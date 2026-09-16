@@ -34,10 +34,11 @@ The map shows the structure and current understanding at a glance. The underlyin
 
 ### Requirements
 
-- Obsidian desktop `1.5.0` or later.
-- A local Codex installation signed in to your account. Codex models use [`codex-acp`](https://github.com/agentclientprotocol/codex-acp).
-- Optional: Claude Code CLI for `claude:*` models.
-- Current public release: `0.4.0`. It has been tested on macOS; other desktop platforms may require custom executable paths.
+- Obsidian desktop `1.12.7` or later.
+- A local Codex installation signed in to your account. Codex models use [`codex-acp`](https://github.com/agentclientprotocol/codex-acp), with Codex CLI as the fallback.
+- Optional: a signed-in Claude Code CLI for `claude:*` models.
+- These are the only supported AI execution backends: `codex-acp`, Codex CLI, and Claude Code CLI.
+- Current version: `0.4.0`. It has been tested on macOS; other desktop platforms may require custom executable paths.
 
 ### Install
 
@@ -45,13 +46,12 @@ The map shows the structure and current understanding at a glance. The underlyin
 
 **Manually:**
 
-1. Download these four files from [`visual-agent-map/`](visual-agent-map/):
+1. Download these three files from [`visual-agent-map/`](visual-agent-map/):
    - `main.js`
    - `manifest.json`
    - `styles.css`
-   - `response-schema.json`
 2. Create `<your-vault>/.obsidian/plugins/visual-agent-map/`.
-3. Put the four files in that folder.
+3. Put the three files in that folder.
 4. Reload Obsidian, open **Settings → Community plugins**, and enable **Visual Agent Map**.
 5. In the plugin settings, confirm the paths to `codex-acp`, Codex CLI, or Claude Code CLI for the providers you use.
 
@@ -78,7 +78,18 @@ Agent Workspace/
 └── Inbox/
 ```
 
-Your research stays inside the vault. Back up the vault before testing any plugin that modifies files.
+Plugin-created maps and notes stay inside the vault. Back up the vault before testing any plugin that modifies files.
+
+### Privacy and network access
+
+- The plugin has no telemetry and does not store API keys.
+- External AI tools start only after you run an AI task. The selected topic, relevant note content, instructions, and task are passed to the configured local CLI, which may communicate with OpenAI or Anthropic using your signed-in account.
+- The plugin executes the configured `codex-acp`, Codex CLI, or Claude Code CLI binary outside the vault. Codex CLI fallback may create `response-schema.json` inside the plugin folder from a schema bundled in `main.js`.
+- AI results can include remote image and source URLs. Opening notes that contain those images may contact the third-party image hosts.
+
+### Build from source
+
+Run `npm ci`, `npm run build`, and `npm test` from the repository root. The production bundle is written to `visual-agent-map/main.js`.
 
 ### Current limitations
 
@@ -115,10 +126,11 @@ Visual Agent Map 是一個桌面版 Obsidian 外掛，用視覺化心智圖拆�
 
 ### 系統需求
 
-- Obsidian 桌面版 `1.5.0` 或更新版本。
-- 已安裝並登入本機 Codex；Codex 模型透過 [`codex-acp`](https://github.com/agentclientprotocol/codex-acp) 執行。
-- 選用：使用 `claude:*` 模型時需要 Claude Code CLI。
-- 目前公開版本為 `0.4.0`，已在 macOS 驗證；其他桌面平台可能需要自行設定執行檔路徑。
+- Obsidian 桌面版 `1.12.7` 或更新版本。
+- 已安裝並登入本機 Codex；Codex 模型主要透過 [`codex-acp`](https://github.com/agentclientprotocol/codex-acp) 執行，失敗時改用 Codex CLI。
+- 選用：使用 `claude:*` 模型時需要已登入的 Claude Code CLI。
+- 目前只支援三種 AI 執行後端：`codex-acp`、Codex CLI、Claude Code CLI。
+- 目前版本為 `0.4.0`，已在 macOS 驗證；其他桌面平台可能需要自行設定執行檔路徑。
 
 ### 安裝
 
@@ -126,9 +138,9 @@ Visual Agent Map 是一個桌面版 Obsidian 外掛，用視覺化心智圖拆�
 
 **手動安裝：**
 
-1. 從 [`visual-agent-map/`](visual-agent-map/) 下載四個檔案：`main.js`、`manifest.json`、`styles.css`、`response-schema.json`。
+1. 從 [`visual-agent-map/`](visual-agent-map/) 下載三個檔案：`main.js`、`manifest.json`、`styles.css`。
 2. 建立 `<你的-vault>/.obsidian/plugins/visual-agent-map/`。
-3. 將四個檔案放入該資料夾。
+3. 將三個檔案放入該資料夾。
 4. 重新載入 Obsidian，在 **設定 → 第三方外掛** 啟用 **Visual Agent Map**。
 5. 在外掛設定確認你所使用 provider 的 `codex-acp`、Codex CLI 或 Claude Code CLI 路徑。
 
@@ -144,7 +156,18 @@ Visual Agent Map 是一個桌面版 Obsidian 外掛，用視覺化心智圖拆�
 
 ### 資料保存
 
-所有研究內容都保存在 Vault 內的 `Agent Workspace/`。測試任何會修改檔案的外掛前，仍建議先備份 Vault。
+外掛建立的心智圖與筆記都保存在 Vault 內的 `Agent Workspace/`。測試任何會修改檔案的外掛前，仍建議先備份 Vault。
+
+### 隱私與網路連線
+
+- 外掛不包含遙測，也不儲存 API key。
+- 只有在你執行 AI 任務後，外掛才會啟動外部 AI 工具。選取的議題、相關筆記內容、指示與任務會傳給設定的本機 CLI；CLI 可能使用你的登入帳號與 OpenAI 或 Anthropic 通訊。
+- 外掛會執行 Vault 外的 `codex-acp`、Codex CLI 或 Claude Code CLI。Codex CLI fallback 可能依照 `main.js` 內嵌的 schema，在外掛資料夾建立 `response-schema.json`。
+- AI 結果可能包含遠端圖片與來源網址。開啟含有這些圖片的筆記時，可能會連線到第三方圖片主機。
+
+### 從原始碼建置
+
+在 repository 根目錄執行 `npm ci`、`npm run build` 與 `npm test`。正式 bundle 會輸出至 `visual-agent-map/main.js`。
 
 ### 目前限制
 
@@ -152,3 +175,12 @@ Visual Agent Map 是一個桌面版 Obsidian 外掛，用視覺化心智圖拆�
 - 尚未上架 Obsidian 第三方外掛目錄。
 - 本版尚未包含自動排列、節點搜尋、多母議題及永久任務歷史。
 - 復原／重做紀錄只保留在目前 Obsidian 工作階段。
+
+## License
+
+Copyright © 2026 Kevin Tsai.
+
+This project is licensed under the GNU Affero General Public License
+Version 3 (AGPL-3.0-only).
+
+See the [LICENSE](LICENSE) file for details.

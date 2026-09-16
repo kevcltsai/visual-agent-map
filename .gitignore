@@ -1,4 +1,5 @@
 .DS_Store
+node_modules/
 PRODUCT-CONCEPT*.md
 RELEASE-CHECKLIST*.md
 /spec/

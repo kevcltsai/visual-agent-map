@@ -33,6 +33,46 @@ module.exports = __toCommonJS(main_exports);
 var import_obsidian2 = require("obsidian");
 var import_node_child_process = require("node:child_process");
 var import_node_fs = require("node:fs");
+
+// response-schema.json
+var response_schema_default = {
+  $schema: "https://json-schema.org/draft/2020-12/schema",
+  type: "object",
+  properties: {
+    summary: {
+      type: "string",
+      description: "\u9069\u5408\u5FC3\u667A\u5716\u7684\u4E00\u53E5\u7E41\u9AD4\u4E2D\u6587\u7D50\u8AD6\uFF0C80 \u5B57\u5167"
+    },
+    detail: {
+      type: "string",
+      description: "\u5B8C\u6574\u7684\u7E41\u9AD4\u4E2D\u6587 Markdown \u5206\u6790"
+    },
+    suggestions: {
+      type: "array",
+      items: { type: "object", properties: { title: { type: "string" }, task: { type: "string" }, contribution: { type: "string" } }, required: ["title", "task", "contribution"], additionalProperties: false }
+    },
+    visualReferences: {
+      type: "array",
+      items: {
+        type: "object",
+        properties: {
+          title: { type: "string" },
+          imageUrl: { type: "string" },
+          sourceUrl: { type: "string" },
+          description: { type: "string" },
+          palette: { type: "array", items: { type: "string" } },
+          formula: { type: "string" }
+        },
+        required: ["title", "imageUrl", "sourceUrl", "description", "palette", "formula"],
+        additionalProperties: false
+      }
+    }
+  },
+  required: ["summary", "detail", "suggestions", "visualReferences"],
+  additionalProperties: false
+};
+
+// main.ts
 var import_node_path = require("node:path");
 
 // map-model.ts
@@ -139,7 +179,7 @@ var DEFAULT_SETTINGS = {
   mapsFolder: "Agent Workspace/Maps",
   mapId: "default",
   cliPath: "codex",
-  codexAcpPath: "/opt/homebrew/bin/codex-acp",
+  codexAcpPath: "codex-acp",
   claudePath: "claude",
   cliModel: "gpt-5.6-luna",
   cliReasoning: "low",
@@ -754,6 +794,8 @@ ${body}`);
 
 // main.ts
 var VIEW_TYPE = "visual-agent-map-view";
+var RESPONSE_SCHEMA_JSON = `${JSON.stringify(response_schema_default, null, 2)}
+`;
 var labels = { idea: "\u5F85\u7814\u7A76", running: "AI \u57F7\u884C\u4E2D", completed: "AI \u5B8C\u6210", error: "\u57F7\u884C\u932F\u8AA4" };
 function clampPreviewScale(value) {
   const scale = typeof value === "number" ? value : Number(value);
@@ -2477,17 +2519,17 @@ var VisualAgentMapSettingTab = class extends import_obsidian2.PluginSettingTab {
   display() {
     this.containerEl.empty();
     this.containerEl.createEl("h2", { text: "Visual Agent Map" });
-    this.containerEl.createEl("p", { text: "\u4F7F\u7528\u672C\u6A5F Codex ACP / Claude Code \u767B\u5165\u72C0\u614B\u3002AI \u4EFB\u52D9\u5B8C\u6210\u5F8C\u6703\u76F4\u63A5\u66F4\u65B0\u76EE\u524D\u7406\u89E3\uFF0C\u5B8C\u6574\u7D50\u679C\u4FDD\u5B58\u5728\u8B70\u984C MD \u8A73\u60C5\u4E2D\u3002" });
+    this.containerEl.createEl("p", { text: "\u652F\u63F4\u672C\u6A5F Codex ACP\u3001Codex CLI fallback \u8207 Claude Code CLI\u3002\u5916\u90E8\u5DE5\u5177\u53EA\u6703\u5728\u4F60\u57F7\u884C AI \u4EFB\u52D9\u6642\u555F\u52D5\uFF1B\u7D50\u679C\u6703\u66F4\u65B0\u76EE\u524D\u7406\u89E3\u4E26\u4FDD\u5B58\u5728\u8B70\u984C MD \u8A73\u60C5\u4E2D\u3002" });
     const text = (name, key, desc) => {
       new import_obsidian2.Setting(this.containerEl).setName(name).setDesc(desc).addText((input) => input.setValue(this.plugin.settings[key]).onChange(async (value) => {
         this.plugin.settings[key] = value.trim();
         await this.plugin.saveSettings();
       }));
     };
-    text("Codex ACP \u8DEF\u5F91", "codexAcpPath", "\u7528\u65BC\u5E38\u99D0 Codex session \u8207\u81EA\u52D5\u53D6\u5F97\u6A21\u578B\u6E05\u55AE\u3002");
+    text("Codex ACP \u8DEF\u5F91", "codexAcpPath", "Codex \u7684\u4E3B\u8981\u57F7\u884C\u65B9\u5F0F\uFF1B\u6703\u91CD\u7528 session \u4E26\u53D6\u5F97\u53EF\u7528\u6A21\u578B\u3002");
     text("Claude Code CLI \u8DEF\u5F91", "claudePath", "\u7528\u65BC claude:sonnet\u3001claude:opus\u3001claude:fable\uFF1B\u9700\u5148\u5B8C\u6210 Claude Code \u767B\u5165\u3002");
     text("\u5DE5\u4F5C\u5340\u9810\u8A2D Model", "cliModel", "\u76EE\u524D\u6700\u4F4E\u6210\u672C\u6A21\u578B\u70BA gpt-5.6-luna\uFF1B\u8B8A\u66F4\u53EA\u5F71\u97FF\u4E4B\u5F8C\u65B0\u589E\u7684\u6839\u8B70\u984C\u3002");
-    text("Model \u9078\u55AE", "models", "\u555F\u52D5\u5F8C\u6703\u512A\u5148\u88DC\u5165 Codex ACP \u56DE\u5831\u7684\u6A21\u578B\uFF1BClaude Code \u8ACB\u4F7F\u7528 claude:sonnet\u3001claude:opus \u6216 claude:fable\u3002");
+    text("Model \u9078\u55AE", "models", "Codex \u6A21\u578B\u900F\u904E Codex ACP \u6216 Codex CLI \u57F7\u884C\uFF1BClaude Code \u8ACB\u4F7F\u7528 claude:sonnet\u3001claude:opus \u6216 claude:fable\u3002");
     this.containerEl.createEl("p", { cls: "setting-item-description", text: "\u4E00\u822C\u4EFB\u52D9\u4F7F\u7528\u4F4E\u63A8\u7406\uFF1B\u6574\u5408\u5B50\u8B70\u984C\u4F7F\u7528\u9AD8\u63A8\u7406\u3002" });
     const advanced = this.containerEl.createEl("details");
     advanced.createEl("summary", { text: "Advanced" });
@@ -2553,16 +2595,16 @@ var VisualAgentMapPlugin = class extends import_obsidian2.Plugin {
     this.addRibbonIcon("git-fork", "Open Visual Agent Map", () => {
       void this.activateView().catch((error) => new import_obsidian2.Notice(String(error)));
     });
-    this.addCommand({ id: "open-visual-agent-map", name: "Open visual agent map", callback: () => {
+    this.addCommand({ id: "open", name: "Open visual agent map", callback: () => {
       void this.activateView().catch((error) => new import_obsidian2.Notice(String(error)));
     } });
-    this.addCommand({ id: "rebuild-visual-agent-map-references", name: "\u91CD\u5EFA\u8B70\u984C reference", callback: () => {
+    this.addCommand({ id: "rebuild-references", name: "\u91CD\u5EFA\u8B70\u984C reference", callback: () => {
       void this.mutate(async () => {
         await this.repo.rebuildDerivedData();
         new import_obsidian2.Notice("\u8B70\u984C reference \u5DF2\u4F9D\u5FC3\u667A\u5716\u91CD\u5EFA\u3002");
       });
     } });
-    this.addCommand({ id: "normalize-visual-agent-map-note-filenames", name: "\u540C\u6B65\u8B70\u984C\u540D\u7A31\u8207\u6A94\u540D", callback: () => {
+    this.addCommand({ id: "normalize-note-filenames", name: "\u540C\u6B65\u8B70\u984C\u540D\u7A31\u8207\u6A94\u540D", callback: () => {
       void this.mutate(async () => {
         const count = await this.repo.normalizeGeneratedNoteFilenames();
         new import_obsidian2.Notice(count ? `\u5DF2\u540C\u6B65 ${count} \u4EFD\u8B70\u984C\u6A94\u540D\u3002` : "\u8B70\u984C\u6A94\u540D\u5DF2\u662F\u6700\u65B0\u72C0\u614B\u3002");
@@ -2589,7 +2631,6 @@ var VisualAgentMapPlugin = class extends import_obsidian2.Plugin {
         console.error("Visual Agent Map topic presentation", error);
         new import_obsidian2.Notice(`\u7121\u6CD5\u5957\u7528\u8B70\u984C\u7B46\u8A18\u986F\u793A\u8A2D\u5B9A\uFF1A${error instanceof Error ? error.message : String(error)}`);
       });
-      void this.ready.then(() => this.refreshCodexAcpModels()).catch((error) => console.warn("Visual Agent Map Codex ACP model refresh", error));
     });
     this.registerEvent(this.app.vault.on("modify", (file) => {
       if (!this.writing && file instanceof import_obsidian2.TFile) for (const view of this.views()) view.changed(file);
@@ -2672,20 +2713,13 @@ var VisualAgentMapPlugin = class extends import_obsidian2.Plugin {
     await leaf.setViewState({ type: VIEW_TYPE, active: true, state: path ? { file: path } : leaf.view instanceof VisualAgentMapView ? leaf.view.getState() : {} });
     await this.app.workspace.revealLeaf(leaf);
   }
-  async refreshCodexAcpModels() {
-    const adapter = this.app.vault.adapter;
-    if (!(adapter instanceof import_obsidian2.FileSystemAdapter) || !this.manifest.dir) return;
-    const pluginDirectory = (0, import_node_path.join)(adapter.getBasePath(), this.manifest.dir);
-    await this.ensureAcp(pluginDirectory);
-    for (const view of this.views()) await view.refreshFromPlugin();
-  }
   async askModel(context, model) {
     const adapter = this.app.vault.adapter;
     if (!(adapter instanceof import_obsidian2.FileSystemAdapter)) throw new Error("CLI \u6A21\u5F0F\u53EA\u652F\u63F4\u684C\u9762\u7248 Obsidian");
     if (!this.manifest.dir) throw new Error("\u627E\u4E0D\u5230\u5916\u639B\u76EE\u9304");
     const pluginDirectory = (0, import_node_path.join)(adapter.getBasePath(), this.manifest.dir);
     const schemaPath = (0, import_node_path.join)(pluginDirectory, "response-schema.json");
-    if (model.startsWith("claude:")) return this.askClaude(context, model.slice("claude:".length), pluginDirectory, schemaPath);
+    if (model.startsWith("claude:")) return this.askClaude(context, model.slice("claude:".length), pluginDirectory);
     const instructions = [
       "\u4F60\u662F\u8996\u89BA\u5316\u601D\u8003 Agent\u3002\u4E0D\u8981\u4FEE\u6539\u4EFB\u4F55\u6A94\u6848\uFF1B\u9664\u975E\u4EFB\u52D9\u660E\u78BA\u6307\u5B9A\uFF0C\u5426\u5247\u4E0D\u8981\u8B80\u53D6\u672C\u6A5F\u6A94\u6848\u3002",
       '\u53EA\u56DE\u50B3 JSON\uFF0C\u4E0D\u8981\u4F7F\u7528 Markdown code fence\u3002\u683C\u5F0F\u5FC5\u9808\u7B26\u5408\uFF1A{"summary":"...","detail":"...","suggestions":[{"title":"...","task":"...","contribution":"..."}],"visualReferences":[{"title":"...","imageUrl":"https://...","sourceUrl":"https://...","description":"...","palette":["navy","white"],"formula":"..."}]}\u3002\u82E5\u6C92\u6709\u8996\u89BA\u53C3\u8003\uFF0CvisualReferences \u56DE\u50B3\u7A7A\u9663\u5217\u3002',
@@ -2874,7 +2908,15 @@ ${context.task}`
     const text = this.acpTextSince(since).trim();
     return this.parseAiResult(text, "Codex ACP");
   }
+  ensureResponseSchema(schemaPath) {
+    try {
+      if ((0, import_node_fs.readFileSync)(schemaPath, "utf8") === RESPONSE_SCHEMA_JSON) return;
+    } catch (e) {
+    }
+    (0, import_node_fs.writeFileSync)(schemaPath, RESPONSE_SCHEMA_JSON, "utf8");
+  }
   async askCodexExec(instructions, model, pluginDirectory, schemaPath) {
+    this.ensureResponseSchema(schemaPath);
     const args = [
       "exec",
       "--skip-git-repo-check",
@@ -2933,8 +2975,8 @@ ${context.task}`
       child.stdin.end(instructions);
     });
   }
-  async askClaude(context, model, pluginDirectory, schemaPath) {
-    const schema = (0, import_node_fs.readFileSync)(schemaPath, "utf8");
+  async askClaude(context, model, pluginDirectory) {
+    const schema = RESPONSE_SCHEMA_JSON;
     const args = [
       "-p",
       "--output-format",

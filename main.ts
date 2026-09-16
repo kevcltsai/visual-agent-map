@@ -18,6 +18,9 @@ interface AcpNotification { jsonrpc: "2.0"; method: string; params?: unknown }
 type AcpMessage = AcpRequest | AcpResponse | AcpNotification;
 const labels = { idea: "待研究", running: "AI 執行中", completed: "AI 完成", error: "執行錯誤" };
 interface PreviewMetrics { min: number; max: number; height: number; image: string; title: string; body: string; labelSize: string; table: string; line: string; padding: string }
+function isRecord(value: unknown): value is Record<string, unknown> { return typeof value === "object" && value !== null; }
+function isUnknownArray(value: unknown): value is unknown[] { return Array.isArray(value); }
+function metadataValue(value: unknown, key: string): unknown { return isRecord(value) ? value[key] : undefined; }
 function clampPreviewScale(value: unknown): number {
   const scale = typeof value === "number" ? value : Number(value);
   return Number.isFinite(scale) ? Math.max(80, Math.min(240, Math.round(scale))) : 120;
@@ -102,8 +105,8 @@ class NameModal extends Modal {
   constructor(app: App, private titleText: string, private value: string, private submit: (value: string) => void) { super(app); }
   onOpen(): void {
     this.titleEl.setText(this.titleText);
-    const input = this.contentEl.createEl("input", { type: "text", value: this.value });
-    input.setAttr("aria-label", this.titleText); input.style.width = "100%";
+    const input = this.contentEl.createEl("input", { type: "text", value: this.value, cls: "vam-name-input" });
+    input.setAttr("aria-label", this.titleText);
     const save = (): void => { const value = input.value.trim(); if (value) { this.close(); this.submit(value); } };
     input.addEventListener("keydown", event => { if (event.key === "Enter") save(); });
     new Setting(this.contentEl).addButton(b => b.setButtonText("取消").onClick(() => this.close())).addButton(b => b.setButtonText("儲存").setCta().onClick(save));
@@ -463,10 +466,10 @@ export class VisualAgentMapView extends ItemView {
       { label: `刪除「${this.map.title}」`, description: "議題筆記不會被刪除。", buttonLabel: "移到垃圾桶", action: () => this.enqueue(async () => {
         if (!this.map) return;
         const path = this.path, file = this.plugin.repo.file(path), content = await this.app.vault.read(file), map = clone(this.map);
-        await this.app.vault.trash(file, false); this.map = null; this.path = ""; await this.plugin.rebuildDerivedData();
+        await this.app.fileManager.trashFile(file); this.map = null; this.path = ""; await this.plugin.rebuildDerivedData();
         this.history.push({
           undo: async () => { await this.app.vault.create(path, content); this.path = path; this.map = clone(map); await this.plugin.rebuildDerivedData(); },
-          redo: async () => { await this.app.vault.trash(this.plugin.repo.file(path), false); this.path = ""; this.map = null; await this.plugin.rebuildDerivedData(); }
+          redo: async () => { await this.app.fileManager.trashFile(this.plugin.repo.file(path)); this.path = ""; this.map = null; await this.plugin.rebuildDerivedData(); }
         });
         this.render();
       }) }
@@ -547,7 +550,7 @@ export class VisualAgentMapView extends ItemView {
     const workspace = this.contentEl.createDiv("vam-workspace");
     this.viewportEl = workspace.createDiv("vam-viewport");
     this.stageEl = this.viewportEl.createDiv("vam-stage");
-    this.edgesEl = document.createElementNS("http://www.w3.org/2000/svg", "svg"); this.edgesEl.addClass("vam-edges"); this.stageEl.appendChild(this.edgesEl);
+    this.edgesEl = this.stageEl.createSvg("svg", { cls: "vam-edges" });
     const shown = visibleNodes(this.map.nodes);
     if (this.selected && !shown.some(node => node.id === this.selected)) this.selected = null;
     this.multiSelected = new Set([...this.multiSelected].filter(id => shown.some(node => node.id === id)));
@@ -618,9 +621,9 @@ export class VisualAgentMapView extends ItemView {
     preview.addEventListener("mouseenter", () => this.clearHoverTimer());
     preview.addEventListener("mouseleave", () => this.hideHoverCardSoon());
     preview.createEl("strong", { text: note.title });
-    preview.createEl("span", { cls: "vam-hover-label", text: "目前結論" });
+    preview.createSpan({ cls: "vam-hover-label", text: "目前結論" });
     preview.createEl("p", { text: note.summary || "尚未形成結論" });
-    preview.createEl("span", { cls: "vam-hover-label", text: "User Notes" });
+    preview.createSpan({ cls: "vam-hover-label", text: "User Notes" });
     const images = markdownImages(note.userNotes, 4);
     if (images.length) {
       const grid = preview.createDiv("vam-hover-image-grid");
@@ -961,7 +964,7 @@ export class VisualAgentMapView extends ItemView {
       if (!node.parentId) continue;
       const parent = this.stageEl.querySelector<HTMLElement>(`[data-node-id="${CSS.escape(node.parentId)}"]`), child = this.stageEl.querySelector<HTMLElement>(`[data-node-id="${CSS.escape(node.id)}"]`); if (!parent || !child) continue;
       const x1 = parent.offsetLeft + parent.offsetWidth, y1 = parent.offsetTop + parent.offsetHeight / 2, x2 = child.offsetLeft, y2 = child.offsetTop + child.offsetHeight / 2, bend = Math.max(60, Math.abs(x2 - x1) / 2);
-      const path = document.createElementNS("http://www.w3.org/2000/svg", "path"); path.setAttribute("d", `M ${x1} ${y1} C ${x1 + bend} ${y1}, ${x2 - bend} ${y2}, ${x2} ${y2}`); path.addClass("vam-edge"); this.edgesEl.appendChild(path);
+      this.edgesEl.createSvg("path", { cls: "vam-edge", attr: { d: `M ${x1} ${y1} C ${x1 + bend} ${y1}, ${x2 - bend} ${y2}, ${x2} ${y2}` } });
     }
   }
   private async runAgent(node: MapNode): Promise<void> {
@@ -991,14 +994,14 @@ export class VisualAgentMapView extends ItemView {
 class VisualAgentMapSettingTab extends PluginSettingTab {
   constructor(app: App, private plugin: VisualAgentMapPlugin) { super(app, plugin); }
   display(): void {
-    this.containerEl.empty(); this.containerEl.createEl("h2", { text: "Visual Agent Map" });
+    this.containerEl.empty(); new Setting(this.containerEl).setName("AI providers").setHeading();
     this.containerEl.createEl("p", { text: "支援本機 Codex ACP、Codex CLI fallback 與 Claude Code CLI。外部工具只會在你執行 AI 任務時啟動；結果會更新目前理解並保存在議題 MD 詳情中。" });
     const text = (name: string, key: "cliPath" | "codexAcpPath" | "claudePath" | "cliModel" | "models", desc: string): void => { new Setting(this.containerEl).setName(name).setDesc(desc).addText(input => input.setValue(this.plugin.settings[key]).onChange(async value => { this.plugin.settings[key] = value.trim(); await this.plugin.saveSettings(); })); };
     text("Codex ACP 路徑", "codexAcpPath", "Codex 的主要執行方式；會重用 session 並取得可用模型。"); text("Claude Code CLI 路徑", "claudePath", "用於 claude:sonnet、claude:opus、claude:fable；需先完成 Claude Code 登入。"); text("工作區預設 Model", "cliModel", "目前最低成本模型為 gpt-5.6-luna；變更只影響之後新增的根議題。"); text("Model 選單", "models", "Codex 模型透過 Codex ACP 或 Codex CLI 執行；Claude Code 請使用 claude:sonnet、claude:opus 或 claude:fable。");
     this.containerEl.createEl("p", { cls: "setting-item-description", text: "一般任務使用低推理；整合子議題使用高推理。" });
     const advanced = this.containerEl.createEl("details"); advanced.createEl("summary", { text: "Advanced" });
     new Setting(advanced).setName("Codex CLI fallback 路徑").setDesc("只有 Codex ACP 失敗時才使用。").addText(input => input.setValue(this.plugin.settings.cliPath).onChange(async value => { this.plugin.settings.cliPath = value.trim(); await this.plugin.saveSettings(); }));
-    this.containerEl.createEl("p", { text: `主題資料夾：${this.plugin.settings.topicsFolder}　未分類收件匣：${this.plugin.settings.inboxFolder}` });
+    this.containerEl.createEl("p", { text: `主題資料夾：${this.plugin.settings.topicsFolder} · 未分類收件匣：${this.plugin.settings.inboxFolder}` });
   }
 }
 export default class VisualAgentMapPlugin extends Plugin {
@@ -1033,7 +1036,7 @@ export default class VisualAgentMapPlugin extends Plugin {
     this.ready = initialize;
     this.registerView(VIEW_TYPE, leaf => new VisualAgentMapView(leaf, this));
     this.addRibbonIcon("git-fork", "Open Visual Agent Map", () => { void this.activateView().catch(error => new Notice(String(error))); });
-    this.addCommand({ id: "open", name: "Open visual agent map", callback: () => { void this.activateView().catch(error => new Notice(String(error))); } });
+    this.addCommand({ id: "open", name: "Open map", callback: () => { void this.activateView().catch(error => new Notice(String(error))); } });
     this.addCommand({ id: "rebuild-references", name: "重建議題 reference", callback: () => { void this.mutate(async () => { await this.repo.rebuildDerivedData(); new Notice("議題 reference 已依心智圖重建。"); }); } });
     this.addCommand({ id: "normalize-note-filenames", name: "同步議題名稱與檔名", callback: () => { void this.mutate(async () => { const count = await this.repo.normalizeGeneratedNoteFilenames(); new Notice(count ? `已同步 ${count} 份議題檔名。` : "議題檔名已是最新狀態。"); }); } });
     this.addSettingTab(new VisualAgentMapSettingTab(this.app, this));
@@ -1063,18 +1066,20 @@ export default class VisualAgentMapPlugin extends Plugin {
     }); }));
   }
   private isMap(file: TFile): boolean {
-    const marker = this.app.metadataCache.getFileCache(file)?.frontmatter?.["visual-agent-map"];
+    const frontmatter: unknown = this.app.metadataCache.getFileCache(file)?.frontmatter;
+    const marker = metadataValue(frontmatter, "visual-agent-map");
     return marker === true || marker === "true" || (file.extension === "md" && (file.path.startsWith(`${this.settings.mapsFolder}/`) || file.path.startsWith(`${this.settings.topicsFolder}/`) && file.name === "Map.md"));
   }
   private isNode(file: TFile): boolean {
-    const marker = this.app.metadataCache.getFileCache(file)?.frontmatter?.["agent-map-node"];
+    const frontmatter: unknown = this.app.metadataCache.getFileCache(file)?.frontmatter;
+    const marker = metadataValue(frontmatter, "agent-map-node");
     return marker === true || marker === "true" || (file.extension === "md" && (file.path.startsWith(`${this.settings.notesFolder}/`) || file.path.startsWith(`${this.settings.topicsFolder}/`) || file.path.startsWith(`${this.settings.inboxFolder}/`)));
   }
   private styleNodeLeaf(leaf: WorkspaceLeaf | null): void {
     if (!(leaf?.view instanceof MarkdownView)) return;
     leaf.view.containerEl.toggleClass("vam-topic-markdown", !!leaf.view.file && this.isNode(leaf.view.file));
   }
-  onunload(): void { if (this.acp) { this.acp.child.kill(); this.acp = null; } for (const child of this.childProcesses) child.kill(); this.childProcesses.clear(); this.app.workspace.detachLeavesOfType(VIEW_TYPE); }
+  onunload(): void { if (this.acp) { this.acp.child.kill(); this.acp = null; } for (const child of this.childProcesses) child.kill(); this.childProcesses.clear(); }
   async saveSettings(): Promise<void> { await this.saveData(this.settings); }
   async rebuildDerivedData(): Promise<void> { try { await this.repo.rebuildDerivedData(); } catch (error) { console.error("Visual Agent Map reference rebuild", error); new Notice(`心智圖已儲存，但 reference 更新失敗：${error instanceof Error ? error.message : String(error)}`); } }
   async openDetails(file: TFile): Promise<void> {
@@ -1134,13 +1139,13 @@ export default class VisualAgentMapPlugin extends Plugin {
     const cleaned = raw.replace(/^```(?:json)?\s*/i, "").replace(/\s*```$/, "").trim();
     const parsed = JSON.parse(cleaned) as { summary?: unknown; detail?: unknown; suggestions?: unknown; visualReferences?: unknown };
     if (typeof parsed.summary !== "string" || typeof parsed.detail !== "string") throw new Error(`${label} 沒有回傳 summary 與 detail`);
-    const suggestions = Array.isArray(parsed.suggestions) ? parsed.suggestions.filter((item): item is { title: string; task: string; contribution?: string } => !!item && typeof item.title === "string" && typeof item.task === "string").map(item => ({ title: item.title.trim(), task: item.task.trim(), contribution: typeof item.contribution === "string" ? item.contribution.trim() : "" })).filter(item => item.title) : [];
-    const visualReferences = Array.isArray(parsed.visualReferences) ? parsed.visualReferences.filter((item): item is { title?: unknown; imageUrl: string; sourceUrl: string; description?: unknown; palette?: unknown; formula?: unknown } => !!item && typeof item.imageUrl === "string" && typeof item.sourceUrl === "string").map(item => ({
+    const suggestions = isUnknownArray(parsed.suggestions) ? parsed.suggestions.filter((item): item is Record<string, unknown> & { title: string; task: string } => isRecord(item) && typeof item.title === "string" && typeof item.task === "string").map(item => ({ title: item.title.trim(), task: item.task.trim(), contribution: typeof item.contribution === "string" ? item.contribution.trim() : "" })).filter(item => item.title) : [];
+    const visualReferences = isUnknownArray(parsed.visualReferences) ? parsed.visualReferences.filter((item): item is Record<string, unknown> & { imageUrl: string; sourceUrl: string } => isRecord(item) && typeof item.imageUrl === "string" && typeof item.sourceUrl === "string").map(item => ({
       title: typeof item.title === "string" ? item.title.trim() : "視覺參考",
       imageUrl: item.imageUrl.trim(),
       sourceUrl: item.sourceUrl.trim(),
       description: typeof item.description === "string" ? item.description.trim() : "",
-      palette: Array.isArray(item.palette) ? item.palette.map(String).map(color => color.trim()).filter(Boolean).slice(0, 8) : [],
+      palette: isUnknownArray(item.palette) ? item.palette.filter((color): color is string => typeof color === "string").map(color => color.trim()).filter(Boolean).slice(0, 8) : [],
       formula: typeof item.formula === "string" ? item.formula.trim() : ""
     })).filter(item => /^https?:\/\//i.test(item.imageUrl) && /^https?:\/\//i.test(item.sourceUrl)).slice(0, 6) : [];
     return { summary: Array.from(parsed.summary.trim()).slice(0, 80).join(""), detail: parsed.detail.trim(), suggestions, visualReferences };
@@ -1155,7 +1160,7 @@ export default class VisualAgentMapPlugin extends Plugin {
     this.acpSend({ jsonrpc: "2.0", id, method, params });
     return new Promise((resolve, reject) => this.acp?.pending.set(id, { resolve, reject }));
   }
-  private acpRespond(id: number, result: unknown): void { this.acpSend({ jsonrpc: "2.0", id, result } as AcpResponse); }
+  private acpRespond(id: number, result: unknown): void { this.acpSend({ jsonrpc: "2.0", id, result }); }
   private handleAcpMessage(message: AcpMessage): void {
     if ("id" in message && ("result" in message || "error" in message)) {
       const entry = this.acp?.pending.get(message.id);

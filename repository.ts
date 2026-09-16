@@ -74,12 +74,15 @@ const DETAIL_END = "<!-- visual-agent-map:detail:end -->";
 const NOTE_CSS_CLASS = "visual-agent-map-node";
 
 function marker(value: unknown): boolean { return value === true || value === "true"; }
+function isRecord(value: unknown): value is Record<string, unknown> { return typeof value === "object" && value !== null; }
+function isUnknownArray(value: unknown): value is unknown[] { return Array.isArray(value); }
+function text(value: unknown, fallback = ""): string { return typeof value === "string" || typeof value === "number" || typeof value === "boolean" ? String(value) : fallback; }
 function parentPath(path: string): string { return path.includes("/") ? path.slice(0, path.lastIndexOf("/")) : ""; }
 function baseName(path: string): string { return path.slice(path.lastIndexOf("/") + 1); }
 
 function ensureNoteCssClass(fm: Record<string, unknown>): boolean {
-  const current = Array.isArray(fm.cssclasses)
-    ? fm.cssclasses.map(String)
+  const current = isUnknownArray(fm.cssclasses)
+    ? fm.cssclasses.filter((item): item is string => typeof item === "string")
     : typeof fm.cssclasses === "string"
       ? fm.cssclasses.split(/[\s,]+/).filter(Boolean)
       : [];
@@ -94,7 +97,9 @@ export function safeName(title: string): string {
 
 function frontmatter(content: string): Record<string, unknown> {
   const yaml = content.match(/^---\r?\n([\s\S]*?)\r?\n---(?:\r?\n|$)/)?.[1];
-  return yaml ? (parseYaml(yaml) ?? {}) as Record<string, unknown> : {};
+  if (!yaml) return {};
+  const parsed: unknown = parseYaml(yaml);
+  return isRecord(parsed) ? parsed : {};
 }
 
 type NoteSection = "Current Summary" | "Prompt" | "Rules" | "Detail" | "Visual References" | "Working Findings" | "New Findings" | "User Notes";
@@ -243,26 +248,26 @@ export class Repository {
 
   async readNote(path: string): Promise<Note> {
     const file = this.file(path), content = await this.app.vault.read(file), fm = frontmatter(content);
-    const status = String(fm.status ?? "idea");
+    const status = text(fm.status, "idea");
     const normalized = status === "review" || status === "accepted" ? "completed" : status;
-    const source = String(fm["model-source"] ?? "workspace");
-    const state = String(fm["topic-state"] ?? (path.includes("/Archive/") ? "archived" : path.includes("/Unassigned/") ? "unassigned" : path.startsWith(`${this.settings.inboxFolder}/`) ? "inbox" : "active"));
+    const source = text(fm["model-source"], "workspace");
+    const state = text(fm["topic-state"], path.includes("/Archive/") ? "archived" : path.includes("/Unassigned/") ? "unassigned" : path.startsWith(`${this.settings.inboxFolder}/`) ? "inbox" : "active");
     return {
-      title: String(fm.title ?? file.basename),
-      summary: section(content, "Current Summary") || String(fm.summary ?? "尚未形成結論"),
+      title: text(fm.title, file.basename),
+      summary: section(content, "Current Summary") || text(fm.summary, "尚未形成結論"),
       prompt: section(content, "Prompt"),
       rules: section(content, "Rules"),
       detail: section(content, "Detail"),
       visualReferences: section(content, "Visual References"),
       newFindings: section(content, "Working Findings") || section(content, "New Findings"),
       userNotes: section(content, "User Notes"),
-      model: String(fm.model ?? this.settings.cliModel),
+      model: text(fm.model, this.settings.cliModel),
       modelSource: ["workspace", "inherited", "manual"].includes(source) ? source as ModelSource : "workspace",
       status: ["idea", "running", "completed", "error"].includes(normalized) ? normalized as Status : "idea",
-      mapId: String(fm["agent-map-id"] ?? ""),
-      topicId: String(fm["topic-id"] ?? fm["agent-map-id"] ?? ""),
+      mapId: text(fm["agent-map-id"]),
+      topicId: text(fm["topic-id"], text(fm["agent-map-id"])),
       topicState: ["active", "unassigned", "archived", "inbox"].includes(state) ? state as TopicState : "active",
-      sourcePaths: Array.isArray(fm["source-notes"]) ? fm["source-notes"].map(String).filter(Boolean) : []
+      sourcePaths: isUnknownArray(fm["source-notes"]) ? fm["source-notes"].filter((item): item is string => typeof item === "string" && !!item) : []
     };
   }
 
@@ -293,7 +298,7 @@ export class Repository {
         else { body = removeSection(body, "Working Findings"); body = removeSection(body, "New Findings"); }
       }
       if (patch.userNotes !== undefined) body = replaceSection(body, "User Notes", patch.userNotes);
-      body = normalizeBodyOrder(body, String(fm.title ?? path.replace(/\.md$/, "")), String(fm.summary ?? "尚未形成結論"));
+      body = normalizeBodyOrder(body, text(fm.title, path.replace(/\.md$/, "")), text(fm.summary, "尚未形成結論"));
       return `---\n${stringifyYaml(fm)}---\n${body}`;
     });
   }
@@ -333,7 +338,8 @@ export class Repository {
   async mapFiles(): Promise<TFile[]> {
     const files: TFile[] = [];
     for (const file of this.app.vault.getMarkdownFiles()) {
-      const cached = this.app.metadataCache.getFileCache(file)?.frontmatter?.["visual-agent-map"];
+      const cacheFrontmatter: unknown = this.app.metadataCache.getFileCache(file)?.frontmatter;
+      const cached = isRecord(cacheFrontmatter) ? cacheFrontmatter["visual-agent-map"] : undefined;
       if (marker(cached) || /^---\r?\n[\s\S]*?visual-agent-map: true\r?\n/.test(await this.app.vault.cachedRead(file))) files.push(file);
     }
     return files.sort((a, b) => a.path.localeCompare(b.path));
@@ -378,7 +384,7 @@ export class Repository {
     if (this.app.vault.getAbstractFileByPath(target)) throw new Error("這個主題已有 Map.md。");
     const map = await this.readMap(sourcePath), candidates = this.app.vault.getMarkdownFiles().filter(file => file.path.startsWith(`${root}/Notes/`));
     const byId = new Map<string, string>();
-    for (const file of candidates) { const fm = frontmatter(await this.app.vault.read(file)); if (fm["node-id"]) byId.set(String(fm["node-id"]), file.path); }
+    for (const file of candidates) { const fm = frontmatter(await this.app.vault.read(file)), nodeId = text(fm["node-id"]); if (nodeId) byId.set(nodeId, file.path); }
     for (const node of map.nodes) if (!(this.app.vault.getAbstractFileByPath(node.path) instanceof TFile) && byId.has(node.id)) node.path = byId.get(node.id)!;
     await this.moveExact(sourcePath, target); await this.saveMap(target, map);
     for (const node of map.nodes) if (this.app.vault.getAbstractFileByPath(node.path) instanceof TFile) await this.setLifecycle(node.path, map.id, map.id, "active");
@@ -487,7 +493,7 @@ export class Repository {
       if (!marker(fm["agent-map-node"])) continue;
       ensureNoteCssClass(fm);
       const owner = ownership.get(file.path);
-      let state: TopicState = file.path.startsWith(`${this.settings.inboxFolder}/`) ? "inbox" : file.path.includes("/Archive/") ? "archived" : file.path.includes("/Unassigned/") ? "unassigned" : owner ? "active" : String(fm["topic-state"] ?? "unassigned") as TopicState;
+      let state: TopicState = file.path.startsWith(`${this.settings.inboxFolder}/`) ? "inbox" : file.path.includes("/Archive/") ? "archived" : file.path.includes("/Unassigned/") ? "unassigned" : owner ? "active" : text(fm["topic-state"], "unassigned") as TopicState;
       if (owner) {
         fm["agent-map-id"] = owner.map.id; fm["topic-id"] = owner.map.id; fm["topic-state"] = "active"; state = "active";
         if (fm["model-source"] === undefined) fm["model-source"] = owner.node.parentId ? "inherited" : "workspace";
@@ -497,7 +503,7 @@ export class Repository {
         else fm["topic-state"] = state;
       }
       let body = ensureUserNotes(content.replace(/^---\r?\n[\s\S]*?\r?\n---(?:\r?\n|$)/, ""));
-      const topicId = String(fm["topic-id"] ?? ""), topic = topics.get(topicId);
+      const topicId = text(fm["topic-id"]), topic = topics.get(topicId);
       if (owner) {
         if (!body.includes(DETAIL_START)) body = replaceSection(body, "Detail", section(body, "Detail"));
         const parent = owner.node.parentId ? owner.map.nodes.find(item => item.id === owner.node.parentId) : undefined;
@@ -513,7 +519,7 @@ export class Repository {
         fm["agent-map-references"] = [`所屬主題：[[${noteLink(topic.mapPath)}|${topic.map.title}]]`, `狀態：${state === "archived" ? "已封存" : "未歸類"}`];
         body = withoutReference(body);
       } else { delete fm["agent-map-references"]; body = withoutReference(body); }
-      body = normalizeBodyOrder(body, String(fm.title ?? file.basename), String(fm.summary ?? "尚未形成結論"));
+      body = normalizeBodyOrder(body, text(fm.title, file.basename), text(fm.summary, "尚未形成結論"));
       const next = `---\n${stringifyYaml(fm)}---\n${body}`;
       if (next !== content) await this.app.vault.process(file, () => next);
     }

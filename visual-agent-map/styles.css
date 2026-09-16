@@ -1,4 +1,5 @@
-.vam-view { padding: 0 !important; overflow: hidden; display: flex; flex-direction: column; height: 100%; }
+.view-content.vam-view { padding: 0; overflow: hidden; display: flex; flex-direction: column; height: 100%; }
+.vam-name-input { width: 100%; }
 .vam-toolbar, .vam-map-tools { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; padding: 10px 14px; border-bottom: 1px solid var(--background-modifier-border); background: var(--background-primary); flex-shrink: 0; }
 .vam-map-title { margin-right: auto; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 280px; }
 .vam-toolbar button, .vam-map-tools button, .vam-actions button { font-size: var(--font-ui-small); }
@@ -47,7 +48,7 @@
 .vam-empty { margin: 60px auto; padding: 24px; max-width: 440px; color: var(--text-muted); text-align: center; line-height: 1.8; pointer-events: none; }
 .vam-note-list { display: flex; flex-direction: column; gap: 8px; max-height: 400px; overflow-y: auto; margin-top: 12px; }
 .vam-note-list button { height: auto; min-height: 32px; text-align: left; white-space: normal; }
-.vam-detail-button { margin-left: auto; font-size: 14px !important; }
+.vam-node-header .vam-detail-button { margin-left: auto; font-size: 14px; }
 .vam-proposal { display: grid; grid-template-columns: 24px 1fr; gap: 8px; margin: 10px 0; align-items: start; }
 .vam-proposal textarea { grid-column: 2; width: 100%; resize: vertical; }
 .vam-task-input { width: 100%; box-sizing: border-box; resize: vertical; }
@@ -68,7 +69,7 @@
 .vam-collection-row { display: flex; align-items: center; gap: 12px; padding: 10px 0; border-bottom: 1px solid var(--background-modifier-border); }
 .vam-collection-row > span { flex: 1; min-width: 0; overflow-wrap: anywhere; }
 .vam-collection-actions { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 6px; }
-.visual-agent-map-node .metadata-container,
-.vam-topic-markdown .metadata-container { display: none !important; }
+.workspace-leaf-content .visual-agent-map-node .metadata-container,
+.workspace-leaf-content .vam-topic-markdown .metadata-container { display: none; }
 @media (max-width: 900px) { .vam-map-tools > .vam-hint { display: none; } .vam-inspector { width: 260px; } }
 @media (max-width: 600px) { .vam-inspector { position: absolute; right: 0; top: 0; bottom: 0; width: min(300px, 85%); z-index: 5; box-shadow: -5px 0 20px rgba(0,0,0,0.1); } }

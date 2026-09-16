@@ -1,0 +1,4 @@
+.DS_Store
+PRODUCT-CONCEPT*.md
+RELEASE-CHECKLIST*.md
+/spec/

@@ -140,7 +140,7 @@ var DEFAULT_SETTINGS = {
   mapId: "default",
   cliPath: "codex",
   codexAcpPath: "/opt/homebrew/bin/codex-acp",
-  claudePath: "/Users/kevintsai/.local/bin/claude",
+  claudePath: "claude",
   cliModel: "gpt-5.6-luna",
   cliReasoning: "low",
   previewScale: 120,

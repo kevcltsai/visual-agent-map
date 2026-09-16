@@ -91,6 +91,10 @@ Plugin-created maps and notes stay inside the vault. Back up the vault before te
 
 Run `npm ci`, `npm run build`, and `npm test` from the repository root. The production bundle is written to `visual-agent-map/main.js`.
 
+### Development
+
+This project was developed with Codex.
+
 ### Current limitations
 
 - Desktop only.
@@ -168,6 +172,10 @@ Visual Agent Map 是一個桌面版 Obsidian 外掛，用視覺化心智圖拆�
 ### 從原始碼建置
 
 在 repository 根目錄執行 `npm ci`、`npm run build` 與 `npm test`。正式 bundle 會輸出至 `visual-agent-map/main.js`。
+
+### 開發說明
+
+本專案使用 Codex 開發。
 
 ### 目前限制
 

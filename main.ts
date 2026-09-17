@@ -1,6 +1,7 @@
 import { t, setUiLanguage } from "./i18n";
 import { App, MarkdownRenderer, FileSystemAdapter, ItemView, MarkdownView, Modal, Notice, Plugin, PluginSettingTab, Setting, TFile, WorkspaceLeaf } from "obsidian";
 import { NameModal } from "./ui/modals/name-modal";
+import { ChoiceModal } from "./ui/modals/choice-modal";
 import { spawn, type ChildProcessWithoutNullStreams } from "node:child_process";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
@@ -31,19 +32,6 @@ class AcpParseError extends Error { constructor(message: string) { super(message
 const ACP_CONTROL_TIMEOUT_MS = 30_000;
 const ACP_PROMPT_TIMEOUT_MS = 15 * 60 * 1000;
 const labels = { idea: t("待研究"), running: t("AI 執行中"), completed: t("AI 完成"), error: t("執行錯誤") };
-class ChoiceModal extends Modal {
-  constructor(app: App, private titleText: string, private description: string, private choices: { label: string; description?: string; buttonLabel?: string; action: () => void }[]) { super(app); }
-  onOpen(): void {
-    this.titleEl.setText(this.titleText);
-    this.contentEl.createEl("p", { text: this.description, cls: "vam-modal-intro" });
-    for (const choice of this.choices) {
-      const setting = new Setting(this.contentEl);
-      if (choice.description) setting.setName(choice.label).setDesc(choice.description).addButton(b => b.setButtonText(choice.buttonLabel ?? t("選擇")).onClick(() => { this.close(); choice.action(); }));
-      else setting.addButton(b => b.setButtonText(choice.label).onClick(() => { this.close(); choice.action(); }));
-    }
-    new Setting(this.contentEl).addButton(b => b.setButtonText(t("取消")).onClick(() => this.close()));
-  }
-}
 class FirstUseModal extends Modal {
   constructor(app: App, private complete: () => void) { super(app); }
   onOpen(): void {

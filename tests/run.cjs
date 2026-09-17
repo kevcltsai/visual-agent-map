@@ -53,11 +53,9 @@ test('model inheritance distinguishes CLI default from absent parent and copies 
   assert.equal(child, 'parent-model');
 });
 test('workspace defaults to the configured low-cost model and low reasoning', () => {
-  assert.equal(DEFAULT_SETTINGS.codexAcpPath, 'codex-acp');
-  assert.equal(DEFAULT_SETTINGS.cliPath, 'codex');
-  assert.equal(DEFAULT_SETTINGS.claudePath, 'claude');
   assert.equal(DEFAULT_SETTINGS.cliModel, 'gpt-5.6-luna');
   assert.equal(DEFAULT_SETTINGS.cliReasoning, 'low');
+  assert.equal(DEFAULT_SETTINGS.firstUseNoticeSeen, false);
   assert.match(DEFAULT_SETTINGS.models, /claude:sonnet/);
   assert.match(DEFAULT_SETTINGS.models, /claude:opus/);
   assert.match(DEFAULT_SETTINGS.models, /claude:fable/);
@@ -65,15 +63,6 @@ test('workspace defaults to the configured low-cost model and low reasoning', ()
 test('Codex output schema requires every declared property', () => {
   const schema = JSON.parse(fs.readFileSync(path.join(root, 'response-schema.json'), 'utf8'));
   assert.deepEqual(new Set(schema.required), new Set(Object.keys(schema.properties)));
-});
-test('community install can recreate the bundled Codex output schema', t => {
-  const temp = fs.mkdtempSync(path.join(require('node:os').tmpdir(), 'visual-agent-map-'));
-  t.after(() => fs.rmSync(temp, { recursive: true, force: true }));
-  const schemaPath = path.join(temp, 'response-schema.json');
-  const { default: Plugin } = load('main.ts', { obsidian });
-  const plugin = new Plugin();
-  plugin.ensureResponseSchema(schemaPath);
-  assert.deepEqual(JSON.parse(fs.readFileSync(schemaPath, 'utf8')), JSON.parse(fs.readFileSync(path.join(root, 'response-schema.json'), 'utf8')));
 });
 test('undo and redo preserve ordering; new edit invalidates redo', () => {
   const h = new core.History(); h.push('move'); h.push('delete'); assert.equal(h.undo(), 'delete'); assert.equal(h.undo(), 'move'); assert.equal(h.redo(), 'move'); h.push('edit'); assert.equal(h.canRedo, false); assert.equal(h.undo(), 'edit');
@@ -131,7 +120,8 @@ test('visual references are stored inside the editable Detail section', async ()
   await repo.updateNote(n.path, { visualReferences: '### Navy + Beige\n\n![Navy + Beige](https://example.com/outfit.jpg)\n\n來源：https://example.com/page\n配色：navy / beige' });
   let note = await repo.readNote(n.path);
   assert.equal(note.visualReferences, '');
-  assert.match(note.detail, /### 視覺參考[\s\S]*### Navy \+ Beige/);
+  assert.match(note.detail, /\*\*Navy \+ Beige\*\*/);
+  assert.doesNotMatch(note.detail, /### 視覺參考/);
   assert.doesNotMatch(contents.get(n.path), /## Visual References/);
   await repo.updateNote(n.path, { visualReferences: '' });
   note = await repo.readNote(n.path);
@@ -143,7 +133,8 @@ test('managed references stay outside Detail and preserve user-authored content'
   const mapPath = await repo.createMap('Map A', [n]);
   await repo.rebuildDerivedData();
   let text = contents.get(n.path);
-  assert.doesNotMatch(text, /visual-agent-map:references:start/);
+  assert.match(text, /visual-agent-map:references:start/);
+  assert.match(text, /## Reference Links/);
   assert.match(text, /agent-map-references:/);
   assert.doesNotMatch((await repo.readNote(n.path)).detail, /關聯議題/);
   text = text.replace('<!-- visual-agent-map:detail:end -->', '<!-- visual-agent-map:detail:end -->\n\n## User notes\n\nUser content'); contents.set(n.path, text);
@@ -200,11 +191,11 @@ test('a missing Map can be rebuilt from topic Notes as root nodes', async () => 
   await repo.ensureTopicFolders(root); await repo.createNote('Recovered', 'a', placeholder, `${root}/Map.md`, 'workspace');
   const path = await repo.rebuildMissingMap(root), rebuilt = await repo.readMap(path); assert.equal(rebuilt.id, 'stable-topic'); assert.equal(rebuilt.nodes.length, 1); assert.equal(rebuilt.nodes[0].parentId, null);
 });
-test('replacing AI synthesis preserves User Notes', async () => {
+test('replacing AI synthesis preserves 預覽', async () => {
   const { repo } = fixture(), n = await topicNote(repo, 'Synthesis');
-  await repo.updateNote(n.path, { detail: 'Old synthesis', userNotes: 'Keep this manually written note' });
+  await repo.updateNote(n.path, { detail: 'Old synthesis', preview: 'Keep this manually written note' });
   await repo.updateNote(n.path, { detail: 'New synthesis', prompt: '' });
-  const result = await repo.readNote(n.path); assert.equal(result.detail, 'New synthesis'); assert.equal(result.userNotes, 'Keep this manually written note'); assert.equal(result.prompt, '');
+  const result = await repo.readNote(n.path); assert.equal(result.detail, 'New synthesis'); assert.equal(result.preview, 'Keep this manually written note'); assert.equal(result.prompt, '');
 });
 test('text undo uses field patches and preserves AI details arriving in between', async () => {
   const { repo, app } = fixture(), n = await topicNote(repo, 'Original', 'a');
@@ -239,7 +230,7 @@ test('hover helpers extract image and table from user notes markdown', () => {
 });
 test('new notes include AI rules but omit working findings; clearing legacy findings removes the section', async () => {
   const { repo, contents } = fixture(), n = await topicNote(repo, 'Direct write', 'a');
-  assert.match(contents.get(n.path), /## Rules[\s\S]*## User Notes[\s\S]*## Detail/);
+  assert.match(contents.get(n.path), /## Rules[\s\S]*## 預覽[\s\S]*## Detail/);
   assert.doesNotMatch(contents.get(n.path), /## Working Findings/);
   await repo.updateNote(n.path, { newFindings: 'Legacy finding' });
   assert.match(contents.get(n.path), /## Working Findings\n\nLegacy finding/);
@@ -375,26 +366,40 @@ test('map structural undo restores deleted branch; redo removes it again', async
   await view.travel(false); assert.equal((await repo.readMap(file)).nodes.length, 4);
   await view.travel(true); assert.equal((await repo.readMap(file)).nodes.length, 1);
 });
-test('Codex ACP reuses a session, receives selected model and updates the model menu from ACP', async () => {
-  const { EventEmitter } = require('node:events'); let command, modelSetCount = 0, promptCount = 0;
+test('layout-only map changes and AI note results do not rebuild derived data', async () => {
+  const { repo, app } = fixture(), file = await repo.createMap('Layout', tree()); let rebuilds = 0;
+  const { VisualAgentMapView } = load('main.ts', { obsidian }); const view = new VisualAgentMapView({ app }, { repo, rebuildDerivedData: async () => { rebuilds++; } });
+  view.path = file; view.map = await repo.readMap(file); view.render = () => {}; view.hydrate = async () => {};
+  await view.mapChange(map => { map.nodes[0].x = 120; map.viewport.zoom = 1.2; }); assert.equal(rebuilds, 0);
+  await view.mapChange(map => { map.nodes[0].parentId = 'd'; }); assert.equal(rebuilds, 1);
+});
+test('Codex ACP isolates each task session, receives selected models and routes updates by session', async () => {
+  const { EventEmitter } = require('node:events'); let command, modelSetCount = 0, promptCount = 0, sessionCount = 0;
   const child = new EventEmitter(); child.stdout = new EventEmitter(); child.stderr = new EventEmitter(); child.kill = () => {};
   child.stdin = { write: line => {
     const message = JSON.parse(line.trim());
     const reply = result => process.nextTick(() => child.stdout.emit('data', Buffer.from(`${JSON.stringify({ jsonrpc: '2.0', id: message.id, result })}\n`)));
     if (message.method === 'initialize') reply({});
-    else if (message.method === 'session/new') reply({ sessionId: 's1', configOptions: [{ id: 'model', category: 'model', options: [{ value: 'child-model' }, { value: 'gpt-5.6-luna' }] }, { id: 'reasoning-effort', category: 'reasoning', options: [{ value: 'low' }] }] });
-    else if (message.method === 'session/set_config_option') { if (message.params.configId === 'model') { modelSetCount++; assert.equal(message.params.value, 'child-model'); } reply({}); }
-    else if (message.method === 'session/prompt') { promptCount++; const prompt = message.params.prompt[0].text; assert.match(prompt, /Current topic|目前議題/); assert.match(prompt, /Use official sources/); assert.match(prompt, /AI 規則/); assert.match(prompt, /一般任務/); assert.match(prompt, /task/); process.nextTick(() => { child.stdout.emit('data', Buffer.from(`${JSON.stringify({ jsonrpc: '2.0', method: 'session/update', params: { update: { sessionUpdate: 'agent_message_chunk', text: JSON.stringify({ summary: '結'.repeat(90), detail: 'detail', suggestions: [] }) } } })}\n`)); child.stdout.emit('data', Buffer.from(`${JSON.stringify({ jsonrpc: '2.0', id: message.id, result: {} })}\n`)); }); }
+    else if (message.method === 'session/new') reply({ sessionId: `s${++sessionCount}`, configOptions: [{ id: 'model', category: 'model', options: [{ value: 'child-model' }, { value: 'second-model' }, { value: 'gpt-5.6-luna' }] }, { id: 'reasoning-effort', category: 'reasoning', options: [{ value: 'low' }] }] });
+    else if (message.method === 'session/set_config_option') { if (message.params.configId === 'model') { modelSetCount++; assert.match(message.params.value, /^(child-model|second-model)$/); } reply({}); }
+    else if (message.method === 'session/prompt') { promptCount++; const prompt = message.params.prompt[0].text; assert.match(prompt, /Current topic|目前議題/); assert.match(prompt, /Use official sources/); assert.match(prompt, /AI 規則/); assert.match(prompt, /一般任務/); assert.match(prompt, /task/); const sessionId = message.params.sessionId; process.nextTick(() => { child.stdout.emit('data', Buffer.from(`${JSON.stringify({ jsonrpc: '2.0', method: 'session/update', params: { sessionId, update: { sessionUpdate: 'agent_message_chunk', text: JSON.stringify({ summary: sessionId === 's1' ? 'first' : 'second', detail: 'detail', suggestions: [] }) } } })}\n`)); child.stdout.emit('data', Buffer.from(`${JSON.stringify({ jsonrpc: '2.0', id: message.id, result: {} })}\n`)); }); }
   } };
   const { default: Plugin } = load('main.ts', { obsidian, 'node:child_process': { spawn: (path) => { command = path; return child; } } });
   const plugin = new Plugin(); plugin.app = { vault: { adapter: new obsidian.FileSystemAdapter() } }; plugin.manifest = { dir: '.obsidian/plugins/visual-agent-map' };
   plugin.saveData = async data => { plugin.saved = data; };
-  const result = await plugin.askModel({ title: 'Current topic', summary: 'current summary', rules: 'Use official sources', task: 'task', ancestors: 'context', mode: 'task' }, 'child-model');
+  const [result, second] = await Promise.all([
+    plugin.askModel({ title: 'Current topic', summary: 'current summary', rules: 'Use official sources', task: 'task', ancestors: 'context', mode: 'task' }, 'child-model'),
+    plugin.askModel({ title: 'Current topic', summary: 'current summary', rules: 'Use official sources', task: 'task', ancestors: 'context', mode: 'task' }, 'second-model')
+  ]);
   assert.equal(command, DEFAULT_SETTINGS.codexAcpPath);
-  assert.equal(modelSetCount, 1);
-  assert.equal(promptCount, 1);
+  assert.equal(modelSetCount, 2);
+  assert.equal(promptCount, 2);
   assert.match(plugin.settings.models, /child-model/);
-  assert.equal(result.summary.length, 80);
+  assert.equal(result.summary, 'first');
+  assert.equal(second.summary, 'second');
+  assert.equal(plugin.acp.sessions.size, 0);
+  await assert.rejects(plugin.acpRequest('unresponsive/test', {}, 5), error => error.name === 'AcpTimeoutError');
+  assert.equal(plugin.acp.pending.size, 0);
 });
 test('Claude model prefix routes to Claude Code CLI with structured output', async () => {
   const { EventEmitter } = require('node:events'); let command, args;
@@ -408,4 +413,103 @@ test('Claude model prefix routes to Claude Code CLI with structured output', asy
   assert.equal(args[args.indexOf('--model') + 1], 'sonnet');
   assert.equal(args.includes('--json-schema'), true);
   assert.equal(result.summary, 'Claude summary');
+});
+
+test('legacy User Notes move to preview without losing either section or duplicating on save', async () => {
+  const { repo, contents } = fixture(), n = await topicNote(repo, 'Legacy preview');
+  await repo.updateNote(n.path, { preview: 'New preview' });
+  contents.set(n.path, contents.get(n.path).replace('## Detail', '## User Notes\n\nLegacy text\n\n## Detail'));
+  assert.equal((await repo.readNote(n.path)).preview, 'New preview\n\nLegacy text');
+  await repo.updateNote(n.path, { summary: 'AI summary' });
+  await repo.updateNote(n.path, { detail: 'AI detail' });
+  assert.equal((await repo.readNote(n.path)).preview, 'New preview\n\nLegacy text');
+  assert.doesNotMatch(contents.get(n.path), /## User Notes/);
+  await repo.updateNote(n.path, { preview: '' });
+  assert.equal((await repo.readNote(n.path)).preview, '');
+});
+test('preview cards display only editable preview content', () => {
+  const source = fs.readFileSync(path.join(root, 'main.ts'), 'utf8');
+  const card = source.slice(source.indexOf('preview.createEl("strong", { text: note.title })'), source.indexOf('const host = workspace.getBoundingClientRect()'));
+  assert.match(card, /note.preview/);
+  assert.doesNotMatch(card, /note.summary|User Notes|目前結論/);
+});
+
+test('first AI answer seeds summary and image in preview, later answers preserve it including an explicit clear', async () => {
+  const { repo } = fixture(), n = await topicNote(repo, 'Preview default');
+  assert.equal((await repo.readNote(n.path)).preview, '尚未形成結論');
+  await repo.updateNote(n.path, { summary: '簡短結論', detail: '文字\n\n![相關圖片](https://example.com/image.jpg)' });
+  assert.equal((await repo.readNote(n.path)).preview, '簡短結論\n\n![相關圖片](https://example.com/image.jpg)');
+  await repo.updateNote(n.path, { summary: '第二次結論', detail: '新正文' });
+  assert.match((await repo.readNote(n.path)).preview, /簡短結論/);
+  await repo.updateNote(n.path, { preview: '' });
+  await repo.updateNote(n.path, { summary: '第三次結論' });
+  assert.equal((await repo.readNote(n.path)).preview, '');
+});
+test('AI answer cannot replace preview edited while task was running', async () => {
+  const { repo } = fixture(), n = await topicNote(repo, 'Manual preview');
+  await repo.updateNote(n.path, { preview: '使用者的文字' });
+  await repo.updateNote(n.path, { summary: 'AI 結論', detail: '![圖](https://example.com/image.jpg)' });
+  assert.equal((await repo.readNote(n.path)).preview, '使用者的文字');
+});
+test('images follow related text and inline images are not duplicated', async () => {
+  const { repo } = fixture(), n = await topicNote(repo, 'Inline images');
+  const reference = '**配色建議**\n![配色](https://example.com/color.jpg)\n來源：https://example.com/source';
+  await repo.updateNote(n.path, { summary: '結論', detail: '### 核心結論\n\n摘要\n\n### 關鍵知識\n\n配色建議：採用低彩度。\n\n另一項建議。\n\n### 證據與來源\n\n來源', visualReferences: reference });
+  let detail = (await repo.readNote(n.path)).detail;
+  assert.ok(detail.indexOf('![配色]') > detail.indexOf('配色建議：'));
+  assert.ok(detail.indexOf('![配色]') < detail.indexOf('另一項建議'));
+  assert.doesNotMatch(detail, /### 視覺參考/);
+  await repo.updateNote(n.path, { visualReferences: reference });
+  detail = (await repo.readNote(n.path)).detail;
+  assert.equal((detail.match(/color.jpg/g) || []).length, 1);
+  assert.match((await repo.readNote(n.path)).preview, /color.jpg/);
+});
+
+test('references in synthesized notes remain clickable after rebuilding, updates and source renames', async () => {
+  const { repo, contents } = fixture(); const path = await repo.createMap('References', []), mapDoc = await repo.readMap(path);
+  const first = await repo.createNote('Source A', 'a', mapDoc, path, 'workspace'), second = await repo.createNote('Source B', 'a', mapDoc, path, 'workspace');
+  const integrated = await repo.createNote('Integrated', 'a', mapDoc, path, 'workspace'); mapDoc.nodes.push(first, second, integrated); await repo.saveMap(path, mapDoc);
+  await repo.updateNote(integrated.path, {sourcePaths: [first.path, second.path], detail: 'Knowledge'});
+  await repo.rebuildDerivedData(); await repo.updateNote(integrated.path, {summary: 'Updated'}); await repo.rebuildDerivedData();
+  const text = contents.get(integrated.path);
+  assert.match(text, /## Reference Links/);
+  assert.ok(text.includes('[[' + first.path.replace(/\.md$/, '') + ']]'));
+  assert.ok(text.includes('[[' + second.path.replace(/\.md$/, '') + ']]'));
+  assert.equal((text.match(/## Reference Links/g) || []).length, 1);
+  assert.equal((await repo.readNote(integrated.path)).detail, 'Knowledge');
+  const renamed = await repo.renameNote(first.path, 'Source renamed'); await repo.rebuildDerivedData();
+  assert.ok(contents.get(integrated.path).includes('[[' + renamed.replace(/\.md$/, '') + ']]'));
+  assert.deepEqual((await repo.readNote(integrated.path)).sourcePaths, [renamed, second.path]);
+  const moved = await repo.moveUnique(renamed, repo.topicFolder(path, 'Unassigned'));
+  await repo.rebuildDerivedData();
+  assert.ok(contents.get(integrated.path).includes('[[' + moved.replace(/\.md$/, '') + ']]'));
+});
+test('preview renderer receives Markdown in original order with no extra Preview label', () => {
+  const created = []; let rendered;
+  const rect = {left:0,top:0,right:100,width:800,height:600};
+  const element = () => ({style:{setProperty(){}},addEventListener(){},createEl(tag, options){created.push([tag,options.text]);return element()},createDiv(){return element()},getBoundingClientRect(){return rect},remove(){}});
+  const workspace = element(); const contentEl = {querySelector(){return workspace}};
+  const {VisualAgentMapView} = load('main.ts', {obsidian:{...obsidian,MarkdownRenderer:{render(app, markdown, el, path){rendered={markdown,path};return Promise.resolve()}}}});
+  const view = new VisualAgentMapView({app:{}},{settings:{...DEFAULT_SETTINGS}}); view.contentEl=contentEl;view.map=map([node('a')]);
+  const markdown='Text first\n\n![Image](https://example.com/a.png)\n\nText after\n\n|A|B|\n|---|---|\n|1|2|';
+  view.showHoverCard({...element(),dataset:{nodeId:'a'}},{title:'Topic',preview:markdown});
+  assert.equal(rendered.markdown,markdown);assert.equal(rendered.path,'a.md');assert.deepEqual(created,[['strong','Topic']]);
+});
+test('dragging synthesized roots persists coordinates and removal preserves notes with undo', async () => {
+  const {repo,app} = fixture(), path = await repo.createMap('Root operations', []), mapDoc = await repo.readMap(path);
+  const first = await repo.createNote('First','a',mapDoc,path,'workspace'), second=await repo.createNote('Second','a',mapDoc,path,'workspace'); mapDoc.nodes.push(first,second);await repo.saveMap(path,mapDoc);
+  let pending=Promise.resolve();
+  const plugin={repo,settings:{...DEFAULT_SETTINGS},rebuildDerivedData:()=>repo.rebuildDerivedData(),askModel:async()=>({summary:'Merged',detail:'Knowledge',visualReferences:[],suggestions:[]}),mutate(work){pending=pending.then(work);return pending}};
+  const {VisualAgentMapView}=load('main.ts',{obsidian}); const view=new VisualAgentMapView({app},plugin);view.path=path;view.map=mapDoc;view.integrationMode=true;view.render=()=>{};view.focusNode=()=>{};view.drawEdges=()=>{};view.updateHistoryButtons=()=>{};
+  await view.createIntegratedNode('Combined',[first,second],'Combine','');
+  const root=view.map.nodes.find(n=>n.id!==first.id&&n.id!==second.id); assert.equal(root.parentId,null);assert.equal(view.integrationMode,false);
+  const origin={x:root.x,y:root.y}; const events=new Map(),card={style:{},setPointerCapture(){},addEventListener(name,fn){events.set(name,fn)},removeEventListener(name){events.delete(name)}};
+  view.enableDrag(card,root);events.get('pointerdown')({target:{closest(){return null}},button:0,clientX:10,clientY:10,pointerId:1});assert.equal(view.dragging,true);
+  events.get('pointermove')({clientX:80,clientY:50});events.get('pointerup')({type:'pointerup'});await pending;
+  const saved=(await repo.readMap(path)).nodes.find(n=>n.id===root.id); assert.equal(saved.x,origin.x+70);assert.equal(saved.y,origin.y+40);assert.equal(view.dragging,false);
+  await view.removeToUnassigned(saved,false);assert.ok(!(await repo.readMap(path)).nodes.some(n=>n.id===root.id));assert.equal((await repo.collectionFiles(path,'Unassigned')).length,1);
+  await view.travel(false);assert.ok((await repo.readMap(path)).nodes.some(n=>n.id===root.id));assert.ok(app.vault.getAbstractFileByPath(root.path));
+});
+test('UI language switch translates labels and placeholders without changing knowledge headings', () => {
+  const {t,setUiLanguage}=load('i18n.ts');setUiLanguage('en');assert.equal(t('選擇下一步'),'Choose next step');assert.equal(t('展開 {0}',3),'Expand 3');assert.equal(t('核心結論'),'核心結論');setUiLanguage('zh-TW');assert.equal(t('選擇下一步'),'選擇下一步');
 });

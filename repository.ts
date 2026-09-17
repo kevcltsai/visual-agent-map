@@ -14,7 +14,7 @@ export interface Note {
   detail: string;
   visualReferences: string;
   newFindings: string;
-  userNotes: string;
+  preview: string;
   model: string;
   modelSource: ModelSource;
   status: Status;
@@ -25,6 +25,7 @@ export interface Note {
 }
 export type NotePatch = Partial<Note>;
 export interface Settings {
+  language: "zh-TW" | "en";
   workspaceFolder: string;
   topicsFolder: string;
   inboxFolder: string;
@@ -41,6 +42,7 @@ export interface Settings {
   models: string;
   migrated: boolean;
   structureVersion: number;
+  firstUseNoticeSeen: boolean;
 }
 export interface TopicInfo { id: string; title: string; mapPath: string; root: string }
 export interface BrokenTopic { title: string; root: string; noteCount: number }
@@ -50,6 +52,7 @@ export interface LegacyMigrationPlan {
 }
 
 export const DEFAULT_SETTINGS: Settings = {
+  language: "zh-TW",
   workspaceFolder: "Agent Workspace",
   topicsFolder: "Agent Workspace/Topics",
   inboxFolder: "Agent Workspace/Inbox",
@@ -57,14 +60,15 @@ export const DEFAULT_SETTINGS: Settings = {
   mapsFolder: "Agent Workspace/Maps",
   mapId: "default",
   cliPath: "codex",
-  codexAcpPath: "codex-acp",
-  claudePath: "claude",
+  codexAcpPath: "/opt/homebrew/bin/codex-acp",
+  claudePath: "/Users/kevintsai/.local/bin/claude",
   cliModel: "gpt-5.6-luna",
   cliReasoning: "low",
   previewScale: 120,
   models: "gpt-6-astra, gpt-5.6-sol, gpt-5.6-terra, gpt-5.6-luna, gpt-5.5, claude:sonnet, claude:opus, claude:fable",
   migrated: false,
-  structureVersion: 2
+  structureVersion: 2,
+  firstUseNoticeSeen: false
 };
 
 const REFERENCE_START = "<!-- visual-agent-map:references:start -->";
@@ -74,15 +78,12 @@ const DETAIL_END = "<!-- visual-agent-map:detail:end -->";
 const NOTE_CSS_CLASS = "visual-agent-map-node";
 
 function marker(value: unknown): boolean { return value === true || value === "true"; }
-function isRecord(value: unknown): value is Record<string, unknown> { return typeof value === "object" && value !== null; }
-function isUnknownArray(value: unknown): value is unknown[] { return Array.isArray(value); }
-function text(value: unknown, fallback = ""): string { return typeof value === "string" || typeof value === "number" || typeof value === "boolean" ? String(value) : fallback; }
 function parentPath(path: string): string { return path.includes("/") ? path.slice(0, path.lastIndexOf("/")) : ""; }
 function baseName(path: string): string { return path.slice(path.lastIndexOf("/") + 1); }
 
 function ensureNoteCssClass(fm: Record<string, unknown>): boolean {
-  const current = isUnknownArray(fm.cssclasses)
-    ? fm.cssclasses.filter((item): item is string => typeof item === "string")
+  const current = Array.isArray(fm.cssclasses)
+    ? fm.cssclasses.map(String)
     : typeof fm.cssclasses === "string"
       ? fm.cssclasses.split(/[\s,]+/).filter(Boolean)
       : [];
@@ -97,12 +98,10 @@ export function safeName(title: string): string {
 
 function frontmatter(content: string): Record<string, unknown> {
   const yaml = content.match(/^---\r?\n([\s\S]*?)\r?\n---(?:\r?\n|$)/)?.[1];
-  if (!yaml) return {};
-  const parsed: unknown = parseYaml(yaml);
-  return isRecord(parsed) ? parsed : {};
+  return yaml ? (parseYaml(yaml) ?? {}) as Record<string, unknown> : {};
 }
 
-type NoteSection = "Current Summary" | "Prompt" | "Rules" | "Detail" | "Visual References" | "Working Findings" | "New Findings" | "User Notes";
+type NoteSection = "Current Summary" | "Prompt" | "Rules" | "Detail" | "Visual References" | "Working Findings" | "New Findings" | "預覽" | "User Notes";
 
 function sectionBounds(content: string, heading: NoteSection): { start: number; end: number } | null {
   if (heading === "Detail") {
@@ -161,8 +160,11 @@ function removeSection(content: string, heading: NoteSection): string {
   return `${content.slice(0, headingMatch.index).trimEnd()}\n\n${content.slice(bounds.end).trimStart()}`;
 }
 
-function ensureUserNotes(content: string): string {
-  return sectionBounds(content, "User Notes") ? content : replaceSection(content, "User Notes", "");
+function ensurePreview(content: string): string {
+  const legacy = section(content, "User Notes");
+  const preview = section(content, "預覽");
+  const merged = [preview, legacy].filter(Boolean).join("\n\n");
+  return replaceSection(removeSection(content, "User Notes"), "預覽", merged);
 }
 
 function withoutReference(content: string): string {
@@ -173,19 +175,41 @@ function withoutReference(content: string): string {
 }
 
 function detailWithVisualReferences(detail: string, visualReferences: string): string {
-  const current = detail.trim(), references = visualReferences.trim();
-  if (!references) return current;
-  return [current, `### 視覺參考\n\n${references}`].filter(Boolean).join("\n\n");
+  let current = detail.trim();
+  const references = visualReferences.trim().split(/\n(?=\*\*[^\n]+\*\*\n|### )/).filter(Boolean);
+  for (const reference of references) {
+    const image = reference.match(/!\[[^\]]*\]\(([^)]+)\)/);
+    if (!image || current.includes(`](${image[1]})`)) continue;
+    const block = reference.replace(/^### (.+)$/gm, "**$1**").trim();
+    const title = block.match(/^\*\*(.+)\*\*/)?.[1];
+    const paragraphs = current.split("\n\n");
+    const related = title ? paragraphs.findIndex(text => !/^#{1,6} /.test(text) && text.includes(title)) : -1;
+    if (related >= 0) {
+      paragraphs.splice(related + 1, 0, block);
+      current = paragraphs.join("\n\n");
+    } else {
+      const knowledge = /^### 關鍵知識\s*$/m.exec(current);
+      const next = knowledge ? /^### .+$/m.exec(current.slice(knowledge.index + knowledge[0].length)) : null;
+      const at = knowledge && next ? knowledge.index + knowledge[0].length + next.index : current.length;
+      current = [current.slice(0, at).trimEnd(), block, current.slice(at).trimStart()].filter(Boolean).join("\n\n");
+    }
+  }
+  return current;
 }
 
-function noteBody(title: string, summary: string, prompt = "", rules = "", userNotes = "", detail = "", visualReferences = "", newFindings = "", leftover = ""): string {
+function initialPreview(summary: string, detail: string): string {
+  const image = detail.match(/!\[[^\]]*\]\((?:https?:\/\/[^)\s]+)\)/)?.[0];
+  return [summary.trim(), image].filter(Boolean).join("\n\n");
+}
+
+function noteBody(title: string, summary: string, prompt = "", rules = "", preview = "尚未形成結論", detail = "", visualReferences = "", newFindings = "", leftover = ""): string {
   const detailBlock = `${DETAIL_START}\n${detailWithVisualReferences(detail, visualReferences)}\n${DETAIL_END}`;
   return [
     `# ${title}`,
     `## Current Summary\n\n${summary.trim() || "尚未形成結論"}`,
     `## Prompt\n\n${prompt.trim()}`,
     `## Rules\n\n${rules.trim()}`,
-    `## User Notes\n\n${userNotes.trim()}`,
+    `## 預覽\n\n${preview.trim()}`,
     `## Detail\n\n${detailBlock}`,
     newFindings.trim() ? `## Working Findings\n\n${newFindings.trim()}` : "",
     leftover.trim()
@@ -193,16 +217,24 @@ function noteBody(title: string, summary: string, prompt = "", rules = "", userN
 }
 
 function normalizeBodyOrder(content: string, title: string, summaryFallback: string): string {
-  const clean = withoutReference(content);
+  const clean = ensurePreview(withoutReference(content));
   const summary = section(clean, "Current Summary") || summaryFallback;
   const prompt = section(clean, "Prompt");
   const rules = section(clean, "Rules");
-  const userNotes = section(clean, "User Notes");
+  const preview = section(clean, "預覽");
   const detail = detailWithVisualReferences(section(clean, "Detail"), section(clean, "Visual References"));
   const newFindings = section(clean, "Working Findings") || section(clean, "New Findings");
   let leftover = clean.replace(/^# .*$(?:\r?\n)*/m, "");
-  for (const heading of ["Current Summary", "Prompt", "Rules", "User Notes", "Detail", "Visual References", "Working Findings", "New Findings"] as NoteSection[]) leftover = removeSection(leftover, heading);
-  return noteBody(title, summary, prompt, rules, userNotes, detail, "", newFindings, leftover);
+  for (const heading of ["Current Summary", "Prompt", "Rules", "預覽", "Detail", "Visual References", "Working Findings", "New Findings"] as NoteSection[]) leftover = removeSection(leftover, heading);
+  return noteBody(title, summary, prompt, rules, preview, detail, "", newFindings, leftover);
+}
+
+function withReferenceLinks(body: string, fm: Record<string, unknown>): string {
+  const sources = Array.isArray(fm["source-notes"]) ? fm["source-notes"].map(String).filter(Boolean) : [];
+  const relationships = Array.isArray(fm["agent-map-references"]) ? fm["agent-map-references"].map(String).filter(text => text.includes("[[")) : [];
+  const links = [...relationships, ...sources.map(path => `來源議題：[[${noteLink(path)}]]`)];
+  const clean = withoutReference(body).trimEnd();
+  return links.length ? `${clean}\n\n${REFERENCE_START}\n## Reference Links\n\n${[...new Set(links)].map(link => `- ${link}`).join("\n")}\n${REFERENCE_END}\n` : `${clean}\n`;
 }
 
 function noteLink(path: string): string { return path.replace(/\.md$/, "").replace(/\|/g, "\\|"); }
@@ -248,26 +280,26 @@ export class Repository {
 
   async readNote(path: string): Promise<Note> {
     const file = this.file(path), content = await this.app.vault.read(file), fm = frontmatter(content);
-    const status = text(fm.status, "idea");
+    const status = String(fm.status ?? "idea");
     const normalized = status === "review" || status === "accepted" ? "completed" : status;
-    const source = text(fm["model-source"], "workspace");
-    const state = text(fm["topic-state"], path.includes("/Archive/") ? "archived" : path.includes("/Unassigned/") ? "unassigned" : path.startsWith(`${this.settings.inboxFolder}/`) ? "inbox" : "active");
+    const source = String(fm["model-source"] ?? "workspace");
+    const state = String(fm["topic-state"] ?? (path.includes("/Archive/") ? "archived" : path.includes("/Unassigned/") ? "unassigned" : path.startsWith(`${this.settings.inboxFolder}/`) ? "inbox" : "active"));
     return {
-      title: text(fm.title, file.basename),
-      summary: section(content, "Current Summary") || text(fm.summary, "尚未形成結論"),
+      title: String(fm.title ?? file.basename),
+      summary: section(content, "Current Summary") || String(fm.summary ?? "尚未形成結論"),
       prompt: section(content, "Prompt"),
       rules: section(content, "Rules"),
       detail: section(content, "Detail"),
       visualReferences: section(content, "Visual References"),
       newFindings: section(content, "Working Findings") || section(content, "New Findings"),
-      userNotes: section(content, "User Notes"),
-      model: text(fm.model, this.settings.cliModel),
+      preview: [section(content, "預覽"), section(content, "User Notes")].filter(Boolean).join("\n\n"),
+      model: String(fm.model ?? this.settings.cliModel),
       modelSource: ["workspace", "inherited", "manual"].includes(source) ? source as ModelSource : "workspace",
       status: ["idea", "running", "completed", "error"].includes(normalized) ? normalized as Status : "idea",
-      mapId: text(fm["agent-map-id"]),
-      topicId: text(fm["topic-id"], text(fm["agent-map-id"])),
+      mapId: String(fm["agent-map-id"] ?? ""),
+      topicId: String(fm["topic-id"] ?? fm["agent-map-id"] ?? ""),
       topicState: ["active", "unassigned", "archived", "inbox"].includes(state) ? state as TopicState : "active",
-      sourcePaths: isUnknownArray(fm["source-notes"]) ? fm["source-notes"].filter((item): item is string => typeof item === "string" && !!item) : []
+      sourcePaths: Array.isArray(fm["source-notes"]) ? fm["source-notes"].map(String).filter(Boolean) : []
     };
   }
 
@@ -283,7 +315,7 @@ export class Repository {
       if (patch.sourcePaths !== undefined) patch.sourcePaths.length ? fm["source-notes"] = patch.sourcePaths : delete fm["source-notes"];
       fm.updated = new Date().toISOString();
       let body = content.replace(/^---\r?\n[\s\S]*?\r?\n---(?:\r?\n|$)/, "");
-      body = ensureUserNotes(body);
+      body = ensurePreview(body);
       if (patch.title !== undefined) body = body.replace(/^# .*$/m, `# ${patch.title.replace(/\n/g, " ")}`);
       if (patch.summary !== undefined) body = replaceSummarySection(body, patch.summary);
       if (patch.prompt !== undefined) body = replaceSection(body, "Prompt", patch.prompt);
@@ -297,9 +329,16 @@ export class Repository {
         if (patch.newFindings.trim()) body = replaceSection(body, "Working Findings", patch.newFindings);
         else { body = removeSection(body, "Working Findings"); body = removeSection(body, "New Findings"); }
       }
-      if (patch.userNotes !== undefined) body = replaceSection(body, "User Notes", patch.userNotes);
-      body = normalizeBodyOrder(body, text(fm.title, path.replace(/\.md$/, "")), text(fm.summary, "尚未形成結論"));
-      return `---\n${stringifyYaml(fm)}---\n${body}`;
+      if (patch.preview !== undefined) {
+        body = replaceSection(body, "預覽", patch.preview);
+        fm["preview-initialized"] = true;
+      } else if (patch.summary !== undefined && patch.summary.trim() && patch.summary !== "尚未形成結論" && fm["preview-initialized"] !== true) {
+        const preview = section(body, "預覽").trim();
+        if (!preview || preview === "尚未形成結論") body = replaceSection(body, "預覽", initialPreview(patch.summary, section(body, "Detail")));
+        fm["preview-initialized"] = true;
+      }
+      body = normalizeBodyOrder(body, String(fm.title ?? path.replace(/\.md$/, "")), String(fm.summary ?? "尚未形成結論"));
+      return `---\n${stringifyYaml(fm)}---\n${withReferenceLinks(body, fm)}`;
     });
   }
 
@@ -315,6 +354,7 @@ export class Repository {
       "agent-map-id": map.id,
       title,
       summary: "尚未形成結論",
+      "preview-initialized": false,
       model,
       "model-source": modelSource,
       status: "idea",
@@ -338,8 +378,7 @@ export class Repository {
   async mapFiles(): Promise<TFile[]> {
     const files: TFile[] = [];
     for (const file of this.app.vault.getMarkdownFiles()) {
-      const cacheFrontmatter: unknown = this.app.metadataCache.getFileCache(file)?.frontmatter;
-      const cached = isRecord(cacheFrontmatter) ? cacheFrontmatter["visual-agent-map"] : undefined;
+      const cached = this.app.metadataCache.getFileCache(file)?.frontmatter?.["visual-agent-map"];
       if (marker(cached) || /^---\r?\n[\s\S]*?visual-agent-map: true\r?\n/.test(await this.app.vault.cachedRead(file))) files.push(file);
     }
     return files.sort((a, b) => a.path.localeCompare(b.path));
@@ -384,7 +423,7 @@ export class Repository {
     if (this.app.vault.getAbstractFileByPath(target)) throw new Error("這個主題已有 Map.md。");
     const map = await this.readMap(sourcePath), candidates = this.app.vault.getMarkdownFiles().filter(file => file.path.startsWith(`${root}/Notes/`));
     const byId = new Map<string, string>();
-    for (const file of candidates) { const fm = frontmatter(await this.app.vault.read(file)), nodeId = text(fm["node-id"]); if (nodeId) byId.set(nodeId, file.path); }
+    for (const file of candidates) { const fm = frontmatter(await this.app.vault.read(file)); if (fm["node-id"]) byId.set(String(fm["node-id"]), file.path); }
     for (const node of map.nodes) if (!(this.app.vault.getAbstractFileByPath(node.path) instanceof TFile) && byId.has(node.id)) node.path = byId.get(node.id)!;
     await this.moveExact(sourcePath, target); await this.saveMap(target, map);
     for (const node of map.nodes) if (this.app.vault.getAbstractFileByPath(node.path) instanceof TFile) await this.setLifecycle(node.path, map.id, map.id, "active");
@@ -416,6 +455,7 @@ export class Repository {
     const file = this.file(path), desired = normalizePath(`${folder}/${baseName(path)}`);
     const target = this.app.vault.getAbstractFileByPath(desired) ? this.unique(folder, file.basename) : desired;
     await this.app.fileManager.renameFile(file, target);
+    await this.replaceSourcePath(path, target);
     return target;
   }
 
@@ -423,6 +463,7 @@ export class Repository {
     await this.folder(parentPath(target));
     if (this.app.vault.getAbstractFileByPath(target)) throw new Error(`目標檔案已存在：${target}`);
     await this.app.fileManager.renameFile(this.file(path), target);
+    await this.replaceSourcePath(path, target);
   }
 
   async renameNote(path: string, title: string, exactTarget?: string): Promise<string> {
@@ -431,6 +472,7 @@ export class Repository {
     if (desired === path) return path;
     const target = exactTarget ?? (this.app.vault.getAbstractFileByPath(desired) ? this.unique(folder, title) : desired);
     await this.app.fileManager.renameFile(this.file(path), target);
+    await this.replaceSourcePath(path, target);
     return target;
   }
 
@@ -493,7 +535,7 @@ export class Repository {
       if (!marker(fm["agent-map-node"])) continue;
       ensureNoteCssClass(fm);
       const owner = ownership.get(file.path);
-      let state: TopicState = file.path.startsWith(`${this.settings.inboxFolder}/`) ? "inbox" : file.path.includes("/Archive/") ? "archived" : file.path.includes("/Unassigned/") ? "unassigned" : owner ? "active" : text(fm["topic-state"], "unassigned") as TopicState;
+      let state: TopicState = file.path.startsWith(`${this.settings.inboxFolder}/`) ? "inbox" : file.path.includes("/Archive/") ? "archived" : file.path.includes("/Unassigned/") ? "unassigned" : owner ? "active" : String(fm["topic-state"] ?? "unassigned") as TopicState;
       if (owner) {
         fm["agent-map-id"] = owner.map.id; fm["topic-id"] = owner.map.id; fm["topic-state"] = "active"; state = "active";
         if (fm["model-source"] === undefined) fm["model-source"] = owner.node.parentId ? "inherited" : "workspace";
@@ -502,8 +544,8 @@ export class Repository {
         if (state === "inbox") { delete fm["topic-id"]; fm["topic-state"] = "inbox"; }
         else fm["topic-state"] = state;
       }
-      let body = ensureUserNotes(content.replace(/^---\r?\n[\s\S]*?\r?\n---(?:\r?\n|$)/, ""));
-      const topicId = text(fm["topic-id"]), topic = topics.get(topicId);
+      let body = ensurePreview(content.replace(/^---\r?\n[\s\S]*?\r?\n---(?:\r?\n|$)/, ""));
+      const topicId = String(fm["topic-id"] ?? ""), topic = topics.get(topicId);
       if (owner) {
         if (!body.includes(DETAIL_START)) body = replaceSection(body, "Detail", section(body, "Detail"));
         const parent = owner.node.parentId ? owner.map.nodes.find(item => item.id === owner.node.parentId) : undefined;
@@ -519,8 +561,8 @@ export class Repository {
         fm["agent-map-references"] = [`所屬主題：[[${noteLink(topic.mapPath)}|${topic.map.title}]]`, `狀態：${state === "archived" ? "已封存" : "未歸類"}`];
         body = withoutReference(body);
       } else { delete fm["agent-map-references"]; body = withoutReference(body); }
-      body = normalizeBodyOrder(body, text(fm.title, file.basename), text(fm.summary, "尚未形成結論"));
-      const next = `---\n${stringifyYaml(fm)}---\n${body}`;
+      body = normalizeBodyOrder(body, String(fm.title ?? file.basename), String(fm.summary ?? "尚未形成結論"));
+      const next = `---\n${stringifyYaml(fm)}---\n${withReferenceLinks(body, fm)}`;
       if (next !== content) await this.app.vault.process(file, () => next);
     }
   }

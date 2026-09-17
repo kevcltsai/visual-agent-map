@@ -15,8 +15,6 @@
     "importHelpers": true,
     "downlevelIteration": true,
     "esModuleInterop": true,
-    "resolveJsonModule": true,
-    "types": [],
     "lib": ["DOM", "ES2022"]
   },
   "include": ["**/*.ts"]

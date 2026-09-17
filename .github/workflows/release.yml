@@ -38,13 +38,19 @@ jobs:
       - name: Build
         run: npm run build
 
+      - name: Verify release artifacts
+        run: |
+          test -f main.js
+          test -f manifest.json
+          test -f styles.css
+
       - name: Generate artifact attestations
         uses: actions/attest@v4
         with:
           subject-path: |
             main.js
             manifest.json
-            visual-agent-map/styles.css
+            styles.css
 
       - name: Create GitHub release
         env:
@@ -53,6 +59,6 @@ jobs:
           gh release create "$GITHUB_REF_NAME"
           main.js
           manifest.json
-          visual-agent-map/styles.css
+          styles.css
           --title "$GITHUB_REF_NAME"
           --generate-notes

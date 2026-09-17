@@ -5,6 +5,7 @@
   "scripts": {
     "dev": "node esbuild.config.mjs",
     "build": "tsc -noEmit -skipLibCheck && node esbuild.config.mjs production",
+    "check:artifacts": "node scripts/check-artifacts.mjs",
     "lint": "eslint .",
     "test": "node tests/run.cjs"
   },

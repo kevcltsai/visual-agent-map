@@ -39,10 +39,7 @@ jobs:
         run: npm run build
 
       - name: Verify release artifacts
-        run: |
-          test -f main.js
-          test -f manifest.json
-          test -f styles.css
+        run: npm run check:artifacts
 
       - name: Generate artifact attestations
         uses: actions/attest@v4

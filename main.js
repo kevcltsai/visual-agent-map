@@ -1053,8 +1053,7 @@ ${body}`);
   }
 };
 
-// main.ts
-var VIEW_TYPE = "visual-agent-map-view";
+// ai/context-builder.ts
 var estimateTokens = (value) => Math.ceil((value || "").length / 4);
 var dedupeRules = (value) => Array.from(new Map(value.split("\n").map((line) => line.trim()).filter(Boolean).map((line) => [line.replace(/\s+/g, " ").toLowerCase(), line])).values()).join("\n");
 function buildPreparedTaskContext(input, model, budget = 32e3) {
@@ -1072,61 +1071,8 @@ function buildPreparedTaskContext(input, model, budget = 32e3) {
   const contextBreakdown = { task: estimateTokens(context.task), currentSummary: estimateTokens(context.summary), currentDetail: estimateTokens(context.detail), effectiveRules: estimateTokens(context.rules), ancestors: estimateTokens(context.ancestors), workingFindings: estimateTokens(context.workingFindings), sourceContext: estimateTokens(context.sourceContext) };
   return { context, metrics: { provider: model.startsWith("claude:") ? "claude" : "codex", model, mode, estimatedInputTokens: Object.values(contextBreakdown).reduce((a, b) => a + b, 0), contextBreakdown, contextBuildMs: Date.now() - started, sessionStrategy: "fresh-session-per-node-task" } };
 }
-var AcpTransportError = class extends Error {
-  constructor(message) {
-    super(message);
-    this.name = "AcpTransportError";
-  }
-};
-var AcpTimeoutError = class extends Error {
-  constructor(method, timeoutMs) {
-    super(`Codex ACP ${method} \u5728 ${Math.ceil(timeoutMs / 1e3)} \u79D2\u5167\u6C92\u6709\u56DE\u61C9`);
-    this.name = "AcpTimeoutError";
-  }
-};
-var AcpSessionError = class extends Error {
-  constructor(message) {
-    super(message);
-    this.name = "AcpSessionError";
-  }
-};
-var AcpModelError = class extends Error {
-  constructor(message) {
-    super(message);
-    this.name = "AcpModelError";
-  }
-};
-var AcpParseError = class extends Error {
-  constructor(message) {
-    super(message);
-    this.name = "AcpParseError";
-  }
-};
-var ACP_CONTROL_TIMEOUT_MS = 3e4;
-var ACP_PROMPT_TIMEOUT_MS = 15 * 60 * 1e3;
-var labels = { idea: t("\u5F85\u7814\u7A76"), running: t("AI \u57F7\u884C\u4E2D"), completed: t("AI \u5B8C\u6210"), error: t("\u57F7\u884C\u932F\u8AA4") };
-function clampPreviewScale(value) {
-  const scale = typeof value === "number" ? value : Number(value);
-  return Number.isFinite(scale) ? Math.max(80, Math.min(240, Math.round(scale))) : 120;
-}
-function legacyPreviewScale(value) {
-  return value === "small" ? 90 : value === "large" ? 160 : 120;
-}
-function previewMetrics(scaleValue) {
-  const scale = clampPreviewScale(scaleValue) / 120;
-  return {
-    min: Math.round(240 * scale),
-    max: Math.round(320 * scale),
-    height: Math.round(420 * scale),
-    image: `${Math.round(150 * scale)}px`,
-    title: `${Math.round(15 * scale)}px`,
-    body: `${Math.round(13 * scale)}px`,
-    labelSize: `${Math.round(11 * scale)}px`,
-    table: `${Math.round(11 * scale)}px`,
-    line: String(Math.max(1.3, Math.min(1.75, 1.45 + (scale - 1) * 0.18))),
-    padding: `${Math.round(14 * scale)}px ${Math.round(16 * scale)}px`
-  };
-}
+
+// ai/result-utils.ts
 var KNOWLEDGE_HEADINGS = ["\u6838\u5FC3\u7D50\u8AD6", "\u95DC\u9375\u77E5\u8B58", "\u8B49\u64DA\u8207\u4F86\u6E90", "\u53D6\u6368\u8207\u9650\u5236", "\u5F85\u78BA\u8A8D\u4E8B\u9805", "\u66F4\u65B0\u7D00\u9304"];
 function canonicalDetail(value) {
   const detail = value.trim();
@@ -1164,6 +1110,19 @@ function visualReferencesMarkdown(references = []) {
     ].filter(Boolean).join("\n");
   }).filter(Boolean).join("\n\n");
 }
+
+// ui/preview-utils.ts
+function clampPreviewScale(value) {
+  const scale = typeof value === "number" ? value : Number(value);
+  return Number.isFinite(scale) ? Math.max(80, Math.min(240, Math.round(scale))) : 120;
+}
+function legacyPreviewScale(value) {
+  return value === "small" ? 90 : value === "large" ? 160 : 120;
+}
+function previewMetrics(scaleValue) {
+  const scale = clampPreviewScale(scaleValue) / 120;
+  return { min: Math.round(240 * scale), max: Math.round(320 * scale), height: Math.round(420 * scale), image: `${Math.round(150 * scale)}px`, title: `${Math.round(15 * scale)}px`, body: `${Math.round(13 * scale)}px`, labelSize: `${Math.round(11 * scale)}px`, table: `${Math.round(11 * scale)}px`, line: String(Math.max(1.3, Math.min(1.75, 1.45 + (scale - 1) * 0.18))), padding: `${Math.round(14 * scale)}px ${Math.round(16 * scale)}px` };
+}
 function markdownImages(markdown, limit = 4) {
   const images = [];
   for (const match of markdown.matchAll(/!\[([^\]]*)\]\((https?:\/\/[^)\s]+)\)/gi)) {
@@ -1190,6 +1149,42 @@ function firstMarkdownTable(markdown) {
   }
   return [];
 }
+
+// main.ts
+var VIEW_TYPE = "visual-agent-map-view";
+var AcpTransportError = class extends Error {
+  constructor(message) {
+    super(message);
+    this.name = "AcpTransportError";
+  }
+};
+var AcpTimeoutError = class extends Error {
+  constructor(method, timeoutMs) {
+    super(`Codex ACP ${method} \u5728 ${Math.ceil(timeoutMs / 1e3)} \u79D2\u5167\u6C92\u6709\u56DE\u61C9`);
+    this.name = "AcpTimeoutError";
+  }
+};
+var AcpSessionError = class extends Error {
+  constructor(message) {
+    super(message);
+    this.name = "AcpSessionError";
+  }
+};
+var AcpModelError = class extends Error {
+  constructor(message) {
+    super(message);
+    this.name = "AcpModelError";
+  }
+};
+var AcpParseError = class extends Error {
+  constructor(message) {
+    super(message);
+    this.name = "AcpParseError";
+  }
+};
+var ACP_CONTROL_TIMEOUT_MS = 3e4;
+var ACP_PROMPT_TIMEOUT_MS = 15 * 60 * 1e3;
+var labels = { idea: t("\u5F85\u7814\u7A76"), running: t("AI \u57F7\u884C\u4E2D"), completed: t("AI \u5B8C\u6210"), error: t("\u57F7\u884C\u932F\u8AA4") };
 var NameModal = class extends import_obsidian2.Modal {
   constructor(app, titleText, value, submit) {
     super(app);

@@ -4,28 +4,18 @@ import { spawn, type ChildProcessWithoutNullStreams } from "node:child_process";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { canParent, clone, descendants, History, inheritModel, MapDocument, MapNode, parseMap, removeNodes, serializeMap, visibleNodes } from "./map-model";
-import { DEFAULT_SETTINGS, ModelSource, Note, NotePatch, Repository, Settings, TopicInfo, TopicState, VisualReference } from "./repository";
+import { DEFAULT_SETTINGS, ModelSource, Note, NotePatch, Repository, Settings, TopicInfo, TopicState } from "./repository";
+import { buildPreparedTaskContext, estimateTokens } from "./ai/context-builder";
+import { canonicalDetail, visualReferencesMarkdown } from "./ai/result-utils";
+import type { AiResult, Suggestion, TaskContext } from "./ai/types";
+import { clampPreviewScale, legacyPreviewScale, previewMetrics } from "./ui/preview-utils";
+
+export { buildPreparedTaskContext } from "./ai/context-builder";
+export { canonicalDetail, visualReferencesMarkdown } from "./ai/result-utils";
+export { firstMarkdownImage, firstMarkdownTable, markdownImages } from "./ui/preview-utils";
+export type { AiRunMetrics, PreparedTaskContext } from "./ai/types";
 const VIEW_TYPE = "visual-agent-map-view";
 interface Action { undo: () => Promise<void>; redo: () => Promise<void> }
-interface Suggestion { title: string; task: string; contribution: string }
-type AiTaskKind = "task" | "decompose" | "synthesize";
-interface TaskContext { title: string; summary: string; rules: string; detail: string; task: string; ancestors: string; workingFindings?: string; sourceContext?: string; mode?: AiTaskKind }
-interface AiResult { summary: string; detail: string; suggestions: Suggestion[]; visualReferences: VisualReference[] }
-export interface AiRunMetrics { provider: string; model: string; mode: AiTaskKind | "task"; estimatedInputTokens: number; contextBreakdown: Record<string, number>; contextBuildMs: number; providerMs?: number; totalMs?: number; sessionStrategy: string }
-export interface PreparedTaskContext { context: TaskContext; metrics: AiRunMetrics }
-const estimateTokens = (value: string | undefined): number => Math.ceil((value || "").length / 4);
-const dedupeRules = (value: string): string => Array.from(new Map(value.split("\n").map(line => line.trim()).filter(Boolean).map(line => [line.replace(/\s+/g, " ").toLowerCase(), line])).values()).join("\n");
-export function buildPreparedTaskContext(input: TaskContext, model: string, budget = 32_000): PreparedTaskContext {
-  const started = Date.now(), mode: AiTaskKind = input.mode || "task";
-  const context: TaskContext = { ...input, rules: dedupeRules(input.rules), ancestors: input.ancestors.replace(/^\s*AI 規則：.*(?:\n|$)/gm, "").trim() };
-  if (mode === "decompose") { context.detail = ""; context.sourceContext = ""; context.workingFindings = ""; }
-  if (mode === "task" && context.summary.trim() && !/(延續|修改|既有|原有|更新)/.test(context.task)) context.detail = "";
-  const optional: ("sourceContext" | "workingFindings" | "detail" | "ancestors")[] = ["sourceContext", "workingFindings", "detail", "ancestors"];
-  const used = (): number => Object.values(context).reduce((sum, value) => sum + (typeof value === "string" ? estimateTokens(value) : 0), 0);
-  for (const key of optional) if (used() > budget && context[key]) context[key] = String(context[key]).slice(0, Math.max(0, (budget - used() + estimateTokens(String(context[key]))) * 4));
-  const contextBreakdown = { task: estimateTokens(context.task), currentSummary: estimateTokens(context.summary), currentDetail: estimateTokens(context.detail), effectiveRules: estimateTokens(context.rules), ancestors: estimateTokens(context.ancestors), workingFindings: estimateTokens(context.workingFindings), sourceContext: estimateTokens(context.sourceContext) };
-  return { context, metrics: { provider: model.startsWith("claude:") ? "claude" : "codex", model, mode, estimatedInputTokens: Object.values(contextBreakdown).reduce((a, b) => a + b, 0), contextBreakdown, contextBuildMs: Date.now() - started, sessionStrategy: "fresh-session-per-node-task" } };
-}
 interface AcpRequest { jsonrpc: "2.0"; id: number; method: string; params?: unknown }
 interface AcpResponse { jsonrpc: "2.0"; id: number; result?: unknown; error?: { message?: string } | string }
 interface AcpNotification { jsonrpc: "2.0"; method: string; params?: unknown }
@@ -39,87 +29,6 @@ class AcpParseError extends Error { constructor(message: string) { super(message
 const ACP_CONTROL_TIMEOUT_MS = 30_000;
 const ACP_PROMPT_TIMEOUT_MS = 15 * 60 * 1000;
 const labels = { idea: t("待研究"), running: t("AI 執行中"), completed: t("AI 完成"), error: t("執行錯誤") };
-interface PreviewMetrics { min: number; max: number; height: number; image: string; title: string; body: string; labelSize: string; table: string; line: string; padding: string }
-function clampPreviewScale(value: unknown): number {
-  const scale = typeof value === "number" ? value : Number(value);
-  return Number.isFinite(scale) ? Math.max(80, Math.min(240, Math.round(scale))) : 120;
-}
-function legacyPreviewScale(value: unknown): number {
-  return value === "small" ? 90 : value === "large" ? 160 : 120;
-}
-function previewMetrics(scaleValue: number): PreviewMetrics {
-  const scale = clampPreviewScale(scaleValue) / 120;
-  return {
-    min: Math.round(240 * scale),
-    max: Math.round(320 * scale),
-    height: Math.round(420 * scale),
-    image: `${Math.round(150 * scale)}px`,
-    title: `${Math.round(15 * scale)}px`,
-    body: `${Math.round(13 * scale)}px`,
-    labelSize: `${Math.round(11 * scale)}px`,
-    table: `${Math.round(11 * scale)}px`,
-    line: String(Math.max(1.3, Math.min(1.75, 1.45 + (scale - 1) * 0.18))),
-    padding: `${Math.round(14 * scale)}px ${Math.round(16 * scale)}px`
-  };
-}
-const KNOWLEDGE_HEADINGS = ["核心結論", "關鍵知識", "證據與來源", "取捨與限制", "待確認事項", "更新紀錄"] as const;
-export function canonicalDetail(value: string): string {
-  const detail = value.trim();
-  if (KNOWLEDGE_HEADINGS.every(heading => new RegExp(`^### ${heading}\\s*$`, "m").test(detail))) return detail;
-  const stamp = new Date().toLocaleDateString("zh-TW");
-  return [
-    `### 核心結論\n\n${detail || "尚待整理。"}`,
-    "### 關鍵知識\n\n尚待補充。",
-    "### 證據與來源\n\n尚待補充。",
-    "### 取捨與限制\n\n尚待補充。",
-    "### 待確認事項\n\n尚待補充。",
-    `### 更新紀錄\n\n- ${stamp}：整理為結構化知識。`
-  ].join("\n\n");
-}
-export function visualReferencesMarkdown(references: VisualReference[] = []): string {
-  return references.map(item => {
-    const title = item.title.trim() || "視覺參考";
-    const imageUrl = item.imageUrl.trim();
-    const sourceUrl = item.sourceUrl.trim();
-    if (!imageUrl || !sourceUrl) return "";
-    const palette = item.palette.map(color => color.trim()).filter(Boolean).join(" / ");
-    return [
-      `**${title}**`,
-      "",
-      `![${title}](${imageUrl})`,
-      "",
-      `來源：${sourceUrl}`,
-      item.description.trim() ? `用途：${item.description.trim()}` : "",
-      palette ? `配色：${palette}` : "",
-      item.formula.trim() ? `可套用公式：${item.formula.trim()}` : ""
-    ].filter(Boolean).join("\n");
-  }).filter(Boolean).join("\n\n");
-}
-export function markdownImages(markdown: string, limit = 4): { alt: string; url: string }[] {
-  const images: { alt: string; url: string }[] = [];
-  for (const match of markdown.matchAll(/!\[([^\]]*)\]\((https?:\/\/[^)\s]+)\)/gi)) {
-    images.push({ alt: match[1] || "視覺參考", url: match[2] });
-    if (images.length >= limit) break;
-  }
-  return images;
-}
-export function firstMarkdownImage(markdown: string): { alt: string; url: string } | null {
-  return markdownImages(markdown, 1)[0] ?? null;
-}
-export function firstMarkdownTable(markdown: string): string[][] {
-  const lines = markdown.split(/\r?\n/);
-  for (let i = 0; i < lines.length - 1; i++) {
-    if (!/^\s*\|.+\|\s*$/.test(lines[i]) || !/^\s*\|[\s:|-]+\|\s*$/.test(lines[i + 1])) continue;
-    const rows: string[][] = [];
-    for (let j = i; j < lines.length && /^\s*\|.+\|\s*$/.test(lines[j]); j++) {
-      if (j === i + 1) continue;
-      rows.push(lines[j].trim().slice(1, -1).split("|").map(cell => cell.trim()).filter(Boolean));
-      if (rows.length >= 4) break;
-    }
-    return rows.filter(row => row.length);
-  }
-  return [];
-}
 class NameModal extends Modal {
   constructor(app: App, private titleText: string, private value: string, private submit: (value: string) => void) { super(app); }
   onOpen(): void {

@@ -1111,6 +1111,20 @@ function visualReferencesMarkdown(references = []) {
   }).filter(Boolean).join("\n\n");
 }
 
+// ai/provider-registry.ts
+var ProviderRegistry = class {
+  constructor(codex, claude) {
+    this.codex = codex;
+    this.claude = claude;
+  }
+  select(model) {
+    return model.startsWith("claude:") ? this.claude : this.codex;
+  }
+  modelFor(provider, model) {
+    return provider.id === "claude" ? model.slice("claude:".length) : model;
+  }
+};
+
 // ui/preview-utils.ts
 function clampPreviewScale(value) {
   const scale = typeof value === "number" ? value : Number(value);
@@ -2885,6 +2899,10 @@ var VisualAgentMapPlugin = class extends import_obsidian2.Plugin {
     __publicField(this, "detailsLeaf", null);
     __publicField(this, "queue", Promise.resolve());
     __publicField(this, "writing", 0);
+    __publicField(this, "providers", new ProviderRegistry(
+      { id: "codex", run: async (context, model) => this.runCodex(context, model) },
+      { id: "claude", run: async (context, model) => this.runClaude(context, model) }
+    ));
   }
   async mutate(work) {
     const result = this.queue.then(async () => {
@@ -3067,7 +3085,8 @@ var VisualAgentMapPlugin = class extends import_obsidian2.Plugin {
     context = prepared.context;
     const pluginDirectory = (0, import_node_path.join)(adapter.getBasePath(), this.manifest.dir);
     const schemaPath = (0, import_node_path.join)(pluginDirectory, "response-schema.json");
-    if (model.startsWith("claude:")) return this.askClaude(context, model.slice("claude:".length), pluginDirectory, schemaPath);
+    const provider = this.providers.select(model);
+    if (provider.id === "claude") return provider.run(context, this.providers.modelFor(provider, model));
     const instructions = [
       "\u4F60\u662F\u8996\u89BA\u5316\u601D\u8003 Agent\u3002\u4E0D\u8981\u4FEE\u6539\u4EFB\u4F55\u6A94\u6848\uFF1B\u9664\u975E\u4EFB\u52D9\u660E\u78BA\u6307\u5B9A\uFF0C\u5426\u5247\u4E0D\u8981\u8B80\u53D6\u672C\u6A5F\u6A94\u6848\u3002",
       '\u53EA\u56DE\u50B3 JSON\uFF0C\u4E0D\u8981\u4F7F\u7528 Markdown code fence\u3002\u683C\u5F0F\u5FC5\u9808\u7B26\u5408\uFF1A{"summary":"...","detail":"...","suggestions":[{"title":"...","task":"...","contribution":"..."}],"visualReferences":[{"title":"...","imageUrl":"https://...","sourceUrl":"https://...","description":"...","palette":["navy","white"],"formula":"..."}]}\u3002\u82E5\u6C92\u6709\u8996\u89BA\u53C3\u8003\uFF0CvisualReferences \u56DE\u50B3\u7A7A\u9663\u5217\u3002',
@@ -3103,6 +3122,16 @@ ${context.task}`
       console.warn("Visual Agent Map Codex ACP transport failed before prompting; falling back to Codex CLI", error);
       return this.askCodexExec(instructions, model, pluginDirectory, schemaPath);
     }
+  }
+  async runCodex(context, model) {
+    return this.askModel(context, model);
+  }
+  async runClaude(context, model) {
+    const adapter = this.app.vault.adapter;
+    if (!(adapter instanceof import_obsidian2.FileSystemAdapter)) throw new Error(t("CLI \u6A21\u5F0F\u53EA\u652F\u63F4\u684C\u9762\u7248 Obsidian"));
+    if (!this.manifest.dir) throw new Error(t("\u627E\u4E0D\u5230\u5916\u639B\u76EE\u9304"));
+    const pluginDirectory = (0, import_node_path.join)(adapter.getBasePath(), this.manifest.dir);
+    return this.askClaude(context, model, pluginDirectory, (0, import_node_path.join)(pluginDirectory, "response-schema.json"));
   }
   parseAiResult(raw, label) {
     const cleaned = raw.replace(/^```(?:json)?\s*/i, "").replace(/\s*```$/, "").trim();

@@ -8,6 +8,7 @@ import { DEFAULT_SETTINGS, ModelSource, Note, NotePatch, Repository, Settings, T
 import { buildPreparedTaskContext, estimateTokens } from "./ai/context-builder";
 import { canonicalDetail, visualReferencesMarkdown } from "./ai/result-utils";
 import type { AiResult, Suggestion, TaskContext } from "./ai/types";
+import { ProviderRegistry } from "./ai/provider-registry";
 import { clampPreviewScale, legacyPreviewScale, previewMetrics } from "./ui/preview-utils";
 
 export { buildPreparedTaskContext } from "./ai/context-builder";
@@ -948,6 +949,10 @@ export default class VisualAgentMapPlugin extends Plugin {
   private detailsLeaf: WorkspaceLeaf | null = null;
   private queue: Promise<void> = Promise.resolve();
   private writing = 0;
+  private providers = new ProviderRegistry(
+    { id: "codex", run: async (context, model) => this.runCodex(context, model) },
+    { id: "claude", run: async (context, model) => this.runClaude(context, model) }
+  );
   async mutate(work: () => Promise<void>): Promise<void> {
     const result = this.queue.then(async () => { this.writing++; try { await work(); for (const view of this.views()) await view.synchronize(); } finally { this.writing--; } });
     this.queue = result.catch(error => { console.error("Visual Agent Map", error); new Notice(error instanceof Error ? error.message : String(error)); });
@@ -1052,7 +1057,8 @@ export default class VisualAgentMapPlugin extends Plugin {
     context = prepared.context;
     const pluginDirectory = join(adapter.getBasePath(), this.manifest.dir);
     const schemaPath = join(pluginDirectory, "response-schema.json");
-    if (model.startsWith("claude:")) return this.askClaude(context, model.slice("claude:".length), pluginDirectory, schemaPath);
+    const provider = this.providers.select(model);
+    if (provider.id === "claude") return provider.run(context, this.providers.modelFor(provider, model));
     const instructions = [
       "你是視覺化思考 Agent。不要修改任何檔案；除非任務明確指定，否則不要讀取本機檔案。",
       "只回傳 JSON，不要使用 Markdown code fence。格式必須符合：{\"summary\":\"...\",\"detail\":\"...\",\"suggestions\":[{\"title\":\"...\",\"task\":\"...\",\"contribution\":\"...\"}],\"visualReferences\":[{\"title\":\"...\",\"imageUrl\":\"https://...\",\"sourceUrl\":\"https://...\",\"description\":\"...\",\"palette\":[\"navy\",\"white\"],\"formula\":\"...\"}]}。若沒有視覺參考，visualReferences 回傳空陣列。",
@@ -1088,6 +1094,14 @@ export default class VisualAgentMapPlugin extends Plugin {
       console.warn("Visual Agent Map Codex ACP transport failed before prompting; falling back to Codex CLI", error);
       return this.askCodexExec(instructions, model, pluginDirectory, schemaPath);
     }
+  }
+  private async runCodex(context: TaskContext, model: string): Promise<AiResult> { return this.askModel(context, model); }
+  private async runClaude(context: TaskContext, model: string): Promise<AiResult> {
+    const adapter = this.app.vault.adapter;
+    if (!(adapter instanceof FileSystemAdapter)) throw new Error(t("CLI 模式只支援桌面版 Obsidian"));
+    if (!this.manifest.dir) throw new Error(t("找不到外掛目錄"));
+    const pluginDirectory = join(adapter.getBasePath(), this.manifest.dir);
+    return this.askClaude(context, model, pluginDirectory, join(pluginDirectory, "response-schema.json"));
   }
   private parseAiResult(raw: string, label: string): AiResult {
     const cleaned = raw.replace(/^```(?:json)?\s*/i, "").replace(/\s*```$/, "").trim();

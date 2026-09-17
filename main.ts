@@ -1,5 +1,6 @@
 import { t, setUiLanguage } from "./i18n";
 import { App, MarkdownRenderer, FileSystemAdapter, ItemView, MarkdownView, Modal, Notice, Plugin, PluginSettingTab, Setting, TFile, WorkspaceLeaf } from "obsidian";
+import { NameModal } from "./ui/modals/name-modal";
 import { spawn, type ChildProcessWithoutNullStreams } from "node:child_process";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
@@ -30,18 +31,6 @@ class AcpParseError extends Error { constructor(message: string) { super(message
 const ACP_CONTROL_TIMEOUT_MS = 30_000;
 const ACP_PROMPT_TIMEOUT_MS = 15 * 60 * 1000;
 const labels = { idea: t("待研究"), running: t("AI 執行中"), completed: t("AI 完成"), error: t("執行錯誤") };
-class NameModal extends Modal {
-  constructor(app: App, private titleText: string, private value: string, private submit: (value: string) => void) { super(app); }
-  onOpen(): void {
-    this.titleEl.setText(this.titleText);
-    const input = this.contentEl.createEl("input", { type: "text", value: this.value });
-    input.setAttr("aria-label", this.titleText); input.style.width = "100%";
-    const save = (): void => { const value = input.value.trim(); if (value) { this.close(); this.submit(value); } };
-    input.addEventListener("keydown", event => { if (event.key === "Enter") save(); });
-    new Setting(this.contentEl).addButton(b => b.setButtonText(t("取消")).onClick(() => this.close())).addButton(b => b.setButtonText(t("儲存")).setCta().onClick(save));
-    input.focus(); input.select();
-  }
-}
 class ChoiceModal extends Modal {
   constructor(app: App, private titleText: string, private description: string, private choices: { label: string; description?: string; buttonLabel?: string; action: () => void }[]) { super(app); }
   onOpen(): void {

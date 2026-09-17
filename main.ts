@@ -1,5 +1,5 @@
-import { App, FileSystemAdapter, ItemView, MarkdownView, Modal, Notice, Plugin, PluginSettingTab, Setting, TFile, WorkspaceLeaf } from "obsidian";
-import { spawn, type ChildProcessWithoutNullStreams } from "node:child_process";
+import { App, FileSystemAdapter, ItemView, MarkdownView, Modal, Notice, Plugin, PluginSettingTab, Setting, TFile, WorkspaceLeaf, type SettingDefinitionItem } from "obsidian";
+import { spawn, type VisualAgentChildProcess } from "node:child_process";
 import { readFileSync, writeFileSync } from "node:fs";
 import responseSchema from "./response-schema.json";
 import { join } from "node:path";
@@ -993,6 +993,26 @@ export class VisualAgentMapView extends ItemView {
 }
 class VisualAgentMapSettingTab extends PluginSettingTab {
   constructor(app: App, private plugin: VisualAgentMapPlugin) { super(app, plugin); }
+  getSettingDefinitions(): SettingDefinitionItem[] {
+    return [{
+      type: "group",
+      heading: "AI providers",
+      items: [
+        { name: "Codex ACP 路徑", desc: "Codex 的主要執行方式；會重用 session 並取得可用模型。", control: { type: "text", key: "codexAcpPath" } },
+        { name: "Claude Code CLI 路徑", desc: "用於 claude:sonnet、claude:opus、claude:fable；需先完成 Claude Code 登入。", control: { type: "text", key: "claudePath" } },
+        { name: "工作區預設 Model", desc: "目前最低成本模型為 gpt-5.6-luna；變更只影響之後新增的根議題。", control: { type: "text", key: "cliModel" } },
+        { name: "Model 選單", desc: "Codex 模型透過 Codex ACP 或 Codex CLI 執行；Claude Code 請使用 claude:sonnet、claude:opus 或 claude:fable。", control: { type: "text", key: "models" } },
+        { name: "Codex CLI fallback 路徑", desc: "只有 Codex ACP 失敗時才使用。", control: { type: "text", key: "cliPath" } },
+        { name: "資料夾", desc: `主題資料夾：${this.plugin.settings.topicsFolder} · 未分類收件匣：${this.plugin.settings.inboxFolder}`, searchable: false }
+      ]
+    }];
+  }
+  getControlValue(key: string): unknown { return key in this.plugin.settings ? this.plugin.settings[key as keyof Settings] : undefined; }
+  async setControlValue(key: string, value: unknown): Promise<void> {
+    if (typeof value !== "string" || !["codexAcpPath", "claudePath", "cliModel", "models", "cliPath"].includes(key)) return;
+    this.plugin.settings[key as "codexAcpPath" | "claudePath" | "cliModel" | "models" | "cliPath"] = value.trim();
+    await this.plugin.saveSettings();
+  }
   display(): void {
     this.containerEl.empty(); new Setting(this.containerEl).setName("AI providers").setHeading();
     this.containerEl.createEl("p", { text: "支援本機 Codex ACP、Codex CLI fallback 與 Claude Code CLI。外部工具只會在你執行 AI 任務時啟動；結果會更新目前理解並保存在議題 MD 詳情中。" });
@@ -1010,8 +1030,8 @@ export default class VisualAgentMapPlugin extends Plugin {
   ready: Promise<void> = Promise.resolve();
   readonly running = new Set<string>();
   readonly pendingSuggestions = new Map<string, Suggestion[]>();
-  private childProcesses = new Set<ChildProcessWithoutNullStreams>();
-  private acp: { child: ChildProcessWithoutNullStreams; buffer: string; nextId: number; sessionId: string | null; pending: Map<number, { resolve: (value: unknown) => void; reject: (error: Error) => void }>; updates: unknown[] } | null = null;
+  private childProcesses = new Set<VisualAgentChildProcess>();
+  private acp: { child: VisualAgentChildProcess; buffer: string; nextId: number; sessionId: string | null; pending: Map<number, { resolve: (value: unknown) => void; reject: (error: Error) => void }>; updates: unknown[] } | null = null;
   private acpConfigIds = { model: "model", reasoning: "" };
   private detailsLeaf: WorkspaceLeaf | null = null;
   private queue: Promise<void> = Promise.resolve();
@@ -1188,7 +1208,7 @@ export default class VisualAgentMapPlugin extends Plugin {
       this.childProcesses.add(child);
       this.acp = { child, buffer: "", nextId: 1, sessionId: null, pending: new Map(), updates: [] };
       let stderr = "";
-      child.stdout.on("data", (chunk: Buffer) => {
+      child.stdout.on("data", chunk => {
         if (!this.acp || this.acp.child !== child) return;
         this.acp.buffer += chunk.toString("utf8");
         while (true) {
@@ -1199,7 +1219,7 @@ export default class VisualAgentMapPlugin extends Plugin {
           if (line) this.handleAcpMessage(JSON.parse(line) as AcpMessage);
         }
       });
-      child.stderr.on("data", (chunk: Buffer) => { stderr += chunk.toString(); });
+      child.stderr.on("data", chunk => { stderr += chunk.toString(); });
       child.on("error", error => {
         for (const entry of this.acp?.pending.values() ?? []) entry.reject(new Error(`無法啟動 Codex ACP：${error.message}`));
         this.childProcesses.delete(child);
@@ -1301,11 +1321,11 @@ export default class VisualAgentMapPlugin extends Plugin {
         reject(new Error("Codex CLI 執行超過 15 分鐘"));
       }, 15 * 60 * 1000);
 
-      child.stdout.on("data", (chunk: Buffer) => {
+      child.stdout.on("data", chunk => {
         stdout += chunk.toString();
         if (stdout.length > outputLimit) child.kill();
       });
-      child.stderr.on("data", (chunk: Buffer) => {
+      child.stderr.on("data", chunk => {
         stderr += chunk.toString();
         if (stderr.length > outputLimit) child.kill();
       });
@@ -1377,11 +1397,11 @@ export default class VisualAgentMapPlugin extends Plugin {
         reject(new Error("Claude Code CLI 執行超過 15 分鐘"));
       }, 15 * 60 * 1000);
 
-      child.stdout.on("data", (chunk: Buffer) => {
+      child.stdout.on("data", chunk => {
         stdout += chunk.toString();
         if (stdout.length > outputLimit) child.kill();
       });
-      child.stderr.on("data", (chunk: Buffer) => {
+      child.stderr.on("data", chunk => {
         stderr += chunk.toString();
         if (stderr.length > outputLimit) child.kill();
       });

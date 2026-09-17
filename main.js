@@ -2528,6 +2528,28 @@ var VisualAgentMapSettingTab = class extends import_obsidian2.PluginSettingTab {
     super(app, plugin);
     __publicField(this, "plugin", plugin);
   }
+  getSettingDefinitions() {
+    return [{
+      type: "group",
+      heading: "AI providers",
+      items: [
+        { name: "Codex ACP \u8DEF\u5F91", desc: "Codex \u7684\u4E3B\u8981\u57F7\u884C\u65B9\u5F0F\uFF1B\u6703\u91CD\u7528 session \u4E26\u53D6\u5F97\u53EF\u7528\u6A21\u578B\u3002", control: { type: "text", key: "codexAcpPath" } },
+        { name: "Claude Code CLI \u8DEF\u5F91", desc: "\u7528\u65BC claude:sonnet\u3001claude:opus\u3001claude:fable\uFF1B\u9700\u5148\u5B8C\u6210 Claude Code \u767B\u5165\u3002", control: { type: "text", key: "claudePath" } },
+        { name: "\u5DE5\u4F5C\u5340\u9810\u8A2D Model", desc: "\u76EE\u524D\u6700\u4F4E\u6210\u672C\u6A21\u578B\u70BA gpt-5.6-luna\uFF1B\u8B8A\u66F4\u53EA\u5F71\u97FF\u4E4B\u5F8C\u65B0\u589E\u7684\u6839\u8B70\u984C\u3002", control: { type: "text", key: "cliModel" } },
+        { name: "Model \u9078\u55AE", desc: "Codex \u6A21\u578B\u900F\u904E Codex ACP \u6216 Codex CLI \u57F7\u884C\uFF1BClaude Code \u8ACB\u4F7F\u7528 claude:sonnet\u3001claude:opus \u6216 claude:fable\u3002", control: { type: "text", key: "models" } },
+        { name: "Codex CLI fallback \u8DEF\u5F91", desc: "\u53EA\u6709 Codex ACP \u5931\u6557\u6642\u624D\u4F7F\u7528\u3002", control: { type: "text", key: "cliPath" } },
+        { name: "\u8CC7\u6599\u593E", desc: `\u4E3B\u984C\u8CC7\u6599\u593E\uFF1A${this.plugin.settings.topicsFolder} \xB7 \u672A\u5206\u985E\u6536\u4EF6\u5323\uFF1A${this.plugin.settings.inboxFolder}`, searchable: false }
+      ]
+    }];
+  }
+  getControlValue(key) {
+    return key in this.plugin.settings ? this.plugin.settings[key] : void 0;
+  }
+  async setControlValue(key, value) {
+    if (typeof value !== "string" || !["codexAcpPath", "claudePath", "cliModel", "models", "cliPath"].includes(key)) return;
+    this.plugin.settings[key] = value.trim();
+    await this.plugin.saveSettings();
+  }
   display() {
     this.containerEl.empty();
     new import_obsidian2.Setting(this.containerEl).setName("AI providers").setHeading();

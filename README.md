@@ -38,7 +38,7 @@ The map shows the structure and current understanding at a glance. The underlyin
 - A local Codex installation signed in to your account. Codex models use [`codex-acp`](https://github.com/agentclientprotocol/codex-acp), with Codex CLI as the fallback.
 - Optional: a signed-in Claude Code CLI for `claude:*` models.
 - These are the only supported AI execution backends: `codex-acp`, Codex CLI, and Claude Code CLI.
-- Current version: `0.4.1`. It has been tested on macOS; other desktop platforms may require custom executable paths.
+- Current version: `0.4.2`. It has been tested on macOS; other desktop platforms may require custom executable paths.
 
 ### Install
 
@@ -134,7 +134,7 @@ Visual Agent Map 是一個桌面版 Obsidian 外掛，用視覺化心智圖拆�
 - 已安裝並登入本機 Codex；Codex 模型主要透過 [`codex-acp`](https://github.com/agentclientprotocol/codex-acp) 執行，失敗時改用 Codex CLI。
 - 選用：使用 `claude:*` 模型時需要已登入的 Claude Code CLI。
 - 目前只支援三種 AI 執行後端：`codex-acp`、Codex CLI、Claude Code CLI。
-- 目前版本為 `0.4.1`，已在 macOS 驗證；其他桌面平台可能需要自行設定執行檔路徑。
+- 目前版本為 `0.4.2`，已在 macOS 驗證；其他桌面平台可能需要自行設定執行檔路徑。
 
 ### 安裝
 

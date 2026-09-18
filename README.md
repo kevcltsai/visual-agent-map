@@ -35,7 +35,7 @@ Visual Agent Map is a desktop-only Obsidian plugin for breaking a broad question
 - Obsidian desktop `1.7.2` or later.
 - A local Codex installation signed in to your account.
 - [`codex-acp`](https://github.com/agentclientprotocol/codex-acp) is preferred; Codex CLI is used only when ACP has a prompt-before transport error.
-- Desktop only. Current release: `0.5.2`.
+- Desktop only. Current release: `0.5.3`.
 
 ### Install
 

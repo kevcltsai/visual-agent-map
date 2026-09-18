@@ -34,10 +34,10 @@ Visual Agent Map is a desktop-only Obsidian plugin for breaking a broad question
 
 ### Requirements
 
-- Obsidian desktop `1.7.2` or later.
+- Obsidian desktop `1.13.7` or later (the verified compatibility baseline for this release).
 - A local Codex installation signed in to your account.
 - [`codex-acp`](https://github.com/agentclientprotocol/codex-acp) is preferred; Codex CLI is used only when ACP has a prompt-before transport error.
-- Desktop only. Current release: `0.6.0`.
+- Desktop only. Current release: `0.6.1`.
 
 ### Install
 
@@ -102,6 +102,23 @@ Visual Agent Map 是桌面版 Obsidian 外掛：用視覺化心智圖拆解複�
 - **偵錯日誌**：可從命令面板查看、複製或清除 VAM 執行記錄。
 - **使用本機登入狀態**：使用本機已登入的 Codex 工具，不儲存 API key。
 
+![議題工作台與 Markdown 詳細內容](assets/screenshots/topic-workspace.png)
+
+### 使用方式
+
+1. 為研究主題建立一張心智圖。
+2. 新增議題與子議題，定義需要回答的問題。
+3. 選擇並確認一項聚焦的 Codex 任務。
+4. 在心智圖查看摘要，在 Markdown 筆記閱讀完整內容。
+5. 繼續研究，或將相關發現整合成新的議題。
+
+### 系統需求
+
+- Obsidian 桌面版 `1.13.7` 或更新版本（本版本實際驗證的相容性基線）。
+- 已在本機安裝並登入 Codex。
+- 建議使用 [`codex-acp`](https://github.com/agentclientprotocol/codex-acp)；只有 ACP 在送出 prompt 前發生 transport error 時，才會改用 Codex CLI。
+- 僅支援桌面版。目前版本：`0.6.1`。
+
 ### 安裝
 
 請從指定的 [GitHub Release](https://github.com/kevcltsai/visual-agent-map/releases) 下載 `main.js`、`manifest.json`、`styles.css`；不要使用 branch 檔案。
@@ -113,13 +130,26 @@ Visual Agent Map 是桌面版 Obsidian 外掛：用視覺化心智圖拆解複�
 
 不要把整個 repository 複製到外掛資料夾，也不要在該資料夾執行 `npm install`。可參考 [INSTALL.md](INSTALL.md) 的安裝說明。
 
-### 資料保存與隱私
+### Vault 資料
+
+```text
+Agent Workspace/
+├── Topics/
+│   └── <topic>/
+│       ├── Map.md
+│       ├── Notes/
+│       ├── Unassigned/
+│       └── Archive/
+└── Inbox/
+```
 
 外掛建立的資料保存在 Vault 的 `Agent Workspace/`。全新安裝只建立空的基本結構並開啟唯讀內建範例；卸載外掛不會刪除 Workspace 內容。
 
+### 隱私與網路存取
+
 - 不含 telemetry，也不儲存 API key。
-- 只有你確認執行 AI 任務後，外掛才會將必要議題內容、規則與任務交給本機已登入的 Codex 工具。
-- 外掛不會自行安裝或更新 `codex-acp`／Codex CLI。
+- 只有你確認執行 AI 任務後，外掛才會將相關議題內容、指令與任務交給本機已登入的 Codex 工具。
+- 外掛會在 Vault 外執行設定的 `codex-acp` 或 Codex CLI，但不會自行安裝或更新它們。
 - Markdown 的遠端圖片會依 Obsidian 一般行為連線至對應圖片來源。
 
 ### 目前限制
@@ -127,6 +157,10 @@ Visual Agent Map 是桌面版 Obsidian 外掛：用視覺化心智圖拆解複�
 - 僅支援桌面版，已上架 Obsidian Community Plugin catalog。
 - 尚未包含自動排列、節點搜尋、多母議題與永久任務歷史。
 - 復原／重做只保留在目前 Obsidian 工作階段。
+
+### 從原始碼建置
+
+在 repository 根目錄執行 `npm ci`、`npm run build` 與 `npm test`。正式產物為 `main.js`、`manifest.json`、`styles.css`。
 
 ## License
 

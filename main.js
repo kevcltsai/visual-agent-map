@@ -3339,50 +3339,16 @@ var VisualAgentMapSettingTab = class extends import_obsidian5.PluginSettingTab {
     ];
   }
   async setControlValue(key, value) {
-    if (key === "language") this.plugin.settings.language = value === "en" ? "en" : "zh-TW";
+    const languageChanged = key === "language";
+    if (languageChanged) this.plugin.settings.language = value === "en" ? "en" : "zh-TW";
     else if (typeof value === "string" && (key === "cliPath" || key === "codexAcpPath" || key === "cliModel" || key === "models")) this.plugin.settings[key] = value.trim();
     else return;
     setUiLanguage(this.plugin.settings.language);
     await this.plugin.saveSettings();
-  }
-  display() {
-    this.containerEl.empty();
-    ;
-    new import_obsidian5.Setting(this.containerEl).setName(t("\u4ECB\u9762\u8A9E\u8A00")).addDropdown((input) => input.addOption("zh-TW", "\u7E41\u9AD4\u4E2D\u6587").addOption("en", "English").setValue(this.plugin.settings.language).onChange(async (value) => {
-      this.plugin.settings.language = value === "en" ? "en" : "zh-TW";
-      setUiLanguage(this.plugin.settings.language);
-      await this.plugin.saveSettings();
+    if (languageChanged) {
       for (const view of this.plugin.views()) await view.refreshFromPlugin();
-      this.display();
-    }));
-    this.containerEl.createEl("p", { text: t("\u4F7F\u7528\u672C\u6A5F Codex ACP \u767B\u5165\u72C0\u614B\u3002AI \u4EFB\u52D9\u5B8C\u6210\u5F8C\u6703\u76F4\u63A5\u66F4\u65B0\u76EE\u524D\u7406\u89E3\uFF0C\u5B8C\u6574\u7D50\u679C\u4FDD\u5B58\u5728\u8B70\u984C MD \u8A73\u60C5\u4E2D\u3002") });
-    const text2 = (name, key, desc) => {
-      new import_obsidian5.Setting(this.containerEl).setName(name).setDesc(desc).addText((input) => input.setValue(this.plugin.settings[key]).onChange(async (value) => {
-        this.plugin.settings[key] = value.trim();
-        await this.plugin.saveSettings();
-      }));
-    };
-    text2(t("Codex ACP \u8DEF\u5F91"), "codexAcpPath", t("\u7528\u65BC\u5E38\u99D0 Codex session \u8207\u81EA\u52D5\u53D6\u5F97\u6A21\u578B\u6E05\u55AE\u3002"));
-    text2(t("\u5DE5\u4F5C\u5340\u9810\u8A2D Model"), "cliModel", t("\u76EE\u524D\u6700\u4F4E\u6210\u672C\u6A21\u578B\u70BA gpt-5.6-luna\uFF1B\u8B8A\u66F4\u53EA\u5F71\u97FF\u4E4B\u5F8C\u65B0\u589E\u7684\u6839\u8B70\u984C\u3002"));
-    text2(t("Model \u9078\u55AE"), "models", t("\u555F\u52D5\u5F8C\u6703\u512A\u5148\u88DC\u5165 Codex ACP \u56DE\u5831\u7684\u6A21\u578B\u3002"));
-    this.containerEl.createEl("p", { cls: "setting-item-description", text: t("\u4E00\u822C\u4EFB\u52D9\u4F7F\u7528\u4F4E\u63A8\u7406\uFF1B\u6574\u5408\u5B50\u8B70\u984C\u4F7F\u7528\u9AD8\u63A8\u7406\u3002") });
-    const advanced = this.containerEl.createEl("details");
-    advanced.createEl("summary", { text: "Advanced" });
-    new import_obsidian5.Setting(advanced).setName(t("Codex CLI fallback \u8DEF\u5F91")).setDesc(t("\u53EA\u6709 Codex ACP \u5728 prompt \u524D\u767C\u751F transport error \u6642\u624D\u4F7F\u7528\u3002")).addText((input) => input.setValue(this.plugin.settings.cliPath).onChange(async (value) => {
-      this.plugin.settings.cliPath = value.trim();
-      await this.plugin.saveSettings();
-    }));
-    this.containerEl.createEl("p", { text: t("\u4E3B\u984C\u8CC7\u6599\u593E\uFF1A{0}\u3000\u672A\u5206\u985E\u6536\u4EF6\u5323\uFF1A{1}", this.plugin.settings.topicsFolder, this.plugin.settings.inboxFolder) });
-    new import_obsidian5.Setting(this.containerEl).setName(t("\u4FEE\u5FA9 Agent Workspace")).setDesc(t("\u53EA\u5EFA\u7ACB\u7F3A\u5C11\u7684\u57FA\u672C\u8CC7\u6599\u593E\uFF0C\u4E0D\u6703\u5FA9\u539F\u3001\u642C\u79FB\u6216\u8986\u5BEB\u7B46\u8A18\u8207\u5FC3\u667A\u5716\u3002")).addButton((button) => button.setButtonText(t("\u4FEE\u5FA9")).onClick(() => {
-      void this.plugin.mutate(() => this.plugin.repairWorkspace());
-    }));
-    new import_obsidian5.Setting(this.containerEl).setName(t("\u627E\u56DE\u65E2\u6709 Workspace")).setDesc(t("\u6383\u63CF\u53EF\u8FA8\u8B58\u7684 VAM Workspace\uFF0C\u78BA\u8A8D\u5F8C\u624D\u91CD\u65B0\u9023\u7D50\uFF0C\u4E0D\u6703\u642C\u79FB\u6216\u8986\u5BEB\u8CC7\u6599\u3002")).addButton((button) => button.setButtonText(t("\u6383\u63CF")).onClick(() => {
-      void this.plugin.offerWorkspaceReconnect();
-    }));
-    const diagnostic = this.plugin.codexAcpDiagnostic();
-    new import_obsidian5.Setting(this.containerEl).setName(t("Codex ACP \u72C0\u614B")).setDesc(diagnostic.installed ? t("\u5DF2\u627E\u5230\uFF1A{0}", diagnostic.executable) : t("\u672A\u627E\u5230 Codex ACP\u3002\u8ACB\u5148\u5B89\u88DD @agentclientprotocol/codex-acp \u4E26\u5B8C\u6210 Codex \u767B\u5165\uFF1BVAM \u4E0D\u6703\u81EA\u52D5\u5B89\u88DD\u7CFB\u7D71\u5957\u4EF6\u3002")).addButton((button) => button.setButtonText(t("\u91CD\u65B0\u6AA2\u67E5")).onClick(() => {
-      void this.plugin.recheckCodexAcp();
-    }));
+      this.update();
+    }
   }
 };
 var VisualAgentMapPlugin = class extends import_obsidian5.Plugin {

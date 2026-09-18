@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.6.1] - 2026-09-19
+
+### Fixed
+
+- Aligned the English and Traditional Chinese README so both languages publish the same usage, requirements, installation, data, privacy, limitations, and build information.
+- Replaced the unverified Obsidian `1.7.2` compatibility claim with the verified `1.13.7` baseline across README, manifest, and version metadata.
+- Added release checks that reject README language drift and inconsistent public version or compatibility metadata.
+
 ## [0.6.0] - 2026-09-19
 
 ### Added

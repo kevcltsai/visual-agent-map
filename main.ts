@@ -1021,34 +1021,16 @@ class VisualAgentMapSettingTab extends PluginSettingTab {
     ];
   }
   async setControlValue(key: string, value: unknown): Promise<void> {
-    if (key === "language") this.plugin.settings.language = value === "en" ? "en" : "zh-TW";
+    const languageChanged = key === "language";
+    if (languageChanged) this.plugin.settings.language = value === "en" ? "en" : "zh-TW";
     else if (typeof value === "string" && (key === "cliPath" || key === "codexAcpPath" || key === "cliModel" || key === "models")) this.plugin.settings[key] = value.trim();
     else return;
     setUiLanguage(this.plugin.settings.language);
     await this.plugin.saveSettings();
-  }
-  display(): void {
-    this.containerEl.empty(); ;
-    new Setting(this.containerEl).setName(t("介面語言")).addDropdown(input => input.addOption("zh-TW", "繁體中文").addOption("en", "English").setValue(this.plugin.settings.language).onChange(async value => {
-      this.plugin.settings.language = value === "en" ? "en" : "zh-TW";
-      setUiLanguage(this.plugin.settings.language); await this.plugin.saveSettings();
+    if (languageChanged) {
       for (const view of this.plugin.views()) await view.refreshFromPlugin();
-      this.display();
-    }));
-    this.containerEl.createEl("p", { text: t("使用本機 Codex ACP 登入狀態。AI 任務完成後會直接更新目前理解，完整結果保存在議題 MD 詳情中。") });
-    const text = (name: string, key: "cliPath" | "codexAcpPath" | "cliModel" | "models", desc: string): void => { new Setting(this.containerEl).setName(name).setDesc(desc).addText(input => input.setValue(this.plugin.settings[key]).onChange(async value => { this.plugin.settings[key] = value.trim(); await this.plugin.saveSettings(); })); };
-    text(t("Codex ACP 路徑"), "codexAcpPath", t("用於常駐 Codex session 與自動取得模型清單。")); text(t("工作區預設 Model"), "cliModel", t("目前最低成本模型為 gpt-5.6-luna；變更只影響之後新增的根議題。")); text(t("Model 選單"), "models", t("啟動後會優先補入 Codex ACP 回報的模型。"));
-    this.containerEl.createEl("p", { cls: "setting-item-description", text: t("一般任務使用低推理；整合子議題使用高推理。") });
-    const advanced = this.containerEl.createEl("details"); advanced.createEl("summary", { text: "Advanced" });
-    new Setting(advanced).setName(t("Codex CLI fallback 路徑")).setDesc(t("只有 Codex ACP 在 prompt 前發生 transport error 時才使用。")).addText(input => input.setValue(this.plugin.settings.cliPath).onChange(async value => { this.plugin.settings.cliPath = value.trim(); await this.plugin.saveSettings(); }));
-    this.containerEl.createEl("p", { text: t("主題資料夾：{0}　未分類收件匣：{1}", this.plugin.settings.topicsFolder, this.plugin.settings.inboxFolder) });
-    new Setting(this.containerEl).setName(t("修復 Agent Workspace")).setDesc(t("只建立缺少的基本資料夾，不會復原、搬移或覆寫筆記與心智圖。"))
-      .addButton(button => button.setButtonText(t("修復")).onClick(() => { void this.plugin.mutate(() => this.plugin.repairWorkspace()); }));
-    new Setting(this.containerEl).setName(t("找回既有 Workspace")).setDesc(t("掃描可辨識的 VAM Workspace，確認後才重新連結，不會搬移或覆寫資料。"))
-      .addButton(button => button.setButtonText(t("掃描")).onClick(() => { void this.plugin.offerWorkspaceReconnect(); }));
-    const diagnostic = this.plugin.codexAcpDiagnostic();
-    new Setting(this.containerEl).setName(t("Codex ACP 狀態")).setDesc(diagnostic.installed ? t("已找到：{0}", diagnostic.executable) : t("未找到 Codex ACP。請先安裝 @agentclientprotocol/codex-acp 並完成 Codex 登入；VAM 不會自動安裝系統套件。"))
-      .addButton(button => button.setButtonText(t("重新檢查")).onClick(() => { void this.plugin.recheckCodexAcp(); }));
+      this.update();
+    }
   }
 }
 export default class VisualAgentMapPlugin extends Plugin {

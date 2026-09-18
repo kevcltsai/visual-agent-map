@@ -1,69 +1,131 @@
-# Visual Agent Map v0.5
+# Visual Agent Map
 
-v0.5 是可交付版本，沿用「一個研究主題一個資料夾」的心智圖、活動筆記、未歸類筆記與封存資料結構。
+Turn complex questions into a visual research map while keeping every result in editable Markdown.
 
-## 已實作
+[English](#english) · [繁體中文](#繁體中文)
 
-- 每張心智圖可新增、開啟、重新命名及移到 Vault 垃圾桶。
-- 新主題位於 `Agent Workspace/Topics/<主題>/`，包含 `Map.md`、`Notes/`、`Unassigned/` 與 `Archive/`。
-- 來源不明的舊孤兒筆記集中在 `Agent Workspace/Inbox/`。
-- 從圖中移除節點時，筆記移入同主題 `Unassigned`；可重新認領、封存或移至其他主題。
-- 封存筆記必須先取消封存，才可重新加入心智圖。
-- 節點可選擇 Model，並支援自訂模型 ID。根議題使用設定中的預設值；子議題建立時複製母議題目前的值，之後各自獨立。
-- 修改母議題或刪除連結；每個節點至多一個母議題，不允許循環連結。
-- 滾輪縮放、空白處拖曳平移與顯示全部。
-- 移動節點，收合／展開分支；收合時顯示隱藏的節點數。
-- 移除單一節點並將子議題提升為根議題，或移除整個分支。筆記會移至同主題 `Unassigned`，可透過「未歸類」重新認領。
-- 復原／重做節點新增、移除、移動、文字與 Model 編輯、連結與收合操作，以及心智圖重新命名、刪除。
-- 圖面顯示議題、目前理解與需要處理的狀態；成功狀態不佔用卡片注意力。點選節點開啟工作台，右上角詳情按鈕在固定的右側 Markdown 欄開啟完整內容。
-- 浮動預覽依 Markdown 原有順序呈現文字、圖片與表格，不顯示「預覽」標籤；停留 0.7 秒後出現，拖曳時取消預覽。
-- 主工具列只保留高頻操作；分類管理集中在「整理」，低頻心智圖管理集中在「更多…」。
-- 多選後只保留「建立整合議題」，並自動保存來源當下內容，不要求選擇連結模式。
-- 「整合子議題發現」在執行前確認一次，完成後直接更新目前理解與 MD Detail，保留 預覽 與來源子議題連結。
-- 舊版全域 `Maps/`、`Nodes/` 可從心智圖工具列預覽後整理；確認前不搬移任何檔案，孤兒筆記進入 Inbox。
+![Visual Agent Map overview](assets/screenshots/map-overview.png)
 
-## 操作流程
+## English
 
-Visual Agent Map 的 Codex 模型只會使用你的 Codex 流量，不會使用 ChatGPT 流量。開始前請準備既有的 ChatGPT 帳號，並在本機完成 Codex CLI 登入；外掛不提供獨立帳號，也不會保存 API key。
+Visual Agent Map is a desktop-only Obsidian plugin for breaking a broad question into connected topics, running focused Codex tasks, and preserving the results as ordinary Markdown notes. The map shows structure and current understanding at a glance; notes remain readable, editable, and portable without the plugin.
 
-## 外部服務與資料
+### Highlights
 
-- 外掛會透過本機已登入的 Codex CLI 或 `codex-acp`，將你確認執行的 AI 任務、目前議題內容與必要的關聯脈絡交給 Codex 服務處理。
-- 外掛會啟動你在設定中指定、位於 Obsidian Vault 外部的 Codex 或 `codex-acp`；這是執行外部 AI 任務與使用既有登入狀態所必需。外掛不會自行安裝、更新或自我更新這些工具。
-- 外掛不含 client-side telemetry；AI 任務以外不會將 Vault 內容傳送至外部服務。含遠端圖片網址的 Markdown 預覽，會依 Obsidian 的一般圖片載入行為向該圖片來源請求內容。
+- **Visual topic map** — create topics and subtopics, drag nodes, collapse branches, zoom, and change parent relationships.
+- **Focused topic workspace** — keep current understanding, reusable AI rules, and the next task beside each topic.
+- **Codex-assisted research** — research, compare options, check risks, propose subtopics, or synthesize findings.
+- **Markdown-first storage** — each topic is a normal Markdown note; the map structure is stored in `Map.md`.
+- **Knowledge organization** — remove notes from a map without deleting them; reclaim, archive, or move them later.
+- **Safer editing** — previewed migration, conflict handling, and session undo/redo protect existing work.
+- **Local credentials** — uses locally signed-in Codex tools and never stores API keys.
 
-1. 安裝並開啟外掛後，首次使用會顯示一次性說明，確認你了解帳號與流量的使用方式。
-2. 在工具列新增心智圖，或開啟既有心智圖。
-3. 點「＋ 議題」，選取卡片並編輯議題與目前理解。
-4. 在 Model 下拉選單選模型；選「自訂模型…」可輸入模型 ID。Codex 模型會透過 `codex-acp` 執行；下拉候選可由 ACP 自動補入，也可在外掛設定的「Model 選單」以逗號分隔設定。
-5. 從「選擇下一步」手動新增子議題。新節點會繼承建立當下的母議題模型。
-6. 在「母議題／連結」選擇新的母議題，或選「無母議題」解除連結。模型不因移接而改變。
-7. 點「選擇下一步」選擇研究、比較、風險檢查或「自己描述下一步」；送出前可檢查任務，完成後直接更新目前理解與 MD Detail。
-8. 不在文字欄位中時，可使用 `Cmd/Ctrl+Z` 復原、`Cmd/Ctrl+Shift+Z` 重做。文字欄位使用原生文字復原，離開欄位後保存。
-9. 使用「整理」管理未歸類、封存與收件匣；檔案搬移與認領在目前工作階段可復原。
+![Topic workspace and Markdown detail](assets/screenshots/topic-workspace.png)
 
-## 資料規則
+### How it works
 
-- 心智圖檔案的 `agent-map` 資料區塊保存節點引用、單一母議題關係、座標、收合及視角；其他 Markdown 說明文字會保留。
-- 議題筆記保存議題、目前理解、規則、Model、狀態、Prompt 和完整 Detail。一份議題筆記同一時間只能屬於一張心智圖。
-- 編輯標題不自動更改議題筆記檔名；可在 Obsidian 檔案列表重新命名，外掛會更新引用。
-- 刪除心智圖使用 Vault `.trash`，保留所有議題筆記。永久刪除筆記請使用 Obsidian 檔案管理功能。
-- 復原紀錄保存在目前開啟的視圖中（最多 80 步），不跨外掛重新載入或切換心智圖保存。外部修改圖結構、筆記重新命名或 AI 結果回來時會清除相關歷史，避免用舊快照覆蓋新狀態。
-- 舊資料不在外掛啟動時自動搬移。使用「整理舊資料」先查看 Map、圖內筆記與孤兒數量，再確認遷移。
-- 工作區預設 Model 為 `gpt-5.6-luna`。一般任務使用 low reasoning，整合子議題使用 high reasoning。新版筆記建立 `Rules` 供 AI 規則使用，但不建立 Working Findings；舊 Findings 會在下一次 AI 任務完成時移入 Detail。
-- AI 回傳的視覺參考會收進 Detail 內的「視覺參考」段落，不再另建 `Visual References` 區塊；使用者可像一般 Markdown 內容一樣編輯。
+1. Create a mind map for a research subject.
+2. Add topics and subtopics to define the questions to answer.
+3. Choose and confirm a focused Codex task.
+4. Review the summary on the map and the full Markdown detail.
+5. Continue research or synthesize related findings into a new topic.
 
-## 本版範圍外
+### Requirements
 
-自動排列、拖動整個分支、搜尋節點、多母議題及完整任務歷史尚未加入。AI 任務預設採用 `codex-acp` 常駐 session；只有在 prompt 前發生 ACP transport error 時才會 fallback 到 `codex exec`。
+- Obsidian desktop `1.7.2` or later.
+- A local Codex installation signed in to your account.
+- [`codex-acp`](https://github.com/agentclientprotocol/codex-acp) is preferred; Codex CLI is used only when ACP has a prompt-before transport error.
+- Desktop only. Current release: `0.5.2`.
 
-## 驗證
+### Install
 
-- `npm run build`：TypeScript 檢查及 esbuild 建置。
-- `npm test`：圖結構、模型繼承、資料保存、匯入、復原及 CLI 參數測試；CLI 測試使用替身，不消耗帳號額度。
-- 已在桌面版 Obsidian 實測主要圖編輯操作、hover 預覽與外掛重載後狀態。
+Download `main.js`, `manifest.json`, and `styles.css` from the exact [GitHub Release](https://github.com/kevcltsai/visual-agent-map/releases) you choose. Do not install from a branch.
 
-參見 [安裝說明](INSTALL.md)。
+1. Create `<your-vault>/.obsidian/plugins/visual-agent-map/`.
+2. Place the three release assets in that folder, preserving an existing `data.json`.
+3. Reload Obsidian and enable **Visual Agent Map** under **Settings → Community plugins**.
+4. Confirm the local `codex-acp` and Codex CLI paths in plugin settings.
 
-- 外掛設定提供「介面語言」繁體中文／English，預設繁體中文；不改寫既有 MD 或改變 AI 回答語言。
-- 整合根議題可拖曳、從圖中移除與復原，來源連結保存在 MD 的 Reference Links 區塊；來源改名或移動時同步更新。
+Do not copy the repository or run `npm install` inside the plugin directory. See [INSTALL.md](INSTALL.md) for agent-assisted installation.
+
+### Vault data
+
+```text
+Agent Workspace/
+├── Topics/
+│   └── <topic>/
+│       ├── Map.md
+│       ├── Notes/
+│       ├── Unassigned/
+│       └── Archive/
+└── Inbox/
+```
+
+Plugin-created content stays in the vault. Existing general Markdown is not modified during onboarding unless you explicitly create a map.
+
+### Privacy and network access
+
+- No telemetry and no stored API keys.
+- A topic task is sent to the locally signed-in Codex tool only after you explicitly confirm it. Relevant topic content, instructions, and the task are included as context.
+- The plugin runs configured `codex-acp` or Codex CLI outside the vault; it never installs or updates them.
+- Remote images in Markdown follow Obsidian's ordinary image-loading behavior.
+
+### Current limitations
+
+- Desktop only; not yet distributed through the Obsidian Community Plugin catalog.
+- No automatic layout, node search, multiple parents, or persistent task history.
+- Undo/redo lasts for the current Obsidian session.
+
+### Build from source
+
+Run `npm ci`, `npm run build`, and `npm test` at the repository root. The production assets are `main.js`, `manifest.json`, and `styles.css`.
+
+---
+
+## 繁體中文
+
+Visual Agent Map 是桌面版 Obsidian 外掛：用視覺化心智圖拆解複雜問題、執行聚焦的 Codex 任務，並將所有結果保存為一般 Markdown 筆記。
+
+心智圖讓你快速掌握研究結構與目前結論；即使不使用外掛，底層筆記仍可直接閱讀、編輯與搬移。
+
+### 主要功能
+
+- **視覺化議題地圖**：建立議題與子議題、拖曳節點、收合分支、縮放，以及調整母子關係。
+- **議題工作台**：在每個節點旁管理目前理解、AI 規則與下一步任務。
+- **Codex 輔助研究**：研究、比較、風險檢查、拆解子議題與整合發現。
+- **Markdown 優先**：每個節點都是普通 Markdown 筆記，圖面結構保存在 `Map.md`。
+- **知識整理**：從圖上移除筆記不會刪除內容，之後仍可認領、封存或移至其他主題。
+- **安全編輯**：遷移預覽、衝突處理與工作階段復原／重做，降低影響既有資料的風險。
+- **使用本機登入狀態**：使用本機已登入的 Codex 工具，不儲存 API key。
+
+### 安裝
+
+請從指定的 [GitHub Release](https://github.com/kevcltsai/visual-agent-map/releases) 下載 `main.js`、`manifest.json`、`styles.css`；不要使用 branch 檔案。
+
+1. 建立 `<你的-vault>/.obsidian/plugins/visual-agent-map/`。
+2. 放入三個 release assets，並保留既有的 `data.json`。
+3. 重新載入 Obsidian，在 **設定 → 第三方外掛** 啟用 **Visual Agent Map**。
+4. 在外掛設定確認本機 `codex-acp` 與 Codex CLI 路徑。
+
+不要把整個 repository 複製到外掛資料夾，也不要在該資料夾執行 `npm install`。可參考 [INSTALL.md](INSTALL.md) 的安裝說明。
+
+### 資料保存與隱私
+
+外掛建立的資料保存在 Vault 的 `Agent Workspace/`。首次 onboarding 不會修改既有一般 Markdown，除非你明確選擇建立心智圖。
+
+- 不含 telemetry，也不儲存 API key。
+- 只有你確認執行 AI 任務後，外掛才會將必要議題內容、規則與任務交給本機已登入的 Codex 工具。
+- 外掛不會自行安裝或更新 `codex-acp`／Codex CLI。
+- Markdown 的遠端圖片會依 Obsidian 一般行為連線至對應圖片來源。
+
+### 目前限制
+
+- 僅支援桌面版，尚未上架 Obsidian Community Plugin catalog。
+- 尚未包含自動排列、節點搜尋、多母議題與永久任務歷史。
+- 復原／重做只保留在目前 Obsidian 工作階段。
+
+## License
+
+Copyright © 2026 Kevin Tsai.
+
+This project is licensed under the GNU Affero General Public License Version 3 (AGPL-3.0-only). See [LICENSE](LICENSE).

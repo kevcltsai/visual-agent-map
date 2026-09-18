@@ -1,5 +1,11 @@
 # Changelog
 
+## [0.5.3] - 2026-09-18
+
+### Changed
+
+- Restored the public GitHub README as a product landing page with clear installation, requirements, privacy, limitations, and bilingual guidance.
+
 ## [0.5.2] - 2026-09-18
 
 ### Changed

@@ -1,5 +1,30 @@
 # Changelog
 
+## [0.6.0] - 2026-09-19
+
+### Added
+
+- Added a bilingual, built-in Taiwan travel sample that demonstrates both subtopic exploration and synthesis into a new journey root.
+- Added a short, repeatable sample tour and one-click duplication into a normal editable workspace map.
+- Rebuilt the sample from canonical Map/Note Markdown, expanded it to 12 nodes, and added five bundled images plus Preview image/table examples.
+- Added explicit Agent Workspace recovery in the empty state, settings, and Command Palette.
+- Added read-only discovery and user-confirmed reconnection for custom VAM workspaces after reinstall.
+- Added an in-memory debug log with a Command Palette viewer, timestamped levels, refresh, copy, and clear actions; ACP initialization, malformed responses, and AI task failures are now captured explicitly.
+- Added reproducible onboarding, normal-use, and reinstall test-vault profiles with SHA-256 workspace integrity verification.
+
+### Changed
+
+- Fresh installs now create only the empty `Agent Workspace/Topics` and `Agent Workspace/Inbox` structure, then open the read-only sample without running AI or writing sample files to the Vault.
+- Existing installations never silently recreate a manually removed Agent Workspace; repair only restores missing base folders and never overwrites content.
+- New installs no longer assume the Apple Silicon Homebrew path for `codex-acp`; macOS discovery now covers Homebrew, local npm prefixes, Volta, fnm, nvm, and the inherited PATH.
+- ACP responses may include brief progress prose before the structured result; VAM now extracts and validates the final complete JSON object instead of failing the task on that prefix.
+- Settings now shows the resolved Codex ACP status and provides an explicit recheck action; VAM never installs or updates system dependencies automatically.
+- The Codex CLI fallback schema is embedded in `main.js`, so standard three-file Community Plugin installations no longer depend on an extra release asset.
+
+### Validation
+
+- Built-in sample schema, bilingual content, duplicate identity isolation, workspace repair, replacement onboarding contract, and debug-log behavior are covered by automated tests.
+
 ## [0.5.3] - 2026-09-18
 
 ### Changed

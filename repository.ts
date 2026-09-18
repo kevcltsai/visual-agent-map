@@ -42,6 +42,8 @@ export interface Settings {
   migrated: boolean;
   structureVersion: number;
   firstUseNoticeSeen: boolean;
+  workspaceInitialized: boolean;
+  sampleTourVersionSeen: number;
 }
 export interface TopicInfo { id: string; title: string; mapPath: string; root: string }
 export interface BrokenTopic { title: string; root: string; noteCount: number }
@@ -59,14 +61,16 @@ export const DEFAULT_SETTINGS: Settings = {
   mapsFolder: "Agent Workspace/Maps",
   mapId: "default",
   cliPath: "codex",
-  codexAcpPath: "/opt/homebrew/bin/codex-acp",
+  codexAcpPath: "codex-acp",
   cliModel: "gpt-5.6-luna",
   cliReasoning: "low",
   previewScale: 120,
   models: "gpt-6-astra, gpt-5.6-sol, gpt-5.6-terra, gpt-5.6-luna, gpt-5.5",
   migrated: false,
   structureVersion: 2,
-  firstUseNoticeSeen: false
+  firstUseNoticeSeen: false,
+  workspaceInitialized: false,
+  sampleTourVersionSeen: 0
 };
 
 const REFERENCE_START = "<!-- visual-agent-map:references:start -->";
@@ -253,6 +257,24 @@ export class Repository {
       current = current ? `${current}/${part}` : part;
       if (!this.app.vault.getAbstractFileByPath(current)) await this.app.vault.createFolder(current);
     }
+  }
+
+  workspaceExists(): boolean { return this.app.vault.getAbstractFileByPath(this.settings.workspaceFolder) instanceof TFolder; }
+
+  async workspaceCandidates(): Promise<string[]> {
+    const candidates = new Set<string>();
+    for (const file of this.app.vault.getMarkdownFiles()) {
+      const match = file.path.match(/^(.*)\/Topics\/[^/]+\/Map\.md$/);
+      if (!match?.[1]) continue;
+      try { parseMap(await this.app.vault.read(file)); candidates.add(match[1]); }
+      catch { /* Ignore unrelated files named Map.md. */ }
+    }
+    return [...candidates].sort((left, right) => left.localeCompare(right));
+  }
+
+  async ensureWorkspace(): Promise<void> {
+    await this.folder(this.settings.topicsFolder);
+    await this.folder(this.settings.inboxFolder);
   }
 
   unique(folder: string, name: string): string {

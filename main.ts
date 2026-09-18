@@ -2,15 +2,19 @@ import { t, setUiLanguage } from "./i18n";
 import { App, MarkdownRenderer, FileSystemAdapter, ItemView, MarkdownView, Modal, Notice, Plugin, PluginSettingTab, Setting, TFile, WorkspaceLeaf, type SettingDefinitionItem } from "obsidian";
 import { NameModal } from "./ui/modals/name-modal";
 import { ChoiceModal } from "./ui/modals/choice-modal";
+import { DebugLogModal } from "./ui/modals/debug-log-modal";
 import { spawn, type ChildProcessWithoutNullStreams } from "node:child_process";
-import { existsSync } from "node:fs";
-import { join } from "node:path";
+import { existsSync, readdirSync, writeFileSync } from "node:fs";
+import { delimiter, join } from "node:path";
 import { canParent, clone, descendants, History, inheritModel, MapDocument, MapNode, parseMap, removeNodes, serializeMap, visibleNodes } from "./map-model";
 import { DEFAULT_SETTINGS, ModelSource, Note, NotePatch, Repository, Settings, TopicInfo, TopicState } from "./repository";
 import { buildPreparedTaskContext, estimateTokens } from "./ai/context-builder";
 import { canonicalDetail, visualReferencesMarkdown } from "./ai/result-utils";
 import type { AiResult, Suggestion, TaskContext } from "./ai/types";
 import { clampPreviewScale, legacyPreviewScale, previewMetrics } from "./ui/preview-utils";
+import { BUILTIN_SAMPLE_ID, builtInSample, SAMPLE_TOUR_VERSION } from "./builtin-sample";
+import { debugLog, LogManager } from "./log-manager";
+import responseSchema from "./response-schema.json";
 
 export { buildPreparedTaskContext } from "./ai/context-builder";
 export { canonicalDetail, visualReferencesMarkdown } from "./ai/result-utils";
@@ -30,23 +34,52 @@ class AcpModelError extends Error { constructor(message: string) { super(message
 class AcpParseError extends Error { constructor(message: string) { super(message); this.name = "AcpParseError"; } }
 const ACP_CONTROL_TIMEOUT_MS = 30_000;
 const ACP_PROMPT_TIMEOUT_MS = 15 * 60 * 1000;
-const labels = { idea: t("待研究"), running: t("AI 執行中"), completed: t("AI 完成"), error: t("執行錯誤") };
-type OnboardingChoice = "blank" | "sample" | "later";
-class FirstUseModal extends Modal {
-  private choice: OnboardingChoice = "later";
-  constructor(app: App, private complete: (choice: OnboardingChoice) => void) { super(app); }
-  onOpen(): void {
-    this.titleEl.setText(t("開始使用"));
-    this.contentEl.createEl("p", { text: t("先建立一張空白心智圖，或建立可自由編輯與刪除的範例。建立範例不會執行 AI 任務。"), cls: "vam-modal-intro" });
-    this.contentEl.createEl("p", { text: t("只有在你確認執行 AI 任務時，外掛才會使用本機已登入的 Codex CLI；不使用 ChatGPT 對話額度，且不保存 API key。"), cls: "vam-modal-intro" });
-    new Setting(this.contentEl).setName(t("建立空白心智圖")).setDesc(t("建立一個新的空白研究主題。"))
-      .addButton(button => button.setButtonText(t("建立")).onClick(() => { this.choice = "blank"; this.close(); }));
-    new Setting(this.contentEl).setName(t("建立範例心智圖")).setDesc(t("建立含有旅行規劃與三個子議題的可刪除範例。"))
-      .addButton(button => button.setButtonText(t("建立範例")).setCta().onClick(() => { this.choice = "sample"; this.close(); }));
-    new Setting(this.contentEl).addButton(button => button.setButtonText(t("稍後再說")).onClick(() => this.close()));
-  }
-  onClose(): void { this.complete(this.choice); }
+
+export function ensureResponseSchema(schemaPath: string): string {
+  if (!existsSync(schemaPath)) writeFileSync(schemaPath, `${JSON.stringify(responseSchema, null, 2)}\n`, "utf8");
+  return schemaPath;
 }
+
+export function extractJsonObject(raw: string): string {
+  const candidates: string[] = [];
+  let start = -1, depth = 0, quoted = false, escaped = false;
+  for (let index = 0; index < raw.length; index++) {
+    const character = raw[index];
+    if (start < 0) {
+      if (character === "{") { start = index; depth = 1; quoted = false; escaped = false; }
+      continue;
+    }
+    if (quoted) {
+      if (escaped) escaped = false;
+      else if (character === "\\") escaped = true;
+      else if (character === '"') quoted = false;
+      continue;
+    }
+    if (character === '"') quoted = true;
+    else if (character === "{") depth++;
+    else if (character === "}" && --depth === 0) { candidates.push(raw.slice(start, index + 1)); start = -1; }
+  }
+  for (const candidate of candidates.reverse()) {
+    try { JSON.parse(candidate); return candidate; }
+    catch { /* Continue to an earlier balanced object. */ }
+  }
+  throw new SyntaxError("Codex 回應中找不到完整 JSON object");
+}
+const LEGACY_CODEX_ACP_PATH = "/opt/homebrew/bin/codex-acp";
+export function executableCandidates(configured: string, home: string, pathValue: string, nvmVersions: string[] = []): string[] {
+  if (configured.includes("/") || configured.includes("\\")) return [configured];
+  const dirs = [
+    home ? join(home, ".local/bin") : "",
+    home ? join(home, ".npm-global/bin") : "",
+    home ? join(home, ".volta/bin") : "",
+    home ? join(home, ".fnm/current/bin") : "",
+    "/opt/homebrew/bin", "/usr/local/bin",
+    ...nvmVersions.map(version => join(home, ".nvm/versions/node", version, "bin")),
+    ...pathValue.split(delimiter)
+  ].filter(Boolean);
+  return [...new Set(dirs)].map(directory => join(directory, configured));
+}
+const labels = { idea: t("待研究"), running: t("AI 執行中"), completed: t("AI 完成"), error: t("執行錯誤") };
 class TaskModal extends Modal {
   constructor(app: App, private value: string, private submit: (value: string, run: boolean) => void, private titleText = t("自訂 AI 任務"), private description = t("描述這一步要請 AI 完成什麼。"), private rules = "") { super(app); }
   onOpen(): void {
@@ -163,12 +196,19 @@ export class VisualAgentMapView extends ItemView {
   private suppressClickUntil = 0;
   private closed = false;
   private headerTitle = "";
+  private builtIn = false;
+  private showSampleTour = false;
+  private sampleTourStep = 0;
   constructor(leaf: WorkspaceLeaf, private plugin: VisualAgentMapPlugin) { super(leaf); }
   getViewType(): string { return VIEW_TYPE; }
   getDisplayText(): string { return this.map?.title ?? "Visual Agent Map"; }
   getIcon(): string { return "git-fork"; }
-  getState(): Record<string, unknown> { return { file: this.path }; }
-  async setState(state: Record<string, unknown>, result: { history: boolean }): Promise<void> { if (typeof state.file === "string" && state.file !== this.path) await this.openMap(state.file); await super.setState(state, result); }
+  getState(): Record<string, unknown> { return this.builtIn ? { sample: BUILTIN_SAMPLE_ID } : { file: this.path }; }
+  async setState(state: Record<string, unknown>, result: { history: boolean }): Promise<void> {
+    if (state.sample === BUILTIN_SAMPLE_ID) await this.openBuiltInSample();
+    else if (typeof state.file === "string" && state.file !== this.path) await this.openMap(state.file);
+    await super.setState(state, result);
+  }
   async onOpen(): Promise<void> {
     this.contentEl.addClass("vam-view"); this.contentEl.tabIndex = 0;
     this.registerDomEvent(this.contentEl, "keydown", event => {
@@ -177,21 +217,34 @@ export class VisualAgentMapView extends ItemView {
       if (event.key === "Escape") { this.selected = null; this.multiSelected.clear(); this.integrationMode = false; this.render(); }
     });
     await this.plugin.ready;
-    if (!this.path) { const files = await this.plugin.repo.mapFiles(); if (files.length) await this.openMap(files[0].path); else this.render(); }
+    if (!this.path && !this.builtIn) {
+      if (this.plugin.consumeFirstInstallSample()) await this.openBuiltInSample();
+      else if (!this.plugin.repo.workspaceExists()) this.render();
+      else { const files = await this.plugin.repo.mapFiles(); if (files.length) await this.openMap(files[0].path); else this.render(); }
+    }
   }
   async onClose(): Promise<void> { this.closed = true; if (this.refreshTimer !== null) window.clearTimeout(this.refreshTimer); if (this.hoverTimer !== null) window.clearTimeout(this.hoverTimer); this.hoverCard?.remove(); if (this.viewportTimer !== null) { window.clearTimeout(this.viewportTimer); await this.persist(); } }
-  async refreshFromPlugin(): Promise<void> { await this.hydrate(); this.render(); }
+  async refreshFromPlugin(): Promise<void> { if (this.builtIn) { await this.openBuiltInSample(this.showSampleTour); return; } await this.hydrate(); this.render(); }
   private enqueue(work: () => Promise<void>): void { void this.plugin.mutate(work).catch(() => {}); }
-  private async persist(): Promise<void> { if (this.map && this.path) await this.plugin.repo.saveMap(this.path, this.map); }
+  private async persist(): Promise<void> { if (!this.builtIn && this.map && this.path) await this.plugin.repo.saveMap(this.path, this.map); }
   private async hydrate(): Promise<void> {
+    if (this.builtIn) { this.notes = builtInSample(this.plugin.settings.language).notes; return; }
     this.notes.clear();
     for (const node of this.map?.nodes ?? []) { try { this.notes.set(node.id, await this.plugin.repo.readNote(node.path)); } catch { /* A missing note remains visible and removable on the map. */ } }
   }
   async openMap(path: string): Promise<void> {
     if (this.viewportTimer !== null) { window.clearTimeout(this.viewportTimer); this.viewportTimer = null; await this.persist(); }
     const map = await this.plugin.repo.readMap(path);
-    this.path = path; this.map = map; this.integrationMode = false; this.selected = null; this.multiSelected.clear(); this.history.clear(); await this.hydrate(); this.render();
+    this.builtIn = false; this.path = path; this.map = map; this.integrationMode = false; this.selected = null; this.multiSelected.clear(); this.history.clear(); await this.hydrate(); this.render();
     this.app.workspace.requestSaveLayout();
+  }
+  async openBuiltInSample(forceTour = false): Promise<void> {
+    if (this.viewportTimer !== null) { window.clearTimeout(this.viewportTimer); this.viewportTimer = null; await this.persist(); }
+    const sample = builtInSample(this.plugin.settings.language);
+    this.builtIn = true; this.path = ""; this.map = sample.map; this.notes = sample.notes; this.integrationMode = false; this.selected = null; this.multiSelected.clear(); this.history.clear();
+    this.showSampleTour = forceTour || this.plugin.settings.sampleTourVersionSeen < SAMPLE_TOUR_VERSION;
+    this.sampleTourStep = 0; this.selected = this.showSampleTour ? "explore" : null;
+    this.render(); this.app.workspace.requestSaveLayout();
   }
   changed(file: TFile): void {
     if (file.path !== this.path && !this.map?.nodes.some(node => node.path === file.path)) return;
@@ -345,6 +398,7 @@ export class VisualAgentMapView extends ItemView {
   }
   private updateHistoryButtons(): void { const undo = this.contentEl.querySelector<HTMLButtonElement>("[data-history=undo]"), redo = this.contentEl.querySelector<HTMLButtonElement>("[data-history=redo]"); if (undo) undo.disabled = !this.history.canUndo; if (redo) redo.disabled = !this.history.canRedo; }
   async synchronize(): Promise<void> {
+    if (this.builtIn) return;
     if (!this.path || !this.map || this.closed) return;
     if (!(this.app.vault.getAbstractFileByPath(this.path) instanceof TFile)) { this.map = null; this.path = ""; this.history.clear(); this.render(); return; }
     const disk = await this.plugin.repo.readMap(this.path);
@@ -443,17 +497,56 @@ export class VisualAgentMapView extends ItemView {
     this.contentEl.empty();
     const toolbar = this.contentEl.createDiv("vam-toolbar");
     toolbar.createEl("strong", { text: this.map?.title ?? "Visual Agent Map", cls: "vam-map-title" });
-    this.button(toolbar, t("切換心智圖"), () => this.enqueue(async () => { const topics = await this.plugin.repo.topics(); new ChoiceModal(this.app, t("切換心智圖"), t("選擇要開啟的研究主題"), topics.map(topic => ({ label: topic.title, action: () => this.enqueue(() => this.openMap(topic.mapPath)) }))).open(); }));
+    if (this.builtIn) toolbar.createSpan({ cls: "vam-readonly-badge", text: t("官方範例 · 唯讀") });
+    this.button(toolbar, t("切換心智圖"), () => this.enqueue(async () => { const topics = await this.plugin.repo.topics(); new ChoiceModal(this.app, t("切換心智圖"), t("選擇要開啟的研究主題"), [
+      { label: t("範例：台灣旅行規劃"), description: t("官方唯讀範例"), action: () => this.enqueue(() => this.openBuiltInSample()) },
+      ...topics.map(topic => ({ label: topic.title, action: () => this.enqueue(() => this.openMap(topic.mapPath)) }))
+    ]).open(); }));
     this.button(toolbar, t("＋ 心智圖"), () => new NameModal(this.app, t("新增心智圖"), t("新的心智圖"), title => this.enqueue(async () => this.openMap(await this.plugin.repo.createMap(title)))).open());
-    const undo = this.button(toolbar, t("復原"), () => this.enqueue(() => this.travel(false)), !this.history.canUndo); undo.dataset.history = "undo";
-    const redo = this.button(toolbar, t("重做"), () => this.enqueue(() => this.travel(true)), !this.history.canRedo); redo.dataset.history = "redo";
-    this.button(toolbar, t("更多…"), () => this.openMapActions());
-    if (!this.map) { this.contentEl.createDiv({ cls: "vam-empty", text: t("新增或開啟一張心智圖，開始整理你的議題。") }); return; }
+    if (this.builtIn) {
+      this.button(toolbar, t("複製到我的工作區"), () => this.enqueue(async () => this.openMap(await this.plugin.duplicateBuiltInSample()))).addClass("mod-cta");
+      this.button(toolbar, t("重新顯示導覽"), () => { this.showSampleTour = true; this.render(); });
+    } else {
+      const undo = this.button(toolbar, t("復原"), () => this.enqueue(() => this.travel(false)), !this.history.canUndo); undo.dataset.history = "undo";
+      const redo = this.button(toolbar, t("重做"), () => this.enqueue(() => this.travel(true)), !this.history.canRedo); redo.dataset.history = "redo";
+      this.button(toolbar, t("更多…"), () => this.openMapActions());
+    }
+    if (!this.map) {
+      const empty = this.contentEl.createDiv("vam-empty-state");
+      empty.createEl("h2", { text: this.plugin.repo.workspaceExists() ? t("還沒有心智圖") : t("Agent Workspace 不存在") });
+      empty.createEl("p", { text: this.plugin.repo.workspaceExists() ? t("建立第一張心智圖，開始整理你的議題。") : t("可以安全地重建基本資料夾；既有筆記不會被覆寫。") });
+      const actions = empty.createDiv("vam-empty-actions");
+      if (!this.plugin.repo.workspaceExists()) {
+        this.button(actions, t("找回既有 Workspace"), () => this.enqueue(() => this.plugin.offerWorkspaceReconnect())).addClass("mod-cta");
+        this.button(actions, t("修復 Agent Workspace"), () => this.enqueue(() => this.plugin.repairWorkspace()));
+      }
+      this.button(actions, t("建立新心智圖"), () => new NameModal(this.app, t("新增心智圖"), t("新的心智圖"), title => this.enqueue(async () => this.openMap(await this.plugin.repo.createMap(title)))).open());
+      this.button(actions, t("查看範例"), () => this.enqueue(() => this.openBuiltInSample(true)));
+      return;
+    }
+    if (this.builtIn && this.showSampleTour) {
+      const tour = this.contentEl.createDiv("vam-sample-tour");
+      const steps = [
+        { id: "explore", title: t("1 / 5　從問題開始"), body: t("先把模糊目標拆成可以分別研究的議題。") },
+        { id: "constraints", title: t("2 / 5　展開多層子議題"), body: t("子議題還能繼續展開；複製後也可以收合與調整結構。") },
+        { id: "food", title: t("3 / 5　用預覽呈現重點"), body: t("預覽由你控制，可以放文字、圖片與表格，並顯示在 hover card。") },
+        { id: "journey", title: t("4 / 5　把來源收斂成新根議題"), body: t("完整旅程引用實際採用的來源，方便回頭檢查假設。") },
+        { id: "next", title: t("5 / 5　複製成自己的版本"), body: t("這張範例不執行 AI、不寫入 Vault；複製後即可自由修改與繼續研究。") }
+      ];
+      const step = steps[this.sampleTourStep];
+      const copy = tour.createDiv(); copy.createEl("strong", { text: step.title }); copy.createEl("p", { text: step.body });
+      const actions = tour.createDiv("vam-sample-tour-actions");
+      if (this.sampleTourStep > 0) this.button(actions, t("上一步"), () => { this.sampleTourStep--; this.selectSampleNode(steps[this.sampleTourStep].id); });
+      if (this.sampleTourStep < steps.length - 1) this.button(actions, t("下一步"), () => { this.sampleTourStep++; this.selectSampleNode(steps[this.sampleTourStep].id); }).addClass("mod-cta");
+      this.button(actions, this.sampleTourStep === steps.length - 1 ? t("完成導覽") : t("跳過導覽"), () => { this.showSampleTour = false; this.plugin.settings.sampleTourVersionSeen = SAMPLE_TOUR_VERSION; void this.plugin.saveSettings(); this.render(); });
+    }
     const tools = this.contentEl.createDiv("vam-map-tools");
-    this.button(tools, t("＋ 議題"), () => this.enqueue(() => this.addNode(null))).addClass("mod-cta");
-    this.button(tools, t("整理"), () => this.enqueue(() => this.openOrganizer()));
-    const integrate = this.button(tools, this.integrationMode ? t("結束整合") : t("整合議題"), () => { this.integrationMode = !this.integrationMode; this.multiSelected.clear(); this.selected = null; this.render(); });
-    if (this.integrationMode) integrate.addClass("is-active");
+    if (!this.builtIn) {
+      this.button(tools, t("＋ 議題"), () => this.enqueue(() => this.addNode(null))).addClass("mod-cta");
+      this.button(tools, t("整理"), () => this.enqueue(() => this.openOrganizer()));
+      const integrate = this.button(tools, this.integrationMode ? t("結束整合") : t("整合議題"), () => { this.integrationMode = !this.integrationMode; this.multiSelected.clear(); this.selected = null; this.render(); });
+      if (this.integrationMode) integrate.addClass("is-active");
+    }
     this.button(tools, "−", () => this.zoomBy(1 / 1.2)).setAttr("aria-label", t("縮小"));
     this.zoomLabel = tools.createSpan({ text: `${Math.round(this.map.viewport.zoom * 100)}%`, cls: "vam-zoom" });
     this.button(tools, "＋", () => this.zoomBy(1.2)).setAttr("aria-label", t("放大"));
@@ -502,16 +595,16 @@ export class VisualAgentMapView extends ItemView {
     }
     if (!note || note.status !== "completed") header.createSpan({ cls: `vam-status vam-status-${note?.status ?? "error"}`, text: note ? t(labels[note.status]) : t("筆記不存在") });
     if (this.plugin.pendingSuggestions.has(node.path)) header.createSpan({ cls: "vam-badge-new", text: t("待確認建議") });
-    const details = this.button(header, "↗", () => this.openDetails(node)); details.addClass("vam-detail-button"); details.setAttr("aria-label", t("在右側欄開啟詳情"));
+    const details = this.button(header, "↗", () => this.builtIn ? this.selectSampleNode(node.id) : this.openDetails(node)); details.addClass("vam-detail-button"); details.setAttr("aria-label", this.builtIn ? t("查看範例內容") : t("在右側欄開啟詳情"));
     const count = descendants(this.map!.nodes, node.id).size;
-    if (count) this.button(header, node.collapsed ? t("展開 {0}", count) : t("收合"), () => this.enqueue(() => this.mapChange(map => { const n = map.nodes.find(n => n.id === node.id)!; n.collapsed = !n.collapsed; })));
+    if (count && !this.builtIn) this.button(header, node.collapsed ? t("展開 {0}", count) : t("收合"), () => this.enqueue(() => this.mapChange(map => { const n = map.nodes.find(n => n.id === node.id)!; n.collapsed = !n.collapsed; })));
     const title = card.createEl("h3", { text: note?.title ?? node.path, cls: "vam-card-title" });
     title.setAttr("title", note?.title ?? node.path);
     card.createEl("p", { cls: "vam-card-summary", text: note?.summary ?? t("檔案已移動或刪除，可從圖中移除此節點。") });
-    this.enableDrag(card, node);
+    if (!this.builtIn) this.enableDrag(card, node); else card.addClass("is-readonly");
     card.addEventListener("click", event => { if (Date.now() < this.suppressClickUntil) return; if ((event.target as Element).closest("button") || event.metaKey || event.ctrlKey) return; if (this.integrationMode) { if (this.multiSelected.has(node.id)) this.multiSelected.delete(node.id); else this.multiSelected.add(node.id); this.render(); return; } this.multiSelected.clear(); this.selected = node.id; this.render(); });
     card.addEventListener("keydown", event => { if (event.key === "Enter" && event.target === card) { this.selected = node.id; this.render(); } });
-    card.addEventListener("contextmenu", event => { event.preventDefault(); new ChoiceModal(this.app, note?.title ?? t("議題操作"), t("選擇操作"), [
+    if (!this.builtIn) card.addEventListener("contextmenu", event => { event.preventDefault(); new ChoiceModal(this.app, note?.title ?? t("議題操作"), t("選擇操作"), [
       { label: t("新增子議題"), action: () => this.enqueue(() => this.addNode(node)) },
       { label: t("AI 拆解議題"), action: () => this.enqueue(() => this.proposeChildren(node)) },
       { label: node.collapsed ? t("展開分支") : t("收合分支"), action: () => this.enqueue(() => this.mapChange(map => { map.nodes.find(n => n.id === node.id)!.collapsed = !node.collapsed; })) },
@@ -525,6 +618,10 @@ export class VisualAgentMapView extends ItemView {
   private clearHoverTimer(): void {
     if (this.hoverTimer !== null) window.clearTimeout(this.hoverTimer);
     this.hoverTimer = null;
+  }
+  private selectSampleNode(id: string): void {
+    const node = this.map?.nodes.find(item => item.id === id); if (!node) return;
+    this.selected = id; this.render(); this.focusNode(node);
   }
   private hideHoverCardSoon(): void {
     this.clearHoverTimer();
@@ -571,8 +668,14 @@ export class VisualAgentMapView extends ItemView {
   }
   private renderInspector(parent: HTMLElement, node: MapNode): void {
     const panel = parent.createDiv("vam-inspector"), note = this.notes.get(node.id);
-    const heading = panel.createDiv("vam-inspector-heading"); heading.createEl("strong", { text: t("議題工作台") }); this.button(heading, t("關閉"), () => { this.selected = null; this.render(); });
+    const heading = panel.createDiv("vam-inspector-heading"); heading.createEl("strong", { text: this.builtIn ? t("範例內容") : t("議題工作台") }); this.button(heading, t("關閉"), () => { this.selected = null; this.render(); });
     if (note) {
+      if (this.builtIn) {
+        panel.createEl("h3", { text: note.title }); panel.createEl("p", { text: note.summary, cls: "vam-sample-summary" });
+        const detail = panel.createDiv("vam-sample-detail"); void MarkdownRenderer.render(this.app, note.detail, detail, "", this);
+        if (note.sourcePaths.length) { const sources = panel.createDiv("vam-reference-sources"); sources.createEl("strong", { text: t("來源議題") }); for (const path of note.sourcePaths) { const source = this.map?.nodes.find(item => item.path === path); if (source) this.button(sources, this.notes.get(source.id)?.title ?? path, () => this.selectSampleNode(source.id)); } }
+        return;
+      }
       const field = (label: string, key: "title" | "summary" | "rules" | "preview", rows = 0): void => {
         const wrapper = panel.createEl("label", { cls: "vam-field" }); wrapper.createSpan({ text: label });
         const input = rows ? wrapper.createEl("textarea", { text: note[key] }) : wrapper.createEl("input", { type: "text", value: note[key] });
@@ -711,7 +814,7 @@ export class VisualAgentMapView extends ItemView {
       if (suggestions.length < 3) { new Notice(t("AI 認為目前不需要拆解，或沒有提出 3 至 7 個可建立的子議題。")); return; }
       this.plugin.pendingSuggestions.set(parent.path, suggestions);
       new Notice(t("子議題建議完成：{0} 項。點選節點後可查看。", suggestions.length));
-    } catch (error) { console.error("Visual Agent Map AI split", error); new Notice(error instanceof Error ? error.message : String(error)); }
+    } catch (error) { console.error("Visual Agent Map AI split", error); new Notice(this.plugin.recordFailure("AI 拆解失敗", error)); }
     finally { this.plugin.running.delete(parent.path); await this.hydrate(); this.render(); }
   }
   private openChildSuggestions(parent: MapNode, suggestions: Suggestion[]): void {
@@ -757,7 +860,7 @@ export class VisualAgentMapView extends ItemView {
       const result = await this.plugin.askModel({ title: note.title, summary: note.summary, rules: note.rules, detail: note.detail, task, ancestors: await this.ancestorContext(node), sourceContext, mode: "synthesize" }, note.model);
       await this.plugin.repo.updateNote(node.path, { summary: result.summary, detail: canonicalDetail(result.detail), visualReferences: visualReferencesMarkdown(result.visualReferences), newFindings: "", status: "completed" });
       new Notice(t("子議題整合已寫入目前理解與 MD 詳情。"));
-    } catch (error) { console.error("Visual Agent Map child integration", error); await this.plugin.repo.updateNote(node.path, { status: "error" }); new Notice(error instanceof Error ? error.message : String(error)); }
+    } catch (error) { console.error("Visual Agent Map child integration", error); await this.plugin.repo.updateNote(node.path, { status: "error" }); new Notice(this.plugin.recordFailure("子議題整合失敗", error)); }
     finally { this.plugin.running.delete(node.path); await this.hydrate(); this.render(); }
   }
   private integrateSelected(): void {
@@ -893,7 +996,7 @@ export class VisualAgentMapView extends ItemView {
       if (result.suggestions.length) this.plugin.pendingSuggestions.set(node.path, result.suggestions.slice(0, 7));
     })).catch(error => this.plugin.mutate(async () => {
       console.error("Visual Agent Map AI task", error); await this.plugin.repo.updateNote(node.path, { status: "error" });
-      new Notice(error instanceof Error ? t("AI 任務失敗：{0}", error.message) : t("AI 任務失敗。"));
+      new Notice(this.plugin.recordFailure("AI 任務失敗", error));
     })).finally(() => {
       this.plugin.running.delete(node.path);
       for (const view of this.plugin.views()) view.enqueue(async () => { await view.hydrate(); view.render(); });
@@ -904,12 +1007,17 @@ class VisualAgentMapSettingTab extends PluginSettingTab {
   constructor(app: App, private plugin: VisualAgentMapPlugin) { super(app, plugin); }
   getSettingDefinitions(): SettingDefinitionItem[] {
     const text = (name: string, key: "cliPath" | "codexAcpPath" | "cliModel" | "models", desc: string): SettingDefinitionItem => ({ name, desc, control: { type: "text", key } });
+    const diagnostic = this.plugin.codexAcpDiagnostic();
     return [
       { name: t("介面語言"), control: { type: "dropdown", key: "language", options: { "zh-TW": "繁體中文", en: "English" } } },
       text(t("Codex ACP 路徑"), "codexAcpPath", t("用於常駐 Codex session 與自動取得模型清單。")),
       text(t("工作區預設 Model"), "cliModel", t("目前最低成本模型為 gpt-5.6-luna；變更只影響之後新增的根議題。")),
       text(t("Model 選單"), "models", t("啟動後會優先補入 Codex ACP 回報的模型。")),
-      text(t("Codex CLI fallback 路徑"), "cliPath", t("只有 Codex ACP 在 prompt 前發生 transport error 時才使用。"))
+      text(t("Codex CLI fallback 路徑"), "cliPath", t("只有 Codex ACP 在 prompt 前發生 transport error 時才使用。")),
+      { name: t("Workspace 位置"), render: setting => { setting.setName(t("Workspace 位置")).setDesc(t("主題資料夾：{0}　未分類收件匣：{1}", this.plugin.settings.topicsFolder, this.plugin.settings.inboxFolder)); } },
+      { name: t("修復 Agent Workspace"), render: setting => { setting.setName(t("修復 Agent Workspace")).setDesc(t("只建立缺少的基本資料夾，不會復原、搬移或覆寫筆記與心智圖。")).addButton(button => button.setButtonText(t("修復")).onClick(() => { void this.plugin.mutate(() => this.plugin.repairWorkspace()); })); } },
+      { name: t("找回既有 Workspace"), render: setting => { setting.setName(t("找回既有 Workspace")).setDesc(t("掃描可辨識的 VAM Workspace，確認後才重新連結，不會搬移或覆寫資料。")).addButton(button => button.setButtonText(t("掃描")).onClick(() => { void this.plugin.offerWorkspaceReconnect(); })); } },
+      { name: t("Codex ACP 狀態"), render: setting => { setting.setName(t("Codex ACP 狀態")).setDesc(diagnostic.installed ? t("已找到：{0}", diagnostic.executable) : t("未找到 Codex ACP。請先安裝 @agentclientprotocol/codex-acp 並完成 Codex 登入；VAM 不會自動安裝系統套件。")).addButton(button => button.setButtonText(t("重新檢查")).onClick(() => { void this.plugin.recheckCodexAcp(); })); } }
     ];
   }
   async setControlValue(key: string, value: unknown): Promise<void> {
@@ -932,8 +1040,15 @@ class VisualAgentMapSettingTab extends PluginSettingTab {
     text(t("Codex ACP 路徑"), "codexAcpPath", t("用於常駐 Codex session 與自動取得模型清單。")); text(t("工作區預設 Model"), "cliModel", t("目前最低成本模型為 gpt-5.6-luna；變更只影響之後新增的根議題。")); text(t("Model 選單"), "models", t("啟動後會優先補入 Codex ACP 回報的模型。"));
     this.containerEl.createEl("p", { cls: "setting-item-description", text: t("一般任務使用低推理；整合子議題使用高推理。") });
     const advanced = this.containerEl.createEl("details"); advanced.createEl("summary", { text: "Advanced" });
-    new Setting(advanced).setName(t("Codex CLI fallback 路徑")).setDesc(t("只有 Codex ACP 失敗時才使用。")).addText(input => input.setValue(this.plugin.settings.cliPath).onChange(async value => { this.plugin.settings.cliPath = value.trim(); await this.plugin.saveSettings(); }));
+    new Setting(advanced).setName(t("Codex CLI fallback 路徑")).setDesc(t("只有 Codex ACP 在 prompt 前發生 transport error 時才使用。")).addText(input => input.setValue(this.plugin.settings.cliPath).onChange(async value => { this.plugin.settings.cliPath = value.trim(); await this.plugin.saveSettings(); }));
     this.containerEl.createEl("p", { text: t("主題資料夾：{0}　未分類收件匣：{1}", this.plugin.settings.topicsFolder, this.plugin.settings.inboxFolder) });
+    new Setting(this.containerEl).setName(t("修復 Agent Workspace")).setDesc(t("只建立缺少的基本資料夾，不會復原、搬移或覆寫筆記與心智圖。"))
+      .addButton(button => button.setButtonText(t("修復")).onClick(() => { void this.plugin.mutate(() => this.plugin.repairWorkspace()); }));
+    new Setting(this.containerEl).setName(t("找回既有 Workspace")).setDesc(t("掃描可辨識的 VAM Workspace，確認後才重新連結，不會搬移或覆寫資料。"))
+      .addButton(button => button.setButtonText(t("掃描")).onClick(() => { void this.plugin.offerWorkspaceReconnect(); }));
+    const diagnostic = this.plugin.codexAcpDiagnostic();
+    new Setting(this.containerEl).setName(t("Codex ACP 狀態")).setDesc(diagnostic.installed ? t("已找到：{0}", diagnostic.executable) : t("未找到 Codex ACP。請先安裝 @agentclientprotocol/codex-acp 並完成 Codex 登入；VAM 不會自動安裝系統套件。"))
+      .addButton(button => button.setButtonText(t("重新檢查")).onClick(() => { void this.plugin.recheckCodexAcp(); }));
   }
 }
 export default class VisualAgentMapPlugin extends Plugin {
@@ -942,6 +1057,7 @@ export default class VisualAgentMapPlugin extends Plugin {
   ready: Promise<void> = Promise.resolve();
   readonly running = new Set<string>();
   readonly pendingSuggestions = new Map<string, Suggestion[]>();
+  readonly logs: LogManager = debugLog;
   private childProcesses = new Set<ChildProcessWithoutNullStreams>();
   private acp: { child: ChildProcessWithoutNullStreams; buffer: string; nextId: number; pending: Map<number, { resolve: (value: unknown) => void; reject: (error: Error) => void; timeout: number }>; sessions: Map<string, AcpTaskState>; initializing: Promise<void> } | null = null;
   private acpConfigIds = { model: "model", reasoning: "" };
@@ -949,18 +1065,33 @@ export default class VisualAgentMapPlugin extends Plugin {
   private queue: Promise<void> = Promise.resolve();
   private writing = 0;
   private externalReconcileTimer: number | null = null;
+  private firstInstallSamplePending = false;
+  private workspaceRecoveryCandidates: string[] = [];
+  recordFailure(context: string, error: unknown): string {
+    const message = error instanceof Error ? error.message : String(error);
+    this.logs.appendLog("error", `${context}：${message}`);
+    return message;
+  }
   async mutate(work: () => Promise<void>): Promise<void> {
     const result = this.queue.then(async () => { this.writing++; try { await work(); for (const view of this.views()) await view.synchronize(); } finally { this.writing--; } });
-    this.queue = result.catch(error => { console.error("Visual Agent Map", error); new Notice(error instanceof Error ? error.message : String(error)); });
+    this.queue = result.catch(error => { const message = error instanceof Error ? error.message : String(error); this.logs.appendLog("error", `操作失敗：${message}`); console.error("Visual Agent Map", error); new Notice(message); });
     return result;
   }
   views(): VisualAgentMapView[] { return this.app.workspace.getLeavesOfType(VIEW_TYPE).map(leaf => leaf.view).filter((view): view is VisualAgentMapView => view instanceof VisualAgentMapView); }
   async onload(): Promise<void> {
     const saved = await this.loadData() as Partial<Settings> | null;
-    this.settings = { ...DEFAULT_SETTINGS, language: saved?.language === "en" ? "en" : "zh-TW", workspaceFolder: saved?.workspaceFolder || DEFAULT_SETTINGS.workspaceFolder, topicsFolder: saved?.topicsFolder || DEFAULT_SETTINGS.topicsFolder, inboxFolder: saved?.inboxFolder || DEFAULT_SETTINGS.inboxFolder, notesFolder: saved?.notesFolder || DEFAULT_SETTINGS.notesFolder, mapsFolder: saved?.mapsFolder || DEFAULT_SETTINGS.mapsFolder, mapId: saved?.mapId || "default", cliPath: saved?.cliPath || DEFAULT_SETTINGS.cliPath, codexAcpPath: saved?.codexAcpPath || DEFAULT_SETTINGS.codexAcpPath, cliModel: saved?.cliModel || DEFAULT_SETTINGS.cliModel, cliReasoning: saved?.cliReasoning || DEFAULT_SETTINGS.cliReasoning, previewScale: saved?.previewScale !== undefined ? clampPreviewScale(saved.previewScale) : legacyPreviewScale(saved?.previewSize), models: (saved?.models || DEFAULT_SETTINGS.models).split(/[,\n]/).map(item => item.trim()).filter(item => item && !item.startsWith("claude:")).join(", ") || DEFAULT_SETTINGS.models, migrated: saved?.migrated === true, structureVersion: saved?.structureVersion ?? (saved ? 1 : DEFAULT_SETTINGS.structureVersion), firstUseNoticeSeen: saved?.firstUseNoticeSeen === true };
+    this.settings = { ...DEFAULT_SETTINGS, language: saved?.language === "en" ? "en" : "zh-TW", workspaceFolder: saved?.workspaceFolder || DEFAULT_SETTINGS.workspaceFolder, topicsFolder: saved?.topicsFolder || DEFAULT_SETTINGS.topicsFolder, inboxFolder: saved?.inboxFolder || DEFAULT_SETTINGS.inboxFolder, notesFolder: saved?.notesFolder || DEFAULT_SETTINGS.notesFolder, mapsFolder: saved?.mapsFolder || DEFAULT_SETTINGS.mapsFolder, mapId: saved?.mapId || "default", cliPath: saved?.cliPath || DEFAULT_SETTINGS.cliPath, codexAcpPath: saved?.codexAcpPath === LEGACY_CODEX_ACP_PATH ? DEFAULT_SETTINGS.codexAcpPath : saved?.codexAcpPath || DEFAULT_SETTINGS.codexAcpPath, cliModel: saved?.cliModel || DEFAULT_SETTINGS.cliModel, cliReasoning: saved?.cliReasoning || DEFAULT_SETTINGS.cliReasoning, previewScale: saved?.previewScale !== undefined ? clampPreviewScale(saved.previewScale) : legacyPreviewScale(saved?.previewSize), models: (saved?.models || DEFAULT_SETTINGS.models).split(/[,\n]/).map(item => item.trim()).filter(item => item && !item.startsWith("claude:")).join(", ") || DEFAULT_SETTINGS.models, migrated: saved?.migrated === true, structureVersion: saved?.structureVersion ?? (saved ? 1 : DEFAULT_SETTINGS.structureVersion), firstUseNoticeSeen: saved?.firstUseNoticeSeen === true, workspaceInitialized: saved ? saved.workspaceInitialized !== false : false, sampleTourVersionSeen: saved?.sampleTourVersionSeen ?? 0 };
     setUiLanguage(this.settings.language);
+    this.logs.appendLog("info", `Visual Agent Map ${this.manifest.version || "unknown"} 載入`);
     this.repo = new Repository(this.app, this.settings);
     const initialize = (this.settings.migrated ? Promise.resolve() : this.repo.migrate().then(async () => { await this.repo.rebuildDerivedData(); this.settings.migrated = true; })).then(async () => {
+      if (!saved) {
+        if (this.repo.workspaceExists()) { this.settings.workspaceInitialized = true; await this.saveSettings(); }
+        else {
+          this.workspaceRecoveryCandidates = await this.repo.workspaceCandidates();
+          if (!this.workspaceRecoveryCandidates.length) { await this.repo.ensureWorkspace(); this.settings.workspaceInitialized = true; this.firstInstallSamplePending = true; await this.saveSettings(); }
+        }
+      }
       if (this.settings.structureVersion < 2) {
         const count = await this.repo.normalizeGeneratedNoteFilenames();
         this.settings.structureVersion = 2; await this.saveSettings();
@@ -974,7 +1105,10 @@ export default class VisualAgentMapPlugin extends Plugin {
     this.addCommand({ id: "rebuild-references", name: t("重建議題 reference"), callback: () => { void this.mutate(async () => { await this.repo.rebuildDerivedData(); new Notice(t("議題 reference 已依心智圖重建。")); }); } });
     this.addCommand({ id: "normalize-note-filenames", name: t("同步議題名稱與檔名"), callback: () => { void this.mutate(async () => { const count = await this.repo.normalizeGeneratedNoteFilenames(); new Notice(count ? t("已同步 {0} 份議題檔名。", count) : t("議題檔名已是最新狀態。")); }); } });
     this.addCommand({ id: "repair-note-presentation", name: t("修復議題筆記顯示"), callback: () => { void this.mutate(async () => { await this.repo.ensureNodePresentation(); new Notice(t("已修復議題筆記顯示。")); }); } });
-    this.addCommand({ id: "open-onboarding", name: t("重新開啟開始使用"), callback: () => this.openOnboarding() });
+    this.addCommand({ id: "open-built-in-sample", name: t("開啟台灣旅行範例"), callback: () => { void this.activateBuiltInSample(true); } });
+    this.addCommand({ id: "repair-workspace", name: t("修復 Agent Workspace"), callback: () => { void this.mutate(() => this.repairWorkspace()); } });
+    this.addCommand({ id: "reconnect-workspace", name: t("找回既有 Workspace"), callback: () => { void this.offerWorkspaceReconnect(); } });
+    this.addCommand({ id: "open-debug-log", name: t("開啟偵錯日誌 (Open Debug Log)"), callback: () => new DebugLogModal(this.app, this.logs).open() });
     this.addSettingTab(new VisualAgentMapSettingTab(this.app, this));
     this.registerEvent(this.app.workspace.on("file-menu", (menu, file) => { if (file instanceof TFile && this.isMap(file)) menu.addItem(item => item.setTitle(t("以心智圖開啟")).setIcon("git-fork").onClick(() => { void this.activateView(file.path); })); }));
     this.registerEvent(this.app.workspace.on("active-leaf-change", leaf => {
@@ -988,8 +1122,12 @@ export default class VisualAgentMapPlugin extends Plugin {
     }));
     this.app.workspace.onLayoutReady(() => {
       for (const leaf of this.app.workspace.getLeavesOfType("markdown")) this.styleNodeLeaf(leaf);
-      if (!this.settings.firstUseNoticeSeen && !this.app.vault.getAbstractFileByPath(this.settings.workspaceFolder)) this.openOnboarding();
-      void this.ready.then(() => this.refreshCodexAcpModels()).catch(error => console.warn("Visual Agent Map Codex ACP model refresh", error));
+      void this.ready.then(async () => {
+        if (this.workspaceRecoveryCandidates.length) await this.offerWorkspaceReconnect(this.workspaceRecoveryCandidates);
+        else if (this.firstInstallSamplePending) await this.activateBuiltInSample();
+        try { await this.refreshCodexAcpModels(); }
+        catch (error) { const message = error instanceof Error ? error.message : String(error); this.logs.appendLog("warn", `Codex ACP 尚未就緒：${message}`); new Notice(t("Codex ACP 尚未就緒；Sample 與非 AI 功能仍可使用。請到 VAM Settings 查看並重新檢查。")); }
+      }).catch(error => { this.logs.appendLog("warn", `初始化未完成：${error instanceof Error ? error.message : String(error)}`); console.warn("Visual Agent Map initialization", error); });
     });
     this.registerEvent(this.app.vault.on("modify", file => { if (!this.writing && file instanceof TFile) for (const view of this.views()) view.changed(file); }));
     this.registerEvent(this.app.vault.on("delete", file => { if (!this.writing && file instanceof TFile) { for (const view of this.views()) view.deleted(file); this.scheduleExternalReconciliation(); if (file.path.startsWith(`${this.settings.mapsFolder}/`) || file.path.startsWith(`${this.settings.topicsFolder}/`) && file.name === "Map.md") void this.mutate(() => this.repo.rebuildDerivedData()); } }));
@@ -1000,39 +1138,59 @@ export default class VisualAgentMapPlugin extends Plugin {
       for (const view of this.views()) await view.renamed(file, oldPath);
     }); }));
   }
-  openOnboarding(): void { new FirstUseModal(this.app, choice => { void this.completeOnboarding(choice); }).open(); }
-  private async completeOnboarding(choice: OnboardingChoice): Promise<void> {
-    if (choice === "later") { this.settings.firstUseNoticeSeen = true; await this.saveSettings(); return; }
-    try {
-      const path = choice === "sample" ? await this.createSampleMap() : await this.repo.createMap(t("我的第一張心智圖"));
-      await this.rebuildDerivedData();
-      await this.activateView(path);
-      this.settings.firstUseNoticeSeen = true;
-      await this.saveSettings();
-    } catch (error) {
-      new Notice(t("建立心智圖失敗：{0}。請檢查 vault 後重試。", error instanceof Error ? error.message : String(error)));
-      this.openOnboarding();
-    }
+  consumeFirstInstallSample(): boolean { const pending = this.firstInstallSamplePending; this.firstInstallSamplePending = false; return pending; }
+  async repairWorkspace(): Promise<void> { await this.repo.ensureWorkspace(); this.settings.workspaceInitialized = true; await this.saveSettings(); for (const view of this.views()) await view.refreshFromPlugin(); new Notice(t("Agent Workspace 已可使用。")); }
+  private connectWorkspace(root: string): void {
+    this.settings.workspaceFolder = root;
+    this.settings.topicsFolder = `${root}/Topics`;
+    this.settings.inboxFolder = `${root}/Inbox`;
+    this.settings.notesFolder = `${root}/Nodes`;
+    this.settings.mapsFolder = `${root}/Maps`;
+    this.settings.workspaceInitialized = true;
   }
-  private async createSampleMap(): Promise<string> {
-    const path = await this.repo.createMap(t("範例：旅行規劃"));
-    const map = await this.repo.readMap(path);
-    const root = await this.repo.createNote(t("旅行目標"), this.settings.cliModel, map, path, "workspace");
-    root.x = 80; root.y = 280; map.nodes.push(root);
-    await this.repo.updateNote(root.path, { summary: t("這是一張可自由編輯或刪除的範例心智圖。"), prompt: t("規劃一趟兩天一夜的旅行，先列出最重要的限制與期待。"), rules: t("先使用這張圖熟悉新增、編輯與連結議題的方式。") });
-    const samples = [
-      [t("交通與住宿"), t("比較抵達方式、住宿區域與移動時間。")],
-      [t("景點與路線"), t("安排每日景點，讓移動路線合理且保留彈性。")],
-      [t("餐廳與預算"), t("列出用餐選擇、預算範圍與訂位需求。")]
-    ];
-    for (let index = 0; index < samples.length; index++) {
-      const [title, prompt] = samples[index];
-      const node = await this.repo.createNote(title, this.settings.cliModel, map, path, "inherited");
-      node.parentId = root.id; node.x = 420; node.y = 80 + index * 200; map.nodes.push(node);
-      await this.repo.updateNote(node.path, { prompt });
+  async offerWorkspaceReconnect(known?: string[]): Promise<void> {
+    const candidates = known ?? await this.repo.workspaceCandidates();
+    this.workspaceRecoveryCandidates = [];
+    if (!candidates.length) { new Notice(t("找不到可辨識的既有 VAM Workspace。")); return; }
+    new ChoiceModal(this.app, t("找回既有 Workspace"), t("選擇後只會重新連結設定，不會搬移或改寫內容。"), candidates.map(root => ({ label: root, action: () => this.mutate(async () => {
+      this.connectWorkspace(root); await this.saveSettings(); await this.repo.rebuildDerivedData(); for (const view of this.views()) await view.refreshFromPlugin(); new Notice(t("已重新連結 Workspace：{0}", root));
+    }) }))).open();
+  }
+  codexAcpDiagnostic(): { executable: string; installed: boolean } {
+    const executable = this.resolveExecutable(this.settings.codexAcpPath);
+    return { executable, installed: existsSync(executable) };
+  }
+  async recheckCodexAcp(): Promise<void> {
+    const diagnostic = this.codexAcpDiagnostic();
+    if (!diagnostic.installed) { new Notice(t("未找到 Codex ACP：{0}", diagnostic.executable)); return; }
+    try {
+      const adapter = this.app.vault.adapter;
+      if (!(adapter instanceof FileSystemAdapter) || !this.manifest.dir) throw new Error(t("CLI 模式只支援桌面版 Obsidian"));
+      await this.ensureAcpProcess(join(adapter.getBasePath(), this.manifest.dir)); new Notice(t("Codex ACP 已就緒：{0}", diagnostic.executable));
+    } catch (error) { new Notice(t("Codex ACP 檢查失敗：{0}", this.recordFailure("Codex ACP 重新檢查失敗", error))); }
+  }
+  async duplicateBuiltInSample(): Promise<string> {
+    await this.repo.ensureWorkspace(); this.settings.workspaceInitialized = true;
+    const sample = builtInSample(this.settings.language, false), path = await this.repo.createMap(sample.map.title), map = await this.repo.readMap(path), root = this.repo.topicRoot(path);
+    try {
+      await this.repo.folder(`${root}/Attachments`);
+      for (const [name, data] of sample.assets) await this.app.vault.createBinary(`${root}/Attachments/${name}`, data);
+      const byOldPath = new Map<string, MapNode>();
+      for (const source of sample.map.nodes) {
+        const note = sample.notes.get(source.id)!;
+        const created = await this.repo.createNote(note.title, this.settings.cliModel, map, path, source.parentId ? "inherited" : "workspace");
+        created.x = source.x; created.y = source.y; created.collapsed = source.collapsed; byOldPath.set(source.path, created); map.nodes.push(created);
+      }
+      for (const source of sample.map.nodes) {
+        const created = byOldPath.get(source.path)!, note = sample.notes.get(source.id)!;
+        created.parentId = source.parentId ? byOldPath.get(sample.map.nodes.find(item => item.id === source.parentId)!.path)!.id : null;
+        await this.repo.updateNote(created.path, { summary: note.summary, prompt: note.prompt, rules: note.rules, preview: note.preview, detail: note.detail, status: note.status, sourcePaths: note.sourcePaths.map(sourcePath => byOldPath.get(sourcePath)!.path) });
+      }
+      map.viewport = { ...sample.map.viewport }; await this.repo.saveMap(path, map); await this.repo.rebuildDerivedData(); await this.saveSettings(); new Notice(t("已建立可自由修改的範例副本。")); return path;
+    } catch (error) {
+      const folder = this.app.vault.getAbstractFileByPath(root); if (folder) { try { await this.app.fileManager.trashFile(folder); } catch { /* Preserve the original duplicate failure. */ } }
+      throw error;
     }
-    await this.repo.saveMap(path, map);
-    return path;
   }
   private isMap(file: TFile): boolean {
     const marker: unknown = this.app.metadataCache.getFileCache(file)?.frontmatter?.["visual-agent-map"];
@@ -1076,6 +1234,13 @@ export default class VisualAgentMapPlugin extends Plugin {
     await this.app.workspace.revealLeaf(this.detailsLeaf);
   }
   private async activateView(path?: string): Promise<void> { await this.ready; let leaf = this.app.workspace.getLeavesOfType(VIEW_TYPE)[0]; if (!leaf) leaf = this.app.workspace.getLeaf("tab"); await leaf.setViewState({ type: VIEW_TYPE, active: true, state: path ? { file: path } : leaf.view instanceof VisualAgentMapView ? leaf.view.getState() : {} }); await this.app.workspace.revealLeaf(leaf); }
+  private async activateBuiltInSample(forceTour = false): Promise<void> {
+    await this.ready; this.firstInstallSamplePending = false;
+    let leaf = this.app.workspace.getLeavesOfType(VIEW_TYPE)[0]; if (!leaf) leaf = this.app.workspace.getLeaf("tab");
+    await leaf.setViewState({ type: VIEW_TYPE, active: true, state: { sample: BUILTIN_SAMPLE_ID } });
+    if (forceTour && leaf.view instanceof VisualAgentMapView) await leaf.view.openBuiltInSample(true);
+    await this.app.workspace.revealLeaf(leaf);
+  }
   private async refreshCodexAcpModels(): Promise<void> {
     const adapter = this.app.vault.adapter;
     if (!(adapter instanceof FileSystemAdapter) || !this.manifest.dir) return;
@@ -1093,7 +1258,7 @@ export default class VisualAgentMapPlugin extends Plugin {
     const prepared = buildPreparedTaskContext(context, model);
     context = prepared.context;
     const pluginDirectory = join(adapter.getBasePath(), this.manifest.dir);
-    const schemaPath = join(pluginDirectory, "response-schema.json");
+    const schemaPath = ensureResponseSchema(join(pluginDirectory, "response-schema.json"));
     const instructions = [
       "你是視覺化思考 Agent。不要修改任何檔案；除非任務明確指定，否則不要讀取本機檔案。",
       "只回傳 JSON，不要使用 Markdown code fence。格式必須符合：{\"summary\":\"...\",\"detail\":\"...\",\"suggestions\":[{\"title\":\"...\",\"task\":\"...\",\"contribution\":\"...\"}],\"visualReferences\":[{\"title\":\"...\",\"imageUrl\":\"https://...\",\"sourceUrl\":\"https://...\",\"description\":\"...\",\"palette\":[\"navy\",\"white\"],\"formula\":\"...\"}]}。若沒有視覺參考，visualReferences 回傳空陣列。",
@@ -1126,6 +1291,7 @@ export default class VisualAgentMapPlugin extends Plugin {
     }
     catch (error) {
       if (!(error instanceof AcpTransportError)) throw error;
+      this.logs.appendLog("warn", `Codex ACP transport failure，改用 Codex CLI fallback：${error.message}`);
       console.warn("Visual Agent Map Codex ACP transport failed before prompting; falling back to Codex CLI", error);
       try { return await this.askCodexExec(instructions, model, pluginDirectory, schemaPath); }
       catch (fallbackError) { throw new Error(`Codex ACP：${error.message}\nCodex CLI fallback：${fallbackError instanceof Error ? fallbackError.message : String(fallbackError)}`); }
@@ -1133,7 +1299,7 @@ export default class VisualAgentMapPlugin extends Plugin {
   }
   private parseAiResult(raw: string, label: string): AiResult {
     const cleaned = raw.replace(/^```(?:json)?\s*/i, "").replace(/\s*```$/, "").trim();
-    const parsed: { summary?: unknown; detail?: unknown; suggestions?: unknown; visualReferences?: unknown } = JSON.parse(cleaned) as { summary?: unknown; detail?: unknown; suggestions?: unknown; visualReferences?: unknown };
+    const parsed: { summary?: unknown; detail?: unknown; suggestions?: unknown; visualReferences?: unknown } = JSON.parse(extractJsonObject(cleaned)) as { summary?: unknown; detail?: unknown; suggestions?: unknown; visualReferences?: unknown };
     if (typeof parsed.summary !== "string" || typeof parsed.detail !== "string") throw new Error(`${label} 沒有回傳 summary 與 detail`);
     const isRecord = (value: unknown): value is Record<string, unknown> => typeof value === "object" && value !== null;
     const suggestions = Array.isArray(parsed.suggestions) ? parsed.suggestions.filter((item): item is Record<string, unknown> => isRecord(item) && typeof item.title === "string" && typeof item.task === "string").map(item => ({ title: String(item.title).trim(), task: String(item.task).trim(), contribution: typeof item.contribution === "string" ? item.contribution.trim() : "" })).filter(item => item.title) : [];
@@ -1191,10 +1357,10 @@ export default class VisualAgentMapPlugin extends Plugin {
     }
   }
   private resolveExecutable(configured: string): string {
-    if (configured.includes("/")) return configured;
     const home = process.env.HOME || "";
-    const candidates = [home ? join(home, ".local/bin", configured) : "", `/opt/homebrew/bin/${configured}`, `/usr/local/bin/${configured}`];
-    return candidates.find(candidate => candidate && existsSync(candidate)) || configured;
+    let nvmVersions: string[] = [];
+    if (home) { try { nvmVersions = readdirSync(join(home, ".nvm/versions/node")); } catch { /* nvm is optional. */ } }
+    return executableCandidates(configured, home, process.env.PATH || "", nvmVersions).find(candidate => existsSync(candidate)) || configured;
   }
   private cliEnvironment(): NodeJS.ProcessEnv {
     const home = process.env.HOME || "";
@@ -1204,6 +1370,7 @@ export default class VisualAgentMapPlugin extends Plugin {
   private async ensureAcpProcess(pluginDirectory: string): Promise<void> {
     if (!this.acp) {
       const executable = this.resolveExecutable(this.settings.codexAcpPath);
+      this.logs.appendLog("info", `啟動 Codex ACP：${executable}`);
       const child = spawn(executable, [], { cwd: pluginDirectory, env: this.cliEnvironment(), stdio: ["pipe", "pipe", "pipe"] });
       this.childProcesses.add(child);
       this.acp = { child, buffer: "", nextId: 1, pending: new Map(), sessions: new Map(), initializing: Promise.resolve() };
@@ -1216,21 +1383,32 @@ export default class VisualAgentMapPlugin extends Plugin {
           if (newline === -1) return;
           const line = this.acp.buffer.slice(0, newline).trim();
           this.acp.buffer = this.acp.buffer.slice(newline + 1);
-          if (line) this.handleAcpMessage(JSON.parse(line) as AcpMessage);
+          if (line) {
+            try { this.handleAcpMessage(JSON.parse(line) as AcpMessage); }
+            catch (error) {
+              const message = this.recordFailure("Codex ACP 回應無法解析", error);
+              for (const entry of this.acp?.pending.values() ?? []) { window.clearTimeout(entry.timeout); entry.reject(new AcpTransportError(message)); }
+              this.acp?.pending.clear();
+            }
+          }
         }
       });
       child.stderr.on("data", (chunk: Buffer) => { stderr += chunk.toString(); });
       child.on("error", error => {
+        this.logs.appendLog("error", `無法啟動 Codex ACP（${executable}）：${error.message}`);
         for (const entry of this.acp?.pending.values() ?? []) { window.clearTimeout(entry.timeout); entry.reject(new AcpTransportError(`無法啟動 Codex ACP（${executable}）：${error.message}`)); }
         this.childProcesses.delete(child);
         if (this.acp?.child === child) this.acp = null;
       });
       child.on("close", code => {
+        if (code !== 0) this.logs.appendLog("error", stderr.trim() || `Codex ACP 結束碼：${code ?? "未知"}`);
         for (const entry of this.acp?.pending.values() ?? []) { window.clearTimeout(entry.timeout); entry.reject(new AcpTransportError(stderr.trim() || `Codex ACP 結束碼：${code ?? "未知"}`)); }
         this.childProcesses.delete(child);
         if (this.acp?.child === child) this.acp = null;
       });
-      this.acp.initializing = this.acpRequest("initialize", { protocolVersion: 1, clientCapabilities: { fs: { readTextFile: false, writeTextFile: false }, terminal: false }, clientInfo: { name: "visual-agent-map", version: this.manifest.version || "0.0.0" } }).then(() => undefined);
+      this.acp.initializing = this.acpRequest("initialize", { protocolVersion: 1, clientCapabilities: { fs: { readTextFile: false, writeTextFile: false }, terminal: false }, clientInfo: { name: "visual-agent-map", version: this.manifest.version || "0.0.0" } })
+        .then(() => { this.logs.appendLog("info", `Codex ACP 已就緒：${executable}`); })
+        .catch(error => { this.recordFailure("Codex ACP 初始化失敗", error); throw error; });
     }
     try { await this.acp.initializing; }
     catch (error) { throw error instanceof AcpTransportError ? error : new AcpTransportError(error instanceof Error ? error.message : String(error)); }

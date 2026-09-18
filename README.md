@@ -18,6 +18,8 @@ Visual Agent Map is a desktop-only Obsidian plugin for breaking a broad question
 - **Markdown-first storage** — each topic is a normal Markdown note; the map structure is stored in `Map.md`.
 - **Knowledge organization** — remove notes from a map without deleting them; reclaim, archive, or move them later.
 - **Safer editing** — previewed migration, conflict handling, and session undo/redo protect existing work.
+- **Built-in sample** — explore a read-only Taiwan travel map, then duplicate it into an editable workspace.
+- **Debug log** — inspect, copy, or clear VAM runtime diagnostics from the Command Palette.
 - **Local credentials** — uses locally signed-in Codex tools and never stores API keys.
 
 ![Topic workspace and Markdown detail](assets/screenshots/topic-workspace.png)
@@ -35,7 +37,7 @@ Visual Agent Map is a desktop-only Obsidian plugin for breaking a broad question
 - Obsidian desktop `1.7.2` or later.
 - A local Codex installation signed in to your account.
 - [`codex-acp`](https://github.com/agentclientprotocol/codex-acp) is preferred; Codex CLI is used only when ACP has a prompt-before transport error.
-- Desktop only. Current release: `0.5.3`.
+- Desktop only. Current release: `0.6.0`.
 
 ### Install
 
@@ -61,7 +63,7 @@ Agent Workspace/
 └── Inbox/
 ```
 
-Plugin-created content stays in the vault. Existing general Markdown is not modified during onboarding unless you explicitly create a map.
+Plugin-created content stays in the vault. A fresh installation creates the empty workspace structure and opens the read-only built-in sample; uninstalling the plugin does not delete workspace content.
 
 ### Privacy and network access
 
@@ -96,6 +98,8 @@ Visual Agent Map 是桌面版 Obsidian 外掛：用視覺化心智圖拆解複�
 - **Markdown 優先**：每個節點都是普通 Markdown 筆記，圖面結構保存在 `Map.md`。
 - **知識整理**：從圖上移除筆記不會刪除內容，之後仍可認領、封存或移至其他主題。
 - **安全編輯**：遷移預覽、衝突處理與工作階段復原／重做，降低影響既有資料的風險。
+- **內建範例**：可瀏覽唯讀的台灣旅遊心智圖，再複製成自己的可編輯版本。
+- **偵錯日誌**：可從命令面板查看、複製或清除 VAM 執行記錄。
 - **使用本機登入狀態**：使用本機已登入的 Codex 工具，不儲存 API key。
 
 ### 安裝
@@ -111,7 +115,7 @@ Visual Agent Map 是桌面版 Obsidian 外掛：用視覺化心智圖拆解複�
 
 ### 資料保存與隱私
 
-外掛建立的資料保存在 Vault 的 `Agent Workspace/`。首次 onboarding 不會修改既有一般 Markdown，除非你明確選擇建立心智圖。
+外掛建立的資料保存在 Vault 的 `Agent Workspace/`。全新安裝只建立空的基本結構並開啟唯讀內建範例；卸載外掛不會刪除 Workspace 內容。
 
 - 不含 telemetry，也不儲存 API key。
 - 只有你確認執行 AI 任務後，外掛才會將必要議題內容、規則與任務交給本機已登入的 Codex 工具。

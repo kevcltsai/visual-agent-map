@@ -1,13 +1,19 @@
 {
   "name": "visual-agent-map",
-  "version": "0.5.3",
+  "version": "0.6.0",
   "private": true,
   "scripts": {
     "dev": "node esbuild.config.mjs",
-    "build": "tsc -noEmit -skipLibCheck && node esbuild.config.mjs production",
+    "compile:sample": "node scripts/compile-sample.mjs",
+    "build": "npm run compile:sample && tsc -noEmit -skipLibCheck && node esbuild.config.mjs production",
     "check:artifacts": "node scripts/check-artifacts.mjs",
+    "test:vault": "npm run test:vault:onboarding",
+    "test:vault:onboarding": "node scripts/create-onboarding-test-vault.mjs --profile=onboarding",
+    "test:vault:normal": "node scripts/create-onboarding-test-vault.mjs --profile=normal",
+    "test:vault:reinstall": "node scripts/create-onboarding-test-vault.mjs --profile=reinstall",
+    "verify:vault:reinstall": "node scripts/verify-reinstall-test-vault.mjs",
     "lint": "eslint .",
-    "test": "node tests/run.cjs"
+    "test": "npm run compile:sample && node tests/run.cjs"
   },
   "devDependencies": {
     "@types/node": "^22.10.2",

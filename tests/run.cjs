@@ -12,6 +12,7 @@ function load(entry, overrides = {}) {
   return module.exports;
 }
 const core = load('map-model.ts');
+const logging = load('log-manager.ts');
 const node = (id, parentId = null, collapsed = false) => ({ id, parentId, path: `${id}.md`, x: 0, y: 0, collapsed });
 const map = nodes => ({ id: 'map', title: '測試心智圖', version: 1, nodes, viewport: { x: 0, y: 0, zoom: 1 } });
 const plain = obj => JSON.parse(JSON.stringify(obj));
@@ -55,14 +56,66 @@ test('model inheritance distinguishes CLI default from absent parent and copies 
 test('workspace defaults to the configured low-cost model and low reasoning', () => {
   assert.equal(DEFAULT_SETTINGS.cliModel, 'gpt-5.6-luna');
   assert.equal(DEFAULT_SETTINGS.cliReasoning, 'low');
+  assert.equal(DEFAULT_SETTINGS.codexAcpPath, 'codex-acp');
   assert.equal(DEFAULT_SETTINGS.firstUseNoticeSeen, false);
+  assert.equal(DEFAULT_SETTINGS.workspaceInitialized, false);
+  assert.equal(DEFAULT_SETTINGS.sampleTourVersionSeen, 0);
   assert.doesNotMatch(DEFAULT_SETTINGS.models, /claude:/);
 });
+test('macOS executable discovery covers Homebrew, local npm, Volta, fnm, nvm and inherited PATH', () => {
+  const { executableCandidates } = load('main.ts', { obsidian });
+  const candidates = executableCandidates('codex-acp', '/Users/friend', '/custom/npm/bin:/usr/bin', ['v20.18.0']);
+  for (const path of [
+    '/Users/friend/.local/bin/codex-acp', '/Users/friend/.npm-global/bin/codex-acp',
+    '/Users/friend/.volta/bin/codex-acp', '/Users/friend/.fnm/current/bin/codex-acp',
+    '/opt/homebrew/bin/codex-acp', '/usr/local/bin/codex-acp',
+    '/Users/friend/.nvm/versions/node/v20.18.0/bin/codex-acp', '/custom/npm/bin/codex-acp'
+  ]) assert.ok(candidates.includes(path), path);
+  assert.deepEqual(Array.from(executableCandidates('/exact/codex-acp', '/Users/friend', '', [])), ['/exact/codex-acp']);
+});
+test('standard three-file installation materializes the embedded Codex output schema on demand', t => {
+  const folder = fs.mkdtempSync(path.join(require('node:os').tmpdir(), 'vam-schema-'));
+  t.after(() => fs.rmSync(folder, { recursive: true, force: true }));
+  const schemaPath = path.join(folder, 'response-schema.json');
+  const { ensureResponseSchema } = load('main.ts', { obsidian });
+  assert.equal(ensureResponseSchema(schemaPath), schemaPath);
+  const schema = JSON.parse(fs.readFileSync(schemaPath, 'utf8'));
+  assert.deepEqual(Array.from(schema.required), ['summary', 'detail', 'suggestions', 'visualReferences']);
+});
+test('built-in Taiwan sample is bilingual, read-only source data with exploration and synthesis roots', () => {
+  const sample = load('builtin-sample.ts');
+  for (const language of ['zh-TW', 'en']) {
+    assert.deepEqual(Array.from(sample.validateBuiltInSample(language)), []);
+    const data = sample.builtInSample(language);
+    assert.equal(data.map.nodes.filter(node => node.parentId === null).length, 2);
+    assert.ok(Array.from(data.notes.values()).some(note => note.sourcePaths.length === 6));
+    assert.equal(data.map.nodes.length, 12); assert.equal(data.assets.size, 5);
+  }
+  assert.notEqual(sample.builtInSample('zh-TW').map.title, sample.builtInSample('en').map.title);
+});
+test('workspace repair creates only the configured base folders and is idempotent', async () => {
+  const { repo, app } = fixture();
+  assert.equal(repo.workspaceExists(), false);
+  await repo.ensureWorkspace(); await repo.ensureWorkspace();
+  assert.ok(app.vault.getAbstractFileByPath('Agent Workspace/Topics') instanceof TFolder);
+  assert.ok(app.vault.getAbstractFileByPath('Agent Workspace/Inbox') instanceof TFolder);
+});
+test('workspace rediscovery finds valid custom VAM workspaces without accepting unrelated Map files', async () => {
+  const { repo, app } = fixture();
+  await repo.folder('Research/My Maps/Topics/Trip');
+  await app.vault.create('Research/My Maps/Topics/Trip/Map.md', core.serializeMap(map([])));
+  await repo.folder('Unrelated/Topics/Folder');
+  await app.vault.create('Unrelated/Topics/Folder/Map.md', '# Not a VAM map');
+  assert.deepEqual(Array.from(await repo.workspaceCandidates()), ['Research/My Maps']);
+  assert.equal(repo.workspaceExists(), false);
+});
 test('general tasks retain existing Detail while decompose uses lightweight context', () => {
-  const { buildPreparedTaskContext } = load('main.ts', { obsidian });
+  const { buildPreparedTaskContext, extractJsonObject } = load('main.ts', { obsidian });
   const input = { title: 'Topic', summary: 'Existing summary', detail: 'Existing Detail', rules: '', task: 'Research the topic', ancestors: '', mode: 'task' };
   assert.equal(buildPreparedTaskContext(input, 'gpt-5.6-luna').context.detail, 'Existing Detail');
   assert.equal(buildPreparedTaskContext({ ...input, mode: 'decompose' }, 'gpt-5.6-luna').context.detail, '');
+  assert.deepEqual(JSON.parse(extractJsonObject('我會先查核。\n{"summary":"ok","detail":"brace } in string"}\n完成。')), { summary: 'ok', detail: 'brace } in string' });
+  assert.throws(() => extractJsonObject('沒有結構化回應'), /JSON object/);
 });
 test('Codex output schema requires every declared property', () => {
   const schema = JSON.parse(fs.readFileSync(path.join(root, 'response-schema.json'), 'utf8'));
@@ -70,6 +123,28 @@ test('Codex output schema requires every declared property', () => {
 });
 test('undo and redo preserve ordering; new edit invalidates redo', () => {
   const h = new core.History(); h.push('move'); h.push('delete'); assert.equal(h.undo(), 'delete'); assert.equal(h.undo(), 'move'); assert.equal(h.redo(), 'move'); h.push('edit'); assert.equal(h.canRedo, false); assert.equal(h.undo(), 'edit');
+});
+test('debug log manager timestamps, bounds, formats and clears in-memory entries', () => {
+  const logs = new logging.LogManager(2);
+  let changes = 0; const unsubscribe = logs.subscribe(() => changes++);
+  logs.appendLog('debug', 'discarded'); logs.appendLog('info', 'ACP started'); logs.appendLog('error', 'ACP failed');
+  const entries = logs.getLogs();
+  assert.equal(entries.length, 2); assert.equal(entries[0].message, 'ACP started'); assert.match(entries[0].timestamp, /^\d{4}-\d{2}-\d{2}T/);
+  assert.match(logging.formatDebugLogs(entries), /\[INFO\] ACP started/); assert.match(logging.formatDebugLogs(entries), /\[ERROR\] ACP failed/);
+  entries[0].message = 'changed outside'; assert.equal(logs.getLogs()[0].message, 'ACP started');
+  logs.clear(); assert.equal(logs.getLogs().length, 0); assert.equal(changes, 4);
+  unsubscribe(); logs.appendLog('info', 'ignored by listener'); assert.equal(changes, 4);
+});
+test('debug log command opens the custom modal and exposes copy and clear actions', () => {
+  const source = fs.readFileSync(path.join(root, 'main.ts'), 'utf8');
+  const modal = fs.readFileSync(path.join(root, 'ui/modals/debug-log-modal.ts'), 'utf8');
+  assert.match(source, /id: "open-debug-log"/); assert.match(source, /new DebugLogModal\(this\.app, this\.logs\)\.open\(\)/);
+  assert.match(modal, /navigator\.clipboard\.writeText/); assert.match(modal, /this\.logs\.clear\(\)/);
+  assert.match(modal, /更新日誌/);
+  assert.match(modal, /this\.logs\.subscribe/);
+  assert.match(source, /Codex ACP 初始化失敗/);
+  assert.match(source, /Codex ACP 已就緒/);
+  assert.match(source, /AI 任務失敗/);
 });
 class TFolder { constructor(path) { this.path = path; this.name = path.split('/').at(-1); this.children = []; this.parent = null; } }
 class TFile { constructor(path) { this.path = path; this.name = path.split('/').at(-1); this.basename = this.name.replace(/\.md$/, ''); this.extension = this.name.includes('.') ? this.name.split('.').at(-1) : ''; this.parent = null; this.stat = { mtime: Date.now() }; } }
@@ -86,12 +161,13 @@ function fixture() {
   const renameTree = (from, to) => { const entries = Array.from(files.entries()).filter(([p]) => p === from || p.startsWith(`${from}/`)).sort((a, b) => a[0].length - b[0].length); for (const [old, item] of entries) { files.delete(old); const next = `${to}${old.slice(from.length)}`; item.path = next; item.name = next.split('/').at(-1); if (item instanceof TFile) { item.basename = item.name.replace(/\.md$/, ''); item.stat.mtime = Date.now(); const content = contents.get(old); contents.delete(old); contents.set(next, content); } files.set(next, item); } for (const [, item] of entries) attach(item); };
   const app = { vault: {
     getAbstractFileByPath: p => files.get(p),
-    getMarkdownFiles: () => Array.from(files.values()).filter(file => file instanceof TFile),
+    getMarkdownFiles: () => Array.from(files.values()).filter(file => file instanceof TFile && file.extension === 'md'),
     read: async file => contents.get(file.path), cachedRead: async file => contents.get(file.path),
     createFolder: async p => { const folder = new TFolder(p); files.set(p, folder); attach(folder); return folder; },
     create: async (p, content) => { assert.equal(files.has(p), false); const file = new TFile(p); files.set(p, file); contents.set(p, content); attach(file); return file; },
+    createBinary: async (p, content) => { assert.equal(files.has(p), false); const file = new TFile(p); files.set(p, file); contents.set(p, content); attach(file); return file; },
     process: async (file, change) => { contents.set(file.path, change(contents.get(file.path))); }
-  }, metadataCache: { getFileCache: file => { const text = contents.get(file.path) || ''; return { frontmatter: text.includes('agent-map-node: true') ? { 'agent-map-node': true } : text.includes('visual-agent-map: true') ? { 'visual-agent-map': true } : {} }; }, getFirstLinkpathDest: link => Array.from(files.values()).find(file => file instanceof TFile && (file.basename === link || file.path.replace(/\.md$/, '') === link)) || null }, fileManager: { renameFile: async (item, target) => renameTree(item.path, target) } };
+  }, metadataCache: { getFileCache: file => { const text = contents.get(file.path) || ''; return { frontmatter: text.includes('agent-map-node: true') ? { 'agent-map-node': true } : text.includes('visual-agent-map: true') ? { 'visual-agent-map': true } : {} }; }, getFirstLinkpathDest: link => Array.from(files.values()).find(file => file instanceof TFile && (file.basename === link || file.path.replace(/\.md$/, '') === link)) || null }, fileManager: { renameFile: async (item, target) => renameTree(item.path, target), trashFile: async () => {} } };
   return { app, contents, repo: new Repository(app, { ...DEFAULT_SETTINGS }) };
 }
 async function topicNote(repo, title = '題目', model = 'model-a', id = 'map-a') {
@@ -330,35 +406,39 @@ test('decomposition keeps only 3 to 7 proposals and does not write nodes before 
   assert.equal(plugin.pendingSuggestions.get(parent.path).length, 7);
   assert.equal((await repo.readMap(mapPath)).nodes.length, 1);
 });
-test('sample onboarding creates a removable map with one root and three child topics without AI', async () => {
+test('duplicating the built-in sample creates an independent editable map with new identities', async () => {
   const { repo, app } = fixture();
   const { default: Plugin } = load('main.ts', { obsidian });
-  const plugin = new Plugin(); plugin.app = app; plugin.repo = repo; plugin.settings = { ...DEFAULT_SETTINGS };
-  const mapPath = await plugin.createSampleMap();
+  const plugin = new Plugin(); plugin.app = app; plugin.repo = repo; plugin.settings = { ...DEFAULT_SETTINGS }; plugin.saveSettings = async () => {};
+  const mapPath = await plugin.duplicateBuiltInSample();
   const sample = await repo.readMap(mapPath);
-  assert.match(mapPath, /Agent Workspace\/Topics\/範例：旅行規劃\/Map\.md$/);
-  assert.equal(sample.nodes.length, 4);
-  const root = sample.nodes.find(node => node.parentId === null);
-  assert.ok(root);
-  assert.equal(sample.nodes.filter(node => node.parentId === root.id).length, 3);
-  const rootNote = await repo.readNote(root.path);
-  assert.equal(rootNote.status, 'idea');
-  assert.match(rootNote.prompt, /兩天一夜/);
-  assert.equal(rootNote.modelSource, 'workspace');
-  for (const node of sample.nodes.filter(node => node.id !== root.id)) assert.equal((await repo.readNote(node.path)).modelSource, 'inherited');
+  assert.match(mapPath, /Agent Workspace\/Topics\/範例：台灣旅行規劃\/Map\.md$/);
+  assert.equal(sample.nodes.length, 12);
+  assert.equal(sample.nodes.filter(node => node.parentId === null).length, 2);
+  assert.notEqual(sample.id, 'builtin-taiwan-travel');
+  assert.ok(sample.nodes.every(node => !['explore', 'constraints', 'transport', 'food', 'nature', 'journey'].includes(node.id)));
+  const synthesis = await repo.readNote(sample.nodes.find(node => node.x === 1050).path);
+  assert.equal(synthesis.status, 'completed'); assert.equal(synthesis.sourcePaths.length, 6);
+  assert.ok(synthesis.sourcePaths.every(source => source.startsWith('Agent Workspace/Topics/')));
+  assert.ok(app.vault.getAbstractFileByPath('Agent Workspace/Topics/範例：台灣旅行規劃/Attachments/east-coast-landscape.webp'));
 });
-test('first-use onboarding shows the local AI usage notice before its setup choices', () => {
+test('onboarding uses an embedded sample and explicit workspace repair without a dismiss-and-create-nothing path', () => {
   const source = fs.readFileSync(path.join(root, 'main.ts'), 'utf8');
-  const modalStart = source.indexOf('class FirstUseModal');
-  const modalEnd = source.indexOf('\nclass ', modalStart + 1);
-  const modal = source.slice(modalStart, modalEnd === -1 ? undefined : modalEnd);
-  const notice = '只有在你確認執行 AI 任務時，外掛才會使用本機已登入的 Codex CLI；不使用 ChatGPT 對話額度，且不保存 API key。';
-  assert.ok(modal.includes(`t("${notice}")`));
-  assert.ok(modal.indexOf(`t("${notice}")`) < modal.indexOf('t("建立空白心智圖")'));
-  assert.match(source, /id: "open-onboarding"/);
-  assert.match(source, /建立心智圖失敗：\{0\}。請檢查 vault 後重試。/);
-  const completion = source.slice(source.indexOf('private async completeOnboarding'), source.indexOf('private async createSampleMap'));
-  assert.ok(completion.indexOf('await this.createSampleMap') < completion.lastIndexOf('this.settings.firstUseNoticeSeen = true'));
+  assert.doesNotMatch(source, /class FirstUseModal|id: "open-onboarding"|稍後再說/);
+  assert.match(source, /id: "open-built-in-sample"/);
+  assert.match(source, /id: "repair-workspace"/);
+  assert.match(source, /this\.workspaceRecoveryCandidates = await this\.repo\.workspaceCandidates\(\)/);
+  assert.match(source, /if \(!this\.workspaceRecoveryCandidates\.length\) \{ await this\.repo\.ensureWorkspace\(\)/);
+  assert.match(source, /id: "reconnect-workspace"/);
+});
+test('Obsidian 1.13 declarative settings expose workspace recovery and ACP diagnostics', () => {
+  const source = fs.readFileSync(path.join(root, 'main.ts'), 'utf8');
+  const definitions = source.slice(source.indexOf('getSettingDefinitions()'), source.indexOf('async setControlValue'));
+  assert.match(definitions, /Workspace 位置/);
+  assert.match(definitions, /修復 Agent Workspace/);
+  assert.match(definitions, /找回既有 Workspace/);
+  assert.match(definitions, /Codex ACP 狀態/);
+  assert.match(definitions, /重新檢查/);
 });
 test('generated child filenames are migrated to their topic titles and maps stay linked', async () => {
   const { repo, app } = fixture(), mapPath = await repo.createMap('Filename migration'), mapDoc = await repo.readMap(mapPath);
@@ -482,7 +562,7 @@ test('Codex ACP isolates each task session, receives selected models and routes 
     else if (message.method === 'session/set_config_option') { if (message.params.configId === 'model') { modelSetCount++; assert.match(message.params.value, /^(child-model|second-model)$/); } reply({}); }
     else if (message.method === 'session/prompt') { promptCount++; const prompt = message.params.prompt[0].text; assert.match(prompt, /Current topic|目前議題/); assert.match(prompt, /Use official sources/); assert.match(prompt, /AI 規則/); assert.match(prompt, /一般任務/); assert.match(prompt, /task/); const sessionId = message.params.sessionId; process.nextTick(() => { child.stdout.emit('data', Buffer.from(`${JSON.stringify({ jsonrpc: '2.0', method: 'session/update', params: { sessionId, update: { sessionUpdate: 'agent_message_chunk', content: { type: 'text', text: JSON.stringify({ summary: sessionId === 's1' ? 'first' : 'second', detail: 'detail', suggestions: [] }) } } } })}\n`)); child.stdout.emit('data', Buffer.from(`${JSON.stringify({ jsonrpc: '2.0', id: message.id, result: {} })}\n`)); }); }
   } };
-  const { default: Plugin } = load('main.ts', { obsidian, 'node:child_process': { spawn: (path) => { command = path; return child; } } });
+  const { default: Plugin } = load('main.ts', { obsidian, 'node:fs': { existsSync: () => false, readdirSync: () => [], writeFileSync: () => {} }, 'node:child_process': { spawn: (path) => { command = path; return child; } } });
   const plugin = new Plugin(); plugin.app = { vault: { adapter: new obsidian.FileSystemAdapter() } }; plugin.manifest = { dir: '.obsidian/plugins/visual-agent-map' };
   plugin.saveData = async data => { plugin.saved = data; };
   const [result, second] = await Promise.all([

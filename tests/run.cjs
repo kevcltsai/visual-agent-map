@@ -8,7 +8,7 @@ const root = path.resolve(__dirname, '..');
 function load(entry, overrides = {}) {
   const code = buildSync({ entryPoints: [path.join(root, entry)], bundle: true, write: false, platform: 'node', format: 'cjs', external: ['obsidian', 'node:*'] }).outputFiles[0].text;
   const module = { exports: {} };
-  vm.runInNewContext(code, { module, exports: module.exports, require: name => overrides[name] || require(name), console, crypto: require('node:crypto').webcrypto, window: { setTimeout, clearTimeout } });
+  vm.runInNewContext(code, { module, exports: module.exports, require: name => overrides[name] || require(name), console, crypto: require('node:crypto').webcrypto, process, window: { setTimeout, clearTimeout } });
   return module.exports;
 }
 const core = load('map-model.ts');
@@ -56,9 +56,13 @@ test('workspace defaults to the configured low-cost model and low reasoning', ()
   assert.equal(DEFAULT_SETTINGS.cliModel, 'gpt-5.6-luna');
   assert.equal(DEFAULT_SETTINGS.cliReasoning, 'low');
   assert.equal(DEFAULT_SETTINGS.firstUseNoticeSeen, false);
-  assert.match(DEFAULT_SETTINGS.models, /claude:sonnet/);
-  assert.match(DEFAULT_SETTINGS.models, /claude:opus/);
-  assert.match(DEFAULT_SETTINGS.models, /claude:fable/);
+  assert.doesNotMatch(DEFAULT_SETTINGS.models, /claude:/);
+});
+test('general tasks retain existing Detail while decompose uses lightweight context', () => {
+  const { buildPreparedTaskContext } = load('main.ts', { obsidian });
+  const input = { title: 'Topic', summary: 'Existing summary', detail: 'Existing Detail', rules: '', task: 'Research the topic', ancestors: '', mode: 'task' };
+  assert.equal(buildPreparedTaskContext(input, 'gpt-5.6-luna').context.detail, 'Existing Detail');
+  assert.equal(buildPreparedTaskContext({ ...input, mode: 'decompose' }, 'gpt-5.6-luna').context.detail, '');
 });
 test('Codex output schema requires every declared property', () => {
   const schema = JSON.parse(fs.readFileSync(path.join(root, 'response-schema.json'), 'utf8'));
@@ -173,6 +177,42 @@ test('preview migration moves owned notes into a topic and unknown orphans into 
   assert.equal((await repo.readNote(movedMap.nodes[0].path)).topicState, 'active');
   assert.equal((await repo.inboxFiles()).length, 1); assert.equal((await repo.readNote((await repo.inboxFiles())[0].path)).topicState, 'inbox');
 });
+test('preview migration rolls back all completed moves when a later move fails', async () => {
+  const { repo, app } = fixture();
+  await repo.folder('Agent Workspace/Maps'); await repo.folder('Agent Workspace/Nodes');
+  const content = `---\nagent-map-node: true\nnode-id: "a"\ntitle: "a"\n---\n\n# a\n`;
+  await app.vault.create('Agent Workspace/Nodes/a.md', content);
+  const legacy = map([node('a')]); legacy.title = 'Rollback'; legacy.nodes[0].path = 'Agent Workspace/Nodes/a.md';
+  await app.vault.create('Agent Workspace/Maps/Rollback.md', core.serializeMap(legacy));
+  const rename = app.fileManager.renameFile; let failed = false;
+  app.fileManager.renameFile = async (item, target) => {
+    if (!failed && target.includes('/Notes/')) { failed = true; throw new Error('controlled migration failure'); }
+    await rename(item, target);
+  };
+  const plan = await repo.legacyMigrationPlan();
+  await assert.rejects(() => repo.migrateLegacyWorkspace(plan), /controlled migration failure/);
+  assert.ok(app.vault.getAbstractFileByPath('Agent Workspace/Maps/Rollback.md'));
+  assert.ok(app.vault.getAbstractFileByPath('Agent Workspace/Nodes/a.md'));
+  assert.equal(app.vault.getAbstractFileByPath('Agent Workspace/Topics/Rollback/Map.md'), undefined);
+});
+test('external rename reconciliation only follows a unique matching node-id', async () => {
+  const { repo, app, contents } = fixture(); const n = await topicNote(repo, 'External rename');
+  const mapPath = 'Agent Workspace/Topics/map-a/Map.md', doc = { id: 'map-a', title: 'Map A', version: 1, nodes: [n], viewport: { x: 0, y: 0, zoom: 1 } };
+  await app.vault.create(mapPath, core.serializeMap(doc));
+  const renamed = 'Agent Workspace/Topics/map-a/Notes/External rename moved.md';
+  await app.fileManager.renameFile(app.vault.getAbstractFileByPath(n.path), renamed);
+  assert.equal(await repo.reconcileMissingNodePaths(), 1);
+  assert.equal((await repo.readMap(mapPath)).nodes[0].path, renamed);
+
+  const second = fixture(); const other = await topicNote(second.repo, 'Ambiguous rename');
+  const otherMap = 'Agent Workspace/Topics/map-a/Map.md', otherDoc = { id: 'map-a', title: 'Map A', version: 1, nodes: [other], viewport: { x: 0, y: 0, zoom: 1 } };
+  await second.app.vault.create(otherMap, core.serializeMap(otherDoc));
+  const firstCandidate = 'Agent Workspace/Topics/map-a/Notes/Ambiguous one.md', secondCandidate = 'Agent Workspace/Topics/map-a/Notes/Ambiguous two.md';
+  await second.app.fileManager.renameFile(second.app.vault.getAbstractFileByPath(other.path), firstCandidate);
+  await second.app.vault.create(secondCandidate, second.contents.get(firstCandidate));
+  assert.equal(await second.repo.reconcileMissingNodePaths(), 0);
+  assert.equal((await second.repo.readMap(otherMap)).nodes[0].path, other.path);
+});
 test('new topics contain Map, Notes, Unassigned and Archive', async () => {
   const { repo, app } = fixture(), mapPath = await repo.createMap('Topic A');
   assert.equal(mapPath, 'Agent Workspace/Topics/Topic A/Map.md');
@@ -274,6 +314,52 @@ test('new child topics inherit the parent AI rules once', async () => {
   const child = (await repo.readMap(mapPath)).nodes.at(-1);
   assert.equal((await repo.readNote(child.path)).rules, 'Use official sources and tables.');
 });
+test('decomposition keeps only 3 to 7 proposals and does not write nodes before confirmation', async () => {
+  const { repo, app } = fixture(), parent = await topicNote(repo, 'Parent', 'model-a');
+  const mapPath = 'Agent Workspace/Topics/map-a/Map.md';
+  const mapDoc = { id: 'map-a', title: 'map-a', version: 1, nodes: [parent], viewport: { x: 0, y: 0, zoom: 1 } };
+  await app.vault.create(mapPath, core.serializeMap(mapDoc));
+  const { VisualAgentMapView } = load('main.ts', { obsidian });
+  const plugin = { repo, settings: { ...DEFAULT_SETTINGS }, running: new Set(), pendingSuggestions: new Map(), askModel: async () => ({ summary: '', detail: '', visualReferences: [], suggestions: [{ title: 'Only one', task: '', contribution: '' }, { title: 'Only two', task: '', contribution: '' }] }) };
+  const view = new VisualAgentMapView({ app }, plugin); view.path = mapPath; view.map = mapDoc; view.render = () => {}; view.hydrate = async () => {};
+  await view.proposeChildren(parent, true);
+  assert.equal(plugin.pendingSuggestions.has(parent.path), false);
+  assert.equal((await repo.readMap(mapPath)).nodes.length, 1);
+  plugin.askModel = async () => ({ summary: '', detail: '', visualReferences: [], suggestions: Array.from({ length: 8 }, (_, index) => ({ title: `Suggestion ${index + 1}`, task: '', contribution: '' })) });
+  await view.proposeChildren(parent, true);
+  assert.equal(plugin.pendingSuggestions.get(parent.path).length, 7);
+  assert.equal((await repo.readMap(mapPath)).nodes.length, 1);
+});
+test('sample onboarding creates a removable map with one root and three child topics without AI', async () => {
+  const { repo, app } = fixture();
+  const { default: Plugin } = load('main.ts', { obsidian });
+  const plugin = new Plugin(); plugin.app = app; plugin.repo = repo; plugin.settings = { ...DEFAULT_SETTINGS };
+  const mapPath = await plugin.createSampleMap();
+  const sample = await repo.readMap(mapPath);
+  assert.match(mapPath, /Agent Workspace\/Topics\/範例：旅行規劃\/Map\.md$/);
+  assert.equal(sample.nodes.length, 4);
+  const root = sample.nodes.find(node => node.parentId === null);
+  assert.ok(root);
+  assert.equal(sample.nodes.filter(node => node.parentId === root.id).length, 3);
+  const rootNote = await repo.readNote(root.path);
+  assert.equal(rootNote.status, 'idea');
+  assert.match(rootNote.prompt, /兩天一夜/);
+  assert.equal(rootNote.modelSource, 'workspace');
+  for (const node of sample.nodes.filter(node => node.id !== root.id)) assert.equal((await repo.readNote(node.path)).modelSource, 'inherited');
+});
+test('first-use onboarding shows the local AI usage notice before its setup choices', () => {
+  const source = fs.readFileSync(path.join(root, 'main.ts'), 'utf8');
+  const modalStart = source.indexOf('class FirstUseModal');
+  const modalEnd = source.indexOf('\nclass ', modalStart + 1);
+  const modal = source.slice(modalStart, modalEnd === -1 ? undefined : modalEnd);
+  const notice = '只有在你確認執行 AI 任務時，外掛才會使用本機已登入的 Codex CLI；不使用 ChatGPT 對話額度，且不保存 API key。';
+  assert.ok(modal.includes(`t("${notice}")`));
+  assert.ok(modal.indexOf(`t("${notice}")`) < modal.indexOf('t("建立空白心智圖")'));
+  assert.match(source, /id: "open-onboarding"/);
+  assert.match(source, /建立心智圖失敗：\{0\}。請檢查 vault 後重試。/);
+  const completion = source.slice(source.indexOf('private async completeOnboarding'), source.indexOf('private async createSampleMap'));
+  assert.ok(completion.indexOf('await this.createSampleMap') < completion.lastIndexOf('this.settings.firstUseNoticeSeen = true'));
+});
 test('generated child filenames are migrated to their topic titles and maps stay linked', async () => {
   const { repo, app } = fixture(), mapPath = await repo.createMap('Filename migration'), mapDoc = await repo.readMap(mapPath);
   const child = await repo.createNote('新的子議題', 'a', mapDoc, mapPath, 'workspace');
@@ -352,6 +438,18 @@ test('creating an integrated topic runs AI with full sources and keeps clickable
   assert.equal(integrated.rules, 'Use tables');
   assert.equal(integrated.status, 'completed');
 });
+test('failed multi-select integration creates no empty root or note', async () => {
+  const { repo, app } = fixture(), first = await topicNote(repo, 'Recipe A', 'model-a'), second = await topicNote(repo, 'Recipe B', 'model-a');
+  const mapPath = 'Agent Workspace/Topics/map-a/Map.md';
+  const mapDoc = { id: 'map-a', title: 'map-a', version: 1, nodes: [first, second], viewport: { x: 0, y: 0, zoom: 1 } };
+  await app.vault.create(mapPath, core.serializeMap(mapDoc));
+  const { VisualAgentMapView } = load('main.ts', { obsidian });
+  const plugin = { repo, settings: { ...DEFAULT_SETTINGS }, askModel: async () => { throw new Error('provider unavailable'); } };
+  const view = new VisualAgentMapView({ app }, plugin); view.path = mapPath; view.map = mapDoc; view.render = () => {};
+  await assert.rejects(() => view.createIntegratedNode('Should not exist', [first, second], 'Combine', ''), /provider unavailable/);
+  assert.equal((await repo.readMap(mapPath)).nodes.length, 2);
+  assert.equal(app.vault.getAbstractFileByPath('Agent Workspace/Topics/map-a/Notes/Should not exist.md'), undefined);
+});
 test('topic notes hide properties without removing existing css classes', async () => {
   const { repo, contents } = fixture(); const n = await topicNote(repo, 'Styled', 'a');
   let content = contents.get(n.path); assert.match(content, /visual-agent-map-node/);
@@ -382,7 +480,7 @@ test('Codex ACP isolates each task session, receives selected models and routes 
     if (message.method === 'initialize') reply({});
     else if (message.method === 'session/new') reply({ sessionId: `s${++sessionCount}`, configOptions: [{ id: 'model', category: 'model', options: [{ value: 'child-model' }, { value: 'second-model' }, { value: 'gpt-5.6-luna' }] }, { id: 'reasoning-effort', category: 'reasoning', options: [{ value: 'low' }] }] });
     else if (message.method === 'session/set_config_option') { if (message.params.configId === 'model') { modelSetCount++; assert.match(message.params.value, /^(child-model|second-model)$/); } reply({}); }
-    else if (message.method === 'session/prompt') { promptCount++; const prompt = message.params.prompt[0].text; assert.match(prompt, /Current topic|目前議題/); assert.match(prompt, /Use official sources/); assert.match(prompt, /AI 規則/); assert.match(prompt, /一般任務/); assert.match(prompt, /task/); const sessionId = message.params.sessionId; process.nextTick(() => { child.stdout.emit('data', Buffer.from(`${JSON.stringify({ jsonrpc: '2.0', method: 'session/update', params: { sessionId, update: { sessionUpdate: 'agent_message_chunk', text: JSON.stringify({ summary: sessionId === 's1' ? 'first' : 'second', detail: 'detail', suggestions: [] }) } } })}\n`)); child.stdout.emit('data', Buffer.from(`${JSON.stringify({ jsonrpc: '2.0', id: message.id, result: {} })}\n`)); }); }
+    else if (message.method === 'session/prompt') { promptCount++; const prompt = message.params.prompt[0].text; assert.match(prompt, /Current topic|目前議題/); assert.match(prompt, /Use official sources/); assert.match(prompt, /AI 規則/); assert.match(prompt, /一般任務/); assert.match(prompt, /task/); const sessionId = message.params.sessionId; process.nextTick(() => { child.stdout.emit('data', Buffer.from(`${JSON.stringify({ jsonrpc: '2.0', method: 'session/update', params: { sessionId, update: { sessionUpdate: 'agent_message_chunk', content: { type: 'text', text: JSON.stringify({ summary: sessionId === 's1' ? 'first' : 'second', detail: 'detail', suggestions: [] }) } } } })}\n`)); child.stdout.emit('data', Buffer.from(`${JSON.stringify({ jsonrpc: '2.0', id: message.id, result: {} })}\n`)); }); }
   } };
   const { default: Plugin } = load('main.ts', { obsidian, 'node:child_process': { spawn: (path) => { command = path; return child; } } });
   const plugin = new Plugin(); plugin.app = { vault: { adapter: new obsidian.FileSystemAdapter() } }; plugin.manifest = { dir: '.obsidian/plugins/visual-agent-map' };
@@ -401,18 +499,19 @@ test('Codex ACP isolates each task session, receives selected models and routes 
   await assert.rejects(plugin.acpRequest('unresponsive/test', {}, 5), error => error.name === 'AcpTimeoutError');
   assert.equal(plugin.acp.pending.size, 0);
 });
-test('Claude model prefix routes to Claude Code CLI with structured output', async () => {
-  const { EventEmitter } = require('node:events'); let command, args;
-  const child = new EventEmitter(); child.stdout = new EventEmitter(); child.stderr = new EventEmitter(); child.kill = () => {};
-  child.stdin = { end: prompt => { assert.match(prompt, /Current topic|目前議題/); assert.match(prompt, /Use official sources/); process.nextTick(() => { child.stdout.emit('data', Buffer.from(JSON.stringify({ result: JSON.stringify({ summary: 'Claude summary', detail: 'Claude detail', suggestions: [] }), is_error: false }))); child.emit('close', 0); }); } };
-  const { default: Plugin } = load('main.ts', { obsidian, 'node:child_process': { spawn: (path, argv) => { command = path; args = argv; return child; } } });
-  const adapter = new obsidian.FileSystemAdapter(); adapter.getBasePath = () => root;
-  const plugin = new Plugin(); plugin.settings = { ...DEFAULT_SETTINGS, claudePath: '/bin/claude' }; plugin.app = { vault: { adapter } }; plugin.manifest = { dir: '.' };
-  const result = await plugin.askModel({ title: 'Current topic', summary: 'current summary', rules: 'Use official sources', task: 'task', ancestors: 'context', mode: 'task' }, 'claude:sonnet');
-  assert.equal(command, '/bin/claude');
-  assert.equal(args[args.indexOf('--model') + 1], 'sonnet');
-  assert.equal(args.includes('--json-schema'), true);
-  assert.equal(result.summary, 'Claude summary');
+test('legacy Claude models fail clearly without starting a provider', async () => {
+  const { default: Plugin } = load('main.ts', { obsidian });
+  const plugin = new Plugin();
+  await assert.rejects(plugin.askModel({ title: 'Current topic', summary: '', rules: '', detail: '', task: 'task', ancestors: '', mode: 'task' }, 'claude:sonnet'), /Claude Code 已不再支援/);
+});
+
+test('external conflict UI retains file, screen, and manual merge choices', () => {
+  const source = fs.readFileSync(path.join(root, 'main.ts'), 'utf8');
+  for (const modal of ['class ConflictModal', 'class MapConflictModal']) {
+    const start = source.indexOf(modal), next = source.indexOf('\nclass ', start + modal.length);
+    const body = source.slice(start, next < 0 ? source.length : next);
+    assert.match(body, /使用檔案內容/); assert.match(body, /保留畫面內容/); assert.match(body, /儲存合併內容/);
+  }
 });
 
 test('legacy User Notes move to preview without losing either section or duplicating on save', async () => {

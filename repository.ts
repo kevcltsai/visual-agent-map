@@ -34,7 +34,6 @@ export interface Settings {
   mapId: string;
   cliPath: string;
   codexAcpPath: string;
-  claudePath: string;
   cliModel: string;
   cliReasoning: string;
   previewSize?: "small" | "medium" | "large";
@@ -61,11 +60,10 @@ export const DEFAULT_SETTINGS: Settings = {
   mapId: "default",
   cliPath: "codex",
   codexAcpPath: "/opt/homebrew/bin/codex-acp",
-  claudePath: "/Users/kevintsai/.local/bin/claude",
   cliModel: "gpt-5.6-luna",
   cliReasoning: "low",
   previewScale: 120,
-  models: "gpt-6-astra, gpt-5.6-sol, gpt-5.6-terra, gpt-5.6-luna, gpt-5.5, claude:sonnet, claude:opus, claude:fable",
+  models: "gpt-6-astra, gpt-5.6-sol, gpt-5.6-terra, gpt-5.6-luna, gpt-5.5",
   migrated: false,
   structureVersion: 2,
   firstUseNoticeSeen: false
@@ -78,6 +76,7 @@ const DETAIL_END = "<!-- visual-agent-map:detail:end -->";
 const NOTE_CSS_CLASS = "visual-agent-map-node";
 
 function marker(value: unknown): boolean { return value === true || value === "true"; }
+function text(value: unknown, fallback = ""): string { return typeof value === "string" ? value : fallback; }
 function parentPath(path: string): string { return path.includes("/") ? path.slice(0, path.lastIndexOf("/")) : ""; }
 function baseName(path: string): string { return path.slice(path.lastIndexOf("/") + 1); }
 
@@ -280,26 +279,26 @@ export class Repository {
 
   async readNote(path: string): Promise<Note> {
     const file = this.file(path), content = await this.app.vault.read(file), fm = frontmatter(content);
-    const status = String(fm.status ?? "idea");
+    const status = text(fm.status, "idea");
     const normalized = status === "review" || status === "accepted" ? "completed" : status;
-    const source = String(fm["model-source"] ?? "workspace");
-    const state = String(fm["topic-state"] ?? (path.includes("/Archive/") ? "archived" : path.includes("/Unassigned/") ? "unassigned" : path.startsWith(`${this.settings.inboxFolder}/`) ? "inbox" : "active"));
+    const source = text(fm["model-source"], "workspace");
+    const state = text(fm["topic-state"], path.includes("/Archive/") ? "archived" : path.includes("/Unassigned/") ? "unassigned" : path.startsWith(`${this.settings.inboxFolder}/`) ? "inbox" : "active");
     return {
-      title: String(fm.title ?? file.basename),
-      summary: section(content, "Current Summary") || String(fm.summary ?? "尚未形成結論"),
+      title: text(fm.title, file.basename),
+      summary: section(content, "Current Summary") || text(fm.summary, "尚未形成結論"),
       prompt: section(content, "Prompt"),
       rules: section(content, "Rules"),
       detail: section(content, "Detail"),
       visualReferences: section(content, "Visual References"),
       newFindings: section(content, "Working Findings") || section(content, "New Findings"),
       preview: [section(content, "預覽"), section(content, "User Notes")].filter(Boolean).join("\n\n"),
-      model: String(fm.model ?? this.settings.cliModel),
+      model: text(fm.model, this.settings.cliModel),
       modelSource: ["workspace", "inherited", "manual"].includes(source) ? source as ModelSource : "workspace",
       status: ["idea", "running", "completed", "error"].includes(normalized) ? normalized as Status : "idea",
-      mapId: String(fm["agent-map-id"] ?? ""),
-      topicId: String(fm["topic-id"] ?? fm["agent-map-id"] ?? ""),
+      mapId: text(fm["agent-map-id"]),
+      topicId: text(fm["topic-id"], text(fm["agent-map-id"])),
       topicState: ["active", "unassigned", "archived", "inbox"].includes(state) ? state as TopicState : "active",
-      sourcePaths: Array.isArray(fm["source-notes"]) ? fm["source-notes"].map(String).filter(Boolean) : []
+      sourcePaths: Array.isArray(fm["source-notes"]) ? fm["source-notes"].filter((value): value is string => typeof value === "string" && Boolean(value)) : []
     };
   }
 
@@ -337,7 +336,7 @@ export class Repository {
         if (!preview || preview === "尚未形成結論") body = replaceSection(body, "預覽", initialPreview(patch.summary, section(body, "Detail")));
         fm["preview-initialized"] = true;
       }
-      body = normalizeBodyOrder(body, String(fm.title ?? path.replace(/\.md$/, "")), String(fm.summary ?? "尚未形成結論"));
+      body = normalizeBodyOrder(body, text(fm.title, path.replace(/\.md$/, "")), text(fm.summary, "尚未形成結論"));
       return `---\n${stringifyYaml(fm)}---\n${withReferenceLinks(body, fm)}`;
     });
   }
@@ -378,10 +377,33 @@ export class Repository {
   async mapFiles(): Promise<TFile[]> {
     const files: TFile[] = [];
     for (const file of this.app.vault.getMarkdownFiles()) {
-      const cached = this.app.metadataCache.getFileCache(file)?.frontmatter?.["visual-agent-map"];
+      const cached: unknown = this.app.metadataCache.getFileCache(file)?.frontmatter?.["visual-agent-map"];
       if (marker(cached) || /^---\r?\n[\s\S]*?visual-agent-map: true\r?\n/.test(await this.app.vault.cachedRead(file))) files.push(file);
     }
     return files.sort((a, b) => a.path.localeCompare(b.path));
+  }
+
+  async reconcileMissingNodePaths(): Promise<number> {
+    const candidates = new Map<string, string[]>();
+    for (const file of this.app.vault.getMarkdownFiles()) {
+      const fm = frontmatter(await this.app.vault.read(file));
+      if (!marker(fm["agent-map-node"])) continue;
+      const id = text(fm["node-id"]);
+      if (id) candidates.set(id, [...(candidates.get(id) ?? []), file.path]);
+    }
+    let repaired = 0;
+    for (const file of await this.mapFiles()) {
+      const map = await this.readMap(file.path); let changed = false;
+      for (const node of map.nodes) {
+        if (this.app.vault.getAbstractFileByPath(node.path) instanceof TFile) continue;
+        const matches = candidates.get(node.id) ?? [];
+        if (matches.length !== 1) continue;
+        const oldPath = node.path; node.path = matches[0]; changed = true; repaired++;
+        await this.replaceSourcePath(oldPath, node.path);
+      }
+      if (changed) await this.saveMap(file.path, map);
+    }
+    return repaired;
   }
 
   async topics(): Promise<TopicInfo[]> {
@@ -423,7 +445,7 @@ export class Repository {
     if (this.app.vault.getAbstractFileByPath(target)) throw new Error("這個主題已有 Map.md。");
     const map = await this.readMap(sourcePath), candidates = this.app.vault.getMarkdownFiles().filter(file => file.path.startsWith(`${root}/Notes/`));
     const byId = new Map<string, string>();
-    for (const file of candidates) { const fm = frontmatter(await this.app.vault.read(file)); if (fm["node-id"]) byId.set(String(fm["node-id"]), file.path); }
+    for (const file of candidates) { const fm = frontmatter(await this.app.vault.read(file)); const id = text(fm["node-id"]); if (id) byId.set(id, file.path); }
     for (const node of map.nodes) if (!(this.app.vault.getAbstractFileByPath(node.path) instanceof TFile) && byId.has(node.id)) node.path = byId.get(node.id)!;
     await this.moveExact(sourcePath, target); await this.saveMap(target, map);
     for (const node of map.nodes) if (this.app.vault.getAbstractFileByPath(node.path) instanceof TFile) await this.setLifecycle(node.path, map.id, map.id, "active");
@@ -535,7 +557,7 @@ export class Repository {
       if (!marker(fm["agent-map-node"])) continue;
       ensureNoteCssClass(fm);
       const owner = ownership.get(file.path);
-      let state: TopicState = file.path.startsWith(`${this.settings.inboxFolder}/`) ? "inbox" : file.path.includes("/Archive/") ? "archived" : file.path.includes("/Unassigned/") ? "unassigned" : owner ? "active" : String(fm["topic-state"] ?? "unassigned") as TopicState;
+      let state: TopicState = file.path.startsWith(`${this.settings.inboxFolder}/`) ? "inbox" : file.path.includes("/Archive/") ? "archived" : file.path.includes("/Unassigned/") ? "unassigned" : owner ? "active" : text(fm["topic-state"], "unassigned") as TopicState;
       if (owner) {
         fm["agent-map-id"] = owner.map.id; fm["topic-id"] = owner.map.id; fm["topic-state"] = "active"; state = "active";
         if (fm["model-source"] === undefined) fm["model-source"] = owner.node.parentId ? "inherited" : "workspace";
@@ -545,7 +567,7 @@ export class Repository {
         else fm["topic-state"] = state;
       }
       let body = ensurePreview(content.replace(/^---\r?\n[\s\S]*?\r?\n---(?:\r?\n|$)/, ""));
-      const topicId = String(fm["topic-id"] ?? ""), topic = topics.get(topicId);
+      const topicId = text(fm["topic-id"]), topic = topics.get(topicId);
       if (owner) {
         if (!body.includes(DETAIL_START)) body = replaceSection(body, "Detail", section(body, "Detail"));
         const parent = owner.node.parentId ? owner.map.nodes.find(item => item.id === owner.node.parentId) : undefined;
@@ -561,7 +583,7 @@ export class Repository {
         fm["agent-map-references"] = [`所屬主題：[[${noteLink(topic.mapPath)}|${topic.map.title}]]`, `狀態：${state === "archived" ? "已封存" : "未歸類"}`];
         body = withoutReference(body);
       } else { delete fm["agent-map-references"]; body = withoutReference(body); }
-      body = normalizeBodyOrder(body, String(fm.title ?? file.basename), String(fm.summary ?? "尚未形成結論"));
+      body = normalizeBodyOrder(body, text(fm.title, file.basename), text(fm.summary, "尚未形成結論"));
       const next = `---\n${stringifyYaml(fm)}---\n${withReferenceLinks(body, fm)}`;
       if (next !== content) await this.app.vault.process(file, () => next);
     }

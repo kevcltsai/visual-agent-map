@@ -51,6 +51,7 @@
 .vam-proposal { display: grid; grid-template-columns: 24px 1fr; gap: 8px; margin: 10px 0; align-items: start; }
 .vam-proposal textarea { grid-column: 2; width: 100%; resize: vertical; }
 .vam-task-input { width: 100%; box-sizing: border-box; resize: vertical; }
+.vam-name-input { width: 100%; }
 .vam-selection-bar { position: absolute; z-index: 6; bottom: 16px; left: 50%; transform: translateX(-50%); display: flex; align-items: center; gap: 8px; max-width: calc(100% - 32px); padding: 8px 12px; border: 1px solid var(--interactive-accent); border-radius: 10px; background: var(--background-primary); box-shadow: 0 5px 20px rgba(0,0,0,0.16); }
 .vam-selection-bar > span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .vam-reference-sources { display: flex; flex-direction: column; gap: 7px; margin: 14px 0; padding: 12px; border: 1px solid var(--background-modifier-border); border-radius: var(--radius-s); }

@@ -40,6 +40,29 @@ var english = {
   "AI \u5B8C\u6210": "AI complete",
   "\u57F7\u884C\u932F\u8AA4": "Task error",
   "\u53D6\u6D88": "Cancel",
+  "\u958B\u59CB\u4F7F\u7528": "Get started",
+  "\u5148\u5EFA\u7ACB\u4E00\u5F35\u7A7A\u767D\u5FC3\u667A\u5716\uFF0C\u6216\u5EFA\u7ACB\u53EF\u81EA\u7531\u7DE8\u8F2F\u8207\u522A\u9664\u7684\u7BC4\u4F8B\u3002\u5EFA\u7ACB\u7BC4\u4F8B\u4E0D\u6703\u57F7\u884C AI \u4EFB\u52D9\u3002": "Create an empty mind map, or a sample you can freely edit or delete. Creating a sample never runs an AI task.",
+  "\u53EA\u6709\u5728\u4F60\u78BA\u8A8D\u57F7\u884C AI \u4EFB\u52D9\u6642\uFF0C\u5916\u639B\u624D\u6703\u4F7F\u7528\u672C\u6A5F\u5DF2\u767B\u5165\u7684 Codex CLI\uFF1B\u4E0D\u4F7F\u7528 ChatGPT \u5C0D\u8A71\u984D\u5EA6\uFF0C\u4E14\u4E0D\u4FDD\u5B58 API key\u3002": "Only after you confirm an AI task will the plugin use your locally signed-in Codex CLI. It doesn't use ChatGPT chat usage and doesn't store API keys.",
+  "\u5EFA\u7ACB\u7A7A\u767D\u5FC3\u667A\u5716": "Create an empty mind map",
+  "\u5EFA\u7ACB\u4E00\u500B\u65B0\u7684\u7A7A\u767D\u7814\u7A76\u4E3B\u984C\u3002": "Create a new, empty research topic.",
+  "\u5EFA\u7ACB": "Create",
+  "\u5EFA\u7ACB\u7BC4\u4F8B\u5FC3\u667A\u5716": "Create a sample mind map",
+  "\u5EFA\u7ACB\u542B\u6709\u65C5\u884C\u898F\u5283\u8207\u4E09\u500B\u5B50\u8B70\u984C\u7684\u53EF\u522A\u9664\u7BC4\u4F8B\u3002": "Create a removable trip-planning example with three subtopics.",
+  "\u5EFA\u7ACB\u7BC4\u4F8B": "Create sample",
+  "AI \u8A8D\u70BA\u76EE\u524D\u4E0D\u9700\u8981\u62C6\u89E3\uFF0C\u6216\u6C92\u6709\u63D0\u51FA 3 \u81F3 7 \u500B\u53EF\u5EFA\u7ACB\u7684\u5B50\u8B70\u984C\u3002": "AI does not recommend decomposition, or did not propose 3 to 7 child topics that can be created.",
+  "\u7A0D\u5F8C\u518D\u8AAA": "Not now",
+  "\u6211\u7684\u7B2C\u4E00\u5F35\u5FC3\u667A\u5716": "My first mind map",
+  "\u7BC4\u4F8B\uFF1A\u65C5\u884C\u898F\u5283": "Sample: Trip planning",
+  "\u65C5\u884C\u76EE\u6A19": "Trip goal",
+  "\u9019\u662F\u4E00\u5F35\u53EF\u81EA\u7531\u7DE8\u8F2F\u6216\u522A\u9664\u7684\u7BC4\u4F8B\u5FC3\u667A\u5716\u3002": "This is a sample mind map you can freely edit or delete.",
+  "\u898F\u5283\u4E00\u8D9F\u5169\u5929\u4E00\u591C\u7684\u65C5\u884C\uFF0C\u5148\u5217\u51FA\u6700\u91CD\u8981\u7684\u9650\u5236\u8207\u671F\u5F85\u3002": "Plan a two-day trip. Start with the most important constraints and expectations.",
+  "\u5148\u4F7F\u7528\u9019\u5F35\u5716\u719F\u6089\u65B0\u589E\u3001\u7DE8\u8F2F\u8207\u9023\u7D50\u8B70\u984C\u7684\u65B9\u5F0F\u3002": "Use this map to learn how to add, edit, and link topics.",
+  "\u4EA4\u901A\u8207\u4F4F\u5BBF": "Transport and stay",
+  "\u6BD4\u8F03\u62B5\u9054\u65B9\u5F0F\u3001\u4F4F\u5BBF\u5340\u57DF\u8207\u79FB\u52D5\u6642\u9593\u3002": "Compare arrival options, accommodation areas, and travel time.",
+  "\u666F\u9EDE\u8207\u8DEF\u7DDA": "Places and route",
+  "\u5B89\u6392\u6BCF\u65E5\u666F\u9EDE\uFF0C\u8B93\u79FB\u52D5\u8DEF\u7DDA\u5408\u7406\u4E14\u4FDD\u7559\u5F48\u6027\u3002": "Plan daily places with a sensible route and room for flexibility.",
+  "\u9910\u5EF3\u8207\u9810\u7B97": "Food and budget",
+  "\u5217\u51FA\u7528\u9910\u9078\u64C7\u3001\u9810\u7B97\u7BC4\u570D\u8207\u8A02\u4F4D\u9700\u6C42\u3002": "List dining options, budget range, and reservation needs.",
   "\u5132\u5B58": "Save",
   "\u9078\u64C7": "Select",
   "\u81EA\u8A02 AI \u4EFB\u52D9": "Custom AI task",
@@ -214,15 +237,14 @@ var english = {
   "\u8ACB\u81F3\u5C11\u9078\u53D6\u5169\u500B\u8B70\u984C\u3002": "Select at least two topics.",
   "\u8ACB\u5148\u8F38\u5165\u8981\u4EA4\u7D66 AI \u7684\u554F\u984C\u6216\u4EFB\u52D9\u3002": "Enter a question or task for AI first.",
   "AI \u4EFB\u52D9\u5931\u6557\u3002": "AI task failed.",
-  "\u4F7F\u7528\u672C\u6A5F Codex ACP / Claude Code \u767B\u5165\u72C0\u614B\u3002AI \u4EFB\u52D9\u5B8C\u6210\u5F8C\u6703\u76F4\u63A5\u66F4\u65B0\u76EE\u524D\u7406\u89E3\uFF0C\u5B8C\u6574\u7D50\u679C\u4FDD\u5B58\u5728\u8B70\u984C MD \u8A73\u60C5\u4E2D\u3002": "Uses your local Codex ACP / Claude Code login. AI updates current understanding and saves full results in the topic's Markdown details.",
+  "\u4F7F\u7528\u672C\u6A5F Codex ACP \u767B\u5165\u72C0\u614B\u3002AI \u4EFB\u52D9\u5B8C\u6210\u5F8C\u6703\u76F4\u63A5\u66F4\u65B0\u76EE\u524D\u7406\u89E3\uFF0C\u5B8C\u6574\u7D50\u679C\u4FDD\u5B58\u5728\u8B70\u984C MD \u8A73\u60C5\u4E2D\u3002": "Uses your local Codex ACP login. AI updates current understanding and saves full results in the topic's Markdown details.",
+  "\u91CD\u65B0\u958B\u555F\u958B\u59CB\u4F7F\u7528": "Open getting started again",
   "Codex ACP \u8DEF\u5F91": "Codex ACP path",
   "\u7528\u65BC\u5E38\u99D0 Codex session \u8207\u81EA\u52D5\u53D6\u5F97\u6A21\u578B\u6E05\u55AE\u3002": "Used for persistent Codex sessions and automatic model discovery.",
-  "Claude Code CLI \u8DEF\u5F91": "Claude Code CLI path",
-  "\u7528\u65BC claude:sonnet\u3001claude:opus\u3001claude:fable\uFF1B\u9700\u5148\u5B8C\u6210 Claude Code \u767B\u5165\u3002": "Used for claude:sonnet, claude:opus and claude:fable. Sign in to Claude Code first.",
   "\u5DE5\u4F5C\u5340\u9810\u8A2D Model": "Workspace default model",
   "\u76EE\u524D\u6700\u4F4E\u6210\u672C\u6A21\u578B\u70BA gpt-5.6-luna\uFF1B\u8B8A\u66F4\u53EA\u5F71\u97FF\u4E4B\u5F8C\u65B0\u589E\u7684\u6839\u8B70\u984C\u3002": "Default: gpt-5.6-luna. Changes apply to newly created root topics.",
   "Model \u9078\u55AE": "Model list",
-  "\u555F\u52D5\u5F8C\u6703\u512A\u5148\u88DC\u5165 Codex ACP \u56DE\u5831\u7684\u6A21\u578B\uFF1BClaude Code \u8ACB\u4F7F\u7528 claude:sonnet\u3001claude:opus \u6216 claude:fable\u3002": "Models reported by Codex ACP are added on startup. For Claude Code, use claude:sonnet, claude:opus or claude:fable.",
+  "\u555F\u52D5\u5F8C\u6703\u512A\u5148\u88DC\u5165 Codex ACP \u56DE\u5831\u7684\u6A21\u578B\u3002": "Models reported by Codex ACP are added on startup.",
   "\u4E00\u822C\u4EFB\u52D9\u4F7F\u7528\u4F4E\u63A8\u7406\uFF1B\u6574\u5408\u5B50\u8B70\u984C\u4F7F\u7528\u9AD8\u63A8\u7406\u3002": "Regular tasks use low reasoning; subtopic synthesis uses high reasoning.",
   "Codex CLI fallback \u8DEF\u5F91": "Codex CLI fallback path",
   "\u53EA\u6709 Codex ACP \u5931\u6557\u6642\u624D\u4F7F\u7528\u3002": "Used only when Codex ACP fails.",
@@ -238,8 +260,8 @@ var english = {
   "Codex ACP \u56DE\u50B3\u932F\u8AA4": "Codex ACP returned an error",
   "Codex ACP \u6C92\u6709\u5EFA\u7ACB session": "Codex ACP did not create a session",
   "Codex CLI \u57F7\u884C\u8D85\u904E 15 \u5206\u9418": "Codex CLI exceeded 15 minutes",
-  "Claude Code CLI \u57F7\u884C\u8D85\u904E 15 \u5206\u9418": "Claude Code CLI exceeded 15 minutes",
-  "Claude Code CLI \u56DE\u50B3\u932F\u8AA4": "Claude Code CLI returned an error",
+  "Claude Code \u5DF2\u4E0D\u518D\u652F\u63F4\u3002\u8ACB\u5728\u8B70\u984C\u8A2D\u5B9A\u4E2D\u9078\u64C7 Codex model\u3002": "Claude Code is no longer supported. Choose a Codex model in the topic settings.",
+  "\u5EFA\u7ACB\u5FC3\u667A\u5716\u5931\u6557\uFF1A{0}\u3002\u8ACB\u6AA2\u67E5 vault \u5F8C\u91CD\u8A66\u3002": "Could not create the mind map: {0}. Check the vault and try again.",
   "\u5C07\u6574\u5408 {0} \u500B\u4F86\u6E90\u8B70\u984C\uFF0CAI \u6703\u8B80\u53D6\u5B8C\u6574\u77E5\u8B58\u5167\u5BB9\u4E26\u5EFA\u7ACB\u65B0\u7684\u6839\u8B70\u984C\u3002": "Synthesize {0} source topics. AI reads their full knowledge and creates a new root topic.",
   "{0}\u6709\u5916\u90E8\u4FEE\u6539": "{0} changed externally",
   "\u5408\u4F75\u5167\u5BB9\u7121\u6548\uFF1A{0}": "Invalid merged contents: {0}",
@@ -259,6 +281,8 @@ var english = {
   "\u5DF2\u5C07 {0} \u4EFD\u5B50\u8B70\u984C\u6A94\u540D\u540C\u6B65\u70BA\u8B70\u984C\u540D\u7A31\u3002": "Synced {0} subtopic filenames with their names.",
   "\u5DF2\u540C\u6B65 {0} \u4EFD\u8B70\u984C\u6A94\u540D\u3002": "Synced {0} topic filenames.",
   "\u7121\u6CD5\u5957\u7528\u8B70\u984C\u7B46\u8A18\u986F\u793A\u8A2D\u5B9A\uFF1A{0}": "Unable to apply note display settings: {0}",
+  "\u4FEE\u5FA9\u8B70\u984C\u7B46\u8A18\u986F\u793A": "Repair topic note display",
+  "\u5DF2\u4FEE\u5FA9\u8B70\u984C\u7B46\u8A18\u986F\u793A\u3002": "Topic note display repaired.",
   "\u5FC3\u667A\u5716\u5DF2\u5132\u5B58\uFF0C\u4F46 reference \u66F4\u65B0\u5931\u6557\uFF1A{0}": "Map saved, but reference update failed: {0}",
   "\u5C07\u5EFA\u7ACB {0} \u500B\u4E3B\u984C\u8CC7\u6599\u593E\uFF0C\u642C\u79FB {1} \u4EFD\u5716\u5167\u7B46\u8A18\uFF0C\u4E26\u5C07 {2} \u4EFD\u5B64\u5152\u7B46\u8A18\u79FB\u81F3 Inbox\u3002\u4EFB\u4E00\u6B65\u5931\u6557\u90FD\u6703\u9084\u539F\u5DF2\u642C\u79FB\u7684\u6A94\u6848\u3002": "Create {0} topic folders, move {1} map notes and move {2} orphan notes to Inbox. If any step fails, moved files will be restored.",
   "{0}\uFF08{1} \u4EFD Notes\uFF09": "{0} ({1} notes)",
@@ -269,12 +293,12 @@ var language = "zh-TW";
 function setUiLanguage(value) {
   language = value;
 }
-function t(text, ...values) {
+function t(text2, ...values) {
   var _a;
-  const translated = language === "en" ? (_a = english[text]) != null ? _a : text : text;
+  const translated = language === "en" ? (_a = english[text2]) != null ? _a : text2 : text2;
   return translated.replace(/\{(\d+)\}/g, (_, index) => {
-    var _a2;
-    return String((_a2 = values[Number(index)]) != null ? _a2 : "");
+    const value = values[Number(index)];
+    return typeof value === "string" || typeof value === "number" || typeof value === "boolean" ? String(value) : "";
   });
 }
 
@@ -292,9 +316,8 @@ var NameModal = class extends import_obsidian.Modal {
   }
   onOpen() {
     this.titleEl.setText(this.titleText);
-    const input = this.contentEl.createEl("input", { type: "text", value: this.value });
+    const input = this.contentEl.createEl("input", { type: "text", value: this.value, cls: "vam-name-input" });
     input.setAttr("aria-label", this.titleText);
-    input.style.width = "100%";
     const save = () => {
       const value = input.value.trim();
       if (value) {
@@ -452,11 +475,10 @@ var DEFAULT_SETTINGS = {
   mapId: "default",
   cliPath: "codex",
   codexAcpPath: "/opt/homebrew/bin/codex-acp",
-  claudePath: "/Users/kevintsai/.local/bin/claude",
   cliModel: "gpt-5.6-luna",
   cliReasoning: "low",
   previewScale: 120,
-  models: "gpt-6-astra, gpt-5.6-sol, gpt-5.6-terra, gpt-5.6-luna, gpt-5.5, claude:sonnet, claude:opus, claude:fable",
+  models: "gpt-6-astra, gpt-5.6-sol, gpt-5.6-terra, gpt-5.6-luna, gpt-5.5",
   migrated: false,
   structureVersion: 2,
   firstUseNoticeSeen: false
@@ -468,6 +490,9 @@ var DETAIL_END = "<!-- visual-agent-map:detail:end -->";
 var NOTE_CSS_CLASS = "visual-agent-map-node";
 function marker(value) {
   return value === true || value === "true";
+}
+function text(value, fallback = "") {
+  return typeof value === "string" ? value : fallback;
 }
 function parentPath(path) {
   return path.includes("/") ? path.slice(0, path.lastIndexOf("/")) : "";
@@ -589,7 +614,7 @@ function detailWithVisualReferences(detail, visualReferences) {
     const block = reference.replace(/^### (.+)$/gm, "**$1**").trim();
     const title = (_a = block.match(/^\*\*(.+)\*\*/)) == null ? void 0 : _a[1];
     const paragraphs = current.split("\n\n");
-    const related = title ? paragraphs.findIndex((text) => !/^#{1,6} /.test(text) && text.includes(title)) : -1;
+    const related = title ? paragraphs.findIndex((text2) => !/^#{1,6} /.test(text2) && text2.includes(title)) : -1;
     if (related >= 0) {
       paragraphs.splice(related + 1, 0, block);
       current = paragraphs.join("\n\n");
@@ -648,7 +673,7 @@ function normalizeBodyOrder(content, title, summaryFallback) {
 }
 function withReferenceLinks(body, fm) {
   const sources = Array.isArray(fm["source-notes"]) ? fm["source-notes"].map(String).filter(Boolean) : [];
-  const relationships = Array.isArray(fm["agent-map-references"]) ? fm["agent-map-references"].map(String).filter((text) => text.includes("[[")) : [];
+  const relationships = Array.isArray(fm["agent-map-references"]) ? fm["agent-map-references"].map(String).filter((text2) => text2.includes("[[")) : [];
   const links = [...relationships, ...sources.map((path) => `\u4F86\u6E90\u8B70\u984C\uFF1A[[${noteLink(path)}]]`)];
   const clean = withoutReference(body).trimEnd();
   return links.length ? `${clean}
@@ -704,33 +729,31 @@ var Repository = class {
     for (const name of ["Notes", "Unassigned", "Archive"]) await this.folder(`${root}/${name}`);
   }
   async readNote(path) {
-    var _a, _b, _c, _d, _e, _f, _g, _h, _i;
     const file = this.file(path), content = await this.app.vault.read(file), fm = frontmatter(content);
-    const status = String((_a = fm.status) != null ? _a : "idea");
+    const status = text(fm.status, "idea");
     const normalized = status === "review" || status === "accepted" ? "completed" : status;
-    const source = String((_b = fm["model-source"]) != null ? _b : "workspace");
-    const state = String((_c = fm["topic-state"]) != null ? _c : path.includes("/Archive/") ? "archived" : path.includes("/Unassigned/") ? "unassigned" : path.startsWith(`${this.settings.inboxFolder}/`) ? "inbox" : "active");
+    const source = text(fm["model-source"], "workspace");
+    const state = text(fm["topic-state"], path.includes("/Archive/") ? "archived" : path.includes("/Unassigned/") ? "unassigned" : path.startsWith(`${this.settings.inboxFolder}/`) ? "inbox" : "active");
     return {
-      title: String((_d = fm.title) != null ? _d : file.basename),
-      summary: section(content, "Current Summary") || String((_e = fm.summary) != null ? _e : "\u5C1A\u672A\u5F62\u6210\u7D50\u8AD6"),
+      title: text(fm.title, file.basename),
+      summary: section(content, "Current Summary") || text(fm.summary, "\u5C1A\u672A\u5F62\u6210\u7D50\u8AD6"),
       prompt: section(content, "Prompt"),
       rules: section(content, "Rules"),
       detail: section(content, "Detail"),
       visualReferences: section(content, "Visual References"),
       newFindings: section(content, "Working Findings") || section(content, "New Findings"),
       preview: [section(content, "\u9810\u89BD"), section(content, "User Notes")].filter(Boolean).join("\n\n"),
-      model: String((_f = fm.model) != null ? _f : this.settings.cliModel),
+      model: text(fm.model, this.settings.cliModel),
       modelSource: ["workspace", "inherited", "manual"].includes(source) ? source : "workspace",
       status: ["idea", "running", "completed", "error"].includes(normalized) ? normalized : "idea",
-      mapId: String((_g = fm["agent-map-id"]) != null ? _g : ""),
-      topicId: String((_i = (_h = fm["topic-id"]) != null ? _h : fm["agent-map-id"]) != null ? _i : ""),
+      mapId: text(fm["agent-map-id"]),
+      topicId: text(fm["topic-id"], text(fm["agent-map-id"])),
       topicState: ["active", "unassigned", "archived", "inbox"].includes(state) ? state : "active",
-      sourcePaths: Array.isArray(fm["source-notes"]) ? fm["source-notes"].map(String).filter(Boolean) : []
+      sourcePaths: Array.isArray(fm["source-notes"]) ? fm["source-notes"].filter((value) => typeof value === "string" && Boolean(value)) : []
     };
   }
   async updateNote(path, patch) {
     await this.app.vault.process(this.file(path), (content) => {
-      var _a, _b;
       const fm = frontmatter(content);
       ensureNoteCssClass(fm);
       for (const key of ["title", "summary", "model", "status"]) if (patch[key] !== void 0) fm[key] = patch[key];
@@ -766,7 +789,7 @@ var Repository = class {
         if (!preview || preview === "\u5C1A\u672A\u5F62\u6210\u7D50\u8AD6") body = replaceSection(body, "\u9810\u89BD", initialPreview(patch.summary, section(body, "Detail")));
         fm["preview-initialized"] = true;
       }
-      body = normalizeBodyOrder(body, String((_a = fm.title) != null ? _a : path.replace(/\.md$/, "")), String((_b = fm.summary) != null ? _b : "\u5C1A\u672A\u5F62\u6210\u7D50\u8AD6"));
+      body = normalizeBodyOrder(body, text(fm.title, path.replace(/\.md$/, "")), text(fm.summary, "\u5C1A\u672A\u5F62\u6210\u7D50\u8AD6"));
       return `---
 ${(0, import_obsidian3.stringifyYaml)(fm)}---
 ${withReferenceLinks(body, fm)}`;
@@ -815,6 +838,33 @@ ${JSON.stringify(map, null, 2)}
     }
     return files.sort((a, b) => a.path.localeCompare(b.path));
   }
+  async reconcileMissingNodePaths() {
+    var _a, _b;
+    const candidates = /* @__PURE__ */ new Map();
+    for (const file of this.app.vault.getMarkdownFiles()) {
+      const fm = frontmatter(await this.app.vault.read(file));
+      if (!marker(fm["agent-map-node"])) continue;
+      const id = text(fm["node-id"]);
+      if (id) candidates.set(id, [...(_a = candidates.get(id)) != null ? _a : [], file.path]);
+    }
+    let repaired = 0;
+    for (const file of await this.mapFiles()) {
+      const map = await this.readMap(file.path);
+      let changed = false;
+      for (const node of map.nodes) {
+        if (this.app.vault.getAbstractFileByPath(node.path) instanceof import_obsidian3.TFile) continue;
+        const matches = (_b = candidates.get(node.id)) != null ? _b : [];
+        if (matches.length !== 1) continue;
+        const oldPath = node.path;
+        node.path = matches[0];
+        changed = true;
+        repaired++;
+        await this.replaceSourcePath(oldPath, node.path);
+      }
+      if (changed) await this.saveMap(file.path, map);
+    }
+    return repaired;
+  }
   async topics() {
     const topics = [];
     for (const file of await this.mapFiles()) {
@@ -857,7 +907,8 @@ ${JSON.stringify(map, null, 2)}
     const byId = /* @__PURE__ */ new Map();
     for (const file of candidates) {
       const fm = frontmatter(await this.app.vault.read(file));
-      if (fm["node-id"]) byId.set(String(fm["node-id"]), file.path);
+      const id = text(fm["node-id"]);
+      if (id) byId.set(id, file.path);
     }
     for (const node of map.nodes) if (!(this.app.vault.getAbstractFileByPath(node.path) instanceof import_obsidian3.TFile) && byId.has(node.id)) node.path = byId.get(node.id);
     await this.moveExact(sourcePath, target);
@@ -956,7 +1007,6 @@ ${JSON.stringify(map, null, 2)}
     await this.updateNote(path, { topicId, mapId, topicState: state });
   }
   async rebuildDerivedData() {
-    var _a, _b, _c, _d;
     const ownership = /* @__PURE__ */ new Map();
     const topics = /* @__PURE__ */ new Map();
     for (const mapFile of await this.mapFiles()) {
@@ -973,7 +1023,7 @@ ${JSON.stringify(map, null, 2)}
       if (!marker(fm["agent-map-node"])) continue;
       ensureNoteCssClass(fm);
       const owner = ownership.get(file.path);
-      let state = file.path.startsWith(`${this.settings.inboxFolder}/`) ? "inbox" : file.path.includes("/Archive/") ? "archived" : file.path.includes("/Unassigned/") ? "unassigned" : owner ? "active" : String((_a = fm["topic-state"]) != null ? _a : "unassigned");
+      let state = file.path.startsWith(`${this.settings.inboxFolder}/`) ? "inbox" : file.path.includes("/Archive/") ? "archived" : file.path.includes("/Unassigned/") ? "unassigned" : owner ? "active" : text(fm["topic-state"], "unassigned");
       if (owner) {
         fm["agent-map-id"] = owner.map.id;
         fm["topic-id"] = owner.map.id;
@@ -988,7 +1038,7 @@ ${JSON.stringify(map, null, 2)}
         } else fm["topic-state"] = state;
       }
       let body = ensurePreview(content.replace(/^---\r?\n[\s\S]*?\r?\n---(?:\r?\n|$)/, ""));
-      const topicId = String((_b = fm["topic-id"]) != null ? _b : ""), topic = topics.get(topicId);
+      const topicId = text(fm["topic-id"]), topic = topics.get(topicId);
       if (owner) {
         if (!body.includes(DETAIL_START)) body = replaceSection(body, "Detail", section(body, "Detail"));
         const parent = owner.node.parentId ? owner.map.nodes.find((item) => item.id === owner.node.parentId) : void 0;
@@ -1007,7 +1057,7 @@ ${JSON.stringify(map, null, 2)}
         delete fm["agent-map-references"];
         body = withoutReference(body);
       }
-      body = normalizeBodyOrder(body, String((_c = fm.title) != null ? _c : file.basename), String((_d = fm.summary) != null ? _d : "\u5C1A\u672A\u5F62\u6210\u7D50\u8AD6"));
+      body = normalizeBodyOrder(body, text(fm.title, file.basename), text(fm.summary, "\u5C1A\u672A\u5F62\u6210\u7D50\u8AD6"));
       const next = `---
 ${(0, import_obsidian3.stringifyYaml)(fm)}---
 ${withReferenceLinks(body, fm)}`;
@@ -1126,12 +1176,12 @@ function buildPreparedTaskContext(input, model, budget = 32e3) {
     context.sourceContext = "";
     context.workingFindings = "";
   }
-  if (mode === "task" && context.summary.trim() && !/(延續|修改|既有|原有|更新)/.test(context.task)) context.detail = "";
   const optional = ["sourceContext", "workingFindings", "detail", "ancestors"];
-  const used = () => Object.values(context).reduce((sum, value) => sum + (typeof value === "string" ? estimateTokens(value) : 0), 0);
+  const used = () => [context.title, context.summary, context.rules, context.detail, context.task, context.ancestors, context.workingFindings, context.sourceContext].reduce((sum, value) => sum + estimateTokens(value), 0);
   for (const key of optional) if (used() > budget && context[key]) context[key] = String(context[key]).slice(0, Math.max(0, (budget - used() + estimateTokens(String(context[key]))) * 4));
   const contextBreakdown = { task: estimateTokens(context.task), currentSummary: estimateTokens(context.summary), currentDetail: estimateTokens(context.detail), effectiveRules: estimateTokens(context.rules), ancestors: estimateTokens(context.ancestors), workingFindings: estimateTokens(context.workingFindings), sourceContext: estimateTokens(context.sourceContext) };
-  return { context, metrics: { provider: model.startsWith("claude:") ? "claude" : "codex", model, mode, estimatedInputTokens: Object.values(contextBreakdown).reduce((a, b) => a + b, 0), contextBreakdown, contextBuildMs: Date.now() - started, sessionStrategy: "fresh-session-per-node-task" } };
+  const estimatedInputTokens = [contextBreakdown.task, contextBreakdown.currentSummary, contextBreakdown.currentDetail, contextBreakdown.effectiveRules, contextBreakdown.ancestors, contextBreakdown.workingFindings, contextBreakdown.sourceContext].reduce((sum, count) => sum + count, 0);
+  return { context, metrics: { provider: "codex", model, mode, estimatedInputTokens, contextBreakdown, contextBuildMs: Date.now() - started, sessionStrategy: "fresh-session-per-node-task" } };
 }
 
 // ai/result-utils.ts
@@ -1172,20 +1222,6 @@ function visualReferencesMarkdown(references = []) {
     ].filter(Boolean).join("\n");
   }).filter(Boolean).join("\n\n");
 }
-
-// ai/provider-registry.ts
-var ProviderRegistry = class {
-  constructor(codex, claude) {
-    this.codex = codex;
-    this.claude = claude;
-  }
-  select(model) {
-    return model.startsWith("claude:") ? this.claude : this.codex;
-  }
-  modelFor(provider, model) {
-    return provider.id === "claude" ? model.slice("claude:".length) : model;
-  }
-};
 
 // ui/preview-utils.ts
 function clampPreviewScale(value) {
@@ -1265,15 +1301,24 @@ var FirstUseModal = class extends import_obsidian4.Modal {
   constructor(app, complete) {
     super(app);
     this.complete = complete;
+    __publicField(this, "choice", "later");
   }
   onOpen() {
-    this.titleEl.setText("\u958B\u59CB\u4F7F\u7528 Visual Agent Map");
-    this.contentEl.createEl("p", { text: "Visual Agent Map \u7684 Codex \u6A21\u578B\u53EA\u6703\u4F7F\u7528\u4F60\u7684 Codex \u6D41\u91CF\uFF0C\u4E0D\u6703\u4F7F\u7528 ChatGPT \u6D41\u91CF\u3002\u4F7F\u7528\u524D\uFF0C\u8ACB\u5148\u5728\u9019\u53F0\u96FB\u8166\u767B\u5165\u65E2\u6709\u7684 ChatGPT \u5E33\u865F\u8207 Codex CLI\u3002", cls: "vam-modal-intro" });
-    this.contentEl.createEl("p", { text: "\u53EA\u6709\u5728\u4F60\u78BA\u8A8D\u57F7\u884C AI \u4EFB\u52D9\u6642\uFF0C\u5916\u639B\u624D\u6703\u628A\u76EE\u524D\u8B70\u984C\u53CA\u5FC5\u8981\u8108\u7D61\u4EA4\u7D66\u672C\u6A5F Codex \u5DE5\u5177\u8655\u7406\uFF1B\u5916\u639B\u4E0D\u6703\u4FDD\u5B58 API key\u3002" });
-    new import_obsidian4.Setting(this.contentEl).addButton((button) => button.setButtonText("\u6211\u4E86\u89E3\uFF0C\u958B\u59CB\u4F7F\u7528").setCta().onClick(() => this.close()));
+    this.titleEl.setText(t("\u958B\u59CB\u4F7F\u7528"));
+    this.contentEl.createEl("p", { text: t("\u5148\u5EFA\u7ACB\u4E00\u5F35\u7A7A\u767D\u5FC3\u667A\u5716\uFF0C\u6216\u5EFA\u7ACB\u53EF\u81EA\u7531\u7DE8\u8F2F\u8207\u522A\u9664\u7684\u7BC4\u4F8B\u3002\u5EFA\u7ACB\u7BC4\u4F8B\u4E0D\u6703\u57F7\u884C AI \u4EFB\u52D9\u3002"), cls: "vam-modal-intro" });
+    this.contentEl.createEl("p", { text: t("\u53EA\u6709\u5728\u4F60\u78BA\u8A8D\u57F7\u884C AI \u4EFB\u52D9\u6642\uFF0C\u5916\u639B\u624D\u6703\u4F7F\u7528\u672C\u6A5F\u5DF2\u767B\u5165\u7684 Codex CLI\uFF1B\u4E0D\u4F7F\u7528 ChatGPT \u5C0D\u8A71\u984D\u5EA6\uFF0C\u4E14\u4E0D\u4FDD\u5B58 API key\u3002"), cls: "vam-modal-intro" });
+    new import_obsidian4.Setting(this.contentEl).setName(t("\u5EFA\u7ACB\u7A7A\u767D\u5FC3\u667A\u5716")).setDesc(t("\u5EFA\u7ACB\u4E00\u500B\u65B0\u7684\u7A7A\u767D\u7814\u7A76\u4E3B\u984C\u3002")).addButton((button) => button.setButtonText(t("\u5EFA\u7ACB")).onClick(() => {
+      this.choice = "blank";
+      this.close();
+    }));
+    new import_obsidian4.Setting(this.contentEl).setName(t("\u5EFA\u7ACB\u7BC4\u4F8B\u5FC3\u667A\u5716")).setDesc(t("\u5EFA\u7ACB\u542B\u6709\u65C5\u884C\u898F\u5283\u8207\u4E09\u500B\u5B50\u8B70\u984C\u7684\u53EF\u522A\u9664\u7BC4\u4F8B\u3002")).addButton((button) => button.setButtonText(t("\u5EFA\u7ACB\u7BC4\u4F8B")).setCta().onClick(() => {
+      this.choice = "sample";
+      this.close();
+    }));
+    new import_obsidian4.Setting(this.contentEl).addButton((button) => button.setButtonText(t("\u7A0D\u5F8C\u518D\u8AAA")).onClick(() => this.close()));
   }
   onClose() {
-    this.complete();
+    this.complete(this.choice);
   }
 };
 var TaskModal = class extends import_obsidian4.Modal {
@@ -1622,8 +1667,8 @@ var VisualAgentMapView = class extends import_obsidian4.ItemView {
       this.render();
     } else this.changed(file);
   }
-  button(parent, text, action, disabled = false) {
-    const button = parent.createEl("button", { text: t(text) });
+  button(parent, text2, action, disabled = false) {
+    const button = parent.createEl("button", { text: t(text2) });
     button.disabled = disabled;
     button.addEventListener("click", (event) => {
       event.stopPropagation();
@@ -1976,7 +2021,7 @@ var VisualAgentMapView = class extends import_obsidian4.ItemView {
       { label: t("\u522A\u9664\u300C{0}\u300D", this.map.title), description: t("\u8B70\u984C\u7B46\u8A18\u4E0D\u6703\u88AB\u522A\u9664\u3002"), buttonLabel: t("\u79FB\u5230\u5783\u573E\u6876"), action: () => this.enqueue(async () => {
         if (!this.map) return;
         const path = this.path, file = this.plugin.repo.file(path), content = await this.app.vault.read(file), map = clone(this.map);
-        await this.app.vault.trash(file, false);
+        await this.app.fileManager.trashFile(file);
         this.map = null;
         this.path = "";
         await this.plugin.rebuildDerivedData();
@@ -1988,7 +2033,7 @@ var VisualAgentMapView = class extends import_obsidian4.ItemView {
             await this.plugin.rebuildDerivedData();
           },
           redo: async () => {
-            await this.app.vault.trash(this.plugin.repo.file(path), false);
+            await this.app.fileManager.trashFile(this.plugin.repo.file(path));
             this.path = "";
             this.map = null;
             await this.plugin.rebuildDerivedData();
@@ -2113,7 +2158,7 @@ var VisualAgentMapView = class extends import_obsidian4.ItemView {
     const workspace = this.contentEl.createDiv("vam-workspace");
     this.viewportEl = workspace.createDiv("vam-viewport");
     this.stageEl = this.viewportEl.createDiv("vam-stage");
-    this.edgesEl = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+    this.edgesEl = createSvg("svg");
     this.edgesEl.addClass("vam-edges");
     this.stageEl.appendChild(this.edgesEl);
     const shown = visibleNodes(this.map.nodes);
@@ -2490,8 +2535,8 @@ var VisualAgentMapView = class extends import_obsidian4.ItemView {
     try {
       const result = await this.plugin.askModel({ title: note.title, summary: note.summary, rules: note.rules, detail: note.detail, task: "\u8ACB\u5224\u65B7\u6B64\u8B70\u984C\u662F\u5426\u9700\u8981\u62C6\u89E3\u3002\u82E5\u9700\u8981\uFF0C\u63D0\u51FA 3 \u5230 7 \u500B\u53EF\u7368\u7ACB\u8655\u7406\u7684\u5B50\u8B70\u984C\uFF0C\u6BCF\u9805\u63D0\u4F9B title\u3001task \u8207 contribution\uFF1B\u4E0D\u8981\u5EFA\u7ACB\u6216\u4FEE\u6539\u4EFB\u4F55\u6A94\u6848\u3002", ancestors: await this.ancestorContext(parent), mode: "decompose" }, note.model);
       const suggestions = result.suggestions.slice(0, 7);
-      if (!suggestions.length) {
-        new import_obsidian4.Notice(t("AI \u8A8D\u70BA\u76EE\u524D\u4E0D\u9700\u8981\u62C6\u89E3\uFF0C\u6216\u6C92\u6709\u63D0\u51FA\u53EF\u5EFA\u7ACB\u7684\u5B50\u8B70\u984C\u3002"));
+      if (suggestions.length < 3) {
+        new import_obsidian4.Notice(t("AI \u8A8D\u70BA\u76EE\u524D\u4E0D\u9700\u8981\u62C6\u89E3\uFF0C\u6216\u6C92\u6709\u63D0\u51FA 3 \u81F3 7 \u500B\u53EF\u5EFA\u7ACB\u7684\u5B50\u8B70\u984C\u3002"));
         return;
       }
       this.plugin.pendingSuggestions.set(parent.path, suggestions);
@@ -2815,7 +2860,7 @@ ${note.detail.trim().split("\n").map((line) => `    ${line}`).join("\n")}` : "",
       const parent = this.stageEl.querySelector(`[data-node-id="${CSS.escape(node.parentId)}"]`), child = this.stageEl.querySelector(`[data-node-id="${CSS.escape(node.id)}"]`);
       if (!parent || !child) continue;
       const x1 = parent.offsetLeft + parent.offsetWidth, y1 = parent.offsetTop + parent.offsetHeight / 2, x2 = child.offsetLeft, y2 = child.offsetTop + child.offsetHeight / 2, bend = Math.max(60, Math.abs(x2 - x1) / 2);
-      const path = document.createElementNS("http://www.w3.org/2000/svg", "path");
+      const path = createSvg("path");
       path.setAttribute("d", `M ${x1} ${y1} C ${x1 + bend} ${y1}, ${x2 - bend} ${y2}, ${x2} ${y2}`);
       path.addClass("vam-edge");
       this.edgesEl.appendChild(path);
@@ -2862,9 +2907,26 @@ var VisualAgentMapSettingTab = class extends import_obsidian4.PluginSettingTab {
     super(app, plugin);
     this.plugin = plugin;
   }
+  getSettingDefinitions() {
+    const text2 = (name, key, desc) => ({ name, desc, control: { type: "text", key } });
+    return [
+      { name: t("\u4ECB\u9762\u8A9E\u8A00"), control: { type: "dropdown", key: "language", options: { "zh-TW": "\u7E41\u9AD4\u4E2D\u6587", en: "English" } } },
+      text2(t("Codex ACP \u8DEF\u5F91"), "codexAcpPath", t("\u7528\u65BC\u5E38\u99D0 Codex session \u8207\u81EA\u52D5\u53D6\u5F97\u6A21\u578B\u6E05\u55AE\u3002")),
+      text2(t("\u5DE5\u4F5C\u5340\u9810\u8A2D Model"), "cliModel", t("\u76EE\u524D\u6700\u4F4E\u6210\u672C\u6A21\u578B\u70BA gpt-5.6-luna\uFF1B\u8B8A\u66F4\u53EA\u5F71\u97FF\u4E4B\u5F8C\u65B0\u589E\u7684\u6839\u8B70\u984C\u3002")),
+      text2(t("Model \u9078\u55AE"), "models", t("\u555F\u52D5\u5F8C\u6703\u512A\u5148\u88DC\u5165 Codex ACP \u56DE\u5831\u7684\u6A21\u578B\u3002")),
+      text2(t("Codex CLI fallback \u8DEF\u5F91"), "cliPath", t("\u53EA\u6709 Codex ACP \u5728 prompt \u524D\u767C\u751F transport error \u6642\u624D\u4F7F\u7528\u3002"))
+    ];
+  }
+  async setControlValue(key, value) {
+    if (key === "language") this.plugin.settings.language = value === "en" ? "en" : "zh-TW";
+    else if (typeof value === "string" && (key === "cliPath" || key === "codexAcpPath" || key === "cliModel" || key === "models")) this.plugin.settings[key] = value.trim();
+    else return;
+    setUiLanguage(this.plugin.settings.language);
+    await this.plugin.saveSettings();
+  }
   display() {
     this.containerEl.empty();
-    this.containerEl.createEl("h2", { text: "Visual Agent Map" });
+    ;
     new import_obsidian4.Setting(this.containerEl).setName(t("\u4ECB\u9762\u8A9E\u8A00")).addDropdown((input) => input.addOption("zh-TW", "\u7E41\u9AD4\u4E2D\u6587").addOption("en", "English").setValue(this.plugin.settings.language).onChange(async (value) => {
       this.plugin.settings.language = value === "en" ? "en" : "zh-TW";
       setUiLanguage(this.plugin.settings.language);
@@ -2872,17 +2934,16 @@ var VisualAgentMapSettingTab = class extends import_obsidian4.PluginSettingTab {
       for (const view of this.plugin.views()) await view.refreshFromPlugin();
       this.display();
     }));
-    this.containerEl.createEl("p", { text: t("\u4F7F\u7528\u672C\u6A5F Codex ACP / Claude Code \u767B\u5165\u72C0\u614B\u3002AI \u4EFB\u52D9\u5B8C\u6210\u5F8C\u6703\u76F4\u63A5\u66F4\u65B0\u76EE\u524D\u7406\u89E3\uFF0C\u5B8C\u6574\u7D50\u679C\u4FDD\u5B58\u5728\u8B70\u984C MD \u8A73\u60C5\u4E2D\u3002") });
-    const text = (name, key, desc) => {
+    this.containerEl.createEl("p", { text: t("\u4F7F\u7528\u672C\u6A5F Codex ACP \u767B\u5165\u72C0\u614B\u3002AI \u4EFB\u52D9\u5B8C\u6210\u5F8C\u6703\u76F4\u63A5\u66F4\u65B0\u76EE\u524D\u7406\u89E3\uFF0C\u5B8C\u6574\u7D50\u679C\u4FDD\u5B58\u5728\u8B70\u984C MD \u8A73\u60C5\u4E2D\u3002") });
+    const text2 = (name, key, desc) => {
       new import_obsidian4.Setting(this.containerEl).setName(name).setDesc(desc).addText((input) => input.setValue(this.plugin.settings[key]).onChange(async (value) => {
         this.plugin.settings[key] = value.trim();
         await this.plugin.saveSettings();
       }));
     };
-    text(t("Codex ACP \u8DEF\u5F91"), "codexAcpPath", t("\u7528\u65BC\u5E38\u99D0 Codex session \u8207\u81EA\u52D5\u53D6\u5F97\u6A21\u578B\u6E05\u55AE\u3002"));
-    text(t("Claude Code CLI \u8DEF\u5F91"), "claudePath", t("\u7528\u65BC claude:sonnet\u3001claude:opus\u3001claude:fable\uFF1B\u9700\u5148\u5B8C\u6210 Claude Code \u767B\u5165\u3002"));
-    text(t("\u5DE5\u4F5C\u5340\u9810\u8A2D Model"), "cliModel", t("\u76EE\u524D\u6700\u4F4E\u6210\u672C\u6A21\u578B\u70BA gpt-5.6-luna\uFF1B\u8B8A\u66F4\u53EA\u5F71\u97FF\u4E4B\u5F8C\u65B0\u589E\u7684\u6839\u8B70\u984C\u3002"));
-    text(t("Model \u9078\u55AE"), "models", t("\u555F\u52D5\u5F8C\u6703\u512A\u5148\u88DC\u5165 Codex ACP \u56DE\u5831\u7684\u6A21\u578B\uFF1BClaude Code \u8ACB\u4F7F\u7528 claude:sonnet\u3001claude:opus \u6216 claude:fable\u3002"));
+    text2(t("Codex ACP \u8DEF\u5F91"), "codexAcpPath", t("\u7528\u65BC\u5E38\u99D0 Codex session \u8207\u81EA\u52D5\u53D6\u5F97\u6A21\u578B\u6E05\u55AE\u3002"));
+    text2(t("\u5DE5\u4F5C\u5340\u9810\u8A2D Model"), "cliModel", t("\u76EE\u524D\u6700\u4F4E\u6210\u672C\u6A21\u578B\u70BA gpt-5.6-luna\uFF1B\u8B8A\u66F4\u53EA\u5F71\u97FF\u4E4B\u5F8C\u65B0\u589E\u7684\u6839\u8B70\u984C\u3002"));
+    text2(t("Model \u9078\u55AE"), "models", t("\u555F\u52D5\u5F8C\u6703\u512A\u5148\u88DC\u5165 Codex ACP \u56DE\u5831\u7684\u6A21\u578B\u3002"));
     this.containerEl.createEl("p", { cls: "setting-item-description", text: t("\u4E00\u822C\u4EFB\u52D9\u4F7F\u7528\u4F4E\u63A8\u7406\uFF1B\u6574\u5408\u5B50\u8B70\u984C\u4F7F\u7528\u9AD8\u63A8\u7406\u3002") });
     const advanced = this.containerEl.createEl("details");
     advanced.createEl("summary", { text: "Advanced" });
@@ -2907,10 +2968,7 @@ var VisualAgentMapPlugin = class extends import_obsidian4.Plugin {
     __publicField(this, "detailsLeaf", null);
     __publicField(this, "queue", Promise.resolve());
     __publicField(this, "writing", 0);
-    __publicField(this, "providers", new ProviderRegistry(
-      { id: "codex", run: async (context, model) => this.runCodex(context, model) },
-      { id: "claude", run: async (context, model) => this.runClaude(context, model) }
-    ));
+    __publicField(this, "externalReconcileTimer", null);
   }
   async mutate(work) {
     const result = this.queue.then(async () => {
@@ -2934,7 +2992,7 @@ var VisualAgentMapPlugin = class extends import_obsidian4.Plugin {
   async onload() {
     var _a;
     const saved = await this.loadData();
-    this.settings = { ...DEFAULT_SETTINGS, language: (saved == null ? void 0 : saved.language) === "en" ? "en" : "zh-TW", workspaceFolder: (saved == null ? void 0 : saved.workspaceFolder) || DEFAULT_SETTINGS.workspaceFolder, topicsFolder: (saved == null ? void 0 : saved.topicsFolder) || DEFAULT_SETTINGS.topicsFolder, inboxFolder: (saved == null ? void 0 : saved.inboxFolder) || DEFAULT_SETTINGS.inboxFolder, notesFolder: (saved == null ? void 0 : saved.notesFolder) || DEFAULT_SETTINGS.notesFolder, mapsFolder: (saved == null ? void 0 : saved.mapsFolder) || DEFAULT_SETTINGS.mapsFolder, mapId: (saved == null ? void 0 : saved.mapId) || "default", cliPath: (saved == null ? void 0 : saved.cliPath) || DEFAULT_SETTINGS.cliPath, codexAcpPath: (saved == null ? void 0 : saved.codexAcpPath) || DEFAULT_SETTINGS.codexAcpPath, claudePath: (saved == null ? void 0 : saved.claudePath) || DEFAULT_SETTINGS.claudePath, cliModel: (saved == null ? void 0 : saved.cliModel) || DEFAULT_SETTINGS.cliModel, cliReasoning: (saved == null ? void 0 : saved.cliReasoning) || DEFAULT_SETTINGS.cliReasoning, previewScale: (saved == null ? void 0 : saved.previewScale) !== void 0 ? clampPreviewScale(saved.previewScale) : legacyPreviewScale(saved == null ? void 0 : saved.previewSize), models: (saved == null ? void 0 : saved.models) || DEFAULT_SETTINGS.models, migrated: (saved == null ? void 0 : saved.migrated) === true, structureVersion: (_a = saved == null ? void 0 : saved.structureVersion) != null ? _a : saved ? 1 : DEFAULT_SETTINGS.structureVersion, firstUseNoticeSeen: (saved == null ? void 0 : saved.firstUseNoticeSeen) === true };
+    this.settings = { ...DEFAULT_SETTINGS, language: (saved == null ? void 0 : saved.language) === "en" ? "en" : "zh-TW", workspaceFolder: (saved == null ? void 0 : saved.workspaceFolder) || DEFAULT_SETTINGS.workspaceFolder, topicsFolder: (saved == null ? void 0 : saved.topicsFolder) || DEFAULT_SETTINGS.topicsFolder, inboxFolder: (saved == null ? void 0 : saved.inboxFolder) || DEFAULT_SETTINGS.inboxFolder, notesFolder: (saved == null ? void 0 : saved.notesFolder) || DEFAULT_SETTINGS.notesFolder, mapsFolder: (saved == null ? void 0 : saved.mapsFolder) || DEFAULT_SETTINGS.mapsFolder, mapId: (saved == null ? void 0 : saved.mapId) || "default", cliPath: (saved == null ? void 0 : saved.cliPath) || DEFAULT_SETTINGS.cliPath, codexAcpPath: (saved == null ? void 0 : saved.codexAcpPath) || DEFAULT_SETTINGS.codexAcpPath, cliModel: (saved == null ? void 0 : saved.cliModel) || DEFAULT_SETTINGS.cliModel, cliReasoning: (saved == null ? void 0 : saved.cliReasoning) || DEFAULT_SETTINGS.cliReasoning, previewScale: (saved == null ? void 0 : saved.previewScale) !== void 0 ? clampPreviewScale(saved.previewScale) : legacyPreviewScale(saved == null ? void 0 : saved.previewSize), models: ((saved == null ? void 0 : saved.models) || DEFAULT_SETTINGS.models).split(/[,\n]/).map((item) => item.trim()).filter((item) => item && !item.startsWith("claude:")).join(", ") || DEFAULT_SETTINGS.models, migrated: (saved == null ? void 0 : saved.migrated) === true, structureVersion: (_a = saved == null ? void 0 : saved.structureVersion) != null ? _a : saved ? 1 : DEFAULT_SETTINGS.structureVersion, firstUseNoticeSeen: (saved == null ? void 0 : saved.firstUseNoticeSeen) === true };
     setUiLanguage(this.settings.language);
     this.repo = new Repository(this.app, this.settings);
     const initialize = (this.settings.migrated ? Promise.resolve() : this.repo.migrate().then(async () => {
@@ -2950,24 +3008,31 @@ var VisualAgentMapPlugin = class extends import_obsidian4.Plugin {
     });
     this.ready = initialize;
     this.registerView(VIEW_TYPE, (leaf) => new VisualAgentMapView(leaf, this));
-    this.addRibbonIcon("git-fork", "Open Visual Agent Map", () => {
+    this.addRibbonIcon("git-fork", "Open map", () => {
       void this.activateView().catch((error) => new import_obsidian4.Notice(String(error)));
     });
-    this.addCommand({ id: "open-visual-agent-map", name: "Open visual agent map", callback: () => {
+    this.addCommand({ id: "open-map", name: "Open map", callback: () => {
       void this.activateView().catch((error) => new import_obsidian4.Notice(String(error)));
     } });
-    this.addCommand({ id: "rebuild-visual-agent-map-references", name: t("\u91CD\u5EFA\u8B70\u984C reference"), callback: () => {
+    this.addCommand({ id: "rebuild-references", name: t("\u91CD\u5EFA\u8B70\u984C reference"), callback: () => {
       void this.mutate(async () => {
         await this.repo.rebuildDerivedData();
         new import_obsidian4.Notice(t("\u8B70\u984C reference \u5DF2\u4F9D\u5FC3\u667A\u5716\u91CD\u5EFA\u3002"));
       });
     } });
-    this.addCommand({ id: "normalize-visual-agent-map-note-filenames", name: t("\u540C\u6B65\u8B70\u984C\u540D\u7A31\u8207\u6A94\u540D"), callback: () => {
+    this.addCommand({ id: "normalize-note-filenames", name: t("\u540C\u6B65\u8B70\u984C\u540D\u7A31\u8207\u6A94\u540D"), callback: () => {
       void this.mutate(async () => {
         const count = await this.repo.normalizeGeneratedNoteFilenames();
         new import_obsidian4.Notice(count ? t("\u5DF2\u540C\u6B65 {0} \u4EFD\u8B70\u984C\u6A94\u540D\u3002", count) : t("\u8B70\u984C\u6A94\u540D\u5DF2\u662F\u6700\u65B0\u72C0\u614B\u3002"));
       });
     } });
+    this.addCommand({ id: "repair-note-presentation", name: t("\u4FEE\u5FA9\u8B70\u984C\u7B46\u8A18\u986F\u793A"), callback: () => {
+      void this.mutate(async () => {
+        await this.repo.ensureNodePresentation();
+        new import_obsidian4.Notice(t("\u5DF2\u4FEE\u5FA9\u8B70\u984C\u7B46\u8A18\u986F\u793A\u3002"));
+      });
+    } });
+    this.addCommand({ id: "open-onboarding", name: t("\u91CD\u65B0\u958B\u555F\u958B\u59CB\u4F7F\u7528"), callback: () => this.openOnboarding() });
     this.addSettingTab(new VisualAgentMapSettingTab(this.app, this));
     this.registerEvent(this.app.workspace.on("file-menu", (menu, file) => {
       if (file instanceof import_obsidian4.TFile && this.isMap(file)) menu.addItem((item) => item.setTitle(t("\u4EE5\u5FC3\u667A\u5716\u958B\u555F")).setIcon("git-fork").onClick(() => {
@@ -2985,14 +3050,7 @@ var VisualAgentMapPlugin = class extends import_obsidian4.Plugin {
     }));
     this.app.workspace.onLayoutReady(() => {
       for (const leaf of this.app.workspace.getLeavesOfType("markdown")) this.styleNodeLeaf(leaf);
-      if (!this.settings.firstUseNoticeSeen) new FirstUseModal(this.app, () => {
-        this.settings.firstUseNoticeSeen = true;
-        void this.saveSettings();
-      }).open();
-      void this.ready.then(() => this.repo.ensureNodePresentation()).catch((error) => {
-        console.error("Visual Agent Map topic presentation", error);
-        new import_obsidian4.Notice(t("\u7121\u6CD5\u5957\u7528\u8B70\u984C\u7B46\u8A18\u986F\u793A\u8A2D\u5B9A\uFF1A{0}", error instanceof Error ? error.message : String(error)));
-      });
+      if (!this.settings.firstUseNoticeSeen && !this.app.vault.getAbstractFileByPath(this.settings.workspaceFolder)) this.openOnboarding();
       void this.ready.then(() => this.refreshCodexAcpModels()).catch((error) => console.warn("Visual Agent Map Codex ACP model refresh", error));
     });
     this.registerEvent(this.app.vault.on("modify", (file) => {
@@ -3001,6 +3059,7 @@ var VisualAgentMapPlugin = class extends import_obsidian4.Plugin {
     this.registerEvent(this.app.vault.on("delete", (file) => {
       if (!this.writing && file instanceof import_obsidian4.TFile) {
         for (const view of this.views()) view.deleted(file);
+        this.scheduleExternalReconciliation();
         if (file.path.startsWith(`${this.settings.mapsFolder}/`) || file.path.startsWith(`${this.settings.topicsFolder}/`) && file.name === "Map.md") void this.mutate(() => this.repo.rebuildDerivedData());
       }
     }));
@@ -3020,6 +3079,53 @@ var VisualAgentMapPlugin = class extends import_obsidian4.Plugin {
         for (const view of this.views()) await view.renamed(file, oldPath);
       });
     }));
+  }
+  openOnboarding() {
+    new FirstUseModal(this.app, (choice) => {
+      void this.completeOnboarding(choice);
+    }).open();
+  }
+  async completeOnboarding(choice) {
+    if (choice === "later") {
+      this.settings.firstUseNoticeSeen = true;
+      await this.saveSettings();
+      return;
+    }
+    try {
+      const path = choice === "sample" ? await this.createSampleMap() : await this.repo.createMap(t("\u6211\u7684\u7B2C\u4E00\u5F35\u5FC3\u667A\u5716"));
+      await this.rebuildDerivedData();
+      await this.activateView(path);
+      this.settings.firstUseNoticeSeen = true;
+      await this.saveSettings();
+    } catch (error) {
+      new import_obsidian4.Notice(t("\u5EFA\u7ACB\u5FC3\u667A\u5716\u5931\u6557\uFF1A{0}\u3002\u8ACB\u6AA2\u67E5 vault \u5F8C\u91CD\u8A66\u3002", error instanceof Error ? error.message : String(error)));
+      this.openOnboarding();
+    }
+  }
+  async createSampleMap() {
+    const path = await this.repo.createMap(t("\u7BC4\u4F8B\uFF1A\u65C5\u884C\u898F\u5283"));
+    const map = await this.repo.readMap(path);
+    const root = await this.repo.createNote(t("\u65C5\u884C\u76EE\u6A19"), this.settings.cliModel, map, path, "workspace");
+    root.x = 80;
+    root.y = 280;
+    map.nodes.push(root);
+    await this.repo.updateNote(root.path, { summary: t("\u9019\u662F\u4E00\u5F35\u53EF\u81EA\u7531\u7DE8\u8F2F\u6216\u522A\u9664\u7684\u7BC4\u4F8B\u5FC3\u667A\u5716\u3002"), prompt: t("\u898F\u5283\u4E00\u8D9F\u5169\u5929\u4E00\u591C\u7684\u65C5\u884C\uFF0C\u5148\u5217\u51FA\u6700\u91CD\u8981\u7684\u9650\u5236\u8207\u671F\u5F85\u3002"), rules: t("\u5148\u4F7F\u7528\u9019\u5F35\u5716\u719F\u6089\u65B0\u589E\u3001\u7DE8\u8F2F\u8207\u9023\u7D50\u8B70\u984C\u7684\u65B9\u5F0F\u3002") });
+    const samples = [
+      [t("\u4EA4\u901A\u8207\u4F4F\u5BBF"), t("\u6BD4\u8F03\u62B5\u9054\u65B9\u5F0F\u3001\u4F4F\u5BBF\u5340\u57DF\u8207\u79FB\u52D5\u6642\u9593\u3002")],
+      [t("\u666F\u9EDE\u8207\u8DEF\u7DDA"), t("\u5B89\u6392\u6BCF\u65E5\u666F\u9EDE\uFF0C\u8B93\u79FB\u52D5\u8DEF\u7DDA\u5408\u7406\u4E14\u4FDD\u7559\u5F48\u6027\u3002")],
+      [t("\u9910\u5EF3\u8207\u9810\u7B97"), t("\u5217\u51FA\u7528\u9910\u9078\u64C7\u3001\u9810\u7B97\u7BC4\u570D\u8207\u8A02\u4F4D\u9700\u6C42\u3002")]
+    ];
+    for (let index = 0; index < samples.length; index++) {
+      const [title, prompt] = samples[index];
+      const node = await this.repo.createNote(title, this.settings.cliModel, map, path, "inherited");
+      node.parentId = root.id;
+      node.x = 420;
+      node.y = 80 + index * 200;
+      map.nodes.push(node);
+      await this.repo.updateNote(node.path, { prompt });
+    }
+    await this.repo.saveMap(path, map);
+    return path;
   }
   isMap(file) {
     var _a, _b;
@@ -3042,7 +3148,6 @@ var VisualAgentMapPlugin = class extends import_obsidian4.Plugin {
     }
     for (const child of this.childProcesses) child.kill();
     this.childProcesses.clear();
-    this.app.workspace.detachLeavesOfType(VIEW_TYPE);
   }
   async saveSettings() {
     await this.saveData(this.settings);
@@ -3054,6 +3159,17 @@ var VisualAgentMapPlugin = class extends import_obsidian4.Plugin {
       console.error("Visual Agent Map reference rebuild", error);
       new import_obsidian4.Notice(t("\u5FC3\u667A\u5716\u5DF2\u5132\u5B58\uFF0C\u4F46 reference \u66F4\u65B0\u5931\u6557\uFF1A{0}", error instanceof Error ? error.message : String(error)));
     }
+  }
+  scheduleExternalReconciliation() {
+    if (this.writing) return;
+    if (this.externalReconcileTimer !== null) window.clearTimeout(this.externalReconcileTimer);
+    this.externalReconcileTimer = window.setTimeout(() => {
+      this.externalReconcileTimer = null;
+      void this.mutate(async () => {
+        const repaired = await this.repo.reconcileMissingNodePaths();
+        if (repaired) await this.rebuildDerivedData();
+      }).catch((error) => console.error("Visual Agent Map external rename reconciliation", error));
+    }, 500);
   }
   async openDetails(file) {
     var _a, _b;
@@ -3085,6 +3201,7 @@ var VisualAgentMapPlugin = class extends import_obsidian4.Plugin {
     for (const view of this.views()) await view.refreshFromPlugin();
   }
   async askModel(context, model) {
+    if (model.startsWith("claude:")) throw new Error(t("Claude Code \u5DF2\u4E0D\u518D\u652F\u63F4\u3002\u8ACB\u5728\u8B70\u984C\u8A2D\u5B9A\u4E2D\u9078\u64C7 Codex model\u3002"));
     const adapter = this.app.vault.adapter;
     if (!(adapter instanceof import_obsidian4.FileSystemAdapter)) throw new Error(t("CLI \u6A21\u5F0F\u53EA\u652F\u63F4\u684C\u9762\u7248 Obsidian"));
     if (!this.manifest.dir) throw new Error(t("\u627E\u4E0D\u5230\u5916\u639B\u76EE\u9304"));
@@ -3093,8 +3210,6 @@ var VisualAgentMapPlugin = class extends import_obsidian4.Plugin {
     context = prepared.context;
     const pluginDirectory = (0, import_node_path.join)(adapter.getBasePath(), this.manifest.dir);
     const schemaPath = (0, import_node_path.join)(pluginDirectory, "response-schema.json");
-    const provider = this.providers.select(model);
-    if (provider.id === "claude") return provider.run(context, this.providers.modelFor(provider, model));
     const instructions = [
       "\u4F60\u662F\u8996\u89BA\u5316\u601D\u8003 Agent\u3002\u4E0D\u8981\u4FEE\u6539\u4EFB\u4F55\u6A94\u6848\uFF1B\u9664\u975E\u4EFB\u52D9\u660E\u78BA\u6307\u5B9A\uFF0C\u5426\u5247\u4E0D\u8981\u8B80\u53D6\u672C\u6A5F\u6A94\u6848\u3002",
       '\u53EA\u56DE\u50B3 JSON\uFF0C\u4E0D\u8981\u4F7F\u7528 Markdown code fence\u3002\u683C\u5F0F\u5FC5\u9808\u7B26\u5408\uFF1A{"summary":"...","detail":"...","suggestions":[{"title":"...","task":"...","contribution":"..."}],"visualReferences":[{"title":"...","imageUrl":"https://...","sourceUrl":"https://...","description":"...","palette":["navy","white"],"formula":"..."}]}\u3002\u82E5\u6C92\u6709\u8996\u89BA\u53C3\u8003\uFF0CvisualReferences \u56DE\u50B3\u7A7A\u9663\u5217\u3002',
@@ -3128,28 +3243,24 @@ ${context.task}`
     } catch (error) {
       if (!(error instanceof AcpTransportError)) throw error;
       console.warn("Visual Agent Map Codex ACP transport failed before prompting; falling back to Codex CLI", error);
-      return this.askCodexExec(instructions, model, pluginDirectory, schemaPath);
+      try {
+        return await this.askCodexExec(instructions, model, pluginDirectory, schemaPath);
+      } catch (fallbackError) {
+        throw new Error(`Codex ACP\uFF1A${error.message}
+Codex CLI fallback\uFF1A${fallbackError instanceof Error ? fallbackError.message : String(fallbackError)}`);
+      }
     }
-  }
-  async runCodex(context, model) {
-    return this.askModel(context, model);
-  }
-  async runClaude(context, model) {
-    const adapter = this.app.vault.adapter;
-    if (!(adapter instanceof import_obsidian4.FileSystemAdapter)) throw new Error(t("CLI \u6A21\u5F0F\u53EA\u652F\u63F4\u684C\u9762\u7248 Obsidian"));
-    if (!this.manifest.dir) throw new Error(t("\u627E\u4E0D\u5230\u5916\u639B\u76EE\u9304"));
-    const pluginDirectory = (0, import_node_path.join)(adapter.getBasePath(), this.manifest.dir);
-    return this.askClaude(context, model, pluginDirectory, (0, import_node_path.join)(pluginDirectory, "response-schema.json"));
   }
   parseAiResult(raw, label) {
     const cleaned = raw.replace(/^```(?:json)?\s*/i, "").replace(/\s*```$/, "").trim();
     const parsed = JSON.parse(cleaned);
     if (typeof parsed.summary !== "string" || typeof parsed.detail !== "string") throw new Error(`${label} \u6C92\u6709\u56DE\u50B3 summary \u8207 detail`);
-    const suggestions = Array.isArray(parsed.suggestions) ? parsed.suggestions.filter((item) => !!item && typeof item.title === "string" && typeof item.task === "string").map((item) => ({ title: item.title.trim(), task: item.task.trim(), contribution: typeof item.contribution === "string" ? item.contribution.trim() : "" })).filter((item) => item.title) : [];
-    const visualReferences = Array.isArray(parsed.visualReferences) ? parsed.visualReferences.filter((item) => !!item && typeof item.imageUrl === "string" && typeof item.sourceUrl === "string").map((item) => ({
+    const isRecord = (value) => typeof value === "object" && value !== null;
+    const suggestions = Array.isArray(parsed.suggestions) ? parsed.suggestions.filter((item) => isRecord(item) && typeof item.title === "string" && typeof item.task === "string").map((item) => ({ title: String(item.title).trim(), task: String(item.task).trim(), contribution: typeof item.contribution === "string" ? item.contribution.trim() : "" })).filter((item) => item.title) : [];
+    const visualReferences = Array.isArray(parsed.visualReferences) ? parsed.visualReferences.filter((item) => isRecord(item) && typeof item.imageUrl === "string" && typeof item.sourceUrl === "string").map((item) => ({
       title: typeof item.title === "string" ? item.title.trim() : "\u8996\u89BA\u53C3\u8003",
-      imageUrl: item.imageUrl.trim(),
-      sourceUrl: item.sourceUrl.trim(),
+      imageUrl: String(item.imageUrl).trim(),
+      sourceUrl: String(item.sourceUrl).trim(),
       description: typeof item.description === "string" ? item.description.trim() : "",
       palette: Array.isArray(item.palette) ? item.palette.map(String).map((color) => color.trim()).filter(Boolean).slice(0, 8) : [],
       formula: typeof item.formula === "string" ? item.formula.trim() : ""
@@ -3220,9 +3331,21 @@ ${context.task}`
       this.acpRespond(message.id, {});
     }
   }
+  resolveExecutable(configured) {
+    if (configured.includes("/")) return configured;
+    const home = process.env.HOME || "";
+    const candidates = [home ? (0, import_node_path.join)(home, ".local/bin", configured) : "", `/opt/homebrew/bin/${configured}`, `/usr/local/bin/${configured}`];
+    return candidates.find((candidate) => candidate && (0, import_node_fs.existsSync)(candidate)) || configured;
+  }
+  cliEnvironment() {
+    const home = process.env.HOME || "";
+    const paths = [home ? (0, import_node_path.join)(home, ".local/bin") : "", "/opt/homebrew/bin", "/usr/local/bin", "/usr/bin", "/bin", process.env.PATH || ""].filter(Boolean);
+    return { ...process.env, PATH: [...new Set(paths)].join(":") };
+  }
   async ensureAcpProcess(pluginDirectory) {
     if (!this.acp) {
-      const child = (0, import_node_child_process.spawn)(this.settings.codexAcpPath, [], { cwd: pluginDirectory, stdio: ["pipe", "pipe", "pipe"] });
+      const executable = this.resolveExecutable(this.settings.codexAcpPath);
+      const child = (0, import_node_child_process.spawn)(executable, [], { cwd: pluginDirectory, env: this.cliEnvironment(), stdio: ["pipe", "pipe", "pipe"] });
       this.childProcesses.add(child);
       this.acp = { child, buffer: "", nextId: 1, pending: /* @__PURE__ */ new Map(), sessions: /* @__PURE__ */ new Map(), initializing: Promise.resolve() };
       let stderr = "";
@@ -3244,7 +3367,7 @@ ${context.task}`
         var _a, _b, _c;
         for (const entry of (_b = (_a = this.acp) == null ? void 0 : _a.pending.values()) != null ? _b : []) {
           window.clearTimeout(entry.timeout);
-          entry.reject(new AcpTransportError(`\u7121\u6CD5\u555F\u52D5 Codex ACP\uFF1A${error.message}`));
+          entry.reject(new AcpTransportError(`\u7121\u6CD5\u555F\u52D5 Codex ACP\uFF08${executable}\uFF09\uFF1A${error.message}`));
         }
         this.childProcesses.delete(child);
         if (((_c = this.acp) == null ? void 0 : _c.child) === child) this.acp = null;
@@ -3291,9 +3414,16 @@ ${context.task}`
     };
     return { model: findId(["model"]) || "model", reasoning: findId(["reasoning", "reasoning-effort", "model_reasoning_effort"]) };
   }
+  acpChunkText(value) {
+    if (typeof value === "string") return value;
+    if (Array.isArray(value)) return value.map((item) => this.acpChunkText(item)).join("");
+    if (!value || typeof value !== "object") return "";
+    const record = value;
+    return this.acpChunkText(record.text) || this.acpChunkText(record.content);
+  }
   acpText(sessionId) {
     var _a, _b, _c;
-    return ((_c = (_b = (_a = this.acp) == null ? void 0 : _a.sessions.get(sessionId)) == null ? void 0 : _b.updates) != null ? _c : []).map((item) => item.update).filter((update) => (update == null ? void 0 : update.sessionUpdate) === "agent_message_chunk" || (update == null ? void 0 : update.type) === "agent_message_chunk").map((update) => (update == null ? void 0 : update.text) || (update == null ? void 0 : update.content) || "").join("");
+    return ((_c = (_b = (_a = this.acp) == null ? void 0 : _a.sessions.get(sessionId)) == null ? void 0 : _b.updates) != null ? _c : []).map((item) => item.update).filter((update) => (update == null ? void 0 : update.sessionUpdate) === "agent_message_chunk" || (update == null ? void 0 : update.type) === "agent_message_chunk").map((update) => this.acpChunkText(update == null ? void 0 : update.text) || this.acpChunkText(update == null ? void 0 : update.content)).join("");
   }
   async askCodexAcp(prompt, model, pluginDirectory) {
     var _a, _b;
@@ -3354,8 +3484,10 @@ ${context.task}`
     args.push("--config", `model_reasoning_effort=${this.settings.cliReasoning || "low"}`);
     args.push("-");
     return new Promise((resolve, reject) => {
-      const child = (0, import_node_child_process.spawn)(this.settings.cliPath, args, {
+      const executable = this.resolveExecutable(this.settings.cliPath);
+      const child = (0, import_node_child_process.spawn)(executable, args, {
         cwd: pluginDirectory,
+        env: this.cliEnvironment(),
         stdio: ["pipe", "pipe", "pipe"]
       });
       this.childProcesses.add(child);
@@ -3377,7 +3509,7 @@ ${context.task}`
       child.on("error", (error) => {
         window.clearTimeout(timeout);
         this.childProcesses.delete(child);
-        reject(new Error(`\u7121\u6CD5\u555F\u52D5 Codex CLI\uFF1A${error.message}`));
+        reject(new Error(`\u7121\u6CD5\u555F\u52D5 Codex CLI\uFF08${executable}\uFF09\uFF1A${error.message}`));
       });
       child.on("close", (code) => {
         window.clearTimeout(timeout);
@@ -3388,92 +3520,6 @@ ${context.task}`
         }
         try {
           resolve(this.parseAiResult(stdout, "Codex CLI"));
-        } catch (error) {
-          reject(error instanceof Error ? error : new Error(String(error)));
-        }
-      });
-      child.stdin.end(instructions);
-    });
-  }
-  async askClaude(context, model, pluginDirectory, schemaPath) {
-    const schema = (0, import_node_fs.readFileSync)(schemaPath, "utf8");
-    const args = [
-      "-p",
-      "--output-format",
-      "json",
-      "--permission-mode",
-      "dontAsk",
-      "--permission-prompts",
-      "none",
-      "--tools",
-      "",
-      "--no-session-persistence",
-      "--json-schema",
-      schema,
-      "--model",
-      model || "sonnet"
-    ];
-    const instructions = [
-      "\u4F60\u662F\u8996\u89BA\u5316\u601D\u8003 Agent\u3002\u4E0D\u8981\u4FEE\u6539\u4EFB\u4F55\u6A94\u6848\uFF0C\u4E5F\u4E0D\u8981\u8B80\u53D6\u672C\u6A5F\u6A94\u6848\u3002",
-      context.mode === "task" ? "\u9019\u662F\u4E00\u822C\u4EFB\u52D9\uFF1Asummary \u5FC5\u9808\u662F\u4E00\u53E5\u9069\u5408\u5FC3\u667A\u5716\u986F\u793A\u7684\u65B0\u76EE\u524D\u7406\u89E3\uFF0C80 \u5B57\u5167\uFF1Bdetail \u662F\u6703\u76F4\u63A5\u53D6\u4EE3\u820A Detail \u7684\u5B8C\u6574\u77E5\u8B58\u9801\uFF0C\u5FC5\u9808\u5438\u6536\u820A\u5167\u5BB9\u8207\u672C\u6B21\u767C\u73FE\u3001\u53BB\u9664\u91CD\u8907\u3001\u4FDD\u7559\u4ECD\u6709\u6548\u7684\u4F86\u6E90\u3002" : context.mode === "decompose" ? "\u9019\u662F Decompose \u6A21\u5F0F\uFF1A\u53EA\u7522\u751F 3\u20137 \u500B\u53EF\u7368\u7ACB\u8655\u7406\u7684\u5B50\u8B70\u984C suggestions\u3002summary \u8207 detail \u7C21\u8FF0\u62C6\u89E3\u5224\u65B7\uFF1B\u4E0D\u8981\u66F4\u65B0\u7D50\u8AD6\u3002" : context.mode === "synthesize" ? "\u9019\u662F Synthesize \u6A21\u5F0F\uFF1Asummary \u5FC5\u9808\u662F\u9AD8\u54C1\u8CEA\u6574\u5408\u7D50\u8AD6\uFF0C80 \u5B57\u5167\uFF1Bdetail \u5FC5\u9808\u6574\u5408\u4F86\u6E90\u5B8C\u6574\u77E5\u8B58\u3001\u6536\u6582\u91CD\u8907\u5167\u5BB9\u3001\u6E05\u695A\u5448\u73FE\u5171\u8B58\u3001\u5206\u6B67\u3001\u53D6\u6368\u8207\u672A\u89E3\u554F\u984C\uFF1B\u5B8C\u6210\u5F8C\u6703\u76F4\u63A5\u5BEB\u56DE\u3002" : "summary \u5FC5\u9808\u662F\u4E00\u53E5\u9069\u5408\u5FC3\u667A\u5716\u986F\u793A\u7684\u65B0\u76EE\u524D\u7406\u89E3\uFF0Cdetail \u5FC5\u9808\u662F\u5B8C\u6574\u7E41\u9AD4\u4E2D\u6587 Markdown \u5206\u6790\u3002",
-      context.mode !== "decompose" ? "detail \u5FC5\u9808\u4E14\u53EA\u80FD\u4F9D\u5E8F\u4F7F\u7528\u4EE5\u4E0B\u516D\u500B\u4E09\u7D1A\u6A19\u984C\uFF1A### \u6838\u5FC3\u7D50\u8AD6\u3001### \u95DC\u9375\u77E5\u8B58\u3001### \u8B49\u64DA\u8207\u4F86\u6E90\u3001### \u53D6\u6368\u8207\u9650\u5236\u3001### \u5F85\u78BA\u8A8D\u4E8B\u9805\u3001### \u66F4\u65B0\u7D00\u9304\u3002\u66F4\u65B0\u7D00\u9304\u53EA\u65B0\u589E\u4E00\u884C\u672C\u6B21\u8B8A\u66F4\u6458\u8981\uFF0C\u4E0D\u53EF\u91CD\u8CBC\u5B8C\u6574\u7B54\u6848\uFF1B\u6C92\u6709\u5167\u5BB9\u7684\u6BB5\u843D\u5BEB\u300C\u5C1A\u5F85\u88DC\u5145\u300D\u3002" : "",
-      context.mode !== "decompose" ? "\u82E5\u4EFB\u52D9\u9700\u8981\u8996\u89BA\u7406\u89E3\uFF08\u4F8B\u5982\u7A7F\u642D\u3001\u914D\u8272\u3001\u5BA4\u5167\u8A2D\u8A08\u3001\u98DF\u8B5C\u5916\u89C0\u3001UI \u53C3\u8003\uFF09\uFF0C\u8ACB\u63D0\u4F9B 1\u20136 \u500B\u5DF2\u641C\u5C0B\u5230\u7684\u5716\u7247\u53C3\u8003 visualReferences\uFF1B\u5FC5\u9808\u5305\u542B\u5716\u7247 URL \u8207\u4F86\u6E90\u9801 URL\uFF0C\u4E0D\u8981\u751F\u6210\u5716\u7247\uFF0C\u4E0D\u8981\u7DE8\u9020\u4F86\u6E90\u3002" : "",
-      context.mode !== "decompose" ? "\u5716\u7247\u5FC5\u9808\u76F4\u63A5\u5D4C\u5165 detail \u7684\u76F8\u95DC\u8AAA\u660E\u6BB5\u843D\u4E4B\u5F8C\uFF0C\u4F7F\u7528 Markdown \u5716\u7247\u8A9E\u6CD5\uFF0C\u4E26\u5728\u5716\u7247\u4E0B\u65B9\u9644\u4F86\u6E90\u9801\u9023\u7D50\u3002\u4E0D\u8981\u5EFA\u7ACB\u8996\u89BA\u53C3\u8003\u3001\u5716\u793A\u6216\u5716\u7247\u96C6\u5408\u7684\u7368\u7ACB\u6BB5\u843D\uFF1B\u5716\u7247\u8207 visualReferences \u4F7F\u7528\u76F8\u540C URL\u3002\u512A\u5148\u641C\u5C0B\u53EF\u5E6B\u52A9\u7406\u89E3\u8B70\u984C\u7684\u76F8\u95DC\u5716\u7247\uFF0C\u627E\u4E0D\u5230\u53EF\u9760\u5716\u7247\u6642\u4E0D\u8981\u7DE8\u9020\u3002" : "",
-      `\u76EE\u524D\u8B70\u984C\uFF1A
-${context.title}`,
-      `\u76EE\u524D\u7406\u89E3\uFF1A
-${context.summary}`,
-      context.mode !== "decompose" ? `\u73FE\u6709 Detail\uFF08\u9808\u6574\u5408\u5F8C\u5B8C\u6574\u53D6\u4EE3\uFF0C\u4E0D\u80FD\u539F\u6A23\u91CD\u8907\u8FFD\u52A0\uFF09\uFF1A
-${context.detail || "\uFF08\u7121\uFF09"}` : "",
-      `\u76EE\u524D\u8B70\u984C\u7684 AI \u898F\u5247\uFF08\u512A\u5148\u9075\u5B88\uFF09\uFF1A
-${context.rules || "\uFF08\u7121\uFF09"}`,
-      context.workingFindings ? `\u820A\u7248\u5F85\u6574\u7406\u767C\u73FE\uFF08\u672C\u6B21\u5FC5\u9808\u4E00\u4F75\u6536\u6582\uFF09\uFF1A
-${context.workingFindings}` : "",
-      context.sourceContext ? `\u6574\u5408\u4F86\u6E90\u80CC\u666F\uFF1A
-${context.sourceContext}` : "",
-      `\u7956\u5148\u8B70\u984C\u80CC\u666F\uFF1A
-${context.ancestors || "\uFF08\u7121\uFF09"}`,
-      `\u76EE\u524D\u4EFB\u52D9\uFF1A
-${context.task}`
-    ].join("\n\n");
-    return new Promise((resolve, reject) => {
-      const child = (0, import_node_child_process.spawn)(this.settings.claudePath, args, {
-        cwd: pluginDirectory,
-        stdio: ["pipe", "pipe", "pipe"]
-      });
-      this.childProcesses.add(child);
-      let stdout = "";
-      let stderr = "";
-      const outputLimit = 5 * 1024 * 1024;
-      const timeout = window.setTimeout(() => {
-        child.kill();
-        reject(new Error(t("Claude Code CLI \u57F7\u884C\u8D85\u904E 15 \u5206\u9418")));
-      }, 15 * 60 * 1e3);
-      child.stdout.on("data", (chunk) => {
-        stdout += chunk.toString();
-        if (stdout.length > outputLimit) child.kill();
-      });
-      child.stderr.on("data", (chunk) => {
-        stderr += chunk.toString();
-        if (stderr.length > outputLimit) child.kill();
-      });
-      child.on("error", (error) => {
-        window.clearTimeout(timeout);
-        this.childProcesses.delete(child);
-        reject(new Error(`\u7121\u6CD5\u555F\u52D5 Claude Code CLI\uFF1A${error.message}`));
-      });
-      child.on("close", (code) => {
-        window.clearTimeout(timeout);
-        this.childProcesses.delete(child);
-        if (code !== 0) {
-          reject(new Error(stderr.trim() || `Claude Code CLI \u7D50\u675F\u78BC\uFF1A${code != null ? code : "\u672A\u77E5"}`));
-          return;
-        }
-        try {
-          const wrapper = JSON.parse(stdout.trim());
-          if (wrapper.is_error) throw new Error(typeof wrapper.result === "string" ? wrapper.result : t("Claude Code CLI \u56DE\u50B3\u932F\u8AA4"));
-          const raw = typeof wrapper.result === "string" ? wrapper.result.trim() : stdout.trim();
-          resolve(this.parseAiResult(raw, "Claude"));
         } catch (error) {
           reject(error instanceof Error ? error : new Error(String(error)));
         }

@@ -7,10 +7,10 @@ export function buildPreparedTaskContext(input: TaskContext, model: string, budg
   const started = Date.now(), mode: AiTaskKind = input.mode || "task";
   const context: TaskContext = { ...input, rules: dedupeRules(input.rules), ancestors: input.ancestors.replace(/^\s*AI 規則：.*(?:\n|$)/gm, "").trim() };
   if (mode === "decompose") { context.detail = ""; context.sourceContext = ""; context.workingFindings = ""; }
-  if (mode === "task" && context.summary.trim() && !/(延續|修改|既有|原有|更新)/.test(context.task)) context.detail = "";
   const optional: ("sourceContext" | "workingFindings" | "detail" | "ancestors")[] = ["sourceContext", "workingFindings", "detail", "ancestors"];
-  const used = (): number => Object.values(context).reduce((sum, value) => sum + (typeof value === "string" ? estimateTokens(value) : 0), 0);
+  const used = (): number => [context.title, context.summary, context.rules, context.detail, context.task, context.ancestors, context.workingFindings, context.sourceContext].reduce((sum, value) => sum + estimateTokens(value), 0);
   for (const key of optional) if (used() > budget && context[key]) context[key] = String(context[key]).slice(0, Math.max(0, (budget - used() + estimateTokens(String(context[key]))) * 4));
   const contextBreakdown = { task: estimateTokens(context.task), currentSummary: estimateTokens(context.summary), currentDetail: estimateTokens(context.detail), effectiveRules: estimateTokens(context.rules), ancestors: estimateTokens(context.ancestors), workingFindings: estimateTokens(context.workingFindings), sourceContext: estimateTokens(context.sourceContext) };
-  return { context, metrics: { provider: model.startsWith("claude:") ? "claude" : "codex", model, mode, estimatedInputTokens: Object.values(contextBreakdown).reduce((a, b) => a + b, 0), contextBreakdown, contextBuildMs: Date.now() - started, sessionStrategy: "fresh-session-per-node-task" } };
+  const estimatedInputTokens = [contextBreakdown.task, contextBreakdown.currentSummary, contextBreakdown.currentDetail, contextBreakdown.effectiveRules, contextBreakdown.ancestors, contextBreakdown.workingFindings, contextBreakdown.sourceContext].reduce((sum, count) => sum + count, 0);
+  return { context, metrics: { provider: "codex", model, mode, estimatedInputTokens, contextBreakdown, contextBuildMs: Date.now() - started, sessionStrategy: "fresh-session-per-node-task" } };
 }

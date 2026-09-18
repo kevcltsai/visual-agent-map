@@ -28,8 +28,8 @@ Visual Agent Map 的 Codex 模型只會使用你的 Codex 流量，不會使用 
 
 ## 外部服務與資料
 
-- 使用 Codex 模型時，外掛會透過本機已登入的 Codex CLI 或 `codex-acp` 將你確認執行的 AI 任務、目前議題內容與必要的關聯脈絡交給 Codex 服務處理。選用 `claude:*` 模型時，則會透過本機已登入的 Claude Code CLI 傳送相同類型的任務脈絡給 Claude 服務。
-- 外掛會啟動你在設定中指定、位於 Obsidian Vault 外部的 Codex、`codex-acp` 或 Claude CLI；這是執行外部 AI 任務與使用既有登入狀態所必需。外掛不會自行安裝、更新或自我更新這些工具。
+- 外掛會透過本機已登入的 Codex CLI 或 `codex-acp`，將你確認執行的 AI 任務、目前議題內容與必要的關聯脈絡交給 Codex 服務處理。
+- 外掛會啟動你在設定中指定、位於 Obsidian Vault 外部的 Codex 或 `codex-acp`；這是執行外部 AI 任務與使用既有登入狀態所必需。外掛不會自行安裝、更新或自我更新這些工具。
 - 外掛不含 client-side telemetry；AI 任務以外不會將 Vault 內容傳送至外部服務。含遠端圖片網址的 Markdown 預覽，會依 Obsidian 的一般圖片載入行為向該圖片來源請求內容。
 
 1. 安裝並開啟外掛後，首次使用會顯示一次性說明，確認你了解帳號與流量的使用方式。
@@ -52,11 +52,10 @@ Visual Agent Map 的 Codex 模型只會使用你的 Codex 流量，不會使用 
 - 舊資料不在外掛啟動時自動搬移。使用「整理舊資料」先查看 Map、圖內筆記與孤兒數量，再確認遷移。
 - 工作區預設 Model 為 `gpt-5.6-luna`。一般任務使用 low reasoning，整合子議題使用 high reasoning。新版筆記建立 `Rules` 供 AI 規則使用，但不建立 Working Findings；舊 Findings 會在下一次 AI 任務完成時移入 Detail。
 - AI 回傳的視覺參考會收進 Detail 內的「視覺參考」段落，不再另建 `Visual References` 區塊；使用者可像一般 Markdown 內容一樣編輯。
-- Model 選單支援 Claude Code provider 前綴：`claude:sonnet`、`claude:opus`、`claude:fable`。使用前需先完成 Claude Code CLI 登入。
 
 ## 本版範圍外
 
-自動排列、拖動整個分支、搜尋節點、多母議題及完整任務歷史尚未加入。AI 任務預設採用 `codex-acp` 常駐 session；`codex exec` 只作 Advanced fallback。
+自動排列、拖動整個分支、搜尋節點、多母議題及完整任務歷史尚未加入。AI 任務預設採用 `codex-acp` 常駐 session；只有在 prompt 前發生 ACP transport error 時才會 fallback 到 `codex exec`。
 
 ## 驗證
 

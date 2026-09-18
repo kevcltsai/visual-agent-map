@@ -72,7 +72,7 @@ Plugin-created content stays in the vault. Existing general Markdown is not modi
 
 ### Current limitations
 
-- Desktop only; not yet distributed through the Obsidian Community Plugin catalog.
+- Desktop only; available through the Obsidian Community Plugin catalog.
 - No automatic layout, node search, multiple parents, or persistent task history.
 - Undo/redo lasts for the current Obsidian session.
 
@@ -120,7 +120,7 @@ Visual Agent Map 是桌面版 Obsidian 外掛：用視覺化心智圖拆解複�
 
 ### 目前限制
 
-- 僅支援桌面版，尚未上架 Obsidian Community Plugin catalog。
+- 僅支援桌面版，已上架 Obsidian Community Plugin catalog。
 - 尚未包含自動排列、節點搜尋、多母議題與永久任務歷史。
 - 復原／重做只保留在目前 Obsidian 工作階段。
 

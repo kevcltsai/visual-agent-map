@@ -1,4 +1,23 @@
-import { spawn, type ChildProcessWithoutNullStreams } from "node:child_process";
+import { spawn as nodeSpawn } from "node:child_process";
+
+type ProcessEnvironment = Record<string, string | undefined>;
+interface NodeChunk { toString(encoding?: string): string }
+interface ReadableProcessStream { on(event: "data", listener: (chunk: NodeChunk) => void): this }
+interface WritableProcessStream { write(data: string): boolean }
+interface ChildProcessHandle {
+  stdin: WritableProcessStream;
+  stdout: ReadableProcessStream;
+  stderr: ReadableProcessStream;
+  on(event: "error", listener: (error: Error) => void): this;
+  on(event: "close", listener: (code: number | null) => void): this;
+  kill(): boolean;
+}
+type SpawnProcess = (executable: string, args: string[], options: {
+  cwd: string;
+  env: ProcessEnvironment;
+  stdio: ["pipe", "pipe", "pipe"];
+}) => ChildProcessHandle;
+const spawnProcess = nodeSpawn as unknown as SpawnProcess;
 
 export interface CodexModel {
   id: string;
@@ -13,7 +32,7 @@ export interface CodexModel {
 export interface CodexAppServerOptions {
   executable: string;
   cwd: string;
-  env: NodeJS.ProcessEnv;
+  env: ProcessEnvironment;
   clientVersion: string;
   onLog?: (level: "info" | "warn" | "error", message: string) => void;
 }
@@ -28,7 +47,7 @@ const CONTROL_TIMEOUT_MS = 30_000;
 const TURN_TIMEOUT_MS = 15 * 60 * 1000;
 
 export class CodexAppServerRuntime {
-  private child: ChildProcessWithoutNullStreams | null = null;
+  private child: ChildProcessHandle | null = null;
   private buffer = "";
   private stderr = "";
   private nextId = 1;
@@ -131,14 +150,14 @@ export class CodexAppServerRuntime {
     this.options.onLog?.("info", `啟動 Codex App Server：${this.options.executable} app-server`);
     this.buffer = "";
     this.stderr = "";
-    const child = spawn(this.options.executable, ["app-server"], {
+    const child = spawnProcess(this.options.executable, ["app-server"], {
       cwd: this.options.cwd,
       env: this.options.env,
       stdio: ["pipe", "pipe", "pipe"]
     });
     this.child = child;
-    child.stdout.on("data", (chunk: Buffer) => this.consume(child, chunk.toString("utf8")));
-    child.stderr.on("data", (chunk: Buffer) => { if (this.child === child) this.stderr = `${this.stderr}${chunk.toString("utf8")}`.slice(-16_384); });
+    child.stdout.on("data", chunk => this.consume(child, chunk.toString("utf8")));
+    child.stderr.on("data", chunk => { if (this.child === child) this.stderr = `${this.stderr}${chunk.toString("utf8")}`.slice(-16_384); });
     child.on("error", error => this.failProcess(child, new Error(`無法啟動 Codex App Server（${this.options.executable}）：${error.message}`)));
     child.on("close", code => this.failProcess(child, new Error(this.stderr.trim() || `Codex App Server 結束碼：${code ?? "未知"}`)));
     await this.request("initialize", {
@@ -149,7 +168,7 @@ export class CodexAppServerRuntime {
     this.options.onLog?.("info", "Codex App Server 已就緒");
   }
 
-  private consume(child: ChildProcessWithoutNullStreams, chunk: string): void {
+  private consume(child: ChildProcessHandle, chunk: string): void {
     if (this.child !== child) return;
     this.buffer += chunk;
     while (true) {
@@ -228,7 +247,7 @@ export class CodexAppServerRuntime {
     this.child.stdin.write(`${JSON.stringify(message)}\n`);
   }
 
-  private failProcess(child: ChildProcessWithoutNullStreams, error: Error): void {
+  private failProcess(child: ChildProcessHandle, error: Error): void {
     if (this.child !== child) return;
     this.options.onLog?.("error", error.message);
     for (const entry of this.pending.values()) { window.clearTimeout(entry.timeout); entry.reject(error); }

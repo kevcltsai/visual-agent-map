@@ -3,8 +3,8 @@ import { App, MarkdownRenderer, FileSystemAdapter, ItemView, MarkdownView, Modal
 import { NameModal } from "./ui/modals/name-modal";
 import { ChoiceModal } from "./ui/modals/choice-modal";
 import { DebugLogModal } from "./ui/modals/debug-log-modal";
-import { existsSync, readdirSync } from "node:fs";
-import { delimiter, join } from "node:path";
+import { existsSync as nodeExistsSync, readdirSync as nodeReaddirSync } from "node:fs";
+import { delimiter as nodeDelimiter, join as nodeJoin } from "node:path";
 import { canParent, clone, descendants, History, inheritModel, MapDocument, MapNode, parseMap, removeNodes, serializeMap, visibleNodes } from "./map-model";
 import { DEFAULT_SETTINGS, ModelSource, Note, NotePatch, Repository, Settings, TopicInfo, TopicState } from "./repository";
 import { buildPreparedTaskContext } from "./ai/context-builder";
@@ -21,6 +21,15 @@ export { canonicalDetail, visualReferencesMarkdown } from "./ai/result-utils";
 export { firstMarkdownImage, firstMarkdownTable, markdownImages } from "./ui/preview-utils";
 export type { AiRunMetrics, PreparedTaskContext } from "./ai/types";
 const VIEW_TYPE = "visual-agent-map-view";
+type ProcessEnvironment = Record<string, string | undefined>;
+function typedNodeBinding<T>(value: unknown): T { return value as T; }
+const existsSync = typedNodeBinding<(path: string) => boolean>(nodeExistsSync);
+const readdirSync = typedNodeBinding<(path: string) => string[]>(nodeReaddirSync);
+const delimiter = typedNodeBinding<string>(nodeDelimiter);
+const join = typedNodeBinding<(...paths: string[]) => string>(nodeJoin);
+function currentProcessEnvironment(): ProcessEnvironment {
+  return (window as Window & { process?: { env?: ProcessEnvironment } }).process?.env ?? {};
+}
 interface Action { undo: () => Promise<void>; redo: () => Promise<void> }
 
 export function extractJsonObject(raw: string): string {
@@ -1285,14 +1294,16 @@ export default class VisualAgentMapPlugin extends Plugin {
     return this.codexRuntime;
   }
   private resolveExecutable(configured: string): string {
-    const home = process.env.HOME || "";
+    const environment = currentProcessEnvironment();
+    const home = environment.HOME || "";
     let nvmVersions: string[] = [];
     if (home) { try { nvmVersions = readdirSync(join(home, ".nvm/versions/node")); } catch { /* nvm is optional. */ } }
-    return executableCandidates(configured, home, process.env.PATH || "", nvmVersions).find(candidate => existsSync(candidate)) || configured;
+    return executableCandidates(configured, home, environment.PATH || "", nvmVersions).find(candidate => existsSync(candidate)) || configured;
   }
-  private cliEnvironment(): NodeJS.ProcessEnv {
-    const home = process.env.HOME || "";
-    const paths = [home ? join(home, ".local/bin") : "", "/opt/homebrew/bin", "/usr/local/bin", "/usr/bin", "/bin", process.env.PATH || ""].filter(Boolean);
-    return { ...process.env, PATH: [...new Set(paths)].join(":") };
+  private cliEnvironment(): ProcessEnvironment {
+    const environment = currentProcessEnvironment();
+    const home = environment.HOME || "";
+    const paths = [home ? join(home, ".local/bin") : "", "/opt/homebrew/bin", "/usr/local/bin", "/usr/bin", "/bin", environment.PATH || ""].filter(Boolean);
+    return { ...environment, PATH: [...new Set(paths)].join(":") };
   }
 }

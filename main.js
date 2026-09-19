@@ -1513,6 +1513,7 @@ var response_schema_default = {
 
 // ai/runtime/codex-app-server.ts
 var import_node_child_process = require("node:child_process");
+var spawnProcess = import_node_child_process.spawn;
 var CONTROL_TIMEOUT_MS = 3e4;
 var TURN_TIMEOUT_MS = 15 * 60 * 1e3;
 var CodexAppServerRuntime = class {
@@ -1633,7 +1634,7 @@ var CodexAppServerRuntime = class {
     (_b = (_a = this.options).onLog) == null ? void 0 : _b.call(_a, "info", `\u555F\u52D5 Codex App Server\uFF1A${this.options.executable} app-server`);
     this.buffer = "";
     this.stderr = "";
-    const child = (0, import_node_child_process.spawn)(this.options.executable, ["app-server"], {
+    const child = spawnProcess(this.options.executable, ["app-server"], {
       cwd: this.options.cwd,
       env: this.options.env,
       stdio: ["pipe", "pipe", "pipe"]
@@ -1750,6 +1751,17 @@ var CodexAppServerRuntime = class {
 
 // main.ts
 var VIEW_TYPE = "visual-agent-map-view";
+function typedNodeBinding(value) {
+  return value;
+}
+var existsSync = typedNodeBinding(import_node_fs.existsSync);
+var readdirSync = typedNodeBinding(import_node_fs.readdirSync);
+var delimiter = typedNodeBinding(import_node_path.delimiter);
+var join = typedNodeBinding(import_node_path.join);
+function currentProcessEnvironment() {
+  var _a, _b;
+  return (_b = (_a = window.process) == null ? void 0 : _a.env) != null ? _b : {};
+}
 function extractJsonObject(raw) {
   const candidates = [];
   let start = -1, depth = 0, quoted = false, escaped = false;
@@ -1789,16 +1801,16 @@ function extractJsonObject(raw) {
 function executableCandidates(configured, home, pathValue, nvmVersions = []) {
   if (configured.includes("/") || configured.includes("\\")) return [configured];
   const dirs = [
-    home ? (0, import_node_path.join)(home, ".local/bin") : "",
-    home ? (0, import_node_path.join)(home, ".npm-global/bin") : "",
-    home ? (0, import_node_path.join)(home, ".volta/bin") : "",
-    home ? (0, import_node_path.join)(home, ".fnm/current/bin") : "",
+    home ? join(home, ".local/bin") : "",
+    home ? join(home, ".npm-global/bin") : "",
+    home ? join(home, ".volta/bin") : "",
+    home ? join(home, ".fnm/current/bin") : "",
     "/opt/homebrew/bin",
     "/usr/local/bin",
-    ...nvmVersions.map((version) => (0, import_node_path.join)(home, ".nvm/versions/node", version, "bin")),
-    ...pathValue.split(import_node_path.delimiter)
+    ...nvmVersions.map((version) => join(home, ".nvm/versions/node", version, "bin")),
+    ...pathValue.split(delimiter)
   ].filter(Boolean);
-  return [...new Set(dirs)].map((directory) => (0, import_node_path.join)(directory, configured));
+  return [...new Set(dirs)].map((directory) => join(directory, configured));
 }
 var labels = { idea: t("\u5F85\u7814\u7A76"), running: t("AI \u57F7\u884C\u4E2D"), completed: t("AI \u5B8C\u6210"), error: t("\u57F7\u884C\u932F\u8AA4") };
 var TaskModal = class extends import_obsidian5.Modal {
@@ -3742,7 +3754,7 @@ var VisualAgentMapPlugin = class extends import_obsidian5.Plugin {
   }
   codexDiagnostic() {
     const executable = this.resolveExecutable(this.settings.codexPath);
-    return { executable, installed: (0, import_node_fs.existsSync)(executable) };
+    return { executable, installed: existsSync(executable) };
   }
   resetCodexRuntime() {
     var _a;
@@ -3877,7 +3889,7 @@ var VisualAgentMapPlugin = class extends import_obsidian5.Plugin {
     var _a, _b, _c, _d;
     const adapter = this.app.vault.adapter;
     if (!(adapter instanceof import_obsidian5.FileSystemAdapter) || !this.manifest.dir) return;
-    const pluginDirectory = (0, import_node_path.join)(adapter.getBasePath(), this.manifest.dir);
+    const pluginDirectory = join(adapter.getBasePath(), this.manifest.dir);
     const models = await this.runtime(pluginDirectory).listModels();
     this.settings.models = models.map((item) => item.model).join(", ");
     if (!models.some((item) => item.model === this.settings.cliModel)) this.settings.cliModel = ((_a = models.find((item) => item.model === DEFAULT_SETTINGS.cliModel)) == null ? void 0 : _a.model) || ((_b = models.find((item) => item.isDefault)) == null ? void 0 : _b.model) || ((_c = models[0]) == null ? void 0 : _c.model) || "";
@@ -3893,7 +3905,7 @@ var VisualAgentMapPlugin = class extends import_obsidian5.Plugin {
     const totalStarted = Date.now();
     const prepared = buildPreparedTaskContext(context, model);
     context = prepared.context;
-    const pluginDirectory = (0, import_node_path.join)(adapter.getBasePath(), this.manifest.dir);
+    const pluginDirectory = join(adapter.getBasePath(), this.manifest.dir);
     const instructions = [
       "\u4F60\u662F\u8996\u89BA\u5316\u601D\u8003 Agent\u3002\u4E0D\u8981\u4FEE\u6539\u4EFB\u4F55\u6A94\u6848\uFF1B\u9664\u975E\u4EFB\u52D9\u660E\u78BA\u6307\u5B9A\uFF0C\u5426\u5247\u4E0D\u8981\u8B80\u53D6\u672C\u6A5F\u6A94\u6848\u3002",
       '\u53EA\u56DE\u50B3 JSON\uFF0C\u4E0D\u8981\u4F7F\u7528 Markdown code fence\u3002\u683C\u5F0F\u5FC5\u9808\u7B26\u5408\uFF1A{"summary":"...","detail":"...","suggestions":[{"title":"...","task":"...","contribution":"..."}],"visualReferences":[{"title":"...","imageUrl":"https://...","sourceUrl":"https://...","description":"...","palette":["navy","white"],"formula":"..."}]}\u3002\u82E5\u6C92\u6709\u8996\u89BA\u53C3\u8003\uFF0CvisualReferences \u56DE\u50B3\u7A7A\u9663\u5217\u3002',
@@ -3955,19 +3967,21 @@ ${context.task}`
     return this.codexRuntime;
   }
   resolveExecutable(configured) {
-    const home = process.env.HOME || "";
+    const environment = currentProcessEnvironment();
+    const home = environment.HOME || "";
     let nvmVersions = [];
     if (home) {
       try {
-        nvmVersions = (0, import_node_fs.readdirSync)((0, import_node_path.join)(home, ".nvm/versions/node"));
+        nvmVersions = readdirSync(join(home, ".nvm/versions/node"));
       } catch (e) {
       }
     }
-    return executableCandidates(configured, home, process.env.PATH || "", nvmVersions).find((candidate) => (0, import_node_fs.existsSync)(candidate)) || configured;
+    return executableCandidates(configured, home, environment.PATH || "", nvmVersions).find((candidate) => existsSync(candidate)) || configured;
   }
   cliEnvironment() {
-    const home = process.env.HOME || "";
-    const paths = [home ? (0, import_node_path.join)(home, ".local/bin") : "", "/opt/homebrew/bin", "/usr/local/bin", "/usr/bin", "/bin", process.env.PATH || ""].filter(Boolean);
-    return { ...process.env, PATH: [...new Set(paths)].join(":") };
+    const environment = currentProcessEnvironment();
+    const home = environment.HOME || "";
+    const paths = [home ? join(home, ".local/bin") : "", "/opt/homebrew/bin", "/usr/local/bin", "/usr/bin", "/bin", environment.PATH || ""].filter(Boolean);
+    return { ...environment, PATH: [...new Set(paths)].join(":") };
   }
 };

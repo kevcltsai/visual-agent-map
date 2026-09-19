@@ -35,9 +35,8 @@ Visual Agent Map is a desktop-only Obsidian plugin for breaking a broad question
 ### Requirements
 
 - Obsidian desktop `1.13.7` or later (the verified compatibility baseline for this release).
-- A local Codex installation signed in to your account.
-- [`codex-acp`](https://github.com/agentclientprotocol/codex-acp) is preferred; Codex CLI is used only when ACP has a prompt-before transport error.
-- Desktop only. Current release: `0.6.1`.
+- A local [Codex CLI](https://developers.openai.com/codex/cli/) installation signed in with ChatGPT. Visual Agent Map starts its App Server locally and does not require a separate API key.
+- Desktop only. Current release: `0.6.2`.
 
 ### Install
 
@@ -46,7 +45,7 @@ Download `main.js`, `manifest.json`, and `styles.css` from the exact [GitHub Rel
 1. Create `<your-vault>/.obsidian/plugins/visual-agent-map/`.
 2. Place the three release assets in that folder, preserving an existing `data.json`.
 3. Reload Obsidian and enable **Visual Agent Map** under **Settings → Community plugins**.
-4. Confirm the local `codex-acp` and Codex CLI paths in plugin settings.
+4. Confirm the Codex CLI path and App Server status in plugin settings.
 
 Do not copy the repository or run `npm install` inside the plugin directory. See [INSTALL.md](INSTALL.md) for agent-assisted installation.
 
@@ -69,7 +68,7 @@ Plugin-created content stays in the vault. A fresh installation creates the empt
 
 - No telemetry and no stored API keys.
 - A topic task is sent to the locally signed-in Codex tool only after you explicitly confirm it. Relevant topic content, instructions, and the task are included as context.
-- The plugin runs configured `codex-acp` or Codex CLI outside the vault; it never installs or updates them.
+- The plugin starts `codex app-server` outside the vault with read-only sandboxing and no command or file-change approvals; it never installs or updates Codex CLI.
 - Remote images in Markdown follow Obsidian's ordinary image-loading behavior.
 
 ### Current limitations
@@ -115,9 +114,8 @@ Visual Agent Map 是桌面版 Obsidian 外掛：用視覺化心智圖拆解複�
 ### 系統需求
 
 - Obsidian 桌面版 `1.13.7` 或更新版本（本版本實際驗證的相容性基線）。
-- 已在本機安裝並登入 Codex。
-- 建議使用 [`codex-acp`](https://github.com/agentclientprotocol/codex-acp)；只有 ACP 在送出 prompt 前發生 transport error 時，才會改用 Codex CLI。
-- 僅支援桌面版。目前版本：`0.6.1`。
+- 已在本機安裝 [Codex CLI](https://developers.openai.com/codex/cli/) 並以 ChatGPT 登入。Visual Agent Map 會在本機啟動 App Server，不需要另外設定 API key。
+- 僅支援桌面版。目前版本：`0.6.2`。
 
 ### 安裝
 
@@ -126,7 +124,7 @@ Visual Agent Map 是桌面版 Obsidian 外掛：用視覺化心智圖拆解複�
 1. 建立 `<你的-vault>/.obsidian/plugins/visual-agent-map/`。
 2. 放入三個 release assets，並保留既有的 `data.json`。
 3. 重新載入 Obsidian，在 **設定 → 第三方外掛** 啟用 **Visual Agent Map**。
-4. 在外掛設定確認本機 `codex-acp` 與 Codex CLI 路徑。
+4. 在外掛設定確認 Codex CLI 路徑與 App Server 狀態。
 
 不要把整個 repository 複製到外掛資料夾，也不要在該資料夾執行 `npm install`。可參考 [INSTALL.md](INSTALL.md) 的安裝說明。
 
@@ -149,7 +147,7 @@ Agent Workspace/
 
 - 不含 telemetry，也不儲存 API key。
 - 只有你確認執行 AI 任務後，外掛才會將相關議題內容、指令與任務交給本機已登入的 Codex 工具。
-- 外掛會在 Vault 外執行設定的 `codex-acp` 或 Codex CLI，但不會自行安裝或更新它們。
+- 外掛會在 Vault 外以唯讀 sandbox、禁止 command／file-change approval 的設定啟動 `codex app-server`，但不會自行安裝或更新 Codex CLI。
 - Markdown 的遠端圖片會依 Obsidian 一般行為連線至對應圖片來源。
 
 ### 目前限制

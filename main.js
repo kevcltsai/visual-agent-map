@@ -25,7 +25,6 @@ __export(main_exports, {
   buildPreparedTaskContext: () => buildPreparedTaskContext,
   canonicalDetail: () => canonicalDetail,
   default: () => VisualAgentMapPlugin,
-  ensureResponseSchema: () => ensureResponseSchema,
   executableCandidates: () => executableCandidates,
   extractJsonObject: () => extractJsonObject,
   firstMarkdownImage: () => firstMarkdownImage,
@@ -240,17 +239,12 @@ var english = {
   "\u8ACB\u81F3\u5C11\u9078\u53D6\u5169\u500B\u8B70\u984C\u3002": "Select at least two topics.",
   "\u8ACB\u5148\u8F38\u5165\u8981\u4EA4\u7D66 AI \u7684\u554F\u984C\u6216\u4EFB\u52D9\u3002": "Enter a question or task for AI first.",
   "AI \u4EFB\u52D9\u5931\u6557\u3002": "AI task failed.",
-  "\u4F7F\u7528\u672C\u6A5F Codex ACP \u767B\u5165\u72C0\u614B\u3002AI \u4EFB\u52D9\u5B8C\u6210\u5F8C\u6703\u76F4\u63A5\u66F4\u65B0\u76EE\u524D\u7406\u89E3\uFF0C\u5B8C\u6574\u7D50\u679C\u4FDD\u5B58\u5728\u8B70\u984C MD \u8A73\u60C5\u4E2D\u3002": "Uses your local Codex ACP login. AI updates current understanding and saves full results in the topic's Markdown details.",
   "\u91CD\u65B0\u958B\u555F\u958B\u59CB\u4F7F\u7528": "Open getting started again",
-  "Codex ACP \u8DEF\u5F91": "Codex ACP path",
   "\u7528\u65BC\u5E38\u99D0 Codex session \u8207\u81EA\u52D5\u53D6\u5F97\u6A21\u578B\u6E05\u55AE\u3002": "Used for persistent Codex sessions and automatic model discovery.",
   "\u5DE5\u4F5C\u5340\u9810\u8A2D Model": "Workspace default model",
   "\u76EE\u524D\u6700\u4F4E\u6210\u672C\u6A21\u578B\u70BA gpt-5.6-luna\uFF1B\u8B8A\u66F4\u53EA\u5F71\u97FF\u4E4B\u5F8C\u65B0\u589E\u7684\u6839\u8B70\u984C\u3002": "Default: gpt-5.6-luna. Changes apply to newly created root topics.",
   "Model \u9078\u55AE": "Model list",
-  "\u555F\u52D5\u5F8C\u6703\u512A\u5148\u88DC\u5165 Codex ACP \u56DE\u5831\u7684\u6A21\u578B\u3002": "Models reported by Codex ACP are added on startup.",
   "\u4E00\u822C\u4EFB\u52D9\u4F7F\u7528\u4F4E\u63A8\u7406\uFF1B\u6574\u5408\u5B50\u8B70\u984C\u4F7F\u7528\u9AD8\u63A8\u7406\u3002": "Regular tasks use low reasoning; subtopic synthesis uses high reasoning.",
-  "Codex CLI fallback \u8DEF\u5F91": "Codex CLI fallback path",
-  "\u53EA\u6709 Codex ACP \u5931\u6557\u6642\u624D\u4F7F\u7528\u3002": "Used only when Codex ACP fails.",
   "\u91CD\u5EFA\u8B70\u984C reference": "Rebuild topic references",
   "\u8B70\u984C reference \u5DF2\u4F9D\u5FC3\u667A\u5716\u91CD\u5EFA\u3002": "Topic references were rebuilt from the mind map.",
   "\u540C\u6B65\u8B70\u984C\u540D\u7A31\u8207\u6A94\u540D": "Sync topic names and filenames",
@@ -259,9 +253,6 @@ var english = {
   "\u7121\u6CD5\u958B\u555F\u53F3\u5074\u8A73\u60C5\u6B04\u3002": "Unable to open the right details sidebar.",
   "CLI \u6A21\u5F0F\u53EA\u652F\u63F4\u684C\u9762\u7248 Obsidian": "CLI mode requires desktop Obsidian",
   "\u627E\u4E0D\u5230\u5916\u639B\u76EE\u9304": "Plugin folder not found",
-  "Codex ACP \u5C1A\u672A\u555F\u52D5": "Codex ACP has not started",
-  "Codex ACP \u56DE\u50B3\u932F\u8AA4": "Codex ACP returned an error",
-  "Codex ACP \u6C92\u6709\u5EFA\u7ACB session": "Codex ACP did not create a session",
   "Codex CLI \u57F7\u884C\u8D85\u904E 15 \u5206\u9418": "Codex CLI exceeded 15 minutes",
   "Claude Code \u5DF2\u4E0D\u518D\u652F\u63F4\u3002\u8ACB\u5728\u8B70\u984C\u8A2D\u5B9A\u4E2D\u9078\u64C7 Codex model\u3002": "Claude Code is no longer supported. Choose a Codex model in the topic settings.",
   "\u5EFA\u7ACB\u5FC3\u667A\u5716\u5931\u6557\uFF1A{0}\u3002\u8ACB\u6AA2\u67E5 vault \u5F8C\u91CD\u8A66\u3002": "Could not create the mind map: {0}. Check the vault and try again.",
@@ -319,17 +310,11 @@ var english = {
   "Workspace \u4F4D\u7F6E": "Workspace location",
   "\u6383\u63CF\u53EF\u8FA8\u8B58\u7684 VAM Workspace\uFF0C\u78BA\u8A8D\u5F8C\u624D\u91CD\u65B0\u9023\u7D50\uFF0C\u4E0D\u6703\u642C\u79FB\u6216\u8986\u5BEB\u8CC7\u6599\u3002": "Scan for recognizable VAM workspaces and reconnect only after confirmation, without moving or overwriting data.",
   "\u6383\u63CF": "Scan",
-  "Codex ACP \u72C0\u614B": "Codex ACP status",
   "\u5DF2\u627E\u5230\uFF1A{0}": "Found: {0}",
-  "\u672A\u627E\u5230 Codex ACP\u3002\u8ACB\u5148\u5B89\u88DD @agentclientprotocol/codex-acp \u4E26\u5B8C\u6210 Codex \u767B\u5165\uFF1BVAM \u4E0D\u6703\u81EA\u52D5\u5B89\u88DD\u7CFB\u7D71\u5957\u4EF6\u3002": "Codex ACP was not found. Install @agentclientprotocol/codex-acp and sign in to Codex first; VAM never installs system packages automatically.",
   "\u91CD\u65B0\u6AA2\u67E5": "Check again",
-  "Codex ACP \u5C1A\u672A\u5C31\u7DD2\uFF1BSample \u8207\u975E AI \u529F\u80FD\u4ECD\u53EF\u4F7F\u7528\u3002\u8ACB\u5230 VAM Settings \u67E5\u770B\u4E26\u91CD\u65B0\u6AA2\u67E5\u3002": "Codex ACP is not ready. The sample and non-AI features remain available. Open VAM Settings to review and check again.",
   "\u627E\u4E0D\u5230\u53EF\u8FA8\u8B58\u7684\u65E2\u6709 VAM Workspace\u3002": "No recognizable existing VAM Workspace was found.",
   "\u9078\u64C7\u5F8C\u53EA\u6703\u91CD\u65B0\u9023\u7D50\u8A2D\u5B9A\uFF0C\u4E0D\u6703\u642C\u79FB\u6216\u6539\u5BEB\u5167\u5BB9\u3002": "Choosing a Workspace only reconnects the setting; it does not move or rewrite content.",
   "\u5DF2\u91CD\u65B0\u9023\u7D50 Workspace\uFF1A{0}": "Reconnected Workspace: {0}",
-  "\u672A\u627E\u5230 Codex ACP\uFF1A{0}": "Codex ACP was not found: {0}",
-  "Codex ACP \u5DF2\u5C31\u7DD2\uFF1A{0}": "Codex ACP is ready: {0}",
-  "Codex ACP \u6AA2\u67E5\u5931\u6557\uFF1A{0}": "Codex ACP check failed: {0}",
   "\u5EFA\u7ACB\u65B0\u5FC3\u667A\u5716": "Create a new mind map",
   "\u67E5\u770B\u7BC4\u4F8B": "View sample",
   "\u5148\u63A2\u7D22\uFF0C\u518D\u6536\u6582\u6210\u5B8C\u6574\u65C5\u7A0B": "Explore first, then synthesize a complete journey",
@@ -351,7 +336,18 @@ var english = {
   "\u6E05\u9664\u65E5\u8A8C": "Clear logs",
   "\u76EE\u524D\u6C92\u6709\u5075\u932F\u65E5\u8A8C\u3002": "There are no debug logs yet.",
   "\u5075\u932F\u65E5\u8A8C\u5DF2\u8907\u88FD\u3002": "Debug log copied.",
-  "\u7121\u6CD5\u8907\u88FD\u5075\u932F\u65E5\u8A8C\u3002": "Unable to copy the debug log."
+  "\u7121\u6CD5\u8907\u88FD\u5075\u932F\u65E5\u8A8C\u3002": "Unable to copy the debug log.",
+  "Codex CLI \u8DEF\u5F91": "Codex CLI path",
+  "VAM \u6703\u4EE5\u6B64\u555F\u52D5 codex app-server\u3002": "VAM uses this executable to start codex app-server.",
+  "\u6A21\u578B\u6E05\u55AE\u7531 Codex App Server \u81EA\u52D5\u53D6\u5F97\uFF1B\u8B8A\u66F4\u53EA\u5F71\u97FF\u4E4B\u5F8C\u65B0\u589E\u7684\u6839\u8B70\u984C\u3002": "Models are loaded from Codex App Server; changes apply only to new root topics.",
+  "Codex App Server \u72C0\u614B": "Codex App Server status",
+  "\u5DF2\u627E\u5230 Codex CLI\uFF1A{0}": "Codex CLI found: {0}",
+  "\u672A\u627E\u5230 Codex CLI\u3002\u8ACB\u5148\u5B89\u88DD Codex CLI \u4E26\u4EE5 ChatGPT \u767B\u5165\uFF1BVAM \u4E0D\u6703\u81EA\u52D5\u5B89\u88DD\u7CFB\u7D71\u5957\u4EF6\u3002": "Codex CLI was not found. Install it and sign in with ChatGPT; VAM never installs system packages automatically.",
+  "Codex App Server \u5C1A\u672A\u5C31\u7DD2\uFF1BSample \u8207\u975E AI \u529F\u80FD\u4ECD\u53EF\u4F7F\u7528\u3002\u8ACB\u5230 VAM Settings \u67E5\u770B\u4E26\u91CD\u65B0\u6AA2\u67E5\u3002": "Codex App Server is not ready. Samples and non-AI features remain available; check VAM Settings.",
+  "\u672A\u627E\u5230 Codex CLI\uFF1A{0}": "Codex CLI was not found: {0}",
+  "Codex App Server \u5DF2\u5C31\u7DD2\uFF1A{0}": "Codex App Server is ready: {0}",
+  "Codex App Server \u6AA2\u67E5\u5931\u6557\uFF1A{0}": "Codex App Server check failed: {0}",
+  "\u76EE\u524D\u6A21\u578B\u5DF2\u4E0D\u53EF\u7528": "Current model is unavailable"
 };
 var language = "zh-TW";
 function setUiLanguage(value) {
@@ -516,7 +512,6 @@ var DebugLogModal = class extends import_obsidian3.Modal {
 };
 
 // main.ts
-var import_node_child_process = require("node:child_process");
 var import_node_fs = require("node:fs");
 var import_node_path = require("node:path");
 
@@ -624,12 +619,11 @@ var DEFAULT_SETTINGS = {
   notesFolder: "Agent Workspace/Nodes",
   mapsFolder: "Agent Workspace/Maps",
   mapId: "default",
-  cliPath: "codex",
-  codexAcpPath: "codex-acp",
+  codexPath: "codex",
   cliModel: "gpt-5.6-luna",
   cliReasoning: "low",
   previewScale: 120,
-  models: "gpt-6-astra, gpt-5.6-sol, gpt-5.6-terra, gpt-5.6-luna, gpt-5.5",
+  models: "",
   migrated: false,
   structureVersion: 2,
   firstUseNoticeSeen: false,
@@ -1517,45 +1511,245 @@ var response_schema_default = {
   additionalProperties: false
 };
 
+// ai/runtime/codex-app-server.ts
+var import_node_child_process = require("node:child_process");
+var CONTROL_TIMEOUT_MS = 3e4;
+var TURN_TIMEOUT_MS = 15 * 60 * 1e3;
+var CodexAppServerRuntime = class {
+  constructor(options) {
+    this.options = options;
+    __publicField(this, "child", null);
+    __publicField(this, "buffer", "");
+    __publicField(this, "stderr", "");
+    __publicField(this, "nextId", 1);
+    __publicField(this, "pending", /* @__PURE__ */ new Map());
+    __publicField(this, "turns", /* @__PURE__ */ new Map());
+    __publicField(this, "initializing", null);
+  }
+  async start() {
+    if (this.initializing) return this.initializing;
+    const initializing = this.startProcess();
+    this.initializing = initializing;
+    try {
+      await initializing;
+    } catch (error) {
+      if (this.initializing === initializing) this.initializing = null;
+      const child = this.child;
+      if (child) this.failProcess(child, error instanceof Error ? error : new Error(String(error)));
+      throw error;
+    }
+  }
+  stop() {
+    var _a;
+    const error = new Error("Codex App Server \u5DF2\u505C\u6B62");
+    for (const entry of this.pending.values()) {
+      window.clearTimeout(entry.timeout);
+      entry.reject(error);
+    }
+    for (const entry of this.turns.values()) {
+      window.clearTimeout(entry.timeout);
+      entry.reject(error);
+    }
+    this.pending.clear();
+    this.turns.clear();
+    (_a = this.child) == null ? void 0 : _a.kill();
+    this.child = null;
+    this.initializing = null;
+  }
+  async listModels() {
+    var _a;
+    await this.start();
+    const models = [];
+    let cursor = null;
+    do {
+      const response = await this.request("model/list", { cursor, limit: 100, includeHidden: false });
+      for (const value of (_a = response.data) != null ? _a : []) {
+        if (!value || typeof value !== "object") continue;
+        const item = value;
+        const model = typeof item.model === "string" ? item.model.trim() : "";
+        const id = typeof item.id === "string" ? item.id.trim() : "";
+        const displayName = typeof item.displayName === "string" ? item.displayName.trim() : "";
+        const efforts = Array.isArray(item.supportedReasoningEfforts) ? item.supportedReasoningEfforts : [];
+        if (item.hidden !== false || !model || !id || !displayName || !efforts.length) continue;
+        models.push({
+          id,
+          model,
+          displayName,
+          hidden: false,
+          supportedReasoningEfforts: efforts,
+          defaultReasoningEffort: typeof item.defaultReasoningEffort === "string" ? item.defaultReasoningEffort : "low",
+          isDefault: item.isDefault === true
+        });
+      }
+      cursor = typeof response.nextCursor === "string" && response.nextCursor ? response.nextCursor : null;
+    } while (cursor);
+    return [...new Map(models.map((model) => [model.model, model])).values()];
+  }
+  async runTask(prompt, model, effort, outputSchema) {
+    var _a, _b, _c;
+    await this.start();
+    const started = await this.request("thread/start", {
+      model: model || null,
+      cwd: this.options.cwd,
+      approvalPolicy: "never",
+      sandbox: "read-only",
+      ephemeral: true
+    });
+    const threadId = typeof ((_a = started.thread) == null ? void 0 : _a.id) === "string" ? started.thread.id : "";
+    if (!threadId) throw new Error("Codex App Server \u6C92\u6709\u5EFA\u7ACB thread");
+    const completed = new Promise((resolve, reject) => {
+      const timeout = window.setTimeout(() => {
+        this.turns.delete(threadId);
+        reject(new Error("Codex App Server turn \u5728 15 \u5206\u9418\u5167\u6C92\u6709\u5B8C\u6210"));
+      }, TURN_TIMEOUT_MS);
+      this.turns.set(threadId, { messages: [], resolve, reject, timeout });
+    });
+    try {
+      await this.request("turn/start", {
+        threadId,
+        input: [{ type: "text", text: prompt, text_elements: [] }],
+        model: model || null,
+        effort: effort || "low",
+        outputSchema
+      });
+      return await completed;
+    } catch (error) {
+      const state = this.turns.get(threadId);
+      if (state) {
+        window.clearTimeout(state.timeout);
+        this.turns.delete(threadId);
+      } else await completed.catch(() => void 0);
+      throw error;
+    } finally {
+      try {
+        await this.request("thread/unsubscribe", { threadId }, 5e3);
+      } catch (error) {
+        (_c = (_b = this.options).onLog) == null ? void 0 : _c.call(_b, "warn", `Codex App Server \u7121\u6CD5\u53D6\u6D88 thread \u8A02\u95B1\uFF1A${error instanceof Error ? error.message : String(error)}`);
+      }
+    }
+  }
+  async startProcess() {
+    var _a, _b, _c, _d;
+    (_b = (_a = this.options).onLog) == null ? void 0 : _b.call(_a, "info", `\u555F\u52D5 Codex App Server\uFF1A${this.options.executable} app-server`);
+    this.buffer = "";
+    this.stderr = "";
+    const child = (0, import_node_child_process.spawn)(this.options.executable, ["app-server"], {
+      cwd: this.options.cwd,
+      env: this.options.env,
+      stdio: ["pipe", "pipe", "pipe"]
+    });
+    this.child = child;
+    child.stdout.on("data", (chunk) => this.consume(child, chunk.toString("utf8")));
+    child.stderr.on("data", (chunk) => {
+      if (this.child === child) this.stderr = `${this.stderr}${chunk.toString("utf8")}`.slice(-16384);
+    });
+    child.on("error", (error) => this.failProcess(child, new Error(`\u7121\u6CD5\u555F\u52D5 Codex App Server\uFF08${this.options.executable}\uFF09\uFF1A${error.message}`)));
+    child.on("close", (code) => this.failProcess(child, new Error(this.stderr.trim() || `Codex App Server \u7D50\u675F\u78BC\uFF1A${code != null ? code : "\u672A\u77E5"}`)));
+    await this.request("initialize", {
+      clientInfo: { name: "visual-agent-map", title: "Visual Agent Map", version: this.options.clientVersion },
+      capabilities: { experimentalApi: false, requestAttestation: false }
+    });
+    this.send({ method: "initialized" });
+    (_d = (_c = this.options).onLog) == null ? void 0 : _d.call(_c, "info", "Codex App Server \u5DF2\u5C31\u7DD2");
+  }
+  consume(child, chunk) {
+    if (this.child !== child) return;
+    this.buffer += chunk;
+    while (true) {
+      const newline = this.buffer.indexOf("\n");
+      if (newline < 0) return;
+      const line = this.buffer.slice(0, newline).trim();
+      this.buffer = this.buffer.slice(newline + 1);
+      if (!line) continue;
+      try {
+        this.handle(JSON.parse(line));
+      } catch (error) {
+        this.failProcess(child, new Error(`Codex App Server \u56DE\u61C9\u7121\u6CD5\u89E3\u6790\uFF1A${error instanceof Error ? error.message : String(error)}`));
+      }
+    }
+  }
+  handle(message) {
+    var _a, _b;
+    if ("id" in message && "method" in message) {
+      this.respondToServerRequest(message);
+      return;
+    }
+    if ("id" in message) {
+      const entry = this.pending.get(message.id);
+      if (!entry) return;
+      this.pending.delete(message.id);
+      window.clearTimeout(entry.timeout);
+      if (message.error) entry.reject(new Error(message.error.message || "Codex App Server \u56DE\u50B3\u932F\u8AA4"));
+      else entry.resolve(message.result);
+      return;
+    }
+    if (!("method" in message)) return;
+    const params = message.params;
+    const threadId = typeof (params == null ? void 0 : params.threadId) === "string" ? params.threadId : "";
+    const state = this.turns.get(threadId);
+    if (!state) return;
+    if (message.method === "item/completed") {
+      const item = params == null ? void 0 : params.item;
+      if ((item == null ? void 0 : item.type) === "agentMessage" && typeof item.text === "string") state.messages.push(item.text);
+      return;
+    }
+    if (message.method === "turn/completed") {
+      const turn = params == null ? void 0 : params.turn;
+      window.clearTimeout(state.timeout);
+      this.turns.delete(threadId);
+      if ((turn == null ? void 0 : turn.status) === "completed") state.resolve(((_a = state.messages.at(-1)) == null ? void 0 : _a.trim()) || "");
+      else state.reject(new Error(typeof ((_b = turn == null ? void 0 : turn.error) == null ? void 0 : _b.message) === "string" ? turn.error.message : `Codex turn ${typeof (turn == null ? void 0 : turn.status) === "string" ? turn.status : "\u5931\u6557"}`));
+    }
+  }
+  respondToServerRequest(message) {
+    const result = message.method === "item/commandExecution/requestApproval" || message.method === "item/fileChange/requestApproval" ? { decision: "decline" } : message.method === "item/permissions/requestApproval" ? { permissions: {} } : message.method === "item/tool/requestUserInput" ? { answers: {} } : message.method === "mcpServer/elicitation/request" ? { action: "decline", content: null } : null;
+    if (result) this.send({ id: message.id, result });
+    else this.send({ id: message.id, error: { code: -32601, message: `Unsupported server request: ${message.method}` } });
+  }
+  request(method, params, timeoutMs = CONTROL_TIMEOUT_MS) {
+    const id = this.nextId++;
+    return new Promise((resolve, reject) => {
+      const timeout = window.setTimeout(() => {
+        this.pending.delete(id);
+        reject(new Error(`Codex App Server ${method} \u5728 ${Math.ceil(timeoutMs / 1e3)} \u79D2\u5167\u6C92\u6709\u56DE\u61C9`));
+      }, timeoutMs);
+      this.pending.set(id, { resolve, reject, timeout });
+      try {
+        this.send({ id, method, params });
+      } catch (error) {
+        window.clearTimeout(timeout);
+        this.pending.delete(id);
+        reject(error instanceof Error ? error : new Error(String(error)));
+      }
+    });
+  }
+  send(message) {
+    if (!this.child) throw new Error("Codex App Server \u5C1A\u672A\u555F\u52D5");
+    this.child.stdin.write(`${JSON.stringify(message)}
+`);
+  }
+  failProcess(child, error) {
+    var _a, _b;
+    if (this.child !== child) return;
+    (_b = (_a = this.options).onLog) == null ? void 0 : _b.call(_a, "error", error.message);
+    for (const entry of this.pending.values()) {
+      window.clearTimeout(entry.timeout);
+      entry.reject(error);
+    }
+    for (const entry of this.turns.values()) {
+      window.clearTimeout(entry.timeout);
+      entry.reject(error);
+    }
+    this.pending.clear();
+    this.turns.clear();
+    this.child = null;
+    this.initializing = null;
+    child.kill();
+  }
+};
+
 // main.ts
 var VIEW_TYPE = "visual-agent-map-view";
-var AcpTransportError = class extends Error {
-  constructor(message) {
-    super(message);
-    this.name = "AcpTransportError";
-  }
-};
-var AcpTimeoutError = class extends Error {
-  constructor(method, timeoutMs) {
-    super(`Codex ACP ${method} \u5728 ${Math.ceil(timeoutMs / 1e3)} \u79D2\u5167\u6C92\u6709\u56DE\u61C9`);
-    this.name = "AcpTimeoutError";
-  }
-};
-var AcpSessionError = class extends Error {
-  constructor(message) {
-    super(message);
-    this.name = "AcpSessionError";
-  }
-};
-var AcpModelError = class extends Error {
-  constructor(message) {
-    super(message);
-    this.name = "AcpModelError";
-  }
-};
-var AcpParseError = class extends Error {
-  constructor(message) {
-    super(message);
-    this.name = "AcpParseError";
-  }
-};
-var ACP_CONTROL_TIMEOUT_MS = 3e4;
-var ACP_PROMPT_TIMEOUT_MS = 15 * 60 * 1e3;
-function ensureResponseSchema(schemaPath) {
-  if (!(0, import_node_fs.existsSync)(schemaPath)) (0, import_node_fs.writeFileSync)(schemaPath, `${JSON.stringify(response_schema_default, null, 2)}
-`, "utf8");
-  return schemaPath;
-}
 function extractJsonObject(raw) {
   const candidates = [];
   let start = -1, depth = 0, quoted = false, escaped = false;
@@ -1592,7 +1786,6 @@ function extractJsonObject(raw) {
   }
   throw new SyntaxError("Codex \u56DE\u61C9\u4E2D\u627E\u4E0D\u5230\u5B8C\u6574 JSON object");
 }
-var LEGACY_CODEX_ACP_PATH = "/opt/homebrew/bin/codex-acp";
 function executableCandidates(configured, home, pathValue, nvmVersions = []) {
   if (configured.includes("/") || configured.includes("\\")) return [configured];
   const dirs = [
@@ -2810,27 +3003,15 @@ var VisualAgentMapView = class extends import_obsidian5.ItemView {
       modelLabel.createSpan({ text: t("\u4F7F\u7528\u6A21\u578B") });
       const select = modelLabel.createEl("select");
       select.setAttr("aria-label", t("\u4F7F\u7528\u6A21\u578B"));
-      const options = new Set([this.plugin.settings.cliModel, ...this.plugin.settings.models.split(/[\n,]/), ...Array.from(this.notes.values()).map((n) => n.model)].map((s) => s.trim()).filter(Boolean));
+      const options = new Set(this.plugin.settings.models.split(/[\n,]/).map((s) => s.trim()).filter(Boolean));
       for (const model of options) select.createEl("option", { value: model, text: model });
-      select.createEl("option", { value: "__custom__", text: t("\u81EA\u8A02\u6A21\u578B\u2026") });
+      if (!options.has(note.model)) {
+        const unavailable = select.createEl("option", { value: note.model, text: t("\u76EE\u524D\u6A21\u578B\u5DF2\u4E0D\u53EF\u7528") });
+        unavailable.disabled = true;
+      }
       select.value = note.model;
-      const custom = modelLabel.createEl("input", { type: "text", placeholder: t("\u8F38\u5165\u6A21\u578B ID") });
-      custom.setAttr("aria-label", t("\u81EA\u8A02\u6A21\u578B ID"));
-      custom.hidden = true;
       select.addEventListener("change", () => {
-        custom.hidden = select.value !== "__custom__";
-        if (!custom.hidden) custom.focus();
-        else this.enqueue(() => this.noteChange(node, { model: select.value, modelSource: "manual" }));
-      });
-      custom.addEventListener("change", () => {
-        const model = custom.value.trim();
-        if (!model) return;
-        this.enqueue(async () => {
-          await this.noteChange(node, { model, modelSource: "manual" });
-          if (!Array.from(select.options).some((option) => option.value === model)) select.add(new Option(model, model), select.options.length - 1);
-          select.value = model;
-          custom.hidden = true;
-        });
+        if (options.has(select.value)) this.enqueue(() => this.noteChange(node, { model: select.value, modelSource: "manual" }));
       });
       const sourceLabels = { workspace: t("\u5DE5\u4F5C\u5340\u9810\u8A2D"), inherited: t("\u5EFA\u7ACB\u6642\u7E7C\u627F"), manual: t("\u624B\u52D5\u6307\u5B9A") };
       advanced.createEl("p", { cls: "vam-hint", text: t("{0} \xB7 {1}\uFF1B\u4E00\u822C\u4EFB\u52D9\u4F7F\u7528\u4F4E\u63A8\u7406\uFF0C\u6574\u5408\u5B50\u8B70\u984C\u4F7F\u7528\u9AD8\u63A8\u7406\u3002", note.model, sourceLabels[note.modelSource]) });
@@ -3311,13 +3492,12 @@ var VisualAgentMapSettingTab = class extends import_obsidian5.PluginSettingTab {
   }
   getSettingDefinitions() {
     const text2 = (name, key, desc) => ({ name, desc, control: { type: "text", key } });
-    const diagnostic = this.plugin.codexAcpDiagnostic();
+    const diagnostic = this.plugin.codexDiagnostic();
+    const models = Object.fromEntries(this.plugin.settings.models.split(/[,\n]/).map((model) => model.trim()).filter(Boolean).map((model) => [model, model]));
     return [
       { name: t("\u4ECB\u9762\u8A9E\u8A00"), control: { type: "dropdown", key: "language", options: { "zh-TW": "\u7E41\u9AD4\u4E2D\u6587", en: "English" } } },
-      text2(t("Codex ACP \u8DEF\u5F91"), "codexAcpPath", t("\u7528\u65BC\u5E38\u99D0 Codex session \u8207\u81EA\u52D5\u53D6\u5F97\u6A21\u578B\u6E05\u55AE\u3002")),
-      text2(t("\u5DE5\u4F5C\u5340\u9810\u8A2D Model"), "cliModel", t("\u76EE\u524D\u6700\u4F4E\u6210\u672C\u6A21\u578B\u70BA gpt-5.6-luna\uFF1B\u8B8A\u66F4\u53EA\u5F71\u97FF\u4E4B\u5F8C\u65B0\u589E\u7684\u6839\u8B70\u984C\u3002")),
-      text2(t("Model \u9078\u55AE"), "models", t("\u555F\u52D5\u5F8C\u6703\u512A\u5148\u88DC\u5165 Codex ACP \u56DE\u5831\u7684\u6A21\u578B\u3002")),
-      text2(t("Codex CLI fallback \u8DEF\u5F91"), "cliPath", t("\u53EA\u6709 Codex ACP \u5728 prompt \u524D\u767C\u751F transport error \u6642\u624D\u4F7F\u7528\u3002")),
+      text2(t("Codex CLI \u8DEF\u5F91"), "codexPath", t("VAM \u6703\u4EE5\u6B64\u555F\u52D5 codex app-server\u3002")),
+      { name: t("\u5DE5\u4F5C\u5340\u9810\u8A2D Model"), desc: t("\u6A21\u578B\u6E05\u55AE\u7531 Codex App Server \u81EA\u52D5\u53D6\u5F97\uFF1B\u8B8A\u66F4\u53EA\u5F71\u97FF\u4E4B\u5F8C\u65B0\u589E\u7684\u6839\u8B70\u984C\u3002"), control: { type: "dropdown", key: "cliModel", options: models } },
       { name: t("Workspace \u4F4D\u7F6E"), render: (setting) => {
         setting.setName(t("Workspace \u4F4D\u7F6E")).setDesc(t("\u4E3B\u984C\u8CC7\u6599\u593E\uFF1A{0}\u3000\u672A\u5206\u985E\u6536\u4EF6\u5323\uFF1A{1}", this.plugin.settings.topicsFolder, this.plugin.settings.inboxFolder));
       } },
@@ -3331,9 +3511,9 @@ var VisualAgentMapSettingTab = class extends import_obsidian5.PluginSettingTab {
           void this.plugin.offerWorkspaceReconnect();
         }));
       } },
-      { name: t("Codex ACP \u72C0\u614B"), render: (setting) => {
-        setting.setName(t("Codex ACP \u72C0\u614B")).setDesc(diagnostic.installed ? t("\u5DF2\u627E\u5230\uFF1A{0}", diagnostic.executable) : t("\u672A\u627E\u5230 Codex ACP\u3002\u8ACB\u5148\u5B89\u88DD @agentclientprotocol/codex-acp \u4E26\u5B8C\u6210 Codex \u767B\u5165\uFF1BVAM \u4E0D\u6703\u81EA\u52D5\u5B89\u88DD\u7CFB\u7D71\u5957\u4EF6\u3002")).addButton((button) => button.setButtonText(t("\u91CD\u65B0\u6AA2\u67E5")).onClick(() => {
-          void this.plugin.recheckCodexAcp();
+      { name: t("Codex App Server \u72C0\u614B"), render: (setting) => {
+        setting.setName(t("Codex App Server \u72C0\u614B")).setDesc(diagnostic.installed ? t("\u5DF2\u627E\u5230 Codex CLI\uFF1A{0}", diagnostic.executable) : t("\u672A\u627E\u5230 Codex CLI\u3002\u8ACB\u5148\u5B89\u88DD Codex CLI \u4E26\u4EE5 ChatGPT \u767B\u5165\uFF1BVAM \u4E0D\u6703\u81EA\u52D5\u5B89\u88DD\u7CFB\u7D71\u5957\u4EF6\u3002")).addButton((button) => button.setButtonText(t("\u91CD\u65B0\u6AA2\u67E5")).onClick(() => {
+          void this.plugin.recheckCodex();
         }));
       } }
     ];
@@ -3341,8 +3521,9 @@ var VisualAgentMapSettingTab = class extends import_obsidian5.PluginSettingTab {
   async setControlValue(key, value) {
     const languageChanged = key === "language";
     if (languageChanged) this.plugin.settings.language = value === "en" ? "en" : "zh-TW";
-    else if (typeof value === "string" && (key === "cliPath" || key === "codexAcpPath" || key === "cliModel" || key === "models")) this.plugin.settings[key] = value.trim();
+    else if (typeof value === "string" && (key === "codexPath" || key === "cliModel")) this.plugin.settings[key] = value.trim();
     else return;
+    if (key === "codexPath") this.plugin.resetCodexRuntime();
     setUiLanguage(this.plugin.settings.language);
     await this.plugin.saveSettings();
     if (languageChanged) {
@@ -3360,9 +3541,8 @@ var VisualAgentMapPlugin = class extends import_obsidian5.Plugin {
     __publicField(this, "running", /* @__PURE__ */ new Set());
     __publicField(this, "pendingSuggestions", /* @__PURE__ */ new Map());
     __publicField(this, "logs", debugLog);
-    __publicField(this, "childProcesses", /* @__PURE__ */ new Set());
-    __publicField(this, "acp", null);
-    __publicField(this, "acpConfigIds", { model: "model", reasoning: "" });
+    __publicField(this, "codexRuntime", null);
+    __publicField(this, "settingTab");
     __publicField(this, "detailsLeaf", null);
     __publicField(this, "queue", Promise.resolve());
     __publicField(this, "writing", 0);
@@ -3399,7 +3579,8 @@ var VisualAgentMapPlugin = class extends import_obsidian5.Plugin {
   async onload() {
     var _a, _b;
     const saved = await this.loadData();
-    this.settings = { ...DEFAULT_SETTINGS, language: (saved == null ? void 0 : saved.language) === "en" ? "en" : "zh-TW", workspaceFolder: (saved == null ? void 0 : saved.workspaceFolder) || DEFAULT_SETTINGS.workspaceFolder, topicsFolder: (saved == null ? void 0 : saved.topicsFolder) || DEFAULT_SETTINGS.topicsFolder, inboxFolder: (saved == null ? void 0 : saved.inboxFolder) || DEFAULT_SETTINGS.inboxFolder, notesFolder: (saved == null ? void 0 : saved.notesFolder) || DEFAULT_SETTINGS.notesFolder, mapsFolder: (saved == null ? void 0 : saved.mapsFolder) || DEFAULT_SETTINGS.mapsFolder, mapId: (saved == null ? void 0 : saved.mapId) || "default", cliPath: (saved == null ? void 0 : saved.cliPath) || DEFAULT_SETTINGS.cliPath, codexAcpPath: (saved == null ? void 0 : saved.codexAcpPath) === LEGACY_CODEX_ACP_PATH ? DEFAULT_SETTINGS.codexAcpPath : (saved == null ? void 0 : saved.codexAcpPath) || DEFAULT_SETTINGS.codexAcpPath, cliModel: (saved == null ? void 0 : saved.cliModel) || DEFAULT_SETTINGS.cliModel, cliReasoning: (saved == null ? void 0 : saved.cliReasoning) || DEFAULT_SETTINGS.cliReasoning, previewScale: (saved == null ? void 0 : saved.previewScale) !== void 0 ? clampPreviewScale(saved.previewScale) : legacyPreviewScale(saved == null ? void 0 : saved.previewSize), models: ((saved == null ? void 0 : saved.models) || DEFAULT_SETTINGS.models).split(/[,\n]/).map((item) => item.trim()).filter((item) => item && !item.startsWith("claude:")).join(", ") || DEFAULT_SETTINGS.models, migrated: (saved == null ? void 0 : saved.migrated) === true, structureVersion: (_a = saved == null ? void 0 : saved.structureVersion) != null ? _a : saved ? 1 : DEFAULT_SETTINGS.structureVersion, firstUseNoticeSeen: (saved == null ? void 0 : saved.firstUseNoticeSeen) === true, workspaceInitialized: saved ? saved.workspaceInitialized !== false : false, sampleTourVersionSeen: (_b = saved == null ? void 0 : saved.sampleTourVersionSeen) != null ? _b : 0 };
+    const legacy = saved;
+    this.settings = { ...DEFAULT_SETTINGS, language: (saved == null ? void 0 : saved.language) === "en" ? "en" : "zh-TW", workspaceFolder: (saved == null ? void 0 : saved.workspaceFolder) || DEFAULT_SETTINGS.workspaceFolder, topicsFolder: (saved == null ? void 0 : saved.topicsFolder) || DEFAULT_SETTINGS.topicsFolder, inboxFolder: (saved == null ? void 0 : saved.inboxFolder) || DEFAULT_SETTINGS.inboxFolder, notesFolder: (saved == null ? void 0 : saved.notesFolder) || DEFAULT_SETTINGS.notesFolder, mapsFolder: (saved == null ? void 0 : saved.mapsFolder) || DEFAULT_SETTINGS.mapsFolder, mapId: (saved == null ? void 0 : saved.mapId) || "default", codexPath: (saved == null ? void 0 : saved.codexPath) || (legacy == null ? void 0 : legacy.cliPath) || DEFAULT_SETTINGS.codexPath, cliModel: (saved == null ? void 0 : saved.cliModel) || DEFAULT_SETTINGS.cliModel, cliReasoning: (saved == null ? void 0 : saved.cliReasoning) || DEFAULT_SETTINGS.cliReasoning, previewScale: (saved == null ? void 0 : saved.previewScale) !== void 0 ? clampPreviewScale(saved.previewScale) : legacyPreviewScale(saved == null ? void 0 : saved.previewSize), models: "", migrated: (saved == null ? void 0 : saved.migrated) === true, structureVersion: (_a = saved == null ? void 0 : saved.structureVersion) != null ? _a : saved ? 1 : DEFAULT_SETTINGS.structureVersion, firstUseNoticeSeen: (saved == null ? void 0 : saved.firstUseNoticeSeen) === true, workspaceInitialized: saved ? saved.workspaceInitialized !== false : false, sampleTourVersionSeen: (_b = saved == null ? void 0 : saved.sampleTourVersionSeen) != null ? _b : 0 };
     setUiLanguage(this.settings.language);
     this.logs.appendLog("info", `Visual Agent Map ${this.manifest.version || "unknown"} \u8F09\u5165`);
     this.repo = new Repository(this.app, this.settings);
@@ -3464,7 +3645,8 @@ var VisualAgentMapPlugin = class extends import_obsidian5.Plugin {
       void this.offerWorkspaceReconnect();
     } });
     this.addCommand({ id: "open-debug-log", name: t("\u958B\u555F\u5075\u932F\u65E5\u8A8C (Open Debug Log)"), callback: () => new DebugLogModal(this.app, this.logs).open() });
-    this.addSettingTab(new VisualAgentMapSettingTab(this.app, this));
+    this.settingTab = new VisualAgentMapSettingTab(this.app, this);
+    this.addSettingTab(this.settingTab);
     this.registerEvent(this.app.workspace.on("file-menu", (menu, file) => {
       if (file instanceof import_obsidian5.TFile && this.isMap(file)) menu.addItem((item) => item.setTitle(t("\u4EE5\u5FC3\u667A\u5716\u958B\u555F")).setIcon("git-fork").onClick(() => {
         void this.activateView(file.path);
@@ -3485,11 +3667,11 @@ var VisualAgentMapPlugin = class extends import_obsidian5.Plugin {
         if (this.workspaceRecoveryCandidates.length) await this.offerWorkspaceReconnect(this.workspaceRecoveryCandidates);
         else if (this.firstInstallSamplePending) await this.activateBuiltInSample();
         try {
-          await this.refreshCodexAcpModels();
+          await this.refreshCodexModels();
         } catch (error) {
           const message = error instanceof Error ? error.message : String(error);
-          this.logs.appendLog("warn", `Codex ACP \u5C1A\u672A\u5C31\u7DD2\uFF1A${message}`);
-          new import_obsidian5.Notice(t("Codex ACP \u5C1A\u672A\u5C31\u7DD2\uFF1BSample \u8207\u975E AI \u529F\u80FD\u4ECD\u53EF\u4F7F\u7528\u3002\u8ACB\u5230 VAM Settings \u67E5\u770B\u4E26\u91CD\u65B0\u6AA2\u67E5\u3002"));
+          this.logs.appendLog("warn", `Codex App Server \u5C1A\u672A\u5C31\u7DD2\uFF1A${message}`);
+          new import_obsidian5.Notice(t("Codex App Server \u5C1A\u672A\u5C31\u7DD2\uFF1BSample \u8207\u975E AI \u529F\u80FD\u4ECD\u53EF\u4F7F\u7528\u3002\u8ACB\u5230 VAM Settings \u67E5\u770B\u4E26\u91CD\u65B0\u6AA2\u67E5\u3002"));
         }
       }).catch((error) => {
         this.logs.appendLog("warn", `\u521D\u59CB\u5316\u672A\u5B8C\u6210\uFF1A${error instanceof Error ? error.message : String(error)}`);
@@ -3558,23 +3740,26 @@ var VisualAgentMapPlugin = class extends import_obsidian5.Plugin {
       new import_obsidian5.Notice(t("\u5DF2\u91CD\u65B0\u9023\u7D50 Workspace\uFF1A{0}", root));
     }) }))).open();
   }
-  codexAcpDiagnostic() {
-    const executable = this.resolveExecutable(this.settings.codexAcpPath);
+  codexDiagnostic() {
+    const executable = this.resolveExecutable(this.settings.codexPath);
     return { executable, installed: (0, import_node_fs.existsSync)(executable) };
   }
-  async recheckCodexAcp() {
-    const diagnostic = this.codexAcpDiagnostic();
+  resetCodexRuntime() {
+    var _a;
+    (_a = this.codexRuntime) == null ? void 0 : _a.stop();
+    this.codexRuntime = null;
+  }
+  async recheckCodex() {
+    const diagnostic = this.codexDiagnostic();
     if (!diagnostic.installed) {
-      new import_obsidian5.Notice(t("\u672A\u627E\u5230 Codex ACP\uFF1A{0}", diagnostic.executable));
+      new import_obsidian5.Notice(t("\u672A\u627E\u5230 Codex CLI\uFF1A{0}", diagnostic.executable));
       return;
     }
     try {
-      const adapter = this.app.vault.adapter;
-      if (!(adapter instanceof import_obsidian5.FileSystemAdapter) || !this.manifest.dir) throw new Error(t("CLI \u6A21\u5F0F\u53EA\u652F\u63F4\u684C\u9762\u7248 Obsidian"));
-      await this.ensureAcpProcess((0, import_node_path.join)(adapter.getBasePath(), this.manifest.dir));
-      new import_obsidian5.Notice(t("Codex ACP \u5DF2\u5C31\u7DD2\uFF1A{0}", diagnostic.executable));
+      await this.refreshCodexModels();
+      new import_obsidian5.Notice(t("Codex App Server \u5DF2\u5C31\u7DD2\uFF1A{0}", diagnostic.executable));
     } catch (error) {
-      new import_obsidian5.Notice(t("Codex ACP \u6AA2\u67E5\u5931\u6557\uFF1A{0}", this.recordFailure("Codex ACP \u91CD\u65B0\u6AA2\u67E5\u5931\u6557", error)));
+      new import_obsidian5.Notice(t("Codex App Server \u6AA2\u67E5\u5931\u6557\uFF1A{0}", this.recordFailure("Codex App Server \u91CD\u65B0\u6AA2\u67E5\u5931\u6557", error)));
     }
   }
   async duplicateBuiltInSample() {
@@ -3631,12 +3816,9 @@ var VisualAgentMapPlugin = class extends import_obsidian5.Plugin {
     leaf.view.containerEl.toggleClass("vam-topic-markdown", !!leaf.view.file && this.isNode(leaf.view.file));
   }
   onunload() {
-    if (this.acp) {
-      this.acp.child.kill();
-      this.acp = null;
-    }
-    for (const child of this.childProcesses) child.kill();
-    this.childProcesses.clear();
+    var _a;
+    (_a = this.codexRuntime) == null ? void 0 : _a.stop();
+    this.codexRuntime = null;
   }
   async saveSettings() {
     await this.saveData(this.settings);
@@ -3691,11 +3873,16 @@ var VisualAgentMapPlugin = class extends import_obsidian5.Plugin {
     if (forceTour && leaf.view instanceof VisualAgentMapView) await leaf.view.openBuiltInSample(true);
     await this.app.workspace.revealLeaf(leaf);
   }
-  async refreshCodexAcpModels() {
+  async refreshCodexModels() {
+    var _a, _b, _c, _d;
     const adapter = this.app.vault.adapter;
     if (!(adapter instanceof import_obsidian5.FileSystemAdapter) || !this.manifest.dir) return;
     const pluginDirectory = (0, import_node_path.join)(adapter.getBasePath(), this.manifest.dir);
-    await this.ensureAcpProcess(pluginDirectory);
+    const models = await this.runtime(pluginDirectory).listModels();
+    this.settings.models = models.map((item) => item.model).join(", ");
+    if (!models.some((item) => item.model === this.settings.cliModel)) this.settings.cliModel = ((_a = models.find((item) => item.model === DEFAULT_SETTINGS.cliModel)) == null ? void 0 : _a.model) || ((_b = models.find((item) => item.isDefault)) == null ? void 0 : _b.model) || ((_c = models[0]) == null ? void 0 : _c.model) || "";
+    await this.saveSettings();
+    (_d = this.settingTab) == null ? void 0 : _d.update();
     for (const view of this.views()) await view.refreshFromPlugin();
   }
   async askModel(context, model) {
@@ -3707,7 +3894,6 @@ var VisualAgentMapPlugin = class extends import_obsidian5.Plugin {
     const prepared = buildPreparedTaskContext(context, model);
     context = prepared.context;
     const pluginDirectory = (0, import_node_path.join)(adapter.getBasePath(), this.manifest.dir);
-    const schemaPath = ensureResponseSchema((0, import_node_path.join)(pluginDirectory, "response-schema.json"));
     const instructions = [
       "\u4F60\u662F\u8996\u89BA\u5316\u601D\u8003 Agent\u3002\u4E0D\u8981\u4FEE\u6539\u4EFB\u4F55\u6A94\u6848\uFF1B\u9664\u975E\u4EFB\u52D9\u660E\u78BA\u6307\u5B9A\uFF0C\u5426\u5247\u4E0D\u8981\u8B80\u53D6\u672C\u6A5F\u6A94\u6848\u3002",
       '\u53EA\u56DE\u50B3 JSON\uFF0C\u4E0D\u8981\u4F7F\u7528 Markdown code fence\u3002\u683C\u5F0F\u5FC5\u9808\u7B26\u5408\uFF1A{"summary":"...","detail":"...","suggestions":[{"title":"...","task":"...","contribution":"..."}],"visualReferences":[{"title":"...","imageUrl":"https://...","sourceUrl":"https://...","description":"...","palette":["navy","white"],"formula":"..."}]}\u3002\u82E5\u6C92\u6709\u8996\u89BA\u53C3\u8003\uFF0CvisualReferences \u56DE\u50B3\u7A7A\u9663\u5217\u3002',
@@ -3734,21 +3920,11 @@ ${context.task}`
     ].join("\n\n");
     console.debug("Visual Agent Map AI metrics", prepared.metrics);
     const providerStarted = Date.now();
-    try {
-      const result = await this.askCodexAcp(instructions, model, pluginDirectory);
-      console.debug("Visual Agent Map AI metrics", { ...prepared.metrics, providerMs: Date.now() - providerStarted, totalMs: Date.now() - totalStarted });
-      return result;
-    } catch (error) {
-      if (!(error instanceof AcpTransportError)) throw error;
-      this.logs.appendLog("warn", `Codex ACP transport failure\uFF0C\u6539\u7528 Codex CLI fallback\uFF1A${error.message}`);
-      console.warn("Visual Agent Map Codex ACP transport failed before prompting; falling back to Codex CLI", error);
-      try {
-        return await this.askCodexExec(instructions, model, pluginDirectory, schemaPath);
-      } catch (fallbackError) {
-        throw new Error(`Codex ACP\uFF1A${error.message}
-Codex CLI fallback\uFF1A${fallbackError instanceof Error ? fallbackError.message : String(fallbackError)}`);
-      }
-    }
+    const effort = context.mode === "synthesize" ? "high" : this.settings.cliReasoning || "low";
+    const raw = await this.runtime(pluginDirectory).runTask(instructions, model, effort, response_schema_default);
+    const result = this.parseAiResult(raw, "Codex App Server");
+    console.debug("Visual Agent Map AI metrics", { ...prepared.metrics, providerMs: Date.now() - providerStarted, totalMs: Date.now() - totalStarted });
+    return result;
   }
   parseAiResult(raw, label) {
     const cleaned = raw.replace(/^```(?:json)?\s*/i, "").replace(/\s*```$/, "").trim();
@@ -3766,69 +3942,17 @@ Codex CLI fallback\uFF1A${fallbackError instanceof Error ? fallbackError.message
     })).filter((item) => /^https?:\/\//i.test(item.imageUrl) && /^https?:\/\//i.test(item.sourceUrl)).slice(0, 6) : [];
     return { summary: Array.from(parsed.summary.trim()).slice(0, 80).join(""), detail: parsed.detail.trim(), suggestions, visualReferences };
   }
-  acpSend(message) {
-    if (!this.acp) throw new Error(t("Codex ACP \u5C1A\u672A\u555F\u52D5"));
-    this.acp.child.stdin.write(`${JSON.stringify(message)}
-`);
-  }
-  acpRequest(method, params, timeoutMs = method === "session/prompt" ? ACP_PROMPT_TIMEOUT_MS : ACP_CONTROL_TIMEOUT_MS) {
-    if (!this.acp) throw new Error(t("Codex ACP \u5C1A\u672A\u555F\u52D5"));
-    const id = this.acp.nextId++;
-    const acp = this.acp;
-    return new Promise((resolve, reject) => {
-      const timeout = window.setTimeout(() => {
-        if (!acp.pending.delete(id)) return;
-        reject(new AcpTimeoutError(method, timeoutMs));
-      }, timeoutMs);
-      acp.pending.set(id, { resolve, reject, timeout });
-      try {
-        this.acpSend({ jsonrpc: "2.0", id, method, params });
-      } catch (error) {
-        window.clearTimeout(timeout);
-        acp.pending.delete(id);
-        reject(error instanceof Error ? error : new Error(String(error)));
-      }
-    });
-  }
-  acpRespond(id, result) {
-    this.acpSend({ jsonrpc: "2.0", id, result });
-  }
-  handleAcpMessage(message) {
-    var _a, _b, _c, _d;
-    if ("id" in message && ("result" in message || "error" in message)) {
-      const entry = (_a = this.acp) == null ? void 0 : _a.pending.get(message.id);
-      if (!entry) return;
-      (_b = this.acp) == null ? void 0 : _b.pending.delete(message.id);
-      window.clearTimeout(entry.timeout);
-      if (message.error) entry.reject(new Error(typeof message.error === "string" ? message.error : message.error.message || t("Codex ACP \u56DE\u50B3\u932F\u8AA4")));
-      else entry.resolve(message.result);
-      return;
+  runtime(pluginDirectory) {
+    if (!this.codexRuntime) {
+      this.codexRuntime = new CodexAppServerRuntime({
+        executable: this.resolveExecutable(this.settings.codexPath),
+        cwd: pluginDirectory,
+        env: this.cliEnvironment(),
+        clientVersion: this.manifest.version || "0.0.0",
+        onLog: (level, message) => this.logs.appendLog(level, message)
+      });
     }
-    if ("method" in message && message.method === "session/update") {
-      const params = message.params;
-      const sessionId = typeof (params == null ? void 0 : params.sessionId) === "string" ? params.sessionId : "";
-      (_d = (_c = this.acp) == null ? void 0 : _c.sessions.get(sessionId)) == null ? void 0 : _d.updates.push(message.params);
-      return;
-    }
-    if ("id" in message && "method" in message) {
-      if (message.method === "session/request_permission") {
-        this.acpRespond(message.id, { outcome: { outcome: "cancelled" } });
-        return;
-      }
-      if (message.method === "terminal/create") {
-        this.acpRespond(message.id, { terminalId: "visual-agent-map-denied" });
-        return;
-      }
-      if (message.method === "terminal/output") {
-        this.acpRespond(message.id, { output: "", truncated: false, exitStatus: { exitCode: 1 } });
-        return;
-      }
-      if (message.method === "terminal/wait_for_exit") {
-        this.acpRespond(message.id, { exitCode: 1 });
-        return;
-      }
-      this.acpRespond(message.id, {});
-    }
+    return this.codexRuntime;
   }
   resolveExecutable(configured) {
     const home = process.env.HOME || "";
@@ -3845,210 +3969,5 @@ Codex CLI fallback\uFF1A${fallbackError instanceof Error ? fallbackError.message
     const home = process.env.HOME || "";
     const paths = [home ? (0, import_node_path.join)(home, ".local/bin") : "", "/opt/homebrew/bin", "/usr/local/bin", "/usr/bin", "/bin", process.env.PATH || ""].filter(Boolean);
     return { ...process.env, PATH: [...new Set(paths)].join(":") };
-  }
-  async ensureAcpProcess(pluginDirectory) {
-    if (!this.acp) {
-      const executable = this.resolveExecutable(this.settings.codexAcpPath);
-      this.logs.appendLog("info", `\u555F\u52D5 Codex ACP\uFF1A${executable}`);
-      const child = (0, import_node_child_process.spawn)(executable, [], { cwd: pluginDirectory, env: this.cliEnvironment(), stdio: ["pipe", "pipe", "pipe"] });
-      this.childProcesses.add(child);
-      this.acp = { child, buffer: "", nextId: 1, pending: /* @__PURE__ */ new Map(), sessions: /* @__PURE__ */ new Map(), initializing: Promise.resolve() };
-      let stderr = "";
-      child.stdout.on("data", (chunk) => {
-        var _a, _b, _c;
-        if (!this.acp || this.acp.child !== child) return;
-        this.acp.buffer += chunk.toString("utf8");
-        while (true) {
-          const newline = this.acp.buffer.indexOf("\n");
-          if (newline === -1) return;
-          const line = this.acp.buffer.slice(0, newline).trim();
-          this.acp.buffer = this.acp.buffer.slice(newline + 1);
-          if (line) {
-            try {
-              this.handleAcpMessage(JSON.parse(line));
-            } catch (error) {
-              const message = this.recordFailure("Codex ACP \u56DE\u61C9\u7121\u6CD5\u89E3\u6790", error);
-              for (const entry of (_b = (_a = this.acp) == null ? void 0 : _a.pending.values()) != null ? _b : []) {
-                window.clearTimeout(entry.timeout);
-                entry.reject(new AcpTransportError(message));
-              }
-              (_c = this.acp) == null ? void 0 : _c.pending.clear();
-            }
-          }
-        }
-      });
-      child.stderr.on("data", (chunk) => {
-        stderr += chunk.toString();
-      });
-      child.on("error", (error) => {
-        var _a, _b, _c;
-        this.logs.appendLog("error", `\u7121\u6CD5\u555F\u52D5 Codex ACP\uFF08${executable}\uFF09\uFF1A${error.message}`);
-        for (const entry of (_b = (_a = this.acp) == null ? void 0 : _a.pending.values()) != null ? _b : []) {
-          window.clearTimeout(entry.timeout);
-          entry.reject(new AcpTransportError(`\u7121\u6CD5\u555F\u52D5 Codex ACP\uFF08${executable}\uFF09\uFF1A${error.message}`));
-        }
-        this.childProcesses.delete(child);
-        if (((_c = this.acp) == null ? void 0 : _c.child) === child) this.acp = null;
-      });
-      child.on("close", (code) => {
-        var _a, _b, _c;
-        if (code !== 0) this.logs.appendLog("error", stderr.trim() || `Codex ACP \u7D50\u675F\u78BC\uFF1A${code != null ? code : "\u672A\u77E5"}`);
-        for (const entry of (_b = (_a = this.acp) == null ? void 0 : _a.pending.values()) != null ? _b : []) {
-          window.clearTimeout(entry.timeout);
-          entry.reject(new AcpTransportError(stderr.trim() || `Codex ACP \u7D50\u675F\u78BC\uFF1A${code != null ? code : "\u672A\u77E5"}`));
-        }
-        this.childProcesses.delete(child);
-        if (((_c = this.acp) == null ? void 0 : _c.child) === child) this.acp = null;
-      });
-      this.acp.initializing = this.acpRequest("initialize", { protocolVersion: 1, clientCapabilities: { fs: { readTextFile: false, writeTextFile: false }, terminal: false }, clientInfo: { name: "visual-agent-map", version: this.manifest.version || "0.0.0" } }).then(() => {
-        this.logs.appendLog("info", `Codex ACP \u5DF2\u5C31\u7DD2\uFF1A${executable}`);
-      }).catch((error) => {
-        this.recordFailure("Codex ACP \u521D\u59CB\u5316\u5931\u6557", error);
-        throw error;
-      });
-    }
-    try {
-      await this.acp.initializing;
-    } catch (error) {
-      throw error instanceof AcpTransportError ? error : new AcpTransportError(error instanceof Error ? error.message : String(error));
-    }
-  }
-  codexModelsFromConfig(configOptions) {
-    if (!Array.isArray(configOptions)) return [];
-    const option = configOptions.find((item) => {
-      const record = item;
-      return record.id === "model" || record.category === "model";
-    });
-    if (!Array.isArray(option == null ? void 0 : option.options)) return [];
-    const flatten = (items) => items.flatMap((item) => {
-      const record = item;
-      if (Array.isArray(record.options)) return flatten(record.options);
-      return typeof record.value === "string" ? [record.value] : [];
-    });
-    return flatten(option.options);
-  }
-  codexConfigIds(configOptions) {
-    if (!Array.isArray(configOptions)) return { model: "model", reasoning: "" };
-    const findId = (matches) => {
-      const option = configOptions.find((item) => {
-        const record = item;
-        return matches.includes(String(record.id)) || matches.includes(String(record.category));
-      });
-      return typeof (option == null ? void 0 : option.id) === "string" ? option.id : "";
-    };
-    return { model: findId(["model"]) || "model", reasoning: findId(["reasoning", "reasoning-effort", "model_reasoning_effort"]) };
-  }
-  acpChunkText(value) {
-    if (typeof value === "string") return value;
-    if (Array.isArray(value)) return value.map((item) => this.acpChunkText(item)).join("");
-    if (!value || typeof value !== "object") return "";
-    const record = value;
-    return this.acpChunkText(record.text) || this.acpChunkText(record.content);
-  }
-  acpText(sessionId) {
-    var _a, _b, _c;
-    return ((_c = (_b = (_a = this.acp) == null ? void 0 : _a.sessions.get(sessionId)) == null ? void 0 : _b.updates) != null ? _c : []).map((item) => item.update).filter((update) => (update == null ? void 0 : update.sessionUpdate) === "agent_message_chunk" || (update == null ? void 0 : update.type) === "agent_message_chunk").map((update) => this.acpChunkText(update == null ? void 0 : update.text) || this.acpChunkText(update == null ? void 0 : update.content)).join("");
-  }
-  async askCodexAcp(prompt, model, pluginDirectory) {
-    var _a, _b;
-    await this.ensureAcpProcess(pluginDirectory);
-    let session;
-    try {
-      session = await this.acpRequest("session/new", { cwd: pluginDirectory, mcpServers: [] });
-    } catch (error) {
-      throw error instanceof AcpTransportError ? error : new AcpSessionError(error instanceof Error ? error.message : String(error));
-    }
-    if (!session.sessionId) throw new AcpSessionError(t("Codex ACP \u6C92\u6709\u5EFA\u7ACB session"));
-    const sessionId = session.sessionId;
-    (_a = this.acp) == null ? void 0 : _a.sessions.set(sessionId, { updates: [] });
-    this.acpConfigIds = this.codexConfigIds(session.configOptions);
-    const acpModels = this.codexModelsFromConfig(session.configOptions);
-    if (acpModels.length) {
-      const merged = Array.from(/* @__PURE__ */ new Set([...acpModels, ...this.settings.models.split(/[\n,]/).map((item) => item.trim()).filter(Boolean)]));
-      const next = merged.join(", ");
-      if (next !== this.settings.models) {
-        this.settings.models = next;
-        await this.saveSettings();
-      }
-    }
-    try {
-      const modelOption = model.trim();
-      if (modelOption) await this.acpRequest("session/set_config_option", { sessionId, configId: this.acpConfigIds.model, value: modelOption }).catch((error) => {
-        throw error instanceof AcpTransportError ? error : new AcpModelError(error instanceof Error ? error.message : String(error));
-      });
-      const modeLine = prompt.includes("\u9019\u662F Synthesize \u6A21\u5F0F") ? "high" : "low";
-      if (this.acpConfigIds.reasoning) await this.acpRequest("session/set_config_option", { sessionId, configId: this.acpConfigIds.reasoning, value: modeLine }).catch(() => void 0);
-      const response = await this.acpRequest("session/prompt", { sessionId, prompt: [{ type: "text", text: prompt }] });
-      if (response.usage) console.debug("Visual Agent Map ACP usage", { sessionId, usage: response.usage, estimated: false });
-      else console.debug("Visual Agent Map ACP usage", { sessionId, estimatedInputTokens: estimateTokens(prompt), estimated: true });
-      try {
-        return this.parseAiResult(this.acpText(sessionId).trim(), "Codex ACP");
-      } catch (error) {
-        throw new AcpParseError(error instanceof Error ? error.message : String(error));
-      }
-    } finally {
-      (_b = this.acp) == null ? void 0 : _b.sessions.delete(sessionId);
-    }
-  }
-  async askCodexExec(instructions, model, pluginDirectory, schemaPath) {
-    const args = [
-      "exec",
-      "--skip-git-repo-check",
-      "--ephemeral",
-      "--sandbox",
-      "read-only",
-      "--color",
-      "never",
-      "--output-schema",
-      schemaPath,
-      "-C",
-      pluginDirectory
-    ];
-    if (model) args.push("--model", model);
-    args.push("--config", `model_reasoning_effort=${this.settings.cliReasoning || "low"}`);
-    args.push("-");
-    return new Promise((resolve, reject) => {
-      const executable = this.resolveExecutable(this.settings.cliPath);
-      const child = (0, import_node_child_process.spawn)(executable, args, {
-        cwd: pluginDirectory,
-        env: this.cliEnvironment(),
-        stdio: ["pipe", "pipe", "pipe"]
-      });
-      this.childProcesses.add(child);
-      let stdout = "";
-      let stderr = "";
-      const outputLimit = 5 * 1024 * 1024;
-      const timeout = window.setTimeout(() => {
-        child.kill();
-        reject(new Error(t("Codex CLI \u57F7\u884C\u8D85\u904E 15 \u5206\u9418")));
-      }, 15 * 60 * 1e3);
-      child.stdout.on("data", (chunk) => {
-        stdout += chunk.toString();
-        if (stdout.length > outputLimit) child.kill();
-      });
-      child.stderr.on("data", (chunk) => {
-        stderr += chunk.toString();
-        if (stderr.length > outputLimit) child.kill();
-      });
-      child.on("error", (error) => {
-        window.clearTimeout(timeout);
-        this.childProcesses.delete(child);
-        reject(new Error(`\u7121\u6CD5\u555F\u52D5 Codex CLI\uFF08${executable}\uFF09\uFF1A${error.message}`));
-      });
-      child.on("close", (code) => {
-        window.clearTimeout(timeout);
-        this.childProcesses.delete(child);
-        if (code !== 0) {
-          reject(new Error(stderr.trim() || `Codex CLI \u7D50\u675F\u78BC\uFF1A${code != null ? code : "\u672A\u77E5"}`));
-          return;
-        }
-        try {
-          resolve(this.parseAiResult(stdout, "Codex CLI"));
-        } catch (error) {
-          reject(error instanceof Error ? error : new Error(String(error)));
-        }
-      });
-      child.stdin.end(instructions);
-    });
   }
 };

@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.6.2] - 2026-09-20
+
+### Changed
+
+- Replaced the separate ACP transport and CLI fallback with the Codex CLI App Server protocol.
+- New workspaces default to the lowest-cost configured product model, `gpt-5.6-luna`, with low reasoning; available models are discovered from the signed-in Codex installation.
+
+### Fixed
+
+- App Server tasks now unsubscribe ephemeral threads, decline unsupported interactive requests instead of hanging, and ignore stale child-process events after restart.
+- Resolved the remaining Obsidian review warnings for destructive buttons and over-broad CSS overrides.
+
 ## [0.6.1] - 2026-09-19
 
 ### Fixed

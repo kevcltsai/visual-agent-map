@@ -12,7 +12,7 @@ Complete the installation end to end:
    - `styles.css`
    Use the assets attached to that exact release tag, not raw GitHub file URLs.
 6. Do not clone the whole repository into the plugin directory, do not copy internal project documents, and do not run `npm install` in the vault.
-7. Verify that Node.js and the Codex CLI are installed and that Codex is signed in. If `codex-acp` is missing, stop and ask before installing a version compatible with the selected release.
-8. Tell me the resolved `codex-acp` path shown in Visual Agent Map settings. Visual Agent Map supports Codex models only.
+7. Verify that Node.js and the Codex CLI are installed and that Codex is signed in with ChatGPT. Do not install or update Codex CLI without asking first.
+8. Tell me the resolved Codex CLI path and App Server status shown in Visual Agent Map settings. Visual Agent Map supports Codex models only.
 9. Ask me to reload Obsidian and enable Visual Agent Map under Community plugins. Do not change Obsidian's restricted-mode or security settings without my confirmation.
 10. Verify the three installed plugin files, confirm that any existing `data.json` and `Agent Workspace/` were preserved, and report every command run plus the final paths. If a step fails, stop and report the error instead of claiming success.

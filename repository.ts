@@ -32,8 +32,7 @@ export interface Settings {
   notesFolder: string;
   mapsFolder: string;
   mapId: string;
-  cliPath: string;
-  codexAcpPath: string;
+  codexPath: string;
   cliModel: string;
   cliReasoning: string;
   previewSize?: "small" | "medium" | "large";
@@ -60,12 +59,11 @@ export const DEFAULT_SETTINGS: Settings = {
   notesFolder: "Agent Workspace/Nodes",
   mapsFolder: "Agent Workspace/Maps",
   mapId: "default",
-  cliPath: "codex",
-  codexAcpPath: "codex-acp",
+  codexPath: "codex",
   cliModel: "gpt-5.6-luna",
   cliReasoning: "low",
   previewScale: 120,
-  models: "gpt-6-astra, gpt-5.6-sol, gpt-5.6-terra, gpt-5.6-luna, gpt-5.5",
+  models: "",
   migrated: false,
   structureVersion: 2,
   firstUseNoticeSeen: false,

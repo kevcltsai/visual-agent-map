@@ -56,31 +56,22 @@ test('model inheritance distinguishes CLI default from absent parent and copies 
 test('workspace defaults to the configured low-cost model and low reasoning', () => {
   assert.equal(DEFAULT_SETTINGS.cliModel, 'gpt-5.6-luna');
   assert.equal(DEFAULT_SETTINGS.cliReasoning, 'low');
-  assert.equal(DEFAULT_SETTINGS.codexAcpPath, 'codex-acp');
+  assert.equal(DEFAULT_SETTINGS.codexPath, 'codex');
   assert.equal(DEFAULT_SETTINGS.firstUseNoticeSeen, false);
   assert.equal(DEFAULT_SETTINGS.workspaceInitialized, false);
   assert.equal(DEFAULT_SETTINGS.sampleTourVersionSeen, 0);
   assert.doesNotMatch(DEFAULT_SETTINGS.models, /claude:/);
 });
-test('macOS executable discovery covers Homebrew, local npm, Volta, fnm, nvm and inherited PATH', () => {
+test('Codex executable discovery covers Homebrew, local npm, Volta, fnm, nvm and inherited PATH', () => {
   const { executableCandidates } = load('main.ts', { obsidian });
-  const candidates = executableCandidates('codex-acp', '/Users/friend', '/custom/npm/bin:/usr/bin', ['v20.18.0']);
+  const candidates = executableCandidates('codex', '/Users/friend', '/custom/npm/bin:/usr/bin', ['v20.18.0']);
   for (const path of [
-    '/Users/friend/.local/bin/codex-acp', '/Users/friend/.npm-global/bin/codex-acp',
-    '/Users/friend/.volta/bin/codex-acp', '/Users/friend/.fnm/current/bin/codex-acp',
-    '/opt/homebrew/bin/codex-acp', '/usr/local/bin/codex-acp',
-    '/Users/friend/.nvm/versions/node/v20.18.0/bin/codex-acp', '/custom/npm/bin/codex-acp'
+    '/Users/friend/.local/bin/codex', '/Users/friend/.npm-global/bin/codex',
+    '/Users/friend/.volta/bin/codex', '/Users/friend/.fnm/current/bin/codex',
+    '/opt/homebrew/bin/codex', '/usr/local/bin/codex',
+    '/Users/friend/.nvm/versions/node/v20.18.0/bin/codex', '/custom/npm/bin/codex'
   ]) assert.ok(candidates.includes(path), path);
-  assert.deepEqual(Array.from(executableCandidates('/exact/codex-acp', '/Users/friend', '', [])), ['/exact/codex-acp']);
-});
-test('standard three-file installation materializes the embedded Codex output schema on demand', t => {
-  const folder = fs.mkdtempSync(path.join(require('node:os').tmpdir(), 'vam-schema-'));
-  t.after(() => fs.rmSync(folder, { recursive: true, force: true }));
-  const schemaPath = path.join(folder, 'response-schema.json');
-  const { ensureResponseSchema } = load('main.ts', { obsidian });
-  assert.equal(ensureResponseSchema(schemaPath), schemaPath);
-  const schema = JSON.parse(fs.readFileSync(schemaPath, 'utf8'));
-  assert.deepEqual(Array.from(schema.required), ['summary', 'detail', 'suggestions', 'visualReferences']);
+  assert.deepEqual(Array.from(executableCandidates('/exact/codex', '/Users/friend', '', [])), ['/exact/codex']);
 });
 test('built-in Taiwan sample is bilingual, read-only source data with exploration and synthesis roots', () => {
   const sample = load('builtin-sample.ts');
@@ -127,11 +118,11 @@ test('undo and redo preserve ordering; new edit invalidates redo', () => {
 test('debug log manager timestamps, bounds, formats and clears in-memory entries', () => {
   const logs = new logging.LogManager(2);
   let changes = 0; const unsubscribe = logs.subscribe(() => changes++);
-  logs.appendLog('debug', 'discarded'); logs.appendLog('info', 'ACP started'); logs.appendLog('error', 'ACP failed');
+  logs.appendLog('debug', 'discarded'); logs.appendLog('info', 'runtime started'); logs.appendLog('error', 'runtime failed');
   const entries = logs.getLogs();
-  assert.equal(entries.length, 2); assert.equal(entries[0].message, 'ACP started'); assert.match(entries[0].timestamp, /^\d{4}-\d{2}-\d{2}T/);
-  assert.match(logging.formatDebugLogs(entries), /\[INFO\] ACP started/); assert.match(logging.formatDebugLogs(entries), /\[ERROR\] ACP failed/);
-  entries[0].message = 'changed outside'; assert.equal(logs.getLogs()[0].message, 'ACP started');
+  assert.equal(entries.length, 2); assert.equal(entries[0].message, 'runtime started'); assert.match(entries[0].timestamp, /^\d{4}-\d{2}-\d{2}T/);
+  assert.match(logging.formatDebugLogs(entries), /\[INFO\] runtime started/); assert.match(logging.formatDebugLogs(entries), /\[ERROR\] runtime failed/);
+  entries[0].message = 'changed outside'; assert.equal(logs.getLogs()[0].message, 'runtime started');
   logs.clear(); assert.equal(logs.getLogs().length, 0); assert.equal(changes, 4);
   unsubscribe(); logs.appendLog('info', 'ignored by listener'); assert.equal(changes, 4);
 });
@@ -142,8 +133,8 @@ test('debug log command opens the custom modal and exposes copy and clear action
   assert.match(modal, /navigator\.clipboard\.writeText/); assert.match(modal, /this\.logs\.clear\(\)/);
   assert.match(modal, /更新日誌/);
   assert.match(modal, /this\.logs\.subscribe/);
-  assert.match(source, /Codex ACP 初始化失敗/);
-  assert.match(source, /Codex ACP 已就緒/);
+  assert.match(source, /Codex App Server 尚未就緒/);
+  assert.match(source, /Codex App Server 已就緒/);
   assert.match(source, /AI 任務失敗/);
 });
 class TFolder { constructor(path) { this.path = path; this.name = path.split('/').at(-1); this.children = []; this.parent = null; } }
@@ -431,14 +422,15 @@ test('onboarding uses an embedded sample and explicit workspace repair without a
   assert.match(source, /if \(!this\.workspaceRecoveryCandidates\.length\) \{ await this\.repo\.ensureWorkspace\(\)/);
   assert.match(source, /id: "reconnect-workspace"/);
 });
-test('Obsidian 1.13 declarative settings expose workspace recovery and ACP diagnostics', () => {
+test('Obsidian 1.13 declarative settings expose workspace recovery and App Server diagnostics', () => {
   const source = fs.readFileSync(path.join(root, 'main.ts'), 'utf8');
   const definitions = source.slice(source.indexOf('getSettingDefinitions()'), source.indexOf('async setControlValue'));
   assert.match(definitions, /Workspace 位置/);
   assert.match(definitions, /修復 Agent Workspace/);
   assert.match(definitions, /找回既有 Workspace/);
-  assert.match(definitions, /Codex ACP 狀態/);
+  assert.match(definitions, /Codex App Server 狀態/);
   assert.match(definitions, /重新檢查/);
+  assert.match(source, /this\.settingTab\?\.update\(\)/);
 });
 test('generated child filenames are migrated to their topic titles and maps stay linked', async () => {
   const { repo, app } = fixture(), mapPath = await repo.createMap('Filename migration'), mapDoc = await repo.readMap(mapPath);
@@ -551,33 +543,89 @@ test('layout-only map changes and AI note results do not rebuild derived data', 
   await view.mapChange(map => { map.nodes[0].x = 120; map.viewport.zoom = 1.2; }); assert.equal(rebuilds, 0);
   await view.mapChange(map => { map.nodes[0].parentId = 'd'; }); assert.equal(rebuilds, 1);
 });
-test('Codex ACP isolates each task session, receives selected models and routes updates by session', async () => {
-  const { EventEmitter } = require('node:events'); let command, modelSetCount = 0, promptCount = 0, sessionCount = 0;
+test('Codex App Server uses model/list and cleans up fresh ephemeral threads for concurrent tasks', async () => {
+  const { EventEmitter } = require('node:events'); let command, args, turnCount = 0, threadCount = 0, unsubscribeCount = 0;
   const child = new EventEmitter(); child.stdout = new EventEmitter(); child.stderr = new EventEmitter(); child.kill = () => {};
   child.stdin = { write: line => {
     const message = JSON.parse(line.trim());
-    const reply = result => process.nextTick(() => child.stdout.emit('data', Buffer.from(`${JSON.stringify({ jsonrpc: '2.0', id: message.id, result })}\n`)));
+    const reply = result => process.nextTick(() => child.stdout.emit('data', Buffer.from(`${JSON.stringify({ id: message.id, result })}\n`)));
     if (message.method === 'initialize') reply({});
-    else if (message.method === 'session/new') reply({ sessionId: `s${++sessionCount}`, configOptions: [{ id: 'model', category: 'model', options: [{ value: 'child-model' }, { value: 'second-model' }, { value: 'gpt-5.6-luna' }] }, { id: 'reasoning-effort', category: 'reasoning', options: [{ value: 'low' }] }] });
-    else if (message.method === 'session/set_config_option') { if (message.params.configId === 'model') { modelSetCount++; assert.match(message.params.value, /^(child-model|second-model)$/); } reply({}); }
-    else if (message.method === 'session/prompt') { promptCount++; const prompt = message.params.prompt[0].text; assert.match(prompt, /Current topic|目前議題/); assert.match(prompt, /Use official sources/); assert.match(prompt, /AI 規則/); assert.match(prompt, /一般任務/); assert.match(prompt, /task/); const sessionId = message.params.sessionId; process.nextTick(() => { child.stdout.emit('data', Buffer.from(`${JSON.stringify({ jsonrpc: '2.0', method: 'session/update', params: { sessionId, update: { sessionUpdate: 'agent_message_chunk', content: { type: 'text', text: JSON.stringify({ summary: sessionId === 's1' ? 'first' : 'second', detail: 'detail', suggestions: [] }) } } } })}\n`)); child.stdout.emit('data', Buffer.from(`${JSON.stringify({ jsonrpc: '2.0', id: message.id, result: {} })}\n`)); }); }
+    else if (message.method === 'model/list') reply({ data: [
+      { id: 'visible', model: 'visible-model', displayName: 'Visible', hidden: false, supportedReasoningEfforts: [{ reasoningEffort: 'low' }], defaultReasoningEffort: 'low', isDefault: true },
+      { id: 'hidden', model: 'hidden-model', displayName: 'Hidden', hidden: true, supportedReasoningEfforts: [{ reasoningEffort: 'low' }], defaultReasoningEffort: 'low', isDefault: false },
+      { id: 'internal', model: 'internal-model', displayName: '', hidden: false, supportedReasoningEfforts: [], defaultReasoningEffort: 'low', isDefault: false }
+    ], nextCursor: null });
+    else if (message.method === 'thread/start') { assert.equal(message.params.ephemeral, true); assert.equal(message.params.sandbox, 'read-only'); reply({ thread: { id: `thread-${++threadCount}` } }); }
+    else if (message.method === 'thread/unsubscribe') { unsubscribeCount++; reply({}); }
+    else if (message.method === 'turn/start') {
+      turnCount++; assert.ok(message.params.outputSchema.properties.summary); assert.match(message.params.input[0].text, /目前議題/);
+      const threadId = message.params.threadId, summary = threadId === 'thread-1' ? 'first' : 'second';
+      process.nextTick(() => {
+        child.stdout.emit('data', Buffer.from(`${JSON.stringify({ id: message.id, result: { turn: { id: `turn-${turnCount}` } } })}\n`));
+        child.stdout.emit('data', Buffer.from(`${JSON.stringify({ method: 'item/completed', params: { threadId, turnId: `turn-${turnCount}`, item: { type: 'agentMessage', text: JSON.stringify({ summary, detail: 'detail', suggestions: [], visualReferences: [] }) } } })}\n`));
+        child.stdout.emit('data', Buffer.from(`${JSON.stringify({ method: 'turn/completed', params: { threadId, turn: { status: 'completed' } } })}\n`));
+      });
+    }
   } };
-  const { default: Plugin } = load('main.ts', { obsidian, 'node:fs': { existsSync: () => false, readdirSync: () => [], writeFileSync: () => {} }, 'node:child_process': { spawn: (path) => { command = path; return child; } } });
-  const plugin = new Plugin(); plugin.app = { vault: { adapter: new obsidian.FileSystemAdapter() } }; plugin.manifest = { dir: '.obsidian/plugins/visual-agent-map' };
+  const { default: Plugin } = load('main.ts', { obsidian, 'node:fs': { existsSync: () => false, readdirSync: () => [] }, 'node:child_process': { spawn: (path, invocation) => { command = path; args = invocation; return child; } } });
+  const plugin = new Plugin(); plugin.app = { vault: { adapter: new obsidian.FileSystemAdapter() }, workspace: { getLeavesOfType: () => [] } }; plugin.manifest = { dir: '.obsidian/plugins/visual-agent-map' };
   plugin.saveData = async data => { plugin.saved = data; };
+  await plugin.refreshCodexModels();
   const [result, second] = await Promise.all([
-    plugin.askModel({ title: 'Current topic', summary: 'current summary', rules: 'Use official sources', task: 'task', ancestors: 'context', mode: 'task' }, 'child-model'),
-    plugin.askModel({ title: 'Current topic', summary: 'current summary', rules: 'Use official sources', task: 'task', ancestors: 'context', mode: 'task' }, 'second-model')
+    plugin.askModel({ title: 'Current topic', summary: 'current summary', rules: 'Use official sources', task: 'task', ancestors: 'context', mode: 'task' }, 'visible-model'),
+    plugin.askModel({ title: 'Current topic', summary: 'current summary', rules: 'Use official sources', task: 'task', ancestors: 'context', mode: 'task' }, 'visible-model')
   ]);
-  assert.equal(command, DEFAULT_SETTINGS.codexAcpPath);
-  assert.equal(modelSetCount, 2);
-  assert.equal(promptCount, 2);
-  assert.match(plugin.settings.models, /child-model/);
+  assert.equal(command, DEFAULT_SETTINGS.codexPath); assert.deepEqual(Array.from(args), ['app-server']);
+  assert.equal(turnCount, 2); assert.equal(threadCount, 2);
+  assert.equal(unsubscribeCount, 2);
+  assert.equal(plugin.settings.models, 'visible-model');
   assert.equal(result.summary, 'first');
   assert.equal(second.summary, 'second');
-  assert.equal(plugin.acp.sessions.size, 0);
-  await assert.rejects(plugin.acpRequest('unresponsive/test', {}, 5), error => error.name === 'AcpTimeoutError');
-  assert.equal(plugin.acp.pending.size, 0);
+});
+test('Codex App Server declines unsupported interaction requests instead of hanging', async () => {
+  const { EventEmitter } = require('node:events'); const sent = [];
+  const child = new EventEmitter(); child.stdout = new EventEmitter(); child.stderr = new EventEmitter(); child.kill = () => {};
+  child.stdin = { write: line => {
+    const message = JSON.parse(line.trim()); sent.push(message);
+    if (message.method === 'initialize') process.nextTick(() => child.stdout.emit('data', Buffer.from(`${JSON.stringify({ id: message.id, result: {} })}\n`)));
+  } };
+  const { CodexAppServerRuntime } = load('ai/runtime/codex-app-server.ts', { 'node:child_process': { spawn: () => child } });
+  const runtime = new CodexAppServerRuntime({ executable: 'codex', cwd: '/plugin', env: {}, clientVersion: 'test' });
+  await runtime.start();
+  const requests = [
+    { id: 'command', method: 'item/commandExecution/requestApproval', expected: { decision: 'decline' } },
+    { id: 'file', method: 'item/fileChange/requestApproval', expected: { decision: 'decline' } },
+    { id: 'permission', method: 'item/permissions/requestApproval', expected: { permissions: {} } },
+    { id: 'input', method: 'item/tool/requestUserInput', expected: { answers: {} } },
+    { id: 'mcp', method: 'mcpServer/elicitation/request', expected: { action: 'decline', content: null } }
+  ];
+  for (const request of requests) child.stdout.emit('data', Buffer.from(`${JSON.stringify({ id: request.id, method: request.method, params: {} })}\n`));
+  child.stdout.emit('data', Buffer.from(`${JSON.stringify({ id: 'unknown', method: 'unknown/request', params: {} })}\n`));
+  await new Promise(resolve => setImmediate(resolve));
+  for (const request of requests) assert.deepEqual(plain(sent.find(message => message.id === request.id)?.result), request.expected);
+  assert.equal(sent.find(message => message.id === 'unknown')?.error?.code, -32601);
+  runtime.stop();
+});
+test('Codex App Server ignores stale child events after a clean restart', async () => {
+  const { EventEmitter } = require('node:events'); const children = [];
+  const spawn = () => {
+    const child = new EventEmitter(); child.stdout = new EventEmitter(); child.stderr = new EventEmitter(); child.kill = () => {};
+    child.stdin = { write: line => {
+      const message = JSON.parse(line.trim());
+      if (message.method === 'initialize') process.nextTick(() => child.stdout.emit('data', Buffer.from(`${JSON.stringify({ id: message.id, result: {} })}\n`)));
+      else if (message.method === 'model/list') process.nextTick(() => child.stdout.emit('data', Buffer.from(`${JSON.stringify({ id: message.id, result: { data: [], nextCursor: null } })}\n`)));
+    } };
+    children.push(child); return child;
+  };
+  const { CodexAppServerRuntime } = load('ai/runtime/codex-app-server.ts', { 'node:child_process': { spawn } });
+  const runtime = new CodexAppServerRuntime({ executable: 'codex', cwd: '/plugin', env: {}, clientVersion: 'test' });
+  await runtime.start();
+  const first = children[0]; first.stdout.emit('data', Buffer.from('{')); first.emit('error', new Error('first failed'));
+  await runtime.start();
+  first.emit('close', 1);
+  await runtime.listModels();
+  assert.equal(children.length, 2);
+  runtime.stop();
 });
 test('legacy Claude models fail clearly without starting a provider', async () => {
   const { default: Plugin } = load('main.ts', { obsidian });

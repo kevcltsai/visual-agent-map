@@ -3,18 +3,18 @@ import { App, MarkdownRenderer, FileSystemAdapter, ItemView, MarkdownView, Modal
 import { NameModal } from "./ui/modals/name-modal";
 import { ChoiceModal } from "./ui/modals/choice-modal";
 import { DebugLogModal } from "./ui/modals/debug-log-modal";
-import { spawn, type ChildProcessWithoutNullStreams } from "node:child_process";
-import { existsSync, readdirSync, writeFileSync } from "node:fs";
+import { existsSync, readdirSync } from "node:fs";
 import { delimiter, join } from "node:path";
 import { canParent, clone, descendants, History, inheritModel, MapDocument, MapNode, parseMap, removeNodes, serializeMap, visibleNodes } from "./map-model";
 import { DEFAULT_SETTINGS, ModelSource, Note, NotePatch, Repository, Settings, TopicInfo, TopicState } from "./repository";
-import { buildPreparedTaskContext, estimateTokens } from "./ai/context-builder";
+import { buildPreparedTaskContext } from "./ai/context-builder";
 import { canonicalDetail, visualReferencesMarkdown } from "./ai/result-utils";
 import type { AiResult, Suggestion, TaskContext } from "./ai/types";
 import { clampPreviewScale, legacyPreviewScale, previewMetrics } from "./ui/preview-utils";
 import { BUILTIN_SAMPLE_ID, builtInSample, SAMPLE_TOUR_VERSION } from "./builtin-sample";
 import { debugLog, LogManager } from "./log-manager";
 import responseSchema from "./response-schema.json";
+import { CodexAppServerRuntime } from "./ai/runtime/codex-app-server";
 
 export { buildPreparedTaskContext } from "./ai/context-builder";
 export { canonicalDetail, visualReferencesMarkdown } from "./ai/result-utils";
@@ -22,23 +22,6 @@ export { firstMarkdownImage, firstMarkdownTable, markdownImages } from "./ui/pre
 export type { AiRunMetrics, PreparedTaskContext } from "./ai/types";
 const VIEW_TYPE = "visual-agent-map-view";
 interface Action { undo: () => Promise<void>; redo: () => Promise<void> }
-interface AcpRequest { jsonrpc: "2.0"; id: number; method: string; params?: unknown }
-interface AcpResponse { jsonrpc: "2.0"; id: number; result?: unknown; error?: { message?: string } | string }
-interface AcpNotification { jsonrpc: "2.0"; method: string; params?: unknown }
-type AcpMessage = AcpRequest | AcpResponse | AcpNotification;
-interface AcpTaskState { updates: unknown[] }
-class AcpTransportError extends Error { constructor(message: string) { super(message); this.name = "AcpTransportError"; } }
-class AcpTimeoutError extends Error { constructor(method: string, timeoutMs: number) { super(`Codex ACP ${method} 在 ${Math.ceil(timeoutMs / 1000)} 秒內沒有回應`); this.name = "AcpTimeoutError"; } }
-class AcpSessionError extends Error { constructor(message: string) { super(message); this.name = "AcpSessionError"; } }
-class AcpModelError extends Error { constructor(message: string) { super(message); this.name = "AcpModelError"; } }
-class AcpParseError extends Error { constructor(message: string) { super(message); this.name = "AcpParseError"; } }
-const ACP_CONTROL_TIMEOUT_MS = 30_000;
-const ACP_PROMPT_TIMEOUT_MS = 15 * 60 * 1000;
-
-export function ensureResponseSchema(schemaPath: string): string {
-  if (!existsSync(schemaPath)) writeFileSync(schemaPath, `${JSON.stringify(responseSchema, null, 2)}\n`, "utf8");
-  return schemaPath;
-}
 
 export function extractJsonObject(raw: string): string {
   const candidates: string[] = [];
@@ -65,7 +48,6 @@ export function extractJsonObject(raw: string): string {
   }
   throw new SyntaxError("Codex 回應中找不到完整 JSON object");
 }
-const LEGACY_CODEX_ACP_PATH = "/opt/homebrew/bin/codex-acp";
 export function executableCandidates(configured: string, home: string, pathValue: string, nvmVersions: string[] = []): string[] {
   if (configured.includes("/") || configured.includes("\\")) return [configured];
   const dirs = [
@@ -735,12 +717,11 @@ export class VisualAgentMapView extends ItemView {
       const advanced = panel.createEl("details", { cls: "vam-advanced" }); advanced.createEl("summary", { text: t("模型與進階設定") });
       const modelLabel = advanced.createEl("label", { cls: "vam-field" }); modelLabel.createSpan({ text: t("使用模型") });
       const select = modelLabel.createEl("select"); select.setAttr("aria-label", t("使用模型"));
-      const options = new Set([this.plugin.settings.cliModel, ...this.plugin.settings.models.split(/[\n,]/), ...Array.from(this.notes.values()).map(n => n.model)].map(s => s.trim()).filter(Boolean));
+      const options = new Set(this.plugin.settings.models.split(/[\n,]/).map(s => s.trim()).filter(Boolean));
       for (const model of options) select.createEl("option", { value: model, text: model });
-      select.createEl("option", { value: "__custom__", text: t("自訂模型…") }); select.value = note.model;
-      const custom = modelLabel.createEl("input", { type: "text", placeholder: t("輸入模型 ID") }); custom.setAttr("aria-label", t("自訂模型 ID")); custom.hidden = true;
-      select.addEventListener("change", () => { custom.hidden = select.value !== "__custom__"; if (!custom.hidden) custom.focus(); else this.enqueue(() => this.noteChange(node, { model: select.value, modelSource: "manual" })); });
-      custom.addEventListener("change", () => { const model = custom.value.trim(); if (!model) return; this.enqueue(async () => { await this.noteChange(node, { model, modelSource: "manual" }); if (!Array.from(select.options).some(option => option.value === model)) select.add(new Option(model, model), select.options.length - 1); select.value = model; custom.hidden = true; }); });
+      if (!options.has(note.model)) { const unavailable = select.createEl("option", { value: note.model, text: t("目前模型已不可用") }); unavailable.disabled = true; }
+      select.value = note.model;
+      select.addEventListener("change", () => { if (options.has(select.value)) this.enqueue(() => this.noteChange(node, { model: select.value, modelSource: "manual" })); });
       const sourceLabels: Record<ModelSource, string> = { workspace: t("工作區預設"), inherited: t("建立時繼承"), manual: t("手動指定") };
       advanced.createEl("p", { cls: "vam-hint", text: t("{0} · {1}；一般任務使用低推理，整合子議題使用高推理。", note.model, sourceLabels[note.modelSource]) });
     } else {
@@ -1006,25 +987,25 @@ export class VisualAgentMapView extends ItemView {
 class VisualAgentMapSettingTab extends PluginSettingTab {
   constructor(app: App, private plugin: VisualAgentMapPlugin) { super(app, plugin); }
   getSettingDefinitions(): SettingDefinitionItem[] {
-    const text = (name: string, key: "cliPath" | "codexAcpPath" | "cliModel" | "models", desc: string): SettingDefinitionItem => ({ name, desc, control: { type: "text", key } });
-    const diagnostic = this.plugin.codexAcpDiagnostic();
+    const text = (name: string, key: "codexPath", desc: string): SettingDefinitionItem => ({ name, desc, control: { type: "text", key } });
+    const diagnostic = this.plugin.codexDiagnostic();
+    const models = Object.fromEntries(this.plugin.settings.models.split(/[,\n]/).map(model => model.trim()).filter(Boolean).map(model => [model, model]));
     return [
       { name: t("介面語言"), control: { type: "dropdown", key: "language", options: { "zh-TW": "繁體中文", en: "English" } } },
-      text(t("Codex ACP 路徑"), "codexAcpPath", t("用於常駐 Codex session 與自動取得模型清單。")),
-      text(t("工作區預設 Model"), "cliModel", t("目前最低成本模型為 gpt-5.6-luna；變更只影響之後新增的根議題。")),
-      text(t("Model 選單"), "models", t("啟動後會優先補入 Codex ACP 回報的模型。")),
-      text(t("Codex CLI fallback 路徑"), "cliPath", t("只有 Codex ACP 在 prompt 前發生 transport error 時才使用。")),
+      text(t("Codex CLI 路徑"), "codexPath", t("VAM 會以此啟動 codex app-server。")),
+      { name: t("工作區預設 Model"), desc: t("模型清單由 Codex App Server 自動取得；變更只影響之後新增的根議題。"), control: { type: "dropdown", key: "cliModel", options: models } },
       { name: t("Workspace 位置"), render: setting => { setting.setName(t("Workspace 位置")).setDesc(t("主題資料夾：{0}　未分類收件匣：{1}", this.plugin.settings.topicsFolder, this.plugin.settings.inboxFolder)); } },
       { name: t("修復 Agent Workspace"), render: setting => { setting.setName(t("修復 Agent Workspace")).setDesc(t("只建立缺少的基本資料夾，不會復原、搬移或覆寫筆記與心智圖。")).addButton(button => button.setButtonText(t("修復")).onClick(() => { void this.plugin.mutate(() => this.plugin.repairWorkspace()); })); } },
       { name: t("找回既有 Workspace"), render: setting => { setting.setName(t("找回既有 Workspace")).setDesc(t("掃描可辨識的 VAM Workspace，確認後才重新連結，不會搬移或覆寫資料。")).addButton(button => button.setButtonText(t("掃描")).onClick(() => { void this.plugin.offerWorkspaceReconnect(); })); } },
-      { name: t("Codex ACP 狀態"), render: setting => { setting.setName(t("Codex ACP 狀態")).setDesc(diagnostic.installed ? t("已找到：{0}", diagnostic.executable) : t("未找到 Codex ACP。請先安裝 @agentclientprotocol/codex-acp 並完成 Codex 登入；VAM 不會自動安裝系統套件。")).addButton(button => button.setButtonText(t("重新檢查")).onClick(() => { void this.plugin.recheckCodexAcp(); })); } }
+      { name: t("Codex App Server 狀態"), render: setting => { setting.setName(t("Codex App Server 狀態")).setDesc(diagnostic.installed ? t("已找到 Codex CLI：{0}", diagnostic.executable) : t("未找到 Codex CLI。請先安裝 Codex CLI 並以 ChatGPT 登入；VAM 不會自動安裝系統套件。")).addButton(button => button.setButtonText(t("重新檢查")).onClick(() => { void this.plugin.recheckCodex(); })); } }
     ];
   }
   async setControlValue(key: string, value: unknown): Promise<void> {
     const languageChanged = key === "language";
     if (languageChanged) this.plugin.settings.language = value === "en" ? "en" : "zh-TW";
-    else if (typeof value === "string" && (key === "cliPath" || key === "codexAcpPath" || key === "cliModel" || key === "models")) this.plugin.settings[key] = value.trim();
+    else if (typeof value === "string" && (key === "codexPath" || key === "cliModel")) this.plugin.settings[key] = value.trim();
     else return;
+    if (key === "codexPath") this.plugin.resetCodexRuntime();
     setUiLanguage(this.plugin.settings.language);
     await this.plugin.saveSettings();
     if (languageChanged) {
@@ -1040,9 +1021,8 @@ export default class VisualAgentMapPlugin extends Plugin {
   readonly running = new Set<string>();
   readonly pendingSuggestions = new Map<string, Suggestion[]>();
   readonly logs: LogManager = debugLog;
-  private childProcesses = new Set<ChildProcessWithoutNullStreams>();
-  private acp: { child: ChildProcessWithoutNullStreams; buffer: string; nextId: number; pending: Map<number, { resolve: (value: unknown) => void; reject: (error: Error) => void; timeout: number }>; sessions: Map<string, AcpTaskState>; initializing: Promise<void> } | null = null;
-  private acpConfigIds = { model: "model", reasoning: "" };
+  private codexRuntime: CodexAppServerRuntime | null = null;
+  private settingTab!: VisualAgentMapSettingTab;
   private detailsLeaf: WorkspaceLeaf | null = null;
   private queue: Promise<void> = Promise.resolve();
   private writing = 0;
@@ -1062,7 +1042,8 @@ export default class VisualAgentMapPlugin extends Plugin {
   views(): VisualAgentMapView[] { return this.app.workspace.getLeavesOfType(VIEW_TYPE).map(leaf => leaf.view).filter((view): view is VisualAgentMapView => view instanceof VisualAgentMapView); }
   async onload(): Promise<void> {
     const saved = await this.loadData() as Partial<Settings> | null;
-    this.settings = { ...DEFAULT_SETTINGS, language: saved?.language === "en" ? "en" : "zh-TW", workspaceFolder: saved?.workspaceFolder || DEFAULT_SETTINGS.workspaceFolder, topicsFolder: saved?.topicsFolder || DEFAULT_SETTINGS.topicsFolder, inboxFolder: saved?.inboxFolder || DEFAULT_SETTINGS.inboxFolder, notesFolder: saved?.notesFolder || DEFAULT_SETTINGS.notesFolder, mapsFolder: saved?.mapsFolder || DEFAULT_SETTINGS.mapsFolder, mapId: saved?.mapId || "default", cliPath: saved?.cliPath || DEFAULT_SETTINGS.cliPath, codexAcpPath: saved?.codexAcpPath === LEGACY_CODEX_ACP_PATH ? DEFAULT_SETTINGS.codexAcpPath : saved?.codexAcpPath || DEFAULT_SETTINGS.codexAcpPath, cliModel: saved?.cliModel || DEFAULT_SETTINGS.cliModel, cliReasoning: saved?.cliReasoning || DEFAULT_SETTINGS.cliReasoning, previewScale: saved?.previewScale !== undefined ? clampPreviewScale(saved.previewScale) : legacyPreviewScale(saved?.previewSize), models: (saved?.models || DEFAULT_SETTINGS.models).split(/[,\n]/).map(item => item.trim()).filter(item => item && !item.startsWith("claude:")).join(", ") || DEFAULT_SETTINGS.models, migrated: saved?.migrated === true, structureVersion: saved?.structureVersion ?? (saved ? 1 : DEFAULT_SETTINGS.structureVersion), firstUseNoticeSeen: saved?.firstUseNoticeSeen === true, workspaceInitialized: saved ? saved.workspaceInitialized !== false : false, sampleTourVersionSeen: saved?.sampleTourVersionSeen ?? 0 };
+    const legacy: (Partial<Settings> & { cliPath?: string }) | null = saved;
+    this.settings = { ...DEFAULT_SETTINGS, language: saved?.language === "en" ? "en" : "zh-TW", workspaceFolder: saved?.workspaceFolder || DEFAULT_SETTINGS.workspaceFolder, topicsFolder: saved?.topicsFolder || DEFAULT_SETTINGS.topicsFolder, inboxFolder: saved?.inboxFolder || DEFAULT_SETTINGS.inboxFolder, notesFolder: saved?.notesFolder || DEFAULT_SETTINGS.notesFolder, mapsFolder: saved?.mapsFolder || DEFAULT_SETTINGS.mapsFolder, mapId: saved?.mapId || "default", codexPath: saved?.codexPath || legacy?.cliPath || DEFAULT_SETTINGS.codexPath, cliModel: saved?.cliModel || DEFAULT_SETTINGS.cliModel, cliReasoning: saved?.cliReasoning || DEFAULT_SETTINGS.cliReasoning, previewScale: saved?.previewScale !== undefined ? clampPreviewScale(saved.previewScale) : legacyPreviewScale(saved?.previewSize), models: "", migrated: saved?.migrated === true, structureVersion: saved?.structureVersion ?? (saved ? 1 : DEFAULT_SETTINGS.structureVersion), firstUseNoticeSeen: saved?.firstUseNoticeSeen === true, workspaceInitialized: saved ? saved.workspaceInitialized !== false : false, sampleTourVersionSeen: saved?.sampleTourVersionSeen ?? 0 };
     setUiLanguage(this.settings.language);
     this.logs.appendLog("info", `Visual Agent Map ${this.manifest.version || "unknown"} 載入`);
     this.repo = new Repository(this.app, this.settings);
@@ -1091,7 +1072,8 @@ export default class VisualAgentMapPlugin extends Plugin {
     this.addCommand({ id: "repair-workspace", name: t("修復 Agent Workspace"), callback: () => { void this.mutate(() => this.repairWorkspace()); } });
     this.addCommand({ id: "reconnect-workspace", name: t("找回既有 Workspace"), callback: () => { void this.offerWorkspaceReconnect(); } });
     this.addCommand({ id: "open-debug-log", name: t("開啟偵錯日誌 (Open Debug Log)"), callback: () => new DebugLogModal(this.app, this.logs).open() });
-    this.addSettingTab(new VisualAgentMapSettingTab(this.app, this));
+    this.settingTab = new VisualAgentMapSettingTab(this.app, this);
+    this.addSettingTab(this.settingTab);
     this.registerEvent(this.app.workspace.on("file-menu", (menu, file) => { if (file instanceof TFile && this.isMap(file)) menu.addItem(item => item.setTitle(t("以心智圖開啟")).setIcon("git-fork").onClick(() => { void this.activateView(file.path); })); }));
     this.registerEvent(this.app.workspace.on("active-leaf-change", leaf => {
       this.styleNodeLeaf(leaf);
@@ -1107,8 +1089,8 @@ export default class VisualAgentMapPlugin extends Plugin {
       void this.ready.then(async () => {
         if (this.workspaceRecoveryCandidates.length) await this.offerWorkspaceReconnect(this.workspaceRecoveryCandidates);
         else if (this.firstInstallSamplePending) await this.activateBuiltInSample();
-        try { await this.refreshCodexAcpModels(); }
-        catch (error) { const message = error instanceof Error ? error.message : String(error); this.logs.appendLog("warn", `Codex ACP 尚未就緒：${message}`); new Notice(t("Codex ACP 尚未就緒；Sample 與非 AI 功能仍可使用。請到 VAM Settings 查看並重新檢查。")); }
+        try { await this.refreshCodexModels(); }
+        catch (error) { const message = error instanceof Error ? error.message : String(error); this.logs.appendLog("warn", `Codex App Server 尚未就緒：${message}`); new Notice(t("Codex App Server 尚未就緒；Sample 與非 AI 功能仍可使用。請到 VAM Settings 查看並重新檢查。")); }
       }).catch(error => { this.logs.appendLog("warn", `初始化未完成：${error instanceof Error ? error.message : String(error)}`); console.warn("Visual Agent Map initialization", error); });
     });
     this.registerEvent(this.app.vault.on("modify", file => { if (!this.writing && file instanceof TFile) for (const view of this.views()) view.changed(file); }));
@@ -1138,18 +1120,17 @@ export default class VisualAgentMapPlugin extends Plugin {
       this.connectWorkspace(root); await this.saveSettings(); await this.repo.rebuildDerivedData(); for (const view of this.views()) await view.refreshFromPlugin(); new Notice(t("已重新連結 Workspace：{0}", root));
     }) }))).open();
   }
-  codexAcpDiagnostic(): { executable: string; installed: boolean } {
-    const executable = this.resolveExecutable(this.settings.codexAcpPath);
+  codexDiagnostic(): { executable: string; installed: boolean } {
+    const executable = this.resolveExecutable(this.settings.codexPath);
     return { executable, installed: existsSync(executable) };
   }
-  async recheckCodexAcp(): Promise<void> {
-    const diagnostic = this.codexAcpDiagnostic();
-    if (!diagnostic.installed) { new Notice(t("未找到 Codex ACP：{0}", diagnostic.executable)); return; }
+  resetCodexRuntime(): void { this.codexRuntime?.stop(); this.codexRuntime = null; }
+  async recheckCodex(): Promise<void> {
+    const diagnostic = this.codexDiagnostic();
+    if (!diagnostic.installed) { new Notice(t("未找到 Codex CLI：{0}", diagnostic.executable)); return; }
     try {
-      const adapter = this.app.vault.adapter;
-      if (!(adapter instanceof FileSystemAdapter) || !this.manifest.dir) throw new Error(t("CLI 模式只支援桌面版 Obsidian"));
-      await this.ensureAcpProcess(join(adapter.getBasePath(), this.manifest.dir)); new Notice(t("Codex ACP 已就緒：{0}", diagnostic.executable));
-    } catch (error) { new Notice(t("Codex ACP 檢查失敗：{0}", this.recordFailure("Codex ACP 重新檢查失敗", error))); }
+      await this.refreshCodexModels(); new Notice(t("Codex App Server 已就緒：{0}", diagnostic.executable));
+    } catch (error) { new Notice(t("Codex App Server 檢查失敗：{0}", this.recordFailure("Codex App Server 重新檢查失敗", error))); }
   }
   async duplicateBuiltInSample(): Promise<string> {
     await this.repo.ensureWorkspace(); this.settings.workspaceInitialized = true;
@@ -1186,7 +1167,7 @@ export default class VisualAgentMapPlugin extends Plugin {
     if (!(leaf?.view instanceof MarkdownView)) return;
     leaf.view.containerEl.toggleClass("vam-topic-markdown", !!leaf.view.file && this.isNode(leaf.view.file));
   }
-  onunload(): void { if (this.acp) { this.acp.child.kill(); this.acp = null; } for (const child of this.childProcesses) child.kill(); this.childProcesses.clear();  }
+  onunload(): void { this.codexRuntime?.stop(); this.codexRuntime = null; }
   async saveSettings(): Promise<void> { await this.saveData(this.settings); }
   async rebuildDerivedData(): Promise<void> { try { await this.repo.rebuildDerivedData(); } catch (error) { console.error("Visual Agent Map reference rebuild", error); new Notice(t("心智圖已儲存，但 reference 更新失敗：{0}", error instanceof Error ? error.message : String(error))); } }
   private scheduleExternalReconciliation(): void {
@@ -1223,11 +1204,15 @@ export default class VisualAgentMapPlugin extends Plugin {
     if (forceTour && leaf.view instanceof VisualAgentMapView) await leaf.view.openBuiltInSample(true);
     await this.app.workspace.revealLeaf(leaf);
   }
-  private async refreshCodexAcpModels(): Promise<void> {
+  private async refreshCodexModels(): Promise<void> {
     const adapter = this.app.vault.adapter;
     if (!(adapter instanceof FileSystemAdapter) || !this.manifest.dir) return;
     const pluginDirectory = join(adapter.getBasePath(), this.manifest.dir);
-    await this.ensureAcpProcess(pluginDirectory);
+    const models = await this.runtime(pluginDirectory).listModels();
+    this.settings.models = models.map(item => item.model).join(", ");
+    if (!models.some(item => item.model === this.settings.cliModel)) this.settings.cliModel = models.find(item => item.model === DEFAULT_SETTINGS.cliModel)?.model || models.find(item => item.isDefault)?.model || models[0]?.model || "";
+    await this.saveSettings();
+    this.settingTab?.update();
     for (const view of this.views()) await view.refreshFromPlugin();
   }
   async askModel(context: TaskContext, model: string): Promise<AiResult> {
@@ -1240,7 +1225,6 @@ export default class VisualAgentMapPlugin extends Plugin {
     const prepared = buildPreparedTaskContext(context, model);
     context = prepared.context;
     const pluginDirectory = join(adapter.getBasePath(), this.manifest.dir);
-    const schemaPath = ensureResponseSchema(join(pluginDirectory, "response-schema.json"));
     const instructions = [
       "你是視覺化思考 Agent。不要修改任何檔案；除非任務明確指定，否則不要讀取本機檔案。",
       "只回傳 JSON，不要使用 Markdown code fence。格式必須符合：{\"summary\":\"...\",\"detail\":\"...\",\"suggestions\":[{\"title\":\"...\",\"task\":\"...\",\"contribution\":\"...\"}],\"visualReferences\":[{\"title\":\"...\",\"imageUrl\":\"https://...\",\"sourceUrl\":\"https://...\",\"description\":\"...\",\"palette\":[\"navy\",\"white\"],\"formula\":\"...\"}]}。若沒有視覺參考，visualReferences 回傳空陣列。",
@@ -1266,18 +1250,11 @@ export default class VisualAgentMapPlugin extends Plugin {
 
     console.debug("Visual Agent Map AI metrics", prepared.metrics);
     const providerStarted = Date.now();
-    try {
-      const result = await this.askCodexAcp(instructions, model, pluginDirectory);
-      console.debug("Visual Agent Map AI metrics", { ...prepared.metrics, providerMs: Date.now() - providerStarted, totalMs: Date.now() - totalStarted });
-      return result;
-    }
-    catch (error) {
-      if (!(error instanceof AcpTransportError)) throw error;
-      this.logs.appendLog("warn", `Codex ACP transport failure，改用 Codex CLI fallback：${error.message}`);
-      console.warn("Visual Agent Map Codex ACP transport failed before prompting; falling back to Codex CLI", error);
-      try { return await this.askCodexExec(instructions, model, pluginDirectory, schemaPath); }
-      catch (fallbackError) { throw new Error(`Codex ACP：${error.message}\nCodex CLI fallback：${fallbackError instanceof Error ? fallbackError.message : String(fallbackError)}`); }
-    }
+    const effort = context.mode === "synthesize" ? "high" : this.settings.cliReasoning || "low";
+    const raw = await this.runtime(pluginDirectory).runTask(instructions, model, effort, responseSchema);
+    const result = this.parseAiResult(raw, "Codex App Server");
+    console.debug("Visual Agent Map AI metrics", { ...prepared.metrics, providerMs: Date.now() - providerStarted, totalMs: Date.now() - totalStarted });
+    return result;
   }
   private parseAiResult(raw: string, label: string): AiResult {
     const cleaned = raw.replace(/^```(?:json)?\s*/i, "").replace(/\s*```$/, "").trim();
@@ -1295,48 +1272,17 @@ export default class VisualAgentMapPlugin extends Plugin {
     })).filter(item => /^https?:\/\//i.test(item.imageUrl) && /^https?:\/\//i.test(item.sourceUrl)).slice(0, 6) : [];
     return { summary: Array.from(parsed.summary.trim()).slice(0, 80).join(""), detail: parsed.detail.trim(), suggestions, visualReferences };
   }
-  private acpSend(message: AcpMessage): void {
-    if (!this.acp) throw new Error(t("Codex ACP 尚未啟動"));
-    this.acp.child.stdin.write(`${JSON.stringify(message)}\n`);
-  }
-  private acpRequest(method: string, params?: unknown, timeoutMs = method === "session/prompt" ? ACP_PROMPT_TIMEOUT_MS : ACP_CONTROL_TIMEOUT_MS): Promise<unknown> {
-    if (!this.acp) throw new Error(t("Codex ACP 尚未啟動"));
-    const id = this.acp.nextId++;
-    const acp = this.acp;
-    return new Promise((resolve, reject) => {
-      const timeout = window.setTimeout(() => {
-        if (!acp.pending.delete(id)) return;
-        reject(new AcpTimeoutError(method, timeoutMs));
-      }, timeoutMs);
-      acp.pending.set(id, { resolve, reject, timeout });
-      try { this.acpSend({ jsonrpc: "2.0", id, method, params }); }
-      catch (error) { window.clearTimeout(timeout); acp.pending.delete(id); reject(error instanceof Error ? error : new Error(String(error))); }
-    });
-  }
-  private acpRespond(id: number, result: unknown): void { this.acpSend({ jsonrpc: "2.0", id, result }); }
-  private handleAcpMessage(message: AcpMessage): void {
-    if ("id" in message && ("result" in message || "error" in message)) {
-      const entry = this.acp?.pending.get(message.id);
-      if (!entry) return;
-      this.acp?.pending.delete(message.id);
-      window.clearTimeout(entry.timeout);
-      if (message.error) entry.reject(new Error(typeof message.error === "string" ? message.error : message.error.message || t("Codex ACP 回傳錯誤")));
-      else entry.resolve(message.result);
-      return;
+  private runtime(pluginDirectory: string): CodexAppServerRuntime {
+    if (!this.codexRuntime) {
+      this.codexRuntime = new CodexAppServerRuntime({
+        executable: this.resolveExecutable(this.settings.codexPath),
+        cwd: pluginDirectory,
+        env: this.cliEnvironment(),
+        clientVersion: this.manifest.version || "0.0.0",
+        onLog: (level, message) => this.logs.appendLog(level, message)
+      });
     }
-    if ("method" in message && message.method === "session/update") {
-      const params = message.params as { sessionId?: unknown } | undefined;
-      const sessionId = typeof params?.sessionId === "string" ? params.sessionId : "";
-      this.acp?.sessions.get(sessionId)?.updates.push(message.params);
-      return;
-    }
-    if ("id" in message && "method" in message) {
-      if (message.method === "session/request_permission") { this.acpRespond(message.id, { outcome: { outcome: "cancelled" } }); return; }
-      if (message.method === "terminal/create") { this.acpRespond(message.id, { terminalId: "visual-agent-map-denied" }); return; }
-      if (message.method === "terminal/output") { this.acpRespond(message.id, { output: "", truncated: false, exitStatus: { exitCode: 1 } }); return; }
-      if (message.method === "terminal/wait_for_exit") { this.acpRespond(message.id, { exitCode: 1 }); return; }
-      this.acpRespond(message.id, {});
-    }
+    return this.codexRuntime;
   }
   private resolveExecutable(configured: string): string {
     const home = process.env.HOME || "";
@@ -1348,177 +1294,5 @@ export default class VisualAgentMapPlugin extends Plugin {
     const home = process.env.HOME || "";
     const paths = [home ? join(home, ".local/bin") : "", "/opt/homebrew/bin", "/usr/local/bin", "/usr/bin", "/bin", process.env.PATH || ""].filter(Boolean);
     return { ...process.env, PATH: [...new Set(paths)].join(":") };
-  }
-  private async ensureAcpProcess(pluginDirectory: string): Promise<void> {
-    if (!this.acp) {
-      const executable = this.resolveExecutable(this.settings.codexAcpPath);
-      this.logs.appendLog("info", `啟動 Codex ACP：${executable}`);
-      const child = spawn(executable, [], { cwd: pluginDirectory, env: this.cliEnvironment(), stdio: ["pipe", "pipe", "pipe"] });
-      this.childProcesses.add(child);
-      this.acp = { child, buffer: "", nextId: 1, pending: new Map(), sessions: new Map(), initializing: Promise.resolve() };
-      let stderr = "";
-      child.stdout.on("data", (chunk: Buffer) => {
-        if (!this.acp || this.acp.child !== child) return;
-        this.acp.buffer += chunk.toString("utf8");
-        while (true) {
-          const newline = this.acp.buffer.indexOf("\n");
-          if (newline === -1) return;
-          const line = this.acp.buffer.slice(0, newline).trim();
-          this.acp.buffer = this.acp.buffer.slice(newline + 1);
-          if (line) {
-            try { this.handleAcpMessage(JSON.parse(line) as AcpMessage); }
-            catch (error) {
-              const message = this.recordFailure("Codex ACP 回應無法解析", error);
-              for (const entry of this.acp?.pending.values() ?? []) { window.clearTimeout(entry.timeout); entry.reject(new AcpTransportError(message)); }
-              this.acp?.pending.clear();
-            }
-          }
-        }
-      });
-      child.stderr.on("data", (chunk: Buffer) => { stderr += chunk.toString(); });
-      child.on("error", error => {
-        this.logs.appendLog("error", `無法啟動 Codex ACP（${executable}）：${error.message}`);
-        for (const entry of this.acp?.pending.values() ?? []) { window.clearTimeout(entry.timeout); entry.reject(new AcpTransportError(`無法啟動 Codex ACP（${executable}）：${error.message}`)); }
-        this.childProcesses.delete(child);
-        if (this.acp?.child === child) this.acp = null;
-      });
-      child.on("close", code => {
-        if (code !== 0) this.logs.appendLog("error", stderr.trim() || `Codex ACP 結束碼：${code ?? "未知"}`);
-        for (const entry of this.acp?.pending.values() ?? []) { window.clearTimeout(entry.timeout); entry.reject(new AcpTransportError(stderr.trim() || `Codex ACP 結束碼：${code ?? "未知"}`)); }
-        this.childProcesses.delete(child);
-        if (this.acp?.child === child) this.acp = null;
-      });
-      this.acp.initializing = this.acpRequest("initialize", { protocolVersion: 1, clientCapabilities: { fs: { readTextFile: false, writeTextFile: false }, terminal: false }, clientInfo: { name: "visual-agent-map", version: this.manifest.version || "0.0.0" } })
-        .then(() => { this.logs.appendLog("info", `Codex ACP 已就緒：${executable}`); })
-        .catch(error => { this.recordFailure("Codex ACP 初始化失敗", error); throw error; });
-    }
-    try { await this.acp.initializing; }
-    catch (error) { throw error instanceof AcpTransportError ? error : new AcpTransportError(error instanceof Error ? error.message : String(error)); }
-  }
-  private codexModelsFromConfig(configOptions: unknown): string[] {
-    if (!Array.isArray(configOptions)) return [];
-    const option = configOptions.find(item => {
-      const record = item as { id?: unknown; category?: unknown };
-      return record.id === "model" || record.category === "model";
-    }) as { options?: unknown } | undefined;
-    if (!Array.isArray(option?.options)) return [];
-    const flatten = (items: unknown[]): string[] => items.flatMap(item => {
-      const record = item as { value?: unknown; options?: unknown };
-      if (Array.isArray(record.options)) return flatten(record.options);
-      return typeof record.value === "string" ? [record.value] : [];
-    });
-    return flatten(option.options);
-  }
-  private codexConfigIds(configOptions: unknown): { model: string; reasoning: string } {
-    if (!Array.isArray(configOptions)) return { model: "model", reasoning: "" };
-    const findId = (matches: string[]): string => {
-      const option = configOptions.find(item => {
-        const record = item as { id?: unknown; category?: unknown };
-        return matches.includes(String(record.id)) || matches.includes(String(record.category));
-      }) as { id?: unknown } | undefined;
-      return typeof option?.id === "string" ? option.id : "";
-    };
-    return { model: findId(["model"]) || "model", reasoning: findId(["reasoning", "reasoning-effort", "model_reasoning_effort"]) };
-  }
-  private acpChunkText(value: unknown): string {
-    if (typeof value === "string") return value;
-    if (Array.isArray(value)) return value.map(item => this.acpChunkText(item)).join("");
-    if (!value || typeof value !== "object") return "";
-    const record = value as { text?: unknown; content?: unknown };
-    return this.acpChunkText(record.text) || this.acpChunkText(record.content);
-  }
-  private acpText(sessionId: string): string {
-    return (this.acp?.sessions.get(sessionId)?.updates ?? [])
-      .map(item => (item as { update?: { sessionUpdate?: string; type?: string; text?: unknown; content?: unknown } }).update)
-      .filter(update => update?.sessionUpdate === "agent_message_chunk" || update?.type === "agent_message_chunk")
-      .map(update => this.acpChunkText(update?.text) || this.acpChunkText(update?.content))
-      .join("");
-  }
-  private async askCodexAcp(prompt: string, model: string, pluginDirectory: string): Promise<AiResult> {
-    await this.ensureAcpProcess(pluginDirectory);
-    let session: { sessionId?: string; configOptions?: unknown[] };
-    try { session = await this.acpRequest("session/new", { cwd: pluginDirectory, mcpServers: [] }) as { sessionId?: string; configOptions?: unknown[] }; }
-    catch (error) { throw error instanceof AcpTransportError ? error : new AcpSessionError(error instanceof Error ? error.message : String(error)); }
-    if (!session.sessionId) throw new AcpSessionError(t("Codex ACP 沒有建立 session"));
-    const sessionId = session.sessionId;
-    this.acp?.sessions.set(sessionId, { updates: [] });
-    this.acpConfigIds = this.codexConfigIds(session.configOptions);
-    const acpModels = this.codexModelsFromConfig(session.configOptions);
-    if (acpModels.length) {
-      const merged = Array.from(new Set([...acpModels, ...this.settings.models.split(/[\n,]/).map(item => item.trim()).filter(Boolean)]));
-      const next = merged.join(", ");
-      if (next !== this.settings.models) { this.settings.models = next; await this.saveSettings(); }
-    }
-    try {
-      const modelOption = model.trim();
-      if (modelOption) await this.acpRequest("session/set_config_option", { sessionId, configId: this.acpConfigIds.model, value: modelOption }).catch(error => { throw error instanceof AcpTransportError ? error : new AcpModelError(error instanceof Error ? error.message : String(error)); });
-      const modeLine = prompt.includes("這是 Synthesize 模式") ? "high" : "low";
-      if (this.acpConfigIds.reasoning) await this.acpRequest("session/set_config_option", { sessionId, configId: this.acpConfigIds.reasoning, value: modeLine }).catch(() => undefined);
-      const response = await this.acpRequest("session/prompt", { sessionId, prompt: [{ type: "text", text: prompt }] }) as { usage?: unknown };
-      if (response.usage) console.debug("Visual Agent Map ACP usage", { sessionId, usage: response.usage, estimated: false });
-      else console.debug("Visual Agent Map ACP usage", { sessionId, estimatedInputTokens: estimateTokens(prompt), estimated: true });
-      try { return this.parseAiResult(this.acpText(sessionId).trim(), "Codex ACP"); }
-      catch (error) { throw new AcpParseError(error instanceof Error ? error.message : String(error)); }
-    } finally {
-      this.acp?.sessions.delete(sessionId);
-    }
-  }
-  private async askCodexExec(instructions: string, model: string, pluginDirectory: string, schemaPath: string): Promise<AiResult> {
-    const args = [
-      "exec",
-      "--skip-git-repo-check",
-      "--ephemeral",
-      "--sandbox", "read-only",
-      "--color", "never",
-      "--output-schema", schemaPath,
-      "-C", pluginDirectory
-    ];
-    if (model) args.push("--model", model);
-    args.push("--config", `model_reasoning_effort=${this.settings.cliReasoning || "low"}`);
-    args.push("-");
-    return new Promise((resolve, reject) => {
-      const executable = this.resolveExecutable(this.settings.cliPath);
-      const child = spawn(executable, args, {
-        cwd: pluginDirectory,
-        env: this.cliEnvironment(),
-        stdio: ["pipe", "pipe", "pipe"]
-      });
-      this.childProcesses.add(child);
-      let stdout = "";
-      let stderr = "";
-      const outputLimit = 5 * 1024 * 1024;
-      const timeout = window.setTimeout(() => {
-        child.kill();
-        reject(new Error(t("Codex CLI 執行超過 15 分鐘")));
-      }, 15 * 60 * 1000);
-
-      child.stdout.on("data", (chunk: Buffer) => {
-        stdout += chunk.toString();
-        if (stdout.length > outputLimit) child.kill();
-      });
-      child.stderr.on("data", (chunk: Buffer) => {
-        stderr += chunk.toString();
-        if (stderr.length > outputLimit) child.kill();
-      });
-      child.on("error", (error) => {
-        window.clearTimeout(timeout);
-        this.childProcesses.delete(child);
-        reject(new Error(`無法啟動 Codex CLI（${executable}）：${error.message}`));
-      });
-      child.on("close", (code) => {
-        window.clearTimeout(timeout);
-        this.childProcesses.delete(child);
-        if (code !== 0) {
-          reject(new Error(stderr.trim() || `Codex CLI 結束碼：${code ?? "未知"}`));
-          return;
-        }
-        try {
-          resolve(this.parseAiResult(stdout, "Codex CLI"));
-        } catch (error) {
-          reject(error instanceof Error ? error : new Error(String(error)));
-        }
-      });
-      child.stdin.end(instructions);
-    });
   }
 }

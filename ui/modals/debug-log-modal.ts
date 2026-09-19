@@ -25,7 +25,7 @@ export class DebugLogModal extends Modal {
       try { await navigator.clipboard.writeText(text); new Notice(t("偵錯日誌已複製。")); }
       catch { new Notice(t("無法複製偵錯日誌。")); }
     }));
-    actions.addButton(button => button.setButtonText(t("清除日誌")).setWarning().onClick(() => this.logs.clear()));
+    actions.addButton(button => button.setButtonText(t("清除日誌")).setDestructive().onClick(() => this.logs.clear()));
 
     const list = this.contentEl.createDiv("vam-debug-log-list");
     const entries = this.logs.getLogs();

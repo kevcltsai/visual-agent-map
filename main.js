@@ -492,7 +492,7 @@ var DebugLogModal = class extends import_obsidian3.Modal {
         new import_obsidian3.Notice(t("\u7121\u6CD5\u8907\u88FD\u5075\u932F\u65E5\u8A8C\u3002"));
       }
     }));
-    actions.addButton((button) => button.setButtonText(t("\u6E05\u9664\u65E5\u8A8C")).setWarning().onClick(() => this.logs.clear()));
+    actions.addButton((button) => button.setButtonText(t("\u6E05\u9664\u65E5\u8A8C")).setDestructive().onClick(() => this.logs.clear()));
     const list = this.contentEl.createDiv("vam-debug-log-list");
     const entries = this.logs.getLogs();
     if (!entries.length) {

@@ -229,9 +229,10 @@ test('editing note fields preserves latest AI detail and unrelated frontmatter',
   const { repo, contents } = fixture(); const n = await topicNote(repo);
   contents.set(n.path, contents.get(n.path).replace('---\n', '---\ncustom: "retain me"\n'));
   await repo.updateNote(n.path, { detail: '## Nested heading\n\nAI result with $& and ```code```', newFindings: 'Fresh research', status: 'review' });
-  await repo.updateNote(n.path, { title: '修改標題', model: 'model-b', prompt: 'A task with $&' });
+  await repo.updateNote(n.path, { title: '修改標題', model: 'model-b', reasoning: 'high', prompt: 'A task with $&' });
   const result = await repo.readNote(n.path);
   assert.equal(result.detail, '## Nested heading\n\nAI result with $& and ```code```'); assert.equal(result.prompt, 'A task with $&'); assert.equal(result.model, 'model-b'); assert.equal(result.status, 'completed');
+  assert.equal(result.reasoning, 'high');
   assert.equal(result.newFindings, 'Fresh research');
   assert.match(contents.get(n.path), /## Working Findings\n\nFresh research/);
   assert.match(contents.get(n.path), /custom: "retain me"/);
@@ -429,7 +430,7 @@ test('a successful AI task immediately updates summary and MD detail', async () 
 });
 test('new child topics inherit the parent AI rules once', async () => {
   const { repo, app } = fixture(), parent = await topicNote(repo, 'Parent', 'a');
-  await repo.updateNote(parent.path, { rules: 'Use official sources and tables.' });
+  await repo.updateNote(parent.path, { rules: 'Use official sources and tables.', reasoning: 'high' });
   const mapPath = 'Agent Workspace/Topics/map-a/Map.md';
   const mapDoc = { id: 'map-a', title: 'map-a', version: 1, nodes: [parent], viewport: { x: 0, y: 0, zoom: 1 } };
   await app.vault.create(mapPath, core.serializeMap(mapDoc));
@@ -439,6 +440,7 @@ test('new child topics inherit the parent AI rules once', async () => {
   await view.addNode(parent);
   const child = (await repo.readMap(mapPath)).nodes.at(-1);
   assert.equal((await repo.readNote(child.path)).rules, 'Use official sources and tables.');
+  assert.equal((await repo.readNote(child.path)).reasoning, 'high');
 });
 test('confirmed child batches rebuild derived data only once', async () => {
   const { repo, app } = fixture(), parent = await topicNote(repo, 'Parent', 'a'); let rebuilds = 0;
@@ -528,6 +530,8 @@ test('Obsidian 1.13 declarative settings expose workspace recovery and App Serve
   assert.match(definitions, /重新檢查/);
   assert.match(definitions, /安裝說明/);
   assert.match(source, /this\.settingTab\?\.update\(\)/);
+  assert.match(source, /setAttr\("aria-label", t\("推理等級"\)\)/);
+  assert.match(source, /noteChange\(node, \{ reasoning:/);
 });
 test('full rebuild refreshes derived data and open views', async () => {
   const { default: Plugin } = load('main.ts', { obsidian }); let rebuilds = 0, refreshes = 0;
@@ -687,10 +691,10 @@ test('Codex App Server uses model/list, selected reasoning and fresh ephemeral t
   const plugin = new Plugin(); plugin.app = { vault: { adapter: new obsidian.FileSystemAdapter() }, workspace: { getLeavesOfType: () => [] } }; plugin.manifest = { dir: '.obsidian/plugins/visual-agent-map' };
   plugin.saveData = async data => { plugin.saved = data; };
   await plugin.refreshCodexModels();
-  plugin.settings.cliReasoning = 'medium';
+  plugin.settings.cliReasoning = 'low';
   const [result, second] = await Promise.all([
-    plugin.askModel({ title: 'Current topic', summary: 'current summary', rules: 'Use official sources', task: 'task', ancestors: 'context', mode: 'task' }, 'visible-model'),
-    plugin.askModel({ title: 'Current topic', summary: 'current summary', rules: 'Use official sources', task: 'task', ancestors: 'context', mode: 'synthesize' }, 'visible-model')
+    plugin.askModel({ title: 'Current topic', summary: 'current summary', rules: 'Use official sources', task: 'task', ancestors: 'context', mode: 'task' }, 'visible-model', 'medium'),
+    plugin.askModel({ title: 'Current topic', summary: 'current summary', rules: 'Use official sources', task: 'task', ancestors: 'context', mode: 'synthesize' }, 'visible-model', 'medium')
   ]);
   assert.equal(command, DEFAULT_SETTINGS.codexPath); assert.deepEqual(Array.from(args), ['app-server']);
   assert.equal(turnCount, 2); assert.equal(threadCount, 2);

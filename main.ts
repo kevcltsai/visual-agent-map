@@ -778,7 +778,12 @@ export class VisualAgentMapView extends ItemView {
       select.value = note.model;
       select.addEventListener("change", () => { if (options.has(select.value)) this.enqueue(() => this.noteChange(node, { model: select.value, modelSource: "manual" })); });
       const sourceLabels: Record<ModelSource, string> = { workspace: t("工作區預設"), inherited: t("建立時繼承"), manual: t("手動指定") };
-      advanced.createEl("p", { cls: "vam-hint", text: t("{0} · {1}；目前推理等級：{2}。", note.model, sourceLabels[note.modelSource], this.plugin.settings.cliReasoning) });
+      const reasoningLabel = advanced.createEl("label", { cls: "vam-field" }); reasoningLabel.createSpan({ text: t("推理等級") });
+      const reasoning = reasoningLabel.createEl("select"); reasoning.setAttr("aria-label", t("推理等級"));
+      for (const [value, label] of [["low", t("低 (Low)")], ["medium", t("中 (Medium)")], ["high", t("高 (High)")]]) reasoning.createEl("option", { value, text: label });
+      reasoning.value = normalizeReasoningLevel(note.reasoning ?? this.plugin.settings.cliReasoning);
+      reasoning.addEventListener("change", () => this.enqueue(() => this.noteChange(node, { reasoning: normalizeReasoningLevel(reasoning.value) })));
+      advanced.createEl("p", { cls: "vam-hint", text: t("{0} · {1}；推理等級可依議題調整。", note.model, sourceLabels[note.modelSource]) });
     } else {
       panel.createEl("p", { text: t("此節點的筆記不存在，可重新連結未歸類筆記或從圖中移除。") });
       this.button(panel, t("重新連結筆記"), () => this.enqueue(async () => {
@@ -825,7 +830,7 @@ export class VisualAgentMapView extends ItemView {
     const model = inheritModel(parent ? (await this.plugin.repo.readNote(parent.path)).model : undefined, this.plugin.settings.cliModel);
     if (!this.path.startsWith(`${this.plugin.settings.topicsFolder}/`)) { new Notice(t("請先使用「整理舊資料」轉換目前心智圖。")); return; }
     const node = await this.plugin.repo.createNote(suggestedTitle?.trim() || (parent ? t("新的子議題") : t("我的核心議題")), model, this.map, this.path, parent ? "inherited" : "workspace");
-    if (parent) await this.plugin.repo.updateNote(node.path, { rules: (await this.plugin.repo.readNote(parent.path)).rules });
+    if (parent) { const parentNote = await this.plugin.repo.readNote(parent.path); await this.plugin.repo.updateNote(node.path, { rules: parentNote.rules, reasoning: parentNote.reasoning }); }
     node.parentId = parent?.id ?? null; node.x = parent ? parent.x + 340 : 80;
     const siblings = this.map.nodes.filter(n => n.parentId === node.parentId);
     node.y = siblings.length ? Math.max(...siblings.map(n => n.y)) + 220 : parent?.y ?? 80;
@@ -845,7 +850,7 @@ export class VisualAgentMapView extends ItemView {
     }
     this.plugin.running.add(parent.path); this.render();
     try {
-      const result = await this.plugin.askModel({ title: note.title, summary: note.summary, rules: note.rules, detail: note.detail, task: "請判斷此議題是否需要拆解。若需要，提出 3 到 7 個可獨立處理的子議題，每項提供 title、task 與 contribution；不要建立或修改任何檔案。", ancestors: await this.ancestorContext(parent), mode: "decompose" }, note.model);
+      const result = await this.plugin.askModel({ title: note.title, summary: note.summary, rules: note.rules, detail: note.detail, task: "請判斷此議題是否需要拆解。若需要，提出 3 到 7 個可獨立處理的子議題，每項提供 title、task 與 contribution；不要建立或修改任何檔案。", ancestors: await this.ancestorContext(parent), mode: "decompose" }, note.model, note.reasoning);
       const suggestions = result.suggestions.slice(0, 7);
       if (suggestions.length < 3) { new Notice(t("AI 認為目前不需要拆解，或沒有提出 3 至 7 個可建立的子議題。")); return; }
       this.plugin.pendingSuggestions.set(parent.path, suggestions);
@@ -905,7 +910,7 @@ export class VisualAgentMapView extends ItemView {
     const task = "根據直屬子議題的完整知識，更新母議題的目前理解與結構化知識；合併重複資訊，清楚標示共識、差異、取捨與待確認事項。";
     this.plugin.running.add(node.path); await this.plugin.repo.updateNote(node.path, { status: "running" }); await this.hydrate(); this.render();
     try {
-      const result = await this.plugin.askModel({ title: note.title, summary: note.summary, rules: note.rules, detail: note.detail, task, ancestors: await this.ancestorContext(node), sourceContext, mode: "synthesize" }, note.model);
+      const result = await this.plugin.askModel({ title: note.title, summary: note.summary, rules: note.rules, detail: note.detail, task, ancestors: await this.ancestorContext(node), sourceContext, mode: "synthesize" }, note.model, note.reasoning);
       await this.plugin.repo.updateNote(node.path, { summary: result.summary, detail: canonicalDetail(result.detail), visualReferences: visualReferencesMarkdown(result.visualReferences), newFindings: "", status: "completed" });
       new Notice(t("子議題整合已寫入目前理解與 MD 詳情。"));
     } catch (error) { console.error("Visual Agent Map child integration", error); await this.plugin.repo.updateNote(node.path, { status: "error" }); new Notice(this.plugin.recordFailure("子議題整合失敗", error)); }
@@ -966,7 +971,7 @@ export class VisualAgentMapView extends ItemView {
     this.integrationMode = false; this.multiSelected.clear(); this.render();
     const model = this.plugin.settings.cliModel;
     const sourceText = await this.sourceDigest(sources, "strong");
-    const result = await this.plugin.askModel({ title, summary: "尚未形成結論", rules, detail: "", task: goal, ancestors: "", sourceContext: sourceText, mode: "synthesize" }, model);
+    const result = await this.plugin.askModel({ title, summary: "尚未形成結論", rules, detail: "", task: goal, ancestors: "", sourceContext: sourceText, mode: "synthesize" }, model, this.plugin.settings.cliReasoning);
     const integrated = await this.plugin.repo.createNote(title, model, this.map, this.path, "workspace");
     await this.plugin.repo.updateNote(integrated.path, { summary: result.summary, rules, detail: canonicalDetail(result.detail), visualReferences: visualReferencesMarkdown(result.visualReferences), prompt: goal, sourcePaths: sources.map(source => source.path), status: "completed" });
     integrated.parentId = null;
@@ -1038,7 +1043,7 @@ export class VisualAgentMapView extends ItemView {
     try { await this.plugin.repo.updateNote(node.path, { status: "running" }); } catch (error) { this.plugin.running.delete(node.path); throw error; }
     await this.hydrate(); this.render();
     // Leave the mutation queue immediately: independent branches can run concurrently.
-    void this.plugin.askModel(context, note.model).then(result => this.plugin.mutate(async () => {
+    void this.plugin.askModel(context, note.model, note.reasoning).then(result => this.plugin.mutate(async () => {
       await this.plugin.repo.updateNote(node.path, { summary: result.summary, detail: canonicalDetail(result.detail), visualReferences: visualReferencesMarkdown(result.visualReferences), newFindings: "", status: "completed" });
       for (const view of this.plugin.views()) view.history.clear();
       if (result.suggestions.length) this.plugin.pendingSuggestions.set(node.path, result.suggestions.slice(0, 7));
@@ -1303,7 +1308,7 @@ export default class VisualAgentMapPlugin extends Plugin {
     this.settingTab?.update();
     for (const view of this.views()) await view.refreshFromPlugin();
   }
-  async askModel(context: TaskContext, model: string): Promise<AiResult> {
+  async askModel(context: TaskContext, model: string, reasoning?: unknown): Promise<AiResult> {
     if (model.startsWith("claude:")) throw new Error(t("Claude Code 已不再支援。請在議題設定中選擇 Codex model。"));
     const adapter = this.app.vault.adapter;
     if (!(adapter instanceof FileSystemAdapter)) throw new Error(t("CLI 模式只支援桌面版 Obsidian"));
@@ -1338,7 +1343,7 @@ export default class VisualAgentMapPlugin extends Plugin {
 
     console.debug("Visual Agent Map AI metrics", prepared.metrics);
     const providerStarted = Date.now();
-    const effort = this.settings.cliReasoning;
+    const effort = normalizeReasoningLevel(reasoning ?? this.settings.cliReasoning);
     const raw = await this.runtime(pluginDirectory).runTask(instructions, model, effort, responseSchema);
     const result = this.parseAiResult(raw, "Codex App Server");
     console.debug("Visual Agent Map AI metrics", { ...prepared.metrics, providerMs: Date.now() - providerStarted, totalMs: Date.now() - totalStarted });

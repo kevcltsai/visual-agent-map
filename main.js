@@ -261,6 +261,7 @@ var english = {
   "\u7528\u65BC\u5E38\u99D0 Codex session \u8207\u81EA\u52D5\u53D6\u5F97\u6A21\u578B\u6E05\u55AE\u3002": "Used for persistent Codex sessions and automatic model discovery.",
   "\u5DE5\u4F5C\u5340\u9810\u8A2D Model": "Workspace default model",
   "AI \u63A8\u7406\u7B49\u7D1A": "AI reasoning level",
+  "\u63A8\u7406\u7B49\u7D1A": "Reasoning level",
   "\u5957\u7528\u5230\u4E00\u822C\u3001\u62C6\u89E3\u8207\u6574\u5408 AI \u4EFB\u52D9\u3002\u7B49\u7D1A\u8D8A\u9AD8\u901A\u5E38\u9700\u8981\u8F03\u591A\u6642\u9593\u8207\u4F7F\u7528\u984D\u5EA6\u3002": "Applies to regular, decomposition, and synthesis AI tasks. Higher levels usually take more time and allowance.",
   "\u4F4E (Low)": "Low",
   "\u4E2D (Medium)": "Medium",
@@ -296,6 +297,7 @@ var english = {
   "\u67E5\u770B AI \u5B50\u8B70\u984C\u5EFA\u8B70\uFF08{0}\uFF09": "Review AI subtopic proposals ({0})",
   "{0} \xB7 {1}\uFF1B\u4E00\u822C\u4EFB\u52D9\u4F7F\u7528\u4F4E\u63A8\u7406\uFF0C\u6574\u5408\u5B50\u8B70\u984C\u4F7F\u7528\u9AD8\u63A8\u7406\u3002": "{0} \xB7 {1}; regular tasks use low reasoning, synthesis uses high reasoning.",
   "{0} \xB7 {1}\uFF1B\u76EE\u524D\u63A8\u7406\u7B49\u7D1A\uFF1A{2}\u3002": "{0} \xB7 {1}; current reasoning level: {2}.",
+  "{0} \xB7 {1}\uFF1B\u63A8\u7406\u7B49\u7D1A\u53EF\u4F9D\u8B70\u984C\u8ABF\u6574\u3002": "{0} \xB7 {1}; reasoning can be adjusted per topic.",
   "\u9019\u6703\u4F7F\u7528 {0} \u63A8\u7406\u7B49\u7D1A\u57F7\u884C AI \u4EFB\u52D9\uFF0C\u4E0D\u6703\u76F4\u63A5\u4FEE\u6539\u5FC3\u667A\u5716\u7D50\u69CB\u3002": "Run the AI task with {0} reasoning. The map structure stays unchanged until confirmation.",
   "\u9019\u6703\u4F7F\u7528 {0} \u63A8\u7406\u7B49\u7D1A\u57F7\u884C AI \u4EFB\u52D9\u3002": "Run the AI task with {0} reasoning.",
   "\u4F7F\u7528 {0}": "Use {0}",
@@ -930,6 +932,7 @@ var Repository = class {
     for (const name of ["Notes", "Unassigned", "Archive"]) await this.folder(`${root}/${name}`);
   }
   async readNote(path) {
+    var _a;
     const file = this.file(path), content = await this.app.vault.read(file), fm = frontmatter(content);
     const status = text(fm.status, "idea");
     const normalized = status === "review" || status === "accepted" ? "completed" : status;
@@ -946,6 +949,7 @@ var Repository = class {
       preview: [section(content, "\u9810\u89BD"), section(content, "User Notes")].filter(Boolean).join("\n\n"),
       model: text(fm.model, this.settings.cliModel),
       modelSource: ["workspace", "inherited", "manual"].includes(source) ? source : "workspace",
+      reasoning: normalizeReasoningLevel((_a = fm["reasoning-level"]) != null ? _a : this.settings.cliReasoning),
       status: ["idea", "running", "completed", "error"].includes(normalized) ? normalized : "idea",
       mapId: text(fm["agent-map-id"]),
       topicId: text(fm["topic-id"], text(fm["agent-map-id"])),
@@ -959,6 +963,7 @@ var Repository = class {
       ensureNoteCssClass(fm);
       for (const key of ["title", "summary", "model", "status"]) if (patch[key] !== void 0) fm[key] = patch[key];
       if (patch.modelSource !== void 0) fm["model-source"] = patch.modelSource;
+      if (patch.reasoning !== void 0) fm["reasoning-level"] = normalizeReasoningLevel(patch.reasoning);
       if (patch.mapId !== void 0) patch.mapId ? fm["agent-map-id"] = patch.mapId : delete fm["agent-map-id"];
       if (patch.topicId !== void 0) patch.topicId ? fm["topic-id"] = patch.topicId : delete fm["topic-id"];
       if (patch.topicState !== void 0) fm["topic-state"] = patch.topicState;
@@ -1011,6 +1016,7 @@ ${withReferenceLinks(body, fm)}`;
       "preview-initialized": false,
       model,
       "model-source": modelSource,
+      "reasoning-level": this.settings.cliReasoning,
       status: "idea",
       cssclasses: [NOTE_CSS_CLASS]
     };
@@ -3008,7 +3014,7 @@ var VisualAgentMapView = class extends import_obsidian5.ItemView {
     this.drawEdges();
   }
   renderInspector(parent, node) {
-    var _a, _b, _c, _d, _e, _f, _g, _h, _i;
+    var _a, _b, _c, _d, _e, _f, _g, _h, _i, _j;
     const panel = parent.createDiv("vam-inspector"), note = this.notes.get(node.id);
     const heading = panel.createDiv("vam-inspector-heading");
     heading.createEl("strong", { text: this.builtIn ? t("\u7BC4\u4F8B\u5167\u5BB9") : t("\u8B70\u984C\u5DE5\u4F5C\u53F0") });
@@ -3118,7 +3124,14 @@ var VisualAgentMapView = class extends import_obsidian5.ItemView {
         if (options.has(select.value)) this.enqueue(() => this.noteChange(node, { model: select.value, modelSource: "manual" }));
       });
       const sourceLabels = { workspace: t("\u5DE5\u4F5C\u5340\u9810\u8A2D"), inherited: t("\u5EFA\u7ACB\u6642\u7E7C\u627F"), manual: t("\u624B\u52D5\u6307\u5B9A") };
-      advanced.createEl("p", { cls: "vam-hint", text: t("{0} \xB7 {1}\uFF1B\u76EE\u524D\u63A8\u7406\u7B49\u7D1A\uFF1A{2}\u3002", note.model, sourceLabels[note.modelSource], this.plugin.settings.cliReasoning) });
+      const reasoningLabel = advanced.createEl("label", { cls: "vam-field" });
+      reasoningLabel.createSpan({ text: t("\u63A8\u7406\u7B49\u7D1A") });
+      const reasoning = reasoningLabel.createEl("select");
+      reasoning.setAttr("aria-label", t("\u63A8\u7406\u7B49\u7D1A"));
+      for (const [value, label] of [["low", t("\u4F4E (Low)")], ["medium", t("\u4E2D (Medium)")], ["high", t("\u9AD8 (High)")]]) reasoning.createEl("option", { value, text: label });
+      reasoning.value = normalizeReasoningLevel((_g = note.reasoning) != null ? _g : this.plugin.settings.cliReasoning);
+      reasoning.addEventListener("change", () => this.enqueue(() => this.noteChange(node, { reasoning: normalizeReasoningLevel(reasoning.value) })));
+      advanced.createEl("p", { cls: "vam-hint", text: t("{0} \xB7 {1}\uFF1B\u63A8\u7406\u7B49\u7D1A\u53EF\u4F9D\u8B70\u984C\u8ABF\u6574\u3002", note.model, sourceLabels[note.modelSource]) });
     } else {
       panel.createEl("p", { text: t("\u6B64\u7BC0\u9EDE\u7684\u7B46\u8A18\u4E0D\u5B58\u5728\uFF0C\u53EF\u91CD\u65B0\u9023\u7D50\u672A\u6B78\u985E\u7B46\u8A18\u6216\u5F9E\u5716\u4E2D\u79FB\u9664\u3002") });
       this.button(panel, t("\u91CD\u65B0\u9023\u7D50\u7B46\u8A18"), () => this.enqueue(async () => {
@@ -3134,8 +3147,8 @@ var VisualAgentMapView = class extends import_obsidian5.ItemView {
     const parents = parentLabel.createEl("select");
     parents.setAttr("aria-label", t("\u6BCD\u8B70\u984C\uFF0F\u9023\u7D50"));
     parents.createEl("option", { value: "", text: t("\u7121\u6BCD\u8B70\u984C\uFF08\u6839\u8B70\u984C\uFF09") });
-    for (const candidate of this.map.nodes) if (canParent(this.map.nodes, node.id, candidate.id)) parents.createEl("option", { value: candidate.id, text: (_h = (_g = this.notes.get(candidate.id)) == null ? void 0 : _g.title) != null ? _h : candidate.path });
-    parents.value = (_i = node.parentId) != null ? _i : "";
+    for (const candidate of this.map.nodes) if (canParent(this.map.nodes, node.id, candidate.id)) parents.createEl("option", { value: candidate.id, text: (_i = (_h = this.notes.get(candidate.id)) == null ? void 0 : _h.title) != null ? _i : candidate.path });
+    parents.value = (_j = node.parentId) != null ? _j : "";
     parents.addEventListener("change", () => {
       const parentId = parents.value || null;
       this.enqueue(() => this.mapChange((map) => {
@@ -3190,7 +3203,10 @@ var VisualAgentMapView = class extends import_obsidian5.ItemView {
       return;
     }
     const node = await this.plugin.repo.createNote((suggestedTitle == null ? void 0 : suggestedTitle.trim()) || (parent ? t("\u65B0\u7684\u5B50\u8B70\u984C") : t("\u6211\u7684\u6838\u5FC3\u8B70\u984C")), model, this.map, this.path, parent ? "inherited" : "workspace");
-    if (parent) await this.plugin.repo.updateNote(node.path, { rules: (await this.plugin.repo.readNote(parent.path)).rules });
+    if (parent) {
+      const parentNote = await this.plugin.repo.readNote(parent.path);
+      await this.plugin.repo.updateNote(node.path, { rules: parentNote.rules, reasoning: parentNote.reasoning });
+    }
     node.parentId = (_a = parent == null ? void 0 : parent.id) != null ? _a : null;
     node.x = parent ? parent.x + 340 : 80;
     const siblings = this.map.nodes.filter((n) => n.parentId === node.parentId);
@@ -3220,7 +3236,7 @@ var VisualAgentMapView = class extends import_obsidian5.ItemView {
     this.plugin.running.add(parent.path);
     this.render();
     try {
-      const result = await this.plugin.askModel({ title: note.title, summary: note.summary, rules: note.rules, detail: note.detail, task: "\u8ACB\u5224\u65B7\u6B64\u8B70\u984C\u662F\u5426\u9700\u8981\u62C6\u89E3\u3002\u82E5\u9700\u8981\uFF0C\u63D0\u51FA 3 \u5230 7 \u500B\u53EF\u7368\u7ACB\u8655\u7406\u7684\u5B50\u8B70\u984C\uFF0C\u6BCF\u9805\u63D0\u4F9B title\u3001task \u8207 contribution\uFF1B\u4E0D\u8981\u5EFA\u7ACB\u6216\u4FEE\u6539\u4EFB\u4F55\u6A94\u6848\u3002", ancestors: await this.ancestorContext(parent), mode: "decompose" }, note.model);
+      const result = await this.plugin.askModel({ title: note.title, summary: note.summary, rules: note.rules, detail: note.detail, task: "\u8ACB\u5224\u65B7\u6B64\u8B70\u984C\u662F\u5426\u9700\u8981\u62C6\u89E3\u3002\u82E5\u9700\u8981\uFF0C\u63D0\u51FA 3 \u5230 7 \u500B\u53EF\u7368\u7ACB\u8655\u7406\u7684\u5B50\u8B70\u984C\uFF0C\u6BCF\u9805\u63D0\u4F9B title\u3001task \u8207 contribution\uFF1B\u4E0D\u8981\u5EFA\u7ACB\u6216\u4FEE\u6539\u4EFB\u4F55\u6A94\u6848\u3002", ancestors: await this.ancestorContext(parent), mode: "decompose" }, note.model, note.reasoning);
       const suggestions = result.suggestions.slice(0, 7);
       if (suggestions.length < 3) {
         new import_obsidian5.Notice(t("AI \u8A8D\u70BA\u76EE\u524D\u4E0D\u9700\u8981\u62C6\u89E3\uFF0C\u6216\u6C92\u6709\u63D0\u51FA 3 \u81F3 7 \u500B\u53EF\u5EFA\u7ACB\u7684\u5B50\u8B70\u984C\u3002"));
@@ -3311,7 +3327,7 @@ var VisualAgentMapView = class extends import_obsidian5.ItemView {
     await this.hydrate();
     this.render();
     try {
-      const result = await this.plugin.askModel({ title: note.title, summary: note.summary, rules: note.rules, detail: note.detail, task, ancestors: await this.ancestorContext(node), sourceContext, mode: "synthesize" }, note.model);
+      const result = await this.plugin.askModel({ title: note.title, summary: note.summary, rules: note.rules, detail: note.detail, task, ancestors: await this.ancestorContext(node), sourceContext, mode: "synthesize" }, note.model, note.reasoning);
       await this.plugin.repo.updateNote(node.path, { summary: result.summary, detail: canonicalDetail(result.detail), visualReferences: visualReferencesMarkdown(result.visualReferences), newFindings: "", status: "completed" });
       new import_obsidian5.Notice(t("\u5B50\u8B70\u984C\u6574\u5408\u5DF2\u5BEB\u5165\u76EE\u524D\u7406\u89E3\u8207 MD \u8A73\u60C5\u3002"));
     } catch (error) {
@@ -3390,7 +3406,7 @@ ${note.detail.trim().split("\n").map((line) => `    ${line}`).join("\n")}` : "",
     this.render();
     const model = this.plugin.settings.cliModel;
     const sourceText = await this.sourceDigest(sources2, "strong");
-    const result = await this.plugin.askModel({ title, summary: "\u5C1A\u672A\u5F62\u6210\u7D50\u8AD6", rules, detail: "", task: goal, ancestors: "", sourceContext: sourceText, mode: "synthesize" }, model);
+    const result = await this.plugin.askModel({ title, summary: "\u5C1A\u672A\u5F62\u6210\u7D50\u8AD6", rules, detail: "", task: goal, ancestors: "", sourceContext: sourceText, mode: "synthesize" }, model, this.plugin.settings.cliReasoning);
     const integrated = await this.plugin.repo.createNote(title, model, this.map, this.path, "workspace");
     await this.plugin.repo.updateNote(integrated.path, { summary: result.summary, rules, detail: canonicalDetail(result.detail), visualReferences: visualReferencesMarkdown(result.visualReferences), prompt: goal, sourcePaths: sources2.map((source) => source.path), status: "completed" });
     integrated.parentId = null;
@@ -3580,7 +3596,7 @@ ${note.detail.trim().split("\n").map((line) => `    ${line}`).join("\n")}` : "",
     }
     await this.hydrate();
     this.render();
-    void this.plugin.askModel(context, note.model).then((result) => this.plugin.mutate(async () => {
+    void this.plugin.askModel(context, note.model, note.reasoning).then((result) => this.plugin.mutate(async () => {
       await this.plugin.repo.updateNote(node.path, { summary: result.summary, detail: canonicalDetail(result.detail), visualReferences: visualReferencesMarkdown(result.visualReferences), newFindings: "", status: "completed" });
       for (const view of this.plugin.views()) view.history.clear();
       if (result.suggestions.length) this.plugin.pendingSuggestions.set(node.path, result.suggestions.slice(0, 7));
@@ -4024,7 +4040,7 @@ var VisualAgentMapPlugin = class extends import_obsidian5.Plugin {
     (_d = this.settingTab) == null ? void 0 : _d.update();
     for (const view of this.views()) await view.refreshFromPlugin();
   }
-  async askModel(context, model) {
+  async askModel(context, model, reasoning) {
     if (model.startsWith("claude:")) throw new Error(t("Claude Code \u5DF2\u4E0D\u518D\u652F\u63F4\u3002\u8ACB\u5728\u8B70\u984C\u8A2D\u5B9A\u4E2D\u9078\u64C7 Codex model\u3002"));
     const adapter = this.app.vault.adapter;
     if (!(adapter instanceof import_obsidian5.FileSystemAdapter)) throw new Error(t("CLI \u6A21\u5F0F\u53EA\u652F\u63F4\u684C\u9762\u7248 Obsidian"));
@@ -4059,7 +4075,7 @@ ${context.task}`
     ].join("\n\n");
     console.debug("Visual Agent Map AI metrics", prepared.metrics);
     const providerStarted = Date.now();
-    const effort = this.settings.cliReasoning;
+    const effort = normalizeReasoningLevel(reasoning != null ? reasoning : this.settings.cliReasoning);
     const raw = await this.runtime(pluginDirectory).runTask(instructions, model, effort, response_schema_default);
     const result = this.parseAiResult(raw, "Codex App Server");
     console.debug("Visual Agent Map AI metrics", { ...prepared.metrics, providerMs: Date.now() - providerStarted, totalMs: Date.now() - totalStarted });

@@ -18,6 +18,7 @@ export interface Note {
   preview: string;
   model: string;
   modelSource: ModelSource;
+  reasoning?: ReasoningLevel;
   status: Status;
   mapId: string;
   topicId: string;
@@ -321,6 +322,7 @@ export class Repository {
       preview: [section(content, "預覽"), section(content, "User Notes")].filter(Boolean).join("\n\n"),
       model: text(fm.model, this.settings.cliModel),
       modelSource: ["workspace", "inherited", "manual"].includes(source) ? source as ModelSource : "workspace",
+      reasoning: normalizeReasoningLevel(fm["reasoning-level"] ?? this.settings.cliReasoning),
       status: ["idea", "running", "completed", "error"].includes(normalized) ? normalized as Status : "idea",
       mapId: text(fm["agent-map-id"]),
       topicId: text(fm["topic-id"], text(fm["agent-map-id"])),
@@ -335,6 +337,7 @@ export class Repository {
       ensureNoteCssClass(fm);
       for (const key of ["title", "summary", "model", "status"] as const) if (patch[key] !== undefined) fm[key] = patch[key];
       if (patch.modelSource !== undefined) fm["model-source"] = patch.modelSource;
+      if (patch.reasoning !== undefined) fm["reasoning-level"] = normalizeReasoningLevel(patch.reasoning);
       if (patch.mapId !== undefined) patch.mapId ? fm["agent-map-id"] = patch.mapId : delete fm["agent-map-id"];
       if (patch.topicId !== undefined) patch.topicId ? fm["topic-id"] = patch.topicId : delete fm["topic-id"];
       if (patch.topicState !== undefined) fm["topic-state"] = patch.topicState;
@@ -383,6 +386,7 @@ export class Repository {
       "preview-initialized": false,
       model,
       "model-source": modelSource,
+      "reasoning-level": this.settings.cliReasoning,
       status: "idea",
       cssclasses: [NOTE_CSS_CLASS]
     };

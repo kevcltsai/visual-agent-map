@@ -1,18 +1,107 @@
-Install a selected public Visual Agent Map GitHub Release into my Obsidian desktop vault from https://github.com/kevcltsai/visual-agent-map/releases. Do not use files from the `main` branch as a production installation source.
+# Install Visual Agent Map
 
-Complete the installation end to end:
+This guide takes you from installation to your first editable VAM map. VAM is currently verified on **Obsidian Desktop 1.13.7+ for macOS**.
 
-1. If I have not provided the absolute path to my Obsidian vault, ask for that path before changing files. Never guess the vault path.
-2. Verify that the vault exists and contains a `.obsidian` directory. Stop and explain the problem if either check fails.
-3. Use `<vault>/.obsidian/plugins/visual-agent-map/` as the plugin directory.
-4. If the plugin directory already exists, preserve its `data.json`. Never delete or overwrite the vault's `Agent Workspace/` folder.
-5. Select one GitHub Release version and download its three release assets into the plugin directory, replacing older copies only after all downloads succeed:
-   - `main.js`
-   - `manifest.json`
-   - `styles.css`
-   Use the assets attached to that exact release tag, not raw GitHub file URLs.
-6. Do not clone the whole repository into the plugin directory, do not copy internal project documents, and do not run `npm install` in the vault.
-7. Verify that Node.js and the Codex CLI are installed and that Codex is signed in with ChatGPT. Do not install or update Codex CLI without asking first.
-8. Tell me the resolved Codex CLI path and App Server status shown in Visual Agent Map settings. Visual Agent Map supports Codex models only.
-9. Ask me to reload Obsidian and enable Visual Agent Map under Community plugins. Do not change Obsidian's restricted-mode or security settings without my confirmation.
-10. Verify the three installed plugin files, confirm that any existing `data.json` and `Agent Workspace/` were preserved, and report every command run plus the final paths. If a step fails, stop and report the error instead of claiming success.
+## What you need
+
+- Obsidian Desktop 1.13.7 or later.
+- Codex CLI, for creating an editable map and using AI features.
+- A ChatGPT account signed in through Codex CLI. ChatGPT Free can use Codex, with a smaller allowance than paid plans.
+
+VAM does not require an API key. A standalone Codex CLI installation does not require npm; Node.js and npm are only needed when building VAM from source.
+
+## 1. Install VAM
+
+### From Obsidian Community plugins
+
+1. Open **Settings → Community plugins** in Obsidian.
+2. Select **Browse**, search for **Visual Agent Map**, then select **Install**.
+3. Select **Enable**.
+
+### From a GitHub Release
+
+1. Download `main.js`, `manifest.json`, and `styles.css` from the same [Visual Agent Map release](https://github.com/kevcltsai/visual-agent-map/releases).
+2. Place all three files in `<your-vault>/.obsidian/plugins/visual-agent-map/`.
+3. Reload Obsidian, then enable **Visual Agent Map** under **Settings → Community plugins**.
+
+Do not install files from the repository's `main` branch into a production vault.
+
+## 2. Prepare Codex
+
+1. Install the [Codex CLI](https://developers.openai.com/codex/cli/).
+2. In Terminal, run `codex` and sign in with your ChatGPT account.
+3. Return to VAM. In the built-in sample, select **Check Codex**. You can also use **Settings → Visual Agent Map → Recheck**.
+4. Continue when VAM reports that Codex App Server is ready.
+
+VAM never installs or updates Codex CLI for you.
+
+## 3. Start your first map
+
+1. Explore the built-in read-only sample and its five-step tour.
+2. After Codex is ready, select **Duplicate to my workspace** to start from the sample, or **Create empty mind map**.
+3. Select a topic and choose **Next step** to run your first AI task.
+4. Before that first task runs, VAM shows a one-time notice that AI tasks use your signed-in account's Codex allowance. Canceling does not dismiss the notice permanently.
+
+You are ready when you can open an editable map, select a Codex model, and see **Next step** on a topic.
+
+## If setup does not complete
+
+- **Codex CLI not found:** enter its executable path in **Settings → Visual Agent Map → Codex CLI path**, then select **Recheck**.
+- **Authentication failure:** run `codex` in Terminal and sign in again.
+- **Workspace missing:** use **Find existing Workspace** or **Repair Agent Workspace** in VAM settings. Repair does not overwrite existing notes.
+- **Need diagnostics:** run **Open Debug Log** from the Obsidian Command Palette. Logs stay in memory and disappear after the plugin reloads.
+
+---
+
+# 安裝 Visual Agent Map
+
+本指南會帶你從安裝一路完成第一張可編輯的 VAM 心智圖。VAM 目前已驗證的環境是 **macOS 上的 Obsidian Desktop 1.13.7+**。
+
+## 需要準備
+
+- Obsidian Desktop 1.13.7 或更新版本。
+- Codex CLI，用於建立可編輯的心智圖與使用 AI 功能。
+- 透過 Codex CLI 登入的 ChatGPT 帳號。ChatGPT Free 可以使用 Codex，但額度比付費方案少。
+
+VAM 不需要 API key。使用獨立版 Codex CLI 不需要 npm；只有從原始碼建置 VAM 才需要 Node.js 與 npm。
+
+## 1. 安裝 VAM
+
+### 從 Obsidian Community plugins 安裝
+
+1. 在 Obsidian 開啟 **Settings → Community plugins**。
+2. 選擇 **Browse**，搜尋 **Visual Agent Map**，再選擇 **Install**。
+3. 選擇 **Enable**。
+
+### 從 GitHub Release 安裝
+
+1. 從同一個 [Visual Agent Map release](https://github.com/kevcltsai/visual-agent-map/releases) 下載 `main.js`、`manifest.json`、`styles.css`。
+2. 把三個檔案放進 `<你的-vault>/.obsidian/plugins/visual-agent-map/`。
+3. 重新載入 Obsidian，然後到 **Settings → Community plugins** 啟用 **Visual Agent Map**。
+
+正式使用時，不要從 repository 的 `main` branch 安裝檔案。
+
+## 2. 準備 Codex
+
+1. 安裝 [Codex CLI](https://developers.openai.com/codex/cli/)。
+2. 在 Terminal 執行 `codex`，並使用 ChatGPT 帳號登入。
+3. 回到 VAM，在內建範例選擇 **檢查 Codex**；也可以到 **Settings → Visual Agent Map → 重新檢查**。
+4. VAM 顯示 Codex App Server 已就緒後再繼續。
+
+VAM 不會自行安裝或更新 Codex CLI。
+
+## 3. 開始第一張心智圖
+
+1. 先探索內建唯讀範例與五步導覽。
+2. Codex 就緒後，選擇 **複製到我的工作區**，或選擇 **建立空白心智圖**。
+3. 選取議題，再選擇 **下一步**，執行第一個 AI 任務。
+4. 第一次任務執行前，VAM 會一次性提醒 AI 任務會使用登入帳號的 Codex 額度。若取消，下一次執行仍會顯示提醒。
+
+當你能開啟可編輯的心智圖、選擇 Codex model，並在議題上看到 **下一步**，就代表設定完成。
+
+## 設定沒有完成時
+
+- **找不到 Codex CLI：** 到 **Settings → Visual Agent Map → Codex CLI 路徑** 填入執行檔路徑，再選擇 **重新檢查**。
+- **登入失敗：** 在 Terminal 執行 `codex` 並重新登入。
+- **Workspace 遺失：** 在 VAM settings 使用 **找回既有 Workspace** 或 **修復 Agent Workspace**。修復不會覆寫既有筆記。
+- **需要診斷資訊：** 從 Obsidian Command Palette 執行 **開啟偵錯日誌 (Open Debug Log)**。日誌只存在記憶體，重新載入外掛後會消失。

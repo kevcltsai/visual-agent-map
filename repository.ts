@@ -41,6 +41,7 @@ export interface Settings {
   migrated: boolean;
   structureVersion: number;
   firstUseNoticeSeen: boolean;
+  codexUsageNoticeSeen: boolean;
   workspaceInitialized: boolean;
   sampleTourVersionSeen: number;
 }
@@ -67,6 +68,7 @@ export const DEFAULT_SETTINGS: Settings = {
   migrated: false,
   structureVersion: 2,
   firstUseNoticeSeen: false,
+  codexUsageNoticeSeen: false,
   workspaceInitialized: false,
   sampleTourVersionSeen: 0
 };

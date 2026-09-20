@@ -44,8 +44,26 @@ var english = {
   "\u53D6\u6D88": "Cancel",
   "\u958B\u59CB\u4F7F\u7528": "Get started",
   "\u5148\u5EFA\u7ACB\u4E00\u5F35\u7A7A\u767D\u5FC3\u667A\u5716\uFF0C\u6216\u5EFA\u7ACB\u53EF\u81EA\u7531\u7DE8\u8F2F\u8207\u522A\u9664\u7684\u7BC4\u4F8B\u3002\u5EFA\u7ACB\u7BC4\u4F8B\u4E0D\u6703\u57F7\u884C AI \u4EFB\u52D9\u3002": "Create an empty mind map, or a sample you can freely edit or delete. Creating a sample never runs an AI task.",
-  "\u53EA\u6709\u5728\u4F60\u78BA\u8A8D\u57F7\u884C AI \u4EFB\u52D9\u6642\uFF0C\u5916\u639B\u624D\u6703\u4F7F\u7528\u672C\u6A5F\u5DF2\u767B\u5165\u7684 Codex CLI\uFF1B\u4E0D\u4F7F\u7528 ChatGPT \u5C0D\u8A71\u984D\u5EA6\uFF0C\u4E14\u4E0D\u4FDD\u5B58 API key\u3002": "Only after you confirm an AI task will the plugin use your locally signed-in Codex CLI. It doesn't use ChatGPT chat usage and doesn't store API keys.",
+  "\u53EA\u6709\u5728\u4F60\u78BA\u8A8D\u57F7\u884C AI \u4EFB\u52D9\u6642\uFF0C\u5916\u639B\u624D\u6703\u4F7F\u7528\u672C\u6A5F\u5DF2\u767B\u5165\u7684 Codex CLI \u8207\u8A72\u5E33\u865F\u7684 Codex \u984D\u5EA6\uFF1B\u5916\u639B\u4E0D\u4FDD\u5B58 API key\u3002": "Only after you confirm an AI task will the plugin use your locally signed-in Codex CLI and that account's Codex allowance. The plugin does not store API keys.",
   "\u5EFA\u7ACB\u7A7A\u767D\u5FC3\u667A\u5716": "Create an empty mind map",
+  "\u958B\u59CB\u4F7F\u7528 VAM": "Start using VAM",
+  "Codex \u5DF2\u5C31\u7DD2\u3002\u8907\u88FD\u7BC4\u4F8B\u6216\u5EFA\u7ACB\u7A7A\u767D\u5FC3\u667A\u5716\uFF0C\u958B\u59CB\u81EA\u5DF1\u7684\u7814\u7A76\u3002": "Codex is ready. Duplicate the sample or create an empty mind map to start your own research.",
+  "\u5148\u5B8C\u6210 Codex \u8A2D\u5B9A\uFF0C\u518D\u8907\u88FD\u7BC4\u4F8B\u6216\u5EFA\u7ACB\u5FC3\u667A\u5716\u3002\u4F60\u4ECD\u53EF\u7E7C\u7E8C\u700F\u89BD\u9019\u4EFD\u552F\u8B80\u7BC4\u4F8B\u3002": "Finish Codex setup before duplicating the sample or creating a mind map. You can still explore this read-only sample.",
+  "\u6AA2\u67E5 Codex": "Check Codex",
+  "Codex \u984D\u5EA6\u63D0\u9192": "Codex allowance notice",
+  "VAM \u6703\u900F\u904E\u4F60\u76EE\u524D\u767B\u5165\u7684 Codex \u5E33\u865F\u57F7\u884C AI \u4EFB\u52D9\uFF0C\u4E26\u4F7F\u7528\u8A72\u5E33\u865F\u7684 Codex \u4F7F\u7528\u984D\u5EA6\u3002\u53EF\u7528\u984D\u5EA6\u8207\u9650\u5236\u4F9D\u4F60\u7684 ChatGPT \u65B9\u6848\u800C\u5B9A\u3002": "VAM runs AI tasks through your signed-in Codex account and uses that account's Codex allowance. Available usage and limits depend on your ChatGPT plan.",
+  "\u4E86\u89E3\u4E26\u57F7\u884C": "Understand and run",
+  "\u5B89\u88DD\u4E26\u9023\u63A5 Codex": "Install and connect Codex",
+  "VAM \u9700\u8981 Codex CLI \u624D\u80FD\u5EFA\u7ACB\u7B2C\u4E00\u5F35\u53EF\u7DE8\u8F2F\u5FC3\u667A\u5716\u8207\u57F7\u884C AI \u4EFB\u52D9\u3002ChatGPT Free \u4E5F\u53EF\u4F7F\u7528\uFF0C\u4F46 Codex \u984D\u5EA6\u8F03\u5C11\u3002": "VAM needs Codex CLI to create your first editable mind map and run AI tasks. ChatGPT Free is supported with a smaller Codex allowance.",
+  "\u958B\u555F\u5B98\u65B9 Codex CLI \u5B89\u88DD\u6307\u5357\u4E26\u5B8C\u6210\u5B89\u88DD\uFF1A": "Open the official Codex CLI installation guide and complete installation: ",
+  "Codex CLI \u5B98\u65B9\u5B89\u88DD\u6307\u5357": "Official Codex CLI installation guide",
+  "\u5728 Terminal \u57F7\u884C codex\uFF0C\u4E26\u7528\u4F60\u7684 ChatGPT \u5E33\u865F\u767B\u5165\u3002": "Run codex in Terminal and sign in with your ChatGPT account.",
+  "\u56DE\u5230 VAM\uFF0C\u9078\u64C7\u300C\u6211\u5DF2\u5B8C\u6210\uFF0C\u91CD\u65B0\u6AA2\u67E5\u300D\u3002": "Return to VAM and select \u201CI've finished \u2014 check again.\u201D",
+  "\u4E0D\u9700\u8981 API key\u3002\u7368\u7ACB\u7248 Codex CLI \u4E0D\u9700\u8981 npm\uFF1B\u53EA\u6709\u5F9E\u539F\u59CB\u78BC\u5EFA\u7F6E VAM \u624D\u9700\u8981 Node.js \u8207 npm\u3002": "No API key is required. The standalone Codex CLI does not require npm; Node.js and npm are only needed to build VAM from source.",
+  "\u76EE\u524D\u6AA2\u67E5\u7684\u8DEF\u5F91\uFF1A{0}": "Path currently checked: {0}",
+  "\u7A0D\u5F8C\u8655\u7406": "Do this later",
+  "\u6211\u5DF2\u5B8C\u6210\uFF0C\u91CD\u65B0\u6AA2\u67E5": "I've finished \u2014 check again",
+  "\u5B89\u88DD\u8AAA\u660E": "Installation guide",
   "\u5EFA\u7ACB\u4E00\u500B\u65B0\u7684\u7A7A\u767D\u7814\u7A76\u4E3B\u984C\u3002": "Create a new, empty research topic.",
   "\u5EFA\u7ACB": "Create",
   "\u5EFA\u7ACB\u7BC4\u4F8B\u5FC3\u667A\u5716": "Create a sample mind map",
@@ -342,7 +360,7 @@ var english = {
   "\u6A21\u578B\u6E05\u55AE\u7531 Codex App Server \u81EA\u52D5\u53D6\u5F97\uFF1B\u8B8A\u66F4\u53EA\u5F71\u97FF\u4E4B\u5F8C\u65B0\u589E\u7684\u6839\u8B70\u984C\u3002": "Models are loaded from Codex App Server; changes apply only to new root topics.",
   "Codex App Server \u72C0\u614B": "Codex App Server status",
   "\u5DF2\u627E\u5230 Codex CLI\uFF1A{0}": "Codex CLI found: {0}",
-  "\u672A\u627E\u5230 Codex CLI\u3002\u8ACB\u5148\u5B89\u88DD Codex CLI \u4E26\u4EE5 ChatGPT \u767B\u5165\uFF1BVAM \u4E0D\u6703\u81EA\u52D5\u5B89\u88DD\u7CFB\u7D71\u5957\u4EF6\u3002": "Codex CLI was not found. Install it and sign in with ChatGPT; VAM never installs system packages automatically.",
+  "\u672A\u627E\u5230 Codex CLI\u3002\u8ACB\u4F9D\u5B89\u88DD\u8AAA\u660E\u5B8C\u6210\u5B89\u88DD\u8207 ChatGPT \u767B\u5165\uFF1BVAM \u4E0D\u6703\u81EA\u52D5\u5B89\u88DD\u7CFB\u7D71\u5957\u4EF6\u3002": "Codex CLI was not found. Follow the installation guide to install it and sign in with ChatGPT; VAM never installs system packages automatically.",
   "Codex App Server \u5C1A\u672A\u5C31\u7DD2\uFF1BSample \u8207\u975E AI \u529F\u80FD\u4ECD\u53EF\u4F7F\u7528\u3002\u8ACB\u5230 VAM Settings \u67E5\u770B\u4E26\u91CD\u65B0\u6AA2\u67E5\u3002": "Codex App Server is not ready. Samples and non-AI features remain available; check VAM Settings.",
   "\u672A\u627E\u5230 Codex CLI\uFF1A{0}": "Codex CLI was not found: {0}",
   "Codex App Server \u5DF2\u5C31\u7DD2\uFF1A{0}": "Codex App Server is ready: {0}",
@@ -627,6 +645,7 @@ var DEFAULT_SETTINGS = {
   migrated: false,
   structureVersion: 2,
   firstUseNoticeSeen: false,
+  codexUsageNoticeSeen: false,
   workspaceInitialized: false,
   sampleTourVersionSeen: 0
 };
@@ -1751,6 +1770,7 @@ var CodexAppServerRuntime = class {
 
 // main.ts
 var VIEW_TYPE = "visual-agent-map-view";
+var CODEX_INSTALL_URL = "https://developers.openai.com/codex/cli/";
 function typedNodeBinding(value) {
   return value;
 }
@@ -1840,6 +1860,49 @@ var TaskModal = class extends import_obsidian5.Modal {
     new import_obsidian5.Setting(this.contentEl).addButton((b) => b.setButtonText(t("\u53D6\u6D88")).onClick(() => this.close())).addButton((b) => b.setButtonText(t("\u53EA\u5132\u5B58")).onClick(() => save(false))).addButton((b) => b.setButtonText(t("\u78BA\u8A8D\u4E26\u57F7\u884C")).setCta().onClick(() => save(true)));
     input.focus();
     input.setSelectionRange(input.value.length, input.value.length);
+  }
+};
+var CodexUsageModal = class extends import_obsidian5.Modal {
+  constructor(app, resolve) {
+    super(app);
+    this.resolve = resolve;
+    __publicField(this, "settled", false);
+  }
+  onOpen() {
+    this.titleEl.setText(t("Codex \u984D\u5EA6\u63D0\u9192"));
+    this.contentEl.createEl("p", { text: t("VAM \u6703\u900F\u904E\u4F60\u76EE\u524D\u767B\u5165\u7684 Codex \u5E33\u865F\u57F7\u884C AI \u4EFB\u52D9\uFF0C\u4E26\u4F7F\u7528\u8A72\u5E33\u865F\u7684 Codex \u4F7F\u7528\u984D\u5EA6\u3002\u53EF\u7528\u984D\u5EA6\u8207\u9650\u5236\u4F9D\u4F60\u7684 ChatGPT \u65B9\u6848\u800C\u5B9A\u3002"), cls: "vam-modal-intro" });
+    const finish = (confirmed) => {
+      this.settled = true;
+      this.close();
+      this.resolve(confirmed);
+    };
+    new import_obsidian5.Setting(this.contentEl).addButton((button) => button.setButtonText(t("\u53D6\u6D88")).onClick(() => finish(false))).addButton((button) => button.setButtonText(t("\u4E86\u89E3\u4E26\u57F7\u884C")).setCta().onClick(() => finish(true)));
+  }
+  onClose() {
+    if (!this.settled) this.resolve(false);
+  }
+};
+var CodexSetupModal = class extends import_obsidian5.Modal {
+  constructor(app, executable, recheck) {
+    super(app);
+    this.executable = executable;
+    this.recheck = recheck;
+  }
+  onOpen() {
+    this.titleEl.setText(t("\u5B89\u88DD\u4E26\u9023\u63A5 Codex"));
+    this.contentEl.createEl("p", { text: t("VAM \u9700\u8981 Codex CLI \u624D\u80FD\u5EFA\u7ACB\u7B2C\u4E00\u5F35\u53EF\u7DE8\u8F2F\u5FC3\u667A\u5716\u8207\u57F7\u884C AI \u4EFB\u52D9\u3002ChatGPT Free \u4E5F\u53EF\u4F7F\u7528\uFF0C\u4F46 Codex \u984D\u5EA6\u8F03\u5C11\u3002"), cls: "vam-modal-intro" });
+    const steps = this.contentEl.createEl("ol", { cls: "vam-setup-steps" });
+    const install = steps.createEl("li");
+    install.appendText(t("\u958B\u555F\u5B98\u65B9 Codex CLI \u5B89\u88DD\u6307\u5357\u4E26\u5B8C\u6210\u5B89\u88DD\uFF1A"));
+    install.createEl("a", { text: t("Codex CLI \u5B98\u65B9\u5B89\u88DD\u6307\u5357"), href: CODEX_INSTALL_URL, attr: { target: "_blank", rel: "noopener noreferrer" } });
+    steps.createEl("li", { text: t("\u5728 Terminal \u57F7\u884C codex\uFF0C\u4E26\u7528\u4F60\u7684 ChatGPT \u5E33\u865F\u767B\u5165\u3002") });
+    steps.createEl("li", { text: t("\u56DE\u5230 VAM\uFF0C\u9078\u64C7\u300C\u6211\u5DF2\u5B8C\u6210\uFF0C\u91CD\u65B0\u6AA2\u67E5\u300D\u3002") });
+    this.contentEl.createEl("p", { text: t("\u4E0D\u9700\u8981 API key\u3002\u7368\u7ACB\u7248 Codex CLI \u4E0D\u9700\u8981 npm\uFF1B\u53EA\u6709\u5F9E\u539F\u59CB\u78BC\u5EFA\u7F6E VAM \u624D\u9700\u8981 Node.js \u8207 npm\u3002"), cls: "vam-setup-note" });
+    this.contentEl.createEl("p", { text: t("\u76EE\u524D\u6AA2\u67E5\u7684\u8DEF\u5F91\uFF1A{0}", this.executable), cls: "vam-setup-path" });
+    new import_obsidian5.Setting(this.contentEl).addButton((button) => button.setButtonText(t("\u7A0D\u5F8C\u8655\u7406")).onClick(() => this.close())).addButton((button) => button.setButtonText(t("\u6211\u5DF2\u5B8C\u6210\uFF0C\u91CD\u65B0\u6AA2\u67E5")).setCta().onClick(() => {
+      this.close();
+      this.recheck();
+    }));
   }
 };
 var ChildProposalModal = class extends import_obsidian5.Modal {
@@ -2647,14 +2710,13 @@ var VisualAgentMapView = class extends import_obsidian5.ItemView {
         ...topics.map((topic) => ({ label: topic.title, action: () => this.enqueue(() => this.openMap(topic.mapPath)) }))
       ]).open();
     }));
-    this.button(toolbar, t("\uFF0B \u5FC3\u667A\u5716"), () => new NameModal(this.app, t("\u65B0\u589E\u5FC3\u667A\u5716"), t("\u65B0\u7684\u5FC3\u667A\u5716"), (title2) => this.enqueue(async () => this.openMap(await this.plugin.repo.createMap(title2)))).open());
     if (this.builtIn) {
-      this.button(toolbar, t("\u8907\u88FD\u5230\u6211\u7684\u5DE5\u4F5C\u5340"), () => this.enqueue(async () => this.openMap(await this.plugin.duplicateBuiltInSample()))).addClass("mod-cta");
       this.button(toolbar, t("\u91CD\u65B0\u986F\u793A\u5C0E\u89BD"), () => {
         this.showSampleTour = true;
         this.render();
       });
-    } else {
+    } else if (this.map) {
+      this.button(toolbar, t("\uFF0B \u5FC3\u667A\u5716"), () => new NameModal(this.app, t("\u65B0\u589E\u5FC3\u667A\u5716"), t("\u65B0\u7684\u5FC3\u667A\u5716"), (title2) => this.enqueue(async () => this.openMap(await this.plugin.repo.createMap(title2)))).open());
       const undo = this.button(toolbar, t("\u5FA9\u539F"), () => this.enqueue(() => this.travel(false)), !this.history.canUndo);
       undo.dataset.history = "undo";
       const redo = this.button(toolbar, t("\u91CD\u505A"), () => this.enqueue(() => this.travel(true)), !this.history.canRedo);
@@ -2670,7 +2732,8 @@ var VisualAgentMapView = class extends import_obsidian5.ItemView {
         this.button(actions, t("\u627E\u56DE\u65E2\u6709 Workspace"), () => this.enqueue(() => this.plugin.offerWorkspaceReconnect())).addClass("mod-cta");
         this.button(actions, t("\u4FEE\u5FA9 Agent Workspace"), () => this.enqueue(() => this.plugin.repairWorkspace()));
       }
-      this.button(actions, t("\u5EFA\u7ACB\u65B0\u5FC3\u667A\u5716"), () => new NameModal(this.app, t("\u65B0\u589E\u5FC3\u667A\u5716"), t("\u65B0\u7684\u5FC3\u667A\u5716"), (title2) => this.enqueue(async () => this.openMap(await this.plugin.repo.createMap(title2)))).open());
+      if (this.plugin.settings.models.trim()) this.button(actions, t("\u5EFA\u7ACB\u65B0\u5FC3\u667A\u5716"), () => new NameModal(this.app, t("\u65B0\u589E\u5FC3\u667A\u5716"), t("\u65B0\u7684\u5FC3\u667A\u5716"), (title2) => this.enqueue(async () => this.openMap(await this.plugin.repo.createMap(title2)))).open());
+      else this.button(actions, t("\u6AA2\u67E5 Codex"), () => this.enqueue(() => this.plugin.recheckCodex())).addClass("mod-cta");
       this.button(actions, t("\u67E5\u770B\u7BC4\u4F8B"), () => this.enqueue(() => this.openBuiltInSample(true)));
       return;
     }
@@ -2702,6 +2765,18 @@ var VisualAgentMapView = class extends import_obsidian5.ItemView {
         void this.plugin.saveSettings();
         this.render();
       });
+    }
+    if (this.builtIn) {
+      const start = this.contentEl.createDiv("vam-sample-start");
+      const ready = !!this.plugin.settings.models.trim();
+      const copy = start.createDiv();
+      copy.createEl("strong", { text: t("\u958B\u59CB\u4F7F\u7528 VAM") });
+      copy.createEl("p", { text: ready ? t("Codex \u5DF2\u5C31\u7DD2\u3002\u8907\u88FD\u7BC4\u4F8B\u6216\u5EFA\u7ACB\u7A7A\u767D\u5FC3\u667A\u5716\uFF0C\u958B\u59CB\u81EA\u5DF1\u7684\u7814\u7A76\u3002") : t("\u5148\u5B8C\u6210 Codex \u8A2D\u5B9A\uFF0C\u518D\u8907\u88FD\u7BC4\u4F8B\u6216\u5EFA\u7ACB\u5FC3\u667A\u5716\u3002\u4F60\u4ECD\u53EF\u7E7C\u7E8C\u700F\u89BD\u9019\u4EFD\u552F\u8B80\u7BC4\u4F8B\u3002") });
+      const actions = start.createDiv("vam-sample-start-actions");
+      if (ready) {
+        this.button(actions, t("\u8907\u88FD\u5230\u6211\u7684\u5DE5\u4F5C\u5340"), () => this.enqueue(async () => this.openMap(await this.plugin.duplicateBuiltInSample()))).addClass("mod-cta");
+        this.button(actions, t("\u5EFA\u7ACB\u7A7A\u767D\u5FC3\u667A\u5716"), () => new NameModal(this.app, t("\u65B0\u589E\u5FC3\u667A\u5716"), t("\u65B0\u7684\u5FC3\u667A\u5716"), (title2) => this.enqueue(async () => this.openMap(await this.plugin.repo.createMap(title2)))).open());
+      } else this.button(actions, t("\u6AA2\u67E5 Codex"), () => this.enqueue(() => this.plugin.recheckCodex())).addClass("mod-cta");
     }
     const tools = this.contentEl.createDiv("vam-map-tools");
     if (!this.builtIn) {
@@ -2982,7 +3057,7 @@ var VisualAgentMapView = class extends import_obsidian5.ItemView {
           prompt,
           (value, run) => this.enqueue(async () => {
             await this.noteChange(node, { prompt: value });
-            if (run) await this.runAgent(node);
+            if (run) await this.plugin.confirmCodexUsage(() => this.runAgent(node));
           }),
           title,
           t("AI \u5B8C\u6210\u5F8C\u6703\u76F4\u63A5\u66F4\u65B0\u76EE\u524D\u7406\u89E3\uFF0C\u5B8C\u6574\u7D50\u679C\u6703\u4FDD\u5B58\u5728 MD \u8A73\u60C5\u4E2D\u3002\u9001\u51FA\u524D\u53EF\u8ABF\u6574\u4EFB\u52D9\u3002"),
@@ -3121,7 +3196,7 @@ var VisualAgentMapView = class extends import_obsidian5.ItemView {
     if (this.plugin.running.has(parent.path)) return;
     if (!confirmed) {
       new ChoiceModal(this.app, t("\u78BA\u8A8D AI \u62C6\u89E3"), t("AI \u6703\u5206\u6790\u76EE\u524D\u8B70\u984C\u4E26\u63D0\u51FA 3\u20137 \u500B\u5B50\u8B70\u984C\uFF1B\u7D50\u679C\u5B8C\u6210\u5F8C\u4ECD\u9700\u7531\u4F60\u78BA\u8A8D\u624D\u6703\u5EFA\u7ACB\u7BC0\u9EDE\u3002\n\n\u672C\u6B21\u5957\u7528\u7684 AI \u898F\u5247\uFF1A\n{0}", note.rules.trim() || "\u672A\u8A2D\u5B9A\u984D\u5916\u898F\u5247\u3002"), [
-        { label: t("\u4F7F\u7528 {0}", note.model), description: t("\u9019\u6703\u57F7\u884C\u4E00\u6B21\u4F4E\u63A8\u7406 AI \u4EFB\u52D9\uFF0C\u4E0D\u6703\u76F4\u63A5\u4FEE\u6539\u5FC3\u667A\u5716\u7D50\u69CB\u3002"), buttonLabel: t("\u78BA\u8A8D\u4E26\u57F7\u884C"), action: () => this.enqueue(() => this.proposeChildren(parent, true)) }
+        { label: t("\u4F7F\u7528 {0}", note.model), description: t("\u9019\u6703\u57F7\u884C\u4E00\u6B21\u4F4E\u63A8\u7406 AI \u4EFB\u52D9\uFF0C\u4E0D\u6703\u76F4\u63A5\u4FEE\u6539\u5FC3\u667A\u5716\u7D50\u69CB\u3002"), buttonLabel: t("\u78BA\u8A8D\u4E26\u57F7\u884C"), action: () => void this.plugin.confirmCodexUsage(async () => this.enqueue(() => this.proposeChildren(parent, true))) }
       ]).open();
       return;
     }
@@ -3199,7 +3274,7 @@ var VisualAgentMapView = class extends import_obsidian5.ItemView {
     }
     if (!confirmed) {
       new ChoiceModal(this.app, t("\u78BA\u8A8D\u6574\u5408\u5B50\u8B70\u984C"), t("AI \u6703\u8B80\u53D6 {0} \u500B\u76F4\u5C6C\u5B50\u8B70\u984C\uFF1B\u5B8C\u6210\u5F8C\u76F4\u63A5\u66F4\u65B0\u76EE\u524D\u7406\u89E3\u8207 MD \u8A73\u60C5\u3002\n\n\u672C\u6B21\u5957\u7528\u7684 AI \u898F\u5247\uFF1A\n{1}", children.length, note.rules.trim() || "\u672A\u8A2D\u5B9A\u984D\u5916\u898F\u5247\u3002"), [
-        { label: t("\u4F7F\u7528 {0}", note.model), description: t("\u9019\u6703\u57F7\u884C\u4E00\u6B21\u9AD8\u63A8\u7406 AI \u4EFB\u52D9\u3002"), buttonLabel: t("\u78BA\u8A8D\u4E26\u57F7\u884C"), action: () => this.enqueue(() => this.integrateChildren(node, true)) }
+        { label: t("\u4F7F\u7528 {0}", note.model), description: t("\u9019\u6703\u57F7\u884C\u4E00\u6B21\u9AD8\u63A8\u7406 AI \u4EFB\u52D9\u3002"), buttonLabel: t("\u78BA\u8A8D\u4E26\u57F7\u884C"), action: () => void this.plugin.confirmCodexUsage(async () => this.enqueue(() => this.integrateChildren(node, true))) }
       ]).open();
       return;
     }
@@ -3231,7 +3306,7 @@ var VisualAgentMapView = class extends import_obsidian5.ItemView {
     const nodes = [...this.multiSelected].map((id) => this.map.nodes.find((node) => node.id === id)).filter((node) => !!node);
     const notes = nodes.map((node) => this.notes.get(node.id)).filter((note) => !!note);
     const sharedRules = notes.length && notes.every((note) => note.rules === notes[0].rules) ? notes[0].rules : "";
-    new IntegrationModal(this.app, notes.map((note) => note.title), sharedRules, (title, goal, rules) => this.enqueue(() => this.createIntegratedNode(title, nodes, goal, rules))).open();
+    new IntegrationModal(this.app, notes.map((note) => note.title), sharedRules, (title, goal, rules) => void this.plugin.confirmCodexUsage(async () => this.enqueue(() => this.createIntegratedNode(title, nodes, goal, rules)))).open();
   }
   async sourceDigest(sources2, mode = "strong") {
     if (mode === "weak") return sources2.map((source) => `- [[${source.path.replace(/\.md$/, "")}]]`).join("\n");
@@ -3524,7 +3599,9 @@ var VisualAgentMapSettingTab = class extends import_obsidian5.PluginSettingTab {
         }));
       } },
       { name: t("Codex App Server \u72C0\u614B"), render: (setting) => {
-        setting.setName(t("Codex App Server \u72C0\u614B")).setDesc(diagnostic.installed ? t("\u5DF2\u627E\u5230 Codex CLI\uFF1A{0}", diagnostic.executable) : t("\u672A\u627E\u5230 Codex CLI\u3002\u8ACB\u5148\u5B89\u88DD Codex CLI \u4E26\u4EE5 ChatGPT \u767B\u5165\uFF1BVAM \u4E0D\u6703\u81EA\u52D5\u5B89\u88DD\u7CFB\u7D71\u5957\u4EF6\u3002")).addButton((button) => button.setButtonText(t("\u91CD\u65B0\u6AA2\u67E5")).onClick(() => {
+        setting.setName(t("Codex App Server \u72C0\u614B")).setDesc(diagnostic.installed ? t("\u5DF2\u627E\u5230 Codex CLI\uFF1A{0}", diagnostic.executable) : t("\u672A\u627E\u5230 Codex CLI\u3002\u8ACB\u4F9D\u5B89\u88DD\u8AAA\u660E\u5B8C\u6210\u5B89\u88DD\u8207 ChatGPT \u767B\u5165\uFF1BVAM \u4E0D\u6703\u81EA\u52D5\u5B89\u88DD\u7CFB\u7D71\u5957\u4EF6\u3002"));
+        if (!diagnostic.installed) setting.addButton((button) => button.setButtonText(t("\u5B89\u88DD\u8AAA\u660E")).onClick(() => this.plugin.openCodexSetupGuide()));
+        setting.addButton((button) => button.setButtonText(t("\u91CD\u65B0\u6AA2\u67E5")).onClick(() => {
           void this.plugin.recheckCodex();
         }));
       } }
@@ -3592,7 +3669,7 @@ var VisualAgentMapPlugin = class extends import_obsidian5.Plugin {
     var _a, _b;
     const saved = await this.loadData();
     const legacy = saved;
-    this.settings = { ...DEFAULT_SETTINGS, language: (saved == null ? void 0 : saved.language) === "en" ? "en" : "zh-TW", workspaceFolder: (saved == null ? void 0 : saved.workspaceFolder) || DEFAULT_SETTINGS.workspaceFolder, topicsFolder: (saved == null ? void 0 : saved.topicsFolder) || DEFAULT_SETTINGS.topicsFolder, inboxFolder: (saved == null ? void 0 : saved.inboxFolder) || DEFAULT_SETTINGS.inboxFolder, notesFolder: (saved == null ? void 0 : saved.notesFolder) || DEFAULT_SETTINGS.notesFolder, mapsFolder: (saved == null ? void 0 : saved.mapsFolder) || DEFAULT_SETTINGS.mapsFolder, mapId: (saved == null ? void 0 : saved.mapId) || "default", codexPath: (saved == null ? void 0 : saved.codexPath) || (legacy == null ? void 0 : legacy.cliPath) || DEFAULT_SETTINGS.codexPath, cliModel: (saved == null ? void 0 : saved.cliModel) || DEFAULT_SETTINGS.cliModel, cliReasoning: (saved == null ? void 0 : saved.cliReasoning) || DEFAULT_SETTINGS.cliReasoning, previewScale: (saved == null ? void 0 : saved.previewScale) !== void 0 ? clampPreviewScale(saved.previewScale) : legacyPreviewScale(saved == null ? void 0 : saved.previewSize), models: "", migrated: (saved == null ? void 0 : saved.migrated) === true, structureVersion: (_a = saved == null ? void 0 : saved.structureVersion) != null ? _a : saved ? 1 : DEFAULT_SETTINGS.structureVersion, firstUseNoticeSeen: (saved == null ? void 0 : saved.firstUseNoticeSeen) === true, workspaceInitialized: saved ? saved.workspaceInitialized !== false : false, sampleTourVersionSeen: (_b = saved == null ? void 0 : saved.sampleTourVersionSeen) != null ? _b : 0 };
+    this.settings = { ...DEFAULT_SETTINGS, language: (saved == null ? void 0 : saved.language) === "en" ? "en" : "zh-TW", workspaceFolder: (saved == null ? void 0 : saved.workspaceFolder) || DEFAULT_SETTINGS.workspaceFolder, topicsFolder: (saved == null ? void 0 : saved.topicsFolder) || DEFAULT_SETTINGS.topicsFolder, inboxFolder: (saved == null ? void 0 : saved.inboxFolder) || DEFAULT_SETTINGS.inboxFolder, notesFolder: (saved == null ? void 0 : saved.notesFolder) || DEFAULT_SETTINGS.notesFolder, mapsFolder: (saved == null ? void 0 : saved.mapsFolder) || DEFAULT_SETTINGS.mapsFolder, mapId: (saved == null ? void 0 : saved.mapId) || "default", codexPath: (saved == null ? void 0 : saved.codexPath) || (legacy == null ? void 0 : legacy.cliPath) || DEFAULT_SETTINGS.codexPath, cliModel: (saved == null ? void 0 : saved.cliModel) || DEFAULT_SETTINGS.cliModel, cliReasoning: (saved == null ? void 0 : saved.cliReasoning) || DEFAULT_SETTINGS.cliReasoning, previewScale: (saved == null ? void 0 : saved.previewScale) !== void 0 ? clampPreviewScale(saved.previewScale) : legacyPreviewScale(saved == null ? void 0 : saved.previewSize), models: "", migrated: (saved == null ? void 0 : saved.migrated) === true, structureVersion: (_a = saved == null ? void 0 : saved.structureVersion) != null ? _a : saved ? 1 : DEFAULT_SETTINGS.structureVersion, firstUseNoticeSeen: (saved == null ? void 0 : saved.firstUseNoticeSeen) === true, codexUsageNoticeSeen: (saved == null ? void 0 : saved.codexUsageNoticeSeen) === true, workspaceInitialized: saved ? saved.workspaceInitialized !== false : false, sampleTourVersionSeen: (_b = saved == null ? void 0 : saved.sampleTourVersionSeen) != null ? _b : 0 };
     setUiLanguage(this.settings.language);
     this.logs.appendLog("info", `Visual Agent Map ${this.manifest.version || "unknown"} \u8F09\u5165`);
     this.repo = new Repository(this.app, this.settings);
@@ -3761,10 +3838,16 @@ var VisualAgentMapPlugin = class extends import_obsidian5.Plugin {
     (_a = this.codexRuntime) == null ? void 0 : _a.stop();
     this.codexRuntime = null;
   }
+  openCodexSetupGuide() {
+    const diagnostic = this.codexDiagnostic();
+    new CodexSetupModal(this.app, diagnostic.executable, () => {
+      void this.recheckCodex();
+    }).open();
+  }
   async recheckCodex() {
     const diagnostic = this.codexDiagnostic();
     if (!diagnostic.installed) {
-      new import_obsidian5.Notice(t("\u672A\u627E\u5230 Codex CLI\uFF1A{0}", diagnostic.executable));
+      this.openCodexSetupGuide();
       return;
     }
     try {
@@ -3834,6 +3917,15 @@ var VisualAgentMapPlugin = class extends import_obsidian5.Plugin {
   }
   async saveSettings() {
     await this.saveData(this.settings);
+  }
+  async confirmCodexUsage(run) {
+    if (!this.settings.codexUsageNoticeSeen) {
+      const confirmed = await new Promise((resolve) => new CodexUsageModal(this.app, resolve).open());
+      if (!confirmed) return;
+      this.settings.codexUsageNoticeSeen = true;
+      await this.saveSettings();
+    }
+    await run();
   }
   async rebuildDerivedData() {
     try {

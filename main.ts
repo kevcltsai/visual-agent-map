@@ -21,6 +21,7 @@ export { canonicalDetail, visualReferencesMarkdown } from "./ai/result-utils";
 export { firstMarkdownImage, firstMarkdownTable, markdownImages } from "./ui/preview-utils";
 export type { AiRunMetrics, PreparedTaskContext } from "./ai/types";
 const VIEW_TYPE = "visual-agent-map-view";
+const CODEX_INSTALL_URL = "https://developers.openai.com/codex/cli/";
 type ProcessEnvironment = Record<string, string | undefined>;
 function typedNodeBinding<T>(value: unknown): T { return value as T; }
 const existsSync = typedNodeBinding<(path: string) => boolean>(nodeExistsSync);
@@ -83,6 +84,37 @@ class TaskModal extends Modal {
     const save = (run: boolean): void => { const value = input.value.trim(); if (!value) return; this.close(); this.submit(value, run); };
     new Setting(this.contentEl).addButton(b => b.setButtonText(t("取消")).onClick(() => this.close())).addButton(b => b.setButtonText(t("只儲存")).onClick(() => save(false))).addButton(b => b.setButtonText(t("確認並執行")).setCta().onClick(() => save(true)));
     input.focus(); input.setSelectionRange(input.value.length, input.value.length);
+  }
+}
+class CodexUsageModal extends Modal {
+  private settled = false;
+  constructor(app: App, private resolve: (confirmed: boolean) => void) { super(app); }
+  onOpen(): void {
+    this.titleEl.setText(t("Codex 額度提醒"));
+    this.contentEl.createEl("p", { text: t("VAM 會透過你目前登入的 Codex 帳號執行 AI 任務，並使用該帳號的 Codex 使用額度。可用額度與限制依你的 ChatGPT 方案而定。"), cls: "vam-modal-intro" });
+    const finish = (confirmed: boolean): void => { this.settled = true; this.close(); this.resolve(confirmed); };
+    new Setting(this.contentEl)
+      .addButton(button => button.setButtonText(t("取消")).onClick(() => finish(false)))
+      .addButton(button => button.setButtonText(t("了解並執行")).setCta().onClick(() => finish(true)));
+  }
+  onClose(): void { if (!this.settled) this.resolve(false); }
+}
+class CodexSetupModal extends Modal {
+  constructor(app: App, private executable: string, private recheck: () => void) { super(app); }
+  onOpen(): void {
+    this.titleEl.setText(t("安裝並連接 Codex"));
+    this.contentEl.createEl("p", { text: t("VAM 需要 Codex CLI 才能建立第一張可編輯心智圖與執行 AI 任務。ChatGPT Free 也可使用，但 Codex 額度較少。"), cls: "vam-modal-intro" });
+    const steps = this.contentEl.createEl("ol", { cls: "vam-setup-steps" });
+    const install = steps.createEl("li");
+    install.appendText(t("開啟官方 Codex CLI 安裝指南並完成安裝："));
+    install.createEl("a", { text: t("Codex CLI 官方安裝指南"), href: CODEX_INSTALL_URL, attr: { target: "_blank", rel: "noopener noreferrer" } });
+    steps.createEl("li", { text: t("在 Terminal 執行 codex，並用你的 ChatGPT 帳號登入。") });
+    steps.createEl("li", { text: t("回到 VAM，選擇「我已完成，重新檢查」。") });
+    this.contentEl.createEl("p", { text: t("不需要 API key。獨立版 Codex CLI 不需要 npm；只有從原始碼建置 VAM 才需要 Node.js 與 npm。"), cls: "vam-setup-note" });
+    this.contentEl.createEl("p", { text: t("目前檢查的路徑：{0}", this.executable), cls: "vam-setup-path" });
+    new Setting(this.contentEl)
+      .addButton(button => button.setButtonText(t("稍後處理")).onClick(() => this.close()))
+      .addButton(button => button.setButtonText(t("我已完成，重新檢查")).setCta().onClick(() => { this.close(); this.recheck(); }));
   }
 }
 class ChildProposalModal extends Modal {
@@ -493,11 +525,10 @@ export class VisualAgentMapView extends ItemView {
       { label: t("範例：台灣旅行規劃"), description: t("官方唯讀範例"), action: () => this.enqueue(() => this.openBuiltInSample()) },
       ...topics.map(topic => ({ label: topic.title, action: () => this.enqueue(() => this.openMap(topic.mapPath)) }))
     ]).open(); }));
-    this.button(toolbar, t("＋ 心智圖"), () => new NameModal(this.app, t("新增心智圖"), t("新的心智圖"), title => this.enqueue(async () => this.openMap(await this.plugin.repo.createMap(title)))).open());
     if (this.builtIn) {
-      this.button(toolbar, t("複製到我的工作區"), () => this.enqueue(async () => this.openMap(await this.plugin.duplicateBuiltInSample()))).addClass("mod-cta");
       this.button(toolbar, t("重新顯示導覽"), () => { this.showSampleTour = true; this.render(); });
-    } else {
+    } else if (this.map) {
+      this.button(toolbar, t("＋ 心智圖"), () => new NameModal(this.app, t("新增心智圖"), t("新的心智圖"), title => this.enqueue(async () => this.openMap(await this.plugin.repo.createMap(title)))).open());
       const undo = this.button(toolbar, t("復原"), () => this.enqueue(() => this.travel(false)), !this.history.canUndo); undo.dataset.history = "undo";
       const redo = this.button(toolbar, t("重做"), () => this.enqueue(() => this.travel(true)), !this.history.canRedo); redo.dataset.history = "redo";
       this.button(toolbar, t("更多…"), () => this.openMapActions());
@@ -511,7 +542,8 @@ export class VisualAgentMapView extends ItemView {
         this.button(actions, t("找回既有 Workspace"), () => this.enqueue(() => this.plugin.offerWorkspaceReconnect())).addClass("mod-cta");
         this.button(actions, t("修復 Agent Workspace"), () => this.enqueue(() => this.plugin.repairWorkspace()));
       }
-      this.button(actions, t("建立新心智圖"), () => new NameModal(this.app, t("新增心智圖"), t("新的心智圖"), title => this.enqueue(async () => this.openMap(await this.plugin.repo.createMap(title)))).open());
+      if (this.plugin.settings.models.trim()) this.button(actions, t("建立新心智圖"), () => new NameModal(this.app, t("新增心智圖"), t("新的心智圖"), title => this.enqueue(async () => this.openMap(await this.plugin.repo.createMap(title)))).open());
+      else this.button(actions, t("檢查 Codex"), () => this.enqueue(() => this.plugin.recheckCodex())).addClass("mod-cta");
       this.button(actions, t("查看範例"), () => this.enqueue(() => this.openBuiltInSample(true)));
       return;
     }
@@ -530,6 +562,18 @@ export class VisualAgentMapView extends ItemView {
       if (this.sampleTourStep > 0) this.button(actions, t("上一步"), () => { this.sampleTourStep--; this.selectSampleNode(steps[this.sampleTourStep].id); });
       if (this.sampleTourStep < steps.length - 1) this.button(actions, t("下一步"), () => { this.sampleTourStep++; this.selectSampleNode(steps[this.sampleTourStep].id); }).addClass("mod-cta");
       this.button(actions, this.sampleTourStep === steps.length - 1 ? t("完成導覽") : t("跳過導覽"), () => { this.showSampleTour = false; this.plugin.settings.sampleTourVersionSeen = SAMPLE_TOUR_VERSION; void this.plugin.saveSettings(); this.render(); });
+    }
+    if (this.builtIn) {
+      const start = this.contentEl.createDiv("vam-sample-start");
+      const ready = !!this.plugin.settings.models.trim();
+      const copy = start.createDiv();
+      copy.createEl("strong", { text: t("開始使用 VAM") });
+      copy.createEl("p", { text: ready ? t("Codex 已就緒。複製範例或建立空白心智圖，開始自己的研究。") : t("先完成 Codex 設定，再複製範例或建立心智圖。你仍可繼續瀏覽這份唯讀範例。") });
+      const actions = start.createDiv("vam-sample-start-actions");
+      if (ready) {
+        this.button(actions, t("複製到我的工作區"), () => this.enqueue(async () => this.openMap(await this.plugin.duplicateBuiltInSample()))).addClass("mod-cta");
+        this.button(actions, t("建立空白心智圖"), () => new NameModal(this.app, t("新增心智圖"), t("新的心智圖"), title => this.enqueue(async () => this.openMap(await this.plugin.repo.createMap(title)))).open());
+      } else this.button(actions, t("檢查 Codex"), () => this.enqueue(() => this.plugin.recheckCodex())).addClass("mod-cta");
     }
     const tools = this.contentEl.createDiv("vam-map-tools");
     if (!this.builtIn) {
@@ -698,7 +742,7 @@ export class VisualAgentMapView extends ItemView {
         new TaskModal(
           this.app,
           prompt,
-          (value, run) => this.enqueue(async () => { await this.noteChange(node, { prompt: value }); if (run) await this.runAgent(node); }),
+          (value, run) => this.enqueue(async () => { await this.noteChange(node, { prompt: value }); if (run) await this.plugin.confirmCodexUsage(() => this.runAgent(node)); }),
           title,
           t("AI 完成後會直接更新目前理解，完整結果會保存在 MD 詳情中。送出前可調整任務。"),
           latest.rules
@@ -793,7 +837,7 @@ export class VisualAgentMapView extends ItemView {
     if (this.plugin.running.has(parent.path)) return;
     if (!confirmed) {
       new ChoiceModal(this.app, t("確認 AI 拆解"), t("AI 會分析目前議題並提出 3–7 個子議題；結果完成後仍需由你確認才會建立節點。\n\n本次套用的 AI 規則：\n{0}", note.rules.trim() || "未設定額外規則。"), [
-        { label: t("使用 {0}", note.model), description: t("這會執行一次低推理 AI 任務，不會直接修改心智圖結構。"), buttonLabel: t("確認並執行"), action: () => this.enqueue(() => this.proposeChildren(parent, true)) }
+        { label: t("使用 {0}", note.model), description: t("這會執行一次低推理 AI 任務，不會直接修改心智圖結構。"), buttonLabel: t("確認並執行"), action: () => void this.plugin.confirmCodexUsage(async () => this.enqueue(() => this.proposeChildren(parent, true))) }
       ]).open();
       return;
     }
@@ -839,7 +883,7 @@ export class VisualAgentMapView extends ItemView {
     if (!children.length) { new Notice(t("這個議題目前沒有直屬子議題。")); return; }
     if (!confirmed) {
       new ChoiceModal(this.app, t("確認整合子議題"), t("AI 會讀取 {0} 個直屬子議題；完成後直接更新目前理解與 MD 詳情。\n\n本次套用的 AI 規則：\n{1}", children.length, note.rules.trim() || "未設定額外規則。"), [
-        { label: t("使用 {0}", note.model), description: t("這會執行一次高推理 AI 任務。"), buttonLabel: t("確認並執行"), action: () => this.enqueue(() => this.integrateChildren(node, true)) }
+        { label: t("使用 {0}", note.model), description: t("這會執行一次高推理 AI 任務。"), buttonLabel: t("確認並執行"), action: () => void this.plugin.confirmCodexUsage(async () => this.enqueue(() => this.integrateChildren(node, true))) }
       ]).open();
       return;
     }
@@ -858,7 +902,7 @@ export class VisualAgentMapView extends ItemView {
     const nodes = [...this.multiSelected].map(id => this.map!.nodes.find(node => node.id === id)).filter((node): node is MapNode => !!node);
     const notes = nodes.map(node => this.notes.get(node.id)).filter((note): note is Note => !!note);
     const sharedRules = notes.length && notes.every(note => note.rules === notes[0].rules) ? notes[0].rules : "";
-    new IntegrationModal(this.app, notes.map(note => note.title), sharedRules, (title, goal, rules) => this.enqueue(() => this.createIntegratedNode(title, nodes, goal, rules))).open();
+    new IntegrationModal(this.app, notes.map(note => note.title), sharedRules, (title, goal, rules) => void this.plugin.confirmCodexUsage(async () => this.enqueue(() => this.createIntegratedNode(title, nodes, goal, rules)))).open();
   }
   private async sourceDigest(sources: MapNode[], mode: "strong" | "summary" | "weak" = "strong"): Promise<string> {
     if (mode === "weak") return sources.map(source => `- [[${source.path.replace(/\.md$/, "")}]]`).join("\n");
@@ -1006,7 +1050,11 @@ class VisualAgentMapSettingTab extends PluginSettingTab {
       { name: t("Workspace 位置"), render: setting => { setting.setName(t("Workspace 位置")).setDesc(t("主題資料夾：{0}　未分類收件匣：{1}", this.plugin.settings.topicsFolder, this.plugin.settings.inboxFolder)); } },
       { name: t("修復 Agent Workspace"), render: setting => { setting.setName(t("修復 Agent Workspace")).setDesc(t("只建立缺少的基本資料夾，不會復原、搬移或覆寫筆記與心智圖。")).addButton(button => button.setButtonText(t("修復")).onClick(() => { void this.plugin.mutate(() => this.plugin.repairWorkspace()); })); } },
       { name: t("找回既有 Workspace"), render: setting => { setting.setName(t("找回既有 Workspace")).setDesc(t("掃描可辨識的 VAM Workspace，確認後才重新連結，不會搬移或覆寫資料。")).addButton(button => button.setButtonText(t("掃描")).onClick(() => { void this.plugin.offerWorkspaceReconnect(); })); } },
-      { name: t("Codex App Server 狀態"), render: setting => { setting.setName(t("Codex App Server 狀態")).setDesc(diagnostic.installed ? t("已找到 Codex CLI：{0}", diagnostic.executable) : t("未找到 Codex CLI。請先安裝 Codex CLI 並以 ChatGPT 登入；VAM 不會自動安裝系統套件。")).addButton(button => button.setButtonText(t("重新檢查")).onClick(() => { void this.plugin.recheckCodex(); })); } }
+      { name: t("Codex App Server 狀態"), render: setting => {
+        setting.setName(t("Codex App Server 狀態")).setDesc(diagnostic.installed ? t("已找到 Codex CLI：{0}", diagnostic.executable) : t("未找到 Codex CLI。請依安裝說明完成安裝與 ChatGPT 登入；VAM 不會自動安裝系統套件。"));
+        if (!diagnostic.installed) setting.addButton(button => button.setButtonText(t("安裝說明")).onClick(() => this.plugin.openCodexSetupGuide()));
+        setting.addButton(button => button.setButtonText(t("重新檢查")).onClick(() => { void this.plugin.recheckCodex(); }));
+      } }
     ];
   }
   async setControlValue(key: string, value: unknown): Promise<void> {
@@ -1052,7 +1100,7 @@ export default class VisualAgentMapPlugin extends Plugin {
   async onload(): Promise<void> {
     const saved = await this.loadData() as Partial<Settings> | null;
     const legacy: (Partial<Settings> & { cliPath?: string }) | null = saved;
-    this.settings = { ...DEFAULT_SETTINGS, language: saved?.language === "en" ? "en" : "zh-TW", workspaceFolder: saved?.workspaceFolder || DEFAULT_SETTINGS.workspaceFolder, topicsFolder: saved?.topicsFolder || DEFAULT_SETTINGS.topicsFolder, inboxFolder: saved?.inboxFolder || DEFAULT_SETTINGS.inboxFolder, notesFolder: saved?.notesFolder || DEFAULT_SETTINGS.notesFolder, mapsFolder: saved?.mapsFolder || DEFAULT_SETTINGS.mapsFolder, mapId: saved?.mapId || "default", codexPath: saved?.codexPath || legacy?.cliPath || DEFAULT_SETTINGS.codexPath, cliModel: saved?.cliModel || DEFAULT_SETTINGS.cliModel, cliReasoning: saved?.cliReasoning || DEFAULT_SETTINGS.cliReasoning, previewScale: saved?.previewScale !== undefined ? clampPreviewScale(saved.previewScale) : legacyPreviewScale(saved?.previewSize), models: "", migrated: saved?.migrated === true, structureVersion: saved?.structureVersion ?? (saved ? 1 : DEFAULT_SETTINGS.structureVersion), firstUseNoticeSeen: saved?.firstUseNoticeSeen === true, workspaceInitialized: saved ? saved.workspaceInitialized !== false : false, sampleTourVersionSeen: saved?.sampleTourVersionSeen ?? 0 };
+    this.settings = { ...DEFAULT_SETTINGS, language: saved?.language === "en" ? "en" : "zh-TW", workspaceFolder: saved?.workspaceFolder || DEFAULT_SETTINGS.workspaceFolder, topicsFolder: saved?.topicsFolder || DEFAULT_SETTINGS.topicsFolder, inboxFolder: saved?.inboxFolder || DEFAULT_SETTINGS.inboxFolder, notesFolder: saved?.notesFolder || DEFAULT_SETTINGS.notesFolder, mapsFolder: saved?.mapsFolder || DEFAULT_SETTINGS.mapsFolder, mapId: saved?.mapId || "default", codexPath: saved?.codexPath || legacy?.cliPath || DEFAULT_SETTINGS.codexPath, cliModel: saved?.cliModel || DEFAULT_SETTINGS.cliModel, cliReasoning: saved?.cliReasoning || DEFAULT_SETTINGS.cliReasoning, previewScale: saved?.previewScale !== undefined ? clampPreviewScale(saved.previewScale) : legacyPreviewScale(saved?.previewSize), models: "", migrated: saved?.migrated === true, structureVersion: saved?.structureVersion ?? (saved ? 1 : DEFAULT_SETTINGS.structureVersion), firstUseNoticeSeen: saved?.firstUseNoticeSeen === true, codexUsageNoticeSeen: saved?.codexUsageNoticeSeen === true, workspaceInitialized: saved ? saved.workspaceInitialized !== false : false, sampleTourVersionSeen: saved?.sampleTourVersionSeen ?? 0 };
     setUiLanguage(this.settings.language);
     this.logs.appendLog("info", `Visual Agent Map ${this.manifest.version || "unknown"} 載入`);
     this.repo = new Repository(this.app, this.settings);
@@ -1134,9 +1182,13 @@ export default class VisualAgentMapPlugin extends Plugin {
     return { executable, installed: existsSync(executable) };
   }
   resetCodexRuntime(): void { this.codexRuntime?.stop(); this.codexRuntime = null; }
+  openCodexSetupGuide(): void {
+    const diagnostic = this.codexDiagnostic();
+    new CodexSetupModal(this.app, diagnostic.executable, () => { void this.recheckCodex(); }).open();
+  }
   async recheckCodex(): Promise<void> {
     const diagnostic = this.codexDiagnostic();
-    if (!diagnostic.installed) { new Notice(t("未找到 Codex CLI：{0}", diagnostic.executable)); return; }
+    if (!diagnostic.installed) { this.openCodexSetupGuide(); return; }
     try {
       await this.refreshCodexModels(); new Notice(t("Codex App Server 已就緒：{0}", diagnostic.executable));
     } catch (error) { new Notice(t("Codex App Server 檢查失敗：{0}", this.recordFailure("Codex App Server 重新檢查失敗", error))); }
@@ -1178,6 +1230,15 @@ export default class VisualAgentMapPlugin extends Plugin {
   }
   onunload(): void { this.codexRuntime?.stop(); this.codexRuntime = null; }
   async saveSettings(): Promise<void> { await this.saveData(this.settings); }
+  async confirmCodexUsage(run: () => Promise<void>): Promise<void> {
+    if (!this.settings.codexUsageNoticeSeen) {
+      const confirmed = await new Promise<boolean>(resolve => new CodexUsageModal(this.app, resolve).open());
+      if (!confirmed) return;
+      this.settings.codexUsageNoticeSeen = true;
+      await this.saveSettings();
+    }
+    await run();
+  }
   async rebuildDerivedData(): Promise<void> { try { await this.repo.rebuildDerivedData(); } catch (error) { console.error("Visual Agent Map reference rebuild", error); new Notice(t("心智圖已儲存，但 reference 更新失敗：{0}", error instanceof Error ? error.message : String(error))); } }
   private scheduleExternalReconciliation(): void {
     if (this.writing) return;

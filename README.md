@@ -10,6 +10,8 @@ Turn complex questions into a visual research map while keeping every result in 
 
 Visual Agent Map is a desktop-only Obsidian plugin for breaking a broad question into connected topics, running focused Codex tasks, and preserving the results as ordinary Markdown notes. The map shows structure and current understanding at a glance; notes remain readable, editable, and portable without the plugin.
 
+This project is developed with [OpenAI Codex](https://openai.com/codex/) as a coding collaborator. Product direction, design decisions, validation, and releases are managed by the maintainer.
+
 ### Highlights
 
 - **Visual topic map** — create topics and subtopics, drag nodes, collapse branches, zoom, and change parent relationships.
@@ -32,22 +34,31 @@ Visual Agent Map is a desktop-only Obsidian plugin for breaking a broad question
 4. Review the summary on the map and the full Markdown detail.
 5. Continue research or synthesize related findings into a new topic.
 
+### What's new in 0.7.0
+
+- A rebuilt installation guide covers both Obsidian Community plugins and manual GitHub Release installation through the first editable map.
+- The built-in sample now shows whether Codex is ready and gives the correct next action.
+- If Codex CLI is missing, VAM opens an in-product setup guide with the official installation link, ChatGPT sign-in steps, and a recheck action.
+- Before the first AI task, VAM explains once that the task uses the signed-in account's Codex allowance.
+
+See [CHANGELOG.md](CHANGELOG.md) for the complete version history.
+
 ### Requirements
 
 - Obsidian desktop `1.13.7` or later (the verified compatibility baseline for this release).
-- A local [Codex CLI](https://developers.openai.com/codex/cli/) installation signed in with ChatGPT. Visual Agent Map starts its App Server locally and does not require a separate API key.
-- Desktop only. Current release: `0.6.2`.
+- A local [Codex CLI](https://developers.openai.com/codex/cli/) installation signed in with ChatGPT. ChatGPT Free is supported with a smaller Codex allowance. Visual Agent Map does not require an API key; npm is only needed to build from source.
+- Desktop only. Current release: `0.7.0`.
 
 ### Install
 
-Download `main.js`, `manifest.json`, and `styles.css` from the exact [GitHub Release](https://github.com/kevcltsai/visual-agent-map/releases) you choose. Do not install from a branch.
+Install **Visual Agent Map** from Obsidian's Community plugins browser. For manual installation, download `main.js`, `manifest.json`, and `styles.css` from the same [GitHub Release](https://github.com/kevcltsai/visual-agent-map/releases); do not install from a branch.
 
 1. Create `<your-vault>/.obsidian/plugins/visual-agent-map/`.
 2. Place the three release assets in that folder, preserving an existing `data.json`.
 3. Reload Obsidian and enable **Visual Agent Map** under **Settings → Community plugins**.
 4. Confirm the Codex CLI path and App Server status in plugin settings.
 
-Do not copy the repository or run `npm install` inside the plugin directory. See [INSTALL.md](INSTALL.md) for agent-assisted installation.
+Do not copy the repository or run `npm install` inside the plugin directory. Follow [INSTALL.md](INSTALL.md) for the complete first-use journey.
 
 ### Vault data
 
@@ -67,7 +78,7 @@ Plugin-created content stays in the vault. A fresh installation creates the empt
 ### Privacy and network access
 
 - No telemetry and no stored API keys.
-- A topic task is sent to the locally signed-in Codex tool only after you explicitly confirm it. Relevant topic content, instructions, and the task are included as context.
+- Before the first AI task, VAM shows a one-time notice that the task uses the signed-in account's Codex allowance. Relevant topic content, instructions, and the task are then sent to the locally signed-in Codex tool.
 - The plugin starts `codex app-server` outside the vault with read-only sandboxing and no command or file-change approvals; it never installs or updates Codex CLI.
 - Remote images in Markdown follow Obsidian's ordinary image-loading behavior.
 
@@ -88,6 +99,8 @@ Run `npm ci`, `npm run build`, and `npm test` at the repository root. The produc
 Visual Agent Map 是桌面版 Obsidian 外掛：用視覺化心智圖拆解複雜問題、執行聚焦的 Codex 任務，並將所有結果保存為一般 Markdown 筆記。
 
 心智圖讓你快速掌握研究結構與目前結論；即使不使用外掛，底層筆記仍可直接閱讀、編輯與搬移。
+
+本專案使用 [OpenAI Codex](https://openai.com/codex/) 協助開發；產品方向、設計決策、驗證與發布由維護者負責。
 
 ### 主要功能
 
@@ -111,22 +124,31 @@ Visual Agent Map 是桌面版 Obsidian 外掛：用視覺化心智圖拆解複�
 4. 在心智圖查看摘要，在 Markdown 筆記閱讀完整內容。
 5. 繼續研究，或將相關發現整合成新的議題。
 
+### 0.7.0 更新內容
+
+- 重新設計安裝指南，涵蓋 Obsidian 第三方外掛與 GitHub Release 手動安裝，直到建立第一張可編輯心智圖。
+- 內建範例會持續顯示 Codex 是否就緒，以及使用者當下正確的下一步。
+- 找不到 Codex CLI 時，VAM 會開啟內建設定說明，提供官方安裝連結、ChatGPT 登入步驟與重新檢查操作。
+- 第一次執行 AI 任務前，VAM 會一次性說明該任務將使用登入帳號的 Codex 額度。
+
+完整版本紀錄請見 [CHANGELOG.md](CHANGELOG.md)。
+
 ### 系統需求
 
 - Obsidian 桌面版 `1.13.7` 或更新版本（本版本實際驗證的相容性基線）。
-- 已在本機安裝 [Codex CLI](https://developers.openai.com/codex/cli/) 並以 ChatGPT 登入。Visual Agent Map 會在本機啟動 App Server，不需要另外設定 API key。
-- 僅支援桌面版。目前版本：`0.6.2`。
+- 已在本機安裝 [Codex CLI](https://developers.openai.com/codex/cli/) 並以 ChatGPT 登入。ChatGPT Free 可以使用，但 Codex 額度較少。Visual Agent Map 不需要 API key；只有從原始碼建置才需要 npm。
+- 僅支援桌面版。目前版本：`0.7.0`。
 
 ### 安裝
 
-請從指定的 [GitHub Release](https://github.com/kevcltsai/visual-agent-map/releases) 下載 `main.js`、`manifest.json`、`styles.css`；不要使用 branch 檔案。
+請先從 Obsidian 的第三方外掛瀏覽器安裝 **Visual Agent Map**。若要手動安裝，請從同一個 [GitHub Release](https://github.com/kevcltsai/visual-agent-map/releases) 下載 `main.js`、`manifest.json`、`styles.css`；不要使用 branch 檔案。
 
 1. 建立 `<你的-vault>/.obsidian/plugins/visual-agent-map/`。
 2. 放入三個 release assets，並保留既有的 `data.json`。
 3. 重新載入 Obsidian，在 **設定 → 第三方外掛** 啟用 **Visual Agent Map**。
 4. 在外掛設定確認 Codex CLI 路徑與 App Server 狀態。
 
-不要把整個 repository 複製到外掛資料夾，也不要在該資料夾執行 `npm install`。可參考 [INSTALL.md](INSTALL.md) 的安裝說明。
+不要把整個 repository 複製到外掛資料夾，也不要在該資料夾執行 `npm install`。完整首次使用旅程請見 [INSTALL.md](INSTALL.md)。
 
 ### Vault 資料
 
@@ -146,7 +168,7 @@ Agent Workspace/
 ### 隱私與網路存取
 
 - 不含 telemetry，也不儲存 API key。
-- 只有你確認執行 AI 任務後，外掛才會將相關議題內容、指令與任務交給本機已登入的 Codex 工具。
+- 第一次執行 AI 任務前，VAM 會一次性提醒該任務會使用登入帳號的 Codex 額度，之後才會把相關議題內容、指令與任務交給本機已登入的 Codex 工具。
 - 外掛會在 Vault 外以唯讀 sandbox、禁止 command／file-change approval 的設定啟動 `codex app-server`，但不會自行安裝或更新 Codex CLI。
 - Markdown 的遠端圖片會依 Obsidian 一般行為連線至對應圖片來源。
 

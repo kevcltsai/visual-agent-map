@@ -1,5 +1,16 @@
 # Changelog
 
+## [0.7.0] - 2026-09-20
+
+This release improves the complete first-use journey, from installation and Codex setup to the first editable map and first AI task.
+
+### Changed
+
+- Rebuilt the installation guide around the full path from Community plugins or GitHub Release to the first editable map.
+- The built-in sample now shows Codex readiness as the next onboarding step and unlocks duplicate or empty-map creation when ready.
+- When Codex CLI is missing, VAM now opens an in-product setup guide with the official install link, ChatGPT sign-in steps, requirements clarification, and a recheck action.
+- The first real AI task now shows a one-time notice that it uses the signed-in account's Codex allowance; canceling keeps the notice pending.
+
 ## [0.6.2] - 2026-09-20
 
 ### Changed

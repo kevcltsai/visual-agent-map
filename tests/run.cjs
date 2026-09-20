@@ -58,6 +58,7 @@ test('workspace defaults to the configured low-cost model and low reasoning', ()
   assert.equal(DEFAULT_SETTINGS.cliReasoning, 'low');
   assert.equal(DEFAULT_SETTINGS.codexPath, 'codex');
   assert.equal(DEFAULT_SETTINGS.firstUseNoticeSeen, false);
+  assert.equal(DEFAULT_SETTINGS.codexUsageNoticeSeen, false);
   assert.equal(DEFAULT_SETTINGS.workspaceInitialized, false);
   assert.equal(DEFAULT_SETTINGS.sampleTourVersionSeen, 0);
   assert.doesNotMatch(DEFAULT_SETTINGS.models, /claude:/);
@@ -421,6 +422,18 @@ test('onboarding uses an embedded sample and explicit workspace repair without a
   assert.match(source, /this\.workspaceRecoveryCandidates = await this\.repo\.workspaceCandidates\(\)/);
   assert.match(source, /if \(!this\.workspaceRecoveryCandidates\.length\) \{ await this\.repo\.ensureWorkspace\(\)/);
   assert.match(source, /id: "reconnect-workspace"/);
+  assert.match(source, /vam-sample-start/);
+  assert.match(source, /Codex 已就緒。複製範例或建立空白心智圖/);
+  assert.match(source, /this\.plugin\.settings\.models\.trim\(\)/);
+  assert.match(source, /else if \(this\.map\)/);
+});
+test('the first real AI task requires a one-time Codex allowance acknowledgement', () => {
+  const source = fs.readFileSync(path.join(root, 'main.ts'), 'utf8');
+  assert.match(source, /class CodexUsageModal/);
+  assert.match(source, /使用該帳號的 Codex 使用額度/);
+  assert.match(source, /if \(!confirmed\) return;/);
+  assert.match(source, /this\.settings\.codexUsageNoticeSeen = true/);
+  assert.ok((source.match(/confirmCodexUsage\(/g) || []).length >= 5);
 });
 test('Obsidian 1.13 declarative settings expose workspace recovery and App Server diagnostics', () => {
   const source = fs.readFileSync(path.join(root, 'main.ts'), 'utf8');
@@ -430,7 +443,18 @@ test('Obsidian 1.13 declarative settings expose workspace recovery and App Serve
   assert.match(definitions, /找回既有 Workspace/);
   assert.match(definitions, /Codex App Server 狀態/);
   assert.match(definitions, /重新檢查/);
+  assert.match(definitions, /安裝說明/);
   assert.match(source, /this\.settingTab\?\.update\(\)/);
+});
+test('missing Codex opens an in-product setup guide with official installation and sign-in steps', () => {
+  const source = fs.readFileSync(path.join(root, 'main.ts'), 'utf8');
+  assert.match(source, /class CodexSetupModal/);
+  assert.match(source, /https:\/\/developers\.openai\.com\/codex\/cli\//);
+  assert.match(source, /ChatGPT Free 也可使用/);
+  assert.match(source, /不需要 API key/);
+  assert.match(source, /獨立版 Codex CLI 不需要 npm/);
+  assert.match(source, /在 Terminal 執行 codex/);
+  assert.match(source, /if \(!diagnostic\.installed\) \{ this\.openCodexSetupGuide\(\); return; \}/);
 });
 test('generated child filenames are migrated to their topic titles and maps stay linked', async () => {
   const { repo, app } = fixture(), mapPath = await repo.createMap('Filename migration'), mapDoc = await repo.readMap(mapPath);

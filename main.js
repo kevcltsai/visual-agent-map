@@ -260,6 +260,11 @@ var english = {
   "\u91CD\u65B0\u958B\u555F\u958B\u59CB\u4F7F\u7528": "Open getting started again",
   "\u7528\u65BC\u5E38\u99D0 Codex session \u8207\u81EA\u52D5\u53D6\u5F97\u6A21\u578B\u6E05\u55AE\u3002": "Used for persistent Codex sessions and automatic model discovery.",
   "\u5DE5\u4F5C\u5340\u9810\u8A2D Model": "Workspace default model",
+  "AI \u63A8\u7406\u7B49\u7D1A": "AI reasoning level",
+  "\u5957\u7528\u5230\u4E00\u822C\u3001\u62C6\u89E3\u8207\u6574\u5408 AI \u4EFB\u52D9\u3002\u7B49\u7D1A\u8D8A\u9AD8\u901A\u5E38\u9700\u8981\u8F03\u591A\u6642\u9593\u8207\u4F7F\u7528\u984D\u5EA6\u3002": "Applies to regular, decomposition, and synthesis AI tasks. Higher levels usually take more time and allowance.",
+  "\u4F4E (Low)": "Low",
+  "\u4E2D (Medium)": "Medium",
+  "\u9AD8 (High)": "High",
   "\u76EE\u524D\u6700\u4F4E\u6210\u672C\u6A21\u578B\u70BA gpt-5.6-luna\uFF1B\u8B8A\u66F4\u53EA\u5F71\u97FF\u4E4B\u5F8C\u65B0\u589E\u7684\u6839\u8B70\u984C\u3002": "Default: gpt-5.6-luna. Changes apply to newly created root topics.",
   "Model \u9078\u55AE": "Model list",
   "\u4E00\u822C\u4EFB\u52D9\u4F7F\u7528\u4F4E\u63A8\u7406\uFF1B\u6574\u5408\u5B50\u8B70\u984C\u4F7F\u7528\u9AD8\u63A8\u7406\u3002": "Regular tasks use low reasoning; subtopic synthesis uses high reasoning.",
@@ -290,6 +295,9 @@ var english = {
   "{0}\uFF08\u5DF2\u79FB\u52D5\uFF09": "{0} (moved)",
   "\u67E5\u770B AI \u5B50\u8B70\u984C\u5EFA\u8B70\uFF08{0}\uFF09": "Review AI subtopic proposals ({0})",
   "{0} \xB7 {1}\uFF1B\u4E00\u822C\u4EFB\u52D9\u4F7F\u7528\u4F4E\u63A8\u7406\uFF0C\u6574\u5408\u5B50\u8B70\u984C\u4F7F\u7528\u9AD8\u63A8\u7406\u3002": "{0} \xB7 {1}; regular tasks use low reasoning, synthesis uses high reasoning.",
+  "{0} \xB7 {1}\uFF1B\u76EE\u524D\u63A8\u7406\u7B49\u7D1A\uFF1A{2}\u3002": "{0} \xB7 {1}; current reasoning level: {2}.",
+  "\u9019\u6703\u4F7F\u7528 {0} \u63A8\u7406\u7B49\u7D1A\u57F7\u884C AI \u4EFB\u52D9\uFF0C\u4E0D\u6703\u76F4\u63A5\u4FEE\u6539\u5FC3\u667A\u5716\u7D50\u69CB\u3002": "Run the AI task with {0} reasoning. The map structure stays unchanged until confirmation.",
+  "\u9019\u6703\u4F7F\u7528 {0} \u63A8\u7406\u7B49\u7D1A\u57F7\u884C AI \u4EFB\u52D9\u3002": "Run the AI task with {0} reasoning.",
   "\u4F7F\u7528 {0}": "Use {0}",
   "\u5B50\u8B70\u984C\u5EFA\u8B70\u5B8C\u6210\uFF1A{0} \u9805\u3002\u9EDE\u9078\u7BC0\u9EDE\u5F8C\u53EF\u67E5\u770B\u3002": "{0} subtopic proposals ready. Click the node to review.",
   "AI \u4EFB\u52D9\u5931\u6557\uFF1A{0}": "AI task failed: {0}",
@@ -653,6 +661,9 @@ var DEFAULT_SETTINGS = {
   workspaceInitialized: false,
   sampleTourVersionSeen: 0
 };
+function normalizeReasoningLevel(value) {
+  return value === "medium" || value === "high" ? value : "low";
+}
 var REFERENCE_START = "<!-- visual-agent-map:references:start -->";
 var REFERENCE_END = "<!-- visual-agent-map:references:end -->";
 var DETAIL_START = "<!-- visual-agent-map:detail:start -->";
@@ -3107,7 +3118,7 @@ var VisualAgentMapView = class extends import_obsidian5.ItemView {
         if (options.has(select.value)) this.enqueue(() => this.noteChange(node, { model: select.value, modelSource: "manual" }));
       });
       const sourceLabels = { workspace: t("\u5DE5\u4F5C\u5340\u9810\u8A2D"), inherited: t("\u5EFA\u7ACB\u6642\u7E7C\u627F"), manual: t("\u624B\u52D5\u6307\u5B9A") };
-      advanced.createEl("p", { cls: "vam-hint", text: t("{0} \xB7 {1}\uFF1B\u4E00\u822C\u4EFB\u52D9\u4F7F\u7528\u4F4E\u63A8\u7406\uFF0C\u6574\u5408\u5B50\u8B70\u984C\u4F7F\u7528\u9AD8\u63A8\u7406\u3002", note.model, sourceLabels[note.modelSource]) });
+      advanced.createEl("p", { cls: "vam-hint", text: t("{0} \xB7 {1}\uFF1B\u76EE\u524D\u63A8\u7406\u7B49\u7D1A\uFF1A{2}\u3002", note.model, sourceLabels[note.modelSource], this.plugin.settings.cliReasoning) });
     } else {
       panel.createEl("p", { text: t("\u6B64\u7BC0\u9EDE\u7684\u7B46\u8A18\u4E0D\u5B58\u5728\uFF0C\u53EF\u91CD\u65B0\u9023\u7D50\u672A\u6B78\u985E\u7B46\u8A18\u6216\u5F9E\u5716\u4E2D\u79FB\u9664\u3002") });
       this.button(panel, t("\u91CD\u65B0\u9023\u7D50\u7B46\u8A18"), () => this.enqueue(async () => {
@@ -3202,7 +3213,7 @@ var VisualAgentMapView = class extends import_obsidian5.ItemView {
     if (this.plugin.running.has(parent.path)) return;
     if (!confirmed) {
       new ChoiceModal(this.app, t("\u78BA\u8A8D AI \u62C6\u89E3"), t("AI \u6703\u5206\u6790\u76EE\u524D\u8B70\u984C\u4E26\u63D0\u51FA 3\u20137 \u500B\u5B50\u8B70\u984C\uFF1B\u7D50\u679C\u5B8C\u6210\u5F8C\u4ECD\u9700\u7531\u4F60\u78BA\u8A8D\u624D\u6703\u5EFA\u7ACB\u7BC0\u9EDE\u3002\n\n\u672C\u6B21\u5957\u7528\u7684 AI \u898F\u5247\uFF1A\n{0}", note.rules.trim() || "\u672A\u8A2D\u5B9A\u984D\u5916\u898F\u5247\u3002"), [
-        { label: t("\u4F7F\u7528 {0}", note.model), description: t("\u9019\u6703\u57F7\u884C\u4E00\u6B21\u4F4E\u63A8\u7406 AI \u4EFB\u52D9\uFF0C\u4E0D\u6703\u76F4\u63A5\u4FEE\u6539\u5FC3\u667A\u5716\u7D50\u69CB\u3002"), buttonLabel: t("\u78BA\u8A8D\u4E26\u57F7\u884C"), action: () => void this.plugin.confirmCodexUsage(async () => this.enqueue(() => this.proposeChildren(parent, true))) }
+        { label: t("\u4F7F\u7528 {0}", note.model), description: t("\u9019\u6703\u4F7F\u7528 {0} \u63A8\u7406\u7B49\u7D1A\u57F7\u884C AI \u4EFB\u52D9\uFF0C\u4E0D\u6703\u76F4\u63A5\u4FEE\u6539\u5FC3\u667A\u5716\u7D50\u69CB\u3002", this.plugin.settings.cliReasoning), buttonLabel: t("\u78BA\u8A8D\u4E26\u57F7\u884C"), action: () => void this.plugin.confirmCodexUsage(async () => this.enqueue(() => this.proposeChildren(parent, true))) }
       ]).open();
       return;
     }
@@ -3289,7 +3300,7 @@ var VisualAgentMapView = class extends import_obsidian5.ItemView {
     }
     if (!confirmed) {
       new ChoiceModal(this.app, t("\u78BA\u8A8D\u6574\u5408\u5B50\u8B70\u984C"), t("AI \u6703\u8B80\u53D6 {0} \u500B\u76F4\u5C6C\u5B50\u8B70\u984C\uFF1B\u5B8C\u6210\u5F8C\u76F4\u63A5\u66F4\u65B0\u76EE\u524D\u7406\u89E3\u8207 MD \u8A73\u60C5\u3002\n\n\u672C\u6B21\u5957\u7528\u7684 AI \u898F\u5247\uFF1A\n{1}", children.length, note.rules.trim() || "\u672A\u8A2D\u5B9A\u984D\u5916\u898F\u5247\u3002"), [
-        { label: t("\u4F7F\u7528 {0}", note.model), description: t("\u9019\u6703\u57F7\u884C\u4E00\u6B21\u9AD8\u63A8\u7406 AI \u4EFB\u52D9\u3002"), buttonLabel: t("\u78BA\u8A8D\u4E26\u57F7\u884C"), action: () => void this.plugin.confirmCodexUsage(async () => this.enqueue(() => this.integrateChildren(node, true))) }
+        { label: t("\u4F7F\u7528 {0}", note.model), description: t("\u9019\u6703\u4F7F\u7528 {0} \u63A8\u7406\u7B49\u7D1A\u57F7\u884C AI \u4EFB\u52D9\u3002", this.plugin.settings.cliReasoning), buttonLabel: t("\u78BA\u8A8D\u4E26\u57F7\u884C"), action: () => void this.plugin.confirmCodexUsage(async () => this.enqueue(() => this.integrateChildren(node, true))) }
       ]).open();
       return;
     }
@@ -3600,6 +3611,7 @@ var VisualAgentMapSettingTab = class extends import_obsidian5.PluginSettingTab {
       { name: t("\u4ECB\u9762\u8A9E\u8A00"), control: { type: "dropdown", key: "language", options: { "zh-TW": "\u7E41\u9AD4\u4E2D\u6587", en: "English" } } },
       text2(t("Codex CLI \u8DEF\u5F91"), "codexPath", t("VAM \u6703\u4EE5\u6B64\u555F\u52D5 codex app-server\u3002")),
       { name: t("\u5DE5\u4F5C\u5340\u9810\u8A2D Model"), desc: t("\u6A21\u578B\u6E05\u55AE\u7531 Codex App Server \u81EA\u52D5\u53D6\u5F97\uFF1B\u8B8A\u66F4\u53EA\u5F71\u97FF\u4E4B\u5F8C\u65B0\u589E\u7684\u6839\u8B70\u984C\u3002"), control: { type: "dropdown", key: "cliModel", options: models } },
+      { name: t("AI \u63A8\u7406\u7B49\u7D1A"), desc: t("\u5957\u7528\u5230\u4E00\u822C\u3001\u62C6\u89E3\u8207\u6574\u5408 AI \u4EFB\u52D9\u3002\u7B49\u7D1A\u8D8A\u9AD8\u901A\u5E38\u9700\u8981\u8F03\u591A\u6642\u9593\u8207\u4F7F\u7528\u984D\u5EA6\u3002"), control: { type: "dropdown", key: "cliReasoning", options: { low: t("\u4F4E (Low)"), medium: t("\u4E2D (Medium)"), high: t("\u9AD8 (High)") } } },
       { name: t("Workspace \u4F4D\u7F6E"), render: (setting) => {
         setting.setName(t("Workspace \u4F4D\u7F6E")).setDesc(t("\u4E3B\u984C\u8CC7\u6599\u593E\uFF1A{0}\u3000\u672A\u5206\u985E\u6536\u4EF6\u5323\uFF1A{1}", this.plugin.settings.topicsFolder, this.plugin.settings.inboxFolder));
       } },
@@ -3631,6 +3643,7 @@ var VisualAgentMapSettingTab = class extends import_obsidian5.PluginSettingTab {
     const languageChanged = key === "language";
     if (languageChanged) this.plugin.settings.language = value === "en" ? "en" : "zh-TW";
     else if (typeof value === "string" && (key === "codexPath" || key === "cliModel")) this.plugin.settings[key] = value.trim();
+    else if (key === "cliReasoning") this.plugin.settings.cliReasoning = normalizeReasoningLevel(value);
     else return;
     if (key === "codexPath") this.plugin.resetCodexRuntime();
     setUiLanguage(this.plugin.settings.language);
@@ -3689,7 +3702,7 @@ var VisualAgentMapPlugin = class extends import_obsidian5.Plugin {
     var _a, _b;
     const saved = await this.loadData();
     const legacy = saved;
-    this.settings = { ...DEFAULT_SETTINGS, language: (saved == null ? void 0 : saved.language) === "en" ? "en" : "zh-TW", workspaceFolder: (saved == null ? void 0 : saved.workspaceFolder) || DEFAULT_SETTINGS.workspaceFolder, topicsFolder: (saved == null ? void 0 : saved.topicsFolder) || DEFAULT_SETTINGS.topicsFolder, inboxFolder: (saved == null ? void 0 : saved.inboxFolder) || DEFAULT_SETTINGS.inboxFolder, notesFolder: (saved == null ? void 0 : saved.notesFolder) || DEFAULT_SETTINGS.notesFolder, mapsFolder: (saved == null ? void 0 : saved.mapsFolder) || DEFAULT_SETTINGS.mapsFolder, mapId: (saved == null ? void 0 : saved.mapId) || "default", codexPath: (saved == null ? void 0 : saved.codexPath) || (legacy == null ? void 0 : legacy.cliPath) || DEFAULT_SETTINGS.codexPath, cliModel: (saved == null ? void 0 : saved.cliModel) || DEFAULT_SETTINGS.cliModel, cliReasoning: (saved == null ? void 0 : saved.cliReasoning) || DEFAULT_SETTINGS.cliReasoning, previewScale: (saved == null ? void 0 : saved.previewScale) !== void 0 ? clampPreviewScale(saved.previewScale) : legacyPreviewScale(saved == null ? void 0 : saved.previewSize), models: "", migrated: (saved == null ? void 0 : saved.migrated) === true, structureVersion: (_a = saved == null ? void 0 : saved.structureVersion) != null ? _a : saved ? 1 : DEFAULT_SETTINGS.structureVersion, firstUseNoticeSeen: (saved == null ? void 0 : saved.firstUseNoticeSeen) === true, codexUsageNoticeSeen: (saved == null ? void 0 : saved.codexUsageNoticeSeen) === true, workspaceInitialized: saved ? saved.workspaceInitialized !== false : false, sampleTourVersionSeen: (_b = saved == null ? void 0 : saved.sampleTourVersionSeen) != null ? _b : 0 };
+    this.settings = { ...DEFAULT_SETTINGS, language: (saved == null ? void 0 : saved.language) === "en" ? "en" : "zh-TW", workspaceFolder: (saved == null ? void 0 : saved.workspaceFolder) || DEFAULT_SETTINGS.workspaceFolder, topicsFolder: (saved == null ? void 0 : saved.topicsFolder) || DEFAULT_SETTINGS.topicsFolder, inboxFolder: (saved == null ? void 0 : saved.inboxFolder) || DEFAULT_SETTINGS.inboxFolder, notesFolder: (saved == null ? void 0 : saved.notesFolder) || DEFAULT_SETTINGS.notesFolder, mapsFolder: (saved == null ? void 0 : saved.mapsFolder) || DEFAULT_SETTINGS.mapsFolder, mapId: (saved == null ? void 0 : saved.mapId) || "default", codexPath: (saved == null ? void 0 : saved.codexPath) || (legacy == null ? void 0 : legacy.cliPath) || DEFAULT_SETTINGS.codexPath, cliModel: (saved == null ? void 0 : saved.cliModel) || DEFAULT_SETTINGS.cliModel, cliReasoning: normalizeReasoningLevel(saved == null ? void 0 : saved.cliReasoning), previewScale: (saved == null ? void 0 : saved.previewScale) !== void 0 ? clampPreviewScale(saved.previewScale) : legacyPreviewScale(saved == null ? void 0 : saved.previewSize), models: "", migrated: (saved == null ? void 0 : saved.migrated) === true, structureVersion: (_a = saved == null ? void 0 : saved.structureVersion) != null ? _a : saved ? 1 : DEFAULT_SETTINGS.structureVersion, firstUseNoticeSeen: (saved == null ? void 0 : saved.firstUseNoticeSeen) === true, codexUsageNoticeSeen: (saved == null ? void 0 : saved.codexUsageNoticeSeen) === true, workspaceInitialized: saved ? saved.workspaceInitialized !== false : false, sampleTourVersionSeen: (_b = saved == null ? void 0 : saved.sampleTourVersionSeen) != null ? _b : 0 };
     setUiLanguage(this.settings.language);
     this.logs.appendLog("info", `Visual Agent Map ${this.manifest.version || "unknown"} \u8F09\u5165`);
     this.repo = new Repository(this.app, this.settings);
@@ -4046,7 +4059,7 @@ ${context.task}`
     ].join("\n\n");
     console.debug("Visual Agent Map AI metrics", prepared.metrics);
     const providerStarted = Date.now();
-    const effort = context.mode === "synthesize" ? "high" : this.settings.cliReasoning || "low";
+    const effort = this.settings.cliReasoning;
     const raw = await this.runtime(pluginDirectory).runTask(instructions, model, effort, response_schema_default);
     const result = this.parseAiResult(raw, "Codex App Server");
     console.debug("Visual Agent Map AI metrics", { ...prepared.metrics, providerMs: Date.now() - providerStarted, totalMs: Date.now() - totalStarted });

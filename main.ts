@@ -6,7 +6,7 @@ import { DebugLogModal } from "./ui/modals/debug-log-modal";
 import { existsSync as nodeExistsSync, readdirSync as nodeReaddirSync } from "node:fs";
 import { delimiter as nodeDelimiter, dirname as nodeDirname, isAbsolute as nodeIsAbsolute, join as nodeJoin } from "node:path";
 import { canParent, clone, descendants, History, inheritModel, MapDocument, MapNode, parseMap, removeNodes, serializeMap, visibleNodes } from "./map-model";
-import { DEFAULT_SETTINGS, ModelSource, Note, NotePatch, Repository, Settings, TopicInfo, TopicState } from "./repository";
+import { DEFAULT_SETTINGS, ModelSource, normalizeReasoningLevel, Note, NotePatch, Repository, Settings, TopicInfo, TopicState } from "./repository";
 import { buildPreparedTaskContext } from "./ai/context-builder";
 import { canonicalDetail, visualReferencesMarkdown } from "./ai/result-utils";
 import type { AiResult, Suggestion, TaskContext } from "./ai/types";
@@ -778,7 +778,7 @@ export class VisualAgentMapView extends ItemView {
       select.value = note.model;
       select.addEventListener("change", () => { if (options.has(select.value)) this.enqueue(() => this.noteChange(node, { model: select.value, modelSource: "manual" })); });
       const sourceLabels: Record<ModelSource, string> = { workspace: t("工作區預設"), inherited: t("建立時繼承"), manual: t("手動指定") };
-      advanced.createEl("p", { cls: "vam-hint", text: t("{0} · {1}；一般任務使用低推理，整合子議題使用高推理。", note.model, sourceLabels[note.modelSource]) });
+      advanced.createEl("p", { cls: "vam-hint", text: t("{0} · {1}；目前推理等級：{2}。", note.model, sourceLabels[note.modelSource], this.plugin.settings.cliReasoning) });
     } else {
       panel.createEl("p", { text: t("此節點的筆記不存在，可重新連結未歸類筆記或從圖中移除。") });
       this.button(panel, t("重新連結筆記"), () => this.enqueue(async () => {
@@ -839,7 +839,7 @@ export class VisualAgentMapView extends ItemView {
     if (this.plugin.running.has(parent.path)) return;
     if (!confirmed) {
       new ChoiceModal(this.app, t("確認 AI 拆解"), t("AI 會分析目前議題並提出 3–7 個子議題；結果完成後仍需由你確認才會建立節點。\n\n本次套用的 AI 規則：\n{0}", note.rules.trim() || "未設定額外規則。"), [
-        { label: t("使用 {0}", note.model), description: t("這會執行一次低推理 AI 任務，不會直接修改心智圖結構。"), buttonLabel: t("確認並執行"), action: () => void this.plugin.confirmCodexUsage(async () => this.enqueue(() => this.proposeChildren(parent, true))) }
+        { label: t("使用 {0}", note.model), description: t("這會使用 {0} 推理等級執行 AI 任務，不會直接修改心智圖結構。", this.plugin.settings.cliReasoning), buttonLabel: t("確認並執行"), action: () => void this.plugin.confirmCodexUsage(async () => this.enqueue(() => this.proposeChildren(parent, true))) }
       ]).open();
       return;
     }
@@ -897,7 +897,7 @@ export class VisualAgentMapView extends ItemView {
     if (!children.length) { new Notice(t("這個議題目前沒有直屬子議題。")); return; }
     if (!confirmed) {
       new ChoiceModal(this.app, t("確認整合子議題"), t("AI 會讀取 {0} 個直屬子議題；完成後直接更新目前理解與 MD 詳情。\n\n本次套用的 AI 規則：\n{1}", children.length, note.rules.trim() || "未設定額外規則。"), [
-        { label: t("使用 {0}", note.model), description: t("這會執行一次高推理 AI 任務。"), buttonLabel: t("確認並執行"), action: () => void this.plugin.confirmCodexUsage(async () => this.enqueue(() => this.integrateChildren(node, true))) }
+        { label: t("使用 {0}", note.model), description: t("這會使用 {0} 推理等級執行 AI 任務。", this.plugin.settings.cliReasoning), buttonLabel: t("確認並執行"), action: () => void this.plugin.confirmCodexUsage(async () => this.enqueue(() => this.integrateChildren(node, true))) }
       ]).open();
       return;
     }
@@ -1061,6 +1061,7 @@ class VisualAgentMapSettingTab extends PluginSettingTab {
       { name: t("介面語言"), control: { type: "dropdown", key: "language", options: { "zh-TW": "繁體中文", en: "English" } } },
       text(t("Codex CLI 路徑"), "codexPath", t("VAM 會以此啟動 codex app-server。")),
       { name: t("工作區預設 Model"), desc: t("模型清單由 Codex App Server 自動取得；變更只影響之後新增的根議題。"), control: { type: "dropdown", key: "cliModel", options: models } },
+      { name: t("AI 推理等級"), desc: t("套用到一般、拆解與整合 AI 任務。等級越高通常需要較多時間與使用額度。"), control: { type: "dropdown", key: "cliReasoning", options: { low: t("低 (Low)"), medium: t("中 (Medium)"), high: t("高 (High)") } } },
       { name: t("Workspace 位置"), render: setting => { setting.setName(t("Workspace 位置")).setDesc(t("主題資料夾：{0}　未分類收件匣：{1}", this.plugin.settings.topicsFolder, this.plugin.settings.inboxFolder)); } },
       { name: t("修復 Agent Workspace"), render: setting => { setting.setName(t("修復 Agent Workspace")).setDesc(t("只建立缺少的基本資料夾，不會復原、搬移或覆寫筆記與心智圖。")).addButton(button => button.setButtonText(t("修復")).onClick(() => { void this.plugin.mutate(() => this.plugin.repairWorkspace()); })); } },
       { name: t("重新整理 VAM 資料"), render: setting => { setting.setName(t("重新整理 VAM 資料")).setDesc(t("重新掃描心智圖與議題筆記，重建 reference 與衍生資料。原始內容不會被覆寫。")).addButton(button => button.setButtonText(t("完整重建")).onClick(() => { void this.plugin.mutate(() => this.plugin.fullRebuild()); })); } },
@@ -1076,6 +1077,7 @@ class VisualAgentMapSettingTab extends PluginSettingTab {
     const languageChanged = key === "language";
     if (languageChanged) this.plugin.settings.language = value === "en" ? "en" : "zh-TW";
     else if (typeof value === "string" && (key === "codexPath" || key === "cliModel")) this.plugin.settings[key] = value.trim();
+    else if (key === "cliReasoning") this.plugin.settings.cliReasoning = normalizeReasoningLevel(value);
     else return;
     if (key === "codexPath") this.plugin.resetCodexRuntime();
     setUiLanguage(this.plugin.settings.language);
@@ -1115,7 +1117,7 @@ export default class VisualAgentMapPlugin extends Plugin {
   async onload(): Promise<void> {
     const saved = await this.loadData() as Partial<Settings> | null;
     const legacy: (Partial<Settings> & { cliPath?: string }) | null = saved;
-    this.settings = { ...DEFAULT_SETTINGS, language: saved?.language === "en" ? "en" : "zh-TW", workspaceFolder: saved?.workspaceFolder || DEFAULT_SETTINGS.workspaceFolder, topicsFolder: saved?.topicsFolder || DEFAULT_SETTINGS.topicsFolder, inboxFolder: saved?.inboxFolder || DEFAULT_SETTINGS.inboxFolder, notesFolder: saved?.notesFolder || DEFAULT_SETTINGS.notesFolder, mapsFolder: saved?.mapsFolder || DEFAULT_SETTINGS.mapsFolder, mapId: saved?.mapId || "default", codexPath: saved?.codexPath || legacy?.cliPath || DEFAULT_SETTINGS.codexPath, cliModel: saved?.cliModel || DEFAULT_SETTINGS.cliModel, cliReasoning: saved?.cliReasoning || DEFAULT_SETTINGS.cliReasoning, previewScale: saved?.previewScale !== undefined ? clampPreviewScale(saved.previewScale) : legacyPreviewScale(saved?.previewSize), models: "", migrated: saved?.migrated === true, structureVersion: saved?.structureVersion ?? (saved ? 1 : DEFAULT_SETTINGS.structureVersion), firstUseNoticeSeen: saved?.firstUseNoticeSeen === true, codexUsageNoticeSeen: saved?.codexUsageNoticeSeen === true, workspaceInitialized: saved ? saved.workspaceInitialized !== false : false, sampleTourVersionSeen: saved?.sampleTourVersionSeen ?? 0 };
+    this.settings = { ...DEFAULT_SETTINGS, language: saved?.language === "en" ? "en" : "zh-TW", workspaceFolder: saved?.workspaceFolder || DEFAULT_SETTINGS.workspaceFolder, topicsFolder: saved?.topicsFolder || DEFAULT_SETTINGS.topicsFolder, inboxFolder: saved?.inboxFolder || DEFAULT_SETTINGS.inboxFolder, notesFolder: saved?.notesFolder || DEFAULT_SETTINGS.notesFolder, mapsFolder: saved?.mapsFolder || DEFAULT_SETTINGS.mapsFolder, mapId: saved?.mapId || "default", codexPath: saved?.codexPath || legacy?.cliPath || DEFAULT_SETTINGS.codexPath, cliModel: saved?.cliModel || DEFAULT_SETTINGS.cliModel, cliReasoning: normalizeReasoningLevel(saved?.cliReasoning), previewScale: saved?.previewScale !== undefined ? clampPreviewScale(saved.previewScale) : legacyPreviewScale(saved?.previewSize), models: "", migrated: saved?.migrated === true, structureVersion: saved?.structureVersion ?? (saved ? 1 : DEFAULT_SETTINGS.structureVersion), firstUseNoticeSeen: saved?.firstUseNoticeSeen === true, codexUsageNoticeSeen: saved?.codexUsageNoticeSeen === true, workspaceInitialized: saved ? saved.workspaceInitialized !== false : false, sampleTourVersionSeen: saved?.sampleTourVersionSeen ?? 0 };
     setUiLanguage(this.settings.language);
     this.logs.appendLog("info", `Visual Agent Map ${this.manifest.version || "unknown"} 載入`);
     this.repo = new Repository(this.app, this.settings);
@@ -1336,7 +1338,7 @@ export default class VisualAgentMapPlugin extends Plugin {
 
     console.debug("Visual Agent Map AI metrics", prepared.metrics);
     const providerStarted = Date.now();
-    const effort = context.mode === "synthesize" ? "high" : this.settings.cliReasoning || "low";
+    const effort = this.settings.cliReasoning;
     const raw = await this.runtime(pluginDirectory).runTask(instructions, model, effort, responseSchema);
     const result = this.parseAiResult(raw, "Codex App Server");
     console.debug("Visual Agent Map AI metrics", { ...prepared.metrics, providerMs: Date.now() - providerStarted, totalMs: Date.now() - totalStarted });

@@ -62,6 +62,9 @@ test('workspace defaults to the configured low-cost model and low reasoning', ()
   assert.equal(DEFAULT_SETTINGS.workspaceInitialized, false);
   assert.equal(DEFAULT_SETTINGS.sampleTourVersionSeen, 0);
   assert.doesNotMatch(DEFAULT_SETTINGS.models, /claude:/);
+  assert.equal(normalizeReasoningLevel('medium'), 'medium');
+  assert.equal(normalizeReasoningLevel('high'), 'high');
+  assert.equal(normalizeReasoningLevel('unsupported'), 'low');
 });
 test('Codex executable discovery covers Homebrew, local npm, Volta, fnm, nvm and inherited PATH', () => {
   const { executableCandidates } = load('main.ts', { obsidian });
@@ -201,7 +204,7 @@ const obsidian = {
   parseYaml: text => Object.fromEntries(text.trim().split('\n').filter(Boolean).map(line => { const index = line.indexOf(':'); const raw = line.slice(index + 1).trim(); let value; try { value = JSON.parse(raw); } catch { value = raw; } return [line.slice(0, index), value]; })),
   stringifyYaml: obj => Object.entries(obj).map(([key, value]) => `${key}: ${JSON.stringify(value)}`).join('\n') + '\n'
 };
-const { Repository, DEFAULT_SETTINGS } = load('repository.ts', { obsidian });
+const { Repository, DEFAULT_SETTINGS, normalizeReasoningLevel } = load('repository.ts', { obsidian });
 function fixture() {
   const files = new Map(), contents = new Map();
   const attach = item => { const folderPath = item.path.split('/').slice(0, -1).join('/'); item.parent = files.get(folderPath) || null; if (item.parent instanceof TFolder && !item.parent.children.includes(item)) item.parent.children.push(item); };
@@ -513,6 +516,11 @@ test('Obsidian 1.13 declarative settings expose workspace recovery and App Serve
   const definitions = source.slice(source.indexOf('getSettingDefinitions()'), source.indexOf('async setControlValue'));
   assert.match(definitions, /Workspace 位置/);
   assert.match(definitions, /修復 Agent Workspace/);
+  assert.match(definitions, /AI 推理等級/);
+  assert.match(definitions, /cliReasoning/);
+  assert.match(definitions, /low: t\("低 \(Low\)"\)/);
+  assert.match(definitions, /medium: t\("中 \(Medium\)"\)/);
+  assert.match(definitions, /high: t\("高 \(High\)"\)/);
   assert.match(definitions, /重新整理 VAM 資料/);
   assert.match(definitions, /完整重建/);
   assert.match(definitions, /找回既有 Workspace/);
@@ -651,8 +659,8 @@ test('layout-only map changes and AI note results do not rebuild derived data', 
   await view.mapChange(map => { map.nodes[0].x = 120; map.viewport.zoom = 1.2; }); assert.equal(rebuilds, 0);
   await view.mapChange(map => { map.nodes[0].parentId = 'd'; }); assert.equal(rebuilds, 1);
 });
-test('Codex App Server uses model/list and cleans up fresh ephemeral threads for concurrent tasks', async () => {
-  const { EventEmitter } = require('node:events'); let command, args, turnCount = 0, threadCount = 0, unsubscribeCount = 0;
+test('Codex App Server uses model/list, selected reasoning and fresh ephemeral threads', async () => {
+  const { EventEmitter } = require('node:events'); let command, args, turnCount = 0, threadCount = 0, unsubscribeCount = 0; const efforts = [];
   const child = new EventEmitter(); child.stdout = new EventEmitter(); child.stderr = new EventEmitter(); child.kill = () => {};
   child.stdin = { write: line => {
     const message = JSON.parse(line.trim());
@@ -666,7 +674,7 @@ test('Codex App Server uses model/list and cleans up fresh ephemeral threads for
     else if (message.method === 'thread/start') { assert.equal(message.params.ephemeral, true); assert.equal(message.params.sandbox, 'read-only'); reply({ thread: { id: `thread-${++threadCount}` } }); }
     else if (message.method === 'thread/unsubscribe') { unsubscribeCount++; reply({}); }
     else if (message.method === 'turn/start') {
-      turnCount++; assert.ok(message.params.outputSchema.properties.summary); assert.match(message.params.input[0].text, /目前議題/);
+      turnCount++; efforts.push(message.params.effort); assert.ok(message.params.outputSchema.properties.summary); assert.match(message.params.input[0].text, /目前議題/);
       const threadId = message.params.threadId, summary = threadId === 'thread-1' ? 'first' : 'second';
       process.nextTick(() => {
         child.stdout.emit('data', Buffer.from(`${JSON.stringify({ id: message.id, result: { turn: { id: `turn-${turnCount}` } } })}\n`));
@@ -679,13 +687,15 @@ test('Codex App Server uses model/list and cleans up fresh ephemeral threads for
   const plugin = new Plugin(); plugin.app = { vault: { adapter: new obsidian.FileSystemAdapter() }, workspace: { getLeavesOfType: () => [] } }; plugin.manifest = { dir: '.obsidian/plugins/visual-agent-map' };
   plugin.saveData = async data => { plugin.saved = data; };
   await plugin.refreshCodexModels();
+  plugin.settings.cliReasoning = 'medium';
   const [result, second] = await Promise.all([
     plugin.askModel({ title: 'Current topic', summary: 'current summary', rules: 'Use official sources', task: 'task', ancestors: 'context', mode: 'task' }, 'visible-model'),
-    plugin.askModel({ title: 'Current topic', summary: 'current summary', rules: 'Use official sources', task: 'task', ancestors: 'context', mode: 'task' }, 'visible-model')
+    plugin.askModel({ title: 'Current topic', summary: 'current summary', rules: 'Use official sources', task: 'task', ancestors: 'context', mode: 'synthesize' }, 'visible-model')
   ]);
   assert.equal(command, DEFAULT_SETTINGS.codexPath); assert.deepEqual(Array.from(args), ['app-server']);
   assert.equal(turnCount, 2); assert.equal(threadCount, 2);
   assert.equal(unsubscribeCount, 2);
+  assert.deepEqual(efforts, ['medium', 'medium']);
   assert.equal(plugin.settings.models, 'visible-model');
   assert.equal(result.summary, 'first');
   assert.equal(second.summary, 'second');

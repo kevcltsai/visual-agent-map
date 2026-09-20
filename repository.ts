@@ -5,6 +5,7 @@ export type Status = "idea" | "running" | "completed" | "error";
 export type ModelSource = "workspace" | "inherited" | "manual";
 export type TopicState = "active" | "unassigned" | "archived" | "inbox";
 export type TopicCollection = "Notes" | "Unassigned" | "Archive";
+export type ReasoningLevel = "low" | "medium" | "high";
 export interface VisualReference { title: string; imageUrl: string; sourceUrl: string; description: string; palette: string[]; formula: string }
 export interface Note {
   title: string;
@@ -34,7 +35,7 @@ export interface Settings {
   mapId: string;
   codexPath: string;
   cliModel: string;
-  cliReasoning: string;
+  cliReasoning: ReasoningLevel;
   previewSize?: "small" | "medium" | "large";
   previewScale: number;
   models: string;
@@ -72,6 +73,10 @@ export const DEFAULT_SETTINGS: Settings = {
   workspaceInitialized: false,
   sampleTourVersionSeen: 0
 };
+
+export function normalizeReasoningLevel(value: unknown): ReasoningLevel {
+  return value === "medium" || value === "high" ? value : "low";
+}
 
 const REFERENCE_START = "<!-- visual-agent-map:references:start -->";
 const REFERENCE_END = "<!-- visual-agent-map:references:end -->";

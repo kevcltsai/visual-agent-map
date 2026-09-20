@@ -764,6 +764,13 @@ test('external conflict UI retains file, screen, and manual merge choices', () =
   }
 });
 
+test('VAM notes hide properties in reading and live preview without removing frontmatter', () => {
+  const styles = fs.readFileSync(path.join(root, 'styles.css'), 'utf8');
+  assert.match(styles, /\.markdown-preview-view\.visual-agent-map-node \.metadata-container/);
+  assert.match(styles, /\.vam-topic-markdown \.metadata-container \{ display: none !important; \}/);
+  assert.doesNotMatch(styles, /\.markdown-preview-view\.vam-topic-markdown \.metadata-container/);
+});
+
 test('legacy User Notes move to preview without losing either section or duplicating on save', async () => {
   const { repo, contents } = fixture(), n = await topicNote(repo, 'Legacy preview');
   await repo.updateNote(n.path, { preview: 'New preview' });

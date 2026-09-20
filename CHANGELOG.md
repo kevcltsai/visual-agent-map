@@ -1,5 +1,11 @@
 # Changelog
 
+## [0.7.1] - 2026-09-20
+
+### Fixed
+
+- Codex launch now adds the resolved executable directory to the child PATH, so npm/nvm installations can find their sibling Node executable when Obsidian starts without the terminal environment.
+
 ## [0.7.0] - 2026-09-20
 
 This release improves the complete first-use journey, from installation and Codex setup to the first editable map and first AI task.

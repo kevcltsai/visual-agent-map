@@ -5,10 +5,10 @@ const path = require('node:path');
 const { test } = require('node:test');
 const { buildSync } = require('esbuild');
 const root = path.resolve(__dirname, '..');
-function load(entry, overrides = {}) {
+function load(entry, overrides = {}, windowValues = {}) {
   const code = buildSync({ entryPoints: [path.join(root, entry)], bundle: true, write: false, platform: 'node', format: 'cjs', external: ['obsidian', 'node:*'] }).outputFiles[0].text;
   const module = { exports: {} };
-  vm.runInNewContext(code, { module, exports: module.exports, require: name => overrides[name] || require(name), console, crypto: require('node:crypto').webcrypto, process, window: { setTimeout, clearTimeout } });
+  vm.runInNewContext(code, { module, exports: module.exports, require: name => overrides[name] || require(name), console, crypto: require('node:crypto').webcrypto, process, window: { setTimeout, clearTimeout, ...windowValues } });
   return module.exports;
 }
 const core = load('map-model.ts');
@@ -74,6 +74,61 @@ test('Codex executable discovery covers Homebrew, local npm, Volta, fnm, nvm and
   ]) assert.ok(candidates.includes(path), path);
   assert.deepEqual(Array.from(executableCandidates('/exact/codex', '/Users/friend', '', [])), ['/exact/codex']);
 });
+
+test('Codex launch uses its sibling Node with automatic nvm discovery and explicit paths', async () => {
+  const temporary = fs.mkdtempSync(path.join(require('node:os').tmpdir(), 'vam-codex-path-'));
+  const home = path.join(temporary, 'Friend Home');
+  const bin = path.join(home, '.nvm/versions/node/v24.14.0/bin');
+  const executable = path.join(bin, 'codex');
+  fs.mkdirSync(bin, { recursive: true });
+  const quote = value => "'" + value.replaceAll("'", "'\\''") + "'";
+  fs.writeFileSync(path.join(bin, 'node'), `#!/bin/sh\nVAM_TEST_NODE=sibling exec ${quote(process.execPath)} "$@"\n`, { mode: 0o755 });
+  fs.writeFileSync(executable, `#!/usr/bin/env node
+const readline = require('node:readline');
+readline.createInterface({ input: process.stdin }).on('line', line => {
+  const message = JSON.parse(line);
+  if (message.id === undefined) return;
+  const model = process.env.VAM_TEST_NODE === 'sibling' ? 'sibling-node' : 'wrong-node';
+  const result = message.method === 'model/list'
+    ? { data: [{ id: model, model, displayName: model, hidden: false, supportedReasoningEfforts: [{ reasoningEffort: 'low' }] }] }
+    : {};
+  process.stdout.write(JSON.stringify({ id: message.id, result }) + '\\n');
+});
+`, { mode: 0o755 });
+  try {
+    for (const configured of ['codex', executable]) {
+      const environment = { HOME: home, PATH: '/usr/bin:/bin', VAM_TEST_PRESERVED: 'yes' };
+      const before = { ...environment };
+      const { default: Plugin } = load('main.ts', { obsidian }, { process: { env: environment } });
+      const plugin = new Plugin();
+      plugin.settings.codexPath = configured; plugin.manifest = { version: '0.7.1' };
+      const runtime = plugin.runtime(temporary);
+      try {
+        assert.equal(runtime.options.executable, executable);
+        const models = await runtime.listModels();
+        assert.equal(models[0].model, 'sibling-node');
+        assert.equal(runtime.options.env.PATH.split(path.delimiter)[0], bin);
+        assert.equal(runtime.options.env.VAM_TEST_PRESERVED, 'yes');
+        assert.deepEqual(environment, before);
+      } finally { runtime.stop(); }
+    }
+  } finally { fs.rmSync(temporary, { recursive: true, force: true }); }
+});
+test('Codex launch retains fallback PATH without adding the working directory', () => {
+  for (const environment of [{}, { PATH: '/custom/bin:/usr/bin:/custom/bin', KEEP: 'yes' }]) {
+    const { default: Plugin } = load('main.ts', { obsidian, 'node:fs': { existsSync: () => false, readdirSync: () => [] } }, { process: { env: environment } });
+    const plugin = new Plugin(); plugin.manifest = { version: '0.7.1' };
+    const runtime = plugin.runtime('/vault');
+    const dirs = Array.from(runtime.options.env.PATH.split(path.delimiter));
+    assert.equal(runtime.options.executable, 'codex');
+    assert.ok(!dirs.includes('.') && !dirs.includes(''));
+    for (const dir of ['/opt/homebrew/bin', '/usr/local/bin', '/usr/bin', '/bin']) assert.ok(dirs.includes(dir));
+    if (environment.PATH) assert.ok(dirs.includes('/custom/bin'));
+    assert.equal(dirs.length, new Set(dirs).size);
+    assert.equal(runtime.options.env.KEEP, environment.KEEP);
+  }
+});
+
 test('built-in Taiwan sample is bilingual, read-only source data with exploration and synthesis roots', () => {
   const sample = load('builtin-sample.ts');
   for (const language of ['zh-TW', 'en']) {

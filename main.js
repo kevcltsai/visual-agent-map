@@ -1777,6 +1777,8 @@ function typedNodeBinding(value) {
 var existsSync = typedNodeBinding(import_node_fs.existsSync);
 var readdirSync = typedNodeBinding(import_node_fs.readdirSync);
 var delimiter = typedNodeBinding(import_node_path.delimiter);
+var dirname = typedNodeBinding(import_node_path.dirname);
+var isAbsolute = typedNodeBinding(import_node_path.isAbsolute);
 var join = typedNodeBinding(import_node_path.join);
 function currentProcessEnvironment() {
   var _a, _b;
@@ -4048,10 +4050,11 @@ ${context.task}`
   }
   runtime(pluginDirectory) {
     if (!this.codexRuntime) {
+      const executable = this.resolveExecutable(this.settings.codexPath);
       this.codexRuntime = new CodexAppServerRuntime({
-        executable: this.resolveExecutable(this.settings.codexPath),
+        executable,
         cwd: pluginDirectory,
-        env: this.cliEnvironment(),
+        env: this.cliEnvironment(executable),
         clientVersion: this.manifest.version || "0.0.0",
         onLog: (level, message) => this.logs.appendLog(level, message)
       });
@@ -4070,10 +4073,10 @@ ${context.task}`
     }
     return executableCandidates(configured, home, environment.PATH || "", nvmVersions).find((candidate) => existsSync(candidate)) || configured;
   }
-  cliEnvironment() {
+  cliEnvironment(executable) {
     const environment = currentProcessEnvironment();
     const home = environment.HOME || "";
-    const paths = [home ? join(home, ".local/bin") : "", "/opt/homebrew/bin", "/usr/local/bin", "/usr/bin", "/bin", environment.PATH || ""].filter(Boolean);
-    return { ...environment, PATH: [...new Set(paths)].join(":") };
+    const paths = [isAbsolute(executable) ? dirname(executable) : "", home ? join(home, ".local/bin") : "", "/opt/homebrew/bin", "/usr/local/bin", "/usr/bin", "/bin", ...(environment.PATH || "").split(delimiter)].filter(Boolean);
+    return { ...environment, PATH: [...new Set(paths)].join(delimiter) };
   }
 };

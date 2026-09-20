@@ -4,7 +4,7 @@ import { NameModal } from "./ui/modals/name-modal";
 import { ChoiceModal } from "./ui/modals/choice-modal";
 import { DebugLogModal } from "./ui/modals/debug-log-modal";
 import { existsSync as nodeExistsSync, readdirSync as nodeReaddirSync } from "node:fs";
-import { delimiter as nodeDelimiter, join as nodeJoin } from "node:path";
+import { delimiter as nodeDelimiter, dirname as nodeDirname, isAbsolute as nodeIsAbsolute, join as nodeJoin } from "node:path";
 import { canParent, clone, descendants, History, inheritModel, MapDocument, MapNode, parseMap, removeNodes, serializeMap, visibleNodes } from "./map-model";
 import { DEFAULT_SETTINGS, ModelSource, Note, NotePatch, Repository, Settings, TopicInfo, TopicState } from "./repository";
 import { buildPreparedTaskContext } from "./ai/context-builder";
@@ -27,6 +27,8 @@ function typedNodeBinding<T>(value: unknown): T { return value as T; }
 const existsSync = typedNodeBinding<(path: string) => boolean>(nodeExistsSync);
 const readdirSync = typedNodeBinding<(path: string) => string[]>(nodeReaddirSync);
 const delimiter = typedNodeBinding<string>(nodeDelimiter);
+const dirname = typedNodeBinding<(path: string) => string>(nodeDirname);
+const isAbsolute = typedNodeBinding<(path: string) => boolean>(nodeIsAbsolute);
 const join = typedNodeBinding<(...paths: string[]) => string>(nodeJoin);
 function currentProcessEnvironment(): ProcessEnvironment {
   return (window as Window & { process?: { env?: ProcessEnvironment } }).process?.env ?? {};
@@ -1344,10 +1346,11 @@ export default class VisualAgentMapPlugin extends Plugin {
   }
   private runtime(pluginDirectory: string): CodexAppServerRuntime {
     if (!this.codexRuntime) {
+      const executable = this.resolveExecutable(this.settings.codexPath);
       this.codexRuntime = new CodexAppServerRuntime({
-        executable: this.resolveExecutable(this.settings.codexPath),
+        executable,
         cwd: pluginDirectory,
-        env: this.cliEnvironment(),
+        env: this.cliEnvironment(executable),
         clientVersion: this.manifest.version || "0.0.0",
         onLog: (level, message) => this.logs.appendLog(level, message)
       });
@@ -1361,10 +1364,11 @@ export default class VisualAgentMapPlugin extends Plugin {
     if (home) { try { nvmVersions = readdirSync(join(home, ".nvm/versions/node")); } catch { /* nvm is optional. */ } }
     return executableCandidates(configured, home, environment.PATH || "", nvmVersions).find(candidate => existsSync(candidate)) || configured;
   }
-  private cliEnvironment(): ProcessEnvironment {
+  private cliEnvironment(executable: string): ProcessEnvironment {
     const environment = currentProcessEnvironment();
     const home = environment.HOME || "";
-    const paths = [home ? join(home, ".local/bin") : "", "/opt/homebrew/bin", "/usr/local/bin", "/usr/bin", "/bin", environment.PATH || ""].filter(Boolean);
-    return { ...environment, PATH: [...new Set(paths)].join(":") };
+    // npm launchers use /usr/bin/env node; keep the resolved installation ahead of GUI defaults.
+    const paths = [isAbsolute(executable) ? dirname(executable) : "", home ? join(home, ".local/bin") : "", "/opt/homebrew/bin", "/usr/local/bin", "/usr/bin", "/bin", ...(environment.PATH || "").split(delimiter)].filter(Boolean);
+    return { ...environment, PATH: [...new Set(paths)].join(delimiter) };
   }
 }

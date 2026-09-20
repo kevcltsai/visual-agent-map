@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.8.1] - 2026-09-21
+
+### Fixed
+
+- Replaced the VAM Properties visibility override with a more specific selector that does not require `!important`.
+- Made tag releases idempotent by updating assets when the GitHub Release already exists.
+
 ## [0.8.0] - 2026-09-21
 
 ### Added

@@ -437,6 +437,24 @@ test('new child topics inherit the parent AI rules once', async () => {
   const child = (await repo.readMap(mapPath)).nodes.at(-1);
   assert.equal((await repo.readNote(child.path)).rules, 'Use official sources and tables.');
 });
+test('confirmed child batches rebuild derived data only once', async () => {
+  const { repo, app } = fixture(), parent = await topicNote(repo, 'Parent', 'a'); let rebuilds = 0;
+  const mapPath = 'Agent Workspace/Topics/map-a/Map.md';
+  const mapDoc = { id: 'map-a', title: 'map-a', version: 1, nodes: [parent], viewport: { x: 0, y: 0, zoom: 1 } };
+  await app.vault.create(mapPath, core.serializeMap(mapDoc));
+  const { VisualAgentMapView } = load('main.ts', { obsidian });
+  const view = new VisualAgentMapView({ app }, { repo, settings: { ...DEFAULT_SETTINGS }, rebuildDerivedData: async () => { rebuilds++; } });
+  view.path = mapPath; view.map = mapDoc; view.contentEl = { querySelector: () => null }; view.render = () => {}; view.hydrate = async () => {}; view.focusNode = () => {};
+  await view.createChildBatch(parent, [
+    { title: 'One', task: 'Task one', contribution: 'First' },
+    { title: 'Two', task: 'Task two', contribution: 'Second' },
+    { title: 'Three', task: 'Task three', contribution: 'Third' }
+  ]);
+  const saved = await repo.readMap(mapPath);
+  assert.equal(saved.nodes.length, 4);
+  assert.equal(rebuilds, 1);
+  assert.equal((await repo.readNote(saved.nodes[1].path)).prompt, 'Task one');
+});
 test('decomposition keeps only 3 to 7 proposals and does not write nodes before confirmation', async () => {
   const { repo, app } = fixture(), parent = await topicNote(repo, 'Parent', 'model-a');
   const mapPath = 'Agent Workspace/Topics/map-a/Map.md';
@@ -495,11 +513,22 @@ test('Obsidian 1.13 declarative settings expose workspace recovery and App Serve
   const definitions = source.slice(source.indexOf('getSettingDefinitions()'), source.indexOf('async setControlValue'));
   assert.match(definitions, /Workspace 位置/);
   assert.match(definitions, /修復 Agent Workspace/);
+  assert.match(definitions, /重新整理 VAM 資料/);
+  assert.match(definitions, /完整重建/);
   assert.match(definitions, /找回既有 Workspace/);
   assert.match(definitions, /Codex App Server 狀態/);
   assert.match(definitions, /重新檢查/);
   assert.match(definitions, /安裝說明/);
   assert.match(source, /this\.settingTab\?\.update\(\)/);
+});
+test('full rebuild refreshes derived data and open views', async () => {
+  const { default: Plugin } = load('main.ts', { obsidian }); let rebuilds = 0, refreshes = 0;
+  const plugin = new Plugin();
+  plugin.repo = { rebuildDerivedData: async () => { rebuilds++; } };
+  plugin.views = () => [{ refreshFromPlugin: async () => { refreshes++; } }];
+  await plugin.fullRebuild();
+  assert.equal(rebuilds, 1);
+  assert.equal(refreshes, 1);
 });
 test('missing Codex opens an in-product setup guide with official installation and sign-in steps', () => {
   const source = fs.readFileSync(path.join(root, 'main.ts'), 'utf8');

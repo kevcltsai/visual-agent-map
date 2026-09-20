@@ -284,7 +284,7 @@ export class VisualAgentMapView extends ItemView {
   async renamed(file: TFile, oldPath: string): Promise<void> { if (this.path === oldPath) this.path = file.path; if (this.map) { for (const node of this.map.nodes) if (node.path === oldPath) node.path = file.path; this.history.clear(); await this.hydrate(); this.render(); } }
   deleted(file: TFile): void { if (file.path === this.path) { this.map = null; this.path = ""; this.history.clear(); this.render(); } else this.changed(file); }
   private button(parent: HTMLElement, text: string, action: () => void, disabled = false): HTMLButtonElement { const button = parent.createEl("button", { text: t(text) }); button.disabled = disabled; button.addEventListener("click", event => { event.stopPropagation(); action(); }); return button; }
-  private async mapChange(change: (map: MapDocument) => void): Promise<void> {
+  private async mapChange(change: (map: MapDocument) => void, rebuildDerivedData = true): Promise<void> {
     if (!this.map) return;
     const path = this.path;
     const disk = await this.plugin.repo.readMap(path);
@@ -299,7 +299,7 @@ export class VisualAgentMapView extends ItemView {
     const after = clone(this.map);
     try { await this.persist(); } catch (error) { this.map = before; this.render(); throw error; }
     const ownership = (map: MapDocument): string => JSON.stringify(map.nodes.map(node => [node.id, node.path, node.parentId]));
-    if (ownership(before) !== ownership(after)) await this.plugin.rebuildDerivedData();
+    if (rebuildDerivedData && ownership(before) !== ownership(after)) await this.plugin.rebuildDerivedData();
     const restore = async (snapshot: MapDocument): Promise<void> => { const previous = clone(this.map!); const next = clone(snapshot); if (this.map) next.viewport = clone(this.map.viewport); await this.plugin.repo.saveMap(path, next); this.map = next; if (ownership(previous) !== ownership(next)) await this.plugin.rebuildDerivedData(); await this.hydrate(); };
     this.history.push({ undo: () => restore(before), redo: () => restore(after) }); this.render();
   }
@@ -820,7 +820,7 @@ export class VisualAgentMapView extends ItemView {
       ]).open();
     } }))).open();
   }
-  private async addNode(parent: MapNode | null, suggestedTitle?: string): Promise<void> {
+  private async addNode(parent: MapNode | null, suggestedTitle?: string, rebuildDerivedData = true): Promise<void> {
     if (!this.map) return;
     const model = inheritModel(parent ? (await this.plugin.repo.readNote(parent.path)).model : undefined, this.plugin.settings.cliModel);
     if (!this.path.startsWith(`${this.plugin.settings.topicsFolder}/`)) { new Notice(t("請先使用「整理舊資料」轉換目前心智圖。")); return; }
@@ -830,7 +830,7 @@ export class VisualAgentMapView extends ItemView {
     const siblings = this.map.nodes.filter(n => n.parentId === node.parentId);
     node.y = siblings.length ? Math.max(...siblings.map(n => n.y)) + 220 : parent?.y ?? 80;
     this.notes.set(node.id, await this.plugin.repo.readNote(node.path)); this.selected = node.id;
-    await this.mapChange(map => { map.nodes.push(node); if (parent) map.nodes.find(n => n.id === parent.id)!.collapsed = false; }); this.focusNode(node);
+    await this.mapChange(map => { map.nodes.push(node); if (parent) map.nodes.find(n => n.id === parent.id)!.collapsed = false; }, rebuildDerivedData); this.focusNode(node);
   }
   private async proposeChildren(parent: MapNode, confirmed = false): Promise<void> {
     const pending = this.plugin.pendingSuggestions.get(parent.path);
@@ -856,8 +856,20 @@ export class VisualAgentMapView extends ItemView {
   private openChildSuggestions(parent: MapNode, suggestions: Suggestion[]): void {
     new ChildProposalModal(this.app, suggestions.slice(0, 7), items => this.enqueue(async () => {
       this.plugin.pendingSuggestions.delete(parent.path);
-      for (const item of items) { await this.addNode(parent, item.title); const child = this.map!.nodes.at(-1)!; await this.noteChange(child, { prompt: item.task, detail: item.contribution ? canonicalDetail(item.contribution) : "" }); }
+      await this.createChildBatch(parent, items);
     })).open();
+  }
+  private async createChildBatch(parent: MapNode, items: Suggestion[]): Promise<void> {
+    let created = 0;
+    try {
+      for (const item of items) {
+        await this.addNode(parent, item.title, false); created++;
+        const child = this.map!.nodes.at(-1)!;
+        await this.noteChange(child, { prompt: item.task, detail: item.contribution ? canonicalDetail(item.contribution) : "" });
+      }
+    } finally {
+      if (created) await this.plugin.rebuildDerivedData();
+    }
   }
   private async ancestorContext(node: MapNode): Promise<string> {
     const chain: MapNode[] = [], seen = new Set([node.id]); let parent = node.parentId;
@@ -1051,6 +1063,7 @@ class VisualAgentMapSettingTab extends PluginSettingTab {
       { name: t("工作區預設 Model"), desc: t("模型清單由 Codex App Server 自動取得；變更只影響之後新增的根議題。"), control: { type: "dropdown", key: "cliModel", options: models } },
       { name: t("Workspace 位置"), render: setting => { setting.setName(t("Workspace 位置")).setDesc(t("主題資料夾：{0}　未分類收件匣：{1}", this.plugin.settings.topicsFolder, this.plugin.settings.inboxFolder)); } },
       { name: t("修復 Agent Workspace"), render: setting => { setting.setName(t("修復 Agent Workspace")).setDesc(t("只建立缺少的基本資料夾，不會復原、搬移或覆寫筆記與心智圖。")).addButton(button => button.setButtonText(t("修復")).onClick(() => { void this.plugin.mutate(() => this.plugin.repairWorkspace()); })); } },
+      { name: t("重新整理 VAM 資料"), render: setting => { setting.setName(t("重新整理 VAM 資料")).setDesc(t("重新掃描心智圖與議題筆記，重建 reference 與衍生資料。原始內容不會被覆寫。")).addButton(button => button.setButtonText(t("完整重建")).onClick(() => { void this.plugin.mutate(() => this.plugin.fullRebuild()); })); } },
       { name: t("找回既有 Workspace"), render: setting => { setting.setName(t("找回既有 Workspace")).setDesc(t("掃描可辨識的 VAM Workspace，確認後才重新連結，不會搬移或覆寫資料。")).addButton(button => button.setButtonText(t("掃描")).onClick(() => { void this.plugin.offerWorkspaceReconnect(); })); } },
       { name: t("Codex App Server 狀態"), render: setting => {
         setting.setName(t("Codex App Server 狀態")).setDesc(diagnostic.installed ? t("已找到 Codex CLI：{0}", diagnostic.executable) : t("未找到 Codex CLI。請依安裝說明完成安裝與 ChatGPT 登入；VAM 不會自動安裝系統套件。"));
@@ -1124,7 +1137,7 @@ export default class VisualAgentMapPlugin extends Plugin {
     this.registerView(VIEW_TYPE, leaf => new VisualAgentMapView(leaf, this));
     this.addRibbonIcon("git-fork", "Open map", () => { void this.activateView().catch(error => new Notice(String(error))); });
     this.addCommand({ id: "open-map", name: "Open map", callback: () => { void this.activateView().catch(error => new Notice(String(error))); } });
-    this.addCommand({ id: "rebuild-references", name: t("重建議題 reference"), callback: () => { void this.mutate(async () => { await this.repo.rebuildDerivedData(); new Notice(t("議題 reference 已依心智圖重建。")); }); } });
+    this.addCommand({ id: "rebuild-references", name: t("重新整理 VAM 資料"), callback: () => { void this.mutate(() => this.fullRebuild()); } });
     this.addCommand({ id: "normalize-note-filenames", name: t("同步議題名稱與檔名"), callback: () => { void this.mutate(async () => { const count = await this.repo.normalizeGeneratedNoteFilenames(); new Notice(count ? t("已同步 {0} 份議題檔名。", count) : t("議題檔名已是最新狀態。")); }); } });
     this.addCommand({ id: "repair-note-presentation", name: t("修復議題筆記顯示"), callback: () => { void this.mutate(async () => { await this.repo.ensureNodePresentation(); new Notice(t("已修復議題筆記顯示。")); }); } });
     this.addCommand({ id: "open-built-in-sample", name: t("開啟台灣旅行範例"), callback: () => { void this.activateBuiltInSample(true); } });
@@ -1163,6 +1176,7 @@ export default class VisualAgentMapPlugin extends Plugin {
   }
   consumeFirstInstallSample(): boolean { const pending = this.firstInstallSamplePending; this.firstInstallSamplePending = false; return pending; }
   async repairWorkspace(): Promise<void> { await this.repo.ensureWorkspace(); this.settings.workspaceInitialized = true; await this.saveSettings(); for (const view of this.views()) await view.refreshFromPlugin(); new Notice(t("Agent Workspace 已可使用。")); }
+  async fullRebuild(): Promise<void> { await this.repo.rebuildDerivedData(); for (const view of this.views()) await view.refreshFromPlugin(); new Notice(t("VAM 資料已重新整理。")); }
   private connectWorkspace(root: string): void {
     this.settings.workspaceFolder = root;
     this.settings.topicsFolder = `${root}/Topics`;

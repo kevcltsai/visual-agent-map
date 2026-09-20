@@ -265,6 +265,10 @@ var english = {
   "\u4E00\u822C\u4EFB\u52D9\u4F7F\u7528\u4F4E\u63A8\u7406\uFF1B\u6574\u5408\u5B50\u8B70\u984C\u4F7F\u7528\u9AD8\u63A8\u7406\u3002": "Regular tasks use low reasoning; subtopic synthesis uses high reasoning.",
   "\u91CD\u5EFA\u8B70\u984C reference": "Rebuild topic references",
   "\u8B70\u984C reference \u5DF2\u4F9D\u5FC3\u667A\u5716\u91CD\u5EFA\u3002": "Topic references were rebuilt from the mind map.",
+  "\u91CD\u65B0\u6574\u7406 VAM \u8CC7\u6599": "Refresh VAM data",
+  "\u91CD\u65B0\u6383\u63CF\u5FC3\u667A\u5716\u8207\u8B70\u984C\u7B46\u8A18\uFF0C\u91CD\u5EFA reference \u8207\u884D\u751F\u8CC7\u6599\u3002\u539F\u59CB\u5167\u5BB9\u4E0D\u6703\u88AB\u8986\u5BEB\u3002": "Rescan maps and topic notes, then rebuild references and derived data. Original content is not overwritten.",
+  "\u5B8C\u6574\u91CD\u5EFA": "Full rebuild",
+  "VAM \u8CC7\u6599\u5DF2\u91CD\u65B0\u6574\u7406\u3002": "VAM data has been refreshed.",
   "\u540C\u6B65\u8B70\u984C\u540D\u7A31\u8207\u6A94\u540D": "Sync topic names and filenames",
   "\u8B70\u984C\u6A94\u540D\u5DF2\u662F\u6700\u65B0\u72C0\u614B\u3002": "Topic filenames are up to date.",
   "\u4EE5\u5FC3\u667A\u5716\u958B\u555F": "Open as mind map",
@@ -2271,7 +2275,7 @@ var VisualAgentMapView = class extends import_obsidian5.ItemView {
     });
     return button;
   }
-  async mapChange(change) {
+  async mapChange(change, rebuildDerivedData = true) {
     if (!this.map) return;
     const path = this.path;
     const disk = await this.plugin.repo.readMap(path);
@@ -2297,7 +2301,7 @@ var VisualAgentMapView = class extends import_obsidian5.ItemView {
       throw error;
     }
     const ownership = (map) => JSON.stringify(map.nodes.map((node) => [node.id, node.path, node.parentId]));
-    if (ownership(before) !== ownership(after)) await this.plugin.rebuildDerivedData();
+    if (rebuildDerivedData && ownership(before) !== ownership(after)) await this.plugin.rebuildDerivedData();
     const restore = async (snapshot) => {
       const previous = clone(this.map);
       const next = clone(snapshot);
@@ -3166,7 +3170,7 @@ var VisualAgentMapView = class extends import_obsidian5.ItemView {
       ]).open();
     } }))).open();
   }
-  async addNode(parent, suggestedTitle) {
+  async addNode(parent, suggestedTitle, rebuildDerivedData = true) {
     var _a, _b;
     if (!this.map) return;
     const model = inheritModel(parent ? (await this.plugin.repo.readNote(parent.path)).model : void 0, this.plugin.settings.cliModel);
@@ -3185,7 +3189,7 @@ var VisualAgentMapView = class extends import_obsidian5.ItemView {
     await this.mapChange((map) => {
       map.nodes.push(node);
       if (parent) map.nodes.find((n) => n.id === parent.id).collapsed = false;
-    });
+    }, rebuildDerivedData);
     this.focusNode(node);
   }
   async proposeChildren(parent, confirmed = false) {
@@ -3225,12 +3229,21 @@ var VisualAgentMapView = class extends import_obsidian5.ItemView {
   openChildSuggestions(parent, suggestions) {
     new ChildProposalModal(this.app, suggestions.slice(0, 7), (items) => this.enqueue(async () => {
       this.plugin.pendingSuggestions.delete(parent.path);
+      await this.createChildBatch(parent, items);
+    })).open();
+  }
+  async createChildBatch(parent, items) {
+    let created = 0;
+    try {
       for (const item of items) {
-        await this.addNode(parent, item.title);
+        await this.addNode(parent, item.title, false);
+        created++;
         const child = this.map.nodes.at(-1);
         await this.noteChange(child, { prompt: item.task, detail: item.contribution ? canonicalDetail(item.contribution) : "" });
       }
-    })).open();
+    } finally {
+      if (created) await this.plugin.rebuildDerivedData();
+    }
   }
   async ancestorContext(node) {
     var _a;
@@ -3595,6 +3608,11 @@ var VisualAgentMapSettingTab = class extends import_obsidian5.PluginSettingTab {
           void this.plugin.mutate(() => this.plugin.repairWorkspace());
         }));
       } },
+      { name: t("\u91CD\u65B0\u6574\u7406 VAM \u8CC7\u6599"), render: (setting) => {
+        setting.setName(t("\u91CD\u65B0\u6574\u7406 VAM \u8CC7\u6599")).setDesc(t("\u91CD\u65B0\u6383\u63CF\u5FC3\u667A\u5716\u8207\u8B70\u984C\u7B46\u8A18\uFF0C\u91CD\u5EFA reference \u8207\u884D\u751F\u8CC7\u6599\u3002\u539F\u59CB\u5167\u5BB9\u4E0D\u6703\u88AB\u8986\u5BEB\u3002")).addButton((button) => button.setButtonText(t("\u5B8C\u6574\u91CD\u5EFA")).onClick(() => {
+          void this.plugin.mutate(() => this.plugin.fullRebuild());
+        }));
+      } },
       { name: t("\u627E\u56DE\u65E2\u6709 Workspace"), render: (setting) => {
         setting.setName(t("\u627E\u56DE\u65E2\u6709 Workspace")).setDesc(t("\u6383\u63CF\u53EF\u8FA8\u8B58\u7684 VAM Workspace\uFF0C\u78BA\u8A8D\u5F8C\u624D\u91CD\u65B0\u9023\u7D50\uFF0C\u4E0D\u6703\u642C\u79FB\u6216\u8986\u5BEB\u8CC7\u6599\u3002")).addButton((button) => button.setButtonText(t("\u6383\u63CF")).onClick(() => {
           void this.plugin.offerWorkspaceReconnect();
@@ -3708,11 +3726,8 @@ var VisualAgentMapPlugin = class extends import_obsidian5.Plugin {
     this.addCommand({ id: "open-map", name: "Open map", callback: () => {
       void this.activateView().catch((error) => new import_obsidian5.Notice(String(error)));
     } });
-    this.addCommand({ id: "rebuild-references", name: t("\u91CD\u5EFA\u8B70\u984C reference"), callback: () => {
-      void this.mutate(async () => {
-        await this.repo.rebuildDerivedData();
-        new import_obsidian5.Notice(t("\u8B70\u984C reference \u5DF2\u4F9D\u5FC3\u667A\u5716\u91CD\u5EFA\u3002"));
-      });
+    this.addCommand({ id: "rebuild-references", name: t("\u91CD\u65B0\u6574\u7406 VAM \u8CC7\u6599"), callback: () => {
+      void this.mutate(() => this.fullRebuild());
     } });
     this.addCommand({ id: "normalize-note-filenames", name: t("\u540C\u6B65\u8B70\u984C\u540D\u7A31\u8207\u6A94\u540D"), callback: () => {
       void this.mutate(async () => {
@@ -3807,6 +3822,11 @@ var VisualAgentMapPlugin = class extends import_obsidian5.Plugin {
     await this.saveSettings();
     for (const view of this.views()) await view.refreshFromPlugin();
     new import_obsidian5.Notice(t("Agent Workspace \u5DF2\u53EF\u4F7F\u7528\u3002"));
+  }
+  async fullRebuild() {
+    await this.repo.rebuildDerivedData();
+    for (const view of this.views()) await view.refreshFromPlugin();
+    new import_obsidian5.Notice(t("VAM \u8CC7\u6599\u5DF2\u91CD\u65B0\u6574\u7406\u3002"));
   }
   connectWorkspace(root) {
     this.settings.workspaceFolder = root;

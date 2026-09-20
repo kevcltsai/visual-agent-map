@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.8.0] - 2026-09-21
+
+### Added
+
+- Added a user-triggered full VAM data rebuild in Settings and the Command Palette.
+- Added workspace and per-topic Codex reasoning-level controls.
+
+### Changed
+
+- Creating a confirmed batch of child topics now rebuilds derived data only once.
+- VAM note Properties are hidden in reading and Live Preview while their YAML metadata remains intact.
+
 ## [0.7.1] - 2026-09-20
 
 ### Fixed

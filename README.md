@@ -34,6 +34,8 @@ This project is developed with [OpenAI Codex](https://openai.com/codex/) as a co
 4. Review the summary on the map and the full Markdown detail.
 5. Continue research or synthesize related findings into a new topic.
 
+Choose **Organize existing content** for a Codex task without web search, or **Research new information** for a bounded search (three searches and up to five main sources, with a stop reminder rather than a hard server limit). Reasoning can be set to Auto or chosen manually. While a node task is running, **Stop research** interrupts its Codex turn and preserves the existing note.
+
 ### What's new in 0.7.0
 
 - A rebuilt installation guide covers both Obsidian Community plugins and manual GitHub Release installation through the first editable map.
@@ -123,6 +125,8 @@ Visual Agent Map 是桌面版 Obsidian 外掛：用視覺化心智圖拆解複�
 3. 選擇並確認一項聚焦的 Codex 任務。
 4. 在心智圖查看摘要，在 Markdown 筆記閱讀完整內容。
 5. 繼續研究，或將相關發現整合成新的議題。
+
+可選「整理現有內容」執行不使用網路搜尋的 Codex 任務，或選「研究新資料」使用有限搜尋（最多三次搜尋、五個主要來源；停止提醒不是伺服器硬上限）。推理等級可選自動或手動。節點任務執行中可按「停止研究」，中斷 Codex 並保留原筆記。
 
 ### 0.7.0 更新內容
 

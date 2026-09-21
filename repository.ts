@@ -5,7 +5,8 @@ export type Status = "idea" | "running" | "completed" | "error";
 export type ModelSource = "workspace" | "inherited" | "manual";
 export type TopicState = "active" | "unassigned" | "archived" | "inbox";
 export type TopicCollection = "Notes" | "Unassigned" | "Archive";
-export type ReasoningLevel = "low" | "medium" | "high";
+export type ReasoningLevel = "auto" | "low" | "medium" | "high";
+export type ResearchMode = "local" | "research";
 export interface VisualReference { title: string; imageUrl: string; sourceUrl: string; description: string; palette: string[]; formula: string }
 export interface Note {
   title: string;
@@ -19,6 +20,7 @@ export interface Note {
   model: string;
   modelSource: ModelSource;
   reasoning?: ReasoningLevel;
+  researchMode: ResearchMode;
   status: Status;
   mapId: string;
   topicId: string;
@@ -76,7 +78,7 @@ export const DEFAULT_SETTINGS: Settings = {
 };
 
 export function normalizeReasoningLevel(value: unknown): ReasoningLevel {
-  return value === "medium" || value === "high" ? value : "low";
+  return value === "auto" || value === "medium" || value === "high" ? value : "low";
 }
 
 const REFERENCE_START = "<!-- visual-agent-map:references:start -->";
@@ -323,6 +325,7 @@ export class Repository {
       model: text(fm.model, this.settings.cliModel),
       modelSource: ["workspace", "inherited", "manual"].includes(source) ? source as ModelSource : "workspace",
       reasoning: normalizeReasoningLevel(fm["reasoning-level"] ?? this.settings.cliReasoning),
+      researchMode: fm["research-mode"] === "local" ? "local" : "research",
       status: ["idea", "running", "completed", "error"].includes(normalized) ? normalized as Status : "idea",
       mapId: text(fm["agent-map-id"]),
       topicId: text(fm["topic-id"], text(fm["agent-map-id"])),
@@ -338,6 +341,7 @@ export class Repository {
       for (const key of ["title", "summary", "model", "status"] as const) if (patch[key] !== undefined) fm[key] = patch[key];
       if (patch.modelSource !== undefined) fm["model-source"] = patch.modelSource;
       if (patch.reasoning !== undefined) fm["reasoning-level"] = normalizeReasoningLevel(patch.reasoning);
+      if (patch.researchMode !== undefined) fm["research-mode"] = patch.researchMode;
       if (patch.mapId !== undefined) patch.mapId ? fm["agent-map-id"] = patch.mapId : delete fm["agent-map-id"];
       if (patch.topicId !== undefined) patch.topicId ? fm["topic-id"] = patch.topicId : delete fm["topic-id"];
       if (patch.topicState !== undefined) fm["topic-state"] = patch.topicState;

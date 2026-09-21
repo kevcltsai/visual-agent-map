@@ -342,7 +342,18 @@ const english: Record<string, string> = {
   "未找到 Codex CLI：{0}": "Codex CLI was not found: {0}",
   "Codex App Server 已就緒：{0}": "Codex App Server is ready: {0}",
   "Codex App Server 檢查失敗：{0}": "Codex App Server check failed: {0}",
-  "目前模型已不可用": "Current model is unavailable"
+  "目前模型已不可用": "Current model is unavailable",
+  "內容來源": "Content source",
+  "研究新資料（有限搜尋）": "Research new information (limited search)",
+  "只整理現有內容（不搜尋）": "Organize existing content (no search)",
+  "整理現有內容": "Organize existing content",
+  "只整理目前筆記與已連結的來源，不搜尋新資料。": "Organize this note and linked sources without searching for new information.",
+  "確認整理任務": "Confirm organization task",
+  "自動 (Auto)": "Auto",
+  "自動模式會對簡單任務使用 Low、對複雜整合使用 Medium；手動選擇不會被覆蓋。": "Auto uses Low for simple tasks and Medium for complex synthesis; manual choices are preserved.",
+  "停止研究": "Stop research",
+  "研究已停止，原有內容保留。": "Research stopped. Existing content was preserved.",
+  "議題內容已變更，過時的 AI 結果未寫入。": "The topic changed, so the outdated AI result was not saved."
 };
 let language: "zh-TW" | "en" = "zh-TW";
 export function setUiLanguage(value: "zh-TW" | "en"): void { language = value; }

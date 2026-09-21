@@ -379,7 +379,18 @@ var english = {
   "\u672A\u627E\u5230 Codex CLI\uFF1A{0}": "Codex CLI was not found: {0}",
   "Codex App Server \u5DF2\u5C31\u7DD2\uFF1A{0}": "Codex App Server is ready: {0}",
   "Codex App Server \u6AA2\u67E5\u5931\u6557\uFF1A{0}": "Codex App Server check failed: {0}",
-  "\u76EE\u524D\u6A21\u578B\u5DF2\u4E0D\u53EF\u7528": "Current model is unavailable"
+  "\u76EE\u524D\u6A21\u578B\u5DF2\u4E0D\u53EF\u7528": "Current model is unavailable",
+  "\u5167\u5BB9\u4F86\u6E90": "Content source",
+  "\u7814\u7A76\u65B0\u8CC7\u6599\uFF08\u6709\u9650\u641C\u5C0B\uFF09": "Research new information (limited search)",
+  "\u53EA\u6574\u7406\u73FE\u6709\u5167\u5BB9\uFF08\u4E0D\u641C\u5C0B\uFF09": "Organize existing content (no search)",
+  "\u6574\u7406\u73FE\u6709\u5167\u5BB9": "Organize existing content",
+  "\u53EA\u6574\u7406\u76EE\u524D\u7B46\u8A18\u8207\u5DF2\u9023\u7D50\u7684\u4F86\u6E90\uFF0C\u4E0D\u641C\u5C0B\u65B0\u8CC7\u6599\u3002": "Organize this note and linked sources without searching for new information.",
+  "\u78BA\u8A8D\u6574\u7406\u4EFB\u52D9": "Confirm organization task",
+  "\u81EA\u52D5 (Auto)": "Auto",
+  "\u81EA\u52D5\u6A21\u5F0F\u6703\u5C0D\u7C21\u55AE\u4EFB\u52D9\u4F7F\u7528 Low\u3001\u5C0D\u8907\u96DC\u6574\u5408\u4F7F\u7528 Medium\uFF1B\u624B\u52D5\u9078\u64C7\u4E0D\u6703\u88AB\u8986\u84CB\u3002": "Auto uses Low for simple tasks and Medium for complex synthesis; manual choices are preserved.",
+  "\u505C\u6B62\u7814\u7A76": "Stop research",
+  "\u7814\u7A76\u5DF2\u505C\u6B62\uFF0C\u539F\u6709\u5167\u5BB9\u4FDD\u7559\u3002": "Research stopped. Existing content was preserved.",
+  "\u8B70\u984C\u5167\u5BB9\u5DF2\u8B8A\u66F4\uFF0C\u904E\u6642\u7684 AI \u7D50\u679C\u672A\u5BEB\u5165\u3002": "The topic changed, so the outdated AI result was not saved."
 };
 var language = "zh-TW";
 function setUiLanguage(value) {
@@ -664,7 +675,7 @@ var DEFAULT_SETTINGS = {
   sampleTourVersionSeen: 0
 };
 function normalizeReasoningLevel(value) {
-  return value === "medium" || value === "high" ? value : "low";
+  return value === "auto" || value === "medium" || value === "high" ? value : "low";
 }
 var REFERENCE_START = "<!-- visual-agent-map:references:start -->";
 var REFERENCE_END = "<!-- visual-agent-map:references:end -->";
@@ -950,6 +961,7 @@ var Repository = class {
       model: text(fm.model, this.settings.cliModel),
       modelSource: ["workspace", "inherited", "manual"].includes(source) ? source : "workspace",
       reasoning: normalizeReasoningLevel((_a = fm["reasoning-level"]) != null ? _a : this.settings.cliReasoning),
+      researchMode: fm["research-mode"] === "local" ? "local" : "research",
       status: ["idea", "running", "completed", "error"].includes(normalized) ? normalized : "idea",
       mapId: text(fm["agent-map-id"]),
       topicId: text(fm["topic-id"], text(fm["agent-map-id"])),
@@ -964,6 +976,7 @@ var Repository = class {
       for (const key of ["title", "summary", "model", "status"]) if (patch[key] !== void 0) fm[key] = patch[key];
       if (patch.modelSource !== void 0) fm["model-source"] = patch.modelSource;
       if (patch.reasoning !== void 0) fm["reasoning-level"] = normalizeReasoningLevel(patch.reasoning);
+      if (patch.researchMode !== void 0) fm["research-mode"] = patch.researchMode;
       if (patch.mapId !== void 0) patch.mapId ? fm["agent-map-id"] = patch.mapId : delete fm["agent-map-id"];
       if (patch.topicId !== void 0) patch.topicId ? fm["topic-id"] = patch.topicId : delete fm["topic-id"];
       if (patch.topicState !== void 0) fm["topic-state"] = patch.topicState;
@@ -1430,6 +1443,18 @@ function visualReferencesMarkdown(references = []) {
   }).filter(Boolean).join("\n\n");
 }
 
+// ai/task-policy.ts
+var RESEARCH_SEARCH_BUDGET = 3;
+function effectiveReasoningLevel(context, selected) {
+  if (selected !== "auto") return selected;
+  if (context.mode === "synthesize") return "medium";
+  return context.sourceContext && context.sourceContext.length > 6e3 ? "medium" : "low";
+}
+function researchGuidance(context) {
+  if (context.researchMode === "local") return "\u9019\u662F\u6574\u7406\u65E2\u6709\u5167\u5BB9\u7684\u4EFB\u52D9\uFF1A\u53EA\u4F7F\u7528\u672C\u6B21\u63D0\u4F9B\u7684\u8B70\u984C\u8207\u4F86\u6E90\u80CC\u666F\uFF0C\u4E0D\u8981\u641C\u5C0B\u7DB2\u8DEF\u3001\u8B80\u53D6\u5176\u4ED6\u6A94\u6848\u6216\u63D0\u51FA\u672A\u7D93\u63D0\u4F9B\u8CC7\u6599\u652F\u6301\u7684\u65B0\u4E8B\u5BE6\u3002";
+  return `\u53EA\u6709\u9700\u8981\u5916\u90E8\u4E8B\u5BE6\u6642\u624D\u641C\u5C0B\uFF1B\u6700\u591A\u9032\u884C ${RESEARCH_SEARCH_BUDGET} \u6B21\u7DB2\u8DEF\u641C\u5C0B\u3001\u95B1\u8B80\u6700\u591A 5 \u500B\u4E3B\u8981\u4F86\u6E90\u3002\u8CC7\u8A0A\u8DB3\u5920\u5C31\u505C\u6B62\uFF0C\u4E0D\u505A\u7AAE\u76E1\u5F0F\u7814\u7A76\uFF1B\u82E5\u8B49\u64DA\u4E0D\u8DB3\uFF0C\u660E\u78BA\u5217\u70BA\u5F85\u78BA\u8A8D\u4E8B\u9805\u3002`;
+}
+
 // ui/preview-utils.ts
 function clampPreviewScale(value) {
   const scale = typeof value === "number" ? value : Number(value);
@@ -1508,7 +1533,7 @@ function builtInSample(language2, useEmbeddedAssets = true) {
   for (const node of map.nodes) {
     const note = source.notes[node.path];
     if (!note) throw new Error(`Built-in sample note is missing: ${node.path}`);
-    notes.set(node.id, { ...note, preview: useEmbeddedAssets ? embedAssets(note.preview) : note.preview, detail: useEmbeddedAssets ? embedAssets(note.detail) : note.detail, visualReferences: "", newFindings: "", model: "", modelSource: "workspace", mapId: map.id, topicId: map.id, topicState: "active", sourcePaths: [...note.sourcePaths] });
+    notes.set(node.id, { ...note, preview: useEmbeddedAssets ? embedAssets(note.preview) : note.preview, detail: useEmbeddedAssets ? embedAssets(note.detail) : note.detail, visualReferences: "", newFindings: "", model: "", modelSource: "workspace", researchMode: "research", mapId: map.id, topicId: map.id, topicState: "active", sourcePaths: [...note.sourcePaths] });
   }
   return { map, notes, assets: new Map(Object.entries(compiled_default.assets).map(([name, data]) => [name, binary(data)])) };
 }
@@ -1556,6 +1581,11 @@ var import_node_child_process = require("node:child_process");
 var spawnProcess = import_node_child_process.spawn;
 var CONTROL_TIMEOUT_MS = 3e4;
 var TURN_TIMEOUT_MS = 15 * 60 * 1e3;
+function cancelledError() {
+  const error = new Error("AI \u4EFB\u52D9\u5DF2\u53D6\u6D88");
+  error.name = "AbortError";
+  return error;
+}
 var CodexAppServerRuntime = class {
   constructor(options) {
     this.options = options;
@@ -1626,9 +1656,11 @@ var CodexAppServerRuntime = class {
     } while (cursor);
     return [...new Map(models.map((model) => [model.model, model])).values()];
   }
-  async runTask(prompt, model, effort, outputSchema) {
-    var _a, _b, _c;
+  async runTask(prompt, model, effort, outputSchema, controls) {
+    var _a, _b, _c, _d, _e, _f, _g, _h, _i, _j, _k, _l;
+    if ((_a = controls == null ? void 0 : controls.signal) == null ? void 0 : _a.aborted) throw cancelledError();
     await this.start();
+    if ((_b = controls == null ? void 0 : controls.signal) == null ? void 0 : _b.aborted) throw cancelledError();
     const started = await this.request("thread/start", {
       model: model || null,
       cwd: this.options.cwd,
@@ -1636,36 +1668,55 @@ var CodexAppServerRuntime = class {
       sandbox: "read-only",
       ephemeral: true
     });
-    const threadId = typeof ((_a = started.thread) == null ? void 0 : _a.id) === "string" ? started.thread.id : "";
+    const threadId = typeof ((_c = started.thread) == null ? void 0 : _c.id) === "string" ? started.thread.id : "";
     if (!threadId) throw new Error("Codex App Server \u6C92\u6709\u5EFA\u7ACB thread");
     const completed = new Promise((resolve, reject) => {
+      var _a2;
       const timeout = window.setTimeout(() => {
         this.turns.delete(threadId);
         reject(new Error("Codex App Server turn \u5728 15 \u5206\u9418\u5167\u6C92\u6709\u5B8C\u6210"));
       }, TURN_TIMEOUT_MS);
-      this.turns.set(threadId, { messages: [], resolve, reject, timeout });
+      this.turns.set(threadId, { messages: [], resolve, reject, timeout, turnId: "", searches: 0, searchBudget: (_a2 = controls == null ? void 0 : controls.searchBudget) != null ? _a2 : 0, steered: false });
     });
+    const state = this.turns.get(threadId);
+    const interrupt = () => {
+      if (state.turnId) void this.request("turn/interrupt", { threadId, turnId: state.turnId }).catch((error) => {
+        var _a2, _b2;
+        return (_b2 = (_a2 = this.options).onLog) == null ? void 0 : _b2.call(_a2, "warn", `\u53D6\u6D88 AI \u4EFB\u52D9\u5931\u6557\uFF1A${error instanceof Error ? error.message : String(error)}`);
+      });
+    };
+    (_d = controls == null ? void 0 : controls.signal) == null ? void 0 : _d.addEventListener("abort", interrupt, { once: true });
     try {
-      await this.request("turn/start", {
+      if ((_e = controls == null ? void 0 : controls.signal) == null ? void 0 : _e.aborted) throw cancelledError();
+      const startedTurn = await this.request("turn/start", {
         threadId,
         input: [{ type: "text", text: prompt, text_elements: [] }],
         model: model || null,
         effort: effort || "low",
         outputSchema
       });
-      return await completed;
+      state.turnId = typeof ((_f = startedTurn.turn) == null ? void 0 : _f.id) === "string" ? startedTurn.turn.id : "";
+      if ((_g = controls == null ? void 0 : controls.signal) == null ? void 0 : _g.aborted) interrupt();
+      this.steerIfNeeded(threadId, state);
+      const answer = await completed;
+      if ((_h = controls == null ? void 0 : controls.signal) == null ? void 0 : _h.aborted) throw cancelledError();
+      return answer;
     } catch (error) {
-      const state = this.turns.get(threadId);
-      if (state) {
-        window.clearTimeout(state.timeout);
+      const state2 = this.turns.get(threadId);
+      if (state2) {
+        window.clearTimeout(state2.timeout);
         this.turns.delete(threadId);
+        state2.reject(error instanceof Error ? error : new Error(String(error)));
+        await completed.catch(() => void 0);
       } else await completed.catch(() => void 0);
+      if ((_i = controls == null ? void 0 : controls.signal) == null ? void 0 : _i.aborted) throw cancelledError();
       throw error;
     } finally {
+      (_j = controls == null ? void 0 : controls.signal) == null ? void 0 : _j.removeEventListener("abort", interrupt);
       try {
         await this.request("thread/unsubscribe", { threadId }, 5e3);
       } catch (error) {
-        (_c = (_b = this.options).onLog) == null ? void 0 : _c.call(_b, "warn", `Codex App Server \u7121\u6CD5\u53D6\u6D88 thread \u8A02\u95B1\uFF1A${error instanceof Error ? error.message : String(error)}`);
+        (_l = (_k = this.options).onLog) == null ? void 0 : _l.call(_k, "warn", `Codex App Server \u7121\u6CD5\u53D6\u6D88 thread \u8A02\u95B1\uFF1A${error instanceof Error ? error.message : String(error)}`);
       }
     }
   }
@@ -1674,7 +1725,7 @@ var CodexAppServerRuntime = class {
     (_b = (_a = this.options).onLog) == null ? void 0 : _b.call(_a, "info", `\u555F\u52D5 Codex App Server\uFF1A${this.options.executable} app-server`);
     this.buffer = "";
     this.stderr = "";
-    const child = spawnProcess(this.options.executable, ["app-server"], {
+    const child = spawnProcess(this.options.executable, this.options.webSearchDisabled ? ["--config", 'web_search="disabled"', "app-server"] : ["app-server"], {
       cwd: this.options.cwd,
       env: this.options.env,
       stdio: ["pipe", "pipe", "pipe"]
@@ -1729,6 +1780,14 @@ var CodexAppServerRuntime = class {
     const threadId = typeof (params == null ? void 0 : params.threadId) === "string" ? params.threadId : "";
     const state = this.turns.get(threadId);
     if (!state) return;
+    if (message.method === "item/started") {
+      const item = params == null ? void 0 : params.item;
+      if ((item == null ? void 0 : item.type) === "webSearch" && (!item.action || item.action.type === "search")) {
+        state.searches++;
+        this.steerIfNeeded(threadId, state);
+      }
+      return;
+    }
     if (message.method === "item/completed") {
       const item = params == null ? void 0 : params.item;
       if ((item == null ? void 0 : item.type) === "agentMessage" && typeof item.text === "string") state.messages.push(item.text);
@@ -1741,6 +1800,14 @@ var CodexAppServerRuntime = class {
       if ((turn == null ? void 0 : turn.status) === "completed") state.resolve(((_a = state.messages.at(-1)) == null ? void 0 : _a.trim()) || "");
       else state.reject(new Error(typeof ((_b = turn == null ? void 0 : turn.error) == null ? void 0 : _b.message) === "string" ? turn.error.message : `Codex turn ${typeof (turn == null ? void 0 : turn.status) === "string" ? turn.status : "\u5931\u6557"}`));
     }
+  }
+  steerIfNeeded(threadId, state) {
+    if (this.turns.get(threadId) !== state || state.steered || !state.searchBudget || state.searches < state.searchBudget || !state.turnId) return;
+    state.steered = true;
+    void this.request("turn/steer", { threadId, expectedTurnId: state.turnId, input: [{ type: "text", text: "\u7DB2\u8DEF\u641C\u5C0B\u9810\u7B97\u5DF2\u7528\u5B8C\u3002\u8ACB\u505C\u6B62\u641C\u5C0B\uFF0C\u6839\u64DA\u5DF2\u53D6\u5F97\u7684\u8CC7\u6599\u5B8C\u6210\u7B54\u6848\uFF1B\u4E0D\u8DB3\u4E4B\u8655\u660E\u78BA\u5217\u70BA\u5F85\u78BA\u8A8D\u3002" }] }).catch((error) => {
+      var _a, _b;
+      return (_b = (_a = this.options).onLog) == null ? void 0 : _b.call(_a, "warn", `\u641C\u5C0B\u505C\u6B62\u63D0\u9192\u672A\u9001\u9054\uFF1A${error instanceof Error ? error.message : String(error)}`);
+    });
   }
   respondToServerRequest(message) {
     const result = message.method === "item/commandExecution/requestApproval" || message.method === "item/fileChange/requestApproval" ? { decision: "decline" } : message.method === "item/permissions/requestApproval" ? { permissions: {} } : message.method === "item/tool/requestUserInput" ? { answers: {} } : message.method === "mcpServer/elicitation/request" ? { action: "decline", content: null } : null;
@@ -1857,13 +1924,14 @@ function executableCandidates(configured, home, pathValue, nvmVersions = []) {
 }
 var labels = { idea: t("\u5F85\u7814\u7A76"), running: t("AI \u57F7\u884C\u4E2D"), completed: t("AI \u5B8C\u6210"), error: t("\u57F7\u884C\u932F\u8AA4") };
 var TaskModal = class extends import_obsidian5.Modal {
-  constructor(app, value, submit, titleText = t("\u81EA\u8A02 AI \u4EFB\u52D9"), description = t("\u63CF\u8FF0\u9019\u4E00\u6B65\u8981\u8ACB AI \u5B8C\u6210\u4EC0\u9EBC\u3002"), rules = "") {
+  constructor(app, value, submit, titleText = t("\u81EA\u8A02 AI \u4EFB\u52D9"), description = t("\u63CF\u8FF0\u9019\u4E00\u6B65\u8981\u8ACB AI \u5B8C\u6210\u4EC0\u9EBC\u3002"), rules = "", mode = "research") {
     super(app);
     this.value = value;
     this.submit = submit;
     this.titleText = titleText;
     this.description = description;
     this.rules = rules;
+    this.mode = mode;
   }
   onOpen() {
     this.titleEl.setText(this.titleText);
@@ -1874,11 +1942,18 @@ var TaskModal = class extends import_obsidian5.Modal {
     const input = this.contentEl.createEl("textarea", { text: this.value, cls: "vam-task-input" });
     input.rows = 7;
     input.setAttr("aria-label", t("\u81EA\u8A02 AI \u4EFB\u52D9"));
+    const source = this.contentEl.createEl("label", { cls: "vam-field" });
+    source.createSpan({ text: t("\u5167\u5BB9\u4F86\u6E90") });
+    const mode = source.createEl("select");
+    mode.setAttr("aria-label", t("\u5167\u5BB9\u4F86\u6E90"));
+    mode.createEl("option", { value: "research", text: t("\u7814\u7A76\u65B0\u8CC7\u6599\uFF08\u6709\u9650\u641C\u5C0B\uFF09") });
+    mode.createEl("option", { value: "local", text: t("\u53EA\u6574\u7406\u73FE\u6709\u5167\u5BB9\uFF08\u4E0D\u641C\u5C0B\uFF09") });
+    mode.value = this.mode;
     const save = (run) => {
       const value = input.value.trim();
       if (!value) return;
       this.close();
-      this.submit(value, run);
+      this.submit(value, run, mode.value === "local" ? "local" : "research");
     };
     new import_obsidian5.Setting(this.contentEl).addButton((b) => b.setButtonText(t("\u53D6\u6D88")).onClick(() => this.close())).addButton((b) => b.setButtonText(t("\u53EA\u5132\u5B58")).onClick(() => save(false))).addButton((b) => b.setButtonText(t("\u78BA\u8A8D\u4E26\u57F7\u884C")).setCta().onClick(() => save(true)));
     input.focus();
@@ -2504,23 +2579,27 @@ var VisualAgentMapView = class extends import_obsidian5.ItemView {
     this.render();
   }
   async noteChange(node, patch) {
+    var _a, _b;
     const current = await this.plugin.repo.readNote(node.path), before = {};
     for (const key of Object.keys(patch)) before[key] = current[key];
     if (Object.keys(patch).every((key) => current[key] === patch[key])) return;
     await this.plugin.repo.updateNote(node.path, patch);
+    if (["title", "summary", "prompt", "rules", "detail", "model", "reasoning", "researchMode", "sourcePaths"].some((key) => key in patch)) (_b = (_a = this.plugin.activeTasks) == null ? void 0 : _a.get(node.path)) == null ? void 0 : _b.abort();
     this.history.push({ undo: () => this.plugin.repo.updateNote(node.path, before), redo: () => this.plugin.repo.updateNote(node.path, patch) });
     this.notes.set(node.id, await this.plugin.repo.readNote(node.path));
     this.refreshCard(node);
     this.updateHistoryButtons();
   }
   async renameNode(node, title) {
+    var _a, _b;
     if (!this.map) return;
     const current = await this.plugin.repo.readNote(node.path), oldTitle = current.title, oldPath = node.path;
     if (oldTitle === title && oldPath.endsWith(`/${title}.md`)) return;
+    (_b = (_a = this.plugin.activeTasks) == null ? void 0 : _a.get(oldPath)) == null ? void 0 : _b.abort();
     const apply = async (from, to, nextTitle) => {
-      var _a;
+      var _a2;
       const nextPath = await this.plugin.repo.renameNote(from, nextTitle, to);
-      const target = (_a = this.map) == null ? void 0 : _a.nodes.find((item) => item.id === node.id);
+      const target = (_a2 = this.map) == null ? void 0 : _a2.nodes.find((item) => item.id === node.id);
       if (target) target.path = nextPath;
       node.path = nextPath;
       if (this.map) await this.plugin.repo.saveMap(this.path, this.map);
@@ -3073,30 +3152,32 @@ var VisualAgentMapView = class extends import_obsidian5.ItemView {
       }
       const actions = panel.createDiv("vam-actions");
       const running = this.plugin.running.has(node.path);
-      const previewTask = (title, prompt) => this.enqueue(async () => {
+      const previewTask = (title, prompt, defaultMode = "research") => this.enqueue(async () => {
         const latest = await this.plugin.repo.readNote(node.path);
         new TaskModal(
           this.app,
           prompt,
-          (value, run) => this.enqueue(async () => {
-            await this.noteChange(node, { prompt: value });
+          (value, run, researchMode) => this.enqueue(async () => {
+            await this.noteChange(node, { prompt: value, researchMode });
             if (run) await this.plugin.confirmCodexUsage(() => this.runAgent(node));
           }),
           title,
           t("AI \u5B8C\u6210\u5F8C\u6703\u76F4\u63A5\u66F4\u65B0\u76EE\u524D\u7406\u89E3\uFF0C\u5B8C\u6574\u7D50\u679C\u6703\u4FDD\u5B58\u5728 MD \u8A73\u60C5\u4E2D\u3002\u9001\u51FA\u524D\u53EF\u8ABF\u6574\u4EFB\u52D9\u3002"),
-          latest.rules
+          latest.rules,
+          defaultMode
         ).open();
       });
       const nextSteps = [
+        { label: t("\u6574\u7406\u73FE\u6709\u5167\u5BB9"), description: t("\u53EA\u6574\u7406\u76EE\u524D\u7B46\u8A18\u8207\u5DF2\u9023\u7D50\u7684\u4F86\u6E90\uFF0C\u4E0D\u641C\u5C0B\u65B0\u8CC7\u6599\u3002"), action: () => previewTask(t("\u78BA\u8A8D\u6574\u7406\u4EFB\u52D9"), `\u6574\u7406\u300C${note.title}\u300D\u7684\u73FE\u6709\u5167\u5BB9\uFF0C\u53BB\u9664\u91CD\u8907\u4E26\u4FDD\u7559\u6709\u7528\u7684\u4F86\u6E90\u3002`, "local") },
         { label: t("\u7814\u7A76\u9019\u500B\u8B70\u984C"), description: t("\u88DC\u8DB3\u8CC7\u8A0A\u3001\u4F86\u6E90\u8207\u4ECD\u5F85\u78BA\u8A8D\u4E4B\u8655\u3002"), action: () => previewTask(t("\u78BA\u8A8D\u7814\u7A76\u4EFB\u52D9"), `\u7814\u7A76\u300C${note.title}\u300D\uFF0C\u88DC\u8DB3\u8CC7\u8A0A\u3001\u4F86\u6E90\u8207\u4E0D\u78BA\u5B9A\u8655\u3002`) },
         { label: t("\u6BD4\u8F03\u53EF\u884C\u9078\u9805"), description: t("\u6574\u7406\u65B9\u6848\u3001\u53D6\u6368\u8207\u5EFA\u8B70\u3002"), action: () => previewTask(t("\u78BA\u8A8D\u6BD4\u8F03\u4EFB\u52D9"), `\u6BD4\u8F03\u300C${note.title}\u300D\u7684\u53EF\u884C\u9078\u9805\u3001\u53D6\u6368\u8207\u5EFA\u8B70\u3002`) },
         { label: t("\u6AA2\u67E5\u98A8\u96AA\u8207\u5047\u8A2D"), description: t("\u5C0B\u627E\u53CD\u4F8B\u3001\u98A8\u96AA\u53CA\u5F85\u9A57\u8B49\u5047\u8A2D\u3002"), action: () => previewTask(t("\u78BA\u8A8D\u98A8\u96AA\u6AA2\u67E5\u4EFB\u52D9"), `\u627E\u51FA\u300C${note.title}\u300D\u7684\u53CD\u4F8B\u3001\u98A8\u96AA\u8207\u5F85\u9A57\u8B49\u5047\u8A2D\u3002`) },
         { label: t("\u7531 AI \u62C6\u6210\u5B50\u8B70\u984C"), description: t("\u7522\u751F 3\u20137 \u500B\u5EFA\u8B70\uFF1B\u78BA\u8A8D\u5F8C\u624D\u5EFA\u7ACB\u7BC0\u9EDE\u3002"), action: () => this.enqueue(() => this.proposeChildren(node)) },
         { label: t("\u6574\u5408\u5B50\u8B70\u984C\u767C\u73FE"), description: t("\u5F59\u6574\u76F4\u5C6C\u5B50\u8B70\u984C\uFF1B\u78BA\u8A8D\u4EFB\u52D9\u5F8C\u81EA\u52D5\u66F4\u65B0\u76EE\u524D\u7406\u89E3\u3002"), action: () => this.enqueue(() => this.integrateChildren(node)) },
         { label: t("\u624B\u52D5\u65B0\u589E\u5B50\u8B70\u984C"), description: t("\u5EFA\u7ACB\u7A7A\u767D\u5B50\u8B70\u984C\uFF0C\u4E0D\u6703\u57F7\u884C AI\u3002"), action: () => this.enqueue(() => this.addNode(node)) },
-        { label: t("\u81EA\u5DF1\u63CF\u8FF0\u4E0B\u4E00\u6B65"), description: t("\u81EA\u884C\u64B0\u5BEB\u9019\u6B21\u8981 AI \u5B8C\u6210\u7684\u5DE5\u4F5C\uFF0C\u53EF\u53EA\u5132\u5B58\u6216\u78BA\u8A8D\u4E26\u57F7\u884C\u3002"), action: () => previewTask(t("\u81EA\u5DF1\u63CF\u8FF0\u4E0B\u4E00\u6B65"), note.prompt) }
+        { label: t("\u81EA\u5DF1\u63CF\u8FF0\u4E0B\u4E00\u6B65"), description: t("\u81EA\u884C\u64B0\u5BEB\u9019\u6B21\u8981 AI \u5B8C\u6210\u7684\u5DE5\u4F5C\uFF0C\u53EF\u53EA\u5132\u5B58\u6216\u78BA\u8A8D\u4E26\u57F7\u884C\u3002"), action: () => previewTask(t("\u81EA\u5DF1\u63CF\u8FF0\u4E0B\u4E00\u6B65"), note.prompt, note.researchMode) }
       ];
-      if (note.prompt.trim()) nextSteps.splice(3, 0, { label: t("\u57F7\u884C\u5DF2\u4FDD\u5B58\u7684\u4EFB\u52D9"), description: t("\u57F7\u884C\u5148\u524D\u4FDD\u5B58\u7684\u4EFB\u52D9\uFF1B\u9001\u51FA\u524D\u4ECD\u53EF\u4FEE\u6539\u3002"), action: () => previewTask(t("\u78BA\u8A8D\u5DF2\u4FDD\u5B58\u7684\u4EFB\u52D9"), note.prompt) });
+      if (note.prompt.trim()) nextSteps.splice(4, 0, { label: t("\u57F7\u884C\u5DF2\u4FDD\u5B58\u7684\u4EFB\u52D9"), description: t("\u57F7\u884C\u5148\u524D\u4FDD\u5B58\u7684\u4EFB\u52D9\uFF1B\u9001\u51FA\u524D\u4ECD\u53EF\u4FEE\u6539\u3002"), action: () => previewTask(t("\u78BA\u8A8D\u5DF2\u4FDD\u5B58\u7684\u4EFB\u52D9"), note.prompt, note.researchMode) });
       this.button(actions, running ? t("AI \u57F7\u884C\u4E2D\u2026") : t("\u9078\u64C7\u4E0B\u4E00\u6B65"), () => this.enqueue(async () => {
         var _a2;
         const input = panel.querySelector(`textarea[aria-label="${t("AI \u898F\u5247")}"]`);
@@ -3105,6 +3186,10 @@ var VisualAgentMapView = class extends import_obsidian5.ItemView {
         if (rules !== latest.rules) await this.noteChange(node, { rules });
         new ChoiceModal(this.app, t("\u4E0B\u4E00\u6B65"), t("\u9078\u64C7\u76EE\u7684\u5F8C\uFF0C\u518D\u78BA\u8A8D AI \u5C07\u57F7\u884C\u7684\u4EFB\u52D9\u3002"), nextSteps).open();
       }), running).addClass("mod-cta");
+      if (running && this.plugin.activeTasks.has(node.path)) this.button(actions, t("\u505C\u6B62\u7814\u7A76"), () => {
+        var _a2;
+        return (_a2 = this.plugin.activeTasks.get(node.path)) == null ? void 0 : _a2.abort();
+      });
       const pending = this.plugin.pendingSuggestions.get(node.path);
       if (pending == null ? void 0 : pending.length) this.button(actions, t("\u67E5\u770B AI \u5B50\u8B70\u984C\u5EFA\u8B70\uFF08{0}\uFF09", pending.length), () => this.openChildSuggestions(node, pending), running);
       const advanced = panel.createEl("details", { cls: "vam-advanced" });
@@ -3128,7 +3213,7 @@ var VisualAgentMapView = class extends import_obsidian5.ItemView {
       reasoningLabel.createSpan({ text: t("\u63A8\u7406\u7B49\u7D1A") });
       const reasoning = reasoningLabel.createEl("select");
       reasoning.setAttr("aria-label", t("\u63A8\u7406\u7B49\u7D1A"));
-      for (const [value, label] of [["low", t("\u4F4E (Low)")], ["medium", t("\u4E2D (Medium)")], ["high", t("\u9AD8 (High)")]]) reasoning.createEl("option", { value, text: label });
+      for (const [value, label] of [["auto", t("\u81EA\u52D5 (Auto)")], ["low", t("\u4F4E (Low)")], ["medium", t("\u4E2D (Medium)")], ["high", t("\u9AD8 (High)")]]) reasoning.createEl("option", { value, text: label });
       reasoning.value = normalizeReasoningLevel((_g = note.reasoning) != null ? _g : this.plugin.settings.cliReasoning);
       reasoning.addEventListener("change", () => this.enqueue(() => this.noteChange(node, { reasoning: normalizeReasoningLevel(reasoning.value) })));
       advanced.createEl("p", { cls: "vam-hint", text: t("{0} \xB7 {1}\uFF1B\u63A8\u7406\u7B49\u7D1A\u53EF\u4F9D\u8B70\u984C\u8ABF\u6574\u3002", note.model, sourceLabels[note.modelSource]) });
@@ -3579,33 +3664,50 @@ ${note.detail.trim().split("\n").map((line) => `    ${line}`).join("\n")}` : "",
     }
   }
   async runAgent(node) {
+    const taskPath = node.path;
     const note = await this.plugin.repo.readNote(node.path);
     if (!note.prompt) {
       new import_obsidian5.Notice(t("\u8ACB\u5148\u8F38\u5165\u8981\u4EA4\u7D66 AI \u7684\u554F\u984C\u6216\u4EFB\u52D9\u3002"));
       return;
     }
     if (this.plugin.running.has(node.path)) return;
-    const context = { title: note.title, summary: note.summary, rules: note.rules, detail: note.detail, task: note.prompt, ancestors: await this.ancestorContext(node), workingFindings: note.newFindings, sourceContext: await this.extractedSourceContext(note), mode: "task" };
+    const context = { title: note.title, summary: note.summary, rules: note.rules, detail: note.detail, task: note.prompt, ancestors: await this.ancestorContext(node), workingFindings: note.newFindings, sourceContext: await this.extractedSourceContext(note), mode: "task", researchMode: note.researchMode };
     this.plugin.pendingSuggestions.delete(node.path);
     this.plugin.running.add(node.path);
+    const controller = new AbortController();
+    this.plugin.activeTasks.set(taskPath, controller);
     try {
       await this.plugin.repo.updateNote(node.path, { status: "running" });
     } catch (error) {
-      this.plugin.running.delete(node.path);
+      this.plugin.activeTasks.delete(taskPath);
+      this.plugin.running.delete(taskPath);
       throw error;
     }
     await this.hydrate();
     this.render();
-    void this.plugin.askModel(context, note.model, note.reasoning).then((result) => this.plugin.mutate(async () => {
+    void this.plugin.askModel(context, note.model, note.reasoning, controller.signal).then((result) => this.plugin.mutate(async () => {
+      const latest = await this.plugin.repo.readNote(node.path);
+      const stale = latest.title !== note.title || latest.prompt !== note.prompt || latest.rules !== note.rules || latest.detail !== note.detail || latest.summary !== note.summary || latest.model !== note.model || latest.reasoning !== note.reasoning || latest.researchMode !== note.researchMode || latest.sourcePaths.join("\n") !== note.sourcePaths.join("\n");
+      if (controller.signal.aborted || stale) {
+        await this.plugin.repo.updateNote(node.path, { status: note.status });
+        if (stale) new import_obsidian5.Notice(t("\u8B70\u984C\u5167\u5BB9\u5DF2\u8B8A\u66F4\uFF0C\u904E\u6642\u7684 AI \u7D50\u679C\u672A\u5BEB\u5165\u3002"));
+        return;
+      }
       await this.plugin.repo.updateNote(node.path, { summary: result.summary, detail: canonicalDetail(result.detail), visualReferences: visualReferencesMarkdown(result.visualReferences), newFindings: "", status: "completed" });
       for (const view of this.plugin.views()) view.history.clear();
       if (result.suggestions.length) this.plugin.pendingSuggestions.set(node.path, result.suggestions.slice(0, 7));
     })).catch((error) => this.plugin.mutate(async () => {
+      if (controller.signal.aborted || error instanceof Error && error.name === "AbortError") {
+        await this.plugin.repo.updateNote(node.path, { status: note.status });
+        new import_obsidian5.Notice(t("\u7814\u7A76\u5DF2\u505C\u6B62\uFF0C\u539F\u6709\u5167\u5BB9\u4FDD\u7559\u3002"));
+        return;
+      }
       console.error("Visual Agent Map AI task", error);
       await this.plugin.repo.updateNote(node.path, { status: "error" });
       new import_obsidian5.Notice(this.plugin.recordFailure("AI \u4EFB\u52D9\u5931\u6557", error));
     })).finally(() => {
-      this.plugin.running.delete(node.path);
+      if (this.plugin.activeTasks.get(taskPath) === controller) this.plugin.activeTasks.delete(taskPath);
+      this.plugin.running.delete(taskPath);
       for (const view of this.plugin.views()) view.enqueue(async () => {
         await view.hydrate();
         view.render();
@@ -3627,7 +3729,7 @@ var VisualAgentMapSettingTab = class extends import_obsidian5.PluginSettingTab {
       { name: t("\u4ECB\u9762\u8A9E\u8A00"), control: { type: "dropdown", key: "language", options: { "zh-TW": "\u7E41\u9AD4\u4E2D\u6587", en: "English" } } },
       text2(t("Codex CLI \u8DEF\u5F91"), "codexPath", t("VAM \u6703\u4EE5\u6B64\u555F\u52D5 codex app-server\u3002")),
       { name: t("\u5DE5\u4F5C\u5340\u9810\u8A2D Model"), desc: t("\u6A21\u578B\u6E05\u55AE\u7531 Codex App Server \u81EA\u52D5\u53D6\u5F97\uFF1B\u8B8A\u66F4\u53EA\u5F71\u97FF\u4E4B\u5F8C\u65B0\u589E\u7684\u6839\u8B70\u984C\u3002"), control: { type: "dropdown", key: "cliModel", options: models } },
-      { name: t("AI \u63A8\u7406\u7B49\u7D1A"), desc: t("\u5957\u7528\u5230\u4E00\u822C\u3001\u62C6\u89E3\u8207\u6574\u5408 AI \u4EFB\u52D9\u3002\u7B49\u7D1A\u8D8A\u9AD8\u901A\u5E38\u9700\u8981\u8F03\u591A\u6642\u9593\u8207\u4F7F\u7528\u984D\u5EA6\u3002"), control: { type: "dropdown", key: "cliReasoning", options: { low: t("\u4F4E (Low)"), medium: t("\u4E2D (Medium)"), high: t("\u9AD8 (High)") } } },
+      { name: t("AI \u63A8\u7406\u7B49\u7D1A"), desc: t("\u81EA\u52D5\u6A21\u5F0F\u6703\u5C0D\u7C21\u55AE\u4EFB\u52D9\u4F7F\u7528 Low\u3001\u5C0D\u8907\u96DC\u6574\u5408\u4F7F\u7528 Medium\uFF1B\u624B\u52D5\u9078\u64C7\u4E0D\u6703\u88AB\u8986\u84CB\u3002"), control: { type: "dropdown", key: "cliReasoning", options: { auto: t("\u81EA\u52D5 (Auto)"), low: t("\u4F4E (Low)"), medium: t("\u4E2D (Medium)"), high: t("\u9AD8 (High)") } } },
       { name: t("Workspace \u4F4D\u7F6E"), render: (setting) => {
         setting.setName(t("Workspace \u4F4D\u7F6E")).setDesc(t("\u4E3B\u984C\u8CC7\u6599\u593E\uFF1A{0}\u3000\u672A\u5206\u985E\u6536\u4EF6\u5323\uFF1A{1}", this.plugin.settings.topicsFolder, this.plugin.settings.inboxFolder));
       } },
@@ -3677,9 +3779,11 @@ var VisualAgentMapPlugin = class extends import_obsidian5.Plugin {
     __publicField(this, "repo");
     __publicField(this, "ready", Promise.resolve());
     __publicField(this, "running", /* @__PURE__ */ new Set());
+    __publicField(this, "activeTasks", /* @__PURE__ */ new Map());
     __publicField(this, "pendingSuggestions", /* @__PURE__ */ new Map());
     __publicField(this, "logs", debugLog);
     __publicField(this, "codexRuntime", null);
+    __publicField(this, "localCodexRuntime", null);
     __publicField(this, "settingTab");
     __publicField(this, "detailsLeaf", null);
     __publicField(this, "queue", Promise.resolve());
@@ -3885,9 +3989,12 @@ var VisualAgentMapPlugin = class extends import_obsidian5.Plugin {
     return { executable, installed: existsSync(executable) };
   }
   resetCodexRuntime() {
-    var _a;
+    var _a, _b;
+    for (const controller of this.activeTasks.values()) controller.abort();
     (_a = this.codexRuntime) == null ? void 0 : _a.stop();
+    (_b = this.localCodexRuntime) == null ? void 0 : _b.stop();
     this.codexRuntime = null;
+    this.localCodexRuntime = null;
   }
   openCodexSetupGuide() {
     const diagnostic = this.codexDiagnostic();
@@ -3962,9 +4069,7 @@ var VisualAgentMapPlugin = class extends import_obsidian5.Plugin {
     leaf.view.containerEl.toggleClass("vam-topic-markdown", !!leaf.view.file && this.isNode(leaf.view.file));
   }
   onunload() {
-    var _a;
-    (_a = this.codexRuntime) == null ? void 0 : _a.stop();
-    this.codexRuntime = null;
+    this.resetCodexRuntime();
   }
   async saveSettings() {
     await this.saveData(this.settings);
@@ -4040,7 +4145,7 @@ var VisualAgentMapPlugin = class extends import_obsidian5.Plugin {
     (_d = this.settingTab) == null ? void 0 : _d.update();
     for (const view of this.views()) await view.refreshFromPlugin();
   }
-  async askModel(context, model, reasoning) {
+  async askModel(context, model, reasoning, signal) {
     if (model.startsWith("claude:")) throw new Error(t("Claude Code \u5DF2\u4E0D\u518D\u652F\u63F4\u3002\u8ACB\u5728\u8B70\u984C\u8A2D\u5B9A\u4E2D\u9078\u64C7 Codex model\u3002"));
     const adapter = this.app.vault.adapter;
     if (!(adapter instanceof import_obsidian5.FileSystemAdapter)) throw new Error(t("CLI \u6A21\u5F0F\u53EA\u652F\u63F4\u684C\u9762\u7248 Obsidian"));
@@ -4054,8 +4159,9 @@ var VisualAgentMapPlugin = class extends import_obsidian5.Plugin {
       '\u53EA\u56DE\u50B3 JSON\uFF0C\u4E0D\u8981\u4F7F\u7528 Markdown code fence\u3002\u683C\u5F0F\u5FC5\u9808\u7B26\u5408\uFF1A{"summary":"...","detail":"...","suggestions":[{"title":"...","task":"...","contribution":"..."}],"visualReferences":[{"title":"...","imageUrl":"https://...","sourceUrl":"https://...","description":"...","palette":["navy","white"],"formula":"..."}]}\u3002\u82E5\u6C92\u6709\u8996\u89BA\u53C3\u8003\uFF0CvisualReferences \u56DE\u50B3\u7A7A\u9663\u5217\u3002',
       context.mode === "task" ? "\u9019\u662F\u4E00\u822C\u4EFB\u52D9\uFF1Asummary \u5FC5\u9808\u662F\u4E00\u53E5\u9069\u5408\u5FC3\u667A\u5716\u986F\u793A\u7684\u65B0\u76EE\u524D\u7406\u89E3\uFF0C80 \u5B57\u5167\uFF1Bdetail \u662F\u6703\u76F4\u63A5\u53D6\u4EE3\u820A Detail \u7684\u5B8C\u6574\u77E5\u8B58\u9801\uFF0C\u5FC5\u9808\u5438\u6536\u820A\u5167\u5BB9\u8207\u672C\u6B21\u767C\u73FE\u3001\u53BB\u9664\u91CD\u8907\u3001\u4FDD\u7559\u4ECD\u6709\u6548\u7684\u4F86\u6E90\u3002\u82E5\u8B70\u984C\u904E\u65BC\u8907\u96DC\u624D\u63D0\u4F9B suggestions\uFF0C\u5426\u5247\u56DE\u50B3\u7A7A\u9663\u5217\u3002" : context.mode === "decompose" ? "\u9019\u662F Decompose \u6A21\u5F0F\uFF1A\u53EA\u7522\u751F 3\u20137 \u500B\u53EF\u7368\u7ACB\u8655\u7406\u7684\u5B50\u8B70\u984C suggestions\u3002summary \u7C21\u8FF0\u662F\u5426\u5EFA\u8B70\u62C6\u89E3\uFF0Cdetail \u7C21\u8FF0\u62C6\u89E3\u7406\u7531\uFF1B\u4E0D\u8981\u66F4\u65B0\u7D50\u8AD6\u3002" : context.mode === "synthesize" ? "\u9019\u662F Synthesize \u6A21\u5F0F\uFF1Asummary \u5FC5\u9808\u662F\u9AD8\u54C1\u8CEA\u6574\u5408\u7D50\u8AD6\uFF0C80 \u5B57\u5167\uFF1Bdetail \u5FC5\u9808\u6574\u5408\u4F86\u6E90\u5B8C\u6574\u77E5\u8B58\u3001\u6536\u6582\u91CD\u8907\u5167\u5BB9\u3001\u6E05\u695A\u5448\u73FE\u5171\u8B58\u3001\u5206\u6B67\u3001\u53D6\u6368\u8207\u672A\u89E3\u554F\u984C\uFF1B\u5B8C\u6210\u5F8C\u6703\u76F4\u63A5\u5BEB\u56DE\u3002" : "summary \u5FC5\u9808\u662F\u4E00\u53E5\u9069\u5408\u5FC3\u667A\u5716\u986F\u793A\u7684\u65B0\u76EE\u524D\u7406\u89E3\uFF0Cdetail \u5FC5\u9808\u662F\u5B8C\u6574\u7E41\u9AD4\u4E2D\u6587 Markdown \u5206\u6790\u3002",
       context.mode !== "decompose" ? "detail \u5FC5\u9808\u4E14\u53EA\u80FD\u4F9D\u5E8F\u4F7F\u7528\u4EE5\u4E0B\u516D\u500B\u4E09\u7D1A\u6A19\u984C\uFF1A### \u6838\u5FC3\u7D50\u8AD6\u3001### \u95DC\u9375\u77E5\u8B58\u3001### \u8B49\u64DA\u8207\u4F86\u6E90\u3001### \u53D6\u6368\u8207\u9650\u5236\u3001### \u5F85\u78BA\u8A8D\u4E8B\u9805\u3001### \u66F4\u65B0\u7D00\u9304\u3002\u66F4\u65B0\u7D00\u9304\u53EA\u65B0\u589E\u4E00\u884C\u672C\u6B21\u8B8A\u66F4\u6458\u8981\uFF0C\u4E0D\u53EF\u91CD\u8CBC\u5B8C\u6574\u7B54\u6848\uFF1B\u6C92\u6709\u5167\u5BB9\u7684\u6BB5\u843D\u5BEB\u300C\u5C1A\u5F85\u88DC\u5145\u300D\u3002" : "",
-      context.mode !== "decompose" ? "\u82E5\u4EFB\u52D9\u9700\u8981\u8996\u89BA\u7406\u89E3\uFF08\u4F8B\u5982\u7A7F\u642D\u3001\u914D\u8272\u3001\u5BA4\u5167\u8A2D\u8A08\u3001\u98DF\u8B5C\u5916\u89C0\u3001UI \u53C3\u8003\uFF09\uFF0C\u8ACB\u63D0\u4F9B 1\u20136 \u500B\u5DF2\u641C\u5C0B\u5230\u7684\u5716\u7247\u53C3\u8003 visualReferences\uFF1B\u5FC5\u9808\u5305\u542B\u5716\u7247 URL \u8207\u4F86\u6E90\u9801 URL\uFF0C\u4E0D\u8981\u751F\u6210\u5716\u7247\uFF0C\u4E0D\u8981\u7DE8\u9020\u4F86\u6E90\u3002" : "",
-      context.mode !== "decompose" ? "\u5716\u7247\u5FC5\u9808\u76F4\u63A5\u5D4C\u5165 detail \u7684\u76F8\u95DC\u8AAA\u660E\u6BB5\u843D\u4E4B\u5F8C\uFF0C\u4F7F\u7528 Markdown \u5716\u7247\u8A9E\u6CD5\uFF0C\u4E26\u5728\u5716\u7247\u4E0B\u65B9\u9644\u4F86\u6E90\u9801\u9023\u7D50\u3002\u4E0D\u8981\u5EFA\u7ACB\u8996\u89BA\u53C3\u8003\u3001\u5716\u793A\u6216\u5716\u7247\u96C6\u5408\u7684\u7368\u7ACB\u6BB5\u843D\uFF1B\u5716\u7247\u8207 visualReferences \u4F7F\u7528\u76F8\u540C URL\u3002\u512A\u5148\u641C\u5C0B\u53EF\u5E6B\u52A9\u7406\u89E3\u8B70\u984C\u7684\u76F8\u95DC\u5716\u7247\uFF0C\u627E\u4E0D\u5230\u53EF\u9760\u5716\u7247\u6642\u4E0D\u8981\u7DE8\u9020\u3002" : "",
+      researchGuidance(context),
+      context.mode !== "decompose" && context.researchMode !== "local" ? "\u82E5\u4EFB\u52D9\u9700\u8981\u8996\u89BA\u7406\u89E3\uFF08\u4F8B\u5982\u7A7F\u642D\u3001\u914D\u8272\u3001\u5BA4\u5167\u8A2D\u8A08\u3001\u98DF\u8B5C\u5916\u89C0\u3001UI \u53C3\u8003\uFF09\uFF0C\u8ACB\u63D0\u4F9B 1\u20136 \u500B\u5DF2\u641C\u5C0B\u5230\u7684\u5716\u7247\u53C3\u8003 visualReferences\uFF1B\u5FC5\u9808\u5305\u542B\u5716\u7247 URL \u8207\u4F86\u6E90\u9801 URL\uFF0C\u4E0D\u8981\u751F\u6210\u5716\u7247\uFF0C\u4E0D\u8981\u7DE8\u9020\u4F86\u6E90\u3002" : "",
+      context.mode !== "decompose" && context.researchMode !== "local" ? "\u5716\u7247\u5FC5\u9808\u76F4\u63A5\u5D4C\u5165 detail \u7684\u76F8\u95DC\u8AAA\u660E\u6BB5\u843D\u4E4B\u5F8C\uFF0C\u4F7F\u7528 Markdown \u5716\u7247\u8A9E\u6CD5\uFF0C\u4E26\u5728\u5716\u7247\u4E0B\u65B9\u9644\u4F86\u6E90\u9801\u9023\u7D50\u3002\u4E0D\u8981\u5EFA\u7ACB\u8996\u89BA\u53C3\u8003\u3001\u5716\u793A\u6216\u5716\u7247\u96C6\u5408\u7684\u7368\u7ACB\u6BB5\u843D\uFF1B\u5716\u7247\u8207 visualReferences \u4F7F\u7528\u76F8\u540C URL\u3002\u512A\u5148\u641C\u5C0B\u53EF\u5E6B\u52A9\u7406\u89E3\u8B70\u984C\u7684\u76F8\u95DC\u5716\u7247\uFF0C\u627E\u4E0D\u5230\u53EF\u9760\u5716\u7247\u6642\u4E0D\u8981\u7DE8\u9020\u3002" : "",
       `\u76EE\u524D\u8B70\u984C\uFF1A
 ${context.title}`,
       `\u76EE\u524D\u7406\u89E3\uFF1A
@@ -4075,8 +4181,8 @@ ${context.task}`
     ].join("\n\n");
     console.debug("Visual Agent Map AI metrics", prepared.metrics);
     const providerStarted = Date.now();
-    const effort = normalizeReasoningLevel(reasoning != null ? reasoning : this.settings.cliReasoning);
-    const raw = await this.runtime(pluginDirectory).runTask(instructions, model, effort, response_schema_default);
+    const effort = effectiveReasoningLevel(context, normalizeReasoningLevel(reasoning != null ? reasoning : this.settings.cliReasoning));
+    const raw = await this.runtime(pluginDirectory, context.researchMode === "local").runTask(instructions, model, effort, response_schema_default, { signal, searchBudget: context.researchMode === "local" ? 0 : RESEARCH_SEARCH_BUDGET });
     const result = this.parseAiResult(raw, "Codex App Server");
     console.debug("Visual Agent Map AI metrics", { ...prepared.metrics, providerMs: Date.now() - providerStarted, totalMs: Date.now() - totalStarted });
     return result;
@@ -4097,18 +4203,21 @@ ${context.task}`
     })).filter((item) => /^https?:\/\//i.test(item.imageUrl) && /^https?:\/\//i.test(item.sourceUrl)).slice(0, 6) : [];
     return { summary: Array.from(parsed.summary.trim()).slice(0, 80).join(""), detail: parsed.detail.trim(), suggestions, visualReferences };
   }
-  runtime(pluginDirectory) {
-    if (!this.codexRuntime) {
-      const executable = this.resolveExecutable(this.settings.codexPath);
-      this.codexRuntime = new CodexAppServerRuntime({
-        executable,
-        cwd: pluginDirectory,
-        env: this.cliEnvironment(executable),
-        clientVersion: this.manifest.version || "0.0.0",
-        onLog: (level, message) => this.logs.appendLog(level, message)
-      });
-    }
-    return this.codexRuntime;
+  runtime(pluginDirectory, local = false) {
+    if (local && this.localCodexRuntime) return this.localCodexRuntime;
+    if (!local && this.codexRuntime) return this.codexRuntime;
+    const executable = this.resolveExecutable(this.settings.codexPath);
+    const runtime = new CodexAppServerRuntime({
+      executable,
+      cwd: pluginDirectory,
+      env: this.cliEnvironment(executable),
+      clientVersion: this.manifest.version || "0.0.0",
+      webSearchDisabled: local,
+      onLog: (level, message) => this.logs.appendLog(level, message)
+    });
+    if (local) this.localCodexRuntime = runtime;
+    else this.codexRuntime = runtime;
+    return runtime;
   }
   resolveExecutable(configured) {
     const environment = currentProcessEnvironment();

@@ -6,9 +6,10 @@ import { DebugLogModal } from "./ui/modals/debug-log-modal";
 import { existsSync as nodeExistsSync, readdirSync as nodeReaddirSync } from "node:fs";
 import { delimiter as nodeDelimiter, dirname as nodeDirname, isAbsolute as nodeIsAbsolute, join as nodeJoin } from "node:path";
 import { canParent, clone, descendants, History, inheritModel, MapDocument, MapNode, parseMap, removeNodes, serializeMap, visibleNodes } from "./map-model";
-import { DEFAULT_SETTINGS, ModelSource, normalizeReasoningLevel, Note, NotePatch, Repository, Settings, TopicInfo, TopicState } from "./repository";
+import { DEFAULT_SETTINGS, ModelSource, normalizeReasoningLevel, Note, NotePatch, Repository, ResearchMode, Settings, TopicInfo, TopicState } from "./repository";
 import { buildPreparedTaskContext } from "./ai/context-builder";
 import { canonicalDetail, visualReferencesMarkdown } from "./ai/result-utils";
+import { effectiveReasoningLevel, RESEARCH_SEARCH_BUDGET, researchGuidance } from "./ai/task-policy";
 import type { AiResult, Suggestion, TaskContext } from "./ai/types";
 import { clampPreviewScale, legacyPreviewScale, previewMetrics } from "./ui/preview-utils";
 import { BUILTIN_SAMPLE_ID, builtInSample, SAMPLE_TOUR_VERSION } from "./builtin-sample";
@@ -75,7 +76,7 @@ export function executableCandidates(configured: string, home: string, pathValue
 }
 const labels = { idea: t("待研究"), running: t("AI 執行中"), completed: t("AI 完成"), error: t("執行錯誤") };
 class TaskModal extends Modal {
-  constructor(app: App, private value: string, private submit: (value: string, run: boolean) => void, private titleText = t("自訂 AI 任務"), private description = t("描述這一步要請 AI 完成什麼。"), private rules = "") { super(app); }
+  constructor(app: App, private value: string, private submit: (value: string, run: boolean, mode: ResearchMode) => void, private titleText = t("自訂 AI 任務"), private description = t("描述這一步要請 AI 完成什麼。"), private rules = "", private mode: ResearchMode = "research") { super(app); }
   onOpen(): void {
     this.titleEl.setText(this.titleText);
     this.contentEl.createEl("p", { text: this.description, cls: "vam-modal-intro" });
@@ -83,7 +84,12 @@ class TaskModal extends Modal {
     rulePreview.createEl("strong", { text: t("本次套用的 AI 規則") });
     rulePreview.createEl("p", { text: this.rules.trim() || t("未設定額外規則。") });
     const input = this.contentEl.createEl("textarea", { text: this.value, cls: "vam-task-input" }); input.rows = 7; input.setAttr("aria-label", t("自訂 AI 任務"));
-    const save = (run: boolean): void => { const value = input.value.trim(); if (!value) return; this.close(); this.submit(value, run); };
+    const source = this.contentEl.createEl("label", { cls: "vam-field" }); source.createSpan({ text: t("內容來源") });
+    const mode = source.createEl("select"); mode.setAttr("aria-label", t("內容來源"));
+    mode.createEl("option", { value: "research", text: t("研究新資料（有限搜尋）") });
+    mode.createEl("option", { value: "local", text: t("只整理現有內容（不搜尋）") });
+    mode.value = this.mode;
+    const save = (run: boolean): void => { const value = input.value.trim(); if (!value) return; this.close(); this.submit(value, run, mode.value === "local" ? "local" : "research"); };
     new Setting(this.contentEl).addButton(b => b.setButtonText(t("取消")).onClick(() => this.close())).addButton(b => b.setButtonText(t("只儲存")).onClick(() => save(false))).addButton(b => b.setButtonText(t("確認並執行")).setCta().onClick(() => save(true)));
     input.focus(); input.setSelectionRange(input.value.length, input.value.length);
   }
@@ -383,6 +389,7 @@ export class VisualAgentMapView extends ItemView {
     for (const key of Object.keys(patch) as (keyof Note)[]) (before as Record<string, unknown>)[key] = current[key];
     if (Object.keys(patch).every(key => current[key as keyof Note] === patch[key as keyof Note])) return;
     await this.plugin.repo.updateNote(node.path, patch);
+    if (["title", "summary", "prompt", "rules", "detail", "model", "reasoning", "researchMode", "sourcePaths"].some(key => key in patch)) this.plugin.activeTasks?.get(node.path)?.abort();
     this.history.push({ undo: () => this.plugin.repo.updateNote(node.path, before), redo: () => this.plugin.repo.updateNote(node.path, patch) });
     this.notes.set(node.id, await this.plugin.repo.readNote(node.path));
     this.refreshCard(node);
@@ -392,6 +399,7 @@ export class VisualAgentMapView extends ItemView {
     if (!this.map) return;
     const current = await this.plugin.repo.readNote(node.path), oldTitle = current.title, oldPath = node.path;
     if (oldTitle === title && oldPath.endsWith(`/${title}.md`)) return;
+    this.plugin.activeTasks?.get(oldPath)?.abort();
     const apply = async (from: string, to: string | undefined, nextTitle: string): Promise<string> => {
       const nextPath = await this.plugin.repo.renameNote(from, nextTitle, to);
       const target = this.map?.nodes.find(item => item.id === node.id); if (target) target.path = nextPath;
@@ -739,27 +747,29 @@ export class VisualAgentMapView extends ItemView {
       }
       const actions = panel.createDiv("vam-actions");
       const running = this.plugin.running.has(node.path);
-      const previewTask = (title: string, prompt: string): void => this.enqueue(async () => {
+      const previewTask = (title: string, prompt: string, defaultMode: ResearchMode = "research"): void => this.enqueue(async () => {
         const latest = await this.plugin.repo.readNote(node.path);
         new TaskModal(
           this.app,
           prompt,
-          (value, run) => this.enqueue(async () => { await this.noteChange(node, { prompt: value }); if (run) await this.plugin.confirmCodexUsage(() => this.runAgent(node)); }),
+          (value, run, researchMode) => this.enqueue(async () => { await this.noteChange(node, { prompt: value, researchMode }); if (run) await this.plugin.confirmCodexUsage(() => this.runAgent(node)); }),
           title,
           t("AI 完成後會直接更新目前理解，完整結果會保存在 MD 詳情中。送出前可調整任務。"),
-          latest.rules
+          latest.rules,
+          defaultMode
         ).open();
       });
       const nextSteps: { label: string; description?: string; action: () => void }[] = [
+        { label: t("整理現有內容"), description: t("只整理目前筆記與已連結的來源，不搜尋新資料。"), action: () => previewTask(t("確認整理任務"), `整理「${note.title}」的現有內容，去除重複並保留有用的來源。`, "local") },
         { label: t("研究這個議題"), description: t("補足資訊、來源與仍待確認之處。"), action: () => previewTask(t("確認研究任務"), `研究「${note.title}」，補足資訊、來源與不確定處。`) },
         { label: t("比較可行選項"), description: t("整理方案、取捨與建議。"), action: () => previewTask(t("確認比較任務"), `比較「${note.title}」的可行選項、取捨與建議。`) },
         { label: t("檢查風險與假設"), description: t("尋找反例、風險及待驗證假設。"), action: () => previewTask(t("確認風險檢查任務"), `找出「${note.title}」的反例、風險與待驗證假設。`) },
         { label: t("由 AI 拆成子議題"), description: t("產生 3–7 個建議；確認後才建立節點。"), action: () => this.enqueue(() => this.proposeChildren(node)) },
         { label: t("整合子議題發現"), description: t("彙整直屬子議題；確認任務後自動更新目前理解。"), action: () => this.enqueue(() => this.integrateChildren(node)) },
         { label: t("手動新增子議題"), description: t("建立空白子議題，不會執行 AI。"), action: () => this.enqueue(() => this.addNode(node)) },
-        { label: t("自己描述下一步"), description: t("自行撰寫這次要 AI 完成的工作，可只儲存或確認並執行。"), action: () => previewTask(t("自己描述下一步"), note.prompt) }
+        { label: t("自己描述下一步"), description: t("自行撰寫這次要 AI 完成的工作，可只儲存或確認並執行。"), action: () => previewTask(t("自己描述下一步"), note.prompt, note.researchMode) }
       ];
-      if (note.prompt.trim()) nextSteps.splice(3, 0, { label: t("執行已保存的任務"), description: t("執行先前保存的任務；送出前仍可修改。"), action: () => previewTask(t("確認已保存的任務"), note.prompt) });
+      if (note.prompt.trim()) nextSteps.splice(4, 0, { label: t("執行已保存的任務"), description: t("執行先前保存的任務；送出前仍可修改。"), action: () => previewTask(t("確認已保存的任務"), note.prompt, note.researchMode) });
       this.button(actions, running ? t("AI 執行中…") : t("選擇下一步"), () => this.enqueue(async () => {
         const input = panel.querySelector<HTMLTextAreaElement>(`textarea[aria-label="${t("AI 規則")}"]`);
         const rules = input?.value.trim() ?? note.rules;
@@ -767,6 +777,7 @@ export class VisualAgentMapView extends ItemView {
         if (rules !== latest.rules) await this.noteChange(node, { rules });
         new ChoiceModal(this.app, t("下一步"), t("選擇目的後，再確認 AI 將執行的任務。"), nextSteps).open();
       }), running).addClass("mod-cta");
+      if (running && this.plugin.activeTasks.has(node.path)) this.button(actions, t("停止研究"), () => this.plugin.activeTasks.get(node.path)?.abort());
       const pending = this.plugin.pendingSuggestions.get(node.path);
       if (pending?.length) this.button(actions, t("查看 AI 子議題建議（{0}）", pending.length), () => this.openChildSuggestions(node, pending), running);
       const advanced = panel.createEl("details", { cls: "vam-advanced" }); advanced.createEl("summary", { text: t("模型與進階設定") });
@@ -780,7 +791,7 @@ export class VisualAgentMapView extends ItemView {
       const sourceLabels: Record<ModelSource, string> = { workspace: t("工作區預設"), inherited: t("建立時繼承"), manual: t("手動指定") };
       const reasoningLabel = advanced.createEl("label", { cls: "vam-field" }); reasoningLabel.createSpan({ text: t("推理等級") });
       const reasoning = reasoningLabel.createEl("select"); reasoning.setAttr("aria-label", t("推理等級"));
-      for (const [value, label] of [["low", t("低 (Low)")], ["medium", t("中 (Medium)")], ["high", t("高 (High)")]]) reasoning.createEl("option", { value, text: label });
+      for (const [value, label] of [["auto", t("自動 (Auto)")], ["low", t("低 (Low)")], ["medium", t("中 (Medium)")], ["high", t("高 (High)")]]) reasoning.createEl("option", { value, text: label });
       reasoning.value = normalizeReasoningLevel(note.reasoning ?? this.plugin.settings.cliReasoning);
       reasoning.addEventListener("change", () => this.enqueue(() => this.noteChange(node, { reasoning: normalizeReasoningLevel(reasoning.value) })));
       advanced.createEl("p", { cls: "vam-hint", text: t("{0} · {1}；推理等級可依議題調整。", note.model, sourceLabels[note.modelSource]) });
@@ -1034,24 +1045,32 @@ export class VisualAgentMapView extends ItemView {
     }
   }
   private async runAgent(node: MapNode): Promise<void> {
+    const taskPath = node.path;
     const note = await this.plugin.repo.readNote(node.path);
     if (!note.prompt) { new Notice(t("請先輸入要交給 AI 的問題或任務。")); return; }
     if (this.plugin.running.has(node.path)) return;
-    const context: TaskContext = { title: note.title, summary: note.summary, rules: note.rules, detail: note.detail, task: note.prompt, ancestors: await this.ancestorContext(node), workingFindings: note.newFindings, sourceContext: await this.extractedSourceContext(note), mode: "task" };
+    const context: TaskContext = { title: note.title, summary: note.summary, rules: note.rules, detail: note.detail, task: note.prompt, ancestors: await this.ancestorContext(node), workingFindings: note.newFindings, sourceContext: await this.extractedSourceContext(note), mode: "task", researchMode: note.researchMode };
     this.plugin.pendingSuggestions.delete(node.path);
     this.plugin.running.add(node.path);
-    try { await this.plugin.repo.updateNote(node.path, { status: "running" }); } catch (error) { this.plugin.running.delete(node.path); throw error; }
+    const controller = new AbortController();
+    this.plugin.activeTasks.set(taskPath, controller);
+    try { await this.plugin.repo.updateNote(node.path, { status: "running" }); } catch (error) { this.plugin.activeTasks.delete(taskPath); this.plugin.running.delete(taskPath); throw error; }
     await this.hydrate(); this.render();
     // Leave the mutation queue immediately: independent branches can run concurrently.
-    void this.plugin.askModel(context, note.model, note.reasoning).then(result => this.plugin.mutate(async () => {
+    void this.plugin.askModel(context, note.model, note.reasoning, controller.signal).then(result => this.plugin.mutate(async () => {
+      const latest = await this.plugin.repo.readNote(node.path);
+      const stale = latest.title !== note.title || latest.prompt !== note.prompt || latest.rules !== note.rules || latest.detail !== note.detail || latest.summary !== note.summary || latest.model !== note.model || latest.reasoning !== note.reasoning || latest.researchMode !== note.researchMode || latest.sourcePaths.join("\n") !== note.sourcePaths.join("\n");
+      if (controller.signal.aborted || stale) { await this.plugin.repo.updateNote(node.path, { status: note.status }); if (stale) new Notice(t("議題內容已變更，過時的 AI 結果未寫入。")); return; }
       await this.plugin.repo.updateNote(node.path, { summary: result.summary, detail: canonicalDetail(result.detail), visualReferences: visualReferencesMarkdown(result.visualReferences), newFindings: "", status: "completed" });
       for (const view of this.plugin.views()) view.history.clear();
       if (result.suggestions.length) this.plugin.pendingSuggestions.set(node.path, result.suggestions.slice(0, 7));
     })).catch(error => this.plugin.mutate(async () => {
+      if (controller.signal.aborted || (error instanceof Error && error.name === "AbortError")) { await this.plugin.repo.updateNote(node.path, { status: note.status }); new Notice(t("研究已停止，原有內容保留。")); return; }
       console.error("Visual Agent Map AI task", error); await this.plugin.repo.updateNote(node.path, { status: "error" });
       new Notice(this.plugin.recordFailure("AI 任務失敗", error));
     })).finally(() => {
-      this.plugin.running.delete(node.path);
+      if (this.plugin.activeTasks.get(taskPath) === controller) this.plugin.activeTasks.delete(taskPath);
+      this.plugin.running.delete(taskPath);
       for (const view of this.plugin.views()) view.enqueue(async () => { await view.hydrate(); view.render(); });
     }).catch(() => {});
   }
@@ -1066,7 +1085,7 @@ class VisualAgentMapSettingTab extends PluginSettingTab {
       { name: t("介面語言"), control: { type: "dropdown", key: "language", options: { "zh-TW": "繁體中文", en: "English" } } },
       text(t("Codex CLI 路徑"), "codexPath", t("VAM 會以此啟動 codex app-server。")),
       { name: t("工作區預設 Model"), desc: t("模型清單由 Codex App Server 自動取得；變更只影響之後新增的根議題。"), control: { type: "dropdown", key: "cliModel", options: models } },
-      { name: t("AI 推理等級"), desc: t("套用到一般、拆解與整合 AI 任務。等級越高通常需要較多時間與使用額度。"), control: { type: "dropdown", key: "cliReasoning", options: { low: t("低 (Low)"), medium: t("中 (Medium)"), high: t("高 (High)") } } },
+      { name: t("AI 推理等級"), desc: t("自動模式會對簡單任務使用 Low、對複雜整合使用 Medium；手動選擇不會被覆蓋。"), control: { type: "dropdown", key: "cliReasoning", options: { auto: t("自動 (Auto)"), low: t("低 (Low)"), medium: t("中 (Medium)"), high: t("高 (High)") } } },
       { name: t("Workspace 位置"), render: setting => { setting.setName(t("Workspace 位置")).setDesc(t("主題資料夾：{0}　未分類收件匣：{1}", this.plugin.settings.topicsFolder, this.plugin.settings.inboxFolder)); } },
       { name: t("修復 Agent Workspace"), render: setting => { setting.setName(t("修復 Agent Workspace")).setDesc(t("只建立缺少的基本資料夾，不會復原、搬移或覆寫筆記與心智圖。")).addButton(button => button.setButtonText(t("修復")).onClick(() => { void this.plugin.mutate(() => this.plugin.repairWorkspace()); })); } },
       { name: t("重新整理 VAM 資料"), render: setting => { setting.setName(t("重新整理 VAM 資料")).setDesc(t("重新掃描心智圖與議題筆記，重建 reference 與衍生資料。原始內容不會被覆寫。")).addButton(button => button.setButtonText(t("完整重建")).onClick(() => { void this.plugin.mutate(() => this.plugin.fullRebuild()); })); } },
@@ -1098,9 +1117,11 @@ export default class VisualAgentMapPlugin extends Plugin {
   repo!: Repository;
   ready: Promise<void> = Promise.resolve();
   readonly running = new Set<string>();
+  readonly activeTasks = new Map<string, AbortController>();
   readonly pendingSuggestions = new Map<string, Suggestion[]>();
   readonly logs: LogManager = debugLog;
   private codexRuntime: CodexAppServerRuntime | null = null;
+  private localCodexRuntime: CodexAppServerRuntime | null = null;
   private settingTab!: VisualAgentMapSettingTab;
   private detailsLeaf: WorkspaceLeaf | null = null;
   private queue: Promise<void> = Promise.resolve();
@@ -1204,7 +1225,7 @@ export default class VisualAgentMapPlugin extends Plugin {
     const executable = this.resolveExecutable(this.settings.codexPath);
     return { executable, installed: existsSync(executable) };
   }
-  resetCodexRuntime(): void { this.codexRuntime?.stop(); this.codexRuntime = null; }
+  resetCodexRuntime(): void { for (const controller of this.activeTasks.values()) controller.abort(); this.codexRuntime?.stop(); this.localCodexRuntime?.stop(); this.codexRuntime = null; this.localCodexRuntime = null; }
   openCodexSetupGuide(): void {
     const diagnostic = this.codexDiagnostic();
     new CodexSetupModal(this.app, diagnostic.executable, () => { void this.recheckCodex(); }).open();
@@ -1251,7 +1272,7 @@ export default class VisualAgentMapPlugin extends Plugin {
     if (!(leaf?.view instanceof MarkdownView)) return;
     leaf.view.containerEl.toggleClass("vam-topic-markdown", !!leaf.view.file && this.isNode(leaf.view.file));
   }
-  onunload(): void { this.codexRuntime?.stop(); this.codexRuntime = null; }
+  onunload(): void { this.resetCodexRuntime(); }
   async saveSettings(): Promise<void> { await this.saveData(this.settings); }
   async confirmCodexUsage(run: () => Promise<void>): Promise<void> {
     if (!this.settings.codexUsageNoticeSeen) {
@@ -1308,7 +1329,7 @@ export default class VisualAgentMapPlugin extends Plugin {
     this.settingTab?.update();
     for (const view of this.views()) await view.refreshFromPlugin();
   }
-  async askModel(context: TaskContext, model: string, reasoning?: unknown): Promise<AiResult> {
+  async askModel(context: TaskContext, model: string, reasoning?: unknown, signal?: AbortSignal): Promise<AiResult> {
     if (model.startsWith("claude:")) throw new Error(t("Claude Code 已不再支援。請在議題設定中選擇 Codex model。"));
     const adapter = this.app.vault.adapter;
     if (!(adapter instanceof FileSystemAdapter)) throw new Error(t("CLI 模式只支援桌面版 Obsidian"));
@@ -1329,8 +1350,9 @@ export default class VisualAgentMapPlugin extends Plugin {
             ? "這是 Synthesize 模式：summary 必須是高品質整合結論，80 字內；detail 必須整合來源完整知識、收斂重複內容、清楚呈現共識、分歧、取捨與未解問題；完成後會直接寫回。"
             : "summary 必須是一句適合心智圖顯示的新目前理解，detail 必須是完整繁體中文 Markdown 分析。",
       context.mode !== "decompose" ? "detail 必須且只能依序使用以下六個三級標題：### 核心結論、### 關鍵知識、### 證據與來源、### 取捨與限制、### 待確認事項、### 更新紀錄。更新紀錄只新增一行本次變更摘要，不可重貼完整答案；沒有內容的段落寫「尚待補充」。" : "",
-      context.mode !== "decompose" ? "若任務需要視覺理解（例如穿搭、配色、室內設計、食譜外觀、UI 參考），請提供 1–6 個已搜尋到的圖片參考 visualReferences；必須包含圖片 URL 與來源頁 URL，不要生成圖片，不要編造來源。" : "",
-      context.mode !== "decompose" ? "圖片必須直接嵌入 detail 的相關說明段落之後，使用 Markdown 圖片語法，並在圖片下方附來源頁連結。不要建立視覺參考、圖示或圖片集合的獨立段落；圖片與 visualReferences 使用相同 URL。優先搜尋可幫助理解議題的相關圖片，找不到可靠圖片時不要編造。" : "",
+      researchGuidance(context),
+      context.mode !== "decompose" && context.researchMode !== "local" ? "若任務需要視覺理解（例如穿搭、配色、室內設計、食譜外觀、UI 參考），請提供 1–6 個已搜尋到的圖片參考 visualReferences；必須包含圖片 URL 與來源頁 URL，不要生成圖片，不要編造來源。" : "",
+      context.mode !== "decompose" && context.researchMode !== "local" ? "圖片必須直接嵌入 detail 的相關說明段落之後，使用 Markdown 圖片語法，並在圖片下方附來源頁連結。不要建立視覺參考、圖示或圖片集合的獨立段落；圖片與 visualReferences 使用相同 URL。優先搜尋可幫助理解議題的相關圖片，找不到可靠圖片時不要編造。" : "",
       `目前議題：\n${context.title}`,
       `目前理解：\n${context.summary}`,
       context.mode !== "decompose" ? `現有 Detail（須整合後完整取代，不能原樣重複追加）：\n${context.detail || "（無）"}` : "",
@@ -1343,8 +1365,8 @@ export default class VisualAgentMapPlugin extends Plugin {
 
     console.debug("Visual Agent Map AI metrics", prepared.metrics);
     const providerStarted = Date.now();
-    const effort = normalizeReasoningLevel(reasoning ?? this.settings.cliReasoning);
-    const raw = await this.runtime(pluginDirectory).runTask(instructions, model, effort, responseSchema);
+    const effort = effectiveReasoningLevel(context, normalizeReasoningLevel(reasoning ?? this.settings.cliReasoning));
+    const raw = await this.runtime(pluginDirectory, context.researchMode === "local").runTask(instructions, model, effort, responseSchema, { signal, searchBudget: context.researchMode === "local" ? 0 : RESEARCH_SEARCH_BUDGET });
     const result = this.parseAiResult(raw, "Codex App Server");
     console.debug("Visual Agent Map AI metrics", { ...prepared.metrics, providerMs: Date.now() - providerStarted, totalMs: Date.now() - totalStarted });
     return result;
@@ -1365,18 +1387,21 @@ export default class VisualAgentMapPlugin extends Plugin {
     })).filter(item => /^https?:\/\//i.test(item.imageUrl) && /^https?:\/\//i.test(item.sourceUrl)).slice(0, 6) : [];
     return { summary: Array.from(parsed.summary.trim()).slice(0, 80).join(""), detail: parsed.detail.trim(), suggestions, visualReferences };
   }
-  private runtime(pluginDirectory: string): CodexAppServerRuntime {
-    if (!this.codexRuntime) {
-      const executable = this.resolveExecutable(this.settings.codexPath);
-      this.codexRuntime = new CodexAppServerRuntime({
-        executable,
-        cwd: pluginDirectory,
-        env: this.cliEnvironment(executable),
-        clientVersion: this.manifest.version || "0.0.0",
-        onLog: (level, message) => this.logs.appendLog(level, message)
-      });
-    }
-    return this.codexRuntime;
+  private runtime(pluginDirectory: string, local = false): CodexAppServerRuntime {
+    if (local && this.localCodexRuntime) return this.localCodexRuntime;
+    if (!local && this.codexRuntime) return this.codexRuntime;
+    const executable = this.resolveExecutable(this.settings.codexPath);
+    const runtime = new CodexAppServerRuntime({
+      executable,
+      cwd: pluginDirectory,
+      env: this.cliEnvironment(executable),
+      clientVersion: this.manifest.version || "0.0.0",
+      webSearchDisabled: local,
+      onLog: (level, message) => this.logs.appendLog(level, message)
+    });
+    if (local) this.localCodexRuntime = runtime;
+    else this.codexRuntime = runtime;
+    return runtime;
   }
   private resolveExecutable(configured: string): string {
     const environment = currentProcessEnvironment();

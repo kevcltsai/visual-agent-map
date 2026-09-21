@@ -35,7 +35,7 @@ export function builtInSample(language: "zh-TW" | "en", useEmbeddedAssets = true
   for (const node of map.nodes) {
     const note = source.notes[node.path];
     if (!note) throw new Error(`Built-in sample note is missing: ${node.path}`);
-    notes.set(node.id, { ...note, preview: useEmbeddedAssets ? embedAssets(note.preview) : note.preview, detail: useEmbeddedAssets ? embedAssets(note.detail) : note.detail, visualReferences: "", newFindings: "", model: "", modelSource: "workspace", mapId: map.id, topicId: map.id, topicState: "active", sourcePaths: [...note.sourcePaths] });
+    notes.set(node.id, { ...note, preview: useEmbeddedAssets ? embedAssets(note.preview) : note.preview, detail: useEmbeddedAssets ? embedAssets(note.detail) : note.detail, visualReferences: "", newFindings: "", model: "", modelSource: "workspace", researchMode: "research", mapId: map.id, topicId: map.id, topicState: "active", sourcePaths: [...note.sourcePaths] });
   }
   return { map, notes, assets: new Map(Object.entries(compiled.assets).map(([name, data]) => [name, binary(data)])) };
 }

@@ -12,7 +12,7 @@
     },
     "suggestions": {
       "type": "array",
-      "items": { "type": "object", "properties": { "title": { "type": "string" }, "task": { "type": "string" }, "contribution": { "type": "string" }, "parentTitle": { "type": "string" } }, "required": ["title", "task", "contribution", "parentTitle"], "additionalProperties": false }
+      "items": { "type": "object", "properties": { "title": { "type": "string" }, "task": { "type": "string" }, "contribution": { "type": "string" } }, "required": ["title", "task", "contribution"], "additionalProperties": false }
     },
     "visualReferences": {
       "type": "array",

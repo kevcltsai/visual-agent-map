@@ -34,7 +34,6 @@ export interface CodexAppServerOptions {
   cwd: string;
   env: ProcessEnvironment;
   clientVersion: string;
-  webSearchDisabled?: boolean;
   onLog?: (level: "info" | "warn" | "error", message: string) => void;
 }
 
@@ -42,11 +41,10 @@ interface RpcResponse { id: number; result?: unknown; error?: { message?: string
 interface RpcNotification { method: string; params?: unknown }
 interface RpcServerRequest { id: number | string; method: string; params?: unknown }
 interface PendingRequest { resolve: (value: unknown) => void; reject: (error: Error) => void; timeout: number }
-interface TurnState { messages: string[]; resolve: (text: string) => void; reject: (error: Error) => void; timeout: number; turnId: string; searches: number; searchBudget: number; steered: boolean }
+interface TurnState { messages: string[]; resolve: (text: string) => void; reject: (error: Error) => void; timeout: number }
 
 const CONTROL_TIMEOUT_MS = 30_000;
 const TURN_TIMEOUT_MS = 15 * 60 * 1000;
-function cancelledError(): Error { const error = new Error("AI 任務已取消"); error.name = "AbortError"; return error; }
 
 export class CodexAppServerRuntime {
   private child: ChildProcessHandle | null = null;
@@ -109,10 +107,8 @@ export class CodexAppServerRuntime {
     return [...new Map(models.map(model => [model.model, model])).values()];
   }
 
-  async runTask(prompt: string, model: string, effort: string, outputSchema: unknown, controls?: { signal?: AbortSignal; searchBudget?: number }): Promise<string> {
-    if (controls?.signal?.aborted) throw cancelledError();
+  async runTask(prompt: string, model: string, effort: string, outputSchema: unknown): Promise<string> {
     await this.start();
-    if (controls?.signal?.aborted) throw cancelledError();
     const started = await this.request("thread/start", {
       model: model || null,
       cwd: this.options.cwd,
@@ -128,35 +124,23 @@ export class CodexAppServerRuntime {
         this.turns.delete(threadId);
         reject(new Error("Codex App Server turn 在 15 分鐘內沒有完成"));
       }, TURN_TIMEOUT_MS);
-      this.turns.set(threadId, { messages: [], resolve, reject, timeout, turnId: "", searches: 0, searchBudget: controls?.searchBudget ?? 0, steered: false });
+      this.turns.set(threadId, { messages: [], resolve, reject, timeout });
     });
-    const state = this.turns.get(threadId)!;
-    const interrupt = (): void => { if (state.turnId) void this.request("turn/interrupt", { threadId, turnId: state.turnId }).catch(error => this.options.onLog?.("warn", `取消 AI 任務失敗：${error instanceof Error ? error.message : String(error)}`)); };
-    controls?.signal?.addEventListener("abort", interrupt, { once: true });
     try {
-      if (controls?.signal?.aborted) throw cancelledError();
-      const startedTurn = await this.request("turn/start", {
+      await this.request("turn/start", {
         threadId,
         input: [{ type: "text", text: prompt, text_elements: [] }],
         model: model || null,
         effort: effort || "low",
-        sandboxPolicy: { type: "readOnly", networkAccess: false },
         outputSchema
-      }) as { turn?: { id?: unknown } };
-      state.turnId = typeof startedTurn.turn?.id === "string" ? startedTurn.turn.id : "";
-      if (controls?.signal?.aborted) interrupt();
-      this.steerIfNeeded(threadId, state);
-      const answer = await completed;
-      if (controls?.signal?.aborted) throw cancelledError();
-      return answer;
+      });
+      return await completed;
     } catch (error) {
       const state = this.turns.get(threadId);
-      if (state) { window.clearTimeout(state.timeout); this.turns.delete(threadId); state.reject(error instanceof Error ? error : new Error(String(error))); await completed.catch(() => undefined); }
+      if (state) { window.clearTimeout(state.timeout); this.turns.delete(threadId); }
       else await completed.catch(() => undefined);
-      if (controls?.signal?.aborted) throw cancelledError();
       throw error;
     } finally {
-      controls?.signal?.removeEventListener("abort", interrupt);
       try { await this.request("thread/unsubscribe", { threadId }, 5_000); }
       catch (error) { this.options.onLog?.("warn", `Codex App Server 無法取消 thread 訂閱：${error instanceof Error ? error.message : String(error)}`); }
     }
@@ -166,7 +150,7 @@ export class CodexAppServerRuntime {
     this.options.onLog?.("info", `啟動 Codex App Server：${this.options.executable} app-server`);
     this.buffer = "";
     this.stderr = "";
-    const child = spawnProcess(this.options.executable, this.options.webSearchDisabled ? ["--config", "web_search=\"disabled\"", "app-server"] : ["app-server"], {
+    const child = spawnProcess(this.options.executable, ["app-server"], {
       cwd: this.options.cwd,
       env: this.options.env,
       stdio: ["pipe", "pipe", "pipe"]
@@ -217,11 +201,6 @@ export class CodexAppServerRuntime {
     const threadId = typeof params?.threadId === "string" ? params.threadId : "";
     const state = this.turns.get(threadId);
     if (!state) return;
-    if (message.method === "item/started") {
-      const item = params?.item as { type?: unknown; action?: { type?: unknown } } | undefined;
-      if (item?.type === "webSearch" && (!item.action || item.action.type === "search")) { state.searches++; this.steerIfNeeded(threadId, state); }
-      return;
-    }
     if (message.method === "item/completed") {
       const item = params?.item as { type?: unknown; text?: unknown } | undefined;
       if (item?.type === "agentMessage" && typeof item.text === "string") state.messages.push(item.text);
@@ -234,12 +213,6 @@ export class CodexAppServerRuntime {
       if (turn?.status === "completed") state.resolve(state.messages.at(-1)?.trim() || "");
       else state.reject(new Error(typeof turn?.error?.message === "string" ? turn.error.message : `Codex turn ${typeof turn?.status === "string" ? turn.status : "失敗"}`));
     }
-  }
-
-  private steerIfNeeded(threadId: string, state: TurnState): void {
-    if (this.turns.get(threadId) !== state || state.steered || !state.searchBudget || state.searches < state.searchBudget || !state.turnId) return;
-    state.steered = true;
-    void this.request("turn/steer", { threadId, expectedTurnId: state.turnId, input: [{ type: "text", text: "網路搜尋預算已用完。請停止搜尋，根據已取得的資料完成答案；不足之處明確列為待確認。" }] }).catch(error => this.options.onLog?.("warn", `搜尋停止提醒未送達：${error instanceof Error ? error.message : String(error)}`));
   }
 
   private respondToServerRequest(message: RpcServerRequest): void {

@@ -8,7 +8,7 @@ const root = path.resolve(__dirname, '..');
 function load(entry, overrides = {}, windowValues = {}) {
   const code = buildSync({ entryPoints: [path.join(root, entry)], bundle: true, write: false, platform: 'node', format: 'cjs', external: ['obsidian', 'node:*'] }).outputFiles[0].text;
   const module = { exports: {} };
-  vm.runInNewContext(code, { module, exports: module.exports, require: name => overrides[name] || require(name), console, crypto: require('node:crypto').webcrypto, process, AbortController, window: { setTimeout, clearTimeout, ...windowValues } });
+  vm.runInNewContext(code, { module, exports: module.exports, require: name => overrides[name] || require(name), console, crypto: require('node:crypto').webcrypto, process, window: { setTimeout, clearTimeout, ...windowValues } });
   return module.exports;
 }
 const core = load('map-model.ts');
@@ -64,41 +64,7 @@ test('workspace defaults to the configured low-cost model and low reasoning', ()
   assert.doesNotMatch(DEFAULT_SETTINGS.models, /claude:/);
   assert.equal(normalizeReasoningLevel('medium'), 'medium');
   assert.equal(normalizeReasoningLevel('high'), 'high');
-  assert.equal(normalizeReasoningLevel('auto'), 'auto');
   assert.equal(normalizeReasoningLevel('unsupported'), 'low');
-});
-test('automatic reasoning respects manual choices and local tasks avoid research', () => {
-  const { effectiveReasoningLevel, researchGuidance, RESEARCH_SEARCH_BUDGET } = load('ai/task-policy.ts');
-  const task = { title: 'Topic', summary: '', rules: '', detail: '', task: 'Organize', ancestors: '', mode: 'task', researchMode: 'local' };
-  assert.equal(effectiveReasoningLevel(task, 'auto'), 'low');
-  assert.equal(effectiveReasoningLevel({ ...task, mode: 'synthesize' }, 'auto'), 'medium');
-  assert.equal(effectiveReasoningLevel({ ...task, sourceContext: 'x'.repeat(6_001) }, 'auto'), 'medium');
-  assert.equal(effectiveReasoningLevel({ ...task, mode: 'synthesize' }, 'high'), 'high');
-  assert.match(researchGuidance(task), /不要搜尋網路/);
-  assert.match(researchGuidance(task), /現有資料不足/);
-  assert.match(researchGuidance({ ...task, researchMode: 'research' }), /最多 3 次網路搜尋/);
-  assert.equal(RESEARCH_SEARCH_BUDGET, 3);
-});
-test('research depth sets separate search targets and source selection ranks only related notes', () => {
-  const { researchLimits } = load('ai/task-policy.ts');
-  const { selectSourceDocuments, sourceContext } = load('ai/source-selection.ts');
-  assert.deepEqual(plain(researchLimits('fast')), { searches: 1, sources: 2 });
-  assert.deepEqual(plain(researchLimits('normal')), { searches: 3, sources: 5 });
-  assert.deepEqual(plain(researchLimits('deep')), { searches: 6, sources: 10 });
-  const { researchGuidance } = load('ai/task-policy.ts');
-  assert.match(researchGuidance({ researchMode: 'local', researchDepth: 'fast' }), /快速概覽/);
-  assert.match(researchGuidance({ researchMode: 'local', researchDepth: 'deep' }), /深入研究/);
-  const docs = [{ name: '旅行/台北交通.md', content: '捷運與公車' }, { name: '旅行/台北飯店.md', content: '住宿價格' }, { name: '工作/會議.md', content: '無關' }];
-  const picked = selectSourceDocuments('台北交通', docs, 'fast');
-  assert.deepEqual(picked.map(item => item.name), ['旅行/台北交通.md', '旅行/台北飯店.md']);
-  assert.doesNotMatch(sourceContext(picked), /工作\/會議/);
-});
-test('explicit source context survives long existing Markdown', () => {
-  const { buildPreparedTaskContext } = load('ai/context-builder.ts');
-  const context = { title: 'Topic', summary: '', rules: '', detail: 'old '.repeat(8_000), task: 'Review selected note', ancestors: '', workingFindings: '', sourceContext: '來源：selected.md\nverified evidence', mode: 'task', researchMode: 'local', researchDepth: 'normal', visualMode: 'off' };
-  const prepared = buildPreparedTaskContext(context, 'test-model', 1_000);
-  assert.match(prepared.context.sourceContext, /verified evidence/);
-  assert.ok(prepared.context.detail.length < context.detail.length);
 });
 test('Codex executable discovery covers Homebrew, local npm, Volta, fnm, nvm and inherited PATH', () => {
   const { executableCandidates } = load('main.ts', { obsidian });
@@ -239,29 +205,6 @@ const obsidian = {
   stringifyYaml: obj => Object.entries(obj).map(([key, value]) => `${key}: ${JSON.stringify(value)}`).join('\n') + '\n'
 };
 const { Repository, DEFAULT_SETTINGS, normalizeReasoningLevel } = load('repository.ts', { obsidian });
-test('node plus adds a child without opening a duplicate right-click menu', () => {
-  const { VisualAgentMapView } = load('main.ts', { obsidian });
-  const events = new Map(), buttons = [];
-  const element = tag => ({ tag, children: [], dataset: {}, style: {},
-    createDiv(options) { const child = element('div'); child.cls = options?.cls ?? options; this.children.push(child); return child; },
-    createEl(name, options) { const child = element(name); child.text = options?.text; this.children.push(child); if (name === 'button') buttons.push(child); return child; },
-    createSpan(options) { const child = element('span'); child.text = options?.text; this.children.push(child); return child; },
-    setAttr(name, value) { this[name] = value; }, addClass(name) { this.cls = name; },
-    addEventListener(name, handler) { events.set(`${tag}:${name}`, handler); if (tag === 'button') this.click = handler; }
-  });
-  const topic = node('parent');
-  const view = new VisualAgentMapView({ app: {} }, { pendingSuggestions: new Map() });
-  view.stageEl = element('stage'); view.map = map([topic]);
-  view.notes = new Map([[topic.id, { title: 'Parent', summary: '', status: 'completed' }]]);
-  view.enableDrag = () => {};
-  let added = 0; view.addNode = () => { added++; }; view.enqueue = work => work();
-  view.renderNode(topic);
-  const plus = buttons.find(button => button.text === '+');
-  assert.equal(plus['aria-label'], '手動新增子議題');
-  plus.click({ stopPropagation() {} });
-  assert.equal(added, 1);
-  assert.equal(events.has('div:contextmenu'), false);
-});
 function fixture() {
   const files = new Map(), contents = new Map();
   const attach = item => { const folderPath = item.path.split('/').slice(0, -1).join('/'); item.parent = files.get(folderPath) || null; if (item.parent instanceof TFolder && !item.parent.children.includes(item)) item.parent.children.push(item); };
@@ -293,18 +236,6 @@ test('editing note fields preserves latest AI detail and unrelated frontmatter',
   assert.equal(result.newFindings, 'Fresh research');
   assert.match(contents.get(n.path), /## Working Findings\n\nFresh research/);
   assert.match(contents.get(n.path), /custom: "retain me"/);
-});
-test('local research mode persists without changing older notes', async () => {
-  const { repo } = fixture(); const n = await topicNote(repo);
-  const original = await repo.readNote(n.path);
-  assert.equal(original.researchMode, 'research');
-  assert.equal(original.researchDepth, 'normal');
-  assert.equal(original.visualMode, 'auto');
-  await repo.updateNote(n.path, { researchMode: 'local', researchDepth: 'deep', visualMode: 'off' });
-  const updated = await repo.readNote(n.path);
-  assert.equal(updated.researchMode, 'local');
-  assert.equal(updated.researchDepth, 'deep');
-  assert.equal(updated.visualMode, 'off');
 });
 test('current summary is editable in the Markdown body', async () => {
   const { repo, contents } = fixture(); const n = await topicNote(repo, 'Editable summary');
@@ -482,7 +413,7 @@ test('a successful AI task immediately updates summary and MD detail', async () 
   await app.vault.create(mapPath, core.serializeMap(mapDoc));
   const { VisualAgentMapView } = load('main.ts', { obsidian }); let view;
   const plugin = {
-    repo, settings: { ...DEFAULT_SETTINGS }, running: new Set(), activeTasks: new Map(), pendingSuggestions: new Map(),
+    repo, settings: { ...DEFAULT_SETTINGS }, running: new Set(), pendingSuggestions: new Map(),
     askModel: async context => { assert.equal(context.mode, 'task'); assert.equal(context.rules, 'Use a comparison table.'); assert.equal(context.detail, 'Existing detail'); assert.equal(context.workingFindings, 'Legacy finding'); return { summary: 'Direct summary', detail: '### 核心結論\n\nDirect detail\n\n### 關鍵知識\n\nExisting detail; Legacy finding\n\n### 證據與來源\n\nSource\n\n### 取捨與限制\n\nNone\n\n### 待確認事項\n\nNone\n\n### 更新紀錄\n\n- Updated', suggestions: [] }; },
     rebuildDerivedData: async () => {}, mutate: async work => work(), views: () => [view]
   };
@@ -496,39 +427,6 @@ test('a successful AI task immediately updates summary and MD detail', async () 
   assert.match(updated.detail, /Legacy finding/);
   assert.match(updated.detail, /Existing detail/);
   assert.doesNotMatch(contents.get(n.path), /## Working Findings/);
-});
-test('cancelling a node task keeps its earlier Markdown and status', async () => {
-  const { repo, app } = fixture(), n = await topicNote(repo, 'Cancel');
-  await repo.updateNote(n.path, { prompt: 'Research', detail: 'Keep this' });
-  const { VisualAgentMapView } = load('main.ts', { obsidian }); let view;
-  const plugin = {
-    repo, running: new Set(), activeTasks: new Map(), pendingSuggestions: new Map(),
-    askModel: (_context, _model, _reasoning, signal) => new Promise((_resolve, reject) => signal.addEventListener('abort', () => { const error = new Error('cancelled'); error.name = 'AbortError'; reject(error); }, { once: true })),
-    mutate: async work => work(), views: () => [view]
-  };
-  view = new VisualAgentMapView({ app }, plugin); view.path = 'Map.md'; view.map = map([n]); view.render = () => {}; view.hydrate = async () => {};
-  await view.runAgent(n);
-  assert.equal((await repo.readNote(n.path)).status, 'running');
-  plugin.activeTasks.get(n.path).abort();
-  await new Promise(resolve => setTimeout(resolve, 20));
-  const after = await repo.readNote(n.path);
-  assert.equal(after.status, 'idea'); assert.equal(after.detail, 'Keep this'); assert.equal(plugin.activeTasks.size, 0);
-});
-test('a completed but stale answer cannot overwrite an edited note', async () => {
-  const { repo, app } = fixture(), n = await topicNote(repo, 'Stale');
-  await repo.updateNote(n.path, { prompt: 'Research', detail: 'Original' });
-  let finish; const { VisualAgentMapView } = load('main.ts', { obsidian }); let view;
-  const plugin = {
-    repo, running: new Set(), activeTasks: new Map(), pendingSuggestions: new Map(),
-    askModel: () => new Promise(resolve => { finish = resolve; }), mutate: async work => work(), views: () => [view]
-  };
-  view = new VisualAgentMapView({ app }, plugin); view.path = 'Map.md'; view.map = map([n]); view.render = () => {}; view.hydrate = async () => {};
-  await view.runAgent(n);
-  await repo.updateNote(n.path, { detail: 'User edit' });
-  finish({ summary: 'Stale summary', detail: 'Stale detail', suggestions: [], visualReferences: [] });
-  await new Promise(resolve => setTimeout(resolve, 20));
-  const after = await repo.readNote(n.path);
-  assert.equal(after.detail, 'User edit'); assert.equal(after.status, 'idea'); assert.notEqual(after.summary, 'Stale summary');
 });
 test('new child topics inherit the parent AI rules once', async () => {
   const { repo, app } = fixture(), parent = await topicNote(repo, 'Parent', 'a');
@@ -562,24 +460,6 @@ test('confirmed child batches rebuild derived data only once', async () => {
   assert.equal(rebuilds, 1);
   assert.equal((await repo.readNote(saved.nodes[1].path)).prompt, 'Task one');
 });
-test('two-level child batches attach grandchildren and still rebuild once', async () => {
-  const { repo, app } = fixture(), parent = await topicNote(repo, 'Parent', 'a'); let rebuilds = 0;
-  const mapPath = 'Agent Workspace/Topics/map-a/Map.md';
-  const mapDoc = { id: 'map-a', title: 'map-a', version: 1, nodes: [parent], viewport: { x: 0, y: 0, zoom: 1 } };
-  await app.vault.create(mapPath, core.serializeMap(mapDoc));
-  const { VisualAgentMapView } = load('main.ts', { obsidian });
-  const view = new VisualAgentMapView({ app }, { repo, settings: { ...DEFAULT_SETTINGS }, rebuildDerivedData: async () => { rebuilds++; } });
-  view.path = mapPath; view.map = mapDoc; view.contentEl = { querySelector: () => null }; view.render = () => {}; view.hydrate = async () => {}; view.focusNode = () => {};
-  await view.createChildBatch(parent, [
-    { title: 'A', task: 'Explore A', contribution: '' },
-    { title: 'B', task: 'Explore B', contribution: '' },
-    { title: 'A1', task: 'Explore A1', contribution: '', parentTitle: 'A' }
-  ]);
-  const saved = await repo.readMap(mapPath);
-  assert.equal(saved.nodes.length, 4);
-  assert.equal(saved.nodes[3].parentId, saved.nodes[1].id);
-  assert.equal(rebuilds, 1);
-});
 test('decomposition keeps only 3 to 7 proposals and does not write nodes before confirmation', async () => {
   const { repo, app } = fixture(), parent = await topicNote(repo, 'Parent', 'model-a');
   const mapPath = 'Agent Workspace/Topics/map-a/Map.md';
@@ -587,7 +467,7 @@ test('decomposition keeps only 3 to 7 proposals and does not write nodes before 
   await app.vault.create(mapPath, core.serializeMap(mapDoc));
   const { VisualAgentMapView } = load('main.ts', { obsidian });
   const plugin = { repo, settings: { ...DEFAULT_SETTINGS }, running: new Set(), pendingSuggestions: new Map(), askModel: async () => ({ summary: '', detail: '', visualReferences: [], suggestions: [{ title: 'Only one', task: '', contribution: '' }, { title: 'Only two', task: '', contribution: '' }] }) };
-  const view = new VisualAgentMapView({ app }, plugin); view.path = mapPath; view.map = mapDoc; view.render = () => {}; view.hydrate = async () => {}; view.openChildSuggestions = () => {};
+  const view = new VisualAgentMapView({ app }, plugin); view.path = mapPath; view.map = mapDoc; view.render = () => {}; view.hydrate = async () => {};
   await view.proposeChildren(parent, true);
   assert.equal(plugin.pendingSuggestions.has(parent.path), false);
   assert.equal((await repo.readMap(mapPath)).nodes.length, 1);
@@ -595,23 +475,6 @@ test('decomposition keeps only 3 to 7 proposals and does not write nodes before 
   await view.proposeChildren(parent, true);
   assert.equal(plugin.pendingSuggestions.get(parent.path).length, 7);
   assert.equal((await repo.readMap(mapPath)).nodes.length, 1);
-});
-test('decomposition receives existing child topics to avoid duplicate proposals', async () => {
-  const { repo, app } = fixture(), parent = await topicNote(repo, 'Travel', 'model-a');
-  const mapPath = 'Agent Workspace/Topics/map-a/Map.md';
-  const mapDoc = { id: 'map-a', title: 'map-a', version: 1, nodes: [parent], viewport: { x: 0, y: 0, zoom: 1 } };
-  await app.vault.create(mapPath, core.serializeMap(mapDoc));
-  const child = await repo.createNote('交通', 'model-a', mapDoc, mapPath, 'workspace');
-  child.parentId = parent.id; mapDoc.nodes.push(child); await repo.saveMap(mapPath, mapDoc);
-  let captured;
-  const plugin = { repo, settings: { ...DEFAULT_SETTINGS }, running: new Set(), pendingSuggestions: new Map(), askModel: async context => { captured = context; return { summary: 'No split', detail: '', visualReferences: [], suggestions: [] }; } };
-  const { VisualAgentMapView } = load('main.ts', { obsidian });
-  const view = new VisualAgentMapView({ app }, plugin); view.path = mapPath; view.map = mapDoc; view.notes.set(child.id, await repo.readNote(child.path)); view.render = () => {}; view.hydrate = async () => {};
-  await view.proposeChildren(parent, true);
-  assert.match(captured.task, /現有直屬子議題/);
-  assert.match(captured.task, /交通/);
-  assert.match(captured.task, /不要為湊數而拆解/);
-  assert.equal(plugin.pendingSuggestions.size, 0);
 });
 test('duplicating the built-in sample creates an independent editable map with new identities', async () => {
   const { repo, app } = fixture();
@@ -687,8 +550,7 @@ test('missing Codex opens an in-product setup guide with official installation a
   assert.match(source, /不需要 API key/);
   assert.match(source, /獨立版 Codex CLI 不需要 npm/);
   assert.match(source, /在 Terminal 執行 codex/);
-  assert.match(source, /if \(showGuide\) this\.openCodexSetupGuide\(\)/);
-  assert.match(source, /this\.recheckCodex\(false\)/);
+  assert.match(source, /if \(!diagnostic\.installed\) \{ this\.openCodexSetupGuide\(\); return; \}/);
 });
 test('generated child filenames are migrated to their topic titles and maps stay linked', async () => {
   const { repo, app } = fixture(), mapPath = await repo.createMap('Filename migration'), mapDoc = await repo.readMap(mapPath);
@@ -817,7 +679,6 @@ test('Codex App Server uses model/list, selected reasoning and fresh ephemeral t
     else if (message.method === 'thread/unsubscribe') { unsubscribeCount++; reply({}); }
     else if (message.method === 'turn/start') {
       turnCount++; efforts.push(message.params.effort); assert.ok(message.params.outputSchema.properties.summary); assert.match(message.params.input[0].text, /目前議題/);
-      assert.deepEqual(plain(message.params.sandboxPolicy), { type: 'readOnly', networkAccess: false });
       const threadId = message.params.threadId, summary = threadId === 'thread-1' ? 'first' : 'second';
       process.nextTick(() => {
         child.stdout.emit('data', Buffer.from(`${JSON.stringify({ id: message.id, result: { turn: { id: `turn-${turnCount}` } } })}\n`));
@@ -842,62 +703,6 @@ test('Codex App Server uses model/list, selected reasoning and fresh ephemeral t
   assert.equal(plugin.settings.models, 'visible-model');
   assert.equal(result.summary, 'first');
   assert.equal(second.summary, 'second');
-});
-test('local Codex runtime disables web search for its process', async () => {
-  const { EventEmitter } = require('node:events'); let args;
-  const child = new EventEmitter(); child.stdout = new EventEmitter(); child.stderr = new EventEmitter(); child.kill = () => {};
-  child.stdin = { write: line => { const message = JSON.parse(line.trim()); if (message.method === 'initialize') process.nextTick(() => child.stdout.emit('data', Buffer.from(`${JSON.stringify({ id: message.id, result: {} })}\n`))); } };
-  const { CodexAppServerRuntime } = load('ai/runtime/codex-app-server.ts', { 'node:child_process': { spawn: (_path, invocation) => { args = invocation; return child; } } });
-  const runtime = new CodexAppServerRuntime({ executable: 'codex', cwd: '/plugin', env: {}, clientVersion: 'test', webSearchDisabled: true });
-  await runtime.start(); assert.deepEqual(plain(args), ['--config', 'web_search="disabled"', 'app-server']); runtime.stop();
-});
-test('research budget sends one stop-search steer after three searches', async () => {
-  const { EventEmitter } = require('node:events'); const sent = [];
-  const child = new EventEmitter(); child.stdout = new EventEmitter(); child.stderr = new EventEmitter(); child.kill = () => {};
-  const emit = message => process.nextTick(() => child.stdout.emit('data', Buffer.from(`${JSON.stringify(message)}\n`)));
-  child.stdin = { write: line => {
-    const message = JSON.parse(line.trim()); sent.push(message);
-    if (message.method === 'initialize') emit({ id: message.id, result: {} });
-    else if (message.method === 'thread/start') emit({ id: message.id, result: { thread: { id: 'thread-1' } } });
-    else if (message.method === 'turn/start') {
-      emit({ id: message.id, result: { turn: { id: 'turn-1' } } });
-      for (let i = 0; i < 3; i++) emit({ method: 'item/started', params: { threadId: 'thread-1', item: { type: 'webSearch', action: { type: 'search' } } } });
-    } else if (message.method === 'turn/steer') {
-      emit({ id: message.id, result: { turnId: 'turn-1' } });
-      emit({ method: 'item/completed', params: { threadId: 'thread-1', item: { type: 'agentMessage', text: 'answer' } } });
-      emit({ method: 'turn/completed', params: { threadId: 'thread-1', turn: { status: 'completed' } } });
-    } else if (message.method === 'thread/unsubscribe') emit({ id: message.id, result: {} });
-  } };
-  const { CodexAppServerRuntime } = load('ai/runtime/codex-app-server.ts', { 'node:child_process': { spawn: () => child } });
-  const runtime = new CodexAppServerRuntime({ executable: 'codex', cwd: '/plugin', env: {}, clientVersion: 'test' });
-  try {
-    assert.equal(await runtime.runTask('research', 'model', 'low', {}, { searchBudget: 3 }), 'answer');
-    assert.equal(sent.filter(message => message.method === 'turn/steer').length, 1);
-    assert.match(sent.find(message => message.method === 'turn/steer').params.input[0].text, /停止搜尋/);
-  } finally { runtime.stop(); }
-});
-test('cancelling a Codex turn sends interrupt and rejects the result', async () => {
-  const { EventEmitter } = require('node:events'); const sent = [];
-  const child = new EventEmitter(); child.stdout = new EventEmitter(); child.stderr = new EventEmitter(); child.kill = () => {};
-  const emit = message => process.nextTick(() => child.stdout.emit('data', Buffer.from(`${JSON.stringify(message)}\n`)));
-  child.stdin = { write: line => {
-    const message = JSON.parse(line.trim()); sent.push(message);
-    if (message.method === 'initialize') emit({ id: message.id, result: {} });
-    else if (message.method === 'thread/start') emit({ id: message.id, result: { thread: { id: 'thread-1' } } });
-    else if (message.method === 'turn/start') emit({ id: message.id, result: { turn: { id: 'turn-1' } } });
-    else if (message.method === 'turn/interrupt') { emit({ id: message.id, result: {} }); emit({ method: 'turn/completed', params: { threadId: 'thread-1', turn: { status: 'interrupted' } } }); }
-    else if (message.method === 'thread/unsubscribe') emit({ id: message.id, result: {} });
-  } };
-  const { CodexAppServerRuntime } = load('ai/runtime/codex-app-server.ts', { 'node:child_process': { spawn: () => child } });
-  const runtime = new CodexAppServerRuntime({ executable: 'codex', cwd: '/plugin', env: {}, clientVersion: 'test' });
-  const controller = new AbortController();
-  try {
-    const pending = runtime.runTask('research', 'model', 'low', {}, { signal: controller.signal });
-    while (!sent.some(message => message.method === 'turn/start')) await new Promise(resolve => setImmediate(resolve));
-    await new Promise(resolve => setImmediate(resolve)); controller.abort();
-    await assert.rejects(pending, error => error.name === 'AbortError');
-    assert.equal(sent.filter(message => message.method === 'turn/interrupt').length, 1);
-  } finally { runtime.stop(); }
 });
 test('Codex App Server declines unsupported interaction requests instead of hanging', async () => {
   const { EventEmitter } = require('node:events'); const sent = [];

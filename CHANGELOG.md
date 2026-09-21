@@ -1,12 +1,5 @@
 # Changelog
 
-## [0.9.1] - 2026-09-22
-
-### Rolled back
-
-- Restored the `0.8.1` feature set and behavior after the `0.9.0` AI workflow changes did not meet expectations.
-- Kept the release version moving forward so existing `0.9.0` installations can receive the rollback as an update. The `0.9.0` release remains available for history and diagnosis.
-
 ## [0.8.1] - 2026-09-21
 
 ### Fixed

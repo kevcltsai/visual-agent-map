@@ -47,7 +47,7 @@ See [CHANGELOG.md](CHANGELOG.md) for the complete version history.
 
 - Obsidian desktop `1.13.7` or later (the verified compatibility baseline for this release).
 - A local [Codex CLI](https://developers.openai.com/codex/cli/) installation signed in with ChatGPT. ChatGPT Free is supported with a smaller Codex allowance. Visual Agent Map does not require an API key; npm is only needed to build from source.
-- Desktop only. Current release: `0.9.1` (rollback to the `0.8.1` feature set).
+- Desktop only. Current release: `0.8.1`.
 
 ### Install
 
@@ -137,7 +137,7 @@ Visual Agent Map 是桌面版 Obsidian 外掛：用視覺化心智圖拆解複�
 
 - Obsidian 桌面版 `1.13.7` 或更新版本（本版本實際驗證的相容性基線）。
 - 已在本機安裝 [Codex CLI](https://developers.openai.com/codex/cli/) 並以 ChatGPT 登入。ChatGPT Free 可以使用，但 Codex 額度較少。Visual Agent Map 不需要 API key；只有從原始碼建置才需要 npm。
-- 僅支援桌面版。目前版本：`0.9.1`（回復至 `0.8.1` 的功能內容）。
+- 僅支援桌面版。目前版本：`0.8.1`。
 
 ### 安裝
 

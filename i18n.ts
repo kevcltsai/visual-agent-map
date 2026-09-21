@@ -340,6 +340,7 @@ const english: Record<string, string> = {
   "未找到 Codex CLI。請依安裝說明完成安裝與 ChatGPT 登入；VAM 不會自動安裝系統套件。": "Codex CLI was not found. Follow the installation guide to install it and sign in with ChatGPT; VAM never installs system packages automatically.",
   "Codex App Server 尚未就緒；Sample 與非 AI 功能仍可使用。請到 VAM Settings 查看並重新檢查。": "Codex App Server is not ready. Samples and non-AI features remain available; check VAM Settings.",
   "未找到 Codex CLI：{0}": "Codex CLI was not found: {0}",
+  "未找到 Codex CLI：{0}。請在 VAM Settings 設定「Codex CLI 路徑」。": "Codex CLI was not found: {0}. Set the Codex CLI path in VAM Settings.",
   "Codex App Server 已就緒：{0}": "Codex App Server is ready: {0}",
   "Codex App Server 檢查失敗：{0}": "Codex App Server check failed: {0}",
   "目前模型已不可用": "Current model is unavailable"

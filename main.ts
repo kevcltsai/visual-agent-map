@@ -405,7 +405,7 @@ export class VisualAgentMapView extends ItemView {
     this.history.push({ undo: () => apply(newPath, oldPath, oldTitle).then(() => {}), redo: () => apply(oldPath, newPath, title).then(() => {}) });
     this.updateHistoryButtons();
   }
-  private async saveFieldWithConflict(node: MapNode, key: "title" | "summary" | "rules" | "preview", label: string, base: string, value: string): Promise<void> {
+  private async saveFieldWithConflict(node: MapNode, key: "title" | "summary" | "rules", label: string, base: string, value: string): Promise<void> {
     const latest = await this.plugin.repo.readNote(node.path);
     if (latest[key] !== base && latest[key] !== value) {
       new ConflictModal(this.app, label, value, latest[key], resolved => {
@@ -713,7 +713,7 @@ export class VisualAgentMapView extends ItemView {
         if (note.sourcePaths.length) { const sources = panel.createDiv("vam-reference-sources"); sources.createEl("strong", { text: t("來源議題") }); for (const path of note.sourcePaths) { const source = this.map?.nodes.find(item => item.path === path); if (source) this.button(sources, this.notes.get(source.id)?.title ?? path, () => this.selectSampleNode(source.id)); } }
         return;
       }
-      const field = (label: string, key: "title" | "summary" | "rules" | "preview", rows = 0): void => {
+      const field = (label: string, key: "title" | "summary" | "rules", rows = 0): void => {
         const wrapper = panel.createEl("label", { cls: "vam-field" }); wrapper.createSpan({ text: label });
         const input = rows ? wrapper.createEl("textarea", { text: note[key] }) : wrapper.createEl("input", { type: "text", value: note[key] });
         input.setAttr("aria-label", label); if (input instanceof HTMLTextAreaElement) input.rows = rows;
@@ -724,7 +724,7 @@ export class VisualAgentMapView extends ItemView {
           this.enqueue(() => this.saveFieldWithConflict(node, key, label, base, value));
         });
       };
-      field(t("議題"), "title"); field(t("目前理解"), "summary", 4); field(t("預覽"), "preview", 6); field(t("AI 規則"), "rules", 4);
+      field(t("議題"), "title"); field(t("目前理解"), "summary", 4); field(t("AI 規則"), "rules", 4);
       const sourcePaths = this.referenceSourcePaths(note, node.path);
       if (sourcePaths.length) {
         const sources = panel.createDiv("vam-reference-sources"); sources.createEl("strong", { text: t("來源議題") });
@@ -1207,11 +1207,15 @@ export default class VisualAgentMapPlugin extends Plugin {
   resetCodexRuntime(): void { this.codexRuntime?.stop(); this.codexRuntime = null; }
   openCodexSetupGuide(): void {
     const diagnostic = this.codexDiagnostic();
-    new CodexSetupModal(this.app, diagnostic.executable, () => { void this.recheckCodex(); }).open();
+    new CodexSetupModal(this.app, diagnostic.executable, () => { void this.recheckCodex(false); }).open();
   }
-  async recheckCodex(): Promise<void> {
+  async recheckCodex(showGuide = true): Promise<void> {
     const diagnostic = this.codexDiagnostic();
-    if (!diagnostic.installed) { this.openCodexSetupGuide(); return; }
+    if (!diagnostic.installed) {
+      if (showGuide) this.openCodexSetupGuide();
+      else new Notice(t("未找到 Codex CLI：{0}。請在 VAM Settings 設定「Codex CLI 路徑」。", diagnostic.executable));
+      return;
+    }
     try {
       await this.refreshCodexModels(); new Notice(t("Codex App Server 已就緒：{0}", diagnostic.executable));
     } catch (error) { new Notice(t("Codex App Server 檢查失敗：{0}", this.recordFailure("Codex App Server 重新檢查失敗", error))); }

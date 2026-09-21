@@ -377,6 +377,7 @@ var english = {
   "\u672A\u627E\u5230 Codex CLI\u3002\u8ACB\u4F9D\u5B89\u88DD\u8AAA\u660E\u5B8C\u6210\u5B89\u88DD\u8207 ChatGPT \u767B\u5165\uFF1BVAM \u4E0D\u6703\u81EA\u52D5\u5B89\u88DD\u7CFB\u7D71\u5957\u4EF6\u3002": "Codex CLI was not found. Follow the installation guide to install it and sign in with ChatGPT; VAM never installs system packages automatically.",
   "Codex App Server \u5C1A\u672A\u5C31\u7DD2\uFF1BSample \u8207\u975E AI \u529F\u80FD\u4ECD\u53EF\u4F7F\u7528\u3002\u8ACB\u5230 VAM Settings \u67E5\u770B\u4E26\u91CD\u65B0\u6AA2\u67E5\u3002": "Codex App Server is not ready. Samples and non-AI features remain available; check VAM Settings.",
   "\u672A\u627E\u5230 Codex CLI\uFF1A{0}": "Codex CLI was not found: {0}",
+  "\u672A\u627E\u5230 Codex CLI\uFF1A{0}\u3002\u8ACB\u5728 VAM Settings \u8A2D\u5B9A\u300CCodex CLI \u8DEF\u5F91\u300D\u3002": "Codex CLI was not found: {0}. Set the Codex CLI path in VAM Settings.",
   "Codex App Server \u5DF2\u5C31\u7DD2\uFF1A{0}": "Codex App Server is ready: {0}",
   "Codex App Server \u6AA2\u67E5\u5931\u6557\uFF1A{0}": "Codex App Server check failed: {0}",
   "\u76EE\u524D\u6A21\u578B\u5DF2\u4E0D\u53EF\u7528": "Current model is unavailable"
@@ -3053,7 +3054,6 @@ var VisualAgentMapView = class extends import_obsidian5.ItemView {
       };
       field(t("\u8B70\u984C"), "title");
       field(t("\u76EE\u524D\u7406\u89E3"), "summary", 4);
-      field(t("\u9810\u89BD"), "preview", 6);
       field(t("AI \u898F\u5247"), "rules", 4);
       const sourcePaths = this.referenceSourcePaths(note, node.path);
       if (sourcePaths.length) {
@@ -3892,13 +3892,14 @@ var VisualAgentMapPlugin = class extends import_obsidian5.Plugin {
   openCodexSetupGuide() {
     const diagnostic = this.codexDiagnostic();
     new CodexSetupModal(this.app, diagnostic.executable, () => {
-      void this.recheckCodex();
+      void this.recheckCodex(false);
     }).open();
   }
-  async recheckCodex() {
+  async recheckCodex(showGuide = true) {
     const diagnostic = this.codexDiagnostic();
     if (!diagnostic.installed) {
-      this.openCodexSetupGuide();
+      if (showGuide) this.openCodexSetupGuide();
+      else new import_obsidian5.Notice(t("\u672A\u627E\u5230 Codex CLI\uFF1A{0}\u3002\u8ACB\u5728 VAM Settings \u8A2D\u5B9A\u300CCodex CLI \u8DEF\u5F91\u300D\u3002", diagnostic.executable));
       return;
     }
     try {

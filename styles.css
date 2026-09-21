@@ -94,6 +94,7 @@
 .vam-collection-actions { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 6px; }
 .markdown-preview-view.visual-agent-map-node .metadata-container,
 body .workspace-leaf-content.vam-topic-markdown .markdown-source-view.mod-cm6 .metadata-container { display: none; }
+.workspace-leaf-content.vam-topic-markdown .inline-title { display: none; }
 @media (max-width: 900px) { .vam-map-tools > .vam-hint { display: none; } .vam-inspector { width: 260px; } }
 @media (max-width: 600px) { .vam-inspector { position: absolute; right: 0; top: 0; bottom: 0; width: min(300px, 85%); z-index: 5; box-shadow: -5px 0 20px rgba(0,0,0,0.1); } }
 

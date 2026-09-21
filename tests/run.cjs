@@ -601,7 +601,8 @@ test('missing Codex opens an in-product setup guide with official installation a
   assert.match(source, /不需要 API key/);
   assert.match(source, /獨立版 Codex CLI 不需要 npm/);
   assert.match(source, /在 Terminal 執行 codex/);
-  assert.match(source, /if \(!diagnostic\.installed\) \{ this\.openCodexSetupGuide\(\); return; \}/);
+  assert.match(source, /if \(showGuide\) this\.openCodexSetupGuide\(\)/);
+  assert.match(source, /this\.recheckCodex\(false\)/);
 });
 test('generated child filenames are migrated to their topic titles and maps stay linked', async () => {
   const { repo, app } = fixture(), mapPath = await repo.createMap('Filename migration'), mapDoc = await repo.readMap(mapPath);

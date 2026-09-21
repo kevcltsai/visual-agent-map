@@ -7,6 +7,8 @@ export type TopicState = "active" | "unassigned" | "archived" | "inbox";
 export type TopicCollection = "Notes" | "Unassigned" | "Archive";
 export type ReasoningLevel = "auto" | "low" | "medium" | "high";
 export type ResearchMode = "local" | "research";
+export type ResearchDepth = "fast" | "normal" | "deep";
+export type VisualMode = "auto" | "on" | "off";
 export interface VisualReference { title: string; imageUrl: string; sourceUrl: string; description: string; palette: string[]; formula: string }
 export interface Note {
   title: string;
@@ -21,6 +23,8 @@ export interface Note {
   modelSource: ModelSource;
   reasoning?: ReasoningLevel;
   researchMode: ResearchMode;
+  researchDepth: ResearchDepth;
+  visualMode: VisualMode;
   status: Status;
   mapId: string;
   topicId: string;
@@ -326,6 +330,8 @@ export class Repository {
       modelSource: ["workspace", "inherited", "manual"].includes(source) ? source as ModelSource : "workspace",
       reasoning: normalizeReasoningLevel(fm["reasoning-level"] ?? this.settings.cliReasoning),
       researchMode: fm["research-mode"] === "local" ? "local" : "research",
+      researchDepth: fm["research-depth"] === "fast" || fm["research-depth"] === "deep" ? fm["research-depth"] : "normal",
+      visualMode: fm["visual-mode"] === "on" || fm["visual-mode"] === "off" ? fm["visual-mode"] : "auto",
       status: ["idea", "running", "completed", "error"].includes(normalized) ? normalized as Status : "idea",
       mapId: text(fm["agent-map-id"]),
       topicId: text(fm["topic-id"], text(fm["agent-map-id"])),
@@ -342,6 +348,8 @@ export class Repository {
       if (patch.modelSource !== undefined) fm["model-source"] = patch.modelSource;
       if (patch.reasoning !== undefined) fm["reasoning-level"] = normalizeReasoningLevel(patch.reasoning);
       if (patch.researchMode !== undefined) fm["research-mode"] = patch.researchMode;
+      if (patch.researchDepth !== undefined) fm["research-depth"] = patch.researchDepth;
+      if (patch.visualMode !== undefined) fm["visual-mode"] = patch.visualMode;
       if (patch.mapId !== undefined) patch.mapId ? fm["agent-map-id"] = patch.mapId : delete fm["agent-map-id"];
       if (patch.topicId !== undefined) patch.topicId ? fm["topic-id"] = patch.topicId : delete fm["topic-id"];
       if (patch.topicState !== undefined) fm["topic-state"] = patch.topicState;

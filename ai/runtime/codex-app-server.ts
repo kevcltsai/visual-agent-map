@@ -140,6 +140,7 @@ export class CodexAppServerRuntime {
         input: [{ type: "text", text: prompt, text_elements: [] }],
         model: model || null,
         effort: effort || "low",
+        sandboxPolicy: { type: "readOnly", networkAccess: false },
         outputSchema
       }) as { turn?: { id?: unknown } };
       state.turnId = typeof startedTurn.turn?.id === "string" ? startedTurn.turn.id : "";

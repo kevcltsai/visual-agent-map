@@ -1,5 +1,20 @@
 # Changelog
 
+## [0.9.0] - 2026-09-22
+
+### Added
+
+- Added Fast, Normal, and Deep research depth independently of Codex reasoning effort, plus Auto, On, and Off visual-reference controls.
+- Added per-task source selection from the current Vault, another Vault or folder, or individual Markdown files; offline tasks explicitly report insufficient evidence.
+- Added an optional two-level shallow subtopic map with a review step before any nodes are created.
+- Added reviewable synthesis drafts before a parent topic is updated or a new integrated topic is created.
+
+### Changed
+
+- Consolidated overlapping AI actions into research, subtopic expansion, synthesis, and custom tasks.
+- Replaced the node context menu for manual child creation with a visible plus button.
+- Child expansion now receives existing subtopics so it can avoid duplicate proposals, and selected source material is retained ahead of older long-form detail when task context is trimmed.
+
 ## [0.8.1] - 2026-09-21
 
 ### Fixed

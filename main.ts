@@ -419,6 +419,7 @@ export class NextStepModal extends Modal {
     };
     show("research");
     this.renderModelSettings();
+    this.contentEl.createEl("p", { text: t("AI 任務超過 3 分鐘時，為避免長時間佔用資源，VAM 會嘗試中斷；未完成的結果不會套用。"), cls: "vam-hint" });
   }
 }
 class AiDraftModal extends Modal {

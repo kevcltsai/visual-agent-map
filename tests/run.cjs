@@ -374,6 +374,7 @@ test('Next Step returns new expansion requests to the map and reviews existing p
     async (options, _direction, found, _failed, createdMap) => { expandCalls++; if (options.multiLayer) { quickOptions = options; createdMap(); } else found([{ title: 'Transport', task: 'Compare', contribution: '', parentTitle: '' }], async items => { created = items; }); },
     async (options, angles, drafted) => { synthCalls++; synthOptions = options; angles([{ title: 'Shared constraints', task: 'Find tradeoffs', contribution: 'Across children' }], async () => { drafted({ summary: 'Draft', detail: 'Detail' }, async (summary, detail) => { saved = [summary, detail]; }); }); });
   modal.onOpen();
+  assert.ok(find(modal.contentEl, item => /3 分鐘.*避免長時間佔用資源/.test(item.text ?? '')));
   const [cards, research, expand, synthesize] = modal.contentEl.children.slice(1);
   assert.equal(all(research, item => item.tag === 'input' && (item.type === 'checkbox' || item.type === 'file')).length, 0);
   assert.equal(all(expand, item => item.tag === 'input' && item.type === 'file').length, 0);
@@ -416,7 +417,7 @@ test('Next Step returns new expansion requests to the map and reviews existing p
   let emptyOptions;
   const empty = new NextStepModal({}, 'No children', 'normal', 0, 0, plugin, async () => {}, async () => {}, async options => { synthCalls++; emptyOptions = options; });
   empty.onOpen(); empty.contentEl.children[1].children[2].click();
-  const emptyPanel = empty.contentEl.children.at(-1);
+  const emptyPanel = empty.contentEl.children[4];
   assert.match(emptyPanel.children[1].text, /沒有直屬子議題/);
   button(emptyPanel, '先取得整合建議').click(); await tick();
   assert.equal(synthCalls, 1);
@@ -495,7 +496,7 @@ test('Next Step returns new expansion requests to the map and reviews existing p
     async () => { researchAfterSave = settingsWrites.length === 2; }, async () => {}, async () => {},
     { model: 'model-a', modelSource: 'workspace', reasoning: 'low', save: async patch => { settingsWrites.push(patch); } });
   settingsModal.onOpen();
-  assert.equal(settingsModal.contentEl.children.at(-1).children[0].text, '模型與進階設定');
+  assert.equal(settingsModal.contentEl.children.find(item => item.cls.includes('vam-next-model')).children[0].text, '模型與進階設定');
   const modelSelect = find(settingsModal.contentEl, item => item['aria-label'] === '使用模型');
   const reasoningSelect = find(settingsModal.contentEl, item => item['aria-label'] === '推理等級');
   modelSelect.value = 'model-b'; modelSelect.change(); reasoningSelect.value = 'high'; reasoningSelect.change();
@@ -1602,11 +1603,12 @@ test('research budget sends one stop-search steer after three searches', async (
   try {
     assert.equal(await runtime.runTask('research', 'model', 'low', {}, { searchBudget: 3 }), 'answer');
     assert.equal(sent.filter(message => message.method === 'turn/steer').length, 1);
+    assert.equal(sent.filter(message => message.method === 'turn/interrupt').length, 0);
     assert.match(sent.find(message => message.method === 'turn/steer').params.input[0].text, /停止搜尋/);
   } finally { runtime.stop(); }
 });
 test('cancelling a Codex turn sends interrupt and rejects the result', async () => {
-  const { EventEmitter } = require('node:events'); const sent = [];
+  const { EventEmitter } = require('node:events'); const sent = [], timerDelays = [];
   const child = new EventEmitter(); child.stdout = new EventEmitter(); child.stderr = new EventEmitter(); child.kill = () => {};
   const emit = message => process.nextTick(() => child.stdout.emit('data', Buffer.from(`${JSON.stringify(message)}\n`)));
   child.stdin = { write: line => {
@@ -1617,15 +1619,46 @@ test('cancelling a Codex turn sends interrupt and rejects the result', async () 
     else if (message.method === 'turn/interrupt') { emit({ id: message.id, result: {} }); emit({ method: 'turn/completed', params: { threadId: 'thread-1', turn: { status: 'interrupted' } } }); }
     else if (message.method === 'thread/unsubscribe') emit({ id: message.id, result: {} });
   } };
-  const { CodexAppServerRuntime } = load('ai/runtime/codex-app-server.ts', { 'node:child_process': { spawn: () => child } });
+  const { CodexAppServerRuntime } = load('ai/runtime/codex-app-server.ts', { 'node:child_process': { spawn: () => child } }, { setTimeout: (callback, delay) => { timerDelays.push(delay); return setTimeout(callback, delay); } });
   const runtime = new CodexAppServerRuntime({ executable: 'codex', cwd: '/plugin', env: {}, clientVersion: 'test' });
   const controller = new AbortController();
   try {
     const pending = runtime.runTask('research', 'model', 'low', {}, { signal: controller.signal });
     while (!sent.some(message => message.method === 'turn/start')) await new Promise(resolve => setImmediate(resolve));
     await new Promise(resolve => setImmediate(resolve)); controller.abort();
+    assert.equal(timerDelays.at(-1), 30_000);
     await assert.rejects(pending, error => error.name === 'AbortError');
     assert.equal(sent.filter(message => message.method === 'turn/interrupt').length, 1);
+  } finally { runtime.stop(); }
+});
+for (const delayedStart of [false, true]) test(`timed-out Codex turn attempts one interrupt${delayedStart ? ' after a late turn/start reply' : ''}`, async () => {
+  const { EventEmitter } = require('node:events'); const sent = [], logs = []; let turnTimeout, startRequest;
+  const child = new EventEmitter(); child.stdout = new EventEmitter(); child.stderr = new EventEmitter(); child.kill = () => {};
+  const emit = message => process.nextTick(() => child.stdout.emit('data', Buffer.from(`${JSON.stringify(message)}\n`)));
+  child.stdin = { write: line => {
+    const message = JSON.parse(line.trim()); sent.push(message);
+    if (message.method === 'initialize') emit({ id: message.id, result: {} });
+    else if (message.method === 'thread/start') emit({ id: message.id, result: { thread: { id: 'thread-1' } } });
+    else if (message.method === 'turn/start') { startRequest = message.id; if (!delayedStart) emit({ id: message.id, result: { turn: { id: 'turn-1' } } }); }
+    else if (message.method === 'turn/interrupt') emit({ id: message.id, error: { message: 'interrupt unavailable' } });
+    else if (message.method === 'thread/unsubscribe') emit({ id: message.id, result: {} });
+  } };
+  const windowValues = {
+    setTimeout: (callback, delay) => delay === 180_000 ? (turnTimeout = callback, 1) : setTimeout(callback, delay),
+    clearTimeout: timer => { if (timer !== 1) clearTimeout(timer); }
+  };
+  const { CodexAppServerRuntime } = load('ai/runtime/codex-app-server.ts', { 'node:child_process': { spawn: () => child } }, windowValues);
+  const runtime = new CodexAppServerRuntime({ executable: 'codex', cwd: '/plugin', env: {}, clientVersion: 'test', onLog: (level, message) => logs.push([level, message]) });
+  try {
+    const pending = runtime.runTask('research', 'model', 'low', {});
+    while (!startRequest || !turnTimeout) await new Promise(resolve => setImmediate(resolve));
+    if (!delayedStart) await new Promise(resolve => setImmediate(resolve));
+    turnTimeout();
+    if (delayedStart) emit({ id: startRequest, result: { turn: { id: 'turn-1' } } });
+    await assert.rejects(pending, /AI 任務超過 3 分鐘.*避免長時間佔用資源.*未完成的結果不會套用/);
+    assert.equal(sent.filter(message => message.method === 'turn/interrupt').length, 1);
+    await new Promise(resolve => setImmediate(resolve));
+    assert.equal(logs.filter(([level, message]) => level === 'warn' && message.includes('逾時後無法停止 AI 任務')).length, 1);
   } finally { runtime.stop(); }
 });
 test('Codex App Server declines unsupported interaction requests instead of hanging', async () => {

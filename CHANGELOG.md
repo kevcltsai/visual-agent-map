@@ -1,5 +1,11 @@
 # Changelog
 
+## [0.9.3] - 2026-09-22
+
+### Changed
+
+- AI tasks now time out after 3 minutes. VAM attempts to interrupt an overdue Codex turn to avoid continued background resource use, does not apply an incomplete result, and explains the reason in the task error.
+
 ## [0.9.2] - 2026-09-22
 
 ### Fixed

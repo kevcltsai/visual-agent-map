@@ -373,6 +373,8 @@ var english = {
   "CLI \u6A21\u5F0F\u53EA\u652F\u63F4\u684C\u9762\u7248 Obsidian": "CLI mode requires desktop Obsidian",
   "\u627E\u4E0D\u5230\u5916\u639B\u76EE\u9304": "Plugin folder not found",
   "Codex CLI \u57F7\u884C\u8D85\u904E 15 \u5206\u9418": "Codex CLI exceeded 15 minutes",
+  "AI \u4EFB\u52D9\u8D85\u904E 3 \u5206\u9418\u6642\uFF0C\u70BA\u907F\u514D\u9577\u6642\u9593\u4F54\u7528\u8CC7\u6E90\uFF0CVAM \u6703\u5617\u8A66\u4E2D\u65B7\uFF1B\u672A\u5B8C\u6210\u7684\u7D50\u679C\u4E0D\u6703\u5957\u7528\u3002": "If an AI task exceeds 3 minutes, VAM attempts to interrupt it to avoid prolonged resource use. Incomplete results are not applied.",
+  "AI \u4EFB\u52D9\u8D85\u904E 3 \u5206\u9418\uFF0C\u70BA\u907F\u514D\u9577\u6642\u9593\u4F54\u7528\u8CC7\u6E90\uFF0CVAM \u6703\u5617\u8A66\u4E2D\u65B7\u3002\u672A\u5B8C\u6210\u7684\u7D50\u679C\u4E0D\u6703\u5957\u7528\uFF1B\u8ACB\u7E2E\u5C0F\u4EFB\u52D9\u7BC4\u570D\u5F8C\u91CD\u8A66\u3002": "The AI task exceeded 3 minutes. VAM attempts to interrupt it to avoid prolonged resource use. Incomplete results are not applied; try a smaller task.",
   "Claude Code \u5DF2\u4E0D\u518D\u652F\u63F4\u3002\u8ACB\u5728\u8B70\u984C\u8A2D\u5B9A\u4E2D\u9078\u64C7 Codex model\u3002": "Claude Code is no longer supported. Choose a Codex model in the topic settings.",
   "\u5EFA\u7ACB\u5FC3\u667A\u5716\u5931\u6557\uFF1A{0}\u3002\u8ACB\u6AA2\u67E5 vault \u5F8C\u91CD\u8A66\u3002": "Could not create the mind map: {0}. Check the vault and try again.",
   "\u5C07\u6574\u5408 {0} \u500B\u4F86\u6E90\u8B70\u984C\uFF0CAI \u6703\u8B80\u53D6\u5B8C\u6574\u77E5\u8B58\u5167\u5BB9\u4E26\u5EFA\u7ACB\u65B0\u7684\u6839\u8B70\u984C\u3002": "Synthesize {0} source topics. AI reads their full knowledge and creates a new root topic.",
@@ -2022,7 +2024,7 @@ var response_schema_default = {
 var import_node_child_process = require("node:child_process");
 var spawnProcess = import_node_child_process.spawn;
 var CONTROL_TIMEOUT_MS = 3e4;
-var TURN_TIMEOUT_MS = 15 * 60 * 1e3;
+var TURN_TIMEOUT_MS = 3 * 60 * 1e3;
 function cancelledError() {
   const error = new Error("AI \u4EFB\u52D9\u5DF2\u53D6\u6D88");
   error.name = "AbortError";
@@ -2112,22 +2114,28 @@ var CodexAppServerRuntime = class {
     });
     const threadId = typeof ((_c = started.thread) == null ? void 0 : _c.id) === "string" ? started.thread.id : "";
     if (!threadId) throw new Error("Codex App Server \u6C92\u6709\u5EFA\u7ACB thread");
+    let timedOut = false, interruptRequested = false;
     const completed = new Promise((resolve, reject) => {
       var _a2;
       const timeout = window.setTimeout(() => {
         this.turns.delete(threadId);
-        reject(new Error("Codex App Server turn \u5728 15 \u5206\u9418\u5167\u6C92\u6709\u5B8C\u6210"));
+        timedOut = true;
+        interrupt(5e3, "\u903E\u6642\u5F8C\u7121\u6CD5\u505C\u6B62 AI \u4EFB\u52D9");
+        reject(new Error(t("AI \u4EFB\u52D9\u8D85\u904E 3 \u5206\u9418\uFF0C\u70BA\u907F\u514D\u9577\u6642\u9593\u4F54\u7528\u8CC7\u6E90\uFF0CVAM \u6703\u5617\u8A66\u4E2D\u65B7\u3002\u672A\u5B8C\u6210\u7684\u7D50\u679C\u4E0D\u6703\u5957\u7528\uFF1B\u8ACB\u7E2E\u5C0F\u4EFB\u52D9\u7BC4\u570D\u5F8C\u91CD\u8A66\u3002")));
       }, TURN_TIMEOUT_MS);
       this.turns.set(threadId, { messages: [], resolve, reject, timeout, turnId: "", searches: 0, searchBudget: (_a2 = controls == null ? void 0 : controls.searchBudget) != null ? _a2 : 0, steered: false });
     });
     const state = this.turns.get(threadId);
-    const interrupt = () => {
-      if (state.turnId) void this.request("turn/interrupt", { threadId, turnId: state.turnId }).catch((error) => {
+    const interrupt = (timeoutMs = CONTROL_TIMEOUT_MS, failure = "\u53D6\u6D88 AI \u4EFB\u52D9\u5931\u6557") => {
+      if (!state.turnId || interruptRequested) return;
+      interruptRequested = true;
+      void this.request("turn/interrupt", { threadId, turnId: state.turnId }, timeoutMs).catch((error) => {
         var _a2, _b2;
-        return (_b2 = (_a2 = this.options).onLog) == null ? void 0 : _b2.call(_a2, "warn", `\u53D6\u6D88 AI \u4EFB\u52D9\u5931\u6557\uFF1A${error instanceof Error ? error.message : String(error)}`);
+        return (_b2 = (_a2 = this.options).onLog) == null ? void 0 : _b2.call(_a2, "warn", `${failure}\uFF1A${error instanceof Error ? error.message : String(error)}`);
       });
     };
-    (_d = controls == null ? void 0 : controls.signal) == null ? void 0 : _d.addEventListener("abort", interrupt, { once: true });
+    const onAbort = () => interrupt();
+    (_d = controls == null ? void 0 : controls.signal) == null ? void 0 : _d.addEventListener("abort", onAbort, { once: true });
     try {
       if ((_e = controls == null ? void 0 : controls.signal) == null ? void 0 : _e.aborted) throw cancelledError();
       const turnRequest = {
@@ -2141,7 +2149,8 @@ var CodexAppServerRuntime = class {
       (_f = controls == null ? void 0 : controls.onRequest) == null ? void 0 : _f.call(controls, turnRequest);
       const startedTurn = await this.request("turn/start", turnRequest);
       state.turnId = typeof ((_g = startedTurn.turn) == null ? void 0 : _g.id) === "string" ? startedTurn.turn.id : "";
-      if ((_h = controls == null ? void 0 : controls.signal) == null ? void 0 : _h.aborted) interrupt();
+      if (timedOut) interrupt(5e3, "\u903E\u6642\u5F8C\u7121\u6CD5\u505C\u6B62 AI \u4EFB\u52D9");
+      else if ((_h = controls == null ? void 0 : controls.signal) == null ? void 0 : _h.aborted) interrupt();
       this.steerIfNeeded(threadId, state);
       const answer = await completed;
       if ((_i = controls == null ? void 0 : controls.signal) == null ? void 0 : _i.aborted) throw cancelledError();
@@ -2157,7 +2166,7 @@ var CodexAppServerRuntime = class {
       if ((_j = controls == null ? void 0 : controls.signal) == null ? void 0 : _j.aborted) throw cancelledError();
       throw error;
     } finally {
-      (_k = controls == null ? void 0 : controls.signal) == null ? void 0 : _k.removeEventListener("abort", interrupt);
+      (_k = controls == null ? void 0 : controls.signal) == null ? void 0 : _k.removeEventListener("abort", onAbort);
       try {
         await this.request("thread/unsubscribe", { threadId }, 5e3);
       } catch (error) {
@@ -2973,6 +2982,7 @@ var NextStepModal = class extends import_obsidian5.Modal {
     };
     show("research");
     this.renderModelSettings();
+    this.contentEl.createEl("p", { text: t("AI \u4EFB\u52D9\u8D85\u904E 3 \u5206\u9418\u6642\uFF0C\u70BA\u907F\u514D\u9577\u6642\u9593\u4F54\u7528\u8CC7\u6E90\uFF0CVAM \u6703\u5617\u8A66\u4E2D\u65B7\uFF1B\u672A\u5B8C\u6210\u7684\u7D50\u679C\u4E0D\u6703\u5957\u7528\u3002"), cls: "vam-hint" });
   }
 };
 var AiDraftModal = class extends import_obsidian5.Modal {

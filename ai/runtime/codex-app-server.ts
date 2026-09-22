@@ -1,4 +1,5 @@
 import { spawn as nodeSpawn } from "node:child_process";
+import { t } from "../../i18n";
 
 type ProcessEnvironment = Record<string, string | undefined>;
 interface NodeChunk { toString(encoding?: string): string }
@@ -45,7 +46,7 @@ interface PendingRequest { resolve: (value: unknown) => void; reject: (error: Er
 interface TurnState { messages: string[]; resolve: (text: string) => void; reject: (error: Error) => void; timeout: number; turnId: string; searches: number; searchBudget: number; steered: boolean }
 
 const CONTROL_TIMEOUT_MS = 30_000;
-const TURN_TIMEOUT_MS = 15 * 60 * 1000;
+const TURN_TIMEOUT_MS = 3 * 60 * 1000;
 function cancelledError(): Error { const error = new Error("AI 任務已取消"); error.name = "AbortError"; return error; }
 
 export class CodexAppServerRuntime {
@@ -123,16 +124,24 @@ export class CodexAppServerRuntime {
     const threadId = typeof started.thread?.id === "string" ? started.thread.id : "";
     if (!threadId) throw new Error("Codex App Server 沒有建立 thread");
 
+    let timedOut = false, interruptRequested = false;
     const completed = new Promise<string>((resolve, reject) => {
       const timeout = window.setTimeout(() => {
         this.turns.delete(threadId);
-        reject(new Error("Codex App Server turn 在 15 分鐘內沒有完成"));
+        timedOut = true;
+        interrupt(5_000, "逾時後無法停止 AI 任務");
+        reject(new Error(t("AI 任務超過 3 分鐘，為避免長時間佔用資源，VAM 會嘗試中斷。未完成的結果不會套用；請縮小任務範圍後重試。")));
       }, TURN_TIMEOUT_MS);
       this.turns.set(threadId, { messages: [], resolve, reject, timeout, turnId: "", searches: 0, searchBudget: controls?.searchBudget ?? 0, steered: false });
     });
     const state = this.turns.get(threadId)!;
-    const interrupt = (): void => { if (state.turnId) void this.request("turn/interrupt", { threadId, turnId: state.turnId }).catch(error => this.options.onLog?.("warn", `取消 AI 任務失敗：${error instanceof Error ? error.message : String(error)}`)); };
-    controls?.signal?.addEventListener("abort", interrupt, { once: true });
+    const interrupt = (timeoutMs = CONTROL_TIMEOUT_MS, failure = "取消 AI 任務失敗"): void => {
+      if (!state.turnId || interruptRequested) return;
+      interruptRequested = true;
+      void this.request("turn/interrupt", { threadId, turnId: state.turnId }, timeoutMs).catch(error => this.options.onLog?.("warn", `${failure}：${error instanceof Error ? error.message : String(error)}`));
+    };
+    const onAbort = (): void => interrupt();
+    controls?.signal?.addEventListener("abort", onAbort, { once: true });
     try {
       if (controls?.signal?.aborted) throw cancelledError();
       const turnRequest = {
@@ -146,7 +155,8 @@ export class CodexAppServerRuntime {
       controls?.onRequest?.(turnRequest);
       const startedTurn = await this.request("turn/start", turnRequest) as { turn?: { id?: unknown } };
       state.turnId = typeof startedTurn.turn?.id === "string" ? startedTurn.turn.id : "";
-      if (controls?.signal?.aborted) interrupt();
+      if (timedOut) interrupt(5_000, "逾時後無法停止 AI 任務");
+      else if (controls?.signal?.aborted) interrupt();
       this.steerIfNeeded(threadId, state);
       const answer = await completed;
       if (controls?.signal?.aborted) throw cancelledError();
@@ -158,7 +168,7 @@ export class CodexAppServerRuntime {
       if (controls?.signal?.aborted) throw cancelledError();
       throw error;
     } finally {
-      controls?.signal?.removeEventListener("abort", interrupt);
+      controls?.signal?.removeEventListener("abort", onAbort);
       try { await this.request("thread/unsubscribe", { threadId }, 5_000); }
       catch (error) { this.options.onLog?.("warn", `Codex App Server 無法取消 thread 訂閱：${error instanceof Error ? error.message : String(error)}`); }
     }

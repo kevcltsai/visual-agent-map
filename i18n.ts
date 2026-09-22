@@ -335,6 +335,8 @@ const english: Record<string, string> = {
   "CLI 模式只支援桌面版 Obsidian": "CLI mode requires desktop Obsidian",
   "找不到外掛目錄": "Plugin folder not found",
   "Codex CLI 執行超過 15 分鐘": "Codex CLI exceeded 15 minutes",
+  "AI 任務超過 3 分鐘時，為避免長時間佔用資源，VAM 會嘗試中斷；未完成的結果不會套用。": "If an AI task exceeds 3 minutes, VAM attempts to interrupt it to avoid prolonged resource use. Incomplete results are not applied.",
+  "AI 任務超過 3 分鐘，為避免長時間佔用資源，VAM 會嘗試中斷。未完成的結果不會套用；請縮小任務範圍後重試。": "The AI task exceeded 3 minutes. VAM attempts to interrupt it to avoid prolonged resource use. Incomplete results are not applied; try a smaller task.",
   "Claude Code 已不再支援。請在議題設定中選擇 Codex model。": "Claude Code is no longer supported. Choose a Codex model in the topic settings.",
   "建立心智圖失敗：{0}。請檢查 vault 後重試。": "Could not create the mind map: {0}. Check the vault and try again.",
   "將整合 {0} 個來源議題，AI 會讀取完整知識內容並建立新的根議題。": "Synthesize {0} source topics. AI reads their full knowledge and creates a new root topic.",

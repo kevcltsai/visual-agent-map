@@ -5,7 +5,10 @@ export type Status = "idea" | "running" | "completed" | "error";
 export type ModelSource = "workspace" | "inherited" | "manual";
 export type TopicState = "active" | "unassigned" | "archived" | "inbox";
 export type TopicCollection = "Notes" | "Unassigned" | "Archive";
-export type ReasoningLevel = "low" | "medium" | "high";
+export type ReasoningLevel = "auto" | "low" | "medium" | "high";
+export type ResearchMode = "local" | "research";
+export type ResearchDepth = "fast" | "normal" | "deep";
+export type VisualMode = "auto" | "on" | "off";
 export interface VisualReference { title: string; imageUrl: string; sourceUrl: string; description: string; palette: string[]; formula: string }
 export interface Note {
   title: string;
@@ -19,6 +22,9 @@ export interface Note {
   model: string;
   modelSource: ModelSource;
   reasoning?: ReasoningLevel;
+  researchMode: ResearchMode;
+  researchDepth: ResearchDepth;
+  visualMode: VisualMode;
   status: Status;
   mapId: string;
   topicId: string;
@@ -44,6 +50,7 @@ export interface Settings {
   structureVersion: number;
   firstUseNoticeSeen: boolean;
   codexUsageNoticeSeen: boolean;
+  aiExchangeLoggingEnabled: boolean;
   workspaceInitialized: boolean;
   sampleTourVersionSeen: number;
 }
@@ -71,12 +78,13 @@ export const DEFAULT_SETTINGS: Settings = {
   structureVersion: 2,
   firstUseNoticeSeen: false,
   codexUsageNoticeSeen: false,
+  aiExchangeLoggingEnabled: false,
   workspaceInitialized: false,
   sampleTourVersionSeen: 0
 };
 
 export function normalizeReasoningLevel(value: unknown): ReasoningLevel {
-  return value === "medium" || value === "high" ? value : "low";
+  return value === "auto" || value === "medium" || value === "high" ? value : "low";
 }
 
 const REFERENCE_START = "<!-- visual-agent-map:references:start -->";
@@ -323,6 +331,9 @@ export class Repository {
       model: text(fm.model, this.settings.cliModel),
       modelSource: ["workspace", "inherited", "manual"].includes(source) ? source as ModelSource : "workspace",
       reasoning: normalizeReasoningLevel(fm["reasoning-level"] ?? this.settings.cliReasoning),
+      researchMode: fm["research-mode"] === "local" ? "local" : "research",
+      researchDepth: fm["research-depth"] === "fast" || fm["research-depth"] === "deep" ? fm["research-depth"] : "normal",
+      visualMode: fm["visual-mode"] === "on" || fm["visual-mode"] === "off" ? fm["visual-mode"] : "auto",
       status: ["idea", "running", "completed", "error"].includes(normalized) ? normalized as Status : "idea",
       mapId: text(fm["agent-map-id"]),
       topicId: text(fm["topic-id"], text(fm["agent-map-id"])),
@@ -338,6 +349,9 @@ export class Repository {
       for (const key of ["title", "summary", "model", "status"] as const) if (patch[key] !== undefined) fm[key] = patch[key];
       if (patch.modelSource !== undefined) fm["model-source"] = patch.modelSource;
       if (patch.reasoning !== undefined) fm["reasoning-level"] = normalizeReasoningLevel(patch.reasoning);
+      if (patch.researchMode !== undefined) fm["research-mode"] = patch.researchMode;
+      if (patch.researchDepth !== undefined) fm["research-depth"] = patch.researchDepth;
+      if (patch.visualMode !== undefined) fm["visual-mode"] = patch.visualMode;
       if (patch.mapId !== undefined) patch.mapId ? fm["agent-map-id"] = patch.mapId : delete fm["agent-map-id"];
       if (patch.topicId !== undefined) patch.topicId ? fm["topic-id"] = patch.topicId : delete fm["topic-id"];
       if (patch.topicState !== undefined) fm["topic-state"] = patch.topicState;
@@ -391,6 +405,23 @@ export class Repository {
       cssclasses: [NOTE_CSS_CLASS]
     };
     await this.app.vault.create(path, `---\n${stringifyYaml(metadata)}---\n${noteBody(title, "尚未形成結論")}`);
+    return { id, path, parentId: null, x: 80, y: 80, collapsed: false };
+  }
+
+  async duplicateNote(sourcePath: string, map: MapDocument, mapPath: string): Promise<MapNode> {
+    const folder = this.topicFolder(mapPath, "Notes");
+    await this.ensureTopicFolders(this.topicRoot(mapPath));
+    const source = await this.app.vault.read(this.file(sourcePath));
+    const metadata = frontmatter(source);
+    const title = `${text(metadata.title, this.file(sourcePath).basename)} 副本`;
+    const id = crypto.randomUUID(), path = this.unique(folder, title);
+    metadata["node-id"] = id;
+    metadata["topic-id"] = map.id;
+    metadata["agent-map-id"] = map.id;
+    metadata["topic-state"] = "active";
+    metadata.title = title;
+    const body = source.replace(/^---\r?\n[\s\S]*?\r?\n---(?:\r?\n|$)/, "").replace(/^# .*$/m, `# ${title}`);
+    await this.app.vault.create(path, `---\n${stringifyYaml(metadata)}---\n${body}`);
     return { id, path, parentId: null, x: 80, y: 80, collapsed: false };
   }
 

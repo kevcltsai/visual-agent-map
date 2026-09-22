@@ -1,5 +1,24 @@
 # Changelog
 
+## [0.9.1] - 2026-09-22
+
+### Added
+
+- Added Fast, Normal, and Deep research depth independently of Codex reasoning effort.
+- Added guided subtopic suggestions with confirmation, and quick maps with an exact first-layer count and children per parent. Requests above 15 topics show an immediate error; incomplete or uneven AI trees cannot change the map.
+- Added optional shallow research after creating children, reviewable synthesis drafts, and selected Markdown notes as additional synthesis sources.
+- Added branch and whole-map auto layout, topic batch actions, and opt-in AI request and reply logging in the debug log.
+
+### Changed
+
+- Topic cards now open their Markdown note directly; the star opens Research, Expand Map, and Synthesize in one window, while the gear opens structure and links.
+- Research and expansion use web-enabled Codex tasks without a web-search control. Synthesis uses local child topics and selected Markdown notes without a web-search control.
+- The plus button beside a node creates a manual child. AI expansion considers existing children to avoid duplicate proposals.
+
+## [0.9.0] - 2026-09-22
+
+Withdrawn prerelease. Its feature descriptions are superseded by 0.9.1.
+
 ## [0.8.1] - 2026-09-21
 
 ### Fixed

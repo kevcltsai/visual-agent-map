@@ -39,17 +39,17 @@ VAM never installs or updates Codex CLI for you.
 
 1. Explore the built-in read-only sample and its five-step tour.
 2. After Codex is ready, select **Duplicate to my workspace** to start from the sample, or **Create empty mind map**.
-3. Select a topic and choose **Next step** to run your first AI task.
+3. Select the star on a topic card to open **Next step** and choose your first AI task.
 4. Before that first task runs, VAM shows a one-time notice that AI tasks use your signed-in account's Codex allowance. Canceling does not dismiss the notice permanently.
 
-You are ready when you can open an editable map, select a Codex model, and see **Next step** on a topic.
+You are ready when you can open an editable map and use the star on a topic card to choose a Codex task and model.
 
 ## If setup does not complete
 
 - **Codex CLI not found:** enter its executable path in **Settings → Visual Agent Map → Codex CLI path**, then select **Recheck**.
 - **Authentication failure:** run `codex` in Terminal and sign in again.
 - **Workspace missing:** use **Find existing Workspace** or **Repair Agent Workspace** in VAM settings. Repair does not overwrite existing notes.
-- **Need diagnostics:** run **Open Debug Log** from the Obsidian Command Palette. Logs stay in memory and disappear after the plugin reloads.
+- **Need diagnostics:** run **Open Debug Log** from the Obsidian Command Palette. Runtime messages stay in memory. AI request and reply logging is off by default; if you enable it in VAM settings, recent exchanges are saved in the vault's plugin folder and can be cleared.
 
 ---
 
@@ -94,14 +94,14 @@ VAM 不會自行安裝或更新 Codex CLI。
 
 1. 先探索內建唯讀範例與五步導覽。
 2. Codex 就緒後，選擇 **複製到我的工作區**，或選擇 **建立空白心智圖**。
-3. 選取議題，再選擇 **下一步**，執行第一個 AI 任務。
+3. 點議題卡片上的星星，開啟 **下一步** 並選擇第一個 AI 任務。
 4. 第一次任務執行前，VAM 會一次性提醒 AI 任務會使用登入帳號的 Codex 額度。若取消，下一次執行仍會顯示提醒。
 
-當你能開啟可編輯的心智圖、選擇 Codex model，並在議題上看到 **下一步**，就代表設定完成。
+當你能開啟可編輯的心智圖，並從議題卡片的星星選擇 Codex 任務與模型，就代表設定完成。
 
 ## 設定沒有完成時
 
 - **找不到 Codex CLI：** 到 **Settings → Visual Agent Map → Codex CLI 路徑** 填入執行檔路徑，再選擇 **重新檢查**。
 - **登入失敗：** 在 Terminal 執行 `codex` 並重新登入。
 - **Workspace 遺失：** 在 VAM settings 使用 **找回既有 Workspace** 或 **修復 Agent Workspace**。修復不會覆寫既有筆記。
-- **需要診斷資訊：** 從 Obsidian Command Palette 執行 **開啟偵錯日誌 (Open Debug Log)**。日誌只存在記憶體，重新載入外掛後會消失。
+- **需要診斷資訊：** 從 Obsidian Command Palette 執行 **開啟偵錯日誌 (Open Debug Log)**。一般執行訊息只保存在記憶體；AI 請求與回覆紀錄預設關閉，若於 VAM 設定啟用，最近的往返紀錄會保存在 Vault 的外掛資料夾，且可清除。

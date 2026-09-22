@@ -1,4 +1,4 @@
-import { copyFileSync, cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, statSync, writeFileSync } from "node:fs";
+import { copyFileSync, cpSync, existsSync, mkdirSync, readFileSync, readdirSync, statSync, writeFileSync } from "node:fs";
 import { createHash } from "node:crypto";
 import { tmpdir } from "node:os";
 import { join, relative } from "node:path";
@@ -11,10 +11,28 @@ if (!["onboarding", "normal", "reinstall"].includes(requested)) throw new Error(
 const artifact = process.env.VAM_TEST_ARTIFACT_DIR || root;
 const assets = ["main.js", "manifest.json", "styles.css"];
 for (const name of assets) if (!existsSync(join(artifact, name))) throw new Error(`Missing release asset ${name} in ${artifact}`);
+const artifactVersion = JSON.parse(readFileSync(join(artifact, "manifest.json"), "utf8")).version;
+const targetVersion = process.env.VAM_TEST_TARGET_VERSION;
+if (!targetVersion && !process.env.VAM_TEST_ARTIFACT_DIR) {
+  throw new Error("Set VAM_TEST_TARGET_VERSION to the development target (for example, 0.9.2), or set VAM_TEST_ARTIFACT_DIR for a release artifact.");
+}
+if (targetVersion && !/^\d+\.\d+\.\d+$/.test(targetVersion)) {
+  throw new Error(`Invalid development target version: ${targetVersion}`);
+}
+const version = targetVersion || artifactVersion;
+if (typeof version !== "string" || !/^\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?$/.test(version)) {
+  throw new Error(`Invalid test Vault version: ${version}`);
+}
 
 const vaultParent = process.env.VAM_TEST_VAULT_PARENT || tmpdir();
 mkdirSync(vaultParent, { recursive: true });
-const vault = mkdtempSync(join(vaultParent, `vam-${requested}-`));
+const vault = join(vaultParent, `vam-${version}${targetVersion ? "-preview" : ""}`);
+try {
+  mkdirSync(vault);
+} catch (error) {
+  if (error.code === "EEXIST") throw new Error(`Test Vault already exists: ${vault}. Reuse it or move it aside after checking its contents.`, { cause: error });
+  throw error;
+}
 const config = join(vault, ".ob" + "sidian");
 const plugin = join(config, "plugins/visual-agent-map");
 mkdirSync(plugin, { recursive: true });

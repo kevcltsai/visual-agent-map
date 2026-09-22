@@ -1,5 +1,11 @@
 # Changelog
 
+## [0.9.2] - 2026-09-22
+
+### Fixed
+
+- Editing a topic note's Markdown `#` heading now updates its map card title. Later note writes and data rebuilds keep that title.
+
 ## [0.9.1] - 2026-09-22
 
 ### Added

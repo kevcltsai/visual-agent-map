@@ -118,6 +118,11 @@ function frontmatter(content: string): Record<string, unknown> {
   return yaml ? (parseYaml(yaml) ?? {}) as Record<string, unknown> : {};
 }
 
+function noteTitle(content: string, fm: Record<string, unknown>, fallback: string): string {
+  const body = content.replace(/^---\r?\n[\s\S]*?\r?\n---(?:\r?\n|$)/, "");
+  return /^# (.+)$/m.exec(body)?.[1]?.trim() || text(fm.title, fallback);
+}
+
 type NoteSection = "Current Summary" | "Prompt" | "Rules" | "Detail" | "Visual References" | "Working Findings" | "New Findings" | "預覽" | "User Notes";
 
 function sectionBounds(content: string, heading: NoteSection): { start: number; end: number } | null {
@@ -320,7 +325,7 @@ export class Repository {
     const source = text(fm["model-source"], "workspace");
     const state = text(fm["topic-state"], path.includes("/Archive/") ? "archived" : path.includes("/Unassigned/") ? "unassigned" : path.startsWith(`${this.settings.inboxFolder}/`) ? "inbox" : "active");
     return {
-      title: text(fm.title, file.basename),
+      title: noteTitle(content, fm, file.basename),
       summary: section(content, "Current Summary") || text(fm.summary, "尚未形成結論"),
       prompt: section(content, "Prompt"),
       rules: section(content, "Rules"),
@@ -346,7 +351,8 @@ export class Repository {
     await this.app.vault.process(this.file(path), content => {
       const fm = frontmatter(content);
       ensureNoteCssClass(fm);
-      for (const key of ["title", "summary", "model", "status"] as const) if (patch[key] !== undefined) fm[key] = patch[key];
+      fm.title = patch.title ?? noteTitle(content, fm, baseName(path).replace(/\.md$/, ""));
+      for (const key of ["summary", "model", "status"] as const) if (patch[key] !== undefined) fm[key] = patch[key];
       if (patch.modelSource !== undefined) fm["model-source"] = patch.modelSource;
       if (patch.reasoning !== undefined) fm["reasoning-level"] = normalizeReasoningLevel(patch.reasoning);
       if (patch.researchMode !== undefined) fm["research-mode"] = patch.researchMode;
@@ -618,6 +624,7 @@ export class Repository {
       const content = await this.app.vault.read(file), fm = frontmatter(content);
       if (!marker(fm["agent-map-node"])) continue;
       ensureNoteCssClass(fm);
+      fm.title = noteTitle(content, fm, file.basename);
       const owner = ownership.get(file.path);
       let state: TopicState = file.path.startsWith(`${this.settings.inboxFolder}/`) ? "inbox" : file.path.includes("/Archive/") ? "archived" : file.path.includes("/Unassigned/") ? "unassigned" : owner ? "active" : text(fm["topic-state"], "unassigned") as TopicState;
       if (owner) {

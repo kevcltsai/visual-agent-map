@@ -1030,6 +1030,11 @@ function frontmatter(content) {
   const yaml = (_a = content.match(/^---\r?\n([\s\S]*?)\r?\n---(?:\r?\n|$)/)) == null ? void 0 : _a[1];
   return yaml ? (_b = (0, import_obsidian4.parseYaml)(yaml)) != null ? _b : {} : {};
 }
+function noteTitle(content, fm, fallback) {
+  var _a, _b;
+  const body = content.replace(/^---\r?\n[\s\S]*?\r?\n---(?:\r?\n|$)/, "");
+  return ((_b = (_a = /^# (.+)$/m.exec(body)) == null ? void 0 : _a[1]) == null ? void 0 : _b.trim()) || text(fm.title, fallback);
+}
 function sectionBounds(content, heading) {
   if (heading === "Detail") {
     const managedStart = content.indexOf(DETAIL_START), managedEnd = content.indexOf(DETAIL_END);
@@ -1272,7 +1277,7 @@ var Repository = class {
     const source = text(fm["model-source"], "workspace");
     const state = text(fm["topic-state"], path.includes("/Archive/") ? "archived" : path.includes("/Unassigned/") ? "unassigned" : path.startsWith(`${this.settings.inboxFolder}/`) ? "inbox" : "active");
     return {
-      title: text(fm.title, file.basename),
+      title: noteTitle(content, fm, file.basename),
       summary: section(content, "Current Summary") || text(fm.summary, "\u5C1A\u672A\u5F62\u6210\u7D50\u8AD6"),
       prompt: section(content, "Prompt"),
       rules: section(content, "Rules"),
@@ -1295,9 +1300,11 @@ var Repository = class {
   }
   async updateNote(path, patch) {
     await this.app.vault.process(this.file(path), (content) => {
+      var _a;
       const fm = frontmatter(content);
       ensureNoteCssClass(fm);
-      for (const key of ["title", "summary", "model", "status"]) if (patch[key] !== void 0) fm[key] = patch[key];
+      fm.title = (_a = patch.title) != null ? _a : noteTitle(content, fm, baseName(path).replace(/\.md$/, ""));
+      for (const key of ["summary", "model", "status"]) if (patch[key] !== void 0) fm[key] = patch[key];
       if (patch.modelSource !== void 0) fm["model-source"] = patch.modelSource;
       if (patch.reasoning !== void 0) fm["reasoning-level"] = normalizeReasoningLevel(patch.reasoning);
       if (patch.researchMode !== void 0) fm["research-mode"] = patch.researchMode;
@@ -1586,6 +1593,7 @@ ${JSON.stringify(map, null, 2)}
       const content = await this.app.vault.read(file), fm = frontmatter(content);
       if (!marker(fm["agent-map-node"])) continue;
       ensureNoteCssClass(fm);
+      fm.title = noteTitle(content, fm, file.basename);
       const owner = ownership.get(file.path);
       let state = file.path.startsWith(`${this.settings.inboxFolder}/`) ? "inbox" : file.path.includes("/Archive/") ? "archived" : file.path.includes("/Unassigned/") ? "unassigned" : owner ? "active" : text(fm["topic-state"], "unassigned");
       if (owner) {

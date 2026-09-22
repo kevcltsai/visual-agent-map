@@ -34,12 +34,9 @@ This project is developed with [OpenAI Codex](https://openai.com/codex/) as a co
 
 Research and map expansion use web-enabled Codex tasks. Synthesis uses direct child topics and any Markdown notes selected for that run; it does not request web search. Fast, Normal and Deep set research depth separately from Codex reasoning effort. While a node task is running, **Stop research** interrupts its Codex turn and preserves the existing note.
 
-### What's new in 0.9.1
+### What's new in 0.9.2
 
-- Use the star on a topic card to choose Research, Expand Map, or Synthesize in one window.
-- Set the first-layer count and children per parent for a quick map. A live count blocks requests above 15 topics; incomplete or uneven AI trees are rejected before map changes.
-- Review suggested directions before creating topics, or optionally run shallow research after a quick map is built. Synthesis offers selected Markdown notes as additional sources.
-- Arrange a branch or the whole map automatically, select multiple topics for batch actions, and optionally inspect AI exchanges in the debug log.
+- Editing the main Markdown heading of a topic note now updates the title on its map card.
 
 See [CHANGELOG.md](CHANGELOG.md) for the complete version history.
 
@@ -47,7 +44,7 @@ See [CHANGELOG.md](CHANGELOG.md) for the complete version history.
 
 - Obsidian desktop `1.13.7` or later (the verified compatibility baseline for this release).
 - A local [Codex CLI](https://developers.openai.com/codex/cli/) installation signed in with ChatGPT. ChatGPT Free is supported with a smaller Codex allowance. Visual Agent Map does not require an API key; npm is only needed to build from source.
-- Desktop only. Current release: `0.9.1`.
+- Desktop only. Current release: `0.9.2`.
 
 ### Install
 
@@ -125,12 +122,9 @@ Visual Agent Map 是桌面版 Obsidian 外掛：用視覺化心智圖拆解複�
 
 研究與展開地圖使用可搜尋網頁的 Codex 任務。整合發現使用直屬子議題和本次選取的 Markdown 筆記，不要求網頁搜尋。快速／標準／深入研究深度與 Codex 推理等級分開設定。節點任務執行中可按「停止研究」，保留原筆記。
 
-### 0.9.1 更新內容
+### 0.9.2 更新內容
 
-- 點議題卡片的星星，在同一視窗選擇研究更深、展開地圖或整合發現。
-- 快速探索地圖可指定第一層數量與每個母議題的延伸數量；畫面即時計算總數，超過 15 個即阻止執行。AI 提案缺漏或分配不均時，在改動地圖前拒絕建立。
-- 可先檢查展開方向再建立子議題，或在快速地圖建立後選擇逐一淺研究；整合發現可選其他 Markdown 筆記作為來源。
-- 可整理分支或整張地圖、多選議題批次操作，並在啟用後於偵錯日誌查看 AI 往返紀錄。
+- 修改議題筆記的 Markdown 主標題後，心智圖上的卡片標題會同步更新。
 
 完整版本紀錄請見 [CHANGELOG.md](CHANGELOG.md)。
 
@@ -138,7 +132,7 @@ Visual Agent Map 是桌面版 Obsidian 外掛：用視覺化心智圖拆解複�
 
 - Obsidian 桌面版 `1.13.7` 或更新版本（本版本實際驗證的相容性基線）。
 - 已在本機安裝 [Codex CLI](https://developers.openai.com/codex/cli/) 並以 ChatGPT 登入。ChatGPT Free 可以使用，但 Codex 額度較少。Visual Agent Map 不需要 API key；只有從原始碼建置才需要 npm。
-- 僅支援桌面版。目前版本：`0.9.1`。
+- 僅支援桌面版。目前版本：`0.9.2`。
 
 ### 安裝
 

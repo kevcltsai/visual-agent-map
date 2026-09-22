@@ -557,6 +557,17 @@ test('current summary is editable in the Markdown body', async () => {
   contents.set(n.path, contents.get(n.path).replace('## Current Summary\n\nAI conclusion that can be edited', '## Current Summary\n\nUser-edited conclusion'));
   assert.equal((await repo.readNote(n.path)).summary, 'User-edited conclusion');
 });
+test('editing a note heading updates its card title and survives later note writes', async () => {
+  const { repo, contents } = fixture(); const n = await topicNote(repo, '新的子議題');
+  contents.set(n.path, contents.get(n.path).replace('# 新的子議題', '# 要如何推廣VAM'));
+  assert.equal((await repo.readNote(n.path)).title, '要如何推廣VAM');
+  await repo.updateNote(n.path, { summary: '新的摘要' });
+  assert.equal((await repo.readNote(n.path)).title, '要如何推廣VAM');
+  assert.match(contents.get(n.path), /title: "要如何推廣VAM"/);
+  assert.match(contents.get(n.path), /^# 要如何推廣VAM$/m);
+  await repo.rebuildDerivedData();
+  assert.equal((await repo.readNote(n.path)).title, '要如何推廣VAM');
+});
 test('visual references are stored inside the editable Detail section', async () => {
   const { repo, contents } = fixture(); const n = await topicNote(repo, 'Outfit');
   await repo.updateNote(n.path, { visualReferences: '### Navy + Beige\n\n![Navy + Beige](https://example.com/outfit.jpg)\n\n來源：https://example.com/page\n配色：navy / beige' });

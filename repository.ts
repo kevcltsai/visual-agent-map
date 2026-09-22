@@ -50,6 +50,7 @@ export interface Settings {
   structureVersion: number;
   firstUseNoticeSeen: boolean;
   codexUsageNoticeSeen: boolean;
+  aiExchangeLoggingEnabled: boolean;
   workspaceInitialized: boolean;
   sampleTourVersionSeen: number;
 }
@@ -77,6 +78,7 @@ export const DEFAULT_SETTINGS: Settings = {
   structureVersion: 2,
   firstUseNoticeSeen: false,
   codexUsageNoticeSeen: false,
+  aiExchangeLoggingEnabled: false,
   workspaceInitialized: false,
   sampleTourVersionSeen: 0
 };
@@ -403,6 +405,23 @@ export class Repository {
       cssclasses: [NOTE_CSS_CLASS]
     };
     await this.app.vault.create(path, `---\n${stringifyYaml(metadata)}---\n${noteBody(title, "尚未形成結論")}`);
+    return { id, path, parentId: null, x: 80, y: 80, collapsed: false };
+  }
+
+  async duplicateNote(sourcePath: string, map: MapDocument, mapPath: string): Promise<MapNode> {
+    const folder = this.topicFolder(mapPath, "Notes");
+    await this.ensureTopicFolders(this.topicRoot(mapPath));
+    const source = await this.app.vault.read(this.file(sourcePath));
+    const metadata = frontmatter(source);
+    const title = `${text(metadata.title, this.file(sourcePath).basename)} 副本`;
+    const id = crypto.randomUUID(), path = this.unique(folder, title);
+    metadata["node-id"] = id;
+    metadata["topic-id"] = map.id;
+    metadata["agent-map-id"] = map.id;
+    metadata["topic-state"] = "active";
+    metadata.title = title;
+    const body = source.replace(/^---\r?\n[\s\S]*?\r?\n---(?:\r?\n|$)/, "").replace(/^# .*$/m, `# ${title}`);
+    await this.app.vault.create(path, `---\n${stringifyYaml(metadata)}---\n${body}`);
     return { id, path, parentId: null, x: 80, y: 80, collapsed: false };
   }
 

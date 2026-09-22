@@ -109,7 +109,7 @@ export class CodexAppServerRuntime {
     return [...new Map(models.map(model => [model.model, model])).values()];
   }
 
-  async runTask(prompt: string, model: string, effort: string, outputSchema: unknown, controls?: { signal?: AbortSignal; searchBudget?: number }): Promise<string> {
+  async runTask(prompt: string, model: string, effort: string, outputSchema: unknown, controls?: { signal?: AbortSignal; searchBudget?: number; onRequest?: (request: unknown) => void }): Promise<string> {
     if (controls?.signal?.aborted) throw cancelledError();
     await this.start();
     if (controls?.signal?.aborted) throw cancelledError();
@@ -135,14 +135,16 @@ export class CodexAppServerRuntime {
     controls?.signal?.addEventListener("abort", interrupt, { once: true });
     try {
       if (controls?.signal?.aborted) throw cancelledError();
-      const startedTurn = await this.request("turn/start", {
+      const turnRequest = {
         threadId,
         input: [{ type: "text", text: prompt, text_elements: [] }],
         model: model || null,
         effort: effort || "low",
         sandboxPolicy: { type: "readOnly", networkAccess: false },
         outputSchema
-      }) as { turn?: { id?: unknown } };
+      };
+      controls?.onRequest?.(turnRequest);
+      const startedTurn = await this.request("turn/start", turnRequest) as { turn?: { id?: unknown } };
       state.turnId = typeof startedTurn.turn?.id === "string" ? startedTurn.turn.id : "";
       if (controls?.signal?.aborted) interrupt();
       this.steerIfNeeded(threadId, state);

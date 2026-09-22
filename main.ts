@@ -6,6 +6,7 @@ import { DebugLogModal } from "./ui/modals/debug-log-modal";
 import { existsSync as nodeExistsSync, readdirSync as nodeReaddirSync } from "node:fs";
 import { delimiter as nodeDelimiter, dirname as nodeDirname, isAbsolute as nodeIsAbsolute, join as nodeJoin } from "node:path";
 import { canParent, clone, descendants, History, inheritModel, MapDocument, MapNode, parseMap, removeNodes, serializeMap, visibleNodes } from "./map-model";
+import { arrangeMap, arrangeNewBranch } from "./map-layout";
 import { DEFAULT_SETTINGS, ModelSource, normalizeReasoningLevel, Note, NotePatch, Repository, ResearchDepth, ResearchMode, Settings, TopicInfo, TopicState, VisualMode } from "./repository";
 import { buildPreparedTaskContext } from "./ai/context-builder";
 import { selectSourceDocuments, sourceContext, type SourceDocument } from "./ai/source-selection";
@@ -15,6 +16,9 @@ import type { AiResult, Suggestion, TaskContext } from "./ai/types";
 import { clampPreviewScale, legacyPreviewScale, previewMetrics } from "./ui/preview-utils";
 import { BUILTIN_SAMPLE_ID, builtInSample, SAMPLE_TOUR_VERSION } from "./builtin-sample";
 import { debugLog, LogManager } from "./log-manager";
+import { AiExchangeLog } from "./ai-exchange-log";
+import { PendingSuggestions } from "./pending-suggestions";
+import { randomUUID } from "node:crypto";
 import responseSchema from "./response-schema.json";
 import { CodexAppServerRuntime } from "./ai/runtime/codex-app-server";
 
@@ -76,7 +80,37 @@ export function executableCandidates(configured: string, home: string, pathValue
   return [...new Set(dirs)].map(directory => join(directory, configured));
 }
 const labels = { idea: t("待研究"), running: t("AI 執行中"), completed: t("AI 完成"), error: t("執行錯誤") };
-interface TaskOptions { researchMode: ResearchMode; researchDepth: ResearchDepth; visualMode: VisualMode; currentVault: boolean; folderFiles: File[]; individualFiles: File[]; multiLayer?: boolean }
+interface TaskOptions { researchMode: ResearchMode; researchDepth: ResearchDepth; visualMode: VisualMode; currentVault: boolean; folderFiles: File[]; individualFiles: File[]; multiLayer?: boolean; shallowResearch?: boolean; layers?: number; firstLayerCount?: number; childrenPerParent?: number }
+class PartialChildBatchError extends Error {}
+function quickShape(layers: number, firstLayerCount: number, childrenPerParent: number): { counts: bigint[]; total: bigint } {
+  if (![layers, firstLayerCount, childrenPerParent].every(Number.isSafeInteger) || layers < 1 || layers > 15 || firstLayerCount < 1 || childrenPerParent < 1) throw new Error(t("層數、第一層數量與每個議題的延伸數量須為正整數；層數最多 15。"));
+  const counts: bigint[] = [];
+  let count = BigInt(firstLayerCount), total = BigInt(0);
+  for (let level = 0; level < layers; level++) { counts.push(count); total += count; count *= BigInt(childrenPerParent); }
+  return { counts, total };
+}
+function quickSuggestions(items: Suggestion[], layers: number, firstLayerCount: number, childrenPerParent: number): Suggestion[] {
+  const shape = quickShape(layers, firstLayerCount, childrenPerParent);
+  if (shape.total > BigInt(15)) throw new Error(t("預計建立 {0} 個子議題，超過上限 15 個。請減少層數、第一層子議題數，或每個議題的延伸數量。", shape.total.toString()));
+  const invalid = (): never => { throw new Error(t("AI 未依設定產生每層數量與母子關係，尚未建立節點；請再試一次。")); };
+  const byTitle = new Map<string, Suggestion>();
+  for (const item of items) {
+    if (!item.title?.trim() || byTitle.has(item.title.trim())) invalid();
+    byTitle.set(item.title.trim(), item);
+  }
+  const grouped: Suggestion[][] = [];
+  let previous = new Set<string>();
+  for (let level = 0; level < layers; level++) {
+    const current = items.filter(item => level === 0 ? !item.parentTitle?.trim() : previous.has(item.parentTitle?.trim() || ""));
+    if (current.length !== Number(shape.counts[level])) invalid();
+    if (level > 0 && [...previous].some(title => current.filter(item => item.parentTitle?.trim() === title).length !== childrenPerParent)) invalid();
+    grouped.push(current);
+    previous = new Set(current.map(item => item.title.trim()));
+  }
+  const selected = grouped.flat();
+  if (selected.length !== items.length) invalid();
+  return selected;
+}
 class TaskModal extends Modal {
   constructor(app: App, private value: string, private submit: (value: string, run: boolean, options: TaskOptions) => void, private titleText = t("自訂 AI 任務"), private description = t("描述這一步要請 AI 完成什麼。"), private rules = "", private mode: ResearchMode = "research", private depth: ResearchDepth = "normal", private visual: VisualMode = "auto", private allowSave = true, private expand = false) { super(app); }
   onOpen(): void {
@@ -108,7 +142,8 @@ class TaskModal extends Modal {
     depth.value = this.depth;
     const layers = this.expand ? this.contentEl.createEl("label", { cls: "vam-field" }) : null;
     const multiLayer = layers?.createEl("input", { type: "checkbox" });
-    if (layers) layers.createSpan({ text: t("一次預覽兩層子議題（最多 15 個節點，淺研究）") });
+    if (multiLayer) multiLayer.checked = true;
+    if (layers) layers.createSpan({ text: t("建立兩層子議題並逐一淺研究（最多 15 個）") });
     const advanced = this.contentEl.createEl("details", { cls: "vam-advanced" }); advanced.createEl("summary", { text: t("圖片與進階選項") });
     const visualLabel = advanced.createEl("label", { cls: "vam-field" }); visualLabel.createSpan({ text: t("圖片參考") });
     const visual = visualLabel.createEl("select"); visual.setAttr("aria-label", t("圖片參考"));
@@ -128,6 +163,262 @@ class TaskModal extends Modal {
     if (this.allowSave) buttons.addButton(b => b.setButtonText(t("只儲存任務設定")).onClick(() => save(false)));
     buttons.addButton(b => b.setButtonText(t("確認並執行")).setCta().onClick(() => save(true)));
     input.focus(); input.setSelectionRange(input.value.length, input.value.length);
+  }
+}
+export class NextStepModal extends Modal {
+  private closed = false;
+  private settingsPending: Promise<void> = Promise.resolve();
+  private settingsError: string | null = null;
+  constructor(app: App, private topic: string, private depth: ResearchDepth, private childrenCount: number, private pendingCount: number, private plugin: VisualAgentMapPlugin,
+    private research: (options: TaskOptions, focus: string, done: (result: AiResult) => void, failed: (message: string) => void) => Promise<void>,
+    private expand: (options: TaskOptions, direction: string, found: (items: Suggestion[], create: (items: Suggestion[]) => Promise<void>) => void, failed: (message: string, retryable?: boolean) => void, created: () => void) => Promise<void>,
+    private synthesize: (options: TaskOptions, angles: (items: Suggestion[], draft: (direction: string) => Promise<void>) => void, drafted: (result: AiResult, save: (summary: string, detail: string) => Promise<void>) => void, failed: (message: string) => void) => Promise<void>,
+    private modelSettings?: { model: string; modelSource: ModelSource; reasoning: string; save: (patch: NotePatch) => Promise<void>; running?: boolean; stop?: () => void; quickError?: string }) { super(app); }
+  onClose(): void { this.closed = true; }
+  private async readySettings(): Promise<void> { await this.settingsPending; if (this.settingsError) throw new Error(this.settingsError); }
+  private renderModelSettings(): void {
+    if (!this.modelSettings) return;
+    const settings = this.modelSettings;
+    const advanced = this.contentEl.createEl("details", { cls: "vam-advanced vam-next-model" }); advanced.createEl("summary", { text: t("模型與進階設定") });
+    const error = advanced.createEl("p", { cls: "vam-hint" });
+    const save = (patch: NotePatch): void => {
+      this.settingsError = null; error.setText("");
+      this.settingsPending = this.settingsPending.then(() => settings.save(patch)).catch(cause => {
+        this.settingsError = cause instanceof Error ? cause.message : String(cause);
+        error.setText(this.settingsError);
+      });
+    };
+    const modelLabel = advanced.createEl("label", { cls: "vam-field" }); modelLabel.createSpan({ text: t("使用模型") });
+    const model = modelLabel.createEl("select"); model.setAttr("aria-label", t("使用模型"));
+    const options = new Set(this.plugin.settings.models.split(/[\n,]/).map(value => value.trim()).filter(Boolean));
+    for (const value of options) model.createEl("option", { value, text: value });
+    if (!options.has(settings.model)) { const unavailable = model.createEl("option", { value: settings.model, text: t("目前模型已不可用") }); unavailable.disabled = true; }
+    model.value = settings.model;
+    model.addEventListener("change", () => { if (options.has(model.value)) save({ model: model.value, modelSource: "manual" }); });
+    const reasoningLabel = advanced.createEl("label", { cls: "vam-field" }); reasoningLabel.createSpan({ text: t("推理等級") });
+    const reasoning = reasoningLabel.createEl("select"); reasoning.setAttr("aria-label", t("推理等級"));
+    for (const [value, label] of [["auto", t("自動 (Auto)")], ["low", t("低 (Low)")], ["medium", t("中 (Medium)")], ["high", t("高 (High)")]]) reasoning.createEl("option", { value, text: label });
+    reasoning.value = normalizeReasoningLevel(settings.reasoning);
+    reasoning.addEventListener("change", () => save({ reasoning: normalizeReasoningLevel(reasoning.value) }));
+    const sourceLabels: Record<ModelSource, string> = { workspace: t("工作區預設"), inherited: t("建立時繼承"), manual: t("手動指定") };
+    advanced.createEl("p", { cls: "vam-hint", text: t("{0} · {1}；推理等級可依議題調整。", settings.model, sourceLabels[settings.modelSource]) });
+  }
+  private sources(panel: HTMLElement): () => TaskOptions {
+    const sourceArea = panel.createEl("details", { cls: "vam-advanced vam-next-sources" });
+    sourceArea.createEl("summary", { text: t("選擇其他筆記來源") });
+    const currentLabel = sourceArea.createEl("label", { cls: "vam-field vam-next-toggle" });
+    const current = currentLabel.createEl("input", { type: "checkbox" });
+    currentLabel.createSpan({ text: t("搜尋目前 Vault 的相關筆記") });
+    const folderLabel = sourceArea.createEl("label", { cls: "vam-field" }); folderLabel.createSpan({ text: t("選擇其他 Vault 或資料夾（只擷取相關 Markdown）") });
+    const folder = folderLabel.createEl("input", { type: "file" }); folder.setAttr("webkitdirectory", ""); folder.multiple = true;
+    const fileLabel = sourceArea.createEl("label", { cls: "vam-field" }); fileLabel.createSpan({ text: t("選擇個別 Markdown（最多 8 份，每份前 20,000 字）") });
+    const files = fileLabel.createEl("input", { type: "file" }); files.accept = ".md"; files.multiple = true;
+    const preview = sourceArea.createEl("p", { cls: "vam-hint" });
+    const refresh = (): void => { const names = [...Array.from(folder.files ?? []), ...Array.from(files.files ?? [])].filter(file => file.name.toLowerCase().endsWith(".md")).map(file => file.webkitRelativePath || file.name); preview.setText([current.checked ? t("目前 Vault") : "", ...names.slice(0, 8), names.length > 8 ? t("另有 {0} 份檔案", names.length - 8) : ""].filter(Boolean).join(" · ") || t("未選其他筆記來源")); };
+    current.addEventListener("change", refresh); folder.addEventListener("change", refresh); files.addEventListener("change", refresh); refresh();
+    sourceArea.createEl("p", { cls: "vam-hint", text: t("來源選擇只用於本次執行，不存入筆記。") });
+    return () => {
+      const individualFiles = Array.from(files.files ?? []).filter(file => file.name.toLowerCase().endsWith(".md"));
+      const folderFiles = Array.from(folder.files ?? []).filter(file => file.name.toLowerCase().endsWith(".md"));
+      if (individualFiles.length > 8) throw new Error(t("一次最多手選 8 份 Markdown。"));
+      if (folderFiles.length > 1000) throw new Error(t("所選資料夾超過 1000 份 Markdown，請縮小範圍。"));
+      return { researchMode: "local", researchDepth: this.depth, visualMode: "auto", currentVault: current.checked, folderFiles, individualFiles };
+    };
+  }
+  private async run(panel: HTMLElement, button: HTMLButtonElement, work: () => Promise<void>, needsUsage = true): Promise<void> {
+    if (button.disabled) return;
+    const start = async (): Promise<void> => {
+      button.disabled = true;
+      const status = panel.querySelector<HTMLElement>(".vam-next-status");
+      status?.setText(t("AI 執行中…"));
+      try { await this.readySettings(); await work(); } catch (error) { this.failed(panel, button, error instanceof Error ? error.message : String(error)); }
+    };
+    if (!needsUsage || this.plugin.settings.codexUsageNoticeSeen) { await start(); return; }
+    const notice = panel.querySelector<HTMLElement>(".vam-next-usage") ?? panel.createDiv("vam-next-usage");
+    notice.empty();
+    notice.createEl("strong", { text: t("Codex 額度提醒") });
+    notice.createEl("p", { text: t("VAM 會透過你目前登入的 Codex 帳號執行 AI 任務，並使用該帳號的 Codex 使用額度。可用額度與限制依你的 ChatGPT 方案而定。") });
+    notice.createEl("button", { text: t("取消") }).addEventListener("click", () => notice.remove());
+    notice.createEl("button", { text: t("了解並執行"), cls: "mod-cta" }).addEventListener("click", () => { void (async () => { try { this.plugin.settings.codexUsageNoticeSeen = true; await this.plugin.saveSettings(); notice.remove(); await start(); } catch (error) { this.plugin.settings.codexUsageNoticeSeen = false; this.failed(panel, button, error instanceof Error ? error.message : String(error)); } })(); });
+  }
+  private failed(panel: HTMLElement, button: HTMLButtonElement, message: string): void {
+    if (this.closed) return;
+    panel.querySelector<HTMLElement>(".vam-next-status")?.setText(message);
+    button.disabled = false;
+  }
+  private proposals(panel: HTMLElement, suggestions: Suggestion[], create: (items: Suggestion[]) => Promise<void>, button: HTMLButtonElement, consumed: () => void): void {
+    if (this.closed) return;
+    const result = panel.querySelector<HTMLElement>(".vam-next-result")!; result.empty();
+    result.createEl("h4", { text: t("AI 子議題提案") });
+    result.createEl("p", { text: t("勾選要建立的子議題；建立前可直接修改名稱與任務。") });
+    const rows: { item: Suggestion; check: HTMLInputElement; title: HTMLInputElement; task: HTMLTextAreaElement; contribution: HTMLTextAreaElement }[] = [];
+    const list = result.createDiv("vam-proposal-list");
+    for (const item of suggestions) { const row = list.createDiv("vam-proposal"); if (item.parentTitle) row.createEl("p", { text: t("↳ {0} 的子議題", item.parentTitle) }); const check = row.createEl("input", { type: "checkbox" }); check.checked = true; const title = row.createEl("input", { type: "text", value: item.title }); const task = row.createEl("textarea", { text: item.task }); task.rows = 2; const contribution = row.createEl("textarea", { text: item.contribution }); contribution.rows = 2; contribution.placeholder = t("對母議題的貢獻"); rows.push({ item, check, title, task, contribution }); }
+    const confirm = result.createEl("button", { text: t("建立子議題"), cls: "mod-cta" });
+    confirm.addEventListener("click", () => { void (async () => {
+      const selected = rows.filter(row => row.check.checked && row.title.value.trim());
+      if (!selected.length) { panel.querySelector<HTMLElement>(".vam-next-status")?.setText(t("請至少選取一個子議題。")); return; }
+      const renamed = new Map(selected.filter(row => !row.item.parentTitle).map(row => [row.item.title, row.title.value.trim()]));
+      const names = selected.filter(row => !row.item.parentTitle).map(row => row.title.value.trim());
+      if (new Set(names).size !== names.length) { this.failed(panel, button, t("第一層子議題名稱不能重複。")); return; }
+      if (selected.some(row => row.item.parentTitle && !renamed.has(row.item.parentTitle))) { this.failed(panel, button, t("請先勾選子議題的母議題。")); return; }
+      confirm.disabled = true;
+      panel.querySelector<HTMLElement>(".vam-next-status")?.setText(t("正在建立子議題…"));
+      try { await create(selected.map(row => ({ title: row.title.value.trim(), task: row.task.value.trim(), contribution: row.contribution.value.trim(), parentTitle: row.item.parentTitle ? renamed.get(row.item.parentTitle)! : "" }))); result.empty(); consumed(); panel.querySelector<HTMLElement>(".vam-next-status")?.setText(t("已建立子議題。")); button.disabled = false; }
+      catch (error) { if (error instanceof PartialChildBatchError) { result.empty(); consumed(); button.disabled = false; } else confirm.disabled = false; panel.querySelector<HTMLElement>(".vam-next-status")?.setText(error instanceof Error ? error.message : String(error)); }
+    })(); });
+    panel.querySelector<HTMLElement>(".vam-next-status")?.setText(t("請確認 AI 建議的子議題。"));
+  }
+  onOpen(): void {
+    this.modalEl.addClass("vam-next-modal");
+    this.titleEl.setText(t("接下來想怎麼探索？"));
+    this.contentEl.createEl("p", { text: t("目前議題：{0}", this.topic), cls: "vam-modal-intro" });
+    const cards = this.contentEl.createDiv("vam-next-cards");
+    let show: (mode: "research" | "expand" | "synthesize") => void;
+    const card = (title: string, description: string, mode: "research" | "expand" | "synthesize"): HTMLButtonElement => {
+      const button = cards.createEl("button", { cls: "vam-next-card" });
+      const copy = button.createSpan(); copy.createEl("strong", { text: t(title) }); copy.createSpan({ text: t(description) });
+      button.createSpan({ text: "›", cls: "vam-next-arrow" });
+      button.addEventListener("click", () => show(mode));
+      button.setAttr("aria-pressed", mode === "research" ? "true" : "false");
+      if (mode === "research") button.addClass("is-active");
+      return button;
+    };
+    const researchCard = card("研究更深", "針對目前議題找答案，自己決定研究深度", "research");
+    const expandCard = card("展開地圖", "先確認一層方向，或自訂初步地圖的層數與數量", "expand");
+    const synthesizeCard = card("整合發現", "從子議題找出共同結論、分歧與下一步", "synthesize");
+    if (this.modelSettings?.running) {
+      const running = this.contentEl.createDiv("vam-next-running"); running.createSpan({ text: t("AI 執行中…") });
+      if (this.modelSettings.stop) running.createEl("button", { text: t("停止研究") }).addEventListener("click", () => this.modelSettings?.stop?.());
+    } else if (this.modelSettings?.quickError) this.contentEl.createEl("p", { cls: "vam-hint", text: this.modelSettings.quickError });
+    const research = this.contentEl.createDiv("vam-next-research");
+    research.createEl("h3", { text: t("研究這個議題") });
+    research.createEl("p", { text: t("以節點問題為起點；結果只更新這個節點。") });
+    const depths = research.createDiv("vam-next-depths");
+    const radios: HTMLInputElement[] = [];
+    for (const [value, label] of [["fast", "快速"], ["normal", "標準"], ["deep", "深入"]] as const) {
+      const option = depths.createEl("label");
+      const radio = option.createEl("input", { type: "radio", attr: { name: "vam-next-depth", value } }); radio.checked = this.depth === value; radios.push(radio);
+      option.createSpan({ text: t(label) });
+    }
+    research.createEl("p", { text: t("這次想特別研究什麼？（選填）") });
+    const focus = research.createEl("textarea", { cls: "vam-next-focus", attr: { placeholder: t("例如：比較火車與租車的取捨") } });
+    const researchOptions = (): TaskOptions => ({ researchMode: "research", researchDepth: this.depth, visualMode: "auto", currentVault: false, folderFiles: [], individualFiles: [] });
+    const footer = research.createDiv("vam-next-footer");
+    footer.createSpan({ text: t("完整結果寫入 MD；手寫內容保留") });
+    const confirm = footer.createEl("button", { text: t("確認研究任務"), cls: "mod-cta" });
+    confirm.disabled = !!this.modelSettings?.running;
+    research.createEl("p", { cls: "vam-next-status" });
+    confirm.addEventListener("click", () => { void this.run(research, confirm, async () => {
+      const options = researchOptions(); options.researchDepth = (radios.find(radio => radio.checked)?.value || "normal") as ResearchDepth;
+      let started = true;
+      await this.research(options, focus.value.trim(), () => {}, message => { if (this.closed) new Notice(message); else { started = false; this.failed(research, confirm, message); } });
+      if (started) this.close();
+    }); });
+    const expandPanel = this.contentEl.createDiv("vam-next-research vam-next-choice");
+    expandPanel.createEl("h3", { text: t("展開這個議題") });
+    expandPanel.createEl("p", { text: t("可以先確認一層方向，或設定第一層數量與每個議題的延伸數量，直接建立初步地圖。") });
+    const modes = expandPanel.createDiv("vam-next-depths");
+    const guided = modes.createEl("button", { text: t("一起選方向"), cls: "is-active" });
+    const quick = modes.createEl("button", { text: t("快速探索地圖") });
+    let multiLayer = false;
+    const setExpandMode = (value: boolean): void => { multiLayer = value; guided.classList.toggle("is-active", !value); quick.classList.toggle("is-active", value); modeHint.setText(value ? t("AI 依設定建立初步地圖；可選擇建立後淺研究。") : this.pendingCount ? t("已有待確認提案；可直接在這裡檢查。") : t("AI 先提出一層子議題，你選擇或修改後才建立。")); quickLimits.classList.toggle("is-hidden", !value); expandFooterText.setText(shallow.checked ? t("建立後會逐一淺研究，並使用 Codex 額度") : t("只建立子議題，不執行研究")); expandButton.setText(value ? t("直接建立初步地圖") : this.pendingCount ? t("查看 AI 子議題建議") : t("取得展開方向")); expandButton.disabled = !!this.modelSettings?.running || (value && !!quickError); };
+    guided.addEventListener("click", () => setExpandMode(false)); quick.addEventListener("click", () => setExpandMode(true));
+    const modeHint = expandPanel.createEl("p", { text: this.pendingCount ? t("已有待確認提案；可直接在這裡檢查。") : t("AI 先提出一層子議題，你選擇或修改後才建立。") });
+    const quickLimits = expandPanel.createDiv("vam-quick-limits is-hidden");
+    const layersLabel = quickLimits.createEl("label", { cls: "vam-field" }); layersLabel.createSpan({ text: t("展開幾層") });
+    const layersInput = layersLabel.createEl("input", { type: "number", attr: { min: "1", max: "15", step: "1", value: "2" } }); layersInput.value = "2";
+    const firstLabel = quickLimits.createEl("label", { cls: "vam-field" }); firstLabel.createSpan({ text: t("第一層子議題數量") });
+    const firstInput = firstLabel.createEl("input", { type: "number", attr: { min: "1", max: "15", step: "1", value: "3" } }); firstInput.value = "3";
+    const childrenLabel = quickLimits.createEl("label", { cls: "vam-field" }); childrenLabel.createSpan({ text: t("每個上一層議題延伸幾個") });
+    const childrenInput = childrenLabel.createEl("input", { type: "number", attr: { min: "1", max: "15", step: "1", value: "2" } }); childrenInput.value = "2";
+    const totalHint = quickLimits.createEl("p", { cls: "vam-hint" }); totalHint.setAttr("aria-live", "polite");
+    let quickError = "";
+    const updateTotal = (): void => {
+      try {
+        const shape = quickShape(Number(layersInput.value), Number(firstInput.value), Number(childrenInput.value));
+        quickError = shape.total > BigInt(15) ? t("預計建立 {0} 個子議題，超過上限 15 個。請減少層數、第一層子議題數，或每個議題的延伸數量。", shape.total.toString()) : "";
+        totalHint.setText(quickError || t("每層數量：{0}；共 {1} 個子議題。", shape.counts.map(String).join(" → "), shape.total.toString()));
+      } catch (error) { quickError = error instanceof Error ? error.message : String(error); totalHint.setText(quickError); }
+      totalHint.classList.toggle("is-error", !!quickError);
+    };
+    layersInput.addEventListener("input", () => { updateTotal(); expandButton.disabled = !!this.modelSettings?.running || (multiLayer && !!quickError); });
+    firstInput.addEventListener("input", () => { updateTotal(); expandButton.disabled = !!this.modelSettings?.running || (multiLayer && !!quickError); });
+    childrenInput.addEventListener("input", () => { updateTotal(); expandButton.disabled = !!this.modelSettings?.running || (multiLayer && !!quickError); });
+    updateTotal();
+    const directionLabel = expandPanel.createEl("label", { cls: "vam-field" }); directionLabel.createSpan({ text: t("想優先探索哪一面？（選填）") });
+    const direction = directionLabel.createEl("textarea", { cls: "vam-next-focus", attr: { placeholder: t("例如：交通、住宿或每天的節奏") } });
+    const expandSources = (): TaskOptions => ({ researchMode: "research", researchDepth: "fast", visualMode: "off", currentVault: false, folderFiles: [], individualFiles: [] });
+    const shallowLabel = expandPanel.createEl("label", { cls: "vam-field vam-next-toggle" }); const shallow = shallowLabel.createEl("input", { type: "checkbox" }); shallow.checked = false; shallowLabel.createSpan({ text: t("建立後逐一淺研究子議題") });
+    const expandFooter = expandPanel.createDiv("vam-next-footer"); const expandFooterText = expandFooter.createSpan({ text: t("確認後只建立子議題，不執行研究") });
+    const expandButton = expandFooter.createEl("button", { text: this.pendingCount ? t("查看 AI 子議題建議") : t("取得展開方向"), cls: "mod-cta" });
+    expandButton.disabled = !!this.modelSettings?.running;
+    expandPanel.createEl("p", { cls: "vam-next-status" }); expandPanel.createDiv("vam-next-result");
+    const consumed = (): void => { this.pendingCount = 0; setExpandMode(multiLayer); };
+    shallow.addEventListener("change", () => setExpandMode(multiLayer));
+    expandButton.addEventListener("click", () => { void this.run(expandPanel, expandButton, async () => {
+      const options = expandSources(); options.multiLayer = multiLayer; options.shallowResearch = shallow.checked; options.researchDepth = "fast"; options.visualMode = "off";
+      if (multiLayer) {
+        const layers = Number(layersInput.value), firstLayerCount = Number(firstInput.value), childrenPerParent = Number(childrenInput.value);
+        const shape = quickShape(layers, firstLayerCount, childrenPerParent);
+        if (shape.total > BigInt(15)) throw new Error(t("預計建立 {0} 個子議題，超過上限 15 個。請減少層數、第一層子議題數，或每個議題的延伸數量。", shape.total.toString()));
+        options.layers = layers; options.firstLayerCount = firstLayerCount; options.childrenPerParent = childrenPerParent;
+        void this.expand(options, direction.value.trim(), () => {}, message => new Notice(message), () => {}).catch(error => new Notice(error instanceof Error ? error.message : String(error)));
+        this.close();
+        return;
+      }
+      if (!this.pendingCount) {
+        void this.expand(options, direction.value.trim(), () => {}, message => new Notice(message), () => {}).catch(error => new Notice(error instanceof Error ? error.message : String(error)));
+        this.close();
+        return;
+      }
+      await this.expand(options, direction.value.trim(), (items, create) => this.proposals(expandPanel, items, create, expandButton, consumed), (message, retryable) => { consumed(); this.failed(expandPanel, expandButton, message); if (retryable === false) expandButton.disabled = true; }, () => this.close());
+    }, multiLayer || !this.pendingCount); });
+    const synthesizePanel = this.contentEl.createDiv("vam-next-research vam-next-choice");
+    synthesizePanel.createEl("h3", { text: t("整合子議題發現") });
+    synthesizePanel.createEl("p", { text: this.childrenCount ? t("AI 先提出整合角度；選定方向後，才更新母議題。") : t("這個議題目前沒有直屬子議題；可以選擇其他筆記作為整合來源。") });
+    {
+      const synthSources = this.sources(synthesizePanel);
+      const synthFooter = synthesizePanel.createDiv("vam-next-footer");
+      const synthButton = synthFooter.createEl("button", { text: t("先取得整合建議"), cls: "mod-cta" });
+      synthButton.disabled = !!this.modelSettings?.running;
+      const synthStatus = synthesizePanel.createEl("p", { cls: "vam-next-status" });
+      const synthResult = synthesizePanel.createDiv("vam-next-result");
+      const showDraft = (draft: AiResult, save: (summary: string, detail: string) => Promise<void>): void => {
+        if (this.closed) return;
+        synthStatus.setText(t("請檢查整合草稿。")); synthResult.empty();
+        const summary = synthResult.createEl("textarea", { cls: "vam-task-input", text: draft.summary }); summary.rows = 4; summary.setAttr("aria-label", t("目前理解"));
+        const detail = synthResult.createEl("textarea", { cls: "vam-task-input", text: draft.detail }); detail.rows = 16; detail.setAttr("aria-label", t("MD 詳情草稿"));
+        const saveButton = synthResult.createEl("button", { text: t("確認寫入母議題"), cls: "mod-cta" });
+        saveButton.addEventListener("click", () => { void (async () => { saveButton.disabled = true; try { await save(summary.value, detail.value); synthStatus.setText(t("子議題整合已寫入目前理解與 MD 詳情。")); synthResult.empty(); } catch (error) { saveButton.disabled = false; this.failed(synthesizePanel, synthButton, error instanceof Error ? error.message : String(error)); } })(); });
+        synthButton.disabled = false;
+      };
+      synthButton.addEventListener("click", () => { void this.run(synthesizePanel, synthButton, async () => {
+        const options = synthSources();
+        if (!this.childrenCount && !options.currentVault && !options.folderFiles.length && !options.individualFiles.length) throw new Error(t("請先選擇其他筆記來源。"));
+        await this.synthesize(options, (items, draft) => {
+        if (this.closed) return;
+        synthStatus.setText(t("選擇或修改整合方向，再取得草稿。")); synthResult.empty();
+        for (const item of items) {
+          const choice = synthResult.createDiv("vam-next-angle");
+          choice.createEl("strong", { text: item.title }); choice.createEl("p", { text: item.contribution || item.task });
+          choice.createEl("button", { text: t("選擇這個方向") }).addEventListener("click", () => { direction.value = item.task || item.title; });
+        }
+        const direction = synthResult.createEl("textarea", { cls: "vam-next-focus", text: items[0]?.task || items[0]?.title || "" });
+        direction.setAttr("aria-label", t("整合方向"));
+        const draftButton = synthResult.createEl("button", { text: t("取得整合草稿"), cls: "mod-cta" });
+        draftButton.addEventListener("click", () => { void (async () => { draftButton.disabled = true; synthStatus.setText(t("AI 執行中…")); try { await this.readySettings(); await draft(direction.value.trim()); } catch (error) { draftButton.disabled = false; this.failed(synthesizePanel, synthButton, error instanceof Error ? error.message : String(error)); } })(); });
+        synthButton.disabled = false;
+      }, showDraft, message => this.failed(synthesizePanel, synthButton, message)); }); });
+    }
+    show = mode => {
+      for (const [name, button, panel] of [["research", researchCard, research], ["expand", expandCard, expandPanel], ["synthesize", synthesizeCard, synthesizePanel]] as const) {
+        button.classList.toggle("is-active", name === mode); button.setAttr("aria-pressed", name === mode ? "true" : "false");
+        panel.style.display = name === mode ? "" : "none";
+      }
+    };
+    show("research");
+    this.renderModelSettings();
   }
 }
 class AiDraftModal extends Modal {
@@ -183,7 +474,14 @@ class ChildProposalModal extends Modal {
     this.contentEl.createEl("p", { text: t("勾選要建立的子議題；建立前可直接修改名稱與任務。") });
     const rows: { item: Suggestion; check: HTMLInputElement; title: HTMLInputElement; task: HTMLTextAreaElement; contribution: HTMLTextAreaElement }[] = [];
     for (const item of this.suggestions) { const row = this.contentEl.createDiv("vam-proposal"); if (item.parentTitle) row.createEl("p", { text: t("↳ {0} 的子議題", item.parentTitle) }); const check = row.createEl("input", { type: "checkbox" }); check.checked = true; const title = row.createEl("input", { type: "text", value: item.title }); const task = row.createEl("textarea", { text: item.task }); task.rows = 2; const contribution = row.createEl("textarea", { text: item.contribution }); contribution.rows = 2; contribution.placeholder = t("對母議題的貢獻"); rows.push({ item, check, title, task, contribution }); }
-    new Setting(this.contentEl).addButton(b => b.setButtonText(t("取消")).onClick(() => this.close())).addButton(b => b.setButtonText(t("建立子議題")).setCta().onClick(() => { const renamed = new Map(rows.map(row => [row.item.title, row.title.value.trim()])); this.close(); this.submit(rows.filter(row => row.check.checked && row.title.value.trim()).map(row => ({ title: row.title.value.trim(), task: row.task.value.trim(), contribution: row.contribution.value.trim(), parentTitle: row.item.parentTitle ? renamed.get(row.item.parentTitle) || row.item.parentTitle : "" }))); }));
+    new Setting(this.contentEl).addButton(b => b.setButtonText(t("取消")).onClick(() => this.close())).addButton(b => b.setButtonText(t("建立子議題")).setCta().onClick(() => {
+      const selected = rows.filter(row => row.check.checked && row.title.value.trim());
+      const renamed = new Map(selected.filter(row => !row.item.parentTitle).map(row => [row.item.title, row.title.value.trim()]));
+      const rootNames = selected.filter(row => !row.item.parentTitle).map(row => row.title.value.trim());
+      if (new Set(rootNames).size !== rootNames.length) { new Notice(t("第一層子議題名稱不能重複。")); return; }
+      if (selected.some(row => row.item.parentTitle && !renamed.has(row.item.parentTitle))) { new Notice(t("請先勾選子議題的母議題。")); return; }
+      this.close(); this.submit(selected.map(row => ({ title: row.title.value.trim(), task: row.task.value.trim(), contribution: row.contribution.value.trim(), parentTitle: row.item.parentTitle ? renamed.get(row.item.parentTitle)! : "" })));
+    }));
   }
 }
 class IntegrationModal extends Modal {
@@ -203,18 +501,6 @@ class IntegrationModal extends Modal {
     const save = (): void => { if (!title.value.trim() || !goal.value.trim()) return; this.close(); this.submit(title.value.trim(), goal.value.trim(), rules.value.trim()); };
     new Setting(this.contentEl).addButton(button => button.setButtonText(t("取消")).onClick(() => this.close())).addButton(button => button.setButtonText(t("下一步：設定 AI 來源")).setCta().onClick(save));
     title.focus(); title.select();
-  }
-}
-class ConflictModal extends Modal {
-  constructor(app: App, private label: string, private local: string, private disk: string, private resolve: (value: string | null) => void) { super(app); }
-  onOpen(): void {
-    this.titleEl.setText(t("{0}有外部修改", this.label));
-    this.contentEl.createEl("p", { text: t("畫面與 Markdown 都有修改。請選擇要保留的內容，或在下方手動合併。") });
-    const input = this.contentEl.createEl("textarea", { cls: "vam-task-input", text: `${this.disk}\n\n${this.local}` }); input.rows = 10;
-    new Setting(this.contentEl)
-      .addButton(b => b.setButtonText(t("使用檔案內容")).onClick(() => { this.close(); this.resolve(null); }))
-      .addButton(b => b.setButtonText(t("保留畫面內容")).onClick(() => { this.close(); this.resolve(this.local); }))
-      .addButton(b => b.setButtonText(t("儲存合併內容")).setCta().onClick(() => { this.close(); this.resolve(input.value.trim()); }));
   }
 }
 class MapConflictModal extends Modal {
@@ -361,13 +647,27 @@ export class VisualAgentMapView extends ItemView {
     this.history.push({ undo: () => restore(before), redo: () => restore(after) }); this.render();
   }
   private async restoreLifecycle(snapshot: MapDocument, moves: FileMove[], parked: boolean): Promise<void> {
-    for (const move of moves) {
-      const from = parked ? move.activePath : move.parkedPath, to = parked ? move.parkedPath : move.activePath;
-      await this.plugin.repo.moveExact(from, to);
-      await this.plugin.repo.setLifecycle(to, move.topicId, parked ? "" : snapshot.id, parked ? move.parkedState : "active");
+    const previous = clone(this.map!), transitioned: FileMove[] = [];
+    try {
+      for (const move of moves) {
+        const from = parked ? move.activePath : move.parkedPath, to = parked ? move.parkedPath : move.activePath;
+        await this.plugin.repo.moveExact(from, to); transitioned.push(move);
+        await this.plugin.repo.setLifecycle(to, move.topicId, parked ? "" : snapshot.id, parked ? move.parkedState : "active");
+      }
+      await this.plugin.repo.saveMap(this.path, clone(snapshot)); this.map = clone(snapshot);
+      await this.plugin.rebuildDerivedData(); await this.hydrate(); this.render();
+    } catch (error) {
+      try {
+        for (const move of transitioned.reverse()) {
+          const from = parked ? move.activePath : move.parkedPath, to = parked ? move.parkedPath : move.activePath;
+          if (this.app.vault.getAbstractFileByPath(to)) await this.plugin.repo.moveExact(to, from);
+          await this.plugin.repo.setLifecycle(from, move.topicId, parked ? previous.id : "", parked ? "active" : move.parkedState);
+        }
+        await this.plugin.repo.saveMap(this.path, previous); this.map = previous;
+        await this.plugin.rebuildDerivedData(); await this.hydrate(); this.render();
+      } catch (rollbackError) { throw new AggregateError([error, rollbackError], "議題狀態轉換失敗，且無法完整復原"); }
+      throw error;
     }
-    await this.plugin.repo.saveMap(this.path, clone(snapshot)); this.map = clone(snapshot);
-    await this.plugin.rebuildDerivedData(); await this.hydrate(); this.render();
   }
   private async removeToUnassigned(node: MapNode, branch: boolean): Promise<void> {
     if (!this.map) return;
@@ -385,6 +685,124 @@ export class VisualAgentMapView extends ItemView {
       this.history.push({ undo: () => this.restoreLifecycle(before, moves, false), redo: () => this.restoreLifecycle(after, moves, true) }); this.render();
     } catch (error) {
       for (const move of [...moves].reverse()) if (this.app.vault.getAbstractFileByPath(move.parkedPath) && !this.app.vault.getAbstractFileByPath(move.activePath)) await this.plugin.repo.moveExact(move.parkedPath, move.activePath);
+      throw error;
+    }
+  }
+  private selectedRoots(): MapNode[] {
+    if (!this.map) return [];
+    return this.map.nodes.filter(node => this.multiSelected.has(node.id) && !this.map!.nodes.some(parent => this.multiSelected.has(parent.id) && descendants(this.map!.nodes, parent.id).has(node.id)));
+  }
+  private confirmRemoveSelected(): void {
+    new ChoiceModal(this.app, t("刪除選取的議題"), t("選取的分支會從圖中移除，筆記移到 Unassigned，可復原。"), [
+      { label: t("確認移除"), action: () => this.enqueue(() => this.removeSelected()) }
+    ]).open();
+  }
+  private async removeSelected(): Promise<void> {
+    if (!this.map) return;
+    const before = clone(this.map), ids = new Set<string>();
+    for (const root of this.selectedRoots()) { ids.add(root.id); for (const id of descendants(before.nodes, root.id)) ids.add(id); }
+    const removed = before.nodes.filter(node => ids.has(node.id)), moves: FileMove[] = [];
+    try {
+      for (const node of removed) {
+        const target = await this.plugin.repo.moveUnique(node.path, this.plugin.repo.topicFolder(this.path, "Unassigned"));
+        moves.push({ activePath: node.path, parkedPath: target, topicId: before.id, parkedState: "unassigned" });
+        await this.plugin.repo.setLifecycle(target, before.id, "", "unassigned");
+      }
+      const after = clone(before); after.nodes = after.nodes.filter(node => !ids.has(node.id));
+      await this.plugin.repo.saveMap(this.path, after); this.map = after; this.selected = null; this.multiSelected.clear();
+      await this.plugin.rebuildDerivedData(); await this.hydrate();
+      this.history.push({ undo: () => this.restoreLifecycle(before, moves, false), redo: () => this.restoreLifecycle(after, moves, true) }); this.render();
+    } catch (error) {
+      try {
+        for (const move of [...moves].reverse()) {
+          if (this.app.vault.getAbstractFileByPath(move.parkedPath) && !this.app.vault.getAbstractFileByPath(move.activePath)) await this.plugin.repo.moveExact(move.parkedPath, move.activePath);
+          if (this.app.vault.getAbstractFileByPath(move.activePath)) await this.plugin.repo.setLifecycle(move.activePath, move.topicId, before.id, "active");
+        }
+        await this.plugin.repo.saveMap(this.path, before); this.map = before;
+        await this.plugin.rebuildDerivedData(); await this.hydrate(); this.render();
+      } catch (rollbackError) { throw new AggregateError([error, rollbackError], "批次移除失敗，且無法完整復原"); }
+      throw error;
+    }
+  }
+  private chooseSelectedParent(copyNodes: boolean): void {
+    if (!this.map) return;
+    const roots = this.selectedRoots();
+    const targets = this.map.nodes.filter(target => copyNodes || roots.every(root => canParent(this.map!.nodes, root.id, target.id)));
+    new ChoiceModal(this.app, copyNodes ? t("複製到…") : t("移動到…"), t("選擇新的母議題"), targets.map(target => ({
+      label: this.notes.get(target.id)?.title ?? target.path,
+      action: () => this.enqueue(() => copyNodes ? this.copySelected(target) : this.moveSelected(target))
+    }))).open();
+  }
+  private async moveSelected(target: MapNode): Promise<void> {
+    const roots = this.selectedRoots();
+    await this.mapChange(map => {
+      let offset = 0;
+      for (const root of roots) {
+        if (!canParent(map.nodes, root.id, target.id)) throw new Error(t("不能建立循環連結。"));
+        const node = map.nodes.find(item => item.id === root.id)!;
+        node.parentId = target.id; node.x = target.x + 340; node.y = target.y + offset++ * 220;
+      }
+      map.nodes.find(node => node.id === target.id)!.collapsed = false;
+    });
+    this.multiSelected.clear(); this.render();
+  }
+  private async copySelected(target: MapNode): Promise<void> {
+    if (!this.map) return;
+    const roots = this.selectedRoots(), before = clone(this.map), copies: MapNode[] = [], replacement = new Map<string, string>();
+    try {
+      for (const root of roots) {
+        const branch: MapNode[] = [];
+        const append = (node: MapNode): void => { branch.push(node); for (const child of before.nodes.filter(item => item.parentId === node.id)) append(child); };
+        append(root);
+        for (const original of branch) {
+          const copy = await this.plugin.repo.duplicateNote(original.path, before, this.path);
+          replacement.set(original.id, copy.id);
+          copy.parentId = original.id === root.id ? target.id : replacement.get(original.parentId!) ?? target.id;
+          copy.x = target.x + 340 + (original.x - root.x);
+          copy.y = target.y + roots.indexOf(root) * 220 + (original.y - root.y);
+          copies.push(copy);
+        }
+      }
+      const after = clone(before); after.nodes.push(...copies); after.nodes.find(node => node.id === target.id)!.collapsed = false;
+      await this.plugin.repo.saveMap(this.path, after); this.map = after;
+      await this.plugin.rebuildDerivedData(); await this.hydrate();
+      const moves: FileMove[] = [];
+      this.history.push({
+        undo: async () => {
+          moves.length = 0;
+          try {
+            for (const copy of copies) {
+              const parkedPath = await this.plugin.repo.moveUnique(copy.path, this.plugin.repo.topicFolder(this.path, "Unassigned"));
+              moves.push({ activePath: copy.path, parkedPath, topicId: before.id, parkedState: "unassigned" });
+              await this.plugin.repo.setLifecycle(parkedPath, before.id, "", "unassigned");
+            }
+            await this.plugin.repo.saveMap(this.path, before); this.map = clone(before);
+            await this.plugin.rebuildDerivedData(); await this.hydrate(); this.render();
+          } catch (error) {
+            try {
+              for (const move of [...moves].reverse()) {
+                if (this.app.vault.getAbstractFileByPath(move.parkedPath)) await this.plugin.repo.moveExact(move.parkedPath, move.activePath);
+                await this.plugin.repo.setLifecycle(move.activePath, before.id, before.id, "active");
+              }
+              await this.plugin.repo.saveMap(this.path, after); this.map = clone(after);
+              await this.plugin.rebuildDerivedData(); await this.hydrate(); this.render();
+            } catch (rollbackError) { throw new AggregateError([error, rollbackError], "復原複製失敗，且無法完整回復"); }
+            throw error;
+          }
+        },
+        redo: () => this.restoreLifecycle(after, moves, false)
+      });
+      this.multiSelected.clear(); this.render();
+    } catch (error) {
+      try {
+        await this.plugin.repo.saveMap(this.path, before); this.map = before;
+        for (const copy of copies) {
+          if (!this.app.vault.getAbstractFileByPath(copy.path)) continue;
+          const parkedPath = await this.plugin.repo.moveUnique(copy.path, this.plugin.repo.topicFolder(this.path, "Unassigned"));
+          await this.plugin.repo.setLifecycle(parkedPath, before.id, "", "unassigned");
+        }
+        await this.plugin.rebuildDerivedData(); await this.hydrate(); this.render();
+      } catch (rollbackError) { throw new AggregateError([error, rollbackError], "批次複製失敗，且無法完整復原"); }
       throw error;
     }
   }
@@ -445,35 +863,6 @@ export class VisualAgentMapView extends ItemView {
     this.notes.set(node.id, await this.plugin.repo.readNote(node.path));
     this.refreshCard(node);
     this.updateHistoryButtons();
-  }
-  private async renameNode(node: MapNode, title: string): Promise<void> {
-    if (!this.map) return;
-    const current = await this.plugin.repo.readNote(node.path), oldTitle = current.title, oldPath = node.path;
-    if (oldTitle === title && oldPath.endsWith(`/${title}.md`)) return;
-    this.plugin.activeTasks?.get(oldPath)?.abort();
-    const apply = async (from: string, to: string | undefined, nextTitle: string): Promise<string> => {
-      const nextPath = await this.plugin.repo.renameNote(from, nextTitle, to);
-      const target = this.map?.nodes.find(item => item.id === node.id); if (target) target.path = nextPath;
-      node.path = nextPath;
-      if (this.map) await this.plugin.repo.saveMap(this.path, this.map);
-      await this.plugin.repo.replaceSourcePath(from, nextPath);
-      await this.plugin.rebuildDerivedData(); await this.hydrate(); this.render();
-      return nextPath;
-    };
-    const newPath = await apply(oldPath, undefined, title);
-    this.history.push({ undo: () => apply(newPath, oldPath, oldTitle).then(() => {}), redo: () => apply(oldPath, newPath, title).then(() => {}) });
-    this.updateHistoryButtons();
-  }
-  private async saveFieldWithConflict(node: MapNode, key: "title" | "summary" | "rules", label: string, base: string, value: string): Promise<void> {
-    const latest = await this.plugin.repo.readNote(node.path);
-    if (latest[key] !== base && latest[key] !== value) {
-      new ConflictModal(this.app, label, value, latest[key], resolved => {
-        if (resolved === null) this.enqueue(async () => { await this.hydrate(); this.render(); });
-        else this.enqueue(() => key === "title" ? this.renameNode(node, resolved) : this.noteChange(node, { [key]: resolved }));
-      }).open();
-      return;
-    }
-    if (key === "title") await this.renameNode(node, value); else await this.noteChange(node, { [key]: value });
   }
   private openDetails(node: MapNode): void { void this.plugin.openDetails(this.plugin.repo.file(node.path)).catch(error => new Notice(error instanceof Error ? error.message : String(error))); }
   private async travel(redo: boolean): Promise<void> {
@@ -640,7 +1029,8 @@ export class VisualAgentMapView extends ItemView {
     if (!this.builtIn) {
       this.button(tools, t("＋ 議題"), () => this.enqueue(() => this.addNode(null))).addClass("mod-cta");
       this.button(tools, t("整理"), () => this.enqueue(() => this.openOrganizer()));
-      const integrate = this.button(tools, this.integrationMode ? t("結束整合") : t("整合議題"), () => { this.integrationMode = !this.integrationMode; this.multiSelected.clear(); this.selected = null; this.render(); });
+      this.button(tools, t("自動排版"), () => this.enqueue(() => this.mapChange(map => { map.nodes = arrangeMap(map.nodes); }, false)));
+      const integrate = this.button(tools, this.integrationMode ? t("結束選取") : t("選取議題"), () => { this.integrationMode = !this.integrationMode; this.multiSelected.clear(); this.selected = null; this.render(); });
       if (this.integrationMode) integrate.addClass("is-active");
     }
     this.button(tools, "−", () => this.zoomBy(1 / 1.2)).setAttr("aria-label", t("縮小"));
@@ -660,7 +1050,7 @@ export class VisualAgentMapView extends ItemView {
       if (previewSaveTimer !== null) window.clearTimeout(previewSaveTimer);
       previewSaveTimer = window.setTimeout(() => { void this.plugin.saveSettings(); previewSaveTimer = null; }, 250);
     });
-    tools.createSpan({ cls: "vam-hint", text: t("拖曳空白處平移 · 滾輪縮放 · 點選節點編輯") });
+    tools.createSpan({ cls: "vam-hint", text: t("拖曳空白處平移 · 滾輪縮放 · 點選節點開啟筆記") });
     const workspace = this.contentEl.createDiv("vam-workspace");
     this.viewportEl = workspace.createDiv("vam-viewport");
     this.stageEl = this.viewportEl.createDiv("vam-stage");
@@ -671,14 +1061,17 @@ export class VisualAgentMapView extends ItemView {
     if (this.integrationMode) {
       const selection = workspace.createDiv("vam-selection-bar");
       const names = [...this.multiSelected].map(id => this.notes.get(id)?.title).filter(Boolean);
-      selection.createSpan({ text: this.multiSelected.size ? t("已選 {0} 個：{1}{2}", this.multiSelected.size, names.slice(0, 2).join("、"), names.length > 2 ? "…" : "") : t("請點選至少 2 個議題") });
+      selection.createSpan({ text: this.multiSelected.size ? t("已選 {0} 個：{1}{2}", this.multiSelected.size, names.slice(0, 2).join("、"), names.length > 2 ? "…" : "") : t("請選取議題") });
       this.button(selection, t("清除"), () => { this.multiSelected.clear(); this.render(); }, !this.multiSelected.size);
-      this.button(selection, t("下一步"), () => this.integrateSelected(), this.multiSelected.size < 2).addClass("mod-cta");
+      this.button(selection, t("刪除"), () => this.confirmRemoveSelected(), !this.multiSelected.size);
+      this.button(selection, t("移動到…"), () => this.chooseSelectedParent(false), !this.multiSelected.size);
+      this.button(selection, t("複製到…"), () => this.chooseSelectedParent(true), !this.multiSelected.size);
+      this.button(selection, t("整合"), () => this.integrateSelected(), this.multiSelected.size < 2).addClass("mod-cta");
     }
     for (const node of shown) this.renderNode(node);
     if (!this.map.nodes.length) this.viewportEl.createDiv({ cls: "vam-empty", text: t("這張心智圖還沒有議題。點「＋ 議題」建立第一個節點。") });
     this.setupPan(); this.transform(); this.drawEdges();
-    if (this.selected) { const node = this.map.nodes.find(n => n.id === this.selected); if (node) this.renderInspector(workspace, node); }
+    if (this.builtIn && this.selected) { const node = this.map.nodes.find(n => n.id === this.selected); if (node) this.renderInspector(workspace, node); }
   }
   private renderNode(node: MapNode): void {
     if (!this.stageEl) return;
@@ -689,8 +1082,16 @@ export class VisualAgentMapView extends ItemView {
       const check = header.createSpan({ cls: `vam-select-check${this.multiSelected.has(node.id) ? " is-checked" : ""}`, text: this.multiSelected.has(node.id) ? "✓" : "" });
       check.setAttr("aria-hidden", "true");
     }
-    if (!note || note.status !== "completed") header.createSpan({ cls: `vam-status vam-status-${note?.status ?? "error"}`, text: note ? t(labels[note.status]) : t("筆記不存在") });
-    if (this.plugin.pendingSuggestions.has(node.path)) header.createSpan({ cls: "vam-badge-new", text: t("待確認建議") });
+    const active = this.plugin.running?.has(node.path) || this.plugin.quickExpandPending?.has(node.path);
+    if (active || !note || note.status !== "completed") header.createSpan({ cls: `vam-status vam-status-${active ? "running" : note?.status ?? "error"}`, text: active ? t("AI 執行中") : note ? t(labels[note.status]) : t("筆記不存在") });
+    const quickError = this.plugin.quickExpandFailures?.get(node.path);
+    if (quickError && !active) { const badge = header.createSpan({ cls: "vam-status vam-status-error", text: t("展開失敗") }); badge.setAttr("title", quickError); }
+    const pendingCount = this.plugin.pendingSuggestions.get(node.path)?.length ?? 0;
+    if (pendingCount && !this.builtIn && !this.integrationMode) this.button(header, t("查看 {0} 個展開建議", pendingCount), () => this.openNodePanel(node, "proposals")).addClass("vam-badge-new");
+    if (!this.builtIn && !this.integrationMode) {
+      const ai = this.button(header, "✦", () => this.openNextStep(node)); ai.addClass("vam-node-tool"); ai.setAttr("aria-label", t("接下來想怎麼探索？"));
+      const structure = this.button(header, "⚙", () => this.openNodePanel(node, "structure")); structure.addClass("vam-node-tool"); structure.setAttr("aria-label", t("結構與連結"));
+    }
     const details = this.button(header, "↗", () => this.builtIn ? this.selectSampleNode(node.id) : this.openDetails(node)); details.addClass("vam-detail-button"); details.setAttr("aria-label", this.builtIn ? t("查看範例內容") : t("在右側欄開啟詳情"));
     const count = descendants(this.map!.nodes, node.id).size;
     if (count && !this.builtIn) this.button(header, node.collapsed ? t("展開 {0}", count) : t("收合"), () => this.enqueue(() => this.mapChange(map => { const n = map.nodes.find(n => n.id === node.id)!; n.collapsed = !n.collapsed; })));
@@ -699,8 +1100,8 @@ export class VisualAgentMapView extends ItemView {
     title.setAttr("title", note?.title ?? node.path);
     card.createEl("p", { cls: "vam-card-summary", text: note?.summary ?? t("檔案已移動或刪除，可從圖中移除此節點。") });
     if (!this.builtIn) this.enableDrag(card, node); else card.addClass("is-readonly");
-    card.addEventListener("click", event => { if (Date.now() < this.suppressClickUntil) return; if ((event.target as Element).closest("button") || event.metaKey || event.ctrlKey) return; if (this.integrationMode) { if (this.multiSelected.has(node.id)) this.multiSelected.delete(node.id); else this.multiSelected.add(node.id); this.render(); return; } this.multiSelected.clear(); this.selected = node.id; this.render(); });
-    card.addEventListener("keydown", event => { if (event.key === "Enter" && event.target === card) { this.selected = node.id; this.render(); } });
+    card.addEventListener("click", event => { if (Date.now() < this.suppressClickUntil) return; if ((event.target as Element).closest("button") || event.metaKey || event.ctrlKey) return; if (this.integrationMode) { if (this.multiSelected.has(node.id)) this.multiSelected.delete(node.id); else this.multiSelected.add(node.id); this.render(); return; } if (this.builtIn) this.selectSampleNode(node.id); else this.openDetails(node); });
+    card.addEventListener("keydown", event => { if (event.key === "Enter" && event.target === card) { if (this.integrationMode) { if (this.multiSelected.has(node.id)) this.multiSelected.delete(node.id); else this.multiSelected.add(node.id); this.render(); } else if (this.builtIn) this.selectSampleNode(node.id); else this.openDetails(node); } });
     card.addEventListener("mouseenter", () => { if (!note || this.integrationMode || this.dragging) return; this.clearHoverTimer(); this.hoverTimer = window.setTimeout(() => { if (!this.dragging && card.isConnected) this.showHoverCard(card, note); }, 700); });
     card.addEventListener("mouseleave", () => this.hideHoverCardSoon());
   }
@@ -755,9 +1156,33 @@ export class VisualAgentMapView extends ItemView {
     else header?.createSpan({ cls: `vam-status vam-status-${note.status}`, text: labels[note.status] });
     this.drawEdges();
   }
-  private renderInspector(parent: HTMLElement, node: MapNode): void {
-    const panel = parent.createDiv("vam-inspector"), note = this.notes.get(node.id);
-    const heading = panel.createDiv("vam-inspector-heading"); heading.createEl("strong", { text: this.builtIn ? t("範例內容") : t("議題工作台") }); this.button(heading, t("關閉"), () => { this.selected = null; this.render(); });
+  private openNextStep(node: MapNode): void {
+    this.enqueue(async () => {
+      const note = await this.plugin.repo.readNote(node.path);
+      new NextStepModal(this.app, note.title, note.researchDepth, this.map?.nodes.filter(item => item.parentId === node.id).length ?? 0, this.plugin.pendingSuggestions.get(node.path)?.length ?? 0, this.plugin, (options, focus, done, failed) => this.plugin.mutate(async () => {
+        const latest = await this.plugin.repo.readNote(node.path);
+        const prompt = `研究「${latest.title}」，補足資訊、來源與不確定處。${focus ? `\n特別研究：${focus}` : ""}`;
+        options.visualMode = latest.visualMode;
+        await this.noteChange(node, { prompt, researchMode: options.researchMode, researchDepth: options.researchDepth });
+        await this.runAgent(node, done, failed);
+      }), (options, direction, found, failed, created) => {
+        if (!options.multiLayer) return this.plugin.mutate(() => this.proposeChildren(node, true, options, direction, found, failed, false, created));
+        return this.startQuickExpansion(node, options, direction, failed, created);
+      }, (options, found, drafted, failed) => this.plugin.mutate(() => this.proposeIntegrationDirections(node, options, found, drafted, failed)),
+      { model: note.model, modelSource: note.modelSource, reasoning: note.reasoning ?? this.plugin.settings.cliReasoning, save: patch => this.plugin.mutate(() => this.noteChange(node, patch)), running: this.plugin.running.has(node.path) || this.plugin.quickExpandPending.has(node.path), stop: this.plugin.activeTasks.has(node.path) ? () => this.plugin.activeTasks.get(node.path)?.abort() : undefined, quickError: this.plugin.quickExpandFailures.get(node.path) }).open();
+    });
+  }
+  private openNodePanel(node: MapNode, mode: "structure" | "proposals"): void {
+    const render = (content: HTMLElement, close: () => void): void => this.renderInspector(content, node, mode, close);
+    new class extends Modal {
+      onOpen(): void { this.modalEl.addClass("vam-topic-modal"); render(this.contentEl, () => this.close()); }
+    }(this.app).open();
+  }
+  private renderInspector(parent: HTMLElement, node: MapNode, mode: "structure" | "proposals" = "structure", close?: () => void): void {
+    const panel = parent.createDiv(this.builtIn ? "vam-inspector" : "vam-topic-panel"), note = this.notes.get(node.id);
+    const heading = panel.createDiv("vam-inspector-heading");
+    heading.createEl("strong", { text: this.builtIn ? t("範例內容") : mode === "structure" ? t("結構與連結") : t("展開建議") });
+    if (this.builtIn) this.button(heading, t("關閉"), () => { this.selected = null; this.render(); });
     if (note) {
       if (this.builtIn) {
         panel.createEl("h3", { text: note.title }); panel.createEl("p", { text: note.summary, cls: "vam-sample-summary" });
@@ -765,18 +1190,8 @@ export class VisualAgentMapView extends ItemView {
         if (note.sourcePaths.length) { const sources = panel.createDiv("vam-reference-sources"); sources.createEl("strong", { text: t("來源議題") }); for (const path of note.sourcePaths) { const source = this.map?.nodes.find(item => item.path === path); if (source) this.button(sources, this.notes.get(source.id)?.title ?? path, () => this.selectSampleNode(source.id)); } }
         return;
       }
-      const field = (label: string, key: "title" | "summary" | "rules", rows = 0): void => {
-        const wrapper = panel.createEl("label", { cls: "vam-field" }); wrapper.createSpan({ text: label });
-        const input = rows ? wrapper.createEl("textarea", { text: note[key] }) : wrapper.createEl("input", { type: "text", value: note[key] });
-        input.setAttr("aria-label", label); if (input instanceof HTMLTextAreaElement) input.rows = rows;
-        const base = note[key];
-        input.addEventListener("change", () => {
-          const value = key === "title" ? input.value.trim() || t("未命名議題") : input.value.trim();
-          note[key] = value;
-          this.enqueue(() => this.saveFieldWithConflict(node, key, label, base, value));
-        });
-      };
-      field(t("議題"), "title"); field(t("目前理解"), "summary", 4); field(t("AI 規則"), "rules", 4);
+      if (mode === "proposals") this.renderPendingProposals(panel, node, note, close);
+      if (mode === "structure") {
       const sourcePaths = this.referenceSourcePaths(note, node.path);
       if (sourcePaths.length) {
         const sources = panel.createDiv("vam-reference-sources"); sources.createEl("strong", { text: t("來源議題") });
@@ -784,76 +1199,84 @@ export class VisualAgentMapView extends ItemView {
           const sourceNode = this.map?.nodes.find(item => item.path === path), sourceNote = sourceNode ? this.notes.get(sourceNode.id) : null;
           const file = this.app.vault.getAbstractFileByPath(path);
           this.button(sources, sourceNote?.title ?? (file instanceof TFile ? file.basename : t("{0}（已移動）", path.split("/").at(-1)?.replace(/\.md$/, ""))), () => {
+            close?.();
             if (sourceNode) { this.selected = sourceNode.id; this.render(); this.focusNode(sourceNode); }
             else if (file instanceof TFile) void this.plugin.openDetails(file);
           }, !(sourceNode || file instanceof TFile));
         }
       }
-      const actions = panel.createDiv("vam-actions");
-      const running = this.plugin.running.has(node.path);
-      const previewTask = (title: string, prompt: string, defaultMode: ResearchMode = "research"): void => this.enqueue(async () => {
-        const latest = await this.plugin.repo.readNote(node.path);
-        new TaskModal(
-          this.app,
-          prompt,
-          (value, run, options) => this.enqueue(async () => { await this.noteChange(node, { prompt: value, researchMode: options.researchMode, researchDepth: options.researchDepth, visualMode: options.visualMode }); if (run) await this.plugin.confirmCodexUsage(() => this.runAgent(node, options)); }),
-          title,
-          t("AI 完成後會直接更新目前理解，完整結果會保存在 MD 詳情中。送出前可調整任務。"),
-          latest.rules,
-          defaultMode,
-          latest.researchDepth,
-          latest.visualMode
-        ).open();
-      });
-      const nextSteps: { label: string; description?: string; action: () => void }[] = [
-        { label: t("研究這個議題"), description: t("補足資訊、來源與仍待確認之處。"), action: () => previewTask(t("確認研究任務"), `研究「${note.title}」，補足資訊、來源與不確定處。`) },
-        { label: t("由 AI 拆成子議題"), description: t("產生 3–7 個建議；確認後才建立節點。"), action: () => this.enqueue(() => this.proposeChildren(node)) },
-        { label: t("整合子議題發現"), description: t("彙整直屬子議題；確認任務後自動更新目前理解。"), action: () => this.enqueue(() => this.integrateChildren(node)) },
-        { label: t("自己描述下一步"), description: t("自行撰寫這次要 AI 完成的工作，可只儲存或確認並執行。"), action: () => previewTask(t("自己描述下一步"), note.prompt, note.researchMode) }
-      ];
-      if (note.prompt.trim()) nextSteps.splice(1, 0, { label: t("執行已保存的任務"), description: t("執行先前保存的任務；送出前仍可修改。"), action: () => previewTask(t("確認已保存的任務"), note.prompt, note.researchMode) });
-      this.button(actions, running ? t("AI 執行中…") : t("選擇下一步"), () => this.enqueue(async () => {
-        const input = panel.querySelector<HTMLTextAreaElement>(`textarea[aria-label="${t("AI 規則")}"]`);
-        const rules = input?.value.trim() ?? note.rules;
-        const latest = await this.plugin.repo.readNote(node.path);
-        if (rules !== latest.rules) await this.noteChange(node, { rules });
-        new ChoiceModal(this.app, t("下一步"), t("選擇目的後，再確認 AI 將執行的任務。"), nextSteps).open();
-      }), running).addClass("mod-cta");
-      if (running && this.plugin.activeTasks.has(node.path)) this.button(actions, t("停止研究"), () => this.plugin.activeTasks.get(node.path)?.abort());
-      const pending = this.plugin.pendingSuggestions.get(node.path);
-      if (pending?.length) this.button(actions, t("查看 AI 子議題建議（{0}）", pending.length), () => this.openChildSuggestions(node, pending), running);
-      const advanced = panel.createEl("details", { cls: "vam-advanced" }); advanced.createEl("summary", { text: t("模型與進階設定") });
-      const modelLabel = advanced.createEl("label", { cls: "vam-field" }); modelLabel.createSpan({ text: t("使用模型") });
-      const select = modelLabel.createEl("select"); select.setAttr("aria-label", t("使用模型"));
-      const options = new Set(this.plugin.settings.models.split(/[\n,]/).map(s => s.trim()).filter(Boolean));
-      for (const model of options) select.createEl("option", { value: model, text: model });
-      if (!options.has(note.model)) { const unavailable = select.createEl("option", { value: note.model, text: t("目前模型已不可用") }); unavailable.disabled = true; }
-      select.value = note.model;
-      select.addEventListener("change", () => { if (options.has(select.value)) this.enqueue(() => this.noteChange(node, { model: select.value, modelSource: "manual" })); });
-      const sourceLabels: Record<ModelSource, string> = { workspace: t("工作區預設"), inherited: t("建立時繼承"), manual: t("手動指定") };
-      const reasoningLabel = advanced.createEl("label", { cls: "vam-field" }); reasoningLabel.createSpan({ text: t("推理等級") });
-      const reasoning = reasoningLabel.createEl("select"); reasoning.setAttr("aria-label", t("推理等級"));
-      for (const [value, label] of [["auto", t("自動 (Auto)")], ["low", t("低 (Low)")], ["medium", t("中 (Medium)")], ["high", t("高 (High)")]]) reasoning.createEl("option", { value, text: label });
-      reasoning.value = normalizeReasoningLevel(note.reasoning ?? this.plugin.settings.cliReasoning);
-      reasoning.addEventListener("change", () => this.enqueue(() => this.noteChange(node, { reasoning: normalizeReasoningLevel(reasoning.value) })));
-      advanced.createEl("p", { cls: "vam-hint", text: t("{0} · {1}；推理等級可依議題調整。", note.model, sourceLabels[note.modelSource]) });
-    } else {
+      }
+    } else if (mode === "structure") {
       panel.createEl("p", { text: t("此節點的筆記不存在，可重新連結未歸類筆記或從圖中移除。") });
       this.button(panel, t("重新連結筆記"), () => this.enqueue(async () => {
         const candidates = [...await this.plugin.repo.collectionFiles(this.path, "Unassigned"), ...await this.plugin.repo.inboxFiles()];
         new NoteCollectionModal(this.app, t("重新連結筆記"), candidates, [{ label: t("使用這份筆記"), run: file => this.enqueue(() => this.relinkMissingNode(node, file)) }]).open();
       }));
     }
-    this.button(panel, t("從圖中移除"), () => new ChoiceModal(this.app, t("從圖中移除"), t("筆記會移至目前主題的 Unassigned，可重新認領或復原。"), [{ label: t("只移除此節點，子議題變成根議題"), action: () => this.enqueue(() => this.removeToUnassigned(node, false)) }]).open());
-    const relationship = panel.createEl("details", { cls: "vam-advanced" }); relationship.createEl("summary", { text: t("結構與連結") });
+    if (mode !== "structure") return;
+    const relationship = panel.createDiv();
     const parentLabel = relationship.createEl("label", { cls: "vam-field" }); parentLabel.createSpan({ text: t("所屬母議題") });
     const parents = parentLabel.createEl("select"); parents.setAttr("aria-label", t("母議題／連結")); parents.createEl("option", { value: "", text: t("無母議題（根議題）") });
     for (const candidate of this.map!.nodes) if (canParent(this.map!.nodes, node.id, candidate.id)) parents.createEl("option", { value: candidate.id, text: this.notes.get(candidate.id)?.title ?? candidate.path });
     parents.value = node.parentId ?? "";
-    parents.addEventListener("change", () => { const parentId = parents.value || null; this.enqueue(() => this.mapChange(map => { if (!canParent(map.nodes, node.id, parentId)) throw new Error(t("不能建立循環連結。")); map.nodes.find(n => n.id === node.id)!.parentId = parentId; })); });
-    this.button(relationship, t("移除母議題連結"), () => this.enqueue(() => this.mapChange(map => { map.nodes.find(n => n.id === node.id)!.parentId = null; })), !node.parentId);
+    parents.addEventListener("change", () => { const parentId = parents.value || null; close?.(); this.enqueue(() => this.mapChange(map => { if (!canParent(map.nodes, node.id, parentId)) throw new Error(t("不能建立循環連結。")); map.nodes.find(n => n.id === node.id)!.parentId = parentId; })); });
+    this.button(relationship, t("移除母議題連結"), () => { close?.(); this.enqueue(() => this.mapChange(map => { map.nodes.find(n => n.id === node.id)!.parentId = null; })); }, !node.parentId);
     relationship.createEl("p", { cls: "vam-hint", text: t("更換母議題會影響下次 AI 任務取得的背景，不會更動模型。") });
-    this.button(relationship, t("從圖中移除"), () => new ChoiceModal(this.app, t("從圖中移除"), t("筆記會移至目前主題的 Unassigned，可重新認領或復原。"), [{ label: t("只移除此節點，子議題變成根議題"), action: () => this.enqueue(() => this.removeToUnassigned(node, false)) }, { label: t("移除整個分支"), action: () => this.enqueue(() => this.removeToUnassigned(node, true)) }]).open());
+    this.button(relationship, t("從圖中移除"), () => { close?.(); new ChoiceModal(this.app, t("從圖中移除"), t("筆記會移至目前主題的 Unassigned，可重新認領或復原。"), [{ label: t("只移除此節點，子議題變成根議題"), action: () => this.enqueue(() => this.removeToUnassigned(node, false)) }, { label: t("移除整個分支"), action: () => this.enqueue(() => this.removeToUnassigned(node, true)) }]).open(); });
+  }
+  private renderPendingProposals(panel: HTMLElement, node: MapNode, note: Note, close?: () => void): void {
+    const suggestions = this.plugin.pendingSuggestions.get(node.path);
+    if (!suggestions?.length) return;
+    const section = panel.createDiv("vam-inspector-proposals");
+    section.createEl("h3", { text: t("{0} 個展開建議", suggestions.length) });
+    section.createEl("p", { text: t("勾選並修改建議；確認後才建立子議題。") });
+    const rows: { original: Suggestion; check: HTMLInputElement; title: HTMLInputElement; task: HTMLTextAreaElement; contribution: HTMLTextAreaElement }[] = [];
+    for (const original of suggestions) {
+      const row = section.createDiv("vam-proposal");
+      if (original.parentTitle) row.createEl("p", { text: t("↳ {0} 的子議題", original.parentTitle) });
+      const checkLabel = row.createEl("label", { cls: "vam-field vam-next-toggle" });
+      const check = checkLabel.createEl("input", { type: "checkbox" }); check.checked = true;
+      checkLabel.createSpan({ text: t("建立這個子議題") });
+      const title = row.createEl("input", { type: "text", value: original.title }); title.setAttr("aria-label", t("子議題名稱"));
+      const task = row.createEl("textarea", { text: original.task }); task.rows = 2; task.setAttr("aria-label", t("研究任務"));
+      const contribution = row.createEl("textarea", { text: original.contribution }); contribution.rows = 2; contribution.setAttr("aria-label", t("對母議題的貢獻"));
+      rows.push({ original, check, title, task, contribution });
+    }
+    const researchLabel = section.createEl("label", { cls: "vam-field vam-next-toggle" });
+    const shallow = researchLabel.createEl("input", { type: "checkbox" }); shallow.checked = !!this.plugin.pendingResearchOptions.get(node.path)?.shallowResearch; researchLabel.createSpan({ text: t("建立後逐一淺研究子議題") });
+    const status = section.createEl("p", { cls: "vam-hint" });
+    const actions = section.createDiv("vam-actions");
+    const create = this.button(actions, t("建立選取的子議題"), () => { void (async () => {
+      const chosen = rows.filter(row => row.check.checked && row.title.value.trim());
+      if (!chosen.length) { status.setText(t("請至少選取一個子議題。")); return; }
+      const names = new Map(chosen.map(row => [row.original.title, row.title.value.trim()]));
+      if (new Set(names.values()).size !== names.size) { status.setText(t("子議題名稱不能重複。")); return; }
+      if (chosen.some(row => row.original.parentTitle && !names.has(row.original.parentTitle))) { status.setText(t("請先勾選子議題的母議題。")); return; }
+      const items = chosen.map(row => ({ title: row.title.value.trim(), task: row.task.value.trim(), contribution: row.contribution.value.trim(), parentTitle: row.original.parentTitle ? names.get(row.original.parentTitle)! : "" }));
+      create.disabled = true; status.setText(t("正在建立子議題…"));
+      try {
+        await this.plugin.mutate(async () => {
+          const current = this.map?.nodes.find(item => item.id === node.id && item.path === node.path);
+          if (!current) throw new Error(t("議題已變更，請重新選取。"));
+          if (this.plugin.pendingSuggestions.get(node.path) !== suggestions) throw new Error(t("展開建議已變更，請重新開啟。"));
+          try { await this.createChildBatch(current, items, shallow.checked ? this.plugin.pendingResearchOptions.get(node.path) ?? { researchMode: "research", researchDepth: "fast", visualMode: "off", currentVault: false, folderFiles: [], individualFiles: [], shallowResearch: true } : undefined); }
+          catch (error) { if (error instanceof PartialChildBatchError) { this.plugin.pendingSuggestions.delete(node.path); this.plugin.pendingResearchOptions.delete(node.path); } throw error; }
+          this.plugin.pendingSuggestions.delete(node.path); this.plugin.pendingResearchOptions.delete(node.path);
+          await (this.plugin.pendingSuggestions as PendingSuggestions).flush?.();
+        });
+        close?.(); this.render();
+      } catch (error) { create.disabled = false; status.setText(error instanceof Error ? error.message : String(error)); }
+    })(); }); create.addClass("mod-cta");
+    this.button(actions, t("捨棄這些建議"), () => { void (async () => {
+      try {
+        await this.plugin.mutate(async () => {
+          if (this.plugin.pendingSuggestions.get(node.path) !== suggestions) throw new Error(t("展開建議已變更，請重新開啟。"));
+          this.plugin.pendingSuggestions.delete(node.path); this.plugin.pendingResearchOptions.delete(node.path);
+          await (this.plugin.pendingSuggestions as PendingSuggestions).flush?.();
+        });
+        close?.(); this.render();
+      } catch (error) { status.setText(error instanceof Error ? error.message : String(error)); }
+    })(); });
   }
   private async previewMigration(): Promise<void> {
     const plan = await this.plugin.repo.legacyMigrationPlan();
@@ -890,52 +1313,149 @@ export class VisualAgentMapView extends ItemView {
     this.notes.set(node.id, await this.plugin.repo.readNote(node.path)); this.selected = node.id;
     await this.mapChange(map => { map.nodes.push(node); if (parent) map.nodes.find(n => n.id === parent.id)!.collapsed = false; }, rebuildDerivedData); this.focusNode(node);
   }
-  private async proposeChildren(parent: MapNode, confirmed = false, options?: TaskOptions, direction = ""): Promise<void> {
+  private startQuickExpansion(parent: MapNode, options: TaskOptions, direction: string, failed: (message: string, retryable?: boolean) => void, created: () => void): Promise<void> {
+    if (this.plugin.running.has(parent.path) || this.plugin.quickExpandPending.has(parent.path)) { failed(t("AI 執行中…")); return Promise.resolve(); }
+    this.plugin.quickExpandFailures.delete(parent.path);
+    this.plugin.quickExpandPending.add(parent.path); this.render();
+    return this.proposeChildren(parent, true, options, direction, undefined, failed, true, created).catch(error => {
+      this.plugin.quickExpandFailures.set(parent.path, error instanceof Error ? error.message : String(error));
+      throw error;
+    }).finally(() => { this.plugin.quickExpandPending.delete(parent.path); this.render(); });
+  }
+  private async proposeChildren(parent: MapNode, confirmed = false, options?: TaskOptions, direction = "", found?: (items: Suggestion[], create: (items: Suggestion[]) => Promise<void>) => void, failed?: (message: string, retryable?: boolean) => void, direct = false, created?: () => void): Promise<void> {
     const pending = this.plugin.pendingSuggestions.get(parent.path);
-    if (pending?.length) { this.openChildSuggestions(parent, pending); return; }
+    const present = (items: Suggestion[]): void => {
+      const version = this.plugin.pendingSuggestions.get(parent.path);
+      const names = items.filter(item => !item.parentTitle).map(item => item.title);
+      if (new Set(names).size !== names.length) {
+        this.plugin.pendingSuggestions.delete(parent.path); this.plugin.pendingResearchOptions.delete(parent.path);
+        const message = t("AI 提案的第一層名稱重複，請重新產生提案。"); if (failed) failed(message); else new Notice(message);
+        return;
+      }
+      if (!found) { this.openChildSuggestions(parent, items); return; }
+      found(items, selected => this.plugin.mutate(async () => {
+        if (!version || this.plugin.pendingSuggestions.get(parent.path) !== version) throw new Error(t("展開建議已變更，請重新開啟。"));
+        try { await this.createChildBatch(parent, selected, this.plugin.pendingResearchOptions.get(parent.path)); }
+        catch (error) { if (error instanceof PartialChildBatchError) { this.plugin.pendingSuggestions.delete(parent.path); this.plugin.pendingResearchOptions.delete(parent.path); } throw error; }
+        this.plugin.pendingSuggestions.delete(parent.path); this.plugin.pendingResearchOptions.delete(parent.path);
+        await (this.plugin.pendingSuggestions as PendingSuggestions).flush?.();
+      }));
+    };
+    if (pending?.length && !direct) {
+      if (options) { if (options.shallowResearch ?? options.multiLayer) this.plugin.pendingResearchOptions.set(parent.path, options); else this.plugin.pendingResearchOptions.delete(parent.path); }
+      present(options && !options.multiLayer ? pending.filter(item => !item.parentTitle) : pending);
+      return;
+    }
     const note = await this.plugin.repo.readNote(parent.path);
-    if (this.plugin.running.has(parent.path)) return;
+    if (this.plugin.running.has(parent.path)) { failed?.(t("AI 執行中…")); return; }
     if (!confirmed) {
       new TaskModal(this.app, t("請建議最有幫助的展開方向；若我指定方向就依指定方向拆解。"), (value, run, chosen) => { if (run) void this.plugin.confirmCodexUsage(async () => this.enqueue(() => this.proposeChildren(parent, true, chosen, value))); }, t("展開子議題"), t("可指定展開方向，或讓 AI 建議；結果先預覽，確認後才建立節點。"), note.rules, note.researchMode, note.researchDepth, note.visualMode, false, true).open();
       return;
     }
+    const targetMapPath = this.path, targetMapId = this.map?.id;
+    const originalChildren = this.map?.nodes.filter(item => item.parentId === parent.id).map(item => item.id).sort().join("|") ?? "";
     this.plugin.running.add(parent.path); this.render();
+    let building = false;
     try {
-      const selectedSources = await this.selectedSourceContext(`${note.title} ${direction}`, options);
       const existing = this.map?.nodes.filter(item => item.parentId === parent.id).map(item => {
         const child = this.notes.get(item.id);
         return `- ${child?.title || item.path}：${child?.summary || "尚無摘要"}`;
       }).join("\n") || "（無）";
-      const result = await this.plugin.askModel({ title: note.title, summary: note.summary, rules: note.rules, detail: note.detail, task: `${direction || "請建議最有幫助的展開方向。"}\n現有直屬子議題：\n${existing}\n請避免與現有子議題同名或高度重疊；若已完整涵蓋，說明無需新增，不要為湊數而拆解。若仍需要拆解，提出 3–7 個第一層子議題。${options?.multiLayer ? "再為每個第一層議題提出 1–2 個淺層子議題，總數最多 15 個；第二層的 parentTitle 必須等於第一層 title。" : "所有 parentTitle 必須是空字串。"}每項提供 title、task 與 contribution；只提出待研究問題，不把未查證事實寫成結論。`, ancestors: await this.ancestorContext(parent), sourceContext: selectedSources, mode: "decompose", researchMode: options?.researchMode ?? note.researchMode, researchDepth: options?.researchDepth ?? note.researchDepth, visualMode: "off" }, note.model, note.reasoning);
-      const roots = result.suggestions.filter(item => !item.parentTitle).slice(0, 7);
-      const rootTitles = new Set(roots.map(item => item.title));
-      const children = options?.multiLayer ? result.suggestions.filter(item => item.parentTitle && rootTitles.has(item.parentTitle)).slice(0, 15 - roots.length) : [];
-      const suggestions = [...roots, ...children];
-      if (roots.length < 3) { new Notice(t("AI 認為目前不需要拆解，或沒有提出 3 至 7 個可建立的子議題。")); return; }
-      this.plugin.pendingSuggestions.set(parent.path, suggestions);
-      this.openChildSuggestions(parent, suggestions);
-    } catch (error) { console.error("Visual Agent Map AI split", error); new Notice(this.plugin.recordFailure("AI 拆解失敗", error)); }
+      const layers = options?.layers ?? 2, firstLayerCount = options?.firstLayerCount ?? 3, childrenPerParent = options?.childrenPerParent ?? 2;
+      const shape = direct ? quickShape(layers, firstLayerCount, childrenPerParent) : null;
+      if (shape && shape.total > BigInt(15)) throw new Error(t("預計建立 {0} 個子議題，超過上限 15 個。請減少層數、第一層子議題數，或每個議題的延伸數量。", shape.total.toString()));
+      const directTask = `請建立 ${layers} 層初步地圖，第一層恰好 ${firstLayerCount} 個子議題；第二層起，每個上一層議題各延伸恰好 ${childrenPerParent} 個子議題。每層數量依序為 ${shape?.counts.join("、")}，總共 ${shape?.total} 個。第一層的 parentTitle 為空字串；之後每項的 parentTitle 必須等於其直屬母議題的 title，每個母議題都要有指定數量的子議題。title 在整批提案中不可重複，依層數順序列出。只提出待研究問題，不把未查證事實寫成結論。`;
+      const guidedTask = "若仍需要拆解，提出 3–7 個第一層子議題；所有 parentTitle 必須是空字串。每項提供 title、task 與 contribution；只提出待研究問題，不把未查證事實寫成結論。";
+      const result = await this.plugin.askModel({ title: note.title, summary: note.summary, rules: note.rules, detail: note.detail, task: `${direction || "請建議最有幫助的展開方向。"}\n現有直屬子議題：\n${existing}\n請避免與現有子議題同名或高度重疊；若已完整涵蓋，說明無需新增，不要為湊數而拆解。${direct ? directTask : guidedTask}`, ancestors: await this.ancestorContext(parent), sourceContext: "", mode: "decompose", researchMode: "research", researchDepth: options?.researchDepth ?? note.researchDepth, visualMode: "off" }, note.model, note.reasoning);
+      const suggestions = direct ? quickSuggestions(result.suggestions, layers, firstLayerCount, childrenPerParent) : result.suggestions.filter(item => !item.parentTitle).slice(0, 7);
+      if (!direct && suggestions.length < 3) { const message = t("AI 認為目前不需要拆解，或沒有提出 3 至 7 個可建立的子議題。"); if (failed) failed(message); else new Notice(message); return; }
+      if (direct) {
+        building = true;
+        let batchFailure: Error | null = null;
+        await this.plugin.mutate(async () => {
+          try {
+            const currentParent = this.map?.nodes.find(item => item.id === parent.id && item.path === parent.path);
+            const currentChildren = this.map?.nodes.filter(item => item.parentId === parent.id).map(item => item.id).sort().join("|") ?? "";
+            if (this.path !== targetMapPath || this.map?.id !== targetMapId || !currentParent || currentChildren !== originalChildren) throw new Error(t("地圖或母議題在 AI 執行期間已變更，未建立子議題。"));
+            const currentNote = await this.plugin.repo.readNote(parent.path);
+            const version = (value: Note): string => JSON.stringify([value.title, value.summary, value.rules, value.detail, value.prompt, value.model, value.reasoning, value.sourcePaths]);
+            if (version(currentNote) !== version(note)) throw new Error(t("地圖或母議題在 AI 執行期間已變更，未建立子議題。"));
+            await this.createChildBatch(currentParent, suggestions, options?.shallowResearch ? options : undefined);
+          } catch (error) { batchFailure = error instanceof Error ? error : new Error(typeof error === "string" ? error : t("建立初步地圖失敗")); }
+        });
+        const batchError = batchFailure as Error | null;
+        if (batchError) throw batchError;
+        this.plugin.pendingSuggestions.delete(parent.path); this.plugin.pendingResearchOptions.delete(parent.path);
+        this.plugin.quickExpandFailures?.delete(parent.path);
+        created?.();
+      } else {
+        this.plugin.pendingSuggestions.set(parent.path, suggestions);
+        await (this.plugin.pendingSuggestions as PendingSuggestions).flush?.();
+        if (options?.shallowResearch) this.plugin.pendingResearchOptions.set(parent.path, options);
+        else this.plugin.pendingResearchOptions?.delete(parent.path);
+        present(suggestions);
+      }
+    } catch (error) {
+      if (building && error instanceof PartialChildBatchError) { this.plugin.pendingSuggestions.delete(parent.path); this.plugin.pendingResearchOptions.delete(parent.path); }
+      console.error("Visual Agent Map AI split", error);
+      const message = this.plugin.recordFailure(building ? "建立初步地圖失敗" : "AI 拆解失敗", error);
+      if (direct) this.plugin.quickExpandFailures?.set(parent.path, message);
+      if (failed) failed(message, !(error instanceof PartialChildBatchError)); else new Notice(message);
+    }
     finally { this.plugin.running.delete(parent.path); await this.hydrate(); this.render(); }
   }
   private openChildSuggestions(parent: MapNode, suggestions: Suggestion[]): void {
+    const version = this.plugin.pendingSuggestions.get(parent.path);
+    const roots = suggestions.filter(item => !item.parentTitle).map(item => item.title);
+    if (new Set(roots).size !== roots.length) {
+      this.plugin.pendingSuggestions.delete(parent.path); this.plugin.pendingResearchOptions.delete(parent.path);
+      new Notice(t("AI 提案的第一層名稱重複，請重新產生提案。")); return;
+    }
     new ChildProposalModal(this.app, suggestions.slice(0, 15), items => this.enqueue(async () => {
+      if (!version || this.plugin.pendingSuggestions.get(parent.path) !== version) throw new Error(t("展開建議已變更，請重新開啟。"));
+      const researchOptions = this.plugin.pendingResearchOptions.get(parent.path);
+      try { await this.createChildBatch(parent, items, researchOptions); }
+      catch (error) { if (error instanceof PartialChildBatchError) { this.plugin.pendingSuggestions.delete(parent.path); this.plugin.pendingResearchOptions.delete(parent.path); } throw error; }
       this.plugin.pendingSuggestions.delete(parent.path);
-      await this.createChildBatch(parent, items);
+      this.plugin.pendingResearchOptions.delete(parent.path);
+      await (this.plugin.pendingSuggestions as PendingSuggestions).flush?.();
     })).open();
   }
-  private async createChildBatch(parent: MapNode, items: Suggestion[]): Promise<void> {
-    let created = 0; const createdByTitle = new Map<string, MapNode>();
+  private async createChildBatch(parent: MapNode, items: Suggestion[], researchOptions?: TaskOptions): Promise<void> {
+    if (!items.length) throw new Error(t("請至少選取一個子議題。"));
+    const rootTitles = new Set(items.filter(item => !item.parentTitle).map(item => item.title));
+    if (rootTitles.size !== items.filter(item => !item.parentTitle).length) throw new Error(t("第一層子議題名稱不能重複。"));
+    const seen = new Set<string>();
+    for (const item of items) {
+      if (seen.has(item.title)) throw new Error(t("子議題名稱不能重複。"));
+      if (item.parentTitle && !seen.has(item.parentTitle)) throw new Error(t("請先勾選子議題的母議題。"));
+      seen.add(item.title);
+    }
+    let created = 0; const createdByTitle = new Map<string, MapNode>(), newNodes: MapNode[] = [];
     try {
       for (const item of items) {
         const owner = item.parentTitle ? createdByTitle.get(item.parentTitle) : parent;
-        if (!owner) continue;
+        if (!owner) throw new Error(t("請先勾選子議題的母議題。"));
         await this.addNode(owner, item.title, false); created++;
         const child = this.map!.nodes.at(-1)!;
-        if (!item.parentTitle) createdByTitle.set(item.title, child);
-        await this.noteChange(child, { prompt: item.task, detail: item.contribution ? canonicalDetail(item.contribution) : "" });
+        newNodes.push(child);
+        createdByTitle.set(item.title, child);
+        await this.noteChange(child, { prompt: item.task, detail: researchOptions ? "" : item.contribution ? canonicalDetail(item.contribution) : "", ...(researchOptions ? { researchMode: "research" as const, researchDepth: "fast" as const, visualMode: "off" as const } : {}) });
       }
-    } finally {
+      if (newNodes.length) await this.mapChange(map => { map.nodes = arrangeNewBranch(map.nodes, parent.id, new Set(newNodes.map(node => node.id))); }, false);
       if (created) await this.plugin.rebuildDerivedData();
+      if (researchOptions) for (const child of newNodes) {
+        try {
+          await this.runAgent(child);
+          if ((await this.plugin.repo.readNote(child.path)).status === "idea") throw new Error(t("淺研究未啟動。"));
+        } catch (error) {
+          await this.plugin.repo.updateNote(child.path, { status: "error" });
+          this.plugin.recordFailure(t("子議題淺研究啟動失敗：{0}", child.path), error);
+        }
+      }
+    } catch (error) {
+      if (created) { await this.plugin.rebuildDerivedData(); throw new PartialChildBatchError(t("部分子議題已建立，請重新開啟視窗確認目前地圖，再繼續操作。") + ` ${error instanceof Error ? error.message : String(error)}`); }
+      throw error;
     }
   }
   private async ancestorContext(node: MapNode): Promise<string> {
@@ -957,30 +1477,51 @@ export class VisualAgentMapView extends ItemView {
     });
     return [...new Set(paths)];
   }
-  private async integrateChildren(node: MapNode, confirmed = false, options?: TaskOptions, direction = ""): Promise<void> {
-    if (!this.map || this.plugin.running.has(node.path)) return;
+  private async proposeIntegrationDirections(node: MapNode, options: TaskOptions, found: (items: Suggestion[], draft: (direction: string) => Promise<void>) => void, drafted: (result: AiResult, save: (summary: string, detail: string) => Promise<void>) => void, failed: (message: string) => void): Promise<void> {
+    if (!this.map) { failed(t("目前沒有可用的心智圖。")); return; }
+    if (this.plugin.running.has(node.path)) { failed(t("AI 執行中…")); return; }
+    const children = this.map.nodes.filter(item => item.parentId === node.id);
+    if (!children.length && !options.currentVault && !options.folderFiles.length && !options.individualFiles.length) { failed(t("請先選擇其他筆記來源。")); return; }
+    const note = await this.plugin.repo.readNote(node.path);
+    this.plugin.running.add(node.path); this.render();
+    try {
+      const childContext = await this.sourceDigest(children, children.length <= 3 ? "strong" : "summary");
+      const selectedSources = await this.selectedSourceContext(note.title, options, node.path);
+      if (!children.length && !selectedSources) { failed(t("所選來源沒有可整合的 Markdown 內容。")); return; }
+      const result = await this.plugin.askModel({ title: note.title, summary: note.summary, rules: note.rules, detail: note.detail, task: "根據提供的直屬子議題與所選筆記來源，只提出兩個不同的整合方向，供使用者選擇。每個方向放在 suggestions，title 是簡短名稱，task 是整合指令，contribution 說明預期發現；先不要改寫母議題。", ancestors: await this.ancestorContext(node), sourceContext: [childContext, selectedSources].filter(Boolean).join("\n\n"), mode: "synthesize", researchMode: options.researchMode, researchDepth: options.researchDepth, visualMode: "off" }, note.model, note.reasoning);
+      const angles = result.suggestions.slice(0, 2);
+      if (!angles.length) { failed(t("AI 未提出整合方向，請重試。")); return; }
+      found(angles, direction => this.plugin.mutate(() => this.integrateChildren(node, true, options, direction, drafted, failed)));
+    } catch (error) { console.error("Visual Agent Map integration directions", error); failed(this.plugin.recordFailure("整合方向建議失敗", error)); }
+    finally { this.plugin.running.delete(node.path); await this.hydrate(); this.render(); }
+  }
+  private async integrateChildren(node: MapNode, confirmed = false, options?: TaskOptions, direction = "", drafted?: (result: AiResult, save: (summary: string, detail: string) => Promise<void>) => void, failed?: (message: string) => void): Promise<void> {
+    if (!this.map || this.plugin.running.has(node.path)) { failed?.(t("AI 執行中…")); return; }
     const note = await this.plugin.repo.readNote(node.path);
     const children = this.map.nodes.filter(item => item.parentId === node.id);
-    if (!children.length) { new Notice(t("這個議題目前沒有直屬子議題。")); return; }
+    if (!children.length && !options?.currentVault && !options?.folderFiles.length && !options?.individualFiles.length) { const message = t("請先選擇其他筆記來源。"); if (failed) failed(message); else new Notice(message); return; }
     if (!confirmed) {
       new TaskModal(this.app, t("整合共識、差異、取捨與待確認事項；先提出結論方向供我確認。"), (value, run, chosen) => { if (run) void this.plugin.confirmCodexUsage(async () => this.enqueue(() => this.integrateChildren(node, true, chosen, value))); }, t("整合子議題"), t("AI 會讀取直屬子議題，產生整合草稿；你確認後才會寫入。"), note.rules, "local", note.researchDepth, note.visualMode, false).open();
       return;
     }
     const childContext = await this.sourceDigest(children, children.length <= 3 ? "strong" : "summary");
-    const selectedSources = await this.selectedSourceContext(`${note.title} ${direction}`, options);
+    const selectedSources = await this.selectedSourceContext(`${note.title} ${direction}`, options, node.path);
+    if (!children.length && !selectedSources) { const message = t("所選來源沒有可整合的 Markdown 內容。"); if (failed) failed(message); else new Notice(message); return; }
     const sourceContext = [childContext, selectedSources].filter(Boolean).join("\n\n");
-    const task = direction || "根據直屬子議題的完整知識，更新母議題的目前理解與結構化知識；合併重複資訊，清楚標示共識、差異、取捨與待確認事項。";
+    const task = direction || "根據提供的直屬子議題與所選筆記來源，更新母議題的目前理解與結構化知識；合併重複資訊，清楚標示共識、差異、取捨與待確認事項。";
     this.plugin.running.add(node.path); await this.plugin.repo.updateNote(node.path, { status: "running" }); await this.hydrate(); this.render();
     try {
       const result = await this.plugin.askModel({ title: note.title, summary: note.summary, rules: note.rules, detail: note.detail, task, ancestors: await this.ancestorContext(node), sourceContext, mode: "synthesize", researchMode: options?.researchMode ?? "local", researchDepth: options?.researchDepth ?? note.researchDepth, visualMode: options?.visualMode ?? note.visualMode }, note.model, note.reasoning);
       await this.plugin.repo.updateNote(node.path, { status: note.status });
-      new AiDraftModal(this.app, result.summary, result.detail, t("確認寫入母議題"), () => this.enqueue(async () => {
+      const save = async (summary: string, detail: string): Promise<void> => this.plugin.mutate(async () => {
         const latest = await this.plugin.repo.readNote(node.path);
-        if (latest.detail !== note.detail || latest.summary !== note.summary) { new Notice(t("議題已變更，整合草稿未寫入。")); return; }
-        await this.plugin.repo.updateNote(node.path, { summary: result.summary, detail: canonicalDetail(result.detail), visualReferences: visualReferencesMarkdown(result.visualReferences), newFindings: "", status: "completed" });
+        if (latest.detail !== note.detail || latest.summary !== note.summary) throw new Error(t("議題已變更，整合草稿未寫入。"));
+        await this.plugin.repo.updateNote(node.path, { summary, detail: canonicalDetail(detail), visualReferences: visualReferencesMarkdown(result.visualReferences), newFindings: "", status: "completed" });
         await this.hydrate(); this.render(); new Notice(t("子議題整合已寫入目前理解與 MD 詳情。"));
-      })).open();
-    } catch (error) { console.error("Visual Agent Map child integration", error); await this.plugin.repo.updateNote(node.path, { status: "error" }); new Notice(this.plugin.recordFailure("子議題整合失敗", error)); }
+      });
+      if (drafted) drafted(result, save);
+      else new AiDraftModal(this.app, result.summary, result.detail, t("確認寫入母議題"), () => { void save(result.summary, result.detail); }).open();
+    } catch (error) { console.error("Visual Agent Map child integration", error); await this.plugin.repo.updateNote(node.path, { status: "error" }); const message = this.plugin.recordFailure("子議題整合失敗", error); if (failed) failed(message); else new Notice(message); }
     finally { this.plugin.running.delete(node.path); await this.hydrate(); this.render(); }
   }
   private integrateSelected(): void {
@@ -1005,35 +1546,6 @@ export class VisualAgentMapView extends ItemView {
         finding ? `  - 舊版待整理發現：${finding}` : ""
       ].filter(Boolean).join("\n");
     }).join("\n");
-  }
-  private async extractedSourceContext(note: Note): Promise<string> {
-    if (note.sourcePaths.length) {
-      const lines: string[] = [];
-      for (const path of note.sourcePaths) {
-        try { lines.push((await this.sourceDigest([{ id: path, path, parentId: null, x: 0, y: 0, collapsed: false }], "strong")).trim()); }
-        catch { lines.push(`- [[${path.replace(/\.md$/, "")}]]\n  - 來源讀取失敗或已移動。`); }
-      }
-      return lines.join("\n");
-    }
-    for (const marker of ["### 整合來源（保存內容）", "### 萃取來源（強連結備份）", "### 合併來源"]) {
-      const index = note.detail.indexOf(marker);
-      if (index >= 0) return note.detail.slice(index + marker.length).trim();
-    }
-    const weakMarker = "### 萃取來源（弱連結）";
-    const weakIndex = note.detail.indexOf(weakMarker);
-    if (weakIndex < 0) return "";
-    const sourceSection = note.detail.slice(weakIndex + weakMarker.length);
-    const paths = [...sourceSection.matchAll(/\[\[([^\]|#]+)(?:[|#][^\]]*)?\]\]/g)].map(match => `${match[1]}.md`);
-    const unique = [...new Set(paths)];
-    const lines: string[] = [];
-    for (const path of unique) {
-      try {
-        lines.push((await this.sourceDigest([{ id: path, path, parentId: null, x: 0, y: 0, collapsed: false }], "strong")).trim());
-      } catch {
-        lines.push(`- [[${path.replace(/\.md$/, "")}]]\n  - 來源讀取失敗或已移動。`);
-      }
-    }
-    return lines.join("\n");
   }
   private async createIntegratedNode(title: string, sources: MapNode[], goal: string, rules: string, options?: TaskOptions, review = false): Promise<void> {
     if (!this.map || sources.length < 2) return;
@@ -1097,7 +1609,7 @@ export class VisualAgentMapView extends ItemView {
       const start = { x: event.clientX, y: event.clientY }, origin = { x: currentNode.x, y: currentNode.y }; let position = { ...origin }, moved = false;
       card.setPointerCapture(event.pointerId);
       const move = (e: PointerEvent): void => { moved ||= Math.hypot(e.clientX - start.x, e.clientY - start.y) > 3; if (!moved) return; position = { x: origin.x + (e.clientX - start.x) / this.map!.viewport.zoom, y: origin.y + (e.clientY - start.y) / this.map!.viewport.zoom }; card.style.left = `${position.x}px`; card.style.top = `${position.y}px`; this.drawEdges(); };
-      const finish = (e: PointerEvent): void => { this.dragging = false; this.suppressClickUntil = moved ? Date.now() + 250 : 0; card.removeEventListener("pointermove", move); card.removeEventListener("pointerup", finish); card.removeEventListener("pointercancel", finish); if (e.type === "pointercancel") { card.style.left = `${origin.x}px`; card.style.top = `${origin.y}px`; this.drawEdges(); return; } if (moved) this.enqueue(() => this.mapChange(map => { const current = map.nodes.find(n => n.id === node.id); if (!current) return; current.x = Math.round(position.x); current.y = Math.round(position.y); })); else if (e.metaKey || e.ctrlKey) { if (this.multiSelected.has(node.id)) this.multiSelected.delete(node.id); else this.multiSelected.add(node.id); this.selected = node.id; this.render(); } else { this.multiSelected.clear(); this.selected = node.id; this.render(); } };
+      const finish = (e: PointerEvent): void => { this.dragging = false; this.suppressClickUntil = Date.now() + 250; card.removeEventListener("pointermove", move); card.removeEventListener("pointerup", finish); card.removeEventListener("pointercancel", finish); if (e.type === "pointercancel") { card.style.left = `${origin.x}px`; card.style.top = `${origin.y}px`; this.drawEdges(); return; } if (moved) this.enqueue(() => this.mapChange(map => { const current = map.nodes.find(n => n.id === node.id); if (!current) return; current.x = Math.round(position.x); current.y = Math.round(position.y); })); else if (e.metaKey || e.ctrlKey) { if (this.multiSelected.has(node.id)) this.multiSelected.delete(node.id); else this.multiSelected.add(node.id); this.selected = node.id; this.render(); } else { this.multiSelected.clear(); this.selected = node.id; this.render(); this.openDetails(node); } };
       card.addEventListener("pointermove", move); card.addEventListener("pointerup", finish); card.addEventListener("pointercancel", finish);
     });
   }
@@ -1111,11 +1623,11 @@ export class VisualAgentMapView extends ItemView {
       const path = createSvg("path"); path.setAttribute("d", `M ${x1} ${y1} C ${x1 + bend} ${y1}, ${x2 - bend} ${y2}, ${x2} ${y2}`); path.addClass("vam-edge"); this.edgesEl.appendChild(path);
     }
   }
-  private async selectedSourceContext(query: string, options?: TaskOptions): Promise<string> {
+  private async selectedSourceContext(query: string, options?: TaskOptions, excludePath?: string): Promise<string> {
     if (!options) return "";
     const documents: SourceDocument[] = [];
     if (options.currentVault) {
-      const files = this.app.vault.getMarkdownFiles();
+      const files = this.app.vault.getMarkdownFiles().filter(file => file.path !== excludePath && !/(^|\/)Map\.md$/i.test(file.path));
       if (files.length > 1000) throw new Error(t("目前 Vault 超過 1000 份 Markdown，請改選較小的資料夾。"));
       for (let index = 0; index < files.length; index += 20) {
         const batch = files.slice(index, index + 20);
@@ -1128,18 +1640,15 @@ export class VisualAgentMapView extends ItemView {
     }
     const selected = selectSourceDocuments(query, documents, options.researchDepth);
     for (const file of options.individualFiles) selected.push({ name: file.name, content: await file.slice(0, 20_000).text(), explicit: true });
-    if ((options.currentVault || options.folderFiles.length || options.individualFiles.length) && !selected.length) return "使用者選取的來源中沒有找到與任務相關的 Markdown；請明確說明現有資料不足。";
+    if (!selected.some(file => file.content.trim())) return "";
     return sourceContext(selected);
   }
-  private async runAgent(node: MapNode, options?: TaskOptions): Promise<void> {
+  private async runAgent(node: MapNode, done?: (result: AiResult) => void, failed?: (message: string) => void): Promise<void> {
     const taskPath = node.path;
     const note = await this.plugin.repo.readNote(node.path);
-    if (!note.prompt) { new Notice(t("請先輸入要交給 AI 的問題或任務。")); return; }
-    if (this.plugin.running.has(node.path)) return;
-    const selectedSources = await this.selectedSourceContext(`${note.title} ${note.prompt}`, options);
-    const explicitScope = !!(options?.currentVault || options?.folderFiles.length || options?.individualFiles.length);
-    const linkedSources = explicitScope ? "" : await this.extractedSourceContext(note);
-    const context: TaskContext = { title: note.title, summary: note.summary, rules: note.rules, detail: note.detail, task: note.prompt, ancestors: await this.ancestorContext(node), workingFindings: note.newFindings, sourceContext: [selectedSources, linkedSources].filter(Boolean).join("\n\n"), mode: "task", researchMode: note.researchMode, researchDepth: note.researchDepth, visualMode: note.visualMode };
+    if (!note.prompt) { const message = t("請先輸入要交給 AI 的問題或任務。"); if (failed) failed(message); else new Notice(message); return; }
+    if (this.plugin.running.has(node.path)) { failed?.(t("AI 執行中…")); return; }
+    const context: TaskContext = { title: note.title, summary: note.summary, rules: note.rules, detail: note.detail, task: note.prompt, ancestors: await this.ancestorContext(node), workingFindings: note.newFindings, sourceContext: "", mode: "task", researchMode: note.researchMode, researchDepth: note.researchDepth, visualMode: note.visualMode };
     this.plugin.pendingSuggestions.delete(node.path);
     this.plugin.running.add(node.path);
     const controller = new AbortController();
@@ -1147,17 +1656,26 @@ export class VisualAgentMapView extends ItemView {
     try { await this.plugin.repo.updateNote(node.path, { status: "running" }); } catch (error) { this.plugin.activeTasks.delete(taskPath); this.plugin.running.delete(taskPath); throw error; }
     await this.hydrate(); this.render();
     // Leave the mutation queue immediately: independent branches can run concurrently.
-    void this.plugin.askModel(context, note.model, note.reasoning, controller.signal).then(result => this.plugin.mutate(async () => {
+    let exchangeId = "";
+    void this.plugin.askModel(context, note.model, note.reasoning, controller.signal, id => { exchangeId = id; }).then(result => this.plugin.mutate(async () => {
       const latest = await this.plugin.repo.readNote(node.path);
       const stale = latest.title !== note.title || latest.prompt !== note.prompt || latest.rules !== note.rules || latest.detail !== note.detail || latest.summary !== note.summary || latest.model !== note.model || latest.reasoning !== note.reasoning || latest.researchMode !== note.researchMode || latest.researchDepth !== note.researchDepth || latest.visualMode !== note.visualMode || latest.sourcePaths.join("\n") !== note.sourcePaths.join("\n");
-      if (controller.signal.aborted || stale) { await this.plugin.repo.updateNote(node.path, { status: note.status }); if (stale) new Notice(t("議題內容已變更，過時的 AI 結果未寫入。")); return; }
+      if (controller.signal.aborted || stale) { await this.plugin.repo.updateNote(node.path, { status: note.status }); if (exchangeId && this.plugin.settings.aiExchangeLoggingEnabled) this.plugin.exchanges?.failed(exchangeId, stale ? "議題內容已變更，過時的 AI 結果未寫入。" : "研究已停止，結果未寫入。"); if (stale) { if (failed) failed(t("議題內容已變更，過時的 AI 結果未寫入。")); else new Notice(t("議題內容已變更，過時的 AI 結果未寫入。")); } return; }
       await this.plugin.repo.updateNote(node.path, { summary: result.summary, detail: canonicalDetail(result.detail), visualReferences: visualReferencesMarkdown(result.visualReferences), newFindings: "", status: "completed" });
+      if (exchangeId && this.plugin.settings.aiExchangeLoggingEnabled) this.plugin.exchanges?.completed(exchangeId);
       for (const view of this.plugin.views()) view.history.clear();
-      if (result.suggestions.length) this.plugin.pendingSuggestions.set(node.path, result.suggestions.slice(0, 7));
+      if (result.suggestions.length) {
+        this.plugin.pendingSuggestions.set(node.path, result.suggestions.slice(0, 7));
+        try { await (this.plugin.pendingSuggestions as PendingSuggestions).flush?.(); }
+        catch (error) { const message = this.plugin.recordFailure("展開建議儲存失敗", error); new Notice(message); }
+      }
+      done?.(result);
     })).catch(error => this.plugin.mutate(async () => {
-      if (controller.signal.aborted || (error instanceof Error && error.name === "AbortError")) { await this.plugin.repo.updateNote(node.path, { status: note.status }); new Notice(t("研究已停止，原有內容保留。")); return; }
-      console.error("Visual Agent Map AI task", error); await this.plugin.repo.updateNote(node.path, { status: "error" });
-      new Notice(this.plugin.recordFailure("AI 任務失敗", error));
+      if (controller.signal.aborted || (error instanceof Error && error.name === "AbortError")) { await this.plugin.repo.updateNote(node.path, { status: note.status }); if (failed) failed(t("研究已停止，原有內容保留。")); else new Notice(t("研究已停止，原有內容保留。")); return; }
+      console.error("Visual Agent Map AI task", error);
+      if (exchangeId && this.plugin.settings.aiExchangeLoggingEnabled && this.plugin.exchanges?.getEntries().find(item => item.id === exchangeId)?.status === "parsed") this.plugin.exchanges.failed(exchangeId, `寫入議題失敗：${error instanceof Error ? error.message : String(error)}`);
+      await this.plugin.repo.updateNote(node.path, { status: "error" });
+      const message = this.plugin.recordFailure("AI 任務失敗", error); if (failed) failed(message); else new Notice(message);
     })).finally(() => {
       if (this.plugin.activeTasks.get(taskPath) === controller) this.plugin.activeTasks.delete(taskPath);
       this.plugin.running.delete(taskPath);
@@ -1176,6 +1694,7 @@ class VisualAgentMapSettingTab extends PluginSettingTab {
       text(t("Codex CLI 路徑"), "codexPath", t("VAM 會以此啟動 codex app-server。")),
       { name: t("工作區預設 Model"), desc: t("模型清單由 Codex App Server 自動取得；變更只影響之後新增的根議題。"), control: { type: "dropdown", key: "cliModel", options: models } },
       { name: t("AI 推理等級"), desc: t("自動模式會對簡單任務使用 Low、對複雜整合使用 Medium；手動選擇不會被覆蓋。"), control: { type: "dropdown", key: "cliReasoning", options: { auto: t("自動 (Auto)"), low: t("低 (Low)"), medium: t("中 (Medium)"), high: t("高 (High)") } } },
+      { name: t("記錄 AI 往返內容"), render: setting => { setting.setName(t("記錄 AI 往返內容")).setDesc(t("開啟後，最近 20 次完整請求與原始回覆會保存在此 Vault 的外掛資料夾，可能包含私人筆記。可從偵錯日誌查看並清除。" )).addToggle(toggle => toggle.setValue(this.plugin.settings.aiExchangeLoggingEnabled).onChange(async value => { this.plugin.settings.aiExchangeLoggingEnabled = value; await this.plugin.saveSettings(); })); } },
       { name: t("Workspace 位置"), render: setting => { setting.setName(t("Workspace 位置")).setDesc(t("主題資料夾：{0}　未分類收件匣：{1}", this.plugin.settings.topicsFolder, this.plugin.settings.inboxFolder)); } },
       { name: t("修復 Agent Workspace"), render: setting => { setting.setName(t("修復 Agent Workspace")).setDesc(t("只建立缺少的基本資料夾，不會復原、搬移或覆寫筆記與心智圖。")).addButton(button => button.setButtonText(t("修復")).onClick(() => { void this.plugin.mutate(() => this.plugin.repairWorkspace()); })); } },
       { name: t("重新整理 VAM 資料"), render: setting => { setting.setName(t("重新整理 VAM 資料")).setDesc(t("重新掃描心智圖與議題筆記，重建 reference 與衍生資料。原始內容不會被覆寫。")).addButton(button => button.setButtonText(t("完整重建")).onClick(() => { void this.plugin.mutate(() => this.plugin.fullRebuild()); })); } },
@@ -1207,9 +1726,13 @@ export default class VisualAgentMapPlugin extends Plugin {
   repo!: Repository;
   ready: Promise<void> = Promise.resolve();
   readonly running = new Set<string>();
+  readonly quickExpandPending = new Set<string>();
+  readonly quickExpandFailures = new Map<string, string>();
   readonly activeTasks = new Map<string, AbortController>();
-  readonly pendingSuggestions = new Map<string, Suggestion[]>();
+  pendingSuggestions: Map<string, Suggestion[]> = new Map();
+  readonly pendingResearchOptions = new Map<string, TaskOptions>();
   readonly logs: LogManager = debugLog;
+  exchanges: AiExchangeLog | null = null;
   private codexRuntime: CodexAppServerRuntime | null = null;
   private localCodexRuntime: CodexAppServerRuntime | null = null;
   private settingTab!: VisualAgentMapSettingTab;
@@ -1233,9 +1756,16 @@ export default class VisualAgentMapPlugin extends Plugin {
   async onload(): Promise<void> {
     const saved = await this.loadData() as Partial<Settings> | null;
     const legacy: (Partial<Settings> & { cliPath?: string }) | null = saved;
-    this.settings = { ...DEFAULT_SETTINGS, language: saved?.language === "en" ? "en" : "zh-TW", workspaceFolder: saved?.workspaceFolder || DEFAULT_SETTINGS.workspaceFolder, topicsFolder: saved?.topicsFolder || DEFAULT_SETTINGS.topicsFolder, inboxFolder: saved?.inboxFolder || DEFAULT_SETTINGS.inboxFolder, notesFolder: saved?.notesFolder || DEFAULT_SETTINGS.notesFolder, mapsFolder: saved?.mapsFolder || DEFAULT_SETTINGS.mapsFolder, mapId: saved?.mapId || "default", codexPath: saved?.codexPath || legacy?.cliPath || DEFAULT_SETTINGS.codexPath, cliModel: saved?.cliModel || DEFAULT_SETTINGS.cliModel, cliReasoning: normalizeReasoningLevel(saved?.cliReasoning), previewScale: saved?.previewScale !== undefined ? clampPreviewScale(saved.previewScale) : legacyPreviewScale(saved?.previewSize), models: "", migrated: saved?.migrated === true, structureVersion: saved?.structureVersion ?? (saved ? 1 : DEFAULT_SETTINGS.structureVersion), firstUseNoticeSeen: saved?.firstUseNoticeSeen === true, codexUsageNoticeSeen: saved?.codexUsageNoticeSeen === true, workspaceInitialized: saved ? saved.workspaceInitialized !== false : false, sampleTourVersionSeen: saved?.sampleTourVersionSeen ?? 0 };
+    this.settings = { ...DEFAULT_SETTINGS, language: saved?.language === "en" ? "en" : "zh-TW", workspaceFolder: saved?.workspaceFolder || DEFAULT_SETTINGS.workspaceFolder, topicsFolder: saved?.topicsFolder || DEFAULT_SETTINGS.topicsFolder, inboxFolder: saved?.inboxFolder || DEFAULT_SETTINGS.inboxFolder, notesFolder: saved?.notesFolder || DEFAULT_SETTINGS.notesFolder, mapsFolder: saved?.mapsFolder || DEFAULT_SETTINGS.mapsFolder, mapId: saved?.mapId || "default", codexPath: saved?.codexPath || legacy?.cliPath || DEFAULT_SETTINGS.codexPath, cliModel: saved?.cliModel || DEFAULT_SETTINGS.cliModel, cliReasoning: normalizeReasoningLevel(saved?.cliReasoning), previewScale: saved?.previewScale !== undefined ? clampPreviewScale(saved.previewScale) : legacyPreviewScale(saved?.previewSize), models: "", migrated: saved?.migrated === true, structureVersion: saved?.structureVersion ?? (saved ? 1 : DEFAULT_SETTINGS.structureVersion), firstUseNoticeSeen: saved?.firstUseNoticeSeen === true, codexUsageNoticeSeen: saved?.codexUsageNoticeSeen === true, aiExchangeLoggingEnabled: saved?.aiExchangeLoggingEnabled === true, workspaceInitialized: saved ? saved.workspaceInitialized !== false : false, sampleTourVersionSeen: saved?.sampleTourVersionSeen ?? 0 };
     setUiLanguage(this.settings.language);
     this.logs.appendLog("info", `Visual Agent Map ${this.manifest.version || "unknown"} 載入`);
+    if (this.app.vault.adapter instanceof FileSystemAdapter && this.manifest.dir) {
+      const pluginDirectory = join(this.app.vault.adapter.getBasePath(), this.manifest.dir);
+      this.exchanges = new AiExchangeLog(join(pluginDirectory, "ai-exchanges.json"), error => this.logs.appendLog("error", `AI 往返紀錄儲存失敗：${error instanceof Error ? error.message : String(error)}`));
+      await this.exchanges.load();
+      this.pendingSuggestions = new PendingSuggestions(join(pluginDirectory, "pending-suggestions.json"), error => this.logs.appendLog("error", `待確認建議儲存失敗：${error instanceof Error ? error.message : String(error)}`));
+      await (this.pendingSuggestions as PendingSuggestions).load();
+    }
     this.repo = new Repository(this.app, this.settings);
     const initialize = (this.settings.migrated ? Promise.resolve() : this.repo.migrate().then(async () => { await this.repo.rebuildDerivedData(); this.settings.migrated = true; })).then(async () => {
       if (!saved) {
@@ -1261,7 +1791,7 @@ export default class VisualAgentMapPlugin extends Plugin {
     this.addCommand({ id: "open-built-in-sample", name: t("開啟台灣旅行範例"), callback: () => { void this.activateBuiltInSample(true); } });
     this.addCommand({ id: "repair-workspace", name: t("修復 Agent Workspace"), callback: () => { void this.mutate(() => this.repairWorkspace()); } });
     this.addCommand({ id: "reconnect-workspace", name: t("找回既有 Workspace"), callback: () => { void this.offerWorkspaceReconnect(); } });
-    this.addCommand({ id: "open-debug-log", name: t("開啟偵錯日誌 (Open Debug Log)"), callback: () => new DebugLogModal(this.app, this.logs).open() });
+    this.addCommand({ id: "open-debug-log", name: t("開啟偵錯日誌 (Open Debug Log)"), callback: () => new DebugLogModal(this.app, this.logs, this.exchanges, () => this.settings.aiExchangeLoggingEnabled).open() });
     this.settingTab = new VisualAgentMapSettingTab(this.app, this);
     this.addSettingTab(this.settingTab);
     this.registerEvent(this.app.workspace.on("file-menu", (menu, file) => { if (file instanceof TFile && this.isMap(file)) menu.addItem(item => item.setTitle(t("以心智圖開啟")).setIcon("git-fork").onClick(() => { void this.activateView(file.path); })); }));
@@ -1423,7 +1953,7 @@ export default class VisualAgentMapPlugin extends Plugin {
     this.settingTab?.update();
     for (const view of this.views()) await view.refreshFromPlugin();
   }
-  async askModel(context: TaskContext, model: string, reasoning?: unknown, signal?: AbortSignal): Promise<AiResult> {
+  async askModel(context: TaskContext, model: string, reasoning?: unknown, signal?: AbortSignal, onExchange?: (id: string) => void): Promise<AiResult> {
     if (model.startsWith("claude:")) throw new Error(t("Claude Code 已不再支援。請在議題設定中選擇 Codex model。"));
     const adapter = this.app.vault.adapter;
     if (!(adapter instanceof FileSystemAdapter)) throw new Error(t("CLI 模式只支援桌面版 Obsidian"));
@@ -1440,7 +1970,7 @@ export default class VisualAgentMapPlugin extends Plugin {
       context.mode === "task"
         ? "這是一般任務：summary 必須是一句適合心智圖顯示的新目前理解，80 字內；detail 是會直接取代舊 Detail 的完整知識頁，必須吸收舊內容與本次發現、去除重複、保留仍有效的來源。若議題過於複雜才提供 suggestions，否則回傳空陣列。"
         : context.mode === "decompose"
-          ? "這是 Decompose 模式：確實需要時才產生 3–7 個可獨立處理的子議題 suggestions；若現有子議題已涵蓋需求，回傳空陣列，不要湊數。summary 簡述是否建議拆解，detail 簡述拆解理由；不要更新結論。"
+          ? "這是 Decompose 模式：依本次任務指定的層數與數量提出可獨立處理的子議題；若現有子議題已涵蓋需求，回傳空陣列，不要湊數。summary 簡述是否建議拆解，detail 簡述拆解理由；不要更新結論。"
           : context.mode === "synthesize"
             ? "這是 Synthesize 模式：summary 必須是高品質整合結論，80 字內；detail 必須整合來源完整知識、收斂重複內容、清楚呈現共識、分歧、取捨與未解問題；若介面提供確認草稿，確認後才會寫回。"
             : "summary 必須是一句適合心智圖顯示的新目前理解，detail 必須是完整繁體中文 Markdown 分析。",
@@ -1461,10 +1991,25 @@ export default class VisualAgentMapPlugin extends Plugin {
     console.debug("Visual Agent Map AI metrics", prepared.metrics);
     const providerStarted = Date.now();
     const effort = effectiveReasoningLevel(context, normalizeReasoningLevel(reasoning ?? this.settings.cliReasoning));
-    const raw = await this.runtime(pluginDirectory, context.researchMode === "local").runTask(instructions, model, effort, responseSchema, { signal, searchBudget: context.researchMode === "local" ? 0 : researchLimits(context.researchDepth).searches });
-    const result = this.parseAiResult(raw, "Codex App Server");
-    console.debug("Visual Agent Map AI metrics", { ...prepared.metrics, providerMs: Date.now() - providerStarted, totalMs: Date.now() - totalStarted });
-    return result;
+    const exchanges = this.settings.aiExchangeLoggingEnabled ? this.exchanges : null;
+    const exchangeId = exchanges ? randomUUID() : "";
+    if (exchanges) { exchanges.begin({ id: exchangeId, startedAt: new Date().toISOString(), topic: context.title, mode: context.mode ?? "task", model, effort }); onExchange?.(exchangeId); }
+    let stage = "啟動 AI";
+    try {
+      const raw = await this.runtime(pluginDirectory, context.researchMode === "local").runTask(instructions, model, effort, responseSchema, {
+        signal, searchBudget: context.researchMode === "local" ? 0 : researchLimits(context.researchDepth).searches,
+        onRequest: request => { stage = "等待 AI 回覆"; if (this.settings.aiExchangeLoggingEnabled) exchanges?.sent(exchangeId, JSON.stringify(request, null, 2)); }
+      });
+      stage = "解析 AI 回覆";
+      if (this.settings.aiExchangeLoggingEnabled) exchanges?.received(exchangeId, raw);
+      const result = this.parseAiResult(raw, "Codex App Server");
+      if (this.settings.aiExchangeLoggingEnabled) exchanges?.parsed(exchangeId);
+      console.debug("Visual Agent Map AI metrics", { ...prepared.metrics, providerMs: Date.now() - providerStarted, totalMs: Date.now() - totalStarted });
+      return result;
+    } catch (error) {
+      if (this.settings.aiExchangeLoggingEnabled) exchanges?.failed(exchangeId, `${stage}：${error instanceof Error ? error.message : String(error)}`);
+      throw error;
+    }
   }
   private parseAiResult(raw: string, label: string): AiResult {
     const cleaned = raw.replace(/^```(?:json)?\s*/i, "").replace(/\s*```$/, "").trim();

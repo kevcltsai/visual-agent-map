@@ -21,7 +21,7 @@ Find the important decisions and risks still missing from this journey.
 ## Rules
 
 Nine days; favor public transport; no more than two priorities per day.
-## 預覽
+## Preview
 
 Expand a broad goal into layered subtopics, then synthesize mature findings into a new journey root.
 ## Detail

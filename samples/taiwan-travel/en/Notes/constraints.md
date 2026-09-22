@@ -21,7 +21,7 @@ Check these constraints for conflicts and required tradeoffs.
 ## Rules
 
 Protect rest and transit buffers instead of maximizing the attraction count.
-## 預覽
+## Preview
 
 Nine days, four lodging bases, and lighter plans on transfer days.
 ## Detail

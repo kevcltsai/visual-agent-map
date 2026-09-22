@@ -505,7 +505,7 @@ test('Next Step returns new expansion requests to the map and reviews existing p
   assert.deepEqual(plain(settingsWrites), [{ model: 'model-b', modelSource: 'manual' }, { reasoning: 'high' }]);
   assert.equal(researchAfterSave, true);
 });
-function fixture() {
+function fixture(language = 'zh-TW') {
   const files = new Map(), contents = new Map();
   const attach = item => { const folderPath = item.path.split('/').slice(0, -1).join('/'); item.parent = files.get(folderPath) || null; if (item.parent instanceof TFolder && !item.parent.children.includes(item)) item.parent.children.push(item); };
   const renameTree = (from, to) => { const entries = Array.from(files.entries()).filter(([p]) => p === from || p.startsWith(`${from}/`)).sort((a, b) => a[0].length - b[0].length); for (const [old, item] of entries) { files.delete(old); const next = `${to}${old.slice(from.length)}`; item.path = next; item.name = next.split('/').at(-1); if (item instanceof TFile) { item.basename = item.name.replace(/\.md$/, ''); item.stat.mtime = Date.now(); const content = contents.get(old); contents.delete(old); contents.set(next, content); } files.set(next, item); } for (const [, item] of entries) attach(item); };
@@ -518,7 +518,7 @@ function fixture() {
     createBinary: async (p, content) => { assert.equal(files.has(p), false); const file = new TFile(p); files.set(p, file); contents.set(p, content); attach(file); return file; },
     process: async (file, change) => { contents.set(file.path, change(contents.get(file.path))); }
   }, metadataCache: { getFileCache: file => { const text = contents.get(file.path) || ''; return { frontmatter: text.includes('agent-map-node: true') ? { 'agent-map-node': true } : text.includes('visual-agent-map: true') ? { 'visual-agent-map': true } : {} }; }, getFirstLinkpathDest: link => Array.from(files.values()).find(file => file instanceof TFile && (file.basename === link || file.path.replace(/\.md$/, '') === link)) || null }, fileManager: { renameFile: async (item, target) => renameTree(item.path, target), trashFile: async () => {} } };
-  return { app, contents, repo: new Repository(app, { ...DEFAULT_SETTINGS }) };
+  return { app, contents, repo: new Repository(app, { ...DEFAULT_SETTINGS, language }) };
 }
 async function topicNote(repo, title = '題目', model = 'model-a', id = 'map-a') {
   const mapDoc = { id, title: id, version: 1, nodes: [], viewport: { x: 0, y: 0, zoom: 1 } };
@@ -557,6 +557,58 @@ test('current summary is editable in the Markdown body', async () => {
   assert.match(contents.get(n.path), /## Current Summary\n\nAI conclusion that can be edited/);
   contents.set(n.path, contents.get(n.path).replace('## Current Summary\n\nAI conclusion that can be edited', '## Current Summary\n\nUser-edited conclusion'));
   assert.equal((await repo.readNote(n.path)).summary, 'User-edited conclusion');
+});
+test('English notes use English preview, pending summary, and managed reference labels', async () => {
+  const { repo, app, contents } = fixture('en');
+  const mapPath = await repo.createMap('Travel'), map = await repo.readMap(mapPath);
+  assert.match(contents.get(mapPath), /This file stores the mind map structure/);
+  assert.doesNotMatch(contents.get(mapPath), /此檔案保存心智圖結構/);
+  const note = await repo.createNote('Route', 'model-a', map, mapPath, 'workspace');
+  map.nodes.push(note); await repo.saveMap(mapPath, map); await repo.rebuildDerivedData();
+  let markdown = contents.get(note.path);
+  assert.match(markdown, /## Current Summary\n\nNo conclusion yet/);
+  assert.match(markdown, /## Preview\n\nNo conclusion yet/);
+  assert.match(markdown, /- Topic: \[\[/);
+  assert.match(markdown, /- Mind map: \[\[/);
+  assert.doesNotMatch(markdown, /尚未形成結論|## 預覽|所屬主題|所屬心智圖/);
+  await repo.updateNote(note.path, { sourcePaths: ['Source.md'], detail: 'English detail' });
+  markdown = contents.get(note.path);
+  assert.match(markdown, /- Source topic: \[\[Source\]\]/);
+  assert.equal((await repo.readNote(note.path)).preview, 'No conclusion yet');
+  await repo.updateNote(note.path, { summary: 'English conclusion' });
+  assert.equal((await repo.readNote(note.path)).preview, 'English conclusion');
+  assert.match(contents.get(note.path), /## Preview\n\nEnglish conclusion/);
+  const copy = await repo.duplicateNote(note.path, map, mapPath);
+  assert.match(copy.path, /Route copy\.md$/);
+  assert.throws(() => repo.file('Missing.md'), /File not found/);
+});
+test('language switch localizes only generated note scaffolding and preserves authored text', async () => {
+  const { repo, app, contents } = fixture();
+  const mapPath = await repo.createMap('Travel'), map = await repo.readMap(mapPath);
+  const note = await repo.createNote('Route', 'model-a', map, mapPath, 'workspace');
+  map.nodes.push(note); await repo.saveMap(mapPath, map); await repo.rebuildDerivedData();
+  await repo.updateNote(note.path, { detail: 'Keep detail', sourcePaths: ['Source.md'] });
+  const beforeSwitch = contents.get(note.path);
+  repo.settings.language = 'en';
+  assert.equal(contents.get(note.path), beforeSwitch);
+  await repo.updateNote(note.path, { model: 'model-b' });
+  let markdown = contents.get(note.path);
+  assert.match(markdown, /## Preview\n\nNo conclusion yet/);
+  assert.match(markdown, /## Current Summary\n\nNo conclusion yet/);
+  assert.match(markdown, /- Topic: \[\[/);
+  assert.match(markdown, /- Source topic: \[\[Source\]\]/);
+  assert.match(markdown, /Keep detail/);
+  assert.doesNotMatch(markdown, /## 預覽|尚未形成結論|所屬主題|來源議題/);
+  await repo.updateNote(note.path, { preview: 'My own preview' });
+  repo.settings.language = 'zh-TW';
+  await repo.rebuildDerivedData();
+  markdown = contents.get(note.path);
+  assert.match(markdown, /## 預覽\n\nMy own preview/);
+  assert.match(markdown, /## Current Summary\n\n尚未形成結論/);
+  assert.match(markdown, /- 所屬主題：\[\[/);
+  assert.match(markdown, /Keep detail/);
+  assert.doesNotMatch(markdown, /## Preview|No conclusion yet/);
+  assert.equal((await repo.readNote(note.path)).preview, 'My own preview');
 });
 test('editing a note heading updates its card title and survives later note writes', async () => {
   const { repo, contents } = fixture(); const n = await topicNote(repo, '新的子議題');
@@ -700,6 +752,9 @@ test('AI result formatting always produces the canonical knowledge structure', a
   const result = canonicalDetail('New analysis');
   for (const heading of ['核心結論', '關鍵知識', '證據與來源', '取捨與限制', '待確認事項', '更新紀錄']) assert.match(result, new RegExp(`### ${heading}`));
   assert.equal((result.match(/New analysis/g) || []).length, 1);
+  const english = canonicalDetail('New analysis', 'en');
+  for (const heading of ['Core conclusions', 'Key knowledge', 'Evidence and sources', 'Tradeoffs and limitations', 'Open questions', 'Update log']) assert.match(english, new RegExp(`### ${heading}`));
+  assert.doesNotMatch(english, /核心結論|尚待補充|整理為結構化知識/);
 });
 test('AI visual references render as image cards', () => {
   const { visualReferencesMarkdown } = load('main.ts', { obsidian });
@@ -707,6 +762,41 @@ test('AI visual references render as image cards', () => {
   assert.match(markdown, /!\[Navy \+ Beige\]\(https:\/\/example.com\/outfit.jpg\)/);
   assert.match(markdown, /來源：https:\/\/example.com\/page/);
   assert.match(markdown, /配色：navy \/ white \/ beige/);
+  const english = visualReferencesMarkdown([{ title: 'Map', imageUrl: 'https://example.com/map.jpg', sourceUrl: 'https://example.com/page', description: 'Route', palette: [], formula: '' }], 'en');
+  assert.match(english, /Source: https:\/\/example.com\/page/);
+  assert.doesNotMatch(english, /來源：|用途：/);
+});
+test('AI prompt defaults to the selected language across task modes', async () => {
+  const { default: Plugin } = load('main.ts', { obsidian });
+  const plugin = new Plugin(); plugin.app = { vault: { adapter: new obsidian.FileSystemAdapter() } }; plugin.manifest = { dir: '.obsidian/plugins/visual-agent-map' };
+  const prompts = [];
+  plugin.runtime = () => ({ runTask: async prompt => { prompts.push(prompt); return '{"summary":"done","detail":"details","suggestions":[],"visualReferences":[]}'; } });
+  const context = { title: 'English topic', summary: 'English summary', rules: '', detail: '', task: 'Expand the map', ancestors: '', researchMode: 'local', researchDepth: 'fast', visualMode: 'off' };
+  plugin.settings.language = 'en';
+  for (const mode of ['task', 'decompose', 'synthesize']) await plugin.askModel({ ...context, mode }, 'test-model', 'low');
+  for (const prompt of prompts) {
+    assert.match(prompt, /Write all newly generated user-facing content in English/);
+    assert.doesNotMatch(prompt, /[一-龥]/);
+  }
+  assert.match(prompts[0], /### Core conclusions/);
+  assert.match(prompts[0], /Insufficient information/);
+  assert.doesNotMatch(prompts[0], /現有資料不足/);
+  assert.doesNotMatch(prompts[0], /detail 必須是完整繁體中文/);
+  plugin.settings.language = 'zh-TW';
+  await plugin.askModel({ ...context, mode: 'task' }, 'test-model', 'low');
+  assert.match(prompts[3], /新產生的使用者可見內容一律使用繁體中文/);
+  assert.match(prompts[3], /### 核心結論/);
+});
+test('AI response fallback keeps the language captured when the task started', async () => {
+  const { default: Plugin } = load('main.ts', { obsidian });
+  const plugin = new Plugin(); plugin.app = { vault: { adapter: new obsidian.FileSystemAdapter() } }; plugin.manifest = { dir: '.obsidian/plugins/visual-agent-map' };
+  plugin.settings.language = 'en';
+  plugin.runtime = () => ({ runTask: async () => {
+    plugin.settings.language = 'zh-TW';
+    return JSON.stringify({ summary: 'Done', detail: 'Details', suggestions: [], visualReferences: [{ imageUrl: 'https://example.com/image.jpg', sourceUrl: 'https://example.com' }] });
+  } });
+  const result = await plugin.askModel({ title: 'Topic', summary: '', rules: '', detail: '', task: 'Research', ancestors: '', mode: 'task', researchMode: 'local', visualMode: 'off' }, 'test-model', 'low');
+  assert.equal(result.visualReferences[0].title, 'Visual reference');
 });
 test('hover helpers extract image and table from user notes markdown', () => {
   const { firstMarkdownImage, firstMarkdownTable, markdownImages } = load('main.ts', { obsidian });
@@ -756,7 +846,7 @@ test('cancelling a node task keeps its earlier Markdown and status', async () =>
   await repo.updateNote(n.path, { prompt: 'Research', detail: 'Keep this' });
   const { VisualAgentMapView } = load('main.ts', { obsidian }); let view;
   const plugin = {
-    repo, running: new Set(), activeTasks: new Map(), pendingSuggestions: new Map(),
+    repo, settings: { ...DEFAULT_SETTINGS }, running: new Set(), activeTasks: new Map(), pendingSuggestions: new Map(),
     askModel: (_context, _model, _reasoning, signal) => new Promise((_resolve, reject) => signal.addEventListener('abort', () => { const error = new Error('cancelled'); error.name = 'AbortError'; reject(error); }, { once: true })),
     mutate: async work => work(), views: () => [view]
   };
@@ -805,7 +895,7 @@ test('a completed but stale answer cannot overwrite an edited note', async () =>
   await repo.updateNote(n.path, { prompt: 'Research', detail: 'Original' });
   let finish; const { VisualAgentMapView } = load('main.ts', { obsidian }); let view;
   const plugin = {
-    repo, running: new Set(), activeTasks: new Map(), pendingSuggestions: new Map(),
+    repo, settings: { ...DEFAULT_SETTINGS }, running: new Set(), activeTasks: new Map(), pendingSuggestions: new Map(),
     askModel: () => new Promise(resolve => { finish = resolve; }), mutate: async work => work(), views: () => [view]
   };
   view = new VisualAgentMapView({ app }, plugin); view.path = 'Map.md'; view.map = map([n]); view.render = () => {}; view.hydrate = async () => {};
@@ -1256,7 +1346,7 @@ test('synthesis directions and draft are separate steps; only confirmed draft up
 test('synthesis can use selected notes when a topic has no children', async () => {
   const { repo, app } = fixture(), parent = await topicNote(repo, 'Parent', 'model-a');
   const contexts = [];
-  const plugin = { repo, running: new Set(), mutate: async work => work(), recordFailure: (_context, error) => error.message, askModel: async context => { contexts.push(context); return contexts.length === 1 ? { summary: '', detail: '', suggestions: [{ title: 'Shared view', task: 'Combine notes', contribution: '' }] } : { summary: 'Combined', detail: 'Combined detail', suggestions: [] }; } };
+  const plugin = { repo, settings: { ...DEFAULT_SETTINGS }, running: new Set(), mutate: async work => work(), recordFailure: (_context, error) => error.message, askModel: async context => { contexts.push(context); return contexts.length === 1 ? { summary: '', detail: '', suggestions: [{ title: 'Shared view', task: 'Combine notes', contribution: '' }] } : { summary: 'Combined', detail: 'Combined detail', suggestions: [] }; } };
   const { VisualAgentMapView } = load('main.ts', { obsidian });
   const view = new VisualAgentMapView({ app }, plugin); view.map = map([parent]); view.render = () => {}; view.hydrate = async () => {}; view.ancestorContext = async () => '';
   const empty = { researchMode: 'local', researchDepth: 'normal', visualMode: 'off', currentVault: false, folderFiles: [], individualFiles: [] };
@@ -1294,6 +1384,19 @@ test('decomposition keeps only 3 to 7 proposals and does not write nodes before 
   await view.proposeChildren(parent, true);
   assert.equal(plugin.pendingSuggestions.get(parent.path).length, 7);
   assert.equal((await repo.readMap(mapPath)).nodes.length, 1);
+});
+test('English expansion uses English-generated task instructions', async () => {
+  const { repo, app } = fixture('en'), parent = await topicNote(repo, 'Parent', 'model-a');
+  const mapPath = 'Agent Workspace/Topics/map-a/Map.md';
+  const mapDoc = { id: 'map-a', title: 'Map', version: 1, nodes: [parent], viewport: { x: 0, y: 0, zoom: 1 } };
+  await app.vault.create(mapPath, core.serializeMap(mapDoc, 'en'));
+  const { VisualAgentMapView } = load('main.ts', { obsidian });
+  let task = '';
+  const plugin = { repo, settings: { ...DEFAULT_SETTINGS, language: 'en' }, running: new Set(), pendingSuggestions: new Map(), askModel: async context => { task = context.task; return { summary: '', detail: '', visualReferences: [], suggestions: Array.from({ length: 3 }, (_, index) => ({ title: `Idea ${index}`, task: 'Research', contribution: '' })) }; } };
+  const view = new VisualAgentMapView({ app }, plugin); view.path = mapPath; view.map = mapDoc; view.render = () => {}; view.hydrate = async () => {}; view.openChildSuggestions = () => {}; view.ancestorContext = async () => '';
+  await view.proposeChildren(parent, true);
+  assert.match(task, /Existing direct subtopics/);
+  assert.doesNotMatch(task, /[一-龥]/);
 });
 test('decomposition receives existing child topics to avoid duplicate proposals', async () => {
   const { repo, app } = fixture(), parent = await topicNote(repo, 'Travel', 'model-a');
@@ -1826,4 +1929,15 @@ test('dragging synthesized roots persists coordinates and removal preserves note
 });
 test('UI language switch translates labels and placeholders without changing knowledge headings', () => {
   const {t,setUiLanguage}=load('i18n.ts');setUiLanguage('en');assert.equal(t('選擇下一步'),'Choose next step');assert.equal(t('展開 {0}',3),'Expand 3');assert.equal(t('核心結論'),'核心結論');setUiLanguage('zh-TW');assert.equal(t('選擇下一步'),'選擇下一步');
+});
+test('every Chinese UI translation call has an English entry', () => {
+  const dictionary = fs.readFileSync(path.join(root, 'i18n.ts'), 'utf8');
+  const keys = new Set([...dictionary.matchAll(/^  "((?:[^"\\]|\\.)+)":/gm)].map(match => match[1]));
+  const sourceFiles = ['main.ts', 'map-model.ts', 'ai/runtime/codex-app-server.ts', ...fs.readdirSync(path.join(root, 'ui')).filter(name => name.endsWith('.ts')).map(name => `ui/${name}`), ...fs.readdirSync(path.join(root, 'ui/modals')).filter(name => name.endsWith('.ts')).map(name => `ui/modals/${name}`)];
+  const missing = [];
+  for (const file of sourceFiles) {
+    const source = fs.readFileSync(path.join(root, file), 'utf8');
+    for (const match of source.matchAll(/\bt\("((?:[^"\\]|\\.)*)"/g)) if (/[^\x00-\x7F]/.test(match[1]) && !keys.has(match[1])) missing.push(`${file}: ${match[1]}`);
+  }
+  assert.deepEqual(missing, []);
 });

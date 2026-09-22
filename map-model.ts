@@ -1,3 +1,5 @@
+import { t } from "./i18n";
+
 export interface MapNode {
   id: string;
   path: string;
@@ -44,22 +46,25 @@ export function removeNodes(nodes: MapNode[], id: string, branch: boolean): MapN
 }
 export function parseMap(content: string): MapDocument {
   const block = content.match(/```agent-map\s*\n([\s\S]*?)\n```/);
-  if (!block) throw new Error("找不到心智圖資料區塊，請保留 agent-map 區塊。");
+  if (!block) throw new Error(t("找不到心智圖資料區塊，請保留 agent-map 區塊。"));
   const map = JSON.parse(block[1]) as MapDocument;
-  if (map.version !== 1 || typeof map.id !== "string" || typeof map.title !== "string" || !Array.isArray(map.nodes)) throw new Error("心智圖格式不正確。");
+  if (map.version !== 1 || typeof map.id !== "string" || typeof map.title !== "string" || !Array.isArray(map.nodes)) throw new Error(t("心智圖格式不正確。"));
   const ids = new Set<string>();
   for (const n of map.nodes) {
-    if (!n || typeof n.id !== "string" || typeof n.path !== "string" || !n.path.endsWith(".md") || !Number.isFinite(n.x) || !Number.isFinite(n.y) || (n.parentId !== null && typeof n.parentId !== "string") || ids.has(n.id)) throw new Error("節點資料不正確或 ID 重複。");
+    if (!n || typeof n.id !== "string" || typeof n.path !== "string" || !n.path.endsWith(".md") || !Number.isFinite(n.x) || !Number.isFinite(n.y) || (n.parentId !== null && typeof n.parentId !== "string") || ids.has(n.id)) throw new Error(t("節點資料不正確或 ID 重複。"));
     ids.add(n.id);
     n.collapsed = n.collapsed === true;
   }
-  for (const n of map.nodes) if (!canParent(map.nodes, n.id, n.parentId)) throw new Error("連結有循環或指向不存在的母議題。");
+  for (const n of map.nodes) if (!canParent(map.nodes, n.id, n.parentId)) throw new Error(t("連結有循環或指向不存在的母議題。"));
   if (!map.viewport || !Number.isFinite(map.viewport.x) || !Number.isFinite(map.viewport.y) || !Number.isFinite(map.viewport.zoom)) map.viewport = { x: 40, y: 40, zoom: 1 };
   map.viewport.zoom = Math.min(2, Math.max(0.25, map.viewport.zoom));
   return map;
 }
-export function serializeMap(map: MapDocument): string {
-  return `---\nvisual-agent-map: true\n---\n\n# ${map.title.replace(/\n/g, " ")}\n\n此檔案保存心智圖結構；完整內容保存在各議題筆記。從檔案選單選擇「以心智圖開啟」。\n\n\`\`\`agent-map\n${JSON.stringify(map, null, 2)}\n\`\`\`\n`;
+export function serializeMap(map: MapDocument, language: "zh-TW" | "en" = "zh-TW"): string {
+  const description = language === "en"
+    ? "This file stores the mind map structure. Full content lives in the topic notes. Choose Open as mind map from the file menu."
+    : "此檔案保存心智圖結構；完整內容保存在各議題筆記。從檔案選單選擇「以心智圖開啟」。";
+  return `---\nvisual-agent-map: true\n---\n\n# ${map.title.replace(/\n/g, " ")}\n\n${description}\n\n\`\`\`agent-map\n${JSON.stringify(map, null, 2)}\n\`\`\`\n`;
 }
 export function inheritModel(parentModel: string | undefined, defaultModel: string): string {
   return parentModel ?? defaultModel;

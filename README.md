@@ -35,9 +35,10 @@ This project is developed with [OpenAI Codex](https://openai.com/codex/) as a co
 Research and map expansion use web-enabled Codex tasks. Synthesis uses direct child topics and any Markdown notes selected for that run; it does not request web search. Fast, Normal and Deep set research depth separately from Codex reasoning effort. While a node task is running, **Stop research** interrupts its Codex turn and preserves the existing note.
 If an AI task runs longer than 3 minutes, VAM attempts to interrupt it to avoid continued background resource use. Incomplete results are not applied; the task error explains what happened.
 
-### What's new in 0.9.3
+### What's new in 0.9.4
 
-- AI tasks time out after 3 minutes. VAM attempts to stop overdue turns and explains why in the task error.
+- A topic outline opens in the left sidebar, following the map hierarchy with search and direct note navigation.
+- English sample and newly generated AI content, note scaffolding, and reference labels follow the interface language more consistently. Existing note content is not translated when the setting changes.
 
 See [CHANGELOG.md](CHANGELOG.md) for the complete version history.
 
@@ -45,7 +46,7 @@ See [CHANGELOG.md](CHANGELOG.md) for the complete version history.
 
 - Obsidian desktop `1.13.7` or later (the verified compatibility baseline for this release).
 - A local [Codex CLI](https://developers.openai.com/codex/cli/) installation signed in with ChatGPT. ChatGPT Free is supported with a smaller Codex allowance. Visual Agent Map does not require an API key; npm is only needed to build from source.
-- Desktop only. Current release: `0.9.3`.
+- Desktop only. Current release: `0.9.4`.
 
 ### Install
 
@@ -124,9 +125,10 @@ Visual Agent Map 是桌面版 Obsidian 外掛：用視覺化心智圖拆解複�
 研究與展開地圖使用可搜尋網頁的 Codex 任務。整合發現使用直屬子議題和本次選取的 Markdown 筆記，不要求網頁搜尋。快速／標準／深入研究深度與 Codex 推理等級分開設定。節點任務執行中可按「停止研究」，保留原筆記。
 AI 任務執行超過 3 分鐘時，為避免持續在背景佔用資源，VAM 會嘗試中斷；未完成的結果不會套用，任務錯誤訊息會說明原因。
 
-### 0.9.3 更新內容
+### 0.9.4 更新內容
 
-- AI 任務超過 3 分鐘後會逾時，VAM 會嘗試中斷，並在任務錯誤訊息說明原因。
+- 左側欄預設開啟依心智圖階層排列的議題大綱，支援搜尋及直接開啟筆記。
+- 英文範例及新產生的 AI 內容、筆記模板與參照標籤會更一致地依介面語言顯示；切換設定不翻譯既有筆記內容。
 
 完整版本紀錄請見 [CHANGELOG.md](CHANGELOG.md)。
 
@@ -134,7 +136,7 @@ AI 任務執行超過 3 分鐘時，為避免持續在背景佔用資源，VAM �
 
 - Obsidian 桌面版 `1.13.7` 或更新版本（本版本實際驗證的相容性基線）。
 - 已在本機安裝 [Codex CLI](https://developers.openai.com/codex/cli/) 並以 ChatGPT 登入。ChatGPT Free 可以使用，但 Codex 額度較少。Visual Agent Map 不需要 API key；只有從原始碼建置才需要 npm。
-- 僅支援桌面版。目前版本：`0.9.3`。
+- 僅支援桌面版。目前版本：`0.9.4`。
 
 ### 安裝
 

@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.9.4] - 2026-09-23
+
+### Added
+
+- Added an automatically opened topic outline in the left sidebar, following the map hierarchy with search and direct note navigation.
+
+### Fixed
+
+- English sample notes now show English Preview headings.
+- New AI tasks use the selected interface language by default across research, map expansion, and synthesis. English-generated note scaffolding, pending summaries, reference labels, and relevant error messages now use English.
+- Switching interface language does not translate or rewrite existing note content.
+
 ## [0.9.3] - 2026-09-22
 
 ### Changed

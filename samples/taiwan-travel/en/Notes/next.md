@@ -21,7 +21,7 @@ Review this journey against my dates, budget, and companion requirements.
 ## Rules
 
 Never overwrite preview content the user has edited.
-## 預覽
+## Preview
 
 > [!tip] Try it
 > Duplicate the sample, then edit this preview and add your own image.

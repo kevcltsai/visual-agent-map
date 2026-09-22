@@ -21,7 +21,7 @@ Filter areas by transport access, evening safety, and luggage needs.
 ## Rules
 
 Location convenience matters more than maximizing room choices.
-## 預覽
+## Preview
 
 Four bases support nine days, with each base serving a clear role.
 ## Detail

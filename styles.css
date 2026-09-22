@@ -1,4 +1,14 @@
 .workspace-leaf-content[data-type="visual-agent-map-view"] .vam-view { padding: 0; overflow: hidden; display: flex; flex-direction: column; height: 100%; }
+.workspace-leaf-content[data-type="visual-agent-map-outline"] .vam-outline { display: flex; flex-direction: column; height: 100%; overflow: hidden; }
+.vam-outline-heading { padding: 14px 12px 8px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.vam-outline-search { margin: 4px 10px 8px; width: calc(100% - 20px); }
+.vam-outline-tree { overflow-y: auto; flex: 1; padding: 4px 6px 12px; }
+.vam-outline-row { display: flex; align-items: center; min-width: 0; min-height: 30px; }
+.vam-outline-toggle, .vam-outline-note { border: 0; box-shadow: none; background: transparent; color: var(--text-normal); }
+.vam-outline-toggle, .vam-outline-spacer { flex: 0 0 22px; width: 22px; padding: 0; text-align: center; }
+.vam-outline-note { display: block; flex: 1; min-width: 0; padding: 4px 6px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; text-align: left; }
+.vam-outline-note:hover, .vam-outline-note.is-active { background: var(--background-modifier-hover); }
+.vam-outline-empty { padding: 12px; color: var(--text-muted); font-size: var(--font-ui-small); }
 .vam-toolbar, .vam-map-tools { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; padding: 10px 14px; border-bottom: 1px solid var(--background-modifier-border); background: var(--background-primary); flex-shrink: 0; }
 .vam-map-title { margin-right: auto; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 280px; }
 .vam-toolbar button, .vam-map-tools button, .vam-actions button { font-size: var(--font-ui-small); }

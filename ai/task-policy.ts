@@ -14,7 +14,15 @@ export function effectiveReasoningLevel(context: TaskContext, selected: Reasonin
   return context.sourceContext && context.sourceContext.length > 6_000 ? "medium" : "low";
 }
 
-export function researchGuidance(context: TaskContext): string {
+export function researchGuidance(context: TaskContext, language: "zh-TW" | "en" = "zh-TW"): string {
+  if (language === "en") {
+    const depth = context.researchDepth === "fast" ? "Quick overview: answer the core question first and briefly list key evidence and gaps; do not conduct a full investigation."
+      : context.researchDepth === "deep" ? "Deep research: compare sources for agreement and disagreement, and detail key evidence, limitations, and open questions."
+        : "Normal research: provide the main evidence, limitations, and open questions needed to support the conclusion.";
+    if (context.researchMode === "local") return `${depth} Use only the provided topic and source context. Do not search the web or read other files. If the available evidence cannot support an answer, explicitly write "Insufficient information" and identify what is missing; do not present model memory or invented sources as verified facts.`;
+    const { searches, sources } = researchLimits(context.researchDepth);
+    return `${depth} Search only when external facts are needed; aim for at most ${searches} web searches and ${sources} primary sources. Stop when evidence is sufficient; otherwise identify the gaps as open questions.`;
+  }
   const depth = context.researchDepth === "fast" ? "快速概覽：先回答核心問題，簡短列出關鍵依據與缺口；不要做完整調查。"
     : context.researchDepth === "deep" ? "深入研究：檢查來源間的一致與分歧，詳列重要證據、限制與待查問題。"
       : "一般研究：提供足以支持結論的主要證據、限制與待確認事項。";

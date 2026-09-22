@@ -21,7 +21,7 @@ Add dietary restrictions and viable alternatives for the group.
 ## Rules
 
 Do not let famous queues control an entire day.
-## 預覽
+## Preview
 
 ![A Taiwanese table with braised pork rice, soup, and side dishes](../Attachments/regional-food.webp)
 

@@ -21,7 +21,7 @@ Update this split after checking prices for the actual travel dates.
 ## Rules
 
 Record the lookup date and uncertainty for every estimate.
-## 預覽
+## Preview
 
 | Category | Suggested share |
 |---|---:|

@@ -21,7 +21,7 @@ Compare time, transfers, luggage burden, and cancellation flexibility.
 ## Rules
 
 Prefer adjustable options with manageable luggage handling.
-## 預覽
+## Preview
 
 High-speed and conventional rail connect the main stops; short rentals cover remote areas.
 ## Detail

@@ -21,7 +21,7 @@ Confirm mobility, food, and rest requirements for everyone traveling.
 ## Rules
 
 Do not schedule high-intensity activities after long transfers.
-## 預覽
+## Preview
 
 Change lodging every two or three days and preserve room for adjustment.
 ## Detail

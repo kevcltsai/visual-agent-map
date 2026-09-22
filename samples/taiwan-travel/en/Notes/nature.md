@@ -21,7 +21,7 @@ Check seasonal trail, weather, and transport constraints.
 ## Rules
 
 Every outdoor plan needs an alternative.
-## 預覽
+## Preview
 
 ![Green mountains and the blue Pacific on Taiwan's east coast](../Attachments/east-coast-landscape.webp)
 

@@ -1,7 +1,7 @@
 {
   "id": "visual-agent-map",
   "name": "Visual Agent Map",
-  "version": "0.9.3",
+  "version": "0.9.4",
   "minAppVersion": "1.13.7",
   "description": "Explore topics with asynchronous AI tasks in a visual map backed by Markdown notes.",
   "author": "Kevin Tsai",

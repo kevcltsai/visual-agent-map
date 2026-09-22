@@ -21,7 +21,7 @@ Confirm pickup locations and wet-weather alternatives near each base.
 ## Rules
 
 Avoid extended driving on tiring transfer days.
-## 預覽
+## Preview
 
 Breaking transport into executable segments exposes transfer and buffer risks.
 ## Detail

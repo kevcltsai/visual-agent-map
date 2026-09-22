@@ -40,7 +40,7 @@ function compileLocale(locale) {
       summary: section(markdown, "Current Summary"),
       prompt: section(markdown, "Prompt"),
       rules: section(markdown, "Rules"),
-      preview: section(markdown, "預覽"),
+      preview: section(markdown, locale === "en" ? "Preview" : "預覽"),
       detail: section(markdown, "Detail"),
       status: field(markdown, "status") || "completed",
       sourcePaths: list(field(markdown, "source-notes"))

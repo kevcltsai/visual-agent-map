@@ -21,7 +21,7 @@ Enter through Taipei and leave from Hualien, using rail to connect cities, food,
 ## Rules
 
 Keep every source topic so the assumptions remain reviewable.
-## 預覽
+## Preview
 
 Days 1–2 Taipei; day 3 Chiayi and Alishan; days 4–5 Tainan; days 6–8 eastern Taiwan; day 9 Hualien departure.
 ## Detail

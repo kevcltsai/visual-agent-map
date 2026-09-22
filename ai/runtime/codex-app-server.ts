@@ -47,7 +47,7 @@ interface TurnState { messages: string[]; resolve: (text: string) => void; rejec
 
 const CONTROL_TIMEOUT_MS = 30_000;
 const TURN_TIMEOUT_MS = 3 * 60 * 1000;
-function cancelledError(): Error { const error = new Error("AI 任務已取消"); error.name = "AbortError"; return error; }
+function cancelledError(): Error { const error = new Error(t("AI 任務已取消")); error.name = "AbortError"; return error; }
 
 export class CodexAppServerRuntime {
   private child: ChildProcessHandle | null = null;
@@ -74,7 +74,7 @@ export class CodexAppServerRuntime {
   }
 
   stop(): void {
-    const error = new Error("Codex App Server 已停止");
+    const error = new Error(t("Codex App Server 已停止"));
     for (const entry of this.pending.values()) { window.clearTimeout(entry.timeout); entry.reject(error); }
     for (const entry of this.turns.values()) { window.clearTimeout(entry.timeout); entry.reject(error); }
     this.pending.clear();
@@ -122,7 +122,7 @@ export class CodexAppServerRuntime {
       ephemeral: true
     }) as { thread?: { id?: unknown } };
     const threadId = typeof started.thread?.id === "string" ? started.thread.id : "";
-    if (!threadId) throw new Error("Codex App Server 沒有建立 thread");
+    if (!threadId) throw new Error(t("Codex App Server 沒有建立 thread"));
 
     let timedOut = false, interruptRequested = false;
     const completed = new Promise<string>((resolve, reject) => {
@@ -186,8 +186,8 @@ export class CodexAppServerRuntime {
     this.child = child;
     child.stdout.on("data", chunk => this.consume(child, chunk.toString("utf8")));
     child.stderr.on("data", chunk => { if (this.child === child) this.stderr = `${this.stderr}${chunk.toString("utf8")}`.slice(-16_384); });
-    child.on("error", error => this.failProcess(child, new Error(`無法啟動 Codex App Server（${this.options.executable}）：${error.message}`)));
-    child.on("close", code => this.failProcess(child, new Error(this.stderr.trim() || `Codex App Server 結束碼：${code ?? "未知"}`)));
+    child.on("error", error => this.failProcess(child, new Error(t("無法啟動 Codex App Server（{0}）：{1}", this.options.executable, error.message))));
+    child.on("close", code => this.failProcess(child, new Error(this.stderr.trim() || t("Codex App Server 結束碼：{0}", code ?? t("未知")))));
     await this.request("initialize", {
       clientInfo: { name: "visual-agent-map", title: "Visual Agent Map", version: this.options.clientVersion },
       capabilities: { experimentalApi: false, requestAttestation: false }
@@ -206,7 +206,7 @@ export class CodexAppServerRuntime {
       this.buffer = this.buffer.slice(newline + 1);
       if (!line) continue;
       try { this.handle(JSON.parse(line) as RpcResponse | RpcNotification | RpcServerRequest); }
-      catch (error) { this.failProcess(child, new Error(`Codex App Server 回應無法解析：${error instanceof Error ? error.message : String(error)}`)); }
+      catch (error) { this.failProcess(child, new Error(t("Codex App Server 回應無法解析：{0}", error instanceof Error ? error.message : String(error)))); }
     }
   }
 
@@ -220,7 +220,7 @@ export class CodexAppServerRuntime {
       if (!entry) return;
       this.pending.delete(message.id);
       window.clearTimeout(entry.timeout);
-      if (message.error) entry.reject(new Error(message.error.message || "Codex App Server 回傳錯誤"));
+      if (message.error) entry.reject(new Error(message.error.message || t("Codex App Server 回傳錯誤")));
       else entry.resolve(message.result);
       return;
     }
@@ -244,7 +244,7 @@ export class CodexAppServerRuntime {
       window.clearTimeout(state.timeout);
       this.turns.delete(threadId);
       if (turn?.status === "completed") state.resolve(state.messages.at(-1)?.trim() || "");
-      else state.reject(new Error(typeof turn?.error?.message === "string" ? turn.error.message : `Codex turn ${typeof turn?.status === "string" ? turn.status : "失敗"}`));
+      else state.reject(new Error(typeof turn?.error?.message === "string" ? turn.error.message : t("Codex turn {0}", typeof turn?.status === "string" ? turn.status : t("失敗"))));
     }
   }
 
@@ -273,7 +273,7 @@ export class CodexAppServerRuntime {
     return new Promise((resolve, reject) => {
       const timeout = window.setTimeout(() => {
         this.pending.delete(id);
-        reject(new Error(`Codex App Server ${method} 在 ${Math.ceil(timeoutMs / 1000)} 秒內沒有回應`));
+        reject(new Error(t("Codex App Server {0} 在 {1} 秒內沒有回應", method, Math.ceil(timeoutMs / 1000))));
       }, timeoutMs);
       this.pending.set(id, { resolve, reject, timeout });
       try { this.send({ id, method, params }); }
@@ -282,7 +282,7 @@ export class CodexAppServerRuntime {
   }
 
   private send(message: object): void {
-    if (!this.child) throw new Error("Codex App Server 尚未啟動");
+    if (!this.child) throw new Error(t("Codex App Server 尚未啟動"));
     this.child.stdin.write(`${JSON.stringify(message)}\n`);
   }
 

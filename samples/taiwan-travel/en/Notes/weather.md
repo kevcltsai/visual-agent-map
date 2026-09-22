@@ -21,7 +21,7 @@ Prepare one low-cost fallback for mountain, coast, and disrupted transport days.
 ## Rules
 
 Favor activities that can be cancelled or rescheduled.
-## 預覽
+## Preview
 
 This idea node shows how a map can preserve an unfinished question for later research.
 ## Detail

@@ -3,13 +3,17 @@ const fs = require('node:fs');
 const os = require('node:os');
 const vm = require('node:vm');
 const path = require('node:path');
-const { test } = require('node:test');
+const { test: nodeTest } = require('node:test');
+const layer = process.argv.find(value => value.startsWith('--layer='))?.split('=')[1];
+if (layer && !['unit', 'integration'].includes(layer)) throw new Error('Unknown test layer');
+const test = (name, fn) => { if (!layer || layer === 'unit') nodeTest(name, fn); };
+const integrationTest = (name, fn) => { if (!layer || layer === 'integration') nodeTest(name, fn); };
 const { buildSync } = require('esbuild');
 const root = path.resolve(__dirname, '..');
 function load(entry, overrides = {}, windowValues = {}) {
   const code = buildSync({ entryPoints: [path.join(root, entry)], bundle: true, write: false, platform: 'node', format: 'cjs', external: ['obsidian', 'node:*'] }).outputFiles[0].text;
   const module = { exports: {} };
-  vm.runInNewContext(code, { module, exports: module.exports, require: name => overrides[name] || require(name), console, crypto: require('node:crypto').webcrypto, process, AbortController, window: { setTimeout, clearTimeout, ...windowValues } });
+  vm.runInNewContext(code, { module, exports: module.exports, require: name => overrides[name] || require(name), console, TextDecoder, crypto: require('node:crypto').webcrypto, process, AbortController, window: { setTimeout, clearTimeout, ...windowValues } });
   return module.exports;
 }
 const core = load('map-model.ts');
@@ -100,19 +104,14 @@ test('automatic reasoning respects manual choices and local tasks avoid research
   assert.match(researchGuidance({ ...task, researchMode: 'research' }), /最多 3 次網路搜尋/);
   assert.equal(RESEARCH_SEARCH_BUDGET, 3);
 });
-test('research depth sets separate search targets and source selection ranks only related notes', () => {
+test('research depth sets separate web search targets', () => {
   const { researchLimits } = load('ai/task-policy.ts');
-  const { selectSourceDocuments, sourceContext } = load('ai/source-selection.ts');
   assert.deepEqual(plain(researchLimits('fast')), { searches: 1, sources: 2 });
   assert.deepEqual(plain(researchLimits('normal')), { searches: 3, sources: 5 });
   assert.deepEqual(plain(researchLimits('deep')), { searches: 6, sources: 10 });
   const { researchGuidance } = load('ai/task-policy.ts');
   assert.match(researchGuidance({ researchMode: 'local', researchDepth: 'fast' }), /快速概覽/);
   assert.match(researchGuidance({ researchMode: 'local', researchDepth: 'deep' }), /深入研究/);
-  const docs = [{ name: '旅行/台北交通.md', content: '捷運與公車' }, { name: '旅行/台北飯店.md', content: '住宿價格' }, { name: '工作/會議.md', content: '無關' }];
-  const picked = selectSourceDocuments('台北交通', docs, 'fast');
-  assert.deepEqual(picked.map(item => item.name), ['旅行/台北交通.md', '旅行/台北飯店.md']);
-  assert.doesNotMatch(sourceContext(picked), /工作\/會議/);
 });
 test('explicit source context survives long existing Markdown', () => {
   const { buildPreparedTaskContext } = load('ai/context-builder.ts');
@@ -133,7 +132,7 @@ test('Codex executable discovery covers Homebrew, local npm, Volta, fnm, nvm and
   assert.deepEqual(Array.from(executableCandidates('/exact/codex', '/Users/friend', '', [])), ['/exact/codex']);
 });
 
-test('Codex launch uses its sibling Node with automatic nvm discovery and explicit paths', async () => {
+integrationTest('Codex launch uses its sibling Node with automatic nvm discovery and explicit paths', async () => {
   const temporary = fs.mkdtempSync(path.join(require('node:os').tmpdir(), 'vam-codex-path-'));
   const home = path.join(temporary, 'Friend Home');
   const bin = path.join(home, '.nvm/versions/node/v24.14.0/bin');
@@ -198,14 +197,14 @@ test('built-in Taiwan sample is bilingual, read-only source data with exploratio
   }
   assert.notEqual(sample.builtInSample('zh-TW').map.title, sample.builtInSample('en').map.title);
 });
-test('workspace repair creates only the configured base folders and is idempotent', async () => {
+integrationTest('workspace repair creates only the configured base folders and is idempotent', async () => {
   const { repo, app } = fixture();
   assert.equal(repo.workspaceExists(), false);
   await repo.ensureWorkspace(); await repo.ensureWorkspace();
   assert.ok(app.vault.getAbstractFileByPath('Agent Workspace/Topics') instanceof TFolder);
   assert.ok(app.vault.getAbstractFileByPath('Agent Workspace/Inbox') instanceof TFolder);
 });
-test('workspace rediscovery finds valid custom VAM workspaces without accepting unrelated Map files', async () => {
+integrationTest('workspace rediscovery finds valid custom VAM workspaces without accepting unrelated Map files', async () => {
   const { repo, app } = fixture();
   await repo.folder('Research/My Maps/Topics/Trip');
   await app.vault.create('Research/My Maps/Topics/Trip/Map.md', core.serializeMap(map([])));
@@ -240,7 +239,7 @@ test('debug log manager timestamps, bounds, formats and clears in-memory entries
   logs.clear(); assert.equal(logs.getLogs().length, 0); assert.equal(changes, 4);
   unsubscribe(); logs.appendLog('info', 'ignored by listener'); assert.equal(changes, 4);
 });
-test('AI exchange log persists exact request and reply with a bounded history and clear', async () => {
+integrationTest('AI exchange log persists exact request and reply with a bounded history and clear', async () => {
   const { AiExchangeLog, formatAiExchange } = load('ai-exchange-log.ts');
   const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'vam-ai-log-'));
   const file = path.join(directory, 'ai-exchanges.json');
@@ -265,7 +264,7 @@ test('AI exchange log persists exact request and reply with a bounded history an
     assert.deepEqual(errors, []);
   } finally { fs.rmSync(directory, { recursive: true, force: true }); }
 });
-test('pending child suggestions persist across reload and disappear after dismissal', async () => {
+integrationTest('pending child suggestions persist across reload and disappear after dismissal', async () => {
   const { PendingSuggestions } = load('pending-suggestions.ts');
   const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'vam-proposals-'));
   const file = path.join(directory, 'pending-suggestions.json');
@@ -283,7 +282,7 @@ test('pending child suggestions persist across reload and disappear after dismis
     assert.deepEqual(errors, []);
   } finally { fs.rmSync(directory, { recursive: true, force: true }); }
 });
-test('proposal persistence reports disk write failure to the caller', async () => {
+integrationTest('proposal persistence reports disk write failure to the caller', async () => {
   const { PendingSuggestions } = load('pending-suggestions.ts');
   const errors = [];
   const store = new PendingSuggestions(path.join(os.tmpdir(), `vam-missing-${Date.now()}`, 'pending.json'), error => errors.push(error));
@@ -296,10 +295,10 @@ test('debug log command opens the custom modal and exposes copy and clear action
   const modal = fs.readFileSync(path.join(root, 'ui/modals/debug-log-modal.ts'), 'utf8');
   assert.match(source, /id: "open-debug-log"/); assert.match(source, /new DebugLogModal\(this\.app, this\.logs, this\.exchanges/);
   assert.match(modal, /navigator\.clipboard\.writeText/); assert.match(modal, /this\.logs\.clear\(\)/);
-  assert.match(modal, /更新日誌/);
+  assert.match(modal, /ui\.debug_log/);
   assert.match(modal, /this\.logs\.subscribe/);
-  assert.match(source, /Codex App Server 尚未就緒/);
-  assert.match(source, /Codex App Server 已就緒/);
+  assert.match(source, /ui\.codex_app_server_is_not_ready_samples_and_non_ai_features_re/);
+  assert.match(source, /ui\.codex_app_server_is_ready_0/);
   assert.match(source, /AI 任務失敗/);
 });
 class TFolder { constructor(path) { this.path = path; this.name = path.split('/').at(-1); this.children = []; this.parent = null; } }
@@ -311,7 +310,7 @@ const obsidian = {
   stringifyYaml: obj => Object.entries(obj).map(([key, value]) => `${key}: ${JSON.stringify(value)}`).join('\n') + '\n'
 };
 const { Repository, DEFAULT_SETTINGS, normalizeReasoningLevel } = load('repository.ts', { obsidian });
-test('node plus adds a child without opening a duplicate right-click menu', () => {
+integrationTest('node plus adds a child without opening a duplicate right-click menu', () => {
   const { VisualAgentMapView } = load('main.ts', { obsidian });
   const events = new Map(), buttons = [];
   const element = tag => ({ tag, children: [], dataset: {}, style: {},
@@ -349,10 +348,10 @@ test('node plus adds a child without opening a duplicate right-click menu', () =
   assert.deepEqual(details, [topic.id, topic.id, topic.id]);
   assert.equal(events.has('div:contextmenu'), false);
 });
-test('Next Step returns new expansion requests to the map and reviews existing proposals in place', async () => {
+integrationTest('Next Step returns new expansion requests to the map and reviews existing proposals in place', async () => {
   let closed = 0, expandCalls = 0, synthCalls = 0, created, saved, quickOptions, researchOptions, synthOptions; const notices = [];
   const element = (tag, options = {}) => ({
-    tag, type: options.type, text: options.text, value: options.value ?? options.text ?? '', cls: options.cls ?? '', children: [], style: {}, disabled: false,
+    tag, type: options.type, text: options.text, get textContent() { return this.text; }, value: options.value ?? options.text ?? '', cls: options.cls ?? '', children: [], style: {}, dataset: {}, disabled: false,
     classList: { toggle(name, enabled) { this[name] = enabled; } },
     createDiv(value) { const child = element('div', { cls: typeof value === 'string' ? value : value?.cls }); this.children.push(child); return child; },
     createEl(name, value) { const child = element(name, value); this.children.push(child); return child; },
@@ -360,6 +359,7 @@ test('Next Step returns new expansion requests to the map and reviews existing p
     addClass(name) { this.cls = name; }, setText(value) { this.text = value; }, setAttr(name, value) { this[name] = value; },
     addEventListener(name, handler) { if (name === 'click') this.click = handler; if (name === 'change') this.change = handler; if (name === 'input') this.input = handler; },
     querySelector(selector) { const name = selector.slice(1); return find(this, item => item.cls.split(' ').includes(name)); },
+    querySelectorAll(selector) { return all(this, item => selector === 'button[data-topic-run]' && item.tag === 'button' && item.dataset.topicRun !== undefined); },
     empty() { this.children = []; }, remove() { this.removed = true; }
   });
   const find = (root, predicate) => predicate(root) ? root : root.children.map(child => find(child, predicate)).find(Boolean);
@@ -367,25 +367,40 @@ test('Next Step returns new expansion requests to the map and reviews existing p
   const button = (root, label) => find(root, item => item.tag === 'button' && item.text === label);
   const tick = () => new Promise(resolve => setTimeout(resolve, 0));
   class Modal { constructor() { this.modalEl = element('modal'); this.titleEl = element('title'); this.contentEl = element('content'); } close() { closed++; this.onClose?.(); } }
-  const { NextStepModal } = load('main.ts', { obsidian: { ...obsidian, Modal, Notice: class { constructor(message) { notices.push(message); } } } });
-  const plugin = { settings: { codexUsageNoticeSeen: true }, saveSettings: async () => {} };
+  const { NextStepModal } = load('main.ts', { obsidian: { ...obsidian, Modal, setIcon: () => {}, Notice: class { constructor(message) { notices.push(message); } } } });
+  const plugin = { settings: { codexUsageNoticeSeen: true, models: 'gpt-test', cliReasoning: 'low', language: 'en' }, saveSettings: async () => {}, activeTasks: new Map(), sources: { currentTopicId: 'current', currentLabel: 'Current topic included', synthesisLabel: 'Current topic and child topics included', topics: async () => [], readTopic: async () => [] } };
+  const modelSettings = { model: 'gpt-test', modelSource: 'workspace', reasoning: 'low', save: async () => {}, sources: plugin.sources };
   const modal = new NextStepModal({}, 'Parent', 'normal', 1, 1, plugin,
     async options => { researchOptions = options; },
     async (options, _direction, found, _failed, createdMap) => { expandCalls++; if (options.multiLayer) { quickOptions = options; createdMap(); } else found([{ title: 'Transport', task: 'Compare', contribution: '', parentTitle: '' }], async items => { created = items; }); },
-    async (options, angles, drafted) => { synthCalls++; synthOptions = options; angles([{ title: 'Shared constraints', task: 'Find tradeoffs', contribution: 'Across children' }], async () => { drafted({ summary: 'Draft', detail: 'Detail' }, async (summary, detail) => { saved = [summary, detail]; }); }); });
+    async (options, angles, drafted) => { synthCalls++; synthOptions = options; angles([{ title: 'Shared constraints', task: 'Find tradeoffs', contribution: 'Across children' }], async () => { drafted({ summary: 'Draft', detail: 'Detail' }, async (summary, detail) => { saved = [summary, detail]; }); }); }, modelSettings);
   modal.onOpen();
   assert.ok(find(modal.contentEl, item => /3 分鐘.*避免長時間佔用資源/.test(item.text ?? '')));
-  const [cards, research, expand, synthesize] = modal.contentEl.children.slice(1);
-  assert.equal(all(research, item => item.tag === 'input' && (item.type === 'checkbox' || item.type === 'file')).length, 0);
-  assert.equal(all(expand, item => item.tag === 'input' && item.type === 'file').length, 0);
+  const cards = find(modal.contentEl, item => item.cls === 'vam-next-cards');
+  const [research, expand, synthesize] = all(modal.contentEl, item => item.cls.includes('vam-next-research'));
+  const requirements = find(modal.contentEl, item => item.tag === 'textarea');
+  assert.equal(requirements.value, '');
+  assert.equal(all(modal.contentEl, item => item.tag === 'textarea').length, 1);
+  assert.equal(button(modal.contentEl, '儲存指示'), undefined);
+  requirements.value = 'Only this run';
+  const researchChecks = all(research, item => item.tag === 'input' && item.type === 'checkbox');
+  assert.equal(researchChecks.length, 2); assert.ok(researchChecks[0].checked); assert.ok(researchChecks[1].checked);
+  assert.ok(find(research, item => item.text === '搜尋圖片參考'));
+  assert.ok(find(research, item => /標準：最多 3 次網路搜尋、以 5 個主要來源為目標/.test(item.text ?? '')), JSON.stringify(all(research, item => item.text).map(item => item.text)));
+  const expandChecks = all(expand, item => item.tag === 'input' && item.type === 'checkbox');
+  assert.equal(expandChecks.length, 3); assert.ok(expandChecks[0].checked); assert.ok(expandChecks[1].checked);
+  assert.ok(find(expand, item => item.text === '搜尋圖片參考'));
+  assert.equal(all(research, item => item.tag === 'input' && item.type === 'file').length, 2);
+  assert.equal(all(expand, item => item.tag === 'input' && item.type === 'file').length, 2);
   assert.equal(all(synthesize, item => item.tag === 'input' && item.type === 'file').length, 2);
-  assert.equal(find(research, item => item.text === '允許搜尋網路'), undefined);
-  assert.equal(find(expand, item => item.text === '允許搜尋網路'), undefined);
-  assert.equal(find(synthesize, item => item.text === '允許搜尋網路'), undefined);
+  assert.ok(find(research, item => item.text === '允許搜尋網路'));
+  assert.ok(find(expand, item => item.text === '允許搜尋網路'));
+  assert.ok(find(synthesize, item => item.text === '允許搜尋網路'));
   assert.equal(find(synthesize, item => item.text === '不複製子議題全文'), undefined);
   cards.children[1].click();
   assert.equal(research.style.display, 'none'); assert.equal(expand.style.display, '');
-  assert.equal(find(expand, item => item.tag === 'input' && item.type === 'checkbox' && item.checked === false)?.checked, false);
+  expandChecks[0].checked = false; expandChecks[0].change();
+  assert.equal(expandChecks[1].disabled, true); assert.equal(expandChecks[1].checked, false);
   button(expand, '查看 AI 子議題建議').click(); await tick();
   assert.equal(expandCalls, 1); assert.equal(closed, 0);
   const proposalCheck = find(expand.querySelector('.vam-next-result'), item => item.tag === 'input' && item.type === 'checkbox');
@@ -402,36 +417,40 @@ test('Next Step returns new expansion requests to the map and reviews existing p
   button(synthesize, '確認寫入母議題').click(); await tick();
   assert.deepEqual(saved, ['Draft', 'Detail']); assert.equal(closed, 0);
   cards.children[0].click(); button(research, '確認研究任務').click(); await tick();
-  assert.equal(researchOptions.researchMode, 'research'); assert.equal(researchOptions.currentVault, false);
+  assert.equal(researchOptions.requirements, 'Only this run'); assert.equal(researchOptions.researchMode, 'research'); assert.equal(researchOptions.referenceGroups.length, 0);
   assert.equal(closed, 1); assert.equal(research.querySelector('.vam-next-result'), undefined);
   const quickModal = new NextStepModal({}, 'Parent', 'normal', 1, 0, plugin, async () => {}, modal.expand, async () => {});
-  quickModal.onOpen(); quickModal.contentEl.children[1].children[1].click(); button(quickModal.contentEl, '快速探索地圖').click();
+  quickModal.onOpen(); find(quickModal.contentEl, item => item.cls === 'vam-next-cards').children[1].click(); button(quickModal.contentEl, '快速探索地圖').click();
   assert.equal(button(quickModal.contentEl, '查看 AI 子議題建議'), undefined);
+  const quickNumbers = all(quickModal.contentEl, item => item.tag === 'input' && item.type === 'number');
+  const [levelInput, , childrenInput] = quickNumbers;
+  assert.equal(childrenInput.disabled, false);
+  levelInput.value = '1'; levelInput.input();
+  assert.equal(childrenInput.disabled, true);
+  assert.equal(find(quickModal.contentEl, item => item.text === '只展開一層時不會用到此設定。').hidden, false);
+  levelInput.value = '2'; levelInput.input();
+  assert.equal(childrenInput.disabled, false);
   button(quickModal.contentEl, '直接建立初步地圖').click(); await tick();
   assert.equal(quickOptions.multiLayer, true); assert.equal(quickOptions.shallowResearch, false); assert.equal(quickOptions.layers, 2); assert.equal(quickOptions.firstLayerCount, 3); assert.equal(quickOptions.childrenPerParent, 2); assert.equal(closed, 2);
-  assert.equal(quickOptions.researchMode, 'research'); assert.equal(quickOptions.folderFiles.length, 0);
+  assert.equal(quickOptions.researchMode, 'local'); assert.equal(quickOptions.referenceGroups.length, 0);
   const partial = new NextStepModal({}, 'Parent', 'normal', 1, 0, plugin, async () => {}, async (_options, _direction, _found, failed) => failed('部分子議題已建立，請重新開啟視窗。', false), async () => {});
-  partial.onOpen(); partial.contentEl.children[1].children[1].click(); button(partial.contentEl, '快速探索地圖').click();
+  partial.onOpen(); find(partial.contentEl, item => item.cls === 'vam-next-cards').children[1].click(); button(partial.contentEl, '快速探索地圖').click();
   button(partial.contentEl, '直接建立初步地圖').click(); await tick();
   assert.equal(closed, 3); assert.match(notices.at(-1), /重新開啟/);
   let emptyOptions;
   const empty = new NextStepModal({}, 'No children', 'normal', 0, 0, plugin, async () => {}, async () => {}, async options => { synthCalls++; emptyOptions = options; });
-  empty.onOpen(); empty.contentEl.children[1].children[2].click();
-  const emptyPanel = empty.contentEl.children[4];
+  empty.onOpen(); find(empty.contentEl, item => item.cls === 'vam-next-cards').children[2].click();
+  const emptyPanel = all(empty.contentEl, item => item.cls.includes('vam-next-research'))[2];
   assert.match(emptyPanel.children[1].text, /沒有直屬子議題/);
   button(emptyPanel, '先取得整合建議').click(); await tick();
-  assert.equal(synthCalls, 1);
-  const emptyChecks = all(emptyPanel, item => item.tag === 'input' && item.type === 'checkbox');
-  emptyChecks[0].checked = true;
-  button(emptyPanel, '先取得整合建議').click(); await tick();
-  assert.equal(synthCalls, 2); assert.equal(emptyOptions.currentVault, true); assert.equal(emptyOptions.researchMode, 'local');
+  assert.equal(synthCalls, 1); assert.equal(emptyOptions, undefined);
   const failing = new NextStepModal({}, 'Parent', 'normal', 1, 1, plugin, async () => {}, async (_options, _direction, _found, failed) => failed('Provider failed'), async () => {});
-  failing.onOpen(); failing.contentEl.children[1].children[1].click();
+  failing.onOpen(); find(failing.contentEl, item => item.cls === 'vam-next-cards').children[1].click();
   button(failing.contentEl, '查看 AI 子議題建議').click(); await tick();
-  assert.equal(failing.contentEl.children[3].querySelector('.vam-next-status').text, 'Provider failed'); assert.equal(closed, 3);
+  assert.equal(all(failing.contentEl, item => item.cls.includes('vam-next-research'))[1].querySelector('.vam-next-status').text, 'Provider failed'); assert.equal(closed, 3);
   const failedResearch = new NextStepModal({}, 'Parent', 'normal', 1, 0, plugin, async (_options, _focus, _done, failed) => failed('Cannot start'), async () => {}, async () => {});
   failedResearch.onOpen(); button(failedResearch.contentEl, '確認研究任務').click(); await tick();
-  assert.equal(closed, 3); assert.equal(failedResearch.contentEl.children[2].querySelector('.vam-next-status').text, 'Cannot start');
+  assert.equal(closed, 3); assert.equal(all(failedResearch.contentEl, item => item.cls.includes('vam-next-research'))[0].querySelector('.vam-next-status').text, 'Cannot start');
   let acknowledged = 0, began = 0;
   const firstUsePlugin = { settings: { codexUsageNoticeSeen: false }, saveSettings: async () => { acknowledged++; } };
   const firstUse = new NextStepModal({}, 'Parent', 'normal', 1, 0, firstUsePlugin, async () => { began++; }, async () => {}, async () => {});
@@ -442,36 +461,30 @@ test('Next Step returns new expansion requests to the map and reviews existing p
   let pendingCalls = 0;
   const pendingPlugin = { settings: { codexUsageNoticeSeen: false }, saveSettings: async () => {} };
   const pendingModal = new NextStepModal({}, 'Parent', 'normal', 1, 1, pendingPlugin, async () => {}, async (_options, _direction, found) => { pendingCalls++; found([{ title: 'Existing', task: 'Research', contribution: '', parentTitle: '' }], async () => {}); }, async () => {});
-  pendingModal.onOpen(); pendingModal.contentEl.children[1].children[1].click();
+  pendingModal.onOpen(); find(pendingModal.contentEl, item => item.cls === 'vam-next-cards').children[1].click();
   button(pendingModal.contentEl, '查看 AI 子議題建議').click(); await tick();
   assert.equal(pendingCalls, 1); assert.equal(button(pendingModal.contentEl, '了解並執行'), undefined);
   button(pendingModal.contentEl, '建立子議題').click(); await tick();
   assert.ok(button(pendingModal.contentEl, '取得展開方向'));
   button(pendingModal.contentEl, '取得展開方向').click(); await tick();
   assert.equal(pendingCalls, 1); assert.ok(button(pendingModal.contentEl, '了解並執行'));
-  const limited = new NextStepModal({}, 'Parent', 'normal', 1, 0, plugin, async () => { began++; }, async () => {}, async () => {});
-  limited.onOpen();
-  const fileInputs = all(limited.contentEl.children[4], item => item.tag === 'input' && item.type === 'file');
-  fileInputs[1].files = Array.from({ length: 9 }, (_, i) => ({ name: `file-${i}.md` }));
-  button(limited.contentEl, '先取得整合建議').click(); await tick();
-  assert.equal(began, 1); assert.equal(limited.contentEl.children[4].querySelector('.vam-next-status').text, '一次最多手選 8 份 Markdown。');
   let finishQuick, completedQuick = false, delayedOptions;
   const delayed = new NextStepModal({}, 'Parent', 'normal', 1, 0, plugin, async () => {}, async options => {
     delayedOptions = options;
     await new Promise(resolve => { finishQuick = resolve; });
     completedQuick = true;
   }, async () => {});
-  delayed.onOpen(); delayed.contentEl.children[1].children[1].click(); button(delayed.contentEl, '快速探索地圖').click();
+  delayed.onOpen(); find(delayed.contentEl, item => item.cls === 'vam-next-cards').children[1].click(); button(delayed.contentEl, '快速探索地圖').click();
   const numbers = all(delayed.contentEl, item => item.tag === 'input' && item.type === 'number');
   numbers[0].value = '3'; numbers[1].value = '2'; numbers[2].value = '2'; numbers[0].input();
-  const shallow = find(delayed.contentEl.children[3], item => item.tag === 'input' && item.type === 'checkbox' && item.checked === false);
+  const shallow = find(all(delayed.contentEl, item => item.cls.includes('vam-next-research'))[1], item => item.tag === 'input' && item.type === 'checkbox' && item.checked === false);
   shallow.checked = true;
   button(delayed.contentEl, '直接建立初步地圖').click(); await tick();
-  assert.equal(closed, 5); assert.equal(completedQuick, false);
+  assert.equal(closed, 4); assert.equal(completedQuick, false);
   assert.equal(delayedOptions.layers, 3); assert.equal(delayedOptions.firstLayerCount, 2); assert.equal(delayedOptions.childrenPerParent, 2); assert.equal(delayedOptions.shallowResearch, true);
-  finishQuick(); await tick(); assert.equal(completedQuick, true);
+  finishQuick(); await tick(); assert.equal(completedQuick, true); assert.equal(closed, 5);
   const invalid = new NextStepModal({}, 'Parent', 'normal', 1, 0, plugin, async () => {}, async () => assert.fail('over-limit task started'), async () => {});
-  invalid.onOpen(); invalid.contentEl.children[1].children[1].click(); button(invalid.contentEl, '快速探索地圖').click();
+  invalid.onOpen(); find(invalid.contentEl, item => item.cls === 'vam-next-cards').children[1].click(); button(invalid.contentEl, '快速探索地圖').click();
   const invalidNumbers = all(invalid.contentEl, item => item.tag === 'input' && item.type === 'number'); invalidNumbers[0].value = '3'; invalidNumbers[1].value = '3'; invalidNumbers[2].value = '2'; invalidNumbers[0].input();
   assert.match(find(invalid.contentEl, item => item.tag === 'p' && item.text?.includes('超過上限 15 個')).text, /預計建立 21 個子議題/);
   assert.equal(button(invalid.contentEl, '直接建立初步地圖').disabled, true);
@@ -485,9 +498,9 @@ test('Next Step returns new expansion requests to the map and reviews existing p
     found([{ title: 'Later', task: 'Explore', contribution: '' }], async () => {});
     guidedFinished = true;
   }, async () => {});
-  guidedModal.onOpen(); guidedModal.contentEl.children[1].children[1].click();
+  guidedModal.onOpen(); find(guidedModal.contentEl, item => item.cls === 'vam-next-cards').children[1].click();
   button(guidedModal.contentEl, '取得展開方向').click(); await tick();
-  assert.equal(closed, 6); assert.equal(guidedFinished, false);
+  assert.equal(closed, 5); assert.equal(guidedFinished, false);
   finishGuided(); await tick();
   assert.equal(guidedFinished, true); assert.equal(button(guidedModal.contentEl, '建立子議題'), undefined);
   const settingsWrites = []; let researchAfterSave = false;
@@ -504,6 +517,14 @@ test('Next Step returns new expansion requests to the map and reviews existing p
   button(settingsModal.contentEl, '確認研究任務').click(); await tick();
   assert.deepEqual(plain(settingsWrites), [{ model: 'model-b', modelSource: 'manual' }, { reasoning: 'high' }]);
   assert.equal(researchAfterSave, true);
+  const closedBeforeCancel = closed;
+  const cancelModal = new NextStepModal({}, 'Parent', 'normal', 1, 0, plugin, async () => {}, async options => new Promise((_resolve, reject) => options.signal.addEventListener('abort', () => { const error = new Error('aborted'); error.name = 'AbortError'; reject(error); }, { once: true })), async () => {});
+  cancelModal.onOpen(); find(cancelModal.contentEl, item => item.cls === 'vam-next-cards').children[1].click();
+  button(cancelModal.contentEl, '快速探索地圖').click(); button(cancelModal.contentEl, '直接建立初步地圖').click(); await tick();
+  const taskCancel = find(cancelModal.contentEl, item => item.cls === 'vam-task-cancel');
+  assert.equal(taskCancel.hidden, false); taskCancel.onclick(); await tick();
+  assert.match(find(all(cancelModal.contentEl, item => item.cls.includes('vam-next-research'))[1], item => item.cls.includes('vam-next-status')).text, /取消/);
+  assert.equal(closed, closedBeforeCancel);
 });
 function fixture(language = 'zh-TW') {
   const files = new Map(), contents = new Map();
@@ -525,7 +546,7 @@ async function topicNote(repo, title = '題目', model = 'model-a', id = 'map-a'
   const mapPath = `Agent Workspace/Topics/${id}/Map.md`; await repo.ensureTopicFolders(`Agent Workspace/Topics/${id}`);
   return repo.createNote(title, model, mapDoc, mapPath, 'workspace');
 }
-test('editing note fields preserves latest AI detail and unrelated frontmatter', async () => {
+integrationTest('editing note fields preserves latest AI detail and unrelated frontmatter', async () => {
   const { repo, contents } = fixture(); const n = await topicNote(repo);
   contents.set(n.path, contents.get(n.path).replace('---\n', '---\ncustom: "retain me"\n'));
   await repo.updateNote(n.path, { detail: '## Nested heading\n\nAI result with $& and ```code```', newFindings: 'Fresh research', status: 'review' });
@@ -537,7 +558,28 @@ test('editing note fields preserves latest AI detail and unrelated frontmatter',
   assert.match(contents.get(n.path), /## Working Findings\n\nFresh research/);
   assert.match(contents.get(n.path), /custom: "retain me"/);
 });
-test('local research mode persists without changing older notes', async () => {
+integrationTest('language changes rename only known Detail headings inside VAM-managed topic notes', async () => {
+  const { repo, app, contents } = fixture();
+  const n = await topicNote(repo, 'Topic to keep');
+  const body = [
+    '### 核心結論\n\nKeep this body.', '### 關鍵知識\n\nKeep knowledge.', '### 證據與來源\n\nKeep evidence.',
+    '### 取捨與限制\n\nKeep tradeoffs.', '### 待確認事項\n\nKeep questions.', '### 更新紀錄\n\nKeep log.',
+    '### Custom section\n\nKeep custom heading.'
+  ].join('\n\n');
+  await repo.updateNote(n.path, { summary: 'Keep summary', detail: body });
+  const untouchedPath = 'Ordinary.md';
+  await app.vault.create(untouchedPath, `# Ordinary\n\n${body}`);
+  assert.equal(await repo.syncManagedDetailHeadings('en'), 1);
+  const updated = contents.get(n.path);
+  for (const heading of ['Core conclusions', 'Key knowledge', 'Evidence and sources', 'Tradeoffs and limitations', 'Open questions', 'Update log']) assert.match(updated, new RegExp(`### ${heading}`));
+  assert.match(updated, /### Custom section\n\nKeep custom heading\./);
+  assert.match(updated, /Keep this body\./); assert.match(updated, /Keep summary/); assert.match(updated, /^# Topic to keep/m);
+  assert.equal(contents.get(untouchedPath), `# Ordinary\n\n${body}`);
+  assert.equal(await repo.syncManagedDetailHeadings('en'), 0);
+  assert.equal(await repo.syncManagedDetailHeadings('zh-TW'), 1);
+  assert.match(contents.get(n.path), /### 核心結論\n\nKeep this body\./);
+});
+integrationTest('local research mode persists without changing older notes', async () => {
   const { repo } = fixture(); const n = await topicNote(repo);
   const original = await repo.readNote(n.path);
   assert.equal(original.researchMode, 'research');
@@ -549,7 +591,7 @@ test('local research mode persists without changing older notes', async () => {
   assert.equal(updated.researchDepth, 'deep');
   assert.equal(updated.visualMode, 'off');
 });
-test('current summary is editable in the Markdown body', async () => {
+integrationTest('current summary is editable in the Markdown body', async () => {
   const { repo, contents } = fixture(); const n = await topicNote(repo, 'Editable summary');
   assert.match(contents.get(n.path), /## Current Summary\n\n尚未形成結論/);
   await repo.updateNote(n.path, { summary: 'AI conclusion that can be edited' });
@@ -558,7 +600,7 @@ test('current summary is editable in the Markdown body', async () => {
   contents.set(n.path, contents.get(n.path).replace('## Current Summary\n\nAI conclusion that can be edited', '## Current Summary\n\nUser-edited conclusion'));
   assert.equal((await repo.readNote(n.path)).summary, 'User-edited conclusion');
 });
-test('English notes use English preview, pending summary, and managed reference labels', async () => {
+integrationTest('English notes use English preview, pending summary, and managed reference labels', async () => {
   const { repo, app, contents } = fixture('en');
   const mapPath = await repo.createMap('Travel'), map = await repo.readMap(mapPath);
   assert.match(contents.get(mapPath), /This file stores the mind map structure/);
@@ -582,7 +624,7 @@ test('English notes use English preview, pending summary, and managed reference 
   assert.match(copy.path, /Route copy\.md$/);
   assert.throws(() => repo.file('Missing.md'), /File not found/);
 });
-test('language switch localizes only generated note scaffolding and preserves authored text', async () => {
+integrationTest('language switch localizes only generated note scaffolding and preserves authored text', async () => {
   const { repo, app, contents } = fixture();
   const mapPath = await repo.createMap('Travel'), map = await repo.readMap(mapPath);
   const note = await repo.createNote('Route', 'model-a', map, mapPath, 'workspace');
@@ -610,7 +652,7 @@ test('language switch localizes only generated note scaffolding and preserves au
   assert.doesNotMatch(markdown, /## Preview|No conclusion yet/);
   assert.equal((await repo.readNote(note.path)).preview, 'My own preview');
 });
-test('editing a note heading updates its card title and survives later note writes', async () => {
+integrationTest('editing a note heading updates its card title and survives later note writes', async () => {
   const { repo, contents } = fixture(); const n = await topicNote(repo, '新的子議題');
   contents.set(n.path, contents.get(n.path).replace('# 新的子議題', '# 要如何推廣VAM'));
   assert.equal((await repo.readNote(n.path)).title, '要如何推廣VAM');
@@ -621,7 +663,7 @@ test('editing a note heading updates its card title and survives later note writ
   await repo.rebuildDerivedData();
   assert.equal((await repo.readNote(n.path)).title, '要如何推廣VAM');
 });
-test('visual references are stored inside the editable Detail section', async () => {
+integrationTest('visual references are stored inside the editable Detail section', async () => {
   const { repo, contents } = fixture(); const n = await topicNote(repo, 'Outfit');
   await repo.updateNote(n.path, { visualReferences: '### Navy + Beige\n\n![Navy + Beige](https://example.com/outfit.jpg)\n\n來源：https://example.com/page\n配色：navy / beige' });
   let note = await repo.readNote(n.path);
@@ -634,7 +676,7 @@ test('visual references are stored inside the editable Detail section', async ()
   assert.equal(note.visualReferences, '');
   assert.doesNotMatch(contents.get(n.path), /## Visual References/);
 });
-test('managed references stay outside Detail and preserve user-authored content', async () => {
+integrationTest('managed references stay outside Detail and preserve user-authored content', async () => {
   const { repo, contents, app } = fixture(); const n = await topicNote(repo);
   const mapPath = await repo.createMap('Map A', [n]);
   await repo.rebuildDerivedData();
@@ -648,24 +690,24 @@ test('managed references stay outside Detail and preserve user-authored content'
   assert.match(contents.get(n.path), /User content/); assert.equal((await repo.readNote(n.path)).detail, 'New detail');
   assert.ok(app.vault.getAbstractFileByPath(mapPath));
 });
-test('a note cannot belong to two maps', async () => {
+integrationTest('a note cannot belong to two maps', async () => {
   const { repo } = fixture(); const n = await topicNote(repo, 'shared');
   await repo.createMap('One', [n]); await repo.createMap('Two', [n]);
   await assert.rejects(() => repo.rebuildDerivedData(), /同時出現在兩張心智圖/);
 });
-test('removing a node clears ownership and generated references while keeping the note', async () => {
+integrationTest('removing a node clears ownership and generated references while keeping the note', async () => {
   const { repo, contents } = fixture(); const n = await topicNote(repo, 'kept'); const mapPath = await repo.createMap('One', [n]);
   await repo.rebuildDerivedData(); const mapDoc = await repo.readMap(mapPath); mapDoc.nodes = []; await repo.saveMap(mapPath, mapDoc); await repo.rebuildDerivedData();
   assert.equal((await repo.readNote(n.path)).mapId, ''); assert.doesNotMatch(contents.get(n.path), /visual-agent-map:references:start/); assert.doesNotMatch(contents.get(n.path), /agent-map-references:/);
 });
-test('maps keep independent layout and preserve Markdown prose', async () => {
+integrationTest('maps keep independent layout and preserve Markdown prose', async () => {
   const { repo, contents } = fixture(); const firstNode = await topicNote(repo, 'first', 'gpt-5.6-terra', 'map-a'); const secondNode = await topicNote(repo, 'second', 'gpt-5.6-terra', 'map-b');
   const first = await repo.createMap('One', [firstNode]), second = await repo.createMap('Two', [secondNode]);
   contents.set(first, contents.get(first) + '\nUser annotation\n');
   const changed = await repo.readMap(first); changed.nodes[0].x = 600; changed.title = 'Renamed'; await repo.saveMap(first, changed);
   assert.equal((await repo.readMap(second)).nodes[0].x, 80); assert.match(contents.get(first), /User annotation/); assert.match(contents.get(first), /# Renamed/);
 });
-test('preview migration moves owned notes into a topic and unknown orphans into Inbox', async () => {
+integrationTest('preview migration moves owned notes into a topic and unknown orphans into Inbox', async () => {
   const { repo, app } = fixture();
   await repo.folder('Agent Workspace/Maps'); await repo.folder('Agent Workspace/Nodes');
   const content = id => `---\nagent-map-node: true\nnode-id: "${id}"\ntitle: "${id}"\n---\n\n# ${id}\n\n## Prompt\n\n## Rules\n\n## Detail\n\nOld detail\n`;
@@ -679,7 +721,7 @@ test('preview migration moves owned notes into a topic and unknown orphans into 
   assert.equal((await repo.readNote(movedMap.nodes[0].path)).topicState, 'active');
   assert.equal((await repo.inboxFiles()).length, 1); assert.equal((await repo.readNote((await repo.inboxFiles())[0].path)).topicState, 'inbox');
 });
-test('preview migration rolls back all completed moves when a later move fails', async () => {
+integrationTest('preview migration rolls back all completed moves when a later move fails', async () => {
   const { repo, app } = fixture();
   await repo.folder('Agent Workspace/Maps'); await repo.folder('Agent Workspace/Nodes');
   const content = `---\nagent-map-node: true\nnode-id: "a"\ntitle: "a"\n---\n\n# a\n`;
@@ -697,7 +739,7 @@ test('preview migration rolls back all completed moves when a later move fails',
   assert.ok(app.vault.getAbstractFileByPath('Agent Workspace/Nodes/a.md'));
   assert.equal(app.vault.getAbstractFileByPath('Agent Workspace/Topics/Rollback/Map.md'), undefined);
 });
-test('external rename reconciliation only follows a unique matching node-id', async () => {
+integrationTest('external rename reconciliation only follows a unique matching node-id', async () => {
   const { repo, app, contents } = fixture(); const n = await topicNote(repo, 'External rename');
   const mapPath = 'Agent Workspace/Topics/map-a/Map.md', doc = { id: 'map-a', title: 'Map A', version: 1, nodes: [n], viewport: { x: 0, y: 0, zoom: 1 } };
   await app.vault.create(mapPath, core.serializeMap(doc));
@@ -715,12 +757,12 @@ test('external rename reconciliation only follows a unique matching node-id', as
   assert.equal(await second.repo.reconcileMissingNodePaths(), 0);
   assert.equal((await second.repo.readMap(otherMap)).nodes[0].path, other.path);
 });
-test('new topics contain Map, Notes, Unassigned and Archive', async () => {
+integrationTest('new topics contain Map, Notes, Unassigned and Archive', async () => {
   const { repo, app } = fixture(), mapPath = await repo.createMap('Topic A');
   assert.equal(mapPath, 'Agent Workspace/Topics/Topic A/Map.md');
   for (const name of ['Notes', 'Unassigned', 'Archive']) assert.ok(app.vault.getAbstractFileByPath(`Agent Workspace/Topics/Topic A/${name}`) instanceof TFolder);
 });
-test('unassigned and archived notes keep topic ownership but leave the map', async () => {
+integrationTest('unassigned and archived notes keep topic ownership but leave the map', async () => {
   const { repo, contents } = fixture(), mapPath = await repo.createMap('Lifecycle'), mapDoc = await repo.readMap(mapPath);
   const n = await repo.createNote('Knowledge', 'a', mapDoc, mapPath, 'workspace'); mapDoc.nodes.push(n); await repo.saveMap(mapPath, mapDoc); await repo.rebuildDerivedData();
   const unassigned = await repo.moveUnique(n.path, repo.topicFolder(mapPath, 'Unassigned')); await repo.setLifecycle(unassigned, mapDoc.id, '', 'unassigned'); mapDoc.nodes = []; await repo.saveMap(mapPath, mapDoc); await repo.rebuildDerivedData();
@@ -728,18 +770,18 @@ test('unassigned and archived notes keep topic ownership but leave the map', asy
   const archived = await repo.moveUnique(unassigned, repo.topicFolder(mapPath, 'Archive')); await repo.setLifecycle(archived, mapDoc.id, '', 'archived'); await repo.rebuildDerivedData();
   note = await repo.readNote(archived); assert.equal(note.topicState, 'archived'); assert.match(contents.get(archived), /狀態：已封存/);
 });
-test('a missing Map can be rebuilt from topic Notes as root nodes', async () => {
+integrationTest('a missing Map can be rebuilt from topic Notes as root nodes', async () => {
   const { repo } = fixture(), root = 'Agent Workspace/Topics/Broken', placeholder = { id: 'stable-topic', title: 'Broken', version: 1, nodes: [], viewport: { x: 0, y: 0, zoom: 1 } };
   await repo.ensureTopicFolders(root); await repo.createNote('Recovered', 'a', placeholder, `${root}/Map.md`, 'workspace');
   const path = await repo.rebuildMissingMap(root), rebuilt = await repo.readMap(path); assert.equal(rebuilt.id, 'stable-topic'); assert.equal(rebuilt.nodes.length, 1); assert.equal(rebuilt.nodes[0].parentId, null);
 });
-test('replacing AI synthesis preserves 預覽', async () => {
+integrationTest('replacing AI synthesis preserves 預覽', async () => {
   const { repo } = fixture(), n = await topicNote(repo, 'Synthesis');
   await repo.updateNote(n.path, { detail: 'Old synthesis', preview: 'Keep this manually written note' });
   await repo.updateNote(n.path, { detail: 'New synthesis', prompt: '' });
   const result = await repo.readNote(n.path); assert.equal(result.detail, 'New synthesis'); assert.equal(result.preview, 'Keep this manually written note'); assert.equal(result.prompt, '');
 });
-test('text undo uses field patches and preserves AI details arriving in between', async () => {
+integrationTest('text undo uses field patches and preserves AI details arriving in between', async () => {
   const { repo, app } = fixture(), n = await topicNote(repo, 'Original', 'a');
   const { VisualAgentMapView } = load('main.ts', { obsidian });
   const view = new VisualAgentMapView({ app }, { repo, rebuildDerivedData: async () => {} });
@@ -766,7 +808,7 @@ test('AI visual references render as image cards', () => {
   assert.match(english, /Source: https:\/\/example.com\/page/);
   assert.doesNotMatch(english, /來源：|用途：/);
 });
-test('AI prompt defaults to the selected language across task modes', async () => {
+integrationTest('AI prompt defaults to the selected language across task modes', async () => {
   const { default: Plugin } = load('main.ts', { obsidian });
   const plugin = new Plugin(); plugin.app = { vault: { adapter: new obsidian.FileSystemAdapter() } }; plugin.manifest = { dir: '.obsidian/plugins/visual-agent-map' };
   const prompts = [];
@@ -775,7 +817,7 @@ test('AI prompt defaults to the selected language across task modes', async () =
   plugin.settings.language = 'en';
   for (const mode of ['task', 'decompose', 'synthesize']) await plugin.askModel({ ...context, mode }, 'test-model', 'low');
   for (const prompt of prompts) {
-    assert.match(prompt, /Write all newly generated user-facing content in English/);
+    assert.match(prompt, /Write newly generated content in English by default/);
     assert.doesNotMatch(prompt, /[一-龥]/);
   }
   assert.match(prompts[0], /### Core conclusions/);
@@ -784,10 +826,10 @@ test('AI prompt defaults to the selected language across task modes', async () =
   assert.doesNotMatch(prompts[0], /detail 必須是完整繁體中文/);
   plugin.settings.language = 'zh-TW';
   await plugin.askModel({ ...context, mode: 'task' }, 'test-model', 'low');
-  assert.match(prompts[3], /新產生的使用者可見內容一律使用繁體中文/);
+  assert.match(prompts[3], /新產生的內容預設使用繁體中文/);
   assert.match(prompts[3], /### 核心結論/);
 });
-test('AI response fallback keeps the language captured when the task started', async () => {
+integrationTest('AI response fallback keeps the language captured when the task started', async () => {
   const { default: Plugin } = load('main.ts', { obsidian });
   const plugin = new Plugin(); plugin.app = { vault: { adapter: new obsidian.FileSystemAdapter() } }; plugin.manifest = { dir: '.obsidian/plugins/visual-agent-map' };
   plugin.settings.language = 'en';
@@ -808,7 +850,7 @@ test('hover helpers extract image and table from user notes markdown', () => {
   assert.equal(markdownImages(markdown, 4)[3].alt, '外套');
   assert.equal(JSON.stringify(firstMarkdownTable(markdown)), JSON.stringify([['面向', '判斷'], ['顏色', 'navy / beige'], ['鞋子', 'white sneakers']]));
 });
-test('new notes include AI rules but omit working findings; clearing legacy findings removes the section', async () => {
+integrationTest('new notes include AI rules but omit working findings; clearing legacy findings removes the section', async () => {
   const { repo, contents } = fixture(), n = await topicNote(repo, 'Direct write', 'a');
   assert.match(contents.get(n.path), /## Rules[\s\S]*## 預覽[\s\S]*## Detail/);
   assert.doesNotMatch(contents.get(n.path), /## Working Findings/);
@@ -818,7 +860,7 @@ test('new notes include AI rules but omit working findings; clearing legacy find
   assert.doesNotMatch(contents.get(n.path), /## Working Findings/);
   assert.equal((await repo.readNote(n.path)).newFindings, '');
 });
-test('a successful AI task immediately updates summary and MD detail', async () => {
+integrationTest('a successful AI task immediately updates summary and MD detail', async () => {
   const { repo, app, contents } = fixture(), n = await topicNote(repo, 'Direct write', 'a');
   await repo.updateNote(n.path, { prompt: 'Research this', rules: 'Use a comparison table.', detail: 'Existing detail', newFindings: 'Legacy finding', sourcePaths: ['Other.md'] });
   const mapPath = 'Agent Workspace/Topics/map-a/Map.md';
@@ -827,13 +869,13 @@ test('a successful AI task immediately updates summary and MD detail', async () 
   const { VisualAgentMapView } = load('main.ts', { obsidian }); let view;
   const plugin = {
     repo, settings: { ...DEFAULT_SETTINGS }, running: new Set(), activeTasks: new Map(), pendingSuggestions: new Map(),
-    askModel: async context => { assert.equal(context.mode, 'task'); assert.equal(context.rules, 'Use a comparison table.'); assert.equal(context.detail, 'Existing detail'); assert.equal(context.workingFindings, 'Legacy finding'); assert.equal(context.sourceContext, ''); return { summary: 'Direct summary', detail: '### 核心結論\n\nDirect detail\n\n### 關鍵知識\n\nExisting detail; Legacy finding\n\n### 證據與來源\n\nSource\n\n### 取捨與限制\n\nNone\n\n### 待確認事項\n\nNone\n\n### 更新紀錄\n\n- Updated', suggestions: [] }; },
+    askModel: async context => { assert.equal(context.mode, 'task'); assert.equal(context.task, 'One-time request'); assert.equal(context.rules, ''); assert.equal(context.detail, 'Existing detail'); assert.equal(context.workingFindings, 'Legacy finding'); assert.equal(context.sourceContext, ''); return { summary: 'Direct summary', detail: '### 核心結論\n\nDirect detail\n\n### 關鍵知識\n\nExisting detail; Legacy finding\n\n### 證據與來源\n\nSource\n\n### 取捨與限制\n\nNone\n\n### 待確認事項\n\nNone\n\n### 更新紀錄\n\n- Updated', suggestions: [] }; },
     rebuildDerivedData: async () => {}, mutate: async work => work(), views: () => [view]
   };
   view = new VisualAgentMapView({ app }, plugin); view.path = mapPath; view.map = mapDoc; view.render = () => {}; view.hydrate = async () => {};
-  await view.runAgent(n); await new Promise(resolve => setTimeout(resolve, 20));
+  await view.runAgent(n, undefined, undefined, { task: 'One-time request' }); await new Promise(resolve => setTimeout(resolve, 20));
   const updated = await repo.readNote(n.path);
-  assert.equal(updated.summary, 'Direct summary');
+  assert.equal(updated.prompt, 'Research this'); assert.equal(updated.summary, 'Direct summary'); assert.equal(updated.rules, 'Use a comparison table.');
   assert.equal(updated.status, 'completed');
   assert.equal(updated.newFindings, '');
   assert.match(updated.detail, /Direct detail/);
@@ -841,7 +883,7 @@ test('a successful AI task immediately updates summary and MD detail', async () 
   assert.match(updated.detail, /Existing detail/);
   assert.doesNotMatch(contents.get(n.path), /## Working Findings/);
 });
-test('cancelling a node task keeps its earlier Markdown and status', async () => {
+integrationTest('cancelling a node task keeps its earlier Markdown and status', async () => {
   const { repo, app } = fixture(), n = await topicNote(repo, 'Cancel');
   await repo.updateNote(n.path, { prompt: 'Research', detail: 'Keep this' });
   const { VisualAgentMapView } = load('main.ts', { obsidian }); let view;
@@ -858,7 +900,28 @@ test('cancelling a node task keeps its earlier Markdown and status', async () =>
   const after = await repo.readNote(n.path);
   assert.equal(after.status, 'idea'); assert.equal(after.detail, 'Keep this'); assert.equal(plugin.activeTasks.size, 0);
 });
-test('provider failure keeps its original AI log stage during node error writeback', async () => {
+integrationTest('cancelling child synthesis restores the topic status and does not report a failure', async () => {
+  const { repo, app } = fixture(), parent = await topicNote(repo, 'Synthesis parent');
+  await repo.updateNote(parent.path, { status: 'completed', summary: 'Existing conclusion', detail: 'Existing knowledge' });
+  const child = await topicNote(repo, 'Synthesis child');
+  const mapPath = 'Agent Workspace/Topics/map-a/Map.md';
+  const mapDoc = { id: 'map-a', title: 'map-a', version: 1, nodes: [{ ...parent, status: 'completed' }, { ...child, parentId: parent.id }], viewport: { x: 0, y: 0, zoom: 1 } };
+  await app.vault.create(mapPath, core.serializeMap(mapDoc));
+  const controller = new AbortController(); let view, reported = '';
+  const plugin = {
+    repo, settings: { ...DEFAULT_SETTINGS }, running: new Set(), activeTasks: new Map(),
+    askModel: (_context, _model, _reasoning, signal) => new Promise((_resolve, reject) => signal.addEventListener('abort', () => { const error = new Error('cancelled'); error.name = 'AbortError'; reject(error); }, { once: true })),
+    mutate: async work => work(), views: () => [view], recordFailure: (_context, error) => { reported = error.message; return error.message; }
+  };
+  const { VisualAgentMapView } = load('main.ts', { obsidian });
+  view = new VisualAgentMapView({ app }, plugin); view.path = mapPath; view.map = mapDoc; view.render = () => {}; view.hydrate = async () => {};
+  const pending = view.integrateChildren(parent, true, { researchMode: 'local', researchDepth: 'normal', visualMode: 'off', referenceGroups: [], signal: controller.signal });
+  await new Promise(resolve => setImmediate(resolve)); controller.abort(); await pending;
+  const after = await repo.readNote(parent.path);
+  assert.equal(after.status, 'completed'); assert.equal(after.summary, 'Existing conclusion'); assert.equal(after.detail, 'Existing knowledge');
+  assert.equal(reported, ''); assert.equal(plugin.running.has(parent.path), false);
+});
+integrationTest('provider failure keeps its original AI log stage during node error writeback', async () => {
   const { repo, app } = fixture(), n = await topicNote(repo, 'Provider failure');
   await repo.updateNote(n.path, { prompt: 'Research' });
   const entry = { id: 'exchange-1', status: 'failed', error: '等待 AI 回覆：provider timeout' };
@@ -875,7 +938,7 @@ test('provider failure keeps its original AI log stage during node error writeba
   assert.equal((await repo.readNote(n.path)).status, 'error');
   assert.equal(entry.error, '等待 AI 回覆：provider timeout');
 });
-test('proposal persistence failure does not erase completed shallow research', async () => {
+integrationTest('proposal persistence failure does not erase completed shallow research', async () => {
   const { repo, app } = fixture(), n = await topicNote(repo, 'Research result');
   await repo.updateNote(n.path, { prompt: 'Research' });
   const pending = new Map(); pending.flush = async () => { throw new Error('disk unavailable'); };
@@ -890,7 +953,7 @@ test('proposal persistence failure does not erase completed shallow research', a
   assert.equal((await repo.readNote(n.path)).summary, 'Researched');
   assert.equal(exchangeStatus, 'completed'); assert.equal(reported, 'disk unavailable');
 });
-test('a completed but stale answer cannot overwrite an edited note', async () => {
+integrationTest('a completed but stale answer cannot overwrite an edited note', async () => {
   const { repo, app } = fixture(), n = await topicNote(repo, 'Stale');
   await repo.updateNote(n.path, { prompt: 'Research', detail: 'Original' });
   let finish; const { VisualAgentMapView } = load('main.ts', { obsidian }); let view;
@@ -906,7 +969,7 @@ test('a completed but stale answer cannot overwrite an edited note', async () =>
   const after = await repo.readNote(n.path);
   assert.equal(after.detail, 'User edit'); assert.equal(after.status, 'idea'); assert.notEqual(after.summary, 'Stale summary');
 });
-test('new child topics inherit the parent AI rules once', async () => {
+integrationTest('new child topics inherit the parent AI rules once', async () => {
   const { repo, app } = fixture(), parent = await topicNote(repo, 'Parent', 'a');
   await repo.updateNote(parent.path, { rules: 'Use official sources and tables.', reasoning: 'high' });
   const mapPath = 'Agent Workspace/Topics/map-a/Map.md';
@@ -920,7 +983,7 @@ test('new child topics inherit the parent AI rules once', async () => {
   assert.equal((await repo.readNote(child.path)).rules, 'Use official sources and tables.');
   assert.equal((await repo.readNote(child.path)).reasoning, 'high');
 });
-test('selected subtopics move together and copied notes keep their content with new identities', async () => {
+integrationTest('selected subtopics move together and copied notes keep their content with new identities', async () => {
   const { repo, app } = fixture(), root = await topicNote(repo, 'Root', 'a');
   const mapPath = 'Agent Workspace/Topics/map-a/Map.md';
   const mapDoc = { id: 'map-a', title: 'map-a', version: 1, nodes: [root], viewport: { x: 0, y: 0, zoom: 1 } };
@@ -950,7 +1013,7 @@ test('selected subtopics move together and copied notes keep their content with 
   assert.equal((await repo.readMap(mapPath)).nodes.length, 4);
   assert.equal((await repo.readNote(copied.path)).topicState, 'active');
 });
-test('copying a legacy note without a title field keeps its filename as the copy title', async () => {
+integrationTest('copying a legacy note without a title field keeps its filename as the copy title', async () => {
   const { repo, app } = fixture();
   const mapPath = 'Agent Workspace/Topics/map-a/Map.md';
   const mapDoc = { id: 'map-a', title: 'map-a', version: 1, nodes: [], viewport: { x: 0, y: 0, zoom: 1 } };
@@ -959,7 +1022,7 @@ test('copying a legacy note without a title field keeps its filename as the copy
   assert.equal((await repo.readNote(copy.path)).title, 'budget 副本');
   assert.match(await app.vault.read(app.vault.getAbstractFileByPath(copy.path)), /^---[\s\S]*# budget 副本/m);
 });
-test('failed batch copy parks created notes and leaves the map unchanged', async () => {
+integrationTest('failed batch copy parks created notes and leaves the map unchanged', async () => {
   const { repo, app } = fixture(), root = await topicNote(repo, 'Root', 'a');
   const mapPath = 'Agent Workspace/Topics/map-a/Map.md';
   const mapDoc = { id: 'map-a', title: 'map-a', version: 1, nodes: [root], viewport: { x: 0, y: 0, zoom: 1 } };
@@ -978,7 +1041,7 @@ test('failed batch copy parks created notes and leaves the map unchanged', async
   assert.equal((await repo.readNote('Agent Workspace/Topics/map-a/Unassigned/First 副本.md')).topicState, 'unassigned');
   assert.equal(view.history.canUndo, false);
 });
-test('failed map save during copy parks the duplicate without changing the map', async () => {
+integrationTest('failed map save during copy parks the duplicate without changing the map', async () => {
   const { repo, app } = fixture(), root = await topicNote(repo, 'Root', 'a');
   const mapPath = 'Agent Workspace/Topics/map-a/Map.md';
   const mapDoc = { id: 'map-a', title: 'map-a', version: 1, nodes: [root], viewport: { x: 0, y: 0, zoom: 1 } };
@@ -994,7 +1057,7 @@ test('failed map save during copy parks the duplicate without changing the map',
   assert.equal((await repo.readNote('Agent Workspace/Topics/map-a/Unassigned/Root 副本.md')).topicState, 'unassigned');
   assert.equal(view.history.canUndo, false);
 });
-test('removing selected subtopic branches parks notes and can be undone', async () => {
+integrationTest('removing selected subtopic branches parks notes and can be undone', async () => {
   const { repo, app } = fixture(), root = await topicNote(repo, 'Root', 'a');
   const mapPath = 'Agent Workspace/Topics/map-a/Map.md';
   const mapDoc = { id: 'map-a', title: 'map-a', version: 1, nodes: [root], viewport: { x: 0, y: 0, zoom: 1 } };
@@ -1012,7 +1075,7 @@ test('removing selected subtopic branches parks notes and can be undone', async 
   assert.equal((await repo.readMap(mapPath)).nodes.length, 3);
   assert.ok(app.vault.getAbstractFileByPath(child.path));
 });
-test('failed batch removal restores map and active note ownership', async () => {
+integrationTest('failed batch removal restores map and active note ownership', async () => {
   const { repo, app } = fixture(), root = await topicNote(repo, 'Root', 'a');
   const mapPath = 'Agent Workspace/Topics/map-a/Map.md';
   const mapDoc = { id: 'map-a', title: 'map-a', version: 1, nodes: [root], viewport: { x: 0, y: 0, zoom: 1 } };
@@ -1031,7 +1094,7 @@ test('failed batch removal restores map and active note ownership', async () => 
   assert.equal((await repo.readNote(child.path)).mapId, mapDoc.id);
   assert.equal(view.history.canUndo, false);
 });
-test('failed rebuild after batch removal also restores map and notes', async () => {
+integrationTest('failed rebuild after batch removal also restores map and notes', async () => {
   const { repo, app } = fixture(), root = await topicNote(repo, 'Root', 'a');
   const mapPath = 'Agent Workspace/Topics/map-a/Map.md';
   const mapDoc = { id: 'map-a', title: 'map-a', version: 1, nodes: [root], viewport: { x: 0, y: 0, zoom: 1 } };
@@ -1047,7 +1110,7 @@ test('failed rebuild after batch removal also restores map and notes', async () 
   assert.equal((await repo.readNote(child.path)).topicState, 'active');
   assert.equal(view.history.canUndo, false);
 });
-test('confirmed child batches rebuild derived data only once', async () => {
+integrationTest('confirmed child batches rebuild derived data only once', async () => {
   const { repo, app } = fixture(), parent = await topicNote(repo, 'Parent', 'a'); let rebuilds = 0;
   const mapPath = 'Agent Workspace/Topics/map-a/Map.md';
   const mapDoc = { id: 'map-a', title: 'map-a', version: 1, nodes: [parent], viewport: { x: 0, y: 0, zoom: 1 } };
@@ -1065,7 +1128,7 @@ test('confirmed child batches rebuild derived data only once', async () => {
   assert.equal(rebuilds, 1);
   assert.equal((await repo.readNote(saved.nodes[1].path)).prompt, 'Task one');
 });
-test('two-level child batches attach grandchildren and still rebuild once', async () => {
+integrationTest('two-level child batches attach grandchildren and still rebuild once', async () => {
   const { repo, app } = fixture(), parent = await topicNote(repo, 'Parent', 'a'); let rebuilds = 0;
   const mapPath = 'Agent Workspace/Topics/map-a/Map.md';
   const mapDoc = { id: 'map-a', title: 'map-a', version: 1, nodes: [parent], viewport: { x: 0, y: 0, zoom: 1 } };
@@ -1083,7 +1146,7 @@ test('two-level child batches attach grandchildren and still rebuild once', asyn
   assert.equal(saved.nodes[3].parentId, saved.nodes[1].id);
   assert.equal(rebuilds, 1);
 });
-test('orphan grandchild proposals fail instead of silently disappearing', async () => {
+integrationTest('orphan grandchild proposals fail instead of silently disappearing', async () => {
   const { repo, app } = fixture(), parent = await topicNote(repo, 'Parent', 'a');
   const mapPath = 'Agent Workspace/Topics/map-a/Map.md';
   const mapDoc = { id: 'map-a', title: 'map-a', version: 1, nodes: [parent], viewport: { x: 0, y: 0, zoom: 1 } };
@@ -1094,7 +1157,7 @@ test('orphan grandchild proposals fail instead of silently disappearing', async 
   await assert.rejects(view.createChildBatch(parent, [{ title: 'Orphan', task: '', contribution: '', parentTitle: 'Missing' }]), /母議題/);
   assert.equal((await repo.readMap(mapPath)).nodes.length, 1);
 });
-test('duplicate first-level proposal names cannot misplace grandchildren', async () => {
+integrationTest('duplicate first-level proposal names cannot misplace grandchildren', async () => {
   const { repo, app } = fixture(), parent = await topicNote(repo, 'Parent', 'a');
   const mapPath = 'Agent Workspace/Topics/map-a/Map.md';
   const mapDoc = { id: 'map-a', title: 'map-a', version: 1, nodes: [parent], viewport: { x: 0, y: 0, zoom: 1 } };
@@ -1125,7 +1188,7 @@ test('ambiguous original AI proposal names are rejected before editing', () => {
   assert.equal(plugin.pendingSuggestions.has('parent.md'), false);
   assert.equal(plugin.pendingResearchOptions.has('parent.md'), false);
 });
-test('confirmed two-level decomposition starts shallow research for every created topic', async () => {
+integrationTest('confirmed two-level decomposition starts shallow research for every created topic', async () => {
   const { repo, app } = fixture(), parent = await topicNote(repo, 'Parent', 'a');
   const mapPath = 'Agent Workspace/Topics/map-a/Map.md';
   const mapDoc = { id: 'map-a', title: 'map-a', version: 1, nodes: [parent], viewport: { x: 0, y: 0, zoom: 1 } };
@@ -1137,15 +1200,15 @@ test('confirmed two-level decomposition starts shallow research for every create
   await view.createChildBatch(parent, [
     { title: 'A', task: 'Research A', contribution: '' },
     { title: 'A1', task: 'Research A1', contribution: '', parentTitle: 'A' }
-  ], { researchMode: 'research', researchDepth: 'normal', visualMode: 'auto', currentVault: false, folderFiles: [], individualFiles: [], multiLayer: true });
+  ], { researchMode: 'research', researchDepth: 'normal', visualMode: 'auto', referenceGroups: [], multiLayer: true });
   const saved = await repo.readMap(mapPath);
   assert.equal(JSON.stringify(researched), JSON.stringify(saved.nodes.slice(1).map(node => node.id)));
   for (const node of saved.nodes.slice(1)) {
     const note = await repo.readNote(node.path);
-    assert.equal(note.researchDepth, 'fast'); assert.equal(note.researchMode, 'research'); assert.equal(note.visualMode, 'off');
+    assert.equal(note.researchDepth, 'fast'); assert.equal(note.researchMode, 'research'); assert.equal(note.visualMode, 'auto');
   }
 });
-test('guided expansion can research a confirmed first-level child', async () => {
+integrationTest('guided expansion can research a confirmed first-level child', async () => {
   const { repo, app } = fixture(), parent = await topicNote(repo, 'Parent', 'model-a');
   const mapPath = 'Agent Workspace/Topics/map-a/Map.md';
   const mapDoc = map([parent]); mapDoc.id = 'map-a';
@@ -1154,11 +1217,11 @@ test('guided expansion can research a confirmed first-level child', async () => 
   const plugin = { repo, settings: { ...DEFAULT_SETTINGS }, rebuildDerivedData: async () => {} };
   const view = new VisualAgentMapView({ app }, plugin); view.path = mapPath; view.map = mapDoc; view.contentEl = { querySelector: () => null }; view.render = () => {}; view.hydrate = async () => {}; view.focusNode = () => {};
   const researched = []; view.runAgent = async child => { researched.push(child.id); await repo.updateNote(child.path, { status: 'running' }); };
-  await view.createChildBatch(parent, [{ title: 'Research me', task: 'Find evidence', contribution: '', parentTitle: '' }], { researchMode: 'local', researchDepth: 'fast', visualMode: 'off', currentVault: false, folderFiles: [], individualFiles: [], multiLayer: false, shallowResearch: true });
+  await view.createChildBatch(parent, [{ title: 'Research me', task: 'Find evidence', contribution: '', parentTitle: '' }], { researchMode: 'local', researchDepth: 'fast', visualMode: 'off', referenceGroups: [], multiLayer: false, shallowResearch: true });
   assert.equal(researched.length, 1);
   assert.equal((await repo.readNote(view.map.nodes.at(-1).path)).researchMode, 'research');
 });
-test('one shallow-research startup failure marks that child and does not strand later children', async () => {
+integrationTest('one shallow-research startup failure marks that child and does not strand later children', async () => {
   const { repo, app } = fixture(), parent = await topicNote(repo, 'Parent', 'model-a');
   const mapPath = 'Agent Workspace/Topics/map-a/Map.md', mapDoc = map([parent]); mapDoc.id = 'map-a';
   await app.vault.create(mapPath, core.serializeMap(mapDoc));
@@ -1167,13 +1230,36 @@ test('one shallow-research startup failure marks that child and does not strand 
   const { VisualAgentMapView } = load('main.ts', { obsidian });
   const view = new VisualAgentMapView({ app }, plugin); view.path = mapPath; view.map = mapDoc; view.contentEl = { querySelector: () => null }; view.render = () => {}; view.hydrate = async () => {};
   view.runAgent = async child => { if ((await repo.readNote(child.path)).title === 'First') throw new Error('startup failed'); await repo.updateNote(child.path, { status: 'running' }); };
-  await view.createChildBatch(parent, [{ title: 'First', task: 'Research first', contribution: '' }, { title: 'Second', task: 'Research second', contribution: '' }], { researchMode: 'research', researchDepth: 'fast', visualMode: 'off', currentVault: false, folderFiles: [], individualFiles: [], shallowResearch: true });
+  await view.createChildBatch(parent, [{ title: 'First', task: 'Research first', contribution: '' }, { title: 'Second', task: 'Research second', contribution: '' }], { researchMode: 'research', researchDepth: 'fast', visualMode: 'off', referenceGroups: [], shallowResearch: true });
   const saved = await repo.readMap(mapPath);
   assert.equal((await repo.readNote(saved.nodes[1].path)).status, 'error');
   assert.equal((await repo.readNote(saved.nodes[2].path)).status, 'running');
   assert.match(failures[0], /startup failed/);
 });
-test('quick exploration creates two levels directly and leaves them unresearched', async () => {
+integrationTest('cancelling shallow research stops the batch without marking unstarted children as errors', async () => {
+  const { repo, app } = fixture(), parent = await topicNote(repo, 'Parent', 'model-a');
+  const mapPath = 'Agent Workspace/Topics/map-a/Map.md', mapDoc = map([parent]); mapDoc.id = 'map-a';
+  await app.vault.create(mapPath, core.serializeMap(mapDoc));
+  const controller = new AbortController(), failures = [], started = [];
+  const plugin = { repo, settings: { ...DEFAULT_SETTINGS }, rebuildDerivedData: async () => {}, recordFailure: (context, error) => failures.push(`${context}: ${error.message}`) };
+  const { VisualAgentMapView } = load('main.ts', { obsidian });
+  const view = new VisualAgentMapView({ app }, plugin); view.path = mapPath; view.map = mapDoc; view.contentEl = { querySelector: () => null }; view.render = () => {}; view.hydrate = async () => {};
+  view.runAgent = async (child, _unusedA, _unusedB, options) => {
+    started.push((await repo.readNote(child.path)).title); assert.equal(options.signal, controller.signal);
+    await repo.updateNote(child.path, { status: 'idea' });
+    controller.abort();
+  };
+  await view.createChildBatch(parent, [
+    { title: 'First', task: 'Research first', contribution: '' },
+    { title: 'Second', task: 'Research second', contribution: '' }
+  ], { researchMode: 'research', researchDepth: 'fast', visualMode: 'off', referenceGroups: [], shallowResearch: true, signal: controller.signal });
+  const saved = await repo.readMap(mapPath);
+  assert.deepEqual(started, ['First']);
+  assert.equal((await repo.readNote(saved.nodes[1].path)).status, 'idea');
+  assert.equal((await repo.readNote(saved.nodes[2].path)).status, 'idea');
+  assert.deepEqual(failures, []);
+});
+integrationTest('quick exploration creates two levels directly and leaves them unresearched', async () => {
   const { repo, app } = fixture(), parent = await topicNote(repo, 'Parent', 'model-a');
   const mapPath = 'Agent Workspace/Topics/map-a/Map.md';
   const mapDoc = map([parent]); mapDoc.id = 'map-a';
@@ -1189,13 +1275,34 @@ test('quick exploration creates two levels directly and leaves them unresearched
   view.path = mapPath; view.map = mapDoc; view.contentEl = { querySelector: () => null }; view.render = () => {}; view.hydrate = async () => {}; view.focusNode = () => {};
   let reviewed = 0, completed = 0, researched = 0;
   view.runAgent = async () => { researched++; };
-  await view.proposeChildren(parent, true, { researchMode: 'research', researchDepth: 'fast', visualMode: 'off', currentVault: false, folderFiles: [], individualFiles: [], multiLayer: true, shallowResearch: false, layers: 2, firstLayerCount: 2, childrenPerParent: 1 }, '', () => { reviewed++; }, message => assert.fail(message), true, () => { completed++; });
+  await view.proposeChildren(parent, true, { researchMode: 'research', researchDepth: 'fast', visualMode: 'off', referenceGroups: [], multiLayer: true, shallowResearch: false, layers: 2, firstLayerCount: 2, childrenPerParent: 1 }, '', () => { reviewed++; }, message => assert.fail(message), true, () => { completed++; });
   const saved = await repo.readMap(mapPath);
   assert.equal(saved.nodes.length, 5); assert.equal(saved.nodes[3].parentId, saved.nodes[1].id); assert.equal(saved.nodes[4].parentId, saved.nodes[2].id);
   assert.equal(reviewed, 0); assert.equal(completed, 1); assert.equal(researched, 0);
   for (const child of saved.nodes.slice(1)) assert.equal((await repo.readNote(child.path)).status, 'idea');
 });
-test('quick exploration gives every parent two children across three levels and starts optional research', async () => {
+integrationTest('quick exploration with zero children per parent creates only the first level', async () => {
+  const { repo, app } = fixture(), parent = await topicNote(repo, 'Parent', 'model-a');
+  const mapPath = 'Agent Workspace/Topics/map-a/Map.md';
+  const mapDoc = map([parent]); mapDoc.id = 'map-a';
+  await app.vault.create(mapPath, core.serializeMap(mapDoc));
+  let task = '';
+  const plugin = { repo, settings: { ...DEFAULT_SETTINGS, language: 'en' }, running: new Set(), pendingSuggestions: new Map(), pendingResearchOptions: new Map(), rebuildDerivedData: async () => {}, mutate: async work => work(), askModel: async context => {
+    task = context.task;
+    return { summary: '', detail: '', visualReferences: [], suggestions: Array.from({ length: 10 }, (_, index) => ({ title: `Child ${index + 1}`, task: `Explore ${index + 1}`, contribution: '', parentTitle: '' })) };
+  } };
+  const { VisualAgentMapView } = load('main.ts', { obsidian });
+  const view = new VisualAgentMapView({ app }, plugin); view.path = mapPath; view.map = mapDoc; view.contentEl = { querySelector: () => null }; view.render = () => {}; view.hydrate = async () => {}; view.focusNode = () => {};
+  let completed = false;
+  await view.proposeChildren(parent, true, { researchMode: 'research', researchDepth: 'fast', visualMode: 'off', referenceGroups: [], multiLayer: true, layers: 2, firstLayerCount: 10, childrenPerParent: 0 }, '', () => assert.fail('quick map should not show review'), message => assert.fail(message), true, () => { completed = true; });
+  const saved = await repo.readMap(mapPath);
+  assert.equal(saved.nodes.length, 11);
+  assert.ok(saved.nodes.slice(1).every(child => child.parentId === parent.id));
+  assert.match(task, /1 level/);
+  assert.match(task, /total: 10/);
+  assert.equal(completed, true);
+});
+integrationTest('quick exploration gives every parent two children across three levels and starts optional research', async () => {
   const { repo, app } = fixture(), parent = await topicNote(repo, 'Parent', 'model-a');
   const mapPath = 'Agent Workspace/Topics/map-a/Map.md';
   const mapDoc = map([parent]); mapDoc.id = 'map-a';
@@ -1213,13 +1320,13 @@ test('quick exploration gives every parent two children across three levels and 
   const { VisualAgentMapView } = load('main.ts', { obsidian });
   const view = new VisualAgentMapView({ app }, plugin); view.path = mapPath; view.map = mapDoc; view.contentEl = { querySelector: () => null }; view.render = () => {}; view.hydrate = async () => {}; view.focusNode = () => {};
   let researched = 0; view.runAgent = async child => { researched++; await repo.updateNote(child.path, { status: 'running' }); };
-  await view.proposeChildren(parent, true, { researchMode: 'research', researchDepth: 'fast', visualMode: 'off', currentVault: false, folderFiles: [], individualFiles: [], multiLayer: true, shallowResearch: true, layers: 3, firstLayerCount: 2, childrenPerParent: 2 }, '', () => assert.fail('quick map should not show review'), message => assert.fail(message), true);
+  await view.proposeChildren(parent, true, { researchMode: 'research', researchDepth: 'fast', visualMode: 'off', referenceGroups: [], multiLayer: true, shallowResearch: true, layers: 3, firstLayerCount: 2, childrenPerParent: 2 }, '', () => assert.fail('quick map should not show review'), message => assert.fail(message), true);
   const saved = await repo.readMap(mapPath);
   assert.equal(saved.nodes.length, 15); assert.equal(researched, 14);
   const byTitle = new Map(); for (const item of saved.nodes.slice(1)) byTitle.set((await repo.readNote(item.path)).title, item);
   for (const item of suggestions) assert.equal(byTitle.get(item.title).parentId, item.parentTitle ? byTitle.get(item.parentTitle).id : parent.id);
 });
-test('quick exploration rejects an uneven branch before creating any topic', async () => {
+integrationTest('quick exploration rejects an uneven branch before creating any topic', async () => {
   const { repo, app } = fixture(), parent = await topicNote(repo, 'Parent', 'model-a');
   const mapPath = 'Agent Workspace/Topics/map-a/Map.md'; const mapDoc = map([parent]); mapDoc.id = 'map-a';
   await app.vault.create(mapPath, core.serializeMap(mapDoc));
@@ -1233,11 +1340,11 @@ test('quick exploration rejects an uneven branch before creating any topic', asy
   const { VisualAgentMapView } = load('main.ts', { obsidian });
   const view = new VisualAgentMapView({ app }, plugin); view.path = mapPath; view.map = mapDoc; view.contentEl = { querySelector: () => null }; view.render = () => {}; view.hydrate = async () => {};
   let failure = '';
-  await view.proposeChildren(parent, true, { researchMode: 'research', researchDepth: 'fast', visualMode: 'off', currentVault: false, folderFiles: [], individualFiles: [], multiLayer: true, layers: 2, firstLayerCount: 2, childrenPerParent: 1 }, '', () => assert.fail('uneven map accepted'), message => { failure = message; }, true);
+  await view.proposeChildren(parent, true, { researchMode: 'research', researchDepth: 'fast', visualMode: 'off', referenceGroups: [], multiLayer: true, layers: 2, firstLayerCount: 2, childrenPerParent: 1 }, '', () => assert.fail('uneven map accepted'), message => { failure = message; }, true);
   assert.match(failure, /每層數量與母子關係/);
   assert.equal((await repo.readMap(mapPath)).nodes.length, 1);
 });
-test('quick AI wait leaves map mutations free and uses the latest parent position', async () => {
+integrationTest('quick AI wait leaves map mutations free and uses the latest parent position', async () => {
   const { repo, app } = fixture(), parent = await topicNote(repo, 'Parent', 'model-a');
   const mapPath = 'Agent Workspace/Topics/map-a/Map.md'; const mapDoc = map([parent]); mapDoc.id = 'map-a';
   await app.vault.create(mapPath, core.serializeMap(mapDoc));
@@ -1246,7 +1353,7 @@ test('quick AI wait leaves map mutations free and uses the latest parent positio
     askModel: () => new Promise(resolve => { resolveModel = resolve; }), mutate(work) { const job = tail.then(work); tail = job.catch(() => {}); return job; } };
   const { VisualAgentMapView } = load('main.ts', { obsidian });
   const view = new VisualAgentMapView({ app }, plugin); view.path = mapPath; view.map = mapDoc; view.contentEl = { querySelector: () => null }; view.render = () => {}; view.hydrate = async () => {}; view.focusNode = () => {};
-  const options = { researchMode: 'local', researchDepth: 'fast', visualMode: 'off', currentVault: false, folderFiles: [], individualFiles: [], multiLayer: true, shallowResearch: false, layers: 1, firstLayerCount: 1, childrenPerParent: 1 };
+  const options = { researchMode: 'local', researchDepth: 'fast', visualMode: 'off', referenceGroups: [], multiLayer: true, shallowResearch: false, layers: 1, firstLayerCount: 1, childrenPerParent: 1 };
   const job = view.startQuickExpansion(parent, options, '', message => assert.fail(message), () => {});
   await new Promise(resolve => setTimeout(resolve, 0)); assert.equal(plugin.quickExpandPending.has(parent.path), true);
   let moved = false;
@@ -1258,7 +1365,7 @@ test('quick AI wait leaves map mutations free and uses the latest parent positio
   const saved = await repo.readMap(mapPath); assert.equal(saved.nodes.length, 2); assert.equal(saved.nodes[1].x, 860);
   assert.equal(plugin.quickExpandPending.size, 0);
 });
-test('quick map discards a delayed answer when its parent has been removed', async () => {
+integrationTest('quick map discards a delayed answer when its parent has been removed', async () => {
   const { repo, app } = fixture(), parent = await topicNote(repo, 'Parent', 'model-a');
   const mapPath = 'Agent Workspace/Topics/map-a/Map.md'; const mapDoc = map([parent]); mapDoc.id = 'map-a';
   await app.vault.create(mapPath, core.serializeMap(mapDoc));
@@ -1267,7 +1374,7 @@ test('quick map discards a delayed answer when its parent has been removed', asy
     askModel: () => new Promise(resolve => { resolveModel = resolve; }), mutate(work) { const job = tail.then(work); tail = job.catch(() => {}); return job; } };
   const { VisualAgentMapView } = load('main.ts', { obsidian });
   const view = new VisualAgentMapView({ app }, plugin); view.path = mapPath; view.map = mapDoc; view.contentEl = { querySelector: () => null }; view.render = () => {}; view.hydrate = async () => {}; view.focusNode = () => {};
-  const options = { researchMode: 'local', researchDepth: 'fast', visualMode: 'off', currentVault: false, folderFiles: [], individualFiles: [], multiLayer: true, shallowResearch: false, layers: 1, firstLayerCount: 1, childrenPerParent: 1 };
+  const options = { researchMode: 'local', researchDepth: 'fast', visualMode: 'off', referenceGroups: [], multiLayer: true, shallowResearch: false, layers: 1, firstLayerCount: 1, childrenPerParent: 1 };
   const job = view.startQuickExpansion(parent, options, '', message => { error = message; }, () => assert.fail('stale result created nodes'));
   await new Promise(resolve => setTimeout(resolve, 0));
   await plugin.mutate(() => view.mapChange(map => { map.nodes = []; }));
@@ -1276,23 +1383,23 @@ test('quick map discards a delayed answer when its parent has been removed', asy
   assert.match(error, /母議題.*變更/); assert.equal((await repo.readMap(mapPath)).nodes.length, 0);
   assert.equal(plugin.quickExpandPending.size, 0); assert.ok(plugin.quickExpandFailures.has(parent.path));
 });
-test('pending proposals use this run\'s shallow research choice and serialize creation', async () => {
+integrationTest('pending proposals use this run\'s shallow research choice and serialize creation', async () => {
   const suggestions = [{ title: 'Existing', task: 'Research', contribution: '', parentTitle: '' }];
   const plugin = { pendingSuggestions: new Map([['parent.md', suggestions]]), pendingResearchOptions: new Map(), mutate: async work => { queued++; return work(); } };
   let queued = 0, create, used;
   const { VisualAgentMapView } = load('main.ts', { obsidian });
   const view = new VisualAgentMapView({ app: {} }, plugin);
   view.createChildBatch = async (_parent, _items, options) => { used = options; };
-  const options = { researchMode: 'local', researchDepth: 'fast', visualMode: 'off', currentVault: false, folderFiles: [], individualFiles: [], multiLayer: false, shallowResearch: true };
+  const options = { researchMode: 'local', researchDepth: 'fast', visualMode: 'off', referenceGroups: [{ name: 'Reference map', documents: [{ path: 'map/topic.md', content: 'private source' }] }], multiLayer: false, shallowResearch: true };
   await view.proposeChildren({ id: 'parent', path: 'parent.md' }, true, options, '', (_items, confirm) => { create = confirm; }, message => assert.fail(message));
-  assert.equal(plugin.pendingResearchOptions.get('parent.md'), options);
+  assert.deepEqual({ ...plugin.pendingResearchOptions.get('parent.md'), referenceGroups: [] }, { ...options, referenceGroups: [] });
   await create(suggestions);
-  assert.equal(queued, 1); assert.equal(used, options); assert.equal(plugin.pendingSuggestions.has('parent.md'), false);
+  assert.equal(queued, 1); assert.equal(used.researchMode, 'local'); assert.equal(used.researchDepth, 'fast'); assert.equal(used.visualMode, 'off'); assert.equal(used.referenceGroups.length, 0); assert.notEqual(used, options); assert.equal(plugin.pendingSuggestions.has('parent.md'), false);
   plugin.pendingSuggestions.set('parent.md', suggestions); plugin.pendingResearchOptions.set('parent.md', options);
   await view.proposeChildren({ id: 'parent', path: 'parent.md' }, true, { ...options, shallowResearch: false }, '', () => {}, message => assert.fail(message));
   assert.equal(plugin.pendingResearchOptions.has('parent.md'), false);
 });
-test('two views cannot create the same pending proposals twice', async () => {
+integrationTest('two views cannot create the same pending proposals twice', async () => {
   const suggestions = [{ title: 'Child', task: 'Research', contribution: '', parentTitle: '' }];
   let tail = Promise.resolve(), created = 0;
   const plugin = { pendingSuggestions: new Map([['parent.md', suggestions]]), pendingResearchOptions: new Map(), mutate(work) { const job = tail.then(work); tail = job.catch(() => {}); return job; } };
@@ -1307,7 +1414,7 @@ test('two views cannot create the same pending proposals twice', async () => {
   assert.deepEqual(outcomes.map(outcome => outcome.status), ['fulfilled', 'rejected']);
   assert.match(outcomes[1].reason.message, /展開建議已變更/);
 });
-test('partial child creation invalidates the proposal so retry cannot duplicate nodes', async () => {
+integrationTest('partial child creation invalidates the proposal so retry cannot duplicate nodes', async () => {
   const { repo, app } = fixture(), parent = await topicNote(repo, 'Parent', 'model-a');
   const mapPath = 'Agent Workspace/Topics/map-a/Map.md';
   const mapDoc = { id: 'map-a', title: 'map-a', version: 1, nodes: [parent], viewport: { x: 0, y: 0, zoom: 1 } };
@@ -1323,53 +1430,53 @@ test('partial child creation invalidates the proposal so retry cannot duplicate 
   assert.equal(queued, 1); assert.equal(plugin.pendingSuggestions.has(parent.path), false);
   assert.equal((await repo.readMap(mapPath)).nodes.length, 3);
 });
-test('synthesis directions and draft are separate steps; only confirmed draft updates the parent', async () => {
+integrationTest('synthesis directions and draft are separate steps; only confirmed draft updates the parent', async () => {
   const { repo, app } = fixture(), parent = await topicNote(repo, 'Parent', 'model-a');
   const mapPath = 'Agent Workspace/Topics/map-a/Map.md';
   const mapDoc = { id: 'map-a', title: 'map-a', version: 1, nodes: [parent], viewport: { x: 0, y: 0, zoom: 1 } };
   await app.vault.create(mapPath, core.serializeMap(mapDoc));
   const child = await repo.createNote('Child', 'model-a', mapDoc, mapPath, 'workspace'); child.parentId = parent.id; mapDoc.nodes.push(child); await repo.saveMap(mapPath, mapDoc);
+  await repo.updateNote(parent.path, { rules: 'Legacy sentinel' });
   const contexts = [];
   const plugin = { repo, settings: { ...DEFAULT_SETTINGS }, running: new Set(), mutate: async work => work(), askModel: async context => { contexts.push(context); return contexts.length === 1 ? { summary: '', detail: '', visualReferences: [], suggestions: [{ title: 'Common ground', task: 'Find shared constraints', contribution: 'A shared view', parentTitle: '' }] } : { summary: 'Draft summary', detail: 'Draft detail', visualReferences: [], suggestions: [] }; } };
   const { VisualAgentMapView } = load('main.ts', { obsidian });
-  const view = new VisualAgentMapView({ app }, plugin); view.path = mapPath; view.map = mapDoc; view.render = () => {}; view.hydrate = async () => {}; view.sourceDigest = async () => 'Child context'; view.selectedSourceContext = async () => ''; view.ancestorContext = async () => '';
+  const view = new VisualAgentMapView({ app }, plugin); view.path = mapPath; view.map = mapDoc; view.render = () => {}; view.hydrate = async () => {}; view.ancestorContext = async () => '';
   let choose, save;
-  const options = { researchMode: 'local', researchDepth: 'normal', visualMode: 'off', currentVault: false, folderFiles: [], individualFiles: [] };
+  const options = { requirements: 'Only compare cost', researchMode: 'local', researchDepth: 'normal', visualMode: 'off', referenceGroups: [{ id: 'picked', name: 'Picked', location: '/refs', documents: [{ path: '/refs/selected.md', content: 'Selected note content', external: true }] }] };
   await view.proposeIntegrationDirections(parent, options, (items, draft) => { assert.equal(items[0].title, 'Common ground'); choose = draft; }, (_result, commit) => { save = commit; }, message => assert.fail(message));
-  assert.equal(contexts.length, 1); assert.notEqual((await repo.readNote(parent.path)).summary, 'Draft summary');
+  assert.equal(contexts.length, 1); assert.equal(contexts[0].referenceGroups.flatMap(group => group.documents).some(document => document.path === '/refs/selected.md'), true); assert.notEqual((await repo.readNote(parent.path)).summary, 'Draft summary');
   await choose('Find shared constraints');
-  assert.equal(contexts[1].task, 'Find shared constraints'); assert.notEqual((await repo.readNote(parent.path)).summary, 'Draft summary');
+  assert.equal(contexts[1].task, 'Find shared constraints\n\nOnly compare cost');
+  for (const context of contexts) { assert.equal(context.rules, ''); assert.match(context.task, /Only compare cost/); assert.ok(context.referenceGroups.flatMap(group => group.documents).some(document => document.path === '/refs/selected.md')); assert.doesNotMatch(JSON.stringify(context), /Legacy sentinel/); } assert.notEqual((await repo.readNote(parent.path)).summary, 'Draft summary');
   await save('Edited summary', 'Edited detail');
   const saved = await repo.readNote(parent.path);
+  assert.equal(saved.rules, 'Legacy sentinel');
   assert.equal(saved.summary, 'Edited summary'); assert.match(saved.detail, /Edited detail/);
 });
-test('synthesis can use selected notes when a topic has no children', async () => {
+integrationTest('synthesis can use selected notes when a topic has no children', async () => {
   const { repo, app } = fixture(), parent = await topicNote(repo, 'Parent', 'model-a');
   const contexts = [];
   const plugin = { repo, settings: { ...DEFAULT_SETTINGS }, running: new Set(), mutate: async work => work(), recordFailure: (_context, error) => error.message, askModel: async context => { contexts.push(context); return contexts.length === 1 ? { summary: '', detail: '', suggestions: [{ title: 'Shared view', task: 'Combine notes', contribution: '' }] } : { summary: 'Combined', detail: 'Combined detail', suggestions: [] }; } };
   const { VisualAgentMapView } = load('main.ts', { obsidian });
   const view = new VisualAgentMapView({ app }, plugin); view.map = map([parent]); view.render = () => {}; view.hydrate = async () => {}; view.ancestorContext = async () => '';
-  const empty = { researchMode: 'local', researchDepth: 'normal', visualMode: 'off', currentVault: false, folderFiles: [], individualFiles: [] };
+  const empty = { researchMode: 'local', researchDepth: 'normal', visualMode: 'off', referenceGroups: [] };
   let failure = '';
   await view.proposeIntegrationDirections(parent, empty, () => assert.fail('missing sources'), () => {}, message => { failure = message; });
   assert.match(failure, /選擇其他筆記來源/);
   assert.equal(contexts.length, 0);
-  await view.proposeIntegrationDirections(parent, { ...empty, currentVault: true }, () => assert.fail('the current topic is not another note'), () => {}, message => { failure = message; });
-  assert.match(failure, /沒有可整合的 Markdown 內容/);
-  assert.equal(contexts.length, 0);
-  await view.proposeIntegrationDirections(parent, { ...empty, individualFiles: [{ name: 'empty.md', slice: () => ({ text: async () => '' }) }] }, () => assert.fail('empty source'), () => {}, message => { failure = message; });
-  assert.match(failure, /沒有可整合的 Markdown 內容/);
+  await view.proposeIntegrationDirections(parent, { ...empty, referenceGroups: [{ id: 'empty', name: 'Empty', location: '', documents: [] }] }, () => assert.fail('empty source'), () => {}, message => { failure = message; });
+  assert.match(failure, /選擇其他筆記來源/);
   assert.equal(contexts.length, 0);
   let draft, save;
-  view.selectedSourceContext = async () => 'Selected note content';
-  await view.proposeIntegrationDirections(parent, { ...empty, individualFiles: [{ name: 'selected.md' }] }, (_items, next) => { draft = next; }, (_result, commit) => { save = commit; }, message => assert.fail(message));
-  assert.equal(contexts[0].sourceContext, 'Selected note content');
+  const selectedGroup = { id: 'selected', name: 'Selected', location: '/refs', documents: [{ path: '/refs/selected.md', content: 'Selected note content', external: true }] };
+  await view.proposeIntegrationDirections(parent, { ...empty, referenceGroups: [selectedGroup] }, (_items, next) => { draft = next; }, (_result, commit) => { save = commit; }, message => assert.fail(message));
+  assert.ok(contexts[0].referenceGroups.flatMap(group => group.documents).some(document => document.path === '/refs/selected.md'));
   await draft('Combine notes');
-  assert.equal(contexts[1].sourceContext, 'Selected note content');
+  assert.ok(contexts[1].referenceGroups.flatMap(group => group.documents).some(document => document.path === '/refs/selected.md'));
   await save('Combined', 'Combined detail');
   assert.equal((await repo.readNote(parent.path)).summary, 'Combined');
 });
-test('decomposition keeps only 3 to 7 proposals and does not write nodes before confirmation', async () => {
+integrationTest('decomposition keeps only 3 to 7 proposals and does not write nodes before confirmation', async () => {
   const { repo, app } = fixture(), parent = await topicNote(repo, 'Parent', 'model-a');
   const mapPath = 'Agent Workspace/Topics/map-a/Map.md';
   const mapDoc = { id: 'map-a', title: 'map-a', version: 1, nodes: [parent], viewport: { x: 0, y: 0, zoom: 1 } };
@@ -1385,7 +1492,7 @@ test('decomposition keeps only 3 to 7 proposals and does not write nodes before 
   assert.equal(plugin.pendingSuggestions.get(parent.path).length, 7);
   assert.equal((await repo.readMap(mapPath)).nodes.length, 1);
 });
-test('English expansion uses English-generated task instructions', async () => {
+integrationTest('English expansion uses English-generated task instructions', async () => {
   const { repo, app } = fixture('en'), parent = await topicNote(repo, 'Parent', 'model-a');
   const mapPath = 'Agent Workspace/Topics/map-a/Map.md';
   const mapDoc = { id: 'map-a', title: 'Map', version: 1, nodes: [parent], viewport: { x: 0, y: 0, zoom: 1 } };
@@ -1398,7 +1505,7 @@ test('English expansion uses English-generated task instructions', async () => {
   assert.match(task, /Existing direct subtopics/);
   assert.doesNotMatch(task, /[一-龥]/);
 });
-test('decomposition receives existing child topics to avoid duplicate proposals', async () => {
+integrationTest('decomposition receives existing child topics to avoid duplicate proposals', async () => {
   const { repo, app } = fixture(), parent = await topicNote(repo, 'Travel', 'model-a');
   await repo.updateNote(parent.path, { researchMode: 'local' });
   const mapPath = 'Agent Workspace/Topics/map-a/Map.md';
@@ -1415,10 +1522,10 @@ test('decomposition receives existing child topics to avoid duplicate proposals'
   assert.match(captured.task, /交通/);
   assert.match(captured.task, /不要為湊數而拆解/);
   assert.equal(captured.researchMode, 'research');
-  assert.equal(captured.sourceContext, '');
+  assert.equal(captured.referenceGroups, undefined);
   assert.equal(plugin.pendingSuggestions.size, 0);
 });
-test('duplicating the built-in sample creates an independent editable map with new identities', async () => {
+integrationTest('duplicating the built-in sample creates an independent editable map with new identities', async () => {
   const { repo, app } = fixture();
   const { default: Plugin } = load('main.ts', { obsidian });
   const plugin = new Plugin(); plugin.app = app; plugin.repo = repo; plugin.settings = { ...DEFAULT_SETTINGS }; plugin.saveSettings = async () => {};
@@ -1443,14 +1550,14 @@ test('onboarding uses an embedded sample and explicit workspace repair without a
   assert.match(source, /if \(!this\.workspaceRecoveryCandidates\.length\) \{ await this\.repo\.ensureWorkspace\(\)/);
   assert.match(source, /id: "reconnect-workspace"/);
   assert.match(source, /vam-sample-start/);
-  assert.match(source, /Codex 已就緒。複製範例或建立空白心智圖/);
+  assert.match(source, /ui\.codex_is_ready_duplicate_the_sample_or_create_an_empty_mind/);
   assert.match(source, /this\.plugin\.settings\.models\.trim\(\)/);
   assert.match(source, /else if \(this\.map\)/);
 });
 test('the first real AI task requires a one-time Codex allowance acknowledgement', () => {
   const source = fs.readFileSync(path.join(root, 'main.ts'), 'utf8');
   assert.match(source, /class CodexUsageModal/);
-  assert.match(source, /使用該帳號的 Codex 使用額度/);
+  assert.match(source, /ui\.vam_runs_ai_tasks_through_your_signed_in_codex_account_and_u/);
   assert.match(source, /if \(!confirmed\) return;/);
   assert.match(source, /this\.settings\.codexUsageNoticeSeen = true/);
   assert.match(source, /if \(!needsUsage \|\| this\.plugin\.settings\.codexUsageNoticeSeen\) \{ await start\(\); return; \}/);
@@ -1459,24 +1566,24 @@ test('the first real AI task requires a one-time Codex allowance acknowledgement
 test('Obsidian 1.13 declarative settings expose workspace recovery and App Server diagnostics', () => {
   const source = fs.readFileSync(path.join(root, 'main.ts'), 'utf8');
   const definitions = source.slice(source.indexOf('getSettingDefinitions()'), source.indexOf('async setControlValue'));
-  assert.match(definitions, /Workspace 位置/);
-  assert.match(definitions, /修復 Agent Workspace/);
-  assert.match(definitions, /AI 推理等級/);
+  assert.match(definitions, /ui\.workspace_location/);
+  assert.match(definitions, /ui\.repair_agent_workspace/);
+  assert.match(definitions, /ui\.ai_reasoning_level/);
   assert.match(definitions, /cliReasoning/);
-  assert.match(definitions, /low: t\("低 \(Low\)"\)/);
-  assert.match(definitions, /medium: t\("中 \(Medium\)"\)/);
-  assert.match(definitions, /high: t\("高 \(High\)"\)/);
-  assert.match(definitions, /重新整理 VAM 資料/);
-  assert.match(definitions, /完整重建/);
-  assert.match(definitions, /找回既有 Workspace/);
-  assert.match(definitions, /Codex App Server 狀態/);
-  assert.match(definitions, /重新檢查/);
-  assert.match(definitions, /安裝說明/);
+  assert.match(definitions, /low: t\("ui\.low"\)/);
+  assert.match(definitions, /medium: t\("ui\.medium"\)/);
+  assert.match(definitions, /high: t\("ui\.high"\)/);
+  assert.match(definitions, /ui\.refresh_vam_data/);
+  assert.match(definitions, /ui\.full_rebuild/);
+  assert.match(definitions, /ui\.reconnect_existing_workspace/);
+  assert.match(definitions, /ui\.codex_app_server_status/);
+  assert.match(definitions, /ui\.check_again/);
+  assert.match(definitions, /ui\.installation_guide/);
   assert.match(source, /this\.settingTab\?\.update\(\)/);
-  assert.match(source, /setAttr\("aria-label", t\("推理等級"\)\)/);
+  assert.match(source, /setAttr\("aria-label", t\("ui\.reasoning_level"\)\)/);
   assert.match(source, /save\(\{ reasoning: normalizeReasoningLevel\(reasoning\.value\) \}\)/);
 });
-test('full rebuild refreshes derived data and open views', async () => {
+integrationTest('full rebuild refreshes derived data and open views', async () => {
   const { default: Plugin } = load('main.ts', { obsidian }); let rebuilds = 0, refreshes = 0;
   const plugin = new Plugin();
   plugin.repo = { rebuildDerivedData: async () => { rebuilds++; } };
@@ -1489,38 +1596,38 @@ test('missing Codex opens an in-product setup guide with official installation a
   const source = fs.readFileSync(path.join(root, 'main.ts'), 'utf8');
   assert.match(source, /class CodexSetupModal/);
   assert.match(source, /https:\/\/developers\.openai\.com\/codex\/cli\//);
-  assert.match(source, /ChatGPT Free 也可使用/);
-  assert.match(source, /不需要 API key/);
-  assert.match(source, /獨立版 Codex CLI 不需要 npm/);
-  assert.match(source, /在 Terminal 執行 codex/);
+  assert.match(source, /ui\.vam_needs_codex_cli_to_create_your_first_editable_mind_map_a/);
+  assert.match(source, /ui\.no_api_key_is_required_the_standalone_codex_cli_does_not_req/);
+  assert.match(source, /ui\.no_api_key_is_required_the_standalone_codex_cli_does_not_req/);
+  assert.match(source, /ui\.run_codex_in_terminal_and_sign_in_with_your_chatgpt_account/);
   assert.match(source, /if \(showGuide\) this\.openCodexSetupGuide\(\)/);
   assert.match(source, /this\.recheckCodex\(false\)/);
 });
-test('generated child filenames are migrated to their topic titles and maps stay linked', async () => {
+integrationTest('generated child filenames are migrated to their topic titles and maps stay linked', async () => {
   const { repo, app } = fixture(), mapPath = await repo.createMap('Filename migration'), mapDoc = await repo.readMap(mapPath);
   const child = await repo.createNote('新的子議題', 'a', mapDoc, mapPath, 'workspace');
   await repo.updateNote(child.path, { title: '清楚的子議題名稱' }); mapDoc.nodes.push(child); await repo.saveMap(mapPath, mapDoc);
   const count = await repo.normalizeGeneratedNoteFilenames(), updated = await repo.readMap(mapPath);
   assert.equal(count, 1); assert.match(updated.nodes[0].path, /清楚的子議題名稱\.md$/); assert.ok(app.vault.getAbstractFileByPath(updated.nodes[0].path));
 });
-test('source digest carries summaries and working findings into extracted roots', async () => {
+integrationTest('map topic sources retain every selected summary and working finding', async () => {
   const { repo, app } = fixture(), first = await topicNote(repo, 'Recipe A', 'a'), second = await topicNote(repo, 'Recipe B', 'a');
   await repo.updateNote(first.path, { summary: 'Use more onion', newFindings: '### 暫存結論\n\nOnion adds sweetness.' });
   await repo.updateNote(second.path, { summary: 'Toast the buns' });
   const { VisualAgentMapView } = load('main.ts', { obsidian }); const view = new VisualAgentMapView({ app }, { repo });
-  const digest = await view.sourceDigest([first, second]);
-  assert.match(digest, /\[\[Agent Workspace\/Topics\/map-a\/Notes\/Recipe A\]\]/);
-  assert.match(digest, /Use more onion/);
-  assert.match(digest, /Onion adds sweetness/);
-  assert.match(digest, /Toast the buns/);
+  const group = await view.topicReferenceGroup([first, second]);
+  assert.deepEqual(group.documents.map(document => document.path), [first.path, second.path]);
+  assert.match(group.documents[0].content, /Use more onion/);
+  assert.match(group.documents[0].content, /Onion adds sweetness/);
+  assert.match(group.documents[1].content, /Toast the buns/);
 });
-test('legacy integrated source links resolve from short Obsidian links', async () => {
+integrationTest('legacy integrated source links resolve from short Obsidian links', async () => {
   const { repo, app } = fixture(), source = await topicNote(repo, 'Recipe A', 'a'), root = await topicNote(repo, 'Integrated Burger', 'a');
   await repo.updateNote(root.path, { detail: '### 整合來源（保存內容）\n\n- [[Recipe A]]' });
   const { VisualAgentMapView } = load('main.ts', { obsidian }); const view = new VisualAgentMapView({ app }, { repo });
   assert.deepEqual(plain(view.referenceSourcePaths(await repo.readNote(root.path), root.path)), [source.path]);
 });
-test('creating an integrated topic runs AI with full sources and keeps clickable source paths', async () => {
+integrationTest('creating an integrated topic runs AI with full sources and keeps clickable source paths', async () => {
   const { repo, app } = fixture(), first = await topicNote(repo, 'Recipe A', 'model-a'), second = await topicNote(repo, 'Recipe B', 'model-a');
   await repo.updateNote(first.path, { summary: 'Saved onion note', newFindings: 'Caramelize slowly.' });
   await repo.updateNote(second.path, { summary: 'Saved bun note' });
@@ -1530,7 +1637,7 @@ test('creating an integrated topic runs AI with full sources and keeps clickable
   await app.vault.create(mapPath, core.serializeMap(mapDoc));
   const { VisualAgentMapView } = load('main.ts', { obsidian });
   const plugin = { repo, settings: { ...DEFAULT_SETTINGS }, rebuildDerivedData: async () => {}, askModel: async context => {
-    assert.equal(context.mode, 'synthesize'); assert.match(context.sourceContext, /Saved onion note/); assert.match(context.sourceContext, /Caramelize slowly/); assert.match(context.sourceContext, /Saved bun note/);
+    assert.equal(context.mode, 'synthesize'); const allSources = context.referenceGroups.flatMap(group => group.documents).map(document => document.content).join('\n'); assert.match(allSources, /Saved onion note/); assert.match(allSources, /Caramelize slowly/); assert.match(allSources, /Saved bun note/);
     return { summary: 'Integrated answer', detail: 'Integrated detail', suggestions: [] };
   } };
   const view = new VisualAgentMapView({ app }, plugin); view.path = mapPath; view.map = mapDoc; view.render = () => {};
@@ -1542,7 +1649,7 @@ test('creating an integrated topic runs AI with full sources and keeps clickable
   assert.equal(integrated.rules, 'Use tables');
   assert.equal(integrated.status, 'completed');
 });
-test('failed multi-select integration creates no empty root or note', async () => {
+integrationTest('failed multi-select integration creates no empty root or note', async () => {
   const { repo, app } = fixture(), first = await topicNote(repo, 'Recipe A', 'model-a'), second = await topicNote(repo, 'Recipe B', 'model-a');
   const mapPath = 'Agent Workspace/Topics/map-a/Map.md';
   const mapDoc = { id: 'map-a', title: 'map-a', version: 1, nodes: [first, second], viewport: { x: 0, y: 0, zoom: 1 } };
@@ -1554,13 +1661,13 @@ test('failed multi-select integration creates no empty root or note', async () =
   assert.equal((await repo.readMap(mapPath)).nodes.length, 2);
   assert.equal(app.vault.getAbstractFileByPath('Agent Workspace/Topics/map-a/Notes/Should not exist.md'), undefined);
 });
-test('topic notes hide properties without removing existing css classes', async () => {
+integrationTest('topic notes hide properties without removing existing css classes', async () => {
   const { repo, contents } = fixture(); const n = await topicNote(repo, 'Styled', 'a');
   let content = contents.get(n.path); assert.match(content, /visual-agent-map-node/);
   content = content.replace('cssclasses: ["visual-agent-map-node"]', 'cssclasses: ["user-class"]'); contents.set(n.path, content);
   await repo.ensureNodePresentation(); content = contents.get(n.path); assert.match(content, /user-class/); assert.match(content, /visual-agent-map-node/);
 });
-test('map structural undo restores deleted branch; redo removes it again', async () => {
+integrationTest('map structural undo restores deleted branch; redo removes it again', async () => {
   const { repo, app } = fixture(); const file = await repo.createMap('Undo', tree());
   const { VisualAgentMapView } = load('main.ts', { obsidian }); const view = new VisualAgentMapView({ app }, { repo, rebuildDerivedData: async () => {} });
   view.path = file; view.map = await repo.readMap(file); view.render = () => {}; view.hydrate = async () => {};
@@ -1568,14 +1675,14 @@ test('map structural undo restores deleted branch; redo removes it again', async
   await view.travel(false); assert.equal((await repo.readMap(file)).nodes.length, 4);
   await view.travel(true); assert.equal((await repo.readMap(file)).nodes.length, 1);
 });
-test('layout-only map changes and AI note results do not rebuild derived data', async () => {
+integrationTest('layout-only map changes and AI note results do not rebuild derived data', async () => {
   const { repo, app } = fixture(), file = await repo.createMap('Layout', tree()); let rebuilds = 0;
   const { VisualAgentMapView } = load('main.ts', { obsidian }); const view = new VisualAgentMapView({ app }, { repo, rebuildDerivedData: async () => { rebuilds++; } });
   view.path = file; view.map = await repo.readMap(file); view.render = () => {}; view.hydrate = async () => {};
   await view.mapChange(map => { map.nodes[0].x = 120; map.viewport.zoom = 1.2; }); assert.equal(rebuilds, 0);
   await view.mapChange(map => { map.nodes[0].parentId = 'd'; }); assert.equal(rebuilds, 1);
 });
-test('full auto layout can be undone without changing parent links', async () => {
+integrationTest('full auto layout can be undone without changing parent links', async () => {
   const { repo, app } = fixture(), file = await repo.createMap('Arrange', tree());
   const { VisualAgentMapView } = load('main.ts', { obsidian });
   const view = new VisualAgentMapView({ app }, { repo, rebuildDerivedData: async () => assert.fail('layout should not rebuild ownership') });
@@ -1588,7 +1695,7 @@ test('full auto layout can be undone without changing parent links', async () =>
   await view.travel(false);
   assert.deepEqual(plain((await repo.readMap(file)).nodes), before);
 });
-test('Codex App Server uses model/list, selected reasoning and fresh ephemeral threads', async () => {
+integrationTest('Codex App Server uses model/list, selected reasoning and fresh ephemeral threads', async () => {
   const { EventEmitter } = require('node:events'); let command, args, turnCount = 0, threadCount = 0, unsubscribeCount = 0; const efforts = [];
   const child = new EventEmitter(); child.stdout = new EventEmitter(); child.stderr = new EventEmitter(); child.kill = () => {};
   child.stdin = { write: line => {
@@ -1630,7 +1737,7 @@ test('Codex App Server uses model/list, selected reasoning and fresh ephemeral t
   assert.equal(result.summary, 'first');
   assert.equal(second.summary, 'second');
 });
-test('AI exchange logging captures the sent payload, raw reply and parse failure', async () => {
+integrationTest('AI exchange logging captures the sent payload, raw reply and parse failure', async () => {
   const { default: Plugin } = load('main.ts', { obsidian });
   const { AiExchangeLog } = load('ai-exchange-log.ts');
   const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'vam-ai-capture-'));
@@ -1651,7 +1758,7 @@ test('AI exchange logging captures the sent payload, raw reply and parse failure
     assert.equal(entries[1].response, 'invalid raw answer'); assert.equal(entries[1].status, 'failed'); assert.match(entries[1].error, /解析 AI 回覆/);
   } finally { fs.rmSync(directory, { recursive: true, force: true }); }
 });
-test('turning exchange logging off during a task stops recording its reply', async () => {
+integrationTest('turning exchange logging off during a task stops recording its reply', async () => {
   const { default: Plugin } = load('main.ts', { obsidian });
   const { AiExchangeLog } = load('ai-exchange-log.ts');
   const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'vam-ai-toggle-'));
@@ -1676,7 +1783,7 @@ test('turning exchange logging off during a task stops recording its reply', asy
     assert.equal(entry.status, 'sent');
   } finally { fs.rmSync(directory, { recursive: true, force: true }); }
 });
-test('local Codex runtime disables web search for its process', async () => {
+integrationTest('local Codex runtime disables web search for its process', async () => {
   const { EventEmitter } = require('node:events'); let args;
   const child = new EventEmitter(); child.stdout = new EventEmitter(); child.stderr = new EventEmitter(); child.kill = () => {};
   child.stdin = { write: line => { const message = JSON.parse(line.trim()); if (message.method === 'initialize') process.nextTick(() => child.stdout.emit('data', Buffer.from(`${JSON.stringify({ id: message.id, result: {} })}\n`))); } };
@@ -1684,7 +1791,7 @@ test('local Codex runtime disables web search for its process', async () => {
   const runtime = new CodexAppServerRuntime({ executable: 'codex', cwd: '/plugin', env: {}, clientVersion: 'test', webSearchDisabled: true });
   await runtime.start(); assert.deepEqual(plain(args), ['--config', 'web_search="disabled"', 'app-server']); runtime.stop();
 });
-test('research budget sends one stop-search steer after three searches', async () => {
+integrationTest('research budget sends one stop-search steer after three searches', async () => {
   const { EventEmitter } = require('node:events'); const sent = [];
   const child = new EventEmitter(); child.stdout = new EventEmitter(); child.stderr = new EventEmitter(); child.kill = () => {};
   const emit = message => process.nextTick(() => child.stdout.emit('data', Buffer.from(`${JSON.stringify(message)}\n`)));
@@ -1710,7 +1817,7 @@ test('research budget sends one stop-search steer after three searches', async (
     assert.match(sent.find(message => message.method === 'turn/steer').params.input[0].text, /停止搜尋/);
   } finally { runtime.stop(); }
 });
-test('cancelling a Codex turn sends interrupt and rejects the result', async () => {
+integrationTest('cancelling a Codex turn sends interrupt and rejects the result', async () => {
   const { EventEmitter } = require('node:events'); const sent = [], timerDelays = [];
   const child = new EventEmitter(); child.stdout = new EventEmitter(); child.stderr = new EventEmitter(); child.kill = () => {};
   const emit = message => process.nextTick(() => child.stdout.emit('data', Buffer.from(`${JSON.stringify(message)}\n`)));
@@ -1764,7 +1871,7 @@ for (const delayedStart of [false, true]) test(`timed-out Codex turn attempts on
     assert.equal(logs.filter(([level, message]) => level === 'warn' && message.includes('逾時後無法停止 AI 任務')).length, 1);
   } finally { runtime.stop(); }
 });
-test('Codex App Server declines unsupported interaction requests instead of hanging', async () => {
+integrationTest('Codex App Server declines unsupported interaction requests instead of hanging', async () => {
   const { EventEmitter } = require('node:events'); const sent = [];
   const child = new EventEmitter(); child.stdout = new EventEmitter(); child.stderr = new EventEmitter(); child.kill = () => {};
   child.stdin = { write: line => {
@@ -1788,7 +1895,7 @@ test('Codex App Server declines unsupported interaction requests instead of hang
   assert.equal(sent.find(message => message.id === 'unknown')?.error?.code, -32601);
   runtime.stop();
 });
-test('Codex App Server ignores stale child events after a clean restart', async () => {
+integrationTest('Codex App Server ignores stale child events after a clean restart', async () => {
   const { EventEmitter } = require('node:events'); const children = [];
   const spawn = () => {
     const child = new EventEmitter(); child.stdout = new EventEmitter(); child.stderr = new EventEmitter(); child.kill = () => {};
@@ -1809,7 +1916,7 @@ test('Codex App Server ignores stale child events after a clean restart', async 
   assert.equal(children.length, 2);
   runtime.stop();
 });
-test('legacy Claude models fail clearly without starting a provider', async () => {
+integrationTest('legacy Claude models fail clearly without starting a provider', async () => {
   const { default: Plugin } = load('main.ts', { obsidian });
   const plugin = new Plugin();
   await assert.rejects(plugin.askModel({ title: 'Current topic', summary: '', rules: '', detail: '', task: 'task', ancestors: '', mode: 'task' }, 'claude:sonnet'), /Claude Code 已不再支援/);
@@ -1820,7 +1927,7 @@ test('external map conflict UI retains file, screen, and manual merge choices', 
   for (const modal of ['class MapConflictModal']) {
     const start = source.indexOf(modal), next = source.indexOf('\nclass ', start + modal.length);
     const body = source.slice(start, next < 0 ? source.length : next);
-    assert.match(body, /使用檔案內容/); assert.match(body, /保留畫面內容/); assert.match(body, /儲存合併內容/);
+    assert.match(body, /ui\.use_file_contents/); assert.match(body, /ui\.keep_editor_contents/); assert.match(body, /ui\.save_merged_contents/);
   }
 });
 
@@ -1832,7 +1939,7 @@ test('VAM notes hide properties in reading and live preview without removing fro
   assert.doesNotMatch(styles, /!important/);
 });
 
-test('legacy User Notes move to preview without losing either section or duplicating on save', async () => {
+integrationTest('legacy User Notes move to preview without losing either section or duplicating on save', async () => {
   const { repo, contents } = fixture(), n = await topicNote(repo, 'Legacy preview');
   await repo.updateNote(n.path, { preview: 'New preview' });
   contents.set(n.path, contents.get(n.path).replace('## Detail', '## User Notes\n\nLegacy text\n\n## Detail'));
@@ -1851,7 +1958,7 @@ test('preview cards display only editable preview content', () => {
   assert.doesNotMatch(card, /note.summary|User Notes|目前結論/);
 });
 
-test('first AI answer seeds summary and image in preview, later answers preserve it including an explicit clear', async () => {
+integrationTest('first AI answer seeds summary and image in preview, later answers preserve it including an explicit clear', async () => {
   const { repo } = fixture(), n = await topicNote(repo, 'Preview default');
   assert.equal((await repo.readNote(n.path)).preview, '尚未形成結論');
   await repo.updateNote(n.path, { summary: '簡短結論', detail: '文字\n\n![相關圖片](https://example.com/image.jpg)' });
@@ -1862,13 +1969,13 @@ test('first AI answer seeds summary and image in preview, later answers preserve
   await repo.updateNote(n.path, { summary: '第三次結論' });
   assert.equal((await repo.readNote(n.path)).preview, '');
 });
-test('AI answer cannot replace preview edited while task was running', async () => {
+integrationTest('AI answer cannot replace preview edited while task was running', async () => {
   const { repo } = fixture(), n = await topicNote(repo, 'Manual preview');
   await repo.updateNote(n.path, { preview: '使用者的文字' });
   await repo.updateNote(n.path, { summary: 'AI 結論', detail: '![圖](https://example.com/image.jpg)' });
   assert.equal((await repo.readNote(n.path)).preview, '使用者的文字');
 });
-test('images follow related text and inline images are not duplicated', async () => {
+integrationTest('images follow related text and inline images are not duplicated', async () => {
   const { repo } = fixture(), n = await topicNote(repo, 'Inline images');
   const reference = '**配色建議**\n![配色](https://example.com/color.jpg)\n來源：https://example.com/source';
   await repo.updateNote(n.path, { summary: '結論', detail: '### 核心結論\n\n摘要\n\n### 關鍵知識\n\n配色建議：採用低彩度。\n\n另一項建議。\n\n### 證據與來源\n\n來源', visualReferences: reference });
@@ -1882,7 +1989,7 @@ test('images follow related text and inline images are not duplicated', async ()
   assert.match((await repo.readNote(n.path)).preview, /color.jpg/);
 });
 
-test('references in synthesized notes remain clickable after rebuilding, updates and source renames', async () => {
+integrationTest('references in synthesized notes remain clickable after rebuilding, updates and source renames', async () => {
   const { repo, contents } = fixture(); const path = await repo.createMap('References', []), mapDoc = await repo.readMap(path);
   const first = await repo.createNote('Source A', 'a', mapDoc, path, 'workspace'), second = await repo.createNote('Source B', 'a', mapDoc, path, 'workspace');
   const integrated = await repo.createNote('Integrated', 'a', mapDoc, path, 'workspace'); mapDoc.nodes.push(first, second, integrated); await repo.saveMap(path, mapDoc);
@@ -1912,7 +2019,7 @@ test('preview renderer receives Markdown in original order with no extra Preview
   view.showHoverCard({...element(),dataset:{nodeId:'a'}},{title:'Topic',preview:markdown});
   assert.equal(rendered.markdown,markdown);assert.equal(rendered.path,'a.md');assert.deepEqual(created,[['strong','Topic']]);
 });
-test('dragging synthesized roots persists coordinates and removal preserves notes with undo', async () => {
+integrationTest('dragging synthesized roots persists coordinates and removal preserves notes with undo', async () => {
   const {repo,app} = fixture(), path = await repo.createMap('Root operations', []), mapDoc = await repo.readMap(path);
   const first = await repo.createNote('First','a',mapDoc,path,'workspace'), second=await repo.createNote('Second','a',mapDoc,path,'workspace'); mapDoc.nodes.push(first,second);await repo.saveMap(path,mapDoc);
   let pending=Promise.resolve();
@@ -1927,17 +2034,104 @@ test('dragging synthesized roots persists coordinates and removal preserves note
   await view.removeToUnassigned(saved,false);assert.ok(!(await repo.readMap(path)).nodes.some(n=>n.id===root.id));assert.equal((await repo.collectionFiles(path,'Unassigned')).length,1);
   await view.travel(false);assert.ok((await repo.readMap(path)).nodes.some(n=>n.id===root.id));assert.ok(app.vault.getAbstractFileByPath(root.path));
 });
-test('UI language switch translates labels and placeholders without changing knowledge headings', () => {
-  const {t,setUiLanguage}=load('i18n.ts');setUiLanguage('en');assert.equal(t('選擇下一步'),'Choose next step');assert.equal(t('展開 {0}',3),'Expand 3');assert.equal(t('核心結論'),'核心結論');setUiLanguage('zh-TW');assert.equal(t('選擇下一步'),'選擇下一步');
+test('UI language switch translates stable semantic keys and placeholders', () => {
+  const {t,setUiLanguage,translate}=load('i18n.ts');setUiLanguage('en');assert.equal(t('ui.interface_language'),'Interface language');assert.equal(t('ui.expand_0',3),'Expand 3');assert.equal(translate('en','detail.core_conclusions'),'Core conclusions');assert.equal(translate('zh-TW','detail.core_conclusions'),'核心結論');setUiLanguage('zh-TW');assert.equal(t('ui.interface_language'),'介面語言');
 });
-test('every Chinese UI translation call has an English entry', () => {
+test('topic status labels follow the selected UI language after startup', () => {
+  const {topicStatusLabel}=load('i18n.ts');
+  assert.equal(topicStatusLabel('idea', 'en'), 'To research');
+  assert.equal(topicStatusLabel('idea', 'zh-TW'), '待研究');
+  assert.equal(topicStatusLabel('error', 'en'), 'Task error');
+});
+test('all user-facing translations use stable semantic keys', () => {
   const dictionary = fs.readFileSync(path.join(root, 'i18n.ts'), 'utf8');
-  const keys = new Set([...dictionary.matchAll(/^  "((?:[^"\\]|\\.)+)":/gm)].map(match => match[1]));
+  const english = dictionary.slice(dictionary.indexOf('const english = {'), dictionary.indexOf('} as const;'));
+  const chinese = dictionary.slice(dictionary.indexOf('const traditionalChinese:'), dictionary.lastIndexOf('};'));
+  const extract = value => new Set([...value.matchAll(/^  "((?:[^"\\]|\\.)+)":/gm)].map(match => match[1]));
+  const keys = extract(english);
+  assert.deepEqual([...extract(chinese)].sort(), [...keys].sort(), 'every locale must define exactly the same semantic keys');
   const sourceFiles = ['main.ts', 'map-model.ts', 'ai/runtime/codex-app-server.ts', ...fs.readdirSync(path.join(root, 'ui')).filter(name => name.endsWith('.ts')).map(name => `ui/${name}`), ...fs.readdirSync(path.join(root, 'ui/modals')).filter(name => name.endsWith('.ts')).map(name => `ui/modals/${name}`)];
   const missing = [];
   for (const file of sourceFiles) {
     const source = fs.readFileSync(path.join(root, file), 'utf8');
-    for (const match of source.matchAll(/\bt\("((?:[^"\\]|\\.)*)"/g)) if (/[^\x00-\x7F]/.test(match[1]) && !keys.has(match[1])) missing.push(`${file}: ${match[1]}`);
+    for (const match of source.matchAll(/\bt\("((?:[^"\\]|\\.)*)"/g)) if (!/^[a-z][a-z0-9_.]*$/.test(match[1]) || !keys.has(match[1])) missing.push(`${file}: ${match[1]}`);
   }
   assert.deepEqual(missing, []);
+});
+
+test('reference batches include every selected Markdown source, deduplicate overlaps, split long files, and keep citations', () => {
+  const api = load('ai/reference-materials.ts', { obsidian });
+  const groups = [
+    { id: 'map-a', name: 'Map A', location: 'Maps/A/Map.md', documents: [{ key: 'same', path: 'Maps/A/one.md', content: 'A'.repeat(35_000) }, { key: 'external', path: '/Volumes/Refs/source.md', external: true, content: 'external evidence' }] },
+    { id: 'folder', name: 'Folder', location: '/Volumes/Refs', documents: [{ key: 'same', path: 'Maps/A/one.md', content: 'duplicate' }, ...Array.from({ length: 100 }, (_, index) => ({ key: `note-${index}`, path: `Folder/note-${index}.md`, content: `unique-sentinel-${index}` }))] }
+  ];
+  const batches = api.referenceBatches(groups, 10_000, 12_000);
+  const joined = batches.join('\n');
+  assert.ok(batches.length > 1); assert.match(joined, /\[S1\] Vault Markdown; cite as an Obsidian wikilink: Maps\/A\/one\.md/);
+  assert.match(joined, /\[S2\] external Markdown; cite the exact path as plain text: \/Volumes\/Refs\/source\.md/);
+  assert.match(joined, /unique-sentinel-0/); assert.match(joined, /unique-sentinel-99/);
+  assert.equal(joined.match(/duplicate/g), null);
+  assert.match(joined, /part 1\/4/); assert.match(joined, /part 4\/4/);
+});
+
+test('reference picker keeps source groups compact, collapsible and task-local', async () => {
+  const css = fs.readFileSync(path.join(__dirname, '..', 'styles.css'), 'utf8');
+  assert.match(css, /\.vam-reference-picker \.vam-reference-feedback \.is-hidden\s*\{\s*display:\s*none;\s*\}/);
+  const element = (tag, options = {}) => ({ tag, cls: options.cls ?? '', text: options.text ?? '', children: [], dataset: {}, listeners: {},
+    createDiv(value) { const child = element('div', { cls: typeof value === 'string' ? value : value?.cls }); this.children.push(child); return child; },
+    createEl(name, value = {}) { const child = element(name, value); Object.assign(child, value); Object.assign(child, value.attr ?? {}); this.children.push(child); return child; },
+    createSpan(value = {}) { const child = element('span', value); this.children.push(child); return child; },
+    addEventListener(name, handler) { this.listeners[name] = handler; }, setText(value) { this.text = value; }, setAttr(name, value) { this[name] = value; },
+    addClass(name) { this.cls = `${this.cls} ${name}`.trim(); }, removeClass(name) { this.cls = this.cls.split(' ').filter(item => item !== name).join(' '); }, empty() { this.children = []; }
+  });
+  const find = (root, predicate) => predicate(root) ? root : root.children.map(child => find(child, predicate)).find(Boolean);
+  class Modal { constructor() { this.titleEl = element('h2'); this.contentEl = element('div'); } open() {} close() {} }
+  const { ReferencePicker } = load('ui/reference-picker.ts', { obsidian: { ...obsidian, Modal, setIcon: (parent, name) => { const icon = element('svg'); icon.iconName = name; parent.children.push(icon); } } });
+  const root = element('root');
+  const picker = new ReferencePicker({ vault: { adapter: {} } }, root, async () => [], async () => [], 'current', 'Current topic and parent are included');
+  const area = root.children[0];
+  assert.ok(find(area, child => child.cls.includes('vam-reference-cancel')).cls.includes('is-hidden'));
+  assert.ok(find(area, child => child.cls.includes('vam-reference-error-acknowledge')).cls.includes('is-hidden'));
+  assert.deepEqual(area.children.filter(child => child.cls.includes('vam-reference-section')).map(child => child.cls), [
+    'vam-reference-section vam-reference-network-section', 'vam-reference-section vam-reference-local-section'
+  ]);
+  const web = find(area, child => child.tag === 'input' && child.type === 'checkbox');
+  const image = find(area, child => child.tag === 'input' && child !== web && child.type === 'checkbox');
+  assert.ok(find(area, child => child.tag === 'strong' && !!child.text));
+  const actionRow = find(area, child => child.cls === 'vam-reference-actions');
+  assert.equal(actionRow.children.filter(child => child.tag === 'button').length, 3);
+  assert.deepEqual(actionRow.children.filter(child => child.tag === 'button').map(button => button.children[0].children[0].iconName), ['git-fork', 'folder-open', 'file-text']);
+  web.checked = false; web.listeners.change(); assert.equal(image.disabled, true); assert.equal(image.checked, false);
+  picker.groups = [{ id: 'map', name: 'Travel map', location: 'Maps/Travel/Map.md', documents: [{ path: 'Maps/Travel/Notes/Train.md', content: 'rail' }] }];
+  picker.refresh();
+  const details = find(area, child => child.tag === 'details');
+  assert.equal(details.open, undefined);
+  assert.equal(find(details, child => child.tag === 'ul'), undefined);
+  const groupRow = find(area, child => child.cls === 'vam-reference-group-row');
+  const remove = find(area, child => child.cls === 'vam-reference-remove');
+  assert.equal(groupRow.children.includes(remove), true);
+  assert.equal(find(find(details, child => child.tag === 'summary'), child => child.tag === 'button'), undefined);
+  details.open = true; details.listeners.toggle();
+  assert.equal(find(details, child => child.tag === 'li').text, 'Maps/Travel/Notes/Train.md');
+  remove.listeners.click({ preventDefault() {} });
+  assert.equal((await picker.ready()).groups.length, 0);
+  assert.ok(find(area, child => child.cls.includes('vam-reference-cancel')).cls.includes('is-hidden'));
+});
+
+integrationTest('Markdown reader accepts only Markdown and reads the full file without changing it', async () => {
+  const api = load('ai/reference-materials.ts', { obsidian });
+  const body = 'Full source sentinel\n'.repeat(30_000);
+  const file = { extension: 'md', path: 'Maps/Source.md' };
+  const result = await api.readMarkdownFile({ vault: { read: async selected => { assert.equal(selected, file); return body; } } }, file);
+  assert.equal(result.path, file.path); assert.equal(result.content, body); assert.equal(result.external, undefined);
+  await assert.rejects(api.readMarkdownFile({ vault: { read: async () => { throw new Error('should not read'); } } }, { extension: 'pdf', path: 'Source.pdf' }), /Only Markdown/);
+});
+
+integrationTest('legacy reference metadata is preserved but no longer copied when duplicating a map', async () => {
+  const { repo } = fixture(); const note = await topicNote(repo, 'Reference owner', 'model');
+  await repo.updateNote(note.path, { referencePaths: ['Evidence.pdf', 'Other.md'], detail: 'Keep all detail' });
+  const preserved = await repo.readNote(note.path);
+  assert.deepEqual(preserved.referencePaths, ['Evidence.pdf', 'Other.md']); assert.equal(preserved.detail, 'Keep all detail');
+  const source = fs.readFileSync(path.join(root, 'main.ts'), 'utf8');
+  assert.doesNotMatch(source, /referencePaths:\s*note\.referencePaths/);
 });

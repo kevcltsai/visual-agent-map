@@ -35,9 +35,6 @@ jobs:
       - name: Test
         run: npm test
 
-      - name: Build
-        run: npm run build
-
       - name: Verify release artifacts
         run: npm run check:artifacts
 

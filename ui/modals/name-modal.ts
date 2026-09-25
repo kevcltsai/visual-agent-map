@@ -9,7 +9,7 @@ export class NameModal extends Modal {
     input.setAttr("aria-label", this.titleText);
     const save = (): void => { const value = input.value.trim(); if (value) { this.close(); this.submit(value); } };
     input.addEventListener("keydown", event => { if (event.key === "Enter") save(); });
-    new Setting(this.contentEl).addButton(b => b.setButtonText(t("取消")).onClick(() => this.close())).addButton(b => b.setButtonText(t("儲存")).setCta().onClick(save));
+    new Setting(this.contentEl).addButton(b => b.setButtonText(t("ui.cancel")).onClick(() => this.close())).addButton(b => b.setButtonText(t("ui.save")).setCta().onClick(save));
     input.focus(); input.select();
   }
 }

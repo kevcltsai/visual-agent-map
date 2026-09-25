@@ -8,9 +8,9 @@ export class ChoiceModal extends Modal {
     this.contentEl.createEl("p", { text: this.description, cls: "vam-modal-intro" });
     for (const choice of this.choices) {
       const setting = new Setting(this.contentEl);
-      if (choice.description) setting.setName(choice.label).setDesc(choice.description).addButton(b => b.setButtonText(choice.buttonLabel ?? t("選擇")).onClick(() => { this.close(); choice.action(); }));
+      if (choice.description) setting.setName(choice.label).setDesc(choice.description).addButton(b => b.setButtonText(choice.buttonLabel ?? t("ui.select")).onClick(() => { this.close(); choice.action(); }));
       else setting.addButton(b => b.setButtonText(choice.label).onClick(() => { this.close(); choice.action(); }));
     }
-    new Setting(this.contentEl).addButton(b => b.setButtonText(t("取消")).onClick(() => this.close()));
+    new Setting(this.contentEl).addButton(b => b.setButtonText(t("ui.cancel")).onClick(() => this.close()));
   }
 }

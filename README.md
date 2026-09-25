@@ -46,7 +46,7 @@ See [CHANGELOG.md](CHANGELOG.md) for the complete version history.
 
 - Obsidian desktop `1.13.7` or later (the verified compatibility baseline for this release).
 - A local [Codex CLI](https://developers.openai.com/codex/cli/) installation signed in with ChatGPT. ChatGPT Free is supported with a smaller Codex allowance. Visual Agent Map does not require an API key; npm is only needed to build from source.
-- Desktop only. Current release: `0.9.4`.
+- Desktop only. Current release: `0.9.5`.
 
 ### Install
 
@@ -90,7 +90,7 @@ Plugin-created content stays in the vault. A fresh installation creates the empt
 
 ### Build from source
 
-Run `npm ci`, `npm run build`, and `npm test` at the repository root. The production assets are `main.js`, `manifest.json`, and `styles.css`.
+Run `npm ci` and `npm test` at the repository root. `npm test` builds, then runs Unit and Integration tests without Obsidian. For UI changes on macOS, close Obsidian and use `npm run test:ui` to run those checks, prepare a fresh disposable test vault, verify installed hashes, and launch the app for a minimal smoke test. `npm run test:ui:prepare` stops before launch; launch success does not mean the smoke test passed. The production assets are `main.js`, `manifest.json`, and `styles.css`.
 
 ---
 
@@ -136,7 +136,7 @@ AI 任務執行超過 3 分鐘時，為避免持續在背景佔用資源，VAM �
 
 - Obsidian 桌面版 `1.13.7` 或更新版本（本版本實際驗證的相容性基線）。
 - 已在本機安裝 [Codex CLI](https://developers.openai.com/codex/cli/) 並以 ChatGPT 登入。ChatGPT Free 可以使用，但 Codex 額度較少。Visual Agent Map 不需要 API key；只有從原始碼建置才需要 npm。
-- 僅支援桌面版。目前版本：`0.9.4`。
+- 僅支援桌面版。目前版本：`0.9.5`。
 
 ### 安裝
 
@@ -180,7 +180,7 @@ Agent Workspace/
 
 ### 從原始碼建置
 
-在 repository 根目錄執行 `npm ci`、`npm run build` 與 `npm test`。正式產物為 `main.js`、`manifest.json`、`styles.css`。
+在 repository 根目錄執行 `npm ci` 與 `npm test`；後者依序 build、Unit、Integration，不啟動 Obsidian。macOS 的 UI 修改先關閉 Obsidian，再用 `npm run test:ui` 完成相同檢查、重建拋棄式測試 Vault、核對安裝檔 hash 並啟動最短 smoke；`npm run test:ui:prepare` 只準備不啟動，啟動成功不代表 smoke 通過。正式產物為 `main.js`、`manifest.json`、`styles.css`。
 
 ## License
 

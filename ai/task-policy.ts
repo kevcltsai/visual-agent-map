@@ -1,5 +1,6 @@
 import type { ReasoningLevel } from "../repository";
 import type { TaskContext } from "./types";
+import { translate, type UiLanguage } from "../i18n";
 
 export const RESEARCH_SEARCH_BUDGET = 3;
 export function researchLimits(depth: TaskContext["researchDepth"]): { searches: number; sources: number } {
@@ -14,19 +15,9 @@ export function effectiveReasoningLevel(context: TaskContext, selected: Reasonin
   return context.sourceContext && context.sourceContext.length > 6_000 ? "medium" : "low";
 }
 
-export function researchGuidance(context: TaskContext, language: "zh-TW" | "en" = "zh-TW"): string {
-  if (language === "en") {
-    const depth = context.researchDepth === "fast" ? "Quick overview: answer the core question first and briefly list key evidence and gaps; do not conduct a full investigation."
-      : context.researchDepth === "deep" ? "Deep research: compare sources for agreement and disagreement, and detail key evidence, limitations, and open questions."
-        : "Normal research: provide the main evidence, limitations, and open questions needed to support the conclusion.";
-    if (context.researchMode === "local") return `${depth} Use only the provided topic and source context. Do not search the web or read other files. If the available evidence cannot support an answer, explicitly write "Insufficient information" and identify what is missing; do not present model memory or invented sources as verified facts.`;
-    const { searches, sources } = researchLimits(context.researchDepth);
-    return `${depth} Search only when external facts are needed; aim for at most ${searches} web searches and ${sources} primary sources. Stop when evidence is sufficient; otherwise identify the gaps as open questions.`;
-  }
-  const depth = context.researchDepth === "fast" ? "快速概覽：先回答核心問題，簡短列出關鍵依據與缺口；不要做完整調查。"
-    : context.researchDepth === "deep" ? "深入研究：檢查來源間的一致與分歧，詳列重要證據、限制與待查問題。"
-      : "一般研究：提供足以支持結論的主要證據、限制與待確認事項。";
-  if (context.researchMode === "local") return `${depth}只使用本次提供的議題與來源背景，不要搜尋網路或讀取其他檔案。若現有資料無法支持答案，明確寫出「現有資料不足」及缺少什麼，不得用模型記憶補成確定事實或編造來源。`;
+export function researchGuidance(context: TaskContext, language: UiLanguage = "zh-TW"): string {
+  const depth = translate(language, context.researchDepth === "fast" ? "research.fast" : context.researchDepth === "deep" ? "research.deep" : "research.normal");
+  if (context.researchMode === "local") return `${depth} ${translate(language, "research.local")}`;
   const { searches, sources } = researchLimits(context.researchDepth);
-  return `${depth}只有需要外部事實時才搜尋；以最多 ${searches} 次網路搜尋、${sources} 個主要來源為目標。資訊足夠就停止；若證據不足，明確列為待確認事項。`;
+  return `${depth} ${translate(language, "research.web", searches, sources)}`;
 }

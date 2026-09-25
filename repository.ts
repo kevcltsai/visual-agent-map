@@ -1,4 +1,5 @@
 import { App, TFile, TFolder, normalizePath, parseYaml, stringifyYaml } from "obsidian";
+import { translate, type TranslationKey } from "./i18n";
 import { MapDocument, MapNode, serializeMap, parseMap } from "./map-model";
 
 export type Status = "idea" | "running" | "completed" | "error";
@@ -30,6 +31,7 @@ export interface Note {
   topicId: string;
   topicState: TopicState;
   sourcePaths: string[];
+  referencePaths?: string[];
 }
 export type NotePatch = Partial<Note>;
 export interface Settings {
@@ -92,6 +94,10 @@ const REFERENCE_END = "<!-- visual-agent-map:references:end -->";
 const DETAIL_START = "<!-- visual-agent-map:detail:start -->";
 const DETAIL_END = "<!-- visual-agent-map:detail:end -->";
 const NOTE_CSS_CLASS = "visual-agent-map-node";
+const MANAGED_DETAIL_HEADINGS: Record<NoteLanguage, readonly string[]> = {
+  "zh-TW": ["核心結論", "關鍵知識", "證據與來源", "取捨與限制", "待確認事項", "更新紀錄"],
+  en: ["Core conclusions", "Key knowledge", "Evidence and sources", "Tradeoffs and limitations", "Open questions", "Update log"]
+};
 
 function marker(value: unknown): boolean { return value === true || value === "true"; }
 function text(value: unknown, fallback = ""): string { return typeof value === "string" ? value : fallback; }
@@ -125,9 +131,9 @@ function noteTitle(content: string, fm: Record<string, unknown>, fallback: strin
 
 type NoteSection = "Current Summary" | "Prompt" | "Rules" | "Detail" | "Visual References" | "Working Findings" | "New Findings" | "預覽" | "Preview" | "User Notes";
 type NoteLanguage = Settings["language"];
-const placeholder = (language: NoteLanguage): string => language === "en" ? "No conclusion yet" : "尚未形成結論";
-const isPlaceholder = (value: string): boolean => value === "尚未形成結論" || value === "No conclusion yet";
-const previewHeading = (language: NoteLanguage): NoteSection => language === "en" ? "Preview" : "預覽";
+const placeholder = (language: NoteLanguage): string => translate(language, "detail.no_conclusion_yet");
+const isPlaceholder = (value: string): boolean => value === translate("zh-TW", "detail.no_conclusion_yet") || value === translate("en", "detail.no_conclusion_yet");
+const previewHeading = (language: NoteLanguage): NoteSection => translate(language, "detail.preview") as NoteSection;
 const previewSection = (content: string): string => [...new Set([section(content, "Preview"), section(content, "預覽")].filter(Boolean))].join("\n\n");
 
 function sectionBounds(content: string, heading: NoteSection): { start: number; end: number } | null {
@@ -284,11 +290,36 @@ function noteLink(path: string): string { return path.replace(/\.md$/, "").repla
 
 export class Repository {
   constructor(readonly app: App, readonly settings: Settings) {}
-  private message(chinese: string, english: string): string { return this.settings.language === "en" ? english : chinese; }
+
+  async syncManagedDetailHeadings(language: NoteLanguage): Promise<number> {
+    const target = MANAGED_DETAIL_HEADINGS[language === "en" ? "en" : "zh-TW"];
+    const replacements = new Map([...MANAGED_DETAIL_HEADINGS["zh-TW"], ...MANAGED_DETAIL_HEADINGS.en].map((heading, index) => [heading, target[index % target.length]]));
+    let changed = 0;
+    for (const file of this.app.vault.getMarkdownFiles()) {
+      await this.app.vault.process(file, content => {
+        const cachedMarker = this.app.metadataCache.getFileCache(file)?.frontmatter?.["agent-map-node"] as unknown;
+        const textualMarker = /^---\r?\n([\s\S]*?)\r?\n---(?:\r?\n|$)/.exec(content)?.[1]?.split(/\r?\n/).some(line => /^\s*["']?agent-map-node["']?:\s*(?:true|["']true["'])\s*$/.test(line));
+        if (!marker(cachedMarker) && !textualMarker) return content;
+        const start = content.indexOf(DETAIL_START), end = content.indexOf(DETAIL_END);
+        if (start < 0 || end <= start) return content;
+        const before = content.slice(start + DETAIL_START.length), managed = before.slice(0, end - start - DETAIL_START.length);
+        const next = managed.replace(/^### ([^\r\n]+)[ \t]*$/gm, (line, heading: string) => {
+          const replacement = replacements.get(heading);
+          return replacement ? `### ${replacement}` : line;
+        });
+        if (next === managed) return content;
+        changed++;
+        const blockStart = start + DETAIL_START.length;
+        return `${content.slice(0, blockStart)}${next}${content.slice(end)}`;
+      });
+    }
+    return changed;
+  }
+  private message(key: TranslationKey): string { return translate(this.settings.language, key); }
 
   file(path: string): TFile {
     const file = this.app.vault.getAbstractFileByPath(path);
-    if (!(file instanceof TFile)) throw new Error(`${this.message("找不到檔案", "File not found")}: ${path}`);
+    if (!(file instanceof TFile)) throw new Error(`${this.message("error.file_not_found")}: ${path}`);
     return file;
   }
 
@@ -365,6 +396,7 @@ export class Repository {
       mapId: text(fm["agent-map-id"]),
       topicId: text(fm["topic-id"], text(fm["agent-map-id"])),
       topicState: ["active", "unassigned", "archived", "inbox"].includes(state) ? state as TopicState : "active",
+      referencePaths: Array.isArray(fm["reference-materials"]) ? fm["reference-materials"].filter((value): value is string => typeof value === "string" && Boolean(value)) : [],
       sourcePaths: Array.isArray(fm["source-notes"]) ? fm["source-notes"].filter((value): value is string => typeof value === "string" && Boolean(value)) : []
     };
   }
@@ -384,6 +416,7 @@ export class Repository {
       if (patch.mapId !== undefined) patch.mapId ? fm["agent-map-id"] = patch.mapId : delete fm["agent-map-id"];
       if (patch.topicId !== undefined) patch.topicId ? fm["topic-id"] = patch.topicId : delete fm["topic-id"];
       if (patch.topicState !== undefined) fm["topic-state"] = patch.topicState;
+      if (patch.referencePaths !== undefined) patch.referencePaths.length ? fm["reference-materials"] = [...new Set(patch.referencePaths)] : delete fm["reference-materials"];
       if (patch.sourcePaths !== undefined) patch.sourcePaths.length ? fm["source-notes"] = patch.sourcePaths : delete fm["source-notes"];
       fm.updated = new Date().toISOString();
       let body = content.replace(/^---\r?\n[\s\S]*?\r?\n---(?:\r?\n|$)/, "");
@@ -522,7 +555,7 @@ export class Repository {
 
   async rebuildMissingMap(root: string): Promise<string> {
     const path = `${root}/Map.md`;
-    if (this.app.vault.getAbstractFileByPath(path)) throw new Error(this.message("這個主題已有 Map.md。", "This topic already has a Map.md file."));
+    if (this.app.vault.getAbstractFileByPath(path)) throw new Error(this.message("error.map_already_exists"));
     const files = this.app.vault.getMarkdownFiles().filter(file => file.path.startsWith(`${root}/Notes/`) && marker(this.app.metadataCache.getFileCache(file)?.frontmatter?.["agent-map-node"]));
     const first = files[0] ? await this.readNote(files[0].path) : null, id = first?.topicId || crypto.randomUUID();
     const nodes: MapNode[] = files.map((file, index) => ({ id: crypto.randomUUID(), path: file.path, parentId: null, x: 80 + Math.floor(index / 6) * 340, y: 80 + index % 6 * 220, collapsed: false }));
@@ -534,7 +567,7 @@ export class Repository {
 
   async relinkMissingMap(root: string, sourcePath: string): Promise<string> {
     const target = `${root}/Map.md`;
-    if (this.app.vault.getAbstractFileByPath(target)) throw new Error(this.message("這個主題已有 Map.md。", "This topic already has a Map.md file."));
+    if (this.app.vault.getAbstractFileByPath(target)) throw new Error(this.message("error.map_already_exists"));
     const map = await this.readMap(sourcePath), candidates = this.app.vault.getMarkdownFiles().filter(file => file.path.startsWith(`${root}/Notes/`));
     const byId = new Map<string, string>();
     for (const file of candidates) { const fm = frontmatter(await this.app.vault.read(file)); const id = text(fm["node-id"]); if (id) byId.set(id, file.path); }
@@ -575,7 +608,7 @@ export class Repository {
 
   async moveExact(path: string, target: string): Promise<void> {
     await this.folder(parentPath(target));
-    if (this.app.vault.getAbstractFileByPath(target)) throw new Error(`${this.message("目標檔案已存在", "Target file already exists")}: ${target}`);
+    if (this.app.vault.getAbstractFileByPath(target)) throw new Error(`${this.message("error.target_exists")}: ${target}`);
     await this.app.fileManager.renameFile(this.file(path), target);
     await this.replaceSourcePath(path, target);
   }
@@ -593,6 +626,7 @@ export class Repository {
   async replaceSourcePath(oldPath: string, newPath: string): Promise<void> {
     for (const file of this.app.vault.getMarkdownFiles()) {
       const note = await this.readNoteIfManaged(file);
+      if (note?.referencePaths?.includes(oldPath)) await this.updateNote(file.path, { referencePaths: note.referencePaths.map(path => path === oldPath ? newPath : path) });
       if (!note?.sourcePaths.includes(oldPath)) continue;
       await this.updateNote(file.path, { sourcePaths: note.sourcePaths.map(path => path === oldPath ? newPath : path) });
     }
@@ -639,7 +673,7 @@ export class Repository {
       const map = await this.readMap(mapFile.path); topics.set(map.id, { map, mapPath: mapFile.path });
       for (const node of map.nodes) {
         const existing = ownership.get(node.path);
-        if (existing && existing.map.id !== map.id) throw new Error(`${this.message("議題筆記同時出現在兩張心智圖", "A topic note appears in two mind maps")}: ${node.path}`);
+        if (existing && existing.map.id !== map.id) throw new Error(`${this.message("error.note_in_multiple_maps")}: ${node.path}`);
         ownership.set(node.path, { map, mapPath: mapFile.path, node });
       }
     }
@@ -768,9 +802,9 @@ export class Repository {
 
   async renameTopic(mapPath: string, title: string, targetRoot?: string): Promise<string> {
     const file = this.file(mapPath), root = file.parent;
-    if (!(root instanceof TFolder) || !mapPath.startsWith(`${this.settings.topicsFolder}/`)) throw new Error(this.message("舊版心智圖請先執行資料整理。", "Migrate the legacy mind map first."));
+    if (!(root instanceof TFolder) || !mapPath.startsWith(`${this.settings.topicsFolder}/`)) throw new Error(this.message("error.migrate_legacy_map"));
     const desired = targetRoot ? normalizePath(targetRoot) : normalizePath(`${this.settings.topicsFolder}/${safeName(title)}`);
-    if (desired !== root.path && this.app.vault.getAbstractFileByPath(desired)) throw new Error(this.message("同名主題資料夾已存在。", "A topic folder with this name already exists."));
+    if (desired !== root.path && this.app.vault.getAbstractFileByPath(desired)) throw new Error(this.message("error.topic_folder_exists"));
     const originalRoot = root.path;
     if (desired !== originalRoot) await this.app.fileManager.renameFile(root, desired);
     const next = `${desired}/Map.md`, map = await this.readMap(next); map.title = title;

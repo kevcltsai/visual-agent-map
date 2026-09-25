@@ -9,7 +9,7 @@ export class DebugLogModal extends Modal {
   constructor(app: App, private readonly logs: LogManager, private readonly exchanges: AiExchangeLog | null, private readonly exchangeEnabled: () => boolean) { super(app); }
 
   onOpen(): void {
-    this.titleEl.setText(t("偵錯日誌"));
+    this.titleEl.setText(t("ui.debug_log"));
     this.renderLogs();
     this.unsubscribe = this.logs.subscribe(() => this.renderLogs());
     this.unsubscribeExchanges = this.exchanges?.subscribe(() => this.renderLogs()) ?? null;
@@ -17,22 +17,22 @@ export class DebugLogModal extends Modal {
 
   private renderLogs(): void {
     this.contentEl.empty();
-    this.contentEl.createEl("p", { cls: "vam-modal-intro", text: t("日誌只保存在記憶體中，重新載入外掛後會消失。複製前請先確認內容不含私人資訊。") });
+    this.contentEl.createEl("p", { cls: "vam-modal-intro", text: t("ui.logs_are_kept_in_memory_only_and_disappear_when_the_plugin_r") });
 
     const actions = new Setting(this.contentEl);
-    actions.addButton(button => button.setButtonText(t("更新日誌")).onClick(() => this.renderLogs()));
-    actions.addButton(button => button.setButtonText(t("複製日誌")).setCta().onClick(async () => {
+    actions.addButton(button => button.setButtonText(t("ui.refresh_logs")).onClick(() => this.renderLogs()));
+    actions.addButton(button => button.setButtonText(t("ui.copy_logs")).setCta().onClick(async () => {
       const text = formatDebugLogs(this.logs.getLogs());
-      if (!text) { new Notice(t("目前沒有偵錯日誌。")); return; }
+      if (!text) { new Notice(t("ui.there_are_no_debug_logs_yet")); return; }
       // 只有使用者主動按下按鈕時，才把日誌寫入系統剪貼簿。
-      try { await navigator.clipboard.writeText(text); new Notice(t("偵錯日誌已複製。")); }
-      catch { new Notice(t("無法複製偵錯日誌。")); }
+      try { await navigator.clipboard.writeText(text); new Notice(t("ui.debug_log_copied")); }
+      catch { new Notice(t("ui.unable_to_copy_the_debug_log")); }
     }));
-    actions.addButton(button => button.setButtonText(t("清除日誌")).setDestructive().onClick(() => this.logs.clear()));
+    actions.addButton(button => button.setButtonText(t("ui.clear_logs")).setDestructive().onClick(() => this.logs.clear()));
 
     const list = this.contentEl.createDiv("vam-debug-log-list");
     const entries = this.logs.getLogs();
-    if (!entries.length) list.createEl("p", { cls: "vam-debug-log-empty", text: t("目前沒有偵錯日誌。") });
+    if (!entries.length) list.createEl("p", { cls: "vam-debug-log-empty", text: t("ui.there_are_no_debug_logs_yet") });
     for (const entry of entries) {
       const row = list.createDiv("vam-debug-log-entry");
       const metadata = row.createDiv("vam-debug-log-meta");
@@ -41,24 +41,24 @@ export class DebugLogModal extends Modal {
       // 使用純文字節點呈現，避免日誌內容被瀏覽器當成 HTML 執行。
       row.createEl("pre", { text: entry.message });
     }
-    this.contentEl.createEl("h3", { text: t("AI 往返紀錄") });
-    this.contentEl.createEl("p", { cls: "vam-modal-intro", text: this.exchangeEnabled() ? t("紀錄保存在此 Vault 的外掛資料夾，最多 20 次；可能包含私人筆記內容。") : t("AI 往返紀錄目前關閉；可在 VAM 設定中啟用。") });
+    this.contentEl.createEl("h3", { text: t("ui.ai_exchanges") });
+    this.contentEl.createEl("p", { cls: "vam-modal-intro", text: this.exchangeEnabled() ? t("ui.up_to_20_exchanges_are_stored_in_this_vault_s_plugin_folder") : t("ui.ai_exchange_recording_is_off_enable_it_in_vam_settings") });
     const exchangeActions = new Setting(this.contentEl);
-    exchangeActions.addButton(button => button.setButtonText(t("清除 AI 往返紀錄")).setDestructive().onClick(() => this.exchanges?.clear()));
+    exchangeActions.addButton(button => button.setButtonText(t("ui.clear_ai_exchanges")).setDestructive().onClick(() => this.exchanges?.clear()));
     const exchangeList = this.contentEl.createDiv("vam-debug-log-list");
     const exchanges = [...(this.exchanges?.getEntries() ?? [])].reverse();
-    if (!exchanges.length) exchangeList.createEl("p", { cls: "vam-debug-log-empty", text: t("目前沒有 AI 往返紀錄。") });
+    if (!exchanges.length) exchangeList.createEl("p", { cls: "vam-debug-log-empty", text: t("ui.there_are_no_ai_exchanges_yet") });
     for (const exchange of exchanges) {
       const item = exchangeList.createEl("details", { cls: "vam-debug-log-entry" });
       item.createEl("summary", { text: `${new Date(exchange.startedAt).toLocaleString()} · ${exchange.topic} · ${exchange.status}` });
       item.createEl("p", { text: `${exchange.mode} · ${exchange.model} · ${exchange.effort}`, cls: "vam-debug-log-meta" });
-      item.createEl("strong", { text: t("送往 AI 的請求") });
-      item.createEl("pre", { text: exchange.request || t("尚未送出") });
-      item.createEl("strong", { text: t("AI 原始回覆") });
-      item.createEl("pre", { text: exchange.response || t("沒有回覆") });
-      if (exchange.error) item.createEl("pre", { text: `${t("錯誤")}: ${exchange.error}` });
-      const copy = item.createEl("button", { text: t("複製這次紀錄") });
-      copy.addEventListener("click", () => { void navigator.clipboard.writeText(formatAiExchange(exchange)).then(() => new Notice(t("AI 往返紀錄已複製。"))).catch(() => new Notice(t("無法複製 AI 往返紀錄。"))); });
+      item.createEl("strong", { text: t("ui.request_sent_to_ai") });
+      item.createEl("pre", { text: exchange.request || t("ui.not_sent_yet") });
+      item.createEl("strong", { text: t("ui.raw_ai_reply") });
+      item.createEl("pre", { text: exchange.response || t("ui.no_reply") });
+      if (exchange.error) item.createEl("pre", { text: `${t("ui.error")}: ${exchange.error}` });
+      const copy = item.createEl("button", { text: t("ui.copy_this_exchange") });
+      copy.addEventListener("click", () => { void navigator.clipboard.writeText(formatAiExchange(exchange)).then(() => new Notice(t("ui.ai_exchange_copied"))).catch(() => new Notice(t("ui.unable_to_copy_the_ai_exchange"))); });
     }
   }
 

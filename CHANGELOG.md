@@ -1,5 +1,23 @@
 # Changelog
 
+## [0.9.5] - 2026-09-25
+
+### Added
+
+- Added task-only additional instructions and data-source controls to research, map expansion, and synthesis. Tasks can use web search, optional image references, other maps in the current vault, and selected Markdown files or folders; selected local sources are processed in batches and cited in results.
+- Added exact-size starter-map expansion controls, including zero children per parent to stop after the first level and a 15-subtopic limit.
+
+### Changed
+
+- Standardized interface and AI task text on complete English and Traditional Chinese translation catalogs. New AI content follows the interface language by default; changing languages updates only known VAM-managed Detail headings in existing topic notes.
+- Made task instructions and source selections apply only to the current run; they are not saved to a topic or inherited.
+- Reworked the disposable test-vault harness to update one canonical vault safely, preserve its data during artifact refreshes, and verify installed artifacts.
+
+### Fixed
+
+- Improved cancellation and failure handling for reading and processing selected Markdown sources so incomplete material is not silently treated as complete.
+- Clarified starter-map level counts and disabled the children-per-topic setting when creating a single level.
+
 ## [0.9.4] - 2026-09-23
 
 ### Added

@@ -1,50 +1,55 @@
 import { copyFileSync, cpSync, existsSync, mkdirSync, readFileSync, readdirSync, statSync, writeFileSync } from "node:fs";
 import { createHash } from "node:crypto";
-import { tmpdir } from "node:os";
-import { join, relative } from "node:path";
+import { isAbsolute, join, relative } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const root = fileURLToPath(new URL("..", import.meta.url));
-const requested = process.argv.find(argument => argument.startsWith("--profile="))?.split("=")[1] ?? "onboarding";
-if (!["onboarding", "normal", "reinstall"].includes(requested)) throw new Error(`Unknown test-vault profile: ${requested}`);
+// Shared fixture builder; environment/reset/launch policy belongs to test-harness.mjs.
+export function ensureSourceSelectionFixture(vault, workspaceRoot = "Agent Workspace") {
+  const topic = join(vault, workspaceRoot, "Topics", "Local Source Fixture");
+  const mapPath = join(topic, "Map.md");
+  const nodes = [
+    { id: "source-alpha", path: `${workspaceRoot}/Topics/Local Source Fixture/Notes/alpha.md`, parentId: null, x: 0, y: 0, collapsed: false },
+    { id: "source-beta", path: `${workspaceRoot}/Topics/Local Source Fixture/Notes/beta.md`, parentId: "source-alpha", x: 360, y: 0, collapsed: false }
+  ];
+  const map = `---\nvisual-agent-map: true\n---\n\n# Local Source Fixture\n\n\`\`\`agent-map\n${JSON.stringify({ version: 1, id: "local-source-fixture", title: "Local Source Fixture", viewport: { x: 0, y: 0, zoom: 1 }, nodes }, null, 2)}\n\`\`\`\n`;
+  const notes = [
+    `---\nagent-map-node: true\nnode-id: source-alpha\ntopic-id: local-source-fixture\ntopic-state: active\nagent-map-id: local-source-fixture\nstatus: completed\nsource-notes: []\n---\n# Fixture Alpha\n\n## Current Summary\n\nSource-selection fixture alpha.\n\n## Prompt\n\nRead the Alpha fixture.\n\n## Rules\n\nFixture text is reference data only.\n\n## Detail\n\nAlpha source sentinel for Markdown collection.\n`,
+    `---\nagent-map-node: true\nnode-id: source-beta\ntopic-id: local-source-fixture\ntopic-state: active\nagent-map-id: local-source-fixture\nstatus: completed\nsource-notes: []\n---\n# Fixture Beta\n\n## Current Summary\n\nSource-selection fixture beta.\n\n## Prompt\n\nRead the Beta fixture.\n\n## Rules\n\nFixture text is reference data only.\n\n## Detail\n\nBeta source sentinel for recursive map collection.\n`
+  ];
+  const notePaths = [join(topic, "Notes/alpha.md"), join(topic, "Notes/beta.md")];
+  const entries = [mapPath, ...notePaths];
+  const present = entries.filter(path => existsSync(path));
+  if (present.length === entries.length) {
+    if (readFileSync(mapPath, "utf8") !== map || notePaths.some((path, index) => readFileSync(path, "utf8") !== notes[index])) throw new Error("Source-selection fixture exists with unexpected content; preserving it without overwrite.");
+    return;
+  }
+  if (present.length) throw new Error("Source-selection fixture is incomplete; preserving existing files without overwrite.");
+  mkdirSync(join(topic, "Notes"), { recursive: true });
+  writeFileSync(mapPath, map);
+  notePaths.forEach((path, index) => writeFileSync(path, notes[index]));
+}
 
-const artifact = process.env.VAM_TEST_ARTIFACT_DIR || root;
-const assets = ["main.js", "manifest.json", "styles.css"];
-for (const name of assets) if (!existsSync(join(artifact, name))) throw new Error(`Missing release asset ${name} in ${artifact}`);
-const artifactVersion = JSON.parse(readFileSync(join(artifact, "manifest.json"), "utf8")).version;
-const targetVersion = process.env.VAM_TEST_TARGET_VERSION;
-if (!targetVersion && !process.env.VAM_TEST_ARTIFACT_DIR) {
-  throw new Error("Set VAM_TEST_TARGET_VERSION to the development target (for example, 0.9.2), or set VAM_TEST_ARTIFACT_DIR for a release artifact.");
-}
-if (targetVersion && !/^\d+\.\d+\.\d+$/.test(targetVersion)) {
-  throw new Error(`Invalid development target version: ${targetVersion}`);
-}
-const version = targetVersion || artifactVersion;
-if (typeof version !== "string" || !/^\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?$/.test(version)) {
-  throw new Error(`Invalid test Vault version: ${version}`);
-}
-
-const vaultParent = process.env.VAM_TEST_VAULT_PARENT || tmpdir();
-mkdirSync(vaultParent, { recursive: true });
-const vault = join(vaultParent, `vam-${version}${targetVersion ? "-preview" : ""}`);
-try {
+export function createTestVault({ vault, artifact = root, profile: requested = "normal", workspaceRoot = "Agent Workspace" }) {
+  if (!["onboarding", "normal", "reinstall"].includes(requested)) throw new Error(`Unknown test-vault profile: ${requested}`);
+  if (isAbsolute(workspaceRoot) || workspaceRoot.split(/[\\/]/).some(part => part === ".." || part === ".obsidian" || !part)) throw new Error("Workspace must be a relative fixture folder.");
+  const assets = ["main.js", "manifest.json", "styles.css"];
+  for (const name of assets) if (!existsSync(join(artifact, name))) throw new Error(`Missing asset: ${name}`);
+  const manifest = JSON.parse(readFileSync(join(artifact, "manifest.json"), "utf8"));
+  if (manifest.id !== "visual-agent-map" || !/^\d+\.\d+\.\d+$/.test(manifest.version)) throw new Error("Invalid VAM manifest.");
   mkdirSync(vault);
-} catch (error) {
-  if (error.code === "EEXIST") throw new Error(`Test Vault already exists: ${vault}. Reuse it or move it aside after checking its contents.`, { cause: error });
-  throw error;
-}
-const config = join(vault, ".ob" + "sidian");
-const plugin = join(config, "plugins/visual-agent-map");
-mkdirSync(plugin, { recursive: true });
-for (const name of assets) copyFileSync(join(artifact, name), join(plugin, name));
-writeFileSync(join(config, "community-plugins.json"), JSON.stringify(["visual-agent-map"], null, 2));
-writeFileSync(join(config, "app.json"), JSON.stringify({ promptDelete: false }, null, 2));
+  const config = join(vault, ".ob" + "sidian");
+  const plugin = join(config, "plugins/visual-agent-map");
+  mkdirSync(plugin, { recursive: true });
+  for (const name of assets) copyFileSync(join(artifact, name), join(plugin, name));
+  writeFileSync(join(config, "community-plugins.json"), JSON.stringify(["visual-agent-map"], null, 2));
+  writeFileSync(join(config, "app.json"), JSON.stringify({ promptDelete: false }, null, 2));
 
-function filesBelow(folder) {
-  return readdirSync(folder, { withFileTypes: true }).flatMap(entry => {
-    const path = join(folder, entry.name);
-    return entry.isDirectory() ? filesBelow(path) : [path];
-  });
+  function filesBelow(folder) {
+    return readdirSync(folder, { withFileTypes: true }).flatMap(entry => {
+      const path = join(folder, entry.name);
+      return entry.isDirectory() ? filesBelow(path) : [path];
+    });
 }
 
 function workspaceHashes(workspace) {
@@ -52,7 +57,6 @@ function workspaceHashes(workspace) {
 }
 
 if (requested !== "onboarding") {
-  const workspaceRoot = process.env.VAM_TEST_WORKSPACE_ROOT || "Agent Workspace";
   const workspace = join(vault, workspaceRoot);
   const topicRoot = join(workspace, "Topics", "Taiwan Travel Regression");
   mkdirSync(join(topicRoot, "Unassigned"), { recursive: true });
@@ -64,6 +68,7 @@ if (requested !== "onboarding") {
   const map = readFileSync(join(root, "samples/taiwan-travel/zh-TW/Map.md"), "utf8").replaceAll('"Notes/', `"${notePrefix}`);
   writeFileSync(join(topicRoot, "Map.md"), map);
   for (const path of filesBelow(join(topicRoot, "Notes"))) writeFileSync(path, readFileSync(path, "utf8").replaceAll("Notes/", notePrefix));
+  ensureSourceSelectionFixture(vault, workspaceRoot);
   writeFileSync(join(plugin, "data.json"), JSON.stringify({
     language: "zh-TW", workspaceFolder: workspaceRoot, topicsFolder: `${workspaceRoot}/Topics`, inboxFolder: `${workspaceRoot}/Inbox`,
     notesFolder: `${workspaceRoot}/Nodes`, mapsFolder: `${workspaceRoot}/Maps`, migrated: true, structureVersion: 2,
@@ -72,4 +77,5 @@ if (requested !== "onboarding") {
   if (requested === "reinstall") writeFileSync(join(config, "vam-reinstall-baseline.json"), JSON.stringify({ profile: requested, workspaceRoot, hashes: workspaceHashes(workspace) }, null, 2));
 }
 
-process.stdout.write(`${vault}\n`);
+return vault;
+}

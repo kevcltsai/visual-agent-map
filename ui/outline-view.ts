@@ -12,7 +12,7 @@ export class OutlineView extends ItemView {
   private activePath = "";
   constructor(leaf: WorkspaceLeaf, private openNote: (path: string) => Promise<void>) { super(leaf); }
   getViewType(): string { return OUTLINE_VIEW_TYPE; }
-  getDisplayText(): string { return t("議題大綱"); }
+  getDisplayText(): string { return t("ui.topic_outline"); }
   getIcon(): string { return "list-tree"; }
   async onOpen(): Promise<void> { this.render(); }
   setMap(map: MapDocument | null, titles: Map<string, string>): void {
@@ -26,9 +26,9 @@ export class OutlineView extends ItemView {
     this.contentEl.empty();
     this.contentEl.addClass("vam-outline");
     const heading = this.contentEl.createDiv("vam-outline-heading");
-    heading.createEl("strong", { text: this.map?.title ?? t("議題大綱") });
-    if (!this.map) { this.contentEl.createDiv({ cls: "vam-outline-empty", text: t("開啟心智圖後，這裡會顯示議題階層。") }); return; }
-    const input = this.contentEl.createEl("input", { type: "search", cls: "vam-outline-search", attr: { placeholder: t("搜尋議題") } });
+    heading.createEl("strong", { text: this.map?.title ?? t("ui.topic_outline") });
+    if (!this.map) { this.contentEl.createDiv({ cls: "vam-outline-empty", text: t("ui.open_a_mind_map_to_see_its_topic_hierarchy_here") }); return; }
+    const input = this.contentEl.createEl("input", { type: "search", cls: "vam-outline-search", attr: { placeholder: t("ui.search_topics") } });
     input.value = this.query;
     input.addEventListener("input", () => { this.query = input.value; this.renderTree(); });
     this.renderTree();
@@ -53,7 +53,7 @@ export class OutlineView extends ItemView {
       if (descendants.length) {
         const toggle = row.createEl("button", { text: query || !this.collapsed.has(node.id) ? "▾" : "▸", cls: "vam-outline-toggle" });
         toggle.disabled = !!query;
-        toggle.setAttr("aria-label", !query && this.collapsed.has(node.id) ? t("展開") : t("收合"));
+        toggle.setAttr("aria-label", !query && this.collapsed.has(node.id) ? t("ui.expand") : t("ui.collapse"));
         toggle.addEventListener("click", () => { if (this.collapsed.has(node.id)) this.collapsed.delete(node.id); else this.collapsed.add(node.id); this.renderTree(); });
       } else row.createSpan("vam-outline-spacer");
       const title = this.titles.get(node.id) ?? node.path.split("/").pop() ?? node.path;
@@ -64,6 +64,6 @@ export class OutlineView extends ItemView {
       if (query || !this.collapsed.has(node.id)) for (const child of descendants) append(child, depth + 1);
     };
     for (const root of children.get(null) ?? []) append(root, 0);
-    if (!tree.childElementCount) tree.createDiv({ cls: "vam-outline-empty", text: t("找不到符合的議題。") });
+    if (!tree.childElementCount) tree.createDiv({ cls: "vam-outline-empty", text: t("ui.no_matching_topics") });
   }
 }

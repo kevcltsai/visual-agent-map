@@ -1,19 +1,24 @@
 {
   "name": "visual-agent-map",
-  "version": "0.9.4",
+  "version": "0.9.5",
   "private": true,
   "scripts": {
     "dev": "node esbuild.config.mjs",
     "compile:sample": "node scripts/compile-sample.mjs",
     "build": "npm run compile:sample && tsc -noEmit -skipLibCheck && node esbuild.config.mjs production",
     "check:artifacts": "node scripts/check-artifacts.mjs",
-    "test:vault": "npm run test:vault:onboarding",
-    "test:vault:onboarding": "node scripts/create-onboarding-test-vault.mjs --profile=onboarding",
-    "test:vault:normal": "node scripts/create-onboarding-test-vault.mjs --profile=normal",
-    "test:vault:reinstall": "node scripts/create-onboarding-test-vault.mjs --profile=reinstall",
+    "test:vault": "npm run test:ui:prepare",
+    "test:vault:onboarding": "node scripts/test-harness.mjs --prepare --profile=onboarding",
+    "test:vault:normal": "node scripts/test-harness.mjs --prepare --profile=normal",
+    "test:vault:reinstall": "node scripts/test-harness.mjs --prepare --profile=reinstall",
     "verify:vault:reinstall": "node scripts/verify-reinstall-test-vault.mjs",
     "lint": "eslint .",
-    "test": "npm run compile:sample && node tests/run.cjs"
+    "test": "node scripts/test-harness.mjs",
+    "test:unit": "npm run compile:sample && node tests/run.cjs --layer=unit",
+    "test:integration": "node tests/run.cjs --layer=integration && node --test tests/test-vault.mjs",
+    "test:ui": "node scripts/test-harness.mjs --ui",
+    "test:ui:prepare": "node scripts/test-harness.mjs --prepare",
+    "test:ui:update": "node scripts/test-harness.mjs --update-current"
   },
   "devDependencies": {
     "@types/node": "^22.10.2",

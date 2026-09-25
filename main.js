@@ -22,6 +22,7 @@ var __publicField = (obj, key, value) => __defNormalProp(obj, typeof key !== "sy
 var main_exports = {};
 __export(main_exports, {
   NextStepModal: () => NextStepModal,
+  VisualAgentMapSettingTab: () => VisualAgentMapSettingTab,
   VisualAgentMapView: () => VisualAgentMapView,
   buildPreparedTaskContext: () => buildPreparedTaskContext,
   canonicalDetail: () => canonicalDetail,
@@ -38,6 +39,12 @@ module.exports = __toCommonJS(main_exports);
 // i18n.ts
 var english = {
   "ui.interface_language": "Interface language",
+  "ui.open_map": "Open mind map",
+  "ui.my_editable_mind_map": "My editable mind map",
+  "ui.sample_start_hint": "Duplicate this sample or create an empty mind map to start. Codex is only needed for AI tasks.",
+  "ui.language_changed_content_preserved": "Interface and official sample are now in English. Your map titles and writing are not translated; VAM-managed Detail headings may update.",
+  "ui.codex_required_for_ai": "Set up Codex before running an AI task. You can keep editing this mind map manually.",
+  "ui.codex_setup_for_ai_only": "Codex CLI is needed for AI tasks. You can create and edit mind maps without it. ChatGPT Free is supported with a smaller Codex allowance.",
   "ui.to_research": "To research",
   "ui.ai_running": "AI running",
   "ui.ai_complete": "AI complete",
@@ -48,14 +55,11 @@ var english = {
   "ui.only_after_you_confirm_an_ai_task_will_the_plugin_use_your_l": "Only after you confirm an AI task will the plugin use your locally signed-in Codex CLI and that account's Codex allowance. The plugin does not store API keys.",
   "ui.create_an_empty_mind_map": "Create an empty mind map",
   "ui.start_using_vam": "Start using VAM",
-  "ui.codex_is_ready_duplicate_the_sample_or_create_an_empty_mind": "Codex is ready. Duplicate the sample or create an empty mind map to start your own research.",
-  "ui.finish_codex_setup_before_duplicating_the_sample_or_creating": "Finish Codex setup before duplicating the sample or creating a mind map. You can still explore this read-only sample.",
   "ui.check_codex": "Check Codex",
   "ui.codex_allowance_notice": "Codex allowance notice",
   "ui.vam_runs_ai_tasks_through_your_signed_in_codex_account_and_u": "VAM runs AI tasks through your signed-in Codex account and uses that account's Codex allowance. Available usage and limits depend on your ChatGPT plan.",
   "ui.understand_and_run": "Understand and run",
   "ui.install_and_connect_codex": "Install and connect Codex",
-  "ui.vam_needs_codex_cli_to_create_your_first_editable_mind_map_a": "VAM needs Codex CLI to create your first editable mind map and run AI tasks. ChatGPT Free is supported with a smaller Codex allowance.",
   "ui.open_the_official_codex_cli_installation_guide_and_complete": "Open the official Codex CLI installation guide and complete installation: ",
   "ui.official_codex_cli_installation_guide": "Official Codex CLI installation guide",
   "ui.run_codex_in_terminal_and_sign_in_with_your_chatgpt_account": "Run codex in Terminal and sign in with your ChatGPT account.",
@@ -724,6 +728,12 @@ var english = {
 };
 var traditionalChinese = {
   "ui.interface_language": "\u4ECB\u9762\u8A9E\u8A00",
+  "ui.open_map": "\u958B\u555F\u5FC3\u667A\u5716",
+  "ui.my_editable_mind_map": "\u6211\u7684\u53EF\u7DE8\u8F2F\u5FC3\u667A\u5716",
+  "ui.sample_start_hint": "\u8907\u88FD\u9019\u4EFD\u7BC4\u4F8B\u6216\u5EFA\u7ACB\u7A7A\u767D\u5FC3\u667A\u5716\u5373\u53EF\u958B\u59CB\uFF1B\u53EA\u6709 AI \u4EFB\u52D9\u9700\u8981 Codex\u3002",
+  "ui.language_changed_content_preserved": "\u4ECB\u9762\u8207\u5B98\u65B9\u7BC4\u4F8B\u5DF2\u5207\u63DB\u70BA\u7E41\u9AD4\u4E2D\u6587\u3002\u4F60\u5BEB\u7684\u5730\u5716\u6A19\u984C\u8207\u5167\u5BB9\u4E0D\u6703\u7FFB\u8B6F\uFF1BVAM \u7BA1\u7406\u7684 Detail \u6BB5\u843D\u6A19\u984C\u53EF\u80FD\u66F4\u65B0\u3002",
+  "ui.codex_required_for_ai": "\u57F7\u884C AI \u4EFB\u52D9\u524D\u8ACB\u5148\u8A2D\u5B9A Codex\uFF1B\u4F60\u4ECD\u53EF\u624B\u52D5\u7DE8\u8F2F\u9019\u5F35\u5FC3\u667A\u5716\u3002",
+  "ui.codex_setup_for_ai_only": "\u53EA\u6709 AI \u4EFB\u52D9\u9700\u8981 Codex CLI\uFF1B\u6C92\u6709 Codex \u4E5F\u80FD\u5EFA\u7ACB\u548C\u7DE8\u8F2F\u5FC3\u667A\u5716\u3002ChatGPT Free \u4E5F\u53EF\u4F7F\u7528\uFF0C\u4F46 Codex \u984D\u5EA6\u8F03\u5C11\u3002",
   "ui.to_research": "\u5F85\u7814\u7A76",
   "ui.ai_running": "AI \u57F7\u884C\u4E2D",
   "ui.ai_complete": "AI \u5B8C\u6210",
@@ -734,14 +744,11 @@ var traditionalChinese = {
   "ui.only_after_you_confirm_an_ai_task_will_the_plugin_use_your_l": "\u53EA\u6709\u5728\u4F60\u78BA\u8A8D\u57F7\u884C AI \u4EFB\u52D9\u6642\uFF0C\u5916\u639B\u624D\u6703\u4F7F\u7528\u672C\u6A5F\u5DF2\u767B\u5165\u7684 Codex CLI \u8207\u8A72\u5E33\u865F\u7684 Codex \u984D\u5EA6\uFF1B\u5916\u639B\u4E0D\u4FDD\u5B58 API key\u3002",
   "ui.create_an_empty_mind_map": "\u5EFA\u7ACB\u7A7A\u767D\u5FC3\u667A\u5716",
   "ui.start_using_vam": "\u958B\u59CB\u4F7F\u7528 VAM",
-  "ui.codex_is_ready_duplicate_the_sample_or_create_an_empty_mind": "Codex \u5DF2\u5C31\u7DD2\u3002\u8907\u88FD\u7BC4\u4F8B\u6216\u5EFA\u7ACB\u7A7A\u767D\u5FC3\u667A\u5716\uFF0C\u958B\u59CB\u81EA\u5DF1\u7684\u7814\u7A76\u3002",
-  "ui.finish_codex_setup_before_duplicating_the_sample_or_creating": "\u5148\u5B8C\u6210 Codex \u8A2D\u5B9A\uFF0C\u518D\u8907\u88FD\u7BC4\u4F8B\u6216\u5EFA\u7ACB\u5FC3\u667A\u5716\u3002\u4F60\u4ECD\u53EF\u7E7C\u7E8C\u700F\u89BD\u9019\u4EFD\u552F\u8B80\u7BC4\u4F8B\u3002",
   "ui.check_codex": "\u6AA2\u67E5 Codex",
   "ui.codex_allowance_notice": "Codex \u984D\u5EA6\u63D0\u9192",
   "ui.vam_runs_ai_tasks_through_your_signed_in_codex_account_and_u": "VAM \u6703\u900F\u904E\u4F60\u76EE\u524D\u767B\u5165\u7684 Codex \u5E33\u865F\u57F7\u884C AI \u4EFB\u52D9\uFF0C\u4E26\u4F7F\u7528\u8A72\u5E33\u865F\u7684 Codex \u4F7F\u7528\u984D\u5EA6\u3002\u53EF\u7528\u984D\u5EA6\u8207\u9650\u5236\u4F9D\u4F60\u7684 ChatGPT \u65B9\u6848\u800C\u5B9A\u3002",
   "ui.understand_and_run": "\u4E86\u89E3\u4E26\u57F7\u884C",
   "ui.install_and_connect_codex": "\u5B89\u88DD\u4E26\u9023\u63A5 Codex",
-  "ui.vam_needs_codex_cli_to_create_your_first_editable_mind_map_a": "VAM \u9700\u8981 Codex CLI \u624D\u80FD\u5EFA\u7ACB\u7B2C\u4E00\u5F35\u53EF\u7DE8\u8F2F\u5FC3\u667A\u5716\u8207\u57F7\u884C AI \u4EFB\u52D9\u3002ChatGPT Free \u4E5F\u53EF\u4F7F\u7528\uFF0C\u4F46 Codex \u984D\u5EA6\u8F03\u5C11\u3002",
   "ui.open_the_official_codex_cli_installation_guide_and_complete": "\u958B\u555F\u5B98\u65B9 Codex CLI \u5B89\u88DD\u6307\u5357\u4E26\u5B8C\u6210\u5B89\u88DD\uFF1A",
   "ui.official_codex_cli_installation_guide": "Codex CLI \u5B98\u65B9\u5B89\u88DD\u6307\u5357",
   "ui.run_codex_in_terminal_and_sign_in_with_your_chatgpt_account": "\u5728 Terminal \u57F7\u884C codex\uFF0C\u4E26\u7528\u4F60\u7684 ChatGPT \u5E33\u865F\u767B\u5165\u3002",
@@ -1409,6 +1416,10 @@ var traditionalChinese = {
   "ui.map_file_description": "\u6B64\u6A94\u6848\u4FDD\u5B58\u5FC3\u667A\u5716\u7D50\u69CB\uFF1B\u5B8C\u6574\u5167\u5BB9\u4FDD\u5B58\u5728\u5404\u8B70\u984C\u7B46\u8A18\u3002\u5F9E\u6A94\u6848\u9078\u55AE\u9078\u64C7\u300C\u4EE5\u5FC3\u667A\u5716\u958B\u555F\u300D\u3002"
 };
 var language = "zh-TW";
+function initialUiLanguage(saved, obsidianLanguage) {
+  if (saved === "zh-TW" || saved === "en") return saved;
+  return obsidianLanguage === "zh-TW" ? "zh-TW" : "en";
+}
 function setUiLanguage(value) {
   language = value;
 }
@@ -3894,6 +3905,11 @@ var NextStepModal = class extends import_obsidian7.Modal {
   async run(panel, button, work, needsUsage = true) {
     var _a;
     if (button.disabled || this.taskController && !this.taskController.signal.aborted) return;
+    button.disabled = true;
+    if (!await this.plugin.codexReadyForAi()) {
+      this.failed(panel, button, t("ui.codex_required_for_ai"));
+      return;
+    }
     const start = async () => {
       var _a2, _b, _c, _d, _e, _f;
       button.disabled = true;
@@ -4369,7 +4385,7 @@ var CodexSetupModal = class extends import_obsidian7.Modal {
   }
   onOpen() {
     this.titleEl.setText(t("ui.install_and_connect_codex"));
-    this.contentEl.createEl("p", { text: t("ui.vam_needs_codex_cli_to_create_your_first_editable_mind_map_a"), cls: "vam-modal-intro" });
+    this.contentEl.createEl("p", { text: t("ui.codex_setup_for_ai_only"), cls: "vam-modal-intro" });
     const steps = this.contentEl.createEl("ol", { cls: "vam-setup-steps" });
     const install = steps.createEl("li");
     install.appendText(t("ui.open_the_official_codex_cli_installation_guide_and_complete"));
@@ -4646,6 +4662,7 @@ var VisualAgentMapView = class extends import_obsidian7.ItemView {
       await this.persist();
     }
     const map = await this.plugin.repo.readMap(path);
+    if (this.builtIn || this.path !== path) this.plugin.closeStaleDetails();
     this.builtIn = false;
     this.path = path;
     this.map = map;
@@ -4664,6 +4681,7 @@ var VisualAgentMapView = class extends import_obsidian7.ItemView {
       await this.persist();
     }
     const sample = builtInSample(this.plugin.settings.language);
+    if (!this.builtIn) this.plugin.closeStaleDetails();
     this.builtIn = true;
     this.path = "";
     this.map = sample.map;
@@ -5318,7 +5336,7 @@ var VisualAgentMapView = class extends import_obsidian7.ItemView {
       const topics = await this.plugin.repo.topics();
       new ChoiceModal(this.app, t("ui.switch_mind_map"), t("ui.choose_a_research_topic_to_open"), [
         { label: t("ui.sample_taiwan_travel_plan"), description: t("ui.official_read_only_sample"), action: () => this.enqueue(() => this.openBuiltInSample()) },
-        ...topics.map((topic) => ({ label: topic.title, action: () => this.enqueue(() => this.openMap(topic.mapPath)) }))
+        ...topics.map((topic) => ({ label: topic.title, description: t("ui.my_editable_mind_map"), action: () => this.enqueue(() => this.openMap(topic.mapPath)) }))
       ]).open();
     }));
     if (this.builtIn) {
@@ -5343,8 +5361,7 @@ var VisualAgentMapView = class extends import_obsidian7.ItemView {
         this.button(actions, t("ui.reconnect_existing_workspace"), () => this.enqueue(() => this.plugin.offerWorkspaceReconnect())).addClass("mod-cta");
         this.button(actions, t("ui.repair_agent_workspace"), () => this.enqueue(() => this.plugin.repairWorkspace()));
       }
-      if (this.plugin.settings.models.trim()) this.button(actions, t("ui.create_a_new_mind_map"), () => new NameModal(this.app, t("ui.new_mind_map"), t("ui.new_mind_map_from_sample"), (title2) => this.enqueue(async () => this.openMap(await this.plugin.repo.createMap(title2)))).open());
-      else this.button(actions, t("ui.check_codex"), () => this.enqueue(() => this.plugin.recheckCodex())).addClass("mod-cta");
+      this.button(actions, t("ui.create_a_new_mind_map"), () => new NameModal(this.app, t("ui.new_mind_map"), t("ui.new_mind_map_from_sample"), (title2) => this.enqueue(async () => this.openMap(await this.plugin.repo.createMap(title2)))).open()).addClass("mod-cta");
       this.button(actions, t("ui.view_sample"), () => this.enqueue(() => this.openBuiltInSample(true)));
       return;
     }
@@ -5379,15 +5396,13 @@ var VisualAgentMapView = class extends import_obsidian7.ItemView {
     }
     if (this.builtIn) {
       const start = this.contentEl.createDiv("vam-sample-start");
-      const ready = !!this.plugin.settings.models.trim();
       const copy = start.createDiv();
       copy.createEl("strong", { text: t("ui.start_using_vam") });
-      copy.createEl("p", { text: ready ? t("ui.codex_is_ready_duplicate_the_sample_or_create_an_empty_mind") : t("ui.finish_codex_setup_before_duplicating_the_sample_or_creating") });
+      copy.createEl("p", { text: t("ui.sample_start_hint") });
       const actions = start.createDiv("vam-sample-start-actions");
-      if (ready) {
-        this.button(actions, t("ui.duplicate_to_my_workspace"), () => this.enqueue(async () => this.openMap(await this.plugin.duplicateBuiltInSample()))).addClass("mod-cta");
-        this.button(actions, t("ui.create_an_empty_mind_map"), () => new NameModal(this.app, t("ui.new_mind_map"), t("ui.new_mind_map_from_sample"), (title2) => this.enqueue(async () => this.openMap(await this.plugin.repo.createMap(title2)))).open());
-      } else this.button(actions, t("ui.check_codex"), () => this.enqueue(() => this.plugin.recheckCodex())).addClass("mod-cta");
+      this.button(actions, t("ui.duplicate_to_my_workspace"), () => this.enqueue(async () => this.openMap(await this.plugin.duplicateBuiltInSample()))).addClass("mod-cta");
+      this.button(actions, t("ui.create_an_empty_mind_map"), () => new NameModal(this.app, t("ui.new_mind_map"), t("ui.new_mind_map_from_sample"), (title2) => this.enqueue(async () => this.openMap(await this.plugin.repo.createMap(title2)))).open());
+      if (!this.plugin.settings.models.trim()) this.button(actions, t("ui.check_codex"), () => this.enqueue(() => this.plugin.recheckCodex()));
     }
     const tools = this.contentEl.createDiv("vam-map-tools");
     if (!this.builtIn) {
@@ -6649,8 +6664,8 @@ var VisualAgentMapSettingTab = class extends import_obsidian7.PluginSettingTab {
     ];
   }
   async setControlValue(key, value) {
-    const languageChanged = key === "language";
-    if (languageChanged) this.plugin.settings.language = value === "en" ? "en" : "zh-TW";
+    const languageChanged = key === "language" && this.plugin.settings.language !== (value === "en" ? "en" : "zh-TW");
+    if (key === "language") this.plugin.settings.language = value === "en" ? "en" : "zh-TW";
     else if (typeof value === "string" && (key === "codexPath" || key === "cliModel")) this.plugin.settings[key] = value.trim();
     else if (key === "cliReasoning") this.plugin.settings.cliReasoning = normalizeReasoningLevel(value);
     else return;
@@ -6658,10 +6673,12 @@ var VisualAgentMapSettingTab = class extends import_obsidian7.PluginSettingTab {
     setUiLanguage(this.plugin.settings.language);
     await this.plugin.saveSettings();
     if (languageChanged) {
+      this.plugin.refreshLocalizedEntrypoints();
       const updated = await this.plugin.repo.syncManagedDetailHeadings(this.plugin.settings.language);
       if (updated) new import_obsidian7.Notice(t("ui.detail_headings_synced_0_notes", updated));
       for (const view of this.plugin.views()) await view.refreshFromPlugin();
       this.update();
+      new import_obsidian7.Notice(t("ui.language_changed_content_preserved"));
     }
   }
 };
@@ -6683,6 +6700,9 @@ var VisualAgentMapPlugin = class extends import_obsidian7.Plugin {
     __publicField(this, "localCodexRuntime", null);
     __publicField(this, "settingTab");
     __publicField(this, "detailsLeaf", null);
+    __publicField(this, "detailsPath", null);
+    __publicField(this, "ribbonIcon", null);
+    __publicField(this, "localizedCommands", []);
     __publicField(this, "queue", Promise.resolve());
     __publicField(this, "writing", 0);
     __publicField(this, "externalReconcileTimer", null);
@@ -6733,7 +6753,7 @@ var VisualAgentMapPlugin = class extends import_obsidian7.Plugin {
     var _a, _b;
     const saved = await this.loadData();
     const legacy = saved;
-    this.settings = { ...DEFAULT_SETTINGS, language: (saved == null ? void 0 : saved.language) === "en" ? "en" : "zh-TW", workspaceFolder: (saved == null ? void 0 : saved.workspaceFolder) || DEFAULT_SETTINGS.workspaceFolder, topicsFolder: (saved == null ? void 0 : saved.topicsFolder) || DEFAULT_SETTINGS.topicsFolder, inboxFolder: (saved == null ? void 0 : saved.inboxFolder) || DEFAULT_SETTINGS.inboxFolder, notesFolder: (saved == null ? void 0 : saved.notesFolder) || DEFAULT_SETTINGS.notesFolder, mapsFolder: (saved == null ? void 0 : saved.mapsFolder) || DEFAULT_SETTINGS.mapsFolder, mapId: (saved == null ? void 0 : saved.mapId) || "default", codexPath: (saved == null ? void 0 : saved.codexPath) || (legacy == null ? void 0 : legacy.cliPath) || DEFAULT_SETTINGS.codexPath, cliModel: (saved == null ? void 0 : saved.cliModel) || DEFAULT_SETTINGS.cliModel, cliReasoning: normalizeReasoningLevel(saved == null ? void 0 : saved.cliReasoning), previewScale: (saved == null ? void 0 : saved.previewScale) !== void 0 ? clampPreviewScale(saved.previewScale) : legacyPreviewScale(saved == null ? void 0 : saved.previewSize), models: "", migrated: (saved == null ? void 0 : saved.migrated) === true, structureVersion: (_a = saved == null ? void 0 : saved.structureVersion) != null ? _a : saved ? 1 : DEFAULT_SETTINGS.structureVersion, firstUseNoticeSeen: (saved == null ? void 0 : saved.firstUseNoticeSeen) === true, codexUsageNoticeSeen: (saved == null ? void 0 : saved.codexUsageNoticeSeen) === true, aiExchangeLoggingEnabled: (saved == null ? void 0 : saved.aiExchangeLoggingEnabled) === true, workspaceInitialized: saved ? saved.workspaceInitialized !== false : false, sampleTourVersionSeen: (_b = saved == null ? void 0 : saved.sampleTourVersionSeen) != null ? _b : 0 };
+    this.settings = { ...DEFAULT_SETTINGS, language: initialUiLanguage(saved == null ? void 0 : saved.language, (0, import_obsidian7.getLanguage)()), workspaceFolder: (saved == null ? void 0 : saved.workspaceFolder) || DEFAULT_SETTINGS.workspaceFolder, topicsFolder: (saved == null ? void 0 : saved.topicsFolder) || DEFAULT_SETTINGS.topicsFolder, inboxFolder: (saved == null ? void 0 : saved.inboxFolder) || DEFAULT_SETTINGS.inboxFolder, notesFolder: (saved == null ? void 0 : saved.notesFolder) || DEFAULT_SETTINGS.notesFolder, mapsFolder: (saved == null ? void 0 : saved.mapsFolder) || DEFAULT_SETTINGS.mapsFolder, mapId: (saved == null ? void 0 : saved.mapId) || "default", codexPath: (saved == null ? void 0 : saved.codexPath) || (legacy == null ? void 0 : legacy.cliPath) || DEFAULT_SETTINGS.codexPath, cliModel: (saved == null ? void 0 : saved.cliModel) || DEFAULT_SETTINGS.cliModel, cliReasoning: normalizeReasoningLevel(saved == null ? void 0 : saved.cliReasoning), previewScale: (saved == null ? void 0 : saved.previewScale) !== void 0 ? clampPreviewScale(saved.previewScale) : legacyPreviewScale(saved == null ? void 0 : saved.previewSize), models: "", migrated: (saved == null ? void 0 : saved.migrated) === true, structureVersion: (_a = saved == null ? void 0 : saved.structureVersion) != null ? _a : saved ? 1 : DEFAULT_SETTINGS.structureVersion, firstUseNoticeSeen: (saved == null ? void 0 : saved.firstUseNoticeSeen) === true, codexUsageNoticeSeen: (saved == null ? void 0 : saved.codexUsageNoticeSeen) === true, aiExchangeLoggingEnabled: (saved == null ? void 0 : saved.aiExchangeLoggingEnabled) === true, workspaceInitialized: saved ? saved.workspaceInitialized !== false : false, sampleTourVersionSeen: (_b = saved == null ? void 0 : saved.sampleTourVersionSeen) != null ? _b : 0 };
     setUiLanguage(this.settings.language);
     this.logs.appendLog("info", `Visual Agent Map ${this.manifest.version || "unknown"} \u8F09\u5165`);
     if (this.app.vault.adapter instanceof import_obsidian7.FileSystemAdapter && this.manifest.dir) {
@@ -6778,40 +6798,40 @@ var VisualAgentMapPlugin = class extends import_obsidian7.Plugin {
         new import_obsidian7.Notice(error instanceof Error ? error.message : String(error));
       }
     }));
-    this.addRibbonIcon("git-fork", "Open map", () => {
+    this.ribbonIcon = this.addRibbonIcon("git-fork", t("ui.open_map"), () => {
       void this.activateView().catch((error) => new import_obsidian7.Notice(String(error)));
     });
-    this.addCommand({ id: "open-map", name: "Open map", callback: () => {
+    this.addLocalizedCommand("open-map", "ui.open_map", () => {
       void this.activateView().catch((error) => new import_obsidian7.Notice(String(error)));
-    } });
-    this.addCommand({ id: "open-topic-outline", name: t("ui.open_topic_outline"), callback: () => {
+    });
+    this.addLocalizedCommand("open-topic-outline", "ui.open_topic_outline", () => {
       void this.activateOutline().catch((error) => new import_obsidian7.Notice(String(error)));
-    } });
-    this.addCommand({ id: "rebuild-references", name: t("ui.refresh_vam_data"), callback: () => {
+    });
+    this.addLocalizedCommand("rebuild-references", "ui.refresh_vam_data", () => {
       void this.mutate(() => this.fullRebuild());
-    } });
-    this.addCommand({ id: "normalize-note-filenames", name: t("ui.sync_topic_names_and_filenames"), callback: () => {
+    });
+    this.addLocalizedCommand("normalize-note-filenames", "ui.sync_topic_names_and_filenames", () => {
       void this.mutate(async () => {
         const count = await this.repo.normalizeGeneratedNoteFilenames();
         new import_obsidian7.Notice(count ? t("ui.synced_0_topic_filenames", count) : t("ui.topic_filenames_are_up_to_date"));
       });
-    } });
-    this.addCommand({ id: "repair-note-presentation", name: t("ui.repair_topic_note_display"), callback: () => {
+    });
+    this.addLocalizedCommand("repair-note-presentation", "ui.repair_topic_note_display", () => {
       void this.mutate(async () => {
         await this.repo.ensureNodePresentation();
         new import_obsidian7.Notice(t("ui.topic_note_display_repaired"));
       });
-    } });
-    this.addCommand({ id: "open-built-in-sample", name: t("ui.open_the_taiwan_travel_sample"), callback: () => {
+    });
+    this.addLocalizedCommand("open-built-in-sample", "ui.open_the_taiwan_travel_sample", () => {
       void this.activateBuiltInSample(true);
-    } });
-    this.addCommand({ id: "repair-workspace", name: t("ui.repair_agent_workspace"), callback: () => {
+    });
+    this.addLocalizedCommand("repair-workspace", "ui.repair_agent_workspace", () => {
       void this.mutate(() => this.repairWorkspace());
-    } });
-    this.addCommand({ id: "reconnect-workspace", name: t("ui.reconnect_existing_workspace"), callback: () => {
+    });
+    this.addLocalizedCommand("reconnect-workspace", "ui.reconnect_existing_workspace", () => {
       void this.offerWorkspaceReconnect();
-    } });
-    this.addCommand({ id: "open-debug-log", name: t("ui.open_debug_log"), callback: () => new DebugLogModal(this.app, this.logs, this.exchanges, () => this.settings.aiExchangeLoggingEnabled).open() });
+    });
+    this.addLocalizedCommand("open-debug-log", "ui.open_debug_log", () => new DebugLogModal(this.app, this.logs, this.exchanges, () => this.settings.aiExchangeLoggingEnabled).open());
     this.settingTab = new VisualAgentMapSettingTab(this.app, this);
     this.addSettingTab(this.settingTab);
     this.registerEvent(this.app.workspace.on("file-menu", (menu, file) => {
@@ -6836,13 +6856,6 @@ var VisualAgentMapPlugin = class extends import_obsidian7.Plugin {
         if (this.workspaceRecoveryCandidates.length) await this.offerWorkspaceReconnect(this.workspaceRecoveryCandidates);
         else if (this.firstInstallSamplePending) await this.activateBuiltInSample();
         await this.activateOutline();
-        try {
-          await this.refreshCodexModels();
-        } catch (error) {
-          const message = error instanceof Error ? error.message : String(error);
-          this.logs.appendLog("warn", `Codex App Server \u5C1A\u672A\u5C31\u7DD2\uFF1A${message}`);
-          new import_obsidian7.Notice(t("ui.codex_app_server_is_not_ready_samples_and_non_ai_features_re"));
-        }
       }).catch((error) => {
         this.logs.appendLog("warn", `\u521D\u59CB\u5316\u672A\u5B8C\u6210\uFF1A${error instanceof Error ? error.message : String(error)}`);
         console.warn("Visual Agent Map initialization", error);
@@ -7006,7 +7019,31 @@ var VisualAgentMapPlugin = class extends import_obsidian7.Plugin {
   async saveSettings() {
     await this.saveData(this.settings);
   }
+  addLocalizedCommand(id, key, callback) {
+    this.localizedCommands.push({ command: this.addCommand({ id, name: t(key), callback }), key });
+  }
+  refreshLocalizedEntrypoints() {
+    var _a;
+    (_a = this.ribbonIcon) == null ? void 0 : _a.setAttribute("aria-label", translate(this.settings.language, "ui.open_map"));
+    for (const { command, key } of this.localizedCommands) command.name = translate(this.settings.language, key);
+  }
+  async codexReadyForAi() {
+    if (!this.codexDiagnostic().installed) {
+      this.openCodexSetupGuide();
+      return false;
+    }
+    if (this.settings.models.trim()) return true;
+    try {
+      await this.refreshCodexModels();
+      if (this.settings.models.trim()) return true;
+    } catch (error) {
+      this.logs.appendLog("warn", `Codex App Server \u5C1A\u672A\u5C31\u7DD2\uFF1A${error instanceof Error ? error.message : String(error)}`);
+    }
+    this.openCodexSetupGuide();
+    return false;
+  }
   async confirmCodexUsage(run) {
+    if (!await this.codexReadyForAi()) return;
     if (!this.settings.codexUsageNoticeSeen) {
       const confirmed = await new Promise((resolve) => new CodexUsageModal(this.app, resolve).open());
       if (!confirmed) return;
@@ -7046,8 +7083,20 @@ var VisualAgentMapPlugin = class extends import_obsidian7.Plugin {
     }
     if (!this.detailsLeaf) throw new Error(t("ui.unable_to_open_the_right_details_sidebar"));
     await this.detailsLeaf.openFile(file);
+    this.detailsPath = file.path;
     this.styleNodeLeaf(this.detailsLeaf);
     await this.app.workspace.revealLeaf(this.detailsLeaf);
+  }
+  closeStaleDetails() {
+    var _a, _b;
+    const closed = ((_a = this.detailsLeaf) == null ? void 0 : _a.view) instanceof import_obsidian7.MarkdownView && ((_b = this.detailsLeaf.view.file) == null ? void 0 : _b.path) === this.detailsPath;
+    if (closed) {
+      this.detailsLeaf.detach();
+      this.app.workspace.trigger("file-open", null);
+      this.app.workspace.trigger("active-leaf-change", this.app.workspace.activeLeaf);
+    }
+    this.detailsLeaf = null;
+    this.detailsPath = null;
   }
   async activateView(path) {
     await this.ready;

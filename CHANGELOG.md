@@ -1,5 +1,18 @@
 # Changelog
 
+## [0.9.6] - 2026-09-26
+
+### Added
+
+- Added bilingual first-use guidance and an official read-only Sample that follows the VAM interface language. New installs use Traditional Chinese when Obsidian is set to `zh-TW` and English otherwise; an existing VAM language choice is preserved.
+- Added the ability to duplicate the Sample, create an empty mind map, and edit maps without Codex. Codex setup guidance now appears when starting an AI task.
+- Added an isolated Obsidian CLI runtime test that verifies the prepared build, canonical test Vault, plugin initialization, Sample, commands, and runtime errors before UI acceptance.
+
+### Changed
+
+- Updated installation guidance and the README in English and Traditional Chinese for the no-Codex manual workflow.
+- Switching maps now closes only a VAM-opened detail note from the previous map and clears Obsidian's cached Outline state.
+
 ## [0.9.5] - 2026-09-25
 
 ### Added

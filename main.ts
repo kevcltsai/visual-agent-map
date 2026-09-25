@@ -1,5 +1,5 @@
-import { t, setUiLanguage, topicStatusLabel, translate, type TranslationKey } from "./i18n";
-import { App, MarkdownRenderer, FileSystemAdapter, ItemView, MarkdownView, Modal, Notice, Plugin, PluginSettingTab, Setting, TFile, WorkspaceLeaf, type SettingDefinitionItem } from "obsidian";
+import { t, setUiLanguage, topicStatusLabel, translate, initialUiLanguage, type TranslationKey } from "./i18n";
+import { App, MarkdownRenderer, FileSystemAdapter, ItemView, MarkdownView, Modal, Notice, Plugin, PluginSettingTab, Setting, TFile, WorkspaceLeaf, getLanguage, type Command, type SettingDefinitionItem } from "obsidian";
 import { ReferencePicker, type ReferenceTopic } from "./ui/reference-picker";
 import { packReferenceChunks, readMarkdownFile, referenceBatches, type ReferenceGroup } from "./ai/reference-materials";
 import { NameModal } from "./ui/modals/name-modal";
@@ -235,6 +235,8 @@ export class NextStepModal extends Modal {
   }
   private async run(panel: HTMLElement, button: HTMLButtonElement, work: () => Promise<void>, needsUsage = true): Promise<void> {
     if (button.disabled || (this.taskController && !this.taskController.signal.aborted)) return;
+    button.disabled = true;
+    if (!await this.plugin.codexReadyForAi()) { this.failed(panel, button, t("ui.codex_required_for_ai")); return; }
     const start = async (): Promise<void> => {
       button.disabled = true;
       const controller = new AbortController(); this.taskController = controller; this.taskSignal = controller.signal;
@@ -497,7 +499,7 @@ class CodexSetupModal extends Modal {
   constructor(app: App, private executable: string, private recheck: () => void) { super(app); }
   onOpen(): void {
     this.titleEl.setText(t("ui.install_and_connect_codex"));
-    this.contentEl.createEl("p", { text: t("ui.vam_needs_codex_cli_to_create_your_first_editable_mind_map_a"), cls: "vam-modal-intro" });
+    this.contentEl.createEl("p", { text: t("ui.codex_setup_for_ai_only"), cls: "vam-modal-intro" });
     const steps = this.contentEl.createEl("ol", { cls: "vam-setup-steps" });
     const install = steps.createEl("li");
     install.appendText(t("ui.open_the_official_codex_cli_installation_guide_and_complete"));
@@ -646,12 +648,14 @@ export class VisualAgentMapView extends ItemView {
   async openMap(path: string): Promise<void> {
     if (this.viewportTimer !== null) { window.clearTimeout(this.viewportTimer); this.viewportTimer = null; await this.persist(); }
     const map = await this.plugin.repo.readMap(path);
+    if (this.builtIn || this.path !== path) this.plugin.closeStaleDetails();
     this.builtIn = false; this.path = path; this.map = map; this.integrationMode = false; this.selected = null; this.multiSelected.clear(); this.history.clear(); await this.hydrate(); this.render();
     this.app.workspace.requestSaveLayout();
   }
   async openBuiltInSample(forceTour = false): Promise<void> {
     if (this.viewportTimer !== null) { window.clearTimeout(this.viewportTimer); this.viewportTimer = null; await this.persist(); }
     const sample = builtInSample(this.plugin.settings.language);
+    if (!this.builtIn) this.plugin.closeStaleDetails();
     this.builtIn = true; this.path = ""; this.map = sample.map; this.notes = sample.notes; this.integrationMode = false; this.selected = null; this.multiSelected.clear(); this.history.clear();
     this.showSampleTour = forceTour || this.plugin.settings.sampleTourVersionSeen < SAMPLE_TOUR_VERSION;
     this.sampleTourStep = 0; this.selected = this.showSampleTour ? "explore" : null;
@@ -1018,7 +1022,7 @@ export class VisualAgentMapView extends ItemView {
     if (this.builtIn) toolbar.createSpan({ cls: "vam-readonly-badge", text: t("ui.official_sample_read_only") });
     this.button(toolbar, t("ui.switch_mind_map"), () => this.enqueue(async () => { const topics = await this.plugin.repo.topics(); new ChoiceModal(this.app, t("ui.switch_mind_map"), t("ui.choose_a_research_topic_to_open"), [
       { label: t("ui.sample_taiwan_travel_plan"), description: t("ui.official_read_only_sample"), action: () => this.enqueue(() => this.openBuiltInSample()) },
-      ...topics.map(topic => ({ label: topic.title, action: () => this.enqueue(() => this.openMap(topic.mapPath)) }))
+      ...topics.map(topic => ({ label: topic.title, description: t("ui.my_editable_mind_map"), action: () => this.enqueue(() => this.openMap(topic.mapPath)) }))
     ]).open(); }));
     if (this.builtIn) {
       this.button(toolbar, t("ui.show_tour_again"), () => { this.showSampleTour = true; this.render(); });
@@ -1037,8 +1041,7 @@ export class VisualAgentMapView extends ItemView {
         this.button(actions, t("ui.reconnect_existing_workspace"), () => this.enqueue(() => this.plugin.offerWorkspaceReconnect())).addClass("mod-cta");
         this.button(actions, t("ui.repair_agent_workspace"), () => this.enqueue(() => this.plugin.repairWorkspace()));
       }
-      if (this.plugin.settings.models.trim()) this.button(actions, t("ui.create_a_new_mind_map"), () => new NameModal(this.app, t("ui.new_mind_map"), t("ui.new_mind_map_from_sample"), title => this.enqueue(async () => this.openMap(await this.plugin.repo.createMap(title)))).open());
-      else this.button(actions, t("ui.check_codex"), () => this.enqueue(() => this.plugin.recheckCodex())).addClass("mod-cta");
+      this.button(actions, t("ui.create_a_new_mind_map"), () => new NameModal(this.app, t("ui.new_mind_map"), t("ui.new_mind_map_from_sample"), title => this.enqueue(async () => this.openMap(await this.plugin.repo.createMap(title)))).open()).addClass("mod-cta");
       this.button(actions, t("ui.view_sample"), () => this.enqueue(() => this.openBuiltInSample(true)));
       return;
     }
@@ -1060,15 +1063,13 @@ export class VisualAgentMapView extends ItemView {
     }
     if (this.builtIn) {
       const start = this.contentEl.createDiv("vam-sample-start");
-      const ready = !!this.plugin.settings.models.trim();
       const copy = start.createDiv();
       copy.createEl("strong", { text: t("ui.start_using_vam") });
-      copy.createEl("p", { text: ready ? t("ui.codex_is_ready_duplicate_the_sample_or_create_an_empty_mind") : t("ui.finish_codex_setup_before_duplicating_the_sample_or_creating") });
+      copy.createEl("p", { text: t("ui.sample_start_hint") });
       const actions = start.createDiv("vam-sample-start-actions");
-      if (ready) {
-        this.button(actions, t("ui.duplicate_to_my_workspace"), () => this.enqueue(async () => this.openMap(await this.plugin.duplicateBuiltInSample()))).addClass("mod-cta");
-        this.button(actions, t("ui.create_an_empty_mind_map"), () => new NameModal(this.app, t("ui.new_mind_map"), t("ui.new_mind_map_from_sample"), title => this.enqueue(async () => this.openMap(await this.plugin.repo.createMap(title)))).open());
-      } else this.button(actions, t("ui.check_codex"), () => this.enqueue(() => this.plugin.recheckCodex())).addClass("mod-cta");
+      this.button(actions, t("ui.duplicate_to_my_workspace"), () => this.enqueue(async () => this.openMap(await this.plugin.duplicateBuiltInSample()))).addClass("mod-cta");
+      this.button(actions, t("ui.create_an_empty_mind_map"), () => new NameModal(this.app, t("ui.new_mind_map"), t("ui.new_mind_map_from_sample"), title => this.enqueue(async () => this.openMap(await this.plugin.repo.createMap(title)))).open());
+      if (!this.plugin.settings.models.trim()) this.button(actions, t("ui.check_codex"), () => this.enqueue(() => this.plugin.recheckCodex()));
     }
     const tools = this.contentEl.createDiv("vam-map-tools");
     if (!this.builtIn) {
@@ -1770,7 +1771,7 @@ export class VisualAgentMapView extends ItemView {
     }).catch(() => {});
   }
 }
-class VisualAgentMapSettingTab extends PluginSettingTab {
+export class VisualAgentMapSettingTab extends PluginSettingTab {
   constructor(app: App, private plugin: VisualAgentMapPlugin) { super(app, plugin); }
   getSettingDefinitions(): SettingDefinitionItem[] {
     const text = (name: string, key: "codexPath", desc: string): SettingDefinitionItem => ({ name, desc, control: { type: "text", key } });
@@ -1794,8 +1795,8 @@ class VisualAgentMapSettingTab extends PluginSettingTab {
     ];
   }
   async setControlValue(key: string, value: unknown): Promise<void> {
-    const languageChanged = key === "language";
-    if (languageChanged) this.plugin.settings.language = value === "en" ? "en" : "zh-TW";
+    const languageChanged = key === "language" && this.plugin.settings.language !== (value === "en" ? "en" : "zh-TW");
+    if (key === "language") this.plugin.settings.language = value === "en" ? "en" : "zh-TW";
     else if (typeof value === "string" && (key === "codexPath" || key === "cliModel")) this.plugin.settings[key] = value.trim();
     else if (key === "cliReasoning") this.plugin.settings.cliReasoning = normalizeReasoningLevel(value);
     else return;
@@ -1803,10 +1804,12 @@ class VisualAgentMapSettingTab extends PluginSettingTab {
     setUiLanguage(this.plugin.settings.language);
     await this.plugin.saveSettings();
     if (languageChanged) {
+      this.plugin.refreshLocalizedEntrypoints();
       const updated = await this.plugin.repo.syncManagedDetailHeadings(this.plugin.settings.language);
       if (updated) new Notice(t("ui.detail_headings_synced_0_notes", updated));
       for (const view of this.plugin.views()) await view.refreshFromPlugin();
       this.update();
+      new Notice(t("ui.language_changed_content_preserved"));
     }
   }
 }
@@ -1826,6 +1829,9 @@ export default class VisualAgentMapPlugin extends Plugin {
   private localCodexRuntime: CodexAppServerRuntime | null = null;
   private settingTab!: VisualAgentMapSettingTab;
   private detailsLeaf: WorkspaceLeaf | null = null;
+  private detailsPath: string | null = null;
+  private ribbonIcon: HTMLElement | null = null;
+  private localizedCommands: { command: Command; key: TranslationKey }[] = [];
   private queue: Promise<void> = Promise.resolve();
   private writing = 0;
   private externalReconcileTimer: number | null = null;
@@ -1858,7 +1864,7 @@ export default class VisualAgentMapPlugin extends Plugin {
   async onload(): Promise<void> {
     const saved = await this.loadData() as Partial<Settings> | null;
     const legacy: (Partial<Settings> & { cliPath?: string }) | null = saved;
-    this.settings = { ...DEFAULT_SETTINGS, language: saved?.language === "en" ? "en" : "zh-TW", workspaceFolder: saved?.workspaceFolder || DEFAULT_SETTINGS.workspaceFolder, topicsFolder: saved?.topicsFolder || DEFAULT_SETTINGS.topicsFolder, inboxFolder: saved?.inboxFolder || DEFAULT_SETTINGS.inboxFolder, notesFolder: saved?.notesFolder || DEFAULT_SETTINGS.notesFolder, mapsFolder: saved?.mapsFolder || DEFAULT_SETTINGS.mapsFolder, mapId: saved?.mapId || "default", codexPath: saved?.codexPath || legacy?.cliPath || DEFAULT_SETTINGS.codexPath, cliModel: saved?.cliModel || DEFAULT_SETTINGS.cliModel, cliReasoning: normalizeReasoningLevel(saved?.cliReasoning), previewScale: saved?.previewScale !== undefined ? clampPreviewScale(saved.previewScale) : legacyPreviewScale(saved?.previewSize), models: "", migrated: saved?.migrated === true, structureVersion: saved?.structureVersion ?? (saved ? 1 : DEFAULT_SETTINGS.structureVersion), firstUseNoticeSeen: saved?.firstUseNoticeSeen === true, codexUsageNoticeSeen: saved?.codexUsageNoticeSeen === true, aiExchangeLoggingEnabled: saved?.aiExchangeLoggingEnabled === true, workspaceInitialized: saved ? saved.workspaceInitialized !== false : false, sampleTourVersionSeen: saved?.sampleTourVersionSeen ?? 0 };
+    this.settings = { ...DEFAULT_SETTINGS, language: initialUiLanguage(saved?.language, getLanguage()), workspaceFolder: saved?.workspaceFolder || DEFAULT_SETTINGS.workspaceFolder, topicsFolder: saved?.topicsFolder || DEFAULT_SETTINGS.topicsFolder, inboxFolder: saved?.inboxFolder || DEFAULT_SETTINGS.inboxFolder, notesFolder: saved?.notesFolder || DEFAULT_SETTINGS.notesFolder, mapsFolder: saved?.mapsFolder || DEFAULT_SETTINGS.mapsFolder, mapId: saved?.mapId || "default", codexPath: saved?.codexPath || legacy?.cliPath || DEFAULT_SETTINGS.codexPath, cliModel: saved?.cliModel || DEFAULT_SETTINGS.cliModel, cliReasoning: normalizeReasoningLevel(saved?.cliReasoning), previewScale: saved?.previewScale !== undefined ? clampPreviewScale(saved.previewScale) : legacyPreviewScale(saved?.previewSize), models: "", migrated: saved?.migrated === true, structureVersion: saved?.structureVersion ?? (saved ? 1 : DEFAULT_SETTINGS.structureVersion), firstUseNoticeSeen: saved?.firstUseNoticeSeen === true, codexUsageNoticeSeen: saved?.codexUsageNoticeSeen === true, aiExchangeLoggingEnabled: saved?.aiExchangeLoggingEnabled === true, workspaceInitialized: saved ? saved.workspaceInitialized !== false : false, sampleTourVersionSeen: saved?.sampleTourVersionSeen ?? 0 };
     setUiLanguage(this.settings.language);
     this.logs.appendLog("info", `Visual Agent Map ${this.manifest.version || "unknown"} 載入`);
     if (this.app.vault.adapter instanceof FileSystemAdapter && this.manifest.dir) {
@@ -1889,16 +1895,16 @@ export default class VisualAgentMapPlugin extends Plugin {
       try { await this.openDetails(this.repo.file(path)); }
       catch (error) { new Notice(error instanceof Error ? error.message : String(error)); }
     }));
-    this.addRibbonIcon("git-fork", "Open map", () => { void this.activateView().catch(error => new Notice(String(error))); });
-    this.addCommand({ id: "open-map", name: "Open map", callback: () => { void this.activateView().catch(error => new Notice(String(error))); } });
-    this.addCommand({ id: "open-topic-outline", name: t("ui.open_topic_outline"), callback: () => { void this.activateOutline().catch(error => new Notice(String(error))); } });
-    this.addCommand({ id: "rebuild-references", name: t("ui.refresh_vam_data"), callback: () => { void this.mutate(() => this.fullRebuild()); } });
-    this.addCommand({ id: "normalize-note-filenames", name: t("ui.sync_topic_names_and_filenames"), callback: () => { void this.mutate(async () => { const count = await this.repo.normalizeGeneratedNoteFilenames(); new Notice(count ? t("ui.synced_0_topic_filenames", count) : t("ui.topic_filenames_are_up_to_date")); }); } });
-    this.addCommand({ id: "repair-note-presentation", name: t("ui.repair_topic_note_display"), callback: () => { void this.mutate(async () => { await this.repo.ensureNodePresentation(); new Notice(t("ui.topic_note_display_repaired")); }); } });
-    this.addCommand({ id: "open-built-in-sample", name: t("ui.open_the_taiwan_travel_sample"), callback: () => { void this.activateBuiltInSample(true); } });
-    this.addCommand({ id: "repair-workspace", name: t("ui.repair_agent_workspace"), callback: () => { void this.mutate(() => this.repairWorkspace()); } });
-    this.addCommand({ id: "reconnect-workspace", name: t("ui.reconnect_existing_workspace"), callback: () => { void this.offerWorkspaceReconnect(); } });
-    this.addCommand({ id: "open-debug-log", name: t("ui.open_debug_log"), callback: () => new DebugLogModal(this.app, this.logs, this.exchanges, () => this.settings.aiExchangeLoggingEnabled).open() });
+    this.ribbonIcon = this.addRibbonIcon("git-fork", t("ui.open_map"), () => { void this.activateView().catch(error => new Notice(String(error))); });
+    this.addLocalizedCommand("open-map", "ui.open_map", () => { void this.activateView().catch(error => new Notice(String(error))); });
+    this.addLocalizedCommand("open-topic-outline", "ui.open_topic_outline", () => { void this.activateOutline().catch(error => new Notice(String(error))); });
+    this.addLocalizedCommand("rebuild-references", "ui.refresh_vam_data", () => { void this.mutate(() => this.fullRebuild()); });
+    this.addLocalizedCommand("normalize-note-filenames", "ui.sync_topic_names_and_filenames", () => { void this.mutate(async () => { const count = await this.repo.normalizeGeneratedNoteFilenames(); new Notice(count ? t("ui.synced_0_topic_filenames", count) : t("ui.topic_filenames_are_up_to_date")); }); });
+    this.addLocalizedCommand("repair-note-presentation", "ui.repair_topic_note_display", () => { void this.mutate(async () => { await this.repo.ensureNodePresentation(); new Notice(t("ui.topic_note_display_repaired")); }); });
+    this.addLocalizedCommand("open-built-in-sample", "ui.open_the_taiwan_travel_sample", () => { void this.activateBuiltInSample(true); });
+    this.addLocalizedCommand("repair-workspace", "ui.repair_agent_workspace", () => { void this.mutate(() => this.repairWorkspace()); });
+    this.addLocalizedCommand("reconnect-workspace", "ui.reconnect_existing_workspace", () => { void this.offerWorkspaceReconnect(); });
+    this.addLocalizedCommand("open-debug-log", "ui.open_debug_log", () => new DebugLogModal(this.app, this.logs, this.exchanges, () => this.settings.aiExchangeLoggingEnabled).open());
     this.settingTab = new VisualAgentMapSettingTab(this.app, this);
     this.addSettingTab(this.settingTab);
     this.registerEvent(this.app.workspace.on("file-menu", (menu, file) => { if (file instanceof TFile && this.isMap(file)) menu.addItem(item => item.setTitle(t("ui.open_as_mind_map")).setIcon("git-fork").onClick(() => { void this.activateView(file.path); })); }));
@@ -1918,8 +1924,6 @@ export default class VisualAgentMapPlugin extends Plugin {
         if (this.workspaceRecoveryCandidates.length) await this.offerWorkspaceReconnect(this.workspaceRecoveryCandidates);
         else if (this.firstInstallSamplePending) await this.activateBuiltInSample();
         await this.activateOutline();
-        try { await this.refreshCodexModels(); }
-        catch (error) { const message = error instanceof Error ? error.message : String(error); this.logs.appendLog("warn", `Codex App Server 尚未就緒：${message}`); new Notice(t("ui.codex_app_server_is_not_ready_samples_and_non_ai_features_re")); }
       }).catch(error => { this.logs.appendLog("warn", `初始化未完成：${error instanceof Error ? error.message : String(error)}`); console.warn("Visual Agent Map initialization", error); });
     });
     this.registerEvent(this.app.vault.on("modify", file => { if (!this.writing && file instanceof TFile) for (const view of this.views()) view.changed(file); }));
@@ -2007,7 +2011,26 @@ export default class VisualAgentMapPlugin extends Plugin {
   }
   onunload(): void { this.resetCodexRuntime(); }
   async saveSettings(): Promise<void> { await this.saveData(this.settings); }
+  private addLocalizedCommand(id: string, key: TranslationKey, callback: () => void): void {
+    this.localizedCommands.push({ command: this.addCommand({ id, name: t(key), callback }), key });
+  }
+  refreshLocalizedEntrypoints(): void {
+    this.ribbonIcon?.setAttribute("aria-label", translate(this.settings.language, "ui.open_map"));
+    for (const { command, key } of this.localizedCommands) command.name = translate(this.settings.language, key);
+  }
+  async codexReadyForAi(): Promise<boolean> {
+    if (!this.codexDiagnostic().installed) { this.openCodexSetupGuide(); return false; }
+    if (this.settings.models.trim()) return true;
+    try {
+      await this.refreshCodexModels();
+      if (this.settings.models.trim()) return true;
+    } catch (error) {
+      this.logs.appendLog("warn", `Codex App Server 尚未就緒：${error instanceof Error ? error.message : String(error)}`);
+    }
+    this.openCodexSetupGuide(); return false;
+  }
   async confirmCodexUsage(run: () => Promise<void>): Promise<void> {
+    if (!await this.codexReadyForAi()) return;
     if (!this.settings.codexUsageNoticeSeen) {
       const confirmed = await new Promise<boolean>(resolve => new CodexUsageModal(this.app, resolve).open());
       if (!confirmed) return;
@@ -2040,8 +2063,19 @@ export default class VisualAgentMapPlugin extends Plugin {
     }
     if (!this.detailsLeaf) throw new Error(t("ui.unable_to_open_the_right_details_sidebar"));
     await this.detailsLeaf.openFile(file);
+    this.detailsPath = file.path;
     this.styleNodeLeaf(this.detailsLeaf);
     await this.app.workspace.revealLeaf(this.detailsLeaf);
+  }
+  closeStaleDetails(): void {
+    const closed = this.detailsLeaf?.view instanceof MarkdownView && this.detailsLeaf.view.file?.path === this.detailsPath;
+    if (closed) {
+      this.detailsLeaf!.detach();
+      this.app.workspace.trigger("file-open", null);
+      this.app.workspace.trigger("active-leaf-change", this.app.workspace.activeLeaf);
+    }
+    this.detailsLeaf = null;
+    this.detailsPath = null;
   }
   private async activateView(path?: string): Promise<void> { await this.ready; let leaf = this.app.workspace.getLeavesOfType(VIEW_TYPE)[0]; if (!leaf) leaf = this.app.workspace.getLeaf("tab"); await leaf.setViewState({ type: VIEW_TYPE, active: true, state: path ? { file: path } : leaf.view instanceof VisualAgentMapView ? leaf.view.getState() : {} }); await this.app.workspace.revealLeaf(leaf); }
   private async activateBuiltInSample(forceTour = false): Promise<void> {

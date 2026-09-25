@@ -30,9 +30,9 @@ test('canonical reset installs exact artifacts/settings/fixtures and detects tam
 test('in-place plugin refresh updates only installed artifacts and preserves test-vault data', t => {
   const { vault } = environment(t); prepareTestVault({ vault });
   const plugin = join(vault, '.obsidian/plugins/visual-agent-map');
-  const note = join(vault, 'Agent Workspace/Topics/Taiwan Travel Regression/Notes/owner-test.md');
+  const note = join(vault, 'Agent Workspace/Topics/Taiwan Travel Regression (zh-TW test fixture)/Notes/owner-test.md');
   const attachment = join(vault, 'Agent Workspace/Attachments/owner-test.bin');
-  mkdirSync(join(vault, 'Agent Workspace/Topics/Taiwan Travel Regression/Notes'), { recursive: true });
+  mkdirSync(join(vault, 'Agent Workspace/Topics/Taiwan Travel Regression (zh-TW test fixture)/Notes'), { recursive: true });
   mkdirSync(join(vault, 'Agent Workspace/Attachments'), { recursive: true });
   writeFileSync(note, '---\nuser: keep\n---\nKeep this note.'); writeFileSync(attachment, Buffer.from([0, 255, 3, 128]));
   writeFileSync(join(plugin, 'main.js'), 'stale plugin build');
@@ -84,7 +84,7 @@ test('onboarding is clean and reinstall preserves Markdown and attachment bytes 
   mkdirSync(plugin);
   for (const name of ['main.js', 'manifest.json', 'styles.css']) copyFileSync(join(root, name), join(plugin, name));
   verify('reinstalled');
-  writeFileSync(join(vault, 'Agent Workspace/Topics/Taiwan Travel Regression/Map.md'), 'damaged');
+  writeFileSync(join(vault, 'Agent Workspace/Topics/Taiwan Travel Regression (zh-TW test fixture)/Map.md'), 'damaged');
   assert.throws(() => verify('reinstalled'));
 });
 
@@ -114,6 +114,7 @@ test('isolated app profile opens only the canonical vault without changing perso
   assert.equal(Object.keys(config.vaults).length, 1);
   assert.deepEqual(Object.values(config.vaults)[0], { path: vault, ts: 0, open: true });
   assert.equal(config.updateDisabled, true);
+  assert.equal(config.cli, true, 'the isolated profile enables Obsidian CLI without changing personal settings');
 });
 
 test('harness stops at the first failing layer', t => {

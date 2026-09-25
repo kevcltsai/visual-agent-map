@@ -1,5 +1,11 @@
 const english = {
   "ui.interface_language": "Interface language",
+  "ui.open_map": "Open mind map",
+  "ui.my_editable_mind_map": "My editable mind map",
+  "ui.sample_start_hint": "Duplicate this sample or create an empty mind map to start. Codex is only needed for AI tasks.",
+  "ui.language_changed_content_preserved": "Interface and official sample are now in English. Your map titles and writing are not translated; VAM-managed Detail headings may update.",
+  "ui.codex_required_for_ai": "Set up Codex before running an AI task. You can keep editing this mind map manually.",
+  "ui.codex_setup_for_ai_only": "Codex CLI is needed for AI tasks. You can create and edit mind maps without it. ChatGPT Free is supported with a smaller Codex allowance.",
   "ui.to_research": "To research",
   "ui.ai_running": "AI running",
   "ui.ai_complete": "AI complete",
@@ -10,14 +16,11 @@ const english = {
   "ui.only_after_you_confirm_an_ai_task_will_the_plugin_use_your_l": "Only after you confirm an AI task will the plugin use your locally signed-in Codex CLI and that account's Codex allowance. The plugin does not store API keys.",
   "ui.create_an_empty_mind_map": "Create an empty mind map",
   "ui.start_using_vam": "Start using VAM",
-  "ui.codex_is_ready_duplicate_the_sample_or_create_an_empty_mind": "Codex is ready. Duplicate the sample or create an empty mind map to start your own research.",
-  "ui.finish_codex_setup_before_duplicating_the_sample_or_creating": "Finish Codex setup before duplicating the sample or creating a mind map. You can still explore this read-only sample.",
   "ui.check_codex": "Check Codex",
   "ui.codex_allowance_notice": "Codex allowance notice",
   "ui.vam_runs_ai_tasks_through_your_signed_in_codex_account_and_u": "VAM runs AI tasks through your signed-in Codex account and uses that account's Codex allowance. Available usage and limits depend on your ChatGPT plan.",
   "ui.understand_and_run": "Understand and run",
   "ui.install_and_connect_codex": "Install and connect Codex",
-  "ui.vam_needs_codex_cli_to_create_your_first_editable_mind_map_a": "VAM needs Codex CLI to create your first editable mind map and run AI tasks. ChatGPT Free is supported with a smaller Codex allowance.",
   "ui.open_the_official_codex_cli_installation_guide_and_complete": "Open the official Codex CLI installation guide and complete installation: ",
   "ui.official_codex_cli_installation_guide": "Official Codex CLI installation guide",
   "ui.run_codex_in_terminal_and_sign_in_with_your_chatgpt_account": "Run codex in Terminal and sign in with your ChatGPT account.",
@@ -690,6 +693,12 @@ export type TranslationKey = keyof typeof english;
 
 const traditionalChinese: Record<TranslationKey, string> = {
   "ui.interface_language": "介面語言",
+  "ui.open_map": "開啟心智圖",
+  "ui.my_editable_mind_map": "我的可編輯心智圖",
+  "ui.sample_start_hint": "複製這份範例或建立空白心智圖即可開始；只有 AI 任務需要 Codex。",
+  "ui.language_changed_content_preserved": "介面與官方範例已切換為繁體中文。你寫的地圖標題與內容不會翻譯；VAM 管理的 Detail 段落標題可能更新。",
+  "ui.codex_required_for_ai": "執行 AI 任務前請先設定 Codex；你仍可手動編輯這張心智圖。",
+  "ui.codex_setup_for_ai_only": "只有 AI 任務需要 Codex CLI；沒有 Codex 也能建立和編輯心智圖。ChatGPT Free 也可使用，但 Codex 額度較少。",
   "ui.to_research": "待研究",
   "ui.ai_running": "AI 執行中",
   "ui.ai_complete": "AI 完成",
@@ -700,14 +709,11 @@ const traditionalChinese: Record<TranslationKey, string> = {
   "ui.only_after_you_confirm_an_ai_task_will_the_plugin_use_your_l": "只有在你確認執行 AI 任務時，外掛才會使用本機已登入的 Codex CLI 與該帳號的 Codex 額度；外掛不保存 API key。",
   "ui.create_an_empty_mind_map": "建立空白心智圖",
   "ui.start_using_vam": "開始使用 VAM",
-  "ui.codex_is_ready_duplicate_the_sample_or_create_an_empty_mind": "Codex 已就緒。複製範例或建立空白心智圖，開始自己的研究。",
-  "ui.finish_codex_setup_before_duplicating_the_sample_or_creating": "先完成 Codex 設定，再複製範例或建立心智圖。你仍可繼續瀏覽這份唯讀範例。",
   "ui.check_codex": "檢查 Codex",
   "ui.codex_allowance_notice": "Codex 額度提醒",
   "ui.vam_runs_ai_tasks_through_your_signed_in_codex_account_and_u": "VAM 會透過你目前登入的 Codex 帳號執行 AI 任務，並使用該帳號的 Codex 使用額度。可用額度與限制依你的 ChatGPT 方案而定。",
   "ui.understand_and_run": "了解並執行",
   "ui.install_and_connect_codex": "安裝並連接 Codex",
-  "ui.vam_needs_codex_cli_to_create_your_first_editable_mind_map_a": "VAM 需要 Codex CLI 才能建立第一張可編輯心智圖與執行 AI 任務。ChatGPT Free 也可使用，但 Codex 額度較少。",
   "ui.open_the_official_codex_cli_installation_guide_and_complete": "開啟官方 Codex CLI 安裝指南並完成安裝：",
   "ui.official_codex_cli_installation_guide": "Codex CLI 官方安裝指南",
   "ui.run_codex_in_terminal_and_sign_in_with_your_chatgpt_account": "在 Terminal 執行 codex，並用你的 ChatGPT 帳號登入。",
@@ -1376,6 +1382,10 @@ const traditionalChinese: Record<TranslationKey, string> = {
 };
 
 let language: UiLanguage = "zh-TW";
+export function initialUiLanguage(saved: unknown, obsidianLanguage: string): UiLanguage {
+  if (saved === "zh-TW" || saved === "en") return saved;
+  return obsidianLanguage === "zh-TW" ? "zh-TW" : "en";
+}
 export function setUiLanguage(value: UiLanguage): void { language = value; }
 export function getUiLanguage(): UiLanguage { return language; }
 export function t(key: TranslationKey, ...values: unknown[]): string {

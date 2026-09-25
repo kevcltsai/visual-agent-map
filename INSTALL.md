@@ -5,8 +5,7 @@ This guide takes you from installation to your first editable VAM map. VAM is cu
 ## What you need
 
 - Obsidian Desktop 1.13.7 or later.
-- Codex CLI, for creating an editable map and using AI features.
-- A ChatGPT account signed in through Codex CLI. ChatGPT Free can use Codex, with a smaller allowance than paid plans.
+- For AI tasks only: Codex CLI and a ChatGPT account signed in through it. ChatGPT Free can use Codex, with a smaller allowance than paid plans.
 
 VAM does not require an API key. A standalone Codex CLI installation does not require npm; Node.js and npm are only needed when building VAM from source.
 
@@ -26,21 +25,22 @@ VAM does not require an API key. A standalone Codex CLI installation does not re
 
 Do not install files from the repository's `main` branch into a production vault.
 
-## 2. Prepare Codex
+## 2. Start your first map
+
+1. Explore the built-in read-only sample and its five-step tour. On a fresh install, VAM follows Obsidian's language when it is Traditional Chinese or English; other Obsidian languages start in English.
+2. Select **Duplicate to my workspace** to start from the sample, or **Create empty mind map**. You can edit either map without Codex.
+3. Changing VAM's interface language also changes the built-in sample. Your map titles and writing are not translated; VAM-managed Detail headings may update.
+
+## 3. Prepare Codex for AI
 
 1. Install the [Codex CLI](https://developers.openai.com/codex/cli/).
 2. In Terminal, run `codex` and sign in with your ChatGPT account.
 3. Return to VAM. In the built-in sample, select **Check Codex**. You can also use **Settings → Visual Agent Map → Recheck**.
-4. Continue when VAM reports that Codex App Server is ready.
+4. Continue with an AI task when VAM reports that Codex App Server is ready.
 
 VAM never installs or updates Codex CLI for you.
 
-## 3. Start your first map
-
-1. Explore the built-in read-only sample and its five-step tour.
-2. After Codex is ready, select **Duplicate to my workspace** to start from the sample, or **Create empty mind map**.
-3. Select the star on a topic card to open **Next step** and choose your first AI task.
-4. Before that first task runs, VAM shows a one-time notice that AI tasks use your signed-in account's Codex allowance. Canceling does not dismiss the notice permanently.
+Select the star on a topic card to open **Next step** and choose an AI task. Before the first task runs, VAM shows a one-time notice that AI tasks use your signed-in account's Codex allowance. Canceling does not dismiss the notice permanently.
 
 You are ready when you can open an editable map and use the star on a topic card to choose a Codex task and model.
 
@@ -60,8 +60,7 @@ You are ready when you can open an editable map and use the star on a topic card
 ## 需要準備
 
 - Obsidian Desktop 1.13.7 或更新版本。
-- Codex CLI，用於建立可編輯的心智圖與使用 AI 功能。
-- 透過 Codex CLI 登入的 ChatGPT 帳號。ChatGPT Free 可以使用 Codex，但額度比付費方案少。
+- 僅執行 AI 任務時需要 Codex CLI，以及透過它登入的 ChatGPT 帳號。ChatGPT Free 可以使用 Codex，但額度比付費方案少。
 
 VAM 不需要 API key。使用獨立版 Codex CLI 不需要 npm；只有從原始碼建置 VAM 才需要 Node.js 與 npm。
 
@@ -81,21 +80,22 @@ VAM 不需要 API key。使用獨立版 Codex CLI 不需要 npm；只有從原�
 
 正式使用時，不要從 repository 的 `main` branch 安裝檔案。
 
-## 2. 準備 Codex
+## 2. 開始第一張心智圖
+
+1. 先探索內建唯讀範例與五步導覽。全新安裝會依 Obsidian 語言顯示繁體中文或英文；其他 Obsidian 語言先顯示英文。
+2. 選擇 **複製到我的工作區**，或選擇 **建立空白心智圖**。兩者都能在沒有 Codex 的情況下編輯。
+3. 切換 VAM 介面語言也會更換內建範例。你寫的地圖標題與內容不會翻譯；VAM 管理的 Detail 段落標題可能更新。
+
+## 3. 為 AI 任務準備 Codex
 
 1. 安裝 [Codex CLI](https://developers.openai.com/codex/cli/)。
 2. 在 Terminal 執行 `codex`，並使用 ChatGPT 帳號登入。
 3. 回到 VAM，在內建範例選擇 **檢查 Codex**；也可以到 **Settings → Visual Agent Map → 重新檢查**。
-4. VAM 顯示 Codex App Server 已就緒後再繼續。
+4. VAM 顯示 Codex App Server 已就緒後再執行 AI 任務。
 
 VAM 不會自行安裝或更新 Codex CLI。
 
-## 3. 開始第一張心智圖
-
-1. 先探索內建唯讀範例與五步導覽。
-2. Codex 就緒後，選擇 **複製到我的工作區**，或選擇 **建立空白心智圖**。
-3. 點議題卡片上的星星，開啟 **下一步** 並選擇第一個 AI 任務。
-4. 第一次任務執行前，VAM 會一次性提醒 AI 任務會使用登入帳號的 Codex 額度。若取消，下一次執行仍會顯示提醒。
+點議題卡片上的星星，開啟 **下一步** 並選擇 AI 任務。第一次任務執行前，VAM 會一次性提醒 AI 任務會使用登入帳號的 Codex 額度。若取消，下一次執行仍會顯示提醒。
 
 當你能開啟可編輯的心智圖，並從議題卡片的星星選擇 Codex 任務與模型，就代表設定完成。
 

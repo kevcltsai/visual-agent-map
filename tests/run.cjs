@@ -293,11 +293,11 @@ integrationTest('proposal persistence reports disk write failure to the caller',
 test('debug log command opens the custom modal and exposes copy and clear actions', () => {
   const source = fs.readFileSync(path.join(root, 'main.ts'), 'utf8');
   const modal = fs.readFileSync(path.join(root, 'ui/modals/debug-log-modal.ts'), 'utf8');
-  assert.match(source, /id: "open-debug-log"/); assert.match(source, /new DebugLogModal\(this\.app, this\.logs, this\.exchanges/);
+  assert.match(source, /addLocalizedCommand\("open-debug-log"/); assert.match(source, /new DebugLogModal\(this\.app, this\.logs, this\.exchanges/);
   assert.match(modal, /navigator\.clipboard\.writeText/); assert.match(modal, /this\.logs\.clear\(\)/);
   assert.match(modal, /ui\.debug_log/);
   assert.match(modal, /this\.logs\.subscribe/);
-  assert.match(source, /ui\.codex_app_server_is_not_ready_samples_and_non_ai_features_re/);
+  assert.match(source, /codexReadyForAi\(\)/);
   assert.match(source, /ui\.codex_app_server_is_ready_0/);
   assert.match(source, /AI 任務失敗/);
 });
@@ -368,7 +368,7 @@ integrationTest('Next Step returns new expansion requests to the map and reviews
   const tick = () => new Promise(resolve => setTimeout(resolve, 0));
   class Modal { constructor() { this.modalEl = element('modal'); this.titleEl = element('title'); this.contentEl = element('content'); } close() { closed++; this.onClose?.(); } }
   const { NextStepModal } = load('main.ts', { obsidian: { ...obsidian, Modal, setIcon: () => {}, Notice: class { constructor(message) { notices.push(message); } } } });
-  const plugin = { settings: { codexUsageNoticeSeen: true, models: 'gpt-test', cliReasoning: 'low', language: 'en' }, saveSettings: async () => {}, activeTasks: new Map(), sources: { currentTopicId: 'current', currentLabel: 'Current topic included', synthesisLabel: 'Current topic and child topics included', topics: async () => [], readTopic: async () => [] } };
+  const plugin = { settings: { codexUsageNoticeSeen: true, models: 'gpt-test', cliReasoning: 'low', language: 'en' }, codexReadyForAi: () => true, saveSettings: async () => {}, activeTasks: new Map(), sources: { currentTopicId: 'current', currentLabel: 'Current topic included', synthesisLabel: 'Current topic and child topics included', topics: async () => [], readTopic: async () => [] } };
   const modelSettings = { model: 'gpt-test', modelSource: 'workspace', reasoning: 'low', save: async () => {}, sources: plugin.sources };
   const modal = new NextStepModal({}, 'Parent', 'normal', 1, 1, plugin,
     async options => { researchOptions = options; },
@@ -452,14 +452,14 @@ integrationTest('Next Step returns new expansion requests to the map and reviews
   failedResearch.onOpen(); button(failedResearch.contentEl, '確認研究任務').click(); await tick();
   assert.equal(closed, 3); assert.equal(all(failedResearch.contentEl, item => item.cls.includes('vam-next-research'))[0].querySelector('.vam-next-status').text, 'Cannot start');
   let acknowledged = 0, began = 0;
-  const firstUsePlugin = { settings: { codexUsageNoticeSeen: false }, saveSettings: async () => { acknowledged++; } };
+  const firstUsePlugin = { settings: { codexUsageNoticeSeen: false }, codexReadyForAi: () => true, saveSettings: async () => { acknowledged++; } };
   const firstUse = new NextStepModal({}, 'Parent', 'normal', 1, 0, firstUsePlugin, async () => { began++; }, async () => {}, async () => {});
   firstUse.onOpen(); button(firstUse.contentEl, '確認研究任務').click(); await tick();
   assert.equal(began, 0); assert.ok(button(firstUse.contentEl, '了解並執行')); assert.equal(closed, 3);
   button(firstUse.contentEl, '了解並執行').click(); await tick();
   assert.equal(began, 1); assert.equal(acknowledged, 1); assert.equal(closed, 4);
   let pendingCalls = 0;
-  const pendingPlugin = { settings: { codexUsageNoticeSeen: false }, saveSettings: async () => {} };
+  const pendingPlugin = { settings: { codexUsageNoticeSeen: false }, codexReadyForAi: () => true, saveSettings: async () => {} };
   const pendingModal = new NextStepModal({}, 'Parent', 'normal', 1, 1, pendingPlugin, async () => {}, async (_options, _direction, found) => { pendingCalls++; found([{ title: 'Existing', task: 'Research', contribution: '', parentTitle: '' }], async () => {}); }, async () => {});
   pendingModal.onOpen(); find(pendingModal.contentEl, item => item.cls === 'vam-next-cards').children[1].click();
   button(pendingModal.contentEl, '查看 AI 子議題建議').click(); await tick();
@@ -505,7 +505,7 @@ integrationTest('Next Step returns new expansion requests to the map and reviews
   assert.equal(guidedFinished, true); assert.equal(button(guidedModal.contentEl, '建立子議題'), undefined);
   const settingsWrites = []; let researchAfterSave = false;
   const settingsModal = new NextStepModal({}, 'Parent', 'normal', 0, 0,
-    { settings: { codexUsageNoticeSeen: true, models: 'model-a,model-b' }, saveSettings: async () => {} },
+    { settings: { codexUsageNoticeSeen: true, models: 'model-a,model-b' }, codexReadyForAi: () => true, saveSettings: async () => {} },
     async () => { researchAfterSave = settingsWrites.length === 2; }, async () => {}, async () => {},
     { model: 'model-a', modelSource: 'workspace', reasoning: 'low', save: async patch => { settingsWrites.push(patch); } });
   settingsModal.onOpen();
@@ -1541,18 +1541,25 @@ integrationTest('duplicating the built-in sample creates an independent editable
   assert.ok(synthesis.sourcePaths.every(source => source.startsWith('Agent Workspace/Topics/')));
   assert.ok(app.vault.getAbstractFileByPath('Agent Workspace/Topics/範例：台灣旅行規劃/Attachments/east-coast-landscape.webp'));
 });
-test('onboarding uses an embedded sample and explicit workspace repair without a dismiss-and-create-nothing path', () => {
-  const source = fs.readFileSync(path.join(root, 'main.ts'), 'utf8');
-  assert.doesNotMatch(source, /class FirstUseModal|id: "open-onboarding"|稍後再說/);
-  assert.match(source, /id: "open-built-in-sample"/);
-  assert.match(source, /id: "repair-workspace"/);
-  assert.match(source, /this\.workspaceRecoveryCandidates = await this\.repo\.workspaceCandidates\(\)/);
-  assert.match(source, /if \(!this\.workspaceRecoveryCandidates\.length\) \{ await this\.repo\.ensureWorkspace\(\)/);
-  assert.match(source, /id: "reconnect-workspace"/);
-  assert.match(source, /vam-sample-start/);
-  assert.match(source, /ui\.codex_is_ready_duplicate_the_sample_or_create_an_empty_mind/);
-  assert.match(source, /this\.plugin\.settings\.models\.trim\(\)/);
-  assert.match(source, /else if \(this\.map\)/);
+test('first-use map view waits for async initialization and opens the official Sample once', async () => {
+  const { VisualAgentMapView } = load('main.ts', { obsidian });
+  let resolveReady, pending = true, opened = 0;
+  const ready = new Promise(resolve => { resolveReady = resolve; });
+  const plugin = {
+    ready,
+    consumeFirstInstallSample() { const value = pending; pending = false; return value; },
+    repo: { workspaceExists: () => false, mapFiles: async () => [] }
+  };
+  const view = new VisualAgentMapView({ app: {} }, plugin);
+  view.contentEl = { addClass() {} }; view.registerDomEvent = () => {};
+  view.openBuiltInSample = async () => { opened++; view.builtIn = true; };
+  const opening = view.onOpen();
+  await Promise.resolve();
+  assert.equal(opened, 0, 'the view must not read workspace data before initialization completes');
+  resolveReady(); await opening;
+  assert.equal(pending, false);
+  assert.equal(opened, 1);
+  assert.equal(view.builtIn, true);
 });
 test('the first real AI task requires a one-time Codex allowance acknowledgement', () => {
   const source = fs.readFileSync(path.join(root, 'main.ts'), 'utf8');
@@ -1596,7 +1603,7 @@ test('missing Codex opens an in-product setup guide with official installation a
   const source = fs.readFileSync(path.join(root, 'main.ts'), 'utf8');
   assert.match(source, /class CodexSetupModal/);
   assert.match(source, /https:\/\/developers\.openai\.com\/codex\/cli\//);
-  assert.match(source, /ui\.vam_needs_codex_cli_to_create_your_first_editable_mind_map_a/);
+  assert.match(source, /ui\.codex_setup_for_ai_only/);
   assert.match(source, /ui\.no_api_key_is_required_the_standalone_codex_cli_does_not_req/);
   assert.match(source, /ui\.no_api_key_is_required_the_standalone_codex_cli_does_not_req/);
   assert.match(source, /ui\.run_codex_in_terminal_and_sign_in_with_your_chatgpt_account/);
@@ -2036,6 +2043,71 @@ integrationTest('dragging synthesized roots persists coordinates and removal pre
 });
 test('UI language switch translates stable semantic keys and placeholders', () => {
   const {t,setUiLanguage,translate}=load('i18n.ts');setUiLanguage('en');assert.equal(t('ui.interface_language'),'Interface language');assert.equal(t('ui.expand_0',3),'Expand 3');assert.equal(translate('en','detail.core_conclusions'),'Core conclusions');assert.equal(translate('zh-TW','detail.core_conclusions'),'核心結論');setUiLanguage('zh-TW');assert.equal(t('ui.interface_language'),'介面語言');
+});
+test('first install follows Obsidian language while existing VAM choice wins', () => {
+  const { initialUiLanguage } = load('i18n.ts');
+  assert.equal(initialUiLanguage(undefined, 'zh-TW'), 'zh-TW');
+  assert.equal(initialUiLanguage(undefined, 'en'), 'en');
+  assert.equal(initialUiLanguage(undefined, 'fr'), 'en');
+  assert.equal(initialUiLanguage('en', 'zh-TW'), 'en');
+  assert.equal(initialUiLanguage('zh-TW', 'en'), 'zh-TW');
+});
+test('changing the language uses the real setting callback and refreshes map and command labels', async () => {
+  const { default: Plugin, VisualAgentMapSettingTab } = load('main.ts', { obsidian });
+  const plugin = new Plugin();
+  const calls = [];
+  plugin.settings = { ...DEFAULT_SETTINGS, language: 'en' };
+  plugin.saveSettings = async () => calls.push(['save', plugin.settings.language]);
+  plugin.repo = { syncManagedDetailHeadings: async language => { calls.push(['headings', language]); return 0; } };
+  plugin.views = () => [{ refreshFromPlugin: async () => calls.push(['view', plugin.settings.language]) }];
+  plugin.refreshLocalizedEntrypoints = () => calls.push(['commands', plugin.settings.language]);
+  const tab = new VisualAgentMapSettingTab({}, plugin);
+  tab.update = () => calls.push(['settings', plugin.settings.language]);
+  await tab.setControlValue('language', 'zh-TW');
+  assert.equal(plugin.settings.language, 'zh-TW');
+  assert.deepEqual(calls, [['save', 'zh-TW'], ['commands', 'zh-TW'], ['headings', 'zh-TW'], ['view', 'zh-TW'], ['settings', 'zh-TW']]);
+  calls.length = 0;
+  await tab.setControlValue('language', 'en');
+  assert.equal(plugin.settings.language, 'en');
+  assert.equal(calls.filter(([kind]) => kind === 'commands').length, 1);
+  assert.equal(calls.filter(([kind]) => kind === 'view').length, 1);
+});
+test('AI entry prompts for Codex only when unavailable and leaves manual work available', async () => {
+  const { default: Plugin } = load('main.ts', { obsidian });
+  const plugin = new Plugin(); let guides = 0;
+  plugin.settings = { ...DEFAULT_SETTINGS, models: '' };
+  plugin.openCodexSetupGuide = () => { guides++; };
+  plugin.codexDiagnostic = () => ({ installed: false });
+  assert.equal(await plugin.codexReadyForAi(), false);
+  assert.equal(guides, 1);
+  plugin.codexDiagnostic = () => ({ installed: true });
+  plugin.refreshCodexModels = async () => { plugin.settings.models = 'gpt-test'; };
+  assert.equal(await plugin.codexReadyForAi(), true);
+  plugin.settings.models = 'gpt-test';
+  assert.equal(await plugin.codexReadyForAi(), true);
+  assert.equal(guides, 1);
+});
+test('localized command and ribbon labels follow the selected VAM language', () => {
+  const { default: Plugin } = load('main.ts', { obsidian });
+  const plugin = new Plugin(), attributes = {}, command = { name: '' };
+  plugin.ribbonIcon = { setAttribute: (key, value) => { attributes[key] = value; } };
+  plugin.localizedCommands = [{ command, key: 'ui.open_map' }];
+  plugin.settings = { ...DEFAULT_SETTINGS, language: 'en' }; plugin.refreshLocalizedEntrypoints();
+  assert.equal(command.name, 'Open mind map');
+  assert.equal(attributes['aria-label'], 'Open mind map');
+  plugin.settings.language = 'zh-TW'; plugin.refreshLocalizedEntrypoints();
+  assert.equal(command.name, '開啟心智圖');
+});
+test('map switch closes only the VAM note that remains in its right pane and clears Obsidian Outline', () => {
+  class MarkdownView { constructor(path) { this.file = { path }; } }
+  const { default: Plugin } = load('main.ts', { obsidian: { ...obsidian, MarkdownView } });
+  const plugin = new Plugin(); let closed = 0, fileCleared = 0, synchronized = 0; plugin.app = { workspace: { activeLeaf: { id: 'map-view' }, trigger: (event, leaf) => { if (event === 'file-open') { assert.equal(leaf, null); fileCleared++; } else { assert.equal(event, 'active-leaf-change'); assert.equal(leaf.id, 'map-view'); synchronized++; } } } };
+  plugin.detailsPath = 'old-note.md';
+  plugin.detailsLeaf = { view: new MarkdownView('other-user-note.md'), detach: () => { closed++; } };
+  plugin.closeStaleDetails(); assert.equal(closed, 0); assert.equal(fileCleared, 0); assert.equal(synchronized, 0);
+  plugin.detailsPath = 'old-note.md';
+  plugin.detailsLeaf = { view: new MarkdownView('old-note.md'), detach: () => { closed++; } };
+  plugin.closeStaleDetails(); assert.equal(closed, 1); assert.equal(fileCleared, 1); assert.equal(synchronized, 1);
 });
 test('topic status labels follow the selected UI language after startup', () => {
   const {topicStatusLabel}=load('i18n.ts');

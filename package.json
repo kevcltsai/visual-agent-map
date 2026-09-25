@@ -1,6 +1,6 @@
 {
   "name": "visual-agent-map",
-  "version": "0.9.5",
+  "version": "0.9.6",
   "private": true,
   "scripts": {
     "dev": "node esbuild.config.mjs",
@@ -16,6 +16,7 @@
     "test": "node scripts/test-harness.mjs",
     "test:unit": "npm run compile:sample && node tests/run.cjs --layer=unit",
     "test:integration": "node tests/run.cjs --layer=integration && node --test tests/test-vault.mjs",
+    "test:runtime": "node scripts/test-runtime.mjs",
     "test:ui": "node scripts/test-harness.mjs --ui",
     "test:ui:prepare": "node scripts/test-harness.mjs --prepare",
     "test:ui:update": "node scripts/test-harness.mjs --update-current"

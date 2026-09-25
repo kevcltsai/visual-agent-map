@@ -24,7 +24,7 @@ export function verifyTestVault(vault, artifact = root) {
   if (JSON.stringify(enabled) !== JSON.stringify([manifest.id])) throw new Error("Plugin enablement mismatch.");
   if (record.profile !== "onboarding") {
     const settings = json(join(plugin, "data.json"));
-    if (!settings.workspaceInitialized || settings.workspaceFolder !== record.workspaceRoot || !existsSync(join(vault, settings.workspaceFolder, "Topics/Taiwan Travel Regression/Map.md"))) throw new Error("Fixture/settings mismatch.");
+    if (!settings.workspaceInitialized || settings.workspaceFolder !== record.workspaceRoot || !existsSync(join(vault, settings.workspaceFolder, "Topics/Taiwan Travel Regression (zh-TW test fixture)/Map.md"))) throw new Error("Fixture/settings mismatch.");
     if (!existsSync(join(vault, settings.workspaceFolder, "Topics/Local Source Fixture/Map.md"))) throw new Error("Local-source fixture missing.");
   }
   return record;
@@ -92,7 +92,7 @@ export function prepareObsidianProfile(vault, runtime) {
   const directory = join(vault, ".vam-app");
   mkdirSync(directory);
   const id = hash(resolve(vault)).slice(0, 16);
-  writeFileSync(join(directory, "obsidian.json"), JSON.stringify({ vaults: { [id]: { path: resolve(vault), ts: 0, open: true } }, updateDisabled: true }, null, 2));
+  writeFileSync(join(directory, "obsidian.json"), JSON.stringify({ vaults: { [id]: { path: resolve(vault), ts: 0, open: true } }, updateDisabled: true, cli: true }, null, 2));
   if (runtime) {
     const destination = join(directory, `obsidian-${runtime.version}.asar`);
     copyFileSync(runtime.path, destination);

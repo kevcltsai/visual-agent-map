@@ -58,13 +58,13 @@ function workspaceHashes(workspace) {
 
 if (requested !== "onboarding") {
   const workspace = join(vault, workspaceRoot);
-  const topicRoot = join(workspace, "Topics", "Taiwan Travel Regression");
+  const topicRoot = join(workspace, "Topics", "Taiwan Travel Regression (zh-TW test fixture)");
   mkdirSync(join(topicRoot, "Unassigned"), { recursive: true });
   mkdirSync(join(topicRoot, "Archive"), { recursive: true });
   mkdirSync(join(workspace, "Inbox"), { recursive: true });
   cpSync(join(root, "samples/taiwan-travel/zh-TW/Notes"), join(topicRoot, "Notes"), { recursive: true });
   cpSync(join(root, "samples/taiwan-travel/Attachments"), join(topicRoot, "Attachments"), { recursive: true, filter: source => statSync(source).isDirectory() || source.endsWith(".webp") });
-  const notePrefix = `${workspaceRoot}/Topics/Taiwan Travel Regression/Notes/`;
+  const notePrefix = `${workspaceRoot}/Topics/Taiwan Travel Regression (zh-TW test fixture)/Notes/`;
   const map = readFileSync(join(root, "samples/taiwan-travel/zh-TW/Map.md"), "utf8").replaceAll('"Notes/', `"${notePrefix}`);
   writeFileSync(join(topicRoot, "Map.md"), map);
   for (const path of filesBelow(join(topicRoot, "Notes"))) writeFileSync(path, readFileSync(path, "utf8").replaceAll("Notes/", notePrefix));

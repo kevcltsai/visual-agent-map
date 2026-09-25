@@ -1,7 +1,7 @@
 {
   "id": "visual-agent-map",
   "name": "Visual Agent Map",
-  "version": "0.9.5",
+  "version": "0.9.6",
   "minAppVersion": "1.13.7",
   "description": "Research complex topics with Codex in a visual map and keep every result as editable Markdown.",
   "author": "Kevin Tsai",

@@ -3,7 +3,7 @@
   "name": "Visual Agent Map",
   "version": "0.9.5",
   "minAppVersion": "1.13.7",
-  "description": "Explore topics with asynchronous AI tasks in a visual map backed by Markdown notes.",
+  "description": "Research complex topics with Codex in a visual map and keep every result as editable Markdown.",
   "author": "Kevin Tsai",
   "isDesktopOnly": true
 }

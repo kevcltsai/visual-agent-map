@@ -33,7 +33,7 @@ Research and map expansion use web-enabled Codex tasks. Synthesis uses direct ch
 
 In **Obsidian Desktop → Settings → Community plugins → Browse**, search for **Visual Agent Map** and install it.
 
-**Requirements:** Obsidian Desktop `1.13.7` or later. Manual maps work without Codex. AI tasks require a locally installed [Codex CLI](https://developers.openai.com/codex/cli/) signed in with ChatGPT; ChatGPT Free is supported with a smaller Codex allowance. This is a desktop-only plugin; npm is needed only to build from source. Current version: **0.9.6**.
+**Requirements:** Obsidian Desktop `1.13.7` or later. Manual maps work without Codex. AI tasks require a locally installed [Codex CLI](https://developers.openai.com/codex/cli/) signed in with ChatGPT; ChatGPT Free is supported with a smaller Codex allowance. This is a desktop-only plugin; npm is needed only to build from source. Current version: **0.9.7**.
 
 For manual installation, download `main.js`, `manifest.json`, and `styles.css` from the same [GitHub Release](https://github.com/kevcltsai/visual-agent-map/releases), place them in `<your-vault>/.obsidian/plugins/visual-agent-map/`, and preserve any existing `data.json`. Reload Obsidian and enable the plugin. Confirm the Codex CLI path and App Server status in settings before using AI. Do not install files from a branch, copy the repository into the plugin folder, or run `npm install` there. See [INSTALL.md](INSTALL.md) for first-use steps.
 
@@ -89,7 +89,7 @@ Copyright © 2026 Kevin Tsai. Licensed under [AGPL-3.0-only](LICENSE).
 
 在 **Obsidian 桌面版 → 設定 → 第三方外掛 → 瀏覽** 搜尋並安裝 **Visual Agent Map**。
 
-**系統需求：** Obsidian 桌面版 `1.13.7` 或更新版本。手動建立地圖不需要 Codex；AI 任務需要本機安裝 [Codex CLI](https://developers.openai.com/codex/cli/) 並以 ChatGPT 登入。ChatGPT Free 可使用，但 Codex 額度較少。外掛僅支援桌面版；只有從原始碼建置才需要 npm。目前版本：**0.9.6**。
+**系統需求：** Obsidian 桌面版 `1.13.7` 或更新版本。手動建立地圖不需要 Codex；AI 任務需要本機安裝 [Codex CLI](https://developers.openai.com/codex/cli/) 並以 ChatGPT 登入。ChatGPT Free 可使用，但 Codex 額度較少。外掛僅支援桌面版；只有從原始碼建置才需要 npm。目前版本：**0.9.7**。
 
 若要手動安裝，請從同一個 [GitHub Release](https://github.com/kevcltsai/visual-agent-map/releases) 下載 `main.js`、`manifest.json`、`styles.css`，放入 `<你的-vault>/.obsidian/plugins/visual-agent-map/`，並保留既有的 `data.json`。重新載入 Obsidian 並啟用外掛；使用 AI 前再到設定確認 Codex CLI 路徑及 App Server 狀態。不要使用 branch 上的檔案、複製整個 repository 至外掛資料夾，或在該資料夾執行 `npm install`。首次使用步驟請見 [INSTALL.md](INSTALL.md)。
 

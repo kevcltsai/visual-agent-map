@@ -64,7 +64,7 @@ export interface LegacyMigrationPlan {
 }
 
 export const DEFAULT_SETTINGS: Settings = {
-  language: "zh-TW",
+  language: "en",
   workspaceFolder: "Agent Workspace",
   topicsFolder: "Agent Workspace/Topics",
   inboxFolder: "Agent Workspace/Inbox",
@@ -94,11 +94,6 @@ const REFERENCE_END = "<!-- visual-agent-map:references:end -->";
 const DETAIL_START = "<!-- visual-agent-map:detail:start -->";
 const DETAIL_END = "<!-- visual-agent-map:detail:end -->";
 const NOTE_CSS_CLASS = "visual-agent-map-node";
-const MANAGED_DETAIL_HEADINGS: Record<NoteLanguage, readonly string[]> = {
-  "zh-TW": ["核心結論", "關鍵知識", "證據與來源", "取捨與限制", "待確認事項", "更新紀錄"],
-  en: ["Core conclusions", "Key knowledge", "Evidence and sources", "Tradeoffs and limitations", "Open questions", "Update log"]
-};
-
 function marker(value: unknown): boolean { return value === true || value === "true"; }
 function text(value: unknown, fallback = ""): string { return typeof value === "string" ? value : fallback; }
 function parentPath(path: string): string { return path.includes("/") ? path.slice(0, path.lastIndexOf("/")) : ""; }
@@ -291,30 +286,6 @@ function noteLink(path: string): string { return path.replace(/\.md$/, "").repla
 export class Repository {
   constructor(readonly app: App, readonly settings: Settings) {}
 
-  async syncManagedDetailHeadings(language: NoteLanguage): Promise<number> {
-    const target = MANAGED_DETAIL_HEADINGS[language === "en" ? "en" : "zh-TW"];
-    const replacements = new Map([...MANAGED_DETAIL_HEADINGS["zh-TW"], ...MANAGED_DETAIL_HEADINGS.en].map((heading, index) => [heading, target[index % target.length]]));
-    let changed = 0;
-    for (const file of this.app.vault.getMarkdownFiles()) {
-      await this.app.vault.process(file, content => {
-        const cachedMarker = this.app.metadataCache.getFileCache(file)?.frontmatter?.["agent-map-node"] as unknown;
-        const textualMarker = /^---\r?\n([\s\S]*?)\r?\n---(?:\r?\n|$)/.exec(content)?.[1]?.split(/\r?\n/).some(line => /^\s*["']?agent-map-node["']?:\s*(?:true|["']true["'])\s*$/.test(line));
-        if (!marker(cachedMarker) && !textualMarker) return content;
-        const start = content.indexOf(DETAIL_START), end = content.indexOf(DETAIL_END);
-        if (start < 0 || end <= start) return content;
-        const before = content.slice(start + DETAIL_START.length), managed = before.slice(0, end - start - DETAIL_START.length);
-        const next = managed.replace(/^### ([^\r\n]+)[ \t]*$/gm, (line, heading: string) => {
-          const replacement = replacements.get(heading);
-          return replacement ? `### ${replacement}` : line;
-        });
-        if (next === managed) return content;
-        changed++;
-        const blockStart = start + DETAIL_START.length;
-        return `${content.slice(0, blockStart)}${next}${content.slice(end)}`;
-      });
-    }
-    return changed;
-  }
   private message(key: TranslationKey): string { return translate(this.settings.language, key); }
 
   file(path: string): TFile {

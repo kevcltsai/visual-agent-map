@@ -3,7 +3,10 @@ const english = {
   "ui.open_map": "Open mind map",
   "ui.my_editable_mind_map": "My editable mind map",
   "ui.sample_start_hint": "Duplicate this sample or create an empty mind map to start. Codex is only needed for AI tasks.",
-  "ui.language_changed_content_preserved": "Interface and official sample are now in English. Your map titles and writing are not translated; VAM-managed Detail headings may update.",
+  "ui.language_changed_content_preserved": "Interface and official sample are now in English. Existing map titles and notes are unchanged.",
+  "ui.language_change_save_failed": "Could not save the language setting. The previous language is still active.",
+  "ui.language_view_refresh_failed": "An open Visual Agent Map view could not refresh after the language change.",
+  "ui.language_change_partial_failure": "The language setting was saved, but an open view did not refresh. Close and reopen that view.",
   "ui.codex_required_for_ai": "Set up Codex before running an AI task. You can keep editing this mind map manually.",
   "ui.codex_setup_for_ai_only": "Codex CLI is needed for AI tasks. You can create and edit mind maps without it. ChatGPT Free is supported with a smaller Codex allowance.",
   "ui.to_research": "To research",
@@ -471,7 +474,7 @@ const english = {
   "ui.ai_proposes_3_7_subtopics_nodes_are_created_only_after_your": "AI proposes 3–7 subtopics. Nodes are created only after your confirmation.\n\nAI rules for this task:\n{0}",
   "ui.ai_reads_0_direct_subtopics_and_updates_current_understandin": "AI reads {0} direct subtopics and updates current understanding and Markdown details.\n\nAI rules for this task:\n{1}",
   "ui.official_sample_read_only": "Official sample · Read-only",
-  "ui.sample_taiwan_travel_plan": "Sample: Taiwan Travel Plan",
+  "ui.sample_taiwan_travel_plan": "Sample: Planning a Taiwan Journey",
   "ui.official_read_only_sample": "Official read-only sample",
   "ui.duplicate_to_my_workspace": "Duplicate to my workspace",
   "ui.1_5_start_with_the_question": "1 / 5  Start with the question",
@@ -630,7 +633,6 @@ const english = {
   "detail.purpose": "Purpose: {0}",
   "detail.palette": "Palette: {0}",
   "detail.reusable_formula": "Reusable formula: {0}",
-  "ui.detail_headings_synced_0_notes": "Updated standard section headings in {0} VAM notes.",
   "research.fast": "Quick overview: answer the core question first and briefly list key evidence and gaps; do not conduct a full investigation.",
   "research.normal": "Normal research: provide the main evidence, limitations, and open questions needed to support the conclusion.",
   "research.deep": "Deep research: compare sources for agreement and disagreement, and detail key evidence, limitations, and open questions.",
@@ -696,7 +698,10 @@ const traditionalChinese: Record<TranslationKey, string> = {
   "ui.open_map": "開啟心智圖",
   "ui.my_editable_mind_map": "我的可編輯心智圖",
   "ui.sample_start_hint": "複製這份範例或建立空白心智圖即可開始；只有 AI 任務需要 Codex。",
-  "ui.language_changed_content_preserved": "介面與官方範例已切換為繁體中文。你寫的地圖標題與內容不會翻譯；VAM 管理的 Detail 段落標題可能更新。",
+  "ui.language_changed_content_preserved": "介面與官方範例已切換為繁體中文。既有地圖標題與筆記內容不會變更。",
+  "ui.language_change_save_failed": "無法儲存介面語言；目前仍使用原語言。",
+  "ui.language_view_refresh_failed": "有一個已開啟的 Visual Agent Map 畫面未能套用語言變更。",
+  "ui.language_change_partial_failure": "語言設定已儲存，但有開啟中的畫面未能更新。請關閉後重新開啟該畫面。",
   "ui.codex_required_for_ai": "執行 AI 任務前請先設定 Codex；你仍可手動編輯這張心智圖。",
   "ui.codex_setup_for_ai_only": "只有 AI 任務需要 Codex CLI；沒有 Codex 也能建立和編輯心智圖。ChatGPT Free 也可使用，但 Codex 額度較少。",
   "ui.to_research": "待研究",
@@ -1323,7 +1328,6 @@ const traditionalChinese: Record<TranslationKey, string> = {
   "detail.purpose": "用途：{0}",
   "detail.palette": "配色：{0}",
   "detail.reusable_formula": "可套用公式：{0}",
-  "ui.detail_headings_synced_0_notes": "已更新 {0} 份 VAM 筆記的標準章節標題。",
   "research.fast": "快速概覽：先回答核心問題，簡短列出關鍵依據與缺口；不要做完整調查。",
   "research.normal": "一般研究：提供足以支持結論的主要證據、限制與待確認事項。",
   "research.deep": "深入研究：檢查來源間的一致與分歧，詳列重要證據、限制與待查問題。",
@@ -1381,10 +1385,10 @@ const traditionalChinese: Record<TranslationKey, string> = {
   "ui.map_file_description": "此檔案保存心智圖結構；完整內容保存在各議題筆記。從檔案選單選擇「以心智圖開啟」。",
 };
 
-let language: UiLanguage = "zh-TW";
-export function initialUiLanguage(saved: unknown, obsidianLanguage: string): UiLanguage {
+let language: UiLanguage = "en";
+export function initialUiLanguage(saved: unknown): UiLanguage {
   if (saved === "zh-TW" || saved === "en") return saved;
-  return obsidianLanguage === "zh-TW" ? "zh-TW" : "en";
+  return "en";
 }
 export function setUiLanguage(value: UiLanguage): void { language = value; }
 export function getUiLanguage(): UiLanguage { return language; }
@@ -1392,10 +1396,11 @@ export function t(key: TranslationKey, ...values: unknown[]): string {
   return translate(language, key, ...values);
 }
 export function translate(locale: UiLanguage, key: TranslationKey, ...values: unknown[]): string {
-  const translated: string = locale === "en" ? english[key] : traditionalChinese[key];
+  const selected: string | undefined = locale === "en" ? english[key] : traditionalChinese[key];
+  const translated = selected || english[key] || String(key);
   return translated.replace(/\{(\d+)\}/g, (_, index: string) => {
     const value = values[Number(index)];
-    return typeof value === "string" || typeof value === "number" || typeof value === "boolean" ? String(value) : "";
+    return typeof value === "string" || typeof value === "number" || typeof value === "boolean" ? String(value) : `{${index}}`;
   });
 }
 

@@ -1,5 +1,5 @@
 import { t, setUiLanguage, topicStatusLabel, translate, initialUiLanguage, type TranslationKey } from "./i18n";
-import { App, MarkdownRenderer, FileSystemAdapter, ItemView, MarkdownView, Modal, Notice, Plugin, PluginSettingTab, Setting, TFile, WorkspaceLeaf, getLanguage, type Command, type SettingDefinitionItem } from "obsidian";
+import { App, MarkdownRenderer, FileSystemAdapter, ItemView, MarkdownView, Modal, Notice, Plugin, PluginSettingTab, Setting, TFile, WorkspaceLeaf, type Command, type SettingDefinitionItem } from "obsidian";
 import { ReferencePicker, type ReferenceTopic } from "./ui/reference-picker";
 import { packReferenceChunks, readMarkdownFile, referenceBatches, type ReferenceGroup } from "./ai/reference-materials";
 import { NameModal } from "./ui/modals/name-modal";
@@ -617,7 +617,7 @@ export class VisualAgentMapView extends ItemView {
   getIcon(): string { return "git-fork"; }
   getState(): Record<string, unknown> { return this.builtIn ? { sample: BUILTIN_SAMPLE_ID } : { file: this.path }; }
   async setState(state: Record<string, unknown>, result: { history: boolean }): Promise<void> {
-    if (state.sample === BUILTIN_SAMPLE_ID) await this.openBuiltInSample();
+    if (state.sample === BUILTIN_SAMPLE_ID && !this.builtIn) await this.openBuiltInSample();
     else if (typeof state.file === "string" && state.file !== this.path) await this.openMap(state.file);
     await super.setState(state, result);
   }
@@ -636,7 +636,27 @@ export class VisualAgentMapView extends ItemView {
     }
   }
   async onClose(): Promise<void> { this.closed = true; if (this.refreshTimer !== null) window.clearTimeout(this.refreshTimer); if (this.hoverTimer !== null) window.clearTimeout(this.hoverTimer); this.hoverCard?.remove(); if (this.viewportTimer !== null) { window.clearTimeout(this.viewportTimer); await this.persist(); } }
-  async refreshFromPlugin(): Promise<void> { if (this.builtIn) { await this.openBuiltInSample(this.showSampleTour); return; } await this.hydrate(); this.render(); }
+  async refreshFromPlugin(): Promise<void> {
+    if (this.builtIn) {
+      const sample = builtInSample(this.plugin.settings.language);
+      if (this.map) sample.map.viewport = { ...this.map.viewport };
+      this.map = sample.map; this.notes = sample.notes; this.renderPreservingFocus(); return;
+    }
+    await this.hydrate(); this.renderPreservingFocus();
+  }
+  private renderPreservingFocus(): void {
+    if (typeof document === "undefined" || !this.contentEl.contains(document.activeElement)) { this.render(); return; }
+    const focusedContainer = document.activeElement === this.contentEl;
+    const before = Array.from(this.contentEl.querySelectorAll<HTMLElement>("button, input, select, textarea, [tabindex]:not([tabindex='-1'])"));
+    const activeIndex = before.indexOf(document.activeElement as HTMLElement);
+    const active = document.activeElement as HTMLInputElement;
+    const selection = active.tagName === "INPUT" || active.tagName === "TEXTAREA" ? [active.selectionStart, active.selectionEnd] as const : null;
+    this.render();
+    const after = Array.from(this.contentEl.querySelectorAll<HTMLElement>("button, input, select, textarea, [tabindex]:not([tabindex='-1'])"));
+    const target = after[activeIndex];
+    if (focusedContainer) this.contentEl.focus(); else target?.focus();
+    if (selection && (target?.tagName === "INPUT" || target?.tagName === "TEXTAREA") && selection[0] !== null && selection[1] !== null) (target as HTMLInputElement).setSelectionRange(selection[0], selection[1]);
+  }
   syncOutline(): void { this.plugin.syncOutline(this.builtIn ? null : this.map, this.notes); }
   private enqueue(work: () => Promise<void>): void { void this.plugin.mutate(work).catch(() => {}); }
   private async persist(): Promise<void> { if (!this.builtIn && this.map && this.path) await this.plugin.repo.saveMap(this.path, this.map); }
@@ -1773,12 +1793,30 @@ export class VisualAgentMapView extends ItemView {
 }
 export class VisualAgentMapSettingTab extends PluginSettingTab {
   constructor(app: App, private plugin: VisualAgentMapPlugin) { super(app, plugin); }
+  refreshAfterLanguageChange(): void {
+    const focused = typeof document !== "undefined" && document.activeElement && this.containerEl.contains(document.activeElement)
+      && document.activeElement.instanceOf(HTMLSelectElement)
+      && Array.from(document.activeElement.options).some(option => option.value === "zh-TW")
+      && Array.from(document.activeElement.options).some(option => option.value === "en");
+    this.update();
+    if (!focused) return;
+    const selector = Array.from(this.containerEl.querySelectorAll<HTMLSelectElement>("select")).find(select => {
+      const values = Array.from(select.options).map(option => option.value);
+      return values.includes("en") && values.includes("zh-TW");
+    });
+    selector?.focus();
+  }
   getSettingDefinitions(): SettingDefinitionItem[] {
     const text = (name: string, key: "codexPath", desc: string): SettingDefinitionItem => ({ name, desc, control: { type: "text", key } });
     const diagnostic = this.plugin.codexDiagnostic();
     const models = Object.fromEntries(this.plugin.settings.models.split(/[,\n]/).map(model => model.trim()).filter(Boolean).map(model => [model, model]));
     return [
-      { name: t("ui.interface_language"), control: { type: "dropdown", key: "language", options: { "zh-TW": "繁體中文", en: "English" } } },
+      { name: t("ui.interface_language"), render: setting => {
+        setting.setName(t("ui.interface_language")).addDropdown(dropdown => {
+          dropdown.addOption("en", "English").addOption("zh-TW", "繁體中文").setValue(this.plugin.settings.language).setDisabled(this.plugin.languageSwitchPending);
+          dropdown.onChange(value => { void this.plugin.changeLanguage(value); });
+        });
+      } },
       text(t("ui.codex_cli_path"), "codexPath", t("ui.vam_uses_this_executable_to_start_codex_app_server")),
       { name: t("ui.workspace_default_model"), desc: t("ui.models_are_loaded_from_codex_app_server_changes_apply_only_t"), control: { type: "dropdown", key: "cliModel", options: models } },
       { name: t("ui.ai_reasoning_level"), desc: t("ui.auto_uses_low_for_simple_tasks_and_medium_for_complex_synthe"), control: { type: "dropdown", key: "cliReasoning", options: { auto: t("ui.auto"), low: t("ui.low"), medium: t("ui.medium"), high: t("ui.high") } } },
@@ -1795,22 +1833,12 @@ export class VisualAgentMapSettingTab extends PluginSettingTab {
     ];
   }
   async setControlValue(key: string, value: unknown): Promise<void> {
-    const languageChanged = key === "language" && this.plugin.settings.language !== (value === "en" ? "en" : "zh-TW");
-    if (key === "language") this.plugin.settings.language = value === "en" ? "en" : "zh-TW";
+    if (key === "language") { await this.plugin.changeLanguage(value); return; }
     else if (typeof value === "string" && (key === "codexPath" || key === "cliModel")) this.plugin.settings[key] = value.trim();
     else if (key === "cliReasoning") this.plugin.settings.cliReasoning = normalizeReasoningLevel(value);
     else return;
     if (key === "codexPath") this.plugin.resetCodexRuntime();
-    setUiLanguage(this.plugin.settings.language);
     await this.plugin.saveSettings();
-    if (languageChanged) {
-      this.plugin.refreshLocalizedEntrypoints();
-      const updated = await this.plugin.repo.syncManagedDetailHeadings(this.plugin.settings.language);
-      if (updated) new Notice(t("ui.detail_headings_synced_0_notes", updated));
-      for (const view of this.plugin.views()) await view.refreshFromPlugin();
-      this.update();
-      new Notice(t("ui.language_changed_content_preserved"));
-    }
   }
 }
 export default class VisualAgentMapPlugin extends Plugin {
@@ -1837,6 +1865,7 @@ export default class VisualAgentMapPlugin extends Plugin {
   private externalReconcileTimer: number | null = null;
   private firstInstallSamplePending = false;
   private workspaceRecoveryCandidates: string[] = [];
+  languageSwitchPending = false;
   recordFailure(context: string, error: unknown): string {
     const message = error instanceof Error ? error.message : String(error);
     this.logs.appendLog("error", `${context}：${message}`);
@@ -1864,7 +1893,7 @@ export default class VisualAgentMapPlugin extends Plugin {
   async onload(): Promise<void> {
     const saved = await this.loadData() as Partial<Settings> | null;
     const legacy: (Partial<Settings> & { cliPath?: string }) | null = saved;
-    this.settings = { ...DEFAULT_SETTINGS, language: initialUiLanguage(saved?.language, getLanguage()), workspaceFolder: saved?.workspaceFolder || DEFAULT_SETTINGS.workspaceFolder, topicsFolder: saved?.topicsFolder || DEFAULT_SETTINGS.topicsFolder, inboxFolder: saved?.inboxFolder || DEFAULT_SETTINGS.inboxFolder, notesFolder: saved?.notesFolder || DEFAULT_SETTINGS.notesFolder, mapsFolder: saved?.mapsFolder || DEFAULT_SETTINGS.mapsFolder, mapId: saved?.mapId || "default", codexPath: saved?.codexPath || legacy?.cliPath || DEFAULT_SETTINGS.codexPath, cliModel: saved?.cliModel || DEFAULT_SETTINGS.cliModel, cliReasoning: normalizeReasoningLevel(saved?.cliReasoning), previewScale: saved?.previewScale !== undefined ? clampPreviewScale(saved.previewScale) : legacyPreviewScale(saved?.previewSize), models: "", migrated: saved?.migrated === true, structureVersion: saved?.structureVersion ?? (saved ? 1 : DEFAULT_SETTINGS.structureVersion), firstUseNoticeSeen: saved?.firstUseNoticeSeen === true, codexUsageNoticeSeen: saved?.codexUsageNoticeSeen === true, aiExchangeLoggingEnabled: saved?.aiExchangeLoggingEnabled === true, workspaceInitialized: saved ? saved.workspaceInitialized !== false : false, sampleTourVersionSeen: saved?.sampleTourVersionSeen ?? 0 };
+    this.settings = { ...DEFAULT_SETTINGS, language: initialUiLanguage(saved?.language), workspaceFolder: saved?.workspaceFolder || DEFAULT_SETTINGS.workspaceFolder, topicsFolder: saved?.topicsFolder || DEFAULT_SETTINGS.topicsFolder, inboxFolder: saved?.inboxFolder || DEFAULT_SETTINGS.inboxFolder, notesFolder: saved?.notesFolder || DEFAULT_SETTINGS.notesFolder, mapsFolder: saved?.mapsFolder || DEFAULT_SETTINGS.mapsFolder, mapId: saved?.mapId || "default", codexPath: saved?.codexPath || legacy?.cliPath || DEFAULT_SETTINGS.codexPath, cliModel: saved?.cliModel || DEFAULT_SETTINGS.cliModel, cliReasoning: normalizeReasoningLevel(saved?.cliReasoning), previewScale: saved?.previewScale !== undefined ? clampPreviewScale(saved.previewScale) : legacyPreviewScale(saved?.previewSize), models: "", migrated: saved?.migrated === true, structureVersion: saved?.structureVersion ?? (saved ? 1 : DEFAULT_SETTINGS.structureVersion), firstUseNoticeSeen: saved?.firstUseNoticeSeen === true, codexUsageNoticeSeen: saved?.codexUsageNoticeSeen === true, aiExchangeLoggingEnabled: saved?.aiExchangeLoggingEnabled === true, workspaceInitialized: saved ? saved.workspaceInitialized !== false : false, sampleTourVersionSeen: saved?.sampleTourVersionSeen ?? 0 };
     setUiLanguage(this.settings.language);
     this.logs.appendLog("info", `Visual Agent Map ${this.manifest.version || "unknown"} 載入`);
     if (this.app.vault.adapter instanceof FileSystemAdapter && this.manifest.dir) {
@@ -2011,6 +2040,39 @@ export default class VisualAgentMapPlugin extends Plugin {
   }
   onunload(): void { this.resetCodexRuntime(); }
   async saveSettings(): Promise<void> { await this.saveData(this.settings); }
+  async changeLanguage(value: unknown): Promise<boolean> {
+    const next = value === "zh-TW" ? "zh-TW" : "en";
+    if (this.languageSwitchPending || next === this.settings.language) return false;
+    const previous = this.settings.language;
+    this.languageSwitchPending = true;
+    try {
+      this.settingTab?.refreshAfterLanguageChange();
+      const nextSettings: Settings = { ...this.settings, language: next };
+      try {
+        await this.saveData(nextSettings);
+      } catch (error) {
+        this.recordFailure(translate(previous, "ui.language_change_save_failed"), error);
+        new Notice(translate(previous, "ui.language_change_save_failed"));
+        return false;
+      }
+      Object.assign(this.settings, nextSettings);
+      setUiLanguage(next);
+      const failures: unknown[] = [];
+      try { this.refreshLocalizedEntrypoints(); } catch (error) { failures.push(error); }
+      try {
+        const views = this.views();
+        const results = await Promise.allSettled(views.map(view => view.refreshFromPlugin()));
+        for (const result of results) if (result.status === "rejected") failures.push(result.reason);
+        if (!views.length) this.syncOutline(null, new Map());
+      } catch (error) { failures.push(error); }
+      for (const error of failures) this.recordFailure(t("ui.language_view_refresh_failed"), error);
+      new Notice(failures.length ? t("ui.language_change_partial_failure") : t("ui.language_changed_content_preserved"));
+      return true;
+    } finally {
+      this.languageSwitchPending = false;
+      this.settingTab?.refreshAfterLanguageChange();
+    }
+  }
   private addLocalizedCommand(id: string, key: TranslationKey, callback: () => void): void {
     this.localizedCommands.push({ command: this.addCommand({ id, name: t(key), callback }), key });
   }

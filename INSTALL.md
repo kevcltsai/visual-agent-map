@@ -27,9 +27,9 @@ Do not install files from the repository's `main` branch into a production vault
 
 ## 2. Start your first map
 
-1. Explore the built-in read-only sample and its five-step tour. On a fresh install, VAM follows Obsidian's language when it is Traditional Chinese or English; other Obsidian languages start in English.
+1. Explore the built-in read-only sample and its five-step tour. A fresh install starts in English regardless of Obsidian's language. You can choose Traditional Chinese in VAM settings; that choice is saved across restarts.
 2. Select **Duplicate to my workspace** to start from the sample, or **Create empty mind map**. You can edit either map without Codex.
-3. Changing VAM's interface language also changes the built-in sample. Your map titles and writing are not translated; VAM-managed Detail headings may update.
+3. Changing VAM's interface language also changes the built-in sample. Existing maps and notes keep their original titles and writing.
 
 ## 3. Prepare Codex for AI
 
@@ -84,7 +84,7 @@ VAM 不需要 API key。使用獨立版 Codex CLI 不需要 npm；只有從原�
 
 1. 先探索內建唯讀範例與五步導覽。全新安裝會依 Obsidian 語言顯示繁體中文或英文；其他 Obsidian 語言先顯示英文。
 2. 選擇 **複製到我的工作區**，或選擇 **建立空白心智圖**。兩者都能在沒有 Codex 的情況下編輯。
-3. 切換 VAM 介面語言也會更換內建範例。你寫的地圖標題與內容不會翻譯；VAM 管理的 Detail 段落標題可能更新。
+3. 切換 VAM 介面語言也會更換內建唯讀範例。既有地圖與筆記的名稱及內容不會改變。
 
 ## 3. 為 AI 任務準備 Codex
 

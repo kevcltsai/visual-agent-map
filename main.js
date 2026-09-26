@@ -42,7 +42,10 @@ var english = {
   "ui.open_map": "Open mind map",
   "ui.my_editable_mind_map": "My editable mind map",
   "ui.sample_start_hint": "Duplicate this sample or create an empty mind map to start. Codex is only needed for AI tasks.",
-  "ui.language_changed_content_preserved": "Interface and official sample are now in English. Your map titles and writing are not translated; VAM-managed Detail headings may update.",
+  "ui.language_changed_content_preserved": "Interface and official sample are now in English. Existing map titles and notes are unchanged.",
+  "ui.language_change_save_failed": "Could not save the language setting. The previous language is still active.",
+  "ui.language_view_refresh_failed": "An open Visual Agent Map view could not refresh after the language change.",
+  "ui.language_change_partial_failure": "The language setting was saved, but an open view did not refresh. Close and reopen that view.",
   "ui.codex_required_for_ai": "Set up Codex before running an AI task. You can keep editing this mind map manually.",
   "ui.codex_setup_for_ai_only": "Codex CLI is needed for AI tasks. You can create and edit mind maps without it. ChatGPT Free is supported with a smaller Codex allowance.",
   "ui.to_research": "To research",
@@ -510,7 +513,7 @@ var english = {
   "ui.ai_proposes_3_7_subtopics_nodes_are_created_only_after_your": "AI proposes 3\u20137 subtopics. Nodes are created only after your confirmation.\n\nAI rules for this task:\n{0}",
   "ui.ai_reads_0_direct_subtopics_and_updates_current_understandin": "AI reads {0} direct subtopics and updates current understanding and Markdown details.\n\nAI rules for this task:\n{1}",
   "ui.official_sample_read_only": "Official sample \xB7 Read-only",
-  "ui.sample_taiwan_travel_plan": "Sample: Taiwan Travel Plan",
+  "ui.sample_taiwan_travel_plan": "Sample: Planning a Taiwan Journey",
   "ui.official_read_only_sample": "Official read-only sample",
   "ui.duplicate_to_my_workspace": "Duplicate to my workspace",
   "ui.1_5_start_with_the_question": "1 / 5  Start with the question",
@@ -669,7 +672,6 @@ var english = {
   "detail.purpose": "Purpose: {0}",
   "detail.palette": "Palette: {0}",
   "detail.reusable_formula": "Reusable formula: {0}",
-  "ui.detail_headings_synced_0_notes": "Updated standard section headings in {0} VAM notes.",
   "research.fast": "Quick overview: answer the core question first and briefly list key evidence and gaps; do not conduct a full investigation.",
   "research.normal": "Normal research: provide the main evidence, limitations, and open questions needed to support the conclusion.",
   "research.deep": "Deep research: compare sources for agreement and disagreement, and detail key evidence, limitations, and open questions.",
@@ -731,7 +733,10 @@ var traditionalChinese = {
   "ui.open_map": "\u958B\u555F\u5FC3\u667A\u5716",
   "ui.my_editable_mind_map": "\u6211\u7684\u53EF\u7DE8\u8F2F\u5FC3\u667A\u5716",
   "ui.sample_start_hint": "\u8907\u88FD\u9019\u4EFD\u7BC4\u4F8B\u6216\u5EFA\u7ACB\u7A7A\u767D\u5FC3\u667A\u5716\u5373\u53EF\u958B\u59CB\uFF1B\u53EA\u6709 AI \u4EFB\u52D9\u9700\u8981 Codex\u3002",
-  "ui.language_changed_content_preserved": "\u4ECB\u9762\u8207\u5B98\u65B9\u7BC4\u4F8B\u5DF2\u5207\u63DB\u70BA\u7E41\u9AD4\u4E2D\u6587\u3002\u4F60\u5BEB\u7684\u5730\u5716\u6A19\u984C\u8207\u5167\u5BB9\u4E0D\u6703\u7FFB\u8B6F\uFF1BVAM \u7BA1\u7406\u7684 Detail \u6BB5\u843D\u6A19\u984C\u53EF\u80FD\u66F4\u65B0\u3002",
+  "ui.language_changed_content_preserved": "\u4ECB\u9762\u8207\u5B98\u65B9\u7BC4\u4F8B\u5DF2\u5207\u63DB\u70BA\u7E41\u9AD4\u4E2D\u6587\u3002\u65E2\u6709\u5730\u5716\u6A19\u984C\u8207\u7B46\u8A18\u5167\u5BB9\u4E0D\u6703\u8B8A\u66F4\u3002",
+  "ui.language_change_save_failed": "\u7121\u6CD5\u5132\u5B58\u4ECB\u9762\u8A9E\u8A00\uFF1B\u76EE\u524D\u4ECD\u4F7F\u7528\u539F\u8A9E\u8A00\u3002",
+  "ui.language_view_refresh_failed": "\u6709\u4E00\u500B\u5DF2\u958B\u555F\u7684 Visual Agent Map \u756B\u9762\u672A\u80FD\u5957\u7528\u8A9E\u8A00\u8B8A\u66F4\u3002",
+  "ui.language_change_partial_failure": "\u8A9E\u8A00\u8A2D\u5B9A\u5DF2\u5132\u5B58\uFF0C\u4F46\u6709\u958B\u555F\u4E2D\u7684\u756B\u9762\u672A\u80FD\u66F4\u65B0\u3002\u8ACB\u95DC\u9589\u5F8C\u91CD\u65B0\u958B\u555F\u8A72\u756B\u9762\u3002",
   "ui.codex_required_for_ai": "\u57F7\u884C AI \u4EFB\u52D9\u524D\u8ACB\u5148\u8A2D\u5B9A Codex\uFF1B\u4F60\u4ECD\u53EF\u624B\u52D5\u7DE8\u8F2F\u9019\u5F35\u5FC3\u667A\u5716\u3002",
   "ui.codex_setup_for_ai_only": "\u53EA\u6709 AI \u4EFB\u52D9\u9700\u8981 Codex CLI\uFF1B\u6C92\u6709 Codex \u4E5F\u80FD\u5EFA\u7ACB\u548C\u7DE8\u8F2F\u5FC3\u667A\u5716\u3002ChatGPT Free \u4E5F\u53EF\u4F7F\u7528\uFF0C\u4F46 Codex \u984D\u5EA6\u8F03\u5C11\u3002",
   "ui.to_research": "\u5F85\u7814\u7A76",
@@ -1358,7 +1363,6 @@ var traditionalChinese = {
   "detail.purpose": "\u7528\u9014\uFF1A{0}",
   "detail.palette": "\u914D\u8272\uFF1A{0}",
   "detail.reusable_formula": "\u53EF\u5957\u7528\u516C\u5F0F\uFF1A{0}",
-  "ui.detail_headings_synced_0_notes": "\u5DF2\u66F4\u65B0 {0} \u4EFD VAM \u7B46\u8A18\u7684\u6A19\u6E96\u7AE0\u7BC0\u6A19\u984C\u3002",
   "research.fast": "\u5FEB\u901F\u6982\u89BD\uFF1A\u5148\u56DE\u7B54\u6838\u5FC3\u554F\u984C\uFF0C\u7C21\u77ED\u5217\u51FA\u95DC\u9375\u4F9D\u64DA\u8207\u7F3A\u53E3\uFF1B\u4E0D\u8981\u505A\u5B8C\u6574\u8ABF\u67E5\u3002",
   "research.normal": "\u4E00\u822C\u7814\u7A76\uFF1A\u63D0\u4F9B\u8DB3\u4EE5\u652F\u6301\u7D50\u8AD6\u7684\u4E3B\u8981\u8B49\u64DA\u3001\u9650\u5236\u8207\u5F85\u78BA\u8A8D\u4E8B\u9805\u3002",
   "research.deep": "\u6DF1\u5165\u7814\u7A76\uFF1A\u6AA2\u67E5\u4F86\u6E90\u9593\u7684\u4E00\u81F4\u8207\u5206\u6B67\uFF0C\u8A73\u5217\u91CD\u8981\u8B49\u64DA\u3001\u9650\u5236\u8207\u5F85\u67E5\u554F\u984C\u3002",
@@ -1415,10 +1419,10 @@ var traditionalChinese = {
   "detail.preview": "\u9810\u89BD",
   "ui.map_file_description": "\u6B64\u6A94\u6848\u4FDD\u5B58\u5FC3\u667A\u5716\u7D50\u69CB\uFF1B\u5B8C\u6574\u5167\u5BB9\u4FDD\u5B58\u5728\u5404\u8B70\u984C\u7B46\u8A18\u3002\u5F9E\u6A94\u6848\u9078\u55AE\u9078\u64C7\u300C\u4EE5\u5FC3\u667A\u5716\u958B\u555F\u300D\u3002"
 };
-var language = "zh-TW";
-function initialUiLanguage(saved, obsidianLanguage) {
+var language = "en";
+function initialUiLanguage(saved) {
   if (saved === "zh-TW" || saved === "en") return saved;
-  return obsidianLanguage === "zh-TW" ? "zh-TW" : "en";
+  return "en";
 }
 function setUiLanguage(value) {
   language = value;
@@ -1427,10 +1431,11 @@ function t(key, ...values) {
   return translate(language, key, ...values);
 }
 function translate(locale, key, ...values) {
-  const translated = locale === "en" ? english[key] : traditionalChinese[key];
+  const selected = locale === "en" ? english[key] : traditionalChinese[key];
+  const translated = selected || english[key] || String(key);
   return translated.replace(/\{(\d+)\}/g, (_, index) => {
     const value = values[Number(index)];
-    return typeof value === "string" || typeof value === "number" || typeof value === "boolean" ? String(value) : "";
+    return typeof value === "string" || typeof value === "number" || typeof value === "boolean" ? String(value) : `{${index}}`;
   });
 }
 function topicStatusLabel(status, locale) {
@@ -2146,7 +2151,7 @@ function arrangeNewBranch(nodes, parentId, newIds) {
 // repository.ts
 var import_obsidian5 = require("obsidian");
 var DEFAULT_SETTINGS = {
-  language: "zh-TW",
+  language: "en",
   workspaceFolder: "Agent Workspace",
   topicsFolder: "Agent Workspace/Topics",
   inboxFolder: "Agent Workspace/Inbox",
@@ -2174,10 +2179,6 @@ var REFERENCE_END = "<!-- visual-agent-map:references:end -->";
 var DETAIL_START = "<!-- visual-agent-map:detail:start -->";
 var DETAIL_END = "<!-- visual-agent-map:detail:end -->";
 var NOTE_CSS_CLASS = "visual-agent-map-node";
-var MANAGED_DETAIL_HEADINGS = {
-  "zh-TW": ["\u6838\u5FC3\u7D50\u8AD6", "\u95DC\u9375\u77E5\u8B58", "\u8B49\u64DA\u8207\u4F86\u6E90", "\u53D6\u6368\u8207\u9650\u5236", "\u5F85\u78BA\u8A8D\u4E8B\u9805", "\u66F4\u65B0\u7D00\u9304"],
-  en: ["Core conclusions", "Key knowledge", "Evidence and sources", "Tradeoffs and limitations", "Open questions", "Update log"]
-};
 function marker(value) {
   return value === true || value === "true";
 }
@@ -2405,31 +2406,6 @@ var Repository = class {
   constructor(app, settings) {
     this.app = app;
     this.settings = settings;
-  }
-  async syncManagedDetailHeadings(language2) {
-    const target = MANAGED_DETAIL_HEADINGS[language2 === "en" ? "en" : "zh-TW"];
-    const replacements = new Map([...MANAGED_DETAIL_HEADINGS["zh-TW"], ...MANAGED_DETAIL_HEADINGS.en].map((heading, index) => [heading, target[index % target.length]]));
-    let changed = 0;
-    for (const file of this.app.vault.getMarkdownFiles()) {
-      await this.app.vault.process(file, (content) => {
-        var _a, _b, _c, _d;
-        const cachedMarker = (_b = (_a = this.app.metadataCache.getFileCache(file)) == null ? void 0 : _a.frontmatter) == null ? void 0 : _b["agent-map-node"];
-        const textualMarker = (_d = (_c = /^---\r?\n([\s\S]*?)\r?\n---(?:\r?\n|$)/.exec(content)) == null ? void 0 : _c[1]) == null ? void 0 : _d.split(/\r?\n/).some((line) => /^\s*["']?agent-map-node["']?:\s*(?:true|["']true["'])\s*$/.test(line));
-        if (!marker(cachedMarker) && !textualMarker) return content;
-        const start = content.indexOf(DETAIL_START), end = content.indexOf(DETAIL_END);
-        if (start < 0 || end <= start) return content;
-        const before = content.slice(start + DETAIL_START.length), managed = before.slice(0, end - start - DETAIL_START.length);
-        const next = managed.replace(/^### ([^\r\n]+)[ \t]*$/gm, (line, heading) => {
-          const replacement = replacements.get(heading);
-          return replacement ? `### ${replacement}` : line;
-        });
-        if (next === managed) return content;
-        changed++;
-        const blockStart = start + DETAIL_START.length;
-        return `${content.slice(0, blockStart)}${next}${content.slice(end)}`;
-      });
-    }
-    return changed;
   }
   message(key) {
     return translate(this.settings.language, key);
@@ -3224,10 +3200,18 @@ var OutlineView = class extends import_obsidian6.ItemView {
     this.render();
   }
   setMap(map, titles) {
+    const search = this.contentEl.querySelector(".vam-outline-search");
+    const restoreFocus = !!search && search === document.activeElement;
+    const selection = restoreFocus ? [search.selectionStart, search.selectionEnd] : null;
     this.map = map;
     this.titles = titles;
     if (map) this.collapsed = new Set([...this.collapsed].filter((id) => map.nodes.some((node) => node.id === id)));
     this.render();
+    if (restoreFocus) {
+      const updated = this.contentEl.querySelector(".vam-outline-search");
+      updated == null ? void 0 : updated.focus();
+      if (updated && selection && selection[0] !== null && selection[1] !== null) updated.setSelectionRange(selection[0], selection[1]);
+    }
   }
   setActivePath(path) {
     this.activePath = path;
@@ -4581,7 +4565,7 @@ var VisualAgentMapView = class extends import_obsidian7.ItemView {
     return this.builtIn ? { sample: BUILTIN_SAMPLE_ID } : { file: this.path };
   }
   async setState(state, result) {
-    if (state.sample === BUILTIN_SAMPLE_ID) await this.openBuiltInSample();
+    if (state.sample === BUILTIN_SAMPLE_ID && !this.builtIn) await this.openBuiltInSample();
     else if (typeof state.file === "string" && state.file !== this.path) await this.openMap(state.file);
     await super.setState(state, result);
   }
@@ -4625,11 +4609,32 @@ var VisualAgentMapView = class extends import_obsidian7.ItemView {
   }
   async refreshFromPlugin() {
     if (this.builtIn) {
-      await this.openBuiltInSample(this.showSampleTour);
+      const sample = builtInSample(this.plugin.settings.language);
+      if (this.map) sample.map.viewport = { ...this.map.viewport };
+      this.map = sample.map;
+      this.notes = sample.notes;
+      this.renderPreservingFocus();
       return;
     }
     await this.hydrate();
+    this.renderPreservingFocus();
+  }
+  renderPreservingFocus() {
+    if (typeof document === "undefined" || !this.contentEl.contains(document.activeElement)) {
+      this.render();
+      return;
+    }
+    const focusedContainer = document.activeElement === this.contentEl;
+    const before = Array.from(this.contentEl.querySelectorAll("button, input, select, textarea, [tabindex]:not([tabindex='-1'])"));
+    const activeIndex = before.indexOf(document.activeElement);
+    const active = document.activeElement;
+    const selection = active.tagName === "INPUT" || active.tagName === "TEXTAREA" ? [active.selectionStart, active.selectionEnd] : null;
     this.render();
+    const after = Array.from(this.contentEl.querySelectorAll("button, input, select, textarea, [tabindex]:not([tabindex='-1'])"));
+    const target = after[activeIndex];
+    if (focusedContainer) this.contentEl.focus();
+    else target == null ? void 0 : target.focus();
+    if (selection && ((target == null ? void 0 : target.tagName) === "INPUT" || (target == null ? void 0 : target.tagName) === "TEXTAREA") && selection[0] !== null && selection[1] !== null) target.setSelectionRange(selection[0], selection[1]);
   }
   syncOutline() {
     this.plugin.syncOutline(this.builtIn ? null : this.map, this.notes);
@@ -6621,12 +6626,29 @@ var VisualAgentMapSettingTab = class extends import_obsidian7.PluginSettingTab {
     super(app, plugin);
     this.plugin = plugin;
   }
+  refreshAfterLanguageChange() {
+    const focused = typeof document !== "undefined" && document.activeElement && this.containerEl.contains(document.activeElement) && document.activeElement.instanceOf(HTMLSelectElement) && Array.from(document.activeElement.options).some((option) => option.value === "zh-TW") && Array.from(document.activeElement.options).some((option) => option.value === "en");
+    this.update();
+    if (!focused) return;
+    const selector = Array.from(this.containerEl.querySelectorAll("select")).find((select) => {
+      const values = Array.from(select.options).map((option) => option.value);
+      return values.includes("en") && values.includes("zh-TW");
+    });
+    selector == null ? void 0 : selector.focus();
+  }
   getSettingDefinitions() {
     const text2 = (name, key, desc) => ({ name, desc, control: { type: "text", key } });
     const diagnostic = this.plugin.codexDiagnostic();
     const models = Object.fromEntries(this.plugin.settings.models.split(/[,\n]/).map((model) => model.trim()).filter(Boolean).map((model) => [model, model]));
     return [
-      { name: t("ui.interface_language"), control: { type: "dropdown", key: "language", options: { "zh-TW": "\u7E41\u9AD4\u4E2D\u6587", en: "English" } } },
+      { name: t("ui.interface_language"), render: (setting) => {
+        setting.setName(t("ui.interface_language")).addDropdown((dropdown) => {
+          dropdown.addOption("en", "English").addOption("zh-TW", "\u7E41\u9AD4\u4E2D\u6587").setValue(this.plugin.settings.language).setDisabled(this.plugin.languageSwitchPending);
+          dropdown.onChange((value) => {
+            void this.plugin.changeLanguage(value);
+          });
+        });
+      } },
       text2(t("ui.codex_cli_path"), "codexPath", t("ui.vam_uses_this_executable_to_start_codex_app_server")),
       { name: t("ui.workspace_default_model"), desc: t("ui.models_are_loaded_from_codex_app_server_changes_apply_only_t"), control: { type: "dropdown", key: "cliModel", options: models } },
       { name: t("ui.ai_reasoning_level"), desc: t("ui.auto_uses_low_for_simple_tasks_and_medium_for_complex_synthe"), control: { type: "dropdown", key: "cliReasoning", options: { auto: t("ui.auto"), low: t("ui.low"), medium: t("ui.medium"), high: t("ui.high") } } },
@@ -6664,22 +6686,14 @@ var VisualAgentMapSettingTab = class extends import_obsidian7.PluginSettingTab {
     ];
   }
   async setControlValue(key, value) {
-    const languageChanged = key === "language" && this.plugin.settings.language !== (value === "en" ? "en" : "zh-TW");
-    if (key === "language") this.plugin.settings.language = value === "en" ? "en" : "zh-TW";
-    else if (typeof value === "string" && (key === "codexPath" || key === "cliModel")) this.plugin.settings[key] = value.trim();
+    if (key === "language") {
+      await this.plugin.changeLanguage(value);
+      return;
+    } else if (typeof value === "string" && (key === "codexPath" || key === "cliModel")) this.plugin.settings[key] = value.trim();
     else if (key === "cliReasoning") this.plugin.settings.cliReasoning = normalizeReasoningLevel(value);
     else return;
     if (key === "codexPath") this.plugin.resetCodexRuntime();
-    setUiLanguage(this.plugin.settings.language);
     await this.plugin.saveSettings();
-    if (languageChanged) {
-      this.plugin.refreshLocalizedEntrypoints();
-      const updated = await this.plugin.repo.syncManagedDetailHeadings(this.plugin.settings.language);
-      if (updated) new import_obsidian7.Notice(t("ui.detail_headings_synced_0_notes", updated));
-      for (const view of this.plugin.views()) await view.refreshFromPlugin();
-      this.update();
-      new import_obsidian7.Notice(t("ui.language_changed_content_preserved"));
-    }
   }
 };
 var VisualAgentMapPlugin = class extends import_obsidian7.Plugin {
@@ -6708,6 +6722,7 @@ var VisualAgentMapPlugin = class extends import_obsidian7.Plugin {
     __publicField(this, "externalReconcileTimer", null);
     __publicField(this, "firstInstallSamplePending", false);
     __publicField(this, "workspaceRecoveryCandidates", []);
+    __publicField(this, "languageSwitchPending", false);
   }
   recordFailure(context, error) {
     const message = error instanceof Error ? error.message : String(error);
@@ -6753,7 +6768,7 @@ var VisualAgentMapPlugin = class extends import_obsidian7.Plugin {
     var _a, _b;
     const saved = await this.loadData();
     const legacy = saved;
-    this.settings = { ...DEFAULT_SETTINGS, language: initialUiLanguage(saved == null ? void 0 : saved.language, (0, import_obsidian7.getLanguage)()), workspaceFolder: (saved == null ? void 0 : saved.workspaceFolder) || DEFAULT_SETTINGS.workspaceFolder, topicsFolder: (saved == null ? void 0 : saved.topicsFolder) || DEFAULT_SETTINGS.topicsFolder, inboxFolder: (saved == null ? void 0 : saved.inboxFolder) || DEFAULT_SETTINGS.inboxFolder, notesFolder: (saved == null ? void 0 : saved.notesFolder) || DEFAULT_SETTINGS.notesFolder, mapsFolder: (saved == null ? void 0 : saved.mapsFolder) || DEFAULT_SETTINGS.mapsFolder, mapId: (saved == null ? void 0 : saved.mapId) || "default", codexPath: (saved == null ? void 0 : saved.codexPath) || (legacy == null ? void 0 : legacy.cliPath) || DEFAULT_SETTINGS.codexPath, cliModel: (saved == null ? void 0 : saved.cliModel) || DEFAULT_SETTINGS.cliModel, cliReasoning: normalizeReasoningLevel(saved == null ? void 0 : saved.cliReasoning), previewScale: (saved == null ? void 0 : saved.previewScale) !== void 0 ? clampPreviewScale(saved.previewScale) : legacyPreviewScale(saved == null ? void 0 : saved.previewSize), models: "", migrated: (saved == null ? void 0 : saved.migrated) === true, structureVersion: (_a = saved == null ? void 0 : saved.structureVersion) != null ? _a : saved ? 1 : DEFAULT_SETTINGS.structureVersion, firstUseNoticeSeen: (saved == null ? void 0 : saved.firstUseNoticeSeen) === true, codexUsageNoticeSeen: (saved == null ? void 0 : saved.codexUsageNoticeSeen) === true, aiExchangeLoggingEnabled: (saved == null ? void 0 : saved.aiExchangeLoggingEnabled) === true, workspaceInitialized: saved ? saved.workspaceInitialized !== false : false, sampleTourVersionSeen: (_b = saved == null ? void 0 : saved.sampleTourVersionSeen) != null ? _b : 0 };
+    this.settings = { ...DEFAULT_SETTINGS, language: initialUiLanguage(saved == null ? void 0 : saved.language), workspaceFolder: (saved == null ? void 0 : saved.workspaceFolder) || DEFAULT_SETTINGS.workspaceFolder, topicsFolder: (saved == null ? void 0 : saved.topicsFolder) || DEFAULT_SETTINGS.topicsFolder, inboxFolder: (saved == null ? void 0 : saved.inboxFolder) || DEFAULT_SETTINGS.inboxFolder, notesFolder: (saved == null ? void 0 : saved.notesFolder) || DEFAULT_SETTINGS.notesFolder, mapsFolder: (saved == null ? void 0 : saved.mapsFolder) || DEFAULT_SETTINGS.mapsFolder, mapId: (saved == null ? void 0 : saved.mapId) || "default", codexPath: (saved == null ? void 0 : saved.codexPath) || (legacy == null ? void 0 : legacy.cliPath) || DEFAULT_SETTINGS.codexPath, cliModel: (saved == null ? void 0 : saved.cliModel) || DEFAULT_SETTINGS.cliModel, cliReasoning: normalizeReasoningLevel(saved == null ? void 0 : saved.cliReasoning), previewScale: (saved == null ? void 0 : saved.previewScale) !== void 0 ? clampPreviewScale(saved.previewScale) : legacyPreviewScale(saved == null ? void 0 : saved.previewSize), models: "", migrated: (saved == null ? void 0 : saved.migrated) === true, structureVersion: (_a = saved == null ? void 0 : saved.structureVersion) != null ? _a : saved ? 1 : DEFAULT_SETTINGS.structureVersion, firstUseNoticeSeen: (saved == null ? void 0 : saved.firstUseNoticeSeen) === true, codexUsageNoticeSeen: (saved == null ? void 0 : saved.codexUsageNoticeSeen) === true, aiExchangeLoggingEnabled: (saved == null ? void 0 : saved.aiExchangeLoggingEnabled) === true, workspaceInitialized: saved ? saved.workspaceInitialized !== false : false, sampleTourVersionSeen: (_b = saved == null ? void 0 : saved.sampleTourVersionSeen) != null ? _b : 0 };
     setUiLanguage(this.settings.language);
     this.logs.appendLog("info", `Visual Agent Map ${this.manifest.version || "unknown"} \u8F09\u5165`);
     if (this.app.vault.adapter instanceof import_obsidian7.FileSystemAdapter && this.manifest.dir) {
@@ -7018,6 +7033,46 @@ var VisualAgentMapPlugin = class extends import_obsidian7.Plugin {
   }
   async saveSettings() {
     await this.saveData(this.settings);
+  }
+  async changeLanguage(value) {
+    var _a, _b;
+    const next = value === "zh-TW" ? "zh-TW" : "en";
+    if (this.languageSwitchPending || next === this.settings.language) return false;
+    const previous = this.settings.language;
+    this.languageSwitchPending = true;
+    try {
+      (_a = this.settingTab) == null ? void 0 : _a.refreshAfterLanguageChange();
+      const nextSettings = { ...this.settings, language: next };
+      try {
+        await this.saveData(nextSettings);
+      } catch (error) {
+        this.recordFailure(translate(previous, "ui.language_change_save_failed"), error);
+        new import_obsidian7.Notice(translate(previous, "ui.language_change_save_failed"));
+        return false;
+      }
+      Object.assign(this.settings, nextSettings);
+      setUiLanguage(next);
+      const failures = [];
+      try {
+        this.refreshLocalizedEntrypoints();
+      } catch (error) {
+        failures.push(error);
+      }
+      try {
+        const views = this.views();
+        const results = await Promise.allSettled(views.map((view) => view.refreshFromPlugin()));
+        for (const result of results) if (result.status === "rejected") failures.push(result.reason);
+        if (!views.length) this.syncOutline(null, /* @__PURE__ */ new Map());
+      } catch (error) {
+        failures.push(error);
+      }
+      for (const error of failures) this.recordFailure(t("ui.language_view_refresh_failed"), error);
+      new import_obsidian7.Notice(failures.length ? t("ui.language_change_partial_failure") : t("ui.language_changed_content_preserved"));
+      return true;
+    } finally {
+      this.languageSwitchPending = false;
+      (_b = this.settingTab) == null ? void 0 : _b.refreshAfterLanguageChange();
+    }
   }
   addLocalizedCommand(id, key, callback) {
     this.localizedCommands.push({ command: this.addCommand({ id, name: t(key), callback }), key });

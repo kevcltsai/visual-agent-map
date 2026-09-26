@@ -43,6 +43,35 @@ test('in-place plugin refresh updates only installed artifacts and preserves tes
   assert.equal(readFileSync(join(plugin, 'main.js'), 'utf8'), readFileSync(join(root, 'main.js'), 'utf8'));
 });
 
+test('in-place refresh upgrades an older owned test build without replacing vault data', t => {
+  const { vault } = environment(t); prepareTestVault({ vault });
+  const plugin = join(vault, '.obsidian/plugins/visual-agent-map');
+  const recordPath = join(vault, '.vam-test-environment.json');
+  const record = JSON.parse(readFileSync(recordPath, 'utf8'));
+  const installed = JSON.parse(readFileSync(join(plugin, 'manifest.json'), 'utf8'));
+  record.version = installed.version = '0.9.5';
+  writeFileSync(recordPath, JSON.stringify(record));
+  writeFileSync(join(plugin, 'manifest.json'), JSON.stringify(installed));
+  const note = join(vault, 'keep.md'); writeFileSync(note, 'Keep existing content.');
+
+  const updated = updateCurrentTestVault({ vault });
+
+  assert.equal(updated.version, JSON.parse(readFileSync(join(root, 'manifest.json'))).version);
+  assert.equal(JSON.parse(readFileSync(join(plugin, 'manifest.json'))).version, updated.version);
+  assert.equal(readFileSync(note, 'utf8'), 'Keep existing content.');
+});
+
+test('in-place refresh refuses a stale ownership record that disagrees with the installed plugin', t => {
+  const { vault } = environment(t); prepareTestVault({ vault });
+  const recordPath = join(vault, '.vam-test-environment.json');
+  const record = JSON.parse(readFileSync(recordPath, 'utf8'));
+  record.version = '0.9.5'; writeFileSync(recordPath, JSON.stringify(record));
+  const plugin = join(vault, '.obsidian/plugins/visual-agent-map'), mainPath = join(plugin, 'main.js');
+  writeFileSync(mainPath, 'keep the existing build');
+  assert.throws(() => updateCurrentTestVault({ vault }), /does not match the owned test-vault record/);
+  assert.equal(readFileSync(mainPath, 'utf8'), 'keep the existing build');
+});
+
 test('in-place refresh refuses vaults owned by another checkout without changing data', t => {
   const { vault } = environment(t); prepareTestVault({ vault });
   const record = join(vault, '.vam-test-environment.json');

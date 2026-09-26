@@ -3,7 +3,7 @@ import { copyFileSync, existsSync, lstatSync, mkdirSync, mkdtempSync, readFileSy
 import { homedir, tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import { execFileSync, spawnSync } from "node:child_process";
+import { execFileSync, spawn, spawnSync } from "node:child_process";
 import { createTestVault, ensureSourceSelectionFixture } from "./create-onboarding-test-vault.mjs";
 
 export const root = fileURLToPath(new URL("..", import.meta.url));
@@ -58,9 +58,10 @@ export function updateCurrentTestVault({ vault = canonicalVault, artifact = root
   const recordPath = join(vault, marker), record = json(recordPath);
   if (record.owner !== realpathSync(root) || record.kind !== "vam-disposable-test-vault") throw new Error("Refusing to update a test vault owned by another checkout.");
   const manifest = json(join(artifact, "manifest.json"));
-  if (manifest.id !== "visual-agent-map" || manifest.version !== record.version) throw new Error("Artifact identity/version does not match the existing test vault.");
   const plugin = join(vault, ".obsidian/plugins/visual-agent-map");
   if (!existsSync(plugin) || lstatSync(plugin).isSymbolicLink() || !lstatSync(plugin).isDirectory()) throw new Error("Refusing an invalid installed plugin directory.");
+  const installedManifest = json(join(plugin, "manifest.json"));
+  if (manifest.id !== "visual-agent-map" || installedManifest.id !== manifest.id || installedManifest.version !== record.version) throw new Error("Installed plugin identity/version does not match the owned test-vault record.");
   if (record.profile !== "onboarding") ensureSourceSelectionFixture(vault, record.workspaceRoot);
   const staging = mkdtempSync(join(plugin, ".vam-update-")), replaced = [];
   try {
@@ -71,7 +72,7 @@ export function updateCurrentTestVault({ vault = canonicalVault, artifact = root
     copyFileSync(recordPath, join(staging, `${marker}.previous`));
     try {
       for (const name of assets) { renameSync(join(staging, name), join(plugin, name)); replaced.push(name); }
-      writeFileSync(join(staging, marker), JSON.stringify({ ...record, hashes: newHashes, source }, null, 2));
+      writeFileSync(join(staging, marker), JSON.stringify({ ...record, version: manifest.version, hashes: newHashes, source }, null, 2));
       renameSync(join(staging, marker), recordPath);
       return verifyTestVault(vault, artifact);
     } catch (error) {
@@ -127,7 +128,10 @@ function installedObsidianRuntime() {
 
 function launchObsidian(appProfile) {
   if (!existsSync(obsidianApp)) throw new Error(`Obsidian app bundle not found at ${obsidianApp}.`);
-  return run("open", ["-na", obsidianApp, "--args", `--user-data-dir=${appProfile}`]);
+  const executable = join(obsidianApp, "Contents/MacOS/Obsidian");
+  if (!existsSync(executable)) throw new Error(`Obsidian executable not found at ${executable}.`);
+  const child = spawn(executable, [`--user-data-dir=${appProfile}`], { cwd: root, detached: true, stdio: "ignore" });
+  child.unref();
 }
 
 export function sourceFingerprint(directory = root) {
@@ -176,6 +180,8 @@ export function main(args = process.argv.slice(2)) {
     if (JSON.stringify(hashes(root)) !== JSON.stringify(builtHashes)) throw new Error("Build artifacts changed during tests.");
     const git = (...values) => execFileSync("git", values, { cwd: root, encoding: "utf8" });
     const source = { branch: git("branch", "--show-current").trim(), commit: git("rev-parse", "HEAD").trim(), status: git("status", "--short").trim(), fingerprint: sourceFingerprint() };
+    const runtime = installedObsidianRuntime();
+    source.obsidianRuntime = { version: runtime.version, hash: runtime.hash };
     source.diffHash = gitDiffHash(root, ["diff", "HEAD", "--binary"]);
     const record = updateCurrentTestVault({ source });
     const appProfile = join(canonicalVault, ".vam-app");

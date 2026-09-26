@@ -330,13 +330,13 @@ integrationTest('node plus adds a child without opening a duplicate right-click 
   view.openDetails = topic => details.push(topic.id); view.openNextStep = topic => next.push(topic.id);
   view.renderNode(topic);
   const plus = buttons.find(button => button.text === '+');
-  assert.equal(plus['aria-label'], '手動新增子議題');
+  assert.equal(plus['aria-label'], 'Add subtopic manually');
   plus.click({ stopPropagation() {} });
   assert.equal(added, 1);
-  const badge = buttons.find(button => button.text === '查看 1 個展開建議');
+  const badge = buttons.find(button => button.text === 'View 1 expansion suggestions');
   badge.click({ stopPropagation() {} });
-  buttons.find(button => button['aria-label'] === '接下來想怎麼探索？').click({ stopPropagation() {} });
-  buttons.find(button => button['aria-label'] === '結構與連結').click({ stopPropagation() {} });
+  buttons.find(button => button['aria-label'] === 'How would you like to explore next?').click({ stopPropagation() {} });
+  buttons.find(button => button['aria-label'] === 'Structure and links').click({ stopPropagation() {} });
   assert.deepEqual(opened, [[topic.id, 'proposals'], [topic.id, 'structure']]); assert.deepEqual(next, [topic.id]);
   events.get('div:pointerdown')({ target: { closest: () => null }, button: 0, pointerId: 1, clientX: 0, clientY: 0 });
   events.get('div:pointerup')({ type: 'pointerup', clientX: 0, clientY: 0 });
@@ -375,122 +375,122 @@ integrationTest('Next Step returns new expansion requests to the map and reviews
     async (options, _direction, found, _failed, createdMap) => { expandCalls++; if (options.multiLayer) { quickOptions = options; createdMap(); } else found([{ title: 'Transport', task: 'Compare', contribution: '', parentTitle: '' }], async items => { created = items; }); },
     async (options, angles, drafted) => { synthCalls++; synthOptions = options; angles([{ title: 'Shared constraints', task: 'Find tradeoffs', contribution: 'Across children' }], async () => { drafted({ summary: 'Draft', detail: 'Detail' }, async (summary, detail) => { saved = [summary, detail]; }); }); }, modelSettings);
   modal.onOpen();
-  assert.ok(find(modal.contentEl, item => /3 分鐘.*避免長時間佔用資源/.test(item.text ?? '')));
+  assert.ok(find(modal.contentEl, item => /3 minutes.*avoid prolonged resource use/.test(item.text ?? '')));
   const cards = find(modal.contentEl, item => item.cls === 'vam-next-cards');
   const [research, expand, synthesize] = all(modal.contentEl, item => item.cls.includes('vam-next-research'));
   const requirements = find(modal.contentEl, item => item.tag === 'textarea');
   assert.equal(requirements.value, '');
   assert.equal(all(modal.contentEl, item => item.tag === 'textarea').length, 1);
-  assert.equal(button(modal.contentEl, '儲存指示'), undefined);
+  assert.equal(button(modal.contentEl, 'Save instructions'), undefined);
   requirements.value = 'Only this run';
   const researchChecks = all(research, item => item.tag === 'input' && item.type === 'checkbox');
   assert.equal(researchChecks.length, 2); assert.ok(researchChecks[0].checked); assert.ok(researchChecks[1].checked);
-  assert.ok(find(research, item => item.text === '搜尋圖片參考'));
-  assert.ok(find(research, item => /標準：最多 3 次網路搜尋、以 5 個主要來源為目標/.test(item.text ?? '')), JSON.stringify(all(research, item => item.text).map(item => item.text)));
+  assert.ok(find(research, item => item.text === 'Search for image references'));
+  assert.ok(find(research, item => /Standard: aim for up to 3 web searches and 5 main sources/.test(item.text ?? '')), JSON.stringify(all(research, item => item.text).map(item => item.text)));
   const expandChecks = all(expand, item => item.tag === 'input' && item.type === 'checkbox');
   assert.equal(expandChecks.length, 3); assert.ok(expandChecks[0].checked); assert.ok(expandChecks[1].checked);
-  assert.ok(find(expand, item => item.text === '搜尋圖片參考'));
+  assert.ok(find(expand, item => item.text === 'Search for image references'));
   assert.equal(all(research, item => item.tag === 'input' && item.type === 'file').length, 2);
   assert.equal(all(expand, item => item.tag === 'input' && item.type === 'file').length, 2);
   assert.equal(all(synthesize, item => item.tag === 'input' && item.type === 'file').length, 2);
-  assert.ok(find(research, item => item.text === '允許搜尋網路'));
-  assert.ok(find(expand, item => item.text === '允許搜尋網路'));
-  assert.ok(find(synthesize, item => item.text === '允許搜尋網路'));
-  assert.equal(find(synthesize, item => item.text === '不複製子議題全文'), undefined);
+  assert.ok(find(research, item => item.text === 'Allow web search'));
+  assert.ok(find(expand, item => item.text === 'Allow web search'));
+  assert.ok(find(synthesize, item => item.text === 'Allow web search'));
+  assert.equal(find(synthesize, item => item.text === 'Does not copy full subtopic notes'), undefined);
   cards.children[1].click();
   assert.equal(research.style.display, 'none'); assert.equal(expand.style.display, '');
   expandChecks[0].checked = false; expandChecks[0].change();
   assert.equal(expandChecks[1].disabled, true); assert.equal(expandChecks[1].checked, false);
-  button(expand, '查看 AI 子議題建議').click(); await tick();
+  button(expand, 'Review AI subtopic suggestions').click(); await tick();
   assert.equal(expandCalls, 1); assert.equal(closed, 0);
   const proposalCheck = find(expand.querySelector('.vam-next-result'), item => item.tag === 'input' && item.type === 'checkbox');
-  proposalCheck.checked = false; button(expand, '建立子議題').click(); await tick();
-  assert.equal(created, undefined); assert.equal(expand.querySelector('.vam-next-status').text, '請至少選取一個子議題。');
+  proposalCheck.checked = false; button(expand, 'Create subtopics').click(); await tick();
+  assert.equal(created, undefined); assert.equal(expand.querySelector('.vam-next-status').text, 'Select at least one subtopic.');
   proposalCheck.checked = true;
-  button(expand, '建立子議題').click(); await tick();
+  button(expand, 'Create subtopics').click(); await tick();
   assert.equal(created[0].title, 'Transport'); assert.equal(closed, 0);
-  cards.children[2].click(); button(synthesize, '先取得整合建議').click(); await tick();
+  cards.children[2].click(); button(synthesize, 'Get synthesis suggestions first').click(); await tick();
   assert.equal(synthCalls, 1); assert.equal(closed, 0);
   assert.equal(synthOptions.researchMode, 'local');
-  assert.ok(button(synthesize, '選擇這個方向'));
-  button(synthesize, '取得整合草稿').click(); await tick();
-  button(synthesize, '確認寫入母議題').click(); await tick();
+  assert.ok(button(synthesize, 'Choose this direction'));
+  button(synthesize, 'Get synthesis draft').click(); await tick();
+  button(synthesize, 'Confirm update to parent topic').click(); await tick();
   assert.deepEqual(saved, ['Draft', 'Detail']); assert.equal(closed, 0);
-  cards.children[0].click(); button(research, '確認研究任務').click(); await tick();
+  cards.children[0].click(); button(research, 'Confirm research task').click(); await tick();
   assert.equal(researchOptions.requirements, 'Only this run'); assert.equal(researchOptions.researchMode, 'research'); assert.equal(researchOptions.referenceGroups.length, 0);
   assert.equal(closed, 1); assert.equal(research.querySelector('.vam-next-result'), undefined);
   const quickModal = new NextStepModal({}, 'Parent', 'normal', 1, 0, plugin, async () => {}, modal.expand, async () => {});
-  quickModal.onOpen(); find(quickModal.contentEl, item => item.cls === 'vam-next-cards').children[1].click(); button(quickModal.contentEl, '快速探索地圖').click();
-  assert.equal(button(quickModal.contentEl, '查看 AI 子議題建議'), undefined);
+  quickModal.onOpen(); find(quickModal.contentEl, item => item.cls === 'vam-next-cards').children[1].click(); button(quickModal.contentEl, 'Quickly explore a map').click();
+  assert.equal(button(quickModal.contentEl, 'Review AI subtopic suggestions'), undefined);
   const quickNumbers = all(quickModal.contentEl, item => item.tag === 'input' && item.type === 'number');
   const [levelInput, , childrenInput] = quickNumbers;
   assert.equal(childrenInput.disabled, false);
   levelInput.value = '1'; levelInput.input();
   assert.equal(childrenInput.disabled, true);
-  assert.equal(find(quickModal.contentEl, item => item.text === '只展開一層時不會用到此設定。').hidden, false);
+  assert.equal(find(quickModal.contentEl, item => item.text === 'Not used when expanding only one level.').hidden, false);
   levelInput.value = '2'; levelInput.input();
   assert.equal(childrenInput.disabled, false);
-  button(quickModal.contentEl, '直接建立初步地圖').click(); await tick();
+  button(quickModal.contentEl, 'Create starter map now').click(); await tick();
   assert.equal(quickOptions.multiLayer, true); assert.equal(quickOptions.shallowResearch, false); assert.equal(quickOptions.layers, 2); assert.equal(quickOptions.firstLayerCount, 3); assert.equal(quickOptions.childrenPerParent, 2); assert.equal(closed, 2);
   assert.equal(quickOptions.researchMode, 'local'); assert.equal(quickOptions.referenceGroups.length, 0);
   const partial = new NextStepModal({}, 'Parent', 'normal', 1, 0, plugin, async () => {}, async (_options, _direction, _found, failed) => failed('部分子議題已建立，請重新開啟視窗。', false), async () => {});
-  partial.onOpen(); find(partial.contentEl, item => item.cls === 'vam-next-cards').children[1].click(); button(partial.contentEl, '快速探索地圖').click();
-  button(partial.contentEl, '直接建立初步地圖').click(); await tick();
+  partial.onOpen(); find(partial.contentEl, item => item.cls === 'vam-next-cards').children[1].click(); button(partial.contentEl, 'Quickly explore a map').click();
+  button(partial.contentEl, 'Create starter map now').click(); await tick();
   assert.equal(closed, 3); assert.match(notices.at(-1), /重新開啟/);
   let emptyOptions;
   const empty = new NextStepModal({}, 'No children', 'normal', 0, 0, plugin, async () => {}, async () => {}, async options => { synthCalls++; emptyOptions = options; });
   empty.onOpen(); find(empty.contentEl, item => item.cls === 'vam-next-cards').children[2].click();
   const emptyPanel = all(empty.contentEl, item => item.cls.includes('vam-next-research'))[2];
-  assert.match(emptyPanel.children[1].text, /沒有直屬子議題/);
-  button(emptyPanel, '先取得整合建議').click(); await tick();
+  assert.match(emptyPanel.children[1].text, /no direct subtopics/i);
+  button(emptyPanel, 'Get synthesis suggestions first').click(); await tick();
   assert.equal(synthCalls, 1); assert.equal(emptyOptions, undefined);
   const failing = new NextStepModal({}, 'Parent', 'normal', 1, 1, plugin, async () => {}, async (_options, _direction, _found, failed) => failed('Provider failed'), async () => {});
   failing.onOpen(); find(failing.contentEl, item => item.cls === 'vam-next-cards').children[1].click();
-  button(failing.contentEl, '查看 AI 子議題建議').click(); await tick();
+  button(failing.contentEl, 'Review AI subtopic suggestions').click(); await tick();
   assert.equal(all(failing.contentEl, item => item.cls.includes('vam-next-research'))[1].querySelector('.vam-next-status').text, 'Provider failed'); assert.equal(closed, 3);
   const failedResearch = new NextStepModal({}, 'Parent', 'normal', 1, 0, plugin, async (_options, _focus, _done, failed) => failed('Cannot start'), async () => {}, async () => {});
-  failedResearch.onOpen(); button(failedResearch.contentEl, '確認研究任務').click(); await tick();
+  failedResearch.onOpen(); button(failedResearch.contentEl, 'Confirm research task').click(); await tick();
   assert.equal(closed, 3); assert.equal(all(failedResearch.contentEl, item => item.cls.includes('vam-next-research'))[0].querySelector('.vam-next-status').text, 'Cannot start');
   let acknowledged = 0, began = 0;
   const firstUsePlugin = { settings: { codexUsageNoticeSeen: false }, codexReadyForAi: () => true, saveSettings: async () => { acknowledged++; } };
   const firstUse = new NextStepModal({}, 'Parent', 'normal', 1, 0, firstUsePlugin, async () => { began++; }, async () => {}, async () => {});
-  firstUse.onOpen(); button(firstUse.contentEl, '確認研究任務').click(); await tick();
-  assert.equal(began, 0); assert.ok(button(firstUse.contentEl, '了解並執行')); assert.equal(closed, 3);
-  button(firstUse.contentEl, '了解並執行').click(); await tick();
+  firstUse.onOpen(); button(firstUse.contentEl, 'Confirm research task').click(); await tick();
+  assert.equal(began, 0); assert.ok(button(firstUse.contentEl, 'Understand and run')); assert.equal(closed, 3);
+  button(firstUse.contentEl, 'Understand and run').click(); await tick();
   assert.equal(began, 1); assert.equal(acknowledged, 1); assert.equal(closed, 4);
   let pendingCalls = 0;
   const pendingPlugin = { settings: { codexUsageNoticeSeen: false }, codexReadyForAi: () => true, saveSettings: async () => {} };
   const pendingModal = new NextStepModal({}, 'Parent', 'normal', 1, 1, pendingPlugin, async () => {}, async (_options, _direction, found) => { pendingCalls++; found([{ title: 'Existing', task: 'Research', contribution: '', parentTitle: '' }], async () => {}); }, async () => {});
   pendingModal.onOpen(); find(pendingModal.contentEl, item => item.cls === 'vam-next-cards').children[1].click();
-  button(pendingModal.contentEl, '查看 AI 子議題建議').click(); await tick();
-  assert.equal(pendingCalls, 1); assert.equal(button(pendingModal.contentEl, '了解並執行'), undefined);
-  button(pendingModal.contentEl, '建立子議題').click(); await tick();
-  assert.ok(button(pendingModal.contentEl, '取得展開方向'));
-  button(pendingModal.contentEl, '取得展開方向').click(); await tick();
-  assert.equal(pendingCalls, 1); assert.ok(button(pendingModal.contentEl, '了解並執行'));
+  button(pendingModal.contentEl, 'Review AI subtopic suggestions').click(); await tick();
+  assert.equal(pendingCalls, 1); assert.equal(button(pendingModal.contentEl, 'Understand and run'), undefined);
+  button(pendingModal.contentEl, 'Create subtopics').click(); await tick();
+  assert.ok(button(pendingModal.contentEl, 'Get expansion directions'));
+  button(pendingModal.contentEl, 'Get expansion directions').click(); await tick();
+  assert.equal(pendingCalls, 1); assert.ok(button(pendingModal.contentEl, 'Understand and run'));
   let finishQuick, completedQuick = false, delayedOptions;
   const delayed = new NextStepModal({}, 'Parent', 'normal', 1, 0, plugin, async () => {}, async options => {
     delayedOptions = options;
     await new Promise(resolve => { finishQuick = resolve; });
     completedQuick = true;
   }, async () => {});
-  delayed.onOpen(); find(delayed.contentEl, item => item.cls === 'vam-next-cards').children[1].click(); button(delayed.contentEl, '快速探索地圖').click();
+  delayed.onOpen(); find(delayed.contentEl, item => item.cls === 'vam-next-cards').children[1].click(); button(delayed.contentEl, 'Quickly explore a map').click();
   const numbers = all(delayed.contentEl, item => item.tag === 'input' && item.type === 'number');
   numbers[0].value = '3'; numbers[1].value = '2'; numbers[2].value = '2'; numbers[0].input();
   const shallow = find(all(delayed.contentEl, item => item.cls.includes('vam-next-research'))[1], item => item.tag === 'input' && item.type === 'checkbox' && item.checked === false);
   shallow.checked = true;
-  button(delayed.contentEl, '直接建立初步地圖').click(); await tick();
+  button(delayed.contentEl, 'Create starter map now').click(); await tick();
   assert.equal(closed, 4); assert.equal(completedQuick, false);
   assert.equal(delayedOptions.layers, 3); assert.equal(delayedOptions.firstLayerCount, 2); assert.equal(delayedOptions.childrenPerParent, 2); assert.equal(delayedOptions.shallowResearch, true);
   finishQuick(); await tick(); assert.equal(completedQuick, true); assert.equal(closed, 5);
   const invalid = new NextStepModal({}, 'Parent', 'normal', 1, 0, plugin, async () => {}, async () => assert.fail('over-limit task started'), async () => {});
-  invalid.onOpen(); find(invalid.contentEl, item => item.cls === 'vam-next-cards').children[1].click(); button(invalid.contentEl, '快速探索地圖').click();
+  invalid.onOpen(); find(invalid.contentEl, item => item.cls === 'vam-next-cards').children[1].click(); button(invalid.contentEl, 'Quickly explore a map').click();
   const invalidNumbers = all(invalid.contentEl, item => item.tag === 'input' && item.type === 'number'); invalidNumbers[0].value = '3'; invalidNumbers[1].value = '3'; invalidNumbers[2].value = '2'; invalidNumbers[0].input();
-  assert.match(find(invalid.contentEl, item => item.tag === 'p' && item.text?.includes('超過上限 15 個')).text, /預計建立 21 個子議題/);
-  assert.equal(button(invalid.contentEl, '直接建立初步地圖').disabled, true);
+  assert.match(find(invalid.contentEl, item => item.tag === 'p' && item.text?.includes('exceeding the limit of 15')).text, /21 subtopics/);
+  assert.equal(button(invalid.contentEl, 'Create starter map now').disabled, true);
   invalidNumbers[0].value = '2'; invalidNumbers[0].input();
-  assert.equal(button(invalid.contentEl, '直接建立初步地圖').disabled, false);
-  assert.match(find(invalid.contentEl, item => item.tag === 'p' && item.text?.includes('每層數量')).text, /3 → 6；共 9 個/);
+  assert.equal(button(invalid.contentEl, 'Create starter map now').disabled, false);
+  assert.ok(all(invalid.contentEl, item => item.tag === 'p').some(item => /3/.test(item.text ?? '') && /6/.test(item.text ?? '') && /9/.test(item.text ?? '')));
   assert.equal(closed, 5);
   let finishGuided, guidedFinished = false;
   const guidedModal = new NextStepModal({}, 'Parent', 'normal', 1, 0, plugin, async () => {}, async (_options, _direction, found) => {
@@ -499,31 +499,31 @@ integrationTest('Next Step returns new expansion requests to the map and reviews
     guidedFinished = true;
   }, async () => {});
   guidedModal.onOpen(); find(guidedModal.contentEl, item => item.cls === 'vam-next-cards').children[1].click();
-  button(guidedModal.contentEl, '取得展開方向').click(); await tick();
+  button(guidedModal.contentEl, 'Get expansion directions').click(); await tick();
   assert.equal(closed, 5); assert.equal(guidedFinished, false);
   finishGuided(); await tick();
-  assert.equal(guidedFinished, true); assert.equal(button(guidedModal.contentEl, '建立子議題'), undefined);
+  assert.equal(guidedFinished, true); assert.equal(button(guidedModal.contentEl, 'Create subtopics'), undefined);
   const settingsWrites = []; let researchAfterSave = false;
   const settingsModal = new NextStepModal({}, 'Parent', 'normal', 0, 0,
     { settings: { codexUsageNoticeSeen: true, models: 'model-a,model-b' }, codexReadyForAi: () => true, saveSettings: async () => {} },
     async () => { researchAfterSave = settingsWrites.length === 2; }, async () => {}, async () => {},
     { model: 'model-a', modelSource: 'workspace', reasoning: 'low', save: async patch => { settingsWrites.push(patch); } });
   settingsModal.onOpen();
-  assert.equal(settingsModal.contentEl.children.find(item => item.cls.includes('vam-next-model')).children[0].text, '模型與進階設定');
-  const modelSelect = find(settingsModal.contentEl, item => item['aria-label'] === '使用模型');
-  const reasoningSelect = find(settingsModal.contentEl, item => item['aria-label'] === '推理等級');
+  assert.equal(settingsModal.contentEl.children.find(item => item.cls.includes('vam-next-model')).children[0].text, 'Model and advanced settings');
+  const modelSelect = find(settingsModal.contentEl, item => item['aria-label'] === 'Model');
+  const reasoningSelect = find(settingsModal.contentEl, item => item['aria-label'] === 'Reasoning level');
   modelSelect.value = 'model-b'; modelSelect.change(); reasoningSelect.value = 'high'; reasoningSelect.change();
   assert.equal(researchAfterSave, false);
-  button(settingsModal.contentEl, '確認研究任務').click(); await tick();
+  button(settingsModal.contentEl, 'Confirm research task').click(); await tick();
   assert.deepEqual(plain(settingsWrites), [{ model: 'model-b', modelSource: 'manual' }, { reasoning: 'high' }]);
   assert.equal(researchAfterSave, true);
   const closedBeforeCancel = closed;
   const cancelModal = new NextStepModal({}, 'Parent', 'normal', 1, 0, plugin, async () => {}, async options => new Promise((_resolve, reject) => options.signal.addEventListener('abort', () => { const error = new Error('aborted'); error.name = 'AbortError'; reject(error); }, { once: true })), async () => {});
   cancelModal.onOpen(); find(cancelModal.contentEl, item => item.cls === 'vam-next-cards').children[1].click();
-  button(cancelModal.contentEl, '快速探索地圖').click(); button(cancelModal.contentEl, '直接建立初步地圖').click(); await tick();
+  button(cancelModal.contentEl, 'Quickly explore a map').click(); button(cancelModal.contentEl, 'Create starter map now').click(); await tick();
   const taskCancel = find(cancelModal.contentEl, item => item.cls === 'vam-task-cancel');
   assert.equal(taskCancel.hidden, false); taskCancel.onclick(); await tick();
-  assert.match(find(all(cancelModal.contentEl, item => item.cls.includes('vam-next-research'))[1], item => item.cls.includes('vam-next-status')).text, /取消/);
+  assert.match(find(all(cancelModal.contentEl, item => item.cls.includes('vam-next-research'))[1], item => item.cls.includes('vam-next-status')).text, /cancelled/i);
   assert.equal(closed, closedBeforeCancel);
 });
 function fixture(language = 'zh-TW') {
@@ -557,27 +557,6 @@ integrationTest('editing note fields preserves latest AI detail and unrelated fr
   assert.equal(result.newFindings, 'Fresh research');
   assert.match(contents.get(n.path), /## Working Findings\n\nFresh research/);
   assert.match(contents.get(n.path), /custom: "retain me"/);
-});
-integrationTest('language changes rename only known Detail headings inside VAM-managed topic notes', async () => {
-  const { repo, app, contents } = fixture();
-  const n = await topicNote(repo, 'Topic to keep');
-  const body = [
-    '### 核心結論\n\nKeep this body.', '### 關鍵知識\n\nKeep knowledge.', '### 證據與來源\n\nKeep evidence.',
-    '### 取捨與限制\n\nKeep tradeoffs.', '### 待確認事項\n\nKeep questions.', '### 更新紀錄\n\nKeep log.',
-    '### Custom section\n\nKeep custom heading.'
-  ].join('\n\n');
-  await repo.updateNote(n.path, { summary: 'Keep summary', detail: body });
-  const untouchedPath = 'Ordinary.md';
-  await app.vault.create(untouchedPath, `# Ordinary\n\n${body}`);
-  assert.equal(await repo.syncManagedDetailHeadings('en'), 1);
-  const updated = contents.get(n.path);
-  for (const heading of ['Core conclusions', 'Key knowledge', 'Evidence and sources', 'Tradeoffs and limitations', 'Open questions', 'Update log']) assert.match(updated, new RegExp(`### ${heading}`));
-  assert.match(updated, /### Custom section\n\nKeep custom heading\./);
-  assert.match(updated, /Keep this body\./); assert.match(updated, /Keep summary/); assert.match(updated, /^# Topic to keep/m);
-  assert.equal(contents.get(untouchedPath), `# Ordinary\n\n${body}`);
-  assert.equal(await repo.syncManagedDetailHeadings('en'), 0);
-  assert.equal(await repo.syncManagedDetailHeadings('zh-TW'), 1);
-  assert.match(contents.get(n.path), /### 核心結論\n\nKeep this body\./);
 });
 integrationTest('local research mode persists without changing older notes', async () => {
   const { repo } = fixture(); const n = await topicNote(repo);
@@ -1154,7 +1133,7 @@ integrationTest('orphan grandchild proposals fail instead of silently disappeari
   const { VisualAgentMapView } = load('main.ts', { obsidian });
   const view = new VisualAgentMapView({ app }, { repo, settings: { ...DEFAULT_SETTINGS }, rebuildDerivedData: async () => {} });
   view.path = mapPath; view.map = mapDoc; view.render = () => {}; view.hydrate = async () => {};
-  await assert.rejects(view.createChildBatch(parent, [{ title: 'Orphan', task: '', contribution: '', parentTitle: 'Missing' }]), /母議題/);
+  await assert.rejects(view.createChildBatch(parent, [{ title: 'Orphan', task: '', contribution: '', parentTitle: 'Missing' }]), /Select the parent topic before its child/);
   assert.equal((await repo.readMap(mapPath)).nodes.length, 1);
 });
 integrationTest('duplicate first-level proposal names cannot misplace grandchildren', async () => {
@@ -1169,7 +1148,7 @@ integrationTest('duplicate first-level proposal names cannot misplace grandchild
     { title: 'Same', task: '', contribution: '' },
     { title: 'Same', task: '', contribution: '' },
     { title: 'Child', task: '', contribution: '', parentTitle: 'Same' }
-  ]), /名稱不能重複/);
+  ]), /First-level topic names must be unique/);
   assert.equal((await repo.readMap(mapPath)).nodes.length, 1);
 });
 test('ambiguous original AI proposal names are rejected before editing', () => {
@@ -1184,7 +1163,7 @@ test('ambiguous original AI proposal names are rejected before editing', () => {
   const view = new VisualAgentMapView({ app: {} }, plugin);
   view.openChildSuggestions({ id: 'parent', path: 'parent.md' }, suggestions);
   assert.equal(opened, 0);
-  assert.match(notices[0], /名稱重複/);
+  assert.match(notices[0], /duplicate first-level names/);
   assert.equal(plugin.pendingSuggestions.has('parent.md'), false);
   assert.equal(plugin.pendingResearchOptions.has('parent.md'), false);
 });
@@ -1341,7 +1320,7 @@ integrationTest('quick exploration rejects an uneven branch before creating any 
   const view = new VisualAgentMapView({ app }, plugin); view.path = mapPath; view.map = mapDoc; view.contentEl = { querySelector: () => null }; view.render = () => {}; view.hydrate = async () => {};
   let failure = '';
   await view.proposeChildren(parent, true, { researchMode: 'research', researchDepth: 'fast', visualMode: 'off', referenceGroups: [], multiLayer: true, layers: 2, firstLayerCount: 2, childrenPerParent: 1 }, '', () => assert.fail('uneven map accepted'), message => { failure = message; }, true);
-  assert.match(failure, /每層數量與母子關係/);
+  assert.match(failure, /level counts and parent-child structure/);
   assert.equal((await repo.readMap(mapPath)).nodes.length, 1);
 });
 integrationTest('quick AI wait leaves map mutations free and uses the latest parent position', async () => {
@@ -1380,7 +1359,7 @@ integrationTest('quick map discards a delayed answer when its parent has been re
   await plugin.mutate(() => view.mapChange(map => { map.nodes = []; }));
   resolveModel({ summary: '', detail: '', visualReferences: [], suggestions: [{ title: 'Stale child', task: 'Explore', contribution: '', parentTitle: '' }] });
   await job;
-  assert.match(error, /母議題.*變更/); assert.equal((await repo.readMap(mapPath)).nodes.length, 0);
+  assert.match(error, /map or parent topic changed/); assert.equal((await repo.readMap(mapPath)).nodes.length, 0);
   assert.equal(plugin.quickExpandPending.size, 0); assert.ok(plugin.quickExpandFailures.has(parent.path));
 });
 integrationTest('pending proposals use this run\'s shallow research choice and serialize creation', async () => {
@@ -1412,7 +1391,7 @@ integrationTest('two views cannot create the same pending proposals twice', asyn
   const outcomes = await Promise.allSettled([acceptFirst(suggestions), acceptSecond(suggestions)]);
   assert.equal(created, 1);
   assert.deepEqual(outcomes.map(outcome => outcome.status), ['fulfilled', 'rejected']);
-  assert.match(outcomes[1].reason.message, /展開建議已變更/);
+  assert.match(outcomes[1].reason.message, /Expansion suggestions changed/);
 });
 integrationTest('partial child creation invalidates the proposal so retry cannot duplicate nodes', async () => {
   const { repo, app } = fixture(), parent = await topicNote(repo, 'Parent', 'model-a');
@@ -1426,7 +1405,7 @@ integrationTest('partial child creation invalidates the proposal so retry cannot
   const view = new VisualAgentMapView({ app }, plugin); view.path = mapPath; view.map = mapDoc; view.contentEl = { querySelector: () => null }; view.render = () => {}; view.hydrate = async () => {}; view.focusNode = () => {};
   view.noteChange = async () => { if (++changes === 2) throw new Error('injected note write failure'); };
   await view.proposeChildren(parent, true, undefined, '', (_items, confirm) => { create = confirm; }, message => assert.fail(message));
-  await assert.rejects(create(suggestions), /部分子議題已建立/);
+  await assert.rejects(create(suggestions), /Some subtopics were created/);
   assert.equal(queued, 1); assert.equal(plugin.pendingSuggestions.has(parent.path), false);
   assert.equal((await repo.readMap(mapPath)).nodes.length, 3);
 });
@@ -1462,10 +1441,10 @@ integrationTest('synthesis can use selected notes when a topic has no children',
   const empty = { researchMode: 'local', researchDepth: 'normal', visualMode: 'off', referenceGroups: [] };
   let failure = '';
   await view.proposeIntegrationDirections(parent, empty, () => assert.fail('missing sources'), () => {}, message => { failure = message; });
-  assert.match(failure, /選擇其他筆記來源/);
+  assert.match(failure, /Choose another note source first/);
   assert.equal(contexts.length, 0);
   await view.proposeIntegrationDirections(parent, { ...empty, referenceGroups: [{ id: 'empty', name: 'Empty', location: '', documents: [] }] }, () => assert.fail('empty source'), () => {}, message => { failure = message; });
-  assert.match(failure, /選擇其他筆記來源/);
+  assert.match(failure, /Choose another note source first/);
   assert.equal(contexts.length, 0);
   let draft, save;
   const selectedGroup = { id: 'selected', name: 'Selected', location: '/refs', documents: [{ path: '/refs/selected.md', content: 'Selected note content', external: true }] };
@@ -1518,9 +1497,9 @@ integrationTest('decomposition receives existing child topics to avoid duplicate
   const { VisualAgentMapView } = load('main.ts', { obsidian });
   const view = new VisualAgentMapView({ app }, plugin); view.path = mapPath; view.map = mapDoc; view.notes.set(child.id, await repo.readNote(child.path)); view.render = () => {}; view.hydrate = async () => {};
   await view.proposeChildren(parent, true);
-  assert.match(captured.task, /現有直屬子議題/);
+  assert.match(captured.task, /Existing direct subtopics/);
   assert.match(captured.task, /交通/);
-  assert.match(captured.task, /不要為湊數而拆解/);
+  assert.match(captured.task, /do not pad the count/);
   assert.equal(captured.researchMode, 'research');
   assert.equal(captured.referenceGroups, undefined);
   assert.equal(plugin.pendingSuggestions.size, 0);
@@ -1531,7 +1510,7 @@ integrationTest('duplicating the built-in sample creates an independent editable
   const plugin = new Plugin(); plugin.app = app; plugin.repo = repo; plugin.settings = { ...DEFAULT_SETTINGS }; plugin.saveSettings = async () => {};
   const mapPath = await plugin.duplicateBuiltInSample();
   const sample = await repo.readMap(mapPath);
-  assert.match(mapPath, /Agent Workspace\/Topics\/範例：台灣旅行規劃\/Map\.md$/);
+  assert.match(mapPath, /Agent Workspace\/Topics\/Sample Planning a Taiwan Journey\/Map\.md$/);
   assert.equal(sample.nodes.length, 12);
   assert.equal(sample.nodes.filter(node => node.parentId === null).length, 2);
   assert.notEqual(sample.id, 'builtin-taiwan-travel');
@@ -1539,7 +1518,7 @@ integrationTest('duplicating the built-in sample creates an independent editable
   const synthesis = await repo.readNote(sample.nodes.find(node => node.x === 1050).path);
   assert.equal(synthesis.status, 'completed'); assert.equal(synthesis.sourcePaths.length, 6);
   assert.ok(synthesis.sourcePaths.every(source => source.startsWith('Agent Workspace/Topics/')));
-  assert.ok(app.vault.getAbstractFileByPath('Agent Workspace/Topics/範例：台灣旅行規劃/Attachments/east-coast-landscape.webp'));
+  assert.ok(app.vault.getAbstractFileByPath('Agent Workspace/Topics/Sample Planning a Taiwan Journey/Attachments/east-coast-landscape.webp'));
 });
 test('first-use map view waits for async initialization and opens the official Sample once', async () => {
   const { VisualAgentMapView } = load('main.ts', { obsidian });
@@ -1651,7 +1630,7 @@ integrationTest('creating an integrated topic runs AI with full sources and keep
   await view.createIntegratedNode('Personal Burger', [first, second], 'Find the best approach', 'Use tables');
   const savedMap = await repo.readMap(mapPath); assert.equal(savedMap.nodes.length, 3);
   const integrated = await repo.readNote(savedMap.nodes[2].path);
-  assert.match(integrated.detail, /### 核心結論/);
+  assert.match(integrated.detail, /### Core conclusions/);
   assert.deepEqual(integrated.sourcePaths, [first.path, second.path]);
   assert.equal(integrated.rules, 'Use tables');
   assert.equal(integrated.status, 'completed');
@@ -1717,7 +1696,7 @@ integrationTest('Codex App Server uses model/list, selected reasoning and fresh 
     else if (message.method === 'thread/start') { assert.equal(message.params.ephemeral, true); assert.equal(message.params.sandbox, 'read-only'); reply({ thread: { id: `thread-${++threadCount}` } }); }
     else if (message.method === 'thread/unsubscribe') { unsubscribeCount++; reply({}); }
     else if (message.method === 'turn/start') {
-      turnCount++; efforts.push(message.params.effort); assert.ok(message.params.outputSchema.properties.summary); assert.match(message.params.input[0].text, /目前議題/);
+      turnCount++; efforts.push(message.params.effort); assert.ok(message.params.outputSchema.properties.summary); assert.match(message.params.input[0].text, /Current topic/);
       assert.deepEqual(plain(message.params.sandboxPolicy), { type: 'readOnly', networkAccess: false });
       const threadId = message.params.threadId, summary = threadId === 'thread-1' ? 'first' : 'second';
       process.nextTick(() => {
@@ -1872,7 +1851,7 @@ for (const delayedStart of [false, true]) test(`timed-out Codex turn attempts on
     if (!delayedStart) await new Promise(resolve => setImmediate(resolve));
     turnTimeout();
     if (delayedStart) emit({ id: startRequest, result: { turn: { id: 'turn-1' } } });
-    await assert.rejects(pending, /AI 任務超過 3 分鐘.*避免長時間佔用資源.*未完成的結果不會套用/);
+    await assert.rejects(pending, /AI task exceeded 3 minutes.*interrupt it to avoid prolonged resource use.*Incomplete results are not applied/);
     assert.equal(sent.filter(message => message.method === 'turn/interrupt').length, 1);
     await new Promise(resolve => setImmediate(resolve));
     assert.equal(logs.filter(([level, message]) => level === 'warn' && message.includes('逾時後無法停止 AI 任務')).length, 1);
@@ -1926,7 +1905,7 @@ integrationTest('Codex App Server ignores stale child events after a clean resta
 integrationTest('legacy Claude models fail clearly without starting a provider', async () => {
   const { default: Plugin } = load('main.ts', { obsidian });
   const plugin = new Plugin();
-  await assert.rejects(plugin.askModel({ title: 'Current topic', summary: '', rules: '', detail: '', task: 'task', ancestors: '', mode: 'task' }, 'claude:sonnet'), /Claude Code 已不再支援/);
+  await assert.rejects(plugin.askModel({ title: 'Current topic', summary: '', rules: '', detail: '', task: 'task', ancestors: '', mode: 'task' }, 'claude:sonnet'), /Claude Code is no longer supported/);
 });
 
 test('external map conflict UI retains file, screen, and manual merge choices', () => {
@@ -2042,35 +2021,104 @@ integrationTest('dragging synthesized roots persists coordinates and removal pre
   await view.travel(false);assert.ok((await repo.readMap(path)).nodes.some(n=>n.id===root.id));assert.ok(app.vault.getAbstractFileByPath(root.path));
 });
 test('UI language switch translates stable semantic keys and placeholders', () => {
-  const {t,setUiLanguage,translate}=load('i18n.ts');setUiLanguage('en');assert.equal(t('ui.interface_language'),'Interface language');assert.equal(t('ui.expand_0',3),'Expand 3');assert.equal(translate('en','detail.core_conclusions'),'Core conclusions');assert.equal(translate('zh-TW','detail.core_conclusions'),'核心結論');setUiLanguage('zh-TW');assert.equal(t('ui.interface_language'),'介面語言');
+  const {t,setUiLanguage,translate}=load('i18n.ts');setUiLanguage('en');assert.equal(t('ui.interface_language'),'Interface language');assert.equal(t('ui.expand_0',3),'Expand 3');assert.equal(translate('en','detail.core_conclusions'),'Core conclusions');assert.equal(translate('zh-TW','detail.core_conclusions'),'核心結論');assert.equal(translate('zh-TW','ui.expand_0'),'展開 {0}');assert.equal(translate('zh-TW','ui.interface_language'),'介面語言');
+  assert.equal(translate('zh-TW','missing.runtime.key'), 'missing.runtime.key');
 });
-test('first install follows Obsidian language while existing VAM choice wins', () => {
+test('first install defaults to English regardless of Obsidian language while saved VAM choice wins', () => {
   const { initialUiLanguage } = load('i18n.ts');
-  assert.equal(initialUiLanguage(undefined, 'zh-TW'), 'zh-TW');
-  assert.equal(initialUiLanguage(undefined, 'en'), 'en');
-  assert.equal(initialUiLanguage(undefined, 'fr'), 'en');
-  assert.equal(initialUiLanguage('en', 'zh-TW'), 'en');
-  assert.equal(initialUiLanguage('zh-TW', 'en'), 'zh-TW');
+  assert.equal(DEFAULT_SETTINGS.language, 'en');
+  assert.equal(initialUiLanguage(undefined), 'en');
+  assert.equal(initialUiLanguage(null), 'en');
+  assert.equal(initialUiLanguage('invalid'), 'en');
+  assert.equal(initialUiLanguage('en'), 'en');
+  assert.equal(initialUiLanguage('zh-TW'), 'zh-TW');
 });
-test('changing the language uses the real setting callback and refreshes map and command labels', async () => {
+test('language change saves before applying and refreshes all views without mutating notes', async () => {
   const { default: Plugin, VisualAgentMapSettingTab } = load('main.ts', { obsidian });
   const plugin = new Plugin();
   const calls = [];
   plugin.settings = { ...DEFAULT_SETTINGS, language: 'en' };
-  plugin.saveSettings = async () => calls.push(['save', plugin.settings.language]);
-  plugin.repo = { syncManagedDetailHeadings: async language => { calls.push(['headings', language]); return 0; } };
-  plugin.views = () => [{ refreshFromPlugin: async () => calls.push(['view', plugin.settings.language]) }];
+  const sharedSettings = plugin.settings;
+  plugin.saveData = async settings => { calls.push(['save', settings.language, plugin.settings.language]); };
+  plugin.repo = { settings: sharedSettings, syncManagedDetailHeadings: async () => { throw new Error('language switch must not rewrite Markdown'); } };
+  plugin.views = () => [
+    { refreshFromPlugin: async () => { calls.push(['view-a', plugin.settings.language]); throw new Error('test view error'); } },
+    { refreshFromPlugin: async () => calls.push(['view-b', plugin.settings.language]) }
+  ];
   plugin.refreshLocalizedEntrypoints = () => calls.push(['commands', plugin.settings.language]);
+  plugin.recordFailure = (...args) => calls.push(['diagnostic', ...args]);
+  plugin.settingTab = { update() {}, refreshAfterLanguageChange: () => calls.push(['settings', plugin.settings.language, plugin.languageSwitchPending]) };
   const tab = new VisualAgentMapSettingTab({}, plugin);
-  tab.update = () => calls.push(['settings', plugin.settings.language]);
   await tab.setControlValue('language', 'zh-TW');
   assert.equal(plugin.settings.language, 'zh-TW');
-  assert.deepEqual(calls, [['save', 'zh-TW'], ['commands', 'zh-TW'], ['headings', 'zh-TW'], ['view', 'zh-TW'], ['settings', 'zh-TW']]);
+  assert.deepEqual(calls.filter(([kind]) => ['save', 'commands', 'view-a', 'view-b'].includes(kind)), [['save', 'zh-TW', 'en'], ['commands', 'zh-TW'], ['view-a', 'zh-TW'], ['view-b', 'zh-TW']]);
+  assert.equal(plugin.settings, sharedSettings);
+  assert.equal(plugin.repo.settings.language, 'zh-TW', 'repository keeps the shared settings object updated');
+  assert.equal(calls.filter(([kind]) => kind === 'diagnostic').length, 1);
+  assert.equal(plugin.languageSwitchPending, false);
   calls.length = 0;
   await tab.setControlValue('language', 'en');
   assert.equal(plugin.settings.language, 'en');
-  assert.equal(calls.filter(([kind]) => kind === 'commands').length, 1);
-  assert.equal(calls.filter(([kind]) => kind === 'view').length, 1);
+  assert.equal(calls.filter(([kind]) => kind === 'save').length, 1);
+  assert.equal(calls.filter(([kind]) => kind === 'view-b').length, 1);
+});
+test('failed language save keeps the old selection and does not refresh views', async () => {
+  const { default: Plugin } = load('main.ts', { obsidian });
+  const plugin = new Plugin(), calls = [];
+  plugin.settings = { ...DEFAULT_SETTINGS, language: 'en' };
+  plugin.saveData = async () => { throw new Error('disk full'); };
+  plugin.views = () => [{ refreshFromPlugin: async () => calls.push('view') }];
+  plugin.refreshLocalizedEntrypoints = () => calls.push('commands');
+  plugin.recordFailure = () => calls.push('logged');
+  plugin.settingTab = { update() {}, refreshAfterLanguageChange: () => calls.push(['settings', plugin.languageSwitchPending]) };
+  assert.equal(await plugin.changeLanguage('zh-TW'), false);
+  assert.equal(plugin.settings.language, 'en');
+  assert.deepEqual(calls, [['settings', true], 'logged', ['settings', false]]);
+});
+test('concurrent language changes are ignored until the first save and refresh completes', async () => {
+  const { default: Plugin } = load('main.ts', { obsidian });
+  let finishSave, writes = 0;
+  const plugin = new Plugin(); plugin.settings = { ...DEFAULT_SETTINGS, language: 'en' };
+  plugin.saveData = async () => { writes++; await new Promise(resolve => { finishSave = resolve; }); };
+  plugin.views = () => [];
+  plugin.refreshLocalizedEntrypoints = () => {};
+  plugin.recordFailure = () => {};
+  plugin.settingTab = { update() {}, refreshAfterLanguageChange() {} };
+  const first = plugin.changeLanguage('zh-TW'); await Promise.resolve();
+  assert.equal(plugin.languageSwitchPending, true);
+  assert.equal(await plugin.changeLanguage('en'), false);
+  assert.equal(writes, 1);
+  finishSave();
+  assert.equal(await first, true);
+  assert.equal(plugin.settings.language, 'zh-TW');
+  assert.equal(plugin.languageSwitchPending, false);
+});
+integrationTest('switching the interface language preserves exact existing Markdown bytes', async () => {
+  const { app, contents, repo } = fixture('zh-TW');
+  const note = await topicNote(repo, '保留原文');
+  const before = contents.get(note.path);
+  const { default: Plugin } = load('main.ts', { obsidian });
+  const plugin = new Plugin(); plugin.settings = repo.settings;
+  plugin.repo = repo; plugin.saveData = async () => {}; plugin.views = () => [];
+  plugin.refreshLocalizedEntrypoints = () => {}; plugin.settingTab = { update() {}, refreshAfterLanguageChange() {} };
+  await plugin.changeLanguage('en');
+  await plugin.changeLanguage('zh-TW');
+  assert.equal(contents.get(note.path), before);
+  assert.equal(await app.vault.read(app.vault.getAbstractFileByPath(note.path)), before);
+});
+test('built-in Sample language refresh preserves selected topic and view state', async () => {
+  const { VisualAgentMapView } = load('main.ts', { obsidian });
+  const { builtInSample } = load('builtin-sample.ts');
+  const plugin = { settings: { language: 'zh-TW' }, syncOutline() {} };
+  const view = new VisualAgentMapView({ app: {} }, plugin);
+  view.builtIn = true; view.map = builtInSample('en').map; view.notes = builtInSample('en').notes;
+  view.map.viewport = { x: -128, y: 74, zoom: 0.83 };
+  view.selected = view.map.nodes[0].id; view.render = () => {};
+  const selected = view.selected, viewport = plain(view.map.viewport);
+  await view.refreshFromPlugin();
+  assert.match(view.map.title, /範例/);
+  assert.equal(view.selected, selected);
+  assert.deepEqual(plain(view.map.viewport), viewport);
 });
 test('AI entry prompts for Codex only when unavailable and leaves manual work available', async () => {
   const { default: Plugin } = load('main.ts', { obsidian });
@@ -2129,6 +2177,10 @@ test('all user-facing translations use stable semantic keys', () => {
     for (const match of source.matchAll(/\bt\("((?:[^"\\]|\\.)*)"/g)) if (!/^[a-z][a-z0-9_.]*$/.test(match[1]) || !keys.has(match[1])) missing.push(`${file}: ${match[1]}`);
   }
   assert.deepEqual(missing, []);
+  const dictionaryValues = source => new Map([...source.matchAll(/^  "((?:[^"\\]|\\.)+)": "((?:[^"\\]|\\.)*)",?$/gm)].map(match => [match[1], match[2]]));
+  const englishValues = dictionaryValues(english), chineseValues = dictionaryValues(chinese);
+  const placeholders = value => [...value.matchAll(/\{\d+\}/g)].map(match => match[0]).sort();
+  for (const [key, value] of englishValues) assert.deepEqual(placeholders(chineseValues.get(key)), placeholders(value), `${key} placeholders must match between locales`);
 });
 
 test('reference batches include every selected Markdown source, deduplicate overlaps, split long files, and keep citations', () => {

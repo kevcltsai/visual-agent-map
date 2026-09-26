@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.9.7] - 2026-09-27
+
+### Changed
+
+- Fresh installs now use English as the VAM interface language by default, while an existing saved VAM language choice remains unchanged.
+- Switching languages updates the interface and official read-only Sample without changing existing map titles or notes.
+- Sample duplication, empty-map creation, and manual editing remain available without Codex; Codex setup is required only for AI tasks.
+
 ## [0.9.6] - 2026-09-26
 
 ### Added

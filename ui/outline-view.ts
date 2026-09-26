@@ -16,10 +16,18 @@ export class OutlineView extends ItemView {
   getIcon(): string { return "list-tree"; }
   async onOpen(): Promise<void> { this.render(); }
   setMap(map: MapDocument | null, titles: Map<string, string>): void {
+    const search = this.contentEl.querySelector<HTMLInputElement>(".vam-outline-search");
+    const restoreFocus = !!search && search === document.activeElement;
+    const selection = restoreFocus ? [search.selectionStart, search.selectionEnd] as const : null;
     this.map = map;
     this.titles = titles;
     if (map) this.collapsed = new Set([...this.collapsed].filter(id => map.nodes.some(node => node.id === id)));
     this.render();
+    if (restoreFocus) {
+      const updated = this.contentEl.querySelector<HTMLInputElement>(".vam-outline-search");
+      updated?.focus();
+      if (updated && selection && selection[0] !== null && selection[1] !== null) updated.setSelectionRange(selection[0], selection[1]);
+    }
   }
   setActivePath(path: string): void { this.activePath = path; this.render(); }
   private render(): void {

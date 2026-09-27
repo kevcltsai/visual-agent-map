@@ -18,15 +18,18 @@ source-notes: [Notes/budget.md, Notes/companions.md, Notes/rail-car.md, Notes/fo
 ## Prompt
 
 
-## Rules
-
-整合後仍保留所有來源議題，方便回頭檢查假設。
 ## 預覽
 
 D1–2 台北；D3 嘉義／阿里山；D4–5 台南；D6–8 花東；D9 花蓮返程。
 ## Detail
 
 <!-- visual-agent-map:detail:start -->
+### 本次任務要求
+
+執行 AI 任務前，請將這次需要遵守的條件填入**本次附加要求**；只寫在筆記裡不會自動套用為任務指令。
+
+> 整合後仍保留所有來源議題，方便回頭檢查假設。
+
 ![九天旅程時間軸](../Attachments/nine-day-timeline.webp)
 
 1. 台北兩天：抵達、城市散步與調整節奏。

@@ -18,14 +18,17 @@ Use Taipei, Chiayi or Taichung, Tainan, and Hualien as four bases to reduce repe
 ## Prompt
 
 Filter areas by transport access, evening safety, and luggage needs.
-## Rules
-
-Location convenience matters more than maximizing room choices.
 ## Preview
 
 Four bases support nine days, with each base serving a clear role.
 ## Detail
 
 <!-- visual-agent-map:detail:start -->
+### Requirements for this run
+
+Before starting an AI task, copy the conditions you want it to follow into **Additional requirements**. This note does not apply them automatically.
+
+> Location convenience matters more than maximizing room choices.
+
 Evaluate lodging and transport together rather than optimizing them independently.
 <!-- visual-agent-map:detail:end -->

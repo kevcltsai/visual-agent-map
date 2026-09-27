@@ -46,12 +46,13 @@ jobs:
             manifest.json
             styles.css
 
-      - name: Create or update GitHub release
+      - name: Create GitHub release (never overwrite)
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           if gh release view "$GITHUB_REF_NAME" >/dev/null 2>&1; then
-            gh release upload "$GITHUB_REF_NAME" main.js manifest.json styles.css --clobber
+            echo "Release already exists; refusing to overwrite published assets." >&2
+            exit 1
           else
             gh release create "$GITHUB_REF_NAME" main.js manifest.json styles.css --title "$GITHUB_REF_NAME" --generate-notes
           fi

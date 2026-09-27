@@ -18,15 +18,18 @@ Enter through Taipei and leave from Hualien, using rail to connect cities, food,
 ## Prompt
 
 
-## Rules
-
-Keep every source topic so the assumptions remain reviewable.
 ## Preview
 
 Days 1–2 Taipei; day 3 Chiayi and Alishan; days 4–5 Tainan; days 6–8 eastern Taiwan; day 9 Hualien departure.
 ## Detail
 
 <!-- visual-agent-map:detail:start -->
+### Requirements for this run
+
+Before starting an AI task, copy the conditions you want it to follow into **Additional requirements**. This note does not apply them automatically.
+
+> Keep every source topic so the assumptions remain reviewable.
+
 ![Nine-day journey timeline](../Attachments/nine-day-timeline.webp)
 
 1. Two days in Taipei to arrive and settle into the pace.

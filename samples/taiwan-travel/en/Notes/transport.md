@@ -18,15 +18,18 @@ Use rail between cities and short car rentals only where remote sights require t
 ## Prompt
 
 Compare time, transfers, luggage burden, and cancellation flexibility.
-## Rules
-
-Prefer adjustable options with manageable luggage handling.
 ## Preview
 
 High-speed and conventional rail connect the main stops; short rentals cover remote areas.
 ## Detail
 
 <!-- visual-agent-map:detail:start -->
+### Requirements for this run
+
+Before starting an AI task, copy the conditions you want it to follow into **Additional requirements**. This note does not apply them automatically.
+
+> Prefer adjustable options with manageable luggage handling.
+
 ![Train and short rental car roles](../Attachments/rail-and-car-options.webp)
 
 Different journey segments need different tools; one mode does not need to serve the entire trip.

@@ -18,15 +18,18 @@ Use high-speed rail in the west, conventional rail in the east, and short rental
 ## Prompt
 
 Confirm pickup locations and wet-weather alternatives near each base.
-## Rules
-
-Avoid extended driving on tiring transfer days.
 ## Preview
 
 Breaking transport into executable segments exposes transfer and buffer risks.
 ## Detail
 
 <!-- visual-agent-map:detail:start -->
+### Requirements for this run
+
+Before starting an AI task, copy the conditions you want it to follow into **Additional requirements**. This note does not apply them automatically.
+
+> Avoid extended driving on tiring transfer days.
+
 - West: fast intercity connections.
 - East: rail travel along the route.
 - Remote areas: one- or two-day rentals.

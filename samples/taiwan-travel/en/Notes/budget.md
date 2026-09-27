@@ -18,9 +18,6 @@ Allocate by proportion and preserve a buffer instead of relying on prices that q
 ## Prompt
 
 Update this split after checking prices for the actual travel dates.
-## Rules
-
-Record the lookup date and uncertainty for every estimate.
 ## Preview
 
 | Category | Suggested share |
@@ -32,5 +29,11 @@ Record the lookup date and uncertainty for every estimate.
 ## Detail
 
 <!-- visual-agent-map:detail:start -->
+### Requirements for this run
+
+Before starting an AI task, copy the conditions you want it to follow into **Additional requirements**. This note does not apply them automatically.
+
+> Record the lookup date and uncertainty for every estimate.
+
 These proportions demonstrate a planning method; they are not current prices.
 <!-- visual-agent-map:detail:end -->

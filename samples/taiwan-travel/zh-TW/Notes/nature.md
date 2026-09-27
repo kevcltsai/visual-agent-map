@@ -18,9 +18,6 @@ source-notes: []
 ## Prompt
 
 依季節確認步道、天候與交通限制。
-## Rules
-
-任何戶外安排都要有替代方案。
 ## 預覽
 
 ![台灣東海岸的山海景觀](../Attachments/east-coast-landscape.webp)
@@ -29,5 +26,11 @@ source-notes: []
 ## Detail
 
 <!-- visual-agent-map:detail:start -->
+### 本次任務要求
+
+執行 AI 任務前，請將這次需要遵守的條件填入**本次附加要求**；只寫在筆記裡不會自動套用為任務指令。
+
+> 任何戶外安排都要有替代方案。
+
 阿里山、花東縱谷與東海岸提供不同尺度的自然體驗；不要把三者都壓縮成快速打卡。
 <!-- visual-agent-map:detail:end -->

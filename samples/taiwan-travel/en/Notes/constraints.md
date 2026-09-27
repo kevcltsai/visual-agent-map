@@ -18,14 +18,17 @@ Fix the duration, budget, companion needs, and travel intensity before adding de
 ## Prompt
 
 Check these constraints for conflicts and required tradeoffs.
-## Rules
-
-Protect rest and transit buffers instead of maximizing the attraction count.
 ## Preview
 
 Nine days, four lodging bases, and lighter plans on transfer days.
 ## Detail
 
 <!-- visual-agent-map:detail:start -->
+### Requirements for this run
+
+Before starting an AI task, copy the conditions you want it to follow into **Additional requirements**. This note does not apply them automatically.
+
+> Protect rest and transit buffers instead of maximizing the attraction count.
+
 Constraints are shared decision rules for every branch, not an afterthought.
 <!-- visual-agent-map:detail:end -->

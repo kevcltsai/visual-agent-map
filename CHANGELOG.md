@@ -1,5 +1,23 @@
 # Changelog
 
+## [0.9.8] - 2026-09-27
+
+### Added
+
+- Experimental local Claude Code support alongside Codex, with per-topic model routing, separate CLI setup and provider usage notices. Successful live Claude tasks remain unverified; shared mock tests pass.
+- Full-content (default) and quick-summary synthesis choices for direct children and selected topics, with complete extra Markdown source processing.
+
+### Fixed
+
+- Official samples now teach per-run Additional requirements instead of populated legacy Rules; existing notes and sample copies remain unchanged.
+- Provider selection updates task readiness checks without silently switching services.
+- Corrupt AI exchange and pending-suggestion JSON is preserved and further persistence is stopped instead of silently overwriting it.
+- Strict lint, artifact checks, regression gates and release protections now share the same automated verification path.
+
+### Known limitations
+
+- Codex model discovery may require Check again in settings after startup. Claude live research, search, synthesis and cross-provider quality comparison await validation.
+
 ## [0.9.7] - 2026-09-27
 
 ### Changed

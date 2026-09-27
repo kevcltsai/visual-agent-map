@@ -18,9 +18,6 @@ source-notes: []
 ## Prompt
 
 加入同行者的飲食限制與可替代選項。
-## Rules
-
-不讓排隊名店控制整天行程。
 ## 預覽
 
 ![台灣地方餐桌：滷肉飯、湯品與小菜](../Attachments/regional-food.webp)
@@ -29,5 +26,11 @@ source-notes: []
 ## Detail
 
 <!-- visual-agent-map:detail:start -->
+### 本次任務要求
+
+執行 AI 任務前，請將這次需要遵守的條件填入**本次附加要求**；只寫在筆記裡不會自動套用為任務指令。
+
+> 不讓排隊名店控制整天行程。
+
 台南小吃、嘉義地方料理與花東風味都可成為探索方向；實際店家需依日期重新查核。
 <!-- visual-agent-map:detail:end -->

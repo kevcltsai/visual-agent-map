@@ -1,11 +1,17 @@
 import { existsSync, readFileSync } from "node:fs";
 
 const required = ["main.js", "manifest.json", "styles.css"];
+for (const path of ["README.md", "LICENSE"]) if (!existsSync(path)) throw new Error(`Missing distribution document: ${path}`);
 for (const path of required) if (!existsSync(path)) throw new Error(`Missing release artifact: ${path}`);
 if (!existsSync("response-schema.json")) throw new Error("Missing response-schema.json source.");
 if (!readFileSync("main.js", "utf8").includes("https://json-schema.org/draft/2020-12/schema")) throw new Error("main.js does not contain the embedded response schema.");
 
 const manifest = JSON.parse(readFileSync("manifest.json", "utf8"));
+for (const field of ["id", "name", "version", "minAppVersion", "author", "description"]) {
+  if (typeof manifest[field] !== "string" || !manifest[field].trim()) throw new Error(`Invalid manifest field: ${field}`);
+}
+if (manifest.isDesktopOnly !== true) throw new Error("VAM uses Node APIs and must be desktop-only.");
+if (!/^\d+\.\d+\.\d+$/.test(manifest.minAppVersion)) throw new Error("Invalid manifest minAppVersion.");
 const packageJson = JSON.parse(readFileSync("package.json", "utf8"));
 const packageLock = JSON.parse(readFileSync("package-lock.json", "utf8"));
 const versions = JSON.parse(readFileSync("versions.json", "utf8"));

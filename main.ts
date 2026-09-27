@@ -1,5 +1,5 @@
 import { t, setUiLanguage, topicStatusLabel, translate, initialUiLanguage, type TranslationKey } from "./i18n";
-import { App, MarkdownRenderer, FileSystemAdapter, ItemView, MarkdownView, Modal, Notice, Plugin, PluginSettingTab, Setting, TFile, WorkspaceLeaf, type Command, type SettingDefinitionItem } from "obsidian";
+import { App, MarkdownRenderer, FileSystemAdapter, ItemView, MarkdownView, Modal, Notice, Plugin, PluginSettingTab, Setting, TFile, View, WorkspaceLeaf, type Command, type SettingDefinitionItem } from "obsidian";
 import { ReferencePicker, type ReferenceTopic } from "./ui/reference-picker";
 import { packReferenceChunks, readMarkdownFile, referenceBatches, type ReferenceGroup } from "./ai/reference-materials";
 import { NameModal } from "./ui/modals/name-modal";
@@ -23,6 +23,8 @@ import { OutlineView, OUTLINE_VIEW_TYPE } from "./ui/outline-view";
 import { randomUUID } from "node:crypto";
 import responseSchema from "./response-schema.json";
 import { CodexAppServerRuntime } from "./ai/runtime/codex-app-server";
+import { ClaudeCodeCliRuntime } from "./ai/runtime/claude-code-cli";
+import { CLAUDE_MODEL_CHOICES, providerForModel, providerModelId } from "./ai/providers/provider";
 
 export { buildPreparedTaskContext } from "./ai/context-builder";
 export { canonicalDetail, visualReferencesMarkdown } from "./ai/result-utils";
@@ -30,6 +32,7 @@ export { firstMarkdownImage, firstMarkdownTable, markdownImages } from "./ui/pre
 export type { AiRunMetrics, PreparedTaskContext } from "./ai/types";
 const VIEW_TYPE = "visual-agent-map-view";
 const CODEX_INSTALL_URL = "https://developers.openai.com/codex/cli/";
+const CLAUDE_INSTALL_URL = "https://code.claude.com/docs/en/setup";
 type ProcessEnvironment = Record<string, string | undefined>;
 function typedNodeBinding<T>(value: unknown): T { return value as T; }
 const existsSync = typedNodeBinding<(path: string) => boolean>(nodeExistsSync);
@@ -81,7 +84,27 @@ export function executableCandidates(configured: string, home: string, pathValue
   ].filter(Boolean);
   return [...new Set(dirs)].map(directory => join(directory, configured));
 }
-interface TaskOptions { referenceGroups?: ReferenceGroup[]; onProgress?: (message: string) => void; signal?: AbortSignal; requirements?: string; researchMode: ResearchMode; researchDepth: ResearchDepth; visualMode: VisualMode; multiLayer?: boolean; shallowResearch?: boolean; layers?: number; firstLayerCount?: number; childrenPerParent?: number }
+type SynthesisContent = "full" | "summary";
+interface TaskOptions { synthesisContent?: SynthesisContent; referenceGroups?: ReferenceGroup[]; onProgress?: (message: string) => void; signal?: AbortSignal; requirements?: string; researchMode: ResearchMode; researchDepth: ResearchDepth; visualMode: VisualMode; multiLayer?: boolean; shallowResearch?: boolean; layers?: number; firstLayerCount?: number; childrenPerParent?: number }
+function renderSynthesisContent(parent: HTMLElement, topics: string[]): HTMLSelectElement {
+  const label = parent.createEl("label", { cls: "vam-field" });
+  label.createSpan({ text: t("ui.synthesis_content") });
+  const select = label.createEl("select"); select.setAttr("aria-label", t("ui.synthesis_content"));
+  select.createEl("option", { value: "full", text: t("ui.synthesis_content_full") });
+  select.createEl("option", { value: "summary", text: t("ui.synthesis_content_summary") });
+  select.value = "full";
+  const hint = parent.createEl("p", { cls: "vam-hint", text: t("ui.synthesis_content_full_hint") });
+  hint.setAttr("aria-live", "polite");
+  select.addEventListener("change", () => hint.setText(t(select.value === "summary" ? "ui.synthesis_content_summary_hint" : "ui.synthesis_content_full_hint")));
+  parent.createEl("p", { cls: "vam-hint", text: t("ui.synthesis_content_scope") });
+  parent.createEl("p", { cls: "vam-hint", text: t("ui.synthesis_content_locked_hint") });
+  parent.createEl("strong", { text: t("ui.synthesis_source_topics") });
+  if (topics.length) {
+    const list = parent.createEl("ul");
+    for (const title of topics) list.createEl("li", { text: title });
+  } else parent.createEl("p", { cls: "vam-hint", text: t("ui.synthesis_no_source_topics") });
+  return select;
+}
 function researchDepthDescription(depth: ResearchDepth): string {
   const description = depth === "fast"
     ? t("ui.quick_aim_for_up_to_1_web_search_and_2_main_sources_answer_t")
@@ -111,7 +134,7 @@ function imageReferencesFromMarkdown(markdown: string): string {
   return [...new Set(blocks)].join("\n\n");
 }
 class PartialChildBatchError extends Error {}
-interface TaskSourceSettings { topics: () => Promise<ReferenceTopic[]>; readTopic: (topic: ReferenceTopic, signal: AbortSignal, progress: (message: string) => void) => Promise<{ path: string; content: string }[]>; currentTopicId: string; currentLabel: string; synthesisLabel?: string }
+interface TaskSourceSettings { topics: () => Promise<ReferenceTopic[]>; readTopic: (topic: ReferenceTopic, signal: AbortSignal, progress: (message: string) => void) => Promise<{ path: string; content: string }[]>; currentTopicId: string; currentLabel: string; synthesisLabel?: string; synthesisTopics?: string[] }
 function quickShape(layers: number, firstLayerCount: number, childrenPerParent: number): { counts: bigint[]; total: bigint } {
   if (![layers, firstLayerCount, childrenPerParent].every(Number.isSafeInteger) || layers < 1 || layers > 15 || firstLayerCount < 1 || childrenPerParent < 0) throw new Error(t("ui.levels_first_level_count_and_children_per_topic_must_be_posi"));
   const counts: bigint[] = [];
@@ -142,7 +165,7 @@ function quickSuggestions(items: Suggestion[], layers: number, firstLayerCount: 
   return selected;
 }
 class TaskModal extends Modal {
-  constructor(app: App, private value: string, private submit: (value: string, run: boolean, options: TaskOptions, rules: string) => void, private titleText = t("ui.custom_ai_task"), private description = t("ui.describe_what_you_want_ai_to_do_next"), private rules = "", private mode: ResearchMode = "research", private depth: ResearchDepth = "normal", private visual: VisualMode = "auto", _allowSave = true, private expand = false, private referenceSettings?: TaskSourceSettings) { super(app); }
+  constructor(app: App, private value: string, private submit: (value: string, run: boolean, options: TaskOptions, rules: string) => void, private titleText = t("ui.custom_ai_task"), private description = t("ui.describe_what_you_want_ai_to_do_next"), private rules = "", private mode: ResearchMode = "research", private depth: ResearchDepth = "normal", private visual: VisualMode = "auto", _allowSave = true, private expand = false, private referenceSettings?: TaskSourceSettings, private synthesisTopics?: string[]) { super(app); }
   onOpen(): void {
     this.titleEl.setText(this.titleText);
     this.contentEl.createEl("p", { text: this.description, cls: "vam-modal-intro" });
@@ -152,6 +175,7 @@ class TaskModal extends Modal {
     input.setAttr("aria-label", t("ui.additional_requirements"));
     this.contentEl.createEl("p", { text: t("ui.requirements_this_task_only"), cls: "vam-hint" });
     if (this.rules.trim()) this.contentEl.createEl("p", { text: t("ui.legacy_rules_not_applied"), cls: "vam-hint" });
+    const synthesis = this.synthesisTopics ? renderSynthesisContent(this.contentEl, this.synthesisTopics) : undefined;
     const referenceLabel = this.expand ? this.referenceSettings?.currentLabel : this.referenceSettings?.synthesisLabel ?? this.referenceSettings?.currentLabel;
     const references = this.referenceSettings ? new ReferencePicker(this.app, this.contentEl, this.referenceSettings.topics, this.referenceSettings.readTopic, this.referenceSettings.currentTopicId, referenceLabel ?? "", this.mode !== "local", this.visual !== "off") : null;
     const depthLabel = this.contentEl.createEl("label", { cls: "vam-field" }); depthLabel.createSpan({ text: t("ui.research_depth") });
@@ -166,9 +190,11 @@ class TaskModal extends Modal {
     if (layers) layers.createSpan({ text: t("ui.create_two_levels_and_research_each_topic_briefly_up_to_15") });
     const save = async (run: boolean): Promise<void> => {
       const value = this.value;
+      const synthesisContent: SynthesisContent = synthesis?.value === "summary" ? "summary" : "full";
+      if (synthesis) synthesis.disabled = true;
       const sources = await references?.ready();
       const shallowResearch = multiLayer?.checked ?? false;
-      this.close(); this.submit(value, run, { referenceGroups: sources?.groups ?? [], requirements: input.value.trim(), researchMode: sources?.webSearch ? "research" : "local", researchDepth: depth.value as ResearchDepth, visualMode: sources?.imageSearch ? (this.visual === "on" ? "on" : "auto") : "off", multiLayer: shallowResearch }, "");
+      this.close(); this.submit(value, run, { ...(synthesis ? { synthesisContent } : {}), referenceGroups: sources?.groups ?? [], requirements: input.value.trim(), researchMode: sources?.webSearch ? "research" : "local", researchDepth: depth.value as ResearchDepth, visualMode: sources?.imageSearch ? (this.visual === "on" ? "on" : "auto") : "off", multiLayer: shallowResearch }, "");
     };
     new Setting(this.contentEl).addButton(b => b.setButtonText(t("ui.cancel")).onClick(() => this.close()))
       .addButton(b => b.setButtonText(t("ui.confirm_and_run")).setCta().onClick(() => { void save(true).catch(error => new Notice(String(error))); }));
@@ -220,11 +246,16 @@ export class NextStepModal extends Modal {
     };
     const modelLabel = advanced.createEl("label", { cls: "vam-field" }); modelLabel.createSpan({ text: t("ui.model") });
     const model = modelLabel.createEl("select"); model.setAttr("aria-label", t("ui.model"));
-    const options = new Set(this.plugin.settings.models.split(/[\n,]/).map(value => value.trim()).filter(Boolean));
-    for (const value of options) model.createEl("option", { value, text: value });
+    const optionList = typeof this.plugin.availableModels === "function" ? this.plugin.availableModels() : this.plugin.settings.models.split(/[\n,]/).map((value: string) => value.trim()).filter(Boolean);
+    const options = new Set<string>(optionList);
+    for (const value of options) model.createEl("option", { value, text: typeof this.plugin.modelLabel === "function" ? this.plugin.modelLabel(value) : value });
     if (!options.has(settings.model)) { const unavailable = model.createEl("option", { value: settings.model, text: t("ui.current_model_is_unavailable") }); unavailable.disabled = true; }
     model.value = settings.model;
-    model.addEventListener("change", () => { if (options.has(model.value)) save({ model: model.value, modelSource: "manual" }); });
+    model.addEventListener("change", () => {
+      if (!options.has(model.value)) return;
+      settings.model = model.value; settings.modelSource = "manual";
+      save({ model: settings.model, modelSource: settings.modelSource });
+    });
     const reasoningLabel = advanced.createEl("label", { cls: "vam-field" }); reasoningLabel.createSpan({ text: t("ui.reasoning_level") });
     const reasoning = reasoningLabel.createEl("select"); reasoning.setAttr("aria-label", t("ui.reasoning_level"));
     for (const [value, label] of [["auto", t("ui.auto")], ["low", t("ui.low")], ["medium", t("ui.medium")], ["high", t("ui.high")]]) reasoning.createEl("option", { value, text: label });
@@ -236,7 +267,6 @@ export class NextStepModal extends Modal {
   private async run(panel: HTMLElement, button: HTMLButtonElement, work: () => Promise<void>, needsUsage = true): Promise<void> {
     if (button.disabled || (this.taskController && !this.taskController.signal.aborted)) return;
     button.disabled = true;
-    if (!await this.plugin.codexReadyForAi()) { this.failed(panel, button, t("ui.codex_required_for_ai")); return; }
     const start = async (): Promise<void> => {
       button.disabled = true;
       const controller = new AbortController(); this.taskController = controller; this.taskSignal = controller.signal;
@@ -260,13 +290,13 @@ export class NextStepModal extends Modal {
         } else release();
       }
     };
-    if (!needsUsage || this.plugin.settings.codexUsageNoticeSeen) { await start(); return; }
-    const notice = panel.querySelector<HTMLElement>(".vam-next-usage") ?? panel.createDiv("vam-next-usage");
-    notice.empty();
-    notice.createEl("strong", { text: t("ui.codex_allowance_notice") });
-    notice.createEl("p", { text: t("ui.vam_runs_ai_tasks_through_your_signed_in_codex_account_and_u") });
-    notice.createEl("button", { text: t("ui.cancel") }).addEventListener("click", () => notice.remove());
-    notice.createEl("button", { text: t("ui.understand_and_run"), cls: "mod-cta" }).addEventListener("click", () => { void (async () => { try { this.plugin.settings.codexUsageNoticeSeen = true; await this.plugin.saveSettings(); notice.remove(); await start(); } catch (error) { this.plugin.settings.codexUsageNoticeSeen = false; this.failed(panel, button, error instanceof Error ? error.message : String(error)); } })(); });
+    try {
+      const model = this.modelSettings?.model ?? this.plugin.settings.cliModel;
+      const started = needsUsage
+        ? await this.plugin.confirmAiUsage(model, start)
+        : await this.plugin.aiReadyForModel(model) && (await start(), true);
+      if (!started) button.disabled = false;
+    } catch (error) { this.failed(panel, button, error instanceof Error ? error.message : String(error)); }
   }
   private failed(panel: HTMLElement, button: HTMLButtonElement, message: string): void {
     if (this.closed) return;
@@ -421,6 +451,7 @@ export class NextStepModal extends Modal {
     synthesizePanel.createEl("h3", { text: t("ui.synthesize_subtopic_findings") });
     synthesizePanel.createEl("p", { text: this.childrenCount ? t("ui.ai_suggests_synthesis_angles_first_the_parent_topic_changes") : t("ui.this_topic_has_no_direct_subtopics_you_can_choose_other_note") });
     {
+      const synthesisContent = renderSynthesisContent(synthesizePanel, this.modelSettings?.sources?.synthesisTopics ?? []);
       const synthesisPicker = this.addReferencePicker(synthesizePanel, "synthesize");
       const synthFooter = synthesizePanel.createDiv("vam-next-footer");
       const synthButton = synthFooter.createEl("button", { text: t("ui.get_synthesis_suggestions_first"), cls: "mod-cta" });
@@ -438,8 +469,10 @@ export class NextStepModal extends Modal {
         synthButton.disabled = false;
       };
       synthButton.addEventListener("click", () => { void this.run(synthesizePanel, synthButton, async () => {
+        const content: SynthesisContent = synthesisContent.value === "summary" ? "summary" : "full";
+        synthesisContent.disabled = true;
         const selected = await synthesisPicker?.ready();
-        const options: TaskOptions = { referenceGroups: selected?.groups ?? [], requirements: this.requirements(), researchMode: selected?.webSearch ? "research" : "local", researchDepth: this.depth, visualMode: selected?.imageSearch ? "auto" : "off", signal: this.taskSignal, onProgress: message => synthStatus.setText(message) };
+        const options: TaskOptions = { synthesisContent: content, referenceGroups: selected?.groups ?? [], requirements: this.requirements(), researchMode: selected?.webSearch ? "research" : "local", researchDepth: this.depth, visualMode: selected?.imageSearch ? "auto" : "off", signal: this.taskSignal, onProgress: message => synthStatus.setText(message) };
         if (!this.childrenCount && !options.referenceGroups?.some(group => group.documents.length)) throw new Error(t("ui.choose_another_note_source_first"));
         await this.synthesize(options, (items, draft) => {
         if (this.closed) return;
@@ -482,19 +515,6 @@ class AiDraftModal extends Modal {
       .addButton(button => button.setButtonText(this.confirmLabel).setCta().onClick(() => { this.close(); this.confirm(); }));
   }
 }
-class CodexUsageModal extends Modal {
-  private settled = false;
-  constructor(app: App, private resolve: (confirmed: boolean) => void) { super(app); }
-  onOpen(): void {
-    this.titleEl.setText(t("ui.codex_allowance_notice"));
-    this.contentEl.createEl("p", { text: t("ui.vam_runs_ai_tasks_through_your_signed_in_codex_account_and_u"), cls: "vam-modal-intro" });
-    const finish = (confirmed: boolean): void => { this.settled = true; this.close(); this.resolve(confirmed); };
-    new Setting(this.contentEl)
-      .addButton(button => button.setButtonText(t("ui.cancel")).onClick(() => finish(false)))
-      .addButton(button => button.setButtonText(t("ui.understand_and_run")).setCta().onClick(() => finish(true)));
-  }
-  onClose(): void { if (!this.settled) this.resolve(false); }
-}
 class CodexSetupModal extends Modal {
   constructor(app: App, private executable: string, private recheck: () => void) { super(app); }
   onOpen(): void {
@@ -511,6 +531,35 @@ class CodexSetupModal extends Modal {
     new Setting(this.contentEl)
       .addButton(button => button.setButtonText(t("ui.do_this_later")).onClick(() => this.close()))
       .addButton(button => button.setButtonText(t("ui.i_ve_finished_check_again")).setCta().onClick(() => { this.close(); this.recheck(); }));
+  }
+}
+class AiUsageModal extends Modal {
+  private settled = false;
+  constructor(app: App, private provider: "codex" | "claude", private resolve: (confirmed: boolean) => void) { super(app); }
+  onOpen(): void {
+    const claude = this.provider === "claude";
+    this.titleEl.setText(claude ? t("ui.claude_usage_notice") : t("ui.codex_allowance_notice"));
+    this.contentEl.createEl("p", { text: t(claude ? "ui.vam_runs_ai_tasks_through_your_claude_code_account_and_uses" : "ui.vam_runs_ai_tasks_through_your_signed_in_codex_account_and_u"), cls: "vam-modal-intro" });
+    const finish = (confirmed: boolean): void => { this.settled = true; this.close(); this.resolve(confirmed); };
+    new Setting(this.contentEl)
+      .addButton(button => button.setButtonText(t("ui.cancel")).onClick(() => finish(false)))
+      .addButton(button => button.setButtonText(t("ui.understand_and_run")).setCta().onClick(() => finish(true)));
+  }
+  onClose(): void { if (!this.settled) this.resolve(false); }
+}
+class ClaudeSetupModal extends Modal {
+  constructor(app: App, private executable: string, private url: string, private recheck: () => void) { super(app); }
+  onOpen(): void {
+    this.titleEl.setText(t("ui.install_and_connect_claude_code"));
+    this.contentEl.createEl("p", { text: t("ui.claude_code_is_only_needed_for_ai_tasks"), cls: "vam-modal-intro" });
+    const steps = this.contentEl.createEl("ol", { cls: "vam-setup-steps" });
+    const install = steps.createEl("li"); install.appendText(t("ui.install_claude_code_and_sign_in_with_your_claude_account"));
+    install.createEl("a", { text: t("ui.official_claude_code_installation_guide"), href: this.url, attr: { target: "_blank", rel: "noopener noreferrer" } });
+    steps.createEl("li", { text: t("ui.return_to_vam_and_check_the_cli_path_again") });
+    this.contentEl.createEl("p", { text: t("ui.path_currently_checked_0", this.executable), cls: "vam-setup-path" });
+    new Setting(this.contentEl)
+      .addButton(button => button.setButtonText(t("ui.do_this_later")).onClick(() => this.close()))
+      .addButton(button => button.setButtonText(t("ui.check_again")).setCta().onClick(() => { this.close(); this.recheck(); }));
   }
 }
 class ChildProposalModal extends Modal {
@@ -1254,6 +1303,7 @@ export class VisualAgentMapView extends ItemView {
       const currentLabel = t("ui.reference_current_topic_included", note.title);
       const synthesisLabel = t("ui.reference_synthesis_topics_included", note.title);
       const sources = this.taskSourceSettings(currentLabel, this.map?.id, synthesisLabel);
+      sources.synthesisTopics = this.map?.nodes.filter(item => item.parentId === node.id).map(item => this.notes.get(item.id)?.title ?? item.path) ?? [];
       new NextStepModal(this.app, note.title, note.researchDepth, this.map?.nodes.filter(item => item.parentId === node.id).length ?? 0, this.plugin.pendingSuggestions.get(node.path)?.length ?? 0, this.plugin,
         async (options, focus, done, failed) => {
           const latest = await this.plugin.repo.readNote(node.path);
@@ -1450,7 +1500,7 @@ export class VisualAgentMapView extends ItemView {
     const note = await this.plugin.repo.readNote(parent.path);
     if (this.plugin.running.has(parent.path)) { failed?.(t("ui.ai_running_ai")); return; }
     if (!confirmed) {
-      new TaskModal(this.app, t("ui.suggest_the_most_useful_expansion_direction_or_follow_the_di"), (value, run, chosen) => { if (run) void this.plugin.confirmCodexUsage(async () => this.enqueue(() => this.proposeChildren(parent, true, chosen, value))); }, t("ui.expand_subtopics"), t("ui.specify_an_expansion_direction_or_ask_ai_to_suggest_one_prev"), note.rules, note.researchMode, note.researchDepth, note.visualMode, false, true, this.taskSourceSettings(t("ui.reference_current_topic_included", note.title))).open();
+      new TaskModal(this.app, t("ui.suggest_the_most_useful_expansion_direction_or_follow_the_di"), (value, run, chosen) => { if (run) void this.plugin.confirmAiUsage(note.model, async () => this.enqueue(() => this.proposeChildren(parent, true, chosen, value))); }, t("ui.expand_subtopics"), t("ui.specify_an_expansion_direction_or_ask_ai_to_suggest_one_prev"), note.rules, note.researchMode, note.researchDepth, note.visualMode, false, true, this.taskSourceSettings(t("ui.reference_current_topic_included", note.title))).open();
       return;
     }
     const targetMapPath = this.path, targetMapId = this.map?.id;
@@ -1593,11 +1643,11 @@ export class VisualAgentMapView extends ItemView {
     const note = await this.plugin.repo.readNote(node.path);
     this.plugin.running.add(node.path); this.render();
     try {
-      const childSources = await this.topicReferenceGroup(children, children.length <= 3 ? "strong" : "summary");
+      const childSources = await this.topicReferenceGroup(children, options?.synthesisContent === "summary" ? "summary" : "strong");
       const selectedSources = options.referenceGroups ?? [];
       if (!children.length && !selectedSources.some(group => group.documents.length)) { failed(t("ui.the_selected_sources_contain_no_markdown_content_to_synthesi")); return; }
       const task = translate(this.plugin.settings.language, "prompt.synthesis_directions");
-      const result = await this.plugin.askModel({ title: note.title, summary: note.summary, rules: "", detail: note.detail, task: [task, options?.requirements].filter(Boolean).join("\n\n"), ancestors: await this.ancestorContext(node), referenceGroups: [childSources, ...selectedSources], onProgress: options.onProgress, mode: "synthesize", researchMode: options.researchMode, researchDepth: options.researchDepth, visualMode: "off" }, note.model, note.reasoning, options.signal);
+      const result = await this.plugin.askModel({ title: note.title, summary: note.summary, rules: "", detail: note.detail, task: [task, options?.requirements].filter(Boolean).join("\n\n"), ancestors: await this.ancestorContext(node), referenceGroups: [...selectedSources, childSources], onProgress: options.onProgress, mode: "synthesize", researchMode: options.researchMode, researchDepth: options.researchDepth, visualMode: "off" }, note.model, note.reasoning, options.signal);
       const angles = result.suggestions.slice(0, 2);
       if (!angles.length) { failed(t("ui.ai_did_not_suggest_a_synthesis_direction_please_retry")); return; }
       found(angles, direction => this.plugin.mutate(() => this.integrateChildren(node, true, options, direction, drafted, failed)));
@@ -1610,17 +1660,17 @@ export class VisualAgentMapView extends ItemView {
     const children = this.map.nodes.filter(item => item.parentId === node.id);
     if (!children.length && !options?.referenceGroups?.some(group => group.documents.length)) { const message = t("ui.choose_another_note_source_first"); if (failed) failed(message); else new Notice(message); return; }
     if (!confirmed) {
-      new TaskModal(this.app, t("ui.synthesize_agreements_differences_tradeoffs_and_open_questio"), (value, run, chosen) => { if (run) void this.plugin.confirmCodexUsage(async () => this.enqueue(() => this.integrateChildren(node, true, chosen, value))); }, t("ui.synthesize_subtopics"), t("ui.ai_reads_direct_subtopics_and_prepares_a_synthesis_draft_not"), note.rules, "local", note.researchDepth, note.visualMode, false, false, this.taskSourceSettings(t("ui.reference_current_topic_included", note.title), this.map?.id, t("ui.reference_synthesis_topics_included", note.title))).open();
+      new TaskModal(this.app, t("ui.synthesize_agreements_differences_tradeoffs_and_open_questio"), (value, run, chosen) => { if (run) void this.plugin.confirmAiUsage(note.model, async () => this.enqueue(() => this.integrateChildren(node, true, chosen, value))); }, t("ui.synthesize_subtopics"), t("ui.ai_reads_direct_subtopics_and_prepares_a_synthesis_draft_not"), note.rules, "local", note.researchDepth, note.visualMode, false, false, this.taskSourceSettings(t("ui.reference_current_topic_included", note.title), this.map?.id, t("ui.reference_synthesis_topics_included", note.title)), children.map(child => this.notes.get(child.id)?.title ?? child.path)).open();
       return;
     }
-    const childSources = await this.topicReferenceGroup(children, children.length <= 3 ? "strong" : "summary");
+    const childSources = await this.topicReferenceGroup(children, options?.synthesisContent === "summary" ? "summary" : "strong");
     const selectedSources = options?.referenceGroups ?? [];
     if (!children.length && !selectedSources.some(group => group.documents.length)) { const message = t("ui.the_selected_sources_contain_no_markdown_content_to_synthesi"); if (failed) failed(message); else new Notice(message); return; }
     const language = this.plugin.settings.language;
     const task = direction || translate(language, "prompt.synthesis_goal");
     this.plugin.running.add(node.path); await this.plugin.repo.updateNote(node.path, { status: "running" }); await this.hydrate(); this.render();
     try {
-      const result = await this.plugin.askModel({ title: note.title, summary: note.summary, rules: "", detail: note.detail, task: [task, options?.requirements].filter(Boolean).join("\n\n"), ancestors: await this.ancestorContext(node), referenceGroups: [childSources, ...selectedSources], onProgress: options?.onProgress, mode: "synthesize", researchMode: options?.researchMode ?? "local", researchDepth: options?.researchDepth ?? note.researchDepth, visualMode: options?.visualMode ?? note.visualMode }, note.model, note.reasoning, options?.signal);
+      const result = await this.plugin.askModel({ title: note.title, summary: note.summary, rules: "", detail: note.detail, task: [task, options?.requirements].filter(Boolean).join("\n\n"), ancestors: await this.ancestorContext(node), referenceGroups: [...selectedSources, childSources], onProgress: options?.onProgress, mode: "synthesize", researchMode: options?.researchMode ?? "local", researchDepth: options?.researchDepth ?? note.researchDepth, visualMode: options?.visualMode ?? note.visualMode }, note.model, note.reasoning, options?.signal);
       await this.plugin.repo.updateNote(node.path, { status: note.status });
       const save = async (summary: string, detail: string): Promise<void> => this.plugin.mutate(async () => {
         const latest = await this.plugin.repo.readNote(node.path);
@@ -1650,7 +1700,7 @@ export class VisualAgentMapView extends ItemView {
     const sharedRules = notes.length && notes.every(note => note.rules === notes[0].rules) ? notes[0].rules : "";
     new IntegrationModal(this.app, notes.map(note => note.title), sharedRules, (title, goal, rules) => {
       const selectedLabel = t("ui.reference_selected_topics_included", notes.map(note => note.title).join(", "));
-      new TaskModal(this.app, goal, (direction, run, options, topicRules) => { if (run) void this.plugin.confirmCodexUsage(async () => this.enqueue(() => this.createIntegratedNode(title, nodes, direction, topicRules, options, true))); }, t("ui.synthesis_direction_and_sources"), t("ui.prepare_a_synthesis_draft_first_then_create_the_topic_after"), rules, "local", "normal", "auto", false, false, this.taskSourceSettings(selectedLabel, this.map?.id, selectedLabel)).open();
+      new TaskModal(this.app, goal, (direction, run, options, topicRules) => { if (run) void this.plugin.confirmAiUsage(this.plugin.settings.cliModel, async () => this.enqueue(() => this.createIntegratedNode(title, nodes, direction, topicRules, options, true))); }, t("ui.synthesis_direction_and_sources"), t("ui.prepare_a_synthesis_draft_first_then_create_the_topic_after"), rules, "local", "normal", "auto", false, false, this.taskSourceSettings(selectedLabel, this.map?.id, selectedLabel), notes.map(note => note.title)).open();
     }).open();
   }
   private async topicReferenceGroup(sources: MapNode[], mode: "strong" | "summary" = "strong"): Promise<ReferenceGroup> {
@@ -1675,8 +1725,8 @@ export class VisualAgentMapView extends ItemView {
     this.integrationMode = false; this.multiSelected.clear(); this.render();
     const model = this.plugin.settings.cliModel;
     const language = this.plugin.settings.language;
-    const sourceGroup = await this.topicReferenceGroup(sources, "strong");
-    const result = await this.plugin.askModel({ title, summary: language === "en" ? "No conclusion yet" : "尚未形成結論", rules, detail: "", task: [goal, options?.requirements].filter(Boolean).join("\n\n"), ancestors: "", referenceGroups: [sourceGroup, ...(options?.referenceGroups ?? [])], onProgress: options?.onProgress, mode: "synthesize", researchMode: options?.researchMode ?? "local", researchDepth: options?.researchDepth ?? "normal", visualMode: options?.visualMode ?? "auto" }, model, this.plugin.settings.cliReasoning, options?.signal);
+    const sourceGroup = await this.topicReferenceGroup(sources, options?.synthesisContent === "summary" ? "summary" : "strong");
+    const result = await this.plugin.askModel({ title, summary: language === "en" ? "No conclusion yet" : "尚未形成結論", rules, detail: "", task: [goal, options?.requirements].filter(Boolean).join("\n\n"), ancestors: "", referenceGroups: [...(options?.referenceGroups ?? []), sourceGroup], onProgress: options?.onProgress, mode: "synthesize", researchMode: options?.researchMode ?? "local", researchDepth: options?.researchDepth ?? "normal", visualMode: options?.visualMode ?? "auto" }, model, this.plugin.settings.cliReasoning, options?.signal);
     if (review) {
       new AiDraftModal(this.app, result.summary, result.detail, t("ui.confirm_new_synthesis_topic"), () => this.enqueue(() => this.saveIntegratedNode(title, sources, goal, rules, model, result, language))).open();
       return;
@@ -1807,9 +1857,10 @@ export class VisualAgentMapSettingTab extends PluginSettingTab {
     selector?.focus();
   }
   getSettingDefinitions(): SettingDefinitionItem[] {
-    const text = (name: string, key: "codexPath", desc: string): SettingDefinitionItem => ({ name, desc, control: { type: "text", key } });
+    const text = (name: string, key: "codexPath" | "claudePath", desc: string): SettingDefinitionItem => ({ name, desc, control: { type: "text", key } });
     const diagnostic = this.plugin.codexDiagnostic();
-    const models = Object.fromEntries(this.plugin.settings.models.split(/[,\n]/).map(model => model.trim()).filter(Boolean).map(model => [model, model]));
+    const claudeDiagnostic = this.plugin.claudeDiagnostic();
+    const models = Object.fromEntries(this.plugin.availableModels().map(model => [model, this.plugin.modelLabel(model)]));
     return [
       { name: t("ui.interface_language"), render: setting => {
         setting.setName(t("ui.interface_language")).addDropdown(dropdown => {
@@ -1818,7 +1869,8 @@ export class VisualAgentMapSettingTab extends PluginSettingTab {
         });
       } },
       text(t("ui.codex_cli_path"), "codexPath", t("ui.vam_uses_this_executable_to_start_codex_app_server")),
-      { name: t("ui.workspace_default_model"), desc: t("ui.models_are_loaded_from_codex_app_server_changes_apply_only_t"), control: { type: "dropdown", key: "cliModel", options: models } },
+      text(t("ui.claude_cli_path"), "claudePath", t("ui.vam_uses_the_claude_code_cli_installed_on_this_computer")),
+      { name: t("ui.workspace_default_model"), desc: t("ui.models_are_loaded_from_each_installed_ai_service_changes_apply_only_to_new_root_topics"), control: { type: "dropdown", key: "cliModel", options: models } },
       { name: t("ui.ai_reasoning_level"), desc: t("ui.auto_uses_low_for_simple_tasks_and_medium_for_complex_synthe"), control: { type: "dropdown", key: "cliReasoning", options: { auto: t("ui.auto"), low: t("ui.low"), medium: t("ui.medium"), high: t("ui.high") } } },
       { name: t("ui.record_ai_exchanges"), render: setting => { setting.setName(t("ui.record_ai_exchanges")).setDesc(t("ui.when_enabled_the_20_most_recent_full_requests_and_raw_replie" )).addToggle(toggle => toggle.setValue(this.plugin.settings.aiExchangeLoggingEnabled).onChange(async value => { this.plugin.settings.aiExchangeLoggingEnabled = value; await this.plugin.saveSettings(); })); } },
       { name: t("ui.workspace_location"), render: setting => { setting.setName(t("ui.workspace_location")).setDesc(t("ui.topics_folder_0_inbox_1", this.plugin.settings.topicsFolder, this.plugin.settings.inboxFolder)); } },
@@ -1829,12 +1881,16 @@ export class VisualAgentMapSettingTab extends PluginSettingTab {
         setting.setName(t("ui.codex_app_server_status")).setDesc(diagnostic.installed ? t("ui.codex_cli_found_0", diagnostic.executable) : t("ui.codex_cli_was_not_found_follow_the_installation_guide_to_ins"));
         if (!diagnostic.installed) setting.addButton(button => button.setButtonText(t("ui.installation_guide")).onClick(() => this.plugin.openCodexSetupGuide()));
         setting.addButton(button => button.setButtonText(t("ui.check_again")).onClick(() => { void this.plugin.recheckCodex(); }));
+      } },
+      { name: t("ui.claude_code_status"), render: setting => {
+        setting.setName(t("ui.claude_code_status")).setDesc(claudeDiagnostic.installed ? t("ui.claude_cli_found_0", claudeDiagnostic.executable) : t("ui.claude_cli_was_not_found_follow_the_installation_guide_to_install_it"));
+        setting.addButton(button => button.setButtonText(t("ui.check_again")).onClick(() => { void this.plugin.recheckClaude(); }));
       } }
     ];
   }
   async setControlValue(key: string, value: unknown): Promise<void> {
     if (key === "language") { await this.plugin.changeLanguage(value); return; }
-    else if (typeof value === "string" && (key === "codexPath" || key === "cliModel")) this.plugin.settings[key] = value.trim();
+    else if (typeof value === "string" && (key === "codexPath" || key === "claudePath" || key === "cliModel")) this.plugin.settings[key] = value.trim();
     else if (key === "cliReasoning") this.plugin.settings.cliReasoning = normalizeReasoningLevel(value);
     else return;
     if (key === "codexPath") this.plugin.resetCodexRuntime();
@@ -1893,7 +1949,7 @@ export default class VisualAgentMapPlugin extends Plugin {
   async onload(): Promise<void> {
     const saved = await this.loadData() as Partial<Settings> | null;
     const legacy: (Partial<Settings> & { cliPath?: string }) | null = saved;
-    this.settings = { ...DEFAULT_SETTINGS, language: initialUiLanguage(saved?.language), workspaceFolder: saved?.workspaceFolder || DEFAULT_SETTINGS.workspaceFolder, topicsFolder: saved?.topicsFolder || DEFAULT_SETTINGS.topicsFolder, inboxFolder: saved?.inboxFolder || DEFAULT_SETTINGS.inboxFolder, notesFolder: saved?.notesFolder || DEFAULT_SETTINGS.notesFolder, mapsFolder: saved?.mapsFolder || DEFAULT_SETTINGS.mapsFolder, mapId: saved?.mapId || "default", codexPath: saved?.codexPath || legacy?.cliPath || DEFAULT_SETTINGS.codexPath, cliModel: saved?.cliModel || DEFAULT_SETTINGS.cliModel, cliReasoning: normalizeReasoningLevel(saved?.cliReasoning), previewScale: saved?.previewScale !== undefined ? clampPreviewScale(saved.previewScale) : legacyPreviewScale(saved?.previewSize), models: "", migrated: saved?.migrated === true, structureVersion: saved?.structureVersion ?? (saved ? 1 : DEFAULT_SETTINGS.structureVersion), firstUseNoticeSeen: saved?.firstUseNoticeSeen === true, codexUsageNoticeSeen: saved?.codexUsageNoticeSeen === true, aiExchangeLoggingEnabled: saved?.aiExchangeLoggingEnabled === true, workspaceInitialized: saved ? saved.workspaceInitialized !== false : false, sampleTourVersionSeen: saved?.sampleTourVersionSeen ?? 0 };
+    this.settings = { ...DEFAULT_SETTINGS, language: initialUiLanguage(saved?.language), workspaceFolder: saved?.workspaceFolder || DEFAULT_SETTINGS.workspaceFolder, topicsFolder: saved?.topicsFolder || DEFAULT_SETTINGS.topicsFolder, inboxFolder: saved?.inboxFolder || DEFAULT_SETTINGS.inboxFolder, notesFolder: saved?.notesFolder || DEFAULT_SETTINGS.notesFolder, mapsFolder: saved?.mapsFolder || DEFAULT_SETTINGS.mapsFolder, mapId: saved?.mapId || "default", codexPath: saved?.codexPath || legacy?.cliPath || DEFAULT_SETTINGS.codexPath, claudePath: saved?.claudePath || DEFAULT_SETTINGS.claudePath, cliModel: saved?.cliModel || DEFAULT_SETTINGS.cliModel, cliReasoning: normalizeReasoningLevel(saved?.cliReasoning), previewScale: saved?.previewScale !== undefined ? clampPreviewScale(saved.previewScale) : legacyPreviewScale(saved?.previewSize), models: "", migrated: saved?.migrated === true, structureVersion: saved?.structureVersion ?? (saved ? 1 : DEFAULT_SETTINGS.structureVersion), firstUseNoticeSeen: saved?.firstUseNoticeSeen === true, codexUsageNoticeSeen: saved?.codexUsageNoticeSeen === true, claudeUsageNoticeSeen: saved?.claudeUsageNoticeSeen === true, aiExchangeLoggingEnabled: saved?.aiExchangeLoggingEnabled === true, workspaceInitialized: saved ? saved.workspaceInitialized !== false : false, sampleTourVersionSeen: saved?.sampleTourVersionSeen ?? 0 };
     setUiLanguage(this.settings.language);
     this.logs.appendLog("info", `Visual Agent Map ${this.manifest.version || "unknown"} 載入`);
     if (this.app.vault.adapter instanceof FileSystemAdapter && this.manifest.dir) {
@@ -1986,6 +2042,22 @@ export default class VisualAgentMapPlugin extends Plugin {
   codexDiagnostic(): { executable: string; installed: boolean } {
     const executable = this.resolveExecutable(this.settings.codexPath);
     return { executable, installed: existsSync(executable) };
+  }
+  claudeDiagnostic(): { executable: string; installed: boolean } {
+    const executable = this.resolveExecutable(this.settings.claudePath);
+    return { executable, installed: existsSync(executable) };
+  }
+  availableModels(): string[] {
+    const models = this.settings.models.split(/[\n,]/).map(value => value.trim()).filter(Boolean);
+    if (this.claudeDiagnostic().installed) models.push(...CLAUDE_MODEL_CHOICES.map(choice => choice.id));
+    return [...new Set(models)];
+  }
+  modelLabel(model: string): string { return CLAUDE_MODEL_CHOICES.find(choice => choice.id === model)?.label ?? `${t("ui.codex_provider_label")} · ${model}`; }
+  private usageNoticeSeen(model: string): boolean { return providerForModel(model) === "claude" ? this.settings.claudeUsageNoticeSeen : this.settings.codexUsageNoticeSeen; }
+  private async setUsageNoticeSeen(model: string): Promise<void> {
+    if (providerForModel(model) === "claude") this.settings.claudeUsageNoticeSeen = true;
+    else this.settings.codexUsageNoticeSeen = true;
+    await this.saveSettings();
   }
   resetCodexRuntime(): void { for (const controller of this.activeTasks.values()) controller.abort(); this.codexRuntime?.stop(); this.localCodexRuntime?.stop(); this.codexRuntime = null; this.localCodexRuntime = null; }
   openCodexSetupGuide(): void {
@@ -2080,7 +2152,11 @@ export default class VisualAgentMapPlugin extends Plugin {
     this.ribbonIcon?.setAttribute("aria-label", translate(this.settings.language, "ui.open_map"));
     for (const { command, key } of this.localizedCommands) command.name = translate(this.settings.language, key);
   }
-  async codexReadyForAi(): Promise<boolean> {
+  async aiReadyForModel(model: string): Promise<boolean> {
+    if (providerForModel(model) === "claude") {
+      if (!this.claudeDiagnostic().installed) { this.openClaudeSetupGuide(); return false; }
+      return true;
+    }
     if (!this.codexDiagnostic().installed) { this.openCodexSetupGuide(); return false; }
     if (this.settings.models.trim()) return true;
     try {
@@ -2091,16 +2167,27 @@ export default class VisualAgentMapPlugin extends Plugin {
     }
     this.openCodexSetupGuide(); return false;
   }
-  async confirmCodexUsage(run: () => Promise<void>): Promise<void> {
-    if (!await this.codexReadyForAi()) return;
-    if (!this.settings.codexUsageNoticeSeen) {
-      const confirmed = await new Promise<boolean>(resolve => new CodexUsageModal(this.app, resolve).open());
-      if (!confirmed) return;
-      this.settings.codexUsageNoticeSeen = true;
-      await this.saveSettings();
+  async codexReadyForAi(): Promise<boolean> { return this.aiReadyForModel(this.settings.cliModel); }
+  openClaudeSetupGuide(): void { new ClaudeSetupModal(this.app, this.claudeDiagnostic().executable, CLAUDE_INSTALL_URL, () => { void this.recheckClaude(); }).open(); }
+  async recheckClaude(): Promise<void> {
+    const diagnostic = this.claudeDiagnostic();
+    if (!diagnostic.installed) { new Notice(t("ui.claude_cli_was_not_found_follow_the_installation_guide_to_install_it")); return; }
+    new Notice(t("ui.claude_cli_found_0", diagnostic.executable));
+    this.settingTab?.update();
+    for (const view of this.views()) await view.refreshFromPlugin();
+  }
+  async confirmAiUsage(model: string, run: () => Promise<void>): Promise<boolean> {
+    if (!await this.aiReadyForModel(model)) return false;
+    if (!this.usageNoticeSeen(model)) {
+      const provider = providerForModel(model);
+      const confirmed = await new Promise<boolean>(resolve => new AiUsageModal(this.app, provider, resolve).open());
+      if (!confirmed) return false;
+      await this.setUsageNoticeSeen(model);
     }
     await run();
+    return true;
   }
+  async confirmCodexUsage(run: () => Promise<void>): Promise<void> { await this.confirmAiUsage(this.settings.cliModel, run); }
   async rebuildDerivedData(): Promise<void> { try { await this.repo.rebuildDerivedData(); } catch (error) { console.error("Visual Agent Map reference rebuild", error); new Notice(t("ui.map_saved_but_reference_update_failed_0", error instanceof Error ? error.message : String(error))); } }
   private scheduleExternalReconciliation(): void {
     if (this.writing) return;
@@ -2134,7 +2221,7 @@ export default class VisualAgentMapPlugin extends Plugin {
     if (closed) {
       this.detailsLeaf!.detach();
       this.app.workspace.trigger("file-open", null);
-      this.app.workspace.trigger("active-leaf-change", this.app.workspace.activeLeaf);
+      this.app.workspace.trigger("active-leaf-change", this.app.workspace.getActiveViewOfType(View)?.leaf ?? null);
     }
     this.detailsLeaf = null;
     this.detailsPath = null;
@@ -2153,13 +2240,14 @@ export default class VisualAgentMapPlugin extends Plugin {
     const pluginDirectory = join(adapter.getBasePath(), this.manifest.dir);
     const models = await this.runtime(pluginDirectory).listModels();
     this.settings.models = models.map(item => item.model).join(", ");
-    if (!models.some(item => item.model === this.settings.cliModel)) this.settings.cliModel = models.find(item => item.model === DEFAULT_SETTINGS.cliModel)?.model || models.find(item => item.isDefault)?.model || models[0]?.model || "";
+    if (providerForModel(this.settings.cliModel) === "codex" && !models.some(item => item.model === this.settings.cliModel)) this.settings.cliModel = models.find(item => item.model === DEFAULT_SETTINGS.cliModel)?.model || models.find(item => item.isDefault)?.model || models[0]?.model || "";
     await this.saveSettings();
     this.settingTab?.update();
     for (const view of this.views()) await view.refreshFromPlugin();
   }
   async askModel(context: TaskContext, model: string, reasoning?: unknown, signal?: AbortSignal, onExchange?: (id: string) => void): Promise<AiResult> {
-    if (model.startsWith("claude:")) throw new Error(t("ui.claude_code_is_no_longer_supported_choose_a_codex_model_in_t"));
+    const provider = providerForModel(model);
+    if (provider === "claude" && !CLAUDE_MODEL_CHOICES.some(choice => choice.id === model)) throw new Error(t("ui.claude_model_is_not_supported_0", model));
     const adapter = this.app.vault.adapter;
     if (!(adapter instanceof FileSystemAdapter)) throw new Error(t("ui.cli_mode_requires_desktop_obsidian"));
     if (!this.manifest.dir) throw new Error(t("ui.plugin_folder_not_found"));
@@ -2170,7 +2258,7 @@ export default class VisualAgentMapPlugin extends Plugin {
     }
 
     const totalStarted = Date.now();
-    const prepared = buildPreparedTaskContext(context, model);
+    const prepared = buildPreparedTaskContext(context, model, 32_000, provider);
     if (prepared.context.sourceContext !== context.sourceContext) throw new Error(t("ui.reference_too_large", t("ui.reference_materials")));
     context = prepared.context;
     const pluginDirectory = join(adapter.getBasePath(), this.manifest.dir);
@@ -2205,13 +2293,16 @@ export default class VisualAgentMapPlugin extends Plugin {
     if (exchanges) { exchanges.begin({ id: exchangeId, startedAt: new Date().toISOString(), topic: context.title, mode: context.mode ?? "task", model, effort }); onExchange?.(exchangeId); }
     let stage = "啟動 AI";
     try {
-      const raw = await this.runtime(pluginDirectory, context.researchMode === "local").runTask(instructions, model, effort, responseSchema, {
+      const controls = {
         signal, searchBudget: context.researchMode === "local" ? 0 : researchLimits(context.researchDepth).searches,
-        onRequest: request => { stage = "等待 AI 回覆"; if (this.settings.aiExchangeLoggingEnabled) exchanges?.sent(exchangeId, JSON.stringify(request, null, 2)); }
-      });
+        onRequest: (request: unknown) => { stage = "等待 AI 回覆"; if (this.settings.aiExchangeLoggingEnabled) exchanges?.sent(exchangeId, JSON.stringify(request, null, 2)); }
+      };
+      const raw = provider === "claude"
+        ? await this.claudeCli(pluginDirectory).runTask(instructions, providerModelId(model), effort, responseSchema, controls)
+        : await this.runtime(pluginDirectory, context.researchMode === "local").runTask(instructions, model, effort, responseSchema, controls);
       stage = "解析 AI 回覆";
       if (this.settings.aiExchangeLoggingEnabled) exchanges?.received(exchangeId, raw);
-      const result = this.parseAiResult(raw, "Codex App Server", outputLanguage);
+      const result = this.parseAiResult(raw, provider === "claude" ? "Claude Code" : "Codex App Server", outputLanguage);
       if (this.settings.aiExchangeLoggingEnabled) exchanges?.parsed(exchangeId);
       console.debug("Visual Agent Map AI metrics", { ...prepared.metrics, providerMs: Date.now() - providerStarted, totalMs: Date.now() - totalStarted });
       return result;
@@ -2277,6 +2368,10 @@ export default class VisualAgentMapPlugin extends Plugin {
     if (local) this.localCodexRuntime = runtime;
     else this.codexRuntime = runtime;
     return runtime;
+  }
+  private claudeCli(pluginDirectory: string): ClaudeCodeCliRuntime {
+    const executable = this.resolveExecutable(this.settings.claudePath);
+    return new ClaudeCodeCliRuntime({ executable, cwd: pluginDirectory, env: this.cliEnvironment(executable), onLog: (level, message) => this.logs.appendLog(level, message) });
   }
   private resolveExecutable(configured: string): string {
     const environment = currentProcessEnvironment();

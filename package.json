@@ -1,6 +1,6 @@
 {
   "name": "visual-agent-map",
-  "version": "0.9.7",
+  "version": "0.9.8",
   "private": true,
   "scripts": {
     "dev": "node esbuild.config.mjs",
@@ -12,9 +12,9 @@
     "test:vault:normal": "node scripts/test-harness.mjs --prepare --profile=normal",
     "test:vault:reinstall": "node scripts/test-harness.mjs --prepare --profile=reinstall",
     "verify:vault:reinstall": "node scripts/verify-reinstall-test-vault.mjs",
-    "lint": "eslint .",
+    "lint": "eslint . --max-warnings=0",
     "test": "node scripts/test-harness.mjs",
-    "test:unit": "npm run compile:sample && node tests/run.cjs --layer=unit",
+    "test:unit": "npm run compile:sample && node tests/run.cjs --layer=unit && node --test tests/compliance-gates.mjs",
     "test:integration": "node tests/run.cjs --layer=integration && node --test tests/test-vault.mjs",
     "test:runtime": "node scripts/test-runtime.mjs",
     "test:ui": "node scripts/test-harness.mjs --ui",
@@ -22,12 +22,13 @@
     "test:ui:update": "node scripts/test-harness.mjs --update-current"
   },
   "devDependencies": {
-    "@types/node": "^22.10.2",
+    "@types/node": "22.20.2",
     "esbuild": "^0.24.2",
     "eslint": "9.39.5",
     "eslint-plugin-depend": "1.3.1",
     "eslint-plugin-obsidianmd": "0.4.2",
-    "obsidian": "latest",
-    "typescript": "^5.7.2"
+    "obsidian": "1.13.1",
+    "typescript": "5.9.3",
+    "typescript-eslint": "8.70.0"
   }
 }

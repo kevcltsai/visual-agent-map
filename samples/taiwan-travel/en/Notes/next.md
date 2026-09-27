@@ -14,13 +14,10 @@ source-notes: [Notes/journey.md]
 # What to do after duplicating
 ## Current Summary
 
-After duplicating, change the preview, images, rules, and constraints to make the journey yours.
+After duplicating, edit the preview and images, then enter your travel constraints in Additional requirements for each AI task to make the journey yours.
 ## Prompt
 
 Review this journey against my dates, budget, and companion requirements.
-## Rules
-
-Never overwrite preview content the user has edited.
 ## Preview
 
 > [!tip] Try it
@@ -28,5 +25,11 @@ Never overwrite preview content the user has edited.
 ## Detail
 
 <!-- visual-agent-map:detail:start -->
+### Requirements for this run
+
+Before starting an AI task, copy the conditions you want it to follow into **Additional requirements**. This note does not apply them automatically.
+
+> Never overwrite preview content the user has edited.
+
 The duplicate is a normal editable map: it can be changed, deleted, or used with AI, and later sample updates never overwrite it.
 <!-- visual-agent-map:detail:end -->

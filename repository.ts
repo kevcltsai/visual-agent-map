@@ -43,6 +43,7 @@ export interface Settings {
   mapsFolder: string;
   mapId: string;
   codexPath: string;
+  claudePath: string;
   cliModel: string;
   cliReasoning: ReasoningLevel;
   previewSize?: "small" | "medium" | "large";
@@ -52,6 +53,7 @@ export interface Settings {
   structureVersion: number;
   firstUseNoticeSeen: boolean;
   codexUsageNoticeSeen: boolean;
+  claudeUsageNoticeSeen: boolean;
   aiExchangeLoggingEnabled: boolean;
   workspaceInitialized: boolean;
   sampleTourVersionSeen: number;
@@ -72,6 +74,7 @@ export const DEFAULT_SETTINGS: Settings = {
   mapsFolder: "Agent Workspace/Maps",
   mapId: "default",
   codexPath: "codex",
+  claudePath: "claude",
   cliModel: "gpt-5.6-luna",
   cliReasoning: "low",
   previewScale: 120,
@@ -80,6 +83,7 @@ export const DEFAULT_SETTINGS: Settings = {
   structureVersion: 2,
   firstUseNoticeSeen: false,
   codexUsageNoticeSeen: false,
+  claudeUsageNoticeSeen: false,
   aiExchangeLoggingEnabled: false,
   workspaceInitialized: false,
   sampleTourVersionSeen: 0

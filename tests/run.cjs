@@ -82,8 +82,10 @@ test('workspace defaults to the configured low-cost model and low reasoning', ()
   assert.equal(DEFAULT_SETTINGS.cliModel, 'gpt-5.6-luna');
   assert.equal(DEFAULT_SETTINGS.cliReasoning, 'low');
   assert.equal(DEFAULT_SETTINGS.codexPath, 'codex');
+  assert.equal(DEFAULT_SETTINGS.claudePath, 'claude');
   assert.equal(DEFAULT_SETTINGS.firstUseNoticeSeen, false);
   assert.equal(DEFAULT_SETTINGS.codexUsageNoticeSeen, false);
+  assert.equal(DEFAULT_SETTINGS.claudeUsageNoticeSeen, false);
   assert.equal(DEFAULT_SETTINGS.workspaceInitialized, false);
   assert.equal(DEFAULT_SETTINGS.sampleTourVersionSeen, 0);
   assert.doesNotMatch(DEFAULT_SETTINGS.models, /claude:/);
@@ -91,6 +93,14 @@ test('workspace defaults to the configured low-cost model and low reasoning', ()
   assert.equal(normalizeReasoningLevel('high'), 'high');
   assert.equal(normalizeReasoningLevel('auto'), 'auto');
   assert.equal(normalizeReasoningLevel('unsupported'), 'low');
+});
+test('model identifiers select one provider and preserve stable Claude aliases', () => {
+  const providers = load('ai/providers/provider.ts');
+  assert.equal(providers.providerForModel('gpt-5.6-luna'), 'codex');
+  assert.equal(providers.providerForModel('claude:sonnet'), 'claude');
+  assert.equal(providers.providerModelId('claude:opus'), 'opus');
+  assert.equal(providers.claudeModelChoice('claude:sonnet').model, 'sonnet');
+  assert.equal(providers.claudeModelChoice('claude:unknown'), undefined);
 });
 test('automatic reasoning respects manual choices and local tasks avoid research', () => {
   const { effectiveReasoningLevel, researchGuidance, RESEARCH_SEARCH_BUDGET } = load('ai/task-policy.ts');
@@ -197,6 +207,19 @@ test('built-in Taiwan sample is bilingual, read-only source data with exploratio
   }
   assert.notEqual(sample.builtInSample('zh-TW').map.title, sample.builtInSample('en').map.title);
 });
+test('official samples teach per-run requirements without active Rules in both languages', () => {
+  const sample = load('builtin-sample.ts');
+  assert.equal(sample.SAMPLE_CONTENT_VERSION, 3); assert.equal(sample.SAMPLE_TOUR_VERSION, 2);
+  for (const locale of ['en', 'zh-TW']) {
+    const data = sample.builtInSample(locale, false);
+    for (const note of data.notes.values()) {
+      assert.equal(note.rules, '');
+      assert.match(note.detail, locale === 'en' ? /Requirements for this run[\s\S]*Additional requirements/ : /本次任務要求[\s\S]*本次附加要求/);
+    }
+    const root = data.notes.get('explore');
+    assert.match(root.detail, locale === 'en' ? /Nine days; favor public transport; no more than two priorities per day/ : /九天八夜；以大眾運輸為主；每天最多安排兩個重點/);
+  }
+});
 integrationTest('workspace repair creates only the configured base folders and is idempotent', async () => {
   const { repo, app } = fixture();
   assert.equal(repo.workspaceExists(), false);
@@ -244,6 +267,7 @@ integrationTest('AI exchange log persists exact request and reply with a bounded
   const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'vam-ai-log-'));
   const file = path.join(directory, 'ai-exchanges.json');
   const errors = [];
+  const sentinel = path.join(directory, 'unrelated.md'); fs.writeFileSync(sentinel, 'preserve');
   try {
     const exchanges = new AiExchangeLog(file, error => errors.push(error), 2);
     for (let index = 0; index < 3; index++) {
@@ -261,6 +285,9 @@ integrationTest('AI exchange log persists exact request and reply with a bounded
     assert.match(formatAiExchange(restored.getEntries()[1]), /raw response 2/);
     restored.clear(); await restored.flush();
     assert.deepEqual(JSON.parse(fs.readFileSync(file, 'utf8')), []);
+    assert.equal(fs.readFileSync(sentinel, 'utf8'), 'preserve');
+    assert.deepEqual(fs.readdirSync(directory).sort(), ['ai-exchanges.json', 'unrelated.md']);
+    if (process.platform !== 'win32') assert.equal(fs.statSync(file).mode & 0o777, 0o600);
     assert.deepEqual(errors, []);
   } finally { fs.rmSync(directory, { recursive: true, force: true }); }
 });
@@ -368,7 +395,8 @@ integrationTest('Next Step returns new expansion requests to the map and reviews
   const tick = () => new Promise(resolve => setTimeout(resolve, 0));
   class Modal { constructor() { this.modalEl = element('modal'); this.titleEl = element('title'); this.contentEl = element('content'); } close() { closed++; this.onClose?.(); } }
   const { NextStepModal } = load('main.ts', { obsidian: { ...obsidian, Modal, setIcon: () => {}, Notice: class { constructor(message) { notices.push(message); } } } });
-  const plugin = { settings: { codexUsageNoticeSeen: true, models: 'gpt-test', cliReasoning: 'low', language: 'en' }, codexReadyForAi: () => true, saveSettings: async () => {}, activeTasks: new Map(), sources: { currentTopicId: 'current', currentLabel: 'Current topic included', synthesisLabel: 'Current topic and child topics included', topics: async () => [], readTopic: async () => [] } };
+  const checkedModels = [];
+  const plugin = { settings: { codexUsageNoticeSeen: true, claudeUsageNoticeSeen: true, models: 'gpt-test', cliReasoning: 'low', language: 'en' }, aiReadyForModel: async model => { checkedModels.push(model); return true; }, confirmAiUsage: async (model, run) => { checkedModels.push(model); await run(); return true; }, saveSettings: async () => {}, activeTasks: new Map(), sources: { currentTopicId: 'current', currentLabel: 'Current topic included', synthesisLabel: 'Current topic and child topics included', synthesisTopics: ['Child A', 'Child B'], topics: async () => [], readTopic: async () => [] } };
   const modelSettings = { model: 'gpt-test', modelSource: 'workspace', reasoning: 'low', save: async () => {}, sources: plugin.sources };
   const modal = new NextStepModal({}, 'Parent', 'normal', 1, 1, plugin,
     async options => { researchOptions = options; },
@@ -409,11 +437,20 @@ integrationTest('Next Step returns new expansion requests to the map and reviews
   proposalCheck.checked = true;
   button(expand, 'Create subtopics').click(); await tick();
   assert.equal(created[0].title, 'Transport'); assert.equal(closed, 0);
+  const contentChoice = find(synthesize, item => item.tag === 'select' && item['aria-label'] === 'Topic synthesis content');
+  assert.equal(contentChoice.value, 'full');
+  assert.ok(find(synthesize, item => item.tag === 'li' && item.text === 'Child A'));
+  assert.ok(find(synthesize, item => item.tag === 'li' && item.text === 'Child B'));
+  contentChoice.value = 'summary'; contentChoice.change();
+  assert.ok(find(synthesize, item => /Important conditions in the body may be omitted/.test(item.text ?? '')));
   cards.children[2].click(); button(synthesize, 'Get synthesis suggestions first').click(); await tick();
+  assert.equal(contentChoice.disabled, true);
+  assert.equal(synthOptions.synthesisContent, 'summary');
   assert.equal(synthCalls, 1); assert.equal(closed, 0);
   assert.equal(synthOptions.researchMode, 'local');
   assert.ok(button(synthesize, 'Choose this direction'));
   button(synthesize, 'Get synthesis draft').click(); await tick();
+  assert.equal(synthOptions.synthesisContent, 'summary');
   button(synthesize, 'Confirm update to parent topic').click(); await tick();
   assert.deepEqual(saved, ['Draft', 'Detail']); assert.equal(closed, 0);
   cards.children[0].click(); button(research, 'Confirm research task').click(); await tick();
@@ -452,14 +489,16 @@ integrationTest('Next Step returns new expansion requests to the map and reviews
   failedResearch.onOpen(); button(failedResearch.contentEl, 'Confirm research task').click(); await tick();
   assert.equal(closed, 3); assert.equal(all(failedResearch.contentEl, item => item.cls.includes('vam-next-research'))[0].querySelector('.vam-next-status').text, 'Cannot start');
   let acknowledged = 0, began = 0;
-  const firstUsePlugin = { settings: { codexUsageNoticeSeen: false }, codexReadyForAi: () => true, saveSettings: async () => { acknowledged++; } };
+  let firstUseConfirmed = false;
+  const firstUsePlugin = { settings: { codexUsageNoticeSeen: false }, aiReadyForModel: async () => true, confirmAiUsage: async (_model, run) => { if (!firstUseConfirmed) { firstUseConfirmed = true; return false; } acknowledged++; await run(); return true; }, saveSettings: async () => { acknowledged++; } };
   const firstUse = new NextStepModal({}, 'Parent', 'normal', 1, 0, firstUsePlugin, async () => { began++; }, async () => {}, async () => {});
   firstUse.onOpen(); button(firstUse.contentEl, 'Confirm research task').click(); await tick();
-  assert.equal(began, 0); assert.ok(button(firstUse.contentEl, 'Understand and run')); assert.equal(closed, 3);
-  button(firstUse.contentEl, 'Understand and run').click(); await tick();
+  assert.equal(began, 0); assert.equal(button(firstUse.contentEl, 'Understand and run'), undefined); assert.equal(closed, 3);
+  button(firstUse.contentEl, 'Confirm research task').click(); await tick();
   assert.equal(began, 1); assert.equal(acknowledged, 1); assert.equal(closed, 4);
   let pendingCalls = 0;
-  const pendingPlugin = { settings: { codexUsageNoticeSeen: false }, codexReadyForAi: () => true, saveSettings: async () => {} };
+  let pendingConfirmed = false;
+  const pendingPlugin = { settings: { codexUsageNoticeSeen: false }, aiReadyForModel: async () => true, confirmAiUsage: async (_model, run) => { if (!pendingConfirmed) { pendingConfirmed = true; return false; } await run(); return true; }, saveSettings: async () => {} };
   const pendingModal = new NextStepModal({}, 'Parent', 'normal', 1, 1, pendingPlugin, async () => {}, async (_options, _direction, found) => { pendingCalls++; found([{ title: 'Existing', task: 'Research', contribution: '', parentTitle: '' }], async () => {}); }, async () => {});
   pendingModal.onOpen(); find(pendingModal.contentEl, item => item.cls === 'vam-next-cards').children[1].click();
   button(pendingModal.contentEl, 'Review AI subtopic suggestions').click(); await tick();
@@ -467,7 +506,7 @@ integrationTest('Next Step returns new expansion requests to the map and reviews
   button(pendingModal.contentEl, 'Create subtopics').click(); await tick();
   assert.ok(button(pendingModal.contentEl, 'Get expansion directions'));
   button(pendingModal.contentEl, 'Get expansion directions').click(); await tick();
-  assert.equal(pendingCalls, 1); assert.ok(button(pendingModal.contentEl, 'Understand and run'));
+  assert.equal(pendingCalls, 1); assert.equal(button(pendingModal.contentEl, 'Understand and run'), undefined);
   let finishQuick, completedQuick = false, delayedOptions;
   const delayed = new NextStepModal({}, 'Parent', 'normal', 1, 0, plugin, async () => {}, async options => {
     delayedOptions = options;
@@ -505,7 +544,7 @@ integrationTest('Next Step returns new expansion requests to the map and reviews
   assert.equal(guidedFinished, true); assert.equal(button(guidedModal.contentEl, 'Create subtopics'), undefined);
   const settingsWrites = []; let researchAfterSave = false;
   const settingsModal = new NextStepModal({}, 'Parent', 'normal', 0, 0,
-    { settings: { codexUsageNoticeSeen: true, models: 'model-a,model-b' }, codexReadyForAi: () => true, saveSettings: async () => {} },
+    { settings: { codexUsageNoticeSeen: true, models: 'model-a,model-b' }, aiReadyForModel: async model => { checkedModels.push(model); return true; }, confirmAiUsage: async (model, run) => { checkedModels.push(model); await run(); return true; }, saveSettings: async () => {} },
     async () => { researchAfterSave = settingsWrites.length === 2; }, async () => {}, async () => {},
     { model: 'model-a', modelSource: 'workspace', reasoning: 'low', save: async patch => { settingsWrites.push(patch); } });
   settingsModal.onOpen();
@@ -516,6 +555,7 @@ integrationTest('Next Step returns new expansion requests to the map and reviews
   assert.equal(researchAfterSave, false);
   button(settingsModal.contentEl, 'Confirm research task').click(); await tick();
   assert.deepEqual(plain(settingsWrites), [{ model: 'model-b', modelSource: 'manual' }, { reasoning: 'high' }]);
+  assert.equal(checkedModels.at(-1), 'model-b');
   assert.equal(researchAfterSave, true);
   const closedBeforeCancel = closed;
   const cancelModal = new NextStepModal({}, 'Parent', 'normal', 1, 0, plugin, async () => {}, async options => new Promise((_resolve, reject) => options.signal.addEventListener('abort', () => { const error = new Error('aborted'); error.name = 'AbortError'; reject(error); }, { once: true })), async () => {});
@@ -807,6 +847,19 @@ integrationTest('AI prompt defaults to the selected language across task modes',
   await plugin.askModel({ ...context, mode: 'task' }, 'test-model', 'low');
   assert.match(prompts[3], /新產生的內容預設使用繁體中文/);
   assert.match(prompts[3], /### 核心結論/);
+});
+integrationTest('Claude Code uses the shared task prompt and structured result parser without provider fallback', async () => {
+  const { default: Plugin } = load('main.ts', { obsidian });
+  const plugin = new Plugin(); plugin.app = { vault: { adapter: new obsidian.FileSystemAdapter() } }; plugin.manifest = { dir: '.obsidian/plugins/visual-agent-map' };
+  let call;
+  plugin.claudeCli = () => ({ runTask: async (...args) => { call = args; return JSON.stringify({ summary: 'Claude result', detail: 'Claude detail', suggestions: [], visualReferences: [] }); } });
+  plugin.runtime = () => { assert.fail('Claude selection must not fall back to Codex'); };
+  const result = await plugin.askModel({ title: 'Topic', summary: 'Existing summary', rules: '', detail: 'Full detail', task: 'One-run requirement', ancestors: '', mode: 'synthesize', researchMode: 'research', researchDepth: 'fast', visualMode: 'off' }, 'claude:sonnet', 'high');
+  assert.equal(call[1], 'sonnet'); assert.equal(call[2], 'high');
+  assert.match(call[0], /One-run requirement/); assert.match(call[0], /Full detail/);
+  assert.ok(call[3] && typeof call[3] === 'object');
+  assert.equal(call[4].searchBudget, 1);
+  assert.deepEqual(plain(result), { summary: 'Claude result', detail: 'Claude detail', suggestions: [], visualReferences: [] });
 });
 integrationTest('AI response fallback keeps the language captured when the task started', async () => {
   const { default: Plugin } = load('main.ts', { obsidian });
@@ -1432,6 +1485,107 @@ integrationTest('synthesis directions and draft are separate steps; only confirm
   assert.equal(saved.rules, 'Legacy sentinel');
   assert.equal(saved.summary, 'Edited summary'); assert.match(saved.detail, /Edited detail/);
 });
+integrationTest('synthesis content is explicit for one, three and four children, with full default and no descendants', async () => {
+  const { VisualAgentMapView } = load('main.ts', { obsidian });
+  const { referenceBatches } = load('ai/reference-materials.ts', { obsidian });
+  for (const count of [1, 3, 4]) for (const choice of [undefined, 'full', 'summary']) {
+    const { repo, app, contents } = fixture(), parent = await topicNote(repo, 'Parent', 'model-a');
+    await repo.updateNote(parent.path, { rules: 'LEGACY_PARENT_RULES' });
+    const children = [];
+    for (let index = 0; index < count; index++) {
+      const child = await topicNote(repo, `Child ${index}`, 'model-a'); child.parentId = parent.id;
+      await repo.updateNote(child.path, { summary: `Summary ${index}`, detail: `DETAIL_START_${index}\n${'body '.repeat(3500)}\nBODY_ONLY_CONDITION_${index}\n${'rest '.repeat(3500)}\nDETAIL_END_${index}`, newFindings: `Finding ${index}`, rules: `LEGACY_CHILD_${index}` });
+      children.push(child);
+    }
+    const grandchild = await topicNote(repo, 'Grandchild', 'model-a'); grandchild.parentId = children[0].id;
+    await repo.updateNote(grandchild.path, { detail: 'EXCLUDED_GRANDCHILD' });
+    const unrelated = await topicNote(repo, 'Unrelated', 'model-a');
+    await repo.updateNote(unrelated.path, { detail: 'EXCLUDED_UNRELATED' });
+    const selected = { id: 'extra', name: 'Extra', location: '/refs', documents: [{ path: '/refs/extra.md', content: 'EXTRA_FULL_BODY', external: true }] };
+    const before = new Map(contents);
+    const contexts = [];
+    const plugin = { repo, settings: { ...DEFAULT_SETTINGS }, running: new Set(), mutate: async work => work(), recordFailure: (_label, error) => error.message,
+      askModel: async context => { contexts.push(context); return contexts.length === 1 ? { suggestions: [{ title: 'Direction', task: 'Compare evidence', contribution: '' }] } : { summary: 'Draft', detail: 'Draft', visualReferences: [], suggestions: [] }; } };
+    const view = new VisualAgentMapView({ app }, plugin); view.map = map([parent, ...children, grandchild, unrelated]); view.render = () => {}; view.hydrate = async () => {}; view.ancestorContext = async () => '';
+    let draft, save;
+    const options = { researchMode: 'local', researchDepth: 'normal', visualMode: 'off', requirements: 'Respect the budget', referenceGroups: [selected], ...(choice ? { synthesisContent: choice } : {}) };
+    await view.proposeIntegrationDirections(parent, options, (_items, next) => { draft = next; }, (_result, commit) => { save = commit; }, message => assert.fail(message));
+    await draft('Compare evidence');
+    assert.equal(typeof save, 'function'); assert.equal(contexts.length, 2);
+    for (const context of contexts) {
+      assert.equal(context.rules, ''); assert.match(context.task, /Respect the budget/);
+      const docs = context.referenceGroups.flatMap(group => group.documents);
+      const automatic = docs.filter(doc => !doc.external);
+      assert.deepEqual(Array.from(docs, doc => doc.path), ['/refs/extra.md', ...children.map(child => child.path)]);
+      assert.equal(docs[0].content, 'EXTRA_FULL_BODY');
+      const batches = referenceBatches(context.referenceGroups).join('\n');
+      assert.doesNotMatch(batches, /EXCLUDED_GRANDCHILD|EXCLUDED_UNRELATED|LEGACY_CHILD/);
+      for (let index = 0; index < count; index++) {
+        assert.ok(automatic[index].content.includes(`Summary ${index}`)); assert.ok(automatic[index].content.includes(`Finding ${index}`));
+        if (choice === 'summary') assert.ok(!automatic[index].content.includes(`BODY_ONLY_CONDITION_${index}`));
+        else {
+          const detail = (await repo.readNote(children[index].path)).detail;
+          assert.ok(automatic[index].content.includes(detail), `full source lost Detail for ${count}/${choice}/${index}`);
+          for (const marker of [`DETAIL_START_${index}`, `BODY_ONLY_CONDITION_${index}`, `DETAIL_END_${index}`]) assert.ok(batches.includes(marker));
+          assert.ok(batches.includes(children[index].path));
+        }
+      }
+    }
+    assert.doesNotMatch(JSON.stringify(contexts), /LEGACY_PARENT_RULES/);
+    assert.equal((await repo.readNote(parent.path)).rules, 'LEGACY_PARENT_RULES');
+    for (const child of [...children, grandchild, unrelated]) assert.equal(contents.get(child.path), before.get(child.path));
+    assert.notEqual((await repo.readNote(parent.path)).summary, 'Draft');
+  }
+});
+integrationTest('multi-select synthesis honors content choice and leaves unselected topics and extra Markdown unchanged', async () => {
+  const { VisualAgentMapView } = load('main.ts', { obsidian });
+  for (const choice of [undefined, 'full', 'summary']) {
+    const { repo, app, contents } = fixture(), a = await topicNote(repo, 'Selected A', 'model-a'), b = await topicNote(repo, 'Selected B', 'model-a'), excluded = await topicNote(repo, 'Not selected', 'model-a');
+    await repo.updateNote(a.path, { summary: 'A summary', detail: 'A_BODY_ONLY', rules: 'OLD_RULE_A' });
+    await repo.updateNote(b.path, { summary: 'B summary', detail: 'B_BODY_ONLY' });
+    const before = new Map(contents);
+    const extra = { id: 'extra', name: 'Extra', location: '/refs', documents: [{ path: '/refs/source.md', content: 'EXTRA_BODY_UNCHANGED', external: true }] };
+    const plugin = { repo, settings: { ...DEFAULT_SETTINGS }, askModel: async context => {
+      const docs = context.referenceGroups.flatMap(group => group.documents);
+      const automatic = docs.filter(doc => !doc.external);
+      assert.deepEqual(Array.from(docs, doc => doc.path), ['/refs/source.md', a.path, b.path]);
+      assert.equal(automatic[0].content.includes('A_BODY_ONLY'), choice !== 'summary');
+      assert.equal(automatic[1].content.includes('B_BODY_ONLY'), choice !== 'summary');
+      assert.equal(docs[0].content, 'EXTRA_BODY_UNCHANGED');
+      assert.match(context.task, /This run only/); assert.equal(context.rules, '');
+      throw new Error('Stop before any write');
+    } };
+    const view = new VisualAgentMapView({ app }, plugin); view.map = map([a, b, excluded]); view.render = () => {};
+    await assert.rejects(view.createIntegratedNode('Draft', [a, b], 'Compare', '', { synthesisContent: choice, requirements: 'This run only', referenceGroups: [extra] }, true), /Stop before any write/);
+    assert.deepEqual(new Map(contents), before);
+  }
+});
+integrationTest('explicit full Markdown wins over overlapping automatic summaries in both synthesis paths', async () => {
+  const { repo, app } = fixture(), parent = await topicNote(repo, 'Parent'), a = await topicNote(repo, 'A'), b = await topicNote(repo, 'B');
+  a.parentId = parent.id; b.parentId = parent.id;
+  await repo.updateNote(a.path, { summary: 'A summary', detail: 'FULL_OVERLAP_CONDITION' });
+  const { referenceBatches } = load('ai/reference-materials.ts', { obsidian });
+  const { VisualAgentMapView } = load('main.ts', { obsidian });
+  const full = await app.vault.read(repo.file(a.path));
+  const extra = { id: 'shared-map', name: 'Other map', location: 'Other/Map.md', documents: [{ path: a.path, content: full }] };
+  let calls = 0;
+  const plugin = { repo, settings: { ...DEFAULT_SETTINGS }, running: new Set(), mutate: async work => work(), recordFailure: (_label, error) => error.message, askModel: async context => {
+    const batches = referenceBatches(context.referenceGroups).join('\n');
+    assert.match(batches, /FULL_OVERLAP_CONDITION/);
+    assert.equal(batches.split('FULL_OVERLAP_CONDITION').length - 1, 1);
+    calls++;
+    return { summary: 'Draft', detail: 'Draft', visualReferences: [], suggestions: [{ title: 'Angle', task: 'Compare', contribution: '' }] };
+  } };
+  const view = new VisualAgentMapView({ app }, plugin); view.map = map([parent, a, b]); view.render = () => {}; view.hydrate = async () => {}; view.ancestorContext = async () => '';
+  const options = { synthesisContent: 'summary', referenceGroups: [extra], researchMode: 'local', researchDepth: 'normal', visualMode: 'off' };
+  let draft;
+  await view.proposeIntegrationDirections(parent, options, (_items, next) => { draft = next; }, () => {}, message => assert.fail(message));
+  await draft('Compare');
+  view.saveIntegratedNode = async () => {};
+  await view.createIntegratedNode('Combined', [a, b], 'Compare', '', options);
+  assert.equal(calls, 3);
+  assert.equal(await app.vault.read(repo.file(a.path)), full);
+});
 integrationTest('synthesis can use selected notes when a topic has no children', async () => {
   const { repo, app } = fixture(), parent = await topicNote(repo, 'Parent', 'model-a');
   const contexts = [];
@@ -1540,14 +1694,15 @@ test('first-use map view waits for async initialization and opens the official S
   assert.equal(opened, 1);
   assert.equal(view.builtIn, true);
 });
-test('the first real AI task requires a one-time Codex allowance acknowledgement', () => {
+test('the first AI task shows a provider-specific usage acknowledgement only once', () => {
   const source = fs.readFileSync(path.join(root, 'main.ts'), 'utf8');
-  assert.match(source, /class CodexUsageModal/);
+  assert.match(source, /class AiUsageModal/);
   assert.match(source, /ui\.vam_runs_ai_tasks_through_your_signed_in_codex_account_and_u/);
-  assert.match(source, /if \(!confirmed\) return;/);
+  assert.match(source, /ui\.vam_runs_ai_tasks_through_your_claude_code_account_and_uses/);
+  assert.match(source, /if \(!confirmed\) return false;/);
   assert.match(source, /this\.settings\.codexUsageNoticeSeen = true/);
-  assert.match(source, /if \(!needsUsage \|\| this\.plugin\.settings\.codexUsageNoticeSeen\) \{ await start\(\); return; \}/);
-  assert.match(source, /this\.plugin\.settings\.codexUsageNoticeSeen = true; await this\.plugin\.saveSettings\(\)/);
+  assert.match(source, /this\.settings\.claudeUsageNoticeSeen = true/);
+  assert.match(source, /confirmAiUsage\(model/);
 });
 test('Obsidian 1.13 declarative settings expose workspace recovery and App Server diagnostics', () => {
   const source = fs.readFileSync(path.join(root, 'main.ts'), 'utf8');
@@ -1902,10 +2057,68 @@ integrationTest('Codex App Server ignores stale child events after a clean resta
   assert.equal(children.length, 2);
   runtime.stop();
 });
-integrationTest('legacy Claude models fail clearly without starting a provider', async () => {
-  const { default: Plugin } = load('main.ts', { obsidian });
-  const plugin = new Plugin();
-  await assert.rejects(plugin.askModel({ title: 'Current topic', summary: '', rules: '', detail: '', task: 'task', ancestors: '', mode: 'task' }, 'claude:sonnet'), /Claude Code is no longer supported/);
+test('Claude CLI uses the local structured-output interface with tools restricted by task mode', async () => {
+  const { EventEmitter } = require('node:events'); let args, prompt, cwd;
+  const result = { type: 'result', subtype: 'success', is_error: false, structured_output: { summary: 'Summary', detail: 'Evidence', suggestions: [], visualReferences: [] } };
+  const spawn = (_executable, received, options) => {
+    args = received; cwd = options.cwd;
+    const child = new EventEmitter(); child.stdout = new EventEmitter(); child.stderr = new EventEmitter(); child.kill = () => true;
+    child.stdin = { end: text => { prompt = text; process.nextTick(() => { child.stdout.emit('data', Buffer.from(JSON.stringify(result))); child.emit('close', 0); }); } };
+    return child;
+  };
+  const { ClaudeCodeCliRuntime, claudeTaskArgs, claudeStructuredOutput } = load('ai/runtime/claude-code-cli.ts', { 'node:child_process': { spawn } });
+  const schema = { type: 'object', properties: { summary: { type: 'string' } } };
+  const localArgs = claudeTaskArgs('sonnet', 'medium', schema, false);
+  assert.equal(localArgs[localArgs.indexOf('--tools') + 1], '');
+  assert.ok(localArgs.includes('--safe-mode'));
+  assert.ok(localArgs.includes('--strict-mcp-config'));
+  assert.deepEqual(JSON.parse(localArgs[localArgs.indexOf('--mcp-config') + 1]), { mcpServers: {} });
+  assert.ok(localArgs.includes('--no-session-persistence'));
+  const webArgs = claudeTaskArgs('opus', 'high', schema, true);
+  assert.equal(webArgs[webArgs.indexOf('--tools') + 1], 'WebSearch,WebFetch');
+  assert.doesNotMatch(webArgs.join(' '), /\b(Bash|Read|Write|Edit|Agent)\b/);
+  const runtime = new ClaudeCodeCliRuntime({ executable: '/usr/local/bin/claude', cwd: '/plugin', env: {}, spawn });
+  const raw = await runtime.runTask('VAM prompt', 'sonnet', 'medium', schema, { searchBudget: 0 });
+  assert.equal(cwd, '/plugin'); assert.equal(prompt, 'VAM prompt');
+  assert.equal(args[args.indexOf('--model') + 1], 'sonnet');
+  assert.deepEqual(JSON.parse(raw), result.structured_output);
+  assert.deepEqual(JSON.parse(claudeStructuredOutput(JSON.stringify(result))), result.structured_output);
+  assert.throws(() => claudeStructuredOutput('not-json'));
+  assert.throws(() => claudeStructuredOutput(JSON.stringify({ ...result, structured_output: undefined })), /structured result/);
+  assert.throws(() => claudeStructuredOutput(JSON.stringify({ ...result, subtype: 'error_max_turns', is_error: true, errors: ['turn limit'] })), /turn limit/);
+});
+
+test('Claude cancellation rejects immediately and terminates only its own process', async () => {
+  const { EventEmitter } = require('node:events'); const kills = [];
+  const spawn = () => {
+    const child = new EventEmitter(); child.stdout = new EventEmitter(); child.stderr = new EventEmitter();
+    child.kill = signal => { kills.push(signal); if (signal === 'SIGTERM') process.nextTick(() => child.emit('close', null, signal)); return true; };
+    child.stdin = { end: () => {} }; return child;
+  };
+  const { ClaudeCodeCliRuntime } = load('ai/runtime/claude-code-cli.ts', { 'node:child_process': { spawn } });
+  const runtime = new ClaudeCodeCliRuntime({ executable: 'claude', cwd: '/plugin', env: {}, spawn });
+  const controller = new AbortController();
+  const task = runtime.runTask('prompt', 'sonnet', 'low', {}, { signal: controller.signal });
+  controller.abort();
+  await assert.rejects(task, error => error.name === 'AbortError');
+  await new Promise(resolve => setImmediate(resolve));
+  assert.deepEqual(kills, ['SIGTERM']);
+});
+
+test('Claude timeout stops its process and never accepts a late structured result', async () => {
+  const { EventEmitter } = require('node:events'); let child; const kills = [];
+  const spawn = () => {
+    child = new EventEmitter(); child.stdout = new EventEmitter(); child.stderr = new EventEmitter();
+    child.kill = signal => { kills.push(signal); if (signal === 'SIGTERM') process.nextTick(() => child.emit('close', null, signal)); return true; };
+    child.stdin = { end: () => {} }; return child;
+  };
+  const { ClaudeCodeCliRuntime } = load('ai/runtime/claude-code-cli.ts', { 'node:child_process': { spawn } });
+  const runtime = new ClaudeCodeCliRuntime({ executable: 'claude', cwd: '/plugin', env: {}, spawn, timeoutMs: 15 });
+  const task = runtime.runTask('prompt', 'sonnet', 'low', {});
+  await assert.rejects(task, /exceeded 3 minutes/);
+  child.stdout.emit('data', Buffer.from(JSON.stringify({ structured_output: { detail: 'late write' } })));
+  child.emit('close', 0);
+  assert.deepEqual(kills, ['SIGTERM']);
 });
 
 test('external map conflict UI retains file, screen, and manual merge choices', () => {
@@ -2149,7 +2362,7 @@ test('localized command and ribbon labels follow the selected VAM language', () 
 test('map switch closes only the VAM note that remains in its right pane and clears Obsidian Outline', () => {
   class MarkdownView { constructor(path) { this.file = { path }; } }
   const { default: Plugin } = load('main.ts', { obsidian: { ...obsidian, MarkdownView } });
-  const plugin = new Plugin(); let closed = 0, fileCleared = 0, synchronized = 0; plugin.app = { workspace: { activeLeaf: { id: 'map-view' }, trigger: (event, leaf) => { if (event === 'file-open') { assert.equal(leaf, null); fileCleared++; } else { assert.equal(event, 'active-leaf-change'); assert.equal(leaf.id, 'map-view'); synchronized++; } } } };
+  const plugin = new Plugin(); let closed = 0, fileCleared = 0, synchronized = 0; plugin.app = { workspace: { getActiveViewOfType: () => ({ leaf: { id: 'map-view' } }), trigger: (event, leaf) => { if (event === 'file-open') { assert.equal(leaf, null); fileCleared++; } else { assert.equal(event, 'active-leaf-change'); assert.equal(leaf.id, 'map-view'); synchronized++; } } } };
   plugin.detailsPath = 'old-note.md';
   plugin.detailsLeaf = { view: new MarkdownView('other-user-note.md'), detach: () => { closed++; } };
   plugin.closeStaleDetails(); assert.equal(closed, 0); assert.equal(fileCleared, 0); assert.equal(synchronized, 0);
@@ -2258,4 +2471,50 @@ integrationTest('legacy reference metadata is preserved but no longer copied whe
   assert.deepEqual(preserved.referencePaths, ['Evidence.pdf', 'Other.md']); assert.equal(preserved.detail, 'Keep all detail');
   const source = fs.readFileSync(path.join(root, 'main.ts'), 'utf8');
   assert.doesNotMatch(source, /referencePaths:\s*note\.referencePaths/);
+});
+
+integrationTest('persisted JSON validates all exchange fields and optional suggestion parent without rewriting input', async () => {
+  const { AiExchangeLog } = load('ai-exchange-log.ts');
+  const { PendingSuggestions } = load('pending-suggestions.ts');
+  const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'vam-json-boundary-'));
+  try {
+    const file = path.join(directory, 'exchanges.json');
+    const valid = { id: '1', startedAt: 'now', topic: 'Topic', mode: 'task', model: 'test', effort: 'low', request: 'prompt', response: 'answer', status: 'completed', error: '' };
+    const invalid = Object.keys(valid).map(key => ({ ...valid, [key]: 12 }));
+    const text = JSON.stringify([valid, ...invalid, { ...valid, status: 'unknown' }]); fs.writeFileSync(file, text);
+    const errors = []; const log = new AiExchangeLog(file, error => errors.push(error)); await log.load();
+    assert.equal(log.getEntries().length, 0); assert.equal(errors.length, 1);
+    log.begin({ ...valid, id: 'new' }); await log.flush(); assert.equal(fs.readFileSync(file, 'utf8'), text);
+    const proposals = path.join(directory, 'suggestions.json');
+    fs.writeFileSync(proposals, JSON.stringify([['topic.md', [{ title: 'A', task: 'B', contribution: 'C' }, { title: 'A', task: 'B', contribution: 'C', parentTitle: 12 }]]]));
+    const pending = new PendingSuggestions(proposals, error => errors.push(error)); await pending.load();
+    assert.equal(pending.size, 0); const original = fs.readFileSync(proposals, 'utf8');
+    pending.set('new.md', [{ title: 'New', task: '', contribution: '' }]); await assert.rejects(pending.flush());
+    assert.equal(fs.readFileSync(proposals, 'utf8'), original);
+    for (const Store of [AiExchangeLog, PendingSuggestions]) {
+      const failures = []; const broken = new Store(file, error => failures.push(error));
+      fs.writeFileSync(file, '{broken'); await broken.load(); assert.equal(failures.length, 1);
+      fs.rmSync(file); const missing = new Store(file, error => failures.push(error)); await missing.load(); assert.equal(failures.length, 1);
+    }
+  } finally { fs.rmSync(directory, { recursive: true, force: true }); }
+});
+
+integrationTest('Codex launch preserves executable as one argument and refuses privileged server requests', async () => {
+  const { EventEmitter } = require('node:events'); const sent = []; let launch;
+  const child = new EventEmitter(); child.stdout = new EventEmitter(); child.stderr = new EventEmitter(); child.kill = () => {};
+  child.stdin = { write: line => { const message = JSON.parse(line.trim()); sent.push(message); if (message.method === 'initialize') process.nextTick(() => child.stdout.emit('data', Buffer.from(`${JSON.stringify({ id: message.id, result: {} })}\n`))); } };
+  const { CodexAppServerRuntime } = load('ai/runtime/codex-app-server.ts', { 'node:child_process': { spawn: (...args) => { launch = args; return child; } } });
+  const executable = '/trusted path/codex;unexpected'; const env = { PATH: '/trusted/bin' };
+  const runtime = new CodexAppServerRuntime({ executable, cwd: '/vault/custom-config/plugins/visual-agent-map', env, clientVersion: 'test' });
+  try {
+    await runtime.start(); assert.equal(launch[0], executable); assert.deepEqual(plain(launch[1]), ['app-server']);
+    assert.equal(launch[2].cwd, '/vault/custom-config/plugins/visual-agent-map'); assert.equal(launch[2].env, env); assert.ok(!launch[2].shell);
+    for (const [index, method] of ['item/commandExecution/requestApproval', 'item/fileChange/requestApproval', 'item/permissions/requestApproval', 'unknown/privilege'].entries()) {
+      child.stdout.emit('data', Buffer.from(`${JSON.stringify({ id: 'server-' + index, method, params: {} })}\n`));
+    }
+    assert.deepEqual(sent.find(message => message.id === 'server-0').result, { decision: 'decline' });
+    assert.deepEqual(sent.find(message => message.id === 'server-1').result, { decision: 'decline' });
+    assert.deepEqual(sent.find(message => message.id === 'server-2').result, { permissions: {} });
+    assert.equal(sent.find(message => message.id === 'server-3').error.code, -32601);
+  } finally { runtime.stop(); }
 });

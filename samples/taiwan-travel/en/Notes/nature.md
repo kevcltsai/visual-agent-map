@@ -18,9 +18,6 @@ Use one mountain experience, one coastal stretch, and one slow-travel region as 
 ## Prompt
 
 Check seasonal trail, weather, and transport constraints.
-## Rules
-
-Every outdoor plan needs an alternative.
 ## Preview
 
 ![Green mountains and the blue Pacific on Taiwan's east coast](../Attachments/east-coast-landscape.webp)
@@ -29,5 +26,11 @@ Alt text preserves meaning when an image cannot load.
 ## Detail
 
 <!-- visual-agent-map:detail:start -->
+### Requirements for this run
+
+Before starting an AI task, copy the conditions you want it to follow into **Additional requirements**. This note does not apply them automatically.
+
+> Every outdoor plan needs an alternative.
+
 Alishan, the East Rift Valley, and the coast offer different scales of nature; avoid reducing them to quick photo stops.
 <!-- visual-agent-map:detail:end -->

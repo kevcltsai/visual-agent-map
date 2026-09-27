@@ -18,9 +18,6 @@ Choose one representative meal per stop and leave the rest open for nearby disco
 ## Prompt
 
 Add dietary restrictions and viable alternatives for the group.
-## Rules
-
-Do not let famous queues control an entire day.
 ## Preview
 
 ![A Taiwanese table with braised pork rice, soup, and side dishes](../Attachments/regional-food.webp)
@@ -29,5 +26,11 @@ User-controlled preview content can combine text, images, and tables in the hove
 ## Detail
 
 <!-- visual-agent-map:detail:start -->
+### Requirements for this run
+
+Before starting an AI task, copy the conditions you want it to follow into **Additional requirements**. This note does not apply them automatically.
+
+> Do not let famous queues control an entire day.
+
 Tainan snacks, Chiayi specialties, and east-coast flavors are exploration directions; verify venues for the actual dates.
 <!-- visual-agent-map:detail:end -->

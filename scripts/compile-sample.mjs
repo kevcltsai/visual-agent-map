@@ -59,6 +59,6 @@ const topology = sample => sample.nodes.map(({ id, path, parentId, x, y, collaps
 if (JSON.stringify(topology(locales["zh-TW"])) !== JSON.stringify(topology(locales.en))) throw new Error("Sample locale topology must match exactly");
 const totalBytes = Object.keys(assets).reduce((sum, name) => sum + statSync(join(sampleRoot, "Attachments", name)).size, 0);
 if (totalBytes > 1_200_000) throw new Error(`Sample attachments exceed 1.2 MB: ${totalBytes}`);
-const output = { contentVersion: 2, locales, assets };
+const output = { contentVersion: 3, locales, assets };
 writeFileSync(join(sampleRoot, "compiled.json"), `${JSON.stringify(output)}\n`);
 process.stdout.write(`Compiled ${Object.keys(output.locales["zh-TW"].notes).length} notes and ${Object.keys(assets).length} assets from ${relative(root, sampleRoot)}\n`);

@@ -19,6 +19,7 @@ export function formatAiExchange(entry: AiExchange): string {
 
 export class AiExchangeLog {
   private entries: AiExchange[] = [];
+  private loadError: unknown = null;
   private listeners = new Set<() => void>();
   private writes: Promise<void> = Promise.resolve();
   constructor(private readonly path: string, private readonly onError: (error: unknown) => void, private readonly limit = 20) {}
@@ -27,14 +28,18 @@ export class AiExchangeLog {
     try {
       const parsed: unknown = JSON.parse(await readFile(this.path, "utf8"));
       if (!Array.isArray(parsed)) throw new Error("AI 往返紀錄格式錯誤");
-      this.entries = (parsed as unknown[]).filter((item): item is AiExchange => {
+      const entries = (parsed as unknown[]).filter((item): item is AiExchange => {
         if (!item || typeof item !== "object") return false;
         const entry = item as Record<string, unknown>;
-        return typeof entry.id === "string" && typeof entry.request === "string" && typeof entry.response === "string" && typeof entry.status === "string";
-      }).slice(-this.limit);
+        return ["id", "startedAt", "topic", "mode", "model", "effort", "request", "response", "error"].every(key => typeof entry[key] === "string")
+          && typeof entry.status === "string" && ["preparing", "sent", "received", "parsed", "completed", "failed"].includes(entry.status);
+      });
+      if (entries.length !== parsed.length) throw new Error("AI 往返紀錄欄位格式錯誤；保留原檔並停止寫入");
+      this.entries = entries.slice(-this.limit);
+      this.loadError = null;
       this.emit();
-    } catch (error) {
-      if ((error as NodeJS.ErrnoException).code !== "ENOENT") this.onError(error);
+    } catch (error: unknown) {
+      if (!(error && typeof error === "object" && "code" in error && error.code === "ENOENT")) { this.loadError = error; this.onError(error); }
     }
   }
 
@@ -62,6 +67,7 @@ export class AiExchangeLog {
   private emit(): void { for (const listener of this.listeners) listener(); }
   private changed(): void {
     this.emit();
+    if (this.loadError) { this.onError(this.loadError); return; }
     const snapshot = JSON.stringify(this.entries);
     this.writes = this.writes.then(async () => {
       const temporary = `${this.path}.tmp`;

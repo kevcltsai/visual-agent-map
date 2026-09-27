@@ -18,15 +18,18 @@ Set the constraints first, then explore transport, food, nature, and lodging ind
 ## Prompt
 
 Find the important decisions and risks still missing from this journey.
-## Rules
-
-Nine days; favor public transport; no more than two priorities per day.
 ## Preview
 
 Expand a broad goal into layered subtopics, then synthesize mature findings into a new journey root.
 ## Detail
 
 <!-- visual-agent-map:detail:start -->
+### Requirements for this run
+
+Before starting an AI task, copy the conditions you want it to follow into **Additional requirements**. This note does not apply them automatically.
+
+> Nine days; favor public transport; no more than two priorities per day.
+
 ![Illustrated overview of a Taiwan circuit](../Attachments/taiwan-route-overview.webp)
 
 This map moves from a fuzzy goal through constraints and options to an executable journey.

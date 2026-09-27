@@ -1,4 +1,4 @@
-import { spawn as nodeSpawn } from "node:child_process";
+import { spawn as nodeSpawn } from "child_process";
 import { t } from "../../i18n";
 
 interface ClaudeProcess {

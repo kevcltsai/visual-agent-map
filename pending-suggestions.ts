@@ -1,4 +1,4 @@
-import { readFile, rename, writeFile } from "node:fs/promises";
+import { readFile, rename, writeFile } from "fs/promises";
 import type { Suggestion } from "./ai/types";
 
 export class PendingSuggestions extends Map<string, Suggestion[]> {

@@ -1,4 +1,4 @@
-import { readFile, rename, writeFile } from "node:fs/promises";
+import { readFile, rename, writeFile } from "fs/promises";
 
 export interface AiExchange {
   id: string;

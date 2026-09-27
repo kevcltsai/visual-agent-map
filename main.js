@@ -1887,7 +1887,7 @@ function formatDebugLogs(entries) {
 var debugLog = new LogManager();
 
 // ai-exchange-log.ts
-var import_promises = require("node:fs/promises");
+var import_promises = require("fs/promises");
 function formatAiExchange(entry) {
   return [`[${entry.startedAt}] ${entry.topic} \xB7 ${entry.mode} \xB7 ${entry.model}/${entry.effort} \xB7 ${entry.status}`, "\n\u9001\u5F80 AI \u7684\u8ACB\u6C42\uFF1A\n", entry.request || "\uFF08\u5C1A\u672A\u9001\u51FA\uFF09", "\nAI \u539F\u59CB\u56DE\u8986\uFF1A\n", entry.response || "\uFF08\u7121\uFF09", "\n\u932F\u8AA4\uFF1A\n", entry.error || "\uFF08\u7121\uFF09"].join("\n");
 }
@@ -3185,7 +3185,7 @@ function builtInSample(language2, useEmbeddedAssets = true) {
 }
 
 // pending-suggestions.ts
-var import_promises2 = require("node:fs/promises");
+var import_promises2 = require("fs/promises");
 var PendingSuggestions = class extends Map {
   constructor(path, onError) {
     super();
@@ -3364,7 +3364,7 @@ var OutlineView = class extends import_obsidian6.ItemView {
 };
 
 // main.ts
-var import_node_crypto = require("node:crypto");
+var import_crypto = require("crypto");
 
 // response-schema.json
 var response_schema_default = {
@@ -3695,7 +3695,7 @@ var CodexAppServerRuntime = class {
 };
 
 // ai/runtime/claude-code-cli.ts
-var import_node_child_process2 = require("node:child_process");
+var import_child_process = require("child_process");
 var CLAUDE_TASK_TIMEOUT_MS = 3 * 60 * 1e3;
 function claudeTaskArgs(model, effort, schema, webSearch) {
   return [
@@ -3743,7 +3743,7 @@ var ClaudeCodeCliRuntime = class {
     this.options = options;
     __publicField(this, "spawn");
     var _a;
-    this.spawn = (_a = options.spawn) != null ? _a : import_node_child_process2.spawn;
+    this.spawn = (_a = options.spawn) != null ? _a : import_child_process.spawn;
   }
   async runTask(prompt, model, effort, outputSchema, controls = {}) {
     var _a, _b, _c, _d, _e;
@@ -7566,7 +7566,7 @@ ${context.task}`
     const providerStarted = Date.now();
     const effort = effectiveReasoningLevel(context, normalizeReasoningLevel(reasoning != null ? reasoning : this.settings.cliReasoning));
     const exchanges = this.settings.aiExchangeLoggingEnabled ? this.exchanges : null;
-    const exchangeId = exchanges ? (0, import_node_crypto.randomUUID)() : "";
+    const exchangeId = exchanges ? (0, import_crypto.randomUUID)() : "";
     if (exchanges) {
       exchanges.begin({ id: exchangeId, startedAt: (/* @__PURE__ */ new Date()).toISOString(), topic: context.title, mode: (_b = context.mode) != null ? _b : "task", model, effort });
       onExchange == null ? void 0 : onExchange(exchangeId);

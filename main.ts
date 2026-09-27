@@ -20,7 +20,7 @@ import { debugLog, LogManager } from "./log-manager";
 import { AiExchangeLog } from "./ai-exchange-log";
 import { PendingSuggestions } from "./pending-suggestions";
 import { OutlineView, OUTLINE_VIEW_TYPE } from "./ui/outline-view";
-import { randomUUID } from "crypto";
+import { randomUUID } from "node:crypto";
 import responseSchema from "./response-schema.json";
 import { CodexAppServerRuntime } from "./ai/runtime/codex-app-server";
 import { ClaudeCodeCliRuntime } from "./ai/runtime/claude-code-cli";

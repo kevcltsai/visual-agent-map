@@ -20,6 +20,8 @@ export interface Note {
   visualReferences: string;
   newFindings: string;
   preview: string;
+  previewSection?: string;
+  previewInitialized?: boolean;
   model: string;
   modelSource: ModelSource;
   reasoning?: ReasoningLevel;
@@ -241,7 +243,7 @@ function noteBody(title: string, summary: string, language: NoteLanguage, prompt
     `# ${title}`,
     `## Current Summary\n\n${summary.trim() || placeholder(language)}`,
     `## Prompt\n\n${prompt.trim()}`,
-    `## Rules\n\n${rules.trim()}`,
+    rules.trim() ? `## Rules\n\n${rules.trim()}` : "",
     `## ${previewHeading(language)}\n\n${preview.trim()}`,
     `## Detail\n\n${detailBlock}`,
     newFindings.trim() ? `## Working Findings\n\n${newFindings.trim()}` : "",
@@ -361,6 +363,8 @@ export class Repository {
       visualReferences: section(content, "Visual References"),
       newFindings: section(content, "Working Findings") || section(content, "New Findings"),
       preview: [previewSection(content), section(content, "User Notes")].filter(Boolean).join("\n\n"),
+      previewSection: previewSection(content),
+      previewInitialized: fm["preview-initialized"] === true,
       model: text(fm.model, this.settings.cliModel),
       modelSource: ["workspace", "inherited", "manual"].includes(source) ? source as ModelSource : "workspace",
       reasoning: normalizeReasoningLevel(fm["reasoning-level"] ?? this.settings.cliReasoning),
@@ -413,11 +417,14 @@ export class Repository {
       if (patch.preview !== undefined) {
         body = replaceSection(body, previewHeading(this.settings.language), patch.preview);
         fm["preview-initialized"] = true;
+      } else if (patch.previewSection !== undefined) {
+        body = replaceSection(body, previewHeading(this.settings.language), patch.previewSection);
       } else if (patch.summary !== undefined && patch.summary.trim() && !isPlaceholder(patch.summary) && fm["preview-initialized"] !== true) {
         const preview = previewSection(body).trim();
         if (!preview || isPlaceholder(preview)) body = replaceSection(body, previewHeading(this.settings.language), initialPreview(patch.summary, section(body, "Detail")));
         fm["preview-initialized"] = true;
       }
+      if (patch.previewInitialized !== undefined) fm["preview-initialized"] = patch.previewInitialized;
       body = normalizeBodyOrder(body, text(fm.title, path.replace(/\.md$/, "")), text(fm.summary, placeholder(this.settings.language)), this.settings.language);
       return `---\n${stringifyYaml(fm)}---\n${withReferenceLinks(body, fm, this.settings.language)}`;
     });

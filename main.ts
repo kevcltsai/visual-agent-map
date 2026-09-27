@@ -1,7 +1,7 @@
 import { t, setUiLanguage, topicStatusLabel, translate, initialUiLanguage, type TranslationKey } from "./i18n";
 import { App, MarkdownRenderer, FileSystemAdapter, ItemView, MarkdownView, Modal, Notice, Plugin, PluginSettingTab, Setting, TFile, View, WorkspaceLeaf, type Command, type SettingDefinitionItem } from "obsidian";
 import { ReferencePicker, type ReferenceTopic } from "./ui/reference-picker";
-import { packReferenceChunks, readMarkdownFile, referenceBatches, type ReferenceGroup } from "./ai/reference-materials";
+import { packReferenceChunks, readMarkdownFile, referenceBatches, referenceCatalog, resolveReferenceLinks, type ReferenceGroup } from "./ai/reference-materials";
 import { NameModal } from "./ui/modals/name-modal";
 import { ChoiceModal } from "./ui/modals/choice-modal";
 import { DebugLogModal } from "./ui/modals/debug-log-modal";
@@ -44,7 +44,7 @@ const join = typedNodeBinding<(...paths: string[]) => string>(nodeJoin);
 function currentProcessEnvironment(): ProcessEnvironment {
   return (window as Window & { process?: { env?: ProcessEnvironment } }).process?.env ?? {};
 }
-interface Action { undo: () => Promise<void>; redo: () => Promise<void> }
+interface Action { undo: () => Promise<void>; redo: () => Promise<void>; label?: string }
 
 export function extractJsonObject(raw: string): string {
   const candidates: string[] = [];
@@ -85,7 +85,7 @@ export function executableCandidates(configured: string, home: string, pathValue
   return [...new Set(dirs)].map(directory => join(directory, configured));
 }
 type SynthesisContent = "full" | "summary";
-interface TaskOptions { synthesisContent?: SynthesisContent; referenceGroups?: ReferenceGroup[]; onProgress?: (message: string) => void; signal?: AbortSignal; requirements?: string; researchMode: ResearchMode; researchDepth: ResearchDepth; visualMode: VisualMode; multiLayer?: boolean; shallowResearch?: boolean; layers?: number; firstLayerCount?: number; childrenPerParent?: number }
+interface TaskOptions { synthesisContent?: SynthesisContent; referenceGroups?: ReferenceGroup[]; onProgress?: (message: string) => void; signal?: AbortSignal; outputLanguage?: Settings["language"]; requirements?: string; researchMode: ResearchMode; researchDepth: ResearchDepth; visualMode: VisualMode; multiLayer?: boolean; shallowResearch?: boolean; layers?: number; firstLayerCount?: number; childrenPerParent?: number }
 function renderSynthesisContent(parent: HTMLElement, topics: string[]): HTMLSelectElement {
   const label = parent.createEl("label", { cls: "vam-field" });
   label.createSpan({ text: t("ui.synthesis_content") });
@@ -165,7 +165,7 @@ function quickSuggestions(items: Suggestion[], layers: number, firstLayerCount: 
   return selected;
 }
 class TaskModal extends Modal {
-  constructor(app: App, private value: string, private submit: (value: string, run: boolean, options: TaskOptions, rules: string) => void, private titleText = t("ui.custom_ai_task"), private description = t("ui.describe_what_you_want_ai_to_do_next"), private rules = "", private mode: ResearchMode = "research", private depth: ResearchDepth = "normal", private visual: VisualMode = "auto", _allowSave = true, private expand = false, private referenceSettings?: TaskSourceSettings, private synthesisTopics?: string[]) { super(app); }
+  constructor(app: App, private value: string, private submit: (value: string, run: boolean, options: TaskOptions, rules: string) => void, private titleText = t("ui.custom_ai_task"), private description = t("ui.describe_what_you_want_ai_to_do_next"), private rules = "", private mode: ResearchMode = "research", private depth: ResearchDepth = "normal", private visual: VisualMode = "auto", _allowSave = true, private expand = false, private referenceSettings?: TaskSourceSettings, private synthesisTopics?: string[], private currentLanguage: Settings["language"] = "zh-TW", private modelId = "", private reasoningId = "auto", private targetLabel = "") { super(app); }
   onOpen(): void {
     this.titleEl.setText(this.titleText);
     this.contentEl.createEl("p", { text: this.description, cls: "vam-modal-intro" });
@@ -174,13 +174,24 @@ class TaskModal extends Modal {
     const input = label.createEl("textarea", { cls: "vam-task-input" }); input.rows = 3;
     input.setAttr("aria-label", t("ui.additional_requirements"));
     this.contentEl.createEl("p", { text: t("ui.requirements_this_task_only"), cls: "vam-hint" });
+    this.contentEl.createEl("p", { text: t("ui.summary_fields_hint"), cls: "vam-hint" });
+    const languageLabel = this.contentEl.createEl("label", { cls: "vam-field" }); languageLabel.createSpan({ text: t("ui.output_language") });
+    const languageSelect = languageLabel.createEl("select"); languageSelect.setAttr("aria-label", t("ui.output_language"));
+    languageSelect.createEl("option", { value: "zh-TW", text: "繁體中文" }); languageSelect.createEl("option", { value: "en", text: "English" }); languageSelect.value = this.currentLanguage;
     if (this.rules.trim()) this.contentEl.createEl("p", { text: t("ui.legacy_rules_not_applied"), cls: "vam-hint" });
     const synthesis = this.synthesisTopics ? renderSynthesisContent(this.contentEl, this.synthesisTopics) : undefined;
     const referenceLabel = this.expand ? this.referenceSettings?.currentLabel : this.referenceSettings?.synthesisLabel ?? this.referenceSettings?.currentLabel;
     const references = this.referenceSettings ? new ReferencePicker(this.app, this.contentEl, this.referenceSettings.topics, this.referenceSettings.readTopic, this.referenceSettings.currentTopicId, referenceLabel ?? "", this.mode !== "local", this.visual !== "off") : null;
+    const executionSummary = this.contentEl.createEl("p", { cls: "vam-hint", attr: { "aria-live": "polite" } });
+    const updateSummary = (): void => {
+      const selected = references?.selection();
+      const result = this.synthesisTopics ? t("ui.review_synthesis_draft") : this.expand ? t("ui.expand_subtopics") : t("ui.current_understanding");
+      executionSummary.setText(t("ui.ai_task_summary", this.modelId, this.reasoningId, references?.describe() ?? `0 ${t("ui.markdown_files")}`, t(selected?.webSearch ? "ui.on" : "ui.off"), this.targetLabel ? `${this.targetLabel} · ${result}` : result));
+    };
+    this.contentEl.addEventListener("change", updateSummary); updateSummary();
     const depthLabel = this.contentEl.createEl("label", { cls: "vam-field" }); depthLabel.createSpan({ text: t("ui.research_depth") });
     const depthHint = this.contentEl.createEl("p", { cls: "vam-hint", text: researchDepthDescription(this.depth) });
-    const depth = this.contentEl.createEl("select"); depth.setAttr("aria-label", t("ui.research_depth"));
+    const depth = this.contentEl.createEl("select", { cls: "vam-depth-select" }); depth.setAttr("aria-label", t("ui.research_depth"));
     for (const [value, key] of [["fast", "ui.fast_quick_overview"], ["normal", "ui.normal_standard_research"], ["deep", "ui.deep_in_depth_research"]] as const) depth.createEl("option", { value, text: t(key) });
     depth.value = this.depth;
     depth.addEventListener("change", () => depthHint.setText(researchDepthDescription(depth.value as ResearchDepth)));
@@ -194,7 +205,7 @@ class TaskModal extends Modal {
       if (synthesis) synthesis.disabled = true;
       const sources = await references?.ready();
       const shallowResearch = multiLayer?.checked ?? false;
-      this.close(); this.submit(value, run, { ...(synthesis ? { synthesisContent } : {}), referenceGroups: sources?.groups ?? [], requirements: input.value.trim(), researchMode: sources?.webSearch ? "research" : "local", researchDepth: depth.value as ResearchDepth, visualMode: sources?.imageSearch ? (this.visual === "on" ? "on" : "auto") : "off", multiLayer: shallowResearch }, "");
+      this.close(); this.submit(value, run, { ...(synthesis ? { synthesisContent } : {}), referenceGroups: sources?.groups ?? [], requirements: input.value.trim(), outputLanguage: languageSelect.value as Settings["language"], researchMode: sources?.webSearch ? "research" : "local", researchDepth: depth.value as ResearchDepth, visualMode: sources?.imageSearch ? (this.visual === "on" ? "on" : "auto") : "off", multiLayer: shallowResearch }, "");
     };
     new Setting(this.contentEl).addButton(b => b.setButtonText(t("ui.cancel")).onClick(() => this.close()))
       .addButton(b => b.setButtonText(t("ui.confirm_and_run")).setCta().onClick(() => { void save(true).catch(error => new Notice(String(error))); }));
@@ -249,26 +260,28 @@ export class NextStepModal extends Modal {
     const optionList = typeof this.plugin.availableModels === "function" ? this.plugin.availableModels() : this.plugin.settings.models.split(/[\n,]/).map((value: string) => value.trim()).filter(Boolean);
     const options = new Set<string>(optionList);
     for (const value of options) model.createEl("option", { value, text: typeof this.plugin.modelLabel === "function" ? this.plugin.modelLabel(value) : value });
-    if (!options.has(settings.model)) { const unavailable = model.createEl("option", { value: settings.model, text: t("ui.current_model_is_unavailable") }); unavailable.disabled = true; }
+    if (!options.has(settings.model)) { const unavailable = model.createEl("option", { value: settings.model, text: t(this.plugin.settings.models.trim() ? "ui.current_model_is_unavailable" : "ui.model_not_checked") }); unavailable.disabled = !!this.plugin.settings.models.trim(); }
+    const sourceLabels: Record<ModelSource, string> = { workspace: t("ui.workspace_default"), inherited: t("ui.inherited_at_creation"), manual: t("ui.manually_selected") };
+    const modelSummary = advanced.createEl("p", { cls: "vam-hint", text: t("ui.0_1_reasoning_can_be_adjusted_per_topic", settings.model, sourceLabels[settings.modelSource]) });
     model.value = settings.model;
     model.addEventListener("change", () => {
       if (!options.has(model.value)) return;
       settings.model = model.value; settings.modelSource = "manual";
+      modelSummary.setText(t("ui.0_1_reasoning_can_be_adjusted_per_topic", settings.model, sourceLabels[settings.modelSource]));
       save({ model: settings.model, modelSource: settings.modelSource });
     });
     const reasoningLabel = advanced.createEl("label", { cls: "vam-field" }); reasoningLabel.createSpan({ text: t("ui.reasoning_level") });
     const reasoning = reasoningLabel.createEl("select"); reasoning.setAttr("aria-label", t("ui.reasoning_level"));
     for (const [value, label] of [["auto", t("ui.auto")], ["low", t("ui.low")], ["medium", t("ui.medium")], ["high", t("ui.high")]]) reasoning.createEl("option", { value, text: label });
     reasoning.value = normalizeReasoningLevel(settings.reasoning);
-    reasoning.addEventListener("change", () => save({ reasoning: normalizeReasoningLevel(reasoning.value) }));
-    const sourceLabels: Record<ModelSource, string> = { workspace: t("ui.workspace_default"), inherited: t("ui.inherited_at_creation"), manual: t("ui.manually_selected") };
-    advanced.createEl("p", { cls: "vam-hint", text: t("ui.0_1_reasoning_can_be_adjusted_per_topic", settings.model, sourceLabels[settings.modelSource]) });
+    reasoning.addEventListener("change", () => { settings.reasoning = normalizeReasoningLevel(reasoning.value); save({ reasoning: normalizeReasoningLevel(reasoning.value) }); });
   }
   private async run(panel: HTMLElement, button: HTMLButtonElement, work: () => Promise<void>, needsUsage = true): Promise<void> {
     if (button.disabled || (this.taskController && !this.taskController.signal.aborted)) return;
     button.disabled = true;
     const start = async (): Promise<void> => {
       button.disabled = true;
+      const failureHelp = panel.querySelector<HTMLElement>(".vam-ai-failure-help"); if (failureHelp) failureHelp.hidden = true;
       const controller = new AbortController(); this.taskController = controller; this.taskSignal = controller.signal;
       const tasksBefore = new Set(this.plugin.activeTasks?.keys?.() ?? []);
       const status = panel.querySelector<HTMLElement>(".vam-next-status");
@@ -303,6 +316,18 @@ export class NextStepModal extends Modal {
     panel.querySelector<HTMLElement>(".vam-next-status")?.setText(message);
     button.disabled = false;
   }
+  private failedAi(panel: HTMLElement, button: HTMLButtonElement, message: string): void {
+    this.failed(panel, button, message);
+    if (this.closed) return;
+    let help = panel.querySelector<HTMLElement>(".vam-ai-failure-help");
+    if (!help) {
+      help = panel.createDiv("vam-ai-failure-help");
+      help.createEl("p", { text: t("ui.ai_failure_next_steps"), cls: "vam-hint" });
+      help.createEl("button", { text: t("ui.open_debug_log") }).addEventListener("click", () =>
+        new DebugLogModal(this.app, this.plugin.logs, this.plugin.exchanges, () => this.plugin.settings.aiExchangeLoggingEnabled).open());
+    }
+    help.hidden = false;
+  }
   private proposals(panel: HTMLElement, suggestions: Suggestion[], create: (items: Suggestion[]) => Promise<void>, button: HTMLButtonElement, consumed: () => void, options: TaskOptions): void {
     if (this.closed) return;
     const result = panel.querySelector<HTMLElement>(".vam-next-result")!; result.empty();
@@ -310,7 +335,7 @@ export class NextStepModal extends Modal {
     result.createEl("p", { text: t("ui.select_subtopics_to_create_you_can_edit_their_names_and_task") });
     const rows: { item: Suggestion; check: HTMLInputElement; title: HTMLInputElement; task: HTMLTextAreaElement; contribution: HTMLTextAreaElement }[] = [];
     const list = result.createDiv("vam-proposal-list");
-    for (const item of suggestions) { const row = list.createDiv("vam-proposal"); if (item.parentTitle) row.createEl("p", { text: t("ui.child_of_0", item.parentTitle) }); const check = row.createEl("input", { type: "checkbox" }); check.checked = true; const title = row.createEl("input", { type: "text", value: item.title }); const task = row.createEl("textarea", { text: item.task }); task.rows = 2; const contribution = row.createEl("textarea", { text: item.contribution }); contribution.rows = 2; contribution.placeholder = t("ui.contribution_to_the_parent_topic"); rows.push({ item, check, title, task, contribution }); }
+    for (const item of suggestions) { const row = list.createDiv("vam-proposal"); if (item.parentTitle) row.createEl("p", { text: t("ui.child_of_0", item.parentTitle) }); const check = row.createEl("input", { type: "checkbox" }); check.checked = true; check.setAttr("aria-label", t("ui.select_proposal_0", item.title)); const title = row.createEl("input", { type: "text", value: item.title }); title.setAttr("aria-label", t("ui.proposal_name")); const task = row.createEl("textarea", { text: item.task }); task.rows = 2; task.setAttr("aria-label", t("ui.proposal_task")); const contribution = row.createEl("textarea", { text: item.contribution }); contribution.rows = 2; contribution.placeholder = t("ui.contribution_to_the_parent_topic"); contribution.setAttr("aria-label", t("ui.contribution_to_the_parent_topic")); rows.push({ item, check, title, task, contribution }); }
     const confirm = result.createEl("button", { text: t("ui.create_subtopics"), cls: "mod-cta" });
     confirm.addEventListener("click", () => { void (async () => {
       const selected = rows.filter(row => row.check.checked && row.title.value.trim());
@@ -333,6 +358,9 @@ export class NextStepModal extends Modal {
     this.titleEl.setText(t("ui.how_would_you_like_to_explore_next"));
     this.contentEl.createEl("p", { text: t("ui.current_topic_0", this.topic), cls: "vam-modal-intro" });
     this.renderRequirements();
+    this.contentEl.createEl("p", { text: t("ui.summary_fields_hint"), cls: "vam-hint" });
+    const languageLabel = this.contentEl.createEl("label", { cls: "vam-field" }); languageLabel.createSpan({ text: t("ui.output_language") });
+    const languageSelect = languageLabel.createEl("select"); languageSelect.createEl("option", { value: "zh-TW", text: "繁體中文" }); languageSelect.createEl("option", { value: "en", text: "English" }); languageSelect.value = this.plugin.settings.language;
     const cards = this.contentEl.createDiv("vam-next-cards");
     let show: (mode: "research" | "expand" | "synthesize") => void;
     const card = (title: TranslationKey, description: TranslationKey, mode: "research" | "expand" | "synthesize"): HTMLButtonElement => {
@@ -365,6 +393,16 @@ export class NextStepModal extends Modal {
     }
     radios.forEach(radio => radio.addEventListener("change", () => { if (radio.checked) depthHint.setText(researchDepthDescription(radio.value as ResearchDepth)); }));
     const researchPicker = this.addReferencePicker(research, "research");
+    const executionSummary = this.contentEl.createEl("p", { cls: "vam-hint", attr: { "aria-live": "polite" } });
+    const updateExecutionSummary = (): void => {
+      const activeButton = this.contentEl.querySelector<HTMLButtonElement>(".vam-next-card.is-active");
+      const mode = activeButton === expandCard ? "expand" : activeButton === synthesizeCard ? "synthesize" : "research";
+      const active = t(mode === "expand" ? "ui.expand_the_map" : mode === "synthesize" ? "ui.synthesize_findings" : "ui.research_deeper");
+      const picker = this.references.get(mode) ?? researchPicker;
+      executionSummary.setText(t("ui.ai_task_summary", this.modelSettings?.model ?? this.plugin.settings.cliModel, this.modelSettings?.reasoning ?? this.plugin.settings.cliReasoning, picker?.describe() ?? `0 ${t("ui.markdown_files")}`, t(picker?.selection().webSearch ? "ui.on" : "ui.off"), `${this.topic} · ${active}`));
+    };
+    this.contentEl.addEventListener("change", updateExecutionSummary);
+    updateExecutionSummary();
     const footer = research.createDiv("vam-next-footer");
     footer.createSpan({ text: t("ui.full_results_go_to_markdown_your_writing_is_preserved") });
     const confirm = footer.createEl("button", { text: t("ui.confirm_research_task"), cls: "mod-cta" });
@@ -373,10 +411,10 @@ export class NextStepModal extends Modal {
     research.createEl("p", { cls: "vam-next-status" });
     confirm.addEventListener("click", () => { void this.run(research, confirm, async () => {
       const selected = await researchPicker?.ready();
-      const options: TaskOptions = { referenceGroups: selected?.groups ?? [], researchMode: selected?.webSearch ? "research" : "local", researchDepth: (radios.find(radio => radio.checked)?.value || "normal") as ResearchDepth, visualMode: selected?.imageSearch ? "auto" : "off", requirements: this.requirements(), signal: this.taskSignal, onProgress: message => research.querySelector<HTMLElement>(".vam-next-status")?.setText(message) };
+      const options: TaskOptions = { referenceGroups: selected?.groups ?? [], outputLanguage: languageSelect.value as Settings["language"], researchMode: selected?.webSearch ? "research" : "local", researchDepth: (radios.find(radio => radio.checked)?.value || "normal") as ResearchDepth, visualMode: selected?.imageSearch ? "auto" : "off", requirements: this.requirements(), signal: this.taskSignal, onProgress: message => research.querySelector<HTMLElement>(".vam-next-status")?.setText(message) };
       let started = true;
       const release = (): void => { const cancel = research.querySelector<HTMLButtonElement>(".vam-task-cancel"); if (cancel) cancel.hidden = true; this.taskSignal = undefined; this.taskController = undefined; };
-      await this.research(options, "", () => { release(); this.close(); }, message => { release(); if (this.closed) new Notice(message); else { started = false; this.failed(research, confirm, message); } });
+      await this.research(options, "", () => { release(); this.close(); }, message => { release(); if (this.closed) new Notice(message); else { started = false; this.failedAi(research, confirm, message); } });
       if (this.modelSettings?.path && this.plugin.activeTasks?.has(this.modelSettings.path)) started = false;
       if (started) this.close();
     }); });
@@ -430,7 +468,7 @@ export class NextStepModal extends Modal {
     shallow.addEventListener("change", () => { setExpandMode(multiLayer); });
     expandButton.addEventListener("click", () => { void this.run(expandPanel, expandButton, async () => {
       const selected = await expandPicker?.ready();
-      const options: TaskOptions = { referenceGroups: selected?.groups ?? [], requirements: this.requirements(), researchMode: selected?.webSearch ? "research" : "local", multiLayer, shallowResearch: shallow.checked, researchDepth: "fast", visualMode: shallow.checked && selected?.imageSearch ? "auto" : "off", signal: this.taskSignal, onProgress: message => expandPanel.querySelector<HTMLElement>(".vam-next-status")?.setText(message) };
+      const options: TaskOptions = { referenceGroups: selected?.groups ?? [], outputLanguage: languageSelect.value as Settings["language"], requirements: this.requirements(), researchMode: selected?.webSearch ? "research" : "local", multiLayer, shallowResearch: shallow.checked, researchDepth: "fast", visualMode: shallow.checked && selected?.imageSearch ? "auto" : "off", signal: this.taskSignal, onProgress: message => expandPanel.querySelector<HTMLElement>(".vam-next-status")?.setText(message) };
       if (multiLayer) {
         const layers = Number(layersInput.value), firstLayerCount = Number(firstInput.value), childrenPerParent = Number(childrenInput.value);
         const shape = quickShape(layers, firstLayerCount, childrenPerParent);
@@ -445,7 +483,7 @@ export class NextStepModal extends Modal {
         this.close();
         return;
       }
-      await this.expand(options, "", (items, create) => this.proposals(expandPanel, items, create, expandButton, consumed, options), (message, retryable) => { consumed(); this.failed(expandPanel, expandButton, message); if (retryable === false) expandButton.disabled = true; }, () => this.close());
+      await this.expand(options, "", (items, create) => this.proposals(expandPanel, items, create, expandButton, consumed, options), (message, retryable) => { consumed(); if (retryable === false) this.failed(expandPanel, expandButton, message); else this.failedAi(expandPanel, expandButton, message); if (retryable === false) expandButton.disabled = true; }, () => this.close());
     }, multiLayer || !this.pendingCount); });
     const synthesizePanel = this.contentEl.createDiv("vam-next-research vam-next-choice");
     synthesizePanel.createEl("h3", { text: t("ui.synthesize_subtopic_findings") });
@@ -472,7 +510,7 @@ export class NextStepModal extends Modal {
         const content: SynthesisContent = synthesisContent.value === "summary" ? "summary" : "full";
         synthesisContent.disabled = true;
         const selected = await synthesisPicker?.ready();
-        const options: TaskOptions = { synthesisContent: content, referenceGroups: selected?.groups ?? [], requirements: this.requirements(), researchMode: selected?.webSearch ? "research" : "local", researchDepth: this.depth, visualMode: selected?.imageSearch ? "auto" : "off", signal: this.taskSignal, onProgress: message => synthStatus.setText(message) };
+        const options: TaskOptions = { synthesisContent: content, referenceGroups: selected?.groups ?? [], outputLanguage: languageSelect.value as Settings["language"], requirements: this.requirements(), researchMode: selected?.webSearch ? "research" : "local", researchDepth: this.depth, visualMode: selected?.imageSearch ? "auto" : "off", signal: this.taskSignal, onProgress: message => synthStatus.setText(message) };
         if (!this.childrenCount && !options.referenceGroups?.some(group => group.documents.length)) throw new Error(t("ui.choose_another_note_source_first"));
         await this.synthesize(options, (items, draft) => {
         if (this.closed) return;
@@ -487,13 +525,14 @@ export class NextStepModal extends Modal {
         const draftButton = synthResult.createEl("button", { text: t("ui.get_synthesis_draft"), cls: "mod-cta" });
         draftButton.addEventListener("click", () => { void this.run(synthesizePanel, draftButton, async () => { options.signal = this.taskSignal; await draft(direction.value.trim()); draftButton.disabled = false; }); });
         synthButton.disabled = false;
-      }, showDraft, message => this.failed(synthesizePanel, synthButton, message)); }); });
+      }, showDraft, message => this.failedAi(synthesizePanel, synthButton, message)); }); });
     }
     show = mode => {
       for (const [name, button, panel] of [["research", researchCard, research], ["expand", expandCard, expandPanel], ["synthesize", synthesizeCard, synthesizePanel]] as const) {
         button.classList.toggle("is-active", name === mode); button.setAttr("aria-pressed", name === mode ? "true" : "false");
         panel.style.display = name === mode ? "" : "none";
       }
+      updateExecutionSummary();
     };
     show("research");
     this.renderModelSettings();
@@ -568,7 +607,7 @@ class ChildProposalModal extends Modal {
     this.titleEl.setText(t("ui.ai_subtopic_proposals"));
     this.contentEl.createEl("p", { text: t("ui.select_subtopics_to_create_you_can_edit_their_names_and_task") });
     const rows: { item: Suggestion; check: HTMLInputElement; title: HTMLInputElement; task: HTMLTextAreaElement; contribution: HTMLTextAreaElement }[] = [];
-    for (const item of this.suggestions) { const row = this.contentEl.createDiv("vam-proposal"); if (item.parentTitle) row.createEl("p", { text: t("ui.child_of_0", item.parentTitle) }); const check = row.createEl("input", { type: "checkbox" }); check.checked = true; const title = row.createEl("input", { type: "text", value: item.title }); const task = row.createEl("textarea", { text: item.task }); task.rows = 2; const contribution = row.createEl("textarea", { text: item.contribution }); contribution.rows = 2; contribution.placeholder = t("ui.contribution_to_the_parent_topic"); rows.push({ item, check, title, task, contribution }); }
+    for (const item of this.suggestions) { const row = this.contentEl.createDiv("vam-proposal"); if (item.parentTitle) row.createEl("p", { text: t("ui.child_of_0", item.parentTitle) }); const check = row.createEl("input", { type: "checkbox" }); check.checked = true; check.setAttr("aria-label", t("ui.select_proposal_0", item.title)); const title = row.createEl("input", { type: "text", value: item.title }); title.setAttr("aria-label", t("ui.proposal_name")); const task = row.createEl("textarea", { text: item.task }); task.rows = 2; task.setAttr("aria-label", t("ui.proposal_task")); const contribution = row.createEl("textarea", { text: item.contribution }); contribution.rows = 2; contribution.placeholder = t("ui.contribution_to_the_parent_topic"); contribution.setAttr("aria-label", t("ui.contribution_to_the_parent_topic")); rows.push({ item, check, title, task, contribution }); }
     new Setting(this.contentEl).addButton(b => b.setButtonText(t("ui.cancel")).onClick(() => this.close())).addButton(b => b.setButtonText(t("ui.create_subtopics")).setCta().onClick(() => {
       const selected = rows.filter(row => row.check.checked && row.title.value.trim());
       const renamed = new Map(selected.filter(row => !row.item.parentTitle).map(row => [row.item.title, row.title.value.trim()]));
@@ -644,6 +683,8 @@ export class VisualAgentMapView extends ItemView {
   private selected: string | null = null;
   private multiSelected = new Set<string>();
   private history = new History<Action>();
+  private deletedMap: { path: string; content: string; map: MapDocument; deleted: boolean; deleteAction?: Action } | null = null;
+  private integrationTask: { title: string; goal: string; rules: string; sources: MapNode[]; options: TaskOptions; mapPath: string; mapId: string; sourceContent: string; controller: AbortController; state: "running" | "draft" | "failed" | "cancelled"; progress: string; draft?: AiResult } | null = null;
   private viewportEl: HTMLElement | null = null;
   private stageEl: HTMLElement | null = null;
   private edgesEl: SVGSVGElement | null = null;
@@ -706,7 +747,7 @@ export class VisualAgentMapView extends ItemView {
     if (focusedContainer) this.contentEl.focus(); else target?.focus();
     if (selection && (target?.tagName === "INPUT" || target?.tagName === "TEXTAREA") && selection[0] !== null && selection[1] !== null) (target as HTMLInputElement).setSelectionRange(selection[0], selection[1]);
   }
-  syncOutline(): void { this.plugin.syncOutline(this.builtIn ? null : this.map, this.notes); }
+  syncOutline(): void { this.plugin.syncOutline(this.builtIn ? null : this.map, this.notes, this.builtIn); }
   private enqueue(work: () => Promise<void>): void { void this.plugin.mutate(work).catch(() => {}); }
   private async persist(): Promise<void> { if (!this.builtIn && this.map && this.path) await this.plugin.repo.saveMap(this.path, this.map); }
   private async hydrate(): Promise<void> {
@@ -741,7 +782,7 @@ export class VisualAgentMapView extends ItemView {
     }, 400);
   }
   async renamed(file: TFile, oldPath: string): Promise<void> { if (this.path === oldPath) this.path = file.path; if (this.map) { for (const node of this.map.nodes) if (node.path === oldPath) node.path = file.path; this.history.clear(); await this.hydrate(); this.render(); } }
-  deleted(file: TFile): void { if (file.path === this.path) { this.map = null; this.path = ""; this.history.clear(); this.render(); } else this.changed(file); }
+  deleted(file: TFile): void { if (file.path === this.path) { this.map = null; this.path = ""; if (this.deletedMap?.path !== file.path) this.history.clear(); this.render(); } else this.changed(file); }
   private button(parent: HTMLElement, text: string, action: () => void, disabled = false): HTMLButtonElement { const button = parent.createEl("button", { text }); button.disabled = disabled; button.addEventListener("click", event => { event.stopPropagation(); action(); }); return button; }
   private async mapChange(change: (map: MapDocument) => void, rebuildDerivedData = true): Promise<void> {
     if (!this.map) return;
@@ -978,7 +1019,20 @@ export class VisualAgentMapView extends ItemView {
     if (["title", "summary", "prompt", "rules", "detail", "model", "reasoning", "researchMode", "sourcePaths", "referencePaths"].some(key => key in patch)) this.plugin.activeTasks?.get(node.path)?.abort();
     this.history.push({ undo: () => this.plugin.repo.updateNote(node.path, before), redo: () => this.plugin.repo.updateNote(node.path, patch) });
     this.notes.set(node.id, await this.plugin.repo.readNote(node.path));
-    this.refreshCard(node);
+    this.render();
+  }
+  private recordNoteWrite(path: string, before: Note, after: Note, fields: (keyof NotePatch)[], label: string): void {
+    const oldValues: NotePatch = {}, newValues: NotePatch = {};
+    for (const field of fields) {
+      (oldValues as Record<string, unknown>)[field] = before[field];
+      (newValues as Record<string, unknown>)[field] = after[field];
+    }
+    const restore = async (expected: NotePatch, replacement: NotePatch): Promise<void> => {
+      const latest = await this.plugin.repo.readNote(path);
+      for (const field of fields) if (JSON.stringify(latest[field]) !== JSON.stringify(expected[field])) throw new Error(t("ui.the_topic_changed_the_synthesis_draft_was_not_saved"));
+      await this.plugin.repo.updateNote(path, replacement);
+    };
+    this.history.push({ label, undo: () => restore(newValues, oldValues), redo: () => restore(oldValues, newValues) });
     this.updateHistoryButtons();
   }
   private openDetails(node: MapNode): void { void this.plugin.openDetails(this.plugin.repo.file(node.path)).catch(error => new Notice(error instanceof Error ? error.message : String(error))); }
@@ -986,7 +1040,7 @@ export class VisualAgentMapView extends ItemView {
     const action = redo ? this.history.redo() : this.history.undo(); if (!action) return;
     try { await (redo ? action.redo() : action.undo()); await this.hydrate(); this.render(); } catch (error) { if (redo) this.history.undo(); else this.history.redo(); throw error; }
   }
-  private updateHistoryButtons(): void { const undo = this.contentEl.querySelector<HTMLButtonElement>("[data-history=undo]"), redo = this.contentEl.querySelector<HTMLButtonElement>("[data-history=redo]"); if (undo) undo.disabled = !this.history.canUndo; if (redo) redo.disabled = !this.history.canRedo; }
+  private updateHistoryButtons(): void { const undo = this.contentEl?.querySelector<HTMLButtonElement>("[data-history=undo]"), redo = this.contentEl?.querySelector<HTMLButtonElement>("[data-history=redo]"); if (undo) { undo.disabled = !this.history.canUndo; undo.setText(this.history.undoEntry?.label ? `${t("ui.undo")}: ${this.history.undoEntry.label}` : t("ui.undo")); } if (redo) { redo.disabled = !this.history.canRedo; redo.setText(this.history.redoEntry?.label ? `${t("ui.redo")}: ${this.history.redoEntry.label}` : t("ui.redo")); } }
   async synchronize(): Promise<void> {
     if (this.builtIn) return;
     if (!this.path || !this.map || this.closed) return;
@@ -1034,15 +1088,54 @@ export class VisualAgentMapView extends ItemView {
     new ChoiceModal(this.app, t("ui.delete_mind_map"), t("ui.move_only_the_map_file_to_the_vault_trash_keep_all_notes_you"), [
       { label: t("ui.delete_0", this.map.title), description: t("ui.topic_notes_will_be_kept"), buttonLabel: t("ui.move_to_trash"), action: () => this.enqueue(async () => {
         if (!this.map) return;
+        if (this.viewportTimer !== null) { window.clearTimeout(this.viewportTimer); this.viewportTimer = null; await this.persist(); }
         const path = this.path, file = this.plugin.repo.file(path), content = await this.app.vault.read(file), map = clone(this.map);
-        await this.app.fileManager.trashFile(file); this.map = null; this.path = ""; await this.plugin.rebuildDerivedData();
-        this.history.push({
-          undo: async () => { await this.app.vault.create(path, content); this.path = path; this.map = clone(map); await this.plugin.rebuildDerivedData(); },
-          redo: async () => { await this.app.fileManager.trashFile(this.plugin.repo.file(path)); this.path = ""; this.map = null; await this.plugin.rebuildDerivedData(); }
-        });
+        this.deletedMap = { path, content, map, deleted: true };
+        try { await this.app.fileManager.trashFile(file); }
+        catch (error) { this.deletedMap = null; throw error; }
+        this.map = null; this.path = ""; await this.plugin.rebuildDerivedData();
+        const deleteAction: Action = {
+          label: t("ui.delete_mind_map"),
+          undo: async () => { await this.restoreDeletedMap(); },
+          redo: async () => { await this.deleteRestoredMap(); }
+        };
+        this.deletedMap.deleteAction = deleteAction;
+        this.history.push(deleteAction);
         this.render();
       }) }
     ]).open();
+  }
+  private async restoreDeletedMap(): Promise<void> {
+    const deleted = this.deletedMap;
+    if (!deleted?.deleted) return;
+    if (this.app.vault.getAbstractFileByPath(deleted.path)) throw new Error(t("ui.restore_path_occupied"));
+    await this.app.vault.create(deleted.path, deleted.content);
+    deleted.deleted = false;
+    this.builtIn = false;
+    this.path = deleted.path;
+    this.map = clone(deleted.map);
+    await this.plugin.rebuildDerivedData();
+    await this.hydrate();
+    this.render();
+  }
+  private async deleteRestoredMap(): Promise<void> {
+    const deleted = this.deletedMap;
+    if (!deleted || deleted.deleted) return;
+    const file = this.app.vault.getAbstractFileByPath(deleted.path);
+    if (!(file instanceof TFile) || await this.app.vault.read(file) !== deleted.content) throw new Error(t("ui.the_topic_changed_the_synthesis_draft_was_not_saved"));
+    await this.app.fileManager.trashFile(file);
+    deleted.deleted = true; this.path = ""; this.map = null;
+    await this.plugin.rebuildDerivedData(); this.render();
+  }
+  private async restoreDeletedMapFromUi(): Promise<void> {
+    if (this.viewportTimer !== null) { window.clearTimeout(this.viewportTimer); this.viewportTimer = null; await this.persist(); }
+    if (this.history.undoEntry === this.deletedMap?.deleteAction) await this.travel(false);
+    else {
+      await this.restoreDeletedMap();
+      this.history.clear();
+      this.history.push({ label: t("ui.restore_deleted_map"), undo: () => this.deleteRestoredMap(), redo: () => this.restoreDeletedMap() });
+      this.updateHistoryButtons();
+    }
   }
   private async openOrganizer(): Promise<void> {
     if (!this.map) return;
@@ -1077,7 +1170,7 @@ export class VisualAgentMapView extends ItemView {
   }
   private render(): void {
     if (this.closed) return;
-    this.plugin.syncOutline(this.builtIn ? null : this.map, this.notes);
+    this.plugin.syncOutline(this.builtIn ? null : this.map, this.notes, this.builtIn);
     if (this.hoverTimer !== null) { window.clearTimeout(this.hoverTimer); this.hoverTimer = null; }
     this.hoverCard?.remove(); this.hoverCard = null;
     const title = this.getDisplayText();
@@ -1099,12 +1192,27 @@ export class VisualAgentMapView extends ItemView {
       this.button(toolbar, t("ui.mind_map"), () => new NameModal(this.app, t("ui.new_mind_map"), t("ui.new_mind_map_from_sample"), title => this.enqueue(async () => this.openMap(await this.plugin.repo.createMap(title)))).open());
       const undo = this.button(toolbar, t("ui.undo"), () => this.enqueue(() => this.travel(false)), !this.history.canUndo); undo.dataset.history = "undo";
       const redo = this.button(toolbar, t("ui.redo"), () => this.enqueue(() => this.travel(true)), !this.history.canRedo); redo.dataset.history = "redo";
+      this.updateHistoryButtons();
       this.button(toolbar, t("ui.more"), () => this.openMapActions());
+    }
+    if (!this.map && (this.history.canUndo || this.history.canRedo)) {
+      const undo = this.button(toolbar, t("ui.undo"), () => this.enqueue(() => this.travel(false)), !this.history.canUndo); undo.dataset.history = "undo";
+      const redo = this.button(toolbar, t("ui.redo"), () => this.enqueue(() => this.travel(true)), !this.history.canRedo); redo.dataset.history = "redo";
+      this.updateHistoryButtons();
+    }
+    if (this.deletedMap?.deleted) this.button(toolbar, t("ui.restore_deleted_map"), () => this.enqueue(() => this.restoreDeletedMapFromUi()));
+    if (this.integrationTask && this.integrationTask.mapPath === this.path) {
+      const task = this.integrationTask, state = this.contentEl.createDiv("vam-integration-progress");
+      state.setAttr("aria-live", "polite");
+      state.createSpan({ text: task.state === "running" ? task.progress || t("ui.integration_running") : task.state === "draft" ? t("ui.integration_draft_ready") : task.state === "failed" ? task.progress || t("ui.integration_failed") : t("ui.research_stopped_existing_content_was_preserved") });
+      if (task.state === "running") this.button(state, t("ui.stop_research"), () => { task.controller.abort(); task.state = "cancelled"; this.render(); });
+      if (task.state === "draft") this.button(state, t("ui.review_synthesis_draft"), () => this.reviewIntegratedDraft(task));
+      if (task.state === "failed" || task.state === "cancelled") this.button(state, t("ui.try_again"), () => this.enqueue(() => this.createIntegratedNode(task.title, task.sources, task.goal, task.rules, task.options, true)));
     }
     if (!this.map) {
       const empty = this.contentEl.createDiv("vam-empty-state");
-      empty.createEl("h2", { text: this.plugin.repo.workspaceExists() ? t("ui.no_mind_maps_yet") : t("ui.agent_workspace_is_missing") });
-      empty.createEl("p", { text: this.plugin.repo.workspaceExists() ? t("ui.create_your_first_mind_map_to_start_organizing_topics") : t("ui.the_base_folders_can_be_safely_recreated_existing_notes_will") });
+      empty.createEl("h2", { text: this.plugin.repo.workspaceExists() ? t("ui.no_map_open") : t("ui.agent_workspace_is_missing") });
+      empty.createEl("p", { text: this.plugin.repo.workspaceExists() ? t("ui.open_or_create_map_hint") : t("ui.the_base_folders_can_be_safely_recreated_existing_notes_will") });
       const actions = empty.createDiv("vam-empty-actions");
       if (!this.plugin.repo.workspaceExists()) {
         this.button(actions, t("ui.reconnect_existing_workspace"), () => this.enqueue(() => this.plugin.offerWorkspaceReconnect())).addClass("mod-cta");
@@ -1112,6 +1220,7 @@ export class VisualAgentMapView extends ItemView {
       }
       this.button(actions, t("ui.create_a_new_mind_map"), () => new NameModal(this.app, t("ui.new_mind_map"), t("ui.new_mind_map_from_sample"), title => this.enqueue(async () => this.openMap(await this.plugin.repo.createMap(title)))).open()).addClass("mod-cta");
       this.button(actions, t("ui.view_sample"), () => this.enqueue(() => this.openBuiltInSample(true)));
+      if (this.deletedMap?.deleted) this.button(actions, t("ui.restore_deleted_map"), () => this.enqueue(() => this.restoreDeletedMapFromUi()));
       return;
     }
     if (this.builtIn && this.showSampleTour) {
@@ -1184,7 +1293,7 @@ export class VisualAgentMapView extends ItemView {
       this.button(selection, t("ui.synthesize"), () => this.integrateSelected(), this.multiSelected.size < 2).addClass("mod-cta");
     }
     for (const node of shown) this.renderNode(node);
-    if (!this.map.nodes.length) this.viewportEl.createDiv({ cls: "vam-empty", text: t("ui.this_mind_map_has_no_topics_click_topic_to_create_the_first") });
+    if (!this.map.nodes.length) { const emptyMap = this.viewportEl.createDiv("vam-empty"); emptyMap.createSpan({ text: t("ui.this_mind_map_has_no_topics_click_topic_to_create_the_first") }); this.button(emptyMap, t("ui.topic"), () => this.enqueue(() => this.addNode(null))); }
     this.setupPan(); this.transform(); this.drawEdges();
     if (this.builtIn && this.selected) { const node = this.map.nodes.find(n => n.id === this.selected); if (node) this.renderInspector(workspace, node); }
   }
@@ -1196,6 +1305,8 @@ export class VisualAgentMapView extends ItemView {
     if (this.integrationMode) {
       const check = header.createSpan({ cls: `vam-select-check${this.multiSelected.has(node.id) ? " is-checked" : ""}`, text: this.multiSelected.has(node.id) ? "✓" : "" });
       check.setAttr("aria-hidden", "true");
+      const select = header.createEl("input", { type: "checkbox" }); select.checked = this.multiSelected.has(node.id); select.setAttr("aria-label", note?.title ?? node.path);
+      select.addEventListener("click", event => { event.stopPropagation(); if (select.checked) this.multiSelected.add(node.id); else this.multiSelected.delete(node.id); this.render(); });
     }
     const active = this.plugin.running?.has(node.path) || this.plugin.quickExpandPending?.has(node.path);
     if (active || !note || note.status !== "completed") header.createSpan({ cls: `vam-status vam-status-${active ? "running" : note?.status ?? "error"}`, text: active ? t("ui.ai_running") : note ? topicStatusLabel(note.status, this.plugin.settings.language) : t("ui.note_missing") });
@@ -1206,6 +1317,7 @@ export class VisualAgentMapView extends ItemView {
     if (!this.builtIn && !this.integrationMode) {
       const ai = this.button(header, "✦", () => this.openNextStep(node)); ai.addClass("vam-node-tool"); ai.setAttr("aria-label", t("ui.how_would_you_like_to_explore_next"));
       const structure = this.button(header, "⚙", () => this.openNodePanel(node, "structure")); structure.addClass("vam-node-tool"); structure.setAttr("aria-label", t("ui.structure_and_links"));
+      if (note) { const rename = this.button(header, "✎", () => new NameModal(this.app, t("ui.new_topic_name"), note.title, title => this.enqueue(() => this.noteChange(node, { title }))).open()); rename.addClass("vam-node-tool"); rename.setAttr("aria-label", t("ui.new_topic_name")); }
     }
     const details = this.button(header, "↗", () => this.builtIn ? this.selectSampleNode(node.id) : this.openDetails(node)); details.addClass("vam-detail-button"); details.setAttr("aria-label", this.builtIn ? t("ui.view_sample_content") : t("ui.open_details_in_right_sidebar"));
     const count = descendants(this.map!.nodes, node.id).size;
@@ -1308,7 +1420,7 @@ export class VisualAgentMapView extends ItemView {
         async (options, focus, done, failed) => {
           const latest = await this.plugin.repo.readNote(node.path);
           const task = translate(this.plugin.settings.language, "prompt.research_topic", latest.title);
-          await this.runAgent(node, done, failed, { task: [task, options.requirements].filter(Boolean).join("\n\n"), referenceGroups: options.referenceGroups, onProgress: options.onProgress, signal: options.signal, rules: "", researchMode: options.researchMode, researchDepth: options.researchDepth, visualMode: options.visualMode });
+          await this.runAgent(node, done, failed, { task: [task, options.requirements].filter(Boolean).join("\n\n"), referenceGroups: options.referenceGroups, onProgress: options.onProgress, signal: options.signal, outputLanguage: options.outputLanguage, rules: "", researchMode: options.researchMode, researchDepth: options.researchDepth, visualMode: options.visualMode });
         },
         (options, direction, found, failed, created) => {
           if (!options.multiLayer) return this.proposeChildren(node, true, options, direction, found, failed, false, created);
@@ -1454,15 +1566,19 @@ export class VisualAgentMapView extends ItemView {
   }
   private async addNode(parent: MapNode | null, suggestedTitle?: string, rebuildDerivedData = true): Promise<void> {
     if (!this.map) return;
+    if (!suggestedTitle?.trim()) {
+      new NameModal(this.app, parent ? t("ui.new_subtopic") : t("ui.my_core_topic"), "", title => this.enqueue(() => this.addNode(parent, title))).open();
+      return;
+    }
     const model = inheritModel(parent ? (await this.plugin.repo.readNote(parent.path)).model : undefined, this.plugin.settings.cliModel);
     if (!this.path.startsWith(`${this.plugin.settings.topicsFolder}/`)) { new Notice(t("ui.use_migrate_old_data_to_convert_this_map_first")); return; }
     const node = await this.plugin.repo.createNote(suggestedTitle?.trim() || (parent ? t("ui.new_subtopic") : t("ui.my_core_topic")), model, this.map, this.path, parent ? "inherited" : "workspace");
-    if (parent) { const parentNote = await this.plugin.repo.readNote(parent.path); await this.plugin.repo.updateNote(node.path, { rules: parentNote.rules, reasoning: parentNote.reasoning }); }
+    if (parent) { const parentNote = await this.plugin.repo.readNote(parent.path); await this.plugin.repo.updateNote(node.path, { reasoning: parentNote.reasoning }); }
     node.parentId = parent?.id ?? null; node.x = parent ? parent.x + 340 : 80;
     const siblings = this.map.nodes.filter(n => n.parentId === node.parentId);
     node.y = siblings.length ? Math.max(...siblings.map(n => n.y)) + 220 : parent?.y ?? 80;
     this.notes.set(node.id, await this.plugin.repo.readNote(node.path)); this.selected = node.id;
-    await this.mapChange(map => { map.nodes.push(node); if (parent) map.nodes.find(n => n.id === parent.id)!.collapsed = false; }, rebuildDerivedData); this.focusNode(node);
+    await this.mapChange(map => { map.nodes.push(node); if (parent) map.nodes.find(n => n.id === parent.id)!.collapsed = false; }, rebuildDerivedData); if (this.map) this.map.viewport.zoom = Math.max(this.map.viewport.zoom, 0.7); this.focusNode(node);
   }
   private startQuickExpansion(parent: MapNode, options: TaskOptions, direction: string, failed: (message: string, retryable?: boolean) => void, created: () => void): Promise<void> {
     if (this.plugin.running.has(parent.path) || this.plugin.quickExpandPending.has(parent.path)) { failed(t("ui.ai_running_ai")); return Promise.resolve(); }
@@ -1500,7 +1616,7 @@ export class VisualAgentMapView extends ItemView {
     const note = await this.plugin.repo.readNote(parent.path);
     if (this.plugin.running.has(parent.path)) { failed?.(t("ui.ai_running_ai")); return; }
     if (!confirmed) {
-      new TaskModal(this.app, t("ui.suggest_the_most_useful_expansion_direction_or_follow_the_di"), (value, run, chosen) => { if (run) void this.plugin.confirmAiUsage(note.model, async () => this.enqueue(() => this.proposeChildren(parent, true, chosen, value))); }, t("ui.expand_subtopics"), t("ui.specify_an_expansion_direction_or_ask_ai_to_suggest_one_prev"), note.rules, note.researchMode, note.researchDepth, note.visualMode, false, true, this.taskSourceSettings(t("ui.reference_current_topic_included", note.title))).open();
+      new TaskModal(this.app, t("ui.suggest_the_most_useful_expansion_direction_or_follow_the_di"), (value, run, chosen) => { if (run) void this.plugin.confirmAiUsage(note.model, async () => this.enqueue(() => this.proposeChildren(parent, true, chosen, value))); }, t("ui.expand_subtopics"), t("ui.specify_an_expansion_direction_or_ask_ai_to_suggest_one_prev"), note.rules, note.researchMode, note.researchDepth, note.visualMode, false, true, this.taskSourceSettings(t("ui.reference_current_topic_included", note.title)), undefined, this.plugin.settings.language, note.model, note.reasoning ?? this.plugin.settings.cliReasoning, note.title).open();
       return;
     }
     const targetMapPath = this.path, targetMapId = this.map?.id;
@@ -1508,7 +1624,7 @@ export class VisualAgentMapView extends ItemView {
     this.plugin.running.add(parent.path); this.render();
     let building = false;
     try {
-      const outputLanguage = this.plugin.settings.language;
+      const outputLanguage = options?.outputLanguage ?? this.plugin.settings.language;
       const existing = this.map?.nodes.filter(item => item.parentId === parent.id).map(item => {
         const child = this.notes.get(item.id);
         return `- ${child?.title || item.path}: ${child?.summary || translate(outputLanguage, "prompt.no_summary_yet")}`;
@@ -1520,9 +1636,9 @@ export class VisualAgentMapView extends ItemView {
       const directTask = translate(outputLanguage, "prompt.direct_expansion", effectiveLayers, firstLayerCount, childrenPerParent, shape?.counts.join(outputLanguage === "en" ? ", " : "、"), shape?.total.toString());
       const guidedTask = translate(outputLanguage, "prompt.guided_expansion");
       const task = `${direct ? translate(outputLanguage, "prompt.preliminary_map", effectiveLayers, firstLayerCount, childrenPerParent, shape?.counts.join(outputLanguage === "en" ? ", " : "、"), shape?.total.toString()) : direction || translate(outputLanguage, "prompt.expansion_direction")}\n${translate(outputLanguage, "prompt.existing_subtopics")}\n${existing}\n${translate(outputLanguage, "prompt.avoid_duplicates")} ${direct ? directTask : guidedTask}`;
-      const result = await this.plugin.askModel({ title: note.title, summary: note.summary, rules: "", detail: note.detail, task: [task, options?.requirements].filter(Boolean).join("\n\n"), ancestors: await this.ancestorContext(parent), referenceGroups: options?.referenceGroups, onProgress: options?.onProgress, mode: "decompose", researchMode: options?.researchMode ?? "research", researchDepth: options?.researchDepth ?? note.researchDepth, visualMode: "off" }, note.model, note.reasoning, options?.signal);
+      const result = await this.plugin.askModel({ title: note.title, summary: note.summary, rules: "", detail: note.detail, task: [task, options?.requirements].filter(Boolean).join("\n\n"), ancestors: await this.ancestorContext(parent), referenceGroups: options?.referenceGroups, onProgress: options?.onProgress, outputLanguage: options?.outputLanguage, mode: "decompose", researchMode: options?.researchMode ?? "research", researchDepth: options?.researchDepth ?? note.researchDepth, visualMode: "off" }, note.model, note.reasoning, options?.signal);
       const suggestions = direct ? quickSuggestions(result.suggestions, effectiveLayers, firstLayerCount, childrenPerParent) : result.suggestions.filter(item => !item.parentTitle).slice(0, 7);
-      if (!direct && suggestions.length < 3) { const message = t("ui.ai_does_not_recommend_decomposition_or_did_not_propose_3_to"); if (failed) failed(message); else new Notice(message); return; }
+      if (!direct && suggestions.length === 0) { const message = result.detail.trim() || t("ui.ai_does_not_recommend_decomposition_or_did_not_propose_3_to"); if (failed) failed(message); else new Notice(message); return; }
       if (direct) {
         building = true;
         let batchFailure: Error | null = null;
@@ -1647,7 +1763,7 @@ export class VisualAgentMapView extends ItemView {
       const selectedSources = options.referenceGroups ?? [];
       if (!children.length && !selectedSources.some(group => group.documents.length)) { failed(t("ui.the_selected_sources_contain_no_markdown_content_to_synthesi")); return; }
       const task = translate(this.plugin.settings.language, "prompt.synthesis_directions");
-      const result = await this.plugin.askModel({ title: note.title, summary: note.summary, rules: "", detail: note.detail, task: [task, options?.requirements].filter(Boolean).join("\n\n"), ancestors: await this.ancestorContext(node), referenceGroups: [...selectedSources, childSources], onProgress: options.onProgress, mode: "synthesize", researchMode: options.researchMode, researchDepth: options.researchDepth, visualMode: "off" }, note.model, note.reasoning, options.signal);
+      const result = await this.plugin.askModel({ title: note.title, summary: note.summary, rules: "", detail: note.detail, task: [task, options?.requirements].filter(Boolean).join("\n\n"), ancestors: await this.ancestorContext(node), referenceGroups: [...selectedSources, childSources], onProgress: options.onProgress, outputLanguage: options.outputLanguage, mode: "synthesize", researchMode: options.researchMode, researchDepth: options.researchDepth, visualMode: "off" }, note.model, note.reasoning, options.signal);
       const angles = result.suggestions.slice(0, 2);
       if (!angles.length) { failed(t("ui.ai_did_not_suggest_a_synthesis_direction_please_retry")); return; }
       found(angles, direction => this.plugin.mutate(() => this.integrateChildren(node, true, options, direction, drafted, failed)));
@@ -1660,22 +1776,32 @@ export class VisualAgentMapView extends ItemView {
     const children = this.map.nodes.filter(item => item.parentId === node.id);
     if (!children.length && !options?.referenceGroups?.some(group => group.documents.length)) { const message = t("ui.choose_another_note_source_first"); if (failed) failed(message); else new Notice(message); return; }
     if (!confirmed) {
-      new TaskModal(this.app, t("ui.synthesize_agreements_differences_tradeoffs_and_open_questio"), (value, run, chosen) => { if (run) void this.plugin.confirmAiUsage(note.model, async () => this.enqueue(() => this.integrateChildren(node, true, chosen, value))); }, t("ui.synthesize_subtopics"), t("ui.ai_reads_direct_subtopics_and_prepares_a_synthesis_draft_not"), note.rules, "local", note.researchDepth, note.visualMode, false, false, this.taskSourceSettings(t("ui.reference_current_topic_included", note.title), this.map?.id, t("ui.reference_synthesis_topics_included", note.title)), children.map(child => this.notes.get(child.id)?.title ?? child.path)).open();
+      new TaskModal(this.app, t("ui.synthesize_agreements_differences_tradeoffs_and_open_questio"), (value, run, chosen) => { if (run) void this.plugin.confirmAiUsage(note.model, async () => this.enqueue(() => this.integrateChildren(node, true, chosen, value))); }, t("ui.synthesize_subtopics"), t("ui.ai_reads_direct_subtopics_and_prepares_a_synthesis_draft_not"), note.rules, "local", note.researchDepth, note.visualMode, false, false, this.taskSourceSettings(t("ui.reference_current_topic_included", note.title), this.map?.id, t("ui.reference_synthesis_topics_included", note.title)), children.map(child => this.notes.get(child.id)?.title ?? child.path), this.plugin.settings.language, note.model, note.reasoning ?? this.plugin.settings.cliReasoning, note.title).open();
       return;
     }
     const childSources = await this.topicReferenceGroup(children, options?.synthesisContent === "summary" ? "summary" : "strong");
+    const sourceSnapshot = JSON.stringify(childSources.documents);
+    const childIds = children.map(child => child.id).sort().join("|");
+    const mapPath = this.path, mapId = this.map.id;
+    const noteSnapshot = JSON.stringify([note.title, note.summary, note.detail, note.prompt, note.rules, note.model, note.reasoning, note.sourcePaths, note.referencePaths]);
     const selectedSources = options?.referenceGroups ?? [];
     if (!children.length && !selectedSources.some(group => group.documents.length)) { const message = t("ui.the_selected_sources_contain_no_markdown_content_to_synthesi"); if (failed) failed(message); else new Notice(message); return; }
     const language = this.plugin.settings.language;
     const task = direction || translate(language, "prompt.synthesis_goal");
     this.plugin.running.add(node.path); await this.plugin.repo.updateNote(node.path, { status: "running" }); await this.hydrate(); this.render();
     try {
-      const result = await this.plugin.askModel({ title: note.title, summary: note.summary, rules: "", detail: note.detail, task: [task, options?.requirements].filter(Boolean).join("\n\n"), ancestors: await this.ancestorContext(node), referenceGroups: [...selectedSources, childSources], onProgress: options?.onProgress, mode: "synthesize", researchMode: options?.researchMode ?? "local", researchDepth: options?.researchDepth ?? note.researchDepth, visualMode: options?.visualMode ?? note.visualMode }, note.model, note.reasoning, options?.signal);
+      const result = await this.plugin.askModel({ title: note.title, summary: note.summary, rules: "", detail: note.detail, task: [task, options?.requirements].filter(Boolean).join("\n\n"), ancestors: await this.ancestorContext(node), referenceGroups: [...selectedSources, childSources], onProgress: options?.onProgress, outputLanguage: options?.outputLanguage, mode: "synthesize", researchMode: options?.researchMode ?? "local", researchDepth: options?.researchDepth ?? note.researchDepth, visualMode: options?.visualMode ?? note.visualMode }, note.model, note.reasoning, options?.signal);
+      if (options?.signal?.aborted) throw new DOMException("Aborted", "AbortError");
       await this.plugin.repo.updateNote(node.path, { status: note.status });
       const save = async (summary: string, detail: string): Promise<void> => this.plugin.mutate(async () => {
+        if (options?.signal?.aborted || this.path !== mapPath || this.map?.id !== mapId || this.map.nodes.filter(item => item.parentId === node.id).map(item => item.id).sort().join("|") !== childIds) throw new Error(t("ui.the_topic_changed_the_synthesis_draft_was_not_saved"));
+        const currentSources = await this.topicReferenceGroup(children, options?.synthesisContent === "summary" ? "summary" : "strong");
+        if (JSON.stringify(currentSources.documents) !== sourceSnapshot) throw new Error(t("ui.the_topic_changed_the_synthesis_draft_was_not_saved"));
         const latest = await this.plugin.repo.readNote(node.path);
-        if (latest.detail !== note.detail || latest.summary !== note.summary) throw new Error(t("ui.the_topic_changed_the_synthesis_draft_was_not_saved"));
-        await this.plugin.repo.updateNote(node.path, { summary, detail: canonicalDetail(detail, this.plugin.settings.language), visualReferences: visualReferencesMarkdown(result.visualReferences, language), newFindings: "", status: "completed" });
+        if (JSON.stringify([latest.title, latest.summary, latest.detail, latest.prompt, latest.rules, latest.model, latest.reasoning, latest.sourcePaths, latest.referencePaths]) !== noteSnapshot) throw new Error(t("ui.the_topic_changed_the_synthesis_draft_was_not_saved"));
+        await this.plugin.repo.updateNote(node.path, { summary, detail: canonicalDetail(detail, options?.outputLanguage ?? this.plugin.settings.language), visualReferences: visualReferencesMarkdown(result.visualReferences, language), newFindings: "", status: "completed" });
+        const saved = await this.plugin.repo.readNote(node.path);
+        this.recordNoteWrite(node.path, { ...latest, status: note.status }, saved, ["summary", "detail", "visualReferences", "newFindings", "previewSection", "previewInitialized", "status"], t("ui.synthesize_subtopics"));
         await this.hydrate(); this.render(); new Notice(t("ui.subtopic_synthesis_was_saved_to_current_understanding_and_ma"));
       });
       if (drafted) drafted(result, save);
@@ -1700,7 +1826,7 @@ export class VisualAgentMapView extends ItemView {
     const sharedRules = notes.length && notes.every(note => note.rules === notes[0].rules) ? notes[0].rules : "";
     new IntegrationModal(this.app, notes.map(note => note.title), sharedRules, (title, goal, rules) => {
       const selectedLabel = t("ui.reference_selected_topics_included", notes.map(note => note.title).join(", "));
-      new TaskModal(this.app, goal, (direction, run, options, topicRules) => { if (run) void this.plugin.confirmAiUsage(this.plugin.settings.cliModel, async () => this.enqueue(() => this.createIntegratedNode(title, nodes, direction, topicRules, options, true))); }, t("ui.synthesis_direction_and_sources"), t("ui.prepare_a_synthesis_draft_first_then_create_the_topic_after"), rules, "local", "normal", "auto", false, false, this.taskSourceSettings(selectedLabel, this.map?.id, selectedLabel), notes.map(note => note.title)).open();
+      new TaskModal(this.app, goal, (direction, run, options, topicRules) => { if (run) void this.plugin.confirmAiUsage(this.plugin.settings.cliModel, async () => this.enqueue(() => this.createIntegratedNode(title, nodes, direction, topicRules, options, true))); }, t("ui.synthesis_direction_and_sources"), t("ui.prepare_a_synthesis_draft_first_then_create_the_topic_after"), rules, "local", "normal", "auto", false, false, this.taskSourceSettings(selectedLabel, this.map?.id, selectedLabel), notes.map(note => note.title), this.plugin.settings.language, this.plugin.settings.cliModel, this.plugin.settings.cliReasoning, title).open();
     }).open();
   }
   private async topicReferenceGroup(sources: MapNode[], mode: "strong" | "summary" = "strong"): Promise<ReferenceGroup> {
@@ -1722,27 +1848,63 @@ export class VisualAgentMapView extends ItemView {
   }
   private async createIntegratedNode(title: string, sources: MapNode[], goal: string, rules: string, options?: TaskOptions, review = false): Promise<void> {
     if (!this.map || sources.length < 2) return;
-    this.integrationMode = false; this.multiSelected.clear(); this.render();
+    const controller = new AbortController();
+    const mapPath = this.path, mapId = this.map.id;
+    const sourceGroup = await this.topicReferenceGroup(sources, options?.synthesisContent === "summary" ? "summary" : "strong");
+    const task: NonNullable<VisualAgentMapView["integrationTask"]> = { title, goal, rules, sources, options: options ?? { researchMode: "local", researchDepth: "normal", visualMode: "off" }, mapPath, mapId, sourceContent: JSON.stringify(sourceGroup.documents), controller, state: "running", progress: "" };
+    this.integrationTask = task;
+    this.render();
     const model = this.plugin.settings.cliModel;
     const language = this.plugin.settings.language;
-    const sourceGroup = await this.topicReferenceGroup(sources, options?.synthesisContent === "summary" ? "summary" : "strong");
-    const result = await this.plugin.askModel({ title, summary: language === "en" ? "No conclusion yet" : "尚未形成結論", rules, detail: "", task: [goal, options?.requirements].filter(Boolean).join("\n\n"), ancestors: "", referenceGroups: [...(options?.referenceGroups ?? []), sourceGroup], onProgress: options?.onProgress, mode: "synthesize", researchMode: options?.researchMode ?? "local", researchDepth: options?.researchDepth ?? "normal", visualMode: options?.visualMode ?? "auto" }, model, this.plugin.settings.cliReasoning, options?.signal);
-    if (review) {
-      new AiDraftModal(this.app, result.summary, result.detail, t("ui.confirm_new_synthesis_topic"), () => this.enqueue(() => this.saveIntegratedNode(title, sources, goal, rules, model, result, language))).open();
-      return;
+    try {
+      const result = await this.plugin.askModel({ title, summary: language === "en" ? "No conclusion yet" : "尚未形成結論", rules: "", detail: "", task: [goal, options?.requirements].filter(Boolean).join("\n\n"), ancestors: "", referenceGroups: [...(options?.referenceGroups ?? []), sourceGroup], onProgress: message => { if (this.integrationTask !== task) return; task.progress = message; options?.onProgress?.(message); this.render(); }, outputLanguage: options?.outputLanguage, mode: "synthesize", researchMode: options?.researchMode ?? "local", researchDepth: options?.researchDepth ?? "normal", visualMode: options?.visualMode ?? "auto" }, model, this.plugin.settings.cliReasoning, controller.signal);
+      if (this.integrationTask !== task) return;
+      if (controller.signal.aborted || this.path !== mapPath || this.map?.id !== mapId) throw new Error(t("ui.the_map_or_parent_topic_changed_while_ai_was_running_no_subt"));
+      const latest = await this.topicReferenceGroup(sources, options?.synthesisContent === "summary" ? "summary" : "strong");
+      if (JSON.stringify(latest.documents) !== task.sourceContent) throw new Error(t("ui.the_topic_changed_the_synthesis_draft_was_not_saved"));
+      task.state = "draft"; task.draft = result; this.render();
+      if (review) this.reviewIntegratedDraft(task);
+      else await this.saveIntegratedNode(title, sources, goal, rules, model, result, options?.outputLanguage ?? language, task);
+    } catch (error) {
+      if (this.integrationTask !== task) return;
+      task.state = controller.signal.aborted ? "cancelled" : "failed";
+      task.progress = controller.signal.aborted ? t("ui.research_stopped_existing_content_was_preserved") : error instanceof Error ? error.message : String(error);
+      this.render();
+      if (!controller.signal.aborted) throw error;
     }
-    await this.saveIntegratedNode(title, sources, goal, rules, model, result, language);
   }
-  private async saveIntegratedNode(title: string, sources: MapNode[], goal: string, rules: string, model: string, result: AiResult, language: "zh-TW" | "en"): Promise<void> {
-    if (!this.map) return;
+  private reviewIntegratedDraft(task: NonNullable<VisualAgentMapView["integrationTask"]>): void {
+    if (!task.draft) return;
+    new AiDraftModal(this.app, task.draft.summary, task.draft.detail, t("ui.confirm_new_synthesis_topic"), () => this.enqueue(() => this.saveIntegratedNode(task.title, task.sources, task.goal, task.rules, this.plugin.settings.cliModel, task.draft!, task.options.outputLanguage ?? this.plugin.settings.language, task))).open();
+  }
+  private async saveIntegratedNode(title: string, sources: MapNode[], goal: string, rules: string, model: string, result: AiResult, language: "zh-TW" | "en", task: NonNullable<VisualAgentMapView["integrationTask"]>): Promise<void> {
+    if (!this.map || this.integrationTask !== task || this.path !== task.mapPath || this.map.id !== task.mapId || task.state !== "draft") throw new Error(t("ui.the_topic_changed_the_synthesis_draft_was_not_saved"));
+    const latest = await this.topicReferenceGroup(sources, task.options.synthesisContent === "summary" ? "summary" : "strong");
+    if (JSON.stringify(latest.documents) !== task.sourceContent || sources.some(source => !this.map?.nodes.some(node => node.id === source.id && node.path === source.path))) throw new Error(t("ui.the_topic_changed_the_synthesis_draft_was_not_saved"));
     const integrated = await this.plugin.repo.createNote(title, model, this.map, this.path, "workspace");
-    await this.plugin.repo.updateNote(integrated.path, { summary: result.summary, rules, detail: canonicalDetail(result.detail, this.plugin.settings.language), visualReferences: visualReferencesMarkdown(result.visualReferences, language), prompt: goal, sourcePaths: sources.map(source => source.path), status: "completed" });
-    integrated.parentId = null;
-    integrated.x = Math.max(...sources.map(node => node.x)) + 340;
-    integrated.y = sources.reduce((sum, node) => sum + node.y, 0) / sources.length;
-    this.notes.set(integrated.id, await this.plugin.repo.readNote(integrated.path)); this.selected = integrated.id; this.multiSelected.clear(); this.integrationMode = false;
-    await this.mapChange(map => { map.nodes.push(integrated); });
-    await this.hydrate(); this.render(); this.focusNode(integrated);
+    try {
+      await this.plugin.repo.updateNote(integrated.path, { summary: result.summary, detail: canonicalDetail(result.detail, language), visualReferences: visualReferencesMarkdown(result.visualReferences, language), prompt: goal, sourcePaths: sources.map(source => source.path), status: "completed" });
+      integrated.parentId = null;
+      integrated.x = Math.max(...sources.map(node => node.x)) + 340;
+      integrated.y = sources.reduce((sum, node) => sum + node.y, 0) / sources.length;
+      await this.mapChange(map => { map.nodes.push(integrated); });
+      if (this.history.undoEntry) this.history.undoEntry.label = t("ui.confirm_new_synthesis_topic");
+      this.integrationTask = null; this.selected = integrated.id; this.multiSelected.clear(); this.integrationMode = false;
+      await this.hydrate(); this.render(); this.focusNode(integrated);
+    } catch (error) {
+      const disk = await this.plugin.repo.readMap(this.path);
+      if (!disk.nodes.some(node => node.id === integrated.id)) {
+        const parked = await this.plugin.repo.moveUnique(integrated.path, this.plugin.repo.topicFolder(this.path, "Unassigned"));
+        await this.plugin.repo.setLifecycle(parked, disk.id, "", "unassigned");
+        await this.plugin.rebuildDerivedData();
+      } else {
+        this.integrationTask = null; this.map = disk; this.selected = integrated.id; this.multiSelected.clear(); this.integrationMode = false;
+        try { await this.plugin.rebuildDerivedData(); await this.hydrate(); this.render(); this.focusNode(integrated); }
+        catch { this.render(); new Notice(t("ui.synthesis_saved_refresh_failed")); }
+        return;
+      }
+      throw error;
+    }
   }
   private transform(): void { if (!this.map || !this.stageEl) return; const { x, y, zoom } = this.map.viewport; this.stageEl.style.transform = `translate(${x}px, ${y}px) scale(${zoom})`; this.zoomLabel?.setText(`${Math.round(zoom * 100)}%`); }
   private saveViewport(): void { if (this.viewportTimer !== null) window.clearTimeout(this.viewportTimer); this.viewportTimer = window.setTimeout(() => { this.viewportTimer = null; this.enqueue(() => this.persist()); }, 250); }
@@ -1818,9 +1980,11 @@ export class VisualAgentMapView extends ItemView {
       const latest = await this.plugin.repo.readNote(node.path);
       const stale = latest.title !== note.title || latest.prompt !== note.prompt || latest.rules !== note.rules || latest.detail !== note.detail || latest.summary !== note.summary || latest.model !== note.model || latest.reasoning !== note.reasoning || latest.researchMode !== note.researchMode || latest.researchDepth !== note.researchDepth || latest.visualMode !== note.visualMode || latest.sourcePaths.join("\n") !== note.sourcePaths.join("\n") || JSON.stringify(latest.referencePaths) !== JSON.stringify(note.referencePaths);
       if (controller.signal.aborted || stale) { await this.plugin.repo.updateNote(node.path, { status: note.status }); if (exchangeId && this.plugin.settings.aiExchangeLoggingEnabled) this.plugin.exchanges?.failed(exchangeId, stale ? "議題內容已變更，過時的 AI 結果未寫入。" : "研究已停止，結果未寫入。"); if (stale) { if (failed) failed(t("ui.the_topic_changed_so_the_outdated_ai_result_was_not_saved")); else new Notice(t("ui.the_topic_changed_so_the_outdated_ai_result_was_not_saved")); } return; }
-      await this.plugin.repo.updateNote(node.path, { summary: result.summary, detail: canonicalDetail(result.detail, this.plugin.settings.language), visualReferences: visualReferencesMarkdown(result.visualReferences, language), newFindings: "", status: "completed" });
+      await this.plugin.repo.updateNote(node.path, { summary: result.summary, detail: canonicalDetail(result.detail, context.outputLanguage ?? this.plugin.settings.language), visualReferences: visualReferencesMarkdown(result.visualReferences, language), newFindings: "", status: "completed" });
+      const saved = await this.plugin.repo.readNote(node.path);
+      this.recordNoteWrite(node.path, { ...latest, status: note.status }, saved, ["summary", "detail", "visualReferences", "newFindings", "previewSection", "previewInitialized", "status"], t("ui.research_task"));
       if (exchangeId && this.plugin.settings.aiExchangeLoggingEnabled) this.plugin.exchanges?.completed(exchangeId);
-      for (const view of this.plugin.views()) view.history.clear();
+      for (const view of this.plugin.views()) if (view !== this) view.history.clear();
       if (result.suggestions.length) {
         this.plugin.pendingSuggestions.set(node.path, result.suggestions.slice(0, 7));
         try { await (this.plugin.pendingSuggestions as PendingSuggestions).flush?.(); }
@@ -1933,9 +2097,9 @@ export default class VisualAgentMapPlugin extends Plugin {
     return result;
   }
   views(): VisualAgentMapView[] { return this.app.workspace.getLeavesOfType(VIEW_TYPE).map(leaf => leaf.view).filter((view): view is VisualAgentMapView => view instanceof VisualAgentMapView); }
-  syncOutline(map: MapDocument | null, notes: Map<string, Note>): void {
+  syncOutline(map: MapDocument | null, notes: Map<string, Note>, sample = false): void {
     const titles = new Map([...notes].map(([id, note]) => [id, note.title]));
-    for (const leaf of this.app.workspace.getLeavesOfType(OUTLINE_VIEW_TYPE)) if (leaf.view instanceof OutlineView) leaf.view.setMap(map, titles);
+    for (const leaf of this.app.workspace.getLeavesOfType(OUTLINE_VIEW_TYPE)) if (leaf.view instanceof OutlineView) leaf.view.setMap(map, titles, sample);
   }
   async activateOutline(): Promise<void> {
     let leaf: WorkspaceLeaf | null = this.app.workspace.getLeavesOfType(OUTLINE_VIEW_TYPE)[0] ?? null;
@@ -2150,7 +2314,7 @@ export default class VisualAgentMapPlugin extends Plugin {
   }
   refreshLocalizedEntrypoints(): void {
     this.ribbonIcon?.setAttribute("aria-label", translate(this.settings.language, "ui.open_map"));
-    for (const { command, key } of this.localizedCommands) command.name = translate(this.settings.language, key);
+    for (const { command, key } of this.localizedCommands) command.name = `Visual Agent Map (VAM): ${translate(this.settings.language, key)}`;
   }
   async aiReadyForModel(model: string): Promise<boolean> {
     if (providerForModel(model) === "claude") {
@@ -2252,9 +2416,10 @@ export default class VisualAgentMapPlugin extends Plugin {
     if (!(adapter instanceof FileSystemAdapter)) throw new Error(t("ui.cli_mode_requires_desktop_obsidian"));
     if (!this.manifest.dir) throw new Error(t("ui.plugin_folder_not_found"));
 
-    if (context.referenceGroups?.some(group => group.documents.length)) {
+    const referenceGroups = context.referenceGroups ?? [];
+    if (referenceGroups.some(group => group.documents.length)) {
       const findings = await this.extractReferenceFindings(context, model, reasoning, signal);
-      context = { ...context, sourceContext: [context.sourceContext, findings].filter(Boolean).join("\n\n"), referenceGroups: undefined };
+      context = { ...context, sourceContext: [context.sourceContext, findings, `Source registry (retain these identities in citations):\n${referenceCatalog(referenceGroups)}`].filter(Boolean).join("\n\n"), referenceGroups: undefined };
     }
 
     const totalStarted = Date.now();
@@ -2262,8 +2427,7 @@ export default class VisualAgentMapPlugin extends Plugin {
     if (prepared.context.sourceContext !== context.sourceContext) throw new Error(t("ui.reference_too_large", t("ui.reference_materials")));
     context = prepared.context;
     const pluginDirectory = join(adapter.getBasePath(), this.manifest.dir);
-    const outputLanguage = this.settings.language;
-    const interfaceLanguage = this.settings.language;
+    const outputLanguage = context.outputLanguage ?? this.settings.language;
     const instructions = [
       translate(outputLanguage, "prompt.output_language"),
       translate(outputLanguage, "prompt.role"),
@@ -2272,7 +2436,7 @@ export default class VisualAgentMapPlugin extends Plugin {
       context.sourceContext && context.researchMode !== "local" ? translate(outputLanguage, "prompt.local_first") : "",
       translate(outputLanguage, "prompt.json"),
       translate(outputLanguage, context.mode === "task" ? "prompt.general_task" : context.mode === "decompose" ? "prompt.decompose" : context.mode === "synthesize" ? "prompt.synthesize" : "prompt.default_task"),
-      context.mode !== "decompose" ? translate(outputLanguage, "prompt.detail_structure", ["detail.core_conclusions", "detail.key_knowledge", "detail.evidence_and_sources", "detail.tradeoffs_and_limitations", "detail.open_questions", "detail.update_log"].map(key => `### ${translate(interfaceLanguage, key as TranslationKey)}`).join(", ")) : "",
+      context.mode !== "decompose" ? translate(outputLanguage, "prompt.detail_structure", ["detail.core_conclusions", "detail.key_knowledge", "detail.evidence_and_sources", "detail.tradeoffs_and_limitations", "detail.open_questions", "detail.update_log"].map(key => `### ${translate(outputLanguage, key as TranslationKey)}`).join(", ")) : "",
       researchGuidance(context, outputLanguage),
       ...visualGuidance(context, outputLanguage),
       `${translate(outputLanguage, "prompt.label_topic")}:\n${context.title}`,
@@ -2303,6 +2467,10 @@ export default class VisualAgentMapPlugin extends Plugin {
       stage = "解析 AI 回覆";
       if (this.settings.aiExchangeLoggingEnabled) exchanges?.received(exchangeId, raw);
       const result = this.parseAiResult(raw, provider === "claude" ? "Claude Code" : "Codex App Server", outputLanguage);
+      if (referenceGroups.length) {
+        result.summary = resolveReferenceLinks(result.summary, referenceGroups);
+        result.detail = resolveReferenceLinks(result.detail, referenceGroups);
+      }
       if (this.settings.aiExchangeLoggingEnabled) exchanges?.parsed(exchangeId);
       console.debug("Visual Agent Map AI metrics", { ...prepared.metrics, providerMs: Date.now() - providerStarted, totalMs: Date.now() - totalStarted });
       return result;

@@ -816,6 +816,11 @@ test('AI result formatting always produces the canonical knowledge structure', a
   const english = canonicalDetail('New analysis', 'en');
   for (const heading of ['Core conclusions', 'Key knowledge', 'Evidence and sources', 'Tradeoffs and limitations', 'Open questions', 'Update log']) assert.match(english, new RegExp(`### ${heading}`));
   assert.doesNotMatch(english, /核心結論|尚待補充|整理為結構化知識/);
+  const bilingual = canonicalDetail('### 核心結論\n\n中文結論\n\n### 證據與來源\n\n[[來源.md]]', 'en');
+  assert.equal((bilingual.match(/中文結論/g) || []).length, 1);
+  assert.match(bilingual, /### Core conclusions\n\n中文結論/);
+  assert.doesNotMatch(bilingual, /### 核心結論/);
+  assert.doesNotMatch(bilingual, /To be added/);
 });
 test('AI visual references render as image cards', () => {
   const { visualReferencesMarkdown } = load('main.ts', { obsidian });
@@ -882,9 +887,10 @@ test('hover helpers extract image and table from user notes markdown', () => {
   assert.equal(markdownImages(markdown, 4)[3].alt, '外套');
   assert.equal(JSON.stringify(firstMarkdownTable(markdown)), JSON.stringify([['面向', '判斷'], ['顏色', 'navy / beige'], ['鞋子', 'white sneakers']]));
 });
-integrationTest('new notes include AI rules but omit working findings; clearing legacy findings removes the section', async () => {
+integrationTest('new notes omit inactive rules and working findings; clearing legacy findings removes the section', async () => {
   const { repo, contents } = fixture(), n = await topicNote(repo, 'Direct write', 'a');
-  assert.match(contents.get(n.path), /## Rules[\s\S]*## 預覽[\s\S]*## Detail/);
+  assert.match(contents.get(n.path), /## Prompt[\s\S]*## 預覽[\s\S]*## Detail/);
+  assert.doesNotMatch(contents.get(n.path), /## Rules/);
   assert.doesNotMatch(contents.get(n.path), /## Working Findings/);
   await repo.updateNote(n.path, { newFindings: 'Legacy finding' });
   assert.match(contents.get(n.path), /## Working Findings\n\nLegacy finding/);
@@ -914,6 +920,14 @@ integrationTest('a successful AI task immediately updates summary and MD detail'
   assert.match(updated.detail, /Legacy finding/);
   assert.match(updated.detail, /Existing detail/);
   assert.doesNotMatch(contents.get(n.path), /## Working Findings/);
+  assert.equal(updated.previewInitialized, true);
+  await view.travel(false);
+  const restored = await repo.readNote(n.path);
+  assert.equal(restored.status, 'idea');
+  assert.equal(restored.previewInitialized, false);
+  assert.doesNotMatch(restored.previewSection, /Direct summary/);
+  await view.travel(true);
+  assert.equal((await repo.readNote(n.path)).previewInitialized, true);
 });
 integrationTest('cancelling a node task keeps its earlier Markdown and status', async () => {
   const { repo, app } = fixture(), n = await topicNote(repo, 'Cancel');
@@ -1001,7 +1015,7 @@ integrationTest('a completed but stale answer cannot overwrite an edited note', 
   const after = await repo.readNote(n.path);
   assert.equal(after.detail, 'User edit'); assert.equal(after.status, 'idea'); assert.notEqual(after.summary, 'Stale summary');
 });
-integrationTest('new child topics inherit the parent AI rules once', async () => {
+integrationTest('new child topics inherit reasoning without activating legacy rules', async () => {
   const { repo, app } = fixture(), parent = await topicNote(repo, 'Parent', 'a');
   await repo.updateNote(parent.path, { rules: 'Use official sources and tables.', reasoning: 'high' });
   const mapPath = 'Agent Workspace/Topics/map-a/Map.md';
@@ -1010,9 +1024,9 @@ integrationTest('new child topics inherit the parent AI rules once', async () =>
   const { VisualAgentMapView } = load('main.ts', { obsidian });
   const view = new VisualAgentMapView({ app }, { repo, settings: { ...DEFAULT_SETTINGS }, rebuildDerivedData: async () => {} });
   view.path = mapPath; view.map = mapDoc; view.render = () => {};
-  await view.addNode(parent);
+  await view.addNode(parent, 'Child');
   const child = (await repo.readMap(mapPath)).nodes.at(-1);
-  assert.equal((await repo.readNote(child.path)).rules, 'Use official sources and tables.');
+  assert.equal((await repo.readNote(child.path)).rules, '');
   assert.equal((await repo.readNote(child.path)).reasoning, 'high');
 });
 integrationTest('selected subtopics move together and copied notes keep their content with new identities', async () => {
@@ -1609,7 +1623,7 @@ integrationTest('synthesis can use selected notes when a topic has no children',
   await save('Combined', 'Combined detail');
   assert.equal((await repo.readNote(parent.path)).summary, 'Combined');
 });
-integrationTest('decomposition keeps only 3 to 7 proposals and does not write nodes before confirmation', async () => {
+integrationTest('decomposition accepts 1 to 7 proposals and does not write nodes before confirmation', async () => {
   const { repo, app } = fixture(), parent = await topicNote(repo, 'Parent', 'model-a');
   const mapPath = 'Agent Workspace/Topics/map-a/Map.md';
   const mapDoc = { id: 'map-a', title: 'map-a', version: 1, nodes: [parent], viewport: { x: 0, y: 0, zoom: 1 } };
@@ -1618,8 +1632,13 @@ integrationTest('decomposition keeps only 3 to 7 proposals and does not write no
   const plugin = { repo, settings: { ...DEFAULT_SETTINGS }, running: new Set(), pendingSuggestions: new Map(), askModel: async () => ({ summary: '', detail: '', visualReferences: [], suggestions: [{ title: 'Only one', task: '', contribution: '' }, { title: 'Only two', task: '', contribution: '' }] }) };
   const view = new VisualAgentMapView({ app }, plugin); view.path = mapPath; view.map = mapDoc; view.render = () => {}; view.hydrate = async () => {}; view.openChildSuggestions = () => {};
   await view.proposeChildren(parent, true);
-  assert.equal(plugin.pendingSuggestions.has(parent.path), false);
+  assert.equal(plugin.pendingSuggestions.get(parent.path).length, 2);
+  plugin.pendingSuggestions.clear();
   assert.equal((await repo.readMap(mapPath)).nodes.length, 1);
+  plugin.askModel = async () => ({ summary: '', detail: '', visualReferences: [], suggestions: [{ title: 'Only one', task: '', contribution: '' }] });
+  await view.proposeChildren(parent, true);
+  assert.equal(plugin.pendingSuggestions.get(parent.path).length, 1);
+  plugin.pendingSuggestions.clear();
   plugin.askModel = async () => ({ summary: '', detail: '', visualReferences: [], suggestions: Array.from({ length: 8 }, (_, index) => ({ title: `Suggestion ${index + 1}`, task: '', contribution: '' })) });
   await view.proposeChildren(parent, true);
   assert.equal(plugin.pendingSuggestions.get(parent.path).length, 7);
@@ -1787,7 +1806,7 @@ integrationTest('creating an integrated topic runs AI with full sources and keep
   const integrated = await repo.readNote(savedMap.nodes[2].path);
   assert.match(integrated.detail, /### Core conclusions/);
   assert.deepEqual(integrated.sourcePaths, [first.path, second.path]);
-  assert.equal(integrated.rules, 'Use tables');
+  assert.equal(integrated.rules, '');
   assert.equal(integrated.status, 'completed');
 });
 integrationTest('failed multi-select integration creates no empty root or note', async () => {
@@ -1802,11 +1821,33 @@ integrationTest('failed multi-select integration creates no empty root or note',
   assert.equal((await repo.readMap(mapPath)).nodes.length, 2);
   assert.equal(app.vault.getAbstractFileByPath('Agent Workspace/Topics/map-a/Notes/Should not exist.md'), undefined);
 });
+integrationTest('saved integration is not offered for retry when derived-data refresh fails', async () => {
+  const { repo, app } = fixture(), first = await topicNote(repo, 'Source A'), second = await topicNote(repo, 'Source B');
+  const mapPath = 'Agent Workspace/Topics/map-a/Map.md';
+  const mapDoc = { id: 'map-a', title: 'map-a', version: 1, nodes: [first, second], viewport: { x: 0, y: 0, zoom: 1 } };
+  await app.vault.create(mapPath, core.serializeMap(mapDoc));
+  const { VisualAgentMapView } = load('main.ts', { obsidian });
+  const plugin = { repo, settings: { ...DEFAULT_SETTINGS }, rebuildDerivedData: async () => { throw new Error('refresh unavailable'); }, askModel: async () => ({ summary: 'Combined', detail: 'Combined knowledge', suggestions: [] }) };
+  const view = new VisualAgentMapView({ app }, plugin); view.path = mapPath; view.map = mapDoc; view.render = () => {}; view.focusNode = () => {};
+  await view.createIntegratedNode('Combined', [first, second], 'Compare', '');
+  assert.equal((await repo.readMap(mapPath)).nodes.length, 3);
+  assert.equal(view.integrationTask, null);
+});
 integrationTest('topic notes hide properties without removing existing css classes', async () => {
   const { repo, contents } = fixture(); const n = await topicNote(repo, 'Styled', 'a');
   let content = contents.get(n.path); assert.match(content, /visual-agent-map-node/);
   content = content.replace('cssclasses: ["visual-agent-map-node"]', 'cssclasses: ["user-class"]'); contents.set(n.path, content);
   await repo.ensureNodePresentation(); content = contents.get(n.path); assert.match(content, /user-class/); assert.match(content, /visual-agent-map-node/);
+});
+integrationTest('deleted map restore refuses an occupied path without changing its contents', async () => {
+  const { repo, app } = fixture(), path = await repo.createMap('Restoration conflict', []);
+  const existing = await app.vault.read(repo.file(path));
+  const { VisualAgentMapView } = load('main.ts', { obsidian });
+  const view = new VisualAgentMapView({ app }, { repo });
+  view.deletedMap = { path, content: 'previous map contents', map: await repo.readMap(path), deleted: true };
+  await assert.rejects(() => view.restoreDeletedMap());
+  assert.equal(await app.vault.read(repo.file(path)), existing);
+  assert.equal(view.deletedMap.deleted, true);
 });
 integrationTest('map structural undo restores deleted branch; redo removes it again', async () => {
   const { repo, app } = fixture(); const file = await repo.createMap('Undo', tree());
@@ -2067,8 +2108,12 @@ test('Claude CLI uses the local structured-output interface with tools restricte
     return child;
   };
   const { ClaudeCodeCliRuntime, claudeTaskArgs, claudeStructuredOutput } = load('ai/runtime/claude-code-cli.ts', { 'node:child_process': { spawn } });
-  const schema = { type: 'object', properties: { summary: { type: 'string' } } };
+  const schema = { $schema: 'https://json-schema.org/draft/2020-12/schema', type: 'object', properties: { summary: { type: 'string' } }, required: ['summary'], additionalProperties: false };
   const localArgs = claudeTaskArgs('sonnet', 'medium', schema, false);
+  const claudeSchema = JSON.parse(localArgs[localArgs.indexOf('--json-schema') + 1]);
+  assert.equal(claudeSchema.$schema, undefined);
+  assert.deepEqual(claudeSchema.required, ['summary']);
+  assert.equal(claudeSchema.additionalProperties, false);
   assert.equal(localArgs[localArgs.indexOf('--tools') + 1], '');
   assert.ok(localArgs.includes('--safe-mode'));
   assert.ok(localArgs.includes('--strict-mcp-config'));
@@ -2082,6 +2127,7 @@ test('Claude CLI uses the local structured-output interface with tools restricte
   assert.equal(cwd, '/plugin'); assert.equal(prompt, 'VAM prompt');
   assert.equal(args[args.indexOf('--model') + 1], 'sonnet');
   assert.deepEqual(JSON.parse(raw), result.structured_output);
+  assert.deepEqual(JSON.parse(claudeStructuredOutput(JSON.stringify([{ type: 'system', subtype: 'init' }, result]))), result.structured_output);
   assert.deepEqual(JSON.parse(claudeStructuredOutput(JSON.stringify(result))), result.structured_output);
   assert.throws(() => claudeStructuredOutput('not-json'));
   assert.throws(() => claudeStructuredOutput(JSON.stringify({ ...result, structured_output: undefined })), /structured result/);
@@ -2173,6 +2219,23 @@ integrationTest('AI answer cannot replace preview edited while task was running'
   await repo.updateNote(n.path, { preview: '使用者的文字' });
   await repo.updateNote(n.path, { summary: 'AI 結論', detail: '![圖](https://example.com/image.jpg)' });
   assert.equal((await repo.readNote(n.path)).preview, '使用者的文字');
+});
+integrationTest('AI history refuses to undo over a later edit and retains the undo entry', async () => {
+  const { repo, app } = fixture(), node = await topicNote(repo, 'Conflict guard');
+  const before = await repo.readNote(node.path);
+  await repo.updateNote(node.path, { summary: 'AI answer', detail: 'AI detail', status: 'completed' });
+  const after = await repo.readNote(node.path);
+  const { VisualAgentMapView } = load('main.ts', { obsidian });
+  const view = new VisualAgentMapView({ app }, { repo }); view.map = map([node]); view.render = () => {}; view.hydrate = async () => {};
+  view.recordNoteWrite(node.path, before, after, ['summary', 'detail', 'status'], 'Research');
+  await repo.updateNote(node.path, { detail: 'Manual follow-up' });
+  await assert.rejects(() => view.travel(false));
+  assert.equal((await repo.readNote(node.path)).detail, 'Manual follow-up');
+  assert.equal(view.history.canUndo, true);
+  await repo.updateNote(node.path, { detail: 'AI detail' });
+  await view.travel(false);
+  assert.equal((await repo.readNote(node.path)).summary, before.summary);
+  assert.equal(view.history.canRedo, true);
 });
 integrationTest('images follow related text and inline images are not duplicated', async () => {
   const { repo } = fixture(), n = await topicNote(repo, 'Inline images');
@@ -2354,10 +2417,10 @@ test('localized command and ribbon labels follow the selected VAM language', () 
   plugin.ribbonIcon = { setAttribute: (key, value) => { attributes[key] = value; } };
   plugin.localizedCommands = [{ command, key: 'ui.open_map' }];
   plugin.settings = { ...DEFAULT_SETTINGS, language: 'en' }; plugin.refreshLocalizedEntrypoints();
-  assert.equal(command.name, 'Open mind map');
+  assert.equal(command.name, 'Visual Agent Map (VAM): Open mind map');
   assert.equal(attributes['aria-label'], 'Open mind map');
   plugin.settings.language = 'zh-TW'; plugin.refreshLocalizedEntrypoints();
-  assert.equal(command.name, '開啟心智圖');
+  assert.equal(command.name, 'Visual Agent Map (VAM): 開啟心智圖');
 });
 test('map switch closes only the VAM note that remains in its right pane and clears Obsidian Outline', () => {
   class MarkdownView { constructor(path) { this.file = { path }; } }
@@ -2409,6 +2472,15 @@ test('reference batches include every selected Markdown source, deduplicate over
   assert.match(joined, /unique-sentinel-0/); assert.match(joined, /unique-sentinel-99/);
   assert.equal(joined.match(/duplicate/g), null);
   assert.match(joined, /part 1\/4/); assert.match(joined, /part 4\/4/);
+  assert.match(api.referenceCatalog(groups), /\[S2\] External file \(plain path\): \/Volumes\/Refs\/source\.md/);
+  assert.equal(api.resolveReferenceLinks('See [[source.md]]', groups), 'See 外部來源：/Volumes/Refs/source.md');
+  assert.equal(api.resolveReferenceLinks('Vault [S1], external [S2]', groups), 'Vault [[Maps/A/one.md]], external 外部來源：/Volumes/Refs/source.md');
+  const namesake = [{ id: 'mixed', documents: [{ path: 'Vault/source.md', content: 'vault' }, { path: '/Volumes/Refs/source.md', external: true, content: 'external' }] }];
+  assert.equal(api.resolveReferenceLinks('Vault [S1], external [S2]', namesake), 'Vault [[Vault/source.md]], external 外部來源：/Volumes/Refs/source.md');
+  assert.equal(api.resolveReferenceLinks('Ambiguous [[source.md]]', namesake), 'Ambiguous 來源待確認：source.md');
+  assert.equal(api.resolveReferenceLinks('Exact [[Vault/source.md]]', namesake), 'Exact [[Vault/source.md]]');
+  assert.equal(api.resolveReferenceLinks('Unknown [S3]', namesake), 'Unknown 來源待確認：[S3]');
+  assert.equal(api.resolveReferenceLinks('See [[same.md]]', [{ id: 'a', documents: [{ path: '/a/same.md', external: true, content: '' }, { path: '/b/same.md', external: true, content: '' }] }]), 'See 來源待確認：same.md');
 });
 
 test('reference picker keeps source groups compact, collapsible and task-local', async () => {
@@ -2426,6 +2498,8 @@ test('reference picker keeps source groups compact, collapsible and task-local',
   const { ReferencePicker } = load('ui/reference-picker.ts', { obsidian: { ...obsidian, Modal, setIcon: (parent, name) => { const icon = element('svg'); icon.iconName = name; parent.children.push(icon); } } });
   const root = element('root');
   const picker = new ReferencePicker({ vault: { adapter: {} } }, root, async () => [], async () => [], 'current', 'Current topic and parent are included');
+  const offline = new ReferencePicker({ vault: { adapter: {} } }, element('root'), async () => [], async () => [], 'current', 'Current topic and parent are included', false, true);
+  assert.deepEqual(plain(offline.selection()), { webSearch: false, imageSearch: false });
   const area = root.children[0];
   assert.ok(find(area, child => child.cls.includes('vam-reference-cancel')).cls.includes('is-hidden'));
   assert.ok(find(area, child => child.cls.includes('vam-reference-error-acknowledge')).cls.includes('is-hidden'));

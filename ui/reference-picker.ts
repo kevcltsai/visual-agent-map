@@ -15,9 +15,11 @@ export class ReferencePicker {
   private refresh: () => void;
   private webSearch: boolean;
   private imageSearch: boolean;
+  describe(): string { return `${this.groups.flatMap(group => group.documents).length} ${t("ui.markdown_files")} · ${t("ui.allow_web_search")} ${t(this.webSearch ? "ui.on" : "ui.off")} · ${t("ui.search_for_image_references")} ${t(this.imageSearch && this.webSearch ? "ui.on" : "ui.off")}`; }
+  selection(): { webSearch: boolean; imageSearch: boolean } { return { webSearch: this.webSearch, imageSearch: this.imageSearch && this.webSearch }; }
 
   constructor(private app: App, parent: HTMLElement, private topics: () => Promise<ReferenceTopic[]>, private readTopic: (topic: ReferenceTopic, signal: AbortSignal, progress: (message: string) => void) => Promise<ReferenceDocument[]>, private currentTopicId: string, currentLabel: string, initialWeb = true, initialImages = true) {
-    this.webSearch = initialWeb; this.imageSearch = initialImages;
+    this.webSearch = initialWeb; this.imageSearch = initialWeb && initialImages;
     const area = parent.createDiv("vam-reference-picker");
     const heading = area.createDiv("vam-reference-heading");
     heading.createEl("h3", { text: t("ui.data_sources") });
@@ -31,7 +33,7 @@ export class ReferencePicker {
     const web = webLabel.createEl("input", { type: "checkbox" }); web.checked = initialWeb;
     webLabel.createSpan({ text: t("ui.allow_web_search") });
     const imageLabel = network.createEl("label", { cls: "vam-field vam-next-toggle vam-reference-image-option" });
-    const images = imageLabel.createEl("input", { type: "checkbox" }); images.checked = initialImages;
+    const images = imageLabel.createEl("input", { type: "checkbox" }); images.checked = initialWeb && initialImages;
     images.disabled = !web.checked;
     imageLabel.createSpan({ text: t("ui.search_for_image_references") });
     web.addEventListener("change", () => { this.webSearch = web.checked; images.disabled = !web.checked; if (!web.checked) { images.checked = false; this.imageSearch = false; } });
@@ -82,6 +84,7 @@ export class ReferencePicker {
           details.dataset.rendered = "true";
         });
       }
+      if (typeof Event !== "undefined") area.dispatchEvent?.(new Event("change", { bubbles: true }));
     };
     area.createEl("p", { cls: "vam-hint vam-reference-duration-hint", text: t("ui.reference_time_and_citations_hint") });
     this.refresh();

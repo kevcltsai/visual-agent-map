@@ -40,3 +40,28 @@ export function referenceBatches(groups: ReferenceGroup[], documentLimit = 14_00
   }
   return packReferenceChunks(chunks, batchLimit);
 }
+
+export function referenceCatalog(groups: ReferenceGroup[]): string {
+  const documents = dedupeReferenceGroups(groups).flatMap(group => group.documents);
+  return documents.map((document, index) => `[S${index + 1}] ${document.external ? "External file (plain path)" : "Vault note (wikilink)"}: ${document.path}`).join("\n");
+}
+
+export function resolveReferenceLinks(detail: string, groups: ReferenceGroup[]): string {
+  const documents = dedupeReferenceGroups(groups).flatMap(group => group.documents);
+  const identified = detail.replace(/\[S(\d+)\]/g, (original, number: string) => {
+    const document = documents[Number(number) - 1];
+    if (!document) return `來源待確認：${original}`;
+    return document.external ? `外部來源：${document.path}` : `[[${document.path}]]`;
+  });
+  return identified.replace(/\[\[([^\]]+)\]\]/g, (original, target: string) => {
+    const name = target.split("|")[0].trim();
+    const exact = documents.filter(document => document.path === name);
+    const matches = exact.length ? exact : documents.filter(document => {
+      const basename = document.path.split("/").pop() ?? document.path;
+      return basename === name || basename.replace(/\.md$/i, "") === name;
+    });
+    if (matches.length > 1) return `來源待確認：${name}`;
+    if (matches.length !== 1 || !matches[0].external) return original;
+    return `外部來源：${matches[0].path}`;
+  });
+}

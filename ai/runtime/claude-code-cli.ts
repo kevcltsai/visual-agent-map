@@ -26,10 +26,18 @@ export interface ClaudeTaskControls {
 }
 export const CLAUDE_TASK_TIMEOUT_MS = 3 * 60 * 1000;
 
+// Claude accepts the schema body but its CLI validator does not resolve a draft URI.
+// Keep the validation keywords intact for both the CLI and our result parser.
+export function claudeOutputSchema(schema: unknown): unknown {
+  if (!schema || typeof schema !== "object" || Array.isArray(schema)) return schema;
+  const { $schema: _draft, ...body } = schema as Record<string, unknown>;
+  return body;
+}
+
 export function claudeTaskArgs(model: string, effort: string, schema: unknown, webSearch: boolean): string[] {
   return [
     "--print", "--output-format", "json", "--verbose",
-    "--json-schema", JSON.stringify(schema),
+    "--json-schema", JSON.stringify(claudeOutputSchema(schema)),
     "--model", model,
     "--effort", ["low", "medium", "high"].includes(effort) ? effort : "low",
     "--permission-mode", "dontAsk", "--permission-prompts", "none",
@@ -40,8 +48,10 @@ export function claudeTaskArgs(model: string, effort: string, schema: unknown, w
 
 export function claudeStructuredOutput(stdout: string): string {
   const value: unknown = JSON.parse(stdout);
-  if (!value || typeof value !== "object") throw new Error(t("ui.claude_returned_an_invalid_response"));
-  const record = value as { type?: unknown; structured_output?: unknown; result?: unknown; is_error?: unknown; subtype?: unknown; errors?: unknown };
+  const events: unknown[] = Array.isArray(value) ? value as unknown[] : [];
+  const final: unknown = events.length ? events.reverse().find(item => item && typeof item === "object" && "type" in item && item.type === "result") : value;
+  if (!final || typeof final !== "object") throw new Error(t("ui.claude_returned_an_invalid_response"));
+  const record = final as { type?: unknown; structured_output?: unknown; result?: unknown; is_error?: unknown; subtype?: unknown; errors?: unknown };
   if (record.is_error === true || (typeof record.subtype === "string" && record.subtype.startsWith("error_"))) {
     const details = Array.isArray(record.errors) ? record.errors.filter(item => typeof item === "string").join("\n") : "";
     throw new Error(details || (typeof record.result === "string" ? record.result : t("ui.claude_task_failed")));
@@ -66,7 +76,7 @@ export class ClaudeCodeCliRuntime {
     if (controls.signal?.aborted) throw abortError();
     const webSearch = (controls.searchBudget ?? 0) > 0;
     const args = claudeTaskArgs(model, effort, outputSchema, webSearch);
-    controls.onRequest?.({ provider: "claude", executable: this.options.executable, args: args.map((arg, index) => index === args.indexOf(JSON.stringify(outputSchema)) ? "<response-schema>" : arg), input: "<VAM prompt via stdin>" });
+    controls.onRequest?.({ provider: "claude", executable: this.options.executable, args: args.map((arg, index) => index === args.indexOf(JSON.stringify(claudeOutputSchema(outputSchema))) ? "<response-schema>" : arg), input: "<VAM prompt via stdin>" });
     this.options.onLog?.("info", `啟動 Claude Code：${this.options.executable} --print (${webSearch ? "網路搜尋可用" : "僅使用 VAM 提供的內容"})`);
 
     return new Promise<string>((resolve, reject) => {

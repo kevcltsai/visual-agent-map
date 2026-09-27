@@ -29,11 +29,13 @@
 
 Research and map expansion can use web-enabled Codex or Claude Code tasks. Synthesis uses direct child topics (or selected topics for multi-select) and notes selected for that run; web search is off by default. Choose a service and model per topic; tasks may consume the selected account's allowance.
 
+In each topic note, **Current Summary** is the map-card conclusion, **Prompt** is the topic's standing question, **Preview** is the card preview, and **Detail** is the full knowledge. Put instructions for a single AI run in **Additional requirements**; existing `Rules` text in older notes is preserved but is not applied automatically. Choose the answer language for each task. The six knowledge sections still organize the answer; a request such as “three conclusions” controls the number of points in Core conclusions.
+
 ### Install
 
 In **Obsidian Desktop → Settings → Community plugins → Browse**, search for **Visual Agent Map** and install it.
 
-**Requirements:** Obsidian Desktop `1.13.7` or later. Manual maps work without an AI service. AI tasks require a locally installed [Codex CLI](https://developers.openai.com/codex/cli/) or [Claude Code](https://docs.anthropic.com/en/docs/claude-code/overview), configured and signed in with the corresponding account. This is a desktop-only plugin; npm is needed only to build from source. Current version: **0.9.8**.
+**Requirements:** Obsidian Desktop `1.13.7` or later. Manual maps work without an AI service. AI tasks require a locally installed [Codex CLI](https://developers.openai.com/codex/cli/) or [Claude Code](https://docs.anthropic.com/en/docs/claude-code/overview), configured and signed in with the corresponding account. This is a desktop-only plugin; npm is needed only to build from source. Current version: **0.9.9**.
 
 For manual installation, download `main.js`, `manifest.json`, and `styles.css` from the same [GitHub Release](https://github.com/kevcltsai/visual-agent-map/releases), place them in `<your-vault>/.obsidian/plugins/visual-agent-map/`, and preserve any existing `data.json`. Reload Obsidian and enable the plugin. Configure at least one supported CLI in settings before using AI. Do not install files from a branch, copy the repository into the plugin folder, or run `npm install` there. See [INSTALL.md](INSTALL.md) for first-use steps.
 
@@ -56,9 +58,9 @@ Parent and multi-select synthesis default to **Full content synthesis**; choose 
 
 ### Current limitations
 
-Claude Code support is experimental: shared workflow and process tests pass, but successful live Claude research, web search and synthesis have not yet been verified. A live attempt was rejected by an account organization policy (HTTP 403). Provider availability, account access, model capabilities and answer quality may differ; equivalent live results are not claimed. If Codex models are missing after startup, use **Check again** for Codex in VAM settings, then reopen the task dialog. Search counts are prompt targets and stopping reminders, not strict service-enforced limits.
+Claude Code support is experimental. Model availability, account access, web search, synthesis and answer quality depend on the installed CLI and account; equivalent live results are not claimed. If Codex models are missing after startup, use **Check again** for Codex in VAM settings, then reopen the task dialog. Search counts are prompt targets and stopping reminders, not strict service-enforced limits.
 
-Desktop only. There is no node search, multiple parents, or persistent task history. Undo and redo last for the current Obsidian session. A running node task can be stopped while preserving its existing note; after three minutes, the plugin attempts to interrupt it and does not apply incomplete results.
+Desktop only. The outline searches topic titles in the current mind map; it does not search full note text or across maps. Multiple parents and persistent task history are unavailable. Undo and redo last for the current Obsidian session, including saved AI results. Deleted maps can be restored in the same session; topic notes stay in the Vault. A running node task can be stopped while preserving its existing note; after three minutes, the plugin attempts to interrupt it and does not apply incomplete results. External Markdown references remain outside the Vault and are cited as external paths.
 
 See the [changelog](CHANGELOG.md) for version history and [setup instructions](INSTALL.md) for more detail. This project is developed with [OpenAI Codex](https://openai.com/codex/) as a coding collaborator; the maintainer manages product direction, validation, and releases.
 
@@ -99,7 +101,7 @@ Copyright © 2026 Kevin Tsai. Licensed under [AGPL-3.0-only](LICENSE).
 
 在 **Obsidian 桌面版 → 設定 → 第三方外掛 → 瀏覽** 搜尋並安裝 **Visual Agent Map**。
 
-**系統需求：** Obsidian 桌面版 `1.13.7` 或更新版本。手動建立地圖不需要 AI 服務；AI 任務需要本機安裝 [Codex CLI](https://developers.openai.com/codex/cli/) 或 [Claude Code](https://docs.anthropic.com/en/docs/claude-code/overview)，並使用對應帳號完成設定。外掛僅支援桌面版；只有從原始碼建置才需要 npm。目前版本：**0.9.8**。
+**系統需求：** Obsidian 桌面版 `1.13.7` 或更新版本。手動建立地圖不需要 AI 服務；AI 任務需要本機安裝 [Codex CLI](https://developers.openai.com/codex/cli/) 或 [Claude Code](https://docs.anthropic.com/en/docs/claude-code/overview)，並使用對應帳號完成設定。外掛僅支援桌面版；只有從原始碼建置才需要 npm。目前版本：**0.9.9**。
 
 若要手動安裝，請從同一個 [GitHub Release](https://github.com/kevcltsai/visual-agent-map/releases) 下載 `main.js`、`manifest.json`、`styles.css`，放入 `<你的-vault>/.obsidian/plugins/visual-agent-map/`，並保留既有的 `data.json`。重新載入 Obsidian 並啟用外掛；使用 AI 前，到設定確認至少一個 CLI 路徑與狀態。不要使用 branch 上的檔案、複製整個 repository 至外掛資料夾，或在該資料夾執行 `npm install`。首次使用步驟請見 [INSTALL.md](INSTALL.md)。
 
@@ -118,13 +120,15 @@ Copyright © 2026 Kevin Tsai. Licensed under [AGPL-3.0-only](LICENSE).
 
 每次任務的指令請填入「本次附加要求」。筆記中的舊 `Rules` 保留供相容使用，但不會自動套用。官方範例將條件保留在 Detail，並說明如何填入當次任務。
 
+筆記中的 **Current Summary（摘要）** 是地圖卡片結論，**Prompt** 是議題的長期問題，**Preview（預覽）** 是卡片預覽，**Detail（詳情）** 是完整知識。每次任務可選回答語言；六個知識章節仍用於整理答案。「三點結論」等要求決定核心結論的點數，不刪除其餘知識章節。
+
 母議題與多選整合預設採「完整內容整合」，也可選「摘要快速整合」省略完整 Detail。母議題只自動納入直屬子題，多選只納入已選議題；兩者都不自動加入孫題。額外 Markdown 來源一律全文讀取、去重與分批處理。完整模式確保 Detail 納入來源處理，資料多時可能較慢；不保證全文一次送入模型或答案逐字保留所有細節。
 
 ### 目前限制
 
-Claude Code 支援目前屬實驗性功能：共用流程與程序測試通過，但成功的 Claude 真實研究、網路搜尋及整合仍待驗證。一次真實呼叫被帳號組織政策拒絕（HTTP 403）。服務可用性、帳號權限、模型能力與答案品質可能不同，目前不宣稱兩家實際結果等價。若啟動後沒有 Codex 模型，請在 VAM 設定按 Codex 的「重新檢查」，再重新開啟任務視窗。搜尋次數是提示目標與收尾提醒，不是服務端強制上限。
+Claude Code 支援仍屬實驗性功能。模型、帳號、網路搜尋、整合及回答品質取決於已安裝的 CLI 與帳號，不宣稱兩家實際結果等價。若啟動後沒有 Codex 模型，請在 VAM 設定按 Codex 的「重新檢查」，再重新開啟任務視窗。搜尋次數是提示目標與收尾提醒，不是服務端強制上限。
 
-僅支援桌面版。尚無節點搜尋、多母議題或永久任務歷史。復原與重做只保留於目前 Obsidian 工作階段。執行中的節點任務可停止，原筆記會保留；超過三分鐘時，外掛會嘗試中斷，未完成的結果不會套用。
+僅支援桌面版。大綱可搜尋目前心智圖的議題名稱，不搜尋筆記全文或跨圖內容。尚無多母議題或永久任務歷史。復原與重做只保留於目前 Obsidian 工作階段，包含已保存的 AI 結果；刪除的地圖可在同一工作階段還原，議題筆記仍留在 Vault。執行中的節點任務可停止，原筆記會保留；超過三分鐘時，外掛會嘗試中斷，未完成的結果不會套用。外部 Markdown 來源仍在 Vault 外，以外部路徑引用。
 
 版本紀錄請見 [CHANGELOG.md](CHANGELOG.md)，其他設定資訊請見 [INSTALL.md](INSTALL.md)。本專案使用 [OpenAI Codex](https://openai.com/codex/) 協助開發；產品方向、驗證與發布由維護者負責。
 

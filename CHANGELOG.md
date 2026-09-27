@@ -1,5 +1,25 @@
 # Changelog
 
+## [0.9.9] - 2026-09-28
+
+### Added
+
+- Named, session-only undo and redo for saved AI results and deleted maps, with conflict checks before restoring changed content.
+- Per-task answer language, execution summaries, reviewable expansion proposals, clearer task progress and retry guidance.
+- Topic naming and renaming, plus actionable empty states and improved keyboard labels.
+
+### Fixed
+
+- Adapted Claude Code's structured-output schema and event parsing; live Claude completion remains unverified without a signed-in account.
+- Preserved source identity through batched research and cited external Markdown as external locations rather than Vault links.
+- Recognized English and Traditional Chinese knowledge headings without nesting duplicate sections, and respected requested conclusion counts.
+- Prevented canceled or stale integration results from writing a new topic, and kept generated notes when undoing a new root.
+- Clarified legacy Rules, current-map outline search, and first-use instructions in both languages.
+
+### Known limitations
+
+- Claude Code live research and saving remain unverified. Undo and redo last only for the current Obsidian session; other platform and screen-reader validation is pending.
+
 ## [0.9.8] - 2026-09-27
 
 ### Added

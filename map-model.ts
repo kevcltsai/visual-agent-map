@@ -72,6 +72,8 @@ export class History<T> {
   private future: T[] = [];
   get canUndo(): boolean { return this.past.length > 0; }
   get canRedo(): boolean { return this.future.length > 0; }
+  get undoEntry(): T | undefined { return this.past[this.past.length - 1]; }
+  get redoEntry(): T | undefined { return this.future[this.future.length - 1]; }
   push(entry: T): void { this.past.push(entry); if (this.past.length > 80) this.past.shift(); this.future = []; }
   undo(): T | undefined { const entry = this.past.pop(); if (entry) this.future.push(entry); return entry; }
   redo(): T | undefined { const entry = this.future.pop(); if (entry) this.past.push(entry); return entry; }

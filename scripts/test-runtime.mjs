@@ -88,12 +88,12 @@ try {
 
   evaluate(`(async()=>{await app.plugins.plugins["visual-agent-map"].settingTab.setControlValue("language","zh-TW"); return true})()`);
   const chinese = evaluate(`JSON.stringify((() => { const p=app.plugins.plugins["visual-agent-map"]; const v=app.workspace.getLeavesOfType("visual-agent-map-view").find(l=>l.view.builtIn)?.view; return { language:p.settings.language, title:v?.getDisplayText(), mapTitle:v?.map?.title, command:p.localizedCommands.find(x=>x.command.id.endsWith(":open-map"))?.command.name, hint:document.querySelector(".vam-sample-start")?.innerText||"" }; })())`);
-  check("Language change updates Sample and entry points", chinese.language === "zh-TW" && chinese.command === "開啟心智圖" && chinese.mapTitle?.includes("台灣"), JSON.stringify({ language: chinese.language, mapTitle: chinese.mapTitle, command: chinese.command }));
+  check("Language change updates Sample and entry points", chinese.language === "zh-TW" && chinese.command === "Visual Agent Map (VAM): 開啟心智圖" && chinese.mapTitle?.includes("台灣"), JSON.stringify({ language: chinese.language, mapTitle: chinese.mapTitle, command: chinese.command }));
   check("Chinese first-use actions remain available", chinese.hint.includes("複製到我的工作區") && chinese.hint.includes("建立空白心智圖"), chinese.hint.replace(/\s+/g, " "));
 
   evaluate(`(async()=>{await app.plugins.plugins["visual-agent-map"].settingTab.setControlValue("language","en"); return true})()`);
   const afterSwitch = evaluate(`JSON.stringify((() => { const p=app.plugins.plugins["visual-agent-map"]; const v=app.workspace.getLeavesOfType("visual-agent-map-view").find(l=>l.view.builtIn)?.view; return { language:p.settings.language, title:v?.map?.title, command:p.localizedCommands.find(x=>x.command.id.endsWith(":open-map"))?.command.name }; })())`);
-  check("Switching back restores English Sample", afterSwitch.language === "en" && afterSwitch.command === "Open mind map" && afterSwitch.title?.includes("Taiwan Journey"), JSON.stringify(afterSwitch));
+  check("Switching back restores English Sample", afterSwitch.language === "en" && afterSwitch.command === "Visual Agent Map (VAM): Open mind map" && afterSwitch.title?.includes("Taiwan Journey"), JSON.stringify(afterSwitch));
 
   const errors = run("dev:errors");
   const pluginLogs = evaluate(`JSON.stringify(app.plugins.plugins["visual-agent-map"].logs.entries.filter(e=>e.level==="error"||e.message.includes("初始化未完成")))`);

@@ -648,7 +648,7 @@ export class Repository {
     await this.updateNote(path, { topicId, mapId, topicState: state });
   }
 
-  async rebuildDerivedData(): Promise<void> {
+  async rebuildDerivedData(noteRoot?: string): Promise<void> {
     const ownership = new Map<string, { map: MapDocument; mapPath: string; node: MapNode }>();
     const topics = new Map<string, { map: MapDocument; mapPath: string }>();
     for (const mapFile of await this.mapFiles()) {
@@ -661,6 +661,7 @@ export class Repository {
     }
 
     for (const file of this.app.vault.getMarkdownFiles()) {
+      if (noteRoot && !file.path.startsWith(`${noteRoot}/`)) continue;
       const content = await this.app.vault.read(file), fm = frontmatter(content);
       if (!marker(fm["agent-map-node"])) continue;
       ensureNoteCssClass(fm);
@@ -715,9 +716,11 @@ export class Repository {
     }
   }
 
-  async createMap(title: string, nodes: MapNode[] = []): Promise<string> {
+  async createMap(title: string, nodes: MapNode[] = [], onRootCreated?: (folder: TFolder) => void): Promise<string> {
     await this.folder(this.settings.topicsFolder);
     const root = this.uniqueFolder(this.settings.topicsFolder, title);
+    const folder = await this.app.vault.createFolder(root);
+    onRootCreated?.(folder);
     await this.ensureTopicFolders(root);
     const path = `${root}/Map.md`;
     const map: MapDocument = { version: 1, id: crypto.randomUUID(), title, nodes, viewport: { x: 40, y: 40, zoom: 1 } };

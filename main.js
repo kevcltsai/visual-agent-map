@@ -176,7 +176,8 @@ var english = {
   "ui.reference_map_note_unavailable": "A note belonging to this mind map could not be read: {0}",
   "ui.reference_folder_no_markdown": "The selected folder contains no Markdown files.",
   "ui.reference_file_no_markdown": "No Markdown files were selected.",
-  "ui.reference_time_and_citations_hint": "More material takes longer to process. Results cite the source files used.",
+  "ui.reference_archived_excluded": "Excluded {0} archived VAM notes from this folder selection. To include one intentionally, select that Markdown file directly.",
+  "ui.reference_time_and_citations_hint": "Folder selections exclude archived VAM notes. More material takes longer to process. Results cite the source files used.",
   "ui.reference_processing_progress": "Extracting evidence: batch {0} of {1}\u2026",
   "ui.reference_processing_empty_result": "A selected source batch returned no readable findings. No partial result was saved.",
   "ui.reference_processing_could_not_reduce": "The selected material could not be condensed while preserving traceable evidence. No partial result was saved.",
@@ -377,7 +378,7 @@ var english = {
   "ui.children_count_unused_for_one_level": "Not used when expanding only one level.",
   "ui.topics_by_level_0_1_total": "Topics by level: {0}; {1} total.",
   "ui.zero_children_stops_after_first_level_0_1": "0 stops after the first level. Topics by level: {0}; {1} total.",
-  "ui.levels_first_level_count_and_children_per_topic_must_be_posi": "Levels and first-level count must be positive whole numbers; children per topic must be a non-negative whole number; at most 15 levels.",
+  "ui.levels_first_level_count_and_children_per_topic_must_be_posi": "Levels and first-level count must be positive whole numbers; children per topic must be a positive whole number for multiple levels; at most 15 levels.",
   "ui.rules_match_parent_and_are_independently_editable": "These rules match the parent's; this topic can be edited independently.",
   "ui.rules_differ_from_parent_and_are_independently_editable": "These rules differ from the parent's and can be edited independently.",
   "ui.this_would_create_0_subtopics_exceeding_the_limit_of_15_redu": "This would create {0} subtopics, exceeding the limit of 15. Reduce the levels, first-level count, or children per topic.",
@@ -580,6 +581,8 @@ var english = {
   "ui.back": "Back",
   "ui.skip_tour": "Skip tour",
   "ui.finish_tour": "Finish tour",
+  "ui.sample_cleanup_failed": "{0}; cleanup failed for {1}: {2}",
+  "ui.sample_cleanup_folder_changed": "The folder was replaced; it has been preserved.",
   "ui.created_an_editable_copy_of_the_sample": "Created an editable copy of the sample.",
   "ui.show_tour_again": "Show tour again",
   "ui.agent_workspace_is_missing": "Agent Workspace is missing",
@@ -918,7 +921,8 @@ var traditionalChinese = {
   "ui.reference_map_note_unavailable": "\u7121\u6CD5\u8B80\u53D6\u9019\u5F35\u5FC3\u667A\u5716\u6240\u5C6C\u7684\u8B70\u984C\u7B46\u8A18\uFF1A{0}",
   "ui.reference_folder_no_markdown": "\u9078\u53D6\u7684\u8CC7\u6599\u593E\u5167\u6C92\u6709 Markdown \u6A94\u6848\u3002",
   "ui.reference_file_no_markdown": "\u6C92\u6709\u9078\u53D6 Markdown \u6A94\u6848\u3002",
-  "ui.reference_time_and_citations_hint": "\u8CC7\u6599\u8D8A\u591A\uFF0C\u8655\u7406\u6642\u9593\u8D8A\u9577\uFF1B\u7D50\u679C\u6703\u6A19\u793A\u5BE6\u969B\u4F7F\u7528\u7684\u4F86\u6E90\u6A94\u6848\u3002",
+  "ui.reference_archived_excluded": "\u672C\u6B21\u8CC7\u6599\u593E\u9078\u53D6\u5DF2\u6392\u9664 {0} \u4EFD VAM \u5C01\u5B58\u7B46\u8A18\u3002\u82E5\u8981\u523B\u610F\u7D0D\u5165\uFF0C\u8ACB\u76F4\u63A5\u9078\u53D6\u8A72 Markdown \u6A94\u6848\u3002",
+  "ui.reference_time_and_citations_hint": "\u9078\u53D6\u8CC7\u6599\u593E\u6642\u6703\u6392\u9664 VAM \u5C01\u5B58\u7B46\u8A18\u3002\u8CC7\u6599\u8D8A\u591A\uFF0C\u8655\u7406\u6642\u9593\u8D8A\u9577\uFF1B\u7D50\u679C\u6703\u6A19\u793A\u5BE6\u969B\u4F7F\u7528\u7684\u4F86\u6E90\u6A94\u6848\u3002",
   "ui.reference_processing_progress": "\u6B63\u5728\u64F7\u53D6\u8CC7\u6599\uFF1A\u7B2C {0}\uFF0F{1} \u6279\u2026",
   "ui.reference_processing_empty_result": "\u6709\u4E00\u6279\u9078\u53D6\u8CC7\u6599\u7121\u6CD5\u7522\u751F\u53EF\u8B80\u5167\u5BB9\uFF0C\u672A\u5132\u5B58\u90E8\u5206\u7D50\u679C\u3002",
   "ui.reference_processing_could_not_reduce": "\u9078\u53D6\u8CC7\u6599\u91CF\u904E\u5927\uFF0C\u7121\u6CD5\u5728\u4FDD\u7559\u4F86\u6E90\u5F15\u7528\u7684\u60C5\u6CC1\u4E0B\u6574\u7406\uFF1B\u672A\u5132\u5B58\u90E8\u5206\u7D50\u679C\u3002",
@@ -1119,7 +1123,7 @@ var traditionalChinese = {
   "ui.children_count_unused_for_one_level": "\u53EA\u5C55\u958B\u4E00\u5C64\u6642\u4E0D\u6703\u7528\u5230\u6B64\u8A2D\u5B9A\u3002",
   "ui.topics_by_level_0_1_total": "\u6BCF\u5C64\u6578\u91CF\uFF1A{0}\uFF1B\u5171 {1} \u500B\u5B50\u8B70\u984C\u3002",
   "ui.zero_children_stops_after_first_level_0_1": "\u5EF6\u4F38\u6578\u70BA 0 \u6642\uFF0C\u53EA\u5EFA\u7ACB\u7B2C\u4E00\u5C64\u3002\u6BCF\u5C64\u6578\u91CF\uFF1A{0}\uFF1B\u5171 {1} \u500B\u5B50\u8B70\u984C\u3002",
-  "ui.levels_first_level_count_and_children_per_topic_must_be_posi": "\u5C64\u6578\u8207\u7B2C\u4E00\u5C64\u6578\u91CF\u9808\u70BA\u6B63\u6574\u6578\uFF1B\u6BCF\u500B\u8B70\u984C\u7684\u5EF6\u4F38\u6578\u91CF\u53EF\u70BA 0 \u6216\u6B63\u6574\u6578\uFF1B\u5C64\u6578\u6700\u591A 15\u3002",
+  "ui.levels_first_level_count_and_children_per_topic_must_be_posi": "\u5C64\u6578\u8207\u7B2C\u4E00\u5C64\u6578\u91CF\u9808\u70BA\u6B63\u6574\u6578\uFF1B\u591A\u5C64\u6642\u6BCF\u500B\u8B70\u984C\u7684\u5EF6\u4F38\u6578\u91CF\u9808\u70BA\u6B63\u6574\u6578\uFF1B\u5C64\u6578\u6700\u591A 15\u3002",
   "ui.rules_match_parent_and_are_independently_editable": "\u76EE\u524D\u898F\u5247\u8207\u6BCD\u8B70\u984C\u76F8\u540C\uFF1B\u6B64\u5B50\u8B70\u984C\u53EF\u7368\u7ACB\u4FEE\u6539\u898F\u5247\u3002",
   "ui.rules_differ_from_parent_and_are_independently_editable": "\u76EE\u524D\u898F\u5247\u8207\u6BCD\u8B70\u984C\u4E0D\u540C\uFF1B\u6B64\u5B50\u8B70\u984C\u7684\u898F\u5247\u53EF\u7368\u7ACB\u4FEE\u6539\u3002",
   "ui.this_would_create_0_subtopics_exceeding_the_limit_of_15_redu": "\u9810\u8A08\u5EFA\u7ACB {0} \u500B\u5B50\u8B70\u984C\uFF0C\u8D85\u904E\u4E0A\u9650 15 \u500B\u3002\u8ACB\u6E1B\u5C11\u5C64\u6578\u3001\u7B2C\u4E00\u5C64\u5B50\u8B70\u984C\u6578\uFF0C\u6216\u6BCF\u500B\u8B70\u984C\u7684\u5EF6\u4F38\u6578\u91CF\u3002",
@@ -1322,6 +1326,8 @@ var traditionalChinese = {
   "ui.back": "\u4E0A\u4E00\u6B65",
   "ui.skip_tour": "\u8DF3\u904E\u5C0E\u89BD",
   "ui.finish_tour": "\u5B8C\u6210\u5C0E\u89BD",
+  "ui.sample_cleanup_failed": "{0}\uFF1B\u7121\u6CD5\u6E05\u7406 {1}\uFF1A{2}",
+  "ui.sample_cleanup_folder_changed": "\u8CC7\u6599\u593E\u5DF2\u88AB\u66FF\u63DB\uFF0C\u5DF2\u4FDD\u7559\u5167\u5BB9\u3002",
   "ui.created_an_editable_copy_of_the_sample": "\u5DF2\u5EFA\u7ACB\u53EF\u81EA\u7531\u4FEE\u6539\u7684\u7BC4\u4F8B\u526F\u672C\u3002",
   "ui.show_tour_again": "\u91CD\u65B0\u986F\u793A\u5C0E\u89BD",
   "ui.agent_workspace_is_missing": "Agent Workspace \u4E0D\u5B58\u5728",
@@ -1778,8 +1784,8 @@ var ReferencePicker = class {
       this.cancelReadButton.removeClass("is-hidden");
       this.report(t("ui.reference_reading"));
       try {
-        await work(controller.signal);
-        this.report(this.pendingError ? this.pendingError.message : "");
+        const message = await work(controller.signal);
+        this.report(this.pendingError ? this.pendingError.message : message || "");
       } catch (error) {
         this.pendingError = error instanceof Error ? error : new Error(String(error));
         this.report(controller.signal.aborted ? t("ui.reference_read_cancelled") : t("ui.reference_read_failed", this.pendingError.message));
@@ -1838,9 +1844,26 @@ var ReferencePicker = class {
     this.enqueue(async (signal) => {
       const documents = await this.readFiles(files, true, signal);
       if (signal.aborted) throw new DOMException("Aborted", "AbortError");
-      this.groups.push({ id: `folder:${crypto.randomUUID()}`, name: folderName, location: folderLocation, documents });
+      const included = documents.filter((document2) => {
+        var _a2;
+        const yaml = (_a2 = document2.content.match(/^---\r?\n([\s\S]*?)\r?\n---(?:\r?\n|$)/)) == null ? void 0 : _a2[1];
+        if (!yaml) return true;
+        let metadata;
+        try {
+          metadata = (0, import_obsidian.parseYaml)(yaml);
+        } catch (error) {
+          if (yaml.includes("agent-map-node")) throw error;
+          return true;
+        }
+        if (!metadata || typeof metadata !== "object") return true;
+        const fields = metadata;
+        const managed = fields["agent-map-node"] === true || fields["agent-map-node"] === "true";
+        return !managed || !(fields["topic-state"] === "archived" || fields["topic-state"] === void 0 && document2.path.replace(/\\/g, "/").split("/").at(-2) === "Archive");
+      });
+      this.groups.push({ id: `folder:${crypto.randomUUID()}`, name: folderName, location: folderLocation, documents: included });
       this.groups = dedupeReferenceGroups(this.groups);
       this.refresh();
+      return included.length !== documents.length ? t("ui.reference_archived_excluded", documents.length - included.length) : "";
     });
   }
   async readFiles(files, fromFolder, signal) {
@@ -2936,7 +2959,7 @@ ${JSON.stringify(map, null, 2)}
   async setLifecycle(path, topicId, mapId, state) {
     await this.updateNote(path, { topicId, mapId, topicState: state });
   }
-  async rebuildDerivedData() {
+  async rebuildDerivedData(noteRoot) {
     const ownership = /* @__PURE__ */ new Map();
     const topics = /* @__PURE__ */ new Map();
     for (const mapFile of await this.mapFiles()) {
@@ -2949,6 +2972,7 @@ ${JSON.stringify(map, null, 2)}
       }
     }
     for (const file of this.app.vault.getMarkdownFiles()) {
+      if (noteRoot && !file.path.startsWith(`${noteRoot}/`)) continue;
       const content = await this.app.vault.read(file), fm = frontmatter(content);
       if (!marker(fm["agent-map-node"])) continue;
       ensureNoteCssClass(fm);
@@ -3011,9 +3035,11 @@ ${(0, import_obsidian5.stringifyYaml)(fm)}---
 ${body}`);
     }
   }
-  async createMap(title, nodes = []) {
+  async createMap(title, nodes = [], onRootCreated) {
     await this.folder(this.settings.topicsFolder);
     const root = this.uniqueFolder(this.settings.topicsFolder, title);
+    const folder = await this.app.vault.createFolder(root);
+    onRootCreated == null ? void 0 : onRootCreated(folder);
     await this.ensureTopicFolders(root);
     const path = `${root}/Map.md`;
     const map = { version: 1, id: crypto.randomUUID(), title, nodes, viewport: { x: 40, y: 40, zoom: 1 } };
@@ -4057,14 +4083,13 @@ function imageReferencesFromMarkdown(markdown) {
 var PartialChildBatchError = class extends Error {
 };
 function quickShape(layers, firstLayerCount, childrenPerParent) {
-  if (![layers, firstLayerCount, childrenPerParent].every(Number.isSafeInteger) || layers < 1 || layers > 15 || firstLayerCount < 1 || childrenPerParent < 0) throw new Error(t("ui.levels_first_level_count_and_children_per_topic_must_be_posi"));
+  if (![layers, firstLayerCount].every(Number.isSafeInteger) || layers < 1 || layers > 15 || firstLayerCount < 1 || layers > 1 && (!Number.isSafeInteger(childrenPerParent) || childrenPerParent < 1)) throw new Error(t("ui.levels_first_level_count_and_children_per_topic_must_be_posi"));
   const counts = [];
   let count = BigInt(firstLayerCount), total = BigInt(0);
   for (let level = 0; level < layers; level++) {
     counts.push(count);
     total += count;
-    if (childrenPerParent === 0) break;
-    count *= BigInt(childrenPerParent);
+    if (level + 1 < layers) count *= BigInt(childrenPerParent);
   }
   return { counts, total };
 }
@@ -4549,7 +4574,7 @@ var NextStepModal = class extends import_obsidian7.Modal {
     firstInput.value = "3";
     const childrenLabel = quickLimits.createEl("label", { cls: "vam-field" });
     childrenLabel.createSpan({ text: t("ui.children_per_parent_topic") });
-    const childrenInput = childrenLabel.createEl("input", { type: "number", attr: { min: "0", max: "15", step: "1", value: "2" } });
+    const childrenInput = childrenLabel.createEl("input", { type: "number", attr: { min: "1", max: "15", step: "1", value: "2" } });
     childrenInput.value = "2";
     const childrenHint = quickLimits.createEl("p", { text: t("ui.children_count_unused_for_one_level"), cls: "vam-hint" });
     childrenHint.hidden = true;
@@ -4563,7 +4588,7 @@ var NextStepModal = class extends import_obsidian7.Modal {
         childrenHint.hidden = !childrenInput.disabled;
         const shape = quickShape(layers, firstLayerCount, childrenPerParent);
         quickError = shape.total > BigInt(15) ? t("ui.this_would_create_0_subtopics_exceeding_the_limit_of_15_redu", shape.total.toString()) : "";
-        totalHint.setText(quickError || (childrenPerParent === 0 && layers > 1 ? t("ui.zero_children_stops_after_first_level_0_1", shape.counts.map(String).join(" \u2192 "), shape.total.toString()) : t("ui.topics_by_level_0_1_total", shape.counts.map(String).join(" \u2192 "), shape.total.toString())));
+        totalHint.setText(quickError || t("ui.topics_by_level_0_1_total", shape.counts.map(String).join(" \u2192 "), shape.total.toString()));
       } catch (error) {
         quickError = error instanceof Error ? error.message : String(error);
         totalHint.setText(quickError);
@@ -4620,14 +4645,7 @@ var NextStepModal = class extends import_obsidian7.Modal {
           if (shape.total > BigInt(15)) throw new Error(t("ui.this_would_create_0_subtopics_exceeding_the_limit_of_15_redu", shape.total.toString()));
           options.layers = layers;
           options.firstLayerCount = firstLayerCount;
-          options.childrenPerParent = childrenPerParent;
-          await this.expand(options, "", () => {
-          }, (message) => new import_obsidian7.Notice(message), () => {
-          });
-          this.close();
-          return;
-        }
-        if (!this.pendingCount) {
+          options.childrenPerParent = layers === 1 ? 1 : childrenPerParent;
           await this.expand(options, "", () => {
           }, (message) => new import_obsidian7.Notice(message), () => {
           });
@@ -6552,6 +6570,7 @@ var VisualAgentMapView = class extends import_obsidian7.ItemView {
         this.plugin.pendingSuggestions.delete(parent.path);
         this.plugin.pendingResearchOptions.delete(parent.path);
         await ((_b2 = (_a2 = this.plugin.pendingSuggestions).flush) == null ? void 0 : _b2.call(_a2));
+        this.render();
       }));
     };
     if ((pending == null ? void 0 : pending.length) && !direct) {
@@ -6584,7 +6603,7 @@ var VisualAgentMapView = class extends import_obsidian7.ItemView {
         const child = this.notes.get(item.id);
         return `- ${(child == null ? void 0 : child.title) || item.path}: ${(child == null ? void 0 : child.summary) || translate(outputLanguage, "prompt.no_summary_yet")}`;
       }).join("\n")) || translate(outputLanguage, "prompt.none");
-      const layers = (_h = options == null ? void 0 : options.layers) != null ? _h : 2, firstLayerCount = (_i = options == null ? void 0 : options.firstLayerCount) != null ? _i : 3, childrenPerParent = (_j = options == null ? void 0 : options.childrenPerParent) != null ? _j : 2;
+      const layers = (_h = options == null ? void 0 : options.layers) != null ? _h : 2, firstLayerCount = (_i = options == null ? void 0 : options.firstLayerCount) != null ? _i : 3, childrenPerParent = layers === 1 ? 1 : (_j = options == null ? void 0 : options.childrenPerParent) != null ? _j : 2;
       const shape = direct ? quickShape(layers, firstLayerCount, childrenPerParent) : null;
       const effectiveLayers = (_k = shape == null ? void 0 : shape.counts.length) != null ? _k : layers;
       if (shape && shape.total > BigInt(15)) throw new Error(t("ui.this_would_create_0_subtopics_exceeding_the_limit_of_15_redu", shape.total.toString()));
@@ -6673,10 +6692,12 @@ ${translate(outputLanguage, "prompt.avoid_duplicates")} ${direct ? directTask : 
       this.plugin.pendingSuggestions.delete(parent.path);
       this.plugin.pendingResearchOptions.delete(parent.path);
       await ((_b = (_a = this.plugin.pendingSuggestions).flush) == null ? void 0 : _b.call(_a));
+      this.render();
     })).open();
   }
   async createChildBatch(parent, items, researchOptions) {
-    var _a, _b, _c;
+    var _a, _b, _c, _d;
+    if (!((_a = this.map) == null ? void 0 : _a.nodes.some((node) => node.id === parent.id && node.path === parent.path))) throw new Error(t("ui.the_map_or_parent_topic_changed_while_ai_was_running_no_subt"));
     if (!items.length) throw new Error(t("ui.select_at_least_one_subtopic"));
     const rootTitles = new Set(items.filter((item) => !item.parentTitle).map((item) => item.title));
     if (rootTitles.size !== items.filter((item) => !item.parentTitle).length) throw new Error(t("ui.first_level_topic_names_must_be_unique"));
@@ -6704,13 +6725,13 @@ ${translate(outputLanguage, "prompt.avoid_duplicates")} ${direct ? directTask : 
       }, false);
       if (created) await this.plugin.rebuildDerivedData();
       if (researchOptions) for (const child of newNodes) {
-        if ((_a = researchOptions.signal) == null ? void 0 : _a.aborted) break;
+        if ((_b = researchOptions.signal) == null ? void 0 : _b.aborted) break;
         try {
           await this.runAgent(child, void 0, void 0, { rules: "", referenceGroups: [], onProgress: researchOptions.onProgress, signal: researchOptions.signal, researchMode: researchOptions.researchMode, researchDepth: researchOptions.researchDepth, visualMode: researchOptions.visualMode, task: [(await this.plugin.repo.readNote(child.path)).prompt, researchOptions.requirements].filter(Boolean).join("\n\n") });
-          if ((_b = researchOptions.signal) == null ? void 0 : _b.aborted) break;
+          if ((_c = researchOptions.signal) == null ? void 0 : _c.aborted) break;
           if ((await this.plugin.repo.readNote(child.path)).status === "idea") throw new Error(t("ui.shallow_research_did_not_start"));
         } catch (error) {
-          if (((_c = researchOptions.signal) == null ? void 0 : _c.aborted) || error instanceof Error && error.name === "AbortError") break;
+          if (((_d = researchOptions.signal) == null ? void 0 : _d.aborted) || error instanceof Error && error.name === "AbortError") break;
           await this.plugin.repo.updateNote(child.path, { status: "error" });
           this.plugin.recordFailure(t("ui.could_not_start_shallow_research_for_subtopic_0", child.path), error);
         }
@@ -7640,8 +7661,14 @@ var VisualAgentMapPlugin = class extends import_obsidian7.Plugin {
   async duplicateBuiltInSample() {
     await this.repo.ensureWorkspace();
     this.settings.workspaceInitialized = true;
-    const sample = builtInSample(this.settings.language, false), path = await this.repo.createMap(sample.map.title), map = await this.repo.readMap(path), root = this.repo.topicRoot(path);
+    const sample = builtInSample(this.settings.language, false);
+    let createdRoot;
     try {
+      const path = await this.repo.createMap(sample.map.title, [], (folder) => {
+        createdRoot = folder;
+      });
+      const root = this.repo.topicRoot(path);
+      const map = await this.repo.readMap(path);
       await this.repo.folder(`${root}/Attachments`);
       for (const [name, data] of sample.assets) await this.app.vault.createBinary(`${root}/Attachments/${name}`, data);
       const byOldPath = /* @__PURE__ */ new Map();
@@ -7661,16 +7688,20 @@ var VisualAgentMapPlugin = class extends import_obsidian7.Plugin {
       }
       map.viewport = { ...sample.map.viewport };
       await this.repo.saveMap(path, map);
-      await this.repo.rebuildDerivedData();
+      await this.repo.rebuildDerivedData(root);
       await this.saveSettings();
       new import_obsidian7.Notice(t("ui.created_an_editable_copy_of_the_sample"));
       return path;
     } catch (error) {
-      const folder = this.app.vault.getAbstractFileByPath(root);
-      if (folder) {
+      if (createdRoot) {
+        const root = createdRoot.path;
         try {
-          await this.app.fileManager.trashFile(folder);
-        } catch (e) {
+          const current = this.app.vault.getAbstractFileByPath(root);
+          if (current && current !== createdRoot) throw new Error(t("ui.sample_cleanup_folder_changed"));
+          if (current) await this.app.fileManager.trashFile(createdRoot);
+        } catch (cleanupError) {
+          const message = (value) => value instanceof Error ? value.message : String(value);
+          throw new Error(t("ui.sample_cleanup_failed", message(error), root, message(cleanupError)), { cause: error });
         }
       }
       throw error;

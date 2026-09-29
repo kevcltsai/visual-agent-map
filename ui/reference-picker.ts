@@ -1,4 +1,4 @@
-import { App, FileSystemAdapter, Modal, setIcon } from "obsidian";
+import { App, FileSystemAdapter, Modal, parseYaml, setIcon } from "obsidian";
 import { t, type TranslationKey } from "../i18n";
 import { dedupeReferenceGroups, type ReferenceDocument, type ReferenceGroup } from "../ai/reference-materials";
 
@@ -97,11 +97,11 @@ export class ReferencePicker {
     return button;
   }
 
-  private enqueue(work: (signal: AbortSignal) => Promise<void>): void {
+  private enqueue(work: (signal: AbortSignal) => Promise<void | string>): void {
     this.pending = this.pending.then(async () => {
       const controller = new AbortController(); this.activeRead = controller; this.cancelReadButton.hidden = false; this.cancelReadButton.removeClass("is-hidden");
       this.report(t("ui.reference_reading"));
-      try { await work(controller.signal); this.report(this.pendingError ? this.pendingError.message : ""); }
+      try { const message = await work(controller.signal); this.report(this.pendingError ? this.pendingError.message : message || ""); }
       catch (error) {
         this.pendingError = error instanceof Error ? error : new Error(String(error));
         this.report(controller.signal.aborted ? t("ui.reference_read_cancelled") : t("ui.reference_read_failed", this.pendingError.message));
@@ -149,7 +149,19 @@ export class ReferencePicker {
     this.enqueue(async signal => {
       const documents = await this.readFiles(files, true, signal);
       if (signal.aborted) throw new DOMException("Aborted", "AbortError");
-      this.groups.push({ id: `folder:${crypto.randomUUID()}`, name: folderName, location: folderLocation, documents }); this.groups = dedupeReferenceGroups(this.groups); this.refresh();
+      const included = documents.filter(document => {
+        const yaml = document.content.match(/^---\r?\n([\s\S]*?)\r?\n---(?:\r?\n|$)/)?.[1];
+        if (!yaml) return true;
+        let metadata: unknown;
+        try { metadata = parseYaml(yaml); }
+        catch (error) { if (yaml.includes("agent-map-node")) throw error; return true; }
+        if (!metadata || typeof metadata !== "object") return true;
+        const fields = metadata as Record<string, unknown>;
+        const managed = fields["agent-map-node"] === true || fields["agent-map-node"] === "true";
+        return !managed || !(fields["topic-state"] === "archived" || (fields["topic-state"] === undefined && document.path.replace(/\\/g, "/").split("/").at(-2) === "Archive"));
+      });
+      this.groups.push({ id: `folder:${crypto.randomUUID()}`, name: folderName, location: folderLocation, documents: included }); this.groups = dedupeReferenceGroups(this.groups); this.refresh();
+      return included.length !== documents.length ? t("ui.reference_archived_excluded", documents.length - included.length) : "";
     });
   }
 

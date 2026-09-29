@@ -1,6 +1,6 @@
 # Install Visual Agent Map
 
-This guide takes you from installation to your first editable VAM map. VAM is currently verified on **Obsidian Desktop 1.13.7+ for macOS**.
+This guide takes you from installation to your first editable VAM map. VAM is requires **Obsidian Desktop 1.13.7 or later**; the tested environment is **macOS with Obsidian 1.13.7**.
 
 ## What you need
 
@@ -57,7 +57,7 @@ Claude Code is experimental; successful live tasks remain unverified. CLI detect
 
 # 安裝 Visual Agent Map
 
-本指南會帶你從安裝一路完成第一張可編輯的 VAM 心智圖。VAM 目前已驗證的環境是 **macOS 上的 Obsidian Desktop 1.13.7+**。
+本指南會帶你從安裝一路完成第一張可編輯的 VAM 心智圖。VAM 需要 **Obsidian Desktop 1.13.7 或更新版本**；實際驗證環境為 **macOS 上的 Obsidian 1.13.7**。
 
 ## 需要準備
 

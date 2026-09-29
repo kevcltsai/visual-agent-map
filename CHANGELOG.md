@@ -1,5 +1,20 @@
 # Changelog
 
+## [0.9.10] - 2026-09-29
+
+### Fixed
+
+- Keep first-time expansion proposals in the task form for editing and selection; preserve input for retries when no proposals are returned.
+- Refresh pending-proposal indicators after creation and reject confirmation when the parent topic is no longer in the current map.
+- Clean up failed sample copies only when the new folder is still owned by the operation; preserve existing notes and report cleanup failures with the remaining location.
+- Exclude identifiable archived VAM notes from folder source selections and show the excluded count. Individual Markdown selection can still include an archived note intentionally.
+- Require positive child counts for multi-level quick expansion and ignore the unused child-count field for a single level.
+- Clarify temporary undo history and distinguish the minimum Obsidian requirement from the tested macOS version.
+
+### Known limitations
+
+- Claude Code remains experimental; successful live tasks are still unverified without a signed-in account. Broader accessibility, platform, and live timeout validation remains pending.
+
 ## [0.9.9] - 2026-09-28
 
 ### Added
@@ -18,7 +33,7 @@
 
 ### Known limitations
 
-- Claude Code live research and saving remain unverified. Undo and redo last only for the current Obsidian session; other platform and screen-reader validation is pending.
+- Claude Code live research and saving remain unverified. Undo and redo are temporary; switching maps or closing the map view clears ordinary edit history; other platform and screen-reader validation is pending.
 
 ## [0.9.8] - 2026-09-27
 

@@ -30,7 +30,7 @@ Create a map → add topics or ask AI for suggestions → research a node → re
 
 Search for **Visual Agent Map** in **Obsidian → Settings → Community plugins → Browse**, then install and enable it.
 
-**Version 0.9.9 · Obsidian Desktop 1.13.7+**. Manual maps work without AI. For AI tasks, install [Codex CLI](https://developers.openai.com/codex/cli/), sign in with ChatGPT, and check its status in VAM settings. [Claude Code](https://docs.anthropic.com/en/docs/claude-code/overview) is also available as an experimental alternative with its own account.
+**Version 0.9.10 · Obsidian Desktop 1.13.7+**. Manual maps work without AI. For AI tasks, install [Codex CLI](https://developers.openai.com/codex/cli/), sign in with ChatGPT, and check its status in VAM settings. [Claude Code](https://docs.anthropic.com/en/docs/claude-code/overview) is also available as an experimental alternative with its own account.
 
 **Manual install:** Download `main.js`, `manifest.json`, and `styles.css` from the same [GitHub Release](https://github.com/kevcltsai/visual-agent-map/releases/latest). Place them in `<your-vault>/.obsidian/plugins/visual-agent-map/`, preserve existing `data.json`, then reload Obsidian and enable VAM. Use release files, not a repository checkout. Setup help: [INSTALL.md](INSTALL.md).
 
@@ -56,7 +56,7 @@ Node filesystem APIs probe CLI paths outside the vault and save AI exchanges, pe
 
 ### Current limitations
 
-Desktop only; currently verified on macOS. Claude Code is experimental, with successful live tasks still unverified. Models, web access, and answer quality depend on your CLI and account. Outline search covers topic titles in the current map only. No multiple parents or persistent task history; undo/redo lasts for the current session. Stopping a task preserves existing notes. VAM attempts to interrupt tasks after three minutes and does not apply incomplete results.
+Desktop only; currently verified on macOS. Claude Code is experimental, with successful live tasks still unverified. Models, web access, and answer quality depend on your CLI and account. Outline search covers topic titles in the current map only. No multiple parents or persistent task history; undo/redo is temporary. Switching maps or closing the map view clears its ordinary edit history. Stopping a task preserves existing notes. VAM attempts to interrupt tasks after three minutes and does not apply incomplete results.
 
 ### License
 
@@ -92,7 +92,7 @@ Copyright © 2026 Kevin Tsai · [AGPL-3.0-only](LICENSE) · [Changelog](CHANGELO
 
 在 **Obsidian → 設定 → 第三方外掛 → 瀏覽** 搜尋 **Visual Agent Map**，安裝並啟用。
 
-**版本 0.9.9 · Obsidian 桌面版 1.13.7+**。手動建立地圖不需要 AI；執行 AI 任務前，請安裝 [Codex CLI](https://developers.openai.com/codex/cli/)、以 ChatGPT 登入，並在 VAM 設定確認狀態。也可使用實驗性支援的 [Claude Code](https://docs.anthropic.com/en/docs/claude-code/overview)，須登入對應帳號。
+**版本 0.9.10 · Obsidian 桌面版 1.13.7+**。手動建立地圖不需要 AI；執行 AI 任務前，請安裝 [Codex CLI](https://developers.openai.com/codex/cli/)、以 ChatGPT 登入，並在 VAM 設定確認狀態。也可使用實驗性支援的 [Claude Code](https://docs.anthropic.com/en/docs/claude-code/overview)，須登入對應帳號。
 
 **手動安裝：** 從同一個 [GitHub Release](https://github.com/kevcltsai/visual-agent-map/releases/latest) 下載 `main.js`、`manifest.json`、`styles.css`，放入 `<你的-vault>/.obsidian/plugins/visual-agent-map/`，保留既有 `data.json`，再重新載入 Obsidian 並啟用。請使用正式發布檔案，勿直接複製 repository。設定指南：[INSTALL.md](INSTALL.md)。
 
@@ -118,7 +118,7 @@ Node 檔案 API 會探測 Vault 外的 CLI 路徑，並在外掛目錄保存 AI 
 
 ### 目前限制
 
-僅支援桌面版，目前已驗證環境為 macOS。Claude Code 屬實驗性支援，成功真實任務仍待驗證。模型、網頁存取與回答品質取決於 CLI 與帳號。大綱只搜尋目前地圖的議題名稱。尚無多母議題或永久任務歷史；復原／重做只保留於目前工作階段。停止任務會保留原筆記；超過三分鐘會嘗試中斷，未完成的結果不會套用。
+僅支援桌面版，目前已驗證環境為 macOS。Claude Code 屬實驗性支援，成功真實任務仍待驗證。模型、網頁存取與回答品質取決於 CLI 與帳號。大綱只搜尋目前地圖的議題名稱。尚無多母議題或永久任務歷史；復原／重做為暫存紀錄，切換地圖或關閉地圖檢視會清除一般編輯歷史。停止任務會保留原筆記；超過三分鐘會嘗試中斷，未完成的結果不會套用。
 
 ### 授權
 

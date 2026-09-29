@@ -1,5 +1,5 @@
 import { t, setUiLanguage, topicStatusLabel, translate, initialUiLanguage, type TranslationKey } from "./i18n";
-import { App, MarkdownRenderer, FileSystemAdapter, ItemView, MarkdownView, Modal, Notice, Plugin, PluginSettingTab, Setting, TFile, View, WorkspaceLeaf, type Command, type SettingDefinitionItem } from "obsidian";
+import { App, MarkdownRenderer, FileSystemAdapter, ItemView, MarkdownView, Modal, Notice, Plugin, PluginSettingTab, Setting, TFile, type TFolder, View, WorkspaceLeaf, type Command, type SettingDefinitionItem } from "obsidian";
 import { ReferencePicker, type ReferenceTopic } from "./ui/reference-picker";
 import { packReferenceChunks, readMarkdownFile, referenceBatches, referenceCatalog, resolveReferenceLinks, type ReferenceGroup } from "./ai/reference-materials";
 import { NameModal } from "./ui/modals/name-modal";
@@ -136,10 +136,10 @@ function imageReferencesFromMarkdown(markdown: string): string {
 class PartialChildBatchError extends Error {}
 interface TaskSourceSettings { topics: () => Promise<ReferenceTopic[]>; readTopic: (topic: ReferenceTopic, signal: AbortSignal, progress: (message: string) => void) => Promise<{ path: string; content: string }[]>; currentTopicId: string; currentLabel: string; synthesisLabel?: string; synthesisTopics?: string[] }
 function quickShape(layers: number, firstLayerCount: number, childrenPerParent: number): { counts: bigint[]; total: bigint } {
-  if (![layers, firstLayerCount, childrenPerParent].every(Number.isSafeInteger) || layers < 1 || layers > 15 || firstLayerCount < 1 || childrenPerParent < 0) throw new Error(t("ui.levels_first_level_count_and_children_per_topic_must_be_posi"));
+  if (![layers, firstLayerCount].every(Number.isSafeInteger) || layers < 1 || layers > 15 || firstLayerCount < 1 || (layers > 1 && (!Number.isSafeInteger(childrenPerParent) || childrenPerParent < 1))) throw new Error(t("ui.levels_first_level_count_and_children_per_topic_must_be_posi"));
   const counts: bigint[] = [];
   let count = BigInt(firstLayerCount), total = BigInt(0);
-  for (let level = 0; level < layers; level++) { counts.push(count); total += count; if (childrenPerParent === 0) break; count *= BigInt(childrenPerParent); }
+  for (let level = 0; level < layers; level++) { counts.push(count); total += count; if (level + 1 < layers) count *= BigInt(childrenPerParent); }
   return { counts, total };
 }
 function quickSuggestions(items: Suggestion[], layers: number, firstLayerCount: number, childrenPerParent: number): Suggestion[] {
@@ -435,7 +435,7 @@ export class NextStepModal extends Modal {
     const firstLabel = quickLimits.createEl("label", { cls: "vam-field" }); firstLabel.createSpan({ text: t("ui.first_level_subtopics") });
     const firstInput = firstLabel.createEl("input", { type: "number", attr: { min: "1", max: "15", step: "1", value: "3" } }); firstInput.value = "3";
     const childrenLabel = quickLimits.createEl("label", { cls: "vam-field" }); childrenLabel.createSpan({ text: t("ui.children_per_parent_topic") });
-    const childrenInput = childrenLabel.createEl("input", { type: "number", attr: { min: "0", max: "15", step: "1", value: "2" } }); childrenInput.value = "2";
+    const childrenInput = childrenLabel.createEl("input", { type: "number", attr: { min: "1", max: "15", step: "1", value: "2" } }); childrenInput.value = "2";
     const childrenHint = quickLimits.createEl("p", { text: t("ui.children_count_unused_for_one_level"), cls: "vam-hint" }); childrenHint.hidden = true;
     const totalHint = quickLimits.createEl("p", { cls: "vam-hint" }); totalHint.setAttr("aria-live", "polite");
     let quickError = "";
@@ -446,9 +446,7 @@ export class NextStepModal extends Modal {
         childrenHint.hidden = !childrenInput.disabled;
         const shape = quickShape(layers, firstLayerCount, childrenPerParent);
         quickError = shape.total > BigInt(15) ? t("ui.this_would_create_0_subtopics_exceeding_the_limit_of_15_redu", shape.total.toString()) : "";
-        totalHint.setText(quickError || (childrenPerParent === 0 && layers > 1
-          ? t("ui.zero_children_stops_after_first_level_0_1", shape.counts.map(String).join(" → "), shape.total.toString())
-          : t("ui.topics_by_level_0_1_total", shape.counts.map(String).join(" → "), shape.total.toString())));
+        totalHint.setText(quickError || t("ui.topics_by_level_0_1_total", shape.counts.map(String).join(" → "), shape.total.toString()));
       } catch (error) { quickError = error instanceof Error ? error.message : String(error); totalHint.setText(quickError); }
       totalHint.classList.toggle("is-error", !!quickError);
     };
@@ -473,12 +471,7 @@ export class NextStepModal extends Modal {
         const layers = Number(layersInput.value), firstLayerCount = Number(firstInput.value), childrenPerParent = Number(childrenInput.value);
         const shape = quickShape(layers, firstLayerCount, childrenPerParent);
         if (shape.total > BigInt(15)) throw new Error(t("ui.this_would_create_0_subtopics_exceeding_the_limit_of_15_redu", shape.total.toString()));
-        options.layers = layers; options.firstLayerCount = firstLayerCount; options.childrenPerParent = childrenPerParent;
-        await this.expand(options, "", () => {}, message => new Notice(message), () => {});
-        this.close();
-        return;
-      }
-      if (!this.pendingCount) {
+        options.layers = layers; options.firstLayerCount = firstLayerCount; options.childrenPerParent = layers === 1 ? 1 : childrenPerParent;
         await this.expand(options, "", () => {}, message => new Notice(message), () => {});
         this.close();
         return;
@@ -1606,6 +1599,7 @@ export class VisualAgentMapView extends ItemView {
         catch (error) { if (error instanceof PartialChildBatchError) { this.plugin.pendingSuggestions.delete(parent.path); this.plugin.pendingResearchOptions.delete(parent.path); } throw error; }
         this.plugin.pendingSuggestions.delete(parent.path); this.plugin.pendingResearchOptions.delete(parent.path);
         await (this.plugin.pendingSuggestions as PendingSuggestions).flush?.();
+        this.render();
       }));
     };
     if (pending?.length && !direct) {
@@ -1629,7 +1623,7 @@ export class VisualAgentMapView extends ItemView {
         const child = this.notes.get(item.id);
         return `- ${child?.title || item.path}: ${child?.summary || translate(outputLanguage, "prompt.no_summary_yet")}`;
       }).join("\n") || translate(outputLanguage, "prompt.none");
-      const layers = options?.layers ?? 2, firstLayerCount = options?.firstLayerCount ?? 3, childrenPerParent = options?.childrenPerParent ?? 2;
+      const layers = options?.layers ?? 2, firstLayerCount = options?.firstLayerCount ?? 3, childrenPerParent = layers === 1 ? 1 : options?.childrenPerParent ?? 2;
       const shape = direct ? quickShape(layers, firstLayerCount, childrenPerParent) : null;
       const effectiveLayers = shape?.counts.length ?? layers;
       if (shape && shape.total > BigInt(15)) throw new Error(t("ui.this_would_create_0_subtopics_exceeding_the_limit_of_15_redu", shape.total.toString()));
@@ -1689,9 +1683,11 @@ export class VisualAgentMapView extends ItemView {
       this.plugin.pendingSuggestions.delete(parent.path);
       this.plugin.pendingResearchOptions.delete(parent.path);
       await (this.plugin.pendingSuggestions as PendingSuggestions).flush?.();
+      this.render();
     })).open();
   }
   private async createChildBatch(parent: MapNode, items: Suggestion[], researchOptions?: TaskOptions): Promise<void> {
+    if (!this.map?.nodes.some(node => node.id === parent.id && node.path === parent.path)) throw new Error(t("ui.the_map_or_parent_topic_changed_while_ai_was_running_no_subt"));
     if (!items.length) throw new Error(t("ui.select_at_least_one_subtopic"));
     const rootTitles = new Set(items.filter(item => !item.parentTitle).map(item => item.title));
     if (rootTitles.size !== items.filter(item => !item.parentTitle).length) throw new Error(t("ui.first_level_topic_names_must_be_unique"));
@@ -1707,7 +1703,7 @@ export class VisualAgentMapView extends ItemView {
         const owner = item.parentTitle ? createdByTitle.get(item.parentTitle) : parent;
         if (!owner) throw new Error(t("ui.select_the_parent_topic_before_its_child"));
         await this.addNode(owner, item.title, false); created++;
-        const child = this.map!.nodes.at(-1)!;
+        const child = this.map.nodes.at(-1)!;
         newNodes.push(child);
         createdByTitle.set(item.title, child);
         await this.noteChange(child, { prompt: item.task, detail: researchOptions ? "" : item.contribution ? canonicalDetail(item.contribution, this.plugin.settings.language) : "", ...(researchOptions ? { researchMode: "research" as const, researchDepth: "fast" as const, visualMode: researchOptions.visualMode } : {}) });
@@ -2241,8 +2237,12 @@ export default class VisualAgentMapPlugin extends Plugin {
   }
   async duplicateBuiltInSample(): Promise<string> {
     await this.repo.ensureWorkspace(); this.settings.workspaceInitialized = true;
-    const sample = builtInSample(this.settings.language, false), path = await this.repo.createMap(sample.map.title), map = await this.repo.readMap(path), root = this.repo.topicRoot(path);
+    const sample = builtInSample(this.settings.language, false);
+    let createdRoot: TFolder | undefined;
     try {
+      const path = await this.repo.createMap(sample.map.title, [], folder => { createdRoot = folder; });
+      const root = this.repo.topicRoot(path);
+      const map = await this.repo.readMap(path);
       await this.repo.folder(`${root}/Attachments`);
       for (const [name, data] of sample.assets) await this.app.vault.createBinary(`${root}/Attachments/${name}`, data);
       const byOldPath = new Map<string, MapNode>();
@@ -2256,9 +2256,20 @@ export default class VisualAgentMapPlugin extends Plugin {
         created.parentId = source.parentId ? byOldPath.get(sample.map.nodes.find(item => item.id === source.parentId)!.path)!.id : null;
         await this.repo.updateNote(created.path, { summary: note.summary, prompt: note.prompt, rules: note.rules, preview: note.preview, detail: note.detail, status: note.status, sourcePaths: note.sourcePaths.map(sourcePath => byOldPath.get(sourcePath)!.path) });
       }
-      map.viewport = { ...sample.map.viewport }; await this.repo.saveMap(path, map); await this.repo.rebuildDerivedData(); await this.saveSettings(); new Notice(t("ui.created_an_editable_copy_of_the_sample")); return path;
+      map.viewport = { ...sample.map.viewport }; await this.repo.saveMap(path, map); await this.repo.rebuildDerivedData(root); await this.saveSettings(); new Notice(t("ui.created_an_editable_copy_of_the_sample")); return path;
     } catch (error) {
-      const folder = this.app.vault.getAbstractFileByPath(root); if (folder) { try { await this.app.fileManager.trashFile(folder); } catch { /* Preserve the original duplicate failure. */ } }
+      if (createdRoot) {
+        const root = createdRoot.path;
+        try {
+          const current = this.app.vault.getAbstractFileByPath(root);
+          if (current && current !== createdRoot) throw new Error(t("ui.sample_cleanup_folder_changed"));
+          if (current) await this.app.fileManager.trashFile(createdRoot);
+        }
+        catch (cleanupError) {
+          const message = (value: unknown): string => value instanceof Error ? value.message : String(value);
+          throw new Error(t("ui.sample_cleanup_failed", message(error), root, message(cleanupError)), { cause: error });
+        }
+      }
       throw error;
     }
   }

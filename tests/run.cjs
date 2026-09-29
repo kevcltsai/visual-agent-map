@@ -375,7 +375,7 @@ integrationTest('node plus adds a child without opening a duplicate right-click 
   assert.deepEqual(details, [topic.id, topic.id, topic.id]);
   assert.equal(events.has('div:contextmenu'), false);
 });
-integrationTest('Next Step returns new expansion requests to the map and reviews existing proposals in place', async () => {
+integrationTest('Next Step reviews first expansion proposals in place and keeps existing proposal review', async () => {
   let closed = 0, expandCalls = 0, synthCalls = 0, created, saved, quickOptions, researchOptions, synthOptions; const notices = [];
   const element = (tag, options = {}) => ({
     tag, type: options.type, text: options.text, get textContent() { return this.text; }, value: options.value ?? options.text ?? '', cls: options.cls ?? '', children: [], style: {}, dataset: {}, disabled: false,
@@ -437,6 +437,28 @@ integrationTest('Next Step returns new expansion requests to the map and reviews
   proposalCheck.checked = true;
   button(expand, 'Create subtopics').click(); await tick();
   assert.equal(created[0].title, 'Transport'); assert.equal(closed, 0);
+  let firstCreated, firstAttempts = 0;
+  const firstFlow = new NextStepModal({}, 'Parent', 'normal', 0, 0, plugin, async () => {}, async (_options, _direction, found, failed) => {
+    firstAttempts++;
+    if (firstAttempts === 1) { failed('No useful proposals'); return; }
+    found([{ title: 'First idea', task: 'Explore it', contribution: '', parentTitle: '' }], async items => { firstCreated = items; });
+  }, async () => {});
+  firstFlow.onOpen(); find(firstFlow.contentEl, item => item.cls === 'vam-next-cards').children[1].click();
+  const firstPanel = all(firstFlow.contentEl, item => item.cls.includes('vam-next-research'))[1];
+  const firstRequirements = find(firstFlow.contentEl, item => item.tag === 'textarea'); firstRequirements.value = 'Keep this while retrying';
+  button(firstPanel, 'Get expansion directions').click(); await tick();
+  assert.equal(firstPanel.querySelector('.vam-next-status').text, 'No useful proposals');
+  assert.equal(firstRequirements.value, 'Keep this while retrying'); assert.equal(closed, 0);
+  button(firstPanel, 'Get expansion directions').click(); await tick();
+  assert.ok(find(firstPanel.querySelector('.vam-next-result'), item => item.text === 'AI subtopic proposals'));
+  const firstCheckbox = find(firstPanel.querySelector('.vam-next-result'), item => item.tag === 'input' && item.type === 'checkbox');
+  firstCheckbox.checked = false;
+  button(firstPanel, 'Create subtopics').click(); await tick();
+  assert.equal(firstCreated, undefined); assert.equal(firstPanel.querySelector('.vam-next-status').text, 'Select at least one subtopic.');
+  firstCheckbox.checked = true;
+  const firstName = find(firstPanel.querySelector('.vam-next-result'), item => item.tag === 'input' && item.type === 'text'); firstName.value = 'Edited idea';
+  button(firstPanel, 'Create subtopics').click(); await tick();
+  assert.equal(firstCreated[0].title, 'Edited idea'); assert.equal(closed, 0);
   const contentChoice = find(synthesize, item => item.tag === 'select' && item['aria-label'] === 'Topic synthesis content');
   assert.equal(contentChoice.value, 'full');
   assert.ok(find(synthesize, item => item.tag === 'li' && item.text === 'Child A'));
@@ -541,7 +563,9 @@ integrationTest('Next Step returns new expansion requests to the map and reviews
   button(guidedModal.contentEl, 'Get expansion directions').click(); await tick();
   assert.equal(closed, 5); assert.equal(guidedFinished, false);
   finishGuided(); await tick();
-  assert.equal(guidedFinished, true); assert.equal(button(guidedModal.contentEl, 'Create subtopics'), undefined);
+  assert.equal(guidedFinished, true); assert.ok(button(guidedModal.contentEl, 'Create subtopics'));
+  button(guidedModal.contentEl, 'Create subtopics').click(); await tick();
+  assert.equal(closed, 5);
   const settingsWrites = []; let researchAfterSave = false;
   const settingsModal = new NextStepModal({}, 'Parent', 'normal', 0, 0,
     { settings: { codexUsageNoticeSeen: true, models: 'model-a,model-b' }, aiReadyForModel: async model => { checkedModels.push(model); return true; }, confirmAiUsage: async (model, run) => { checkedModels.push(model); await run(); return true; }, saveSettings: async () => {} },
@@ -574,12 +598,12 @@ function fixture(language = 'zh-TW') {
     getAbstractFileByPath: p => files.get(p),
     getMarkdownFiles: () => Array.from(files.values()).filter(file => file instanceof TFile && file.extension === 'md'),
     read: async file => contents.get(file.path), cachedRead: async file => contents.get(file.path),
-    createFolder: async p => { const folder = new TFolder(p); files.set(p, folder); attach(folder); return folder; },
+    createFolder: async p => { if (files.has(p)) throw new Error(`Folder already exists: ${p}`); const folder = new TFolder(p); files.set(p, folder); attach(folder); return folder; },
     create: async (p, content) => { assert.equal(files.has(p), false); const file = new TFile(p); files.set(p, file); contents.set(p, content); attach(file); return file; },
     createBinary: async (p, content) => { assert.equal(files.has(p), false); const file = new TFile(p); files.set(p, file); contents.set(p, content); attach(file); return file; },
     process: async (file, change) => { contents.set(file.path, change(contents.get(file.path))); }
   }, metadataCache: { getFileCache: file => { const text = contents.get(file.path) || ''; return { frontmatter: text.includes('agent-map-node: true') ? { 'agent-map-node': true } : text.includes('visual-agent-map: true') ? { 'visual-agent-map': true } : {} }; }, getFirstLinkpathDest: link => Array.from(files.values()).find(file => file instanceof TFile && (file.basename === link || file.path.replace(/\.md$/, '') === link)) || null }, fileManager: { renameFile: async (item, target) => renameTree(item.path, target), trashFile: async () => {} } };
-  return { app, contents, repo: new Repository(app, { ...DEFAULT_SETTINGS, language }) };
+  return { app, contents, files, repo: new Repository(app, { ...DEFAULT_SETTINGS, language }) };
 }
 async function topicNote(repo, title = '題目', model = 'model-a', id = 'map-a') {
   const mapDoc = { id, title: id, version: 1, nodes: [], viewport: { x: 0, y: 0, zoom: 1 } };
@@ -1327,20 +1351,23 @@ integrationTest('quick exploration creates two levels directly and leaves them u
   assert.equal(reviewed, 0); assert.equal(completed, 1); assert.equal(researched, 0);
   for (const child of saved.nodes.slice(1)) assert.equal((await repo.readNote(child.path)).status, 'idea');
 });
-integrationTest('quick exploration with zero children per parent creates only the first level', async () => {
+integrationTest('quick exploration rejects zero for multiple levels and ignores unused single-level child count', async () => {
   const { repo, app } = fixture(), parent = await topicNote(repo, 'Parent', 'model-a');
   const mapPath = 'Agent Workspace/Topics/map-a/Map.md';
   const mapDoc = map([parent]); mapDoc.id = 'map-a';
   await app.vault.create(mapPath, core.serializeMap(mapDoc));
   let task = '';
-  const plugin = { repo, settings: { ...DEFAULT_SETTINGS, language: 'en' }, running: new Set(), pendingSuggestions: new Map(), pendingResearchOptions: new Map(), rebuildDerivedData: async () => {}, mutate: async work => work(), askModel: async context => {
+  const plugin = { recordFailure: (_label, error) => String(error), repo, settings: { ...DEFAULT_SETTINGS, language: 'en' }, running: new Set(), pendingSuggestions: new Map(), pendingResearchOptions: new Map(), rebuildDerivedData: async () => {}, mutate: async work => work(), askModel: async context => {
     task = context.task;
     return { summary: '', detail: '', visualReferences: [], suggestions: Array.from({ length: 10 }, (_, index) => ({ title: `Child ${index + 1}`, task: `Explore ${index + 1}`, contribution: '', parentTitle: '' })) };
   } };
   const { VisualAgentMapView } = load('main.ts', { obsidian });
   const view = new VisualAgentMapView({ app }, plugin); view.path = mapPath; view.map = mapDoc; view.contentEl = { querySelector: () => null }; view.render = () => {}; view.hydrate = async () => {}; view.focusNode = () => {};
   let completed = false;
-  await view.proposeChildren(parent, true, { researchMode: 'research', researchDepth: 'fast', visualMode: 'off', referenceGroups: [], multiLayer: true, layers: 2, firstLayerCount: 10, childrenPerParent: 0 }, '', () => assert.fail('quick map should not show review'), message => assert.fail(message), true, () => { completed = true; });
+  let failure = '';
+  await view.proposeChildren(parent, true, { multiLayer: true, layers: 2, firstLayerCount: 10, childrenPerParent: 0 }, '', () => assert.fail('invalid shape'), message => { failure = message; }, true);
+  assert.match(failure, /positive whole/); assert.equal(task, ''); assert.equal((await repo.readMap(mapPath)).nodes.length, 1);
+  await view.proposeChildren(parent, true, { researchMode: 'research', researchDepth: 'fast', visualMode: 'off', referenceGroups: [], multiLayer: true, layers: 1, firstLayerCount: 10, childrenPerParent: NaN }, '', () => assert.fail('quick map should not show review'), message => assert.fail(message), true, () => { completed = true; });
   const saved = await repo.readMap(mapPath);
   assert.equal(saved.nodes.length, 11);
   assert.ok(saved.nodes.slice(1).every(child => child.parentId === parent.id));
@@ -1435,6 +1462,7 @@ integrationTest('pending proposals use this run\'s shallow research choice and s
   let queued = 0, create, used;
   const { VisualAgentMapView } = load('main.ts', { obsidian });
   const view = new VisualAgentMapView({ app: {} }, plugin);
+  view.render = () => {};
   view.createChildBatch = async (_parent, _items, options) => { used = options; };
   const options = { researchMode: 'local', researchDepth: 'fast', visualMode: 'off', referenceGroups: [{ name: 'Reference map', documents: [{ path: 'map/topic.md', content: 'private source' }] }], multiLayer: false, shallowResearch: true };
   await view.proposeChildren({ id: 'parent', path: 'parent.md' }, true, options, '', (_items, confirm) => { create = confirm; }, message => assert.fail(message));
@@ -1451,7 +1479,7 @@ integrationTest('two views cannot create the same pending proposals twice', asyn
   const plugin = { pendingSuggestions: new Map([['parent.md', suggestions]]), pendingResearchOptions: new Map(), mutate(work) { const job = tail.then(work); tail = job.catch(() => {}); return job; } };
   const { VisualAgentMapView } = load('main.ts', { obsidian });
   const first = new VisualAgentMapView({ app: {} }, plugin), second = new VisualAgentMapView({ app: {} }, plugin);
-  for (const view of [first, second]) view.createChildBatch = async () => { created++; };
+  for (const view of [first, second]) { view.render = () => {}; view.createChildBatch = async () => { created++; }; }
   let acceptFirst, acceptSecond;
   await first.proposeChildren({ id: 'parent', path: 'parent.md' }, true, undefined, '', (_items, accept) => { acceptFirst = accept; });
   await second.proposeChildren({ id: 'parent', path: 'parent.md' }, true, undefined, '', (_items, accept) => { acceptSecond = accept; });
@@ -1651,7 +1679,7 @@ integrationTest('English expansion uses English-generated task instructions', as
   await app.vault.create(mapPath, core.serializeMap(mapDoc, 'en'));
   const { VisualAgentMapView } = load('main.ts', { obsidian });
   let task = '';
-  const plugin = { repo, settings: { ...DEFAULT_SETTINGS, language: 'en' }, running: new Set(), pendingSuggestions: new Map(), askModel: async context => { task = context.task; return { summary: '', detail: '', visualReferences: [], suggestions: Array.from({ length: 3 }, (_, index) => ({ title: `Idea ${index}`, task: 'Research', contribution: '' })) }; } };
+  const plugin = { recordFailure: (_label, error) => String(error), repo, settings: { ...DEFAULT_SETTINGS, language: 'en' }, running: new Set(), pendingSuggestions: new Map(), askModel: async context => { task = context.task; return { summary: '', detail: '', visualReferences: [], suggestions: Array.from({ length: 3 }, (_, index) => ({ title: `Idea ${index}`, task: 'Research', contribution: '' })) }; } };
   const view = new VisualAgentMapView({ app }, plugin); view.path = mapPath; view.map = mapDoc; view.render = () => {}; view.hydrate = async () => {}; view.openChildSuggestions = () => {}; view.ancestorContext = async () => '';
   await view.proposeChildren(parent, true);
   assert.match(task, /Existing direct subtopics/);
@@ -1692,6 +1720,88 @@ integrationTest('duplicating the built-in sample creates an independent editable
   assert.equal(synthesis.status, 'completed'); assert.equal(synthesis.sourcePaths.length, 6);
   assert.ok(synthesis.sourcePaths.every(source => source.startsWith('Agent Workspace/Topics/')));
   assert.ok(app.vault.getAbstractFileByPath('Agent Workspace/Topics/Sample Planning a Taiwan Journey/Attachments/east-coast-landscape.webp'));
+});
+integrationTest('failed Sample duplication removes only its new map and reports cleanup failures', async () => {
+  const { repo, app, files, contents } = fixture();
+  const existingPath = await repo.createMap('Sample Planning a Taiwan Journey');
+  const existingMap = contents.get(existingPath);
+  const { default: Plugin } = load('main.ts', { obsidian });
+  const plugin = new Plugin(); plugin.app = app; plugin.repo = repo; plugin.settings = { ...DEFAULT_SETTINGS }; plugin.saveSettings = async () => {};
+  const trashFile = async folder => {
+    for (const [path, item] of Array.from(files.entries())) if (path === folder.path || path.startsWith(`${folder.path}/`)) { files.delete(path); contents.delete(path); item.parent?.children && (item.parent.children = item.parent.children.filter(child => child !== item)); }
+  };
+  app.fileManager.trashFile = trashFile;
+  const createBinary = app.vault.createBinary;
+  app.vault.createBinary = async () => { throw new Error('injected attachment failure'); };
+  await assert.rejects(plugin.duplicateBuiltInSample(), /injected attachment failure/);
+  app.vault.createBinary = createBinary;
+  assert.equal(contents.get(existingPath), existingMap);
+  assert.ok(app.vault.getAbstractFileByPath(existingPath));
+  assert.equal(!!app.vault.getAbstractFileByPath('Agent Workspace/Topics/Sample Planning a Taiwan Journey 2'), false);
+
+  const cleanupFailure = new Error('injected cleanup failure');
+  app.fileManager.trashFile = async () => { throw cleanupFailure; };
+  app.vault.createBinary = async () => { throw new Error('injected second attachment failure'); };
+  await assert.rejects(plugin.duplicateBuiltInSample(), /cleanup failed for Agent Workspace\/Topics\/Sample Planning a Taiwan Journey 2: Error: injected cleanup failure/);
+});
+
+integrationTest('Sample rollback covers creation failures and never adopts a colliding or replaced folder', async () => {
+  const { default: Plugin } = load('main.ts', { obsidian });
+  for (const stage of ['root-collision', 'child-folder', 'map-file', 'read-map', 'note-create', 'note-update', 'save-map', 'rebuild', 'settings', 'replacement']) {
+    const { repo, app, files, contents } = fixture('en');
+    const oldPath = await repo.createMap('Existing');
+    const oldMap = await repo.readMap(oldPath);
+    const oldNode = await repo.createNote('Existing note', 'model', oldMap, oldPath, 'workspace');
+    const before = new Map(contents);
+    const plugin = new Plugin(); Object.assign(plugin, { app, repo, settings: { ...DEFAULT_SETTINGS }, saveSettings: async () => {} });
+    const root = 'Agent Workspace/Topics/Sample Planning a Taiwan Journey';
+    const trashed = [];
+    app.fileManager.trashFile = async folder => { trashed.push(folder.path); for (const key of [...files.keys()]) if (key === folder.path || key.startsWith(folder.path + '/')) { files.delete(key); contents.delete(key); } };
+    const fail = () => { throw new Error('injected ' + stage); };
+    const createFolder = app.vault.createFolder;
+    if (stage === 'root-collision') app.vault.createFolder = async path => { if (path === root) { await createFolder(path); fail(); } return createFolder(path); };
+    if (stage === 'child-folder') app.vault.createFolder = async path => { if (path === root + '/Unassigned') fail(); return createFolder(path); };
+    const create = app.vault.create;
+    if (stage === 'map-file') app.vault.create = async (path, data) => { if (path === root + '/Map.md') fail(); return create(path, data); };
+    if (stage === 'read-map') repo.readMap = fail;
+    if (stage === 'note-create') repo.createNote = fail;
+    if (stage === 'note-update') repo.updateNote = fail;
+    if (stage === 'save-map') repo.saveMap = fail;
+    if (stage === 'rebuild') repo.rebuildDerivedData = fail;
+    if (stage === 'settings') plugin.saveSettings = fail;
+    if (stage === 'replacement') app.vault.createBinary = async () => { files.set(root, new TFolder(root)); fail(); };
+    await assert.rejects(plugin.duplicateBuiltInSample(), /injected/);
+    const preserved = stage === 'root-collision' || stage === 'replacement';
+    assert.equal(!!files.get(root), preserved, stage);
+    assert.deepEqual(trashed, preserved ? [] : [root], stage);
+    for (const [path, content] of before) assert.equal(contents.get(path), content, stage + ': ' + path);
+    assert.ok(files.get(oldNode.path));
+  }
+});
+
+integrationTest('guided proposals support zero, one, two and seven, saving selected edits and rejecting a switched map', async () => {
+  const { VisualAgentMapView } = load('main.ts', { obsidian });
+  for (const count of [0, 1, 2, 7]) {
+    const { repo, app } = fixture('en');
+    const path = await repo.createMap('Guided'), doc = await repo.readMap(path);
+    const parent = await repo.createNote('Parent', 'model-a', doc, path, 'workspace'); doc.nodes.push(parent); await repo.saveMap(path, doc);
+    const plugin = { repo, settings: { ...DEFAULT_SETTINGS }, running: new Set(), pendingSuggestions: new Map(), pendingResearchOptions: new Map(), mutate: async work => work(), rebuildDerivedData: async () => {}, askModel: async () => ({ summary: '', detail: 'No useful split', suggestions: Array.from({length: count}, (_, i) => ({title: 'Child ' + i, task: 'Explore', contribution: ''})) }) };
+    const view = new VisualAgentMapView({app}, plugin); Object.assign(view, {path, map: doc, contentEl: {querySelector: () => null}, render() {}, async hydrate() {}, focusNode() {}});
+    let offered, confirm, failure, renderedPending;
+    view.render = () => { renderedPending = plugin.pendingSuggestions.size; };
+    await view.proposeChildren(parent, true, {}, '', (items, create) => { offered = items; confirm = create; }, message => { failure = message; });
+    assert.equal((await repo.readMap(path)).nodes.length, 1);
+    if (!count) { assert.equal(failure, 'No useful split'); continue; }
+    assert.equal(offered.length, count);
+    view.map = { ...doc, id: 'other', nodes: [] }; view.path = 'Other/Map.md';
+    await assert.rejects(confirm(offered), /changed/);
+    assert.equal((await repo.readMap(path)).nodes.length, 1);
+    view.map = doc; view.path = path;
+    await confirm([{...offered[0], title: 'Edited choice'}]);
+    const reopened = await repo.readMap(path); assert.equal(reopened.nodes.length, 2);
+    assert.equal((await repo.readNote(reopened.nodes[1].path)).title, 'Edited choice');
+    assert.equal(plugin.pendingSuggestions.size, 0); assert.equal(renderedPending, 0);
+  }
 });
 test('first-use map view waits for async initialization and opens the official Sample once', async () => {
   const { VisualAgentMapView } = load('main.ts', { obsidian });
@@ -2527,6 +2637,17 @@ test('reference picker keeps source groups compact, collapsible and task-local',
   remove.listeners.click({ preventDefault() {} });
   assert.equal((await picker.ready()).groups.length, 0);
   assert.ok(find(area, child => child.cls.includes('vam-reference-cancel')).cls.includes('is-hidden'));
+  const input = (path, content) => ({name: path.split('/').at(-1), webkitRelativePath: path, text: async () => content});
+  const archived = input('Vault/Topic/Archive/old.md', '---\nagent-map-node: true\ntopic-state: archived\n---\nOld');
+  const ordinary = input('Vault/Archive/ordinary.md', 'Ordinary archive');
+  const active = input('Archive/Topics/Archive/Notes/active.md', '---\nagent-map-node: true\ntopic-state: active\n---\nCurrent');
+  picker.addFolder([archived, ordinary, active]);
+  let chosen = await picker.ready();
+  assert.deepEqual(plain(chosen.groups.flatMap(group => group.documents).map(doc => doc.path)), [ordinary.webkitRelativePath, active.webkitRelativePath]);
+  assert.ok(find(area, child => child.text.includes('Excluded 1')));
+  picker.addFiles([archived]); chosen = await picker.ready();
+  assert.equal(chosen.groups.flatMap(group => group.documents).length, 3);
+  assert.ok(chosen.groups.flatMap(group => group.documents).some(doc => doc.content.endsWith('Old')));
 });
 
 integrationTest('Markdown reader accepts only Markdown and reads the full file without changing it', async () => {

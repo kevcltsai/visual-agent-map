@@ -42,7 +42,7 @@ Create a map → add topics or ask AI for suggestions → research a node → re
 
 Search for **Visual Agent Map** in **Obsidian → Settings → Community plugins → Browse**, then install and enable it.
 
-**Version 0.9.10 · Obsidian Desktop 1.13.7+**. Manual maps work without AI. For AI tasks, install [Codex CLI](https://developers.openai.com/codex/cli/), sign in with ChatGPT, and check its status in VAM settings. [Claude Code](https://docs.anthropic.com/en/docs/claude-code/overview) is also available as an experimental alternative with its own account.
+**Development candidate 0.10.0 · Obsidian Desktop 1.13.7+**. The current public release is 0.9.10; this candidate has not been released. Manual maps work without AI. For AI tasks, install [Codex CLI](https://developers.openai.com/codex/cli/), sign in with ChatGPT, and check its status in VAM settings. [Claude Code](https://docs.anthropic.com/en/docs/claude-code/overview) is also available as an experimental alternative with its own account.
 
 **Manual install:** Download `main.js`, `manifest.json`, and `styles.css` from the same [GitHub Release](https://github.com/kevcltsai/visual-agent-map/releases/latest). Place them in `<your-vault>/.obsidian/plugins/visual-agent-map/`, preserve existing `data.json`, then reload Obsidian and enable VAM. Use release files, not a repository checkout. Setup help: [INSTALL.md](INSTALL.md).
 
@@ -116,7 +116,7 @@ Copyright © 2026 Kevin Tsai · [AGPL-3.0-only](LICENSE) · [Changelog](CHANGELO
 
 在 **Obsidian → 設定 → 第三方外掛 → 瀏覽** 搜尋 **Visual Agent Map**，安裝並啟用。
 
-**版本 0.9.10 · Obsidian 桌面版 1.13.7+**。手動建立地圖不需要 AI；執行 AI 任務前，請安裝 [Codex CLI](https://developers.openai.com/codex/cli/)、以 ChatGPT 登入，並在 VAM 設定確認狀態。也可使用實驗性支援的 [Claude Code](https://docs.anthropic.com/en/docs/claude-code/overview)，須登入對應帳號。
+**開發候選版 0.10.0 · Obsidian 桌面版 1.13.7+**。目前公開正式版為 0.9.10；此候選版尚未發布。手動建立地圖不需要 AI；執行 AI 任務前，請安裝 [Codex CLI](https://developers.openai.com/codex/cli/)、以 ChatGPT 登入，並在 VAM 設定確認狀態。也可使用實驗性支援的 [Claude Code](https://docs.anthropic.com/en/docs/claude-code/overview)，須登入對應帳號。
 
 **手動安裝：** 從同一個 [GitHub Release](https://github.com/kevcltsai/visual-agent-map/releases/latest) 下載 `main.js`、`manifest.json`、`styles.css`，放入 `<你的-vault>/.obsidian/plugins/visual-agent-map/`，保留既有 `data.json`，再重新載入 Obsidian 並啟用。請使用正式發布檔案，勿直接複製 repository。設定指南：[INSTALL.md](INSTALL.md)。
 

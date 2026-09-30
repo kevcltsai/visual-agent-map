@@ -1,6 +1,6 @@
 # Changelog
 
-## [0.10.0] - 2026-09-30 (candidate; not yet released)
+## [0.10.0] - 2026-10-01
 
 ### Added
 

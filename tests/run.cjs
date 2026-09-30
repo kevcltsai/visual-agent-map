@@ -330,8 +330,8 @@ test('debug log command opens the custom modal and exposes copy and clear action
 });
 class TFolder { constructor(path) { this.path = path; this.name = path.split('/').at(-1); this.children = []; this.parent = null; } }
 class TFile { constructor(path) { this.path = path; this.name = path.split('/').at(-1); this.basename = this.name.replace(/\.md$/, ''); this.extension = this.name.includes('.') ? this.name.split('.').at(-1) : ''; this.parent = null; this.stat = { mtime: Date.now() }; } }
-const obsidian = {
-  TFile, TFolder, App: class {}, Plugin: class {}, ItemView: class { constructor(leaf) { this.app = leaf.app; } }, PluginSettingTab: class {}, Modal: class {}, Notice: class {}, FileSystemAdapter: class { getBasePath() { return '/vault'; } },
+const obsidian = { setIcon: (parent, name) => { parent.iconName = name; }, Menu: class { addItem(callback) { callback({ setTitle() { return this; }, setWarning() { return this; }, onClick() { return this; } }); return this; } showAtMouseEvent() { return this; } },
+  TFile, TFolder, App: class {}, Plugin: class {}, ItemView: class { constructor(leaf) { this.app = leaf.app; } async setState() {} }, PluginSettingTab: class {}, Modal: class {}, Notice: class {}, FileSystemAdapter: class { getBasePath() { return '/vault'; } },
   normalizePath: value => value.replace(/\/+/g, '/').replace(/^\//, ''),
   parseYaml: text => Object.fromEntries(text.trim().split('\n').filter(Boolean).map(line => { const index = line.indexOf(':'); const raw = line.slice(index + 1).trim(); let value; try { value = JSON.parse(raw); } catch { value = raw; } return [line.slice(0, index), value]; })),
   stringifyYaml: obj => Object.entries(obj).map(([key, value]) => `${key}: ${JSON.stringify(value)}`).join('\n') + '\n'
@@ -601,7 +601,15 @@ function fixture(language = 'zh-TW') {
     createFolder: async p => { if (files.has(p)) throw new Error(`Folder already exists: ${p}`); const folder = new TFolder(p); files.set(p, folder); attach(folder); return folder; },
     create: async (p, content) => { assert.equal(files.has(p), false); const file = new TFile(p); files.set(p, file); contents.set(p, content); attach(file); return file; },
     createBinary: async (p, content) => { assert.equal(files.has(p), false); const file = new TFile(p); files.set(p, file); contents.set(p, content); attach(file); return file; },
-    process: async (file, change) => { contents.set(file.path, change(contents.get(file.path))); }
+    process: async (file, change) => { contents.set(file.path, change(contents.get(file.path))); },
+    adapter: {
+      exists: async p => files.has(p),
+      mkdir: async p => { if (files.has(p)) throw new Error(`Folder already exists: ${p}`); const folder = new TFolder(p); files.set(p, folder); attach(folder); },
+      list: async p => ({ files: [...files.values()].filter(file => file instanceof TFile && file.parent?.path === p).map(file => file.path), folders: [...files.values()].filter(file => file instanceof TFolder && file.parent?.path === p).map(file => file.path) }),
+      read: async p => { if (!contents.has(p)) throw new Error(`Missing file: ${p}`); return contents.get(p); },
+      write: async (p, value) => { if (!files.has(p)) { const file = new TFile(p); files.set(p, file); attach(file); } contents.set(p, value); },
+      process: async (p, change) => { if (!contents.has(p)) throw new Error(`Missing file: ${p}`); const next = change(contents.get(p)); contents.set(p, next); return next; }
+    }
   }, metadataCache: { getFileCache: file => { const text = contents.get(file.path) || ''; return { frontmatter: text.includes('agent-map-node: true') ? { 'agent-map-node': true } : text.includes('visual-agent-map: true') ? { 'visual-agent-map': true } : {} }; }, getFirstLinkpathDest: link => Array.from(files.values()).find(file => file instanceof TFile && (file.basename === link || file.path.replace(/\.md$/, '') === link)) || null }, fileManager: { renameFile: async (item, target) => renameTree(item.path, target), trashFile: async () => {} } };
   return { app, contents, files, repo: new Repository(app, { ...DEFAULT_SETTINGS, language }) };
 }
@@ -2007,6 +2015,7 @@ integrationTest('Codex App Server uses model/list, selected reasoning and fresh 
       const threadId = message.params.threadId, summary = threadId === 'thread-1' ? 'first' : 'second';
       process.nextTick(() => {
         child.stdout.emit('data', Buffer.from(`${JSON.stringify({ id: message.id, result: { turn: { id: `turn-${turnCount}` } } })}\n`));
+        child.stdout.emit('data', Buffer.from(`${JSON.stringify({ method: 'item/completed', params: { threadId, turnId: `turn-${turnCount}`, item: { type: 'agentMessage', text: 'Progress commentary' } } })}\n`));
         child.stdout.emit('data', Buffer.from(`${JSON.stringify({ method: 'item/completed', params: { threadId, turnId: `turn-${turnCount}`, item: { type: 'agentMessage', text: JSON.stringify({ summary, detail: 'detail', suggestions: [], visualReferences: [] }) } } })}\n`));
         child.stdout.emit('data', Buffer.from(`${JSON.stringify({ method: 'turn/completed', params: { threadId, turn: { status: 'completed' } } })}\n`));
       });
@@ -2028,6 +2037,30 @@ integrationTest('Codex App Server uses model/list, selected reasoning and fresh 
   assert.equal(plugin.settings.models, 'visible-model');
   assert.equal(result.summary, 'first');
   assert.equal(second.summary, 'second');
+});
+integrationTest('Codex App Server accepts a plain-text turn without changing structured VAM turns', async () => {
+  const { EventEmitter } = require('node:events'); const sent = []; let steer;
+  const child = new EventEmitter(); child.stdout = new EventEmitter(); child.stderr = new EventEmitter(); child.kill = () => {};
+  const emit = message => process.nextTick(() => child.stdout.emit('data', Buffer.from(`${JSON.stringify(message)}\n`)));
+  child.stdin = { write: line => {
+    const message = JSON.parse(line.trim()); sent.push(message);
+    if (message.method === 'initialize') emit({ id: message.id, result: {} });
+    else if (message.method === 'thread/start') emit({ id: message.id, result: { thread: { id: 'plain-thread' } } });
+    else if (message.method === 'turn/start') {
+      assert.equal(Object.hasOwn(message.params, 'outputSchema'), false);
+      emit({ id: message.id, result: { turn: { id: 'plain-turn' } } });
+      emit({ method: 'item/agentMessage/delta', params: { threadId: 'plain-thread', itemId: 'agent-1', delta: '# Full' } });
+      emit({ method: 'item/agentMessage/delta', params: { threadId: 'plain-thread', itemId: 'agent-1', delta: ' conversation' } });
+    } else if (message.method === 'turn/steer') {
+      assert.match(message.params.input[0].text, /include parent question/); emit({ id: message.id, result: {} });
+      emit({ method: 'item/completed', params: { threadId: 'plain-thread', item: { id: 'agent-1', type: 'agentMessage', text: '# Full conversation' } } });
+      emit({ method: 'turn/completed', params: { threadId: 'plain-thread', turn: { status: 'completed' } } });
+    } else if (message.method === 'thread/unsubscribe') emit({ id: message.id, result: {} });
+  } };
+  const { CodexAppServerRuntime } = load('ai/runtime/codex-app-server.ts', { 'node:child_process': { spawn: () => child } });
+  const runtime = new CodexAppServerRuntime({ executable: 'codex', cwd: '/plugin', env: {}, clientVersion: 'test' });
+  try { const chunks = []; const running = runtime.runTask('coffee', 'model', 'high', undefined, { onText: text => chunks.push(text), onSteer: handler => { steer = handler; } }); await until(() => !!steer); await steer('include parent question'); assert.equal(await running, '# Full conversation'); assert.deepEqual(chunks, ['# Full', '# Full conversation', '# Full conversation']); }
+  finally { runtime.stop(); }
 });
 integrationTest('AI exchange logging captures the sent payload, raw reply and parse failure', async () => {
   const { default: Plugin } = load('main.ts', { obsidian });
@@ -2242,6 +2275,25 @@ test('Claude CLI uses the local structured-output interface with tools restricte
   assert.throws(() => claudeStructuredOutput('not-json'));
   assert.throws(() => claudeStructuredOutput(JSON.stringify({ ...result, structured_output: undefined })), /structured result/);
   assert.throws(() => claudeStructuredOutput(JSON.stringify({ ...result, subtype: 'error_max_turns', is_error: true, errors: ['turn limit'] })), /turn limit/);
+  const textResult = { type: 'result', subtype: 'success', is_error: false, result: '# Complete Markdown table' };
+  assert.equal(claudeStructuredOutput(JSON.stringify(textResult), true), '# Complete Markdown table');
+  assert.ok(!claudeTaskArgs('sonnet', 'high', undefined, false).includes('--json-schema'));
+});
+integrationTest('Claude stream-json keeps one request open for live guest interventions', async () => {
+  const { EventEmitter } = require('node:events'); let args, handler, child; const input = [], chunks = [];
+  const result = { type: 'result', subtype: 'success', is_error: false, result: 'Hello there' };
+  const spawn = (_executable, received) => {
+    args = received; child = new EventEmitter(); child.stdout = new EventEmitter(); child.stderr = new EventEmitter(); child.kill = () => true;
+    child.stdin = { write: line => { const message = JSON.parse(line); input.push(message); if (input.length === 1) process.nextTick(() => child.stdout.emit('data', Buffer.from(`${JSON.stringify({ type: 'stream_event', event: { delta: { type: 'text_delta', text: 'Hello' } } })}\n`))); else process.nextTick(() => { child.stdout.emit('data', Buffer.from(`${JSON.stringify({ type: 'stream_event', event: { delta: { type: 'text_delta', text: ' there' } } })}\n${JSON.stringify(result)}\n`)); }); return true; }, end: () => process.nextTick(() => child.emit('close', 0)) };
+    return child;
+  };
+  const { ClaudeCodeCliRuntime } = load('ai/runtime/claude-code-cli.ts', { 'node:child_process': { spawn } });
+  const runtime = new ClaudeCodeCliRuntime({ executable: 'claude', cwd: '/plugin', env: {}, spawn });
+  const task = runtime.runTask('initial prompt', 'sonnet', 'low', undefined, { onText: text => chunks.push(text), onSteer: steer => { handler = steer; } });
+  await until(() => !!handler); await handler('Ask Lin to explain the cost'); assert.equal(await task, 'Hello there');
+  assert.ok(args.includes('--input-format') && args[args.indexOf('--input-format') + 1] === 'stream-json');
+  assert.deepEqual(input.map(item => item.message.content[0].text), ['initial prompt', 'Ask Lin to explain the cost']);
+  assert.deepEqual(chunks, ['Hello', 'Hello there']);
 });
 
 test('Claude cancellation rejects immediately and terminates only its own process', async () => {
@@ -2292,6 +2344,15 @@ test('VAM notes hide properties in reading and live preview without removing fro
   assert.match(styles, /body \.workspace-leaf-content\.vam-topic-markdown \.markdown-source-view\.mod-cm6 \.metadata-container \{ display: none; \}/);
   assert.doesNotMatch(styles, /\.markdown-preview-view\.vam-topic-markdown \.metadata-container/);
   assert.doesNotMatch(styles, /!important/);
+});
+
+test('Coffee Tables room switches conversation and insights by pane width', () => {
+  const styles = fs.readFileSync(path.join(root, 'styles.css'), 'utf8');
+  const responsive = styles.slice(styles.indexOf('@container (max-width: 899px)'));
+  assert.match(responsive, /\.ct-room-columns\s*\{\s*flex-direction:\s*column/);
+  assert.match(responsive, /\.ct-pane-tabs\s*\{[^}]*display:\s*flex/);
+  assert.match(responsive, /\.ct-room-columns\[data-pane="chat"\].*\.ct-insight-panel/);
+  assert.doesNotMatch(styles.match(/@media\s*\(max-width:\s*900px\)\s*\{([^}]*(?:\}[^}]*)?)\}/s)?.[1] ?? '', /\.ct-room-columns/);
 });
 
 integrationTest('legacy User Notes move to preview without losing either section or duplicating on save', async () => {
@@ -2431,13 +2492,14 @@ test('language change saves before applying and refreshes all views without muta
     { refreshFromPlugin: async () => { calls.push(['view-a', plugin.settings.language]); throw new Error('test view error'); } },
     { refreshFromPlugin: async () => calls.push(['view-b', plugin.settings.language]) }
   ];
+  plugin.coffeeViews = () => [{ refreshForLanguageChange: async () => calls.push(['coffee-a', plugin.settings.language]) }, { refreshForLanguageChange: async () => calls.push(['coffee-b', plugin.settings.language]) }];
   plugin.refreshLocalizedEntrypoints = () => calls.push(['commands', plugin.settings.language]);
   plugin.recordFailure = (...args) => calls.push(['diagnostic', ...args]);
   plugin.settingTab = { update() {}, refreshAfterLanguageChange: () => calls.push(['settings', plugin.settings.language, plugin.languageSwitchPending]) };
   const tab = new VisualAgentMapSettingTab({}, plugin);
   await tab.setControlValue('language', 'zh-TW');
   assert.equal(plugin.settings.language, 'zh-TW');
-  assert.deepEqual(calls.filter(([kind]) => ['save', 'commands', 'view-a', 'view-b'].includes(kind)), [['save', 'zh-TW', 'en'], ['commands', 'zh-TW'], ['view-a', 'zh-TW'], ['view-b', 'zh-TW']]);
+  assert.deepEqual(calls.filter(([kind]) => ['save', 'commands', 'view-a', 'view-b', 'coffee-a', 'coffee-b'].includes(kind)), [['save', 'zh-TW', 'en'], ['commands', 'zh-TW'], ['view-a', 'zh-TW'], ['view-b', 'zh-TW'], ['coffee-a', 'zh-TW'], ['coffee-b', 'zh-TW']]);
   assert.equal(plugin.settings, sharedSettings);
   assert.equal(plugin.repo.settings.language, 'zh-TW', 'repository keeps the shared settings object updated');
   assert.equal(calls.filter(([kind]) => kind === 'diagnostic').length, 1);
@@ -2712,4 +2774,464 @@ integrationTest('Codex launch preserves executable as one argument and refuses p
     assert.deepEqual(sent.find(message => message.id === 'server-2').result, { permissions: {} });
     assert.equal(sent.find(message => message.id === 'server-3').error.code, -32601);
   } finally { runtime.stop(); }
+});
+
+// Coffee Tables uses one plain-text generation, then one request per follow-up.
+const coffeeTypes = load('experiences/coffee-tables/types.ts');
+const coffee = load('experiences/coffee-tables/engine.ts');
+const coffeePrompts = load('experiences/coffee-tables/prompts.ts');
+const coffeeSession = () => coffeeTypes.createSession('學生免費的營養午餐是否應該開放讓家長加價', 'test-model', 'high', 'zh-TW');
+const coffeeTableList = load('experiences/coffee-tables/list.ts');
+const coffeeTopics = load('experiences/coffee-tables/topics.ts');
+test('Coffee Tables inspiration topics are bilingual, deterministic in tests and avoid immediate repeats', () => {
+  assert.equal(coffeeTopics.COFFEE_TOPICS.length, 20);
+  assert.ok(coffeeTopics.COFFEE_TOPICS.every(item => item.zh.length > 8 && item.en.length > 8));
+  assert.equal(new Set(coffeeTopics.COFFEE_TOPICS.map(item => item.id)).size, 20);
+  assert.equal(coffeeTopics.coffeeTopicText('school-lunch', 'en'), coffeeTopics.COFFEE_TOPICS[6].en);
+  assert.equal(coffeeTopics.coffeeTopicText('school-lunch', 'zh-TW'), coffeeTopics.COFFEE_TOPICS[6].zh);
+  assert.equal(coffeeTopics.pickCoffeeTopic('zh-TW', '', () => 0), coffeeTopics.COFFEE_TOPICS[0].zh);
+  assert.equal(coffeeTopics.pickCoffeeTopic('zh-TW', coffeeTopics.COFFEE_TOPICS[0].zh, () => 0), coffeeTopics.COFFEE_TOPICS[1].zh);
+  assert.equal(coffeeTopics.pickCoffeeTopic('en', '', () => 0), coffeeTopics.COFFEE_TOPICS[0].en);
+});
+test('Coffee Tables roster shows configured role placeholders and replaces introduced guests as text arrives', () => {
+  const { rosterFor, liveRosterFor } = load('experiences/coffee-tables/view.ts', { obsidian }); const session = coffeeSession();
+  const roster = rosterFor(session, '- **林岑｜主持人**：擅長追問。\n- **許雯｜主題專家**：研究勞動。');
+  assert.equal(roster.length, 10); assert.deepEqual(Array.from(roster.slice(0, 2), person => person.name), ['林岑', '許雯']);
+  assert.equal(roster.filter(person => person.role === '即將登場').length, 8);
+  session.rounds = [{ id: 'round-1', markdown: '- **林岑｜主持人**：擅長追問。\n- **許雯｜主題專家**：研究勞動。', notes: '', status: 'completed', createdAt: '2026-01-01T00:00:00.000Z' }];
+  const whileContinuing = liveRosterFor(session, '- **柏翰｜主題專家**：研究組織行為。\n\n### 柏翰｜主題專家\n接續發言。');
+  assert.deepEqual(Array.from(whileContinuing.slice(0, 2), person => person.name), ['林岑', '許雯']);
+  assert.equal(whileContinuing.find(person => person.name === '柏翰')?.role, '主題專家');
+  assert.equal(whileContinuing.length, 10);
+});
+test('Coffee Tables recent-first list filters states, searches exact topics and sorts by meaningful activity', () => {
+  const now = Date.parse('2026-09-30T00:00:00.000Z'), item = (id, topic, status, updatedAt, extra = {}) => ({ id, path: `${id}.md`, topic, status, createdAt: '2026-09-01T00:00:00.000Z', updatedAt, model: 'm', ...extra });
+  const entries = [item('older','Shared','completed','2026-09-29T23:00:00.000Z',{lastCompletedAt:'2026-09-02T00:00:00.000Z'}), item('running','Shared','generating','2026-09-20T00:00:00.000Z',{lastGenerationStartedAt:'2026-09-29T23:30:00.000Z'}), item('draft','unfinished','error','2026-09-28T00:00:00.000Z'), item('recent','recent','completed','2026-09-10T00:00:00.000Z',{lastCompletedAt:'2026-09-29T23:45:00.000Z'}), item('past','past','completed','2026-09-29T00:00:00.000Z',{lastCompletedAt:'2026-09-22T00:00:00.000Z'})];
+  assert.deepEqual(coffeeTableList.selectTables(entries).map(row => row.id), ['recent','running','draft','past','older']);
+  assert.deepEqual(coffeeTableList.selectTables(entries, 'SHARED').map(row => row.id), ['running','older']);
+  assert.deepEqual(coffeeTableList.selectTables(entries, '', 'unfinished').map(row => row.id), ['draft']);
+  assert.deepEqual(coffeeTableList.selectTables(entries, '', 'completed', ' Shared ').map(row => row.id), ['older']);
+  assert.equal(coffeeTableList.topicTableCount('Shared', entries), 2); assert.equal(coffeeTableList.topicTableCount('shared', entries), 0);
+  assert.equal(coffeeTableList.tableTime(entries[2]).isFallback, true); assert.equal(coffeeTableList.tableTime(entries[1]).value, Date.parse('2026-09-29T23:30:00.000Z'));
+  assert.equal(coffeeTableList.effectiveTableStatus({ status: 'completed', questions: [{ status: 'pending' }], rounds: [] }, true), 'generating'); assert.equal(coffeeTableList.effectiveTableStatus({ status: 'completed', questions: [{ status: 'error' }], rounds: [] }), 'error'); assert.equal(coffeeTableList.effectiveTableStatus({ status: 'generating', questions: [], rounds: [] }), 'error'); assert.deepEqual(coffeeTableList.selectTables([], '').map(row => row.id), []);
+});
+test('Coffee Tables list timestamps stay compact while retaining clear day and year context', () => {
+  const now = new Date(2026, 8, 30, 16, 0).getTime();
+  assert.match(coffeeTableList.formatTableTime(new Date(2026, 8, 30, 14, 30).getTime(), now, 'zh-TW'), /^今天/);
+  assert.match(coffeeTableList.formatTableTime(new Date(2026, 8, 29, 14, 30).getTime(), now, 'en'), /^Yesterday/);
+  assert.doesNotMatch(coffeeTableList.formatTableTime(new Date(2026, 8, 20, 14, 30).getTime(), now, 'zh-TW'), /2026/);
+  assert.match(coffeeTableList.formatTableTime(new Date(2025, 8, 20, 14, 30).getTime(), now, 'en'), /2025/);
+});
+const deferred = () => { let resolve; const promise = new Promise(r => { resolve = r; }); return { promise, resolve }; };
+const until = async predicate => { for (let i = 0; i < 100; i++) { if (predicate()) return; await new Promise(r => setImmediate(r)); } throw new Error('condition not reached'); };
+test('Coffee Tables prompt keeps the owner’s role topology and conversational intent in one plain-text request', () => {
+  const prompt = coffeePrompts.tablePrompt('Topic', 'zh-TW');
+  assert.match(prompt, /使用者原始主題[\s\S]*\nTopic\n/); assert.match(prompt, /2 位風格不同的主持人/); assert.match(prompt, /觀察者/); assert.equal((prompt.match(/- 主題專家/g) ?? []).length, 4);
+  assert.match(prompt, /跨領域專家/); assert.match(prompt, /generalist/); assert.match(prompt, /虛構模擬/); assert.match(prompt, /完整保留，不另取聊天室標題/);
+  assert.match(prompt, /10–18 次簡短發言/); assert.match(prompt, /# 觀察者整理/); assert.match(prompt, /每個標題下 2–4 個條列/); assert.match(prompt, /## 意外連結[\s\S]*## 值得繼續想的問題[\s\S]*## 核心分歧[\s\S]*## 探索方向[\s\S]*## 值得查證的假設/); assert.match(prompt, /修正假設/); assert.match(prompt, /尚未解決的核心分歧/); assert.match(prompt, /coffee-tables-complete/);
+  const resumed = coffeePrompts.tablePrompt('Topic', 'zh-TW', undefined, '### 林岑｜主持人\n先前中斷的話');
+  assert.match(resumed, /不要輸出工作流程、計畫、確認或自我說明/); assert.match(resumed, /直接從上一句接續對談/);
+  const resumedEnglish = coffeePrompts.tablePrompt('Topic', 'en', undefined, '### Host\nAn interrupted thought');
+  assert.match(resumedEnglish, /Do not output process notes, plans, confirmations or self-commentary/); assert.match(resumedEnglish, /Continue the conversation directly from the last sentence/);
+  const tailored = coffeePrompts.tablePrompt('原始主題：保留標點？', 'en', { counts: { experts: 0, 'cross-domain': 0, generalist: 0, affected: 1 }, guests: [{ id: 'g1', category: 'affected', description: 'frontline support' }], background: '', customPrompt: 'Use small company examples.' });
+  assert.match(tailored, /原始主題：保留標點？/); assert.match(tailored, /frontline support/); assert.match(tailored, /Use small company examples/); assert.doesNotMatch(tailored, /4 位與主題相關/); assert.match(tailored, /does not have a cross-domain guest|沒有跨領域來賓/);
+  assert.match(tailored, /roughly 10–18 concise speaker turns/); assert.match(tailored, /# Observer’s notes/); assert.match(tailored, /## Unexpected connections[\s\S]*## Questions worth pursuing[\s\S]*## Core disagreements[\s\S]*## Directions to explore[\s\S]*## Assumptions to verify/); assert.match(tailored, /questions worth pursuing/i); assert.match(tailored, /coffee-tables-complete/);
+  assert.doesNotMatch(prompt, /JSON|nextSpeakerId|輪數|字數限制/);
+  const session = coffeeSession(); session.transcriptMarkdown = '主持人：我們剛才談到免費午餐。';
+  assert.match(coffeePrompts.questionPrompt(session, '那家長付費會不會讓孩子被分級？'), /我們剛才談到免費午餐/);
+  assert.match(coffeePrompts.questionPrompt(session, '那家長付費會不會讓孩子被分級？'), /家長付費/);
+  assert.match(coffeePrompts.questionPrompt(session, '追問'), /## 意外連結[\s\S]*## 值得繼續想的問題[\s\S]*## 核心分歧[\s\S]*## 探索方向[\s\S]*## 值得查證的假設/); assert.match(coffeePrompts.questionPrompt(session, '追問'), /coffee-tables-complete/);
+});
+test('Coffee Tables assembles the full timeline chronologically, including interventions, drafts and custom instructions', () => {
+  const session = coffeeSession();
+  session.guests.customPrompt = '多談第一線的實際情況';
+  session.rounds = [{ id: 'r1', markdown: '第一段來賓發言', notes: '', status: 'completed', createdAt: '2026-01-01T00:00:00.000Z' }, { id: 'r2', markdown: '', draftMarkdown: '第二段未完成草稿', notes: '', status: 'error', createdAt: '2026-01-01T00:00:04.000Z' }];
+  session.transcriptMarkdown = '第一段來賓發言';
+  session.questions = [{ id: 'q1', question: '追問已完成？', answer: '已完成回答', status: 'complete', createdAt: '2026-01-01T00:00:02.000Z' }, { id: 'q2', question: '追問中斷？', answer: '', draftAnswer: '追問回答草稿', status: 'error', createdAt: '2026-01-01T00:00:05.000Z' }];
+  session.interventions = [{ id: 'i1', kind: 'comment', text: '使用者中途補充', createdAt: '2026-01-01T00:00:03.000Z' }];
+  const context = coffeePrompts.assembleCoffeeContext(session);
+  const positions = ['第一段來賓發言', '追問已完成？', '使用者中途補充', '第二段未完成草稿', '追問中斷？'].map(item => context.indexOf(item));
+  assert.ok(positions.every(position => position >= 0));
+  assert.deepEqual(positions, [...positions].sort((a, b) => a - b));
+  assert.match(coffeePrompts.observerOnlyPrompt(session), /第二段未完成草稿/);
+  assert.match(coffeePrompts.observerOnlyPrompt(session), /追問回答草稿/);
+  assert.match(coffeePrompts.questionPrompt(session, '接下來呢？'), /多談第一線的實際情況/);
+  session.rounds[0].markdown = '### 主持人｜甲\n\n第一句。\n\n### 專家｜乙\n\n第二句。';
+  session.interventions = [{ id: 'mid', kind: 'comment', text: '使用者在兩位發言間插話', createdAt: '2026-01-01T00:00:01.500Z', roundId: 'r1', afterTurn: 1 }];
+  const interleaved = coffeePrompts.assembleCoffeeContext(session);
+  assert.ok(interleaved.indexOf('第一句。') < interleaved.indexOf('使用者在兩位發言間插話'));
+  assert.ok(interleaved.indexOf('使用者在兩位發言間插話') < interleaved.indexOf('第二句。'));
+});
+test('Coffee Tables bilingual samples retain full discussions, five observer notes and a follow-up each', () => {
+  const { COFFEE_SAMPLE_ZH, COFFEE_SAMPLE_EN } = load('experiences/coffee-tables/samples.ts');
+  for (const sample of [COFFEE_SAMPLE_ZH, COFFEE_SAMPLE_EN]) {
+    assert.ok(sample.markdown.length > 8000); assert.ok(sample.question.length > 20); assert.ok(sample.answer.length > 100);
+    assert.match(sample.markdown, /(?:最大.*討論轉折|Major turns)/); assert.match(sample.markdown, /(?:尚未解決的核心衝突|Unresolved conflicts)/);
+  }
+  assert.match(COFFEE_SAMPLE_ZH.title, /中文/); assert.match(COFFEE_SAMPLE_EN.title, /English/);
+});
+test('Coffee Tables validates numeric guest counts and named guests occupy their selected category slots', () => {
+  const { parseSession } = coffeeTypes;
+  const valid = coffeeSession();
+  valid.guests = { counts: { experts: 2, 'cross-domain': 0, generalist: 0, affected: 1 }, guests: [{ id: 'named-1', category: 'experts', description: '第一線客服' }], background: '小公司', customPrompt: '多談實際做法' };
+  assert.equal(parseSession(JSON.stringify(valid)).guests.guests.length, 1); assert.equal(parseSession(JSON.stringify(valid)).guests.hostCount, 2);
+  for (let count = 1; count <= 4; count++) { const hosted = { ...valid, guests: { ...valid.guests, hostCount: count } }; assert.equal(parseSession(JSON.stringify(hosted)).guests.hostCount, count); assert.match(coffeePrompts.tablePrompt('Topic', 'en', hosted.guests), new RegExp(`${count} (?:host|hosts)`)); }
+  assert.throws(() => parseSession(JSON.stringify({ ...valid, guests: { ...valid.guests, hostCount: 5 } })), /guest count/i);
+  for (const counts of [
+    { experts: 0, 'cross-domain': 0, generalist: 0, affected: 0 },
+    { experts: 8, 'cross-domain': 8, generalist: 0, affected: 0 },
+    { experts: 9, 'cross-domain': 1, generalist: 1, affected: 1 },
+    { experts: 1, 'cross-domain': 0, generalist: 0, affected: 0 },
+  ]) {
+    const invalid = { ...valid, guests: { ...valid.guests, counts, guests: [{ id: 'named-1', category: 'experts', description: '客服' }, { id: 'named-2', category: 'experts', description: '店長' }] } };
+    assert.throws(() => parseSession(JSON.stringify(invalid)), /guest count/i);
+  }
+});
+integrationTest('Coffee Tables continues in the same timeline and refreshes observer notes from the full context', async () => {
+  const session = coffeeSession(); session.guests.customPrompt = '多談小公司能採取的做法';
+  const notes = (version, label) => `# 觀察者整理\n\n## 最大討論轉折\n- ${label}\n\n## 被推翻或修正的假設\n- ${version}\n\n## 值得繼續追問的問題\n- 下一步？\n\n## 尚未解決的核心分歧\n- 仍有取捨`;
+  const responses = [
+    `### 主持人｜林岑\n先從規模談起。\n\n${notes('小公司不一定有完整團隊', '從導入轉向誰負責')}`,
+    `### 受影響者｜客服代表\n我們要先談員工能不能拒絕。\n\n${notes('效率不代表工作量消失', '追問把焦點帶到拒絕權')}`,
+    `### 主持人｜周以安\n先把試辦退出條件寫清楚。\n\n${notes('試辦也需要退出條件', '使用者追問帶出可逆性')}`,
+  ];
+  const prompts = [];
+  const engine = new coffee.CoffeeEngine(session, async request => { prompts.push(request.prompt); return responses.shift(); }, async () => {});
+  await engine.start(); const firstTranscript = engine.session.transcriptMarkdown;
+  await engine.continueTable();
+  assert.equal(engine.session.rounds.length, 2); assert.match(engine.session.transcriptMarkdown, /先從規模談起/); assert.match(engine.session.transcriptMarkdown, /我們要先談員工能不能拒絕/);
+  assert.match(prompts[1], /(?:新增約 8–12 次簡短發言|add roughly 8–12 concise speaker turns)/); assert.match(prompts[1], /小公司能採取的做法/); assert.match(prompts[1], /從導入轉向誰負責/);
+  assert.equal(engine.session.observerNotes.length, 2); assert.match(engine.session.observerNotes[0], /追問把焦點帶到拒絕權/); assert.match(engine.session.observerNotes[1], /從導入轉向誰負責/);
+  await engine.ask('員工能拒絕試辦嗎？');
+  assert.match(engine.session.questions.at(-1).question, /員工能拒絕試辦嗎/); assert.match(engine.session.questions.at(-1).answer, /先把試辦退出條件寫清楚/); assert.match(prompts[2], /小公司能採取的做法/); assert.match(prompts[2], /使用者的新問題/); assert.match(prompts[2], /追問把焦點帶到拒絕權/);
+  assert.equal(engine.session.observerNotes.length, 3); assert.ok(firstTranscript.length > 0);
+});
+integrationTest('Coffee Tables makes one full-text call and saves the complete Markdown only after success', async () => {
+  const session = coffeeSession(); let calls = 0, saves = [];
+  const transcript = '# 對談\n\n### 主持人｜主持人\n\n可以加菜，但別讓孩子被標記。\n\n# 觀察者整理\n\n## 最大討論轉折\n- 從公平轉向選擇\n\n## 被推翻或修正的假設\n- 家長付費必然改善品質\n\n## 值得繼續追問的問題\n- 如何避免標記\n\n## 尚未解決的核心分歧\n- 公平與選擇的取捨';
+  const engine = new coffee.CoffeeEngine(session, async request => { calls++; assert.match(request.prompt, /1 位中立觀察者/); assert.equal(request.session.model, 'test-model'); return transcript; }, async value => saves.push(plain(value)));
+  await engine.generate();
+  assert.equal(calls, 1); assert.equal(engine.session.status, 'completed', engine.error); assert.equal(engine.session.transcriptMarkdown, '# 對談\n\n### 主持人｜主持人\n\n可以加菜，但別讓孩子被標記。');
+  assert.equal(saves.at(-1).transcriptMarkdown, engine.session.transcriptMarkdown); assert.equal(saves.at(-1).status, 'completed');
+});
+integrationTest('Coffee Tables recognizes a complete saved draft with bold Markdown insight groups without calling the model again', async () => {
+  const session = coffeeSession(); const transcript = '### 主持人｜周沐\n\n先從時間實際去了哪裡開始。\n\n### 觀察者｜許安\n\n要確認績效制度有沒有改變。'; const notes = '# 觀察者整理\n\n- **最新轉折**\n  - 焦點轉向時間是否真的回到員工。\n- **修正後的假設**\n  - 省時不代表工作量下降。\n- **值得繼續追問的問題**\n  - 如何記錄修正成本？\n- **尚未解決的核心分歧**\n  - 產能與喘息空間如何取捨。'; const draft = `${transcript}\n\n${notes}\n\n${transcript}\n\n${notes}\n\n<!-- coffee-tables-complete -->`;
+  session.status = 'error'; session.error = 'observer format'; session.draftMarkdown = draft;
+  session.rounds = [{ id: 'draft-round', markdown: '', notes: '', draftMarkdown: draft, status: 'error', createdAt: session.createdAt }];
+  let calls = 0, saved;
+  const engine = new coffee.CoffeeEngine(session, async () => { calls++; return ''; }, async value => { saved = plain(value); });
+  await engine.start();
+  assert.equal(calls, 0); assert.equal(engine.session.status, 'completed'); assert.match(engine.session.transcriptMarkdown, /先從時間實際去了哪裡開始/); assert.equal((engine.session.transcriptMarkdown.match(/先從時間實際去了哪裡開始/g) ?? []).length, 1, engine.session.transcriptMarkdown);
+  assert.match(engine.session.observerNotes[0], /省時不代表工作量下降/); assert.equal(engine.session.draftMarkdown, undefined); assert.equal(saved.status, 'completed');
+});
+integrationTest('Coffee Tables trusts a complete observer summary from the resolved stream when the runtime final text disagrees', async () => {
+  const session = coffeeSession(), streamed = '### 主持人｜林岑\n\n省下時間要先確認有沒有轉成別人的工作。\n\n# 觀察者整理\n\n- **最新轉折**\n  - 討論從節省時間轉向工作是否轉移。\n- **修正後的假設**\n  - 個人省時不代表案件總時間下降。\n- **值得繼續追問的問題**\n  - 如何記錄交接成本？\n- **尚未解決的核心分歧**\n  - 緩衝和產能怎麼分配？';
+  let calls = 0; const engine = new coffee.CoffeeEngine(session, async request => { calls++; request.onText?.(streamed); return 'Runtime final text omitted the completed summary.'; }, async () => {});
+  await engine.start(); assert.equal(calls, 1); assert.equal(engine.session.status, 'completed'); assert.match(engine.session.transcriptMarkdown, /省下時間要先確認/); assert.match(engine.session.observerNotes[0], /交接成本/); assert.equal(engine.session.draftMarkdown, undefined);
+});
+integrationTest('Coffee Tables accepts the concise prose observer summary returned during Obsidian acceptance', async () => {
+  const session = coffeeSession();
+  const transcript = '### 周沐｜主持人（好奇追問）\n\n今天的題目是省下的時間應該去哪裡？';
+  const notes = '# 觀察者整理\n\n目前桌上有一個暫時共識：省下的時間不應自動等同於多接案件，應該考慮減少尖峰壓力、培訓、交接緩衝和實際休息。但這些選項怎麼分配，仍取決於績效制度與輪班安排是否一起調整。\n\n還需要查證幾件事：AI 真正節省的是哪些工作時間；人工檢查和修正增加多少成本；不同班別、資歷和案件類型是否受到不同影響；以及員工選擇休息或培訓後，績效評估是否真的不會吃虧。';
+  const engine = new coffee.CoffeeEngine(session, async () => `${transcript}\n\n${notes}`, async () => {});
+  await engine.start();
+  assert.equal(engine.session.status, 'completed', engine.error);
+  assert.equal(engine.session.transcriptMarkdown, transcript);
+  assert.match(engine.session.observerNotes[0], /省下的時間不應自動等同於多接案件/);
+  assert.match(engine.session.observerNotes[0], /還需要查證幾件事/);
+});
+integrationTest('Coffee Tables keeps a prose observer summary as a draft when its final paragraph is truncated', async () => {
+  const session = coffeeSession();
+  const response = '### 周沐｜主持人\n\n我們需要一起看工作量。\n\n# 觀察者整理\n\n目前桌上有一個暫時共識：要同時觀察緩衝時間、交接和工作負擔。\n\n還需要查證幾件事：不同班別是否受影響，以及客服選擇休息後的績效「保護條款」';
+  const engine = new coffee.CoffeeEngine(session, async request => { request.onText?.(response); return response; }, async () => {});
+  await engine.start();
+  assert.equal(engine.session.status, 'error');
+  assert.equal(engine.session.transcriptMarkdown, '');
+  assert.match(engine.session.draftMarkdown, /績效「保護條款」$/);
+  assert.match(engine.error, /整理格式不完整/);
+});
+integrationTest('Coffee Tables does not recover an interrupted draft with empty observer groups', async () => {
+  const session = coffeeSession(); const partial = '### 主持人｜林岑\n\n先把問題拆小。\n\n# 觀察者整理\n\n- **最新轉折**\n  - 焦點改變了。\n- **修正後的假設**\n  - 假設需要重看。\n- **值得繼續追問的問題**\n  - 這段尚未完成。\n- **尚未解決的核心分歧**\n  - 尚';
+  session.status = 'error'; session.draftMarkdown = partial; session.rounds = [{ id: 'partial-round', markdown: '', notes: '', draftMarkdown: partial, status: 'error', createdAt: session.createdAt }];
+  const pending = deferred(); let calls = 0;
+  const engine = new coffee.CoffeeEngine(session, async () => { calls++; return pending.promise; }, async () => {});
+  const running = engine.start(); await until(() => calls === 1); assert.equal(engine.session.status, 'generating');
+  engine.cancel(); pending.resolve(''); await running; assert.equal(engine.session.status, 'error'); assert.match(engine.session.draftMarkdown, /尚未完成/);
+});
+integrationTest('Coffee Tables preserves turn positions when recovering a draft that contains interventions', async () => {
+  const session = coffeeSession(); const speech = '### 主持人｜林岑\n\n先談怎麼分工。'; const notes = '# 觀察者整理\n\n- **最新轉折**\n  - 討論開始從工具轉向工作如何重新分配。\n- **修正後的假設**\n  - 省下時間不代表第一線工作量自然下降。\n- **值得繼續追問的問題**\n  - 誰來記錄並處理自動化的例外？\n- **尚未解決的核心分歧**\n  - 效率提升應該回到公司還是員工？';
+  const draft = `${speech}\n\n${speech}\n\n${notes}\n\n<!-- coffee-tables-complete -->`; session.status = 'error'; session.draftMarkdown = draft; session.rounds = [{ id: 'draft-with-intervention', markdown: '', notes: '', draftMarkdown: draft, status: 'error', createdAt: session.createdAt }]; session.interventions = [{ id: 'comment-1', kind: 'comment', text: '先談第一線的工作量。', createdAt: new Date().toISOString(), status: 'sent', roundId: 'draft-with-intervention', afterTurn: 2 }];
+  const engine = new coffee.CoffeeEngine(session, async () => { throw new Error('must not call provider'); }, async () => {}); await engine.start();
+  assert.equal(engine.session.interventions[0].afterTurn, 2); assert.equal((engine.session.transcriptMarkdown.match(/先談怎麼分工/g) ?? []).length, 2); assert.equal(engine.session.status, 'completed');
+});
+integrationTest('Coffee Tables failure preserves the existing transcript and retry replaces the same follow-up', async () => {
+  const session = coffeeSession(); session.status = 'completed'; session.transcriptMarkdown = '完整對談'; let fail = true, calls = 0;
+  const engine = new coffee.CoffeeEngine(session, async request => { calls++; assert.match(request.prompt, /完整對談/); if (fail) throw new Error('provider failed'); return '### 林岑｜主持人\n\n由主持人接話。\n\n# 觀察者整理\n\n## 最大討論轉折\n- 更新\n## 被推翻或修正的假設\n- 更新\n## 值得繼續追問的問題\n- 更新\n## 尚未解決的核心分歧\n- 更新'; }, async () => {});
+  await engine.ask('為什麼免費和加價不能混在一起？', 'q1');
+  assert.equal(engine.session.questions.length, 1); assert.equal(engine.session.questions[0].status, 'error'); assert.equal(engine.session.transcriptMarkdown, '完整對談');
+  fail = false; await engine.ask('為什麼免費和加價不能混在一起？', 'q1');
+  assert.equal(calls, 2); assert.equal(engine.session.questions.length, 1); assert.equal(engine.session.questions[0].status, 'complete'); assert.equal(engine.session.questions[0].answer, '### 林岑｜主持人\n\n由主持人接話。');
+});
+integrationTest('Coffee Tables follow-up retry drops an interrupted observer-notes tail from the answer', async () => {
+  const session = coffeeSession(); session.status = 'completed'; session.transcriptMarkdown = '原本對談'; session.questions = [{ id: 'q-tail', question: '追問問題', answer: '', draftAnswer: '### 林岑｜主持人\n\n已收到的回答。\n\n# 觀察者整理\n\n## 核心分歧\n- 尚未整理完成', status: 'error', createdAt: session.createdAt }];
+  const notes = '# 觀察者整理\n\n## 最大討論轉折\n- 回到工作分配\n\n## 被推翻或修正的假設\n- 效率不等於公平\n\n## 值得繼續追問的問題\n- 誰承擔例外？\n\n## 尚未解決的核心分歧\n- 由誰決定';
+  const engine = new coffee.CoffeeEngine(session, async () => `### 受影響者｜客服代表\n\n我補充例外工作。\n\n${notes}`, async () => {});
+  await engine.ask('追問問題', 'q-tail');
+  const answer = engine.session.questions[0].answer;
+  assert.match(answer, /已收到的回答/); assert.match(answer, /我補充例外工作/);
+  assert.doesNotMatch(answer, /# 觀察者整理|尚未整理完成/);
+  assert.equal((answer.match(/已收到的回答/g) ?? []).length, 1);
+});
+integrationTest('Coffee Tables locks follow-up submission while the question is being saved', async () => {
+  const session = coffeeSession(); session.status = 'completed'; session.transcriptMarkdown = 'Full table'; const saved = deferred(); let saving = false;
+  const engine = new coffee.CoffeeEngine(session, async () => 'One answer', async value => { if (value.questions.length && !saving) { saving = true; await saved.promise; } });
+  const first = engine.ask('First question'); await until(() => saving); await engine.ask('Second question'); saved.resolve(); await first;
+  assert.equal(engine.session.questions.length, 1); assert.equal(engine.session.questions[0].question, 'First question');
+});
+integrationTest('Coffee Tables cancellation discards late text and closing waits for the pending request', async () => {
+  const late = deferred(); let saved = [];
+  const engine = new coffee.CoffeeEngine(coffeeSession(), async request => { request.onText?.('已收到的草稿'); return late.promise; }, async value => saved.push(plain(value)));
+  const running = engine.generate(); await until(() => engine.busy && engine.session.draftMarkdown); engine.cancel(); late.resolve('這是取消後的晚到回答'); await running;
+  assert.equal(engine.session.transcriptMarkdown, ''); assert.equal(engine.session.status, 'error'); assert.equal(engine.session.draftMarkdown, '已收到的草稿'); assert.equal(saved.at(-1).draftMarkdown, '已收到的草稿');
+  const second = new coffee.CoffeeEngine(coffeeSession(), async () => late.promise, async () => {}); const task = second.generate(); await until(() => second.busy); const closing = second.stop(); await closing; await task;
+  assert.equal(second.session.transcriptMarkdown, '');
+});
+integrationTest('Coffee Tables retry folds its saved partial conversation into the completed segment', async () => {
+  const session = coffeeSession(); let calls = 0; const partial = '### 林岑｜主持人\n先談怎麼分工。';
+  session.status = 'error'; session.draftMarkdown = partial; session.rounds = [{ id: 'failed-round', markdown: '', notes: '', draftMarkdown: partial, status: 'error', createdAt: session.createdAt }]; session.interventions = [{ id: 'retry-comment', kind: 'comment', text: '先把第一線的工作量算進去。', createdAt: session.createdAt, status: 'sent', roundId: 'failed-round', afterTurn: 1 }];
+  const notes = '# 觀察者整理\n\n## 最大討論轉折\n- 從工具轉向分工\n\n## 被推翻或修正的假設\n- 自動化不會自行減少責任\n\n## 值得繼續追問的問題\n- 誰負責覆核？\n\n## 尚未解決的核心分歧\n- 效率與控制';
+  const engine = new coffee.CoffeeEngine(session, async request => { calls++; if (calls === 1) { request.onText?.(partial); throw new Error('network interrupted'); } assert.match(request.prompt, /先談怎麼分工/); request.onText?.(`${partial}\n\n### 家長｜受影響者\n我想先知道誰負責。`); return `### 家長｜受影響者\n我想先知道誰負責。\n\n${notes}`; }, async () => {});
+  await engine.start(); assert.equal(engine.session.status, 'error'); assert.match(engine.session.draftMarkdown, /先談怎麼分工/);
+  await engine.start(); assert.equal(engine.session.status, 'completed'); assert.match(engine.session.transcriptMarkdown, /先談怎麼分工/); assert.match(engine.session.transcriptMarkdown, /誰負責/); assert.equal(engine.session.draftMarkdown, undefined); assert.equal(engine.session.rounds.filter(round => round.draftMarkdown).length, 0); assert.equal(engine.session.interventions[0].roundId, engine.session.rounds[0].id); assert.equal(engine.session.interventions[0].afterTurn, 1); assert.ok(Date.parse(engine.session.lastCompletedAt) >= Date.parse(session.createdAt));
+});
+integrationTest('Coffee Tables can refresh observer notes from a stopped draft without generating dialogue', async () => {
+  const session = coffeeSession(); session.status = 'error'; session.transcriptMarkdown = '### 林岑｜主持人\n\n先前已完成的對談。'; session.draftMarkdown = '### 家長｜受影響者\n\n收到一半的觀點。';
+  const previous = '# 觀察者整理\n\n## 最大討論轉折\n- 舊整理'; session.observerNotes = [previous]; let calls = 0, saved;
+  const fresh = '# 觀察者整理\n\n## 最大討論轉折\n- 草稿帶來的新轉折\n\n## 被推翻或修正的假設\n- 舊假設需要修正\n\n## 值得繼續追問的問題\n- 誰承擔後續責任？\n\n## 尚未解決的核心分歧\n- 效率與公平';
+  const engine = new coffee.CoffeeEngine(session, async request => { calls++; assert.match(request.prompt, /只更新觀察者整理|only produce observer notes/i); assert.match(request.prompt, /收到一半的觀點/); request.onText?.(fresh); return fresh; }, async value => { saved = plain(value); });
+  await engine.refreshObserverNotes();
+  assert.equal(calls, 1); assert.equal(engine.session.status, 'error'); assert.match(engine.session.draftMarkdown, /收到一半的觀點/); assert.match(engine.session.observerNotes[0], /草稿帶來的新轉折/); assert.equal(engine.session.observerNotes[1], previous); assert.equal(saved.status, 'error');
+});
+integrationTest('Coffee Tables retains a previous observer-summary draft if a summary retry fails', async () => {
+  const session = coffeeSession(); session.status = 'error'; session.draftMarkdown = '### 來賓｜專家\n\n已保存對談。'; session.observerDraftMarkdown = '# 觀察者整理\n\n## 核心分歧\n- 先前整理草稿';
+  const previous = '# 觀察者整理\n\n## 核心分歧\n- 正式舊版'; session.observerNotes = [previous];
+  const engine = new coffee.CoffeeEngine(session, async request => { request.onText?.('未完成的新整理'); throw new Error('network interrupted'); }, async () => {});
+  await engine.refreshObserverNotes();
+  assert.equal(engine.session.observerNotes[0], previous);
+  assert.match(engine.session.observerDraftMarkdown, /先前整理草稿/);
+  assert.match(engine.session.observerDraftMarkdown, /未完成的新整理/);
+  assert.equal(engine.session.dirtyNotes, true);
+});
+integrationTest('Coffee Tables routes in-room comments, guest questions and direction changes into the active request', async () => {
+  const pending = deferred(), steers = [], saves = [];
+  const engine = new coffee.CoffeeEngine(coffeeSession(), async request => { request.registerIntervention?.(async text => { steers.push(text); }); return pending.promise; }, async value => saves.push(plain(value)));
+  const task = engine.start(); const early = engine.intervene('comment', 'A parent in the room has a different concern.'); await until(() => engine.busy && engine.steer); await early;
+  await engine.intervene('guest-question', 'What would this cost?', '林岑');
+  await engine.intervene('redirect', 'Compare equal access with family choice.');
+  assert.equal(steers.length, 3); assert.match(steers[0], /A parent/); assert.match(steers[1], /林岑/); assert.match(steers[2], /new direction|redirect/i);
+  assert.equal(engine.session.interventions?.length, 3); assert.ok(engine.session.interventions.every(item => item.status === 'sent')); assert.equal(saves.at(-1).interventions.length, 3);
+  pending.resolve('The full discussion.'); await task;
+});
+integrationTest('Coffee Tables shutdown drains an accepted intervention before returning', async () => {
+  const response = deferred(), steering = deferred(); let startedSteer = false;
+  const engine = new coffee.CoffeeEngine(coffeeSession(), async request => { request.signal.addEventListener('abort', () => response.resolve('')); request.registerIntervention?.(async () => { startedSteer = true; await steering.promise; }); return response.promise; }, async () => {});
+  const task = engine.start(); await until(() => engine.busy && engine.steer);
+  const intervention = engine.intervene('comment', 'One last point.'); await until(() => startedSteer);
+  let returned = false; const stopping = engine.stop().then(() => { returned = true; }); await task; await Promise.resolve(); assert.equal(returned, false);
+  steering.resolve(); await intervention; await stopping; assert.equal(returned, true);
+});
+integrationTest('Coffee Tables preview inspection is read-only and refuses an incomplete save journal', async () => {
+  const { CoffeeStorage } = load('experiences/coffee-tables/storage.ts', { obsidian }); const { app, files, contents } = fixture(); app.vault.getFiles = () => [...files.values()].filter(f => f instanceof TFile);
+  const store = new CoffeeStorage(app.vault, 'Agent Workspace'), session = coffeeSession(); session.status = 'completed'; session.transcriptMarkdown = '### 主持人｜林岑\n已保存。'; session.rounds = [{ id: 'round-ro', markdown: session.transcriptMarkdown, notes: '# 觀察者整理\n\n## 分歧\n- 保留', status: 'completed', createdAt: session.createdAt }]; await store.save(session);
+  const path = store.sessionPath(session.id), before = contents.get(path), sidePath = store.sidecarPath(session.id), sideRaw = contents.get(sidePath); let writes = 0; const write = app.vault.adapter.write, processFile = app.vault.adapter.process; app.vault.adapter.write = async (...args) => { writes++; return write(...args); }; app.vault.adapter.process = async (...args) => { writes++; return processFile(...args); };
+  const read = await store.inspectReadOnly(path); assert.equal(read.id, session.id); assert.equal(writes, 0); assert.equal(contents.get(path), before);
+  const side = JSON.parse(sideRaw); side.journal = { previousMarkdownHash: 'x', nextMarkdownHash: 'y', previousSidecar: sideRaw }; contents.set(sidePath, JSON.stringify(side)); const journal = contents.get(sidePath); await assert.rejects(store.inspectReadOnly(path), /unfinished save/); assert.equal(writes, 0); assert.equal(contents.get(sidePath), journal);
+});
+
+integrationTest('Coffee Tables Markdown storage round trips punctuation, Traditional Chinese, Q&A and protects outside edits', async () => {
+  const { CoffeeStorage } = load('experiences/coffee-tables/storage.ts', { obsidian });
+  const { app, files, contents } = fixture(); app.vault.getFiles = () => [...files.values()].filter(f => f instanceof TFile);
+  const store = new CoffeeStorage(app.vault, 'Agent Workspace'), session = coffeeSession();
+  session.status = 'completed'; session.lastGenerationStartedAt = '2026-09-29T20:00:00.000Z'; session.lastCompletedAt = '2026-09-29T20:05:00.000Z'; session.transcriptMarkdown = '### 林岑｜主持人\n先問現場怎麼運作。\n\n### 家長｜受影響者\n孩子會注意到標籤。'; session.rounds = [{ id: 'round-main', markdown: session.transcriptMarkdown, notes: '', status: 'completed', createdAt: session.createdAt }];
+  session.draftMarkdown = '### 主持人｜追問\n第一段尚未完成';
+  session.observerDraftMarkdown = '# 觀察者整理\n\n## 核心分歧\n- 整理草稿也需要保存';
+  session.observerNotes = ['# 觀察者整理\n\n## 最大討論轉折\n- 新版轉折\n\n## 尚未解決的核心分歧\n- 新版分歧', '# 觀察者整理\n\n## 最大討論轉折\n- 舊版轉折\n\n## 尚未解決的核心分歧\n- 舊版分歧'];
+  session.questions = [{ id: 'q-1', question: '會不會造成分級？', answer: '要看加價如何呈現。', draftAnswer: '### 觀眾｜家長\n我還在回答…', status: 'complete', createdAt: new Date(Date.parse(session.createdAt) + 2000).toISOString() }];
+  session.interventions = [{ id: 'comment-1', kind: 'comment', text: '家長也需要看得到退出方式。', createdAt: new Date(Date.parse(session.createdAt) + 1000).toISOString(), status: 'sent', roundId: 'round-main', afterTurn: 1 }];
+  await store.save(session); const filePath = store.sessionPath(session.id), original = contents.get(filePath);
+  assert.match(original, /先問現場怎麼運作[\s\S]*你（插話）[\s\S]*家長也需要看得到退出方式[\s\S]*孩子會注意到標籤/); assert.match(original, /會不會造成分級/); assert.match(original, /Reasoning|推理強度/); assert.match(original, /## 對話紀錄/); assert.equal(original.split("\n")[0], `# ${session.topic}`); assert.doesNotMatch(original, /coffee-tables-data|coffee-tables-transcript-end|<\!--.*version/i); assert.ok(files.has(`${store.hidden}/${session.id}.json`)); assert.doesNotMatch(original, new RegExp(session.id));
+  assert.ok(original.length < (session.transcriptMarkdown.length + session.draftMarkdown.length + session.questions[0].draftAnswer.length) * 2 + 2200, 'session metadata should not duplicate or expand the transcript');
+  const reopened = new CoffeeStorage(app.vault, 'Agent Workspace'), restored = await reopened.load(session.id); assert.equal(restored.topic, session.topic); assert.match(restored.transcriptMarkdown,/先問現場怎麼運作/); assert.equal(restored.questions[0].question,session.questions[0].question); assert.equal(restored.questions[0].draftAnswer,session.questions[0].draftAnswer); assert.match(restored.interventions[0].text,/退出方式/); assert.match(restored.draftMarkdown,/第一段尚未完成/); assert.match(restored.observerDraftMarkdown,/整理草稿也需要保存/); assert.match(restored.observerNotes[0], /新版分歧/); assert.match(restored.observerNotes[1], /舊版分歧/); assert.equal(restored.model,session.model); assert.equal(restored.lastGenerationStartedAt, session.lastGenerationStartedAt); assert.equal(restored.lastCompletedAt, session.lastCompletedAt);
+  const outside = original.replace('先問現場怎麼運作。', '編輯者補上現場資訊。'); contents.set(filePath, outside); const inspected = await store.inspect(filePath); assert.equal(inspected.dirtyNotes, true); await assert.rejects(store.save(session), /changed outside/); assert.equal(contents.get(filePath), outside);
+  const adopted = await store.reload(filePath); assert.match(adopted.transcriptMarkdown, /編輯者補上現場資訊/); assert.match(adopted.interventions[0].text, /退出方式/); assert.equal(adopted.dirtyNotes, true);
+});
+integrationTest('Coffee Tables Markdown omits empty failed rounds while retaining the saved draft', async () => {
+  const { CoffeeStorage } = load('experiences/coffee-tables/storage.ts', { obsidian }); const { app, files, contents } = fixture(); app.vault.getFiles = () => [...files.values()].filter(file => file instanceof TFile);
+  const store = new CoffeeStorage(app.vault, 'Agent Workspace'), session = coffeeSession(); session.status = 'error'; session.rounds = [{ id: 'empty-1', markdown: '', notes: '', status: 'error', createdAt: session.createdAt }, { id: 'empty-2', markdown: '', notes: '', status: 'error', createdAt: session.createdAt }, { id: 'draft-3', markdown: '', notes: '', draftMarkdown: '### 主持人｜林岑\n草稿保留。', status: 'error', createdAt: session.createdAt }]; session.draftMarkdown = session.rounds[2].draftMarkdown;
+  await store.save(session); const markdown = contents.get(store.sessionPath(session.id)); assert.doesNotMatch(markdown, /^## (?:Conversation part \d+|對談第 \d+ 段)$/m); assert.match(markdown, /Unfinished drafts|未完成草稿/); assert.match(markdown, /草稿保留/);
+  const restored = await new CoffeeStorage(app.vault, 'Agent Workspace').load(session.id); assert.equal(restored.rounds.length, 0); assert.match(restored.draftMarkdown, /草稿保留/);
+});
+integrationTest('Coffee Tables titles produce safe Markdown names without replacing a same-title table', async () => {
+  const { CoffeeStorage, topicSlug } = load('experiences/coffee-tables/storage.ts', { obsidian }); const { app, files, contents } = fixture(); app.vault.getFiles = () => [...files.values()].filter(file => file instanceof TFile);
+  assert.equal(topicSlug('  AI / 工作？  '), 'AI 工作？');
+  const store = new CoffeeStorage(app.vault, 'Agent Workspace'), first = coffeeSession(); first.topic = 'AI / 工作？'; await store.save(first);
+  const second = coffeeSession(); second.topic = first.topic; await store.save(second);
+  assert.match(store.sessionPath(first.id), /AI 工作？\.md$/); assert.match(store.sessionPath(second.id), /AI 工作？（2）\.md$/);
+  const reopened = new CoffeeStorage(app.vault, 'Agent Workspace'); assert.equal((await reopened.load(store.sessionPath(first.id))).topic, first.topic);
+  files.delete(store.sessionPath(first.id)); contents.delete(store.sessionPath(first.id)); assert.equal((await reopened.load(store.sessionPath(second.id))).id, second.id); assert.equal((await reopened.reload(store.sessionPath(second.id))).id, second.id);
+});
+integrationTest('Coffee Tables recovers a new table when interruption occurs between Markdown and sidecar writes', async () => {
+  const { CoffeeStorage } = load('experiences/coffee-tables/storage.ts', { obsidian }); const { app, files, contents } = fixture(); app.vault.getFiles = () => [...files.values()].filter(file => file instanceof TFile);
+  const store = new CoffeeStorage(app.vault, 'Agent Workspace'), session = coffeeSession(); session.transcriptMarkdown = '### 主持人｜林岑\n這是第一段完整對談。'; session.rounds = [{ id: 'round-a', markdown: session.transcriptMarkdown, notes: '', status: 'completed', createdAt: session.createdAt }];
+  const process = app.vault.adapter.process; let writes = 0; app.vault.adapter.process = async (...args) => { if (++writes === 1) throw new Error('simulated interruption'); return process(...args); };
+  await assert.rejects(store.save(session), /simulated interruption/);
+  const markdownPath = store.path(session.id, session.topic), sidecarPath = store.sidecarPath(session.id); assert.ok(contents.has(markdownPath)); assert.match(contents.get(sidecarPath), /targetMarkdown/);
+  const reopened = new CoffeeStorage(app.vault, 'Agent Workspace'); await reopened.recoverPendingCreates();
+  assert.doesNotMatch(contents.get(sidecarPath), /targetMarkdown/); const loaded = await reopened.load(markdownPath); assert.match(loaded.transcriptMarkdown, /第一段完整對談/);
+});
+
+integrationTest('Coffee Tables stores same-topic sessions in native topic folders and moves legacy notes with their sidecar mapping', async () => {
+  const { CoffeeStorage } = load('experiences/coffee-tables/storage.ts', { obsidian }); const { app, files, contents } = fixture(); app.vault.getFiles = () => [...files.values()].filter(file => file instanceof TFile);
+  const store = new CoffeeStorage(app.vault, 'Agent Workspace', (file, target) => app.fileManager.renameFile(file, target));
+  const first = coffeeSession(); first.status = 'completed'; first.transcriptMarkdown = '### 林岑｜主持人\n\n完整內容'; first.rounds = [{ id: 'r1', markdown: first.transcriptMarkdown, notes: '', status: 'completed', createdAt: first.createdAt }];
+  await store.save(first); const firstPath = store.sessionPath(first.id); assert.match(firstPath, /Coffee Tables\/.+（[a-f0-9]{8}）\/.+\.md$/);
+  const second = { ...coffeeSession(), id: 'coffee-second' }; await store.save(second); assert.equal(store.sessionPath(first.id).split('/').at(-2), store.sessionPath(second.id).split('/').at(-2));
+  const original = app.vault.getAbstractFileByPath(firstPath), legacyPath = `${store.folder}/legacy.md`; await app.fileManager.renameFile(original, legacyPath);
+  const sidePath = store.sidecarPath(first.id), side = JSON.parse(contents.get(sidePath)); side.filePath = legacyPath; contents.set(sidePath, JSON.stringify(side, null, 2));
+  const upgrader = new CoffeeStorage(app.vault, 'Agent Workspace', (file, target) => app.fileManager.renameFile(file, target)); const moved = await upgrader.organizeExisting(); assert.equal(moved.moved, 1);
+  assert.equal((await new CoffeeStorage(app.vault, 'Agent Workspace').load(first.id)).id, first.id);
+});
+integrationTest('Coffee Tables resolves a moved note with frontmatter and preserves an explicitly edited root title', async () => {
+  const { CoffeeStorage } = load('experiences/coffee-tables/storage.ts', { obsidian }); const { app, files, contents } = fixture(); app.vault.getFiles = () => [...files.values()].filter(file => file instanceof TFile);
+  const initial = new CoffeeStorage(app.vault, 'Agent Workspace', (file, target) => app.fileManager.renameFile(file, target)); const session = coffeeSession(); await initial.save(session);
+  const originalPath = initial.sessionPath(session.id), originalFile = app.vault.getAbstractFileByPath(originalPath); contents.set(originalPath, `---\ntags: [coffee]\n---\n\n${contents.get(originalPath)}`);
+  const movedPath = `${initial.folder}/renamed-note.md`; await app.fileManager.renameFile(originalFile, movedPath);
+  const reopened = new CoffeeStorage(app.vault, 'Agent Workspace', (file, target) => app.fileManager.renameFile(file, target)); const restored = await reopened.load(session.id); assert.equal(restored.topic, session.topic);
+  const edited = contents.get(movedPath).replace(`# ${session.topic}`, '# A title explicitly changed in Obsidian'); contents.set(movedPath, edited);
+  const adopted = await reopened.reload(movedPath); assert.equal(adopted.topic, 'A title explicitly changed in Obsidian');
+});
+integrationTest('Coffee Tables startup move recovery does not clear a live FileManager move journal', async () => {
+  const { CoffeeStorage } = load('experiences/coffee-tables/storage.ts', { obsidian }); const { app, files, contents } = fixture(); app.vault.getFiles = () => [...files.values()].filter(file => file instanceof TFile);
+  const initial = new CoffeeStorage(app.vault, 'Agent Workspace', (file, target) => app.fileManager.renameFile(file, target)); const session = coffeeSession(); await initial.save(session); const current = initial.sessionPath(session.id), legacyPath = `${initial.folder}/moving-note.md`; await app.fileManager.renameFile(app.vault.getAbstractFileByPath(current), legacyPath); const sidePath = initial.sidecarPath(session.id), side = JSON.parse(contents.get(sidePath)); side.filePath = legacyPath; contents.set(sidePath, JSON.stringify(side, null, 2));
+  const gate = deferred(), renameStarted = deferred(), store = new CoffeeStorage(app.vault, 'Agent Workspace', (file, target) => { renameStarted.resolve({ file, target }); return gate.promise.then(() => app.fileManager.renameFile(file, target)); }); const moving = store.organizeExisting(); const { target } = await renameStarted.promise; const staged = JSON.parse(contents.get(sidePath)); assert.ok(staged.moveJournal); await store.recoverMoves(); assert.ok(JSON.parse(contents.get(sidePath)).moveJournal); gate.resolve(); const result = await moving; assert.equal(result.moved, 1); assert.equal((await new CoffeeStorage(app.vault, 'Agent Workspace').load(target)).id, session.id);
+});
+integrationTest('Coffee Tables deletion waits for a safe archive and restores Markdown and hidden session state without overwrite', async () => {
+  const { CoffeeStorage } = load('experiences/coffee-tables/storage.ts', { obsidian }); const { app, files, contents } = fixture(); app.vault.getFiles = () => [...files.values()].filter(file => file instanceof TFile);
+  app.vault.delete = async file => { files.delete(file.path); contents.delete(file.path); }; app.vault.adapter.remove = async path => { files.delete(path); contents.delete(path); }; const store = new CoffeeStorage(app.vault, 'Agent Workspace', (file, target) => app.fileManager.renameFile(file, target), async file => app.vault.delete(file));
+  const session = coffeeSession(); session.status = 'completed'; session.transcriptMarkdown = '### 林岑｜主持人\n\n保留對談'; session.rounds = [{ id: 'r1', markdown: session.transcriptMarkdown, notes: '', status: 'completed', createdAt: session.createdAt }]; await store.save(session);
+  const originalPath = store.sessionPath(session.id), trashRecord = await store.delete(session.id); assert.equal(app.vault.getAbstractFileByPath(originalPath), undefined); assert.equal((await store.deletedTables()).length, 1); await assert.rejects(store.save(session), /was deleted/);
+  const restoredPath = await store.restoreDeleted(trashRecord); assert.equal((await new CoffeeStorage(app.vault, 'Agent Workspace').load(restoredPath)).id, session.id); assert.match(await app.vault.read(app.vault.getAbstractFileByPath(restoredPath)), /保留對談/); const restoredSession = await store.load(restoredPath); restoredSession.updatedAt = new Date().toISOString(); await store.save(restoredSession);
+  const other = { ...coffeeSession(), topic: 'Collision test topic' }; await store.save(other); const record = await store.delete(other.id); const parsed = JSON.parse(contents.get(record)); await app.vault.create(parsed.originalPath, '# occupied'); const collisionPath = await store.restoreDeleted(record); assert.notEqual(collisionPath, parsed.originalPath); assert.match(collisionPath, /（2）\.md$/);
+  const retainedSidecar = { ...coffeeSession(), id: 'coffee-delete-retained', topic: 'Retained sidecar topic' }; await store.save(retainedSidecar); const retainedPath = store.sessionPath(retainedSidecar.id); const remove = app.vault.adapter.remove; app.vault.adapter.remove = async path => { if (path === store.sidecarPath(retainedSidecar.id)) throw new Error('simulated sidecar cleanup failure'); return remove(path); }; const retainedRecord = await store.delete(retainedSidecar.id); assert.equal((await store.deletedTables()).some(item => item.path === retainedRecord), true); await app.vault.create(retainedPath, '# collision'); const retainedRestored = await store.restoreDeleted(retainedRecord); const reopenedRetained = await new CoffeeStorage(app.vault, 'Agent Workspace').load(retainedRestored); assert.equal(reopenedRetained.id, retainedSidecar.id); assert.equal(JSON.parse(contents.get(store.sidecarPath(retainedSidecar.id))).filePath, retainedRestored);
+  const interrupted = { ...coffeeSession(), id: 'coffee-delete-interrupted', topic: 'Interrupted trash metadata' }; await store.save(interrupted); const process = app.vault.adapter.process; let failedOnce = false; app.vault.adapter.process = async (path, fn) => { if (!failedOnce && path.includes('/.sessions/trash/')) { failedOnce = true; throw new Error('simulated archive status interruption'); } return process(path, fn); }; const interruptedRecord = await store.delete(interrupted.id); app.vault.adapter.process = process; assert.equal(JSON.parse(contents.get(interruptedRecord)).trashed, false); assert.equal((await store.deletedTables()).some(item => item.path === interruptedRecord), true); const interruptedPath = await store.restoreDeleted(interruptedRecord); assert.equal((await new CoffeeStorage(app.vault, 'Agent Workspace').load(interruptedPath)).id, interrupted.id);
+  const partial = { ...coffeeSession(), id: 'coffee-restore-interrupted', topic: 'Interrupted restore' }; await store.save(partial); const partialRecord = await store.delete(partial.id); const processRestore = app.vault.adapter.process; let restoreFailed = false; app.vault.adapter.process = async (path, fn) => { if (!restoreFailed && path === store.sidecarPath(partial.id)) { restoreFailed = true; throw new Error('simulated sidecar restore interruption'); } return processRestore(path, fn); }; await assert.rejects(store.restoreDeleted(partialRecord), /simulated sidecar restore interruption/); app.vault.adapter.process = processRestore; const journal = JSON.parse(contents.get(partialRecord)).restoreJournal; assert.ok(journal.targetPath); const partialRestored = await store.restoreDeleted(partialRecord); assert.equal(partialRestored, journal.targetPath); assert.equal((await new CoffeeStorage(app.vault, 'Agent Workspace').load(partialRestored)).id, partial.id);
+});
+integrationTest('Coffee Tables delete archives the latest hidden state if it changes during the trash callback', async () => {
+  const { CoffeeStorage } = load('experiences/coffee-tables/storage.ts', { obsidian }); const { app, files, contents } = fixture(); app.vault.getFiles = () => [...files.values()].filter(file => file instanceof TFile); app.vault.adapter.remove = async path => { files.delete(path); contents.delete(path); };
+  const session = coffeeSession(); session.status = 'completed'; const sidePath = `Agent Workspace/Coffee Tables/.sessions/${session.id}.json`; const store = new CoffeeStorage(app.vault, 'Agent Workspace', (file, target) => app.fileManager.renameFile(file, target), async file => { const side = JSON.parse(contents.get(sidePath)); side.updatedAt = '2026-09-30T12:00:00.000Z'; contents.set(sidePath, JSON.stringify(side, null, 2)); files.delete(file.path); contents.delete(file.path); }); await store.save(session);
+  const recordPath = await store.delete(session.id), record = JSON.parse(contents.get(recordPath)); assert.equal(JSON.parse(record.sidecar).updatedAt, '2026-09-30T12:00:00.000Z'); assert.equal((await store.deletedTables()).length, 1);
+});
+integrationTest('Coffee Tables v2 migration backs up the source, writes clean Markdown and is idempotent', async () => {
+  const { CoffeeStorage } = load('experiences/coffee-tables/storage.ts', { obsidian }); const { app, files, contents } = fixture(); app.vault.getFiles = () => [...files.values()].filter(file => file instanceof TFile);
+  const id = 'coffee-v2-recoverable', topic = '舊版桌聊主題', path = `Agent Workspace/Coffee Tables/${id}.md`, createdAt = '2026-09-29T00:00:00.000Z';
+  await app.vault.createFolder('Agent Workspace'); await app.vault.createFolder('Agent Workspace/Coffee Tables');
+  const legacy = { version: 2, id, topic, language: 'zh-TW', model: 'test-model', reasoning: 'low', createdAt, updatedAt: createdAt, status: 'completed', transcriptMarkdown: '', questions: [], guests: { perspectives: ['experts'], background: '客服' } };
+  const source = `# ${topic}\n\n<!-- coffee-tables-data:${encodeURIComponent(JSON.stringify(legacy))} -->\n\n## 對談\n\n### 主持人｜林岑\n\n保留這段原始對談。\n\n<!-- coffee-tables-transcript-end:${id} -->\n\n<!-- coffee-tables-draft-start:${id} -->\n\n### 主持人｜續聊\n\n保留這段舊草稿。\n\n<!-- coffee-tables-draft-end:${id} -->`;
+  const oldFile = await app.vault.create(path, source); const store = new CoffeeStorage(app.vault, 'Agent Workspace', (file, next) => app.fileManager.renameFile(file, next)); const migrated = await store.load(path);
+  assert.equal(migrated.version, 3); assert.match(migrated.transcriptMarkdown, /保留這段原始對談/); assert.match(migrated.draftMarkdown, /保留這段舊草稿/); assert.equal(migrated.guests.counts.experts, 4);
+  const backup = contents.get(`${store.hidden}/backups/${id}-v2.md`); assert.equal(backup, source); assert.doesNotMatch(contents.get(store.sessionPath(id)), /coffee-tables-data/);
+  const again = await new CoffeeStorage(app.vault, 'Agent Workspace').load(store.sessionPath(id)); assert.equal(again.id, id); assert.equal(oldFile.path, store.sessionPath(id)); assert.notEqual(oldFile.path, path); assert.equal([...files.keys()].filter(item => item.endsWith(`${id}-v2.md`)).length, 1);
+});
+test('Coffee Tables speaker parser creates stable roster and speech identities and ignores note headings', () => {
+  const { parseGuests, parseSpeeches } = load('experiences/coffee-tables/view.ts', { obsidian });
+  const markdown = '- **主持人 甲｜林岑**：抓矛盾\n- **Xiao Yun｜Customer-support lead**: Frontline work\n\n### 林岑｜主持人\n你說要自動化，責任歸誰？\n\n### Xiao Yun｜Customer-support lead\n工作量沒有減少。\n\n# 觀察者整理\n## 主要轉折\n### 假設一\n不是來賓';
+  assert.deepEqual(plain(parseGuests(markdown)), [{ name: '林岑', role: '主持人 甲', bio: '抓矛盾' }, { name: 'Xiao Yun', role: 'Customer-support lead', bio: 'Frontline work' }]);
+  assert.deepEqual(plain(parseSpeeches(markdown)), [{ name: '林岑', role: '主持人', text: '你說要自動化，責任歸誰？' }, { name: 'Xiao Yun', role: 'Customer-support lead', text: '工作量沒有減少。' }]);
+});
+integrationTest('Coffee Tables engine survives view closure and reopening without starting a duplicate request', async () => {
+  const pending = deferred(); let calls = 0, saved = [];
+  const manager = new coffee.CoffeeManager(async request => { calls++; request.onText?.('Live draft'); return pending.promise; }, async value => { saved.push(plain(value)); });
+  const session = coffeeSession(), firstViewEngine = manager.open(session), task = firstViewEngine.start(); await until(() => calls === 1 && firstViewEngine.session.draftMarkdown === 'Live draft');
+  const reopenedViewEngine = manager.open(session); assert.equal(reopenedViewEngine, firstViewEngine); assert.equal(calls, 1);
+  pending.resolve('### 主持人｜主持人\n\nComplete conversation\n\n# 觀察者整理\n\n## 最大討論轉折\n- A\n## 被推翻或修正的假設\n- B\n## 值得繼續追問的問題\n- C\n## 尚未解決的核心分歧\n- D'); await task; assert.equal(manager.open(firstViewEngine.session).session.status, 'completed'); assert.equal(calls, 1); assert.match(saved.at(-1).transcriptMarkdown, /Complete conversation/);
+});
+test('Coffee Tables deletion locks every view of a shared manager engine and retires it after removal', async () => {
+  let calls = 0; const manager = new coffee.CoffeeManager(async () => { calls++; return 'not expected'; }, async () => {}); const session = coffeeSession(); session.status = 'completed'; const first = manager.open(session), second = manager.open(session); assert.equal(first, second);
+  const locked = await manager.prepareDelete(session.id); await Promise.all([second.continueTable(), second.ask('continue?')]); assert.equal(calls, 0); assert.equal(manager.get(session.id), first); manager.completeDelete(session.id, locked); await Promise.all([first.start(), second.continueTable(), second.ask('late?')]); assert.equal(first.deleted, true); assert.equal(manager.get(session.id), undefined); assert.equal(calls, 0); assert.throws(() => manager.open(session), /being deleted or was deleted/); manager.restore(session.id); assert.equal(manager.open(session).session.id, session.id);
+  const uncached = { ...coffeeSession(), id: 'uncached-delete-id' }; await manager.prepareDelete(uncached.id); assert.throws(() => manager.open(uncached), /being deleted or was deleted/); manager.cancelDelete(uncached.id, undefined); assert.equal(manager.open(uncached).session.id, uncached.id);
+});
+test('Coffee Tables copies legacy sessions without rewriting the source', () => {
+  const legacy = { version: 1, id: 'old-session', topic: '舊桌', language: 'zh-TW', model: 'm', reasoning: 'low', createdAt: '2026-01-01', updatedAt: '2026-01-01', status: 'completed', participants: [{ id: 'host-a', name: '小安', role: '主持人', lens: '好奇' }], messages: [{ id: 'm1', speakerId: 'host-a', text: '保留這句', replyTo: null, move: 'opening', targetId: null, createdAt: '2026-01-01' }], nextSpeakerId: 'host-a', segmentStart: 0, notes: null, endReason: 'natural' };
+  const copy = coffeeTypes.copyLegacySession(legacy);
+  assert.equal(copy.version, 3); assert.match(copy.transcriptMarkdown, /保留這句/); assert.notEqual(copy.id, legacy.id); assert.equal(legacy.version, 1);
+});
+integrationTest('Coffee Tables provider adapter uses plain text while preserving model, reasoning, logging and cancellation', async () => {
+  const { default: Plugin } = load('main.ts', { obsidian });
+  for (const model of ['test-codex', 'claude:sonnet']) {
+    const plugin = new Plugin(); plugin.app = { vault: { adapter: new obsidian.FileSystemAdapter() } }; plugin.manifest = { dir: 'plugin' }; plugin.settings.aiExchangeLoggingEnabled = true;
+    const events = []; plugin.exchanges = Object.fromEntries(['begin', 'sent', 'received', 'completed', 'failed'].map(key => [key, (...args) => events.push([key, ...args])]));
+    const runTask = async (_prompt, actualModel, effort, schema, controls) => { assert.equal(effort, 'high'); assert.equal(schema, undefined); assert.equal(controls.searchBudget, 0); assert.equal(actualModel, model === 'claude:sonnet' ? 'sonnet' : model); controls.onRequest({ prompt: 'plain text' }); return '完整 Markdown'; };
+    plugin.runtime = (_directory, local) => { assert.equal(local, true); return { runTask }; }; plugin.claudeCli = () => ({ runTask });
+    const request = { session: { ...coffeeSession(), model, reasoning: 'high' }, prompt: 'coffee prompt', signal: new AbortController().signal };
+    assert.equal(await plugin.runCoffeeRequest(request), '完整 Markdown'); assert.deepEqual(events.map(event => event[0]), ['begin', 'sent', 'received', 'completed']); assert.equal(plugin.activeTasks.size, 0);
+    const abort = new AbortController(); abort.abort(); await assert.rejects(plugin.runCoffeeRequest({ ...request, signal: abort.signal }), /cancelled/);
+  }
+});
+function coffeeElement(tag, options = {}) {
+  return { tag, text: options.text ?? '', value: options.value ?? '', children: [], disabled: false, attrs: options.attr ?? {},
+    createDiv(value) { const element = coffeeElement('div', typeof value === 'string' ? { cls: value } : value); this.children.push(element); return element; },
+    createEl(name, value) { const element = coffeeElement(name, value); this.children.push(element); return element; }, createSpan(value) { const element = coffeeElement('span', value); this.children.push(element); return element; }, addClass() {}, toggleClass() {}, removeClass() {}, setText(value) { this.text = value; }, empty() { this.children = []; }, focus() {}, remove() { this.removed = true; },
+    classList: { add() {}, toggle() {} }, dataset: {},
+    setAttribute(name, value) { this.attrs[name] = value; },
+    addEventListener(name, handler) { this[name] = handler; }, get childElementCount() { return this.children.length; } };
+}
+const coffeeFind = (root, predicate) => predicate(root) ? root : root.children.map(child => coffeeFind(child, predicate)).find(Boolean);
+integrationTest('Coffee Tables home form keeps discovered model and reasoning choices and disables start during discovery', async () => {
+  const { CoffeeTablesView } = load('experiences/coffee-tables/view.ts', { obsidian });
+  const plugin = { settings: { language: 'en', cliModel: 'm', cliReasoning: 'low' }, availableModels: () => ['m'], coffeeReasoningEfforts: model => model === 'm' ? ['low'] : ['medium', 'high'], refreshCoffeeModels: async () => ['m', 'codex-other'], modelLabel: value => value, confirmAiUsage: async (_model, run) => run() };
+  const view = new CoffeeTablesView({ app: {} }, plugin); view.contentEl = coffeeElement('root'); view.store = { list: () => [] }; await view.home();
+  const selects = []; const visit = node => { if (node.tag === 'select') selects.push(node); node.children.forEach(visit); }; visit(view.contentEl);
+  await until(() => !selects[0].disabled); assert.deepEqual(selects[0].children.map(option => option.value), ['m', 'codex-other']);
+  assert.deepEqual(selects[1].children.map(option => option.value), ['auto', 'low']);
+  const summaries = []; const findSummaries = node => { if (node.tag === 'summary') summaries.push(node.text); node.children.forEach(findSummaries); }; findSummaries(view.contentEl); assert.ok(summaries.some(text => /Adjust this table · m · 2 hosts \+ 7 guests/.test(text)));
+  selects[0].value = 'codex-other'; selects[0].change(); assert.deepEqual(selects[1].children.map(option => option.value), ['auto', 'medium', 'high']);
+});
+integrationTest('Coffee Tables explicit return home cannot be overridden by a delayed saved session state', async () => {
+  const { CoffeeTablesView } = load('experiences/coffee-tables/view.ts', { obsidian }); let loads = 0, saves = 0;
+  const plugin = { ready: Promise.resolve(), settings: {}, coffeeStorage: {} };
+  const view = new CoffeeTablesView({ app: { workspace: { requestSaveLayout: () => saves++ } } }, plugin); view.store = {}; view.home = async () => { view.engine = null; }; view.loadSession = async () => { loads++; };
+  view.returnHome(); await view.setState({ sessionId: 'previous-session' }, { history: false });
+  assert.equal(loads, 0); assert.equal(saves, 1);
+  const restored = new CoffeeTablesView({ app: { workspace: { requestSaveLayout() {} } } }, plugin); restored.store = {}; restored.loadSession = async () => { loads++; };
+  await restored.setState({ sessionId: 'saved-session' }, { history: false }); assert.equal(loads, 1);
+});
+integrationTest('Coffee Tables stale external-conflict loads cannot override a newer room selection', async () => {
+  const { CoffeeTablesView } = load('experiences/coffee-tables/view.ts', { obsidian }), oldLoad = { promise: null, reject: null }, newLoad = deferred(), stopPending = deferred(); oldLoad.promise = new Promise((_resolve, reject) => { oldLoad.reject = reject; }); let stopCalled = false, attached = []; const session = { ...coffeeSession(), status: 'completed' };
+  const cached = { busy: true, session, stop: async () => { stopCalled = true; await stopPending.promise; }, reportPersistenceError() {} }; const plugin = { coffeeManager: { get: () => cached } };
+  const view = new CoffeeTablesView({ app: {} }, plugin); view.store = { load: path => path === 'old.md' ? oldLoad.promise : newLoad.promise, inspect: async () => session }; view.attach = value => attached.push(value.topic);
+  const older = view.loadSession('old.md'); oldLoad.reject(new Error('changed outside the room')); await until(() => stopCalled); const newer = view.loadSession('new.md'); stopPending.resolve(); await older; assert.deepEqual(attached, []); newLoad.resolve(session); await newer; assert.deepEqual(attached, [session.topic]);
+});
+
+integrationTest('Coffee Tables historical preview cancels a pending generating-room navigation', async () => {
+  const { CoffeeTablesView } = load('experiences/coffee-tables/view.ts', { obsidian });
+  let delayedRoom = deferred(); const completed = { ...coffeeSession(), id: 'done', topic: 'History topic', status: 'completed', transcriptMarkdown: '', rounds: [], observerNotes: [] };
+  const generating = { ...coffeeSession(), id: 'running', topic: 'Running topic', status: 'generating', transcriptMarkdown: '', rounds: [], observerNotes: [] };
+  const plugin = { settings: { language: 'en', cliModel: 'm', cliReasoning: 'low', workspaceFolder: 'workspace' }, availableModels: () => ['m'], coffeeReasoningEfforts: () => ['low'], refreshCoffeeModels: async () => ['m'], modelLabel: value => value, confirmAiUsage: async (_model, run) => run(), coffeeManager: { get: id => id === generating.id ? { busy: true, session: generating } : undefined } };
+  const view = new CoffeeTablesView({ app: { workspace: { requestSaveLayout() {} } } }, plugin); view.contentEl = coffeeElement('root');
+  view.store = { recoverPendingCreates: async () => {}, list: () => [{ path: 'running.md', extension: 'md', basename: 'Running topic', stat: { ctime: 1, mtime: 1 } }, { path: 'done.md', extension: 'md', basename: 'History topic', stat: { ctime: 1, mtime: 1 } }], inspectReadOnly: async path => path === 'done.md' ? completed : generating, load: () => delayedRoom.promise };
+  const attached = []; view.attach = session => attached.push(session.id); await view.home();
+  const findButton = text => coffeeFind(view.contentEl, element => element.tag === 'button' && (element.text.includes(text) || element.children.some(child => child.text.includes(text))));
+  await until(() => findButton('Running topic')); const runningButton = findButton('Running topic'); assert.ok(runningButton); runningButton.click(); await Promise.resolve();
+  const historyButton = findButton('History topic'); assert.ok(historyButton); historyButton.click(); await until(() => findButton('Enter this table'));
+  delayedRoom.resolve(generating); await new Promise(resolve => setImmediate(resolve)); assert.deepEqual(attached, []);
+  delayedRoom = deferred(); findButton('Enter this table').click(); await Promise.resolve(); findButton('Open new table').click(); delayedRoom.resolve(completed); await new Promise(resolve => setImmediate(resolve)); assert.deepEqual(attached, []);
+});
+
+integrationTest('Coffee Tables VAM handoff links the transcript and starts from an editable research question', async () => {
+  let modal, opened; class Modal { constructor() { modal = this; this.titleEl = coffeeElement('title'); this.contentEl = coffeeElement('content'); } open() {} close() {} }
+  const { default: Plugin } = load('main.ts', { obsidian: { ...obsidian, Modal } }); const { app, repo } = fixture('en'), plugin = new Plugin(); plugin.app = app; plugin.repo = repo; plugin.settings.language = 'en';
+  const session = { ...coffeeSession(), status: 'completed', transcriptMarkdown: 'The table discussed meal choices.' }; plugin.mutate = run => run(); plugin.activateView = async path => { opened = path; };
+  await plugin.openCoffeeHandoff(session, 'Agent Workspace/Coffee Tables/session.md'); coffeeFind(modal.contentEl, element => element.text === 'Create research map').click(); await until(() => opened);
+  const map = await repo.readMap(opened); assert.equal(map.nodes.length, 1); const note = await repo.readNote(map.nodes[0].path);
+  assert.match(note.detail, /Coffee Tables/); assert.doesNotMatch(note.detail, /meal choices/); assert.match(note.detail, /Simulated Coffee Tables discussion/);
 });

@@ -1,3 +1,7 @@
+import { CoffeeTablesView, COFFEE_TABLES_VIEW_TYPE, COFFEE_TABLES_NAME } from "./experiences/coffee-tables/view";
+import type { CoffeeRequest, CoffeeSession } from "./experiences/coffee-tables/types";
+import { CoffeeManager } from "./experiences/coffee-tables/engine";
+import { CoffeeStorage } from "./experiences/coffee-tables/storage";
 import { t, setUiLanguage, topicStatusLabel, translate, initialUiLanguage, type TranslationKey } from "./i18n";
 import { App, MarkdownRenderer, FileSystemAdapter, ItemView, MarkdownView, Modal, Notice, Plugin, PluginSettingTab, Setting, TFile, type TFolder, View, WorkspaceLeaf, type Command, type SettingDefinitionItem } from "obsidian";
 import { ReferencePicker, type ReferenceTopic } from "./ui/reference-picker";
@@ -2023,7 +2027,7 @@ export class VisualAgentMapSettingTab extends PluginSettingTab {
     const models = Object.fromEntries(this.plugin.availableModels().map(model => [model, this.plugin.modelLabel(model)]));
     return [
       { name: t("ui.interface_language"), render: setting => {
-        setting.setName(t("ui.interface_language")).addDropdown(dropdown => {
+        setting.setName(t("ui.interface_language")).setDesc(t("ui.interface_language_description")).addDropdown(dropdown => {
           dropdown.addOption("en", "English").addOption("zh-TW", "繁體中文").setValue(this.plugin.settings.language).setDisabled(this.plugin.languageSwitchPending);
           dropdown.onChange(value => { void this.plugin.changeLanguage(value); });
         });
@@ -2071,6 +2075,9 @@ export default class VisualAgentMapPlugin extends Plugin {
   exchanges: AiExchangeLog | null = null;
   private codexRuntime: CodexAppServerRuntime | null = null;
   private localCodexRuntime: CodexAppServerRuntime | null = null;
+  private coffeeModelEfforts = new Map<string, string[]>();
+  coffeeManager: CoffeeManager | null = null;
+  coffeeStorage: CoffeeStorage | null = null;
   private settingTab!: VisualAgentMapSettingTab;
   private detailsLeaf: WorkspaceLeaf | null = null;
   private detailsPath: string | null = null;
@@ -2135,6 +2142,12 @@ export default class VisualAgentMapPlugin extends Plugin {
       }
     });
     this.ready = initialize;
+    this.registerView(COFFEE_TABLES_VIEW_TYPE, leaf => new CoffeeTablesView(leaf, this));
+    this.coffeeStorage = new CoffeeStorage(this.app.vault, this.settings.workspaceFolder, (file, path) => this.app.fileManager.renameFile(file, path), file => this.app.fileManager.trashFile(file));
+    this.coffeeManager = new CoffeeManager(request => this.runCoffeeRequest(request), session => this.coffeeStorage!.save(session));
+    const openCoffee = (): void => { void this.activateCoffeeTables().catch((error: unknown) => new Notice(String(error))); };
+    this.addRibbonIcon("coffee", `Open ${COFFEE_TABLES_NAME}`, openCoffee);
+    this.addCommand({ id: "open-coffee-tables", name: `Open ${COFFEE_TABLES_NAME}`, callback: openCoffee });
     this.registerView(VIEW_TYPE, leaf => new VisualAgentMapView(leaf, this));
     this.registerView(OUTLINE_VIEW_TYPE, leaf => new OutlineView(leaf, async path => {
       try { await this.openDetails(this.repo.file(path)); }
@@ -2212,6 +2225,17 @@ export default class VisualAgentMapPlugin extends Plugin {
     if (this.claudeDiagnostic().installed) models.push(...CLAUDE_MODEL_CHOICES.map(choice => choice.id));
     return [...new Set(models)];
   }
+  async refreshCoffeeModels(): Promise<string[]> {
+    if (this.codexDiagnostic().installed) {
+      try { await this.refreshCodexModels(); }
+      catch (error) { this.logs.appendLog("warn", `Coffee Tables 無法載入 Codex 模型：${error instanceof Error ? error.message : String(error)}`); }
+    }
+    return this.availableModels();
+  }
+  coffeeReasoningEfforts(model: string): string[] {
+    if (providerForModel(model) === "claude") return ["low", "medium", "high"];
+    return this.coffeeModelEfforts.get(model) ?? [];
+  }
   modelLabel(model: string): string { return CLAUDE_MODEL_CHOICES.find(choice => choice.id === model)?.label ?? `${t("ui.codex_provider_label")} · ${model}`; }
   private usageNoticeSeen(model: string): boolean { return providerForModel(model) === "claude" ? this.settings.claudeUsageNoticeSeen : this.settings.codexUsageNoticeSeen; }
   private async setUsageNoticeSeen(model: string): Promise<void> {
@@ -2285,7 +2309,7 @@ export default class VisualAgentMapPlugin extends Plugin {
     if (!(leaf?.view instanceof MarkdownView)) return;
     leaf.view.containerEl.toggleClass("vam-topic-markdown", !!leaf.view.file && this.isNode(leaf.view.file));
   }
-  onunload(): void { this.resetCodexRuntime(); }
+  onunload(): void { void this.coffeeManager?.stop(); this.coffeeManager = null; this.resetCodexRuntime(); }
   async saveSettings(): Promise<void> { await this.saveData(this.settings); }
   async changeLanguage(value: unknown): Promise<boolean> {
     const next = value === "zh-TW" ? "zh-TW" : "en";
@@ -2312,6 +2336,11 @@ export default class VisualAgentMapPlugin extends Plugin {
         for (const result of results) if (result.status === "rejected") failures.push(result.reason);
         if (!views.length) this.syncOutline(null, new Map());
       } catch (error) { failures.push(error); }
+      try {
+        const views = this.coffeeViews();
+        const results = await Promise.allSettled(views.map(view => view.refreshForLanguageChange()));
+        for (const result of results) if (result.status === "rejected") failures.push(result.reason);
+      } catch (error) { failures.push(error); }
       for (const error of failures) this.recordFailure(t("ui.language_view_refresh_failed"), error);
       new Notice(failures.length ? t("ui.language_change_partial_failure") : t("ui.language_changed_content_preserved"));
       return true;
@@ -2327,6 +2356,7 @@ export default class VisualAgentMapPlugin extends Plugin {
     this.ribbonIcon?.setAttribute("aria-label", translate(this.settings.language, "ui.open_map"));
     for (const { command, key } of this.localizedCommands) command.name = `Visual Agent Map (VAM): ${translate(this.settings.language, key)}`;
   }
+  coffeeViews(): CoffeeTablesView[] { return this.app.workspace.getLeavesOfType(COFFEE_TABLES_VIEW_TYPE).map(leaf => leaf.view).filter((view): view is CoffeeTablesView => view instanceof CoffeeTablesView); }
   async aiReadyForModel(model: string): Promise<boolean> {
     if (providerForModel(model) === "claude") {
       if (!this.claudeDiagnostic().installed) { this.openClaudeSetupGuide(); return false; }
@@ -2401,6 +2431,61 @@ export default class VisualAgentMapPlugin extends Plugin {
     this.detailsLeaf = null;
     this.detailsPath = null;
   }
+  async activateCoffeeTables(): Promise<void> {
+    await this.ready;
+    let leaf = this.app.workspace.getLeavesOfType(COFFEE_TABLES_VIEW_TYPE)[0];
+    if (!leaf) { leaf = this.app.workspace.getLeaf("tab"); await leaf.setViewState({ type: COFFEE_TABLES_VIEW_TYPE, active: true }); }
+    await this.app.workspace.revealLeaf(leaf);
+  }
+  async runCoffeeRequest(request: CoffeeRequest): Promise<string> {
+    if (!(this.app.vault.adapter instanceof FileSystemAdapter) || !this.manifest.dir) throw new Error("Coffee Tables requires the desktop runtime");
+    const { session, signal, prompt } = request;
+    const directory = join(this.app.vault.adapter.getBasePath(), this.manifest.dir);
+    const effort = effectiveReasoningLevel({ title: session.topic, summary: "", detail: "", rules: "", task: "", ancestors: "" }, normalizeReasoningLevel(session.reasoning));
+    const exchanges = this.settings.aiExchangeLoggingEnabled ? this.exchanges : null;
+    const id = randomUUID();
+    const key = `coffee:${id}`; const controller = new AbortController();
+    const abort = (): void => controller.abort();
+    signal.addEventListener("abort", abort, { once: true });
+    if (signal.aborted) controller.abort();
+    this.activeTasks.set(key, controller);
+    exchanges?.begin({ id, startedAt: new Date().toISOString(), topic: `Coffee Tables · ${session.topic}`, mode: "task", model: session.model, effort });
+    try {
+      const controls = { signal: controller.signal, searchBudget: 0, timeoutMs: 15 * 60 * 1000, onText: (text: string): void => request.onText?.(text), onSteer: (handler: (text: string) => Promise<void>): void => request.registerIntervention?.(handler), onRequest: (data: unknown): void => { if (this.settings.aiExchangeLoggingEnabled) exchanges?.sent(id, JSON.stringify({ request: data, prompt }, null, 2)); } };
+      const raw = providerForModel(session.model) === "claude"
+        ? await this.claudeCli(directory).runTask(prompt, providerModelId(session.model), effort, undefined, controls)
+        : await this.runtime(directory, true).runTask(prompt, session.model, effort, undefined, controls);
+      if (controller.signal.aborted) throw new Error("Coffee Tables request cancelled");
+      if (this.settings.aiExchangeLoggingEnabled) { exchanges?.received(id, raw); exchanges?.completed(id); }
+      return raw;
+    } catch (error) {
+      if (this.settings.aiExchangeLoggingEnabled) exchanges?.failed(id, error instanceof Error ? error.message : String(error));
+      throw error;
+    } finally { signal.removeEventListener("abort", abort); this.activeTasks.delete(key); }
+  }
+  async openCoffeeHandoff(session: CoffeeSession, sourcePath: string): Promise<void> {
+    const zh = this.settings.language === "zh-TW";
+    const modal = new Modal(this.app);
+    modal.titleEl.setText(zh ? "帶去 VAM 深入研究" : "Take to VAM for deeper research");
+    modal.contentEl.createEl("p", { text: zh ? "編輯要深入研究的問題，並從來源對談開始。" : "Edit the question for deeper research. The source conversation will be linked." });
+    const question = modal.contentEl.createEl("textarea", { cls: "ct-handoff-question", attr: { rows: "3", "aria-label": zh ? "研究問題" : "Research question" } });
+    question.value = session.topic;
+    const create = modal.contentEl.createEl("button", { text: zh ? "建立研究地圖" : "Create research map", cls: "mod-cta" });
+    create.addEventListener("click", () => {
+      const title = question.value.trim(); if (!title || create.disabled) return;
+      create.disabled = true;
+      void this.mutate(async () => {
+        const path = await this.repo.createMap(title);
+        const map = await this.repo.readMap(path);
+        const node = await this.repo.createNote(title, session.model, map, path, "manual");
+        const detail = [zh ? "Coffee Tables 的模擬對談，內容尚未查證，不代表使用者結論。" : "Simulated Coffee Tables discussion; unverified and not the user's conclusion.", `[[${sourcePath}|Coffee Tables 對談]]`].join("\n\n");
+        await this.repo.updateNote(node.path, { detail, reasoning: normalizeReasoningLevel(session.reasoning) });
+        map.nodes.push(node); await this.repo.saveMap(path, map);
+        modal.close(); await this.activateView(path);
+      }).catch((error: unknown) => { new Notice(`${String(error)} · ${zh ? "可能已建立部分研究檔案，請先檢查再重試。" : "Some research files may have been created; inspect before retrying."}`); });
+    });
+    modal.open();
+  }
   private async activateView(path?: string): Promise<void> { await this.ready; let leaf = this.app.workspace.getLeavesOfType(VIEW_TYPE)[0]; if (!leaf) leaf = this.app.workspace.getLeaf("tab"); await leaf.setViewState({ type: VIEW_TYPE, active: true, state: path ? { file: path } : leaf.view instanceof VisualAgentMapView ? leaf.view.getState() : {} }); await this.app.workspace.revealLeaf(leaf); }
   private async activateBuiltInSample(forceTour = false): Promise<void> {
     await this.ready; this.firstInstallSamplePending = false;
@@ -2414,6 +2499,7 @@ export default class VisualAgentMapPlugin extends Plugin {
     if (!(adapter instanceof FileSystemAdapter) || !this.manifest.dir) return;
     const pluginDirectory = join(adapter.getBasePath(), this.manifest.dir);
     const models = await this.runtime(pluginDirectory).listModels();
+    this.coffeeModelEfforts = new Map(models.map(item => [item.model, item.supportedReasoningEfforts.map(effort => effort.reasoningEffort).filter(value => ["low", "medium", "high"].includes(value))]));
     this.settings.models = models.map(item => item.model).join(", ");
     if (providerForModel(this.settings.cliModel) === "codex" && !models.some(item => item.model === this.settings.cliModel)) this.settings.cliModel = models.find(item => item.model === DEFAULT_SETTINGS.cliModel)?.model || models.find(item => item.isDefault)?.model || models[0]?.model || "";
     await this.saveSettings();

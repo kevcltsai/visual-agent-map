@@ -62,7 +62,7 @@ export function updateCurrentTestVault({ vault = canonicalVault, artifact = root
   if (!existsSync(plugin) || lstatSync(plugin).isSymbolicLink() || !lstatSync(plugin).isDirectory()) throw new Error("Refusing an invalid installed plugin directory.");
   const installedManifest = json(join(plugin, "manifest.json"));
   if (manifest.id !== "visual-agent-map" || installedManifest.id !== manifest.id || installedManifest.version !== record.version) throw new Error("Installed plugin identity/version does not match the owned test-vault record.");
-  if (record.profile !== "onboarding") ensureSourceSelectionFixture(vault, record.workspaceRoot);
+  if (record.profile !== "onboarding") ensureSourceSelectionFixture(vault, record.workspaceRoot, { preserveExisting: true });
   const staging = mkdtempSync(join(plugin, ".vam-update-")), replaced = [];
   try {
     for (const name of assets) copyFileSync(join(artifact, name), join(staging, name));

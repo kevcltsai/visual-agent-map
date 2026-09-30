@@ -43,6 +43,19 @@ test('in-place plugin refresh updates only installed artifacts and preserves tes
   assert.equal(readFileSync(join(plugin, 'main.js'), 'utf8'), readFileSync(join(root, 'main.js'), 'utf8'));
 });
 
+test('in-place refresh preserves complete user-modified source-selection fixtures', t => {
+  const { vault } = environment(t); prepareTestVault({ vault });
+  const fixture = join(vault, 'Agent Workspace/Topics/Local Source Fixture');
+  const files = [join(fixture, 'Map.md'), join(fixture, 'Notes/alpha.md'), join(fixture, 'Notes/beta.md')];
+  const contents = ['User map', 'User alpha note', 'User beta note'];
+  files.forEach((path, index) => writeFileSync(path, contents[index]));
+
+  updateCurrentTestVault({ vault });
+
+  assert.deepEqual(files.map(path => readFileSync(path, 'utf8')), contents);
+  assert.deepEqual(verifyTestVault(vault).hashes, JSON.parse(readFileSync(join(vault, '.vam-test-environment.json'), 'utf8')).hashes);
+});
+
 test('in-place refresh upgrades an older owned test build without replacing vault data', t => {
   const { vault } = environment(t); prepareTestVault({ vault });
   const plugin = join(vault, '.obsidian/plugins/visual-agent-map');

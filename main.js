@@ -36,6 +36,2772 @@ __export(main_exports, {
 });
 module.exports = __toCommonJS(main_exports);
 
+// experiences/coffee-tables/view.ts
+var import_obsidian2 = require("obsidian");
+
+// experiences/coffee-tables/prompts.ts
+var MAX_COFFEE_CONTEXT_CHARS = 18e4;
+function assembleCoffeeContext(session) {
+  var _a, _b, _c, _d;
+  const events = [];
+  let order = 0;
+  const add = (at, text2) => {
+    if (!text2.trim()) return;
+    const parsed = at ? Date.parse(at) : Number.NaN;
+    events.push({ at: Number.isFinite(parsed) ? parsed : Number.MAX_SAFE_INTEGER, order: order++, text: text2.trim() });
+  };
+  const rounds = (_a = session.rounds) != null ? _a : [];
+  const attachedInterventions = /* @__PURE__ */ new Set();
+  if (rounds.length) {
+    for (const round of rounds) {
+      const source = round.markdown || round.draftMarkdown || "";
+      const attached = ((_b = session.interventions) != null ? _b : []).filter((item) => item.roundId === round.id).sort((a, b) => {
+        var _a2, _b2;
+        return ((_a2 = a.afterTurn) != null ? _a2 : 0) - ((_b2 = b.afterTurn) != null ? _b2 : 0) || Date.parse(a.createdAt) - Date.parse(b.createdAt);
+      });
+      for (const item of attached) attachedInterventions.add(item.id);
+      if (!attached.length || !/^###\s+/m.test(source)) {
+        add(round.createdAt, [source, ...attached.map((item) => `\u4F7F\u7528\u8005\u4ECB\u5165\uFF1A${item.text}`)].filter(Boolean).join("\n\n"));
+        continue;
+      }
+      const parts = source.split(/(?=^###\s+)/m), output = [];
+      let speakerTurns = 0, nextIntervention = 0;
+      const inject = (limit) => {
+        var _a2;
+        while (nextIntervention < attached.length && ((_a2 = attached[nextIntervention].afterTurn) != null ? _a2 : 0) <= limit) output.push(`\u4F7F\u7528\u8005\u4ECB\u5165\uFF1A${attached[nextIntervention++].text}`);
+      };
+      for (const part of parts) {
+        if (/^###\s+/.test(part)) {
+          inject(speakerTurns);
+          output.push(part);
+          speakerTurns++;
+          inject(speakerTurns);
+        } else {
+          inject(0);
+          if (part.trim()) output.push(part);
+        }
+      }
+      inject(Number.MAX_SAFE_INTEGER);
+      add(round.createdAt, output.join("\n\n"));
+    }
+  } else add(session.createdAt, session.transcriptMarkdown);
+  for (const question of session.questions) {
+    if (question.status === "pending" && !question.answer && !question.draftAnswer) continue;
+    add(question.createdAt, `\u4F7F\u7528\u8005\u8FFD\u554F\uFF1A${question.question}
+\u684C\u4E0A\u56DE\u7B54\uFF1A${question.answer || question.draftAnswer || "\uFF08\u56DE\u7B54\u5C1A\u672A\u5B8C\u6210\uFF09"}`);
+  }
+  for (const intervention of (_c = session.interventions) != null ? _c : []) if (!attachedInterventions.has(intervention.id)) add(intervention.createdAt, `\u4F7F\u7528\u8005\u4ECB\u5165\uFF1A${intervention.text}`);
+  events.sort((a, b) => a.at - b.at || a.order - b.order);
+  const notes = ((_d = session.observerNotes) == null ? void 0 : _d[0]) ? `\u76EE\u524D\u89C0\u5BDF\u8005\u6574\u7406\uFF08\u53EA\u7528\u4F86\u63A8\u9032\u8A0E\u8AD6\uFF0C\u4E0D\u8981\u91CD\u5BEB\uFF09\uFF1A
+${session.observerNotes[0]}` : "";
+  return [...events.map((item) => item.text), notes].filter(Boolean).join("\n\n");
+}
+var LABELS = { experts: "\u4E3B\u984C\u5C08\u5BB6", "cross-domain": "\u8DE8\u9818\u57DF\u5C08\u5BB6", generalist: "\u597D\u5947\u7684\u901A\u624D generalist", affected: "\u53D7\u5F71\u97FF\u8005" };
+function names(guests) {
+  return ["experts", "cross-domain", "generalist", "affected"].flatMap((category) => Array.from({ length: guests.counts[category] }, (_, index) => {
+    const named = guests.guests.filter((item) => item.category === category)[index];
+    return named ? `${LABELS[category]}\uFF1A${named.description}` : LABELS[category];
+  }));
+}
+function tablePrompt(topic, language2, guests, draft = "", priorContext = "") {
+  var _a;
+  const zh = language2 === "zh-TW";
+  const languageLine = zh ? "\u8ACB\u7528\u81EA\u7136\u3001\u53E3\u8A9E\u7684\u7E41\u9AD4\u4E2D\u6587\uFF08\u53F0\u7063\u7528\u6CD5\uFF09\u5BEB\u4F5C\u3002" : "Write in natural, conversational English.";
+  const settings = guests != null ? guests : { counts: { experts: 4, "cross-domain": 1, generalist: 1, affected: 1 }, guests: [], background: "", customPrompt: "" };
+  const attendeeRoles = names(settings).map((role) => `- ${role}`);
+  const background = settings.background.trim() ? `
+\u88DC\u5145\u80CC\u666F\uFF1A${settings.background.trim()}` : "";
+  const custom = settings.customPrompt.trim() ? `
+
+\u4F7F\u7528\u8005\u7684\u984D\u5916\u8981\u6C42\uFF08\u5F71\u97FF\u8A0E\u8AD6\u7126\u9EDE\u3001\u4F8B\u5B50\u8207\u8A9E\u6C23\uFF1B\u4E0D\u53EF\u66F4\u6539\u65E2\u5B9A\u4F86\u8CD3\u4EBA\u6578\u3001\u8F38\u51FA\u7D50\u69CB\u3001\u6A21\u64EC\u8072\u660E\u53CA\u6536\u5C3E\u689D\u4EF6\uFF09\uFF1A
+${settings.customPrompt.trim()}` : "";
+  const continuing = !!(draft || priorContext);
+  const turns = zh ? continuing ? "\u9019\u662F\u63A5\u7E8C\u6BB5\uFF0C\u65B0\u589E\u7D04 8\u201312 \u6B21\u7C21\u77ED\u767C\u8A00\u3002\u6CBF\u7528\u539F\u684C\u4EBA\u7269\uFF0C\u512A\u5148\u78B0\u89F8\u9084\u6C92\u89E3\u958B\u7684\u554F\u984C\u3001\u56DE\u61C9\u4F7F\u7528\u8005\u4ECB\u5165\u6216\u8FFD\u554F\uFF1B\u4E0D\u8981\u91CD\u8907\u539F\u672C\u7ACB\u5834\u3002" : "\u5168\u684C\u7D04 10\u201318 \u6B21\u7C21\u77ED\u767C\u8A00\u70BA\u8EDF\u76EE\u6A19\u3002" : continuing ? "This is a continuation: add roughly 8\u201312 concise speaker turns. Keep the same guests, pursue unresolved questions and respond to the user's follow-up; do not repeat earlier positions." : "Aim for roughly 10\u201318 concise speaker turns across the table.";
+  const continuationGuard = zh ? "\u9019\u662F\u540C\u4E00\u5834\u5C0D\u8AC7\u7684\u63A5\u7E8C\uFF0C\u76F4\u63A5\u5F9E\u4E0A\u4E00\u53E5\u63A5\u7E8C\u5C0D\u8AC7\u3002\u4E0D\u8981\u8F38\u51FA\u5DE5\u4F5C\u6D41\u7A0B\u3001\u8A08\u756B\u3001\u78BA\u8A8D\u6216\u81EA\u6211\u8AAA\u660E\uFF0C\u4E0D\u8981\u5BEB\u4EFB\u4F55\u524D\u8A00\uFF0C\u4E5F\u4E0D\u8981\u91CD\u5217\u4EBA\u7269\u4ECB\u7D39\u6216\u91CD\u8FF0\u5DF2\u5B8C\u6210\u7684\u5C0D\u8AC7\u3002\u7B2C\u4E00\u500B\u53EF\u898B\u5167\u5BB9\u5FC5\u9808\u662F\u81EA\u7136\u7684\u5C0D\u8AC7\u767C\u8A00\uFF1B\u82E5\u8349\u7A3F\u6700\u5F8C\u4E00\u53E5\u5C1A\u672A\u8AAA\u5B8C\uFF0C\u9806\u8457\u8A9E\u610F\u63A5\u5B8C\u3002" : "This is the same table continuing. Continue the conversation directly from the last sentence. Do not output process notes, plans, confirmations or self-commentary; do not add a preamble, repeat the guest introductions, or restate completed dialogue. The first visible content must be a natural dialogue turn; if the draft ends mid-sentence, complete it naturally.";
+  const notes = zh ? "\u6700\u5F8C\u5FC5\u9808\u8F38\u51FA\u5B8C\u6574\u7684\u300C# \u89C0\u5BDF\u8005\u6574\u7406\u300D\uFF0C\u4E26\u56B4\u683C\u4F7F\u7528\u4EE5\u4E0B\u4E94\u500B Markdown \u4E8C\u7D1A\u6A19\u984C\uFF08\u6BCF\u500B\u6A19\u984C\u4E0B 2\u20134 \u500B\u689D\u5217\uFF09\uFF1A## \u610F\u5916\u9023\u7D50\u3001## \u503C\u5F97\u7E7C\u7E8C\u60F3\u7684\u554F\u984C\u3001## \u6838\u5FC3\u5206\u6B67\u3001## \u63A2\u7D22\u65B9\u5411\u3001## \u503C\u5F97\u67E5\u8B49\u7684\u5047\u8A2D\u3002\u6A19\u984C\u8207\u689D\u5217\u4E0D\u53EF\u7701\u7565\uFF0C\u4E5F\u4E0D\u8981\u628A\u89C0\u5BDF\u8005\u6574\u7406\u5BEB\u6210\u5C0D\u8AC7\u767C\u8A00\u3002\u6574\u5408\u672C\u6BB5\u8207\u524D\u6587\u7684\u6700\u65B0\u8F49\u6298\u3001\u4FEE\u6B63\u5047\u8A2D\u3001\u503C\u5F97\u7E7C\u7E8C\u8FFD\u554F\u7684\u554F\u984C\u53CA\u5C1A\u672A\u89E3\u6C7A\u7684\u6838\u5FC3\u5206\u6B67\uFF0C\u53EA\u7D0D\u5165\u5C0D\u8AC7\u5BE6\u969B\u63D0\u53CA\u7684\u5167\u5BB9\uFF0C\u4E0D\u6DFB\u52A0\u65B0\u4E8B\u5BE6\u3002\u5168\u90E8\u6574\u7406\u5B8C\u6210\u5F8C\uFF0C\u6700\u5F8C\u55AE\u7368\u8F38\u51FA `<!-- coffee-tables-complete -->` \u4F5C\u70BA\u5B8C\u6210\u6A19\u8A18\uFF0C\u4E0D\u8981\u5728\u6A19\u8A18\u5F8C\u52A0\u4EFB\u4F55\u5167\u5BB9\u3002" : "End with a complete `# Observer\u2019s notes` and use exactly these five Markdown second-level headings, each followed by 2\u20134 bullets: `## Unexpected connections`, `## Questions worth pursuing`, `## Core disagreements`, `## Directions to explore`, and `## Assumptions to verify`. Do not omit headings or present the notes as dialogue. Integrate the latest turns, revised assumptions, questions worth pursuing and unresolved disagreements with the previous discussion; use only points grounded in the conversation. After all notes are complete, output `<!-- coffee-tables-complete -->` alone as the final line, with nothing after it.";
+  const prior = priorContext ? `
+
+\u5148\u524D\u5C0D\u8AC7\u8207\u8FFD\u554F\uFF08\u53EA\u4F5C\u8108\u7D61\uFF0C\u4E0D\u8981\u91CD\u5BEB\uFF09\uFF1A
+${priorContext}` : "";
+  const draftText = draft ? `
+
+\u672C\u6BB5\u5DF2\u6536\u5230\u7684\u8349\u7A3F\uFF0C\u8ACB\u5F9E\u6700\u5F8C\u4E00\u53E5\u63A5\u7E8C\uFF1A
+${draft}` : "";
+  const hostCount = (_a = settings.hostCount) != null ? _a : 2;
+  const hostInstruction = zh ? hostCount === 1 ? "1 \u4F4D\u4E3B\u6301\u4EBA\uFF0C\u540C\u6642\u517C\u5177\u6293\u77DB\u76FE\u8207\u597D\u5947\u8FFD\u554F\uFF0C\u4F9D\u5C0D\u8A71\u9700\u8981\u5207\u63DB\u3002" : hostCount === 2 ? "2 \u4F4D\u98A8\u683C\u4E0D\u540C\u7684\u4E3B\u6301\u4EBA\uFF1A\u4E00\u4F4D\u6293\u77DB\u76FE\uFF0C\u4E00\u4F4D\u597D\u5947\u8FFD\u554F\u3002" : `${hostCount} \u4F4D\u4E3B\u6301\u4EBA\uFF0C\u98A8\u683C\u4E92\u88DC\u4E14\u4E0D\u8981\u91CD\u8907\u7E3D\u7D50\u3002` : hostCount === 1 ? "1 host who combines sharp contradiction-spotting with curious follow-up questions." : hostCount === 2 ? "2 hosts with distinct styles: one sharp and contradiction-focused, the other curious and probing." : `${hostCount} hosts with complementary styles who avoid repetitive summaries.`;
+  const opening = continuing ? `${continuationGuard}
+
+` : "\u958B\u982D\u5217\u53C3\u8207\u8005\uFF08\u6BCF\u4EBA\u4E00\u884C\u300C- **\u59D3\u540D\uFF5C\u89D2\u8272**\uFF1A\u7C21\u77ED\u80CC\u666F\u300D\uFF09\u3002";
+  const prompt = `\u8ACB\u6A21\u64EC\u4E00\u5834 Coffee Table \u5F0F\u591A\u4EBA\u5C0D\u8AC7\u3002\u4E3B\u6301\u4EBA\u4EBA\u6578\u7531\u4F7F\u7528\u8005\u6307\u5B9A\uFF1B\u89C0\u5BDF\u8005\u56FA\u5B9A\uFF0C\u5176\u9918\u4F86\u8CD3\u4F9D\u4E0B\u5217\u4EBA\u6578\u5B89\u6392\u3002${languageLine}
+
+\u4F7F\u7528\u8005\u539F\u59CB\u4E3B\u984C\uFF08\u5B8C\u6574\u4FDD\u7559\uFF0C\u4E0D\u53E6\u53D6\u804A\u5929\u5BA4\u6A19\u984C\uFF09\uFF1A
+${topic}
+
+\u56FA\u5B9A\u4EBA\u7269\uFF1A
+- ${hostInstruction}
+- 1 \u4F4D\u4E2D\u7ACB\u89C0\u5BDF\u8005
+\u4F86\u8CD3\u540D\u984D\uFF1A
+${attendeeRoles.join("\n")}
+\u6BCF\u4F4D\u4EBA\u7269\u90FD\u8981\u7528\u7C21\u77ED\u80CC\u666F\u4ECB\u7D39\u3002\u4E0D\u5F97\u8D85\u51FA\u6307\u5B9A\u985E\u5225\u4EBA\u6578\uFF1B\u4EBA\u7269\u8207\u7D93\u9A57\u5747\u70BA AI \u865B\u69CB\u6A21\u64EC\uFF0C\u4E0D\u4EE3\u8868\u771F\u4EBA\u8B49\u8A00\u6216\u5DF2\u67E5\u8B49\u4E8B\u5BE6\u3002${background}${custom}${prior}${draftText}
+
+\u4EBA\u7269\u5F7C\u6B64\u81EA\u7136\u63A5\u8A71\u3001\u8FFD\u554F\u3001\u6311\u6230\u8207\u4FEE\u6B63\uFF0C\u4E0D\u8981\u8F2A\u6D41\u767C\u8868\u6587\u7AE0\u3002\u4F7F\u7528\u767D\u8A71\u8207\u751F\u6D3B\u4F8B\u5B50\uFF0C\u4E3B\u6301\u4EBA\u9069\u5EA6\u4E32\u9023\uFF0C\u4E0D\u8981\u6BCF\u8F2A\u7E3D\u7D50\u3002${settings.counts["cross-domain"] ? "\u8DE8\u9818\u57DF\u985E\u6BD4\u8981\u8AAA\u660E\u76F8\u4F3C\u8655\u8207\u9650\u5236\u3002" : "\u672C\u684C\u6C92\u6709\u8DE8\u9818\u57DF\u4F86\u8CD3\uFF0C\u4E0D\u8981\u786C\u52A0\u8DE8\u9818\u57DF\u5C08\u5BB6\u6216\u985E\u6BD4\u3002"}
+
+${turns}\u6DB5\u84CB\u4E0D\u540C\u89D2\u5EA6\u8207\u672A\u89E3\u554F\u984C\uFF1B\u51FA\u73FE\u91CD\u8907\u6642\u81EA\u7136\u6536\u5C3E\uFF0C\u4E0D\u5F37\u8FEB\u6BCF\u4F4D\u4F86\u8CD3\u767C\u8A00\u3002
+
+\u7528 Markdown \u8F38\u51FA\u4E14\u4E0D\u8981\u66FF\u684C\u804A\u53E6\u5BEB\u6A19\u984C\u3002${opening}\u6BCF\u6B21\u767C\u8A00\u4F7F\u7528\u300C### \u59D3\u540D\uFF5C\u89D2\u8272\u300D\uFF1B\u6700\u5F8C\u662F\u89C0\u5BDF\u8005\u6574\u7406\u3002${notes}`;
+  if (prompt.length > MAX_COFFEE_CONTEXT_CHARS) throw new Error(zh ? "\u9019\u684C\u7684\u5167\u5BB9\u592A\u9577\uFF0C\u7121\u6CD5\u5B89\u5168\u5730\u5168\u90E8\u4EA4\u7D66\u6A21\u578B\u3002\u8ACB\u5148\u958B\u65B0\u684C\uFF1B\u820A\u5167\u5BB9\u5DF2\u5B8C\u6574\u4FDD\u7559\u3002" : "This table is too long to send safely in full. Start a new table; the existing conversation is preserved.");
+  return prompt;
+}
+function questionPrompt(session, question, draft = "") {
+  const zh = session.language === "zh-TW", language2 = zh ? "\u8ACB\u7528\u81EA\u7136\u3001\u53E3\u8A9E\u7684\u7E41\u9AD4\u4E2D\u6587\u56DE\u7B54\u3002" : "Answer in natural, conversational English.";
+  const settings = session.guests;
+  const custom = (settings == null ? void 0 : settings.customPrompt.trim()) ? `
+\u684C\u804A\u984D\u5916\u8981\u6C42\uFF1A
+${settings.customPrompt.trim()}` : "";
+  const context = assembleCoffeeContext(session);
+  if (context.length + question.length > MAX_COFFEE_CONTEXT_CHARS) throw new Error(zh ? "\u9019\u684C\u7684\u5167\u5BB9\u592A\u9577\uFF0C\u7121\u6CD5\u5B89\u5168\u5730\u5168\u90E8\u4EA4\u7D66\u6A21\u578B\u3002\u8ACB\u5148\u958B\u65B0\u684C\uFF1B\u820A\u5167\u5BB9\u5DF2\u5B8C\u6574\u4FDD\u7559\u3002" : "This table is too long to send safely in full. Start a new table; the existing conversation is preserved.");
+  return `\u5EF6\u7E8C Coffee Tables \u5C0D\u8AC7\u56DE\u7B54\u8FFD\u554F\u3002\u7531\u6700\u76F8\u95DC\u7684\u4E00\u4F4D\u6216\u5E7E\u4F4D\u539F\u4F86\u8CD3\u81EA\u7136\u63A5\u8A71\uFF1B\u82E5\u9EDE\u540D\u4F86\u8CD3\u5C31\u8B93\u5176\u56DE\u61C9\u3002\u4FDD\u7559\u6B67\u898B\uFF0C\u53EA\u5F15\u7528\u5C0D\u8AC7\u5BE6\u969B\u8AAA\u904E\u7684\u5167\u5BB9\uFF0C\u4E0D\u91CD\u6F14\u6574\u684C\u6216\u88DC\u9020\u5DF2\u67E5\u8B49\u4E8B\u5BE6\u3002\u4EBA\u7269\u662F\u865B\u69CB\u6A21\u64EC\u3002${language2}${custom}
+
+\u5B8C\u6574\u5148\u524D\u5C0D\u8AC7\u8207\u8FFD\u554F\uFF1A
+${context}
+
+\u4F7F\u7528\u8005\u7684\u65B0\u554F\u984C\uFF1A
+${question}${draft ? `
+
+\u4E0A\u6B21\u4E2D\u65B7\u524D\u5DF2\u4FDD\u5B58\u7684\u56DE\u7B54\u8349\u7A3F\uFF0C\u8ACB\u5F9E\u6700\u5F8C\u4E00\u53E5\u7E7C\u7E8C\uFF0C\u4E0D\u8981\u91CD\u8907\uFF1A
+${draft}` : ""}
+
+\u7528 Markdown \u8F38\u51FA\u81EA\u7136\u63A5\u8A71\uFF0C\u6BCF\u6BB5\u6A19\u793A\u767C\u8A00\u8005\uFF0C\u4E4B\u5F8C\u9644\u4E0A\u5B8C\u6574\u7684\u300C# \u89C0\u5BDF\u8005\u6574\u7406\u300D\uFF0C\u4E26\u56B4\u683C\u4F7F\u7528\u4EE5\u4E0B\u4E94\u500B Markdown \u4E8C\u7D1A\u6A19\u984C\uFF08\u6BCF\u500B\u6A19\u984C\u4E0B 2\u20134 \u500B\u689D\u5217\uFF09\uFF1A## \u610F\u5916\u9023\u7D50\u3001## \u503C\u5F97\u7E7C\u7E8C\u60F3\u7684\u554F\u984C\u3001## \u6838\u5FC3\u5206\u6B67\u3001## \u63A2\u7D22\u65B9\u5411\u3001## \u503C\u5F97\u67E5\u8B49\u7684\u5047\u8A2D\u3002\u6A19\u984C\u8207\u689D\u5217\u4E0D\u53EF\u7701\u7565\uFF0C\u4E5F\u4E0D\u8981\u628A\u6574\u7406\u5BEB\u6210\u5C0D\u8AC7\u767C\u8A00\u3002\u6574\u5408\u524D\u6587\u53CA\u672C\u6B21\u63A5\u7E8C\u7684\u8F49\u6298\u3001\u4FEE\u6B63\u5047\u8A2D\u3001\u65B0\u554F\u984C\u8207\u672A\u89E3\u5206\u6B67\uFF1B\u52FF\u6DFB\u52A0\u65B0\u4E8B\u5BE6\u3002\u5168\u90E8\u6574\u7406\u5B8C\u6210\u5F8C\uFF0C\u6700\u5F8C\u55AE\u7368\u8F38\u51FA\u5B8C\u6210\u6A19\u8A18 <!-- coffee-tables-complete --> \u4F5C\u70BA\u5B8C\u6210\u6A19\u8A18\uFF0C\u4E0D\u8981\u5728\u6A19\u8A18\u5F8C\u52A0\u4EFB\u4F55\u5167\u5BB9\u3002`;
+}
+function observerOnlyPrompt(session) {
+  var _a, _b;
+  const zh = session.language === "zh-TW";
+  const history = [assembleCoffeeContext(session), session.draftMarkdown ? `\u672A\u5B8C\u6210\u5C0D\u8AC7\u8349\u7A3F\uFF1A
+${session.draftMarkdown}` : "", session.observerDraftMarkdown ? `\u89C0\u5BDF\u8005\u6574\u7406\u8349\u7A3F\uFF1A
+${session.observerDraftMarkdown}` : ""].filter(Boolean).join("\n\n");
+  if (history.length > MAX_COFFEE_CONTEXT_CHARS) throw new Error(zh ? "\u9019\u684C\u7684\u5167\u5BB9\u592A\u9577\uFF0C\u7121\u6CD5\u5B89\u5168\u5730\u5168\u90E8\u4EA4\u7D66\u6A21\u578B\u3002\u820A\u5167\u5BB9\u5DF2\u5B8C\u6574\u4FDD\u7559\u3002" : "This table is too long to summarize safely in full. The existing conversation is preserved.");
+  const instructions = zh ? "\u53EA\u66F4\u65B0\u89C0\u5BDF\u8005\u6574\u7406\u3002\u4E0D\u8981\u7E8C\u5BEB\u3001\u88DC\u5BEB\u6216\u6539\u5BEB\u4EFB\u4F55\u4F86\u8CD3\u5C0D\u8A71\uFF0C\u4E0D\u8981\u8072\u7A31\u8A0E\u8AD6\u5DF2\u5B8C\u6210\u3002\u6839\u64DA\u5168\u90E8\u5DF2\u5B8C\u6210\u8207\u672A\u5B8C\u6210\u5167\u5BB9\u6574\u7406\u9019\u4E94\u9805\uFF0C\u6BCF\u9805\u5217\u51FA\u5177\u9AD4\u3001\u53EF\u8FFD\u6EAF\u5230\u5C0D\u8A71\u7684\u89C0\u5BDF\uFF1B\u4E0D\u5F97\u6DFB\u52A0\u65B0\u4E8B\u5BE6\u6216\u66FF\u4F7F\u7528\u8005\u4E0B\u7D50\u8AD6\u3002\u6700\u5F8C\u8F38\u51FA coffee-tables-complete \u6A19\u8A18\u3002" : "Only produce refreshed observer notes. Do not continue, add, or rewrite any guest dialogue, and do not claim the discussion is complete. Summarize these five areas from all completed and unfinished content, with concrete observations grounded in the conversation; add no facts and do not decide for the user. End with the coffee-tables-complete marker.";
+  const headings = zh ? "## \u610F\u5916\u9023\u7D50\n## \u503C\u5F97\u7E7C\u7E8C\u60F3\u7684\u554F\u984C\n## \u6838\u5FC3\u5206\u6B67\n## \u63A2\u7D22\u65B9\u5411\n## \u503C\u5F97\u67E5\u8B49\u7684\u5047\u8A2D" : "## Unexpected connections\n## Questions worth pursuing\n## Core disagreements\n## Directions to explore\n## Assumptions to verify";
+  return `${zh ? "\u8ACB\u7528\u81EA\u7136\u3001\u53E3\u8A9E\u7684\u7E41\u9AD4\u4E2D\u6587\u3002" : "Write in natural, conversational English."}
+${instructions}
+${((_b = (_a = session.guests) == null ? void 0 : _a.customPrompt) == null ? void 0 : _b.trim()) ? `${zh ? "\u6574\u684C\u984D\u5916\u8981\u6C42" : "Table instructions"}: ${session.guests.customPrompt.trim()}
+` : ""}
+${zh ? "\u5B8C\u6574\u5C0D\u8AC7\u3001\u8FFD\u554F\u3001\u4ECB\u5165\u53CA\u8349\u7A3F" : "Full conversation, follow-ups, interventions and drafts"}:
+${history}
+
+# ${zh ? "\u89C0\u5BDF\u8005\u6574\u7406" : "Observer\u2019s notes"}
+
+${headings}
+
+<!-- coffee-tables-complete -->`;
+}
+
+// experiences/coffee-tables/engine.ts
+function splitObserverNotes(markdown) {
+  const match = /^# (?:觀察者整理|Observer(?:[’']s)? notes)\s*$/m.exec(markdown);
+  if (!match || match.index < 0) return { dialogue: markdown.trim(), notes: "" };
+  return { dialogue: markdown.slice(0, match.index).trim(), notes: markdown.slice(match.index).trim() };
+}
+function noteSections(notes) {
+  if (!notes) return [];
+  const groups = [...notes.matchAll(/^(?:## .+|\s*[-*]\s+\*\*[^*\n]{2,}\*\*\s*)$/gm)];
+  if (groups.length >= 4) {
+    const populated = groups.filter((group, index) => {
+      var _a, _b, _c;
+      const start = ((_a = group.index) != null ? _a : 0) + group[0].length;
+      const end = (_c = (_b = groups[index + 1]) == null ? void 0 : _b.index) != null ? _c : notes.length;
+      return /^\s*[-*]\s+\S/m.test(notes.slice(start, end));
+    });
+    if (populated.length >= 4) return [notes];
+  }
+  const body = notes.replace(/^# (?:觀察者整理|Observer(?:[’']s)? notes)\s*$/m, "").trim();
+  const paragraphs = body.split(/\n\s*\n/).map((paragraph) => paragraph.replace(/^[-*]\s+/, "").trim());
+  const endsAsCompleteSentence = (paragraph) => /[。！？.!?…](?:[」』”’"\])）】}]*)$/u.test(paragraph);
+  return paragraphs.length >= 2 && paragraphs.every((paragraph) => paragraph.length >= 30 && endsAsCompleteSentence(paragraph)) ? [notes] : [];
+}
+var COMPLETION_MARKER = /\s*<!-- coffee-tables-complete -->\s*$/;
+function stripCompletionMarker(markdown) {
+  return markdown.replace(COMPLETION_MARKER, "").trim();
+}
+function appendDraft(draft, continuation) {
+  const left = draft.trim(), right = continuation.trim();
+  return !left ? right : !right || right.startsWith(left) ? right || left : `${left}
+
+${right}`;
+}
+var CoffeeEngine = class {
+  constructor(session, runtime, saveSession) {
+    this.session = session;
+    this.runtime = runtime;
+    this.saveSession = saveSession;
+    __publicField(this, "busy", false);
+    __publicField(this, "error", "");
+    __publicField(this, "controller", null);
+    __publicField(this, "pending", null);
+    __publicField(this, "generation", 0);
+    __publicField(this, "deleting", false);
+    __publicField(this, "retired", false);
+    __publicField(this, "persistQueue", Promise.resolve());
+    __publicField(this, "checkpoint", null);
+    __publicField(this, "persistenceError", "");
+    __publicField(this, "steer", null);
+    __publicField(this, "queuedSteers", []);
+    __publicField(this, "interventionTasks", /* @__PURE__ */ new Set());
+    __publicField(this, "startedAt", 0);
+    __publicField(this, "listeners", /* @__PURE__ */ new Set());
+  }
+  get acceptsInterventions() {
+    return this.busy && this.session.status === "generating";
+  }
+  get persistenceFailed() {
+    return !!this.persistenceError;
+  }
+  get deleted() {
+    return this.retired;
+  }
+  beginDelete() {
+    if (this.retired) return;
+    this.deleting = true;
+    this.cancel();
+    this.changed();
+  }
+  cancelDelete() {
+    if (!this.retired) {
+      this.deleting = false;
+      this.changed();
+    }
+  }
+  retire() {
+    this.deleting = true;
+    this.retired = true;
+    this.generation++;
+    this.cancel();
+    this.changed();
+  }
+  subscribe(listener) {
+    this.listeners.add(listener);
+    return () => this.listeners.delete(listener);
+  }
+  changed() {
+    for (const listener of this.listeners) listener();
+  }
+  setSession(next) {
+    this.session = { ...next, updatedAt: (/* @__PURE__ */ new Date()).toISOString() };
+    this.changed();
+  }
+  persist() {
+    var _a;
+    if (this.retired) return Promise.resolve();
+    const snapshot = { ...this.session, questions: this.session.questions.map((question) => ({ ...question })), rounds: ((_a = this.session.rounds) != null ? _a : []).map((round) => ({ ...round })) };
+    this.persistQueue = this.persistQueue.catch(() => void 0).then(() => this.retired ? void 0 : this.saveSession(snapshot));
+    return this.persistQueue;
+  }
+  async persistCurrent() {
+    await this.flush();
+  }
+  async retrySave() {
+    if (this.deleting || this.retired) return;
+    this.persistenceError = "";
+    this.error = "";
+    this.setSession({ ...this.session, error: void 0 });
+    await this.flush();
+    this.changed();
+  }
+  reportPersistenceError(error) {
+    this.persistenceError = error instanceof Error ? error.message : String(error);
+    this.error = this.persistenceError;
+    this.changed();
+  }
+  scheduleCheckpoint() {
+    if (this.checkpoint !== null) return;
+    this.checkpoint = window.setTimeout(() => {
+      this.checkpoint = null;
+      void this.persist().catch((error) => {
+        this.reportPersistenceError(error);
+        this.cancel();
+      });
+    }, 1e3);
+  }
+  async flush() {
+    if (this.checkpoint !== null) {
+      window.clearTimeout(this.checkpoint);
+      this.checkpoint = null;
+    }
+    await this.persist();
+  }
+  updateDraft(text2, roundId, questionId) {
+    var _a;
+    if (questionId) this.setSession({ ...this.session, questions: this.session.questions.map((item) => item.id === questionId ? { ...item, draftAnswer: text2 } : item) });
+    else if (roundId) this.setSession({ ...this.session, draftMarkdown: text2, rounds: ((_a = this.session.rounds) != null ? _a : []).map((item) => item.id === roundId ? { ...item, draftMarkdown: text2, status: "generating" } : item) });
+    else this.setSession({ ...this.session, draftMarkdown: text2 });
+    this.scheduleCheckpoint();
+  }
+  start() {
+    var _a, _b, _c;
+    if (this.deleting || this.retired) return Promise.resolve();
+    if (this.pending || this.busy) return (_a = this.pending) != null ? _a : Promise.resolve();
+    if (this.session.status === "completed") return Promise.resolve();
+    if (this.session.status === "error" && this.recoverCompleteDraft()) return this.pending;
+    return this.runRound(((_c = (_b = this.session.rounds) == null ? void 0 : _b.length) != null ? _c : 0) > 0 ? "continuation" : "initial");
+  }
+  recoverCompleteDraft() {
+    var _a, _b, _c, _d, _e, _f, _g, _h, _i, _j, _k, _l, _m, _n, _o, _p;
+    const savedDraft = (_d = (_c = this.session.draftMarkdown) != null ? _c : (_b = [...(_a = this.session.rounds) != null ? _a : []].reverse().find((round2) => round2.draftMarkdown)) == null ? void 0 : _b.draftMarkdown) != null ? _d : "";
+    if (!COMPLETION_MARKER.test(savedDraft)) return null;
+    const draft = stripCompletionMarker(savedDraft);
+    const noteHeadings = [...draft.matchAll(/^# (?:觀察者整理|Observer(?:[’']s)? notes)\s*$/gm)];
+    const latestNotesHeading = noteHeadings.at(-1);
+    const notes = latestNotesHeading ? draft.slice(latestNotesHeading.index).trim() : "";
+    const parts = draft.split(/(?=^### )/gm), introduction = (((_e = parts[0]) == null ? void 0 : _e.startsWith("### ")) ? "" : (_f = parts.shift()) != null ? _f : "").split(/^# (?:觀察者整理|Observer(?:[’']s)? notes)\s*$/m)[0].trim();
+    const draftRoundIds = new Set(((_g = this.session.rounds) != null ? _g : []).filter((round2) => round2.draftMarkdown).map((round2) => round2.id));
+    const hasDraftInterventions = ((_h = this.session.interventions) != null ? _h : []).some((item) => item.roundId && draftRoundIds.has(item.roundId));
+    const seen = /* @__PURE__ */ new Set();
+    const speeches = parts.map((part) => part.split(/^# (?:觀察者整理|Observer(?:[’']s)? notes)\s*$/m)[0].trim()).filter((part) => {
+      if (!part.startsWith("### ") || !hasDraftInterventions && seen.has(part)) return false;
+      seen.add(part);
+      return true;
+    });
+    const dialogue = [introduction, ...speeches].filter(Boolean).join("\n\n");
+    if (!dialogue || !noteSections(notes).length) return null;
+    const draftRounds = ((_i = this.session.rounds) != null ? _i : []).filter((round2) => round2.draftMarkdown);
+    const roundId = (_k = (_j = draftRounds.at(-1)) == null ? void 0 : _j.id) != null ? _k : crypto.randomUUID();
+    const round = { id: roundId, markdown: dialogue, notes, status: "completed", createdAt: (_m = (_l = draftRounds[0]) == null ? void 0 : _l.createdAt) != null ? _m : (/* @__PURE__ */ new Date()).toISOString() };
+    const completedRounds = ((_n = this.session.rounds) != null ? _n : []).filter((item) => !item.draftMarkdown && item.status === "completed");
+    const draftRoundIdsForInterventions = new Set(draftRounds.map((item) => item.id));
+    const interventions = ((_o = this.session.interventions) != null ? _o : []).map((item) => item.roundId && draftRoundIdsForInterventions.has(item.roundId) ? { ...item, roundId } : item);
+    const rounds = [...completedRounds, round];
+    this.setSession({ ...this.session, rounds, interventions, transcriptMarkdown: rounds.map((item) => item.markdown).filter(Boolean).join("\n\n"), observerNotes: [notes, ...((_p = this.session.observerNotes) != null ? _p : []).filter((item) => item !== notes)], draftMarkdown: void 0, dirtyNotes: false, status: "completed", lastCompletedAt: (/* @__PURE__ */ new Date()).toISOString(), error: void 0 });
+    const pending = this.flush().finally(() => {
+      if (this.pending === pending) this.pending = null;
+      this.changed();
+    });
+    this.pending = pending;
+    return pending;
+  }
+  async recoverResolvedStreamDraft(previousDraft) {
+    var _a, _b;
+    const draft = (_a = this.session.draftMarkdown) != null ? _a : "", notesHeadings = [...draft.matchAll(/^# (?:觀察者整理|Observer(?:[’']s)? notes)\s*$/gm)], latest = notesHeadings.at(-1);
+    if (!latest || ((_b = latest.index) != null ? _b : 0) < previousDraft.length || !noteSections(draft.slice(latest.index)).length) return false;
+    this.setSession({ ...this.session, draftMarkdown: `${draft.trim()}
+
+<!-- coffee-tables-complete -->` });
+    await this.flush();
+    const recovered = this.recoverCompleteDraft();
+    if (!recovered) return false;
+    await recovered;
+    return this.session.status === "completed";
+  }
+  continueTable() {
+    var _a;
+    if (this.deleting || this.retired) return Promise.resolve();
+    if (this.pending || this.busy || this.session.status !== "completed") return (_a = this.pending) != null ? _a : Promise.resolve();
+    return this.runRound("continuation");
+  }
+  refreshObserverNotes() {
+    var _a, _b;
+    if (this.deleting || this.retired || this.pending || this.busy || this.persistenceError) return (_a = this.pending) != null ? _a : Promise.resolve();
+    const previousObserverDraft = (_b = this.session.observerDraftMarkdown) != null ? _b : "", source = observerOnlyPrompt(this.session), generation = ++this.generation, controller = new AbortController();
+    this.controller = controller;
+    this.busy = true;
+    this.startedAt = Date.now();
+    this.error = "";
+    this.persistenceError = "";
+    this.setSession({ ...this.session, observerDraftMarkdown: previousObserverDraft, dirtyNotes: true, lastGenerationStartedAt: (/* @__PURE__ */ new Date()).toISOString() });
+    const pending = (async () => {
+      var _a2;
+      try {
+        await this.flush();
+        let streamed = previousObserverDraft;
+        const response = await this.runtime({ prompt: source, session: this.session, signal: controller.signal, onText: (text2) => {
+          if (this.generation !== generation || controller.signal.aborted) return;
+          streamed = appendDraft(previousObserverDraft, text2);
+          this.setSession({ ...this.session, observerDraftMarkdown: streamed, dirtyNotes: true });
+          this.scheduleCheckpoint();
+        } });
+        if (this.generation !== generation || controller.signal.aborted) return;
+        let candidate = stripCompletionMarker(response), notes = candidate;
+        if (!noteSections(notes).length && noteSections(stripCompletionMarker(streamed)).length) notes = stripCompletionMarker(streamed);
+        if (!noteSections(notes).length) throw new Error(this.session.language === "zh-TW" ? "\u6574\u7406\u672A\u5B8C\u6574\u6536\u5230\uFF1B\u539F\u6709\u6574\u7406\u4ECD\u4FDD\u7559\uFF0C\u8349\u7A3F\u5DF2\u4FDD\u5B58\u3002" : "The notes were incomplete. Earlier notes are preserved and the draft is saved.");
+        this.setSession({ ...this.session, observerNotes: [notes, ...((_a2 = this.session.observerNotes) != null ? _a2 : []).filter((item) => item !== notes)], observerDraftMarkdown: void 0, dirtyNotes: false, error: void 0 });
+        await this.flush();
+      } catch (error) {
+        if (this.generation === generation) {
+          this.error = controller.signal.aborted ? this.session.language === "zh-TW" ? "\u6574\u7406\u5DF2\u505C\u6B62\uFF1B\u8349\u7A3F\u5DF2\u4FDD\u5B58\u3002" : "Notes stopped; the draft is saved." : error instanceof Error ? error.message : String(error);
+          this.setSession({ ...this.session, dirtyNotes: true });
+          await this.flush().catch((saveError) => this.reportPersistenceError(saveError));
+        }
+      } finally {
+        if (this.generation === generation) {
+          this.busy = false;
+          this.controller = null;
+          this.pending = null;
+          this.changed();
+        }
+      }
+    })();
+    this.pending = pending;
+    this.changed();
+    return pending;
+  }
+  generate() {
+    return this.start();
+  }
+  runRound(kind) {
+    var _a, _b, _c, _d, _e, _f;
+    this.steer = null;
+    this.queuedSteers = [];
+    this.persistenceError = "";
+    const generation = ++this.generation, controller = new AbortController(), roundId = crypto.randomUUID(), previousDraft = this.session.status === "error" ? (_d = (_c = this.session.draftMarkdown) != null ? _c : (_b = (_a = this.session.rounds) == null ? void 0 : _a.at(-1)) == null ? void 0 : _b.draftMarkdown) != null ? _d : "" : kind === "initial" ? (_e = this.session.draftMarkdown) != null ? _e : "" : "";
+    const context = kind === "continuation" ? assembleCoffeeContext(this.session) : "";
+    if (context.length + previousDraft.length > MAX_COFFEE_CONTEXT_CHARS) return Promise.reject(new Error(this.session.language === "zh-TW" ? "\u9019\u684C\u7684\u5167\u5BB9\u592A\u9577\uFF0C\u7121\u6CD5\u5B89\u5168\u5730\u5168\u90E8\u4EA4\u7D66\u6A21\u578B\u3002\u8ACB\u5148\u958B\u65B0\u684C\uFF1B\u820A\u5167\u5BB9\u5DF2\u5B8C\u6574\u4FDD\u7559\u3002" : "This table is too long to send safely in full. Start a new table; the existing conversation is preserved."));
+    const round = { id: roundId, markdown: "", notes: "", ...previousDraft ? { draftMarkdown: previousDraft } : {}, status: "generating", createdAt: (/* @__PURE__ */ new Date()).toISOString() };
+    this.controller = controller;
+    this.busy = true;
+    this.startedAt = Date.now();
+    this.error = "";
+    this.setSession({ ...this.session, status: "generating", lastGenerationStartedAt: (/* @__PURE__ */ new Date()).toISOString(), error: void 0, rounds: [...(_f = this.session.rounds) != null ? _f : [], round] });
+    const pending = (async () => {
+      var _a2, _b2, _c2, _d2;
+      try {
+        await this.flush();
+        const prompt = tablePrompt(this.session.topic, this.session.language, this.session.guests, previousDraft, context);
+        const response = await this.runtime({ prompt, session: this.session, signal: controller.signal, onText: (text2) => {
+          if (this.generation === generation && !controller.signal.aborted) this.updateDraft(previousDraft ? `${previousDraft}
+
+${text2}` : text2, roundId);
+        }, registerIntervention: (steer) => {
+          if (this.generation !== generation || controller.signal.aborted) return;
+          this.steer = steer;
+          for (const queued of this.queuedSteers.splice(0)) void this.deliverIntervention(queued, steer, generation, controller).catch(() => void 0);
+        } });
+        if (this.generation !== generation) return;
+        if (controller.signal.aborted) {
+          await this.finishInterrupted(new Error("Generation stopped"), generation, controller, roundId);
+          return;
+        }
+        const finalText = stripCompletionMarker(response);
+        if (!finalText) throw new Error("The model returned an empty conversation");
+        const { dialogue, notes } = splitObserverNotes(finalText);
+        if (!dialogue || !noteSections(notes).length) {
+          if (await this.recoverResolvedStreamDraft(previousDraft)) return;
+          throw new Error(this.session.language === "zh-TW" ? "\u5C0D\u8AC7\u5DF2\u6536\u5230\uFF0C\u4F46\u89C0\u5BDF\u8005\u6574\u7406\u683C\u5F0F\u4E0D\u5B8C\u6574\uFF1B\u672C\u6BB5\u5DF2\u4FDD\u7559\u8349\u7A3F\uFF0C\u820A\u6574\u7406\u4ECD\u4FDD\u7559\u3002" : "The conversation arrived without a complete observer summary. This segment is saved as a draft; earlier notes are kept.");
+        }
+        const resumedDialogue = previousDraft ? splitObserverNotes(previousDraft).dialogue : "";
+        const completed = ((_a2 = this.session.rounds) != null ? _a2 : []).map((item) => item.id === roundId ? { ...item, markdown: [resumedDialogue, dialogue].filter(Boolean).join("\n\n"), notes, draftMarkdown: void 0, status: "completed" } : item).map((item) => previousDraft && item.id !== roundId && item.draftMarkdown ? { ...item, draftMarkdown: void 0 } : item).filter((item) => item.markdown || item.status !== "error" || item.draftMarkdown);
+        const resumedRoundIds = new Set(((_b2 = this.session.rounds) != null ? _b2 : []).filter((item) => previousDraft && item.draftMarkdown).map((item) => item.id));
+        const interventions = ((_c2 = this.session.interventions) != null ? _c2 : []).map((item) => {
+          var _a3;
+          return item.roundId && resumedRoundIds.has(item.roundId) ? { ...item, roundId, afterTurn: (_a3 = item.afterTurn) != null ? _a3 : 0 } : item;
+        });
+        this.setSession({ ...this.session, rounds: completed, interventions, transcriptMarkdown: completed.map((item) => item.markdown).filter(Boolean).join("\n\n"), observerNotes: [notes, ...(_d2 = this.session.observerNotes) != null ? _d2 : []], dirtyNotes: false, draftMarkdown: void 0, status: "completed", lastCompletedAt: (/* @__PURE__ */ new Date()).toISOString(), error: void 0 });
+        await this.flush();
+      } catch (error) {
+        await this.finishInterrupted(error, generation, controller, roundId);
+      } finally {
+        if (this.generation === generation) {
+          this.busy = false;
+          this.controller = null;
+          this.pending = null;
+          this.steer = null;
+          this.queuedSteers = [];
+          this.changed();
+        }
+      }
+    })();
+    this.pending = pending;
+    this.changed();
+    return pending;
+  }
+  async intervene(kind, text2, target) {
+    var _a, _b, _c, _d, _e;
+    const value = text2.trim();
+    if (this.deleting || this.retired || !this.busy || ((_a = this.controller) == null ? void 0 : _a.signal.aborted) || !value) return;
+    const generation = this.generation, controller = this.controller;
+    const instruction = kind === "guest-question" ? `The user asks ${target ? `${target} ` : "a guest "}to respond to this question: ${value}. Let that person answer naturally and keep the discussion moving.` : kind === "redirect" ? `The user wants to redirect the discussion: ${value}. Acknowledge this briefly and continue in the new direction.` : `The user adds this comment: ${value}. Respond naturally if relevant, then continue the discussion.`;
+    const activeRound = [...(_b = this.session.rounds) != null ? _b : []].reverse().find((item) => item.status === "generating");
+    const streamed = (_c = this.session.draftMarkdown) != null ? _c : "", afterTurn = ((_d = streamed.match(/^### .+$/gm)) != null ? _d : []).length;
+    const entry = { id: crypto.randomUUID(), kind, ...target ? { target } : {}, text: value, createdAt: (/* @__PURE__ */ new Date()).toISOString(), status: "pending", ...activeRound ? { roundId: activeRound.id, afterTurn } : {} };
+    this.setSession({ ...this.session, interventions: [...(_e = this.session.interventions) != null ? _e : [], entry] });
+    await this.flush();
+    if (generation !== this.generation || controller.signal.aborted) return;
+    if (this.steer) await this.deliverIntervention(`${entry.id}
+${instruction}`, this.steer, generation, controller);
+    else this.queuedSteers.push(`${entry.id}
+${instruction}`);
+  }
+  deliverIntervention(payload, steer, generation, controller) {
+    const separator = payload.indexOf("\n"), id = payload.slice(0, separator), instruction = payload.slice(separator + 1);
+    const task = (async () => {
+      var _a, _b;
+      try {
+        await steer(instruction);
+        if (generation !== this.generation || controller.signal.aborted) return;
+        this.setSession({ ...this.session, interventions: ((_a = this.session.interventions) != null ? _a : []).map((item) => item.id === id ? { ...item, status: "sent" } : item) });
+        await this.flush();
+      } catch (error) {
+        if (generation === this.generation && !controller.signal.aborted) {
+          this.setSession({ ...this.session, interventions: ((_b = this.session.interventions) != null ? _b : []).map((item) => item.id === id ? { ...item, status: "failed" } : item) });
+          this.error = error instanceof Error ? error.message : String(error);
+          await this.flush().catch((saveError) => this.reportPersistenceError(saveError));
+        }
+        throw error;
+      }
+    })();
+    this.interventionTasks.add(task);
+    void task.finally(() => this.interventionTasks.delete(task)).catch(() => void 0);
+    return task;
+  }
+  async finishInterrupted(error, generation, controller, id, questionId) {
+    var _a;
+    if (this.generation !== generation) return;
+    this.error = this.persistenceError || (controller.signal.aborted ? "" : error instanceof Error ? error.message : String(error));
+    if (questionId) this.setSession({ ...this.session, questions: this.session.questions.map((item) => item.id === questionId ? { ...item, status: "error", error: this.error || "Cancelled" } : item), dirtyNotes: true });
+    else if (id) this.setSession({ ...this.session, status: "error", error: this.error || "Generation stopped", rounds: ((_a = this.session.rounds) != null ? _a : []).map((item) => item.id === id ? { ...item, status: "error" } : item) });
+    try {
+      await this.flush();
+    } catch (saveError) {
+      this.reportPersistenceError(saveError);
+    }
+  }
+  async ask(question, id = crypto.randomUUID()) {
+    var _a;
+    if (this.pending || this.busy || this.session.status !== "completed") return;
+    const value = question.trim();
+    if (!value || this.deleting || this.retired) return;
+    const existing = this.session.questions.find((item) => item.id === id), previousDraft = (_a = existing == null ? void 0 : existing.draftAnswer) != null ? _a : "", entry = existing ? { ...existing, question: value, status: "pending", error: void 0 } : { id, question: value, answer: "", status: "pending", createdAt: (/* @__PURE__ */ new Date()).toISOString() };
+    const generation = ++this.generation, controller = new AbortController();
+    this.controller = controller;
+    this.busy = true;
+    this.startedAt = Date.now();
+    this.error = "";
+    this.steer = null;
+    this.queuedSteers = [];
+    this.persistenceError = "";
+    this.setSession({ ...this.session, lastGenerationStartedAt: (/* @__PURE__ */ new Date()).toISOString(), questions: existing ? this.session.questions.map((item) => item.id === id ? entry : item) : [...this.session.questions, entry] });
+    const pending = (async () => {
+      var _a2;
+      try {
+        await this.flush();
+        let streamed = "";
+        const response = await this.runtime({ prompt: questionPrompt(this.session, value, previousDraft), session: this.session, signal: controller.signal, onText: (text2) => {
+          if (this.generation === generation && !controller.signal.aborted) {
+            streamed = appendDraft(previousDraft, text2);
+            this.updateDraft(streamed, void 0, id);
+          }
+        } });
+        if (this.generation !== generation) return;
+        if (controller.signal.aborted) {
+          await this.finishInterrupted(new Error("Generation stopped"), generation, controller, void 0, id);
+          return;
+        }
+        let { dialogue, notes } = splitObserverNotes(stripCompletionMarker(response));
+        if ((!dialogue || !noteSections(notes).length) && streamed) {
+          const fromStream = splitObserverNotes(stripCompletionMarker(streamed));
+          if (fromStream.dialogue && noteSections(fromStream.notes).length) ({ dialogue, notes } = fromStream);
+        }
+        if (!dialogue || !noteSections(notes).length) throw new Error(this.session.language === "zh-TW" ? "\u8FFD\u554F\u56DE\u7B54\u6216\u89C0\u5BDF\u8005\u6574\u7406\u4E0D\u5B8C\u6574\uFF0C\u8ACB\u4FDD\u7559\u8349\u7A3F\u5F8C\u91CD\u8A66\u3002" : "The answer or observer notes are incomplete. The draft is saved for retry.");
+        const previousDialogue = splitObserverNotes(previousDraft).dialogue;
+        const answer = appendDraft(previousDialogue, dialogue);
+        this.setSession({ ...this.session, questions: this.session.questions.map((item) => item.id === id ? { ...item, answer, draftAnswer: void 0, status: "complete", error: void 0 } : item), observerNotes: [notes, ...((_a2 = this.session.observerNotes) != null ? _a2 : []).filter((item) => item !== notes)], dirtyNotes: false, lastCompletedAt: (/* @__PURE__ */ new Date()).toISOString() });
+        await this.flush();
+      } catch (error) {
+        await this.finishInterrupted(error, generation, controller, void 0, id);
+      } finally {
+        if (this.generation === generation) {
+          this.busy = false;
+          this.controller = null;
+          this.pending = null;
+          this.steer = null;
+          this.queuedSteers = [];
+          this.changed();
+        }
+      }
+    })();
+    this.pending = pending;
+    await pending;
+  }
+  cancel() {
+    var _a;
+    (_a = this.controller) == null ? void 0 : _a.abort();
+  }
+  async stop() {
+    this.cancel();
+    await this.pending;
+    await Promise.allSettled([...this.interventionTasks]);
+    if (this.checkpoint !== null) await this.flush().catch((error) => this.reportPersistenceError(error));
+    await this.persistQueue.catch((error) => this.reportPersistenceError(error));
+  }
+};
+var CoffeeManager = class {
+  constructor(runtime, saveSession) {
+    this.runtime = runtime;
+    this.saveSession = saveSession;
+    __publicField(this, "engines", /* @__PURE__ */ new Map());
+    __publicField(this, "deletingIds", /* @__PURE__ */ new Set());
+    __publicField(this, "deletedIds", /* @__PURE__ */ new Set());
+  }
+  open(session) {
+    if (this.deletingIds.has(session.id) || this.deletedIds.has(session.id)) throw new Error("This Coffee Tables session is being deleted or was deleted; reload it after restoring it");
+    const cached = this.engines.get(session.id);
+    if (cached) return cached;
+    if (session.status === "generating") session = { ...session, status: "error", error: "Generation stopped when Obsidian closed; saved draft is available." };
+    const engine = new CoffeeEngine(session, this.runtime, this.saveSession);
+    this.engines.set(session.id, engine);
+    if (session.status === "error") void engine.persistCurrent().catch((error) => engine.reportPersistenceError(error));
+    return engine;
+  }
+  forget(id) {
+    this.engines.delete(id);
+  }
+  get(id) {
+    return this.engines.get(id);
+  }
+  async prepareDelete(id) {
+    this.deletingIds.add(id);
+    const engine = this.engines.get(id);
+    engine == null ? void 0 : engine.beginDelete();
+    try {
+      await (engine == null ? void 0 : engine.stop());
+      return engine;
+    } catch (error) {
+      this.cancelDelete(id, engine);
+      throw error;
+    }
+  }
+  completeDelete(id, engine) {
+    engine == null ? void 0 : engine.retire();
+    if (this.engines.get(id) === engine) this.engines.delete(id);
+    this.deletingIds.delete(id);
+    this.deletedIds.add(id);
+  }
+  cancelDelete(id, engine) {
+    this.deletingIds.delete(id);
+    engine == null ? void 0 : engine.cancelDelete();
+  }
+  restore(id) {
+    this.deletedIds.delete(id);
+  }
+  async stop() {
+    await Promise.all([...this.engines.values()].map((engine) => engine.stop()));
+    this.engines.clear();
+  }
+};
+
+// experiences/coffee-tables/storage.ts
+var import_obsidian = require("obsidian");
+
+// experiences/coffee-tables/types.ts
+var DEFAULT_COUNTS = { experts: 4, "cross-domain": 1, generalist: 1, affected: 1 };
+var CATEGORIES = ["experts", "cross-domain", "generalist", "affected"];
+function normalizedGuests(value) {
+  if (!value || typeof value !== "object") return void 0;
+  const raw = value;
+  if (raw.counts && typeof raw.counts === "object") {
+    const source = raw.counts;
+    const counts2 = Object.fromEntries(CATEGORIES.map((key) => [key, Number.isInteger(source[key]) ? Number(source[key]) : -1]));
+    const guests = Array.isArray(raw.guests) ? raw.guests.filter((item) => !!item && typeof item === "object" && typeof item.id === "string" && CATEGORIES.includes(item.category) && typeof item.description === "string").map((item) => ({ ...item })) : [];
+    return { counts: counts2, guests, background: typeof raw.background === "string" ? raw.background : "", customPrompt: typeof raw.customPrompt === "string" ? raw.customPrompt : "", hostCount: Number.isInteger(raw.hostCount) ? Number(raw.hostCount) : 2 };
+  }
+  const perspectives = Array.isArray(raw.perspectives) ? raw.perspectives.filter((item) => CATEGORIES.includes(item)) : CATEGORIES;
+  const counts = { experts: perspectives.includes("experts") ? 4 : 0, "cross-domain": perspectives.includes("cross-domain") ? 1 : 0, generalist: perspectives.includes("generalist") ? 1 : 0, affected: perspectives.includes("affected") ? 1 : 0 };
+  return { counts, guests: [], background: typeof raw.background === "string" ? raw.background : "", customPrompt: "", hostCount: 2 };
+}
+function createSession(topic, model, reasoning, language2, guests) {
+  const now = (/* @__PURE__ */ new Date()).toISOString();
+  return { version: 3, id: crypto.randomUUID(), topic, model, reasoning, language: language2, createdAt: now, updatedAt: now, status: "ready", transcriptMarkdown: "", questions: [], guests: guests ? normalizedGuests(guests) : normalizedGuests({ counts: DEFAULT_COUNTS, guests: [], background: "", customPrompt: "" }), rounds: [], observerNotes: [] };
+}
+function normalizeSession(value) {
+  const questions = Array.isArray(value.questions) ? value.questions.map((item) => ({ ...item, createdAt: typeof item.createdAt === "string" ? item.createdAt : String(value.createdAt) })) : [];
+  const transcript = typeof value.transcriptMarkdown === "string" ? value.transcriptMarkdown : "";
+  const rounds = Array.isArray(value.rounds) && (value.rounds.length || !transcript) ? value.rounds : transcript ? [{ id: "round-1", markdown: transcript, notes: "", status: value.status === "completed" ? "completed" : "error", createdAt: String(value.createdAt) }] : [];
+  return { ...value, version: 3, guests: normalizedGuests(value.guests), rounds, observerNotes: Array.isArray(value.observerNotes) ? value.observerNotes.filter((item) => typeof item === "string") : [], questions, transcriptMarkdown: rounds.map((round) => round.markdown).filter(Boolean).join("\n\n"), dirtyNotes: value.dirtyNotes === true };
+}
+function parseSession(raw) {
+  var _a, _b;
+  const value = JSON.parse(raw);
+  if (value.version === 1) {
+    if (typeof value.id !== "string" || typeof value.topic !== "string" || !Array.isArray(value.messages) || !Array.isArray(value.participants)) throw new Error("Invalid legacy Coffee Tables session");
+    return value;
+  }
+  if (![2, 3].includes(Number(value.version)) || typeof value.id !== "string" || !/^[a-zA-Z0-9-]+$/.test(value.id) || typeof value.topic !== "string" || !value.topic.trim() || !["en", "zh-TW"].includes(String(value.language)) || !["ready", "generating", "completed", "error"].includes(String(value.status)) || typeof value.model !== "string" || typeof value.reasoning !== "string" || typeof value.createdAt !== "string" || typeof value.updatedAt !== "string" || typeof value.transcriptMarkdown !== "string" || !Array.isArray(value.questions)) throw new Error("Invalid Coffee Tables session");
+  const session = normalizeSession(value);
+  const ids = /* @__PURE__ */ new Set();
+  if (session.draftMarkdown !== void 0 && typeof session.draftMarkdown !== "string") throw new Error("Invalid conversation draft");
+  if (session.observerDraftMarkdown !== void 0 && typeof session.observerDraftMarkdown !== "string") throw new Error("Invalid observer notes draft");
+  if (session.interventions !== void 0 && (!Array.isArray(session.interventions) || !session.interventions.every((item) => item && typeof item.id === "string" && ["comment", "guest-question", "redirect"].includes(item.kind) && typeof item.text === "string"))) throw new Error("Invalid Coffee Tables interventions");
+  for (const item of session.questions) {
+    if (!item || typeof item.id !== "string" || ids.has(item.id) || typeof item.question !== "string" || !item.question.trim() || typeof item.answer !== "string" || item.draftAnswer !== void 0 && typeof item.draftAnswer !== "string" || !["pending", "complete", "error"].includes(item.status)) throw new Error("Invalid Coffee Tables question");
+    ids.add(item.id);
+  }
+  const total2 = Object.values((_b = (_a = session.guests) == null ? void 0 : _a.counts) != null ? _b : {}).reduce((sum, value2) => sum + value2, 0);
+  if (session.guests && (total2 < 1 || total2 > 12 || Object.values(session.guests.counts).some((value2) => !Number.isInteger(value2) || value2 < 0 || value2 > 8) || !Number.isInteger(session.guests.hostCount) || session.guests.hostCount < 1 || session.guests.hostCount > 4 || session.guests.guests.some((guest) => session.guests.guests.filter((item) => item.category === guest.category).length > session.guests.counts[guest.category]))) throw new Error("Invalid Coffee Tables guest count");
+  return session;
+}
+function copyLegacySession(legacy) {
+  const lines = [`# ${legacy.topic}`, "", "> \u8F03\u65E9\u7248\u672C\u7684\u6A21\u64EC\u5C0D\u8AC7\uFF1B\u4EE5\u4E0B\u5167\u5BB9\u7167\u539F\u7D00\u9304\u4FDD\u7559\u3002", ""];
+  for (const message of legacy.messages) {
+    const person = legacy.participants.find((entry) => entry.id === message.speakerId);
+    lines.push(`### ${person ? `${person.name} \xB7 ${person.role}` : message.speakerId === "user" ? "\u4F7F\u7528\u8005" : message.speakerId}`, "", message.text, "");
+  }
+  if (legacy.notes) {
+    const titles = ["\u610F\u5916\u9023\u7D50", "\u503C\u5F97\u7E7C\u7E8C\u60F3\u7684\u554F\u984C", "\u6838\u5FC3\u5206\u6B67", "\u63A2\u7D22\u65B9\u5411", "\u503C\u5F97\u67E5\u8B49\u7684\u5047\u8A2D"];
+    ["connections", "questions", "disagreements", "directions", "assumptions"].forEach((key, index) => {
+      var _a, _b;
+      return lines.push(`### ${titles[index]}`, "", ...((_b = (_a = legacy.notes) == null ? void 0 : _a[key]) != null ? _b : []).map((item) => `- ${item}`), "");
+    });
+  }
+  const session = createSession(legacy.topic, legacy.model, legacy.reasoning, legacy.language);
+  session.createdAt = legacy.createdAt;
+  session.updatedAt = (/* @__PURE__ */ new Date()).toISOString();
+  session.status = "completed";
+  session.transcriptMarkdown = lines.join("\n");
+  session.rounds = [{ id: "round-1", markdown: session.transcriptMarkdown, notes: "", status: "completed", createdAt: legacy.createdAt }];
+  return session;
+}
+
+// experiences/coffee-tables/storage.ts
+var CATEGORY_LABELS = { experts: ["\u4E3B\u984C\u5C08\u5BB6", "Topic experts"], "cross-domain": ["\u8DE8\u9818\u57DF\u5C08\u5BB6", "Cross-domain experts"], generalist: ["\u597D\u5947\u7684\u901A\u624D", "Curious generalists"], affected: ["\u53D7\u5F71\u97FF\u8005", "Affected perspectives"] };
+var markdownTopic = (raw) => {
+  var _a, _b;
+  let body = raw.replace(/^\uFEFF/, "");
+  const frontmatter2 = /^---\r?\n[\s\S]*?\r?\n---(?:\r?\n|$)/.exec(body);
+  if (frontmatter2) body = body.slice(frontmatter2[0].length);
+  return ((_b = (_a = /^\s*# ([^\r\n]+)(?:\r?\n|$)/.exec(body)) == null ? void 0 : _a[1]) == null ? void 0 : _b.trim()) || void 0;
+};
+var CoffeeStorage = class {
+  constructor(vault, workspace, renameFile, trashFile) {
+    this.vault = vault;
+    this.renameFile = renameFile;
+    this.trashFile = trashFile;
+    __publicField(this, "originals", /* @__PURE__ */ new Map());
+    __publicField(this, "sidecarOriginals", /* @__PURE__ */ new Map());
+    __publicField(this, "locations", /* @__PURE__ */ new Map());
+    __publicField(this, "revisions", /* @__PURE__ */ new Map());
+    __publicField(this, "activeWrites", /* @__PURE__ */ new Set());
+    __publicField(this, "activeMoves", /* @__PURE__ */ new Set());
+    __publicField(this, "deletedIds", /* @__PURE__ */ new Set());
+    __publicField(this, "folder");
+    __publicField(this, "hidden");
+    this.folder = (0, import_obsidian.normalizePath)(`${workspace}/Coffee Tables`);
+    this.hidden = (0, import_obsidian.normalizePath)(`${this.folder}/.sessions`);
+  }
+  path(id, topic) {
+    if (!/^[a-zA-Z0-9-]+$/.test(id)) throw new Error("Invalid session ID");
+    const slug = topic ? topicSlug(topic) : id;
+    return `${topic ? this.topicFolder(topic) : `${this.folder}/${slug}`}/${slug}.md`;
+  }
+  sidecarPath(id) {
+    if (!/^[a-zA-Z0-9-]+$/.test(id)) throw new Error("Invalid session ID");
+    return `${this.hidden}/${id}.json`;
+  }
+  sessionPath(id) {
+    var _a;
+    return (_a = this.locations.get(id)) != null ? _a : this.path(id);
+  }
+  list() {
+    return this.vault.getFiles().filter((file) => {
+      var _a, _b, _c;
+      return file.extension === "md" && (((_a = file.parent) == null ? void 0 : _a.path) === this.folder || ((_c = (_b = file.parent) == null ? void 0 : _b.parent) == null ? void 0 : _c.path) === this.folder && !file.parent.name.startsWith("."));
+    }).sort((a, b) => b.stat.mtime - a.stat.mtime);
+  }
+  topicFolder(topic) {
+    const slug = topicSlug(topic).slice(0, 64);
+    return `${this.folder}/${slug}\uFF08${shortHash(topic.trim())}\uFF09`;
+  }
+  titlePath(topic, id) {
+    const directory = this.topicFolder(topic), base = `${directory}/${topicSlug(topic)}.md`, stem = base.slice(0, -3);
+    let path = base, suffix = 2;
+    while (this.vault.getAbstractFileByPath(path) && this.vault.getAbstractFileByPath(path) !== this.vault.getAbstractFileByPath(this.sessionPath(id))) path = `${stem}\uFF08${suffix++}\uFF09.md`;
+    return path;
+  }
+  async ensureFolder(path) {
+    if (path === this.hidden || path.startsWith(`${this.hidden}/`)) {
+      if (await this.vault.adapter.exists(path)) return;
+      try {
+        await this.vault.adapter.mkdir(path);
+      } catch (error) {
+        if (await this.vault.adapter.exists(path)) return;
+        throw error;
+      }
+      return;
+    }
+    const parent = path.slice(0, path.lastIndexOf("/"));
+    if (parent && !this.vault.getAbstractFileByPath(parent)) await this.ensureFolder(parent);
+    const current = this.vault.getAbstractFileByPath(path);
+    if (current) {
+      if (!(current instanceof import_obsidian.TFolder)) throw new Error(`Coffee Tables storage path is not a folder: ${path}`);
+      return;
+    }
+    try {
+      await this.vault.createFolder(path);
+    } catch (error) {
+      const raced = this.vault.getAbstractFileByPath(path);
+      if (raced instanceof import_obsidian.TFolder) return;
+      if (await this.vault.adapter.exists(path)) {
+        const refreshed = this.vault.getAbstractFileByPath(path);
+        if (!refreshed || refreshed instanceof import_obsidian.TFolder) return;
+      }
+      throw error;
+    }
+  }
+  async hiddenPaths() {
+    const listing = await this.vault.adapter.list(this.hidden).catch(() => ({ files: [], folders: [] }));
+    return listing.files.filter((path) => new RegExp(`^${this.hidden.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}/[a-zA-Z0-9-]+\\.json$`).test(path));
+  }
+  async readHidden(path) {
+    return await this.vault.adapter.read(path);
+  }
+  async writeHidden(path, contents, expected) {
+    if (expected === void 0) {
+      if (await this.vault.adapter.exists(path)) throw new Error("Coffee Tables hidden session already exists");
+      await this.vault.adapter.write(path, contents);
+      return;
+    }
+    await this.vault.adapter.process(path, (current) => {
+      if (current !== expected) throw new Error("Hidden Coffee Tables data changed outside this room; no content was overwritten");
+      return contents;
+    });
+  }
+  sidecar(session, revision, filePath) {
+    var _a;
+    const { rounds = [], questions = [] } = session;
+    const storedRounds = rounds.filter((round) => {
+      var _a2;
+      return round.markdown.trim() || round.draftMarkdown || round.status === "generating" || ((_a2 = session.interventions) != null ? _a2 : []).some((item) => item.roundId === round.id);
+    });
+    return { version: 3, id: session.id, topic: session.topic, language: session.language, model: session.model, reasoning: session.reasoning, createdAt: session.createdAt, updatedAt: session.updatedAt, ...session.lastGenerationStartedAt ? { lastGenerationStartedAt: session.lastGenerationStartedAt } : {}, ...session.lastCompletedAt ? { lastCompletedAt: session.lastCompletedAt } : {}, status: session.status, ...session.error ? { error: session.error } : {}, guests: session.guests, rounds: storedRounds.map(({ markdown: _markdown, notes: _notes, ...round }) => round), questions: questions.map(({ id, createdAt, status, error, draftAnswer }) => ({ id, createdAt: createdAt != null ? createdAt : session.createdAt, status, ...error ? { error } : {}, ...draftAnswer ? { draftAnswer } : {} })), ...session.interventions ? { interventions: session.interventions } : {}, ...session.draftMarkdown ? { draftMarkdown: session.draftMarkdown } : {}, ...session.observerDraftMarkdown ? { observerDraftMarkdown: session.observerDraftMarkdown } : {}, ...session.dirtyNotes ? { dirtyNotes: true } : {}, revision, filePath, transcriptHash: conversationHash(rounds, questions, (_a = session.interventions) != null ? _a : []) };
+  }
+  parseMarkdown(raw, side) {
+    var _a, _b, _c, _d, _e, _f, _g, _h, _i, _j, _k, _l, _m, _n, _o, _p, _q, _r, _s, _t, _u, _v;
+    const title = (_a = markdownTopic(raw)) != null ? _a : side.topic;
+    const settingsMatch = /^## (?:開桌設定|Table settings)\s*\n([\s\S]*?)(?=^## |$(?![\s\S]))/m.exec(raw);
+    const transcriptStart = /^## (?:對話紀錄|Conversation)\s*$/m.exec(raw);
+    if (!transcriptStart) throw new Error("Coffee Tables Markdown is missing its conversation section");
+    const afterTranscript = raw.slice(transcriptStart.index + transcriptStart[0].length);
+    const tailHeadings = [...afterTranscript.matchAll(/^## (?:觀察者整理|Observer notes|未完成草稿|Unfinished drafts)\s*$/gm)];
+    const contentEnd = tailHeadings.length ? tailHeadings[0].index : afterTranscript.length;
+    const conversation = afterTranscript.slice(0, contentEnd).trim();
+    const markers = [...conversation.matchAll(/^## (對談第 (\d+) 段|追問第 (\d+) 題|使用者介入第 (\d+) 則|Conversation part (\d+)|Follow-up (\d+)|User note (\d+))\s*$/gm)];
+    if (!markers.length && conversation) throw new Error("Coffee Tables conversation section structure is unclear; reload stopped without changing this note");
+    const rounds = [];
+    const questionsById = new Map(((_b = side.questions) != null ? _b : []).map((question, index) => [question.id, { ...question, question: "", answer: "", index }]));
+    for (let i = 0; i < markers.length; i++) {
+      const marker2 = markers[i], start = marker2.index + marker2[0].length, end = (_d = (_c = markers[i + 1]) == null ? void 0 : _c.index) != null ? _d : conversation.length, body = conversation.slice(start, end).trim();
+      const roundMatch = /對談第 (\d+) 段|Conversation part (\d+)/.exec(marker2[1]), qMatch = /追問第 (\d+) 題|Follow-up (\d+)/.exec(marker2[1]), interventionMatch = /使用者介入第 (\d+) 則|User note (\d+)/.exec(marker2[1]);
+      if (roundMatch) {
+        if (!body) continue;
+        const nth = Number((_e = roundMatch[1]) != null ? _e : roundMatch[2]) - 1, meta = (_f = side.rounds) == null ? void 0 : _f[nth];
+        const roundId = (_g = meta == null ? void 0 : meta.id) != null ? _g : `round-${nth + 1}`, roundInterventions = ((_h = side.interventions) != null ? _h : []).filter((item) => item.roundId === roundId).sort((a, b) => {
+          var _a2, _b2;
+          return ((_a2 = a.afterTurn) != null ? _a2 : 0) - ((_b2 = b.afterTurn) != null ? _b2 : 0);
+        });
+        const inputPattern = /^> \*\*你（插話）\*\*：([^\n]*(?:\n> [^\n]*)*)/gm, inputs = [...body.matchAll(inputPattern)];
+        inputs.forEach((input, index) => {
+          if (roundInterventions[index]) roundInterventions[index].text = input[1].split("\n").map((line) => line.replace(/^> ?/, "")).join("\n").trim();
+        });
+        const withoutInputs = body.replace(inputPattern, "").replace(/\n{3,}/g, "\n\n").trim(), { dialogue, notes } = splitObserverNotes(withoutInputs);
+        rounds.push({ ...meta != null ? meta : { id: roundId, createdAt: side.createdAt, status: side.status === "completed" ? "completed" : "error" }, markdown: dialogue, notes });
+      } else if (qMatch) {
+        const nth = Number((_i = qMatch[1]) != null ? _i : qMatch[2]) - 1, meta = [...questionsById.values()][nth];
+        if (!meta) throw new Error("A follow-up is missing its hidden session record");
+        const answerAt = /^### (?:桌上回答|Table response)\s*$/m.exec(body);
+        const question = answerAt ? body.slice(0, answerAt.index).trim() : body;
+        const answer = answerAt ? body.slice(answerAt.index + answerAt[0].length).trim() : "";
+        meta.question = question;
+        meta.answer = answer;
+      } else if (interventionMatch) {
+        const nth = Number((_j = interventionMatch[1]) != null ? _j : interventionMatch[2]) - 1, items = (_k = side.interventions) != null ? _k : [], item = items[nth];
+        if (!item) throw new Error("A user comment is missing its hidden session record");
+        item.text = body;
+      } else throw new Error("Unknown Coffee Tables conversation section");
+    }
+    const notesStart = /^## (?:觀察者整理|Observer notes)\s*$/m.exec(raw);
+    const draftStart = /^## (?:未完成草稿|Unfinished drafts)\s*$/m.exec(raw);
+    const notesBlock = notesStart ? raw.slice(notesStart.index + notesStart[0].length, draftStart && draftStart.index > notesStart.index ? draftStart.index : raw.length) : "";
+    const latestStart = /^### (?:最新版本|Latest)\s*$/m.exec(notesBlock), historyStart = /^### (?:先前版本|History)\s*$/m.exec(notesBlock);
+    const latest = latestStart ? notesBlock.slice(latestStart.index + latestStart[0].length, historyStart && historyStart.index > latestStart.index ? historyStart.index : notesBlock.length).trim() : "";
+    const history = historyStart ? notesBlock.slice(historyStart.index + historyStart[0].length).trim() : "";
+    const noteVersions = [...history.matchAll(/^#### (?:第 (\d+) 版|Version (\d+))\s*\n([\s\S]*?)(?=^#### |$(?![\s\S]))/gm)].map((match) => match[3].trim()).filter(Boolean);
+    const settings = (_l = settingsMatch == null ? void 0 : settingsMatch[1]) != null ? _l : "";
+    const model = (_n = (_m = /^- (?:模型|Model): (.+)$/m.exec(settings)) == null ? void 0 : _m[1]) != null ? _n : side.model;
+    const reasoning = (_p = (_o = /^- (?:推理強度|Reasoning): (.+)$/m.exec(settings)) == null ? void 0 : _o[1]) != null ? _p : side.reasoning;
+    const custom = (_u = (_t = (_r = (_q = /^### (?:這桌的額外要求|Additional requests)\s*\n([\s\S]*?)(?=^### |$(?![\s\S]))/m.exec(settings)) == null ? void 0 : _q[1]) == null ? void 0 : _r.split("\n").map((line) => line.replace(/^> ?/, "")).join("\n").trim()) != null ? _t : (_s = side.guests) == null ? void 0 : _s.customPrompt) != null ? _u : "";
+    const guestSettings = side.guests ? { ...side.guests, customPrompt: custom } : void 0;
+    const questions = [...questionsById.values()].filter((question) => question.question).map(({ index: _index, ...question }) => question), interventions = (_v = side.interventions) != null ? _v : [];
+    const session = { version: 3, id: side.id, topic: title, language: side.language, model, reasoning, createdAt: side.createdAt, updatedAt: side.updatedAt, ...side.lastGenerationStartedAt ? { lastGenerationStartedAt: side.lastGenerationStartedAt } : {}, ...side.lastCompletedAt ? { lastCompletedAt: side.lastCompletedAt } : {}, status: side.status, ...side.error ? { error: side.error } : {}, guests: guestSettings, rounds, transcriptMarkdown: rounds.map((round) => round.markdown).join("\n\n"), questions, observerNotes: [latest, ...noteVersions].filter(Boolean), ...side.draftMarkdown ? { draftMarkdown: side.draftMarkdown } : {}, ...side.observerDraftMarkdown ? { observerDraftMarkdown: side.observerDraftMarkdown } : {}, ...side.interventions ? { interventions } : {}, ...side.dirtyNotes || !!side.transcriptHash && conversationHash(rounds, questions, interventions) !== side.transcriptHash ? { dirtyNotes: true } : {} };
+    return parseSession(JSON.stringify(session));
+  }
+  encode(session) {
+    var _a, _b, _c, _d, _e, _f, _g, _h, _i, _j, _k, _l, _m, _n, _o, _p, _q, _r, _s;
+    const zh = session.language === "zh-TW", count = (_b = (_a = session.guests) == null ? void 0 : _a.counts) != null ? _b : { experts: 4, "cross-domain": 1, generalist: 1, affected: 1 };
+    const t2 = (zhText, enText) => zh ? zhText : enText;
+    const lines = [`# ${session.topic}`, "", `## ${t2("\u958B\u684C\u8A2D\u5B9A", "Table settings")}`, "", `- ${t2("\u6A21\u578B", "Model")}: ${session.model}`, `- ${t2("\u63A8\u7406\u5F37\u5EA6", "Reasoning")}: ${session.reasoning}`, `- ${t2("\u4E3B\u6301\u4EBA", "Hosts")}: ${(_d = (_c = session.guests) == null ? void 0 : _c.hostCount) != null ? _d : 2}`, `- ${t2("\u4E3B\u984C\u5C08\u5BB6", "Topic experts")}: ${count.experts}`, `- ${t2("\u8DE8\u9818\u57DF\u5C08\u5BB6", "Cross-domain experts")}: ${count["cross-domain"]}`, `- ${t2("\u597D\u5947\u7684\u901A\u624D", "Curious generalists")}: ${count.generalist}`, `- ${t2("\u53D7\u5F71\u97FF\u8005", "Affected perspectives")}: ${count.affected}`];
+    for (const guest of (_f = (_e = session.guests) == null ? void 0 : _e.guests) != null ? _f : []) lines.push(`- ${t2("\u6307\u5B9A\u4F86\u8CD3", "Guest")}: ${t2(...CATEGORY_LABELS[guest.category])} \u2014 ${guest.description}`);
+    if ((_g = session.guests) == null ? void 0 : _g.background) lines.push(`- ${t2("\u88DC\u5145\u80CC\u666F", "Background")}: ${session.guests.background}`);
+    if ((_h = session.guests) == null ? void 0 : _h.customPrompt.trim()) lines.push("", `### ${t2("\u9019\u684C\u7684\u984D\u5916\u8981\u6C42", "Additional requests")}`, "", ...session.guests.customPrompt.split("\n").map((line) => `> ${line}`));
+    lines.push("", `## ${t2("\u5C0D\u8A71\u7D00\u9304", "Conversation")}`, "");
+    const events = [];
+    let roundNumber = 0;
+    for (const round of (_i = session.rounds) != null ? _i : []) {
+      const attached = ((_j = session.interventions) != null ? _j : []).filter((item) => item.roundId === round.id).sort((a, b) => {
+        var _a2, _b2;
+        return ((_a2 = a.afterTurn) != null ? _a2 : 0) - ((_b2 = b.afterTurn) != null ? _b2 : 0);
+      }), body = interleaveInterventions(round.markdown, attached);
+      if (!body) continue;
+      roundNumber++;
+      events.push({ at: round.createdAt, lines: [`## ${t2(`\u5C0D\u8AC7\u7B2C ${roundNumber} \u6BB5`, `Conversation part ${roundNumber}`)}`, "", body] });
+    }
+    for (let i = 0; i < session.questions.length; i++) {
+      const question = session.questions[i];
+      events.push({ at: (_k = question.createdAt) != null ? _k : session.createdAt, lines: [`## ${t2(`\u8FFD\u554F\u7B2C ${i + 1} \u984C`, `Follow-up ${i + 1}`)}`, "", question.question, "", `### ${t2("\u684C\u4E0A\u56DE\u7B54", "Table response")}`, "", question.answer || question.draftAnswer || t2("\uFF08\u5C1A\u672A\u56DE\u7B54\uFF09", "(No answer yet.)")] });
+    }
+    for (let i = 0; i < ((_l = session.interventions) != null ? _l : []).length; i++) {
+      const item = session.interventions[i];
+      if (item.roundId) continue;
+      events.push({ at: item.createdAt, lines: [`## ${t2(`\u4F7F\u7528\u8005\u4ECB\u5165\u7B2C ${i + 1} \u5247`, `User note ${i + 1}`)}`, "", demoteRootHeadings(item.text)] });
+    }
+    events.sort((a, b) => a.at.localeCompare(b.at));
+    for (const event of events) lines.push(...event.lines, "");
+    const latest = (_n = (_m = session.observerNotes) == null ? void 0 : _m[0]) != null ? _n : "";
+    const history = (_p = (_o = session.observerNotes) == null ? void 0 : _o.slice(1)) != null ? _p : [];
+    if (latest || history.length) {
+      lines.push(`## ${t2("\u89C0\u5BDF\u8005\u6574\u7406", "Observer notes")}`, "", `### ${t2("\u6700\u65B0\u7248\u672C", "Latest")}`, "", latest);
+      if (history.length) {
+        lines.push("", `### ${t2("\u5148\u524D\u7248\u672C", "History")}`, "");
+        history.forEach((notes, index) => lines.push(`#### ${t2(`\u7B2C ${index + 1} \u7248`, `Version ${index + 1}`)}`, "", notes, ""));
+      }
+    }
+    const drafts = [...((_q = session.rounds) != null ? _q : []).filter((round) => round.draftMarkdown).map((round, index) => `### ${t2(`\u5C0D\u8AC7\u7B2C ${index + 1} \u6BB5\u8349\u7A3F`, `Conversation part ${index + 1} draft`)}
+
+${round.draftMarkdown}`), ...session.questions.filter((question) => question.draftAnswer).map((question, index) => `### ${t2(`\u8FFD\u554F\u8349\u7A3F ${index + 1}`, `Follow-up draft ${index + 1}`)}
+
+${question.draftAnswer}`)];
+    if (session.observerDraftMarkdown) drafts.push(`### ${t2("\u89C0\u5BDF\u8005\u6574\u7406\u8349\u7A3F", "Observer notes draft")}
+
+${session.observerDraftMarkdown}`);
+    if (drafts.length || session.draftMarkdown && !((_r = session.rounds) != null ? _r : []).some((round) => round.draftMarkdown)) lines.push(`## ${t2("\u672A\u5B8C\u6210\u8349\u7A3F", "Unfinished drafts")}`, "", ...session.draftMarkdown && !((_s = session.rounds) != null ? _s : []).some((round) => round.draftMarkdown) ? [session.draftMarkdown] : [], ...drafts);
+    return lines.join("\n");
+  }
+  async writeNewSidecar(session, path, targetMarkdown) {
+    await this.ensureFolder(this.hidden);
+    const filePath = this.sidecarPath(session.id);
+    if (await this.vault.adapter.exists(filePath)) throw new Error("Coffee Tables hidden session already exists");
+    const base = this.sidecar(session, 1, path);
+    const raw = JSON.stringify(targetMarkdown === void 0 ? base : { ...base, journal: { previousMarkdownHash: contentHash(""), nextMarkdownHash: contentHash(targetMarkdown), previousSidecar: "", targetMarkdown } }, null, 2);
+    await this.writeHidden(filePath, raw);
+    this.sidecarOriginals.set(session.id, raw);
+    this.revisions.set(session.id, 1);
+  }
+  async recoverPendingCreates() {
+    const sidecars = await this.hiddenPaths();
+    for (const sideFile of sidecars) {
+      const raw = await this.readHidden(sideFile);
+      let side;
+      try {
+        side = JSON.parse(raw);
+      } catch (e) {
+        continue;
+      }
+      const journal = side.journal;
+      if (!(journal == null ? void 0 : journal.targetMarkdown) || this.activeWrites.has(side.id)) continue;
+      const file = this.vault.getAbstractFileByPath(side.filePath);
+      if (!file) {
+        if (journal.previousMarkdownHash !== contentHash("")) throw new Error(`Coffee Tables recovery stopped because ${side.filePath} is missing`);
+        await this.ensureFolder(side.filePath.split("/").slice(0, -1).join("/"));
+        await this.vault.create(side.filePath, journal.targetMarkdown);
+      } else if (!(file instanceof import_obsidian.TFile) || contentHash(await this.vault.read(file)) !== journal.nextMarkdownHash) {
+        throw new Error(`Coffee Tables recovery found an outside change at ${side.filePath}; both files were preserved`);
+      }
+      const { journal: _journal, ...committed } = side;
+      const next = JSON.stringify(committed, null, 2);
+      await this.writeHidden(sideFile, next, raw);
+    }
+  }
+  async recoverMoves() {
+    for (const sidePath of await this.hiddenPaths()) {
+      const raw = await this.readHidden(sidePath);
+      let side;
+      try {
+        side = JSON.parse(raw);
+      } catch (e) {
+        continue;
+      }
+      const move = side.moveJournal;
+      if (!move || this.activeMoves.has(side.id)) continue;
+      const source = this.vault.getAbstractFileByPath(move.previousPath), target = this.vault.getAbstractFileByPath(move.targetPath);
+      if (source instanceof import_obsidian.TFile === target instanceof import_obsidian.TFile) throw new Error(`Coffee Tables move recovery found an ambiguous pair for ${side.topic}; both files were preserved`);
+      const filePath = target instanceof import_obsidian.TFile ? move.targetPath : move.previousPath, { moveJournal: _moveJournal, ...committed } = side, next = JSON.stringify({ ...committed, filePath }, null, 2);
+      await this.writeHidden(sidePath, next, raw);
+      this.locations.set(side.id, filePath);
+      this.sidecarOriginals.set(side.id, next);
+    }
+  }
+  parseV2(raw) {
+    var _a, _b, _c;
+    const match = /^<!-- coffee-tables-data:([\s\S]*?) -->$/mu.exec(raw);
+    if (!match) throw new Error("Legacy Coffee Tables metadata is missing");
+    const stored = JSON.parse(decodeURIComponent(match[1])), id = String(stored.id), lang = stored.language === "zh-TW", conversationTitle = lang ? "## \u5C0D\u8AC7" : "## Conversation", startAt = raw.indexOf(conversationTitle, match.index + match[0].length), endAt = raw.indexOf(`<!-- coffee-tables-transcript-end:${id} -->`, startAt);
+    if (startAt < 0 || endAt < startAt || stored.version !== 2) throw new Error("Legacy Coffee Tables transcript is incomplete");
+    const transcriptMarkdown = raw.slice(startAt + conversationTitle.length, endAt).trim(), questions = ((_a = stored.questionStates) != null ? _a : []).map((state) => {
+      const qid = String(state.id), q = raw.indexOf(`<!-- coffee-tables-question:${qid} -->`, endAt), a = raw.indexOf(`<!-- coffee-tables-answer:${qid} -->`, q), e = raw.indexOf(`<!-- coffee-tables-question-end:${qid} -->`, a);
+      if (q < 0 || a < 0 || e < 0) throw new Error("Legacy follow-up is incomplete");
+      return { id: qid, question: raw.slice(q + `<!-- coffee-tables-question:${qid} -->`.length, a).trim(), answer: raw.slice(a + `<!-- coffee-tables-answer:${qid} -->`.length, e).trim(), status: state.status, ...typeof state.error === "string" ? { error: state.error } : {}, ...typeof state.draftAnswer === "string" ? { draftAnswer: state.draftAnswer } : {}, createdAt: String(stored.createdAt) };
+    });
+    const legacyDraft = (_c = (_b = /<!--\s*coffee-tables-draft-start(?:\s*:[^>]+)?\s*-->([\s\S]*?)<!--\s*coffee-tables-draft-end(?:\s*:[^>]+)?\s*-->/i.exec(raw)) == null ? void 0 : _b[1]) == null ? void 0 : _c.trim();
+    const session = { ...stored, version: 3, transcriptMarkdown, questions, guests: migrateGuests(stored.guests), rounds: transcriptMarkdown ? [{ id: "round-1", markdown: splitObserverNotes(transcriptMarkdown).dialogue, notes: splitObserverNotes(transcriptMarkdown).notes, status: stored.status === "completed" ? "completed" : "error", createdAt: String(stored.createdAt) }] : [], observerNotes: splitObserverNotes(transcriptMarkdown).notes ? [splitObserverNotes(transcriptMarkdown).notes] : [], draftMarkdown: typeof stored.draftMarkdown === "string" ? stored.draftMarkdown : legacyDraft };
+    return parseSession(JSON.stringify(session));
+  }
+  async load(idOrPath) {
+    let file = this.vault.getAbstractFileByPath(idOrPath.includes("/") ? idOrPath : `${this.folder}/${idOrPath}.md`);
+    if (!(file instanceof import_obsidian.TFile)) file = this.vault.getAbstractFileByPath(`${this.folder}/${idOrPath}.json`);
+    if (!(file instanceof import_obsidian.TFile) && !idOrPath.includes("/")) {
+      try {
+        const sideRaw2 = await this.readHidden(this.sidecarPath(idOrPath)), side2 = JSON.parse(sideRaw2);
+        const linked = side2.filePath ? this.vault.getAbstractFileByPath(side2.filePath) : null;
+        if (linked instanceof import_obsidian.TFile) file = linked;
+      } catch (e) {
+      }
+    }
+    if (!(file instanceof import_obsidian.TFile)) {
+      const candidates = this.list().filter((item) => item.extension === "md"), sidecars = await this.hiddenPaths();
+      for (const candidate of candidates) {
+        try {
+          const raw2 = await this.vault.read(candidate), heading = markdownTopic(raw2);
+          for (const item of sidecars) {
+            const side2 = JSON.parse(await this.readHidden(item));
+            const requested = side2.id === idOrPath || side2.filePath === idOrPath;
+            const exactPath = side2.filePath === candidate.path;
+            const uniquelyMoved = !this.vault.getAbstractFileByPath(side2.filePath) && side2.topic === heading && (await Promise.all(candidates.map(async (sibling) => markdownTopic(await this.vault.read(sibling))))).filter((title2) => title2 === heading).length === 1;
+            if (requested && (side2.topic === heading || !heading && exactPath) && (exactPath || uniquelyMoved)) {
+              file = candidate;
+              break;
+            }
+          }
+          if (file instanceof import_obsidian.TFile) break;
+        } catch (e) {
+        }
+      }
+    }
+    if (!(file instanceof import_obsidian.TFile)) throw new Error("Coffee Tables session is missing");
+    const raw = await this.vault.read(file);
+    let session;
+    if (/^<!-- coffee-tables-data:/m.test(raw)) {
+      session = this.parseV2(raw);
+      const backup = `${this.hidden}/backups`;
+      await this.ensureFolder(this.hidden);
+      await this.ensureFolder(backup);
+      const backupPath = `${backup}/${session.id}-v2.md`;
+      if (!await this.vault.adapter.exists(backupPath)) await this.writeHidden(backupPath, raw);
+      const path = this.titlePath(session.topic, session.id);
+      if (!await this.vault.adapter.exists(this.sidecarPath(session.id))) await this.writeNewSidecar(session, path);
+      const clean = this.encode(session);
+      await this.ensureFolder(path.split("/").slice(0, -1).join("/"));
+      await this.vault.process(file, (current) => {
+        if (current !== raw) throw new Error("Coffee Tables note changed during migration; original data was preserved");
+        return clean;
+      });
+      if (path !== file.path && this.renameFile) await this.renameFile(file, path);
+      this.locations.set(session.id, path);
+      this.originals.set(session.id, clean);
+      this.sidecarOriginals.set(session.id, JSON.stringify(this.sidecar(session, 1, path), null, 2));
+      this.revisions.set(session.id, 1);
+      return session;
+    }
+    const title = markdownTopic(raw);
+    if (!title) {
+      try {
+        const legacy = parseSession(raw);
+        if (legacy.version === 1) return legacy;
+      } catch (e) {
+      }
+    }
+    let side = await this.findSidecar(file.path, title);
+    if (side == null ? void 0 : side.journal) side = await this.recoverJournal(file, raw, side);
+    if (!side) {
+      try {
+        return parseSession(raw);
+      } catch (e) {
+        throw new Error("This readable Markdown has no hidden session data. Keep it as a note; restore its .sessions file to continue the chat.");
+      }
+    }
+    const priorMarkdown = this.originals.get(side.id);
+    if (priorMarkdown !== void 0 && priorMarkdown !== raw) throw new Error("Session changed outside this room. Reload the note to adopt your edits; no content was overwritten.");
+    const sessionLoaded = this.parseMarkdown(raw, side);
+    const sidePath = this.sidecarPath(sessionLoaded.id);
+    if (!await this.vault.adapter.exists(sidePath)) throw new Error("Coffee Tables hidden session data is missing");
+    const sideRaw = await this.readHidden(sidePath), priorSidecar = this.sidecarOriginals.get(sessionLoaded.id);
+    if (priorSidecar !== void 0 && priorSidecar !== sideRaw) throw new Error("Coffee Tables hidden data changed outside this room. Reload it before continuing.");
+    this.locations.set(sessionLoaded.id, file.path);
+    this.originals.set(sessionLoaded.id, raw);
+    this.sidecarOriginals.set(sessionLoaded.id, sideRaw);
+    this.revisions.set(sessionLoaded.id, side.revision);
+    return sessionLoaded;
+  }
+  async findSidecar(path, title) {
+    var _a;
+    const candidates = await this.hiddenPaths();
+    const parsed = [];
+    for (const file of candidates) {
+      try {
+        parsed.push(JSON.parse(await this.readHidden(file)));
+      } catch (e) {
+      }
+    }
+    const exact = parsed.filter((side) => side.filePath === path);
+    if (exact.length === 1) return exact[0];
+    if (exact.length > 1) throw new Error("Multiple Coffee Tables records point to this note; no session was opened");
+    const moved = title ? parsed.filter((side) => side.topic === title && (!side.filePath || !this.vault.getAbstractFileByPath(side.filePath))) : [];
+    if (moved.length > 1) throw new Error("More than one moved Coffee Tables table has this title; choose its original note or restore hidden session data");
+    return (_a = moved[0]) != null ? _a : null;
+  }
+  async recoverJournal(file, markdown, staged) {
+    if (this.activeWrites.has(staged.id)) throw new Error("Coffee Tables save is still in progress; reopen after it finishes");
+    const journal = staged.journal;
+    if (!journal) return staged;
+    const digest = contentHash(markdown), sidePath = this.sidecarPath(staged.id);
+    if (!await this.vault.adapter.exists(sidePath)) throw new Error("Coffee Tables hidden session data is missing");
+    let result;
+    if (digest === journal.nextMarkdownHash) {
+      const { journal: _journal, ...committed } = staged;
+      result = { ...committed, filePath: file.path };
+    } else if (digest === journal.previousMarkdownHash) {
+      result = JSON.parse(journal.previousSidecar);
+    } else throw new Error("Coffee Tables note and hidden record changed during a save. Both files were preserved for manual review.");
+    const oldRaw = await this.readHidden(sidePath), nextRaw = JSON.stringify(result, null, 2);
+    await this.writeHidden(sidePath, nextRaw, oldRaw);
+    this.sidecarOriginals.set(staged.id, nextRaw);
+    this.revisions.set(staged.id, result.revision);
+    return result;
+  }
+  async stageSidecar(session, path, cleanMarkdown, previousMarkdown) {
+    var _a;
+    const sidePath = this.sidecarPath(session.id);
+    if (!await this.vault.adapter.exists(sidePath)) throw new Error("Coffee Tables hidden session data is missing; no content was written");
+    const original = this.sidecarOriginals.get(session.id);
+    if (original === void 0) throw new Error("Reload this table before saving hidden session data");
+    const revision = ((_a = this.revisions.get(session.id)) != null ? _a : 0) + 1, committedObject = this.sidecar(session, revision, path), committed = JSON.stringify(committedObject, null, 2);
+    const staged = JSON.stringify({ ...committedObject, journal: { previousMarkdownHash: contentHash(previousMarkdown), nextMarkdownHash: contentHash(cleanMarkdown), previousSidecar: original } }, null, 2);
+    await this.writeHidden(sidePath, staged, original);
+    return { path: sidePath, staged, committed, revision };
+  }
+  async inspectReadOnly(path) {
+    const file = this.vault.getAbstractFileByPath(path);
+    if (!(file instanceof import_obsidian.TFile)) throw new Error("Coffee Tables session is missing");
+    const raw = await this.vault.read(file);
+    if (/^<!-- coffee-tables-data:/m.test(raw)) return this.parseV2(raw);
+    const title = markdownTopic(raw);
+    const side = await this.findSidecar(path, title);
+    if (!side) throw new Error("Coffee Tables hidden session data is missing");
+    if (side.journal) throw new Error("This table has an unfinished save. Open it to safely recover the saved changes.");
+    return this.parseMarkdown(raw, side);
+  }
+  async inspect(path) {
+    const file = this.vault.getAbstractFileByPath(path);
+    if (!(file instanceof import_obsidian.TFile)) throw new Error("Coffee Tables session is missing");
+    const raw = await this.vault.read(file);
+    if (/^<!-- coffee-tables-data:/m.test(raw)) return this.parseV2(raw);
+    const title = markdownTopic(raw);
+    let side = await this.findSidecar(path, title);
+    if (side == null ? void 0 : side.journal) {
+      if (this.activeWrites.has(side.id)) {
+        const journal = side.journal;
+        if (contentHash(raw) === journal.previousMarkdownHash) side = JSON.parse(journal.previousSidecar);
+        else if (contentHash(raw) === journal.nextMarkdownHash) {
+          const { journal: _journal, ...committed } = side;
+          side = committed;
+        } else throw new Error("Coffee Tables note and hidden state changed during save");
+      } else side = await this.recoverJournal(file, raw, side);
+    }
+    return side ? this.parseMarkdown(raw, side) : (() => {
+      throw new Error("Coffee Tables hidden session data is missing");
+    })();
+  }
+  async save(sessionInput) {
+    var _a;
+    const session = parseSession(JSON.stringify(sessionInput));
+    if (session.version !== 3) throw new Error("Unsupported Coffee Tables session version");
+    if (this.deletedIds.has(session.id)) throw new Error("This Coffee Tables session was deleted; reload the restored note before saving");
+    let path = (_a = this.locations.get(session.id)) != null ? _a : this.titlePath(session.topic, session.id);
+    const clean = this.encode(session), file = this.vault.getAbstractFileByPath(path), original = this.originals.get(session.id);
+    if (!file) {
+      path = this.titlePath(session.topic, session.id);
+      await this.ensureFolder(path.split("/").slice(0, -1).join("/"));
+      if (this.vault.getAbstractFileByPath(path)) throw new Error("A Coffee Tables note already exists; reopen it before saving");
+      this.activeWrites.add(session.id);
+      try {
+        await this.writeNewSidecar(session, path, clean);
+        await this.vault.create(path, clean);
+        const sidePath = this.sidecarPath(session.id);
+        if (!await this.vault.adapter.exists(sidePath)) throw new Error("Coffee Tables hidden session data is missing after create");
+        const staged = await this.readHidden(sidePath);
+        const side = JSON.parse(staged);
+        const { journal: _journal, ...committed } = side;
+        const committedRaw = JSON.stringify(committed, null, 2);
+        await this.writeHidden(sidePath, committedRaw, staged);
+        this.sidecarOriginals.set(session.id, committedRaw);
+        this.revisions.set(session.id, committed.revision);
+      } finally {
+        this.activeWrites.delete(session.id);
+      }
+    } else {
+      if (!(file instanceof import_obsidian.TFile) || original === void 0) throw new Error("Reload this table before saving");
+      const current = await this.vault.read(file);
+      if (current !== original) throw new Error("Session changed outside this room. Reload the note to adopt your edits; no content was overwritten.");
+      const sidePath = this.sidecarPath(session.id);
+      if (!await this.vault.adapter.exists(sidePath)) throw new Error("Coffee Tables hidden session data is missing; the Markdown note was preserved");
+      const originalSidecar = this.sidecarOriginals.get(session.id);
+      this.activeWrites.add(session.id);
+      try {
+        const transaction = await this.stageSidecar(session, path, clean, original);
+        try {
+          await this.vault.process(file, (value) => {
+            if (value !== original) throw new Error("Session changed outside this room; no content was overwritten");
+            return clean;
+          });
+          await this.writeHidden(transaction.path, transaction.committed, transaction.staged);
+          this.sidecarOriginals.set(session.id, transaction.committed);
+          this.revisions.set(session.id, transaction.revision);
+        } catch (error) {
+          const current2 = await this.vault.read(file).catch(() => "");
+          if (current2 === clean) await this.vault.process(file, (value) => value === clean ? original : value).catch(() => void 0);
+          await this.writeHidden(transaction.path, originalSidecar, transaction.staged).catch(() => void 0);
+          throw error;
+        }
+      } finally {
+        this.activeWrites.delete(session.id);
+      }
+    }
+    this.originals.set(session.id, clean);
+    this.locations.set(session.id, path);
+    if (this.renameFile && file instanceof import_obsidian.TFile) {
+      const next = this.titlePath(session.topic, session.id);
+      if (next !== file.path) {
+        await this.ensureFolder(next.split("/").slice(0, -1).join("/"));
+        path = await this.moveManagedFile(file, session.id, next);
+      }
+    }
+  }
+  async moveManagedFile(file, id, targetPath) {
+    if (!this.renameFile) throw new Error("FileManager rename is unavailable");
+    if (this.activeMoves.has(id)) throw new Error("This Coffee Tables file is already being moved");
+    this.activeMoves.add(id);
+    try {
+      const sidePath = this.sidecarPath(id), raw = await this.readHidden(sidePath), expected = this.sidecarOriginals.get(id);
+      if (expected !== void 0 && raw !== expected) throw new Error("Coffee Tables hidden data changed outside this room; reload before moving");
+      const staged = JSON.stringify({ ...JSON.parse(raw), moveJournal: { previousPath: file.path, targetPath } }, null, 2);
+      await this.writeHidden(sidePath, staged, raw);
+      await this.renameFile(file, targetPath);
+      const { moveJournal: _move, ...committed } = JSON.parse(staged), next = JSON.stringify({ ...committed, filePath: targetPath }, null, 2);
+      await this.writeHidden(sidePath, next, staged);
+      this.locations.set(id, targetPath);
+      this.sidecarOriginals.set(id, next);
+      return targetPath;
+    } finally {
+      this.activeMoves.delete(id);
+    }
+  }
+  async reload(path) {
+    const markdownFile = this.vault.getAbstractFileByPath(path);
+    if (!(markdownFile instanceof import_obsidian.TFile)) throw new Error("Coffee Tables session is missing");
+    const title = markdownTopic(await this.vault.read(markdownFile));
+    const sidecars = await this.hiddenPaths(), records = [];
+    for (const sidePath2 of sidecars) {
+      const raw2 = await this.readHidden(sidePath2);
+      try {
+        records.push({ path: sidePath2, side: JSON.parse(raw2), raw: raw2 });
+      } catch (e) {
+      }
+    }
+    const exact = records.filter((record) => record.side.filePath === path);
+    const located = records.filter((record) => this.locations.get(record.side.id) === path);
+    const candidates = exact.length ? exact : located.length ? located : records.filter((record) => record.side.topic === title && (!record.side.filePath || !this.vault.getAbstractFileByPath(record.side.filePath)));
+    if (candidates.length !== 1) throw new Error(candidates.length ? "More than one Coffee Tables record matches this note; reload stopped safely" : "Coffee Tables hidden session record was not found");
+    const { path: sidePath, side, raw } = candidates[0];
+    this.originals.delete(side.id);
+    this.sidecarOriginals.delete(side.id);
+    if (side.filePath !== path) {
+      const next = JSON.stringify({ ...side, filePath: path }, null, 2);
+      await this.writeHidden(sidePath, next, raw);
+    }
+    return await this.load(path);
+  }
+  async renameToTopic(id, topic) {
+    var _a;
+    const file = this.vault.getAbstractFileByPath((_a = this.locations.get(id)) != null ? _a : this.path(id));
+    if (file instanceof import_obsidian.TFile && this.renameFile) {
+      const target = this.titlePath(topic, id);
+      if (target !== file.path) {
+        await this.renameFile(file, target);
+        this.locations.set(id, target);
+      }
+    }
+  }
+  async openMarkdown(id) {
+    var _a;
+    const file = this.vault.getAbstractFileByPath(id.includes("/") ? id : (_a = this.locations.get(id)) != null ? _a : this.path(id));
+    if (!(file instanceof import_obsidian.TFile)) throw new Error("Coffee Tables Markdown note is missing");
+    return file;
+  }
+  async organizeExisting(busyIds = /* @__PURE__ */ new Set()) {
+    var _a, _b;
+    let moved = 0, skipped = 0;
+    for (const file of [...this.list()]) {
+      if (((_a = file.parent) == null ? void 0 : _a.path) !== this.folder) continue;
+      try {
+        const raw = await this.vault.read(file), heading = markdownTopic(raw), side = await this.findSidecar(file.path, heading);
+        const topic = heading != null ? heading : side == null ? void 0 : side.topic;
+        if (!topic) {
+          skipped++;
+          continue;
+        }
+        if (side && (side.status === "generating" || busyIds.has(side.id))) {
+          skipped++;
+          continue;
+        }
+        const id = (_b = side == null ? void 0 : side.id) != null ? _b : `legacy-${shortHash(file.path)}`, target = this.titlePath(topic, id);
+        if (!this.renameFile) throw new Error("FileManager rename is unavailable");
+        await this.ensureFolder(target.split("/").slice(0, -1).join("/"));
+        if (side) await this.moveManagedFile(file, side.id, target);
+        else await this.renameFile(file, target);
+        moved++;
+      } catch (e) {
+        skipped++;
+      }
+    }
+    return { moved, skipped };
+  }
+  async delete(id, markdownPath) {
+    var _a, _b;
+    const safeId = /^[a-zA-Z0-9-]+$/.test(id) ? id : `legacy-${shortHash(id)}`, file = await this.openMarkdown(markdownPath != null ? markdownPath : id), sidePath = `${this.hidden}/${safeId}.json`, trashFolder = `${this.hidden}/trash`, bundlePath = `${trashFolder}/${safeId}-${Date.now()}.json`;
+    await this.ensureFolder(trashFolder);
+    let raw = await this.vault.read(file), sideRaw = await this.vault.adapter.read(sidePath).catch(() => void 0);
+    const record = { version: 1, id, topic: (_a = markdownTopic(raw)) != null ? _a : file.basename, originalPath: file.path, markdown: raw, ...sideRaw ? { sidecar: sideRaw } : {}, deletedAt: (/* @__PURE__ */ new Date()).toISOString(), trashed: false };
+    let bundle = JSON.stringify(record, null, 2);
+    await this.writeHidden(bundlePath, bundle);
+    let stable = false;
+    for (let attempt = 0; attempt < 3; attempt++) {
+      const latestMarkdown = await this.vault.read(file), latestSidecar2 = await this.vault.adapter.read(sidePath).catch(() => void 0);
+      if (latestMarkdown === raw && latestSidecar2 === sideRaw) {
+        stable = true;
+        break;
+      }
+      raw = latestMarkdown;
+      sideRaw = latestSidecar2;
+      record.markdown = raw;
+      record.topic = (_b = markdownTopic(raw)) != null ? _b : file.basename;
+      if (sideRaw === void 0) delete record.sidecar;
+      else record.sidecar = sideRaw;
+      const previousBundle = await this.readHidden(bundlePath);
+      bundle = JSON.stringify(record, null, 2);
+      await this.writeHidden(bundlePath, bundle, previousBundle);
+    }
+    if (!stable) {
+      await this.vault.adapter.remove(bundlePath).catch(() => void 0);
+      throw new Error("This table changed while it was being archived. The note was left in place; retry deletion after reloading it.");
+    }
+    try {
+      if (this.trashFile) await this.trashFile(file);
+      else await this.vault.adapter.trashLocal(file.path);
+    } catch (error) {
+      await this.vault.adapter.remove(bundlePath).catch(() => void 0);
+      throw error;
+    }
+    const staged = JSON.parse(await this.readHidden(bundlePath));
+    staged.trashed = true;
+    await this.writeHidden(bundlePath, JSON.stringify(staged, null, 2), bundle).catch(() => void 0);
+    const latestSidecar = await this.vault.adapter.read(sidePath).catch(() => void 0);
+    if (latestSidecar !== sideRaw) {
+      const archived = JSON.parse(await this.readHidden(bundlePath));
+      if (latestSidecar === void 0) delete archived.sidecar;
+      else archived.sidecar = latestSidecar;
+      const previousBundle = await this.readHidden(bundlePath);
+      await this.writeHidden(bundlePath, JSON.stringify(archived, null, 2), previousBundle).catch(() => void 0);
+    }
+    if (sideRaw && latestSidecar === sideRaw) await this.vault.adapter.process(sidePath, (current) => {
+      if (current !== sideRaw) throw new Error("Coffee Tables hidden data changed outside this room; deletion preserved it");
+      return "";
+    }).catch(() => void 0);
+    this.originals.delete(safeId);
+    this.sidecarOriginals.delete(safeId);
+    this.locations.delete(safeId);
+    this.revisions.delete(safeId);
+    this.deletedIds.add(id);
+    return bundlePath;
+  }
+  async deletedTables() {
+    const folder = `${this.hidden}/trash`, listing = await this.vault.adapter.list(folder).catch(() => ({ files: [], folders: [] })), result = [];
+    for (const path of listing.files.filter((item) => item.endsWith(".json"))) try {
+      const record = JSON.parse(await this.readHidden(path));
+      const originalPath = typeof record.originalPath === "string" ? record.originalPath : "";
+      const originalMissing = !!originalPath && !this.vault.getAbstractFileByPath(originalPath);
+      if (record.version === 1 && record.restoredPath === void 0 && (record.restoreJournal !== void 0 || record.trashed === true || originalMissing)) result.push({ path, id: String(record.id), topic: String(record.topic), deletedAt: String(record.deletedAt) });
+    } catch (e) {
+    }
+    return result.sort((a, b) => b.deletedAt.localeCompare(a.deletedAt));
+  }
+  async restoreDeleted(bundlePath) {
+    var _a;
+    const bundleRaw = await this.readHidden(bundlePath), record = JSON.parse(bundleRaw);
+    const originalPath = typeof record.originalPath === "string" ? record.originalPath : "";
+    if (record.version !== 1 || record.trashed !== true && record.restoreJournal === void 0 && (!!originalPath && !!this.vault.getAbstractFileByPath(originalPath)) || typeof record.id !== "string" || typeof record.markdown !== "string") throw new Error("Deleted Coffee Tables record is incomplete; no file was changed");
+    const sidePath = this.sidecarPath(record.id), originalBundleSidecar = typeof record.sidecar === "string" ? record.sidecar : void 0, currentSidecar = await this.vault.adapter.read(sidePath).catch(() => void 0);
+    const base = typeof record.originalPath === "string" ? record.originalPath : this.titlePath(String(record.topic), record.id), stem = base.slice(0, -3);
+    let journal = record.restoreJournal;
+    let target = (_a = journal == null ? void 0 : journal.targetPath) != null ? _a : base;
+    if (!journal) {
+      let suffix = 2;
+      while (this.vault.getAbstractFileByPath(target)) target = `${stem}\uFF08${suffix++}\uFF09.md`;
+    }
+    const existingTarget = this.vault.getAbstractFileByPath(target);
+    if (existingTarget && (!(existingTarget instanceof import_obsidian.TFile) || await this.vault.read(existingTarget) !== record.markdown)) {
+      let suffix = 2;
+      target = base;
+      while (this.vault.getAbstractFileByPath(target)) target = `${stem}\uFF08${suffix++}\uFF09.md`;
+      journal = void 0;
+    }
+    const before = journal ? journal.sidecarBefore : currentSidecar;
+    let after = journal == null ? void 0 : journal.sidecarAfter;
+    if (!journal) {
+      if (currentSidecar !== void 0 && currentSidecar !== originalBundleSidecar && currentSidecar !== "") throw new Error("This Coffee Tables session already exists; restore stopped without overwriting it");
+      if (originalBundleSidecar) {
+        const side = JSON.parse(originalBundleSidecar);
+        after = JSON.stringify({ ...side, filePath: target }, null, 2);
+      }
+    }
+    const stagedRecord = { ...record, restoreJournal: { targetPath: target, ...before !== void 0 ? { sidecarBefore: before } : {}, ...after !== void 0 ? { sidecarAfter: after } : {} } }, stagedRaw = JSON.stringify(stagedRecord, null, 2);
+    await this.writeHidden(bundlePath, stagedRaw, bundleRaw);
+    await this.ensureFolder(target.split("/").slice(0, -1).join("/"));
+    if (!this.vault.getAbstractFileByPath(target)) await this.vault.create(target, record.markdown);
+    const sideNow = await this.vault.adapter.read(sidePath).catch(() => void 0);
+    if (after !== void 0 && sideNow !== after) {
+      if (sideNow !== before) throw new Error("Coffee Tables hidden data changed during restore; the Markdown and recovery record were preserved");
+      if (sideNow === void 0) await this.writeHidden(sidePath, after);
+      else await this.writeHidden(sidePath, after, sideNow);
+    }
+    const { restoreJournal: _journal, ...committed } = stagedRecord, completed = JSON.stringify({ ...committed, restoredPath: target }, null, 2);
+    await this.writeHidden(bundlePath, completed, stagedRaw);
+    await this.vault.adapter.remove(bundlePath).catch(() => void 0);
+    this.deletedIds.delete(record.id);
+    this.locations.set(record.id, target);
+    this.originals.set(record.id, record.markdown);
+    if (after !== void 0) {
+      this.sidecarOriginals.set(record.id, after);
+      this.revisions.set(record.id, JSON.parse(after).revision);
+    }
+    return target;
+  }
+  async duplicateLegacy(legacy) {
+    const copy = copyLegacySession(legacy);
+    await this.save(copy);
+    return copy;
+  }
+};
+function migrateGuests(value) {
+  if (!value || typeof value !== "object") return void 0;
+  const raw = value;
+  if (raw.counts) return raw;
+  const selected = Array.isArray(raw.perspectives) ? raw.perspectives : ["experts", "cross-domain", "generalist", "affected"];
+  return { counts: { experts: selected.includes("experts") ? 4 : 0, "cross-domain": selected.includes("cross-domain") ? 1 : 0, generalist: selected.includes("generalist") ? 1 : 0, affected: selected.includes("affected") ? 1 : 0 }, guests: [], background: typeof raw.background === "string" ? raw.background : "", customPrompt: "" };
+}
+function conversationHash(rounds, questions, interventions) {
+  return contentHash(JSON.stringify({ rounds: rounds.map((round) => demoteRootHeadings(round.markdown)), questions: questions.map(({ question, answer, draftAnswer }) => [question, answer, draftAnswer != null ? draftAnswer : ""]), interventions: interventions.map((item) => demoteRootHeadings(item.text)) }));
+}
+function interleaveInterventions(markdown, interventions) {
+  if (!interventions.length) return demoteRootHeadings(markdown);
+  const chunks = markdown.split(/(?=^### .+$)/gm), output = [];
+  let turns = 0, inserted = /* @__PURE__ */ new Set();
+  const insertThrough = (count) => {
+    var _a;
+    for (const item of interventions) if (!inserted.has(item.id) && ((_a = item.afterTurn) != null ? _a : 0) <= count) {
+      const quoted = item.text.trim().split("\n").map((line, index) => index === 0 ? `> **\u4F60\uFF08\u63D2\u8A71\uFF09**\uFF1A${line}` : `> ${line}`).join("\n");
+      output.push("", quoted, "");
+      inserted.add(item.id);
+    }
+  };
+  for (const chunk of chunks) {
+    if (/^### .+$/m.test(chunk)) insertThrough(turns);
+    output.push(demoteRootHeadings(chunk));
+    if (/^### .+$/m.test(chunk)) turns++;
+  }
+  insertThrough(turns);
+  return output.join("\n").trim();
+}
+function contentHash(value) {
+  let hash = 2166136261;
+  for (let i = 0; i < value.length; i++) hash = Math.imul(hash ^ value.charCodeAt(i), 16777619);
+  return (hash >>> 0).toString(16);
+}
+function demoteRootHeadings(markdown) {
+  return markdown.split("\n").map((line) => /^(#{1,2})\s/.test(line) ? `##${line}` : line).join("\n");
+}
+function shortHash(value) {
+  let hash = 2166136261;
+  for (const character of value.normalize("NFC").trim()) hash = Math.imul(hash ^ character.codePointAt(0), 16777619);
+  return (hash >>> 0).toString(16).padStart(8, "0").slice(0, 8);
+}
+function topicSlug(topic) {
+  const printable = Array.from(topic.normalize("NFC")).filter((character) => {
+    var _a;
+    return ((_a = character.codePointAt(0)) != null ? _a : 0) >= 32;
+  }).join("");
+  const slug = Array.from(printable.replace(/[\\/:*?"<>|#^[\]]/g, " ").replace(/\s+/g, " ").replace(/[. ]+$/g, "").trim()).slice(0, 80).join("").trim();
+  return slug || "Coffee Table";
+}
+
+// experiences/coffee-tables/samples.ts
+var COFFEE_SAMPLE_ZH = { "title": "\u7E41\u9AD4\u4E2D\u6587\uFF5CCoffee Table\uFF1A\u516C\u53F8\u5230\u5E95\u8981\u4E0D\u8981\u63A8 AI\uFF1F", "topic": "\u8981\u5982\u4F55\u5728\u516C\u53F8\u5167\u90E8\u63A8\u884CAI, \u6BCF\u500B\u4EBA\u90FD\u64D4\u5FC3AI\u6703\u53D6\u4EE3\u81EA\u5DF1\u800C\u4E0D\u9858\u610F\u8A8D\u771F\u63A8\u884C", "language": "zh-TW", "markdown": "**\u4EBA\u7269**\n\n- **\u4E3B\u6301\u4EBA \u7532\uFF5C\u6797\u5C91**\uFF1A\u7280\u5229\uFF0C\u5C08\u6293\u77DB\u76FE  \n- **\u4E3B\u6301\u4EBA \u4E59\uFF5C\u5468\u6600**\uFF1A\u597D\u5947\uFF0C\u559C\u6B61\u8FFD\u554F\u5230\u5E95  \n- **\u89C0\u5BDF\u8005\uFF5C\u6C88\u9ED8**\uFF1A\u4E0D\u7AD9\u968A\uFF0C\u8A18\u9304\u5047\u8A2D\u8207\u8F49\u6298  \n- **\u5C08\u5BB6\u4E00\uFF5C\u9673\u6021\u5B89**\uFF1A\u4EBA\u8CC7\u4E3B\u7BA1\uFF0C\u95DC\u5FC3\u7D44\u7E54\u8207\u54E1\u5DE5\u5B89\u5168\u611F  \n- **\u5C08\u5BB6\u4E8C\uFF5C\u9AD8\u5B50\u8B19**\uFF1AAI \u7522\u54C1\u9867\u554F\uFF0C\u5354\u52A9\u4F01\u696D\u5C0E\u5165\u5DE5\u5177  \n- **\u5C08\u5BB6\u4E09\uFF5C\u8A31\u6587\u54F2**\uFF1A\u88FD\u9020\u696D\u73FE\u5834\u4E3B\u7BA1\uFF0C\u91CD\u8996\u6D41\u7A0B\u8207\u98A8\u96AA  \n- **\u5C08\u5BB6\u56DB\uFF5C\u8607\u96C5\u96EF**\uFF1A\u52DE\u52D5\u8207\u8077\u6DAF\u7814\u7A76\u8005\uFF0C\u7814\u7A76\u5DE5\u4F5C\u5982\u4F55\u6539\u8B8A  \n- **\u8DE8\u9818\u57DF\u5C08\u5BB6\uFF5C\u8449\u66FC**\uFF1A\u6025\u8A3A\u8B77\u7406\u5E2B  \n- **\u85DD\u4EBA\uFF0FGeneralist\uFF5C\u963F\u9054**\uFF1A\u4E3B\u6301\u904E\u7BC0\u76EE\uFF0C\u4EC0\u9EBC\u90FD\u6562\u554F  \n- **\u7576\u4E8B\u4EBA\uFF5C\u5C0F\u82B8**\uFF1A\u5BA2\u670D\u4E2D\u5FC3\u7D44\u9577\uFF0C\u5DE5\u4F5C\u6B63\u53D7\u5230 AI \u5F71\u97FF  \n- **\u89C0\u773E**\uFF1A\u73FE\u5834\u54E1\u5DE5\uFF0C\u4E0D\u5B9A\u6642\u63D0\u554F  \n\n---\n\n## \u5C0D\u8AC7\u958B\u59CB\n\n### \u6797\u5C91\uFF5C\u4E3B\u6301\u4EBA\n\n\u4ECA\u5929\u7684\u984C\u76EE\u807D\u8D77\u4F86\u5F88\u76F4\u63A5\uFF1A\u516C\u53F8\u8981\u600E\u9EBC\u63A8 AI\uFF0C\u800C\u54E1\u5DE5\u53C8\u6015 AI \u53D6\u4EE3\u81EA\u5DF1\u3002\n\n\u4F46\u6211\u60F3\u5148\u628A\u4E00\u53E5\u5F88\u5E38\u898B\u7684\u8A71\u653E\u684C\u4E0A\uFF1A\n\n> \u300C\u5927\u5BB6\u4E0D\u662F\u53CD\u5C0D AI\uFF0C\u53EA\u662F\u5BB3\u6015\u5931\u53BB\u5DE5\u4F5C\u3002\u300D\n\n\u9019\u53E5\u8A71\u53EF\u80FD\u662F\u771F\u7684\uFF0C\u4E5F\u53EF\u80FD\u53EA\u662F\u516C\u53F8\u65B9\u4FBF\u62FF\u4F86\u89E3\u91CB\u54E1\u5DE5\u4E0D\u914D\u5408\u7684\u8AAA\u6CD5\u3002\n\n### \u5468\u6600\uFF5C\u4E3B\u6301\u4EBA\n\n\u90A3\u6211\u5011\u5148\u4E0D\u8981\u6025\u8457\u60F3\u8FA6\u6CD5\u300C\u6D88\u9664\u6050\u61FC\u300D\u3002\n\n\u5C0F\u82B8\uFF0C\u59B3\u662F\u5BA2\u670D\u4E2D\u5FC3\u7D44\u9577\u3002\u516C\u53F8\u6700\u8FD1\u5C0E\u5165 AI\uFF0C\u59B3\u7B2C\u4E00\u500B\u60F3\u5230\u7684\u662F\u4EC0\u9EBC\uFF1F\n\n### \u5C0F\u82B8\uFF5C\u7576\u4E8B\u4EBA\n\n\u6211\u7B2C\u4E00\u500B\u60F3\u5230\u7684\u662F\uFF1A\u90A3\u6211\u9084\u6709\u6C92\u6709\u5FC5\u8981\u5B58\u5728\uFF1F\n\n\u4E0D\u662F\u5F88\u62BD\u8C61\u7684\u90A3\u7A2E\u300C\u672A\u4F86\u5DE5\u4F5C\u6703\u6539\u8B8A\u300D\u3002\u662F\u6211\u6BCF\u5929\u5728\u505A\u7684\u4E8B\u60C5\uFF0CAI \u5DF2\u7D93\u53EF\u4EE5\u505A\u4E00\u534A\u4E86\u3002\n\n\u5B83\u53EF\u4EE5\u5148\u56DE\u7B54\u5BA2\u6236\u554F\u984C\u3001\u5206\u985E\u6848\u4EF6\u3001\u5E6B\u5FD9\u6574\u7406\u7D00\u9304\u3002\u516C\u53F8\u8DDF\u6211\u5011\u8AAA\uFF1A\u300C\u59B3\u5011\u4E4B\u5F8C\u53EF\u4EE5\u628A\u6642\u9593\u653E\u5728\u66F4\u6709\u50F9\u503C\u7684\u4E8B\u60C5\u4E0A\u3002\u300D\n\n\u4F46\u8001\u5BE6\u8AAA\uFF0C\u6211\u807D\u5230\u7684\u662F\uFF1A\u300C\u59B3\u5011\u73FE\u5728\u505A\u7684\u4E8B\u60C5\uFF0C\u50F9\u503C\u4E0D\u9AD8\u3002\u300D\n\n### \u9AD8\u5B50\u8B19\uFF5CAI \u9867\u554F\n\n\u6211\u89BA\u5F97\u9019\u88E1\u6709\u4E00\u500B\u8AA4\u6703\u3002AI \u4E0D\u4E00\u5B9A\u662F\u62FF\u4F86\u53D6\u4EE3\u4EBA\uFF0C\u4E5F\u53EF\u4EE5\u62FF\u4F86\u6E1B\u5C11\u91CD\u8907\u5DE5\u4F5C\u3002\n\n### \u6797\u5C91\n\n\u300C\u8AA4\u6703\u300D\uFF1F\n\n\u5C0F\u82B8\u525B\u525B\u8AAA\u516C\u53F8\u5DF2\u7D93\u8B93 AI \u505A\u6389\u4E00\u534A\u5DE5\u4F5C\u3002\u59B3\u89BA\u5F97\u5979\u8AA4\u6703\u4E86\u4EC0\u9EBC\uFF1F\n\n### \u9AD8\u5B50\u8B19\n\n\u6211\u7684\u610F\u601D\u4E0D\u662F\u5979\u7684\u611F\u53D7\u4E0D\u5C0D\uFF0C\u800C\u662F\u300C\u5DE5\u4F5C\u88AB AI \u505A\u6389\u300D\u4E0D\u7B49\u65BC\u300C\u4EBA\u88AB AI \u53D6\u4EE3\u300D\u3002\u5F88\u591A\u6642\u5019\uFF0C\u5DE5\u4F5C\u5167\u5BB9\u6703\u91CD\u65B0\u5206\u914D\u3002\n\n### \u5C0F\u82B8\n\n\u53EF\u662F\u5982\u679C\u539F\u672C\u5341\u500B\u4EBA\u8655\u7406\u4E00\u5343\u4EF6\u6848\u4EF6\uFF0C\u73FE\u5728 AI \u53EF\u4EE5\u8655\u7406\u4E03\u767E\u4EF6\uFF0C\u516C\u53F8\u70BA\u4EC0\u9EBC\u9084\u9700\u8981\u5341\u500B\u4EBA\uFF1F\n\n### \u9AD8\u5B50\u8B19\n\n\u9019\u8981\u770B\u516C\u53F8\u600E\u9EBC\u8A2D\u8A08\u3002\n\n### \u5C0F\u82B8\n\n\u4E0D\uFF0C\u9019\u8981\u770B\u516C\u53F8\u600E\u9EBC\u7B97\u9322\u3002\n\n\u73FE\u5834\u6709\u4EBA\u7B11\u4E86\u4E00\u4E0B\u3002\n\n### \u6797\u5C91\n\n\u5F88\u597D\uFF0C\u9019\u5C31\u51FA\u73FE\u7B2C\u4E00\u500B\u77DB\u76FE\u4E86\u3002\n\n\u5C08\u5BB6\u8AAA\uFF1A\u300C\u6280\u8853\u4E0A\u53EF\u4EE5\u91CD\u65B0\u5206\u5DE5\u3002\u300D\n\n\u7576\u4E8B\u4EBA\u8AAA\uFF1A\u300C\u4F46\u516C\u53F8\u6709\u7D93\u6FDF\u8A98\u56E0\u76F4\u63A5\u5C11\u8ACB\u4EBA\u3002\u300D\n\n\u6021\u5B89\uFF0C\u59B3\u662F\u4EBA\u8CC7\uFF0C\u59B3\u6703\u600E\u9EBC\u56DE\uFF1F\n\n### \u9673\u6021\u5B89\uFF5C\u4EBA\u8CC7\u4E3B\u7BA1\n\n\u5C0F\u82B8\u8B1B\u5F97\u5F88\u5BE6\u969B\u3002\u516C\u53F8\u4E0D\u80FD\u53EA\u8AAA\u300CAI \u662F\u4F86\u5E6B\u52A9\u5927\u5BB6\u7684\u300D\uFF0C\u537B\u4E0D\u56DE\u7B54\u4E00\u500B\u554F\u984C\uFF1A\n\n\u5982\u679C\u6548\u7387\u771F\u7684\u63D0\u9AD8\u4E86\uFF0C\u7701\u4E0B\u4F86\u7684\u4EBA\u529B\u6210\u672C\u8981\u53BB\u54EA\u88E1\uFF1F\n\n\u662F\u62FF\u4F86\u88C1\u54E1\uFF1F\u52A0\u85AA\uFF1F\u7E2E\u77ED\u5DE5\u6642\uFF1F\u9084\u662F\u63A5\u66F4\u591A\u5DE5\u4F5C\uFF1F\n\n\u5982\u679C\u9019\u500B\u554F\u984C\u6C92\u6709\u7B54\u6848\uFF0C\u54E1\u5DE5\u4E0D\u76F8\u4FE1\u516C\u53F8\u5F88\u5408\u7406\u3002\n\n### \u963F\u9054\uFF5C\u85DD\u4EBA\uFF0FGeneralist\n\n\u6211\u60F3\u554F\u4E00\u500B\u5F88\u767D\u7661\u4F46\u53EF\u80FD\u5F88\u91CD\u8981\u7684\u554F\u984C\u3002\n\n\u516C\u53F8\u8AAA AI \u8B93\u5927\u5BB6\u505A\u66F4\u6709\u50F9\u503C\u7684\u5DE5\u4F5C\uFF0C\u9019\u500B\u300C\u66F4\u6709\u50F9\u503C\u300D\u662F\u8AB0\u5B9A\u7FA9\u7684\uFF1F\n\n\u56E0\u70BA\u6211\u4EE5\u524D\u62CD\u7BC0\u76EE\uFF0C\u88FD\u4F5C\u4EBA\u4E5F\u5E38\u8AAA\uFF1A\u300C\u9019\u4E00\u6BB5\u6211\u5011\u6539\u5F97\u66F4\u6709\u6DF1\u5EA6\u3002\u300D\n\n\u7D50\u679C\u5C31\u662F\u628A\u539F\u672C\u4E09\u5206\u9418\u7684\u5167\u5BB9\uFF0C\u6539\u6210\u5927\u5BB6\u90FD\u770B\u4E0D\u61C2\u7684\u5341\u5206\u9418\u3002\n\n### \u5468\u6600\n\n\u5C0D\uFF0C\u9019\u5F88\u6709\u610F\u601D\u3002\n\n\u300C\u66F4\u6709\u50F9\u503C\u300D\u53EF\u80FD\u53EA\u662F\u628A\u539F\u672C\u7684\u5DE5\u4F5C\u8B8A\u5F97\u66F4\u8907\u96DC\u3002\n\n\u5C0F\u82B8\uFF0C\u59B3\u5011\u5C0E\u5165 AI \u4E4B\u5F8C\uFF0C\u5DE5\u4F5C\u771F\u7684\u8B8A\u6709\u50F9\u503C\u4E86\u55CE\uFF1F\n\n### \u5C0F\u82B8\n\n\u6709\u4E9B\u8B8A\u597D\u4E86\uFF0C\u6709\u4E9B\u8B8A\u7CDF\u3002\n\nAI \u5E6B\u6211\u6574\u7406\u5BA2\u670D\u7D00\u9304\uFF0C\u9019\u90E8\u5206\u5F88\u597D\uFF0C\u539F\u672C\u6211\u8981\u82B1\u4E8C\u5341\u5206\u9418\u6574\u7406\uFF0C\u73FE\u5728\u4E94\u5206\u9418\u5C31\u597D\u3002\n\n\u4F46\u516C\u53F8\u6C92\u6709\u56E0\u6B64\u8B93\u6211\u5C11\u63A5\u96FB\u8A71\uFF0C\u53CD\u800C\u8AAA\uFF1A\u300C\u65E2\u7136\u59B3\u7701\u4E0B\u5341\u4E94\u5206\u9418\uFF0C\u5C31\u53EF\u4EE5\u591A\u63A5\u5E7E\u901A\u3002\u300D\n\n\u6240\u4EE5\u6211\u6C92\u6709\u8B8A\u8F15\u9B06\uFF0C\u53EA\u662F\u5DE5\u4F5C\u901F\u5EA6\u8B8A\u5FEB\u3002\n\n### \u8A31\u6587\u54F2\uFF5C\u88FD\u9020\u696D\u4E3B\u7BA1\n\n\u9019\u5728\u5DE5\u5EE0\u5F88\u5E38\u898B\u3002\n\n\u6A5F\u5668\u8B8A\u5FEB\u4E4B\u5F8C\uFF0C\u4E0D\u4E00\u5B9A\u8B93\u4EBA\u4F11\u606F\uFF0C\u800C\u662F\u7522\u91CF\u76EE\u6A19\u4E00\u8D77\u63D0\u9AD8\u3002\n\n### \u6797\u5C91\n\n\u90A3\u59B3\u5011\u6240\u8B02\u7684\u300C\u63A8 AI\u300D\uFF0C\u662F\u4E0D\u662F\u5176\u5BE6\u662F\uFF1A\n\n> \u7528\u65B0\u5DE5\u5177\uFF0C\u628A\u4EBA\u69A8\u5F97\u66F4\u4E7E\uFF1F\n\n### \u9AD8\u5B50\u8B19\n\n\u9019\u6A23\u8B1B\u592A\u60B2\u89C0\u4E86\u3002\u4F01\u696D\u672C\u4F86\u5C31\u8981\u63D0\u9AD8\u6548\u7387\uFF0C\u4E0D\u7136\u6210\u672C\u4E0A\u5347\u3001\u7AF6\u722D\u4E0D\u904E\u5225\u4EBA\uFF0C\u6700\u5F8C\u5DE5\u4F5C\u9084\u662F\u4FDD\u4E0D\u4F4F\u3002\n\n### \u8607\u96C5\u96EF\uFF5C\u8077\u6DAF\u7814\u7A76\u8005\n\n\u53EF\u662F\u300C\u4E0D\u63D0\u9AD8\u6548\u7387\uFF0C\u516C\u53F8\u5C31\u6703\u5012\u300D\u9019\u53E5\u8A71\uFF0C\u4E5F\u5E38\u5E38\u88AB\u7576\u6210\u842C\u7528\u7406\u7531\u3002\n\n\u6548\u7387\u63D0\u9AD8\u4E4B\u5F8C\uFF0C\u8AB0\u7372\u5F97\u597D\u8655\uFF1F\u9019\u4E0D\u662F\u6280\u8853\u554F\u984C\uFF0C\u662F\u5206\u914D\u554F\u984C\u3002\n\n### \u9AD8\u5B50\u8B19\n\n\u4F46\u5982\u679C\u4E0D\u63A8\uFF0C\u5225\u7684\u516C\u53F8\u63A8\u4E86\uFF0C\u5E02\u5834\u6703\u6DD8\u6C70\u6211\u5011\u3002\n\n### \u6797\u5C91\n\n\u9019\u53E5\u8A71\u6211\u4E5F\u5F88\u719F\u3002\n\n\u300C\u5225\u4EBA\u90FD\u5728\u505A\uFF0C\u6240\u4EE5\u6211\u5011\u53EA\u80FD\u505A\u3002\u300D\n\n\u53EF\u662F\u5982\u679C\u5927\u5BB6\u90FD\u7528 AI \u628A\u5BA2\u670D\u7E2E\u6E1B\u4E00\u534A\uFF0C\u6700\u5F8C\u6574\u500B\u7522\u696D\u7684\u5BA2\u6236\u90FD\u66F4\u96E3\u627E\u5230\u771F\u4EBA\uFF0C\u90A3\u6211\u5011\u5230\u5E95\u662F\u5728\u9032\u6B65\uFF0C\u9084\u662F\u5728\u4E00\u8D77\u628A\u670D\u52D9\u8B8A\u5DEE\uFF1F\n\n### \u5468\u6600\n\n\u5B50\u8B19\uFF0C\u4F60\u525B\u525B\u8AAA\u4F01\u696D\u8981\u63A8\uFF0C\u4E0D\u7136\u6703\u88AB\u6DD8\u6C70\u3002\u90A3\u6709\u6C92\u6709\u53EF\u80FD\u771F\u6B63\u8A72\u554F\u7684\u662F\uFF1A\n\n\u300C\u54EA\u4E9B\u5DE5\u4F5C\u9069\u5408\u7528 AI\uFF1F\u300D\n\n\u800C\u4E0D\u662F\u300C\u516C\u53F8\u8981\u4E0D\u8981\u5168\u9762\u5C0E\u5165 AI\uFF1F\u300D\n\n### \u9AD8\u5B50\u8B19\n\n\u6211\u540C\u610F\u4E0D\u80FD\u5168\u9762\u4E82\u63A8\u3002\u4F46\u516C\u53F8\u9700\u8981\u4E00\u500B\u65B9\u5411\uFF0C\u4E0D\u53EF\u80FD\u6BCF\u500B\u90E8\u9580\u90FD\u81EA\u5DF1\u6C7A\u5B9A\u3002\n\n### \u8A31\u6587\u54F2\n\n\u5176\u5BE6\u73FE\u5834\u6700\u6015\u7684\u5C31\u662F\u7E3D\u90E8\u8AAA\u300C\u8ACB\u5404\u55AE\u4F4D\u7A4D\u6975\u64C1\u62B1 AI\u300D\u3002\n\n\u9019\u53E5\u8A71\u807D\u8D77\u4F86\u5F88\u6709\u65B9\u5411\uFF0C\u5BE6\u969B\u4E0A\u7B49\u65BC\u6C92\u6709\u65B9\u5411\u3002\n\n\u6211\u5011\u5DE5\u5EE0\u6709\u4E00\u6B21\u5C0E\u5165\u9810\u6E2C\u7DAD\u4FEE\u7CFB\u7D71\uFF0C\u7E3D\u90E8\u8AAA\u53EF\u4EE5\u63D0\u524D\u767C\u73FE\u8A2D\u5099\u6545\u969C\u3002\u7D50\u679C\u73FE\u5834\u4E3B\u7BA1\u6BCF\u5929\u591A\u4E86\u4E00\u5806\u8B66\u5831\uFF0C\u771F\u6B63\u91CD\u8981\u7684\u6545\u969C\u53CD\u800C\u88AB\u6DF9\u6C92\u3002\n\n### \u963F\u9054\n\n\u9019\u807D\u8D77\u4F86\u5F88\u50CF\u624B\u6A5F\u901A\u77E5\u3002\n\n\u4E00\u958B\u59CB\u662F\u6015\u6F0F\u6389\u8A0A\u606F\uFF0C\u6240\u4EE5\u6BCF\u500B App \u90FD\u958B\u901A\u77E5\u3002\u6700\u5F8C\u624B\u6A5F\u4E00\u76F4\u97FF\uFF0C\u4F46\u4F60\u4E0D\u77E5\u9053\u54EA\u500B\u662F\u771F\u7684\u91CD\u8981\u3002\n\n### \u8449\u66FC\uFF5C\u6025\u8A3A\u8B77\u7406\u5E2B\n\n\u6025\u8A3A\u4E5F\u5F88\u50CF\u3002\n\n\u5982\u679C\u6211\u5011\u628A\u6240\u6709\u75C5\u4EBA\u90FD\u6A19\u6210\u300C\u53EF\u80FD\u6709\u5371\u96AA\u300D\uFF0C\u90A3\u7B49\u65BC\u6C92\u6709\u5206\u7D1A\u3002\n\nAI \u6709\u6642\u5019\u4E0D\u662F\u5E6B\u4F60\u505A\u6C7A\u5B9A\uFF0C\u800C\u662F\u628A\u66F4\u591A\u6771\u897F\u4E1F\u7D66\u4F60\u6C7A\u5B9A\u3002\n\n### \u5468\u6600\n\n\u6240\u4EE5 AI \u53EF\u80FD\u4E0D\u662F\u6E1B\u5C11\u5DE5\u4F5C\uFF0C\u800C\u662F\u628A\u5DE5\u4F5C\u5F9E\u300C\u57F7\u884C\u300D\u8B8A\u6210\u300C\u5224\u65B7\u300D\u3002\n\n### \u8449\u66FC\n\n\u5C0D\uFF0C\u800C\u4E14\u5224\u65B7\u901A\u5E38\u66F4\u7D2F\u3002\n\n\u4EE5\u524D\u4F60\u7167\u6D41\u7A0B\u505A\u5B8C\u4E00\u4EF6\u4E8B\uFF0C\u8CAC\u4EFB\u6BD4\u8F03\u6E05\u695A\u3002\u73FE\u5728\u7CFB\u7D71\u5EFA\u8B70\u4E00\u500B\u7B54\u6848\uFF0C\u4F60\u8981\u6C7A\u5B9A\u8981\u4E0D\u8981\u76F8\u4FE1\u5B83\u3002\u505A\u5C0D\u4E86\uFF0C\u5927\u5BB6\u8AAA\u7CFB\u7D71\u5F88\u68D2\uFF1B\u505A\u932F\u4E86\uFF0C\u5927\u5BB6\u554F\u4F60\u70BA\u4EC0\u9EBC\u6C92\u6709\u767C\u73FE\u7CFB\u7D71\u932F\u3002\n\n### \u6797\u5C91\n\n\u9019\u5F88\u95DC\u9375\u3002\n\n\u516C\u53F8\u8AAA AI \u5E6B\u4F60\u505A\u6C7A\u5B9A\uFF0C\u4F46\u8CAC\u4EFB\u9084\u662F\u4F60\u7684\u3002\n\n### \u9AD8\u5B50\u8B19\n\n\u9019\u662F\u5C0E\u5165\u8A2D\u8A08\u7684\u554F\u984C\u3002\u53EF\u4EE5\u5EFA\u7ACB\u5BE9\u6838\u6D41\u7A0B\u3002\n\n### \u5C0F\u82B8\n\n\u300C\u5BE9\u6838\u6D41\u7A0B\u300D\u807D\u8D77\u4F86\u5F88\u597D\uFF0C\u4F46\u5BA2\u670D\u73FE\u5834\u901A\u5E38\u662F\u4E00\u500B\u4EBA\u540C\u6642\u8655\u7406\u597D\u5E7E\u500B\u5BA2\u6236\u3002\n\n\u5982\u679C AI \u6BCF\u4E00\u5247\u56DE\u7B54\u90FD\u8981\u6211\u91CD\u65B0\u6AA2\u67E5\uFF0C\u90A3\u6211\u6839\u672C\u6C92\u6709\u7701\u6642\u9593\u3002\n\n### \u9673\u6021\u5B89\n\n\u800C\u4E14\u5982\u679C\u54E1\u5DE5\u88AB\u8981\u6C42\u300C\u4F7F\u7528 AI\uFF0C\u4F46\u51FA\u4E86\u932F\u7B97\u4F60\u7684\u300D\uFF0C\u5927\u5BB6\u7576\u7136\u6703\u5F88\u4FDD\u5B88\u3002\n\n### \u6797\u5C91\n\n\u6240\u4EE5\u6211\u5011\u73FE\u5728\u53C8\u9047\u5230\u4E00\u500B\u77DB\u76FE\uFF1A\n\n\u516C\u53F8\u5E0C\u671B\u54E1\u5DE5\u6562\u7528\uFF0C\u4F46\u54E1\u5DE5\u77E5\u9053\u51FA\u4E8B\u8981\u81EA\u5DF1\u625B\u3002\n\n\u9019\u7A2E\u60C5\u6CC1\u4E0B\uFF0C\u516C\u53F8\u662F\u4E0D\u662F\u5176\u5BE6\u4E0D\u662F\u5728\u9F13\u52F5\u4F7F\u7528\uFF0C\u800C\u662F\u5728\u628A\u98A8\u96AA\u5F80\u4E0B\u4E1F\uFF1F\n\n### \u6C88\u9ED8\uFF5C\u89C0\u5BDF\u8005\n\n\u6211\u60F3\u63D2\u4E00\u53E5\u3002\n\n\u5230\u76EE\u524D\u70BA\u6B62\uFF0C\u5927\u5BB6\u4E00\u76F4\u8AAA\u300C\u54E1\u5DE5\u5BB3\u6015 AI\u300D\uFF0C\u4F46\u6211\u807D\u5230\u7684\u5167\u5BB9\u6BD4\u8F03\u50CF\u662F\uFF1A\n\n\u54E1\u5DE5\u5BB3\u6015\u7684\u4E0D\u662F AI \u672C\u8EAB\uFF0C\u800C\u662F\u516C\u53F8\u7528 AI \u91CD\u65B0\u5206\u914D\u5229\u76CA\u3001\u8CAC\u4EFB\u548C\u5DE5\u4F5C\u91CF\uFF0C\u537B\u4E0D\u628A\u898F\u5247\u8AAA\u6E05\u695A\u3002\n\n\u4E5F\u8A31\u4E00\u958B\u59CB\u7684\u554F\u984C\u554F\u932F\u4E86\u3002\n\n\u4E0D\u662F\u300C\u5982\u4F55\u8B93\u54E1\u5DE5\u4E0D\u6015 AI\u300D\uFF0C\u800C\u662F\uFF1A\n\n> \u300C\u516C\u53F8\u662F\u5426\u9858\u610F\u8B93\u54E1\u5DE5\u53C3\u8207\u6C7A\u5B9A AI \u5E36\u4F86\u7684\u597D\u8655\u8207\u98A8\u96AA\u600E\u9EBC\u5206\u914D\uFF1F\u300D\n\n### \u6797\u5C91\n\n\u5F88\u597D\u3002\u6021\u5B89\uFF0C\u9019\u5C0D\u4EBA\u8CC7\u4F86\u8AAA\u6703\u4E0D\u6703\u592A\u7406\u60F3\uFF1F\n\n### \u9673\u6021\u5B89\n\n\u4E0D\u6703\uFF0C\u4F46\u5F88\u96E3\u3002\n\n\u516C\u53F8\u5E38\u5E38\u5E0C\u671B\u54E1\u5DE5\u53C3\u8207\u8A0E\u8AD6\uFF0C\u524D\u63D0\u662F\u6700\u5F8C\u4E0D\u8981\u771F\u7684\u5F71\u97FF\u6C7A\u5B9A\u3002\n\n### \u963F\u9054\n\n\u90A3\u53EB\u4EC0\u9EBC\uFF1F\u53C3\u8207\u5F0F\u88DD\u98FE\uFF1F\n\n### \u9673\u6021\u5B89\n\n\u6709\u9EDE\u50CF\u3002\n\n\u4F8B\u5982\u516C\u53F8\u627E\u5BA2\u670D\u4EBA\u54E1\u4F86\u6E2C\u8A66 AI\uFF0C\u554F\u5927\u5BB6\uFF1A\u300C\u4F60\u5011\u89BA\u5F97\u597D\u4E0D\u597D\u7528\uFF1F\u300D\n\n\u4F46\u6C92\u6709\u4EBA\u554F\uFF1A\u300C\u5982\u679C\u5B83\u597D\u7528\u5230\u53EF\u4EE5\u5C11\u4E09\u500B\u4EBA\uFF0C\u9019\u4E09\u500B\u4EBA\u7684\u672A\u4F86\u600E\u9EBC\u8FA6\uFF1F\u300D\n\n### \u5C0F\u82B8\n\n\u5C0D\u3002\u516C\u53F8\u53EB\u6211\u5011\u5E6B\u5FD9\u8A13\u7DF4 AI\uFF0C\u537B\u4E0D\u8AAA AI \u5B78\u6703\u4E4B\u5F8C\uFF0C\u6211\u5011\u6703\u8B8A\u6210\u4EC0\u9EBC\u3002\n\n\u6211\u5011\u63D0\u4F9B\u6700\u719F\u6089\u5BA2\u6236\u7684\u7D93\u9A57\u3001\u5E38\u898B\u554F\u984C\u3001\u8655\u7406\u65B9\u5F0F\u3002\u53EF\u662F\u90A3\u4E9B\u6771\u897F\u4E00\u65E6\u88AB\u6574\u7406\u9032\u7CFB\u7D71\uFF0C\u5C31\u597D\u50CF\u4E0D\u518D\u5C6C\u65BC\u6211\u5011\u4E86\u3002\n\n### \u9AD8\u5B50\u8B19\n\n\u4F46\u5982\u679C\u4E0D\u628A\u9019\u4E9B\u7D93\u9A57\u6574\u7406\u51FA\u4F86\uFF0CAI \u5C31\u4E0D\u6703\u597D\u7528\u3002\u9019\u4E9B\u77E5\u8B58\u61C9\u8A72\u88AB\u4FDD\u5B58\uFF0C\u4E0D\u662F\u53EA\u653E\u5728\u67D0\u5E7E\u500B\u4EBA\u7684\u8166\u888B\u88E1\u3002\n\n### \u5C0F\u82B8\n\n\u6211\u6C92\u6709\u8AAA\u4E0D\u8981\u4FDD\u5B58\u3002\n\n\u6211\u662F\u5728\u554F\uFF1A\u4FDD\u5B58\u4E4B\u5F8C\uFF0C\u539F\u672C\u7D2F\u7A4D\u9019\u4E9B\u7D93\u9A57\u7684\u4EBA\uFF0C\u6709\u6C92\u6709\u5F97\u5230\u4EC0\u9EBC\uFF1F\n\n### \u8607\u96C5\u96EF\n\n\u9019\u88E1\u5176\u5BE6\u6D89\u53CA\u4E00\u500B\u5F88\u6DF1\u7684\u554F\u984C\uFF1A\u516C\u53F8\u628A\u500B\u4EBA\u7684\u719F\u7DF4\u5EA6\uFF0C\u8F49\u6210\u7D44\u7E54\u7684\u8CC7\u6599\u4E4B\u5F8C\uFF0C\u500B\u4EBA\u7684\u8AC7\u5224\u529B\u6703\u4E0D\u6703\u4E0B\u964D\uFF1F\n\n\u4EE5\u524D\u53EA\u6709\u5C0F\u82B8\u77E5\u9053\u600E\u9EBC\u8655\u7406\u6700\u96E3\u7E8F\u7684\u5BA2\u6236\uFF0C\u6240\u4EE5\u5979\u5F88\u91CD\u8981\u3002\u73FE\u5728\u516C\u53F8\u628A\u5979\u7684\u65B9\u6CD5\u6559\u7D66 AI\uFF0C\u7406\u8AD6\u4E0A\u5927\u5BB6\u90FD\u53D7\u76CA\uFF1B\u4F46\u5C0F\u82B8\u4E5F\u53EF\u80FD\u8B8A\u5F97\u6BD4\u8F03\u5BB9\u6613\u88AB\u66FF\u4EE3\u3002\n\n### \u8A31\u6587\u54F2\n\n\u5DE5\u5EE0\u4E5F\u4E00\u6A23\u3002\u8001\u54E1\u5DE5\u77E5\u9053\u6A5F\u53F0\u54EA\u7A2E\u8072\u97F3\u4E0D\u5C0D\u3001\u54EA\u500B\u6EAB\u5EA6\u4EE3\u8868\u5FEB\u58DE\u4E86\u3002\u4EE5\u524D\u9019\u662F\u4ED6\u7684\u7D93\u9A57\u548C\u5730\u4F4D\u3002\n\n\u5982\u679C\u516C\u53F8\u628A\u7D93\u9A57\u505A\u6210\u7CFB\u7D71\uFF0C\u537B\u6C92\u6709\u8B93\u8001\u54E1\u5DE5\u53C3\u8207\u8A2D\u8A08\uFF0C\u4ED6\u6703\u89BA\u5F97\u81EA\u5DF1\u5728\u8A13\u7DF4\u4E00\u53F0\u53D6\u4EE3\u81EA\u5DF1\u7684\u6A5F\u5668\u3002\n\n### \u8449\u66FC\n\n\u6211\u60F3\u5230\u6025\u8A3A\u88E1\u7684\u5B78\u5F92\u5236\u5EA6\u3002\n\n\u5E74\u8F15\u8B77\u7406\u5E2B\u6703\u8DDF\u8457\u8CC7\u6DF1\u7684\u4EBA\u5B78\uFF0C\u4E0D\u53EA\u662F\u5B78\u6A19\u6E96\u6D41\u7A0B\uFF0C\u9084\u5B78\u600E\u9EBC\u89C0\u5BDF\u4E00\u500B\u4EBA\u300C\u770B\u8D77\u4F86\u4E0D\u592A\u5C0D\u300D\u3002\n\n\u5982\u679C\u6211\u5011\u628A\u9019\u4E9B\u90FD\u5BEB\u6210\u6A19\u6E96\u7B54\u6848\uFF0C\u53EF\u80FD\u6703\u5931\u53BB\u90A3\u4E9B\u8AAA\u4E0D\u6E05\u695A\u3001\u4F46\u5F88\u91CD\u8981\u7684\u76F4\u89BA\u3002\n\n### \u9AD8\u5B50\u8B19\n\n\u53EF\u662F AI \u4E5F\u53EF\u4EE5\u5E6B\u5FD9\u4FDD\u5B58\u9019\u4E9B\u76F4\u89BA\uFF0C\u8B93\u65B0\u4EBA\u66F4\u5FEB\u4E0A\u624B\u3002\n\n### \u8449\u66FC\n\n\u53EF\u4EE5\uFF0C\u4F46\u524D\u63D0\u662F\u4F60\u627F\u8A8D\u5B83\u4E0D\u4E00\u5B9A\u61C2\u3002\n\n### \u9AD8\u5B50\u8B19\n\nAI \u672C\u4F86\u5C31\u4E0D\u61C9\u8A72\u88AB\u7576\u6210\u5B8C\u5168\u6B63\u78BA\u3002\n\n### \u6797\u5C91\n\n\u53EF\u662F\u5E02\u5834\u7C21\u5831\u901A\u5E38\u4E0D\u662F\u9019\u6A23\u8B1B\u7684\u3002\n\n\u7C21\u5831\u6703\u8AAA\uFF1A\u300CAI \u53EF\u4EE5\u5927\u5E45\u63D0\u5347\u6E96\u78BA\u7387\u3001\u964D\u4F4E\u932F\u8AA4\u7387\u3001\u7E2E\u77ED\u65B0\u4EBA\u8A13\u7DF4\u6642\u9593\u3002\u300D\n\n\u6C92\u6709\u4EBA\u5728\u7C21\u5831\u6700\u5F8C\u8AAA\uFF1A\u300C\u53E6\u5916\uFF0C\u5B83\u6709\u6642\u5019\u6703\u81EA\u4FE1\u5730\u8B1B\u932F\uFF0C\u8ACB\u5927\u5BB6\u4FDD\u6301\u8B66\u89BA\u3002\u300D\n\n### \u963F\u9054\n\n\u9019\u5C31\u50CF\u8ACB\u4E00\u500B\u5F88\u6703\u8B1B\u8A71\u3001\u4F46\u5076\u723E\u4E82\u63B0\u7684\u4EBA\u7576\u540C\u4E8B\u3002\n\n\u4E00\u958B\u59CB\u5927\u5BB6\u89BA\u5F97\u4ED6\u53CD\u61C9\u597D\u5FEB\uFF0C\u5F8C\u4F86\u767C\u73FE\u4ED6\u8B1B\u932F\u6642\u4E5F\u5F88\u6709\u81EA\u4FE1\u3002\n\n### \u5468\u6600\n\n\u90A3\u54E1\u5DE5\u8981\u600E\u9EBC\u77E5\u9053\u4EC0\u9EBC\u6642\u5019\u8A72\u76F8\u4FE1 AI\uFF1F\n\n### \u8A31\u6587\u54F2\n\n\u4E0D\u80FD\u53EA\u9760\u54E1\u5DE5\u81EA\u5DF1\u5B78\u6703\u61F7\u7591\u3002\n\n\u8981\u8B93\u4ED6\u5011\u77E5\u9053\uFF0C\u54EA\u4E9B\u4E8B\u60C5 AI \u53EF\u4EE5\u76F4\u63A5\u8655\u7406\uFF0C\u54EA\u4E9B\u4E8B\u60C5\u4E00\u5B9A\u8981\u4EA4\u7D66\u4EBA\u3002\n\n### \u5C0F\u82B8\n\n\u9019\u53E5\u8A71\u8AAA\u8D77\u4F86\u5BB9\u6613\u3002\n\n\u5728\u5BA2\u670D\u73FE\u5834\uFF0C\u6700\u9EBB\u7169\u7684\u4E0D\u662F\u6A19\u6E96\u554F\u984C\uFF0C\u800C\u662F\u90A3\u4E9B\u4ECB\u65BC\u6A19\u6E96\u548C\u4F8B\u5916\u4E4B\u9593\u7684\u554F\u984C\u3002AI \u6700\u5BB9\u6613\u5728\u9019\u7A2E\u5730\u65B9\u8B1B\u5F97\u5F88\u50CF\u771F\u7684\u3002\n\n### \u9673\u6021\u5B89\n\n\u6240\u4EE5\u8A13\u7DF4\u4E0D\u53EA\u662F\u6559\u5927\u5BB6\u6309\u54EA\u500B\u6309\u9215\uFF0C\u800C\u662F\u8B93\u5927\u5BB6\u77E5\u9053\u600E\u9EBC\u6311\u6230 AI\u3002\n\n### \u6797\u5C91\n\n\u4F46\u6211\u61F7\u7591\uFF0C\u5F88\u591A\u516C\u53F8\u771F\u6B63\u60F3\u8981\u7684\u4E0D\u662F\u300C\u6703\u6311\u6230 AI \u7684\u54E1\u5DE5\u300D\uFF0C\u800C\u662F\u300C\u9858\u610F\u7167\u8457 AI \u505A\u7684\u54E1\u5DE5\u300D\u3002\n\n### \u9AD8\u5B50\u8B19\n\n\u9019\u6709\u9EDE\u4E0D\u516C\u5E73\u3002\u4F01\u696D\u4E5F\u4E0D\u53EF\u80FD\u8B93\u6BCF\u500B\u4EBA\u90FD\u7121\u9650\u8CEA\u7591\u7CFB\u7D71\uFF0C\u9019\u6A23\u6548\u7387\u6703\u6D88\u5931\u3002\n\n### \u8607\u96C5\u96EF\n\n\u6548\u7387\u4E0D\u662F\u552F\u4E00\u6307\u6A19\u3002\n\n\u5982\u679C\u54E1\u5DE5\u56E0\u70BA\u5BB3\u6015\u88AB\u8FFD\u8E64\uFF0C\u958B\u59CB\u6545\u610F\u4E0D\u7559\u4E0B\u7D00\u9304\uFF1B\u56E0\u70BA\u5BB3\u6015\u8868\u73FE\u88AB\u6BD4\u8F03\uFF0C\u958B\u59CB\u53EA\u63A5\u5BB9\u6613\u7684\u6848\u4EF6\uFF1B\u56E0\u70BA\u5BB3\u6015\u72AF\u932F\uFF0C\u958B\u59CB\u5B8C\u5168\u4F9D\u8CF4 AI\u2014\u2014\u90A3\u5E33\u9762\u4E0A\u7684\u6548\u7387\u53EF\u80FD\u4E0A\u5347\uFF0C\u5BE6\u969B\u7684\u7D44\u7E54\u80FD\u529B\u537B\u4E0B\u964D\u3002\n\n### \u6C88\u9ED8\n\n\u6211\u60F3\u8A18\u4E0B\u9019\u500B\u8F49\u6298\u3002\n\n\u525B\u624D\u5927\u5BB6\u8AC7\u7684\u662F\u300C\u5982\u4F55\u8B93\u54E1\u5DE5\u9858\u610F\u4F7F\u7528 AI\u300D\uFF0C\u73FE\u5728\u8B8A\u6210\u300C\u516C\u53F8\u7528\u4EC0\u9EBC\u65B9\u5F0F\u8861\u91CF\u4F7F\u7528 AI \u7684\u4EBA\u300D\u3002\n\n\u54E1\u5DE5\u6015\u7684\u53EF\u80FD\u4E0D\u53EA\u662F\u5931\u696D\uFF0C\u4E5F\u5305\u62EC\uFF1A\n\n- \u88AB\u7CFB\u7D71\u76E3\u63A7\n- \u88AB\u62FF\u4F86\u6392\u540D\n- \u88AB\u8981\u6C42\u66F4\u5FEB\n- \u88AB\u8FFD\u7A76 AI \u9020\u6210\u7684\u932F\u8AA4\n- \u81EA\u5DF1\u7684\u7D93\u9A57\u88AB\u62FF\u8D70\u5F8C\u5931\u53BB\u50F9\u503C\n\n### \u89C0\u773E\u4E00\uFF5C\u73FE\u5834\u54E1\u5DE5\n\n\u6211\u60F3\u554F\u4E00\u500B\u6BD4\u8F03\u73FE\u5BE6\u7684\u3002\n\n\u5982\u679C\u516C\u53F8\u8AAA\u4E0D\u6703\u88C1\u54E1\uFF0C\u4F46\u6C92\u6709\u767D\u7D19\u9ED1\u5B57\uFF0C\u5927\u5BB6\u600E\u9EBC\u76F8\u4FE1\uFF1F\n\n### \u9673\u6021\u5B89\n\n\u4E0D\u80FD\u53EA\u53EB\u54E1\u5DE5\u76F8\u4FE1\u3002\n\n\u516C\u53F8\u53EF\u4EE5\u627F\u8AFE\u4E00\u6BB5\u6642\u9593\u5167\u4E0D\u56E0 AI \u76F4\u63A5\u88C1\u54E1\uFF0C\u4E26\u4E14\u8AAA\u660E\u5982\u679C\u5DE5\u4F5C\u6E1B\u5C11\uFF0C\u6703\u600E\u9EBC\u5B89\u6392\u8F49\u8ABF\u6216\u8A13\u7DF4\u3002\n\n### \u6797\u5C91\n\n\u300C\u4E00\u6BB5\u6642\u9593\u300D\u662F\u591A\u4E45\uFF1F\n\n\u4E09\u500B\u6708\uFF1F\u4E00\u5E74\uFF1F\u4E94\u5E74\uFF1F\n\n### \u9673\u6021\u5B89\n\n\u9019\u8981\u770B\u516C\u53F8\u72C0\u6CC1\u3002\n\n### \u5C0F\u82B8\n\n\u90A3\u54E1\u5DE5\u9084\u662F\u6703\u89BA\u5F97\u9019\u662F\u66AB\u7DE9\uFF0C\u4E0D\u662F\u4FDD\u969C\u3002\n\n### \u8607\u96C5\u96EF\n\n\u800C\u4E14\u627F\u8AFE\u4E0D\u88C1\u54E1\uFF0C\u4E5F\u4E0D\u4EE3\u8868\u5DE5\u4F5C\u4E0D\u6703\u8B8A\u5F97\u4E0D\u53EF\u5FCD\u53D7\u3002\n\n\u516C\u53F8\u53EF\u4EE5\u4E0D\u88C1\u59B3\uFF0C\u4F46\u628A\u76EE\u6A19\u63D0\u9AD8\u5230\u59B3\u505A\u4E0D\u5B8C\uFF0C\u6700\u5F8C\u59B3\u81EA\u5DF1\u96E2\u8077\u3002\n\n### \u9AD8\u5B50\u8B19\n\n\u53EF\u662F\u5982\u679C\u516C\u53F8\u9023\u9019\u7A2E\u627F\u8AFE\u90FD\u4E0D\u6562\u7D66\uFF0CAI \u5C0E\u5165\u6703\u5B8C\u5168\u505C\u6EEF\u3002\n\n### \u6797\u5C91\n\n\u4E5F\u8A31\u505C\u6EEF\u4E0D\u4E00\u5B9A\u662F\u58DE\u4E8B\u3002\n\n### \u9AD8\u5B50\u8B19\n\n\u4F46\u5E02\u5834\u4E0D\u6703\u7B49\u6211\u5011\u3002\n\n### \u6797\u5C91\n\n\u4F60\u4E00\u76F4\u8AAA\u5E02\u5834\u4E0D\u6703\u7B49\u3002\u90A3\u5982\u679C\u5E02\u5834\u903C\u5927\u5BB6\u505A\u4E00\u4EF6\u54E1\u5DE5\u4E0D\u4FE1\u4EFB\u3001\u5BA2\u6236\u4E5F\u4E0D\u559C\u6B61\u7684\u4E8B\uFF0C\u6211\u5011\u5C31\u53EA\u80FD\u7167\u505A\u55CE\uFF1F\n\n### \u9AD8\u5B50\u8B19\n\n\u4E0D\u662F\u53EA\u80FD\u7167\u505A\uFF0C\u4F46\u4E0D\u80FD\u628A\u6050\u61FC\u7576\u6210\u4E0D\u6539\u8B8A\u7684\u7406\u7531\u3002\n\n### \u5C0F\u82B8\n\n\u4E5F\u4E0D\u80FD\u628A\u7AF6\u722D\u7576\u6210\u4E0D\u8CA0\u8CAC\u4EFB\u7684\u7406\u7531\u3002\n\n\u73FE\u5834\u5B89\u975C\u4E86\u4E00\u4E0B\u3002\n\n### \u5468\u6600\n\n\u5C0F\u82B8\uFF0C\u59B3\u525B\u624D\u597D\u50CF\u4E0D\u662F\u55AE\u7D14\u53CD\u5C0D AI\u3002\n\n### \u5C0F\u82B8\n\n\u6211\u4E0D\u53CD\u5C0D\u3002\n\n\u6211\u6BCF\u5929\u90FD\u5E0C\u671B\u6709\u5DE5\u5177\u5E6B\u6211\u8655\u7406\u90A3\u4E9B\u6C92\u4EBA\u60F3\u505A\u7684\u4E8B\u60C5\u3002\u771F\u6B63\u8B93\u6211\u4E0D\u8212\u670D\u7684\u662F\uFF0C\u516C\u53F8\u8981\u6211\u76F8\u4FE1 AI \u6703\u8B93\u6211\u66F4\u91CD\u8981\uFF0C\u4F46\u5F9E\u4F86\u6C92\u6709\u554F\u904E\u6211\uFF1A\u4EC0\u9EBC\u4E8B\u60C5\u624D\u662F\u6211\u60F3\u82B1\u6642\u9593\u505A\u7684\u3002\n\n### \u963F\u9054\n\n\u9019\u53E5\u6211\u807D\u61C2\u4E86\u3002\n\n\u4E0D\u662F\u300CAI \u6703\u4E0D\u6703\u6436\u8D70\u4F60\u7684\u5DE5\u4F5C\u300D\uFF0C\u800C\u662F\u300C\u5982\u679C AI \u62FF\u8D70\u4E00\u90E8\u5206\u5DE5\u4F5C\uFF0C\u8AB0\u4F86\u6C7A\u5B9A\u5269\u4E0B\u7684\u5DE5\u4F5C\u503C\u4E0D\u503C\u5F97\u505A\u300D\u3002\n\n### \u8449\u66FC\n\n\u800C\u4E14\u6709\u4E9B\u5DE5\u4F5C\u672C\u4F86\u5C31\u4E0D\u8A72\u88AB\u5B8C\u5168\u6D88\u9664\u3002\n\n\u6025\u8A3A\u88E1\uFF0C\u75C5\u4EBA\u6709\u6642\u5019\u9700\u8981\u7684\u4E0D\u662F\u6700\u5FEB\u7684\u7B54\u6848\uFF0C\u800C\u662F\u6709\u4EBA\u770B\u8457\u4ED6\uFF0C\u77E5\u9053\u4ED6\u5176\u5BE6\u5F88\u5BB3\u6015\u3002\n\n\u5BA2\u670D\u4E5F\u53EF\u80FD\u4E00\u6A23\u3002\u5BA2\u6236\u4E0D\u4E00\u5B9A\u53EA\u662F\u8981\u9000\u8CA8\u6D41\u7A0B\uFF0C\u4ED6\u53EF\u80FD\u662F\u60F3\u78BA\u8A8D\u81EA\u5DF1\u6C92\u6709\u88AB\u6577\u884D\u3002\n\n### \u9AD8\u5B50\u8B19\n\n\u9019\u4E9B\u53EF\u4EE5\u4FDD\u7559\u7D66\u771F\u4EBA\u8655\u7406\u3002\n\n### \u5C0F\u82B8\n\n\u8AB0\u6C7A\u5B9A\u4EC0\u9EBC\u6642\u5019\u300C\u503C\u5F97\u771F\u4EBA\u8655\u7406\u300D\uFF1F\n\n\u5982\u679C\u7CFB\u7D71\u5224\u65B7\u9019\u500B\u5BA2\u6236\u53EA\u503C\u4E09\u5206\u9418\uFF0C\u800C\u6211\u89BA\u5F97\u4ED6\u9700\u8981\u4E8C\u5341\u5206\u9418\uFF0C\u6700\u5F8C\u807D\u8AB0\u7684\uFF1F\n\n### \u9AD8\u5B50\u8B19\n\n\u53EF\u4EE5\u8A2D\u8A08\u5347\u7D1A\u898F\u5247\u3002\n\n### \u6797\u5C91\n\n\u53C8\u56DE\u5230\u898F\u5247\u3002\n\n\u898F\u5247\u8AB0\u8A02\uFF1F\u8CC7\u6599\u5F9E\u54EA\u88E1\u4F86\uFF1F\u932F\u4E86\u8AB0\u8CA0\u8CAC\uFF1F\u7701\u4E0B\u4F86\u7684\u6642\u9593\u7D66\u8AB0\uFF1F\u9019\u4E9B\u5982\u679C\u6C92\u8B1B\uFF0C\u5DE5\u5177\u518D\u6F02\u4EAE\u90FD\u53EA\u662F\u628A\u554F\u984C\u85CF\u8D77\u4F86\u3002\n\n### \u89C0\u773E\u4E8C\uFF5C\u73FE\u5834\u54E1\u5DE5\n\n\u6211\u60F3\u88DC\u5145\u4E00\u500B\u6211\u5011\u516C\u53F8\u7684\u60C5\u6CC1\u3002\n\n\u4E3B\u7BA1\u6BCF\u5929\u53EB\u6211\u5011\u4F7F\u7528 AI\uFF0C\u9084\u6703\u770B\u8AB0\u7528\u5F97\u5C11\u3002\u4F46\u5F88\u591A\u4EBA\u5176\u5BE6\u662F\u5148\u81EA\u5DF1\u505A\u597D\uFF0C\u518D\u628A\u5167\u5BB9\u4E1F\u7D66 AI \u6539\u5BEB\uFF0C\u9019\u6A23\u7CFB\u7D71\u770B\u8D77\u4F86\u6709\u4F7F\u7528\u7387\uFF0C\u5BE6\u969B\u4E0A\u6C92\u6709\u5E6B\u5FD9\u3002\n\n### \u963F\u9054\n\n\u9019\u53EB\u4E0D\u53EB\u516C\u53F8\u7248\u7684\u6253\u5361\uFF1F\n\n### \u8A31\u6587\u54F2\n\n\u5DE5\u5EE0\u4E5F\u6709\u3002\u7CFB\u7D71\u8981\u6C42\u5927\u5BB6\u586B\u6578\u4F4D\u8868\u55AE\uFF0C\u73FE\u5834\u5C31\u5148\u5728\u7D19\u4E0A\u8A18\uFF0C\u665A\u4E0A\u518D\u4E00\u6B21\u8F38\u5165\u3002\u8868\u55AE\u5B8C\u6210\u7387\u5F88\u597D\u770B\uFF0C\u4F46\u73FE\u5834\u6C92\u6709\u8B8A\u597D\u3002\n\n### \u6C88\u9ED8\n\n\u9019\u662F\u53E6\u4E00\u500B\u8F49\u6298\u3002\n\n\u300C\u63A8\u884C AI\u300D\u53EF\u80FD\u88AB\u8AA4\u89E3\u6210\u300C\u63D0\u9AD8 AI \u4F7F\u7528\u7387\u300D\u3002\n\n\u4F46\u4F7F\u7528\u7387\u4E0D\u4EE3\u8868\u6709\u7528\uFF0C\u66F4\u4E0D\u4EE3\u8868\u4FE1\u4EFB\u3002\n\n### \u5468\u6600\n\n\u90A3\u5982\u679C\u4E0D\u770B\u4F7F\u7528\u7387\uFF0C\u516C\u53F8\u8981\u770B\u4EC0\u9EBC\uFF1F\n\n### \u8607\u96C5\u96EF\n\n\u770B\u554F\u984C\u6709\u6C92\u6709\u6539\u5584\u3002\n\n\u4F8B\u5982\u5BA2\u670D\u662F\u4E0D\u662F\u5C11\u4E86\u91CD\u8907\u8F38\u5165\uFF1F\u65B0\u4EBA\u662F\u4E0D\u662F\u6BD4\u8F03\u5FEB\u627E\u5230\u7B54\u6848\uFF1F\u5BA2\u6236\u662F\u4E0D\u662F\u6BD4\u8F03\u5BB9\u6613\u5F97\u5230\u771F\u6B63\u7684\u5E6B\u52A9\uFF1F\u54E1\u5DE5\u662F\u4E0D\u662F\u6709\u66F4\u591A\u6642\u9593\u8655\u7406\u8907\u96DC\u554F\u984C\uFF1F\n\n### \u6797\u5C91\n\n\u9019\u807D\u8D77\u4F86\u5F88\u5408\u7406\uFF0C\u4F46\u6BCF\u500B\u6307\u6A19\u90FD\u53EF\u80FD\u88AB\u64CD\u5F04\u3002\n\n### \u963F\u9054\n\n\u90A3\u662F\u4E0D\u662F\u6240\u6709\u7BA1\u7406\u90FD\u6703\u88AB\u64CD\u5F04\uFF1F\u5305\u542B\u300C\u5927\u5BB6\u90FD\u5F88\u6709\u5411\u5FC3\u529B\u300D\u9019\u7A2E\u554F\u5377\u3002\n\n### \u9673\u6021\u5B89\n\n\u6240\u4EE5\u4E0D\u80FD\u53EA\u9760\u4E00\u500B\u6578\u5B57\u3002\u8981\u628A\u54E1\u5DE5\u7684\u56DE\u994B\u4E5F\u653E\u9032\u53BB\u3002\n\n### \u5C0F\u82B8\n\n\u4F46\u56DE\u994B\u771F\u7684\u6703\u5F71\u97FF\u6C7A\u7B56\u55CE\uFF1F\n\n\u6211\u5011\u4EE5\u524D\u586B\u904E\u5F88\u591A\u554F\u5377\uFF0C\u6700\u5F8C\u53EA\u6536\u5230\u4E00\u5C01\u4FE1\uFF1A\u300C\u611F\u8B1D\u5927\u5BB6\u5BF6\u8CB4\u610F\u898B\u3002\u300D\n\n### \u9673\u6021\u5B89\n\n\u9019\u662F\u4FE1\u4EFB\u5DF2\u7D93\u88AB\u6D88\u8017\u7684\u554F\u984C\u3002\n\n### \u5C0F\u82B8\n\n\u6240\u4EE5\u4E0D\u8981\u518D\u53EB\u6211\u5011\u76F8\u4FE1\u3002\u5148\u8B93\u6211\u5011\u770B\u5230\u4E00\u6B21\uFF0C\u516C\u53F8\u771F\u7684\u56E0\u70BA\u73FE\u5834\u7684\u610F\u898B\u6539\u4E86\u4EC0\u9EBC\u3002\n\n### \u8449\u66FC\n\n\u9019\u5F88\u50CF\u91AB\u9662\u63A8\u65B0\u6D41\u7A0B\u3002\n\n\u5927\u5BB6\u4E0D\u6703\u56E0\u70BA\u9662\u9577\u8AAA\u300C\u9019\u662F\u70BA\u4E86\u75C5\u4EBA\u597D\u300D\u5C31\u76F8\u4FE1\u3002\u901A\u5E38\u662F\u5148\u5728\u4E00\u500B\u5C0F\u7BC4\u570D\u8A66\uFF0C\u8B93\u7B2C\u4E00\u7DDA\u7684\u4EBA\u53EF\u4EE5\u558A\u505C\uFF0C\u51FA\u932F\u6642\u4E0D\u6703\u88AB\u7F75\uFF0C\u7136\u5F8C\u771F\u7684\u6839\u64DA\u7D50\u679C\u4FEE\u6539\u3002\n\n### \u9AD8\u5B50\u8B19\n\n\u5C0F\u898F\u6A21\u8A66\u9EDE\u6211\u540C\u610F\u3002\u4F46\u4F01\u696D\u4E0D\u80FD\u6C38\u9060\u8A66\u9EDE\uFF0C\u7E3D\u8981\u64F4\u5927\u3002\n\n### \u8449\u66FC\n\n\u7576\u7136\u3002\u4F46\u4F60\u4E0D\u80FD\u56E0\u70BA\u624B\u8853\u5BA4 A \u6210\u529F\uFF0C\u5C31\u76F4\u63A5\u628A\u540C\u4E00\u5957\u6D41\u7A0B\u642C\u5230\u6025\u8A3A\u3001\u5152\u79D1\u548C\u9577\u7167\u75C5\u623F\u3002\n\n### \u8A31\u6587\u54F2\n\n\u9019\u9EDE\u975E\u5E38\u91CD\u8981\u3002\u4E0D\u540C\u90E8\u9580\u7684\u300C\u932F\u8AA4\u6210\u672C\u300D\u4E0D\u4E00\u6A23\u3002\n\n\u5BA2\u670D\u56DE\u7B54\u932F\uFF0C\u53EF\u80FD\u662F\u5BA2\u8A34\uFF1B\u88FD\u9020\u7DDA\u5224\u65B7\u932F\uFF0C\u53EF\u80FD\u662F\u5B89\u5168\u4E8B\u6545\u3002\n\n### \u6797\u5C91\n\n\u6240\u4EE5\u300C\u5168\u516C\u53F8 AI \u7B56\u7565\u300D\u53EF\u80FD\u672C\u8EAB\u5C31\u6709\u554F\u984C\u3002\n\n### \u5468\u6600\n\n\u59B3\u7684\u610F\u601D\u662F\uFF1F\n\n### \u6797\u5C91\n\n\u516C\u53F8\u7E3D\u90E8\u60F3\u8981\u4E00\u500B\u7D71\u4E00\u7B54\u6848\uFF0C\u4F46\u4E0D\u540C\u5DE5\u4F5C\u9700\u8981\u7684\u662F\u4E0D\u540C\u7A0B\u5EA6\u7684\u81EA\u52D5\u5316\u3001\u5BE9\u6838\u548C\u8CAC\u4EFB\u5B89\u6392\u3002\n\n### \u9AD8\u5B50\u8B19\n\n\u53EF\u662F\u6C92\u6709\u7D71\u4E00\u7B56\u7565\uFF0C\u5404\u90E8\u9580\u6703\u5404\u81EA\u8CB7\u5DE5\u5177\uFF0C\u8CC7\u6599\u4E5F\u6703\u6563\u6389\u3002\n\n### \u8607\u96C5\u96EF\n\n\u7D71\u4E00\u7684\u53EF\u4EE5\u662F\u5E95\u7DDA\uFF0C\u4E0D\u4E00\u5B9A\u662F\u505A\u6CD5\u3002\n\n\u4F8B\u5982\u516C\u53F8\u53EF\u4EE5\u7D71\u4E00\u898F\u5B9A\uFF1A\u4E0D\u80FD\u7528 AI \u505A\u54EA\u4E9B\u6C7A\u7B56\u3001\u54E1\u5DE5\u8CC7\u6599\u600E\u9EBC\u4FDD\u8B77\u3001\u932F\u8AA4\u600E\u9EBC\u56DE\u5831\u3001\u8AB0\u6709\u6B0A\u505C\u7528\u7CFB\u7D71\u3002\n\n\u81F3\u65BC\u6BCF\u5929\u600E\u9EBC\u7528\uFF0C\u53EF\u4EE5\u8B93\u73FE\u5834\u53C3\u8207\u8A2D\u8A08\u3002\n\n### \u6C88\u9ED8\n\n\u6211\u807D\u5230\u4E00\u500B\u65B0\u7684\u5340\u5206\uFF1A\n\n\u4E0D\u662F\u300C\u4E2D\u592E\u63A7\u5236\u300D\u6216\u300C\u5B8C\u5168\u653E\u4EFB\u300D\u4E8C\u9078\u4E00\uFF0C\u800C\u662F\uFF1A\n\n- \u516C\u53F8\u7D71\u4E00\u5B88\u4F4F\u5E95\u7DDA\n- \u73FE\u5834\u5171\u540C\u6C7A\u5B9A\u600E\u9EBC\u4F7F\u7528\n- \u54E1\u5DE5\u5206\u4EAB\u6548\u7387\u6210\u679C\uFF0C\u4E5F\u53C3\u8207\u627F\u64D4\u98A8\u96AA\n\n### \u963F\u9054\n\n\u53EF\u662F\u6211\u9084\u662F\u60F3\u554F\u4E00\u500B\u6700\u76F4\u63A5\u7684\u3002\n\n\u5982\u679C\u6700\u5F8C AI \u771F\u7684\u8B93\u516C\u53F8\u5C11\u9700\u8981\u5F88\u591A\u4EBA\uFF0C\u90A3\u600E\u9EBC\u8FA6\uFF1F\n\n\u5927\u5BB6\u525B\u525B\u8AC7\u4E86\u5F88\u591A\u53C3\u8207\u3001\u8A13\u7DF4\u3001\u4FE1\u4EFB\uFF0C\u4F46\u9019\u500B\u6700\u96E3\u770B\u7684\u7D50\u679C\u9084\u662F\u5728\u3002\n\n### \u73FE\u5834\u518D\u6B21\u5B89\u975C\u3002\n\n### \u9673\u6021\u5B89\n\n\u90A3\u516C\u53F8\u5C31\u5FC5\u9808\u8AA0\u5BE6\u627F\u8A8D\uFF0CAI \u5C0E\u5165\u53EF\u80FD\u6703\u6539\u8B8A\u4EBA\u6578\uFF0C\u800C\u4E0D\u662F\u7528\u300C\u5347\u7D1A\u8F49\u578B\u300D\u5305\u88DD\u3002\n\n### \u5C0F\u82B8\n\n\u5982\u679C\u771F\u7684\u6703\u5C11\u4EBA\uFF0C\u8ACB\u65E9\u9EDE\u8B1B\u3002\n\n\u6700\u7CDF\u7CD5\u7684\u662F\uFF0C\u516C\u53F8\u4E00\u908A\u8AAA\u4E0D\u6703\u53D6\u4EE3\uFF0C\u4E00\u908A\u628A\u62DB\u52DF\u51CD\u7D50\u3001\u628A\u96E2\u8077\u7684\u4EBA\u4E0D\u88DC\u3001\u628A\u5DE5\u4F5C\u6162\u6162\u5206\u7D66\u5269\u4E0B\u7684\u4EBA\u3002\n\n### \u9AD8\u5B50\u8B19\n\n\u4F46\u5982\u679C\u4E00\u958B\u59CB\u5C31\u8AAA\u53EF\u80FD\u6E1B\u5C11\u4EBA\u529B\uFF0C\u54E1\u5DE5\u4E00\u5B9A\u6703\u62B5\u5236\uFF0C\u5C0E\u5165\u6839\u672C\u505A\u4E0D\u4E0B\u53BB\u3002\n\n### \u6797\u5C91\n\n\u6240\u4EE5\u4F60\u7684\u610F\u601D\u662F\uFF0C\u516C\u53F8\u61C9\u8A72\u5148\u4E0D\u8981\u8B1B\u771F\u8A71\uFF0C\u7B49\u5927\u5BB6\u7FD2\u6163\u4E4B\u5F8C\u518D\u8AAA\uFF1F\n\n### \u9AD8\u5B50\u8B19\n\n\u6211\u4E0D\u662F\u9019\u500B\u610F\u601D\u3002\n\n### \u6797\u5C91\n\n\u4F46\u6548\u679C\u53EF\u80FD\u5C31\u662F\u90A3\u6A23\u3002\n\n### \u9AD8\u5B50\u8B19\n\n\u6211\u53EA\u662F\u8AAA\uFF0C\u4F01\u696D\u9700\u8981\u4FDD\u7559\u8ABF\u6574\u7A7A\u9593\u3002\n\n### \u8607\u96C5\u96EF\n\n\u54E1\u5DE5\u4E5F\u9700\u8981\u4FDD\u7559\u9078\u64C7\u7A7A\u9593\u3002\n\n\u5982\u679C\u516C\u53F8\u8981\u4FDD\u7559\u300C\u8ABF\u6574\u7A7A\u9593\u300D\uFF0C\u54E1\u5DE5\u537B\u88AB\u8981\u6C42\u5168\u5FC3\u6295\u5165\u3001\u5206\u4EAB\u77E5\u8B58\u3001\u63A5\u53D7\u91CD\u65B0\u8A13\u7DF4\uFF0C\u90A3\u9019\u500B\u95DC\u4FC2\u4E26\u4E0D\u5C0D\u7B49\u3002\n\n### \u5468\u6600\n\n\u90A3\u6709\u6C92\u6709\u53EF\u80FD\uFF0C\u54E1\u5DE5\u4E5F\u80FD\u62FF\u5230\u4E00\u90E8\u5206 AI \u5E36\u4F86\u7684\u6536\u76CA\uFF1F\n\n\u4F8B\u5982\u5C11\u52A0\u73ED\u3001\u7E2E\u77ED\u5DE5\u6642\u3001\u589E\u52A0\u734E\u91D1\uFF0C\u6216\u662F\u628A\u7701\u4E0B\u7684\u6642\u9593\u62FF\u4F86\u5B78\u65B0\u6280\u80FD\u3002\n\n### \u9AD8\u5B50\u8B19\n\n\u7406\u8AD6\u4E0A\u53EF\u4EE5\uFF0C\u4F46\u8981\u770B\u7522\u696D\u3002\n\n### \u8A31\u6587\u54F2\n\n\u4E0D\u8981\u6BCF\u6B21\u90FD\u8AAA\u300C\u770B\u7522\u696D\u300D\u3002\u6211\u5011\u53EF\u4EE5\u5148\u554F\u4E00\u500B\u5C0F\u554F\u984C\uFF1A\n\n\u5982\u679C AI \u5E6B\u6211\u6BCF\u5929\u7701\u4E00\u5C0F\u6642\uFF0C\u9019\u4E00\u5C0F\u6642\u80FD\u4E0D\u80FD\u771F\u7684\u9084\u7D66\u6211\uFF1F\n\n### \u5C0F\u82B8\n\n\u6216\u81F3\u5C11\u4E0D\u8981\u7ACB\u523B\u585E\u9032\u66F4\u591A\u6848\u4EF6\u3002\n\n### \u963F\u9054\n\n\u9019\u61C9\u8A72\u662F\u6240\u6709\u4E0A\u73ED\u65CF\u6700\u60F3\u77E5\u9053\u7684\u3002\n\n### \u8449\u66FC\n\n\u800C\u4E14\u300C\u7701\u4E0B\u6642\u9593\u300D\u4E0D\u4E00\u5B9A\u8981\u62FF\u4F86\u505A\u66F4\u591A\u5DE5\u4F5C\u3002\u5B83\u53EF\u80FD\u62FF\u4F86\u4F11\u606F\u3001\u4EA4\u63A5\u3001\u5B78\u7FD2\uFF0C\u751A\u81F3\u53EA\u662F\u8B93\u4EBA\u4E0D\u8981\u6BCF\u5929\u90FD\u5728\u5FEB\u7206\u70B8\u7684\u908A\u7DE3\u3002\n\n### \u6C88\u9ED8\n\n\u9019\u88E1\u7684\u554F\u984C\u5DF2\u7D93\u5F9E\u300C\u5982\u4F55\u63A8 AI\u300D\u8B8A\u6210\u300C\u6211\u5011\u8A8D\u70BA\u5DE5\u4F5C\u61C9\u8A72\u670D\u52D9\u4EC0\u9EBC\u300D\u3002\n\n\u5982\u679C\u6548\u7387\u63D0\u9AD8\uFF0C\u537B\u6C92\u6709\u8B93\u4EBA\u66F4\u5B89\u5168\u3001\u66F4\u6709\u5224\u65B7\u529B\u3001\u66F4\u6709\u6642\u9593\u7167\u9867\u91CD\u8981\u7684\u4E8B\uFF0C\u90A3\u6548\u7387\u5230\u5E95\u6539\u5584\u4E86\u4EC0\u9EBC\uFF1F\n\n### \u6797\u5C91\n\n\u6211\u60F3\u8ACB\u6BCF\u500B\u4EBA\u4E0D\u8981\u7E3D\u7D50\u7ACB\u5834\uFF0C\u53EA\u56DE\u7B54\u4E00\u500B\u554F\u984C\uFF1A\n\n\u4ECA\u5929\u8AC7\u5230\u73FE\u5728\uFF0C\u54EA\u4E00\u500B\u81EA\u5DF1\u7684\u60F3\u6CD5\u88AB\u52D5\u6416\u4E86\uFF1F\n\n\u5B50\u8B19\uFF0C\u4F60\u5148\u4F86\u3002\n\n### \u9AD8\u5B50\u8B19\n\n\u6211\u539F\u672C\u6BD4\u8F03\u76F8\u4FE1\uFF0C\u53EA\u8981\u628A AI \u7684\u597D\u8655\u8B1B\u6E05\u695A\uFF0C\u54E1\u5DE5\u5C31\u6703\u6BD4\u8F03\u9858\u610F\u63A5\u53D7\u3002\n\n\u73FE\u5728\u6211\u89BA\u5F97\u4E0D\u5920\u3002\u54E1\u5DE5\u4E0D\u662F\u6C92\u807D\u61C2\u597D\u8655\uFF0C\u800C\u662F\u4ED6\u5011\u4E5F\u770B\u5F97\u5230\u516C\u53F8\u53EF\u80FD\u62FF AI \u4F86\u505A\u4EC0\u9EBC\u3002\n\n\u6240\u4EE5\u4E0D\u80FD\u53EA\u5C55\u793A\u5DE5\u5177\u591A\u53B2\u5BB3\uFF0C\u8981\u5148\u8AAA\u6E05\u695A\u6B0A\u529B\u548C\u5229\u76CA\u600E\u9EBC\u8B8A\u3002\n\n### \u9673\u6021\u5B89\n\n\u6211\u539F\u672C\u4EE5\u70BA\u4EBA\u8CC7\u7684\u5DE5\u4F5C\u662F\u964D\u4F4E\u6050\u61FC\u3001\u5354\u52A9\u8F49\u578B\u3002\n\n\u73FE\u5728\u6211\u89BA\u5F97\uFF0C\u4EBA\u8CC7\u6709\u6642\u5019\u61C9\u8A72\u628A\u6050\u61FC\u4FDD\u7559\u4E0B\u4F86\u3002\u56E0\u70BA\u6050\u61FC\u53EF\u80FD\u662F\u5728\u63D0\u9192\u516C\u53F8\uFF0C\u6709\u4E9B\u627F\u8AFE\u9084\u6C92\u60F3\u6E05\u695A\u3002\n\n### \u8A31\u6587\u54F2\n\n\u6211\u539F\u672C\u89BA\u5F97\u73FE\u5834\u6700\u5927\u7684\u963B\u529B\u662F\u8001\u54E1\u5DE5\u4E0D\u60F3\u5B78\u65B0\u5DE5\u5177\u3002\n\n\u73FE\u5728\u6211\u89BA\u5F97\u5F88\u591A\u4EBA\u4E0D\u662F\u4E0D\u60F3\u5B78\uFF0C\u662F\u4E0D\u60F3\u628A\u81EA\u5DF1\u5E7E\u5341\u5E74\u7684\u7D93\u9A57\u4EA4\u51FA\u53BB\u4E4B\u5F8C\uFF0C\u8B8A\u6210\u4E00\u500B\u53EF\u4EE5\u88AB\u522A\u6389\u7684\u6210\u672C\u3002\n\n### \u8607\u96C5\u96EF\n\n\u6211\u539F\u672C\u60F3\u8AC7\u7684\u662F\u8077\u80FD\u8F49\u63DB\u3002\u73FE\u5728\u89BA\u5F97\u300C\u8F49\u63DB\u300D\u9019\u500B\u8A5E\u592A\u4E2D\u6027\u4E86\uFF0C\u597D\u50CF\u6BCF\u500B\u4EBA\u90FD\u6709\u76F8\u540C\u80FD\u529B\u3001\u6642\u9593\u548C\u6A5F\u6703\u3002\n\n\u5176\u5BE6\u6709\u4EBA\u8F49\u5F97\u904E\u53BB\uFF0C\u6709\u4EBA\u8F49\u4E0D\u904E\u53BB\u3002\u8AB0\u8CA0\u8CAC\u627F\u64D4\u90A3\u500B\u843D\u5DEE\uFF0C\u4E0D\u80FD\u88AB\u85CF\u5728\u6F02\u4EAE\u7684\u8A5E\u88E1\u3002\n\n### \u8449\u66FC\n\n\u6211\u539F\u672C\u4EE5\u70BA\u53EF\u4EE5\u7528\u91AB\u7642\u7684\u6848\u4F8B\u63D0\u9192\u5927\u5BB6\u4FDD\u7559\u4EBA\u7684\u5224\u65B7\u3002\n\n\u4F46\u6211\u73FE\u5728\u89BA\u5F97\uFF0C\u91CD\u9EDE\u4E0D\u53EA\u662F\u300C\u4EBA\u8981\u7559\u5728\u8FF4\u8DEF\u88E1\u300D\u3002\u6709\u6642\u5019\u4EBA\u7559\u5728\u8FF4\u8DEF\u88E1\uFF0C\u53EA\u662F\u8CA0\u8CAC\u66FF\u6A5F\u5668\u80CC\u934B\u3002\n\n\u771F\u6B63\u8981\u554F\u7684\u662F\uFF0C\u4EBA\u6709\u6C92\u6709\u6B0A\u529B\u5426\u6C7A\u6A5F\u5668\u3002\n\n### \u963F\u9054\n\n\u6211\u539F\u672C\u4EE5\u70BA\u5927\u5BB6\u53EA\u662F\u6015\u5931\u696D\u3002\n\n\u73FE\u5728\u89BA\u5F97\u5927\u5BB6\u4E5F\u6015\u53E6\u4E00\u4EF6\u4E8B\uFF1A\u6D3B\u8457\u4E0A\u73ED\uFF0C\u4F46\u5DE5\u4F5C\u8B8A\u5F97\u5B8C\u5168\u4E0D\u50CF\u81EA\u5DF1\u60F3\u505A\u7684\u4E8B\u3002\n\n### \u5C0F\u82B8\n\n\u6211\u539F\u672C\u4EE5\u70BA\u81EA\u5DF1\u9700\u8981\u516C\u53F8\u4FDD\u8B49\u4E0D\u6703\u88C1\u54E1\u3002\n\n\u73FE\u5728\u6211\u89BA\u5F97\uFF0C\u4FDD\u8B49\u53EF\u80FD\u6C38\u9060\u4E0D\u5920\u3002\u6211\u8981\u7684\u662F\u516C\u53F8\u627F\u8A8D\uFF0C\u9019\u4E0D\u662F\u55AE\u7D14\u7684\u5DE5\u5177\u5347\u7D1A\uFF0C\u800C\u662F\u6211\u5011\u4E00\u8D77\u91CD\u65B0\u8AC7\u5DE5\u4F5C\u7684\u898F\u5247\u3002\n\n\u800C\u4E14\u9019\u6B21\u4E0D\u80FD\u53EA\u6709\u4E3B\u7BA1\u5728\u8AC7\u3002\n\n### \u5468\u6600\n\n\u6211\u539F\u672C\u4EE5\u70BA\u6211\u5011\u4ECA\u5929\u6703\u8A0E\u8AD6\u600E\u9EBC\u8B93\u54E1\u5DE5\u63A5\u53D7 AI\u3002\n\n\u73FE\u5728\u6211\u89BA\u5F97\uFF0C\u66F4\u503C\u5F97\u554F\u7684\u662F\uFF1A\n\n\u5982\u679C\u54E1\u5DE5\u5B8C\u5168\u5408\u7406\u5730\u4E0D\u4FE1\u4EFB\u516C\u53F8\uFF0C\u516C\u53F8\u8981\u5148\u6539\u8B8A\u4EC0\u9EBC\uFF0C\u624D\u6709\u8CC7\u683C\u8981\u6C42\u54E1\u5DE5\u6539\u8B8A\uFF1F\n\n### \u6797\u5C91\n\n\u6211\u539F\u672C\u60F3\u6293\u51FA\u8AB0\u5728\u963B\u64CB AI\u3002\n\n\u73FE\u5728\u6211\u61F7\u7591\uFF0C\u771F\u6B63\u7684\u963B\u529B\u53EF\u80FD\u4E0D\u662F\u54E1\u5DE5\uFF0C\u800C\u662F\u516C\u53F8\u4E0D\u60F3\u9762\u5C0D AI \u6703\u628A\u539F\u672C\u5C31\u5B58\u5728\u7684\u4E0D\u516C\u5E73\u653E\u5927\u3002\n\n### \u6C88\u9ED8\n\n\u6211\u4E5F\u88DC\u4E00\u53E5\u3002\n\n\u6211\u5011\u4ECA\u5929\u6C92\u6709\u5F97\u5230\u4E00\u500B\u300C\u63A8 AI \u7684\u6700\u4F73\u505A\u6CD5\u300D\u3002\u4F46\u9019\u53EF\u80FD\u662F\u56E0\u70BA\u539F\u672C\u5C31\u6C92\u6709\u4E00\u500B\u55AE\u7D14\u7684\u300CAI \u5C0E\u5165\u554F\u984C\u300D\u3002\n\n\u684C\u4E0A\u5176\u5BE6\u6709\u597D\u5E7E\u500B\u554F\u984C\u758A\u5728\u4E00\u8D77\uFF1A\n\n- \u5DE5\u4F5C\u6703\u4E0D\u6703\u6D88\u5931\uFF1F\n- \u5DE5\u4F5C\u6703\u4E0D\u6703\u8B8A\u5F97\u66F4\u5FEB\u3001\u66F4\u7D2F\uFF1F\n- \u8AB0\u64C1\u6709\u54E1\u5DE5\u7D2F\u7A4D\u7684\u7D93\u9A57\uFF1F\n- AI \u51FA\u932F\u6642\u8AB0\u8CA0\u8CAC\uFF1F\n- \u6548\u7387\u5E36\u4F86\u7684\u6536\u76CA\u600E\u9EBC\u5206\uFF1F\n- \u54E1\u5DE5\u6709\u6C92\u6709\u5426\u6C7A\u6B0A\uFF1F\n- \u516C\u53F8\u60F3\u8981\u7684\u662F\u6539\u5584\u5DE5\u4F5C\uFF0C\u9084\u662F\u964D\u4F4E\u6210\u672C\uFF1F\n\n\u5982\u679C\u9019\u4E9B\u554F\u984C\u4E0D\u62C6\u958B\uFF0C\u6240\u6709\u300C\u5982\u4F55\u63A8\u884C AI\u300D\u7684\u7B54\u6848\uFF0C\u90FD\u53EF\u80FD\u53EA\u662F\u6559\u516C\u53F8\u600E\u9EBC\u8B93\u54E1\u5DE5\u66F4\u9806\u5229\u5730\u63A5\u53D7\u4E00\u500B\u5DF2\u7D93\u6C7A\u5B9A\u597D\u7684\u7D50\u679C\u3002\n\n---\n\n# \u89C0\u5BDF\u8005\u6574\u7406\uFF5C\u6C88\u9ED8\n\n## 1. \u6700\u5927\u7684\u5E7E\u500B\u8A0E\u8AD6\u8F49\u6298\n\n### \u5F9E\u300C\u54E1\u5DE5\u6015 AI\u300D\u8F49\u5411\u300C\u54E1\u5DE5\u6015\u516C\u53F8\u600E\u9EBC\u7528 AI\u300D\n\n\u4E00\u958B\u59CB\u5927\u5BB6\u628A\u963B\u529B\u7406\u89E3\u6210\u54E1\u5DE5\u7684\u5FC3\u7406\u554F\u984C\uFF0C\u597D\u50CF\u53EA\u8981\u52A0\u5F37\u6E9D\u901A\u3001\u5B89\u6392\u8A13\u7DF4\uFF0C\u54E1\u5DE5\u5C31\u6703\u653E\u5FC3\u3002\n\n\u4F46\u5C0F\u82B8\u6307\u51FA\uFF0C\u54E1\u5DE5\u771F\u6B63\u64D4\u5FC3\u7684\u662F\uFF1A\n\n- AI \u7701\u4E0B\u7684\u6642\u9593\u6703\u4E0D\u6703\u8B8A\u6210\u66F4\u591A\u5DE5\u4F5C\uFF1F\n- \u81EA\u5DF1\u7684\u7D93\u9A57\u88AB\u62FF\u53BB\u8A13\u7DF4\u7CFB\u7D71\u5F8C\uFF0C\u6703\u4E0D\u6703\u5931\u53BB\u50F9\u503C\uFF1F\n- AI \u51FA\u932F\u6642\uFF0C\u8CAC\u4EFB\u662F\u4E0D\u662F\u4ECD\u7136\u7531\u4EBA\u627F\u64D4\uFF1F\n- \u516C\u53F8\u662F\u4E0D\u662F\u8AAA\u4E0D\u88C1\u54E1\uFF0C\u5BE6\u969B\u4E0A\u537B\u7528\u5225\u7684\u65B9\u6CD5\u6E1B\u5C11\u4EBA\u529B\uFF1F\n\n\u8A0E\u8AD6\u56E0\u6B64\u5F9E\u300C\u600E\u9EBC\u5B89\u64AB\u54E1\u5DE5\u300D\u8F49\u6210\u300C\u516C\u53F8\u662F\u5426\u503C\u5F97\u88AB\u4FE1\u4EFB\u300D\u3002\n\n### \u5F9E\u300C\u4F7F\u7528 AI\u300D\u8F49\u5411\u300C\u8AB0\u6C7A\u5B9A\u4F7F\u7528\u898F\u5247\u300D\n\n\u5927\u5BB6\u539F\u672C\u8AC7\u7684\u662F\u5DE5\u5177\u597D\u4E0D\u597D\u7528\uFF0C\u5F8C\u4F86\u767C\u73FE\u771F\u6B63\u91CD\u8981\u7684\u662F\uFF1A\n\n- \u4EC0\u9EBC\u4E8B\u60C5\u53EF\u4EE5\u4EA4\u7D66 AI\uFF1F\n- \u4EC0\u9EBC\u4E8B\u60C5\u4E00\u5B9A\u8981\u7531\u4EBA\u5224\u65B7\uFF1F\n- \u4EBA\u80FD\u4E0D\u80FD\u5426\u6C7A AI\uFF1F\n- \u8AB0\u53EF\u4EE5\u66AB\u505C\u7CFB\u7D71\uFF1F\n- \u5931\u8AA4\u7531\u8AB0\u8CA0\u8CAC\uFF1F\n\nAI \u4E0D\u53EA\u662F\u6548\u7387\u5DE5\u5177\uFF0C\u4E5F\u6703\u6539\u8B8A\u6B0A\u529B\u548C\u8CAC\u4EFB\u7684\u5206\u914D\u3002\n\n### \u5F9E\u300C\u63D0\u9AD8\u6548\u7387\u300D\u8F49\u5411\u300C\u6548\u7387\u7684\u6210\u679C\u6B78\u8AB0\u300D\n\n\u516C\u53F8\u5E38\u8AAA AI \u53EF\u4EE5\u7701\u6642\u9593\u3001\u63D0\u9AD8\u6548\u7387\uFF0C\u4F46\u73FE\u5834\u7D93\u9A57\u986F\u793A\uFF0C\u7701\u4E0B\u4F86\u7684\u6642\u9593\u53EF\u80FD\u88AB\u62FF\u53BB\u63A5\u66F4\u591A\u5DE5\u4F5C\u3002\n\n\u56E0\u6B64\uFF0C\u300C\u6548\u7387\u63D0\u5347\u300D\u4E26\u4E0D\u81EA\u52D5\u7B49\u65BC\u300C\u5DE5\u4F5C\u8B8A\u597D\u300D\u3002\u9084\u8981\u554F\uFF1A\n\n- \u54E1\u5DE5\u80FD\u4E0D\u80FD\u5C11\u52A0\u73ED\uFF1F\n- \u5DE5\u4F5C\u91CF\u6703\u4E0D\u6703\u540C\u6B65\u589E\u52A0\uFF1F\n- \u516C\u53F8\u662F\u5426\u9858\u610F\u5206\u4EAB\u6536\u76CA\uFF1F\n- \u662F\u5426\u6709\u66F4\u591A\u6642\u9593\u5B78\u7FD2\u3001\u4F11\u606F\u6216\u8655\u7406\u8907\u96DC\u554F\u984C\uFF1F\n\n### \u5F9E\u300C\u5168\u9762\u5C0E\u5165\u300D\u8F49\u5411\u300C\u4F9D\u5DE5\u4F5C\u98A8\u96AA\u5206\u7D1A\u300D\n\n\u88FD\u9020\u696D\u3001\u5BA2\u670D\u3001\u91AB\u7642\u7684\u932F\u8AA4\u6210\u672C\u4E0D\u540C\uFF0C\u4E0D\u53EF\u80FD\u53EA\u7528\u4E00\u5957\u898F\u5247\u3002\n\n\u6BD4\u8F03\u5408\u7406\u7684\u65B9\u5411\u53EF\u80FD\u662F\uFF1A\n\n- \u516C\u53F8\u8A02\u5171\u540C\u5E95\u7DDA\n- \u5404\u90E8\u9580\u4F9D\u98A8\u96AA\u8A2D\u8A08\u4F7F\u7528\u65B9\u5F0F\n- \u7B2C\u4E00\u7DDA\u54E1\u5DE5\u53C3\u8207\u6E2C\u8A66\n- \u5141\u8A31\u54E1\u5DE5\u56DE\u5831\u3001\u6311\u6230\u751A\u81F3\u66AB\u505C\u7CFB\u7D71\n\n---\n\n## 2. \u88AB\u63A8\u7FFB\u7684\u5047\u8A2D\n\n### \u5047\u8A2D\u4E00\uFF1A\u54E1\u5DE5\u53CD\u5C0D AI\uFF0C\u662F\u56E0\u70BA\u4E0D\u4E86\u89E3 AI\n\n\u5C0D\u8AC7\u4E2D\u6C92\u6709\u5B8C\u5168\u5426\u5B9A\u300C\u4E0D\u4E86\u89E3\u300D\u53EF\u80FD\u9020\u6210\u963B\u529B\uFF0C\u4F46\u66F4\u5927\u7684\u554F\u984C\u662F\uFF1A\u54E1\u5DE5\u5F80\u5F80\u6BD4\u516C\u53F8\u66F4\u6E05\u695A AI \u53EF\u80FD\u88AB\u62FF\u4F86\u505A\u4EC0\u9EBC\u3002\n\n\u4ED6\u5011\u4E0D\u662F\u6C92\u770B\u898B AI \u7684\u597D\u8655\uFF0C\u800C\u662F\u4E5F\u770B\u898B\u4E86\u98A8\u96AA\u3002\n\n### \u5047\u8A2D\u4E8C\uFF1AAI \u7701\u4E0B\u7684\u6642\u9593\uFF0C\u81EA\u7136\u6703\u8B8A\u6210\u66F4\u6709\u50F9\u503C\u7684\u5DE5\u4F5C\n\n\u4E0D\u4E00\u5B9A\u3002\n\n\u5B83\u53EF\u80FD\u8B8A\u6210\u66F4\u591A\u6848\u4EF6\u3001\u66F4\u9AD8\u76EE\u6A19\u3001\u66F4\u5BC6\u96C6\u7684\u76E3\u63A7\uFF0C\u751A\u81F3\u66F4\u5927\u7684\u5FC3\u7406\u58D3\u529B\u3002\n\n### \u5047\u8A2D\u4E09\uFF1A\u53EA\u8981\u4EBA\u9084\u5728\u6700\u5F8C\u5BE9\u6838\uFF0C\u5C31\u6709\u4EBA\u985E\u63A7\u5236\n\n\u4E0D\u4E00\u5B9A\u3002\n\n\u5982\u679C\u4EBA\u6C92\u6709\u8DB3\u5920\u6642\u9593\u3001\u8CC7\u8A0A\u6216\u5426\u6C7A\u6B0A\uFF0C\u53EA\u662F\u88AB\u8981\u6C42\u66FF AI \u7684\u932F\u8AA4\u8CA0\u8CAC\uFF0C\u90A3\u300C\u4EBA\u5728\u8FF4\u8DEF\u4E2D\u300D\u53EF\u80FD\u53EA\u662F\u8CAC\u4EFB\u8F49\u5AC1\u3002\n\n### \u5047\u8A2D\u56DB\uFF1A\u516C\u53F8\u627F\u8AFE\u4E0D\u88C1\u54E1\uFF0C\u5C31\u80FD\u6D88\u9664\u54E1\u5DE5\u7684\u4E0D\u5B89\n\n\u4E0D\u4E00\u5B9A\u3002\n\n\u5373\u4F7F\u4E0D\u6B63\u5F0F\u88C1\u54E1\uFF0C\u516C\u53F8\u4ECD\u53EF\u80FD\u51CD\u7D50\u62DB\u52DF\u3001\u589E\u52A0\u5DE5\u4F5C\u91CF\u3001\u8B93\u4EBA\u81EA\u7136\u96E2\u8077\uFF0C\u6216\u8B93\u5DE5\u4F5C\u8B8A\u5F97\u4E0D\u53EF\u6301\u7E8C\u3002\n\n### \u5047\u8A2D\u4E94\uFF1A\u63D0\u9AD8 AI \u4F7F\u7528\u7387\uFF0C\u5C31\u4EE3\u8868\u5C0E\u5165\u6210\u529F\n\n\u4E0D\u4E00\u5B9A\u3002\n\n\u54E1\u5DE5\u53EF\u80FD\u70BA\u4E86\u9054\u6210\u6307\u6A19\u800C\u8868\u9762\u4F7F\u7528\uFF0C\u5BE6\u969B\u4E0A\u4ECD\u7528\u539F\u672C\u7684\u65B9\u6CD5\u5DE5\u4F5C\u3002\n\n\u771F\u6B63\u8A72\u770B\u7684\u662F\u554F\u984C\u6709\u6C92\u6709\u6539\u5584\uFF0C\u800C\u4E0D\u662F\u5DE5\u5177\u88AB\u6309\u4E86\u5E7E\u6B21\u3002\n\n### \u5047\u8A2D\u516D\uFF1AAI \u5C0E\u5165\u53EA\u662F\u6280\u8853\u5347\u7D1A\n\n\u5C0D\u8AC7\u986F\u793A\uFF0C\u5B83\u540C\u6642\u662F\uFF1A\n\n- \u5DE5\u4F5C\u8A2D\u8A08\u7684\u6539\u8B8A\n- \u77E5\u8B58\u6240\u6709\u6B0A\u7684\u6539\u8B8A\n- \u8CAC\u4EFB\u5206\u914D\u7684\u6539\u8B8A\n- \u8B70\u50F9\u80FD\u529B\u7684\u6539\u8B8A\n- \u5229\u76CA\u5206\u914D\u7684\u6539\u8B8A\n\n---\n\n## 3. \u65B0\u7522\u751F\u3001\u6BD4\u539F\u984C\u66F4\u503C\u5F97\u554F\u7684\u554F\u984C\n\n- \u5982\u679C AI \u771F\u7684\u63D0\u9AD8\u6548\u7387\uFF0C\u7701\u4E0B\u4F86\u7684\u6642\u9593\u548C\u6536\u76CA\u8981\u5206\u7D66\u8AB0\uFF1F\n- \u54E1\u5DE5\u80FD\u4E0D\u80FD\u53C3\u8207\u6C7A\u5B9A AI \u5C0E\u5165\u5F8C\uFF0C\u54EA\u4E9B\u5DE5\u4F5C\u7559\u4E0B\u3001\u54EA\u4E9B\u5DE5\u4F5C\u6D88\u5931\uFF1F\n- \u516C\u53F8\u662F\u5426\u9858\u610F\u516C\u958B AI \u5C0E\u5165\u53EF\u80FD\u9020\u6210\u7684\u4EBA\u529B\u8B8A\u5316\uFF1F\n- \u7B2C\u4E00\u7DDA\u54E1\u5DE5\u662F\u5426\u6709\u6B0A\u62D2\u7D55\u3001\u66AB\u505C\u6216\u63A8\u7FFB AI \u7684\u5EFA\u8B70\uFF1F\n- \u54EA\u4E9B\u5DE5\u4F5C\u5373\u4F7F AI \u505A\u5F97\u5230\uFF0C\u4E5F\u4E0D\u61C9\u8A72\u5B8C\u5168\u4EA4\u7D66 AI\uFF1F\n- \u516C\u53F8\u8981\u7684\u662F\u66F4\u597D\u7684\u5DE5\u4F5C\uFF0C\u9084\u662F\u66F4\u5C11\u7684\u4EBA\u529B\u6210\u672C\uFF1F\n- \u5982\u679C\u54E1\u5DE5\u4E0D\u4FE1\u4EFB\u516C\u53F8\uFF0C\u516C\u53F8\u8981\u5148\u6539\u8B8A\u4EC0\u9EBC\uFF0C\u624D\u6709\u8CC7\u683C\u8981\u6C42\u54E1\u5DE5\u6539\u8B8A\uFF1F\n- \u4E00\u500B\u771F\u6B63\u516C\u5E73\u7684 AI \u5C0E\u5165\uFF0C\u9664\u4E86\u8A13\u7DF4\u54E1\u5DE5\u4F7F\u7528\u5DE5\u5177\uFF0C\u9084\u61C9\u8A72\u63D0\u4F9B\u4EC0\u9EBC\u4FDD\u969C\uFF1F\n- \u6211\u5011\u662F\u5426\u628A\u300C\u4E0D\u9858\u610F\u5C0E\u5165 AI\u300D\u8AA4\u89E3\u6210\u963B\u529B\uFF0C\u800C\u5B83\u5176\u5BE6\u53EF\u80FD\u662F\u4E00\u7A2E\u98A8\u96AA\u8B66\u5831\uFF1F\n- \u5982\u679C AI \u8B93\u67D0\u4E9B\u5DE5\u4F5C\u6D88\u5931\uFF0C\u6211\u5011\u9858\u4E0D\u9858\u610F\u627F\u8A8D\u9019\u662F\u4E00\u500B\u9700\u8981\u5171\u540C\u8AC7\u5224\u7684\u793E\u6703\u9078\u64C7\uFF0C\u800C\u4E0D\u662F\u55AE\u7D14\u7684\u6280\u8853\u7D50\u679C\uFF1F\n\n---\n\n## 4. \u5C1A\u672A\u89E3\u6C7A\u7684\u6838\u5FC3\u885D\u7A81\n\n### \u4F01\u696D\u9700\u8981\u901F\u5EA6\uFF0C\u54E1\u5DE5\u9700\u8981\u5B89\u5168\u611F\n\n\u4F01\u696D\u64D4\u5FC3\u843D\u5F8C\u7AF6\u722D\uFF0C\u54E1\u5DE5\u64D4\u5FC3\u81EA\u5DF1\u88AB\u72A7\u7272\u3002\u9019\u5169\u7A2E\u7126\u616E\u90FD\u662F\u771F\u7684\uFF0C\u4F46\u76EE\u524D\u6C92\u6709\u81EA\u52D5\u76F8\u5BB9\u7684\u89E3\u6CD5\u3002\n\n### \u516C\u53F8\u60F3\u4FDD\u7559\u5F48\u6027\uFF0C\u54E1\u5DE5\u9700\u8981\u660E\u78BA\u627F\u8AFE\n\n\u516C\u53F8\u5E0C\u671B\u4E0D\u8981\u904E\u65E9\u627F\u8AFE\uFF0C\u4FDD\u7559\u8ABF\u6574\u7A7A\u9593\uFF1B\u54E1\u5DE5\u5247\u8A8D\u70BA\uFF0C\u5728\u98A8\u96AA\u4E0D\u5C0D\u7B49\u7684\u60C5\u6CC1\u4E0B\uFF0C\u6C92\u6709\u627F\u8AFE\u5C31\u4E0D\u53EF\u80FD\u771F\u6B63\u6295\u5165\u3002\n\n### AI \u53EF\u4EE5\u63D0\u9AD8\u6548\u7387\uFF0C\u4F46\u6548\u7387\u7684\u6210\u679C\u5982\u4F55\u5206\u914D\u4ECD\u672A\u89E3\u6C7A\n\n\u5982\u679C\u6548\u7387\u53EA\u8F49\u5316\u6210\u66F4\u591A\u7522\u91CF\u548C\u66F4\u5C11\u4EBA\u529B\uFF0C\u54E1\u5DE5\u81EA\u7136\u6703\u628A AI \u8996\u70BA\u5A01\u8105\u3002\n\n### \u54E1\u5DE5\u88AB\u8981\u6C42\u63D0\u4F9B\u77E5\u8B58\uFF0C\u537B\u4E0D\u4E00\u5B9A\u80FD\u5206\u4EAB\u77E5\u8B58\u88AB\u5546\u54C1\u5316\u5F8C\u7684\u50F9\u503C\n\n\u516C\u53F8\u9700\u8981\u628A\u500B\u4EBA\u7D93\u9A57\u8F49\u6210\u7D44\u7E54\u80FD\u529B\uFF0C\u4F46\u54E1\u5DE5\u4E5F\u9700\u8981\u4FDD\u8B77\u81EA\u5DF1\u7684\u5C08\u696D\u50F9\u503C\u8207\u8AC7\u5224\u80FD\u529B\u3002\n\n### \u4EBA\u88AB\u4FDD\u7559\u5728\u6D41\u7A0B\u4E2D\uFF0C\u537B\u672A\u5FC5\u64C1\u6709\u771F\u6B63\u7684\u6B0A\u529B\n\n\u300C\u6700\u5F8C\u7531\u4EBA\u5BE9\u6838\u300D\u807D\u8D77\u4F86\u5B89\u5168\uFF0C\u4F46\u5982\u679C\u4EBA\u6C92\u6709\u6642\u9593\u3001\u8CC7\u6E90\u548C\u5426\u6C7A\u6B0A\uFF0C\u90A3\u53EA\u662F\u5F62\u5F0F\u4E0A\u7684\u4EBA\u985E\u53C3\u8207\u3002\n\n### \u6700\u6839\u672C\u7684\u885D\u7A81\u53EF\u80FD\u4E0D\u662F\u300C\u8981\u4E0D\u8981\u7528 AI\u300D\n\n\u800C\u662F\uFF1A\n\n> \u516C\u53F8\u662F\u5426\u9858\u610F\u628A AI \u5C0E\u5165\u7576\u6210\u4E00\u6B21\u91CD\u65B0\u8AC7\u5224\u5DE5\u4F5C\u898F\u5247\u7684\u6A5F\u6703\uFF0C\u800C\u4E0D\u662F\u53EA\u628A\u5B83\u7576\u6210\u4E00\u500B\u964D\u4F4E\u6210\u672C\u7684\u5DE5\u5177\uFF1F", "question": "\u6709\u4EBA\u8AAA, \u7B2C\u4E00\u500B\u5728\u516C\u53F8\u5B78\u6703AI\u7684\u4EBA, \u5C31\u6703\u6709\u66F4\u591A\u7684\u5DE5\u4F5C\u843D\u5728\u81EA\u5DF1\u982D\u4E0A. \u9019\u6A23\u5B50\u672C\u696D\u7167\u9867\u4E0D\u5230, \u65B0\u7684AI\u5C08\u6848\u4E5F\u505A\u4E0D\u597D, \u8A72\u600E\u9EBC\u8FA6", "answer": "**\u5C0F\u82B8\uFF5C\u7576\u4E8B\u4EBA**\uFF1A\u9019\u500B\u6211\u5F88\u6709\u611F\u3002\u6703\u7528\u7684\u4EBA\u5E38\u5E38\u4E0D\u662F\u5C11\u505A\u672C\u696D\uFF0C\u800C\u662F\u88AB\u53EB\u53BB\u6559\u5225\u4EBA\u3001\u6E2C\u5DE5\u5177\u3001\u6574\u7406\u8CC7\u6599\uFF0C\u6700\u5F8C\u5169\u908A\u90FD\u8981\u8CA0\u8CAC\u3002\u516C\u53F8\u4E0D\u80FD\u628A\u300C\u6700\u5148\u5B78\u6703\u300D\u7576\u6210\u514D\u8CBB\u52A0\u73ED\u7684\u7406\u7531\u3002\n\n**\u9AD8\u5B50\u8B19\uFF5CAI \u9867\u554F**\uFF1A\u6240\u4EE5\u4E0D\u80FD\u53EA\u734E\u52F5\u4F7F\u7528\u7387\uFF0C\u61C9\u8A72\u628A AI \u5C08\u6848\u7576\u6210\u6B63\u5F0F\u5DE5\u4F5C\uFF0C\u660E\u78BA\u632A\u51FA\u6642\u9593\u3001\u8ABF\u6574\u539F\u672C\u7684\u76EE\u6A19\uFF0C\u4E5F\u8981\u6709\u4EBA\u63A5\u624B\u672C\u696D\u3002\u5426\u5247\u300C\u5C0E\u5165 AI\u300D\u53EA\u662F\u628A\u8CAC\u4EFB\u4E1F\u7D66\u6700\u7A4D\u6975\u7684\u4EBA\u3002\n\n**\u8A31\u6587\u54F2\uFF5C\u88FD\u9020\u696D\u4E3B\u7BA1**\uFF1A\u73FE\u5834\u6700\u5BE6\u969B\u7684\u505A\u6CD5\u662F\u5148\u9650\u5B9A\u7BC4\u570D\u3002\u4E0D\u8981\u4E00\u500B\u4EBA\u540C\u6642\u7576\u7A2E\u5B50\u6559\u7DF4\u3001\u5C08\u6848\u7D93\u7406\uFF0C\u9084\u8981\u7DAD\u6301\u539F\u672C\u7522\u91CF\u3002\u5148\u9078\u4E00\u9805\u6D41\u7A0B\u8A66\uFF0C\u78BA\u8A8D\u7701\u4E0B\u7684\u6642\u9593\u771F\u7684\u88AB\u4FDD\u7559\u4E0B\u4F86\uFF0C\u800C\u4E0D\u662F\u7ACB\u523B\u585E\u66F4\u591A\u5DE5\u4F5C\u3002\n\n**\u9673\u6021\u5B89\uFF5C\u4EBA\u8CC7\u4E3B\u7BA1**\uFF1A\u800C\u4E14\u9019\u7A2E\u984D\u5916\u8CA2\u737B\u8981\u88AB\u770B\u898B\uFF1A\u7B97\u9032\u7E3E\u6548\u3001\u7D66\u8A13\u7DF4\u6642\u9593\uFF0C\u751A\u81F3\u8ABF\u6574\u8077\u8CAC\u6216\u85AA\u916C\u3002\u4E4B\u524D\u5927\u5BB6\u5DF2\u7D93\u8B1B\u904E\uFF0C\u6548\u7387\u63D0\u9AD8\u5F8C\uFF0C\u7701\u4E0B\u4F86\u7684\u6642\u9593\u4E0D\u80FD\u81EA\u52D5\u8B8A\u6210\u66F4\u591A\u6848\u4EF6\u3002\n\n**\u6797\u5C91\uFF5C\u4E3B\u6301\u4EBA**\uFF1A\u6240\u4EE5\u554F\u984C\u4E0D\u53EA\u662F\u300C\u8AB0\u5148\u5B78\u6703 AI\u300D\uFF0C\u800C\u662F\u516C\u53F8\u6709\u6C92\u6709\u628A\u5B78\u7FD2\u3001\u8A66\u932F\u548C\u63A8\u52D5\u8B8A\u6210\u6B63\u5F0F\u5DE5\u4F5C\u3002\u5426\u5247\u6700\u5148\u5B78\u6703\u7684\u4EBA\uFF0C\u78BA\u5BE6\u53EF\u80FD\u53EA\u662F\u6700\u5148\u88AB\u69A8\u4E7E\u7684\u4EBA\u3002" };
+var COFFEE_SAMPLE_EN = { "title": "English\uFF5CCoffee Table: Should Our Company Adopt AI?", "topic": "How should a company introduce AI when employees fear it will replace them?", "language": "en", "markdown": "> Every guest and experience in this conversation is fictional. This is a thinking exercise, not testimony or verified advice.\n\n**The table**\n\n- **Lin Cen\uFF5CSharp host**: Spots contradictions and asks who benefits.\n- **Zhou Yun\uFF5CCurious host**: Follows questions and connects viewpoints.\n- **Shen Mo\uFF5CObserver**: Tracks assumptions and turns in the discussion.\n- **Chen Yi-an\uFF5CHR leader**: Cares about trust, transition and employee safety.\n- **Gao Zi-qian\uFF5CAI consultant**: Helps organizations introduce AI.\n- **Xu Wen-zhe\uFF5CManufacturing manager**: Focuses on workflow and operational risk.\n- **Su Ya-wen\uFF5CLabor researcher**: Studies how work and bargaining power change.\n- **Ye Man\uFF5CEmergency nurse**: Brings a cross-disciplinary view of triage and responsibility.\n- **A-Da\uFF5CEntertainer and generalist**: Asks the question others might skip.\n- **Xiao Yun\uFF5CCustomer-support team lead**: Her work is already changing.\n- **Audience**: Employees and managers from the room.\n\n### Lin Cen\uFF5CHost\nThe question sounds simple: how should a company introduce AI when employees are afraid it will replace them?\n\nPeople often say, \u201CThey are not against AI. They are just worried about losing their jobs.\u201D That might be true. It might also be a convenient way for the company to explain why people are not cooperating.\n\n### Zhou Yun\uFF5CHost\nLet\u2019s not rush to \u201Cmake the fear go away.\u201D Xiao Yun, what was your first thought when your company introduced AI?\n\n### Xiao Yun\uFF5CCustomer-support lead\n\u201CWill I still be needed?\u201D Not as some abstract question about the future. The system already answers common questions, sorts cases and drafts notes. Management says we can spend more time on valuable work. What I hear is that the work I do now has little value.\n\n### Gao Zi-qian\uFF5CAI consultant\nWork being automated does not necessarily mean people are being replaced. Sometimes it is just a new division of work.\n\n### Lin Cen\uFF5CHost\nYou called her concern a misunderstanding. She says AI already handles half her tasks. What exactly is she misunderstanding?\n\n### Xiao Yun\uFF5CCustomer-support lead\nIf ten people handled a thousand cases and AI now handles seven hundred, why would the company still need ten people?\n\n### Chen Yi-an\uFF5CHR leader\nThat is a fair question. If efficiency improves, where does the saved labor cost go: layoffs, higher pay, shorter hours, or simply more work? If the company cannot answer, it is reasonable that employees do not trust its promises.\n\n### A-Da\uFF5CGeneralist\nWho gets to define \u201Cmore valuable work\u201D? I once heard a producer call a change \u201Cmore meaningful.\u201D It turned a three-minute segment into ten minutes nobody understood.\n\n### Xiao Yun\uFF5CCustomer-support lead\nAI does save me time on notes. But the company did not reduce my calls; it raised the target. I am faster, not less busy.\n\n### Xu Wen-zhe\uFF5CManufacturing manager\nThat happens on a production line too. A machine gets faster, then the output target rises with it.\n\n### Lin Cen\uFF5CHost\nSo could \u201CAI makes work better\u201D quietly mean \u201Cthe same people must do more\u201D?\n\n### Gao Zi-qian\uFF5CAI consultant\nCompanies still need to improve efficiency. If competitors do and we do not, the business may not survive.\n\n### Su Ya-wen\uFF5CLabor researcher\n\u201CEfficiency\u201D is not the end of the question. Who gets the benefit? That is a distribution decision, not a technical fact.\n\n### Ye Man\uFF5CEmergency nurse\nIn a hospital, if every patient is marked urgent, the label stops helping. AI can add alerts and judgments instead of taking work away. People then have to decide which alerts to trust.\n\n### Zhou Yun\uFF5CHost\nAnd that judgment can be more tiring than following a routine.\n\n### Ye Man\uFF5CEmergency nurse\nYes. If the system is wrong, the human may still be blamed. \u201CA person reviewed it\u201D only means something if that person has enough time, information and authority to reject the recommendation.\n\n### Shen Mo\uFF5CObserver\nA turn in the conversation: perhaps employees fear more than the technology. They fear how the company will distribute the gains, the risk and the responsibility.\n\nThe question may not be \u201CHow do we get employees to stop fearing AI?\u201D It may be \u201CWill the company let employees help decide how AI changes their work?\u201D\n\n### Chen Yi-an\uFF5CHR leader\nThat requires more than a listening session. Employees need to see their feedback change an actual decision.\n\n### Xiao Yun\uFF5CCustomer-support lead\nWe were asked to help train a system with the knowledge we built over years. I am not against saving that knowledge. I want to know what happens to the people whose experience becomes part of the system.\n\n### Xu Wen-zhe\uFF5CManufacturing manager\nExperienced operators hear a machine sound different before the dashboard catches it. If a company captures that skill but never involves them in designing the tool, they may feel they are training their replacement.\n\n### Gao Zi-qian\uFF5CAI consultant\nThat same knowledge could help new staff learn faster.\n\n### Ye Man\uFF5CEmergency nurse\nIt could. But the system must show its limits, and staff need the power to override it. \u201CHuman in the loop\u201D can become a polite way to make a person carry the blame.\n\n### A-Da\uFF5CGeneralist\nThe company says, \u201CUse AI,\u201D and measures who uses it most. Is a high usage number proof that anyone is better off?\n\n### Audience member\uFF5CEmployee\nPeople in my office sometimes finish a task the old way, then paste it into AI just to satisfy the usage target. The dashboard looks great, but the work did not improve.\n\n### Shen Mo\uFF5CObserver\nAnother shift: activity is not value. A better measure might be whether customers get clearer answers, repetitive entry decreases, or employees gain time for difficult cases.\n\n### Lin Cen\uFF5CHost\nThose measures can be gamed too. What would make the test credible?\n\n### Xu Wen-zhe\uFF5CManufacturing manager\nLet the people doing the work help choose the measures. Test one process at a time. In a factory, a wrong answer can create a safety risk; in another team, the cost may be different.\n\n### Su Ya-wen\uFF5CLabor researcher\nThe company can set shared boundaries\u2014privacy, prohibited decisions, how to report errors and who may stop a system\u2014while each team helps shape its own workflow.\n\n### Gao Zi-qian\uFF5CAI consultant\nI agree on a pilot, but a company cannot pilot forever.\n\n### Ye Man\uFF5CEmergency nurse\nIt should not copy a successful pilot in one department straight into every other one. A surgery ward, emergency room and call center do not have the same risks.\n\n### Audience member\uFF5CEmployee\nIf the company says it will not lay people off, but does not put that in writing, why should anyone believe it?\n\n### Chen Yi-an\uFF5CHR leader\nA promise may help, but it cannot be the whole plan. The company should also explain retraining, transfers and what happens when a role changes.\n\n### Xiao Yun\uFF5CCustomer-support lead\nEven without layoffs, management can freeze hiring, stop replacing people who leave, or raise workloads until people quit. \u201CNo layoffs\u201D does not answer what my job will become.\n\n### A-Da\uFF5CGeneralist\nCould employees share some of the gains? If AI saves an hour, can that hour go back to a person instead of immediately becoming more cases?\n\n### Xu Wen-zhe\uFF5CManufacturing manager\nStart with that concrete question. Measure the time saved, and agree in advance how much becomes new output, learning, rest or better handoffs.\n\n### Lin Cen\uFF5CHost\nWho decides which work is worth keeping? A customer may need a person even when the system predicts that the case should take three minutes.\n\n### Xiao Yun\uFF5CCustomer-support lead\nExactly. I do not reject AI. I want the company to ask what work I want to spend time on, and let me explain when the customer needs a human.\n\n### Su Ya-wen\uFF5CLabor researcher\nWhen personal know-how becomes company data, bargaining power may change too. \u201CReskilling\u201D sounds neutral, but not everyone has the same time, opportunity or security to move into a new role.\n\n### Lin Cen\uFF5CHost\nBefore we wrap, name one belief that shifted. Gao?\n\n### Gao Zi-qian\uFF5CAI consultant\nI thought explaining the benefits would make adoption easier. Now I think the company must also explain how power, responsibility and the gains will change.\n\n### Chen Yi-an\uFF5CHR leader\nI thought HR should reduce fear. Some fear is useful evidence that the company has not settled important promises.\n\n### Ye Man\uFF5CEmergency nurse\nI thought the key was keeping a human in the loop. Now I would ask whether that person can really say no to the system.\n\n### Xiao Yun\uFF5CCustomer-support lead\nI thought I needed a promise that nobody would be laid off. Now I want the company to admit that AI changes the rules of work, and include the people affected in deciding those rules.\n\n### Zhou Yun\uFF5CHost\nMaybe the more useful question is: if employees have good reason to distrust the company, what must the company change before asking them to change?\n\n### Shen Mo\uFF5CObserver\nWe did not find a universal recipe. \u201CAI adoption\u201D bundles together several questions: Will jobs disappear? Who owns the knowledge employees contribute? Who carries the cost when AI is wrong? Who receives the gains? Can a worker reject or pause the system?\n\nIf those questions remain unanswered, an adoption plan can become a way to help employees accept a decision that has already been made.\n\n# Observer\u2019s notes\n\n## Major turns\n- \u201CEmployees fear AI\u201D shifted to \u201Cemployees fear how the company will use it.\u201D\n- A person reviewing an AI output is not meaningful oversight without time and veto power.\n- Usage rates shifted to measures of actual work and customer outcomes.\n- A single company policy shifted to common safeguards plus department-specific practices.\n- The question moved from adoption tactics to who sets the rules and shares the gains.\n\n## Assumptions challenged\n- That resistance comes from not understanding AI.\n- That saved time automatically becomes better work.\n- That keeping a human reviewer guarantees human control.\n- That usage rate means the tool is useful.\n- That a no-layoff promise alone creates job security.\n\n## Better questions to keep exploring\n- Who receives the time and money AI saves?\n- Which decisions may AI recommend, and which must a person make?\n- Can affected staff pause, reject or change a system?\n- What happens to staff whose knowledge trains the tool?\n- What concrete evidence would show that a pilot improved work?\n\n## Unresolved conflicts\n- Companies want speed and flexibility; employees want security and honest commitments.\n- AI may increase productivity, while its benefits may flow mainly to the company.\n- Human review may protect customers or simply move responsibility onto staff.\n- Companies need shared rules, while each department faces different risks.", "question": "The first person at work to learn AI may get more work piled on. Then they cannot do their regular job or the AI project well. What should happen?", "answer": "**Xiao Yun\uFF5CCustomer-support lead:** I have seen that happen. People who learn first get asked to train others, test tools and organize data while keeping all their regular work. The company should not treat initiative as free overtime.\n\n**Gao Zi-qian\uFF5CAI consultant:** Make the AI project part of the actual job. Reserve time, adjust existing targets and arrange coverage for the person's regular duties. Otherwise adopting AI just moves responsibility to the most willing person.\n\n**Xu Wen-zhe\uFF5CManufacturing manager:** Keep the first experiment small. Do not make one person the trainer, project manager and production owner at once.\n\n**Chen Yi-an\uFF5CHR leader:** Count this contribution in workload, evaluation and training time.\n\n**Lin Cen\uFF5CHost:** The question is whether the company makes learning and testing real work. Otherwise the first learner may simply be the first one to burn out." };
+
+// experiences/coffee-tables/list.ts
+var activityTime = (item) => Date.parse(item.lastGenerationStartedAt || item.updatedAt || item.createdAt) || 0;
+var startTime = (item) => Date.parse(item.lastGenerationStartedAt || item.updatedAt || item.createdAt) || 0;
+var completeTime = (item) => Date.parse(item.lastCompletedAt || item.updatedAt || item.createdAt) || 0;
+function itemTime(item) {
+  return item.status === "completed" ? completeTime(item) : activityTime(item);
+}
+function effectiveTableStatus(session, busy = false) {
+  var _a, _b;
+  if (busy) return "generating";
+  if (session.status === "generating" || session.questions.some((question) => question.status !== "complete") || ((_a = session.rounds) != null ? _a : []).some((round) => round.status !== "completed") || ((_b = session.interventions) != null ? _b : []).some((item) => item.status === "pending" || item.status === "failed")) return "error";
+  return session.status;
+}
+function selectTables(items, query = "", filter = "all", focusedTopic) {
+  const needle = query.trim().toLocaleLowerCase(), topic = focusedTopic == null ? void 0 : focusedTopic.trim();
+  return items.filter((item) => {
+    if (needle && !item.topic.toLocaleLowerCase().includes(needle)) return false;
+    if (topic && item.topic.trim() !== topic) return false;
+    if (filter === "generating") return item.status === "generating";
+    if (filter === "unfinished") return item.status !== "generating" && item.status !== "completed";
+    if (filter === "completed") return item.status === "completed";
+    return true;
+  }).sort((a, b) => itemTime(b) - itemTime(a) || a.id.localeCompare(b.id));
+}
+function topicTableCount(topic, items) {
+  const exactTopic = topic.trim();
+  return items.filter((item) => item.topic.trim() === exactTopic).length;
+}
+function tableTime(item) {
+  if (item.status === "completed") return { value: completeTime(item), isFallback: !item.lastCompletedAt };
+  if (item.lastGenerationStartedAt) return { value: startTime(item), isFallback: false };
+  return { value: activityTime(item), isFallback: true };
+}
+function formatTableTime(timestamp, now = Date.now(), language2 = "en") {
+  const date = new Date(timestamp), today = new Date(now);
+  if (!Number.isFinite(date.getTime())) return "";
+  const sameDay = date.getFullYear() === today.getFullYear() && date.getMonth() === today.getMonth() && date.getDate() === today.getDate();
+  const yesterday = new Date(today.getFullYear(), today.getMonth(), today.getDate() - 1);
+  const isYesterday = date.getFullYear() === yesterday.getFullYear() && date.getMonth() === yesterday.getMonth() && date.getDate() === yesterday.getDate();
+  const zh = language2.toLowerCase().startsWith("zh");
+  if (sameDay || isYesterday) {
+    const day = sameDay ? zh ? "\u4ECA\u5929" : "Today" : zh ? "\u6628\u5929" : "Yesterday";
+    return `${day} ${new Intl.DateTimeFormat(zh ? "zh-TW" : "en", { hour: "2-digit", minute: "2-digit", hour12: !zh }).format(date)}`;
+  }
+  return new Intl.DateTimeFormat(zh ? "zh-TW" : "en", { month: "short", day: "numeric", ...date.getFullYear() !== today.getFullYear() ? { year: "numeric" } : {} }).format(date);
+}
+
+// experiences/coffee-tables/topics.ts
+var COFFEE_TOPICS = [
+  { id: "ai-saved-time", zh: "\u516C\u53F8\u5C0E\u5165 AI \u7701\u4E0B\u7684\u6642\u9593\uFF0C\u61C9\u8A72\u7531\u8AB0\u6C7A\u5B9A\u600E\u9EBC\u7528\uFF1F", en: "Who should decide how a company uses the time saved by AI?" },
+  { id: "efficiency-or-security", zh: "\u4E00\u5BB6\u516C\u53F8\u61C9\u8A72\u5148\u8FFD\u6C42\u6548\u7387\uFF0C\u9084\u662F\u54E1\u5DE5\u7684\u5B89\u5168\u611F\uFF1F", en: "Should a company prioritize efficiency or employees\u2019 sense of security?" },
+  { id: "remote-work", zh: "\u9060\u8DDD\u5DE5\u4F5C\u8B93\u4EBA\u66F4\u81EA\u7531\uFF0C\u9084\u662F\u66F4\u96E3\u4E0B\u73ED\uFF1F", en: "Does remote work make people freer, or make it harder to switch off?" },
+  { id: "ideas-in-meetings", zh: "\u70BA\u4EC0\u9EBC\u597D\u9EDE\u5B50\u5E38\u5728\u6703\u8B70\u88E1\u6D88\u5931\uFF1F", en: "Why do good ideas often disappear in meetings?" },
+  { id: "small-company-ai", zh: "\u5C0F\u516C\u53F8\u8981\u5982\u4F55\u63A1\u7528 AI\uFF0C\u53C8\u4E0D\u589E\u52A0\u54E1\u5DE5\u8CA0\u64D4\uFF1F", en: "How can a small company adopt AI without adding to employees\u2019 workload?" },
+  { id: "schools-and-ai", zh: "\u5B78\u6821\u61C9\u8A72\u6559\u5B78\u751F\u4F7F\u7528 AI\uFF0C\u9084\u662F\u5148\u9650\u5236\u4F7F\u7528\uFF1F", en: "Should schools teach students to use AI or restrict it first?" },
+  { id: "school-lunch", zh: "\u514D\u8CBB\u71DF\u990A\u5348\u9910\u662F\u5426\u61C9\u8A72\u958B\u653E\u5BB6\u9577\u52A0\u50F9\uFF1F", en: "Should parents be allowed to pay extra for school lunches that are otherwise free?" },
+  { id: "children-freedom", zh: "\u5B69\u5B50\u9700\u8981\u66F4\u591A\u81EA\u7531\uFF0C\u9084\u662F\u66F4\u6E05\u695A\u7684\u898F\u5247\uFF1F", en: "Do children need more freedom or clearer rules?" },
+  { id: "test-scores", zh: "\u8003\u8A66\u6210\u7E3E\u80FD\u4E0D\u80FD\u4EE3\u8868\u4E00\u500B\u4EBA\u771F\u6B63\u5B78\u6703\u4E86\u4EC0\u9EBC\uFF1F", en: "Can test scores show what someone has really learned?" },
+  { id: "loving-work", zh: "\u5DE5\u4F5C\u4E00\u5B9A\u8981\u662F\u81EA\u5DF1\u71B1\u611B\u7684\u4E8B\u55CE\uFF1F", en: "Does your work have to be something you love?" },
+  { id: "cities-and-forests", zh: "\u57CE\u5E02\u53EF\u4EE5\u5411\u68EE\u6797\u5B78\u5230\u4EC0\u9EBC\uFF1F", en: "What can cities learn from forests?" },
+  { id: "neighborhood-help", zh: "\u4E00\u500B\u793E\u5340\u600E\u6A23\u624D\u80FD\u8B93\u964C\u751F\u4EBA\u9858\u610F\u4E92\u76F8\u5E6B\u5FD9\uFF1F", en: "How can a neighborhood help strangers feel willing to help each other?" },
+  { id: "convenience-and-skills", zh: "\u4FBF\u5229\u7684\u751F\u6D3B\uFF0C\u662F\u5426\u8B93\u6211\u5011\u5931\u53BB\u67D0\u4E9B\u80FD\u529B\uFF1F", en: "Does a more convenient life make us lose some abilities?" },
+  { id: "social-media", zh: "\u793E\u7FA4\u5A92\u9AD4\u8B93\u4EBA\u66F4\u6709\u9023\u7D50\uFF0C\u9084\u662F\u66F4\u5B64\u55AE\uFF1F", en: "Does social media connect people or make them lonelier?" },
+  { id: "recommendation-algorithms", zh: "\u63A8\u85A6\u6F14\u7B97\u6CD5\u662F\u5728\u5E6B\u6211\u5011\u9078\u64C7\uFF0C\u9084\u662F\u5728\u7E2E\u5C0F\u9078\u64C7\uFF1F", en: "Do recommendation algorithms help us choose or narrow our choices?" },
+  { id: "human-creativity", zh: "\u7576 AI \u80FD\u5275\u4F5C\uFF0C\u4EBA\u7684\u5275\u4F5C\u50F9\u503C\u6703\u5728\u54EA\u88E1\uFF1F", en: "When AI can create, where does the value of human creativity lie?" },
+  { id: "fairness", zh: "\u516C\u5E73\u662F\u6BCF\u500B\u4EBA\u5F97\u5230\u4E00\u6A23\uFF0C\u9084\u662F\u5F97\u5230\u81EA\u5DF1\u9700\u8981\u7684\uFF1F", en: "Is fairness giving everyone the same thing or what each person needs?" },
+  { id: "product-needs", zh: "\u4E00\u500B\u7522\u54C1\u61C9\u8A72\u6EFF\u8DB3\u9700\u6C42\uFF0C\u9084\u662F\u6311\u6230\u4F7F\u7528\u8005\u7684\u7FD2\u6163\uFF1F", en: "Should a product meet users\u2019 needs or challenge their habits?" },
+  { id: "real-progress", zh: "\u6211\u5011\u5982\u4F55\u5206\u8FA8\u771F\u6B63\u7684\u9032\u6B65\u8207\u53EA\u662F\u8B8A\u5F97\u66F4\u5FD9\uFF1F", en: "How can we tell real progress from simply getting busier?" },
+  { id: "preserve-disagreement", zh: "\u4EC0\u9EBC\u60C5\u6CC1\u4E0B\uFF0C\u4FDD\u7559\u5206\u6B67\u6BD4\u9054\u6210\u5171\u8B58\u66F4\u6709\u50F9\u503C\uFF1F", en: "When is preserving disagreement more valuable than reaching consensus?" }
+];
+function coffeeTopicText(id, language2) {
+  const topic = COFFEE_TOPICS.find((item) => item.id === id);
+  return topic == null ? void 0 : topic[language2 === "en" ? "en" : "zh"];
+}
+function pickCoffeeTopic(language2, previous = "", random = Math.random) {
+  const candidates = COFFEE_TOPICS.filter((item) => item[language2 === "en" ? "en" : "zh"] !== previous);
+  const pool = candidates.length ? candidates : COFFEE_TOPICS;
+  return pool[Math.floor(random() * pool.length)][language2 === "en" ? "en" : "zh"];
+}
+
+// experiences/coffee-tables/view.ts
+var COFFEE_TABLES_NAME = "Coffee Tables";
+var COFFEE_TABLES_VIEW_TYPE = "coffee-tables-view";
+var CoffeeDeleteModal = class extends import_obsidian2.Modal {
+  constructor(app, topic, zh) {
+    super(app);
+    this.topic = topic;
+    this.zh = zh;
+    __publicField(this, "resolveResult");
+    __publicField(this, "confirmed", false);
+  }
+  confirm() {
+    return new Promise((resolve) => {
+      this.resolveResult = resolve;
+      this.open();
+    });
+  }
+  onOpen() {
+    const content = this.contentEl;
+    content.empty();
+    content.createEl("h2", { text: this.zh ? "\u522A\u9664\u9019\u5834\u684C\u804A\uFF1F" : "Delete this table?" });
+    content.createEl("p", { text: this.zh ? `\u300C${this.topic}\u300D\u7684 Markdown \u8207\u8A2D\u5B9A\u6703\u5148\u5099\u4EFD\uFF0C\u518D\u79FB\u5165\u5783\u573E\u6876\u3002\u4E4B\u5F8C\u53EF\u5F9E\u300C\u6700\u8FD1\u522A\u9664\u300D\u5FA9\u539F\u3002` : `\u201C${this.topic}\u201D will be backed up and moved to the vault trash. You can restore it from Recently deleted.` });
+    const buttons = content.createDiv({ cls: "modal-button-container" });
+    const cancel = buttons.createEl("button", { text: this.zh ? "\u53D6\u6D88" : "Cancel" });
+    cancel.onclick = () => this.close();
+    const remove = buttons.createEl("button", { text: this.zh ? "\u79FB\u5230\u5783\u573E\u6876" : "Move to trash" });
+    remove.addClass("mod-warning");
+    remove.onclick = () => {
+      this.confirmed = true;
+      this.close();
+    };
+  }
+  onClose() {
+    var _a;
+    this.contentEl.empty();
+    (_a = this.resolveResult) == null ? void 0 : _a.call(this, this.confirmed);
+    this.resolveResult = void 0;
+  }
+};
+var CATEGORIES2 = [
+  { id: "experts", en: "Topic experts", zh: "\u4E3B\u984C\u5C08\u5BB6", descEn: "Bring subject knowledge and challenge each other\u2019s assumptions.", descZh: "\u88DC\u5145\u5C08\u696D\u80CC\u666F\uFF0C\u6311\u6230\u5F7C\u6B64\u7684\u5224\u65B7\u3002" },
+  { id: "cross-domain", en: "Cross-domain experts", zh: "\u8DE8\u9818\u57DF\u5C08\u5BB6", descEn: "Offer useful ideas from another field and explain where the analogy breaks.", descZh: "\u501F\u7528\u5176\u4ED6\u9818\u57DF\u7684\u7D93\u9A57\uFF0C\u4E5F\u6307\u51FA\u985E\u6BD4\u9650\u5236\u3002" },
+  { id: "generalist", en: "Curious generalists", zh: "\u597D\u5947\u7684\u901A\u624D", descEn: "Ask direct questions and connect the discussion to everyday life.", descZh: "\u554F\u51FA\u76F4\u767D\u554F\u984C\uFF0C\u628A\u8A0E\u8AD6\u62C9\u56DE\u65E5\u5E38\u3002" },
+  { id: "affected", en: "Affected perspectives", zh: "\u53D7\u5F71\u97FF\u8005", descEn: "Challenge abstract assumptions from a lived situation.", descZh: "\u5F9E\u5BE6\u969B\u8655\u5883\u51FA\u767C\uFF0C\u6311\u6230\u62BD\u8C61\u5047\u8A2D\u3002" }
+];
+function parseGuests(markdown) {
+  return [...markdown.matchAll(/^- \*\*(.+?)\s*[｜|]\s*(.+?)\*\*[：:]\s*(.+)$/gm)].map((match) => /主持人|觀察者|專家|藝人|當事人/.test(match[1]) ? { name: match[2].trim(), role: match[1].trim(), bio: match[3].trim() } : { name: match[1].trim(), role: match[2].trim(), bio: match[3].trim() });
+}
+function rosterFor(session, markdown) {
+  var _a, _b;
+  const zh = session.language === "zh-TW", settings = session.guests;
+  const people = [...new Map(parseGuests(markdown).map((person) => [person.name.trim().toLocaleLowerCase(), person])).values()];
+  const roles = [{ category: "host", en: "Host", zh: "\u4E3B\u6301\u4EBA", count: (_a = settings == null ? void 0 : settings.hostCount) != null ? _a : 2 }, { category: "observer", en: "Observer", zh: "\u89C0\u5BDF\u8005", count: 1 }, ...CATEGORIES2.map((item) => {
+    var _a2;
+    return { category: item.id, en: item.en, zh: item.zh, count: (_a2 = settings == null ? void 0 : settings.counts[item.id]) != null ? _a2 : 0 };
+  })];
+  const roleKey = (role) => /主持|host/i.test(role) ? "host" : /觀察|observer/i.test(role) ? "observer" : /跨領域|cross.domain/i.test(role) ? "cross-domain" : /通才|generalist/i.test(role) ? "generalist" : /受影響|當事|affected|lived/i.test(role) ? "affected" : /專家|expert/i.test(role) ? "experts" : "";
+  const used = /* @__PURE__ */ new Map();
+  for (const person of people) {
+    const key = roleKey(person.role);
+    if (key) used.set(key, ((_b = used.get(key)) != null ? _b : 0) + 1);
+  }
+  const placeholders = roles.flatMap((item) => {
+    var _a2;
+    return Array.from({ length: Math.max(0, item.count - ((_a2 = used.get(item.category)) != null ? _a2 : 0)) }, (_, index) => ({ name: `${zh ? item.zh : item.en} ${index + 1}`, role: zh ? "\u5373\u5C07\u767B\u5834" : "Joining", bio: zh ? "\u7B49\u5F85\u4EBA\u7269\u4ECB\u7D39" : "Waiting for the introduction" }));
+  });
+  return [...people, ...placeholders];
+}
+function liveRosterFor(session, draftMarkdown = "") {
+  var _a, _b;
+  const history = [session.transcriptMarkdown, ...((_a = session.rounds) != null ? _a : []).flatMap((round) => [round.markdown, round.draftMarkdown]), ...((_b = session.questions) != null ? _b : []).flatMap((question) => [question.answer, question.draftAnswer])];
+  return rosterFor(session, [...history, draftMarkdown].filter(Boolean).join("\n"));
+}
+function parseSpeeches(markdown) {
+  const body = markdown.split(/^# (?:觀察者整理|Observer(?:[’']s)? notes)\s*$/m, 1)[0];
+  const people = parseGuests(body), roles = new Map(people.map((person) => [person.name, person.role]));
+  return [...body.matchAll(/^###\s+([^\n]+)\n([\s\S]*?)(?=^###\s|$(?![\s\S]))/gm)].map((match) => {
+    const [name, explicitRole] = match[1].split(/[｜|]/, 2).map((value) => value.trim());
+    const person = people.find((entry) => entry.name === name);
+    return { name, role: explicitRole || (person == null ? void 0 : person.role) || roles.get(name) || "", text: match[2].trim() };
+  }).filter((item) => item.text && item.role && !/^(觀察者整理|Observer(?:[’']s)? notes)$/.test(item.name));
+}
+function defaults() {
+  return { experts: 4, "cross-domain": 1, generalist: 1, affected: 1 };
+}
+function total(counts) {
+  return Object.values(counts).reduce((sum, count) => sum + count, 0);
+}
+var CoffeeTablesView = class extends import_obsidian2.ItemView {
+  constructor(leaf, plugin) {
+    super(leaf);
+    this.plugin = plugin;
+    __publicField(this, "store");
+    __publicField(this, "engine", null);
+    __publicField(this, "unsubscribe", null);
+    __publicField(this, "closed", false);
+    __publicField(this, "generation", 0);
+    __publicField(this, "navigationGeneration", 0);
+    __publicField(this, "homeGeneration", 0);
+    __publicField(this, "listGeneration", 0);
+    __publicField(this, "selectedPath", "");
+    __publicField(this, "previewVisible", false);
+    __publicField(this, "homeQuery", "");
+    __publicField(this, "tableFilter", "all");
+    __publicField(this, "focusedTopic", null);
+    __publicField(this, "recoveredPendingCreates", false);
+    __publicField(this, "scrollEpoch", 0);
+    __publicField(this, "homePane", "main");
+    __publicField(this, "homeForm", {});
+    __publicField(this, "homeEdit", null);
+    __publicField(this, "homeMainScrollTop", 0);
+    __publicField(this, "homeListScrollTop", 0);
+    __publicField(this, "firstRoomScroll", null);
+    __publicField(this, "markdownJobs", null);
+    __publicField(this, "renderTimer", null);
+    __publicField(this, "statusTimer", null);
+    __publicField(this, "stateSignature", "");
+    __publicField(this, "composerValues", /* @__PURE__ */ new Map());
+    __publicField(this, "suppressStateRestore", false);
+  }
+  getViewType() {
+    return COFFEE_TABLES_VIEW_TYPE;
+  }
+  getDisplayText() {
+    return COFFEE_TABLES_NAME;
+  }
+  getIcon() {
+    return "coffee";
+  }
+  tr(en, zh) {
+    return this.plugin.settings.language === "zh-TW" ? zh : en;
+  }
+  async refreshForLanguageChange() {
+    var _a, _b, _c, _d, _e, _f;
+    if (this.closed) return;
+    if (this.engine) {
+      this.render();
+      return;
+    }
+    const active = this.contentEl.ownerDocument.activeElement;
+    const field = active == null ? void 0 : active.dataset.ctHomeField, start = active instanceof HTMLInputElement || active instanceof HTMLTextAreaElement ? active.selectionStart : null, end = active instanceof HTMLInputElement || active instanceof HTMLTextAreaElement ? active.selectionEnd : null;
+    this.homeForm.advancedOpen = ((_a = this.contentEl.querySelector(".ct-advanced-settings")) == null ? void 0 : _a.open) ? "true" : (_b = this.homeForm.advancedOpen) != null ? _b : "false";
+    this.homeForm.topicIdeasOpen = ((_c = this.contentEl.querySelector(".ct-topic-ideas")) == null ? void 0 : _c.open) ? "true" : (_d = this.homeForm.topicIdeasOpen) != null ? _d : "false";
+    this.homeMainScrollTop = (_f = (_e = this.contentEl.querySelector(".ct-home-main")) == null ? void 0 : _e.scrollTop) != null ? _f : this.homeMainScrollTop;
+    await this.home();
+    if (field) {
+      const replacement = this.contentEl.querySelector(`[data-ct-home-field="${field}"]`);
+      replacement == null ? void 0 : replacement.focus();
+      if (replacement instanceof HTMLInputElement || replacement instanceof HTMLTextAreaElement) {
+        try {
+          replacement.setSelectionRange(start != null ? start : replacement.value.length, end != null ? end : replacement.value.length);
+        } catch (e) {
+        }
+      }
+    }
+  }
+  async onOpen() {
+    var _a;
+    await this.plugin.ready;
+    this.closed = false;
+    this.suppressStateRestore = false;
+    this.store = (_a = this.plugin.coffeeStorage) != null ? _a : new CoffeeStorage(this.app.vault, this.plugin.settings.workspaceFolder);
+    this.contentEl.addClass("ct-view");
+    await this.home();
+  }
+  async onClose() {
+    var _a;
+    this.closed = true;
+    this.generation++;
+    (_a = this.unsubscribe) == null ? void 0 : _a.call(this);
+    this.unsubscribe = null;
+    if (this.renderTimer !== null) window.clearTimeout(this.renderTimer);
+    if (this.statusTimer !== null) window.clearInterval(this.statusTimer);
+  }
+  getState() {
+    var _a, _b;
+    return { sessionId: (_b = (_a = this.engine) == null ? void 0 : _a.session.id) != null ? _b : null };
+  }
+  async setState(state, result) {
+    var _a, _b;
+    await this.plugin.ready;
+    if (!this.store) this.store = (_a = this.plugin.coffeeStorage) != null ? _a : new CoffeeStorage(this.app.vault, this.plugin.settings.workspaceFolder);
+    if (state.sessionId && !this.suppressStateRestore && state.sessionId !== ((_b = this.engine) == null ? void 0 : _b.session.id)) await this.loadSession(state.sessionId);
+    await super.setState(state, result);
+  }
+  returnHome(edit) {
+    this.suppressStateRestore = true;
+    if (!edit) this.homeEdit = null;
+    void this.home(edit);
+    this.app.workspace.requestSaveLayout();
+  }
+  button(parent, label, action, disabled = false) {
+    const button = parent.createEl("button", { text: label });
+    button.disabled = disabled;
+    button.addEventListener("click", () => {
+      void Promise.resolve().then(action).catch((error) => new import_obsidian2.Notice(error instanceof Error ? error.message : String(error)));
+    });
+    return button;
+  }
+  async home(edit) {
+    var _a, _b, _c, _d, _e, _f, _g, _h, _i, _j, _k, _l, _m, _n, _o, _p, _q, _r, _s, _t;
+    const requestedEdit = !!edit;
+    if (!edit && this.homeEdit) edit = this.homeEdit;
+    if (requestedEdit && edit) {
+      this.homeEdit = edit;
+      const priorGuests = ((_b = (_a = edit.guests) == null ? void 0 : _a.guests) == null ? void 0 : _b.length) ? edit.guests.guests : ((_c = edit.guests) == null ? void 0 : _c.background) ? [{ id: crypto.randomUUID(), category: "experts", description: edit.guests.background }] : [];
+      this.homeForm = { ...this.homeForm, topic: edit.topic, topicIdeaId: "", topicEdited: "true", model: edit.model, reasoning: edit.reasoning, hostCount: String((_e = (_d = edit.guests) == null ? void 0 : _d.hostCount) != null ? _e : 2), custom: (_g = (_f = edit.guests) == null ? void 0 : _f.customPrompt) != null ? _g : "", invites: JSON.stringify(priorGuests), ...Object.fromEntries(CATEGORIES2.map((item) => {
+        var _a2, _b2;
+        return [`count-${item.id}`, String((_b2 = (_a2 = edit.guests) == null ? void 0 : _a2.counts[item.id]) != null ? _b2 : defaults()[item.id])];
+      })) };
+    }
+    const generation = ++this.generation;
+    this.navigationGeneration++;
+    (_h = this.unsubscribe) == null ? void 0 : _h.call(this);
+    this.unsubscribe = null;
+    if (this.closed || generation !== this.generation) return;
+    if (!this.recoveredPendingCreates) {
+      try {
+        await this.store.recoverPendingCreates();
+        await this.store.recoverMoves();
+      } catch (error) {
+        new import_obsidian2.Notice(error instanceof Error ? error.message : String(error));
+      }
+      this.recoveredPendingCreates = true;
+    }
+    if (this.closed || generation !== this.generation) return;
+    this.engine = null;
+    this.contentEl.empty();
+    const shell = this.contentEl.createDiv("ct-home-shell");
+    const home = shell.createDiv("ct-home-main");
+    home.scrollTop = this.homeMainScrollTop;
+    home.addEventListener("scroll", () => this.homeMainScrollTop = home.scrollTop);
+    const tabs = shell.createDiv("ct-home-tabs");
+    this.button(tabs, this.tr("Setup and preview", "\u4E3B\u5340"), () => {
+      this.homePane = "main";
+      shell.dataset.pane = "main";
+    });
+    this.button(tabs, this.tr("Table list", "\u684C\u804A\u6E05\u55AE"), () => {
+      this.homePane = "list";
+      shell.dataset.pane = "list";
+    });
+    shell.dataset.pane = this.homePane;
+    const title = home.createDiv("ct-home-title");
+    const cup = title.createSpan({ cls: "ct-coffee-icon" });
+    (0, import_obsidian2.setIcon)(cup, "coffee");
+    title.createEl("h2", { text: COFFEE_TABLES_NAME });
+    home.createEl("p", { cls: "ct-intro", text: this.tr("Bring different AI perspectives together to spot blind spots, unexpected connections and better questions.", "\u8B93\u4E0D\u540C\u80CC\u666F\u7684 AI \u4F86\u8CD3\u4E00\u8D77\u804A\uFF0C\u5E6B\u4F60\u767C\u73FE\u76F2\u9EDE\u3001\u610F\u5916\u9023\u7D50\uFF0C\u4EE5\u53CA\u66F4\u503C\u5F97\u554F\u7684\u554F\u984C\u3002") });
+    home.createEl("p", { cls: "ct-muted", text: this.tr("Guests and experiences are AI simulations.", "\u4F86\u8CD3\u8207\u7D93\u9A57\u70BA AI \u6A21\u64EC\u3002") });
+    const setup = home.createDiv("ct-home-section");
+    setup.createEl("h3", { text: this.tr("Start a table", "\u958B\u4E00\u684C") });
+    const topic = setup.createEl("textarea", { attr: { "aria-label": this.tr("Topic", "\u4E3B\u984C"), placeholder: this.tr("What would you like to explore?", "\u4ECA\u5929\u60F3\u63A2\u7D22\u4EC0\u9EBC\u554F\u984C\uFF1F"), maxlength: "1200", rows: "3", "data-ct-home-field": "topic" } });
+    const topicWasEdited = this.homeForm.topicEdited === "true", ideaId = (_i = this.homeForm.topicIdeaId) != null ? _i : "";
+    const suggestedTopic = ideaId && !topicWasEdited ? coffeeTopicText(ideaId, this.plugin.settings.language) : void 0;
+    topic.value = topicWasEdited ? (_j = this.homeForm.topic) != null ? _j : "" : (_l = suggestedTopic != null ? suggestedTopic : this.homeForm.topic) != null ? _l : pickCoffeeTopic(this.plugin.settings.language, (_k = this.homeForm.previousTopic) != null ? _k : "");
+    if (!edit && !topicWasEdited && !ideaId) this.homeForm.topicIdeaId = (_n = (_m = COFFEE_TOPICS.find((item) => item[this.plugin.settings.language === "en" ? "en" : "zh"] === topic.value)) == null ? void 0 : _m.id) != null ? _n : "";
+    const ideas = setup.createEl("details", { cls: "ct-topic-ideas" });
+    ideas.open = this.homeForm.topicIdeasOpen === "true";
+    ideas.addEventListener("toggle", () => {
+      this.homeForm.topicIdeasOpen = String(ideas.open);
+    });
+    ideas.createEl("summary", { text: this.tr("Browse 20 topic ideas", "\u770B\u770B 20 \u500B\u8A0E\u8AD6\u4E3B\u984C") });
+    const ideaList = ideas.createDiv("ct-topic-list");
+    for (const item of COFFEE_TOPICS) {
+      const value = item[this.plugin.settings.language === "en" ? "en" : "zh"];
+      this.button(ideaList, value, () => {
+        topic.value = value;
+        this.homeForm.topicIdeaId = item.id;
+        this.homeForm.topicEdited = "false";
+        snapshotForm();
+      });
+    }
+    this.button(setup, this.tr("Surprise me with a topic", "\u63DB\u500B\u984C\u76EE"), () => {
+      var _a2, _b2;
+      const previous = topic.value;
+      topic.value = pickCoffeeTopic(this.plugin.settings.language, previous);
+      this.homeForm.topicIdeaId = (_b2 = (_a2 = COFFEE_TOPICS.find((item) => item[this.plugin.settings.language === "en" ? "en" : "zh"] === topic.value)) == null ? void 0 : _a2.id) != null ? _b2 : "";
+      this.homeForm.topicEdited = "false";
+      this.homeForm.previousTopic = previous;
+      snapshotForm();
+    });
+    const advanced = setup.createEl("details", { cls: "ct-advanced-settings" });
+    advanced.open = this.homeForm.advancedOpen === "true";
+    advanced.addEventListener("toggle", () => {
+      this.homeForm.advancedOpen = String(advanced.open);
+    });
+    const advancedSummary = advanced.createEl("summary", { text: this.tr("Adjust this table", "\u8ABF\u6574\u9019\u684C") });
+    const models = advanced.createDiv("ct-model-row");
+    const model = models.createEl("select", { attr: { "aria-label": this.tr("AI model", "AI \u6A21\u578B") } });
+    const reasoning = models.createEl("select", { attr: { "aria-label": this.tr("Reasoning effort", "\u63A8\u7406\u5F37\u5EA6") } });
+    const efforts = { auto: ["Auto", "\u81EA\u52D5"], low: ["Low", "\u4F4E"], medium: ["Medium", "\u4E2D"], high: ["High", "\u9AD8"] };
+    const setReasoning = () => {
+      const selected = reasoning.value || this.homeForm.reasoning || (edit == null ? void 0 : edit.reasoning) || this.plugin.settings.cliReasoning;
+      const values = ["auto", ...this.plugin.coffeeReasoningEfforts(model.value).filter((value) => Object.hasOwn(efforts, value))];
+      reasoning.empty();
+      values.forEach((value) => reasoning.createEl("option", { value, text: this.tr(...efforts[value]) }));
+      reasoning.value = values.includes(selected) ? selected : "auto";
+    };
+    const setModels = (available) => {
+      var _a2;
+      model.empty();
+      available.forEach((id) => model.createEl("option", { value: id, text: this.plugin.modelLabel(id) }));
+      const selected = this.homeForm.model || (edit == null ? void 0 : edit.model) || "";
+      model.value = available.includes(selected) ? selected : available.includes(this.plugin.settings.cliModel) ? this.plugin.settings.cliModel : (_a2 = available[0]) != null ? _a2 : "";
+      setReasoning();
+    };
+    model.dataset.ctHomeField = "model";
+    reasoning.dataset.ctHomeField = "reasoning";
+    const modelStatus = advanced.createEl("p", { cls: "ct-muted", text: this.tr("Loading available models\u2026", "\u6B63\u5728\u8F09\u5165\u53EF\u7528\u6A21\u578B\u2026") });
+    setModels(this.plugin.availableModels());
+    model.disabled = true;
+    reasoning.disabled = true;
+    const old = edit == null ? void 0 : edit.guests, counts = (old == null ? void 0 : old.counts) ? { ...old.counts } : defaults();
+    const hostRow = advanced.createDiv("ct-host-count");
+    hostRow.createEl("label", { text: this.tr("Hosts", "\u4E3B\u6301\u4EBA") });
+    const hostCount = hostRow.createEl("select", { attr: { "aria-label": this.tr("Number of hosts", "\u4E3B\u6301\u4EBA\u4EBA\u6578"), "data-ct-home-field": "hostCount" } });
+    for (let count = 1; count <= 4; count++) hostCount.createEl("option", { value: String(count), text: String(count) });
+    hostCount.value = String((_p = (_o = this.homeForm.hostCount) != null ? _o : old == null ? void 0 : old.hostCount) != null ? _p : 2);
+    hostRow.createEl("p", { cls: "ct-muted", text: this.tr("One host can combine both facilitation styles.", "\u4E00\u4F4D\u4E3B\u6301\u4EBA\u53EF\u4EE5\u540C\u6642\u8CA0\u8CAC\u6293\u77DB\u76FE\u8207\u597D\u5947\u8FFD\u554F\u3002") });
+    const hostRisk = hostRow.createEl("p", { cls: "ct-risk-warning is-hidden", attr: { role: "status" }, text: this.tr("More than two hosts may leave less room for guests to speak.", "\u4E3B\u6301\u4EBA\u8D85\u904E\u5169\u4F4D\uFF0C\u53EF\u80FD\u6703\u5360\u7528\u4F86\u8CD3\u63A5\u8A71\u7684\u7A7A\u9593\u3002") });
+    const guestSection = advanced.createDiv("ct-guests");
+    guestSection.createEl("h4", { text: this.tr("Choose your guests", "\u9078\u64C7\u4F86\u8CD3") });
+    const guestIntro = this.tr("Each perspective adds a different kind of question and challenge.", "\u4E0D\u540C\u8996\u89D2\u6703\u5E36\u4F86\u4E0D\u540C\u554F\u984C\u8207\u6311\u6230\u3002");
+    guestSection.createEl("p", { cls: "ct-muted", text: guestIntro });
+    const countInputs = /* @__PURE__ */ new Map();
+    const updateAdvancedSummary = () => {
+      const selectedModel = model.value ? this.plugin.modelLabel(model.value) : this.tr("Select a model", "\u9078\u64C7\u6A21\u578B");
+      const guests = [...countInputs.values()].reduce((sum, input) => sum + (Number(input.value) || 0), 0);
+      advancedSummary.setText(`${this.tr("Adjust this table", "\u8ABF\u6574\u9019\u684C")} \xB7 ${selectedModel} \xB7 ${hostCount.value} ${this.tr("hosts", "\u4F4D\u4E3B\u6301\u4EBA")} + ${guests} ${this.tr("guests", "\u4F4D\u4F86\u8CD3")}`);
+    };
+    for (const category of CATEGORIES2) {
+      const row = guestSection.createDiv("ct-count-row");
+      const label = row.createEl("label");
+      label.createSpan({ text: this.tr(category.en, category.zh) });
+      const input = label.createEl("input", { attr: { type: "number", min: "0", max: "8", step: "1", "aria-label": this.tr(category.en, category.zh), "data-ct-home-field": `count-${category.id}` } });
+      input.value = (_q = this.homeForm[`count-${category.id}`]) != null ? _q : String(counts[category.id]);
+      countInputs.set(category.id, input);
+      row.createEl("p", { cls: "ct-muted", text: this.tr(category.descEn, category.descZh) });
+    }
+    const warning = guestSection.createEl("p", { cls: "ct-risk-warning is-hidden", attr: { role: "status" } });
+    const invites = advanced.createDiv("ct-invites");
+    invites.createEl("h4", { text: this.tr("Guests you have in mind", "\u60F3\u9080\u8ACB\u7684\u4F86\u8CD3") });
+    const inviteRows = [];
+    const savedInvites = (() => {
+      var _a2;
+      try {
+        return JSON.parse((_a2 = this.homeForm.invites) != null ? _a2 : "[]");
+      } catch (e) {
+        return [];
+      }
+    })();
+    const addInvite = (guest) => {
+      var _a2;
+      const row = invites.createDiv("ct-invite-row"), id = (_a2 = guest == null ? void 0 : guest.id) != null ? _a2 : crypto.randomUUID();
+      const select = row.createEl("select", { attr: { "aria-label": this.tr("Guest category", "\u4F86\u8CD3\u985E\u5225"), "data-ct-home-field": `invite-category-${id}` } });
+      CATEGORIES2.forEach((item) => select.createEl("option", { value: item.id, text: this.tr(item.en, item.zh) }));
+      const description = row.createEl("input", { attr: { type: "text", maxlength: "160", placeholder: this.tr("Name or background, e.g. a frontline support worker", "\u59D3\u540D\u6216\u80CC\u666F\uFF0C\u4F8B\u5982\uFF1A\u7B2C\u4E00\u7DDA\u5BA2\u670D\uFF0C\u8F2A\u73ED\u5341\u5E74"), "aria-label": this.tr("Guest name or background", "\u4F86\u8CD3\u59D3\u540D\u6216\u80CC\u666F"), "data-ct-home-field": `invite-description-${id}` } });
+      if (guest) {
+        select.value = guest.category;
+        description.value = guest.description;
+      }
+      const remove = this.button(row, this.tr("Remove", "\u79FB\u9664"), () => {
+        row.remove();
+        const rowIndex = inviteRows.findIndex((item) => item.row === row);
+        if (rowIndex >= 0) inviteRows.splice(rowIndex, 1);
+        updateWarning();
+        snapshotForm();
+      });
+      inviteRows.push({ id, category: select, description, row });
+      select.addEventListener("change", () => {
+        updateWarning();
+        snapshotForm();
+      });
+      description.addEventListener("input", () => {
+        updateWarning();
+        snapshotForm();
+      });
+    };
+    if (this.homeForm.invites !== void 0) savedInvites.forEach((guest) => addInvite(guest));
+    else if ((_r = old == null ? void 0 : old.guests) == null ? void 0 : _r.length) old.guests.forEach((guest) => addInvite(guest));
+    else savedInvites.forEach((guest) => addInvite(guest));
+    this.button(invites, this.tr("Add a guest", "\u65B0\u589E\u4F86\u8CD3"), () => {
+      addInvite();
+      snapshotForm();
+    });
+    const customLabel = advanced.createEl("label", { cls: "ct-custom-prompt-label" });
+    customLabel.createSpan({ text: this.tr("Extra requests for this table", "\u9019\u684C\u7684\u984D\u5916\u8981\u6C42\uFF08\u9078\u586B\uFF09") });
+    const custom = customLabel.createEl("textarea", { attr: { rows: "3", maxlength: "4000", placeholder: this.tr("e.g. Focus on what a small company can do; avoid management jargon.", "\u4F8B\u5982\uFF1A\u591A\u8AC7\u5C0F\u516C\u53F8\u80FD\u63A1\u53D6\u7684\u505A\u6CD5\uFF0C\u5C11\u7528\u7BA1\u7406\u8853\u8A9E\u3002"), "data-ct-home-field": "custom" } });
+    custom.value = (_t = (_s = this.homeForm.custom) != null ? _s : old == null ? void 0 : old.customPrompt) != null ? _t : "";
+    const snapshotForm = () => {
+      this.homeForm = { ...this.homeForm, topic: topic.value, model: model.value, reasoning: reasoning.value, custom: custom.value, hostCount: hostCount.value, ...Object.fromEntries([...countInputs].map(([key, input]) => [`count-${key}`, input.value])), invites: JSON.stringify(inviteRows.map((item) => ({ id: item.id, category: item.category.value, description: item.description.value }))) };
+    };
+    const updateWarning = () => {
+      const current = Object.fromEntries([...countInputs].map(([key, input]) => [key, Number(input.value)]));
+      const assigned = Object.fromEntries(CATEGORIES2.map((item) => [item.id, inviteRows.filter((guest) => guest.category.value === item.id && guest.description.value.trim()).length]));
+      const overflow = CATEGORIES2.filter((item) => assigned[item.id] > current[item.id]);
+      const n = total(current);
+      warning.toggleClass("is-hidden", !(n > 7 || n < 1 || n > 12 || overflow.length));
+      warning.setText(overflow.length ? this.tr(`There are more named guests than ${overflow.map((item) => item.en).join(", ")} places. Increase the count or remove a guest.`, `${overflow.map((item) => item.zh).join("\u3001")}\u4EBA\u6578\u8D85\u904E\u8A2D\u5B9A\u540D\u984D\uFF0C\u8ACB\u589E\u52A0\u540D\u984D\u6216\u79FB\u9664\u4F86\u8CD3\u3002`) : n < 1 || n > 12 ? this.tr("Choose 1\u201312 guests in total.", "\u4F86\u8CD3\u7E3D\u6578\u9700\u4ECB\u65BC 1\u201312 \u4EBA\u3002") : n > 7 ? this.tr("More guests can mean more waiting and less room for each person to go deeper.", "\u4F86\u8CD3\u8D8A\u591A\uFF0C\u7B49\u5F85\u53EF\u80FD\u8D8A\u4E45\uFF0C\u6BCF\u500B\u4EBA\u6DF1\u5165\u63A5\u8A71\u7684\u7A7A\u9593\u4E5F\u53EF\u80FD\u8B8A\u5C11\u3002") : "");
+    };
+    countInputs.forEach((input) => input.addEventListener("input", () => {
+      updateWarning();
+      updateAdvancedSummary();
+      snapshotForm();
+    }));
+    updateWarning();
+    updateAdvancedSummary();
+    topic.addEventListener("input", () => {
+      this.homeForm.topicEdited = "true";
+      snapshotForm();
+    });
+    custom.addEventListener("input", snapshotForm);
+    model.addEventListener("change", () => {
+      setReasoning();
+      updateAdvancedSummary();
+      snapshotForm();
+    });
+    reasoning.addEventListener("change", snapshotForm);
+    hostCount.addEventListener("change", () => {
+      hostRisk.toggleClass("is-hidden", Number(hostCount.value) <= 2);
+      updateAdvancedSummary();
+      snapshotForm();
+    });
+    hostRisk.toggleClass("is-hidden", Number(hostCount.value) <= 2);
+    snapshotForm();
+    const start = this.button(setup, this.tr(edit ? "Open a new table with these settings" : "Open table", edit ? "\u7528\u9019\u4E9B\u8A2D\u5B9A\u958B\u65B0\u684C" : "\u958B\u4E00\u684C"), async () => {
+      const finalCounts = Object.fromEntries([...countInputs].map(([key, input]) => [key, Number(input.value)]));
+      const finalTotal = total(finalCounts);
+      const guests = inviteRows.filter((item) => item.description.value.trim()).map((item) => ({ id: crypto.randomUUID(), category: item.category.value, description: item.description.value.trim() }));
+      const over = CATEGORIES2.some((item) => guests.filter((guest) => guest.category === item.id).length > finalCounts[item.id]);
+      if (!topic.value.trim() || !model.value || finalTotal < 1 || finalTotal > 12 || Object.values(finalCounts).some((value) => !Number.isInteger(value) || value < 0 || value > 8) || over) {
+        warning.removeClass("is-hidden");
+        topic.focus();
+        return;
+      }
+      start.disabled = true;
+      try {
+        await this.plugin.confirmAiUsage(model.value, async () => {
+          var _a2;
+          if (this.closed || generation !== this.generation) return;
+          const settings = { counts: finalCounts, guests, background: "", customPrompt: custom.value, hostCount: Number(hostCount.value) };
+          const session = createSession(topic.value, model.value, reasoning.value, this.plugin.settings.language, settings);
+          await this.store.save(session);
+          if (this.closed || generation !== this.generation) return;
+          this.homeForm = {};
+          this.homeEdit = null;
+          this.attach(session);
+          void ((_a2 = this.engine) == null ? void 0 : _a2.start());
+        });
+      } finally {
+        if (!this.closed && generation === this.generation) start.disabled = false;
+      }
+    });
+    start.addClass("mod-cta");
+    start.disabled = true;
+    const modelLoad = this.plugin.refreshCoffeeModels();
+    void modelLoad.then((available) => {
+      if (this.closed || generation !== this.generation) return;
+      setModels(available);
+      updateAdvancedSummary();
+      modelStatus.remove();
+      model.disabled = false;
+      reasoning.disabled = false;
+      start.disabled = available.length === 0;
+    }).catch(() => {
+      if (!this.closed && generation === this.generation) modelStatus.setText(this.tr("Could not load models. Check provider setup and try again.", "\u7121\u6CD5\u8F09\u5165\u6A21\u578B\uFF0C\u8ACB\u6AA2\u67E5 provider \u8A2D\u5B9A\u5F8C\u91CD\u8A66\u3002"));
+    });
+    const samples = home.createDiv("ct-home-section");
+    samples.createEl("h3", { text: this.tr("See a sample conversation", "\u770B\u770B\u793A\u7BC4\u684C\u804A") });
+    for (const sample of [COFFEE_SAMPLE_ZH, COFFEE_SAMPLE_EN]) this.button(samples, sample.language === "en" ? this.tr("English sample \xB7 Should Our Company Adopt AI?", "\u82F1\u6587\u7BC4\u4F8B \xB7 \u516C\u53F8\u61C9\u8A72\u5C0E\u5165 AI \u55CE\uFF1F") : this.tr("Traditional Chinese sample \xB7 Should Our Company Adopt AI?", "\u7E41\u9AD4\u4E2D\u6587\u7BC4\u4F8B \xB7 \u516C\u53F8\u5230\u5E95\u8981\u4E0D\u8981\u63A8 AI\uFF1F"), async () => this.openSample(sample.language)).addClass("ct-session-link");
+    const preview = home.createDiv("ct-preview is-hidden");
+    const aside = shell.createDiv("ct-home-sidebar");
+    const searchRow = aside.createDiv("ct-list-search");
+    const searchIcon = searchRow.createSpan({ cls: "ct-search-icon", attr: { "aria-hidden": "true" } });
+    (0, import_obsidian2.setIcon)(searchIcon, "search");
+    const search = searchRow.createEl("input", { attr: { type: "search", placeholder: this.tr("Search topics", "\u641C\u5C0B\u4E3B\u984C"), "aria-label": this.tr("Search topics", "\u641C\u5C0B\u4E3B\u984C"), "data-ct-home-field": "search" } });
+    search.value = this.homeQuery;
+    const clear = this.button(searchRow, this.tr("Clear", "\u6E05\u9664"), () => {
+      search.value = "";
+      this.homeQuery = "";
+      void renderList();
+    });
+    clear.addClass("ct-search-clear");
+    search.addEventListener("input", () => {
+      this.homeQuery = search.value;
+      void renderList();
+    });
+    const filterBar = aside.createDiv("ct-list-filters"), filterButtons = /* @__PURE__ */ new Map();
+    const filterLabels = { all: ["All", "\u5168\u90E8"], generating: ["Generating", "\u751F\u6210\u4E2D"], unfinished: ["Unfinished", "\u672A\u5B8C\u6210"], completed: ["Completed", "\u5DF2\u5B8C\u6210"] };
+    for (const filter of ["all", "generating", "unfinished", "completed"]) {
+      const button = this.button(filterBar, this.tr(...filterLabels[filter]), () => {
+        this.tableFilter = filter;
+        this.focusedTopic = null;
+        updateFilters();
+        void renderList();
+      });
+      button.setAttribute("aria-pressed", String(this.tableFilter === filter));
+      filterButtons.set(filter, button);
+    }
+    const topicFocusRow = aside.createDiv("ct-topic-focus is-hidden");
+    const topicFocusText = topicFocusRow.createSpan();
+    this.button(topicFocusRow, this.tr("Show all tables", "\u986F\u793A\u5168\u90E8\u684C\u804A"), () => {
+      this.focusedTopic = null;
+      updateFilters();
+      void renderList();
+    });
+    const updateFilters = () => {
+      for (const [filter, button] of filterButtons) {
+        button.toggleClass("is-active", this.tableFilter === filter && !this.focusedTopic);
+        button.setAttribute("aria-pressed", String(this.tableFilter === filter && !this.focusedTopic));
+      }
+      topicFocusRow.toggleClass("is-hidden", !this.focusedTopic);
+      if (this.focusedTopic) topicFocusText.setText(this.tr(`Same topic: ${this.focusedTopic}`, `\u540C\u4E00\u4E3B\u984C\uFF1A${this.focusedTopic}`));
+    };
+    const listTools = aside.createDiv("ct-list-tools");
+    this.button(listTools, this.tr("Organize existing tables", "\u6574\u7406\u65E2\u6709\u684C\u804A"), async () => {
+      const result = await this.store.organizeExisting();
+      new import_obsidian2.Notice(this.tr(`Moved ${result.moved}; skipped ${result.skipped}.`, `\u5DF2\u6574\u7406 ${result.moved} \u5834\uFF1B\u7565\u904E ${result.skipped} \u5834\u3002`));
+      void renderList();
+    });
+    this.button(listTools, this.tr("Recently deleted", "\u6700\u8FD1\u522A\u9664"), async () => {
+      const panel = aside.createDiv("ct-trash-list");
+      panel.empty();
+      panel.createEl("h3", { text: this.tr("Recently deleted", "\u6700\u8FD1\u522A\u9664") });
+      const deleted = await this.store.deletedTables();
+      for (const item of deleted) {
+        const row = panel.createDiv("ct-trash-row");
+        row.createSpan({ text: item.topic });
+        this.button(row, this.tr("Restore", "\u5FA9\u539F"), async () => {
+          var _a2;
+          await this.store.restoreDeleted(item.path);
+          (_a2 = this.plugin.coffeeManager) == null ? void 0 : _a2.restore(item.id);
+          panel.remove();
+          void renderList();
+        });
+      }
+      if (!deleted.length) panel.createEl("p", { cls: "ct-muted", text: this.tr("No deleted tables.", "\u6C92\u6709\u5DF2\u522A\u9664\u7684\u684C\u804A\u3002") });
+    });
+    const listScroller = aside.createDiv("ct-list-scroll");
+    const list = listScroller.createDiv("ct-list-content");
+    listScroller.scrollTop = this.homeListScrollTop;
+    listScroller.addEventListener("scroll", () => this.homeListScrollTop = listScroller.scrollTop);
+    const deleteTable = async (session, path) => {
+      if (!await new CoffeeDeleteModal(this.app, session.topic, this.plugin.settings.language === "zh-TW").confirm()) return;
+      const manager = this.plugin.coffeeManager;
+      let engine;
+      try {
+        engine = await (manager == null ? void 0 : manager.prepareDelete(session.id));
+        await this.store.delete(session.id, path);
+        manager == null ? void 0 : manager.completeDelete(session.id, engine);
+        if (this.closed) return;
+        this.selectedPath = "";
+        this.suppressStateRestore = true;
+        await this.home();
+        this.app.workspace.requestSaveLayout();
+      } catch (error) {
+        manager == null ? void 0 : manager.cancelDelete(session.id, engine);
+        throw error;
+      }
+    };
+    const openMarkdown = async (id) => {
+      const file = await this.store.openMarkdown(id);
+      await this.app.workspace.getLeaf(false).openFile(file);
+    };
+    const showPreview = async (path) => {
+      var _a2, _b2, _c2, _d2, _e2, _f2;
+      const token = ++this.navigationGeneration;
+      this.homeGeneration++;
+      this.homePane = "main";
+      shell.dataset.pane = "main";
+      this.selectedPath = path;
+      this.previewVisible = true;
+      preview.empty();
+      preview.removeClass("is-hidden");
+      setup.addClass("is-hidden");
+      samples.addClass("is-hidden");
+      preview.createEl("p", { cls: "ct-muted", text: this.tr("Loading saved notes\u2026", "\u6B63\u5728\u8B80\u53D6\u5DF2\u4FDD\u5B58\u7684\u6574\u7406\u2026") });
+      try {
+        const inspected = await this.store.inspectReadOnly(path);
+        let session = inspected.version === 1 ? { ...copyLegacySession(inspected), createdAt: inspected.createdAt, updatedAt: inspected.updatedAt } : inspected;
+        const active = (_a2 = this.plugin.coffeeManager) == null ? void 0 : _a2.get(session.id);
+        if (active) session = active.session;
+        if (this.closed || token !== this.navigationGeneration) return;
+        preview.empty();
+        preview.createEl("h2", { text: session.topic });
+        preview.createEl("p", { cls: "ct-muted", text: `${this.tr("Latest update", "\u6700\u5F8C\u66F4\u65B0")} \xB7 ${new Date(session.lastCompletedAt || session.updatedAt || session.createdAt).toLocaleString()}` });
+        if (session.dirtyNotes) preview.createEl("p", { cls: "ct-warning", text: this.tr("These notes predate later conversation changes.", "\u9019\u4EFD\u6574\u7406\u7522\u751F\u5F8C\uFF0C\u5C0D\u8AC7\u5167\u5BB9\u6709\u904E\u66F4\u65B0\u3002") });
+        const notes = (_f2 = (_e2 = (_b2 = session.observerNotes) == null ? void 0 : _b2[0]) != null ? _e2 : (_d2 = (_c2 = session.rounds) == null ? void 0 : _c2.find((round) => round.notes)) == null ? void 0 : _d2.notes) != null ? _f2 : "";
+        if (notes) void import_obsidian2.MarkdownRenderer.render(this.app, notes, preview.createDiv("ct-preview-notes markdown-rendered"), path, this);
+        else preview.createEl("p", { cls: "ct-muted", text: this.tr("No observer notes yet. You can still enter this table.", "\u5C1A\u7121\u89C0\u5BDF\u8005\u6574\u7406\uFF0C\u4ECD\u53EF\u9032\u5165\u684C\u804A\u3002") });
+        this.button(preview, this.tr("Enter this table", "\u9032\u5165\u9019\u500B\u684C\u804A"), () => {
+          this.suppressStateRestore = true;
+          void this.loadSession(path, true);
+        }).addClass("mod-cta");
+        this.button(preview, this.tr("Open Markdown", "\u958B\u555F Markdown"), () => openMarkdown(path));
+        this.button(preview, this.tr("Delete table", "\u522A\u9664\u684C\u804A"), () => deleteTable(session, path));
+        this.button(preview, this.tr("Open new table", "\u958B\u65B0\u684C"), () => {
+          this.navigationGeneration++;
+          this.homeGeneration++;
+          this.suppressStateRestore = true;
+          this.selectedPath = "";
+          this.previewVisible = false;
+          preview.addClass("is-hidden");
+          setup.removeClass("is-hidden");
+          samples.removeClass("is-hidden");
+          this.app.workspace.requestSaveLayout();
+        });
+      } catch (error) {
+        if (this.closed || token !== this.navigationGeneration) return;
+        preview.empty();
+        preview.createEl("p", { cls: "ct-error", text: this.tr(`Preview unavailable: ${error instanceof Error ? error.message : String(error)}`, `\u7121\u6CD5\u9810\u89BD\uFF1A${error instanceof Error ? error.message : String(error)}`) });
+        this.button(preview, this.tr("Enter this table", "\u9032\u5165\u9019\u500B\u684C\u804A"), () => {
+          this.suppressStateRestore = true;
+          void this.loadSession(path, true);
+        }).addClass("mod-cta");
+      }
+    };
+    const renderList = async () => {
+      var _a2;
+      const token = ++this.listGeneration, oldTop = listScroller.scrollTop, entries = [];
+      for (const file of this.store.list().filter((item) => item.extension === "md")) {
+        try {
+          const inspected = await this.store.inspectReadOnly(file.path);
+          let session = inspected.version === 1 ? { ...copyLegacySession(inspected), createdAt: inspected.createdAt, updatedAt: inspected.updatedAt } : inspected;
+          const active = (_a2 = this.plugin.coffeeManager) == null ? void 0 : _a2.get(session.id);
+          if (active) session = active.session;
+          entries.push({ id: session.id, path: file.path, topic: session.topic, status: effectiveTableStatus(session, active == null ? void 0 : active.busy), createdAt: session.createdAt, updatedAt: session.updatedAt, lastGenerationStartedAt: session.lastGenerationStartedAt, lastCompletedAt: session.lastCompletedAt, model: session.model });
+        } catch (e) {
+          entries.push({ id: `unreadable:${file.path}`, path: file.path, topic: file.basename, status: "error", createdAt: new Date(file.stat.ctime).toISOString(), updatedAt: new Date(file.stat.mtime).toISOString(), model: "", unreadable: true });
+        }
+        if (this.closed || token !== this.listGeneration) return;
+      }
+      if (this.closed || token !== this.listGeneration) return;
+      list.empty();
+      updateFilters();
+      const visible = selectTables(entries, this.homeQuery, this.tableFilter, this.focusedTopic);
+      list.createEl("h3", { cls: "ct-list-heading", text: `${this.tr("Tables", "\u684C\u804A")} (${visible.length})` });
+      for (const item of visible) {
+        const time = tableTime(item), timestamp = new Date(time.value), status = item.status === "generating" ? this.tr("Generating", "\u751F\u6210\u4E2D") : item.status === "completed" ? this.tr("Complete", "\u5DF2\u5B8C\u6210") : item.status === "error" ? this.tr("Interrupted", "\u4E2D\u65B7") : this.tr("Draft", "\u8349\u7A3F");
+        const entry = list.createDiv("ct-list-entry"), button = this.button(entry, "", () => {
+          if (item.status === "generating") void this.loadSession(item.path);
+          else void showPreview(item.path);
+        });
+        button.empty();
+        button.addClass("ct-list-item");
+        button.createSpan({ cls: "ct-list-title", text: item.topic });
+        const meta = button.createDiv("ct-list-meta");
+        meta.createSpan({ text: formatTableTime(time.value, Date.now(), this.plugin.settings.language) });
+        const badge = meta.createSpan({ cls: `ct-status-badge ct-status-${item.status}`, text: status });
+        badge.setAttribute("aria-label", status);
+        if (time.isFallback) meta.createSpan({ cls: "ct-list-fallback", text: this.tr("Last updated", "\u6700\u5F8C\u66F4\u65B0") });
+        if (item.unreadable) {
+          button.addClass("ct-list-unreadable");
+          button.disabled = true;
+        }
+        if (this.selectedPath === item.path) button.addClass("is-selected");
+        button.setAttribute("aria-current", this.selectedPath === item.path ? "true" : "false");
+        if (Number.isFinite(timestamp.getTime())) button.setAttribute("title", `${item.topic}
+${timestamp.toLocaleString()}${item.model ? ` \xB7 ${item.model}` : ""}`);
+        const sameCount = topicTableCount(item.topic, entries);
+        if (!item.unreadable && sameCount > 1) {
+          const same = entry.createEl("button", { cls: "ct-same-topic-link", text: this.tr(`Same topic \xB7 ${sameCount} tables`, `\u540C\u984C\u5171 ${sameCount} \u5834`) });
+          same.addEventListener("click", (event) => {
+            event.preventDefault();
+            event.stopPropagation();
+            this.focusedTopic = item.topic.trim();
+            this.tableFilter = "all";
+            this.homeQuery = "";
+            search.value = "";
+            updateFilters();
+            void renderList();
+          });
+        }
+        if (!item.unreadable) {
+          const actions = entry.createEl("button", { cls: "ct-row-menu-trigger", text: "\u22EF", attr: { "aria-label": this.tr("Table actions", "\u684C\u804A\u64CD\u4F5C"), title: this.tr("Table actions", "\u684C\u804A\u64CD\u4F5C") } });
+          actions.addEventListener("click", (event) => {
+            event.preventDefault();
+            event.stopPropagation();
+            const menu = new import_obsidian2.Menu();
+            menu.addItem((option) => option.setTitle(this.tr("Enter this table", "\u9032\u5165\u9019\u500B\u684C\u804A")).onClick(() => {
+              if (item.status === "generating") void this.loadSession(item.path);
+              else void this.loadSession(item.path, true);
+            }));
+            menu.addItem((option) => option.setTitle(this.tr("Open Markdown", "\u958B\u555F Markdown")).onClick(() => void openMarkdown(item.path)));
+            menu.addItem((option) => option.setTitle(this.tr("Edit settings and start another", "\u7DE8\u8F2F\u8A2D\u5B9A\uFF0C\u518D\u958B\u4E00\u684C")).onClick(async () => {
+              const session = await this.store.inspectReadOnly(item.path);
+              if (session.version === 3) await this.home(session);
+            }));
+            menu.addItem((option) => option.setTitle(this.tr("Delete table", "\u522A\u9664\u684C\u804A")).setWarning(true).onClick(async () => {
+              const stored = await this.store.inspectReadOnly(item.path), session = stored.version === 3 ? stored : copyLegacySession(stored);
+              await deleteTable(session, item.path);
+            }));
+            menu.showAtMouseEvent(event);
+          });
+        }
+      }
+      if (!visible.length) list.createEl("p", { cls: "ct-muted", text: this.homeQuery || this.focusedTopic ? this.tr("No matching tables.", "\u627E\u4E0D\u5230\u7B26\u5408\u7684\u684C\u804A\u3002") : this.tr("Your tables will appear here.", "\u684C\u804A\u6703\u986F\u793A\u5728\u9019\u88E1\u3002") });
+      listScroller.scrollTop = oldTop;
+    };
+    void renderList();
+    if (this.statusTimer !== null && typeof window.clearInterval === "function") window.clearInterval(this.statusTimer);
+    this.statusTimer = typeof window.setInterval === "function" ? window.setInterval(() => {
+      const focused = this.contentEl.ownerDocument.activeElement;
+      if (!this.closed && this.contentEl.querySelector(".ct-home-sidebar") && !(focused == null ? void 0 : focused.closest(".ct-list-entry, .ct-list-filters, .ct-list-search"))) void renderList();
+    }, 3e3) : null;
+    if (this.previewVisible && this.selectedPath) void showPreview(this.selectedPath);
+  }
+  async openSample(language2) {
+    const sample = language2 === "en" ? COFFEE_SAMPLE_EN : COFFEE_SAMPLE_ZH, now = (/* @__PURE__ */ new Date()).toISOString();
+    const roles = new Map(parseGuests(sample.markdown).map((person) => [person.name, person.role]));
+    const markdown = sample.markdown.replace(/^###\s+([^\n|｜]+)$/gm, (heading, name) => {
+      var _a;
+      return `### ${name}\uFF5C${(_a = roles.get(name.trim())) != null ? _a : "Guest"}`;
+    });
+    const session = createSession(sample.topic, "Built-in sample", "\u2014", language2);
+    session.id = `sample-${language2 === "en" ? "en" : "zh"}`;
+    session.createdAt = now;
+    session.updatedAt = now;
+    session.status = "completed";
+    session.transcriptMarkdown = markdown;
+    session.rounds = [{ id: "sample-round", markdown, notes: observerNotes(markdown), status: "completed", createdAt: now }];
+    session.observerNotes = [observerNotes(markdown)];
+    session.questions = [{ id: `sample-question-${language2 === "en" ? "en" : "zh"}`, question: sample.question, answer: sample.answer, status: "complete", createdAt: now }];
+    this.attach(session);
+  }
+  async loadSession(path, startAtTop = false) {
+    var _a, _b;
+    const generation = ++this.navigationGeneration;
+    this.generation++;
+    (_a = this.unsubscribe) == null ? void 0 : _a.call(this);
+    let stored;
+    try {
+      stored = await this.store.load(path);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      if (/changed outside|外部修改|outside this room/i.test(message)) {
+        const latest = await this.store.inspect(path).catch(() => null);
+        if (this.closed || generation !== this.navigationGeneration) return;
+        if (latest && latest.version === 3) {
+          const cached = (_b = this.plugin.coffeeManager) == null ? void 0 : _b.get(latest.id);
+          if (cached) {
+            if (cached.busy) await cached.stop();
+            if (this.closed || generation !== this.navigationGeneration) return;
+            this.attach(cached.session);
+            cached.reportPersistenceError(new Error(message));
+            return;
+          }
+        }
+      }
+      throw error;
+    }
+    if (this.closed || generation !== this.navigationGeneration) return;
+    if (stored.version === 1) {
+      this.attachLegacy(stored);
+      return;
+    }
+    this.attach(stored, startAtTop);
+  }
+  attachLegacy(legacy) {
+    this.navigationGeneration++;
+    this.contentEl.empty();
+    const room = this.contentEl.createDiv("ct-room");
+    room.createEl("h2", { text: legacy.topic });
+    this.button(room, this.tr("All tables", "\u6240\u6709\u684C\u804A"), () => this.returnHome());
+    room.createEl("p", { cls: "ct-muted", text: this.tr("Older saved table \xB7 read only", "\u820A\u7248\u684C\u804A\u7D00\u9304 \xB7 \u552F\u8B80") });
+    void import_obsidian2.MarkdownRenderer.render(this.app, copyLegacySession(legacy).transcriptMarkdown, room.createDiv("ct-scroll markdown-rendered"), this.store.sessionPath(legacy.id), this);
+  }
+  attach(session, startAtTop = true) {
+    var _a, _b, _c;
+    this.navigationGeneration++;
+    (_a = this.unsubscribe) == null ? void 0 : _a.call(this);
+    if (this.statusTimer !== null && typeof window.clearInterval === "function") {
+      window.clearInterval(this.statusTimer);
+      this.statusTimer = null;
+    }
+    this.previewVisible = false;
+    this.firstRoomScroll = startAtTop && session.status === "completed" ? "top" : "bottom";
+    this.composerValues.clear();
+    this.engine = (_c = (_b = this.plugin.coffeeManager) == null ? void 0 : _b.open(session)) != null ? _c : new CoffeeEngine(session, (request) => this.plugin.runCoffeeRequest(request), (value) => this.store.save(value));
+    this.unsubscribe = this.engine.subscribe(() => this.refresh());
+    this.render();
+    this.app.workspace.requestSaveLayout();
+  }
+  render() {
+    var _a, _b, _c, _d, _e, _f, _g, _h, _i, _j, _k, _l, _m;
+    const engine = this.engine;
+    if (!engine || this.closed) return;
+    const priorScroll = this.contentEl.querySelector(".ct-chat-scroll"), hadPriorScroll = !!priorScroll, oldTop = (_a = priorScroll == null ? void 0 : priorScroll.scrollTop) != null ? _a : 0, wasBottom = !!priorScroll && priorScroll.scrollHeight - priorScroll.scrollTop - priorScroll.clientHeight < 100, firstScroll = hadPriorScroll ? null : this.firstRoomScroll, scrollEpoch = this.scrollEpoch, active = this.contentEl.ownerDocument.activeElement, activeField = active == null ? void 0 : active.dataset.ctField, activeValue = active == null ? void 0 : active.value, activeStart = active instanceof HTMLInputElement || active instanceof HTMLTextAreaElement ? active.selectionStart : void 0, activeEnd = active instanceof HTMLInputElement || active instanceof HTMLTextAreaElement ? active.selectionEnd : void 0;
+    this.firstRoomScroll = null;
+    this.markdownJobs = [];
+    this.contentEl.querySelectorAll("[data-ct-field]").forEach((field) => this.composerValues.set(field.dataset.ctField, field.value));
+    this.contentEl.empty();
+    const room = this.contentEl.createDiv("ct-room"), fixed = room.createDiv("ct-fixed"), header = fixed.createDiv("ct-header");
+    header.createEl("h2", { text: engine.session.topic });
+    this.button(header, this.tr("All tables", "\u6240\u6709\u684C\u804A"), () => this.returnHome());
+    header.createEl("p", { cls: "ct-muted", text: `${this.plugin.modelLabel(engine.session.model)} \xB7 ${this.tr("AI simulated perspectives", "AI \u865B\u69CB\u6A21\u64EC\u8996\u89D2")} \xB7 ${engine.session.language === "en" ? this.tr("Conversation: English", "\u5C0D\u8AC7\u8A9E\u8A00\uFF1A\u82F1\u6587") : this.tr("Conversation: Traditional Chinese", "\u5C0D\u8AC7\u8A9E\u8A00\uFF1A\u7E41\u9AD4\u4E2D\u6587")}` });
+    const roster = fixed.createDiv("ct-roster"), status = fixed.createDiv({ cls: "ct-status", attr: { role: "status", "aria-live": "polite" } });
+    if (engine.busy) this.button(fixed, this.tr("Stop", "\u505C\u6B62\u751F\u6210"), () => engine.cancel());
+    if (!engine.session.id.startsWith("sample-")) this.button(fixed, this.tr("Open Markdown", "\u958B\u555F Markdown"), async () => {
+      const file = await this.store.openMarkdown(engine.session.id);
+      await this.app.workspace.getLeaf(false).openFile(file);
+    });
+    const body = room.createDiv("ct-room-columns"), tabs = body.createDiv("ct-pane-tabs");
+    body.dataset.pane = "chat";
+    const chatTab = this.button(tabs, this.tr("Conversation", "\u5C0D\u8AC7"), () => {
+      body.dataset.pane = "chat";
+    });
+    const insightTab = this.button(tabs, this.tr("Insights", "\u6D1E\u898B"), () => {
+      body.dataset.pane = "insight";
+    });
+    chatTab.addClass("ct-pane-tab");
+    insightTab.addClass("ct-pane-tab");
+    const chatPanel = body.createDiv("ct-chat-panel"), scrolling = chatPanel.createDiv("ct-chat-scroll"), messages = scrolling.createDiv("ct-messages");
+    const events = [];
+    ((_b = engine.session.rounds) != null ? _b : []).forEach((round, index) => {
+      if (round.markdown) events.push({ at: round.createdAt, type: "round", index });
+    });
+    engine.session.questions.forEach((question, index) => {
+      var _a2;
+      return events.push({ at: (_a2 = question.createdAt) != null ? _a2 : engine.session.createdAt, type: "question", index });
+    });
+    ((_c = engine.session.interventions) != null ? _c : []).forEach((item, index) => {
+      if (!item.roundId) events.push({ at: item.createdAt, type: "intervention", index });
+    });
+    events.sort((a, b) => a.at.localeCompare(b.at));
+    for (const event of events) {
+      if (event.type === "round") {
+        const round = ((_d = engine.session.rounds) != null ? _d : [])[event.index];
+        this.renderRound(round.markdown, round.id, messages);
+      } else if (event.type === "question") {
+        const question = engine.session.questions[event.index];
+        this.renderUserBubble(question.question, messages);
+        if (question.answer) this.renderBubbles(question.answer, messages);
+        if (question.status !== "complete") {
+          const live = messages.createDiv({ cls: "ct-live-answer", attr: { "data-live-question-id": question.id } });
+          if (question.draftAnswer) this.renderStreaming(question.draftAnswer, live);
+        }
+        if (question.status === "error") messages.createEl("p", { cls: "ct-error", text: question.error });
+        if (question.status !== "complete") this.button(messages, this.tr("Retry", "\u91CD\u8A66"), () => {
+          void engine.ask(question.question, question.id);
+        });
+      } else {
+        const item = engine.session.interventions[event.index];
+        this.renderUserBubble(item.text, messages);
+        if (item.status === "failed") messages.createEl("small", { cls: "ct-muted", text: this.tr("Not delivered", "\u5C1A\u672A\u9001\u9054") });
+      }
+    }
+    const draft = engine.session.status === "completed" ? "" : (_e = engine.session.draftMarkdown) != null ? _e : "";
+    if (engine.busy && !draft) messages.createEl("p", { cls: "ct-waiting", text: this.tr("Waiting for the first words\u2026", "\u7B49\u5F85\u7B2C\u4E00\u6BB5\u5C0D\u8AC7\u5167\u5BB9\u2026") });
+    if (draft || engine.busy) {
+      const round = [...(_f = engine.session.rounds) != null ? _f : []].reverse().find((item) => item.status === "generating");
+      const live = messages.createDiv("ct-live-draft");
+      if (draft) this.renderRound(draft, round == null ? void 0 : round.id, live);
+    }
+    const latest = chatPanel.createDiv("ct-latest is-hidden");
+    this.button(latest, this.tr("Go to bottom of chat", "\u5230\u5C0D\u8A71\u5E95\u90E8"), () => {
+      scrolling.scrollTop = scrolling.scrollHeight;
+      latest.classList.add("is-hidden");
+    });
+    scrolling.addEventListener("scroll", () => {
+      this.scrollEpoch++;
+      latest.classList.toggle("is-hidden", scrolling.scrollHeight - scrolling.scrollTop - scrolling.clientHeight < 100);
+    });
+    const composer = chatPanel.createDiv("ct-composer");
+    if (engine.session.status === "completed") {
+      this.button(composer, this.tr("Continue chatting", "\u7E7C\u7E8C\u804A"), async () => {
+        if (engine.session.id.startsWith("sample-")) await this.copySample();
+        const current = this.engine;
+        if (current) await this.plugin.confirmAiUsage(current.session.model, () => current.continueTable());
+      }).addClass("mod-cta");
+      const question = composer.createEl("textarea", { attr: { rows: "2", maxlength: "1800", placeholder: this.tr("Ask the table a follow-up\u2026", "\u8FFD\u554F\u684C\u4E0A\u7684\u4EBA\u2026"), "aria-label": this.tr("Follow-up question", "\u8FFD\u554F"), "data-ct-field": "follow-up" } });
+      question.value = (_h = (_g = this.composerValues.get("follow-up")) != null ? _g : this.composerValues.get("intervention-text")) != null ? _h : "";
+      question.addEventListener("input", () => this.composerValues.set("follow-up", question.value));
+      this.button(composer, this.tr("Ask", "\u9001\u51FA\u8FFD\u554F"), async () => {
+        const value = question.value.trim();
+        if (!value) return;
+        question.value = "";
+        this.composerValues.delete("follow-up");
+        this.composerValues.delete("intervention-text");
+        if (engine.session.id.startsWith("sample-")) await this.copySample();
+        if (this.engine) await this.plugin.confirmAiUsage(this.engine.session.model, () => this.engine.ask(value));
+      }, engine.busy).addClass("mod-cta");
+      if (engine.session.dirtyNotes) {
+        this.button(composer, this.tr("Refresh observer notes", "\u66F4\u65B0\u89C0\u5BDF\u8005\u6574\u7406"), async () => {
+          await this.plugin.confirmAiUsage(engine.session.model, () => engine.refreshObserverNotes());
+        }, engine.busy || engine.persistenceFailed);
+        composer.createEl("small", { cls: "ct-muted", text: this.tr("Uses the whole table and saved drafts; it does not add dialogue.", "\u4F9D\u6574\u684C\u5C0D\u8AC7\u8207\u5DF2\u4FDD\u5B58\u8349\u7A3F\u6574\u7406\uFF0C\u4E0D\u6703\u65B0\u589E\u767C\u8A00\u3002") });
+      }
+    } else if (engine.session.status === "ready") this.button(composer, this.tr("Generate conversation", "\u958B\u59CB\u751F\u6210\u5C0D\u8AC7"), async () => {
+      await this.plugin.confirmAiUsage(engine.session.model, () => engine.start());
+    }).addClass("mod-cta");
+    else if (engine.session.status === "error") {
+      if (!engine.persistenceFailed) this.button(composer, this.tr(engine.session.draftMarkdown ? "Continue generating from saved draft" : "Retry this segment", engine.session.draftMarkdown ? "\u5F9E\u5DF2\u4FDD\u5B58\u8349\u7A3F\u7E7C\u7E8C\u751F\u6210" : "\u91CD\u8A66\u9019\u4E00\u6BB5"), async () => {
+        await this.plugin.confirmAiUsage(engine.session.model, () => engine.start());
+      });
+      else this.button(composer, this.tr("Retry saving", "\u91CD\u8A66\u4FDD\u5B58"), () => engine.retrySave());
+      if (!engine.persistenceFailed && (engine.session.draftMarkdown || engine.session.transcriptMarkdown || engine.session.questions.length)) {
+        this.button(composer, this.tr("Refresh observer notes only", "\u53EA\u6574\u7406\u76EE\u524D\u5167\u5BB9"), async () => {
+          await this.plugin.confirmAiUsage(engine.session.model, () => engine.refreshObserverNotes());
+        }, engine.busy);
+        composer.createEl("small", { cls: "ct-muted", text: this.tr("Uses saved dialogue and drafts without adding new speaker turns.", "\u6839\u64DA\u5DF2\u4FDD\u5B58\u5C0D\u8AC7\u8207\u8349\u7A3F\u6574\u7406\uFF0C\u4E0D\u6703\u65B0\u589E\u4F86\u8CD3\u767C\u8A00\u3002") });
+      }
+      this.button(composer, this.tr("Edit settings and start another", "\u8ABF\u6574\u8A2D\u5B9A\uFF0C\u518D\u958B\u4E00\u684C"), () => this.home(engine.session));
+      this.button(composer, this.tr("Open Markdown", "\u958B\u555F Markdown"), async () => {
+        const file = await this.store.openMarkdown(engine.session.id);
+        await this.app.workspace.getLeaf(false).openFile(file);
+      });
+      if (engine.session.draftMarkdown) this.button(composer, this.tr("Copy draft", "\u8907\u88FD\u8349\u7A3F"), async () => {
+        var _a2;
+        await navigator.clipboard.writeText((_a2 = engine.session.draftMarkdown) != null ? _a2 : "");
+        new import_obsidian2.Notice(this.tr("Draft copied.", "\u8349\u7A3F\u5DF2\u8907\u88FD\u3002"));
+      });
+      const savedDraft = !engine.persistenceFailed && !!engine.session.draftMarkdown;
+      const message = composer.createEl("p", { cls: "ct-error", text: `${engine.error || engine.session.error || this.tr("Generation stopped.", "\u751F\u6210\u5DF2\u505C\u6B62\u3002")} \xB7 ${engine.persistenceFailed ? this.tr("The latest text is only in this open view. Retry saving or copy the draft.", "\u6700\u65B0\u5167\u5BB9\u5C1A\u672A\u4FDD\u5B58\uFF0C\u53EA\u4FDD\u7559\u5728\u76EE\u524D\u756B\u9762\uFF1B\u8ACB\u91CD\u8A66\u4FDD\u5B58\u6216\u8907\u88FD\u8349\u7A3F\u3002") : savedDraft ? this.tr("Received text is saved as a draft.", "\u5DF2\u6536\u5230\u7684\u6587\u5B57\u5DF2\u4FDD\u5B58\u70BA\u8349\u7A3F\u3002") : this.tr("The existing conversation is preserved.", "\u539F\u6709\u5C0D\u8AC7\u5167\u5BB9\u5DF2\u4FDD\u7559\u3002")}` });
+      if (this.composerValues.get("intervention-text")) {
+        composer.createEl("p", { cls: "ct-muted", text: this.tr("Your unsent message is kept below.", "\u5C1A\u672A\u9001\u51FA\u7684\u8A0A\u606F\u4FDD\u7559\u5728\u4E0B\u65B9\u3002") });
+        const retained = composer.createEl("textarea", { attr: { rows: "2", placeholder: this.tr("Unsent message", "\u5C1A\u672A\u9001\u51FA\u7684\u8A0A\u606F"), "data-ct-field": "intervention-text" } });
+        retained.value = (_i = this.composerValues.get("intervention-text")) != null ? _i : "";
+        retained.addEventListener("input", () => this.composerValues.set("intervention-text", retained.value));
+      }
+    } else if (engine.busy) {
+      const select = composer.createEl("select", { attr: { "aria-label": this.tr("How to join", "\u4ECB\u5165\u65B9\u5F0F"), "data-ct-field": "intervention-kind" } });
+      for (const [value, en, zh] of [["comment", "Say something", "\u8AAA\u9EDE\u4EC0\u9EBC"], ["guest-question", "Ask a guest", "\u8FFD\u554F\u67D0\u4EBA"], ["redirect", "Change direction", "\u63DB\u500B\u65B9\u5411"]]) select.createEl("option", { value, text: this.tr(en, zh) });
+      select.value = (_j = this.composerValues.get("intervention-kind")) != null ? _j : "comment";
+      select.addEventListener("change", () => this.composerValues.set("intervention-kind", select.value));
+      const target = composer.createEl("input", { attr: { type: "text", placeholder: this.tr("Guest name (optional)", "\u4F86\u8CD3\u59D3\u540D\uFF08\u9078\u586B\uFF09"), "data-ct-field": "intervention-target" } });
+      target.value = (_k = this.composerValues.get("intervention-target")) != null ? _k : "";
+      target.addEventListener("input", () => this.composerValues.set("intervention-target", target.value));
+      const input = composer.createEl("textarea", { attr: { rows: "2", placeholder: this.tr("Join the conversation\u2026", "\u52A0\u5165\u5C0D\u8AC7\u2026"), "data-ct-field": "intervention-text" } });
+      input.value = (_l = this.composerValues.get("intervention-text")) != null ? _l : "";
+      input.addEventListener("input", () => this.composerValues.set("intervention-text", input.value));
+      this.button(composer, this.tr("Send", "\u9001\u51FA"), async () => {
+        if (!input.value.trim()) return;
+        const text2 = input.value;
+        input.value = "";
+        this.composerValues.delete("intervention-text");
+        try {
+          await engine.intervene(select.value, text2, target.value);
+        } catch (error) {
+          input.value = text2;
+          this.composerValues.set("intervention-text", text2);
+          throw error;
+        }
+      });
+    }
+    if (/changed outside|外部修改|outside this room/i.test(engine.error)) this.button(composer, this.tr("Reload edits", "\u91CD\u65B0\u8F09\u5165\u4FEE\u6539"), async () => {
+      var _a2;
+      if (engine.busy) await engine.stop();
+      const session = await this.store.reload(this.store.sessionPath(engine.session.id));
+      (_a2 = this.plugin.coffeeManager) == null ? void 0 : _a2.forget(engine.session.id);
+      this.attach(session);
+    });
+    const insight = body.createDiv("ct-insight-panel");
+    insight.createEl("h3", { text: this.tr("Observer\u2019s notes", "\u89C0\u5BDF\u8005\u6574\u7406") });
+    const notes = (_m = engine.session.observerNotes) != null ? _m : [];
+    if (engine.session.dirtyNotes) insight.createEl("p", { cls: "ct-muted", text: this.tr("The conversation changed; these notes have not been refreshed yet.", "\u5C0D\u8AC7\u5167\u5BB9\u5DF2\u4FEE\u6539\uFF0C\u9019\u4EFD\u6574\u7406\u5C1A\u672A\u66F4\u65B0\u3002") });
+    if (notes[0]) this.renderMarkdown(notes[0], insight.createDiv("ct-insight-latest markdown-rendered"));
+    else insight.createEl("p", { cls: "ct-muted", text: this.tr("The observer\u2019s notes will appear when this segment finishes.", "\u672C\u6BB5\u5B8C\u6210\u5F8C\u6703\u66F4\u65B0\u89C0\u5BDF\u8005\u6574\u7406\u3002") });
+    if (engine.session.observerDraftMarkdown || engine.busy && engine.session.dirtyNotes) {
+      insight.createEl("p", { cls: "ct-muted", text: this.tr("Updating notes from the saved conversation\u2026", "\u6B63\u5728\u6839\u64DA\u5DF2\u4FDD\u5B58\u5C0D\u8AC7\u66F4\u65B0\u6574\u7406\u2026") });
+      const draft2 = insight.createDiv("ct-observer-draft");
+      if (engine.session.observerDraftMarkdown) this.renderStreaming(engine.session.observerDraftMarkdown, draft2);
+    }
+    if (notes.length > 1) {
+      const history = insight.createEl("details");
+      history.createEl("summary", { text: this.tr("Earlier notes", "\u5148\u524D\u6574\u7406") });
+      for (const [index, note] of notes.slice(1).entries()) {
+        history.createEl("h4", { text: this.tr(`Version ${notes.length - index - 1}`, `\u7B2C ${notes.length - index - 1} \u7248`) });
+        this.renderMarkdown(note, history.createDiv("ct-insight-history markdown-rendered"));
+      }
+    }
+    if (engine.session.status === "completed" && !engine.session.id.startsWith("sample-")) {
+      const handoff = this.button(insight, this.tr("Take to VAM for deeper research", "\u5E36\u53BB VAM \u6DF1\u5165\u7814\u7A76"), () => this.plugin.openCoffeeHandoff(engine.session, this.store.sessionPath(engine.session.id)));
+      handoff.addClass("mod-cta");
+    }
+    if (engine.session.status === "completed") this.button(insight, this.tr("Edit settings and start another table", "\u7DE8\u8F2F\u8A2D\u5B9A\uFF0C\u518D\u958B\u4E00\u684C"), () => this.returnHome(engine.session));
+    this.renderRoster(roster, liveRosterFor(engine.session, draft));
+    this.updateStatus(status, engine);
+    this.stateSignature = `${engine.session.status}:${engine.busy}:${engine.error}:${engine.session.questions.length}`;
+    this.contentEl.querySelectorAll("[data-ct-field]").forEach((field) => {
+      const value = this.composerValues.get(field.dataset.ctField);
+      if (value !== void 0 && !field.value) field.value = value;
+    });
+    if (activeField) {
+      const field = activeField === "intervention-text" && engine.session.status === "completed" ? "follow-up" : activeField, replacement = this.contentEl.querySelector(`[data-ct-field="${field}"]`);
+      if (replacement) {
+        if (activeValue !== void 0) replacement.value = activeValue;
+        replacement.focus();
+        if (!(replacement instanceof HTMLSelectElement)) {
+          try {
+            replacement.setSelectionRange(activeStart != null ? activeStart : replacement.value.length, activeEnd != null ? activeEnd : replacement.value.length);
+          } catch (e) {
+          }
+        }
+      }
+    }
+    if (engine.busy && this.statusTimer === null && typeof window.setInterval === "function") this.statusTimer = window.setInterval(() => {
+      const current = this.contentEl.querySelector(".ct-status");
+      if (current && this.engine) this.updateStatus(current, this.engine);
+    }, 1e3);
+    if (!engine.busy && this.statusTimer !== null) {
+      window.clearInterval(this.statusTimer);
+      this.statusTimer = null;
+    }
+    const markdownJobs = this.markdownJobs;
+    this.markdownJobs = null;
+    const sessionId = engine.session.id;
+    void Promise.all(markdownJobs != null ? markdownJobs : []).then(() => new Promise((resolve) => window.requestAnimationFrame(() => {
+      var _a2;
+      if (this.closed || ((_a2 = this.engine) == null ? void 0 : _a2.session.id) !== sessionId || this.scrollEpoch !== scrollEpoch) {
+        resolve();
+        return;
+      }
+      if (firstScroll === "top") scrolling.scrollTop = 0;
+      else if (firstScroll === "bottom" || hadPriorScroll && wasBottom) scrolling.scrollTop = scrolling.scrollHeight;
+      else scrolling.scrollTop = oldTop;
+      resolve();
+    })));
+    if (hadPriorScroll && !wasBottom) scrolling.scrollTop = oldTop;
+  }
+  renderBubbles(markdown, target) {
+    const speeches = parseSpeeches(markdown);
+    if (!speeches.length) {
+      this.renderMarkdown(markdown, target);
+      return;
+    }
+    for (const item of speeches) this.renderSpeech(item.name, item.role, item.text, target);
+  }
+  renderRound(markdown, roundId, target) {
+    var _a, _b, _c;
+    const speeches = parseSpeeches(markdown), interventions = ((_b = (_a = this.engine) == null ? void 0 : _a.session.interventions) != null ? _b : []).filter((item) => item.roundId && item.roundId === roundId).sort((a, b) => {
+      var _a2, _b2;
+      return ((_a2 = a.afterTurn) != null ? _a2 : 0) - ((_b2 = b.afterTurn) != null ? _b2 : 0);
+    });
+    if (!speeches.length) {
+      if (markdown) this.renderMarkdown(markdown, target.createDiv("ct-live-plain markdown-rendered"));
+      for (const item of interventions) this.renderUserBubble(item.text, target);
+      return;
+    }
+    let next = 0;
+    for (let index = 0; index <= speeches.length; index++) {
+      while (next < interventions.length && ((_c = interventions[next].afterTurn) != null ? _c : 0) <= index) this.renderUserBubble(interventions[next++].text, target);
+      if (index < speeches.length) {
+        const speech = speeches[index];
+        this.renderSpeech(speech.name, speech.role, speech.text, target);
+      }
+    }
+  }
+  renderSpeech(name, role, text2, target) {
+    if (name === "\u4F60" || name.toLowerCase() === "you") {
+      this.renderUserBubble(text2, target);
+      return;
+    }
+    const article = target.createDiv("ct-message");
+    article.createDiv({ cls: `ct-avatar ct-color-${avatarColor(name)}`, text: initials(name), attr: { "aria-hidden": "true" } });
+    const content = article.createDiv("ct-message-content");
+    content.createEl("strong", { text: name });
+    content.createSpan({ cls: "ct-role", text: role });
+    this.renderMarkdown(text2, content.createDiv("ct-bubble markdown-rendered"));
+  }
+  renderStreaming(markdown, target) {
+    const speeches = parseSpeeches(markdown);
+    if (!speeches.length) {
+      this.renderMarkdown(markdown, target.createDiv("ct-live-plain markdown-rendered"));
+      return;
+    }
+    this.renderBubbles(markdown, target);
+  }
+  renderUserBubble(text2, target) {
+    const article = target.createDiv("ct-message ct-message-user");
+    article.createDiv({ cls: "ct-avatar ct-user-avatar", text: this.tr("You", "\u4F60") });
+    const content = article.createDiv("ct-message-content");
+    content.createEl("strong", { text: this.tr("You", "\u4F60") });
+    this.renderMarkdown(text2, content.createDiv("ct-bubble markdown-rendered"));
+  }
+  renderMarkdown(markdown, target) {
+    var _a, _b, _c;
+    const job = import_obsidian2.MarkdownRenderer.render(this.app, markdown, target, this.store.sessionPath((_b = (_a = this.engine) == null ? void 0 : _a.session.id) != null ? _b : ""), this).then(() => void 0);
+    (_c = this.markdownJobs) == null ? void 0 : _c.push(job);
+  }
+  renderRoster(target, people) {
+    target.empty();
+    for (const person of people) {
+      const chip = target.createEl("button", { cls: "ct-person", attr: { title: person.bio, "aria-label": `${person.name}, ${person.role}. ${person.bio}` } });
+      chip.createSpan({ cls: `ct-avatar ct-color-${avatarColor(person.name)}`, text: initials(person.name), attr: { "aria-hidden": "true" } });
+      chip.createSpan({ cls: "ct-person-label", text: `${person.name} \xB7 ${person.role}` });
+      chip.addEventListener("click", () => new import_obsidian2.Notice(`${person.name}\uFF5C${person.role}
+${person.bio}`));
+    }
+  }
+  updateStatus(status, engine) {
+    var _a;
+    const elapsed = engine.busy ? `${Math.floor((Date.now() - engine.startedAt) / 6e4)} min` : "";
+    const last = parseSpeeches((_a = engine.session.draftMarkdown) != null ? _a : "").at(-1);
+    status.setText(engine.error || (engine.busy ? `${last ? `${last.name} \xB7 ` : ""}${this.tr("is speaking", "\u6B63\u5728\u767C\u8A00")} \xB7 ${elapsed}` : engine.session.status === "completed" ? this.tr("Table complete", "\u5C0D\u8AC7\u5B8C\u6210") : engine.session.status === "error" ? this.tr("Stopped \xB7 draft saved", "\u5DF2\u505C\u6B62 \xB7 \u8349\u7A3F\u5DF2\u4FDD\u5B58") : this.tr("Ready to generate", "\u6E96\u5099\u751F\u6210")));
+  }
+  async copySample() {
+    var _a, _b, _c, _d;
+    const source = (_a = this.engine) == null ? void 0 : _a.session;
+    if (!source || !source.id.startsWith("sample-")) return;
+    const copy = createSession(source.topic, this.plugin.settings.cliModel, this.plugin.settings.cliReasoning, source.language, source.guests);
+    copy.status = "completed";
+    copy.transcriptMarkdown = source.transcriptMarkdown;
+    copy.rounds = (_c = (_b = source.rounds) == null ? void 0 : _b.map((item) => ({ ...item }))) != null ? _c : [];
+    copy.observerNotes = [...(_d = source.observerNotes) != null ? _d : []];
+    copy.questions = source.questions.map((item) => ({ ...item, id: crypto.randomUUID() }));
+    await this.store.save(copy);
+    this.attach(copy);
+  }
+  refresh() {
+    const engine = this.engine;
+    if (!engine || this.closed) return;
+    if (engine.deleted) {
+      this.returnHome();
+      return;
+    }
+    const signature = `${engine.session.status}:${engine.busy}:${engine.error}:${engine.session.questions.length}`;
+    if (signature !== this.stateSignature) {
+      this.render();
+      return;
+    }
+    if (this.renderTimer !== null) return;
+    this.renderTimer = window.setTimeout(() => {
+      this.renderTimer = null;
+      if (!this.engine || this.closed) return;
+      this.refreshLive();
+    }, 250);
+  }
+  refreshLive() {
+    var _a, _b, _c;
+    const engine = this.engine;
+    if (!engine) return;
+    const scroller = this.contentEl.querySelector(".ct-chat-scroll"), wasBottom = !scroller || scroller.scrollHeight - scroller.scrollTop - scroller.clientHeight < 100, oldTop = (_a = scroller == null ? void 0 : scroller.scrollTop) != null ? _a : 0;
+    const status = this.contentEl.querySelector(".ct-status");
+    if (status) this.updateStatus(status, engine);
+    const draft = this.contentEl.querySelector(".ct-live-draft");
+    if (draft) {
+      draft.empty();
+      const round = [...(_b = engine.session.rounds) != null ? _b : []].reverse().find((item) => item.status === "generating");
+      if (engine.session.status !== "completed" && engine.session.draftMarkdown) this.renderRound(engine.session.draftMarkdown, round == null ? void 0 : round.id, draft);
+    }
+    for (const question of engine.session.questions) {
+      const live = this.contentEl.querySelector(`[data-live-question-id="${question.id}"]`);
+      if (live) {
+        live.empty();
+        if (question.draftAnswer) this.renderStreaming(question.draftAnswer, live);
+      }
+    }
+    const roster = this.contentEl.querySelector(".ct-roster");
+    if (roster) this.renderRoster(roster, liveRosterFor(engine.session, (_c = engine.session.draftMarkdown) != null ? _c : ""));
+    const observerDraft = this.contentEl.querySelector(".ct-observer-draft");
+    if (observerDraft) {
+      observerDraft.empty();
+      if (engine.session.observerDraftMarkdown) this.renderStreaming(engine.session.observerDraftMarkdown, observerDraft);
+    }
+    if (scroller) scroller.scrollTop = wasBottom ? scroller.scrollHeight : oldTop;
+  }
+};
+function observerNotes(markdown) {
+  var _a, _b;
+  return (_b = (_a = markdown.match(/^# (?:觀察者整理|Observer(?:[’']s)? notes)[\s\S]*$/m)) == null ? void 0 : _a[0]) != null ? _b : "";
+}
+function initials(name) {
+  return [...name.replace(/[^\p{L}\p{N}]/gu, "")].slice(0, 2).join("") || "\u2022";
+}
+function avatarColor(name) {
+  let hash = 0;
+  for (const char of name) hash = hash * 31 + char.codePointAt(0) | 0;
+  return Math.abs(hash) % 8;
+}
+
 // i18n.ts
 var english = {
   "ui.output_language": "Answer language for this task",
@@ -61,12 +2827,13 @@ var english = {
   "ui.model_not_checked": "Model list has not been checked yet",
   "ui.open_or_create_map_hint": "Open an existing mind map or create a new one.",
   "ui.interface_language": "Interface language",
+  "ui.interface_language_description": "Controls VAM and Coffee Tables only; it is independent of Obsidian\u2019s language. Existing notes and conversation text are preserved.",
   "ui.open_map": "Open mind map",
   "ui.my_editable_mind_map": "My editable mind map",
   "ui.sample_start_hint": "Duplicate this sample or create an empty mind map to start. An AI provider is only needed for AI tasks.",
-  "ui.language_changed_content_preserved": "Interface and official sample are now in English. Existing map titles and notes are unchanged.",
+  "ui.language_changed_content_preserved": "VAM and Coffee Tables are now in English. Existing notes and conversation text are unchanged.",
   "ui.language_change_save_failed": "Could not save the language setting. The previous language is still active.",
-  "ui.language_view_refresh_failed": "An open Visual Agent Map view could not refresh after the language change.",
+  "ui.language_view_refresh_failed": "An open VAM or Coffee Tables view could not refresh after the language change.",
   "ui.language_change_partial_failure": "The language setting was saved, but an open view did not refresh. Close and reopen that view.",
   "ui.codex_required_for_ai": "Set up Codex before running an AI task. You can keep editing this mind map manually.",
   "ui.claude_cli_path": "Claude Code CLI path",
@@ -806,12 +3573,13 @@ var traditionalChinese = {
   "ui.model_not_checked": "\u6A21\u578B\u6E05\u55AE\u5C1A\u672A\u6AA2\u67E5",
   "ui.open_or_create_map_hint": "\u958B\u555F\u73FE\u6709\u5FC3\u667A\u5716\uFF0C\u6216\u5EFA\u7ACB\u65B0\u5716\u3002",
   "ui.interface_language": "\u4ECB\u9762\u8A9E\u8A00",
+  "ui.interface_language_description": "\u53EA\u63A7\u5236 VAM \u8207 Coffee Tables\uFF0C\u548C Obsidian \u7684\u8A9E\u8A00\u8A2D\u5B9A\u5206\u958B\u3002\u65E2\u6709\u7B46\u8A18\u53CA\u5C0D\u8AC7\u5167\u5BB9\u6703\u4FDD\u7559\u539F\u6587\u3002",
   "ui.open_map": "\u958B\u555F\u5FC3\u667A\u5716",
   "ui.my_editable_mind_map": "\u6211\u7684\u53EF\u7DE8\u8F2F\u5FC3\u667A\u5716",
   "ui.sample_start_hint": "\u8907\u88FD\u9019\u4EFD\u7BC4\u4F8B\u6216\u5EFA\u7ACB\u7A7A\u767D\u5FC3\u667A\u5716\u5373\u53EF\u958B\u59CB\uFF1B\u53EA\u6709 AI \u4EFB\u52D9\u9700\u8981\u9078\u64C7 AI \u670D\u52D9\u3002",
-  "ui.language_changed_content_preserved": "\u4ECB\u9762\u8207\u5B98\u65B9\u7BC4\u4F8B\u5DF2\u5207\u63DB\u70BA\u7E41\u9AD4\u4E2D\u6587\u3002\u65E2\u6709\u5730\u5716\u6A19\u984C\u8207\u7B46\u8A18\u5167\u5BB9\u4E0D\u6703\u8B8A\u66F4\u3002",
+  "ui.language_changed_content_preserved": "VAM \u8207 Coffee Tables \u5DF2\u5207\u63DB\u70BA\u7E41\u9AD4\u4E2D\u6587\u3002\u65E2\u6709\u7B46\u8A18\u53CA\u5C0D\u8AC7\u5167\u5BB9\u6703\u4FDD\u7559\u539F\u6587\u3002",
   "ui.language_change_save_failed": "\u7121\u6CD5\u5132\u5B58\u4ECB\u9762\u8A9E\u8A00\uFF1B\u76EE\u524D\u4ECD\u4F7F\u7528\u539F\u8A9E\u8A00\u3002",
-  "ui.language_view_refresh_failed": "\u6709\u4E00\u500B\u5DF2\u958B\u555F\u7684 Visual Agent Map \u756B\u9762\u672A\u80FD\u5957\u7528\u8A9E\u8A00\u8B8A\u66F4\u3002",
+  "ui.language_view_refresh_failed": "\u6709\u4E00\u500B\u5DF2\u958B\u555F\u7684 VAM \u6216 Coffee Tables \u756B\u9762\u672A\u80FD\u5957\u7528\u8A9E\u8A00\u8B8A\u66F4\u3002",
   "ui.language_change_partial_failure": "\u8A9E\u8A00\u8A2D\u5B9A\u5DF2\u5132\u5B58\uFF0C\u4F46\u6709\u958B\u555F\u4E2D\u7684\u756B\u9762\u672A\u80FD\u66F4\u65B0\u3002\u8ACB\u95DC\u9589\u5F8C\u91CD\u65B0\u958B\u555F\u8A72\u756B\u9762\u3002",
   "ui.codex_required_for_ai": "\u57F7\u884C AI \u4EFB\u52D9\u524D\u8ACB\u5148\u8A2D\u5B9A Codex\uFF1B\u4F60\u4ECD\u53EF\u624B\u52D5\u7DE8\u8F2F\u9019\u5F35\u5FC3\u667A\u5716\u3002",
   "ui.claude_cli_path": "Claude Code CLI \u8DEF\u5F91",
@@ -1557,10 +4325,10 @@ function topicStatusLabel(status, locale) {
 }
 
 // main.ts
-var import_obsidian7 = require("obsidian");
+var import_obsidian9 = require("obsidian");
 
 // ui/reference-picker.ts
-var import_obsidian = require("obsidian");
+var import_obsidian3 = require("obsidian");
 
 // ai/reference-materials.ts
 async function readMarkdownFile(app, file) {
@@ -1738,7 +4506,7 @@ var ReferencePicker = class {
         const details = card.createEl("details");
         const summary = details.createEl("summary");
         const disclosure = summary.createSpan({ cls: "vam-reference-disclosure" });
-        (0, import_obsidian.setIcon)(disclosure, "file-text");
+        (0, import_obsidian3.setIcon)(disclosure, "file-text");
         const summaryText = summary.createSpan({ cls: "vam-reference-summary-text" });
         summaryText.createEl("strong", { text: group.name });
         summaryText.createSpan({ text: group.location, cls: "vam-hint vam-reference-location" });
@@ -1772,7 +4540,7 @@ var ReferencePicker = class {
   createSourceButton(parent, icon, key) {
     const button = parent.createEl("button", { cls: "vam-reference-action" });
     const image = button.createSpan({ cls: "vam-reference-action-icon" });
-    (0, import_obsidian.setIcon)(image, icon);
+    (0, import_obsidian3.setIcon)(image, icon);
     button.createSpan({ text: t(key), cls: "vam-reference-action-label" });
     return button;
   }
@@ -1801,7 +4569,7 @@ var ReferencePicker = class {
   async selectTopic() {
     try {
       const topics = (await this.topics()).filter((topic) => topic.id !== this.currentTopicId);
-      const modal = new import_obsidian.Modal(this.app);
+      const modal = new import_obsidian3.Modal(this.app);
       modal.titleEl.setText(t("ui.reference_select_mind_map"));
       if (!topics.length) modal.contentEl.createEl("p", { text: t("ui.reference_no_other_mind_maps"), cls: "vam-hint" });
       for (const topic of topics) {
@@ -1850,7 +4618,7 @@ var ReferencePicker = class {
         if (!yaml) return true;
         let metadata;
         try {
-          metadata = (0, import_obsidian.parseYaml)(yaml);
+          metadata = (0, import_obsidian3.parseYaml)(yaml);
         } catch (error) {
           if (yaml.includes("agent-map-node")) throw error;
           return true;
@@ -1880,7 +4648,7 @@ var ReferencePicker = class {
     var _a;
     const nativePath = (_a = file.path) == null ? void 0 : _a.replace(/\\/g, "/");
     const adapter = this.app.vault.adapter;
-    const vaultRoot = adapter instanceof import_obsidian.FileSystemAdapter ? adapter.getBasePath().replace(/\\/g, "/").replace(/\/$/, "") : "";
+    const vaultRoot = adapter instanceof import_obsidian3.FileSystemAdapter ? adapter.getBasePath().replace(/\\/g, "/").replace(/\/$/, "") : "";
     const isInVault = !!nativePath && !!vaultRoot && nativePath.startsWith(`${vaultRoot}/`);
     const path = isInVault ? nativePath.slice(vaultRoot.length + 1) : nativePath || (fromFolder ? file.webkitRelativePath : file.name) || file.name;
     return { path, content: await file.text(), external: !isInVault, key: nativePath || (fromFolder ? file.webkitRelativePath : `${crypto.randomUUID()}/${file.name}`) };
@@ -1893,8 +4661,8 @@ var ReferencePicker = class {
 };
 
 // ui/modals/name-modal.ts
-var import_obsidian2 = require("obsidian");
-var NameModal = class extends import_obsidian2.Modal {
+var import_obsidian4 = require("obsidian");
+var NameModal = class extends import_obsidian4.Modal {
   constructor(app, titleText, value, submit) {
     super(app);
     this.titleText = titleText;
@@ -1915,15 +4683,15 @@ var NameModal = class extends import_obsidian2.Modal {
     input.addEventListener("keydown", (event) => {
       if (event.key === "Enter") save();
     });
-    new import_obsidian2.Setting(this.contentEl).addButton((b) => b.setButtonText(t("ui.cancel")).onClick(() => this.close())).addButton((b) => b.setButtonText(t("ui.save")).setCta().onClick(save));
+    new import_obsidian4.Setting(this.contentEl).addButton((b) => b.setButtonText(t("ui.cancel")).onClick(() => this.close())).addButton((b) => b.setButtonText(t("ui.save")).setCta().onClick(save));
     input.focus();
     input.select();
   }
 };
 
 // ui/modals/choice-modal.ts
-var import_obsidian3 = require("obsidian");
-var ChoiceModal = class extends import_obsidian3.Modal {
+var import_obsidian5 = require("obsidian");
+var ChoiceModal = class extends import_obsidian5.Modal {
   constructor(app, titleText, description, choices) {
     super(app);
     this.titleText = titleText;
@@ -1934,7 +4702,7 @@ var ChoiceModal = class extends import_obsidian3.Modal {
     this.titleEl.setText(this.titleText);
     this.contentEl.createEl("p", { text: this.description, cls: "vam-modal-intro" });
     for (const choice of this.choices) {
-      const setting = new import_obsidian3.Setting(this.contentEl);
+      const setting = new import_obsidian5.Setting(this.contentEl);
       if (choice.description) setting.setName(choice.label).setDesc(choice.description).addButton((b) => {
         var _a;
         return b.setButtonText((_a = choice.buttonLabel) != null ? _a : t("ui.select")).onClick(() => {
@@ -1947,12 +4715,12 @@ var ChoiceModal = class extends import_obsidian3.Modal {
         choice.action();
       }));
     }
-    new import_obsidian3.Setting(this.contentEl).addButton((b) => b.setButtonText(t("ui.cancel")).onClick(() => this.close()));
+    new import_obsidian5.Setting(this.contentEl).addButton((b) => b.setButtonText(t("ui.cancel")).onClick(() => this.close()));
   }
 };
 
 // ui/modals/debug-log-modal.ts
-var import_obsidian4 = require("obsidian");
+var import_obsidian6 = require("obsidian");
 
 // log-manager.ts
 var LogManager = class {
@@ -2079,7 +4847,7 @@ var AiExchangeLog = class {
 };
 
 // ui/modals/debug-log-modal.ts
-var DebugLogModal = class extends import_obsidian4.Modal {
+var DebugLogModal = class extends import_obsidian6.Modal {
   constructor(app, logs, exchanges, exchangeEnabled) {
     super(app);
     this.logs = logs;
@@ -2099,19 +4867,19 @@ var DebugLogModal = class extends import_obsidian4.Modal {
     var _a, _b;
     this.contentEl.empty();
     this.contentEl.createEl("p", { cls: "vam-modal-intro", text: t("ui.logs_are_kept_in_memory_only_and_disappear_when_the_plugin_r") });
-    const actions = new import_obsidian4.Setting(this.contentEl);
+    const actions = new import_obsidian6.Setting(this.contentEl);
     actions.addButton((button) => button.setButtonText(t("ui.refresh_logs")).onClick(() => this.renderLogs()));
     actions.addButton((button) => button.setButtonText(t("ui.copy_logs")).setCta().onClick(async () => {
       const text2 = formatDebugLogs(this.logs.getLogs());
       if (!text2) {
-        new import_obsidian4.Notice(t("ui.there_are_no_debug_logs_yet"));
+        new import_obsidian6.Notice(t("ui.there_are_no_debug_logs_yet"));
         return;
       }
       try {
         await navigator.clipboard.writeText(text2);
-        new import_obsidian4.Notice(t("ui.debug_log_copied"));
+        new import_obsidian6.Notice(t("ui.debug_log_copied"));
       } catch (e) {
-        new import_obsidian4.Notice(t("ui.unable_to_copy_the_debug_log"));
+        new import_obsidian6.Notice(t("ui.unable_to_copy_the_debug_log"));
       }
     }));
     actions.addButton((button) => button.setButtonText(t("ui.clear_logs")).setDestructive().onClick(() => this.logs.clear()));
@@ -2127,7 +4895,7 @@ var DebugLogModal = class extends import_obsidian4.Modal {
     }
     this.contentEl.createEl("h3", { text: t("ui.ai_exchanges") });
     this.contentEl.createEl("p", { cls: "vam-modal-intro", text: this.exchangeEnabled() ? t("ui.up_to_20_exchanges_are_stored_in_this_vault_s_plugin_folder") : t("ui.ai_exchange_recording_is_off_enable_it_in_vam_settings") });
-    const exchangeActions = new import_obsidian4.Setting(this.contentEl);
+    const exchangeActions = new import_obsidian6.Setting(this.contentEl);
     exchangeActions.addButton((button) => button.setButtonText(t("ui.clear_ai_exchanges")).setDestructive().onClick(() => {
       var _a2;
       return (_a2 = this.exchanges) == null ? void 0 : _a2.clear();
@@ -2146,7 +4914,7 @@ var DebugLogModal = class extends import_obsidian4.Modal {
       if (exchange.error) item.createEl("pre", { text: `${t("ui.error")}: ${exchange.error}` });
       const copy = item.createEl("button", { text: t("ui.copy_this_exchange") });
       copy.addEventListener("click", () => {
-        void navigator.clipboard.writeText(formatAiExchange(exchange)).then(() => new import_obsidian4.Notice(t("ui.ai_exchange_copied"))).catch(() => new import_obsidian4.Notice(t("ui.unable_to_copy_the_ai_exchange")));
+        void navigator.clipboard.writeText(formatAiExchange(exchange)).then(() => new import_obsidian6.Notice(t("ui.ai_exchange_copied"))).catch(() => new import_obsidian6.Notice(t("ui.unable_to_copy_the_ai_exchange")));
       });
     }
   }
@@ -2323,7 +5091,7 @@ function arrangeNewBranch(nodes, parentId, newIds) {
 }
 
 // repository.ts
-var import_obsidian5 = require("obsidian");
+var import_obsidian7 = require("obsidian");
 var DEFAULT_SETTINGS = {
   language: "en",
   workspaceFolder: "Agent Workspace",
@@ -2379,7 +5147,7 @@ function safeName(title) {
 function frontmatter(content) {
   var _a, _b;
   const yaml = (_a = content.match(/^---\r?\n([\s\S]*?)\r?\n---(?:\r?\n|$)/)) == null ? void 0 : _a[1];
-  return yaml ? (_b = (0, import_obsidian5.parseYaml)(yaml)) != null ? _b : {} : {};
+  return yaml ? (_b = (0, import_obsidian7.parseYaml)(yaml)) != null ? _b : {} : {};
 }
 function noteTitle(content, fm, fallback) {
   var _a, _b;
@@ -2588,18 +5356,18 @@ var Repository = class {
   }
   file(path) {
     const file = this.app.vault.getAbstractFileByPath(path);
-    if (!(file instanceof import_obsidian5.TFile)) throw new Error(`${this.message("error.file_not_found")}: ${path}`);
+    if (!(file instanceof import_obsidian7.TFile)) throw new Error(`${this.message("error.file_not_found")}: ${path}`);
     return file;
   }
   async folder(path) {
     let current = "";
-    for (const part of (0, import_obsidian5.normalizePath)(path).split("/").filter(Boolean)) {
+    for (const part of (0, import_obsidian7.normalizePath)(path).split("/").filter(Boolean)) {
       current = current ? `${current}/${part}` : part;
       if (!this.app.vault.getAbstractFileByPath(current)) await this.app.vault.createFolder(current);
     }
   }
   workspaceExists() {
-    return this.app.vault.getAbstractFileByPath(this.settings.workspaceFolder) instanceof import_obsidian5.TFolder;
+    return this.app.vault.getAbstractFileByPath(this.settings.workspaceFolder) instanceof import_obsidian7.TFolder;
   }
   async workspaceCandidates() {
     const candidates = /* @__PURE__ */ new Set();
@@ -2619,13 +5387,13 @@ var Repository = class {
     await this.folder(this.settings.inboxFolder);
   }
   unique(folder, name) {
-    const base = (0, import_obsidian5.normalizePath)(`${folder}/${safeName(name)}`);
+    const base = (0, import_obsidian7.normalizePath)(`${folder}/${safeName(name)}`);
     let path = `${base}.md`, number = 2;
     while (this.app.vault.getAbstractFileByPath(path)) path = `${base} ${number++}.md`;
     return path;
   }
   uniqueFolder(folder, name) {
-    const base = (0, import_obsidian5.normalizePath)(`${folder}/${safeName(name)}`);
+    const base = (0, import_obsidian7.normalizePath)(`${folder}/${safeName(name)}`);
     let path = base, number = 2;
     while (this.app.vault.getAbstractFileByPath(path)) path = `${base} ${number++}`;
     return path;
@@ -2723,7 +5491,7 @@ var Repository = class {
       if (patch.previewInitialized !== void 0) fm["preview-initialized"] = patch.previewInitialized;
       body = normalizeBodyOrder(body, text(fm.title, path.replace(/\.md$/, "")), text(fm.summary, placeholder(this.settings.language)), this.settings.language);
       return `---
-${(0, import_obsidian5.stringifyYaml)(fm)}---
+${(0, import_obsidian7.stringifyYaml)(fm)}---
 ${withReferenceLinks(body, fm, this.settings.language)}`;
     });
   }
@@ -2747,7 +5515,7 @@ ${withReferenceLinks(body, fm, this.settings.language)}`;
       cssclasses: [NOTE_CSS_CLASS]
     };
     await this.app.vault.create(path, `---
-${(0, import_obsidian5.stringifyYaml)(metadata)}---
+${(0, import_obsidian7.stringifyYaml)(metadata)}---
 ${noteBody(title, placeholder(this.settings.language), this.settings.language, "", "", placeholder(this.settings.language))}`);
     return { id, path, parentId: null, x: 80, y: 80, collapsed: false };
   }
@@ -2765,7 +5533,7 @@ ${noteBody(title, placeholder(this.settings.language), this.settings.language, "
     metadata.title = title;
     const body = source.replace(/^---\r?\n[\s\S]*?\r?\n---(?:\r?\n|$)/, "").replace(/^# .*$/m, `# ${title}`);
     await this.app.vault.create(path, `---
-${(0, import_obsidian5.stringifyYaml)(metadata)}---
+${(0, import_obsidian7.stringifyYaml)(metadata)}---
 ${body}`);
     return { id, path, parentId: null, x: 80, y: 80, collapsed: false };
   }
@@ -2803,7 +5571,7 @@ ${JSON.stringify(map, null, 2)}
       const map = await this.readMap(file.path);
       let changed = false;
       for (const node of map.nodes) {
-        if (this.app.vault.getAbstractFileByPath(node.path) instanceof import_obsidian5.TFile) continue;
+        if (this.app.vault.getAbstractFileByPath(node.path) instanceof import_obsidian7.TFile) continue;
         const matches = (_b = candidates.get(node.id)) != null ? _b : [];
         if (matches.length !== 1) continue;
         const oldPath = node.path;
@@ -2826,10 +5594,10 @@ ${JSON.stringify(map, null, 2)}
   }
   async brokenTopics() {
     const root = this.app.vault.getAbstractFileByPath(this.settings.topicsFolder);
-    if (!(root instanceof import_obsidian5.TFolder)) return [];
+    if (!(root instanceof import_obsidian7.TFolder)) return [];
     const broken = [];
     for (const child of root.children) {
-      if (!(child instanceof import_obsidian5.TFolder) || this.app.vault.getAbstractFileByPath(`${child.path}/Map.md`)) continue;
+      if (!(child instanceof import_obsidian7.TFolder) || this.app.vault.getAbstractFileByPath(`${child.path}/Map.md`)) continue;
       const prefix = `${child.path}/Notes/`;
       const noteCount = this.app.vault.getMarkdownFiles().filter((file) => file.path.startsWith(prefix)).length;
       broken.push({ title: child.name, root: child.path, noteCount });
@@ -2861,10 +5629,10 @@ ${JSON.stringify(map, null, 2)}
       const id = text(fm["node-id"]);
       if (id) byId.set(id, file.path);
     }
-    for (const node of map.nodes) if (!(this.app.vault.getAbstractFileByPath(node.path) instanceof import_obsidian5.TFile) && byId.has(node.id)) node.path = byId.get(node.id);
+    for (const node of map.nodes) if (!(this.app.vault.getAbstractFileByPath(node.path) instanceof import_obsidian7.TFile) && byId.has(node.id)) node.path = byId.get(node.id);
     await this.moveExact(sourcePath, target);
     await this.saveMap(target, map);
-    for (const node of map.nodes) if (this.app.vault.getAbstractFileByPath(node.path) instanceof import_obsidian5.TFile) await this.setLifecycle(node.path, map.id, map.id, "active");
+    for (const node of map.nodes) if (this.app.vault.getAbstractFileByPath(node.path) instanceof import_obsidian7.TFile) await this.setLifecycle(node.path, map.id, map.id, "active");
     await this.rebuildDerivedData();
     return target;
   }
@@ -2893,7 +5661,7 @@ ${JSON.stringify(map, null, 2)}
   }
   async moveUnique(path, folder) {
     await this.folder(folder);
-    const file = this.file(path), desired = (0, import_obsidian5.normalizePath)(`${folder}/${baseName(path)}`);
+    const file = this.file(path), desired = (0, import_obsidian7.normalizePath)(`${folder}/${baseName(path)}`);
     const target = this.app.vault.getAbstractFileByPath(desired) ? this.unique(folder, file.basename) : desired;
     await this.app.fileManager.renameFile(file, target);
     await this.replaceSourcePath(path, target);
@@ -2907,7 +5675,7 @@ ${JSON.stringify(map, null, 2)}
   }
   async renameNote(path, title, exactTarget) {
     await this.updateNote(path, { title });
-    const folder = parentPath(path), desired = exactTarget != null ? exactTarget : (0, import_obsidian5.normalizePath)(`${folder}/${safeName(title)}.md`);
+    const folder = parentPath(path), desired = exactTarget != null ? exactTarget : (0, import_obsidian7.normalizePath)(`${folder}/${safeName(title)}.md`);
     if (desired === path) return path;
     const target = exactTarget != null ? exactTarget : this.app.vault.getAbstractFileByPath(desired) ? this.unique(folder, title) : desired;
     await this.app.fileManager.renameFile(this.file(path), target);
@@ -2934,7 +5702,7 @@ ${JSON.stringify(map, null, 2)}
       let changed = false;
       for (const node of map.nodes) {
         const file = this.app.vault.getAbstractFileByPath(node.path);
-        if (!(file instanceof import_obsidian5.TFile) || !/^新的子議題(?: \d+)*$/.test(file.basename)) continue;
+        if (!(file instanceof import_obsidian7.TFile) || !/^新的子議題(?: \d+)*$/.test(file.basename)) continue;
         const note = await this.readNote(node.path);
         if (!note.title.trim() || safeName(note.title) === file.basename) continue;
         const oldPath = node.path, newPath = await this.renameNote(oldPath, note.title);
@@ -3020,7 +5788,7 @@ ${JSON.stringify(map, null, 2)}
       }
       body = normalizeBodyOrder(body, text(fm.title, file.basename), text(fm.summary, placeholder(this.settings.language)), this.settings.language);
       const next = `---
-${(0, import_obsidian5.stringifyYaml)(fm)}---
+${(0, import_obsidian7.stringifyYaml)(fm)}---
 ${withReferenceLinks(body, fm, this.settings.language)}`;
       if (next !== content) await this.app.vault.process(file, () => next);
     }
@@ -3031,7 +5799,7 @@ ${withReferenceLinks(body, fm, this.settings.language)}`;
       if (!marker(fm["agent-map-node"]) || !ensureNoteCssClass(fm)) continue;
       const body = content.replace(/^---\r?\n[\s\S]*?\r?\n---(?:\r?\n|$)/, "");
       await this.app.vault.process(file, () => `---
-${(0, import_obsidian5.stringifyYaml)(fm)}---
+${(0, import_obsidian7.stringifyYaml)(fm)}---
 ${body}`);
     }
   }
@@ -3054,7 +5822,7 @@ ${body}`);
     for (const file of legacyMaps) {
       const map = await this.readMap(file.path);
       for (const node of map.nodes) assigned.add(node.path);
-      let targetRoot = (0, import_obsidian5.normalizePath)(`${this.settings.topicsFolder}/${safeName(map.title)}`), number = 2;
+      let targetRoot = (0, import_obsidian7.normalizePath)(`${this.settings.topicsFolder}/${safeName(map.title)}`), number = 2;
       const base = targetRoot;
       while (this.app.vault.getAbstractFileByPath(targetRoot) || reservedRoots.has(targetRoot)) targetRoot = `${base} ${number++}`;
       reservedRoots.add(targetRoot);
@@ -3101,19 +5869,19 @@ ${body}`);
     } catch (error) {
       for (const move of [...moves].reverse()) {
         const current = this.app.vault.getAbstractFileByPath(move.to);
-        if (current instanceof import_obsidian5.TFile && !this.app.vault.getAbstractFileByPath(move.from)) await this.app.fileManager.renameFile(current, move.from);
+        if (current instanceof import_obsidian7.TFile && !this.app.vault.getAbstractFileByPath(move.from)) await this.app.fileManager.renameFile(current, move.from);
       }
       for (const [path, content] of originals) {
         const file = this.app.vault.getAbstractFileByPath(path);
-        if (file instanceof import_obsidian5.TFile) await this.app.vault.process(file, () => content);
+        if (file instanceof import_obsidian7.TFile) await this.app.vault.process(file, () => content);
       }
       throw error;
     }
   }
   async renameTopic(mapPath, title, targetRoot) {
     const file = this.file(mapPath), root = file.parent;
-    if (!(root instanceof import_obsidian5.TFolder) || !mapPath.startsWith(`${this.settings.topicsFolder}/`)) throw new Error(this.message("error.migrate_legacy_map"));
-    const desired = targetRoot ? (0, import_obsidian5.normalizePath)(targetRoot) : (0, import_obsidian5.normalizePath)(`${this.settings.topicsFolder}/${safeName(title)}`);
+    if (!(root instanceof import_obsidian7.TFolder) || !mapPath.startsWith(`${this.settings.topicsFolder}/`)) throw new Error(this.message("error.migrate_legacy_map"));
+    const desired = targetRoot ? (0, import_obsidian7.normalizePath)(targetRoot) : (0, import_obsidian7.normalizePath)(`${this.settings.topicsFolder}/${safeName(title)}`);
     if (desired !== root.path && this.app.vault.getAbstractFileByPath(desired)) throw new Error(this.message("error.topic_folder_exists"));
     const originalRoot = root.path;
     if (desired !== originalRoot) await this.app.fileManager.renameFile(root, desired);
@@ -3373,9 +6141,9 @@ var PendingSuggestions = class extends Map {
 };
 
 // ui/outline-view.ts
-var import_obsidian6 = require("obsidian");
+var import_obsidian8 = require("obsidian");
 var OUTLINE_VIEW_TYPE = "visual-agent-map-outline";
-var OutlineView = class extends import_obsidian6.ItemView {
+var OutlineView = class extends import_obsidian8.ItemView {
   constructor(leaf, openNote) {
     super(leaf);
     this.openNote = openNote;
@@ -3607,7 +6375,7 @@ var CodexAppServerRuntime = class {
     return [...new Map(models.map((model) => [model.model, model])).values()];
   }
   async runTask(prompt, model, effort, outputSchema, controls) {
-    var _a, _b, _c, _d, _e, _f, _g, _h, _i, _j, _k, _l, _m;
+    var _a, _b, _c, _d, _e, _f, _g, _h, _i, _j, _k, _l, _m, _n;
     if ((_a = controls == null ? void 0 : controls.signal) == null ? void 0 : _a.aborted) throw cancelledError();
     await this.start();
     if ((_b = controls == null ? void 0 : controls.signal) == null ? void 0 : _b.aborted) throw cancelledError();
@@ -3622,16 +6390,17 @@ var CodexAppServerRuntime = class {
     if (!threadId) throw new Error(t("ui.codex_app_server_did_not_create_a_thread"));
     let timedOut = false, interruptRequested = false;
     const completed = new Promise((resolve, reject) => {
-      var _a2;
+      var _a2, _b2;
       const timeout = window.setTimeout(() => {
         this.turns.delete(threadId);
         timedOut = true;
         interrupt(5e3, "\u903E\u6642\u5F8C\u7121\u6CD5\u505C\u6B62 AI \u4EFB\u52D9");
-        reject(new Error(t("ui.the_ai_task_exceeded_3_minutes_vam_attempts_to_interrupt_it")));
-      }, TURN_TIMEOUT_MS);
-      this.turns.set(threadId, { messages: [], resolve, reject, timeout, turnId: "", searches: 0, searchBudget: (_a2 = controls == null ? void 0 : controls.searchBudget) != null ? _a2 : 0, steered: false });
+        reject(new Error((controls == null ? void 0 : controls.timeoutMs) ? "Coffee Tables: generation timed out; received text is saved as a draft." : t("ui.the_ai_task_exceeded_3_minutes_vam_attempts_to_interrupt_it")));
+      }, (_a2 = controls == null ? void 0 : controls.timeoutMs) != null ? _a2 : TURN_TIMEOUT_MS);
+      this.turns.set(threadId, { messages: [], visibleMessages: /* @__PURE__ */ new Map(), resolve, reject, timeout, turnId: "", searches: 0, searchBudget: (_b2 = controls == null ? void 0 : controls.searchBudget) != null ? _b2 : 0, steered: false, onText: controls == null ? void 0 : controls.onText });
     });
     const state = this.turns.get(threadId);
+    void completed.catch(() => void 0);
     const interrupt = (timeoutMs = CONTROL_TIMEOUT_MS, failure = "\u53D6\u6D88 AI \u4EFB\u52D9\u5931\u6557") => {
       if (!state.turnId || interruptRequested) return;
       interruptRequested = true;
@@ -3640,7 +6409,14 @@ var CodexAppServerRuntime = class {
         return (_b2 = (_a2 = this.options).onLog) == null ? void 0 : _b2.call(_a2, "warn", `${failure}\uFF1A${error instanceof Error ? error.message : String(error)}`);
       });
     };
-    const onAbort = () => interrupt();
+    const onAbort = () => {
+      interrupt();
+      if (this.turns.get(threadId) === state) {
+        window.clearTimeout(state.timeout);
+        this.turns.delete(threadId);
+        state.reject(cancelledError());
+      }
+    };
     (_d = controls == null ? void 0 : controls.signal) == null ? void 0 : _d.addEventListener("abort", onAbort, { once: true });
     try {
       if ((_e = controls == null ? void 0 : controls.signal) == null ? void 0 : _e.aborted) throw cancelledError();
@@ -3650,16 +6426,21 @@ var CodexAppServerRuntime = class {
         model: model || null,
         effort: effort || "low",
         sandboxPolicy: { type: "readOnly", networkAccess: false },
-        outputSchema
+        ...outputSchema ? { outputSchema } : {}
       };
       (_f = controls == null ? void 0 : controls.onRequest) == null ? void 0 : _f.call(controls, turnRequest);
       const startedTurn = await this.request("turn/start", turnRequest);
       state.turnId = typeof ((_g = startedTurn.turn) == null ? void 0 : _g.id) === "string" ? startedTurn.turn.id : "";
+      (_h = controls == null ? void 0 : controls.onSteer) == null ? void 0 : _h.call(controls, async (text2) => {
+        var _a2;
+        if (((_a2 = controls.signal) == null ? void 0 : _a2.aborted) || this.turns.get(threadId) !== state || !state.turnId) throw cancelledError();
+        await this.request("turn/steer", { threadId, expectedTurnId: state.turnId, input: [{ type: "text", text: text2 }] });
+      });
       if (timedOut) interrupt(5e3, "\u903E\u6642\u5F8C\u7121\u6CD5\u505C\u6B62 AI \u4EFB\u52D9");
-      else if ((_h = controls == null ? void 0 : controls.signal) == null ? void 0 : _h.aborted) interrupt();
+      else if ((_i = controls == null ? void 0 : controls.signal) == null ? void 0 : _i.aborted) onAbort();
       this.steerIfNeeded(threadId, state);
       const answer = await completed;
-      if ((_i = controls == null ? void 0 : controls.signal) == null ? void 0 : _i.aborted) throw cancelledError();
+      if ((_j = controls == null ? void 0 : controls.signal) == null ? void 0 : _j.aborted) throw cancelledError();
       return answer;
     } catch (error) {
       const state2 = this.turns.get(threadId);
@@ -3669,14 +6450,14 @@ var CodexAppServerRuntime = class {
         state2.reject(error instanceof Error ? error : new Error(String(error)));
         await completed.catch(() => void 0);
       } else await completed.catch(() => void 0);
-      if ((_j = controls == null ? void 0 : controls.signal) == null ? void 0 : _j.aborted) throw cancelledError();
+      if ((_k = controls == null ? void 0 : controls.signal) == null ? void 0 : _k.aborted) throw cancelledError();
       throw error;
     } finally {
-      (_k = controls == null ? void 0 : controls.signal) == null ? void 0 : _k.removeEventListener("abort", onAbort);
+      (_l = controls == null ? void 0 : controls.signal) == null ? void 0 : _l.removeEventListener("abort", onAbort);
       try {
         await this.request("thread/unsubscribe", { threadId }, 5e3);
       } catch (error) {
-        (_m = (_l = this.options).onLog) == null ? void 0 : _m.call(_l, "warn", `Codex App Server \u7121\u6CD5\u53D6\u6D88 thread \u8A02\u95B1\uFF1A${error instanceof Error ? error.message : String(error)}`);
+        (_n = (_m = this.options).onLog) == null ? void 0 : _n.call(_m, "warn", `Codex App Server \u7121\u6CD5\u53D6\u6D88 thread \u8A02\u95B1\uFF1A${error instanceof Error ? error.message : String(error)}`);
       }
     }
   }
@@ -3721,7 +6502,7 @@ var CodexAppServerRuntime = class {
     }
   }
   handle(message) {
-    var _a, _b;
+    var _a, _b, _c, _d, _e, _f, _g;
     if ("id" in message && "method" in message) {
       this.respondToServerRequest(message);
       return;
@@ -3740,6 +6521,16 @@ var CodexAppServerRuntime = class {
     const threadId = typeof (params == null ? void 0 : params.threadId) === "string" ? params.threadId : "";
     const state = this.turns.get(threadId);
     if (!state) return;
+    if (message.method === "item/agentMessage/delta" && typeof (params == null ? void 0 : params.delta) === "string") {
+      if (state.streamItem !== params.itemId) {
+        state.streamItem = params.itemId;
+        state.streamText = "";
+      }
+      state.streamText = ((_a = state.streamText) != null ? _a : "") + params.delta;
+      if (typeof params.itemId === "string") state.visibleMessages.set(params.itemId, state.streamText);
+      (_b = state.onText) == null ? void 0 : _b.call(state, [...state.visibleMessages.values()].join("\n\n"));
+      return;
+    }
     if (message.method === "item/started") {
       const item = params == null ? void 0 : params.item;
       if ((item == null ? void 0 : item.type) === "webSearch" && (!item.action || item.action.type === "search")) {
@@ -3750,15 +6541,20 @@ var CodexAppServerRuntime = class {
     }
     if (message.method === "item/completed") {
       const item = params == null ? void 0 : params.item;
-      if ((item == null ? void 0 : item.type) === "agentMessage" && typeof item.text === "string") state.messages.push(item.text);
+      if ((item == null ? void 0 : item.type) === "agentMessage" && typeof item.text === "string") {
+        const id = typeof item.id === "string" ? item.id : (_c = state.streamItem) != null ? _c : `message-${state.messages.length}`;
+        state.visibleMessages.set(id, item.text);
+        state.messages.push(item.text);
+        (_d = state.onText) == null ? void 0 : _d.call(state, [...state.visibleMessages.values()].join("\n\n"));
+      }
       return;
     }
     if (message.method === "turn/completed") {
       const turn = params == null ? void 0 : params.turn;
       window.clearTimeout(state.timeout);
       this.turns.delete(threadId);
-      if ((turn == null ? void 0 : turn.status) === "completed") state.resolve(((_a = state.messages.at(-1)) == null ? void 0 : _a.trim()) || "");
-      else state.reject(new Error(typeof ((_b = turn == null ? void 0 : turn.error) == null ? void 0 : _b.message) === "string" ? turn.error.message : t("ui.codex_turn_0", typeof (turn == null ? void 0 : turn.status) === "string" ? turn.status : t("ui.failed"))));
+      if ((turn == null ? void 0 : turn.status) === "completed") state.resolve(state.onText ? [...state.visibleMessages.values()].join("\n\n").trim() || ((_e = state.messages.at(-1)) == null ? void 0 : _e.trim()) || "" : ((_f = state.messages.at(-1)) == null ? void 0 : _f.trim()) || "");
+      else state.reject(new Error(typeof ((_g = turn == null ? void 0 : turn.error) == null ? void 0 : _g.message) === "string" ? turn.error.message : t("ui.codex_turn_0", typeof (turn == null ? void 0 : turn.status) === "string" ? turn.status : t("ui.failed"))));
     }
   }
   steerIfNeeded(threadId, state) {
@@ -3830,8 +6626,7 @@ function claudeTaskArgs(model, effort, schema, webSearch) {
     "--output-format",
     "json",
     "--verbose",
-    "--json-schema",
-    JSON.stringify(claudeOutputSchema(schema)),
+    ...schema ? ["--json-schema", JSON.stringify(claudeOutputSchema(schema))] : [],
     "--model",
     model,
     "--effort",
@@ -3849,7 +6644,7 @@ function claudeTaskArgs(model, effort, schema, webSearch) {
     webSearch ? "WebSearch,WebFetch" : ""
   ];
 }
-function claudeStructuredOutput(stdout) {
+function claudeStructuredOutput(stdout, plainText = false) {
   const value = JSON.parse(stdout);
   const events = Array.isArray(value) ? value : [];
   const final = events.length ? events.reverse().find((item) => item && typeof item === "object" && "type" in item && item.type === "result") : value;
@@ -3859,6 +6654,7 @@ function claudeStructuredOutput(stdout) {
     const details = Array.isArray(record.errors) ? record.errors.filter((item) => typeof item === "string").join("\n") : "";
     throw new Error(details || (typeof record.result === "string" ? record.result : t("ui.claude_task_failed")));
   }
+  if (plainText && typeof record.result === "string") return record.result;
   if (record.structured_output === void 0 || record.structured_output === null) throw new Error(t("ui.claude_did_not_return_structured_output"));
   return JSON.stringify(record.structured_output);
 }
@@ -3879,10 +6675,15 @@ var ClaudeCodeCliRuntime = class {
     if ((_a = controls.signal) == null ? void 0 : _a.aborted) throw abortError();
     const webSearch = ((_b = controls.searchBudget) != null ? _b : 0) > 0;
     const args = claudeTaskArgs(model, effort, outputSchema, webSearch);
+    if (controls.onText && !outputSchema) {
+      args[args.indexOf("json")] = "stream-json";
+      args.push("--include-partial-messages");
+      if (controls.onSteer) args.push("--input-format", "stream-json");
+    }
     (_c = controls.onRequest) == null ? void 0 : _c.call(controls, { provider: "claude", executable: this.options.executable, args: args.map((arg, index) => index === args.indexOf(JSON.stringify(claudeOutputSchema(outputSchema))) ? "<response-schema>" : arg), input: "<VAM prompt via stdin>" });
     (_e = (_d = this.options).onLog) == null ? void 0 : _e.call(_d, "info", `\u555F\u52D5 Claude Code\uFF1A${this.options.executable} --print (${webSearch ? "\u7DB2\u8DEF\u641C\u5C0B\u53EF\u7528" : "\u50C5\u4F7F\u7528 VAM \u63D0\u4F9B\u7684\u5167\u5BB9"})`);
     return new Promise((resolve, reject) => {
-      var _a2, _b2;
+      var _a2, _b2, _c2;
       let child;
       try {
         child = this.spawn(this.options.executable, args, { cwd: this.options.cwd, env: this.options.env, stdio: ["pipe", "pipe", "pipe"], windowsHide: true });
@@ -3890,7 +6691,43 @@ var ClaudeCodeCliRuntime = class {
         reject(error instanceof Error ? error : new Error(String(error)));
         return;
       }
-      let stdout = "", stderr = "", settled = false;
+      let stdout = "", stderr = "", settled = false, inputOpen = Boolean(controls.onSteer);
+      let streamBuffer = "", streamText = "", currentText = "", finalResult = "";
+      const streaming = !!controls.onText && !outputSchema;
+      const readStreamLine = (line) => {
+        var _a3, _b3, _c3, _d2, _e2, _f, _g, _h;
+        if (!line.trim()) return;
+        const record = JSON.parse(line);
+        if (record.parent_tool_use_id) return;
+        if (record.type === "result") {
+          finalResult = line;
+          if (inputOpen) {
+            inputOpen = false;
+            child.stdin.end();
+          }
+          return;
+        }
+        if (record.type === "stream_event" && ((_a3 = record.event) == null ? void 0 : _a3.type) === "message_start") currentText = "";
+        if (record.type === "stream_event" && ((_c3 = (_b3 = record.event) == null ? void 0 : _b3.delta) == null ? void 0 : _c3.type) === "text_delta" && typeof record.event.delta.text === "string") {
+          currentText += record.event.delta.text;
+          (_d2 = controls.onText) == null ? void 0 : _d2.call(controls, [streamText, currentText].filter(Boolean).join("\n\n"));
+        }
+        if (record.type === "stream_event" && ((_e2 = record.event) == null ? void 0 : _e2.type) === "message_stop") {
+          if (currentText.trim()) streamText = [streamText, currentText].filter(Boolean).join("\n\n");
+          currentText = "";
+          (_f = controls.onText) == null ? void 0 : _f.call(controls, streamText);
+        }
+        if (record.type === "assistant" && ((_g = record.message) == null ? void 0 : _g.content)) {
+          const complete = record.message.content.filter((item) => item.type === "text").map((item) => {
+            var _a4;
+            return (_a4 = item.text) != null ? _a4 : "";
+          }).join("\n");
+          if (complete && !streamText.endsWith(complete)) {
+            currentText = complete;
+            (_h = controls.onText) == null ? void 0 : _h.call(controls, [streamText, currentText].filter(Boolean).join("\n\n"));
+          }
+        }
+      };
       const cleanup = () => {
         var _a3;
         window.clearTimeout(timeout);
@@ -3922,11 +6759,27 @@ var ClaudeCodeCliRuntime = class {
       };
       const timeout = window.setTimeout(() => {
         stop();
-        finish(new Error(t("ui.the_ai_task_exceeded_3_minutes_vam_attempts_to_interrupt_it")));
-      }, (_a2 = this.options.timeoutMs) != null ? _a2 : CLAUDE_TASK_TIMEOUT_MS);
-      (_b2 = controls.signal) == null ? void 0 : _b2.addEventListener("abort", onAbort, { once: true });
+        finish(new Error(controls.timeoutMs ? "Coffee Tables: generation timed out; received text is saved as a draft." : t("ui.the_ai_task_exceeded_3_minutes_vam_attempts_to_interrupt_it")));
+      }, (_b2 = (_a2 = controls.timeoutMs) != null ? _a2 : this.options.timeoutMs) != null ? _b2 : CLAUDE_TASK_TIMEOUT_MS);
+      (_c2 = controls.signal) == null ? void 0 : _c2.addEventListener("abort", onAbort, { once: true });
       child.stdout.on("data", (chunk) => {
-        if (!settled) stdout = `${stdout}${chunk.toString("utf8")}`.slice(-4e6);
+        if (settled) return;
+        if (!streaming) {
+          stdout = `${stdout}${chunk.toString("utf8")}`.slice(-4e6);
+          return;
+        }
+        streamBuffer += chunk.toString("utf8");
+        try {
+          let newline;
+          while ((newline = streamBuffer.indexOf("\n")) >= 0) {
+            const line = streamBuffer.slice(0, newline);
+            streamBuffer = streamBuffer.slice(newline + 1);
+            readStreamLine(line);
+          }
+        } catch (error) {
+          stop();
+          finish(error instanceof Error ? error : new Error(String(error)));
+        }
       });
       child.stderr.on("data", (chunk) => {
         if (!settled) stderr = `${stderr}${chunk.toString("utf8")}`.slice(-16384);
@@ -3944,13 +6797,26 @@ var ClaudeCodeCliRuntime = class {
           return;
         }
         try {
-          finish(void 0, claudeStructuredOutput(stdout));
+          if (streaming) readStreamLine(streamBuffer);
+          const result = claudeStructuredOutput(streaming ? finalResult : stdout, !outputSchema);
+          const streamed = [streamText, currentText].filter(Boolean).join("\n\n");
+          finish(void 0, streaming && result.length < streamed.length ? streamed : result);
         } catch (error) {
           finish(error instanceof Error ? error : new Error(String(error)));
         }
       });
       try {
-        child.stdin.end(prompt);
+        if (controls.onSteer) {
+          const sendInput = (text2) => {
+            if (!inputOpen || settled) throw new Error("This Coffee Tables response has already ended.");
+            child.stdin.write(`${JSON.stringify({ type: "user", message: { role: "user", content: [{ type: "text", text: text2 }] } })}
+`);
+          };
+          sendInput(prompt);
+          controls.onSteer(async (text2) => {
+            sendInput(text2);
+          });
+        } else child.stdin.end(prompt);
       } catch (error) {
         stop();
         finish(error instanceof Error ? error : new Error(String(error)));
@@ -4085,13 +6951,13 @@ var PartialChildBatchError = class extends Error {
 function quickShape(layers, firstLayerCount, childrenPerParent) {
   if (![layers, firstLayerCount].every(Number.isSafeInteger) || layers < 1 || layers > 15 || firstLayerCount < 1 || layers > 1 && (!Number.isSafeInteger(childrenPerParent) || childrenPerParent < 1)) throw new Error(t("ui.levels_first_level_count_and_children_per_topic_must_be_posi"));
   const counts = [];
-  let count = BigInt(firstLayerCount), total = BigInt(0);
+  let count = BigInt(firstLayerCount), total2 = BigInt(0);
   for (let level = 0; level < layers; level++) {
     counts.push(count);
-    total += count;
+    total2 += count;
     if (level + 1 < layers) count *= BigInt(childrenPerParent);
   }
-  return { counts, total };
+  return { counts, total: total2 };
 }
 function quickSuggestions(items, layers, firstLayerCount, childrenPerParent) {
   var _a;
@@ -4124,7 +6990,7 @@ function quickSuggestions(items, layers, firstLayerCount, childrenPerParent) {
   if (selected.length !== items.length) invalid();
   return selected;
 }
-var TaskModal = class extends import_obsidian7.Modal {
+var TaskModal = class extends import_obsidian9.Modal {
   constructor(app, value, submit, titleText = t("ui.custom_ai_task"), description = t("ui.describe_what_you_want_ai_to_do_next"), rules = "", mode = "research", depth = "normal", visual = "auto", _allowSave = true, expand = false, referenceSettings, synthesisTopics, currentLanguage = "zh-TW", modelId = "", reasoningId = "auto", targetLabel = "") {
     super(app);
     this.value = value;
@@ -4196,14 +7062,14 @@ var TaskModal = class extends import_obsidian7.Modal {
       this.close();
       this.submit(value, run, { ...synthesis ? { synthesisContent } : {}, referenceGroups: (_b2 = sources2 == null ? void 0 : sources2.groups) != null ? _b2 : [], requirements: input.value.trim(), outputLanguage: languageSelect.value, researchMode: (sources2 == null ? void 0 : sources2.webSearch) ? "research" : "local", researchDepth: depth.value, visualMode: (sources2 == null ? void 0 : sources2.imageSearch) ? this.visual === "on" ? "on" : "auto" : "off", multiLayer: shallowResearch }, "");
     };
-    new import_obsidian7.Setting(this.contentEl).addButton((b) => b.setButtonText(t("ui.cancel")).onClick(() => this.close())).addButton((b) => b.setButtonText(t("ui.confirm_and_run")).setCta().onClick(() => {
-      void save(true).catch((error) => new import_obsidian7.Notice(String(error)));
+    new import_obsidian9.Setting(this.contentEl).addButton((b) => b.setButtonText(t("ui.cancel")).onClick(() => this.close())).addButton((b) => b.setButtonText(t("ui.confirm_and_run")).setCta().onClick(() => {
+      void save(true).catch((error) => new import_obsidian9.Notice(String(error)));
     }));
     input.focus();
     input.setSelectionRange(input.value.length, input.value.length);
   }
 };
-var NextStepModal = class extends import_obsidian7.Modal {
+var NextStepModal = class extends import_obsidian9.Modal {
   constructor(app, topic, depth, childrenCount, pendingCount, plugin, research, expand, synthesize, modelSettings) {
     super(app);
     this.topic = topic;
@@ -4405,8 +7271,8 @@ var NextStepModal = class extends import_obsidian7.Modal {
           return;
         }
         const renamed = new Map(selected.filter((row) => !row.item.parentTitle).map((row) => [row.item.title, row.title.value.trim()]));
-        const names = selected.filter((row) => !row.item.parentTitle).map((row) => row.title.value.trim());
-        if (new Set(names).size !== names.length) {
+        const names2 = selected.filter((row) => !row.item.parentTitle).map((row) => row.title.value.trim());
+        if (new Set(names2).size !== names2.length) {
           this.failed(panel, button, t("ui.first_level_topic_names_must_be_unique"));
           return;
         }
@@ -4530,7 +7396,7 @@ var NextStepModal = class extends import_obsidian7.Modal {
           this.close();
         }, (message) => {
           release();
-          if (this.closed) new import_obsidian7.Notice(message);
+          if (this.closed) new import_obsidian9.Notice(message);
           else {
             started = false;
             this.failedAi(research, confirm, message);
@@ -4647,7 +7513,7 @@ var NextStepModal = class extends import_obsidian7.Modal {
           options.firstLayerCount = firstLayerCount;
           options.childrenPerParent = layers === 1 ? 1 : childrenPerParent;
           await this.expand(options, "", () => {
-          }, (message) => new import_obsidian7.Notice(message), () => {
+          }, (message) => new import_obsidian9.Notice(message), () => {
           });
           this.close();
           return;
@@ -4747,7 +7613,7 @@ var NextStepModal = class extends import_obsidian7.Modal {
     this.contentEl.createEl("p", { text: t("ui.if_an_ai_task_exceeds_3_minutes_vam_attempts_to_interrupt_it"), cls: "vam-hint" });
   }
 };
-var AiDraftModal = class extends import_obsidian7.Modal {
+var AiDraftModal = class extends import_obsidian9.Modal {
   constructor(app, summary, detail, confirmLabel, confirm) {
     super(app);
     this.summary = summary;
@@ -4763,13 +7629,13 @@ var AiDraftModal = class extends import_obsidian7.Modal {
     const detail = this.contentEl.createEl("textarea", { cls: "vam-task-input", text: this.detail });
     detail.rows = 18;
     detail.readOnly = true;
-    new import_obsidian7.Setting(this.contentEl).addButton((button) => button.setButtonText(t("ui.cancel")).onClick(() => this.close())).addButton((button) => button.setButtonText(this.confirmLabel).setCta().onClick(() => {
+    new import_obsidian9.Setting(this.contentEl).addButton((button) => button.setButtonText(t("ui.cancel")).onClick(() => this.close())).addButton((button) => button.setButtonText(this.confirmLabel).setCta().onClick(() => {
       this.close();
       this.confirm();
     }));
   }
 };
-var CodexSetupModal = class extends import_obsidian7.Modal {
+var CodexSetupModal = class extends import_obsidian9.Modal {
   constructor(app, executable, recheck) {
     super(app);
     this.executable = executable;
@@ -4786,13 +7652,13 @@ var CodexSetupModal = class extends import_obsidian7.Modal {
     steps.createEl("li", { text: t("ui.return_to_vam_and_select_i_ve_finished_check_again") });
     this.contentEl.createEl("p", { text: t("ui.no_api_key_is_required_the_standalone_codex_cli_does_not_req"), cls: "vam-setup-note" });
     this.contentEl.createEl("p", { text: t("ui.path_currently_checked_0", this.executable), cls: "vam-setup-path" });
-    new import_obsidian7.Setting(this.contentEl).addButton((button) => button.setButtonText(t("ui.do_this_later")).onClick(() => this.close())).addButton((button) => button.setButtonText(t("ui.i_ve_finished_check_again")).setCta().onClick(() => {
+    new import_obsidian9.Setting(this.contentEl).addButton((button) => button.setButtonText(t("ui.do_this_later")).onClick(() => this.close())).addButton((button) => button.setButtonText(t("ui.i_ve_finished_check_again")).setCta().onClick(() => {
       this.close();
       this.recheck();
     }));
   }
 };
-var AiUsageModal = class extends import_obsidian7.Modal {
+var AiUsageModal = class extends import_obsidian9.Modal {
   constructor(app, provider, resolve) {
     super(app);
     this.provider = provider;
@@ -4808,13 +7674,13 @@ var AiUsageModal = class extends import_obsidian7.Modal {
       this.close();
       this.resolve(confirmed);
     };
-    new import_obsidian7.Setting(this.contentEl).addButton((button) => button.setButtonText(t("ui.cancel")).onClick(() => finish(false))).addButton((button) => button.setButtonText(t("ui.understand_and_run")).setCta().onClick(() => finish(true)));
+    new import_obsidian9.Setting(this.contentEl).addButton((button) => button.setButtonText(t("ui.cancel")).onClick(() => finish(false))).addButton((button) => button.setButtonText(t("ui.understand_and_run")).setCta().onClick(() => finish(true)));
   }
   onClose() {
     if (!this.settled) this.resolve(false);
   }
 };
-var ClaudeSetupModal = class extends import_obsidian7.Modal {
+var ClaudeSetupModal = class extends import_obsidian9.Modal {
   constructor(app, executable, url, recheck) {
     super(app);
     this.executable = executable;
@@ -4830,13 +7696,13 @@ var ClaudeSetupModal = class extends import_obsidian7.Modal {
     install.createEl("a", { text: t("ui.official_claude_code_installation_guide"), href: this.url, attr: { target: "_blank", rel: "noopener noreferrer" } });
     steps.createEl("li", { text: t("ui.return_to_vam_and_check_the_cli_path_again") });
     this.contentEl.createEl("p", { text: t("ui.path_currently_checked_0", this.executable), cls: "vam-setup-path" });
-    new import_obsidian7.Setting(this.contentEl).addButton((button) => button.setButtonText(t("ui.do_this_later")).onClick(() => this.close())).addButton((button) => button.setButtonText(t("ui.check_again")).setCta().onClick(() => {
+    new import_obsidian9.Setting(this.contentEl).addButton((button) => button.setButtonText(t("ui.do_this_later")).onClick(() => this.close())).addButton((button) => button.setButtonText(t("ui.check_again")).setCta().onClick(() => {
       this.close();
       this.recheck();
     }));
   }
 };
-var ChildProposalModal = class extends import_obsidian7.Modal {
+var ChildProposalModal = class extends import_obsidian9.Modal {
   constructor(app, suggestions, submit) {
     super(app);
     this.suggestions = suggestions;
@@ -4863,16 +7729,16 @@ var ChildProposalModal = class extends import_obsidian7.Modal {
       contribution.setAttr("aria-label", t("ui.contribution_to_the_parent_topic"));
       rows.push({ item, check, title, task, contribution });
     }
-    new import_obsidian7.Setting(this.contentEl).addButton((b) => b.setButtonText(t("ui.cancel")).onClick(() => this.close())).addButton((b) => b.setButtonText(t("ui.create_subtopics")).setCta().onClick(() => {
+    new import_obsidian9.Setting(this.contentEl).addButton((b) => b.setButtonText(t("ui.cancel")).onClick(() => this.close())).addButton((b) => b.setButtonText(t("ui.create_subtopics")).setCta().onClick(() => {
       const selected = rows.filter((row) => row.check.checked && row.title.value.trim());
       const renamed = new Map(selected.filter((row) => !row.item.parentTitle).map((row) => [row.item.title, row.title.value.trim()]));
       const rootNames = selected.filter((row) => !row.item.parentTitle).map((row) => row.title.value.trim());
       if (new Set(rootNames).size !== rootNames.length) {
-        new import_obsidian7.Notice(t("ui.first_level_topic_names_must_be_unique"));
+        new import_obsidian9.Notice(t("ui.first_level_topic_names_must_be_unique"));
         return;
       }
       if (selected.some((row) => row.item.parentTitle && !renamed.has(row.item.parentTitle))) {
-        new import_obsidian7.Notice(t("ui.select_the_parent_topic_before_its_child"));
+        new import_obsidian9.Notice(t("ui.select_the_parent_topic_before_its_child"));
         return;
       }
       this.close();
@@ -4880,10 +7746,10 @@ var ChildProposalModal = class extends import_obsidian7.Modal {
     }));
   }
 };
-var IntegrationModal = class extends import_obsidian7.Modal {
-  constructor(app, names, _defaultRules, submit) {
+var IntegrationModal = class extends import_obsidian9.Modal {
+  constructor(app, names2, _defaultRules, submit) {
     super(app);
-    this.names = names;
+    this.names = names2;
     this.submit = submit;
   }
   onOpen() {
@@ -4906,12 +7772,12 @@ var IntegrationModal = class extends import_obsidian7.Modal {
       this.close();
       this.submit(title.value.trim(), goal.value.trim(), "");
     };
-    new import_obsidian7.Setting(this.contentEl).addButton((button) => button.setButtonText(t("ui.cancel")).onClick(() => this.close())).addButton((button) => button.setButtonText(t("ui.next_set_ai_sources")).setCta().onClick(save));
+    new import_obsidian9.Setting(this.contentEl).addButton((button) => button.setButtonText(t("ui.cancel")).onClick(() => this.close())).addButton((button) => button.setButtonText(t("ui.next_set_ai_sources")).setCta().onClick(save));
     title.focus();
     title.select();
   }
 };
-var MapConflictModal = class extends import_obsidian7.Modal {
+var MapConflictModal = class extends import_obsidian9.Modal {
   constructor(app, local, disk, resolve) {
     super(app);
     this.local = local;
@@ -4929,11 +7795,11 @@ var MapConflictModal = class extends import_obsidian7.Modal {
       this.close();
       this.resolve(map);
     };
-    new import_obsidian7.Setting(this.contentEl).addButton((button) => button.setButtonText(t("ui.use_file_contents")).onClick(() => finish(clone(this.disk)))).addButton((button) => button.setButtonText(t("ui.keep_editor_contents")).onClick(() => finish(clone(this.local)))).addButton((button) => button.setButtonText(t("ui.save_merged_contents")).setCta().onClick(() => {
+    new import_obsidian9.Setting(this.contentEl).addButton((button) => button.setButtonText(t("ui.use_file_contents")).onClick(() => finish(clone(this.disk)))).addButton((button) => button.setButtonText(t("ui.keep_editor_contents")).onClick(() => finish(clone(this.local)))).addButton((button) => button.setButtonText(t("ui.save_merged_contents")).setCta().onClick(() => {
       try {
         finish(parseMap(serializeMap(JSON.parse(input.value))));
       } catch (error) {
-        new import_obsidian7.Notice(error instanceof Error ? t("ui.invalid_merged_contents_0", error.message) : t("ui.invalid_merged_contents"));
+        new import_obsidian9.Notice(error instanceof Error ? t("ui.invalid_merged_contents_0", error.message) : t("ui.invalid_merged_contents"));
       }
     }));
   }
@@ -4941,7 +7807,7 @@ var MapConflictModal = class extends import_obsidian7.Modal {
     if (!this.settled) this.resolve(clone(this.disk));
   }
 };
-var NoteCollectionModal = class extends import_obsidian7.Modal {
+var NoteCollectionModal = class extends import_obsidian9.Modal {
   constructor(app, titleText, files, actions) {
     super(app);
     this.titleText = titleText;
@@ -4960,10 +7826,10 @@ var NoteCollectionModal = class extends import_obsidian7.Modal {
         action.run(file);
       });
     }
-    new import_obsidian7.Setting(this.contentEl).addButton((button) => button.setButtonText(t("ui.close")).onClick(() => this.close()));
+    new import_obsidian9.Setting(this.contentEl).addButton((button) => button.setButtonText(t("ui.close")).onClick(() => this.close()));
   }
 };
-var TopicPickerModal = class extends import_obsidian7.Modal {
+var TopicPickerModal = class extends import_obsidian9.Modal {
   constructor(app, titleText, topics, choose) {
     super(app);
     this.titleText = titleText;
@@ -4972,15 +7838,15 @@ var TopicPickerModal = class extends import_obsidian7.Modal {
   }
   onOpen() {
     this.titleEl.setText(this.titleText);
-    for (const topic of this.topics) new import_obsidian7.Setting(this.contentEl).setName(topic.title).setDesc(topic.root).addButton((button) => button.setButtonText(t("ui.select")).onClick(() => {
+    for (const topic of this.topics) new import_obsidian9.Setting(this.contentEl).setName(topic.title).setDesc(topic.root).addButton((button) => button.setButtonText(t("ui.select")).onClick(() => {
       this.close();
       this.choose(topic);
     }));
     if (!this.topics.length) this.contentEl.createEl("p", { text: t("ui.no_other_topics") });
-    new import_obsidian7.Setting(this.contentEl).addButton((button) => button.setButtonText(t("ui.cancel")).onClick(() => this.close()));
+    new import_obsidian9.Setting(this.contentEl).addButton((button) => button.setButtonText(t("ui.cancel")).onClick(() => this.close()));
   }
 };
-var VisualAgentMapView = class extends import_obsidian7.ItemView {
+var VisualAgentMapView = class extends import_obsidian9.ItemView {
   constructor(leaf, plugin) {
     super(leaf);
     this.plugin = plugin;
@@ -5634,7 +8500,7 @@ var VisualAgentMapView = class extends import_obsidian7.ItemView {
     this.updateHistoryButtons();
   }
   openDetails(node) {
-    void this.plugin.openDetails(this.plugin.repo.file(node.path)).catch((error) => new import_obsidian7.Notice(error instanceof Error ? error.message : String(error)));
+    void this.plugin.openDetails(this.plugin.repo.file(node.path)).catch((error) => new import_obsidian9.Notice(error instanceof Error ? error.message : String(error)));
   }
   async travel(redo) {
     const action = redo ? this.history.redo() : this.history.undo();
@@ -5665,7 +8531,7 @@ var VisualAgentMapView = class extends import_obsidian7.ItemView {
     var _a;
     if (this.builtIn) return;
     if (!this.path || !this.map || this.closed) return;
-    if (!(this.app.vault.getAbstractFileByPath(this.path) instanceof import_obsidian7.TFile)) {
+    if (!(this.app.vault.getAbstractFileByPath(this.path) instanceof import_obsidian9.TFile)) {
       this.map = null;
       this.path = "";
       this.history.clear();
@@ -5702,7 +8568,7 @@ var VisualAgentMapView = class extends import_obsidian7.ItemView {
     new NameModal(this.app, t("ui.rename_mind_map"), this.map.title, (title) => this.enqueue(async () => {
       if (!this.map) return;
       if (!this.path.startsWith(`${this.plugin.settings.topicsFolder}/`)) {
-        new import_obsidian7.Notice(t("ui.migrate_old_data_before_renaming_this_topic"));
+        new import_obsidian9.Notice(t("ui.migrate_old_data_before_renaming_this_topic"));
         return;
       }
       const before = clone(this.map), beforeRoot = this.plugin.repo.topicRoot(this.path);
@@ -5774,7 +8640,7 @@ var VisualAgentMapView = class extends import_obsidian7.ItemView {
     const deleted = this.deletedMap;
     if (!deleted || deleted.deleted) return;
     const file = this.app.vault.getAbstractFileByPath(deleted.path);
-    if (!(file instanceof import_obsidian7.TFile) || await this.app.vault.read(file) !== deleted.content) throw new Error(t("ui.the_topic_changed_the_synthesis_draft_was_not_saved"));
+    if (!(file instanceof import_obsidian9.TFile) || await this.app.vault.read(file) !== deleted.content) throw new Error(t("ui.the_topic_changed_the_synthesis_draft_was_not_saved"));
     await this.app.fileManager.trashFile(file);
     deleted.deleted = true;
     this.path = "";
@@ -6007,11 +8873,11 @@ var VisualAgentMapView = class extends import_obsidian7.ItemView {
     this.multiSelected = new Set([...this.multiSelected].filter((id) => shown.some((node) => node.id === id)));
     if (this.integrationMode) {
       const selection = workspace.createDiv("vam-selection-bar");
-      const names = [...this.multiSelected].map((id) => {
+      const names2 = [...this.multiSelected].map((id) => {
         var _a2;
         return (_a2 = this.notes.get(id)) == null ? void 0 : _a2.title;
       }).filter(Boolean);
-      selection.createSpan({ text: this.multiSelected.size ? t("ui.selected_0_1_2", this.multiSelected.size, names.slice(0, 2).join("\u3001"), names.length > 2 ? "\u2026" : "") : t("ui.prompt_select_topics") });
+      selection.createSpan({ text: this.multiSelected.size ? t("ui.selected_0_1_2", this.multiSelected.size, names2.slice(0, 2).join("\u3001"), names2.length > 2 ? "\u2026" : "") : t("ui.prompt_select_topics") });
       this.button(selection, t("ui.clear"), () => {
         this.multiSelected.clear();
         this.render();
@@ -6171,7 +9037,7 @@ var VisualAgentMapView = class extends import_obsidian7.ItemView {
     preview.createEl("strong", { text: note.title });
     const content = preview.createDiv("vam-hover-markdown");
     const path = (_d = (_c = (_b = this.map) == null ? void 0 : _b.nodes.find((node) => node.id === card.dataset.nodeId)) == null ? void 0 : _c.path) != null ? _d : "";
-    void import_obsidian7.MarkdownRenderer.render(this.app, note.preview || t("ui.no_preview_content_yet"), content, path, this);
+    void import_obsidian9.MarkdownRenderer.render(this.app, note.preview || t("ui.no_preview_content_yet"), content, path, this);
     const host = workspace.getBoundingClientRect(), rect = card.getBoundingClientRect();
     const availableWidth = Math.max(180, host.width - 24);
     const width = Math.min(size.max, Math.max(Math.min(size.min, availableWidth), availableWidth));
@@ -6212,7 +9078,7 @@ var VisualAgentMapView = class extends import_obsidian7.ItemView {
         const map = await this.plugin.repo.readMap(topic.mapPath);
         const files = map.nodes.map((node) => {
           const file = this.app.vault.getAbstractFileByPath(node.path);
-          if (!(file instanceof import_obsidian7.TFile) || file.extension.toLowerCase() !== "md") throw new Error(t("ui.reference_map_note_unavailable", node.path));
+          if (!(file instanceof import_obsidian9.TFile) || file.extension.toLowerCase() !== "md") throw new Error(t("ui.reference_map_note_unavailable", node.path));
           return file;
         });
         const documents = [];
@@ -6275,7 +9141,7 @@ var VisualAgentMapView = class extends import_obsidian7.ItemView {
   }
   openNodePanel(node, mode) {
     const render = (content, close) => this.renderInspector(content, node, mode, close);
-    new class extends import_obsidian7.Modal {
+    new class extends import_obsidian9.Modal {
       onOpen() {
         this.modalEl.addClass("vam-topic-modal");
         render(this.contentEl, () => this.close());
@@ -6296,7 +9162,7 @@ var VisualAgentMapView = class extends import_obsidian7.ItemView {
         panel.createEl("h3", { text: note.title });
         panel.createEl("p", { text: note.summary, cls: "vam-sample-summary" });
         const detail = panel.createDiv("vam-sample-detail");
-        void import_obsidian7.MarkdownRenderer.render(this.app, note.detail, detail, "", this);
+        void import_obsidian9.MarkdownRenderer.render(this.app, note.detail, detail, "", this);
         if (note.sourcePaths.length) {
           const sources2 = panel.createDiv("vam-reference-sources");
           sources2.createEl("strong", { text: t("ui.source_topics") });
@@ -6316,14 +9182,14 @@ var VisualAgentMapView = class extends import_obsidian7.ItemView {
           for (const path of sourcePaths) {
             const sourceNode = (_d = this.map) == null ? void 0 : _d.nodes.find((item) => item.path === path), sourceNote = sourceNode ? this.notes.get(sourceNode.id) : null;
             const file = this.app.vault.getAbstractFileByPath(path);
-            this.button(sources2, (_f = sourceNote == null ? void 0 : sourceNote.title) != null ? _f : file instanceof import_obsidian7.TFile ? file.basename : t("ui.0_moved", (_e = path.split("/").at(-1)) == null ? void 0 : _e.replace(/\.md$/, "")), () => {
+            this.button(sources2, (_f = sourceNote == null ? void 0 : sourceNote.title) != null ? _f : file instanceof import_obsidian9.TFile ? file.basename : t("ui.0_moved", (_e = path.split("/").at(-1)) == null ? void 0 : _e.replace(/\.md$/, "")), () => {
               close == null ? void 0 : close();
               if (sourceNode) {
                 this.selected = sourceNode.id;
                 this.render();
                 this.focusNode(sourceNode);
-              } else if (file instanceof import_obsidian7.TFile) void this.plugin.openDetails(file);
-            }, !(sourceNode || file instanceof import_obsidian7.TFile));
+              } else if (file instanceof import_obsidian9.TFile) void this.plugin.openDetails(file);
+            }, !(sourceNode || file instanceof import_obsidian9.TFile));
           }
         }
       }
@@ -6401,16 +9267,16 @@ var VisualAgentMapView = class extends import_obsidian7.ItemView {
           status.setText(t("ui.select_at_least_one_subtopic"));
           return;
         }
-        const names = new Map(chosen.map((row) => [row.original.title, row.title.value.trim()]));
-        if (new Set(names.values()).size !== names.size) {
+        const names2 = new Map(chosen.map((row) => [row.original.title, row.title.value.trim()]));
+        if (new Set(names2.values()).size !== names2.size) {
           status.setText(t("ui.subtopic_names_must_be_unique"));
           return;
         }
-        if (chosen.some((row) => row.original.parentTitle && !names.has(row.original.parentTitle))) {
+        if (chosen.some((row) => row.original.parentTitle && !names2.has(row.original.parentTitle))) {
           status.setText(t("ui.select_the_parent_topic_before_its_child"));
           return;
         }
-        const items = chosen.map((row) => ({ title: row.title.value.trim(), task: row.task.value.trim(), contribution: row.contribution.value.trim(), parentTitle: row.original.parentTitle ? names.get(row.original.parentTitle) : "" }));
+        const items = chosen.map((row) => ({ title: row.title.value.trim(), task: row.task.value.trim(), contribution: row.contribution.value.trim(), parentTitle: row.original.parentTitle ? names2.get(row.original.parentTitle) : "" }));
         create.disabled = true;
         status.setText(t("ui.creating_subtopics"));
         try {
@@ -6462,7 +9328,7 @@ var VisualAgentMapView = class extends import_obsidian7.ItemView {
   async previewMigration() {
     const plan = await this.plugin.repo.legacyMigrationPlan();
     if (!plan.maps.length && !plan.orphanPaths.length) {
-      new import_obsidian7.Notice(t("ui.no_old_data_to_migrate"));
+      new import_obsidian9.Notice(t("ui.no_old_data_to_migrate"));
       return;
     }
     const noteCount = plan.maps.reduce((sum, item) => sum + item.notePaths.length, 0);
@@ -6472,13 +9338,13 @@ var VisualAgentMapView = class extends import_obsidian7.ItemView {
       this.history.clear();
       if (next) await this.openMap(next);
       else this.render();
-      new import_obsidian7.Notice(t("ui.old_data_was_migrated_into_topic_folders"));
+      new import_obsidian9.Notice(t("ui.old_data_was_migrated_into_topic_folders"));
     }) }]).open();
   }
   async repairMissingTopic() {
     const broken = await this.plugin.repo.brokenTopics();
     if (!broken.length) {
-      new import_obsidian7.Notice(t("ui.no_topics_with_a_missing_map_md"));
+      new import_obsidian9.Notice(t("ui.no_topics_with_a_missing_map_md"));
       return;
     }
     new ChoiceModal(this.app, t("ui.repair_missing_map"), t("ui.choose_a_topic_to_repair"), broken.map((topic) => ({ label: t("ui.0_1_notes", topic.title, topic.noteCount), action: () => {
@@ -6500,7 +9366,7 @@ var VisualAgentMapView = class extends import_obsidian7.ItemView {
     }
     const model = inheritModel(parent ? (await this.plugin.repo.readNote(parent.path)).model : void 0, this.plugin.settings.cliModel);
     if (!this.path.startsWith(`${this.plugin.settings.topicsFolder}/`)) {
-      new import_obsidian7.Notice(t("ui.use_migrate_old_data_to_convert_this_map_first"));
+      new import_obsidian9.Notice(t("ui.use_migrate_old_data_to_convert_this_map_first"));
       return;
     }
     const node = await this.plugin.repo.createNote((suggestedTitle == null ? void 0 : suggestedTitle.trim()) || (parent ? t("ui.new_subtopic") : t("ui.my_core_topic")), model, this.map, this.path, parent ? "inherited" : "workspace");
@@ -6542,13 +9408,13 @@ var VisualAgentMapView = class extends import_obsidian7.ItemView {
     const pending = this.plugin.pendingSuggestions.get(parent.path);
     const present = (items) => {
       const version = this.plugin.pendingSuggestions.get(parent.path);
-      const names = items.filter((item) => !item.parentTitle).map((item) => item.title);
-      if (new Set(names).size !== names.length) {
+      const names2 = items.filter((item) => !item.parentTitle).map((item) => item.title);
+      if (new Set(names2).size !== names2.length) {
         this.plugin.pendingSuggestions.delete(parent.path);
         this.plugin.pendingResearchOptions.delete(parent.path);
         const message = t("ui.ai_proposed_duplicate_first_level_names_generate_the_proposa");
         if (failed) failed(message);
-        else new import_obsidian7.Notice(message);
+        else new import_obsidian9.Notice(message);
         return;
       }
       if (!found) {
@@ -6618,7 +9484,7 @@ ${translate(outputLanguage, "prompt.avoid_duplicates")} ${direct ? directTask : 
       if (!direct && suggestions.length === 0) {
         const message = result.detail.trim() || t("ui.ai_does_not_recommend_decomposition_or_did_not_propose_3_to");
         if (failed) failed(message);
-        else new import_obsidian7.Notice(message);
+        else new import_obsidian9.Notice(message);
         return;
       }
       if (direct) {
@@ -6660,7 +9526,7 @@ ${translate(outputLanguage, "prompt.avoid_duplicates")} ${direct ? directTask : 
       const message = this.plugin.recordFailure(building ? "\u5EFA\u7ACB\u521D\u6B65\u5730\u5716\u5931\u6557" : "AI \u62C6\u89E3\u5931\u6557", error);
       if (direct) (_r = this.plugin.quickExpandFailures) == null ? void 0 : _r.set(parent.path, message);
       if (failed) failed(message, !(error instanceof PartialChildBatchError));
-      else new import_obsidian7.Notice(message);
+      else new import_obsidian9.Notice(message);
     } finally {
       this.plugin.running.delete(parent.path);
       await this.hydrate();
@@ -6673,7 +9539,7 @@ ${translate(outputLanguage, "prompt.avoid_duplicates")} ${direct ? directTask : 
     if (new Set(roots).size !== roots.length) {
       this.plugin.pendingSuggestions.delete(parent.path);
       this.plugin.pendingResearchOptions.delete(parent.path);
-      new import_obsidian7.Notice(t("ui.ai_proposed_duplicate_first_level_names_generate_the_proposa"));
+      new import_obsidian9.Notice(t("ui.ai_proposed_duplicate_first_level_names_generate_the_proposa"));
       return;
     }
     new ChildProposalModal(this.app, suggestions.slice(0, 15), (items) => this.enqueue(async () => {
@@ -6773,7 +9639,7 @@ ${translate(outputLanguage, "prompt.avoid_duplicates")} ${direct ? directTask : 
     const paths = [...section2.matchAll(/\[\[([^\]|#]+)(?:[|#][^\]]*)?\]\]/g)].map((match) => {
       var _a, _b;
       const link = match[1], direct = link.endsWith(".md") ? link : `${link}.md`;
-      if (this.app.vault.getAbstractFileByPath(direct) instanceof import_obsidian7.TFile) return direct;
+      if (this.app.vault.getAbstractFileByPath(direct) instanceof import_obsidian9.TFile) return direct;
       return (_b = (_a = this.app.metadataCache.getFirstLinkpathDest(link, ownerPath)) == null ? void 0 : _a.path) != null ? _b : direct;
     });
     return [...new Set(paths)];
@@ -6831,7 +9697,7 @@ ${translate(outputLanguage, "prompt.avoid_duplicates")} ${direct ? directTask : 
     if (!children.length && !((_a = options == null ? void 0 : options.referenceGroups) == null ? void 0 : _a.some((group) => group.documents.length))) {
       const message = t("ui.choose_another_note_source_first");
       if (failed) failed(message);
-      else new import_obsidian7.Notice(message);
+      else new import_obsidian9.Notice(message);
       return;
     }
     if (!confirmed) {
@@ -6852,7 +9718,7 @@ ${translate(outputLanguage, "prompt.avoid_duplicates")} ${direct ? directTask : 
     if (!children.length && !selectedSources.some((group) => group.documents.length)) {
       const message = t("ui.the_selected_sources_contain_no_markdown_content_to_synthesi");
       if (failed) failed(message);
-      else new import_obsidian7.Notice(message);
+      else new import_obsidian9.Notice(message);
       return;
     }
     const language2 = this.plugin.settings.language;
@@ -6877,7 +9743,7 @@ ${translate(outputLanguage, "prompt.avoid_duplicates")} ${direct ? directTask : 
         this.recordNoteWrite(node.path, { ...latest, status: note.status }, saved, ["summary", "detail", "visualReferences", "newFindings", "previewSection", "previewInitialized", "status"], t("ui.synthesize_subtopics"));
         await this.hydrate();
         this.render();
-        new import_obsidian7.Notice(t("ui.subtopic_synthesis_was_saved_to_current_understanding_and_ma"));
+        new import_obsidian9.Notice(t("ui.subtopic_synthesis_was_saved_to_current_understanding_and_ma"));
       });
       if (drafted) drafted(result, save);
       else new AiDraftModal(this.app, result.summary, result.detail, t("ui.confirm_update_to_parent_topic"), () => {
@@ -6886,13 +9752,13 @@ ${translate(outputLanguage, "prompt.avoid_duplicates")} ${direct ? directTask : 
     } catch (error) {
       if (((_i = options == null ? void 0 : options.signal) == null ? void 0 : _i.aborted) || error instanceof Error && error.name === "AbortError") {
         await this.plugin.repo.updateNote(node.path, { status: note.status });
-        new import_obsidian7.Notice(t("ui.research_stopped_existing_content_was_preserved"));
+        new import_obsidian9.Notice(t("ui.research_stopped_existing_content_was_preserved"));
       } else {
         console.error("Visual Agent Map child integration", error);
         await this.plugin.repo.updateNote(node.path, { status: "error" });
         const message = this.plugin.recordFailure("\u5B50\u8B70\u984C\u6574\u5408\u5931\u6557", error);
         if (failed) failed(message);
-        else new import_obsidian7.Notice(message);
+        else new import_obsidian9.Notice(message);
       }
     } finally {
       this.plugin.running.delete(node.path);
@@ -6902,7 +9768,7 @@ ${translate(outputLanguage, "prompt.avoid_duplicates")} ${direct ? directTask : 
   }
   integrateSelected() {
     if (!this.map || this.multiSelected.size < 2) {
-      new import_obsidian7.Notice(t("ui.select_at_least_two_topics"));
+      new import_obsidian9.Notice(t("ui.select_at_least_two_topics"));
       return;
     }
     const nodes = [...this.multiSelected].map((id) => this.map.nodes.find((node) => node.id === id)).filter((node) => !!node);
@@ -7022,7 +9888,7 @@ ${note.detail.trim()}` : "",
           this.focusNode(integrated);
         } catch (e) {
           this.render();
-          new import_obsidian7.Notice(t("ui.synthesis_saved_refresh_failed"));
+          new import_obsidian9.Notice(t("ui.synthesis_saved_refresh_failed"));
         }
         return;
       }
@@ -7192,7 +10058,7 @@ ${note.detail.trim()}` : "",
     if (!((_a = overrides == null ? void 0 : overrides.task) != null ? _a : note.prompt)) {
       const message = t("ui.enter_a_question_or_task_for_ai_first");
       if (failed) failed(message);
-      else new import_obsidian7.Notice(message);
+      else new import_obsidian9.Notice(message);
       return;
     }
     if (this.plugin.running.has(node.path)) {
@@ -7229,7 +10095,7 @@ ${note.detail.trim()}` : "",
         if (exchangeId && this.plugin.settings.aiExchangeLoggingEnabled) (_a2 = this.plugin.exchanges) == null ? void 0 : _a2.failed(exchangeId, stale ? "\u8B70\u984C\u5167\u5BB9\u5DF2\u8B8A\u66F4\uFF0C\u904E\u6642\u7684 AI \u7D50\u679C\u672A\u5BEB\u5165\u3002" : "\u7814\u7A76\u5DF2\u505C\u6B62\uFF0C\u7D50\u679C\u672A\u5BEB\u5165\u3002");
         if (stale) {
           if (failed) failed(t("ui.the_topic_changed_so_the_outdated_ai_result_was_not_saved"));
-          else new import_obsidian7.Notice(t("ui.the_topic_changed_so_the_outdated_ai_result_was_not_saved"));
+          else new import_obsidian9.Notice(t("ui.the_topic_changed_so_the_outdated_ai_result_was_not_saved"));
         }
         return;
       }
@@ -7244,7 +10110,7 @@ ${note.detail.trim()}` : "",
           await ((_e = (_d = this.plugin.pendingSuggestions).flush) == null ? void 0 : _e.call(_d));
         } catch (error) {
           const message = this.plugin.recordFailure("\u5C55\u958B\u5EFA\u8B70\u5132\u5B58\u5931\u6557", error);
-          new import_obsidian7.Notice(message);
+          new import_obsidian9.Notice(message);
         }
       }
       done == null ? void 0 : done(result);
@@ -7253,7 +10119,7 @@ ${note.detail.trim()}` : "",
       if (controller.signal.aborted || error instanceof Error && error.name === "AbortError") {
         await this.plugin.repo.updateNote(node.path, { status: note.status });
         if (failed) failed(t("ui.research_stopped_existing_content_was_preserved"));
-        else new import_obsidian7.Notice(t("ui.research_stopped_existing_content_was_preserved"));
+        else new import_obsidian9.Notice(t("ui.research_stopped_existing_content_was_preserved"));
         return;
       }
       console.error("Visual Agent Map AI task", error);
@@ -7261,7 +10127,7 @@ ${note.detail.trim()}` : "",
       await this.plugin.repo.updateNote(node.path, { status: "error" });
       const message = this.plugin.recordFailure("AI \u4EFB\u52D9\u5931\u6557", error);
       if (failed) failed(message);
-      else new import_obsidian7.Notice(message);
+      else new import_obsidian9.Notice(message);
     })).finally(() => {
       var _a2;
       (_a2 = overrides == null ? void 0 : overrides.signal) == null ? void 0 : _a2.removeEventListener("abort", abortFromTaskModal);
@@ -7275,7 +10141,7 @@ ${note.detail.trim()}` : "",
     });
   }
 };
-var VisualAgentMapSettingTab = class extends import_obsidian7.PluginSettingTab {
+var VisualAgentMapSettingTab = class extends import_obsidian9.PluginSettingTab {
   constructor(app, plugin) {
     super(app, plugin);
     this.plugin = plugin;
@@ -7297,7 +10163,7 @@ var VisualAgentMapSettingTab = class extends import_obsidian7.PluginSettingTab {
     const models = Object.fromEntries(this.plugin.availableModels().map((model) => [model, this.plugin.modelLabel(model)]));
     return [
       { name: t("ui.interface_language"), render: (setting) => {
-        setting.setName(t("ui.interface_language")).addDropdown((dropdown) => {
+        setting.setName(t("ui.interface_language")).setDesc(t("ui.interface_language_description")).addDropdown((dropdown) => {
           dropdown.addOption("en", "English").addOption("zh-TW", "\u7E41\u9AD4\u4E2D\u6587").setValue(this.plugin.settings.language).setDisabled(this.plugin.languageSwitchPending);
           dropdown.onChange((value) => {
             void this.plugin.changeLanguage(value);
@@ -7358,7 +10224,7 @@ var VisualAgentMapSettingTab = class extends import_obsidian7.PluginSettingTab {
     await this.plugin.saveSettings();
   }
 };
-var VisualAgentMapPlugin = class extends import_obsidian7.Plugin {
+var VisualAgentMapPlugin = class extends import_obsidian9.Plugin {
   constructor() {
     super(...arguments);
     __publicField(this, "settings", { ...DEFAULT_SETTINGS });
@@ -7374,6 +10240,9 @@ var VisualAgentMapPlugin = class extends import_obsidian7.Plugin {
     __publicField(this, "exchanges", null);
     __publicField(this, "codexRuntime", null);
     __publicField(this, "localCodexRuntime", null);
+    __publicField(this, "coffeeModelEfforts", /* @__PURE__ */ new Map());
+    __publicField(this, "coffeeManager", null);
+    __publicField(this, "coffeeStorage", null);
     __publicField(this, "settingTab");
     __publicField(this, "detailsLeaf", null);
     __publicField(this, "detailsPath", null);
@@ -7405,7 +10274,7 @@ var VisualAgentMapPlugin = class extends import_obsidian7.Plugin {
       const message = error instanceof Error ? error.message : String(error);
       this.logs.appendLog("error", `\u64CD\u4F5C\u5931\u6557\uFF1A${message}`);
       console.error("Visual Agent Map", error);
-      new import_obsidian7.Notice(message);
+      new import_obsidian9.Notice(message);
     });
     return result;
   }
@@ -7433,7 +10302,7 @@ var VisualAgentMapPlugin = class extends import_obsidian7.Plugin {
     this.settings = { ...DEFAULT_SETTINGS, language: initialUiLanguage(saved == null ? void 0 : saved.language), workspaceFolder: (saved == null ? void 0 : saved.workspaceFolder) || DEFAULT_SETTINGS.workspaceFolder, topicsFolder: (saved == null ? void 0 : saved.topicsFolder) || DEFAULT_SETTINGS.topicsFolder, inboxFolder: (saved == null ? void 0 : saved.inboxFolder) || DEFAULT_SETTINGS.inboxFolder, notesFolder: (saved == null ? void 0 : saved.notesFolder) || DEFAULT_SETTINGS.notesFolder, mapsFolder: (saved == null ? void 0 : saved.mapsFolder) || DEFAULT_SETTINGS.mapsFolder, mapId: (saved == null ? void 0 : saved.mapId) || "default", codexPath: (saved == null ? void 0 : saved.codexPath) || (legacy == null ? void 0 : legacy.cliPath) || DEFAULT_SETTINGS.codexPath, claudePath: (saved == null ? void 0 : saved.claudePath) || DEFAULT_SETTINGS.claudePath, cliModel: (saved == null ? void 0 : saved.cliModel) || DEFAULT_SETTINGS.cliModel, cliReasoning: normalizeReasoningLevel(saved == null ? void 0 : saved.cliReasoning), previewScale: (saved == null ? void 0 : saved.previewScale) !== void 0 ? clampPreviewScale(saved.previewScale) : legacyPreviewScale(saved == null ? void 0 : saved.previewSize), models: "", migrated: (saved == null ? void 0 : saved.migrated) === true, structureVersion: (_a = saved == null ? void 0 : saved.structureVersion) != null ? _a : saved ? 1 : DEFAULT_SETTINGS.structureVersion, firstUseNoticeSeen: (saved == null ? void 0 : saved.firstUseNoticeSeen) === true, codexUsageNoticeSeen: (saved == null ? void 0 : saved.codexUsageNoticeSeen) === true, claudeUsageNoticeSeen: (saved == null ? void 0 : saved.claudeUsageNoticeSeen) === true, aiExchangeLoggingEnabled: (saved == null ? void 0 : saved.aiExchangeLoggingEnabled) === true, workspaceInitialized: saved ? saved.workspaceInitialized !== false : false, sampleTourVersionSeen: (_b = saved == null ? void 0 : saved.sampleTourVersionSeen) != null ? _b : 0 };
     setUiLanguage(this.settings.language);
     this.logs.appendLog("info", `Visual Agent Map ${this.manifest.version || "unknown"} \u8F09\u5165`);
-    if (this.app.vault.adapter instanceof import_obsidian7.FileSystemAdapter && this.manifest.dir) {
+    if (this.app.vault.adapter instanceof import_obsidian9.FileSystemAdapter && this.manifest.dir) {
       const pluginDirectory = join(this.app.vault.adapter.getBasePath(), this.manifest.dir);
       this.exchanges = new AiExchangeLog(join(pluginDirectory, "ai-exchanges.json"), (error) => this.logs.appendLog("error", `AI \u5F80\u8FD4\u7D00\u9304\u5132\u5B58\u5931\u6557\uFF1A${error instanceof Error ? error.message : String(error)}`));
       await this.exchanges.load();
@@ -7463,26 +10332,34 @@ var VisualAgentMapPlugin = class extends import_obsidian7.Plugin {
         const count = await this.repo.normalizeGeneratedNoteFilenames();
         this.settings.structureVersion = 2;
         await this.saveSettings();
-        if (count) new import_obsidian7.Notice(t("ui.synced_0_subtopic_filenames_with_their_names", count));
+        if (count) new import_obsidian9.Notice(t("ui.synced_0_subtopic_filenames_with_their_names", count));
       }
     });
     this.ready = initialize;
+    this.registerView(COFFEE_TABLES_VIEW_TYPE, (leaf) => new CoffeeTablesView(leaf, this));
+    this.coffeeStorage = new CoffeeStorage(this.app.vault, this.settings.workspaceFolder, (file, path) => this.app.fileManager.renameFile(file, path), (file) => this.app.fileManager.trashFile(file));
+    this.coffeeManager = new CoffeeManager((request) => this.runCoffeeRequest(request), (session) => this.coffeeStorage.save(session));
+    const openCoffee = () => {
+      void this.activateCoffeeTables().catch((error) => new import_obsidian9.Notice(String(error)));
+    };
+    this.addRibbonIcon("coffee", `Open ${COFFEE_TABLES_NAME}`, openCoffee);
+    this.addCommand({ id: "open-coffee-tables", name: `Open ${COFFEE_TABLES_NAME}`, callback: openCoffee });
     this.registerView(VIEW_TYPE, (leaf) => new VisualAgentMapView(leaf, this));
     this.registerView(OUTLINE_VIEW_TYPE, (leaf) => new OutlineView(leaf, async (path) => {
       try {
         await this.openDetails(this.repo.file(path));
       } catch (error) {
-        new import_obsidian7.Notice(error instanceof Error ? error.message : String(error));
+        new import_obsidian9.Notice(error instanceof Error ? error.message : String(error));
       }
     }));
     this.ribbonIcon = this.addRibbonIcon("git-fork", t("ui.open_map"), () => {
-      void this.activateView().catch((error) => new import_obsidian7.Notice(String(error)));
+      void this.activateView().catch((error) => new import_obsidian9.Notice(String(error)));
     });
     this.addLocalizedCommand("open-map", "ui.open_map", () => {
-      void this.activateView().catch((error) => new import_obsidian7.Notice(String(error)));
+      void this.activateView().catch((error) => new import_obsidian9.Notice(String(error)));
     });
     this.addLocalizedCommand("open-topic-outline", "ui.open_topic_outline", () => {
-      void this.activateOutline().catch((error) => new import_obsidian7.Notice(String(error)));
+      void this.activateOutline().catch((error) => new import_obsidian9.Notice(String(error)));
     });
     this.addLocalizedCommand("rebuild-references", "ui.refresh_vam_data", () => {
       void this.mutate(() => this.fullRebuild());
@@ -7490,13 +10367,13 @@ var VisualAgentMapPlugin = class extends import_obsidian7.Plugin {
     this.addLocalizedCommand("normalize-note-filenames", "ui.sync_topic_names_and_filenames", () => {
       void this.mutate(async () => {
         const count = await this.repo.normalizeGeneratedNoteFilenames();
-        new import_obsidian7.Notice(count ? t("ui.synced_0_topic_filenames", count) : t("ui.topic_filenames_are_up_to_date"));
+        new import_obsidian9.Notice(count ? t("ui.synced_0_topic_filenames", count) : t("ui.topic_filenames_are_up_to_date"));
       });
     });
     this.addLocalizedCommand("repair-note-presentation", "ui.repair_topic_note_display", () => {
       void this.mutate(async () => {
         await this.repo.ensureNodePresentation();
-        new import_obsidian7.Notice(t("ui.topic_note_display_repaired"));
+        new import_obsidian9.Notice(t("ui.topic_note_display_repaired"));
       });
     });
     this.addLocalizedCommand("open-built-in-sample", "ui.open_the_taiwan_travel_sample", () => {
@@ -7512,15 +10389,15 @@ var VisualAgentMapPlugin = class extends import_obsidian7.Plugin {
     this.settingTab = new VisualAgentMapSettingTab(this.app, this);
     this.addSettingTab(this.settingTab);
     this.registerEvent(this.app.workspace.on("file-menu", (menu, file) => {
-      if (file instanceof import_obsidian7.TFile && this.isMap(file)) menu.addItem((item) => item.setTitle(t("ui.open_as_mind_map")).setIcon("git-fork").onClick(() => {
+      if (file instanceof import_obsidian9.TFile && this.isMap(file)) menu.addItem((item) => item.setTitle(t("ui.open_as_mind_map")).setIcon("git-fork").onClick(() => {
         void this.activateView(file.path);
       }));
     }));
     this.registerEvent(this.app.workspace.on("active-leaf-change", (leaf) => {
       this.styleNodeLeaf(leaf);
-      if (!((leaf == null ? void 0 : leaf.view) instanceof import_obsidian7.MarkdownView) || !leaf.view.file || !this.isMap(leaf.view.file)) return;
+      if (!((leaf == null ? void 0 : leaf.view) instanceof import_obsidian9.MarkdownView) || !leaf.view.file || !this.isMap(leaf.view.file)) return;
       const path = leaf.view.file.path;
-      void leaf.setViewState({ type: VIEW_TYPE, state: { file: path }, active: true }).catch((error) => new import_obsidian7.Notice(error instanceof Error ? error.message : String(error)));
+      void leaf.setViewState({ type: VIEW_TYPE, state: { file: path }, active: true }).catch((error) => new import_obsidian9.Notice(error instanceof Error ? error.message : String(error)));
     }));
     this.registerEvent(this.app.workspace.on("file-open", (file) => {
       var _a2;
@@ -7539,17 +10416,17 @@ var VisualAgentMapPlugin = class extends import_obsidian7.Plugin {
       });
     });
     this.registerEvent(this.app.vault.on("modify", (file) => {
-      if (!this.writing && file instanceof import_obsidian7.TFile) for (const view of this.views()) view.changed(file);
+      if (!this.writing && file instanceof import_obsidian9.TFile) for (const view of this.views()) view.changed(file);
     }));
     this.registerEvent(this.app.vault.on("delete", (file) => {
-      if (!this.writing && file instanceof import_obsidian7.TFile) {
+      if (!this.writing && file instanceof import_obsidian9.TFile) {
         for (const view of this.views()) view.deleted(file);
         this.scheduleExternalReconciliation();
         if (file.path.startsWith(`${this.settings.mapsFolder}/`) || file.path.startsWith(`${this.settings.topicsFolder}/`) && file.name === "Map.md") void this.mutate(() => this.repo.rebuildDerivedData());
       }
     }));
     this.registerEvent(this.app.vault.on("rename", (file, oldPath) => {
-      if (!this.writing && file instanceof import_obsidian7.TFile) void this.mutate(async () => {
+      if (!this.writing && file instanceof import_obsidian9.TFile) void this.mutate(async () => {
         await this.repo.replaceSourcePath(oldPath, file.path);
         for (const mapFile of await this.repo.mapFiles()) {
           const map = await this.repo.readMap(mapFile.path);
@@ -7575,12 +10452,12 @@ var VisualAgentMapPlugin = class extends import_obsidian7.Plugin {
     this.settings.workspaceInitialized = true;
     await this.saveSettings();
     for (const view of this.views()) await view.refreshFromPlugin();
-    new import_obsidian7.Notice(t("ui.agent_workspace_is_ready"));
+    new import_obsidian9.Notice(t("ui.agent_workspace_is_ready"));
   }
   async fullRebuild() {
     await this.repo.rebuildDerivedData();
     for (const view of this.views()) await view.refreshFromPlugin();
-    new import_obsidian7.Notice(t("ui.vam_data_has_been_refreshed"));
+    new import_obsidian9.Notice(t("ui.vam_data_has_been_refreshed"));
   }
   connectWorkspace(root) {
     this.settings.workspaceFolder = root;
@@ -7594,7 +10471,7 @@ var VisualAgentMapPlugin = class extends import_obsidian7.Plugin {
     const candidates = known != null ? known : await this.repo.workspaceCandidates();
     this.workspaceRecoveryCandidates = [];
     if (!candidates.length) {
-      new import_obsidian7.Notice(t("ui.no_recognizable_existing_vam_workspace_was_found"));
+      new import_obsidian9.Notice(t("ui.no_recognizable_existing_vam_workspace_was_found"));
       return;
     }
     new ChoiceModal(this.app, t("ui.reconnect_existing_workspace"), t("ui.choosing_a_workspace_only_reconnects_the_setting_it_does_not"), candidates.map((root) => ({ label: root, action: () => this.mutate(async () => {
@@ -7602,7 +10479,7 @@ var VisualAgentMapPlugin = class extends import_obsidian7.Plugin {
       await this.saveSettings();
       await this.repo.rebuildDerivedData();
       for (const view of this.views()) await view.refreshFromPlugin();
-      new import_obsidian7.Notice(t("ui.reconnected_workspace_0", root));
+      new import_obsidian9.Notice(t("ui.reconnected_workspace_0", root));
     }) }))).open();
   }
   codexDiagnostic() {
@@ -7617,6 +10494,21 @@ var VisualAgentMapPlugin = class extends import_obsidian7.Plugin {
     const models = this.settings.models.split(/[\n,]/).map((value) => value.trim()).filter(Boolean);
     if (this.claudeDiagnostic().installed) models.push(...CLAUDE_MODEL_CHOICES.map((choice) => choice.id));
     return [...new Set(models)];
+  }
+  async refreshCoffeeModels() {
+    if (this.codexDiagnostic().installed) {
+      try {
+        await this.refreshCodexModels();
+      } catch (error) {
+        this.logs.appendLog("warn", `Coffee Tables \u7121\u6CD5\u8F09\u5165 Codex \u6A21\u578B\uFF1A${error instanceof Error ? error.message : String(error)}`);
+      }
+    }
+    return this.availableModels();
+  }
+  coffeeReasoningEfforts(model) {
+    var _a;
+    if (providerForModel(model) === "claude") return ["low", "medium", "high"];
+    return (_a = this.coffeeModelEfforts.get(model)) != null ? _a : [];
   }
   modelLabel(model) {
     var _a, _b;
@@ -7648,14 +10540,14 @@ var VisualAgentMapPlugin = class extends import_obsidian7.Plugin {
     const diagnostic = this.codexDiagnostic();
     if (!diagnostic.installed) {
       if (showGuide) this.openCodexSetupGuide();
-      else new import_obsidian7.Notice(t("ui.codex_cli_was_not_found_0_set_the_codex_cli_path_in_vam_sett", diagnostic.executable));
+      else new import_obsidian9.Notice(t("ui.codex_cli_was_not_found_0_set_the_codex_cli_path_in_vam_sett", diagnostic.executable));
       return;
     }
     try {
       await this.refreshCodexModels();
-      new import_obsidian7.Notice(t("ui.codex_app_server_is_ready_0", diagnostic.executable));
+      new import_obsidian9.Notice(t("ui.codex_app_server_is_ready_0", diagnostic.executable));
     } catch (error) {
-      new import_obsidian7.Notice(t("ui.codex_app_server_check_failed_0", this.recordFailure("Codex App Server \u91CD\u65B0\u6AA2\u67E5\u5931\u6557", error)));
+      new import_obsidian9.Notice(t("ui.codex_app_server_check_failed_0", this.recordFailure("Codex App Server \u91CD\u65B0\u6AA2\u67E5\u5931\u6557", error)));
     }
   }
   async duplicateBuiltInSample() {
@@ -7690,7 +10582,7 @@ var VisualAgentMapPlugin = class extends import_obsidian7.Plugin {
       await this.repo.saveMap(path, map);
       await this.repo.rebuildDerivedData(root);
       await this.saveSettings();
-      new import_obsidian7.Notice(t("ui.created_an_editable_copy_of_the_sample"));
+      new import_obsidian9.Notice(t("ui.created_an_editable_copy_of_the_sample"));
       return path;
     } catch (error) {
       if (createdRoot) {
@@ -7718,10 +10610,13 @@ var VisualAgentMapPlugin = class extends import_obsidian7.Plugin {
     return marker2 === true || marker2 === "true" || file.extension === "md" && (file.path.startsWith(`${this.settings.notesFolder}/`) || file.path.startsWith(`${this.settings.topicsFolder}/`) || file.path.startsWith(`${this.settings.inboxFolder}/`));
   }
   styleNodeLeaf(leaf) {
-    if (!((leaf == null ? void 0 : leaf.view) instanceof import_obsidian7.MarkdownView)) return;
+    if (!((leaf == null ? void 0 : leaf.view) instanceof import_obsidian9.MarkdownView)) return;
     leaf.view.containerEl.toggleClass("vam-topic-markdown", !!leaf.view.file && this.isNode(leaf.view.file));
   }
   onunload() {
+    var _a;
+    void ((_a = this.coffeeManager) == null ? void 0 : _a.stop());
+    this.coffeeManager = null;
     this.resetCodexRuntime();
   }
   async saveSettings() {
@@ -7740,7 +10635,7 @@ var VisualAgentMapPlugin = class extends import_obsidian7.Plugin {
         await this.saveData(nextSettings);
       } catch (error) {
         this.recordFailure(translate(previous, "ui.language_change_save_failed"), error);
-        new import_obsidian7.Notice(translate(previous, "ui.language_change_save_failed"));
+        new import_obsidian9.Notice(translate(previous, "ui.language_change_save_failed"));
         return false;
       }
       Object.assign(this.settings, nextSettings);
@@ -7759,8 +10654,15 @@ var VisualAgentMapPlugin = class extends import_obsidian7.Plugin {
       } catch (error) {
         failures.push(error);
       }
+      try {
+        const views = this.coffeeViews();
+        const results = await Promise.allSettled(views.map((view) => view.refreshForLanguageChange()));
+        for (const result of results) if (result.status === "rejected") failures.push(result.reason);
+      } catch (error) {
+        failures.push(error);
+      }
       for (const error of failures) this.recordFailure(t("ui.language_view_refresh_failed"), error);
-      new import_obsidian7.Notice(failures.length ? t("ui.language_change_partial_failure") : t("ui.language_changed_content_preserved"));
+      new import_obsidian9.Notice(failures.length ? t("ui.language_change_partial_failure") : t("ui.language_changed_content_preserved"));
       return true;
     } finally {
       this.languageSwitchPending = false;
@@ -7774,6 +10676,9 @@ var VisualAgentMapPlugin = class extends import_obsidian7.Plugin {
     var _a;
     (_a = this.ribbonIcon) == null ? void 0 : _a.setAttribute("aria-label", translate(this.settings.language, "ui.open_map"));
     for (const { command, key } of this.localizedCommands) command.name = `Visual Agent Map (VAM): ${translate(this.settings.language, key)}`;
+  }
+  coffeeViews() {
+    return this.app.workspace.getLeavesOfType(COFFEE_TABLES_VIEW_TYPE).map((leaf) => leaf.view).filter((view) => view instanceof CoffeeTablesView);
   }
   async aiReadyForModel(model) {
     if (providerForModel(model) === "claude") {
@@ -7809,10 +10714,10 @@ var VisualAgentMapPlugin = class extends import_obsidian7.Plugin {
     var _a;
     const diagnostic = this.claudeDiagnostic();
     if (!diagnostic.installed) {
-      new import_obsidian7.Notice(t("ui.claude_cli_was_not_found_follow_the_installation_guide_to_install_it"));
+      new import_obsidian9.Notice(t("ui.claude_cli_was_not_found_follow_the_installation_guide_to_install_it"));
       return;
     }
-    new import_obsidian7.Notice(t("ui.claude_cli_found_0", diagnostic.executable));
+    new import_obsidian9.Notice(t("ui.claude_cli_found_0", diagnostic.executable));
     (_a = this.settingTab) == null ? void 0 : _a.update();
     for (const view of this.views()) await view.refreshFromPlugin();
   }
@@ -7835,7 +10740,7 @@ var VisualAgentMapPlugin = class extends import_obsidian7.Plugin {
       await this.repo.rebuildDerivedData();
     } catch (error) {
       console.error("Visual Agent Map reference rebuild", error);
-      new import_obsidian7.Notice(t("ui.map_saved_but_reference_update_failed_0", error instanceof Error ? error.message : String(error)));
+      new import_obsidian9.Notice(t("ui.map_saved_but_reference_update_failed_0", error instanceof Error ? error.message : String(error)));
     }
   }
   scheduleExternalReconciliation() {
@@ -7856,7 +10761,7 @@ var VisualAgentMapPlugin = class extends import_obsidian7.Plugin {
     if (!this.detailsLeaf) {
       this.detailsLeaf = (_b = (_a = markdownLeaves.filter((leaf) => {
         var _a2, _b2;
-        return leaf.getRoot() === this.app.workspace.rightSplit && leaf.view instanceof import_obsidian7.MarkdownView && !!leaf.view.file && ((_b2 = (_a2 = this.app.metadataCache.getFileCache(leaf.view.file)) == null ? void 0 : _a2.frontmatter) == null ? void 0 : _b2["agent-map-node"]) === true;
+        return leaf.getRoot() === this.app.workspace.rightSplit && leaf.view instanceof import_obsidian9.MarkdownView && !!leaf.view.file && ((_b2 = (_a2 = this.app.metadataCache.getFileCache(leaf.view.file)) == null ? void 0 : _a2.frontmatter) == null ? void 0 : _b2["agent-map-node"]) === true;
       }).sort((a, b) => a.view.containerEl.getBoundingClientRect().top - b.view.containerEl.getBoundingClientRect().top)[0]) != null ? _a : this.app.workspace.getRightLeaf(false)) != null ? _b : this.app.workspace.getRightLeaf(true);
     }
     if (!this.detailsLeaf) throw new Error(t("ui.unable_to_open_the_right_details_sidebar"));
@@ -7867,14 +10772,90 @@ var VisualAgentMapPlugin = class extends import_obsidian7.Plugin {
   }
   closeStaleDetails() {
     var _a, _b, _c, _d;
-    const closed = ((_a = this.detailsLeaf) == null ? void 0 : _a.view) instanceof import_obsidian7.MarkdownView && ((_b = this.detailsLeaf.view.file) == null ? void 0 : _b.path) === this.detailsPath;
+    const closed = ((_a = this.detailsLeaf) == null ? void 0 : _a.view) instanceof import_obsidian9.MarkdownView && ((_b = this.detailsLeaf.view.file) == null ? void 0 : _b.path) === this.detailsPath;
     if (closed) {
       this.detailsLeaf.detach();
       this.app.workspace.trigger("file-open", null);
-      this.app.workspace.trigger("active-leaf-change", (_d = (_c = this.app.workspace.getActiveViewOfType(import_obsidian7.View)) == null ? void 0 : _c.leaf) != null ? _d : null);
+      this.app.workspace.trigger("active-leaf-change", (_d = (_c = this.app.workspace.getActiveViewOfType(import_obsidian9.View)) == null ? void 0 : _c.leaf) != null ? _d : null);
     }
     this.detailsLeaf = null;
     this.detailsPath = null;
+  }
+  async activateCoffeeTables() {
+    await this.ready;
+    let leaf = this.app.workspace.getLeavesOfType(COFFEE_TABLES_VIEW_TYPE)[0];
+    if (!leaf) {
+      leaf = this.app.workspace.getLeaf("tab");
+      await leaf.setViewState({ type: COFFEE_TABLES_VIEW_TYPE, active: true });
+    }
+    await this.app.workspace.revealLeaf(leaf);
+  }
+  async runCoffeeRequest(request) {
+    if (!(this.app.vault.adapter instanceof import_obsidian9.FileSystemAdapter) || !this.manifest.dir) throw new Error("Coffee Tables requires the desktop runtime");
+    const { session, signal, prompt } = request;
+    const directory = join(this.app.vault.adapter.getBasePath(), this.manifest.dir);
+    const effort = effectiveReasoningLevel({ title: session.topic, summary: "", detail: "", rules: "", task: "", ancestors: "" }, normalizeReasoningLevel(session.reasoning));
+    const exchanges = this.settings.aiExchangeLoggingEnabled ? this.exchanges : null;
+    const id = (0, import_node_crypto.randomUUID)();
+    const key = `coffee:${id}`;
+    const controller = new AbortController();
+    const abort = () => controller.abort();
+    signal.addEventListener("abort", abort, { once: true });
+    if (signal.aborted) controller.abort();
+    this.activeTasks.set(key, controller);
+    exchanges == null ? void 0 : exchanges.begin({ id, startedAt: (/* @__PURE__ */ new Date()).toISOString(), topic: `Coffee Tables \xB7 ${session.topic}`, mode: "task", model: session.model, effort });
+    try {
+      const controls = { signal: controller.signal, searchBudget: 0, timeoutMs: 15 * 60 * 1e3, onText: (text2) => {
+        var _a;
+        return (_a = request.onText) == null ? void 0 : _a.call(request, text2);
+      }, onSteer: (handler) => {
+        var _a;
+        return (_a = request.registerIntervention) == null ? void 0 : _a.call(request, handler);
+      }, onRequest: (data) => {
+        if (this.settings.aiExchangeLoggingEnabled) exchanges == null ? void 0 : exchanges.sent(id, JSON.stringify({ request: data, prompt }, null, 2));
+      } };
+      const raw = providerForModel(session.model) === "claude" ? await this.claudeCli(directory).runTask(prompt, providerModelId(session.model), effort, void 0, controls) : await this.runtime(directory, true).runTask(prompt, session.model, effort, void 0, controls);
+      if (controller.signal.aborted) throw new Error("Coffee Tables request cancelled");
+      if (this.settings.aiExchangeLoggingEnabled) {
+        exchanges == null ? void 0 : exchanges.received(id, raw);
+        exchanges == null ? void 0 : exchanges.completed(id);
+      }
+      return raw;
+    } catch (error) {
+      if (this.settings.aiExchangeLoggingEnabled) exchanges == null ? void 0 : exchanges.failed(id, error instanceof Error ? error.message : String(error));
+      throw error;
+    } finally {
+      signal.removeEventListener("abort", abort);
+      this.activeTasks.delete(key);
+    }
+  }
+  async openCoffeeHandoff(session, sourcePath) {
+    const zh = this.settings.language === "zh-TW";
+    const modal = new import_obsidian9.Modal(this.app);
+    modal.titleEl.setText(zh ? "\u5E36\u53BB VAM \u6DF1\u5165\u7814\u7A76" : "Take to VAM for deeper research");
+    modal.contentEl.createEl("p", { text: zh ? "\u7DE8\u8F2F\u8981\u6DF1\u5165\u7814\u7A76\u7684\u554F\u984C\uFF0C\u4E26\u5F9E\u4F86\u6E90\u5C0D\u8AC7\u958B\u59CB\u3002" : "Edit the question for deeper research. The source conversation will be linked." });
+    const question = modal.contentEl.createEl("textarea", { cls: "ct-handoff-question", attr: { rows: "3", "aria-label": zh ? "\u7814\u7A76\u554F\u984C" : "Research question" } });
+    question.value = session.topic;
+    const create = modal.contentEl.createEl("button", { text: zh ? "\u5EFA\u7ACB\u7814\u7A76\u5730\u5716" : "Create research map", cls: "mod-cta" });
+    create.addEventListener("click", () => {
+      const title = question.value.trim();
+      if (!title || create.disabled) return;
+      create.disabled = true;
+      void this.mutate(async () => {
+        const path = await this.repo.createMap(title);
+        const map = await this.repo.readMap(path);
+        const node = await this.repo.createNote(title, session.model, map, path, "manual");
+        const detail = [zh ? "Coffee Tables \u7684\u6A21\u64EC\u5C0D\u8AC7\uFF0C\u5167\u5BB9\u5C1A\u672A\u67E5\u8B49\uFF0C\u4E0D\u4EE3\u8868\u4F7F\u7528\u8005\u7D50\u8AD6\u3002" : "Simulated Coffee Tables discussion; unverified and not the user's conclusion.", `[[${sourcePath}|Coffee Tables \u5C0D\u8AC7]]`].join("\n\n");
+        await this.repo.updateNote(node.path, { detail, reasoning: normalizeReasoningLevel(session.reasoning) });
+        map.nodes.push(node);
+        await this.repo.saveMap(path, map);
+        modal.close();
+        await this.activateView(path);
+      }).catch((error) => {
+        new import_obsidian9.Notice(`${String(error)} \xB7 ${zh ? "\u53EF\u80FD\u5DF2\u5EFA\u7ACB\u90E8\u5206\u7814\u7A76\u6A94\u6848\uFF0C\u8ACB\u5148\u6AA2\u67E5\u518D\u91CD\u8A66\u3002" : "Some research files may have been created; inspect before retrying."}`);
+      });
+    });
+    modal.open();
   }
   async activateView(path) {
     await this.ready;
@@ -7895,9 +10876,10 @@ var VisualAgentMapPlugin = class extends import_obsidian7.Plugin {
   async refreshCodexModels() {
     var _a, _b, _c, _d;
     const adapter = this.app.vault.adapter;
-    if (!(adapter instanceof import_obsidian7.FileSystemAdapter) || !this.manifest.dir) return;
+    if (!(adapter instanceof import_obsidian9.FileSystemAdapter) || !this.manifest.dir) return;
     const pluginDirectory = join(adapter.getBasePath(), this.manifest.dir);
     const models = await this.runtime(pluginDirectory).listModels();
+    this.coffeeModelEfforts = new Map(models.map((item) => [item.model, item.supportedReasoningEfforts.map((effort) => effort.reasoningEffort).filter((value) => ["low", "medium", "high"].includes(value))]));
     this.settings.models = models.map((item) => item.model).join(", ");
     if (providerForModel(this.settings.cliModel) === "codex" && !models.some((item) => item.model === this.settings.cliModel)) this.settings.cliModel = ((_a = models.find((item) => item.model === DEFAULT_SETTINGS.cliModel)) == null ? void 0 : _a.model) || ((_b = models.find((item) => item.isDefault)) == null ? void 0 : _b.model) || ((_c = models[0]) == null ? void 0 : _c.model) || "";
     await this.saveSettings();
@@ -7909,7 +10891,7 @@ var VisualAgentMapPlugin = class extends import_obsidian7.Plugin {
     const provider = providerForModel(model);
     if (provider === "claude" && !CLAUDE_MODEL_CHOICES.some((choice) => choice.id === model)) throw new Error(t("ui.claude_model_is_not_supported_0", model));
     const adapter = this.app.vault.adapter;
-    if (!(adapter instanceof import_obsidian7.FileSystemAdapter)) throw new Error(t("ui.cli_mode_requires_desktop_obsidian"));
+    if (!(adapter instanceof import_obsidian9.FileSystemAdapter)) throw new Error(t("ui.cli_mode_requires_desktop_obsidian"));
     if (!this.manifest.dir) throw new Error(t("ui.plugin_folder_not_found"));
     const referenceGroups = (_a = context.referenceGroups) != null ? _a : [];
     if (referenceGroups.some((group) => group.documents.length)) {

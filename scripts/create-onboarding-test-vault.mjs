@@ -5,7 +5,7 @@ import { fileURLToPath } from "node:url";
 
 const root = fileURLToPath(new URL("..", import.meta.url));
 // Shared fixture builder; environment/reset/launch policy belongs to test-harness.mjs.
-export function ensureSourceSelectionFixture(vault, workspaceRoot = "Agent Workspace") {
+export function ensureSourceSelectionFixture(vault, workspaceRoot = "Agent Workspace", { preserveExisting = false } = {}) {
   const topic = join(vault, workspaceRoot, "Topics", "Local Source Fixture");
   const mapPath = join(topic, "Map.md");
   const nodes = [
@@ -21,7 +21,10 @@ export function ensureSourceSelectionFixture(vault, workspaceRoot = "Agent Works
   const entries = [mapPath, ...notePaths];
   const present = entries.filter(path => existsSync(path));
   if (present.length === entries.length) {
-    if (readFileSync(mapPath, "utf8") !== map || notePaths.some((path, index) => readFileSync(path, "utf8") !== notes[index])) throw new Error("Source-selection fixture exists with unexpected content; preserving it without overwrite.");
+    if (readFileSync(mapPath, "utf8") !== map || notePaths.some((path, index) => readFileSync(path, "utf8") !== notes[index])) {
+      if (preserveExisting) return;
+      throw new Error("Source-selection fixture exists with unexpected content; preserving it without overwrite.");
+    }
     return;
   }
   if (present.length) throw new Error("Source-selection fixture is incomplete; preserving existing files without overwrite.");

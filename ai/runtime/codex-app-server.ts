@@ -43,7 +43,7 @@ interface RpcResponse { id: number; result?: unknown; error?: { message?: string
 interface RpcNotification { method: string; params?: unknown }
 interface RpcServerRequest { id: number | string; method: string; params?: unknown }
 interface PendingRequest { resolve: (value: unknown) => void; reject: (error: Error) => void; timeout: number }
-interface TurnState { messages: string[]; resolve: (text: string) => void; reject: (error: Error) => void; timeout: number; turnId: string; searches: number; searchBudget: number; steered: boolean }
+interface TurnState { messages: string[]; visibleMessages: Map<string, string>; resolve: (text: string) => void; reject: (error: Error) => void; timeout: number; turnId: string; searches: number; searchBudget: number; steered: boolean; streamItem?: string; streamText?: string; onText?: (text: string) => void }
 
 const CONTROL_TIMEOUT_MS = 30_000;
 const TURN_TIMEOUT_MS = 3 * 60 * 1000;
@@ -110,7 +110,7 @@ export class CodexAppServerRuntime {
     return [...new Map(models.map(model => [model.model, model])).values()];
   }
 
-  async runTask(prompt: string, model: string, effort: string, outputSchema: unknown, controls?: { signal?: AbortSignal; searchBudget?: number; onRequest?: (request: unknown) => void }): Promise<string> {
+  async runTask(prompt: string, model: string, effort: string, outputSchema: unknown, controls?: { signal?: AbortSignal; searchBudget?: number; onRequest?: (request: unknown) => void; onText?: (text: string) => void; onSteer?: (steer: (text: string) => Promise<void>) => void; timeoutMs?: number }): Promise<string> {
     if (controls?.signal?.aborted) throw cancelledError();
     await this.start();
     if (controls?.signal?.aborted) throw cancelledError();
@@ -130,17 +130,18 @@ export class CodexAppServerRuntime {
         this.turns.delete(threadId);
         timedOut = true;
         interrupt(5_000, "逾時後無法停止 AI 任務");
-        reject(new Error(t("ui.the_ai_task_exceeded_3_minutes_vam_attempts_to_interrupt_it")));
-      }, TURN_TIMEOUT_MS);
-      this.turns.set(threadId, { messages: [], resolve, reject, timeout, turnId: "", searches: 0, searchBudget: controls?.searchBudget ?? 0, steered: false });
+        reject(new Error(controls?.timeoutMs ? "Coffee Tables: generation timed out; received text is saved as a draft." : t("ui.the_ai_task_exceeded_3_minutes_vam_attempts_to_interrupt_it")));
+      }, controls?.timeoutMs ?? TURN_TIMEOUT_MS);
+      this.turns.set(threadId, { messages: [], visibleMessages: new Map(), resolve, reject, timeout, turnId: "", searches: 0, searchBudget: controls?.searchBudget ?? 0, steered: false, onText: controls?.onText });
     });
     const state = this.turns.get(threadId)!;
+    void completed.catch(() => undefined);
     const interrupt = (timeoutMs = CONTROL_TIMEOUT_MS, failure = "取消 AI 任務失敗"): void => {
       if (!state.turnId || interruptRequested) return;
       interruptRequested = true;
       void this.request("turn/interrupt", { threadId, turnId: state.turnId }, timeoutMs).catch(error => this.options.onLog?.("warn", `${failure}：${error instanceof Error ? error.message : String(error)}`));
     };
-    const onAbort = (): void => interrupt();
+    const onAbort = (): void => { interrupt(); if (this.turns.get(threadId) === state) { window.clearTimeout(state.timeout); this.turns.delete(threadId); state.reject(cancelledError()); } };
     controls?.signal?.addEventListener("abort", onAbort, { once: true });
     try {
       if (controls?.signal?.aborted) throw cancelledError();
@@ -150,13 +151,17 @@ export class CodexAppServerRuntime {
         model: model || null,
         effort: effort || "low",
         sandboxPolicy: { type: "readOnly", networkAccess: false },
-        outputSchema
+        ...(outputSchema ? { outputSchema } : {})
       };
       controls?.onRequest?.(turnRequest);
       const startedTurn = await this.request("turn/start", turnRequest) as { turn?: { id?: unknown } };
       state.turnId = typeof startedTurn.turn?.id === "string" ? startedTurn.turn.id : "";
+      controls?.onSteer?.(async text => {
+        if (controls.signal?.aborted || this.turns.get(threadId) !== state || !state.turnId) throw cancelledError();
+        await this.request("turn/steer", { threadId, expectedTurnId: state.turnId, input: [{ type: "text", text }] });
+      });
       if (timedOut) interrupt(5_000, "逾時後無法停止 AI 任務");
-      else if (controls?.signal?.aborted) interrupt();
+      else if (controls?.signal?.aborted) onAbort();
       this.steerIfNeeded(threadId, state);
       const answer = await completed;
       if (controls?.signal?.aborted) throw cancelledError();
@@ -225,25 +230,32 @@ export class CodexAppServerRuntime {
       return;
     }
     if (!("method" in message)) return;
-    const params = message.params as { threadId?: unknown; item?: unknown; turn?: unknown } | undefined;
+    const params = message.params as { threadId?: unknown; item?: unknown; turn?: unknown; itemId?: string; delta?: string } | undefined;
     const threadId = typeof params?.threadId === "string" ? params.threadId : "";
     const state = this.turns.get(threadId);
     if (!state) return;
+    if (message.method === "item/agentMessage/delta" && typeof params?.delta === "string") {
+      if (state.streamItem !== params.itemId) { state.streamItem = params.itemId; state.streamText = ""; }
+      state.streamText = (state.streamText ?? "") + params.delta;
+      if (typeof params.itemId === "string") state.visibleMessages.set(params.itemId, state.streamText);
+      state.onText?.([...state.visibleMessages.values()].join("\n\n"));
+      return;
+    }
     if (message.method === "item/started") {
       const item = params?.item as { type?: unknown; action?: { type?: unknown } } | undefined;
       if (item?.type === "webSearch" && (!item.action || item.action.type === "search")) { state.searches++; this.steerIfNeeded(threadId, state); }
       return;
     }
     if (message.method === "item/completed") {
-      const item = params?.item as { type?: unknown; text?: unknown } | undefined;
-      if (item?.type === "agentMessage" && typeof item.text === "string") state.messages.push(item.text);
+      const item = params?.item as { type?: unknown; text?: unknown; id?: unknown } | undefined;
+      if (item?.type === "agentMessage" && typeof item.text === "string") { const id = typeof item.id === "string" ? item.id : state.streamItem ?? `message-${state.messages.length}`; state.visibleMessages.set(id, item.text); state.messages.push(item.text); state.onText?.([...state.visibleMessages.values()].join("\n\n")); }
       return;
     }
     if (message.method === "turn/completed") {
       const turn = params?.turn as { status?: unknown; error?: { message?: unknown } | null } | undefined;
       window.clearTimeout(state.timeout);
       this.turns.delete(threadId);
-      if (turn?.status === "completed") state.resolve(state.messages.at(-1)?.trim() || "");
+      if (turn?.status === "completed") state.resolve(state.onText ? [...state.visibleMessages.values()].join("\n\n").trim() || state.messages.at(-1)?.trim() || "" : state.messages.at(-1)?.trim() || "");
       else state.reject(new Error(typeof turn?.error?.message === "string" ? turn.error.message : t("ui.codex_turn_0", typeof turn?.status === "string" ? turn.status : t("ui.failed"))));
     }
   }

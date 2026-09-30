@@ -2,7 +2,7 @@ import { spawn as nodeSpawn } from "node:child_process";
 import { t } from "../../i18n";
 
 interface ClaudeProcess {
-  stdin: { end(data?: string): void };
+  stdin: { write(data: string): boolean; end(data?: string): void };
   stdout: { on(event: "data", listener: (chunk: { toString(encoding?: string): string }) => void): void };
   stderr: { on(event: "data", listener: (chunk: { toString(encoding?: string): string }) => void): void };
   on(event: "error", listener: (error: Error) => void): void;
@@ -23,6 +23,9 @@ export interface ClaudeTaskControls {
   searchBudget?: number;
   onRequest?: (request: unknown) => void;
   onProgress?: (message: string) => void;
+  onText?: (text: string) => void;
+  onSteer?: (steer: (text: string) => Promise<void>) => void;
+  timeoutMs?: number;
 }
 export const CLAUDE_TASK_TIMEOUT_MS = 3 * 60 * 1000;
 
@@ -37,7 +40,7 @@ export function claudeOutputSchema(schema: unknown): unknown {
 export function claudeTaskArgs(model: string, effort: string, schema: unknown, webSearch: boolean): string[] {
   return [
     "--print", "--output-format", "json", "--verbose",
-    "--json-schema", JSON.stringify(claudeOutputSchema(schema)),
+    ...(schema ? ["--json-schema", JSON.stringify(claudeOutputSchema(schema))] : []),
     "--model", model,
     "--effort", ["low", "medium", "high"].includes(effort) ? effort : "low",
     "--permission-mode", "dontAsk", "--permission-prompts", "none",
@@ -46,7 +49,7 @@ export function claudeTaskArgs(model: string, effort: string, schema: unknown, w
   ];
 }
 
-export function claudeStructuredOutput(stdout: string): string {
+export function claudeStructuredOutput(stdout: string, plainText = false): string {
   const value: unknown = JSON.parse(stdout);
   const events: unknown[] = Array.isArray(value) ? value as unknown[] : [];
   const final: unknown = events.length ? events.reverse().find(item => item && typeof item === "object" && "type" in item && item.type === "result") : value;
@@ -56,6 +59,7 @@ export function claudeStructuredOutput(stdout: string): string {
     const details = Array.isArray(record.errors) ? record.errors.filter(item => typeof item === "string").join("\n") : "";
     throw new Error(details || (typeof record.result === "string" ? record.result : t("ui.claude_task_failed")));
   }
+  if (plainText && typeof record.result === "string") return record.result;
   if (record.structured_output === undefined || record.structured_output === null) throw new Error(t("ui.claude_did_not_return_structured_output"));
   return JSON.stringify(record.structured_output);
 }
@@ -76,6 +80,7 @@ export class ClaudeCodeCliRuntime {
     if (controls.signal?.aborted) throw abortError();
     const webSearch = (controls.searchBudget ?? 0) > 0;
     const args = claudeTaskArgs(model, effort, outputSchema, webSearch);
+    if (controls.onText && !outputSchema) { args[args.indexOf("json")] = "stream-json"; args.push("--include-partial-messages"); if (controls.onSteer) args.push("--input-format", "stream-json"); }
     controls.onRequest?.({ provider: "claude", executable: this.options.executable, args: args.map((arg, index) => index === args.indexOf(JSON.stringify(claudeOutputSchema(outputSchema))) ? "<response-schema>" : arg), input: "<VAM prompt via stdin>" });
     this.options.onLog?.("info", `啟動 Claude Code：${this.options.executable} --print (${webSearch ? "網路搜尋可用" : "僅使用 VAM 提供的內容"})`);
 
@@ -87,7 +92,19 @@ export class ClaudeCodeCliRuntime {
         reject(error instanceof Error ? error : new Error(String(error)));
         return;
       }
-      let stdout = "", stderr = "", settled = false;
+      let stdout = "", stderr = "", settled = false, inputOpen = Boolean(controls.onSteer);
+      let streamBuffer = "", streamText = "", currentText = "", finalResult = "";
+      const streaming = !!controls.onText && !outputSchema;
+      const readStreamLine = (line: string): void => {
+        if (!line.trim()) return;
+        const record = JSON.parse(line) as { type?: string; parent_tool_use_id?: string | null; event?: { type?: string; delta?: { type?: string; text?: string } }; message?: { content?: Array<{ type?: string; text?: string }> } };
+        if (record.parent_tool_use_id) return;
+        if (record.type === "result") { finalResult = line; if (inputOpen) { inputOpen = false; child.stdin.end(); } return; }
+        if (record.type === "stream_event" && record.event?.type === "message_start") currentText = "";
+        if (record.type === "stream_event" && record.event?.delta?.type === "text_delta" && typeof record.event.delta.text === "string") { currentText += record.event.delta.text; controls.onText?.([streamText, currentText].filter(Boolean).join("\n\n")); }
+        if (record.type === "stream_event" && record.event?.type === "message_stop") { if (currentText.trim()) streamText = [streamText, currentText].filter(Boolean).join("\n\n"); currentText = ""; controls.onText?.(streamText); }
+        if (record.type === "assistant" && record.message?.content) { const complete = record.message.content.filter(item => item.type === "text").map(item => item.text ?? "").join("\n"); if (complete && !streamText.endsWith(complete)) { currentText = complete; controls.onText?.([streamText, currentText].filter(Boolean).join("\n\n")); } }
+      };
       const cleanup = (): void => {
         window.clearTimeout(timeout);
         controls.signal?.removeEventListener("abort", onAbort);
@@ -107,10 +124,16 @@ export class ClaudeCodeCliRuntime {
       const onAbort = (): void => { stop(); finish(abortError()); };
       const timeout = window.setTimeout(() => {
         stop();
-        finish(new Error(t("ui.the_ai_task_exceeded_3_minutes_vam_attempts_to_interrupt_it")));
-      }, this.options.timeoutMs ?? CLAUDE_TASK_TIMEOUT_MS);
+        finish(new Error(controls.timeoutMs ? "Coffee Tables: generation timed out; received text is saved as a draft." : t("ui.the_ai_task_exceeded_3_minutes_vam_attempts_to_interrupt_it")));
+      }, controls.timeoutMs ?? this.options.timeoutMs ?? CLAUDE_TASK_TIMEOUT_MS);
       controls.signal?.addEventListener("abort", onAbort, { once: true });
-      child.stdout.on("data", chunk => { if (!settled) stdout = `${stdout}${chunk.toString("utf8")}`.slice(-4_000_000); });
+      child.stdout.on("data", chunk => {
+        if (settled) return;
+        if (!streaming) { stdout = `${stdout}${chunk.toString("utf8")}`.slice(-4_000_000); return; }
+        streamBuffer += chunk.toString("utf8");
+        try { let newline: number; while ((newline = streamBuffer.indexOf("\n")) >= 0) { const line = streamBuffer.slice(0, newline); streamBuffer = streamBuffer.slice(newline + 1); readStreamLine(line); } }
+        catch (error) { stop(); finish(error instanceof Error ? error : new Error(String(error))); }
+      });
       child.stderr.on("data", chunk => { if (!settled) stderr = `${stderr}${chunk.toString("utf8")}`.slice(-16_384); });
       child.on("error", error => {
         if (killTimer) window.clearTimeout(killTimer);
@@ -124,10 +147,21 @@ export class ClaudeCodeCliRuntime {
           finish(new Error(message.slice(-4_000)));
           return;
         }
-        try { finish(undefined, claudeStructuredOutput(stdout)); }
+        try {
+          if (streaming) readStreamLine(streamBuffer);
+          const result = claudeStructuredOutput(streaming ? finalResult : stdout, !outputSchema);
+          const streamed = [streamText, currentText].filter(Boolean).join("\n\n");
+          finish(undefined, streaming && result.length < streamed.length ? streamed : result);
+        }
         catch (error) { finish(error instanceof Error ? error : new Error(String(error))); }
       });
-      try { child.stdin.end(prompt); }
+      try {
+        if (controls.onSteer) {
+          const sendInput = (text: string): void => { if (!inputOpen || settled) throw new Error("This Coffee Tables response has already ended."); child.stdin.write(`${JSON.stringify({ type: "user", message: { role: "user", content: [{ type: "text", text }] } })}\n`); };
+          sendInput(prompt);
+          controls.onSteer(async text => { sendInput(text); });
+        } else child.stdin.end(prompt);
+      }
       catch (error) { stop(); finish(error instanceof Error ? error : new Error(String(error))); }
     });
   }

@@ -1,5 +1,19 @@
 # Changelog
 
+## [Unreleased]
+
+### Added
+
+- **Coffee Tables:** Open a streaming, multi-perspective AI conversation from its own Obsidian view. Choose guest perspectives and counts, listen in, add comments, ask a guest a question, or redirect the discussion.
+- Continue a finished discussion or follow up in the same timeline. Observer notes update with each completed segment and preserve earlier versions.
+- Search and filter saved tables by status, preview observer notes, and narrow the list to exact same-topic sessions. Conversations are readable Markdown notes with separate resumable session data.
+- Added English and Traditional Chinese Coffee Tables interface text and bilingual suggested topics.
+
+### Changed
+
+- Reworked the Coffee Tables list to show each recent session with its full topic, activity time, and status instead of nesting sessions under topic groups. Added an exact-topic shortcut for finding related sessions.
+- The Markdown document's first top-level heading is the session topic; headings inside conversation or observer notes no longer replace it.
+
 ## [0.9.10] - 2026-09-29
 
 ### Fixed

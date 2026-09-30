@@ -20,6 +20,18 @@
 
 **Keep what you learn.** Your research stays in ordinary Markdown notes you can read and edit without the plugin.
 
+### Coffee Tables — new in the development build
+
+**Bring a question to a table of simulated AI guests.** Hosts help different perspectives respond to one another, so you can notice blind spots, unexpected connections, and better questions—not just collect separate answers.
+
+- Choose guest perspectives and counts, then watch one natural, streaming conversation take shape.
+- Listen in, add a comment, ask a guest a question, or redirect the discussion. Continue a finished table or follow up in the same conversation.
+- Review observer notes that evolve with the discussion, including key turns, open questions, and unresolved disagreements.
+- Find and revisit tables with search and status filters. Conversations and notes are saved as Markdown; resumable session data is kept separately.
+- The interface is available in English and Traditional Chinese. AI guests and their experiences are simulations, not real people or verified experts.
+
+Coffee Tables is available from the Coffee Tables ribbon icon or the **Open Coffee Tables** command in the current development build. It is **not included in the 0.9.10 release** linked in the install instructions above.
+
 ### How it works
 
 **Question → Map → Research → Expand**
@@ -81,6 +93,18 @@ Copyright © 2026 Kevin Tsai · [AGPL-3.0-only](LICENSE) · [Changelog](CHANGELO
 **一次研究一個分支。** 聚焦提問、預覽子議題建議，確認整合草稿後再儲存。
 
 **留下真正可用的知識。** 研究成果就是一般 Markdown 筆記，離開外掛也能閱讀與編輯。
+
+### Coffee Tables — 開發版新功能
+
+**帶一個問題來，讓不同觀點的 AI 來賓一起聊。** 主持人協助來賓彼此回應，幫你發現盲點、意外連結和更值得追問的問題，而不只是收集一排各自獨立的答案。
+
+- 選擇來賓視角與人數，觀看模型以串流方式自然安排對談。
+- 可以旁聽、加入想法、追問特定來賓或改變方向；一場桌聊結束後也能在同一串對話繼續聊。
+- 觀察者整理會隨討論更新，記下重要轉折、值得追問的問題及尚未解決的分歧。
+- 透過搜尋與狀態篩選找回桌聊。對談與筆記保存為 Markdown；可恢復的工作階段資料另行保存。
+- 介面支援繁體中文與英文。AI 來賓及其經驗皆為模擬，不是真實人物或經查證的專家。
+
+目前可在開發版透過 Coffee Tables 咖啡杯圖示或 **Open Coffee Tables** 命令開啟。**此功能尚未包含在上方連結的 0.9.10 正式版中。**
 
 ### 使用方式
 

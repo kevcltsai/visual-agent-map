@@ -184,7 +184,7 @@ export class AiTaskService {
   }
 
   private parseAiResult(raw: string, label: string, language: Settings["language"]): AiResult {
-    const cleaned = raw.replace(/^\`\`\`(?:json)?\s*/i, "").replace(/\s*\`\`\`$/, "").trim();
+    const cleaned = raw.replace(/^```(?:json)?\s*/i, "").replace(/\s*```$/, "").trim();
     const parsed: { summary?: unknown; detail?: unknown; suggestions?: unknown; visualReferences?: unknown } =
       JSON.parse(extractJsonObject(cleaned)) as { summary?: unknown; detail?: unknown; suggestions?: unknown; visualReferences?: unknown };
     if (typeof parsed.summary !== "string" || typeof parsed.detail !== "string") throw new Error(`${label} 沒有回傳 summary 與 detail`);

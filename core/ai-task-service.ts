@@ -1,9 +1,8 @@
 import { packReferenceChunks, referenceBatches, referenceCatalog, resolveReferenceLinks } from "../ai/reference-materials";
 import { buildPreparedTaskContext } from "../ai/context-builder";
-import { effectiveReasoningLevel, researchGuidance, researchLimits } from "../ai/task-policy";
-import type { AiResult, TaskContext } from "../ai/types";
-import { normalizeReasoningLevel, type Settings } from "../repository";
-import { translate, t, type TranslationKey } from "../i18n";
+import { effectiveReasoningLevel, normalizeReasoningLevel, researchGuidance, researchLimits } from "../ai/task-policy";
+import type { AiResult, ReasoningLevel, TaskContext } from "../ai/types";
+import { translate, t, type TranslationKey, type UiLanguage } from "../i18n";
 import responseSchema from "../response-schema.json";
 import { CLAUDE_MODEL_CHOICES, providerForModel, providerModelId } from "../ai/providers/provider";
 import type { CodexAppServerRuntime } from "../ai/runtime/codex-app-server";
@@ -40,8 +39,8 @@ export function extractJsonObject(raw: string): string {
 
 export interface AiTaskServiceOptions {
   pluginDirectory: () => string;
-  language: () => Settings["language"];
-  defaultReasoning: () => Settings["cliReasoning"];
+  language: () => UiLanguage;
+  defaultReasoning: () => ReasoningLevel;
   exchangeLoggingEnabled: () => boolean;
   exchanges: () => AiExchangeLog | null;
   codexRuntime: (directory: string, local: boolean) => CodexAppServerRuntime;
@@ -183,7 +182,7 @@ export class AiTaskService {
     }
   }
 
-  private parseAiResult(raw: string, label: string, language: Settings["language"]): AiResult {
+  private parseAiResult(raw: string, label: string, language: UiLanguage): AiResult {
     const cleaned = raw.replace(/^```(?:json)?\s*/i, "").replace(/\s*```$/, "").trim();
     const parsed: { summary?: unknown; detail?: unknown; suggestions?: unknown; visualReferences?: unknown } =
       JSON.parse(extractJsonObject(cleaned)) as { summary?: unknown; detail?: unknown; suggestions?: unknown; visualReferences?: unknown };

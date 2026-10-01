@@ -2,18 +2,16 @@ import { CoffeeTablesView, COFFEE_TABLES_VIEW_TYPE, COFFEE_TABLES_NAME } from ".
 import type { CoffeeRequest, CoffeeSession } from "./experiences/coffee-tables/types";
 import { CoffeeManager } from "./experiences/coffee-tables/engine";
 import { CoffeeStorage } from "./experiences/coffee-tables/storage";
-import { VisualAgentMapView, VIEW_TYPE, type TaskOptions, visualGuidance } from "./experiences/visual-map/view";
+import { VisualAgentMapView, VIEW_TYPE, type TaskOptions } from "./experiences/visual-map/view";
 import { t, setUiLanguage, translate, initialUiLanguage, type TranslationKey } from "./i18n";
 import { FileSystemAdapter, MarkdownView, Modal, Notice, Plugin, TFile, type TFolder, View, WorkspaceLeaf, type Command } from "obsidian";
-import { packReferenceChunks, referenceBatches, referenceCatalog, resolveReferenceLinks } from "./ai/reference-materials";
 import { ChoiceModal } from "./ui/modals/choice-modal";
 import { DebugLogModal } from "./ui/modals/debug-log-modal";
 import { AiUsageModal, ClaudeSetupModal, CodexSetupModal, VisualAgentMapSettingTab, CLAUDE_INSTALL_URL } from "./ui/settings-tab";
 import { join } from "node:path";
 import { type MapDocument, type MapNode } from "./map-model";
 import { DEFAULT_SETTINGS, normalizeReasoningLevel, type Note, Repository, type Settings } from "./repository";
-import { buildPreparedTaskContext } from "./ai/context-builder";
-import { effectiveReasoningLevel, researchGuidance, researchLimits } from "./ai/task-policy";
+import { effectiveReasoningLevel } from "./ai/task-policy";
 import type { AiResult, Suggestion, TaskContext } from "./ai/types";
 import { clampPreviewScale, legacyPreviewScale } from "./ui/preview-utils";
 import { BUILTIN_SAMPLE_ID, builtInSample } from "./builtin-sample";
@@ -23,46 +21,22 @@ import { PendingSuggestions } from "./pending-suggestions";
 import { OutlineView, OUTLINE_VIEW_TYPE } from "./ui/outline-view";
 import { groupRibbonIcons } from "./ui/ribbon-group";
 import { randomUUID } from "node:crypto";
-import responseSchema from "./response-schema.json";
 import { CodexAppServerRuntime } from "./ai/runtime/codex-app-server";
 import { ClaudeCodeCliRuntime } from "./ai/runtime/claude-code-cli";
 import { CLAUDE_MODEL_CHOICES, providerForModel, providerModelId } from "./ai/providers/provider";
 import { ThinkingCore } from "./core/thinking-core";
 import { AiRuntimeService } from "./core/ai-runtime-service";
+import { AiTaskService } from "./core/ai-task-service";
 import { createThinkingArtifact, type ThinkingArtifact } from "./core/thinking-artifact";
 
 export { buildPreparedTaskContext } from "./ai/context-builder";
+export { extractJsonObject } from "./core/ai-task-service";
 export { executableCandidates } from "./core/ai-runtime-service";
 export { canonicalDetail, visualReferencesMarkdown } from "./ai/result-utils";
 export { NextStepModal, VisualAgentMapView } from "./experiences/visual-map/view";
 export { VisualAgentMapSettingTab } from "./ui/settings-tab";
 export { firstMarkdownImage, firstMarkdownTable, markdownImages } from "./ui/preview-utils";
 export type { AiRunMetrics, PreparedTaskContext } from "./ai/types";
-export function extractJsonObject(raw: string): string {
-  const candidates: string[] = [];
-  let start = -1, depth = 0, quoted = false, escaped = false;
-  for (let index = 0; index < raw.length; index++) {
-    const character = raw[index];
-    if (start < 0) {
-      if (character === "{") { start = index; depth = 1; quoted = false; escaped = false; }
-      continue;
-    }
-    if (quoted) {
-      if (escaped) escaped = false;
-      else if (character === "\\") escaped = true;
-      else if (character === '"') quoted = false;
-      continue;
-    }
-    if (character === '"') quoted = true;
-    else if (character === "{") depth++;
-    else if (character === "}" && --depth === 0) { candidates.push(raw.slice(start, index + 1)); start = -1; }
-  }
-  for (const candidate of candidates.reverse()) {
-    try { JSON.parse(candidate); return candidate; }
-    catch { /* Continue to an earlier balanced object. */ }
-  }
-  throw new SyntaxError("Codex 回應中找不到完整 JSON object");
-}
 export default class VisualAgentMapPlugin extends Plugin {
   settings: Settings = { ...DEFAULT_SETTINGS };
   repo!: Repository;
@@ -80,7 +54,16 @@ export default class VisualAgentMapPlugin extends Plugin {
     clientVersion: () => this.manifest.version || "0.0.0",
     onLog: (level, message) => this.logs.appendLog(level, message)
   });
-  readonly core = new ThinkingCore(this.aiRuntime);
+  readonly aiTasks = new AiTaskService({
+    pluginDirectory: () => this.pluginDirectory(),
+    language: () => this.settings.language,
+    defaultReasoning: () => this.settings.cliReasoning,
+    exchangeLoggingEnabled: () => this.settings.aiExchangeLoggingEnabled,
+    exchanges: () => this.exchanges,
+    codexRuntime: (directory, local) => this.runtime(directory, local),
+    claudeRuntime: directory => this.claudeCli(directory)
+  });
+  readonly core = new ThinkingCore(this.aiRuntime, this.aiTasks);
   exchanges: AiExchangeLog | null = null;
   private coffeeModelEfforts = new Map<string, string[]>();
   coffeeManager: CoffeeManager | null = null;
@@ -555,116 +538,13 @@ export default class VisualAgentMapPlugin extends Plugin {
     for (const view of this.views()) await view.refreshFromPlugin();
   }
   async askModel(context: TaskContext, model: string, reasoning?: unknown, signal?: AbortSignal, onExchange?: (id: string) => void): Promise<AiResult> {
-    const provider = providerForModel(model);
-    if (provider === "claude" && !CLAUDE_MODEL_CHOICES.some(choice => choice.id === model)) throw new Error(t("ui.claude_model_is_not_supported_0", model));
+    return this.aiTasks.askModel(context, model, reasoning, signal, onExchange);
+  }
+  private pluginDirectory(): string {
     const adapter = this.app.vault.adapter;
     if (!(adapter instanceof FileSystemAdapter)) throw new Error(t("ui.cli_mode_requires_desktop_obsidian"));
     if (!this.manifest.dir) throw new Error(t("ui.plugin_folder_not_found"));
-
-    const referenceGroups = context.referenceGroups ?? [];
-    if (referenceGroups.some(group => group.documents.length)) {
-      const findings = await this.extractReferenceFindings(context, model, reasoning, signal);
-      context = { ...context, sourceContext: [context.sourceContext, findings, `Source registry (retain these identities in citations):\n${referenceCatalog(referenceGroups)}`].filter(Boolean).join("\n\n"), referenceGroups: undefined };
-    }
-
-    const totalStarted = Date.now();
-    const prepared = buildPreparedTaskContext(context, model, 32_000, provider);
-    if (prepared.context.sourceContext !== context.sourceContext) throw new Error(t("ui.reference_too_large", t("ui.reference_materials")));
-    context = prepared.context;
-    const pluginDirectory = join(adapter.getBasePath(), this.manifest.dir);
-    const outputLanguage = context.outputLanguage ?? this.settings.language;
-    const instructions = [
-      translate(outputLanguage, "prompt.output_language"),
-      translate(outputLanguage, "prompt.role"),
-      translate(outputLanguage, "prompt.source_safety"),
-      context.sourceContext ? translate(outputLanguage, "prompt.reference_citations") : "",
-      context.sourceContext && context.researchMode !== "local" ? translate(outputLanguage, "prompt.local_first") : "",
-      translate(outputLanguage, "prompt.json"),
-      translate(outputLanguage, context.mode === "task" ? "prompt.general_task" : context.mode === "decompose" ? "prompt.decompose" : context.mode === "synthesize" ? "prompt.synthesize" : "prompt.default_task"),
-      context.mode !== "decompose" ? translate(outputLanguage, "prompt.detail_structure", ["detail.core_conclusions", "detail.key_knowledge", "detail.evidence_and_sources", "detail.tradeoffs_and_limitations", "detail.open_questions", "detail.update_log"].map(key => `### ${translate(outputLanguage, key as TranslationKey)}`).join(", ")) : "",
-      researchGuidance(context, outputLanguage),
-      ...visualGuidance(context, outputLanguage),
-      `${translate(outputLanguage, "prompt.label_topic")}:\n${context.title}`,
-      `${translate(outputLanguage, "prompt.label_summary")}:\n${context.summary}`,
-      context.mode !== "decompose" ? `${translate(outputLanguage, "prompt.label_detail")}:\n${context.detail || translate(outputLanguage, "prompt.none")}` : "",
-      `${translate(outputLanguage, "prompt.label_rules")}:\n${context.rules || translate(outputLanguage, "prompt.none")}`,
-      context.workingFindings ? `${translate(outputLanguage, "prompt.label_findings")}:\n${context.workingFindings}` : "",
-      context.sourceContext ? `${translate(outputLanguage, "prompt.label_sources")}:\n${context.sourceContext}` : "",
-      `${translate(outputLanguage, "prompt.label_ancestors")}:\n${context.ancestors || translate(outputLanguage, "prompt.none")}`,
-      `${translate(outputLanguage, "prompt.label_task")}:\n${context.task}`
-    ].join("\n\n");
-
-    console.debug("Visual Agent Map AI metrics", prepared.metrics);
-    const providerStarted = Date.now();
-    const effort = effectiveReasoningLevel(context, normalizeReasoningLevel(reasoning ?? this.settings.cliReasoning));
-    const exchanges = this.settings.aiExchangeLoggingEnabled ? this.exchanges : null;
-    const exchangeId = exchanges ? randomUUID() : "";
-    if (exchanges) { exchanges.begin({ id: exchangeId, startedAt: new Date().toISOString(), topic: context.title, mode: context.mode ?? "task", model, effort }); onExchange?.(exchangeId); }
-    let stage = "啟動 AI";
-    try {
-      const controls = {
-        signal, searchBudget: context.researchMode === "local" ? 0 : researchLimits(context.researchDepth).searches,
-        onRequest: (request: unknown) => { stage = "等待 AI 回覆"; if (this.settings.aiExchangeLoggingEnabled) exchanges?.sent(exchangeId, JSON.stringify(request, null, 2)); }
-      };
-      const raw = provider === "claude"
-        ? await this.claudeCli(pluginDirectory).runTask(instructions, providerModelId(model), effort, responseSchema, controls)
-        : await this.runtime(pluginDirectory, context.researchMode === "local").runTask(instructions, model, effort, responseSchema, controls);
-      stage = "解析 AI 回覆";
-      if (this.settings.aiExchangeLoggingEnabled) exchanges?.received(exchangeId, raw);
-      const result = this.parseAiResult(raw, provider === "claude" ? "Claude Code" : "Codex App Server", outputLanguage);
-      if (referenceGroups.length) {
-        result.summary = resolveReferenceLinks(result.summary, referenceGroups);
-        result.detail = resolveReferenceLinks(result.detail, referenceGroups);
-      }
-      if (this.settings.aiExchangeLoggingEnabled) exchanges?.parsed(exchangeId);
-      console.debug("Visual Agent Map AI metrics", { ...prepared.metrics, providerMs: Date.now() - providerStarted, totalMs: Date.now() - totalStarted });
-      return result;
-    } catch (error) {
-      if (this.settings.aiExchangeLoggingEnabled) exchanges?.failed(exchangeId, `${stage}：${error instanceof Error ? error.message : String(error)}`);
-      throw error;
-    }
-  }
-  private async extractReferenceFindings(context: TaskContext, model: string, reasoning: unknown, signal?: AbortSignal): Promise<string> {
-    let working = referenceBatches(context.referenceGroups ?? []);
-    let round = 0;
-    while (true) {
-      round++;
-      const batches = round === 1 ? working : packReferenceChunks(working);
-      const findings: string[] = [];
-      for (let index = 0; index < batches.length; index++) {
-        if (signal?.aborted) throw new DOMException("Aborted", "AbortError");
-        context.onProgress?.(t("ui.reference_processing_progress", index + 1, batches.length));
-        const result = await this.askModel({
-          title: context.title, summary: "", rules: "", detail: "",
-          task: round === 1
-            ? translate(this.settings.language, "prompt.reference_extract")
-            : translate(this.settings.language, "prompt.reference_reduce"),
-          ancestors: "", sourceContext: batches[index], mode: "task", researchMode: "local", researchDepth: "fast", visualMode: "off"
-        }, model, reasoning, signal);
-        if (!result.detail.trim()) throw new Error(t("ui.reference_processing_empty_result"));
-        findings.push(result.detail.trim());
-      }
-      const joined = findings.map(value => `Evidence:\n${value}`).join("\n\n");
-      if (joined.length <= 18_000) { context.onProgress?.(""); return joined; }
-      if (joined.length >= working.reduce((sum, value) => sum + value.length, 0)) throw new Error(t("ui.reference_processing_could_not_reduce"));
-      working = findings;
-    }
-  }
-  private parseAiResult(raw: string, label: string, language: "zh-TW" | "en"): AiResult {
-    const cleaned = raw.replace(/^```(?:json)?\s*/i, "").replace(/\s*```$/, "").trim();
-    const parsed: { summary?: unknown; detail?: unknown; suggestions?: unknown; visualReferences?: unknown } = JSON.parse(extractJsonObject(cleaned)) as { summary?: unknown; detail?: unknown; suggestions?: unknown; visualReferences?: unknown };
-    if (typeof parsed.summary !== "string" || typeof parsed.detail !== "string") throw new Error(`${label} 沒有回傳 summary 與 detail`);
-    const isRecord = (value: unknown): value is Record<string, unknown> => typeof value === "object" && value !== null;
-    const suggestions = Array.isArray(parsed.suggestions) ? parsed.suggestions.filter((item): item is Record<string, unknown> => isRecord(item) && typeof item.title === "string" && typeof item.task === "string").map(item => ({ title: String(item.title).trim(), task: String(item.task).trim(), contribution: typeof item.contribution === "string" ? item.contribution.trim() : "", parentTitle: typeof item.parentTitle === "string" ? item.parentTitle.trim() : "" })).filter(item => item.title) : [];
-    const visualReferences = Array.isArray(parsed.visualReferences) ? parsed.visualReferences.filter((item): item is Record<string, unknown> => isRecord(item) && typeof item.imageUrl === "string" && typeof item.sourceUrl === "string").map(item => ({
-      title: typeof item.title === "string" ? item.title.trim() : language === "en" ? "Visual reference" : "視覺參考",
-      imageUrl: String(item.imageUrl).trim(),
-      sourceUrl: String(item.sourceUrl).trim(),
-      description: typeof item.description === "string" ? item.description.trim() : "",
-      palette: Array.isArray(item.palette) ? item.palette.map(String).map(color => color.trim()).filter(Boolean).slice(0, 8) : [],
-      formula: typeof item.formula === "string" ? item.formula.trim() : ""
-    })).filter(item => /^https?:\/\//i.test(item.imageUrl) && /^https?:\/\//i.test(item.sourceUrl)).slice(0, 6) : [];
-    return { summary: Array.from(parsed.summary.trim()).slice(0, 80).join(""), detail: parsed.detail.trim(), suggestions, visualReferences };
+    return join(adapter.getBasePath(), this.manifest.dir);
   }
   runtime(pluginDirectory: string, local = false): CodexAppServerRuntime { return this.aiRuntime.codex(pluginDirectory, local); }
   private claudeCli(pluginDirectory: string): ClaudeCodeCliRuntime { return this.aiRuntime.claude(pluginDirectory); }

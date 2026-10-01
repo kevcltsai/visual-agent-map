@@ -2,16 +2,15 @@ import { App, TFile, TFolder, normalizePath, parseYaml, stringifyYaml } from "ob
 import { translate, type TranslationKey } from "./i18n";
 import { MapDocument, MapNode, serializeMap, parseMap } from "./map-model";
 import type { CoffeeStyle } from "./experiences/coffee-tables/types";
+import type { ReasoningLevel, ResearchDepth, ResearchMode, VisualMode, VisualReference } from "./ai/types";
+import { normalizeReasoningLevel } from "./ai/task-policy";
+export type { ReasoningLevel, ResearchDepth, ResearchMode, VisualMode, VisualReference } from "./ai/types";
+export { normalizeReasoningLevel } from "./ai/task-policy";
 
 export type Status = "idea" | "running" | "completed" | "error";
 export type ModelSource = "workspace" | "inherited" | "manual";
 export type TopicState = "active" | "unassigned" | "archived" | "inbox";
 export type TopicCollection = "Notes" | "Unassigned" | "Archive";
-export type ReasoningLevel = "auto" | "low" | "medium" | "high";
-export type ResearchMode = "local" | "research";
-export type ResearchDepth = "fast" | "normal" | "deep";
-export type VisualMode = "auto" | "on" | "off";
-export interface VisualReference { title: string; imageUrl: string; sourceUrl: string; description: string; palette: string[]; formula: string }
 export interface Note {
   title: string;
   summary: string;
@@ -95,9 +94,6 @@ export const DEFAULT_SETTINGS: Settings = {
   sampleTourVersionSeen: 0
 };
 
-export function normalizeReasoningLevel(value: unknown): ReasoningLevel {
-  return value === "auto" || value === "medium" || value === "high" ? value : "low";
-}
 
 const REFERENCE_START = "<!-- visual-agent-map:references:start -->";
 const REFERENCE_END = "<!-- visual-agent-map:references:end -->";

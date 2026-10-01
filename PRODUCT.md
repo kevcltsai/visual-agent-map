@@ -28,7 +28,7 @@ Each experience:
 Heavy resources are shared. Do not create one AI runtime, vault index or background watcher per experience.
 
 Prefer:
-- install many, load one;
+- register many experiences, initialize heavy work on demand;
 - deferred views;
 - plugin-level shared services;
 - event-driven work over polling;

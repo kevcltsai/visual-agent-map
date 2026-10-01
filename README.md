@@ -37,7 +37,7 @@ Maps, research notes, Coffee Tables conversations, and observer notes are readab
 <details>
 <summary>Local access and permissions</summary>
 
-The CLI inherits Obsidian's OS permissions; its read-only or tool restrictions are not an OS sandbox. VAM may read vault Markdown paths to find its workspace and probe CLI paths outside the vault. Optional AI exchange logs and temporary files are stored in plugin data. VAM does not install or update your CLI.
+The CLI inherits Obsidian's OS permissions; its read-only or tool restrictions are not an OS sandbox. VAM may read vault Markdown paths to find its workspace and probe CLI paths outside the vault. Optional AI exchange logs and temporary files are stored in plugin data. Copy actions write the requested text to the clipboard; VAM does not read clipboard contents or install/update your CLI.
 
 </details>
 
@@ -88,7 +88,7 @@ Coffee Tables 來賓是模擬角色，不是真實專家；對談內容不會自
 <details>
 <summary>本機存取與權限</summary>
 
-CLI 繼承 Obsidian 的作業系統權限；唯讀或工具限制不等於 OS sandbox。VAM 可能讀取 Vault 的 Markdown 路徑來尋找工作區，也會探測 Vault 外的 CLI 路徑。選用的 AI 往返紀錄與暫存檔會保存在外掛資料中。VAM 不會自行安裝或更新 CLI。
+CLI 繼承 Obsidian 的作業系統權限；唯讀或工具限制不等於 OS sandbox。VAM 可能讀取 Vault 的 Markdown 路徑來尋找工作區，也會探測 Vault 外的 CLI 路徑。選用的 AI 往返紀錄與暫存檔會保存在外掛資料中。複製操作只將指定文字寫入剪貼簿；VAM 不讀取剪貼簿內容，也不會自行安裝或更新 CLI。
 
 </details>
 

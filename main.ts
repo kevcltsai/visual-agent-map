@@ -70,7 +70,6 @@ export default class VisualAgentMapPlugin extends Plugin {
   readonly quickExpandPending = new Set<string>();
   readonly quickExpandFailures = new Map<string, string>();
   readonly activeTasks = new Map<string, AbortController>();
-  readonly core = new ThinkingCore();
   pendingSuggestions: Map<string, Suggestion[]> = new Map();
   readonly pendingResearchOptions = new Map<string, TaskOptions>();
   readonly logs: LogManager = debugLog;
@@ -80,6 +79,7 @@ export default class VisualAgentMapPlugin extends Plugin {
     clientVersion: () => this.manifest.version || "0.0.0",
     onLog: (level, message) => this.logs.appendLog(level, message)
   });
+  readonly core = new ThinkingCore(this.aiRuntime);
   exchanges: AiExchangeLog | null = null;
   private coffeeModelEfforts = new Map<string, string[]>();
   coffeeManager: CoffeeManager | null = null;

@@ -20,7 +20,7 @@ The Obsidian plugin is one product shell with multiple experiences. Visual Map a
 Each experience:
 - owns its interaction model and view state;
 - uses shared AI, context, storage and navigation services where practical;
-- can exchange durable thinking artifacts with other experiences;
+- can exchange structured thinking artifacts with other experiences;
 - must not reach directly into another experience's private implementation.
 
 ## Shared-core invariants
@@ -37,14 +37,14 @@ Prefer:
 
 ## Cross-experience handoff
 
-Experiences exchange `ThinkingArtifact` values through the shared experience router. Handoffs describe meaning (question, insight, argument, evidence, disagreement, conclusion, synthesis or decision), not another view's internal state.
+Experiences exchange `ThinkingArtifact` values through the shared experience router. Handoffs describe meaning (question, insight, argument, evidence, disagreement, conclusion, synthesis or decision), not another view's internal state. User-owned durable results remain Markdown in the vault.
 
 ## Safety against architecture drift
 
 A feature is not complete if it requires:
 - importing another experience's view internals;
 - duplicating a shared AI runtime or vault-wide index;
-- adding product orchestration back into `main.ts`;
+- adding experience-internal UI or business logic back into `main.ts`;
 - bypassing review/save boundaries for AI-generated user content.
 
-`main.ts` is the composition root. It should register views, commands and shared services, not own feature logic.
+`main.ts` is the composition root. It may coordinate plugin lifecycle, navigation and cross-experience handoffs, but experience-internal UI and business logic belong under `experiences/`.

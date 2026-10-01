@@ -1,8 +1,7 @@
-import { translate } from "../i18n";
-import type { Settings } from "../repository";
+import { translate, type UiLanguage } from "../i18n";
 import type { TaskContext } from "./types";
 
-export function visualGuidance(context: TaskContext, language: Settings["language"]): string[] {
+export function visualGuidance(context: TaskContext, language: UiLanguage): string[] {
   const synthesis = context.mode === "synthesize";
   const maySearch = context.researchMode !== "local" && context.mode !== "decompose" && context.visualMode !== "off";
   const mayReuse = synthesis;

@@ -10,7 +10,6 @@ import { canParent, clone, descendants, History, inheritModel, type MapDocument,
 import { arrangeMap, arrangeNewBranch } from "../../map-layout";
 import { normalizeReasoningLevel, type ModelSource, type Note, type NotePatch, type ResearchDepth, type ResearchMode, type Settings, type TopicInfo, type TopicState, type VisualMode } from "../../repository";
 import { canonicalDetail, visualReferencesMarkdown } from "../../ai/result-utils";
-import { visualGuidance } from "../../ai/visual-guidance";
 import type { AiResult, Suggestion, TaskContext } from "../../ai/types";
 import { clampPreviewScale, previewMetrics } from "../../ui/preview-utils";
 import { BUILTIN_SAMPLE_ID, builtInSample, SAMPLE_TOUR_VERSION } from "../../builtin-sample";

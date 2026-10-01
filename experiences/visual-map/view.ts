@@ -10,6 +10,7 @@ import { canParent, clone, descendants, History, inheritModel, type MapDocument,
 import { arrangeMap, arrangeNewBranch } from "../../map-layout";
 import { normalizeReasoningLevel, type ModelSource, type Note, type NotePatch, type ResearchDepth, type ResearchMode, type Settings, type TopicInfo, type TopicState, type VisualMode } from "../../repository";
 import { canonicalDetail, visualReferencesMarkdown } from "../../ai/result-utils";
+import { visualGuidance } from "../../ai/visual-guidance";
 import type { AiResult, Suggestion, TaskContext } from "../../ai/types";
 import { clampPreviewScale, previewMetrics } from "../../ui/preview-utils";
 import { BUILTIN_SAMPLE_ID, builtInSample, SAMPLE_TOUR_VERSION } from "../../builtin-sample";
@@ -46,19 +47,6 @@ function researchDepthDescription(depth: ResearchDepth): string {
       ? t("ui.deep_aim_for_up_to_6_web_searches_and_10_main_sources_compar")
       : t("ui.standard_aim_for_up_to_3_web_searches_and_5_main_sources_sum");
   return `${description} ${t("ui.web_and_image_searches_share_the_search_limit_search_counts")}`;
-}
-export function visualGuidance(context: TaskContext, language: Settings["language"]): string[] {
-  const synthesis = context.mode === "synthesize";
-  const maySearch = context.researchMode !== "local" && context.mode !== "decompose" && context.visualMode !== "off";
-  const mayReuse = synthesis;
-  const instructions: string[] = [];
-  if (!maySearch) {
-    instructions.push(translate(language, "prompt.visual_none"));
-    if (mayReuse) instructions.push(translate(language, "prompt.visual_preserve"));
-  } else if (context.visualMode === "on") instructions.push(translate(language, "prompt.visual_on"));
-  else instructions.push(translate(language, "prompt.visual_auto"));
-  if (maySearch || mayReuse) instructions.push(translate(language, "prompt.visual_embed"));
-  return instructions;
 }
 function imageReferencesFromMarkdown(markdown: string): string {
   const lines = markdown.split("\n");

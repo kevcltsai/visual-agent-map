@@ -13,7 +13,6 @@ import { delimiter as nodeDelimiter, dirname as nodeDirname, isAbsolute as nodeI
 import { type MapDocument, type MapNode } from "./map-model";
 import { DEFAULT_SETTINGS, normalizeReasoningLevel, type Note, Repository, type Settings } from "./repository";
 import { buildPreparedTaskContext } from "./ai/context-builder";
-import { canonicalDetail, visualReferencesMarkdown } from "./ai/result-utils";
 import { effectiveReasoningLevel, researchGuidance, researchLimits } from "./ai/task-policy";
 import type { AiResult, Suggestion, TaskContext } from "./ai/types";
 import { clampPreviewScale, legacyPreviewScale } from "./ui/preview-utils";

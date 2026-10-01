@@ -5642,8 +5642,8 @@ function topicStatusLabel(status, locale) {
   return translate(locale, keys[status]);
 }
 
-// main.ts
-var import_obsidian9 = require("obsidian");
+// experiences/visual-map/view.ts
+var import_obsidian8 = require("obsidian");
 
 // ui/reference-picker.ts
 var import_obsidian3 = require("obsidian");
@@ -6246,10 +6246,6 @@ var DebugLogModal = class extends import_obsidian6.Modal {
   }
 };
 
-// main.ts
-var import_node_fs = require("node:fs");
-var import_node_path = require("node:path");
-
 // map-model.ts
 var clone = (value) => JSON.parse(JSON.stringify(value));
 function descendants(nodes, id) {
@@ -6410,6 +6406,29 @@ function arrangeNewBranch(nodes, parentId, newIds) {
 
 // repository.ts
 var import_obsidian7 = require("obsidian");
+
+// ai/task-policy.ts
+function normalizeReasoningLevel(value) {
+  return value === "auto" || value === "medium" || value === "high" ? value : "low";
+}
+function researchLimits(depth) {
+  if (depth === "fast") return { searches: 1, sources: 2 };
+  if (depth === "deep") return { searches: 6, sources: 10 };
+  return { searches: 3, sources: 5 };
+}
+function effectiveReasoningLevel(context, selected) {
+  if (selected !== "auto") return selected;
+  if (context.mode === "synthesize") return "medium";
+  return context.sourceContext && context.sourceContext.length > 6e3 ? "medium" : "low";
+}
+function researchGuidance(context, language2 = "zh-TW") {
+  const depth = translate(language2, context.researchDepth === "fast" ? "research.fast" : context.researchDepth === "deep" ? "research.deep" : "research.normal");
+  if (context.researchMode === "local") return `${depth} ${translate(language2, "research.local")}`;
+  const { searches, sources: sources2 } = researchLimits(context.researchDepth);
+  return `${depth} ${translate(language2, "research.web", searches, sources2)}`;
+}
+
+// repository.ts
 var DEFAULT_SETTINGS = {
   coffeeStyles: [],
   language: "en",
@@ -6434,9 +6453,6 @@ var DEFAULT_SETTINGS = {
   workspaceInitialized: false,
   sampleTourVersionSeen: 0
 };
-function normalizeReasoningLevel(value) {
-  return value === "auto" || value === "medium" || value === "high" ? value : "low";
-}
 var REFERENCE_START = "<!-- visual-agent-map:references:start -->";
 var REFERENCE_END = "<!-- visual-agent-map:references:end -->";
 var DETAIL_START = "<!-- visual-agent-map:detail:start -->";
@@ -7215,24 +7231,6 @@ ${body}`);
   }
 };
 
-// ai/context-builder.ts
-var estimateTokens = (value) => Math.ceil((value || "").length / 4);
-var dedupeRules = (value) => Array.from(new Map(value.split("\n").map((line) => line.trim()).filter(Boolean).map((line) => [line.replace(/\s+/g, " ").toLowerCase(), line])).values()).join("\n");
-function buildPreparedTaskContext(input, model, budget = 32e3, provider = "codex") {
-  const started = Date.now(), mode = input.mode || "task";
-  const context = { ...input, rules: dedupeRules(input.rules), ancestors: input.ancestors.replace(/^\s*AI 規則：.*(?:\n|$)/gm, "").trim() };
-  if (mode === "decompose") {
-    context.detail = "";
-    context.workingFindings = "";
-  }
-  const optional = ["detail", "workingFindings", "ancestors", "sourceContext"];
-  const used = () => [context.title, context.summary, context.rules, context.detail, context.task, context.ancestors, context.workingFindings, context.sourceContext].reduce((sum, value) => sum + estimateTokens(value), 0);
-  for (const key2 of optional) if (used() > budget && context[key2]) context[key2] = String(context[key2]).slice(0, Math.max(0, (budget - used() + estimateTokens(String(context[key2]))) * 4));
-  const contextBreakdown = { task: estimateTokens(context.task), currentSummary: estimateTokens(context.summary), currentDetail: estimateTokens(context.detail), effectiveRules: estimateTokens(context.rules), ancestors: estimateTokens(context.ancestors), workingFindings: estimateTokens(context.workingFindings), sourceContext: estimateTokens(context.sourceContext) };
-  const estimatedInputTokens = [contextBreakdown.task, contextBreakdown.currentSummary, contextBreakdown.currentDetail, contextBreakdown.effectiveRules, contextBreakdown.ancestors, contextBreakdown.workingFindings, contextBreakdown.sourceContext].reduce((sum, count) => sum + count, 0);
-  return { context, metrics: { provider, model, mode, estimatedInputTokens, contextBreakdown, contextBuildMs: Date.now() - started, sessionStrategy: "fresh-session-per-node-task" } };
-}
-
 // ai/result-utils.ts
 function canonicalDetail(value, language2 = "zh-TW") {
   var _a;
@@ -7282,24 +7280,6 @@ function visualReferencesMarkdown(references = [], language2 = "zh-TW") {
       item.formula.trim() ? translate(language2, "detail.reusable_formula", item.formula.trim()) : ""
     ].filter(Boolean).join("\n");
   }).filter(Boolean).join("\n\n");
-}
-
-// ai/task-policy.ts
-function researchLimits(depth) {
-  if (depth === "fast") return { searches: 1, sources: 2 };
-  if (depth === "deep") return { searches: 6, sources: 10 };
-  return { searches: 3, sources: 5 };
-}
-function effectiveReasoningLevel(context, selected) {
-  if (selected !== "auto") return selected;
-  if (context.mode === "synthesize") return "medium";
-  return context.sourceContext && context.sourceContext.length > 6e3 ? "medium" : "low";
-}
-function researchGuidance(context, language2 = "zh-TW") {
-  const depth = translate(language2, context.researchDepth === "fast" ? "research.fast" : context.researchDepth === "deep" ? "research.deep" : "research.normal");
-  if (context.researchMode === "local") return `${depth} ${translate(language2, "research.local")}`;
-  const { searches, sources: sources2 } = researchLimits(context.researchDepth);
-  return `${depth} ${translate(language2, "research.web", searches, sources2)}`;
 }
 
 // ui/preview-utils.ts
@@ -7459,853 +7439,8 @@ var PendingSuggestions = class extends Map {
   }
 };
 
-// ui/outline-view.ts
-var import_obsidian8 = require("obsidian");
-var OUTLINE_VIEW_TYPE = "visual-agent-map-outline";
-var OutlineView = class extends import_obsidian8.ItemView {
-  constructor(leaf, openNote) {
-    super(leaf);
-    this.openNote = openNote;
-    __publicField(this, "map", null);
-    __publicField(this, "titles", /* @__PURE__ */ new Map());
-    __publicField(this, "collapsed", /* @__PURE__ */ new Set());
-    __publicField(this, "query", "");
-    __publicField(this, "activePath", "");
-    __publicField(this, "sample", false);
-    __publicField(this, "coffee", null);
-    __publicField(this, "coffeeActive", false);
-    __publicField(this, "locateCoffee", null);
-    __publicField(this, "fillCoffee", null);
-  }
-  getViewType() {
-    return OUTLINE_VIEW_TYPE;
-  }
-  getDisplayText() {
-    return t("ui.topic_outline");
-  }
-  getIcon() {
-    return "list-tree";
-  }
-  async onOpen() {
-    this.render();
-  }
-  setMap(map, titles, sample = false) {
-    const search = this.contentEl.querySelector(".vam-outline-search");
-    const restoreFocus = !!search && search === document.activeElement;
-    const selection = restoreFocus ? [search.selectionStart, search.selectionEnd] : null;
-    this.map = map;
-    this.sample = sample;
-    this.titles = titles;
-    if (map) this.collapsed = new Set([...this.collapsed].filter((id) => map.nodes.some((node) => node.id === id)));
-    this.render();
-    if (restoreFocus) {
-      const updated = this.contentEl.querySelector(".vam-outline-search");
-      updated == null ? void 0 : updated.focus();
-      if (updated && selection && selection[0] !== null && selection[1] !== null) updated.setSelectionRange(selection[0], selection[1]);
-    }
-  }
-  setActivePath(path) {
-    this.activePath = path;
-    this.render();
-  }
-  setCoffeeOutline(snapshot, active, locate, fill = null) {
-    const search = this.contentEl.querySelector(".vam-outline-search"), restoreFocus = !!search && search === document.activeElement;
-    const selection = restoreFocus ? [search.selectionStart, search.selectionEnd] : null;
-    this.coffee = snapshot;
-    this.coffeeActive = active;
-    this.locateCoffee = locate;
-    this.fillCoffee = fill;
-    this.render();
-    if (restoreFocus) {
-      const updated = this.contentEl.querySelector(".vam-outline-search");
-      updated == null ? void 0 : updated.focus();
-      if (updated && selection && selection[0] !== null && selection[1] !== null) updated.setSelectionRange(selection[0], selection[1]);
-    }
-  }
-  render() {
-    var _a, _b, _c, _d;
-    this.contentEl.empty();
-    this.contentEl.addClass("vam-outline");
-    const heading = this.contentEl.createDiv("vam-outline-heading");
-    heading.createEl("strong", { text: this.coffeeActive ? (_b = (_a = this.coffee) == null ? void 0 : _a.topic) != null ? _b : "Coffee Tables" : (_d = (_c = this.map) == null ? void 0 : _c.title) != null ? _d : t("ui.topic_outline") });
-    if (this.coffeeActive) {
-      this.renderCoffee();
-      return;
-    }
-    if (!this.map) {
-      this.contentEl.createDiv({ cls: "vam-outline-empty", text: t(this.sample ? "ui.sample_outline_hint" : "ui.open_a_mind_map_to_see_its_topic_hierarchy_here") });
-      return;
-    }
-    const input = this.contentEl.createEl("input", { type: "search", cls: "vam-outline-search", attr: { placeholder: t("ui.search_topics") } });
-    input.value = this.query;
-    input.addEventListener("input", () => {
-      this.query = input.value;
-      this.renderTree();
-    });
-    this.renderTree();
-  }
-  renderCoffee() {
-    this.contentEl.createEl("h4", { text: t("ui.coffee_segments") });
-    const snapshot = this.coffee;
-    if (!(snapshot == null ? void 0 : snapshot.segments.length)) {
-      this.contentEl.createDiv({ cls: "vam-outline-empty", text: t("ui.coffee_segments_empty") });
-      return;
-    }
-    if (!snapshot.readOnly && snapshot.segments.some((item) => !item.summary && item.text.trim() && item.status !== "generating")) {
-      const fill = this.contentEl.createEl("button", { text: t("ui.coffee_fill_summaries") });
-      fill.addEventListener("click", () => {
-        var _a;
-        return (_a = this.fillCoffee) == null ? void 0 : _a.call(this);
-      });
-    }
-    const tree = this.contentEl.createDiv("vam-outline-tree");
-    snapshot.segments.forEach((item, index) => {
-      var _a;
-      const button = tree.createEl("button", { cls: "vam-coffee-segment" });
-      const kind = t(item.kind === "question" ? "ui.coffee_segment_question" : item.kind === "continuation" ? "ui.coffee_segment_continuation" : item.kind === "legacy" ? "ui.coffee_segment_legacy" : "ui.coffee_segment_initial");
-      button.createEl("strong", { text: getUiLanguage() === "zh-TW" ? `\u7B2C ${index + 1} \u6BB5\u30FB${kind}` : `Segment ${index + 1} \xB7 ${kind}` });
-      button.createSpan({ text: item.status === "generating" ? t("ui.coffee_segment_generating") : (_a = item.summary) != null ? _a : t("ui.coffee_segment_no_summary") });
-      if (item.status === "error") button.createEl("small", { text: t("ui.coffee_segment_incomplete") });
-      button.addEventListener("click", () => {
-        var _a2;
-        if (!((_a2 = this.locateCoffee) == null ? void 0 : _a2.call(this, item.id))) new import_obsidian8.Notice(t("ui.coffee_segment_no_content"));
-      });
-    });
-  }
-  renderTree() {
-    var _a, _b, _c;
-    (_a = this.contentEl.querySelector(".vam-outline-tree")) == null ? void 0 : _a.remove();
-    if (!this.map) return;
-    const tree = this.contentEl.createDiv("vam-outline-tree");
-    const children = /* @__PURE__ */ new Map();
-    for (const node of this.map.nodes) children.set(node.parentId, [...(_b = children.get(node.parentId)) != null ? _b : [], node]);
-    const query = this.query.trim().toLocaleLowerCase();
-    const matches = (node) => {
-      var _a2, _b2;
-      if (!query) return true;
-      if (((_a2 = this.titles.get(node.id)) != null ? _a2 : node.path).toLocaleLowerCase().includes(query)) return true;
-      return ((_b2 = children.get(node.id)) != null ? _b2 : []).some(matches);
-    };
-    const append = (node, depth) => {
-      var _a2, _b2, _c2;
-      if (!matches(node)) return;
-      const descendants2 = (_a2 = children.get(node.id)) != null ? _a2 : [];
-      const row = tree.createDiv("vam-outline-row");
-      row.style.paddingLeft = `${8 + depth * 16}px`;
-      if (descendants2.length) {
-        const toggle = row.createEl("button", { text: query || !this.collapsed.has(node.id) ? "\u25BE" : "\u25B8", cls: "vam-outline-toggle" });
-        toggle.disabled = !!query;
-        toggle.setAttr("aria-label", !query && this.collapsed.has(node.id) ? t("ui.expand") : t("ui.collapse"));
-        toggle.addEventListener("click", () => {
-          if (this.collapsed.has(node.id)) this.collapsed.delete(node.id);
-          else this.collapsed.add(node.id);
-          this.renderTree();
-        });
-      } else row.createSpan("vam-outline-spacer");
-      const title = (_c2 = (_b2 = this.titles.get(node.id)) != null ? _b2 : node.path.split("/").pop()) != null ? _c2 : node.path;
-      const button = row.createEl("button", { text: title, cls: "vam-outline-note" });
-      button.title = title;
-      if (node.path === this.activePath) button.addClass("is-active");
-      button.addEventListener("click", () => {
-        void this.openNote(node.path);
-      });
-      if (query || !this.collapsed.has(node.id)) for (const child of descendants2) append(child, depth + 1);
-    };
-    for (const root of (_c = children.get(null)) != null ? _c : []) append(root, 0);
-    if (!tree.childElementCount) {
-      tree.createDiv({ cls: "vam-outline-empty", text: t(query ? "ui.no_matching_topics" : "ui.empty_outline_hint") });
-      if (query) tree.createEl("button", { text: t("ui.clear_search") }).addEventListener("click", () => {
-        this.query = "";
-        this.render();
-      });
-    }
-  }
-};
-
-// ui/ribbon-group.ts
-function groupRibbonIcons(map, coffee) {
-  const parent = map.parentElement;
-  if (!parent || coffee.parentElement !== parent) return () => {
-  };
-  const classes = ["vam-ribbon-group", "vam-ribbon-group-start", "vam-ribbon-group-end"];
-  parent.classList.add("vam-ribbon-container");
-  const update = () => {
-    var _a, _b;
-    observer.disconnect();
-    for (const icon of [map, coffee]) icon.classList.remove(...classes);
-    const present = [map, coffee].filter((icon) => icon.parentElement === parent);
-    for (const icon of present) {
-      if (icon !== parent.lastElementChild) parent.appendChild(icon);
-    }
-    for (const icon of present) icon.classList.add("vam-ribbon-group");
-    (_a = present[0]) == null ? void 0 : _a.classList.add("vam-ribbon-group-start");
-    (_b = present.at(-1)) == null ? void 0 : _b.classList.add("vam-ribbon-group-end");
-    observer.observe(parent, { childList: true });
-  };
-  const observer = new window.MutationObserver(() => update());
-  update();
-  return () => {
-    observer.disconnect();
-    parent.classList.remove("vam-ribbon-container");
-    for (const icon of [map, coffee]) icon.classList.remove(...classes);
-  };
-}
-
-// main.ts
-var import_node_crypto = require("node:crypto");
-
-// response-schema.json
-var response_schema_default = {
-  $schema: "https://json-schema.org/draft/2020-12/schema",
-  type: "object",
-  properties: {
-    summary: {
-      type: "string",
-      description: "\u9069\u5408\u5FC3\u667A\u5716\u7684\u4E00\u53E5\u7E41\u9AD4\u4E2D\u6587\u7D50\u8AD6\uFF0C80 \u5B57\u5167"
-    },
-    detail: {
-      type: "string",
-      description: "\u5B8C\u6574\u7684\u7E41\u9AD4\u4E2D\u6587 Markdown \u5206\u6790"
-    },
-    suggestions: {
-      type: "array",
-      items: { type: "object", properties: { title: { type: "string" }, task: { type: "string" }, contribution: { type: "string" }, parentTitle: { type: "string" } }, required: ["title", "task", "contribution", "parentTitle"], additionalProperties: false }
-    },
-    visualReferences: {
-      type: "array",
-      items: {
-        type: "object",
-        properties: {
-          title: { type: "string" },
-          imageUrl: { type: "string" },
-          sourceUrl: { type: "string" },
-          description: { type: "string" },
-          palette: { type: "array", items: { type: "string" } },
-          formula: { type: "string" }
-        },
-        required: ["title", "imageUrl", "sourceUrl", "description", "palette", "formula"],
-        additionalProperties: false
-      }
-    }
-  },
-  required: ["summary", "detail", "suggestions", "visualReferences"],
-  additionalProperties: false
-};
-
-// ai/runtime/codex-app-server.ts
-var import_node_child_process = require("node:child_process");
-var spawnProcess = import_node_child_process.spawn;
-var CONTROL_TIMEOUT_MS = 3e4;
-var TURN_TIMEOUT_MS = 3 * 60 * 1e3;
-function cancelledError() {
-  const error = new Error(t("ui.ai_task_cancelled"));
-  error.name = "AbortError";
-  return error;
-}
-var CodexAppServerRuntime = class {
-  constructor(options) {
-    this.options = options;
-    __publicField(this, "child", null);
-    __publicField(this, "buffer", "");
-    __publicField(this, "stderr", "");
-    __publicField(this, "nextId", 1);
-    __publicField(this, "pending", /* @__PURE__ */ new Map());
-    __publicField(this, "turns", /* @__PURE__ */ new Map());
-    __publicField(this, "initializing", null);
-  }
-  async start() {
-    if (this.initializing) return this.initializing;
-    const initializing = this.startProcess();
-    this.initializing = initializing;
-    try {
-      await initializing;
-    } catch (error) {
-      if (this.initializing === initializing) this.initializing = null;
-      const child = this.child;
-      if (child) this.failProcess(child, error instanceof Error ? error : new Error(String(error)));
-      throw error;
-    }
-  }
-  stop() {
-    var _a;
-    const error = new Error(t("ui.codex_app_server_has_stopped"));
-    for (const entry of this.pending.values()) {
-      window.clearTimeout(entry.timeout);
-      entry.reject(error);
-    }
-    for (const entry of this.turns.values()) {
-      window.clearTimeout(entry.timeout);
-      entry.reject(error);
-    }
-    this.pending.clear();
-    this.turns.clear();
-    (_a = this.child) == null ? void 0 : _a.kill();
-    this.child = null;
-    this.initializing = null;
-  }
-  async listModels() {
-    var _a;
-    await this.start();
-    const models = [];
-    let cursor = null;
-    do {
-      const response = await this.request("model/list", { cursor, limit: 100, includeHidden: false });
-      for (const value of (_a = response.data) != null ? _a : []) {
-        if (!value || typeof value !== "object") continue;
-        const item = value;
-        const model = typeof item.model === "string" ? item.model.trim() : "";
-        const id = typeof item.id === "string" ? item.id.trim() : "";
-        const displayName = typeof item.displayName === "string" ? item.displayName.trim() : "";
-        const efforts = Array.isArray(item.supportedReasoningEfforts) ? item.supportedReasoningEfforts : [];
-        if (item.hidden !== false || !model || !id || !displayName || !efforts.length) continue;
-        models.push({
-          id,
-          model,
-          displayName,
-          hidden: false,
-          supportedReasoningEfforts: efforts,
-          defaultReasoningEffort: typeof item.defaultReasoningEffort === "string" ? item.defaultReasoningEffort : "low",
-          isDefault: item.isDefault === true
-        });
-      }
-      cursor = typeof response.nextCursor === "string" && response.nextCursor ? response.nextCursor : null;
-    } while (cursor);
-    return [...new Map(models.map((model) => [model.model, model])).values()];
-  }
-  async runTask(prompt, model, effort, outputSchema, controls) {
-    var _a, _b, _c, _d, _e, _f, _g, _h, _i, _j, _k, _l, _m, _n;
-    if ((_a = controls == null ? void 0 : controls.signal) == null ? void 0 : _a.aborted) throw cancelledError();
-    await this.start();
-    if ((_b = controls == null ? void 0 : controls.signal) == null ? void 0 : _b.aborted) throw cancelledError();
-    const started = await this.request("thread/start", {
-      model: model || null,
-      cwd: this.options.cwd,
-      approvalPolicy: "never",
-      sandbox: "read-only",
-      ephemeral: true,
-      ...(controls == null ? void 0 : controls.textOnly) ? {
-        baseInstructions: "You are a text-generation assistant. Complete the supplied conversation-writing task directly. Do not inspect the environment, repositories, Git, files, or use tools. All necessary context is in the request. Output only the requested Markdown.",
-        config: { "features.shell_tool": false, "features.unified_exec": false }
-      } : {}
-    });
-    const threadId = typeof ((_c = started.thread) == null ? void 0 : _c.id) === "string" ? started.thread.id : "";
-    if (!threadId) throw new Error(t("ui.codex_app_server_did_not_create_a_thread"));
-    let timedOut = false, interruptRequested = false;
-    const completed = new Promise((resolve, reject) => {
-      var _a2, _b2;
-      const timeout = window.setTimeout(() => {
-        this.turns.delete(threadId);
-        timedOut = true;
-        interrupt(5e3, "\u903E\u6642\u5F8C\u7121\u6CD5\u505C\u6B62 AI \u4EFB\u52D9");
-        reject(new Error((controls == null ? void 0 : controls.timeoutMs) ? "Coffee Tables: generation timed out; received text is saved as a draft." : t("ui.the_ai_task_exceeded_3_minutes_vam_attempts_to_interrupt_it")));
-      }, (_a2 = controls == null ? void 0 : controls.timeoutMs) != null ? _a2 : TURN_TIMEOUT_MS);
-      this.turns.set(threadId, { messages: [], visibleMessages: /* @__PURE__ */ new Map(), resolve, reject, timeout, turnId: "", searches: 0, searchBudget: (_b2 = controls == null ? void 0 : controls.searchBudget) != null ? _b2 : 0, steered: false, onText: controls == null ? void 0 : controls.onText });
-    });
-    const state = this.turns.get(threadId);
-    void completed.catch(() => void 0);
-    const interrupt = (timeoutMs = CONTROL_TIMEOUT_MS, failure = "\u53D6\u6D88 AI \u4EFB\u52D9\u5931\u6557") => {
-      if (!state.turnId || interruptRequested) return;
-      interruptRequested = true;
-      void this.request("turn/interrupt", { threadId, turnId: state.turnId }, timeoutMs).catch((error) => {
-        var _a2, _b2;
-        return (_b2 = (_a2 = this.options).onLog) == null ? void 0 : _b2.call(_a2, "warn", `${failure}\uFF1A${error instanceof Error ? error.message : String(error)}`);
-      });
-    };
-    const onAbort = () => {
-      interrupt();
-      if (this.turns.get(threadId) === state) {
-        window.clearTimeout(state.timeout);
-        this.turns.delete(threadId);
-        state.reject(cancelledError());
-      }
-    };
-    (_d = controls == null ? void 0 : controls.signal) == null ? void 0 : _d.addEventListener("abort", onAbort, { once: true });
-    try {
-      if ((_e = controls == null ? void 0 : controls.signal) == null ? void 0 : _e.aborted) throw cancelledError();
-      const turnRequest = {
-        threadId,
-        input: [{ type: "text", text: prompt, text_elements: [] }],
-        model: model || null,
-        effort: effort || "low",
-        sandboxPolicy: { type: "readOnly", networkAccess: false },
-        ...outputSchema ? { outputSchema } : {}
-      };
-      (_f = controls == null ? void 0 : controls.onRequest) == null ? void 0 : _f.call(controls, turnRequest);
-      const startedTurn = await this.request("turn/start", turnRequest);
-      state.turnId = typeof ((_g = startedTurn.turn) == null ? void 0 : _g.id) === "string" ? startedTurn.turn.id : "";
-      (_h = controls == null ? void 0 : controls.onSteer) == null ? void 0 : _h.call(controls, async (text2) => {
-        var _a2;
-        if (((_a2 = controls.signal) == null ? void 0 : _a2.aborted) || this.turns.get(threadId) !== state || !state.turnId) throw cancelledError();
-        await this.request("turn/steer", { threadId, expectedTurnId: state.turnId, input: [{ type: "text", text: text2 }] });
-      });
-      if (timedOut) interrupt(5e3, "\u903E\u6642\u5F8C\u7121\u6CD5\u505C\u6B62 AI \u4EFB\u52D9");
-      else if ((_i = controls == null ? void 0 : controls.signal) == null ? void 0 : _i.aborted) onAbort();
-      this.steerIfNeeded(threadId, state);
-      const answer = await completed;
-      if ((_j = controls == null ? void 0 : controls.signal) == null ? void 0 : _j.aborted) throw cancelledError();
-      return answer;
-    } catch (error) {
-      const state2 = this.turns.get(threadId);
-      if (state2) {
-        window.clearTimeout(state2.timeout);
-        this.turns.delete(threadId);
-        state2.reject(error instanceof Error ? error : new Error(String(error)));
-        await completed.catch(() => void 0);
-      } else await completed.catch(() => void 0);
-      if ((_k = controls == null ? void 0 : controls.signal) == null ? void 0 : _k.aborted) throw cancelledError();
-      throw error;
-    } finally {
-      (_l = controls == null ? void 0 : controls.signal) == null ? void 0 : _l.removeEventListener("abort", onAbort);
-      try {
-        await this.request("thread/unsubscribe", { threadId }, 5e3);
-      } catch (error) {
-        (_n = (_m = this.options).onLog) == null ? void 0 : _n.call(_m, "warn", `Codex App Server \u7121\u6CD5\u53D6\u6D88 thread \u8A02\u95B1\uFF1A${error instanceof Error ? error.message : String(error)}`);
-      }
-    }
-  }
-  async startProcess() {
-    var _a, _b, _c, _d;
-    (_b = (_a = this.options).onLog) == null ? void 0 : _b.call(_a, "info", `\u555F\u52D5 Codex App Server\uFF1A${this.options.executable} app-server`);
-    this.buffer = "";
-    this.stderr = "";
-    const child = spawnProcess(this.options.executable, this.options.webSearchDisabled ? ["--config", 'web_search="disabled"', "app-server"] : ["app-server"], {
-      cwd: this.options.cwd,
-      env: this.options.env,
-      stdio: ["pipe", "pipe", "pipe"]
-    });
-    this.child = child;
-    child.stdout.on("data", (chunk) => this.consume(child, chunk.toString("utf8")));
-    child.stderr.on("data", (chunk) => {
-      if (this.child === child) this.stderr = `${this.stderr}${chunk.toString("utf8")}`.slice(-16384);
-    });
-    child.on("error", (error) => this.failProcess(child, new Error(t("ui.could_not_start_codex_app_server_0_1", this.options.executable, error.message))));
-    child.on("close", (code) => this.failProcess(child, new Error(this.stderr.trim() || t("ui.codex_app_server_exit_code_0", code != null ? code : t("ui.unknown")))));
-    await this.request("initialize", {
-      clientInfo: { name: "visual-agent-map", title: "Visual Agent Map", version: this.options.clientVersion },
-      capabilities: { experimentalApi: false, requestAttestation: false }
-    });
-    this.send({ method: "initialized" });
-    (_d = (_c = this.options).onLog) == null ? void 0 : _d.call(_c, "info", "Codex App Server \u5DF2\u5C31\u7DD2");
-  }
-  consume(child, chunk) {
-    if (this.child !== child) return;
-    this.buffer += chunk;
-    while (true) {
-      const newline = this.buffer.indexOf("\n");
-      if (newline < 0) return;
-      const line = this.buffer.slice(0, newline).trim();
-      this.buffer = this.buffer.slice(newline + 1);
-      if (!line) continue;
-      try {
-        this.handle(JSON.parse(line));
-      } catch (error) {
-        this.failProcess(child, new Error(t("ui.could_not_parse_codex_app_server_response_0", error instanceof Error ? error.message : String(error))));
-      }
-    }
-  }
-  handle(message) {
-    var _a, _b, _c, _d, _e, _f, _g;
-    if ("id" in message && "method" in message) {
-      this.respondToServerRequest(message);
-      return;
-    }
-    if ("id" in message) {
-      const entry = this.pending.get(message.id);
-      if (!entry) return;
-      this.pending.delete(message.id);
-      window.clearTimeout(entry.timeout);
-      if (message.error) entry.reject(new Error(message.error.message || t("ui.codex_app_server_returned_an_error")));
-      else entry.resolve(message.result);
-      return;
-    }
-    if (!("method" in message)) return;
-    const params = message.params;
-    const threadId = typeof (params == null ? void 0 : params.threadId) === "string" ? params.threadId : "";
-    const state = this.turns.get(threadId);
-    if (!state) return;
-    if (message.method === "item/agentMessage/delta" && typeof (params == null ? void 0 : params.delta) === "string") {
-      if (state.streamItem !== params.itemId) {
-        state.streamItem = params.itemId;
-        state.streamText = "";
-      }
-      state.streamText = ((_a = state.streamText) != null ? _a : "") + params.delta;
-      if (typeof params.itemId === "string") state.visibleMessages.set(params.itemId, state.streamText);
-      (_b = state.onText) == null ? void 0 : _b.call(state, [...state.visibleMessages.values()].join("\n\n"));
-      return;
-    }
-    if (message.method === "item/started") {
-      const item = params == null ? void 0 : params.item;
-      if ((item == null ? void 0 : item.type) === "webSearch" && (!item.action || item.action.type === "search")) {
-        state.searches++;
-        this.steerIfNeeded(threadId, state);
-      }
-      return;
-    }
-    if (message.method === "item/completed") {
-      const item = params == null ? void 0 : params.item;
-      if ((item == null ? void 0 : item.type) === "agentMessage" && typeof item.text === "string") {
-        const id = typeof item.id === "string" ? item.id : (_c = state.streamItem) != null ? _c : `message-${state.messages.length}`;
-        state.visibleMessages.set(id, item.text);
-        state.messages.push(item.text);
-        (_d = state.onText) == null ? void 0 : _d.call(state, [...state.visibleMessages.values()].join("\n\n"));
-      }
-      return;
-    }
-    if (message.method === "turn/completed") {
-      const turn = params == null ? void 0 : params.turn;
-      window.clearTimeout(state.timeout);
-      this.turns.delete(threadId);
-      if ((turn == null ? void 0 : turn.status) === "completed") state.resolve(state.onText ? [...state.visibleMessages.values()].join("\n\n").trim() || ((_e = state.messages.at(-1)) == null ? void 0 : _e.trim()) || "" : ((_f = state.messages.at(-1)) == null ? void 0 : _f.trim()) || "");
-      else state.reject(new Error(typeof ((_g = turn == null ? void 0 : turn.error) == null ? void 0 : _g.message) === "string" ? turn.error.message : t("ui.codex_turn_0", typeof (turn == null ? void 0 : turn.status) === "string" ? turn.status : t("ui.failed"))));
-    }
-  }
-  steerIfNeeded(threadId, state) {
-    if (this.turns.get(threadId) !== state || state.steered || !state.searchBudget || state.searches < state.searchBudget || !state.turnId) return;
-    state.steered = true;
-    void this.request("turn/steer", { threadId, expectedTurnId: state.turnId, input: [{ type: "text", text: "\u7DB2\u8DEF\u641C\u5C0B\u9810\u7B97\u5DF2\u7528\u5B8C\u3002\u8ACB\u505C\u6B62\u641C\u5C0B\uFF0C\u6839\u64DA\u5DF2\u53D6\u5F97\u7684\u8CC7\u6599\u5B8C\u6210\u7B54\u6848\uFF1B\u4E0D\u8DB3\u4E4B\u8655\u660E\u78BA\u5217\u70BA\u5F85\u78BA\u8A8D\u3002" }] }).catch((error) => {
-      var _a, _b;
-      return (_b = (_a = this.options).onLog) == null ? void 0 : _b.call(_a, "warn", `\u641C\u5C0B\u505C\u6B62\u63D0\u9192\u672A\u9001\u9054\uFF1A${error instanceof Error ? error.message : String(error)}`);
-    });
-  }
-  respondToServerRequest(message) {
-    const result = message.method === "item/commandExecution/requestApproval" || message.method === "item/fileChange/requestApproval" ? { decision: "decline" } : message.method === "item/permissions/requestApproval" ? { permissions: {} } : message.method === "item/tool/requestUserInput" ? { answers: {} } : message.method === "mcpServer/elicitation/request" ? { action: "decline", content: null } : null;
-    if (result) this.send({ id: message.id, result });
-    else this.send({ id: message.id, error: { code: -32601, message: `Unsupported server request: ${message.method}` } });
-  }
-  request(method, params, timeoutMs = CONTROL_TIMEOUT_MS) {
-    const id = this.nextId++;
-    return new Promise((resolve, reject) => {
-      const timeout = window.setTimeout(() => {
-        this.pending.delete(id);
-        reject(new Error(t("ui.codex_app_server_0_did_not_respond_within_1_seconds", method, Math.ceil(timeoutMs / 1e3))));
-      }, timeoutMs);
-      this.pending.set(id, { resolve, reject, timeout });
-      try {
-        this.send({ id, method, params });
-      } catch (error) {
-        window.clearTimeout(timeout);
-        this.pending.delete(id);
-        reject(error instanceof Error ? error : new Error(String(error)));
-      }
-    });
-  }
-  send(message) {
-    if (!this.child) throw new Error(t("ui.codex_app_server_has_not_started"));
-    this.child.stdin.write(`${JSON.stringify(message)}
-`);
-  }
-  failProcess(child, error) {
-    var _a, _b;
-    if (this.child !== child) return;
-    (_b = (_a = this.options).onLog) == null ? void 0 : _b.call(_a, "error", error.message);
-    for (const entry of this.pending.values()) {
-      window.clearTimeout(entry.timeout);
-      entry.reject(error);
-    }
-    for (const entry of this.turns.values()) {
-      window.clearTimeout(entry.timeout);
-      entry.reject(error);
-    }
-    this.pending.clear();
-    this.turns.clear();
-    this.child = null;
-    this.initializing = null;
-    child.kill();
-  }
-};
-
-// ai/runtime/claude-code-cli.ts
-var import_node_child_process2 = require("node:child_process");
-var CLAUDE_TASK_TIMEOUT_MS = 3 * 60 * 1e3;
-function claudeOutputSchema(schema) {
-  if (!schema || typeof schema !== "object" || Array.isArray(schema)) return schema;
-  const { $schema: _draft, ...body } = schema;
-  return body;
-}
-function claudeTaskArgs(model, effort, schema, webSearch) {
-  return [
-    "--print",
-    "--output-format",
-    "json",
-    "--verbose",
-    ...schema ? ["--json-schema", JSON.stringify(claudeOutputSchema(schema))] : [],
-    "--model",
-    model,
-    "--effort",
-    ["low", "medium", "high"].includes(effort) ? effort : "low",
-    "--permission-mode",
-    "dontAsk",
-    "--permission-prompts",
-    "none",
-    "--safe-mode",
-    "--strict-mcp-config",
-    "--mcp-config",
-    JSON.stringify({ mcpServers: {} }),
-    "--no-session-persistence",
-    "--tools",
-    webSearch ? "WebSearch,WebFetch" : ""
-  ];
-}
-function claudeStructuredOutput(stdout, plainText = false) {
-  const value = JSON.parse(stdout);
-  const events = Array.isArray(value) ? value : [];
-  const final = events.length ? events.reverse().find((item) => item && typeof item === "object" && "type" in item && item.type === "result") : value;
-  if (!final || typeof final !== "object") throw new Error(t("ui.claude_returned_an_invalid_response"));
-  const record = final;
-  if (record.is_error === true || typeof record.subtype === "string" && record.subtype.startsWith("error_")) {
-    const details = Array.isArray(record.errors) ? record.errors.filter((item) => typeof item === "string").join("\n") : "";
-    throw new Error(details || (typeof record.result === "string" ? record.result : t("ui.claude_task_failed")));
-  }
-  if (plainText && typeof record.result === "string") return record.result;
-  if (record.structured_output === void 0 || record.structured_output === null) throw new Error(t("ui.claude_did_not_return_structured_output"));
-  return JSON.stringify(record.structured_output);
-}
-function abortError() {
-  const error = new Error(t("ui.ai_task_cancelled"));
-  error.name = "AbortError";
-  return error;
-}
-var ClaudeCodeCliRuntime = class {
-  constructor(options) {
-    this.options = options;
-    __publicField(this, "spawn");
-    var _a;
-    this.spawn = (_a = options.spawn) != null ? _a : import_node_child_process2.spawn;
-  }
-  async runTask(prompt, model, effort, outputSchema, controls = {}) {
-    var _a, _b, _c, _d, _e;
-    if ((_a = controls.signal) == null ? void 0 : _a.aborted) throw abortError();
-    const webSearch = ((_b = controls.searchBudget) != null ? _b : 0) > 0;
-    const args = claudeTaskArgs(model, effort, outputSchema, webSearch);
-    if (controls.onText && !outputSchema) {
-      args[args.indexOf("json")] = "stream-json";
-      args.push("--include-partial-messages");
-      if (controls.onSteer) args.push("--input-format", "stream-json");
-    }
-    (_c = controls.onRequest) == null ? void 0 : _c.call(controls, { provider: "claude", executable: this.options.executable, args: args.map((arg, index) => index === args.indexOf(JSON.stringify(claudeOutputSchema(outputSchema))) ? "<response-schema>" : arg), input: "<VAM prompt via stdin>" });
-    (_e = (_d = this.options).onLog) == null ? void 0 : _e.call(_d, "info", `\u555F\u52D5 Claude Code\uFF1A${this.options.executable} --print (${webSearch ? "\u7DB2\u8DEF\u641C\u5C0B\u53EF\u7528" : "\u50C5\u4F7F\u7528 VAM \u63D0\u4F9B\u7684\u5167\u5BB9"})`);
-    return new Promise((resolve, reject) => {
-      var _a2, _b2, _c2;
-      let child;
-      try {
-        child = this.spawn(this.options.executable, args, { cwd: this.options.cwd, env: this.options.env, stdio: ["pipe", "pipe", "pipe"], windowsHide: true });
-      } catch (error) {
-        reject(error instanceof Error ? error : new Error(String(error)));
-        return;
-      }
-      let stdout = "", stderr = "", settled = false, inputOpen = Boolean(controls.onSteer);
-      let streamBuffer = "", streamText = "", currentText = "", finalResult = "";
-      const streaming = !!controls.onText && !outputSchema;
-      const readStreamLine = (line) => {
-        var _a3, _b3, _c3, _d2, _e2, _f, _g, _h;
-        if (!line.trim()) return;
-        const record = JSON.parse(line);
-        if (record.parent_tool_use_id) return;
-        if (record.type === "result") {
-          finalResult = line;
-          if (inputOpen) {
-            inputOpen = false;
-            child.stdin.end();
-          }
-          return;
-        }
-        if (record.type === "stream_event" && ((_a3 = record.event) == null ? void 0 : _a3.type) === "message_start") currentText = "";
-        if (record.type === "stream_event" && ((_c3 = (_b3 = record.event) == null ? void 0 : _b3.delta) == null ? void 0 : _c3.type) === "text_delta" && typeof record.event.delta.text === "string") {
-          currentText += record.event.delta.text;
-          (_d2 = controls.onText) == null ? void 0 : _d2.call(controls, [streamText, currentText].filter(Boolean).join("\n\n"));
-        }
-        if (record.type === "stream_event" && ((_e2 = record.event) == null ? void 0 : _e2.type) === "message_stop") {
-          if (currentText.trim()) streamText = [streamText, currentText].filter(Boolean).join("\n\n");
-          currentText = "";
-          (_f = controls.onText) == null ? void 0 : _f.call(controls, streamText);
-        }
-        if (record.type === "assistant" && ((_g = record.message) == null ? void 0 : _g.content)) {
-          const complete = record.message.content.filter((item) => item.type === "text").map((item) => {
-            var _a4;
-            return (_a4 = item.text) != null ? _a4 : "";
-          }).join("\n");
-          if (complete && !streamText.endsWith(complete)) {
-            currentText = complete;
-            (_h = controls.onText) == null ? void 0 : _h.call(controls, [streamText, currentText].filter(Boolean).join("\n\n"));
-          }
-        }
-      };
-      const cleanup = () => {
-        var _a3;
-        window.clearTimeout(timeout);
-        (_a3 = controls.signal) == null ? void 0 : _a3.removeEventListener("abort", onAbort);
-      };
-      const finish = (error, result) => {
-        if (settled) return;
-        settled = true;
-        cleanup();
-        if (error) reject(error);
-        else resolve(result != null ? result : "");
-      };
-      let killTimer;
-      const stop = () => {
-        try {
-          child.kill("SIGTERM");
-        } catch (e) {
-        }
-        killTimer = window.setTimeout(() => {
-          try {
-            child.kill("SIGKILL");
-          } catch (e) {
-          }
-        }, 1500);
-      };
-      const onAbort = () => {
-        stop();
-        finish(abortError());
-      };
-      const timeout = window.setTimeout(() => {
-        stop();
-        finish(new Error(controls.timeoutMs ? "Coffee Tables: generation timed out; received text is saved as a draft." : t("ui.the_ai_task_exceeded_3_minutes_vam_attempts_to_interrupt_it")));
-      }, (_b2 = (_a2 = controls.timeoutMs) != null ? _a2 : this.options.timeoutMs) != null ? _b2 : CLAUDE_TASK_TIMEOUT_MS);
-      (_c2 = controls.signal) == null ? void 0 : _c2.addEventListener("abort", onAbort, { once: true });
-      child.stdout.on("data", (chunk) => {
-        if (settled) return;
-        if (!streaming) {
-          stdout = `${stdout}${chunk.toString("utf8")}`.slice(-4e6);
-          return;
-        }
-        streamBuffer += chunk.toString("utf8");
-        try {
-          let newline;
-          while ((newline = streamBuffer.indexOf("\n")) >= 0) {
-            const line = streamBuffer.slice(0, newline);
-            streamBuffer = streamBuffer.slice(newline + 1);
-            readStreamLine(line);
-          }
-        } catch (error) {
-          stop();
-          finish(error instanceof Error ? error : new Error(String(error)));
-        }
-      });
-      child.stderr.on("data", (chunk) => {
-        if (!settled) stderr = `${stderr}${chunk.toString("utf8")}`.slice(-16384);
-      });
-      child.on("error", (error) => {
-        if (killTimer) window.clearTimeout(killTimer);
-        finish(new Error(t("ui.could_not_start_claude_code_0_1", this.options.executable, error.message)));
-      });
-      child.on("close", (code) => {
-        if (killTimer) window.clearTimeout(killTimer);
-        if (settled) return;
-        if (code !== 0) {
-          const message = stderr.trim() || t("ui.claude_exited_with_code_0", code != null ? code : t("ui.unknown"));
-          finish(new Error(message.slice(-4e3)));
-          return;
-        }
-        try {
-          if (streaming) readStreamLine(streamBuffer);
-          const result = claudeStructuredOutput(streaming ? finalResult : stdout, !outputSchema);
-          const streamed = [streamText, currentText].filter(Boolean).join("\n\n");
-          finish(void 0, streaming && result.length < streamed.length ? streamed : result);
-        } catch (error) {
-          finish(error instanceof Error ? error : new Error(String(error)));
-        }
-      });
-      try {
-        if (controls.onSteer) {
-          const sendInput = (text2) => {
-            if (!inputOpen || settled) throw new Error("This Coffee Tables response has already ended.");
-            child.stdin.write(`${JSON.stringify({ type: "user", message: { role: "user", content: [{ type: "text", text: text2 }] } })}
-`);
-          };
-          sendInput(prompt);
-          controls.onSteer(async (text2) => {
-            sendInput(text2);
-          });
-        } else child.stdin.end(prompt);
-      } catch (error) {
-        stop();
-        finish(error instanceof Error ? error : new Error(String(error)));
-      }
-    });
-  }
-};
-
-// ai/providers/provider.ts
-var CLAUDE_MODEL_CHOICES = [
-  { id: "claude:sonnet", label: "Claude \xB7 Sonnet", model: "sonnet" },
-  { id: "claude:opus", label: "Claude \xB7 Opus", model: "opus" }
-];
-function providerForModel(model) {
-  return model.startsWith("claude:") ? "claude" : "codex";
-}
-function providerModelId(model) {
-  return providerForModel(model) === "claude" ? model.slice("claude:".length) : model;
-}
-
-// main.ts
+// experiences/visual-map/view.ts
 var VIEW_TYPE = "visual-agent-map-view";
-var CODEX_INSTALL_URL = "https://developers.openai.com/codex/cli/";
-var CLAUDE_INSTALL_URL = "https://code.claude.com/docs/en/setup";
-function typedNodeBinding(value) {
-  return value;
-}
-var existsSync = typedNodeBinding(import_node_fs.existsSync);
-var readdirSync = typedNodeBinding(import_node_fs.readdirSync);
-var delimiter = typedNodeBinding(import_node_path.delimiter);
-var dirname = typedNodeBinding(import_node_path.dirname);
-var isAbsolute = typedNodeBinding(import_node_path.isAbsolute);
-var join = typedNodeBinding(import_node_path.join);
-function currentProcessEnvironment() {
-  var _a, _b;
-  return (_b = (_a = window.process) == null ? void 0 : _a.env) != null ? _b : {};
-}
-function extractJsonObject(raw) {
-  const candidates = [];
-  let start = -1, depth = 0, quoted = false, escaped = false;
-  for (let index = 0; index < raw.length; index++) {
-    const character = raw[index];
-    if (start < 0) {
-      if (character === "{") {
-        start = index;
-        depth = 1;
-        quoted = false;
-        escaped = false;
-      }
-      continue;
-    }
-    if (quoted) {
-      if (escaped) escaped = false;
-      else if (character === "\\") escaped = true;
-      else if (character === '"') quoted = false;
-      continue;
-    }
-    if (character === '"') quoted = true;
-    else if (character === "{") depth++;
-    else if (character === "}" && --depth === 0) {
-      candidates.push(raw.slice(start, index + 1));
-      start = -1;
-    }
-  }
-  for (const candidate of candidates.reverse()) {
-    try {
-      JSON.parse(candidate);
-      return candidate;
-    } catch (e) {
-    }
-  }
-  throw new SyntaxError("Codex \u56DE\u61C9\u4E2D\u627E\u4E0D\u5230\u5B8C\u6574 JSON object");
-}
-function executableCandidates(configured, home, pathValue, nvmVersions = []) {
-  if (configured.includes("/") || configured.includes("\\")) return [configured];
-  const dirs = [
-    home ? join(home, ".local/bin") : "",
-    home ? join(home, ".npm-global/bin") : "",
-    home ? join(home, ".volta/bin") : "",
-    home ? join(home, ".fnm/current/bin") : "",
-    "/opt/homebrew/bin",
-    "/usr/local/bin",
-    ...nvmVersions.map((version) => join(home, ".nvm/versions/node", version, "bin")),
-    ...pathValue.split(delimiter)
-  ].filter(Boolean);
-  return [...new Set(dirs)].map((directory) => join(directory, configured));
-}
 function renderSynthesisContent(parent, topics) {
   const label = parent.createEl("label", { cls: "vam-field" });
   label.createSpan({ text: t("ui.synthesis_content") });
@@ -8329,19 +7464,6 @@ function renderSynthesisContent(parent, topics) {
 function researchDepthDescription(depth) {
   const description = depth === "fast" ? t("ui.quick_aim_for_up_to_1_web_search_and_2_main_sources_answer_t") : depth === "deep" ? t("ui.deep_aim_for_up_to_6_web_searches_and_10_main_sources_compar") : t("ui.standard_aim_for_up_to_3_web_searches_and_5_main_sources_sum");
   return `${description} ${t("ui.web_and_image_searches_share_the_search_limit_search_counts")}`;
-}
-function visualGuidance(context, language2) {
-  const synthesis = context.mode === "synthesize";
-  const maySearch = context.researchMode !== "local" && context.mode !== "decompose" && context.visualMode !== "off";
-  const mayReuse = synthesis;
-  const instructions = [];
-  if (!maySearch) {
-    instructions.push(translate(language2, "prompt.visual_none"));
-    if (mayReuse) instructions.push(translate(language2, "prompt.visual_preserve"));
-  } else if (context.visualMode === "on") instructions.push(translate(language2, "prompt.visual_on"));
-  else instructions.push(translate(language2, "prompt.visual_auto"));
-  if (maySearch || mayReuse) instructions.push(translate(language2, "prompt.visual_embed"));
-  return instructions;
 }
 function imageReferencesFromMarkdown(markdown) {
   const lines = markdown.split("\n");
@@ -8392,7 +7514,7 @@ function quickSuggestions(items, layers, firstLayerCount, childrenPerParent) {
   if (selected.length !== items.length) invalid();
   return selected;
 }
-var TaskModal = class extends import_obsidian9.Modal {
+var TaskModal = class extends import_obsidian8.Modal {
   constructor(app, value, submit, titleText = t("ui.custom_ai_task"), description = t("ui.describe_what_you_want_ai_to_do_next"), rules = "", mode = "research", depth = "normal", visual = "auto", _allowSave = true, expand = false, referenceSettings, synthesisTopics, currentLanguage = "zh-TW", modelId = "", reasoningId = "auto", targetLabel = "") {
     super(app);
     this.value = value;
@@ -8464,14 +7586,14 @@ var TaskModal = class extends import_obsidian9.Modal {
       this.close();
       this.submit(value, run, { ...synthesis ? { synthesisContent } : {}, referenceGroups: (_b2 = sources2 == null ? void 0 : sources2.groups) != null ? _b2 : [], requirements: input.value.trim(), outputLanguage: languageSelect.value, researchMode: (sources2 == null ? void 0 : sources2.webSearch) ? "research" : "local", researchDepth: depth.value, visualMode: (sources2 == null ? void 0 : sources2.imageSearch) ? this.visual === "on" ? "on" : "auto" : "off", multiLayer: shallowResearch }, "");
     };
-    new import_obsidian9.Setting(this.contentEl).addButton((b) => b.setButtonText(t("ui.cancel")).onClick(() => this.close())).addButton((b) => b.setButtonText(t("ui.confirm_and_run")).setCta().onClick(() => {
-      void save(true).catch((error) => new import_obsidian9.Notice(String(error)));
+    new import_obsidian8.Setting(this.contentEl).addButton((b) => b.setButtonText(t("ui.cancel")).onClick(() => this.close())).addButton((b) => b.setButtonText(t("ui.confirm_and_run")).setCta().onClick(() => {
+      void save(true).catch((error) => new import_obsidian8.Notice(String(error)));
     }));
     input.focus();
     input.setSelectionRange(input.value.length, input.value.length);
   }
 };
-var NextStepModal = class extends import_obsidian9.Modal {
+var NextStepModal = class extends import_obsidian8.Modal {
   constructor(app, topic, depth, childrenCount, pendingCount, plugin, research, expand, synthesize, modelSettings) {
     super(app);
     this.topic = topic;
@@ -8798,7 +7920,7 @@ var NextStepModal = class extends import_obsidian9.Modal {
           this.close();
         }, (message) => {
           release();
-          if (this.closed) new import_obsidian9.Notice(message);
+          if (this.closed) new import_obsidian8.Notice(message);
           else {
             started = false;
             this.failedAi(research, confirm, message);
@@ -8915,7 +8037,7 @@ var NextStepModal = class extends import_obsidian9.Modal {
           options.firstLayerCount = firstLayerCount;
           options.childrenPerParent = layers === 1 ? 1 : childrenPerParent;
           await this.expand(options, "", () => {
-          }, (message) => new import_obsidian9.Notice(message), () => {
+          }, (message) => new import_obsidian8.Notice(message), () => {
           });
           this.close();
           return;
@@ -9015,7 +8137,7 @@ var NextStepModal = class extends import_obsidian9.Modal {
     this.contentEl.createEl("p", { text: t("ui.if_an_ai_task_exceeds_3_minutes_vam_attempts_to_interrupt_it"), cls: "vam-hint" });
   }
 };
-var AiDraftModal = class extends import_obsidian9.Modal {
+var AiDraftModal = class extends import_obsidian8.Modal {
   constructor(app, summary, detail, confirmLabel, confirm) {
     super(app);
     this.summary = summary;
@@ -9031,80 +8153,13 @@ var AiDraftModal = class extends import_obsidian9.Modal {
     const detail = this.contentEl.createEl("textarea", { cls: "vam-task-input", text: this.detail });
     detail.rows = 18;
     detail.readOnly = true;
-    new import_obsidian9.Setting(this.contentEl).addButton((button) => button.setButtonText(t("ui.cancel")).onClick(() => this.close())).addButton((button) => button.setButtonText(this.confirmLabel).setCta().onClick(() => {
+    new import_obsidian8.Setting(this.contentEl).addButton((button) => button.setButtonText(t("ui.cancel")).onClick(() => this.close())).addButton((button) => button.setButtonText(this.confirmLabel).setCta().onClick(() => {
       this.close();
       this.confirm();
     }));
   }
 };
-var CodexSetupModal = class extends import_obsidian9.Modal {
-  constructor(app, executable, recheck) {
-    super(app);
-    this.executable = executable;
-    this.recheck = recheck;
-  }
-  onOpen() {
-    this.titleEl.setText(t("ui.install_and_connect_codex"));
-    this.contentEl.createEl("p", { text: t("ui.codex_setup_for_ai_only"), cls: "vam-modal-intro" });
-    const steps = this.contentEl.createEl("ol", { cls: "vam-setup-steps" });
-    const install = steps.createEl("li");
-    install.appendText(t("ui.open_the_official_codex_cli_installation_guide_and_complete"));
-    install.createEl("a", { text: t("ui.official_codex_cli_installation_guide"), href: CODEX_INSTALL_URL, attr: { target: "_blank", rel: "noopener noreferrer" } });
-    steps.createEl("li", { text: t("ui.run_codex_in_terminal_and_sign_in_with_your_chatgpt_account") });
-    steps.createEl("li", { text: t("ui.return_to_vam_and_select_i_ve_finished_check_again") });
-    this.contentEl.createEl("p", { text: t("ui.no_api_key_is_required_the_standalone_codex_cli_does_not_req"), cls: "vam-setup-note" });
-    this.contentEl.createEl("p", { text: t("ui.path_currently_checked_0", this.executable), cls: "vam-setup-path" });
-    new import_obsidian9.Setting(this.contentEl).addButton((button) => button.setButtonText(t("ui.do_this_later")).onClick(() => this.close())).addButton((button) => button.setButtonText(t("ui.i_ve_finished_check_again")).setCta().onClick(() => {
-      this.close();
-      this.recheck();
-    }));
-  }
-};
-var AiUsageModal = class extends import_obsidian9.Modal {
-  constructor(app, provider, resolve) {
-    super(app);
-    this.provider = provider;
-    this.resolve = resolve;
-    __publicField(this, "settled", false);
-  }
-  onOpen() {
-    const claude = this.provider === "claude";
-    this.titleEl.setText(claude ? t("ui.claude_usage_notice") : t("ui.codex_allowance_notice"));
-    this.contentEl.createEl("p", { text: t(claude ? "ui.vam_runs_ai_tasks_through_your_claude_code_account_and_uses" : "ui.vam_runs_ai_tasks_through_your_signed_in_codex_account_and_u"), cls: "vam-modal-intro" });
-    const finish = (confirmed) => {
-      this.settled = true;
-      this.close();
-      this.resolve(confirmed);
-    };
-    new import_obsidian9.Setting(this.contentEl).addButton((button) => button.setButtonText(t("ui.cancel")).onClick(() => finish(false))).addButton((button) => button.setButtonText(t("ui.understand_and_run")).setCta().onClick(() => finish(true)));
-  }
-  onClose() {
-    if (!this.settled) this.resolve(false);
-  }
-};
-var ClaudeSetupModal = class extends import_obsidian9.Modal {
-  constructor(app, executable, url, recheck) {
-    super(app);
-    this.executable = executable;
-    this.url = url;
-    this.recheck = recheck;
-  }
-  onOpen() {
-    this.titleEl.setText(t("ui.install_and_connect_claude_code"));
-    this.contentEl.createEl("p", { text: t("ui.claude_code_is_only_needed_for_ai_tasks"), cls: "vam-modal-intro" });
-    const steps = this.contentEl.createEl("ol", { cls: "vam-setup-steps" });
-    const install = steps.createEl("li");
-    install.appendText(t("ui.install_claude_code_and_sign_in_with_your_claude_account"));
-    install.createEl("a", { text: t("ui.official_claude_code_installation_guide"), href: this.url, attr: { target: "_blank", rel: "noopener noreferrer" } });
-    steps.createEl("li", { text: t("ui.return_to_vam_and_check_the_cli_path_again") });
-    this.contentEl.createEl("p", { text: t("ui.path_currently_checked_0", this.executable), cls: "vam-setup-path" });
-    new import_obsidian9.Setting(this.contentEl).addButton((button) => button.setButtonText(t("ui.do_this_later")).onClick(() => this.close())).addButton((button) => button.setButtonText(t("ui.check_again")).setCta().onClick(() => {
-      this.close();
-      this.recheck();
-    }));
-  }
-};
-var ChildProposalModal = class extends import_obsidian9.Modal {
+var ChildProposalModal = class extends import_obsidian8.Modal {
   constructor(app, suggestions, submit) {
     super(app);
     this.suggestions = suggestions;
@@ -9131,16 +8186,16 @@ var ChildProposalModal = class extends import_obsidian9.Modal {
       contribution.setAttr("aria-label", t("ui.contribution_to_the_parent_topic"));
       rows.push({ item, check, title, task, contribution });
     }
-    new import_obsidian9.Setting(this.contentEl).addButton((b) => b.setButtonText(t("ui.cancel")).onClick(() => this.close())).addButton((b) => b.setButtonText(t("ui.create_subtopics")).setCta().onClick(() => {
+    new import_obsidian8.Setting(this.contentEl).addButton((b) => b.setButtonText(t("ui.cancel")).onClick(() => this.close())).addButton((b) => b.setButtonText(t("ui.create_subtopics")).setCta().onClick(() => {
       const selected = rows.filter((row) => row.check.checked && row.title.value.trim());
       const renamed = new Map(selected.filter((row) => !row.item.parentTitle).map((row) => [row.item.title, row.title.value.trim()]));
       const rootNames = selected.filter((row) => !row.item.parentTitle).map((row) => row.title.value.trim());
       if (new Set(rootNames).size !== rootNames.length) {
-        new import_obsidian9.Notice(t("ui.first_level_topic_names_must_be_unique"));
+        new import_obsidian8.Notice(t("ui.first_level_topic_names_must_be_unique"));
         return;
       }
       if (selected.some((row) => row.item.parentTitle && !renamed.has(row.item.parentTitle))) {
-        new import_obsidian9.Notice(t("ui.select_the_parent_topic_before_its_child"));
+        new import_obsidian8.Notice(t("ui.select_the_parent_topic_before_its_child"));
         return;
       }
       this.close();
@@ -9148,7 +8203,7 @@ var ChildProposalModal = class extends import_obsidian9.Modal {
     }));
   }
 };
-var IntegrationModal = class extends import_obsidian9.Modal {
+var IntegrationModal = class extends import_obsidian8.Modal {
   constructor(app, names2, _defaultRules, submit) {
     super(app);
     this.names = names2;
@@ -9174,12 +8229,12 @@ var IntegrationModal = class extends import_obsidian9.Modal {
       this.close();
       this.submit(title.value.trim(), goal.value.trim(), "");
     };
-    new import_obsidian9.Setting(this.contentEl).addButton((button) => button.setButtonText(t("ui.cancel")).onClick(() => this.close())).addButton((button) => button.setButtonText(t("ui.next_set_ai_sources")).setCta().onClick(save));
+    new import_obsidian8.Setting(this.contentEl).addButton((button) => button.setButtonText(t("ui.cancel")).onClick(() => this.close())).addButton((button) => button.setButtonText(t("ui.next_set_ai_sources")).setCta().onClick(save));
     title.focus();
     title.select();
   }
 };
-var MapConflictModal = class extends import_obsidian9.Modal {
+var MapConflictModal = class extends import_obsidian8.Modal {
   constructor(app, local, disk, resolve) {
     super(app);
     this.local = local;
@@ -9197,11 +8252,11 @@ var MapConflictModal = class extends import_obsidian9.Modal {
       this.close();
       this.resolve(map);
     };
-    new import_obsidian9.Setting(this.contentEl).addButton((button) => button.setButtonText(t("ui.use_file_contents")).onClick(() => finish(clone(this.disk)))).addButton((button) => button.setButtonText(t("ui.keep_editor_contents")).onClick(() => finish(clone(this.local)))).addButton((button) => button.setButtonText(t("ui.save_merged_contents")).setCta().onClick(() => {
+    new import_obsidian8.Setting(this.contentEl).addButton((button) => button.setButtonText(t("ui.use_file_contents")).onClick(() => finish(clone(this.disk)))).addButton((button) => button.setButtonText(t("ui.keep_editor_contents")).onClick(() => finish(clone(this.local)))).addButton((button) => button.setButtonText(t("ui.save_merged_contents")).setCta().onClick(() => {
       try {
         finish(parseMap(serializeMap(JSON.parse(input.value))));
       } catch (error) {
-        new import_obsidian9.Notice(error instanceof Error ? t("ui.invalid_merged_contents_0", error.message) : t("ui.invalid_merged_contents"));
+        new import_obsidian8.Notice(error instanceof Error ? t("ui.invalid_merged_contents_0", error.message) : t("ui.invalid_merged_contents"));
       }
     }));
   }
@@ -9209,7 +8264,7 @@ var MapConflictModal = class extends import_obsidian9.Modal {
     if (!this.settled) this.resolve(clone(this.disk));
   }
 };
-var NoteCollectionModal = class extends import_obsidian9.Modal {
+var NoteCollectionModal = class extends import_obsidian8.Modal {
   constructor(app, titleText, files, actions) {
     super(app);
     this.titleText = titleText;
@@ -9228,10 +8283,10 @@ var NoteCollectionModal = class extends import_obsidian9.Modal {
         action.run(file);
       });
     }
-    new import_obsidian9.Setting(this.contentEl).addButton((button) => button.setButtonText(t("ui.close")).onClick(() => this.close()));
+    new import_obsidian8.Setting(this.contentEl).addButton((button) => button.setButtonText(t("ui.close")).onClick(() => this.close()));
   }
 };
-var TopicPickerModal = class extends import_obsidian9.Modal {
+var TopicPickerModal = class extends import_obsidian8.Modal {
   constructor(app, titleText, topics, choose) {
     super(app);
     this.titleText = titleText;
@@ -9240,15 +8295,15 @@ var TopicPickerModal = class extends import_obsidian9.Modal {
   }
   onOpen() {
     this.titleEl.setText(this.titleText);
-    for (const topic of this.topics) new import_obsidian9.Setting(this.contentEl).setName(topic.title).setDesc(topic.root).addButton((button) => button.setButtonText(t("ui.select")).onClick(() => {
+    for (const topic of this.topics) new import_obsidian8.Setting(this.contentEl).setName(topic.title).setDesc(topic.root).addButton((button) => button.setButtonText(t("ui.select")).onClick(() => {
       this.close();
       this.choose(topic);
     }));
     if (!this.topics.length) this.contentEl.createEl("p", { text: t("ui.no_other_topics") });
-    new import_obsidian9.Setting(this.contentEl).addButton((button) => button.setButtonText(t("ui.cancel")).onClick(() => this.close()));
+    new import_obsidian8.Setting(this.contentEl).addButton((button) => button.setButtonText(t("ui.cancel")).onClick(() => this.close()));
   }
 };
-var VisualAgentMapView = class extends import_obsidian9.ItemView {
+var VisualAgentMapView = class extends import_obsidian8.ItemView {
   constructor(leaf, plugin) {
     super(leaf);
     this.plugin = plugin;
@@ -9902,7 +8957,7 @@ var VisualAgentMapView = class extends import_obsidian9.ItemView {
     this.updateHistoryButtons();
   }
   openDetails(node) {
-    void this.plugin.openDetails(this.plugin.repo.file(node.path)).catch((error) => new import_obsidian9.Notice(error instanceof Error ? error.message : String(error)));
+    void this.plugin.openDetails(this.plugin.repo.file(node.path)).catch((error) => new import_obsidian8.Notice(error instanceof Error ? error.message : String(error)));
   }
   async travel(redo) {
     const action = redo ? this.history.redo() : this.history.undo();
@@ -9933,7 +8988,7 @@ var VisualAgentMapView = class extends import_obsidian9.ItemView {
     var _a;
     if (this.builtIn) return;
     if (!this.path || !this.map || this.closed) return;
-    if (!(this.app.vault.getAbstractFileByPath(this.path) instanceof import_obsidian9.TFile)) {
+    if (!(this.app.vault.getAbstractFileByPath(this.path) instanceof import_obsidian8.TFile)) {
       this.map = null;
       this.path = "";
       this.history.clear();
@@ -9970,7 +9025,7 @@ var VisualAgentMapView = class extends import_obsidian9.ItemView {
     new NameModal(this.app, t("ui.rename_mind_map"), this.map.title, (title) => this.enqueue(async () => {
       if (!this.map) return;
       if (!this.path.startsWith(`${this.plugin.settings.topicsFolder}/`)) {
-        new import_obsidian9.Notice(t("ui.migrate_old_data_before_renaming_this_topic"));
+        new import_obsidian8.Notice(t("ui.migrate_old_data_before_renaming_this_topic"));
         return;
       }
       const before = clone(this.map), beforeRoot = this.plugin.repo.topicRoot(this.path);
@@ -10042,7 +9097,7 @@ var VisualAgentMapView = class extends import_obsidian9.ItemView {
     const deleted = this.deletedMap;
     if (!deleted || deleted.deleted) return;
     const file = this.app.vault.getAbstractFileByPath(deleted.path);
-    if (!(file instanceof import_obsidian9.TFile) || await this.app.vault.read(file) !== deleted.content) throw new Error(t("ui.the_topic_changed_the_synthesis_draft_was_not_saved"));
+    if (!(file instanceof import_obsidian8.TFile) || await this.app.vault.read(file) !== deleted.content) throw new Error(t("ui.the_topic_changed_the_synthesis_draft_was_not_saved"));
     await this.app.fileManager.trashFile(file);
     deleted.deleted = true;
     this.path = "";
@@ -10439,7 +9494,7 @@ var VisualAgentMapView = class extends import_obsidian9.ItemView {
     preview.createEl("strong", { text: note.title });
     const content = preview.createDiv("vam-hover-markdown");
     const path = (_d = (_c = (_b = this.map) == null ? void 0 : _b.nodes.find((node) => node.id === card.dataset.nodeId)) == null ? void 0 : _c.path) != null ? _d : "";
-    void import_obsidian9.MarkdownRenderer.render(this.app, note.preview || t("ui.no_preview_content_yet"), content, path, this);
+    void import_obsidian8.MarkdownRenderer.render(this.app, note.preview || t("ui.no_preview_content_yet"), content, path, this);
     const host = workspace.getBoundingClientRect(), rect = card.getBoundingClientRect();
     const availableWidth = Math.max(180, host.width - 24);
     const width = Math.min(size.max, Math.max(Math.min(size.min, availableWidth), availableWidth));
@@ -10480,7 +9535,7 @@ var VisualAgentMapView = class extends import_obsidian9.ItemView {
         const map = await this.plugin.repo.readMap(topic.mapPath);
         const files = map.nodes.map((node) => {
           const file = this.app.vault.getAbstractFileByPath(node.path);
-          if (!(file instanceof import_obsidian9.TFile) || file.extension.toLowerCase() !== "md") throw new Error(t("ui.reference_map_note_unavailable", node.path));
+          if (!(file instanceof import_obsidian8.TFile) || file.extension.toLowerCase() !== "md") throw new Error(t("ui.reference_map_note_unavailable", node.path));
           return file;
         });
         const documents = [];
@@ -10543,7 +9598,7 @@ var VisualAgentMapView = class extends import_obsidian9.ItemView {
   }
   openNodePanel(node, mode) {
     const render = (content, close) => this.renderInspector(content, node, mode, close);
-    new class extends import_obsidian9.Modal {
+    new class extends import_obsidian8.Modal {
       onOpen() {
         this.modalEl.addClass("vam-topic-modal");
         render(this.contentEl, () => this.close());
@@ -10564,7 +9619,7 @@ var VisualAgentMapView = class extends import_obsidian9.ItemView {
         panel.createEl("h3", { text: note.title });
         panel.createEl("p", { text: note.summary, cls: "vam-sample-summary" });
         const detail = panel.createDiv("vam-sample-detail");
-        void import_obsidian9.MarkdownRenderer.render(this.app, note.detail, detail, "", this);
+        void import_obsidian8.MarkdownRenderer.render(this.app, note.detail, detail, "", this);
         if (note.sourcePaths.length) {
           const sources2 = panel.createDiv("vam-reference-sources");
           sources2.createEl("strong", { text: t("ui.source_topics") });
@@ -10584,14 +9639,14 @@ var VisualAgentMapView = class extends import_obsidian9.ItemView {
           for (const path of sourcePaths) {
             const sourceNode = (_d = this.map) == null ? void 0 : _d.nodes.find((item) => item.path === path), sourceNote = sourceNode ? this.notes.get(sourceNode.id) : null;
             const file = this.app.vault.getAbstractFileByPath(path);
-            this.button(sources2, (_f = sourceNote == null ? void 0 : sourceNote.title) != null ? _f : file instanceof import_obsidian9.TFile ? file.basename : t("ui.0_moved", (_e = path.split("/").at(-1)) == null ? void 0 : _e.replace(/\.md$/, "")), () => {
+            this.button(sources2, (_f = sourceNote == null ? void 0 : sourceNote.title) != null ? _f : file instanceof import_obsidian8.TFile ? file.basename : t("ui.0_moved", (_e = path.split("/").at(-1)) == null ? void 0 : _e.replace(/\.md$/, "")), () => {
               close == null ? void 0 : close();
               if (sourceNode) {
                 this.selected = sourceNode.id;
                 this.render();
                 this.focusNode(sourceNode);
-              } else if (file instanceof import_obsidian9.TFile) void this.plugin.openDetails(file);
-            }, !(sourceNode || file instanceof import_obsidian9.TFile));
+              } else if (file instanceof import_obsidian8.TFile) void this.plugin.openDetails(file);
+            }, !(sourceNode || file instanceof import_obsidian8.TFile));
           }
         }
       }
@@ -10730,7 +9785,7 @@ var VisualAgentMapView = class extends import_obsidian9.ItemView {
   async previewMigration() {
     const plan = await this.plugin.repo.legacyMigrationPlan();
     if (!plan.maps.length && !plan.orphanPaths.length) {
-      new import_obsidian9.Notice(t("ui.no_old_data_to_migrate"));
+      new import_obsidian8.Notice(t("ui.no_old_data_to_migrate"));
       return;
     }
     const noteCount = plan.maps.reduce((sum, item) => sum + item.notePaths.length, 0);
@@ -10740,13 +9795,13 @@ var VisualAgentMapView = class extends import_obsidian9.ItemView {
       this.history.clear();
       if (next) await this.openMap(next);
       else this.render();
-      new import_obsidian9.Notice(t("ui.old_data_was_migrated_into_topic_folders"));
+      new import_obsidian8.Notice(t("ui.old_data_was_migrated_into_topic_folders"));
     }) }]).open();
   }
   async repairMissingTopic() {
     const broken = await this.plugin.repo.brokenTopics();
     if (!broken.length) {
-      new import_obsidian9.Notice(t("ui.no_topics_with_a_missing_map_md"));
+      new import_obsidian8.Notice(t("ui.no_topics_with_a_missing_map_md"));
       return;
     }
     new ChoiceModal(this.app, t("ui.repair_missing_map"), t("ui.choose_a_topic_to_repair"), broken.map((topic) => ({ label: t("ui.0_1_notes", topic.title, topic.noteCount), action: () => {
@@ -10768,7 +9823,7 @@ var VisualAgentMapView = class extends import_obsidian9.ItemView {
     }
     const model = inheritModel(parent ? (await this.plugin.repo.readNote(parent.path)).model : void 0, this.plugin.settings.cliModel);
     if (!this.path.startsWith(`${this.plugin.settings.topicsFolder}/`)) {
-      new import_obsidian9.Notice(t("ui.use_migrate_old_data_to_convert_this_map_first"));
+      new import_obsidian8.Notice(t("ui.use_migrate_old_data_to_convert_this_map_first"));
       return;
     }
     const node = await this.plugin.repo.createNote((suggestedTitle == null ? void 0 : suggestedTitle.trim()) || (parent ? t("ui.new_subtopic") : t("ui.my_core_topic")), model, this.map, this.path, parent ? "inherited" : "workspace");
@@ -10816,7 +9871,7 @@ var VisualAgentMapView = class extends import_obsidian9.ItemView {
         this.plugin.pendingResearchOptions.delete(parent.path);
         const message = t("ui.ai_proposed_duplicate_first_level_names_generate_the_proposa");
         if (failed) failed(message);
-        else new import_obsidian9.Notice(message);
+        else new import_obsidian8.Notice(message);
         return;
       }
       if (!found) {
@@ -10886,7 +9941,7 @@ ${translate(outputLanguage, "prompt.avoid_duplicates")} ${direct ? directTask : 
       if (!direct && suggestions.length === 0) {
         const message = result.detail.trim() || t("ui.ai_does_not_recommend_decomposition_or_did_not_propose_3_to");
         if (failed) failed(message);
-        else new import_obsidian9.Notice(message);
+        else new import_obsidian8.Notice(message);
         return;
       }
       if (direct) {
@@ -10928,7 +9983,7 @@ ${translate(outputLanguage, "prompt.avoid_duplicates")} ${direct ? directTask : 
       const message = this.plugin.recordFailure(building ? "\u5EFA\u7ACB\u521D\u6B65\u5730\u5716\u5931\u6557" : "AI \u62C6\u89E3\u5931\u6557", error);
       if (direct) (_r = this.plugin.quickExpandFailures) == null ? void 0 : _r.set(parent.path, message);
       if (failed) failed(message, !(error instanceof PartialChildBatchError));
-      else new import_obsidian9.Notice(message);
+      else new import_obsidian8.Notice(message);
     } finally {
       this.plugin.running.delete(parent.path);
       await this.hydrate();
@@ -10941,7 +9996,7 @@ ${translate(outputLanguage, "prompt.avoid_duplicates")} ${direct ? directTask : 
     if (new Set(roots).size !== roots.length) {
       this.plugin.pendingSuggestions.delete(parent.path);
       this.plugin.pendingResearchOptions.delete(parent.path);
-      new import_obsidian9.Notice(t("ui.ai_proposed_duplicate_first_level_names_generate_the_proposa"));
+      new import_obsidian8.Notice(t("ui.ai_proposed_duplicate_first_level_names_generate_the_proposa"));
       return;
     }
     new ChildProposalModal(this.app, suggestions.slice(0, 15), (items) => this.enqueue(async () => {
@@ -11041,7 +10096,7 @@ ${translate(outputLanguage, "prompt.avoid_duplicates")} ${direct ? directTask : 
     const paths = [...section2.matchAll(/\[\[([^\]|#]+)(?:[|#][^\]]*)?\]\]/g)].map((match) => {
       var _a, _b;
       const link = match[1], direct = link.endsWith(".md") ? link : `${link}.md`;
-      if (this.app.vault.getAbstractFileByPath(direct) instanceof import_obsidian9.TFile) return direct;
+      if (this.app.vault.getAbstractFileByPath(direct) instanceof import_obsidian8.TFile) return direct;
       return (_b = (_a = this.app.metadataCache.getFirstLinkpathDest(link, ownerPath)) == null ? void 0 : _a.path) != null ? _b : direct;
     });
     return [...new Set(paths)];
@@ -11099,7 +10154,7 @@ ${translate(outputLanguage, "prompt.avoid_duplicates")} ${direct ? directTask : 
     if (!children.length && !((_a = options == null ? void 0 : options.referenceGroups) == null ? void 0 : _a.some((group) => group.documents.length))) {
       const message = t("ui.choose_another_note_source_first");
       if (failed) failed(message);
-      else new import_obsidian9.Notice(message);
+      else new import_obsidian8.Notice(message);
       return;
     }
     if (!confirmed) {
@@ -11120,7 +10175,7 @@ ${translate(outputLanguage, "prompt.avoid_duplicates")} ${direct ? directTask : 
     if (!children.length && !selectedSources.some((group) => group.documents.length)) {
       const message = t("ui.the_selected_sources_contain_no_markdown_content_to_synthesi");
       if (failed) failed(message);
-      else new import_obsidian9.Notice(message);
+      else new import_obsidian8.Notice(message);
       return;
     }
     const language2 = this.plugin.settings.language;
@@ -11145,7 +10200,7 @@ ${translate(outputLanguage, "prompt.avoid_duplicates")} ${direct ? directTask : 
         this.recordNoteWrite(node.path, { ...latest, status: note.status }, saved, ["summary", "detail", "visualReferences", "newFindings", "previewSection", "previewInitialized", "status"], t("ui.synthesize_subtopics"));
         await this.hydrate();
         this.render();
-        new import_obsidian9.Notice(t("ui.subtopic_synthesis_was_saved_to_current_understanding_and_ma"));
+        new import_obsidian8.Notice(t("ui.subtopic_synthesis_was_saved_to_current_understanding_and_ma"));
       });
       if (drafted) drafted(result, save);
       else new AiDraftModal(this.app, result.summary, result.detail, t("ui.confirm_update_to_parent_topic"), () => {
@@ -11154,13 +10209,13 @@ ${translate(outputLanguage, "prompt.avoid_duplicates")} ${direct ? directTask : 
     } catch (error) {
       if (((_i = options == null ? void 0 : options.signal) == null ? void 0 : _i.aborted) || error instanceof Error && error.name === "AbortError") {
         await this.plugin.repo.updateNote(node.path, { status: note.status });
-        new import_obsidian9.Notice(t("ui.research_stopped_existing_content_was_preserved"));
+        new import_obsidian8.Notice(t("ui.research_stopped_existing_content_was_preserved"));
       } else {
         console.error("Visual Agent Map child integration", error);
         await this.plugin.repo.updateNote(node.path, { status: "error" });
         const message = this.plugin.recordFailure("\u5B50\u8B70\u984C\u6574\u5408\u5931\u6557", error);
         if (failed) failed(message);
-        else new import_obsidian9.Notice(message);
+        else new import_obsidian8.Notice(message);
       }
     } finally {
       this.plugin.running.delete(node.path);
@@ -11170,7 +10225,7 @@ ${translate(outputLanguage, "prompt.avoid_duplicates")} ${direct ? directTask : 
   }
   integrateSelected() {
     if (!this.map || this.multiSelected.size < 2) {
-      new import_obsidian9.Notice(t("ui.select_at_least_two_topics"));
+      new import_obsidian8.Notice(t("ui.select_at_least_two_topics"));
       return;
     }
     const nodes = [...this.multiSelected].map((id) => this.map.nodes.find((node) => node.id === id)).filter((node) => !!node);
@@ -11290,7 +10345,7 @@ ${note.detail.trim()}` : "",
           this.focusNode(integrated);
         } catch (e) {
           this.render();
-          new import_obsidian9.Notice(t("ui.synthesis_saved_refresh_failed"));
+          new import_obsidian8.Notice(t("ui.synthesis_saved_refresh_failed"));
         }
         return;
       }
@@ -11460,7 +10515,7 @@ ${note.detail.trim()}` : "",
     if (!((_a = overrides == null ? void 0 : overrides.task) != null ? _a : note.prompt)) {
       const message = t("ui.enter_a_question_or_task_for_ai_first");
       if (failed) failed(message);
-      else new import_obsidian9.Notice(message);
+      else new import_obsidian8.Notice(message);
       return;
     }
     if (this.plugin.running.has(node.path)) {
@@ -11497,7 +10552,7 @@ ${note.detail.trim()}` : "",
         if (exchangeId && this.plugin.settings.aiExchangeLoggingEnabled) (_a2 = this.plugin.exchanges) == null ? void 0 : _a2.failed(exchangeId, stale ? "\u8B70\u984C\u5167\u5BB9\u5DF2\u8B8A\u66F4\uFF0C\u904E\u6642\u7684 AI \u7D50\u679C\u672A\u5BEB\u5165\u3002" : "\u7814\u7A76\u5DF2\u505C\u6B62\uFF0C\u7D50\u679C\u672A\u5BEB\u5165\u3002");
         if (stale) {
           if (failed) failed(t("ui.the_topic_changed_so_the_outdated_ai_result_was_not_saved"));
-          else new import_obsidian9.Notice(t("ui.the_topic_changed_so_the_outdated_ai_result_was_not_saved"));
+          else new import_obsidian8.Notice(t("ui.the_topic_changed_so_the_outdated_ai_result_was_not_saved"));
         }
         return;
       }
@@ -11512,7 +10567,7 @@ ${note.detail.trim()}` : "",
           await ((_e = (_d = this.plugin.pendingSuggestions).flush) == null ? void 0 : _e.call(_d));
         } catch (error) {
           const message = this.plugin.recordFailure("\u5C55\u958B\u5EFA\u8B70\u5132\u5B58\u5931\u6557", error);
-          new import_obsidian9.Notice(message);
+          new import_obsidian8.Notice(message);
         }
       }
       done == null ? void 0 : done(result);
@@ -11521,7 +10576,7 @@ ${note.detail.trim()}` : "",
       if (controller.signal.aborted || error instanceof Error && error.name === "AbortError") {
         await this.plugin.repo.updateNote(node.path, { status: note.status });
         if (failed) failed(t("ui.research_stopped_existing_content_was_preserved"));
-        else new import_obsidian9.Notice(t("ui.research_stopped_existing_content_was_preserved"));
+        else new import_obsidian8.Notice(t("ui.research_stopped_existing_content_was_preserved"));
         return;
       }
       console.error("Visual Agent Map AI task", error);
@@ -11529,7 +10584,7 @@ ${note.detail.trim()}` : "",
       await this.plugin.repo.updateNote(node.path, { status: "error" });
       const message = this.plugin.recordFailure("AI \u4EFB\u52D9\u5931\u6557", error);
       if (failed) failed(message);
-      else new import_obsidian9.Notice(message);
+      else new import_obsidian8.Notice(message);
     })).finally(() => {
       var _a2;
       (_a2 = overrides == null ? void 0 : overrides.signal) == null ? void 0 : _a2.removeEventListener("abort", abortFromTaskModal);
@@ -11541,6 +10596,81 @@ ${note.detail.trim()}` : "",
       });
     }).catch(() => {
     });
+  }
+};
+
+// main.ts
+var import_obsidian11 = require("obsidian");
+
+// ui/settings-tab.ts
+var import_obsidian9 = require("obsidian");
+var CODEX_INSTALL_URL = "https://developers.openai.com/codex/cli/";
+var CLAUDE_INSTALL_URL = "https://code.claude.com/docs/en/setup";
+var CodexSetupModal = class extends import_obsidian9.Modal {
+  constructor(app, executable, recheck) {
+    super(app);
+    this.executable = executable;
+    this.recheck = recheck;
+  }
+  onOpen() {
+    this.titleEl.setText(t("ui.install_and_connect_codex"));
+    this.contentEl.createEl("p", { text: t("ui.codex_setup_for_ai_only"), cls: "vam-modal-intro" });
+    const steps = this.contentEl.createEl("ol", { cls: "vam-setup-steps" });
+    const install = steps.createEl("li");
+    install.appendText(t("ui.open_the_official_codex_cli_installation_guide_and_complete"));
+    install.createEl("a", { text: t("ui.official_codex_cli_installation_guide"), href: CODEX_INSTALL_URL, attr: { target: "_blank", rel: "noopener noreferrer" } });
+    steps.createEl("li", { text: t("ui.run_codex_in_terminal_and_sign_in_with_your_chatgpt_account") });
+    steps.createEl("li", { text: t("ui.return_to_vam_and_select_i_ve_finished_check_again") });
+    this.contentEl.createEl("p", { text: t("ui.no_api_key_is_required_the_standalone_codex_cli_does_not_req"), cls: "vam-setup-note" });
+    this.contentEl.createEl("p", { text: t("ui.path_currently_checked_0", this.executable), cls: "vam-setup-path" });
+    new import_obsidian9.Setting(this.contentEl).addButton((button) => button.setButtonText(t("ui.do_this_later")).onClick(() => this.close())).addButton((button) => button.setButtonText(t("ui.i_ve_finished_check_again")).setCta().onClick(() => {
+      this.close();
+      this.recheck();
+    }));
+  }
+};
+var AiUsageModal = class extends import_obsidian9.Modal {
+  constructor(app, provider, resolve) {
+    super(app);
+    this.provider = provider;
+    this.resolve = resolve;
+    __publicField(this, "settled", false);
+  }
+  onOpen() {
+    const claude = this.provider === "claude";
+    this.titleEl.setText(claude ? t("ui.claude_usage_notice") : t("ui.codex_allowance_notice"));
+    this.contentEl.createEl("p", { text: t(claude ? "ui.vam_runs_ai_tasks_through_your_claude_code_account_and_uses" : "ui.vam_runs_ai_tasks_through_your_signed_in_codex_account_and_u"), cls: "vam-modal-intro" });
+    const finish = (confirmed) => {
+      this.settled = true;
+      this.close();
+      this.resolve(confirmed);
+    };
+    new import_obsidian9.Setting(this.contentEl).addButton((button) => button.setButtonText(t("ui.cancel")).onClick(() => finish(false))).addButton((button) => button.setButtonText(t("ui.understand_and_run")).setCta().onClick(() => finish(true)));
+  }
+  onClose() {
+    if (!this.settled) this.resolve(false);
+  }
+};
+var ClaudeSetupModal = class extends import_obsidian9.Modal {
+  constructor(app, executable, url, recheck) {
+    super(app);
+    this.executable = executable;
+    this.url = url;
+    this.recheck = recheck;
+  }
+  onOpen() {
+    this.titleEl.setText(t("ui.install_and_connect_claude_code"));
+    this.contentEl.createEl("p", { text: t("ui.claude_code_is_only_needed_for_ai_tasks"), cls: "vam-modal-intro" });
+    const steps = this.contentEl.createEl("ol", { cls: "vam-setup-steps" });
+    const install = steps.createEl("li");
+    install.appendText(t("ui.install_claude_code_and_sign_in_with_your_claude_account"));
+    install.createEl("a", { text: t("ui.official_claude_code_installation_guide"), href: this.url, attr: { target: "_blank", rel: "noopener noreferrer" } });
+    steps.createEl("li", { text: t("ui.return_to_vam_and_check_the_cli_path_again") });
+    this.contentEl.createEl("p", { text: t("ui.path_currently_checked_0", this.executable), cls: "vam-setup-path" });
+    new import_obsidian9.Setting(this.contentEl).addButton((button) => button.setButtonText(t("ui.do_this_later")).onClick(() => this.close())).addButton((button) => button.setButtonText(t("ui.check_again")).setCta().onClick(() => {
+      this.close();
+      this.recheck();
+    }));
   }
 };
 var VisualAgentMapSettingTab = class extends import_obsidian9.PluginSettingTab {
@@ -11626,7 +10756,1155 @@ var VisualAgentMapSettingTab = class extends import_obsidian9.PluginSettingTab {
     await this.plugin.saveSettings();
   }
 };
-var VisualAgentMapPlugin = class extends import_obsidian9.Plugin {
+
+// main.ts
+var import_node_path2 = require("node:path");
+
+// ui/outline-view.ts
+var import_obsidian10 = require("obsidian");
+var OUTLINE_VIEW_TYPE = "visual-agent-map-outline";
+var OutlineView = class extends import_obsidian10.ItemView {
+  constructor(leaf, openNote) {
+    super(leaf);
+    this.openNote = openNote;
+    __publicField(this, "map", null);
+    __publicField(this, "titles", /* @__PURE__ */ new Map());
+    __publicField(this, "collapsed", /* @__PURE__ */ new Set());
+    __publicField(this, "query", "");
+    __publicField(this, "activePath", "");
+    __publicField(this, "sample", false);
+    __publicField(this, "coffee", null);
+    __publicField(this, "coffeeActive", false);
+    __publicField(this, "locateCoffee", null);
+    __publicField(this, "fillCoffee", null);
+  }
+  getViewType() {
+    return OUTLINE_VIEW_TYPE;
+  }
+  getDisplayText() {
+    return t("ui.topic_outline");
+  }
+  getIcon() {
+    return "list-tree";
+  }
+  async onOpen() {
+    this.render();
+  }
+  setMap(map, titles, sample = false) {
+    const search = this.contentEl.querySelector(".vam-outline-search");
+    const restoreFocus = !!search && search === document.activeElement;
+    const selection = restoreFocus ? [search.selectionStart, search.selectionEnd] : null;
+    this.map = map;
+    this.sample = sample;
+    this.titles = titles;
+    if (map) this.collapsed = new Set([...this.collapsed].filter((id) => map.nodes.some((node) => node.id === id)));
+    this.render();
+    if (restoreFocus) {
+      const updated = this.contentEl.querySelector(".vam-outline-search");
+      updated == null ? void 0 : updated.focus();
+      if (updated && selection && selection[0] !== null && selection[1] !== null) updated.setSelectionRange(selection[0], selection[1]);
+    }
+  }
+  setActivePath(path) {
+    this.activePath = path;
+    this.render();
+  }
+  setCoffeeOutline(snapshot, active, locate, fill = null) {
+    const search = this.contentEl.querySelector(".vam-outline-search"), restoreFocus = !!search && search === document.activeElement;
+    const selection = restoreFocus ? [search.selectionStart, search.selectionEnd] : null;
+    this.coffee = snapshot;
+    this.coffeeActive = active;
+    this.locateCoffee = locate;
+    this.fillCoffee = fill;
+    this.render();
+    if (restoreFocus) {
+      const updated = this.contentEl.querySelector(".vam-outline-search");
+      updated == null ? void 0 : updated.focus();
+      if (updated && selection && selection[0] !== null && selection[1] !== null) updated.setSelectionRange(selection[0], selection[1]);
+    }
+  }
+  render() {
+    var _a, _b, _c, _d;
+    this.contentEl.empty();
+    this.contentEl.addClass("vam-outline");
+    const heading = this.contentEl.createDiv("vam-outline-heading");
+    heading.createEl("strong", { text: this.coffeeActive ? (_b = (_a = this.coffee) == null ? void 0 : _a.topic) != null ? _b : "Coffee Tables" : (_d = (_c = this.map) == null ? void 0 : _c.title) != null ? _d : t("ui.topic_outline") });
+    if (this.coffeeActive) {
+      this.renderCoffee();
+      return;
+    }
+    if (!this.map) {
+      this.contentEl.createDiv({ cls: "vam-outline-empty", text: t(this.sample ? "ui.sample_outline_hint" : "ui.open_a_mind_map_to_see_its_topic_hierarchy_here") });
+      return;
+    }
+    const input = this.contentEl.createEl("input", { type: "search", cls: "vam-outline-search", attr: { placeholder: t("ui.search_topics") } });
+    input.value = this.query;
+    input.addEventListener("input", () => {
+      this.query = input.value;
+      this.renderTree();
+    });
+    this.renderTree();
+  }
+  renderCoffee() {
+    this.contentEl.createEl("h4", { text: t("ui.coffee_segments") });
+    const snapshot = this.coffee;
+    if (!(snapshot == null ? void 0 : snapshot.segments.length)) {
+      this.contentEl.createDiv({ cls: "vam-outline-empty", text: t("ui.coffee_segments_empty") });
+      return;
+    }
+    if (!snapshot.readOnly && snapshot.segments.some((item) => !item.summary && item.text.trim() && item.status !== "generating")) {
+      const fill = this.contentEl.createEl("button", { text: t("ui.coffee_fill_summaries") });
+      fill.addEventListener("click", () => {
+        var _a;
+        return (_a = this.fillCoffee) == null ? void 0 : _a.call(this);
+      });
+    }
+    const tree = this.contentEl.createDiv("vam-outline-tree");
+    snapshot.segments.forEach((item, index) => {
+      var _a;
+      const button = tree.createEl("button", { cls: "vam-coffee-segment" });
+      const kind = t(item.kind === "question" ? "ui.coffee_segment_question" : item.kind === "continuation" ? "ui.coffee_segment_continuation" : item.kind === "legacy" ? "ui.coffee_segment_legacy" : "ui.coffee_segment_initial");
+      button.createEl("strong", { text: getUiLanguage() === "zh-TW" ? `\u7B2C ${index + 1} \u6BB5\u30FB${kind}` : `Segment ${index + 1} \xB7 ${kind}` });
+      button.createSpan({ text: item.status === "generating" ? t("ui.coffee_segment_generating") : (_a = item.summary) != null ? _a : t("ui.coffee_segment_no_summary") });
+      if (item.status === "error") button.createEl("small", { text: t("ui.coffee_segment_incomplete") });
+      button.addEventListener("click", () => {
+        var _a2;
+        if (!((_a2 = this.locateCoffee) == null ? void 0 : _a2.call(this, item.id))) new import_obsidian10.Notice(t("ui.coffee_segment_no_content"));
+      });
+    });
+  }
+  renderTree() {
+    var _a, _b, _c;
+    (_a = this.contentEl.querySelector(".vam-outline-tree")) == null ? void 0 : _a.remove();
+    if (!this.map) return;
+    const tree = this.contentEl.createDiv("vam-outline-tree");
+    const children = /* @__PURE__ */ new Map();
+    for (const node of this.map.nodes) children.set(node.parentId, [...(_b = children.get(node.parentId)) != null ? _b : [], node]);
+    const query = this.query.trim().toLocaleLowerCase();
+    const matches = (node) => {
+      var _a2, _b2;
+      if (!query) return true;
+      if (((_a2 = this.titles.get(node.id)) != null ? _a2 : node.path).toLocaleLowerCase().includes(query)) return true;
+      return ((_b2 = children.get(node.id)) != null ? _b2 : []).some(matches);
+    };
+    const append = (node, depth) => {
+      var _a2, _b2, _c2;
+      if (!matches(node)) return;
+      const descendants2 = (_a2 = children.get(node.id)) != null ? _a2 : [];
+      const row = tree.createDiv("vam-outline-row");
+      row.style.paddingLeft = `${8 + depth * 16}px`;
+      if (descendants2.length) {
+        const toggle = row.createEl("button", { text: query || !this.collapsed.has(node.id) ? "\u25BE" : "\u25B8", cls: "vam-outline-toggle" });
+        toggle.disabled = !!query;
+        toggle.setAttr("aria-label", !query && this.collapsed.has(node.id) ? t("ui.expand") : t("ui.collapse"));
+        toggle.addEventListener("click", () => {
+          if (this.collapsed.has(node.id)) this.collapsed.delete(node.id);
+          else this.collapsed.add(node.id);
+          this.renderTree();
+        });
+      } else row.createSpan("vam-outline-spacer");
+      const title = (_c2 = (_b2 = this.titles.get(node.id)) != null ? _b2 : node.path.split("/").pop()) != null ? _c2 : node.path;
+      const button = row.createEl("button", { text: title, cls: "vam-outline-note" });
+      button.title = title;
+      if (node.path === this.activePath) button.addClass("is-active");
+      button.addEventListener("click", () => {
+        void this.openNote(node.path);
+      });
+      if (query || !this.collapsed.has(node.id)) for (const child of descendants2) append(child, depth + 1);
+    };
+    for (const root of (_c = children.get(null)) != null ? _c : []) append(root, 0);
+    if (!tree.childElementCount) {
+      tree.createDiv({ cls: "vam-outline-empty", text: t(query ? "ui.no_matching_topics" : "ui.empty_outline_hint") });
+      if (query) tree.createEl("button", { text: t("ui.clear_search") }).addEventListener("click", () => {
+        this.query = "";
+        this.render();
+      });
+    }
+  }
+};
+
+// ui/ribbon-group.ts
+function groupRibbonIcons(map, coffee) {
+  const parent = map.parentElement;
+  if (!parent || coffee.parentElement !== parent) return () => {
+  };
+  const classes = ["vam-ribbon-group", "vam-ribbon-group-start", "vam-ribbon-group-end"];
+  parent.classList.add("vam-ribbon-container");
+  const update = () => {
+    var _a, _b;
+    observer.disconnect();
+    for (const icon of [map, coffee]) icon.classList.remove(...classes);
+    const present = [map, coffee].filter((icon) => icon.parentElement === parent);
+    for (const icon of present) {
+      if (icon !== parent.lastElementChild) parent.appendChild(icon);
+    }
+    for (const icon of present) icon.classList.add("vam-ribbon-group");
+    (_a = present[0]) == null ? void 0 : _a.classList.add("vam-ribbon-group-start");
+    (_b = present.at(-1)) == null ? void 0 : _b.classList.add("vam-ribbon-group-end");
+    observer.observe(parent, { childList: true });
+  };
+  const observer = new window.MutationObserver(() => update());
+  update();
+  return () => {
+    observer.disconnect();
+    parent.classList.remove("vam-ribbon-container");
+    for (const icon of [map, coffee]) icon.classList.remove(...classes);
+  };
+}
+
+// main.ts
+var import_node_crypto2 = require("node:crypto");
+
+// ai/providers/provider.ts
+var CLAUDE_MODEL_CHOICES = [
+  { id: "claude:sonnet", label: "Claude \xB7 Sonnet", model: "sonnet" },
+  { id: "claude:opus", label: "Claude \xB7 Opus", model: "opus" }
+];
+function providerForModel(model) {
+  return model.startsWith("claude:") ? "claude" : "codex";
+}
+function providerModelId(model) {
+  return providerForModel(model) === "claude" ? model.slice("claude:".length) : model;
+}
+
+// core/experience-router.ts
+var ExperienceRouter = class {
+  constructor() {
+    __publicField(this, "handlers", /* @__PURE__ */ new Map());
+  }
+  register(target, handler) {
+    if (this.handlers.has(target)) throw new Error(`Experience already registered: ${target}`);
+    this.handlers.set(target, handler);
+    return () => {
+      if (this.handlers.get(target) === handler) this.handlers.delete(target);
+    };
+  }
+  canHandoff(target) {
+    return this.handlers.has(target);
+  }
+  async handoff({ target, artifact }) {
+    const handler = this.handlers.get(target);
+    if (!handler) throw new Error(`Experience is not available: ${target}`);
+    await handler(artifact);
+  }
+};
+
+// core/thinking-core.ts
+var ThinkingCore = class {
+  constructor(ai, tasks) {
+    this.ai = ai;
+    this.tasks = tasks;
+    __publicField(this, "experiences", new ExperienceRouter());
+  }
+};
+
+// core/ai-runtime-service.ts
+var import_node_fs = require("node:fs");
+var import_node_path = require("node:path");
+
+// ai/runtime/codex-app-server.ts
+var import_node_child_process = require("node:child_process");
+var spawnProcess = import_node_child_process.spawn;
+var CONTROL_TIMEOUT_MS = 3e4;
+var TURN_TIMEOUT_MS = 3 * 60 * 1e3;
+function cancelledError() {
+  const error = new Error(t("ui.ai_task_cancelled"));
+  error.name = "AbortError";
+  return error;
+}
+var CodexAppServerRuntime = class {
+  constructor(options) {
+    this.options = options;
+    __publicField(this, "child", null);
+    __publicField(this, "buffer", "");
+    __publicField(this, "stderr", "");
+    __publicField(this, "nextId", 1);
+    __publicField(this, "pending", /* @__PURE__ */ new Map());
+    __publicField(this, "turns", /* @__PURE__ */ new Map());
+    __publicField(this, "initializing", null);
+  }
+  async start() {
+    if (this.initializing) return this.initializing;
+    const initializing = this.startProcess();
+    this.initializing = initializing;
+    try {
+      await initializing;
+    } catch (error) {
+      if (this.initializing === initializing) this.initializing = null;
+      const child = this.child;
+      if (child) this.failProcess(child, error instanceof Error ? error : new Error(String(error)));
+      throw error;
+    }
+  }
+  stop() {
+    var _a;
+    const error = new Error(t("ui.codex_app_server_has_stopped"));
+    for (const entry of this.pending.values()) {
+      window.clearTimeout(entry.timeout);
+      entry.reject(error);
+    }
+    for (const entry of this.turns.values()) {
+      window.clearTimeout(entry.timeout);
+      entry.reject(error);
+    }
+    this.pending.clear();
+    this.turns.clear();
+    (_a = this.child) == null ? void 0 : _a.kill();
+    this.child = null;
+    this.initializing = null;
+  }
+  async listModels() {
+    var _a;
+    await this.start();
+    const models = [];
+    let cursor = null;
+    do {
+      const response = await this.request("model/list", { cursor, limit: 100, includeHidden: false });
+      for (const value of (_a = response.data) != null ? _a : []) {
+        if (!value || typeof value !== "object") continue;
+        const item = value;
+        const model = typeof item.model === "string" ? item.model.trim() : "";
+        const id = typeof item.id === "string" ? item.id.trim() : "";
+        const displayName = typeof item.displayName === "string" ? item.displayName.trim() : "";
+        const efforts = Array.isArray(item.supportedReasoningEfforts) ? item.supportedReasoningEfforts : [];
+        if (item.hidden !== false || !model || !id || !displayName || !efforts.length) continue;
+        models.push({
+          id,
+          model,
+          displayName,
+          hidden: false,
+          supportedReasoningEfforts: efforts,
+          defaultReasoningEffort: typeof item.defaultReasoningEffort === "string" ? item.defaultReasoningEffort : "low",
+          isDefault: item.isDefault === true
+        });
+      }
+      cursor = typeof response.nextCursor === "string" && response.nextCursor ? response.nextCursor : null;
+    } while (cursor);
+    return [...new Map(models.map((model) => [model.model, model])).values()];
+  }
+  async runTask(prompt, model, effort, outputSchema, controls) {
+    var _a, _b, _c, _d, _e, _f, _g, _h, _i, _j, _k, _l, _m, _n;
+    if ((_a = controls == null ? void 0 : controls.signal) == null ? void 0 : _a.aborted) throw cancelledError();
+    await this.start();
+    if ((_b = controls == null ? void 0 : controls.signal) == null ? void 0 : _b.aborted) throw cancelledError();
+    const started = await this.request("thread/start", {
+      model: model || null,
+      cwd: this.options.cwd,
+      approvalPolicy: "never",
+      sandbox: "read-only",
+      ephemeral: true,
+      ...(controls == null ? void 0 : controls.textOnly) ? {
+        baseInstructions: "You are a text-generation assistant. Complete the supplied conversation-writing task directly. Do not inspect the environment, repositories, Git, files, or use tools. All necessary context is in the request. Output only the requested Markdown.",
+        config: { "features.shell_tool": false, "features.unified_exec": false }
+      } : {}
+    });
+    const threadId = typeof ((_c = started.thread) == null ? void 0 : _c.id) === "string" ? started.thread.id : "";
+    if (!threadId) throw new Error(t("ui.codex_app_server_did_not_create_a_thread"));
+    let timedOut = false, interruptRequested = false;
+    const completed = new Promise((resolve, reject) => {
+      var _a2, _b2;
+      const timeout = window.setTimeout(() => {
+        this.turns.delete(threadId);
+        timedOut = true;
+        interrupt(5e3, "\u903E\u6642\u5F8C\u7121\u6CD5\u505C\u6B62 AI \u4EFB\u52D9");
+        reject(new Error((controls == null ? void 0 : controls.timeoutMs) ? "Coffee Tables: generation timed out; received text is saved as a draft." : t("ui.the_ai_task_exceeded_3_minutes_vam_attempts_to_interrupt_it")));
+      }, (_a2 = controls == null ? void 0 : controls.timeoutMs) != null ? _a2 : TURN_TIMEOUT_MS);
+      this.turns.set(threadId, { messages: [], visibleMessages: /* @__PURE__ */ new Map(), resolve, reject, timeout, turnId: "", searches: 0, searchBudget: (_b2 = controls == null ? void 0 : controls.searchBudget) != null ? _b2 : 0, steered: false, onText: controls == null ? void 0 : controls.onText });
+    });
+    const state = this.turns.get(threadId);
+    void completed.catch(() => void 0);
+    const interrupt = (timeoutMs = CONTROL_TIMEOUT_MS, failure = "\u53D6\u6D88 AI \u4EFB\u52D9\u5931\u6557") => {
+      if (!state.turnId || interruptRequested) return;
+      interruptRequested = true;
+      void this.request("turn/interrupt", { threadId, turnId: state.turnId }, timeoutMs).catch((error) => {
+        var _a2, _b2;
+        return (_b2 = (_a2 = this.options).onLog) == null ? void 0 : _b2.call(_a2, "warn", `${failure}\uFF1A${error instanceof Error ? error.message : String(error)}`);
+      });
+    };
+    const onAbort = () => {
+      interrupt();
+      if (this.turns.get(threadId) === state) {
+        window.clearTimeout(state.timeout);
+        this.turns.delete(threadId);
+        state.reject(cancelledError());
+      }
+    };
+    (_d = controls == null ? void 0 : controls.signal) == null ? void 0 : _d.addEventListener("abort", onAbort, { once: true });
+    try {
+      if ((_e = controls == null ? void 0 : controls.signal) == null ? void 0 : _e.aborted) throw cancelledError();
+      const turnRequest = {
+        threadId,
+        input: [{ type: "text", text: prompt, text_elements: [] }],
+        model: model || null,
+        effort: effort || "low",
+        sandboxPolicy: { type: "readOnly", networkAccess: false },
+        ...outputSchema ? { outputSchema } : {}
+      };
+      (_f = controls == null ? void 0 : controls.onRequest) == null ? void 0 : _f.call(controls, turnRequest);
+      const startedTurn = await this.request("turn/start", turnRequest);
+      state.turnId = typeof ((_g = startedTurn.turn) == null ? void 0 : _g.id) === "string" ? startedTurn.turn.id : "";
+      (_h = controls == null ? void 0 : controls.onSteer) == null ? void 0 : _h.call(controls, async (text2) => {
+        var _a2;
+        if (((_a2 = controls.signal) == null ? void 0 : _a2.aborted) || this.turns.get(threadId) !== state || !state.turnId) throw cancelledError();
+        await this.request("turn/steer", { threadId, expectedTurnId: state.turnId, input: [{ type: "text", text: text2 }] });
+      });
+      if (timedOut) interrupt(5e3, "\u903E\u6642\u5F8C\u7121\u6CD5\u505C\u6B62 AI \u4EFB\u52D9");
+      else if ((_i = controls == null ? void 0 : controls.signal) == null ? void 0 : _i.aborted) onAbort();
+      this.steerIfNeeded(threadId, state);
+      const answer = await completed;
+      if ((_j = controls == null ? void 0 : controls.signal) == null ? void 0 : _j.aborted) throw cancelledError();
+      return answer;
+    } catch (error) {
+      const state2 = this.turns.get(threadId);
+      if (state2) {
+        window.clearTimeout(state2.timeout);
+        this.turns.delete(threadId);
+        state2.reject(error instanceof Error ? error : new Error(String(error)));
+        await completed.catch(() => void 0);
+      } else await completed.catch(() => void 0);
+      if ((_k = controls == null ? void 0 : controls.signal) == null ? void 0 : _k.aborted) throw cancelledError();
+      throw error;
+    } finally {
+      (_l = controls == null ? void 0 : controls.signal) == null ? void 0 : _l.removeEventListener("abort", onAbort);
+      try {
+        await this.request("thread/unsubscribe", { threadId }, 5e3);
+      } catch (error) {
+        (_n = (_m = this.options).onLog) == null ? void 0 : _n.call(_m, "warn", `Codex App Server \u7121\u6CD5\u53D6\u6D88 thread \u8A02\u95B1\uFF1A${error instanceof Error ? error.message : String(error)}`);
+      }
+    }
+  }
+  async startProcess() {
+    var _a, _b, _c, _d;
+    (_b = (_a = this.options).onLog) == null ? void 0 : _b.call(_a, "info", `\u555F\u52D5 Codex App Server\uFF1A${this.options.executable} app-server`);
+    this.buffer = "";
+    this.stderr = "";
+    const child = spawnProcess(this.options.executable, this.options.webSearchDisabled ? ["--config", 'web_search="disabled"', "app-server"] : ["app-server"], {
+      cwd: this.options.cwd,
+      env: this.options.env,
+      stdio: ["pipe", "pipe", "pipe"]
+    });
+    this.child = child;
+    child.stdout.on("data", (chunk) => this.consume(child, chunk.toString("utf8")));
+    child.stderr.on("data", (chunk) => {
+      if (this.child === child) this.stderr = `${this.stderr}${chunk.toString("utf8")}`.slice(-16384);
+    });
+    child.on("error", (error) => this.failProcess(child, new Error(t("ui.could_not_start_codex_app_server_0_1", this.options.executable, error.message))));
+    child.on("close", (code) => this.failProcess(child, new Error(this.stderr.trim() || t("ui.codex_app_server_exit_code_0", code != null ? code : t("ui.unknown")))));
+    await this.request("initialize", {
+      clientInfo: { name: "visual-agent-map", title: "Visual Agent Map", version: this.options.clientVersion },
+      capabilities: { experimentalApi: false, requestAttestation: false }
+    });
+    this.send({ method: "initialized" });
+    (_d = (_c = this.options).onLog) == null ? void 0 : _d.call(_c, "info", "Codex App Server \u5DF2\u5C31\u7DD2");
+  }
+  consume(child, chunk) {
+    if (this.child !== child) return;
+    this.buffer += chunk;
+    while (true) {
+      const newline = this.buffer.indexOf("\n");
+      if (newline < 0) return;
+      const line = this.buffer.slice(0, newline).trim();
+      this.buffer = this.buffer.slice(newline + 1);
+      if (!line) continue;
+      try {
+        this.handle(JSON.parse(line));
+      } catch (error) {
+        this.failProcess(child, new Error(t("ui.could_not_parse_codex_app_server_response_0", error instanceof Error ? error.message : String(error))));
+      }
+    }
+  }
+  handle(message) {
+    var _a, _b, _c, _d, _e, _f, _g;
+    if ("id" in message && "method" in message) {
+      this.respondToServerRequest(message);
+      return;
+    }
+    if ("id" in message) {
+      const entry = this.pending.get(message.id);
+      if (!entry) return;
+      this.pending.delete(message.id);
+      window.clearTimeout(entry.timeout);
+      if (message.error) entry.reject(new Error(message.error.message || t("ui.codex_app_server_returned_an_error")));
+      else entry.resolve(message.result);
+      return;
+    }
+    if (!("method" in message)) return;
+    const params = message.params;
+    const threadId = typeof (params == null ? void 0 : params.threadId) === "string" ? params.threadId : "";
+    const state = this.turns.get(threadId);
+    if (!state) return;
+    if (message.method === "item/agentMessage/delta" && typeof (params == null ? void 0 : params.delta) === "string") {
+      if (state.streamItem !== params.itemId) {
+        state.streamItem = params.itemId;
+        state.streamText = "";
+      }
+      state.streamText = ((_a = state.streamText) != null ? _a : "") + params.delta;
+      if (typeof params.itemId === "string") state.visibleMessages.set(params.itemId, state.streamText);
+      (_b = state.onText) == null ? void 0 : _b.call(state, [...state.visibleMessages.values()].join("\n\n"));
+      return;
+    }
+    if (message.method === "item/started") {
+      const item = params == null ? void 0 : params.item;
+      if ((item == null ? void 0 : item.type) === "webSearch" && (!item.action || item.action.type === "search")) {
+        state.searches++;
+        this.steerIfNeeded(threadId, state);
+      }
+      return;
+    }
+    if (message.method === "item/completed") {
+      const item = params == null ? void 0 : params.item;
+      if ((item == null ? void 0 : item.type) === "agentMessage" && typeof item.text === "string") {
+        const id = typeof item.id === "string" ? item.id : (_c = state.streamItem) != null ? _c : `message-${state.messages.length}`;
+        state.visibleMessages.set(id, item.text);
+        state.messages.push(item.text);
+        (_d = state.onText) == null ? void 0 : _d.call(state, [...state.visibleMessages.values()].join("\n\n"));
+      }
+      return;
+    }
+    if (message.method === "turn/completed") {
+      const turn = params == null ? void 0 : params.turn;
+      window.clearTimeout(state.timeout);
+      this.turns.delete(threadId);
+      if ((turn == null ? void 0 : turn.status) === "completed") state.resolve(state.onText ? [...state.visibleMessages.values()].join("\n\n").trim() || ((_e = state.messages.at(-1)) == null ? void 0 : _e.trim()) || "" : ((_f = state.messages.at(-1)) == null ? void 0 : _f.trim()) || "");
+      else state.reject(new Error(typeof ((_g = turn == null ? void 0 : turn.error) == null ? void 0 : _g.message) === "string" ? turn.error.message : t("ui.codex_turn_0", typeof (turn == null ? void 0 : turn.status) === "string" ? turn.status : t("ui.failed"))));
+    }
+  }
+  steerIfNeeded(threadId, state) {
+    if (this.turns.get(threadId) !== state || state.steered || !state.searchBudget || state.searches < state.searchBudget || !state.turnId) return;
+    state.steered = true;
+    void this.request("turn/steer", { threadId, expectedTurnId: state.turnId, input: [{ type: "text", text: "\u7DB2\u8DEF\u641C\u5C0B\u9810\u7B97\u5DF2\u7528\u5B8C\u3002\u8ACB\u505C\u6B62\u641C\u5C0B\uFF0C\u6839\u64DA\u5DF2\u53D6\u5F97\u7684\u8CC7\u6599\u5B8C\u6210\u7B54\u6848\uFF1B\u4E0D\u8DB3\u4E4B\u8655\u660E\u78BA\u5217\u70BA\u5F85\u78BA\u8A8D\u3002" }] }).catch((error) => {
+      var _a, _b;
+      return (_b = (_a = this.options).onLog) == null ? void 0 : _b.call(_a, "warn", `\u641C\u5C0B\u505C\u6B62\u63D0\u9192\u672A\u9001\u9054\uFF1A${error instanceof Error ? error.message : String(error)}`);
+    });
+  }
+  respondToServerRequest(message) {
+    const result = message.method === "item/commandExecution/requestApproval" || message.method === "item/fileChange/requestApproval" ? { decision: "decline" } : message.method === "item/permissions/requestApproval" ? { permissions: {} } : message.method === "item/tool/requestUserInput" ? { answers: {} } : message.method === "mcpServer/elicitation/request" ? { action: "decline", content: null } : null;
+    if (result) this.send({ id: message.id, result });
+    else this.send({ id: message.id, error: { code: -32601, message: `Unsupported server request: ${message.method}` } });
+  }
+  request(method, params, timeoutMs = CONTROL_TIMEOUT_MS) {
+    const id = this.nextId++;
+    return new Promise((resolve, reject) => {
+      const timeout = window.setTimeout(() => {
+        this.pending.delete(id);
+        reject(new Error(t("ui.codex_app_server_0_did_not_respond_within_1_seconds", method, Math.ceil(timeoutMs / 1e3))));
+      }, timeoutMs);
+      this.pending.set(id, { resolve, reject, timeout });
+      try {
+        this.send({ id, method, params });
+      } catch (error) {
+        window.clearTimeout(timeout);
+        this.pending.delete(id);
+        reject(error instanceof Error ? error : new Error(String(error)));
+      }
+    });
+  }
+  send(message) {
+    if (!this.child) throw new Error(t("ui.codex_app_server_has_not_started"));
+    this.child.stdin.write(`${JSON.stringify(message)}
+`);
+  }
+  failProcess(child, error) {
+    var _a, _b;
+    if (this.child !== child) return;
+    (_b = (_a = this.options).onLog) == null ? void 0 : _b.call(_a, "error", error.message);
+    for (const entry of this.pending.values()) {
+      window.clearTimeout(entry.timeout);
+      entry.reject(error);
+    }
+    for (const entry of this.turns.values()) {
+      window.clearTimeout(entry.timeout);
+      entry.reject(error);
+    }
+    this.pending.clear();
+    this.turns.clear();
+    this.child = null;
+    this.initializing = null;
+    child.kill();
+  }
+};
+
+// ai/runtime/claude-code-cli.ts
+var import_node_child_process2 = require("node:child_process");
+var CLAUDE_TASK_TIMEOUT_MS = 3 * 60 * 1e3;
+function claudeOutputSchema(schema) {
+  if (!schema || typeof schema !== "object" || Array.isArray(schema)) return schema;
+  const { $schema: _draft, ...body } = schema;
+  return body;
+}
+function claudeTaskArgs(model, effort, schema, webSearch) {
+  return [
+    "--print",
+    "--output-format",
+    "json",
+    "--verbose",
+    ...schema ? ["--json-schema", JSON.stringify(claudeOutputSchema(schema))] : [],
+    "--model",
+    model,
+    "--effort",
+    ["low", "medium", "high"].includes(effort) ? effort : "low",
+    "--permission-mode",
+    "dontAsk",
+    "--permission-prompts",
+    "none",
+    "--safe-mode",
+    "--strict-mcp-config",
+    "--mcp-config",
+    JSON.stringify({ mcpServers: {} }),
+    "--no-session-persistence",
+    "--tools",
+    webSearch ? "WebSearch,WebFetch" : ""
+  ];
+}
+function claudeStructuredOutput(stdout, plainText = false) {
+  const value = JSON.parse(stdout);
+  const events = Array.isArray(value) ? value : [];
+  const final = events.length ? events.reverse().find((item) => item && typeof item === "object" && "type" in item && item.type === "result") : value;
+  if (!final || typeof final !== "object") throw new Error(t("ui.claude_returned_an_invalid_response"));
+  const record = final;
+  if (record.is_error === true || typeof record.subtype === "string" && record.subtype.startsWith("error_")) {
+    const details = Array.isArray(record.errors) ? record.errors.filter((item) => typeof item === "string").join("\n") : "";
+    throw new Error(details || (typeof record.result === "string" ? record.result : t("ui.claude_task_failed")));
+  }
+  if (plainText && typeof record.result === "string") return record.result;
+  if (record.structured_output === void 0 || record.structured_output === null) throw new Error(t("ui.claude_did_not_return_structured_output"));
+  return JSON.stringify(record.structured_output);
+}
+function abortError() {
+  const error = new Error(t("ui.ai_task_cancelled"));
+  error.name = "AbortError";
+  return error;
+}
+var ClaudeCodeCliRuntime = class {
+  constructor(options) {
+    this.options = options;
+    __publicField(this, "spawn");
+    var _a;
+    this.spawn = (_a = options.spawn) != null ? _a : import_node_child_process2.spawn;
+  }
+  async runTask(prompt, model, effort, outputSchema, controls = {}) {
+    var _a, _b, _c, _d, _e;
+    if ((_a = controls.signal) == null ? void 0 : _a.aborted) throw abortError();
+    const webSearch = ((_b = controls.searchBudget) != null ? _b : 0) > 0;
+    const args = claudeTaskArgs(model, effort, outputSchema, webSearch);
+    if (controls.onText && !outputSchema) {
+      args[args.indexOf("json")] = "stream-json";
+      args.push("--include-partial-messages");
+      if (controls.onSteer) args.push("--input-format", "stream-json");
+    }
+    (_c = controls.onRequest) == null ? void 0 : _c.call(controls, { provider: "claude", executable: this.options.executable, args: args.map((arg, index) => index === args.indexOf(JSON.stringify(claudeOutputSchema(outputSchema))) ? "<response-schema>" : arg), input: "<VAM prompt via stdin>" });
+    (_e = (_d = this.options).onLog) == null ? void 0 : _e.call(_d, "info", `\u555F\u52D5 Claude Code\uFF1A${this.options.executable} --print (${webSearch ? "\u7DB2\u8DEF\u641C\u5C0B\u53EF\u7528" : "\u50C5\u4F7F\u7528 VAM \u63D0\u4F9B\u7684\u5167\u5BB9"})`);
+    return new Promise((resolve, reject) => {
+      var _a2, _b2, _c2;
+      let child;
+      try {
+        child = this.spawn(this.options.executable, args, { cwd: this.options.cwd, env: this.options.env, stdio: ["pipe", "pipe", "pipe"], windowsHide: true });
+      } catch (error) {
+        reject(error instanceof Error ? error : new Error(String(error)));
+        return;
+      }
+      let stdout = "", stderr = "", settled = false, inputOpen = Boolean(controls.onSteer);
+      let streamBuffer = "", streamText = "", currentText = "", finalResult = "";
+      const streaming = !!controls.onText && !outputSchema;
+      const readStreamLine = (line) => {
+        var _a3, _b3, _c3, _d2, _e2, _f, _g, _h;
+        if (!line.trim()) return;
+        const record = JSON.parse(line);
+        if (record.parent_tool_use_id) return;
+        if (record.type === "result") {
+          finalResult = line;
+          if (inputOpen) {
+            inputOpen = false;
+            child.stdin.end();
+          }
+          return;
+        }
+        if (record.type === "stream_event" && ((_a3 = record.event) == null ? void 0 : _a3.type) === "message_start") currentText = "";
+        if (record.type === "stream_event" && ((_c3 = (_b3 = record.event) == null ? void 0 : _b3.delta) == null ? void 0 : _c3.type) === "text_delta" && typeof record.event.delta.text === "string") {
+          currentText += record.event.delta.text;
+          (_d2 = controls.onText) == null ? void 0 : _d2.call(controls, [streamText, currentText].filter(Boolean).join("\n\n"));
+        }
+        if (record.type === "stream_event" && ((_e2 = record.event) == null ? void 0 : _e2.type) === "message_stop") {
+          if (currentText.trim()) streamText = [streamText, currentText].filter(Boolean).join("\n\n");
+          currentText = "";
+          (_f = controls.onText) == null ? void 0 : _f.call(controls, streamText);
+        }
+        if (record.type === "assistant" && ((_g = record.message) == null ? void 0 : _g.content)) {
+          const complete = record.message.content.filter((item) => item.type === "text").map((item) => {
+            var _a4;
+            return (_a4 = item.text) != null ? _a4 : "";
+          }).join("\n");
+          if (complete && !streamText.endsWith(complete)) {
+            currentText = complete;
+            (_h = controls.onText) == null ? void 0 : _h.call(controls, [streamText, currentText].filter(Boolean).join("\n\n"));
+          }
+        }
+      };
+      const cleanup = () => {
+        var _a3;
+        window.clearTimeout(timeout);
+        (_a3 = controls.signal) == null ? void 0 : _a3.removeEventListener("abort", onAbort);
+      };
+      const finish = (error, result) => {
+        if (settled) return;
+        settled = true;
+        cleanup();
+        if (error) reject(error);
+        else resolve(result != null ? result : "");
+      };
+      let killTimer;
+      const stop = () => {
+        try {
+          child.kill("SIGTERM");
+        } catch (e) {
+        }
+        killTimer = window.setTimeout(() => {
+          try {
+            child.kill("SIGKILL");
+          } catch (e) {
+          }
+        }, 1500);
+      };
+      const onAbort = () => {
+        stop();
+        finish(abortError());
+      };
+      const timeout = window.setTimeout(() => {
+        stop();
+        finish(new Error(controls.timeoutMs ? "Coffee Tables: generation timed out; received text is saved as a draft." : t("ui.the_ai_task_exceeded_3_minutes_vam_attempts_to_interrupt_it")));
+      }, (_b2 = (_a2 = controls.timeoutMs) != null ? _a2 : this.options.timeoutMs) != null ? _b2 : CLAUDE_TASK_TIMEOUT_MS);
+      (_c2 = controls.signal) == null ? void 0 : _c2.addEventListener("abort", onAbort, { once: true });
+      child.stdout.on("data", (chunk) => {
+        if (settled) return;
+        if (!streaming) {
+          stdout = `${stdout}${chunk.toString("utf8")}`.slice(-4e6);
+          return;
+        }
+        streamBuffer += chunk.toString("utf8");
+        try {
+          let newline;
+          while ((newline = streamBuffer.indexOf("\n")) >= 0) {
+            const line = streamBuffer.slice(0, newline);
+            streamBuffer = streamBuffer.slice(newline + 1);
+            readStreamLine(line);
+          }
+        } catch (error) {
+          stop();
+          finish(error instanceof Error ? error : new Error(String(error)));
+        }
+      });
+      child.stderr.on("data", (chunk) => {
+        if (!settled) stderr = `${stderr}${chunk.toString("utf8")}`.slice(-16384);
+      });
+      child.on("error", (error) => {
+        if (killTimer) window.clearTimeout(killTimer);
+        finish(new Error(t("ui.could_not_start_claude_code_0_1", this.options.executable, error.message)));
+      });
+      child.on("close", (code) => {
+        if (killTimer) window.clearTimeout(killTimer);
+        if (settled) return;
+        if (code !== 0) {
+          const message = stderr.trim() || t("ui.claude_exited_with_code_0", code != null ? code : t("ui.unknown"));
+          finish(new Error(message.slice(-4e3)));
+          return;
+        }
+        try {
+          if (streaming) readStreamLine(streamBuffer);
+          const result = claudeStructuredOutput(streaming ? finalResult : stdout, !outputSchema);
+          const streamed = [streamText, currentText].filter(Boolean).join("\n\n");
+          finish(void 0, streaming && result.length < streamed.length ? streamed : result);
+        } catch (error) {
+          finish(error instanceof Error ? error : new Error(String(error)));
+        }
+      });
+      try {
+        if (controls.onSteer) {
+          const sendInput = (text2) => {
+            if (!inputOpen || settled) throw new Error("This Coffee Tables response has already ended.");
+            child.stdin.write(`${JSON.stringify({ type: "user", message: { role: "user", content: [{ type: "text", text: text2 }] } })}
+`);
+          };
+          sendInput(prompt);
+          controls.onSteer(async (text2) => {
+            sendInput(text2);
+          });
+        } else child.stdin.end(prompt);
+      } catch (error) {
+        stop();
+        finish(error instanceof Error ? error : new Error(String(error)));
+      }
+    });
+  }
+};
+
+// core/ai-runtime-service.ts
+function currentProcessEnvironment() {
+  var _a, _b;
+  return (_b = (_a = window.process) == null ? void 0 : _a.env) != null ? _b : {};
+}
+function executableCandidates(configured, home, pathValue, nvmVersions = []) {
+  if (configured.includes("/") || configured.includes("\\")) return [configured];
+  const dirs = [
+    home ? (0, import_node_path.join)(home, ".local/bin") : "",
+    home ? (0, import_node_path.join)(home, ".npm-global/bin") : "",
+    home ? (0, import_node_path.join)(home, ".volta/bin") : "",
+    home ? (0, import_node_path.join)(home, ".fnm/current/bin") : "",
+    "/opt/homebrew/bin",
+    "/usr/local/bin",
+    ...nvmVersions.map((version) => (0, import_node_path.join)(home, ".nvm/versions/node", version, "bin")),
+    ...pathValue.split(import_node_path.delimiter)
+  ].filter(Boolean);
+  return [...new Set(dirs)].map((directory) => (0, import_node_path.join)(directory, configured));
+}
+var AiRuntimeService = class {
+  constructor(options) {
+    this.options = options;
+    __publicField(this, "codexRuntime", null);
+    __publicField(this, "localCodexRuntime", null);
+  }
+  reset() {
+    var _a, _b;
+    (_a = this.codexRuntime) == null ? void 0 : _a.stop();
+    (_b = this.localCodexRuntime) == null ? void 0 : _b.stop();
+    this.codexRuntime = null;
+    this.localCodexRuntime = null;
+  }
+  diagnostic(configured) {
+    const executable = this.resolveExecutable(configured);
+    return { executable, installed: (0, import_node_fs.existsSync)(executable) };
+  }
+  codex(pluginDirectory, local = false) {
+    if (local && this.localCodexRuntime) return this.localCodexRuntime;
+    if (!local && this.codexRuntime) return this.codexRuntime;
+    const executable = this.resolveExecutable(this.options.codexPath());
+    const runtime = new CodexAppServerRuntime({
+      executable,
+      cwd: pluginDirectory,
+      env: this.cliEnvironment(executable),
+      clientVersion: this.options.clientVersion(),
+      webSearchDisabled: local,
+      onLog: (level, message) => this.options.onLog(level, message)
+    });
+    if (local) this.localCodexRuntime = runtime;
+    else this.codexRuntime = runtime;
+    return runtime;
+  }
+  claude(pluginDirectory) {
+    const executable = this.resolveExecutable(this.options.claudePath());
+    return new ClaudeCodeCliRuntime({
+      executable,
+      cwd: pluginDirectory,
+      env: this.cliEnvironment(executable),
+      onLog: (level, message) => this.options.onLog(level, message)
+    });
+  }
+  resolveExecutable(configured) {
+    const environment = currentProcessEnvironment();
+    const home = environment.HOME || "";
+    let nvmVersions = [];
+    if (home) {
+      try {
+        nvmVersions = (0, import_node_fs.readdirSync)((0, import_node_path.join)(home, ".nvm/versions/node"));
+      } catch (e) {
+      }
+    }
+    return executableCandidates(configured, home, environment.PATH || "", nvmVersions).find((candidate) => (0, import_node_fs.existsSync)(candidate)) || configured;
+  }
+  cliEnvironment(executable) {
+    const environment = currentProcessEnvironment();
+    const home = environment.HOME || "";
+    const paths = [
+      (0, import_node_path.isAbsolute)(executable) ? (0, import_node_path.dirname)(executable) : "",
+      home ? (0, import_node_path.join)(home, ".local/bin") : "",
+      "/opt/homebrew/bin",
+      "/usr/local/bin",
+      "/usr/bin",
+      "/bin",
+      ...(environment.PATH || "").split(import_node_path.delimiter)
+    ].filter(Boolean);
+    return { ...environment, PATH: [...new Set(paths)].join(import_node_path.delimiter) };
+  }
+};
+
+// ai/context-builder.ts
+var estimateTokens = (value) => Math.ceil((value || "").length / 4);
+var dedupeRules = (value) => Array.from(new Map(value.split("\n").map((line) => line.trim()).filter(Boolean).map((line) => [line.replace(/\s+/g, " ").toLowerCase(), line])).values()).join("\n");
+function buildPreparedTaskContext(input, model, budget = 32e3, provider = "codex") {
+  const started = Date.now(), mode = input.mode || "task";
+  const context = { ...input, rules: dedupeRules(input.rules), ancestors: input.ancestors.replace(/^\s*AI 規則：.*(?:\n|$)/gm, "").trim() };
+  if (mode === "decompose") {
+    context.detail = "";
+    context.workingFindings = "";
+  }
+  const optional = ["detail", "workingFindings", "ancestors", "sourceContext"];
+  const used = () => [context.title, context.summary, context.rules, context.detail, context.task, context.ancestors, context.workingFindings, context.sourceContext].reduce((sum, value) => sum + estimateTokens(value), 0);
+  for (const key2 of optional) if (used() > budget && context[key2]) context[key2] = String(context[key2]).slice(0, Math.max(0, (budget - used() + estimateTokens(String(context[key2]))) * 4));
+  const contextBreakdown = { task: estimateTokens(context.task), currentSummary: estimateTokens(context.summary), currentDetail: estimateTokens(context.detail), effectiveRules: estimateTokens(context.rules), ancestors: estimateTokens(context.ancestors), workingFindings: estimateTokens(context.workingFindings), sourceContext: estimateTokens(context.sourceContext) };
+  const estimatedInputTokens = [contextBreakdown.task, contextBreakdown.currentSummary, contextBreakdown.currentDetail, contextBreakdown.effectiveRules, contextBreakdown.ancestors, contextBreakdown.workingFindings, contextBreakdown.sourceContext].reduce((sum, count) => sum + count, 0);
+  return { context, metrics: { provider, model, mode, estimatedInputTokens, contextBreakdown, contextBuildMs: Date.now() - started, sessionStrategy: "fresh-session-per-node-task" } };
+}
+
+// response-schema.json
+var response_schema_default = {
+  $schema: "https://json-schema.org/draft/2020-12/schema",
+  type: "object",
+  properties: {
+    summary: {
+      type: "string",
+      description: "\u9069\u5408\u5FC3\u667A\u5716\u7684\u4E00\u53E5\u7E41\u9AD4\u4E2D\u6587\u7D50\u8AD6\uFF0C80 \u5B57\u5167"
+    },
+    detail: {
+      type: "string",
+      description: "\u5B8C\u6574\u7684\u7E41\u9AD4\u4E2D\u6587 Markdown \u5206\u6790"
+    },
+    suggestions: {
+      type: "array",
+      items: { type: "object", properties: { title: { type: "string" }, task: { type: "string" }, contribution: { type: "string" }, parentTitle: { type: "string" } }, required: ["title", "task", "contribution", "parentTitle"], additionalProperties: false }
+    },
+    visualReferences: {
+      type: "array",
+      items: {
+        type: "object",
+        properties: {
+          title: { type: "string" },
+          imageUrl: { type: "string" },
+          sourceUrl: { type: "string" },
+          description: { type: "string" },
+          palette: { type: "array", items: { type: "string" } },
+          formula: { type: "string" }
+        },
+        required: ["title", "imageUrl", "sourceUrl", "description", "palette", "formula"],
+        additionalProperties: false
+      }
+    }
+  },
+  required: ["summary", "detail", "suggestions", "visualReferences"],
+  additionalProperties: false
+};
+
+// ai/visual-guidance.ts
+function visualGuidance(context, language2) {
+  const synthesis = context.mode === "synthesize";
+  const maySearch = context.researchMode !== "local" && context.mode !== "decompose" && context.visualMode !== "off";
+  const mayReuse = synthesis;
+  const instructions = [];
+  if (!maySearch) {
+    instructions.push(translate(language2, "prompt.visual_none"));
+    if (mayReuse) instructions.push(translate(language2, "prompt.visual_preserve"));
+  } else if (context.visualMode === "on") instructions.push(translate(language2, "prompt.visual_on"));
+  else instructions.push(translate(language2, "prompt.visual_auto"));
+  if (maySearch || mayReuse) instructions.push(translate(language2, "prompt.visual_embed"));
+  return instructions;
+}
+
+// core/ai-task-service.ts
+var import_node_crypto = require("node:crypto");
+function extractJsonObject(raw) {
+  const candidates = [];
+  let start = -1, depth = 0, quoted = false, escaped = false;
+  for (let index = 0; index < raw.length; index++) {
+    const character = raw[index];
+    if (start < 0) {
+      if (character === "{") {
+        start = index;
+        depth = 1;
+        quoted = false;
+        escaped = false;
+      }
+      continue;
+    }
+    if (quoted) {
+      if (escaped) escaped = false;
+      else if (character === "\\") escaped = true;
+      else if (character === '"') quoted = false;
+      continue;
+    }
+    if (character === '"') quoted = true;
+    else if (character === "{") depth++;
+    else if (character === "}" && --depth === 0) {
+      candidates.push(raw.slice(start, index + 1));
+      start = -1;
+    }
+  }
+  for (const candidate of candidates.reverse()) {
+    try {
+      JSON.parse(candidate);
+      return candidate;
+    } catch (e) {
+    }
+  }
+  throw new SyntaxError("Codex \u56DE\u61C9\u4E2D\u627E\u4E0D\u5230\u5B8C\u6574 JSON object");
+}
+var AiTaskService = class {
+  constructor(options) {
+    this.options = options;
+  }
+  async askModel(input, model, reasoning, signal, onExchange) {
+    var _a, _b, _c;
+    const provider = providerForModel(model);
+    if (provider === "claude" && !CLAUDE_MODEL_CHOICES.some((choice) => choice.id === model)) {
+      throw new Error(t("ui.claude_model_is_not_supported_0", model));
+    }
+    let context = input;
+    const referenceGroups = (_a = context.referenceGroups) != null ? _a : [];
+    if (referenceGroups.some((group) => group.documents.length)) {
+      const findings = await this.extractReferenceFindings(context, model, reasoning, signal);
+      context = {
+        ...context,
+        sourceContext: [
+          context.sourceContext,
+          findings,
+          `Source registry (retain these identities in citations):
+${referenceCatalog(referenceGroups)}`
+        ].filter(Boolean).join("\n\n"),
+        referenceGroups: void 0
+      };
+    }
+    const totalStarted = Date.now();
+    const prepared = buildPreparedTaskContext(context, model, 32e3, provider);
+    if (prepared.context.sourceContext !== context.sourceContext) {
+      throw new Error(t("ui.reference_too_large", t("ui.reference_materials")));
+    }
+    context = prepared.context;
+    const pluginDirectory = this.options.pluginDirectory();
+    const outputLanguage = (_b = context.outputLanguage) != null ? _b : this.options.language();
+    const instructions = [
+      translate(outputLanguage, "prompt.output_language"),
+      translate(outputLanguage, "prompt.role"),
+      translate(outputLanguage, "prompt.source_safety"),
+      context.sourceContext ? translate(outputLanguage, "prompt.reference_citations") : "",
+      context.sourceContext && context.researchMode !== "local" ? translate(outputLanguage, "prompt.local_first") : "",
+      translate(outputLanguage, "prompt.json"),
+      translate(outputLanguage, context.mode === "task" ? "prompt.general_task" : context.mode === "decompose" ? "prompt.decompose" : context.mode === "synthesize" ? "prompt.synthesize" : "prompt.default_task"),
+      context.mode !== "decompose" ? translate(outputLanguage, "prompt.detail_structure", ["detail.core_conclusions", "detail.key_knowledge", "detail.evidence_and_sources", "detail.tradeoffs_and_limitations", "detail.open_questions", "detail.update_log"].map((key2) => `### ${translate(outputLanguage, key2)}`).join(", ")) : "",
+      researchGuidance(context, outputLanguage),
+      ...visualGuidance(context, outputLanguage),
+      `${translate(outputLanguage, "prompt.label_topic")}:
+${context.title}`,
+      `${translate(outputLanguage, "prompt.label_summary")}:
+${context.summary}`,
+      context.mode !== "decompose" ? `${translate(outputLanguage, "prompt.label_detail")}:
+${context.detail || translate(outputLanguage, "prompt.none")}` : "",
+      `${translate(outputLanguage, "prompt.label_rules")}:
+${context.rules || translate(outputLanguage, "prompt.none")}`,
+      context.workingFindings ? `${translate(outputLanguage, "prompt.label_findings")}:
+${context.workingFindings}` : "",
+      context.sourceContext ? `${translate(outputLanguage, "prompt.label_sources")}:
+${context.sourceContext}` : "",
+      `${translate(outputLanguage, "prompt.label_ancestors")}:
+${context.ancestors || translate(outputLanguage, "prompt.none")}`,
+      `${translate(outputLanguage, "prompt.label_task")}:
+${context.task}`
+    ].join("\n\n");
+    console.debug("Visual Agent Map AI metrics", prepared.metrics);
+    const providerStarted = Date.now();
+    const effort = effectiveReasoningLevel(context, normalizeReasoningLevel(reasoning != null ? reasoning : this.options.defaultReasoning()));
+    const exchanges = this.options.exchangeLoggingEnabled() ? this.options.exchanges() : null;
+    const exchangeId = exchanges ? (0, import_node_crypto.randomUUID)() : "";
+    if (exchanges) {
+      exchanges.begin({ id: exchangeId, startedAt: (/* @__PURE__ */ new Date()).toISOString(), topic: context.title, mode: (_c = context.mode) != null ? _c : "task", model, effort });
+      onExchange == null ? void 0 : onExchange(exchangeId);
+    }
+    let stage = "\u555F\u52D5 AI";
+    try {
+      const controls = {
+        signal,
+        searchBudget: context.researchMode === "local" ? 0 : researchLimits(context.researchDepth).searches,
+        onRequest: (request) => {
+          stage = "\u7B49\u5F85 AI \u56DE\u8986";
+          if (this.options.exchangeLoggingEnabled()) exchanges == null ? void 0 : exchanges.sent(exchangeId, JSON.stringify(request, null, 2));
+        }
+      };
+      const raw = provider === "claude" ? await this.options.claudeRuntime(pluginDirectory).runTask(instructions, providerModelId(model), effort, response_schema_default, controls) : await this.options.codexRuntime(pluginDirectory, context.researchMode === "local").runTask(instructions, model, effort, response_schema_default, controls);
+      stage = "\u89E3\u6790 AI \u56DE\u8986";
+      if (this.options.exchangeLoggingEnabled()) exchanges == null ? void 0 : exchanges.received(exchangeId, raw);
+      const result = this.parseAiResult(raw, provider === "claude" ? "Claude Code" : "Codex App Server", outputLanguage);
+      if (referenceGroups.length) {
+        result.summary = resolveReferenceLinks(result.summary, referenceGroups);
+        result.detail = resolveReferenceLinks(result.detail, referenceGroups);
+      }
+      if (this.options.exchangeLoggingEnabled()) exchanges == null ? void 0 : exchanges.parsed(exchangeId);
+      console.debug("Visual Agent Map AI metrics", { ...prepared.metrics, providerMs: Date.now() - providerStarted, totalMs: Date.now() - totalStarted });
+      return result;
+    } catch (error) {
+      if (this.options.exchangeLoggingEnabled()) exchanges == null ? void 0 : exchanges.failed(exchangeId, `${stage}\uFF1A${error instanceof Error ? error.message : String(error)}`);
+      throw error;
+    }
+  }
+  async extractReferenceFindings(context, model, reasoning, signal) {
+    var _a, _b, _c;
+    let working = referenceBatches((_a = context.referenceGroups) != null ? _a : []);
+    let round = 0;
+    while (true) {
+      round++;
+      const batches = round === 1 ? working : packReferenceChunks(working);
+      const findings = [];
+      for (let index = 0; index < batches.length; index++) {
+        if (signal == null ? void 0 : signal.aborted) throw new DOMException("Aborted", "AbortError");
+        (_b = context.onProgress) == null ? void 0 : _b.call(context, t("ui.reference_processing_progress", index + 1, batches.length));
+        const result = await this.askModel({
+          title: context.title,
+          summary: "",
+          rules: "",
+          detail: "",
+          task: round === 1 ? translate(this.options.language(), "prompt.reference_extract") : translate(this.options.language(), "prompt.reference_reduce"),
+          ancestors: "",
+          sourceContext: batches[index],
+          mode: "task",
+          researchMode: "local",
+          researchDepth: "fast",
+          visualMode: "off"
+        }, model, reasoning, signal);
+        if (!result.detail.trim()) throw new Error(t("ui.reference_processing_empty_result"));
+        findings.push(result.detail.trim());
+      }
+      const joined = findings.map((value) => `Evidence:
+${value}`).join("\n\n");
+      if (joined.length <= 18e3) {
+        (_c = context.onProgress) == null ? void 0 : _c.call(context, "");
+        return joined;
+      }
+      if (joined.length >= working.reduce((sum, value) => sum + value.length, 0)) {
+        throw new Error(t("ui.reference_processing_could_not_reduce"));
+      }
+      working = findings;
+    }
+  }
+  parseAiResult(raw, label, language2) {
+    const cleaned = raw.replace(/^```(?:json)?\s*/i, "").replace(/\s*```$/, "").trim();
+    const parsed = JSON.parse(extractJsonObject(cleaned));
+    if (typeof parsed.summary !== "string" || typeof parsed.detail !== "string") throw new Error(`${label} \u6C92\u6709\u56DE\u50B3 summary \u8207 detail`);
+    const isRecord = (value) => typeof value === "object" && value !== null;
+    const suggestions = Array.isArray(parsed.suggestions) ? parsed.suggestions.filter((item) => isRecord(item) && typeof item.title === "string" && typeof item.task === "string").map((item) => ({
+      title: String(item.title).trim(),
+      task: String(item.task).trim(),
+      contribution: typeof item.contribution === "string" ? item.contribution.trim() : "",
+      parentTitle: typeof item.parentTitle === "string" ? item.parentTitle.trim() : ""
+    })).filter((item) => item.title) : [];
+    const visualReferences = Array.isArray(parsed.visualReferences) ? parsed.visualReferences.filter((item) => isRecord(item) && typeof item.imageUrl === "string" && typeof item.sourceUrl === "string").map((item) => ({
+      title: typeof item.title === "string" ? item.title.trim() : language2 === "en" ? "Visual reference" : "\u8996\u89BA\u53C3\u8003",
+      imageUrl: String(item.imageUrl).trim(),
+      sourceUrl: String(item.sourceUrl).trim(),
+      description: typeof item.description === "string" ? item.description.trim() : "",
+      palette: Array.isArray(item.palette) ? item.palette.map(String).map((color) => color.trim()).filter(Boolean).slice(0, 8) : [],
+      formula: typeof item.formula === "string" ? item.formula.trim() : ""
+    })).filter((item) => /^https?:\/\//i.test(item.imageUrl) && /^https?:\/\//i.test(item.sourceUrl)).slice(0, 6) : [];
+    return {
+      summary: Array.from(parsed.summary.trim()).slice(0, 80).join(""),
+      detail: parsed.detail.trim(),
+      suggestions,
+      visualReferences
+    };
+  }
+};
+
+// core/thinking-artifact.ts
+function createThinkingArtifact(input) {
+  return { version: 1, ...input };
+}
+
+// main.ts
+var VisualAgentMapPlugin = class extends import_obsidian11.Plugin {
   constructor() {
     super(...arguments);
     __publicField(this, "settings", { ...DEFAULT_SETTINGS });
@@ -11639,9 +11917,23 @@ var VisualAgentMapPlugin = class extends import_obsidian9.Plugin {
     __publicField(this, "pendingSuggestions", /* @__PURE__ */ new Map());
     __publicField(this, "pendingResearchOptions", /* @__PURE__ */ new Map());
     __publicField(this, "logs", debugLog);
+    __publicField(this, "aiRuntime", new AiRuntimeService({
+      codexPath: () => this.settings.codexPath,
+      claudePath: () => this.settings.claudePath,
+      clientVersion: () => this.manifest.version || "0.0.0",
+      onLog: (level, message) => this.logs.appendLog(level, message)
+    }));
+    __publicField(this, "aiTasks", new AiTaskService({
+      pluginDirectory: () => this.pluginDirectory(),
+      language: () => this.settings.language,
+      defaultReasoning: () => this.settings.cliReasoning,
+      exchangeLoggingEnabled: () => this.settings.aiExchangeLoggingEnabled,
+      exchanges: () => this.exchanges,
+      codexRuntime: (directory, local) => this.runtime(directory, local),
+      claudeRuntime: (directory) => this.claudeCli(directory)
+    }));
+    __publicField(this, "core", new ThinkingCore(this.aiRuntime, this.aiTasks));
     __publicField(this, "exchanges", null);
-    __publicField(this, "codexRuntime", null);
-    __publicField(this, "localCodexRuntime", null);
     __publicField(this, "coffeeModelEfforts", /* @__PURE__ */ new Map());
     __publicField(this, "coffeeManager", null);
     __publicField(this, "coffeeStorage", null);
@@ -11681,7 +11973,7 @@ var VisualAgentMapPlugin = class extends import_obsidian9.Plugin {
       const message = error instanceof Error ? error.message : String(error);
       this.logs.appendLog("error", `\u64CD\u4F5C\u5931\u6557\uFF1A${message}`);
       console.error("Visual Agent Map", error);
-      new import_obsidian9.Notice(message);
+      new import_obsidian11.Notice(message);
     });
     return result;
   }
@@ -11741,11 +12033,11 @@ var VisualAgentMapPlugin = class extends import_obsidian9.Plugin {
     this.settings = { ...DEFAULT_SETTINGS, coffeeStyles: Array.isArray(saved == null ? void 0 : saved.coffeeStyles) ? saved.coffeeStyles.filter((item) => !!item && typeof item === "object" && typeof item.id === "string" && typeof item.name === "string" && typeof item.prompt === "string") : [], defaultCoffeeStyleId: typeof (saved == null ? void 0 : saved.defaultCoffeeStyleId) === "string" ? saved.defaultCoffeeStyleId : void 0, language: initialUiLanguage(saved == null ? void 0 : saved.language), workspaceFolder: (saved == null ? void 0 : saved.workspaceFolder) || DEFAULT_SETTINGS.workspaceFolder, topicsFolder: (saved == null ? void 0 : saved.topicsFolder) || DEFAULT_SETTINGS.topicsFolder, inboxFolder: (saved == null ? void 0 : saved.inboxFolder) || DEFAULT_SETTINGS.inboxFolder, notesFolder: (saved == null ? void 0 : saved.notesFolder) || DEFAULT_SETTINGS.notesFolder, mapsFolder: (saved == null ? void 0 : saved.mapsFolder) || DEFAULT_SETTINGS.mapsFolder, mapId: (saved == null ? void 0 : saved.mapId) || "default", codexPath: (saved == null ? void 0 : saved.codexPath) || (legacy == null ? void 0 : legacy.cliPath) || DEFAULT_SETTINGS.codexPath, claudePath: (saved == null ? void 0 : saved.claudePath) || DEFAULT_SETTINGS.claudePath, cliModel: (saved == null ? void 0 : saved.cliModel) || DEFAULT_SETTINGS.cliModel, cliReasoning: normalizeReasoningLevel(saved == null ? void 0 : saved.cliReasoning), previewScale: (saved == null ? void 0 : saved.previewScale) !== void 0 ? clampPreviewScale(saved.previewScale) : legacyPreviewScale(saved == null ? void 0 : saved.previewSize), models: "", migrated: (saved == null ? void 0 : saved.migrated) === true, structureVersion: (_a = saved == null ? void 0 : saved.structureVersion) != null ? _a : saved ? 1 : DEFAULT_SETTINGS.structureVersion, firstUseNoticeSeen: (saved == null ? void 0 : saved.firstUseNoticeSeen) === true, codexUsageNoticeSeen: (saved == null ? void 0 : saved.codexUsageNoticeSeen) === true, claudeUsageNoticeSeen: (saved == null ? void 0 : saved.claudeUsageNoticeSeen) === true, aiExchangeLoggingEnabled: (saved == null ? void 0 : saved.aiExchangeLoggingEnabled) === true, workspaceInitialized: saved ? saved.workspaceInitialized !== false : false, sampleTourVersionSeen: (_b = saved == null ? void 0 : saved.sampleTourVersionSeen) != null ? _b : 0 };
     setUiLanguage(this.settings.language);
     this.logs.appendLog("info", `Visual Agent Map ${this.manifest.version || "unknown"} \u8F09\u5165`);
-    if (this.app.vault.adapter instanceof import_obsidian9.FileSystemAdapter && this.manifest.dir) {
-      const pluginDirectory = join(this.app.vault.adapter.getBasePath(), this.manifest.dir);
-      this.exchanges = new AiExchangeLog(join(pluginDirectory, "ai-exchanges.json"), (error) => this.logs.appendLog("error", `AI \u5F80\u8FD4\u7D00\u9304\u5132\u5B58\u5931\u6557\uFF1A${error instanceof Error ? error.message : String(error)}`));
+    if (this.app.vault.adapter instanceof import_obsidian11.FileSystemAdapter && this.manifest.dir) {
+      const pluginDirectory = (0, import_node_path2.join)(this.app.vault.adapter.getBasePath(), this.manifest.dir);
+      this.exchanges = new AiExchangeLog((0, import_node_path2.join)(pluginDirectory, "ai-exchanges.json"), (error) => this.logs.appendLog("error", `AI \u5F80\u8FD4\u7D00\u9304\u5132\u5B58\u5931\u6557\uFF1A${error instanceof Error ? error.message : String(error)}`));
       await this.exchanges.load();
-      this.pendingSuggestions = new PendingSuggestions(join(pluginDirectory, "pending-suggestions.json"), (error) => this.logs.appendLog("error", `\u5F85\u78BA\u8A8D\u5EFA\u8B70\u5132\u5B58\u5931\u6557\uFF1A${error instanceof Error ? error.message : String(error)}`));
+      this.pendingSuggestions = new PendingSuggestions((0, import_node_path2.join)(pluginDirectory, "pending-suggestions.json"), (error) => this.logs.appendLog("error", `\u5F85\u78BA\u8A8D\u5EFA\u8B70\u5132\u5B58\u5931\u6557\uFF1A${error instanceof Error ? error.message : String(error)}`));
       await this.pendingSuggestions.load();
     }
     this.repo = new Repository(this.app, this.settings);
@@ -11771,15 +12063,16 @@ var VisualAgentMapPlugin = class extends import_obsidian9.Plugin {
         const count = await this.repo.normalizeGeneratedNoteFilenames();
         this.settings.structureVersion = 2;
         await this.saveSettings();
-        if (count) new import_obsidian9.Notice(t("ui.synced_0_subtopic_filenames_with_their_names", count));
+        if (count) new import_obsidian11.Notice(t("ui.synced_0_subtopic_filenames_with_their_names", count));
       }
     });
     this.ready = initialize;
+    this.register(this.core.experiences.register("visual-map", (artifact) => this.openArtifactInVisualMap(artifact)));
     this.registerView(COFFEE_TABLES_VIEW_TYPE, (leaf) => new CoffeeTablesView(leaf, this));
     this.coffeeStorage = new CoffeeStorage(this.app.vault, this.settings.workspaceFolder, (file, path) => this.app.fileManager.renameFile(file, path), (file) => this.app.fileManager.trashFile(file));
     this.coffeeManager = new CoffeeManager((request) => this.runCoffeeRequest(request), (session, summariesOnly) => this.coffeeStorage.save(session, summariesOnly));
     const openCoffee = () => {
-      void this.activateCoffeeTables().catch((error) => new import_obsidian9.Notice(String(error)));
+      void this.activateCoffeeTables().catch((error) => new import_obsidian11.Notice(String(error)));
     };
     const coffeeRibbonIcon = this.addRibbonIcon("coffee", `Open ${COFFEE_TABLES_NAME}`, openCoffee);
     this.addCommand({ id: "open-coffee-tables", name: `Open ${COFFEE_TABLES_NAME}`, callback: openCoffee });
@@ -11788,19 +12081,19 @@ var VisualAgentMapPlugin = class extends import_obsidian9.Plugin {
       try {
         await this.openDetails(this.repo.file(path));
       } catch (error) {
-        new import_obsidian9.Notice(error instanceof Error ? error.message : String(error));
+        new import_obsidian11.Notice(error instanceof Error ? error.message : String(error));
       }
     }));
     this.ribbonIcon = this.addRibbonIcon("brain-circuit", t("ui.open_map"), () => {
-      void this.activateView().catch((error) => new import_obsidian9.Notice(String(error)));
+      void this.activateView().catch((error) => new import_obsidian11.Notice(String(error)));
     });
     const mapRibbonIcon = this.ribbonIcon;
     this.app.workspace.onLayoutReady(() => this.register(groupRibbonIcons(mapRibbonIcon, coffeeRibbonIcon)));
     this.addLocalizedCommand("open-map", "ui.open_map", () => {
-      void this.activateView().catch((error) => new import_obsidian9.Notice(String(error)));
+      void this.activateView().catch((error) => new import_obsidian11.Notice(String(error)));
     });
     this.addLocalizedCommand("open-topic-outline", "ui.open_topic_outline", () => {
-      void this.activateOutline().catch((error) => new import_obsidian9.Notice(String(error)));
+      void this.activateOutline().catch((error) => new import_obsidian11.Notice(String(error)));
     });
     this.addLocalizedCommand("rebuild-references", "ui.refresh_vam_data", () => {
       void this.mutate(() => this.fullRebuild());
@@ -11808,13 +12101,13 @@ var VisualAgentMapPlugin = class extends import_obsidian9.Plugin {
     this.addLocalizedCommand("normalize-note-filenames", "ui.sync_topic_names_and_filenames", () => {
       void this.mutate(async () => {
         const count = await this.repo.normalizeGeneratedNoteFilenames();
-        new import_obsidian9.Notice(count ? t("ui.synced_0_topic_filenames", count) : t("ui.topic_filenames_are_up_to_date"));
+        new import_obsidian11.Notice(count ? t("ui.synced_0_topic_filenames", count) : t("ui.topic_filenames_are_up_to_date"));
       });
     });
     this.addLocalizedCommand("repair-note-presentation", "ui.repair_topic_note_display", () => {
       void this.mutate(async () => {
         await this.repo.ensureNodePresentation();
-        new import_obsidian9.Notice(t("ui.topic_note_display_repaired"));
+        new import_obsidian11.Notice(t("ui.topic_note_display_repaired"));
       });
     });
     this.addLocalizedCommand("open-built-in-sample", "ui.open_the_taiwan_travel_sample", () => {
@@ -11830,7 +12123,7 @@ var VisualAgentMapPlugin = class extends import_obsidian9.Plugin {
     this.settingTab = new VisualAgentMapSettingTab(this.app, this);
     this.addSettingTab(this.settingTab);
     this.registerEvent(this.app.workspace.on("file-menu", (menu, file) => {
-      if (file instanceof import_obsidian9.TFile && this.isMap(file)) menu.addItem((item) => item.setTitle(t("ui.open_as_mind_map")).setIcon("brain-circuit").onClick(() => {
+      if (file instanceof import_obsidian11.TFile && this.isMap(file)) menu.addItem((item) => item.setTitle(t("ui.open_as_mind_map")).setIcon("brain-circuit").onClick(() => {
         void this.activateView(file.path);
       }));
     }));
@@ -11842,9 +12135,9 @@ var VisualAgentMapPlugin = class extends import_obsidian9.Plugin {
         return;
       }
       this.syncCoffeeOutline();
-      if (!((leaf == null ? void 0 : leaf.view) instanceof import_obsidian9.MarkdownView) || !leaf.view.file || !this.isMap(leaf.view.file)) return;
+      if (!((leaf == null ? void 0 : leaf.view) instanceof import_obsidian11.MarkdownView) || !leaf.view.file || !this.isMap(leaf.view.file)) return;
       const path = leaf.view.file.path;
-      void leaf.setViewState({ type: VIEW_TYPE, state: { file: path }, active: true }).catch((error) => new import_obsidian9.Notice(error instanceof Error ? error.message : String(error)));
+      void leaf.setViewState({ type: VIEW_TYPE, state: { file: path }, active: true }).catch((error) => new import_obsidian11.Notice(error instanceof Error ? error.message : String(error)));
     }));
     this.registerEvent(this.app.workspace.on("file-open", (file) => {
       var _a2;
@@ -11863,17 +12156,17 @@ var VisualAgentMapPlugin = class extends import_obsidian9.Plugin {
       });
     });
     this.registerEvent(this.app.vault.on("modify", (file) => {
-      if (!this.writing && file instanceof import_obsidian9.TFile) for (const view of this.views()) view.changed(file);
+      if (!this.writing && file instanceof import_obsidian11.TFile) for (const view of this.views()) view.changed(file);
     }));
     this.registerEvent(this.app.vault.on("delete", (file) => {
-      if (!this.writing && file instanceof import_obsidian9.TFile) {
+      if (!this.writing && file instanceof import_obsidian11.TFile) {
         for (const view of this.views()) view.deleted(file);
         this.scheduleExternalReconciliation();
         if (file.path.startsWith(`${this.settings.mapsFolder}/`) || file.path.startsWith(`${this.settings.topicsFolder}/`) && file.name === "Map.md") void this.mutate(() => this.repo.rebuildDerivedData());
       }
     }));
     this.registerEvent(this.app.vault.on("rename", (file, oldPath) => {
-      if (!this.writing && file instanceof import_obsidian9.TFile) void this.mutate(async () => {
+      if (!this.writing && file instanceof import_obsidian11.TFile) void this.mutate(async () => {
         await this.repo.replaceSourcePath(oldPath, file.path);
         for (const mapFile of await this.repo.mapFiles()) {
           const map = await this.repo.readMap(mapFile.path);
@@ -11899,12 +12192,12 @@ var VisualAgentMapPlugin = class extends import_obsidian9.Plugin {
     this.settings.workspaceInitialized = true;
     await this.saveSettings();
     for (const view of this.views()) await view.refreshFromPlugin();
-    new import_obsidian9.Notice(t("ui.agent_workspace_is_ready"));
+    new import_obsidian11.Notice(t("ui.agent_workspace_is_ready"));
   }
   async fullRebuild() {
     await this.repo.rebuildDerivedData();
     for (const view of this.views()) await view.refreshFromPlugin();
-    new import_obsidian9.Notice(t("ui.vam_data_has_been_refreshed"));
+    new import_obsidian11.Notice(t("ui.vam_data_has_been_refreshed"));
   }
   connectWorkspace(root) {
     this.settings.workspaceFolder = root;
@@ -11918,7 +12211,7 @@ var VisualAgentMapPlugin = class extends import_obsidian9.Plugin {
     const candidates = known != null ? known : await this.repo.workspaceCandidates();
     this.workspaceRecoveryCandidates = [];
     if (!candidates.length) {
-      new import_obsidian9.Notice(t("ui.no_recognizable_existing_vam_workspace_was_found"));
+      new import_obsidian11.Notice(t("ui.no_recognizable_existing_vam_workspace_was_found"));
       return;
     }
     new ChoiceModal(this.app, t("ui.reconnect_existing_workspace"), t("ui.choosing_a_workspace_only_reconnects_the_setting_it_does_not"), candidates.map((root) => ({ label: root, action: () => this.mutate(async () => {
@@ -11926,16 +12219,14 @@ var VisualAgentMapPlugin = class extends import_obsidian9.Plugin {
       await this.saveSettings();
       await this.repo.rebuildDerivedData();
       for (const view of this.views()) await view.refreshFromPlugin();
-      new import_obsidian9.Notice(t("ui.reconnected_workspace_0", root));
+      new import_obsidian11.Notice(t("ui.reconnected_workspace_0", root));
     }) }))).open();
   }
   codexDiagnostic() {
-    const executable = this.resolveExecutable(this.settings.codexPath);
-    return { executable, installed: existsSync(executable) };
+    return this.aiRuntime.diagnostic(this.settings.codexPath);
   }
   claudeDiagnostic() {
-    const executable = this.resolveExecutable(this.settings.claudePath);
-    return { executable, installed: existsSync(executable) };
+    return this.aiRuntime.diagnostic(this.settings.claudePath);
   }
   availableModels() {
     const models = this.settings.models.split(/[\n,]/).map((value) => value.trim()).filter(Boolean);
@@ -11970,12 +12261,8 @@ var VisualAgentMapPlugin = class extends import_obsidian9.Plugin {
     await this.saveSettings();
   }
   resetCodexRuntime() {
-    var _a, _b;
     for (const controller of this.activeTasks.values()) controller.abort();
-    (_a = this.codexRuntime) == null ? void 0 : _a.stop();
-    (_b = this.localCodexRuntime) == null ? void 0 : _b.stop();
-    this.codexRuntime = null;
-    this.localCodexRuntime = null;
+    this.aiRuntime.reset();
   }
   openCodexSetupGuide() {
     const diagnostic = this.codexDiagnostic();
@@ -11987,14 +12274,14 @@ var VisualAgentMapPlugin = class extends import_obsidian9.Plugin {
     const diagnostic = this.codexDiagnostic();
     if (!diagnostic.installed) {
       if (showGuide) this.openCodexSetupGuide();
-      else new import_obsidian9.Notice(t("ui.codex_cli_was_not_found_0_set_the_codex_cli_path_in_vam_sett", diagnostic.executable));
+      else new import_obsidian11.Notice(t("ui.codex_cli_was_not_found_0_set_the_codex_cli_path_in_vam_sett", diagnostic.executable));
       return;
     }
     try {
       await this.refreshCodexModels();
-      new import_obsidian9.Notice(t("ui.codex_app_server_is_ready_0", diagnostic.executable));
+      new import_obsidian11.Notice(t("ui.codex_app_server_is_ready_0", diagnostic.executable));
     } catch (error) {
-      new import_obsidian9.Notice(t("ui.codex_app_server_check_failed_0", this.recordFailure("Codex App Server \u91CD\u65B0\u6AA2\u67E5\u5931\u6557", error)));
+      new import_obsidian11.Notice(t("ui.codex_app_server_check_failed_0", this.recordFailure("Codex App Server \u91CD\u65B0\u6AA2\u67E5\u5931\u6557", error)));
     }
   }
   async duplicateBuiltInSample() {
@@ -12029,7 +12316,7 @@ var VisualAgentMapPlugin = class extends import_obsidian9.Plugin {
       await this.repo.saveMap(path, map);
       await this.repo.rebuildDerivedData(root);
       await this.saveSettings();
-      new import_obsidian9.Notice(t("ui.created_an_editable_copy_of_the_sample"));
+      new import_obsidian11.Notice(t("ui.created_an_editable_copy_of_the_sample"));
       return path;
     } catch (error) {
       if (createdRoot) {
@@ -12057,7 +12344,7 @@ var VisualAgentMapPlugin = class extends import_obsidian9.Plugin {
     return marker2 === true || marker2 === "true" || file.extension === "md" && (file.path.startsWith(`${this.settings.notesFolder}/`) || file.path.startsWith(`${this.settings.topicsFolder}/`) || file.path.startsWith(`${this.settings.inboxFolder}/`));
   }
   styleNodeLeaf(leaf) {
-    if (!((leaf == null ? void 0 : leaf.view) instanceof import_obsidian9.MarkdownView)) return;
+    if (!((leaf == null ? void 0 : leaf.view) instanceof import_obsidian11.MarkdownView)) return;
     leaf.view.containerEl.toggleClass("vam-topic-markdown", !!leaf.view.file && this.isNode(leaf.view.file));
   }
   onunload() {
@@ -12082,7 +12369,7 @@ var VisualAgentMapPlugin = class extends import_obsidian9.Plugin {
         await this.saveData(nextSettings);
       } catch (error) {
         this.recordFailure(translate(previous, "ui.language_change_save_failed"), error);
-        new import_obsidian9.Notice(translate(previous, "ui.language_change_save_failed"));
+        new import_obsidian11.Notice(translate(previous, "ui.language_change_save_failed"));
         return false;
       }
       Object.assign(this.settings, nextSettings);
@@ -12109,7 +12396,7 @@ var VisualAgentMapPlugin = class extends import_obsidian9.Plugin {
         failures.push(error);
       }
       for (const error of failures) this.recordFailure(t("ui.language_view_refresh_failed"), error);
-      new import_obsidian9.Notice(failures.length ? t("ui.language_change_partial_failure") : t("ui.language_changed_content_preserved"));
+      new import_obsidian11.Notice(failures.length ? t("ui.language_change_partial_failure") : t("ui.language_changed_content_preserved"));
       return true;
     } finally {
       this.languageSwitchPending = false;
@@ -12161,10 +12448,10 @@ var VisualAgentMapPlugin = class extends import_obsidian9.Plugin {
     var _a;
     const diagnostic = this.claudeDiagnostic();
     if (!diagnostic.installed) {
-      new import_obsidian9.Notice(t("ui.claude_cli_was_not_found_follow_the_installation_guide_to_install_it"));
+      new import_obsidian11.Notice(t("ui.claude_cli_was_not_found_follow_the_installation_guide_to_install_it"));
       return;
     }
-    new import_obsidian9.Notice(t("ui.claude_cli_found_0", diagnostic.executable));
+    new import_obsidian11.Notice(t("ui.claude_cli_found_0", diagnostic.executable));
     (_a = this.settingTab) == null ? void 0 : _a.update();
     for (const view of this.views()) await view.refreshFromPlugin();
   }
@@ -12187,7 +12474,7 @@ var VisualAgentMapPlugin = class extends import_obsidian9.Plugin {
       await this.repo.rebuildDerivedData();
     } catch (error) {
       console.error("Visual Agent Map reference rebuild", error);
-      new import_obsidian9.Notice(t("ui.map_saved_but_reference_update_failed_0", error instanceof Error ? error.message : String(error)));
+      new import_obsidian11.Notice(t("ui.map_saved_but_reference_update_failed_0", error instanceof Error ? error.message : String(error)));
     }
   }
   scheduleExternalReconciliation() {
@@ -12208,7 +12495,7 @@ var VisualAgentMapPlugin = class extends import_obsidian9.Plugin {
     if (!this.detailsLeaf) {
       this.detailsLeaf = (_b = (_a = markdownLeaves.filter((leaf) => {
         var _a2, _b2;
-        return leaf.getRoot() === this.app.workspace.rightSplit && leaf.view instanceof import_obsidian9.MarkdownView && !!leaf.view.file && ((_b2 = (_a2 = this.app.metadataCache.getFileCache(leaf.view.file)) == null ? void 0 : _a2.frontmatter) == null ? void 0 : _b2["agent-map-node"]) === true;
+        return leaf.getRoot() === this.app.workspace.rightSplit && leaf.view instanceof import_obsidian11.MarkdownView && !!leaf.view.file && ((_b2 = (_a2 = this.app.metadataCache.getFileCache(leaf.view.file)) == null ? void 0 : _a2.frontmatter) == null ? void 0 : _b2["agent-map-node"]) === true;
       }).sort((a, b) => a.view.containerEl.getBoundingClientRect().top - b.view.containerEl.getBoundingClientRect().top)[0]) != null ? _a : this.app.workspace.getRightLeaf(false)) != null ? _b : this.app.workspace.getRightLeaf(true);
     }
     if (!this.detailsLeaf) throw new Error(t("ui.unable_to_open_the_right_details_sidebar"));
@@ -12219,11 +12506,11 @@ var VisualAgentMapPlugin = class extends import_obsidian9.Plugin {
   }
   closeStaleDetails() {
     var _a, _b, _c, _d;
-    const closed = ((_a = this.detailsLeaf) == null ? void 0 : _a.view) instanceof import_obsidian9.MarkdownView && ((_b = this.detailsLeaf.view.file) == null ? void 0 : _b.path) === this.detailsPath;
+    const closed = ((_a = this.detailsLeaf) == null ? void 0 : _a.view) instanceof import_obsidian11.MarkdownView && ((_b = this.detailsLeaf.view.file) == null ? void 0 : _b.path) === this.detailsPath;
     if (closed) {
       this.detailsLeaf.detach();
       this.app.workspace.trigger("file-open", null);
-      this.app.workspace.trigger("active-leaf-change", (_d = (_c = this.app.workspace.getActiveViewOfType(import_obsidian9.View)) == null ? void 0 : _c.leaf) != null ? _d : null);
+      this.app.workspace.trigger("active-leaf-change", (_d = (_c = this.app.workspace.getActiveViewOfType(import_obsidian11.View)) == null ? void 0 : _c.leaf) != null ? _d : null);
     }
     this.detailsLeaf = null;
     this.detailsPath = null;
@@ -12239,12 +12526,12 @@ var VisualAgentMapPlugin = class extends import_obsidian9.Plugin {
     if (leaf.view instanceof CoffeeTablesView) this.syncCoffeeOutline(leaf.view);
   }
   async runCoffeeRequest(request) {
-    if (!(this.app.vault.adapter instanceof import_obsidian9.FileSystemAdapter) || !this.manifest.dir) throw new Error("Coffee Tables requires the desktop runtime");
+    if (!(this.app.vault.adapter instanceof import_obsidian11.FileSystemAdapter) || !this.manifest.dir) throw new Error("Coffee Tables requires the desktop runtime");
     const { session, signal, prompt } = request;
-    const directory = join(this.app.vault.adapter.getBasePath(), this.manifest.dir);
+    const directory = (0, import_node_path2.join)(this.app.vault.adapter.getBasePath(), this.manifest.dir);
     const effort = effectiveReasoningLevel({ title: session.topic, summary: "", detail: "", rules: "", task: "", ancestors: "" }, normalizeReasoningLevel(session.reasoning));
     const exchanges = this.settings.aiExchangeLoggingEnabled ? this.exchanges : null;
-    const id = (0, import_node_crypto.randomUUID)();
+    const id = (0, import_node_crypto2.randomUUID)();
     const key2 = `coffee:${id}`;
     const controller = new AbortController();
     const abort = () => controller.abort();
@@ -12279,7 +12566,7 @@ var VisualAgentMapPlugin = class extends import_obsidian9.Plugin {
   }
   async openCoffeeHandoff(session, sourcePath) {
     const zh = this.settings.language === "zh-TW";
-    const modal = new import_obsidian9.Modal(this.app);
+    const modal = new import_obsidian11.Modal(this.app);
     modal.titleEl.setText(zh ? "\u5E36\u53BB VAM \u6DF1\u5165\u7814\u7A76" : "Take to VAM for deeper research");
     modal.contentEl.createEl("p", { text: zh ? "\u7DE8\u8F2F\u8981\u6DF1\u5165\u7814\u7A76\u7684\u554F\u984C\uFF0C\u4E26\u5F9E\u4F86\u6E90\u5C0D\u8AC7\u958B\u59CB\u3002" : "Edit the question for deeper research. The source conversation will be linked." });
     const question = modal.contentEl.createEl("textarea", { cls: "ct-handoff-question", attr: { rows: "3", "aria-label": zh ? "\u7814\u7A76\u554F\u984C" : "Research question" } });
@@ -12289,21 +12576,37 @@ var VisualAgentMapPlugin = class extends import_obsidian9.Plugin {
       const title = question.value.trim();
       if (!title || create.disabled) return;
       create.disabled = true;
-      void this.mutate(async () => {
-        const path = await this.repo.createMap(title);
-        const map = await this.repo.readMap(path);
-        const node = await this.repo.createNote(title, session.model, map, path, "manual");
-        const detail = [zh ? "Coffee Tables \u7684\u6A21\u64EC\u5C0D\u8AC7\uFF0C\u5167\u5BB9\u5C1A\u672A\u67E5\u8B49\uFF0C\u4E0D\u4EE3\u8868\u4F7F\u7528\u8005\u7D50\u8AD6\u3002" : "Simulated Coffee Tables discussion; unverified and not the user's conclusion.", `[[${sourcePath}|Coffee Tables \u5C0D\u8AC7]]`].join("\n\n");
-        await this.repo.updateNote(node.path, { detail, reasoning: normalizeReasoningLevel(session.reasoning) });
-        map.nodes.push(node);
-        await this.repo.saveMap(path, map);
-        modal.close();
-        await this.activateView(path);
-      }).catch((error) => {
-        new import_obsidian9.Notice(`${String(error)} \xB7 ${zh ? "\u53EF\u80FD\u5DF2\u5EFA\u7ACB\u90E8\u5206\u7814\u7A76\u6A94\u6848\uFF0C\u8ACB\u5148\u6AA2\u67E5\u518D\u91CD\u8A66\u3002" : "Some research files may have been created; inspect before retrying."}`);
+      const artifact = createThinkingArtifact({
+        id: (0, import_node_crypto2.randomUUID)(),
+        kind: "question",
+        title,
+        content: zh ? "Coffee Tables \u7684\u6A21\u64EC\u5C0D\u8AC7\uFF0C\u5167\u5BB9\u5C1A\u672A\u67E5\u8B49\uFF0C\u4E0D\u4EE3\u8868\u4F7F\u7528\u8005\u7D50\u8AD6\u3002" : "Simulated Coffee Tables discussion; unverified and not the user's conclusion.",
+        origin: { experience: "coffee-tables", sessionId: session.id, path: sourcePath },
+        sources: [{ label: "Coffee Tables", path: sourcePath, experience: "coffee-tables", sessionId: session.id }],
+        metadata: { model: session.model, reasoning: session.reasoning }
+      });
+      void this.core.experiences.handoff({ target: "visual-map", artifact }).then(() => modal.close()).catch((error) => {
+        create.disabled = false;
+        new import_obsidian11.Notice(`${String(error)} \xB7 ${zh ? "\u53EF\u80FD\u5DF2\u5EFA\u7ACB\u90E8\u5206\u7814\u7A76\u6A94\u6848\uFF0C\u8ACB\u5148\u6AA2\u67E5\u518D\u91CD\u8A66\u3002" : "Some research files may have been created; inspect before retrying."}`);
       });
     });
     modal.open();
+  }
+  async openArtifactInVisualMap(artifact) {
+    await this.mutate(async () => {
+      var _a, _b;
+      const model = typeof ((_a = artifact.metadata) == null ? void 0 : _a.model) === "string" ? artifact.metadata.model : this.settings.cliModel;
+      const reasoning = normalizeReasoningLevel((_b = artifact.metadata) == null ? void 0 : _b.reasoning);
+      const path = await this.repo.createMap(artifact.title);
+      const map = await this.repo.readMap(path);
+      const node = await this.repo.createNote(artifact.title, model, map, path, "manual");
+      const links = artifact.sources.filter((source) => source.path).map((source) => `[[${source.path}|${source.label}]]`);
+      const detail = [artifact.content, ...links].filter(Boolean).join("\n\n");
+      await this.repo.updateNote(node.path, { detail, reasoning });
+      map.nodes.push(node);
+      await this.repo.saveMap(path, map);
+      await this.activateView(path);
+    });
   }
   async activateView(path) {
     await this.ready;
@@ -12324,8 +12627,8 @@ var VisualAgentMapPlugin = class extends import_obsidian9.Plugin {
   async refreshCodexModels() {
     var _a, _b, _c, _d;
     const adapter = this.app.vault.adapter;
-    if (!(adapter instanceof import_obsidian9.FileSystemAdapter) || !this.manifest.dir) return;
-    const pluginDirectory = join(adapter.getBasePath(), this.manifest.dir);
+    if (!(adapter instanceof import_obsidian11.FileSystemAdapter) || !this.manifest.dir) return;
+    const pluginDirectory = (0, import_node_path2.join)(adapter.getBasePath(), this.manifest.dir);
     const models = await this.runtime(pluginDirectory).listModels();
     this.coffeeModelEfforts = new Map(models.map((item) => [item.model, item.supportedReasoningEfforts.map((effort) => effort.reasoningEffort).filter((value) => ["low", "medium", "high"].includes(value))]));
     this.settings.models = models.map((item) => item.model).join(", ");
@@ -12335,176 +12638,18 @@ var VisualAgentMapPlugin = class extends import_obsidian9.Plugin {
     for (const view of this.views()) await view.refreshFromPlugin();
   }
   async askModel(context, model, reasoning, signal, onExchange) {
-    var _a, _b, _c;
-    const provider = providerForModel(model);
-    if (provider === "claude" && !CLAUDE_MODEL_CHOICES.some((choice) => choice.id === model)) throw new Error(t("ui.claude_model_is_not_supported_0", model));
+    return this.aiTasks.askModel(context, model, reasoning, signal, onExchange);
+  }
+  pluginDirectory() {
     const adapter = this.app.vault.adapter;
-    if (!(adapter instanceof import_obsidian9.FileSystemAdapter)) throw new Error(t("ui.cli_mode_requires_desktop_obsidian"));
+    if (!(adapter instanceof import_obsidian11.FileSystemAdapter)) throw new Error(t("ui.cli_mode_requires_desktop_obsidian"));
     if (!this.manifest.dir) throw new Error(t("ui.plugin_folder_not_found"));
-    const referenceGroups = (_a = context.referenceGroups) != null ? _a : [];
-    if (referenceGroups.some((group) => group.documents.length)) {
-      const findings = await this.extractReferenceFindings(context, model, reasoning, signal);
-      context = { ...context, sourceContext: [context.sourceContext, findings, `Source registry (retain these identities in citations):
-${referenceCatalog(referenceGroups)}`].filter(Boolean).join("\n\n"), referenceGroups: void 0 };
-    }
-    const totalStarted = Date.now();
-    const prepared = buildPreparedTaskContext(context, model, 32e3, provider);
-    if (prepared.context.sourceContext !== context.sourceContext) throw new Error(t("ui.reference_too_large", t("ui.reference_materials")));
-    context = prepared.context;
-    const pluginDirectory = join(adapter.getBasePath(), this.manifest.dir);
-    const outputLanguage = (_b = context.outputLanguage) != null ? _b : this.settings.language;
-    const instructions = [
-      translate(outputLanguage, "prompt.output_language"),
-      translate(outputLanguage, "prompt.role"),
-      translate(outputLanguage, "prompt.source_safety"),
-      context.sourceContext ? translate(outputLanguage, "prompt.reference_citations") : "",
-      context.sourceContext && context.researchMode !== "local" ? translate(outputLanguage, "prompt.local_first") : "",
-      translate(outputLanguage, "prompt.json"),
-      translate(outputLanguage, context.mode === "task" ? "prompt.general_task" : context.mode === "decompose" ? "prompt.decompose" : context.mode === "synthesize" ? "prompt.synthesize" : "prompt.default_task"),
-      context.mode !== "decompose" ? translate(outputLanguage, "prompt.detail_structure", ["detail.core_conclusions", "detail.key_knowledge", "detail.evidence_and_sources", "detail.tradeoffs_and_limitations", "detail.open_questions", "detail.update_log"].map((key2) => `### ${translate(outputLanguage, key2)}`).join(", ")) : "",
-      researchGuidance(context, outputLanguage),
-      ...visualGuidance(context, outputLanguage),
-      `${translate(outputLanguage, "prompt.label_topic")}:
-${context.title}`,
-      `${translate(outputLanguage, "prompt.label_summary")}:
-${context.summary}`,
-      context.mode !== "decompose" ? `${translate(outputLanguage, "prompt.label_detail")}:
-${context.detail || translate(outputLanguage, "prompt.none")}` : "",
-      `${translate(outputLanguage, "prompt.label_rules")}:
-${context.rules || translate(outputLanguage, "prompt.none")}`,
-      context.workingFindings ? `${translate(outputLanguage, "prompt.label_findings")}:
-${context.workingFindings}` : "",
-      context.sourceContext ? `${translate(outputLanguage, "prompt.label_sources")}:
-${context.sourceContext}` : "",
-      `${translate(outputLanguage, "prompt.label_ancestors")}:
-${context.ancestors || translate(outputLanguage, "prompt.none")}`,
-      `${translate(outputLanguage, "prompt.label_task")}:
-${context.task}`
-    ].join("\n\n");
-    console.debug("Visual Agent Map AI metrics", prepared.metrics);
-    const providerStarted = Date.now();
-    const effort = effectiveReasoningLevel(context, normalizeReasoningLevel(reasoning != null ? reasoning : this.settings.cliReasoning));
-    const exchanges = this.settings.aiExchangeLoggingEnabled ? this.exchanges : null;
-    const exchangeId = exchanges ? (0, import_node_crypto.randomUUID)() : "";
-    if (exchanges) {
-      exchanges.begin({ id: exchangeId, startedAt: (/* @__PURE__ */ new Date()).toISOString(), topic: context.title, mode: (_c = context.mode) != null ? _c : "task", model, effort });
-      onExchange == null ? void 0 : onExchange(exchangeId);
-    }
-    let stage = "\u555F\u52D5 AI";
-    try {
-      const controls = {
-        signal,
-        searchBudget: context.researchMode === "local" ? 0 : researchLimits(context.researchDepth).searches,
-        onRequest: (request) => {
-          stage = "\u7B49\u5F85 AI \u56DE\u8986";
-          if (this.settings.aiExchangeLoggingEnabled) exchanges == null ? void 0 : exchanges.sent(exchangeId, JSON.stringify(request, null, 2));
-        }
-      };
-      const raw = provider === "claude" ? await this.claudeCli(pluginDirectory).runTask(instructions, providerModelId(model), effort, response_schema_default, controls) : await this.runtime(pluginDirectory, context.researchMode === "local").runTask(instructions, model, effort, response_schema_default, controls);
-      stage = "\u89E3\u6790 AI \u56DE\u8986";
-      if (this.settings.aiExchangeLoggingEnabled) exchanges == null ? void 0 : exchanges.received(exchangeId, raw);
-      const result = this.parseAiResult(raw, provider === "claude" ? "Claude Code" : "Codex App Server", outputLanguage);
-      if (referenceGroups.length) {
-        result.summary = resolveReferenceLinks(result.summary, referenceGroups);
-        result.detail = resolveReferenceLinks(result.detail, referenceGroups);
-      }
-      if (this.settings.aiExchangeLoggingEnabled) exchanges == null ? void 0 : exchanges.parsed(exchangeId);
-      console.debug("Visual Agent Map AI metrics", { ...prepared.metrics, providerMs: Date.now() - providerStarted, totalMs: Date.now() - totalStarted });
-      return result;
-    } catch (error) {
-      if (this.settings.aiExchangeLoggingEnabled) exchanges == null ? void 0 : exchanges.failed(exchangeId, `${stage}\uFF1A${error instanceof Error ? error.message : String(error)}`);
-      throw error;
-    }
-  }
-  async extractReferenceFindings(context, model, reasoning, signal) {
-    var _a, _b, _c;
-    let working = referenceBatches((_a = context.referenceGroups) != null ? _a : []);
-    let round = 0;
-    while (true) {
-      round++;
-      const batches = round === 1 ? working : packReferenceChunks(working);
-      const findings = [];
-      for (let index = 0; index < batches.length; index++) {
-        if (signal == null ? void 0 : signal.aborted) throw new DOMException("Aborted", "AbortError");
-        (_b = context.onProgress) == null ? void 0 : _b.call(context, t("ui.reference_processing_progress", index + 1, batches.length));
-        const result = await this.askModel({
-          title: context.title,
-          summary: "",
-          rules: "",
-          detail: "",
-          task: round === 1 ? translate(this.settings.language, "prompt.reference_extract") : translate(this.settings.language, "prompt.reference_reduce"),
-          ancestors: "",
-          sourceContext: batches[index],
-          mode: "task",
-          researchMode: "local",
-          researchDepth: "fast",
-          visualMode: "off"
-        }, model, reasoning, signal);
-        if (!result.detail.trim()) throw new Error(t("ui.reference_processing_empty_result"));
-        findings.push(result.detail.trim());
-      }
-      const joined = findings.map((value) => `Evidence:
-${value}`).join("\n\n");
-      if (joined.length <= 18e3) {
-        (_c = context.onProgress) == null ? void 0 : _c.call(context, "");
-        return joined;
-      }
-      if (joined.length >= working.reduce((sum, value) => sum + value.length, 0)) throw new Error(t("ui.reference_processing_could_not_reduce"));
-      working = findings;
-    }
-  }
-  parseAiResult(raw, label, language2) {
-    const cleaned = raw.replace(/^```(?:json)?\s*/i, "").replace(/\s*```$/, "").trim();
-    const parsed = JSON.parse(extractJsonObject(cleaned));
-    if (typeof parsed.summary !== "string" || typeof parsed.detail !== "string") throw new Error(`${label} \u6C92\u6709\u56DE\u50B3 summary \u8207 detail`);
-    const isRecord = (value) => typeof value === "object" && value !== null;
-    const suggestions = Array.isArray(parsed.suggestions) ? parsed.suggestions.filter((item) => isRecord(item) && typeof item.title === "string" && typeof item.task === "string").map((item) => ({ title: String(item.title).trim(), task: String(item.task).trim(), contribution: typeof item.contribution === "string" ? item.contribution.trim() : "", parentTitle: typeof item.parentTitle === "string" ? item.parentTitle.trim() : "" })).filter((item) => item.title) : [];
-    const visualReferences = Array.isArray(parsed.visualReferences) ? parsed.visualReferences.filter((item) => isRecord(item) && typeof item.imageUrl === "string" && typeof item.sourceUrl === "string").map((item) => ({
-      title: typeof item.title === "string" ? item.title.trim() : language2 === "en" ? "Visual reference" : "\u8996\u89BA\u53C3\u8003",
-      imageUrl: String(item.imageUrl).trim(),
-      sourceUrl: String(item.sourceUrl).trim(),
-      description: typeof item.description === "string" ? item.description.trim() : "",
-      palette: Array.isArray(item.palette) ? item.palette.map(String).map((color) => color.trim()).filter(Boolean).slice(0, 8) : [],
-      formula: typeof item.formula === "string" ? item.formula.trim() : ""
-    })).filter((item) => /^https?:\/\//i.test(item.imageUrl) && /^https?:\/\//i.test(item.sourceUrl)).slice(0, 6) : [];
-    return { summary: Array.from(parsed.summary.trim()).slice(0, 80).join(""), detail: parsed.detail.trim(), suggestions, visualReferences };
+    return (0, import_node_path2.join)(adapter.getBasePath(), this.manifest.dir);
   }
   runtime(pluginDirectory, local = false) {
-    if (local && this.localCodexRuntime) return this.localCodexRuntime;
-    if (!local && this.codexRuntime) return this.codexRuntime;
-    const executable = this.resolveExecutable(this.settings.codexPath);
-    const runtime = new CodexAppServerRuntime({
-      executable,
-      cwd: pluginDirectory,
-      env: this.cliEnvironment(executable),
-      clientVersion: this.manifest.version || "0.0.0",
-      webSearchDisabled: local,
-      onLog: (level, message) => this.logs.appendLog(level, message)
-    });
-    if (local) this.localCodexRuntime = runtime;
-    else this.codexRuntime = runtime;
-    return runtime;
+    return this.aiRuntime.codex(pluginDirectory, local);
   }
   claudeCli(pluginDirectory) {
-    const executable = this.resolveExecutable(this.settings.claudePath);
-    return new ClaudeCodeCliRuntime({ executable, cwd: pluginDirectory, env: this.cliEnvironment(executable), onLog: (level, message) => this.logs.appendLog(level, message) });
-  }
-  resolveExecutable(configured) {
-    const environment = currentProcessEnvironment();
-    const home = environment.HOME || "";
-    let nvmVersions = [];
-    if (home) {
-      try {
-        nvmVersions = readdirSync(join(home, ".nvm/versions/node"));
-      } catch (e) {
-      }
-    }
-    return executableCandidates(configured, home, environment.PATH || "", nvmVersions).find((candidate) => existsSync(candidate)) || configured;
-  }
-  cliEnvironment(executable) {
-    const environment = currentProcessEnvironment();
-    const home = environment.HOME || "";
-    const paths = [isAbsolute(executable) ? dirname(executable) : "", home ? join(home, ".local/bin") : "", "/opt/homebrew/bin", "/usr/local/bin", "/usr/bin", "/bin", ...(environment.PATH || "").split(delimiter)].filter(Boolean);
-    return { ...environment, PATH: [...new Set(paths)].join(delimiter) };
+    return this.aiRuntime.claude(pluginDirectory);
   }
 };

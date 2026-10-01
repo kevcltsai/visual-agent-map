@@ -9,8 +9,7 @@ import { packReferenceChunks, referenceBatches, referenceCatalog, resolveReferen
 import { ChoiceModal } from "./ui/modals/choice-modal";
 import { DebugLogModal } from "./ui/modals/debug-log-modal";
 import { AiUsageModal, ClaudeSetupModal, CodexSetupModal, VisualAgentMapSettingTab, CLAUDE_INSTALL_URL } from "./ui/settings-tab";
-import { existsSync as nodeExistsSync, readdirSync as nodeReaddirSync } from "node:fs";
-import { delimiter as nodeDelimiter, dirname as nodeDirname, isAbsolute as nodeIsAbsolute, join as nodeJoin } from "node:path";
+import { join } from "node:path";
 import { type MapDocument, type MapNode } from "./map-model";
 import { DEFAULT_SETTINGS, normalizeReasoningLevel, type Note, Repository, type Settings } from "./repository";
 import { buildPreparedTaskContext } from "./ai/context-builder";
@@ -29,25 +28,15 @@ import { CodexAppServerRuntime } from "./ai/runtime/codex-app-server";
 import { ClaudeCodeCliRuntime } from "./ai/runtime/claude-code-cli";
 import { CLAUDE_MODEL_CHOICES, providerForModel, providerModelId } from "./ai/providers/provider";
 import { ThinkingCore } from "./core/thinking-core";
+import { AiRuntimeService } from "./core/ai-runtime-service";
 import { createThinkingArtifact, type ThinkingArtifact } from "./core/thinking-artifact";
 
 export { buildPreparedTaskContext } from "./ai/context-builder";
+export { executableCandidates } from "./core/ai-runtime-service";
 export { canonicalDetail, visualReferencesMarkdown } from "./ai/result-utils";
 export { NextStepModal, VisualAgentMapView } from "./experiences/visual-map/view";
 export { firstMarkdownImage, firstMarkdownTable, markdownImages } from "./ui/preview-utils";
 export type { AiRunMetrics, PreparedTaskContext } from "./ai/types";
-type ProcessEnvironment = Record<string, string | undefined>;
-function typedNodeBinding<T>(value: unknown): T { return value as T; }
-const existsSync = typedNodeBinding<(path: string) => boolean>(nodeExistsSync);
-const readdirSync = typedNodeBinding<(path: string) => string[]>(nodeReaddirSync);
-const delimiter = typedNodeBinding<string>(nodeDelimiter);
-const dirname = typedNodeBinding<(path: string) => string>(nodeDirname);
-const isAbsolute = typedNodeBinding<(path: string) => boolean>(nodeIsAbsolute);
-const join = typedNodeBinding<(...paths: string[]) => string>(nodeJoin);
-function currentProcessEnvironment(): ProcessEnvironment {
-  return (window as Window & { process?: { env?: ProcessEnvironment } }).process?.env ?? {};
-}
-
 export function extractJsonObject(raw: string): string {
   const candidates: string[] = [];
   let start = -1, depth = 0, quoted = false, escaped = false;
@@ -73,19 +62,6 @@ export function extractJsonObject(raw: string): string {
   }
   throw new SyntaxError("Codex 回應中找不到完整 JSON object");
 }
-export function executableCandidates(configured: string, home: string, pathValue: string, nvmVersions: string[] = []): string[] {
-  if (configured.includes("/") || configured.includes("\\")) return [configured];
-  const dirs = [
-    home ? join(home, ".local/bin") : "",
-    home ? join(home, ".npm-global/bin") : "",
-    home ? join(home, ".volta/bin") : "",
-    home ? join(home, ".fnm/current/bin") : "",
-    "/opt/homebrew/bin", "/usr/local/bin",
-    ...nvmVersions.map(version => join(home, ".nvm/versions/node", version, "bin")),
-    ...pathValue.split(delimiter)
-  ].filter(Boolean);
-  return [...new Set(dirs)].map(directory => join(directory, configured));
-}
 export default class VisualAgentMapPlugin extends Plugin {
   settings: Settings = { ...DEFAULT_SETTINGS };
   repo!: Repository;
@@ -98,9 +74,13 @@ export default class VisualAgentMapPlugin extends Plugin {
   pendingSuggestions: Map<string, Suggestion[]> = new Map();
   readonly pendingResearchOptions = new Map<string, TaskOptions>();
   readonly logs: LogManager = debugLog;
+  readonly aiRuntime = new AiRuntimeService({
+    codexPath: () => this.settings.codexPath,
+    claudePath: () => this.settings.claudePath,
+    clientVersion: () => this.manifest.version || "0.0.0",
+    onLog: (level, message) => this.logs.appendLog(level, message)
+  });
   exchanges: AiExchangeLog | null = null;
-  private codexRuntime: CodexAppServerRuntime | null = null;
-  private localCodexRuntime: CodexAppServerRuntime | null = null;
   private coffeeModelEfforts = new Map<string, string[]>();
   coffeeManager: CoffeeManager | null = null;
   coffeeStorage: CoffeeStorage | null = null;
@@ -266,14 +246,8 @@ export default class VisualAgentMapPlugin extends Plugin {
       this.connectWorkspace(root); await this.saveSettings(); await this.repo.rebuildDerivedData(); for (const view of this.views()) await view.refreshFromPlugin(); new Notice(t("ui.reconnected_workspace_0", root));
     }) }))).open();
   }
-  codexDiagnostic(): { executable: string; installed: boolean } {
-    const executable = this.resolveExecutable(this.settings.codexPath);
-    return { executable, installed: existsSync(executable) };
-  }
-  claudeDiagnostic(): { executable: string; installed: boolean } {
-    const executable = this.resolveExecutable(this.settings.claudePath);
-    return { executable, installed: existsSync(executable) };
-  }
+  codexDiagnostic(): { executable: string; installed: boolean } { return this.aiRuntime.diagnostic(this.settings.codexPath); }
+  claudeDiagnostic(): { executable: string; installed: boolean } { return this.aiRuntime.diagnostic(this.settings.claudePath); }
   availableModels(): string[] {
     const models = this.settings.models.split(/[\n,]/).map(value => value.trim()).filter(Boolean);
     if (this.claudeDiagnostic().installed) models.push(...CLAUDE_MODEL_CHOICES.map(choice => choice.id));
@@ -297,7 +271,7 @@ export default class VisualAgentMapPlugin extends Plugin {
     else this.settings.codexUsageNoticeSeen = true;
     await this.saveSettings();
   }
-  resetCodexRuntime(): void { for (const controller of this.activeTasks.values()) controller.abort(); this.codexRuntime?.stop(); this.localCodexRuntime?.stop(); this.codexRuntime = null; this.localCodexRuntime = null; }
+  resetCodexRuntime(): void { for (const controller of this.activeTasks.values()) controller.abort(); this.aiRuntime.reset(); }
   openCodexSetupGuide(): void {
     const diagnostic = this.codexDiagnostic();
     new CodexSetupModal(this.app, diagnostic.executable, () => { void this.recheckCodex(false); }).open();
@@ -691,38 +665,7 @@ export default class VisualAgentMapPlugin extends Plugin {
     })).filter(item => /^https?:\/\//i.test(item.imageUrl) && /^https?:\/\//i.test(item.sourceUrl)).slice(0, 6) : [];
     return { summary: Array.from(parsed.summary.trim()).slice(0, 80).join(""), detail: parsed.detail.trim(), suggestions, visualReferences };
   }
-  private runtime(pluginDirectory: string, local = false): CodexAppServerRuntime {
-    if (local && this.localCodexRuntime) return this.localCodexRuntime;
-    if (!local && this.codexRuntime) return this.codexRuntime;
-    const executable = this.resolveExecutable(this.settings.codexPath);
-    const runtime = new CodexAppServerRuntime({
-      executable,
-      cwd: pluginDirectory,
-      env: this.cliEnvironment(executable),
-      clientVersion: this.manifest.version || "0.0.0",
-      webSearchDisabled: local,
-      onLog: (level, message) => this.logs.appendLog(level, message)
-    });
-    if (local) this.localCodexRuntime = runtime;
-    else this.codexRuntime = runtime;
-    return runtime;
-  }
-  private claudeCli(pluginDirectory: string): ClaudeCodeCliRuntime {
-    const executable = this.resolveExecutable(this.settings.claudePath);
-    return new ClaudeCodeCliRuntime({ executable, cwd: pluginDirectory, env: this.cliEnvironment(executable), onLog: (level, message) => this.logs.appendLog(level, message) });
-  }
-  private resolveExecutable(configured: string): string {
-    const environment = currentProcessEnvironment();
-    const home = environment.HOME || "";
-    let nvmVersions: string[] = [];
-    if (home) { try { nvmVersions = readdirSync(join(home, ".nvm/versions/node")); } catch { /* nvm is optional. */ } }
-    return executableCandidates(configured, home, environment.PATH || "", nvmVersions).find(candidate => existsSync(candidate)) || configured;
-  }
-  private cliEnvironment(executable: string): ProcessEnvironment {
-    const environment = currentProcessEnvironment();
-    const home = environment.HOME || "";
-    // npm launchers use /usr/bin/env node; keep the resolved installation ahead of GUI defaults.
-    const paths = [isAbsolute(executable) ? dirname(executable) : "", home ? join(home, ".local/bin") : "", "/opt/homebrew/bin", "/usr/local/bin", "/usr/bin", "/bin", ...(environment.PATH || "").split(delimiter)].filter(Boolean);
-    return { ...environment, PATH: [...new Set(paths)].join(delimiter) };
-  }
+  runtime(pluginDirectory: string, local = false): CodexAppServerRuntime { return this.aiRuntime.codex(pluginDirectory, local); }
+  private claudeCli(pluginDirectory: string): ClaudeCodeCliRuntime { return this.aiRuntime.claude(pluginDirectory); }
+
 }

@@ -104,6 +104,13 @@ test('product architecture keeps shell, core, and experiences separated', () => 
   for (const name of coreFiles) {
     const source = fs.readFileSync(path.join(root, 'core', name), 'utf8');
     assert.doesNotMatch(source, /(?:\.\.\/)+experiences\//, `core/${name} must not import an experience`);
+    assert.doesNotMatch(source, /from ["'][^"']*repository["']/, `core/${name} must not depend on repository settings that include experience state`);
+  }
+
+  for (const sharedAi of ['types.ts', 'task-policy.ts', 'visual-guidance.ts']) {
+    const source = fs.readFileSync(path.join(root, 'ai', sharedAi), 'utf8');
+    assert.doesNotMatch(source, /from ["'][^"']*repository["']/, `ai/${sharedAi} must stay experience-independent`);
+    assert.doesNotMatch(source, /experiences\//, `ai/${sharedAi} must not import an experience`);
   }
 
   const visualFiles = fs.readdirSync(path.join(root, 'experiences', 'visual-map')).filter(name => name.endsWith('.ts'));

@@ -28,7 +28,7 @@ Coffee Tables is included in **0.10.0**. Its guests are simulated, not real expe
 1. In **Obsidian Desktop → Settings → Community plugins → Browse**, find **Visual Agent Map**, then install and enable it. Requires Obsidian **1.13.7+**; macOS with 1.13.7 is the verified environment.
 2. Try the built-in sample or create a map. Manual mapping needs no AI. For AI research or Coffee Tables, sign in to [Codex CLI](https://developers.openai.com/codex/cli/) or [Claude Code](https://docs.anthropic.com/en/docs/claude-code/overview), then check the CLI in VAM settings. Claude Code support is experimental.
 
-[Setup and troubleshooting](INSTALL.md) · [Manual installation from the 0.10.0 release](https://github.com/kevcltsai/visual-agent-map/releases/tag/0.10.0)
+Setup and troubleshooting: [INSTALL.md](INSTALL.md) · [Manual installation from the 0.10.0 release](https://github.com/kevcltsai/visual-agent-map/releases/tag/0.10.0)
 
 ### Your notes and privacy
 
@@ -79,7 +79,7 @@ Coffee Tables **已包含在 0.10.0 正式版**。來賓是模擬角色，不是
 1. 到 **Obsidian 桌面版 → 設定 → 第三方外掛 → 瀏覽** 搜尋 **Visual Agent Map**，安裝並啟用。需要 Obsidian **1.13.7+**；已驗證環境為 macOS 與 Obsidian 1.13.7。
 2. 先試內建範例，或建立自己的地圖。手動繪圖不需要 AI。要使用 AI 研究或 Coffee Tables，登入 [Codex CLI](https://developers.openai.com/codex/cli/) 或 [Claude Code](https://docs.anthropic.com/en/docs/claude-code/overview)，再到 VAM 設定檢查 CLI。Claude Code 仍屬實驗性支援。
 
-[安裝與問題排除](INSTALL.md) · [從 0.10.0 正式版手動安裝](https://github.com/kevcltsai/visual-agent-map/releases/tag/0.10.0)
+安裝與問題排除：[INSTALL.md](INSTALL.md) · [從 0.10.0 正式版手動安裝](https://github.com/kevcltsai/visual-agent-map/releases/tag/0.10.0)
 
 ### 你的筆記與隱私
 

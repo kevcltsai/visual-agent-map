@@ -30,6 +30,8 @@ import responseSchema from "./response-schema.json";
 import { CodexAppServerRuntime } from "./ai/runtime/codex-app-server";
 import { ClaudeCodeCliRuntime } from "./ai/runtime/claude-code-cli";
 import { CLAUDE_MODEL_CHOICES, providerForModel, providerModelId } from "./ai/providers/provider";
+import { ThinkingCore } from "./core/thinking-core";
+import { createThinkingArtifact, type ThinkingArtifact } from "./core/thinking-artifact";
 
 export { buildPreparedTaskContext } from "./ai/context-builder";
 export { canonicalDetail, visualReferencesMarkdown } from "./ai/result-utils";
@@ -2070,6 +2072,7 @@ export default class VisualAgentMapPlugin extends Plugin {
   readonly quickExpandPending = new Set<string>();
   readonly quickExpandFailures = new Map<string, string>();
   readonly activeTasks = new Map<string, AbortController>();
+  readonly core = new ThinkingCore();
   pendingSuggestions: Map<string, Suggestion[]> = new Map();
   readonly pendingResearchOptions = new Map<string, TaskOptions>();
   readonly logs: LogManager = debugLog;
@@ -2165,6 +2168,7 @@ export default class VisualAgentMapPlugin extends Plugin {
       }
     });
     this.ready = initialize;
+    this.register(this.core.experiences.register("visual-map", artifact => this.openArtifactInVisualMap(artifact)));
     this.registerView(COFFEE_TABLES_VIEW_TYPE, leaf => new CoffeeTablesView(leaf, this));
     this.coffeeStorage = new CoffeeStorage(this.app.vault, this.settings.workspaceFolder, (file, path) => this.app.fileManager.renameFile(file, path), file => this.app.fileManager.trashFile(file));
     this.coffeeManager = new CoffeeManager(request => this.runCoffeeRequest(request), (session, summariesOnly) => this.coffeeStorage!.save(session, summariesOnly));
@@ -2503,17 +2507,35 @@ export default class VisualAgentMapPlugin extends Plugin {
     create.addEventListener("click", () => {
       const title = question.value.trim(); if (!title || create.disabled) return;
       create.disabled = true;
-      void this.mutate(async () => {
-        const path = await this.repo.createMap(title);
-        const map = await this.repo.readMap(path);
-        const node = await this.repo.createNote(title, session.model, map, path, "manual");
-        const detail = [zh ? "Coffee Tables 的模擬對談，內容尚未查證，不代表使用者結論。" : "Simulated Coffee Tables discussion; unverified and not the user's conclusion.", `[[${sourcePath}|Coffee Tables 對談]]`].join("\n\n");
-        await this.repo.updateNote(node.path, { detail, reasoning: normalizeReasoningLevel(session.reasoning) });
-        map.nodes.push(node); await this.repo.saveMap(path, map);
-        modal.close(); await this.activateView(path);
-      }).catch((error: unknown) => { new Notice(`${String(error)} · ${zh ? "可能已建立部分研究檔案，請先檢查再重試。" : "Some research files may have been created; inspect before retrying."}`); });
+      const artifact = createThinkingArtifact({
+        id: randomUUID(),
+        kind: "question",
+        title,
+        content: zh ? "Coffee Tables 的模擬對談，內容尚未查證，不代表使用者結論。" : "Simulated Coffee Tables discussion; unverified and not the user's conclusion.",
+        origin: { experience: "coffee-tables", sessionId: session.id, path: sourcePath },
+        sources: [{ label: "Coffee Tables", path: sourcePath, experience: "coffee-tables", sessionId: session.id }],
+        metadata: { model: session.model, reasoning: session.reasoning }
+      });
+      void this.core.experiences.handoff({ target: "visual-map", artifact })
+        .then(() => modal.close())
+        .catch((error: unknown) => { create.disabled = false; new Notice(`${String(error)} · ${zh ? "可能已建立部分研究檔案，請先檢查再重試。" : "Some research files may have been created; inspect before retrying."}`); });
     });
     modal.open();
+  }
+  private async openArtifactInVisualMap(artifact: ThinkingArtifact): Promise<void> {
+    await this.mutate(async () => {
+      const model = typeof artifact.metadata?.model === "string" ? artifact.metadata.model : this.settings.cliModel;
+      const reasoning = normalizeReasoningLevel(artifact.metadata?.reasoning);
+      const path = await this.repo.createMap(artifact.title);
+      const map = await this.repo.readMap(path);
+      const node = await this.repo.createNote(artifact.title, model, map, path, "manual");
+      const links = artifact.sources.filter(source => source.path).map(source => `[[${source.path}|${source.label}]]`);
+      const detail = [artifact.content, ...links].filter(Boolean).join("\n\n");
+      await this.repo.updateNote(node.path, { detail, reasoning });
+      map.nodes.push(node);
+      await this.repo.saveMap(path, map);
+      await this.activateView(path);
+    });
   }
   private async activateView(path?: string): Promise<void> { await this.ready; let leaf = this.app.workspace.getLeavesOfType(VIEW_TYPE)[0]; if (!leaf) leaf = this.app.workspace.getLeaf("tab"); await leaf.setViewState({ type: VIEW_TYPE, active: true, state: path ? { file: path } : leaf.view instanceof VisualAgentMapView ? leaf.view.getState() : {} }); await this.app.workspace.revealLeaf(leaf); }
   private async activateBuiltInSample(forceTour = false): Promise<void> {

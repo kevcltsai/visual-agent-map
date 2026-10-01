@@ -9,7 +9,7 @@ import { CLAUDE_MODEL_CHOICES, providerForModel, providerModelId } from "../ai/p
 import type { CodexAppServerRuntime } from "../ai/runtime/codex-app-server";
 import type { ClaudeCodeCliRuntime } from "../ai/runtime/claude-code-cli";
 import type { AiExchangeLog } from "../ai-exchange-log";
-import { visualGuidance } from "../experiences/visual-map/view";
+import { visualGuidance } from "../ai/visual-guidance";
 import { randomUUID } from "node:crypto";
 
 export function extractJsonObject(raw: string): string {

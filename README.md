@@ -20,7 +20,7 @@
 
 **Keep what you learn.** Your research stays in ordinary Markdown notes you can read and edit without the plugin.
 
-### Coffee Tables — new in the development build
+### Coffee Tables — new in 0.10.0
 
 **Bring a question to a table of simulated AI guests.** Hosts help different perspectives respond to one another, so you can notice blind spots, unexpected connections, and better questions—not just collect separate answers.
 
@@ -30,7 +30,7 @@
 - Find and revisit tables with search and status filters. Conversations and notes are saved as Markdown; resumable session data is kept separately.
 - The interface is available in English and Traditional Chinese. AI guests and their experiences are simulations, not real people or verified experts.
 
-Coffee Tables is available from the Coffee Tables ribbon icon or the **Open Coffee Tables** command in the current development build. It is **not included in the 0.9.10 release** linked in the install instructions above.
+Coffee Tables is included in the **0.10.0 release**. Open it from the Coffee Tables ribbon icon or the **Open Coffee Tables** command.
 
 ### How it works
 
@@ -94,7 +94,7 @@ Copyright © 2026 Kevin Tsai · [AGPL-3.0-only](LICENSE) · [Changelog](CHANGELO
 
 **留下真正可用的知識。** 研究成果就是一般 Markdown 筆記，離開外掛也能閱讀與編輯。
 
-### Coffee Tables — 開發版新功能
+### Coffee Tables — 0.10.0 新功能
 
 **帶一個問題來，讓不同觀點的 AI 來賓一起聊。** 主持人協助來賓彼此回應，幫你發現盲點、意外連結和更值得追問的問題，而不只是收集一排各自獨立的答案。
 
@@ -104,7 +104,7 @@ Copyright © 2026 Kevin Tsai · [AGPL-3.0-only](LICENSE) · [Changelog](CHANGELO
 - 透過搜尋與狀態篩選找回桌聊。對談與筆記保存為 Markdown；可恢復的工作階段資料另行保存。
 - 介面支援繁體中文與英文。AI 來賓及其經驗皆為模擬，不是真實人物或經查證的專家。
 
-目前可在開發版透過 Coffee Tables 咖啡杯圖示或 **Open Coffee Tables** 命令開啟。**此功能尚未包含在上方連結的 0.9.10 正式版中。**
+Coffee Tables 已包含在 **0.10.0 正式版**中，可透過 Coffee Tables 咖啡杯圖示或 **Open Coffee Tables** 命令開啟。
 
 ### 使用方式
 

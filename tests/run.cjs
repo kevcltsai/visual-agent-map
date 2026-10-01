@@ -13,7 +13,7 @@ const root = path.resolve(__dirname, '..');
 function load(entry, overrides = {}, windowValues = {}) {
   const code = buildSync({ entryPoints: [path.join(root, entry)], bundle: true, write: false, platform: 'node', format: 'cjs', external: ['obsidian', 'node:*'] }).outputFiles[0].text;
   const module = { exports: {} };
-  vm.runInNewContext(code, { module, exports: module.exports, require: name => overrides[name] || require(name), console, TextDecoder, crypto: require('node:crypto').webcrypto, process, AbortController, window: { setTimeout, clearTimeout, ...windowValues } });
+  vm.runInNewContext(code, { module, exports: module.exports, require: name => overrides[name] || require(name), console, TextDecoder, crypto: require('node:crypto').webcrypto, process, AbortController, HTMLInputElement: class {}, HTMLTextAreaElement: class {}, HTMLSelectElement: class {}, window: { setTimeout, clearTimeout, ...windowValues } });
   return module.exports;
 }
 const core = load('map-model.ts');
@@ -2045,7 +2045,7 @@ integrationTest('Codex App Server accepts a plain-text turn without changing str
   child.stdin = { write: line => {
     const message = JSON.parse(line.trim()); sent.push(message);
     if (message.method === 'initialize') emit({ id: message.id, result: {} });
-    else if (message.method === 'thread/start') emit({ id: message.id, result: { thread: { id: 'plain-thread' } } });
+    else if (message.method === 'thread/start') { assert.equal(message.params.config['features.shell_tool'], false); assert.equal(message.params.config['features.unified_exec'], false); assert.match(message.params.baseInstructions, /text-generation/); emit({ id: message.id, result: { thread: { id: 'plain-thread' } } }); }
     else if (message.method === 'turn/start') {
       assert.equal(Object.hasOwn(message.params, 'outputSchema'), false);
       emit({ id: message.id, result: { turn: { id: 'plain-turn' } } });
@@ -2059,7 +2059,7 @@ integrationTest('Codex App Server accepts a plain-text turn without changing str
   } };
   const { CodexAppServerRuntime } = load('ai/runtime/codex-app-server.ts', { 'node:child_process': { spawn: () => child } });
   const runtime = new CodexAppServerRuntime({ executable: 'codex', cwd: '/plugin', env: {}, clientVersion: 'test' });
-  try { const chunks = []; const running = runtime.runTask('coffee', 'model', 'high', undefined, { onText: text => chunks.push(text), onSteer: handler => { steer = handler; } }); await until(() => !!steer); await steer('include parent question'); assert.equal(await running, '# Full conversation'); assert.deepEqual(chunks, ['# Full', '# Full conversation', '# Full conversation']); }
+  try { const chunks = []; const running = runtime.runTask('coffee', 'model', 'high', undefined, { textOnly: true, onText: text => chunks.push(text), onSteer: handler => { steer = handler; } }); await until(() => !!steer); await steer('include parent question'); assert.equal(await running, '# Full conversation'); assert.deepEqual(chunks, ['# Full', '# Full conversation', '# Full conversation']); }
   finally { runtime.stop(); }
 });
 integrationTest('AI exchange logging captures the sent payload, raw reply and parse failure', async () => {
@@ -2683,7 +2683,7 @@ test('reference picker keeps source groups compact, collapsible and task-local',
   assert.ok(find(area, child => child.tag === 'strong' && !!child.text));
   const actionRow = find(area, child => child.cls === 'vam-reference-actions');
   assert.equal(actionRow.children.filter(child => child.tag === 'button').length, 3);
-  assert.deepEqual(actionRow.children.filter(child => child.tag === 'button').map(button => button.children[0].children[0].iconName), ['git-fork', 'folder-open', 'file-text']);
+  assert.deepEqual(actionRow.children.filter(child => child.tag === 'button').map(button => button.children[0].children[0].iconName), ['brain-circuit', 'folder-open', 'file-text']);
   web.checked = false; web.listeners.change(); assert.equal(image.disabled, true); assert.equal(image.checked, false);
   picker.groups = [{ id: 'map', name: 'Travel map', location: 'Maps/Travel/Map.md', documents: [{ path: 'Maps/Travel/Notes/Train.md', content: 'rail' }] }];
   picker.refresh();
@@ -2780,9 +2780,101 @@ integrationTest('Codex launch preserves executable as one argument and refuses p
 const coffeeTypes = load('experiences/coffee-tables/types.ts');
 const coffee = load('experiences/coffee-tables/engine.ts');
 const coffeePrompts = load('experiences/coffee-tables/prompts.ts');
+const coffeeInsights = load('experiences/coffee-tables/insights.ts');
+const coffeeGuestInvitations = load('experiences/coffee-tables/guest-invitations.ts');
+test('Coffee insight migration retains distinct older notes and creates stable IDs', () => {
+  const oldest = '# 觀察者整理\n\n## 核心分歧\n- 規則一致能增加可預期性，但無法消除起點差異。<!-- source: 規則要一樣 -->\n';
+  const latest = '# 觀察者整理\n\n## 核心分歧\n- 規則一致能增加可預期性，但無法消除起點差異。\n- 申請門檻可能先排除最需要協助的人。\n';
+  const baseline = coffeeInsights.baselineFromVersions([latest, oldest], 'zh-TW');
+  assert.equal(baseline.length, 2);
+  assert.equal(new Set(baseline.map(item => item.id)).size, 2);
+  assert.equal(baseline[0].sources[0], '規則要一樣');
+});
+test('Coffee insight merge updates IDs, explicitly folds aliases, and keeps omitted insights', () => {
+  const current = coffeeInsights.baselineFromVersions(['# 觀察者整理\n\n## 核心分歧\n- 舊觀點 A。\n- 舊觀點 B。\n'], 'zh-TW');
+  const [a,b] = current;
+  const update = `# 觀察者整理\n\n## 疑問與可能解方\n- 疑問的可能解方仍受資源限制。<!-- coffee-insight:merge:${a.id},${b.id} -->\n  疑問：需要支援但流程很長。\n  可能解方：提供簡化申請。\n  條件與限制：簡化流程仍需足夠人力。\n`;
+  const merged = coffeeInsights.mergeInsightUpdates(current, update, 'zh-TW');
+  assert.equal(merged.length, 1);
+  assert.equal(merged[0].id, a.id);
+  assert.deepEqual(plain(merged[0].mergedIds), [b.id]);
+  assert.match(merged[0].proposedSolution, /簡化申請/);
+  assert.match(merged[0].detail, /舊觀點 B/);
+  const roundTrip = coffeeInsights.parseInsightNotes(coffeeInsights.serializeInsightNotes(merged, 'zh-TW'), 'zh-TW');
+  assert.equal(roundTrip[0].id, a.id);
+  assert.deepEqual(plain(roundTrip[0].mergedIds), [b.id]);
+});
+test('Coffee insight update preserves the explicit ID through summary changes and reopen', () => {
+  const original = coffeeInsights.serializeInsightNotes(coffeeInsights.baselineFromVersions(['# 觀察者整理\n\n## 核心分歧\n- 規則一致可能掩蓋不同起點。\n'], 'zh-TW'), 'zh-TW');
+  const before = coffeeInsights.parseInsightNotes(original, 'zh-TW')[0];
+  const generated = `# 觀察者整理\n\n## 核心分歧\n- 統一規則提升可預期性，卻可能讓起點差異更難被看見。<!-- coffee-insight:update:${before.id} -->\n  - 脈絡：來賓補充資源配置條件會改變規則效果。\n`;
+  const revised = coffeeInsights.mergeInsightUpdates([before], generated, 'zh-TW');
+  assert.equal(revised[0].id, before.id);
+  const reopened = coffeeInsights.baselineFromVersions([coffeeInsights.serializeInsightNotes(revised, 'zh-TW')], 'zh-TW');
+  assert.equal(reopened[0].id, before.id);
+  assert.match(reopened[0].summary, /統一規則提升可預期性/);
+});
+test('Coffee insight duplicate consolidation retains persisted merge aliases', () => {
+  const versions = [
+    '# 觀察者整理\n\n## 核心分歧\n- 同一核心觀點。<!-- coffee-insight:v1:id=primary;merged=older-alias -->\n',
+    '# 觀察者整理\n\n## 核心分歧\n- 同一核心觀點。<!-- coffee-insight:v1:id=duplicate;merged=another-alias -->\n',
+  ];
+  const merged = coffeeInsights.baselineFromVersions(versions, 'zh-TW');
+  assert.equal(merged.length, 1);
+  assert.deepEqual(plain(merged[0].mergedIds), ['older-alias', 'duplicate', 'another-alias']);
+  const reopened = coffeeInsights.parseInsightNotes(coffeeInsights.serializeInsightNotes(merged, 'zh-TW'), 'zh-TW');
+  assert.deepEqual(plain(reopened[0].mergedIds), ['older-alias', 'duplicate', 'another-alias']);
+});
+test('Coffee insight update rejects unknown targets without modifying baseline', () => {
+  const current = coffeeInsights.baselineFromVersions(['# 觀察者整理\n\n## 核心分歧\n- 保留舊內容。\n'], 'zh-TW');
+  assert.throws(() => coffeeInsights.mergeInsightUpdates(current, '# 觀察者整理\n\n## 核心分歧\n- 新內容。<!-- coffee-insight:update:missing-id -->\n', 'zh-TW'), /unknown|不存在/i);
+  assert.match(coffeeInsights.serializeInsightNotes(current, 'zh-TW'), /保留舊內容/);
+});
+test('Coffee invitation validation accepts a new guest and caps cumulative room size', () => {
+  const types = load('experiences/coffee-tables/types.ts');
+  const counts = { experts: 4, 'cross-domain': 1, generalist: 1, affected: 1 };
+  const invites = (length, category = 'experts') => Array.from({ length }, (_, index) => ({ id: `new-${index}`, name: `新來賓${index}`, category, description: '帶來不同處境的觀點' }));
+  assert.equal(coffeeGuestInvitations.validateGuestInvitations(invites(1), counts, []), null);
+  assert.match(coffeeGuestInvitations.validateGuestInvitations(invites(6), counts, []), /12 位/);
+  assert.match(coffeeGuestInvitations.validateGuestInvitations([{ ...invites(1)[0], name: '既有來賓' }], counts, [], undefined, ['既有來賓']), /已在這桌/);
+  const completed = { id: 'asked-before', question: 'q', answer: 'a', status: 'complete', invitedGuests: invites(1, 'affected') };
+  assert.equal(coffeeGuestInvitations.validateGuestInvitations(invites(4).map((guest, index) => ({ ...guest, id: `later-${index}`, name: `後續來賓${index}` })), counts, [completed]), null);
+  assert.ok(types.parseSession(JSON.stringify({ ...types.createSession('題目', 'm', 'low', 'zh-TW'), status: 'completed', questions: [{ ...completed, createdAt: new Date().toISOString() }] })).questions[0].invitedGuests);
+});
+test('Coffee Tables every prompt mode carries cumulative update operations and the solutions category', () => {
+  const session = coffeeTypes.createSession('整桌題目', 'm', 'low', 'zh-TW');
+  session.status = 'completed';
+  session.observerNotes = ['# 觀察者整理\n\n## 核心分歧\n- 最新整桌洞見。', '# 觀察者整理\n\n## 意外連結\n- 更早保存的跨域連結。'];
+  const prompts = [coffeePrompts.tablePrompt(session.topic, session.language, session.guests), coffeePrompts.tablePrompt(session.topic, session.language, session.guests, '草稿'), coffeePrompts.questionPrompt(session, '新追問'), coffeePrompts.observerOnlyPrompt(session)];
+  for (const prompt of prompts) {
+    assert.match(prompt, /疑問與可能解方/);
+    assert.match(prompt, /coffee-insight:(?:keep|update|merge):/);
+    assert.match(prompt, /coffee-insight:new/);
+    assert.match(prompt, /沒有重新輸出的舊項目會由程式保留|the program retains old items you do not rewrite/i);
+  }
+  const refresh = coffeePrompts.observerOnlyPrompt(session);
+  assert.match(refresh, /更早保存的跨域連結/);
+});
+test('Coffee follow-up prompts name invited guests and retain them in later table continuations', () => {
+  const session = coffeeTypes.createSession('整桌題目', 'm', 'low', 'zh-TW');
+  const invite = { id: 'guest-invite-1', name: '林照', category: 'affected', description: '熟悉夜班與照護資源的社工' };
+  const followUp = coffeePrompts.questionPrompt(session, '夜班怎麼找支援', '', [invite]);
+  assert.match(followUp, /林照[｜|]受影響者：熟悉夜班與照護資源的社工/);
+  session.questions.push({ id: 'q-1', createdAt: session.createdAt, question: '已完成的追問', answer: '林照談到夜班資源。', status: 'complete', invitedGuests: [invite] });
+  assert.match(coffeePrompts.tablePrompt(session.topic, session.language, session.guests, '', coffeePrompts.assembleCoffeeContext(session)), /林照[｜|]受影響者：熟悉夜班與照護資源的社工/);
+});
 const coffeeSession = () => coffeeTypes.createSession('學生免費的營養午餐是否應該開放讓家長加價', 'test-model', 'high', 'zh-TW');
 const coffeeTableList = load('experiences/coffee-tables/list.ts');
 const coffeeTopics = load('experiences/coffee-tables/topics.ts');
+integrationTest('Coffee Tables keeps an invited guest through failed retry and later continuation', async () => {
+  const session = coffeeSession(); session.status = 'completed'; session.transcriptMarkdown = '### 周沐｜主持人\n\n先談如何求援。'; session.rounds = [{ id: 'prior-round', markdown: session.transcriptMarkdown, notes: '', status: 'completed', createdAt: session.createdAt }];
+  const invitation = { id: 'invite-care-worker', name: '林照', category: 'affected', description: '熟悉夜班與照護資源的社工' }; let fail = true, prompts = [];
+  const notes = '# 觀察者整理\n\n' + ['意外連結','值得繼續想的問題','核心分歧','探索方向','值得查證的假設'].map((title,index)=>`## ${title}\n- 具體洞見 ${index + 1}，脈絡完整且仍待對談推進。`).join('\n\n');
+  const engine = new coffee.CoffeeEngine(session, async request => { prompts.push(request.prompt); if (fail) throw new Error('retry this invite'); if (prompts.length === 2) return `### 林照｜受影響者\n\n夜班同仁要有可直接使用的求援窗口。\n\n${notes}`; return `### 周沐｜主持人\n\n${prompts.length === 3 ? '林照提出的窗口需要接上正式交接流程。' : '正式交接流程應列明跨班支援窗口。'}\n\n${notes}`; }, async () => {});
+  await engine.ask('夜班如何找到即時支援？', 'followup-care', [invitation]); assert.equal(engine.session.questions[0].status, 'error'); assert.equal(JSON.stringify(engine.session.questions[0].invitedGuests), JSON.stringify([invitation]));
+  fail = false; await engine.ask('夜班如何找到即時支援？', 'followup-care'); assert.equal(engine.session.questions.length, 1); assert.match(prompts[1], /林照[｜|].*熟悉夜班與照護資源的社工/); assert.equal(engine.session.questions[0].status, 'complete');
+  await engine.continueTable(); assert.match(prompts[2], /林照[｜|].*熟悉夜班與照護資源的社工/); assert.match(prompts[2], /求援窗口/); await engine.continueTable(); assert.match(prompts[3], /正式交接流程/); assert.equal(engine.session.observerNotes.length, 1);
+});
 test('Coffee Tables inspiration topics are bilingual, deterministic in tests and avoid immediate repeats', () => {
   assert.equal(coffeeTopics.COFFEE_TOPICS.length, 20);
   assert.ok(coffeeTopics.COFFEE_TOPICS.every(item => item.zh.length > 8 && item.en.length > 8));
@@ -2826,21 +2918,48 @@ const deferred = () => { let resolve; const promise = new Promise(r => { resolve
 const until = async predicate => { for (let i = 0; i < 100; i++) { if (predicate()) return; await new Promise(r => setImmediate(r)); } throw new Error('condition not reached'); };
 test('Coffee Tables prompt keeps the owner’s role topology and conversational intent in one plain-text request', () => {
   const prompt = coffeePrompts.tablePrompt('Topic', 'zh-TW');
-  assert.match(prompt, /使用者原始主題[\s\S]*\nTopic\n/); assert.match(prompt, /2 位風格不同的主持人/); assert.match(prompt, /觀察者/); assert.equal((prompt.match(/- 主題專家/g) ?? []).length, 4);
+  assert.match(prompt, /使用者原始主題[\s\S]*\nTopic\n/); assert.match(prompt, /主持人 2 位/); assert.match(prompt, /兩位主持人分工為一位留意矛盾、一位好奇追問/); assert.match(prompt, /觀察者/); assert.match(prompt, /source: 對談中的原句/); assert.equal((prompt.match(/- 主題專家/g) ?? []).length, 4);
+  assert.match(prompt, /每個可定位到具體發言的洞見，都要/); assert.match(prompt, /沒有單一來源/);
   assert.match(prompt, /跨領域專家/); assert.match(prompt, /generalist/); assert.match(prompt, /虛構模擬/); assert.match(prompt, /完整保留，不另取聊天室標題/);
-  assert.match(prompt, /10–18 次簡短發言/); assert.match(prompt, /# 觀察者整理/); assert.match(prompt, /每個標題下 2–4 個條列/); assert.match(prompt, /## 意外連結[\s\S]*## 值得繼續想的問題[\s\S]*## 核心分歧[\s\S]*## 探索方向[\s\S]*## 值得查證的假設/); assert.match(prompt, /修正假設/); assert.match(prompt, /尚未解決的核心分歧/); assert.match(prompt, /coffee-tables-complete/);
+  assert.match(prompt, /10–18 次簡短發言/); assert.match(prompt, /# 觀察者整理/); assert.match(prompt, /## 意外連結[\s\S]*## 值得繼續想的問題[\s\S]*## 核心分歧[\s\S]*## 探索方向[\s\S]*## 值得查證的假設/); assert.match(prompt, /每次續聊新增約 8–12 次簡短發言/); assert.match(prompt, /未解問題/); assert.match(prompt, /coffee-tables-complete/);
   const resumed = coffeePrompts.tablePrompt('Topic', 'zh-TW', undefined, '### 林岑｜主持人\n先前中斷的話');
-  assert.match(resumed, /不要輸出工作流程、計畫、確認或自我說明/); assert.match(resumed, /直接從上一句接續對談/);
+  assert.match(resumed, /不加前言、流程說明或重複人物介紹/); assert.match(resumed, /從前一句自然接續/);
   const resumedEnglish = coffeePrompts.tablePrompt('Topic', 'en', undefined, '### Host\nAn interrupted thought');
-  assert.match(resumedEnglish, /Do not output process notes, plans, confirmations or self-commentary/); assert.match(resumedEnglish, /Continue the conversation directly from the last sentence/);
+  assert.match(resumedEnglish, /without a preamble, process notes/); assert.match(resumedEnglish, /resume naturally from the last sentence/);
   const tailored = coffeePrompts.tablePrompt('原始主題：保留標點？', 'en', { counts: { experts: 0, 'cross-domain': 0, generalist: 0, affected: 1 }, guests: [{ id: 'g1', category: 'affected', description: 'frontline support' }], background: '', customPrompt: 'Use small company examples.' });
-  assert.match(tailored, /原始主題：保留標點？/); assert.match(tailored, /frontline support/); assert.match(tailored, /Use small company examples/); assert.doesNotMatch(tailored, /4 位與主題相關/); assert.match(tailored, /does not have a cross-domain guest|沒有跨領域來賓/);
-  assert.match(tailored, /roughly 10–18 concise speaker turns/); assert.match(tailored, /# Observer’s notes/); assert.match(tailored, /## Unexpected connections[\s\S]*## Questions worth pursuing[\s\S]*## Core disagreements[\s\S]*## Directions to explore[\s\S]*## Assumptions to verify/); assert.match(tailored, /questions worth pursuing/i); assert.match(tailored, /coffee-tables-complete/);
+  assert.match(tailored, /原始主題：保留標點？/); assert.match(tailored, /frontline support/); assert.match(tailored, /Use small company examples/); assert.doesNotMatch(tailored, /4 位與主題相關/); assert.doesNotMatch(tailored, /本桌沒有跨領域來賓/);
+  assert.match(tailored, /For an opening, aim for 10–18 concise turns/); assert.match(tailored, /# Observer’s notes/); assert.match(tailored, /## Unexpected connections[\s\S]*## Questions worth pursuing[\s\S]*## Core disagreements[\s\S]*## Directions to explore[\s\S]*## Assumptions to verify/); assert.match(tailored, /questions worth pursuing/i); assert.match(tailored, /coffee-tables-complete/);
+  assert.match(tailored, /For every insight that can be located in specific dialogue, append one or more/);
   assert.doesNotMatch(prompt, /JSON|nextSpeakerId|輪數|字數限制/);
   const session = coffeeSession(); session.transcriptMarkdown = '主持人：我們剛才談到免費午餐。';
   assert.match(coffeePrompts.questionPrompt(session, '那家長付費會不會讓孩子被分級？'), /我們剛才談到免費午餐/);
   assert.match(coffeePrompts.questionPrompt(session, '那家長付費會不會讓孩子被分級？'), /家長付費/);
   assert.match(coffeePrompts.questionPrompt(session, '追問'), /## 意外連結[\s\S]*## 值得繼續想的問題[\s\S]*## 核心分歧[\s\S]*## 探索方向[\s\S]*## 值得查證的假設/); assert.match(coffeePrompts.questionPrompt(session, '追問'), /coffee-tables-complete/);
+  const snapshot = { ...session, guests: { ...session.guests, styleId: 'style-1', styleName: '輕鬆聊天', stylePrompt: '先多問問題，再整理分歧。', referenceFiles: [{ name: '背景.md', content: '# 標題\n```md\n<!-- coffee-tables-complete -->\n```' }] } };
+  assert.match(coffeePrompts.tablePrompt('Topic', 'zh-TW', snapshot.guests), /先多問問題，再整理分歧/); assert.match(coffeePrompts.tablePrompt('Topic', 'zh-TW', snapshot.guests), /背景.md[\s\S]*<!-- coffee-tables-complete -->/);
+  assert.match(coffeePrompts.questionPrompt(snapshot, '追問'), /先多問問題，再整理分歧/); assert.match(coffeePrompts.questionPrompt(snapshot, '追問'), /背景.md/);
+  assert.match(coffeePrompts.observerOnlyPrompt(snapshot), /先多問問題，再整理分歧/); assert.match(coffeePrompts.observerOnlyPrompt(snapshot), /背景.md/); assert.match(coffeePrompts.observerOnlyPrompt(snapshot), /source: 對談中的原句/);
+  assert.throws(() => coffeePrompts.questionPrompt(snapshot, 'x'.repeat(180000)), /太長|too long/);
+});
+test('Coffee Tables custom style replaces editable built-in behavior guidance in every generation mode', () => {
+  const session = coffeeSession();
+  session.guests.stylePrompt = '自由深入討論，不限制發言輪數；遇到草稿從全新角度重新展開；觀察者只整理三個最重要的發現。';
+  session.observerNotes = ['舊觀察整理'];
+  const opening = coffeePrompts.tablePrompt('Topic', 'zh-TW', session.guests);
+  const continuation = coffeePrompts.tablePrompt('Topic', 'zh-TW', session.guests, '### 主持人｜甲\n草稿');
+  const followUp = coffeePrompts.questionPrompt(session, '請談談成本', '先前追問草稿');
+  const observerRefresh = coffeePrompts.observerOnlyPrompt(session);
+  for (const prompt of [opening, continuation, followUp, observerRefresh]) {
+    assert.match(prompt, /自由深入討論，不限制發言輪數[\s\S]*遇到草稿從全新角度重新展開/);
+    assert.doesNotMatch(prompt, /10–18 次簡短發言|約 8–12 次簡短發言|roughly 8–12 concise speaker turns|10–18 concise speaker turns|每個標題下 2–4 個條列|each followed by 2–4 bullets|一位留意矛盾，一位好奇追問/);
+    assert.doesNotMatch(prompt, /只作脈絡，不要重寫|請從最後一句接續|只用來推進討論，不要重寫|請從最後一句繼續|不要重複/);
+  }
+  assert.match(opening, /### 姓名｜角色/);
+  assert.match(opening, /## 意外連結/);
+  assert.match(opening, /coffee-tables-complete/);
+  assert.match(observerRefresh, /只更新觀察者整理/);
+  session.guests.stylePrompt = '';
+  assert.doesNotMatch(coffeePrompts.tablePrompt('Topic', 'zh-TW', session.guests), /聊天室風格：[\s\S]*?請用自然、口語的繁體中文（台灣用法）對話/);
 });
 test('Coffee Tables assembles the full timeline chronologically, including interventions, drafts and custom instructions', () => {
   const session = coffeeSession();
@@ -2875,7 +2994,7 @@ test('Coffee Tables validates numeric guest counts and named guests occupy their
   const valid = coffeeSession();
   valid.guests = { counts: { experts: 2, 'cross-domain': 0, generalist: 0, affected: 1 }, guests: [{ id: 'named-1', category: 'experts', description: '第一線客服' }], background: '小公司', customPrompt: '多談實際做法' };
   assert.equal(parseSession(JSON.stringify(valid)).guests.guests.length, 1); assert.equal(parseSession(JSON.stringify(valid)).guests.hostCount, 2);
-  for (let count = 1; count <= 4; count++) { const hosted = { ...valid, guests: { ...valid.guests, hostCount: count } }; assert.equal(parseSession(JSON.stringify(hosted)).guests.hostCount, count); assert.match(coffeePrompts.tablePrompt('Topic', 'en', hosted.guests), new RegExp(`${count} (?:host|hosts)`)); }
+  for (let count = 1; count <= 4; count++) { const hosted = { ...valid, guests: { ...valid.guests, hostCount: count } }; assert.equal(parseSession(JSON.stringify(hosted)).guests.hostCount, count); assert.match(coffeePrompts.tablePrompt('Topic', 'en', hosted.guests), new RegExp(`主持人 ${count} 位`)); }
   assert.throws(() => parseSession(JSON.stringify({ ...valid, guests: { ...valid.guests, hostCount: 5 } })), /guest count/i);
   for (const counts of [
     { experts: 0, 'cross-domain': 0, generalist: 0, affected: 0 },
@@ -2901,10 +3020,10 @@ integrationTest('Coffee Tables continues in the same timeline and refreshes obse
   await engine.continueTable();
   assert.equal(engine.session.rounds.length, 2); assert.match(engine.session.transcriptMarkdown, /先從規模談起/); assert.match(engine.session.transcriptMarkdown, /我們要先談員工能不能拒絕/);
   assert.match(prompts[1], /(?:新增約 8–12 次簡短發言|add roughly 8–12 concise speaker turns)/); assert.match(prompts[1], /小公司能採取的做法/); assert.match(prompts[1], /從導入轉向誰負責/);
-  assert.equal(engine.session.observerNotes.length, 2); assert.match(engine.session.observerNotes[0], /追問把焦點帶到拒絕權/); assert.match(engine.session.observerNotes[1], /從導入轉向誰負責/);
+  assert.equal(engine.session.observerNotes.length, 1); assert.match(engine.session.observerNotes[0], /追問把焦點帶到拒絕權/); assert.match(engine.session.observerNotes[0], /從導入轉向誰負責/);
   await engine.ask('員工能拒絕試辦嗎？');
   assert.match(engine.session.questions.at(-1).question, /員工能拒絕試辦嗎/); assert.match(engine.session.questions.at(-1).answer, /先把試辦退出條件寫清楚/); assert.match(prompts[2], /小公司能採取的做法/); assert.match(prompts[2], /使用者的新問題/); assert.match(prompts[2], /追問把焦點帶到拒絕權/);
-  assert.equal(engine.session.observerNotes.length, 3); assert.ok(firstTranscript.length > 0);
+  assert.equal(engine.session.observerNotes.length, 1); assert.match(engine.session.observerNotes[0], /小公司不一定有完整團隊/); assert.ok(firstTranscript.length > 0);
 });
 integrationTest('Coffee Tables makes one full-text call and saves the complete Markdown only after success', async () => {
   const session = coffeeSession(); let calls = 0, saves = [];
@@ -2923,6 +3042,70 @@ integrationTest('Coffee Tables recognizes a complete saved draft with bold Markd
   await engine.start();
   assert.equal(calls, 0); assert.equal(engine.session.status, 'completed'); assert.match(engine.session.transcriptMarkdown, /先從時間實際去了哪裡開始/); assert.equal((engine.session.transcriptMarkdown.match(/先從時間實際去了哪裡開始/g) ?? []).length, 1, engine.session.transcriptMarkdown);
   assert.match(engine.session.observerNotes[0], /省時不代表工作量下降/); assert.equal(engine.session.draftMarkdown, undefined); assert.equal(saved.status, 'completed');
+});
+integrationTest('Coffee Tables recovers complete observer sections when the root heading is missing', async () => {
+  const session = coffeeSession();
+  const dialogue = '### 主持人｜林岑\n\n對話文字。\n\n### 沈默｜中立觀察者\n\n簡短觀察。';
+  const notes = [
+    '## 意外連結\n\n- 這裡寫出討論中出現的意外連結。',
+    '## 值得繼續想的問題\n\n- 還要釐清後續值得討論的問題。',
+    '## 核心分歧\n\n- 這裡保留尚未解決的核心分歧。',
+    '## 探索方向\n\n- 可以接著探索其他方向。',
+    '## 值得查證的假設\n\n- 需要查證的假設仍待確認。',
+  ].join('\n\n');
+  const draft = `${dialogue}\n\n${notes}\n\n<!-- coffee-tables-complete -->`;
+  session.status = 'error'; session.error = 'observer format'; session.draftMarkdown = draft;
+  session.rounds = [{ id: 'missing-root-round', markdown: '', notes: '', draftMarkdown: draft, status: 'error', createdAt: session.createdAt }];
+  let calls = 0;
+  const engine = new coffee.CoffeeEngine(session, async () => { calls++; return ''; }, async () => {});
+  await engine.start();
+  assert.equal(calls, 0); assert.equal(engine.session.status, 'completed');
+  assert.match(engine.session.transcriptMarkdown, /簡短觀察/); assert.doesNotMatch(engine.session.transcriptMarkdown, /## 意外連結/);
+  assert.match(engine.session.observerNotes[0], /^# 觀察者整理/); assert.match(engine.session.observerNotes[0], /## 意外連結/);
+});
+integrationTest('Coffee Tables removes earlier rootless observer sections when a complete draft is duplicated', async () => {
+  const session = coffeeSession();
+  const notes = label => [
+    `## 意外連結\n\n- ${label} 的意外連結內容已完整整理。`,
+    `## 值得繼續想的問題\n\n- ${label} 後續值得討論的問題仍然存在。`,
+    `## 核心分歧\n\n- ${label} 尚未解決的核心分歧需要保留。`,
+    `## 探索方向\n\n- ${label} 可以接著探索其他方向。`,
+    `## 值得查證的假設\n\n- ${label} 還需要查證這項假設。`,
+  ].join('\n\n');
+  const first = `### 主持人｜林岑\n\n第一段對談。\n\n### 沈默｜中立觀察者\n\n第一份整理前的觀察。\n\n${notes('第一份')}`;
+  const second = `### 主持人｜周禾\n\n第二段對談。\n\n### 沈默｜中立觀察者\n\n第二份整理前的觀察。\n\n${notes('第二份')}`;
+  const draft = `${first}\n\n${second}\n\n<!-- coffee-tables-complete -->`;
+  session.status = 'error'; session.draftMarkdown = draft; session.rounds = [{ id: 'duplicate-rootless-round', markdown: '', notes: '', draftMarkdown: draft, status: 'error', createdAt: session.createdAt }];
+  let calls = 0; const engine = new coffee.CoffeeEngine(session, async () => { calls++; return ''; }, async () => {});
+  await engine.start();
+  assert.equal(calls, 0); assert.equal(engine.session.status, 'completed');
+  assert.match(engine.session.transcriptMarkdown, /第一段對談/); assert.match(engine.session.transcriptMarkdown, /第二段對談/);
+  assert.doesNotMatch(engine.session.transcriptMarkdown, /## 意外連結/);
+  assert.match(engine.session.observerNotes[0], /第二份.*意外連結內容/); assert.doesNotMatch(engine.session.observerNotes[0], /第一份.*意外連結內容/);
+});
+integrationTest('Coffee Tables does not recover rootless observer notes missing a standard section', async () => {
+  const session = coffeeSession();
+  const draft = '### 主持人｜林岑\n\n對談文字。\n\n### 沈默｜中立觀察者\n\n簡短觀察。\n\n## 意外連結\n\n- 有整理。\n\n## 值得繼續想的問題\n\n- 有整理。\n\n## 核心分歧\n\n- 有整理。\n\n## 探索方向\n\n- 有整理。\n\n<!-- coffee-tables-complete -->';
+  session.status = 'error'; session.draftMarkdown = draft; session.rounds = [{ id: 'incomplete-rootless-round', markdown: '', notes: '', draftMarkdown: draft, status: 'error', createdAt: session.createdAt }];
+  let calls = 0; const engine = new coffee.CoffeeEngine(session, async () => { calls++; return ''; }, async () => {});
+  await engine.start();
+  assert.equal(calls, 1); assert.equal(engine.session.status, 'error'); assert.equal(engine.session.transcriptMarkdown, '');
+});
+integrationTest('Coffee Tables does not recover rootless observer notes with an empty standard section', async () => {
+  const session = coffeeSession();
+  const draft = '### 主持人｜林岑\n\n對談文字。\n\n### 沈默｜中立觀察者\n\n簡短觀察。\n\n## 意外連結\n\n- 有整理。\n\n## 值得繼續想的問題\n\n- 有整理。\n\n## 核心分歧\n\n- 有整理。\n\n## 探索方向\n\n- 有整理。\n\n## 值得查證的假設\n\n<!-- coffee-tables-complete -->';
+  session.status = 'error'; session.draftMarkdown = draft; session.rounds = [{ id: 'empty-rootless-round', markdown: '', notes: '', draftMarkdown: draft, status: 'error', createdAt: session.createdAt }];
+  let calls = 0; const engine = new coffee.CoffeeEngine(session, async () => { calls++; return ''; }, async () => {});
+  await engine.start();
+  assert.equal(calls, 1); assert.equal(engine.session.status, 'error'); assert.equal(engine.session.transcriptMarkdown, '');
+});
+integrationTest('Coffee Tables recognizes complete English observer sections without the root heading', async () => {
+  const session = coffeeSession(); session.language = 'en';
+  const draft = '### Host | Lin Cen\n\nConversation text.\n\n### Observer | Observer\n\nBrief observation.\n\n## Unexpected connections\n\n- A useful unexpected connection is visible in the conversation.\n\n## Questions worth pursuing\n\n- A question remains open for further discussion.\n\n## Core disagreements\n\n- The unresolved disagreement should be retained.\n\n## Directions to explore\n\n- Several directions remain available for exploration.\n\n## Assumptions to verify\n\n- This assumption needs checking before it is treated as fact.\n\n<!-- coffee-tables-complete -->';
+  session.status = 'error'; session.draftMarkdown = draft; session.rounds = [{ id: 'english-rootless-round', markdown: '', notes: '', draftMarkdown: draft, status: 'error', createdAt: session.createdAt }];
+  let calls = 0; const engine = new coffee.CoffeeEngine(session, async () => { calls++; return ''; }, async () => {});
+  await engine.start();
+  assert.equal(calls, 0); assert.equal(engine.session.status, 'completed'); assert.match(engine.session.observerNotes[0], /^# Observer’s notes/);
 });
 integrationTest('Coffee Tables trusts a complete observer summary from the resolved stream when the runtime final text disagrees', async () => {
   const session = coffeeSession(), streamed = '### 主持人｜林岑\n\n省下時間要先確認有沒有轉成別人的工作。\n\n# 觀察者整理\n\n- **最新轉折**\n  - 討論從節省時間轉向工作是否轉移。\n- **修正後的假設**\n  - 個人省時不代表案件總時間下降。\n- **值得繼續追問的問題**\n  - 如何記錄交接成本？\n- **尚未解決的核心分歧**\n  - 緩衝和產能怎麼分配？';
@@ -3010,7 +3193,7 @@ integrationTest('Coffee Tables can refresh observer notes from a stopped draft w
   const fresh = '# 觀察者整理\n\n## 最大討論轉折\n- 草稿帶來的新轉折\n\n## 被推翻或修正的假設\n- 舊假設需要修正\n\n## 值得繼續追問的問題\n- 誰承擔後續責任？\n\n## 尚未解決的核心分歧\n- 效率與公平';
   const engine = new coffee.CoffeeEngine(session, async request => { calls++; assert.match(request.prompt, /只更新觀察者整理|only produce observer notes/i); assert.match(request.prompt, /收到一半的觀點/); request.onText?.(fresh); return fresh; }, async value => { saved = plain(value); });
   await engine.refreshObserverNotes();
-  assert.equal(calls, 1); assert.equal(engine.session.status, 'error'); assert.match(engine.session.draftMarkdown, /收到一半的觀點/); assert.match(engine.session.observerNotes[0], /草稿帶來的新轉折/); assert.equal(engine.session.observerNotes[1], previous); assert.equal(saved.status, 'error');
+  assert.equal(calls, 1); assert.equal(engine.session.status, 'error'); assert.match(engine.session.draftMarkdown, /收到一半的觀點/); assert.match(engine.session.observerNotes[0], /草稿帶來的新轉折/); assert.equal(saved.status, 'error');
 });
 integrationTest('Coffee Tables retains a previous observer-summary draft if a summary retry fails', async () => {
   const session = coffeeSession(); session.status = 'error'; session.draftMarkdown = '### 來賓｜專家\n\n已保存對談。'; session.observerDraftMarkdown = '# 觀察者整理\n\n## 核心分歧\n- 先前整理草稿';
@@ -3048,6 +3231,28 @@ integrationTest('Coffee Tables preview inspection is read-only and refuses an in
   const side = JSON.parse(sideRaw); side.journal = { previousMarkdownHash: 'x', nextMarkdownHash: 'y', previousSidecar: sideRaw }; contents.set(sidePath, JSON.stringify(side)); const journal = contents.get(sidePath); await assert.rejects(store.inspectReadOnly(path), /unfinished save/); assert.equal(writes, 0); assert.equal(contents.get(sidePath), journal);
 });
 
+integrationTest('Coffee Tables persists follow-up guest invitations and keeps one cumulative insight document', async () => {
+  const { CoffeeStorage } = load('experiences/coffee-tables/storage.ts', { obsidian });
+  const { app, files, contents } = fixture(); app.vault.getFiles = () => [...files.values()].filter(file => file instanceof TFile);
+  const store = new CoffeeStorage(app.vault, 'Agent Workspace'), session = coffeeSession(); session.status = 'completed';
+  const invited = [{ id: 'invite-anna', name: '林照', category: 'affected', description: '熟悉夜班與照護資源的社工' }];
+  session.questions = [{ id: 'question-guest', question: '夜班遇到突發狀況如何求援？', answer: '先確認交接流程。', status: 'complete', createdAt: session.createdAt, invitedGuests: invited }];
+  session.observerNotes = ['# 觀察者整理\n\n## 核心分歧\n- 是否把求援責任留給第一線。', '# 觀察者整理\n\n## 意外連結\n- 夜班支援也像備援網絡。'];
+  await store.save(session); const path = store.sessionPath(session.id), raw = contents.get(path);
+  assert.match(raw, /林照｜受影響者/); assert.doesNotMatch(raw, /### 先前版本|### 最新版本/); assert.match(raw, /夜班支援也像備援網絡/); assert.match(raw, /是否把求援責任留給第一線/);
+  const restored = await new CoffeeStorage(app.vault, 'Agent Workspace').load(session.id);
+  assert.equal(JSON.stringify(restored.questions[0].invitedGuests), JSON.stringify(invited)); assert.equal(restored.observerNotes.length, 1);
+});
+integrationTest('Coffee Tables backs up the exact old versioned Markdown before its first cumulative rewrite', async () => {
+  const { CoffeeStorage } = load('experiences/coffee-tables/storage.ts', { obsidian });
+  const { app, files, contents } = fixture(); app.vault.getFiles = () => [...files.values()].filter(file => file instanceof TFile);
+  const store = new CoffeeStorage(app.vault, 'Agent Workspace'), session = coffeeSession(); session.status = 'completed';
+  session.observerNotes = ['# 觀察者整理\n\n## 核心分歧\n- 最新見解。', '# 觀察者整理\n\n## 意外連結\n- 早期跨域線索。']; await store.save(session);
+  const path = store.sessionPath(session.id), first = contents.get(path), old = first.replace(/## 觀察者整理[\s\S]*$/, '## 觀察者整理\n\n### 最新版本\n\n# 觀察者整理\n\n## 核心分歧\n- 最新見解。\n\n### 先前版本\n\n#### 第 1 版\n\n# 觀察者整理\n\n## 意外連結\n- 早期跨域線索。'); contents.set(path, old);
+  const reopenedStore = new CoffeeStorage(app.vault, 'Agent Workspace'), loaded = await reopenedStore.load(session.id); await reopenedStore.save(loaded);
+  const backups = [...contents.keys()].filter(name => name.includes('/.sessions/backups/') && name.endsWith('.md'));
+  assert.equal(backups.length, 1); assert.equal(contents.get(backups[0]), old); assert.match(contents.get(path), /早期跨域線索/); assert.doesNotMatch(contents.get(path), /### 先前版本/);
+});
 integrationTest('Coffee Tables Markdown storage round trips punctuation, Traditional Chinese, Q&A and protects outside edits', async () => {
   const { CoffeeStorage } = load('experiences/coffee-tables/storage.ts', { obsidian });
   const { app, files, contents } = fixture(); app.vault.getFiles = () => [...files.values()].filter(f => f instanceof TFile);
@@ -3061,15 +3266,20 @@ integrationTest('Coffee Tables Markdown storage round trips punctuation, Traditi
   await store.save(session); const filePath = store.sessionPath(session.id), original = contents.get(filePath);
   assert.match(original, /先問現場怎麼運作[\s\S]*你（插話）[\s\S]*家長也需要看得到退出方式[\s\S]*孩子會注意到標籤/); assert.match(original, /會不會造成分級/); assert.match(original, /Reasoning|推理強度/); assert.match(original, /## 對話紀錄/); assert.equal(original.split("\n")[0], `# ${session.topic}`); assert.doesNotMatch(original, /coffee-tables-data|coffee-tables-transcript-end|<\!--.*version/i); assert.ok(files.has(`${store.hidden}/${session.id}.json`)); assert.doesNotMatch(original, new RegExp(session.id));
   assert.ok(original.length < (session.transcriptMarkdown.length + session.draftMarkdown.length + session.questions[0].draftAnswer.length) * 2 + 2200, 'session metadata should not duplicate or expand the transcript');
-  const reopened = new CoffeeStorage(app.vault, 'Agent Workspace'), restored = await reopened.load(session.id); assert.equal(restored.topic, session.topic); assert.match(restored.transcriptMarkdown,/先問現場怎麼運作/); assert.equal(restored.questions[0].question,session.questions[0].question); assert.equal(restored.questions[0].draftAnswer,session.questions[0].draftAnswer); assert.match(restored.interventions[0].text,/退出方式/); assert.match(restored.draftMarkdown,/第一段尚未完成/); assert.match(restored.observerDraftMarkdown,/整理草稿也需要保存/); assert.match(restored.observerNotes[0], /新版分歧/); assert.match(restored.observerNotes[1], /舊版分歧/); assert.equal(restored.model,session.model); assert.equal(restored.lastGenerationStartedAt, session.lastGenerationStartedAt); assert.equal(restored.lastCompletedAt, session.lastCompletedAt);
+  const reopened = new CoffeeStorage(app.vault, 'Agent Workspace'), restored = await reopened.load(session.id); assert.equal(restored.topic, session.topic); assert.match(restored.transcriptMarkdown,/先問現場怎麼運作/); assert.equal(restored.questions[0].question,session.questions[0].question); assert.equal(restored.questions[0].draftAnswer,session.questions[0].draftAnswer); assert.match(restored.interventions[0].text,/退出方式/); assert.match(restored.draftMarkdown,/第一段尚未完成/); assert.match(restored.observerDraftMarkdown,/整理草稿也需要保存/); assert.match(restored.observerNotes[0], /新版分歧/); assert.match(restored.observerNotes[0], /舊版分歧/); assert.equal(restored.observerNotes.length, 1); assert.equal(restored.model,session.model); assert.equal(restored.lastGenerationStartedAt, session.lastGenerationStartedAt); assert.equal(restored.lastCompletedAt, session.lastCompletedAt);
   const outside = original.replace('先問現場怎麼運作。', '編輯者補上現場資訊。'); contents.set(filePath, outside); const inspected = await store.inspect(filePath); assert.equal(inspected.dirtyNotes, true); await assert.rejects(store.save(session), /changed outside/); assert.equal(contents.get(filePath), outside);
   const adopted = await store.reload(filePath); assert.match(adopted.transcriptMarkdown, /編輯者補上現場資訊/); assert.match(adopted.interventions[0].text, /退出方式/); assert.equal(adopted.dirtyNotes, true);
+});
+integrationTest('Coffee Tables Markdown round trips style snapshots and reference text without parsing embedded headings as dialogue', async () => {
+  const { CoffeeStorage } = load('experiences/coffee-tables/storage.ts', { obsidian }); const { app, files } = fixture(); app.vault.getFiles = () => [...files.values()].filter(file => file instanceof TFile);
+  const store = new CoffeeStorage(app.vault, 'Agent Workspace'), session = coffeeSession(); session.status = 'completed'; session.guests.styleId = 'style-1'; session.guests.styleName = '輕鬆聊天'; session.guests.stylePrompt = '主持人多追問。'; session.guests.referenceFiles = [{ name: '背景.md', content: '# 內文標題\n```md\n### 假來賓｜主持人\n<!-- coffee-tables-complete -->\n```' }]; session.transcriptMarkdown = '### 林岑｜主持人\n真正的發言。'; session.rounds = [{ id: 'style-round', markdown: session.transcriptMarkdown, notes: '', status: 'completed', createdAt: session.createdAt }];
+  await store.save(session); const restored = await new CoffeeStorage(app.vault, 'Agent Workspace').load(session.id); assert.equal(restored.guests.styleId, 'style-1'); assert.equal(restored.guests.styleName, '輕鬆聊天'); assert.equal(restored.guests.stylePrompt, '主持人多追問。'); assert.equal(JSON.stringify(restored.guests.referenceFiles), JSON.stringify(session.guests.referenceFiles)); assert.equal(restored.rounds[0].markdown, session.transcriptMarkdown);
 });
 integrationTest('Coffee Tables Markdown omits empty failed rounds while retaining the saved draft', async () => {
   const { CoffeeStorage } = load('experiences/coffee-tables/storage.ts', { obsidian }); const { app, files, contents } = fixture(); app.vault.getFiles = () => [...files.values()].filter(file => file instanceof TFile);
   const store = new CoffeeStorage(app.vault, 'Agent Workspace'), session = coffeeSession(); session.status = 'error'; session.rounds = [{ id: 'empty-1', markdown: '', notes: '', status: 'error', createdAt: session.createdAt }, { id: 'empty-2', markdown: '', notes: '', status: 'error', createdAt: session.createdAt }, { id: 'draft-3', markdown: '', notes: '', draftMarkdown: '### 主持人｜林岑\n草稿保留。', status: 'error', createdAt: session.createdAt }]; session.draftMarkdown = session.rounds[2].draftMarkdown;
   await store.save(session); const markdown = contents.get(store.sessionPath(session.id)); assert.doesNotMatch(markdown, /^## (?:Conversation part \d+|對談第 \d+ 段)$/m); assert.match(markdown, /Unfinished drafts|未完成草稿/); assert.match(markdown, /草稿保留/);
-  const restored = await new CoffeeStorage(app.vault, 'Agent Workspace').load(session.id); assert.equal(restored.rounds.length, 0); assert.match(restored.draftMarkdown, /草稿保留/);
+  const restored = await new CoffeeStorage(app.vault, 'Agent Workspace').load(session.id); assert.deepEqual(Array.from(restored.rounds, item => item.id), ["empty-1","empty-2","draft-3"]); assert.match(restored.draftMarkdown, /草稿保留/);
 });
 integrationTest('Coffee Tables titles produce safe Markdown names without replacing a same-title table', async () => {
   const { CoffeeStorage, topicSlug } = load('experiences/coffee-tables/storage.ts', { obsidian }); const { app, files, contents } = fixture(); app.vault.getFiles = () => [...files.values()].filter(file => file instanceof TFile);
@@ -3155,6 +3365,59 @@ integrationTest('Coffee Tables engine survives view closure and reopening withou
   const reopenedViewEngine = manager.open(session); assert.equal(reopenedViewEngine, firstViewEngine); assert.equal(calls, 1);
   pending.resolve('### 主持人｜主持人\n\nComplete conversation\n\n# 觀察者整理\n\n## 最大討論轉折\n- A\n## 被推翻或修正的假設\n- B\n## 值得繼續追問的問題\n- C\n## 尚未解決的核心分歧\n- D'); await task; assert.equal(manager.open(firstViewEngine.session).session.status, 'completed'); assert.equal(calls, 1); assert.match(saved.at(-1).transcriptMarkdown, /Complete conversation/);
 });
+test('Coffee Tables outline parses localized headings, wrapped bullets and nested list detail without treating code as structure', () => {
+  assert.ok(fs.existsSync(path.join(root, 'experiences/coffee-tables/outline.ts')), 'Coffee Tables outline logic module exists');
+  const { parseCoffeeOutline } = load('experiences/coffee-tables/outline.ts');
+  const notes = '# 觀察者整理\n\n## 意外連結\n- **創作價值**與勞動條件相連，\n  速度未必讓人得到更多自由。 <!-- source: AI 工具讓創作者產出更快，卻沒有得到更多自由時間。 -->\n  - 也要查看接案者的修改成本。\n\n## Questions worth pursuing\n- Can creators refuse training use?\n\n```md\n## fake section\n- fake item\n```';
+  const parsedNotes = parseCoffeeOutline(notes);
+  assert.equal(parsedNotes[0].items[0].sourceText, 'AI 工具讓創作者產出更快，卻沒有得到更多自由時間。');
+  assert.doesNotMatch(parsedNotes[0].items[0].text, /source:/);
+  const { findRelatedSpeech } = load('experiences/coffee-tables/outline.ts');
+  assert.equal(findRelatedSpeech(parsedNotes[0].items[0].sourceText, [{ id: 'source-speech', text: 'AI 工具讓創作者產出更快，卻沒有得到更多自由時間。', order: 5 }]), 'source-speech');
+  assert.deepEqual(plain(parsedNotes), [
+    { id: 'section-0', title: '意外連結', depth: 2, items: [
+      { id: 'section-0-item-0', text: '創作價值與勞動條件相連，速度未必讓人得到更多自由。', sourceText: 'AI 工具讓創作者產出更快，卻沒有得到更多自由時間。', context: '也要查看接案者的修改成本。', depth: 0 },
+    ] },
+    { id: 'section-1', title: 'Questions worth pursuing', depth: 2, items: [
+      { id: 'section-1-item-0', text: 'Can creators refuse training use?', depth: 0 },
+    ] },
+  ]);
+});
+test('Coffee Tables outline matching finds the strongest related Chinese speech and refuses ambiguous or generic matches', () => {
+  assert.ok(fs.existsSync(path.join(root, 'experiences/coffee-tables/outline.ts')), 'Coffee Tables outline logic module exists');
+  const { findRelatedSpeech } = load('experiences/coffee-tables/outline.ts');
+  const targets = [
+    { id: 'dialogue-1', text: 'AI工具讓作品生產更快，卻沒有證據顯示創作者因此得到更多自由時間。', order: 0 },
+    { id: 'dialogue-2', text: '稿酬降低可能和接案工作者需要反覆修改作品有關。', order: 1 },
+    { id: 'dialogue-3', text: '要再觀察使用者是否真的理解作品。', order: 2 },
+  ];
+  assert.equal(findRelatedSpeech('自動化產出更快，創作者仍沒有因此得到更多自由時間。', targets), 'dialogue-1');
+  assert.equal(findRelatedSpeech('加價午餐不只涉及食物，也像公共運輸的差別定價，牽涉基本服務與額外選擇的界線。', [
+    { id: 'analogy', text: '公共運輸有時會讓乘客加價買更舒適的座位，這跟午餐有一點相似：都是在基本服務之外提供選擇。但限制也很明顯，交通座位比較像個人使用；孩子一起吃飯時，食物差異會直接變成同儕之間看得見的差距。', order: 0 },
+    { id: 'other', text: '學校必須先保障基本營養，不能把過敏或醫療需求當成額外選擇。', order: 1 },
+  ]), 'analogy');
+  assert.equal(findRelatedSpeech('產出速度和創作人自由時間的關係', [
+    { id: 'first', text: 'AI提高產出速度，也未增加創作者的自由時間。', order: 0 },
+    { id: 'second', text: 'AI提升產出速度，也未增加創作者的休閒時間。', order: 1 },
+  ]), 'first');
+  assert.equal(findRelatedSpeech('先用 MIT、之後改授權聽起來簡單，但外部貢獻者的著作權會讓未來的選擇更複雜。', [
+    { id: 'license-question', text: '那如果我不確定未來會不會做雲端服務，是不是先 MIT，之後有人拿去做 SaaS 再改 AGPL 就好？', order: 0 },
+    { id: 'license-rights', text: '你通常可以對未來版本改授權，但已經用舊版本的人仍按舊授權使用；若程式有外部貢獻，還得確認你有權這麼做。', order: 1 },
+    { id: 'license-followup', text: '以後改授權不是完全不行，但不會把舊版本的使用權收回來；開始接受外部貢獻後，還多一層權利確認。', order: 2 },
+  ]), 'license-followup');
+  assert.equal(findRelatedSpeech('加速產出之後創作者仍沒有更多自由時間', [
+    { id: 'one', text: 'AI加快產出，但創作者沒有得到更多自由時間。', order: 0 },
+    { id: 'two', text: 'AI加速產出，創作者仍沒有得到更多自由時間。', order: 1 },
+  ]), null);
+  assert.equal(findRelatedSpeech('意外連結', targets), null);
+  assert.equal(findRelatedSpeech('作品生產速度更快', [
+    { id: 'earlier', text: '作品生產速度更快。', order: 0 },
+    { id: 'later', text: '作品生產速度更快。', order: 1 },
+  ]), 'earlier');
+  assert.equal(findRelatedSpeech('今天摘要要討論親子講座如何安排時間', [
+    { id: 'short-phrase', text: '親子講座', order: 0 },
+  ]), null);
+});
 test('Coffee Tables deletion locks every view of a shared manager engine and retires it after removal', async () => {
   let calls = 0; const manager = new coffee.CoffeeManager(async () => { calls++; return 'not expected'; }, async () => {}); const session = coffeeSession(); session.status = 'completed'; const first = manager.open(session), second = manager.open(session); assert.equal(first, second);
   const locked = await manager.prepareDelete(session.id); await Promise.all([second.continueTable(), second.ask('continue?')]); assert.equal(calls, 0); assert.equal(manager.get(session.id), first); manager.completeDelete(session.id, locked); await Promise.all([first.start(), second.continueTable(), second.ask('late?')]); assert.equal(first.deleted, true); assert.equal(manager.get(session.id), undefined); assert.equal(calls, 0); assert.throws(() => manager.open(session), /being deleted or was deleted/); manager.restore(session.id); assert.equal(manager.open(session).session.id, session.id);
@@ -3186,6 +3449,21 @@ function coffeeElement(tag, options = {}) {
     addEventListener(name, handler) { this[name] = handler; }, get childElementCount() { return this.children.length; } };
 }
 const coffeeFind = (root, predicate) => predicate(root) ? root : root.children.map(child => coffeeFind(child, predicate)).find(Boolean);
+integrationTest('Coffee Tables puts saved-draft recovery in the pinned room toolbar', () => {
+  const { CoffeeTablesView } = load('experiences/coffee-tables/view.ts', { obsidian }, { requestAnimationFrame: callback => callback() });
+  const session = coffeeSession(); session.status = 'error'; session.draftMarkdown = '### 主持人｜林岑\n\n已收到的對談。'; session.rounds = [{ id: 'failed-round', markdown: '', notes: '', draftMarkdown: session.draftMarkdown, status: 'error', createdAt: session.createdAt }];
+  const plugin = { settings: { language: 'zh-TW' }, modelLabel: value => value, confirmAiUsage: async (_model, run) => run() };
+  const view = new CoffeeTablesView({ app: { workspace: { requestSaveLayout() {} } } }, plugin); view.engine = { session, busy: false, persistenceFailed: false, error: 'observer summary incomplete' }; view.store = { sessionPath: () => 'failed.md' }; view.contentEl = coffeeElement('root'); view.contentEl.ownerDocument = { activeElement: null }; view.contentEl.querySelector = () => null; view.contentEl.querySelectorAll = () => [];
+  view.renderRound = () => {}; view.renderMarkdown = () => {}; view.renderRoster = () => {}; view.updateStatus = () => {};
+  view.render();
+  const fixed = view.contentEl.children[0].children[0];
+  const header = fixed.children[0], actions = header.children[1];
+  assert.equal(header.children[0].tag, 'h2');
+  assert.equal(actions.tag, 'div');
+  assert.deepEqual(actions.children.map(item => item.text), ['回主頁', '開啟 Markdown', '刪除桌聊', '開新桌']);
+  assert.equal(header.children[2].tag, 'p');
+  assert.ok(coffeeFind(fixed, item => item.tag === 'button' && item.text === '從已保存草稿繼續'));
+});
 integrationTest('Coffee Tables home form keeps discovered model and reasoning choices and disables start during discovery', async () => {
   const { CoffeeTablesView } = load('experiences/coffee-tables/view.ts', { obsidian });
   const plugin = { settings: { language: 'en', cliModel: 'm', cliReasoning: 'low' }, availableModels: () => ['m'], coffeeReasoningEfforts: model => model === 'm' ? ['low'] : ['medium', 'high'], refreshCoffeeModels: async () => ['m', 'codex-other'], modelLabel: value => value, confirmAiUsage: async (_model, run) => run() };
@@ -3234,4 +3512,210 @@ integrationTest('Coffee Tables VAM handoff links the transcript and starts from 
   await plugin.openCoffeeHandoff(session, 'Agent Workspace/Coffee Tables/session.md'); coffeeFind(modal.contentEl, element => element.text === 'Create research map').click(); await until(() => opened);
   const map = await repo.readMap(opened); assert.equal(map.nodes.length, 1); const note = await repo.readNote(map.nodes[0].path);
   assert.match(note.detail, /Coffee Tables/); assert.doesNotMatch(note.detail, /meal choices/); assert.match(note.detail, /Simulated Coffee Tables discussion/);
+});
+
+test('product ribbon pins both entrances below other actions and cleans up on unload', () => {
+  let observer;
+  class Observer {
+    constructor(callback) { this.callback = callback; observer = this; }
+    observe() { this.connected = true; }
+    disconnect() { this.connected = false; }
+    moved(node) { if (this.connected) this.callback([{ addedNodes: [node] }]); }
+  }
+  const parent = {
+    children: [],
+    classList: { add() {}, remove() {} },
+    get lastElementChild() { return this.children.at(-1); },
+    appendChild(icon) { this.insertBefore(icon, null); },
+    insertBefore(icon, next) {
+      this.children = this.children.filter(child => child !== icon);
+      const index = next ? this.children.indexOf(next) : this.children.length;
+      this.children.splice(index, 0, icon); icon.parentElement = this;
+    }
+  };
+  const make = name => ({
+    name, parentElement: parent,
+    classList: { values: new Set(), add(...names) { names.forEach(n => this.values.add(n)); }, remove(...names) { names.forEach(n => this.values.delete(n)); } },
+    get nextSibling() { return parent.children[parent.children.indexOf(this) + 1] || null; },
+    get nextElementSibling() { return this.nextSibling; }
+  });
+  const before = make('before'), coffee = make('coffee'), other = make('other'), map = make('map');
+  parent.children = [before, coffee, other, map];
+  const { groupRibbonIcons } = load('ui/ribbon-group.ts', {}, { MutationObserver: Observer });
+  const stop = groupRibbonIcons(map, coffee);
+  assert.deepEqual(parent.children.map(x => x.name), ['before', 'other', 'map', 'coffee']);
+  assert.ok(map.classList.values.has('vam-ribbon-group-start'));
+  assert.ok(coffee.classList.values.has('vam-ribbon-group-end'));
+  parent.insertBefore(coffee, before); observer.moved(coffee);
+  assert.deepEqual(parent.children.map(x => x.name), ['before', 'other', 'map', 'coffee']);
+  parent.insertBefore(map, null); observer.moved(map);
+  assert.deepEqual(parent.children.map(x => x.name), ['before', 'other', 'map', 'coffee']);
+  parent.children = parent.children.filter(x => x !== coffee); coffee.parentElement = null;
+  observer.moved(other);
+  assert.ok(map.classList.values.has('vam-ribbon-group-start'));
+  assert.ok(map.classList.values.has('vam-ribbon-group-end'));
+  parent.insertBefore(coffee, before); observer.moved(coffee);
+  assert.equal(map.nextElementSibling, coffee);
+  stop();
+  assert.equal(observer.connected, false);
+  assert.equal(map.classList.values.size, 0);
+  assert.equal(coffee.classList.values.size, 0);
+});
+
+integrationTest('Coffee Tables streaming restores scroll after asynchronous Markdown and preserves user scrolling', async () => {
+  const { CoffeeTablesView } = load('experiences/coffee-tables/view.ts', { obsidian }, { requestAnimationFrame: callback => callback() });
+  const session = coffeeSession(); session.status = 'generating'; session.draftMarkdown = 'A growing dialogue';
+  const view = new CoffeeTablesView({ app: {} }, { settings: { language: 'en' } });
+  view.engine = { session }; view.renderRoster = () => {};
+  const scrolling = { scrollTop: 400, scrollHeight: 1000, clientHeight: 300, isConnected: true };
+  const draft = { style: {}, setCssProps() {}, addClass() { this.style.minHeight = "900px"; }, removeClass() { this.style.minHeight = ""; }, offsetHeight: 900, empty() { scrolling.scrollHeight = 500; } };
+  view.contentEl = { querySelector: selector => selector === '.ct-chat-scroll' ? scrolling : selector === '.ct-live-draft' ? draft : null };
+  let pending = deferred();
+  view.renderRound = () => { view.markdownJobs.push(pending.promise.then(() => { scrolling.scrollHeight = 1200; })); };
+  view.refreshLive();
+  pending.resolve(); await until(() => draft.style.minHeight === '');
+  assert.equal(scrolling.scrollTop, 400);
+  scrolling.scrollTop = 900; pending = deferred(); view.refreshLive();
+  scrolling.scrollTop = 650; view.scrollEpoch++; pending.resolve(); await until(() => draft.style.minHeight === '');
+  assert.equal(scrolling.scrollTop, 650);
+});
+
+integrationTest('Coffee Tables accepts complete bold observer headings and prose with hidden source comments', async () => {
+  const sections = ['意外連結', '值得繼續想的問題', '核心分歧', '探索方向', '值得查證的假設'];
+  const notes = sections.map(title => `**## ${title}**\n\n共同規則有助於避免任意，但可能忽略處境差異，仍需要確認實際使用情況。<!-- source: 共同規則可能把差異藏起來。 -->`).join('\n\n');
+  const response = `### 林予安｜主持人\n\n共同規則可能把差異藏起來。\n\n### 陳敬文｜中立觀察者\n\n${notes}\n\n<!-- coffee-tables-complete -->`;
+  const engine = new coffee.CoffeeEngine(coffeeSession(), async () => response, async () => {});
+  await engine.start();
+  assert.equal(engine.session.status, 'completed');
+  assert.doesNotMatch(engine.session.transcriptMarkdown, /核心分歧/);
+  assert.match(engine.session.observerNotes[0], /^# 觀察者整理/);
+  const { parseCoffeeOutline } = load('experiences/coffee-tables/outline.ts');
+  const outline = parseCoffeeOutline(engine.session.observerNotes[0]);
+  assert.equal(outline.length, 5);
+  assert.equal(outline[0].items[0].sourceText, '共同規則可能把差異藏起來。');
+  const stopped = coffeeSession(); stopped.status = 'stopped'; stopped.draftMarkdown = response;
+  const reopened = new coffee.CoffeeEngine(stopped, async () => { assert.fail('Complete stopped draft must recover without AI'); }, async () => {});
+  await reopened.start(); assert.equal(reopened.session.status, 'completed');
+});
+
+
+test('Coffee Tables restored visible built-in insights apply in all four modes without constraining custom styles', () => {
+  for (const language of ['zh-TW', 'en']) {
+    const session = coffeeSession(); session.language = language;
+    session.guests.stylePrompt = language === 'zh-TW' ? coffeePrompts.BUILTIN_COFFEE_STYLE_PROMPT : coffeePrompts.BUILTIN_COFFEE_STYLE_PROMPT_EN;
+    session.transcriptMarkdown = 'Earlier important exchange'; session.observerNotes = ['# 觀察者整理\n\n## 核心分歧\n\n- Earlier valuable insight: the exchange showed a concrete unresolved tradeoff.'];
+    session.guests.referenceFiles = [{ name: 'context.md', content: 'Reference background' }];
+    const prompts = [coffeePrompts.tablePrompt(session.topic, language, session.guests), coffeePrompts.tablePrompt(session.topic, language, session.guests, 'Saved draft', coffeePrompts.assembleCoffeeContext(session)), coffeePrompts.questionPrompt(session, 'New question'), coffeePrompts.observerOnlyPrompt(session)];
+    for (const prompt of prompts) {
+      assert.match(prompt, /原本五類每類整理 2–4|2–4 distinct, substantive insights in each of the first five categories/);
+      assert.match(prompt, /沒有重新輸出的舊項目會由程式保留|the program retains old items you do not rewrite/); assert.match(prompt, /整合完整對談|use the complete saved conversation/);
+      assert.match(prompt, /context.md/);
+      assert.match(prompt, /程式會保留未提及項目|the program retains old items you do not rewrite/);
+    }
+    for (const prompt of prompts.slice(1)) { assert.match(prompt, /Earlier important exchange/); assert.match(prompt, /Earlier valuable insight/); }
+    session.guests.stylePrompt = 'User-authored style only';
+    for (const prompt of [coffeePrompts.tablePrompt(session.topic, language, session.guests), coffeePrompts.questionPrompt(session, 'Question'), coffeePrompts.observerOnlyPrompt(session)]) assert.doesNotMatch(prompt, /原本五類每類整理 2–4|2–4 distinct, substantive insights in each of the first five categories/);
+  }
+});
+integrationTest('Coffee Tables token timestamps repaint live regions instead of rebuilding the reading pane', async () => {
+  const { CoffeeTablesView } = load('experiences/coffee-tables/view.ts', { obsidian });
+  const session = coffeeSession(); session.status = 'generating'; let renders = 0, live = 0;
+  const view = new CoffeeTablesView({ app: {} }, { settings: {} }); view.engine = { session, busy: true, error: '' }; view.render = () => renders++; view.refreshLive = () => live++;
+  view.refresh(); session.updatedAt = 'later-token'; view.refresh(); await new Promise(resolve => setTimeout(resolve, 300)); assert.equal(live, 1); assert.equal(renders, 1);
+});
+integrationTest('Coffee Tables consecutive full repaints retain reading position until Markdown finishes', async () => {
+  const { CoffeeTablesView } = load('experiences/coffee-tables/view.ts', { obsidian }, { requestAnimationFrame: callback => callback() });
+  const session = coffeeSession(); session.status = 'completed'; session.rounds = [{id:'r',markdown:'Saved dialogue',createdAt:session.createdAt}];
+  const view = new CoffeeTablesView({ app: {} }, {settings:{language:'en'},modelLabel:x=>x}); view.engine = {session,busy:false}; view.store = {sessionPath:()=>''}; view.renderRoster=()=>{}; view.updateStatus=()=>{}; view.renderMarkdown=()=>{};
+  let scrolling = {scrollTop:400,scrollHeight:1000,clientHeight:300}; const pending = deferred();
+  const make = (tag, options={}) => { const el = coffeeElement(tag,options); const cls=typeof options==='string'?options:options.cls; el.isConnected=true;
+    el.createDiv=value=>{const child=make('div',typeof value==='string'?{cls:value}:value);el.children.push(child);return child};
+    if (cls==='ct-chat-scroll') { scrolling=el; el.scrollHeight=300;el.clientHeight=300;let top=0;Object.defineProperty(el,'scrollTop',{get:()=>top,set:value=>{top=Math.max(0,Math.min(value,el.scrollHeight-el.clientHeight))}}); }
+    if (cls==='ct-messages') { const owner=scrolling;el.setCssProps=props=>{owner.scrollHeight=parseFloat(props['--ct-live-held-height'])};el.removeClass=()=>{owner.scrollHeight=1200}; }
+    return el;
+  };
+  view.contentEl=make('root');view.contentEl.ownerDocument={activeElement:null};view.contentEl.querySelector=selector=>selector==='.ct-chat-scroll'?scrolling:null;view.contentEl.querySelectorAll=()=>[];
+  view.renderRound=()=>view.markdownJobs.push(pending.promise);
+  view.render(); assert.equal(scrolling.scrollTop,400);view.render();assert.equal(scrolling.scrollTop,400);
+  pending.resolve();await new Promise(resolve=>setTimeout(resolve,0));assert.equal(scrolling.scrollTop,400);
+  view.engine.busy=true; session.status='generating'; view.render(); let rebuilt=0; view.render=()=>rebuilt++; view.refreshLive=()=>{}; session.updatedAt='next-token';view.refresh();assert.equal(rebuilt,0);
+});
+integrationTest('Coffee Tables observer refresh keeps the previous latest notes when final saving fails', async () => {
+  const session=coffeeSession();session.status='completed';session.observerNotes=['Previous latest notes'];
+  const fresh='# 觀察者整理\n\n'+['意外連結','值得繼續想的問題','核心分歧','探索方向','值得查證的假設'].map(t=>'## '+t+'\n- A concrete observation.\n- A second observation.').join('\n\n');
+  const engine=new coffee.CoffeeEngine(session,async request=>{request.onText?.(fresh);return fresh},async value=>{if(value.observerNotes[0].includes('A concrete observation.'))throw new Error('Final save failed')});
+  await engine.refreshObserverNotes();assert.equal(engine.session.observerNotes[0],'Previous latest notes');assert.match(engine.session.observerDraftMarkdown,/A concrete observation\./);assert.match(engine.error,/Final save failed/);
+});
+
+test('Coffee segment navigation sorts rounds and follow-ups without treating interventions as new segments', () => {
+  const { coffeeSegments } = load('experiences/coffee-tables/segments.ts');
+  const session = { id: 'table', createdAt: '2026-01-01', transcriptMarkdown: '', rounds: [{ id: 'a', createdAt: '2026-01-01', kind: 'initial', status: 'completed', markdown: 'A', summary: 'Opening.' }, { id: 'b', createdAt: '2026-01-03', kind: 'continuation', status: 'error', markdown: '', draftMarkdown: 'Draft' }], questions: [{ id: 'q', createdAt: '2026-01-02', question: 'Why?', answer: 'Because.', status: 'complete' }], interventions: [{ id: 'i', text: 'A turning question', roundId: 'a', afterTurn: 2, createdAt: '2026-01-02' }] };
+  assert.deepEqual(plain(coffeeSegments(session)).map(x => [x.id,x.kind,x.status]), [['round:a','initial','completed'],['question:q','question','completed'],['round:b','continuation','error']]);
+  assert.ok(coffeeSegments(session)[0].text.includes('A turning question'));
+});
+test('Coffee summary parsing removes metadata without damaging notes and ignores malformed summaries', () => {
+  const { extractSegmentSummary, parseSummaryBatch } = load('experiences/coffee-tables/segments.ts');
+  const result = extractSegmentSummary('### A｜Host\nHello.\n<!-- coffee-segment-summary: {"summary":"The debate shifted to responsibility."} -->\n# Observer’s notes\nNotes');
+  assert.equal(result.summary, 'The debate shifted to responsibility.'); assert.ok(!result.markdown.includes('coffee-segment-summary')); assert.ok(result.markdown.includes('# Observer’s notes'));
+  assert.equal(extractSegmentSummary('text\n<!-- coffee-segment-summary: bad -->').summary, undefined);
+  assert.deepEqual(plain(parseSummaryBatch('{"summaries":[{"id":"round:a","summary":"One."},{"id":"foreign","summary":"Ignore."}]}', ['round:a'])), [{id:'round:a',summary:'One.'}]);
+  assert.throws(() => parseSummaryBatch('{"summaries":[{"id":"round:a","summary":"One."},{"id":"round:a","summary":"Two."}]}', ['round:a']));
+});
+
+integrationTest('Coffee segment summaries are saved with generation; retries retain round identity and missing summaries do not fail dialogue', async () => {
+  const { CoffeeEngine } = load('experiences/coffee-tables/engine.ts');
+  const session = coffeeSession(); let attempts = 0;
+  const coffeeResponse = '### Host|Host\nA discussion.\n# Observer’s notes\n' + ['Unexpected connections','Questions worth pursuing','Core disagreements','Directions to explore','Assumptions to verify'].map(title => `## ${title}\n- A concrete observation from this dialogue.`).join('\n');
+  const engine = new CoffeeEngine(session, async () => { if (++attempts === 1) throw new Error('offline'); return coffeeResponse + '\n<!-- coffee-segment-summary: {"summary":"A shift in the question."} -->'; }, async () => {});
+  await engine.start(); const id = engine.session.rounds[0].id; assert.equal(engine.session.rounds[0].status, 'error');
+  await engine.start(); assert.equal(engine.session.rounds.length,1); assert.equal(engine.session.rounds[0].id,id); assert.equal(engine.session.rounds[0].summary,'A shift in the question.'); assert.ok(!engine.session.transcriptMarkdown.includes('coffee-segment-summary'));
+  const other = new CoffeeEngine(coffeeSession(), async () => coffeeResponse, async () => {}); await other.start(); assert.equal(other.session.status,'completed'); assert.equal(other.session.rounds[0].summary,undefined);
+});
+integrationTest('Coffee summary backfill makes one request, saves partial IDs only, and preserves dialogue and insights on failure or cancellation', async () => {
+  const { CoffeeEngine } = load('experiences/coffee-tables/engine.ts');
+  const session = coffeeSession(); session.status='completed'; session.rounds=[{id:'a',markdown:'Hello.',notes:'',status:'completed',createdAt:session.createdAt},{id:'b',markdown:'More.',notes:'',summary:'Existing.',status:'completed',createdAt:session.createdAt}]; session.questions=[{id:'q',question:'Why?',answer:'Reason.',status:'complete',createdAt:session.createdAt}]; session.observerNotes=['Keep these notes.']; let calls=0;
+  const engine = new CoffeeEngine(session, async ({prompt}) => {calls++; assert.ok(prompt.includes('round:a')); assert.ok(!prompt.includes('round:b')); return '{"summaries":[{"id":"round:a","summary":"Opening turn."}]}';},async()=>{});
+  await engine.fillSegmentSummaries(); assert.equal(calls,1); assert.equal(engine.session.rounds[0].summary,'Opening turn.'); assert.equal(engine.session.rounds[1].summary,'Existing.'); assert.equal(engine.session.questions[0].summary,undefined); assert.equal(engine.session.observerNotes[0],'Keep these notes.'); assert.ok(engine.error);
+  const failed = new CoffeeEngine(session,async()=>'{broken',async()=>{}); await failed.fillSegmentSummaries(); assert.deepEqual(plain(failed.session),plain(session));
+  const saveFailed = new CoffeeEngine(session,async()=>'{"summaries":[{"id":"round:a","summary":"Opening turn."}]}',async()=>{throw new Error('disk');}); await saveFailed.fillSegmentSummaries(); assert.equal(saveFailed.session.rounds[0].summary,undefined);
+  let abort; const cancelled = new CoffeeEngine(session,({signal})=>new Promise(resolve=>{abort=()=>resolve('{"summaries":[{"id":"round:a","summary":"Never save."}]}'); signal.addEventListener('abort',abort);}),async()=>{}); const pending=cancelled.fillSegmentSummaries(); cancelled.cancel(); await pending; assert.equal(cancelled.session.rounds[0].summary,undefined);
+});
+
+integrationTest('Coffee navigation summary metadata round trips by identity without changing transcript or triggering stale insights', async () => {
+  const { CoffeeStorage } = load('experiences/coffee-tables/storage.ts', { obsidian }); const { app, files, contents } = fixture(); app.vault.getFiles = () => [...files.values()].filter(f=>f instanceof TFile);
+  const store=new CoffeeStorage(app.vault,'Agent Workspace'), session=coffeeSession(); session.status='completed'; session.rounds=[{id:'empty',markdown:'',notes:'',status:'error',createdAt:session.createdAt},{id:'spoken',markdown:'### A|Host\nSpeech.',notes:'',kind:'continuation',summary:'A concrete turn.',status:'completed',createdAt:session.createdAt}]; session.questions=[{id:'q',question:'Why?',answer:'Because.',status:'complete',summary:'The follow-up explores causes.',createdAt:session.createdAt}];
+  await store.save(session); const reopened=await new CoffeeStorage(app.vault,'Agent Workspace').load(session.id); assert.equal(reopened.rounds.find(x=>x.id==='spoken').summary,'A concrete turn.'); assert.equal(reopened.rounds.find(x=>x.id==='spoken').kind,'continuation'); assert.equal(reopened.questions[0].summary,'The follow-up explores causes.'); assert.ok(!reopened.dirtyNotes); assert.equal(reopened.transcriptMarkdown,'### A|Host\nSpeech.');
+  const file=store.sessionPath(session.id), raw=contents.get(file); const marker=/<!-- coffee-tables-navigation:([^\n]+) -->/.exec(raw); const metadata=JSON.parse(decodeURIComponent(marker[1])); metadata.find(x=>x.id==='round:spoken').summary='Edited summary.'; contents.set(file,raw.replace(marker[0],`<!-- coffee-tables-navigation:${encodeURIComponent(JSON.stringify(metadata))} -->`)); const edited=await new CoffeeStorage(app.vault,'Agent Workspace').load(session.id); assert.equal(edited.rounds.find(x=>x.id==='spoken').summary,'Edited summary.'); assert.ok(!edited.dirtyNotes);
+});
+integrationTest('Coffee insight filtering expands matching context without changing saved collapse preferences', () => {
+  const {CoffeeTablesView}=load('experiences/coffee-tables/view.ts',{obsidian}); const view=new CoffeeTablesView({app:{}},{settings:{language:'en'}}); view.engine={session:{id:'table',language:'en'}}; view.renderMarkdown=()=>{};
+  const markdown='# Observer’s notes\n## Unexpected connections\n- Brief insight. <!-- coffee-insight:v1:id=item-a -->\n  - Context: A detailed bridge to trust.\n## Core disagreements\n- Other insight. <!-- coffee-insight:v1:id=item-b -->'; const target=coffeeElement('root'); view.renderInsightNotes(markdown,target);
+  const input=coffeeFind(target,x=>x.tag==='input'); input.value='trust'; input.input(); assert.equal(coffeeFind(target,x=>x.tag==='input'),input);
+  const state=view.insightStates.get('table'); state.collapsed.add('connections'); state.query='trust'; target.empty(); view.renderInsightNotes(markdown,target); const group=coffeeFind(target,x=>x.tag==='details' && x.dataset.insightCategory); assert.equal(group.open,true); assert.equal(coffeeFind(group,x=>x.dataset.insightId==='item-a').open,true); assert.equal(coffeeFind(target,x=>x.dataset.insightId==='item-b'),undefined); assert.equal(state.expanded.size,0); assert.ok(state.collapsed.has('connections'));
+  state.query='';target.empty();view.renderInsightNotes(markdown,target); assert.equal(coffeeFind(target,x=>x.dataset.insightCategory==='connections').open,false); assert.equal(coffeeFind(target,x=>x.dataset.insightId==='item-a').open,false);
+});
+integrationTest('Coffee segment jump uses exact anchors and switches narrow layout to conversation', () => {
+  const {CoffeeTablesView}=load('experiences/coffee-tables/view.ts',{obsidian}); const view=new CoffeeTablesView({app:{}},{settings:{language:'en'}}); let scroll; const message={addClass(){},removeClass(){}}, segment={dataset:{coffeeSegment:'round:a'},getBoundingClientRect:()=>({top:300}),querySelector:()=>message},scroller={scrollTop:50,getBoundingClientRect:()=>({top:100}),scrollTo:value=>scroll=value},body={dataset:{pane:'insight'}};
+  view.contentEl={querySelectorAll:()=>[segment],querySelector:q=>q==='.ct-chat-scroll'?scroller:q==='.ct-room-columns'?body:null}; assert.equal(view.locateSegment('round:a'),true); assert.equal(scroll.top,226); assert.equal(body.dataset.pane,'chat'); assert.equal(view.locateSegment('round:missing'),false);
+});
+
+integrationTest('Coffee legacy navigation stays read only and clears the previous room', () => {
+  const {CoffeeTablesView}=load('experiences/coffee-tables/view.ts',{obsidian:{...obsidian,MarkdownRenderer:{render:async()=>{}}}});
+  const view=new CoffeeTablesView({app:{workspace:{}}},{settings:{language:'en'},isCoffeeOutlineSource:()=>true,refreshCoffeeOutline(){}});
+  view.contentEl=coffeeElement('root'); view.button=()=>{}; view.store={sessionPath:()=> 'legacy.md'}; view.engine={session:{id:'previous'}};
+  view.attachLegacy({version:1,id:'old',topic:'Old table',model:'model',createdAt:'2026-01-01',messages:[{speakerId:'host',text:'Old discussion'}],participants:[{id:'host',name:'Host',role:'Host'}],notes:null});
+  assert.equal(view.engine,null); assert.equal(view.outlineSnapshot().sessionId,'old'); assert.equal(view.outlineSnapshot().segments[0].kind,'legacy'); assert.ok(coffeeFind(view.contentEl,x=>x.attrs['data-coffee-segment']==='legacy'));
+});
+
+integrationTest('Coffee summary-only save preserves exact historic insight Markdown', async () => {
+ const {CoffeeStorage}=load('experiences/coffee-tables/storage.ts',{obsidian}); const {app,files,contents}=fixture(); app.vault.getFiles=()=>[...files.values()].filter(f=>f instanceof TFile);
+ const store=new CoffeeStorage(app.vault,'Agent Workspace'), session=coffeeSession(); session.rounds=[{id:'round-a',markdown:'### Host|Host\nOriginal dialogue.',notes:'',status:'completed',createdAt:session.createdAt}]; await store.save(session);
+ const path=store.sessionPath(session.id), original=contents.get(path), historic=original.replace(/^<!-- coffee-tables-navigation:[^\n]+ -->\n?/m,'').replace('## Observer notes','## Observer notes\n\n### Latest\n\nKeep this formatting.\n\n### History'); contents.set(path,historic);
+ const fresh=new CoffeeStorage(app.vault,'Agent Workspace'); const loaded=await fresh.load(session.id); loaded.rounds[0].summary='The segment explored a concrete turn.'; await fresh.save(loaded,true); const saved=contents.get(path);
+ assert.equal(saved.replace(/^<!-- coffee-tables-navigation:[^\n]+ -->\n\n/m,''),historic); assert.equal((await fresh.load(session.id)).rounds[0].summary,loaded.rounds[0].summary);
+});
+integrationTest('Coffee summary metadata ignores reference markers and headings', async () => {
+ const {CoffeeStorage}=load('experiences/coffee-tables/storage.ts',{obsidian}); const {app,files,contents}=fixture(); app.vault.getFiles=()=>[...files.values()].filter(f=>f instanceof TFile); const store=new CoffeeStorage(app.vault,'Agent Workspace'),session=coffeeSession();
+ session.rounds=[{id:'round-a',markdown:'### Host|Host\nReal conversation.',notes:'',status:'completed',createdAt:session.createdAt}]; session.guests={...(session.guests||{}),customPrompt:'',counts:{experts:1,'cross-domain':0,generalist:0,affected:0},referenceFiles:[{name:'reference.md',content:'```\n<!-- coffee-tables-navigation:%5B%5D -->\n\n## Conversation\nQuoted reference headings.'}]};
+ await store.save(session); const encoded=contents.get(store.sessionPath(session.id)); const before=encoded.replace('````text','```text').replace(/\n````\n/g,'\n```\n'); contents.set(store.sessionPath(session.id),before); const fresh=new CoffeeStorage(app.vault,'Agent Workspace'); const loaded=await fresh.load(session.id); assert.equal(loaded.rounds[0].markdown,session.rounds[0].markdown); loaded.rounds[0].summary='A genuine navigation summary.'; await fresh.save(loaded,true); const after=contents.get(store.sessionPath(session.id)); assert.ok(after.includes(session.guests.referenceFiles[0].content)); assert.equal(after.match(/coffee-tables-navigation:/g).length,2); assert.equal((await fresh.load(session.id)).rounds[0].summary,loaded.rounds[0].summary); assert.equal(before.replace(/^<!-- coffee-tables-navigation:[^\n]+ -->$/gm,''),after.replace(/^<!-- coffee-tables-navigation:[^\n]+ -->$/gm,''));
 });

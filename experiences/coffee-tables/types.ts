@@ -3,16 +3,20 @@ import type { UiLanguage } from "../../i18n";
 export type GuestCategory = "experts" | "cross-domain" | "generalist" | "affected";
 export type GuestCounts = Record<GuestCategory, number>;
 export interface NamedGuest { id: string; category: GuestCategory; description: string }
-export interface GuestSettings { counts: GuestCounts; guests: NamedGuest[]; background: string; customPrompt: string; hostCount?: number }
-export interface CoffeeQuestion { id: string; question: string; answer: string; draftAnswer?: string; status: "pending" | "complete" | "error"; error?: string; createdAt?: string }
+export interface CoffeeGuestInvitation { id: string; name: string; category: GuestCategory; description: string }
+export interface CoffeeStyle { id: string; name: string; prompt: string }
+export interface CoffeeReference { name: string; content: string }
+export interface GuestSettings { counts: GuestCounts; guests: NamedGuest[]; background: string; customPrompt: string; styleId?: string; styleName?: string; stylePrompt?: string; referenceFiles?: CoffeeReference[]; hostCount?: number }
+export interface CoffeeQuestion { summary?: string; id: string; question: string; answer: string; draftAnswer?: string; invitedGuests?: CoffeeGuestInvitation[]; status: "pending" | "complete" | "error"; error?: string; createdAt?: string }
 export interface CoffeeIntervention { id: string; kind: "comment" | "guest-question" | "redirect"; target?: string; text: string; createdAt: string; status?: "pending" | "sent" | "failed"; roundId?: string; afterTurn?: number }
-export interface CoffeeRound { id: string; markdown: string; notes: string; draftMarkdown?: string; status: "generating" | "completed" | "error"; createdAt: string }
+export interface CoffeeRound { summary?: string; kind?: "initial" | "continuation" | "legacy"; id: string; markdown: string; notes: string; draftMarkdown?: string; status: "generating" | "completed" | "error"; createdAt: string }
 export interface CoffeeSession {
   version: 3; id: string; topic: string; language: UiLanguage; model: string; reasoning: string;
   createdAt: string; updatedAt: string; lastGenerationStartedAt?: string; lastCompletedAt?: string; status: "ready" | "generating" | "completed" | "error";
   transcriptMarkdown: string; questions: CoffeeQuestion[]; error?: string; draftMarkdown?: string; observerDraftMarkdown?: string;
   guests?: GuestSettings; rounds?: CoffeeRound[]; observerNotes?: string[]; dirtyNotes?: boolean;
   interventions?: CoffeeIntervention[];
+  referenceFiles?: CoffeeReference[];
 }
 export interface LegacyCoffeeSession {
   version: 1; id: string; topic: string; language: UiLanguage; model: string; reasoning: string;
@@ -26,6 +30,7 @@ export type CoffeeRuntime = (request: CoffeeRequest) => Promise<string>;
 
 const DEFAULT_COUNTS: GuestCounts = { experts: 4, "cross-domain": 1, generalist: 1, affected: 1 };
 const CATEGORIES: GuestCategory[] = ["experts", "cross-domain", "generalist", "affected"];
+function isCoffeeReference(value: unknown): value is CoffeeReference { return !!value && typeof value === "object" && typeof (value as { name?: unknown }).name === "string" && typeof (value as { content?: unknown }).content === "string"; }
 function normalizedGuests(value: unknown): GuestSettings | undefined {
   if (!value || typeof value !== "object") return undefined;
   const raw = value as Record<string, unknown>;
@@ -33,7 +38,8 @@ function normalizedGuests(value: unknown): GuestSettings | undefined {
     const source = raw.counts as Record<string, unknown>;
     const counts = Object.fromEntries(CATEGORIES.map(key => [key, Number.isInteger(source[key]) ? Number(source[key]) : -1])) as GuestCounts;
     const guests = Array.isArray(raw.guests) ? raw.guests.filter((item): item is NamedGuest => !!item && typeof item === "object" && typeof (item as NamedGuest).id === "string" && CATEGORIES.includes((item as NamedGuest).category) && typeof (item as NamedGuest).description === "string").map(item => ({...item})) : [];
-    return { counts, guests, background: typeof raw.background === "string" ? raw.background : "", customPrompt: typeof raw.customPrompt === "string" ? raw.customPrompt : "", hostCount: Number.isInteger(raw.hostCount) ? Number(raw.hostCount) : 2 };
+    const referenceFiles = Array.isArray(raw.referenceFiles) ? (raw.referenceFiles as unknown[]).filter(isCoffeeReference) : undefined;
+    return { counts, guests, background: typeof raw.background === "string" ? raw.background : "", customPrompt: typeof raw.customPrompt === "string" ? raw.customPrompt : "", ...(typeof raw.styleId === "string" ? { styleId: raw.styleId } : {}), ...(typeof raw.styleName === "string" ? { styleName: raw.styleName } : {}), ...(typeof raw.stylePrompt === "string" ? { stylePrompt: raw.stylePrompt } : {}), ...(referenceFiles ? { referenceFiles } : {}), hostCount: Number.isInteger(raw.hostCount) ? Number(raw.hostCount) : 2 };
   }
   const perspectives = Array.isArray(raw.perspectives) ? raw.perspectives.filter((item): item is GuestCategory => CATEGORIES.includes(item as GuestCategory)) : CATEGORIES;
   const counts: GuestCounts = { experts: perspectives.includes("experts") ? 4 : 0, "cross-domain": perspectives.includes("cross-domain") ? 1 : 0, generalist: perspectives.includes("generalist") ? 1 : 0, affected: perspectives.includes("affected") ? 1 : 0 };
@@ -44,7 +50,7 @@ export function createSession(topic: string, model: string, reasoning: string, l
   return { version: 3, id: crypto.randomUUID(), topic, model, reasoning, language, createdAt: now, updatedAt: now, status: "ready", transcriptMarkdown: "", questions: [], guests: guests ? normalizedGuests(guests) : normalizedGuests({ counts: DEFAULT_COUNTS, guests: [], background: "", customPrompt: "" }), rounds: [], observerNotes: [] };
 }
 function normalizeSession(value: Record<string, unknown>): CoffeeSession {
-  const questions = Array.isArray(value.questions) ? value.questions.map(item => ({ ...(item as CoffeeQuestion), createdAt: typeof (item as CoffeeQuestion).createdAt === "string" ? (item as CoffeeQuestion).createdAt : String(value.createdAt) })) : [];
+  const questions = Array.isArray(value.questions) ? value.questions.map(item => ({ ...(item as CoffeeQuestion), ...(Array.isArray((item as CoffeeQuestion).invitedGuests) ? { invitedGuests: (item as CoffeeQuestion).invitedGuests!.filter(guest => guest && typeof guest.id === "string" && typeof guest.name === "string" && CATEGORIES.includes(guest.category) && typeof guest.description === "string").map(guest => ({ ...guest })) } : {}), createdAt: typeof (item as CoffeeQuestion).createdAt === "string" ? (item as CoffeeQuestion).createdAt : String(value.createdAt) })) : [];
   const transcript = typeof value.transcriptMarkdown === "string" ? value.transcriptMarkdown : "";
   const rounds = Array.isArray(value.rounds) && (value.rounds.length || !transcript) ? value.rounds as CoffeeRound[] : (transcript ? [{ id: "round-1", markdown: transcript, notes: "", status: (value.status === "completed" ? "completed" : "error") as CoffeeRound["status"], createdAt: String(value.createdAt) }] : []);
   return { ...(value as unknown as CoffeeSession), version: 3, guests: normalizedGuests(value.guests), rounds, observerNotes: Array.isArray(value.observerNotes) ? value.observerNotes.filter((item): item is string => typeof item === "string") : [], questions, transcriptMarkdown: rounds.map(round => round.markdown).filter(Boolean).join("\n\n"), dirtyNotes: value.dirtyNotes === true };
@@ -57,12 +63,22 @@ export function parseSession(raw: string): AnyCoffeeSession {
   }
   if (![2, 3].includes(Number(value.version)) || typeof value.id !== "string" || !/^[a-zA-Z0-9-]+$/.test(value.id) || typeof value.topic !== "string" || !value.topic.trim() || !["en", "zh-TW"].includes(String(value.language)) || !["ready", "generating", "completed", "error"].includes(String(value.status)) || typeof value.model !== "string" || typeof value.reasoning !== "string" || typeof value.createdAt !== "string" || typeof value.updatedAt !== "string" || typeof value.transcriptMarkdown !== "string" || !Array.isArray(value.questions)) throw new Error("Invalid Coffee Tables session");
   const session = normalizeSession(value); const ids = new Set<string>();
+  if (session.referenceFiles !== undefined && (!Array.isArray(session.referenceFiles) || session.referenceFiles.some(item => !item || typeof item.name !== "string" || typeof item.content !== "string"))) throw new Error("Invalid Coffee Tables reference files");
   if (session.draftMarkdown !== undefined && typeof session.draftMarkdown !== "string") throw new Error("Invalid conversation draft");
   if (session.observerDraftMarkdown !== undefined && typeof session.observerDraftMarkdown !== "string") throw new Error("Invalid observer notes draft");
   if (session.interventions !== undefined && (!Array.isArray(session.interventions) || !session.interventions.every(item => item && typeof item.id === "string" && ["comment", "guest-question", "redirect"].includes(item.kind) && typeof item.text === "string"))) throw new Error("Invalid Coffee Tables interventions");
-  for (const item of session.questions) { if (!item || typeof item.id !== "string" || ids.has(item.id) || typeof item.question !== "string" || !item.question.trim() || typeof item.answer !== "string" || (item.draftAnswer !== undefined && typeof item.draftAnswer !== "string") || !["pending", "complete", "error"].includes(item.status)) throw new Error("Invalid Coffee Tables question"); ids.add(item.id); }
+  let invitedTotal = 0; const invitedIds = new Set<string>();
+  for (const item of session.questions) {
+    if (!item || typeof item.id !== "string" || ids.has(item.id) || typeof item.question !== "string" || !item.question.trim() || typeof item.answer !== "string" || (item.draftAnswer !== undefined && typeof item.draftAnswer !== "string") || !["pending", "complete", "error"].includes(item.status)) throw new Error("Invalid Coffee Tables question");
+    ids.add(item.id);
+    for (const guest of item.invitedGuests ?? []) {
+      if (!guest || typeof guest.id !== "string" || invitedIds.has(guest.id) || !guest.name.trim() || guest.name.length > 60 || !guest.description.trim() || guest.description.length > 160 || !CATEGORIES.includes(guest.category)) throw new Error("Invalid Coffee Tables follow-up guest");
+      invitedIds.add(guest.id);
+      if (item.status === "complete") invitedTotal++;
+    }
+  }
   const total = Object.values(session.guests?.counts ?? {}).reduce((sum, value) => sum + value, 0);
-  if (session.guests && (total < 1 || total > 12 || Object.values(session.guests.counts).some(value => !Number.isInteger(value) || value < 0 || value > 8) || !Number.isInteger(session.guests.hostCount) || session.guests.hostCount! < 1 || session.guests.hostCount! > 4 || session.guests.guests.some(guest => session.guests!.guests.filter(item => item.category === guest.category).length > session.guests!.counts[guest.category]))) throw new Error("Invalid Coffee Tables guest count");
+  if (session.guests && (total < 1 || total + invitedTotal > 12 || Object.values(session.guests.counts).some(value => !Number.isInteger(value) || value < 0 || value > 8) || !Number.isInteger(session.guests.hostCount) || session.guests.hostCount! < 1 || session.guests.hostCount! > 4 || session.guests.guests.some(guest => session.guests!.guests.filter(item => item.category === guest.category).length > session.guests!.counts[guest.category]))) throw new Error("Invalid Coffee Tables guest count");
   return session;
 }
 export function copyLegacySession(legacy: LegacyCoffeeSession): CoffeeSession {

@@ -1,6 +1,7 @@
 import { App, TFile, TFolder, normalizePath, parseYaml, stringifyYaml } from "obsidian";
 import { translate, type TranslationKey } from "./i18n";
 import { MapDocument, MapNode, serializeMap, parseMap } from "./map-model";
+import type { CoffeeStyle } from "./experiences/coffee-tables/types";
 
 export type Status = "idea" | "running" | "completed" | "error";
 export type ModelSource = "workspace" | "inherited" | "manual";
@@ -37,6 +38,8 @@ export interface Note {
 }
 export type NotePatch = Partial<Note>;
 export interface Settings {
+  coffeeStyles?: CoffeeStyle[];
+  defaultCoffeeStyleId?: string;
   language: "zh-TW" | "en";
   workspaceFolder: string;
   topicsFolder: string;
@@ -68,6 +71,7 @@ export interface LegacyMigrationPlan {
 }
 
 export const DEFAULT_SETTINGS: Settings = {
+  coffeeStyles: [],
   language: "en",
   workspaceFolder: "Agent Workspace",
   topicsFolder: "Agent Workspace/Topics",

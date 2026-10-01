@@ -1,5 +1,31 @@
 # Changelog
 
+## [Unreleased]
+
+### Added
+
+- Editable Coffee Tables conversation instructions, reusable styles, per-table snapshots, and UTF-8 `.txt` / `.md` background files.
+- Cumulative observer insights with expandable context, a questions-and-possible-solutions category, search, category collapse, and source navigation. Existing insights survive updates that omit them.
+- Conversation segment navigation with one-sentence summaries, direct jumps, and an optional single-request backfill for missing summaries.
+- Guests invited with follow-up questions stay in the table after a successful response, including after reopening.
+
+### Changed
+
+- Use a brain-circuit icon for VAM and group the VAM and Coffee Tables ribbon entries with separators.
+- Keep table navigation actions in a separate pinned row and preserve the home list state on return. Remove per-row action menus, legacy organization and recently-deleted interfaces, and the restored-instructions application action. Existing backup data is retained.
+- Use the left pane for Coffee Tables conversation segments; observer insights are searched and browsed on the right.
+
+### Fixed
+
+- Preserve reading position during streaming and avoid clipping wrapped navigation text in narrow sidebars.
+- Treat background contents as reference data and preserve Markdown parsing when references contain headings, code fences, or output markers.
+- Restrict Coffee Tables text-generation tasks from inspecting Git or the surrounding environment.
+
+### Known limitations
+
+- Legacy v1 conversations remain read-only; segment-summary backfill does not write to them.
+- Claude Code live tasks remain unverified.
+
 ## [0.10.0] - 2026-10-01
 
 ### Added

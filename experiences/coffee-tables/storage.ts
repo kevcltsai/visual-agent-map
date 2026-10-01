@@ -1,6 +1,7 @@
 import { normalizePath, TFile, TFolder, type Vault } from "obsidian";
-import { copyLegacySession, parseSession, type AnyCoffeeSession, type CoffeeRound, type CoffeeSession, type LegacyCoffeeSession } from "./types";
+import { copyLegacySession, parseSession, type AnyCoffeeSession, type CoffeeReference, type CoffeeRound, type CoffeeSession, type LegacyCoffeeSession } from "./types";
 import { splitObserverNotes } from "./engine";
+import { baselineFromVersions, serializeInsightNotes } from "./insights";
 
 const CATEGORY_LABELS: Record<string, [string, string]> = { experts: ["主題專家", "Topic experts"], "cross-domain": ["跨領域專家", "Cross-domain experts"], generalist: ["好奇的通才", "Curious generalists"], affected: ["受影響者", "Affected perspectives"] };
 const markdownTopic = (raw: string): string | undefined => {
@@ -9,7 +10,33 @@ const markdownTopic = (raw: string): string | undefined => {
   if (frontmatter) body = body.slice(frontmatter[0].length);
   return /^\s*# ([^\r\n]+)(?:\r?\n|$)/.exec(body)?.[1]?.trim() || undefined;
 };
-interface Sidecar { version: 3; id: string; topic: string; language: CoffeeSession["language"]; model: string; reasoning: string; createdAt: string; updatedAt: string; lastGenerationStartedAt?: string; lastCompletedAt?: string; status: CoffeeSession["status"]; error?: string; guests: CoffeeSession["guests"]; rounds: Array<Omit<CoffeeRound, "markdown" | "notes">>; questions: Array<{ id: string; createdAt: string; status: CoffeeSession["questions"][number]["status"]; error?: string; draftAnswer?: string }>; interventions?: CoffeeSession["interventions"]; draftMarkdown?: string; observerDraftMarkdown?: string; dirtyNotes?: boolean; revision: number; filePath: string; transcriptHash: string; journal?: { previousMarkdownHash: string; nextMarkdownHash: string; previousSidecar: string; targetMarkdown?: string }; moveJournal?: { previousPath: string; targetPath: string } }
+function isCoffeeReferenceList(value: unknown): value is CoffeeReference[] { return Array.isArray(value) && value.every(item => !!item && typeof item === "object" && typeof (item as { name?: unknown }).name === "string" && typeof (item as { content?: unknown }).content === "string"); }
+function conversationBoundary(raw: string): { index: number; heading: string; navigation?: RegExpExecArray } {
+  let start = 0;
+  const referenceMarker = /^<!-- coffee-tables-references:([^\n]+) -->$/m.exec(raw);
+  if (referenceMarker) {
+    try {
+      const files: unknown = JSON.parse(decodeURIComponent(referenceMarker[1]));
+      if (!isCoffeeReferenceList(files)) throw new Error("Invalid references");
+      let end = referenceMarker.index + referenceMarker[0].length;
+      for (const file of files) { const at = raw.indexOf(file.content,end); if (at < 0) throw new Error("Reference text missing"); end = at + file.content.length; }
+      start = raw.indexOf("\n",end) + 1;
+      const closing = /^(?:`{3,}|~{3,})[ \t]*\r?\n/.exec(raw.slice(start)); if (closing) start += closing[0].length;
+    } catch { throw new Error("Cannot reliably locate the reference boundary; original data was preserved"); }
+  }
+  let fence = "", offset = start;
+  for (const line of raw.slice(start).split("\n")) {
+    const match = /^\s*(`{3,}|~{3,})/.exec(line);
+    if (match) { if (!fence) fence = match[1]; else if (match[1][0] === fence[0] && match[1].length >= fence.length && !line.slice(match[0].length).trim()) fence = ""; }
+    if (!fence && /^## (?:對話紀錄|Conversation)\s*$/.test(line)) {
+      const navigation = /<!-- coffee-tables-navigation:([^\n]+) -->[\r\n]*$/.exec(raw.slice(0,offset));
+      return {index: offset, heading: line, ...(navigation ? {navigation} : {})};
+    }
+    offset += line.length + 1;
+  }
+  throw new Error("Coffee Tables Markdown is missing its conversation section");
+}
+interface Sidecar { version: 3; id: string; topic: string; language: CoffeeSession["language"]; model: string; reasoning: string; createdAt: string; updatedAt: string; lastGenerationStartedAt?: string; lastCompletedAt?: string; status: CoffeeSession["status"]; error?: string; guests: CoffeeSession["guests"]; rounds: Array<Omit<CoffeeRound, "markdown" | "notes">>; questions: Array<{ summary?: string; id: string; createdAt: string; status: CoffeeSession["questions"][number]["status"]; error?: string; draftAnswer?: string; invitedGuests?: CoffeeSession["questions"][number]["invitedGuests"] }>; interventions?: CoffeeSession["interventions"]; draftMarkdown?: string; observerDraftMarkdown?: string; dirtyNotes?: boolean; revision: number; filePath: string; transcriptHash: string; journal?: { previousMarkdownHash: string; nextMarkdownHash: string; previousSidecar: string; targetMarkdown?: string }; moveJournal?: { previousPath: string; targetPath: string } }
 export class CoffeeStorage {
   private originals = new Map<string, string>(); private sidecarOriginals = new Map<string, string>(); private locations = new Map<string, string>(); private revisions = new Map<string, number>(); private activeWrites = new Set<string>(); private activeMoves = new Set<string>(); private deletedIds = new Set<string>();
   readonly folder: string; readonly hidden: string;
@@ -26,14 +53,14 @@ export class CoffeeStorage {
   private async writeHidden(path: string, contents: string, expected?: string): Promise<void> { if (expected === undefined) { if (await this.vault.adapter.exists(path)) throw new Error("Coffee Tables hidden session already exists"); await this.vault.adapter.write(path, contents); return; } await this.vault.adapter.process(path, current => { if (current !== expected) throw new Error("Hidden Coffee Tables data changed outside this room; no content was overwritten"); return contents; }); }
   private sidecar(session: CoffeeSession, revision: number, filePath: string): Sidecar {
     const { rounds = [], questions = [] } = session;
-    const storedRounds = rounds.filter(round => round.markdown.trim() || round.draftMarkdown || round.status === "generating" || (session.interventions ?? []).some(item => item.roundId === round.id));
-    return { version: 3, id: session.id, topic: session.topic, language: session.language, model: session.model, reasoning: session.reasoning, createdAt: session.createdAt, updatedAt: session.updatedAt, ...(session.lastGenerationStartedAt ? { lastGenerationStartedAt: session.lastGenerationStartedAt } : {}), ...(session.lastCompletedAt ? { lastCompletedAt: session.lastCompletedAt } : {}), status: session.status, ...(session.error ? { error: session.error } : {}), guests: session.guests, rounds: storedRounds.map(({ markdown: _markdown, notes: _notes, ...round }) => round), questions: questions.map(({ id, createdAt, status, error, draftAnswer }) => ({ id, createdAt: createdAt ?? session.createdAt, status, ...(error ? { error } : {}), ...(draftAnswer ? { draftAnswer } : {}) })), ...(session.interventions ? { interventions: session.interventions } : {}), ...(session.draftMarkdown ? { draftMarkdown: session.draftMarkdown } : {}), ...(session.observerDraftMarkdown ? { observerDraftMarkdown: session.observerDraftMarkdown } : {}), ...(session.dirtyNotes ? { dirtyNotes: true } : {}), revision, filePath, transcriptHash: conversationHash(rounds, questions, session.interventions ?? []) };
+    const storedRounds = rounds;
+    return { version: 3, id: session.id, topic: session.topic, language: session.language, model: session.model, reasoning: session.reasoning, createdAt: session.createdAt, updatedAt: session.updatedAt, ...(session.lastGenerationStartedAt ? { lastGenerationStartedAt: session.lastGenerationStartedAt } : {}), ...(session.lastCompletedAt ? { lastCompletedAt: session.lastCompletedAt } : {}), status: session.status, ...(session.error ? { error: session.error } : {}), guests: session.guests, rounds: storedRounds.map(({ markdown: _markdown, notes: _notes, ...round }) => round), questions: questions.map(({ id, createdAt, status, error, draftAnswer, invitedGuests, summary }) => ({ summary, id, createdAt: createdAt ?? session.createdAt, status, ...(error ? { error } : {}), ...(draftAnswer ? { draftAnswer } : {}), ...(invitedGuests?.length ? { invitedGuests } : {}) })), ...(session.interventions ? { interventions: session.interventions } : {}), ...(session.draftMarkdown ? { draftMarkdown: session.draftMarkdown } : {}), ...(session.observerDraftMarkdown ? { observerDraftMarkdown: session.observerDraftMarkdown } : {}), ...(session.dirtyNotes ? { dirtyNotes: true } : {}), revision, filePath, transcriptHash: conversationHash(rounds, questions, session.interventions ?? []) };
   }
   private parseMarkdown(raw: string, side: Sidecar): CoffeeSession {
     const title = markdownTopic(raw) ?? side.topic;
     const settingsMatch = /^## (?:開桌設定|Table settings)\s*\n([\s\S]*?)(?=^## |$(?![\s\S]))/m.exec(raw);
-    const transcriptStart = /^## (?:對話紀錄|Conversation)\s*$/m.exec(raw); if (!transcriptStart) throw new Error("Coffee Tables Markdown is missing its conversation section");
-    const afterTranscript = raw.slice(transcriptStart.index + transcriptStart[0].length);
+    const boundary = conversationBoundary(raw);
+    const afterTranscript = raw.slice(boundary.index + boundary.heading.length);
     const tailHeadings = [...afterTranscript.matchAll(/^## (?:觀察者整理|Observer notes|未完成草稿|Unfinished drafts)\s*$/gm)];
     const contentEnd = tailHeadings.length ? tailHeadings[0].index : afterTranscript.length;
     const conversation = afterTranscript.slice(0, contentEnd).trim();
@@ -44,8 +71,8 @@ export class CoffeeStorage {
     for (let i = 0; i < markers.length; i++) {
       const marker = markers[i], start = marker.index + marker[0].length, end = markers[i + 1]?.index ?? conversation.length, body = conversation.slice(start, end).trim();
       const roundMatch = /對談第 (\d+) 段|Conversation part (\d+)/.exec(marker[1]), qMatch = /追問第 (\d+) 題|Follow-up (\d+)/.exec(marker[1]), interventionMatch = /使用者介入第 (\d+) 則|User note (\d+)/.exec(marker[1]);
-      if (roundMatch) { if (!body) continue; const nth = Number(roundMatch[1] ?? roundMatch[2]) - 1, meta = side.rounds?.[nth]; const roundId = meta?.id ?? `round-${nth + 1}`, roundInterventions = (side.interventions ?? []).filter(item => item.roundId === roundId).sort((a, b) => (a.afterTurn ?? 0) - (b.afterTurn ?? 0)); const inputPattern = /^> \*\*你（插話）\*\*：([^\n]*(?:\n> [^\n]*)*)/gm, inputs = [...body.matchAll(inputPattern)]; inputs.forEach((input, index) => { if (roundInterventions[index]) roundInterventions[index].text = input[1].split("\n").map(line => line.replace(/^> ?/, "")).join("\n").trim(); }); const withoutInputs = body.replace(inputPattern, "").replace(/\n{3,}/g, "\n\n").trim(), { dialogue, notes } = splitObserverNotes(withoutInputs); rounds.push({ ...(meta ?? { id: roundId, createdAt: side.createdAt, status: side.status === "completed" ? "completed" : "error" }), markdown: dialogue, notes }); }
-      else if (qMatch) { const nth = Number(qMatch[1] ?? qMatch[2]) - 1, meta = [...questionsById.values()][nth]; if (!meta) throw new Error("A follow-up is missing its hidden session record"); const answerAt = /^### (?:桌上回答|Table response)\s*$/m.exec(body); const question = answerAt ? body.slice(0, answerAt.index).trim() : body; const answer = answerAt ? body.slice(answerAt.index + answerAt[0].length).trim() : ""; meta.question = question; meta.answer = answer; }
+      if (roundMatch) { const nth = Number(roundMatch[1] ?? roundMatch[2]) - 1, persistedId = /^<!-- coffee-tables-round:([a-zA-Z0-9-]+) -->$/m.exec(body)?.[1], meta = persistedId ? side.rounds?.find(item => item.id === persistedId) : side.rounds?.[nth]; const roundId = meta?.id ?? `round-${nth + 1}`, roundInterventions = (side.interventions ?? []).filter(item => item.roundId === roundId).sort((a, b) => (a.afterTurn ?? 0) - (b.afterTurn ?? 0)); const inputPattern = /^> \*\*你（插話）\*\*：([^\n]*(?:\n> [^\n]*)*)/gm, inputs = [...body.matchAll(inputPattern)]; inputs.forEach((input, index) => { if (roundInterventions[index]) roundInterventions[index].text = input[1].split("\n").map(line => line.replace(/^> ?/, "")).join("\n").trim(); }); const withoutInputs = body.replace(/^<!-- coffee-tables-round:[a-zA-Z0-9-]+ -->\s*$/gm, "").replace(inputPattern, "").replace(/\n{3,}/g, "\n\n").trim(), { dialogue, notes } = splitObserverNotes(withoutInputs); rounds.push({ ...(meta ?? { id: roundId, createdAt: side.createdAt, status: side.status === "completed" ? "completed" : "error" }), markdown: dialogue, notes }); }
+      else if (qMatch) { const nth = Number(qMatch[1] ?? qMatch[2]) - 1, meta = [...questionsById.values()][nth]; if (!meta) throw new Error("A follow-up is missing its hidden session record"); const answerAt = /^### (?:桌上回答|Table response)\s*$/m.exec(body); const inviteAt = /^### (?:邀請來賓|Invited guests)\s*$/m.exec(body); const questionEnd = [answerAt?.index, inviteAt?.index].filter((at): at is number => at !== undefined).sort((a,b) => a-b)[0] ?? body.length; meta.question = body.slice(0, questionEnd).trim(); meta.answer = answerAt ? body.slice(answerAt.index + answerAt[0].length, inviteAt && inviteAt.index > answerAt.index ? inviteAt.index : body.length).trim() : ""; }
       else if (interventionMatch) { const nth = Number(interventionMatch[1] ?? interventionMatch[2]) - 1, items = side.interventions ?? [], item = items[nth]; if (!item) throw new Error("A user comment is missing its hidden session record"); item.text = body; }
       else throw new Error("Unknown Coffee Tables conversation section");
     }
@@ -53,16 +80,33 @@ export class CoffeeStorage {
     const draftStart = /^## (?:未完成草稿|Unfinished drafts)\s*$/m.exec(raw);
     const notesBlock = notesStart ? raw.slice(notesStart.index + notesStart[0].length, draftStart && draftStart.index > notesStart.index ? draftStart.index : raw.length) : "";
     const latestStart = /^### (?:最新版本|Latest)\s*$/m.exec(notesBlock), historyStart = /^### (?:先前版本|History)\s*$/m.exec(notesBlock);
-    const latest = latestStart ? notesBlock.slice(latestStart.index + latestStart[0].length, historyStart && historyStart.index > latestStart.index ? historyStart.index : notesBlock.length).trim() : "";
+    const latest = latestStart ? notesBlock.slice(latestStart.index + latestStart[0].length, historyStart && historyStart.index > latestStart.index ? historyStart.index : notesBlock.length).trim() : historyStart ? notesBlock.slice(0, historyStart.index).trim() : notesBlock.trim();
     const history = historyStart ? notesBlock.slice(historyStart.index + historyStart[0].length).trim() : "";
     const noteVersions = [...history.matchAll(/^#### (?:第 (\d+) 版|Version (\d+))\s*\n([\s\S]*?)(?=^#### |$(?![\s\S]))/gm)].map(match => match[3].trim()).filter(Boolean);
     const settings = settingsMatch?.[1] ?? "";
     const model = /^- (?:模型|Model): (.+)$/m.exec(settings)?.[1] ?? side.model;
     const reasoning = /^- (?:推理強度|Reasoning): (.+)$/m.exec(settings)?.[1] ?? side.reasoning;
     const custom = /^### (?:這桌的額外要求|Additional requests)\s*\n([\s\S]*?)(?=^### |$(?![\s\S]))/m.exec(settings)?.[1]?.split("\n").map(line => line.replace(/^> ?/, "")).join("\n").trim() ?? side.guests?.customPrompt ?? "";
-    const guestSettings = side.guests ? { ...side.guests, customPrompt: custom } : undefined;
+    const styleMatch = /^<!-- coffee-tables-style:([^\n]+) -->$/m.exec(settings);
+    let styleSnapshot: { id?: string; name?: string; prompt?: string } | undefined;
+    if (styleMatch) try { styleSnapshot = JSON.parse(decodeURIComponent(styleMatch[1])) as typeof styleSnapshot; } catch { /* Fall back to the hidden session snapshot. */ }
+    const referenceMatch = /^<!-- coffee-tables-references:([^\n]+) -->$/m.exec(raw);
+    let referenceFiles = side.guests?.referenceFiles ?? [];
+    if (referenceMatch) try { const parsed: unknown = JSON.parse(decodeURIComponent(referenceMatch[1])); if (isCoffeeReferenceList(parsed)) referenceFiles = parsed; } catch { /* Keep the sidecar snapshot when the note marker is malformed. */ }
+    const guestSettings = side.guests ? { ...side.guests, customPrompt: custom, ...(styleSnapshot ? { styleId: styleSnapshot.id, styleName: styleSnapshot.name, stylePrompt: styleSnapshot.prompt } : {}), referenceFiles } : undefined;
     const questions = [...questionsById.values()].filter(question => question.question).map(({ index: _index, ...question }) => question), interventions = side.interventions ?? [];
-    const session: CoffeeSession = { version: 3, id: side.id, topic: title, language: side.language, model, reasoning, createdAt: side.createdAt, updatedAt: side.updatedAt, ...(side.lastGenerationStartedAt ? { lastGenerationStartedAt: side.lastGenerationStartedAt } : {}), ...(side.lastCompletedAt ? { lastCompletedAt: side.lastCompletedAt } : {}), status: side.status, ...(side.error ? { error: side.error } : {}), guests: guestSettings, rounds, transcriptMarkdown: rounds.map(round => round.markdown).join("\n\n"), questions, observerNotes: [latest, ...noteVersions].filter(Boolean), ...(side.draftMarkdown ? { draftMarkdown: side.draftMarkdown } : {}), ...(side.observerDraftMarkdown ? { observerDraftMarkdown: side.observerDraftMarkdown } : {}), ...(side.interventions ? { interventions } : {}), ...((side.dirtyNotes || (!!side.transcriptHash && conversationHash(rounds, questions, interventions) !== side.transcriptHash)) ? { dirtyNotes: true } : {}) };
+    const navigationMatch = boundary.navigation;
+    if (navigationMatch) try {
+      const data: unknown = JSON.parse(decodeURIComponent(navigationMatch[1]));
+      if (Array.isArray(data)) for (const entry of data as Array<{ id?: unknown; summary?: unknown; kind?: unknown }>) {
+        if (typeof entry.id !== "string") continue;
+        const item = entry.id.startsWith("round:") ? rounds.find(round => `round:${round.id}` === entry.id) : questions.find(question => `question:${question.id}` === entry.id);
+        if (item) { item.summary = typeof entry.summary === "string" && !/[\r\n]/.test(entry.summary) ? entry.summary.trim() || undefined : undefined; if ("markdown" in item && ["initial","continuation","legacy"].includes(String(entry.kind))) item.kind = entry.kind as CoffeeRound["kind"]; }
+      }
+    } catch { /* Preserve the sidecar snapshot when navigation metadata is malformed. */ }
+    for (const meta of side.rounds ?? []) if (!rounds.some(round => round.id === meta.id) && meta.status !== "completed") rounds.push({ ...meta, markdown: "", notes: "" });
+    rounds.sort((a,b) => a.createdAt.localeCompare(b.createdAt));
+    const session: CoffeeSession = { version: 3, id: side.id, topic: title, language: side.language, model, reasoning, createdAt: side.createdAt, updatedAt: side.updatedAt, ...(side.lastGenerationStartedAt ? { lastGenerationStartedAt: side.lastGenerationStartedAt } : {}), ...(side.lastCompletedAt ? { lastCompletedAt: side.lastCompletedAt } : {}), status: side.status, ...(side.error ? { error: side.error } : {}), guests: guestSettings, rounds, transcriptMarkdown: rounds.map(round => round.markdown).filter(Boolean).join("\n\n"), questions, observerNotes: [latest, ...noteVersions].filter(Boolean), ...(side.draftMarkdown ? { draftMarkdown: side.draftMarkdown } : {}), ...(side.observerDraftMarkdown ? { observerDraftMarkdown: side.observerDraftMarkdown } : {}), ...(side.interventions ? { interventions } : {}), ...((side.dirtyNotes || (!!side.transcriptHash && conversationHash(rounds, questions, interventions) !== side.transcriptHash)) ? { dirtyNotes: true } : {}) };
     return parseSession(JSON.stringify(session)) as CoffeeSession;
   }
   private encode(session: CoffeeSession): string {
@@ -71,15 +115,22 @@ export class CoffeeStorage {
     const lines = [`# ${session.topic}`, "", `## ${t("開桌設定", "Table settings")}`, "", `- ${t("模型", "Model")}: ${session.model}`, `- ${t("推理強度", "Reasoning")}: ${session.reasoning}`, `- ${t("主持人", "Hosts")}: ${session.guests?.hostCount ?? 2}`, `- ${t("主題專家", "Topic experts")}: ${count.experts}`, `- ${t("跨領域專家", "Cross-domain experts")}: ${count["cross-domain"]}`, `- ${t("好奇的通才", "Curious generalists")}: ${count.generalist}`, `- ${t("受影響者", "Affected perspectives")}: ${count.affected}`];
     for (const guest of session.guests?.guests ?? []) lines.push(`- ${t("指定來賓", "Guest")}: ${t(...CATEGORY_LABELS[guest.category])} — ${guest.description}`);
     if (session.guests?.background) lines.push(`- ${t("補充背景", "Background")}: ${session.guests.background}`);
-    if (session.guests?.customPrompt.trim()) lines.push("", `### ${t("這桌的額外要求", "Additional requests")}`, "", ...session.guests.customPrompt.split("\n").map(line => `> ${line}`));
+    if (session.guests?.stylePrompt?.trim()) lines.push("", `### ${t("聊天室風格", "Conversation style")}`, "", ...session.guests.stylePrompt.split("\n").map(line => `> ${line}`), `<!-- coffee-tables-style:${encodeURIComponent(JSON.stringify({ id: session.guests.styleId, name: session.guests.styleName, prompt: session.guests.stylePrompt }))} -->`);
+    else if (session.guests?.customPrompt.trim()) lines.push("", `### ${t("這桌的額外要求", "Additional requests")}`, "", ...session.guests.customPrompt.split("\n").map(line => `> ${line}`));
+    if (session.guests?.referenceFiles?.length) {
+      const files = session.guests.referenceFiles;
+      lines.push("", `## ${t("背景參考資料", "Background references")}`, "", `<!-- coffee-tables-references:${encodeURIComponent(JSON.stringify(files))} -->`);
+      for (const [index, file] of files.entries()) { const fence = "`".repeat(Math.max(3, ...[...file.content.matchAll(/`+/g)].map(match => match[0].length + 1))); lines.push("", `### ${t(`文件 ${index + 1}：${file.name}`, `File ${index + 1}: ${file.name}`)}`, "", `${fence}text`, file.content, fence); }
+    }
+    lines.push(`<!-- coffee-tables-navigation:${encodeURIComponent(JSON.stringify([...(session.rounds ?? []).map(item => ({id: `round:${item.id}`, summary: item.summary, kind: item.kind})), ...session.questions.map(item => ({id: `question:${item.id}`, summary: item.summary}))]))} -->`, "");
     lines.push("", `## ${t("對話紀錄", "Conversation")}`, "");
     const events: Array<{ at: string; lines: string[] }> = [];
-    let roundNumber = 0; for (const round of session.rounds ?? []) { const attached = (session.interventions ?? []).filter(item => item.roundId === round.id).sort((a, b) => (a.afterTurn ?? 0) - (b.afterTurn ?? 0)), body = interleaveInterventions(round.markdown, attached); if (!body) continue; roundNumber++; events.push({ at: round.createdAt, lines: [`## ${t(`對談第 ${roundNumber} 段`, `Conversation part ${roundNumber}`)}`, "", body] }); }
-    for (let i = 0; i < session.questions.length; i++) { const question = session.questions[i]; events.push({ at: question.createdAt ?? session.createdAt, lines: [`## ${t(`追問第 ${i + 1} 題`, `Follow-up ${i + 1}`)}`, "", question.question, "", `### ${t("桌上回答", "Table response")}`, "", question.answer || question.draftAnswer || t("（尚未回答）", "(No answer yet.)")] }); }
+    let roundNumber = 0; for (const round of session.rounds ?? []) { const attached = (session.interventions ?? []).filter(item => item.roundId === round.id).sort((a, b) => (a.afterTurn ?? 0) - (b.afterTurn ?? 0)), body = interleaveInterventions(round.markdown, attached); if (!body) continue; roundNumber++; events.push({ at: round.createdAt, lines: [`## ${t(`對談第 ${roundNumber} 段`, `Conversation part ${roundNumber}`)}`, "", `<!-- coffee-tables-round:${round.id} -->`, "", body] }); }
+    for (let i = 0; i < session.questions.length; i++) { const question = session.questions[i]; const invitations = question.invitedGuests?.length ? ["", `### ${t("邀請來賓", "Invited guests")}`, "", ...question.invitedGuests.map(guest => `- **${guest.name}｜${t(...CATEGORY_LABELS[guest.category])}**：${guest.description}`)] : []; events.push({ at: question.createdAt ?? session.createdAt, lines: [`## ${t(`追問第 ${i + 1} 題`, `Follow-up ${i + 1}`)}`, "", question.question, "", `### ${t("桌上回答", "Table response")}`, "", question.answer || question.draftAnswer || t("（尚未回答）", "(No answer yet.)"), ...invitations] }); }
     for (let i = 0; i < (session.interventions ?? []).length; i++) { const item = session.interventions![i]; if (item.roundId) continue; events.push({ at: item.createdAt, lines: [`## ${t(`使用者介入第 ${i + 1} 則`, `User note ${i + 1}`)}`, "", demoteRootHeadings(item.text)] }); }
     events.sort((a, b) => a.at.localeCompare(b.at)); for (const event of events) lines.push(...event.lines, "");
-    const latest = session.observerNotes?.[0] ?? ""; const history = session.observerNotes?.slice(1) ?? [];
-    if (latest || history.length) { lines.push(`## ${t("觀察者整理", "Observer notes")}`, "", `### ${t("最新版本", "Latest")}`, "", latest); if (history.length) { lines.push("", `### ${t("先前版本", "History")}`, ""); history.forEach((notes, index) => lines.push(`#### ${t(`第 ${index + 1} 版`, `Version ${index + 1}`)}`, "", notes, "")); } }
+    const insights = baselineFromVersions(session.observerNotes ?? [], session.language);
+    if (insights.length) lines.push(`## ${t("觀察者整理", "Observer notes")}`, "", serializeInsightNotes(insights, session.language));
     const drafts = [...(session.rounds ?? []).filter(round => round.draftMarkdown).map((round, index) => `### ${t(`對談第 ${index + 1} 段草稿`, `Conversation part ${index + 1} draft`)}\n\n${round.draftMarkdown}`), ...session.questions.filter(question => question.draftAnswer).map((question, index) => `### ${t(`追問草稿 ${index + 1}`, `Follow-up draft ${index + 1}`)}\n\n${question.draftAnswer}`)];
     if (session.observerDraftMarkdown) drafts.push(`### ${t("觀察者整理草稿", "Observer notes draft")}\n\n${session.observerDraftMarkdown}`);
     if (drafts.length || (session.draftMarkdown && !(session.rounds ?? []).some(round => round.draftMarkdown))) lines.push(`## ${t("未完成草稿", "Unfinished drafts")}`, "", ...((session.draftMarkdown && !(session.rounds ?? []).some(round => round.draftMarkdown)) ? [session.draftMarkdown] : []), ...drafts);
@@ -180,9 +231,9 @@ export class CoffeeStorage {
     return this.parseMarkdown(raw, side);
   }
   async inspect(path: string): Promise<AnyCoffeeSession> { const file = this.vault.getAbstractFileByPath(path); if (!(file instanceof TFile)) throw new Error("Coffee Tables session is missing"); const raw = await this.vault.read(file); if (/^<!-- coffee-tables-data:/m.test(raw)) return this.parseV2(raw); const title = markdownTopic(raw); let side = await this.findSidecar(path,title); if (side?.journal) { if (this.activeWrites.has(side.id)) { const journal = side.journal; if (contentHash(raw) === journal.previousMarkdownHash) side = JSON.parse(journal.previousSidecar) as Sidecar; else if (contentHash(raw) === journal.nextMarkdownHash) { const { journal: _journal, ...committed } = side; side = committed; } else throw new Error("Coffee Tables note and hidden state changed during save"); } else side = await this.recoverJournal(file,raw,side); } return side ? this.parseMarkdown(raw, side) : (() => { throw new Error("Coffee Tables hidden session data is missing"); })(); }
-  async save(sessionInput: CoffeeSession): Promise<void> {
+  async save(sessionInput: CoffeeSession, summariesOnly = false): Promise<void> {
     const session = parseSession(JSON.stringify(sessionInput)) as CoffeeSession; if (session.version !== 3) throw new Error("Unsupported Coffee Tables session version"); if (this.deletedIds.has(session.id)) throw new Error("This Coffee Tables session was deleted; reload the restored note before saving");
-    let path = this.locations.get(session.id) ?? this.titlePath(session.topic, session.id); const clean = this.encode(session), file = this.vault.getAbstractFileByPath(path), original = this.originals.get(session.id);
+    let path = this.locations.get(session.id) ?? this.titlePath(session.topic, session.id); let clean = this.encode(session); const file = this.vault.getAbstractFileByPath(path), original = this.originals.get(session.id);
     if (!file) {
       path = this.titlePath(session.topic, session.id); await this.ensureFolder(path.split("/").slice(0, -1).join("/")); if (this.vault.getAbstractFileByPath(path)) throw new Error("A Coffee Tables note already exists; reopen it before saving");
       this.activeWrites.add(session.id); try {
@@ -194,6 +245,19 @@ export class CoffeeStorage {
     } else {
       if (!(file instanceof TFile) || original === undefined) throw new Error("Reload this table before saving");
       const current = await this.vault.read(file); if (current !== original) throw new Error("Session changed outside this room. Reload the note to adopt your edits; no content was overwritten.");
+      if (summariesOnly) {
+        const marker = `<!-- coffee-tables-navigation:${encodeURIComponent(JSON.stringify([...(session.rounds ?? []).map(item => ({id: `round:${item.id}`, summary: item.summary, kind: item.kind})), ...session.questions.map(item => ({id: `question:${item.id}`, summary: item.summary}))]))} -->`;
+        const boundary = conversationBoundary(current);
+        clean = boundary.navigation ? current.slice(0,boundary.navigation.index) + marker + current.slice(boundary.navigation.index + boundary.navigation[0].trimEnd().length) : current.slice(0,boundary.index) + marker + "\n\n" + current.slice(boundary.index);
+        if (clean === current && !current.includes(marker)) throw new Error("Cannot locate the conversation section; original data was preserved");
+      }
+      if (!summariesOnly && /^### (?:先前版本|History)\s*$/m.test(current)) {
+        const backupFolder = `${this.hidden}/backups`; await this.ensureFolder(this.hidden); await this.ensureFolder(backupFolder);
+        const backupPath = `${backupFolder}/${session.id}-observer-history-${contentHash(current)}.md`;
+        if (await this.vault.adapter.exists(backupPath)) { if (await this.vault.adapter.read(backupPath) !== current) throw new Error("Coffee Tables history backup path contains different data; the original note was preserved"); }
+        else await this.writeHidden(backupPath, current);
+        clean = this.encode({ ...session, observerNotes: [serializeInsightNotes(baselineFromVersions(session.observerNotes ?? [], session.language), session.language)] });
+      }
       const sidePath = this.sidecarPath(session.id); if (!await this.vault.adapter.exists(sidePath)) throw new Error("Coffee Tables hidden session data is missing; the Markdown note was preserved");
       const originalSidecar = this.sidecarOriginals.get(session.id)!; this.activeWrites.add(session.id);
       try {
@@ -297,7 +361,7 @@ export class CoffeeStorage {
   async duplicateLegacy(legacy: LegacyCoffeeSession): Promise<CoffeeSession> { const copy = copyLegacySession(legacy); await this.save(copy); return copy; }
 }
 function migrateGuests(value: unknown): CoffeeSession["guests"] { if (!value || typeof value !== "object") return undefined; const raw = value as Record<string, unknown>; if (raw.counts) return raw as unknown as CoffeeSession["guests"]; const selected = Array.isArray(raw.perspectives) ? raw.perspectives as string[] : ["experts", "cross-domain", "generalist", "affected"]; return { counts: { experts: selected.includes("experts") ? 4 : 0, "cross-domain": selected.includes("cross-domain") ? 1 : 0, generalist: selected.includes("generalist") ? 1 : 0, affected: selected.includes("affected") ? 1 : 0 }, guests: [], background: typeof raw.background === "string" ? raw.background : "", customPrompt: "" }; }
-function conversationHash(rounds: CoffeeRound[], questions: CoffeeSession["questions"], interventions: NonNullable<CoffeeSession["interventions"]>): string { return contentHash(JSON.stringify({ rounds: rounds.map(round => demoteRootHeadings(round.markdown)), questions: questions.map(({ question, answer, draftAnswer }) => [question, answer, draftAnswer ?? ""]), interventions: interventions.map(item => demoteRootHeadings(item.text)) })); }
+function conversationHash(rounds: CoffeeRound[], questions: CoffeeSession["questions"], interventions: NonNullable<CoffeeSession["interventions"]>): string { return contentHash(JSON.stringify({ rounds: rounds.map(round => demoteRootHeadings(round.markdown)).filter(Boolean), questions: questions.map(({ question, answer, draftAnswer, invitedGuests }) => [question, answer, draftAnswer ?? "", invitedGuests ?? []]), interventions: interventions.map(item => demoteRootHeadings(item.text)) })); }
 function interleaveInterventions(markdown: string, interventions: NonNullable<CoffeeSession["interventions"]>): string { if (!interventions.length) return demoteRootHeadings(markdown); const chunks = markdown.split(/(?=^### .+$)/gm), output: string[] = []; let turns = 0, inserted = new Set<string>(); const insertThrough = (count: number): void => { for (const item of interventions) if (!inserted.has(item.id) && (item.afterTurn ?? 0) <= count) { const quoted = item.text.trim().split("\n").map((line, index) => index === 0 ? `> **你（插話）**：${line}` : `> ${line}`).join("\n"); output.push("", quoted, ""); inserted.add(item.id); } }; for (const chunk of chunks) { if (/^### .+$/m.test(chunk)) insertThrough(turns); output.push(demoteRootHeadings(chunk)); if (/^### .+$/m.test(chunk)) turns++; } insertThrough(turns); return output.join("\n").trim(); }
 function contentHash(value: string): string { let hash = 2166136261; for (let i = 0; i < value.length; i++) hash = Math.imul(hash ^ value.charCodeAt(i),16777619); return (hash >>> 0).toString(16); }
 function demoteRootHeadings(markdown: string): string { return markdown.split("\n").map(line => /^(#{1,2})\s/.test(line) ? `##${line}` : line).join("\n"); }

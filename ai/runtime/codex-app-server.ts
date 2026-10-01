@@ -110,7 +110,7 @@ export class CodexAppServerRuntime {
     return [...new Map(models.map(model => [model.model, model])).values()];
   }
 
-  async runTask(prompt: string, model: string, effort: string, outputSchema: unknown, controls?: { signal?: AbortSignal; searchBudget?: number; onRequest?: (request: unknown) => void; onText?: (text: string) => void; onSteer?: (steer: (text: string) => Promise<void>) => void; timeoutMs?: number }): Promise<string> {
+  async runTask(prompt: string, model: string, effort: string, outputSchema: unknown, controls?: { textOnly?: boolean; signal?: AbortSignal; searchBudget?: number; onRequest?: (request: unknown) => void; onText?: (text: string) => void; onSteer?: (steer: (text: string) => Promise<void>) => void; timeoutMs?: number }): Promise<string> {
     if (controls?.signal?.aborted) throw cancelledError();
     await this.start();
     if (controls?.signal?.aborted) throw cancelledError();
@@ -119,7 +119,11 @@ export class CodexAppServerRuntime {
       cwd: this.options.cwd,
       approvalPolicy: "never",
       sandbox: "read-only",
-      ephemeral: true
+      ephemeral: true,
+      ...(controls?.textOnly ? {
+        baseInstructions: "You are a text-generation assistant. Complete the supplied conversation-writing task directly. Do not inspect the environment, repositories, Git, files, or use tools. All necessary context is in the request. Output only the requested Markdown.",
+        config: { "features.shell_tool": false, "features.unified_exec": false }
+      } : {})
     }) as { thread?: { id?: unknown } };
     const threadId = typeof started.thread?.id === "string" ? started.thread.id : "";
     if (!threadId) throw new Error(t("ui.codex_app_server_did_not_create_a_thread"));

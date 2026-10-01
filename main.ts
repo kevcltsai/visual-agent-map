@@ -24,6 +24,7 @@ import { debugLog, LogManager } from "./log-manager";
 import { AiExchangeLog } from "./ai-exchange-log";
 import { PendingSuggestions } from "./pending-suggestions";
 import { OutlineView, OUTLINE_VIEW_TYPE } from "./ui/outline-view";
+import { groupRibbonIcons } from "./ui/ribbon-group";
 import { randomUUID } from "node:crypto";
 import responseSchema from "./response-schema.json";
 import { CodexAppServerRuntime } from "./ai/runtime/codex-app-server";
@@ -701,7 +702,7 @@ export class VisualAgentMapView extends ItemView {
   constructor(leaf: WorkspaceLeaf, private plugin: VisualAgentMapPlugin) { super(leaf); }
   getViewType(): string { return VIEW_TYPE; }
   getDisplayText(): string { return this.map?.title ?? "Visual Agent Map"; }
-  getIcon(): string { return "git-fork"; }
+  getIcon(): string { return "brain-circuit"; }
   getState(): Record<string, unknown> { return this.builtIn ? { sample: BUILTIN_SAMPLE_ID } : { file: this.path }; }
   async setState(state: Record<string, unknown>, result: { history: boolean }): Promise<void> {
     if (state.sample === BUILTIN_SAMPLE_ID && !this.builtIn) await this.openBuiltInSample();
@@ -2078,6 +2079,11 @@ export default class VisualAgentMapPlugin extends Plugin {
   private coffeeModelEfforts = new Map<string, string[]>();
   coffeeManager: CoffeeManager | null = null;
   coffeeStorage: CoffeeStorage | null = null;
+  private coffeeOutlineActive = false;
+  private coffeeOutlineSource: CoffeeTablesView | null = null;
+  private outlineMap: MapDocument | null = null;
+  private outlineTitles = new Map<string, string>();
+  private outlineSample = false;
   private settingTab!: VisualAgentMapSettingTab;
   private detailsLeaf: WorkspaceLeaf | null = null;
   private detailsPath: string | null = null;
@@ -2102,13 +2108,30 @@ export default class VisualAgentMapPlugin extends Plugin {
   views(): VisualAgentMapView[] { return this.app.workspace.getLeavesOfType(VIEW_TYPE).map(leaf => leaf.view).filter((view): view is VisualAgentMapView => view instanceof VisualAgentMapView); }
   syncOutline(map: MapDocument | null, notes: Map<string, Note>, sample = false): void {
     const titles = new Map([...notes].map(([id, note]) => [id, note.title]));
-    for (const leaf of this.app.workspace.getLeavesOfType(OUTLINE_VIEW_TYPE)) if (leaf.view instanceof OutlineView) leaf.view.setMap(map, titles, sample);
+    this.outlineMap = map; this.outlineTitles = titles; this.outlineSample = sample;
+    for (const leaf of this.app.workspace.getLeavesOfType(OUTLINE_VIEW_TYPE)) if (leaf.view instanceof OutlineView) { if (!this.coffeeOutlineActive) leaf.view.setMap(map, titles, sample); }
+  }
+  syncCoffeeOutline(view?: CoffeeTablesView): void {
+    this.coffeeOutlineSource = view ?? null;
+    this.coffeeOutlineActive = !!view;
+    for (const leaf of this.app.workspace.getLeavesOfType(OUTLINE_VIEW_TYPE)) if (leaf.view instanceof OutlineView) {
+      leaf.view.setCoffeeOutline(this.coffeeOutlineSource?.outlineSnapshot() ?? null, this.coffeeOutlineActive, id => this.coffeeOutlineSource?.locateSegment(id) ?? false, () => { void this.coffeeOutlineSource?.confirmFillSummaries(); });
+      if (!this.coffeeOutlineActive) leaf.view.setMap(this.outlineMap, this.outlineTitles, this.outlineSample);
+    }
+  }
+  isCoffeeOutlineSource(view: CoffeeTablesView): boolean { return this.coffeeOutlineSource === view; }
+  refreshCoffeeOutline(view: CoffeeTablesView): void {
+    if (this.coffeeOutlineSource !== view) return;
+    for (const leaf of this.app.workspace.getLeavesOfType(OUTLINE_VIEW_TYPE)) if (leaf.view instanceof OutlineView) leaf.view.setCoffeeOutline(view.outlineSnapshot(), true, id => view.locateSegment(id), () => { void view.confirmFillSummaries(); });
   }
   async activateOutline(): Promise<void> {
+    const activeCoffeeView = this.app.workspace.getActiveViewOfType(CoffeeTablesView);
+    if (activeCoffeeView) this.syncCoffeeOutline(activeCoffeeView);
     let leaf: WorkspaceLeaf | null = this.app.workspace.getLeavesOfType(OUTLINE_VIEW_TYPE)[0] ?? null;
     if (!leaf) leaf = this.app.workspace.getLeftLeaf(true);
     if (!leaf) throw new Error(t("ui.could_not_open_the_left_sidebar"));
     await leaf.setViewState({ type: OUTLINE_VIEW_TYPE, active: true });
+    this.syncCoffeeOutline(this.coffeeOutlineSource ?? undefined);
     const mapView = this.views()[0];
     if (mapView) mapView.syncOutline();
     await this.app.workspace.revealLeaf(leaf);
@@ -2116,7 +2139,7 @@ export default class VisualAgentMapPlugin extends Plugin {
   async onload(): Promise<void> {
     const saved = await this.loadData() as Partial<Settings> | null;
     const legacy: (Partial<Settings> & { cliPath?: string }) | null = saved;
-    this.settings = { ...DEFAULT_SETTINGS, language: initialUiLanguage(saved?.language), workspaceFolder: saved?.workspaceFolder || DEFAULT_SETTINGS.workspaceFolder, topicsFolder: saved?.topicsFolder || DEFAULT_SETTINGS.topicsFolder, inboxFolder: saved?.inboxFolder || DEFAULT_SETTINGS.inboxFolder, notesFolder: saved?.notesFolder || DEFAULT_SETTINGS.notesFolder, mapsFolder: saved?.mapsFolder || DEFAULT_SETTINGS.mapsFolder, mapId: saved?.mapId || "default", codexPath: saved?.codexPath || legacy?.cliPath || DEFAULT_SETTINGS.codexPath, claudePath: saved?.claudePath || DEFAULT_SETTINGS.claudePath, cliModel: saved?.cliModel || DEFAULT_SETTINGS.cliModel, cliReasoning: normalizeReasoningLevel(saved?.cliReasoning), previewScale: saved?.previewScale !== undefined ? clampPreviewScale(saved.previewScale) : legacyPreviewScale(saved?.previewSize), models: "", migrated: saved?.migrated === true, structureVersion: saved?.structureVersion ?? (saved ? 1 : DEFAULT_SETTINGS.structureVersion), firstUseNoticeSeen: saved?.firstUseNoticeSeen === true, codexUsageNoticeSeen: saved?.codexUsageNoticeSeen === true, claudeUsageNoticeSeen: saved?.claudeUsageNoticeSeen === true, aiExchangeLoggingEnabled: saved?.aiExchangeLoggingEnabled === true, workspaceInitialized: saved ? saved.workspaceInitialized !== false : false, sampleTourVersionSeen: saved?.sampleTourVersionSeen ?? 0 };
+    this.settings = { ...DEFAULT_SETTINGS, coffeeStyles: Array.isArray(saved?.coffeeStyles) ? saved.coffeeStyles.filter((item: unknown): item is { id: string; name: string; prompt: string } => !!item && typeof item === "object" && typeof (item as { id?: unknown }).id === "string" && typeof (item as { name?: unknown }).name === "string" && typeof (item as { prompt?: unknown }).prompt === "string") : [], defaultCoffeeStyleId: typeof saved?.defaultCoffeeStyleId === "string" ? saved.defaultCoffeeStyleId : undefined, language: initialUiLanguage(saved?.language), workspaceFolder: saved?.workspaceFolder || DEFAULT_SETTINGS.workspaceFolder, topicsFolder: saved?.topicsFolder || DEFAULT_SETTINGS.topicsFolder, inboxFolder: saved?.inboxFolder || DEFAULT_SETTINGS.inboxFolder, notesFolder: saved?.notesFolder || DEFAULT_SETTINGS.notesFolder, mapsFolder: saved?.mapsFolder || DEFAULT_SETTINGS.mapsFolder, mapId: saved?.mapId || "default", codexPath: saved?.codexPath || legacy?.cliPath || DEFAULT_SETTINGS.codexPath, claudePath: saved?.claudePath || DEFAULT_SETTINGS.claudePath, cliModel: saved?.cliModel || DEFAULT_SETTINGS.cliModel, cliReasoning: normalizeReasoningLevel(saved?.cliReasoning), previewScale: saved?.previewScale !== undefined ? clampPreviewScale(saved.previewScale) : legacyPreviewScale(saved?.previewSize), models: "", migrated: saved?.migrated === true, structureVersion: saved?.structureVersion ?? (saved ? 1 : DEFAULT_SETTINGS.structureVersion), firstUseNoticeSeen: saved?.firstUseNoticeSeen === true, codexUsageNoticeSeen: saved?.codexUsageNoticeSeen === true, claudeUsageNoticeSeen: saved?.claudeUsageNoticeSeen === true, aiExchangeLoggingEnabled: saved?.aiExchangeLoggingEnabled === true, workspaceInitialized: saved ? saved.workspaceInitialized !== false : false, sampleTourVersionSeen: saved?.sampleTourVersionSeen ?? 0 };
     setUiLanguage(this.settings.language);
     this.logs.appendLog("info", `Visual Agent Map ${this.manifest.version || "unknown"} 載入`);
     if (this.app.vault.adapter instanceof FileSystemAdapter && this.manifest.dir) {
@@ -2144,16 +2167,18 @@ export default class VisualAgentMapPlugin extends Plugin {
     this.ready = initialize;
     this.registerView(COFFEE_TABLES_VIEW_TYPE, leaf => new CoffeeTablesView(leaf, this));
     this.coffeeStorage = new CoffeeStorage(this.app.vault, this.settings.workspaceFolder, (file, path) => this.app.fileManager.renameFile(file, path), file => this.app.fileManager.trashFile(file));
-    this.coffeeManager = new CoffeeManager(request => this.runCoffeeRequest(request), session => this.coffeeStorage!.save(session));
+    this.coffeeManager = new CoffeeManager(request => this.runCoffeeRequest(request), (session, summariesOnly) => this.coffeeStorage!.save(session, summariesOnly));
     const openCoffee = (): void => { void this.activateCoffeeTables().catch((error: unknown) => new Notice(String(error))); };
-    this.addRibbonIcon("coffee", `Open ${COFFEE_TABLES_NAME}`, openCoffee);
+    const coffeeRibbonIcon = this.addRibbonIcon("coffee", `Open ${COFFEE_TABLES_NAME}`, openCoffee);
     this.addCommand({ id: "open-coffee-tables", name: `Open ${COFFEE_TABLES_NAME}`, callback: openCoffee });
     this.registerView(VIEW_TYPE, leaf => new VisualAgentMapView(leaf, this));
     this.registerView(OUTLINE_VIEW_TYPE, leaf => new OutlineView(leaf, async path => {
       try { await this.openDetails(this.repo.file(path)); }
       catch (error) { new Notice(error instanceof Error ? error.message : String(error)); }
     }));
-    this.ribbonIcon = this.addRibbonIcon("git-fork", t("ui.open_map"), () => { void this.activateView().catch(error => new Notice(String(error))); });
+    this.ribbonIcon = this.addRibbonIcon("brain-circuit", t("ui.open_map"), () => { void this.activateView().catch(error => new Notice(String(error))); });
+    const mapRibbonIcon = this.ribbonIcon;
+    this.app.workspace.onLayoutReady(() => this.register(groupRibbonIcons(mapRibbonIcon, coffeeRibbonIcon)));
     this.addLocalizedCommand("open-map", "ui.open_map", () => { void this.activateView().catch(error => new Notice(String(error))); });
     this.addLocalizedCommand("open-topic-outline", "ui.open_topic_outline", () => { void this.activateOutline().catch(error => new Notice(String(error))); });
     this.addLocalizedCommand("rebuild-references", "ui.refresh_vam_data", () => { void this.mutate(() => this.fullRebuild()); });
@@ -2165,9 +2190,12 @@ export default class VisualAgentMapPlugin extends Plugin {
     this.addLocalizedCommand("open-debug-log", "ui.open_debug_log", () => new DebugLogModal(this.app, this.logs, this.exchanges, () => this.settings.aiExchangeLoggingEnabled).open());
     this.settingTab = new VisualAgentMapSettingTab(this.app, this);
     this.addSettingTab(this.settingTab);
-    this.registerEvent(this.app.workspace.on("file-menu", (menu, file) => { if (file instanceof TFile && this.isMap(file)) menu.addItem(item => item.setTitle(t("ui.open_as_mind_map")).setIcon("git-fork").onClick(() => { void this.activateView(file.path); })); }));
+    this.registerEvent(this.app.workspace.on("file-menu", (menu, file) => { if (file instanceof TFile && this.isMap(file)) menu.addItem(item => item.setTitle(t("ui.open_as_mind_map")).setIcon("brain-circuit").onClick(() => { void this.activateView(file.path); })); }));
     this.registerEvent(this.app.workspace.on("active-leaf-change", leaf => {
       this.styleNodeLeaf(leaf);
+      if (leaf?.view instanceof OutlineView) return;
+      if (leaf?.view instanceof CoffeeTablesView) { this.syncCoffeeOutline(leaf.view); return; }
+      this.syncCoffeeOutline();
       if (!(leaf?.view instanceof MarkdownView) || !leaf.view.file || !this.isMap(leaf.view.file)) return;
       const path = leaf.view.file.path;
       void leaf.setViewState({ type: VIEW_TYPE, state: { file: path }, active: true }).catch(error => new Notice(error instanceof Error ? error.message : String(error)));
@@ -2436,6 +2464,7 @@ export default class VisualAgentMapPlugin extends Plugin {
     let leaf = this.app.workspace.getLeavesOfType(COFFEE_TABLES_VIEW_TYPE)[0];
     if (!leaf) { leaf = this.app.workspace.getLeaf("tab"); await leaf.setViewState({ type: COFFEE_TABLES_VIEW_TYPE, active: true }); }
     await this.app.workspace.revealLeaf(leaf);
+    if (leaf.view instanceof CoffeeTablesView) this.syncCoffeeOutline(leaf.view);
   }
   async runCoffeeRequest(request: CoffeeRequest): Promise<string> {
     if (!(this.app.vault.adapter instanceof FileSystemAdapter) || !this.manifest.dir) throw new Error("Coffee Tables requires the desktop runtime");
@@ -2451,7 +2480,7 @@ export default class VisualAgentMapPlugin extends Plugin {
     this.activeTasks.set(key, controller);
     exchanges?.begin({ id, startedAt: new Date().toISOString(), topic: `Coffee Tables · ${session.topic}`, mode: "task", model: session.model, effort });
     try {
-      const controls = { signal: controller.signal, searchBudget: 0, timeoutMs: 15 * 60 * 1000, onText: (text: string): void => request.onText?.(text), onSteer: (handler: (text: string) => Promise<void>): void => request.registerIntervention?.(handler), onRequest: (data: unknown): void => { if (this.settings.aiExchangeLoggingEnabled) exchanges?.sent(id, JSON.stringify({ request: data, prompt }, null, 2)); } };
+      const controls = { textOnly: true, signal: controller.signal, searchBudget: 0, timeoutMs: 15 * 60 * 1000, onText: (text: string): void => request.onText?.(text), onSteer: (handler: (text: string) => Promise<void>): void => request.registerIntervention?.(handler), onRequest: (data: unknown): void => { if (this.settings.aiExchangeLoggingEnabled) exchanges?.sent(id, JSON.stringify({ request: data, prompt }, null, 2)); } };
       const raw = providerForModel(session.model) === "claude"
         ? await this.claudeCli(directory).runTask(prompt, providerModelId(session.model), effort, undefined, controls)
         : await this.runtime(directory, true).runTask(prompt, session.model, effort, undefined, controls);

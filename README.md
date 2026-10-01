@@ -23,6 +23,10 @@
 
 Coffee Tables is included in **0.10.0**. Its guests are simulated, not real experts; the conversation is not fact-checked.
 
+### In the next development build
+
+Coffee Tables adds editable conversation styles, reusable style presets, and `.txt` / `.md` background snapshots. Observer insights accumulate across turns, with expandable context, search, category collapse, and links to conversation sources. A segment navigator shows each opening, continuation, and follow-up with a one-sentence summary; older conversations can request missing summaries. Follow-up questions can invite guests who remain at the table. These additions are not included in the 0.10.0 release.
+
 ### Get started
 
 1. In **Obsidian Desktop → Settings → Community plugins → Browse**, find **Visual Agent Map**, then install and enable it. Requires Obsidian **1.13.7+**; macOS with 1.13.7 is the verified environment.
@@ -32,7 +36,7 @@ Setup and troubleshooting: [INSTALL.md](INSTALL.md) · [Manual installation from
 
 ### Your notes and privacy
 
-Maps, research notes, Coffee Tables conversations, and observer notes are readable Markdown in your vault. VAM has no telemetry or stored API keys. AI tasks send relevant content through your local CLI to OpenAI or Anthropic; your provider allowance or charges may apply. AI request/reply logging is off by default.
+Maps, research notes, Coffee Tables conversations, and observer notes are readable Markdown in your vault. VAM has no telemetry or stored API keys. AI tasks send relevant content, including selected background files and guest profiles, through your local CLI to OpenAI or Anthropic; your provider allowance or charges may apply. AI request/reply logging is off by default.
 
 <details>
 <summary>Local access and permissions</summary>
@@ -74,6 +78,10 @@ Copyright © 2026 Kevin Tsai
 
 Coffee Tables **已包含在 0.10.0 正式版**。來賓是模擬角色，不是真實專家；對談內容不會自動查證。
 
+### 下一個開發版本
+
+Coffee Tables 新增可編輯的聊天室指令、常用風格庫，以及 `.txt`／`.md` 背景內容快照。觀察者洞見跨回合累積，可展開脈絡、搜尋、收合分類與跳到對談來源。段落導覽列出開場、續聊及追問的一句話摘要；舊桌可按需補齊摘要。追問時也能邀請新來賓，加入後留在這桌。這些更新尚未包含在 0.10.0 正式版。
+
 ### 開始使用
 
 1. 到 **Obsidian 桌面版 → 設定 → 第三方外掛 → 瀏覽** 搜尋 **Visual Agent Map**，安裝並啟用。需要 Obsidian **1.13.7+**；已驗證環境為 macOS 與 Obsidian 1.13.7。
@@ -83,7 +91,7 @@ Coffee Tables **已包含在 0.10.0 正式版**。來賓是模擬角色，不是
 
 ### 你的筆記與隱私
 
-地圖、研究筆記、Coffee Tables 對談和觀察者筆記都是 Vault 裡可閱讀的 Markdown。VAM 不含遙測，也不儲存 API key。AI 任務會透過本機 CLI 將相關內容傳送至 OpenAI 或 Anthropic；可能使用帳號額度或產生費用。AI 請求／回覆紀錄預設關閉。
+地圖、研究筆記、Coffee Tables 對談和觀察者筆記都是 Vault 裡可閱讀的 Markdown。VAM 不含遙測，也不儲存 API key。AI 任務會透過本機 CLI 將相關內容（含選取的背景檔與來賓設定）傳送至 OpenAI 或 Anthropic；可能使用帳號額度或產生費用。AI 請求／回覆紀錄預設關閉。
 
 <details>
 <summary>本機存取與權限</summary>

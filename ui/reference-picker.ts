@@ -42,7 +42,7 @@ export class ReferencePicker {
     const local = area.createDiv("vam-reference-section vam-reference-local-section");
     local.createEl("strong", { text: t("ui.local_data") });
     const controls = local.createDiv("vam-reference-actions");
-    const addMap = this.createSourceButton(controls, "git-fork", "ui.reference_select_mind_map");
+    const addMap = this.createSourceButton(controls, "brain-circuit", "ui.reference_select_mind_map");
     addMap.addEventListener("click", () => { void this.selectTopic(); });
     const addFolder = this.createSourceButton(controls, "folder-open", "ui.reference_select_folder");
     const folder = controls.createEl("input", { type: "file" }); folder.setAttr("webkitdirectory", ""); folder.multiple = true; folder.hidden = true;

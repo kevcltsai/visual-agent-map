@@ -1,19 +1,19 @@
 import type VisualAgentMapPlugin from "../../main";
-import { t, topicStatusLabel, translate } from "../../i18n";
+import { t, topicStatusLabel, translate, type TranslationKey } from "../../i18n";
 import { App, MarkdownRenderer, ItemView, Modal, Notice, Setting, TFile, WorkspaceLeaf } from "obsidian";
 import { ReferencePicker, type ReferenceTopic } from "../../ui/reference-picker";
 import { readMarkdownFile, type ReferenceGroup } from "../../ai/reference-materials";
 import { NameModal } from "../../ui/modals/name-modal";
 import { ChoiceModal } from "../../ui/modals/choice-modal";
+import { DebugLogModal } from "../../ui/modals/debug-log-modal";
 import { canParent, clone, descendants, History, inheritModel, type MapDocument, type MapNode, parseMap, removeNodes, serializeMap, visibleNodes } from "../../map-model";
 import { arrangeMap, arrangeNewBranch } from "../../map-layout";
 import { normalizeReasoningLevel, type ModelSource, type Note, type NotePatch, type ResearchDepth, type ResearchMode, type Settings, type TopicInfo, type TopicState, type VisualMode } from "../../repository";
 import { canonicalDetail, visualReferencesMarkdown } from "../../ai/result-utils";
 import type { AiResult, Suggestion, TaskContext } from "../../ai/types";
-import { previewMetrics } from "../../ui/preview-utils";
+import { clampPreviewScale, previewMetrics } from "../../ui/preview-utils";
 import { BUILTIN_SAMPLE_ID, builtInSample, SAMPLE_TOUR_VERSION } from "../../builtin-sample";
-import { join } from "node:path";
-import { randomUUID } from "node:crypto";
+import { PendingSuggestions } from "../../pending-suggestions";
 
 export const VIEW_TYPE = "visual-agent-map-view";
 interface Action { undo: () => Promise<void>; redo: () => Promise<void>; label?: string }

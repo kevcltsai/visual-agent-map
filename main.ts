@@ -35,6 +35,7 @@ export { buildPreparedTaskContext } from "./ai/context-builder";
 export { executableCandidates } from "./core/ai-runtime-service";
 export { canonicalDetail, visualReferencesMarkdown } from "./ai/result-utils";
 export { NextStepModal, VisualAgentMapView } from "./experiences/visual-map/view";
+export { VisualAgentMapSettingTab } from "./ui/settings-tab";
 export { firstMarkdownImage, firstMarkdownTable, markdownImages } from "./ui/preview-utils";
 export type { AiRunMetrics, PreparedTaskContext } from "./ai/types";
 export function extractJsonObject(raw: string): string {

@@ -1,8 +1,11 @@
-import type { ReasoningLevel } from "../repository";
+import type { ReasoningLevel } from "./types";
 import type { TaskContext } from "./types";
 import { translate, type UiLanguage } from "../i18n";
 
 export const RESEARCH_SEARCH_BUDGET = 3;
+export function normalizeReasoningLevel(value: unknown): ReasoningLevel {
+  return value === "auto" || value === "medium" || value === "high" ? value : "low";
+}
 export function researchLimits(depth: TaskContext["researchDepth"]): { searches: number; sources: number } {
   if (depth === "fast") return { searches: 1, sources: 2 };
   if (depth === "deep") return { searches: 6, sources: 10 };

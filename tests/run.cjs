@@ -94,6 +94,61 @@ test('workspace defaults to the configured low-cost model and low reasoning', ()
   assert.equal(normalizeReasoningLevel('auto'), 'auto');
   assert.equal(normalizeReasoningLevel('unsupported'), 'low');
 });
+test('product architecture keeps shell, core, and experiences separated', () => {
+  const shell = fs.readFileSync(path.join(root, 'main.ts'), 'utf8');
+  assert.doesNotMatch(shell, /class VisualAgentMapView/);
+  assert.doesNotMatch(shell, /class CoffeeTablesView/);
+  assert.doesNotMatch(shell, /class AiTaskService/);
+
+  const coreFiles = fs.readdirSync(path.join(root, 'core')).filter(name => name.endsWith('.ts'));
+  for (const name of coreFiles) {
+    const source = fs.readFileSync(path.join(root, 'core', name), 'utf8');
+    assert.doesNotMatch(source, /(?:\.\.\/)+experiences\//, `core/${name} must not import an experience`);
+    assert.doesNotMatch(source, /from ["'][^"']*repository["']/, `core/${name} must not depend on repository settings that include experience state`);
+  }
+
+  for (const sharedAi of ['types.ts', 'task-policy.ts', 'visual-guidance.ts']) {
+    const source = fs.readFileSync(path.join(root, 'ai', sharedAi), 'utf8');
+    assert.doesNotMatch(source, /from ["'][^"']*repository["']/, `ai/${sharedAi} must stay experience-independent`);
+    assert.doesNotMatch(source, /experiences\//, `ai/${sharedAi} must not import an experience`);
+  }
+
+  const visualFiles = fs.readdirSync(path.join(root, 'experiences', 'visual-map')).filter(name => name.endsWith('.ts'));
+  for (const name of visualFiles) {
+    const source = fs.readFileSync(path.join(root, 'experiences', 'visual-map', name), 'utf8');
+    assert.doesNotMatch(source, /experiences\/coffee-tables|\.\.\/coffee-tables/, `visual-map/${name} must not import Coffee Tables`);
+  }
+
+  const coffeeFiles = fs.readdirSync(path.join(root, 'experiences', 'coffee-tables')).filter(name => name.endsWith('.ts'));
+  for (const name of coffeeFiles) {
+    const source = fs.readFileSync(path.join(root, 'experiences', 'coffee-tables', name), 'utf8');
+    assert.doesNotMatch(source, /experiences\/visual-map|\.\.\/visual-map/, `coffee-tables/${name} must not import Visual Map`);
+  }
+});
+
+test('thinking artifacts route through shared core without view coupling', async () => {
+  const artifacts = load('core/thinking-artifact.ts');
+  const { ExperienceRouter } = load('core/experience-router.ts');
+  const artifact = artifacts.createThinkingArtifact({
+    id: 'artifact-1',
+    kind: 'insight',
+    title: 'A useful insight',
+    content: 'The discussion exposed a tradeoff.',
+    origin: { experience: 'coffee-tables', sessionId: 'table-1' },
+    sources: [{ label: 'Coffee Table', experience: 'coffee-tables', sessionId: 'table-1' }]
+  });
+  assert.equal(artifact.version, 1);
+  const router = new ExperienceRouter();
+  let received;
+  const unregister = router.register('visual-map', async value => { received = value; });
+  assert.equal(router.canHandoff('visual-map'), true);
+  await router.handoff({ target: 'visual-map', artifact });
+  assert.deepEqual(plain(received), plain(artifact));
+  unregister();
+  assert.equal(router.canHandoff('visual-map'), false);
+  await assert.rejects(() => router.handoff({ target: 'visual-map', artifact }), /not available/);
+});
+
 test('model identifiers select one provider and preserve stable Claude aliases', () => {
   const providers = load('ai/providers/provider.ts');
   assert.equal(providers.providerForModel('gpt-5.6-luna'), 'codex');
@@ -319,6 +374,7 @@ integrationTest('proposal persistence reports disk write failure to the caller',
 });
 test('debug log command opens the custom modal and exposes copy and clear actions', () => {
   const source = fs.readFileSync(path.join(root, 'main.ts'), 'utf8');
+  const mapSource = fs.readFileSync(path.join(root, 'experiences/visual-map/view.ts'), 'utf8');
   const modal = fs.readFileSync(path.join(root, 'ui/modals/debug-log-modal.ts'), 'utf8');
   assert.match(source, /addLocalizedCommand\("open-debug-log"/); assert.match(source, /new DebugLogModal\(this\.app, this\.logs, this\.exchanges/);
   assert.match(modal, /navigator\.clipboard\.writeText/); assert.match(modal, /this\.logs\.clear\(\)/);
@@ -326,7 +382,7 @@ test('debug log command opens the custom modal and exposes copy and clear action
   assert.match(modal, /this\.logs\.subscribe/);
   assert.match(source, /codexReadyForAi\(\)/);
   assert.match(source, /ui\.codex_app_server_is_ready_0/);
-  assert.match(source, /AI 任務失敗/);
+  assert.match(mapSource, /AI 任務失敗/);
 });
 class TFolder { constructor(path) { this.path = path; this.name = path.split('/').at(-1); this.children = []; this.parent = null; } }
 class TFile { constructor(path) { this.path = path; this.name = path.split('/').at(-1); this.basename = this.name.replace(/\.md$/, ''); this.extension = this.name.includes('.') ? this.name.split('.').at(-1) : ''; this.parent = null; this.stat = { mtime: Date.now() }; } }
@@ -1833,9 +1889,10 @@ test('first-use map view waits for async initialization and opens the official S
 });
 test('the first AI task shows a provider-specific usage acknowledgement only once', () => {
   const source = fs.readFileSync(path.join(root, 'main.ts'), 'utf8');
-  assert.match(source, /class AiUsageModal/);
-  assert.match(source, /ui\.vam_runs_ai_tasks_through_your_signed_in_codex_account_and_u/);
-  assert.match(source, /ui\.vam_runs_ai_tasks_through_your_claude_code_account_and_uses/);
+  const settingsSource = fs.readFileSync(path.join(root, 'ui/settings-tab.ts'), 'utf8');
+  assert.match(settingsSource, /class AiUsageModal/);
+  assert.match(settingsSource, /ui\.vam_runs_ai_tasks_through_your_signed_in_codex_account_and_u/);
+  assert.match(settingsSource, /ui\.vam_runs_ai_tasks_through_your_claude_code_account_and_uses/);
   assert.match(source, /if \(!confirmed\) return false;/);
   assert.match(source, /this\.settings\.codexUsageNoticeSeen = true/);
   assert.match(source, /this\.settings\.claudeUsageNoticeSeen = true/);
@@ -1843,7 +1900,9 @@ test('the first AI task shows a provider-specific usage acknowledgement only onc
 });
 test('Obsidian 1.13 declarative settings expose workspace recovery and App Server diagnostics', () => {
   const source = fs.readFileSync(path.join(root, 'main.ts'), 'utf8');
-  const definitions = source.slice(source.indexOf('getSettingDefinitions()'), source.indexOf('async setControlValue'));
+  const settingsSource = fs.readFileSync(path.join(root, 'ui/settings-tab.ts'), 'utf8');
+  const mapSource = fs.readFileSync(path.join(root, 'experiences/visual-map/view.ts'), 'utf8');
+  const definitions = settingsSource.slice(settingsSource.indexOf('getSettingDefinitions()'), settingsSource.indexOf('async setControlValue'));
   assert.match(definitions, /ui\.workspace_location/);
   assert.match(definitions, /ui\.repair_agent_workspace/);
   assert.match(definitions, /ui\.ai_reasoning_level/);
@@ -1858,8 +1917,8 @@ test('Obsidian 1.13 declarative settings expose workspace recovery and App Serve
   assert.match(definitions, /ui\.check_again/);
   assert.match(definitions, /ui\.installation_guide/);
   assert.match(source, /this\.settingTab\?\.update\(\)/);
-  assert.match(source, /setAttr\("aria-label", t\("ui\.reasoning_level"\)\)/);
-  assert.match(source, /save\(\{ reasoning: normalizeReasoningLevel\(reasoning\.value\) \}\)/);
+  assert.match(mapSource, /setAttr\("aria-label", t\("ui\.reasoning_level"\)\)/);
+  assert.match(mapSource, /save\(\{ reasoning: normalizeReasoningLevel\(reasoning\.value\) \}\)/);
 });
 integrationTest('full rebuild refreshes derived data and open views', async () => {
   const { default: Plugin } = load('main.ts', { obsidian }); let rebuilds = 0, refreshes = 0;
@@ -1872,12 +1931,12 @@ integrationTest('full rebuild refreshes derived data and open views', async () =
 });
 test('missing Codex opens an in-product setup guide with official installation and sign-in steps', () => {
   const source = fs.readFileSync(path.join(root, 'main.ts'), 'utf8');
-  assert.match(source, /class CodexSetupModal/);
-  assert.match(source, /https:\/\/developers\.openai\.com\/codex\/cli\//);
-  assert.match(source, /ui\.codex_setup_for_ai_only/);
-  assert.match(source, /ui\.no_api_key_is_required_the_standalone_codex_cli_does_not_req/);
-  assert.match(source, /ui\.no_api_key_is_required_the_standalone_codex_cli_does_not_req/);
-  assert.match(source, /ui\.run_codex_in_terminal_and_sign_in_with_your_chatgpt_account/);
+  const settingsSource = fs.readFileSync(path.join(root, 'ui/settings-tab.ts'), 'utf8');
+  assert.match(settingsSource, /class CodexSetupModal/);
+  assert.match(settingsSource, /https:\/\/developers\.openai\.com\/codex\/cli\//);
+  assert.match(settingsSource, /ui\.codex_setup_for_ai_only/);
+  assert.match(settingsSource, /ui\.no_api_key_is_required_the_standalone_codex_cli_does_not_req/);
+  assert.match(settingsSource, /ui\.run_codex_in_terminal_and_sign_in_with_your_chatgpt_account/);
   assert.match(source, /if \(showGuide\) this\.openCodexSetupGuide\(\)/);
   assert.match(source, /this\.recheckCodex\(false\)/);
 });
@@ -2330,7 +2389,7 @@ test('Claude timeout stops its process and never accepts a late structured resul
 });
 
 test('external map conflict UI retains file, screen, and manual merge choices', () => {
-  const source = fs.readFileSync(path.join(root, 'main.ts'), 'utf8');
+  const source = fs.readFileSync(path.join(root, 'experiences/visual-map/view.ts'), 'utf8');
   for (const modal of ['class MapConflictModal']) {
     const start = source.indexOf(modal), next = source.indexOf('\nclass ', start + modal.length);
     const body = source.slice(start, next < 0 ? source.length : next);
@@ -2368,7 +2427,7 @@ integrationTest('legacy User Notes move to preview without losing either section
   assert.equal((await repo.readNote(n.path)).preview, '');
 });
 test('preview cards display only editable preview content', () => {
-  const source = fs.readFileSync(path.join(root, 'main.ts'), 'utf8');
+  const source = fs.readFileSync(path.join(root, 'experiences/visual-map/view.ts'), 'utf8');
   const card = source.slice(source.indexOf('preview.createEl("strong", { text: note.title })'), source.indexOf('const host = workspace.getBoundingClientRect()'));
   assert.match(card, /note.preview/);
   assert.doesNotMatch(card, /note.summary|User Notes|目前結論/);
@@ -3509,6 +3568,7 @@ integrationTest('Coffee Tables VAM handoff links the transcript and starts from 
   let modal, opened; class Modal { constructor() { modal = this; this.titleEl = coffeeElement('title'); this.contentEl = coffeeElement('content'); } open() {} close() {} }
   const { default: Plugin } = load('main.ts', { obsidian: { ...obsidian, Modal } }); const { app, repo } = fixture('en'), plugin = new Plugin(); plugin.app = app; plugin.repo = repo; plugin.settings.language = 'en';
   const session = { ...coffeeSession(), status: 'completed', transcriptMarkdown: 'The table discussed meal choices.' }; plugin.mutate = run => run(); plugin.activateView = async path => { opened = path; };
+  plugin.core.experiences.register('visual-map', artifact => plugin.openArtifactInVisualMap(artifact));
   await plugin.openCoffeeHandoff(session, 'Agent Workspace/Coffee Tables/session.md'); coffeeFind(modal.contentEl, element => element.text === 'Create research map').click(); await until(() => opened);
   const map = await repo.readMap(opened); assert.equal(map.nodes.length, 1); const note = await repo.readNote(map.nodes[0].path);
   assert.match(note.detail, /Coffee Tables/); assert.doesNotMatch(note.detail, /meal choices/); assert.match(note.detail, /Simulated Coffee Tables discussion/);

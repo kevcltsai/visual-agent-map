@@ -18,4 +18,6 @@ jobs:
       - run: npm ci
       - run: npm run lint
       - run: npm test
+      - name: Verify generated artifacts are committed
+        run: git diff --exit-code -- main.js samples/taiwan-travel/compiled.json
       - run: npm run check:artifacts

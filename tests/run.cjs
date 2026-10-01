@@ -3536,6 +3536,7 @@ integrationTest('Coffee Tables VAM handoff links the transcript and starts from 
   let modal, opened; class Modal { constructor() { modal = this; this.titleEl = coffeeElement('title'); this.contentEl = coffeeElement('content'); } open() {} close() {} }
   const { default: Plugin } = load('main.ts', { obsidian: { ...obsidian, Modal } }); const { app, repo } = fixture('en'), plugin = new Plugin(); plugin.app = app; plugin.repo = repo; plugin.settings.language = 'en';
   const session = { ...coffeeSession(), status: 'completed', transcriptMarkdown: 'The table discussed meal choices.' }; plugin.mutate = run => run(); plugin.activateView = async path => { opened = path; };
+  plugin.core.experiences.register('visual-map', artifact => plugin.openArtifactInVisualMap(artifact));
   await plugin.openCoffeeHandoff(session, 'Agent Workspace/Coffee Tables/session.md'); coffeeFind(modal.contentEl, element => element.text === 'Create research map').click(); await until(() => opened);
   const map = await repo.readMap(opened); assert.equal(map.nodes.length, 1); const note = await repo.readNote(map.nodes[0].path);
   assert.match(note.detail, /Coffee Tables/); assert.doesNotMatch(note.detail, /meal choices/); assert.match(note.detail, /Simulated Coffee Tables discussion/);

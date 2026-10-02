@@ -3,6 +3,7 @@ export type ThinkingArtifactKind =
   | "insight"
   | "argument"
   | "evidence"
+  | "hypothesis"
   | "disagreement"
   | "conclusion"
   | "synthesis"

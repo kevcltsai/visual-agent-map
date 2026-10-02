@@ -500,7 +500,7 @@ export default class VisualAgentMapPlugin extends Plugin {
         source: sourceArtifact,
         target: "understand",
         model: session.model,
-        reasoning: session.reasoning,
+        reasoning: normalizeReasoningLevel(session.reasoning),
         language: this.settings.language
       });
     } catch (error) {

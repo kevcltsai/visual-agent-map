@@ -3564,14 +3564,18 @@ integrationTest('Coffee Tables historical preview cancels a pending generating-r
   delayedRoom = deferred(); findButton('Enter this table').click(); await Promise.resolve(); findButton('Open new table').click(); delayedRoom.resolve(completed); await new Promise(resolve => setImmediate(resolve)); assert.deepEqual(attached, []);
 });
 
-integrationTest('Coffee Tables VAM handoff links the transcript and starts from an editable research question', async () => {
-  let modal, opened; class Modal { constructor() { modal = this; this.titleEl = coffeeElement('title'); this.contentEl = coffeeElement('content'); } open() {} close() {} }
+integrationTest('Coffee Tables VAM handoff reframes for Understand and preserves provenance and uncertainty', async () => {
+  let modal, opened, request; class Modal { constructor() { modal = this; this.titleEl = coffeeElement('title'); this.contentEl = coffeeElement('content'); } open() {} close() {} }
   const { default: Plugin } = load('main.ts', { obsidian: { ...obsidian, Modal } }); const { app, repo } = fixture('en'), plugin = new Plugin(); plugin.app = app; plugin.repo = repo; plugin.settings.language = 'en';
-  const session = { ...coffeeSession(), status: 'completed', transcriptMarkdown: 'The table discussed meal choices.' }; plugin.mutate = run => run(); plugin.activateView = async path => { opened = path; };
+  const session = { ...coffeeSession(), status: 'completed', transcriptMarkdown: 'The table discussed meal choices.', observerNotes: ['Core tension: cost versus nutrition.'] }; plugin.mutate = run => run(); plugin.activateView = async path => { opened = path; };
+  plugin.core.reframing.reframe = async value => { request = value; return { version: 1, id: 'reframed-1', kind: 'question', title: 'How should meal cost and nutrition be balanced?', summary: 'How should meal cost and nutrition be balanced?', content: 'Investigate the cost-nutrition trade-off without treating simulated claims as facts.', origin: { ...value.source.origin }, sources: [...value.source.sources, { label: value.source.title, artifactId: value.source.id }], metadata: { ...value.source.metadata, reframed: true, targetThinkingMode: value.target, sourceArtifactId: value.source.id } }; };
   plugin.core.experiences.register('visual-map', artifact => plugin.openArtifactInVisualMap(artifact));
-  await plugin.openCoffeeHandoff(session, 'Agent Workspace/Coffee Tables/session.md'); coffeeFind(modal.contentEl, element => element.text === 'Create research map').click(); await until(() => opened);
+  await plugin.openCoffeeHandoff(session, 'Agent Workspace/Coffee Tables/session.md');
+  assert.equal(request.target, 'understand'); assert.match(request.source.content, /cost versus nutrition/); assert.match(request.source.metadata.uncertainty, /Unverified claims/);
+  const question = coffeeFind(modal.contentEl, element => element.tag === 'textarea'); assert.equal(question.value, 'How should meal cost and nutrition be balanced?'); question.value = 'Which trade-offs matter most?';
+  coffeeFind(modal.contentEl, element => element.text === 'Create research map').click(); await until(() => opened);
   const map = await repo.readMap(opened); assert.equal(map.nodes.length, 1); const note = await repo.readNote(map.nodes[0].path);
-  assert.match(note.detail, /Coffee Tables/); assert.doesNotMatch(note.detail, /meal choices/); assert.match(note.detail, /Simulated Coffee Tables discussion/);
+  assert.match(note.detail, /Investigate the cost-nutrition trade-off/); assert.match(note.detail, /Reframing provenance/); assert.match(note.detail, /Target thinking mode: understand/); assert.match(note.detail, /Source artifact:/); assert.match(note.detail, /Uncertainty:/); assert.match(note.detail, /Coffee Tables/);
 });
 
 test('product ribbon pins both entrances below other actions and cleans up on unload', () => {

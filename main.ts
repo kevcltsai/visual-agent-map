@@ -536,7 +536,15 @@ export default class VisualAgentMapPlugin extends Plugin {
       const map = await this.repo.readMap(path);
       const node = await this.repo.createNote(artifact.title, model, map, path, "manual");
       const links = artifact.sources.filter(source => source.path).map(source => `[[${source.path}|${source.label}]]`);
-      const detail = [artifact.content, ...links].filter(Boolean).join("\n\n");
+      const provenance = artifact.metadata?.reframed === true
+        ? [
+            "## Reframing provenance",
+            `- Target thinking mode: ${String(artifact.metadata.targetThinkingMode ?? "unknown")}`,
+            `- Source artifact: ${String(artifact.metadata.sourceArtifactId ?? "unknown")}`,
+            `- Uncertainty: ${String(artifact.metadata.uncertainty ?? "preserved from source")}`
+          ].join("\n")
+        : "";
+      const detail = [artifact.content, provenance, ...links].filter(Boolean).join("\n\n");
       await this.repo.updateNote(node.path, { detail, reasoning });
       map.nodes.push(node);
       await this.repo.saveMap(path, map);

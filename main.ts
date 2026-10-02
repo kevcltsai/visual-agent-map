@@ -478,25 +478,54 @@ export default class VisualAgentMapPlugin extends Plugin {
   }
   async openCoffeeHandoff(session: CoffeeSession, sourcePath: string): Promise<void> {
     const zh = this.settings.language === "zh-TW";
+    const sourceArtifact = createThinkingArtifact({
+      id: randomUUID(),
+      kind: "insight",
+      title: session.topic,
+      summary: session.topic,
+      content: [
+        ...(session.observerNotes ?? []),
+        session.transcriptMarkdown
+      ].filter(Boolean).join("\n\n"),
+      origin: { experience: "coffee-tables", sessionId: session.id, path: sourcePath },
+      sources: [{ label: "Coffee Tables", path: sourcePath, experience: "coffee-tables", sessionId: session.id }],
+      metadata: {
+        model: session.model,
+        reasoning: session.reasoning,
+        uncertainty: zh
+          ? "來源包含 Coffee Tables 模擬對談與觀察者整理；未經查證的內容、角色觀點與推測必須維持未驗證狀態，且不代表使用者立場。"
+          : "The source contains a simulated Coffee Tables discussion and observer notes. Unverified claims, role perspectives, and speculation must remain unverified and do not represent the user's position."
+      }
+    });
+    let artifact = sourceArtifact;
+    try {
+      artifact = await this.core.reframing.reframe({
+        source: sourceArtifact,
+        target: "understand",
+        model: session.model,
+        reasoning: session.reasoning,
+        language: this.settings.language
+      });
+    } catch (error) {
+      this.recordFailure(zh ? "Reframing 失敗，使用來源主題作為備援" : "Reframing failed; using the source topic as fallback", error);
+    }
+
     const modal = new Modal(this.app);
     modal.titleEl.setText(zh ? "帶去 VAM 深入研究" : "Take to VAM for deeper research");
-    modal.contentEl.createEl("p", { text: zh ? "編輯要深入研究的問題，並從來源對談開始。" : "Edit the question for deeper research. The source conversation will be linked." });
+    modal.contentEl.createEl("p", { text: zh ? "AI 已依 Understand 模式重新 framing。你可以修改後再建立研究地圖。" : "AI reframed this for Understand mode. Edit it before creating the research map if needed." });
     const question = modal.contentEl.createEl("textarea", { cls: "ct-handoff-question", attr: { rows: "3", "aria-label": zh ? "研究問題" : "Research question" } });
-    question.value = session.topic;
+    question.value = artifact.title;
     const create = modal.contentEl.createEl("button", { text: zh ? "建立研究地圖" : "Create research map", cls: "mod-cta" });
     create.addEventListener("click", () => {
       const title = question.value.trim(); if (!title || create.disabled) return;
       create.disabled = true;
-      const artifact = createThinkingArtifact({
-        id: randomUUID(),
-        kind: "question",
+      const handoffArtifact: ThinkingArtifact = {
+        ...artifact,
         title,
-        content: zh ? "Coffee Tables 的模擬對談，內容尚未查證，不代表使用者結論。" : "Simulated Coffee Tables discussion; unverified and not the user's conclusion.",
-        origin: { experience: "coffee-tables", sessionId: session.id, path: sourcePath },
-        sources: [{ label: "Coffee Tables", path: sourcePath, experience: "coffee-tables", sessionId: session.id }],
-        metadata: { model: session.model, reasoning: session.reasoning }
-      });
-      void this.core.experiences.handoff({ target: "visual-map", artifact })
+        summary: title,
+        metadata: { ...artifact.metadata, userEditedFraming: title !== artifact.title }
+      };
+      void this.core.experiences.handoff({ target: "visual-map", artifact: handoffArtifact })
         .then(() => modal.close())
         .catch((error: unknown) => { create.disabled = false; new Notice(`${String(error)} · ${zh ? "可能已建立部分研究檔案，請先檢查再重試。" : "Some research files may have been created; inspect before retrying."}`); });
     });

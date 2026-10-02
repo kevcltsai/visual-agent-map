@@ -18,7 +18,7 @@ export interface ReframeRequest {
   source: ThinkingArtifact;
   target: ThinkingMode;
   model: string;
-  reasoning?: ReasoningLevel | string;
+  reasoning?: ReasoningLevel;
   language: UiLanguage;
   signal?: AbortSignal;
 }

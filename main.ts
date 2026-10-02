@@ -483,10 +483,7 @@ export default class VisualAgentMapPlugin extends Plugin {
       kind: "insight",
       title: session.topic,
       summary: session.topic,
-      content: [
-        ...(session.observerNotes ?? []),
-        session.transcriptMarkdown
-      ].filter(Boolean).join("\n\n"),
+      content: (session.observerNotes ?? []).filter(Boolean).join("\n\n") || session.transcriptMarkdown,
       origin: { experience: "coffee-tables", sessionId: session.id, path: sourcePath },
       sources: [{ label: "Coffee Tables", path: sourcePath, experience: "coffee-tables", sessionId: session.id }],
       metadata: {

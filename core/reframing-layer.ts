@@ -61,7 +61,7 @@ export class ReframingLayer {
       title,
       summary: title,
       content: result.detail.trim(),
-      origin: { ...request.source.origin },
+      origin: { experience: request.source.origin.experience, sessionId: request.source.origin.sessionId, path: request.source.origin.path },
       sources: [
         ...request.source.sources,
         { label: request.source.title, experience: request.source.origin.experience, sessionId: request.source.origin.sessionId, path: request.source.origin.path, artifactId: request.source.id }

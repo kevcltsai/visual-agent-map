@@ -32,6 +32,7 @@ import { AiTaskService } from "./core/ai-task-service";
 import { ReframingService, providerReframeRunner } from "./core/reframing-service";
 import { receiveVisualMapHandoff } from "./experiences/visual-map/handoff";
 import { openCoffeeResearchHandoff } from "./experiences/coffee-tables/handoff-modal";
+import { MarkdownSelectionAi } from "./experiences/markdown-context/selection-ai";
 
 export { buildPreparedTaskContext } from "./ai/context-builder";
 export { extractJsonObject } from "./core/ai-task-service";
@@ -137,6 +138,13 @@ export default class VisualAgentMapPlugin extends Plugin {
     const legacy: (Partial<Settings> & { cliPath?: string }) | null = saved;
     this.settings = { ...DEFAULT_SETTINGS, coffeeStyles: Array.isArray(saved?.coffeeStyles) ? saved.coffeeStyles.filter((item: unknown): item is { id: string; name: string; prompt: string } => !!item && typeof item === "object" && typeof (item as { id?: unknown }).id === "string" && typeof (item as { name?: unknown }).name === "string" && typeof (item as { prompt?: unknown }).prompt === "string") : [], defaultCoffeeStyleId: typeof saved?.defaultCoffeeStyleId === "string" ? saved.defaultCoffeeStyleId : undefined, language: initialUiLanguage(saved?.language), workspaceFolder: saved?.workspaceFolder || DEFAULT_SETTINGS.workspaceFolder, topicsFolder: saved?.topicsFolder || DEFAULT_SETTINGS.topicsFolder, inboxFolder: saved?.inboxFolder || DEFAULT_SETTINGS.inboxFolder, notesFolder: saved?.notesFolder || DEFAULT_SETTINGS.notesFolder, mapsFolder: saved?.mapsFolder || DEFAULT_SETTINGS.mapsFolder, mapId: saved?.mapId || "default", codexPath: saved?.codexPath || legacy?.cliPath || DEFAULT_SETTINGS.codexPath, claudePath: saved?.claudePath || DEFAULT_SETTINGS.claudePath, cliModel: saved?.cliModel || DEFAULT_SETTINGS.cliModel, cliReasoning: normalizeReasoningLevel(saved?.cliReasoning), previewScale: saved?.previewScale !== undefined ? clampPreviewScale(saved.previewScale) : legacyPreviewScale(saved?.previewSize), models: "", migrated: saved?.migrated === true, structureVersion: saved?.structureVersion ?? (saved ? 1 : DEFAULT_SETTINGS.structureVersion), firstUseNoticeSeen: saved?.firstUseNoticeSeen === true, codexUsageNoticeSeen: saved?.codexUsageNoticeSeen === true, claudeUsageNoticeSeen: saved?.claudeUsageNoticeSeen === true, aiExchangeLoggingEnabled: saved?.aiExchangeLoggingEnabled === true, workspaceInitialized: saved ? saved.workspaceInitialized !== false : false, sampleTourVersionSeen: saved?.sampleTourVersionSeen ?? 0 };
     setUiLanguage(this.settings.language);
+    const markdownSelectionAi = new MarkdownSelectionAi(this.app, {
+      model: () => this.settings.cliModel,
+      language: () => this.settings.language === "zh-TW" ? "Traditional Chinese" : "English",
+      run: (prompt, model, signal, image) => this.runConfirmedMarkdownContextAi(prompt, model, signal, image)
+    });
+    this.addChild(markdownSelectionAi);
+    this.addCommand({ id: "markdown-selection-ai", name: t("ui.context_ai_open"), checkCallback: checking => markdownSelectionAi.openForSelection(checking) });
     this.logs.appendLog("info", `Visual Agent Map ${this.manifest.version || "unknown"} 載入`);
     if (this.app.vault.adapter instanceof FileSystemAdapter && this.manifest.dir) {
       const pluginDirectory = join(this.app.vault.adapter.getBasePath(), this.manifest.dir);
@@ -487,6 +495,74 @@ export default class VisualAgentMapPlugin extends Plugin {
         ? await this.claudeCli(directory).runTask(prompt, providerModelId(session.model), effort, undefined, controls)
         : await this.runtime(directory, true).runTask(prompt, session.model, effort, undefined, controls);
       if (controller.signal.aborted) throw new Error("Coffee Tables request cancelled");
+      if (this.settings.aiExchangeLoggingEnabled) { exchanges?.received(id, raw); exchanges?.completed(id); }
+      return raw;
+    } catch (error) {
+      if (this.settings.aiExchangeLoggingEnabled) exchanges?.failed(id, error instanceof Error ? error.message : String(error));
+      throw error;
+    } finally { signal.removeEventListener("abort", abort); this.activeTasks.delete(key); }
+  }
+  private async markdownContextImage(image: HTMLImageElement, signal: AbortSignal): Promise<string> {
+    if (signal.aborted || !image.complete || !image.naturalWidth) throw new Error(t("ui.context_ai_image_unavailable"));
+    // Use the already loaded pixels first. Cross-origin images can taint the canvas.
+    try {
+      const canvas = createEl("canvas");
+      const scale = Math.min(1, 2048 / Math.max(image.naturalWidth, image.naturalHeight));
+      canvas.width = Math.max(1, Math.round(image.naturalWidth * scale));
+      canvas.height = Math.max(1, Math.round(image.naturalHeight * scale));
+      const context = canvas.getContext("2d");
+      if (context) { context.drawImage(image, 0, 0, canvas.width, canvas.height); return canvas.toDataURL("image/png"); }
+    } catch { /* Resolve a Vault attachment or an explicitly selected public image below. */ }
+    let bytes: ArrayBuffer;
+    const embeddedPath = image.closest(".internal-embed")?.getAttribute("src")?.split("#")[0];
+    const view = this.app.workspace.getLeavesOfType("markdown").map(leaf => leaf.view).find(view => view instanceof MarkdownView && view.containerEl.contains(image));
+    const file = embeddedPath ? this.app.metadataCache.getFirstLinkpathDest(embeddedPath, view instanceof MarkdownView ? view.file?.path ?? "" : "") : null;
+    if (file instanceof TFile) bytes = await this.app.vault.readBinary(file);
+    else throw new Error(t("ui.context_ai_image_unavailable"));
+    if (signal.aborted) throw new Error(t("ui.ai_task_cancelled"));
+    if (bytes.byteLength > 10 * 1024 * 1024) throw new Error(t("ui.context_ai_image_unavailable"));
+    const buffer = Buffer.from(bytes);
+    const mime = buffer.subarray(0, 8).equals(Buffer.from([137,80,78,71,13,10,26,10])) ? "image/png"
+      : buffer[0] === 255 && buffer[1] === 216 ? "image/jpeg"
+      : buffer.subarray(0, 3).toString() === "GIF" ? "image/gif"
+      : buffer.subarray(0, 4).toString() === "RIFF" && buffer.subarray(8, 12).toString() === "WEBP" ? "image/webp" : "";
+    if (!mime) throw new Error(t("ui.context_ai_image_unavailable"));
+    return `data:${mime};base64,${buffer.toString("base64")}`;
+  }
+
+  private async runConfirmedMarkdownContextAi(prompt: string, model: string, signal: AbortSignal, image?: HTMLImageElement): Promise<string> {
+    let result: string | undefined;
+    const confirmed = await this.confirmAiUsage(model, async () => { result = await this.runMarkdownContextAi(prompt, model, signal, image); });
+    if (!confirmed || result === undefined) throw new Error(t("ui.ai_task_cancelled"));
+    return result;
+  }
+  private async runMarkdownContextAi(prompt: string, model: string, signal: AbortSignal, image?: HTMLImageElement): Promise<string> {
+    if (image && providerForModel(model) === "claude") throw new Error(t("ui.context_ai_image_claude"));
+    const imageDataUrl = image ? await this.markdownContextImage(image, signal) : undefined;
+    if (signal.aborted) throw new Error(t("ui.ai_task_cancelled"));
+    const directory = this.pluginDirectory();
+    const effort = effectiveReasoningLevel({ title: "Selected Markdown text", summary: "", detail: "", rules: "", task: prompt, ancestors: "" }, normalizeReasoningLevel(this.settings.cliReasoning));
+    const exchanges = this.settings.aiExchangeLoggingEnabled ? this.exchanges : null;
+    const id = randomUUID();
+    const key = `markdown-context:${id}`;
+    const controller = new AbortController();
+    const abort = (): void => controller.abort();
+    signal.addEventListener("abort", abort, { once: true });
+    if (signal.aborted) controller.abort();
+    this.activeTasks.set(key, controller);
+    exchanges?.begin({ id, startedAt: new Date().toISOString(), topic: "Markdown selection", mode: "task", model, effort });
+    try {
+      const controls = {
+        textOnly: true,
+        imageDataUrl,
+        signal: controller.signal,
+        searchBudget: 0,
+        onRequest: (data: unknown): void => { if (this.settings.aiExchangeLoggingEnabled) exchanges?.sent(id, JSON.stringify({ request: data, prompt }, null, 2)); }
+      };
+      const raw = providerForModel(model) === "claude"
+        ? await this.claudeCli(directory).runTask(prompt, providerModelId(model), effort, undefined, controls)
+        : await this.runtime(directory, true).runTask(prompt, model, effort, undefined, controls);
+      if (controller.signal.aborted) throw new Error(t("ui.ai_task_cancelled"));
       if (this.settings.aiExchangeLoggingEnabled) { exchanges?.received(id, raw); exchanges?.completed(id); }
       return raw;
     } catch (error) {

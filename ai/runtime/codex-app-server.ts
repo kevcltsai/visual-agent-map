@@ -110,7 +110,7 @@ export class CodexAppServerRuntime {
     return [...new Map(models.map(model => [model.model, model])).values()];
   }
 
-  async runTask(prompt: string, model: string, effort: string, outputSchema: unknown, controls?: { textOnly?: boolean; signal?: AbortSignal; searchBudget?: number; onRequest?: (request: unknown) => void; onAccepted?: () => void; onText?: (text: string) => void; onSteer?: (steer: (text: string) => Promise<void>) => void; timeoutMs?: number }): Promise<string> {
+  async runTask(prompt: string, model: string, effort: string, outputSchema: unknown, controls?: { imageDataUrl?: string; textOnly?: boolean; signal?: AbortSignal; searchBudget?: number; onRequest?: (request: unknown) => void; onAccepted?: () => void; onText?: (text: string) => void; onSteer?: (steer: (text: string) => Promise<void>) => void; timeoutMs?: number }): Promise<string> {
     if (controls?.signal?.aborted) throw cancelledError();
     await this.start();
     if (controls?.signal?.aborted) throw cancelledError();
@@ -167,7 +167,7 @@ export class CodexAppServerRuntime {
       if (controls?.signal?.aborted) throw cancelledError();
       const turnRequest = {
         threadId,
-        input: [{ type: "text", text: prompt, text_elements: [] }],
+        input: [{ type: "text", text: prompt, text_elements: [] }, ...(controls?.imageDataUrl ? [{ type: "image", url: controls.imageDataUrl }] : [])],
         model: model || null,
         effort: effort || "low",
         sandboxPolicy: { type: "readOnly", networkAccess: false },

@@ -28,11 +28,15 @@ export class ShallowExpansionCoordinator {
     const accepted = new Promise<void>((resolve, reject) => { acceptFirst = resolve; rejectFirst = reject; });
     void (async () => {
       let dispatchAccepted = false;
-      try {
-        for (const child of children) {
+      let nextChild = 0;
+      const runningPaths = new Set<string>();
+      const updateCurrent = (): void => { state.currentPath = [...runningPaths][0]; changed(); };
+      const worker = async (): Promise<void> => {
+        while (nextChild < children.length) {
+          const child = children[nextChild++];
           if (controller.signal.aborted) break;
-          state.currentPath = child.path;
-          changed();
+          runningPaths.add(child.path);
+          updateCurrent();
           let acceptedChild = false;
           try {
             await startChild(child, controller.signal, () => {
@@ -47,10 +51,13 @@ export class ShallowExpansionCoordinator {
             }
           } finally {
             state.completed++;
-            state.currentPath = undefined;
-            changed();
+            runningPaths.delete(child.path);
+            updateCurrent();
           }
         }
+      };
+      try {
+        await Promise.all(Array.from({ length: Math.min(3, children.length) }, () => worker()));
       } finally {
         state.status = controller.signal.aborted ? "stopped" : "completed";
         state.currentPath = undefined;

@@ -32,6 +32,8 @@ Setup and troubleshooting: [INSTALL.md](INSTALL.md) · [Manual installation from
 
 ### Your notes and privacy
 
+Development on `main` adds a floating AI action for selected Markdown text and clicked images. Drafts require explicit acceptance before changing a note. Image interpretation currently uses Codex and sends the selected image data only when you run the action; unreadable images fail clearly. Configure the selection command in Obsidian's Hotkeys settings. This feature is not included in the 0.12.0 release.
+
 Maps, research notes, Coffee Tables conversations, and observer notes are readable Markdown in your vault. VAM has no telemetry or stored API keys. AI tasks send relevant content, including selected background files and guest profiles, through your local CLI to OpenAI or Anthropic; your provider allowance or charges may apply. AI request/reply logging is off by default.
 
 <details>
@@ -82,6 +84,8 @@ Coffee Tables 來賓是模擬角色，不是真實專家；對談內容不會自
 安裝與問題排除：[INSTALL.md](INSTALL.md) · [從 0.12.0 正式版手動安裝](https://github.com/kevcltsai/visual-agent-map/releases/tag/0.12.0)
 
 ### 你的筆記與隱私
+
+`main` 開發版新增選取 Markdown 文字與點選圖片的浮動 AI 操作。草稿必須由使用者明確接受才改動筆記。圖片辨識目前使用 Codex，僅在執行時傳送選取圖片的資料；無法讀取圖片會明確顯示失敗。可在 Obsidian 快捷鍵設定配置選取命令。此功能尚未包含於 0.12.0 正式版。
 
 地圖、研究筆記、Coffee Tables 對談和觀察者筆記都是 Vault 裡可閱讀的 Markdown。VAM 不含遙測，也不儲存 API key。AI 任務會透過本機 CLI 將相關內容（含選取的背景檔與來賓設定）傳送至 OpenAI 或 Anthropic；可能使用帳號額度或產生費用。AI 請求／回覆紀錄預設關閉。
 

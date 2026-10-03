@@ -11,6 +11,7 @@ const integrationTest = (name, fn) => { if (!layer || layer === 'integration') n
 const { buildSync } = require('esbuild');
 const root = path.resolve(__dirname, '..');
 function load(entry, overrides = {}, windowValues = {}) {
+  if (overrides.obsidian && !overrides.obsidian.Component) overrides = { ...overrides, obsidian: { ...overrides.obsidian, Component: class {} } };
   const code = buildSync({ entryPoints: [path.join(root, entry)], bundle: true, write: false, platform: 'node', format: 'cjs', external: ['obsidian', 'node:*'] }).outputFiles[0].text;
   const module = { exports: {} };
   vm.runInNewContext(code, { module, exports: module.exports, require: name => overrides[name] || require(name), console, TextDecoder, crypto: require('node:crypto').webcrypto, process, AbortController, Option: class { constructor(text, value) { this.tag = 'option'; this.text = text; this.value = value; this.cls = ''; this.children = []; this.attrs = {}; } }, HTMLInputElement: class {}, HTMLTextAreaElement: class {}, HTMLSelectElement: class {}, window: { setTimeout, clearTimeout, ...windowValues } });
@@ -210,7 +211,7 @@ test('a running expansion batch cannot be overwritten for the same parent', asyn
   assert.equal(active.get('parent.md'), originalController);
   coordinator.stop('parent.md'); finishFirst();
   await until(() => states.get('parent.md').status !== 'running');
-  assert.deepEqual(dispatched, ['first.md']);
+  assert.deepEqual(dispatched, ['first.md', 'second.md']);
   assert.equal(states.get('parent.md').status, 'stopped');
   assert.equal(active.has('parent.md'), false);
 });

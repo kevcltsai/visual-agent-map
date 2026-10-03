@@ -1546,21 +1546,24 @@ integrationTest('cancelling shallow research stops the batch without marking uns
   const children = await view.createChildBatch(parent, [
     { title: 'First', task: 'Research first', contribution: '' },
     { title: 'Second', task: 'Research second', contribution: '' },
-    { title: 'Third', task: 'Research third', contribution: '' }
+    { title: 'Third', task: 'Research third', contribution: '' },
+    { title: 'Fourth', task: 'Research fourth', contribution: '' }
   ], { researchMode: 'research', researchDepth: 'fast', visualMode: 'off', referenceGroups: [] });
   await view.startShallowResearch(parent, children, { researchMode: 'research', researchDepth: 'fast', visualMode: 'off', referenceGroups: [], signal: controller.signal });
+  await until(() => started.length === 3);
   plugin.expansionCoordinator.stop(parent.path);
   await until(() => plugin.expansionBatches.get(parent.path).status !== 'running');
   finishFirst?.();
   const saved = await repo.readMap(mapPath);
-  assert.deepEqual(started, ['First']);
+  assert.deepEqual(started, ['First', 'Second', 'Third']);
   assert.equal(saved.nodes.slice(1).map(child => child.path).join('|'), Array.from(children, child => child.path).join('|'));
   assert.equal((await repo.readNote(saved.nodes[1].path)).status, 'idea');
   assert.equal((await repo.readNote(saved.nodes[2].path)).status, 'idea');
   assert.equal((await repo.readNote(saved.nodes[3].path)).status, 'idea');
+  assert.equal((await repo.readNote(saved.nodes[4].path)).status, 'idea');
   assert.deepEqual(failures, []);
 });
-integrationTest('accepted shallow research is sequential, detached from modal close, and stopped by the parent', async () => {
+integrationTest('accepted shallow research is parallel, detached from modal close, and stopped by the parent', async () => {
   const { repo, app } = fixture(), parent = await topicNote(repo, 'Parent', 'model-a');
   const mapPath = 'Agent Workspace/Topics/map-a/Map.md', mapDoc = map([parent]); mapDoc.id = 'map-a';
   await app.vault.create(mapPath, core.serializeMap(mapDoc));
@@ -1580,7 +1583,8 @@ integrationTest('accepted shallow research is sequential, detached from modal cl
   ], { researchMode: 'research', researchDepth: 'fast', visualMode: 'off', referenceGroups: [{ id: 'parent-source', documents: [{ path: 'External.md' }] }] });
   const pending = view.startShallowResearch(parent, children, { researchMode: 'research', researchDepth: 'fast', visualMode: 'off', referenceGroups: [{ id: 'parent-source', documents: [{ path: 'External.md' }] }], shallowResearch: true, signal: controller.signal, onProgress: () => assert.fail('modal progress callback retained') });
   await pending;
-  assert.deepEqual(started, ['First']);
+  await until(() => started.length === 2);
+  assert.deepEqual(started, ['First', 'Second']);
   controller.abort();
   assert.equal(signals[0].aborted, false);
   finish.get(children[0].path)();

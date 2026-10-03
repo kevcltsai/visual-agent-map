@@ -32,6 +32,7 @@ export interface ThinkingArtifact {
   title: string;
   content: string;
   summary?: string;
+  sourceSnapshot?: string;
   origin: {
     experience: ExperienceId;
     sessionId?: string;

@@ -1,6 +1,7 @@
 import type VisualAgentMapPlugin from "../main";
 import { t } from "../i18n";
 import { normalizeReasoningLevel } from "../repository";
+import { syncModelSelect } from "../core/model-discovery";
 import { App, Modal, PluginSettingTab, Setting, type SettingDefinitionItem } from "obsidian";
 
 export const CODEX_INSTALL_URL = "https://developers.openai.com/codex/cli/";
@@ -54,7 +55,20 @@ export class ClaudeSetupModal extends Modal {
   }
 }
 export class VisualAgentMapSettingTab extends PluginSettingTab {
-  constructor(app: App, private plugin: VisualAgentMapPlugin) { super(app, plugin); }
+  private readonly modelSelects = new Set<HTMLSelectElement>();
+  private readonly modelStatusEls = new Set<HTMLElement>();
+  constructor(app: App, private plugin: VisualAgentMapPlugin) {
+    super(app, plugin);
+    plugin.subscribeModelDiscovery(() => {
+      for (const select of [...this.modelSelects]) {
+        if (!select.isConnected) { this.modelSelects.delete(select); continue; }
+        syncModelSelect(select, plugin.availableModels(), id => plugin.modelLabel(id), t("ui.current_model_is_unavailable"));
+      }
+      const codex = plugin.modelDiscoveryState("codex"), claude = plugin.modelDiscoveryState("claude");
+      const status = `Codex ${codex.status}${codex.error ? `: ${codex.error}` : ""}; Claude CLI candidates ${claude.status}`;
+      for (const element of [...this.modelStatusEls]) { if (!element.isConnected) this.modelStatusEls.delete(element); else element.setText(status); }
+    });
+  }
   refreshAfterLanguageChange(): void {
     const focused = typeof document !== "undefined" && document.activeElement && this.containerEl.contains(document.activeElement)
       && document.activeElement.instanceOf(HTMLSelectElement)
@@ -72,7 +86,6 @@ export class VisualAgentMapSettingTab extends PluginSettingTab {
     const text = (name: string, key: "codexPath" | "claudePath", desc: string): SettingDefinitionItem => ({ name, desc, control: { type: "text", key } });
     const diagnostic = this.plugin.codexDiagnostic();
     const claudeDiagnostic = this.plugin.claudeDiagnostic();
-    const models = Object.fromEntries(this.plugin.availableModels().map(model => [model, this.plugin.modelLabel(model)]));
     return [
       { name: t("ui.interface_language"), render: setting => {
         setting.setName(t("ui.interface_language")).setDesc(t("ui.interface_language_description")).addDropdown(dropdown => {
@@ -82,7 +95,21 @@ export class VisualAgentMapSettingTab extends PluginSettingTab {
       } },
       text(t("ui.codex_cli_path"), "codexPath", t("ui.vam_uses_this_executable_to_start_codex_app_server")),
       text(t("ui.claude_cli_path"), "claudePath", t("ui.vam_uses_the_claude_code_cli_installed_on_this_computer")),
-      { name: t("ui.workspace_default_model"), desc: t("ui.models_are_loaded_from_each_installed_ai_service_changes_apply_only_to_new_root_topics"), control: { type: "dropdown", key: "cliModel", options: models } },
+      { name: t("ui.workspace_default_model"), desc: t("ui.models_are_loaded_from_each_installed_ai_service_changes_apply_only_to_new_root_topics"), render: setting => {
+        setting.setName(t("ui.workspace_default_model")).setDesc("").addDropdown(dropdown => {
+          const select = (dropdown as unknown as { selectEl: HTMLSelectElement }).selectEl;
+          this.modelSelects.add(select);
+          const selected = this.plugin.settings.cliModel;
+          syncModelSelect(select, this.plugin.availableModels(), id => this.plugin.modelLabel(id), t("ui.current_model_is_unavailable"));
+          if (!Array.from(select.options).some(option => option.value === selected)) { const unavailable = new Option(`${selected} (${t("ui.current_model_is_unavailable")})`, selected); unavailable.disabled = true; select.add(unavailable); }
+          dropdown.setValue(selected);
+          dropdown.onChange(value => { void this.setControlValue("cliModel", value); });
+        }).addButton(button => button.setButtonText(t("ui.check_again")).onClick(() => { void this.plugin.refreshModelDiscovery("codex"); void this.plugin.refreshModelDiscovery("claude"); }));
+        this.modelStatusEls.add(setting.descEl);
+        setting.descEl.setText(`Codex ${this.plugin.modelDiscoveryState("codex").status}; Claude CLI candidates ${this.plugin.modelDiscoveryState("claude").status}`);
+        if (this.plugin.modelDiscoveryState("codex").status === "idle") void this.plugin.refreshModelDiscovery("codex");
+        if (this.plugin.modelDiscoveryState("claude").status === "idle") void this.plugin.refreshModelDiscovery("claude");
+      } },
       { name: t("ui.ai_reasoning_level"), desc: t("ui.auto_uses_low_for_simple_tasks_and_medium_for_complex_synthe"), control: { type: "dropdown", key: "cliReasoning", options: { auto: t("ui.auto"), low: t("ui.low"), medium: t("ui.medium"), high: t("ui.high") } } },
       { name: t("ui.record_ai_exchanges"), render: setting => { setting.setName(t("ui.record_ai_exchanges")).setDesc(t("ui.when_enabled_the_20_most_recent_full_requests_and_raw_replie" )).addToggle(toggle => toggle.setValue(this.plugin.settings.aiExchangeLoggingEnabled).onChange(async value => { this.plugin.settings.aiExchangeLoggingEnabled = value; await this.plugin.saveSettings(); })); } },
       { name: t("ui.workspace_location"), render: setting => { setting.setName(t("ui.workspace_location")).setDesc(t("ui.topics_folder_0_inbox_1", this.plugin.settings.topicsFolder, this.plugin.settings.inboxFolder)); } },
@@ -106,6 +133,9 @@ export class VisualAgentMapSettingTab extends PluginSettingTab {
     else if (key === "cliReasoning") this.plugin.settings.cliReasoning = normalizeReasoningLevel(value);
     else return;
     if (key === "codexPath") this.plugin.resetCodexRuntime();
+    if (key === "claudePath") this.plugin.modelDiscovery.invalidate("claude");
     await this.plugin.saveSettings();
+    if (key === "codexPath") void this.plugin.refreshModelDiscovery("codex");
+    if (key === "claudePath") void this.plugin.refreshModelDiscovery("claude");
   }
 }

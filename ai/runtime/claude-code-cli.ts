@@ -2,7 +2,7 @@ import { spawn as nodeSpawn } from "node:child_process";
 import { t } from "../../i18n";
 
 interface ClaudeProcess {
-  stdin: { write(data: string): boolean; end(data?: string): void };
+  stdin: { write(data: string, callback?: (error?: Error | null) => void): boolean; end(data?: string, callback?: (error?: Error | null) => void): void };
   stdout: { on(event: "data", listener: (chunk: { toString(encoding?: string): string }) => void): void };
   stderr: { on(event: "data", listener: (chunk: { toString(encoding?: string): string }) => void): void };
   on(event: "error", listener: (error: Error) => void): void;
@@ -22,6 +22,7 @@ export interface ClaudeTaskControls {
   signal?: AbortSignal;
   searchBudget?: number;
   onRequest?: (request: unknown) => void;
+  onAccepted?: () => void;
   onProgress?: (message: string) => void;
   onText?: (text: string) => void;
   onSteer?: (steer: (text: string) => Promise<void>) => void;
@@ -92,7 +93,7 @@ export class ClaudeCodeCliRuntime {
         reject(error instanceof Error ? error : new Error(String(error)));
         return;
       }
-      let stdout = "", stderr = "", settled = false, inputOpen = Boolean(controls.onSteer);
+      let stdout = "", stderr = "", settled = false, accepted = false, inputOpen = Boolean(controls.onSteer);
       let streamBuffer = "", streamText = "", currentText = "", finalResult = "";
       const streaming = !!controls.onText && !outputSchema;
       const readStreamLine = (line: string): void => {
@@ -115,6 +116,11 @@ export class ClaudeCodeCliRuntime {
         cleanup();
         if (error) reject(error);
         else resolve(result ?? "");
+      };
+      const markAccepted = (): void => {
+        if (accepted || settled || controls.signal?.aborted) return;
+        accepted = true;
+        controls.onAccepted?.();
       };
       let killTimer: number | undefined;
       const stop = (): void => {
@@ -143,7 +149,12 @@ export class ClaudeCodeCliRuntime {
         if (killTimer) window.clearTimeout(killTimer);
         if (settled) return;
         if (code !== 0) {
-          const message = stderr.trim() || t("ui.claude_exited_with_code_0", code ?? t("ui.unknown"));
+          let message = stderr.trim();
+          if (!message) {
+            try { claudeStructuredOutput(streaming ? finalResult : stdout, !outputSchema); }
+            catch (error) { if (error instanceof Error && !(error instanceof SyntaxError)) message = error.message; }
+          }
+          message ||= t("ui.claude_exited_with_code_0", code ?? t("ui.unknown"));
           finish(new Error(message.slice(-4_000)));
           return;
         }
@@ -157,9 +168,17 @@ export class ClaudeCodeCliRuntime {
       });
       try {
         if (controls.onSteer) {
-          const sendInput = (text: string): void => { if (!inputOpen || settled) throw new Error("This Coffee Tables response has already ended."); child.stdin.write(`${JSON.stringify({ type: "user", message: { role: "user", content: [{ type: "text", text }] } })}\n`); };
-          sendInput(prompt);
+          const sendInput = (text: string, accepted?: () => void): void => {
+            if (!inputOpen || settled) throw new Error("This Coffee Tables response has already ended.");
+            child.stdin.write(`${JSON.stringify({ type: "user", message: { role: "user", content: [{ type: "text", text }] } })}\n`, error => {
+              if (error) { stop(); finish(error); return; }
+              if (!settled && !controls.signal?.aborted) accepted?.();
+            });
+          };
+          sendInput(prompt, markAccepted);
           controls.onSteer(async text => { sendInput(text); });
+        } else if (controls.onAccepted) {
+          child.stdin.end(prompt, error => { if (error) { stop(); finish(error); } else markAccepted(); });
         } else child.stdin.end(prompt);
       }
       catch (error) { stop(); finish(error instanceof Error ? error : new Error(String(error))); }

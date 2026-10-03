@@ -3,6 +3,8 @@ import { copyLegacySession, parseSession, type AnyCoffeeSession, type CoffeeRefe
 import { splitObserverNotes } from "./engine";
 import { baselineFromVersions, serializeInsightNotes } from "./insights";
 
+export interface CoffeeHandoffSnapshot { session: CoffeeSession; path: string; markdown: string; sidecar: string | null }
+
 const CATEGORY_LABELS: Record<string, [string, string]> = { experts: ["主題專家", "Topic experts"], "cross-domain": ["跨領域專家", "Cross-domain experts"], generalist: ["好奇的通才", "Curious generalists"], affected: ["受影響者", "Affected perspectives"] };
 const markdownTopic = (raw: string): string | undefined => {
   let body = raw.replace(/^\uFEFF/, "");
@@ -229,6 +231,24 @@ export class CoffeeStorage {
     if (!side) throw new Error("Coffee Tables hidden session data is missing");
     if (side.journal) throw new Error("This table has an unfinished save. Open it to safely recover the saved changes.");
     return this.parseMarkdown(raw, side);
+  }
+  async handoffSnapshot(path: string, id: string): Promise<CoffeeHandoffSnapshot> {
+    const file = this.vault.getAbstractFileByPath(path);
+    if (!(file instanceof TFile)) throw new Error("Coffee source moved or disappeared; reopen the table.");
+    const sidePath = this.sidecarPath(id);
+    const markdown = await this.vault.read(file);
+    const sidecar = await this.vault.adapter.exists(sidePath) ? await this.readHidden(sidePath) : null;
+    const session = await this.inspectReadOnly(path);
+    if (session.version !== 3 || session.id !== id || session.status !== "completed" || id.startsWith("sample-")) throw new Error("Only completed user-owned Coffee tables can be handed off.");
+    const snapshot = { session, path, markdown, sidecar };
+    await this.assertHandoffSnapshot(snapshot);
+    return snapshot;
+  }
+  async assertHandoffSnapshot(snapshot: CoffeeHandoffSnapshot): Promise<void> {
+    const file = this.vault.getAbstractFileByPath(snapshot.path);
+    const sidePath = this.sidecarPath(snapshot.session.id);
+    const sidecar = await this.vault.adapter.exists(sidePath) ? await this.readHidden(sidePath) : null;
+    if (!(file instanceof TFile) || await this.vault.read(file) !== snapshot.markdown || sidecar !== snapshot.sidecar) throw new Error("Coffee source changed; keep your draft and reopen the latest table.");
   }
   async inspect(path: string): Promise<AnyCoffeeSession> { const file = this.vault.getAbstractFileByPath(path); if (!(file instanceof TFile)) throw new Error("Coffee Tables session is missing"); const raw = await this.vault.read(file); if (/^<!-- coffee-tables-data:/m.test(raw)) return this.parseV2(raw); const title = markdownTopic(raw); let side = await this.findSidecar(path,title); if (side?.journal) { if (this.activeWrites.has(side.id)) { const journal = side.journal; if (contentHash(raw) === journal.previousMarkdownHash) side = JSON.parse(journal.previousSidecar) as Sidecar; else if (contentHash(raw) === journal.nextMarkdownHash) { const { journal: _journal, ...committed } = side; side = committed; } else throw new Error("Coffee Tables note and hidden state changed during save"); } else side = await this.recoverJournal(file,raw,side); } return side ? this.parseMarkdown(raw, side) : (() => { throw new Error("Coffee Tables hidden session data is missing"); })(); }
   async save(sessionInput: CoffeeSession, summariesOnly = false): Promise<void> {

@@ -110,10 +110,26 @@ export class CodexAppServerRuntime {
     return [...new Map(models.map(model => [model.model, model])).values()];
   }
 
-  async runTask(prompt: string, model: string, effort: string, outputSchema: unknown, controls?: { textOnly?: boolean; signal?: AbortSignal; searchBudget?: number; onRequest?: (request: unknown) => void; onText?: (text: string) => void; onSteer?: (steer: (text: string) => Promise<void>) => void; timeoutMs?: number }): Promise<string> {
+  async runTask(prompt: string, model: string, effort: string, outputSchema: unknown, controls?: { textOnly?: boolean; signal?: AbortSignal; searchBudget?: number; onRequest?: (request: unknown) => void; onAccepted?: () => void; onText?: (text: string) => void; onSteer?: (steer: (text: string) => Promise<void>) => void; timeoutMs?: number }): Promise<string> {
     if (controls?.signal?.aborted) throw cancelledError();
     await this.start();
     if (controls?.signal?.aborted) throw cancelledError();
+    let textConfig: Record<string, unknown> | undefined;
+    if (controls?.textOnly) {
+      const effective = await this.request("config/read", { includeLayers: false, cwd: this.options.cwd }) as { config?: { mcp_servers?: unknown } };
+      if (!effective.config) throw new Error("Cannot verify text-only Codex configuration");
+      textConfig = Object.fromEntries([
+        "shell_tool", "unified_exec", "apps", "plugins", "remote_plugin", "browser_use", "browser_use_external", "in_app_browser", "computer_use", "code_mode", "code_mode_host", "multi_agent", "goals", "hooks", "image_generation", "view_image", "sleep_tool", "skill_search", "skill_mcp_dependency_install"
+      ].map(feature => [`features.${feature}`, false]));
+      textConfig.web_search = "disabled";
+      const servers = effective.config.mcp_servers;
+      if (servers && typeof servers === "object" && !Array.isArray(servers)) {
+        // Overlay only availability: config/read can redact transport values.
+        // Nested keys preserve IDs containing dots and merge inherited transport.
+        textConfig.mcp_servers = Object.fromEntries(Object.keys(servers).map(id => [id, { enabled: false }]));
+      }
+      if (controls.signal?.aborted) throw cancelledError();
+    }
     const started = await this.request("thread/start", {
       model: model || null,
       cwd: this.options.cwd,
@@ -121,8 +137,8 @@ export class CodexAppServerRuntime {
       sandbox: "read-only",
       ephemeral: true,
       ...(controls?.textOnly ? {
-        baseInstructions: "You are a text-generation assistant. Complete the supplied conversation-writing task directly. Do not inspect the environment, repositories, Git, files, or use tools. All necessary context is in the request. Output only the requested Markdown.",
-        config: { "features.shell_tool": false, "features.unified_exec": false }
+        baseInstructions: "You are a text-generation assistant. Complete the supplied task directly. Do not inspect the environment, repositories, Git, files, or use tools. All necessary context is in the request. Follow the output format requested by the task and output schema.",
+        config: textConfig
       } : {})
     }) as { thread?: { id?: unknown } };
     const threadId = typeof started.thread?.id === "string" ? started.thread.id : "";
@@ -160,6 +176,8 @@ export class CodexAppServerRuntime {
       controls?.onRequest?.(turnRequest);
       const startedTurn = await this.request("turn/start", turnRequest) as { turn?: { id?: unknown } };
       state.turnId = typeof startedTurn.turn?.id === "string" ? startedTurn.turn.id : "";
+      if (!state.turnId) throw new Error("Codex App Server accepted no turn id.");
+      if (!timedOut && !controls?.signal?.aborted && this.turns.get(threadId) === state) controls?.onAccepted?.();
       controls?.onSteer?.(async text => {
         if (controls.signal?.aborted || this.turns.get(threadId) !== state || !state.turnId) throw cancelledError();
         await this.request("turn/steer", { threadId, expectedTurnId: state.turnId, input: [{ type: "text", text }] });

@@ -17,7 +17,7 @@ export class PendingSuggestions extends Map<string, Suggestion[]> {
         const suggestions = (item[1] as unknown[]).filter((value): value is Suggestion => {
           if (!value || typeof value !== "object") return false;
           const suggestion = value as Record<string, unknown>;
-          return typeof suggestion.title === "string" && typeof suggestion.task === "string" && typeof suggestion.contribution === "string" && (suggestion.parentTitle === undefined || typeof suggestion.parentTitle === "string");
+          return typeof suggestion.title === "string" && typeof suggestion.task === "string" && typeof suggestion.contribution === "string" && (suggestion.parentTitle === undefined || typeof suggestion.parentTitle === "string") && (suggestion.thinkingOriginBaseline === undefined || typeof suggestion.thinkingOriginBaseline === "string");
         });
         if (suggestions.length !== item[1].length) throw new Error("待確認建議欄位格式錯誤；保留原檔並停止寫入");
         entries.push([item[0], suggestions]);

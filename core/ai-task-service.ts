@@ -1,5 +1,5 @@
 import { packReferenceChunks, referenceBatches, referenceCatalog, resolveReferenceLinks } from "../ai/reference-materials";
-import { buildPreparedTaskContext } from "../ai/context-builder";
+import { buildPreparedTaskContext, estimateTokens } from "../ai/context-builder";
 import { effectiveReasoningLevel, normalizeReasoningLevel, researchGuidance, researchLimits } from "../ai/task-policy";
 import type { AiResult, ReasoningLevel, TaskContext } from "../ai/types";
 import { translate, t, type TranslationKey, type UiLanguage } from "../i18n";
@@ -55,13 +55,15 @@ export class AiTaskService {
     model: string,
     reasoning?: unknown,
     signal?: AbortSignal,
-    onExchange?: (id: string) => void
+    onExchange?: (id: string) => void,
+    onRequestAccepted?: () => void
   ): Promise<AiResult> {
     const provider = providerForModel(model);
     if (provider === "claude" && !CLAUDE_MODEL_CHOICES.some(choice => choice.id === model)) {
       throw new Error(t("ui.claude_model_is_not_supported_0", model));
     }
 
+    if (estimateTokens(input.sourceContext) > 32_000) throw new Error(t("ui.source_context_exceeds_budget"));
     let context = input;
     const referenceGroups = context.referenceGroups ?? [];
     if (referenceGroups.some(group => group.documents.length)) {
@@ -80,7 +82,7 @@ export class AiTaskService {
     const totalStarted = Date.now();
     const prepared = buildPreparedTaskContext(context, model, 32_000, provider);
     if (prepared.context.sourceContext !== context.sourceContext) {
-      throw new Error(t("ui.reference_too_large", t("ui.reference_materials")));
+      throw new Error(t("ui.source_context_exceeds_budget"));
     }
     context = prepared.context;
     const pluginDirectory = this.options.pluginDirectory();
@@ -122,6 +124,7 @@ export class AiTaskService {
     try {
       const controls = {
         signal,
+        onAccepted: onRequestAccepted,
         searchBudget: context.researchMode === "local" ? 0 : researchLimits(context.researchDepth).searches,
         onRequest: (request: unknown): void => {
           stage = "等待 AI 回覆";

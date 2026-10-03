@@ -17,6 +17,7 @@ export interface Note {
   prompt: string;
   rules: string;
   detail: string;
+  thinkingOrigin?: string;
   visualReferences: string;
   newFindings: string;
   preview: string;
@@ -130,7 +131,7 @@ function noteTitle(content: string, fm: Record<string, unknown>, fallback: strin
   return /^# (.+)$/m.exec(body)?.[1]?.trim() || text(fm.title, fallback);
 }
 
-type NoteSection = "Current Summary" | "Prompt" | "Rules" | "Detail" | "Visual References" | "Working Findings" | "New Findings" | "預覽" | "Preview" | "User Notes";
+type NoteSection = "Thinking Origin" | "Current Summary" | "Prompt" | "Rules" | "Detail" | "Visual References" | "Working Findings" | "New Findings" | "預覽" | "Preview" | "User Notes";
 type NoteLanguage = Settings["language"];
 const placeholder = (language: NoteLanguage): string => translate(language, "detail.no_conclusion_yet");
 const isPlaceholder = (value: string): boolean => value === translate("zh-TW", "detail.no_conclusion_yet") || value === translate("en", "detail.no_conclusion_yet");
@@ -168,6 +169,16 @@ function replaceSection(content: string, heading: NoteSection, value: string): s
   const at = reference >= 0 ? reference : content.length;
   const managed = heading === "Detail" ? `${DETAIL_START}\n${value.trim()}\n${DETAIL_END}` : value.trim();
   return `${content.slice(0, at).trimEnd()}\n\n## ${heading}\n\n${managed}\n\n${content.slice(at).trimStart()}`;
+}
+
+// Blockquoted, escaped source text cannot impersonate managed sections or markers.
+export function originMarkdown(value: string): string {
+  return value.split(/\r?\n/).map(line => `> ${line.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")}`).join("\n");
+}
+function readThinkingOrigin(content: string): string | undefined {
+  const value = section(content, "Thinking Origin");
+  if (!value) return undefined;
+  return value.split("\n").map(line => line.replace(/^> ?/, "").replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/&amp;/g, "&")).join("\n");
 }
 
 function replaceSummarySection(content: string, value: string): string {
@@ -360,6 +371,7 @@ export class Repository {
       prompt: section(content, "Prompt"),
       rules: section(content, "Rules"),
       detail: section(content, "Detail"),
+      thinkingOrigin: readThinkingOrigin(content),
       visualReferences: section(content, "Visual References"),
       newFindings: section(content, "Working Findings") || section(content, "New Findings"),
       preview: [previewSection(content), section(content, "User Notes")].filter(Boolean).join("\n\n"),
@@ -406,6 +418,7 @@ export class Repository {
       if (patch.prompt !== undefined) body = replaceSection(body, "Prompt", patch.prompt);
       if (patch.rules !== undefined) body = replaceSection(body, "Rules", patch.rules);
       if (patch.detail !== undefined) body = replaceSection(body, "Detail", patch.detail);
+      if (patch.thinkingOrigin !== undefined) body = replaceSection(body, "Thinking Origin", originMarkdown(patch.thinkingOrigin));
       if (patch.visualReferences !== undefined) {
         body = removeSection(body, "Visual References");
         if (patch.visualReferences.trim()) body = replaceSection(body, "Detail", detailWithVisualReferences(section(body, "Detail"), patch.visualReferences));
@@ -430,7 +443,7 @@ export class Repository {
     });
   }
 
-  async createNote(title: string, model: string, map: MapDocument, mapPath: string, modelSource: ModelSource): Promise<MapNode> {
+  async createNote(title: string, model: string, map: MapDocument, mapPath: string, modelSource: ModelSource, initial: Pick<NotePatch, "detail" | "thinkingOrigin" | "summary" | "reasoning"> = {}, onCreate?: (path: string) => void): Promise<MapNode> {
     const folder = this.topicFolder(mapPath, "Notes");
     await this.ensureTopicFolders(this.topicRoot(mapPath));
     const id = crypto.randomUUID(), path = this.unique(folder, title);
@@ -445,11 +458,13 @@ export class Repository {
       "preview-initialized": false,
       model,
       "model-source": modelSource,
-      "reasoning-level": this.settings.cliReasoning,
+      "reasoning-level": initial.reasoning ?? this.settings.cliReasoning,
       status: "idea",
       cssclasses: [NOTE_CSS_CLASS]
     };
-    await this.app.vault.create(path, `---\n${stringifyYaml(metadata)}---\n${noteBody(title, placeholder(this.settings.language), this.settings.language, "", "", placeholder(this.settings.language))}`);
+    const origin = initial.thinkingOrigin ? `## Thinking Origin\n\n${originMarkdown(initial.thinkingOrigin)}` : "";
+    onCreate?.(path);
+    await this.app.vault.create(path, `---\n${stringifyYaml(metadata)}---\n${noteBody(title, initial.summary ?? placeholder(this.settings.language), this.settings.language, "", "", placeholder(this.settings.language), initial.detail ?? "", "", "", origin)}`);
     return { id, path, parentId: null, x: 80, y: 80, collapsed: false };
   }
 

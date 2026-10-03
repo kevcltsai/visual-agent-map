@@ -4,7 +4,7 @@ import { CoffeeManager } from "./experiences/coffee-tables/engine";
 import { CoffeeStorage } from "./experiences/coffee-tables/storage";
 import { VisualAgentMapView, VIEW_TYPE, type TaskOptions } from "./experiences/visual-map/view";
 import { t, setUiLanguage, translate, initialUiLanguage, type TranslationKey } from "./i18n";
-import { FileSystemAdapter, MarkdownView, Modal, Notice, Plugin, TFile, type TFolder, View, WorkspaceLeaf, type Command } from "obsidian";
+import { FileSystemAdapter, MarkdownView, Notice, Plugin, TFile, type TFolder, View, WorkspaceLeaf, type Command } from "obsidian";
 import { ChoiceModal } from "./ui/modals/choice-modal";
 import { DebugLogModal } from "./ui/modals/debug-log-modal";
 import { AiUsageModal, ClaudeSetupModal, CodexSetupModal, VisualAgentMapSettingTab, CLAUDE_INSTALL_URL } from "./ui/settings-tab";
@@ -26,8 +26,12 @@ import { ClaudeCodeCliRuntime } from "./ai/runtime/claude-code-cli";
 import { CLAUDE_MODEL_CHOICES, providerForModel, providerModelId } from "./ai/providers/provider";
 import { ThinkingCore } from "./core/thinking-core";
 import { AiRuntimeService } from "./core/ai-runtime-service";
+import { ModelDiscovery, type ModelDiscoveryState } from "./core/model-discovery";
+import { ShallowExpansionCoordinator, type ExpansionBatchState } from "./experiences/visual-map/expansion-batch";
 import { AiTaskService } from "./core/ai-task-service";
-import { createThinkingArtifact, type ThinkingArtifact } from "./core/thinking-artifact";
+import { ReframingService, providerReframeRunner } from "./core/reframing-service";
+import { receiveVisualMapHandoff } from "./experiences/visual-map/handoff";
+import { openCoffeeResearchHandoff } from "./experiences/coffee-tables/handoff-modal";
 
 export { buildPreparedTaskContext } from "./ai/context-builder";
 export { extractJsonObject } from "./core/ai-task-service";
@@ -45,6 +49,8 @@ export default class VisualAgentMapPlugin extends Plugin {
   readonly quickExpandPending = new Set<string>();
   readonly quickExpandFailures = new Map<string, string>();
   readonly activeTasks = new Map<string, AbortController>();
+  readonly expansionBatches = new Map<string, ExpansionBatchState>();
+  readonly expansionCoordinator = new ShallowExpansionCoordinator(this.activeTasks, this.expansionBatches);
   pendingSuggestions: Map<string, Suggestion[]> = new Map();
   readonly pendingResearchOptions = new Map<string, TaskOptions>();
   readonly logs: LogManager = debugLog;
@@ -54,18 +60,19 @@ export default class VisualAgentMapPlugin extends Plugin {
     clientVersion: () => this.manifest.version || "0.0.0",
     onLog: (level, message) => this.logs.appendLog(level, message)
   });
-  readonly aiTasks = new AiTaskService({
+  private readonly aiTaskOptions = {
     pluginDirectory: () => this.pluginDirectory(),
     language: () => this.settings.language,
     defaultReasoning: () => this.settings.cliReasoning,
     exchangeLoggingEnabled: () => this.settings.aiExchangeLoggingEnabled,
     exchanges: () => this.exchanges,
-    codexRuntime: (directory, local) => this.runtime(directory, local),
-    claudeRuntime: directory => this.claudeCli(directory)
-  });
-  readonly core = new ThinkingCore(this.aiRuntime, this.aiTasks);
+    codexRuntime: (directory: string, local: boolean) => this.runtime(directory, local),
+    claudeRuntime: (directory: string) => this.claudeCli(directory)
+  };
+  readonly aiTasks = new AiTaskService(this.aiTaskOptions);
+  readonly core = new ThinkingCore(this.aiRuntime, this.aiTasks, new ReframingService(providerReframeRunner(this.aiTaskOptions, this.activeTasks)));
   exchanges: AiExchangeLog | null = null;
-  private coffeeModelEfforts = new Map<string, string[]>();
+  readonly modelDiscovery = new ModelDiscovery(() => this.codexDiagnostic().installed, () => this.loadCodexModels(), () => this.claudeDiagnostic().installed);
   coffeeManager: CoffeeManager | null = null;
   coffeeStorage: CoffeeStorage | null = null;
   private coffeeOutlineActive = false;
@@ -154,7 +161,7 @@ export default class VisualAgentMapPlugin extends Plugin {
       }
     });
     this.ready = initialize;
-    this.register(this.core.experiences.register("visual-map", artifact => this.openArtifactInVisualMap(artifact)));
+    this.register(this.core.experiences.register("visual-map", (artifact, beforeWrite) => receiveVisualMapHandoff(artifact, { repo: this.repo, defaultModel: () => this.settings.cliModel, exists: path => !!this.app.vault.getAbstractFileByPath(path), mutate: work => this.mutate(work), navigate: path => this.activateView(path), beforeWrite })));
     this.registerView(COFFEE_TABLES_VIEW_TYPE, leaf => new CoffeeTablesView(leaf, this));
     this.coffeeStorage = new CoffeeStorage(this.app.vault, this.settings.workspaceFolder, (file, path) => this.app.fileManager.renameFile(file, path), file => this.app.fileManager.trashFile(file));
     this.coffeeManager = new CoffeeManager(request => this.runCoffeeRequest(request), (session, summariesOnly) => this.coffeeStorage!.save(session, summariesOnly));
@@ -232,21 +239,29 @@ export default class VisualAgentMapPlugin extends Plugin {
   }
   codexDiagnostic(): { executable: string; installed: boolean } { return this.aiRuntime.diagnostic(this.settings.codexPath); }
   claudeDiagnostic(): { executable: string; installed: boolean } { return this.aiRuntime.diagnostic(this.settings.claudePath); }
+  modelDiscoveryState(provider: "codex" | "claude"): ModelDiscoveryState { return this.modelDiscovery.state(provider); }
+  subscribeModelDiscovery(listener: (state: ModelDiscoveryState) => void): () => void { return this.modelDiscovery.subscribe(listener); }
+  async refreshModelDiscovery(provider: "codex" | "claude"): Promise<ModelDiscoveryState> {
+    const state = await this.modelDiscovery.refresh(provider);
+    if (provider === "codex" && state.status === "ready") { this.settings.models = state.models.join(", "); await this.saveSettings(); }
+    return state;
+  }
   availableModels(): string[] {
-    const models = this.settings.models.split(/[\n,]/).map(value => value.trim()).filter(Boolean);
-    if (this.claudeDiagnostic().installed) models.push(...CLAUDE_MODEL_CHOICES.map(choice => choice.id));
+    const codex = this.modelDiscovery.state("codex");
+    const models = codex.status === "idle" || codex.status === "loading"
+      ? this.settings.models.split(/[\n,]/).map(value => value.trim()).filter(Boolean)
+      : [...codex.models];
+    if (this.modelDiscovery.state("claude").status === "ready") models.push(...CLAUDE_MODEL_CHOICES.map(choice => choice.id));
     return [...new Set(models)];
   }
   async refreshCoffeeModels(): Promise<string[]> {
-    if (this.codexDiagnostic().installed) {
-      try { await this.refreshCodexModels(); }
-      catch (error) { this.logs.appendLog("warn", `Coffee Tables 無法載入 Codex 模型：${error instanceof Error ? error.message : String(error)}`); }
-    }
+    const states = await Promise.all([this.refreshModelDiscovery("codex"), this.refreshModelDiscovery("claude")]);
+    for (const state of states) if (state.status === "error") this.logs.appendLog("warn", `${state.provider} model discovery failed: ${state.error ?? "unknown error"}`);
     return this.availableModels();
   }
   coffeeReasoningEfforts(model: string): string[] {
     if (providerForModel(model) === "claude") return ["low", "medium", "high"];
-    return this.coffeeModelEfforts.get(model) ?? [];
+    return this.modelDiscovery.state("codex").reasoningEfforts?.[model] ?? [];
   }
   modelLabel(model: string): string { return CLAUDE_MODEL_CHOICES.find(choice => choice.id === model)?.label ?? `${t("ui.codex_provider_label")} · ${model}`; }
   private usageNoticeSeen(model: string): boolean { return providerForModel(model) === "claude" ? this.settings.claudeUsageNoticeSeen : this.settings.codexUsageNoticeSeen; }
@@ -255,7 +270,7 @@ export default class VisualAgentMapPlugin extends Plugin {
     else this.settings.codexUsageNoticeSeen = true;
     await this.saveSettings();
   }
-  resetCodexRuntime(): void { for (const controller of this.activeTasks.values()) controller.abort(); this.aiRuntime.reset(); }
+  resetCodexRuntime(): void { this.expansionCoordinator.stopAll(); for (const controller of this.activeTasks.values()) controller.abort(); this.modelDiscovery.invalidate("codex"); this.aiRuntime.reset(); }
   openCodexSetupGuide(): void {
     const diagnostic = this.codexDiagnostic();
     new CodexSetupModal(this.app, diagnostic.executable, () => { void this.recheckCodex(false); }).open();
@@ -267,9 +282,10 @@ export default class VisualAgentMapPlugin extends Plugin {
       else new Notice(t("ui.codex_cli_was_not_found_0_set_the_codex_cli_path_in_vam_sett", diagnostic.executable));
       return;
     }
-    try {
-      await this.refreshCodexModels(); new Notice(t("ui.codex_app_server_is_ready_0", diagnostic.executable));
-    } catch (error) { new Notice(t("ui.codex_app_server_check_failed_0", this.recordFailure("Codex App Server 重新檢查失敗", error))); }
+    const state = await this.refreshModelDiscovery("codex");
+    if (state.status === "ready") new Notice(t("ui.codex_app_server_is_ready_0", diagnostic.executable));
+    else if (state.status === "error") new Notice(t("ui.codex_app_server_check_failed_0", this.recordFailure("Codex App Server 重新檢查失敗", state.error ?? "unknown error")));
+    else new Notice(t("ui.codex_cli_was_not_found_0_set_the_codex_cli_path_in_vam_sett", diagnostic.executable));
   }
   async duplicateBuiltInSample(): Promise<string> {
     await this.repo.ensureWorkspace(); this.settings.workspaceInitialized = true;
@@ -371,27 +387,29 @@ export default class VisualAgentMapPlugin extends Plugin {
   coffeeViews(): CoffeeTablesView[] { return this.app.workspace.getLeavesOfType(COFFEE_TABLES_VIEW_TYPE).map(leaf => leaf.view).filter((view): view is CoffeeTablesView => view instanceof CoffeeTablesView); }
   async aiReadyForModel(model: string): Promise<boolean> {
     if (providerForModel(model) === "claude") {
-      if (!this.claudeDiagnostic().installed) { this.openClaudeSetupGuide(); return false; }
-      return true;
+      const state = await this.refreshModelDiscovery("claude");
+      if (state.status === "missing") { this.openClaudeSetupGuide(); return false; }
+      return state.status === "ready" && state.models.includes(model);
     }
     if (!this.codexDiagnostic().installed) { this.openCodexSetupGuide(); return false; }
-    if (this.settings.models.trim()) return true;
     try {
-      await this.refreshCodexModels();
-      if (this.settings.models.trim()) return true;
+      const state = await this.refreshModelDiscovery("codex");
+      if (state.status === "ready" && state.models.includes(model)) return true;
+      if (state.status === "missing") { this.openCodexSetupGuide(); return false; }
+      new Notice(t("ui.current_model_is_unavailable"));
     } catch (error) {
       this.logs.appendLog("warn", `Codex App Server 尚未就緒：${error instanceof Error ? error.message : String(error)}`);
     }
-    this.openCodexSetupGuide(); return false;
+    return false;
   }
   async codexReadyForAi(): Promise<boolean> { return this.aiReadyForModel(this.settings.cliModel); }
   openClaudeSetupGuide(): void { new ClaudeSetupModal(this.app, this.claudeDiagnostic().executable, CLAUDE_INSTALL_URL, () => { void this.recheckClaude(); }).open(); }
   async recheckClaude(): Promise<void> {
     const diagnostic = this.claudeDiagnostic();
+    const state = await this.refreshModelDiscovery("claude");
     if (!diagnostic.installed) { new Notice(t("ui.claude_cli_was_not_found_follow_the_installation_guide_to_install_it")); return; }
     new Notice(t("ui.claude_cli_found_0", diagnostic.executable));
-    this.settingTab?.update();
-    for (const view of this.views()) await view.refreshFromPlugin();
+    if (state.status !== "ready") this.logs.appendLog("warn", `Claude model discovery status: ${state.status}`);
   }
   async confirmAiUsage(model: string, run: () => Promise<void>): Promise<boolean> {
     if (!await this.aiReadyForModel(model)) return false;
@@ -476,47 +494,13 @@ export default class VisualAgentMapPlugin extends Plugin {
       throw error;
     } finally { signal.removeEventListener("abort", abort); this.activeTasks.delete(key); }
   }
-  async openCoffeeHandoff(session: CoffeeSession, sourcePath: string): Promise<void> {
-    const zh = this.settings.language === "zh-TW";
-    const modal = new Modal(this.app);
-    modal.titleEl.setText(zh ? "帶去 VAM 深入研究" : "Take to VAM for deeper research");
-    modal.contentEl.createEl("p", { text: zh ? "編輯要深入研究的問題，並從來源對談開始。" : "Edit the question for deeper research. The source conversation will be linked." });
-    const question = modal.contentEl.createEl("textarea", { cls: "ct-handoff-question", attr: { rows: "3", "aria-label": zh ? "研究問題" : "Research question" } });
-    question.value = session.topic;
-    const create = modal.contentEl.createEl("button", { text: zh ? "建立研究地圖" : "Create research map", cls: "mod-cta" });
-    create.addEventListener("click", () => {
-      const title = question.value.trim(); if (!title || create.disabled) return;
-      create.disabled = true;
-      const artifact = createThinkingArtifact({
-        id: randomUUID(),
-        kind: "question",
-        title,
-        content: zh ? "Coffee Tables 的模擬對談，內容尚未查證，不代表使用者結論。" : "Simulated Coffee Tables discussion; unverified and not the user's conclusion.",
-        origin: { experience: "coffee-tables", sessionId: session.id, path: sourcePath },
-        sources: [{ label: "Coffee Tables", path: sourcePath, experience: "coffee-tables", sessionId: session.id }],
-        metadata: { model: session.model, reasoning: session.reasoning }
-      });
-      void this.core.experiences.handoff({ target: "visual-map", artifact })
-        .then(() => modal.close())
-        .catch((error: unknown) => { create.disabled = false; new Notice(`${String(error)} · ${zh ? "可能已建立部分研究檔案，請先檢查再重試。" : "Some research files may have been created; inspect before retrying."}`); });
-    });
-    modal.open();
+  async openCoffeeHandoff(session: CoffeeSession, sourcePath: string, insightId?: string): Promise<void> {
+    try {
+      if (!this.coffeeStorage) throw new Error("Coffee storage is not ready");
+      await openCoffeeResearchHandoff(this, this.coffeeStorage, session, sourcePath, insightId);
+    } catch (error) { new Notice(error instanceof Error ? error.message : String(error)); }
   }
-  private async openArtifactInVisualMap(artifact: ThinkingArtifact): Promise<void> {
-    await this.mutate(async () => {
-      const model = typeof artifact.metadata?.model === "string" ? artifact.metadata.model : this.settings.cliModel;
-      const reasoning = normalizeReasoningLevel(artifact.metadata?.reasoning);
-      const path = await this.repo.createMap(artifact.title);
-      const map = await this.repo.readMap(path);
-      const node = await this.repo.createNote(artifact.title, model, map, path, "manual");
-      const links = artifact.sources.filter(source => source.path).map(source => `[[${source.path}|${source.label}]]`);
-      const detail = [artifact.content, ...links].filter(Boolean).join("\n\n");
-      await this.repo.updateNote(node.path, { detail, reasoning });
-      map.nodes.push(node);
-      await this.repo.saveMap(path, map);
-      await this.activateView(path);
-    });
-  }
+  async openResearchMap(path: string): Promise<void> { await this.activateView(path); }
   private async activateView(path?: string): Promise<void> { await this.ready; let leaf = this.app.workspace.getLeavesOfType(VIEW_TYPE)[0]; if (!leaf) leaf = this.app.workspace.getLeaf("tab"); await leaf.setViewState({ type: VIEW_TYPE, active: true, state: path ? { file: path } : leaf.view instanceof VisualAgentMapView ? leaf.view.getState() : {} }); await this.app.workspace.revealLeaf(leaf); }
   private async activateBuiltInSample(forceTour = false): Promise<void> {
     await this.ready; this.firstInstallSamplePending = false;
@@ -525,20 +509,18 @@ export default class VisualAgentMapPlugin extends Plugin {
     if (forceTour && leaf.view instanceof VisualAgentMapView) await leaf.view.openBuiltInSample(true);
     await this.app.workspace.revealLeaf(leaf);
   }
-  private async refreshCodexModels(): Promise<void> {
+  private async loadCodexModels(): Promise<{ models: string[]; reasoningEfforts: Record<string, string[]> }> {
     const adapter = this.app.vault.adapter;
-    if (!(adapter instanceof FileSystemAdapter) || !this.manifest.dir) return;
+    if (!(adapter instanceof FileSystemAdapter) || !this.manifest.dir) throw new Error("Codex model discovery requires desktop Obsidian");
     const pluginDirectory = join(adapter.getBasePath(), this.manifest.dir);
     const models = await this.runtime(pluginDirectory).listModels();
-    this.coffeeModelEfforts = new Map(models.map(item => [item.model, item.supportedReasoningEfforts.map(effort => effort.reasoningEffort).filter(value => ["low", "medium", "high"].includes(value))]));
-    this.settings.models = models.map(item => item.model).join(", ");
-    if (providerForModel(this.settings.cliModel) === "codex" && !models.some(item => item.model === this.settings.cliModel)) this.settings.cliModel = models.find(item => item.model === DEFAULT_SETTINGS.cliModel)?.model || models.find(item => item.isDefault)?.model || models[0]?.model || "";
-    await this.saveSettings();
-    this.settingTab?.update();
-    for (const view of this.views()) await view.refreshFromPlugin();
+    return {
+      models: models.map(item => item.model),
+      reasoningEfforts: Object.fromEntries(models.map(item => [item.model, item.supportedReasoningEfforts.map(effort => effort.reasoningEffort).filter(value => ["low", "medium", "high"].includes(value))]))
+    };
   }
-  async askModel(context: TaskContext, model: string, reasoning?: unknown, signal?: AbortSignal, onExchange?: (id: string) => void): Promise<AiResult> {
-    return this.aiTasks.askModel(context, model, reasoning, signal, onExchange);
+  async askModel(context: TaskContext, model: string, reasoning?: unknown, signal?: AbortSignal, onExchange?: (id: string) => void, onRequestAccepted?: () => void): Promise<AiResult> {
+    return this.aiTasks.askModel(context, model, reasoning, signal, onExchange, onRequestAccepted);
   }
   private pluginDirectory(): string {
     const adapter = this.app.vault.adapter;

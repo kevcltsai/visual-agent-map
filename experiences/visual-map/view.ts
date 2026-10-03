@@ -1,3 +1,5 @@
+import { withThinkingOrigin } from "./thinking-origin";
+import { createHash } from "node:crypto";
 import type VisualAgentMapPlugin from "../../main";
 import { t, topicStatusLabel, translate, type TranslationKey } from "../../i18n";
 import { App, MarkdownRenderer, ItemView, Modal, Notice, Setting, TFile, WorkspaceLeaf } from "obsidian";
@@ -14,9 +16,11 @@ import type { AiResult, Suggestion, TaskContext } from "../../ai/types";
 import { clampPreviewScale, previewMetrics } from "../../ui/preview-utils";
 import { BUILTIN_SAMPLE_ID, builtInSample, SAMPLE_TOUR_VERSION } from "../../builtin-sample";
 import { PendingSuggestions } from "../../pending-suggestions";
+import { syncModelSelect } from "../../core/model-discovery";
 
 export const VIEW_TYPE = "visual-agent-map-view";
 interface Action { undo: () => Promise<void>; redo: () => Promise<void>; label?: string }
+const originBaseline = (origin?: string): string => createHash("sha256").update(origin ?? "").digest("hex");
 
 type SynthesisContent = "full" | "summary";
 export interface TaskOptions { synthesisContent?: SynthesisContent; referenceGroups?: ReferenceGroup[]; onProgress?: (message: string) => void; signal?: AbortSignal; outputLanguage?: Settings["language"]; requirements?: string; researchMode: ResearchMode; researchDepth: ResearchDepth; visualMode: VisualMode; multiLayer?: boolean; shallowResearch?: boolean; layers?: number; firstLayerCount?: number; childrenPerParent?: number }
@@ -55,6 +59,7 @@ function imageReferencesFromMarkdown(markdown: string): string {
   return [...new Set(blocks)].join("\n\n");
 }
 class PartialChildBatchError extends Error {}
+interface AgentTaskHandle { finished: Promise<void> }
 interface TaskSourceSettings { topics: () => Promise<ReferenceTopic[]>; readTopic: (topic: ReferenceTopic, signal: AbortSignal, progress: (message: string) => void) => Promise<{ path: string; content: string }[]>; currentTopicId: string; currentLabel: string; synthesisLabel?: string; synthesisTopics?: string[] }
 function quickShape(layers: number, firstLayerCount: number, childrenPerParent: number): { counts: bigint[]; total: bigint } {
   if (![layers, firstLayerCount].every(Number.isSafeInteger) || layers < 1 || layers > 15 || firstLayerCount < 1 || (layers > 1 && (!Number.isSafeInteger(childrenPerParent) || childrenPerParent < 1))) throw new Error(t("ui.levels_first_level_count_and_children_per_topic_must_be_posi"));
@@ -135,34 +140,46 @@ class TaskModal extends Modal {
 }
 export class NextStepModal extends Modal {
   private closed = false;
+  private runPending = false;
   private settingsPending: Promise<void> = Promise.resolve();
   private settingsError: string | null = null;
   constructor(app: App, private topic: string, private depth: ResearchDepth, private childrenCount: number, private pendingCount: number, private plugin: VisualAgentMapPlugin,
-    private research: (options: TaskOptions, focus: string, done: (result: AiResult) => void, failed: (message: string) => void) => Promise<void>,
-    private expand: (options: TaskOptions, direction: string, found: (items: Suggestion[], create: (items: Suggestion[]) => Promise<void>) => void, failed: (message: string, retryable?: boolean) => void, created: () => void) => Promise<void>,
+    private research: (options: TaskOptions, focus: string, done: (result: AiResult) => void, failed: (message: string) => void, accepted: () => void) => Promise<void>,
+    private expand: (options: TaskOptions, direction: string, found: (items: Suggestion[], create: (items: Suggestion[]) => Promise<void>) => void, failed: (message: string, retryable?: boolean) => void, created: () => void, accepted: () => void) => Promise<void>,
     private synthesize: (options: TaskOptions, angles: (items: Suggestion[], draft: (direction: string) => Promise<void>) => void, drafted: (result: AiResult, save: (summary: string, detail: string) => Promise<void>) => void, failed: (message: string) => void) => Promise<void>,
     private modelSettings?: { model: string; modelSource: ModelSource; reasoning: string; rules?: string; path?: string; save: (patch: NotePatch) => Promise<void>; running?: boolean; stop?: () => void; quickError?: string; sources?: TaskSourceSettings }) { super(app); }
-  private references = new Map<string, ReferencePicker>();
   private taskSignal?: AbortSignal;
   private taskController?: AbortController;
+  private unsubscribeModels?: () => void;
   private addReferencePicker(panel: HTMLElement, mode: "research" | "expand" | "synthesize"): ReferencePicker | undefined {
     const sources = this.modelSettings?.sources;
     if (!sources) return undefined;
-    const picker = new ReferencePicker(this.app, panel, sources.topics, sources.readTopic, sources.currentTopicId, mode === "synthesize" ? sources.synthesisLabel ?? sources.currentLabel : sources.currentLabel, mode !== "synthesize", mode !== "synthesize");
-    this.references.set(mode, picker); return picker;
+    const disclosure = panel.createEl("details", { cls: "vam-next-source-details" });
+    disclosure.open = false;
+    const summary = disclosure.createEl("summary");
+    const summaryRow = summary.createSpan({ cls: "vam-next-source-summary-row" });
+    summaryRow.createEl("strong", { text: t("ui.data_sources") });
+    const selection = summaryRow.createSpan({ cls: "vam-next-source-summary" });
+    const pickerContent = disclosure.createDiv();
+    const picker = new ReferencePicker(this.app, pickerContent, sources.topics, sources.readTopic, sources.currentTopicId, mode === "synthesize" ? sources.synthesisLabel ?? sources.currentLabel : sources.currentLabel, mode !== "synthesize", mode !== "synthesize");
+    const updateSelection = (): void => selection.setText(picker.describe());
+    pickerContent.addEventListener("change", updateSelection);
+    updateSelection();
+    return picker;
   }
   private requirementsInput?: HTMLTextAreaElement;
   private renderRequirements(): void {
-    const label = this.contentEl.createEl("label", { cls: "vam-field" });
-    label.createSpan({ text: t("ui.additional_requirements") });
-    this.requirementsInput = label.createEl("textarea", { cls: "vam-next-focus" });
+    const disclosure = this.contentEl.createEl("details", { cls: "vam-next-requirements" });
+    disclosure.open = false;
+    disclosure.createEl("summary", { text: t("ui.additional_requirements") });
+    this.requirementsInput = disclosure.createEl("textarea", { cls: "vam-next-focus" });
     this.requirementsInput.rows = 3;
     this.requirementsInput.setAttr("aria-label", t("ui.additional_requirements"));
-    this.contentEl.createEl("p", { text: t("ui.requirements_this_task_only"), cls: "vam-hint" });
+    disclosure.createEl("p", { text: t("ui.requirements_this_task_only"), cls: "vam-hint" });
     if (this.modelSettings?.rules?.trim()) this.contentEl.createEl("p", { text: t("ui.legacy_rules_not_applied"), cls: "vam-hint" });
   }
   private requirements(): string { return this.requirementsInput?.value.trim() ?? ""; }
-  onClose(): void { this.closed = true; this.taskController?.abort(); }
+  onClose(): void { this.closed = true; this.taskController?.abort(); this.unsubscribeModels?.(); }
   private async readySettings(): Promise<void> { await this.settingsPending; if (this.settingsError) throw new Error(this.settingsError); }
   private renderModelSettings(): void {
     if (!this.modelSettings) return;
@@ -178,10 +195,25 @@ export class NextStepModal extends Modal {
     };
     const modelLabel = advanced.createEl("label", { cls: "vam-field" }); modelLabel.createSpan({ text: t("ui.model") });
     const model = modelLabel.createEl("select"); model.setAttr("aria-label", t("ui.model"));
+    model.add(new Option(this.plugin.modelLabel(settings.model), settings.model)); model.value = settings.model;
     const optionList = typeof this.plugin.availableModels === "function" ? this.plugin.availableModels() : this.plugin.settings.models.split(/[\n,]/).map((value: string) => value.trim()).filter(Boolean);
     const options = new Set<string>(optionList);
-    for (const value of options) model.createEl("option", { value, text: typeof this.plugin.modelLabel === "function" ? this.plugin.modelLabel(value) : value });
-    if (!options.has(settings.model)) { const unavailable = model.createEl("option", { value: settings.model, text: t(this.plugin.settings.models.trim() ? "ui.current_model_is_unavailable" : "ui.model_not_checked") }); unavailable.disabled = !!this.plugin.settings.models.trim(); }
+    const syncModels = (): void => { syncModelSelect(model, this.plugin.availableModels(), id => this.plugin.modelLabel(id), t("ui.current_model_is_unavailable")); options.clear(); this.plugin.availableModels().forEach(id => options.add(id)); };
+    syncModels();
+    const discovery = advanced.createDiv("vam-model-discovery-status");
+    const discoveryText = discovery.createSpan({ cls: "vam-hint" });
+    const retry = discovery.createEl("button", { text: t("ui.check_again") });
+    const updateDiscovery = (): void => {
+      const codex = this.plugin.modelDiscoveryState("codex"), claude = this.plugin.modelDiscoveryState("claude");
+      discoveryText.setText(`Codex: ${codex.status}${codex.error ? ` · ${codex.error}` : ""} | Claude CLI candidates: ${claude.status}`);
+      retry.disabled = codex.status === "loading";
+      syncModels();
+    };
+    this.unsubscribeModels?.();
+    this.unsubscribeModels = this.plugin.subscribeModelDiscovery(() => { if (!this.closed) updateDiscovery(); });
+    retry.addEventListener("click", () => { void this.plugin.refreshModelDiscovery("codex"); void this.plugin.refreshModelDiscovery("claude"); });
+    updateDiscovery();
+    void this.plugin.refreshModelDiscovery("codex"); void this.plugin.refreshModelDiscovery("claude");
     const sourceLabels: Record<ModelSource, string> = { workspace: t("ui.workspace_default"), inherited: t("ui.inherited_at_creation"), manual: t("ui.manually_selected") };
     const modelSummary = advanced.createEl("p", { cls: "vam-hint", text: t("ui.0_1_reasoning_can_be_adjusted_per_topic", settings.model, sourceLabels[settings.modelSource]) });
     model.value = settings.model;
@@ -198,9 +230,11 @@ export class NextStepModal extends Modal {
     reasoning.addEventListener("change", () => { settings.reasoning = normalizeReasoningLevel(reasoning.value); save({ reasoning: normalizeReasoningLevel(reasoning.value) }); });
   }
   private async run(panel: HTMLElement, button: HTMLButtonElement, work: () => Promise<void>, needsUsage = true): Promise<void> {
-    if (button.disabled || (this.taskController && !this.taskController.signal.aborted)) return;
+    if (button.disabled || this.runPending || (this.taskController && !this.taskController.signal.aborted)) return;
+    this.runPending = true;
     button.disabled = true;
     const start = async (): Promise<void> => {
+      if (this.closed) return;
       button.disabled = true;
       const failureHelp = panel.querySelector<HTMLElement>(".vam-ai-failure-help"); if (failureHelp) failureHelp.hidden = true;
       const controller = new AbortController(); this.taskController = controller; this.taskSignal = controller.signal;
@@ -210,10 +244,14 @@ export class NextStepModal extends Modal {
       let cancel = panel.querySelector<HTMLButtonElement>(".vam-task-cancel");
       if (!cancel) cancel = panel.createEl("button", { text: t("ui.cancel"), cls: "vam-task-cancel" });
       cancel.hidden = false; cancel.onclick = () => controller.abort();
-      try { await this.readySettings(); await work(); } catch (error) { this.failed(panel, button, controller.signal.aborted ? t("ui.ai_task_cancelled") : error instanceof Error ? error.message : String(error)); }
+      try {
+        await this.readySettings();
+        if (this.closed || controller.signal.aborted) return;
+        await work();
+      } catch (error) { this.failed(panel, button, controller.signal.aborted ? t("ui.ai_task_cancelled") : error instanceof Error ? error.message : String(error)); }
       finally {
         const backgroundTaskRunning = [...(this.plugin.activeTasks?.keys?.() ?? [])].some(path => !tasksBefore.has(path));
-        const release = (): void => { cancel.hidden = true; if (this.taskSignal === controller.signal) { this.taskSignal = undefined; this.taskController = undefined; } };
+        const release = (): void => { if (!this.closed) cancel.hidden = true; if (this.taskController === controller) { this.taskSignal = undefined; this.taskController = undefined; } };
         if (backgroundTaskRunning) {
           const waitForTasks = (): void => {
             if (this.taskController !== controller) return;
@@ -231,6 +269,7 @@ export class NextStepModal extends Modal {
         : await this.plugin.aiReadyForModel(model) && (await start(), true);
       if (!started) button.disabled = false;
     } catch (error) { this.failed(panel, button, error instanceof Error ? error.message : String(error)); }
+    finally { this.runPending = false; }
   }
   private failed(panel: HTMLElement, button: HTMLButtonElement, message: string): void {
     if (this.closed) return;
@@ -268,8 +307,12 @@ export class NextStepModal extends Modal {
       void this.run(panel, confirm, async () => {
         options.signal = this.taskSignal;
         panel.querySelector<HTMLElement>(".vam-next-status")?.setText(t("ui.creating_subtopics"));
-        try { await create(selected.map(row => ({ title: row.title.value.trim(), task: row.task.value.trim(), contribution: row.contribution.value.trim(), parentTitle: row.item.parentTitle ? renamed.get(row.item.parentTitle)! : "" }))); result.empty(); consumed(); panel.querySelector<HTMLElement>(".vam-next-status")?.setText(t("ui.subtopics_created")); confirm.disabled = false; button.disabled = false; }
-        catch (error) { if (error instanceof PartialChildBatchError) { result.empty(); consumed(); button.disabled = false; } throw error; }
+        try {
+          await create(selected.map(row => ({ title: row.title.value.trim(), task: row.task.value.trim(), contribution: row.contribution.value.trim(), parentTitle: row.item.parentTitle ? renamed.get(row.item.parentTitle)! : "" })));
+          if (options.shallowResearch) { this.taskSignal = undefined; this.taskController = undefined; this.close(); return; }
+          result.empty(); consumed(); panel.querySelector<HTMLElement>(".vam-next-status")?.setText(t("ui.subtopics_created")); confirm.disabled = false; button.disabled = false;
+        }
+        catch (error) { if (error instanceof PartialChildBatchError) { result.empty(); consumed(); button.disabled = true; } throw error; }
       }, false);
     })(); });
     panel.querySelector<HTMLElement>(".vam-next-status")?.setText(t("ui.review_ai_suggested_subtopics"));
@@ -279,9 +322,14 @@ export class NextStepModal extends Modal {
     this.titleEl.setText(t("ui.how_would_you_like_to_explore_next"));
     this.contentEl.createEl("p", { text: t("ui.current_topic_0", this.topic), cls: "vam-modal-intro" });
     this.renderRequirements();
-    this.contentEl.createEl("p", { text: t("ui.summary_fields_hint"), cls: "vam-hint" });
-    const languageLabel = this.contentEl.createEl("label", { cls: "vam-field" }); languageLabel.createSpan({ text: t("ui.output_language") });
-    const languageSelect = languageLabel.createEl("select"); languageSelect.createEl("option", { value: "zh-TW", text: "繁體中文" }); languageSelect.createEl("option", { value: "en", text: "English" }); languageSelect.value = this.plugin.settings.language;
+    const compactSettings = this.contentEl.createDiv("vam-next-compact-settings");
+    const languageLabel = compactSettings.createEl("label", { cls: "vam-next-language" }); languageLabel.createSpan({ text: t("ui.output_language") });
+    const languageSelect = languageLabel.createEl("select"); languageSelect.createEl("option", { value: "zh-TW", text: "繁體中文" }); languageSelect.createEl("option", { value: "en", text: "English" }); languageSelect.value = this.plugin.settings.language; languageSelect.setAttr("aria-label", t("ui.output_language"));
+    const panelHeader = this.contentEl.createDiv("vam-next-panel-header");
+    const panelTitle = panelHeader.createEl("h3", { text: t("ui.research_this_topic") });
+    const confirm = panelHeader.createEl("button", { text: t("ui.confirm_research_task"), cls: "mod-cta" });
+    confirm.dataset.topicRun = t("ui.confirm_research_task");
+    confirm.disabled = !!this.modelSettings?.running;
     const cards = this.contentEl.createDiv("vam-next-cards");
     let show: (mode: "research" | "expand" | "synthesize") => void;
     const card = (title: TranslationKey, description: TranslationKey, mode: "research" | "expand" | "synthesize"): HTMLButtonElement => {
@@ -301,46 +349,45 @@ export class NextStepModal extends Modal {
       if (this.modelSettings.stop) running.createEl("button", { text: t("ui.stop_research") }).addEventListener("click", () => this.modelSettings?.stop?.());
     } else if (this.modelSettings?.quickError) this.contentEl.createEl("p", { cls: "vam-hint", text: this.modelSettings.quickError });
     const research = this.contentEl.createDiv("vam-next-research");
-    research.createEl("h3", { text: t("ui.research_this_topic") });
     research.createEl("p", { text: t("ui.start_from_this_node_s_question_update_only_this_node") });
-    research.createEl("p", { text: t("ui.research_depth"), cls: "vam-hint" });
-    const depthHint = research.createEl("p", { cls: "vam-hint", text: researchDepthDescription(this.depth) });
-    const depths = research.createDiv("vam-next-depths");
+    const depthSet = research.createEl("fieldset", { cls: "vam-next-depth-set" });
+    depthSet.createEl("legend", { text: t("ui.research_depth") });
+    const depths = depthSet.createDiv("vam-next-depths");
     const radios: HTMLInputElement[] = [];
     for (const [value, key] of [["fast", "ui.quick"], ["normal", "ui.standard"], ["deep", "ui.deep"]] as const) {
       const option = depths.createEl("label");
       const radio = option.createEl("input", { type: "radio", attr: { name: "vam-next-depth", value } }); radio.checked = this.depth === value; radios.push(radio);
       option.createSpan({ text: t(key) });
     }
+    const depthDisclosure = research.createEl("details", { cls: "vam-next-depth-help" });
+    depthDisclosure.open = false;
+    depthDisclosure.createEl("summary", { text: t("ui.depth_guidance") });
+    const depthHint = depthDisclosure.createEl("p", { cls: "vam-hint", text: researchDepthDescription(this.depth) });
     radios.forEach(radio => radio.addEventListener("change", () => { if (radio.checked) depthHint.setText(researchDepthDescription(radio.value as ResearchDepth)); }));
     const researchPicker = this.addReferencePicker(research, "research");
-    const executionSummary = this.contentEl.createEl("p", { cls: "vam-hint", attr: { "aria-live": "polite" } });
-    const updateExecutionSummary = (): void => {
-      const activeButton = this.contentEl.querySelector<HTMLButtonElement>(".vam-next-card.is-active");
-      const mode = activeButton === expandCard ? "expand" : activeButton === synthesizeCard ? "synthesize" : "research";
-      const active = t(mode === "expand" ? "ui.expand_the_map" : mode === "synthesize" ? "ui.synthesize_findings" : "ui.research_deeper");
-      const picker = this.references.get(mode) ?? researchPicker;
-      executionSummary.setText(t("ui.ai_task_summary", this.modelSettings?.model ?? this.plugin.settings.cliModel, this.modelSettings?.reasoning ?? this.plugin.settings.cliReasoning, picker?.describe() ?? `0 ${t("ui.markdown_files")}`, t(picker?.selection().webSearch ? "ui.on" : "ui.off"), `${this.topic} · ${active}`));
-    };
-    this.contentEl.addEventListener("change", updateExecutionSummary);
-    updateExecutionSummary();
-    const footer = research.createDiv("vam-next-footer");
-    footer.createSpan({ text: t("ui.full_results_go_to_markdown_your_writing_is_preserved") });
-    const confirm = footer.createEl("button", { text: t("ui.confirm_research_task"), cls: "mod-cta" });
-    confirm.dataset.topicRun = t("ui.confirm_research_task");
-    confirm.disabled = !!this.modelSettings?.running;
     research.createEl("p", { cls: "vam-next-status" });
     confirm.addEventListener("click", () => { void this.run(research, confirm, async () => {
+      const controller = this.taskController;
       const selected = await researchPicker?.ready();
-      const options: TaskOptions = { referenceGroups: selected?.groups ?? [], outputLanguage: languageSelect.value as Settings["language"], researchMode: selected?.webSearch ? "research" : "local", researchDepth: (radios.find(radio => radio.checked)?.value || "normal") as ResearchDepth, visualMode: selected?.imageSearch ? "auto" : "off", requirements: this.requirements(), signal: this.taskSignal, onProgress: message => research.querySelector<HTMLElement>(".vam-next-status")?.setText(message) };
-      let started = true;
-      const release = (): void => { const cancel = research.querySelector<HTMLButtonElement>(".vam-task-cancel"); if (cancel) cancel.hidden = true; this.taskSignal = undefined; this.taskController = undefined; };
-      await this.research(options, "", () => { release(); this.close(); }, message => { release(); if (this.closed) new Notice(message); else { started = false; this.failedAi(research, confirm, message); } });
-      if (this.modelSettings?.path && this.plugin.activeTasks?.has(this.modelSettings.path)) started = false;
-      if (started) this.close();
+      if (this.closed || !controller || controller.signal.aborted) return;
+      const options: TaskOptions = { referenceGroups: selected?.groups ?? [], outputLanguage: languageSelect.value as Settings["language"], researchMode: selected?.webSearch ? "research" : "local", researchDepth: (radios.find(radio => radio.checked)?.value || "normal") as ResearchDepth, visualMode: selected?.imageSearch ? "auto" : "off", requirements: this.requirements(), signal: controller.signal, onProgress: message => { if (!this.closed && !controller.signal.aborted) research.querySelector<HTMLElement>(".vam-next-status")?.setText(message); } };
+      let launchAccepted = false;
+      let launchFailed = false;
+      const release = (): void => { if (this.taskController === controller) { this.taskSignal = undefined; this.taskController = undefined; } if (!this.closed) { const cancel = research.querySelector<HTMLButtonElement>(".vam-task-cancel"); if (cancel) cancel.hidden = true; } };
+      const accepted = (): void => {
+        if (this.closed || controller.signal.aborted || this.taskController !== controller) return;
+        this.taskSignal = undefined; this.taskController = undefined;
+        const cancel = research.querySelector<HTMLButtonElement>(".vam-task-cancel"); if (cancel) cancel.hidden = true;
+        launchAccepted = true;
+        this.close();
+      };
+      await this.research(options, "", () => { if (this.closed) return; release(); this.close(); }, message => { if (this.closed) { new Notice(message); return; } release(); launchFailed = true; this.failedAi(research, confirm, message); }, accepted);
+      if (!this.closed && !launchAccepted && !launchFailed) {
+        release();
+        this.failed(research, confirm, t("ui.ai_task_cancelled"));
+      }
     }); });
     const expandPanel = this.contentEl.createDiv("vam-next-research vam-next-choice");
-    expandPanel.createEl("h3", { text: t("ui.expand_this_topic") });
     expandPanel.createEl("p", { text: t("ui.review_one_level_or_set_the_first_level_count_and_the_number") });
     const modes = expandPanel.createDiv("vam-next-depths");
     const guided = modes.createEl("button", { text: t("ui.choose_directions_together"), cls: "is-active" });
@@ -393,14 +440,12 @@ export class NextStepModal extends Modal {
         const shape = quickShape(layers, firstLayerCount, childrenPerParent);
         if (shape.total > BigInt(15)) throw new Error(t("ui.this_would_create_0_subtopics_exceeding_the_limit_of_15_redu", shape.total.toString()));
         options.layers = layers; options.firstLayerCount = firstLayerCount; options.childrenPerParent = layers === 1 ? 1 : childrenPerParent;
-        await this.expand(options, "", () => {}, message => new Notice(message), () => {});
-        this.close();
+        await this.expand(options, "", () => {}, (message, retryable) => { if (retryable === false) { this.failed(expandPanel, expandButton, message); expandButton.disabled = true; } else this.failedAi(expandPanel, expandButton, message); }, () => this.close(), () => { this.taskSignal = undefined; this.taskController = undefined; this.close(); });
         return;
       }
-      await this.expand(options, "", (items, create) => this.proposals(expandPanel, items, create, expandButton, consumed, options), (message, retryable) => { consumed(); if (retryable === false) this.failed(expandPanel, expandButton, message); else this.failedAi(expandPanel, expandButton, message); if (retryable === false) expandButton.disabled = true; }, () => this.close());
+      await this.expand(options, "", (items, create) => this.proposals(expandPanel, items, create, expandButton, consumed, options), (message, retryable) => { consumed(); if (retryable === false) this.failed(expandPanel, expandButton, message); else this.failedAi(expandPanel, expandButton, message); if (retryable === false) expandButton.disabled = true; }, () => this.close(), () => { this.taskSignal = undefined; this.taskController = undefined; this.close(); });
     }, multiLayer || !this.pendingCount); });
     const synthesizePanel = this.contentEl.createDiv("vam-next-research vam-next-choice");
-    synthesizePanel.createEl("h3", { text: t("ui.synthesize_subtopic_findings") });
     synthesizePanel.createEl("p", { text: this.childrenCount ? t("ui.ai_suggests_synthesis_angles_first_the_parent_topic_changes") : t("ui.this_topic_has_no_direct_subtopics_you_can_choose_other_note") });
     {
       const synthesisContent = renderSynthesisContent(synthesizePanel, this.modelSettings?.sources?.synthesisTopics ?? []);
@@ -446,7 +491,8 @@ export class NextStepModal extends Modal {
         button.classList.toggle("is-active", name === mode); button.setAttr("aria-pressed", name === mode ? "true" : "false");
         panel.style.display = name === mode ? "" : "none";
       }
-      updateExecutionSummary();
+      panelTitle.setText(t(mode === "expand" ? "ui.expand_this_topic" : mode === "synthesize" ? "ui.synthesize_subtopic_findings" : "ui.research_this_topic"));
+      confirm.hidden = mode !== "research";
     };
     show("research");
     this.renderModelSettings();
@@ -1170,13 +1216,23 @@ export class VisualAgentMapView extends ItemView {
     card.dataset.nodeId = node.id; card.style.left = `${node.x}px`; card.style.top = `${node.y}px`; card.tabIndex = 0; card.setAttr("aria-label", note?.title ?? t("ui.note_missing"));
     const header = card.createDiv("vam-node-header");
     if (this.integrationMode) {
-      const check = header.createSpan({ cls: `vam-select-check${this.multiSelected.has(node.id) ? " is-checked" : ""}`, text: this.multiSelected.has(node.id) ? "✓" : "" });
-      check.setAttr("aria-hidden", "true");
       const select = header.createEl("input", { type: "checkbox" }); select.checked = this.multiSelected.has(node.id); select.setAttr("aria-label", note?.title ?? node.path);
       select.addEventListener("click", event => { event.stopPropagation(); if (select.checked) this.multiSelected.add(node.id); else this.multiSelected.delete(node.id); this.render(); });
     }
+    const batch = this.plugin.expansionBatches.get(node.path);
     const active = this.plugin.running?.has(node.path) || this.plugin.quickExpandPending?.has(node.path);
     if (active || !note || note.status !== "completed") header.createSpan({ cls: `vam-status vam-status-${active ? "running" : note?.status ?? "error"}`, text: active ? t("ui.ai_running") : note ? topicStatusLabel(note.status, this.plugin.settings.language) : t("ui.note_missing") });
+    if (batch) {
+      const currentNode = batch.currentPath ? this.map?.nodes.find(item => item.path === batch.currentPath) : undefined;
+      const currentTitle = currentNode ? this.notes.get(currentNode.id)?.title : undefined;
+      const label = `${t("ui.shallow_research_progress")}: ${batch.completed}/${batch.total}${currentTitle ? ` · ${currentTitle}` : ""}${batch.status === "stopped" ? ` · ${t("ui.shallow_research_stopped")}` : ""}`;
+      header.createSpan({ cls: `vam-status vam-status-${batch.status === "running" ? "running" : batch.failures.length ? "error" : "completed"}`, text: label });
+      if (batch.status === "running") this.button(header, t("ui.stop_research"), () => this.plugin.expansionCoordinator.stop(node.path));
+      if (batch.failures.length) { const failure = header.createSpan({ cls: "vam-status vam-status-error", text: `${batch.failures.length} ${t("ui.failed")}` }); failure.setAttr("title", batch.failures.join("\n")); }
+    }
+    if (this.plugin.quickExpandPending?.has(node.path) && batch?.status !== "running") {
+      this.button(header, t("ui.stop_research"), () => this.plugin.activeTasks.get(node.path)?.abort());
+    }
     const quickError = this.plugin.quickExpandFailures?.get(node.path);
     if (quickError && !active) { const badge = header.createSpan({ cls: "vam-status vam-status-error", text: t("ui.expansion_failed") }); badge.setAttr("title", quickError); }
     const pendingCount = this.plugin.pendingSuggestions.get(node.path)?.length ?? 0;
@@ -1284,14 +1340,14 @@ export class VisualAgentMapView extends ItemView {
       const sources = this.taskSourceSettings(currentLabel, this.map?.id, synthesisLabel);
       sources.synthesisTopics = this.map?.nodes.filter(item => item.parentId === node.id).map(item => this.notes.get(item.id)?.title ?? item.path) ?? [];
       new NextStepModal(this.app, note.title, note.researchDepth, this.map?.nodes.filter(item => item.parentId === node.id).length ?? 0, this.plugin.pendingSuggestions.get(node.path)?.length ?? 0, this.plugin,
-        async (options, focus, done, failed) => {
+        async (options, focus, done, failed, accepted) => {
           const latest = await this.plugin.repo.readNote(node.path);
           const task = translate(this.plugin.settings.language, "prompt.research_topic", latest.title);
-          await this.runAgent(node, done, failed, { task: [task, options.requirements].filter(Boolean).join("\n\n"), referenceGroups: options.referenceGroups, onProgress: options.onProgress, signal: options.signal, outputLanguage: options.outputLanguage, rules: "", researchMode: options.researchMode, researchDepth: options.researchDepth, visualMode: options.visualMode });
+          await this.runAgent(node, done, failed, { task: [task, options.requirements].filter(Boolean).join("\n\n"), referenceGroups: options.referenceGroups, onProgress: options.onProgress, signal: options.signal, outputLanguage: options.outputLanguage, rules: "", researchMode: options.researchMode, researchDepth: options.researchDepth, visualMode: options.visualMode }, accepted);
         },
-        (options, direction, found, failed, created) => {
-          if (!options.multiLayer) return this.proposeChildren(node, true, options, direction, found, failed, false, created);
-          return this.startQuickExpansion(node, options, direction, failed, created);
+        (options, direction, found, failed, created, accepted) => {
+          if (!options.multiLayer) return this.proposeChildren(node, true, options, direction, found, failed, false, created, accepted);
+          return this.startQuickExpansion(node, options, direction, failed, created, accepted);
         },
         (options, found, drafted, failed) => this.proposeIntegrationDirections(node, options, found, drafted, failed),
         { model: note.model, modelSource: note.modelSource, reasoning: note.reasoning ?? this.plugin.settings.cliReasoning, rules: note.rules, path: node.path,
@@ -1377,6 +1433,7 @@ export class VisualAgentMapView extends ItemView {
     const status = section.createEl("p", { cls: "vam-hint" });
     const actions = section.createDiv("vam-actions");
     const create = this.button(actions, t("ui.create_selected_subtopics"), () => { void (async () => {
+      if (this.plugin.expansionCoordinator.isRunning(node.path)) { status.setText(t("ui.ai_running_ai")); return; }
       const chosen = rows.filter(row => row.check.checked && row.title.value.trim());
       if (!chosen.length) { status.setText(t("ui.select_at_least_one_subtopic")); return; }
       const names = new Map(chosen.map(row => [row.original.title, row.title.value.trim()]));
@@ -1385,15 +1442,19 @@ export class VisualAgentMapView extends ItemView {
       const items = chosen.map(row => ({ title: row.title.value.trim(), task: row.task.value.trim(), contribution: row.contribution.value.trim(), parentTitle: row.original.parentTitle ? names.get(row.original.parentTitle)! : "" }));
       create.disabled = true; status.setText(t("ui.creating_subtopics"));
       try {
+        let createdNodes: MapNode[] = [];
+        const researchOptions: TaskOptions | undefined = shallow.checked ? { ...(this.plugin.pendingResearchOptions.get(node.path) ?? { researchMode: "research" as const, researchDepth: "fast" as const, referenceGroups: [], visualMode: "off" as const }), shallowResearch: true } : undefined;
         await this.plugin.mutate(async () => {
           const current = this.map?.nodes.find(item => item.id === node.id && item.path === node.path);
           if (!current) throw new Error(t("ui.the_topic_changed_select_it_again"));
           if (this.plugin.pendingSuggestions.get(node.path) !== suggestions) throw new Error(t("ui.expansion_suggestions_changed_open_them_again"));
-          try { await this.createChildBatch(current, items, shallow.checked ? { ...(this.plugin.pendingResearchOptions.get(node.path) ?? { researchMode: "research" as const, researchDepth: "fast" as const, referenceGroups: [], visualMode: "off" as const }), shallowResearch: true } : undefined); }
-          catch (error) { if (error instanceof PartialChildBatchError) { this.plugin.pendingSuggestions.delete(node.path); this.plugin.pendingResearchOptions.delete(node.path); } throw error; }
+          await this.assertSuggestionOrigin(current, suggestions);
+          try { createdNodes = await this.createChildBatch(current, items, researchOptions); }
+          catch (error) { if (error instanceof PartialChildBatchError) await this.clearPartialSuggestions(node.path, error); throw error; }
           this.plugin.pendingSuggestions.delete(node.path); this.plugin.pendingResearchOptions.delete(node.path);
           await (this.plugin.pendingSuggestions as PendingSuggestions).flush?.();
         });
+        if (researchOptions && createdNodes.length) await this.startShallowResearch(node, createdNodes, researchOptions);
         close?.(); this.render();
       } catch (error) { create.disabled = false; status.setText(error instanceof Error ? error.message : String(error)); }
     })(); }); create.addClass("mod-cta");
@@ -1447,16 +1508,18 @@ export class VisualAgentMapView extends ItemView {
     this.notes.set(node.id, await this.plugin.repo.readNote(node.path)); this.selected = node.id;
     await this.mapChange(map => { map.nodes.push(node); if (parent) map.nodes.find(n => n.id === parent.id)!.collapsed = false; }, rebuildDerivedData); if (this.map) this.map.viewport.zoom = Math.max(this.map.viewport.zoom, 0.7); this.focusNode(node);
   }
-  private startQuickExpansion(parent: MapNode, options: TaskOptions, direction: string, failed: (message: string, retryable?: boolean) => void, created: () => void): Promise<void> {
+  private startQuickExpansion(parent: MapNode, options: TaskOptions, direction: string, failed: (message: string, retryable?: boolean) => void, created: () => void, accepted?: () => void): Promise<void> {
     if (this.plugin.running.has(parent.path) || this.plugin.quickExpandPending.has(parent.path)) { failed(t("ui.ai_running_ai")); return Promise.resolve(); }
     this.plugin.quickExpandFailures.delete(parent.path);
     this.plugin.quickExpandPending.add(parent.path); this.render();
-    return this.proposeChildren(parent, true, options, direction, undefined, failed, true, created).catch(error => {
+    return this.proposeChildren(parent, true, options, direction, undefined, failed, true, created, accepted).catch(error => {
       this.plugin.quickExpandFailures.set(parent.path, error instanceof Error ? error.message : String(error));
       throw error;
-    }).finally(() => { this.plugin.quickExpandPending.delete(parent.path); this.render(); });
+    }).finally(() => { if (this.plugin.expansionBatches.get(parent.path)?.status !== "running") this.plugin.quickExpandPending.delete(parent.path); this.render(); });
   }
-  private async proposeChildren(parent: MapNode, confirmed = false, options?: TaskOptions, direction = "", found?: (items: Suggestion[], create: (items: Suggestion[]) => Promise<void>) => void, failed?: (message: string, retryable?: boolean) => void, direct = false, created?: () => void): Promise<void> {
+  private async proposeChildren(parent: MapNode, confirmed = false, options?: TaskOptions, direction = "", found?: (items: Suggestion[], create: (items: Suggestion[]) => Promise<void>) => void, failed?: (message: string, retryable?: boolean) => void, direct = false, created?: () => void, acceptedCallback?: () => void): Promise<void> {
+    if (this.plugin.expansionCoordinator.isRunning(parent.path)) { failed?.(t("ui.ai_running_ai")); return; }
+    const previousBatch = this.plugin.expansionBatches.get(parent.path);
     const pending = this.plugin.pendingSuggestions.get(parent.path);
     const present = (items: Suggestion[]): void => {
       const version = this.plugin.pendingSuggestions.get(parent.path);
@@ -1467,31 +1530,62 @@ export class VisualAgentMapView extends ItemView {
         return;
       }
       if (!found) { this.openChildSuggestions(parent, items); return; }
-      found(items, selected => this.plugin.mutate(async () => {
-        if (!version || this.plugin.pendingSuggestions.get(parent.path) !== version) throw new Error(t("ui.expansion_suggestions_changed_open_them_again"));
-        try { await this.createChildBatch(parent, selected, this.plugin.pendingResearchOptions.get(parent.path)); }
-        catch (error) { if (error instanceof PartialChildBatchError) { this.plugin.pendingSuggestions.delete(parent.path); this.plugin.pendingResearchOptions.delete(parent.path); } throw error; }
-        this.plugin.pendingSuggestions.delete(parent.path); this.plugin.pendingResearchOptions.delete(parent.path);
-        await (this.plugin.pendingSuggestions as PendingSuggestions).flush?.();
-        this.render();
-      }));
+      found(items, async selected => {
+        if (this.plugin.expansionCoordinator.isRunning(parent.path)) throw new Error(t("ui.ai_running_ai"));
+        let createdNodes: MapNode[] = [];
+        const savedOptions = this.plugin.pendingResearchOptions.get(parent.path);
+        const researchOptions = savedOptions ? { ...savedOptions, signal: options?.signal, onProgress: options?.onProgress } : undefined;
+        await this.plugin.mutate(async () => {
+          if (!version || this.plugin.pendingSuggestions.get(parent.path) !== version) throw new Error(t("ui.expansion_suggestions_changed_open_them_again"));
+          await this.assertSuggestionOrigin(parent, version);
+          try { createdNodes = await this.createChildBatch(parent, selected, researchOptions); }
+          catch (error) { if (error instanceof PartialChildBatchError) await this.clearPartialSuggestions(parent.path, error); throw error; }
+          this.plugin.pendingSuggestions.delete(parent.path); this.plugin.pendingResearchOptions.delete(parent.path);
+          await (this.plugin.pendingSuggestions as PendingSuggestions).flush?.();
+          this.render();
+        });
+        if (researchOptions?.shallowResearch && createdNodes.length) await this.startShallowResearch(parent, createdNodes, researchOptions);
+      });
     };
     if (pending?.length && !direct) {
-      if (options) { if (options.shallowResearch ?? options.multiLayer) this.plugin.pendingResearchOptions.set(parent.path, { ...options, referenceGroups: [] }); else this.plugin.pendingResearchOptions.delete(parent.path); }
+      if (options) { if (options.shallowResearch ?? options.multiLayer) this.plugin.pendingResearchOptions.set(parent.path, this.researchChoices(options)); else this.plugin.pendingResearchOptions.delete(parent.path); }
       present(options && !options.multiLayer ? pending.filter(item => !item.parentTitle) : pending);
       return;
     }
-    const note = await this.plugin.repo.readNote(parent.path);
     if (this.plugin.running.has(parent.path)) { failed?.(t("ui.ai_running_ai")); return; }
     if (!confirmed) {
+      const note = await this.plugin.repo.readNote(parent.path);
       new TaskModal(this.app, t("ui.suggest_the_most_useful_expansion_direction_or_follow_the_di"), (value, run, chosen) => { if (run) void this.plugin.confirmAiUsage(note.model, async () => this.enqueue(() => this.proposeChildren(parent, true, chosen, value))); }, t("ui.expand_subtopics"), t("ui.specify_an_expansion_direction_or_ask_ai_to_suggest_one_prev"), note.rules, note.researchMode, note.researchDepth, note.visualMode, false, true, this.taskSourceSettings(t("ui.reference_current_topic_included", note.title)), undefined, this.plugin.settings.language, note.model, note.reasoning ?? this.plugin.settings.cliReasoning, note.title).open();
       return;
     }
-    const targetMapPath = this.path, targetMapId = this.map?.id;
-    const originalChildren = this.map?.nodes.filter(item => item.parentId === parent.id).map(item => item.id).sort().join("|") ?? "";
-    this.plugin.running.add(parent.path); this.render();
+    const controller = new AbortController();
+    const modalSignal = options?.signal;
+    const abortBeforeAcceptance = (): void => controller.abort();
+    if (modalSignal?.aborted) controller.abort();
+    else modalSignal?.addEventListener("abort", abortBeforeAcceptance, { once: true });
+    let accepted = false;
+    const acceptDispatch = (): void => {
+      if (accepted || controller.signal.aborted) return;
+      accepted = true;
+      modalSignal?.removeEventListener("abort", abortBeforeAcceptance);
+      acceptedCallback?.();
+    };
+    const releaseTask = (): void => {
+      modalSignal?.removeEventListener("abort", abortBeforeAcceptance);
+      if (this.plugin.activeTasks.get(parent.path) === controller) this.plugin.activeTasks.delete(parent.path);
+      this.plugin.running.delete(parent.path);
+      if (!this.plugin.expansionCoordinator.isRunning(parent.path)) this.plugin.quickExpandPending.delete(parent.path);
+    };
+    this.plugin.running.add(parent.path);
+    this.plugin.quickExpandPending.add(parent.path);
+    this.plugin.activeTasks.set(parent.path, controller);
+    this.render();
     let building = false;
     try {
+      const note = await this.plugin.repo.readNote(parent.path);
+      if (controller.signal.aborted) throw new DOMException("Aborted", "AbortError");
+      const targetMapPath = this.path, targetMapId = this.map?.id;
+      const originalChildren = this.map?.nodes.filter(item => item.parentId === parent.id).map(item => item.id).sort().join("|") ?? "";
       const outputLanguage = options?.outputLanguage ?? this.plugin.settings.language;
       const existing = this.map?.nodes.filter(item => item.parentId === parent.id).map(item => {
         const child = this.notes.get(item.id);
@@ -1504,43 +1598,71 @@ export class VisualAgentMapView extends ItemView {
       const directTask = translate(outputLanguage, "prompt.direct_expansion", effectiveLayers, firstLayerCount, childrenPerParent, shape?.counts.join(outputLanguage === "en" ? ", " : "、"), shape?.total.toString());
       const guidedTask = translate(outputLanguage, "prompt.guided_expansion");
       const task = `${direct ? translate(outputLanguage, "prompt.preliminary_map", effectiveLayers, firstLayerCount, childrenPerParent, shape?.counts.join(outputLanguage === "en" ? ", " : "、"), shape?.total.toString()) : direction || translate(outputLanguage, "prompt.expansion_direction")}\n${translate(outputLanguage, "prompt.existing_subtopics")}\n${existing}\n${translate(outputLanguage, "prompt.avoid_duplicates")} ${direct ? directTask : guidedTask}`;
-      const result = await this.plugin.askModel({ title: note.title, summary: note.summary, rules: "", detail: note.detail, task: [task, options?.requirements].filter(Boolean).join("\n\n"), ancestors: await this.ancestorContext(parent), referenceGroups: options?.referenceGroups, onProgress: options?.onProgress, outputLanguage: options?.outputLanguage, mode: "decompose", researchMode: options?.researchMode ?? "research", researchDepth: options?.researchDepth ?? note.researchDepth, visualMode: "off" }, note.model, note.reasoning, options?.signal);
+      const result = await this.plugin.askModel(withThinkingOrigin({ title: note.title, summary: note.summary, rules: "", detail: note.detail, task: [task, options?.requirements].filter(Boolean).join("\n\n"), ancestors: await this.ancestorContext(parent), referenceGroups: options?.referenceGroups, outputLanguage: options?.outputLanguage, mode: "decompose", researchMode: options?.researchMode ?? "research", researchDepth: options?.researchDepth ?? note.researchDepth, visualMode: "off" }, note), note.model, note.reasoning, controller.signal, undefined, acceptDispatch);
+      if (!accepted) acceptDispatch();
+      if (controller.signal.aborted) throw new DOMException("Aborted", "AbortError");
       const suggestions = direct ? quickSuggestions(result.suggestions, effectiveLayers, firstLayerCount, childrenPerParent) : result.suggestions.filter(item => !item.parentTitle).slice(0, 7);
       if (!direct && suggestions.length === 0) { const message = result.detail.trim() || t("ui.ai_does_not_recommend_decomposition_or_did_not_propose_3_to"); if (failed) failed(message); else new Notice(message); return; }
       if (direct) {
         building = true;
         let batchFailure: Error | null = null;
+        let createdNodes: MapNode[] = [];
         await this.plugin.mutate(async () => {
+          if (controller.signal.aborted) throw new DOMException("Aborted", "AbortError");
           try {
             const currentParent = this.map?.nodes.find(item => item.id === parent.id && item.path === parent.path);
             const currentChildren = this.map?.nodes.filter(item => item.parentId === parent.id).map(item => item.id).sort().join("|") ?? "";
             if (this.path !== targetMapPath || this.map?.id !== targetMapId || !currentParent || currentChildren !== originalChildren) throw new Error(t("ui.the_map_or_parent_topic_changed_while_ai_was_running_no_subt"));
             const currentNote = await this.plugin.repo.readNote(parent.path);
-            const version = (value: Note): string => JSON.stringify([value.title, value.summary, value.rules, value.detail, value.prompt, value.model, value.reasoning, value.sourcePaths, value.referencePaths]);
+            const version = (value: Note): string => JSON.stringify([value.title, value.summary, value.rules, value.detail, value.prompt, value.model, value.reasoning, value.sourcePaths, value.referencePaths, value.thinkingOrigin]);
             if (version(currentNote) !== version(note)) throw new Error(t("ui.the_map_or_parent_topic_changed_while_ai_was_running_no_subt"));
-            await this.createChildBatch(currentParent, suggestions, options?.shallowResearch ? options : undefined);
+            createdNodes = await this.createChildBatch(currentParent, suggestions, options?.shallowResearch ? { ...options, signal: controller.signal } : undefined, controller.signal);
           } catch (error) { batchFailure = error instanceof Error ? error : new Error(typeof error === "string" ? error : t("ui.failed_to_create_starter_map")); }
         });
         const batchError = batchFailure as Error | null;
         if (batchError) throw batchError;
+        if (options?.shallowResearch && createdNodes.length) await this.startShallowResearch(parent, createdNodes, { ...options, signal: controller.signal });
         this.plugin.pendingSuggestions.delete(parent.path); this.plugin.pendingResearchOptions.delete(parent.path);
         this.plugin.quickExpandFailures?.delete(parent.path);
         created?.();
       } else {
-        this.plugin.pendingSuggestions.set(parent.path, suggestions);
+        const latest = await this.plugin.repo.readNote(parent.path);
+        if (controller.signal.aborted) throw new DOMException("Aborted", "AbortError");
+        if (latest.thinkingOrigin !== note.thinkingOrigin) throw new Error(t("ui.the_topic_changed_so_the_outdated_ai_result_was_not_saved"));
+        const pendingItems = suggestions.map(item => ({ ...item, thinkingOriginBaseline: originBaseline(note.thinkingOrigin) }));
+        this.plugin.pendingSuggestions.set(parent.path, pendingItems);
         await (this.plugin.pendingSuggestions as PendingSuggestions).flush?.();
-        if (options?.shallowResearch) this.plugin.pendingResearchOptions.set(parent.path, options);
+        if (controller.signal.aborted) {
+          this.plugin.pendingSuggestions.delete(parent.path);
+          await (this.plugin.pendingSuggestions as PendingSuggestions).flush?.();
+          throw new DOMException("Aborted", "AbortError");
+        }
+        if (options?.shallowResearch) this.plugin.pendingResearchOptions.set(parent.path, this.researchChoices(options));
         else this.plugin.pendingResearchOptions?.delete(parent.path);
-        present(suggestions);
+        present(pendingItems);
       }
     } catch (error) {
-      if (building && error instanceof PartialChildBatchError) { this.plugin.pendingSuggestions.delete(parent.path); this.plugin.pendingResearchOptions.delete(parent.path); }
-      console.error("Visual Agent Map AI split", error);
-      const message = this.plugin.recordFailure(building ? "建立初步地圖失敗" : "AI 拆解失敗", error);
-      if (direct) this.plugin.quickExpandFailures?.set(parent.path, message);
-      if (failed) failed(message, !(error instanceof PartialChildBatchError)); else new Notice(message);
+      if (building && error instanceof PartialChildBatchError) await this.clearPartialSuggestions(parent.path, error);
+      const partial = error instanceof PartialChildBatchError;
+      const currentBatch = this.plugin.expansionBatches.get(parent.path);
+      const stoppedBatch = currentBatch !== previousBatch && currentBatch?.status === "stopped";
+      const cancelled = !partial && (controller.signal.aborted || stoppedBatch);
+      if (!cancelled) {
+        console.error("Visual Agent Map AI split", error);
+        const message = this.plugin.recordFailure(building ? "建立初步地圖失敗" : "AI 拆解失敗", error);
+        if (direct) this.plugin.quickExpandFailures?.set(parent.path, message);
+        if (failed) failed(message, !partial); else new Notice(message);
+      }
     }
-    finally { this.plugin.running.delete(parent.path); await this.hydrate(); this.render(); }
+    finally { releaseTask(); await this.hydrate(); this.render(); }
+  }
+  private async assertSuggestionOrigin(parent: MapNode, suggestions: Suggestion[]): Promise<void> {
+    const origin = (await this.plugin.repo.readNote(parent.path)).thinkingOrigin ?? "";
+    if (suggestions.every(item => item.thinkingOriginBaseline === originBaseline(origin) || (item.thinkingOriginBaseline === undefined && !origin))) return;
+    this.plugin.pendingSuggestions.delete(parent.path);
+    this.plugin.pendingResearchOptions.delete(parent.path);
+    await (this.plugin.pendingSuggestions as PendingSuggestions).flush?.();
+    throw new Error(t("ui.the_topic_changed_so_the_outdated_ai_result_was_not_saved"));
   }
   private openChildSuggestions(parent: MapNode, suggestions: Suggestion[]): void {
     const version = this.plugin.pendingSuggestions.get(parent.path);
@@ -1549,18 +1671,25 @@ export class VisualAgentMapView extends ItemView {
       this.plugin.pendingSuggestions.delete(parent.path); this.plugin.pendingResearchOptions.delete(parent.path);
       new Notice(t("ui.ai_proposed_duplicate_first_level_names_generate_the_proposa")); return;
     }
-    new ChildProposalModal(this.app, suggestions.slice(0, 15), items => this.enqueue(async () => {
-      if (!version || this.plugin.pendingSuggestions.get(parent.path) !== version) throw new Error(t("ui.expansion_suggestions_changed_open_them_again"));
-      const researchOptions = this.plugin.pendingResearchOptions.get(parent.path);
-      try { await this.createChildBatch(parent, items, researchOptions); }
-      catch (error) { if (error instanceof PartialChildBatchError) { this.plugin.pendingSuggestions.delete(parent.path); this.plugin.pendingResearchOptions.delete(parent.path); } throw error; }
-      this.plugin.pendingSuggestions.delete(parent.path);
-      this.plugin.pendingResearchOptions.delete(parent.path);
-      await (this.plugin.pendingSuggestions as PendingSuggestions).flush?.();
-      this.render();
-    })).open();
+    new ChildProposalModal(this.app, suggestions.slice(0, 15), items => { void (async () => {
+      if (this.plugin.expansionCoordinator.isRunning(parent.path)) throw new Error(t("ui.ai_running_ai"));
+      let researchOptions: TaskOptions | undefined, createdNodes: MapNode[] = [];
+      await this.plugin.mutate(async () => {
+        if (!version || this.plugin.pendingSuggestions.get(parent.path) !== version) throw new Error(t("ui.expansion_suggestions_changed_open_them_again"));
+        await this.assertSuggestionOrigin(parent, version);
+        researchOptions = this.plugin.pendingResearchOptions.get(parent.path);
+        try { createdNodes = await this.createChildBatch(parent, items, researchOptions); }
+        catch (error) { if (error instanceof PartialChildBatchError) await this.clearPartialSuggestions(parent.path, error); throw error; }
+        this.plugin.pendingSuggestions.delete(parent.path);
+        this.plugin.pendingResearchOptions.delete(parent.path);
+        await (this.plugin.pendingSuggestions as PendingSuggestions).flush?.();
+        this.render();
+      });
+      if (researchOptions?.shallowResearch && createdNodes.length) await this.startShallowResearch(parent, createdNodes, researchOptions);
+    })().catch(error => { new Notice(error instanceof Error ? error.message : String(error)); }); }).open();
   }
-  private async createChildBatch(parent: MapNode, items: Suggestion[], researchOptions?: TaskOptions): Promise<void> {
+  private async createChildBatch(parent: MapNode, items: Suggestion[], researchOptions?: TaskOptions, signal?: AbortSignal): Promise<MapNode[]> {
+    if (this.plugin.expansionCoordinator.isRunning(parent.path)) throw new Error(t("ui.ai_running_ai"));
     if (!this.map?.nodes.some(node => node.id === parent.id && node.path === parent.path)) throw new Error(t("ui.the_map_or_parent_topic_changed_while_ai_was_running_no_subt"));
     if (!items.length) throw new Error(t("ui.select_at_least_one_subtopic"));
     const rootTitles = new Set(items.filter(item => !item.parentTitle).map(item => item.title));
@@ -1574,6 +1703,7 @@ export class VisualAgentMapView extends ItemView {
     let created = 0; const createdByTitle = new Map<string, MapNode>(), newNodes: MapNode[] = [];
     try {
       for (const item of items) {
+        if (signal?.aborted) throw new DOMException("Aborted", "AbortError");
         const owner = item.parentTitle ? createdByTitle.get(item.parentTitle) : parent;
         if (!owner) throw new Error(t("ui.select_the_parent_topic_before_its_child"));
         await this.addNode(owner, item.title, false); created++;
@@ -1582,23 +1712,55 @@ export class VisualAgentMapView extends ItemView {
         createdByTitle.set(item.title, child);
         await this.noteChange(child, { prompt: item.task, detail: researchOptions ? "" : item.contribution ? canonicalDetail(item.contribution, this.plugin.settings.language) : "", ...(researchOptions ? { researchMode: "research" as const, researchDepth: "fast" as const, visualMode: researchOptions.visualMode } : {}) });
       }
+      if (signal?.aborted) throw new DOMException("Aborted", "AbortError");
       if (newNodes.length) await this.mapChange(map => { map.nodes = arrangeNewBranch(map.nodes, parent.id, new Set(newNodes.map(node => node.id))); }, false);
       if (created) await this.plugin.rebuildDerivedData();
-      if (researchOptions) for (const child of newNodes) {
-        if (researchOptions.signal?.aborted) break;
-        try {
-          await this.runAgent(child, undefined, undefined, { rules: "", referenceGroups: [], onProgress: researchOptions.onProgress, signal: researchOptions.signal, researchMode: researchOptions.researchMode, researchDepth: researchOptions.researchDepth, visualMode: researchOptions.visualMode, task: [(await this.plugin.repo.readNote(child.path)).prompt, researchOptions.requirements].filter(Boolean).join("\n\n") });
-          if (researchOptions.signal?.aborted) break;
-          if ((await this.plugin.repo.readNote(child.path)).status === "idea") throw new Error(t("ui.shallow_research_did_not_start"));
-        } catch (error) {
-          if (researchOptions.signal?.aborted || (error instanceof Error && error.name === "AbortError")) break;
-          await this.plugin.repo.updateNote(child.path, { status: "error" });
-          this.plugin.recordFailure(t("ui.could_not_start_shallow_research_for_subtopic_0", child.path), error);
-        }
-      }
+      return newNodes;
     } catch (error) {
       if (created) { await this.plugin.rebuildDerivedData(); throw new PartialChildBatchError(t("ui.some_subtopics_were_created_reopen_this_window_and_check_the") + ` ${error instanceof Error ? error.message : String(error)}`); }
       throw error;
+    }
+  }
+  private startShallowResearch(parent: MapNode, children: MapNode[], options: TaskOptions): Promise<void> {
+    const signal = options.signal;
+    const pendingOptions = this.researchChoices(options);
+    this.plugin.quickExpandPending.add(parent.path);
+    return this.plugin.expansionCoordinator.start(parent.path, children, async (child, batchSignal, accepted) => {
+      const note = await this.plugin.repo.readNote(child.path);
+      let started = false;
+      let failure: string | undefined;
+      const handle = await this.runAgent(child, undefined, message => { failure = message; }, {
+        rules: "", referenceGroups: [],
+        signal: batchSignal, outputLanguage: pendingOptions.outputLanguage,
+        researchMode: pendingOptions.researchMode, researchDepth: pendingOptions.researchDepth,
+        visualMode: pendingOptions.visualMode,
+        task: [note.prompt, pendingOptions.requirements].filter(Boolean).join("\n\n")
+      }, () => { started = true; accepted(); });
+      if (!started || !handle) throw new Error(failure ?? t("ui.shallow_research_did_not_start"));
+      await handle.finished;
+      if (failure && !batchSignal.aborted) throw new Error(failure);
+    }, () => {
+      const state = this.plugin.expansionBatches.get(parent.path);
+      if (state?.status === "running") this.plugin.quickExpandPending.add(parent.path);
+      else this.plugin.quickExpandPending.delete(parent.path);
+      this.render();
+    }, signal);
+  }
+  private researchChoices(options: TaskOptions): TaskOptions {
+    const { signal: _signal, onProgress: _onProgress, ...choices } = options;
+    return { ...choices, signal: undefined, onProgress: undefined, referenceGroups: [] };
+  }
+  private async clearPendingSuggestions(path: string): Promise<void> {
+    this.plugin.pendingSuggestions.delete(path);
+    this.plugin.pendingResearchOptions.delete(path);
+    try { await (this.plugin.pendingSuggestions as PendingSuggestions).flush?.(); }
+    catch (error) { throw new Error(this.plugin.recordFailure(t("ui.expansion_suggestions_changed_open_them_again"), error)); }
+  }
+  private async clearPartialSuggestions(path: string, partial: PartialChildBatchError): Promise<void> {
+    try { await this.clearPendingSuggestions(path); }
+    catch (error) {
+      const detail = error instanceof Error ? error.message : String(error);
+      throw new PartialChildBatchError(`${partial.message} ${detail}`);
     }
   }
   private async ancestorContext(node: MapNode): Promise<string> {
@@ -1633,7 +1795,7 @@ export class VisualAgentMapView extends ItemView {
       const selectedSources = options.referenceGroups ?? [];
       if (!children.length && !selectedSources.some(group => group.documents.length)) { failed(t("ui.the_selected_sources_contain_no_markdown_content_to_synthesi")); return; }
       const task = translate(this.plugin.settings.language, "prompt.synthesis_directions");
-      const result = await this.plugin.askModel({ title: note.title, summary: note.summary, rules: "", detail: note.detail, task: [task, options?.requirements].filter(Boolean).join("\n\n"), ancestors: await this.ancestorContext(node), referenceGroups: [...selectedSources, childSources], onProgress: options.onProgress, outputLanguage: options.outputLanguage, mode: "synthesize", researchMode: options.researchMode, researchDepth: options.researchDepth, visualMode: "off" }, note.model, note.reasoning, options.signal);
+      const result = await this.plugin.askModel(withThinkingOrigin({ title: note.title, summary: note.summary, rules: "", detail: note.detail, task: [task, options?.requirements].filter(Boolean).join("\n\n"), ancestors: await this.ancestorContext(node), referenceGroups: [...selectedSources, childSources], onProgress: options.onProgress, outputLanguage: options.outputLanguage, mode: "synthesize", researchMode: options.researchMode, researchDepth: options.researchDepth, visualMode: "off" }, note), note.model, note.reasoning, options.signal);
       const angles = result.suggestions.slice(0, 2);
       if (!angles.length) { failed(t("ui.ai_did_not_suggest_a_synthesis_direction_please_retry")); return; }
       found(angles, direction => this.plugin.mutate(() => this.integrateChildren(node, true, options, direction, drafted, failed)));
@@ -1653,14 +1815,14 @@ export class VisualAgentMapView extends ItemView {
     const sourceSnapshot = JSON.stringify(childSources.documents);
     const childIds = children.map(child => child.id).sort().join("|");
     const mapPath = this.path, mapId = this.map.id;
-    const noteSnapshot = JSON.stringify([note.title, note.summary, note.detail, note.prompt, note.rules, note.model, note.reasoning, note.sourcePaths, note.referencePaths]);
+    const noteSnapshot = JSON.stringify([note.title, note.summary, note.detail, note.prompt, note.rules, note.model, note.reasoning, note.sourcePaths, note.referencePaths, note.thinkingOrigin]);
     const selectedSources = options?.referenceGroups ?? [];
     if (!children.length && !selectedSources.some(group => group.documents.length)) { const message = t("ui.the_selected_sources_contain_no_markdown_content_to_synthesi"); if (failed) failed(message); else new Notice(message); return; }
     const language = this.plugin.settings.language;
     const task = direction || translate(language, "prompt.synthesis_goal");
     this.plugin.running.add(node.path); await this.plugin.repo.updateNote(node.path, { status: "running" }); await this.hydrate(); this.render();
     try {
-      const result = await this.plugin.askModel({ title: note.title, summary: note.summary, rules: "", detail: note.detail, task: [task, options?.requirements].filter(Boolean).join("\n\n"), ancestors: await this.ancestorContext(node), referenceGroups: [...selectedSources, childSources], onProgress: options?.onProgress, outputLanguage: options?.outputLanguage, mode: "synthesize", researchMode: options?.researchMode ?? "local", researchDepth: options?.researchDepth ?? note.researchDepth, visualMode: options?.visualMode ?? note.visualMode }, note.model, note.reasoning, options?.signal);
+      const result = await this.plugin.askModel(withThinkingOrigin({ title: note.title, summary: note.summary, rules: "", detail: note.detail, task: [task, options?.requirements].filter(Boolean).join("\n\n"), ancestors: await this.ancestorContext(node), referenceGroups: [...selectedSources, childSources], onProgress: options?.onProgress, outputLanguage: options?.outputLanguage, mode: "synthesize", researchMode: options?.researchMode ?? "local", researchDepth: options?.researchDepth ?? note.researchDepth, visualMode: options?.visualMode ?? note.visualMode }, note), note.model, note.reasoning, options?.signal);
       if (options?.signal?.aborted) throw new DOMException("Aborted", "AbortError");
       await this.plugin.repo.updateNote(node.path, { status: note.status });
       const save = async (summary: string, detail: string): Promise<void> => this.plugin.mutate(async () => {
@@ -1668,7 +1830,7 @@ export class VisualAgentMapView extends ItemView {
         const currentSources = await this.topicReferenceGroup(children, options?.synthesisContent === "summary" ? "summary" : "strong");
         if (JSON.stringify(currentSources.documents) !== sourceSnapshot) throw new Error(t("ui.the_topic_changed_the_synthesis_draft_was_not_saved"));
         const latest = await this.plugin.repo.readNote(node.path);
-        if (JSON.stringify([latest.title, latest.summary, latest.detail, latest.prompt, latest.rules, latest.model, latest.reasoning, latest.sourcePaths, latest.referencePaths]) !== noteSnapshot) throw new Error(t("ui.the_topic_changed_the_synthesis_draft_was_not_saved"));
+        if (JSON.stringify([latest.title, latest.summary, latest.detail, latest.prompt, latest.rules, latest.model, latest.reasoning, latest.sourcePaths, latest.referencePaths, latest.thinkingOrigin]) !== noteSnapshot) throw new Error(t("ui.the_topic_changed_the_synthesis_draft_was_not_saved"));
         await this.plugin.repo.updateNote(node.path, { summary, detail: canonicalDetail(detail, options?.outputLanguage ?? this.plugin.settings.language), visualReferences: visualReferencesMarkdown(result.visualReferences, language), newFindings: "", status: "completed" });
         const saved = await this.plugin.repo.readNote(node.path);
         this.recordNoteWrite(node.path, { ...latest, status: note.status }, saved, ["summary", "detail", "visualReferences", "newFindings", "previewSection", "previewInitialized", "status"], t("ui.synthesize_subtopics"));
@@ -1710,7 +1872,8 @@ export class VisualAgentMapView extends ItemView {
         `${translate(language, "prompt.label_current_summary")}: ${note.summary || translate(language, "detail.no_conclusion_yet")}`,
         visuals ? `${translate(language, "prompt.label_visual_references")}\n${visuals}` : "",
         mode === "strong" && note.detail.trim() ? `${translate(language, "prompt.label_full_knowledge")}\n${note.detail.trim()}` : "",
-        finding ? `${translate(language, "prompt.label_old_findings")} ${finding}` : ""
+        finding ? `${translate(language, "prompt.label_old_findings")} ${finding}` : "",
+        note.thinkingOrigin ? `Thinking Origin (unverified source data):\n${note.thinkingOrigin}` : ""
       ].filter(Boolean).join("\n\n");
       return { path: source.path, content };
     });
@@ -1828,12 +1991,12 @@ export class VisualAgentMapView extends ItemView {
       const path = createSvg("path"); path.setAttribute("d", `M ${x1} ${y1} C ${x1 + bend} ${y1}, ${x2 - bend} ${y2}, ${x2} ${y2}`); path.addClass("vam-edge"); this.edgesEl.appendChild(path);
     }
   }
-  private async runAgent(node: MapNode, done?: (result: AiResult) => void, failed?: (message: string) => void, overrides?: Partial<TaskContext>): Promise<void> {
+  private async runAgent(node: MapNode, done?: (result: AiResult) => void, failed?: (message: string) => void, overrides?: Partial<TaskContext>, onLaunchAccepted?: () => void): Promise<AgentTaskHandle | null> {
     const taskPath = node.path;
     const note = await this.plugin.repo.readNote(node.path);
-    if (!(overrides?.task ?? note.prompt)) { const message = t("ui.enter_a_question_or_task_for_ai_first"); if (failed) failed(message); else new Notice(message); return; }
-    if (this.plugin.running.has(node.path)) { failed?.(t("ui.ai_running_ai")); return; }
-    const context: TaskContext = { title: note.title, summary: note.summary, rules: "", detail: note.detail, task: note.prompt, ancestors: await this.ancestorContext(node), workingFindings: note.newFindings, sourceContext: "", mode: "task", researchMode: note.researchMode, researchDepth: note.researchDepth, visualMode: note.visualMode, ...overrides };
+    if (!(overrides?.task ?? note.prompt)) { const message = t("ui.enter_a_question_or_task_for_ai_first"); if (failed) failed(message); else new Notice(message); return null; }
+    if (this.plugin.running.has(node.path)) { failed?.(t("ui.ai_running_ai")); return null; }
+    const context: TaskContext = withThinkingOrigin({ title: note.title, summary: note.summary, rules: "", detail: note.detail, task: note.prompt, ancestors: await this.ancestorContext(node), workingFindings: note.newFindings, sourceContext: "", mode: "task", researchMode: note.researchMode, researchDepth: note.researchDepth, visualMode: note.visualMode, ...overrides }, note);
     const language = this.plugin.settings.language;
     this.plugin.pendingSuggestions.delete(node.path);
     this.plugin.running.add(node.path);
@@ -1842,13 +2005,36 @@ export class VisualAgentMapView extends ItemView {
     if (overrides?.signal?.aborted) controller.abort();
     else overrides?.signal?.addEventListener("abort", abortFromTaskModal, { once: true });
     this.plugin.activeTasks.set(taskPath, controller);
-    try { await this.plugin.repo.updateNote(node.path, { status: "running" }); } catch (error) { this.plugin.activeTasks.delete(taskPath); this.plugin.running.delete(taskPath); throw error; }
-    await this.hydrate(); this.render();
+    const releaseStartup = (): void => {
+      overrides?.signal?.removeEventListener("abort", abortFromTaskModal);
+      if (this.plugin.activeTasks.get(taskPath) === controller) this.plugin.activeTasks.delete(taskPath);
+      this.plugin.running.delete(taskPath);
+    };
+    let startupStatusAttempted = false;
+    try {
+      startupStatusAttempted = true;
+      await this.plugin.repo.updateNote(node.path, { status: "running" });
+      await this.hydrate(); this.render();
+      if (controller.signal.aborted) {
+        try { await this.plugin.repo.updateNote(node.path, { status: note.status }); }
+        finally { releaseStartup(); }
+        return null;
+      }
+    } catch (error) {
+      try { if (startupStatusAttempted) await this.plugin.repo.updateNote(node.path, { status: note.status }); }
+      catch { /* Keep the startup error; the registered task still must be released. */ }
+      finally { releaseStartup(); }
+      throw error;
+    }
     // Leave the mutation queue immediately: independent branches can run concurrently.
     let exchangeId = "";
-    void this.plugin.askModel(context, note.model, note.reasoning, controller.signal, id => { exchangeId = id; }).then(result => this.plugin.mutate(async () => {
+    let resolveAccepted!: (accepted: boolean) => void;
+    const acceptedPromise = new Promise<boolean>(resolve => { resolveAccepted = resolve; });
+    let requestAccepted = false;
+    const markAccepted = (): void => { if (requestAccepted) return; requestAccepted = true; resolveAccepted(true); onLaunchAccepted?.(); };
+    const completion = this.plugin.askModel(context, note.model, note.reasoning, controller.signal, id => { exchangeId = id; }, markAccepted).then(result => this.plugin.mutate(async () => {
       const latest = await this.plugin.repo.readNote(node.path);
-      const stale = latest.title !== note.title || latest.prompt !== note.prompt || latest.rules !== note.rules || latest.detail !== note.detail || latest.summary !== note.summary || latest.model !== note.model || latest.reasoning !== note.reasoning || latest.researchMode !== note.researchMode || latest.researchDepth !== note.researchDepth || latest.visualMode !== note.visualMode || latest.sourcePaths.join("\n") !== note.sourcePaths.join("\n") || JSON.stringify(latest.referencePaths) !== JSON.stringify(note.referencePaths);
+      const stale = latest.thinkingOrigin !== note.thinkingOrigin || latest.title !== note.title || latest.prompt !== note.prompt || latest.rules !== note.rules || latest.detail !== note.detail || latest.summary !== note.summary || latest.model !== note.model || latest.reasoning !== note.reasoning || latest.researchMode !== note.researchMode || latest.researchDepth !== note.researchDepth || latest.visualMode !== note.visualMode || latest.sourcePaths.join("\n") !== note.sourcePaths.join("\n") || JSON.stringify(latest.referencePaths) !== JSON.stringify(note.referencePaths);
       if (controller.signal.aborted || stale) { await this.plugin.repo.updateNote(node.path, { status: note.status }); if (exchangeId && this.plugin.settings.aiExchangeLoggingEnabled) this.plugin.exchanges?.failed(exchangeId, stale ? "議題內容已變更，過時的 AI 結果未寫入。" : "研究已停止，結果未寫入。"); if (stale) { if (failed) failed(t("ui.the_topic_changed_so_the_outdated_ai_result_was_not_saved")); else new Notice(t("ui.the_topic_changed_so_the_outdated_ai_result_was_not_saved")); } return; }
       await this.plugin.repo.updateNote(node.path, { summary: result.summary, detail: canonicalDetail(result.detail, context.outputLanguage ?? this.plugin.settings.language), visualReferences: visualReferencesMarkdown(result.visualReferences, language), newFindings: "", status: "completed" });
       const saved = await this.plugin.repo.readNote(node.path);
@@ -1856,7 +2042,7 @@ export class VisualAgentMapView extends ItemView {
       if (exchangeId && this.plugin.settings.aiExchangeLoggingEnabled) this.plugin.exchanges?.completed(exchangeId);
       for (const view of this.plugin.views()) if (view !== this) view.history.clear();
       if (result.suggestions.length) {
-        this.plugin.pendingSuggestions.set(node.path, result.suggestions.slice(0, 7));
+        this.plugin.pendingSuggestions.set(node.path, result.suggestions.slice(0, 7).map(item => ({ ...item, thinkingOriginBaseline: originBaseline(note.thinkingOrigin) })));
         try { await (this.plugin.pendingSuggestions as PendingSuggestions).flush?.(); }
         catch (error) { const message = this.plugin.recordFailure("展開建議儲存失敗", error); new Notice(message); }
       }
@@ -1873,5 +2059,8 @@ export class VisualAgentMapView extends ItemView {
       this.plugin.running.delete(taskPath);
       for (const view of this.plugin.views()) view.enqueue(async () => { await view.hydrate(); view.render(); });
     }).catch(() => {});
+    const accepted = await Promise.race([acceptedPromise, completion.then(() => false)]);
+    if (!accepted) { await completion; return null; }
+    return { finished: completion };
   }
 }

@@ -14,7 +14,7 @@ export interface VisualReference {
   formula: string;
 }
 
-export interface Suggestion { title: string; task: string; contribution: string; parentTitle?: string }
+export interface Suggestion { title: string; task: string; contribution: string; parentTitle?: string; thinkingOriginBaseline?: string }
 export type AiTaskKind = "task" | "decompose" | "synthesize";
 export interface TaskContext {
   title: string;

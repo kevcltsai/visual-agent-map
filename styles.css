@@ -545,4 +545,4 @@ body .workspace-leaf-content.vam-topic-markdown .markdown-source-view.mod-cm6 .m
 .vam-context-ai-panel .vam-context-ai-output { border-color: var(--color-green); }
 .vam-context-ai-panel .setting-item { padding: 6px 0; border: 0; }
 .vam-context-ai-image { max-width: 100%; max-height: 120px; object-fit: contain; }
-.vam-context-ai-panel [hidden] { display: none !important; }
+.vam-context-ai-panel [hidden] { display: none; }

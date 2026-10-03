@@ -1,7 +1,7 @@
 {
   "id": "visual-agent-map",
   "name": "Visual Agent Map",
-  "version": "0.11.0",
+  "version": "0.12.0",
   "minAppVersion": "1.13.7",
   "description": "Explore complex questions with visual research maps and AI conversations, keeping results as editable Markdown.",
   "author": "Kevin Tsai",

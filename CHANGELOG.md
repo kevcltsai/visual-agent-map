@@ -1,5 +1,29 @@
 # Changelog
 
+## [0.12.0] - 2026-10-03
+
+### Added
+
+- Turn a completed Coffee Tables discussion or one insight into an editable research question and context, then create a Visual Map manually or with optional AI reframing.
+- Preserve the initial framing, insight snapshot, simulated/unverified status and source links in an editable Thinking Origin section; research and direction selection retain this context.
+
+### Changed
+
+- Compact the Next Step task form, keep source/depth details collapsible, and preserve per-task answer language and selected model during discovery refresh.
+- Give Codex and Claude selectors shared discovery status and retry behavior. Claude CLI candidates do not imply successful authentication.
+
+### Fixed
+
+- Close the task form after expansion is accepted and keep the task running in the background with progress and Stop controls.
+- Run optional shallow child research sequentially through completion, preserving completed content and stopping further work on cancellation.
+- Distinguish explicit Stop from expansion failure while retaining real provider and partial-write errors.
+- Show one selection checkbox per map node.
+
+### Known limitations
+
+- Claude live execution remains unverified. Native multi-child sequencing and the Reframing model selector were not validated in this release cycle.
+- Reload Obsidian fully after manually replacing plugin files; reloading plugins alone may leave existing map views using earlier code.
+
 ## [0.11.0] - 2026-10-02
 
 ### Added

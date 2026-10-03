@@ -8,7 +8,7 @@
 
 **Start with a question. See the pieces. Follow the ideas worth exploring.** Build a visual AI research map in Obsidian, or talk through a new idea in Coffee Tables. Keep what you learn in editable Markdown notes.
 
-[**Get started**](#get-started) · [See the 0.12.0 release](https://github.com/kevcltsai/visual-agent-map/releases/tag/0.12.0)
+[**Get started**](#get-started) · [See the 0.13.0 release](https://github.com/kevcltsai/visual-agent-map/releases/tag/0.13.0)
 
 ### Take a look
 
@@ -28,11 +28,11 @@ Coffee Tables guests are simulated, not real experts; the conversation is not fa
 1. In **Obsidian Desktop → Settings → Community plugins → Browse**, find **Visual Agent Map**, then install and enable it. Requires Obsidian **1.13.7+**; macOS with 1.13.7 is the verified environment.
 2. Try the built-in sample or create a map. Manual mapping needs no AI. For AI research or Coffee Tables, sign in to [Codex CLI](https://developers.openai.com/codex/cli/) or [Claude Code](https://docs.anthropic.com/en/docs/claude-code/overview), then check the CLI in VAM settings. Claude Code support is experimental.
 
-Setup and troubleshooting: [INSTALL.md](INSTALL.md) · [Manual installation from the 0.12.0 release](https://github.com/kevcltsai/visual-agent-map/releases/tag/0.12.0)
+Setup and troubleshooting: [INSTALL.md](INSTALL.md) · [Manual installation from the 0.13.0 release](https://github.com/kevcltsai/visual-agent-map/releases/tag/0.13.0)
 
 ### Your notes and privacy
 
-Development on `main` adds a floating AI action for selected Markdown text and clicked images. Drafts require explicit acceptance before changing a note. Image interpretation currently uses Codex and sends the selected image data only when you run the action; unreadable images fail clearly. Configure the selection command in Obsidian's Hotkeys settings. This feature is not included in the 0.12.0 release.
+Version 0.13.0 adds a floating AI action for selected Markdown text and clicked images. Drafts require explicit acceptance before changing a note. Image interpretation currently uses Codex and sends the selected image data only when you run the action; unreadable images fail clearly. Configure the selection command in Obsidian's Hotkeys settings.
 
 Maps, research notes, Coffee Tables conversations, and observer notes are readable Markdown in your vault. VAM has no telemetry or stored API keys. AI tasks send relevant content, including selected background files and guest profiles, through your local CLI to OpenAI or Anthropic; your provider allowance or charges may apply. AI request/reply logging is off by default.
 
@@ -61,7 +61,7 @@ Copyright © 2026 Kevin Tsai
 
 **從一個問題出發，看見各個部分，再追你想探索的線索。** 用 Obsidian 視覺化 AI 研究地圖探索分支，或到 Coffee Tables 聊出新角度；想留下的發現都能存成可編輯的 Markdown 筆記。
 
-[**開始使用**](#開始使用) · [查看 0.12.0 正式版](https://github.com/kevcltsai/visual-agent-map/releases/tag/0.12.0)
+[**開始使用**](#開始使用) · [查看 0.13.0 正式版](https://github.com/kevcltsai/visual-agent-map/releases/tag/0.13.0)
 
 ### 看看畫面
 
@@ -81,11 +81,11 @@ Coffee Tables 來賓是模擬角色，不是真實專家；對談內容不會自
 1. 到 **Obsidian 桌面版 → 設定 → 第三方外掛 → 瀏覽** 搜尋 **Visual Agent Map**，安裝並啟用。需要 Obsidian **1.13.7+**；已驗證環境為 macOS 與 Obsidian 1.13.7。
 2. 先試內建範例，或建立自己的地圖。手動繪圖不需要 AI。要使用 AI 研究或 Coffee Tables，登入 [Codex CLI](https://developers.openai.com/codex/cli/) 或 [Claude Code](https://docs.anthropic.com/en/docs/claude-code/overview)，再到 VAM 設定檢查 CLI。Claude Code 仍屬實驗性支援。
 
-安裝與問題排除：[INSTALL.md](INSTALL.md) · [從 0.12.0 正式版手動安裝](https://github.com/kevcltsai/visual-agent-map/releases/tag/0.12.0)
+安裝與問題排除：[INSTALL.md](INSTALL.md) · [從 0.13.0 正式版手動安裝](https://github.com/kevcltsai/visual-agent-map/releases/tag/0.13.0)
 
 ### 你的筆記與隱私
 
-`main` 開發版新增選取 Markdown 文字與點選圖片的浮動 AI 操作。草稿必須由使用者明確接受才改動筆記。圖片辨識目前使用 Codex，僅在執行時傳送選取圖片的資料；無法讀取圖片會明確顯示失敗。可在 Obsidian 快捷鍵設定配置選取命令。此功能尚未包含於 0.12.0 正式版。
+0.13.0 新增選取 Markdown 文字與點選圖片的浮動 AI 操作。草稿必須由使用者明確接受才改動筆記。圖片辨識目前使用 Codex，僅在執行時傳送選取圖片的資料；無法讀取圖片會明確顯示失敗。可在 Obsidian 快捷鍵設定配置選取命令。
 
 地圖、研究筆記、Coffee Tables 對談和觀察者筆記都是 Vault 裡可閱讀的 Markdown。VAM 不含遙測，也不儲存 API key。AI 任務會透過本機 CLI 將相關內容（含選取的背景檔與來賓設定）傳送至 OpenAI 或 Anthropic；可能使用帳號額度或產生費用。AI 請求／回覆紀錄預設關閉。
 

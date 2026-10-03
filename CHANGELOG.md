@@ -1,5 +1,28 @@
 # Changelog
 
+## [0.13.0] - 2026-10-03
+
+### Added
+
+- Floating AI actions for selected Markdown text in reading, live preview and source views, and clicked images. Review editable drafts before accepting or appending them.
+- A configurable Markdown selection command and explicit image transmission on execution. Image interpretation currently requires Codex; original images remain unchanged.
+
+### Changed
+
+- Run shallow child research with up to three concurrent tasks, shared cancellation and independent failure handling.
+- Label subtopic proposal fields for name, research task and contribution.
+
+### Fixed
+
+- Allow creating proposed children under the current note without selecting another proposed parent.
+- Guard AI writeback against changed notes, views and selections.
+
+### Known limitations
+
+- Live provider generation, draft acceptance/writeback and real concurrent research remain unverified in this release cycle. UI entry points and cancellation were previously checked; automated CI covers logic and integration fixtures.
+- Image interpretation is Codex-only and requires loaded image pixels or a readable Vault attachment. It does not fetch remote images separately.
+- Reload Obsidian fully after replacing plugin files.
+
 ## [0.12.0] - 2026-10-03
 
 ### Added

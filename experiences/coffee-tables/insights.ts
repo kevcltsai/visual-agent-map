@@ -34,6 +34,14 @@ const SOURCE_MARKER = /<!--\s*source:\s*([\s\S]*?)\s*-->/gi;
 const ROOT = /^# (?:觀察者整理|Observer(?:[’']s)? notes)\s*$/mi;
 const ID_PATTERN = /^[a-zA-Z0-9_-]{1,100}$/;
 
+export function encodeInsightSource(source: string): string {
+  return source.replace(/&/g, "&amp;").replace(/\r/g, "&#13;").replace(/\n/g, "&#10;").replace(/-->/g, "—>");
+}
+
+function decodeInsightSource(source: string): string {
+  return source.replace(/&#13;/g, "\r").replace(/&#10;/g, "\n").replace(/&amp;/g, "&");
+}
+
 function newId(): string { return crypto.randomUUID(); }
 function legacyId(category: CoffeeInsightCategory, summary: string, salt = 0): string {
   const value = `${category}:${normalize(summary)}:${salt}`;
@@ -46,10 +54,34 @@ function legacyId(category: CoffeeInsightCategory, summary: string, salt = 0): s
   return `legacy-${(left >>> 0).toString(36)}-${(right >>> 0).toString(36)}`;
 }
 function normalize(value: string): string { return value.normalize("NFKC").toLocaleLowerCase().replace(/[\p{P}\p{S}\s]/gu, ""); }
+function differsOnlyByChineseParticle(left: string, right: string): boolean {
+  if (Math.abs(left.length - right.length) !== 1 || Math.min(left.length, right.length) < 12) return false;
+  const longer = left.length > right.length ? left : right, shorter = left.length > right.length ? right : left;
+  const particles = new Set(["的", "地", "得", "了", "著", "着"]);
+  for (let index = 0; index < longer.length; index++) {
+    const removed = longer.slice(0, index) + longer.slice(index + 1);
+    if (removed === shorter && particles.has(longer[index])) return true;
+  }
+  return false;
+}
+function sameOrMissing(left?: string, right?: string): boolean {
+  const a = normalize(left ?? ""), b = normalize(right ?? "");
+  return a === b;
+}
+function nearDuplicate(left: CoffeeInsight, right: CoffeeInsight): boolean {
+  const leftSummary = normalize(left.summary), rightSummary = normalize(right.summary);
+  return left.category === right.category && (leftSummary === rightSummary || differsOnlyByChineseParticle(leftSummary, rightSummary)) &&
+    sameOrMissing(left.detail, right.detail) && sameOrMissing(left.question, right.question) &&
+    sameOrMissing(left.proposedSolution, right.proposedSolution) && sameOrMissing(left.limitations, right.limitations);
+}
 function unique(values: string[]): string[] { return [...new Set(values.map(value => value.trim()).filter(Boolean))]; }
+function exactSourceSetMatch(left: string[], right: string[]): boolean {
+  const a = unique(left), b = unique(right);
+  return a.length > 0 && a.length === b.length && a.every(source => b.includes(source));
+}
 function categoryTitle(category: CoffeeInsightCategory, language: "zh-TW" | "en"): string { return TITLES[language][category]; }
 function splitInsightText(value: string): { summary: string; metadata: string[]; sources: string[] } {
-  const sources = [...value.matchAll(SOURCE_MARKER)].map(match => match[1].trim()).filter(Boolean);
+  const sources = [...value.matchAll(SOURCE_MARKER)].map(match => decodeInsightSource(match[1].trim())).filter(Boolean);
   const metadata = [...value.matchAll(ALL_MARKERS)].map(match => match[0]);
   return {
     summary: value.replace(SOURCE_MARKER, "").replace(MARKER, "").replace(/<!--[\s\S]*?-->/g, "").replace(/^[-*+]\s+/, "").replace(/^\*\*(.*)\*\*$/, "$1").trim(),
@@ -138,7 +170,7 @@ function parseOne(markdown: string): CoffeeInsight[] {
       continue;
     }
     if (current) {
-      const sourceLine = [...line.matchAll(SOURCE_MARKER)].map(match => match[1].trim());
+      const sourceLine = [...line.matchAll(SOURCE_MARKER)].map(match => decodeInsightSource(match[1].trim()));
       if (sourceLine.length) current.sources = unique([...current.sources, ...sourceLine]);
       const detail = line.replace(MARKER, "").replace(SOURCE_MARKER, "").trim();
       if (detail && !detail.startsWith("<!--")) {
@@ -219,13 +251,28 @@ export function mergeInsightUpdates(current: CoffeeInsight[], generated: string,
   for (const item of proposed) {
     const action = (item as CoffeeInsight & { action?: string }).action;
     if (!action) {
-      if (active.some(existing => existing.category === item.category && normalize(existing.summary) === normalize(item.summary))) continue;
+      const duplicate = active.find(existing => nearDuplicate(existing, item));
+      if (duplicate) {
+        duplicate.sources = unique([...duplicate.sources, ...item.sources]);
+        continue;
+      }
       item.persistedId = true;
       active.push(item);
       lookup.set(item.id, item);
       continue;
     }
-    const targets = item.mergedIds.map(id => lookup.get(id));
+    let targets = item.mergedIds.map(id => lookup.get(id));
+    // A model can mistype a stable ID on an unchanged `keep` item. Recover only
+    // when its category and complete, exact source set identify one baseline
+    // item. Keep the strict unknown-reference failure for updates, merges,
+    // source-less items, and ambiguous source sets; never drop the reference.
+    if (action === "keep" && targets.length === 1 && !targets[0] && item.sources.length) {
+      const matches = baseline.filter(candidate => candidate.category === item.category && exactSourceSetMatch(candidate.sources, item.sources));
+      if (matches.length === 1) {
+        item.mergedIds = [matches[0].id];
+        targets = matches;
+      }
+    }
     if (targets.some(target => !target)) throw new Error("Observer insight references an unknown item");
     if (item.mergedIds.some(id => seenTargets.has(id))) throw new Error("Observer insight reference is used more than once");
     item.mergedIds.forEach(id => seenTargets.add(id));
@@ -266,7 +313,7 @@ export function serializeInsightNotes(insights: CoffeeInsight[], language: "zh-T
     lines.push(`## ${categoryTitle(category, language)}`, "");
     for (const item of entries) {
       const merged = item.mergedIds.length ? `;merged=${unique(item.mergedIds).join(",")}` : "";
-      const sources = unique(item.sources).map(source => ` <!-- source: ${source.replace(/-->/g, "—>")} -->`).join("");
+      const sources = unique(item.sources).map(source => ` <!-- source: ${encodeInsightSource(source)} -->`).join("");
       lines.push(`- ${item.summary} <!-- coffee-insight:v1:id=${item.id}${merged} -->${sources}`);
       if (item.detail) lines.push(`  - ${language === "zh-TW" ? "脈絡" : "Context"}：${item.detail.split(/\r?\n/).join(" ")}`);
       if (category === "solutions") {

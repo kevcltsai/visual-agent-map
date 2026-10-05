@@ -6,6 +6,15 @@ export interface TableListItem {
   legacyTime?: boolean; unreadable?: boolean;
 }
 export type TableListFilter = "all" | "generating" | "unfinished" | "completed";
+export type TableListEmptyState = "no-matches" | "no-status-matches" | "no-archived" | "empty";
+
+export function tableListEmptyState(query: string, focusedTopic: string | null | undefined, filter: TableListFilter, archived: boolean, sourceCount: number): TableListEmptyState {
+  if (query.trim() || focusedTopic?.trim()) return "no-matches";
+  if (archived && sourceCount === 0) return "no-archived";
+  if (filter !== "all") return "no-status-matches";
+  if (archived) return "no-archived";
+  return "empty";
+}
 
 const activityTime = (item: TableListItem): number => Date.parse(item.lastGenerationStartedAt || item.updatedAt || item.createdAt) || 0;
 const startTime = (item: TableListItem): number => Date.parse(item.lastGenerationStartedAt || item.updatedAt || item.createdAt) || 0;

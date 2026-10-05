@@ -39,6 +39,7 @@ export interface Note {
 export type NotePatch = Partial<Note>;
 export interface Settings {
   coffeeStyles?: CoffeeStyle[];
+  coffeePersonas?: import("./experiences/coffee-tables/types").CoffeePersonaTemplate[];
   defaultCoffeeStyleId?: string;
   language: "zh-TW" | "en";
   workspaceFolder: string;

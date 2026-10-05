@@ -1,4 +1,4 @@
-import { normalizePath, TFile, TFolder, type Vault } from "obsidian";
+import { normalizePath, TFile, TFolder, type TAbstractFile, type Vault } from "obsidian";
 import { copyLegacySession, parseSession, type AnyCoffeeSession, type CoffeeReference, type CoffeeRound, type CoffeeSession, type LegacyCoffeeSession } from "./types";
 import { splitObserverNotes } from "./engine";
 import { baselineFromVersions, serializeInsightNotes } from "./insights";
@@ -38,17 +38,17 @@ function conversationBoundary(raw: string): { index: number; heading: string; na
   }
   throw new Error("Coffee Tables Markdown is missing its conversation section");
 }
-interface Sidecar { version: 3; id: string; topic: string; language: CoffeeSession["language"]; model: string; reasoning: string; createdAt: string; updatedAt: string; lastGenerationStartedAt?: string; lastCompletedAt?: string; status: CoffeeSession["status"]; error?: string; guests: CoffeeSession["guests"]; rounds: Array<Omit<CoffeeRound, "markdown" | "notes">>; questions: Array<{ summary?: string; id: string; createdAt: string; status: CoffeeSession["questions"][number]["status"]; error?: string; draftAnswer?: string; invitedGuests?: CoffeeSession["questions"][number]["invitedGuests"] }>; interventions?: CoffeeSession["interventions"]; draftMarkdown?: string; observerDraftMarkdown?: string; dirtyNotes?: boolean; revision: number; filePath: string; transcriptHash: string; journal?: { previousMarkdownHash: string; nextMarkdownHash: string; previousSidecar: string; targetMarkdown?: string }; moveJournal?: { previousPath: string; targetPath: string } }
+interface Sidecar { version: 3; id: string; topic: string; language: CoffeeSession["language"]; model: string; reasoning: string; createdAt: string; updatedAt: string; lastGenerationStartedAt?: string; lastCompletedAt?: string; status: CoffeeSession["status"]; error?: string; guests: CoffeeSession["guests"]; rounds: Array<Omit<CoffeeRound, "markdown" | "notes">>; questions: Array<{ summary?: string; id: string; createdAt: string; status: CoffeeSession["questions"][number]["status"]; error?: string; draftAnswer?: string; invitedGuests?: CoffeeSession["questions"][number]["invitedGuests"] }>; interventions?: CoffeeSession["interventions"]; draftMarkdown?: string; observerDraftMarkdown?: string; convergenceDraft?: CoffeeSession["convergenceDraft"]; convergenceUndo?: CoffeeSession["convergenceUndo"]; pinnedInsightIds?: CoffeeSession["pinnedInsightIds"]; convergenceRawDraft?: CoffeeSession["convergenceRawDraft"]; dirtyNotes?: boolean; revision: number; filePath: string; transcriptHash: string; journal?: { previousMarkdownHash: string; nextMarkdownHash: string; previousSidecar: string; targetMarkdown?: string }; moveJournal?: { previousPath: string; targetPath: string } }
 export class CoffeeStorage {
   private originals = new Map<string, string>(); private sidecarOriginals = new Map<string, string>(); private locations = new Map<string, string>(); private revisions = new Map<string, number>(); private activeWrites = new Set<string>(); private activeMoves = new Set<string>(); private deletedIds = new Set<string>();
   readonly folder: string; readonly hidden: string;
-  constructor(private vault: Vault, workspace: string, private renameFile?: (file: TFile, path: string) => Promise<void>, private trashFile?: (file: TFile) => Promise<void>) { this.folder = normalizePath(`${workspace}/Coffee Tables`); this.hidden = normalizePath(`${this.folder}/.sessions`); }
+  constructor(private vault: Vault, workspace: string, private renameFile?: (file: TFile, path: string) => Promise<void>, private trashFile?: (file: TAbstractFile) => Promise<void>) { this.folder = normalizePath(`${workspace}/Coffee Tables`); this.hidden = normalizePath(`${this.folder}/.sessions`); }
   path(id: string, topic?: string): string { if (!/^[a-zA-Z0-9-]+$/.test(id)) throw new Error("Invalid session ID"); const slug = topic ? topicSlug(topic) : id; return `${topic ? this.topicFolder(topic) : `${this.folder}/${slug}`}/${slug}.md`; }
   sidecarPath(id: string): string { if (!/^[a-zA-Z0-9-]+$/.test(id)) throw new Error("Invalid session ID"); return `${this.hidden}/${id}.json`; }
   sessionPath(id: string): string { return this.locations.get(id) ?? this.path(id); }
-  list(): TFile[] { return this.vault.getFiles().filter(file => file.extension === "md" && (file.parent?.path === this.folder || file.parent?.parent?.path === this.folder && !file.parent.name.startsWith(".") )).sort((a, b) => b.stat.mtime - a.stat.mtime); }
+  list(archived = false): TFile[] { return this.vault.getFiles().filter(file => file.extension === "md" && (archived ? file.parent?.path === `${this.folder}/Archive` : file.parent?.path === this.folder || file.parent?.parent?.path === this.folder && !file.parent.name.startsWith(".") && file.parent.name !== "Archive")).sort((a, b) => b.stat.mtime - a.stat.mtime); }
   private topicFolder(topic: string): string { const slug = topicSlug(topic).slice(0, 64); return `${this.folder}/${slug}（${shortHash(topic.trim())}）`; }
-  private titlePath(topic: string, id: string): string { const directory = this.topicFolder(topic), base = `${directory}/${topicSlug(topic)}.md`, stem = base.slice(0, -3); let path = base, suffix = 2; while (this.vault.getAbstractFileByPath(path) && this.vault.getAbstractFileByPath(path) !== this.vault.getAbstractFileByPath(this.sessionPath(id))) path = `${stem}（${suffix++}）.md`; return path; }
+  private titlePath(topic: string, id: string): string { const directory = this.locations.get(id)?.startsWith(`${this.folder}/Archive/`) ? `${this.folder}/Archive` : this.topicFolder(topic), base = `${directory}/${topicSlug(topic)}.md`, stem = base.slice(0, -3); let path = base, suffix = 2; while (this.vault.getAbstractFileByPath(path) && this.vault.getAbstractFileByPath(path) !== this.vault.getAbstractFileByPath(this.sessionPath(id))) path = `${stem}（${suffix++}）.md`; return path; }
   private async ensureFolder(path: string): Promise<void> { if (path === this.hidden || path.startsWith(`${this.hidden}/`)) { if (await this.vault.adapter.exists(path)) return; try { await this.vault.adapter.mkdir(path); } catch (error) { if (await this.vault.adapter.exists(path)) return; throw error; } return; } const parent = path.slice(0, path.lastIndexOf("/")); if (parent && !this.vault.getAbstractFileByPath(parent)) await this.ensureFolder(parent); const current = this.vault.getAbstractFileByPath(path); if (current) { if (!(current instanceof TFolder)) throw new Error(`Coffee Tables storage path is not a folder: ${path}`); return; } try { await this.vault.createFolder(path); } catch (error) { const raced = this.vault.getAbstractFileByPath(path); if (raced instanceof TFolder) return; if (await this.vault.adapter.exists(path)) { const refreshed = this.vault.getAbstractFileByPath(path); if (!refreshed || refreshed instanceof TFolder) return; } throw error; } }
   private async hiddenPaths(): Promise<string[]> { const listing = await this.vault.adapter.list(this.hidden).catch(() => ({ files: [], folders: [] })); return listing.files.filter(path => new RegExp(`^${this.hidden.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}/[a-zA-Z0-9-]+\\.json$`).test(path)); }
   private async readHidden(path: string): Promise<string> { return await this.vault.adapter.read(path); }
@@ -56,7 +56,7 @@ export class CoffeeStorage {
   private sidecar(session: CoffeeSession, revision: number, filePath: string): Sidecar {
     const { rounds = [], questions = [] } = session;
     const storedRounds = rounds;
-    return { version: 3, id: session.id, topic: session.topic, language: session.language, model: session.model, reasoning: session.reasoning, createdAt: session.createdAt, updatedAt: session.updatedAt, ...(session.lastGenerationStartedAt ? { lastGenerationStartedAt: session.lastGenerationStartedAt } : {}), ...(session.lastCompletedAt ? { lastCompletedAt: session.lastCompletedAt } : {}), status: session.status, ...(session.error ? { error: session.error } : {}), guests: session.guests, rounds: storedRounds.map(({ markdown: _markdown, notes: _notes, ...round }) => round), questions: questions.map(({ id, createdAt, status, error, draftAnswer, invitedGuests, summary }) => ({ summary, id, createdAt: createdAt ?? session.createdAt, status, ...(error ? { error } : {}), ...(draftAnswer ? { draftAnswer } : {}), ...(invitedGuests?.length ? { invitedGuests } : {}) })), ...(session.interventions ? { interventions: session.interventions } : {}), ...(session.draftMarkdown ? { draftMarkdown: session.draftMarkdown } : {}), ...(session.observerDraftMarkdown ? { observerDraftMarkdown: session.observerDraftMarkdown } : {}), ...(session.dirtyNotes ? { dirtyNotes: true } : {}), revision, filePath, transcriptHash: conversationHash(rounds, questions, session.interventions ?? []) };
+    return { version: 3, id: session.id, topic: session.topic, language: session.language, model: session.model, reasoning: session.reasoning, createdAt: session.createdAt, updatedAt: session.updatedAt, ...(session.lastGenerationStartedAt ? { lastGenerationStartedAt: session.lastGenerationStartedAt } : {}), ...(session.lastCompletedAt ? { lastCompletedAt: session.lastCompletedAt } : {}), status: session.status, ...(session.error ? { error: session.error } : {}), guests: session.guests, rounds: storedRounds.map(({ markdown: _markdown, notes: _notes, ...round }) => round), questions: questions.map(({ id, createdAt, status, error, draftAnswer, invitedGuests, summary }) => ({ summary, id, createdAt: createdAt ?? session.createdAt, status, ...(error ? { error } : {}), ...(draftAnswer ? { draftAnswer } : {}), ...(invitedGuests?.length ? { invitedGuests } : {}) })), ...(session.interventions ? { interventions: session.interventions } : {}), ...(session.draftMarkdown ? { draftMarkdown: session.draftMarkdown } : {}), ...(session.observerDraftMarkdown ? { observerDraftMarkdown: session.observerDraftMarkdown } : {}), ...(session.convergenceDraft ? { convergenceDraft: session.convergenceDraft } : {}), ...(session.convergenceUndo ? { convergenceUndo: session.convergenceUndo } : {}), ...(session.pinnedInsightIds !== undefined ? { pinnedInsightIds: session.pinnedInsightIds } : {}), ...(session.convergenceRawDraft !== undefined ? { convergenceRawDraft: session.convergenceRawDraft } : {}), ...(session.dirtyNotes ? { dirtyNotes: true } : {}), revision, filePath, transcriptHash: conversationHash(rounds, questions, session.interventions ?? []) };
   }
   private parseMarkdown(raw: string, side: Sidecar): CoffeeSession {
     const title = markdownTopic(raw) ?? side.topic;
@@ -88,7 +88,9 @@ export class CoffeeStorage {
     const settings = settingsMatch?.[1] ?? "";
     const model = /^- (?:模型|Model): (.+)$/m.exec(settings)?.[1] ?? side.model;
     const reasoning = /^- (?:推理強度|Reasoning): (.+)$/m.exec(settings)?.[1] ?? side.reasoning;
-    const custom = /^### (?:這桌的額外要求|Additional requests)\s*\n([\s\S]*?)(?=^### |$(?![\s\S]))/m.exec(settings)?.[1]?.split("\n").map(line => line.replace(/^> ?/, "")).join("\n").trim() ?? side.guests?.customPrompt ?? "";
+    const customBlock = /^### (?:這桌的額外要求|Additional requests)\s*\n([\s\S]*?)(?=^### |$(?![\s\S]))/m.exec(settings)?.[1];
+    const customSource = customBlock === undefined ? side.guests?.customPrompt ?? "" : customBlock.split("\n").map(line => line.replace(/^> ?/, "")).join("\n");
+    const custom = customSource.split("\n").filter(line => !/^<!--[ \t]*coffee-tables-navigation:[^\r\n]*?-->[ \t]*$/.test(line.trim())).join("\n").trim();
     const styleMatch = /^<!-- coffee-tables-style:([^\n]+) -->$/m.exec(settings);
     let styleSnapshot: { id?: string; name?: string; prompt?: string } | undefined;
     if (styleMatch) try { styleSnapshot = JSON.parse(decodeURIComponent(styleMatch[1])) as typeof styleSnapshot; } catch { /* Fall back to the hidden session snapshot. */ }
@@ -108,7 +110,9 @@ export class CoffeeStorage {
     } catch { /* Preserve the sidecar snapshot when navigation metadata is malformed. */ }
     for (const meta of side.rounds ?? []) if (!rounds.some(round => round.id === meta.id) && meta.status !== "completed") rounds.push({ ...meta, markdown: "", notes: "" });
     rounds.sort((a,b) => a.createdAt.localeCompare(b.createdAt));
-    const session: CoffeeSession = { version: 3, id: side.id, topic: title, language: side.language, model, reasoning, createdAt: side.createdAt, updatedAt: side.updatedAt, ...(side.lastGenerationStartedAt ? { lastGenerationStartedAt: side.lastGenerationStartedAt } : {}), ...(side.lastCompletedAt ? { lastCompletedAt: side.lastCompletedAt } : {}), status: side.status, ...(side.error ? { error: side.error } : {}), guests: guestSettings, rounds, transcriptMarkdown: rounds.map(round => round.markdown).filter(Boolean).join("\n\n"), questions, observerNotes: [latest, ...noteVersions].filter(Boolean), ...(side.draftMarkdown ? { draftMarkdown: side.draftMarkdown } : {}), ...(side.observerDraftMarkdown ? { observerDraftMarkdown: side.observerDraftMarkdown } : {}), ...(side.interventions ? { interventions } : {}), ...((side.dirtyNotes || (!!side.transcriptHash && conversationHash(rounds, questions, interventions) !== side.transcriptHash)) ? { dirtyNotes: true } : {}) };
+    const observerNotes = (side.convergenceUndo ? [latest] : [latest, ...noteVersions]).filter(Boolean);
+    const convergenceUndo = side.convergenceUndo;
+    const session: CoffeeSession = { version: 3, id: side.id, topic: title, language: side.language, model, reasoning, createdAt: side.createdAt, updatedAt: side.updatedAt, ...(side.lastGenerationStartedAt ? { lastGenerationStartedAt: side.lastGenerationStartedAt } : {}), ...(side.lastCompletedAt ? { lastCompletedAt: side.lastCompletedAt } : {}), status: side.status, ...(side.error ? { error: side.error } : {}), guests: guestSettings, rounds, transcriptMarkdown: rounds.map(round => round.markdown).filter(Boolean).join("\n\n"), questions, observerNotes, ...(side.draftMarkdown ? { draftMarkdown: side.draftMarkdown } : {}), ...(side.observerDraftMarkdown ? { observerDraftMarkdown: side.observerDraftMarkdown } : {}), ...(side.convergenceDraft ? { convergenceDraft: side.convergenceDraft } : {}), ...(convergenceUndo ? { convergenceUndo } : {}), ...(side.pinnedInsightIds !== undefined ? { pinnedInsightIds: side.pinnedInsightIds } : {}), ...(side.convergenceRawDraft !== undefined ? { convergenceRawDraft: side.convergenceRawDraft } : {}), ...(side.interventions ? { interventions } : {}), ...((side.dirtyNotes || (!!side.transcriptHash && conversationHash(rounds, questions, interventions) !== side.transcriptHash)) ? { dirtyNotes: true } : {}) };
     return parseSession(JSON.stringify(session)) as CoffeeSession;
   }
   private encode(session: CoffeeSession): string {
@@ -131,7 +135,8 @@ export class CoffeeStorage {
     for (let i = 0; i < session.questions.length; i++) { const question = session.questions[i]; const invitations = question.invitedGuests?.length ? ["", `### ${t("邀請來賓", "Invited guests")}`, "", ...question.invitedGuests.map(guest => `- **${guest.name}｜${t(...CATEGORY_LABELS[guest.category])}**：${guest.description}`)] : []; events.push({ at: question.createdAt ?? session.createdAt, lines: [`## ${t(`追問第 ${i + 1} 題`, `Follow-up ${i + 1}`)}`, "", question.question, "", `### ${t("桌上回答", "Table response")}`, "", question.answer || question.draftAnswer || t("（尚未回答）", "(No answer yet.)"), ...invitations] }); }
     for (let i = 0; i < (session.interventions ?? []).length; i++) { const item = session.interventions![i]; if (item.roundId) continue; events.push({ at: item.createdAt, lines: [`## ${t(`使用者介入第 ${i + 1} 則`, `User note ${i + 1}`)}`, "", demoteRootHeadings(item.text)] }); }
     events.sort((a, b) => a.at.localeCompare(b.at)); for (const event of events) lines.push(...event.lines, "");
-    const insights = baselineFromVersions(session.observerNotes ?? [], session.language);
+    const currentNotes = session.convergenceUndo ? session.observerNotes?.slice(0, 1) ?? [] : session.observerNotes ?? [];
+    const insights = baselineFromVersions(currentNotes, session.language);
     if (insights.length) lines.push(`## ${t("觀察者整理", "Observer notes")}`, "", serializeInsightNotes(insights, session.language));
     const drafts = [...(session.rounds ?? []).filter(round => round.draftMarkdown).map((round, index) => `### ${t(`對談第 ${index + 1} 段草稿`, `Conversation part ${index + 1} draft`)}\n\n${round.draftMarkdown}`), ...session.questions.filter(question => question.draftAnswer).map((question, index) => `### ${t(`追問草稿 ${index + 1}`, `Follow-up draft ${index + 1}`)}\n\n${question.draftAnswer}`)];
     if (session.observerDraftMarkdown) drafts.push(`### ${t("觀察者整理草稿", "Observer notes draft")}\n\n${session.observerDraftMarkdown}`);
@@ -183,7 +188,7 @@ export class CoffeeStorage {
     if (/^<!-- coffee-tables-data:/m.test(raw)) {
       session = this.parseV2(raw); const backup = `${this.hidden}/backups`; await this.ensureFolder(this.hidden); await this.ensureFolder(backup);
       const backupPath = `${backup}/${session.id}-v2.md`; if (!await this.vault.adapter.exists(backupPath)) await this.writeHidden(backupPath, raw);
-      const path = this.titlePath(session.topic, session.id); if (!await this.vault.adapter.exists(this.sidecarPath(session.id))) await this.writeNewSidecar(session, path); const clean = this.encode(session);
+      const path = file.parent?.path === `${this.folder}/Archive` ? file.path : this.titlePath(session.topic, session.id); if (!await this.vault.adapter.exists(this.sidecarPath(session.id))) await this.writeNewSidecar(session, path); const clean = this.encode(session);
       await this.ensureFolder(path.split("/").slice(0, -1).join("/"));
       await this.vault.process(file, current => { if (current !== raw) throw new Error("Coffee Tables note changed during migration; original data was preserved"); return clean; }); if (path !== file.path && this.renameFile) await this.renameFile(file, path);
       this.locations.set(session.id, path); this.originals.set(session.id, clean); this.sidecarOriginals.set(session.id, JSON.stringify(this.sidecar(session, 1, path), null, 2)); this.revisions.set(session.id, 1); return session;
@@ -276,7 +281,8 @@ export class CoffeeStorage {
         const backupPath = `${backupFolder}/${session.id}-observer-history-${contentHash(current)}.md`;
         if (await this.vault.adapter.exists(backupPath)) { if (await this.vault.adapter.read(backupPath) !== current) throw new Error("Coffee Tables history backup path contains different data; the original note was preserved"); }
         else await this.writeHidden(backupPath, current);
-        clean = this.encode({ ...session, observerNotes: [serializeInsightNotes(baselineFromVersions(session.observerNotes ?? [], session.language), session.language)] });
+        const currentNotes = session.convergenceUndo ? session.observerNotes?.slice(0, 1) ?? [] : session.observerNotes ?? [];
+        clean = this.encode({ ...session, observerNotes: [serializeInsightNotes(baselineFromVersions(currentNotes, session.language), session.language)] });
       }
       const sidePath = this.sidecarPath(session.id); if (!await this.vault.adapter.exists(sidePath)) throw new Error("Coffee Tables hidden session data is missing; the Markdown note was preserved");
       const originalSidecar = this.sidecarOriginals.get(session.id)!; this.activeWrites.add(session.id);
@@ -321,6 +327,29 @@ export class CoffeeStorage {
     }
     return { moved, skipped };
   }
+  async cleanupEmptyTopicFolders(): Promise<void> {
+    const root = this.vault.getAbstractFileByPath(this.folder);
+    if (!(root instanceof TFolder)) return;
+    for (const folder of [...root.children]) {
+      if (folder instanceof TFolder && /（[a-f0-9]{8}）$/.test(folder.name) && !folder.children.length && !(await this.vault.adapter.list(folder.path)).files.length && !(await this.vault.adapter.list(folder.path)).folders.length) {
+        if (this.trashFile) await this.trashFile(folder); else await this.vault.adapter.trashLocal(folder.path);
+      }
+    }
+  }
+  async setArchived(path: string, archived: boolean): Promise<void> {
+    const file = await this.openMarkdown(path), inspected = await this.inspectReadOnly(path);
+    if (!this.renameFile) throw new Error("FileManager rename is unavailable");
+    const oldParent = file.parent;
+    const directory = archived ? `${this.folder}/Archive` : this.topicFolder(inspected.topic);
+    await this.ensureFolder(directory);
+    let target = `${directory}/${file.name}`, suffix = 2;
+    while (this.vault.getAbstractFileByPath(target) && target !== file.path) target = `${directory}/${file.basename}（${suffix++}）.md`;
+    if (target === file.path) return;
+    const side = await this.findSidecar(path, inspected.topic);
+    if (side) await this.moveManagedFile(file, side.id, target);
+    else { await this.renameFile(file, target); this.locations.set(inspected.id, target); }
+    if (oldParent && !oldParent.children.length) await this.cleanupEmptyTopicFolders();
+  }
   async delete(id: string, markdownPath?: string): Promise<string> {
     const safeId = /^[a-zA-Z0-9-]+$/.test(id) ? id : `legacy-${shortHash(id)}`, file = await this.openMarkdown(markdownPath ?? id), sidePath = `${this.hidden}/${safeId}.json`, trashFolder = `${this.hidden}/trash`, bundlePath = `${trashFolder}/${safeId}-${Date.now()}.json`;
     await this.ensureFolder(trashFolder);
@@ -342,7 +371,7 @@ export class CoffeeStorage {
     const latestSidecar = await this.vault.adapter.read(sidePath).catch(() => undefined);
     if (latestSidecar !== sideRaw) { const archived = JSON.parse(await this.readHidden(bundlePath)) as Record<string, unknown>; if (latestSidecar === undefined) delete archived.sidecar; else archived.sidecar = latestSidecar; const previousBundle = await this.readHidden(bundlePath); await this.writeHidden(bundlePath, JSON.stringify(archived, null, 2), previousBundle).catch(() => undefined); }
     if (sideRaw && latestSidecar === sideRaw) await this.vault.adapter.process(sidePath, current => { if (current !== sideRaw) throw new Error("Coffee Tables hidden data changed outside this room; deletion preserved it"); return ""; }).catch(() => undefined);
-    this.originals.delete(safeId); this.sidecarOriginals.delete(safeId); this.locations.delete(safeId); this.revisions.delete(safeId); this.deletedIds.add(id); return bundlePath;
+    this.originals.delete(safeId); this.sidecarOriginals.delete(safeId); this.locations.delete(safeId); this.revisions.delete(safeId); this.deletedIds.add(id); await this.cleanupEmptyTopicFolders().catch(() => undefined); return bundlePath;
   }
   async deletedTables(): Promise<Array<{ path: string; id: string; topic: string; deletedAt: string }>> {
     const folder = `${this.hidden}/trash`, listing = await this.vault.adapter.list(folder).catch(() => ({ files: [], folders: [] })), result: Array<{ path: string; id: string; topic: string; deletedAt: string }> = [];

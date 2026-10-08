@@ -30,7 +30,7 @@ import { ModelDiscovery, type ModelDiscoveryState } from "./core/model-discovery
 import { ShallowExpansionCoordinator, type ExpansionBatchState } from "./experiences/visual-map/expansion-batch";
 import { AiTaskService } from "./core/ai-task-service";
 import { ReframingService, providerReframeRunner } from "./core/reframing-service";
-import { receiveVisualMapHandoff } from "./experiences/visual-map/handoff";
+import { createVisualMapHandoffHandler } from "./experiences/visual-map/handoff";
 import { openCoffeeResearchHandoff } from "./experiences/coffee-tables/handoff-modal";
 import { MarkdownSelectionAi } from "./experiences/markdown-context/selection-ai";
 
@@ -169,10 +169,16 @@ export default class VisualAgentMapPlugin extends Plugin {
       }
     });
     this.ready = initialize;
-    this.register(this.core.experiences.register("visual-map", (artifact, beforeWrite) => receiveVisualMapHandoff(artifact, { repo: this.repo, defaultModel: () => this.settings.cliModel, exists: path => !!this.app.vault.getAbstractFileByPath(path), mutate: work => this.mutate(work), navigate: path => this.activateView(path), beforeWrite })));
+    this.register(this.core.experiences.register("visual-map", createVisualMapHandoffHandler({
+      repo: this.repo,
+      defaultModel: () => this.settings.cliModel,
+      exists: path => !!this.app.vault.getAbstractFileByPath(path),
+      mutate: work => this.mutate(work),
+      navigate: path => this.activateView(path)
+    })));
     this.registerView(COFFEE_TABLES_VIEW_TYPE, leaf => new CoffeeTablesView(leaf, this));
     this.coffeeStorage = new CoffeeStorage(this.app.vault, this.settings.workspaceFolder, (file, path) => this.app.fileManager.renameFile(file, path), file => this.app.fileManager.trashFile(file));
-    this.coffeeManager = new CoffeeManager(request => this.runCoffeeRequest(request), (session, summariesOnly) => this.coffeeStorage!.save(session, summariesOnly));
+    this.coffeeManager = new CoffeeManager(request => this.runCoffeeRequest(request), (session, summariesOnly) => this.coffeeStorage!.save(session, summariesOnly), sessionId => this.coffeeStorage!.load(sessionId));
     const openCoffee = (): void => { void this.activateCoffeeTables().catch((error: unknown) => new Notice(String(error))); };
     const coffeeRibbonIcon = this.addRibbonIcon("coffee", `Open ${COFFEE_TABLES_NAME}`, openCoffee);
     this.addCommand({ id: "open-coffee-tables", name: `Open ${COFFEE_TABLES_NAME}`, callback: openCoffee });
@@ -570,7 +576,7 @@ export default class VisualAgentMapPlugin extends Plugin {
       throw error;
     } finally { signal.removeEventListener("abort", abort); this.activeTasks.delete(key); }
   }
-  async openCoffeeHandoff(session: CoffeeSession, sourcePath: string, insightId?: string): Promise<void> {
+  async openCoffeeHandoff(session: CoffeeSession, sourcePath: string, insightId?: string | string[]): Promise<void> {
     try {
       if (!this.coffeeStorage) throw new Error("Coffee storage is not ready");
       await openCoffeeResearchHandoff(this, this.coffeeStorage, session, sourcePath, insightId);

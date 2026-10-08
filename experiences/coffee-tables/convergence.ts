@@ -43,11 +43,34 @@ export function enforcePinnedProposals(proposals: CoffeeConvergenceProposal[], b
   }
 }
 
-export function applyConvergenceProposals(baseline: CoffeeInsight[], proposals: CoffeeConvergenceProposal[], acceptedIndices: number[], edits: Record<number, { summary: string; detail: string }>, language: "en" | "zh-TW"): string[] {
+function preservedInsightBlocks(notes: string[]): Map<string, string> {
+  const result = new Map<string, string>();
+  const itemStart = /^(?:[-*+])\s+.*?<!--\s*coffee-insight:v1:id=([a-zA-Z0-9_-]{1,100})(?:;[^>]*)?\s*-->[^\r\n]*(?:\r?\n|$)/gm;
+  const boundaries = /^(?:[-*+]\s+|#{1,6}\s+)/gm;
+  for (const markdown of notes) {
+    const starts = [...markdown.matchAll(itemStart)];
+    const allBoundaries = [...markdown.matchAll(boundaries)];
+    for (const match of starts) {
+      const start = match.index ?? 0;
+      const boundary = allBoundaries.find(candidate => (candidate.index ?? -1) > start)?.index ?? markdown.length;
+      const block = markdown.slice(start, boundary).replace(/(?:\r?\n)+$/, "");
+      const id = match[1];
+      if (!result.has(id)) result.set(id, block);
+    }
+  }
+  return result;
+}
+
+export function applyConvergenceProposals(baseline: CoffeeInsight[], proposals: CoffeeConvergenceProposal[], acceptedIndices: number[], edits: Record<number, { summary: string; detail: string }>, language: "en" | "zh-TW", sourceNotes: string[] = []): string[] {
   const accepted = new Set(acceptedIndices);
   if ([...accepted].some(index => !Number.isInteger(index) || index < 0 || index >= proposals.length)) throw new Error("An accepted convergence proposal does not exist");
   const sourceToProposal = new Map<string, number>();
   proposals.forEach((proposal, index) => proposal.sourceIds.forEach(id => sourceToProposal.set(id, index)));
+  const rawBlocks = preservedInsightBlocks(sourceNotes), preserved = new Map<string, string>();
+  for (const item of baseline) {
+    const proposalIndex = sourceToProposal.get(item.id);
+    if ((proposalIndex === undefined || !accepted.has(proposalIndex)) && rawBlocks.has(item.id)) preserved.set(item.id, rawBlocks.get(item.id)!);
+  }
   const next: CoffeeInsight[] = [];
   const emitted = new Set<number>();
   for (const item of baseline) {
@@ -75,7 +98,7 @@ export function applyConvergenceProposals(baseline: CoffeeInsight[], proposals: 
       limitations: uniqueText(sources.map(source => source.limitations)),
     });
   }
-  return [serializeInsightNotes(next, language)];
+  return [serializeInsightNotes(next, language, preserved)];
 }
 
 function uniqueText(values: Array<string | undefined>): string | undefined {

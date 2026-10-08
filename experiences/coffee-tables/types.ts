@@ -1,6 +1,7 @@
 import type { UiLanguage } from "../../i18n";
 import type { CoffeeCustomization, CoffeeConvergenceDraft } from "./customization";
 import { convergenceSelectionRevision, normalizeCustomization } from "./customization";
+import { guestSettingsFromRoster, parseCoffeeRoster, type CoffeeRoster } from "./roster";
 
 export type GuestCategory = "experts" | "cross-domain" | "generalist" | "affected";
 export type GuestCounts = Record<GuestCategory, number>;
@@ -9,16 +10,16 @@ export interface CoffeePersonaTemplate { id: string; identity: string; category:
 export interface CoffeeGuestInvitation { id: string; name: string; category: GuestCategory; description: string }
 export interface CoffeeStyle { id: string; name: string; prompt: string; customization?: CoffeeCustomization }
 export interface CoffeeReference { name: string; content: string }
-export interface GuestSettings { counts: GuestCounts; guests: NamedGuest[]; background: string; customPrompt: string; styleId?: string; styleName?: string; stylePrompt?: string; customization?: CoffeeCustomization; referenceFiles?: CoffeeReference[]; hostCount?: number }
+export interface GuestSettings { counts: GuestCounts; guests: NamedGuest[]; roster?: CoffeeRoster; background: string; customPrompt: string; styleId?: string; styleName?: string; stylePrompt?: string; customization?: CoffeeCustomization; referenceFiles?: CoffeeReference[]; hostCount?: number }
 export interface CoffeeQuestion { summary?: string; id: string; question: string; answer: string; draftAnswer?: string; invitedGuests?: CoffeeGuestInvitation[]; status: "pending" | "complete" | "error"; error?: string; createdAt?: string }
 export interface CoffeeIntervention { id: string; kind: "comment" | "guest-question" | "redirect"; target?: string; text: string; createdAt: string; status?: "pending" | "sent" | "failed"; roundId?: string; afterTurn?: number }
-export interface CoffeeRound { summary?: string; kind?: "initial" | "continuation" | "legacy"; id: string; markdown: string; notes: string; draftMarkdown?: string; status: "generating" | "completed" | "error"; createdAt: string }
+export interface CoffeeRound { rosterSnapshot?: CoffeeRoster; summary?: string; kind?: "initial" | "continuation" | "legacy"; id: string; markdown: string; notes: string; draftMarkdown?: string; status: "generating" | "completed" | "error"; createdAt: string }
 export interface CoffeeSession {
   version: 3; id: string; topic: string; language: UiLanguage; model: string; reasoning: string;
   createdAt: string; updatedAt: string; lastGenerationStartedAt?: string; lastCompletedAt?: string; status: "ready" | "generating" | "completed" | "error";
   transcriptMarkdown: string; questions: CoffeeQuestion[]; error?: string; draftMarkdown?: string; observerDraftMarkdown?: string;
   guests?: GuestSettings; rounds?: CoffeeRound[]; observerNotes?: string[]; dirtyNotes?: boolean;
-  convergenceDraft?: CoffeeConvergenceDraft; convergenceRawDraft?: string; convergenceUndo?: { notes: string[]; expectedNotes: string[] }; pinnedInsightIds?: string[];
+  convergenceDraft?: CoffeeConvergenceDraft; convergenceRawDraft?: string; convergenceUndo?: { notes: string[]; expectedNotes: string[]; acceptedInsightIds?: string[] }; pinnedInsightIds?: string[];
   interventions?: CoffeeIntervention[];
   referenceFiles?: CoffeeReference[];
 }
@@ -43,9 +44,11 @@ function normalizedGuests(value: unknown, language: string): GuestSettings | und
     const counts = Object.fromEntries(CATEGORIES.map(key => [key, Number.isInteger(source[key]) ? Number(source[key]) : -1])) as GuestCounts;
     const guests = Array.isArray(raw.guests) ? raw.guests.filter((item): item is NamedGuest => !!item && typeof item === "object" && typeof (item as NamedGuest).id === "string" && CATEGORIES.includes((item as NamedGuest).category) && typeof (item as NamedGuest).description === "string").map(item => ({...item})) : [];
     const referenceFiles = Array.isArray(raw.referenceFiles) ? (raw.referenceFiles as unknown[]).filter(isCoffeeReference) : undefined;
+    const roster = raw.roster === undefined ? undefined : parseCoffeeRoster(raw.roster);
     // Structured sessions predate the host-count control and used two hosts.
     // New sessions carry their explicit one-host default from createSession.
-    return { counts, guests, background: typeof raw.background === "string" ? raw.background : "", customPrompt: typeof raw.customPrompt === "string" ? raw.customPrompt : "", ...(typeof raw.styleId === "string" ? { styleId: raw.styleId } : {}), ...(typeof raw.styleName === "string" ? { styleName: raw.styleName } : {}), ...(typeof raw.stylePrompt === "string" ? { stylePrompt: raw.stylePrompt } : {}), ...(raw.customization && typeof raw.customization === "object" ? { customization: normalizeCustomization(raw.customization, language) } : {}), ...(referenceFiles ? { referenceFiles } : {}), hostCount: Number.isInteger(raw.hostCount) ? Number(raw.hostCount) : 2 };
+    const settings: GuestSettings = { counts, guests, background: typeof raw.background === "string" ? raw.background : "", customPrompt: typeof raw.customPrompt === "string" ? raw.customPrompt : "", ...(typeof raw.styleId === "string" ? { styleId: raw.styleId } : {}), ...(typeof raw.styleName === "string" ? { styleName: raw.styleName } : {}), ...(typeof raw.stylePrompt === "string" ? { stylePrompt: raw.stylePrompt } : {}), ...(raw.customization && typeof raw.customization === "object" ? { customization: normalizeCustomization(raw.customization, language) } : {}), ...(referenceFiles ? { referenceFiles } : {}), hostCount: Number.isInteger(raw.hostCount) ? Number(raw.hostCount) : 2, ...(roster ? { roster } : {}) };
+    return roster ? guestSettingsFromRoster(settings, roster) : settings;
   }
   const perspectives = Array.isArray(raw.perspectives) ? raw.perspectives.filter((item): item is GuestCategory => CATEGORIES.includes(item as GuestCategory)) : CATEGORIES;
   const counts: GuestCounts = { experts: perspectives.includes("experts") ? 4 : 0, "cross-domain": perspectives.includes("cross-domain") ? 1 : 0, generalist: perspectives.includes("generalist") ? 1 : 0, affected: perspectives.includes("affected") ? 1 : 0 };
@@ -75,10 +78,16 @@ export function createSession(topic: string, model: string, reasoning: string, l
 function normalizeSession(value: Record<string, unknown>): CoffeeSession {
   const questions = Array.isArray(value.questions) ? value.questions.map(item => ({ ...(item as CoffeeQuestion), ...(Array.isArray((item as CoffeeQuestion).invitedGuests) ? { invitedGuests: (item as CoffeeQuestion).invitedGuests!.filter(guest => guest && typeof guest.id === "string" && typeof guest.name === "string" && CATEGORIES.includes(guest.category) && typeof guest.description === "string").map(guest => ({ ...guest })) } : {}), createdAt: typeof (item as CoffeeQuestion).createdAt === "string" ? (item as CoffeeQuestion).createdAt : String(value.createdAt) })) : [];
   const transcript = typeof value.transcriptMarkdown === "string" ? value.transcriptMarkdown : "";
-  const rounds = Array.isArray(value.rounds) && (value.rounds.length || !transcript) ? value.rounds as CoffeeRound[] : (transcript ? [{ id: "round-1", markdown: transcript, notes: "", status: (value.status === "completed" ? "completed" : "error") as CoffeeRound["status"], createdAt: String(value.createdAt) }] : []);
+  const rounds = (Array.isArray(value.rounds) && (value.rounds.length || !transcript) ? value.rounds as CoffeeRound[] : (transcript ? [{ id: "round-1", markdown: transcript, notes: "", status: (value.status === "completed" ? "completed" : "error") as CoffeeRound["status"], createdAt: String(value.createdAt) }] : [])).map(round => ({ ...round, ...(round.rosterSnapshot ? { rosterSnapshot: parseCoffeeRoster(round.rosterSnapshot) } : {}) }));
   const rawDraft = normalizedConvergenceDraft(value.convergenceDraft, String(value.language));
   const savedRawDraft = typeof value.convergenceRawDraft === "string" ? value.convergenceRawDraft : value.convergenceDraft && typeof value.convergenceDraft === "object" && typeof (value.convergenceDraft as { raw?: unknown }).raw === "string" ? (value.convergenceDraft as { raw: string }).raw : undefined;
   const convergenceUndo = value.convergenceUndo && typeof value.convergenceUndo === "object" && Array.isArray((value.convergenceUndo as { notes?: unknown }).notes) && Array.isArray((value.convergenceUndo as { expectedNotes?: unknown }).expectedNotes) && (value.convergenceUndo as { notes: unknown[] }).notes.every(item => typeof item === "string") && (value.convergenceUndo as { expectedNotes: unknown[] }).expectedNotes.every(item => typeof item === "string") ? { notes: [...(value.convergenceUndo as { notes: string[] }).notes], expectedNotes: [...(value.convergenceUndo as { expectedNotes: string[] }).expectedNotes] } : undefined;
+  if (convergenceUndo) {
+    const ids = (value.convergenceUndo as { acceptedInsightIds?: unknown }).acceptedInsightIds;
+    if (Array.isArray(ids) && ids.length > 0 && ids.every((id): id is string => typeof id === "string" && /^[a-zA-Z0-9_-]{1,100}$/.test(id)) && new Set(ids).size === ids.length) {
+      (convergenceUndo as CoffeeSession["convergenceUndo"])!.acceptedInsightIds = [...ids];
+    }
+  }
   return { ...(value as unknown as CoffeeSession), version: 3, guests: normalizedGuests(value.guests, String(value.language)), rounds, observerNotes: Array.isArray(value.observerNotes) ? value.observerNotes.filter((item): item is string => typeof item === "string") : [], questions, transcriptMarkdown: rounds.map(round => round.markdown).filter(Boolean).join("\n\n"), dirtyNotes: value.dirtyNotes === true, convergenceDraft: rawDraft, convergenceRawDraft: savedRawDraft, convergenceUndo, ...(Array.isArray(value.pinnedInsightIds) ? { pinnedInsightIds: [...new Set(value.pinnedInsightIds.filter((id): id is string => typeof id === "string"))] } : {}) };
 }
 export function parseSession(raw: string): AnyCoffeeSession {

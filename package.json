@@ -14,7 +14,7 @@
     "verify:vault:reinstall": "node scripts/verify-reinstall-test-vault.mjs",
     "lint": "eslint . --max-warnings=0",
     "test": "node scripts/test-harness.mjs",
-    "test:unit": "npm run compile:sample && node tests/run.cjs --layer=unit && node --test tests/compliance-gates.mjs",
+    "test:unit": "npm run compile:sample && node tests/run.cjs --layer=unit && node --test tests/coffee-roster-contract.cjs tests/coffee-customization-storage.cjs tests/coffee-customization-ui.cjs tests/coffee-vam-handoff-filesystem.cjs tests/coffee-observer-quality-contract.cjs tests/compliance-gates.mjs",
     "test:integration": "node tests/run.cjs --layer=integration && node --test tests/test-vault.mjs",
     "test:runtime": "node scripts/test-runtime.mjs",
     "test:ui": "node scripts/test-harness.mjs --ui",

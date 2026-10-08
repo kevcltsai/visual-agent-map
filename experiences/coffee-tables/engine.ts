@@ -1,12 +1,15 @@
 import { coffeeSegments, extractSegmentSummary, parseSummaryBatch } from "./segments";
 import { assembleCoffeeContext, canonicalizeObserverSourceCitations, indexObserverSourceTurns, MAX_COFFEE_CONTEXT_CHARS, observerOnlyPrompt, questionPrompt, resolveObserverSourceIds, tablePrompt } from "./prompts";
-import { type CoffeeRound, type CoffeeRuntime, type CoffeeSession } from "./types";
+import { type AnyCoffeeSession, type CoffeeGuestInvitation, type CoffeeRound, type CoffeeRuntime, type CoffeeSession } from "./types";
 import { baselineFromVersions, mergeInsightUpdates, serializeInsightNotes } from "./insights";
 import { validateGuestInvitations } from "./guest-invitations";
 import { convergenceProposalKey, convergenceSelectionRevision, normalizeCustomization, parseConvergenceProposals, validateConvergenceText, validateCustomization, type CoffeeCustomization } from "./customization";
 import { applyConvergenceProposals, convergenceFingerprint, convergencePrompt, enforcePinnedProposals } from "./convergence";
+import { effectiveRoster, guestSettingsFromRoster, validateRoster, type CoffeeRoster } from "./roster";
+import { parseRoleRecommendations, roleRecommendationPrompt } from "./role-recommendation";
 
 type SaveSession = (session: CoffeeSession, summariesOnly?: boolean) => Promise<void>;
+type LoadSession = (sessionId: string) => Promise<AnyCoffeeSession>;
 const OBSERVER_ROOT = /^# (?:觀察者整理|Observer(?:[’']s)? notes)\s*$/gm;
 const OBSERVER_SECTION = /^## (?:意外連結|值得繼續想的問題|核心分歧|探索方向|值得查證的假設|疑問與可能解方|Unexpected connections|Questions worth pursuing|Core disagreements|Directions to explore|Assumptions to verify|Questions and possible solutions)\s*$/gm;
 const STANDARD_OBSERVER_HEADINGS = {
@@ -211,27 +214,90 @@ function validateOpeningRoster(session: CoffeeSession, dialogue: string): string
 export class CoffeeEngine {
   busy = false; summarizing = false; error = "";
   private controller: AbortController | null = null; private pending: Promise<void> | null = null; private generation = 0; private deleting = false; private retired = false; private metadataWrite = false;
+  recommendationBusy = false; recommendationError = ""; private recommendationController: AbortController | null = null;
   private persistQueue: Promise<void> = Promise.resolve(); private checkpoint: number | null = null; private persistenceError = ""; private pendingWrites = 0; private sessionRevision = 0; private persistedRevision = 0;
   private steer: ((text: string) => Promise<void>) | null = null; private queuedSteers: string[] = []; private interventionTasks = new Set<Promise<void>>();
   startedAt = 0; private readonly listeners = new Set<() => void>();
-  constructor(public session: CoffeeSession, private runtime: CoffeeRuntime, private saveSession: SaveSession) {}
+  constructor(public session: CoffeeSession, private runtime: CoffeeRuntime, private saveSession: SaveSession, private loadSession?: LoadSession) {}
   get acceptsInterventions(): boolean { return this.busy && this.session.status === "generating"; }
   get persistenceFailed(): boolean { return !!this.persistenceError; }
   get deleted(): boolean { return this.retired; }
-  get safeToEvict(): boolean { return !this.busy && !this.pending && !this.metadataWrite && !this.deleting && !this.retired && this.checkpoint === null && this.pendingWrites === 0 && !this.persistenceError && this.sessionRevision === this.persistedRevision && this.listeners.size <= 1; }
+  get safeToEvict(): boolean { return !this.busy && !this.pending && !this.recommendationBusy && !this.metadataWrite && !this.deleting && !this.retired && this.checkpoint === null && this.pendingWrites === 0 && !this.persistenceError && this.sessionRevision === this.persistedRevision && this.listeners.size <= 1; }
   markUnsaved(): void { this.sessionRevision++; }
-  beginDelete(): void { if (this.retired) return; this.deleting = true; this.cancel(); this.changed(); }
+  beginDelete(): void { if (this.retired) return; this.deleting = true; this.cancel(); this.cancelRecommendations(); this.changed(); }
   cancelDelete(): void { if (!this.retired) { this.deleting = false; this.changed(); } }
-  retire(): void { this.deleting = true; this.retired = true; this.generation++; this.cancel(); this.changed(); }
+  retire(): void { this.deleting = true; this.retired = true; this.generation++; this.cancel(); this.cancelRecommendations(); this.changed(); }
   subscribe(listener: () => void): () => void { this.listeners.add(listener); return () => this.listeners.delete(listener); }
   private changed(): void { for (const listener of this.listeners) listener(); }
   private setSession(next: CoffeeSession): void { this.session = { ...next, updatedAt: new Date().toISOString() }; this.sessionRevision++; this.changed(); }
+  private adoptPersistedSession(next: CoffeeSession): void { this.session = next; this.sessionRevision++; this.persistedRevision = this.sessionRevision; this.error = ""; this.persistenceError = ""; this.changed(); }
   private engineError(english: string, traditionalChinese: string): Error { return new Error(this.session.language === "zh-TW" ? traditionalChinese : english); }
   private assertCanEditNotes(): void {
     if (this.deleting || this.retired) throw this.engineError("This Coffee Tables session is being deleted or was deleted", "這個桌聊正在刪除或已刪除。");
     if (this.session.id.startsWith("sample-")) throw this.engineError("Built-in sample sessions are read-only", "示範桌聊只能閱讀，不能修改。");
     if (this.metadataWrite || this.busy || this.pending) throw this.engineError("Wait for the current Coffee Tables operation to finish", "請等目前的桌聊操作完成後再試。");
     if (this.persistenceError) throw new Error(this.persistenceError);
+  }
+  async setRoster(roster: CoffeeRoster): Promise<void> {
+    if (this.deleting || this.retired || this.session.id.startsWith("sample-") || this.metadataWrite || this.persistenceError) throw this.engineError("This Coffee Tables roster cannot be edited right now", "目前無法編輯這桌人物名單。請稍後重試。");
+    const errors = validateRoster(roster);
+    if (errors.length) throw this.engineError("The participant total and role cards are inconsistent", "總人數與人物卡片數量不一致，或有席位設定無效。");
+    const canonicalIds = new Set(roster.cards.map(card => card.id));
+    const invited = this.session.questions.filter(question => question.status === "complete").flatMap(question => question.invitedGuests ?? []).filter(guest => !canonicalIds.has(guest.id)).length;
+    if (roster.hostCount + roster.cards.length + invited > 12) throw this.engineError("The table cannot exceed 12 participants including hosts and follow-up invitees", "這桌含主持人與後續邀請來賓最多 12 位，請先調整席位。");
+    const previous = this.session, base = previous.guests ?? { counts: { experts: 1, "cross-domain": 0, generalist: 0, affected: 1 }, guests: [], background: "", customPrompt: "", hostCount: 1 };
+    const guests = guestSettingsFromRoster(base, roster);
+    this.setSession({ ...previous, guests });
+    try { await this.flush(); } catch (error) { this.setSession({ ...this.session, guests: previous.guests }); throw error; }
+  }
+  async recommendRoster(inputRoster: CoffeeRoster = this.session.guests?.roster as CoffeeRoster, replaceIds?: readonly string[]): Promise<CoffeeRoster> {
+    if (this.deleting || this.retired || this.busy || this.pending || this.metadataWrite || this.persistenceError || this.recommendationBusy) throw this.engineError("Wait for the current Coffee Tables operation to finish", "請等目前的桌聊操作完成後再試。");
+    const roster = inputRoster;
+    if (!roster) throw this.engineError("Create a role roster before requesting recommendations", "請先建立人物席位，再請 AI 提供建議。");
+    const validation = validateRoster(roster);
+    if (validation.length) throw this.engineError("The participant total and role cards are inconsistent", "總人數與人物卡片數量不一致，或有席位設定無效。");
+    const eligible = roster.cards.filter(card => !card.locked && !card.edited && (!replaceIds || replaceIds.includes(card.id)));
+    if (!eligible.length) return roster;
+    const revision = this.sessionRevision, snapshot = this.session, controller = new AbortController();
+    this.recommendationController = controller; this.recommendationBusy = true; this.recommendationError = ""; this.changed();
+    try {
+      const raw = await this.runtime({ prompt: roleRecommendationPrompt(snapshot.topic, roster, snapshot.language, eligible.map(card => card.id)), session: snapshot, signal: controller.signal });
+      if (controller.signal.aborted || this.retired || revision !== this.sessionRevision) throw this.engineError("Recommendations were cancelled because this table changed; your edits are preserved", "聊天室已有變更，已取消過期建議；你的編輯已保留。");
+      const replacements = parseRoleRecommendations(raw, roster, eligible.map(card => card.id));
+      const cards = roster.cards.map(card => replacements.get(card.id) ?? card);
+      return { ...roster, cards };
+    } catch (error) {
+      this.recommendationError = controller.signal.aborted
+        ? (snapshot.language === "zh-TW" ? "人物建議已取消；現有名單與編輯均已保留。" : "Role recommendations were cancelled; the current roster and edits are preserved.")
+        : error instanceof Error ? error.message : String(error);
+      throw error;
+    } finally {
+      if (this.recommendationController === controller) this.recommendationController = null;
+      this.recommendationBusy = false; this.changed();
+    }
+  }
+  cancelRecommendations(): void { this.recommendationController?.abort(); }
+  async testCustomization(stylePrompt: string, customization: CoffeeCustomization): Promise<string> {
+    this.assertCanEditNotes();
+    if (this.recommendationBusy) throw this.engineError("Wait for the current Coffee Tables operation to finish", "請等目前的桌聊操作完成後再試。");
+    if (stylePrompt.length > 30_000) throw this.engineError("Conversation style must be 30,000 characters or fewer.", "聊天室風格最多 30,000 個字元。");
+    const errors = validateCustomization(customization, this.session.language);
+    if (errors.length) throw new Error(errors.join("; "));
+    const snapshot = JSON.parse(JSON.stringify(this.session)) as CoffeeSession;
+    const guests = { ...(snapshot.guests ?? { counts: { experts: 1, "cross-domain": 0, generalist: 0, affected: 1 }, guests: [], background: "", customPrompt: "" }), stylePrompt, customization: normalizeCustomization(customization, snapshot.language) };
+    const request = { ...snapshot, guests };
+    const prompt = tablePrompt(request.topic, request.language, guests) + (guests.customization.convergencePrompt.trim() ? `\n\n${request.language === "zh-TW" ? "這次設定試跑的補充整理要求" : "Additional organization requirements for this settings test"}:\n${guests.customization.convergencePrompt}` : "");
+    if (prompt.length > MAX_COFFEE_CONTEXT_CHARS) throw this.engineError("This table is too long to test safely", "這桌的內容太長，無法安全試跑。");
+    const controller = new AbortController();
+    this.metadataWrite = true; this.recommendationBusy = true; this.recommendationController = controller; this.changed();
+    try {
+      const response = await this.runtime({ prompt, session: request, signal: controller.signal });
+      if (controller.signal.aborted || this.deleting || this.retired) throw this.engineError("The settings test was cancelled; your saved table is unchanged", "設定試跑已取消；已保存的桌聊沒有變更。");
+      return response;
+    } finally {
+      if (this.recommendationController === controller) this.recommendationController = null;
+      this.metadataWrite = false; this.recommendationBusy = false; this.changed();
+    }
   }
   async setCustomization(stylePrompt: string, customization: CoffeeCustomization): Promise<void> {
     this.assertCanEditNotes();
@@ -271,7 +337,7 @@ export class CoffeeEngine {
       try {
         await this.flush(); let streamed = "";
         const response = await this.runtime({ prompt: source, session: this.session, signal: controller.signal, onText: text => { if (this.generation !== generation || controller.signal.aborted) return; streamed += text; this.setSession({ ...this.session, convergenceRawDraft: streamed }); this.scheduleCheckpoint(); } });
-        if (this.generation !== generation) return;
+        if (this.generation !== generation || controller.signal.aborted) return;
         if (controller.signal.aborted) { await this.flush().catch(saveError => this.reportPersistenceError(saveError)); return; }
         const raw = response || streamed;
         if (raw) this.setSession({ ...this.session, convergenceRawDraft: raw });
@@ -317,12 +383,31 @@ export class CoffeeEngine {
       }
     }
     let nextNotes: string[];
-    try { nextNotes = applyConvergenceProposals(baseline, proposals, acceptedIndices, edits, this.session.language); }
+    try { nextNotes = applyConvergenceProposals(baseline, proposals, acceptedIndices, edits, this.session.language, this.session.observerNotes ?? []); }
     catch (error) { if (this.session.language === "zh-TW") throw this.engineError("The convergence proposal is invalid", "整併建議格式無效，請重新整理預覽後再試。"); throw error; }
     this.metadataWrite = true;
     const previous = this.session, expectedNotes = [...nextNotes];
-    this.setSession({ ...previous, observerNotes: nextNotes, convergenceDraft: undefined, convergenceRawDraft: undefined, convergenceUndo: { notes: [...(previous.observerNotes ?? [])], expectedNotes } });
-    try { await this.flush(); } catch (error) { this.setSession(previous); throw error; } finally { this.metadataWrite = false; }
+    const acceptedInsightIds = [...new Set(acceptedIndices)].map(index => proposals[index]!.sourceIds[0]!);
+    this.setSession({ ...previous, observerNotes: nextNotes, convergenceDraft: undefined, convergenceRawDraft: undefined, convergenceUndo: { notes: [...(previous.observerNotes ?? [])], expectedNotes, acceptedInsightIds } });
+    try { await this.flush(); } catch (error) {
+      let persisted: AnyCoffeeSession | undefined;
+      if (this.loadSession) { try { persisted = await this.loadSession(previous.id); } catch { /* Keep the original failure if readback is unavailable. */ } }
+      if (persisted?.version === 3
+        && JSON.stringify(persisted.observerNotes ?? []) === JSON.stringify(expectedNotes)
+        && persisted.convergenceDraft === undefined && persisted.convergenceRawDraft === undefined
+        && JSON.stringify(persisted.convergenceUndo?.notes ?? null) === JSON.stringify(previous.observerNotes ?? [])
+        && JSON.stringify(persisted.convergenceUndo?.expectedNotes ?? null) === JSON.stringify(expectedNotes)) {
+        const acceptanceMatches = JSON.stringify(persisted.convergenceUndo?.acceptedInsightIds ?? null) === JSON.stringify(acceptedInsightIds);
+        this.adoptPersistedSession(persisted);
+        if (!acceptanceMatches) {
+          const metadataError = this.engineError("Convergence notes were saved, but accepted-insight handoff metadata could not be verified. Reopen the table before continuing.", "收斂洞見已保存，但無法驗證已接受洞見的交付資料；請重新開啟桌聊後再繼續。");
+          this.reportPersistenceError(metadataError);
+          throw metadataError;
+        }
+        return;
+      }
+      this.setSession(previous); throw error;
+    } finally { this.metadataWrite = false; }
   }
   updateConvergenceReviewState(revision: string, proposalKeys: string[], edits: Record<string, { summary: string; detail: string }>): void {
     if (this.deleting || this.retired || this.session.id.startsWith("sample-") || this.metadataWrite || this.busy || this.pending || this.persistenceError) return;
@@ -365,7 +450,7 @@ export class CoffeeEngine {
     else this.setSession({ ...this.session, draftMarkdown: text });
     this.scheduleCheckpoint();
   }
-  start(): Promise<void> { if (this.deleting || this.retired || this.session.id.startsWith("sample-") || this.metadataWrite) return Promise.resolve(); if (this.pending || this.busy) return this.pending ?? Promise.resolve(); if (this.session.status === "completed") return Promise.resolve(); if (this.session.draftMarkdown && this.recoverCompleteDraft()) return this.pending!; return this.runRound(hasAcceptedCoffeeDialogue(this.session) ? "continuation" : "initial"); }
+  start(): Promise<void> { if (this.deleting || this.retired || this.session.id.startsWith("sample-") || this.metadataWrite || this.recommendationBusy) return Promise.resolve(); if (this.pending || this.busy) return this.pending ?? Promise.resolve(); if (this.session.status === "completed") return Promise.resolve(); if (this.session.draftMarkdown && this.recoverCompleteDraft()) return this.pending!; return this.runRound(hasAcceptedCoffeeDialogue(this.session) ? "continuation" : "initial"); }
   private recoverCompleteDraft(): Promise<void> | null {
     const savedDraft = this.session.draftMarkdown ?? [...(this.session.rounds ?? [])].reverse().find(round => round.draftMarkdown)?.draftMarkdown ?? "";
     if (!COMPLETION_MARKER.test(savedDraft)) return null;
@@ -403,7 +488,7 @@ export class CoffeeEngine {
     this.setSession({ ...this.session, draftMarkdown: `${draft.trim()}\n\n<!-- coffee-tables-complete -->` });
     await this.flush(); const recovered = this.recoverCompleteDraft(); if (!recovered) return false; await recovered; return this.session.status === "completed";
   }
-  continueTable(): Promise<void> { if (this.deleting || this.retired || this.session.id.startsWith("sample-") || this.metadataWrite) return Promise.resolve(); if (this.pending || this.busy || this.session.status !== "completed") return this.pending ?? Promise.resolve(); return this.runRound("continuation"); }
+  continueTable(): Promise<void> { if (this.deleting || this.retired || this.session.id.startsWith("sample-") || this.metadataWrite || this.recommendationBusy) return Promise.resolve(); if (this.pending || this.busy || this.session.status !== "completed") return this.pending ?? Promise.resolve(); return this.runRound("continuation"); }
   refreshObserverNotes(): Promise<void> {
     if (this.deleting || this.retired || this.session.id.startsWith("sample-") || this.metadataWrite || this.pending || this.busy || this.persistenceError) return this.pending ?? Promise.resolve();
     if (this.session.status === "completed" && !hasSavedCoffeeDialogue(this.session)) return Promise.resolve();
@@ -411,10 +496,12 @@ export class CoffeeEngine {
     this.controller = controller; this.busy = true; this.startedAt = Date.now(); this.error = ""; this.persistenceError = "";
     this.setSession({ ...this.session, observerDraftMarkdown: previousObserverDraft, dirtyNotes: true, lastGenerationStartedAt: new Date().toISOString() });
     const pending = (async () => {
+      let recoverableObserverDraft = previousObserverDraft;
       try {
         await this.flush(); let streamed = previousObserverDraft;
         const response = await this.runtime({ prompt: source, session: this.session, signal: controller.signal, onText: text => { if (this.generation !== generation || controller.signal.aborted) return; streamed = appendDraft(previousObserverDraft, text); this.setSession({ ...this.session, observerDraftMarkdown: streamed, dirtyNotes: true }); this.scheduleCheckpoint(); } });
-        if (this.generation !== generation || controller.signal.aborted) return;
+        if (this.generation !== generation) return;
+        if (controller.signal.aborted) throw new Error("Observer refresh cancelled");
         let candidate = resolveObserverSourceIds(stripCompletionMarker(response), sourceMap);
         if (candidate.unresolved.length) throw new Error(this.session.language === "zh-TW" ? "觀察者來源 ID 無法對應原始發言；既有洞見已保留，草稿已保存。" : "Observer source IDs did not map to original dialogue; earlier insights are preserved and the draft is saved.");
         let notes = candidate.markdown;
@@ -424,11 +511,17 @@ export class CoffeeEngine {
           if (noteSections(candidate.markdown).length) notes = candidate.markdown;
         }
         if (!noteSections(notes).length) throw new Error(this.session.language === "zh-TW" ? "整理未完整收到；原有整理仍保留，草稿已保存。" : "The notes were incomplete. Earlier notes are preserved and the draft is saved.");
+        recoverableObserverDraft = response.trim() || streamed.trim();
+        // Persist the source-resolved candidate as a recoverable draft before
+        // replacing the published notes. A failed save must leave it available.
+        this.setSession({ ...this.session, observerDraftMarkdown: recoverableObserverDraft, dirtyNotes: true });
+        await this.flush();
+        if (this.generation !== generation || controller.signal.aborted) return;
         const previousNotes = [...(this.session.observerNotes ?? [])];
         notes = mergeObserverNotes(this.session, notes);
         this.setSession({ ...this.session, observerNotes: [notes], observerDraftMarkdown: undefined, dirtyNotes: false, error: undefined });
         try { await this.flush(); }
-        catch (error) { this.setSession({ ...this.session, observerNotes: previousNotes, observerDraftMarkdown: notes, dirtyNotes: true }); throw error; }
+        catch (error) { this.setSession({ ...this.session, observerNotes: previousNotes, observerDraftMarkdown: recoverableObserverDraft, dirtyNotes: true }); throw error; }
       } catch (error) {
         if (this.generation === generation) { this.error = controller.signal.aborted ? (this.session.language === "zh-TW" ? "整理已停止；草稿已保存。" : "Notes stopped; the draft is saved.") : error instanceof Error ? error.message : String(error); this.setSession({ ...this.session, dirtyNotes: true }); await this.flush().catch(saveError => this.reportPersistenceError(saveError)); }
       } finally { if (this.generation === generation) { this.busy = false; this.controller = null; this.pending = null; this.changed(); } }
@@ -443,16 +536,19 @@ export class CoffeeEngine {
     // accepted opening and must not bypass the first-round roster validator.
     const isOpening = !hasAcceptedCoffeeDialogue(this.session);
     const context = kind === "continuation" && !isOpening ? assembleCoffeeContext(this.session) : "";
-    const continuingGuests = kind === "continuation" ? this.session.questions.filter(question => question.status === "complete").flatMap(question => question.invitedGuests ?? []) : [];
     if (context.length + previousDraft.length > MAX_COFFEE_CONTEXT_CHARS) return Promise.reject(new Error(this.session.language === "zh-TW" ? "這桌的內容太長，無法安全地全部交給模型。請先開新桌；舊內容已完整保留。" : "This table is too long to send safely in full. Start a new table; the existing conversation is preserved."));
-    const round: CoffeeRound = { id: roundId, kind: retryRound?.kind ?? ((this.session.rounds?.length ?? 0) === 0 ? "initial" : kind), markdown: "", notes: "", ...(previousDraft ? { draftMarkdown: previousDraft } : {}), status: "generating", createdAt: new Date().toISOString() };
+    const requestGuests = this.session.guests ? { ...this.session.guests, counts: { ...this.session.guests.counts }, guests: this.session.guests.guests.map(item => ({ ...item })), ...(this.session.guests.roster ? { roster: { ...this.session.guests.roster, cards: this.session.guests.roster.cards.map(card => ({ ...card, suggestions: [...card.suggestions] })) } } : {}) } : undefined;
+    const canonicalInviteIds = new Set(requestGuests?.roster?.cards.map(card => card.id) ?? []);
+    const continuingGuests = kind === "continuation" ? this.session.questions.filter(question => question.status === "complete").flatMap(question => question.invitedGuests ?? []).filter(guest => !canonicalInviteIds.has(guest.id)) : [];
+    const round: CoffeeRound = { id: roundId, kind: retryRound?.kind ?? ((this.session.rounds?.length ?? 0) === 0 ? "initial" : kind), ...(requestGuests?.roster ? { rosterSnapshot: requestGuests.roster } : {}), markdown: "", notes: "", ...(previousDraft ? { draftMarkdown: previousDraft } : {}), status: "generating", createdAt: new Date().toISOString() };
     this.controller = controller; this.busy = true; this.startedAt = Date.now(); this.error = "";
     this.setSession({ ...this.session, status: "generating", lastGenerationStartedAt: new Date().toISOString(), error: undefined, rounds: [...(this.session.rounds ?? []).filter(item => item.id !== roundId), round] });
     const pending = (async () => {
       try {
         await this.flush();
-        const prompt = tablePrompt(this.session.topic, this.session.language, this.session.guests, previousDraft, context, continuingGuests, isOpening && !!previousDraft);
-        const response = await this.runtime({ prompt, session: this.session, signal: controller.signal, onText: text => { if (this.generation === generation && !controller.signal.aborted) this.updateDraft(previousDraft ? `${previousDraft}\n\n${text}` : text, roundId); }, registerIntervention: steer => { if (this.generation !== generation || controller.signal.aborted) return; this.steer = steer; for (const queued of this.queuedSteers.splice(0)) void this.deliverIntervention(queued, steer, generation, controller).catch(() => undefined); } });
+        const prompt = tablePrompt(this.session.topic, this.session.language, requestGuests, previousDraft, context, continuingGuests, isOpening && !!previousDraft);
+        const requestSession = requestGuests === this.session.guests ? this.session : { ...this.session, guests: requestGuests };
+        const response = await this.runtime({ prompt, session: requestSession, signal: controller.signal, onText: text => { if (this.generation === generation && !controller.signal.aborted) this.updateDraft(previousDraft ? `${previousDraft}\n\n${text}` : text, roundId); }, registerIntervention: steer => { if (this.generation !== generation || controller.signal.aborted) return; this.steer = steer; for (const queued of this.queuedSteers.splice(0)) void this.deliverIntervention(queued, steer, generation, controller).catch(() => undefined); } });
         if (this.generation !== generation) return;
         if (controller.signal.aborted) { await this.finishInterrupted(new Error("Generation stopped"), generation, controller, roundId); return; }
         const streamedDraft = this.session.draftMarkdown ?? "";
@@ -469,7 +565,7 @@ export class CoffeeEngine {
           } else if (await this.recoverResolvedStreamDraft(previousDraft)) return;
           else throw new Error(this.session.language === "zh-TW" ? "對談已收到，但觀察者整理格式不完整；本段已保留草稿，舊整理仍保留。" : "The conversation arrived without a complete observer summary. This segment is saved as a draft; earlier notes are kept.");
         }
-        if (isOpening) { const rosterError = validateOpeningRoster(this.session, dialogue); if (rosterError) throw new Error(rosterError); }
+        if (isOpening) { const rosterSession = requestGuests?.roster ? { ...this.session, guests: requestGuests } : this.session; const rosterError = validateOpeningRoster(rosterSession, dialogue); if (rosterError) throw new Error(rosterError); }
         notes = mergeObserverNotes(this.session, notes);
         const resumedDialogue = previousDraft && !isOpening ? splitObserverNotes(previousDraft).dialogue : "";
         const completed = (this.session.rounds ?? []).map(item => item.id === roundId ? { ...item, markdown: [resumedDialogue, dialogue].filter(Boolean).join("\n\n"), summary: segmentResult.summary, notes, draftMarkdown: undefined, status: "completed" as const } : item).map(item => previousDraft && item.id !== roundId && item.draftMarkdown ? { ...item, draftMarkdown: undefined } : item).filter(item => item.markdown || item.status !== "error" || item.draftMarkdown);
@@ -503,12 +599,14 @@ export class CoffeeEngine {
     else if (id) this.setSession({ ...this.session, status: "error", error: this.error || "Generation stopped", rounds: (this.session.rounds ?? []).map(item => item.id === id ? { ...item, status: "error" } : item) });
     try { await this.flush(); } catch (saveError) { this.reportPersistenceError(saveError); }
   }
-  async ask(question: string, id: string = crypto.randomUUID(), invitedGuests: import("./types").CoffeeGuestInvitation[] = []): Promise<void> {
+  async ask(question: string, id: string = crypto.randomUUID(), invitedGuests: CoffeeGuestInvitation[] = []): Promise<void> {
     if (this.session.id.startsWith("sample-") || this.metadataWrite || this.pending || this.busy || this.session.status !== "completed") return;
     const value = question.trim(); if (!value || this.deleting || this.retired) return;
     const existing = this.session.questions.find(item => item.id === id), previousDraft = existing?.draftAnswer ?? "", invitationSnapshot = invitedGuests.length ? invitedGuests : existing?.invitedGuests ?? [], entry = existing ? { ...existing, question: value, invitedGuests: invitationSnapshot, status: "pending" as const, error: undefined } : { id, question: value, answer: "", invitedGuests: invitationSnapshot, status: "pending" as const, createdAt: new Date().toISOString() };
     const existingNames = [...[this.session.transcriptMarkdown, ...(this.session.rounds ?? []).map(round => round.markdown), ...this.session.questions.map(item => item.answer)].join("\n").matchAll(/^###\s+([^｜|\n]+)[｜|]/gm)].map(match => match[1].trim());
-    const invitationError = validateGuestInvitations(invitationSnapshot, this.session.guests?.counts ?? { experts: 4, "cross-domain": 1, generalist: 1, affected: 1 }, this.session.questions, id, existingNames, this.session.language);
+    const currentSettings = this.session.guests;
+    const currentRoster = currentSettings ? effectiveRoster(currentSettings) : undefined;
+    const invitationError = validateGuestInvitations(invitationSnapshot, currentSettings?.counts ?? { experts: 4, "cross-domain": 1, generalist: 1, affected: 1 }, this.session.questions, id, existingNames, this.session.language, currentRoster?.hostCount ?? 1, currentRoster?.cards.map(card => card.id) ?? []);
     if (invitationError) throw new Error(invitationError);
     const generation = ++this.generation, controller = new AbortController(); this.controller = controller; this.busy = true; this.startedAt = Date.now(); this.error = ""; this.steer = null; this.queuedSteers = []; this.persistenceError = "";
     this.setSession({ ...this.session, lastGenerationStartedAt: new Date().toISOString(), questions: existing ? this.session.questions.map(item => item.id === id ? entry : item) : [...this.session.questions, entry] });
@@ -521,7 +619,16 @@ export class CoffeeEngine {
       notes = mergeObserverNotes(this.session, notes);
       const previousDialogue = splitObserverNotes(previousDraft).dialogue;
       const answer = appendDraft(previousDialogue, dialogue);
-      this.setSession({ ...this.session, questions: this.session.questions.map(item => item.id === id ? { ...item, answer, summary: segmentResult.summary ?? item.summary, draftAnswer: undefined, status: "complete", error: undefined } : item), observerNotes: [notes], dirtyNotes: false, lastCompletedAt: new Date().toISOString() }); await this.flush();
+      let guests = this.session.guests;
+      if (invitationSnapshot.length) {
+        const base = guests ?? { counts: { experts: 1, "cross-domain": 0, generalist: 0, affected: 1 }, guests: [], background: "", customPrompt: "", hostCount: 1 };
+        const roster = effectiveRoster(base), known = new Set(roster.cards.map(card => card.id));
+        const successfulInvites = [...this.session.questions.filter(question => question.status === "complete" && question.id !== id).flatMap(question => question.invitedGuests ?? []), ...invitationSnapshot];
+        const uniqueInvites = [...new Map(successfulInvites.map(guest => [guest.id, guest])).values()];
+        const additions = uniqueInvites.filter(guest => !known.has(guest.id)).map(guest => ({ id: guest.id, category: guest.category, roleName: guest.name, personaRole: "", source: "custom" as const, description: guest.description, style: "", prompt: "", suggestions: [], locked: false, edited: true }));
+        if (additions.length) guests = guestSettingsFromRoster(base, { ...roster, totalParticipants: roster.totalParticipants + additions.length, cards: [...roster.cards, ...additions] });
+      }
+      this.setSession({ ...this.session, guests, questions: this.session.questions.map(item => item.id === id ? { ...item, answer, summary: segmentResult.summary ?? item.summary, draftAnswer: undefined, status: "complete", error: undefined } : item), observerNotes: [notes], dirtyNotes: false, lastCompletedAt: new Date().toISOString() }); await this.flush();
     } catch (error) { await this.finishInterrupted(error, generation, controller, undefined, id); }
       finally { if (this.generation === generation) { this.busy = false; this.controller = null; this.pending = null; this.steer = null; this.queuedSteers = []; this.changed(); } } })(); this.pending = pending; await pending;
   }
@@ -544,11 +651,11 @@ export class CoffeeEngine {
     } catch (error) { if (generation === this.generation) this.error = controller.signal.aborted ? (this.session.language === "zh-TW" ? "摘要已取消；原資料保留。" : "Summaries cancelled; existing data is preserved.") : error instanceof Error ? error.message : String(error);
     } finally { if (generation === this.generation) { this.busy = false; this.summarizing = false; this.controller = null; this.pending = null; this.changed(); } } })(); this.pending = pending; return pending;
   }
-  cancel(): void { this.controller?.abort(); }
+  cancel(): void { this.controller?.abort(); this.cancelRecommendations(); }
   async stop(): Promise<void> { this.cancel(); await this.pending; await Promise.allSettled([...this.interventionTasks]); if (this.checkpoint !== null) await this.flush().catch(error => this.reportPersistenceError(error)); await this.persistQueue.catch(error => this.reportPersistenceError(error)); }
 }
 export class CoffeeManager {
-  private readonly maxIdleEngines = 3; private engines = new Map<string, CoffeeEngine>(); private retained = new Map<CoffeeEngine, number>(); private cacheSubscriptions = new Map<CoffeeEngine, () => void>(); private deletingIds = new Set<string>(); private deletedIds = new Set<string>(); constructor(private runtime: CoffeeRuntime, private saveSession: SaveSession) {}
+  private readonly maxIdleEngines = 3; private engines = new Map<string, CoffeeEngine>(); private retained = new Map<CoffeeEngine, number>(); private cacheSubscriptions = new Map<CoffeeEngine, () => void>(); private deletingIds = new Set<string>(); private deletedIds = new Set<string>(); constructor(private runtime: CoffeeRuntime, private saveSession: SaveSession, private loadSession?: LoadSession) {}
   private touch(engine: CoffeeEngine): void { if (this.engines.get(engine.session.id) === engine) { this.engines.delete(engine.session.id); this.engines.set(engine.session.id, engine); } }
   private evict(engine: CoffeeEngine): void { if (this.engines.get(engine.session.id) !== engine) return; this.engines.delete(engine.session.id); this.cacheSubscriptions.get(engine)?.(); this.cacheSubscriptions.delete(engine); }
   private prune(protectedEngine?: CoffeeEngine): void {
@@ -559,7 +666,7 @@ export class CoffeeManager {
       this.evict(candidate); idle = idle.filter(engine => engine !== candidate);
     }
   }
-  open(session: CoffeeSession): CoffeeEngine { if (this.deletingIds.has(session.id) || this.deletedIds.has(session.id)) throw new Error("This Coffee Tables session is being deleted or was deleted; reload it after restoring it"); const cached = this.engines.get(session.id); if (cached) { this.touch(cached); this.prune(cached); return cached; } const recoveredGenerating = session.status === "generating"; if (recoveredGenerating) session = { ...session, status: "error", error: "Generation stopped when Obsidian closed; saved draft is available." }; const engine = new CoffeeEngine(session, this.runtime, this.saveSession); if (recoveredGenerating) engine.markUnsaved(); this.engines.set(session.id, engine); this.cacheSubscriptions.set(engine, engine.subscribe(() => this.prune())); this.prune(engine); if (session.status === "error") void engine.persistCurrent().catch(error => engine.reportPersistenceError(error)); return engine; }
+  open(session: CoffeeSession): CoffeeEngine { if (this.deletingIds.has(session.id) || this.deletedIds.has(session.id)) throw new Error("This Coffee Tables session is being deleted or was deleted; reload it after restoring it"); const cached = this.engines.get(session.id); if (cached) { this.touch(cached); this.prune(cached); return cached; } const recoveredGenerating = session.status === "generating"; if (recoveredGenerating) session = { ...session, status: "error", error: "Generation stopped when Obsidian closed; saved draft is available." }; const engine = new CoffeeEngine(session, this.runtime, this.saveSession, this.loadSession); if (recoveredGenerating) engine.markUnsaved(); this.engines.set(session.id, engine); this.cacheSubscriptions.set(engine, engine.subscribe(() => this.prune())); this.prune(engine); if (session.status === "error") void engine.persistCurrent().catch(error => engine.reportPersistenceError(error)); return engine; }
   retain(engine: CoffeeEngine): void { this.retained.set(engine, (this.retained.get(engine) ?? 0) + 1); this.touch(engine); }
   release(engine: CoffeeEngine): void { const count = this.retained.get(engine) ?? 0; if (count <= 1) this.retained.delete(engine); else this.retained.set(engine, count - 1); this.prune(); }
   forget(id: string): boolean { const engine = this.engines.get(id); if (!engine) return true; if ((this.retained.get(engine) ?? 0) > 1) return false; this.evict(engine); return true; }

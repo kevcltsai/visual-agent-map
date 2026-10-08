@@ -12,11 +12,14 @@ export function validateGuestInvitations(
   retryQuestionId?: string,
   existingNames: string[] = [],
   language: "zh-TW" | "en" = "zh-TW",
+  hostCount = 0,
+  canonicalRosterIds: string[] = [],
 ): string | null {
   const message = (zh: string, en: string): string => language === "zh-TW" ? zh : en;
   const baseTotal = countGuests(baseCounts);
-  if (baseTotal < 1 || baseTotal > 12) return message("這桌原有來賓人數設定無效。", "The existing guest count is invalid.");
-  const active = questions.filter(question => question.status === "complete" && question.id !== retryQuestionId).flatMap(question => question.invitedGuests ?? []);
+  if (baseTotal < 1 || baseTotal + hostCount > 12) return message("這桌原有人數設定無效（總數含主持人）。", "The existing participant count is invalid; the total includes hosts.");
+  const canonicalIds = new Set(canonicalRosterIds);
+  const active = questions.filter(question => question.status === "complete" && question.id !== retryQuestionId).flatMap(question => question.invitedGuests ?? []).filter(guest => !canonicalIds.has(guest.id));
   const activeIds = new Set<string>();
   const activeNames = new Set(existingNames.map(key).filter(Boolean));
   const activeCounts: Record<GuestCategory, number> = { ...baseCounts };
@@ -40,7 +43,7 @@ export function validateGuestInvitations(
     candidateNames.add(normalizedName);
     candidateCounts[guest.category]++;
   }
-  if (baseTotal + activeIds.size + candidateIds.size > 12) return message("這桌最多 12 位來賓；請減少邀請人數。", "A table can have at most 12 guests. Remove some invitations.");
+  if (baseTotal + hostCount + activeIds.size + candidateIds.size > 12) return message("總人數含主持人最多 12 位；請減少邀請人數。", "The total, including hosts, is capped at 12. Remove some invitations.");
   const overLimit = CATEGORIES.find(category => candidateCounts[category] > 8);
   if (overLimit) return message("每類最多 8 位來賓；請調整邀請類別。", "Each guest perspective is limited to 8 people. Change the category.");
   return null;

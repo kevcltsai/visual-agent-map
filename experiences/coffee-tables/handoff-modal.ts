@@ -1,15 +1,14 @@
 import { Modal, type App } from "obsidian";
 import { randomUUID } from "node:crypto";
 import type VisualAgentMapPlugin from "../../main";
-import { createThinkingArtifact } from "../../core/thinking-artifact";
 import { isHandoffWriteError, type ExperienceHandoffResult } from "../../core/experience-router";
 import { normalizeReasoningLevel } from "../../ai/task-policy";
-import { buildCoffeeSource, coffeeCommittedKey, type CoffeeSource } from "./handoff-source";
+import { buildCoffeeSource, coffeeCommittedKey, createCoffeeHandoffArtifact, type CoffeeSource } from "./handoff-source";
 import type { CoffeeSession } from "./types";
 import type { CoffeeHandoffSnapshot, CoffeeStorage } from "./storage";
 import { syncModelSelect } from "../../core/model-discovery";
 
-export async function openCoffeeResearchHandoff(plugin: VisualAgentMapPlugin, store: CoffeeStorage, displayed: CoffeeSession, path: string, insightId?: string): Promise<CoffeeHandoffModal> {
+export async function openCoffeeResearchHandoff(plugin: VisualAgentMapPlugin, store: CoffeeStorage, displayed: CoffeeSession, path: string, insightId?: string | string[]): Promise<CoffeeHandoffModal> {
   const displayedKey = coffeeCommittedKey(displayed);
   if (plugin.coffeeManager?.get(displayed.id)?.busy) throw new Error("Wait for this table to finish.");
   const snapshot = await store.handoffSnapshot(path, displayed.id);
@@ -151,13 +150,11 @@ export class CoffeeHandoffModal extends Modal {
       }
       await this.assertSource();
       const path = this.snapshot.path;
-      const artifact = createThinkingArtifact({
-        id: this.operationId, kind: "question", title,
-        content: [this.context.value.trim(), this.rationale ? `Reframing rationale:\n${this.rationale}` : ""].filter(Boolean).join("\n\n"),
-        sourceSnapshot: this.source.sourceSnapshot,
-        origin: { experience: "coffee-tables", sessionId: this.snapshot.session.id, path },
-        sources: [{ label: this.snapshot.session.topic, path, experience: "coffee-tables", sessionId: this.snapshot.session.id, artifactId: this.source.artifactId }],
-        metadata: { model: this.model.value, reasoning: this.reasoning.value, reframingMethod: this.method, sourceIdentityKind: this.source.identityKind }
+      const content = [this.context.value.trim(), this.rationale ? `Reframing rationale:\n${this.rationale}` : ""].filter(Boolean).join("\n\n");
+      const artifact = createCoffeeHandoffArtifact({
+        sessionId: this.snapshot.session.id, sourcePath: path, topic: this.snapshot.session.topic,
+        source: this.source, question: title, content, model: this.model.value,
+        reasoning: this.reasoning.value, language: this.language.value, reframingMethod: this.method
       });
       const result = await this.plugin.core.experiences.handoff({ target: "visual-map", artifact, beforeWrite: () => this.assertSource() });
       if (!result) throw new Error("Research handoff did not return saved target paths");

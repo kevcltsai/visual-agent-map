@@ -28,8 +28,8 @@ const CATEGORY_ALIASES: Record<string, CoffeeInsightCategory> = {
   "unexpected connections": "connections", "questions worth pursuing": "questions", "core disagreements": "disagreements", "directions to explore": "directions", "assumptions to verify": "assumptions", "questions and possible solutions": "solutions",
   "main discussion shift": "connections", "latest shift": "connections", "revised assumptions": "assumptions", "assumptions challenged or revised": "assumptions", "questions to pursue": "questions", "unresolved core disagreements": "disagreements",
 };
-const MARKER = /<!--\s*coffee-insight:(v1:([^\s>]+)|(keep|update|merge):([^\s>]+))\s*-->/i;
-const ALL_MARKERS = /<!--\s*coffee-insight:(v1:([^\s>]+)|(keep|update|merge):([^\s>]+))\s*-->/gi;
+const MARKER = /<!--\s*coffee-insight:(v1:([^\s>]+)|(new|keep|update|merge)(?::([^\s>]+))?)\s*-->/i;
+const ALL_MARKERS = /<!--\s*coffee-insight:(v1:([^\s>]+)|(new|keep|update|merge)(?::([^\s>]+))?)\s*-->/gi;
 const SOURCE_MARKER = /<!--\s*source:\s*([\s\S]*?)\s*-->/gi;
 const ROOT = /^# (?:觀察者整理|Observer(?:[’']s)? notes)\s*$/mi;
 const ID_PATTERN = /^[a-zA-Z0-9_-]{1,100}$/;
@@ -98,6 +98,8 @@ function parseOne(markdown: string): CoffeeInsight[] {
   let current: CoffeeInsight | undefined;
   let legacyInsightHeader = false;
   let legacyGrouped = false;
+  let pendingNew = false;
+  let pendingSources: string[] = [];
   let fence: { marker: string; width: number } | undefined;
   const items: CoffeeInsight[] = [];
   const flush = (): void => { if (current?.summary && category) items.push({ ...current, category }); current = undefined; legacyInsightHeader = false; };
@@ -113,9 +115,23 @@ function parseOne(markdown: string): CoffeeInsight[] {
       flush();
       category = CATEGORY_ALIASES[(heading[1] ?? heading[2]).trim().replace(/^\*\*|\*\*$/g, "").toLocaleLowerCase()];
       legacyGrouped = false;
+      pendingNew = false;
+      pendingSources = [];
       continue;
     }
     const list = /^\s{0,3}[-*+]\s+(.+?)\s*$/.exec(line);
+    if (!list) {
+      const markers = [...line.matchAll(ALL_MARKERS)];
+      const sourceMarkers = [...line.matchAll(SOURCE_MARKER)];
+      const withoutMetadata = line.replace(ALL_MARKERS, "").replace(SOURCE_MARKER, "").trim();
+      if (!withoutMetadata && (markers.length || sourceMarkers.length)) {
+        if (markers.some(match => match[3]?.toLocaleLowerCase() === "new")) pendingNew = true;
+        const values = sourceMarkers.map(match => decodeInsightSource(match[1].trim()));
+        if (current && !pendingNew) current.sources = unique([...current.sources, ...values]);
+        else pendingSources = unique([...pendingSources, ...values]);
+        continue;
+      }
+    }
     if (list && !/^\s{2,}/.test(line) && (legacyGrouped || !category)) {
       if (legacyGrouped) { flush(); category = undefined; }
       const header = splitInsightText(list[1]).summary.replace(/^\*\*|\*\*$/g, "").trim().toLocaleLowerCase();
@@ -155,20 +171,28 @@ function parseOne(markdown: string): CoffeeInsight[] {
         category,
         summary: value.summary,
         detail: "",
-        sources: value.sources,
+        sources: unique([...pendingSources, ...value.sources]),
         mergedIds: unique(mergedField?.split(",") ?? []).filter(id => ID_PATTERN.test(id)),
       };
-      if (marker?.[3] === "keep" || marker?.[3] === "update" || marker?.[3] === "merge") {
-        const targets = marker[4].split(",").map(id => id.trim());
-        if (!targets.length || targets.some(id => !ID_PATTERN.test(id))) throw new Error("Invalid observer insight reference");
-        if (marker[3] === "keep" && targets.length !== 1) throw new Error("Invalid observer insight keep reference");
-        if (marker[3] === "update" && targets.length !== 1) throw new Error("Invalid observer insight update reference");
-        if (marker[3] === "merge" && targets.length < 2) throw new Error("Invalid observer insight merge reference");
-        current.mergedIds = targets;
-        (current as CoffeeInsight & { action?: string }).action = marker[3];
+      const action = marker?.[3]?.toLocaleLowerCase() ?? (pendingNew ? "new" : undefined);
+      pendingNew = false;
+      pendingSources = [];
+      if (action === "new" || action === "keep" || action === "update" || action === "merge") {
+        if (action === "new") (current as CoffeeInsight & { action?: string }).action = "new";
+        else {
+          const targets = (marker?.[4] ?? "").split(",").map(id => id.trim());
+          if (!targets.length || targets.some(id => !ID_PATTERN.test(id))) throw new Error("Invalid observer insight reference");
+          if (action === "keep" && targets.length !== 1) throw new Error("Invalid observer insight keep reference");
+          if (action === "update" && targets.length !== 1) throw new Error("Invalid observer insight update reference");
+          if (action === "merge" && targets.length < 2) throw new Error("Invalid observer insight merge reference");
+          current.mergedIds = targets;
+          (current as CoffeeInsight & { action?: string }).action = action;
+        }
       }
       continue;
     }
+    const startsNewParagraph = !!(category && pendingNew && !list && line.trim());
+    if (startsNewParagraph) flush();
     if (current) {
       const sourceLine = [...line.matchAll(SOURCE_MARKER)].map(match => decodeInsightSource(match[1].trim()));
       if (sourceLine.length) current.sources = unique([...current.sources, ...sourceLine]);
@@ -189,7 +213,10 @@ function parseOne(markdown: string): CoffeeInsight[] {
       const summary = value.summary.replace(/^>\s?/, "").trim();
       if (summary) {
         const sentence = summary.match(/^.{1,180}?(?:[。！？.!?](?=\s|$)|$)/u)?.[0]?.trim() || summary.slice(0, 180);
-        current = { id: newId(), category, summary: sentence, detail: summary === sentence ? "" : summary, sources: value.sources, mergedIds: [] };
+        current = { id: newId(), category, summary: sentence, detail: summary === sentence ? "" : summary, sources: unique([...pendingSources, ...value.sources]), mergedIds: [] };
+        if (startsNewParagraph) (current as CoffeeInsight & { action?: string }).action = "new";
+        pendingNew = false;
+        pendingSources = [];
       }
     }
   }
@@ -199,7 +226,7 @@ function parseOne(markdown: string): CoffeeInsight[] {
 
 export function baselineFromVersions(versions: string[], language: "zh-TW" | "en"): CoffeeInsight[] {
   const result: CoffeeInsight[] = [];
-  const byText = new Map<string, CoffeeInsight>();
+  const byId = new Map<string, CoffeeInsight>();
   for (const version of versions) {
     let parsed = parseOne(version);
     if (!parsed.length) {
@@ -211,8 +238,9 @@ export function baselineFromVersions(versions: string[], language: "zh-TW" | "en
     }
     for (const insight of parsed) {
     if (!insight.summary) continue;
-    const key = `${insight.category}:${normalize(insight.summary)}`;
-    const previous = byText.get(key);
+    const previous = (insight.persistedId ? byId.get(insight.id) : undefined) ?? result.find(item =>
+      item.category === insight.category && normalize(item.summary) === normalize(insight.summary) &&
+      (!item.sources.length || !insight.sources.length || exactSourceSetMatch(item.sources, insight.sources)));
     if (previous) {
       previous.sources = unique([...previous.sources, ...insight.sources]);
       previous.detail = [previous.detail, insight.detail].filter(Boolean).filter((value, index, values) => values.indexOf(value) === index).join("\n");
@@ -228,7 +256,7 @@ export function baselineFromVersions(versions: string[], language: "zh-TW" | "en
       while (existingIds.has(legacyId(insight.category, insight.summary, salt))) salt++;
       insight.id = legacyId(insight.category, insight.summary, salt);
     }
-    byText.set(key, insight);
+    byId.set(insight.id, insight);
     result.push(insight);
     }
   }
@@ -250,8 +278,9 @@ export function mergeInsightUpdates(current: CoffeeInsight[], generated: string,
   const seenTargets = new Set<string>();
   for (const item of proposed) {
     const action = (item as CoffeeInsight & { action?: string }).action;
-    if (!action) {
-      const duplicate = active.find(existing => nearDuplicate(existing, item));
+    if (!action || action === "new") {
+      const duplicate = active.find(existing => nearDuplicate(existing, item) &&
+        (!existing.sources.length || !item.sources.length || exactSourceSetMatch(existing.sources, item.sources)));
       if (duplicate) {
         duplicate.sources = unique([...duplicate.sources, ...item.sources]);
         continue;
@@ -303,7 +332,7 @@ export function mergeInsightUpdates(current: CoffeeInsight[], generated: string,
   return active;
 }
 
-export function serializeInsightNotes(insights: CoffeeInsight[], language: "zh-TW" | "en"): string {
+export function serializeInsightNotes(insights: CoffeeInsight[], language: "zh-TW" | "en", preservedBlocks: ReadonlyMap<string, string> = new Map()): string {
   const root = language === "zh-TW" ? "觀察者整理" : "Observer’s notes";
   const lines = [`# ${root}`, ""];
   const order: CoffeeInsightCategory[] = ["connections", "questions", "disagreements", "directions", "assumptions", "solutions"];
@@ -312,6 +341,8 @@ export function serializeInsightNotes(insights: CoffeeInsight[], language: "zh-T
     if (category === "solutions" && !entries.length) continue;
     lines.push(`## ${categoryTitle(category, language)}`, "");
     for (const item of entries) {
+      const preserved = preservedBlocks.get(item.id);
+      if (preserved !== undefined) { lines.push(preserved); continue; }
       const merged = item.mergedIds.length ? `;merged=${unique(item.mergedIds).join(",")}` : "";
       const sources = unique(item.sources).map(source => ` <!-- source: ${encodeInsightSource(source)} -->`).join("");
       lines.push(`- ${item.summary} <!-- coffee-insight:v1:id=${item.id}${merged} -->${sources}`);

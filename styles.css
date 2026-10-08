@@ -510,6 +510,8 @@ body .workspace-leaf-content.vam-topic-markdown .markdown-source-view.mod-cm6 .m
 .ct-style-actions { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
 .ct-style-actions button { height: auto; min-height: 34px; white-space: normal; }
 .ct-style-actions button:first-child { flex-basis: 100%; margin-bottom: 4px; }
+@media (max-width: 600px) { .ct-style-fields { grid-template-columns: minmax(0, 1fr); } }
+
 
 .ct-live-holding { min-height: var(--ct-live-held-height, 0px); }
 .ct-insight-category { margin: 1.1em 0 .45em; font-size: 1.05em; }
@@ -576,3 +578,17 @@ body .workspace-leaf-content.vam-topic-markdown .markdown-source-view.mod-cm6 .m
 .ct-protected-rules { margin-top:16px; color:var(--text-muted); }
 .ct-convergence-proposal { padding:16px 0; border-bottom:1px solid var(--background-modifier-border); }
 .ct-convergence-proposal label { margin-top:10px; }
+
+.ct-participant-total { margin:14px 0; padding:14px; border:1px solid var(--background-modifier-border); border-radius:var(--radius-m); }
+.ct-participant-total label, .ct-role-card label, .ct-persona-library-row { display:flex; flex-direction:column; gap:6px; }
+.ct-participant-total select { max-width:180px; }
+.modal.ct-roster-editor-modal, .modal.ct-roster-editor-modal .modal-content { width:min(920px,calc(100vw - 32px)); max-width:calc(100vw - 32px); }
+.ct-roster-editor-modal .modal-content { max-height:88vh; overflow-y:auto; }
+.ct-roster-editor-cards { display:grid; grid-template-columns:repeat(auto-fit,minmax(min(100%,340px),1fr)); gap:12px; }
+.ct-role-card, .ct-persona-library-row { min-width:0; padding:14px; border:1px solid var(--background-modifier-border); border-radius:var(--radius-m); }
+.ct-role-card textarea, .ct-persona-library-row textarea { box-sizing:border-box; width:100%; resize:vertical; }
+.ct-role-card-heading, .ct-role-suggestions, .ct-persona-template-row, .ct-add-role-seat { display:flex; flex-wrap:wrap; align-items:center; gap:8px; margin:8px 0; }
+.ct-role-card-heading strong { flex:1 1 100%; }
+.ct-role-card .ct-role-lock { flex-direction:row; align-items:center; }
+.ct-persona-library-rows { display:grid; gap:10px; max-height:65vh; overflow:auto; }
+.ct-roster-editor-modal .modal-button-container { display:flex; flex-wrap:wrap; gap:8px; }

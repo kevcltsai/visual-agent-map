@@ -30,13 +30,14 @@ export function customizationFields(parent: HTMLElement, initial: unknown, langu
   const validate = (): void => { errors.setText(validateCustomization(read(), language).join("\n")); };
   const set = (value: unknown): void => { const current = normalizeCustomization(value, language); observer.value = current.observerPrompt; convergence.value = current.convergencePrompt; merge.value = current.mergeLevel; detail.value = current.detailLevel; for (const [key, input] of preserve) input.checked = current.preserve.includes(key as CoffeeCustomization["preserve"][number]); validate(); };
   root.addEventListener("input", () => { validate(); changed(); }); root.addEventListener("change", () => { validate(); changed(); });
-  const reset = root.createEl("button", { text: tr("Restore organization defaults", "還原整理與收斂預設") }); reset.onclick = () => { set(defaultCustomization(language)); changed(); };
+  const reset = root.createEl("button", { text: tr("Restore organization prompts", "還原整理與收斂 Prompt") }); reset.onclick = () => { const defaults = defaultCustomization(language); set({ ...read(), observerPrompt: defaults.observerPrompt, convergencePrompt: defaults.convergencePrompt }); changed(); };
   const protectedRules = root.createEl("details", { cls: "ct-protected-rules" }); protectedRules.createEl("summary", { text: tr("System rules · read only", "系統規則 · 唯讀") });
   protectedRules.createEl("p", { text: tr("The app manages insight IDs, output structure, completion checks, source links and saving. Editing instructions cannot change tool permissions or remove pinned insights.", "系統管理洞見識別碼、輸出結構、完成檢查、來源連結與保存。編輯指令不會改變工具權限，也不能刪除指定保留的洞見。") });
   set(initial); return { read, set };
 }
 
 export class CoffeeCustomizationModal extends Modal {
+  private testing = false;
   constructor(app: App, private engine: CoffeeEngine, private saveDefault: (style: string, customization: CoffeeCustomization) => Promise<void>, private reviewed: () => void, private confirmRun: (work: () => Promise<void>) => Promise<void>) { super(app); }
   onOpen(): void {
     this.modalEl.addClass("ct-customization-modal");
@@ -51,15 +52,25 @@ export class CoffeeCustomizationModal extends Modal {
     style.value = cleanChatStyle(engine.session.guests?.stylePrompt ?? [builtin, engine.session.guests?.customPrompt].filter(Boolean).join("\n\n"));
     const reset = content.createEl("button", { text: tr("Restore chat default", "還原聊天預設") }); reset.onclick = () => { style.value = builtin; };
     const fields = customizationFields(content, engine.session.guests?.customization, engine.session.language);
+    const resetPrompts = content.createEl("button", { text: tr("Reset prompts", "還原這桌 Prompt") });
+    resetPrompts.onclick = () => { const defaults = defaultCustomization(engine.session.language); style.value = builtin; fields.set({ ...fields.read(), observerPrompt: defaults.observerPrompt, convergencePrompt: defaults.convergencePrompt }); };
     const errors = content.createEl("p", { cls: "ct-error", attr: { "aria-live": "polite" } });
+    const testResult = content.createEl("textarea", { attr: { rows: "12", readonly: "true", "aria-label": tr("Settings test result", "設定試跑結果") } });
     const actions = content.createDiv("ct-customization-actions");
     const run = (label: string, action: (value: CoffeeCustomization) => Promise<void>): void => { const button = actions.createEl("button", { text: label }); button.onclick = () => { const value = fields.read(), issues = validateCustomization(value, engine.session.language); errors.setText(issues.join("\n")); if (issues.length) return; for (const item of Array.from(actions.querySelectorAll("button"))) item.disabled = true; void action(value).catch(error => errors.setText(error instanceof Error ? error.message : String(error))).finally(() => { for (const item of Array.from(actions.querySelectorAll("button"))) item.disabled = false; }); }; };
     run(tr("Apply to this table", "套用此聊天室"), async value => { await engine.setCustomization(style.value, value); new Notice(tr("Table settings saved.", "聊天室設定已保存。")); this.close(); });
     run(tr("Default for new tables", "設為新聊天室預設"), async value => { await this.saveDefault(style.value, value); new Notice(tr("Saved for new tables.", "已設為新聊天室預設。")); });
+    run(tr("Test", "試跑"), async value => {
+      const draftStyle = style.value;
+      this.testing = true; testResult.value = "";
+      try { await this.confirmRun(async () => { testResult.value = await engine.testCustomization(draftStyle, value); }); }
+      finally { this.testing = false; }
+    });
     run(tr("Preview convergence once", "只用這次：預覽收斂"), async value => { await this.confirmRun(() => engine.previewConvergence(value)); if (engine.session.convergenceDraft || engine.session.convergenceRawDraft) { this.close(); this.reviewed(); } });
     content.createEl("small", { cls: "ct-muted", text: tr("A one-time preview uses the organization and convergence settings here. Chat changes require Apply or Default.", "本次預覽只使用這裡的整理與收斂設定；聊天風格需按套用或設為預設才會保存。") });
+    content.createEl("small", { cls: "ct-muted", text: tr("Test uses the current draft settings without saving. Reset changes this draft only; Apply to this table saves it.", "試跑使用目前草稿設定，不會保存。還原只改此草稿；套用此聊天室才會保存。") });
   }
-  onClose(): void { this.contentEl.empty(); }
+  onClose(): void { if (this.testing) this.engine.cancelRecommendations(); this.contentEl.empty(); }
 }
 
 export class CoffeeConvergenceModal extends Modal {

@@ -3380,6 +3380,8 @@ test('Coffee invitation validation accepts a new guest and caps cumulative room 
   const completed = { id: 'asked-before', question: 'q', answer: 'a', status: 'complete', invitedGuests: invites(1, 'affected') };
   assert.equal(coffeeGuestInvitations.validateGuestInvitations(invites(4).map((guest, index) => ({ ...guest, id: `later-${index}`, name: `後續來賓${index}` })), counts, [completed]), null);
   assert.ok(types.parseSession(JSON.stringify({ ...types.createSession('題目', 'm', 'low', 'zh-TW'), status: 'completed', questions: [{ ...completed, createdAt: new Date().toISOString() }] })).questions[0].invitedGuests);
+  assert.match(coffeeGuestInvitations.validateGuestInvitations(invites(5), counts, [], undefined, [], 'zh-TW', 1), /總人數含主持人最多 12 位/);
+  assert.equal(coffeeGuestInvitations.validateGuestInvitations(invites(4), counts, [], undefined, [], 'zh-TW', 1), null);
 });
 test('Coffee Tables every prompt mode carries cumulative update operations and the solutions category', () => {
   const session = coffeeTypes.createSession('整桌題目', 'm', 'low', 'zh-TW');
@@ -3476,6 +3478,86 @@ test('Coffee observer source IDs resolve exactly and keep distinct reasons and n
   const unresolved = coffeePrompts.resolveObserverSourceIds('<!-- source-id:turn-999 -->', indexed.sources);
   assert.deepEqual(plain(unresolved.unresolved), ['turn-999']);
   assert.doesNotMatch(unresolved.markdown, /<!-- source:/);
+});
+test('Coffee parser keeps new insight boundaries and source groups in legacy and inline marker formats', () => {
+  const sources = new Map([
+    ['turn-001', 'The evening schedule gives working families another chance to visit.'],
+    ['turn-002', 'The evening schedule makes one-on-one support harder to staff.'],
+  ]);
+  const claim = 'An evening schedule changes access and service capacity.';
+  const reasons = [
+    'The evening schedule makes visits possible for families who finish work late.',
+    'The evening schedule leaves fewer staff available for individual support.',
+  ];
+  const legacy = [
+    '# Observer’s notes', '## Unexpected connections',
+    '<!-- coffee-insight:new -->', '<!-- source-id:turn-001 -->', `- ${claim}`, `  ${reasons[0]}`,
+    '<!-- coffee-insight:new -->', '<!-- source-id:turn-002 -->', `- ${claim}`, `  ${reasons[1]}`,
+  ].join('\n');
+  const inline = [
+    '# Observer’s notes', '## Unexpected connections',
+    `- ${claim} <!-- coffee-insight:new --> <!-- source-id:turn-001 -->`, `  ${reasons[0]}`,
+    `- ${claim} <!-- coffee-insight:new --> <!-- source-id:turn-002 -->`, `  ${reasons[1]}`,
+  ].join('\n');
+  for (const [format, raw] of [['legacy', legacy], ['inline', inline]]) {
+    const resolved = coffeePrompts.resolveObserverSourceIds(raw, sources);
+    assert.deepEqual(plain(resolved.unresolved), [], `${format} source IDs resolve`);
+    const result = coffeeInsights.mergeInsightUpdates([], resolved.markdown, 'en');
+    assert.equal(result.length, 2, `${format} keeps each same-claim insight as a separate item`);
+    assert.notEqual(result[0].id, result[1].id, `${format} gives each source group a distinct ID`);
+    assert.deepEqual(plain(result.map(item => item.detail)), reasons, `${format} keeps each reason attached to its item`);
+    assert.deepEqual(plain(result.map(item => item.sources)), [[sources.get('turn-001')], [sources.get('turn-002')]], `${format} keeps source groups item-specific`);
+  }
+});
+test('Coffee parser preserves every non-bullet marked provider paragraph and its exact source group', () => {
+  const sourceOracle = new Map([
+    ['turn-001', '我常聽到「清楚界線能讓孩子更放心地練習自主」。這個說法我也認同：孩子知道哪些事情可以自己決定，反而比較敢嘗試。'],
+    ['turn-002', '我也會說清楚界線有助孩子練習自主，但理由不太一樣：有些孩子面對每天變動的安排會不安，事先知道接送和作息的範圍，能讓他把心力留給自己選擇的部分。'],
+    ['turn-003', '我不完全同意。家長說的「清楚」有時只是把決定包裝成規則。如果孩子不能參與訂規則，規則可能讓他更不敢說出真正想法；我覺得能不能先聽孩子說，比規則多清楚更重要。'],
+    ['turn-004', '這裡可能有真正的衝突：可預測性可能幫一些孩子，但由大人單方面決定的可預測性，也可能減少孩子的發言空間。'],
+    ['turn-005', '我想到家庭資源也是條件。有時間一起協商、也能調整安排的家長，說「共同訂規則」容易些；輪班或照顧壓力大的家庭，做法可能不同。這不代表哪一類家庭比較在乎孩子。'],
+    ['turn-006', '目前我們沒有談到孩子年齡、具體規則、是否曾發生安全事件，也沒有任何資料能判斷哪一種方式普遍更好。不同孩子和家庭可能不一樣。'],
+  ]);
+  const raw = `# 觀察者整理
+## 意外連結
+<!-- coffee-insight:new -->
+事先說清楚安排，和讓孩子參與決定，可能同時重要，但各自回應不同需要：前者讓部分孩子較能預期日常，後者讓孩子有空間表達真正想法。兩者不是非此即彼，關鍵可能在於哪些事情先劃界、哪些事情能一起商量。<!-- source-id:turn-002 --><!-- source-id:turn-003 --><!-- source-id:turn-004 -->
+
+<!-- coffee-insight:new -->
+「共同訂規則」的可行性也和家庭可用的時間及照顧壓力有關；不能只看家長是否願意協商，就推斷他們在不在乎孩子。這提醒我們，討論做法時也要看家庭實際能否調整安排。<!-- source-id:turn-005 -->
+## 值得繼續想的問題
+<!-- coffee-insight:new -->
+哪些界線適合由大人先說清楚，哪些應讓孩子參與訂定？對談指出可預測性和發言空間都可能重要，但還沒有具體規則或情境可用來分辨兩者如何拿捏。<!-- source-id:turn-002 --><!-- source-id:turn-003 --><!-- source-id:turn-004 --><!-- source-id:turn-006 -->
+
+<!-- coffee-insight:new -->
+當家庭因輪班或照顧壓力而難以協商時，有沒有不必大幅增加時間、仍能聽見孩子想法並保留調整空間的做法？對談提出了資源差異，但尚未討論可能的具體做法。<!-- source-id:turn-005 -->
+## 核心分歧
+<!-- coffee-insight:new -->
+對「清楚界線」的重視背後有兩種不同理由：家長認為界線可讓孩子在明確範圍內練習自主；輔導員則指出，對某些面對日常變動會不安的孩子，預先知道接送和作息範圍能讓他們把心力留給選擇。青少年提出另一個關切：若規則由大人單方面決定，清楚不代表孩子有發言空間；目前對談沒有判定哪種考量普遍優先。<!-- source-id:turn-001 --><!-- source-id:turn-002 --><!-- source-id:turn-003 --><!-- source-id:turn-004 -->
+## 探索方向
+<!-- coffee-insight:new -->
+可從家庭中的具體規則與日常情境開始，了解孩子是否參與訂定、安排是否能調整，以及孩子對變動是否感到不安。這些是對談指出仍需釐清的面向，不代表已知的通用評估方法。<!-- source-id:turn-003 --><!-- source-id:turn-005 --><!-- source-id:turn-006 -->
+## 值得查證的假設
+<!-- coffee-insight:new -->
+目前對談沒有提供資料可判斷哪種方式普遍更好，也沒有足夠根據確認不同做法對不同孩子或家庭的效果；孩子年齡、規則內容及是否曾發生安全事件等條件都尚未交代。<!-- source-id:turn-006 -->
+## 疑問與可能解方`;
+  const resolved = coffeePrompts.resolveObserverSourceIds(raw, sourceOracle);
+  assert.deepEqual(plain(resolved.unresolved), []);
+  const parsed = coffeeInsights.mergeInsightUpdates([], resolved.markdown, 'zh-TW');
+  assert.equal(parsed.length, 7, 'each standalone new marker owns its following paragraph instead of merging with its predecessor');
+  assert.deepEqual(plain(parsed.map(item => item.category)), ['connections', 'connections', 'questions', 'questions', 'disagreements', 'directions', 'assumptions']);
+  assert.deepEqual(plain(parsed.map(item => item.sources)), [
+    ['turn-002', 'turn-003', 'turn-004'].map(id => sourceOracle.get(id)),
+    [sourceOracle.get('turn-005')],
+    ['turn-002', 'turn-003', 'turn-004', 'turn-006'].map(id => sourceOracle.get(id)),
+    [sourceOracle.get('turn-005')],
+    ['turn-001', 'turn-002', 'turn-003', 'turn-004'].map(id => sourceOracle.get(id)),
+    ['turn-003', 'turn-005', 'turn-006'].map(id => sourceOracle.get(id)),
+    [sourceOracle.get('turn-006')],
+  ], 'both same-category non-bullet paragraphs and all other marked paragraphs retain only their own exact sources');
+  const savedAndReopened = coffeeInsights.baselineFromVersions([coffeeInsights.serializeInsightNotes(parsed, 'zh-TW')], 'zh-TW');
+  assert.equal(savedAndReopened.length, 7, 'all seven items survive observer-note serialization and reload');
+  assert.deepEqual(plain(savedAndReopened.map(item => item.sources)), plain(parsed.map(item => item.sources)), 'each item’s source group survives observer-note save and reload');
 });
 test('Coffee source citation repair changes punctuation only and preserves negation, digits, and ambiguous evidence', () => {
   const { canonicalizeObserverSourceCitations } = coffeePrompts;
@@ -3718,6 +3800,57 @@ test('Coffee convergence accounts for each baseline once and applies partial pro
   await assert.rejects(staleEngine.applyConvergence([0]), /changed|refresh|已更新|重新整理/);
   assert.deepEqual(plain(staleEngine.session.observerNotes), [notes]); assert.ok(staleEngine.session.convergenceDraft);
 });
+test('Coffee partial convergence preserves an unselected insight block byte-for-byte', async () => {
+  const unselectedBlock = '- Keep this exact item. <!-- coffee-insight:v1:id=keep-me -->\n  - Reasoning: Preserve this original label and spacing.\n';
+  const notes = `# Observer’s notes\n\n## Unexpected connections\n\n- Revise this item. <!-- coffee-insight:v1:id=revise-me -->\n\n${unselectedBlock}`;
+  const proposals = [
+    { sourceIds: ['revise-me'], summary: 'A revised item.', detail: 'The proposal is accepted.', category: 'connections' },
+    { sourceIds: ['keep-me'], summary: 'Keep this exact item.', detail: 'Preserve this original label and spacing.', category: 'connections' },
+  ];
+  const session = coffeeSession(); session.status = 'completed'; session.observerNotes = [notes];
+  session.convergenceDraft = { baseFingerprint: coffeeConvergence.convergenceFingerprint(session), proposals, raw: JSON.stringify({ proposals }), createdAt: 'candidate-1', customization: coffeeCustomization.defaultCustomization(session.language) };
+  const engine = new coffee.CoffeeEngine(session, async () => assert.fail('Applying a saved proposal must not call a provider'), async () => {});
+
+  await engine.applyConvergence([0]);
+
+  assert.ok(engine.session.observerNotes[0].includes(unselectedBlock), 'unselected source Markdown must remain byte-for-byte intact');
+  assert.match(engine.session.observerNotes[0], /A revised item\./);
+});
+test('Coffee convergence keeps a failed acceptance reviewable for a safe retry', async () => {
+  const notes = '# 觀察者整理\n\n## 核心分歧\n- 原始洞見。<!-- coffee-insight:v1:id=retry-source -->';
+  const proposals = [{ sourceIds: ['retry-source'], summary: '修訂後的洞見。', detail: '保留原脈絡。', category: 'disagreements' }];
+  const session = coffeeSession(); session.status = 'completed'; session.observerNotes = [notes];
+  session.convergenceDraft = { baseFingerprint: coffeeConvergence.convergenceFingerprint(session), proposals, raw: JSON.stringify({ proposals }), createdAt: 'candidate-retry', customization: coffeeCustomization.defaultCustomization(session.language) };
+  let saveAttempts = 0;
+  const engine = new coffee.CoffeeEngine(session, async () => assert.fail('Applying a saved proposal must not call a provider'), async () => { if (saveAttempts++ === 0) throw new Error('disk temporarily unavailable'); });
+
+  await assert.rejects(engine.applyConvergence([0]), /disk temporarily unavailable/);
+  assert.deepEqual(plain(engine.session.observerNotes), [notes]);
+  assert.ok(engine.session.convergenceDraft, 'failed persistence must leave the candidate available');
+  await engine.applyConvergence([0]);
+  assert.match(engine.session.observerNotes[0], /修訂後的洞見/);
+  assert.equal(coffeeInsights.baselineFromVersions(engine.session.observerNotes, session.language).length, 1);
+});
+test('Coffee convergence adopts a committed save after fresh readback resolves a lost acknowledgment', async () => {
+  const notes = '# Observer’s notes\n\n## Core disagreements\n- Original source-linked insight. <!-- coffee-insight:v1:id=ack-source -->';
+  const session = coffeeSession(); session.status = 'completed'; session.observerNotes = [notes];
+  const proposals = [{ sourceIds: ['ack-source'], summary: 'Committed insight.', detail: 'The accepted context is durable.', category: 'disagreements' }];
+  session.convergenceDraft = { baseFingerprint: coffeeConvergence.convergenceFingerprint(session), proposals, raw: JSON.stringify({ proposals }), createdAt: session.createdAt, customization: coffeeCustomization.defaultCustomization(session.language) };
+  let durable;
+  const engine = new coffee.CoffeeEngine(session, async () => assert.fail('Applying a saved proposal must not call a provider'), async value => {
+    durable = plain(value);
+    throw new Error('controlled lost acknowledgment after durable save');
+  }, async id => { assert.equal(id, session.id); return plain(durable); });
+
+  await engine.applyConvergence([0]);
+
+  const accepted = coffeeInsights.baselineFromVersions(engine.session.observerNotes, 'en');
+  assert.equal(accepted[0].summary, 'Committed insight.');
+  assert.equal(engine.session.convergenceDraft, undefined);
+  assert.deepEqual(plain(engine.session.convergenceUndo.notes), [notes]);
+  assert.deepEqual(plain(engine.session.convergenceUndo.expectedNotes), plain(engine.session.observerNotes));
+  assert.equal(engine.safeToEvict, true, 'verified durable state is marked persisted in the engine');
+});
 integrationTest('Coffee convergence cancellation preserves the source notes and raw draft; retry can save a fresh preview', async () => {
   const notes = '# 觀察者整理\n\n## 核心分歧\n- 原始洞見仍保留。<!-- coffee-insight:v1:id=source-a -->';
   const session = coffeeSession(); session.status = 'completed'; session.observerNotes = [notes];
@@ -3766,7 +3899,7 @@ test('Coffee completed observer refresh is available for clean saved dialogue an
   assert.equal(coffee.canRefreshCompletedObserverNotes(session, true, false), false);
   assert.equal(coffee.canRefreshCompletedObserverNotes({ ...session, transcriptMarkdown: '', rounds: [] }, false, false), false);
   await engine.refreshObserverNotes();
-  assert.equal(calls, 1, 'observer refresh is the only generation request');
+  assert.equal(calls, 1, 'observer refresh uses one generation request');
   assert.match(capturedPrompt, /請清楚列出未知事項/);
   assert.match(capturedPrompt, /只更新觀察者整理，不新增或改寫對談/);
   assert.equal(engine.session.status, 'completed');
@@ -3826,7 +3959,7 @@ integrationTest('Coffee repaired output runs through observer refresh, exact-sou
   let calls = 0, capturedPrompt = '';
   const engine = new coffee.CoffeeEngine(session, async request => { calls++; capturedPrompt = request.prompt; return modelOutput; }, value => storage.save(value));
   await engine.refreshObserverNotes();
-  assert.equal(calls, 1, 'only the local runtime stub is called; no external provider is used');
+  assert.equal(calls, 1, 'the local runtime stub handles one observer refresh request; no external provider is used');
   assert.match(capturedPrompt, /coffee-turn:turn-001/);
   assert.match(capturedPrompt, /舊洞見只是待核對記錄，不是對談證據/);
   assert.doesNotMatch(capturedPrompt, /可預期作息減少部分孩子的不安/);
@@ -3852,7 +3985,7 @@ integrationTest('Coffee Tables keeps an invited guest through failed retry and l
   const engine = new coffee.CoffeeEngine(session, async request => { prompts.push(request.prompt); if (fail) throw new Error('retry this invite'); if (prompts.length === 2) return `### 林照｜受影響者\n\n夜班同仁要有可直接使用的求援窗口。\n\n${notes}`; return `### 周沐｜主持人\n\n${prompts.length === 3 ? '林照提出的窗口需要接上正式交接流程。' : '正式交接流程應列明跨班支援窗口。'}\n\n${notes}`; }, async () => {});
   await engine.ask('夜班如何找到即時支援？', 'followup-care', [invitation]); assert.equal(engine.session.questions[0].status, 'error'); assert.equal(JSON.stringify(engine.session.questions[0].invitedGuests), JSON.stringify([invitation]));
   fail = false; await engine.ask('夜班如何找到即時支援？', 'followup-care'); assert.equal(engine.session.questions.length, 1); assert.match(prompts[1], /林照[｜|].*熟悉夜班與照護資源的社工/); assert.equal(engine.session.questions[0].status, 'complete');
-  await engine.continueTable(); assert.match(prompts[2], /林照[｜|].*熟悉夜班與照護資源的社工/); assert.match(prompts[2], /求援窗口/); await engine.continueTable(); assert.match(prompts[3], /正式交接流程/); assert.equal(engine.session.observerNotes.length, 1);
+  await engine.continueTable(); assert.match(prompts[2], /林照.*熟悉夜班與照護資源的社工/); assert.equal((prompts[2].match(/身份「林照」/g) ?? []).length, 1, 'the accepted invite is included exactly once in the canonical continuation roster'); assert.equal(engine.session.guests.roster.totalParticipants, 4); assert.equal(engine.session.guests.roster.cards.some(card => card.id === invitation.id), true); assert.deepEqual(engine.session.rounds.at(-1).rosterSnapshot.cards.map(card => card.id), engine.session.guests.roster.cards.map(card => card.id)); await engine.continueTable(); assert.match(prompts[3], /正式交接流程/); assert.equal(engine.session.observerNotes.length, 1);
 });
 test('Coffee Tables inspiration topics are bilingual, deterministic in tests and avoid immediate repeats', () => {
   assert.equal(coffeeTopics.COFFEE_TOPICS.length, 20);
@@ -4486,7 +4619,7 @@ integrationTest('Coffee Tables provider adapter uses plain text while preserving
   }
 });
 function coffeeElement(tag, options = {}) {
-  return { tag, text: options.text ?? '', value: options.value ?? '', children: [], disabled: false, attrs: options.attr ?? {}, get options() { return this.children.filter(child => child.tag === 'option' || child.value !== undefined); },
+  return { tag, cls: options.cls ?? '', querySelectorAll(selector) { const result = []; const visit = node => { for (const child of node.children) { if (child.removed) continue; const attribute = /^\[([^=\]]+)(?:=["']?([^\]"']+)["']?)?\]$/.exec(selector); const matches = selector.startsWith('.') ? child.cls.split(' ').includes(selector.slice(1)) : attribute ? Object.prototype.hasOwnProperty.call(child.attrs ?? {}, attribute[1]) && (attribute[2] === undefined || String(child.attrs[attribute[1]]) === attribute[2]) : child.tag === selector; if (matches) result.push(child); visit(child); } }; visit(this); return result; }, querySelector(selector) { return this.querySelectorAll(selector)[0] ?? null; }, text: options.text ?? '', value: options.value ?? '', children: [], disabled: false, attrs: options.attr ?? {}, get options() { return this.children.filter(child => !child.removed && (child.tag === 'option' || child.value !== undefined)); },
     createDiv(value) { const element = coffeeElement('div', typeof value === 'string' ? { cls: value } : value); this.children.push(element); return element; },
     createEl(name, value) { const element = coffeeElement(name, value); this.children.push(element); return element; }, createSpan(value) { const element = coffeeElement('span', value); this.children.push(element); return element; }, addClass() {}, toggleClass() {}, removeClass() {}, setText(value) { this.text = value; }, empty() { this.children = []; }, focus() {}, remove() { this.removed = true; },
     add(option) { this.children.push(option); }, replaceChildren(...children) { this.children = children; },
@@ -4494,7 +4627,7 @@ function coffeeElement(tag, options = {}) {
     setAttribute(name, value) { this.attrs[name] = value; },
     addEventListener(name, handler) { this[name] = handler; }, get childElementCount() { return this.children.length; } };
 }
-const coffeeFind = (root, predicate) => predicate(root) ? root : root.children.map(child => coffeeFind(child, predicate)).find(Boolean);
+const coffeeFind = (root, predicate) => predicate(root) ? root : root.children.filter(child => !child.removed).map(child => coffeeFind(child, predicate)).find(Boolean);
 function withCoffeeModelDiscovery(plugin, models) {
   const states = {
     codex: { provider: 'codex', status: 'ready', models: models.filter(model => !model.startsWith('claude:')) },
@@ -4596,85 +4729,344 @@ integrationTest('Coffee opening footer transitions from live join to roster reco
 });
 
 integrationTest('Coffee Tables home form keeps discovered model and reasoning choices and disables start during discovery', async () => {
-  const { CoffeeTablesView } = load('experiences/coffee-tables/view.ts', { obsidian });
-  const plugin = withCoffeeModelDiscovery({ settings: { language: 'en', cliModel: 'm', cliReasoning: 'low' }, coffeeReasoningEfforts: model => model === 'm' ? ['low'] : ['medium', 'high'], refreshCoffeeModels: async () => ['m', 'codex-other'], confirmAiUsage: async (_model, run) => run() }, ['m', 'codex-other']);
-  const view = new CoffeeTablesView({ app: {} }, plugin); view.contentEl = coffeeElement('root'); view.store = { cleanupEmptyTopicFolders: async () => {}, list: () => [] }; await view.home();
-  const selects = []; const visit = node => { if (node.tag === 'select') selects.push(node); node.children.forEach(visit); }; visit(view.contentEl);
-  await until(() => !selects[0].disabled); assert.deepEqual(selects[0].children.map(option => option.value), ['m', 'codex-other']);
-  assert.deepEqual(selects[1].children.map(option => option.value), ['auto', 'low']);
+  class Modal { static instances = []; constructor() { this.modalEl = coffeeElement('modal'); this.contentEl = coffeeElement('content'); Modal.instances.push(this); } open() { this.onOpen?.(); } close() { this.onClose?.(); } }
+  const { CoffeeTablesView } = load('experiences/coffee-tables/view.ts', { obsidian: { ...obsidian, Modal } });
+  const persona = { id: 'saved-expert', identity: 'Avery Lin', role: 'night-shift librarian', category: 'experts', description: 'Works after school hours.', prompt: 'Ask who carries the hidden workload.' };
+  let recommendationCalls = 0;
+  const plugin = withCoffeeModelDiscovery({ settings: { language: 'en', cliModel: 'm', cliReasoning: 'low', coffeePersonas: [persona] }, coffeeReasoningEfforts: model => model === 'm' ? ['low'] : ['medium', 'high'], refreshCoffeeModels: async () => ['m', 'codex-other'], confirmAiUsage: async (_model, run) => { await run(); return true; }, runCoffeeRequest: async request => { recommendationCalls++; return JSON.stringify({ cards: request.session.guests.roster.cards.filter(card => !card.edited && !card.locked).map((card, index) => ({ category: card.category, roleName: `Fictional ${card.category} perspective ${index + 1}`, personaRole: `${card.category} worker`, description: `A fictional ${card.category} perspective.`, style: 'Patient and direct.', prompt: 'Ask who carries the hidden workload.', suggestions: [] })) }); } }, ['m', 'codex-other']);
+  const view = new CoffeeTablesView({ app: {} }, plugin); view.contentEl = coffeeElement('root');
+  const savedRoomR = { id: 'saved-room-R', topic: 'Previously saved fictional room', marker: 'must remain unchanged' };
+  const storedRooms = new Map([[savedRoomR.id, plain(savedRoomR)]]); const attachedRooms = [];
+  let storageWrites = 0, createdRoom;
+  view.store = { cleanupEmptyTopicFolders: async () => {}, list: () => [], save: async value => { storageWrites++; createdRoom = plain(value); storedRooms.set(value.id, plain(value)); } };
+  view.attach = value => attachedRooms.push(plain(value));
+  await view.home();
+  const modelSelect = coffeeFind(view.contentEl, item => item.tag === 'select' && item.attrs?.['aria-label'] === 'AI model');
+  const reasoningSelect = coffeeFind(view.contentEl, item => item.tag === 'select' && item.attrs?.['aria-label'] === 'Reasoning effort');
+  await until(() => !modelSelect.disabled); assert.deepEqual(modelSelect.children.map(option => option.value), ['m', 'codex-other']);
+  assert.deepEqual(reasoningSelect.children.map(option => option.value), ['auto', 'low']);
   const summaries = []; const findSummaries = node => { if (node.tag === 'summary') summaries.push(node.text); node.children.forEach(findSummaries); }; findSummaries(view.contentEl); assert.ok(summaries.some(text => /Adjust this table · m · 1 hosts \+ 2 guests/.test(text)));
-  selects[0].value = 'codex-other'; selects[0].change(); assert.deepEqual(selects[1].children.map(option => option.value), ['auto', 'medium', 'high']);
+  const advanced = coffeeFind(view.contentEl, item => item.cls.split(' ').includes('ct-advanced-settings')); advanced.open = true;
+  const inviteSection = coffeeFind(view.contentEl, item => item.cls.split(' ').includes('ct-invites'));
+  assert.equal(inviteSection.cls.split(' ').includes('is-hidden'), false, 'the approved saved-person picker is visible inside advanced settings');
+  const choose = coffeeFind(inviteSection, item => item.tag === 'select' && item.attrs?.['aria-label'] === 'Choose a saved person');
+  const addSelected = coffeeFind(inviteSection, item => item.tag === 'button' && item.text === 'Add selected person');
+  addSelected.click(); await new Promise(resolve => setTimeout(resolve, 0));
+  assert.equal(inviteSection.querySelectorAll('.ct-invite-row').length, 0, 'an empty selection does not add a person');
+  choose.value = persona.id; addSelected.click(); await until(() => inviteSection.querySelectorAll('.ct-invite-row').length === 1);
+  const fixedIdentity = coffeeFind(inviteSection, item => item.tag === 'strong' && item.text === persona.identity);
+  assert.ok(fixedIdentity, 'selected saved identity is a fixed label, not an editable identity field');
+  assert.equal(coffeeFind(inviteSection, item => item.attrs?.['aria-label'] === 'Person identity'), undefined);
+  assert.equal(recommendationCalls, 0, 'topic, total, and persona selection do not start AI work before an explicit assemble action');
+  const participantTotal = coffeeFind(view.contentEl, item => item.tag === 'select' && item.attrs?.['aria-label'] === 'Total participants including hosts');
+  participantTotal.value = '4'; participantTotal.change();
+  const savedRoomSnapshot = plain(storedRooms.get(savedRoomR.id));
+  modelSelect.value = 'codex-other'; modelSelect.change(); assert.deepEqual(reasoningSelect.children.map(option => option.value), ['auto', 'medium', 'high']);
+  const create = coffeeFind(view.contentEl, item => item.tag === 'button' && item.text === 'Help me assemble this table'); create.click(); await until(() => Modal.instances.length === 1);
+  const cancelledPreview = Modal.instances[0]; assert.equal(recommendationCalls, 1, 'the recommendation route starts only after explicit assemble'); assert.equal(storageWrites, 0, 'the AI suggestion preview is not a saved room');
+  const editedRole = coffeeFind(cancelledPreview.contentEl, item => item.attrs?.['data-persona-field'] === 'role'); editedRole.value = 'Edited only in cancelled preview'; editedRole.input();
+  assert.equal(cancelledPreview.working.cards.some(card => card.edited), true, 'the preview contains an edited seat before cancellation');
+  coffeeFind(cancelledPreview.contentEl, item => item.tag === 'button' && item.text === 'Cancel').onclick(); await until(() => !create.disabled);
+  assert.equal(storageWrites, 0); assert.deepEqual(plain(storedRooms.get(savedRoomR.id)), savedRoomSnapshot, 'cancelling the edited preview leaves previously saved R unchanged'); assert.deepEqual(attachedRooms, [], 'cancelling the preview does not attach a room'); assert.equal(storedRooms.size, 1, 'cancelling the preview does not create a room');
+  create.click(); await until(() => Modal.instances.length === 2);
+  const preview = Modal.instances[1]; assert.equal(storageWrites, 0, 'the second AI suggestion preview is still unpersisted');
+  assert.equal(preview.working.cards[0].roleName, persona.identity, 'pre-chat suggestion preserves the chosen saved-person label');
+  coffeeFind(preview.contentEl, item => item.tag === 'button' && item.text === 'Save table cards').onclick(); await until(() => !!createdRoom);
+  assert.deepEqual([createdRoom.guests.roster.totalParticipants, createdRoom.guests.roster.hostCount, createdRoom.guests.roster.cards.length], [4, 1, 3]);
+  assert.equal(new Set(createdRoom.guests.roster.cards.map(card => card.id)).size, 3);
+  assert.equal(new Set(createdRoom.guests.roster.cards.map(card => card.roleName)).size, 3);
+  assert.deepEqual([createdRoom.guests.roster.cards[0].roleName, createdRoom.guests.roster.cards[0].personaRole, createdRoom.guests.roster.cards[0].templateId], [persona.identity, persona.role, persona.id]);
+  assert.equal(recommendationCalls, 2, 'each explicit assemble requests recommendations once');
 });
-integrationTest('Coffee persona picker requires an explicit add, persists fictional templates, and snapshots room edits across reopen', async () => {
-  const { CoffeeTablesView } = load('experiences/coffee-tables/view.ts', { obsidian });
+integrationTest('Coffee cancel keeps template settings and saved room R; fresh reload confirms R', async () => {
+  class Modal { static instances = []; constructor() { this.modalEl = coffeeElement('modal'); this.contentEl = coffeeElement('content'); Modal.instances.push(this); } open() { this.onOpen?.(); } close() { this.closed = true; this.onClose?.(); } }
+  const { CoffeeTablesView } = load('experiences/coffee-tables/view.ts', { obsidian: { ...obsidian, Modal } });
   const { CoffeeStorage } = load('experiences/coffee-tables/storage.ts', { obsidian });
-  const plugin = withCoffeeModelDiscovery({
-    settings: { language: 'en', cliModel: 'm', cliReasoning: 'low', coffeePersonas: [] },
-    saveSettings: async () => {}, coffeeReasoningEfforts: () => ['low'],
-    refreshCoffeeModels: async () => ['m'], confirmAiUsage: async (_model, run) => run(),
-    modelLabel: value => value
-  }, ['m']);
-  const view = new CoffeeTablesView({ app: {} }, plugin);
-  view.contentEl = coffeeElement('root');
-  let roomSession;
-  view.store = { cleanupEmptyTopicFolders: async () => {}, list: () => [], save: async value => { roomSession = plain(value); } };
+  const { createSession } = load('experiences/coffee-tables/types.ts');
+  const { guestSettingsFromRoster, rosterFromLegacySettings } = load('experiences/coffee-tables/roster.ts');
+  const template = { id: 'template-T', identity: 'Fictional night librarian', category: 'experts', role: 'night-shift librarian', description: 'Works after school hours.', prompt: 'Ask who carries the hidden workload.' };
+  const { app, files } = fixture('en'); app.vault.getFiles = () => [...files.values()].filter(file => file instanceof TFile);
+  const storage = new CoffeeStorage(app.vault, 'Agent Workspace');
+  const room = createSession('Saved room R', 'm', 'low', 'en');
+  const roster = rosterFromLegacySettings(room.guests);
+  roster.cards[0] = { ...roster.cards[0], roleName: template.identity, personaRole: template.role, description: template.description, prompt: template.prompt, templateId: template.id, source: 'library' };
+  room.guests = guestSettingsFromRoster(room.guests, roster);
+  await storage.save(room);
+  const beforeRoom = await new CoffeeStorage(app.vault, 'Agent Workspace').load(room.id);
+  const roomPathsBefore = storage.list().map(file => file.path).sort();
+  let settingsSaves = 0;
+  const plugin = withCoffeeModelDiscovery({ settings: { language: 'en', cliModel: 'm', cliReasoning: 'low', coffeePersonas: [plain(template)] }, saveSettings: async () => { settingsSaves++; }, coffeeReasoningEfforts: () => ['low'], refreshCoffeeModels: async () => ['m'] }, ['m']);
+  const view = new CoffeeTablesView({ app }, plugin); view.contentEl = coffeeElement('root'); view.store = storage;
+  await view.home();
+  coffeeFind(view.contentEl, item => item.tag === 'button' && item.text === 'Manage reusable persona library').click();
+  await until(() => Modal.instances.length === 1);
+  const library = Modal.instances[0];
+  const role = coffeeFind(library.contentEl, item => item.attrs?.['data-persona-field'] === 'role'); role.value = 'Unsaved replacement role';
+  coffeeFind(library.contentEl, item => item.tag === 'button' && item.text === 'Cancel').onclick();
+  await until(() => library.closed);
+  const fresh = await new CoffeeStorage(app.vault, 'Agent Workspace').load(room.id);
+  const roomPathsAfter = new CoffeeStorage(app.vault, 'Agent Workspace').list().map(file => file.path).sort();
+  assert.deepEqual(plugin.settings.coffeePersonas, [template], 'Cancel leaves the active template settings value unchanged');
+  assert.equal(settingsSaves, 0, 'Cancel does not call the settings save boundary');
+  assert.deepEqual(plain(fresh.guests.roster), plain(beforeRoom.guests.roster), 'saved room R retains its copied seat IDs, roles, and template data');
+  assert.deepEqual(roomPathsAfter, roomPathsBefore, 'Cancel does not create a Coffee room');
+});
+integrationTest('Coffee cancel preserves template T across fresh file-backed plugin load and R across fresh CoffeeStorage load', async () => {
+  class Modal { static instances = []; constructor() { this.modalEl = coffeeElement('modal'); this.contentEl = coffeeElement('content'); Modal.instances.push(this); } open() { this.onOpen?.(); } close() { this.closed = true; this.onClose?.(); } }
+  const { default: Plugin } = load('main.ts', { obsidian });
+  const { CoffeeTablesView } = load('experiences/coffee-tables/view.ts', { obsidian: { ...obsidian, Modal } });
+  const { CoffeeStorage } = load('experiences/coffee-tables/storage.ts', { obsidian });
+  const { createSession } = load('experiences/coffee-tables/types.ts');
+  const { guestSettingsFromRoster, rosterFromLegacySettings } = load('experiences/coffee-tables/roster.ts');
+  const tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'coffee-c2-file-backed-'));
+  const physical = virtualPath => path.join(tempRoot, ...virtualPath.split('/').filter(Boolean));
+  const abstract = virtualPath => {
+    const target = physical(virtualPath); if (!fs.existsSync(target)) return null;
+    const stat = fs.statSync(target); const item = stat.isDirectory() ? new TFolder(virtualPath) : new TFile(virtualPath);
+    if (!stat.isDirectory()) item.stat.mtime = stat.mtimeMs;
+    const parentPath = virtualPath.split('/').slice(0, -1).join('/'); item.parent = parentPath ? abstract(parentPath) : null;
+    return item;
+  };
+  const allFiles = (folder = '') => fs.readdirSync(physical(folder), { withFileTypes: true }).flatMap(entry => {
+    const virtualPath = folder ? `${folder}/${entry.name}` : entry.name;
+    return entry.isDirectory() ? allFiles(virtualPath) : [virtualPath];
+  });
+  const adapter = {
+    exists: async virtualPath => fs.existsSync(physical(virtualPath)),
+    mkdir: async virtualPath => fs.mkdirSync(physical(virtualPath), { recursive: true }),
+    list: async virtualPath => {
+      let entries = []; try { entries = fs.readdirSync(physical(virtualPath), { withFileTypes: true }); } catch (error) { if (error.code !== 'ENOENT') throw error; }
+      return { files: entries.filter(entry => entry.isFile()).map(entry => `${virtualPath}/${entry.name}`), folders: entries.filter(entry => entry.isDirectory()).map(entry => `${virtualPath}/${entry.name}`) };
+    },
+    read: async virtualPath => fs.readFileSync(physical(virtualPath), 'utf8'),
+    write: async (virtualPath, value) => { fs.mkdirSync(path.dirname(physical(virtualPath)), { recursive: true }); fs.writeFileSync(physical(virtualPath), value, 'utf8'); },
+    process: async (virtualPath, change) => { const filePath = physical(virtualPath); fs.writeFileSync(filePath, change(fs.readFileSync(filePath, 'utf8')), 'utf8'); }
+  };
+  const vault = {
+    adapter,
+    getAbstractFileByPath: abstract,
+    getFiles: () => allFiles().map(abstract).filter(Boolean),
+    getMarkdownFiles: () => allFiles().filter(filePath => filePath.endsWith('.md')).map(abstract).filter(Boolean),
+    async createFolder(virtualPath) { fs.mkdirSync(physical(virtualPath)); return abstract(virtualPath); },
+    async create(virtualPath, value) { fs.mkdirSync(path.dirname(physical(virtualPath)), { recursive: true }); fs.writeFileSync(physical(virtualPath), value, { flag: 'wx' }); return abstract(virtualPath); },
+    async read(file) { return fs.readFileSync(physical(file.path), 'utf8'); },
+    async cachedRead(file) { return fs.readFileSync(physical(file.path), 'utf8'); },
+    async process(file, change) { const filePath = physical(file.path); fs.writeFileSync(filePath, change(fs.readFileSync(filePath, 'utf8')), 'utf8'); },
+    on: () => ({})
+  };
+  const app = { vault, fileManager: { renameFile: async () => {}, trashFile: async () => {} }, workspace: { on: () => ({}), onLayoutReady: () => {}, getLeavesOfType: () => [] } };
+  const template = { id: 'template-T-file-backed', identity: 'Fictional night librarian', category: 'experts', role: 'night-shift librarian', description: 'Works after school hours.', prompt: 'Ask who carries the hidden workload.' };
+  const settingsPath = path.join(tempRoot, '.obsidian', 'plugins', 'coffee-test', 'data.json');
+  fs.mkdirSync(path.dirname(settingsPath), { recursive: true });
+  const initialSettings = { language: 'en', workspaceFolder: 'Agent Workspace', cliModel: 'm', cliReasoning: 'low', migrated: true, structureVersion: 2, workspaceInitialized: true, coffeePersonas: [plain(template)] };
+  fs.writeFileSync(settingsPath, JSON.stringify(initialSettings), 'utf8');
+  let settingsSaveCalls = 0;
+  const newPlugin = () => {
+    const plugin = new Plugin(); plugin.app = app; plugin.manifest = { version: 'test-fixture', dir: 'not-a-native-plugin-directory' };
+    plugin.loadData = async () => JSON.parse(fs.readFileSync(settingsPath, 'utf8'));
+    plugin.saveData = async settings => { settingsSaveCalls++; fs.writeFileSync(settingsPath, JSON.stringify(settings), 'utf8'); };
+    for (const method of ['addChild', 'addCommand', 'register', 'registerView', 'registerEvent', 'addSettingTab', 'registerEditorExtension', 'registerMarkdownPostProcessor']) plugin[method] = () => {};
+    plugin.addRibbonIcon = () => ({});
+    return plugin;
+  };
+
+  try {
+    const plugin = newPlugin(); await plugin.onload(); await plugin.ready;
+    assert.deepEqual(plain(plugin.settings.coffeePersonas), [template], 'production onload reads T through the file-backed loadData adapter');
+    const room = createSession('Saved room R', 'm', 'low', 'en'); room.id = 'coffee-c2-file-backed-room-r';
+    const roster = rosterFromLegacySettings(room.guests);
+    roster.cards[0] = { ...roster.cards[0], roleName: template.identity, personaRole: template.role, description: template.description, prompt: template.prompt, templateId: template.id, source: 'library' };
+    room.guests = guestSettingsFromRoster(room.guests, roster);
+    await plugin.coffeeStorage.save(room);
+    const beforeRoom = await new CoffeeStorage(vault, 'Agent Workspace').load(room.id);
+    const settingsBytesBefore = fs.readFileSync(settingsPath, 'utf8');
+    const roomPathsBefore = plugin.coffeeStorage.list().map(file => file.path).sort();
+    withCoffeeModelDiscovery(plugin, ['m']);
+    const view = new CoffeeTablesView({ app }, plugin); view.contentEl = coffeeElement('root'); view.store = plugin.coffeeStorage;
+    await view.home();
+    coffeeFind(view.contentEl, item => item.tag === 'button' && item.text === 'Manage reusable persona library').click();
+    await until(() => Modal.instances.length === 1);
+    const library = Modal.instances[0];
+    const role = coffeeFind(library.contentEl, item => item.attrs?.['data-persona-field'] === 'role'); role.value = 'Unsaved replacement role';
+    coffeeFind(library.contentEl, item => item.tag === 'button' && item.text === 'Cancel').onclick();
+    await until(() => library.closed);
+
+    const afterRoom = await new CoffeeStorage(vault, 'Agent Workspace').load(room.id);
+    const roomPathsAfter = new CoffeeStorage(vault, 'Agent Workspace').list().map(file => file.path).sort();
+    assert.equal(settingsSaveCalls, 0, 'cancel does not invoke production saveSettings -> host saveData boundary');
+    assert.equal(fs.readFileSync(settingsPath, 'utf8'), settingsBytesBefore, 'the actual settings fixture bytes remain unchanged after cancel');
+    assert.deepEqual(plain(afterRoom.guests.roster), plain(beforeRoom.guests.roster), 'a new production CoffeeStorage instance reloads R from real filesystem bytes');
+    assert.deepEqual(roomPathsAfter, roomPathsBefore, 'cancel creates no room file');
+
+    const reloadedPlugin = newPlugin(); await reloadedPlugin.onload(); await reloadedPlugin.ready;
+    assert.deepEqual(plain(reloadedPlugin.settings.coffeePersonas), [template], 'a new production plugin instance reloads persisted T through onload');
+    assert.equal(fs.readFileSync(settingsPath, 'utf8'), settingsBytesBefore, 'fresh plugin reload does not rewrite the settings fixture');
+  } finally { fs.rmSync(tempRoot, { recursive: true, force: true }); }
+});
+integrationTest('Coffee persona labels stay fixed in the library and application rows while content remains editable', async () => {
+  class Modal { static instances = []; constructor() { this.modalEl = coffeeElement('modal'); this.contentEl = coffeeElement('content'); Modal.instances.push(this); } open() { this.onOpen?.(); } close() { this.onClose?.(); } }
+  const { CoffeeTablesView } = load('experiences/coffee-tables/view.ts', { obsidian: { ...obsidian, Modal } });
+  const person = { id: 'fictional-person', identity: 'Fictional transit planner', role: 'Transit planner', category: 'experts', description: 'A fictional city worker.', prompt: 'Ask who is missed by the schedule.' };
+  const plugin = withCoffeeModelDiscovery({ settings: { language: 'en', cliModel: 'm', cliReasoning: 'low', coffeePersonas: [person] }, saveSettings: async () => {}, coffeeReasoningEfforts: () => ['low'], refreshCoffeeModels: async () => ['m'] }, ['m']);
+  const view = new CoffeeTablesView({ app: {} }, plugin); view.contentEl = coffeeElement('root'); view.store = { cleanupEmptyTopicFolders: async () => {}, list: () => [] };
+  await view.home();
+  coffeeFind(view.contentEl, item => item.tag === 'button' && item.text === 'Manage reusable persona library').click(); await until(() => Modal.instances.length === 1);
+  const library = Modal.instances[0];
+  assert.ok(coffeeFind(library.contentEl, item => item.tag === 'strong' && item.text === person.identity));
+  assert.equal(coffeeFind(library.contentEl, item => item.attrs?.['aria-label'] === 'Persona identity'), undefined, 'library labels have no editable identity input');
+  const libraryRole = coffeeFind(library.contentEl, item => item.attrs?.['data-persona-field'] === 'role'); libraryRole.value = 'Updated fictional transit planner';
+  coffeeFind(library.contentEl, item => item.tag === 'button' && item.text === 'Save library').onclick(); await until(() => plugin.settings.coffeePersonas[0].role === 'Updated fictional transit planner');
+  assert.equal(plugin.settings.coffeePersonas[0].identity, person.identity, 'editing library content preserves the established label');
+
+  const advanced = coffeeFind(view.contentEl, item => item.cls.split(' ').includes('ct-advanced-settings')); advanced.open = true;
+  const section = coffeeFind(view.contentEl, item => item.cls.split(' ').includes('ct-invites'));
+  const picker = coffeeFind(section, item => item.tag === 'select' && item.attrs?.['aria-label'] === 'Choose a saved person'); picker.value = person.id;
+  coffeeFind(section, item => item.tag === 'button' && item.text === 'Add selected person').click(); await until(() => section.querySelectorAll('.ct-invite-row').length === 1);
+  const row = coffeeFind(section, item => item.cls.split(' ').includes('ct-invite-row'));
+  assert.ok(coffeeFind(row, item => item.tag === 'strong' && item.text === person.identity));
+  assert.equal(coffeeFind(row, item => item.attrs?.['aria-label'] === 'Persona label (set only when creating)'), undefined, 'a pre-chat application row cannot rename a selected template');
+  coffeeFind(row, item => item.attrs?.['aria-label'] === 'Person role').value = 'A fictional night dispatcher';
+  coffeeFind(row, item => item.tag === 'button' && item.text === 'Update person').click(); await until(() => plugin.settings.coffeePersonas[0].role === 'A fictional night dispatcher');
+  assert.equal(plugin.settings.coffeePersonas[0].identity, person.identity, 'updating the applied template changes role content only');
+
+  coffeeFind(section, item => item.tag === 'button' && item.text === 'Add a custom person').click(); await until(() => section.querySelectorAll('.ct-invite-row').length === 2);
+  const customRow = section.querySelectorAll('.ct-invite-row')[1];
+  const creationLabel = coffeeFind(customRow, item => item.attrs?.['aria-label'] === 'Persona label (set only when creating)'); creationLabel.value = 'Fictional weekend caretaker';
+  coffeeFind(customRow, item => item.attrs?.['aria-label'] === 'Person role').value = 'Weekend caretaker';
+  coffeeFind(customRow, item => item.tag === 'button' && item.text === 'Save as person').click(); await until(() => plugin.settings.coffeePersonas.length === 2);
+  assert.equal(coffeeFind(customRow, item => item.attrs?.['aria-label'] === 'Persona label (set only when creating)'), undefined, 'saving a custom row as a reusable person freezes its initial label');
+  assert.ok(coffeeFind(customRow, item => item.tag === 'strong' && item.text === 'Fictional weekend caretaker'));
+  assert.equal(plugin.settings.coffeePersonas[1].identity, 'Fictional weekend caretaker');
+});
+integrationTest('Coffee home permits repeated saved-person selection with distinct labels fixed at row creation', async () => {
+  const { CoffeeTablesView } = load('experiences/coffee-tables/view.ts', { obsidian });
+  const person = { id: 'fictional-repeat', identity: 'Fictional weekend librarian', role: 'Community librarian', category: 'experts', description: 'A fictional librarian.', prompt: 'Ask who handles weekend access.' };
+  const plugin = withCoffeeModelDiscovery({ settings: { language: 'en', cliModel: 'm', cliReasoning: 'low', coffeePersonas: [person] }, saveSettings: async () => {}, coffeeReasoningEfforts: () => ['low'], refreshCoffeeModels: async () => ['m'] }, ['m']);
+  const view = new CoffeeTablesView({ app: {} }, plugin); view.contentEl = coffeeElement('root'); view.store = { cleanupEmptyTopicFolders: async () => {}, list: () => [] };
+  await view.home();
+  const totalSelect = coffeeFind(view.contentEl, item => item.attrs?.['aria-label'] === 'Total participants including hosts'); totalSelect.value = '4'; totalSelect.change();
+  const advanced = coffeeFind(view.contentEl, item => item.cls.split(' ').includes('ct-advanced-settings')); advanced.open = true;
+  const section = coffeeFind(view.contentEl, item => item.cls.split(' ').includes('ct-invites'));
+  const picker = coffeeFind(section, item => item.tag === 'select' && item.attrs?.['aria-label'] === 'Choose a saved person'); picker.value = person.id;
+  const add = coffeeFind(section, item => item.tag === 'button' && item.text === 'Add selected person');
+  add.click(); await until(() => section.querySelectorAll('.ct-invite-row').length === 1);
+  add.click(); await until(() => section.querySelectorAll('.ct-invite-row').length === 2);
+  const rows = section.querySelectorAll('.ct-invite-row');
+  assert.deepEqual(rows.map(row => coffeeFind(row, item => item.tag === 'strong')?.text), [person.identity, `${person.identity} 2`]);
+  assert.ok(rows.every(row => coffeeFind(row, item => item.attrs?.['aria-label'] === 'Persona label (set only when creating)') === undefined));
+});
+integrationTest('Coffee role-card setup uses fixed seats, requires explicit template add, and snapshots edits across reopen', async () => {
+  class Modal { static instances = []; constructor() { this.modalEl = coffeeElement('modal'); this.contentEl = coffeeElement('content'); Modal.instances.push(this); } open() { this.onOpen?.(); } close() { this.onClose?.(); } }
+  const { CoffeeTablesView, CoffeeRosterEditorModal } = load('experiences/coffee-tables/view.ts', { obsidian: { ...obsidian, Modal } });
+  const { CoffeeStorage } = load('experiences/coffee-tables/storage.ts', { obsidian });
+  const { guestSettingsFromRoster } = load('experiences/coffee-tables/roster.ts');
+  const plugin = withCoffeeModelDiscovery({ settings: { language: 'en', cliModel: 'm', cliReasoning: 'low', coffeePersonas: [] }, saveSettings: async () => {}, coffeeReasoningEfforts: () => ['low'], refreshCoffeeModels: async () => ['m'], confirmAiUsage: async (_model, run) => { await run(); return true; }, modelLabel: value => value, runCoffeeRequest: async request => JSON.stringify({ cards: request.session.guests.roster.cards.map((card, index) => ({ category: card.category, roleName: `Fictional ${card.category} perspective ${index + 1}`, personaRole: `Fictional ${card.category} worker`, description: `A fictional ${card.category} perspective.`, style: 'Thoughtful and curious.', prompt: 'Question an assumption.', suggestions: [] })) }) }, ['m']);
+  const view = new CoffeeTablesView({ app: {} }, plugin); view.contentEl = coffeeElement('root');
+  let roomSession, storageWrites = 0;
+  view.store = { cleanupEmptyTopicFolders: async () => {}, list: () => [], save: async value => { storageWrites++; roomSession = plain(value); } };
   view.attach = value => { roomSession = plain(value); };
   await view.home();
-  const rowCount = () => view.contentEl.querySelectorAll('.ct-invite-row').length;
-  assert.equal(rowCount(), 0, 'an empty selection does not create a row');
-  coffeeFind(view.contentEl, item => item.tag === 'button' && item.text === 'Add selected person').click();
-  await Promise.resolve(); assert.equal(rowCount(), 0, 'clicking add with no selection is a no-op');
-  coffeeFind(view.contentEl, item => item.tag === 'button' && item.text === 'Add a custom person').click();
-  await until(() => rowCount() === 1);
-  const identity = coffeeFind(view.contentEl, item => item.attrs?.['aria-label'] === 'Person identity');
-  const role = coffeeFind(view.contentEl, item => item.attrs?.['aria-label'] === 'Person role');
-  const description = coffeeFind(view.contentEl, item => item.attrs?.['aria-label'] === 'Guest background');
-  const personaPrompt = coffeeFind(view.contentEl, item => item.attrs?.['aria-label'] === 'Persona instructions');
-  const category = coffeeFind(view.contentEl, item => item.attrs?.['aria-label'] === 'Guest category');
-  identity.value = 'Avery Lin'; role.value = 'night-shift librarian'; description.value = 'Has worked with families after school hours.'; personaPrompt.value = 'Ask who carries the hidden workload.'; category.value = 'affected';
-  coffeeFind(view.contentEl, item => item.tag === 'button' && item.text === 'Save as person').click();
-  await until(() => plugin.settings.coffeePersonas.length === 1);
-  assert.deepEqual(plain(plugin.settings.coffeePersonas[0]), { id: plugin.settings.coffeePersonas[0].id, identity: 'Avery Lin', role: 'night-shift librarian', category: 'affected', description: 'Has worked with families after school hours.', prompt: 'Ask who carries the hidden workload.' });
-
-  identity.value = 'Jordan Kim'; role.value = 'school meal coordinator'; category.value = 'experts';
-  coffeeFind(view.contentEl, item => item.tag === 'button' && item.text === 'Save as person').click();
-  await until(() => plugin.settings.coffeePersonas.length === 2);
-  identity.value = 'Avery Lin'; role.value = 'night-shift librarian'; category.value = 'affected';
-  const selector = coffeeFind(view.contentEl, item => item.tag === 'select' && item.attrs?.['aria-label'] === 'Choose a saved person');
-  selector.value = plugin.settings.coffeePersonas[1].id;
-  assert.equal(rowCount(), 1, 'selecting a template does not add a second row');
-  coffeeFind(view.contentEl, item => item.tag === 'button' && item.text === 'Add selected person').click();
-  await until(() => rowCount() === 2);
-  assert.equal(rowCount(), 2, 'only the explicit add action copies the selected template');
-  coffeeFind(view.contentEl, item => item.tag === 'button' && item.text === 'Add selected person').click();
-  assert.equal(rowCount(), 2, 'a repeated add does not duplicate a person within the table');
-
   const topic = coffeeFind(view.contentEl, item => item.attrs?.['aria-label'] === 'Topic'); topic.value = 'Fictional library staffing scenario';
-  await until(() => !coffeeFind(view.contentEl, item => item.tag === 'button' && item.text === 'Open table').disabled);
-  coffeeFind(view.contentEl, item => item.tag === 'button' && item.text === 'Open table').click();
-  await until(() => !!roomSession);
-  assert.equal(roomSession.guests.hostCount, 1);
-  assert.deepEqual([roomSession.guests.counts.experts, roomSession.guests.counts.affected], [1, 1]);
-  const selected = roomSession.guests.guests[0];
-  assert.deepEqual([selected.identity, selected.role, selected.category, selected.description, selected.prompt], ['Avery Lin', 'night-shift librarian', 'affected', 'Has worked with families after school hours.', 'Ask who carries the hidden workload.']);
+  const people = coffeeFind(view.contentEl, item => item.tag === 'select' && item.attrs?.['aria-label'] === 'Total participants including hosts'); people.value = '4'; people.change();
+  const create = coffeeFind(view.contentEl, item => item.tag === 'button' && item.text === 'Help me assemble this table');
+  await until(() => !create.disabled); create.click(); await until(() => Modal.instances.length === 1);
+  const firstPreview = Modal.instances[0]; assert.equal(storageWrites, 0, 'a table is not persisted before preview acceptance');
+  assert.equal(firstPreview.working.cards.length, 3);
+  coffeeFind(firstPreview.contentEl, item => item.tag === 'button' && item.text === 'Save table cards').onclick(); await until(() => !!roomSession);
+  assert.equal(roomSession.status, 'ready', 'table setup pauses for persona review before any chat generation');
+  assert.equal(roomSession.guests.roster.totalParticipants, 4, 'the selected total includes the host');
+  assert.equal(roomSession.guests.roster.hostCount, 1);
+  assert.equal(roomSession.guests.roster.cards.length, 3);
+  assert.equal(roomSession.guests.roster.cards.filter(card => card.category === 'experts').length + roomSession.guests.roster.cards.filter(card => card.category === 'affected').length, 3);
+
+  const persona = { id: 'saved-night', identity: 'Avery Lin', category: 'affected', role: 'night-shift librarian', description: 'Works with families after school hours.', prompt: 'Ask who carries the hidden workload.' };
+  let writes = 0; const edited = new CoffeeRosterEditorModal({}, roomSession.guests.roster, [persona], false, async saved => { writes++; plugin.settings.coffeePersonas.push(plain(saved)); }, async (_roster, ids) => { assert.fail(`unexpected recommendation request for ${ids}`); });
+  const pending = edited.edit();
+  const card = edited.contentEl.children.find(item => item.cls.includes('ct-roster-editor-cards')).children[0];
+  edited.contentEl.querySelectorAll('.ct-role-card').forEach(section => {
+    const query = section.querySelectorAll.bind(section);
+    section.querySelectorAll = selector => {
+      if (selector !== '[data-persona-field]') return query(selector);
+      const fields = []; const visit = node => { for (const child of node.children) { if (['input', 'textarea'].includes(child.tag)) fields.push(child); visit(child); } }; visit(section); return fields;
+    };
+    section.querySelector = selector => selector === '.ct-role-lock input' ? coffeeFind(section, item => item.tag === 'input' && item.attrs?.type === 'checkbox') : undefined;
+  });
+  const selector = coffeeFind(card, item => item.tag === 'select' && item.attrs?.['aria-label'] === 'Choose a reusable persona template'); selector.value = persona.id;
+  assert.equal(writes, 0, 'selection alone does not change a card or library');
+  coffeeFind(card, item => item.tag === 'button' && item.text === 'Apply persona details').click();
+  const role = coffeeFind(card, item => item.attrs?.['data-persona-field'] === 'role');
+  const fixedLabel = card.children.find(item => item.cls.includes('ct-role-fixed-identity')).children[1];
+  const originalLabel = roomSession.guests.roster.cards[0].roleName;
+  await until(() => role.value === persona.role);
+  assert.equal(fixedLabel.text, originalLabel, 'applying a reusable persona edits its role content but preserves the card label'); assert.equal(role.value, persona.role);
+  assert.equal(coffeeFind(card, item => item.attrs?.['aria-label'] === 'Persona identity / speaker label'), undefined, 'role cards expose no editable name field');
+  const categoryBadge = card.children.find(item => item.cls.includes('ct-role-card-heading')).children[0];
+  assert.match(categoryBadge.text, /Topic experts/); assert.equal(roomSession.guests.roster.cards[0].category, 'experts', 'applying a persona cannot change its fixed seat category');
+  coffeeFind(card, item => item.tag === 'button' && item.text === 'Save as reusable persona').click(); await until(() => writes === 1);
+  coffeeFind(edited.contentEl, item => item.tag === 'button' && item.text === 'Save table cards').onclick();
+  const updated = await pending;
+  assert.equal(updated.totalParticipants, 4); assert.equal(updated.cards.length, 3);
+  assert.deepEqual([updated.cards[0].roleName, updated.cards[0].personaRole, updated.cards[0].category], [originalLabel, 'night-shift librarian', 'experts']);
+  assert.equal(plugin.settings.coffeePersonas.length, 1, 'only the explicit reusable-save action writes to library');
+  roomSession.guests = guestSettingsFromRoster(roomSession.guests, updated);
+  const savedTemplate = plugin.settings.coffeePersonas[0];
+  assert.deepEqual([roomSession.guests.guests.find(item => item.templateId === savedTemplate.id).identity, roomSession.guests.guests.find(item => item.templateId === savedTemplate.id).role], [originalLabel, 'night-shift librarian']);
   const prompt = coffeePrompts.tablePrompt(roomSession.topic, roomSession.language, roomSession.guests);
-  assert.match(prompt, /Avery Lin/); assert.match(prompt, /night-shift librarian/); assert.match(prompt, /Ask who carries the hidden workload/);
-  assert.match(prompt, /AI 模擬人物視角|Persona instructions only guide simulated perspectives/);
+  assert.match(prompt, new RegExp(originalLabel)); assert.match(prompt, /night-shift librarian/); assert.match(prompt, /Ask who carries the hidden workload/);
+  assert.match(prompt, /observer is exactly one and is excluded from that total/); assert.match(prompt, /AI-simulation label|not real participation/i);
   const { app, files } = fixture(); app.vault.getFiles = () => [...files.values()].filter(file => file instanceof TFile);
   const storage = new CoffeeStorage(app.vault, 'Agent Workspace'); await storage.save(roomSession);
-  const reopened = await storage.load(storage.sessionPath(roomSession.id));
-  assert.deepEqual(plain(reopened.guests.guests[0]), plain(selected));
+  const freshStorage = new CoffeeStorage(app.vault, 'Agent Workspace');
+  const reopened = await freshStorage.load(roomSession.id);
+  assert.deepEqual(plain(reopened.guests.roster), plain(updated));
+  assert.equal(reopened.status, 'ready'); assert.equal(reopened.transcriptMarkdown, '');
+});
 
-  await view.home();
-  assert.equal(rowCount(), 0, 'saved people are not silently pre-added when starting another table');
-  const savedSelector = coffeeFind(view.contentEl, item => item.tag === 'select' && item.attrs?.['aria-label'] === 'Choose a saved person');
-  savedSelector.value = plugin.settings.coffeePersonas[0].id;
-  coffeeFind(view.contentEl, item => item.tag === 'button' && item.text === 'Add selected person').click();
-  await until(() => rowCount() === 1);
-  const editedRole = coffeeFind(view.contentEl, item => item.attrs?.['aria-label'] === 'Person role'); editedRole.value = 'community librarian';
-  coffeeFind(view.contentEl, item => item.tag === 'button' && item.text === 'Update person').click();
-  await until(() => plugin.settings.coffeePersonas[0].role === 'community librarian');
-  assert.equal(reopened.guests.guests[0].role, 'night-shift librarian', 'editing the reusable template does not mutate the room snapshot');
+integrationTest('Coffee manual seats receive unique labels and remain a valid roster when recommendations fail', async () => {
+  class Modal { constructor() { this.modalEl = coffeeElement('modal'); this.contentEl = coffeeElement('content'); } open() { this.onOpen?.(); } close() { this.onClose?.(); } }
+  const { CoffeeRosterEditorModal } = load('experiences/coffee-tables/view.ts', { obsidian: { ...obsidian, Modal } });
+  const { validateRoster } = load('experiences/coffee-tables/roster.ts');
+  const mkCard = (id, category, roleName) => ({ id, category, roleName, source: 'builtin', description: '', style: '', prompt: '', suggestions: [], locked: false, edited: false });
+  const roster = { totalParticipants: 3, hostCount: 1, cards: [mkCard('expert-1', 'experts', 'New persona'), mkCard('affected-1', 'affected', 'Fictional neighbor')] };
+  const modal = new CoffeeRosterEditorModal({}, roster, [], false, async () => {}, async () => { throw new Error('Synthetic recommendation outage'); });
+  const pending = modal.edit();
+  const addSeat = async () => {
+    const expectedCount = modal.working.cards.length + 1;
+    const category = coffeeFind(modal.contentEl, item => item.tag === 'select' && item.attrs?.['aria-label'] === 'Category for added seat');
+    category.value = 'experts';
+    const label = coffeeFind(modal.contentEl, item => item.tag === 'input' && item.attrs?.['aria-label'] === 'Persona label (set only when creating)'); label.value = 'New persona';
+    coffeeFind(modal.contentEl, item => item.tag === 'button' && item.text === 'Explicitly add a participant').click();
+    await until(() => modal.working.cards.length === expectedCount);
+  };
+  await addSeat(); await addSeat();
+  const expertNames = modal.working.cards.filter(card => card.category === 'experts').map(card => card.roleName);
+  assert.deepEqual(plain(expertNames), ['New persona', 'New persona 2', 'New persona 3']);
+  assert.deepEqual(plain(validateRoster(modal.working)), [], 'manual fallback remains valid without AI recommendations or an editable identity field');
+  coffeeFind(modal.contentEl, item => item.tag === 'button' && item.text === 'Cancel').onclick();
+  assert.equal(await pending, null);
+});
+
+integrationTest('Coffee permits reusing one persona template without renaming existing same-category seats', async () => {
+  class Modal { constructor() { this.modalEl = coffeeElement('modal'); this.contentEl = coffeeElement('content'); } open() { this.onOpen?.(); } close() { this.onClose?.(); } }
+  const { CoffeeRosterEditorModal } = load('experiences/coffee-tables/view.ts', { obsidian: { ...obsidian, Modal } });
+  const { validateRoster } = load('experiences/coffee-tables/roster.ts');
+  const card = (id, roleName) => ({ id, category: 'experts', roleName, source: 'builtin', description: '', style: '', prompt: '', suggestions: [], locked: false, edited: false });
+  const template = { id: 'same-template', identity: 'Avery Lin', category: 'experts', role: 'night-shift librarian', description: 'Works after school hours.', prompt: 'Ask who carries the hidden workload.' };
+  const modal = new CoffeeRosterEditorModal({}, { totalParticipants: 3, hostCount: 1, cards: [card('expert-a', 'Topic expert'), card('expert-b', 'Avery   Lin')] }, [template], false, async () => {}, async () => { throw new Error('not used'); });
+  const pending = modal.edit();
+  const sections = () => modal.contentEl.querySelectorAll('.ct-role-card');
+  for (const section of sections()) {
+    const choose = coffeeFind(section, item => item.tag === 'select' && item.attrs?.['aria-label'] === 'Choose a reusable persona template');
+    choose.value = template.id;
+    coffeeFind(section, item => item.tag === 'button' && item.text === 'Apply persona details').click();
+    const expected = section.dataset.cardId === 'expert-a' ? 'Topic expert' : 'Avery   Lin';
+    await until(() => section.children.find(item => item.cls.includes('ct-role-fixed-identity')).children[1].text === expected);
+  }
+  assert.deepEqual(plain(modal.working.cards.map(item => item.roleName)), ['Topic expert', 'Avery   Lin']);
+  assert.ok(modal.working.cards.every(item => item.templateId === template.id), 'both seats still reference the same reusable persona template');
+  assert.deepEqual(plain(validateRoster(modal.working)), [], 'repeated template use remains saveable as distinct same-category speakers');
+  coffeeFind(modal.contentEl, item => item.tag === 'button' && item.text === 'Cancel').onclick();
+  assert.equal(await pending, null);
 });
 
 integrationTest('Coffee Tables empty filters and archive states are clear and batch actions stay disabled', async () => {
@@ -4957,7 +5349,7 @@ integrationTest('Coffee library backend path enforces exact 1+1 roles, refreshes
   ].join('\n');
   const providerPrompts = [];
   const plugin = new Plugin(); plugin.app = { vault: { adapter: new obsidian.FileSystemAdapter() } }; plugin.manifest = { dir: 'plugin' }; plugin.settings.aiExchangeLoggingEnabled = false; plugin.activeTasks = new Map();
-  plugin.runtime = () => ({ runTask: async (prompt, _model, _effort, _schema, controls) => { providerPrompts.push(prompt); const output = providerPrompts.length === 1 ? opening : refreshed; controls.onText(output); return output; } });
+  plugin.runtime = () => ({ runTask: async (prompt, _model, _effort, _schema, controls) => { providerPrompts.push(prompt); const output = /只更新觀察者整理/.test(prompt) ? refreshed : opening; controls.onText(output); return output; } });
   const engine = new coffee.CoffeeEngine(session, request => plugin.runCoffeeRequest(request), value => storage.save(value));
   await engine.start();
   assert.equal(engine.session.status, 'completed');
@@ -4970,7 +5362,7 @@ integrationTest('Coffee library backend path enforces exact 1+1 roles, refreshes
   const emptyBaseline = { ...cleanBeforeRefresh, observerNotes: [], observerDraftMarkdown: undefined, dirtyNotes: true };
   const emptyEngine = new coffee.CoffeeEngine(emptyBaseline, request => plugin.runCoffeeRequest(request), value => storage.save(value));
   await emptyEngine.refreshObserverNotes();
-  assert.equal(providerPrompts.length, 2, 'empty-baseline observer refresh uses the product request adapter');
+  assert.equal(providerPrompts.length, 2, 'empty-baseline observer refresh uses exactly one product request');
   assert.match(providerPrompts[1], /目前沒有任何既有洞見|empty baseline/i);
   assert.match(providerPrompts[1], /coffee-insight:new/);
   assert.doesNotMatch(emptyEngine.error, /unknown item|unknown insight/i);
@@ -5144,8 +5536,40 @@ integrationTest('Coffee Tables consecutive full repaints retain reading position
 integrationTest('Coffee Tables observer refresh keeps the previous latest notes when final saving fails', async () => {
   const session=coffeeSession();session.status='completed';session.transcriptMarkdown='### Host\n\nA saved observation.';session.rounds=[{id:'saved',markdown:session.transcriptMarkdown,notes:'',status:'completed',createdAt:session.createdAt}];session.observerNotes=['Previous latest notes'];
   const fresh='# 觀察者整理\n\n'+['意外連結','值得繼續想的問題','核心分歧','探索方向','值得查證的假設'].map(t=>'## '+t+'\n- A concrete observation.\n- A second observation.').join('\n\n');
-  const engine=new coffee.CoffeeEngine(session,async request=>{request.onText?.(fresh);return fresh},async value=>{if(value.observerNotes[0].includes('A concrete observation.'))throw new Error('Final save failed')});
-  await engine.refreshObserverNotes();assert.equal(engine.session.observerNotes[0],'Previous latest notes');assert.match(engine.session.observerDraftMarkdown,/A concrete observation\./);assert.match(engine.error,/Final save failed/);
+  let calls=0;const engine=new coffee.CoffeeEngine(session,async request=>{calls++;request.onText?.(fresh);return fresh},async value=>{if(value.observerNotes[0].includes('A concrete observation.'))throw new Error('Final save failed')});
+  await engine.refreshObserverNotes();assert.equal(calls,1);assert.equal(engine.session.observerNotes[0],'Previous latest notes');assert.match(engine.session.observerDraftMarkdown,/A concrete observation\./);assert.match(engine.error,/Final save failed/);
+});
+integrationTest('Coffee observer refresh cancelled during recoverable-draft save keeps old notes and reopens the saved draft', async () => {
+  const { CoffeeStorage } = load('experiences/coffee-tables/storage.ts', { obsidian });
+  const { app, files } = fixture(); app.vault.getFiles = () => [...files.values()].filter(file => file instanceof TFile);
+  const storage = new CoffeeStorage(app.vault, 'Agent Workspace');
+  const session = coffeeSession(); session.status = 'completed';
+  session.transcriptMarkdown = '### 林岑｜主持人\n\n已完成的對談。';
+  session.rounds = [{ id: 'cancel-save-race', markdown: session.transcriptMarkdown, notes: '', status: 'completed', createdAt: session.createdAt }];
+  const oldNotes = '# 觀察者整理\n\n## 核心分歧\n- 舊整理必須保留。'; session.observerNotes = [oldNotes];
+  await storage.save(session);
+  const reloadedStorage = new CoffeeStorage(app.vault, 'Agent Workspace');
+  const reloaded = await reloadedStorage.load(session.id);
+  const previousNotes = plain(reloaded.observerNotes);
+  const generated = '# 觀察者整理\n\n## 意外連結\n- New generated note with a concrete connection.\n\n## 值得繼續想的問題\n- A question grounded in the dialogue.\n\n## 核心分歧\n- A disagreement grounded in the dialogue.\n\n## 探索方向\n- A useful direction to explore.\n\n## 值得查證的假設\n- An assumption that still needs evidence.';
+  const enteredSave = deferred(), releaseSave = deferred(); let providerSignal;
+  const engine = new coffee.CoffeeEngine(reloaded, async request => { providerSignal = request.signal; return generated; }, async value => {
+    if (value.observerDraftMarkdown?.includes('New generated note')) { enteredSave.resolve(); await releaseSave.promise; }
+    await reloadedStorage.save(value);
+  });
+
+  const refresh = engine.refreshObserverNotes();
+  await enteredSave.promise;
+  engine.cancel();
+  assert.equal(providerSignal.aborted, true, 'cancel aborts the active refresh without advancing its generation');
+  releaseSave.resolve();
+  await refresh;
+
+  assert.deepEqual(plain(engine.session.observerNotes), previousNotes, 'cancel after the draft-save await must not publish generated notes');
+  assert.match(engine.session.observerDraftMarkdown, /New generated note/);
+  const fresh = await new CoffeeStorage(app.vault, 'Agent Workspace').load(session.id);
+  assert.deepEqual(plain(fresh.observerNotes), previousNotes, 'the prior published notes remain durable after reopening');
+  assert.match(fresh.observerDraftMarkdown, /New generated note/, 'the recoverable draft remains durable after reopening');
 });
 
 test('Coffee segment navigation sorts rounds and follow-ups without treating interventions as new segments', () => {
@@ -5268,6 +5692,110 @@ test('Coffee reframing snapshots exclude drafts/style and never turn ambiguous e
   const single = buildCoffeeSource(session, 'idea'); assert.match(single.content, /Unique line/); assert.match(single.content, /not.*updated|stale/i);
   const changed = {...session, observerNotes:[session.observerNotes[0].replace('Unique line.', 'Repeat phrase.')]}; const ambiguous = buildCoffeeSource(changed, 'idea'); assert.match(ambiguous.content, /unresolved|not.*located/i);
   assert.notEqual(coffeeCommittedKey(session), coffeeCommittedKey(changed));
+});
+
+test('observer refresh resolves source IDs and publishes the saved response with one model request', async () => {
+  const fixture = JSON.parse(fs.readFileSync(path.join(__dirname, 'fixtures/coffee-observer-source-audit-rejection.json'), 'utf8'));
+  const { CoffeeEngine } = load('experiences/coffee-tables/engine.ts');
+  const { createSession } = load('experiences/coffee-tables/types.ts');
+  const insights = load('experiences/coffee-tables/insights.ts');
+  const prompts = load('experiences/coffee-tables/prompts.ts');
+  const sourceMap = prompts.indexObserverSourceTurns(fixture.sourceDialogue).sources;
+  const candidate = prompts.resolveObserverSourceIds(fixture.rawProviderResponse, sourceMap);
+  assert.equal(candidate.unresolved.length, 0);
+  const candidateItems = insights.baselineFromVersions([candidate.markdown], 'zh-TW');
+  const direction = candidateItems.find(item => item.category === fixture.failingCategory && item.summary.includes(fixture.failingClaim));
+  assert.ok(direction, 'the exact frozen provider response retains its known failing direction insight');
+  const oldNotes = '# Observer’s notes\n\n## Core disagreements\n- Earlier saved insight remains. <!-- coffee-insight:v1:id=old-insight -->';
+  const session = createSession('Source audit regression', 'fixture-model', 'low', 'zh-TW');
+  session.status = 'completed'; session.transcriptMarkdown = fixture.sourceDialogue;
+  session.rounds = [{ id: 'fixture-round', kind: 'initial', markdown: fixture.sourceDialogue, notes: '', status: 'completed', createdAt: session.createdAt }];
+  session.observerNotes = [oldNotes];
+  let calls = 0, capturedPrompt = '';
+  const engine = new CoffeeEngine(session, async request => {
+    calls++;
+    capturedPrompt = request.prompt;
+    request.onText?.(fixture.rawProviderResponse);
+    return fixture.rawProviderResponse;
+  }, async () => {});
+
+  await engine.refreshObserverNotes();
+
+  assert.equal(calls, 1, 'observer refresh makes one generation request and no audit request');
+  assert.match(capturedPrompt, /只更新觀察者整理/);
+  const published = insights.baselineFromVersions(engine.session.observerNotes, 'zh-TW');
+  assert.ok(published.some(item => item.summary === direction.summary), 'the generated observer item is retained without a semantic audit gate');
+  assert.deepEqual(plain(published.find(item => item.summary === direction.summary).sources), plain(direction.sources), 'source ID resolution retains the exact mapped source group');
+  assert.ok(published.some(item => item.summary.includes('Earlier saved insight remains')));
+  assert.equal(engine.session.observerDraftMarkdown, undefined);
+  assert.equal(engine.session.dirtyNotes, false);
+});
+
+test('unresolved observer source IDs keep the prior notes and recoverable response draft', async () => {
+  const fixture = JSON.parse(fs.readFileSync(path.join(__dirname, 'fixtures/coffee-observer-source-audit-rejection.json'), 'utf8'));
+  const { CoffeeEngine } = load('experiences/coffee-tables/engine.ts');
+  const { createSession } = load('experiences/coffee-tables/types.ts');
+  const invalid = fixture.rawProviderResponse.replace(/source-id:turn-\d+/g, 'source-id:turn-999');
+  let calls = 0;
+  const oldNotes = '# Observer’s notes\n\n## Questions worth pursuing\n- Keep the accepted note. <!-- coffee-insight:v1:id=old-insight -->';
+  const session = createSession('Unresolved observer source', 'fixture-model', 'low', 'zh-TW');
+  session.status = 'completed'; session.transcriptMarkdown = fixture.sourceDialogue;
+  session.rounds = [{ id: 'fixture-round', kind: 'initial', markdown: fixture.sourceDialogue, notes: '', status: 'completed', createdAt: session.createdAt }];
+  session.observerNotes = [oldNotes];
+  const engine = new CoffeeEngine(session, async request => { calls++; request.onText?.(invalid); return invalid; }, async () => {});
+
+  await engine.refreshObserverNotes();
+
+  assert.equal(calls, 1);
+  assert.deepEqual(plain(engine.session.observerNotes), [oldNotes]);
+  assert.match(engine.session.observerDraftMarkdown, /source-id:turn-999/);
+  assert.match(engine.error, /來源 ID|source IDs/i);
+  assert.equal(engine.session.dirtyNotes, true);
+});
+
+test('late observer generation after cancellation cannot replace previous notes', async () => {
+  const fixture = JSON.parse(fs.readFileSync(path.join(__dirname, 'fixtures/coffee-observer-source-audit-rejection.json'), 'utf8'));
+  const { CoffeeEngine } = load('experiences/coffee-tables/engine.ts');
+  const { createSession } = load('experiences/coffee-tables/types.ts');
+  const oldNotes = '# Observer’s notes\n\n## Directions to explore\n- Previously saved and protected. <!-- coffee-insight:v1:id=protected -->';
+  const session = createSession('Observer refresh cancellation', 'fixture-model', 'low', 'zh-TW');
+  session.status = 'completed'; session.transcriptMarkdown = fixture.sourceDialogue;
+  session.rounds = [{ id: 'fixture-round', kind: 'initial', markdown: fixture.sourceDialogue, notes: '', status: 'completed', createdAt: session.createdAt }];
+  session.observerNotes = [oldNotes];
+  let calls = 0, resolveGeneration;
+  const engine = new CoffeeEngine(session, request => {
+    calls++; request.onText?.(fixture.rawProviderResponse);
+    return new Promise(resolve => { resolveGeneration = () => resolve(fixture.rawProviderResponse); });
+  }, async () => {});
+
+  const pending = engine.refreshObserverNotes();
+  await until(() => calls === 1);
+  engine.cancel();
+  resolveGeneration();
+  await pending;
+
+  assert.deepEqual(plain(engine.session.observerNotes), [oldNotes]);
+  assert.equal(engine.session.observerDraftMarkdown, fixture.rawProviderResponse);
+  assert.match(engine.error, /已停止|stopped|cancelled/i);
+  assert.equal(engine.session.dirtyNotes, true);
+});
+
+test('Coffee VAM source includes only explicitly selected accepted insights', () => {
+  const { buildCoffeeSource } = load('experiences/coffee-tables/handoff-source.ts');
+  const session = { ...coffeeSession(), topic: 'Accepted ideas only', status: 'completed', rounds: [{id:'r1',status:'completed',createdAt:'now',markdown:'P source line.\nQ source line.\nR source line.',notes:''}], observerNotes: [
+    '# Observer’s notes\n\n## Questions worth pursuing\n- Keep P insight <!-- coffee-insight:v1:id=accepted-p --> <!-- source: P source line. -->\n  - Reason: P reason.\n- Keep Q insight <!-- coffee-insight:v1:id=accepted-q --> <!-- source: Q source line. -->\n  - Dissent: Q dissent.\n- Keep R insight <!-- coffee-insight:v1:id=unaccepted-r --> <!-- source: R source line. -->\n  - Limitation: R remains unaccepted.'
+  ] };
+
+  const source = buildCoffeeSource(session, ['accepted-p', 'accepted-q']);
+  assert.match(source.sourceSnapshot, /Keep P insight/);
+  assert.match(source.sourceSnapshot, /Keep Q insight/);
+  assert.doesNotMatch(source.sourceSnapshot, /Keep R insight|R remains unaccepted/);
+  assert.match(source.content, /P source line\./);
+  assert.match(source.content, /Q source line\./);
+  assert.doesNotMatch(source.content, /R source line\.|R remains unaccepted/);
+  assert.notEqual(source.artifactId, buildCoffeeSource(session, 'accepted-p').artifactId);
+  assert.throws(() => buildCoffeeSource(session, []), /select at least one/i);
+  assert.throws(() => buildCoffeeSource(session, ['accepted-p', 'missing']), /selected insight changed/i);
 });
 
 integrationTest('Thinking Origin survives managed updates and hostile Markdown headings', async () => {

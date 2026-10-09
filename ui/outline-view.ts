@@ -4,7 +4,6 @@ import type { MapDocument, MapNode } from "../map-model";
 import type { CoffeeNavigationSnapshot } from "../experiences/coffee-tables/segments";
 
 export const OUTLINE_VIEW_TYPE = "visual-agent-map-outline";
-
 export class OutlineView extends ItemView {
   private map: MapDocument | null = null;
   private titles = new Map<string, string>();

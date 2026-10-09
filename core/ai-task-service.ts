@@ -1,11 +1,11 @@
 import { packReferenceChunks, referenceBatches, referenceCatalog, resolveReferenceLinks } from "../ai/reference-materials";
 import { buildPreparedTaskContext, estimateTokens } from "../ai/context-builder";
-import { effectiveReasoningLevel, normalizeReasoningLevel, researchGuidance, researchLimits } from "../ai/task-policy";
+import { effectiveReasoningLevel, normalizeReasoningLevel, researchGuidance } from "../ai/task-policy";
 import type { AiResult, ReasoningLevel, TaskContext } from "../ai/types";
 import { translate, t, type TranslationKey, type UiLanguage } from "../i18n";
 import responseSchema from "../response-schema.json";
 import { CLAUDE_MODEL_CHOICES, providerForModel, providerModelId } from "../ai/providers/provider";
-import type { CodexAppServerRuntime } from "../ai/runtime/codex-app-server";
+import type { CodexAppServerRuntime, CodexWebSearchEvent } from "../ai/runtime/codex-app-server";
 import type { ClaudeCodeCliRuntime } from "../ai/runtime/claude-code-cli";
 import type { AiExchangeLog } from "../ai-exchange-log";
 import { visualGuidance } from "../ai/visual-guidance";
@@ -56,7 +56,9 @@ export class AiTaskService {
     reasoning?: unknown,
     signal?: AbortSignal,
     onExchange?: (id: string) => void,
-    onRequestAccepted?: () => void
+    onRequestAccepted?: () => void,
+    /** Receives opaque native Codex webSearch events; results may contain snippets only, not page bodies. */
+    onWebSearchEvent?: (event: CodexWebSearchEvent) => void
   ): Promise<AiResult> {
     const provider = providerForModel(model);
     if (provider === "claude" && !CLAUDE_MODEL_CHOICES.some(choice => choice.id === model)) {
@@ -96,7 +98,9 @@ export class AiTaskService {
       translate(outputLanguage, "prompt.json"),
       translate(outputLanguage, context.mode === "task" ? "prompt.general_task" : context.mode === "decompose" ? "prompt.decompose" : context.mode === "synthesize" ? "prompt.synthesize" : "prompt.default_task"),
       context.mode !== "decompose"
-        ? translate(outputLanguage, "prompt.detail_structure", ["detail.core_conclusions", "detail.key_knowledge", "detail.evidence_and_sources", "detail.tradeoffs_and_limitations", "detail.open_questions", "detail.update_log"].map(key => `### ${translate(outputLanguage, key as TranslationKey)}`).join(", "))
+        ? context.detailFormat === "adaptive"
+          ? translate(outputLanguage, "prompt.adaptive_detail_structure")
+          : translate(outputLanguage, "prompt.detail_structure", ["detail.core_conclusions", "detail.key_knowledge", "detail.evidence_and_sources", "detail.tradeoffs_and_limitations", "detail.open_questions", "detail.update_log"].map(key => `### ${translate(outputLanguage, key as TranslationKey)}`).join(", "))
         : "",
       researchGuidance(context, outputLanguage),
       ...visualGuidance(context, outputLanguage),
@@ -125,7 +129,10 @@ export class AiTaskService {
       const controls = {
         signal,
         onAccepted: onRequestAccepted,
-        searchBudget: context.researchMode === "local" ? 0 : researchLimits(context.researchDepth).searches,
+        // Search depth guides investigation; it does not impose a per-task query cap.
+        // Codex uses 0 as no steering budget; Claude receives webSearch separately.
+        searchBudget: 0,
+        webSearch: context.researchMode !== "local",
         onRequest: (request: unknown): void => {
           stage = "等待 AI 回覆";
           if (this.options.exchangeLoggingEnabled()) exchanges?.sent(exchangeId, JSON.stringify(request, null, 2));
@@ -133,7 +140,7 @@ export class AiTaskService {
       };
       const raw = provider === "claude"
         ? await this.options.claudeRuntime(pluginDirectory).runTask(instructions, providerModelId(model), effort, responseSchema, controls)
-        : await this.options.codexRuntime(pluginDirectory, context.researchMode === "local").runTask(instructions, model, effort, responseSchema, controls);
+        : await this.options.codexRuntime(pluginDirectory, context.researchMode === "local").runTask(instructions, model, effort, responseSchema, { ...controls, onWebSearchEvent });
       stage = "解析 AI 回覆";
       if (this.options.exchangeLoggingEnabled()) exchanges?.received(exchangeId, raw);
       const result = this.parseAiResult(raw, provider === "claude" ? "Claude Code" : "Codex App Server", outputLanguage);

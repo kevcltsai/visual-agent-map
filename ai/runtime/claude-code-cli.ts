@@ -21,6 +21,7 @@ export interface ClaudeCodeCliOptions {
 export interface ClaudeTaskControls {
   signal?: AbortSignal;
   searchBudget?: number;
+  webSearch?: boolean;
   onRequest?: (request: unknown) => void;
   onAccepted?: () => void;
   onProgress?: (message: string) => void;
@@ -79,7 +80,7 @@ export class ClaudeCodeCliRuntime {
 
   async runTask(prompt: string, model: string, effort: string, outputSchema: unknown, controls: ClaudeTaskControls = {}): Promise<string> {
     if (controls.signal?.aborted) throw abortError();
-    const webSearch = (controls.searchBudget ?? 0) > 0;
+    const webSearch = controls.webSearch ?? (controls.searchBudget ?? 0) > 0;
     const args = claudeTaskArgs(model, effort, outputSchema, webSearch);
     if (controls.onText && !outputSchema) { args[args.indexOf("json")] = "stream-json"; args.push("--include-partial-messages"); if (controls.onSteer) args.push("--input-format", "stream-json"); }
     controls.onRequest?.({ provider: "claude", executable: this.options.executable, args: args.map((arg, index) => index === args.indexOf(JSON.stringify(claudeOutputSchema(outputSchema))) ? "<response-schema>" : arg), input: "<VAM prompt via stdin>" });

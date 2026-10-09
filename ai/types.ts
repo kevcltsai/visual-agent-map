@@ -30,6 +30,8 @@ export interface TaskContext {
   signal?: AbortSignal;
   outputLanguage?: UiLanguage;
   mode?: AiTaskKind;
+  /** Let a task choose its Markdown structure while retaining the structured result contract. */
+  detailFormat?: "adaptive";
   researchMode?: ResearchMode;
   researchDepth?: ResearchDepth;
   visualMode?: VisualMode;

@@ -920,7 +920,31 @@ export class VisualAgentMapView extends ItemView {
       throw error;
     }
   }
-  private async retryMindSearchSubtopics(branchId: string): Promise<void> {
+  private renderMindSearchFailure(card: HTMLElement, branch: import("../../map-model").MindSearchBranchRecord): void {
+    const runs = this.map?.mindSearch?.runs.filter(run => run.branchId === branch.id) ?? [];
+    const latest = runs.at(-1), attempt = latest?.attempts.find(item => item.id === latest.currentAttemptId);
+    if (attempt?.status !== "failed" && !branch.researchPlanError) return;
+    const box = card.createDiv({ cls: "vam-mindsearch-failure" });
+    box.createEl("p", { text: t("ui.mindsearch_failure_reason", attempt?.stopReason || branch.researchPlanError || t("ui.expansion_failed")) });
+    const phase = attempt?.phase ?? branch.deliveryRecovery?.phase ?? (branch.researchPlanError ? "research-plan" : undefined);
+    const labels: Record<string, string> = {
+      "subtopic-research": t("ui.mindsearch_stage_subtopic"), "report-review": t("ui.mindsearch_stage_review"), "research-plan": t("ui.mindsearch_stage_plan"),
+      "delivery-outline": t("ui.mindsearch_stage_delivery-outline"), "delivery-research": t("ui.mindsearch_stage_delivery-research"),
+      "delivery-writing": t("ui.mindsearch_stage_delivery-writing"), "delivery-acceptance": t("ui.mindsearch_stage_delivery-acceptance")
+    };
+    if (phase && labels[phase]) box.createEl("p", { text: t("ui.mindsearch_failure_stage", labels[phase]) });
+    const timedOut = /超過.*分鐘|timed?\s*out|timeout|exceeded.*minutes/i.test(attempt?.stopReason ?? branch.researchPlanError ?? "");
+    const reason = attempt?.stopReason ?? branch.researchPlanError ?? "";
+    const remedy = timedOut ? "ui.mindsearch_repair_timeout_hint" : /auth|login|sign.in|登入|unauthorized|quota|rate.limit/i.test(reason) ? "ui.mindsearch_repair_auth_hint" : /format|schema|JSON|marker|格式|分類/i.test(reason) ? "ui.mindsearch_repair_format_hint" : /search|搜尋|網路|network/i.test(reason) ? "ui.mindsearch_repair_search_hint" : "ui.mindsearch_repair_retry_hint";
+    box.createEl("p", { text: t(remedy) });
+    if (timedOut) this.button(box, t("ui.mindsearch_repair_timeout"), () => {
+      const terminal = [...branch.results].reverse().find(result => result.kind !== "research");
+      if (terminal) void this.continueMindSearchResearch(branch.questionNodeId, terminal.runId, 600_000);
+      else void this.retryMindSearchSubtopics(branch.id, 600_000);
+    }, this.mindSearchBusy).addClass("mod-cta");
+  }
+
+  private async retryMindSearchSubtopics(branchId: string, timeoutMs?: number): Promise<void> {
     const branch = this.map?.mindSearch?.branches.find(item => item.id === branchId), question = branch && this.map?.nodes.find(item => item.id === branch.questionNodeId);
     const note = question && this.notes.get(question.id);
     if (this.closed || !this.path || !branch || !question || !note || this.mindSearchBusy) return;
@@ -931,6 +955,7 @@ export class VisualAgentMapView extends ItemView {
     const epoch = this.mindSearchViewEpoch, mapPath = this.path, controller = new AbortController();
     this.mindSearchBusy = true; this.mindSearchController = controller; this.mindSearchActiveQuestionNodeId = question.id; this.mindSearchActivityKind = "research"; this.render();
     try {
+      if (timeoutMs) await this.plugin.mutate(() => this.mindSearchRuns.configureRetryTimeout(mapPath, branch.id, timeoutMs));
       const result = branch.researchPlan
         ? await this.mindSearchManual.resumeAnswerResearch(mapPath, branch.id, note.model, note.reasoning, controller.signal)
         : await this.mindSearchManual.retryAnswerResearch(mapPath, branch.id, note.model, note.reasoning, controller.signal);
@@ -1044,7 +1069,7 @@ export class VisualAgentMapView extends ItemView {
       if (this.mindSearchController === controller) { this.mindSearchBusy = false; this.mindSearchController = null; this.mindSearchActiveQuestionNodeId = null; this.mindSearchActivityKind = null; if (this.mindSearchViewIsCurrent(epoch, mapPath)) this.render(); }
     }
   }
-  private async continueMindSearchResearch(questionNodeId: string, runId: string): Promise<void> {
+  private async continueMindSearchResearch(questionNodeId: string, runId: string, timeoutMs?: number): Promise<void> {
     const mapPath = this.path, epoch = this.mindSearchViewEpoch;
     if (this.closed || !mapPath || !this.map?.mindSearch || this.mindSearchBusy || this.builtIn) return;
     const run = this.map.mindSearch.runs.find(item => item.id === runId);
@@ -1054,6 +1079,7 @@ export class VisualAgentMapView extends ItemView {
     this.mindSearchBusy = true; this.mindSearchController = controller; this.mindSearchActiveQuestionNodeId = questionNodeId; this.mindSearchActivityKind = "research"; this.render();
     const isCurrent = () => this.mindSearchViewIsCurrent(epoch, mapPath) && this.mindSearchController === controller;
     try {
+      if (timeoutMs && branch) await this.plugin.mutate(() => this.mindSearchRuns.configureRetryTimeout(mapPath, branch.id, timeoutMs));
       const result = await this.mindSearchManual.continuePartial(mapPath, runId, undefined, undefined, controller.signal);
       if (!isCurrent()) return;
       if (result.status === "waiting-user") new Notice(t("ui.mindsearch_waiting_user"));
@@ -1663,6 +1689,10 @@ export class VisualAgentMapView extends ItemView {
       statusbar.createSpan({ cls: "vam-mindsearch-status-title", text: "MindSearch" });
       statusbar.createSpan({ cls: `vam-mindsearch-status-value vam-status-${stateClass}`, text: stateText });
       if (this.mindSearchBusy) this.button(statusbar, t("ui.stop_research"), () => { this.mindSearchController?.abort(); });
+      const attribution = this.contentEl.createDiv("vam-mindsearch-attribution");
+      attribution.createSpan({ text: t("ui.mindsearch_attribution") });
+      attribution.createEl("a", { text: t("ui.mindsearch_source_project"), href: "https://github.com/InternLM/MindSearch", attr: { target: "_blank", rel: "noopener noreferrer" } });
+      attribution.createEl("a", { text: t("ui.mindsearch_source_paper"), href: "https://arxiv.org/abs/2407.20183", attr: { target: "_blank", rel: "noopener noreferrer" } });
     }
     if (!this.builtIn && this.map?.mindSearch && selectedNode?.mindSearchKind === "question" && selectedNode.mindSearchQuestion) {
       const actions = toolbar.createDiv("vam-mindsearch-actions");
@@ -1824,7 +1854,7 @@ export class VisualAgentMapView extends ItemView {
         if (note) { const rename = this.button(header, "✎", () => new NameModal(this.app, t("ui.new_topic_name"), note.title, title => this.enqueue(() => this.noteChange(node, { title }))).open()); rename.addClass("vam-node-tool"); rename.setAttr("aria-label", t("ui.new_topic_name")); }
       }
       if (node.mindSearchKind === "question") { const remove = this.button(header, "×", () => this.confirmRemoveNode(node)); remove.addClass("vam-node-tool"); remove.setAttr("aria-label", t("ui.remove_from_map")); }
-      if (this.map?.mindSearch && (node.mindSearchKind === "synthesis" || node.mindSearchKind === "conclusion") && this.map.mindSearch.branches.some(branch => branch.results.some(result => result.nodeId === node.id))) {
+      if (this.map?.mindSearch && node.mindSearchKind === "synthesis" && this.map.mindSearch.branches.some(branch => branch.results.some(result => result.nodeId === node.id))) {
         const next = this.button(header, t("ui.mindsearch_new_question"), () => void this.planMindSearchFromSelection(node.id), this.mindSearchBusy);
         next.addClass("vam-node-tool");
         next.setAttr("aria-label", t("ui.mindsearch_new_question_hint"));
@@ -1859,6 +1889,7 @@ export class VisualAgentMapView extends ItemView {
       } else if (!activeInitialRun && terminalAttempt?.status === "partial" && terminalRun) {
         this.button(card, t("ui.mindsearch_continue_research"), () => void this.continueMindSearchResearch(node.id, terminalRun.id), this.mindSearchBusy).addClass("vam-mindsearch-retry");
       } else if (!activeInitialRun && !terminalResult) {
+        this.renderMindSearchFailure(card, initialBranch);
         const label = initialBranch.researchPlan || initialBranch.results.length ? t("ui.mindsearch_continue_research") : t("ui.mindsearch_retry_subtopics");
         this.button(card, label, () => void this.retryMindSearchSubtopics(initialBranch.id), this.mindSearchBusy).addClass("vam-mindsearch-retry");
       }
@@ -1866,6 +1897,7 @@ export class VisualAgentMapView extends ItemView {
     if (node.mindSearchKind === "question" && this.map?.mindSearch) {
       const branch = this.map.mindSearch.branches.find(item => item.questionNodeId === node.id);
       if (branch) {
+        this.renderMindSearchFailure(card, branch);
         const labels = node.mindSearchQuestion?.options.filter(option => branch.answerSnapshot.selections.includes(option.id)).map(option => option.label) ?? branch.answerSnapshot.selections;
         const answer = [...labels, branch.answerSnapshot.freeText].filter(Boolean).join(" — ");
         card.createEl("p", { cls: "vam-mindsearch-answer-snapshot", text: `${t("ui.mindsearch_answer_snapshot")}: ${answer || t("ui.mindsearch_unknown_answer")}` });
@@ -1885,7 +1917,7 @@ export class VisualAgentMapView extends ItemView {
             retry.addClass("vam-mindsearch-retry"); retry.disabled = this.mindSearchBusy;
           }
         } else if (!activeBranchRun && !terminalResult) {
-          this.button(card, t("ui.mindsearch_continue_research"), () => void this.retryMindSearchSubtopics(branch.id), this.mindSearchBusy).addClass("vam-mindsearch-retry");
+          this.button(card, t(branch.deliveryRecovery ? "ui.mindsearch_resume_stage" : "ui.mindsearch_continue_research"), () => void this.retryMindSearchSubtopics(branch.id), this.mindSearchBusy).addClass("vam-mindsearch-retry");
         }
       }
     }

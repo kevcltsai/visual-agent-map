@@ -62,6 +62,7 @@ export class AiTaskService {
     /** Receives opaque native Codex webSearch events; results may contain snippets only, not page bodies. */
     onWebSearchEvent?: (event: CodexWebSearchEvent) => void
   ): Promise<AiResult> {
+    if (input.timeoutMs !== undefined && (!Number.isInteger(input.timeoutMs) || input.timeoutMs < 180_000 || input.timeoutMs > 600_000)) throw new Error("Invalid AI task timeout.");
     const provider = providerForModel(model);
     if (provider === "claude" && !CLAUDE_MODEL_CHOICES.some(choice => choice.id === model)) {
       throw new Error(t("ui.claude_model_is_not_supported_0", model));
@@ -130,6 +131,8 @@ export class AiTaskService {
     try {
       const controls = {
         signal,
+        ...(input.timeoutMs !== undefined ? { timeoutMs: Math.min(600_000, Math.max(180_000, input.timeoutMs)), timeoutMessage: translate(outputLanguage, "ui.mindsearch_task_timeout", Math.ceil(Math.min(600_000, Math.max(180_000, input.timeoutMs)) / 60_000)) } : {}),
+        ...(context.mindSearchIsolatedResearch ? { webSearchOnly: context.researchMode !== "local", textOnly: context.researchMode === "local" } : {}),
         onAccepted: onRequestAccepted,
         // Search depth guides investigation; it does not impose a per-task query cap.
         // Codex uses 0 as no steering budget; Claude receives webSearch separately.
@@ -141,7 +144,9 @@ export class AiTaskService {
         }
       };
       const isMindSearchGapAudit = context.responseContract === "mindsearch-gap-audit" && context.promptProfile === "mindsearch" && context.researchMode === "local";
-      const schema = isMindSearchGapAudit ? mindSearchGapAuditSchema : responseSchema;
+      const isDeliveryAcceptance = context.responseContract === "mindsearch-delivery-acceptance" && context.promptProfile === "mindsearch" && context.researchMode === "local";
+      const deliverySchema = { ...responseSchema, properties: { ...responseSchema.properties, summary: { type: "string", description: "A short plain-language preview. Never put machine-readable review markers here." }, detail: { type: "string", pattern: "^\\s*<!--\\s*mindsearch-review\\s+\\{[^\\r\\n]*\\}\\s*-->", description: "Begin with the COMPLETE first-line MindSearch review marker containing decision and rationale (and stopReason for conclude). Put the marker in detail only, followed by the acceptance explanation. Never split or truncate the marker." } } };
+      const schema = isMindSearchGapAudit ? mindSearchGapAuditSchema : isDeliveryAcceptance ? deliverySchema : responseSchema;
       const raw = provider === "claude"
         ? await this.options.claudeRuntime(pluginDirectory).runTask(instructions, providerModelId(model), effort, schema, controls)
         : await this.options.codexRuntime(pluginDirectory, context.researchMode === "local").runTask(instructions, model, effort, schema, { ...controls, onWebSearchEvent });

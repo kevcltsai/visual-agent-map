@@ -41,6 +41,9 @@
 .vam-mindsearch-status-title { font-size: var(--font-ui-small); font-weight: 800; letter-spacing: .02em; }
 .vam-mindsearch-status-value { font-size: var(--font-ui-small); font-weight: 650; }
 .vam-mindsearch-statusbar.is-active { background: var(--background-modifier-hover); }
+.vam-mindsearch-attribution { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 10px; padding: 6px 14px; border-bottom: 1px solid var(--background-modifier-border); color: var(--text-muted); font-size: var(--font-ui-smaller); line-height: 1.5; }
+.vam-mindsearch-attribution a { white-space: nowrap; }
+.vam-mindsearch-attribution a:focus-visible { outline: 2px solid var(--interactive-accent); outline-offset: 2px; }
 .vam-node-header .vam-mindsearch-question-status { margin-right: auto; padding: 4px 10px; border: 1px solid var(--background-modifier-border); font-size: 12px; font-weight: 700; }
 .vam-mindsearch-start { display: flex; width: 100%; justify-content: center; margin-top: 12px; min-height: 36px; }
 .vam-node[data-mindsearch-kind="conclusion"] { isolation: isolate; border: 0; background: transparent; box-shadow: none; }
@@ -612,3 +615,6 @@ body .workspace-leaf-content.vam-topic-markdown .markdown-source-view.mod-cm6 .m
 .ct-protected-rules { margin-top:16px; color:var(--text-muted); }
 .ct-convergence-proposal { padding:16px 0; border-bottom:1px solid var(--background-modifier-border); }
 .ct-convergence-proposal label { margin-top:10px; }
+
+.vam-mindsearch-failure { margin-top: 8px; padding: 8px; border-left: 3px solid var(--text-error); background: var(--background-secondary); font-size: var(--font-smallest); overflow-wrap: anywhere; }
+.vam-mindsearch-failure p { margin: 0 0 6px; }

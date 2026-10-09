@@ -4,7 +4,7 @@ const vm = require('node:vm');
 const { buildSync } = require('esbuild');
 const code = buildSync({ entryPoints: ['experiences/mind-search/final-delivery.ts'], bundle: true, write: false, platform: 'node', format: 'cjs' }).outputFiles[0].text;
 const moduleValue = { exports: {} };
-vm.runInNewContext(code, { module: moduleValue, exports: moduleValue.exports });
+vm.runInNewContext(code, { module: moduleValue, exports: moduleValue.exports, require });
 const { parseDeliveryOutline, buildFinalDelivery } = moduleValue.exports;
 const base = { title: 'Goal', detail: 'Known conditions and prior reports', signal: new AbortController().signal };
 const outline = '<!-- mindsearch-delivery-outline {"sections":[{"heading":"Steps","purpose":"Execute the goal","searchTask":"Find concrete examples"}]} -->';
@@ -15,6 +15,7 @@ test('final delivery follows outline, web research, full writing and acceptance'
   const delivery = await buildFinalDelivery(base, async context => { calls.push(context); return result(outputs[calls.length - 1]); });
   assert.equal(calls.length, 4);
   assert.equal(calls[1].researchMode, 'research');
+  assert.equal(calls[1].mindSearchIsolatedResearch, true);
   assert.equal(calls[2].researchMode, 'local');
   assert.ok(calls[2].task.includes('https://example.org/docs'));
   assert.ok(calls[3].task.includes('Complete actionable document'));
@@ -39,7 +40,11 @@ test('cancellation stops before another model call', async () => {
 });
 test('acceptance can retain a research gap without converting it to completion', async () => {
   const outputs = [outline, '<!-- mindsearch-delivery-research {"status":"searched"} -->\nUnresolved resource', 'Draft', '<!-- mindsearch-review {"decision":"research_more","rationale":"Missing concrete resources"} -->\nPartial'];
-  const delivery = await buildFinalDelivery(base, async () => result(outputs.shift()));
+  const delivery = await buildFinalDelivery(base, async () => {
+    const response = result(outputs.shift());
+    if (response.detail.includes('\"decision\":\"research_more\"')) response.suggestions = [{ title: 'Concrete resource', task: 'Find a verified resource', contribution: 'Resolve the missing evidence' }];
+    return response;
+  });
   assert.ok(delivery.result.detail.includes('"research_more"'));
   assert.ok(delivery.result.detail.includes('Draft pending completion\n\nDraft'));
   assert.ok(delivery.result.detail.includes('Missing concrete resources'));

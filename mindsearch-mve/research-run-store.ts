@@ -1,3 +1,4 @@
+import { validateMindSearchResearchPlan } from "../experiences/mind-search/research-plan";
 import { createHash, randomUUID } from "node:crypto";
 import type { AiResult } from "../ai/types";
 import type { MapDocument, MindSearchBranchRecord, MindSearchMapData, MindSearchPendingCommit, MindSearchPlannerReviewRecord, MindSearchResultDraftRecord, MindSearchSearchDiagnostic } from "../map-model";
@@ -13,8 +14,8 @@ export interface NewAnswerBranch {
 export interface AttemptHandle { runId: string; attemptId: string; inputSnapshotHash: string; dispatch: boolean }
 export type CommitResult = { status: "committed"; resultId: string; notePath: string; resultStatus?: "completed" | "partial" } | { status: "stale"; runId: string; attemptId: string };
 export type ResultDraftCreation = { status: "ready"; draft: MindSearchResultDraftRecord } | { status: "stale"; runId: string; attemptId: string };
-export interface MindSearchAttemptConfig { model: string; reasoning: "low" | "medium" | "high"; maxResearchTurns: number }
-export interface MindSearchResultDraftOptions { kind?: "research" | "synthesis" | "conclusion"; subtopicId?: string; parentNodeId?: string; convergesFromNodeIds?: string[] }
+export interface MindSearchAttemptConfig { subtopicId?: string; phase?: string; model: string; reasoning: "low" | "medium" | "high"; maxResearchTurns: number }
+export interface MindSearchResultDraftOptions { reuse?: MindSearchResultDraftRecord["reuse"]; kind?: "research" | "synthesis" | "conclusion"; subtopicId?: string; parentNodeId?: string; convergesFromNodeIds?: string[] }
 
 /** Minimal MVE store: immutable user-answer snapshots, attempt fencing, and idempotent Map/Note recovery. */
 export class MindSearchRunStore {
@@ -163,11 +164,12 @@ export class MindSearchRunStore {
     return this.locked(mapPath, async () => {
       const map = await this.repository.readMap(mapPath), state = this.state(map), branch = state.branches.find(item => item.id === branchId);
       if (!branch) throw new Error("Answer branch does not exist.");
-      if (branch.researchPlan) {
+      const replaceEmptyPlan = branch.researchPlan?.length === 0 && !branch.results.length && !state.runs.some(run => run.branchId === branchId && ["running", "saving"].includes(run.attempts.find(attempt => attempt.id === run.currentAttemptId)?.status ?? ""));
+      if (branch.researchPlan && !replaceEmptyPlan) {
         if (JSON.stringify(branch.researchPlan) !== JSON.stringify(plan)) throw new Error("The saved research plan for this answer branch cannot be replaced.");
         return;
       }
-      if (plan.length < 2 || plan.length > 5 || plan.some(item => !item.id.trim() || !item.title.trim() || !item.task.trim() || !item.expectedValue.trim()) || new Set(plan.map(item => item.id)).size !== plan.length || new Set(plan.map(item => item.title.trim().toLowerCase())).size !== plan.length) throw new Error("A new MindSearch research plan needs 2–5 distinct subtopics with unique ids and titles.");
+      validateMindSearchResearchPlan(plan);
       branch.researchPlan = JSON.parse(JSON.stringify(plan)) as NonNullable<MindSearchBranchRecord["researchPlan"]>;
       delete branch.researchPlanError;
       map.mindSearch = state; await this.repository.saveMap(mapPath, map);
@@ -197,11 +199,17 @@ export class MindSearchRunStore {
     return this.locked(mapPath, async () => {
       const map = await this.repository.readMap(mapPath), state = this.state(map), branch = state.branches.find(item => item.id === branchId);
       if (!branch) throw new Error("Answer branch does not exist.");
-      if (!runId) {
-        const activeRun = state.runs.find(item => item.branchId === branchId && (() => { const attempt = item.attempts.find(candidate => candidate.id === item.currentAttemptId); return attempt?.status === "running" || attempt?.status === "saving"; })());
-        if (activeRun) {
-          const activeAttempt = activeRun.attempts.find(item => item.id === activeRun.currentAttemptId)!;
-          return { runId: activeRun.id, attemptId: activeAttempt.id, inputSnapshotHash: activeAttempt.inputSnapshotHash, dispatch: false };
+      {
+        const requestedRun = runId ? state.runs.find(item => item.id === runId) : undefined;
+        if (requestedRun && requestedRun.branchId !== branchId) throw new Error("A research run cannot move to another answer branch.");
+        const activeRuns = state.runs.filter(item => item.id !== runId && item.branchId === branchId && (() => { const attempt = item.attempts.find(candidate => candidate.id === item.currentAttemptId); return attempt?.status === "running" || attempt?.status === "saving"; })());
+        const blocked = activeRuns.find(item => {
+          const attempt = item.attempts.find(candidate => candidate.id === item.currentAttemptId)!;
+          return !config?.subtopicId || !attempt.subtopicId || attempt.subtopicId === config.subtopicId;
+        }) ?? (activeRuns.length >= 2 ? activeRuns[0] : undefined);
+        if (blocked) {
+          const activeAttempt = blocked.attempts.find(item => item.id === blocked.currentAttemptId)!;
+          return { runId: blocked.id, attemptId: activeAttempt.id, inputSnapshotHash: activeAttempt.inputSnapshotHash, dispatch: false };
         }
       }
       const id = runId ?? this.id();
@@ -221,7 +229,7 @@ export class MindSearchRunStore {
       }
       const attemptId = `attempt-${run.attempts.length + 1}`;
       const inputSnapshotHash = this.snapshotHash({ branch: branch.inputSnapshot, answer: branch.answerSnapshot });
-      run.attempts.push({ id: attemptId, inputSnapshotHash, status: "running", ...(config ? { model: config.model, reasoningLevel: config.reasoning, maxResearchTurns: config.maxResearchTurns, researchTurns: 0, plannerReviews: [] } : {}) }); run.currentAttemptId = attemptId;
+      run.attempts.push({ id: attemptId, inputSnapshotHash, status: "running", ...(config ? { subtopicId: config.subtopicId, phase: config.phase, model: config.model, reasoningLevel: config.reasoning, maxResearchTurns: config.maxResearchTurns, researchTurns: 0, plannerReviews: [] } : {}) }); run.currentAttemptId = attemptId;
       map.mindSearch = state; await this.repository.saveMap(mapPath, map);
       MindSearchRunStore.liveAttempts.add(this.liveKey(mapPath, id, attemptId));
       return { runId: id, attemptId, inputSnapshotHash, dispatch: true };
@@ -229,6 +237,40 @@ export class MindSearchRunStore {
   }
 
   releaseAttempt(mapPath: string, handle: AttemptHandle): void { MindSearchRunStore.liveAttempts.delete(this.liveKey(mapPath, handle.runId, handle.attemptId)); }
+
+  async configureRetryTimeout(mapPath: string, branchId: string, timeoutMs: number): Promise<void> {
+    if (!Number.isInteger(timeoutMs) || timeoutMs < 180_000 || timeoutMs > 600_000) throw new Error("Invalid retry timeout.");
+    await this.locked(mapPath, async () => {
+      const map = await this.repository.readMap(mapPath), state = this.state(map);
+      const branch = state.branches.find(item => item.id === branchId);
+      if (!branch) throw new Error("MindSearch branch is missing.");
+      if (state.runs.some(run => run.branchId === branchId && ["running", "saving"].includes(run.attempts.find(item => item.id === run.currentAttemptId)?.status ?? ""))) throw new Error("MindSearch branch is still running.");
+      branch.retryTimeoutMs = timeoutMs;
+      await this.repository.saveMap(mapPath, map);
+    });
+  }
+
+  async saveDeliveryRecovery(mapPath: string, handle: AttemptHandle, recovery: MindSearchBranchRecord["deliveryRecovery"]): Promise<void> {
+    await this.locked(mapPath, async () => {
+      const map = await this.repository.readMap(mapPath), state = this.state(map);
+      const run = state.runs.find(item => item.id === handle.runId), attempt = run?.attempts.find(item => item.id === handle.attemptId);
+      const branch = state.branches.find(item => item.id === run?.branchId);
+      if (!branch || !run || !attempt || run.currentAttemptId !== handle.attemptId || attempt.status !== "running" || attempt.inputSnapshotHash !== handle.inputSnapshotHash || this.snapshotHash({ branch: branch.inputSnapshot, answer: branch.answerSnapshot }) !== handle.inputSnapshotHash) throw new Error("The MindSearch attempt is no longer current.");
+      if (recovery?.phase) attempt.phase = recovery.phase;
+      branch.deliveryRecovery = recovery ? JSON.parse(JSON.stringify(recovery)) as MindSearchBranchRecord["deliveryRecovery"] : undefined;
+      await this.repository.saveMap(mapPath, map);
+    });
+  }
+
+  async recordPhase(mapPath: string, handle: AttemptHandle, phase: string): Promise<void> {
+    await this.locked(mapPath, async () => {
+      const map = await this.repository.readMap(mapPath), state = this.state(map);
+      const run = state.runs.find(item => item.id === handle.runId), attempt = run?.attempts.find(item => item.id === handle.attemptId);
+      if (!run || !attempt || run.currentAttemptId !== handle.attemptId || attempt.status !== "running" || attempt.inputSnapshotHash !== handle.inputSnapshotHash) throw new Error("The MindSearch attempt is no longer current.");
+      attempt.phase = phase;
+      await this.repository.saveMap(mapPath, map);
+    });
+  }
 
   async recordResearchTurn(mapPath: string, handle: AttemptHandle): Promise<number> {
     return this.locked(mapPath, async () => {
@@ -340,7 +382,7 @@ export class MindSearchRunStore {
       const siblingCount = map.nodes.filter(item => item.parentId === parentNodeId).length;
       const kind = options.kind ?? "research";
       const node = { id: nodeId, path: notePath, parentId: parentNodeId, x: parent.x + 360, y: parent.y + 180 + siblingCount * 220, collapsed: false, mindSearchKind: kind, ...(options.convergesFromNodeIds?.length ? { mindSearchConvergesFromNodeIds: [...options.convergesFromNodeIds] } : {}) };
-      const draft: MindSearchResultDraftRecord = { id: this.id(), branchId: branch.id, nodeId, notePath, title, status: "creating", runId: run.id, attemptId: attempt.id, inputSnapshotHash: attempt.inputSnapshotHash, kind, ...(options.subtopicId ? { subtopicId: options.subtopicId } : {}), ...(parentNodeId !== branch.questionNodeId ? { parentNodeId } : {}), ...(options.convergesFromNodeIds?.length ? { convergesFromNodeIds: [...options.convergesFromNodeIds] } : {}), ...(attempt.model ? { model: attempt.model } : {}), ...(attempt.reasoningLevel ? { reasoning: attempt.reasoningLevel } : {}) };
+      const draft: MindSearchResultDraftRecord = { id: this.id(), branchId: branch.id, nodeId, notePath, title, status: "creating", runId: run.id, attemptId: attempt.id, inputSnapshotHash: attempt.inputSnapshotHash, kind, ...(options.reuse ? { reuse: JSON.parse(JSON.stringify(options.reuse)) as MindSearchResultDraftRecord["reuse"] } : {}), ...(options.subtopicId ? { subtopicId: options.subtopicId } : {}), ...(parentNodeId !== branch.questionNodeId ? { parentNodeId } : {}), ...(options.convergesFromNodeIds?.length ? { convergesFromNodeIds: [...options.convergesFromNodeIds] } : {}), ...(attempt.model ? { model: attempt.model } : {}), ...(attempt.reasoningLevel ? { reasoning: attempt.reasoningLevel } : {}) };
       map.nodes.push(node); state.resultDrafts ??= []; state.resultDrafts.push(draft); map.mindSearch = state;
       await this.repository.saveMap(mapPath, map);
       await this.repository.createNoteAt(title, model, map, mapPath, "workspace", notePath, nodeId, { summary: "MindSearch result pending synthesis.", reasoning: reasoning ?? draft.reasoning });
@@ -449,7 +491,7 @@ export class MindSearchRunStore {
     const run = state.runs.find(item => item.id === pending.runId)!;
     const attempt = run.attempts.find(item => item.id === pending.attemptId)!;
     const draft = (state.resultDrafts ?? []).find(item => item.id === pending.resultDraftId);
-    if (!branch.results.some(item => item.resultId === pending.resultId)) branch.results.push({ resultId: pending.resultId, runId: pending.runId, attemptId: pending.attemptId, nodeId: pending.nodeId, notePath: pending.notePath, version: pending.version, ...(draft?.kind ? { kind: draft.kind } : {}), ...(draft?.subtopicId ? { subtopicId: draft.subtopicId } : {}) });
+    if (!branch.results.some(item => item.resultId === pending.resultId)) branch.results.push({ resultId: pending.resultId, runId: pending.runId, attemptId: pending.attemptId, nodeId: pending.nodeId, notePath: pending.notePath, version: pending.version, ...(draft?.kind ? { kind: draft.kind } : {}), ...(draft?.subtopicId ? { subtopicId: draft.subtopicId } : {}), ...(draft?.reuse ? { reuse: draft.reuse } : {}) });
     attempt.status = pending.resultStatus === "partial" ? "partial" : "completed"; state.pendingCommits = state.pendingCommits.filter(item => item.resultId !== pending.resultId);
     state.resultDrafts = (state.resultDrafts ?? []).filter(item => item.id !== pending.resultDraftId);
   }

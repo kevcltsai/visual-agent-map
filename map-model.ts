@@ -1,3 +1,6 @@
+import { validateMindSearchResearchPlan } from "./experiences/mind-search/research-plan";
+import type { AiResult } from "./ai/types";
+import type { FinalDeliveryCheckpoint } from "./experiences/mind-search/final-delivery";
 import { t, translate } from "./i18n";
 
 export interface MapNode {
@@ -55,6 +58,17 @@ export function repairMindSearchResultConvergence(map: MapDocument): boolean {
   return changed;
 }
 
+export interface MindSearchReuseRecord { sourceBranchId: string; sourceResultId: string; sourceNotePath: string; sourceVersion: number; sourceContentHash: string; checkedAt: string; applicableConditions: Record<string, string>; rationale: string; validityReason: string }
+
+function validReuse(record: MindSearchReuseRecord | undefined): boolean {
+  return record === undefined || !!record && [record.sourceBranchId, record.sourceResultId, record.sourceNotePath, record.checkedAt, record.rationale, record.validityReason].every(value => typeof value === "string" && !!value.trim()) && Number.isInteger(record.sourceVersion) && record.sourceVersion > 0 && typeof record.sourceContentHash === "string" && /^[a-f0-9]{64}$/i.test(record.sourceContentHash) && !!record.applicableConditions && typeof record.applicableConditions === "object" && !Array.isArray(record.applicableConditions) && Object.values(record.applicableConditions).every(value => typeof value === "string");
+}
+function validDeliveryCheckpoint(checkpoint: FinalDeliveryCheckpoint): boolean {
+  const resultValid = (result: AiResult): boolean => !!result && typeof result.summary === "string" && typeof result.detail === "string" && Array.isArray(result.suggestions) && Array.isArray(result.visualReferences);
+  const hashValid = (value: string | undefined): boolean => value === undefined || typeof value === "string" && /^[a-f0-9]{64}$/i.test(value);
+  return !!checkpoint && typeof checkpoint === "object" && !Array.isArray(checkpoint) && [checkpoint.outline, checkpoint.research, checkpoint.draft, checkpoint.acceptance].every(result => result === undefined || resultValid(result)) && hashValid(checkpoint.baseFingerprint) && hashValid(checkpoint.researchFingerprint) && hashValid(checkpoint.draftFingerprint) && (checkpoint.sections === undefined || !!checkpoint.sections && typeof checkpoint.sections === "object" && !Array.isArray(checkpoint.sections) && Object.entries(checkpoint.sections).every(([key, section]) => !!key.trim() && !!section && hashValid(section.fingerprint) && typeof section.fingerprint === "string" && Array.isArray(section.evidenceIds) && section.evidenceIds.every(id => typeof id === "string" && !!id.trim()) && resultValid(section.result)));
+}
+
 export interface MindSearchBranchRecord {
   id: string;
   submissionId?: string;
@@ -66,11 +80,13 @@ export interface MindSearchBranchRecord {
   answerSnapshot: { selections: string[]; freeText: string };
   inputSnapshot: { topic: string; conditions: Record<string, string>; upstreamResults: { notePath: string; version: number }[] };
   createdAt: string;
-  researchPlan?: { id: string; title: string; task: string; expectedValue: string }[];
+  researchPlan?: { id: string; title: string; task: string; expectedValue: string; action?: "reuse" | "update" | "research"; dependsOn?: string[]; source?: { branchId: string; resultId: string; notePath: string; version: number; contentHash: string }; rationale?: string; validity?: { conditionKeys: string[]; reason: string } }[];
   researchPlanError?: string;
-  results: { resultId: string; runId: string; attemptId: string; nodeId: string; notePath: string; version: number; kind?: "research" | "synthesis" | "conclusion"; subtopicId?: string }[];
+  retryTimeoutMs?: number;
+  deliveryRecovery?: { fingerprint: string; planner: AiResult; checkpoint: FinalDeliveryCheckpoint; phase?: string; reports?: { summary: string; detail: string }; researchTurn?: number; evidence?: { id: string; hash: string; detail: string }[] };
+  results: { resultId: string; runId: string; attemptId: string; nodeId: string; notePath: string; version: number; kind?: "research" | "synthesis" | "conclusion"; subtopicId?: string; reuse?: MindSearchReuseRecord }[];
 }
-export interface MindSearchResultDraftRecord { id: string; branchId: string; nodeId: string; notePath: string; title: string; status: "creating" | "ready"; runId: string; attemptId: string; inputSnapshotHash: string; model?: string; reasoning?: "low" | "medium" | "high"; kind?: "research" | "synthesis" | "conclusion"; subtopicId?: string; parentNodeId?: string; convergesFromNodeIds?: string[] }
+export interface MindSearchResultDraftRecord { id: string; branchId: string; nodeId: string; notePath: string; title: string; status: "creating" | "ready"; runId: string; attemptId: string; inputSnapshotHash: string; model?: string; reasoning?: "low" | "medium" | "high"; kind?: "research" | "synthesis" | "conclusion"; subtopicId?: string; reuse?: MindSearchReuseRecord; parentNodeId?: string; convergesFromNodeIds?: string[] }
 export interface MindSearchPlannerReviewRecord { decision: "research_more" | "ask_user" | "conclude"; rationale: string; researchTurn: number; question?: string; answerOptions?: (string | { axisId: string; value: string })[]; answerAxis?: { id: string; label: string }; researchTarget?: { title: string; task: string; expectedValue: string } }
 export interface MindSearchSearchDiagnostic { researchTurn: number; startedEvents: number; completedEvents: number; completedSearchActions: number; otherCompletedActions: number }
 export interface MindSearchAttemptRecord {
@@ -78,6 +94,8 @@ export interface MindSearchAttemptRecord {
   inputSnapshotHash: string;
   status: "running" | "saving" | "completed" | "partial" | "failed" | "cancelled" | "superseded";
   stopReason?: string;
+  phase?: string;
+  subtopicId?: string;
   model?: string;
   reasoningLevel?: "low" | "medium" | "high";
   maxResearchTurns?: number;
@@ -199,7 +217,14 @@ function validateMindSearchMap(map: MapDocument): void {
   }
   const branchIds = new Set<string>(), submissionIds = new Set<string>();
   for (const branch of data.branches) {
-    if (!branch || typeof branch.id !== "string" || branchIds.has(branch.id) || (branch.submissionId !== undefined && (typeof branch.submissionId !== "string" || !branch.submissionId.trim() || submissionIds.has(branch.submissionId))) || (branch.sourceQuestionNodeId !== undefined && (typeof branch.sourceQuestionNodeId !== "string" || !branch.sourceQuestionNodeId.trim())) || typeof branch.questionNodeId !== "string" || !map.nodes.some(node => node.id === branch.questionNodeId) || (branch.answerNodeId !== undefined && (typeof branch.answerNodeId !== "string" || !map.nodes.some(node => node.id === branch.answerNodeId && node.mindSearchKind === "answer" && node.parentId === branch.questionNodeId))) || !(branch.parentBranchId === null || typeof branch.parentBranchId === "string") || !branch.answerSnapshot || !Array.isArray(branch.answerSnapshot.selections) || branch.answerSnapshot.selections.some(item => typeof item !== "string") || typeof branch.answerSnapshot.freeText !== "string" || !branch.inputSnapshot || typeof branch.inputSnapshot.topic !== "string" || !branch.inputSnapshot.conditions || typeof branch.inputSnapshot.conditions !== "object" || Array.isArray(branch.inputSnapshot.conditions) || !Array.isArray(branch.inputSnapshot.upstreamResults) || !Array.isArray(branch.results) || (branch.researchPlanError !== undefined && (typeof branch.researchPlanError !== "string" || !branch.researchPlanError.trim() || branch.researchPlanError.length > 500)) || (branch.researchPlan !== undefined && (!Array.isArray(branch.researchPlan) || branch.researchPlan.length < 1 || branch.researchPlan.length > 5 || branch.researchPlan.some(item => !item || typeof item.id !== "string" || !item.id.trim() || typeof item.title !== "string" || !item.title.trim() || typeof item.task !== "string" || !item.task.trim() || typeof item.expectedValue !== "string" || !item.expectedValue.trim()) || new Set(branch.researchPlan.map(item => item.id)).size !== branch.researchPlan.length || new Set(branch.researchPlan.map(item => item.title.trim().toLowerCase())).size !== branch.researchPlan.length))) throw new Error("Invalid MindSearch branch snapshot.");
+    if (!branch || typeof branch.id !== "string" || branchIds.has(branch.id) || (branch.submissionId !== undefined && (typeof branch.submissionId !== "string" || !branch.submissionId.trim() || submissionIds.has(branch.submissionId))) || (branch.sourceQuestionNodeId !== undefined && (typeof branch.sourceQuestionNodeId !== "string" || !branch.sourceQuestionNodeId.trim())) || typeof branch.questionNodeId !== "string" || !map.nodes.some(node => node.id === branch.questionNodeId) || (branch.answerNodeId !== undefined && (typeof branch.answerNodeId !== "string" || !map.nodes.some(node => node.id === branch.answerNodeId && node.mindSearchKind === "answer" && node.parentId === branch.questionNodeId))) || !(branch.parentBranchId === null || typeof branch.parentBranchId === "string") || !branch.answerSnapshot || !Array.isArray(branch.answerSnapshot.selections) || branch.answerSnapshot.selections.some(item => typeof item !== "string") || typeof branch.answerSnapshot.freeText !== "string" || !branch.inputSnapshot || typeof branch.inputSnapshot.topic !== "string" || !branch.inputSnapshot.conditions || typeof branch.inputSnapshot.conditions !== "object" || Array.isArray(branch.inputSnapshot.conditions) || !Array.isArray(branch.inputSnapshot.upstreamResults) || !Array.isArray(branch.results) || (branch.researchPlanError !== undefined && (typeof branch.researchPlanError !== "string" || !branch.researchPlanError.trim() || branch.researchPlanError.length > 500)) || (branch.researchPlan !== undefined && (!Array.isArray(branch.researchPlan) || branch.researchPlan.length > 5 || branch.researchPlan.some(item => !item || typeof item.id !== "string" || !item.id.trim() || typeof item.title !== "string" || !item.title.trim() || typeof item.task !== "string" || !item.task.trim() || typeof item.expectedValue !== "string" || !item.expectedValue.trim()) || new Set(branch.researchPlan.map(item => item.id)).size !== branch.researchPlan.length || new Set(branch.researchPlan.map(item => item.title.trim().toLowerCase())).size !== branch.researchPlan.length))) throw new Error("Invalid MindSearch branch snapshot.");
+    if (branch.researchPlan !== undefined) validateMindSearchResearchPlan(branch.researchPlan);
+    if (branch.retryTimeoutMs !== undefined && (!Number.isInteger(branch.retryTimeoutMs) || branch.retryTimeoutMs < 180_000 || branch.retryTimeoutMs > 600_000)) throw new Error("Invalid MindSearch retry timeout.");
+    if (branch.deliveryRecovery && (typeof branch.deliveryRecovery.fingerprint !== "string" || !branch.deliveryRecovery.planner || typeof branch.deliveryRecovery.planner.detail !== "string" || !validDeliveryCheckpoint(branch.deliveryRecovery.checkpoint))) throw new Error("Invalid MindSearch delivery checkpoint.");
+    if (branch.deliveryRecovery?.evidence !== undefined) {
+      const evidence = branch.deliveryRecovery.evidence;
+      if (!Array.isArray(evidence) || evidence.some(source => !source || typeof source.id !== "string" || !source.id.trim() || typeof source.hash !== "string" || !/^[a-f0-9]{64}$/i.test(source.hash) || typeof source.detail !== "string" || !source.detail.trim()) || new Set(evidence.map(source => source.id)).size !== evidence.length) throw new Error("Invalid MindSearch delivery evidence.");
+    }
     branchIds.add(branch.id);
     if (branch.submissionId) submissionIds.add(branch.submissionId);
     const questionNode = map.nodes.find(node => node.id === branch.questionNodeId)!;
@@ -217,6 +242,8 @@ function validateMindSearchMap(map: MapDocument): void {
   const validAttempt = (attempt: MindSearchAttemptRecord): boolean => {
     if (!attempt || typeof attempt.id !== "string" || typeof attempt.inputSnapshotHash !== "string") return false;
     if (!["running", "saving", "completed", "partial", "failed", "cancelled", "superseded"].includes(attempt.status)) return false;
+    if (attempt.subtopicId !== undefined && (typeof attempt.subtopicId !== "string" || !attempt.subtopicId.trim())) return false;
+    if (attempt.phase !== undefined && (typeof attempt.phase !== "string" || !attempt.phase.trim())) return false;
     if (attempt.model !== undefined && (typeof attempt.model !== "string" || !attempt.model.trim())) return false;
     if (attempt.reasoningLevel !== undefined && !["low", "medium", "high"].includes(attempt.reasoningLevel)) return false;
     if (attempt.maxResearchTurns !== undefined && (!Number.isInteger(attempt.maxResearchTurns) || attempt.maxResearchTurns < 1 || attempt.maxResearchTurns > 3)) return false;
@@ -232,7 +259,7 @@ function validateMindSearchMap(map: MapDocument): void {
   const resultIds = new Set<string>();
   for (const branch of data.branches) for (const result of branch.results) {
     const run = data.runs.find(item => item.id === result?.runId), attempt = run?.attempts.find(item => item.id === result?.attemptId);
-    if (!result || typeof result.resultId !== "string" || resultIds.has(result.resultId) || !run || run.branchId !== branch.id || !["completed", "partial"].includes(attempt?.status ?? "") || typeof result.nodeId !== "string" || typeof result.notePath !== "string" || !Number.isInteger(result.version) || result.version < 1 || (result.kind !== undefined && !["research", "synthesis", "conclusion"].includes(result.kind)) || (result.subtopicId !== undefined && (!branch.researchPlan?.some(item => item.id === result.subtopicId) || typeof result.subtopicId !== "string")) || !map.nodes.some(node => node.id === result.nodeId && node.path === result.notePath && (node.parentId === (branch.answerNodeId ?? branch.questionNodeId) || branch.results.some(parent => parent.nodeId === node.parentId)))) throw new Error("Invalid MindSearch branch result reference.");
+    if (!result || !validReuse(result.reuse) || typeof result.resultId !== "string" || resultIds.has(result.resultId) || !run || run.branchId !== branch.id || !["completed", "partial"].includes(attempt?.status ?? "") || typeof result.nodeId !== "string" || typeof result.notePath !== "string" || !Number.isInteger(result.version) || result.version < 1 || (result.kind !== undefined && !["research", "synthesis", "conclusion"].includes(result.kind)) || (result.subtopicId !== undefined && (!branch.researchPlan?.some(item => item.id === result.subtopicId) || typeof result.subtopicId !== "string")) || !map.nodes.some(node => node.id === result.nodeId && node.path === result.notePath && (node.parentId === (branch.answerNodeId ?? branch.questionNodeId) || branch.results.some(parent => parent.nodeId === node.parentId)))) throw new Error("Invalid MindSearch branch result reference.");
     resultIds.add(result.resultId);
   }
   const drafts = data.resultDrafts ?? [];
@@ -240,7 +267,7 @@ function validateMindSearchMap(map: MapDocument): void {
   for (const draft of drafts) {
     const branch = draft && data.branches.find(item => item.id === draft.branchId);
     const run = draft && data.runs.find(item => item.id === draft.runId), attempt = run?.attempts.find(item => item.id === draft.attemptId);
-    if (!draft || typeof draft.id !== "string" || draftIds.has(draft.id) || !branch || typeof draft.nodeId !== "string" || typeof draft.notePath !== "string" || !draft.notePath.endsWith(".md") || typeof draft.title !== "string" || (draft.status !== "creating" && draft.status !== "ready") || (draft.model !== undefined && (typeof draft.model !== "string" || !draft.model.trim())) || (draft.reasoning !== undefined && !["low", "medium", "high"].includes(draft.reasoning)) || (draft.kind !== undefined && !["research", "synthesis", "conclusion"].includes(draft.kind)) || (draft.subtopicId !== undefined && !branch.researchPlan?.some(item => item.id === draft.subtopicId)) || run?.branchId !== branch.id || !attempt || attempt.inputSnapshotHash !== draft.inputSnapshotHash || !map.nodes.some(node => node.id === draft.nodeId && node.path === draft.notePath && node.parentId === (draft.parentNodeId ?? branch.answerNodeId ?? branch.questionNodeId))) throw new Error("Invalid MindSearch result draft.");
+    if (!draft || !validReuse(draft.reuse) || typeof draft.id !== "string" || draftIds.has(draft.id) || !branch || typeof draft.nodeId !== "string" || typeof draft.notePath !== "string" || !draft.notePath.endsWith(".md") || typeof draft.title !== "string" || (draft.status !== "creating" && draft.status !== "ready") || (draft.model !== undefined && (typeof draft.model !== "string" || !draft.model.trim())) || (draft.reasoning !== undefined && !["low", "medium", "high"].includes(draft.reasoning)) || (draft.kind !== undefined && !["research", "synthesis", "conclusion"].includes(draft.kind)) || (draft.subtopicId !== undefined && !branch.researchPlan?.some(item => item.id === draft.subtopicId)) || run?.branchId !== branch.id || !attempt || attempt.inputSnapshotHash !== draft.inputSnapshotHash || !map.nodes.some(node => node.id === draft.nodeId && node.path === draft.notePath && node.parentId === (draft.parentNodeId ?? branch.answerNodeId ?? branch.questionNodeId))) throw new Error("Invalid MindSearch result draft.");
     draftIds.add(draft.id);
   }
   for (const pending of data.pendingCommits) {

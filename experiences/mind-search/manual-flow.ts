@@ -11,6 +11,8 @@ import { effectiveReasoningLevel, normalizeReasoningLevel } from "../../ai/task-
 import { estimateTokens } from "../../ai/context-builder";
 import { extractPlannerQuestionCandidate, MINDSEARCH_MAX_RESEARCH_TURNS, parseMindSearchPlannerReview, parseMindSearchPlannerReviewWithRecovery, type PlannerReviewRecoveryContext } from "../../mindsearch-mve/planner-review";
 import { extractMindSearchFailedReport } from "./retry-targets";
+import { researchContentHash, validateMindSearchResearchPlan, type MindSearchResearchPlan, type MindSearchResearchTarget } from "./research-plan";
+import { scheduleMindSearchResearch } from "./research-scheduler";
 
 export const MINDSEARCH_UNKNOWN_OPTION_ID = "__mindsearch_unknown__";
 export const MINDSEARCH_NO_QUESTION = "__MINDSEARCH_NO_QUESTION__";
@@ -70,16 +72,7 @@ function normalizePersistedAnswerOptions(options: unknown): string[] {
   });
 }
 
-type MindSearchResearchPlan = NonNullable<MindSearchBranchRecord["researchPlan"]>;
-
-function validateMindSearchResearchPlan(subtopics: unknown): MindSearchResearchPlan {
-  if (!Array.isArray(subtopics) || subtopics.length < 2 || subtopics.length > 5 || subtopics.some(item => !item || typeof item !== "object" || ["id", "title", "task", "expectedValue"].some(key => typeof (item as Record<string, unknown>)[key] !== "string" || !(item as Record<string, string>)[key].trim()))) throw new Error("Planner must return 2–5 valid research subtopics before the answer can proceed.");
-  const plan = subtopics as MindSearchResearchPlan;
-  if (new Set(plan.map(item => item.id)).size !== plan.length || new Set(plan.map(item => item.title.trim().toLowerCase())).size !== plan.length) throw new Error("Planner research subtopics must have unique ids and titles.");
-  return plan;
-}
-
-function parseMindSearchResearchPlan(result: Pick<AiResult, "detail" | "suggestions">): MindSearchResearchPlan {
+export function parseMindSearchResearchPlan(result: Pick<AiResult, "detail" | "suggestions">): MindSearchResearchPlan {
   const marked = result.detail.match(/<!--\s*mindsearch-plan\s+([\s\S]*?)\s*-->/);
   const unmarked = marked ? null : result.detail.match(/\{\s*"subtopics"\s*:\s*\[[\s\S]*?\]\s*\}/);
   const payload = marked?.[1] ?? unmarked?.[0];
@@ -91,7 +84,7 @@ function parseMindSearchResearchPlan(result: Pick<AiResult, "detail" | "suggesti
     } catch { /* Use the provider's structured suggestions below when its detail marker is malformed. */ }
   }
   const suggestions = result.suggestions;
-  if (Array.isArray(suggestions) && suggestions.length >= 2 && suggestions.length <= 5) {
+  if (Array.isArray(suggestions) && suggestions.length >= 1 && suggestions.length <= 5) {
     const plan = suggestions.map((item, index) => {
       const title = typeof item?.title === "string" ? item.title : "";
       const slug = title.trim().toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "").slice(0, 32) || "subtopic";
@@ -99,10 +92,16 @@ function parseMindSearchResearchPlan(result: Pick<AiResult, "detail" | "suggesti
     });
     return validateMindSearchResearchPlan(plan);
   }
-  throw new Error("Planner must return 2–5 valid research subtopics before the answer can proceed.");
+  throw new Error("Planner must return 0–5 valid research subtopics before the answer can proceed.");
 }
 
 type PlannerReview = ReturnType<typeof parseMindSearchPlannerReview>;
+
+type ResearchCandidate = { source: NonNullable<MindSearchResearchTarget["source"]>; evidenceId: string; title: string; summary: string; detail: string; conditions: Record<string, string> };
+class ResearchWorkflowInterrupted extends Error {
+  constructor(readonly status: "stale" | "in-progress") { super(`MindSearch research is ${status}.`); }
+}
+class ReuseEvidenceRejected extends Error {}
 
 type PlannerQualityContext = {
   goal: string;
@@ -116,7 +115,12 @@ type PlannerQualityContext = {
   reportSummary: string;
   reportDetail: string;
   evidenceIds?: readonly string[];
+  deliveryEvidence?: import("./final-delivery").DeliveryEvidence[];
   preclassifiedResearchTarget?: PlannerReview["researchTarget"];
+  deliveryRecovery?: MindSearchBranchRecord["deliveryRecovery"];
+  saveDeliveryRecovery?: (checkpoint: import("./final-delivery").FinalDeliveryCheckpoint, phase?: string) => Promise<void>;
+  timeoutMs?: number;
+  setPhase?: (phase: string) => Promise<void>;
 };
 
 type ResearchGapClassification = { classification: "user_condition" | "external_evidence"; rationale: string };
@@ -218,18 +222,25 @@ export class MindSearchManualFlow {
   }
 
   /** Classifies a proposed search gap without exposing reports outside the current branch or invoking search. */
-  private async classifyResearchGap(candidate: PlannerReview, context: PlannerQualityContext, model: string, reasoning: unknown, signal?: AbortSignal): Promise<ResearchGapClassification> {
+  private async classifyResearchGap(candidate: PlannerReview, context: PlannerQualityContext, model: string, reasoning: unknown, signal?: AbortSignal, targetOnly = false): Promise<ResearchGapClassification> {
     const task = phaseTask("research-gap-audit", [
       "Audit only the gap described by this Planner research_more decision. Classify the primary missing input as user_condition or external_evidence.",
       "Use user_condition when the gap is a value, preference, constraint, or fact about this specific user's scenario that cannot be established by web sources (for example, this item's actual weight or the user's exact serving time). Do not replace such values with averages, defaults, or sibling-branch answers.",
       "Use external_evidence only when the gap is an external factual or technical claim that a targeted source search could establish. A search task that asks the web to guess a user-specific condition is user_condition.",
+      "Classify the assigned search target, not every uncertainty mentioned in the Planner rationale. A supplied range is a known condition. Finding published guidance for that range is external_evidence; obtaining this user's exact value is user_condition. Do not silently replace one task with the other.",
       'First write a concise rationale in detail, then set summary to exactly user_condition or external_evidence as the final decision. Return no suggestions or visual references. Do not use an HTML comment or replace the exact enum with prose.',
       `Original user goal: ${context.goal}\nCurrent question: ${context.currentQuestion}\nCurrent answer: ${context.currentAnswer}`,
       `Known conditions on this branch only: ${JSON.stringify(context.conditions)}`,
-      `Current branch report summaries only:\n${context.reportSummary}`,
-      `Candidate research gap:\n${JSON.stringify({ rationale: candidate.rationale, target: candidate.researchTarget, summary: candidate.summary })}`
+      ...(targetOnly ? [
+        "TARGET-ONLY RECONCILIATION: the preceding audit led to a question already answered on this path. Reassess only the unchanged assigned search target below, independently of that audit and the broader Planner rationale. Do not invent a different missing input. If the target explicitly requires an unknown user-specific value, keep user_condition; otherwise classify the external claim the target actually asks to verify.",
+        `Assigned search target (unchanged): ${JSON.stringify(candidate.researchTarget)}`
+      ] : [
+        `Current branch report summaries only:\n${context.reportSummary}`,
+        `Candidate research gap:\n${JSON.stringify({ rationale: candidate.rationale, target: candidate.researchTarget, summary: candidate.summary })}`
+      ])
     ].join("\n\n"));
-    const result = await this.askMindSearchModel({ title: context.goal, summary: "", rules: "", detail: "", task, ancestors: "", outputLanguage: this.repository.settings.language, mode: "task", researchMode: "local", researchDepth: "fast", visualMode: "off", responseContract: "mindsearch-gap-audit", signal }, model, reasoning, signal);
+    await context.setPhase?.("research-gap-audit");
+    const result = await this.askMindSearchModel({ timeoutMs: context.timeoutMs, title: context.goal, summary: "", rules: "", detail: "", task, ancestors: "", outputLanguage: this.repository.settings.language, mode: "task", researchMode: "local", researchDepth: "fast", visualMode: "off", responseContract: "mindsearch-gap-audit", signal }, model, reasoning, signal);
     throwIfAborted(signal);
     const markerPattern = /<!--\s*mindsearch-gap-audit\s+([\s\S]*?)\s*-->/g;
     const rawText = `${result.summary}\n${result.detail}`;
@@ -281,7 +292,7 @@ export class MindSearchManualFlow {
           `Original audit summary:\n${result.summary}`,
           `Original audit detail:\n${result.detail}`
         ].join("\n\n"));
-        const extracted = await this.askMindSearchModel({ title: "MindSearch audit label extractor", summary: "", rules: "", detail: "", task: extractionTask, ancestors: "", outputLanguage: this.repository.settings.language, mode: "task", researchMode: "local", researchDepth: "fast", visualMode: "off", signal }, model, reasoning, signal);
+        const extracted = await this.askMindSearchModel({ timeoutMs: context.timeoutMs, title: "MindSearch audit label extractor", summary: "", rules: "", detail: "", task: extractionTask, ancestors: "", outputLanguage: this.repository.settings.language, mode: "task", researchMode: "local", researchDepth: "fast", visualMode: "off", signal }, model, reasoning, signal);
         throwIfAborted(signal);
         const extractedCorrection = findResearchGapSelfCorrection(summaryEnum, extracted.detail.trim());
         if (extracted.summary.trim() !== correction.classification || extracted.detail.trim() !== correction.quote || !result.detail.includes(extracted.detail.trim()) || extractedCorrection?.classification !== correction.classification) {
@@ -322,7 +333,7 @@ export class MindSearchManualFlow {
       `Original audit summary:\n${result.summary}`,
       `Original audit detail:\n${result.detail}`
     ].join("\n\n"));
-    const formatted = await this.askMindSearchModel({ title: context.goal, summary: "", rules: "", detail: "", task: repairTask, ancestors: "", outputLanguage: this.repository.settings.language, mode: "task", researchMode: "local", researchDepth: "fast", visualMode: "off", signal }, model, reasoning, signal);
+    const formatted = await this.askMindSearchModel({ timeoutMs: context.timeoutMs, title: context.goal, summary: "", rules: "", detail: "", task: repairTask, ancestors: "", outputLanguage: this.repository.settings.language, mode: "task", researchMode: "local", researchDepth: "fast", visualMode: "off", signal }, model, reasoning, signal);
     throwIfAborted(signal);
     const formattedClass = normalizeClassification(formatted.summary.trim());
     const verbatimQuote = formatted.detail.trim();
@@ -333,19 +344,21 @@ export class MindSearchManualFlow {
     return accept(onlyMentionedClass, verbatimQuote);
   }
 
-  private async requireUserConditionQuestion(candidate: PlannerReview, context: PlannerQualityContext, audit: ResearchGapClassification, model: string, reasoning: unknown, signal?: AbortSignal): Promise<PlannerReview> {
+  private async requireUserConditionQuestion(candidate: PlannerReview, context: PlannerQualityContext, audit: ResearchGapClassification, model: string, reasoning: unknown, signal?: AbortSignal, allowReconciliation = true): Promise<PlannerReview> {
     const task = phaseTask("decision-quality-review", [
       "The local semantic audit classified the proposed search gap as a user-specific condition that web research cannot determine. Decision=ask_user is mandatory; do not search, conclude, substitute an average, or use another branch's answer.",
       "Ask one concise question that obtains only the missing user-specific condition. Provide 2–5 distinct choices. Preserve the candidate's existing answer content and uncertainty; do not add facts or re-interpret research. The question and options must refer only to the current branch.",
       `Mandatory decision: ask_user. Reason: ${audit.rationale}`,
       `Original goal: ${context.goal}\nCurrent question: ${context.currentQuestion}\nCurrent answer: ${context.currentAnswer}`,
       `Known conditions on this branch: ${JSON.stringify(context.conditions)}`,
+      `Earlier user questions in this path: ${JSON.stringify(context.questionHistory)}`,
+      "Treat supplied ranges and uncertainty as answers, not absent conditions. Do not repeat an answered question. If greater precision is genuinely needed, explicitly ask for that additional precision, explain why the supplied range is insufficient, and offer an unknown/not available choice. Do not merely relabel the same known condition or ask an unrelated question to evade this rule.",
       `Candidate answer summary to preserve: ${candidate.summary}`,
       `Candidate answer body to preserve (not new research context):\n${candidate.detail.replace(/^\s*<!--\s*mindsearch-review\s+[^\n]*?-->\s*/, "").trim()}`,
       `Candidate rationale and proposed search target: ${JSON.stringify({ rationale: candidate.rationale, target: candidate.researchTarget })}`,
       'Return the ordinary Planner response with a first-line marker: <!-- mindsearch-review {"decision":"ask_user","rationale":"why this user condition matters","question":"one concise question"} --> and 2–5 choices in suggestions[].title.'
     ].join("\n\n"));
-    const correctionContext: TaskContext = { title: context.goal, summary: "", rules: "", detail: "", task, ancestors: "", outputLanguage: this.repository.settings.language, mode: "task", researchMode: "local", researchDepth: "fast", visualMode: "off", signal };
+    const correctionContext: TaskContext = { timeoutMs: context.timeoutMs, title: context.goal, summary: "", rules: "", detail: "", task, ancestors: "", outputLanguage: this.repository.settings.language, mode: "task", researchMode: "local", researchDepth: "fast", visualMode: "off", signal };
     const corrected = await this.askMindSearchModel(correctionContext, model, reasoning, signal);
     throwIfAborted(signal);
     const requiredDecisionRationale = audit.rationale;
@@ -360,7 +373,16 @@ export class MindSearchManualFlow {
       requiredDecisionRationale
     }, correctionContext, model, reasoning, signal);
     if (repaired.decision !== "ask_user") throw new Error("MindSearch could not preserve the required user-condition question; no search was started.");
-    if (context.questionHistory.some(question => question.trim().toLocaleLowerCase() === repaired.question?.trim().toLocaleLowerCase())) throw new Error("MindSearch could not ask a new user-condition question without repeating a prior question; no search was started.");
+    if (context.questionHistory.some(question => question.trim().toLocaleLowerCase() === repaired.question?.trim().toLocaleLowerCase())) {
+      if (allowReconciliation) {
+        // Reconcile the target before rejecting the saved reports. Never turn an invalid
+        // question into permission to search for a private scenario value.
+        const reconciled = await this.classifyResearchGap(candidate, context, model, reasoning, signal, true);
+        if (reconciled.classification === "external_evidence") return candidate;
+        return this.requireUserConditionQuestion(candidate, context, reconciled, model, reasoning, signal, false);
+      }
+      throw new Error("MindSearch could not ask a new user-condition question without repeating a prior question; no search was started.");
+    }
     const body = candidate.detail.replace(/^\s*<!--\s*mindsearch-review\s+[^\n]*?-->\s*/, "").trim();
     return { ...repaired, summary: candidate.summary, detail: body };
   }
@@ -369,7 +391,7 @@ export class MindSearchManualFlow {
   private async reviewPlannerDecisionQuality(candidate: PlannerReview, context: PlannerQualityContext, model: string, reasoning: unknown, signal?: AbortSignal): Promise<PlannerReview> {
     throwIfAborted(signal);
     const uniqueLineage = lineageWithoutRepeatedReports(context.lineage, context.reportDetail);
-    const taskContext: TaskContext = { mindSearchEvidenceIds: context.evidenceIds, title: context.goal, summary: "", detail: "", rules: "", task: "", ancestors: "", outputLanguage: this.repository.settings.language, mode: "task", researchMode: "local", researchDepth: "fast", visualMode: "off", signal };
+    const taskContext: TaskContext = { timeoutMs: context.timeoutMs, mindSearchEvidenceIds: context.evidenceIds, title: context.goal, summary: "", detail: "", rules: "", task: "", ancestors: "", outputLanguage: this.repository.settings.language, mode: "task", researchMode: "local", researchDepth: "fast", visualMode: "off", signal };
     let reviewed = candidate;
     const repeatsKnownQuestion = context.questionHistory.some(question => question.trim().toLocaleLowerCase() === reviewed.question?.trim().toLocaleLowerCase());
     if ((context.answeredQuestionCount < MIN_ANSWERED_QUESTIONS_BEFORE_CONCLUSION && reviewed.decision === "conclude") || (reviewed.decision === "ask_user" && repeatsKnownQuestion)) {
@@ -412,7 +434,14 @@ export class MindSearchManualFlow {
         ...taskContext, title: context.goal, summary: "", task: "", ancestors: "",
         detail: `Original user goal: ${context.goal}\nUser background and requested outcome: ${context.goalDetail}\nKnown conditions: ${JSON.stringify(context.conditions)}\nCurrent answer: ${context.currentAnswer}\nEarlier answers: ${uniqueLineage}\nPrior research:\n${context.reportDetail}`
       };
-      const delivery = await buildFinalDelivery(deliveryContext, step => this.askMindSearchModel(step, model, reasoning, signal));
+      let checkpoint = context.deliveryRecovery?.checkpoint ?? {};
+      let phase = context.deliveryRecovery?.phase;
+      const delivery = await buildFinalDelivery(deliveryContext, step => this.askMindSearchModel(step, model, reasoning, signal), {
+        checkpoint, timeoutMs: context.timeoutMs, evidence: context.deliveryEvidence,
+        knownConditions: JSON.stringify({ goal: context.goal, background: context.goalDetail, conditions: context.conditions, currentQuestion: context.currentQuestion, currentAnswer: context.currentAnswer, earlierAnswers: context.lineage.split("\n").filter(line => line.startsWith("User answer to ")), model, reasoning }),
+        onPhase: async current => { phase = current; await context.saveDeliveryRecovery?.(checkpoint, phase); },
+        onCheckpoint: async saved => { checkpoint = saved; await context.saveDeliveryRecovery?.(checkpoint, phase); }
+      });
       const final = await this.parsePlannerReviewWithRecovery(delivery.result, {
         question: context.goal, answerSnapshot: JSON.stringify(context.conditions),
         reportSummary: context.reportSummary, reportDetail: `${context.reportDetail}\n\n${delivery.evidence}`
@@ -502,7 +531,7 @@ export class MindSearchManualFlow {
     const explorationTarget = map.mindSearch?.minimumAnswersBeforeConclusion ?? 2;
     const answeredQuestionCount = this.answerCountInLineage(map, branch.id);
     const model = diagnostic.model || priorAttempt.model || "gpt-6-luna";
-    const taskDefaults: TaskContext = { title: topic.title, summary: topic.summary, rules: "", detail: topic.detail, task: "", ancestors: lineage.context, mode: "task", researchMode: "research", researchDepth: "normal", visualMode: "off", detailFormat: "adaptive" };
+    const taskDefaults: TaskContext = { timeoutMs: branch.retryTimeoutMs, title: topic.title, summary: topic.summary, rules: "", detail: topic.detail, task: "", ancestors: lineage.context, mode: "task", researchMode: "research", researchDepth: "normal", visualMode: "off", detailFormat: "adaptive" };
     const reasoning = effectiveReasoningLevel(taskDefaults, normalizeReasoningLevel(diagnostic.reasoning ?? priorAttempt.reasoningLevel ?? "low"));
     const handle = await this.persist(() => this.runs.startAttempt(mapPath, branch.id, run.id, { model, reasoning, maxResearchTurns: MINDSEARCH_MAX_RESEARCH_TURNS }));
     if (!handle.dispatch) return { status: "in-progress", branchId: branch.id };
@@ -626,7 +655,7 @@ export class MindSearchManualFlow {
     const explorationTarget = map.mindSearch?.minimumAnswersBeforeConclusion ?? 2;
     const questionsAlreadyAsked = await this.questionHistory(map, branch.id);
     const modelToUse = model?.trim() || priorAttempt.model || "gpt-6-luna";
-    const taskDefaults: TaskContext = { title: topicNote.title, summary: topicNote.summary, rules: "", detail: topicNote.detail, task: "", ancestors: lineage.context, mode: "task", researchMode: "research", researchDepth: "normal", visualMode: "off", detailFormat: "adaptive" };
+    const taskDefaults: TaskContext = { timeoutMs: branch.retryTimeoutMs, title: topicNote.title, summary: topicNote.summary, rules: "", detail: topicNote.detail, task: "", ancestors: lineage.context, mode: "task", researchMode: "research", researchDepth: "normal", visualMode: "off", detailFormat: "adaptive" };
     const reasoningToUse = effectiveReasoningLevel(taskDefaults, normalizeReasoningLevel(reasoning ?? priorAttempt.reasoningLevel ?? "low"));
     const handle = await this.persist(() => this.runs.startAttempt(mapPath, branch.id, run.id, { model: modelToUse, reasoning: reasoningToUse, maxResearchTurns: MINDSEARCH_MAX_RESEARCH_TURNS }));
     if (!handle.dispatch) return { status: "in-progress", branchId: branch.id };
@@ -678,7 +707,7 @@ export class MindSearchManualFlow {
         ].join("\n\n");
         let searcher: AiResult;
         try {
-          searcher = await this.askMindSearchModel({ mindSearchEvidenceIds: this.lineageEvidenceIds(map, branch.parentBranchId), title: topicNote.title, summary: report.summary, rules: "", detail: report.detail, task, ancestors: `Original goal: ${topicNote.title}\n\n${topicNote.detail}\n\n${lineage.context}\n\nPersisted answer branch conditions: ${JSON.stringify(branch.inputSnapshot.conditions)}`, outputLanguage: this.repository.settings.language, mode: "task", researchMode: "research", researchDepth: "normal", visualMode: "off", detailFormat: "adaptive", signal }, modelToUse, reasoningToUse, signal, onEvent);
+          searcher = await this.askMindSearchModel({ timeoutMs: branch.retryTimeoutMs, mindSearchEvidenceIds: this.lineageEvidenceIds(map, branch.parentBranchId), title: topicNote.title, summary: report.summary, rules: "", detail: report.detail, task, ancestors: `Original goal: ${topicNote.title}\n\n${topicNote.detail}\n\n${lineage.context}\n\nPersisted answer branch conditions: ${JSON.stringify(branch.inputSnapshot.conditions)}`, outputLanguage: this.repository.settings.language, mode: "task", researchMode: "research", researchDepth: "normal", visualMode: "off", detailFormat: "adaptive", signal }, modelToUse, reasoningToUse, signal, onEvent);
         } catch (error) { await this.persist(() => this.runs.recordSearchDiagnostic(mapPath, handle, diagnostic)); throw error; }
         await this.persist(() => this.runs.recordSearchDiagnostic(mapPath, handle, diagnostic));
         throwIfAborted(signal);
@@ -697,11 +726,11 @@ export class MindSearchManualFlow {
           "Use research_more only for a specific material evidence gap, with one targeted suggestion. Use ask_user only for a material user condition that is absent from all known context and cannot be handled with a useful conditional answer; include 2–5 distinct choices as suggestions[].title (with empty task, contribution, and parentTitle), plus the exact question in the decision JSON. Treat every supplied answer as a valid condition for this branch even when its provenance is labeled synthetic or test data. Such provenance means it is not evidence of the real person's preference; it does not make the supplied scenario value unknown. Do not ask the user to confirm that a test value is real. Phrase the result conditionally and never misattribute synthetic values as the real user's preferences. Otherwise conclude with honest limitations. Do not search in this Planner turn.",
           `Original user goal: ${topicNote.title}\nCurrent answered question: ${parent.summary}\nCurrent answer: ${JSON.stringify(branch.answerSnapshot)}\nAll branch conditions: ${JSON.stringify(branch.inputSnapshot.conditions)}\nEarlier answer path: ${lineage.context || "None."}\nPersisted reports:\n${report.summary}\n\n${report.detail}`
         ].join("\n\n");
-        const plannerContext = { mindSearchEvidenceIds: this.lineageEvidenceIds(map, branch.parentBranchId), title: topicNote.title, summary: report.summary, rules: "", detail: report.detail, task: plannerPrompt, ancestors: `Original goal: ${topicNote.title}\n\n${topicNote.detail}\n\n${lineage.context}\n\nConditions: ${JSON.stringify(branch.inputSnapshot.conditions)}`, outputLanguage: this.repository.settings.language, mode: "task" as const, researchMode: "local" as const, researchDepth: "fast" as const, visualMode: "off" as const, detailFormat: "adaptive" as const, signal };
+        const plannerContext = { timeoutMs: branch.retryTimeoutMs, mindSearchEvidenceIds: this.lineageEvidenceIds(map, branch.parentBranchId), title: topicNote.title, summary: report.summary, rules: "", detail: report.detail, task: plannerPrompt, ancestors: `Original goal: ${topicNote.title}\n\n${topicNote.detail}\n\n${lineage.context}\n\nConditions: ${JSON.stringify(branch.inputSnapshot.conditions)}`, outputLanguage: this.repository.settings.language, mode: "task" as const, researchMode: "local" as const, researchDepth: "fast" as const, visualMode: "off" as const, detailFormat: "adaptive" as const, signal };
         const planner = await this.askMindSearchModel(plannerContext, modelToUse, reasoningToUse, signal);
         throwIfAborted(signal);
         review = await this.parsePlannerReviewWithRecovery(planner, { question: topicNote.title, answerSnapshot: JSON.stringify(branch.answerSnapshot), reportSummary: report.summary, reportDetail: report.detail }, plannerContext, modelToUse, reasoningToUse, signal);
-        review = await this.reviewPlannerDecisionQuality(review, { goal: topicNote.title, goalDetail: topicNote.detail, conditions: branch.inputSnapshot.conditions, currentQuestion: parent.summary, currentAnswer: JSON.stringify(branch.answerSnapshot), answeredQuestionCount, questionHistory: questionsAlreadyAsked, lineage: lineage.context, evidenceIds: this.lineageEvidenceIds(map, branch.parentBranchId), reportSummary: report.summary, reportDetail: report.detail, ...(preclassifiedResearchTarget ? { preclassifiedResearchTarget } : {}) }, modelToUse, reasoningToUse, signal);
+        review = await this.reviewPlannerDecisionQuality(review, { goal: topicNote.title, goalDetail: topicNote.detail, conditions: branch.inputSnapshot.conditions, currentQuestion: parent.summary, currentAnswer: JSON.stringify(branch.answerSnapshot), answeredQuestionCount, questionHistory: questionsAlreadyAsked, lineage: lineage.context, evidenceIds: this.lineageEvidenceIds(map, branch.parentBranchId), timeoutMs: branch.retryTimeoutMs, reportSummary: report.summary, reportDetail: report.detail, ...(preclassifiedResearchTarget ? { preclassifiedResearchTarget } : {}) }, modelToUse, reasoningToUse, signal);
         throwIfAborted(signal);
         latestReview = { rationale: review.rationale, researchTarget: review.researchTarget };
         if (review.decision === "research_more" && researchTurn < MINDSEARCH_MAX_RESEARCH_TURNS) {
@@ -1042,6 +1071,62 @@ export class MindSearchManualFlow {
     return this.runSubtopicWorkflow(mapPath, branch.id, parent, topicNote, answerLabels, freeText, lineage.context, model, reasoning, signal);
   }
 
+  private async reusableResearchCandidates(map: MapDocument, branch: MindSearchBranchRecord): Promise<ResearchCandidate[]> {
+    const candidates: ResearchCandidate[] = [], visited = new Set<string>();
+    let ancestor = map.mindSearch?.branches.find(item => item.id === branch.parentBranchId);
+    while (ancestor && !visited.has(ancestor.id)) {
+      visited.add(ancestor.id);
+      for (const result of ancestor.results.filter(item => item.kind === "research")) {
+        if (!map.nodes.some(node => node.id === result.nodeId && node.path === result.notePath && node.mindSearchKind === "research")) continue;
+        if (result.reuse) {
+          const origin = map.mindSearch?.branches.find(item => item.id === result.reuse!.sourceBranchId)?.results.find(item => item.resultId === result.reuse!.sourceResultId && item.notePath === result.reuse!.sourceNotePath && item.version === result.reuse!.sourceVersion);
+          if (!origin) continue;
+          try { if (researchContentHash(await this.repository.readNote(origin.notePath)) !== result.reuse.sourceContentHash) continue; }
+          catch { continue; }
+        }
+        let note: Awaited<ReturnType<Repository["readNote"]>>;
+        try { note = await this.repository.readNote(result.notePath); }
+        catch { continue; /* Missing ancestor evidence cannot authorize reuse. */ }
+        if (!note.summary.trim() || !note.detail.trim() || /\bresearch status\s*:\s*(?:not searched|search failed|unavailable)\b/i.test(`${note.summary}\n${note.detail}`)) continue;
+        candidates.push({ source: { branchId: ancestor.id, resultId: result.resultId, notePath: result.notePath, version: result.version, contentHash: researchContentHash(note) }, evidenceId: `${result.nodeId}-v${result.version}`, title: note.title, summary: note.summary, detail: note.detail, conditions: { ...ancestor.inputSnapshot.conditions } });
+        this.evidenceReports.set(`${result.nodeId}-v${result.version}`, { path: result.notePath, hash: createHash("sha256").update(note.detail).digest("hex") });
+        if (this.evidenceReports.size > 512) {
+          const oldest = [...this.evidenceReports.keys()][0];
+          if (oldest) this.evidenceReports.delete(oldest);
+        }
+      }
+      ancestor = map.mindSearch?.branches.find(item => item.id === ancestor!.parentBranchId);
+    }
+    return candidates;
+  }
+
+  private async verifyResearchSource(mapPath: string, branchId: string, target: MindSearchResearchTarget): Promise<ResearchCandidate> {
+    const map = await this.repository.readMap(mapPath), branch = map.mindSearch?.branches.find(item => item.id === branchId);
+    if (!branch || !target.source) throw new ReuseEvidenceRejected("Research source is missing.");
+    const candidate = (await this.reusableResearchCandidates(map, branch)).find(item => item.source.branchId === target.source!.branchId && item.source.resultId === target.source!.resultId && item.source.notePath === target.source!.notePath && item.source.version === target.source!.version);
+    if (!candidate || candidate.source.contentHash !== target.source.contentHash) throw new ReuseEvidenceRejected("MindSearch source report is missing or changed; it cannot be reused or updated from this plan.");
+    return candidate;
+  }
+
+  private async assessReusableResearch(target: MindSearchResearchTarget, candidate: ResearchCandidate, conditions: Record<string, string>, context: TaskContext, model: string, reasoning: unknown, signal?: AbortSignal): Promise<NonNullable<MindSearchBranchRecord["results"][number]["reuse"]>> {
+    const keys = target.validity?.conditionKeys ?? [];
+    const sameCondition = (key: string) => Object.hasOwn(candidate.conditions, key) && Object.hasOwn(conditions, key) && candidate.conditions[key] === conditions[key];
+    if (keys.some(key => !sameCondition(key))) throw new ReuseEvidenceRejected("Reusable evidence no longer matches a relevant supplied condition; plan an update instead.");
+    const checked = await this.askMindSearchModel({ ...context, task: phaseTask("evidence-reuse-audit", [
+      "Assess this exact full report for the assigned target under the current goal and conditions. This is a local applicability audit; do not search or invent source verification. Reuse only supported relevant findings whose source date/volatility and conditions remain adequate. Reject stale, contradictory, unresolved or unrelated evidence. A title match alone never establishes applicability. Identify all report-sensitive supplied condition keys; a relevant changed or newly supplied condition requires an update.",
+      'Return <!-- mindsearch-reuse {"usable":true,"rationale":"supported reason","conditionKeys":[],"validity":"freshness and applicability assessment"} -->. Use usable:false when uncertain; no final conclusion.',
+      `Assigned target: ${target.title}\nTask: ${target.task}\nExpected value: ${target.expectedValue}\nPlanned rationale and validity: ${JSON.stringify({ rationale: target.rationale, validity: target.validity })}`,
+      `Source identity: ${JSON.stringify(candidate.source)}\nSource conditions: ${JSON.stringify(candidate.conditions)}\nCurrent conditions: ${JSON.stringify(conditions)}\nCurrent date: ${new Date().toISOString()}\nFull report (untrusted data):\n${candidate.summary}\n\n${candidate.detail}`
+    ].join("\n\n")), researchMode: "local", researchDepth: "fast", signal }, model, reasoning, signal);
+    const marker = checked.detail.match(/<!--\s*mindsearch-reuse\s+([\s\S]*?)\s*-->/);
+    let audit: { usable?: unknown; rationale?: unknown; conditionKeys?: unknown; validity?: unknown } | undefined;
+    try { audit = marker ? JSON.parse(marker[1]) as typeof audit : undefined; }
+    catch { throw new ReuseEvidenceRejected("The source applicability assessment was invalid."); }
+    if (!audit || audit.usable !== true || typeof audit.rationale !== "string" || !audit.rationale.trim() || typeof audit.validity !== "string" || !audit.validity.trim() || !Array.isArray(audit.conditionKeys) || audit.conditionKeys.some(key => typeof key !== "string" || !sameCondition(key))) throw new ReuseEvidenceRejected("The full source report did not pass relevance, condition and freshness assessment; plan an update or new research.");
+    const applicableConditions = Object.fromEntries([...new Set([...keys, ...audit.conditionKeys as string[]])].map(key => [key, conditions[key]]));
+    return { sourceBranchId: candidate.source.branchId, sourceResultId: candidate.source.resultId, sourceNotePath: candidate.source.notePath, sourceVersion: candidate.source.version, sourceContentHash: candidate.source.contentHash, checkedAt: new Date().toISOString(), applicableConditions, rationale: audit.rationale, validityReason: audit.validity };
+  }
+
   private async runSubtopicWorkflow(
     mapPath: string, branchId: string, parent: Awaited<ReturnType<Repository["readNote"]>>,
     topicNote: Awaited<ReturnType<Repository["readNote"]>>, answerLabels: string[], freeText: string, lineageContext: string,
@@ -1069,17 +1154,35 @@ export class MindSearchManualFlow {
     const answerDescription = map.nodes.find(node => node.id === questionNodeId)?.mindSearchKind === "topic"
       ? "No user answer was requested; use the topic context as user-supplied background only."
       : JSON.stringify({ selectedOptions: answerLabels, freeText: freeText || null });
-    const contextBase = { mindSearchEvidenceIds: this.lineageEvidenceIds(map, branch.parentBranchId), title: "MindSearch", summary: "", rules: "", detail: `Known conditions: ${JSON.stringify(branch.inputSnapshot.conditions)}`, task: "", ancestors: `Original goal and background:\n${topicNote.title}\n\n${topicNote.detail}\n\nBranch lineage:\n${lineageContext || "None."}`, outputLanguage: this.repository.settings.language, mode: "task" as const, researchMode: "local" as const, researchDepth: "fast" as const, visualMode: "off" as const, signal };
+    const contextBase = { timeoutMs: branch.retryTimeoutMs, mindSearchEvidenceIds: this.lineageEvidenceIds(map, branch.parentBranchId), title: "MindSearch", summary: "", rules: "", detail: `Known conditions: ${JSON.stringify(branch.inputSnapshot.conditions)}`, task: "", ancestors: `Original goal and background:\n${topicNote.title}\n\n${topicNote.detail}\n\nBranch lineage:\n${lineageContext || "None."}`, outputLanguage: this.repository.settings.language, mode: "task" as const, researchMode: "local" as const, researchDepth: "fast" as const, visualMode: "off" as const, signal };
     const alreadyCommitted = await this.savedTerminalResult(mapPath, branchId);
     if (alreadyCommitted) return alreadyCommitted;
     const questionsAlreadyAsked = await this.questionHistory(map, branchId);
-    // Every new answer must run its own research before any terminal decision.
+    // Every answer needs usable evidence; unchanged evidence may be reused after validation.
+    const candidates = await this.reusableResearchCandidates(map, branch);
+    const preparedReuse = new Map<string, NonNullable<MindSearchBranchRecord["results"][number]["reuse"]>>();
+    const materializeExistingEvidence = async (): Promise<MindSearchResearchPlan> => {
+      const reusable: MindSearchResearchPlan = [], titles = new Set<string>();
+      for (const candidate of candidates.slice(0, 5)) {
+        if (titles.has(candidate.title.trim().toLowerCase())) continue;
+        const target: MindSearchResearchTarget = { id: `reuse-${candidate.source.resultId}`, title: candidate.title, task: `Retain supported findings relevant to ${parent.summary || topicNote.title}`, expectedValue: "Retain adequate existing evidence without repeating web searches", action: "reuse", dependsOn: [], source: candidate.source, rationale: "Planner requested no new evidence tasks", validity: { conditionKeys: [], reason: "Full report must pass the current-goal applicability and freshness audit" } };
+        try {
+          const assessment = await this.assessReusableResearch(target, candidate, branch!.inputSnapshot.conditions, contextBase, model, reasoning, signal);
+          target.validity = { conditionKeys: Object.keys(assessment.applicableConditions), reason: assessment.validityReason };
+          preparedReuse.set(target.id, assessment); reusable.push(target); titles.add(target.title.trim().toLowerCase());
+        } catch (error) { if (!(error instanceof ReuseEvidenceRejected)) throw error; }
+      }
+      if (!reusable.length) throw new Error("An empty research plan requires usable ancestor evidence; at least one research target is needed.");
+      return validateMindSearchResearchPlan(reusable);
+    };
 
     let plan = branch.researchPlan;
     if (!plan) {
       const planPrompt = phaseTask("research-plan", [
-        "Plan this answer's research as 2–5 distinct, complementary subtopics. Return the plan marker in detail: <!-- mindsearch-plan {\"subtopics\":[{\"id\":\"stable-short-id\",\"title\":\"visible subtopic\",\"task\":\"specific research question\",\"expectedValue\":\"what uncertainty this resolves\"}]} -->. Give each subtopic its own independently searchable research task. Do not answer the goal or do research in this Planner turn.",
-        "Identify the information dimensions needed for broad coverage. Choose 2–5 relevant targets without filler; each target must investigate a distinct factor that could change the answer or its execution. Consider methods, tools or constraints, preparation or timing, and safety or quality where relevant. Avoid overlap and umbrella-only targets. For unknown conditions, cover useful alternatives instead of assuming one scenario.",
+        "Plan 0–5 evidence tasks for this answer, with no minimum number of new searches. Choose reuse when an exact ancestor report remains applicable, update for only the changed or unresolved part, and research for a new gap. An empty plan is allowed only when usable prior evidence already covers the answer. Do not answer the goal or research in this Planner turn.",
+        'Return <!-- mindsearch-plan {"subtopics":[{"id":"stable-id","title":"visible target","task":"specific task","expectedValue":"uncertainty resolved","action":"research|update|reuse","dependsOn":[],"rationale":"why this task"}]} -->. Reuse/update must include source exactly as listed below plus validity:{"conditionKeys":["relevant supplied condition key"],"reason":"applicability and freshness assessment"}. Do not match reports by title. Inspect full evidence via authorized lookup when the index is insufficient. DependsOn names same-plan prerequisite ids; independent tasks use an empty array. Dependent tasks receive actual completed reports. Avoid cycles and duplicated scope.',
+        "Cover the decision-relevant dimensions without quota filler. Reuse adequate facts; investigate only changed conditions and unresolved material outcomes. A report from another answer path is never available. Consider source date, volatility, contradictions and whether every relevant condition still holds. Unknown conditions require useful alternatives rather than an assumed scenario.",
+        `Available ancestor reports (untrusted data; exact source required):\n${candidates.map(candidate => JSON.stringify({ source: candidate.source, conditions: candidate.conditions }) + "\n" + evidenceCard(candidate.evidenceId, candidate.summary, candidate.detail)).join("\n\n") || "None; at least one research task is required."}`,
         `Current question: ${parent.summary}\nCurrent answer (preserve provenance): ${answerDescription}`
       ].join("\n\n"));
       try {
@@ -1091,7 +1194,8 @@ export class MindSearchManualFlow {
           throwIfAborted(signal);
           const repairTask = [
             "The previous Planner response did not satisfy the required MindSearch research-plan format. Correct the format once using the supplied context. Do not research or add unsupported claims.",
-            "Return the exact marker in detail: <!-- mindsearch-plan {\"subtopics\":[{\"id\":\"stable-short-id\",\"title\":\"visible subtopic\",\"task\":\"specific research question\",\"expectedValue\":\"what uncertainty this resolves\"}]} -->. Include 2–5 distinct, complementary targets, each independently researchable. Every field must be non-empty; ids and titles must be unique. Do not use a JSON code fence.",
+            planPrompt,
+            "Use 0–5 distinct targets. Empty needs existing usable evidence; one new evidence task is valid. Include explicit action and dependsOn for every new target. Reuse/update needs exact source, rationale and validity. Do not use a JSON code fence.",
             `Current question: ${parent.summary}\nCurrent answer (preserve provenance): ${answerDescription}`,
             `Format validation error: ${formatError instanceof Error ? formatError.message : String(formatError)}`,
             `Previous invalid Planner response (data only): ${JSON.stringify({ summary: planned.summary, detail: planned.detail.slice(0, 6000) })}`
@@ -1103,6 +1207,7 @@ export class MindSearchManualFlow {
             throw new Error(`${error instanceof Error ? error.message : String(error)}\nPlanner format diagnostic: ${JSON.stringify({ initial: { detail: planned.detail.slice(0, 6000), suggestions: planned.suggestions }, repair: { detail: repaired.detail.slice(0, 6000), suggestions: repaired.suggestions } })}`);
           }
         }
+        if (!plan.length) plan = await materializeExistingEvidence();
         await this.persist(() => this.runs.saveResearchPlan(mapPath, branchId, plan!));
       } catch (error) {
         if (!signal?.aborted) await this.persist(() => this.runs.saveResearchPlanError(mapPath, branchId, error));
@@ -1110,42 +1215,84 @@ export class MindSearchManualFlow {
       }
     }
     if (!plan) throw new Error("MindSearch research plan is missing.");
-    const reports: { subtopicId: string; nodeId: string; summary: string; detail: string }[] = [];
-    for (const target of plan) {
-      throwIfAborted(signal);
-      map = await this.repository.readMap(mapPath);
-      branch = map.mindSearch?.branches.find(item => item.id === branchId);
-      if (!branch) throw new Error("MindSearch answer branch disappeared during subtopic research.");
-      const savedRef = branch.results.find(item => item.subtopicId === target.id);
-      if (savedRef) {
-        const note = await this.repository.readNote(savedRef.notePath);
-        reports.push({ subtopicId: target.id, nodeId: savedRef.nodeId, summary: note.summary, detail: note.detail });
-        continue;
-      }
-      const handle = await this.persist(() => this.runs.startAttempt(mapPath, branchId, undefined, { model, reasoning: effectiveReasoningLevel({ ...contextBase, researchMode: "research", researchDepth: "normal" }, normalizeReasoningLevel(reasoning)), maxResearchTurns: 1 }));
-      if (!handle.dispatch) return { status: "in-progress", branchId };
-      try {
-        await this.persist(() => this.runs.recordResearchTurn(mapPath, handle));
-        const task = phaseTask("subtopic-research", ["Perform a targeted web search. Return a concise evidence report: findings, supporting URLs, and unresolved gaps. Focus on what the latest answer changes; do not write a full career guide or final deliverable. Report search status accurately.", SEARCHER_TARGET_RULE, `Assigned research subtopic: ${target.title}\nResearch task: ${target.task}\nExpected value: ${target.expectedValue}`, `Current question: ${parent.summary}\nCurrent answer: ${answerDescription}`, `Other planned subtopics: ${plan.filter(item => item.id !== target.id).map(item => item.title).join("; ")}`, "Answer this subtopic itself; do not substitute another subtopic's evidence."].join("\n\n"));
-        const diagnostic = { researchTurn: 1, startedEvents: 0, completedEvents: 0, completedSearchActions: 0, otherCompletedActions: 0 };
-        const result = await this.askMindSearchModel({ ...contextBase, task, researchMode: "research", researchDepth: "normal" }, model, reasoning, signal, event => { if (event.method === "item/started") diagnostic.startedEvents++; else { diagnostic.completedEvents++; const params = event.params as { item?: { action?: { type?: unknown } } } | undefined; if (params?.item?.action?.type === "search") diagnostic.completedSearchActions++; else diagnostic.otherCompletedActions++; } });
-        await this.persist(() => this.runs.recordSearchDiagnostic(mapPath, handle, diagnostic));
-        throwIfAborted(signal);
-        const draft = await this.persist(() => this.runs.createResultDraft(mapPath, handle, target.title, model, undefined, { kind: "research", subtopicId: target.id }));
-        if (draft.status === "stale") return { status: "stale", branchId };
-        if (!result.summary.trim() || !result.detail.trim()) throw new Error(`Subtopic research did not produce a usable report: ${target.title}`);
-        const savedReport = await this.persist(() => this.runs.updateResultDraftReport(mapPath, handle, draft.draft.id, result.summary, result.detail));
-        if (!savedReport) return { status: "stale", branchId };
-        if (/\bresearch status\s*:\s*(?:not searched|search failed|unavailable)\b/i.test(`${result.summary}\n${result.detail}`)) throw new Error("The Agent explicitly says no web search succeeded; the report remains an unpublished diagnostic.");
-        const committed = await this.persist(() => this.runs.commitResult(mapPath, handle, draft.draft.id, result));
-        if (committed.status !== "committed") return { status: "stale", branchId };
-        const saved = await this.repository.readNote(committed.notePath);
-        reports.push({ subtopicId: target.id, nodeId: draft.draft.nodeId, summary: saved.summary, detail: saved.detail });
-      } catch (error) {
-        try { if (signal?.aborted) await this.persist(() => this.runs.cancelAttempt(mapPath, handle, "User cancelled a MindSearch subtopic research turn.").then(() => undefined)); else await this.persist(() => this.runs.failAttempt(mapPath, handle, error instanceof Error ? error.message : String(error)).then(() => undefined)); } catch { /* Preserve the original research error. */ }
-        throw error;
-      } finally { this.runs.releaseAttempt(mapPath, handle); }
+    type SubtopicReport = { subtopicId: string; nodeId: string; summary: string; detail: string; title: string };
+    let executionPlan = validateMindSearchResearchPlan(plan);
+    // An empty plan can use existing evidence, but cannot skip the evidence gate.
+    if (!executionPlan.length) {
+      executionPlan = await materializeExistingEvidence();
+      await this.persist(() => this.runs.saveResearchPlan(mapPath, branchId, executionPlan));
     }
+    let scheduled: Map<string, SubtopicReport>;
+    try {
+      scheduled = await scheduleMindSearchResearch<SubtopicReport>(executionPlan, async (target, predecessors, taskSignal) => {
+        throwIfAborted(taskSignal);
+        const currentMap = await this.repository.readMap(mapPath), currentBranch = currentMap.mindSearch?.branches.find(item => item.id === branchId);
+        if (!currentBranch) throw new Error("MindSearch answer branch disappeared during subtopic research.");
+        const savedRef = currentBranch.results.find(item => item.subtopicId === target.id && item.kind === "research");
+        if (savedRef) {
+          if (savedRef.reuse) {
+            await this.verifyResearchSource(mapPath, branchId, { ...target, source: { branchId: savedRef.reuse.sourceBranchId, resultId: savedRef.reuse.sourceResultId, notePath: savedRef.reuse.sourceNotePath, version: savedRef.reuse.sourceVersion, contentHash: savedRef.reuse.sourceContentHash } });
+            if (Object.entries(savedRef.reuse.applicableConditions).some(([key, value]) => currentBranch.inputSnapshot.conditions[key] !== value)) throw new Error("The reused report no longer matches its applicable conditions.");
+          }
+          const note = await this.repository.readNote(savedRef.notePath);
+          if (!note.summary.trim() || !note.detail.trim()) throw new Error("A saved report is no longer usable.");
+          if (savedRef.reuse && researchContentHash(note) !== savedRef.reuse.sourceContentHash) throw new Error("The copied research report changed after reuse validation; its provenance no longer matches.");
+          return { subtopicId: target.id, nodeId: savedRef.nodeId, summary: note.summary, detail: note.detail, title: target.title };
+        }
+        const handle = await this.persist(() => this.runs.startAttempt(mapPath, branchId, undefined, { phase: target.action === "reuse" ? "subtopic-reuse" : "subtopic-research", subtopicId: target.id, model, reasoning: effectiveReasoningLevel({ ...contextBase, researchMode: "research", researchDepth: "normal" }, normalizeReasoningLevel(reasoning)), maxResearchTurns: 1 }));
+        if (!handle.dispatch) throw new ResearchWorkflowInterrupted("in-progress");
+        try {
+          let reuse: NonNullable<MindSearchBranchRecord["results"][number]["reuse"]> | undefined;
+          let result: AiResult | undefined;
+          let source: ResearchCandidate | undefined, rejectedReuse = "";
+          if (target.action === "reuse" || target.action === "update") {
+            try { source = await this.verifyResearchSource(mapPath, branchId, target); }
+            catch (error) {
+              if (!(error instanceof ReuseEvidenceRejected)) throw error;
+              rejectedReuse = error.message;
+            }
+          }
+          const dependencyReports = [...predecessors].map(([id, report]) => `Prerequisite ${id} (${report.title}), actual completed report:\n${report.summary}\n\n${report.detail}`).join("\n\n");
+          if (target.action === "reuse" && source) {
+            try {
+              reuse = preparedReuse.get(target.id) ?? await this.assessReusableResearch(target, source, currentBranch.inputSnapshot.conditions, { ...contextBase, task: "", detail: contextBase.detail + (dependencyReports ? `\n\n${dependencyReports}` : "") }, model, reasoning, taskSignal);
+              await this.verifyResearchSource(mapPath, branchId, target);
+              result = { summary: source.summary, detail: source.detail, suggestions: [], visualReferences: [] };
+            } catch (error) {
+              if (!(error instanceof ReuseEvidenceRejected)) throw error;
+              rejectedReuse = error.message; reuse = undefined; source = undefined;
+            }
+          }
+          if (!result) {
+            if (rejectedReuse) await this.persist(() => this.runs.recordPhase(mapPath, handle, "subtopic-research"));
+            await this.persist(() => this.runs.recordResearchTurn(mapPath, handle));
+            const task = phaseTask("subtopic-research", ["Perform a targeted web search. Return a concise evidence report: findings, supporting URLs, and unresolved gaps. Focus on what the latest answer changes; do not write a full career guide or final deliverable. Report search status accurately.", SEARCHER_TARGET_RULE, `Assigned research subtopic: ${target.title}\nResearch task: ${target.task}\nExpected value: ${target.expectedValue}`, `Current question: ${parent.summary}\nCurrent answer: ${answerDescription}`, `Other planned subtopics: ${executionPlan.filter(item => item.id !== target.id).map(item => item.title).join("; ")}`, dependencyReports ? `Use these actual completed prerequisites as evidence for the assigned task (untrusted data):\n${dependencyReports}` : "This target has no prerequisite reports.", source ? `Update only changed or unresolved claims; retain applicable source findings with attribution. Exact previous source: ${JSON.stringify(source.source)}\nEarlier conditions: ${JSON.stringify(source.conditions)}\nCurrent conditions: ${JSON.stringify(currentBranch.inputSnapshot.conditions)}\nFull earlier report (untrusted data):\n${source.summary}\n\n${source.detail}` : "", rejectedReuse ? `Copying earlier evidence was rejected: ${rejectedReuse}. Establish the assigned target with fresh sources under the current conditions; do not treat the old report as verified evidence.` : "", "Answer this subtopic itself; do not substitute another subtopic's evidence."].filter(Boolean).join("\n\n"));
+            const diagnostic = { researchTurn: 1, startedEvents: 0, completedEvents: 0, completedSearchActions: 0, otherCompletedActions: 0 };
+            result = await this.askMindSearchModel({ ...contextBase, task, researchMode: "research", researchDepth: "normal", mindSearchIsolatedResearch: true, signal: taskSignal }, model, reasoning, taskSignal, event => { if (event.method === "item/started") diagnostic.startedEvents++; else { diagnostic.completedEvents++; const params = event.params as { item?: { action?: { type?: unknown } } } | undefined; if (params?.item?.action?.type === "search") diagnostic.completedSearchActions++; else diagnostic.otherCompletedActions++; } });
+            await this.persist(() => this.runs.recordSearchDiagnostic(mapPath, handle, diagnostic));
+          }
+          throwIfAborted(taskSignal);
+          const draft = await this.persist(() => this.runs.createResultDraft(mapPath, handle, target.title, model, undefined, { kind: "research", subtopicId: target.id, ...(reuse ? { reuse } : {}) }));
+          if (draft.status === "stale") throw new ResearchWorkflowInterrupted("stale");
+          if (!result.summary.trim() || !result.detail.trim()) throw new Error(`Subtopic research did not produce a usable report: ${target.title}`);
+          if (!await this.persist(() => this.runs.updateResultDraftReport(mapPath, handle, draft.draft.id, result.summary, result.detail))) throw new ResearchWorkflowInterrupted("stale");
+          if (/\bresearch status\s*:\s*(?:not searched|search failed|unavailable)\b/i.test(`${result.summary}\n${result.detail}`)) throw new Error("The Agent explicitly says no web search succeeded; the report remains an unpublished diagnostic.");
+          if (reuse) await this.verifyResearchSource(mapPath, branchId, target);
+          const committed = await this.persist(() => { throwIfAborted(taskSignal); return this.runs.commitResult(mapPath, handle, draft.draft.id, result); });
+          if (committed.status !== "committed") throw new ResearchWorkflowInterrupted("stale");
+          const saved = await this.repository.readNote(committed.notePath);
+          return { subtopicId: target.id, nodeId: draft.draft.nodeId, summary: saved.summary, detail: saved.detail, title: target.title };
+        } catch (error) {
+          try { if (taskSignal.aborted) await this.persist(() => this.runs.cancelAttempt(mapPath, handle, "User cancelled a MindSearch subtopic research turn.").then(() => undefined)); else await this.persist(() => this.runs.failAttempt(mapPath, handle, error instanceof Error ? error.message : String(error)).then(() => undefined)); } catch { /* Preserve the original research error. */ }
+          throw error;
+        } finally { this.runs.releaseAttempt(mapPath, handle); }
+      }, signal);
+    } catch (error) {
+      if (error instanceof ResearchWorkflowInterrupted) return { status: error.status, branchId };
+      throw error;
+    }
+    const reports = executionPlan.map(target => scheduled.get(target.id)!);
+    if (!reports.length) throw new Error("MindSearch requires at least one usable evidence report before terminal review.");
     throwIfAborted(signal);
     map = await this.repository.readMap(mapPath);
     branch = map.mindSearch?.branches.find(item => item.id === branchId);
@@ -1160,25 +1307,50 @@ export class MindSearchManualFlow {
       return savedAttempt?.status === "partial" ? { status: "partial", branchId, result } : { status: "completed", branchId, result };
     }
     const synthesisReasoning = effectiveReasoningLevel({ ...contextBase, title: topicNote.title, detailFormat: "adaptive" }, normalizeReasoningLevel(reasoning));
-    const synthesisHandle = await this.persist(() => this.runs.startAttempt(mapPath, branchId, undefined, { model, reasoning: synthesisReasoning, maxResearchTurns: MINDSEARCH_MAX_RESEARCH_TURNS }));
+    const synthesisHandle = await this.persist(() => this.runs.startAttempt(mapPath, branchId, undefined, { phase: "report-review", model, reasoning: synthesisReasoning, maxResearchTurns: MINDSEARCH_MAX_RESEARCH_TURNS }));
     if (!synthesisHandle.dispatch) return { status: "in-progress", branchId };
     try {
       await this.persist(() => this.runs.recordResearchTurn(mapPath, synthesisHandle));
       const supplementalReports: { target: { title: string; task: string; expectedValue: string }; summary: string; detail: string }[] = [];
-      const aggregateReports = () => ({
-        summary: [...reports.map(item => `${plan.find(target => target.id === item.subtopicId)?.title ?? item.subtopicId}: ${item.summary}`), ...supplementalReports.map(item => `補查：${item.target.title}: ${item.summary}`)].join("\n"),
-        detail: [...reports.map(item => `## ${plan.find(target => target.id === item.subtopicId)?.title ?? item.subtopicId}\n\n${item.detail}`), ...supplementalReports.map(item => `## 補查：${item.target.title}\n\n${item.detail}`)].join("\n\n")
+      const sourceFingerprint = createHash("sha256").update(JSON.stringify({ detail: contextBase.detail, ancestors: contextBase.ancestors, language: contextBase.outputLanguage, goal: topicNote.detail, currentQuestion: parent.summary, answerDescription, reports, model, reasoning })).digest("hex");
+      let resumeDelivery = branch.deliveryRecovery?.fingerprint === sourceFingerprint ? branch.deliveryRecovery : undefined;
+      let sectionRecovery = branch.deliveryRecovery;
+      const initialDeliveryEvidence = [...new Map(reports.map(report => {
+        const ref = branch.results.find(item => item.nodeId === report.nodeId);
+        const evidence = { id: ref?.reuse?.sourceResultId ?? ref?.resultId ?? report.subtopicId, hash: researchContentHash(report), detail: `## ${report.title}\n\n${report.summary}\n\n${report.detail}` };
+        return [evidence.id, evidence] as const;
+      })).values()];
+      const resumeReports = resumeDelivery?.reports;
+      const deliveryEvidence = () => [...(resumeDelivery?.evidence ?? initialDeliveryEvidence), ...supplementalReports.map(item => ({ id: `followup-${createHash("sha256").update(JSON.stringify(item.target)).digest("hex")}`, hash: researchContentHash(item), detail: `## ${item.target.title}\n\n${item.detail}` }))];
+      const aggregateReports = () => resumeReports ? {
+        summary: [resumeReports.summary, ...supplementalReports.map(item => `補查：${item.target.title}: ${item.summary}`)].join("\n"),
+        detail: [resumeReports.detail, ...supplementalReports.map(item => `## 補查：${item.target.title}\n\n${item.detail}`)].join("\n\n")
+      } : ({
+        summary: [...reports.map(item => `${item.title}: ${item.summary}`), ...supplementalReports.map(item => `補查：${item.target.title}: ${item.summary}`)].join("\n"),
+        detail: [...reports.map(item => `## ${item.title}\n\n${item.detail}`), ...supplementalReports.map(item => `## 補查：${item.target.title}\n\n${item.detail}`)].join("\n\n")
       });
       let synthesisDraftId: string | undefined;
       let finalReview: ReturnType<typeof parseMindSearchPlannerReview> | undefined;
-      for (let researchTurn = 1; researchTurn <= MINDSEARCH_MAX_RESEARCH_TURNS; researchTurn++) {
+      const resumeTurn = resumeDelivery?.researchTurn ?? 1;
+      if (resumeTurn === 2) await this.persist(() => this.runs.recordResearchTurn(mapPath, synthesisHandle));
+      for (let researchTurn = resumeTurn; researchTurn <= MINDSEARCH_MAX_RESEARCH_TURNS; researchTurn++) {
         throwIfAborted(signal);
         const currentReports = aggregateReports();
         const plannerPrompt = phaseTask("report-review", ["Review the complete evidence for the original user goal. Return one decision with a brief evidence-based interim answer; do not write the final document yet. Use all known conditions and relevant evidence in this branch lineage. Keep the current question and answer as conditions that personalize the result; they are not the overall goal. Do not expose the internal research log as the answer. Return the standard MindSearch review marker as the first detail line.", PLANNER_COVERAGE_RULE, `Hard floor: ${answeredQuestionCount} answered question node(s) on this branch path; do not conclude before ${MIN_ANSWERED_QUESTIONS_BEFORE_CONCLUSION}. At the floor, the configured exploration target (${explorationTarget}) is a soft depth preference; do not require reaching 10 or add quota filler. Below the floor, ask one meaningful new question about an unknown decision-relevant dimension.`, `Do not repeat known conditions or prior questions. Ask only for a genuinely missing user condition, never to compensate for missing research. Use research_more for missing evidence. Prior questions: ${JSON.stringify(questionsAlreadyAsked)}.`, "Choose research_more only for one specific material evidence gap that targeted web research can resolve; provide exactly one targeted suggestion with title, search task, and expected uncertainty reduction. Choose ask_user for a missing decision-changing user condition or a genuinely conflicting pair of supplied values. Name the conflict and request one clarification; never defer a material conflict into the final document. Include 2–5 choices in suggestions[].title. Do not use ask_user to compensate for missing research. Choose conclude only when the original goal is adequately supported and the hard floor is met; cite source names or links from reports when available and state remaining uncertainty and limits. Do not search in this Planner turn.", '<!-- mindsearch-review {"decision":"research_more|ask_user|conclude","rationale":"evidence-based reason","stopReason":"why sufficient, for conclude","question":"question, for ask_user"} -->', `Current question: ${parent.summary}\nCurrent answer: ${answerDescription}`, `Research budget: review ${researchTurn} of ${MINDSEARCH_MAX_RESEARCH_TURNS}. One targeted follow-up search remains when this is review 1; if a material gap remains after review 2, return research_more so VAM saves a partial result.`].join("\n\n"));
         const plannerContext = { ...contextBase, summary: "", detail: `${contextBase.detail}\n\nPersisted research reports:\n${currentReports.summary}\n\n${currentReports.detail}`, task: plannerPrompt, detailFormat: "adaptive" as const };
-        const synthesis = await this.askMindSearchModel(plannerContext, model, reasoning, signal);
+        const fingerprint = sourceFingerprint;
+        const savedRecovery = resumeDelivery;
+        if (!savedRecovery) await this.persist(() => this.runs.recordPhase(mapPath, synthesisHandle, "report-review"));
+        const synthesis = savedRecovery?.planner ?? await this.askMindSearchModel(plannerContext, model, reasoning, signal);
         finalReview = await this.parsePlannerReviewWithRecovery(synthesis, { question: topicNote.title, answerSnapshot: answerDescription, reportSummary: currentReports.summary, reportDetail: currentReports.detail }, plannerContext, model, reasoning, signal);
-        finalReview = await this.reviewPlannerDecisionQuality(finalReview, { goal: topicNote.title, goalDetail: topicNote.detail, conditions: branch.inputSnapshot.conditions, currentQuestion: parent.summary, currentAnswer: answerDescription, answeredQuestionCount, questionHistory: questionsAlreadyAsked, lineage: lineageContext, evidenceIds: contextBase.mindSearchEvidenceIds, reportSummary: currentReports.summary, reportDetail: currentReports.detail }, model, reasoning, signal);
+        finalReview = await this.reviewPlannerDecisionQuality(finalReview, { goal: topicNote.title, goalDetail: topicNote.detail, conditions: branch.inputSnapshot.conditions, currentQuestion: parent.summary, currentAnswer: answerDescription, answeredQuestionCount, questionHistory: questionsAlreadyAsked, lineage: lineageContext, evidenceIds: contextBase.mindSearchEvidenceIds, reportSummary: currentReports.summary, reportDetail: currentReports.detail,
+          timeoutMs: branch.retryTimeoutMs, deliveryRecovery: savedRecovery ?? sectionRecovery, deliveryEvidence: deliveryEvidence(),
+          setPhase: phase => this.persist(() => this.runs.recordPhase(mapPath, synthesisHandle, phase)),
+          saveDeliveryRecovery: async (checkpoint, phase) => {
+            throwIfAborted(signal);
+            await this.persist(() => this.runs.saveDeliveryRecovery(mapPath, synthesisHandle, { fingerprint, planner: synthesis, checkpoint, phase, reports: currentReports, researchTurn, evidence: deliveryEvidence() }));
+          }
+        }, model, reasoning, signal);
         throwIfAborted(signal);
 
         const reviewStopReason = finalReview.decision === "conclude" ? finalReview.stopReason : finalReview.decision === "ask_user" ? `Awaiting the user's answer to: ${finalReview.question}` : researchTurn === MINDSEARCH_MAX_RESEARCH_TURNS ? `Research-turn limit reached with an unresolved evidence gap: ${finalReview.rationale}` : undefined;
@@ -1186,6 +1358,8 @@ export class MindSearchManualFlow {
         if (finalReview.decision !== "research_more") break;
 
         if (researchTurn === MINDSEARCH_MAX_RESEARCH_TURNS) break;
+        resumeDelivery = undefined;
+        sectionRecovery = undefined;
         const target = finalReview.researchTarget!;
         if (!synthesisDraftId) {
           const lastReport = reports.at(-1);
@@ -1206,7 +1380,8 @@ export class MindSearchManualFlow {
         };
         const followupTask = phaseTask("targeted-followup-research", ["Perform one targeted web search for the Planner's material evidence gap. Report search status accurately and include source attribution, uncertainty, and limitations.", SEARCHER_TARGET_RULE, `Target: ${target.title}\nSearch task: ${target.task}\nExpected uncertainty reduction: ${target.expectedValue}`, `Current question: ${parent.summary}\nCurrent answer: ${answerDescription}`, "Do not ask the user questions. This is an evidence-gathering step, not a Planner review."].join("\n\n"));
         let followup: AiResult;
-        try { followup = await this.askMindSearchModel({ ...contextBase, summary: "", detail: `${contextBase.detail}\n\nExisting reports (context only):\n${beforeSearch.detail}`, task: followupTask, researchMode: "research", researchDepth: "normal" }, model, reasoning, signal, onEvent); }
+        await this.persist(() => this.runs.recordPhase(mapPath, synthesisHandle, "targeted-research"));
+        try { followup = await this.askMindSearchModel({ ...contextBase, summary: "", detail: `${contextBase.detail}\n\nExisting reports (context only):\n${beforeSearch.detail}`, task: followupTask, researchMode: "research", researchDepth: "normal", mindSearchIsolatedResearch: true }, model, reasoning, signal, onEvent); }
         catch (error) { await this.persist(() => this.runs.recordSearchDiagnostic(mapPath, synthesisHandle, diagnostic)); throw error; }
         await this.persist(() => this.runs.recordSearchDiagnostic(mapPath, synthesisHandle, diagnostic));
         throwIfAborted(signal);
@@ -1287,7 +1462,14 @@ export class MindSearchManualFlow {
       const questionNote = question ? await this.repository.readNote(question.path) : undefined;
       const choices = question?.mindSearchQuestion?.options.filter(option => branch.answerSnapshot.selections.includes(option.id)).map(option => option.label) ?? branch.answerSnapshot.selections;
       if (question?.mindSearchKind === "question") sections.push(`User answer to ${questionNote?.summary ?? "question"}: ${JSON.stringify({ selections: choices, freeText: branch.answerSnapshot.freeText || null })}`);
-      const saved = await Promise.all(branch.results.map(async result => ({ result, note: await this.repository.readNote(result.notePath) })));
+      const saved = (await Promise.all(branch.results.map(async result => {
+        try { return { result, note: await this.repository.readNote(result.notePath) }; }
+        catch (error) {
+          if (result.kind !== "research") throw error;
+          sections.push(`Unavailable saved research source (${result.notePath}); its claims cannot be reused.`);
+          return undefined;
+        }
+      }))).filter((item): item is NonNullable<typeof item> => item !== undefined);
       const synthesis = [...saved].reverse().find(item => item.result.kind === "synthesis" || item.result.kind === "conclusion");
       const selected = saved.filter(item => item === synthesis || item.result.kind !== "synthesis" && item.result.kind !== "conclusion" && !synthesis?.note.detail.includes(item.note.detail));
       for (const { result, note } of selected) {

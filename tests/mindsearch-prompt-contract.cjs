@@ -72,8 +72,8 @@ test('research planning requires 2–5 targets in both languages', () => {
   for (const language of ['en', 'zh-TW']) {
     for (const phase of ['research-plan', 'research-plan-repair']) {
       const prompt = buildMindSearchPrompt({ ...context, task: `<!-- mindsearch-phase: ${phase} -->\nPlan the research.` }, language);
-      assert.match(prompt, /2–5/);
-      assert.doesNotMatch(prompt, /1–5/);
+      assert.match(prompt, /0–5/);
+      assert.doesNotMatch(prompt, /2–5/);
     }
   }
 });
@@ -96,7 +96,7 @@ test('answer planning, research, and review prompts carry each data block once a
   const lengths = {};
   for (const phase of phases) {
     const marker = phase === 'research-plan'
-      ? 'Plan 2–5 distinct, complementary and independently researchable subtopics.'
+      ? 'Plan 0–5 distinct evidence tasks with explicit reuse, update, research and dependencies.'
       : phase === 'subtopic-research' ? 'Research only the assigned target.' : 'Review the evidence and return a decision.';
     const task = `<!-- mindsearch-phase: ${phase} -->\n${marker}\nCurrent question: QUESTION_SENTINEL\nCurrent answer: ${values.answer}`;
     await flow.askMindSearchModel({
@@ -109,8 +109,8 @@ test('answer planning, research, and review prompts carry each data block once a
     const actual = buildMindSearchPrompt(captured.at(-1), 'en');
     for (const value of Object.values(values)) assert.equal(actual.split(value).length - 1, 1, `${phase}: ${value} should appear exactly once`);
     if (phase === 'research-plan') {
-      assert.match(actual, /2–5 distinct research targets/);
-      assert.match(actual, /independently researchable/);
+      assert.match(actual, /0–5 distinct evidence tasks/);
+      assert.match(actual, /reuse\/update\/research and dependsOn/);
     }
     const syntheticDuplicatedShape = {
       ...captured.at(-1), title: values.goal, summary: values.goal,

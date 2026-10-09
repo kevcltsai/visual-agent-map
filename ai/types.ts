@@ -17,7 +17,7 @@ export interface VisualReference {
 export interface Suggestion { title: string; task: string; contribution: string; parentTitle?: string; thinkingOriginBaseline?: string }
 export type AiTaskKind = "task" | "decompose" | "synthesize";
 export type PromptProfile = "mindsearch";
-export type AiResponseContract = "mindsearch-gap-audit";
+export type AiResponseContract = "mindsearch-gap-audit" | "mindsearch-delivery-acceptance";
 export interface TaskContext {
   title: string;
   summary: string;
@@ -40,6 +40,10 @@ export interface TaskContext {
   responseContract?: AiResponseContract;
   /** Trusted workflow lookup allowlist for MindSearch evidence retrieval; never serialize into prompts. */
   mindSearchEvidenceIds?: readonly string[];
+  /** Isolate independent research to supplied context and web tools. */
+  mindSearchIsolatedResearch?: boolean;
+  /** Bounded timeout override for this task only. */
+  timeoutMs?: number;
   researchMode?: ResearchMode;
   researchDepth?: ResearchDepth;
   visualMode?: VisualMode;

@@ -1413,7 +1413,7 @@ var CoffeeEngine = class {
     const settings = normalizeCustomization(requested, this.session.language);
     const errors = validateCustomization(settings, this.session.language);
     if (errors.length) throw new Error(errors.join("; "));
-    const fingerprint = convergenceFingerprint(this.session), source = convergencePrompt(this.session, baseline, settings);
+    const fingerprint2 = convergenceFingerprint(this.session), source = convergencePrompt(this.session, baseline, settings);
     if (source.length > MAX_COFFEE_CONTEXT_CHARS) throw new Error(this.session.language === "zh-TW" ? "\u6D1E\u898B\u5167\u5BB9\u592A\u9577\uFF0C\u7121\u6CD5\u5B89\u5168\u5730\u7522\u751F\u9810\u89BD\uFF1B\u539F\u6709\u5167\u5BB9\u5DF2\u4FDD\u7559\u3002" : "The insights are too long to prepare safely; existing content is preserved.");
     const generation = ++this.generation, controller = new AbortController();
     const baselineIds = baseline.map((item) => item.id);
@@ -1445,8 +1445,8 @@ var CoffeeEngine = class {
         try {
           const proposals = parseConvergenceProposals(raw, baselineIds);
           enforcePinnedProposals(proposals, baseline, (_a2 = this.session.pinnedInsightIds) != null ? _a2 : []);
-          if (convergenceFingerprint(this.session) !== fingerprint) throw this.engineError("Observer notes changed while convergence was being prepared; the draft was kept for review", "\u7522\u751F\u9810\u89BD\u671F\u9593\uFF0C\u684C\u804A\u6216\u6D1E\u898B\u5DF2\u6709\u66F4\u65B0\u3002\u539F\u6709\u6D1E\u898B\u8207\u56DE\u61C9\u8349\u7A3F\u5DF2\u4FDD\u7559\uFF0C\u8ACB\u91CD\u65B0\u6574\u7406\u9810\u89BD\u3002");
-          this.setSession({ ...this.session, convergenceDraft: { baseFingerprint: fingerprint, proposals, raw, createdAt: (/* @__PURE__ */ new Date()).toISOString(), customization: settings } });
+          if (convergenceFingerprint(this.session) !== fingerprint2) throw this.engineError("Observer notes changed while convergence was being prepared; the draft was kept for review", "\u7522\u751F\u9810\u89BD\u671F\u9593\uFF0C\u684C\u804A\u6216\u6D1E\u898B\u5DF2\u6709\u66F4\u65B0\u3002\u539F\u6709\u6D1E\u898B\u8207\u56DE\u61C9\u8349\u7A3F\u5DF2\u4FDD\u7559\uFF0C\u8ACB\u91CD\u65B0\u6574\u7406\u9810\u89BD\u3002");
+          this.setSession({ ...this.session, convergenceDraft: { baseFingerprint: fingerprint2, proposals, raw, createdAt: (/* @__PURE__ */ new Date()).toISOString(), customization: settings } });
           await this.flush();
         } catch (error) {
           const message = error instanceof Error ? error.message : String(error);
@@ -5219,7 +5219,7 @@ ${note.thinkingOrigin}`].filter(Boolean).join("\n\n") };
 }
 
 // experiences/visual-map/view.ts
-var import_node_crypto7 = require("node:crypto");
+var import_node_crypto9 = require("node:crypto");
 
 // i18n.ts
 var english = {
@@ -5350,7 +5350,27 @@ var english = {
   "ui.mindsearch_branch_running": "Researching",
   "ui.mindsearch_branch_completed": "Research complete",
   "ui.mindsearch_branch_partial": "More research needed",
+  "ui.mindsearch_attribution": "Research planning, search and synthesis are inspired by MindSearch (Chen et al., 2024), independently implemented and adapted by VAM.",
+  "ui.mindsearch_source_project": "Original project",
+  "ui.mindsearch_source_paper": "Paper",
   "ui.mindsearch_continue_research": "Continue research",
+  "ui.mindsearch_stage_subtopic": "Subtopic research",
+  "ui.mindsearch_stage_review": "Research synthesis review",
+  "ui.mindsearch_stage_plan": "Research planning",
+  "ui.mindsearch_repair_auth_hint": "Check the selected model and provider sign-in, then resume. Completed results are retained.",
+  "ui.mindsearch_repair_format_hint": "The response did not match the required format. Retry this stage; completed results are retained.",
+  "ui.mindsearch_repair_search_hint": "Search did not produce usable evidence. Check connectivity and search availability, then resume.",
+  "ui.mindsearch_task_timeout": "This task exceeded {0} minutes. Completed stages are saved; you can resume from the interrupted stage.",
+  "ui.mindsearch_failure_reason": "Failure reason: {0}",
+  "ui.mindsearch_failure_stage": "Stopped at: {0}",
+  "ui.mindsearch_repair_timeout": "Extend waiting to 10 minutes and resume",
+  "ui.mindsearch_repair_timeout_hint": "The response exceeded the waiting limit. Extend this attempt to 10 minutes and reuse completed stages.",
+  "ui.mindsearch_repair_retry_hint": "Completed results are retained. Retry the interrupted stage; if it fails again, check the reason shown above.",
+  "ui.mindsearch_resume_stage": "Resume from interrupted stage",
+  "ui.mindsearch_stage_delivery-outline": "Document outline",
+  "ui.mindsearch_stage_delivery-research": "Document evidence check",
+  "ui.mindsearch_stage_delivery-writing": "Final document writing",
+  "ui.mindsearch_stage_delivery-acceptance": "Final document review",
   "ui.mindsearch_branch_failed": "Failed",
   "ui.mindsearch_branch_cancelled": "Cancelled",
   "ui.mindsearch_branch_not_started": "Awaiting answer",
@@ -6250,7 +6270,27 @@ var traditionalChinese = {
   "ui.mindsearch_branch_running": "\u7814\u7A76\u4E2D",
   "ui.mindsearch_branch_completed": "\u7814\u7A76\u5B8C\u6210",
   "ui.mindsearch_branch_partial": "\u4ECD\u9700\u88DC\u67E5",
+  "ui.mindsearch_attribution": "\u7814\u7A76\u898F\u5283\u3001\u641C\u5C0B\u8207\u6574\u5408\u6D41\u7A0B\u53C3\u8003 MindSearch\uFF08Chen \u7B49\uFF0C2024\uFF09\uFF0C\u7531 VAM \u7368\u7ACB\u5BE6\u4F5C\u8207\u8ABF\u6574\u3002",
+  "ui.mindsearch_source_project": "\u539F\u5C08\u6848",
+  "ui.mindsearch_source_paper": "\u8AD6\u6587",
   "ui.mindsearch_continue_research": "\u7E7C\u7E8C\u88DC\u67E5",
+  "ui.mindsearch_stage_subtopic": "\u5B50\u8B70\u984C\u7814\u7A76",
+  "ui.mindsearch_stage_review": "\u7814\u7A76\u6536\u6582\u5BE9\u67E5",
+  "ui.mindsearch_stage_plan": "\u7814\u7A76\u898F\u5283",
+  "ui.mindsearch_repair_auth_hint": "\u8ACB\u78BA\u8A8D\u6240\u9078\u6A21\u578B\u8207\u670D\u52D9\u767B\u5165\u72C0\u614B\uFF0C\u518D\u63A5\u7E8C\u57F7\u884C\uFF1B\u5DF2\u5B8C\u6210\u7D50\u679C\u6703\u4FDD\u7559\u3002",
+  "ui.mindsearch_repair_format_hint": "\u56DE\u8986\u672A\u7B26\u5408\u5FC5\u8981\u683C\u5F0F\u3002\u53EF\u91CD\u8A66\u6B64\u968E\u6BB5\uFF0C\u5DF2\u5B8C\u6210\u7D50\u679C\u6703\u4FDD\u7559\u3002",
+  "ui.mindsearch_repair_search_hint": "\u641C\u5C0B\u672A\u53D6\u5F97\u53EF\u7528\u8B49\u64DA\u3002\u8ACB\u78BA\u8A8D\u9023\u7DDA\u8207\u641C\u5C0B\u670D\u52D9\u53EF\u7528\uFF0C\u518D\u63A5\u7E8C\u57F7\u884C\u3002",
+  "ui.mindsearch_task_timeout": "AI \u4EFB\u52D9\u8D85\u904E {0} \u5206\u9418\u3002\u5DF2\u5B8C\u6210\u968E\u6BB5\u5DF2\u4FDD\u5B58\uFF0C\u53EF\u5F9E\u4E2D\u65B7\u8655\u63A5\u7E8C\u3002",
+  "ui.mindsearch_failure_reason": "\u5931\u6557\u539F\u56E0\uFF1A{0}",
+  "ui.mindsearch_failure_stage": "\u4E2D\u65B7\u968E\u6BB5\uFF1A{0}",
+  "ui.mindsearch_repair_timeout": "\u5EF6\u9577\u81F310\u5206\u9418\u4E26\u63A5\u7E8C",
+  "ui.mindsearch_repair_timeout_hint": "\u56DE\u8986\u8D85\u904E\u7B49\u5F85\u4E0A\u9650\u3002\u53EF\u5C07\u672C\u6B21\u7B49\u5F85\u5EF6\u9577\u81F310\u5206\u9418\uFF0C\u6CBF\u7528\u5DF2\u5B8C\u6210\u7684\u968E\u6BB5\u3002",
+  "ui.mindsearch_repair_retry_hint": "\u5DF2\u5B8C\u6210\u7684\u7D50\u679C\u6703\u4FDD\u7559\uFF0C\u53EF\u91CD\u8A66\u4E2D\u65B7\u7684\u968E\u6BB5\uFF1B\u82E5\u518D\u6B21\u5931\u6557\uFF0C\u8ACB\u4F9D\u4E0A\u65B9\u539F\u56E0\u6392\u67E5\u3002",
+  "ui.mindsearch_resume_stage": "\u5F9E\u4E2D\u65B7\u8655\u63A5\u7E8C",
+  "ui.mindsearch_stage_delivery-outline": "\u6587\u4EF6\u5927\u7DB1",
+  "ui.mindsearch_stage_delivery-research": "\u6587\u4EF6\u8B49\u64DA\u88DC\u67E5",
+  "ui.mindsearch_stage_delivery-writing": "\u6700\u7D42\u6587\u4EF6\u64B0\u5BEB",
+  "ui.mindsearch_stage_delivery-acceptance": "\u6700\u7D42\u6587\u4EF6\u9A57\u6536",
   "ui.mindsearch_branch_failed": "\u5931\u6557",
   "ui.mindsearch_branch_cancelled": "\u5DF2\u53D6\u6D88",
   "ui.mindsearch_branch_not_started": "\u5F85\u56DE\u7B54",
@@ -7745,6 +7785,43 @@ var DebugLogModal = class extends import_obsidian9.Modal {
   }
 };
 
+// experiences/mind-search/research-plan.ts
+var import_node_crypto = require("node:crypto");
+function researchContentHash(report) {
+  return (0, import_node_crypto.createHash)("sha256").update(JSON.stringify({ summary: report.summary, detail: report.detail })).digest("hex");
+}
+function validateMindSearchResearchPlan(subtopics) {
+  var _a, _b, _c;
+  if (!Array.isArray(subtopics) || subtopics.length > 5 || subtopics.some((item) => {
+    if (!item || typeof item !== "object") return true;
+    const fields = item;
+    return ["id", "title", "task", "expectedValue"].some((key2) => typeof fields[key2] !== "string" || !fields[key2].trim());
+  })) throw new Error("Planner must return 0\u20135 valid research subtopics before the answer can proceed.");
+  const plan = subtopics;
+  const ids = new Set(plan.map((item) => item.id));
+  if (ids.size !== plan.length || new Set(plan.map((item) => item.title.trim().toLowerCase())).size !== plan.length) throw new Error("Planner research subtopics must have unique ids and titles.");
+  for (const item of plan) {
+    if (item.action !== void 0 && !["reuse", "update", "research"].includes(item.action)) throw new Error("Invalid MindSearch research action.");
+    if (item.dependsOn !== void 0 && (!Array.isArray(item.dependsOn) || new Set(item.dependsOn).size !== item.dependsOn.length || item.dependsOn.some((id) => typeof id !== "string" || !ids.has(id) || id === item.id))) throw new Error("Research dependencies must name distinct existing targets other than themselves.");
+    if (item.action === "reuse" || item.action === "update") {
+      const source = item.source;
+      if (!source || [source.branchId, source.resultId, source.notePath, source.contentHash].some((value) => typeof value !== "string" || !value.trim()) || !Number.isInteger(source.version) || source.version < 1 || !/^[a-f0-9]{64}$/i.test(source.contentHash) || !((_a = item.rationale) == null ? void 0 : _a.trim()) || !((_c = (_b = item.validity) == null ? void 0 : _b.reason) == null ? void 0 : _c.trim()) || !Array.isArray(item.validity.conditionKeys) || item.validity.conditionKeys.some((key2) => typeof key2 !== "string" || !key2.trim())) throw new Error("Reuse and update targets need an exact source, rationale and condition validity assessment.");
+    }
+  }
+  const visiting = /* @__PURE__ */ new Set(), visited = /* @__PURE__ */ new Set();
+  const visit = (id) => {
+    var _a2, _b2;
+    if (visiting.has(id)) throw new Error("Research dependencies cannot contain a cycle.");
+    if (visited.has(id)) return;
+    visiting.add(id);
+    for (const dependency of (_b2 = (_a2 = plan.find((item) => item.id === id)) == null ? void 0 : _a2.dependsOn) != null ? _b2 : []) visit(dependency);
+    visiting.delete(id);
+    visited.add(id);
+  };
+  for (const id of ids) visit(id);
+  return plan;
+}
+
 // map-model.ts
 function clearQuestionConvergenceEdges(map) {
   let changed = false;
@@ -7775,6 +7852,14 @@ function repairMindSearchResultConvergence(map) {
     }
   }
   return changed;
+}
+function validReuse(record) {
+  return record === void 0 || !!record && [record.sourceBranchId, record.sourceResultId, record.sourceNotePath, record.checkedAt, record.rationale, record.validityReason].every((value) => typeof value === "string" && !!value.trim()) && Number.isInteger(record.sourceVersion) && record.sourceVersion > 0 && typeof record.sourceContentHash === "string" && /^[a-f0-9]{64}$/i.test(record.sourceContentHash) && !!record.applicableConditions && typeof record.applicableConditions === "object" && !Array.isArray(record.applicableConditions) && Object.values(record.applicableConditions).every((value) => typeof value === "string");
+}
+function validDeliveryCheckpoint(checkpoint) {
+  const resultValid = (result) => !!result && typeof result.summary === "string" && typeof result.detail === "string" && Array.isArray(result.suggestions) && Array.isArray(result.visualReferences);
+  const hashValid = (value) => value === void 0 || typeof value === "string" && /^[a-f0-9]{64}$/i.test(value);
+  return !!checkpoint && typeof checkpoint === "object" && !Array.isArray(checkpoint) && [checkpoint.outline, checkpoint.research, checkpoint.draft, checkpoint.acceptance].every((result) => result === void 0 || resultValid(result)) && hashValid(checkpoint.baseFingerprint) && hashValid(checkpoint.researchFingerprint) && hashValid(checkpoint.draftFingerprint) && (checkpoint.sections === void 0 || !!checkpoint.sections && typeof checkpoint.sections === "object" && !Array.isArray(checkpoint.sections) && Object.entries(checkpoint.sections).every(([key2, section2]) => !!key2.trim() && !!section2 && hashValid(section2.fingerprint) && typeof section2.fingerprint === "string" && Array.isArray(section2.evidenceIds) && section2.evidenceIds.every((id) => typeof id === "string" && !!id.trim()) && resultValid(section2.result)));
 }
 var clone = (value) => JSON.parse(JSON.stringify(value));
 function descendants(nodes, id) {
@@ -7831,7 +7916,7 @@ function parseMap(content) {
   return map;
 }
 function validateMindSearchMap(map) {
-  var _a, _b, _c, _d, _e, _f;
+  var _a, _b, _c, _d, _e, _f, _g;
   const data = map.mindSearch;
   if (!data || data.version !== 1 || !Array.isArray(data.branches) || !Array.isArray(data.runs) || !Array.isArray(data.pendingCommits) || data.resultDrafts !== void 0 && !Array.isArray(data.resultDrafts)) throw new Error("Invalid MindSearch map extension.");
   if (data.creationId !== void 0 && (typeof data.creationId !== "string" || !data.creationId.trim())) throw new Error("Invalid MindSearch creation identity.");
@@ -7846,7 +7931,14 @@ function validateMindSearchMap(map) {
   }
   const branchIds = /* @__PURE__ */ new Set(), submissionIds = /* @__PURE__ */ new Set();
   for (const branch of data.branches) {
-    if (!branch || typeof branch.id !== "string" || branchIds.has(branch.id) || branch.submissionId !== void 0 && (typeof branch.submissionId !== "string" || !branch.submissionId.trim() || submissionIds.has(branch.submissionId)) || branch.sourceQuestionNodeId !== void 0 && (typeof branch.sourceQuestionNodeId !== "string" || !branch.sourceQuestionNodeId.trim()) || typeof branch.questionNodeId !== "string" || !map.nodes.some((node) => node.id === branch.questionNodeId) || branch.answerNodeId !== void 0 && (typeof branch.answerNodeId !== "string" || !map.nodes.some((node) => node.id === branch.answerNodeId && node.mindSearchKind === "answer" && node.parentId === branch.questionNodeId)) || !(branch.parentBranchId === null || typeof branch.parentBranchId === "string") || !branch.answerSnapshot || !Array.isArray(branch.answerSnapshot.selections) || branch.answerSnapshot.selections.some((item) => typeof item !== "string") || typeof branch.answerSnapshot.freeText !== "string" || !branch.inputSnapshot || typeof branch.inputSnapshot.topic !== "string" || !branch.inputSnapshot.conditions || typeof branch.inputSnapshot.conditions !== "object" || Array.isArray(branch.inputSnapshot.conditions) || !Array.isArray(branch.inputSnapshot.upstreamResults) || !Array.isArray(branch.results) || branch.researchPlanError !== void 0 && (typeof branch.researchPlanError !== "string" || !branch.researchPlanError.trim() || branch.researchPlanError.length > 500) || branch.researchPlan !== void 0 && (!Array.isArray(branch.researchPlan) || branch.researchPlan.length < 1 || branch.researchPlan.length > 5 || branch.researchPlan.some((item) => !item || typeof item.id !== "string" || !item.id.trim() || typeof item.title !== "string" || !item.title.trim() || typeof item.task !== "string" || !item.task.trim() || typeof item.expectedValue !== "string" || !item.expectedValue.trim()) || new Set(branch.researchPlan.map((item) => item.id)).size !== branch.researchPlan.length || new Set(branch.researchPlan.map((item) => item.title.trim().toLowerCase())).size !== branch.researchPlan.length)) throw new Error("Invalid MindSearch branch snapshot.");
+    if (!branch || typeof branch.id !== "string" || branchIds.has(branch.id) || branch.submissionId !== void 0 && (typeof branch.submissionId !== "string" || !branch.submissionId.trim() || submissionIds.has(branch.submissionId)) || branch.sourceQuestionNodeId !== void 0 && (typeof branch.sourceQuestionNodeId !== "string" || !branch.sourceQuestionNodeId.trim()) || typeof branch.questionNodeId !== "string" || !map.nodes.some((node) => node.id === branch.questionNodeId) || branch.answerNodeId !== void 0 && (typeof branch.answerNodeId !== "string" || !map.nodes.some((node) => node.id === branch.answerNodeId && node.mindSearchKind === "answer" && node.parentId === branch.questionNodeId)) || !(branch.parentBranchId === null || typeof branch.parentBranchId === "string") || !branch.answerSnapshot || !Array.isArray(branch.answerSnapshot.selections) || branch.answerSnapshot.selections.some((item) => typeof item !== "string") || typeof branch.answerSnapshot.freeText !== "string" || !branch.inputSnapshot || typeof branch.inputSnapshot.topic !== "string" || !branch.inputSnapshot.conditions || typeof branch.inputSnapshot.conditions !== "object" || Array.isArray(branch.inputSnapshot.conditions) || !Array.isArray(branch.inputSnapshot.upstreamResults) || !Array.isArray(branch.results) || branch.researchPlanError !== void 0 && (typeof branch.researchPlanError !== "string" || !branch.researchPlanError.trim() || branch.researchPlanError.length > 500) || branch.researchPlan !== void 0 && (!Array.isArray(branch.researchPlan) || branch.researchPlan.length > 5 || branch.researchPlan.some((item) => !item || typeof item.id !== "string" || !item.id.trim() || typeof item.title !== "string" || !item.title.trim() || typeof item.task !== "string" || !item.task.trim() || typeof item.expectedValue !== "string" || !item.expectedValue.trim()) || new Set(branch.researchPlan.map((item) => item.id)).size !== branch.researchPlan.length || new Set(branch.researchPlan.map((item) => item.title.trim().toLowerCase())).size !== branch.researchPlan.length)) throw new Error("Invalid MindSearch branch snapshot.");
+    if (branch.researchPlan !== void 0) validateMindSearchResearchPlan(branch.researchPlan);
+    if (branch.retryTimeoutMs !== void 0 && (!Number.isInteger(branch.retryTimeoutMs) || branch.retryTimeoutMs < 18e4 || branch.retryTimeoutMs > 6e5)) throw new Error("Invalid MindSearch retry timeout.");
+    if (branch.deliveryRecovery && (typeof branch.deliveryRecovery.fingerprint !== "string" || !branch.deliveryRecovery.planner || typeof branch.deliveryRecovery.planner.detail !== "string" || !validDeliveryCheckpoint(branch.deliveryRecovery.checkpoint))) throw new Error("Invalid MindSearch delivery checkpoint.");
+    if (((_a = branch.deliveryRecovery) == null ? void 0 : _a.evidence) !== void 0) {
+      const evidence = branch.deliveryRecovery.evidence;
+      if (!Array.isArray(evidence) || evidence.some((source) => !source || typeof source.id !== "string" || !source.id.trim() || typeof source.hash !== "string" || !/^[a-f0-9]{64}$/i.test(source.hash) || typeof source.detail !== "string" || !source.detail.trim()) || new Set(evidence.map((source) => source.id)).size !== evidence.length) throw new Error("Invalid MindSearch delivery evidence.");
+    }
     branchIds.add(branch.id);
     if (branch.submissionId) submissionIds.add(branch.submissionId);
     const questionNode = map.nodes.find((node) => node.id === branch.questionNodeId);
@@ -7859,7 +7951,7 @@ function validateMindSearchMap(map) {
     while (parent) {
       if (seen.has(parent)) throw new Error("MindSearch answer branches cannot contain cycles.");
       seen.add(parent);
-      parent = (_b = (_a = data.branches.find((item) => item.id === parent)) == null ? void 0 : _a.parentBranchId) != null ? _b : null;
+      parent = (_c = (_b = data.branches.find((item) => item.id === parent)) == null ? void 0 : _b.parentBranchId) != null ? _c : null;
     }
   }
   const runIds = /* @__PURE__ */ new Set();
@@ -7867,6 +7959,8 @@ function validateMindSearchMap(map) {
     var _a2;
     if (!attempt || typeof attempt.id !== "string" || typeof attempt.inputSnapshotHash !== "string") return false;
     if (!["running", "saving", "completed", "partial", "failed", "cancelled", "superseded"].includes(attempt.status)) return false;
+    if (attempt.subtopicId !== void 0 && (typeof attempt.subtopicId !== "string" || !attempt.subtopicId.trim())) return false;
+    if (attempt.phase !== void 0 && (typeof attempt.phase !== "string" || !attempt.phase.trim())) return false;
     if (attempt.model !== void 0 && (typeof attempt.model !== "string" || !attempt.model.trim())) return false;
     if (attempt.reasoningLevel !== void 0 && !["low", "medium", "high"].includes(attempt.reasoningLevel)) return false;
     if (attempt.maxResearchTurns !== void 0 && (!Number.isInteger(attempt.maxResearchTurns) || attempt.maxResearchTurns < 1 || attempt.maxResearchTurns > 3)) return false;
@@ -7882,18 +7976,18 @@ function validateMindSearchMap(map) {
   const resultIds = /* @__PURE__ */ new Set();
   for (const branch of data.branches) for (const result of branch.results) {
     const run = data.runs.find((item) => item.id === (result == null ? void 0 : result.runId)), attempt = run == null ? void 0 : run.attempts.find((item) => item.id === (result == null ? void 0 : result.attemptId));
-    if (!result || typeof result.resultId !== "string" || resultIds.has(result.resultId) || !run || run.branchId !== branch.id || !["completed", "partial"].includes((_c = attempt == null ? void 0 : attempt.status) != null ? _c : "") || typeof result.nodeId !== "string" || typeof result.notePath !== "string" || !Number.isInteger(result.version) || result.version < 1 || result.kind !== void 0 && !["research", "synthesis", "conclusion"].includes(result.kind) || result.subtopicId !== void 0 && (!((_d = branch.researchPlan) == null ? void 0 : _d.some((item) => item.id === result.subtopicId)) || typeof result.subtopicId !== "string") || !map.nodes.some((node) => {
+    if (!result || !validReuse(result.reuse) || typeof result.resultId !== "string" || resultIds.has(result.resultId) || !run || run.branchId !== branch.id || !["completed", "partial"].includes((_d = attempt == null ? void 0 : attempt.status) != null ? _d : "") || typeof result.nodeId !== "string" || typeof result.notePath !== "string" || !Number.isInteger(result.version) || result.version < 1 || result.kind !== void 0 && !["research", "synthesis", "conclusion"].includes(result.kind) || result.subtopicId !== void 0 && (!((_e = branch.researchPlan) == null ? void 0 : _e.some((item) => item.id === result.subtopicId)) || typeof result.subtopicId !== "string") || !map.nodes.some((node) => {
       var _a2;
       return node.id === result.nodeId && node.path === result.notePath && (node.parentId === ((_a2 = branch.answerNodeId) != null ? _a2 : branch.questionNodeId) || branch.results.some((parent) => parent.nodeId === node.parentId));
     })) throw new Error("Invalid MindSearch branch result reference.");
     resultIds.add(result.resultId);
   }
-  const drafts = (_e = data.resultDrafts) != null ? _e : [];
+  const drafts = (_f = data.resultDrafts) != null ? _f : [];
   const draftIds = /* @__PURE__ */ new Set();
   for (const draft of drafts) {
     const branch = draft && data.branches.find((item) => item.id === draft.branchId);
     const run = draft && data.runs.find((item) => item.id === draft.runId), attempt = run == null ? void 0 : run.attempts.find((item) => item.id === draft.attemptId);
-    if (!draft || typeof draft.id !== "string" || draftIds.has(draft.id) || !branch || typeof draft.nodeId !== "string" || typeof draft.notePath !== "string" || !draft.notePath.endsWith(".md") || typeof draft.title !== "string" || draft.status !== "creating" && draft.status !== "ready" || draft.model !== void 0 && (typeof draft.model !== "string" || !draft.model.trim()) || draft.reasoning !== void 0 && !["low", "medium", "high"].includes(draft.reasoning) || draft.kind !== void 0 && !["research", "synthesis", "conclusion"].includes(draft.kind) || draft.subtopicId !== void 0 && !((_f = branch.researchPlan) == null ? void 0 : _f.some((item) => item.id === draft.subtopicId)) || (run == null ? void 0 : run.branchId) !== branch.id || !attempt || attempt.inputSnapshotHash !== draft.inputSnapshotHash || !map.nodes.some((node) => {
+    if (!draft || !validReuse(draft.reuse) || typeof draft.id !== "string" || draftIds.has(draft.id) || !branch || typeof draft.nodeId !== "string" || typeof draft.notePath !== "string" || !draft.notePath.endsWith(".md") || typeof draft.title !== "string" || draft.status !== "creating" && draft.status !== "ready" || draft.model !== void 0 && (typeof draft.model !== "string" || !draft.model.trim()) || draft.reasoning !== void 0 && !["low", "medium", "high"].includes(draft.reasoning) || draft.kind !== void 0 && !["research", "synthesis", "conclusion"].includes(draft.kind) || draft.subtopicId !== void 0 && !((_g = branch.researchPlan) == null ? void 0 : _g.some((item) => item.id === draft.subtopicId)) || (run == null ? void 0 : run.branchId) !== branch.id || !attempt || attempt.inputSnapshotHash !== draft.inputSnapshotHash || !map.nodes.some((node) => {
       var _a2, _b2;
       return node.id === draft.nodeId && node.path === draft.notePath && node.parentId === ((_b2 = (_a2 = draft.parentNodeId) != null ? _a2 : branch.answerNodeId) != null ? _b2 : branch.questionNodeId);
     })) throw new Error("Invalid MindSearch result draft.");
@@ -8020,7 +8114,7 @@ function arrangeNewBranch(nodes, parentId, newIds) {
 
 // repository.ts
 var import_obsidian10 = require("obsidian");
-var import_node_crypto = require("node:crypto");
+var import_node_crypto2 = require("node:crypto");
 
 // ai/task-policy.ts
 function normalizeReasoningLevel(value) {
@@ -8914,7 +9008,7 @@ ${body}`);
         if (mindSearch.rootDraft) mindSearch.rootDraft.notePath = rebasePath(mindSearch.rootDraft.notePath);
         if (mindSearch.questionDraft) mindSearch.questionDraft.notePath = rebasePath(mindSearch.questionDraft.notePath);
         for (const pending of mindSearch.pendingCommits) pending.notePath = rebasePath(pending.notePath);
-        const hashSnapshot = (value) => (0, import_node_crypto.createHash)("sha256").update(JSON.stringify(value)).digest("hex");
+        const hashSnapshot = (value) => (0, import_node_crypto2.createHash)("sha256").update(JSON.stringify(value)).digest("hex");
         for (const run of mindSearch.runs) {
           const branch = mindSearch.branches.find((item) => item.id === run.branchId);
           if (!branch) continue;
@@ -9163,7 +9257,7 @@ var PendingSuggestions = class extends Map {
 };
 
 // experiences/mind-search/create-map.ts
-var import_node_crypto2 = require("node:crypto");
+var import_node_crypto3 = require("node:crypto");
 
 // experiences/mind-search/outcome-expectations.ts
 var goals = ["auto", "execute", "understand", "explore", "custom"];
@@ -9236,7 +9330,7 @@ async function createMindSearchMap(repository, model, input) {
     const notePath = repository.unique(repository.topicFolder(mapPath, "Notes"), topic);
     const configuredReasoning = (_d = input.reasoning) != null ? _d : repository.settings.cliReasoning;
     const reasoning = configuredReasoning === "medium" || configuredReasoning === "high" ? configuredReasoning : "low";
-    draft = { nodeId: (0, import_node_crypto2.randomUUID)(), notePath, title: topic, context: rootContext, model: (_e = input.model) != null ? _e : model, reasoning };
+    draft = { nodeId: (0, import_node_crypto3.randomUUID)(), notePath, title: topic, context: rootContext, model: (_e = input.model) != null ? _e : model, reasoning };
     map.mindSearch.rootDraft = draft;
     await repository.saveMap(mapPath, map);
   }
@@ -9261,7 +9355,7 @@ ${draft.context}` : "",
 
 // ui/modals/mind-search-start-modal.ts
 var import_obsidian11 = require("obsidian");
-var import_node_crypto3 = require("node:crypto");
+var import_node_crypto4 = require("node:crypto");
 var MindSearchStartModal = class extends import_obsidian11.Modal {
   constructor(app, submit, models = [], defaultModel = "gpt-6-luna", defaultReasoning = "low", refreshModels) {
     super(app);
@@ -9270,7 +9364,7 @@ var MindSearchStartModal = class extends import_obsidian11.Modal {
     this.defaultModel = defaultModel;
     this.defaultReasoning = defaultReasoning;
     this.refreshModels = refreshModels;
-    __publicField(this, "requestId", (0, import_node_crypto3.randomUUID)());
+    __publicField(this, "requestId", (0, import_node_crypto4.randomUUID)());
   }
   onOpen() {
     this.titleEl.setText(t("ui.mindsearch_start_title"));
@@ -9389,7 +9483,7 @@ var MindSearchStartModal = class extends import_obsidian11.Modal {
     answerCount.setAttr("aria-label", t("ui.mindsearch_minimum_answers"));
     answerCountLabel.createEl("p", { cls: "vam-hint", text: t("ui.mindsearch_answer_target_hint") });
     const newRequest = () => {
-      this.requestId = (0, import_node_crypto3.randomUUID)();
+      this.requestId = (0, import_node_crypto4.randomUUID)();
     };
     topic.addEventListener("input", newRequest);
     context.addEventListener("input", newRequest);
@@ -9464,9 +9558,9 @@ var MindSearchStartModal = class extends import_obsidian11.Modal {
 
 // ui/modals/mind-search-answer-modal.ts
 var import_obsidian12 = require("obsidian");
-var import_node_crypto4 = require("node:crypto");
+var import_node_crypto5 = require("node:crypto");
 var MindSearchAnswerModal = class extends import_obsidian12.Modal {
-  constructor(app, question, options, submit, requestId = (0, import_node_crypto4.randomUUID)()) {
+  constructor(app, question, options, submit, requestId = (0, import_node_crypto5.randomUUID)()) {
     super(app);
     this.question = question;
     this.options = options;
@@ -9486,7 +9580,7 @@ var MindSearchAnswerModal = class extends import_obsidian12.Modal {
       label.createSpan({ text: option.label });
       boxes.set(option.id, input);
       input.addEventListener("change", () => {
-        this.requestId = (0, import_node_crypto4.randomUUID)();
+        this.requestId = (0, import_node_crypto5.randomUUID)();
         if (input.checked && option.id === "__mindsearch_unknown__") {
           for (const [id, peer] of boxes) if (id !== option.id) peer.checked = false;
         } else if (input.checked) {
@@ -9500,7 +9594,7 @@ var MindSearchAnswerModal = class extends import_obsidian12.Modal {
     const freeText = freeTextLabel.createEl("textarea", { attr: { rows: "3" } });
     freeText.setAttr("aria-label", t("ui.mindsearch_free_text"));
     freeText.addEventListener("input", () => {
-      this.requestId = (0, import_node_crypto4.randomUUID)();
+      this.requestId = (0, import_node_crypto5.randomUUID)();
     });
     const status = this.contentEl.createEl("p", { cls: "vam-hint", attr: { "aria-live": "polite" } });
     let pending = false, submitButton;
@@ -9571,6 +9665,8 @@ function deduplicateMindSearchRequest(context) {
 }
 
 // experiences/mind-search/final-delivery.ts
+var import_node_crypto6 = require("node:crypto");
+var fingerprint = (value) => (0, import_node_crypto6.createHash)("sha256").update(JSON.stringify(value)).digest("hex");
 function parseDeliveryOutline(detail) {
   const marker3 = detail.match(/<!--\s*mindsearch-delivery-outline\s+([\s\S]*?)\s*-->/);
   if (!marker3) throw new Error("Final delivery outline is missing; no conclusion was saved.");
@@ -9579,54 +9675,210 @@ function parseDeliveryOutline(detail) {
   if (!Array.isArray(sections) || !sections.length || sections.length > 12) throw new Error("Final delivery outline is invalid; no conclusion was saved.");
   const validated = sections.map((section2) => {
     if (!section2 || typeof section2 !== "object" || !("heading" in section2) || !("purpose" in section2) || !("searchTask" in section2) || typeof section2.heading !== "string" || !section2.heading.trim() || typeof section2.purpose !== "string" || !section2.purpose.trim() || typeof section2.searchTask !== "string") throw new Error("Final delivery outline is invalid; no conclusion was saved.");
-    return { heading: section2.heading, purpose: section2.purpose, searchTask: section2.searchTask };
+    const mapping = {};
+    for (const key2 of ["evidenceIds", "dependencies"]) {
+      if (key2 in section2) {
+        const ids = section2[key2];
+        if (!Array.isArray(ids) || ids.some((id) => typeof id !== "string" || !id.trim()) || new Set(ids).size !== ids.length) throw new Error("Invalid final delivery source mapping.");
+        mapping[key2] = ids;
+      }
+    }
+    return { heading: section2.heading, purpose: section2.purpose, searchTask: section2.searchTask, ...mapping };
   });
   if (new Set(validated.map((section2) => section2.heading.trim().toLowerCase())).size !== validated.length) throw new Error("Final delivery outline contains duplicate sections.");
   return validated;
 }
-async function buildFinalDelivery(base, ask) {
-  const run = async (phase, task, research2 = false) => {
-    var _a, _b;
-    (_a = base.signal) == null ? void 0 : _a.throwIfAborted();
-    const result2 = await ask({ ...base, task: `<!-- mindsearch-phase: ${phase} -->
-${task}`, researchMode: research2 ? "research" : "local", researchDepth: research2 ? "normal" : "fast", detailFormat: "adaptive" });
-    (_b = base.signal) == null ? void 0 : _b.throwIfAborted();
-    if (!result2.summary.trim() || !result2.detail.trim()) throw new Error("Final delivery stage returned empty content; no conclusion was saved.");
-    return result2;
-  };
-  const outlineResult = await run("delivery-outline", 'You are the final-delivery Synthesizer. Design the actual document needed to answer the ORIGINAL user goal with all supplied conditions and outcome preferences. Previous research informs the outline; do not merely concatenate reports or reuse their headings. Return <!-- mindsearch-delivery-outline {"sections":[{"heading":"section title","purpose":"what the reader can do or understand after this section","searchTask":"specific web search needed for this section, or empty if already supported"}]} --> as the first detail line. Choose a suitable structure, not a fixed template. Include concrete examples, resources, execution details or comparisons when required by this user. Identify exact source gaps for the deliverable. Do not ask the user or deliver the document yet.');
-  const sections = parseDeliveryOutline(outlineResult.detail);
-  const outline = JSON.stringify(sections);
-  const needsResearch = sections.some((section2) => section2.searchTask.trim());
-  const research = needsResearch ? await run("delivery-research", `You are the Researcher for the FINAL DOCUMENT. Search the web to fill and verify the sections of this agreed outline: ${outline}. Prioritize the explicit searchTasks and the concrete resources, examples, steps, or current facts required to deliver this user's requested result. Reuse supported prior findings; do not search irrelevant topics. Return a section-by-section evidence report with direct source URLs, what each source supports, usable concrete details and unresolved gaps. Actually use available search tools; never claim a search occurred if it did not. Begin detail with <!-- mindsearch-delivery-research {"status":"searched|unavailable"} -->. If tools fail or are unavailable, return unavailable rather than replacing research with memory. Do not write the final document or ask questions.`, true) : { summary: "Existing evidence", detail: '<!-- mindsearch-delivery-research {"status":"reused"} -->\nNo new search requested by the outline; use the supplied prior evidence.', suggestions: [] };
-  const searchMarker = research.detail.match(/<!--\s*mindsearch-delivery-research\s+([\s\S]*?)\s*-->/);
-  const searchStatus = searchMarker ? JSON.parse(searchMarker[1]) : null;
-  if (!searchStatus || typeof searchStatus !== "object" || !("status" in searchStatus) || searchStatus.status !== (needsResearch ? "searched" : "reused")) throw new Error("Final-document web research was unavailable or not completed; no conclusion was saved.");
-  const evidence = `Final document outline:
-${outline}
-
-Final document research:
-${research.detail}`;
-  const draft = await run("delivery-writing", `Write the complete final document answering the original user goal. Agreed outline: ${outline}. Final-document evidence:
-${research.detail}
-Use all user conditions and earlier supported reports. Develop every section into useful, specific content; do not deliver a short synopsis or a list of capabilities in place of an executable requested result. Integrate steps, examples, resources, acceptance criteria and source links where the goal calls for them. Do not impose those on unrelated goals. Put caveats beside affected advice. Preserve source attribution; do not fabricate URLs, images, facts or user conditions. Mark unresolved facts honestly. Output the actual reader-facing document in detail, without internal audit headings or decision markers; summary is only the canvas preview.`);
-  const result = await run("delivery-acceptance", `Review the full draft against the ORIGINAL goal, supplied conditions, requested format, and agreed outline. Outline: ${outline}
-Final research:
-${research.detail}
-Draft:
-${draft.detail}
-Return a valid first-line MindSearch review marker. Choose conclude ONLY if the document is usable and complete for this request: every required section is developed, necessary examples/resources/steps are concrete and supported, and sources are linked where used. Mere general direction is insufficient for a requested actionable plan. For conclude, return only the marker and a short acceptance note; do not rewrite or repeat the draft. Explain readiness in rationale and stopReason. For shortcomings, list the specific missing outcomes and return research_more. If important delivery evidence remains missing, choose research_more with exactly one concrete target in suggestions (title, task, contribution) and explain the missing outcome. Do not ask the user and do not invent evidence. Marker: <!-- mindsearch-review {"decision":"conclude|research_more","rationale":"reason","stopReason":"delivery readiness, conclude only"} -->.`);
+function validateContent(result) {
+  if (typeof result.summary !== "string" || !result.summary.trim() || typeof result.detail !== "string" || !result.detail.trim()) throw new Error("Final delivery stage returned empty content; no conclusion was saved.");
+}
+function parseAcceptance(result) {
   const acceptance = result.detail.match(/^\s*<!--\s*mindsearch-review\s+(\{[^\n]*\})\s*-->/);
   if (!acceptance) throw new Error("Final delivery acceptance marker missing; no conclusion was saved.");
   const decision = JSON.parse(acceptance[1]);
   if (!decision || typeof decision !== "object" || !("decision" in decision)) throw new Error("Invalid final delivery acceptance.");
   if (decision.decision === "conclude") {
     if (!("rationale" in decision) || !("stopReason" in decision) || typeof decision.rationale !== "string" || !decision.rationale.trim() || typeof decision.stopReason !== "string" || !decision.stopReason.trim()) throw new Error("Final delivery acceptance is incomplete; no conclusion was saved.");
-    return { result: { ...draft, detail: `${acceptance[0].trim()}
+  } else if (decision.decision === "research_more") {
+    const target = Array.isArray(result.suggestions) && result.suggestions.length === 1 ? result.suggestions[0] : void 0;
+    if (!target || [target.title, target.task, target.contribution].some((value) => typeof value !== "string" || !value.trim())) throw new Error("Final delivery acceptance must identify one concrete evidence gap; no conclusion was saved.");
+  } else throw new Error("Final delivery acceptance must conclude or identify an evidence gap.");
+  return { marker: acceptance[0].trim(), decision: decision.decision };
+}
+async function buildFinalDelivery(base, ask, options = {}) {
+  var _a, _b, _c, _d, _e, _f, _g, _h, _i, _j, _k, _l, _m;
+  const baseFingerprint = fingerprint({ title: base.title, rules: base.rules, conditions: (_a = options.knownConditions) != null ? _a : base.detail, language: base.outputLanguage });
+  const savedBaseValid = ((_b = options.checkpoint) == null ? void 0 : _b.baseFingerprint) === baseFingerprint || !((_c = options.checkpoint) == null ? void 0 : _c.baseFingerprint) && options.evidence === void 0;
+  const savedCheckpoint = savedBaseValid ? options.checkpoint : void 0;
+  const checkpoint = { baseFingerprint, ...(savedCheckpoint == null ? void 0 : savedCheckpoint.sections) ? { sections: { ...savedCheckpoint.sections } } : {} };
+  let reuseRemaining = true;
+  const stage = async (key2, produce, validate = validateContent) => {
+    var _a2, _b2, _c2, _d2;
+    (_a2 = base.signal) == null ? void 0 : _a2.throwIfAborted();
+    const saved = reuseRemaining ? savedCheckpoint == null ? void 0 : savedCheckpoint[key2] : void 0;
+    if (saved) {
+      try {
+        validateContent(saved);
+        validate(saved);
+        checkpoint[key2] = saved;
+        return saved;
+      } catch (e) {
+      }
+    }
+    reuseRemaining = false;
+    const result2 = await produce();
+    validateContent(result2);
+    validate(result2);
+    (_b2 = base.signal) == null ? void 0 : _b2.throwIfAborted();
+    checkpoint[key2] = result2;
+    await ((_c2 = options.onCheckpoint) == null ? void 0 : _c2.call(options, { ...checkpoint }));
+    (_d2 = base.signal) == null ? void 0 : _d2.throwIfAborted();
+    return result2;
+  };
+  const run = async (phase, task, research2 = false) => {
+    var _a2, _b2, _c2, _d2, _e2;
+    (_a2 = base.signal) == null ? void 0 : _a2.throwIfAborted();
+    await ((_b2 = options.onPhase) == null ? void 0 : _b2.call(options, phase));
+    (_c2 = base.signal) == null ? void 0 : _c2.throwIfAborted();
+    const writingScope = phase === "delivery-writing" && options.evidence ? { detail: (_d2 = options.knownConditions) != null ? _d2 : "", summary: "", workingFindings: "", sourceContext: "", referenceGroups: [] } : {};
+    const result2 = await ask({ ...base, ...writingScope, ...phase === "delivery-acceptance" ? { responseContract: "mindsearch-delivery-acceptance" } : {}, ...options.timeoutMs === void 0 ? {} : { timeoutMs: options.timeoutMs }, task: `<!-- mindsearch-phase: ${phase} -->
+${task}`, ...research2 ? { mindSearchIsolatedResearch: true } : {}, researchMode: research2 ? "research" : "local", researchDepth: research2 ? "normal" : "fast", detailFormat: "adaptive" });
+    (_e2 = base.signal) == null ? void 0 : _e2.throwIfAborted();
+    validateContent(result2);
+    return result2;
+  };
+  const sourceCatalog = ((_d = options.evidence) != null ? _d : []).map((source) => `Source ID: ${source.id}
+${source.detail}`).join("\n\n");
+  const outlineResult = await stage("outline", () => run("delivery-outline", `You are the final-delivery Synthesizer. Design the actual document needed to answer the ORIGINAL user goal with all supplied conditions and outcome preferences. Previous research informs the outline; do not merely concatenate reports or reuse their headings. Return <!-- mindsearch-delivery-outline {"sections":[{"heading":"section title","purpose":"what the reader can do or understand after this section","searchTask":"specific web search needed for this section, or empty if already supported","evidenceIds":["supplied-source-id"],"dependencies":["additional-source-id"]}]} --> as the first detail line. Choose a suitable structure, not a fixed template. Include concrete examples, resources, execution details or comparisons when required by this user. Map each section to the minimal supplied evidenceIds it needs. Dependencies also name supplied source IDs. Leave searchTask empty when mapped supplied reports already support the section; do not request a full search merely to repeat them. Identify exact source gaps for the deliverable. Do not ask the user or deliver the document yet.
+Supplied evidence IDs and reports:
+${sourceCatalog}`), (result2) => {
+    parseDeliveryOutline(result2.detail);
+  });
+  const sections = parseDeliveryOutline(outlineResult.detail);
+  const outline = JSON.stringify(sections);
+  const needsResearch = sections.some((section2) => section2.searchTask.trim());
+  const researchFingerprint = fingerprint(sections.filter((section2) => section2.searchTask.trim()).map((section2) => {
+    var _a2, _b2, _c2, _d2;
+    const ids = [.../* @__PURE__ */ new Set([...(_a2 = section2.evidenceIds) != null ? _a2 : [], ...(_b2 = section2.dependencies) != null ? _b2 : []])];
+    const scoped = section2.evidenceIds === void 0 && section2.dependencies === void 0 ? (_c2 = options.evidence) != null ? _c2 : [] : ((_d2 = options.evidence) != null ? _d2 : []).filter((source) => ids.includes(source.id));
+    return { heading: section2.heading, searchTask: section2.searchTask, sources: scoped.map((source) => [source.id, source.hash]) };
+  }));
+  if (needsResearch && (savedCheckpoint == null ? void 0 : savedCheckpoint.researchFingerprint) && savedCheckpoint.researchFingerprint !== researchFingerprint) reuseRemaining = false;
+  checkpoint.researchFingerprint = researchFingerprint;
+  const research = await stage("research", async () => needsResearch ? await run("delivery-research", `You are the Researcher for the FINAL DOCUMENT. Search the web to fill and verify the sections of this agreed outline: ${outline}. Prioritize the explicit searchTasks and the concrete resources, examples, steps, or current facts required to deliver this user's requested result. Reuse supported prior findings; do not search irrelevant topics. Return a section-by-section evidence report. Use a Markdown H2 heading exactly matching each agreed section heading with a nonempty searchTask; place only that section's findings under it. Include explicit source IDs (delivery-research:<section-heading>:<number>) and direct source URLs, what each source supports, usable concrete details and unresolved gaps. Actually use available search tools; never claim a search occurred if it did not. Begin detail with <!-- mindsearch-delivery-research {"status":"searched|unavailable"} -->. If tools fail or are unavailable, return unavailable rather than replacing research with memory. Do not write the final document or ask questions.`, true) : { summary: "Existing evidence", detail: '<!-- mindsearch-delivery-research {"status":"reused"} -->\nNo new search requested by the outline; use the supplied prior evidence.', suggestions: [], visualReferences: [] }, (research2) => {
+    const searchMarker = research2.detail.match(/<!--\s*mindsearch-delivery-research\s+([\s\S]*?)\s*-->/);
+    const searchStatus = searchMarker ? JSON.parse(searchMarker[1]) : null;
+    if (!searchStatus || typeof searchStatus !== "object" || !("status" in searchStatus) || searchStatus.status !== (needsResearch ? "searched" : "reused")) throw new Error("Final-document web research was unavailable or not completed; no conclusion was saved.");
+  });
+  const evidence = `Final document outline:
+${outline}
+
+Final document research:
+${research.detail}
+
+Supplied source reports:
+${sourceCatalog}`;
+  const available = new Map(((_e = options.evidence) != null ? _e : []).map((source) => [source.id, source]));
+  if (available.size !== ((_f = options.evidence) != null ? _f : []).length) throw new Error("Duplicate final delivery evidence IDs.");
+  const researchForSection = (section2) => {
+    if (!section2.searchTask.trim()) return "";
+    const lines = research.detail.split("\n");
+    const start = lines.findIndex((line) => line.trim() === `## ${section2.heading}`);
+    if (start >= 0) {
+      const end = lines.findIndex((line, index) => index > start && /^##\s+/.test(line));
+      return lines.slice(start, end < 0 ? void 0 : end).join("\n");
+    }
+    if (options.evidence && sections.filter((item) => item.searchTask.trim()).length > 1) throw new Error("Final research is missing section-scoped evidence; no conclusion was saved.");
+    return research.detail;
+  };
+  const sectionPlans = sections.map((section2) => {
+    var _a2, _b2;
+    const ids = [.../* @__PURE__ */ new Set([...(_a2 = section2.evidenceIds) != null ? _a2 : [], ...(_b2 = section2.dependencies) != null ? _b2 : []])];
+    if (ids.some((id) => !available.has(id))) throw new Error("Final delivery outline references an unavailable source ID.");
+    const sources2 = section2.evidenceIds === void 0 && section2.dependencies === void 0 ? [...available.values()] : ids.map((id) => available.get(id));
+    const scopedEvidence = sources2.length ? sources2.map((source) => `Source ID: ${source.id}
+${source.detail}`).join("\n\n") : available.size ? "No external source is mapped to this section. Do not make source-backed claims." : `${base.detail}
+
+${research.detail}`;
+    const scopedResearch = researchForSection(section2);
+    const sectionFingerprint = fingerprint({ baseFingerprint, heading: section2.heading, purpose: section2.purpose, searchTask: section2.searchTask, sources: sources2.map((source) => [source.id, source.hash]), research: scopedResearch || (!available.size ? research.detail : void 0) });
+    return { section: section2, sources: sources2, scopedEvidence, scopedResearch, sectionFingerprint, key: section2.heading.trim().toLowerCase() };
+  });
+  const draftFingerprint = fingerprint(sectionPlans.map((plan) => plan.sectionFingerprint));
+  let draft;
+  let legacyDraft = reuseRemaining && (savedCheckpoint == null ? void 0 : savedCheckpoint.draft) && (!savedCheckpoint.draftFingerprint || savedCheckpoint.draftFingerprint === draftFingerprint);
+  if (legacyDraft) {
+    try {
+      validateContent(savedCheckpoint.draft);
+    } catch (e) {
+      legacyDraft = void 0;
+    }
+  }
+  if (legacyDraft) {
+    if (savedCheckpoint == null ? void 0 : savedCheckpoint.sections) checkpoint.sections = { ...savedCheckpoint.sections };
+    draft = savedCheckpoint.draft;
+    checkpoint.draft = draft;
+    checkpoint.draftFingerprint = draftFingerprint;
+  } else {
+    reuseRemaining = false;
+    const completed = /* @__PURE__ */ Object.create(null);
+    for (const plan of sectionPlans) {
+      const saved = (_g = savedCheckpoint == null ? void 0 : savedCheckpoint.sections) == null ? void 0 : _g[plan.key];
+      if ((saved == null ? void 0 : saved.fingerprint) === plan.sectionFingerprint) {
+        try {
+          validateContent(saved.result);
+          completed[plan.key] = saved;
+        } catch (e) {
+        }
+      }
+    }
+    checkpoint.sections = completed;
+    for (const plan of sectionPlans) {
+      if (completed[plan.key]) continue;
+      const written = await run("delivery-writing", `Write only the complete section "${plan.section.heading}" of the final document. Purpose: ${plan.section.purpose}. Full outline (structure only): ${outline}.
+Known goal and user conditions:
+${(_h = options.knownConditions) != null ? _h : base.detail}
+Section evidence (cite these explicit source IDs and URLs where used):
+${plan.scopedEvidence}
+${plan.section.searchTask.trim() ? `Additional final-document research:
+${plan.scopedResearch}` : ""}
+Develop this section into useful specific content answering the original user goal. Include steps, examples and resources when required. Preserve all necessary detail; summary is only a canvas preview. Do not write other sections, an audit, or a synopsis. Do not fabricate or imply independent source verification. Output reader-facing Markdown in detail; cite sources where used and place limitations beside affected claims.`);
+      (_i = base.signal) == null ? void 0 : _i.throwIfAborted();
+      completed[plan.key] = { fingerprint: plan.sectionFingerprint, evidenceIds: plan.sources.map((source) => source.id), result: written };
+      await ((_j = options.onCheckpoint) == null ? void 0 : _j.call(options, { ...checkpoint, sections: { ...completed } }));
+      (_k = base.signal) == null ? void 0 : _k.throwIfAborted();
+    }
+    if (sectionPlans.some((plan) => !completed[plan.key])) throw new Error("Final delivery is missing a required section.");
+    const writtenSections = sectionPlans.map((plan) => completed[plan.key].result);
+    const detail = writtenSections.map((written, index) => sections.length === 1 || new RegExp(`^#{1,6}\\s+${sections[index].heading.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}\\s*$`, "m").test(written.detail) ? written.detail : `## ${sections[index].heading}
+
+${written.detail}`).join("\n\n");
+    draft = { summary: writtenSections[0].summary, detail, suggestions: [], visualReferences: writtenSections.flatMap((written) => {
+      var _a2;
+      return (_a2 = written.visualReferences) != null ? _a2 : [];
+    }) };
+    validateContent(draft);
+    checkpoint.draftFingerprint = draftFingerprint;
+    checkpoint.draft = draft;
+    await ((_l = options.onCheckpoint) == null ? void 0 : _l.call(options, { ...checkpoint, sections: { ...completed } }));
+    (_m = base.signal) == null ? void 0 : _m.throwIfAborted();
+  }
+  if ((savedCheckpoint == null ? void 0 : savedCheckpoint.draftFingerprint) && savedCheckpoint.draftFingerprint !== draftFingerprint) reuseRemaining = false;
+  const result = await stage("acceptance", () => run("delivery-acceptance", `Perform the final join review: check cross-section coherence, repeated advice or duplicate passages, source IDs or URLs attributed to the wrong claims, and missing sections. Do not rewrite sections. Review the full draft against the ORIGINAL goal, supplied conditions, requested format, and agreed outline. Outline: ${outline}
+Final research:
+${research.detail}
+Supplied source reports:
+${sourceCatalog}
+Draft:
+${draft.detail}
+Return a valid first-line MindSearch review marker. Choose conclude ONLY if the document is usable and complete for this request: every required section is developed, necessary examples/resources/steps are concrete and supported, and sources are linked where used. Mere general direction is insufficient for a requested actionable plan. For conclude, return only the marker and a short acceptance note; do not rewrite or repeat the draft. Explain readiness in rationale and stopReason. For shortcomings, list the specific missing outcomes and return research_more. If important delivery evidence remains missing, choose research_more with exactly one concrete target in suggestions (title, task, contribution) and explain the missing outcome. Do not ask the user and do not invent evidence. Marker: <!-- mindsearch-review {"decision":"conclude|research_more","rationale":"reason","stopReason":"delivery readiness, conclude only"} -->.`), (result2) => {
+    parseAcceptance(result2);
+  });
+  const acceptance = parseAcceptance(result);
+  if (acceptance.decision === "conclude") {
+    return { result: { ...draft, detail: `${acceptance.marker}
 
 ${draft.detail}`, suggestions: [] }, evidence };
   }
-  if (decision.decision !== "research_more") throw new Error("Final delivery acceptance must conclude or identify an evidence gap.");
   return { result: { ...result, detail: `${result.detail}
 
 ## Draft pending completion
@@ -9635,7 +9887,7 @@ ${draft.detail}` }, evidence };
 }
 
 // experiences/mind-search/manual-flow.ts
-var import_node_crypto5 = require("node:crypto");
+var import_node_crypto7 = require("node:crypto");
 
 // ai/context-builder.ts
 var estimateTokens = (value) => Math.ceil((value || "").length / 4);
@@ -9965,6 +10217,54 @@ function matchMindSearchFailedReportTargets(map, candidates) {
   return targets;
 }
 
+// experiences/mind-search/research-scheduler.ts
+function abortError() {
+  const error = new Error("The operation was aborted.");
+  error.name = "AbortError";
+  return error;
+}
+async function scheduleMindSearchResearch(plan, execute, signal) {
+  var _a;
+  validateMindSearchResearchPlan(plan);
+  const parallel = plan.every((item) => Array.isArray(item.dependsOn));
+  const limit = parallel ? 2 : 1;
+  const controller = new AbortController();
+  const abort = () => controller.abort();
+  signal == null ? void 0 : signal.addEventListener("abort", abort, { once: true });
+  if (signal == null ? void 0 : signal.aborted) abort();
+  const completed = /* @__PURE__ */ new Map(), pending = [...plan];
+  const active = /* @__PURE__ */ new Map();
+  try {
+    while (pending.length || active.size) {
+      if (controller.signal.aborted) throw abortError();
+      while (active.size < limit) {
+        const index = pending.findIndex((target2) => {
+          var _a2;
+          return ((_a2 = target2.dependsOn) != null ? _a2 : []).every((id) => completed.has(id));
+        });
+        if (index === -1) break;
+        const target = pending.splice(index, 1)[0];
+        const predecessors = new Map(((_a = target.dependsOn) != null ? _a : []).map((id) => [id, completed.get(id)]));
+        const task = Promise.resolve().then(() => {
+          if (controller.signal.aborted) throw abortError();
+          return execute(target, predecessors, controller.signal);
+        }).then((value) => ({ id: target.id, ok: true, value }), (error) => ({ id: target.id, ok: false, error }));
+        active.set(target.id, task);
+      }
+      if (!active.size) throw new Error("Research dependencies cannot make progress.");
+      const next = await Promise.race(active.values());
+      active.delete(next.id);
+      if (!next.ok) throw next.error;
+      completed.set(next.id, next.value);
+    }
+    if (controller.signal.aborted) throw abortError();
+    return completed;
+  } finally {
+    await Promise.all(active.values());
+    signal == null ? void 0 : signal.removeEventListener("abort", abort);
+  }
+}
+
 // experiences/mind-search/manual-flow.ts
 var MINDSEARCH_UNKNOWN_OPTION_ID = "__mindsearch_unknown__";
 var MINDSEARCH_NO_QUESTION = "__MINDSEARCH_NO_QUESTION__";
@@ -10011,12 +10311,6 @@ function normalizePersistedAnswerOptions(options) {
     return [];
   });
 }
-function validateMindSearchResearchPlan(subtopics) {
-  if (!Array.isArray(subtopics) || subtopics.length < 2 || subtopics.length > 5 || subtopics.some((item) => !item || typeof item !== "object" || ["id", "title", "task", "expectedValue"].some((key2) => typeof item[key2] !== "string" || !item[key2].trim()))) throw new Error("Planner must return 2\u20135 valid research subtopics before the answer can proceed.");
-  const plan = subtopics;
-  if (new Set(plan.map((item) => item.id)).size !== plan.length || new Set(plan.map((item) => item.title.trim().toLowerCase())).size !== plan.length) throw new Error("Planner research subtopics must have unique ids and titles.");
-  return plan;
-}
 function parseMindSearchResearchPlan(result) {
   var _a;
   const marked = result.detail.match(/<!--\s*mindsearch-plan\s+([\s\S]*?)\s*-->/);
@@ -10031,7 +10325,7 @@ function parseMindSearchResearchPlan(result) {
     }
   }
   const suggestions = result.suggestions;
-  if (Array.isArray(suggestions) && suggestions.length >= 2 && suggestions.length <= 5) {
+  if (Array.isArray(suggestions) && suggestions.length >= 1 && suggestions.length <= 5) {
     const plan = suggestions.map((item, index) => {
       const title = typeof (item == null ? void 0 : item.title) === "string" ? item.title : "";
       const slug = title.trim().toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "").slice(0, 32) || "subtopic";
@@ -10039,8 +10333,16 @@ function parseMindSearchResearchPlan(result) {
     });
     return validateMindSearchResearchPlan(plan);
   }
-  throw new Error("Planner must return 2\u20135 valid research subtopics before the answer can proceed.");
+  throw new Error("Planner must return 0\u20135 valid research subtopics before the answer can proceed.");
 }
+var ResearchWorkflowInterrupted = class extends Error {
+  constructor(status) {
+    super(`MindSearch research is ${status}.`);
+    this.status = status;
+  }
+};
+var ReuseEvidenceRejected = class extends Error {
+};
 function findResearchGapSelfCorrection(summaryClass, detail) {
   const enumOf = (value) => value === "user_condition" || value === "\u4F7F\u7528\u8005\u689D\u4EF6" ? "user_condition" : value === "external_evidence" || value === "\u5916\u90E8\u8B49\u64DA" ? "external_evidence" : void 0;
   const normalizeForMatch = (value) => value.replace(/[`*~]/g, "").replace(/\s+/g, " ").trim().toLocaleLowerCase();
@@ -10057,7 +10359,7 @@ function findResearchGapSelfCorrection(summaryClass, detail) {
   return corrections.length === 1 ? corrections[0] : void 0;
 }
 var _MindSearchManualFlow = class _MindSearchManualFlow {
-  constructor(repository, runs, askModel, id = import_node_crypto5.randomUUID, persist = (operation) => operation()) {
+  constructor(repository, runs, askModel, id = import_node_crypto7.randomUUID, persist = (operation) => operation()) {
     this.repository = repository;
     this.runs = runs;
     this.askModel = askModel;
@@ -10121,7 +10423,7 @@ ${(_d = context.task) != null ? _d : ""}` };
     const evidence = (await Promise.all([...new Set(ids)].map(async (id) => {
       const ref = this.evidenceReports.get(id);
       const note = await this.repository.readNote(ref.path);
-      if ((0, import_node_crypto5.createHash)("sha256").update(note.detail).digest("hex") !== ref.hash) throw new Error("MindSearch evidence changed after indexing; retry with the updated report.");
+      if ((0, import_node_crypto7.createHash)("sha256").update(note.detail).digest("hex") !== ref.hash) throw new Error("MindSearch evidence changed after indexing; retry with the updated report.");
       return `Evidence ID: ${id}
 Full report:
 ${note.detail}`;
@@ -10148,22 +10450,30 @@ Use the loaded evidence for the current phase. This lookup is exhausted; return 
     });
   }
   /** Classifies a proposed search gap without exposing reports outside the current branch or invoking search. */
-  async classifyResearchGap(candidate, context, model, reasoning, signal) {
+  async classifyResearchGap(candidate, context, model, reasoning, signal, targetOnly = false) {
+    var _a;
     const task = phaseTask("research-gap-audit", [
       "Audit only the gap described by this Planner research_more decision. Classify the primary missing input as user_condition or external_evidence.",
       "Use user_condition when the gap is a value, preference, constraint, or fact about this specific user's scenario that cannot be established by web sources (for example, this item's actual weight or the user's exact serving time). Do not replace such values with averages, defaults, or sibling-branch answers.",
       "Use external_evidence only when the gap is an external factual or technical claim that a targeted source search could establish. A search task that asks the web to guess a user-specific condition is user_condition.",
+      "Classify the assigned search target, not every uncertainty mentioned in the Planner rationale. A supplied range is a known condition. Finding published guidance for that range is external_evidence; obtaining this user's exact value is user_condition. Do not silently replace one task with the other.",
       "First write a concise rationale in detail, then set summary to exactly user_condition or external_evidence as the final decision. Return no suggestions or visual references. Do not use an HTML comment or replace the exact enum with prose.",
       `Original user goal: ${context.goal}
 Current question: ${context.currentQuestion}
 Current answer: ${context.currentAnswer}`,
       `Known conditions on this branch only: ${JSON.stringify(context.conditions)}`,
-      `Current branch report summaries only:
+      ...targetOnly ? [
+        "TARGET-ONLY RECONCILIATION: the preceding audit led to a question already answered on this path. Reassess only the unchanged assigned search target below, independently of that audit and the broader Planner rationale. Do not invent a different missing input. If the target explicitly requires an unknown user-specific value, keep user_condition; otherwise classify the external claim the target actually asks to verify.",
+        `Assigned search target (unchanged): ${JSON.stringify(candidate.researchTarget)}`
+      ] : [
+        `Current branch report summaries only:
 ${context.reportSummary}`,
-      `Candidate research gap:
+        `Candidate research gap:
 ${JSON.stringify({ rationale: candidate.rationale, target: candidate.researchTarget, summary: candidate.summary })}`
+      ]
     ].join("\n\n"));
-    const result = await this.askMindSearchModel({ title: context.goal, summary: "", rules: "", detail: "", task, ancestors: "", outputLanguage: this.repository.settings.language, mode: "task", researchMode: "local", researchDepth: "fast", visualMode: "off", responseContract: "mindsearch-gap-audit", signal }, model, reasoning, signal);
+    await ((_a = context.setPhase) == null ? void 0 : _a.call(context, "research-gap-audit"));
+    const result = await this.askMindSearchModel({ timeoutMs: context.timeoutMs, title: context.goal, summary: "", rules: "", detail: "", task, ancestors: "", outputLanguage: this.repository.settings.language, mode: "task", researchMode: "local", researchDepth: "fast", visualMode: "off", responseContract: "mindsearch-gap-audit", signal }, model, reasoning, signal);
     throwIfAborted(signal);
     const markerPattern = /<!--\s*mindsearch-gap-audit\s+([\s\S]*?)\s*-->/g;
     const rawText = `${result.summary}
@@ -10221,7 +10531,7 @@ ${result.summary}`,
           `Original audit detail:
 ${result.detail}`
         ].join("\n\n"));
-        const extracted = await this.askMindSearchModel({ title: "MindSearch audit label extractor", summary: "", rules: "", detail: "", task: extractionTask, ancestors: "", outputLanguage: this.repository.settings.language, mode: "task", researchMode: "local", researchDepth: "fast", visualMode: "off", signal }, model, reasoning, signal);
+        const extracted = await this.askMindSearchModel({ timeoutMs: context.timeoutMs, title: "MindSearch audit label extractor", summary: "", rules: "", detail: "", task: extractionTask, ancestors: "", outputLanguage: this.repository.settings.language, mode: "task", researchMode: "local", researchDepth: "fast", visualMode: "off", signal }, model, reasoning, signal);
         throwIfAborted(signal);
         const extractedCorrection = findResearchGapSelfCorrection(summaryEnum, extracted.detail.trim());
         if (extracted.summary.trim() !== correction.classification || extracted.detail.trim() !== correction.quote || !result.detail.includes(extracted.detail.trim()) || (extractedCorrection == null ? void 0 : extractedCorrection.classification) !== correction.classification) {
@@ -10260,7 +10570,7 @@ ${result.summary}`,
       `Original audit detail:
 ${result.detail}`
     ].join("\n\n"));
-    const formatted = await this.askMindSearchModel({ title: context.goal, summary: "", rules: "", detail: "", task: repairTask, ancestors: "", outputLanguage: this.repository.settings.language, mode: "task", researchMode: "local", researchDepth: "fast", visualMode: "off", signal }, model, reasoning, signal);
+    const formatted = await this.askMindSearchModel({ timeoutMs: context.timeoutMs, title: context.goal, summary: "", rules: "", detail: "", task: repairTask, ancestors: "", outputLanguage: this.repository.settings.language, mode: "task", researchMode: "local", researchDepth: "fast", visualMode: "off", signal }, model, reasoning, signal);
     throwIfAborted(signal);
     const formattedClass = normalizeClassification(formatted.summary.trim());
     const verbatimQuote = formatted.detail.trim();
@@ -10270,7 +10580,7 @@ ${result.detail}`
     }
     return accept(onlyMentionedClass, verbatimQuote);
   }
-  async requireUserConditionQuestion(candidate, context, audit, model, reasoning, signal) {
+  async requireUserConditionQuestion(candidate, context, audit, model, reasoning, signal, allowReconciliation = true) {
     const task = phaseTask("decision-quality-review", [
       "The local semantic audit classified the proposed search gap as a user-specific condition that web research cannot determine. Decision=ask_user is mandatory; do not search, conclude, substitute an average, or use another branch's answer.",
       "Ask one concise question that obtains only the missing user-specific condition. Provide 2\u20135 distinct choices. Preserve the candidate's existing answer content and uncertainty; do not add facts or re-interpret research. The question and options must refer only to the current branch.",
@@ -10279,13 +10589,15 @@ ${result.detail}`
 Current question: ${context.currentQuestion}
 Current answer: ${context.currentAnswer}`,
       `Known conditions on this branch: ${JSON.stringify(context.conditions)}`,
+      `Earlier user questions in this path: ${JSON.stringify(context.questionHistory)}`,
+      "Treat supplied ranges and uncertainty as answers, not absent conditions. Do not repeat an answered question. If greater precision is genuinely needed, explicitly ask for that additional precision, explain why the supplied range is insufficient, and offer an unknown/not available choice. Do not merely relabel the same known condition or ask an unrelated question to evade this rule.",
       `Candidate answer summary to preserve: ${candidate.summary}`,
       `Candidate answer body to preserve (not new research context):
 ${candidate.detail.replace(/^\s*<!--\s*mindsearch-review\s+[^\n]*?-->\s*/, "").trim()}`,
       `Candidate rationale and proposed search target: ${JSON.stringify({ rationale: candidate.rationale, target: candidate.researchTarget })}`,
       'Return the ordinary Planner response with a first-line marker: <!-- mindsearch-review {"decision":"ask_user","rationale":"why this user condition matters","question":"one concise question"} --> and 2\u20135 choices in suggestions[].title.'
     ].join("\n\n"));
-    const correctionContext = { title: context.goal, summary: "", rules: "", detail: "", task, ancestors: "", outputLanguage: this.repository.settings.language, mode: "task", researchMode: "local", researchDepth: "fast", visualMode: "off", signal };
+    const correctionContext = { timeoutMs: context.timeoutMs, title: context.goal, summary: "", rules: "", detail: "", task, ancestors: "", outputLanguage: this.repository.settings.language, mode: "task", researchMode: "local", researchDepth: "fast", visualMode: "off", signal };
     const corrected = await this.askMindSearchModel(correctionContext, model, reasoning, signal);
     throwIfAborted(signal);
     const requiredDecisionRationale = audit.rationale;
@@ -10303,19 +10615,27 @@ ${candidate.detail.replace(/^\s*<!--\s*mindsearch-review\s+[^\n]*?-->\s*/, "").t
     if (context.questionHistory.some((question2) => {
       var _a;
       return question2.trim().toLocaleLowerCase() === ((_a = repaired.question) == null ? void 0 : _a.trim().toLocaleLowerCase());
-    })) throw new Error("MindSearch could not ask a new user-condition question without repeating a prior question; no search was started.");
+    })) {
+      if (allowReconciliation) {
+        const reconciled = await this.classifyResearchGap(candidate, context, model, reasoning, signal, true);
+        if (reconciled.classification === "external_evidence") return candidate;
+        return this.requireUserConditionQuestion(candidate, context, reconciled, model, reasoning, signal, false);
+      }
+      throw new Error("MindSearch could not ask a new user-condition question without repeating a prior question; no search was started.");
+    }
     const body = candidate.detail.replace(/^\s*<!--\s*mindsearch-review\s+[^\n]*?-->\s*/, "").trim();
     return { ...repaired, summary: candidate.summary, detail: body };
   }
   /** One bounded, no-search semantic check for every Planner decision. */
   async reviewPlannerDecisionQuality(candidate, context, model, reasoning, signal) {
+    var _a, _b, _c;
     throwIfAborted(signal);
     const uniqueLineage = lineageWithoutRepeatedReports(context.lineage, context.reportDetail);
-    const taskContext = { mindSearchEvidenceIds: context.evidenceIds, title: context.goal, summary: "", detail: "", rules: "", task: "", ancestors: "", outputLanguage: this.repository.settings.language, mode: "task", researchMode: "local", researchDepth: "fast", visualMode: "off", signal };
+    const taskContext = { timeoutMs: context.timeoutMs, mindSearchEvidenceIds: context.evidenceIds, title: context.goal, summary: "", detail: "", rules: "", task: "", ancestors: "", outputLanguage: this.repository.settings.language, mode: "task", researchMode: "local", researchDepth: "fast", visualMode: "off", signal };
     let reviewed = candidate;
     const repeatsKnownQuestion = context.questionHistory.some((question) => {
-      var _a;
-      return question.trim().toLocaleLowerCase() === ((_a = reviewed.question) == null ? void 0 : _a.trim().toLocaleLowerCase());
+      var _a2;
+      return question.trim().toLocaleLowerCase() === ((_a2 = reviewed.question) == null ? void 0 : _a2.trim().toLocaleLowerCase());
     });
     if (context.answeredQuestionCount < MIN_ANSWERED_QUESTIONS_BEFORE_CONCLUSION && reviewed.decision === "conclude" || reviewed.decision === "ask_user" && repeatsKnownQuestion) {
       throwIfAborted(signal);
@@ -10358,8 +10678,8 @@ ${context.reportDetail}`,
         signal
       );
       const repeatsQuestion = context.questionHistory.some((question) => {
-        var _a;
-        return question.trim().toLocaleLowerCase() === ((_a = reviewed.question) == null ? void 0 : _a.trim().toLocaleLowerCase());
+        var _a2;
+        return question.trim().toLocaleLowerCase() === ((_a2 = reviewed.question) == null ? void 0 : _a2.trim().toLocaleLowerCase());
       });
       if (reviewed.decision !== "ask_user" || repeatsQuestion) throw new Error("MindSearch could not produce a compliant meaningful question below the conclusion floor; the result was not committed.");
     }
@@ -10378,7 +10698,24 @@ Earlier answers: ${uniqueLineage}
 Prior research:
 ${context.reportDetail}`
       };
-      const delivery = await buildFinalDelivery(deliveryContext, (step) => this.askMindSearchModel(step, model, reasoning, signal));
+      let checkpoint = (_b = (_a = context.deliveryRecovery) == null ? void 0 : _a.checkpoint) != null ? _b : {};
+      let phase = (_c = context.deliveryRecovery) == null ? void 0 : _c.phase;
+      const delivery = await buildFinalDelivery(deliveryContext, (step) => this.askMindSearchModel(step, model, reasoning, signal), {
+        checkpoint,
+        timeoutMs: context.timeoutMs,
+        evidence: context.deliveryEvidence,
+        knownConditions: JSON.stringify({ goal: context.goal, background: context.goalDetail, conditions: context.conditions, currentQuestion: context.currentQuestion, currentAnswer: context.currentAnswer, earlierAnswers: context.lineage.split("\n").filter((line) => line.startsWith("User answer to ")), model, reasoning }),
+        onPhase: async (current) => {
+          var _a2;
+          phase = current;
+          await ((_a2 = context.saveDeliveryRecovery) == null ? void 0 : _a2.call(context, checkpoint, phase));
+        },
+        onCheckpoint: async (saved) => {
+          var _a2;
+          checkpoint = saved;
+          await ((_a2 = context.saveDeliveryRecovery) == null ? void 0 : _a2.call(context, checkpoint, phase));
+        }
+      });
       const final = await this.parsePlannerReviewWithRecovery(delivery.result, {
         question: context.goal,
         answerSnapshot: JSON.stringify(context.conditions),
@@ -10479,7 +10816,7 @@ ${delivery.evidence}` }, model, reasoning, signal);
     const explorationTarget = (_f = (_e = map.mindSearch) == null ? void 0 : _e.minimumAnswersBeforeConclusion) != null ? _f : 2;
     const answeredQuestionCount = this.answerCountInLineage(map, branch.id);
     const model = diagnostic.model || priorAttempt.model || "gpt-6-luna";
-    const taskDefaults = { title: topic.title, summary: topic.summary, rules: "", detail: topic.detail, task: "", ancestors: lineage.context, mode: "task", researchMode: "research", researchDepth: "normal", visualMode: "off", detailFormat: "adaptive" };
+    const taskDefaults = { timeoutMs: branch.retryTimeoutMs, title: topic.title, summary: topic.summary, rules: "", detail: topic.detail, task: "", ancestors: lineage.context, mode: "task", researchMode: "research", researchDepth: "normal", visualMode: "off", detailFormat: "adaptive" };
     const reasoning = effectiveReasoningLevel(taskDefaults, normalizeReasoningLevel((_h = (_g = diagnostic.reasoning) != null ? _g : priorAttempt.reasoningLevel) != null ? _h : "low"));
     const handle = await this.persist(() => this.runs.startAttempt(mapPath, branch.id, run.id, { model, reasoning, maxResearchTurns: MINDSEARCH_MAX_RESEARCH_TURNS }));
     if (!handle.dispatch) return { status: "in-progress", branchId: branch.id };
@@ -10609,14 +10946,14 @@ ${followup.detail}`)) throw new Error("The bounded follow-up did not produce a u
   /** Starts a new, user-invoked attempt on a saved partial branch without replacing earlier results. */
   async continuePartial(mapPath, runId, model, reasoning, signal) {
     const key2 = `${mapPath}
-${runId}`, fingerprint = JSON.stringify({ model, reasoning });
+${runId}`, fingerprint2 = JSON.stringify({ model, reasoning });
     const existing = _MindSearchManualFlow.continuationRuns.get(key2);
     if (existing) {
-      if (existing.fingerprint !== fingerprint) throw new Error("This partial continuation is already running with different model settings.");
+      if (existing.fingerprint !== fingerprint2) throw new Error("This partial continuation is already running with different model settings.");
       return existing.promise;
     }
     const promise = this.runPartialContinuation(mapPath, runId, model, reasoning, signal).finally(() => _MindSearchManualFlow.continuationRuns.delete(key2));
-    _MindSearchManualFlow.continuationRuns.set(key2, { fingerprint, promise });
+    _MindSearchManualFlow.continuationRuns.set(key2, { fingerprint: fingerprint2, promise });
     return promise;
   }
   async runPartialContinuation(mapPath, runId, model, reasoning, signal) {
@@ -10644,7 +10981,7 @@ ${runId}`, fingerprint = JSON.stringify({ model, reasoning });
     const explorationTarget = (_d = (_c = map.mindSearch) == null ? void 0 : _c.minimumAnswersBeforeConclusion) != null ? _d : 2;
     const questionsAlreadyAsked = await this.questionHistory(map, branch.id);
     const modelToUse = (model == null ? void 0 : model.trim()) || priorAttempt.model || "gpt-6-luna";
-    const taskDefaults = { title: topicNote.title, summary: topicNote.summary, rules: "", detail: topicNote.detail, task: "", ancestors: lineage.context, mode: "task", researchMode: "research", researchDepth: "normal", visualMode: "off", detailFormat: "adaptive" };
+    const taskDefaults = { timeoutMs: branch.retryTimeoutMs, title: topicNote.title, summary: topicNote.summary, rules: "", detail: topicNote.detail, task: "", ancestors: lineage.context, mode: "task", researchMode: "research", researchDepth: "normal", visualMode: "off", detailFormat: "adaptive" };
     const reasoningToUse = effectiveReasoningLevel(taskDefaults, normalizeReasoningLevel((_e = reasoning != null ? reasoning : priorAttempt.reasoningLevel) != null ? _e : "low"));
     const handle = await this.persist(() => this.runs.startAttempt(mapPath, branch.id, run.id, { model: modelToUse, reasoning: reasoningToUse, maxResearchTurns: MINDSEARCH_MAX_RESEARCH_TURNS }));
     if (!handle.dispatch) return { status: "in-progress", branchId: branch.id };
@@ -10709,7 +11046,7 @@ ${report.detail}`,
         ].join("\n\n");
         let searcher;
         try {
-          searcher = await this.askMindSearchModel({ mindSearchEvidenceIds: this.lineageEvidenceIds(map, branch.parentBranchId), title: topicNote.title, summary: report.summary, rules: "", detail: report.detail, task, ancestors: `Original goal: ${topicNote.title}
+          searcher = await this.askMindSearchModel({ timeoutMs: branch.retryTimeoutMs, mindSearchEvidenceIds: this.lineageEvidenceIds(map, branch.parentBranchId), title: topicNote.title, summary: report.summary, rules: "", detail: report.detail, task, ancestors: `Original goal: ${topicNote.title}
 
 ${topicNote.detail}
 
@@ -10756,7 +11093,7 @@ ${report.summary}
 
 ${report.detail}`
         ].join("\n\n");
-        const plannerContext = { mindSearchEvidenceIds: this.lineageEvidenceIds(map, branch.parentBranchId), title: topicNote.title, summary: report.summary, rules: "", detail: report.detail, task: plannerPrompt, ancestors: `Original goal: ${topicNote.title}
+        const plannerContext = { timeoutMs: branch.retryTimeoutMs, mindSearchEvidenceIds: this.lineageEvidenceIds(map, branch.parentBranchId), title: topicNote.title, summary: report.summary, rules: "", detail: report.detail, task: plannerPrompt, ancestors: `Original goal: ${topicNote.title}
 
 ${topicNote.detail}
 
@@ -10766,7 +11103,7 @@ Conditions: ${JSON.stringify(branch.inputSnapshot.conditions)}`, outputLanguage:
         const planner = await this.askMindSearchModel(plannerContext, modelToUse, reasoningToUse, signal);
         throwIfAborted(signal);
         review = await this.parsePlannerReviewWithRecovery(planner, { question: topicNote.title, answerSnapshot: JSON.stringify(branch.answerSnapshot), reportSummary: report.summary, reportDetail: report.detail }, plannerContext, modelToUse, reasoningToUse, signal);
-        review = await this.reviewPlannerDecisionQuality(review, { goal: topicNote.title, goalDetail: topicNote.detail, conditions: branch.inputSnapshot.conditions, currentQuestion: parent.summary, currentAnswer: JSON.stringify(branch.answerSnapshot), answeredQuestionCount, questionHistory: questionsAlreadyAsked, lineage: lineage.context, evidenceIds: this.lineageEvidenceIds(map, branch.parentBranchId), reportSummary: report.summary, reportDetail: report.detail, ...preclassifiedResearchTarget ? { preclassifiedResearchTarget } : {} }, modelToUse, reasoningToUse, signal);
+        review = await this.reviewPlannerDecisionQuality(review, { goal: topicNote.title, goalDetail: topicNote.detail, conditions: branch.inputSnapshot.conditions, currentQuestion: parent.summary, currentAnswer: JSON.stringify(branch.answerSnapshot), answeredQuestionCount, questionHistory: questionsAlreadyAsked, lineage: lineage.context, evidenceIds: this.lineageEvidenceIds(map, branch.parentBranchId), timeoutMs: branch.retryTimeoutMs, reportSummary: report.summary, reportDetail: report.detail, ...preclassifiedResearchTarget ? { preclassifiedResearchTarget } : {} }, modelToUse, reasoningToUse, signal);
         throwIfAborted(signal);
         latestReview = { rationale: review.rationale, researchTarget: review.researchTarget };
         if (review.decision === "research_more" && researchTurn < MINDSEARCH_MAX_RESEARCH_TURNS) {
@@ -10812,14 +11149,14 @@ Conditions: ${JSON.stringify(branch.inputSnapshot.conditions)}`, outputLanguage:
   async planNextQuestion(mapPath, parentNodeId, model, reasoning, requestId, parentBranchId = null, signal) {
     throwIfAborted(signal);
     const key2 = `${mapPath}
-${requestId}`, fingerprint = JSON.stringify({ parentNodeId, parentBranchId, model, reasoning });
+${requestId}`, fingerprint2 = JSON.stringify({ parentNodeId, parentBranchId, model, reasoning });
     const active = _MindSearchManualFlow.questionPlans.get(key2);
     if (active) {
-      if (active.fingerprint !== fingerprint) throw new Error("This Planner question identity is already running with different input.");
+      if (active.fingerprint !== fingerprint2) throw new Error("This Planner question identity is already running with different input.");
       return this.subscribeToQuestionPlan(key2, active, signal);
     }
     const controller = new AbortController();
-    const entry = { fingerprint, controller, promise: Promise.resolve({ status: "no-question" }), subscribers: /* @__PURE__ */ new Set(), settled: false };
+    const entry = { fingerprint: fingerprint2, controller, promise: Promise.resolve({ status: "no-question" }), subscribers: /* @__PURE__ */ new Set(), settled: false };
     entry.promise = this.createPlannerQuestion(mapPath, parentNodeId, model, reasoning, requestId, parentBranchId, controller.signal).finally(() => {
       entry.settled = true;
       if (_MindSearchManualFlow.questionPlans.get(key2) === entry) _MindSearchManualFlow.questionPlans.delete(key2);
@@ -11042,14 +11379,14 @@ ${lineage.context || "None yet."}`
   async answerAndResearch(mapPath, questionNodeId, input, model, reasoning, signal, onBranchStarted) {
     const key2 = `${mapPath}
 ${input.requestId}`;
-    const fingerprint = JSON.stringify({ questionNodeId, selections: [...new Set(input.selections)].sort(), freeText: input.freeText.trim(), model, reasoning });
+    const fingerprint2 = JSON.stringify({ questionNodeId, selections: [...new Set(input.selections)].sort(), freeText: input.freeText.trim(), model, reasoning });
     const existing = this.answerRuns.get(key2);
     if (existing) {
-      if (existing.fingerprint !== fingerprint) throw new Error("This answer submission identity is already running with different input.");
+      if (existing.fingerprint !== fingerprint2) throw new Error("This answer submission identity is already running with different input.");
       return existing.promise;
     }
     const work = this.runAnswer(mapPath, questionNodeId, input, model, reasoning, signal, onBranchStarted).finally(() => this.answerRuns.delete(key2));
-    this.answerRuns.set(key2, { fingerprint, promise: work });
+    this.answerRuns.set(key2, { fingerprint: fingerprint2, promise: work });
     return work;
   }
   async retryAnswerResearch(mapPath, branchId, model, reasoning, signal) {
@@ -11140,6 +11477,82 @@ ${input.requestId}`;
     throwIfAborted(signal);
     return this.runSubtopicWorkflow(mapPath, branch.id, parent, topicNote, answerLabels, freeText, lineage.context, model, reasoning, signal);
   }
+  async reusableResearchCandidates(map, branch) {
+    var _a, _b, _c, _d;
+    const candidates = [], visited = /* @__PURE__ */ new Set();
+    let ancestor = (_a = map.mindSearch) == null ? void 0 : _a.branches.find((item) => item.id === branch.parentBranchId);
+    while (ancestor && !visited.has(ancestor.id)) {
+      visited.add(ancestor.id);
+      for (const result of ancestor.results.filter((item) => item.kind === "research")) {
+        if (!map.nodes.some((node) => node.id === result.nodeId && node.path === result.notePath && node.mindSearchKind === "research")) continue;
+        if (result.reuse) {
+          const origin = (_c = (_b = map.mindSearch) == null ? void 0 : _b.branches.find((item) => item.id === result.reuse.sourceBranchId)) == null ? void 0 : _c.results.find((item) => item.resultId === result.reuse.sourceResultId && item.notePath === result.reuse.sourceNotePath && item.version === result.reuse.sourceVersion);
+          if (!origin) continue;
+          try {
+            if (researchContentHash(await this.repository.readNote(origin.notePath)) !== result.reuse.sourceContentHash) continue;
+          } catch (e) {
+            continue;
+          }
+        }
+        let note;
+        try {
+          note = await this.repository.readNote(result.notePath);
+        } catch (e) {
+          continue;
+        }
+        if (!note.summary.trim() || !note.detail.trim() || /\bresearch status\s*:\s*(?:not searched|search failed|unavailable)\b/i.test(`${note.summary}
+${note.detail}`)) continue;
+        candidates.push({ source: { branchId: ancestor.id, resultId: result.resultId, notePath: result.notePath, version: result.version, contentHash: researchContentHash(note) }, evidenceId: `${result.nodeId}-v${result.version}`, title: note.title, summary: note.summary, detail: note.detail, conditions: { ...ancestor.inputSnapshot.conditions } });
+        this.evidenceReports.set(`${result.nodeId}-v${result.version}`, { path: result.notePath, hash: (0, import_node_crypto7.createHash)("sha256").update(note.detail).digest("hex") });
+        if (this.evidenceReports.size > 512) {
+          const oldest = [...this.evidenceReports.keys()][0];
+          if (oldest) this.evidenceReports.delete(oldest);
+        }
+      }
+      ancestor = (_d = map.mindSearch) == null ? void 0 : _d.branches.find((item) => item.id === ancestor.parentBranchId);
+    }
+    return candidates;
+  }
+  async verifyResearchSource(mapPath, branchId, target) {
+    var _a;
+    const map = await this.repository.readMap(mapPath), branch = (_a = map.mindSearch) == null ? void 0 : _a.branches.find((item) => item.id === branchId);
+    if (!branch || !target.source) throw new ReuseEvidenceRejected("Research source is missing.");
+    const candidate = (await this.reusableResearchCandidates(map, branch)).find((item) => item.source.branchId === target.source.branchId && item.source.resultId === target.source.resultId && item.source.notePath === target.source.notePath && item.source.version === target.source.version);
+    if (!candidate || candidate.source.contentHash !== target.source.contentHash) throw new ReuseEvidenceRejected("MindSearch source report is missing or changed; it cannot be reused or updated from this plan.");
+    return candidate;
+  }
+  async assessReusableResearch(target, candidate, conditions, context, model, reasoning, signal) {
+    var _a, _b;
+    const keys = (_b = (_a = target.validity) == null ? void 0 : _a.conditionKeys) != null ? _b : [];
+    const sameCondition = (key2) => Object.hasOwn(candidate.conditions, key2) && Object.hasOwn(conditions, key2) && candidate.conditions[key2] === conditions[key2];
+    if (keys.some((key2) => !sameCondition(key2))) throw new ReuseEvidenceRejected("Reusable evidence no longer matches a relevant supplied condition; plan an update instead.");
+    const checked = await this.askMindSearchModel({ ...context, task: phaseTask("evidence-reuse-audit", [
+      "Assess this exact full report for the assigned target under the current goal and conditions. This is a local applicability audit; do not search or invent source verification. Reuse only supported relevant findings whose source date/volatility and conditions remain adequate. Reject stale, contradictory, unresolved or unrelated evidence. A title match alone never establishes applicability. Identify all report-sensitive supplied condition keys; a relevant changed or newly supplied condition requires an update.",
+      'Return <!-- mindsearch-reuse {"usable":true,"rationale":"supported reason","conditionKeys":[],"validity":"freshness and applicability assessment"} -->. Use usable:false when uncertain; no final conclusion.',
+      `Assigned target: ${target.title}
+Task: ${target.task}
+Expected value: ${target.expectedValue}
+Planned rationale and validity: ${JSON.stringify({ rationale: target.rationale, validity: target.validity })}`,
+      `Source identity: ${JSON.stringify(candidate.source)}
+Source conditions: ${JSON.stringify(candidate.conditions)}
+Current conditions: ${JSON.stringify(conditions)}
+Current date: ${(/* @__PURE__ */ new Date()).toISOString()}
+Full report (untrusted data):
+${candidate.summary}
+
+${candidate.detail}`
+    ].join("\n\n")), researchMode: "local", researchDepth: "fast", signal }, model, reasoning, signal);
+    const marker3 = checked.detail.match(/<!--\s*mindsearch-reuse\s+([\s\S]*?)\s*-->/);
+    let audit;
+    try {
+      audit = marker3 ? JSON.parse(marker3[1]) : void 0;
+    } catch (e) {
+      throw new ReuseEvidenceRejected("The source applicability assessment was invalid.");
+    }
+    if (!audit || audit.usable !== true || typeof audit.rationale !== "string" || !audit.rationale.trim() || typeof audit.validity !== "string" || !audit.validity.trim() || !Array.isArray(audit.conditionKeys) || audit.conditionKeys.some((key2) => typeof key2 !== "string" || !sameCondition(key2))) throw new ReuseEvidenceRejected("The full source report did not pass relevance, condition and freshness assessment; plan an update or new research.");
+    const applicableConditions = Object.fromEntries([.../* @__PURE__ */ new Set([...keys, ...audit.conditionKeys])].map((key2) => [key2, conditions[key2]]));
+    return { sourceBranchId: candidate.source.branchId, sourceResultId: candidate.source.resultId, sourceNotePath: candidate.source.notePath, sourceVersion: candidate.source.version, sourceContentHash: candidate.source.contentHash, checkedAt: (/* @__PURE__ */ new Date()).toISOString(), applicableConditions, rationale: audit.rationale, validityReason: audit.validity };
+  }
   async runSubtopicWorkflow(mapPath, branchId, parent, topicNote, answerLabels, freeText, lineageContext, model, reasoning, signal) {
     try {
       return await this.executeSubtopicWorkflow(mapPath, branchId, parent, topicNote, answerLabels, freeText, lineageContext, model, reasoning, signal);
@@ -11154,13 +11567,13 @@ ${input.requestId}`;
     }
   }
   async executeSubtopicWorkflow(mapPath, branchId, parent, topicNote, answerLabels, freeText, lineageContext, model, reasoning, signal) {
-    var _a, _b, _c, _d, _e, _f, _g, _h, _i;
+    var _a, _b, _c, _d, _e, _f, _g, _h, _i, _j, _k;
     let map = await this.repository.readMap(mapPath);
     let branch = (_a = map.mindSearch) == null ? void 0 : _a.branches.find((item) => item.id === branchId);
     if (!branch) throw new Error("MindSearch answer branch disappeared before planning its research.");
     const questionNodeId = branch.questionNodeId;
     const answerDescription = ((_b = map.nodes.find((node) => node.id === questionNodeId)) == null ? void 0 : _b.mindSearchKind) === "topic" ? "No user answer was requested; use the topic context as user-supplied background only." : JSON.stringify({ selectedOptions: answerLabels, freeText: freeText || null });
-    const contextBase = { mindSearchEvidenceIds: this.lineageEvidenceIds(map, branch.parentBranchId), title: "MindSearch", summary: "", rules: "", detail: `Known conditions: ${JSON.stringify(branch.inputSnapshot.conditions)}`, task: "", ancestors: `Original goal and background:
+    const contextBase = { timeoutMs: branch.retryTimeoutMs, mindSearchEvidenceIds: this.lineageEvidenceIds(map, branch.parentBranchId), title: "MindSearch", summary: "", rules: "", detail: `Known conditions: ${JSON.stringify(branch.inputSnapshot.conditions)}`, task: "", ancestors: `Original goal and background:
 ${topicNote.title}
 
 ${topicNote.detail}
@@ -11170,11 +11583,34 @@ ${lineageContext || "None."}`, outputLanguage: this.repository.settings.language
     const alreadyCommitted = await this.savedTerminalResult(mapPath, branchId);
     if (alreadyCommitted) return alreadyCommitted;
     const questionsAlreadyAsked = await this.questionHistory(map, branchId);
+    const candidates = await this.reusableResearchCandidates(map, branch);
+    const preparedReuse = /* @__PURE__ */ new Map();
+    const materializeExistingEvidence = async () => {
+      const reusable = [], titles = /* @__PURE__ */ new Set();
+      for (const candidate of candidates.slice(0, 5)) {
+        if (titles.has(candidate.title.trim().toLowerCase())) continue;
+        const target = { id: `reuse-${candidate.source.resultId}`, title: candidate.title, task: `Retain supported findings relevant to ${parent.summary || topicNote.title}`, expectedValue: "Retain adequate existing evidence without repeating web searches", action: "reuse", dependsOn: [], source: candidate.source, rationale: "Planner requested no new evidence tasks", validity: { conditionKeys: [], reason: "Full report must pass the current-goal applicability and freshness audit" } };
+        try {
+          const assessment = await this.assessReusableResearch(target, candidate, branch.inputSnapshot.conditions, contextBase, model, reasoning, signal);
+          target.validity = { conditionKeys: Object.keys(assessment.applicableConditions), reason: assessment.validityReason };
+          preparedReuse.set(target.id, assessment);
+          reusable.push(target);
+          titles.add(target.title.trim().toLowerCase());
+        } catch (error) {
+          if (!(error instanceof ReuseEvidenceRejected)) throw error;
+        }
+      }
+      if (!reusable.length) throw new Error("An empty research plan requires usable ancestor evidence; at least one research target is needed.");
+      return validateMindSearchResearchPlan(reusable);
+    };
     let plan = branch.researchPlan;
     if (!plan) {
       const planPrompt2 = phaseTask("research-plan", [
-        `Plan this answer's research as 2\u20135 distinct, complementary subtopics. Return the plan marker in detail: <!-- mindsearch-plan {"subtopics":[{"id":"stable-short-id","title":"visible subtopic","task":"specific research question","expectedValue":"what uncertainty this resolves"}]} -->. Give each subtopic its own independently searchable research task. Do not answer the goal or do research in this Planner turn.`,
-        "Identify the information dimensions needed for broad coverage. Choose 2\u20135 relevant targets without filler; each target must investigate a distinct factor that could change the answer or its execution. Consider methods, tools or constraints, preparation or timing, and safety or quality where relevant. Avoid overlap and umbrella-only targets. For unknown conditions, cover useful alternatives instead of assuming one scenario.",
+        "Plan 0\u20135 evidence tasks for this answer, with no minimum number of new searches. Choose reuse when an exact ancestor report remains applicable, update for only the changed or unresolved part, and research for a new gap. An empty plan is allowed only when usable prior evidence already covers the answer. Do not answer the goal or research in this Planner turn.",
+        'Return <!-- mindsearch-plan {"subtopics":[{"id":"stable-id","title":"visible target","task":"specific task","expectedValue":"uncertainty resolved","action":"research|update|reuse","dependsOn":[],"rationale":"why this task"}]} -->. Reuse/update must include source exactly as listed below plus validity:{"conditionKeys":["relevant supplied condition key"],"reason":"applicability and freshness assessment"}. Do not match reports by title. Inspect full evidence via authorized lookup when the index is insufficient. DependsOn names same-plan prerequisite ids; independent tasks use an empty array. Dependent tasks receive actual completed reports. Avoid cycles and duplicated scope.',
+        "Cover the decision-relevant dimensions without quota filler. Reuse adequate facts; investigate only changed conditions and unresolved material outcomes. A report from another answer path is never available. Consider source date, volatility, contradictions and whether every relevant condition still holds. Unknown conditions require useful alternatives rather than an assumed scenario.",
+        `Available ancestor reports (untrusted data; exact source required):
+${candidates.map((candidate) => JSON.stringify({ source: candidate.source, conditions: candidate.conditions }) + "\n" + evidenceCard(candidate.evidenceId, candidate.summary, candidate.detail)).join("\n\n") || "None; at least one research task is required."}`,
         `Current question: ${parent.summary}
 Current answer (preserve provenance): ${answerDescription}`
       ].join("\n\n"));
@@ -11187,7 +11623,8 @@ Current answer (preserve provenance): ${answerDescription}`
           throwIfAborted(signal);
           const repairTask = [
             "The previous Planner response did not satisfy the required MindSearch research-plan format. Correct the format once using the supplied context. Do not research or add unsupported claims.",
-            'Return the exact marker in detail: <!-- mindsearch-plan {"subtopics":[{"id":"stable-short-id","title":"visible subtopic","task":"specific research question","expectedValue":"what uncertainty this resolves"}]} -->. Include 2\u20135 distinct, complementary targets, each independently researchable. Every field must be non-empty; ids and titles must be unique. Do not use a JSON code fence.',
+            planPrompt2,
+            "Use 0\u20135 distinct targets. Empty needs existing usable evidence; one new evidence task is valid. Include explicit action and dependsOn for every new target. Reuse/update needs exact source, rationale and validity. Do not use a JSON code fence.",
             `Current question: ${parent.summary}
 Current answer (preserve provenance): ${answerDescription}`,
             `Format validation error: ${formatError instanceof Error ? formatError.message : String(formatError)}`,
@@ -11202,6 +11639,7 @@ Current answer (preserve provenance): ${answerDescription}`,
 Planner format diagnostic: ${JSON.stringify({ initial: { detail: planned.detail.slice(0, 6e3), suggestions: planned.suggestions }, repair: { detail: repaired.detail.slice(0, 6e3), suggestions: repaired.suggestions } })}`);
           }
         }
+        if (!plan.length) plan = await materializeExistingEvidence();
         await this.persist(() => this.runs.saveResearchPlan(mapPath, branchId, plan));
       } catch (error) {
         if (!(signal == null ? void 0 : signal.aborted)) await this.persist(() => this.runs.saveResearchPlanError(mapPath, branchId, error));
@@ -11209,97 +11647,177 @@ Planner format diagnostic: ${JSON.stringify({ initial: { detail: planned.detail.
       }
     }
     if (!plan) throw new Error("MindSearch research plan is missing.");
-    const reports = [];
-    for (const target of plan) {
-      throwIfAborted(signal);
-      map = await this.repository.readMap(mapPath);
-      branch = (_c = map.mindSearch) == null ? void 0 : _c.branches.find((item) => item.id === branchId);
-      if (!branch) throw new Error("MindSearch answer branch disappeared during subtopic research.");
-      const savedRef = branch.results.find((item) => item.subtopicId === target.id);
-      if (savedRef) {
-        const note = await this.repository.readNote(savedRef.notePath);
-        reports.push({ subtopicId: target.id, nodeId: savedRef.nodeId, summary: note.summary, detail: note.detail });
-        continue;
-      }
-      const handle = await this.persist(() => this.runs.startAttempt(mapPath, branchId, void 0, { model, reasoning: effectiveReasoningLevel({ ...contextBase, researchMode: "research", researchDepth: "normal" }, normalizeReasoningLevel(reasoning)), maxResearchTurns: 1 }));
-      if (!handle.dispatch) return { status: "in-progress", branchId };
-      try {
-        await this.persist(() => this.runs.recordResearchTurn(mapPath, handle));
-        const task = phaseTask("subtopic-research", ["Perform a targeted web search. Return a concise evidence report: findings, supporting URLs, and unresolved gaps. Focus on what the latest answer changes; do not write a full career guide or final deliverable. Report search status accurately.", SEARCHER_TARGET_RULE, `Assigned research subtopic: ${target.title}
+    let executionPlan = validateMindSearchResearchPlan(plan);
+    if (!executionPlan.length) {
+      executionPlan = await materializeExistingEvidence();
+      await this.persist(() => this.runs.saveResearchPlan(mapPath, branchId, executionPlan));
+    }
+    let scheduled;
+    try {
+      scheduled = await scheduleMindSearchResearch(executionPlan, async (target, predecessors, taskSignal) => {
+        var _a2, _b2;
+        throwIfAborted(taskSignal);
+        const currentMap = await this.repository.readMap(mapPath), currentBranch = (_a2 = currentMap.mindSearch) == null ? void 0 : _a2.branches.find((item) => item.id === branchId);
+        if (!currentBranch) throw new Error("MindSearch answer branch disappeared during subtopic research.");
+        const savedRef = currentBranch.results.find((item) => item.subtopicId === target.id && item.kind === "research");
+        if (savedRef) {
+          if (savedRef.reuse) {
+            await this.verifyResearchSource(mapPath, branchId, { ...target, source: { branchId: savedRef.reuse.sourceBranchId, resultId: savedRef.reuse.sourceResultId, notePath: savedRef.reuse.sourceNotePath, version: savedRef.reuse.sourceVersion, contentHash: savedRef.reuse.sourceContentHash } });
+            if (Object.entries(savedRef.reuse.applicableConditions).some(([key2, value]) => currentBranch.inputSnapshot.conditions[key2] !== value)) throw new Error("The reused report no longer matches its applicable conditions.");
+          }
+          const note = await this.repository.readNote(savedRef.notePath);
+          if (!note.summary.trim() || !note.detail.trim()) throw new Error("A saved report is no longer usable.");
+          if (savedRef.reuse && researchContentHash(note) !== savedRef.reuse.sourceContentHash) throw new Error("The copied research report changed after reuse validation; its provenance no longer matches.");
+          return { subtopicId: target.id, nodeId: savedRef.nodeId, summary: note.summary, detail: note.detail, title: target.title };
+        }
+        const handle = await this.persist(() => this.runs.startAttempt(mapPath, branchId, void 0, { phase: target.action === "reuse" ? "subtopic-reuse" : "subtopic-research", subtopicId: target.id, model, reasoning: effectiveReasoningLevel({ ...contextBase, researchMode: "research", researchDepth: "normal" }, normalizeReasoningLevel(reasoning)), maxResearchTurns: 1 }));
+        if (!handle.dispatch) throw new ResearchWorkflowInterrupted("in-progress");
+        try {
+          let reuse;
+          let result;
+          let source, rejectedReuse = "";
+          if (target.action === "reuse" || target.action === "update") {
+            try {
+              source = await this.verifyResearchSource(mapPath, branchId, target);
+            } catch (error) {
+              if (!(error instanceof ReuseEvidenceRejected)) throw error;
+              rejectedReuse = error.message;
+            }
+          }
+          const dependencyReports = [...predecessors].map(([id, report]) => `Prerequisite ${id} (${report.title}), actual completed report:
+${report.summary}
+
+${report.detail}`).join("\n\n");
+          if (target.action === "reuse" && source) {
+            try {
+              reuse = (_b2 = preparedReuse.get(target.id)) != null ? _b2 : await this.assessReusableResearch(target, source, currentBranch.inputSnapshot.conditions, { ...contextBase, task: "", detail: contextBase.detail + (dependencyReports ? `
+
+${dependencyReports}` : "") }, model, reasoning, taskSignal);
+              await this.verifyResearchSource(mapPath, branchId, target);
+              result = { summary: source.summary, detail: source.detail, suggestions: [], visualReferences: [] };
+            } catch (error) {
+              if (!(error instanceof ReuseEvidenceRejected)) throw error;
+              rejectedReuse = error.message;
+              reuse = void 0;
+              source = void 0;
+            }
+          }
+          if (!result) {
+            if (rejectedReuse) await this.persist(() => this.runs.recordPhase(mapPath, handle, "subtopic-research"));
+            await this.persist(() => this.runs.recordResearchTurn(mapPath, handle));
+            const task = phaseTask("subtopic-research", ["Perform a targeted web search. Return a concise evidence report: findings, supporting URLs, and unresolved gaps. Focus on what the latest answer changes; do not write a full career guide or final deliverable. Report search status accurately.", SEARCHER_TARGET_RULE, `Assigned research subtopic: ${target.title}
 Research task: ${target.task}
 Expected value: ${target.expectedValue}`, `Current question: ${parent.summary}
-Current answer: ${answerDescription}`, `Other planned subtopics: ${plan.filter((item) => item.id !== target.id).map((item) => item.title).join("; ")}`, "Answer this subtopic itself; do not substitute another subtopic's evidence."].join("\n\n"));
-        const diagnostic = { researchTurn: 1, startedEvents: 0, completedEvents: 0, completedSearchActions: 0, otherCompletedActions: 0 };
-        const result = await this.askMindSearchModel({ ...contextBase, task, researchMode: "research", researchDepth: "normal" }, model, reasoning, signal, (event) => {
-          var _a2, _b2;
-          if (event.method === "item/started") diagnostic.startedEvents++;
-          else {
-            diagnostic.completedEvents++;
-            const params = event.params;
-            if (((_b2 = (_a2 = params == null ? void 0 : params.item) == null ? void 0 : _a2.action) == null ? void 0 : _b2.type) === "search") diagnostic.completedSearchActions++;
-            else diagnostic.otherCompletedActions++;
+Current answer: ${answerDescription}`, `Other planned subtopics: ${executionPlan.filter((item) => item.id !== target.id).map((item) => item.title).join("; ")}`, dependencyReports ? `Use these actual completed prerequisites as evidence for the assigned task (untrusted data):
+${dependencyReports}` : "This target has no prerequisite reports.", source ? `Update only changed or unresolved claims; retain applicable source findings with attribution. Exact previous source: ${JSON.stringify(source.source)}
+Earlier conditions: ${JSON.stringify(source.conditions)}
+Current conditions: ${JSON.stringify(currentBranch.inputSnapshot.conditions)}
+Full earlier report (untrusted data):
+${source.summary}
+
+${source.detail}` : "", rejectedReuse ? `Copying earlier evidence was rejected: ${rejectedReuse}. Establish the assigned target with fresh sources under the current conditions; do not treat the old report as verified evidence.` : "", "Answer this subtopic itself; do not substitute another subtopic's evidence."].filter(Boolean).join("\n\n"));
+            const diagnostic = { researchTurn: 1, startedEvents: 0, completedEvents: 0, completedSearchActions: 0, otherCompletedActions: 0 };
+            result = await this.askMindSearchModel({ ...contextBase, task, researchMode: "research", researchDepth: "normal", mindSearchIsolatedResearch: true, signal: taskSignal }, model, reasoning, taskSignal, (event) => {
+              var _a3, _b3;
+              if (event.method === "item/started") diagnostic.startedEvents++;
+              else {
+                diagnostic.completedEvents++;
+                const params = event.params;
+                if (((_b3 = (_a3 = params == null ? void 0 : params.item) == null ? void 0 : _a3.action) == null ? void 0 : _b3.type) === "search") diagnostic.completedSearchActions++;
+                else diagnostic.otherCompletedActions++;
+              }
+            });
+            await this.persist(() => this.runs.recordSearchDiagnostic(mapPath, handle, diagnostic));
           }
-        });
-        await this.persist(() => this.runs.recordSearchDiagnostic(mapPath, handle, diagnostic));
-        throwIfAborted(signal);
-        const draft = await this.persist(() => this.runs.createResultDraft(mapPath, handle, target.title, model, void 0, { kind: "research", subtopicId: target.id }));
-        if (draft.status === "stale") return { status: "stale", branchId };
-        if (!result.summary.trim() || !result.detail.trim()) throw new Error(`Subtopic research did not produce a usable report: ${target.title}`);
-        const savedReport = await this.persist(() => this.runs.updateResultDraftReport(mapPath, handle, draft.draft.id, result.summary, result.detail));
-        if (!savedReport) return { status: "stale", branchId };
-        if (/\bresearch status\s*:\s*(?:not searched|search failed|unavailable)\b/i.test(`${result.summary}
+          throwIfAborted(taskSignal);
+          const draft = await this.persist(() => this.runs.createResultDraft(mapPath, handle, target.title, model, void 0, { kind: "research", subtopicId: target.id, ...reuse ? { reuse } : {} }));
+          if (draft.status === "stale") throw new ResearchWorkflowInterrupted("stale");
+          if (!result.summary.trim() || !result.detail.trim()) throw new Error(`Subtopic research did not produce a usable report: ${target.title}`);
+          if (!await this.persist(() => this.runs.updateResultDraftReport(mapPath, handle, draft.draft.id, result.summary, result.detail))) throw new ResearchWorkflowInterrupted("stale");
+          if (/\bresearch status\s*:\s*(?:not searched|search failed|unavailable)\b/i.test(`${result.summary}
 ${result.detail}`)) throw new Error("The Agent explicitly says no web search succeeded; the report remains an unpublished diagnostic.");
-        const committed = await this.persist(() => this.runs.commitResult(mapPath, handle, draft.draft.id, result));
-        if (committed.status !== "committed") return { status: "stale", branchId };
-        const saved = await this.repository.readNote(committed.notePath);
-        reports.push({ subtopicId: target.id, nodeId: draft.draft.nodeId, summary: saved.summary, detail: saved.detail });
-      } catch (error) {
-        try {
-          if (signal == null ? void 0 : signal.aborted) await this.persist(() => this.runs.cancelAttempt(mapPath, handle, "User cancelled a MindSearch subtopic research turn.").then(() => void 0));
-          else await this.persist(() => this.runs.failAttempt(mapPath, handle, error instanceof Error ? error.message : String(error)).then(() => void 0));
-        } catch (e) {
+          if (reuse) await this.verifyResearchSource(mapPath, branchId, target);
+          const committed = await this.persist(() => {
+            throwIfAborted(taskSignal);
+            return this.runs.commitResult(mapPath, handle, draft.draft.id, result);
+          });
+          if (committed.status !== "committed") throw new ResearchWorkflowInterrupted("stale");
+          const saved = await this.repository.readNote(committed.notePath);
+          return { subtopicId: target.id, nodeId: draft.draft.nodeId, summary: saved.summary, detail: saved.detail, title: target.title };
+        } catch (error) {
+          try {
+            if (taskSignal.aborted) await this.persist(() => this.runs.cancelAttempt(mapPath, handle, "User cancelled a MindSearch subtopic research turn.").then(() => void 0));
+            else await this.persist(() => this.runs.failAttempt(mapPath, handle, error instanceof Error ? error.message : String(error)).then(() => void 0));
+          } catch (e) {
+          }
+          throw error;
+        } finally {
+          this.runs.releaseAttempt(mapPath, handle);
         }
-        throw error;
-      } finally {
-        this.runs.releaseAttempt(mapPath, handle);
-      }
+      }, signal);
+    } catch (error) {
+      if (error instanceof ResearchWorkflowInterrupted) return { status: error.status, branchId };
+      throw error;
     }
+    const reports = executionPlan.map((target) => scheduled.get(target.id));
+    if (!reports.length) throw new Error("MindSearch requires at least one usable evidence report before terminal review.");
     throwIfAborted(signal);
     map = await this.repository.readMap(mapPath);
-    branch = (_d = map.mindSearch) == null ? void 0 : _d.branches.find((item) => item.id === branchId);
+    branch = (_c = map.mindSearch) == null ? void 0 : _c.branches.find((item) => item.id === branchId);
     if (!branch) throw new Error("MindSearch answer branch disappeared before synthesis.");
     const answeredQuestionCount = this.answerCountInLineage(map, branch.id);
-    const explorationTarget = (_f = (_e = map.mindSearch) == null ? void 0 : _e.minimumAnswersBeforeConclusion) != null ? _f : 2;
+    const explorationTarget = (_e = (_d = map.mindSearch) == null ? void 0 : _d.minimumAnswersBeforeConclusion) != null ? _e : 2;
     const existingConclusion = [...branch.results].reverse().find((item) => item.kind === "conclusion" || item.kind === "synthesis");
     if (existingConclusion) {
-      const savedRun = (_g = map.mindSearch) == null ? void 0 : _g.runs.find((item) => item.id === existingConclusion.runId);
+      const savedRun = (_f = map.mindSearch) == null ? void 0 : _f.runs.find((item) => item.id === existingConclusion.runId);
       const savedAttempt = savedRun == null ? void 0 : savedRun.attempts.find((item) => item.id === existingConclusion.attemptId);
       const result = { status: "committed", resultId: existingConclusion.resultId, notePath: existingConclusion.notePath, ...(savedAttempt == null ? void 0 : savedAttempt.status) === "partial" ? { resultStatus: "partial" } : {} };
       return (savedAttempt == null ? void 0 : savedAttempt.status) === "partial" ? { status: "partial", branchId, result } : { status: "completed", branchId, result };
     }
     const synthesisReasoning = effectiveReasoningLevel({ ...contextBase, title: topicNote.title, detailFormat: "adaptive" }, normalizeReasoningLevel(reasoning));
-    const synthesisHandle = await this.persist(() => this.runs.startAttempt(mapPath, branchId, void 0, { model, reasoning: synthesisReasoning, maxResearchTurns: MINDSEARCH_MAX_RESEARCH_TURNS }));
+    const synthesisHandle = await this.persist(() => this.runs.startAttempt(mapPath, branchId, void 0, { phase: "report-review", model, reasoning: synthesisReasoning, maxResearchTurns: MINDSEARCH_MAX_RESEARCH_TURNS }));
     if (!synthesisHandle.dispatch) return { status: "in-progress", branchId };
     try {
       await this.persist(() => this.runs.recordResearchTurn(mapPath, synthesisHandle));
       const supplementalReports = [];
-      const aggregateReports = () => ({
-        summary: [...reports.map((item) => {
-          var _a2, _b2;
-          return `${(_b2 = (_a2 = plan.find((target) => target.id === item.subtopicId)) == null ? void 0 : _a2.title) != null ? _b2 : item.subtopicId}: ${item.summary}`;
-        }), ...supplementalReports.map((item) => `\u88DC\u67E5\uFF1A${item.target.title}: ${item.summary}`)].join("\n"),
-        detail: [...reports.map((item) => {
-          var _a2, _b2;
-          return `## ${(_b2 = (_a2 = plan.find((target) => target.id === item.subtopicId)) == null ? void 0 : _a2.title) != null ? _b2 : item.subtopicId}
+      const sourceFingerprint = (0, import_node_crypto7.createHash)("sha256").update(JSON.stringify({ detail: contextBase.detail, ancestors: contextBase.ancestors, language: contextBase.outputLanguage, goal: topicNote.detail, currentQuestion: parent.summary, answerDescription, reports, model, reasoning })).digest("hex");
+      let resumeDelivery = ((_g = branch.deliveryRecovery) == null ? void 0 : _g.fingerprint) === sourceFingerprint ? branch.deliveryRecovery : void 0;
+      let sectionRecovery = branch.deliveryRecovery;
+      const initialDeliveryEvidence = [...new Map(reports.map((report) => {
+        var _a2, _b2, _c2;
+        const ref = branch.results.find((item) => item.nodeId === report.nodeId);
+        const evidence = { id: (_c2 = (_b2 = (_a2 = ref == null ? void 0 : ref.reuse) == null ? void 0 : _a2.sourceResultId) != null ? _b2 : ref == null ? void 0 : ref.resultId) != null ? _c2 : report.subtopicId, hash: researchContentHash(report), detail: `## ${report.title}
 
-${item.detail}`;
-        }), ...supplementalReports.map((item) => `## \u88DC\u67E5\uFF1A${item.target.title}
+${report.summary}
+
+${report.detail}` };
+        return [evidence.id, evidence];
+      })).values()];
+      const resumeReports = resumeDelivery == null ? void 0 : resumeDelivery.reports;
+      const deliveryEvidence = () => {
+        var _a2;
+        return [...(_a2 = resumeDelivery == null ? void 0 : resumeDelivery.evidence) != null ? _a2 : initialDeliveryEvidence, ...supplementalReports.map((item) => ({ id: `followup-${(0, import_node_crypto7.createHash)("sha256").update(JSON.stringify(item.target)).digest("hex")}`, hash: researchContentHash(item), detail: `## ${item.target.title}
+
+${item.detail}` }))];
+      };
+      const aggregateReports = () => resumeReports ? {
+        summary: [resumeReports.summary, ...supplementalReports.map((item) => `\u88DC\u67E5\uFF1A${item.target.title}: ${item.summary}`)].join("\n"),
+        detail: [resumeReports.detail, ...supplementalReports.map((item) => `## \u88DC\u67E5\uFF1A${item.target.title}
 
 ${item.detail}`)].join("\n\n")
-      });
+      } : {
+        summary: [...reports.map((item) => `${item.title}: ${item.summary}`), ...supplementalReports.map((item) => `\u88DC\u67E5\uFF1A${item.target.title}: ${item.summary}`)].join("\n"),
+        detail: [...reports.map((item) => `## ${item.title}
+
+${item.detail}`), ...supplementalReports.map((item) => `## \u88DC\u67E5\uFF1A${item.target.title}
+
+${item.detail}`)].join("\n\n")
+      };
       let synthesisDraftId;
       let finalReview;
-      for (let researchTurn = 1; researchTurn <= MINDSEARCH_MAX_RESEARCH_TURNS; researchTurn++) {
+      const resumeTurn = (_h = resumeDelivery == null ? void 0 : resumeDelivery.researchTurn) != null ? _h : 1;
+      if (resumeTurn === 2) await this.persist(() => this.runs.recordResearchTurn(mapPath, synthesisHandle));
+      for (let researchTurn = resumeTurn; researchTurn <= MINDSEARCH_MAX_RESEARCH_TURNS; researchTurn++) {
         throwIfAborted(signal);
         const currentReports = aggregateReports();
         const plannerPrompt = phaseTask("report-review", ["Review the complete evidence for the original user goal. Return one decision with a brief evidence-based interim answer; do not write the final document yet. Use all known conditions and relevant evidence in this branch lineage. Keep the current question and answer as conditions that personalize the result; they are not the overall goal. Do not expose the internal research log as the answer. Return the standard MindSearch review marker as the first detail line.", PLANNER_COVERAGE_RULE, `Hard floor: ${answeredQuestionCount} answered question node(s) on this branch path; do not conclude before ${MIN_ANSWERED_QUESTIONS_BEFORE_CONCLUSION}. At the floor, the configured exploration target (${explorationTarget}) is a soft depth preference; do not require reaching 10 or add quota filler. Below the floor, ask one meaningful new question about an unknown decision-relevant dimension.`, `Do not repeat known conditions or prior questions. Ask only for a genuinely missing user condition, never to compensate for missing research. Use research_more for missing evidence. Prior questions: ${JSON.stringify(questionsAlreadyAsked)}.`, "Choose research_more only for one specific material evidence gap that targeted web research can resolve; provide exactly one targeted suggestion with title, search task, and expected uncertainty reduction. Choose ask_user for a missing decision-changing user condition or a genuinely conflicting pair of supplied values. Name the conflict and request one clarification; never defer a material conflict into the final document. Include 2\u20135 choices in suggestions[].title. Do not use ask_user to compensate for missing research. Choose conclude only when the original goal is adequately supported and the hard floor is met; cite source names or links from reports when available and state remaining uncertainty and limits. Do not search in this Planner turn.", '<!-- mindsearch-review {"decision":"research_more|ask_user|conclude","rationale":"evidence-based reason","stopReason":"why sufficient, for conclude","question":"question, for ask_user"} -->', `Current question: ${parent.summary}
@@ -11310,14 +11828,39 @@ Persisted research reports:
 ${currentReports.summary}
 
 ${currentReports.detail}`, task: plannerPrompt, detailFormat: "adaptive" };
-        const synthesis = await this.askMindSearchModel(plannerContext, model, reasoning, signal);
+        const fingerprint2 = sourceFingerprint;
+        const savedRecovery = resumeDelivery;
+        if (!savedRecovery) await this.persist(() => this.runs.recordPhase(mapPath, synthesisHandle, "report-review"));
+        const synthesis = (_i = savedRecovery == null ? void 0 : savedRecovery.planner) != null ? _i : await this.askMindSearchModel(plannerContext, model, reasoning, signal);
         finalReview = await this.parsePlannerReviewWithRecovery(synthesis, { question: topicNote.title, answerSnapshot: answerDescription, reportSummary: currentReports.summary, reportDetail: currentReports.detail }, plannerContext, model, reasoning, signal);
-        finalReview = await this.reviewPlannerDecisionQuality(finalReview, { goal: topicNote.title, goalDetail: topicNote.detail, conditions: branch.inputSnapshot.conditions, currentQuestion: parent.summary, currentAnswer: answerDescription, answeredQuestionCount, questionHistory: questionsAlreadyAsked, lineage: lineageContext, evidenceIds: contextBase.mindSearchEvidenceIds, reportSummary: currentReports.summary, reportDetail: currentReports.detail }, model, reasoning, signal);
+        finalReview = await this.reviewPlannerDecisionQuality(finalReview, {
+          goal: topicNote.title,
+          goalDetail: topicNote.detail,
+          conditions: branch.inputSnapshot.conditions,
+          currentQuestion: parent.summary,
+          currentAnswer: answerDescription,
+          answeredQuestionCount,
+          questionHistory: questionsAlreadyAsked,
+          lineage: lineageContext,
+          evidenceIds: contextBase.mindSearchEvidenceIds,
+          reportSummary: currentReports.summary,
+          reportDetail: currentReports.detail,
+          timeoutMs: branch.retryTimeoutMs,
+          deliveryRecovery: savedRecovery != null ? savedRecovery : sectionRecovery,
+          deliveryEvidence: deliveryEvidence(),
+          setPhase: (phase) => this.persist(() => this.runs.recordPhase(mapPath, synthesisHandle, phase)),
+          saveDeliveryRecovery: async (checkpoint, phase) => {
+            throwIfAborted(signal);
+            await this.persist(() => this.runs.saveDeliveryRecovery(mapPath, synthesisHandle, { fingerprint: fingerprint2, planner: synthesis, checkpoint, phase, reports: currentReports, researchTurn, evidence: deliveryEvidence() }));
+          }
+        }, model, reasoning, signal);
         throwIfAborted(signal);
         const reviewStopReason = finalReview.decision === "conclude" ? finalReview.stopReason : finalReview.decision === "ask_user" ? `Awaiting the user's answer to: ${finalReview.question}` : researchTurn === MINDSEARCH_MAX_RESEARCH_TURNS ? `Research-turn limit reached with an unresolved evidence gap: ${finalReview.rationale}` : void 0;
         await this.persist(() => this.runs.recordPlannerReview(mapPath, synthesisHandle, { decision: finalReview.decision, rationale: finalReview.rationale, researchTurn, ...finalReview.decision === "ask_user" ? { question: finalReview.question, answerOptions: finalReview.answerOptions } : {}, ...finalReview.decision === "research_more" ? { researchTarget: finalReview.researchTarget } : {} }, reviewStopReason));
         if (finalReview.decision !== "research_more") break;
         if (researchTurn === MINDSEARCH_MAX_RESEARCH_TURNS) break;
+        resumeDelivery = void 0;
+        sectionRecovery = void 0;
         const target = finalReview.researchTarget;
         if (!synthesisDraftId) {
           const lastReport2 = reports.at(-1);
@@ -11346,11 +11889,12 @@ Search task: ${target.task}
 Expected uncertainty reduction: ${target.expectedValue}`, `Current question: ${parent.summary}
 Current answer: ${answerDescription}`, "Do not ask the user questions. This is an evidence-gathering step, not a Planner review."].join("\n\n"));
         let followup;
+        await this.persist(() => this.runs.recordPhase(mapPath, synthesisHandle, "targeted-research"));
         try {
           followup = await this.askMindSearchModel({ ...contextBase, summary: "", detail: `${contextBase.detail}
 
 Existing reports (context only):
-${beforeSearch.detail}`, task: followupTask, researchMode: "research", researchDepth: "normal" }, model, reasoning, signal, onEvent);
+${beforeSearch.detail}`, task: followupTask, researchMode: "research", researchDepth: "normal", mindSearchIsolatedResearch: true }, model, reasoning, signal, onEvent);
         } catch (error) {
           await this.persist(() => this.runs.recordSearchDiagnostic(mapPath, synthesisHandle, diagnostic));
           throw error;
@@ -11385,7 +11929,7 @@ ${followup.detail}`)) throw new Error("The targeted follow-up did not produce a 
       });
       if (committed.status !== "committed") return { status: "stale", branchId };
       if (isQuestion) {
-        const latestMap = await this.repository.readMap(mapPath), resultRef = (_i = (_h = latestMap.mindSearch) == null ? void 0 : _h.branches.find((item) => item.id === branchId)) == null ? void 0 : _i.results.find((item) => item.runId === synthesisHandle.runId && item.attemptId === synthesisHandle.attemptId);
+        const latestMap = await this.repository.readMap(mapPath), resultRef = (_k = (_j = latestMap.mindSearch) == null ? void 0 : _j.branches.find((item) => item.id === branchId)) == null ? void 0 : _k.results.find((item) => item.runId === synthesisHandle.runId && item.attemptId === synthesisHandle.attemptId);
         if (!resultRef) throw new Error("Planner conclusion was committed without a result reference for its follow-up question.");
         const question = await this.saveManualQuestion(mapPath, resultRef.nodeId, branchId, `post-${synthesisHandle.runId}-${synthesisHandle.attemptId}`, model, synthesisReasoning, finalReview.question, finalReview.rationale, finalReview.answerOptions, "Follow-up question after reviewing all saved research, including any targeted evidence follow-up.", signal);
         if (question.status !== "question") throw new Error("Planner requested a user condition but no follow-up question was saved.");
@@ -11444,12 +11988,20 @@ ${followup.detail}`)) throw new Error("The targeted follow-up did not produce a 
       const questionNote = question ? await this.repository.readNote(question.path) : void 0;
       const choices = (_b = (_a = question == null ? void 0 : question.mindSearchQuestion) == null ? void 0 : _a.options.filter((option) => branch.answerSnapshot.selections.includes(option.id)).map((option) => option.label)) != null ? _b : branch.answerSnapshot.selections;
       if ((question == null ? void 0 : question.mindSearchKind) === "question") sections.push(`User answer to ${(_c = questionNote == null ? void 0 : questionNote.summary) != null ? _c : "question"}: ${JSON.stringify({ selections: choices, freeText: branch.answerSnapshot.freeText || null })}`);
-      const saved = await Promise.all(branch.results.map(async (result) => ({ result, note: await this.repository.readNote(result.notePath) })));
+      const saved = (await Promise.all(branch.results.map(async (result) => {
+        try {
+          return { result, note: await this.repository.readNote(result.notePath) };
+        } catch (error) {
+          if (result.kind !== "research") throw error;
+          sections.push(`Unavailable saved research source (${result.notePath}); its claims cannot be reused.`);
+          return void 0;
+        }
+      }))).filter((item) => item !== void 0);
       const synthesis = [...saved].reverse().find((item) => item.result.kind === "synthesis" || item.result.kind === "conclusion");
       const selected = saved.filter((item) => item === synthesis || item.result.kind !== "synthesis" && item.result.kind !== "conclusion" && !(synthesis == null ? void 0 : synthesis.note.detail.includes(item.note.detail)));
       for (const { result, note } of selected) {
         const evidenceId = `${result.nodeId}-v${result.version}`;
-        this.evidenceReports.set(evidenceId, { path: result.notePath, hash: (0, import_node_crypto5.createHash)("sha256").update(note.detail).digest("hex") });
+        this.evidenceReports.set(evidenceId, { path: result.notePath, hash: (0, import_node_crypto7.createHash)("sha256").update(note.detail).digest("hex") });
         if (this.evidenceReports.size > 512) {
           const oldest = [...this.evidenceReports.keys()][0];
           if (oldest) this.evidenceReports.delete(oldest);
@@ -11485,9 +12037,9 @@ __publicField(_MindSearchManualFlow, "continuationRuns", /* @__PURE__ */ new Map
 var MindSearchManualFlow = _MindSearchManualFlow;
 
 // mindsearch-mve/research-run-store.ts
-var import_node_crypto6 = require("node:crypto");
+var import_node_crypto8 = require("node:crypto");
 var _MindSearchRunStore = class _MindSearchRunStore {
-  constructor(repository, id = import_node_crypto6.randomUUID, now = () => (/* @__PURE__ */ new Date()).toISOString()) {
+  constructor(repository, id = import_node_crypto8.randomUUID, now = () => (/* @__PURE__ */ new Date()).toISOString()) {
     this.repository = repository;
     this.id = id;
     this.now = now;
@@ -11650,13 +12202,18 @@ var _MindSearchRunStore = class _MindSearchRunStore {
   }
   async saveResearchPlan(mapPath, branchId, plan) {
     return this.locked(mapPath, async () => {
+      var _a;
       const map = await this.repository.readMap(mapPath), state = this.state(map), branch = state.branches.find((item) => item.id === branchId);
       if (!branch) throw new Error("Answer branch does not exist.");
-      if (branch.researchPlan) {
+      const replaceEmptyPlan = ((_a = branch.researchPlan) == null ? void 0 : _a.length) === 0 && !branch.results.length && !state.runs.some((run) => {
+        var _a2, _b;
+        return run.branchId === branchId && ["running", "saving"].includes((_b = (_a2 = run.attempts.find((attempt) => attempt.id === run.currentAttemptId)) == null ? void 0 : _a2.status) != null ? _b : "");
+      });
+      if (branch.researchPlan && !replaceEmptyPlan) {
         if (JSON.stringify(branch.researchPlan) !== JSON.stringify(plan)) throw new Error("The saved research plan for this answer branch cannot be replaced.");
         return;
       }
-      if (plan.length < 2 || plan.length > 5 || plan.some((item) => !item.id.trim() || !item.title.trim() || !item.task.trim() || !item.expectedValue.trim()) || new Set(plan.map((item) => item.id)).size !== plan.length || new Set(plan.map((item) => item.title.trim().toLowerCase())).size !== plan.length) throw new Error("A new MindSearch research plan needs 2\u20135 distinct subtopics with unique ids and titles.");
+      validateMindSearchResearchPlan(plan);
       branch.researchPlan = JSON.parse(JSON.stringify(plan));
       delete branch.researchPlanError;
       map.mindSearch = state;
@@ -11684,17 +12241,23 @@ var _MindSearchRunStore = class _MindSearchRunStore {
   }
   async startAttempt(mapPath, branchId, runId, config) {
     return this.locked(mapPath, async () => {
-      var _a, _b;
+      var _a, _b, _c;
       const map = await this.repository.readMap(mapPath), state = this.state(map), branch = state.branches.find((item) => item.id === branchId);
       if (!branch) throw new Error("Answer branch does not exist.");
-      if (!runId) {
-        const activeRun = state.runs.find((item) => item.branchId === branchId && (() => {
+      {
+        const requestedRun = runId ? state.runs.find((item) => item.id === runId) : void 0;
+        if (requestedRun && requestedRun.branchId !== branchId) throw new Error("A research run cannot move to another answer branch.");
+        const activeRuns = state.runs.filter((item) => item.id !== runId && item.branchId === branchId && (() => {
           const attempt = item.attempts.find((candidate) => candidate.id === item.currentAttemptId);
           return (attempt == null ? void 0 : attempt.status) === "running" || (attempt == null ? void 0 : attempt.status) === "saving";
         })());
-        if (activeRun) {
-          const activeAttempt = activeRun.attempts.find((item) => item.id === activeRun.currentAttemptId);
-          return { runId: activeRun.id, attemptId: activeAttempt.id, inputSnapshotHash: activeAttempt.inputSnapshotHash, dispatch: false };
+        const blocked = (_a = activeRuns.find((item) => {
+          const attempt = item.attempts.find((candidate) => candidate.id === item.currentAttemptId);
+          return !(config == null ? void 0 : config.subtopicId) || !attempt.subtopicId || attempt.subtopicId === config.subtopicId;
+        })) != null ? _a : activeRuns.length >= 2 ? activeRuns[0] : void 0;
+        if (blocked) {
+          const activeAttempt = blocked.attempts.find((item) => item.id === blocked.currentAttemptId);
+          return { runId: blocked.id, attemptId: activeAttempt.id, inputSnapshotHash: activeAttempt.inputSnapshotHash, dispatch: false };
         }
       }
       const id = runId != null ? runId : this.id();
@@ -11709,16 +12272,16 @@ var _MindSearchRunStore = class _MindSearchRunStore {
         this.releaseAttempt(mapPath, { runId: id, attemptId: current.id, inputSnapshotHash: current.inputSnapshotHash, dispatch: false });
         current.status = "superseded";
         current.stopReason = "A newer attempt started for this run.";
-        const staleDrafts = ((_a = state.resultDrafts) != null ? _a : []).filter((item) => item.runId === id && item.attemptId === current.id);
+        const staleDrafts = ((_b = state.resultDrafts) != null ? _b : []).filter((item) => item.runId === id && item.attemptId === current.id);
         const staleNodes = new Set(staleDrafts.map((item) => item.nodeId));
         for (const draft of staleDrafts) await this.retireDraftNote(draft, current.stopReason);
-        state.resultDrafts = ((_b = state.resultDrafts) != null ? _b : []).filter((item) => !staleNodes.has(item.nodeId));
+        state.resultDrafts = ((_c = state.resultDrafts) != null ? _c : []).filter((item) => !staleNodes.has(item.nodeId));
         state.pendingCommits = state.pendingCommits.filter((item) => item.runId !== id || item.attemptId !== current.id);
         map.nodes = map.nodes.filter((node) => !staleNodes.has(node.id));
       }
       const attemptId = `attempt-${run.attempts.length + 1}`;
       const inputSnapshotHash = this.snapshotHash({ branch: branch.inputSnapshot, answer: branch.answerSnapshot });
-      run.attempts.push({ id: attemptId, inputSnapshotHash, status: "running", ...config ? { model: config.model, reasoningLevel: config.reasoning, maxResearchTurns: config.maxResearchTurns, researchTurns: 0, plannerReviews: [] } : {} });
+      run.attempts.push({ id: attemptId, inputSnapshotHash, status: "running", ...config ? { subtopicId: config.subtopicId, phase: config.phase, model: config.model, reasoningLevel: config.reasoning, maxResearchTurns: config.maxResearchTurns, researchTurns: 0, plannerReviews: [] } : {} });
       run.currentAttemptId = attemptId;
       map.mindSearch = state;
       await this.repository.saveMap(mapPath, map);
@@ -11728,6 +12291,40 @@ var _MindSearchRunStore = class _MindSearchRunStore {
   }
   releaseAttempt(mapPath, handle) {
     _MindSearchRunStore.liveAttempts.delete(this.liveKey(mapPath, handle.runId, handle.attemptId));
+  }
+  async configureRetryTimeout(mapPath, branchId, timeoutMs) {
+    if (!Number.isInteger(timeoutMs) || timeoutMs < 18e4 || timeoutMs > 6e5) throw new Error("Invalid retry timeout.");
+    await this.locked(mapPath, async () => {
+      const map = await this.repository.readMap(mapPath), state = this.state(map);
+      const branch = state.branches.find((item) => item.id === branchId);
+      if (!branch) throw new Error("MindSearch branch is missing.");
+      if (state.runs.some((run) => {
+        var _a, _b;
+        return run.branchId === branchId && ["running", "saving"].includes((_b = (_a = run.attempts.find((item) => item.id === run.currentAttemptId)) == null ? void 0 : _a.status) != null ? _b : "");
+      })) throw new Error("MindSearch branch is still running.");
+      branch.retryTimeoutMs = timeoutMs;
+      await this.repository.saveMap(mapPath, map);
+    });
+  }
+  async saveDeliveryRecovery(mapPath, handle, recovery) {
+    await this.locked(mapPath, async () => {
+      const map = await this.repository.readMap(mapPath), state = this.state(map);
+      const run = state.runs.find((item) => item.id === handle.runId), attempt = run == null ? void 0 : run.attempts.find((item) => item.id === handle.attemptId);
+      const branch = state.branches.find((item) => item.id === (run == null ? void 0 : run.branchId));
+      if (!branch || !run || !attempt || run.currentAttemptId !== handle.attemptId || attempt.status !== "running" || attempt.inputSnapshotHash !== handle.inputSnapshotHash || this.snapshotHash({ branch: branch.inputSnapshot, answer: branch.answerSnapshot }) !== handle.inputSnapshotHash) throw new Error("The MindSearch attempt is no longer current.");
+      if (recovery == null ? void 0 : recovery.phase) attempt.phase = recovery.phase;
+      branch.deliveryRecovery = recovery ? JSON.parse(JSON.stringify(recovery)) : void 0;
+      await this.repository.saveMap(mapPath, map);
+    });
+  }
+  async recordPhase(mapPath, handle, phase) {
+    await this.locked(mapPath, async () => {
+      const map = await this.repository.readMap(mapPath), state = this.state(map);
+      const run = state.runs.find((item) => item.id === handle.runId), attempt = run == null ? void 0 : run.attempts.find((item) => item.id === handle.attemptId);
+      if (!run || !attempt || run.currentAttemptId !== handle.attemptId || attempt.status !== "running" || attempt.inputSnapshotHash !== handle.inputSnapshotHash) throw new Error("The MindSearch attempt is no longer current.");
+      attempt.phase = phase;
+      await this.repository.saveMap(mapPath, map);
+    });
   }
   async recordResearchTurn(mapPath, handle) {
     return this.locked(mapPath, async () => {
@@ -11857,7 +12454,7 @@ var _MindSearchRunStore = class _MindSearchRunStore {
       const siblingCount = map.nodes.filter((item) => item.parentId === parentNodeId).length;
       const kind = (_b = options.kind) != null ? _b : "research";
       const node = { id: nodeId, path: notePath, parentId: parentNodeId, x: parent.x + 360, y: parent.y + 180 + siblingCount * 220, collapsed: false, mindSearchKind: kind, ...((_c = options.convergesFromNodeIds) == null ? void 0 : _c.length) ? { mindSearchConvergesFromNodeIds: [...options.convergesFromNodeIds] } : {} };
-      const draft = { id: this.id(), branchId: branch.id, nodeId, notePath, title, status: "creating", runId: run.id, attemptId: attempt.id, inputSnapshotHash: attempt.inputSnapshotHash, kind, ...options.subtopicId ? { subtopicId: options.subtopicId } : {}, ...parentNodeId !== branch.questionNodeId ? { parentNodeId } : {}, ...((_d = options.convergesFromNodeIds) == null ? void 0 : _d.length) ? { convergesFromNodeIds: [...options.convergesFromNodeIds] } : {}, ...attempt.model ? { model: attempt.model } : {}, ...attempt.reasoningLevel ? { reasoning: attempt.reasoningLevel } : {} };
+      const draft = { id: this.id(), branchId: branch.id, nodeId, notePath, title, status: "creating", runId: run.id, attemptId: attempt.id, inputSnapshotHash: attempt.inputSnapshotHash, kind, ...options.reuse ? { reuse: JSON.parse(JSON.stringify(options.reuse)) } : {}, ...options.subtopicId ? { subtopicId: options.subtopicId } : {}, ...parentNodeId !== branch.questionNodeId ? { parentNodeId } : {}, ...((_d = options.convergesFromNodeIds) == null ? void 0 : _d.length) ? { convergesFromNodeIds: [...options.convergesFromNodeIds] } : {}, ...attempt.model ? { model: attempt.model } : {}, ...attempt.reasoningLevel ? { reasoning: attempt.reasoningLevel } : {} };
       map.nodes.push(node);
       (_e = state.resultDrafts) != null ? _e : state.resultDrafts = [];
       state.resultDrafts.push(draft);
@@ -12001,7 +12598,7 @@ var _MindSearchRunStore = class _MindSearchRunStore {
     const run = state.runs.find((item) => item.id === pending.runId);
     const attempt = run.attempts.find((item) => item.id === pending.attemptId);
     const draft = ((_a = state.resultDrafts) != null ? _a : []).find((item) => item.id === pending.resultDraftId);
-    if (!branch.results.some((item) => item.resultId === pending.resultId)) branch.results.push({ resultId: pending.resultId, runId: pending.runId, attemptId: pending.attemptId, nodeId: pending.nodeId, notePath: pending.notePath, version: pending.version, ...(draft == null ? void 0 : draft.kind) ? { kind: draft.kind } : {}, ...(draft == null ? void 0 : draft.subtopicId) ? { subtopicId: draft.subtopicId } : {} });
+    if (!branch.results.some((item) => item.resultId === pending.resultId)) branch.results.push({ resultId: pending.resultId, runId: pending.runId, attemptId: pending.attemptId, nodeId: pending.nodeId, notePath: pending.notePath, version: pending.version, ...(draft == null ? void 0 : draft.kind) ? { kind: draft.kind } : {}, ...(draft == null ? void 0 : draft.subtopicId) ? { subtopicId: draft.subtopicId } : {}, ...(draft == null ? void 0 : draft.reuse) ? { reuse: draft.reuse } : {} });
     attempt.status = pending.resultStatus === "partial" ? "partial" : "completed";
     state.pendingCommits = state.pendingCommits.filter((item) => item.resultId !== pending.resultId);
     state.resultDrafts = ((_b = state.resultDrafts) != null ? _b : []).filter((item) => item.id !== pending.resultDraftId);
@@ -12013,7 +12610,7 @@ var _MindSearchRunStore = class _MindSearchRunStore {
     return state;
   }
   snapshotHash(value) {
-    return (0, import_node_crypto6.createHash)("sha256").update(JSON.stringify(value)).digest("hex");
+    return (0, import_node_crypto8.createHash)("sha256").update(JSON.stringify(value)).digest("hex");
   }
   liveKey(mapPath, runId, attemptId) {
     return `${mapPath}
@@ -12043,7 +12640,7 @@ var MindSearchRunStore = _MindSearchRunStore;
 
 // experiences/visual-map/view.ts
 var VIEW_TYPE = "visual-agent-map-view";
-var originBaseline = (origin) => (0, import_node_crypto7.createHash)("sha256").update(origin != null ? origin : "").digest("hex");
+var originBaseline = (origin) => (0, import_node_crypto9.createHash)("sha256").update(origin != null ? origin : "").digest("hex");
 function mindSearchQuestionStatus(map, questionNodeId, activeQuestionNodeId) {
   var _a, _b;
   if (activeQuestionNodeId === questionNodeId) return "running";
@@ -13409,7 +14006,35 @@ var VisualAgentMapView = class _VisualAgentMapView extends import_obsidian13.Ite
       throw error;
     }
   }
-  async retryMindSearchSubtopics(branchId) {
+  renderMindSearchFailure(card, branch) {
+    var _a, _b, _c, _d, _e, _f, _g, _h, _i, _j;
+    const runs = (_c = (_b = (_a = this.map) == null ? void 0 : _a.mindSearch) == null ? void 0 : _b.runs.filter((run) => run.branchId === branch.id)) != null ? _c : [];
+    const latest = runs.at(-1), attempt = latest == null ? void 0 : latest.attempts.find((item) => item.id === latest.currentAttemptId);
+    if ((attempt == null ? void 0 : attempt.status) !== "failed" && !branch.researchPlanError) return;
+    const box = card.createDiv({ cls: "vam-mindsearch-failure" });
+    box.createEl("p", { text: t("ui.mindsearch_failure_reason", (attempt == null ? void 0 : attempt.stopReason) || branch.researchPlanError || t("ui.expansion_failed")) });
+    const phase = (_f = (_e = attempt == null ? void 0 : attempt.phase) != null ? _e : (_d = branch.deliveryRecovery) == null ? void 0 : _d.phase) != null ? _f : branch.researchPlanError ? "research-plan" : void 0;
+    const labels = {
+      "subtopic-research": t("ui.mindsearch_stage_subtopic"),
+      "report-review": t("ui.mindsearch_stage_review"),
+      "research-plan": t("ui.mindsearch_stage_plan"),
+      "delivery-outline": t("ui.mindsearch_stage_delivery-outline"),
+      "delivery-research": t("ui.mindsearch_stage_delivery-research"),
+      "delivery-writing": t("ui.mindsearch_stage_delivery-writing"),
+      "delivery-acceptance": t("ui.mindsearch_stage_delivery-acceptance")
+    };
+    if (phase && labels[phase]) box.createEl("p", { text: t("ui.mindsearch_failure_stage", labels[phase]) });
+    const timedOut = /超過.*分鐘|timed?\s*out|timeout|exceeded.*minutes/i.test((_h = (_g = attempt == null ? void 0 : attempt.stopReason) != null ? _g : branch.researchPlanError) != null ? _h : "");
+    const reason = (_j = (_i = attempt == null ? void 0 : attempt.stopReason) != null ? _i : branch.researchPlanError) != null ? _j : "";
+    const remedy = timedOut ? "ui.mindsearch_repair_timeout_hint" : /auth|login|sign.in|登入|unauthorized|quota|rate.limit/i.test(reason) ? "ui.mindsearch_repair_auth_hint" : /format|schema|JSON|marker|格式|分類/i.test(reason) ? "ui.mindsearch_repair_format_hint" : /search|搜尋|網路|network/i.test(reason) ? "ui.mindsearch_repair_search_hint" : "ui.mindsearch_repair_retry_hint";
+    box.createEl("p", { text: t(remedy) });
+    if (timedOut) this.button(box, t("ui.mindsearch_repair_timeout"), () => {
+      const terminal = [...branch.results].reverse().find((result) => result.kind !== "research");
+      if (terminal) void this.continueMindSearchResearch(branch.questionNodeId, terminal.runId, 6e5);
+      else void this.retryMindSearchSubtopics(branch.id, 6e5);
+    }, this.mindSearchBusy).addClass("mod-cta");
+  }
+  async retryMindSearchSubtopics(branchId, timeoutMs) {
     var _a, _b, _c, _d, _e, _f;
     const branch = (_b = (_a = this.map) == null ? void 0 : _a.mindSearch) == null ? void 0 : _b.branches.find((item) => item.id === branchId), question = branch && ((_c = this.map) == null ? void 0 : _c.nodes.find((item) => item.id === branch.questionNodeId));
     const note = question && this.notes.get(question.id);
@@ -13428,6 +14053,7 @@ var VisualAgentMapView = class _VisualAgentMapView extends import_obsidian13.Ite
     this.mindSearchActivityKind = "research";
     this.render();
     try {
+      if (timeoutMs) await this.plugin.mutate(() => this.mindSearchRuns.configureRetryTimeout(mapPath, branch.id, timeoutMs));
       const result = branch.researchPlan ? await this.mindSearchManual.resumeAnswerResearch(mapPath, branch.id, note.model, note.reasoning, controller.signal) : await this.mindSearchManual.retryAnswerResearch(mapPath, branch.id, note.model, note.reasoning, controller.signal);
       if (!this.mindSearchViewIsCurrent(epoch, mapPath) || this.mindSearchController !== controller) return;
       const latest = await this.plugin.repo.readMap(mapPath);
@@ -13520,7 +14146,7 @@ var VisualAgentMapView = class _VisualAgentMapView extends import_obsidian13.Ite
       }
       this.mindSearchActivityKind = "planning";
       this.render();
-      const result = await this.planMindSearchQuestion(node.id, (0, import_node_crypto7.randomUUID)(), parentBranchId, controller.signal);
+      const result = await this.planMindSearchQuestion(node.id, (0, import_node_crypto9.randomUUID)(), parentBranchId, controller.signal);
       if (!this.mindSearchViewIsCurrent(epoch, mapPath) || this.mindSearchController !== controller) return;
       if (result.status === "question") {
         this.selected = result.node.id;
@@ -13603,7 +14229,7 @@ var VisualAgentMapView = class _VisualAgentMapView extends import_obsidian13.Ite
       }
     }
   }
-  async continueMindSearchResearch(questionNodeId, runId) {
+  async continueMindSearchResearch(questionNodeId, runId, timeoutMs) {
     var _a;
     const mapPath = this.path, epoch = this.mindSearchViewEpoch;
     if (this.closed || !mapPath || !((_a = this.map) == null ? void 0 : _a.mindSearch) || this.mindSearchBusy || this.builtIn) return;
@@ -13618,6 +14244,7 @@ var VisualAgentMapView = class _VisualAgentMapView extends import_obsidian13.Ite
     this.render();
     const isCurrent = () => this.mindSearchViewIsCurrent(epoch, mapPath) && this.mindSearchController === controller;
     try {
+      if (timeoutMs && branch) await this.plugin.mutate(() => this.mindSearchRuns.configureRetryTimeout(mapPath, branch.id, timeoutMs));
       const result = await this.mindSearchManual.continuePartial(mapPath, runId, void 0, void 0, controller.signal);
       if (!isCurrent()) return;
       if (result.status === "waiting-user") new import_obsidian13.Notice(t("ui.mindsearch_waiting_user"));
@@ -13716,7 +14343,7 @@ var VisualAgentMapView = class _VisualAgentMapView extends import_obsidian13.Ite
           if (this.mindSearchViewIsCurrent(epoch, mapPath)) this.render();
         }
       }
-    }, (_d = this.mindSearchAnswerRequestIds.get(node.id)) != null ? _d : (0, import_node_crypto7.randomUUID)()).open();
+    }, (_d = this.mindSearchAnswerRequestIds.get(node.id)) != null ? _d : (0, import_node_crypto9.randomUUID)()).open();
   }
   async openBuiltInSample(forceTour = false) {
     const viewEpoch = this.mindSearchViewEpoch, openEpoch = ++this.mapOpenEpoch;
@@ -14586,6 +15213,10 @@ var VisualAgentMapView = class _VisualAgentMapView extends import_obsidian13.Ite
         var _a2;
         (_a2 = this.mindSearchController) == null ? void 0 : _a2.abort();
       });
+      const attribution = this.contentEl.createDiv("vam-mindsearch-attribution");
+      attribution.createSpan({ text: t("ui.mindsearch_attribution") });
+      attribution.createEl("a", { text: t("ui.mindsearch_source_project"), href: "https://github.com/InternLM/MindSearch", attr: { target: "_blank", rel: "noopener noreferrer" } });
+      attribution.createEl("a", { text: t("ui.mindsearch_source_paper"), href: "https://arxiv.org/abs/2407.20183", attr: { target: "_blank", rel: "noopener noreferrer" } });
     }
     if (!this.builtIn && ((_m = this.map) == null ? void 0 : _m.mindSearch) && (selectedNode == null ? void 0 : selectedNode.mindSearchKind) === "question" && selectedNode.mindSearchQuestion) {
       const actions = toolbar.createDiv("vam-mindsearch-actions");
@@ -14826,7 +15457,7 @@ var VisualAgentMapView = class _VisualAgentMapView extends import_obsidian13.Ite
         remove.addClass("vam-node-tool");
         remove.setAttr("aria-label", t("ui.remove_from_map"));
       }
-      if (((_p = this.map) == null ? void 0 : _p.mindSearch) && (node.mindSearchKind === "synthesis" || node.mindSearchKind === "conclusion") && this.map.mindSearch.branches.some((branch) => branch.results.some((result) => result.nodeId === node.id))) {
+      if (((_p = this.map) == null ? void 0 : _p.mindSearch) && node.mindSearchKind === "synthesis" && this.map.mindSearch.branches.some((branch) => branch.results.some((result) => result.nodeId === node.id))) {
         const next = this.button(header, t("ui.mindsearch_new_question"), () => void this.planMindSearchFromSelection(node.id), this.mindSearchBusy);
         next.addClass("vam-node-tool");
         next.setAttr("aria-label", t("ui.mindsearch_new_question_hint"));
@@ -14876,6 +15507,7 @@ var VisualAgentMapView = class _VisualAgentMapView extends import_obsidian13.Ite
       } else if (!activeInitialRun && (terminalAttempt == null ? void 0 : terminalAttempt.status) === "partial" && terminalRun) {
         this.button(card, t("ui.mindsearch_continue_research"), () => void this.continueMindSearchResearch(node.id, terminalRun.id), this.mindSearchBusy).addClass("vam-mindsearch-retry");
       } else if (!activeInitialRun && !terminalResult) {
+        this.renderMindSearchFailure(card, initialBranch);
         const label = initialBranch.researchPlan || initialBranch.results.length ? t("ui.mindsearch_continue_research") : t("ui.mindsearch_retry_subtopics");
         this.button(card, label, () => void this.retryMindSearchSubtopics(initialBranch.id), this.mindSearchBusy).addClass("vam-mindsearch-retry");
       }
@@ -14883,6 +15515,7 @@ var VisualAgentMapView = class _VisualAgentMapView extends import_obsidian13.Ite
     if (node.mindSearchKind === "question" && ((_w = this.map) == null ? void 0 : _w.mindSearch)) {
       const branch = this.map.mindSearch.branches.find((item) => item.questionNodeId === node.id);
       if (branch) {
+        this.renderMindSearchFailure(card, branch);
         const labels = (_y = (_x = node.mindSearchQuestion) == null ? void 0 : _x.options.filter((option) => branch.answerSnapshot.selections.includes(option.id)).map((option) => option.label)) != null ? _y : branch.answerSnapshot.selections;
         const answer = [...labels, branch.answerSnapshot.freeText].filter(Boolean).join(" \u2014 ");
         card.createEl("p", { cls: "vam-mindsearch-answer-snapshot", text: `${t("ui.mindsearch_answer_snapshot")}: ${answer || t("ui.mindsearch_unknown_answer")}` });
@@ -14906,7 +15539,7 @@ var VisualAgentMapView = class _VisualAgentMapView extends import_obsidian13.Ite
             retry.disabled = this.mindSearchBusy;
           }
         } else if (!activeBranchRun && !terminalResult) {
-          this.button(card, t("ui.mindsearch_continue_research"), () => void this.retryMindSearchSubtopics(branch.id), this.mindSearchBusy).addClass("vam-mindsearch-retry");
+          this.button(card, t(branch.deliveryRecovery ? "ui.mindsearch_resume_stage" : "ui.mindsearch_continue_research"), () => void this.retryMindSearchSubtopics(branch.id), this.mindSearchBusy).addClass("vam-mindsearch-retry");
         }
       }
     }
@@ -16676,7 +17309,7 @@ function groupRibbonIcons(map, coffee) {
 }
 
 // main.ts
-var import_node_crypto12 = require("node:crypto");
+var import_node_crypto14 = require("node:crypto");
 
 // core/experience-router.ts
 var HandoffWriteError = class extends Error {
@@ -16750,13 +17383,15 @@ var CodexAppServerRuntime = class {
   async start() {
     if (this.initializing) return this.initializing;
     const initializing = this.startProcess();
+    const startedChild = this.child;
     this.initializing = initializing;
     try {
       await initializing;
     } catch (error) {
-      if (this.initializing === initializing) this.initializing = null;
-      const child = this.child;
-      if (child) this.failProcess(child, error instanceof Error ? error : new Error(String(error)));
+      if (this.initializing === initializing) {
+        this.initializing = null;
+        if (startedChild && this.child === startedChild) this.failProcess(startedChild, error instanceof Error ? error : new Error(String(error)));
+      }
       throw error;
     }
   }
@@ -16860,10 +17495,11 @@ var CodexAppServerRuntime = class {
     const completed = new Promise((resolve, reject) => {
       var _a2, _b2;
       const timeout = window.setTimeout(() => {
+        var _a3;
         this.turns.delete(threadId);
         timedOut = true;
         interrupt(5e3, "\u903E\u6642\u5F8C\u7121\u6CD5\u505C\u6B62 AI \u4EFB\u52D9");
-        reject(new Error((controls == null ? void 0 : controls.timeoutMs) ? "Coffee Tables: generation timed out; received text is saved as a draft." : t("ui.the_ai_task_exceeded_3_minutes_vam_attempts_to_interrupt_it")));
+        reject(new Error((_a3 = controls == null ? void 0 : controls.timeoutMessage) != null ? _a3 : (controls == null ? void 0 : controls.timeoutMs) ? "Coffee Tables: generation timed out; received text is saved as a draft." : t("ui.the_ai_task_exceeded_3_minutes_vam_attempts_to_interrupt_it")));
       }, (_a2 = controls == null ? void 0 : controls.timeoutMs) != null ? _a2 : TURN_TIMEOUT_MS);
       this.turns.set(threadId, { messages: [], visibleMessages: /* @__PURE__ */ new Map(), resolve, reject, timeout, turnId: "", searches: 0, countedSearchIds: /* @__PURE__ */ new Set(), requireSearch: (controls == null ? void 0 : controls.webSearchOnly) === true, searchBudget: (_b2 = controls == null ? void 0 : controls.searchBudget) != null ? _b2 : 0, steered: false, onRequest: controls == null ? void 0 : controls.onRequest, onText: controls == null ? void 0 : controls.onText, onWebSearchEvent: controls == null ? void 0 : controls.onWebSearchEvent });
     });
@@ -17150,7 +17786,7 @@ function claudeStructuredOutput(stdout, plainText = false) {
   if (record.structured_output === void 0 || record.structured_output === null) throw new Error(t("ui.claude_did_not_return_structured_output"));
   return JSON.stringify(record.structured_output);
 }
-function abortError() {
+function abortError2() {
   const error = new Error(t("ui.ai_task_cancelled"));
   error.name = "AbortError";
   return error;
@@ -17164,7 +17800,7 @@ var ClaudeCodeCliRuntime = class {
   }
   async runTask(prompt, model, effort, outputSchema, controls = {}) {
     var _a, _b, _c, _d, _e, _f;
-    if ((_a = controls.signal) == null ? void 0 : _a.aborted) throw abortError();
+    if ((_a = controls.signal) == null ? void 0 : _a.aborted) throw abortError2();
     const webSearch = (_c = controls.webSearch) != null ? _c : ((_b = controls.searchBudget) != null ? _b : 0) > 0;
     const args = claudeTaskArgs(model, effort, outputSchema, webSearch);
     if (controls.onText && !outputSchema) {
@@ -17253,11 +17889,12 @@ var ClaudeCodeCliRuntime = class {
       };
       const onAbort = () => {
         stop();
-        finish(abortError());
+        finish(abortError2());
       };
       const timeout = window.setTimeout(() => {
+        var _a3;
         stop();
-        finish(new Error(controls.timeoutMs ? "Coffee Tables: generation timed out; received text is saved as a draft." : t("ui.the_ai_task_exceeded_3_minutes_vam_attempts_to_interrupt_it")));
+        finish(new Error((_a3 = controls.timeoutMessage) != null ? _a3 : controls.timeoutMs ? "Coffee Tables: generation timed out; received text is saved as a draft." : t("ui.the_ai_task_exceeded_3_minutes_vam_attempts_to_interrupt_it")));
       }, (_b2 = (_a2 = controls.timeoutMs) != null ? _a2 : this.options.timeoutMs) != null ? _b2 : CLAUDE_TASK_TIMEOUT_MS);
       (_c2 = controls.signal) == null ? void 0 : _c2.addEventListener("abort", onAbort, { once: true });
       child.stdout.on("data", (chunk) => {
@@ -17590,7 +18227,7 @@ function visualGuidance(context, language2) {
 }
 
 // core/ai-task-service.ts
-var import_node_crypto8 = require("node:crypto");
+var import_node_crypto10 = require("node:crypto");
 
 // ai/mindsearch-prompt.ts
 function mindSearchPhase(task) {
@@ -17605,8 +18242,8 @@ function phaseGuidance(phase, language2, responseContract) {
     "research-gap-audit": "Write the rationale first in detail, then set summary to exactly user_condition or external_evidence. Return empty suggestions and visualReferences arrays.",
     "initial-clarification": "Ask only necessary unknown user conditions. Put the intake marker in detail; an empty suggestions array is valid.",
     "initial-question": "When asking, put one question in summary and 2\u20135 distinct answer choices in suggestions[].title; keep the other suggestion fields empty. Do not answer for the user.",
-    "research-plan": "Return the requested plan marker with 2\u20135 distinct research targets. The plan belongs in detail; do not answer the goal or research in this Planner turn.",
-    "research-plan-repair": "Repair only the requested plan format using the supplied context. Return 2\u20135 distinct targets in the requested detail marker; do not research.",
+    "research-plan": "Return the requested plan marker with 0\u20135 distinct evidence tasks, using reuse/update/research and dependsOn. Empty requires usable prior evidence; no minimum new searches. The plan belongs in detail; do not answer the goal or research in this Planner turn.",
+    "research-plan-repair": "Repair only the requested plan format using the supplied context. Return 0\u20135 distinct evidence tasks in the requested detail marker; empty requires usable prior evidence; do not research.",
     "subtopic-research": "Research only the assigned target. Report search status accurately, distinguish evidence from uncertainty, and preserve source attribution. Do not ask the user.",
     "targeted-followup-research": "Research the single assigned evidence gap. Report search status accurately, distinguish evidence from uncertainty, and preserve source attribution. Do not ask the user.",
     "report-review": "For research_more, return exactly one targeted suggestion. For ask_user, return 2\u20135 distinct choices in suggestions[].title. For conclude, include the required stop reason. Follow the decision marker contract.",
@@ -17620,8 +18257,8 @@ function phaseGuidance(phase, language2, responseContract) {
     "research-gap-audit": "\u5148\u5728 detail \u64B0\u5BEB\u7C21\u77ED\u7406\u7531\uFF0C\u518D\u5C07 summary \u8A2D\u70BA\u5B8C\u5168\u76F8\u540C\u7684 user_condition \u6216 external_evidence\u3002suggestions \u8207 visualReferences \u5FC5\u9808\u662F\u7A7A\u9663\u5217\u3002",
     "initial-clarification": "\u53EA\u8A62\u554F\u5FC5\u8981\u4E14\u672A\u77E5\u7684\u4F7F\u7528\u8005\u689D\u4EF6\u3002\u5C07 intake \u6A19\u8A18\u653E\u5728 detail\uFF1Bsuggestions \u53EF\u4EE5\u662F\u7A7A\u9663\u5217\u3002",
     "initial-question": "\u9700\u8981\u63D0\u554F\u6642\uFF0C\u5728 summary \u5BEB\u4E00\u500B\u554F\u984C\uFF0C\u4E26\u5728 suggestions[].title \u63D0\u4F9B 2\u20135 \u500B\u4E0D\u540C\u9078\u9805\uFF1B\u5176\u4ED6 suggestion \u6B04\u4F4D\u7559\u7A7A\u3002\u4E0D\u8981\u4EE3\u66FF\u4F7F\u7528\u8005\u56DE\u7B54\u3002",
-    "research-plan": "\u4F9D\u8981\u6C42\u5728 detail \u56DE\u50B3\u898F\u5283\u6A19\u8A18\uFF0C\u5305\u542B 2\u20135 \u500B\u4E0D\u540C\u7814\u7A76\u76EE\u6A19\uFF1B\u6B64 Planner \u968E\u6BB5\u4E0D\u8981\u56DE\u7B54\u6574\u9AD4\u76EE\u6A19\u6216\u9032\u884C\u7814\u7A76\u3002",
-    "research-plan-repair": "\u53EA\u4F9D\u63D0\u4F9B\u7684\u8108\u7D61\u4FEE\u5FA9\u898F\u5283\u683C\u5F0F\uFF0C\u5728 detail \u6A19\u8A18\u4E2D\u56DE\u50B3 2\u20135 \u500B\u4E0D\u540C\u76EE\u6A19\uFF1B\u4E0D\u8981\u9032\u884C\u7814\u7A76\u3002",
+    "research-plan": "\u4F9D\u8981\u6C42\u5728 detail \u56DE\u50B3\u898F\u5283\u6A19\u8A18\uFF0C\u5305\u542B 0\u20135 \u500B\u4E0D\u540C\u8B49\u64DA\u4EFB\u52D9\uFF0C\u6A19\u660E\u6CBF\u7528\u3001\u66F4\u65B0\u6216\u65B0\u67E5\u8B49\u53CA\u4F9D\u8CF4\uFF1B\u96F6\u4EFB\u52D9\u9808\u6709\u53EF\u7528\u7684\u65E2\u6709\u8B49\u64DA\uFF0C\u4E0D\u8981\u6C42\u6700\u4F4E\u641C\u5C0B\u6578\uFF1B\u6B64 Planner \u968E\u6BB5\u4E0D\u8981\u56DE\u7B54\u6574\u9AD4\u76EE\u6A19\u6216\u9032\u884C\u7814\u7A76\u3002",
+    "research-plan-repair": "\u53EA\u4F9D\u63D0\u4F9B\u7684\u8108\u7D61\u4FEE\u5FA9\u898F\u5283\u683C\u5F0F\uFF0C\u5728 detail \u6A19\u8A18\u4E2D\u56DE\u50B3 0\u20135 \u500B\u4E0D\u540C\u8B49\u64DA\u4EFB\u52D9\uFF1B\u96F6\u4EFB\u52D9\u9808\u6709\u53EF\u7528\u7684\u65E2\u6709\u8B49\u64DA\uFF1B\u4E0D\u8981\u9032\u884C\u7814\u7A76\u3002",
     "subtopic-research": "\u53EA\u7814\u7A76\u6307\u5B9A\u76EE\u6A19\u3002\u6E96\u78BA\u56DE\u5831\u641C\u5C0B\u72C0\u614B\uFF0C\u5340\u5206\u8B49\u64DA\u8207\u4E0D\u78BA\u5B9A\u6027\u4E26\u4FDD\u7559\u4F86\u6E90\u6B78\u5C6C\uFF1B\u4E0D\u8981\u8A62\u554F\u4F7F\u7528\u8005\u3002",
     "targeted-followup-research": "\u53EA\u7814\u7A76\u6307\u5B9A\u7684\u4E00\u9805\u8B49\u64DA\u7F3A\u53E3\u3002\u6E96\u78BA\u56DE\u5831\u641C\u5C0B\u72C0\u614B\uFF0C\u5340\u5206\u8B49\u64DA\u8207\u4E0D\u78BA\u5B9A\u6027\u4E26\u4FDD\u7559\u4F86\u6E90\u6B78\u5C6C\uFF1B\u4E0D\u8981\u8A62\u554F\u4F7F\u7528\u8005\u3002",
     "report-review": "research_more \u5FC5\u9808\u56DE\u50B3\u6070\u597D\u4E00\u500B\u76EE\u6A19\u5EFA\u8B70\uFF1Bask_user \u5FC5\u9808\u5728 suggestions[].title \u63D0\u4F9B 2\u20135 \u500B\u4E0D\u540C\u9078\u9805\uFF1Bconclude \u5FC5\u9808\u5305\u542B\u5FC5\u8981\u7684\u505C\u6B62\u7406\u7531\u3002\u9075\u5B88\u6C7A\u7B56\u6A19\u8A18\u5951\u7D04\u3002",
@@ -17706,6 +18343,7 @@ var AiTaskService = class {
   }
   async askModel(input, model, reasoning, signal, onExchange, onRequestAccepted, onWebSearchEvent) {
     var _a, _b, _c;
+    if (input.timeoutMs !== void 0 && (!Number.isInteger(input.timeoutMs) || input.timeoutMs < 18e4 || input.timeoutMs > 6e5)) throw new Error("Invalid AI task timeout.");
     const provider = providerForModel(model);
     if (provider === "claude" && !CLAUDE_MODEL_CHOICES.some((choice) => choice.id === model)) {
       throw new Error(t("ui.claude_model_is_not_supported_0", model));
@@ -17766,7 +18404,7 @@ ${context.task}`
     const providerStarted = Date.now();
     const effort = effectiveReasoningLevel(context, normalizeReasoningLevel(reasoning != null ? reasoning : this.options.defaultReasoning()));
     const exchanges = this.options.exchangeLoggingEnabled() ? this.options.exchanges() : null;
-    const exchangeId = exchanges ? (0, import_node_crypto8.randomUUID)() : "";
+    const exchangeId = exchanges ? (0, import_node_crypto10.randomUUID)() : "";
     if (exchanges) {
       exchanges.begin({ id: exchangeId, startedAt: (/* @__PURE__ */ new Date()).toISOString(), topic: context.title, mode: (_c = context.mode) != null ? _c : "task", model, effort });
       onExchange == null ? void 0 : onExchange(exchangeId);
@@ -17775,6 +18413,8 @@ ${context.task}`
     try {
       const controls = {
         signal,
+        ...input.timeoutMs !== void 0 ? { timeoutMs: Math.min(6e5, Math.max(18e4, input.timeoutMs)), timeoutMessage: translate(outputLanguage, "ui.mindsearch_task_timeout", Math.ceil(Math.min(6e5, Math.max(18e4, input.timeoutMs)) / 6e4)) } : {},
+        ...context.mindSearchIsolatedResearch ? { webSearchOnly: context.researchMode !== "local", textOnly: context.researchMode === "local" } : {},
         onAccepted: onRequestAccepted,
         // Search depth guides investigation; it does not impose a per-task query cap.
         // Codex uses 0 as no steering budget; Claude receives webSearch separately.
@@ -17786,7 +18426,9 @@ ${context.task}`
         }
       };
       const isMindSearchGapAudit = context.responseContract === "mindsearch-gap-audit" && context.promptProfile === "mindsearch" && context.researchMode === "local";
-      const schema = isMindSearchGapAudit ? mindsearch_gap_audit_schema_default : response_schema_default;
+      const isDeliveryAcceptance = context.responseContract === "mindsearch-delivery-acceptance" && context.promptProfile === "mindsearch" && context.researchMode === "local";
+      const deliverySchema = { ...response_schema_default, properties: { ...response_schema_default.properties, summary: { type: "string", description: "A short plain-language preview. Never put machine-readable review markers here." }, detail: { type: "string", pattern: "^\\s*<!--\\s*mindsearch-review\\s+\\{[^\\r\\n]*\\}\\s*-->", description: "Begin with the COMPLETE first-line MindSearch review marker containing decision and rationale (and stopReason for conclude). Put the marker in detail only, followed by the acceptance explanation. Never split or truncate the marker." } } };
+      const schema = isMindSearchGapAudit ? mindsearch_gap_audit_schema_default : isDeliveryAcceptance ? deliverySchema : response_schema_default;
       const raw = provider === "claude" ? await this.options.claudeRuntime(pluginDirectory).runTask(instructions, providerModelId(model), effort, schema, controls) : await this.options.codexRuntime(pluginDirectory, context.researchMode === "local").runTask(instructions, model, effort, schema, { ...controls, onWebSearchEvent });
       stage = "\u89E3\u6790 AI \u56DE\u8986";
       if (this.options.exchangeLoggingEnabled()) exchanges == null ? void 0 : exchanges.received(exchangeId, raw);
@@ -17874,7 +18516,7 @@ ${value}`).join("\n\n");
 };
 
 // core/reframing-service.ts
-var import_node_crypto9 = require("node:crypto");
+var import_node_crypto11 = require("node:crypto");
 var REFRAME_TOKEN_BUDGET = 32e3;
 var REFRAME_SCHEMA = {
   type: "object",
@@ -17904,7 +18546,7 @@ function parseReframeDraft(raw) {
 }
 function providerReframeRunner(options, activeTasks) {
   return async (request, prompt, schema, signal) => {
-    const id = (0, import_node_crypto9.randomUUID)(), key2 = `reframe:${id}`, controller = new AbortController();
+    const id = (0, import_node_crypto11.randomUUID)(), key2 = `reframe:${id}`, controller = new AbortController();
     const abort = () => controller.abort();
     signal.addEventListener("abort", abort, { once: true });
     if (signal.aborted) controller.abort();
@@ -18010,7 +18652,7 @@ ${artifact.sourceSnapshot || "No insight snapshot was supplied."}`
 
 // experiences/coffee-tables/handoff-modal.ts
 var import_obsidian16 = require("obsidian");
-var import_node_crypto11 = require("node:crypto");
+var import_node_crypto13 = require("node:crypto");
 
 // core/thinking-artifact.ts
 function createThinkingArtifact(input) {
@@ -18018,7 +18660,7 @@ function createThinkingArtifact(input) {
 }
 
 // experiences/coffee-tables/handoff-source.ts
-var import_node_crypto10 = require("node:crypto");
+var import_node_crypto12 = require("node:crypto");
 function references(session) {
   var _a, _b, _c;
   return [...new Map([...(_a = session.referenceFiles) != null ? _a : [], ...(_c = (_b = session.guests) == null ? void 0 : _b.referenceFiles) != null ? _c : []].map((item) => [JSON.stringify(item), item])).values()];
@@ -18086,7 +18728,7 @@ ${JSON.stringify(unresolved)}` : ""].filter(Boolean).join("\n\n") : [
     ...references(session).map((item) => `Background reference: ${item.name}
 ${item.content}`)
   ].filter(Boolean).join("\n\n");
-  return { content, sourceSnapshot, question: (selected == null ? void 0 : selected.question) || (selected == null ? void 0 : selected.summary) || session.topic, artifactId: (selected == null ? void 0 : selected.persistedId) ? selected.id : (0, import_node_crypto10.randomUUID)(), identityKind: (selected == null ? void 0 : selected.persistedId) ? "persisted-insight" : "snapshot" };
+  return { content, sourceSnapshot, question: (selected == null ? void 0 : selected.question) || (selected == null ? void 0 : selected.summary) || session.topic, artifactId: (selected == null ? void 0 : selected.persistedId) ? selected.id : (0, import_node_crypto12.randomUUID)(), identityKind: (selected == null ? void 0 : selected.persistedId) ? "persisted-insight" : "snapshot" };
 }
 
 // experiences/coffee-tables/handoff-modal.ts
@@ -18109,7 +18751,7 @@ var CoffeeHandoffModal = class extends import_obsidian16.Modal {
     this.store = store;
     this.snapshot = snapshot;
     this.source = source;
-    __publicField(this, "operationId", (0, import_node_crypto11.randomUUID)());
+    __publicField(this, "operationId", (0, import_node_crypto13.randomUUID)());
     __publicField(this, "controller", null);
     __publicField(this, "epoch", 0);
     __publicField(this, "closed", false);
@@ -18192,12 +18834,12 @@ var CoffeeHandoffModal = class extends import_obsidian16.Modal {
     this.question.focus();
   }
   field(label, rows) {
-    const id = `ct-handoff-${(0, import_node_crypto11.randomUUID)()}`;
+    const id = `ct-handoff-${(0, import_node_crypto13.randomUUID)()}`;
     this.contentEl.createEl("label", { text: label, attr: { for: id } });
     return this.contentEl.createEl("textarea", { attr: { id, rows: String(rows), "aria-label": label } });
   }
   select(parent, label, values) {
-    const id = `ct-handoff-${(0, import_node_crypto11.randomUUID)()}`;
+    const id = `ct-handoff-${(0, import_node_crypto13.randomUUID)()}`;
     const group = parent.createDiv();
     group.createEl("label", { text: label, attr: { for: id } });
     const select = group.createEl("select", { attr: { id, "aria-label": label } });
@@ -19539,7 +20181,7 @@ var VisualAgentMapPlugin = class extends import_obsidian19.Plugin {
     const directory = (0, import_node_path2.join)(this.app.vault.adapter.getBasePath(), this.manifest.dir);
     const effort = effectiveReasoningLevel({ title: session.topic, summary: "", detail: "", rules: "", task: "", ancestors: "" }, normalizeReasoningLevel(session.reasoning));
     const exchanges = this.settings.aiExchangeLoggingEnabled ? this.exchanges : null;
-    const id = (0, import_node_crypto12.randomUUID)();
+    const id = (0, import_node_crypto14.randomUUID)();
     const key2 = `coffee:${id}`;
     const controller = new AbortController();
     const abort = () => controller.abort();
@@ -19616,7 +20258,7 @@ var VisualAgentMapPlugin = class extends import_obsidian19.Plugin {
     const directory = this.pluginDirectory();
     const effort = effectiveReasoningLevel({ title: "Selected Markdown text", summary: "", detail: "", rules: "", task: prompt, ancestors: "" }, normalizeReasoningLevel(this.settings.cliReasoning));
     const exchanges = this.settings.aiExchangeLoggingEnabled ? this.exchanges : null;
-    const id = (0, import_node_crypto12.randomUUID)();
+    const id = (0, import_node_crypto14.randomUUID)();
     const key2 = `markdown-context:${id}`;
     const controller = new AbortController();
     const abort = () => controller.abort();

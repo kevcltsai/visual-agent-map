@@ -64,12 +64,14 @@ export class CodexAppServerRuntime {
   async start(): Promise<void> {
     if (this.initializing) return this.initializing;
     const initializing = this.startProcess();
+    const startedChild = this.child;
     this.initializing = initializing;
     try { await initializing; }
     catch (error) {
-      if (this.initializing === initializing) this.initializing = null;
-      const child = this.child;
-      if (child) this.failProcess(child, error instanceof Error ? error : new Error(String(error)));
+      if (this.initializing === initializing) {
+        this.initializing = null;
+        if (startedChild && this.child === startedChild) this.failProcess(startedChild, error instanceof Error ? error : new Error(String(error)));
+      }
       throw error;
     }
   }
@@ -111,7 +113,7 @@ export class CodexAppServerRuntime {
     return [...new Map(models.map(model => [model.model, model])).values()];
   }
 
-  async runTask(prompt: string, model: string, effort: string, outputSchema: unknown, controls?: { imageDataUrl?: string; webSearchOnly?: boolean; textOnly?: boolean; signal?: AbortSignal; searchBudget?: number; onRequest?: (request: unknown) => void; onAccepted?: () => void; onText?: (text: string) => void; onWebSearchEvent?: (event: CodexWebSearchEvent) => void; onSteer?: (steer: (text: string) => Promise<void>) => void; timeoutMs?: number }): Promise<string> {
+  async runTask(prompt: string, model: string, effort: string, outputSchema: unknown, controls?: { imageDataUrl?: string; webSearchOnly?: boolean; textOnly?: boolean; signal?: AbortSignal; searchBudget?: number; onRequest?: (request: unknown) => void; onAccepted?: () => void; onText?: (text: string) => void; onWebSearchEvent?: (event: CodexWebSearchEvent) => void; onSteer?: (steer: (text: string) => Promise<void>) => void; timeoutMs?: number; timeoutMessage?: string }): Promise<string> {
     if (controls?.signal?.aborted) throw cancelledError();
     await this.start();
     if (controls?.signal?.aborted) throw cancelledError();
@@ -151,7 +153,7 @@ export class CodexAppServerRuntime {
         this.turns.delete(threadId);
         timedOut = true;
         interrupt(5_000, "逾時後無法停止 AI 任務");
-        reject(new Error(controls?.timeoutMs ? "Coffee Tables: generation timed out; received text is saved as a draft." : t("ui.the_ai_task_exceeded_3_minutes_vam_attempts_to_interrupt_it")));
+        reject(new Error(controls?.timeoutMessage ?? (controls?.timeoutMs ? "Coffee Tables: generation timed out; received text is saved as a draft." : t("ui.the_ai_task_exceeded_3_minutes_vam_attempts_to_interrupt_it"))));
       }, controls?.timeoutMs ?? TURN_TIMEOUT_MS);
       this.turns.set(threadId, { messages: [], visibleMessages: new Map(), resolve, reject, timeout, turnId: "", searches: 0, countedSearchIds: new Set(), requireSearch: controls?.webSearchOnly === true, searchBudget: controls?.searchBudget ?? 0, steered: false, onRequest: controls?.onRequest, onText: controls?.onText, onWebSearchEvent: controls?.onWebSearchEvent });
     });

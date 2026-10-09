@@ -16,6 +16,7 @@ export interface VisualReference {
 
 export interface Suggestion { title: string; task: string; contribution: string; parentTitle?: string; thinkingOriginBaseline?: string }
 export type AiTaskKind = "task" | "decompose" | "synthesize";
+export type PromptProfile = "mindsearch";
 export interface TaskContext {
   title: string;
   summary: string;
@@ -32,6 +33,10 @@ export interface TaskContext {
   mode?: AiTaskKind;
   /** Let a task choose its Markdown structure while retaining the structured result contract. */
   detailFormat?: "adaptive";
+  /** Select a phase-aware prompt builder for MindSearch requests. */
+  promptProfile?: PromptProfile;
+  /** Trusted workflow lookup allowlist for MindSearch evidence retrieval; never serialize into prompts. */
+  mindSearchEvidenceIds?: readonly string[];
   researchMode?: ResearchMode;
   researchDepth?: ResearchDepth;
   visualMode?: VisualMode;

@@ -53,7 +53,7 @@ export function providerReframeRunner(options: AiTaskServiceOptions, activeTasks
     try {
       if (providerForModel(request.model) === "claude" && !CLAUDE_MODEL_CHOICES.some(choice => choice.id === request.model)) throw new Error("Unsupported Claude model");
       const directory = options.pluginDirectory();
-      const controls = { textOnly: true, searchBudget: 0, signal: controller.signal, onRequest: (data: unknown): void => { if (options.exchangeLoggingEnabled()) exchanges?.sent(id, JSON.stringify({ request: data, prompt }, null, 2)); } };
+      const controls = { textOnly: true, searchBudget: 0, signal: controller.signal, onRequest: (data: unknown): void => { if (options.exchangeLoggingEnabled()) exchanges?.sent(id, JSON.stringify({ request: data, prompt }, null, 2), prompt); } };
       const raw = providerForModel(request.model) === "claude"
         ? await options.claudeRuntime(directory).runTask(prompt, providerModelId(request.model), effort, schema, controls)
         : await options.codexRuntime(directory, true).runTask(prompt, request.model, effort, schema, controls);

@@ -195,6 +195,7 @@ export default class VisualAgentMapPlugin extends Plugin {
     this.addLocalizedCommand("open-built-in-sample", "ui.open_the_taiwan_travel_sample", () => { void this.activateBuiltInSample(true); });
     this.addLocalizedCommand("repair-workspace", "ui.repair_agent_workspace", () => { void this.mutate(() => this.repairWorkspace()); });
     this.addLocalizedCommand("reconnect-workspace", "ui.reconnect_existing_workspace", () => { void this.offerWorkspaceReconnect(); });
+    this.addLocalizedCommand("open-prompt-monitor", "ui.prompt_monitor", () => new DebugLogModal(this.app, this.logs, this.exchanges, () => this.settings.aiExchangeLoggingEnabled, async enabled => { this.settings.aiExchangeLoggingEnabled = enabled; await this.saveSettings(); }).open());
     this.addLocalizedCommand("open-debug-log", "ui.open_debug_log", () => new DebugLogModal(this.app, this.logs, this.exchanges, () => this.settings.aiExchangeLoggingEnabled).open());
     this.settingTab = new VisualAgentMapSettingTab(this.app, this);
     this.addSettingTab(this.settingTab);
@@ -493,7 +494,7 @@ export default class VisualAgentMapPlugin extends Plugin {
     this.activeTasks.set(key, controller);
     exchanges?.begin({ id, startedAt: new Date().toISOString(), topic: `Coffee Tables · ${session.topic}`, mode: "task", model: session.model, effort });
     try {
-      const controls = { textOnly: true, signal: controller.signal, searchBudget: 0, timeoutMs: 15 * 60 * 1000, onText: (text: string): void => request.onText?.(text), onSteer: (handler: (text: string) => Promise<void>): void => request.registerIntervention?.(handler), onRequest: (data: unknown): void => { if (this.settings.aiExchangeLoggingEnabled) exchanges?.sent(id, JSON.stringify({ request: data, prompt }, null, 2)); } };
+      const controls = { textOnly: true, signal: controller.signal, searchBudget: 0, timeoutMs: 15 * 60 * 1000, onText: (text: string): void => request.onText?.(text), onSteer: (handler: (text: string) => Promise<void>): void => request.registerIntervention?.(handler), onRequest: (data: unknown): void => { if (this.settings.aiExchangeLoggingEnabled) exchanges?.sent(id, JSON.stringify({ request: data, prompt }, null, 2), prompt); } };
       const raw = providerForModel(session.model) === "claude"
         ? await this.claudeCli(directory).runTask(prompt, providerModelId(session.model), effort, undefined, controls)
         : await this.runtime(directory, true).runTask(prompt, session.model, effort, undefined, controls);
@@ -562,7 +563,7 @@ export default class VisualAgentMapPlugin extends Plugin {
         imageDataUrl,
         signal: controller.signal,
         searchBudget: webSearch ? 4 : 0,
-        onRequest: (data: unknown): void => { if (this.settings.aiExchangeLoggingEnabled) exchanges?.sent(id, JSON.stringify({ request: data, prompt }, null, 2)); }
+        onRequest: (data: unknown): void => { if (this.settings.aiExchangeLoggingEnabled) exchanges?.sent(id, JSON.stringify({ request: data, prompt }, null, 2), prompt); }
       };
       const raw = providerForModel(model) === "claude"
         ? await this.claudeCli(directory).runTask(prompt, providerModelId(model), effort, undefined, controls)

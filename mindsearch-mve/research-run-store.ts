@@ -167,7 +167,7 @@ export class MindSearchRunStore {
         if (JSON.stringify(branch.researchPlan) !== JSON.stringify(plan)) throw new Error("The saved research plan for this answer branch cannot be replaced.");
         return;
       }
-      if (plan.length < 2 || plan.length > 5 || plan.some(item => !item.id.trim() || !item.title.trim() || !item.task.trim() || !item.expectedValue.trim())) throw new Error("A MindSearch answer needs 2–5 distinct research subtopics.");
+      if (plan.length < 2 || plan.length > 5 || plan.some(item => !item.id.trim() || !item.title.trim() || !item.task.trim() || !item.expectedValue.trim()) || new Set(plan.map(item => item.id)).size !== plan.length || new Set(plan.map(item => item.title.trim().toLowerCase())).size !== plan.length) throw new Error("A new MindSearch research plan needs 2–5 distinct subtopics with unique ids and titles.");
       branch.researchPlan = JSON.parse(JSON.stringify(plan)) as NonNullable<MindSearchBranchRecord["researchPlan"]>;
       delete branch.researchPlanError;
       map.mindSearch = state; await this.repository.saveMap(mapPath, map);

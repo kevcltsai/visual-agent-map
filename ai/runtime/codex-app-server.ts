@@ -44,7 +44,7 @@ interface RpcNotification { method: string; params?: unknown }
 interface RpcServerRequest { id: number | string; method: string; params?: unknown }
 interface PendingRequest { resolve: (value: unknown) => void; reject: (error: Error) => void; timeout: number }
 export interface CodexWebSearchEvent { method: "item/started" | "item/completed"; params: unknown }
-interface TurnState { messages: string[]; visibleMessages: Map<string, string>; resolve: (text: string) => void; reject: (error: Error) => void; timeout: number; turnId: string; searches: number; countedSearchIds: Set<string>; requireSearch?: boolean; searchBudget: number; steered: boolean; streamItem?: string; streamText?: string; onText?: (text: string) => void; onWebSearchEvent?: (event: CodexWebSearchEvent) => void }
+interface TurnState { messages: string[]; visibleMessages: Map<string, string>; resolve: (text: string) => void; reject: (error: Error) => void; timeout: number; turnId: string; searches: number; countedSearchIds: Set<string>; requireSearch?: boolean; searchBudget: number; steered: boolean; streamItem?: string; streamText?: string; onRequest?: (request: unknown) => void; onText?: (text: string) => void; onWebSearchEvent?: (event: CodexWebSearchEvent) => void }
 
 const CONTROL_TIMEOUT_MS = 30_000;
 const TURN_TIMEOUT_MS = 3 * 60 * 1000;
@@ -153,7 +153,7 @@ export class CodexAppServerRuntime {
         interrupt(5_000, "逾時後無法停止 AI 任務");
         reject(new Error(controls?.timeoutMs ? "Coffee Tables: generation timed out; received text is saved as a draft." : t("ui.the_ai_task_exceeded_3_minutes_vam_attempts_to_interrupt_it")));
       }, controls?.timeoutMs ?? TURN_TIMEOUT_MS);
-      this.turns.set(threadId, { messages: [], visibleMessages: new Map(), resolve, reject, timeout, turnId: "", searches: 0, countedSearchIds: new Set(), requireSearch: controls?.webSearchOnly === true, searchBudget: controls?.searchBudget ?? 0, steered: false, onText: controls?.onText, onWebSearchEvent: controls?.onWebSearchEvent });
+      this.turns.set(threadId, { messages: [], visibleMessages: new Map(), resolve, reject, timeout, turnId: "", searches: 0, countedSearchIds: new Set(), requireSearch: controls?.webSearchOnly === true, searchBudget: controls?.searchBudget ?? 0, steered: false, onRequest: controls?.onRequest, onText: controls?.onText, onWebSearchEvent: controls?.onWebSearchEvent });
     });
     const state = this.turns.get(threadId)!;
     void completed.catch(() => undefined);
@@ -181,7 +181,9 @@ export class CodexAppServerRuntime {
       if (!timedOut && !controls?.signal?.aborted && this.turns.get(threadId) === state) controls?.onAccepted?.();
       controls?.onSteer?.(async text => {
         if (controls.signal?.aborted || this.turns.get(threadId) !== state || !state.turnId) throw cancelledError();
-        await this.request("turn/steer", { threadId, expectedTurnId: state.turnId, input: [{ type: "text", text }] });
+        const steerRequest = { threadId, expectedTurnId: state.turnId, input: [{ type: "text", text }] };
+        controls?.onRequest?.(steerRequest);
+        await this.request("turn/steer", steerRequest);
       });
       if (timedOut) interrupt(5_000, "逾時後無法停止 AI 任務");
       else if (controls?.signal?.aborted) onAbort();
@@ -306,7 +308,9 @@ export class CodexAppServerRuntime {
   private steerIfNeeded(threadId: string, state: TurnState): void {
     if (this.turns.get(threadId) !== state || state.steered || !state.searchBudget || state.searches < state.searchBudget || !state.turnId) return;
     state.steered = true;
-    void this.request("turn/steer", { threadId, expectedTurnId: state.turnId, input: [{ type: "text", text: "網路搜尋預算已用完。請停止搜尋，根據已取得的資料完成答案；不足之處明確列為待確認。" }] }).catch(error => this.options.onLog?.("warn", `搜尋停止提醒未送達：${error instanceof Error ? error.message : String(error)}`));
+    const steerRequest = { threadId, expectedTurnId: state.turnId, input: [{ type: "text", text: "網路搜尋預算已用完。請停止搜尋，根據已取得的資料完成答案；不足之處明確列為待確認。" }] };
+    state.onRequest?.(steerRequest);
+    void this.request("turn/steer", steerRequest).catch(error => this.options.onLog?.("warn", `搜尋停止提醒未送達：${error instanceof Error ? error.message : String(error)}`));
   }
 
   private respondToServerRequest(message: RpcServerRequest): void {

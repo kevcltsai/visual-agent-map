@@ -41,4 +41,19 @@ test('acceptance can retain a research gap without converting it to completion',
   const outputs = [outline, '<!-- mindsearch-delivery-research {"status":"searched"} -->\nUnresolved resource', 'Draft', '<!-- mindsearch-review {"decision":"research_more","rationale":"Missing concrete resources"} -->\nPartial'];
   const delivery = await buildFinalDelivery(base, async () => result(outputs.shift()));
   assert.ok(delivery.result.detail.includes('"research_more"'));
+  assert.ok(delivery.result.detail.includes('Draft pending completion\n\nDraft'));
+  assert.ok(delivery.result.detail.includes('Missing concrete resources'));
+});
+test('final delivery acceptance cannot replace or shorten the writer draft', async () => {
+  const draft = 'Original complete document\n\nUnique source-backed step https://example.org/proof';
+  const outputs = [outline, '<!-- mindsearch-delivery-research {"status":"searched"} -->\nSource https://example.org/proof', draft, '<!-- mindsearch-review {"decision":"conclude","rationale":"Verified","stopReason":"Ready"} -->\nShort acceptance note'];
+  const delivery = await buildFinalDelivery(base, async () => result(outputs.shift()));
+  assert.equal(delivery.result.detail.split('-->')[1].trim(), draft);
+  assert.ok(!delivery.result.detail.includes('Short acceptance note'));
+});
+test('final delivery reuses evidence when outline has no search gaps', async () => {
+  const phases = [];
+  const outputs = ['<!-- mindsearch-delivery-outline {"sections":[{"heading":"Answer","purpose":"Existing proof","searchTask":""}]} -->', 'Full draft', '<!-- mindsearch-review {"decision":"conclude","rationale":"Complete","stopReason":"Ready"} -->\nPass'];
+  await buildFinalDelivery(base, async context => { phases.push(context.task.match(/mindsearch-phase: ([a-z-]+)/)[1]); return result(outputs.shift()); });
+  assert.deepEqual(phases, ['delivery-outline', 'delivery-writing', 'delivery-acceptance']);
 });

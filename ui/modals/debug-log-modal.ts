@@ -1,12 +1,12 @@
 import { App, Modal, Notice, Setting } from "obsidian";
 import { t } from "../../i18n";
 import { formatDebugLogs, LogManager } from "../../log-manager";
-import { AiExchangeLog, formatAiExchange } from "../../ai-exchange-log";
+import { AiExchangeLog, formatAiExchange, promptMetrics } from "../../ai-exchange-log";
 
 export class DebugLogModal extends Modal {
   private unsubscribe: (() => void) | null = null;
   private unsubscribeExchanges: (() => void) | null = null;
-  constructor(app: App, private readonly logs: LogManager, private readonly exchanges: AiExchangeLog | null, private readonly exchangeEnabled: () => boolean) { super(app); }
+  constructor(app: App, private readonly logs: LogManager, private readonly exchanges: AiExchangeLog | null, private readonly exchangeEnabled: () => boolean, private readonly setExchangeEnabled?: (enabled: boolean) => Promise<void>) { super(app); }
 
   onOpen(): void {
     this.titleEl.setText(t("ui.debug_log"));
@@ -44,14 +44,28 @@ export class DebugLogModal extends Modal {
     this.contentEl.createEl("h3", { text: t("ui.ai_exchanges") });
     this.contentEl.createEl("p", { cls: "vam-modal-intro", text: this.exchangeEnabled() ? t("ui.up_to_20_exchanges_are_stored_in_this_vault_s_plugin_folder") : t("ui.ai_exchange_recording_is_off_enable_it_in_vam_settings") });
     const exchangeActions = new Setting(this.contentEl);
+    if (this.setExchangeEnabled) exchangeActions.setName(t("ui.record_ai_exchanges")).addToggle(toggle => toggle.setValue(this.exchangeEnabled()).onChange(async value => { await this.setExchangeEnabled?.(value); this.renderLogs(); }));
+    exchangeActions.addButton(button => button.setButtonText(t("ui.prompt_monitor_copy_all")).onClick(async () => {
+      try { await navigator.clipboard.writeText((this.exchanges?.getEntries() ?? []).map(formatAiExchange).join("\n\n---\n\n")); new Notice(t("ui.ai_exchange_copied")); }
+      catch { new Notice(t("ui.unable_to_copy_the_ai_exchange")); }
+    }));
     exchangeActions.addButton(button => button.setButtonText(t("ui.clear_ai_exchanges")).setDestructive().onClick(() => this.exchanges?.clear()));
     const exchangeList = this.contentEl.createDiv("vam-debug-log-list");
     const exchanges = [...(this.exchanges?.getEntries() ?? [])].reverse();
+    const sent = exchanges.filter(entry => !!entry.request);
+    const metrics = sent.map(promptMetrics);
+    this.contentEl.createEl("p", { text: t("ui.prompt_monitor_totals", sent.length, metrics.reduce((sum, entry) => sum + entry.characters, 0), metrics.reduce((sum, entry) => sum + entry.estimatedTokens, 0)) });
     if (!exchanges.length) exchangeList.createEl("p", { cls: "vam-debug-log-empty", text: t("ui.there_are_no_ai_exchanges_yet") });
     for (const exchange of exchanges) {
+      const metric = promptMetrics(exchange);
       const item = exchangeList.createEl("details", { cls: "vam-debug-log-entry" });
-      item.createEl("summary", { text: `${new Date(exchange.startedAt).toLocaleString()} · ${exchange.topic} · ${exchange.status}` });
+      item.createEl("summary", { text: `${new Date(exchange.startedAt).toLocaleString()} · ${exchange.topic} · ${metric.phase} · ${exchange.status}` });
       item.createEl("p", { text: `${exchange.mode} · ${exchange.model} · ${exchange.effort}`, cls: "vam-debug-log-meta" });
+      item.createEl("p", { text: t("ui.prompt_monitor_size", metric.characters, metric.estimatedTokens) });
+      if (exchange.durationMs !== undefined) item.createEl("p", { text: t("ui.prompt_monitor_elapsed", this.formatElapsed(exchange.durationMs)) });
+      if (metric.repairReason) item.createEl("p", { text: t("ui.prompt_monitor_repair_reason", metric.repairReason) });
+      item.createEl("strong", { text: t("ui.prompt_monitor_full_prompt") });
+      item.createEl("pre", { text: metric.prompt || t("ui.not_sent_yet") });
       item.createEl("strong", { text: t("ui.request_sent_to_ai") });
       item.createEl("pre", { text: exchange.request || t("ui.not_sent_yet") });
       item.createEl("strong", { text: t("ui.raw_ai_reply") });
@@ -60,6 +74,14 @@ export class DebugLogModal extends Modal {
       const copy = item.createEl("button", { text: t("ui.copy_this_exchange") });
       copy.addEventListener("click", () => { void navigator.clipboard.writeText(formatAiExchange(exchange)).then(() => new Notice(t("ui.ai_exchange_copied"))).catch(() => new Notice(t("ui.unable_to_copy_the_ai_exchange"))); });
     }
+  }
+
+  private formatElapsed(durationMs: number): string {
+    if (durationMs < 1000) return `${durationMs} ms`;
+    if (durationMs < 60_000) return `${(durationMs / 1000).toFixed(1)} s`;
+    const minutes = Math.floor(durationMs / 60_000);
+    const seconds = Math.floor((durationMs % 60_000) / 1000);
+    return `${minutes}m ${seconds}s`;
   }
 
   onClose(): void { this.unsubscribe?.(); this.unsubscribeExchanges?.(); this.unsubscribe = null; this.unsubscribeExchanges = null; this.contentEl.empty(); }

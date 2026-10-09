@@ -10,6 +10,7 @@ import type { ClaudeCodeCliRuntime } from "../ai/runtime/claude-code-cli";
 import type { AiExchangeLog } from "../ai-exchange-log";
 import { visualGuidance } from "../ai/visual-guidance";
 import { randomUUID } from "node:crypto";
+import { buildMindSearchPrompt } from "../ai/mindsearch-prompt";
 
 export function extractJsonObject(raw: string): string {
   const candidates: string[] = [];
@@ -89,7 +90,7 @@ export class AiTaskService {
     context = prepared.context;
     const pluginDirectory = this.options.pluginDirectory();
     const outputLanguage = context.outputLanguage ?? this.options.language();
-    const instructions = [
+    const instructions = context.promptProfile === "mindsearch" ? buildMindSearchPrompt(context, outputLanguage) : [
       translate(outputLanguage, "prompt.output_language"),
       translate(outputLanguage, "prompt.role"),
       translate(outputLanguage, "prompt.source_safety"),
@@ -135,7 +136,7 @@ export class AiTaskService {
         webSearch: context.researchMode !== "local",
         onRequest: (request: unknown): void => {
           stage = "等待 AI 回覆";
-          if (this.options.exchangeLoggingEnabled()) exchanges?.sent(exchangeId, JSON.stringify(request, null, 2));
+          if (this.options.exchangeLoggingEnabled()) exchanges?.sent(exchangeId, JSON.stringify(request, null, 2), instructions);
         }
       };
       const raw = provider === "claude"

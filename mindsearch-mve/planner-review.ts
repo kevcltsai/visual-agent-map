@@ -15,6 +15,57 @@ export interface MindSearchPlannerReview {
 
 const marker = /^\s*<!--\s*mindsearch-review\s+(\{[^\n]*\})\s*-->\s*/;
 
+interface ParsedMarker {
+  raw: Record<string, unknown>;
+  body: string;
+}
+
+function readMarker(detail: string): ParsedMarker | undefined {
+  const match = detail.match(marker);
+  if (!match) return undefined;
+  try {
+    const value: unknown = JSON.parse(match[1]);
+    if (!value || typeof value !== "object" || Array.isArray(value)) return undefined;
+    return { raw: value as Record<string, unknown>, body: detail.slice(match[0].length).trim() };
+  } catch {
+    return undefined;
+  }
+}
+
+function isDecision(value: unknown): value is MindSearchReviewDecision {
+  return value === "research_more" || value === "ask_user" || value === "conclude";
+}
+
+/** Extract only a clearly labeled option list; ordinary report bullets are not answer choices. */
+function extractExplicitOptions(body: string, question: string): string[] {
+  const onlyQuestionAndChoices = body.startsWith(question) ? body.slice(question.length).trim().split(/\r?\n/).map(line => line.trim()).filter(Boolean) : [];
+  if (onlyQuestionAndChoices.length >= 2 && onlyQuestionAndChoices.length <= 5 && onlyQuestionAndChoices.every(line => /^[-*•]\s+\S/.test(line))) {
+    const choices = [...new Set(onlyQuestionAndChoices.map(line => line.replace(/^[-*•]\s+/, "")))];
+    if (choices.length >= 2) return choices;
+  }
+  const lines = body.split(/\r?\n/);
+  const options: string[] = [];
+  let inOptions = false;
+  for (const line of lines) {
+    const trimmed = line.trim();
+    if (!trimmed) {
+      if (inOptions && options.length) break;
+      continue;
+    }
+    if (/^(?:#{1,6}\s*)?(?:answer\s+options|options|選項|可選答案)\s*[:：]?\s*$/i.test(trimmed)) {
+      inOptions = true;
+      continue;
+    }
+    if (!inOptions) continue;
+    const option = trimmed.match(/^(?:[-*•]|\d+[.)、])\s+(.+?)\s*$/)?.[1]?.trim();
+    if (!option) break;
+    options.push(option);
+    if (options.length > 5) return [];
+  }
+  const unique = [...new Set(options)];
+  return unique.length >= 2 && unique.length <= 5 ? unique : [];
+}
+
 /** Parses the small machine-readable Planner decision embedded in the normal VAM AiResult contract. */
 export function parseMindSearchPlannerReview(result: AiResult): MindSearchPlannerReview {
   const match = result.detail.match(marker);
@@ -23,8 +74,8 @@ export function parseMindSearchPlannerReview(result: AiResult): MindSearchPlanne
   try { value = JSON.parse(match[1]); } catch { throw new Error("Planner review decision block is not valid JSON."); }
   if (!value || typeof value !== "object") throw new Error("Planner review decision block must be an object.");
   const raw = value as Record<string, unknown>;
-  if (!["research_more", "ask_user", "conclude"].includes(String(raw.decision))) throw new Error("Planner review decision must be research_more, ask_user, or conclude.");
-  const decision = raw.decision as MindSearchReviewDecision;
+  if (!isDecision(raw.decision)) throw new Error("Planner review decision must be research_more, ask_user, or conclude.");
+  const decision = raw.decision;
   const rationale = typeof raw.rationale === "string" ? raw.rationale.trim() : "";
   if (!rationale) throw new Error("Planner review must explain the evidence-based reason for its decision.");
   const summary = result.summary.trim();
@@ -62,19 +113,87 @@ export async function parseMindSearchPlannerReviewWithRecovery(
   try {
     return parseMindSearchPlannerReview(original);
   } catch (formatError) {
+    const originalMarker = readMarker(original.detail);
+    const originalDecision = originalMarker?.raw.decision;
+    const originalRationale = typeof originalMarker?.raw.rationale === "string" ? originalMarker.raw.rationale.trim() : "";
+    const originalQuestion = typeof originalMarker?.raw.question === "string" ? originalMarker.raw.question.trim() : "";
+    const originalSummary = typeof original.summary === "string" ? original.summary.trim() : "";
+    const originalBody = originalMarker?.body ?? "";
+
+    // A complete ask_user decision with only missing/invalid choices can be repaired
+    // without asking a model to reinterpret the decision or touching report evidence.
+    if (originalDecision === "ask_user" && originalRationale && originalQuestion && originalSummary && originalBody) {
+      const options = extractExplicitOptions(originalBody, originalQuestion);
+      if (options.length) {
+        const recovered = {
+          ...original,
+          detail: `${original.detail.match(marker)?.[0] ?? ""}${originalBody}`,
+          suggestions: options.map(title => ({ title, task: "", contribution: "" }))
+        };
+        return parseMindSearchPlannerReview(recovered);
+      }
+
+      const task = [
+        "Repair only the missing answer choices in this already valid ask_user Planner decision.",
+        "Keep decision=ask_user. Do not change the question, rationale, summary, answer body, or any evidence. Return the ordinary VAM structured response with the same decision marker and 2–5 distinct choices in suggestions[].title. Do not infer choices from prose or add facts.",
+        `Original question: ${originalQuestion}`,
+        `Original rationale: ${originalRationale}`,
+        `Original summary: ${originalSummary}`,
+        `Original answer body (preserve exactly):\n${originalBody}`,
+        `Format validation error: ${formatError instanceof Error ? formatError.message : String(formatError)}`,
+        `Original suggestions: ${JSON.stringify(original.suggestions)}`
+      ].join("\n\n");
+      const repaired = await recover(task);
+      const repairedMarker = readMarker(repaired.detail);
+      if (!repairedMarker || repairedMarker.raw.decision !== "ask_user") {
+        throw new Error("Planner format repair changed or omitted the original ask_user decision.");
+      }
+      const answerOptions = [...new Set(repaired.suggestions.map(item => item.title.trim()).filter(Boolean))];
+      if (answerOptions.length < 2 || answerOptions.length > 5) {
+        throw new Error("Planner format repair did not provide 2–5 distinct answer choices.");
+      }
+      return parseMindSearchPlannerReview({
+        ...original,
+        detail: `${original.detail.match(marker)?.[0] ?? ""}${originalBody}`,
+        suggestions: answerOptions.map(title => ({ title, task: "", contribution: "" }))
+      });
+    }
+
+    const preserveDecision = isDecision(originalDecision) ? originalDecision : undefined;
     const task = [
       "The preceding Planner response did not satisfy the required machine-readable decision contract.",
-      "Make one local format-repair review using only the same saved report and answer snapshot below. Do not search, repeat research, add evidence, or invent facts. Re-evaluate which decision is supported: research_more, ask_user, or conclude. Do not default to any decision merely to repair the format.",
+      preserveDecision
+        ? `Repair only the malformed fields in the original ${preserveDecision} decision. Preserve that decision and every valid original field; do not switch to another decision.`
+        : "Make one local format-repair review using only the same saved report and answer snapshot below. Do not search, repeat research, add evidence, or invent facts. The original decision marker is unusable, so determine a decision from the supplied evidence; do not claim the original decision is known.",
+      "Do not search, repeat research, add evidence, or invent facts. Do not default to any decision merely to repair the format.",
       "Return the ordinary VAM structured response with a useful conditional answer in summary/detail and exactly one valid decision marker as the first line of detail: <!-- mindsearch-review {\"decision\":\"research_more|ask_user|conclude\",\"rationale\":\"evidence-based reason\",\"stopReason\":\"why research stops, for conclude only\",\"question\":\"user question, for ask_user only\"} -->. Use valid single-line JSON and only fields needed for the selected decision.",
       "For research_more, provide exactly one targeted suggestion with title, search task, and expected uncertainty reduction. For ask_user, provide 2–5 distinct choices in suggestions[].title. For conclude, include a stopReason. Preserve supplied values and provenance; never answer for the user or ask whether synthetic test data is real. Keep source claims, inference, uncertainty, and limits distinct.",
       `Format validation error: ${formatError instanceof Error ? formatError.message : String(formatError)}`,
-      `Original question: ${context.question}`,
-      `Answer snapshot (including provenance): ${context.answerSnapshot}`,
-      `Already completed report summary:\n${context.reportSummary}`,
-      `Already completed report detail:\n${context.reportDetail}`,
+      ...(preserveDecision ? [] : [
+        `Original question: ${context.question}`,
+        `Answer snapshot (including provenance): ${context.answerSnapshot}`,
+        `Already completed report summary:\n${context.reportSummary}`,
+        `Already completed report detail:\n${context.reportDetail}`
+      ]),
       `Original Planner response to review:\nSummary: ${original.summary}\n\nDetail:\n${original.detail}\n\nSuggestions: ${JSON.stringify(original.suggestions)}`
     ].join("\n\n");
     const repaired = await recover(task);
-    return parseMindSearchPlannerReview(repaired);
+    const parsed = parseMindSearchPlannerReview(repaired);
+    if (preserveDecision && parsed.decision !== preserveDecision) {
+      throw new Error(`Planner format repair changed the original ${preserveDecision} decision to ${parsed.decision}.`);
+    }
+    if (!preserveDecision || !originalMarker) return parsed;
+
+    const mergedMarker: Record<string, unknown> = { ...readMarker(repaired.detail)?.raw, decision: preserveDecision };
+    for (const key of ["rationale", "question", "stopReason"] as const) {
+      const value = originalMarker.raw[key];
+      if (typeof value === "string" && value.trim()) mergedMarker[key] = value.trim();
+    }
+    const mergedBody = originalBody || readMarker(repaired.detail)?.body || parsed.detail;
+    return parseMindSearchPlannerReview({
+      ...repaired,
+      summary: originalSummary || repaired.summary,
+      detail: `<!-- mindsearch-review ${JSON.stringify(mergedMarker)} -->\n${mergedBody}`
+    });
   }
 }

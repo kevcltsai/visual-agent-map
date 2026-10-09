@@ -971,7 +971,7 @@ async function mindSearchMapFixture() {
   const { MindSearchRunStore } = load('mindsearch-mve/research-run-store.ts');
   return { ...data, mapPath, question, store: new MindSearchRunStore(data.repo, (() => { let next = 0; return () => `mindsearch-id-${++next}`; })(), () => '2026-10-04T22:30:00.000Z') };
 }
-integrationTest('fully specified startup skips the question and web search when its supplied context supports an answer', async () => {
+integrationTest('fully specified startup still enforces the minimum answer floor without creating a conclusion', async () => {
   const { repo } = fixture();
   const { createMindSearchMap } = load('experiences/mind-search/create-map.ts');
   const created = await createMindSearchMap(repo, 'gpt-6-luna', { requestId: 'specified-start-map', topic: 'Build a three-color palette', context: 'Use the supplied blue, amber, and cream colors; preserve contrast and keep the result calm.' });
@@ -981,23 +981,20 @@ integrationTest('fully specified startup skips the question and web search when 
   const flow = new MindSearchManualFlow(repo, new MindSearchRunStore(repo), async (context, model, reasoning) => {
     const phase = ['initial-question', 'saved-evidence-review', 'decision-quality-review', 'research-plan', 'subtopic-research', 'report-review'].find(item => mindSearchPhase(context, item));
     phases.push(phase ?? 'unmarked'); models.push([model, reasoning, context.researchMode]);
-    if (phase === 'initial-question') return { summary: MINDSEARCH_NO_QUESTION, detail: 'The requested outcome and constraints are already supplied.', suggestions: [], visualReferences: [] };
-    if (phase === 'saved-evidence-review') {
-      assert.match(context.task, /topic background as user-supplied context/);
-      return plannerReview('conclude', { rationale: 'The user supplied a complete creative goal and constraints; no factual research is needed.', stopReason: 'A conditional palette answer fully meets this creative request.' }, 'Use blue as the anchor, amber as a small accent, and cream as the balancing background.', 'Keep the three supplied colors and check contrast in the final design.');
-    }
-    if (phase === 'decision-quality-review') return auditEcho(context);
+    if (phase === 'initial-question') return phases.filter(item => item === 'initial-question').length === 1
+      ? { summary: MINDSEARCH_NO_QUESTION, detail: 'The requested outcome and constraints are already supplied.', suggestions: [], visualReferences: [] }
+      : { summary: 'Which contrast target should the palette prioritize?', detail: 'Choose the main accessibility constraint.', suggestions: [{ title: 'Standard text contrast', task: '', contribution: '', parentTitle: '' }, { title: 'Large display text', task: '', contribution: '', parentTitle: '' }], visualReferences: [] };
     throw new Error(`A fully specified startup unexpectedly requested ${phase ?? context.task.slice(0, 90)}.`);
   });
   const outcome = await flow.planNextQuestion(created.mapPath, created.root.id, 'gpt-6-luna', 'low', 'specified-start-question');
-  assert.equal(outcome.status, 'no-question'); assert.equal(outcome.outcome.status, 'completed');
-  const saved = await repo.readMap(created.mapPath), branch = saved.mindSearch.branches[0];
-  assert.deepEqual(plain(branch.answerSnapshot), { selections: [], freeText: '' }, 'startup creates no fabricated user answer');
-  assert.equal(saved.nodes.some(node => node.mindSearchKind === 'question'), false);
-  assert.deepEqual(phases, ['initial-question', 'saved-evidence-review', 'decision-quality-review']);
-  assert.deepEqual(models, Array(3).fill(['gpt-6-luna', 'low', 'local']));
+  assert.equal(outcome.status, 'question', 'the configured floor keeps an apparently complete topic open for user input');
+  const saved = await repo.readMap(created.mapPath);
+  assert.equal(saved.mindSearch.branches.length, 0, 'the topic is not concluded without an answered question path');
+  assert.equal(saved.nodes.some(node => node.mindSearchKind === 'question'), true);
+  assert.deepEqual(phases, ['initial-question', 'initial-question']);
+  assert.deepEqual(models, Array(2).fill(['gpt-6-luna', 'low', 'local']));
 });
-integrationTest('a new answer concludes from inherited saved evidence without web search', async () => {
+integrationTest('a new answer researches its own target before reviewing inherited evidence', async () => {
   const { repo } = fixture();
   const { createMindSearchMap } = load('experiences/mind-search/create-map.ts');
   const created = await createMindSearchMap(repo, 'gpt-6-luna', { requestId: 'evidence-first-map', topic: 'Prepare a cast-iron steak', context: 'Synthetic scenario: 1.5-inch steak, cast-iron pan, thermometer, no oven.' });
@@ -1025,23 +1022,24 @@ integrationTest('a new answer concludes from inherited saved evidence without we
 
   const phases = []; let webCalls = 0;
   const flow = new MindSearchManualFlow(repo, store, async context => {
-    const phase = ['saved-evidence-review', 'decision-quality-review', 'research-plan', 'subtopic-research', 'report-review'].find(item => mindSearchPhase(context, item));
+  const phase = ['research-plan', 'saved-evidence-review', 'subtopic-research', 'report-review'].find(item => mindSearchPhase(context, item));
     phases.push(phase ?? 'unmarked');
-    if (phase === 'saved-evidence-review') {
-      assert.match(context.task, /Synthetic saved report/);
-      return plannerReview('conclude', { rationale: 'The inherited saved report already answers the new branch conditions.', stopReason: 'No material evidence gap remains for this answer.' }, 'For this synthetic 1.5-inch steak, follow the saved conditional cast-iron method and verify the center temperature.', 'The inherited report supports the requested method and preserves its limitations.');
+    if (phase === 'research-plan') return { summary: 'Two complementary targets', detail: '<!-- mindsearch-plan {"subtopics":[{"id":"safety","title":"Safety limits","task":"Check safety limits for the answer","expectedValue":"Retain supported constraints"},{"id":"finish","title":"Finishing method","task":"Compare finishing techniques","expectedValue":"Resolve serving differences"}]} -->', suggestions: [], visualReferences: [] };
+    if (context.researchMode === 'research') { webCalls++; return { summary: 'Synthetic answer-specific report.', detail: 'Research status: search completed\nA targeted report checked the current answer against the inherited method.', suggestions: [], visualReferences: [] }; }
+    if (phase === 'report-review') {
+      assert.match([context.task, context.detail, context.ancestors].join("\n"), /Synthetic saved report/);
+      return plannerReview('ask_user', { rationale: 'The inherited and new reports support a conditional answer, but the finishing preference still changes serving advice.', question: 'Which finish should be prioritized?' }, 'Keep the supplied safety limit and compare the saved method with this answer-specific evidence.', 'The reports do not establish the user’s preferred finish.', ['Simple pan finish', 'Resting and serving']);
     }
-    if (phase === 'decision-quality-review') return auditEcho(context);
-    if (context.researchMode === 'research') { webCalls++; throw new Error('No web search should run when inherited evidence is sufficient.'); }
+    if (context.task.includes('Correct the candidate decision before it can be saved')) return plannerReview('ask_user', { rationale: 'Preparation time could materially change the practical recommendation and is not covered by the prior question.', question: 'How much preparation time is available?' }, 'Keep the supplied safety limit and compare the saved method with this answer-specific evidence.', 'The reports do not establish the available preparation time.', ['Under 30 minutes', 'At least 30 minutes']);
     throw new Error(`Unexpected phase ${phase ?? context.task.slice(0, 90)}.`);
   });
   const result = await flow.answerAndResearch(created.mapPath, followup.id, { requestId: 'evidence-first-child-answer', selections: [followup.mindSearchQuestion.options[0].id], freeText: 'Keep the supplied safety limitation.' }, 'gpt-6-luna', 'low');
-  assert.equal(result.status, 'completed'); assert.equal(webCalls, 0);
-  assert.deepEqual(phases, ['saved-evidence-review', 'decision-quality-review']);
+  assert.equal(result.status, 'waiting-user'); assert.equal(webCalls, 2);
+  assert.deepEqual(phases, ['research-plan', 'subtopic-research', 'subtopic-research', 'report-review', 'unmarked'], 'one bounded quality correction replaces the unsupported early conclusion');
   const saved = await repo.readMap(created.mapPath), child = saved.mindSearch.branches.find(item => item.id === result.branchId);
   assert.equal(child.parentBranchId, parent.id);
   assert.ok(child.inputSnapshot.upstreamResults.some(ref => ref.notePath === parentDraft.notePath));
-  assert.equal(child.results.length, 1); assert.equal(child.results[0].kind, 'conclusion');
+  assert.equal(child.results.filter(item => item.kind === 'research').length, 2);
 });
 integrationTest('MindSearch retry clears a stale plan error when saved evidence concludes by replanning research', async () => {
   const { repo } = fixture(); const { createMindSearchMap } = load('experiences/mind-search/create-map.ts');
@@ -1060,7 +1058,7 @@ integrationTest('MindSearch retry clears a stale plan error when saved evidence 
   const flow = new MindSearchManualFlow(repo, store, async context => { phases.push(context.task.match(/mindsearch-phase:\s*([a-z-]+)/)?.[1]); return currentModel.ask(context); });
   const result = await flow.retryAnswerResearch(created.mapPath, branch.id, 'gpt-6-luna', 'low');
   assert.equal(result.status, 'waiting-user');
-  assert.ok(phases.includes('research-plan')); assert.equal(phases.filter(p => p === 'subtopic-research').length, 2); assert.equal(phases.includes('saved-evidence-review'), false);
+  assert.equal(phases.includes('research-plan'), true); assert.equal(phases.filter(p => p === 'subtopic-research').length, 2); assert.equal(phases.includes('saved-evidence-review'), false);
   map = await repo.readMap(created.mapPath);
   const savedBranch = map.mindSearch.branches.find(item => item.id === branch.id);
   assert.equal(savedBranch.researchPlanError, undefined, 'a successful saved-evidence outcome clears the obsolete plan error');
@@ -1113,12 +1111,41 @@ integrationTest('planned MindSearch resume skips the saved plan and already comp
   });
   const outcome = await flow.resumeAnswerResearch(mapPath, branch.id, 'gpt-6-luna', 'low');
   assert.equal(outcome.status, 'completed');
-  assert.deepEqual(calls.map(call => call.phase), ['subtopic-research', 'report-review', 'decision-quality-review']);
+  assert.deepEqual(calls.map(call => call.phase), ['subtopic-research', 'report-review']);
   assert.equal(contents.get(firstDraft.notePath), bytesBefore, 'resuming does not rewrite the previously saved subtopic report');
   mapDoc = await repo.readMap(mapPath);
   const resumedBranch = mapDoc.mindSearch.branches.find(item => item.id === branch.id);
   assert.equal(resumedBranch.results.filter(item => item.kind === 'research').map(item => item.subtopicId).join(','), 'safety,method');
   assert.equal(resumedBranch.results.filter(item => item.kind === 'conclusion').length, 1);
+});
+integrationTest('MindSearch new research plans require 2–5 unique targets while legacy one-target branches remain resumable', async () => {
+  const { repo, mapPath, question, store } = await mindSearchMapFixture();
+  let map = await repo.readMap(mapPath); const questionNode = map.nodes.find(node => node.id === question.id);
+  questionNode.mindSearchKind = 'question'; questionNode.mindSearchQuestion = { requestId: 'legacy-one-plan-question', parentBranchId: null, options: [{ id: 'a', label: 'A' }, { id: 'b', label: 'B' }], allowMultiple: false, allowFreeText: true };
+  await repo.saveMap(mapPath, map);
+  const createBranch = requestId => store.createAnswerBranch(mapPath, { requestId, questionNodeId: question.id, parentBranchId: null, answerSnapshot: { selections: ['a'], freeText: '' }, inputSnapshot: { topic: 'Legacy plan', conditions: {}, upstreamResults: [] } });
+  const invalidBranch = await createBranch('invalid-plan');
+  const target = (id, title = id) => ({ id, title, task: `Research ${title}.`, expectedValue: `Clarify ${title}.` });
+  await assert.rejects(store.saveResearchPlan(mapPath, invalidBranch.id, [target('one')]), /2–5 distinct subtopics/);
+  await assert.rejects(store.saveResearchPlan(mapPath, invalidBranch.id, Array.from({ length: 6 }, (_, index) => target(`six-${index}`))), /2–5 distinct subtopics/);
+  await assert.rejects(store.saveResearchPlan(mapPath, invalidBranch.id, [target('duplicate', 'Same'), target('duplicate', 'Other')]), /unique ids and titles/);
+  assert.equal((await repo.readMap(mapPath)).mindSearch.branches.find(branch => branch.id === invalidBranch.id).researchPlan, undefined, 'invalid plans are rejected before persistence');
+  await store.saveResearchPlan(mapPath, invalidBranch.id, [target('one'), target('two')]);
+
+  const legacyBranch = await createBranch('legacy-one-plan');
+  map = await repo.readMap(mapPath); map.mindSearch.branches.find(branch => branch.id === legacyBranch.id).researchPlan = [target('legacy', 'Legacy target')]; await repo.saveMap(mapPath, map);
+  const { MindSearchManualFlow } = load('experiences/mind-search/manual-flow.ts'); const phases = [];
+  const flow = new MindSearchManualFlow(repo, store, async context => {
+    const phase = mindSearchPhase(context, 'research-plan') ? 'research-plan' : mindSearchPhase(context, 'subtopic-research') ? 'subtopic-research' : mindSearchPhase(context, 'report-review') ? 'report-review' : 'other'; phases.push(phase);
+    if (phase === 'research-plan') throw new Error('A saved legacy plan must be reused.');
+    if (phase === 'subtopic-research') return { summary: 'Legacy report', detail: 'Research status: search completed\nLegacy evidence.', suggestions: [], visualReferences: [] };
+    if (phase === 'report-review') return plannerReview('ask_user', { rationale: 'The saved legacy report supports a conditional answer.', question: 'Which route detail matters most?' }, 'Conditional legacy result.', 'Preserve the saved evidence.', ['Distance', 'Transfers']);
+    throw new Error('Unexpected legacy resume phase.');
+  });
+  const resumed = await flow.resumeAnswerResearch(mapPath, legacyBranch.id, 'gpt-6-luna', 'low');
+  assert.equal(resumed.status, 'waiting-user');
+  assert.deepEqual(phases.filter(phase => phase === 'subtopic-research'), ['subtopic-research']);
+  assert.equal(phases.includes('research-plan'), false);
 });
 integrationTest('MindSearch removes duplicated topic context and rejects oversized prompts without truncation', async () => {
   const { repo } = fixture(); const { createMindSearchMap } = load('experiences/mind-search/create-map.ts');
@@ -1179,13 +1206,15 @@ integrationTest('MindSearch saved-evidence preflight includes one copy of ancest
     seen.push(context);
     const complete = [context.task, context.detail, context.ancestors].join('\n');
     assert.match(complete, /Avoid steep ramps/); assert.match(complete, /wide sidewalk/);
-    if (complete.includes('A'.repeat(80_000))) assert.equal(complete.split('A'.repeat(80_000)).length - 1, 1, 'long report body is passed once, never truncated');
+    const indexedReport = complete.match(/Evidence ID: ([^\s]+)\nSummary: A route access report\./)?.[1];
+    if (mindSearchPhase(context, 'report-review') && indexedReport && !context.task.includes('Requested full evidence')) return { summary: 'Load the indexed parent evidence.', detail: `<!-- mindsearch-evidence-request {"ids":["${indexedReport}"]} -->`, suggestions: [], visualReferences: [] };
+    if (context.task.includes('Requested full evidence')) assert.equal(context.task.split('A'.repeat(80_000)).length - 1, 1, 'requested long report body is loaded once and never truncated');
     return currentModel.ask(context);
   });
   const result = await flow.retryAnswerResearch(created.mapPath, childBranch.id, 'gpt-6-luna', 'low');
   assert.equal(result.status, 'waiting-user');
-  assert.ok(seen.some(context => mindSearchPhase(context, 'research-plan')));
-  assert.ok(seen.some(context => [context.task, context.detail, context.ancestors].join('\n').includes(longReport)), 'the full 80k report survives deduplication');
+  assert.ok(seen.some(context => mindSearchPhase(context, 'subtopic-research')));
+  assert.ok(seen.some(context => context.task.includes('Requested full evidence') && context.task.includes(uniqueMarker)), 'the full report is loaded only after an explicit evidence-ID request');
   assert.equal((await repo.readNote(reportDraft.notePath)).detail, longReport, 'stored source report is unchanged');
 
 });
@@ -1468,14 +1497,14 @@ integrationTest('MindSearch Manual Planner question, user answer, research resul
   const repeated = flow.answerAndResearch(created.mapPath, question.id, answer, 'gpt-6-luna', 'low');
   const finish = finishResearch; finishResearch = undefined; finish();
   const [outcome, repeatedOutcome] = await Promise.all([first, repeated]);
-  assert.deepEqual(plain(outcome), plain(repeatedOutcome)); assert.equal(outcome.status, 'waiting-user'); assert.equal(aiCalls, 6, 'initial question, plan, two searches, review and audit');
+  assert.deepEqual(plain(outcome), plain(repeatedOutcome)); assert.equal(outcome.status, 'waiting-user'); assert.equal(aiCalls, 5, 'initial question, research plan, two independent searches, and report review');
   let savedMap = await repo.readMap(created.mapPath);
   assert.equal(savedMap.mindSearch.branches.length, 1); assert.deepEqual(plain(savedMap.mindSearch.branches[0].answerSnapshot), plain({ selections: answer.selections, freeText: answer.freeText }));
   const firstBranch = savedMap.mindSearch.branches[0];
   assert.equal(firstBranch.results.filter(item => item.kind === 'research').length, 2);
   const resultRef = firstBranch.results.find(item => item.kind === 'synthesis'), resultNode = savedMap.nodes.find(node => node.id === resultRef.nodeId);
   assert.equal(resultNode.mindSearchKind, 'synthesis');
-  const report = await repo.readNote(resultRef.notePath); assert.match(report.summary, /未知偏好時保留條件式選擇/); assert.match(report.detail, /來源界線/); assert.match(report.detail, /食安溫度|鑄鐵鍋做法/);
+  const report = await repo.readNote(resultRef.notePath); assert.match(report.summary, /未知偏好時保留條件式選擇/); assert.match(report.detail, /來源界線/); assert.match(report.detail, /條件式研究報告/);
 
   const unknown = { requestId: 'manual-answer-unknown', selections: [MINDSEARCH_UNKNOWN_OPTION_ID], freeText: '' };
   const unknownResult = await flow.answerAndResearch(created.mapPath, question.id, unknown, 'gpt-6-luna', 'low');
@@ -1497,8 +1526,8 @@ integrationTest('captured malformed partial Planner replies recover once from th
     {
       name: 'answer without marker',
       file: 'planner_missing_marker.json',
-      recovery: plannerReview('conclude', { rationale: 'The stated synthetic doneness and saved method report support a useful conditional answer.', stopReason: 'The answer and its safety limitation are clear; additional research is not required for this branch.' }, 'Use the saved stovetop method conditionally and keep its safety tradeoff visible.', 'Do not infer preferences beyond the saved synthetic answer.'),
-      outcome: 'completed'
+      recovery: plannerReview('ask_user', { rationale: 'The stored evidence does not establish a decision-relevant preference.', question: 'Which constraint should the next answer prioritize?' }, 'Preserve the useful conditional answer while the missing preference remains unknown.', 'Do not infer preferences beyond the saved synthetic answer.', ['Time available', 'Equipment available']),
+      outcome: 'waiting-user'
     }
   ];
   for (const [index, scenario] of capturedCases.entries()) {
@@ -1536,21 +1565,25 @@ integrationTest('captured malformed partial Planner replies recover once from th
         onWebSearchEvent?.({ method: 'item/completed', params: { item: { action: { type: 'search' } } } });
         return { summary: 'Persisted report used by both Planner passes.', detail: 'Research status: search completed\nExact saved report content for this test.', suggestions: [], visualReferences: [] };
       }
-      if (mindSearchPhase(context, 'decision-quality-review')) return auditEcho(context);
       localPlannerCalls++;
       if (localPlannerCalls === 1) return captured.result;
       assert.match(context.task, /Format validation error:/);
-      assert.match(context.task, /Already completed report detail:[\s\S]*Exact saved report content for this test\./);
-      assert.match(context.task, /Original Planner response to review/);
-      assert.match(context.task, /Do not search, repeat research, add evidence, or invent facts/);
-      assert.match(context.task, /Re-evaluate which decision is supported: research_more, ask_user, or conclude/);
+      if (/mindsearch-review/.test(captured.result.detail)) {
+        assert.match(context.task, /Repair only the missing answer choices/);
+        assert.match(context.task, /Original question:/);
+        assert.doesNotMatch(context.task, /Exact saved report content for this test/);
+      } else {
+        assert.match(context.task, /Already completed report detail:[\s\S]*Exact saved report content for this test\./);
+        assert.match(context.task, /Original Planner response to review/);
+        assert.match(context.task, /Do not search, repeat research, add evidence, or invent facts/);
+      }
       return scenario.recovery;
     });
     const outcome = await continuation.continuePartial(created.mapPath, runId, 'gpt-6-luna', 'low');
     assert.equal(outcome.status, scenario.outcome, `${scenario.name} should be repaired into a valid product decision`);
     assert.equal(searchCalls, 1, 'format recovery must reuse the already persisted report instead of repeating Searcher');
-    assert.equal(localPlannerCalls, 2, 'allow exactly one Planner format-recovery invocation, then a separately identified quality audit');
-    assert.deepEqual(calls.filter(call => !deliveryFixture(call.context)).map(call => call.context.researchMode), ['research', 'local', 'local', 'local']);
+    assert.equal(localPlannerCalls, 2, 'allow exactly one Planner format-recovery invocation');
+    assert.deepEqual(calls.filter(call => !deliveryFixture(call.context)).map(call => call.context.researchMode), ['research', 'local', 'local']);
     assert.equal(contents.get(seed.notePath), seedBytesBefore, 'the prior partial result Note must remain byte-for-byte unchanged');
     const savedMap = await repo.readMap(created.mapPath), savedBranch = savedMap.mindSearch.branches.find(item => item.id === branch.id), savedRun = savedMap.mindSearch.runs.find(item => item.id === runId), attempt = savedRun.attempts.at(-1);
     assert.equal(savedBranch.results.length, 2); assert.ok(savedBranch.results.some(item => item.resultId === seed.resultId));
@@ -1640,8 +1673,7 @@ integrationTest('native RunStore failed Searcher diagnostic enables the saved-re
   const view = new VisualAgentMapView({ app }, { repo, settings: { ...DEFAULT_SETTINGS, language: 'en' }, mutate: async work => work(), syncOutline() {}, askModel: async context => {
     calls.push(context);
     assert.equal(context.researchMode, 'local', 'reviewing a retained report does not repeat its search');
-    if (mindSearchPhase(context, 'decision-quality-review')) return auditEcho(context);
-    return plannerReview('conclude', { rationale: 'Synthetic contract test only.', stopReason: 'The fixture exercises retry wiring.' }, 'Synthetic conditional conclusion.', 'This is not research evidence.');
+    return plannerReview('ask_user', { rationale: 'The retained report supports only a conditional answer, while the requested preference is still unknown.', question: 'Which option should the result prioritize?' }, 'Keep the saved report conditional until the user chooses.', 'Do not infer a preference from a failed Searcher attempt.', ['Option A', 'Option B']);
   } });
   view.path = mapPath; view.map = await repo.readMap(mapPath); view.render = () => {};
   await view.hydrateFailedReportTargets(() => true);
@@ -1651,7 +1683,7 @@ integrationTest('native RunStore failed Searcher diagnostic enables the saved-re
   const savedRun = after.mindSearch.runs.find(item => item.id === 'native-retry-run');
   assert.equal(savedRun.attempts[0].status, 'failed');
   assert.equal(savedRun.attempts[1].status, 'completed');
-  assert.equal(calls.length, 2, 'the saved-report decision and its separate quality audit both run');
+  assert.equal(calls.length, 1, 'the saved-report retry uses one Planner review');
   assert.equal((await reopened.readNote(draft.notePath)).detail, diagnosticBefore.detail, 'the original diagnostic remains byte-for-byte unchanged');
 
   const zeroSearch = await mindSearchMapFixture();
@@ -1763,7 +1795,7 @@ integrationTest('Planner reviews a saved Searcher diagnostic on a new fenced att
   };
 
   const concluded = await runCase('conclude', [plannerReview('conclude', { rationale: 'The saved report supports a useful conditional answer and identifies its limits.', stopReason: 'Remaining uncertainty does not change the supported conditional answer.' }, 'Under this synthetic scenario, use thermometer readings and keep the safety tradeoff visible.', 'Preserve source attribution and do not infer the real user’s preference.')]);
-  assert.equal(concluded.outcome.status, 'completed'); assert.equal(concluded.searches, 0); assert.equal(concluded.calls.length, 2);
+  assert.equal(concluded.outcome.status, 'completed'); assert.equal(concluded.searches, 0); assert.equal(concluded.calls.length, 1);
   assert.equal(concluded.savedRun.attempts[0].status, 'failed'); assert.equal(concluded.savedBranch.results.length, 1);
 
   const followed = await runCase('follow-up', [
@@ -1771,17 +1803,17 @@ integrationTest('Planner reviews a saved Searcher diagnostic on a new fenced att
     plannerReview('conclude', { rationale: 'The bounded follow-up resolves the measurement gap sufficiently for a conditional answer.', stopReason: 'The remaining uncertainty does not change the recommendation.' }, 'Final conditional answer.', 'Use center-temperature readings; the evidence does not support a fixed cooking time.')
   ]);
   assert.equal(followed.outcome.status, 'completed'); assert.equal(followed.searches, 1);
-  assert.deepEqual(followed.calls.map(context => context.researchMode), ['local', 'local', 'research', 'local', 'local']);
+  assert.deepEqual(followed.calls.map(context => context.researchMode), ['local', 'research', 'local']);
   assert.deepEqual(plain(followed.savedRun.attempts[1].plannerReviews.map(item => [item.researchTurn, item.decision])), [[1, 'research_more'], [2, 'conclude']]);
   assert.equal(followed.savedRun.attempts[1].researchTurns, 2);
-  assert.ok(followed.calls.some(context => context.task.includes('The follow-up repeats safety-temperature advice')), 'the next Planner review receives the completed follow-up report');
+  assert.ok(followed.calls.some(context => context.task.includes('The follow-up repeats safety-temperature advice')), 'the bounded follow-up uses the completed report context');
 
   const coreGap = await runCase('core-method-gap', [
     plannerReview('research_more', { rationale: 'The report covers temperature and probe placement but leaves the requested browned-crust stovetop method unanswered; a targeted search may change the practical recommendation.' }, 'Temperature guidance is available, but the cooking method remains open.', 'Find a cast-iron browning method for this thickness.', [{ title: 'Cast-iron crust method', task: 'Find an agent-reported stovetop method for browning a 1.5-inch steak in cast iron while checking internal temperature; preserve the exact method and source limits.', contribution: 'Could supply the missing central cooking method.' }]),
     plannerReview('research_more', { rationale: 'The follow-up again reports safety facts but does not answer the requested skillet method; the core outcome remains open.' }, 'The available report supports temperature guidance only; the stovetop crust method is still unresolved.', 'This result is partial because the central requested method lacks support.', [{ title: 'Still unresolved: stovetop crust method', task: 'The prototype budget is exhausted; retain this as an open question.', contribution: 'The central requested cooking method remains unsupported.' }])
   ]);
   assert.equal(coreGap.outcome.status, 'partial', 'a still-open central method must not be committed as complete');
-  assert.equal(coreGap.searches, 1); assert.deepEqual(coreGap.calls.map(context => context.researchMode), ['local', 'local', 'research', 'local', 'local']);
+  assert.equal(coreGap.searches, 1); assert.deepEqual(coreGap.calls.map(context => context.researchMode), ['local', 'research', 'local']);
   const targetedFollowup = coreGap.calls.find(context => context.researchMode === 'research' && context.task.includes('Planner follow-up target: Cast-iron crust method'));
   assert.ok(targetedFollowup, 'the bounded follow-up uses a research-mode Planner target');
   assert.match(targetedFollowup.task, /Planner follow-up target: Cast-iron crust method[\s\S]*Find an agent-reported stovetop method/);
@@ -1795,7 +1827,7 @@ integrationTest('Planner reviews a saved Searcher diagnostic on a new fenced att
     plannerReview('conclude', { rationale: 'The saved report supports only a conditional answer and retains its clear limitations.', stopReason: 'No new evidence is needed to communicate the supported limits.' }, 'Repaired conditional answer.', 'Keep the missing core method explicit.')
   ]);
   assert.equal(repairedMissingMarker.outcome.status, 'completed'); assert.equal(repairedMissingMarker.searches, 0);
-  assert.deepEqual(repairedMissingMarker.calls.map(context => context.researchMode), ['local', 'local', 'local']);
+  assert.deepEqual(repairedMissingMarker.calls.map(context => context.researchMode), ['local', 'local']);
   assert.equal(repairedMissingMarker.savedRun.attempts[1].status, 'completed');
   assert.equal(repairedMissingMarker.savedBranch.results.length, 1);
   assert.equal(repairedMissingMarker.savedRun.attempts[0].status, 'failed');
@@ -1960,7 +1992,7 @@ integrationTest('MindSearch Planner close cancels only its View subscriber and f
   resolveLate(); await new Promise(resolve => setTimeout(resolve, 0));
   let saved = await repo.readMap(created.mapPath);
   assert.equal(saved.nodes.some(node => node.mindSearchQuestion?.requestId === 'late-close-question'), false, 'an abort-ignoring late model completion cannot commit a question');
-  const retry = new MindSearchManualFlow(repo, new MindSearchRunStore(repo), async () => ({ summary: '重新規劃？', detail: '新 turn。', suggestions: [{ title: 'A' }, { title: 'B' }], visualReferences: [] }));
+  const retry = new MindSearchManualFlow(repo, new MindSearchRunStore(repo), async () => ({ summary: '重新規劃？', detail: '新 turn。', suggestions: [{ title: 'A', task: '', contribution: '', parentTitle: '' }, { title: 'B', task: '', contribution: '', parentTitle: '' }], visualReferences: [] }));
   assert.equal((await retry.planNextQuestion(created.mapPath, created.root.id, 'gpt-6-luna', 'low', 'late-close-question')).status, 'question', 'the request registry is released after cancellation');
   saved = await repo.readMap(created.mapPath);
   assert.equal(saved.nodes.filter(node => node.mindSearchQuestion?.requestId === 'late-close-question').length, 1);
@@ -1968,9 +2000,10 @@ integrationTest('MindSearch Planner close cancels only its View subscriber and f
 integrationTest('Visual Map close fences late Planner rendering and reopen starts a fresh lifecycle', async () => {
   const { repo } = fixture(); const { createMindSearchMap } = load('experiences/mind-search/create-map.ts');
   const created = await createMindSearchMap(repo, 'gpt-6-luna', { requestId: 'view-close-map', topic: '牛排', context: '' });
+  await repo.updateNote(created.root.path, { detail: `${(await repo.readNote(created.root.path)).detail}\n\n<!-- mindsearch-intake-complete -->` });
   let resolvePlanner, call = 0, renders = 0;
   const plugin = { repo, settings: { language: 'zh-TW', cliModel: 'gpt-6-luna' }, ready: Promise.resolve(), mutate: async work => work(),
-    askModel: async () => { call++; if (call === 1) return new Promise(resolve => { resolvePlanner = () => resolve({ summary: '晚到問題？', detail: '不應寫回關閉的 View。', suggestions: [{ title: 'A' }, { title: 'B' }], visualReferences: [] }); }); return { summary: '重新開啟後的問題？', detail: '新生命週期。', suggestions: [{ title: 'A' }, { title: 'B' }], visualReferences: [] }; },
+    askModel: async () => { call++; if (call === 1) return new Promise(resolve => { resolvePlanner = () => resolve({ summary: '晚到問題？', detail: '不應寫回關閉的 View。', suggestions: [{ title: 'A', task: '', contribution: '', parentTitle: '' }, { title: 'B', task: '', contribution: '', parentTitle: '' }], visualReferences: [] }); }); return { summary: '重新開啟後的問題？', detail: '新生命週期。', suggestions: [{ title: 'A', task: '', contribution: '', parentTitle: '' }, { title: 'B', task: '', contribution: '', parentTitle: '' }], visualReferences: [] }; },
     syncOutline() {}, consumeFirstInstallSample: () => false };
   const { VisualAgentMapView } = load('main.ts', { obsidian }); const view = new VisualAgentMapView({ app: {} }, plugin);
   view.contentEl = { addClass() {}, tabIndex: 0 }; view.registerDomEvent = () => {};
@@ -1988,6 +2021,7 @@ integrationTest('Visual Map close fences late Planner rendering and reopen start
 integrationTest('Visual Map close during Planner question save lets the started Note/Map commit finish without late rendering', async () => {
   const { repo } = fixture(); const { createMindSearchMap } = load('experiences/mind-search/create-map.ts');
   const created = await createMindSearchMap(repo, 'gpt-6-luna', { requestId: 'planner-save-close-map', topic: '牛排', context: '' });
+  await repo.updateNote(created.root.path, { detail: `${(await repo.readNote(created.root.path)).detail}\n\n<!-- mindsearch-intake-complete -->` });
   let releaseNote, announceNote; const noteStarted = new Promise(resolve => { announceNote = resolve; });
   const createNoteAt = repo.createNoteAt.bind(repo);
   repo.createNoteAt = async (...args) => { announceNote(); await new Promise(resolve => { releaseNote = resolve; }); return createNoteAt(...args); };
@@ -1995,7 +2029,7 @@ integrationTest('Visual Map close during Planner question save lets the started 
   const mapCommitted = new Promise(resolve => { announceMapCommit = resolve; });
   repo.saveMap = async (...args) => { const result = await realSaveMap(...args); if (++mapWrites === 2) announceMapCommit(); return result; };
   const plugin = { repo, settings: { language: 'zh-TW', cliModel: 'gpt-6-luna' }, mutate: async work => work(), syncOutline() {},
-    askModel: async () => ({ summary: '偏好熟度？', detail: '請使用者選擇。', suggestions: [{ title: '偏紅' }, { title: '較熟' }], visualReferences: [] }) };
+    askModel: async () => ({ summary: '偏好熟度？', detail: '請使用者選擇。', suggestions: [{ title: '偏紅', task: '', contribution: '', parentTitle: '' }, { title: '較熟', task: '', contribution: '', parentTitle: '' }], visualReferences: [] }) };
   const { VisualAgentMapView } = load('main.ts', { obsidian }); const view = new VisualAgentMapView({ app: {} }, plugin);
   view.path = created.mapPath; view.map = created.map; view.notes.set(created.root.id, await repo.readNote(created.root.path)); view.selected = created.root.id;
   let renders = 0; view.render = () => { renders++; };
@@ -2010,7 +2044,7 @@ integrationTest('MindSearch answer modal from an older View lifecycle cannot sub
   const { repo } = fixture(); const { createMindSearchMap } = load('experiences/mind-search/create-map.ts');
   const created = await createMindSearchMap(repo, 'gpt-6-luna', { requestId: 'stale-modal-map', topic: '牛排', context: '' });
   const { MindSearchRunStore } = load('mindsearch-mve/research-run-store.ts'); const { MindSearchManualFlow } = load('experiences/mind-search/manual-flow.ts');
-  const planner = new MindSearchManualFlow(repo, new MindSearchRunStore(repo), async () => ({ summary: '偏好熟度？', detail: '本人回答。', suggestions: [{ title: '偏紅' }, { title: '較熟' }], visualReferences: [] }));
+  const planner = new MindSearchManualFlow(repo, new MindSearchRunStore(repo), async () => ({ summary: '偏好熟度？', detail: '本人回答。', suggestions: [{ title: '偏紅', task: '', contribution: '', parentTitle: '' }, { title: '較熟', task: '', contribution: '', parentTitle: '' }], visualReferences: [] }));
   const planned = await planner.planNextQuestion(created.mapPath, created.root.id, 'gpt-6-luna', 'low', 'stale-modal-question');
   let modal, modelCalls = 0;
   class CapturingModal { constructor(app) { this.app = app; } open() { modal = this; } close() {} }
@@ -2066,14 +2100,17 @@ integrationTest('MindSearch carries ancestor answers and reports into follow-up 
   const created = await createMindSearchMap(repo, 'gpt-6-luna', { requestId: 'lineage-map', topic: '在家煎牛排', context: '鑄鐵鍋；沒有烤箱。' });
   const { MindSearchRunStore } = load('mindsearch-mve/research-run-store.ts');
   const { MindSearchManualFlow } = load('experiences/mind-search/manual-flow.ts');
-  let call = 0, id = 0; const contexts = [];
+  let call = 0, id = 0, requestedParentEvidence = false; const contexts = [];
   const flow = new MindSearchManualFlow(repo, new MindSearchRunStore(repo), async context => {
     contexts.push(context); call++;
     if (mindSearchPhase(context, 'saved-evidence-review')) return savedEvidenceNeedsSearch();
+    if (mindSearchPhase(context, 'research-plan')) return { summary: '安全與操作兩個面向', detail: '<!-- mindsearch-plan {"subtopics":[{"id":"safety","title":"安全條件","task":"查詢適用安全條件","expectedValue":"保留必要安全限制"},{"id":"method","title":"操作方法","task":"比較可行操作方式","expectedValue":"補足執行細節"}]} -->', suggestions: [], visualReferences: [] };
     if (context.task.includes('Decide whether one missing user condition')) return { summary: call === 1 ? '偏好熟度？' : '想要脆皮程度？', detail: '此條件會影響操作。', suggestions: [{ title: '偏紅' }, { title: '較熟' }], visualReferences: [] };
-    if (mindSearchPhase(context, 'research-plan')) return { summary: '拆成安全與操作面向。', detail: '<!-- mindsearch-plan {"subtopics":[{"id":"safety","title":"食安溫度","task":"查詢安全溫度","expectedValue":"保留食安下限"},{"id":"method","title":"烹調方式","task":"研究具體料理方式","expectedValue":"提供操作步驟"}]} -->', suggestions: [], visualReferences: [] };
-    if (mindSearchPhase(context, 'decision-quality-review')) return auditEcho(context);
-    if (mindSearchPhase(context, 'report-review')) return plannerReview(/Current question: 偏好熟度？/.test(context.task) ? 'ask_user' : 'ask_user', /Current question: 偏好熟度？/.test(context.task) ? { rationale: '牛排的具體烹調方向仍由使用者選擇，這項條件無法從證據推斷。', question: '接下來你希望優先深入哪個部分？' } : { rationale: '下一個未確認条件會影響結果。', question: '你能提前多久準備？' }, /Current question: 偏好熟度？/.test(context.task) ? '已整理熟度與溫度取捨，請選擇下一個重點。' : '依條件提供建議。', '保存祖先條件及研究報告：不同熟度與建議溫度存在取捨。', ['烹調方式', '安全溫度']);
+    if (mindSearchPhase(context, 'report-review')) {
+      const evidenceId = `${context.task}\n${context.detail}\n${context.ancestors}`.match(/Evidence ID: ([^\s]+)/)?.[1];
+      if (/外層要酥脆/.test(context.task) && evidenceId && !requestedParentEvidence) { requestedParentEvidence = true; return { summary: 'Need the parent report details.', detail: `<!-- mindsearch-evidence-request {"ids":["${evidenceId}"]} -->`, suggestions: [], visualReferences: [] }; }
+      return plannerReview('ask_user', /外層要酥脆/.test(context.task) ? { rationale: '下一個未確認條件會影響結果。', question: '你能提前多久準備？' } : { rationale: '牛排的具體烹調方向仍由使用者選擇，這項條件無法從證據推斷。', question: '接下來你希望優先深入哪個部分？' }, '保存祖先條件及研究報告：不同熟度與建議溫度存在取捨。', '已整理熟度與溫度取捨，請選擇下一個重點。', ['烹調方式', '安全溫度']);
+    }
     if (context.researchMode === 'research') {
       if (context.task.includes('Assigned research subtopic')) {
         if (/外層要酥脆/.test(context.ancestors)) { assert.match(context.task, /不同熟度與建議溫度存在取捨/); assert.match(context.task, /外層要酥脆/); assert.match(context.ancestors, /沒有烤箱/); return { summary: '依先前熟度與本次表面偏好提供條件式建議。', detail: '保留祖先條件及研究報告。', suggestions: [], visualReferences: [] }; }
@@ -2084,22 +2121,29 @@ integrationTest('MindSearch carries ancestor answers and reports into follow-up 
     throw new Error('Unexpected Planner request in lineage test.');
   }, () => `lineage-${++id}`);
   const firstQuestion = await flow.planNextQuestion(created.mapPath, created.root.id, 'gpt-6-luna', 'low', 'lineage-q1');
+  const beforeFirstAnswer = contexts.length;
   const firstAnswer = await flow.answerAndResearch(created.mapPath, firstQuestion.node.id, { requestId: 'lineage-a1', selections: [firstQuestion.options[0].id], freeText: '中等厚度' }, 'gpt-6-luna', 'low');
   assert.equal(firstAnswer.status, 'waiting-user');
+  const firstAnswerCalls = contexts.slice(beforeFirstAnswer);
+  assert.equal(firstAnswerCalls.filter(context => context.researchMode === 'research').length, 2, 'each planned subtopic has an independent research call');
+  assert.equal(firstAnswerCalls.filter(context => mindSearchPhase(context, 'report-review')).length, 1);
+  assert.ok(firstAnswerCalls.every(context => `${context.task}\n${context.detail}\n${context.ancestors}`.length < 30000), 'branch context remains bounded');
+  assert.ok(firstAnswerCalls.every(context => /鑄鐵鍋|沒有烤箱/.test(`${context.task}\n${context.detail}\n${context.ancestors}`)), 'the original conditions remain available to both calls');
   let map = await repo.readMap(created.mapPath); const firstBranch = map.mindSearch.branches[0], firstResult = firstBranch.results.find(item => item.kind === 'synthesis');
   const secondQuestionNode = map.nodes.find(node => node.id === firstAnswer.questionNodeId);
   const secondQuestion = { node: secondQuestionNode, options: secondQuestionNode.mindSearchQuestion.options };
   assert.equal(secondQuestion.node.mindSearchQuestion.parentBranchId, firstBranch.id);
   const secondAnswer = await flow.answerAndResearch(created.mapPath, secondQuestion.node.id, { requestId: 'lineage-a2', selections: [secondQuestion.options.find(option => option.label === '烹調方式').id], freeText: '外層要酥脆' }, 'gpt-6-luna', 'low');
   assert.equal(secondAnswer.status, 'waiting-user'); map = await repo.readMap(created.mapPath);
-  assert.ok(contexts.some(context => context.task.includes('Assigned research subtopic') && /偏紅/.test(context.ancestors) && /不同熟度與建議溫度存在取捨/.test(context.ancestors)));
+  const followupResearch = contexts.find(context => context.researchMode === 'research' && /外層要酥脆/.test(context.task));
+  assert.ok(followupResearch && /外層要酥脆/.test(followupResearch.task) && /偏紅/.test(followupResearch.ancestors) && /Evidence ID:/.test(followupResearch.ancestors) && /Full report retained/.test(followupResearch.ancestors), 'the follow-up search receives the latest answer, ancestor answer, and indexed parent report');
   const child = map.mindSearch.branches.find(branch => branch.id === secondAnswer.branchId);
   assert.equal(child.parentBranchId, firstBranch.id);
   assert.deepEqual(plain(child.inputSnapshot.conditions), { '偏好熟度？': '偏紅 — 中等厚度', '接下來你希望優先深入哪個部分？': '烹調方式 — 外層要酥脆' });
   assert.ok(child.inputSnapshot.upstreamResults.some(result => result.notePath === firstResult.notePath && result.version === firstResult.version));
   const followupReview = contexts.find(context => mindSearchPhase(context, 'report-review') && /外層要酥脆/.test(context.task));
   assert.ok(followupReview, 'the follow-up evidence review receives the latest answer and parent branch');
-  assert.match(followupReview.task, /偏紅/); assert.match(followupReview.task, /不同熟度與建議溫度存在取捨/);
+  assert.match(followupReview.task, /外層要酥脆/); assert.match(`${followupReview.task}\n${followupReview.detail}\n${followupReview.ancestors}`, /偏紅/); assert.match(`${followupReview.task}\n${followupReview.detail}\n${followupReview.ancestors}`, /Evidence ID:/);
 });
 integrationTest('MindSearch shares active run reservation across Manual Flow instances', async () => {
   const { repo } = fixture(); const { createMindSearchMap } = load('experiences/mind-search/create-map.ts');
@@ -2172,7 +2216,7 @@ integrationTest('Visual Map wires Manual Planner and answer submissions through 
   const planned = await view.planMindSearchQuestion(created.root.id, 'manual-wiring-question-1');
   assert.equal(planned.status, 'question');
   const answered = await view.submitMindSearchAnswer(planned.node.id, { requestId: 'manual-wiring-answer-1', selections: [planned.options[0].id], freeText: '約 1.5 吋。' });
-  assert.equal(answered.status, 'waiting-user'); assert.equal(askCalls, 6); assert.ok(outlinedMaps.length >= 2);
+  assert.equal(answered.status, 'waiting-user'); assert.equal(askCalls, 5); assert.ok(outlinedMaps.length >= 2);
   assert.equal(view.map.mindSearch.branches.length, 1);
   const branch = view.map.mindSearch.branches[0], researchRefs = branch.results.filter(item => item.kind === 'research');
   const conclusionRef = branch.results.find(item => item.kind === 'synthesis');
@@ -2285,57 +2329,43 @@ integrationTest('MindSearch explicit re-answer removes legacy answer pivots, rec
   assert.equal(restored.nodes.find(node => node.id === draft.nodeId).parentId, restoredBranch.questionNodeId);
   assert.equal((await repo.readNote(oldPivot.path)).summary, '舊答案', 'migration preserves the old Markdown note');
 });
-integrationTest('MindSearch records Planner failure and retries the saved answer without duplicating its branch', async () => {
+integrationTest('MindSearch resumes a failed search on the saved answer without duplicating its branch', async () => {
   const { repo, mapPath, question, store } = await mindSearchMapFixture();
   const map = await repo.readMap(mapPath), questionNode = map.nodes.find(node => node.id === question.id);
   questionNode.mindSearchKind = 'question';
   questionNode.mindSearchQuestion = { requestId: 'planning-retry-question', parentBranchId: null, options: [{ id: 'history', label: '歷史街區' }, { id: 'museum', label: '博物館' }], allowMultiple: false, allowFreeText: true };
   await repo.saveMap(mapPath, map);
   const { MindSearchManualFlow } = load('experiences/mind-search/manual-flow.ts');
-  let planningCalls = 0;
+  let failSearch = true;
   const flow = new MindSearchManualFlow(repo, store, async context => {
-    if (mindSearchPhase(context, 'saved-evidence-review')) return savedEvidenceNeedsSearch();
-    if (mindSearchPhase(context, 'decision-quality-review')) return auditEcho(context);
-    if (mindSearchPhase(context, 'research-plan') || mindSearchPhase(context, 'research-plan-repair')) {
-      planningCalls++;
-      if (planningCalls <= 2) return { summary: 'Planner failed to return its required subtopic marker.', detail: 'No machine-readable plan was returned.', suggestions: [], visualReferences: [] };
-      return { summary: 'Two distinct subtopics.', detail: '<!-- mindsearch-plan {"subtopics":[{"id":"route","title":"路線安排","task":"研究適合的步行與交通路線","expectedValue":"形成可執行的一日動線"},{"id":"budget","title":"預算配置","task":"估算景點與交通費用","expectedValue":"確認總額符合預算"}]} -->', suggestions: [], visualReferences: [] };
-    }
-    if (mindSearchPhase(context, 'decision-quality-review')) return auditEcho(context);
-    if (mindSearchPhase(context, 'report-review')) return plannerReview('ask_user', { rationale: '已完成規劃研究；這個使用者條件仍會改變結果。', question: '下一步想深入哪一項？' }, '研究已彙整。', '結果依答案整理。', ['路線', '預算']);
-    return { summary: '已完成指定研究。', detail: 'Report and limitations.', suggestions: [], visualReferences: [] };
+    if (mindSearchPhase(context, 'research-plan')) return { summary: '路線與無障礙條件', detail: '<!-- mindsearch-plan {"subtopics":[{"id":"route","title":"路線選項","task":"研究可行路線與轉乘","expectedValue":"比較路線方案"},{"id":"access","title":"無障礙條件","task":"研究無障礙步行與車站資訊","expectedValue":"確認實際通行限制"}]} -->', suggestions: [], visualReferences: [] };
+    if (context.researchMode === 'research') return failSearch
+      ? { summary: 'Search unavailable', detail: 'Research status: unavailable', suggestions: [], visualReferences: [] }
+      : { summary: 'Route evidence', detail: 'Research status: search completed\nA step-free transit route report with its limits.', suggestions: [], visualReferences: [] };
+    if (mindSearchPhase(context, 'report-review')) return plannerReview('ask_user', { rationale: 'The route report supports a conditional answer, but travel-time preference remains unknown.', question: 'Should the route prioritize the shortest walk or the fewest transfers?' }, 'Use the saved route evidence conditionally until the travel preference is clear.', 'Do not infer a preference from the saved answer.', ['Shortest walk', 'Fewest transfers']);
+    throw new Error(`Unexpected model request: ${context.task.slice(0, 100)}`);
   });
   const input = { requestId: 'saved-answer-planner-retry', selections: ['history'], freeText: '以大眾運輸為主' };
-  await assert.rejects(flow.answerAndResearch(mapPath, question.id, input, 'gpt-6-luna', 'low'), /Planner must return 2–5 valid research subtopics/);
+  await assert.rejects(flow.answerAndResearch(mapPath, question.id, input, 'gpt-6-luna', 'low'), /no web search succeeded/);
   let saved = await repo.readMap(mapPath), branch = saved.mindSearch.branches[0];
-  assert.equal(saved.mindSearch.branches.length, 1, 'a failed Planner call still preserves one answer branch');
-  assert.equal(branch.researchPlan, undefined);
+  assert.equal(saved.mindSearch.branches.length, 1, 'a failed search preserves one answer branch');
+  assert.deepEqual(plain(branch.researchPlan.map(item => item.id)), ['route', 'access']);
   assert.equal(branch.results.length, 0);
-  assert.match(branch.researchPlanError, /Planner must return/);
-
-  const legacy = await repo.readMap(mapPath), legacyBranch = legacy.mindSearch.branches[0];
-  const oldPivot = await repo.createNote('待重試的舊答案支點', 'gpt-6-luna', legacy, mapPath, 'workspace', { summary: '舊答案', detail: '保留原筆記。' });
-  oldPivot.parentId = legacyBranch.questionNodeId;
-  oldPivot.mindSearchKind = 'answer';
-  legacy.nodes.push(oldPivot);
-  legacyBranch.answerNodeId = oldPivot.id;
-  await repo.saveMap(mapPath, legacy);
-
-  const retried = await flow.retryAnswerResearch(mapPath, branch.id, 'gpt-6-luna', 'low');
+  const failedRun = saved.mindSearch.runs.find(run => run.branchId === branch.id);
+  assert.ok(failedRun?.attempts.some(attempt => attempt.status === 'failed'), 'failed search state is persisted for resumption');
+  const answerSnapshot = plain(branch.answerSnapshot), branchId = branch.id;
+  failSearch = false;
+  const retried = await flow.resumeAnswerResearch(mapPath, branchId, 'gpt-6-luna', 'low');
   assert.equal(retried.status, 'waiting-user');
-  saved = await repo.readMap(mapPath); branch = saved.mindSearch.branches[0];
-  assert.equal(saved.mindSearch.branches.length, 1, 'retry reuses the saved answer instead of creating a duplicate branch');
-  assert.equal(branch.researchPlanError, undefined);
-  assert.equal(branch.answerNodeId, undefined, 'retry migrates the legacy answer pivot as part of the explicit saved-answer action');
-  assert.equal(saved.nodes.some(node => node.id === oldPivot.id), false);
-  assert.equal((await repo.readNote(oldPivot.path)).summary, '舊答案', 'retry keeps the old answer Markdown note');
-  assert.deepEqual(plain(branch.researchPlan.map(item => item.id)), ['route', 'budget']);
+  saved = await repo.readMap(mapPath); branch = saved.mindSearch.branches.find(item => item.id === branchId);
+  assert.equal(saved.mindSearch.branches.length, 1, 'resume reuses the saved answer instead of creating a duplicate branch');
+  assert.deepEqual(plain(branch.answerSnapshot), answerSnapshot);
+  assert.deepEqual(plain(branch.researchPlan.map(item => item.id)), ['route', 'access']);
   const research = branch.results.filter(item => item.kind === 'research');
   assert.equal(research.length, 2);
   assert.ok(research.every(item => saved.nodes.find(node => node.id === item.nodeId).parentId === branch.questionNodeId));
-  assert.equal(saved.nodes.some(node => node.mindSearchKind === 'answer'), false);
 });
-integrationTest('MindSearch creates multiple research subtopics, converges all reports, and keeps re-answers in a new branch', async () => {
+integrationTest('MindSearch researches every planned subtopic independently and keeps re-answers in a new branch', async () => {
   const { repo } = fixture(); const { createMindSearchMap } = load('experiences/mind-search/create-map.ts');
   const created = await createMindSearchMap(repo, 'gpt-6-luna', { requestId: 'multi-subtopic-map', topic: '如何選擇牛排熟度？', context: '有溫度計。', minimumAnswersBeforeConclusion: 3 });
   const { MindSearchRunStore } = load('mindsearch-mve/research-run-store.ts'); const { MindSearchManualFlow } = load('experiences/mind-search/manual-flow.ts');
@@ -2343,15 +2373,9 @@ integrationTest('MindSearch creates multiple research subtopics, converges all r
   const flow = new MindSearchManualFlow(repo, new MindSearchRunStore(repo), async context => {
     call++;
     if (mindSearchPhase(context, 'saved-evidence-review')) return savedEvidenceNeedsSearch();
-    if (mindSearchPhase(context, 'decision-quality-review')) return auditEcho(context);
+    if (mindSearchPhase(context, 'research-plan')) return { summary: '安全與口感兩個面向', detail: '<!-- mindsearch-plan {"subtopics":[{"id":"safety","title":"安全溫度","task":"查詢牛排安全溫度","expectedValue":"確認安全底線"},{"id":"texture","title":"口感差異","task":"比較不同熟度口感","expectedValue":"呈現口感取捨"}]} -->', suggestions: [], visualReferences: [] };
     const delivery = deliveryFixture(context); if (delivery) return delivery;
     if (context.task.includes('Decide whether one missing user condition')) return { summary: '偏好哪種熟度？', detail: '用於收斂建議。', suggestions: [{ title: '偏嫩', task: '', contribution: '' }, { title: '較熟', task: '', contribution: '' }], visualReferences: [] };
-    if (mindSearchPhase(context, 'research-plan')) {
-      assert.match(context.task, /meaningfully broad/);
-      assert.match(context.task, /research useful alternatives/);
-      return { summary: '依問題拆分研究面向。', detail: '規劃如下：\n<!-- mindsearch-plan {\n  "subtopics": [{"id":"food-safety","title":"安全溫度","task":"查詢安全熟度與溫度","expectedValue":"釐清食安下限"},{"id":"texture","title":"口感與熟度","task":"比較熟度對口感的影響","expectedValue":"提供口感取捨"}]\n} -->\n兩個互補子議題。', suggestions: [], visualReferences: [] };
-    }
-    if (mindSearchPhase(context, 'decision-quality-review')) return auditEcho(context);
     if (mindSearchPhase(context, 'report-review')) {
       synthesisCalls++;
       if (synthesisCalls === 1) {
@@ -2363,17 +2387,17 @@ integrationTest('MindSearch creates multiple research subtopics, converges all r
         ? plannerReview('ask_user', { rationale: '肉排厚度會影響火候和烹調時間。', question: synthesisCalls === 1 ? '這次牛排大約多厚？' : '能提前多久準備？' }, '下一步先確認牛排厚度。', '依厚度調整火候與時間。', ['薄於 2 公分', '約 2–4 公分', '厚於 4 公分'])
         : plannerReview('conclude', { rationale: '兩題答案與所有研究已足以完成結果。', stopReason: '已回答至少兩題。' }, '依兩題答案收斂最終建議。', '安全底線、口感取捨與操作條件已整合。');
     }
-    return { summary: `已研究 ${context.task.match(/Assigned research subtopic: ([^\n]+)/)?.[1] ?? '子議題'}`, detail: 'Research status: search completed\n來源報告與限制。', suggestions: [], visualReferences: [] };
+    return { summary: '已完成此答案的研究。', detail: 'Research status: search completed\n來源報告與限制。', suggestions: [], visualReferences: [] };
   });
   const question = await flow.planNextQuestion(created.mapPath, created.root.id, 'gpt-6-luna', 'low', 'multi-subtopic-question');
   const first = await flow.answerAndResearch(created.mapPath, question.node.id, { requestId: 'multi-subtopic-answer-a', selections: [question.options[0].id], freeText: '' }, 'gpt-6-luna', 'low');
   assert.equal(first.status, 'waiting-user');
   let saved = await repo.readMap(created.mapPath), branch = saved.mindSearch.branches[0];
-  assert.deepEqual(plain(branch.researchPlan.map(item => item.id)), ['food-safety', 'texture']);
+  assert.deepEqual(plain(branch.researchPlan.map(item => item.id)), ['safety', 'texture']);
   assert.equal(branch.results.filter(item => item.kind === 'research').length, 2);
   const reports = branch.results.filter(item => item.kind === 'research');
   assert.equal(branch.answerNodeId, undefined, 'answers are stored on the question branch, without an answer pivot');
-  assert.ok(reports.every(item => saved.nodes.find(node => node.id === item.nodeId)?.parentId === branch.questionNodeId), 'each research subtopic must grow directly from its answered question');
+  assert.ok(reports.every(item => saved.nodes.find(node => node.id === item.nodeId)?.parentId === branch.questionNodeId), 'the answer research target must grow directly from its answered question');
   const synthesis = branch.results.find(item => item.kind === 'synthesis');
   const convergenceNode = saved.nodes.find(item => item.id === synthesis.nodeId);
   assert.deepEqual(plain(convergenceNode.mindSearchConvergesFromNodeIds), plain(reports.map(item => item.nodeId)));
@@ -2392,7 +2416,7 @@ integrationTest('MindSearch creates multiple research subtopics, converges all r
   assert.equal(saved.mindSearch.branches[1].results.filter(item => item.kind === 'research').length, 2);
   assert.ok(saved.mindSearch.branches[2].results.some(item => item.kind === 'conclusion'));
   assert.equal(synthesisCalls, 3);
-  assert.ok(call >= 15, 'all three answers dispatch distinct research and validated delivery stages');
+  assert.ok(call >= 8, 'all three answers run research and delivery stages');
 });
 integrationTest('opening a saved map clears legacy question convergence edges but keeps synthesis edges', async () => {
   const persisted = map([
@@ -6419,28 +6443,29 @@ integrationTest('Claude nonzero exit exposes structured provider rejection witho
 });
 
 // Current MindSearch coverage scenarios: verify outcomes rather than exact prompt wording/call counts.
-function coverageModel({ failPlan = false, unavailableDelivery = false } = {}) {
-  const phases = [], state = { failPlan };
+function coverageModel({ failSearch = false, unavailableDelivery = false, clarifyConflict = false } = {}) {
+  const phases = [], state = { failSearch, clarifyConflict };
   const response = (summary, detail, suggestions = []) => ({ summary, detail, suggestions, visualReferences: [] });
   const ask = async context => {
     const phase = context.task.match(/mindsearch-phase:\s*([a-z-]+)/)?.[1]; phases.push(phase);
     if (phase === 'saved-evidence-review') return savedEvidenceNeedsSearch();
     if (phase === 'initial-clarification') return response('Clarification', '<!-- mindsearch-intake {"questions":["What constraints matter?"]} -->');
     if (phase === 'initial-question') return response('What is your intended outcome?', 'Unknown success criterion.', [{ title: 'Executable project', task: '', contribution: '' }, { title: 'Compare alternatives', task: '', contribution: '' }]);
-    if (phase === 'research-plan' || phase === 'research-plan-repair') {
-      if (state.failPlan) return response('Malformed plan', 'No valid plan.', []);
-      return response('Two complementary targets', '<!-- mindsearch-plan {"subtopics":[{"id":"methods","title":"Methods","task":"Research applicable methods","expectedValue":"Resolve implementation"},{"id":"resources","title":"Resources","task":"Find concrete resources","expectedValue":"Resolve learning materials"}]} -->');
-    }
+    if (phase === 'research-plan') return response('Two complementary research dimensions.', '<!-- mindsearch-plan {"subtopics":[{"id":"method","title":"Method and options","task":"Research practical methods and relevant alternatives.","expectedValue":"Compare feasible ways to meet the goal."},{"id":"constraints","title":"Constraints and quality","task":"Research key constraints, timing, and quality or safety considerations.","expectedValue":"Identify conditions that could change execution."}]} -->');
     if (phase === 'report-review') {
       const count = Number(context.task.match(/Hard floor: (\d+) answered/)?.[1]);
+      const suppliedContext = `${context.task}\n${context.detail}\n${context.ancestors}`;
+      if (clarifyConflict && /occasional contributor/i.test(suppliedContext) && /primary operations owner/i.test(suppliedContext)) return plannerReview('ask_user', { rationale: 'The same project is described as both occasional contribution and primary operations ownership; clarify responsibility before personalizing the plan.', question: 'For this same project, are you an occasional contributor or the primary operations owner?' }, 'Keep the answer conditional until the conflicting responsibility is clarified.', 'The supplied responsibility descriptions conflict; do not choose one.', ['Occasional contributor', 'Primary operations owner']);
       return count < 3 ? plannerReview('ask_user', { rationale: 'A different unknown constraint changes execution.', question: `Which constraint matters at stage ${count + 1}?` }, 'Interim evidence', 'Applicable evidence and limitations.', ['Time constraint', 'Resource constraint']) : plannerReview('conclude', { rationale: 'Three answers and reports support delivery.', stopReason: 'Ready for delivery stages.' }, 'Candidate document', 'Candidate document');
     }
-    if (phase === 'decision-quality-review') return auditEcho(context);
     if (phase === 'delivery-outline') return response('Document outline', '<!-- mindsearch-delivery-outline {"sections":[{"heading":"Execution plan","purpose":"Complete the original goal","searchTask":"Find verified runnable examples"}]} -->');
     if (phase === 'delivery-research') return response('Delivery evidence', `<!-- mindsearch-delivery-research {"status":"${unavailableDelivery ? 'unavailable' : 'searched'}"} -->\nConcrete example and source https://example.org/reference`);
     if (phase === 'delivery-writing') return response('Canvas preview', '# Complete execution plan\n\n1. Build a small example.\n2. Check the output against requirements.\n3. Extend with evidence.\n\nSource: https://example.org/reference');
     if (phase === 'delivery-acceptance') return plannerReview('conclude', { rationale: 'Every required section is concrete and supported.', stopReason: 'Document usable for original goal.' }, 'Completed document preview', '# Complete execution plan\n\n1. Build a small example.\n2. Check the output against requirements.\n3. Extend with evidence.\n\nSource: https://example.org/reference');
-    if (context.researchMode === 'research') return response('Researched evidence', 'Research status: search completed\nApplicable evidence: https://example.org/reference');
+    if (context.researchMode === 'research') {
+      if (state.failSearch) return response('Search unavailable', 'Research status: unavailable');
+      return response('Researched evidence', 'Research status: search completed\nApplicable evidence: https://example.org/reference');
+    }
     throw new Error(`Unexpected coverage phase ${phase}`);
   };
   return { ask, phases, state };
@@ -6459,7 +6484,10 @@ async function coverageThreeAnswers(subject) {
   let question = (await subject.flow.planNextQuestion(subject.created.mapPath, subject.created.root.id, 'gpt-6-luna', 'low', 'coverage-question')).node;
   let outcome;
   for (let round = 1; round <= 3; round++) {
-    outcome = await subject.flow.answerAndResearch(subject.created.mapPath, question.id, { requestId: `coverage-answer-${round}`, selections: [question.mindSearchQuestion.options[0].id], freeText: `Specific condition ${round}` }, 'gpt-6-luna', 'low');
+    const freeText = subject.model.state.clarifyConflict
+      ? round === 1 ? 'I am an occasional contributor.' : round === 3 ? 'I am the primary operations owner for this same project.' : `Additional condition ${round}`
+      : `Specific condition ${round}`;
+    outcome = await subject.flow.answerAndResearch(subject.created.mapPath, question.id, { requestId: `coverage-answer-${round}`, selections: [question.mindSearchQuestion.options[0].id], freeText }, 'gpt-6-luna', 'low');
     const saved = await subject.repo.readMap(subject.created.mapPath);
     const branch = saved.mindSearch.branches.find(b => b.id === outcome.branchId);
     assert.equal(branch.results.filter(r => r.kind === 'research').length, 2);
@@ -6484,14 +6512,21 @@ integrationTest('coverage: final search unavailable preserves prior research and
   assert.equal(saved.mindSearch.branches.flatMap(b => b.results).filter(r => r.kind === 'research').length, 6);
   assert.equal(saved.mindSearch.branches.some(b => b.results.some(r => r.kind === 'conclusion')), false);
 });
-integrationTest('coverage: malformed plan is saved then retry uses the same answer and produces research', async () => {
-  const subject = await coverageSetup('Retry scenario', { failPlan: true });
+integrationTest('coverage: failed search resumes the saved default plan on the same answer branch', async () => {
+  const subject = await coverageSetup('Retry scenario', { failSearch: true });
   const q = await subject.flow.planNextQuestion(subject.created.mapPath, subject.created.root.id, 'gpt-6-luna', 'low', 'retry-question');
-  await assert.rejects(() => subject.flow.answerAndResearch(subject.created.mapPath, q.node.id, { requestId: 'retry-answer', selections: [q.options[0].id], freeText: 'Saved condition' }, 'gpt-6-luna', 'low'), /Planner must return/);
-  let saved = await subject.repo.readMap(subject.created.mapPath); assert.equal(saved.mindSearch.branches.length, 1); assert.ok(saved.mindSearch.branches[0].researchPlanError);
-  subject.model.state.failPlan = false;
-  await subject.flow.retryAnswerResearch(subject.created.mapPath, saved.mindSearch.branches[0].id, 'gpt-6-luna', 'low');
-  saved = await subject.repo.readMap(subject.created.mapPath); assert.equal(saved.mindSearch.branches.length, 1); assert.equal(saved.mindSearch.branches[0].answerSnapshot.freeText, 'Saved condition'); assert.equal(saved.mindSearch.branches[0].results.filter(r => r.kind === 'research').length, 2);
+  await assert.rejects(() => subject.flow.answerAndResearch(subject.created.mapPath, q.node.id, { requestId: 'retry-answer', selections: [q.options[0].id], freeText: 'Saved condition' }, 'gpt-6-luna', 'low'));
+  let saved = await subject.repo.readMap(subject.created.mapPath); assert.equal(saved.mindSearch.branches.length, 1);
+  const branchId = saved.mindSearch.branches[0].id;
+  assert.deepEqual(plain(saved.mindSearch.branches[0].researchPlan.map(target => target.id)), ['method', 'constraints']);
+  subject.model.state.failSearch = false;
+  const resumed = await subject.flow.resumeAnswerResearch(subject.created.mapPath, branchId, 'gpt-6-luna', 'low');
+  assert.equal(resumed.status, 'waiting-user');
+  saved = await subject.repo.readMap(subject.created.mapPath); const branch = saved.mindSearch.branches.find(item => item.id === branchId);
+  assert.equal(saved.mindSearch.branches.length, 1); assert.equal(branch.answerSnapshot.freeText, 'Saved condition');
+  assert.deepEqual(plain(branch.researchPlan.map(target => target.id)), ['method', 'constraints']);
+  assert.equal(branch.results.filter(r => r.kind === 'research').length, 2);
+  assert.equal(saved.nodes.find(node => node.id === branch.results.find(r => r.kind === 'research').nodeId).parentId, branch.questionNodeId);
 });
 integrationTest('coverage: changed answers keep independent research parents and do not count sibling answers', async () => {
   const subject = await coverageSetup('Independent answers scenario');
@@ -6555,4 +6590,39 @@ integrationTest('MindSearch request deduplication preserves unique evidence and 
   assert.ok(!prepared.ancestors.includes(report));
   assert.equal(context.detail, report + '\n\n' + unique);
   assert.equal(context.ancestors, 'Ancestor header\n' + report);
+});
+
+integrationTest('coverage: third answer researches first and conflicting responsibility keeps exploration open', async () => {
+  const subject = await coverageSetup('Conflicting operations responsibilities', { clarifyConflict: true });
+  const outcome = await coverageThreeAnswers(subject);
+  assert.equal(outcome.status, 'waiting-user');
+  const saved = await subject.repo.readMap(subject.created.mapPath);
+  const branch = saved.mindSearch.branches.find(b => b.id === outcome.branchId);
+  assert.equal(branch.results.filter(r => r.kind === 'research').length, 2);
+  assert.equal(branch.results.some(r => r.kind === 'conclusion'), false);
+  assert.equal(subject.model.phases.includes('saved-evidence-review'), false);
+  assert.equal(subject.model.phases.some(p => p?.startsWith('delivery-')), false);
+  assert.match((await subject.repo.readNote(saved.nodes.find(n => n.id === outcome.questionNodeId).path)).summary, /occasional contributor|primary operations owner/i);
+});
+
+integrationTest('Prompt monitor preserves exact Claude prompts, phases and separate steering requests after reload', async () => {
+  const { AiExchangeLog, promptMetrics } = load('ai-exchange-log.ts');
+  const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'vam-prompt-monitor-'));
+  try {
+    const file = path.join(directory, 'log.json');
+    const log = new AiExchangeLog(file, error => assert.fail(String(error)));
+    log.begin({ id: 'one', startedAt: new Date().toISOString(), topic: 'Research', mode: 'task', model: 'claude', effort: 'high' });
+    const prompt = '<!-- mindsearch-phase: research-plan -->\n完整指令\nprivate context';
+    log.sent('one', JSON.stringify({ input: '<VAM prompt via stdin>' }), prompt);
+    log.sent('one', JSON.stringify({ input: [{ type: 'text', text: 'Stop and use existing evidence' }] }));
+    log.completed('one'); await log.flush();
+    const restored = new AiExchangeLog(file, error => assert.fail(String(error))); await restored.load();
+    const entries = restored.getEntries(); assert.equal(entries.length, 2);
+    assert.equal(promptMetrics(entries[0]).prompt, prompt);
+    assert.equal(promptMetrics(entries[0]).phase, 'research-plan');
+    assert.equal(promptMetrics(entries[0]).characters, Array.from(prompt).length);
+    assert.equal(promptMetrics(entries[1]).prompt, 'Stop and use existing evidence');
+    assert.equal(entries[1].mode, 'steer');
+    assert.ok(promptMetrics(entries[0]).estimatedTokens > 0);
+  } finally { fs.rmSync(directory, { recursive: true, force: true }); }
 });

@@ -5285,6 +5285,13 @@ var english = {
   "ui.create_an_empty_mind_map": "Create an empty mind map",
   "ui.mindsearch_create_map": "Create MindSearch map",
   "ui.mindsearch_start_title": "Create a MindSearch map",
+  "ui.mindsearch_empty_map_hint": "This MindSearch map has no topic yet. MindSearch maps start with a research topic.",
+  "ui.mindsearch_refresh_models": "Refresh model list",
+  "ui.mindsearch_refreshing_models": "Refreshing model list\u2026",
+  "ui.mindsearch_models_refreshed": "Model list refreshed.",
+  "ui.mindsearch_models_refreshed_partial_0": "Model list refreshed with some provider errors: {0}",
+  "ui.mindsearch_no_models_found": "No models were found. Check the configured AI services and try again.",
+  "ui.mindsearch_model_refresh_failed_0": "Could not refresh models: {0}",
   "ui.mindsearch_start_description": "Start with your main question and any conditions you already know. You will answer follow-up questions yourself.",
   "ui.mindsearch_outcome_goal": "What would you like from this exploration?",
   "ui.mindsearch_outcome_hint": "Choose a direction you want. If the topic already states it, you can leave this on automatic.",
@@ -6176,6 +6183,13 @@ var traditionalChinese = {
   "ui.create_an_empty_mind_map": "\u5EFA\u7ACB\u7A7A\u767D\u5FC3\u667A\u5716",
   "ui.mindsearch_create_map": "\u5EFA\u7ACB MindSearch \u5FC3\u667A\u5716",
   "ui.mindsearch_start_title": "\u5EFA\u7ACB MindSearch \u5FC3\u667A\u5716",
+  "ui.mindsearch_empty_map_hint": "\u9019\u5F35 MindSearch \u5FC3\u667A\u5716\u76EE\u524D\u6C92\u6709\u8B70\u984C\u3002MindSearch \u6703\u5F9E\u7814\u7A76\u8B70\u984C\u958B\u59CB\u3002",
+  "ui.mindsearch_refresh_models": "\u4FEE\u5FA9 Model \u6E05\u55AE",
+  "ui.mindsearch_refreshing_models": "\u6B63\u5728\u66F4\u65B0 Model \u6E05\u55AE\u2026",
+  "ui.mindsearch_models_refreshed": "Model \u6E05\u55AE\u5DF2\u66F4\u65B0\u3002",
+  "ui.mindsearch_models_refreshed_partial_0": "Model \u6E05\u55AE\u5DF2\u66F4\u65B0\uFF0C\u4F46\u90E8\u5206\u670D\u52D9\u767C\u751F\u932F\u8AA4\uFF1A{0}",
+  "ui.mindsearch_no_models_found": "\u627E\u4E0D\u5230\u53EF\u7528 Model\u3002\u8ACB\u6AA2\u67E5\u5DF2\u8A2D\u5B9A\u7684 AI \u670D\u52D9\u5F8C\u518D\u8A66\u4E00\u6B21\u3002",
+  "ui.mindsearch_model_refresh_failed_0": "\u7121\u6CD5\u66F4\u65B0 Model \u6E05\u55AE\uFF1A{0}",
   "ui.mindsearch_start_description": "\u5148\u8F38\u5165\u6BCD\u984C\u8207\u5DF2\u77E5\u689D\u4EF6\uFF1B\u5F8C\u7E8C\u554F\u984C\u7531\u4F60\u89AA\u81EA\u56DE\u7B54\u3002",
   "ui.mindsearch_outcome_goal": "\u9019\u6B21\u63A2\u7D22\u5E0C\u671B\u5F97\u5230\u4EC0\u9EBC\uFF1F",
   "ui.mindsearch_outcome_hint": "\u9078\u64C7\u671F\u5F85\u7684\u65B9\u5411\uFF1B\u82E5\u5DF2\u5728\u6BCD\u984C\u8AAA\u660E\uFF0C\u53EF\u4FDD\u7559\u81EA\u52D5\u3002",
@@ -9228,12 +9242,13 @@ ${draft.context}` : "",
 var import_obsidian11 = require("obsidian");
 var import_node_crypto3 = require("node:crypto");
 var MindSearchStartModal = class extends import_obsidian11.Modal {
-  constructor(app, submit, models = [], defaultModel = "gpt-6-luna", defaultReasoning = "low") {
+  constructor(app, submit, models = [], defaultModel = "gpt-6-luna", defaultReasoning = "low", refreshModels) {
     super(app);
     this.submit = submit;
     this.models = models;
     this.defaultModel = defaultModel;
     this.defaultReasoning = defaultReasoning;
+    this.refreshModels = refreshModels;
     __publicField(this, "requestId", (0, import_node_crypto3.randomUUID)());
   }
   onOpen() {
@@ -9266,7 +9281,7 @@ var MindSearchStartModal = class extends import_obsidian11.Modal {
     customLabel.createSpan({ text: t("ui.mindsearch_outcome_description") });
     const customDescription = customLabel.createEl("textarea", { attr: { rows: "2" } });
     customDescription.setAttr("aria-label", t("ui.mindsearch_outcome_description"));
-    customLabel.style.display = "none";
+    customLabel.hidden = true;
     this.contentEl.createEl("p", { cls: "vam-field-label", text: t("ui.mindsearch_outcome_formats") });
     this.contentEl.createEl("p", { cls: "vam-hint", text: t("ui.mindsearch_format_system_hint") });
     const formatChoices = [
@@ -9286,9 +9301,60 @@ var MindSearchStartModal = class extends import_obsidian11.Modal {
     modelLabel.createSpan({ text: t("ui.model") });
     const model = modelLabel.createEl("select");
     model.setAttr("aria-label", t("ui.model"));
-    const modelChoices = this.models.length ? this.models : [{ id: this.defaultModel, label: this.defaultModel }];
-    for (const choice of modelChoices) model.createEl("option", { value: choice.id, text: choice.label });
-    model.value = modelChoices.some((choice) => choice.id === this.defaultModel) ? this.defaultModel : modelChoices[0].id;
+    let modelChoices = this.models.length ? [...this.models] : [{ id: this.defaultModel, label: this.defaultModel }];
+    const selectedModel = () => model.value;
+    const renderModels = (preferred = selectedModel()) => {
+      var _a, _b;
+      model.replaceChildren();
+      for (const choice of modelChoices) model.createEl("option", { value: choice.id, text: choice.label });
+      model.value = modelChoices.some((choice) => choice.id === preferred) ? preferred : (_b = (_a = modelChoices[0]) == null ? void 0 : _a.id) != null ? _b : this.defaultModel;
+      return model.value;
+    };
+    renderModels(this.defaultModel);
+    let refreshingModels = false;
+    const modelRefreshStatus = modelLabel.createEl("p", { cls: "vam-hint", attr: { "aria-live": "polite" } });
+    const refreshButton = modelLabel.createEl("button", { text: t("ui.mindsearch_refresh_models") });
+    refreshButton.type = "button";
+    refreshButton.disabled = !this.refreshModels;
+    refreshButton.addEventListener("click", () => {
+      void (async () => {
+        var _a;
+        if (!this.refreshModels || refreshButton.disabled) return;
+        refreshingModels = true;
+        const previousSelection = selectedModel();
+        refreshButton.disabled = true;
+        model.disabled = true;
+        createButton.disabled = true;
+        modelRefreshStatus.setText(t("ui.mindsearch_refreshing_models"));
+        try {
+          const result = await this.refreshModels();
+          if (!this.contentEl.isConnected) return;
+          const refreshed = Array.isArray(result) ? result : [...result.models];
+          if (!refreshed.length) {
+            modelRefreshStatus.setText(t("ui.mindsearch_no_models_found"));
+            return;
+          }
+          if (!Array.isArray(result) && result.preserveSelection && !refreshed.some((choice) => choice.id === previousSelection)) {
+            const previousChoice = modelChoices.find((choice) => choice.id === previousSelection);
+            if (previousChoice) refreshed.push(previousChoice);
+          }
+          modelChoices = refreshed;
+          const currentSelection = renderModels(previousSelection);
+          if (currentSelection !== previousSelection) newRequest();
+          modelRefreshStatus.setText(Array.isArray(result) ? t("ui.mindsearch_models_refreshed") : (_a = result.message) != null ? _a : t("ui.mindsearch_models_refreshed"));
+        } catch (error) {
+          if (!this.contentEl.isConnected) return;
+          modelRefreshStatus.setText(t("ui.mindsearch_model_refresh_failed_0", error instanceof Error ? error.message : String(error)));
+        } finally {
+          refreshingModels = false;
+          if (this.contentEl.isConnected) {
+            refreshButton.disabled = false;
+            model.disabled = false;
+            createButton.disabled = false;
+          }
+        }
+      })();
+    });
     const reasoningLabel = this.contentEl.createEl("label", { cls: "vam-field" });
     reasoningLabel.createSpan({ text: t("ui.reasoning_level") });
     const reasoning = reasoningLabel.createEl("select");
@@ -9310,7 +9376,7 @@ var MindSearchStartModal = class extends import_obsidian11.Modal {
     reasoning.addEventListener("change", newRequest);
     answerCount.addEventListener("input", newRequest);
     outcome.addEventListener("change", () => {
-      customLabel.style.display = outcome.value === "custom" ? "" : "none";
+      customLabel.hidden = outcome.value !== "custom";
       if (outcome.value !== "custom") customDescription.value = "";
       newRequest();
     });
@@ -9324,7 +9390,7 @@ var MindSearchStartModal = class extends import_obsidian11.Modal {
       button.setButtonText(t("ui.cancel")).onClick(() => this.close());
     }).addButton((button) => button.setButtonText(t("ui.mindsearch_create")).setCta().onClick(() => {
       void (async () => {
-        if (pending) return;
+        if (pending || refreshingModels) return;
         if (!topic.value.trim()) {
           status.setText(t("ui.mindsearch_topic_required"));
           topic.focus();
@@ -9342,6 +9408,7 @@ var MindSearchStartModal = class extends import_obsidian11.Modal {
           return;
         }
         pending = true;
+        refreshButton.disabled = true;
         if (cancelButton) cancelButton.disabled = true;
         const controls = [topic, context, outcome, customDescription, ...formatInputs.map((item) => item.checkbox), model, reasoning, answerCount];
         controls.forEach((control) => {
@@ -9361,6 +9428,7 @@ var MindSearchStartModal = class extends import_obsidian11.Modal {
           status.setText(error instanceof Error ? error.message : String(error));
           pending = false;
           if (cancelButton) cancelButton.disabled = false;
+          refreshButton.disabled = false;
           createButton.disabled = false;
           controls.forEach((control) => {
             control.disabled = false;
@@ -9645,10 +9713,31 @@ function parseMindSearchPlannerReview(result) {
   if (!question || answerOptions.length < 2 || answerOptions.length > 5) throw new Error("ask_user requires one material question and 2\u20135 distinct answer options.");
   return { decision, rationale, question, answerOptions, summary, detail };
 }
+function extractPlannerQuestionCandidate(result) {
+  var _a;
+  const marked = readMarker(result.detail);
+  if ((marked == null ? void 0 : marked.raw.decision) === "ask_user" && typeof marked.raw.question === "string" && marked.raw.question.trim()) return marked.raw.question.trim();
+  const body = (_a = marked == null ? void 0 : marked.body) != null ? _a : result.detail;
+  const lines = body.split(/\r?\n/).map((line) => line.trim());
+  const labeledQuestion = lines.find((line) => /^(?:question|問題)\s*[:：]\s*.+[?？]\s*$/i.test(line));
+  if (labeledQuestion) return labeledQuestion.replace(/^(?:question|問題)\s*[:：]\s*/i, "").trim();
+  const bodyQuestion = lines.map((line) => line.replace(/^(?:[-*•]|\d+[.)、])\s+/, "")).find((candidate) => candidate && candidate.length <= 500 && /[?？]\s*$/.test(candidate));
+  if (bodyQuestion) return bodyQuestion;
+  const candidates = [result.summary];
+  for (const text2 of candidates) for (const line of text2.split(/\r?\n/)) {
+    const candidate = line.trim().replace(/^(?:[-*•]|\d+[.)、])\s+/, "");
+    if (candidate && candidate.length <= 500 && /[?？]\s*$/.test(candidate)) return candidate;
+  }
+  return void 0;
+}
 async function parseMindSearchPlannerReviewWithRecovery(original, context, recover) {
-  var _a, _b, _c, _d, _e, _f, _g;
+  var _a, _b, _c, _d, _e, _f, _g, _h, _i, _j, _k, _l;
   try {
-    return parseMindSearchPlannerReview(original);
+    const parsed = parseMindSearchPlannerReview(original);
+    if (context.requiredDecision && parsed.decision !== context.requiredDecision) {
+      throw new Error(`Planner response violated the required ${context.requiredDecision} decision.`);
+    }
+    return parsed;
   } catch (formatError) {
     const originalMarker = readMarker(original.detail);
     const originalDecision = originalMarker == null ? void 0 : originalMarker.raw.decision;
@@ -9656,12 +9745,59 @@ async function parseMindSearchPlannerReviewWithRecovery(original, context, recov
     const originalQuestion = typeof (originalMarker == null ? void 0 : originalMarker.raw.question) === "string" ? originalMarker.raw.question.trim() : "";
     const originalSummary = typeof original.summary === "string" ? original.summary.trim() : "";
     const originalBody = (_a = originalMarker == null ? void 0 : originalMarker.body) != null ? _a : "";
+    if (context.requiredDecision) {
+      if (originalDecision && originalDecision !== context.requiredDecision) {
+        throw new Error(`Planner response violated the required ${context.requiredDecision} decision.`);
+      }
+      if (context.requiredDecision !== "ask_user") {
+        throw new Error(`Format recovery does not support an imposed ${context.requiredDecision} decision.`);
+      }
+      const question = ((_b = context.preferredQuestion) == null ? void 0 : _b.trim()) || originalQuestion;
+      if (!question) throw new Error("Planner format repair cannot invent a question that was absent from the original response.");
+      const preservedBody = (_c = originalMarker == null ? void 0 : originalMarker.body) != null ? _c : original.detail.replace(/^\s*<!--\s*mindsearch-review\s+[^\n]*?-->\s*/, "").trim();
+      const existingOptions = [...new Set(original.suggestions.map((item) => item.title.trim()).filter(Boolean))];
+      const explicitOptions = extractExplicitOptions(preservedBody, question);
+      let answerOptions = existingOptions.length >= 2 && existingOptions.length <= 5 ? existingOptions : explicitOptions;
+      if (answerOptions.length < 2 || answerOptions.length > 5) {
+        const task2 = [
+          "Complete the format of this already-required ask_user Planner response. The workflow has imposed decision=ask_user; you have no authority to reconsider the decision or research evidence.",
+          "Preserve the exact original question below. Return 2\u20135 distinct answer choices in suggestions[].title. Do not change the summary or answer body, infer a new question, add facts, search, or reinterpret evidence. If the original question cannot be formatted, repeat it exactly in the decision marker.",
+          `Required decision: ${context.requiredDecision}`,
+          `Required rationale: ${(_d = context.requiredDecisionRationale) != null ? _d : "The workflow requires a clarification question at this step."}`,
+          `Exact original question to preserve: ${question}`,
+          `Original summary (preserve): ${originalSummary}`,
+          `Original response body (preserve; not research evidence):
+${preservedBody}`,
+          `Original suggestions: ${JSON.stringify(original.suggestions)}`,
+          `Format validation error: ${formatError instanceof Error ? formatError.message : String(formatError)}`,
+          'Return the ordinary VAM structured response with this exact decision marker: <!-- mindsearch-review {"decision":"ask_user","rationale":"required rationale","question":"exact original question"} -->.'
+        ].join("\n\n");
+        const repaired2 = await recover(task2);
+        const repairedMarker = readMarker(repaired2.detail);
+        if (!repairedMarker || repairedMarker.raw.decision !== "ask_user") {
+          throw new Error("Planner format repair changed or omitted the required ask_user decision.");
+        }
+        answerOptions = [...new Set(repaired2.suggestions.map((item) => item.title.trim()).filter(Boolean))];
+        if (answerOptions.length < 2 || answerOptions.length > 5) throw new Error("Planner format repair did not provide 2\u20135 distinct answer choices.");
+      }
+      const rationale = (_f = (_e = context.requiredDecisionRationale) != null ? _e : originalRationale) != null ? _f : "A clarification is required before the workflow can continue.";
+      const constrained = {
+        ...original,
+        summary: originalSummary || original.summary,
+        detail: `<!-- mindsearch-review ${JSON.stringify({ decision: "ask_user", rationale, question })} -->
+${preservedBody}`,
+        suggestions: answerOptions.map((title) => ({ title, task: "", contribution: "" }))
+      };
+      const parsed2 = parseMindSearchPlannerReview(constrained);
+      if (parsed2.decision !== "ask_user" || parsed2.question !== question) throw new Error("Planner recovery did not preserve the required decision and question.");
+      return parsed2;
+    }
     if (originalDecision === "ask_user" && originalRationale && originalQuestion && originalSummary && originalBody) {
       const options = extractExplicitOptions(originalBody, originalQuestion);
       if (options.length) {
         const recovered = {
           ...original,
-          detail: `${(_c = (_b = original.detail.match(marker2)) == null ? void 0 : _b[0]) != null ? _c : ""}${originalBody}`,
+          detail: `${(_h = (_g = original.detail.match(marker2)) == null ? void 0 : _g[0]) != null ? _h : ""}${originalBody}`,
           suggestions: options.map((title) => ({ title, task: "", contribution: "" }))
         };
         return parseMindSearchPlannerReview(recovered);
@@ -9688,7 +9824,7 @@ ${originalBody}`,
       }
       return parseMindSearchPlannerReview({
         ...original,
-        detail: `${(_e = (_d = original.detail.match(marker2)) == null ? void 0 : _d[0]) != null ? _e : ""}${originalBody}`,
+        detail: `${(_j = (_i = original.detail.match(marker2)) == null ? void 0 : _i[0]) != null ? _j : ""}${originalBody}`,
         suggestions: answerOptions.map((title) => ({ title, task: "", contribution: "" }))
       });
     }
@@ -9722,12 +9858,12 @@ Suggestions: ${JSON.stringify(original.suggestions)}`
       throw new Error(`Planner format repair changed the original ${preserveDecision} decision to ${parsed.decision}.`);
     }
     if (!preserveDecision || !originalMarker) return parsed;
-    const mergedMarker = { ...(_f = readMarker(repaired.detail)) == null ? void 0 : _f.raw, decision: preserveDecision };
+    const mergedMarker = { ...(_k = readMarker(repaired.detail)) == null ? void 0 : _k.raw, decision: preserveDecision };
     for (const key2 of ["rationale", "question", "stopReason"]) {
       const value = originalMarker.raw[key2];
       if (typeof value === "string" && value.trim()) mergedMarker[key2] = value.trim();
     }
-    const mergedBody = originalBody || ((_g = readMarker(repaired.detail)) == null ? void 0 : _g.body) || parsed.detail;
+    const mergedBody = originalBody || ((_l = readMarker(repaired.detail)) == null ? void 0 : _l.body) || parsed.detail;
     return parseMindSearchPlannerReview({
       ...repaired,
       summary: originalSummary || repaired.summary,
@@ -10011,7 +10147,15 @@ ${context.reportDetail}`,
       throwIfAborted(signal);
       reviewed = await this.parsePlannerReviewWithRecovery(
         correctedResult,
-        { question: context.goal, answerSnapshot: JSON.stringify({ conditions: context.conditions, currentQuestion: context.currentQuestion, currentAnswer: context.currentAnswer }), reportSummary: context.reportSummary, reportDetail: context.reportDetail },
+        {
+          question: context.goal,
+          answerSnapshot: JSON.stringify({ conditions: context.conditions, currentQuestion: context.currentQuestion, currentAnswer: context.currentAnswer }),
+          reportSummary: context.reportSummary,
+          reportDetail: context.reportDetail,
+          requiredDecision: "ask_user",
+          preferredQuestion: extractPlannerQuestionCandidate(correctedResult),
+          requiredDecisionRationale: `The branch has ${context.answeredQuestionCount} answered question node(s); at least ${MIN_ANSWERED_QUESTIONS_BEFORE_CONCLUSION} are required before conclusion.`
+        },
         correctionContext,
         model,
         reasoning,
@@ -12696,8 +12840,23 @@ var VisualAgentMapView = class _VisualAgentMapView extends import_obsidian13.Ite
       else {
         const files = await this.plugin.repo.mapFiles();
         if (this.closed || this.mindSearchViewEpoch !== epoch) return;
-        if (files.length) await this.openMap(files[0].path);
-        else this.render();
+        if (files.length) {
+          let defaultPath = files[0].path;
+          for (const file of files) {
+            let candidate;
+            try {
+              candidate = await this.plugin.repo.readMap(file.path);
+            } catch (e) {
+              continue;
+            }
+            if (this.closed || this.mindSearchViewEpoch !== epoch) return;
+            if (!candidate.mindSearch) {
+              defaultPath = file.path;
+              break;
+            }
+          }
+          await this.openMap(defaultPath);
+        } else this.render();
       }
     }
   }
@@ -12886,7 +13045,18 @@ var VisualAgentMapView = class _VisualAgentMapView extends import_obsidian13.Ite
       this.selected = created.root.id;
       this.render();
       this.focusNode(created.root);
-    }), modelChoices, configuredModel, defaultReasoning).open();
+    }), modelChoices, configuredModel, defaultReasoning, async () => {
+      const states = await Promise.all([this.plugin.refreshModelDiscovery("codex"), this.plugin.refreshModelDiscovery("claude")]);
+      const ready = states.filter((state) => state.status === "ready");
+      const models = [...new Set(ready.flatMap((state) => state.models))];
+      if (!ready.length || !models.length) throw new Error(states.map((state) => state.error).filter(Boolean).join("; ") || t("ui.mindsearch_no_models_found"));
+      const choices = models.map((id) => ({ id, label: this.plugin.modelLabel(id) }));
+      const errors = states.filter((state) => state.status === "error").map((state) => state.error).filter(Boolean);
+      return errors.length ? { models: choices, message: t("ui.mindsearch_models_refreshed_partial_0", errors.join("; ")), preserveSelection: true } : choices;
+    }).open();
+  }
+  openNewMindMapModal() {
+    new NameModal(this.app, t("ui.new_mind_map"), t("ui.new_mind_map_from_sample"), (title) => this.enqueue(async () => this.openMapInMutation(await this.plugin.repo.createMap(title)))).open();
   }
   async planMindSearchQuestion(parentNodeId, requestId, parentBranchId = null, signal) {
     if (this.closed || !this.map || !this.path || this.builtIn) throw new Error("Open a saved MindSearch map before planning its next question.");
@@ -14171,7 +14341,7 @@ var VisualAgentMapView = class _VisualAgentMapView extends import_obsidian13.Ite
         this.button(actions, t("ui.reconnect_existing_workspace"), () => this.enqueue(() => this.plugin.offerWorkspaceReconnect())).addClass("mod-cta");
         this.button(actions, t("ui.repair_agent_workspace"), () => this.enqueue(() => this.plugin.repairWorkspace()));
       }
-      this.button(actions, t("ui.create_a_new_mind_map"), () => new NameModal(this.app, t("ui.new_mind_map"), t("ui.new_mind_map_from_sample"), (title2) => this.enqueue(async () => this.openMapInMutation(await this.plugin.repo.createMap(title2)))).open()).addClass("mod-cta");
+      this.button(actions, t("ui.create_a_new_mind_map"), () => this.openNewMindMapModal()).addClass("mod-cta");
       this.button(actions, t("ui.mindsearch_create_map"), () => this.openMindSearchStart());
       this.button(actions, t("ui.view_sample"), () => this.enqueue(() => this.openBuiltInSample(true)));
       if ((_o = this.deletedMap) == null ? void 0 : _o.deleted) this.button(actions, t("ui.restore_deleted_map"), () => this.enqueue(() => this.restoreDeletedMapFromUi()));
@@ -14218,19 +14388,23 @@ var VisualAgentMapView = class _VisualAgentMapView extends import_obsidian13.Ite
     }
     const tools = this.contentEl.createDiv("vam-map-tools");
     if (!this.builtIn) {
-      this.button(tools, t("ui.topic"), () => this.enqueue(() => this.addNode(null))).addClass("mod-cta");
+      const mindSearchMode = !!this.map.mindSearch;
+      if (!mindSearchMode) this.button(tools, t("ui.topic"), () => this.enqueue(() => this.addNode(null))).addClass("mod-cta");
+      if (mindSearchMode) this.button(tools, t("ui.create_a_new_mind_map"), () => this.openNewMindMapModal());
       this.button(tools, t("ui.mindsearch_create_map"), () => this.openMindSearchStart());
-      this.button(tools, t("ui.organize"), () => this.enqueue(() => this.openOrganizer()));
+      if (!mindSearchMode) this.button(tools, t("ui.organize"), () => this.enqueue(() => this.openOrganizer()));
       this.button(tools, t("ui.auto_layout"), () => this.enqueue(() => this.mapChange((map) => {
         map.nodes = arrangeMap(map.nodes);
       }, false)));
-      const integrate = this.button(tools, this.integrationMode ? t("ui.finish_topic_selection") : t("ui.select_topics"), () => {
-        this.integrationMode = !this.integrationMode;
-        this.multiSelected.clear();
-        this.selected = null;
-        this.render();
-      });
-      if (this.integrationMode) integrate.addClass("is-active");
+      if (!mindSearchMode) {
+        const integrate = this.button(tools, this.integrationMode ? t("ui.finish_topic_selection") : t("ui.select_topics"), () => {
+          this.integrationMode = !this.integrationMode;
+          this.multiSelected.clear();
+          this.selected = null;
+          this.render();
+        });
+        if (this.integrationMode) integrate.addClass("is-active");
+      }
     }
     this.button(tools, "\u2212", () => this.zoomBy(1 / 1.2)).setAttr("aria-label", t("ui.zoom_out"));
     this.zoomLabel = tools.createSpan({ text: `${Math.round(this.map.viewport.zoom * 100)}%`, cls: "vam-zoom" });
@@ -14283,8 +14457,8 @@ var VisualAgentMapView = class _VisualAgentMapView extends import_obsidian13.Ite
     for (const node of shown) this.renderNode(node);
     if (!this.map.nodes.length) {
       const emptyMap = this.viewportEl.createDiv("vam-empty");
-      emptyMap.createSpan({ text: t("ui.this_mind_map_has_no_topics_click_topic_to_create_the_first") });
-      this.button(emptyMap, t("ui.topic"), () => this.enqueue(() => this.addNode(null)));
+      emptyMap.createSpan({ text: t(this.map.mindSearch ? "ui.mindsearch_empty_map_hint" : "ui.this_mind_map_has_no_topics_click_topic_to_create_the_first") });
+      if (!this.map.mindSearch) this.button(emptyMap, t("ui.topic"), () => this.enqueue(() => this.addNode(null)));
     }
     this.setupPan();
     this.transform();
@@ -14295,7 +14469,7 @@ var VisualAgentMapView = class _VisualAgentMapView extends import_obsidian13.Ite
     }
   }
   renderNode(node) {
-    var _a, _b, _c, _d, _e, _f, _g, _h, _i, _j, _k, _l, _m, _n, _o, _p, _q, _r, _s, _t, _u, _v, _w, _x;
+    var _a, _b, _c, _d, _e, _f, _g, _h, _i, _j, _k, _l, _m, _n, _o, _p, _q, _r, _s, _t, _u, _v, _w, _x, _y, _z, _A;
     if (!this.stageEl) return;
     const note = this.notes.get(node.id), card = this.stageEl.createDiv({ cls: `vam-node${node.id === this.selected || this.multiSelected.has(node.id) ? " is-selected" : ""}` });
     if (node.mindSearchKind) card.setAttr("data-mindsearch-kind", node.mindSearchKind);
@@ -14350,18 +14524,20 @@ var VisualAgentMapView = class _VisualAgentMapView extends import_obsidian13.Ite
       badge.setAttr("title", quickError);
     }
     const pendingCount = (_m = (_l = this.plugin.pendingSuggestions.get(node.path)) == null ? void 0 : _l.length) != null ? _m : 0;
-    if (pendingCount && !this.builtIn && !this.integrationMode) this.button(header, t("ui.view_0_expansion_suggestions", pendingCount), () => this.openNodePanel(node, "proposals")).addClass("vam-badge-new");
+    if (pendingCount && !this.builtIn && !this.integrationMode && !((_n = this.map) == null ? void 0 : _n.mindSearch)) this.button(header, t("ui.view_0_expansion_suggestions", pendingCount), () => this.openNodePanel(node, "proposals")).addClass("vam-badge-new");
     if (!this.builtIn && !this.integrationMode) {
-      const ai = this.button(header, "\u2726", () => this.openNextStep(node));
-      ai.addClass("vam-node-tool");
-      ai.setAttr("aria-label", t("ui.how_would_you_like_to_explore_next"));
-      const structure = this.button(header, "\u2699", () => this.openNodePanel(node, "structure"));
-      structure.addClass("vam-node-tool");
-      structure.setAttr("aria-label", t("ui.structure_and_links"));
-      if (note) {
-        const rename3 = this.button(header, "\u270E", () => new NameModal(this.app, t("ui.new_topic_name"), note.title, (title2) => this.enqueue(() => this.noteChange(node, { title: title2 }))).open());
-        rename3.addClass("vam-node-tool");
-        rename3.setAttr("aria-label", t("ui.new_topic_name"));
+      if (!((_o = this.map) == null ? void 0 : _o.mindSearch)) {
+        const ai = this.button(header, "\u2726", () => this.openNextStep(node));
+        ai.addClass("vam-node-tool");
+        ai.setAttr("aria-label", t("ui.how_would_you_like_to_explore_next"));
+        const structure = this.button(header, "\u2699", () => this.openNodePanel(node, "structure"));
+        structure.addClass("vam-node-tool");
+        structure.setAttr("aria-label", t("ui.structure_and_links"));
+        if (note) {
+          const rename3 = this.button(header, "\u270E", () => new NameModal(this.app, t("ui.new_topic_name"), note.title, (title2) => this.enqueue(() => this.noteChange(node, { title: title2 }))).open());
+          rename3.addClass("vam-node-tool");
+          rename3.setAttr("aria-label", t("ui.new_topic_name"));
+        }
       }
       if (node.mindSearchKind === "question") {
         const remove = this.button(header, "\xD7", () => this.confirmRemoveNode(node));
@@ -14377,15 +14553,15 @@ var VisualAgentMapView = class _VisualAgentMapView extends import_obsidian13.Ite
       const n = map.nodes.find((n2) => n2.id === node.id);
       n.collapsed = !n.collapsed;
     })));
-    if (!this.builtIn && !this.integrationMode) {
+    if (!this.builtIn && !this.integrationMode && !((_p = this.map) == null ? void 0 : _p.mindSearch)) {
       const add = this.button(card, "+", () => this.enqueue(() => this.addNode(node)));
       add.addClass("vam-add-child");
       add.setAttr("aria-label", t("ui.add_subtopic_manually"));
     }
-    const title = card.createEl("h3", { text: (_n = note == null ? void 0 : note.title) != null ? _n : node.path, cls: "vam-card-title" });
-    title.setAttr("title", (_o = note == null ? void 0 : note.title) != null ? _o : node.path);
-    card.createEl("p", { cls: "vam-card-summary", text: (_p = note == null ? void 0 : note.summary) != null ? _p : t("ui.the_file_was_moved_or_deleted_you_can_remove_this_node_from") });
-    if (node.mindSearchKind === "conclusion" && ((_q = this.map) == null ? void 0 : _q.mindSearch) && !this.builtIn) {
+    const title = card.createEl("h3", { text: (_q = note == null ? void 0 : note.title) != null ? _q : node.path, cls: "vam-card-title" });
+    title.setAttr("title", (_r = note == null ? void 0 : note.title) != null ? _r : node.path);
+    card.createEl("p", { cls: "vam-card-summary", text: (_s = note == null ? void 0 : note.summary) != null ? _s : t("ui.the_file_was_moved_or_deleted_you_can_remove_this_node_from") });
+    if (node.mindSearchKind === "conclusion" && ((_t = this.map) == null ? void 0 : _t.mindSearch) && !this.builtIn) {
       const branch = this.map.mindSearch.branches.find((item) => item.results.some((result) => result.nodeId === node.id));
       const hasFollowup = this.map.nodes.some((item) => item.parentId === node.id && item.mindSearchKind === "question");
       if (branch && !hasFollowup && countMindSearchAnsweredQuestions(this.map, branch.id) < MIN_ANSWERED_QUESTIONS_BEFORE_CONCLUSION) {
@@ -14393,7 +14569,7 @@ var VisualAgentMapView = class _VisualAgentMapView extends import_obsidian13.Ite
         this.button(card, t("ui.mindsearch_resume_early_conclusion"), () => void this.planMindSearchFromSelection(node.id), this.mindSearchBusy).addClass("mod-cta");
       }
     }
-    if (node.mindSearchKind === "topic" && ((_r = this.map) == null ? void 0 : _r.mindSearch) && !this.map.nodes.some((item) => item.mindSearchKind === "question")) {
+    if (node.mindSearchKind === "topic" && ((_u = this.map) == null ? void 0 : _u.mindSearch) && !this.map.nodes.some((item) => item.mindSearchKind === "question")) {
       const initialBranch = this.map.mindSearch.branches.find((item) => item.questionNodeId === node.id && !item.parentBranchId);
       const initialRuns = initialBranch ? this.map.mindSearch.runs.filter((item) => item.branchId === initialBranch.id) : [];
       const activeInitialRun = initialRuns.some((run) => {
@@ -14416,10 +14592,10 @@ var VisualAgentMapView = class _VisualAgentMapView extends import_obsidian13.Ite
         this.button(card, label, () => void this.retryMindSearchSubtopics(initialBranch.id), this.mindSearchBusy).addClass("vam-mindsearch-retry");
       }
     }
-    if (node.mindSearchKind === "question" && ((_s = this.map) == null ? void 0 : _s.mindSearch)) {
+    if (node.mindSearchKind === "question" && ((_v = this.map) == null ? void 0 : _v.mindSearch)) {
       const branch = this.map.mindSearch.branches.find((item) => item.questionNodeId === node.id);
       if (branch) {
-        const labels = (_u = (_t = node.mindSearchQuestion) == null ? void 0 : _t.options.filter((option) => branch.answerSnapshot.selections.includes(option.id)).map((option) => option.label)) != null ? _u : branch.answerSnapshot.selections;
+        const labels = (_x = (_w = node.mindSearchQuestion) == null ? void 0 : _w.options.filter((option) => branch.answerSnapshot.selections.includes(option.id)).map((option) => option.label)) != null ? _x : branch.answerSnapshot.selections;
         const answer = [...labels, branch.answerSnapshot.freeText].filter(Boolean).join(" \u2014 ");
         card.createEl("p", { cls: "vam-mindsearch-answer-snapshot", text: `${t("ui.mindsearch_answer_snapshot")}: ${answer || t("ui.mindsearch_unknown_answer")}` });
         const branchRuns = this.map.mindSearch.runs.filter((item) => item.branchId === branch.id);
@@ -14446,11 +14622,11 @@ var VisualAgentMapView = class _VisualAgentMapView extends import_obsidian13.Ite
         }
       }
     }
-    if (node.mindSearchKind === "answer" && ((_v = this.map) == null ? void 0 : _v.mindSearch)) {
+    if (node.mindSearchKind === "answer" && ((_y = this.map) == null ? void 0 : _y.mindSearch)) {
       const branch = this.map.mindSearch.branches.find((item) => item.answerNodeId === node.id);
       const question = branch && this.map.nodes.find((item) => item.id === branch.questionNodeId);
       if (branch) {
-        const labels = (_x = (_w = question == null ? void 0 : question.mindSearchQuestion) == null ? void 0 : _w.options.filter((option) => branch.answerSnapshot.selections.includes(option.id)).map((option) => option.label)) != null ? _x : branch.answerSnapshot.selections;
+        const labels = (_A = (_z = question == null ? void 0 : question.mindSearchQuestion) == null ? void 0 : _z.options.filter((option) => branch.answerSnapshot.selections.includes(option.id)).map((option) => option.label)) != null ? _A : branch.answerSnapshot.selections;
         const answer = [...labels, branch.answerSnapshot.freeText].filter(Boolean).join(" \u2014 ");
         card.createEl("p", { cls: "vam-mindsearch-answer-snapshot", text: `${t("ui.mindsearch_answer_snapshot")}: ${answer || t("ui.mindsearch_unknown_answer")}` });
       }

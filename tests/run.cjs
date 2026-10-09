@@ -579,6 +579,57 @@ const obsidian = { setIcon: (parent, name) => { parent.iconName = name; }, Menu:
   parseYaml: text => Object.fromEntries(text.trim().split('\n').filter(Boolean).map(line => { const index = line.indexOf(':'); const raw = line.slice(index + 1).trim(); let value; try { value = JSON.parse(raw); } catch { value = raw; } return [line.slice(0, index), value]; })),
   stringifyYaml: obj => Object.entries(obj).map(([key, value]) => `${key}: ${JSON.stringify(value)}`).join('\n') + '\n'
 };
+test('MindSearch model refresh updates choices, preserves selection, and reports failures', async () => {
+  class Element {
+    constructor(tag, options = {}) { this.tag = tag; this.children = []; this.attributes = {}; this.text = options.text ?? ''; this.value = options.value ?? ''; this.disabled = false; this.checked = false; this.isConnected = true; this.handlers = {}; }
+    createDiv(options) { const child = new Element('div', options); this.children.push(child); return child; }
+    createEl(tag, options) { const child = new Element(tag, options); this.children.push(child); return child; }
+    createSpan(options) { return this.createEl('span', options); }
+    setAttr(name, value) { this.attributes[name] = value; }
+    setText(value) { this.text = value; }
+    addClass() {}
+    toggleClass() {}
+    addEventListener(name, handler) { this.handlers[name] = handler; }
+    replaceChildren() { this.children = []; }
+    focus() {}
+    querySelector(selector) { return selector === 'button:last-child' ? this.children.filter(child => child.tag === 'button').at(-1) : null; }
+    click() { return this.handlers.click?.(); }
+  }
+  class Modal { constructor() { this.contentEl = new Element('div'); this.titleEl = new Element('h2'); } close() { this.contentEl.isConnected = false; } }
+  class Setting {
+    constructor(parent) { this.controlEl = parent.createDiv(); }
+    addButton(configure) { const button = this.controlEl.createEl('button'); configure({ setButtonText(text) { button.text = text; return this; }, setCta() { return this; }, onClick(handler) { button.handlers.click = handler; return this; } }); return this; }
+  }
+  const { MindSearchStartModal } = load('ui/modals/mind-search-start-modal.ts', { obsidian: { ...obsidian, Modal, Setting } });
+  const open = refreshModels => {
+    const modal = new MindSearchStartModal({}, async () => {}, [{ id: 'old-model', label: 'Old model' }], 'old-model', 'low', refreshModels);
+    modal.onOpen();
+    const all = []; const visit = el => { all.push(el); for (const child of el.children) visit(child); }; visit(modal.contentEl);
+    return { modal, all };
+  };
+  let calls = 0;
+  const success = open(async () => { calls++; return [{ id: 'old-model', label: 'Old model' }, { id: 'new-model', label: 'New model' }]; });
+  const refresh = success.all.find(el => el.tag === 'button' && el.text === 'Refresh model list');
+  const model = success.all.find(el => el.tag === 'select' && el.attributes['aria-label'] === 'Model');
+  refresh.click(); await new Promise(resolve => setTimeout(resolve, 0));
+  assert.equal(calls, 1); assert.equal(model.value, 'old-model');
+  assert.deepEqual(model.children.map(option => option.value), ['old-model', 'new-model']);
+  const changedSelection = open(async () => ({ models: [{ id: 'new-model', label: 'New model' }], message: 'partial provider error', preserveSelection: true }));
+  const changedModel = changedSelection.all.find(el => el.tag === 'select' && el.attributes['aria-label'] === 'Model');
+  const initialRequestId = changedSelection.modal.requestId;
+  changedSelection.all.find(el => el.tag === 'button' && el.text === 'Refresh model list').click(); await new Promise(resolve => setTimeout(resolve, 0));
+  assert.equal(changedModel.value, 'old-model'); assert.equal(changedSelection.modal.requestId, initialRequestId);
+  assert.deepEqual(changedModel.children.map(option => option.value), ['new-model', 'old-model']);
+  assert.ok(changedSelection.all.some(el => el.text === 'partial provider error'));
+  const removedSelection = open(async () => [{ id: 'new-model', label: 'New model' }]);
+  const removedModel = removedSelection.all.find(el => el.tag === 'select' && el.attributes['aria-label'] === 'Model');
+  const removedRequestId = removedSelection.modal.requestId;
+  removedSelection.all.find(el => el.tag === 'button' && el.text === 'Refresh model list').click(); await new Promise(resolve => setTimeout(resolve, 0));
+  assert.equal(removedModel.value, 'new-model'); assert.notEqual(removedSelection.modal.requestId, removedRequestId);
+  const failed = open(async () => { throw new Error('provider unavailable'); });
+  failed.all.find(el => el.tag === 'button' && el.text === 'Refresh model list').click(); await new Promise(resolve => setTimeout(resolve, 0));
+  assert.ok(failed.all.some(el => el.text.includes('provider unavailable')));
+});
 const { Repository, DEFAULT_SETTINGS, normalizeReasoningLevel } = load('repository.ts', { obsidian });
 integrationTest('node plus adds a child without opening a duplicate right-click menu', () => {
   const { VisualAgentMapView } = load('main.ts', { obsidian });
@@ -631,6 +682,34 @@ integrationTest('node plus adds a child without opening a duplicate right-click 
   events.get('div:keydown')({ key: 'Enter', target: view.stageEl.children[0] });
   assert.deepEqual(details, [topic.id, topic.id, topic.id]);
   assert.equal(events.has('div:contextmenu'), false);
+});
+integrationTest('MindSearch cards hide generic map actions while ordinary map cards retain them', () => {
+  const { VisualAgentMapView } = load('main.ts', { obsidian });
+  const makeElement = (tag, buttons) => ({ tag, children: [], dataset: {}, style: {},
+    createDiv(options) { const child = makeElement('div', buttons); child.cls = options?.cls ?? options; this.children.push(child); return child; },
+    createEl(name, options) { const child = makeElement(name, buttons); child.text = options?.text; this.children.push(child); if (name === 'button') buttons.push(child); return child; },
+    createSpan(options) { const child = makeElement('span', buttons); child.text = options?.text; this.children.push(child); return child; },
+    setAttr(name, value) { this[name] = value; }, addClass(name) { this.cls = name; }, setPointerCapture() {},
+    addEventListener() {}, removeEventListener() {}
+  });
+  const topic = node('topic');
+  const render = doc => {
+    const buttons = [], view = new VisualAgentMapView({ app: {} }, { pendingSuggestions: new Map([['topic.md', [{ title: 'Idea', task: 'Research', contribution: '' }]]]), expansionBatches: new Map() });
+    view.stageEl = makeElement('stage', buttons); view.map = doc; view.notes = new Map([[topic.id, { title: 'Topic', summary: '', status: 'completed' }]]);
+    view.renderNode(topic); return buttons;
+  };
+  const ordinaryButtons = render(map([topic]));
+  assert.ok(ordinaryButtons.some(button => button['aria-label'] === 'How would you like to explore next?'));
+  assert.ok(ordinaryButtons.some(button => button['aria-label'] === 'Structure and links'));
+  assert.ok(ordinaryButtons.some(button => button['aria-label'] === 'New topic name'));
+  assert.ok(ordinaryButtons.some(button => button['aria-label'] === 'Add subtopic manually'));
+  const mindSearch = map([topic]); mindSearch.mindSearch = { version: 1, branches: [], runs: [], pendingCommits: [] };
+  const mindSearchButtons = render(mindSearch);
+  for (const label of ['How would you like to explore next?', 'Structure and links', 'New topic name', 'Add subtopic manually']) {
+    assert.equal(mindSearchButtons.some(button => button['aria-label'] === label), false, `${label} is hidden in MindSearch`);
+  }
+  assert.match(fs.readFileSync(path.join(root, 'experiences/visual-map/view.ts'), 'utf8'), /if \(!mindSearchMode\) this\.button\(tools, t\("ui\.organize"\)/);
+  assert.match(fs.readFileSync(path.join(root, 'experiences/visual-map/view.ts'), 'utf8'), /if \(!mindSearchMode\) \{\s*const integrate = this\.button\(tools/);
 });
 integrationTest('MindSearch question cards show branch progress instead of note lifecycle status', () => {
   const { VisualAgentMapView } = load('main.ts', { obsidian });
@@ -1352,7 +1431,9 @@ integrationTest('MindSearch start locks submitted input and reuses its request i
   const makeElement = (tag, options = {}) => ({ tag, text: options.text ?? '', value: options.value ?? '', cls: options.cls ?? '', children: [], disabled: false, style: {},
     createEl(name, value) { const child = makeElement(name, value); this.children.push(child); return child; },
     createSpan(value) { const child = makeElement('span', value); this.children.push(child); return child; },
+    replaceChildren() { this.children = []; },
     setText(value) { this.text = value; }, setAttr(name, value) { this[name] = value; },
+    addClass(name) { this.cls = `${this.cls} ${name}`.trim(); }, toggleClass(name, enabled) { this.cls = enabled ? `${this.cls} ${name}`.trim() : this.cls.split(' ').filter(item => item !== name).join(' '); },
     addEventListener(name, handler) { this[name] = handler; }, focus() {},
     querySelector(selector) { return selector === 'button:last-child' ? this.children.filter(child => child.tag === 'button').at(-1) : undefined; }
   });
@@ -6576,6 +6657,116 @@ integrationTest('coverage: reload uses persisted reports without regenerating an
   const { MindSearchManualFlow } = load('experiences/mind-search/manual-flow.ts'); const { MindSearchRunStore } = load('mindsearch-mve/research-run-store.ts');
   const reopened = new MindSearchManualFlow(subject.repo, new MindSearchRunStore(subject.repo), async () => { throw new Error('Must reuse persisted answer'); });
   const result = await reopened.answerAndResearch(subject.created.mapPath, q.node.id, input, 'gpt-6-luna', 'low'); assert.equal(result.branchId, first.branchId);
+});
+
+integrationTest('MindSearch forces ask_user below the answer floor and repairs only the decision using saved reports', async () => {
+  const { MindSearchManualFlow, MIN_ANSWERED_QUESTIONS_BEFORE_CONCLUSION } = load('experiences/mind-search/manual-flow.ts', { obsidian });
+  const { parseMindSearchPlannerReview } = load('mindsearch-mve/planner-review.ts');
+  const calls = [];
+  const flow = new MindSearchManualFlow({ settings: { language: 'en' } }, {}, async context => {
+    calls.push(context);
+    assert.equal(context.researchMode, 'local');
+    if (mindSearchPhase(context, 'decision-quality-review')) {
+      return { summary: 'How much time can you spend?', detail: 'A useful conditional answer remains available.', suggestions: [{ title: 'Less than an hour', task: '', contribution: '' }], visualReferences: [] };
+    }
+    if (mindSearchPhase(context, 'format-repair')) {
+      assert.match(context.task, /workflow has imposed decision=ask_user/);
+      assert.match(context.task, /Exact original question to preserve: How much time can you spend\?/);
+      assert.doesNotMatch(context.task, /Saved report one|Saved report two|Saved report three|Saved report four/);
+      return plannerReview('ask_user', { rationale: 'Repaired rationale must be replaced.', question: 'A changed question?' }, 'Changed summary.', 'Changed body.', ['Less than an hour', 'One to two hours', 'More than two hours']);
+    }
+    throw new Error(`Unexpected research or Planner retry: ${context.task.slice(0, 120)}`);
+  });
+  const context = {
+    goal: 'Plan a realistic routine', goalDetail: '', conditions: {}, currentQuestion: 'Do you exercise?', currentAnswer: 'Sometimes',
+    answeredQuestionCount: 2, questionHistory: ['Do you exercise?'], lineage: '',
+    reportSummary: 'Four independent Searcher reports are already saved.',
+    reportDetail: ['Saved report one', 'Saved report two', 'Saved report three', 'Saved report four'].map((name, index) => `### ${name}\nIndependent persisted finding ${index + 1}.`).join('\n\n')
+  };
+  const candidate = parseMindSearchPlannerReview(plannerReview('conclude', { rationale: 'The research appears sufficient.', stopReason: 'No research gap.' }, 'Candidate conclusion.', 'Candidate answer.'));
+  const review = await flow.reviewPlannerDecisionQuality(candidate, context, 'gpt-6-luna', 'low');
+  assert.equal(review.decision, 'ask_user');
+  assert.equal(review.question, 'How much time can you spend?');
+  assert.equal(review.summary, 'How much time can you spend?');
+  assert.equal(review.detail, 'A useful conditional answer remains available.');
+  assert.equal(review.rationale, `The branch has 2 answered question node(s); at least ${MIN_ANSWERED_QUESTIONS_BEFORE_CONCLUSION} are required before conclusion.`);
+  assert.equal(calls.length, 2, 'only the bounded correction and its local format repair ran');
+  assert.equal(calls.some(call => call.researchMode === 'research'), false, 'completed research was not repeated');
+  assert.ok(calls[0].task.includes(context.reportDetail), 'the original quality decision sees the four saved reports');
+
+  calls.length = 0;
+  const aboveFloor = await flow.reviewPlannerDecisionQuality(
+    parseMindSearchPlannerReview(plannerReview('ask_user', { rationale: 'A genuinely missing condition remains.', question: 'What schedule works best?' }, 'Conditional answer.', 'Useful detail.', ['Morning', 'Evening'])),
+    { ...context, answeredQuestionCount: 4 }, 'gpt-6-luna', 'low'
+  );
+  assert.equal(aboveFloor.decision, 'ask_user');
+  assert.equal(calls.length, 0, 'the floor does not force another correction once the branch has enough answers');
+});
+
+integrationTest('MindSearch retries failed decision formatting from four saved reports and commits the next question', async () => {
+  const { repo } = fixture();
+  const { createMindSearchMap } = load('experiences/mind-search/create-map.ts');
+  const created = await createMindSearchMap(repo, 'gpt-6-luna', { requestId: 'forced-ask-map', topic: 'Plan a realistic routine', context: 'Synthetic test scenario.' });
+  const { MindSearchRunStore } = load('mindsearch-mve/research-run-store.ts');
+  const { MindSearchManualFlow } = load('experiences/mind-search/manual-flow.ts', { obsidian });
+  let saved = await repo.readMap(created.mapPath);
+  const earlier = await repo.createNote('Earlier answered condition', 'gpt-6-luna', saved, created.mapPath, 'workspace');
+  earlier.mindSearchKind = 'question';
+  earlier.mindSearchQuestion = { requestId: 'earlier-question', parentBranchId: null, options: [{ id: 'yes', label: 'Yes' }, { id: 'no', label: 'No' }], allowMultiple: false, allowFreeText: true };
+  const question = await repo.createNote('Current question', 'gpt-6-luna', saved, created.mapPath, 'workspace');
+  question.mindSearchKind = 'question';
+  question.mindSearchQuestion = { requestId: 'current-question', parentBranchId: 'earlier-answer', options: [{ id: 'some', label: 'Sometimes' }, { id: 'rare', label: 'Rarely' }], allowMultiple: false, allowFreeText: true };
+  await repo.updateNote(question.path, { summary: 'Do you exercise regularly?' });
+  saved.nodes.push(earlier, question);
+  saved.mindSearch.branches.push({ id: 'earlier-answer', questionNodeId: earlier.id, parentBranchId: null, answerSnapshot: { selections: ['yes'], freeText: 'Synthetic prior condition.' }, inputSnapshot: { topic: saved.title, conditions: { 'Do you exercise?': 'Yes' }, upstreamResults: [] }, createdAt: '2026-10-09T00:00:00.000Z', results: [] });
+  await repo.saveMap(created.mapPath, saved);
+
+  const plan = Array.from({ length: 4 }, (_, index) => ({ id: `target-${index + 1}`, title: `Research dimension ${index + 1}`, task: `Search distinct dimension ${index + 1}.`, expectedValue: `Resolve uncertainty ${index + 1}.` }));
+  const exactQuestion = 'How much time can you spend each day?';
+  const calls = []; let researchCalls = 0, repairCalls = 0;
+  const flow = new MindSearchManualFlow(repo, new MindSearchRunStore(repo), async context => {
+    calls.push(context);
+    if (mindSearchPhase(context, 'research-plan')) return { summary: 'Four complementary research dimensions.', detail: `<!-- mindsearch-plan ${JSON.stringify({ subtopics: plan })} -->`, suggestions: [], visualReferences: [] };
+    if (mindSearchPhase(context, 'subtopic-research')) {
+      researchCalls++;
+      const target = plan.find(item => context.task.includes(item.title));
+      return { summary: `${target.title} finding.`, detail: `Research status: search completed\nIndependent persisted finding for ${target.title}.`, suggestions: [], visualReferences: [] };
+    }
+    if (mindSearchPhase(context, 'report-review')) return plannerReview('conclude', { rationale: 'The four reports appear sufficient.', stopReason: 'Research review ended.' }, 'Candidate conclusion.', 'Candidate conditional answer.');
+    if (mindSearchPhase(context, 'decision-quality-review')) return { summary: 'Could this plan be more ambitious?', detail: `Question: ${exactQuestion}\n\nThe useful conditional answer remains intact.`, suggestions: [{ title: 'Under 30 minutes', task: '', contribution: '' }], visualReferences: [] };
+    if (mindSearchPhase(context, 'format-repair')) {
+      repairCalls++;
+      assert.match(context.task, /workflow has imposed decision=ask_user/);
+      assert.ok(context.task.includes(`Exact original question to preserve: ${exactQuestion}`));
+      assert.doesNotMatch(context.task, /Research dimension [1-4]|Independent persisted finding/);
+      if (repairCalls === 1) return plannerReview('conclude', { rationale: 'Repairer must not change this decision.', stopReason: 'Forbidden.' }, 'Changed.', 'Changed.');
+      return plannerReview('ask_user', { rationale: 'A user condition changes the routine.', question: 'Changed question?' }, 'Changed summary.', 'Changed body.', ['Under 30 minutes', '30 to 60 minutes', 'Over 60 minutes']);
+    }
+    throw new Error(`Unexpected AI phase or research retry: ${context.task.slice(0, 140)}`);
+  });
+
+  const input = { requestId: 'forced-ask-answer', selections: ['some'], freeText: 'Synthetic answer about current availability.' };
+  await assert.rejects(() => flow.answerAndResearch(created.mapPath, question.id, input, 'gpt-6-luna', 'low'), /changed or omitted the required ask_user decision/);
+  saved = await repo.readMap(created.mapPath);
+  const branch = saved.mindSearch.branches.find(item => item.submissionId === input.requestId);
+  assert.ok(branch);
+  assert.deepEqual(Array.from(branch.results.filter(item => item.kind === 'research'), item => item.subtopicId), plan.map(item => item.id));
+  assert.ok(saved.mindSearch.runs.filter(item => item.branchId === branch.id).flatMap(item => item.attempts).some(attempt => attempt.status === 'failed'), 'the failed decision attempt remains recorded');
+  assert.equal(researchCalls, 4);
+
+  const outcome = await flow.answerAndResearch(created.mapPath, question.id, input, 'gpt-6-luna', 'low');
+  assert.equal(outcome.status, 'waiting-user');
+  assert.equal(researchCalls, 4, 'retry reused all four saved reports and ran no Searcher calls');
+  assert.equal(repairCalls, 2);
+  saved = await repo.readMap(created.mapPath);
+  const nextQuestion = saved.nodes.find(item => item.id === outcome.questionNodeId);
+  assert.equal(nextQuestion.mindSearchKind, 'question');
+  assert.equal(await repo.readNote(nextQuestion.path).then(note => note.summary), exactQuestion);
+  assert.equal(nextQuestion.mindSearchQuestion.parentBranchId, branch.id);
+  assert.equal(saved.mindSearch.branches.find(item => item.id === branch.id).results.filter(item => item.kind === 'research').length, 4);
+  const reviewCalls = calls.filter(context => mindSearchPhase(context, 'report-review'));
+  assert.equal(reviewCalls.length, 2);
+  assert.ok(reviewCalls.every(context => plan.every(item => context.detail.includes(item.title))), 'both decision attempts reused the four independently saved reports');
 });
 
 integrationTest('MindSearch request deduplication preserves unique evidence and leaves original context intact', () => {

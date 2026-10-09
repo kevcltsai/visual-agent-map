@@ -71,6 +71,7 @@
 .vam-inspector-proposals .vam-proposal { display: block; padding: 10px 0; border-bottom: 1px solid var(--background-modifier-border); }
 .vam-inspector-proposals .vam-proposal > input, .vam-inspector-proposals .vam-proposal > textarea { display: block; width: 100%; margin-top: 8px; box-sizing: border-box; }
 .vam-field { display: flex; flex-direction: column; gap: 6px; margin: 14px 0; }
+.vam-field[hidden] { display: none; }
 .vam-field > span { font-size: var(--font-ui-small); color: var(--text-muted); font-weight: 600; }
 .vam-field input, .vam-field textarea, .vam-field select { width: 100%; min-width: 0; font-family: var(--font-interface); }
 .vam-field textarea { resize: vertical; line-height: 1.5; }

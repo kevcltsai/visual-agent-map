@@ -9,7 +9,7 @@ import { MindSearchRunStore, type CommitResult } from "../../mindsearch-mve/rese
 import type { CodexWebSearchEvent } from "../../ai/runtime/codex-app-server";
 import { effectiveReasoningLevel, normalizeReasoningLevel } from "../../ai/task-policy";
 import { estimateTokens } from "../../ai/context-builder";
-import { MINDSEARCH_MAX_RESEARCH_TURNS, parseMindSearchPlannerReview, parseMindSearchPlannerReviewWithRecovery, type PlannerReviewRecoveryContext } from "../../mindsearch-mve/planner-review";
+import { extractPlannerQuestionCandidate, MINDSEARCH_MAX_RESEARCH_TURNS, parseMindSearchPlannerReview, parseMindSearchPlannerReviewWithRecovery, type PlannerReviewRecoveryContext } from "../../mindsearch-mve/planner-review";
 import { extractMindSearchFailedReport } from "./retry-targets";
 
 export const MINDSEARCH_UNKNOWN_OPTION_ID = "__mindsearch_unknown__";
@@ -223,7 +223,15 @@ export class MindSearchManualFlow {
       throwIfAborted(signal);
       reviewed = await this.parsePlannerReviewWithRecovery(
         correctedResult,
-        { question: context.goal, answerSnapshot: JSON.stringify({ conditions: context.conditions, currentQuestion: context.currentQuestion, currentAnswer: context.currentAnswer }), reportSummary: context.reportSummary, reportDetail: context.reportDetail },
+        {
+          question: context.goal,
+          answerSnapshot: JSON.stringify({ conditions: context.conditions, currentQuestion: context.currentQuestion, currentAnswer: context.currentAnswer }),
+          reportSummary: context.reportSummary,
+          reportDetail: context.reportDetail,
+          requiredDecision: "ask_user",
+          preferredQuestion: extractPlannerQuestionCandidate(correctedResult),
+          requiredDecisionRationale: `The branch has ${context.answeredQuestionCount} answered question node(s); at least ${MIN_ANSWERED_QUESTIONS_BEFORE_CONCLUSION} are required before conclusion.`
+        },
         correctionContext,
         model,
         reasoning,

@@ -717,7 +717,16 @@ export class VisualAgentMapView extends ItemView {
     if (!this.path && !this.builtIn) {
       if (this.plugin.consumeFirstInstallSample()) await this.openBuiltInSample();
       else if (!this.plugin.repo.workspaceExists()) this.render();
-      else { const files = await this.plugin.repo.mapFiles(); if (this.closed || this.mindSearchViewEpoch !== epoch) return; if (files.length) await this.openMap(files[0].path); else this.render(); }
+      else { const files = await this.plugin.repo.mapFiles(); if (this.closed || this.mindSearchViewEpoch !== epoch) return; if (files.length) {
+        let defaultPath = files[0].path;
+        for (const file of files) {
+          let candidate: MapDocument;
+          try { candidate = await this.plugin.repo.readMap(file.path); } catch { continue; }
+          if (this.closed || this.mindSearchViewEpoch !== epoch) return;
+          if (!candidate.mindSearch) { defaultPath = file.path; break; }
+        }
+        await this.openMap(defaultPath);
+      } else this.render(); }
     }
   }
   async onClose(): Promise<void> {
@@ -846,7 +855,18 @@ export class VisualAgentMapView extends ItemView {
       await this.openMapInMutation(created.mapPath);
       if (!isCurrent() || this.path !== created.mapPath || this.map?.id !== created.map.id) return;
       this.selected = created.root.id; this.render(); this.focusNode(created.root);
-    }), modelChoices, configuredModel, defaultReasoning).open();
+    }), modelChoices, configuredModel, defaultReasoning, async () => {
+      const states = await Promise.all([this.plugin.refreshModelDiscovery("codex"), this.plugin.refreshModelDiscovery("claude")]);
+      const ready = states.filter(state => state.status === "ready");
+      const models = [...new Set(ready.flatMap(state => state.models))];
+      if (!ready.length || !models.length) throw new Error(states.map(state => state.error).filter(Boolean).join("; ") || t("ui.mindsearch_no_models_found"));
+      const choices = models.map(id => ({ id, label: this.plugin.modelLabel(id) }));
+      const errors = states.filter(state => state.status === "error").map(state => state.error).filter(Boolean);
+      return errors.length ? { models: choices, message: t("ui.mindsearch_models_refreshed_partial_0", errors.join("; ")), preserveSelection: true } : choices;
+    }).open();
+  }
+  private openNewMindMapModal(): void {
+    new NameModal(this.app, t("ui.new_mind_map"), t("ui.new_mind_map_from_sample"), title => this.enqueue(async () => this.openMapInMutation(await this.plugin.repo.createMap(title)))).open();
   }
   async planMindSearchQuestion(parentNodeId: string, requestId: string, parentBranchId: string | null = null, signal?: AbortSignal): Promise<PlannerQuestionResult> {
     if (this.closed || !this.map || !this.path || this.builtIn) throw new Error("Open a saved MindSearch map before planning its next question.");
@@ -1666,7 +1686,7 @@ export class VisualAgentMapView extends ItemView {
         this.button(actions, t("ui.reconnect_existing_workspace"), () => this.enqueue(() => this.plugin.offerWorkspaceReconnect())).addClass("mod-cta");
         this.button(actions, t("ui.repair_agent_workspace"), () => this.enqueue(() => this.plugin.repairWorkspace()));
       }
-      this.button(actions, t("ui.create_a_new_mind_map"), () => new NameModal(this.app, t("ui.new_mind_map"), t("ui.new_mind_map_from_sample"), title => this.enqueue(async () => this.openMapInMutation(await this.plugin.repo.createMap(title)))).open()).addClass("mod-cta");
+      this.button(actions, t("ui.create_a_new_mind_map"), () => this.openNewMindMapModal()).addClass("mod-cta");
       this.button(actions, t("ui.mindsearch_create_map"), () => this.openMindSearchStart());
       this.button(actions, t("ui.view_sample"), () => this.enqueue(() => this.openBuiltInSample(true)));
       if (this.deletedMap?.deleted) this.button(actions, t("ui.restore_deleted_map"), () => this.enqueue(() => this.restoreDeletedMapFromUi()));
@@ -1700,12 +1720,16 @@ export class VisualAgentMapView extends ItemView {
     }
     const tools = this.contentEl.createDiv("vam-map-tools");
     if (!this.builtIn) {
-      this.button(tools, t("ui.topic"), () => this.enqueue(() => this.addNode(null))).addClass("mod-cta");
+      const mindSearchMode = !!this.map.mindSearch;
+      if (!mindSearchMode) this.button(tools, t("ui.topic"), () => this.enqueue(() => this.addNode(null))).addClass("mod-cta");
+      if (mindSearchMode) this.button(tools, t("ui.create_a_new_mind_map"), () => this.openNewMindMapModal());
       this.button(tools, t("ui.mindsearch_create_map"), () => this.openMindSearchStart());
-      this.button(tools, t("ui.organize"), () => this.enqueue(() => this.openOrganizer()));
+      if (!mindSearchMode) this.button(tools, t("ui.organize"), () => this.enqueue(() => this.openOrganizer()));
       this.button(tools, t("ui.auto_layout"), () => this.enqueue(() => this.mapChange(map => { map.nodes = arrangeMap(map.nodes); }, false)));
-      const integrate = this.button(tools, this.integrationMode ? t("ui.finish_topic_selection") : t("ui.select_topics"), () => { this.integrationMode = !this.integrationMode; this.multiSelected.clear(); this.selected = null; this.render(); });
-      if (this.integrationMode) integrate.addClass("is-active");
+      if (!mindSearchMode) {
+        const integrate = this.button(tools, this.integrationMode ? t("ui.finish_topic_selection") : t("ui.select_topics"), () => { this.integrationMode = !this.integrationMode; this.multiSelected.clear(); this.selected = null; this.render(); });
+        if (this.integrationMode) integrate.addClass("is-active");
+      }
     }
     this.button(tools, "−", () => this.zoomBy(1 / 1.2)).setAttr("aria-label", t("ui.zoom_out"));
     this.zoomLabel = tools.createSpan({ text: `${Math.round(this.map.viewport.zoom * 100)}%`, cls: "vam-zoom" });
@@ -1743,7 +1767,11 @@ export class VisualAgentMapView extends ItemView {
       this.button(selection, t("ui.synthesize"), () => this.integrateSelected(), this.multiSelected.size < 2).addClass("mod-cta");
     }
     for (const node of shown) this.renderNode(node);
-    if (!this.map.nodes.length) { const emptyMap = this.viewportEl.createDiv("vam-empty"); emptyMap.createSpan({ text: t("ui.this_mind_map_has_no_topics_click_topic_to_create_the_first") }); this.button(emptyMap, t("ui.topic"), () => this.enqueue(() => this.addNode(null))); }
+    if (!this.map.nodes.length) {
+      const emptyMap = this.viewportEl.createDiv("vam-empty");
+      emptyMap.createSpan({ text: t(this.map.mindSearch ? "ui.mindsearch_empty_map_hint" : "ui.this_mind_map_has_no_topics_click_topic_to_create_the_first") });
+      if (!this.map.mindSearch) this.button(emptyMap, t("ui.topic"), () => this.enqueue(() => this.addNode(null)));
+    }
     this.setupPan(); this.transform(); this.drawEdges();
     if (this.builtIn && this.selected) { const node = this.map.nodes.find(n => n.id === this.selected); if (node) this.renderInspector(workspace, node); }
   }
@@ -1782,17 +1810,19 @@ export class VisualAgentMapView extends ItemView {
     const quickError = this.plugin.quickExpandFailures?.get(node.path);
     if (quickError && !active) { const badge = header.createSpan({ cls: "vam-status vam-status-error", text: t("ui.expansion_failed") }); badge.setAttr("title", quickError); }
     const pendingCount = this.plugin.pendingSuggestions.get(node.path)?.length ?? 0;
-    if (pendingCount && !this.builtIn && !this.integrationMode) this.button(header, t("ui.view_0_expansion_suggestions", pendingCount), () => this.openNodePanel(node, "proposals")).addClass("vam-badge-new");
+    if (pendingCount && !this.builtIn && !this.integrationMode && !this.map?.mindSearch) this.button(header, t("ui.view_0_expansion_suggestions", pendingCount), () => this.openNodePanel(node, "proposals")).addClass("vam-badge-new");
     if (!this.builtIn && !this.integrationMode) {
-      const ai = this.button(header, "✦", () => this.openNextStep(node)); ai.addClass("vam-node-tool"); ai.setAttr("aria-label", t("ui.how_would_you_like_to_explore_next"));
-      const structure = this.button(header, "⚙", () => this.openNodePanel(node, "structure")); structure.addClass("vam-node-tool"); structure.setAttr("aria-label", t("ui.structure_and_links"));
-      if (note) { const rename = this.button(header, "✎", () => new NameModal(this.app, t("ui.new_topic_name"), note.title, title => this.enqueue(() => this.noteChange(node, { title }))).open()); rename.addClass("vam-node-tool"); rename.setAttr("aria-label", t("ui.new_topic_name")); }
+      if (!this.map?.mindSearch) {
+        const ai = this.button(header, "✦", () => this.openNextStep(node)); ai.addClass("vam-node-tool"); ai.setAttr("aria-label", t("ui.how_would_you_like_to_explore_next"));
+        const structure = this.button(header, "⚙", () => this.openNodePanel(node, "structure")); structure.addClass("vam-node-tool"); structure.setAttr("aria-label", t("ui.structure_and_links"));
+        if (note) { const rename = this.button(header, "✎", () => new NameModal(this.app, t("ui.new_topic_name"), note.title, title => this.enqueue(() => this.noteChange(node, { title }))).open()); rename.addClass("vam-node-tool"); rename.setAttr("aria-label", t("ui.new_topic_name")); }
+      }
       if (node.mindSearchKind === "question") { const remove = this.button(header, "×", () => this.confirmRemoveNode(node)); remove.addClass("vam-node-tool"); remove.setAttr("aria-label", t("ui.remove_from_map")); }
     }
     const details = this.button(header, "↗", () => this.builtIn ? this.selectSampleNode(node.id) : this.openDetails(node)); details.addClass("vam-detail-button"); details.setAttr("aria-label", this.builtIn ? t("ui.view_sample_content") : t("ui.open_details_in_right_sidebar"));
     const count = descendants(this.map!.nodes, node.id).size;
     if (count && !this.builtIn) this.button(header, node.collapsed ? t("ui.expand_0", count) : t("ui.collapse"), () => this.enqueue(() => this.mapChange(map => { const n = map.nodes.find(n => n.id === node.id)!; n.collapsed = !n.collapsed; })));
-    if (!this.builtIn && !this.integrationMode) { const add = this.button(card, "+", () => this.enqueue(() => this.addNode(node))); add.addClass("vam-add-child"); add.setAttr("aria-label", t("ui.add_subtopic_manually")); }
+    if (!this.builtIn && !this.integrationMode && !this.map?.mindSearch) { const add = this.button(card, "+", () => this.enqueue(() => this.addNode(node))); add.addClass("vam-add-child"); add.setAttr("aria-label", t("ui.add_subtopic_manually")); }
     const title = card.createEl("h3", { text: note?.title ?? node.path, cls: "vam-card-title" });
     title.setAttr("title", note?.title ?? node.path);
     card.createEl("p", { cls: "vam-card-summary", text: note?.summary ?? t("ui.the_file_was_moved_or_deleted_you_can_remove_this_node_from") });

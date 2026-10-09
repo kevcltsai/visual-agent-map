@@ -102,6 +102,33 @@ export interface PlannerReviewRecoveryContext {
   answerSnapshot: string;
   reportSummary: string;
   reportDetail: string;
+  /** A decision imposed by the current workflow step, such as the minimum-answer floor. */
+  requiredDecision?: MindSearchReviewDecision;
+  /** Exact question already proposed by the current Planner response; repair must preserve it. */
+  preferredQuestion?: string;
+  /** Fixed rationale supplied by the workflow when it imposes a decision. */
+  requiredDecisionRationale?: string;
+}
+
+/** Return an explicitly written interrogative from the current response without deriving one from evidence. */
+export function extractPlannerQuestionCandidate(result: Pick<AiResult, "detail" | "summary">): string | undefined {
+  const marked = readMarker(result.detail);
+  if (marked?.raw.decision === "ask_user" && typeof marked.raw.question === "string" && marked.raw.question.trim()) return marked.raw.question.trim();
+  // Prefer an explicitly labeled body question, then a standalone body interrogative;
+  // a summary can be rhetorical, so only use it as a last-resort direct question.
+  const body = marked?.body ?? result.detail;
+  const lines = body.split(/\r?\n/).map(line => line.trim());
+  const labeledQuestion = lines.find(line => /^(?:question|問題)\s*[:：]\s*.+[?？]\s*$/i.test(line));
+  if (labeledQuestion) return labeledQuestion.replace(/^(?:question|問題)\s*[:：]\s*/i, "").trim();
+  const bodyQuestion = lines.map(line => line.replace(/^(?:[-*•]|\d+[.)、])\s+/, ""))
+    .find(candidate => candidate && candidate.length <= 500 && /[?？]\s*$/.test(candidate));
+  if (bodyQuestion) return bodyQuestion;
+  const candidates = [result.summary];
+  for (const text of candidates) for (const line of text.split(/\r?\n/)) {
+    const candidate = line.trim().replace(/^(?:[-*•]|\d+[.)、])\s+/, "");
+    if (candidate && candidate.length <= 500 && /[?？]\s*$/.test(candidate)) return candidate;
+  }
+  return undefined;
 }
 
 /** Parse a Planner decision and allow one local format-repair turn on the same evidence. */
@@ -111,7 +138,11 @@ export async function parseMindSearchPlannerReviewWithRecovery(
   recover: (task: string) => Promise<AiResult>
 ): Promise<MindSearchPlannerReview> {
   try {
-    return parseMindSearchPlannerReview(original);
+    const parsed = parseMindSearchPlannerReview(original);
+    if (context.requiredDecision && parsed.decision !== context.requiredDecision) {
+      throw new Error(`Planner response violated the required ${context.requiredDecision} decision.`);
+    }
+    return parsed;
   } catch (formatError) {
     const originalMarker = readMarker(original.detail);
     const originalDecision = originalMarker?.raw.decision;
@@ -119,6 +150,54 @@ export async function parseMindSearchPlannerReviewWithRecovery(
     const originalQuestion = typeof originalMarker?.raw.question === "string" ? originalMarker.raw.question.trim() : "";
     const originalSummary = typeof original.summary === "string" ? original.summary.trim() : "";
     const originalBody = originalMarker?.body ?? "";
+
+    // Some workflow steps impose a decision (for example, the minimum answered-question floor).
+    // In that path the repairer is a formatter only: it cannot revisit evidence or choose another decision.
+    if (context.requiredDecision) {
+      if (originalDecision && originalDecision !== context.requiredDecision) {
+        throw new Error(`Planner response violated the required ${context.requiredDecision} decision.`);
+      }
+      if (context.requiredDecision !== "ask_user") {
+        throw new Error(`Format recovery does not support an imposed ${context.requiredDecision} decision.`);
+      }
+      const question = context.preferredQuestion?.trim() || originalQuestion;
+      if (!question) throw new Error("Planner format repair cannot invent a question that was absent from the original response.");
+      const preservedBody = originalMarker?.body ?? original.detail.replace(/^\s*<!--\s*mindsearch-review\s+[^\n]*?-->\s*/, "").trim();
+      const existingOptions = [...new Set(original.suggestions.map(item => item.title.trim()).filter(Boolean))];
+      const explicitOptions = extractExplicitOptions(preservedBody, question);
+      let answerOptions = existingOptions.length >= 2 && existingOptions.length <= 5 ? existingOptions : explicitOptions;
+      if (answerOptions.length < 2 || answerOptions.length > 5) {
+        const task = [
+          "Complete the format of this already-required ask_user Planner response. The workflow has imposed decision=ask_user; you have no authority to reconsider the decision or research evidence.",
+          "Preserve the exact original question below. Return 2–5 distinct answer choices in suggestions[].title. Do not change the summary or answer body, infer a new question, add facts, search, or reinterpret evidence. If the original question cannot be formatted, repeat it exactly in the decision marker.",
+          `Required decision: ${context.requiredDecision}`,
+          `Required rationale: ${context.requiredDecisionRationale ?? "The workflow requires a clarification question at this step."}`,
+          `Exact original question to preserve: ${question}`,
+          `Original summary (preserve): ${originalSummary}`,
+          `Original response body (preserve; not research evidence):\n${preservedBody}`,
+          `Original suggestions: ${JSON.stringify(original.suggestions)}`,
+          `Format validation error: ${formatError instanceof Error ? formatError.message : String(formatError)}`,
+          'Return the ordinary VAM structured response with this exact decision marker: <!-- mindsearch-review {"decision":"ask_user","rationale":"required rationale","question":"exact original question"} -->.'
+        ].join("\n\n");
+        const repaired = await recover(task);
+        const repairedMarker = readMarker(repaired.detail);
+        if (!repairedMarker || repairedMarker.raw.decision !== "ask_user") {
+          throw new Error("Planner format repair changed or omitted the required ask_user decision.");
+        }
+        answerOptions = [...new Set(repaired.suggestions.map(item => item.title.trim()).filter(Boolean))];
+        if (answerOptions.length < 2 || answerOptions.length > 5) throw new Error("Planner format repair did not provide 2–5 distinct answer choices.");
+      }
+      const rationale = context.requiredDecisionRationale ?? originalRationale ?? "A clarification is required before the workflow can continue.";
+      const constrained = {
+        ...original,
+        summary: originalSummary || original.summary,
+        detail: `<!-- mindsearch-review ${JSON.stringify({ decision: "ask_user", rationale, question })} -->\n${preservedBody}`,
+        suggestions: answerOptions.map(title => ({ title, task: "", contribution: "" }))
+      };
+      const parsed = parseMindSearchPlannerReview(constrained);
+      if (parsed.decision !== "ask_user" || parsed.question !== question) throw new Error("Planner recovery did not preserve the required decision and question.");
+      return parsed;
+    }
 
     // A complete ask_user decision with only missing/invalid choices can be repaired
     // without asking a model to reinterpret the decision or touching report evidence.

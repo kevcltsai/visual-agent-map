@@ -8,7 +8,7 @@ const { buildSync } = require('esbuild');
 const code = buildSync({ entryPoints: ['mindsearch-mve/planner-review.ts'], bundle: true, write: false, platform: 'node', format: 'cjs' }).outputFiles[0].text;
 const moduleValue = { exports: {} };
 vm.runInNewContext(code, { module: moduleValue, exports: moduleValue.exports });
-const { parseMindSearchPlannerReviewWithRecovery } = moduleValue.exports;
+const { extractPlannerQuestionCandidate, parseMindSearchPlannerReviewWithRecovery } = moduleValue.exports;
 const fixture = JSON.parse(fs.readFileSync(path.join('tests/fixtures/mindsearch/ask_user_missing_options.json'), 'utf8'));
 const context = { question: 'Fixture question', answerSnapshot: 'Synthetic answer snapshot', reportSummary: 'Private full report summary', reportDetail: 'Private full report detail' };
 
@@ -82,4 +82,72 @@ test('question followed only by answer bullets needs no format-repair model call
   const parsed = await parseMindSearchPlannerReviewWithRecovery(original, context, async () => { throw new Error('should recover existing choices'); });
   assert.equal(parsed.question, question);
   assert.deepEqual(Array.from(parsed.answerOptions), ['1–2 hours', '3–5 hours', '6 hours or more']);
+});
+
+test('an imposed ask_user decision repairs an unmarked reply without reopening evidence or changing its question', async () => {
+  const question = '你平常可以投入多少準備時間？';
+  const original = {
+    summary: '你平常可以投入多少準備時間？',
+    detail: '依目前條件，建議先採簡單可行的做法。',
+    suggestions: [{ title: '30 分鐘內', task: '', contribution: '' }]
+  };
+  const constrainedContext = {
+    ...context,
+    requiredDecision: 'ask_user',
+    requiredDecisionRationale: '目前只回答 2 題，至少要回答 3 題才能結論。',
+    preferredQuestion: question
+  };
+  let repairCalls = 0;
+  const parsed = await parseMindSearchPlannerReviewWithRecovery(original, constrainedContext, async task => {
+    repairCalls++;
+    assert.match(task, /workflow has imposed decision=ask_user/);
+    assert.match(task, /Required decision: ask_user/);
+    assert.match(task, new RegExp(question));
+    assert.doesNotMatch(task, /Private full report|Already completed report/);
+    assert.doesNotMatch(task, /Answer snapshot/);
+    return {
+      summary: '不得採用修復器的新摘要。',
+      detail: `<!-- mindsearch-review ${JSON.stringify({ decision: 'ask_user', rationale: '改寫理由不可採用。', question })} -->\n修復器的新正文不可採用。`,
+      suggestions: ['30 分鐘內', '約 1 小時', '超過 1 小時'].map(title => ({ title, task: '', contribution: '' }))
+    };
+  });
+  assert.equal(repairCalls, 1);
+  assert.equal(parsed.decision, 'ask_user');
+  assert.equal(parsed.question, question);
+  assert.equal(parsed.rationale, constrainedContext.requiredDecisionRationale);
+  assert.equal(parsed.summary, original.summary);
+  assert.equal(parsed.detail, original.detail);
+  assert.deepEqual(Array.from(parsed.answerOptions), ['30 分鐘內', '約 1 小時', '超過 1 小時']);
+});
+
+test('an imposed ask_user decision rejects a repairer that returns conclude', async () => {
+  const question = 'Which constraint matters most?';
+  const original = { summary: 'Which constraint matters most?', detail: 'A supported conditional response.', suggestions: [] };
+  await assert.rejects(() => parseMindSearchPlannerReviewWithRecovery(original, {
+    ...context, requiredDecision: 'ask_user', preferredQuestion: question, requiredDecisionRationale: 'Two answers; three required.'
+  }, async () => ({
+    summary: 'Concluded.',
+    detail: '<!-- mindsearch-review {"decision":"conclude","rationale":"Enough evidence.","stopReason":"Done."} -->\nConclusion.',
+    suggestions: []
+  })), /changed or omitted the required ask_user decision/);
+});
+
+test('a parse-valid conclude cannot bypass an imposed ask_user decision', async () => {
+  const original = {
+    summary: 'Conclusion.',
+    detail: '<!-- mindsearch-review {"decision":"conclude","rationale":"Enough evidence.","stopReason":"Done."} -->\nConclusion body.',
+    suggestions: []
+  };
+  let calls = 0;
+  await assert.rejects(() => parseMindSearchPlannerReviewWithRecovery(original, {
+    ...context, requiredDecision: 'ask_user', preferredQuestion: 'Which constraint matters most?'
+  }, async () => { calls++; throw new Error('must reject without repair'); }), /violated the required ask_user decision/);
+  assert.equal(calls, 0);
+});
+
+test('explicit question metadata outranks rhetorical body and summary questions', () => {
+  assert.equal(extractPlannerQuestionCandidate({
+    summary: 'Could there be a better answer?',
+    detail: 'Could this be more ambitious?\n問題：每天可以投入多少時間？'
+  }), '每天可以投入多少時間？');
 });

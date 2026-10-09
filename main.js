@@ -15386,6 +15386,19 @@ var VisualAgentMapView = class _VisualAgentMapView extends import_obsidian13.Ite
     if (!this.stageEl) return;
     const note = this.notes.get(node.id), card = this.stageEl.createDiv({ cls: `vam-node${node.id === this.selected || this.multiSelected.has(node.id) ? " is-selected" : ""}` });
     if (node.mindSearchKind) card.setAttr("data-mindsearch-kind", node.mindSearchKind);
+    if (node.mindSearchKind === "conclusion") {
+      const background = createSvg("svg");
+      background.addClass("vam-conclusion-background");
+      background.setAttribute("viewBox", "0 0 100 100");
+      background.setAttribute("preserveAspectRatio", "none");
+      background.setAttribute("aria-hidden", "true");
+      background.setAttribute("focusable", "false");
+      const shape = createSvg("polygon");
+      shape.setAttribute("points", "25,0.5 75,0.5 99.5,50 75,99.5 25,99.5 0.5,50");
+      shape.setAttribute("vector-effect", "non-scaling-stroke");
+      background.appendChild(shape);
+      card.appendChild(background);
+    }
     card.dataset.nodeId = node.id;
     card.style.left = `${node.x}px`;
     card.style.top = `${node.y}px`;

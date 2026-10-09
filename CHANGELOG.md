@@ -16,6 +16,7 @@
 - Keep research and completed document sections when a later phase fails; preserve cancellation and duplicate-dispatch safeguards.
 - Require the complete final-acceptance decision marker in the document detail field.
 - Remove the New question action from completed conclusion cards.
+- Draw conclusion card backgrounds with SVG to avoid the CSS clip-path compatibility warning.
 
 ### Validation and limitations
 

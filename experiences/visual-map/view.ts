@@ -9,7 +9,7 @@ import { readMarkdownFile, type ReferenceGroup } from "../../ai/reference-materi
 import { NameModal } from "../../ui/modals/name-modal";
 import { ChoiceModal } from "../../ui/modals/choice-modal";
 import { DebugLogModal } from "../../ui/modals/debug-log-modal";
-import { canParent, clearQuestionConvergenceEdges, clone, descendants, History, inheritModel, type MapDocument, type MapNode, parentIdsForNode, parseMap, removeNodes, serializeMap, visibleNodes } from "../../map-model";
+import { canParent, clearQuestionConvergenceEdges, repairMindSearchResultConvergence, clone, descendants, History, inheritModel, type MapDocument, type MapNode, parentIdsForNode, parseMap, removeNodes, serializeMap, visibleNodes } from "../../map-model";
 import { arrangeMap, arrangeNewBranch } from "../../map-layout";
 import { normalizeReasoningLevel, type ModelSource, type Note, type NotePatch, type ResearchDepth, type ResearchMode, type Settings, type TopicInfo, type TopicState, type VisualMode } from "../../repository";
 import { canonicalDetail, visualReferencesMarkdown } from "../../ai/result-utils";
@@ -827,7 +827,9 @@ export class VisualAgentMapView extends ItemView {
       map = await this.plugin.repo.readMap(path);
       if (!isCurrent()) return;
     }
-    if (clearQuestionConvergenceEdges(map)) {
+    const clearedQuestionEdges = clearQuestionConvergenceEdges(map);
+    const repairedResultEdges = repairMindSearchResultConvergence(map);
+    if (clearedQuestionEdges || repairedResultEdges) {
       await this.plugin.repo.saveMap(path, map);
       if (!isCurrent()) return;
     }
@@ -1204,7 +1206,7 @@ export class VisualAgentMapView extends ItemView {
         moves.push({ activePath: item.path, parkedPath: target, topicId: before.id, parkedState: "unassigned" });
         await this.plugin.repo.setLifecycle(target, before.id, "", "unassigned");
       }
-      const after = clone(before); after.nodes = removeNodes(after.nodes, node.id, branch); this.removeMindSearchReferences(after, ids);
+      const after = clone(before); after.nodes = removeNodes(after.nodes, node.id, branch); this.removeMindSearchReferences(after, ids, before.nodes);
       await this.plugin.repo.saveMap(this.path, after); this.map = after; this.selected = null; this.multiSelected.clear();
       await this.plugin.rebuildDerivedData(); await this.hydrate();
       this.history.push({ undo: () => this.restoreLifecycle(before, moves, false), redo: () => this.restoreLifecycle(after, moves, true) }); this.render();
@@ -1224,7 +1226,7 @@ export class VisualAgentMapView extends ItemView {
   }
   private confirmRemoveNode(node: MapNode): void {
     new ChoiceModal(this.app, t("ui.remove_from_map"), t("ui.the_note_will_move_to_this_topic_s_unassigned_folder_you_can"), [
-      { label: t("ui.remove_only_this_node_children_become_roots"), action: () => this.enqueue(() => this.removeToUnassigned(node, false)) },
+      ...(!this.map?.mindSearch || node.mindSearchKind !== "question" ? [{ label: t("ui.remove_only_this_node_children_become_roots"), action: () => this.enqueue(() => this.removeToUnassigned(node, false)) }] : []),
       { label: t("ui.remove_entire_branch"), action: () => this.enqueue(() => this.removeToUnassigned(node, true)) }
     ]).open();
   }
@@ -1245,7 +1247,7 @@ export class VisualAgentMapView extends ItemView {
         moves.push({ activePath: node.path, parkedPath: target, topicId: before.id, parkedState: "unassigned" });
         await this.plugin.repo.setLifecycle(target, before.id, "", "unassigned");
       }
-      const after = clone(before); after.nodes = after.nodes.filter(node => !ids.has(node.id)); this.removeMindSearchReferences(after, ids);
+      const after = clone(before); after.nodes = after.nodes.filter(node => !ids.has(node.id)); this.removeMindSearchReferences(after, ids, before.nodes);
       await this.plugin.repo.saveMap(this.path, after); this.map = after; this.selected = null; this.multiSelected.clear();
       await this.plugin.rebuildDerivedData(); await this.hydrate();
       this.history.push({ undo: () => this.restoreLifecycle(before, moves, false), redo: () => this.restoreLifecycle(after, moves, true) }); this.render();
@@ -1302,9 +1304,13 @@ export class VisualAgentMapView extends ItemView {
     if ([...ids].some(id => protectedIds.has(id))) throw new Error(moving ? "MindSearch question and result nodes referenced by saved branches cannot be moved." : "MindSearch question and result nodes referenced by saved branches cannot be removed.");
     for (const run of data.runs) if (removableBranchIds.has(run.branchId) && run.attempts.some(attempt => attempt.status === "running" || attempt.status === "saving")) throw new Error("A MindSearch branch is still running and cannot be removed yet.");
   }
-  private removeMindSearchReferences(map: MapDocument, removedNodeIds: Set<string>): void {
+  private removeMindSearchReferences(map: MapDocument, removedNodeIds: Set<string>, originalNodes: MapNode[] = map.nodes): void {
     const data = map.mindSearch;
     if (!data) return;
+    for (const question of originalNodes.filter(node => removedNodeIds.has(node.id) && node.mindSearchQuestion)) {
+      const parent = map.nodes.find(node => node.id === question.parentId && !removedNodeIds.has(node.id));
+      if (parent) parent.mindSearchDismissedQuestionRequestIds = [...new Set([...(parent.mindSearchDismissedQuestionRequestIds ?? []), question.mindSearchQuestion!.requestId])];
+    }
     const removedBranchIds = new Set(data.branches.filter(branch => removedNodeIds.has(branch.questionNodeId)).map(branch => branch.id));
     data.branches = data.branches.filter(branch => !removedBranchIds.has(branch.id));
     for (const branch of data.branches) if (branch.parentBranchId && removedBranchIds.has(branch.parentBranchId)) branch.parentBranchId = null;
@@ -1818,6 +1824,12 @@ export class VisualAgentMapView extends ItemView {
         if (note) { const rename = this.button(header, "✎", () => new NameModal(this.app, t("ui.new_topic_name"), note.title, title => this.enqueue(() => this.noteChange(node, { title }))).open()); rename.addClass("vam-node-tool"); rename.setAttr("aria-label", t("ui.new_topic_name")); }
       }
       if (node.mindSearchKind === "question") { const remove = this.button(header, "×", () => this.confirmRemoveNode(node)); remove.addClass("vam-node-tool"); remove.setAttr("aria-label", t("ui.remove_from_map")); }
+      if (this.map?.mindSearch && (node.mindSearchKind === "synthesis" || node.mindSearchKind === "conclusion") && this.map.mindSearch.branches.some(branch => branch.results.some(result => result.nodeId === node.id))) {
+        const next = this.button(header, t("ui.mindsearch_new_question"), () => void this.planMindSearchFromSelection(node.id), this.mindSearchBusy);
+        next.addClass("vam-node-tool");
+        next.setAttr("aria-label", t("ui.mindsearch_new_question_hint"));
+        next.setAttr("title", t("ui.mindsearch_new_question_hint"));
+      }
     }
     const details = this.button(header, "↗", () => this.builtIn ? this.selectSampleNode(node.id) : this.openDetails(node)); details.addClass("vam-detail-button"); details.setAttr("aria-label", this.builtIn ? t("ui.view_sample_content") : t("ui.open_details_in_right_sidebar"));
     const count = descendants(this.map!.nodes, node.id).size;

@@ -5,12 +5,18 @@ export function mindSearchPhase(task: string): string | undefined {
   return task.match(/<!--\s*mindsearch-phase:\s*([a-z-]+)\s*-->/)?.[1];
 }
 
-function phaseGuidance(phase: string | undefined, language: UiLanguage): string {
+function phaseGuidance(phase: string | undefined, language: UiLanguage, responseContract?: TaskContext["responseContract"]): string {
   const english = language === "en";
-  const common = english
-    ? "Follow the phase task and its machine-readable marker exactly. Do not impose a fixed heading template or turn planning, review, repair, or research into a complete knowledge page."
-    : "依照本階段任務與機器可讀標記處理。不要套用固定標題模板，也不要把規劃、審查、修復或研究階段改寫成完整知識頁。";
+  const gapAuditContract = phase === "research-gap-audit" && responseContract === "mindsearch-gap-audit";
+  const common = gapAuditContract
+    ? english
+      ? "Follow the phase task and the dedicated response schema exactly. Do not add a marker, suggestions, or visual references. Do not impose a fixed heading template or turn this audit into a complete knowledge page."
+      : "嚴格遵循本階段任務與專用回應 schema。不要增加標記、建議或視覺參考；不要套用固定標題模板，也不要把稽核改寫成完整知識頁。"
+    : english
+      ? "Follow the phase task and its machine-readable marker exactly. Do not impose a fixed heading template or turn planning, review, repair, or research into a complete knowledge page."
+      : "依照本階段任務與機器可讀標記處理。不要套用固定標題模板，也不要把規劃、審查、修復或研究階段改寫成完整知識頁。";
   const phaseRules: Record<string, string> = english ? {
+    "research-gap-audit": "Write the rationale first in detail, then set summary to exactly user_condition or external_evidence. Return empty suggestions and visualReferences arrays.",
     "initial-clarification": "Ask only necessary unknown user conditions. Put the intake marker in detail; an empty suggestions array is valid.",
     "initial-question": "When asking, put one question in summary and 2–5 distinct answer choices in suggestions[].title; keep the other suggestion fields empty. Do not answer for the user.",
     "research-plan": "Return the requested plan marker with 2–5 distinct research targets. The plan belongs in detail; do not answer the goal or research in this Planner turn.",
@@ -25,6 +31,7 @@ function phaseGuidance(phase: string | undefined, language: UiLanguage): string 
     "delivery-writing": "Write the requested reader-facing deliverable from supplied context and evidence. Follow the task's requested structure and preserve attribution and uncertainty.",
     "delivery-acceptance": "Review the complete deliverable against the original goal and task contract. Return the required decision marker and a brief acceptance note or list of issues; do not reproduce or rewrite the draft. If research_more is required, identify one concrete evidence target. Do not ask the user."
   } : {
+    "research-gap-audit": "先在 detail 撰寫簡短理由，再將 summary 設為完全相同的 user_condition 或 external_evidence。suggestions 與 visualReferences 必須是空陣列。",
     "initial-clarification": "只詢問必要且未知的使用者條件。將 intake 標記放在 detail；suggestions 可以是空陣列。",
     "initial-question": "需要提問時，在 summary 寫一個問題，並在 suggestions[].title 提供 2–5 個不同選項；其他 suggestion 欄位留空。不要代替使用者回答。",
     "research-plan": "依要求在 detail 回傳規劃標記，包含 2–5 個不同研究目標；此 Planner 階段不要回答整體目標或進行研究。",
@@ -58,7 +65,7 @@ export function buildMindSearchPrompt(context: TaskContext, language: UiLanguage
     language === "en"
       ? "Return JSON only, matching the supplied response schema and including every required field. MindSearch has visual search disabled, so visualReferences must be an empty array."
       : "只回傳符合提供之 response schema 的 JSON，並包含所有必要欄位。MindSearch 未啟用視覺搜尋，因此 visualReferences 必須是空陣列。",
-    phaseGuidance(phase, language),
+    phaseGuidance(phase, language, context.responseContract),
     context.researchMode === "local"
       ? language === "en" ? "Do not use web search in this local-only phase." : "此階段僅使用本次提供的內容，不要進行網路搜尋。"
       : context.researchMode === "research"

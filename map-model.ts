@@ -10,6 +10,8 @@ export interface MapNode {
   mindSearchKind?: MindSearchNodeKind;
   mindSearchQuestion?: { requestId: string; parentBranchId?: string | null; options: { id: string; label: string }[]; allowMultiple: boolean; allowFreeText: boolean };
   mindSearchConvergesFromNodeIds?: string[];
+  /** Explicitly removed follow-ups must not be recreated by crash recovery. */
+  mindSearchDismissedQuestionRequestIds?: string[];
 }
 export type MindSearchNodeKind = "topic" | "question" | "answer" | "research" | "synthesis" | "conclusion";
 export interface MapDocument {
@@ -34,6 +36,23 @@ export function clearQuestionConvergenceEdges(map: MapDocument): boolean {
 export function parentIdsForNode(node: MapNode): string[] {
   const convergenceParents = node.mindSearchKind === "question" ? [] : node.mindSearchConvergesFromNodeIds ?? [];
   return [...(node.parentId ? [node.parentId] : []), ...convergenceParents.filter(id => id !== node.parentId)];
+}
+
+/** Repair continuation results saved before their research-source edges were recorded. */
+export function repairMindSearchResultConvergence(map: MapDocument): boolean {
+  let changed = false;
+  for (const branch of map.mindSearch?.branches ?? []) {
+    for (const [index, result] of branch.results.entries()) {
+      const node = map.nodes.find(item => item.id === result.nodeId);
+      if (!node || (node.mindSearchKind !== "synthesis" && node.mindSearchKind !== "conclusion") || node.parentId !== branch.questionNodeId || node.mindSearchConvergesFromNodeIds?.length) continue;
+      const sources = [...new Set(branch.results.slice(0, index).filter(source => source.kind === "research" && source.subtopicId && map.nodes.some(item => item.id === source.nodeId && item.mindSearchKind === "research" && item.parentId === branch.questionNodeId)).map(source => source.nodeId))];
+      if (!sources.length) continue;
+      node.parentId = sources[sources.length - 1]!;
+      node.mindSearchConvergesFromNodeIds = [...sources];
+      changed = true;
+    }
+  }
+  return changed;
 }
 
 export interface MindSearchBranchRecord {
@@ -150,6 +169,7 @@ export function parseMap(content: string): MapDocument {
   const ids = new Set<string>(), mindSearchQuestionRequests = new Set<string>();
   for (const n of map.nodes) {
     if (!n || typeof n.id !== "string" || typeof n.path !== "string" || !n.path.endsWith(".md") || !Number.isFinite(n.x) || !Number.isFinite(n.y) || (n.parentId !== null && typeof n.parentId !== "string") || ids.has(n.id)) throw new Error(t("ui.invalid_node_data_or_duplicate_id"));
+    if (n.mindSearchDismissedQuestionRequestIds !== undefined && (!Array.isArray(n.mindSearchDismissedQuestionRequestIds) || new Set(n.mindSearchDismissedQuestionRequestIds).size !== n.mindSearchDismissedQuestionRequestIds.length || n.mindSearchDismissedQuestionRequestIds.some(id => typeof id !== "string" || !id.trim()))) throw new Error("Invalid dismissed MindSearch question identities.");
     ids.add(n.id);
     n.collapsed = n.collapsed === true;
     if (n.mindSearchKind !== undefined && !["topic", "question", "answer", "research", "synthesis", "conclusion"].includes(n.mindSearchKind)) throw new Error("Invalid MindSearch node kind.");

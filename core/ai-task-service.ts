@@ -4,6 +4,7 @@ import { effectiveReasoningLevel, normalizeReasoningLevel, researchGuidance } fr
 import type { AiResult, ReasoningLevel, TaskContext } from "../ai/types";
 import { translate, t, type TranslationKey, type UiLanguage } from "../i18n";
 import responseSchema from "../response-schema.json";
+import mindSearchGapAuditSchema from "../ai/mindsearch-gap-audit-schema";
 import { CLAUDE_MODEL_CHOICES, providerForModel, providerModelId } from "../ai/providers/provider";
 import type { CodexAppServerRuntime, CodexWebSearchEvent } from "../ai/runtime/codex-app-server";
 import type { ClaudeCodeCliRuntime } from "../ai/runtime/claude-code-cli";
@@ -139,12 +140,14 @@ export class AiTaskService {
           if (this.options.exchangeLoggingEnabled()) exchanges?.sent(exchangeId, JSON.stringify(request, null, 2), instructions);
         }
       };
+      const isMindSearchGapAudit = context.responseContract === "mindsearch-gap-audit" && context.promptProfile === "mindsearch" && context.researchMode === "local";
+      const schema = isMindSearchGapAudit ? mindSearchGapAuditSchema : responseSchema;
       const raw = provider === "claude"
-        ? await this.options.claudeRuntime(pluginDirectory).runTask(instructions, providerModelId(model), effort, responseSchema, controls)
-        : await this.options.codexRuntime(pluginDirectory, context.researchMode === "local").runTask(instructions, model, effort, responseSchema, { ...controls, onWebSearchEvent });
+        ? await this.options.claudeRuntime(pluginDirectory).runTask(instructions, providerModelId(model), effort, schema, controls)
+        : await this.options.codexRuntime(pluginDirectory, context.researchMode === "local").runTask(instructions, model, effort, schema, { ...controls, onWebSearchEvent });
       stage = "解析 AI 回覆";
       if (this.options.exchangeLoggingEnabled()) exchanges?.received(exchangeId, raw);
-      const result = this.parseAiResult(raw, provider === "claude" ? "Claude Code" : "Codex App Server", outputLanguage);
+      const result = this.parseAiResult(raw, provider === "claude" ? "Claude Code" : "Codex App Server", outputLanguage, isMindSearchGapAudit);
       if (referenceGroups.length) {
         result.summary = resolveReferenceLinks(result.summary, referenceGroups);
         result.detail = resolveReferenceLinks(result.detail, referenceGroups);
@@ -193,11 +196,14 @@ export class AiTaskService {
     }
   }
 
-  private parseAiResult(raw: string, label: string, language: UiLanguage): AiResult {
+  private parseAiResult(raw: string, label: string, language: UiLanguage, strictGapAudit = false): AiResult {
     const cleaned = raw.replace(/^```(?:json)?\s*/i, "").replace(/\s*```$/, "").trim();
     const parsed: { summary?: unknown; detail?: unknown; suggestions?: unknown; visualReferences?: unknown } =
       JSON.parse(extractJsonObject(cleaned)) as { summary?: unknown; detail?: unknown; suggestions?: unknown; visualReferences?: unknown };
     if (typeof parsed.summary !== "string" || typeof parsed.detail !== "string") throw new Error(`${label} 沒有回傳 summary 與 detail`);
+    if (strictGapAudit && (!(["user_condition", "external_evidence"] as string[]).includes(parsed.summary) || !parsed.detail.trim() || !Array.isArray(parsed.suggestions) || parsed.suggestions.length !== 0 || !Array.isArray(parsed.visualReferences) || parsed.visualReferences.length !== 0)) {
+      throw new Error("MindSearch research-gap audit returned an invalid structured classification.");
+    }
     const isRecord = (value: unknown): value is Record<string, unknown> => typeof value === "object" && value !== null;
     const suggestions = Array.isArray(parsed.suggestions)
       ? parsed.suggestions

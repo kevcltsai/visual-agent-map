@@ -29,6 +29,26 @@
 .vam-edges { position: absolute; left: 0; top: 0; width: 1px; height: 1px; overflow: visible; pointer-events: none; }
 .vam-edge { fill: none; stroke: var(--interactive-accent); stroke-width: 2; opacity: 0.55; }
 .vam-node { position: absolute; box-sizing: border-box; width: 280px; padding: 14px; border: 1px solid var(--background-modifier-border); border-radius: 12px; background: var(--background-primary); box-shadow: 0 4px 14px rgba(0,0,0,0.08); cursor: grab; user-select: none; }
+.vam-node[data-mindsearch-kind="topic"] { border-radius: 48% / 28%; padding: 22px 24px; }
+.vam-node[data-mindsearch-kind="question"] { isolation: isolate; border-color: transparent; background: transparent; box-shadow: none; }
+.vam-node[data-mindsearch-kind="question"]::before { content: ""; position: absolute; z-index: -1; width: 174px; height: 174px; left: 50%; top: 50%; transform: translate(-50%, -50%) rotate(45deg); border: 1px solid var(--background-modifier-border); border-radius: 10px; background: var(--background-primary); box-shadow: 4px 4px 14px rgba(0,0,0,0.08); }
+.vam-node[data-mindsearch-kind="answer"] { border: 1px solid var(--interactive-accent); border-radius: 18px; }
+.vam-node[data-mindsearch-kind="research"] { border-radius: 4px; }
+.vam-node[data-mindsearch-kind="synthesis"] { border-style: dashed; border-color: var(--interactive-accent); }
+.vam-edge-convergence { stroke: var(--interactive-accent); stroke-dasharray: 5 5; opacity: .8; }
+.vam-mindsearch-answer-snapshot { margin: 8px 0 0; padding: 6px 8px; border-left: 2px solid var(--interactive-accent); color: var(--text-muted); font-size: var(--font-ui-smaller); }
+.vam-mindsearch-statusbar { display: flex; align-items: center; flex-wrap: wrap; gap: 8px 12px; min-height: 42px; padding: 8px 14px; border-bottom: 1px solid var(--background-modifier-border); border-left: 4px solid var(--interactive-accent); background: var(--background-secondary); }
+.vam-mindsearch-status-title { font-size: var(--font-ui-small); font-weight: 800; letter-spacing: .02em; }
+.vam-mindsearch-status-value { font-size: var(--font-ui-small); font-weight: 650; }
+.vam-mindsearch-statusbar.is-active { background: var(--background-modifier-hover); }
+.vam-mindsearch-attribution { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 10px; padding: 6px 14px; border-bottom: 1px solid var(--background-modifier-border); color: var(--text-muted); font-size: var(--font-ui-smaller); line-height: 1.5; }
+.vam-mindsearch-attribution a { white-space: nowrap; }
+.vam-mindsearch-attribution a:focus-visible { outline: 2px solid var(--interactive-accent); outline-offset: 2px; }
+.vam-node-header .vam-mindsearch-question-status { margin-right: auto; padding: 4px 10px; border: 1px solid var(--background-modifier-border); font-size: 12px; font-weight: 700; }
+.vam-mindsearch-start { display: flex; width: 100%; justify-content: center; margin-top: 12px; min-height: 36px; }
+.vam-node[data-mindsearch-kind="conclusion"] { isolation: isolate; border: 0; background: transparent; box-shadow: none; }
+.vam-conclusion-background { position: absolute; inset: 0; width: 100%; height: 100%; z-index: -1; pointer-events: none; filter: drop-shadow(0 4px 7px rgba(0,0,0,0.08)); }
+.vam-conclusion-background polygon { fill: var(--background-primary); stroke: var(--background-modifier-border); stroke-width: 1; }
 .vam-node .vam-add-child { position: absolute; right: -17px; top: 50%; transform: translateY(-50%); width: 34px; height: 34px; padding: 0; border-radius: 50%; background: var(--background-primary); color: var(--text-normal); font-size: 20px; line-height: 1; }
 .vam-node:active { cursor: grabbing; }
 .vam-node.is-selected, .vam-node:focus-visible { border-color: var(--interactive-accent); outline: 2px solid var(--interactive-accent); outline-offset: 2px; }
@@ -53,6 +73,7 @@
 .vam-inspector-proposals .vam-proposal { display: block; padding: 10px 0; border-bottom: 1px solid var(--background-modifier-border); }
 .vam-inspector-proposals .vam-proposal > input, .vam-inspector-proposals .vam-proposal > textarea { display: block; width: 100%; margin-top: 8px; box-sizing: border-box; }
 .vam-field { display: flex; flex-direction: column; gap: 6px; margin: 14px 0; }
+.vam-field[hidden] { display: none; }
 .vam-field > span { font-size: var(--font-ui-small); color: var(--text-muted); font-weight: 600; }
 .vam-field input, .vam-field textarea, .vam-field select { width: 100%; min-width: 0; font-family: var(--font-interface); }
 .vam-field textarea { resize: vertical; line-height: 1.5; }
@@ -171,6 +192,13 @@
 .vam-proposal textarea { resize: vertical; }
 .vam-task-input { width: 100%; box-sizing: border-box; resize: vertical; }
 .vam-name-input { width: 100%; }
+.vam-mindsearch-topic, .vam-mindsearch-context { width: 100%; resize: vertical; }
+.vam-mindsearch-actions { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; padding: 6px 10px; border-bottom: 1px solid var(--background-modifier-border); }
+.vam-mindsearch-actions [aria-live] { color: var(--text-muted); }
+.vam-mindsearch-answer-options { display: grid; gap: 4px; margin: 12px 0; }
+.vam-mindsearch-answer-option { display: flex; align-items: flex-start; gap: 10px; min-height: 44px; padding: 10px; border: 1px solid var(--background-modifier-border); border-radius: var(--radius-s); cursor: pointer; }
+.vam-mindsearch-answer-option input { width: 20px; height: 20px; flex: 0 0 20px; margin: 1px 0 0; }
+.vam-mindsearch-answer-option:focus-within { outline: 2px solid var(--interactive-accent); outline-offset: 2px; }
 .vam-selection-bar { position: absolute; z-index: 6; bottom: 16px; left: 50%; transform: translateX(-50%); display: flex; align-items: center; flex-wrap: wrap; gap: 8px; max-width: calc(100% - 32px); padding: 8px 12px; border: 1px solid var(--interactive-accent); border-radius: 10px; background: var(--background-primary); box-shadow: 0 5px 20px rgba(0,0,0,0.16); }
 .vam-selection-bar > span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .vam-reference-sources { display: flex; flex-direction: column; gap: 7px; margin: 14px 0; padding: 12px; border: 1px solid var(--background-modifier-border); border-radius: var(--radius-s); }
@@ -496,9 +524,22 @@ body .workspace-leaf-content.vam-topic-markdown .markdown-source-view.mod-cm6 .m
 }
 .vam-ribbon-group-start::before { top: -8px; }
 .vam-ribbon-group-end::after { bottom: -8px; }
-.ct-prompt-preview-modal { width: min(860px, 90vw); }
-.ct-prompt-preview-modal textarea { width: 100%; min-height: 48vh; font-family: var(--font-monospace); font-size: var(--font-ui-smaller); white-space: pre-wrap; overflow-wrap: anywhere; }
-.ct-prompt-preview-modal small { display: block; margin-top: 6px; text-align: right; }
+.modal.ct-prompt-preview-modal { width: min(860px, calc(100vw - 32px)); max-width: calc(100vw - 32px); max-height: calc(100vh - 48px); }
+.ct-prompt-preview-content { width: 100%; min-width: 0; overflow-x: hidden; overflow-y: auto; }
+.ct-prompt-preview-content h2, .ct-prompt-preview-content p { overflow-wrap: anywhere; }
+.ct-prompt-preview-content textarea { box-sizing: border-box; display: block; width: 100%; max-width: 100%; min-width: 0; height: 48vh; min-height: 160px; resize: vertical; overflow-x: hidden; overflow-y: auto; font-family: var(--font-monospace); font-size: var(--font-ui-smaller); line-height: 1.6; white-space: pre-wrap; overflow-wrap: anywhere; word-break: break-word; }
+.ct-prompt-preview-content small { display: block; margin-top: 8px; text-align: right; }
+.ct-style-settings, .ct-reference-settings { margin-top: 24px; min-width: 0; }
+.ct-style-fields { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; margin-bottom: 16px; }
+.ct-style-fields label, .ct-style-prompt-label { display: flex; flex-direction: column; gap: 8px; min-width: 0; font-weight: var(--font-medium); }
+.ct-style-fields input, .ct-style-fields select { width: 100%; min-width: 0; }
+.ct-style-prompt-label textarea { box-sizing: border-box; width: 100%; min-height: 220px; max-height: 50vh; padding: 12px; line-height: 1.6; font-weight: var(--font-normal); }
+.ct-style-settings > .ct-muted { margin-block: 12px 16px; line-height: 1.6; }
+.ct-style-actions { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.ct-style-actions button { height: auto; min-height: 34px; white-space: normal; }
+.ct-style-actions button:first-child { flex-basis: 100%; margin-bottom: 4px; }
+@media (max-width: 600px) { .ct-style-fields { grid-template-columns: minmax(0, 1fr); } }
+
 
 .ct-live-holding { min-height: var(--ct-live-held-height, 0px); }
 .ct-insight-category { margin: 1.1em 0 .45em; font-size: 1.05em; }
@@ -546,3 +587,33 @@ body .workspace-leaf-content.vam-topic-markdown .markdown-source-view.mod-cm6 .m
 .vam-context-ai-panel .setting-item { padding: 6px 0; border: 0; }
 .vam-context-ai-image { max-width: 100%; max-height: 120px; object-fit: contain; }
 .vam-context-ai-panel [hidden] { display: none; }
+
+.vam-context-ai-image-choice { margin-block: 12px; padding: 8px; border: 1px solid var(--background-modifier-border); border-radius: 8px; }
+.vam-context-ai-image-choice img { max-width: 100%; max-height: 200px; display: block; margin-bottom: 8px; }
+.vam-context-ai-image-choice a { display: block; margin-top: 4px; }
+.vam-context-ai-preview { overflow: auto; max-height: 320px; }
+
+/* Hide only VAM section boundaries; source mode retains their original text. */
+.cm-line.vam-internal-marker-line, .vam-internal-marker-only { display: none; }
+
+.ct-list-selection { display:flex; flex-wrap:wrap; gap:8px; padding:12px; align-items:center; border-bottom:1px solid var(--background-modifier-border); }
+.ct-list-selection > span { flex-basis:100%; color:var(--text-muted); }
+.ct-list-selection button { height:auto; min-height:30px; white-space:normal; }
+.ct-list-entry { position:relative; padding-left:28px; }
+.ct-list-entry > .ct-table-checkbox { position:absolute; left:2px; top:16px; margin:0; }
+
+.modal.ct-customization-modal { width:min(900px,calc(100vw - 32px)); max-width:calc(100vw - 32px); }
+.ct-customization-modal .modal-content { min-width:0; overflow-x:hidden; }
+.ct-customization-modal label, .ct-customization-fields label { display:flex; flex-direction:column; gap:6px; min-width:0; }
+.ct-customization-modal textarea, .ct-customization-fields textarea { box-sizing:border-box; width:100%; min-width:0; resize:vertical; line-height:1.6; }
+.ct-customization-fields section { margin-top:20px; padding-top:12px; border-top:1px solid var(--background-modifier-border); }
+.ct-customization-fields fieldset { display:flex; flex-wrap:wrap; gap:12px; margin:12px 0; border:1px solid var(--background-modifier-border); }
+.ct-customization-fields fieldset label, .ct-convergence-proposal > label { flex-direction:row; align-items:center; }
+.ct-customization-actions { display:flex; flex-wrap:wrap; gap:8px; margin:16px 0; }
+.ct-customization-actions button { height:auto; min-height:34px; white-space:normal; }
+.ct-protected-rules { margin-top:16px; color:var(--text-muted); }
+.ct-convergence-proposal { padding:16px 0; border-bottom:1px solid var(--background-modifier-border); }
+.ct-convergence-proposal label { margin-top:10px; }
+
+.vam-mindsearch-failure { margin-top: 8px; padding: 8px; border-left: 3px solid var(--text-error); background: var(--background-secondary); font-size: var(--font-smallest); overflow-wrap: anywhere; }
+.vam-mindsearch-failure p { margin: 0 0 6px; }

@@ -17,16 +17,19 @@ export interface ClaudeCodeCliOptions {
   onLog?: (level: "info" | "warn" | "error", message: string) => void;
   spawn?: ClaudeSpawn;
   timeoutMs?: number;
+  timeoutMessage?: string;
 }
 export interface ClaudeTaskControls {
   signal?: AbortSignal;
   searchBudget?: number;
+  webSearch?: boolean;
   onRequest?: (request: unknown) => void;
   onAccepted?: () => void;
   onProgress?: (message: string) => void;
   onText?: (text: string) => void;
   onSteer?: (steer: (text: string) => Promise<void>) => void;
   timeoutMs?: number;
+  timeoutMessage?: string;
 }
 export const CLAUDE_TASK_TIMEOUT_MS = 3 * 60 * 1000;
 
@@ -79,7 +82,7 @@ export class ClaudeCodeCliRuntime {
 
   async runTask(prompt: string, model: string, effort: string, outputSchema: unknown, controls: ClaudeTaskControls = {}): Promise<string> {
     if (controls.signal?.aborted) throw abortError();
-    const webSearch = (controls.searchBudget ?? 0) > 0;
+    const webSearch = controls.webSearch ?? (controls.searchBudget ?? 0) > 0;
     const args = claudeTaskArgs(model, effort, outputSchema, webSearch);
     if (controls.onText && !outputSchema) { args[args.indexOf("json")] = "stream-json"; args.push("--include-partial-messages"); if (controls.onSteer) args.push("--input-format", "stream-json"); }
     controls.onRequest?.({ provider: "claude", executable: this.options.executable, args: args.map((arg, index) => index === args.indexOf(JSON.stringify(claudeOutputSchema(outputSchema))) ? "<response-schema>" : arg), input: "<VAM prompt via stdin>" });
@@ -130,7 +133,7 @@ export class ClaudeCodeCliRuntime {
       const onAbort = (): void => { stop(); finish(abortError()); };
       const timeout = window.setTimeout(() => {
         stop();
-        finish(new Error(controls.timeoutMs ? "Coffee Tables: generation timed out; received text is saved as a draft." : t("ui.the_ai_task_exceeded_3_minutes_vam_attempts_to_interrupt_it")));
+        finish(new Error(controls.timeoutMessage ?? (controls.timeoutMs ? "Coffee Tables: generation timed out; received text is saved as a draft." : t("ui.the_ai_task_exceeded_3_minutes_vam_attempts_to_interrupt_it"))));
       }, controls.timeoutMs ?? this.options.timeoutMs ?? CLAUDE_TASK_TIMEOUT_MS);
       controls.signal?.addEventListener("abort", onAbort, { once: true });
       child.stdout.on("data", chunk => {

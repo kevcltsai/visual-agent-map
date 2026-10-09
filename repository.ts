@@ -1,4 +1,5 @@
 import { App, TFile, TFolder, normalizePath, parseYaml, stringifyYaml } from "obsidian";
+import { createHash } from "node:crypto";
 import { translate, type TranslationKey } from "./i18n";
 import { MapDocument, MapNode, serializeMap, parseMap } from "./map-model";
 import type { CoffeeStyle } from "./experiences/coffee-tables/types";
@@ -311,6 +312,8 @@ export class Repository {
     return file;
   }
 
+  hasNote(path: string): boolean { return this.app.vault.getAbstractFileByPath(path) instanceof TFile; }
+
   async folder(path: string): Promise<void> {
     let current = "";
     for (const part of normalizePath(path).split("/").filter(Boolean)) {
@@ -465,6 +468,39 @@ export class Repository {
     const origin = initial.thinkingOrigin ? `## Thinking Origin\n\n${originMarkdown(initial.thinkingOrigin)}` : "";
     onCreate?.(path);
     await this.app.vault.create(path, `---\n${stringifyYaml(metadata)}---\n${noteBody(title, initial.summary ?? placeholder(this.settings.language), this.settings.language, "", "", placeholder(this.settings.language), initial.detail ?? "", "", "", origin)}`);
+    return { id, path, parentId: null, x: 80, y: 80, collapsed: false };
+  }
+
+  /** Idempotently create a reserved note identity for a journaled MindSearch result draft. */
+  async createNoteAt(title: string, model: string, map: MapDocument, mapPath: string, modelSource: ModelSource, path: string, id: string, initial: Pick<NotePatch, "detail" | "thinkingOrigin" | "summary" | "reasoning" | "prompt"> = {}): Promise<MapNode> {
+    const folder = this.topicFolder(mapPath, "Notes");
+    await this.ensureTopicFolders(this.topicRoot(mapPath));
+    if (parentPath(path) !== folder || !path.endsWith(".md") || !id.trim()) throw new Error("A reserved note must use a valid identity inside this map's Notes folder.");
+    const existing = this.app.vault.getAbstractFileByPath(path);
+    if (existing) {
+      if (existing instanceof TFile) {
+        const fm = frontmatter(await this.app.vault.read(existing));
+        if (marker(fm["agent-map-node"]) && text(fm["node-id"]) === id) return { id, path, parentId: null, x: 80, y: 80, collapsed: false };
+      }
+      throw new Error(`Reserved result note path already belongs to another file: ${path}`);
+    }
+    const metadata = {
+      "agent-map-node": true,
+      "node-id": id,
+      "topic-id": map.id,
+      "topic-state": "active",
+      "agent-map-id": map.id,
+      title,
+      summary: initial.summary ?? placeholder(this.settings.language),
+      "preview-initialized": false,
+      model,
+      "model-source": modelSource,
+      "reasoning-level": initial.reasoning ?? this.settings.cliReasoning,
+      status: "idea",
+      cssclasses: [NOTE_CSS_CLASS]
+    };
+    const origin = initial.thinkingOrigin ? `## Thinking Origin\n\n${originMarkdown(initial.thinkingOrigin)}` : "";
+    await this.app.vault.create(path, `---\n${stringifyYaml(metadata)}---\n${noteBody(title, metadata.summary, this.settings.language, initial.prompt ?? "", "", placeholder(this.settings.language), initial.detail ?? "", "", "", origin)}`);
     return { id, path, parentId: null, x: 80, y: 80, collapsed: false };
   }
 
@@ -731,15 +767,23 @@ export class Repository {
     }
   }
 
-  async createMap(title: string, nodes: MapNode[] = [], onRootCreated?: (folder: TFolder) => void): Promise<string> {
+  async createMap(title: string, nodes: MapNode[] = [], onRootCreated?: (folder: TFolder) => void, mindSearch?: MapDocument["mindSearch"]): Promise<string> {
     await this.folder(this.settings.topicsFolder);
-    const root = this.uniqueFolder(this.settings.topicsFolder, title);
-    const folder = await this.app.vault.createFolder(root);
+    const preferredRoot = normalizePath(`${this.settings.topicsFolder}/${safeName(title)}`);
+    const preferredFolder = this.app.vault.getAbstractFileByPath(preferredRoot);
+    // A failed first Map.md write can leave only the just-created empty topic folder.
+    // For an identity-bearing MindSearch create, reuse that empty folder on retry;
+    // any non-empty existing folder remains untouched and receives the usual suffix.
+    const recoverEmptyMindSearchFolder = !!mindSearch?.creationId && preferredFolder instanceof TFolder && preferredFolder.children.length === 0;
+    const root = recoverEmptyMindSearchFolder ? preferredRoot : this.uniqueFolder(this.settings.topicsFolder, title);
+    const folder = recoverEmptyMindSearchFolder && preferredFolder instanceof TFolder ? preferredFolder : await this.app.vault.createFolder(root);
     onRootCreated?.(folder);
-    await this.ensureTopicFolders(root);
+    if (!mindSearch?.creationId) await this.ensureTopicFolders(root);
     const path = `${root}/Map.md`;
-    const map: MapDocument = { version: 1, id: crypto.randomUUID(), title, nodes, viewport: { x: 40, y: 40, zoom: 1 } };
+    const map: MapDocument = { version: 1, id: crypto.randomUUID(), title, nodes, viewport: { x: 40, y: 40, zoom: 1 }, ...(mindSearch ? { mindSearch } : {}) };
     await this.app.vault.create(path, serializeMap(map, this.settings.language));
+    // Persist the request identity before adding subfolders so a partial setup can be found and resumed.
+    if (mindSearch?.creationId) await this.ensureTopicFolders(root);
     return path;
   }
 
@@ -806,11 +850,71 @@ export class Repository {
     const desired = targetRoot ? normalizePath(targetRoot) : normalizePath(`${this.settings.topicsFolder}/${safeName(title)}`);
     if (desired !== root.path && this.app.vault.getAbstractFileByPath(desired)) throw new Error(this.message("error.topic_folder_exists"));
     const originalRoot = root.path;
-    if (desired !== originalRoot) await this.app.fileManager.renameFile(root, desired);
-    const next = `${desired}/Map.md`, map = await this.readMap(next); map.title = title;
-    for (const node of map.nodes) if (node.path.startsWith(`${originalRoot}/`)) node.path = `${desired}/${node.path.slice(originalRoot.length + 1)}`;
-    await this.saveMap(next, map); await this.rebuildDerivedData();
-    return next;
+    const originalMapPath = `${originalRoot}/Map.md`, originalContent = await this.app.vault.read(this.file(originalMapPath));
+    const originalMap = parseMap(originalContent);
+    if (originalMap.mindSearch?.runs.some(run => run.attempts.some(attempt => attempt.status === "running" || attempt.status === "saving"))) {
+      throw new Error("A MindSearch research attempt is still running or saving. Wait for it to finish before renaming this topic.");
+    }
+    const next = `${desired}/Map.md`;
+    let moved = false;
+    try {
+      if (desired !== originalRoot) {
+        await this.app.fileManager.renameFile(root, desired);
+        moved = true;
+      }
+      const map = await this.readMap(next);
+      map.title = title;
+      const rebasePath = (path: string): string => path.startsWith(`${originalRoot}/`)
+        ? `${desired}/${path.slice(originalRoot.length + 1)}`
+        : path;
+      for (const node of map.nodes) node.path = rebasePath(node.path);
+      const mindSearch = map.mindSearch;
+      if (mindSearch) {
+        for (const branch of mindSearch.branches) {
+          for (const result of branch.inputSnapshot.upstreamResults) result.notePath = rebasePath(result.notePath);
+          for (const result of branch.results) result.notePath = rebasePath(result.notePath);
+        }
+        for (const draft of mindSearch.resultDrafts ?? []) draft.notePath = rebasePath(draft.notePath);
+        if (mindSearch.rootDraft) mindSearch.rootDraft.notePath = rebasePath(mindSearch.rootDraft.notePath);
+        if (mindSearch.questionDraft) mindSearch.questionDraft.notePath = rebasePath(mindSearch.questionDraft.notePath);
+        for (const pending of mindSearch.pendingCommits) pending.notePath = rebasePath(pending.notePath);
+
+        const hashSnapshot = (value: unknown): string => createHash("sha256").update(JSON.stringify(value)).digest("hex");
+        for (const run of mindSearch.runs) {
+          const branch = mindSearch.branches.find(item => item.id === run.branchId);
+          if (!branch) continue;
+          for (const attempt of run.attempts) {
+            attempt.inputSnapshotHash = hashSnapshot({ branch: branch.inputSnapshot, answer: branch.answerSnapshot });
+            for (const draft of mindSearch.resultDrafts ?? []) {
+              if (draft.runId === run.id && draft.attemptId === attempt.id) draft.inputSnapshotHash = attempt.inputSnapshotHash;
+            }
+          }
+        }
+      }
+      await this.saveMap(next, map);
+      await this.rebuildDerivedData();
+      return next;
+    } catch (error) {
+      if (moved) {
+        try {
+          const movedRoot = this.app.vault.getAbstractFileByPath(desired);
+          if (!(movedRoot instanceof TFolder)) throw new Error("Renamed topic folder was not found for rollback.");
+          await this.app.fileManager.renameFile(movedRoot, originalRoot);
+          const restoredMap = this.app.vault.getAbstractFileByPath(originalMapPath);
+          if (!(restoredMap instanceof TFile)) throw new Error("Original Map.md was not found after restoring the topic folder.");
+          await this.app.vault.modify(restoredMap, originalContent);
+          await this.rebuildDerivedData();
+        } catch (rollbackError) {
+          const originalMessage = error instanceof Error ? error.message : String(error);
+          throw new Error(`Topic rename failed (${originalMessage}); rollback also failed (${rollbackError instanceof Error ? rollbackError.message : String(rollbackError)}).`);
+        }
+      } else if (this.app.vault.getAbstractFileByPath(originalMapPath) instanceof TFile) {
+        // A same-folder rename can still fail after the Map.md update; restore its exact source.
+        await this.app.vault.modify(this.file(originalMapPath), originalContent);
+        await this.rebuildDerivedData();
+      }
+      throw error;
+    }
   }
 
   async migrate(): Promise<void> { /* v0.2 import remains intentionally disabled; v0.3 legacy data uses the preview migration. */ }

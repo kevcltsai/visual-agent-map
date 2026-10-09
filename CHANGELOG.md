@@ -1,5 +1,28 @@
 # Changelog
 
+## [0.14.0] - 2026-10-10
+
+### Added
+
+- Guided research with answer snapshots, connected evidence reports and a separate final-document workflow.
+- Exact-source applicability and freshness assessments for report reuse; targeted updates and new evidence tasks without a minimum search quota.
+- Up to two independent evidence tasks in parallel, with dependent tasks receiving saved prerequisite reports.
+- Persisted section-level document writing and resume, including selective invalidation after evidence changes.
+- Failure reasons, saved execution phases and bounded retry controls, including a ten-minute timeout recovery option.
+- Attribution to the MindSearch project and paper, with bilingual README guidance for AIM (Adaptive Inquiry Map).
+
+### Fixed
+
+- Keep research and completed document sections when a later phase fails; preserve cancellation and duplicate-dispatch safeguards.
+- Require the complete final-acceptance decision marker in the document detail field.
+- Remove the New question action from completed conclusion cards.
+- Draw conclusion card backgrounds with SVG to avoid the CSS clip-path compatibility warning.
+
+### Validation and limitations
+
+- Codex live backend testing covered parallel searches, dependent reports, audited reuse, section resume and acceptance-only retry. Saved results were reopened in the macOS Obsidian testing vault.
+- The current interface still uses the MindSearch label. Live Claude Code execution and Windows/Linux remain unverified. AI source selection and review do not guarantee factual accuracy.
+
 ## [0.13.0] - 2026-10-03
 
 ### Added

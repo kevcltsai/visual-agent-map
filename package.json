@@ -1,6 +1,6 @@
 {
   "name": "visual-agent-map",
-  "version": "0.13.0",
+  "version": "0.14.0",
   "private": true,
   "scripts": {
     "dev": "node esbuild.config.mjs",
@@ -15,6 +15,7 @@
     "lint": "eslint . --max-warnings=0",
     "test": "node scripts/test-harness.mjs",
     "test:unit": "npm run compile:sample && node tests/run.cjs --layer=unit && node --test tests/compliance-gates.mjs",
+    "test:mindsearch": "node --test --test-name-pattern='MindSearch|Manual Planner|Planner reviews|saved-report Planner|captured malformed|coverage:|final delivery|missing or unavailable|invalid and duplicate|cancellation stops|acceptance can retain' tests/run.cjs tests/mindsearch-final-delivery.cjs && node --test tests/mindsearch-review-repair.cjs tests/mindsearch-prompt-contract.cjs tests/mindsearch-evidence-context.cjs tests/mindsearch-delivery-resume.cjs tests/mindsearch-section-delivery.cjs tests/mindsearch-parallel-store.cjs tests/codex-parallel-runtime.cjs tests/mindsearch-research-pipeline.cjs tests/prompt-monitor-timing.cjs",
     "test:integration": "node tests/run.cjs --layer=integration && node --test tests/test-vault.mjs",
     "test:runtime": "node scripts/test-runtime.mjs",
     "test:ui": "node scripts/test-harness.mjs --ui",
@@ -29,6 +30,8 @@
     "eslint-plugin-obsidianmd": "0.4.2",
     "obsidian": "1.13.1",
     "typescript": "5.9.3",
-    "typescript-eslint": "8.70.0"
+    "typescript-eslint": "8.70.0",
+    "@codemirror/state": "6.5.0",
+    "@codemirror/view": "6.38.6"
   }
 }

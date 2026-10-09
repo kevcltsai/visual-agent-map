@@ -1,0 +1,15 @@
+{
+  "provenance": {
+    "artifact": "mindsearch-general-partial-live-20261005130054-abd4d5ae.json",
+    "turnIndex": 7,
+    "mode": "local",
+    "model": "gpt-6-luna",
+    "reasoning": "low"
+  },
+  "result": {
+    "summary": "合成情境下，鑄鐵鍋煎製步驟已有來源支持；牛排熟度偏好仍未指定。",
+    "detail": "<!-- mindsearch-review {\"decision\":\"ask_user\",\"rationale\":\"原議題需確認牛排熟度；持續報告已回答鑄鐵鍋爐上煎製與控溫方法，但未提供所選熟度。熟度是使用者條件，不能靠搜尋補足。所提供的合成選項可作為本分支條件，故僅以條件式表述，不推定為真實偏好。\",\"question\":\"此合成分支選定的牛排熟度是哪一種？請選：三分熟、五分熟、七分熟、全熟，或其他。\"} -->\n### 核心結論\n若依本分支提供的合成情境，鑄鐵鍋可先預熱至很熱、接近冒煙，再將擦乾的牛排煎上色，約每分鐘翻面並視鍋內熱區移動；接近目標時調低火力，使用即讀溫度計測量最厚處並依目標熟度停止加熱、靜置。使用者要的實際熟度尚未選定，因此目前不能給出相應中心溫度或離火點。\n\n- 鑄鐵鍋爐上煎製流程：已回答。\n- 使用者偏好的熟度及相應溫度目標：仍待確認。\n\n### 關鍵知識\n- 煎前擦乾牛排；鍋中薄覆高煙點油，預熱至很熱、剛開始冒煙後下肉。\n- 約每分鐘翻面可依來源流程煎至深褐色；可將牛排移至鍋內較熱位置。接近所需溫度時可調低火力，並選擇加入奶油與香料淋煎。\n- 以溫度計測量中心最厚處；固定時間不能可靠代表熟度。特定食譜在目標前約 5°F（約 3°C）離火並靜置至少 5 分鐘，屬該食譜示例，不是通用保證。\n- USDA FSIS 對完整牛排建議至少加熱至 145°F（約 63°C），並靜置至少 3 分鐘。此食品安全建議與熟度口感選擇用途不同。\n\n### 證據與來源\n- [Washington Post：Stovetop Strip Steak](https://www.washingtonpost.com/recipes/stovetop-strip-steak/)：提供爐上鑄鐵鍋預熱、擦乾、翻面、量測中心溫度、奶油淋煎及靜置流程，示例為 strip steak。\n- [Washington Post：How to cook steak in a skillet](https://www.washingtonpost.com/food/2025/05/09/how-to-cook-steak-skillet-stovetop/)：說明鑄鐵鍋保熱、翻面時移動牛排、淋煎及離火後溫度可能上升。\n- [USDA FSIS：Keep Food Safe! Food Safety Basics](https://www.fsis.usda.gov/food-safety/safe-food-handling-and-preparation/food-safety-basics/steps-keep-food-safe)：提供完整肉塊最低內部溫度及靜置建議。\n- [USDA FSIS：Food Thermometers](https://www.fsis.usda.gov/food-safety/safe-food-handling-and-preparation/food-safety-basics/food-thermometers)：說明使用食物溫度計確認安全內部溫度。\n- 原始答案快照標示為合成測試資料；它是本分支情境條件，不是實際使用者偏好的證據。\n\n### 取捨與限制\n- 「鍋熱至剛冒煙」是操作線索，不是通用精確鍋面溫度；爐具、鍋具、油品與通風條件均會影響升溫。\n- 食譜時間及離火溫差取決於牛排尺寸與設備；目前沒有足夠資料提供可靠的固定分鐘數或熟度溫度表。\n- 安全最低溫度不等同熟度分類。若選擇低於 USDA FSIS 建議的溫度，須理解兩者差異。\n\n### 待確認事項\n- 請指定本合成分支採用的熟度：三分熟、五分熟、七分熟、全熟或其他。此選擇只作為分支條件，不代表真實使用者偏好。\n- 若需估算實際煎製時間，還需牛排厚度及爐具資訊。\n\n### 更新紀錄\n- 整理持續報告，確認爐上鑄鐵鍋流程已有支持，並標出熟度條件仍待選定。",
+    "suggestions": [],
+    "visualReferences": []
+  }
+}

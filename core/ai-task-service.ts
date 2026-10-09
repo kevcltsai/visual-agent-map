@@ -1,15 +1,17 @@
 import { packReferenceChunks, referenceBatches, referenceCatalog, resolveReferenceLinks } from "../ai/reference-materials";
 import { buildPreparedTaskContext, estimateTokens } from "../ai/context-builder";
-import { effectiveReasoningLevel, normalizeReasoningLevel, researchGuidance, researchLimits } from "../ai/task-policy";
+import { effectiveReasoningLevel, normalizeReasoningLevel, researchGuidance } from "../ai/task-policy";
 import type { AiResult, ReasoningLevel, TaskContext } from "../ai/types";
 import { translate, t, type TranslationKey, type UiLanguage } from "../i18n";
 import responseSchema from "../response-schema.json";
+import mindSearchGapAuditSchema from "../ai/mindsearch-gap-audit-schema";
 import { CLAUDE_MODEL_CHOICES, providerForModel, providerModelId } from "../ai/providers/provider";
-import type { CodexAppServerRuntime } from "../ai/runtime/codex-app-server";
+import type { CodexAppServerRuntime, CodexWebSearchEvent } from "../ai/runtime/codex-app-server";
 import type { ClaudeCodeCliRuntime } from "../ai/runtime/claude-code-cli";
 import type { AiExchangeLog } from "../ai-exchange-log";
 import { visualGuidance } from "../ai/visual-guidance";
 import { randomUUID } from "node:crypto";
+import { buildMindSearchPrompt } from "../ai/mindsearch-prompt";
 
 export function extractJsonObject(raw: string): string {
   const candidates: string[] = [];
@@ -56,8 +58,11 @@ export class AiTaskService {
     reasoning?: unknown,
     signal?: AbortSignal,
     onExchange?: (id: string) => void,
-    onRequestAccepted?: () => void
+    onRequestAccepted?: () => void,
+    /** Receives opaque native Codex webSearch events; results may contain snippets only, not page bodies. */
+    onWebSearchEvent?: (event: CodexWebSearchEvent) => void
   ): Promise<AiResult> {
+    if (input.timeoutMs !== undefined && (!Number.isInteger(input.timeoutMs) || input.timeoutMs < 180_000 || input.timeoutMs > 600_000)) throw new Error("Invalid AI task timeout.");
     const provider = providerForModel(model);
     if (provider === "claude" && !CLAUDE_MODEL_CHOICES.some(choice => choice.id === model)) {
       throw new Error(t("ui.claude_model_is_not_supported_0", model));
@@ -87,7 +92,7 @@ export class AiTaskService {
     context = prepared.context;
     const pluginDirectory = this.options.pluginDirectory();
     const outputLanguage = context.outputLanguage ?? this.options.language();
-    const instructions = [
+    const instructions = context.promptProfile === "mindsearch" ? buildMindSearchPrompt(context, outputLanguage) : [
       translate(outputLanguage, "prompt.output_language"),
       translate(outputLanguage, "prompt.role"),
       translate(outputLanguage, "prompt.source_safety"),
@@ -96,7 +101,9 @@ export class AiTaskService {
       translate(outputLanguage, "prompt.json"),
       translate(outputLanguage, context.mode === "task" ? "prompt.general_task" : context.mode === "decompose" ? "prompt.decompose" : context.mode === "synthesize" ? "prompt.synthesize" : "prompt.default_task"),
       context.mode !== "decompose"
-        ? translate(outputLanguage, "prompt.detail_structure", ["detail.core_conclusions", "detail.key_knowledge", "detail.evidence_and_sources", "detail.tradeoffs_and_limitations", "detail.open_questions", "detail.update_log"].map(key => `### ${translate(outputLanguage, key as TranslationKey)}`).join(", "))
+        ? context.detailFormat === "adaptive"
+          ? translate(outputLanguage, "prompt.adaptive_detail_structure")
+          : translate(outputLanguage, "prompt.detail_structure", ["detail.core_conclusions", "detail.key_knowledge", "detail.evidence_and_sources", "detail.tradeoffs_and_limitations", "detail.open_questions", "detail.update_log"].map(key => `### ${translate(outputLanguage, key as TranslationKey)}`).join(", "))
         : "",
       researchGuidance(context, outputLanguage),
       ...visualGuidance(context, outputLanguage),
@@ -124,19 +131,28 @@ export class AiTaskService {
     try {
       const controls = {
         signal,
+        ...(input.timeoutMs !== undefined ? { timeoutMs: Math.min(600_000, Math.max(180_000, input.timeoutMs)), timeoutMessage: translate(outputLanguage, "ui.mindsearch_task_timeout", Math.ceil(Math.min(600_000, Math.max(180_000, input.timeoutMs)) / 60_000)) } : {}),
+        ...(context.mindSearchIsolatedResearch ? { webSearchOnly: context.researchMode !== "local", textOnly: context.researchMode === "local" } : {}),
         onAccepted: onRequestAccepted,
-        searchBudget: context.researchMode === "local" ? 0 : researchLimits(context.researchDepth).searches,
+        // Search depth guides investigation; it does not impose a per-task query cap.
+        // Codex uses 0 as no steering budget; Claude receives webSearch separately.
+        searchBudget: 0,
+        webSearch: context.researchMode !== "local",
         onRequest: (request: unknown): void => {
           stage = "等待 AI 回覆";
-          if (this.options.exchangeLoggingEnabled()) exchanges?.sent(exchangeId, JSON.stringify(request, null, 2));
+          if (this.options.exchangeLoggingEnabled()) exchanges?.sent(exchangeId, JSON.stringify(request, null, 2), instructions);
         }
       };
+      const isMindSearchGapAudit = context.responseContract === "mindsearch-gap-audit" && context.promptProfile === "mindsearch" && context.researchMode === "local";
+      const isDeliveryAcceptance = context.responseContract === "mindsearch-delivery-acceptance" && context.promptProfile === "mindsearch" && context.researchMode === "local";
+      const deliverySchema = { ...responseSchema, properties: { ...responseSchema.properties, summary: { type: "string", description: "A short plain-language preview. Never put machine-readable review markers here." }, detail: { type: "string", pattern: "^\\s*<!--\\s*mindsearch-review\\s+\\{[^\\r\\n]*\\}\\s*-->", description: "Begin with the COMPLETE first-line MindSearch review marker containing decision and rationale (and stopReason for conclude). Put the marker in detail only, followed by the acceptance explanation. Never split or truncate the marker." } } };
+      const schema = isMindSearchGapAudit ? mindSearchGapAuditSchema : isDeliveryAcceptance ? deliverySchema : responseSchema;
       const raw = provider === "claude"
-        ? await this.options.claudeRuntime(pluginDirectory).runTask(instructions, providerModelId(model), effort, responseSchema, controls)
-        : await this.options.codexRuntime(pluginDirectory, context.researchMode === "local").runTask(instructions, model, effort, responseSchema, controls);
+        ? await this.options.claudeRuntime(pluginDirectory).runTask(instructions, providerModelId(model), effort, schema, controls)
+        : await this.options.codexRuntime(pluginDirectory, context.researchMode === "local").runTask(instructions, model, effort, schema, { ...controls, onWebSearchEvent });
       stage = "解析 AI 回覆";
       if (this.options.exchangeLoggingEnabled()) exchanges?.received(exchangeId, raw);
-      const result = this.parseAiResult(raw, provider === "claude" ? "Claude Code" : "Codex App Server", outputLanguage);
+      const result = this.parseAiResult(raw, provider === "claude" ? "Claude Code" : "Codex App Server", outputLanguage, isMindSearchGapAudit);
       if (referenceGroups.length) {
         result.summary = resolveReferenceLinks(result.summary, referenceGroups);
         result.detail = resolveReferenceLinks(result.detail, referenceGroups);
@@ -185,11 +201,14 @@ export class AiTaskService {
     }
   }
 
-  private parseAiResult(raw: string, label: string, language: UiLanguage): AiResult {
+  private parseAiResult(raw: string, label: string, language: UiLanguage, strictGapAudit = false): AiResult {
     const cleaned = raw.replace(/^```(?:json)?\s*/i, "").replace(/\s*```$/, "").trim();
     const parsed: { summary?: unknown; detail?: unknown; suggestions?: unknown; visualReferences?: unknown } =
       JSON.parse(extractJsonObject(cleaned)) as { summary?: unknown; detail?: unknown; suggestions?: unknown; visualReferences?: unknown };
     if (typeof parsed.summary !== "string" || typeof parsed.detail !== "string") throw new Error(`${label} 沒有回傳 summary 與 detail`);
+    if (strictGapAudit && (!(["user_condition", "external_evidence"] as string[]).includes(parsed.summary) || !parsed.detail.trim() || !Array.isArray(parsed.suggestions) || parsed.suggestions.length !== 0 || !Array.isArray(parsed.visualReferences) || parsed.visualReferences.length !== 0)) {
+      throw new Error("MindSearch research-gap audit returned an invalid structured classification.");
+    }
     const isRecord = (value: unknown): value is Record<string, unknown> => typeof value === "object" && value !== null;
     const suggestions = Array.isArray(parsed.suggestions)
       ? parsed.suggestions

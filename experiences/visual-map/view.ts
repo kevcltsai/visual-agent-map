@@ -1,5 +1,6 @@
+import { MindSearchClarificationModal } from "../../ui/modals/mind-search-clarification-modal";
 import { withThinkingOrigin } from "./thinking-origin";
-import { createHash } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
 import type VisualAgentMapPlugin from "../../main";
 import { t, topicStatusLabel, translate, type TranslationKey } from "../../i18n";
 import { App, MarkdownRenderer, ItemView, Modal, Notice, Setting, TFile, WorkspaceLeaf } from "obsidian";
@@ -8,7 +9,7 @@ import { readMarkdownFile, type ReferenceGroup } from "../../ai/reference-materi
 import { NameModal } from "../../ui/modals/name-modal";
 import { ChoiceModal } from "../../ui/modals/choice-modal";
 import { DebugLogModal } from "../../ui/modals/debug-log-modal";
-import { canParent, clone, descendants, History, inheritModel, type MapDocument, type MapNode, parseMap, removeNodes, serializeMap, visibleNodes } from "../../map-model";
+import { canParent, clearQuestionConvergenceEdges, repairMindSearchResultConvergence, clone, descendants, History, inheritModel, type MapDocument, type MapNode, parentIdsForNode, parseMap, removeNodes, serializeMap, visibleNodes } from "../../map-model";
 import { arrangeMap, arrangeNewBranch } from "../../map-layout";
 import { normalizeReasoningLevel, type ModelSource, type Note, type NotePatch, type ResearchDepth, type ResearchMode, type Settings, type TopicInfo, type TopicState, type VisualMode } from "../../repository";
 import { canonicalDetail, visualReferencesMarkdown } from "../../ai/result-utils";
@@ -17,12 +18,47 @@ import { clampPreviewScale, previewMetrics } from "../../ui/preview-utils";
 import { BUILTIN_SAMPLE_ID, builtInSample, SAMPLE_TOUR_VERSION } from "../../builtin-sample";
 import { PendingSuggestions } from "../../pending-suggestions";
 import { syncModelSelect } from "../../core/model-discovery";
+import { createMindSearchMap } from "../mind-search/create-map";
+import { MindSearchStartModal } from "../../ui/modals/mind-search-start-modal";
+import { MindSearchAnswerModal } from "../../ui/modals/mind-search-answer-modal";
+import { MindSearchManualFlow, countMindSearchAnsweredQuestions, MIN_ANSWERED_QUESTIONS_BEFORE_CONCLUSION, type ManualResearchResult, type PlannerQuestionResult } from "../mind-search/manual-flow";
+import { MindSearchRunStore } from "../../mindsearch-mve/research-run-store";
+import { matchMindSearchFailedReportTargets } from "../mind-search/retry-targets";
 
 export const VIEW_TYPE = "visual-agent-map-view";
 interface Action { undo: () => Promise<void>; redo: () => Promise<void>; label?: string }
 const originBaseline = (origin?: string): string => createHash("sha256").update(origin ?? "").digest("hex");
 
 type SynthesisContent = "full" | "summary";
+type MindSearchQuestionStatus = "running" | "completed" | "partial" | "failed" | "cancelled" | "not_started";
+function mindSearchQuestionStatus(map: MapDocument, questionNodeId: string, activeQuestionNodeId: string | null): MindSearchQuestionStatus {
+  if (activeQuestionNodeId === questionNodeId) return "running";
+  const branches = map.mindSearch?.branches.filter(branch => branch.questionNodeId === questionNodeId) ?? [];
+  const statuses = branches.map(branch => {
+    if (branch.researchPlanError && !branch.researchPlan) return "failed" as const;
+    const runs = (map.mindSearch?.runs ?? []).filter(item => item.branchId === branch.id);
+    if (runs.some(run => { const attempt = run.attempts.find(item => item.id === run.currentAttemptId); return attempt?.status === "running" || attempt?.status === "saving"; })) return "running" as const;
+    const terminal = [...branch.results].reverse().find(result => result.kind !== "research");
+    if (terminal) {
+      const terminalRun = runs.find(item => item.id === terminal.runId), terminalAttempt = terminalRun?.attempts.find(item => item.id === terminal.attemptId);
+      const latestRun = [...runs].reverse()[0], latestAttempt = latestRun?.attempts.find(item => item.id === latestRun.currentAttemptId);
+      if (latestAttempt?.status === "failed") return "failed" as const;
+      if (latestAttempt?.status === "cancelled") return "cancelled" as const;
+      return terminalAttempt?.status === "partial" ? "partial" as const : "completed" as const;
+    }
+    const latest = [...runs].reverse().find(run => run.attempts.some(item => item.id === run.currentAttemptId));
+    const status = latest?.attempts.find(item => item.id === latest.currentAttemptId)?.status;
+    if (status === "failed") return "failed" as const;
+    if (status === "cancelled") return "cancelled" as const;
+    return branch.researchPlan || branch.results.length || status === "completed" ? "partial" as const : "not_started" as const;
+  });
+  if (statuses.includes("running")) return "running";
+  if (statuses.includes("failed")) return "failed";
+  if (statuses.includes("partial")) return "partial";
+  if (statuses.includes("completed")) return "completed";
+  if (statuses.includes("cancelled")) return "cancelled";
+  return "not_started";
+}
 export interface TaskOptions { synthesisContent?: SynthesisContent; referenceGroups?: ReferenceGroup[]; onProgress?: (message: string) => void; signal?: AbortSignal; outputLanguage?: Settings["language"]; requirements?: string; researchMode: ResearchMode; researchDepth: ResearchDepth; visualMode: VisualMode; multiLayer?: boolean; shallowResearch?: boolean; layers?: number; firstLayerCount?: number; childrenPerParent?: number }
 function renderSynthesisContent(parent: HTMLElement, topics: string[]): HTMLSelectElement {
   const label = parent.createEl("label", { cls: "vam-field" });
@@ -632,11 +668,31 @@ export class VisualAgentMapView extends ItemView {
   private dragging = false;
   private suppressClickUntil = 0;
   private closed = false;
+  private mindSearchViewEpoch = 0;
+  private mapOpenEpoch = 0;
   private headerTitle = "";
   private builtIn = false;
   private showSampleTour = false;
   private sampleTourStep = 0;
-  constructor(leaf: WorkspaceLeaf, private plugin: VisualAgentMapPlugin) { super(leaf); }
+  private readonly mindSearchRuns: MindSearchRunStore;
+  private readonly mindSearchManual: MindSearchManualFlow;
+  private readonly mindSearchRecovery: MindSearchManualFlow;
+  private mindSearchBusy = false;
+  private mindSearchController: AbortController | null = null;
+  private mindSearchActiveQuestionNodeId: string | null = null;
+  private mindSearchActivityKind: "planning" | "research" | "clarifying" | null = null;
+  private mindSearchFailedReports = new Map<string, { runId: string; diagnosticNotePath: string }>();
+  private mindSearchAnswerRequestIds = new Map<string, string>();
+  constructor(leaf: WorkspaceLeaf, private plugin: VisualAgentMapPlugin) {
+    super(leaf);
+    this.mindSearchRuns = new MindSearchRunStore(plugin.repo);
+    this.mindSearchManual = new MindSearchManualFlow(plugin.repo, this.mindSearchRuns, (context, model, reasoning, signal, onWebSearchEvent) => plugin.askModel(context, model, reasoning, signal, undefined, undefined, onWebSearchEvent), undefined, async <T>(operation: () => Promise<T>): Promise<T> => {
+      let result!: T; await plugin.mutate(async () => { result = await operation(); }); return result;
+    });
+    // openMapInMutation already owns the repository queue. Startup recovery must persist
+    // directly within that scope instead of attempting to enqueue the same operation again.
+    this.mindSearchRecovery = new MindSearchManualFlow(plugin.repo, this.mindSearchRuns, (context, model, reasoning, signal, onWebSearchEvent) => plugin.askModel(context, model, reasoning, signal, undefined, undefined, onWebSearchEvent));
+  }
   getViewType(): string { return VIEW_TYPE; }
   getDisplayText(): string { return this.map?.title ?? "Visual Agent Map"; }
   getIcon(): string { return "brain-circuit"; }
@@ -647,6 +703,9 @@ export class VisualAgentMapView extends ItemView {
     await super.setState(state, result);
   }
   async onOpen(): Promise<void> {
+    this.closed = false;
+    const epoch = ++this.mindSearchViewEpoch;
+    this.mapOpenEpoch++;
     this.contentEl.addClass("vam-view"); this.contentEl.tabIndex = 0;
     this.registerDomEvent(this.contentEl, "keydown", event => {
       if (event.target instanceof HTMLElement && event.target.closest("input, textarea, select, [contenteditable=true]")) return;
@@ -654,13 +713,37 @@ export class VisualAgentMapView extends ItemView {
       if (event.key === "Escape") { this.selected = null; this.multiSelected.clear(); this.integrationMode = false; this.render(); }
     });
     await this.plugin.ready;
+    if (this.closed || this.mindSearchViewEpoch !== epoch) return;
     if (!this.path && !this.builtIn) {
       if (this.plugin.consumeFirstInstallSample()) await this.openBuiltInSample();
       else if (!this.plugin.repo.workspaceExists()) this.render();
-      else { const files = await this.plugin.repo.mapFiles(); if (files.length) await this.openMap(files[0].path); else this.render(); }
+      else { const files = await this.plugin.repo.mapFiles(); if (this.closed || this.mindSearchViewEpoch !== epoch) return; if (files.length) {
+        let defaultPath = files[0].path;
+        for (const file of files) {
+          let candidate: MapDocument;
+          try { candidate = await this.plugin.repo.readMap(file.path); } catch { continue; }
+          if (this.closed || this.mindSearchViewEpoch !== epoch) return;
+          if (!candidate.mindSearch) { defaultPath = file.path; break; }
+        }
+        await this.openMap(defaultPath);
+      } else this.render(); }
     }
   }
-  async onClose(): Promise<void> { this.closed = true; if (this.refreshTimer !== null) window.clearTimeout(this.refreshTimer); if (this.hoverTimer !== null) window.clearTimeout(this.hoverTimer); this.hoverCard?.remove(); if (this.viewportTimer !== null) { window.clearTimeout(this.viewportTimer); await this.persist(); } }
+  async onClose(): Promise<void> {
+    this.closed = true;
+    this.mindSearchViewEpoch++;
+    this.mapOpenEpoch++;
+    const controller = this.mindSearchController;
+    this.mindSearchController = null;
+    this.mindSearchBusy = false;
+    this.mindSearchActiveQuestionNodeId = null; this.mindSearchActivityKind = null;
+    controller?.abort();
+    if (this.refreshTimer !== null) window.clearTimeout(this.refreshTimer);
+    if (this.hoverTimer !== null) window.clearTimeout(this.hoverTimer);
+    this.hoverCard?.remove();
+    if (this.viewportTimer !== null) { window.clearTimeout(this.viewportTimer); await this.persist(); }
+  }
+  private mindSearchViewIsCurrent(epoch: number, mapPath: string): boolean { return !this.closed && this.mindSearchViewEpoch === epoch && this.path === mapPath; }
   async refreshFromPlugin(): Promise<void> {
     if (this.builtIn) {
       const sample = builtInSample(this.plugin.settings.language);
@@ -685,20 +768,396 @@ export class VisualAgentMapView extends ItemView {
   syncOutline(): void { this.plugin.syncOutline(this.builtIn ? null : this.map, this.notes, this.builtIn); }
   private enqueue(work: () => Promise<void>): void { void this.plugin.mutate(work).catch(() => {}); }
   private async persist(): Promise<void> { if (!this.builtIn && this.map && this.path) await this.plugin.repo.saveMap(this.path, this.map); }
-  private async hydrate(): Promise<void> {
-    if (this.builtIn) { this.notes = builtInSample(this.plugin.settings.language).notes; return; }
-    this.notes.clear();
-    for (const node of this.map?.nodes ?? []) { try { this.notes.set(node.id, await this.plugin.repo.readNote(node.path)); } catch { /* A missing note remains visible and removable on the map. */ } }
+  private async hydrate(isCurrent: () => boolean = () => true): Promise<void> {
+    this.mindSearchFailedReports.clear();
+    if (this.builtIn) { if (isCurrent()) this.notes = builtInSample(this.plugin.settings.language).notes; return; }
+    const loaded = new Map<string, Note>();
+    for (const node of this.map?.nodes ?? []) {
+      if (!isCurrent()) return;
+      try { loaded.set(node.id, await this.plugin.repo.readNote(node.path)); } catch { /* A missing note remains visible and removable on the map. */ }
+    }
+    if (!isCurrent()) return;
+    this.notes = loaded;
+    await this.hydrateFailedReportTargets(isCurrent);
+  }
+  private async hydrateFailedReportTargets(isCurrent: () => boolean): Promise<void> {
+    const map = this.map, mapPath = this.path;
+    if (!mapPath || !map?.mindSearch) return;
+    const failed = map.mindSearch.runs.some(run => run.attempts.find(item => item.id === run.currentAttemptId)?.status === "failed");
+    if (!failed) return;
+    const notesFolder = this.plugin.repo.topicFolder(mapPath, "Notes"), candidates: Array<{ path: string; note: Note }> = [];
+    for (const file of this.plugin.repo.app.vault.getMarkdownFiles()) {
+      if (!file.path.startsWith(`${notesFolder}/`)) continue;
+      if (!isCurrent()) return;
+      try { candidates.push({ path: file.path, note: await this.plugin.repo.readNote(file.path) }); } catch { /* Unreadable notes cannot authorize a retry action. */ }
+    }
+    if (!isCurrent()) return;
+    this.mindSearchFailedReports.clear();
+    for (const [questionNodeId, target] of matchMindSearchFailedReportTargets(map, candidates)) this.mindSearchFailedReports.set(questionNodeId, target);
   }
   async openMap(path: string): Promise<void> {
-    if (this.viewportTimer !== null) { window.clearTimeout(this.viewportTimer); this.viewportTimer = null; await this.persist(); }
-    const map = await this.plugin.repo.readMap(path);
+    await this.plugin.mutate(() => this.openMapInMutation(path));
+  }
+  private async openMapInMutation(path: string): Promise<void> {
+    const viewEpoch = this.mindSearchViewEpoch, openEpoch = ++this.mapOpenEpoch;
+    const isCurrent = () => !this.closed && this.mindSearchViewEpoch === viewEpoch && this.mapOpenEpoch === openEpoch;
+    if (!isCurrent()) return;
+    if (this.viewportTimer !== null) { window.clearTimeout(this.viewportTimer); this.viewportTimer = null; await this.persist(); if (!isCurrent()) return; }
+    let map = await this.plugin.repo.readMap(path);
+    if (!isCurrent()) return;
+    if (map.mindSearch?.creationId && map.mindSearch.rootDraft) {
+      const resumed = await createMindSearchMap(this.plugin.repo, this.plugin.settings.cliModel, {
+        requestId: map.mindSearch.creationId,
+        topic: map.title,
+        context: map.mindSearch.rootDraft.context,
+        model: map.mindSearch.rootDraft.model,
+        reasoning: map.mindSearch.rootDraft.reasoning
+      });
+      if (!isCurrent()) return;
+      map = resumed.map;
+    }
+    if (map.mindSearch?.questionDraft) { await this.mindSearchRecovery.recoverQuestionDraft(path); if (!isCurrent()) return; map = await this.plugin.repo.readMap(path); if (!isCurrent()) return; }
+    if (map.mindSearch) {
+      await this.mindSearchRuns.recoverPending(path);
+      if (!isCurrent()) return;
+      await this.mindSearchRuns.failInterrupted(path);
+      if (!isCurrent()) return;
+      await this.mindSearchRecovery.recoverPostReportQuestions(path);
+      if (!isCurrent()) return;
+      map = await this.plugin.repo.readMap(path);
+      if (!isCurrent()) return;
+    }
+    const clearedQuestionEdges = clearQuestionConvergenceEdges(map);
+    const repairedResultEdges = repairMindSearchResultConvergence(map);
+    if (clearedQuestionEdges || repairedResultEdges) {
+      await this.plugin.repo.saveMap(path, map);
+      if (!isCurrent()) return;
+    }
     if (this.builtIn || this.path !== path) this.plugin.closeStaleDetails();
-    this.builtIn = false; this.path = path; this.map = map; this.integrationMode = false; this.selected = null; this.multiSelected.clear(); this.history.clear(); await this.hydrate(); this.render();
+    this.builtIn = false; this.path = path; this.map = map; this.integrationMode = false; this.selected = null; this.multiSelected.clear(); this.history.clear(); await this.hydrate(isCurrent); if (!isCurrent()) return; this.render();
     this.app.workspace.requestSaveLayout();
   }
+  openMindSearchStart(): void {
+    if (this.closed) return;
+    const epoch = this.mindSearchViewEpoch;
+    const isCurrent = () => !this.closed && this.mindSearchViewEpoch === epoch;
+    const availableModels = typeof this.plugin.availableModels === "function" ? this.plugin.availableModels() : [];
+    const configuredModel = this.plugin.settings.cliModel?.trim() || "gpt-5.6-luna";
+    const configuredReasoning = normalizeReasoningLevel(this.plugin.settings.cliReasoning);
+    const defaultReasoning = configuredReasoning === "medium" || configuredReasoning === "high" ? configuredReasoning : "low";
+    const modelIds = [...new Set([configuredModel, ...availableModels].filter(Boolean))];
+    const modelChoices = modelIds.map(id => ({ id, label: typeof this.plugin.modelLabel === "function" ? this.plugin.modelLabel(id) : id }));
+    new MindSearchStartModal(this.app, input => this.plugin.mutate(async () => {
+      if (!isCurrent()) return;
+      await this.plugin.repo.ensureWorkspace();
+      if (!isCurrent()) return;
+      const created = await createMindSearchMap(this.plugin.repo, input.model, input);
+      await this.plugin.rebuildDerivedData();
+      if (!isCurrent()) return;
+      await this.openMapInMutation(created.mapPath);
+      if (!isCurrent() || this.path !== created.mapPath || this.map?.id !== created.map.id) return;
+      this.selected = created.root.id; this.render(); this.focusNode(created.root);
+    }), modelChoices, configuredModel, defaultReasoning, async () => {
+      const states = await Promise.all([this.plugin.refreshModelDiscovery("codex"), this.plugin.refreshModelDiscovery("claude")]);
+      const ready = states.filter(state => state.status === "ready");
+      const models = [...new Set(ready.flatMap(state => state.models))];
+      if (!ready.length || !models.length) throw new Error(states.map(state => state.error).filter(Boolean).join("; ") || t("ui.mindsearch_no_models_found"));
+      const choices = models.map(id => ({ id, label: this.plugin.modelLabel(id) }));
+      const errors = states.filter(state => state.status === "error").map(state => state.error).filter(Boolean);
+      return errors.length ? { models: choices, message: t("ui.mindsearch_models_refreshed_partial_0", errors.join("; ")), preserveSelection: true } : choices;
+    }).open();
+  }
+  private openNewMindMapModal(): void {
+    new NameModal(this.app, t("ui.new_mind_map"), t("ui.new_mind_map_from_sample"), title => this.enqueue(async () => this.openMapInMutation(await this.plugin.repo.createMap(title)))).open();
+  }
+  async planMindSearchQuestion(parentNodeId: string, requestId: string, parentBranchId: string | null = null, signal?: AbortSignal): Promise<PlannerQuestionResult> {
+    if (this.closed || !this.map || !this.path || this.builtIn) throw new Error("Open a saved MindSearch map before planning its next question.");
+    const mapPath = this.path, epoch = this.mindSearchViewEpoch;
+    const parent = this.notes.get(parentNodeId);
+    if (!parent) throw new Error("The selected Planner question parent is unavailable.");
+    const planned: PlannerQuestionResult = await this.mindSearchManual.planNextQuestion(mapPath, parentNodeId, parent.model, parent.reasoning, requestId, parentBranchId, signal);
+    const isCurrent = () => this.mindSearchViewIsCurrent(epoch, mapPath) && !signal?.aborted;
+    if (isCurrent()) {
+      const latest = await this.plugin.repo.readMap(mapPath);
+      if (isCurrent()) { this.map = latest; await this.hydrate(isCurrent); if (isCurrent()) { this.render(); this.syncOutline(); } }
+    }
+    return planned;
+  }
+  async submitMindSearchAnswer(questionNodeId: string, input: { requestId: string; selections: string[]; freeText: string }, signal?: AbortSignal): Promise<ManualResearchResult> {
+    if (this.closed || !this.map || !this.path || this.builtIn) throw new Error("Open a saved MindSearch map before submitting an answer.");
+    const mapPath = this.path, epoch = this.mindSearchViewEpoch;
+    const isCurrent = () => this.mindSearchViewIsCurrent(epoch, mapPath) && !signal?.aborted;
+    const question = this.notes.get(questionNodeId);
+    if (!question) throw new Error("The selected Planner question is unavailable.");
+    signal?.throwIfAborted();
+    let recoveredBranches = 0;
+    await this.plugin.mutate(async () => { recoveredBranches = await this.mindSearchRuns.recoverAnswerBranches(mapPath); });
+    if (recoveredBranches) {
+      if (!isCurrent()) return { status: "stale", branchId: "" };
+      this.map = await this.plugin.repo.readMap(mapPath);
+      await this.hydrate(isCurrent);
+      if (!isCurrent()) return { status: "stale", branchId: "" };
+      this.render(); this.syncOutline();
+    }
+    try {
+      const outcome = await this.mindSearchManual.answerAndResearch(mapPath, questionNodeId, input, question.model, question.reasoning, signal, async activeQuestionNodeId => {
+        if (!isCurrent()) return;
+        this.mindSearchActiveQuestionNodeId = activeQuestionNodeId;
+        this.map = await this.plugin.repo.readMap(mapPath);
+        await this.hydrate(isCurrent);
+        if (isCurrent()) this.render();
+      });
+      if (isCurrent()) {
+        const latest = await this.plugin.repo.readMap(mapPath);
+        if (isCurrent()) { this.map = latest; await this.hydrate(isCurrent); if (isCurrent()) { this.render(); this.syncOutline(); } }
+      }
+      return outcome;
+    } catch (error) {
+      if (isCurrent()) {
+        const latest = await this.plugin.repo.readMap(mapPath);
+        if (isCurrent()) { this.map = latest; await this.hydrate(isCurrent); if (isCurrent()) { this.render(); this.syncOutline(); } }
+      }
+      throw error;
+    }
+  }
+  private renderMindSearchFailure(card: HTMLElement, branch: import("../../map-model").MindSearchBranchRecord): void {
+    const runs = this.map?.mindSearch?.runs.filter(run => run.branchId === branch.id) ?? [];
+    const latest = runs.at(-1), attempt = latest?.attempts.find(item => item.id === latest.currentAttemptId);
+    if (attempt?.status !== "failed" && !branch.researchPlanError) return;
+    const box = card.createDiv({ cls: "vam-mindsearch-failure" });
+    box.createEl("p", { text: t("ui.mindsearch_failure_reason", attempt?.stopReason || branch.researchPlanError || t("ui.expansion_failed")) });
+    const phase = attempt?.phase ?? branch.deliveryRecovery?.phase ?? (branch.researchPlanError ? "research-plan" : undefined);
+    const labels: Record<string, string> = {
+      "subtopic-research": t("ui.mindsearch_stage_subtopic"), "report-review": t("ui.mindsearch_stage_review"), "research-plan": t("ui.mindsearch_stage_plan"),
+      "delivery-outline": t("ui.mindsearch_stage_delivery-outline"), "delivery-research": t("ui.mindsearch_stage_delivery-research"),
+      "delivery-writing": t("ui.mindsearch_stage_delivery-writing"), "delivery-acceptance": t("ui.mindsearch_stage_delivery-acceptance")
+    };
+    if (phase && labels[phase]) box.createEl("p", { text: t("ui.mindsearch_failure_stage", labels[phase]) });
+    const timedOut = /超過.*分鐘|timed?\s*out|timeout|exceeded.*minutes/i.test(attempt?.stopReason ?? branch.researchPlanError ?? "");
+    const reason = attempt?.stopReason ?? branch.researchPlanError ?? "";
+    const remedy = timedOut ? "ui.mindsearch_repair_timeout_hint" : /auth|login|sign.in|登入|unauthorized|quota|rate.limit/i.test(reason) ? "ui.mindsearch_repair_auth_hint" : /format|schema|JSON|marker|格式|分類/i.test(reason) ? "ui.mindsearch_repair_format_hint" : /search|搜尋|網路|network/i.test(reason) ? "ui.mindsearch_repair_search_hint" : "ui.mindsearch_repair_retry_hint";
+    box.createEl("p", { text: t(remedy) });
+    if (timedOut) this.button(box, t("ui.mindsearch_repair_timeout"), () => {
+      const terminal = [...branch.results].reverse().find(result => result.kind !== "research");
+      if (terminal) void this.continueMindSearchResearch(branch.questionNodeId, terminal.runId, 600_000);
+      else void this.retryMindSearchSubtopics(branch.id, 600_000);
+    }, this.mindSearchBusy).addClass("mod-cta");
+  }
+
+  private async retryMindSearchSubtopics(branchId: string, timeoutMs?: number): Promise<void> {
+    const branch = this.map?.mindSearch?.branches.find(item => item.id === branchId), question = branch && this.map?.nodes.find(item => item.id === branch.questionNodeId);
+    const note = question && this.notes.get(question.id);
+    if (this.closed || !this.path || !branch || !question || !note || this.mindSearchBusy) return;
+    const branchRuns = (this.map?.mindSearch?.runs ?? []).filter(item => item.branchId === branch.id);
+    if (branchRuns.some(run => { const attempt = run.attempts.find(item => item.id === run.currentAttemptId); return attempt?.status === "running" || attempt?.status === "saving"; })) return;
+    const terminal = branch.results.some(result => result.kind !== "research");
+    if (terminal) return;
+    const epoch = this.mindSearchViewEpoch, mapPath = this.path, controller = new AbortController();
+    this.mindSearchBusy = true; this.mindSearchController = controller; this.mindSearchActiveQuestionNodeId = question.id; this.mindSearchActivityKind = "research"; this.render();
+    try {
+      if (timeoutMs) await this.plugin.mutate(() => this.mindSearchRuns.configureRetryTimeout(mapPath, branch.id, timeoutMs));
+      const result = branch.researchPlan
+        ? await this.mindSearchManual.resumeAnswerResearch(mapPath, branch.id, note.model, note.reasoning, controller.signal)
+        : await this.mindSearchManual.retryAnswerResearch(mapPath, branch.id, note.model, note.reasoning, controller.signal);
+      if (!this.mindSearchViewIsCurrent(epoch, mapPath) || this.mindSearchController !== controller) return;
+      const latest = await this.plugin.repo.readMap(mapPath);
+      if (this.mindSearchViewIsCurrent(epoch, mapPath)) { this.map = latest; await this.hydrate(() => this.mindSearchViewIsCurrent(epoch, mapPath)); this.render(); this.syncOutline(); }
+      if (result.status === "waiting-user") new Notice(t("ui.mindsearch_waiting_user"));
+      else if (result.status === "partial") new Notice(t("ui.mindsearch_research_partial"));
+      else if (result.status === "completed") new Notice(t("ui.mindsearch_research_saved"));
+      else if (result.status === "in-progress") new Notice(t("ui.mindsearch_research_already_running"));
+    } catch (error) {
+      if (!this.mindSearchViewIsCurrent(epoch, mapPath) || this.mindSearchController !== controller) return;
+      if (controller.signal.aborted) new Notice(t("ui.research_stopped_existing_content_was_preserved"));
+      else new Notice(error instanceof Error ? error.message : String(error));
+      const latest = await this.plugin.repo.readMap(mapPath);
+      if (this.mindSearchViewIsCurrent(epoch, mapPath)) { this.map = latest; await this.hydrate(() => this.mindSearchViewIsCurrent(epoch, mapPath)); this.render(); this.syncOutline(); }
+    } finally {
+      if (this.mindSearchController === controller) { this.mindSearchBusy = false; this.mindSearchController = null; this.mindSearchActiveQuestionNodeId = null; this.mindSearchActivityKind = null; if (this.mindSearchViewIsCurrent(epoch, mapPath)) this.render(); }
+    }
+  }
+  async reviewMindSearchFailedReport(runId: string, diagnosticNotePath: string, signal?: AbortSignal): Promise<ManualResearchResult> {
+    if (this.closed || !this.map || !this.path || this.builtIn) throw new Error("Open the saved MindSearch map before reviewing a failed report.");
+    const mapPath = this.path, epoch = this.mindSearchViewEpoch;
+    const outcome = await this.mindSearchManual.reviewFailedAttemptReport(mapPath, runId, diagnosticNotePath, signal);
+    const isCurrent = () => this.mindSearchViewIsCurrent(epoch, mapPath) && !signal?.aborted;
+    if (isCurrent()) {
+      const latest = await this.plugin.repo.readMap(mapPath);
+      if (isCurrent()) { this.map = latest; await this.hydrate(isCurrent); if (isCurrent()) { this.render(); this.syncOutline(); } }
+    }
+    return outcome;
+  }
+  private async planMindSearchFromSelection(nodeId = this.selected): Promise<void> {
+    const node = this.map?.nodes.find(item => item.id === nodeId);
+    if (this.closed || !node || !this.path || !this.map?.mindSearch || this.mindSearchBusy) return;
+    const epoch = this.mindSearchViewEpoch, mapPath = this.path, controller = new AbortController();
+    const parentBranchId = this.map.mindSearch.branches.find(branch => branch.results.some(result => result.nodeId === node.id))?.id ?? null;
+    this.mindSearchBusy = true; this.mindSearchController = controller; this.mindSearchActiveQuestionNodeId = node.id; this.mindSearchActivityKind = "planning"; this.render();
+    try {
+    const rootNote = this.notes.get(node.id);
+    if (node.mindSearchKind === "topic" && rootNote && !rootNote.detail.includes("<!-- mindsearch-intake-complete -->")) {
+      this.mindSearchActivityKind = "clarifying"; this.render();
+      const questions = await this.mindSearchManual.prepareClarification(rootNote, controller.signal);
+      if (!this.mindSearchViewIsCurrent(epoch, mapPath) || controller.signal.aborted) return;
+      if (questions.length) {
+        new MindSearchClarificationModal(this.app, questions, async answers => {
+          if (!this.mindSearchViewIsCurrent(epoch, mapPath)) throw new Error("Reopen the original MindSearch map to continue.");
+          await this.plugin.mutate(async () => {
+            const latest = await this.plugin.repo.readNote(node.path);
+            if (!latest.detail.includes("<!-- mindsearch-intake-complete -->")) {
+              await this.plugin.repo.updateNote(node.path, { detail: latest.detail + "\n\n<!-- mindsearch-intake-complete -->\n## " + (this.plugin.settings.language === "en" ? "Initial user clarification" : "開始前條件釐清") + "\n\n" + answers });
+            }
+          });
+          await this.hydrate();
+          void this.planMindSearchFromSelection(node.id);
+        }, this.plugin.settings.language === "en").open();
+        return;
+      }
+      await this.plugin.mutate(async () => {
+        const latest = await this.plugin.repo.readNote(node.path);
+        await this.plugin.repo.updateNote(node.path, { detail: latest.detail + "\n\n<!-- mindsearch-intake-complete -->" });
+      });
+      await this.hydrate();
+    }
+    this.mindSearchActivityKind = "planning"; this.render();
+    const result = await this.planMindSearchQuestion(node.id, randomUUID(), parentBranchId, controller.signal);
+      if (!this.mindSearchViewIsCurrent(epoch, mapPath) || this.mindSearchController !== controller) return;
+      if (result.status === "question") { this.selected = result.node.id; this.render(); this.focusNode(result.node); new Notice(t("ui.mindsearch_question_ready")); }
+      else if (result.outcome) {
+        const outcome = result.outcome;
+        if (outcome.status === "partial") new Notice(t("ui.mindsearch_research_partial"));
+        else if (outcome.status === "waiting-user") { const question = this.map?.nodes.find(item => item.id === outcome.questionNodeId); if (question) { this.selected = question.id; this.render(); this.focusNode(question); } new Notice(t("ui.mindsearch_waiting_user")); }
+        else if (outcome.status === "completed") new Notice(t("ui.mindsearch_research_saved"));
+        else if (outcome.status === "in-progress") new Notice(t("ui.mindsearch_research_already_running"));
+        else new Notice(t("ui.mindsearch_research_result_stale"));
+      } else new Notice(t("ui.mindsearch_no_question_needed"));
+    } catch (error) {
+      if (!this.mindSearchViewIsCurrent(epoch, mapPath) || this.mindSearchController !== controller) return;
+      if (controller.signal.aborted) new Notice(t("ui.research_stopped_existing_content_was_preserved"));
+      else new Notice(error instanceof Error ? error.message : String(error));
+    } finally {
+      if (this.mindSearchController === controller) { this.mindSearchBusy = false; this.mindSearchController = null; this.mindSearchActiveQuestionNodeId = null; this.mindSearchActivityKind = null; if (this.mindSearchViewIsCurrent(epoch, mapPath)) this.render(); }
+    }
+  }
+  private async retryMindSearchFromSavedReport(questionNodeId: string): Promise<void> {
+    const target = this.mindSearchFailedReports.get(questionNodeId), mapPath = this.path, epoch = this.mindSearchViewEpoch;
+    if (this.closed || !target || !mapPath || !this.map?.mindSearch || this.mindSearchBusy || this.builtIn) return;
+    const run = this.map.mindSearch.runs.find(item => item.id === target.runId);
+    const currentAttempt = run?.attempts.find(item => item.id === run.currentAttemptId);
+    const branch = run && this.map.mindSearch.branches.find(item => item.id === run.branchId);
+    if (!run || currentAttempt?.status !== "failed" || branch?.questionNodeId !== questionNodeId) {
+      this.mindSearchFailedReports.delete(questionNodeId); this.render(); return;
+    }
+    const controller = new AbortController();
+    this.mindSearchBusy = true; this.mindSearchController = controller; this.mindSearchActiveQuestionNodeId = questionNodeId; this.mindSearchActivityKind = "research"; this.render();
+    try {
+      const result = await this.reviewMindSearchFailedReport(target.runId, target.diagnosticNotePath, controller.signal);
+      if (!this.mindSearchViewIsCurrent(epoch, mapPath) || this.mindSearchController !== controller) return;
+      if (result.status === "waiting-user") {
+        const question = this.map?.nodes.find(item => item.id === result.questionNodeId);
+        if (question) { this.selected = question.id; this.render(); this.focusNode(question); }
+        new Notice(t("ui.mindsearch_waiting_user"));
+      } else if (result.status === "partial") new Notice(t("ui.mindsearch_research_partial"));
+      else if (result.status === "completed") new Notice(t("ui.mindsearch_research_saved"));
+      else if (result.status === "in-progress") new Notice(t("ui.mindsearch_research_already_running"));
+      else new Notice(t("ui.mindsearch_research_result_stale"));
+    } catch (error) {
+      if (!this.mindSearchViewIsCurrent(epoch, mapPath) || this.mindSearchController !== controller) return;
+      if (controller.signal.aborted) new Notice(t("ui.research_stopped_existing_content_was_preserved"));
+      else new Notice(error instanceof Error ? error.message : String(error));
+    } finally {
+      if (this.mindSearchController === controller) { this.mindSearchBusy = false; this.mindSearchController = null; this.mindSearchActiveQuestionNodeId = null; this.mindSearchActivityKind = null; if (this.mindSearchViewIsCurrent(epoch, mapPath)) this.render(); }
+    }
+  }
+  private async continueMindSearchResearch(questionNodeId: string, runId: string, timeoutMs?: number): Promise<void> {
+    const mapPath = this.path, epoch = this.mindSearchViewEpoch;
+    if (this.closed || !mapPath || !this.map?.mindSearch || this.mindSearchBusy || this.builtIn) return;
+    const run = this.map.mindSearch.runs.find(item => item.id === runId);
+    const branch = run && this.map.mindSearch.branches.find(item => item.id === run.branchId);
+    if (!run || branch?.questionNodeId !== questionNodeId) return;
+    const controller = new AbortController();
+    this.mindSearchBusy = true; this.mindSearchController = controller; this.mindSearchActiveQuestionNodeId = questionNodeId; this.mindSearchActivityKind = "research"; this.render();
+    const isCurrent = () => this.mindSearchViewIsCurrent(epoch, mapPath) && this.mindSearchController === controller;
+    try {
+      if (timeoutMs && branch) await this.plugin.mutate(() => this.mindSearchRuns.configureRetryTimeout(mapPath, branch.id, timeoutMs));
+      const result = await this.mindSearchManual.continuePartial(mapPath, runId, undefined, undefined, controller.signal);
+      if (!isCurrent()) return;
+      if (result.status === "waiting-user") new Notice(t("ui.mindsearch_waiting_user"));
+      else if (result.status === "partial") new Notice(t("ui.mindsearch_research_partial"));
+      else if (result.status === "completed") new Notice(t("ui.mindsearch_research_saved"));
+      else if (result.status === "in-progress") new Notice(t("ui.mindsearch_research_already_running"));
+    } catch (error) {
+      if (!isCurrent()) return;
+      new Notice(controller.signal.aborted ? t("ui.research_stopped_existing_content_was_preserved") : error instanceof Error ? error.message : String(error));
+    } finally {
+      if (this.mindSearchController === controller) {
+        try {
+          if (this.mindSearchViewIsCurrent(epoch, mapPath)) {
+            const latest = await this.plugin.repo.readMap(mapPath);
+            if (isCurrent()) { this.map = latest; await this.hydrate(isCurrent); }
+          }
+        } catch (error) {
+          if (isCurrent()) new Notice(error instanceof Error ? error.message : String(error));
+        } finally {
+          if (this.mindSearchController === controller) {
+            this.mindSearchBusy = false; this.mindSearchController = null; this.mindSearchActiveQuestionNodeId = null; this.mindSearchActivityKind = null;
+            if (this.mindSearchViewIsCurrent(epoch, mapPath)) { this.render(); this.syncOutline(); }
+          }
+        }
+      }
+    }
+  }
+  private openMindSearchAnswer(node: MapNode): void {
+    const contract = node.mindSearchQuestion, note = this.notes.get(node.id);
+    if (this.closed || !contract || !note || this.mindSearchBusy) return;
+    const epoch = this.mindSearchViewEpoch, mapPath = this.path, requestId = contract.requestId;
+    if (mapPath && (this.map?.mindSearch?.branches.filter(branch => branch.questionNodeId === node.id).length ?? 0) > 1) {
+      void this.plugin.mutate(async () => {
+        const repaired = await this.mindSearchRuns.recoverAnswerBranches(mapPath);
+        if (!repaired || !this.mindSearchViewIsCurrent(epoch, mapPath)) return;
+        this.map = await this.plugin.repo.readMap(mapPath);
+        await this.hydrate(() => this.mindSearchViewIsCurrent(epoch, mapPath));
+        if (!this.mindSearchViewIsCurrent(epoch, mapPath)) return;
+        this.render();
+        const current = this.map?.nodes.find(item => item.id === node.id);
+        if (current) this.openMindSearchAnswer(current);
+      }).catch(error => { if (this.mindSearchViewIsCurrent(epoch, mapPath)) new Notice(error instanceof Error ? error.message : String(error)); });
+      return;
+    }
+    new MindSearchAnswerModal(this.app, note.summary, contract.options, async input => {
+      const currentQuestion = this.map?.nodes.find(item => item.id === node.id);
+      if (!this.mindSearchViewIsCurrent(epoch, mapPath) || currentQuestion?.mindSearchQuestion?.requestId !== requestId || this.mindSearchBusy) return;
+      const controller = new AbortController();
+      this.mindSearchBusy = true; this.mindSearchController = controller; this.mindSearchActiveQuestionNodeId = node.id; this.mindSearchActivityKind = "research"; this.render();
+      try {
+        const result = await this.submitMindSearchAnswer(node.id, input, controller.signal);
+        if (!this.mindSearchViewIsCurrent(epoch, mapPath) || this.mindSearchController !== controller) return;
+        this.mindSearchAnswerRequestIds.delete(node.id);
+        if (result.status === "waiting-user") {
+          const question = this.map?.nodes.find(item => item.id === result.questionNodeId);
+          if (question) { this.selected = question.id; this.render(); this.focusNode(question); }
+          new Notice(t("ui.mindsearch_waiting_user"));
+        }
+        else if (result.status === "partial") new Notice(t("ui.mindsearch_research_partial"));
+        else if (result.status === "completed") new Notice(t("ui.mindsearch_research_saved"));
+        else if (result.status === "in-progress") new Notice(t("ui.mindsearch_research_already_running"));
+        else new Notice(t("ui.mindsearch_research_result_stale"));
+      } catch (error) {
+        if (!this.mindSearchViewIsCurrent(epoch, mapPath) || this.mindSearchController !== controller) throw error;
+        this.mindSearchAnswerRequestIds.set(node.id, input.requestId);
+        if (controller.signal.aborted) new Notice(t("ui.research_stopped_existing_content_was_preserved"));
+        else new Notice(error instanceof Error ? error.message : String(error));
+        throw error;
+      } finally {
+        if (this.mindSearchController === controller) { this.mindSearchBusy = false; this.mindSearchController = null; this.mindSearchActiveQuestionNodeId = null; this.mindSearchActivityKind = null; if (this.mindSearchViewIsCurrent(epoch, mapPath)) this.render(); }
+      }
+    }, this.mindSearchAnswerRequestIds.get(node.id) ?? randomUUID()).open();
+  }
   async openBuiltInSample(forceTour = false): Promise<void> {
+    const viewEpoch = this.mindSearchViewEpoch, openEpoch = ++this.mapOpenEpoch;
+    const isCurrent = () => !this.closed && this.mindSearchViewEpoch === viewEpoch && this.mapOpenEpoch === openEpoch;
     if (this.viewportTimer !== null) { window.clearTimeout(this.viewportTimer); this.viewportTimer = null; await this.persist(); }
+    if (!isCurrent()) return;
     const sample = builtInSample(this.plugin.settings.language);
     if (!this.builtIn) this.plugin.closeStaleDetails();
     this.builtIn = true; this.path = ""; this.map = sample.map; this.notes = sample.notes; this.integrationMode = false; this.selected = null; this.multiSelected.clear(); this.history.clear();
@@ -764,6 +1223,8 @@ export class VisualAgentMapView extends ItemView {
   private async removeToUnassigned(node: MapNode, branch: boolean): Promise<void> {
     if (!this.map) return;
     const before = clone(this.map), ids = branch ? new Set([node.id, ...descendants(before.nodes, node.id)]) : new Set([node.id]);
+    const removableQuestions = new Set(node.mindSearchKind === "question" ? before.nodes.filter(item => ids.has(item.id) && item.mindSearchKind === "question").map(item => item.id) : []);
+    this.assertMindSearchReferencesRemain(before, ids, false, removableQuestions);
     const removed = before.nodes.filter(item => ids.has(item.id)), moves: FileMove[] = [];
     try {
       for (const item of removed) {
@@ -771,7 +1232,7 @@ export class VisualAgentMapView extends ItemView {
         moves.push({ activePath: item.path, parkedPath: target, topicId: before.id, parkedState: "unassigned" });
         await this.plugin.repo.setLifecycle(target, before.id, "", "unassigned");
       }
-      const after = clone(before); after.nodes = removeNodes(after.nodes, node.id, branch);
+      const after = clone(before); after.nodes = removeNodes(after.nodes, node.id, branch); this.removeMindSearchReferences(after, ids, before.nodes);
       await this.plugin.repo.saveMap(this.path, after); this.map = after; this.selected = null; this.multiSelected.clear();
       await this.plugin.rebuildDerivedData(); await this.hydrate();
       this.history.push({ undo: () => this.restoreLifecycle(before, moves, false), redo: () => this.restoreLifecycle(after, moves, true) }); this.render();
@@ -789,10 +1250,22 @@ export class VisualAgentMapView extends ItemView {
       { label: t("ui.confirm_removal"), action: () => this.enqueue(() => this.removeSelected()) }
     ]).open();
   }
+  private confirmRemoveNode(node: MapNode): void {
+    new ChoiceModal(this.app, t("ui.remove_from_map"), t("ui.the_note_will_move_to_this_topic_s_unassigned_folder_you_can"), [
+      ...(!this.map?.mindSearch || node.mindSearchKind !== "question" ? [{ label: t("ui.remove_only_this_node_children_become_roots"), action: () => this.enqueue(() => this.removeToUnassigned(node, false)) }] : []),
+      { label: t("ui.remove_entire_branch"), action: () => this.enqueue(() => this.removeToUnassigned(node, true)) }
+    ]).open();
+  }
   private async removeSelected(): Promise<void> {
     if (!this.map) return;
     const before = clone(this.map), ids = new Set<string>();
-    for (const root of this.selectedRoots()) { ids.add(root.id); for (const id of descendants(before.nodes, root.id)) ids.add(id); }
+    const roots = this.selectedRoots(), removableQuestions = new Set<string>();
+    for (const root of roots) {
+      const branchIds = new Set([root.id, ...descendants(before.nodes, root.id)]);
+      for (const id of branchIds) ids.add(id);
+      if (root.mindSearchKind === "question") for (const item of before.nodes) if (branchIds.has(item.id) && item.mindSearchKind === "question") removableQuestions.add(item.id);
+    }
+    this.assertMindSearchReferencesRemain(before, ids, false, removableQuestions);
     const removed = before.nodes.filter(node => ids.has(node.id)), moves: FileMove[] = [];
     try {
       for (const node of removed) {
@@ -800,7 +1273,7 @@ export class VisualAgentMapView extends ItemView {
         moves.push({ activePath: node.path, parkedPath: target, topicId: before.id, parkedState: "unassigned" });
         await this.plugin.repo.setLifecycle(target, before.id, "", "unassigned");
       }
-      const after = clone(before); after.nodes = after.nodes.filter(node => !ids.has(node.id));
+      const after = clone(before); after.nodes = after.nodes.filter(node => !ids.has(node.id)); this.removeMindSearchReferences(after, ids, before.nodes);
       await this.plugin.repo.saveMap(this.path, after); this.map = after; this.selected = null; this.multiSelected.clear();
       await this.plugin.rebuildDerivedData(); await this.hydrate();
       this.history.push({ undo: () => this.restoreLifecycle(before, moves, false), redo: () => this.restoreLifecycle(after, moves, true) }); this.render();
@@ -827,6 +1300,7 @@ export class VisualAgentMapView extends ItemView {
   }
   private async moveSelected(target: MapNode): Promise<void> {
     const roots = this.selectedRoots();
+    this.assertMindSearchReferencesRemain(this.map!, new Set(roots.map(root => root.id)), true);
     await this.mapChange(map => {
       let offset = 0;
       for (const root of roots) {
@@ -837,6 +1311,43 @@ export class VisualAgentMapView extends ItemView {
       map.nodes.find(node => node.id === target.id)!.collapsed = false;
     });
     this.multiSelected.clear(); this.render();
+  }
+  private assertMindSearchReferencesRemain(map: MapDocument, ids: Set<string>, moving = false, removableQuestionNodeIds = new Set<string>()): void {
+    const data = map.mindSearch;
+    if (!data) return;
+    const protectedIds = new Set<string>();
+    const removableBranchIds = new Set(data.branches.filter(branch => removableQuestionNodeIds.has(branch.questionNodeId)).map(branch => branch.id));
+    for (const branch of data.branches) {
+      if (!removableBranchIds.has(branch.id)) {
+        protectedIds.add(branch.questionNodeId);
+        for (const result of branch.results) protectedIds.add(result.nodeId);
+      }
+    }
+    for (const draft of data.resultDrafts ?? []) if (!removableBranchIds.has(draft.branchId)) protectedIds.add(draft.nodeId);
+    for (const pending of data.pendingCommits) if (!removableBranchIds.has(pending.branchId)) protectedIds.add(pending.nodeId);
+    if (data.questionDraft && (ids.has(data.questionDraft.parentId) || removableBranchIds.has(data.questionDraft.parentBranchId ?? ""))) throw new Error("A MindSearch question is still being saved and cannot be removed yet.");
+    if ((data.resultDrafts ?? []).some(draft => removableBranchIds.has(draft.branchId)) || data.pendingCommits.some(commit => removableBranchIds.has(commit.branchId))) throw new Error("A MindSearch result is still being saved and cannot be removed yet.");
+    if ([...ids].some(id => protectedIds.has(id))) throw new Error(moving ? "MindSearch question and result nodes referenced by saved branches cannot be moved." : "MindSearch question and result nodes referenced by saved branches cannot be removed.");
+    for (const run of data.runs) if (removableBranchIds.has(run.branchId) && run.attempts.some(attempt => attempt.status === "running" || attempt.status === "saving")) throw new Error("A MindSearch branch is still running and cannot be removed yet.");
+  }
+  private removeMindSearchReferences(map: MapDocument, removedNodeIds: Set<string>, originalNodes: MapNode[] = map.nodes): void {
+    const data = map.mindSearch;
+    if (!data) return;
+    for (const question of originalNodes.filter(node => removedNodeIds.has(node.id) && node.mindSearchQuestion)) {
+      const parent = map.nodes.find(node => node.id === question.parentId && !removedNodeIds.has(node.id));
+      if (parent) parent.mindSearchDismissedQuestionRequestIds = [...new Set([...(parent.mindSearchDismissedQuestionRequestIds ?? []), question.mindSearchQuestion!.requestId])];
+    }
+    const removedBranchIds = new Set(data.branches.filter(branch => removedNodeIds.has(branch.questionNodeId)).map(branch => branch.id));
+    data.branches = data.branches.filter(branch => !removedBranchIds.has(branch.id));
+    for (const branch of data.branches) if (branch.parentBranchId && removedBranchIds.has(branch.parentBranchId)) branch.parentBranchId = null;
+    data.runs = data.runs.filter(run => !removedBranchIds.has(run.branchId));
+    if (data.resultDrafts) data.resultDrafts = data.resultDrafts.filter(draft => !removedBranchIds.has(draft.branchId) && !removedNodeIds.has(draft.nodeId));
+    data.pendingCommits = data.pendingCommits.filter(commit => !removedBranchIds.has(commit.branchId) && !removedNodeIds.has(commit.nodeId));
+    if (data.questionDraft && (removedNodeIds.has(data.questionDraft.parentId) || removedBranchIds.has(data.questionDraft.parentBranchId ?? ""))) delete data.questionDraft;
+    for (const node of map.nodes) {
+      if (node.mindSearchConvergesFromNodeIds) node.mindSearchConvergesFromNodeIds = node.mindSearchConvergesFromNodeIds.filter(id => !removedNodeIds.has(id));
+      if (node.mindSearchQuestion?.parentBranchId && removedBranchIds.has(node.mindSearchQuestion.parentBranchId)) node.mindSearchQuestion.parentBranchId = null;
+    }
   }
   private async copySelected(target: MapNode): Promise<void> {
     if (!this.map) return;
@@ -1001,10 +1512,22 @@ export class VisualAgentMapView extends ItemView {
     if (this.map) choices.push({ label: t("ui.delete_current_mind_map"), description: t("ui.remove_only_the_map_file_keep_all_topic_notes_undo_is_availa"), buttonLabel: t("ui.review"), action: () => this.deleteCurrentMap() });
     new ChoiceModal(this.app, t("ui.more_mind_map_actions"), t("ui.additional_map_management_actions"), choices).open();
   }
+  private mindSearchActiveForPath(path: string): boolean {
+    return this.app.workspace.getLeavesOfType(VIEW_TYPE).some(leaf => {
+      const view = leaf.view;
+      if (!(view instanceof VisualAgentMapView) || view.path !== path || !view.map?.mindSearch) return false;
+      return view.mindSearchBusy || view.map.mindSearch.runs.some(run => {
+        const attempt = run.attempts.find(item => item.id === run.currentAttemptId);
+        return attempt?.status === "running" || attempt?.status === "saving";
+      });
+    });
+  }
   private renameCurrentMap(): void {
     if (!this.map) return;
+    if (this.mindSearchActiveForPath(this.path)) { new Notice(t("ui.mindsearch_research_already_running")); return; }
     new NameModal(this.app, t("ui.rename_mind_map"), this.map.title, title => this.enqueue(async () => {
       if (!this.map) return;
+      if (this.mindSearchActiveForPath(this.path)) { new Notice(t("ui.mindsearch_research_already_running")); return; }
       if (!this.path.startsWith(`${this.plugin.settings.topicsFolder}/`)) { new Notice(t("ui.migrate_old_data_before_renaming_this_topic")); return; }
       const before = clone(this.map), beforeRoot = this.plugin.repo.topicRoot(this.path);
       this.path = await this.plugin.repo.renameTopic(this.path, title);
@@ -1119,16 +1642,62 @@ export class VisualAgentMapView extends ItemView {
     if (this.builtIn) toolbar.createSpan({ cls: "vam-readonly-badge", text: t("ui.official_sample_read_only") });
     this.button(toolbar, t("ui.switch_mind_map"), () => this.enqueue(async () => { const topics = await this.plugin.repo.topics(); new ChoiceModal(this.app, t("ui.switch_mind_map"), t("ui.choose_a_research_topic_to_open"), [
       { label: t("ui.sample_taiwan_travel_plan"), description: t("ui.official_read_only_sample"), action: () => this.enqueue(() => this.openBuiltInSample()) },
-      ...topics.map(topic => ({ label: topic.title, description: t("ui.my_editable_mind_map"), action: () => this.enqueue(() => this.openMap(topic.mapPath)) }))
+      ...topics.map(topic => ({ label: topic.title, description: t("ui.my_editable_mind_map"), action: () => this.enqueue(() => this.openMapInMutation(topic.mapPath)) }))
     ]).open(); }));
     if (this.builtIn) {
       this.button(toolbar, t("ui.show_tour_again"), () => { this.showSampleTour = true; this.render(); });
     } else if (this.map) {
-      this.button(toolbar, t("ui.mind_map"), () => new NameModal(this.app, t("ui.new_mind_map"), t("ui.new_mind_map_from_sample"), title => this.enqueue(async () => this.openMap(await this.plugin.repo.createMap(title)))).open());
+      this.button(toolbar, t("ui.mind_map"), () => new NameModal(this.app, t("ui.new_mind_map"), t("ui.new_mind_map_from_sample"), title => this.enqueue(async () => this.openMapInMutation(await this.plugin.repo.createMap(title)))).open());
       const undo = this.button(toolbar, t("ui.undo"), () => this.enqueue(() => this.travel(false)), !this.history.canUndo); undo.dataset.history = "undo";
       const redo = this.button(toolbar, t("ui.redo"), () => this.enqueue(() => this.travel(true)), !this.history.canRedo); redo.dataset.history = "redo";
       this.updateHistoryButtons();
       this.button(toolbar, t("ui.more"), () => this.openMapActions());
+    }
+    const selectedNode = this.map?.nodes.find(node => node.id === this.selected);
+    if (!this.builtIn && this.map?.mindSearch) {
+      const statusbar = this.contentEl.createDiv(`vam-mindsearch-statusbar${this.mindSearchBusy ? " is-active" : ""}`);
+      statusbar.setAttr("aria-live", "polite");
+      const data = this.map.mindSearch;
+      const questions = this.map.nodes.filter(node => node.mindSearchKind === "question");
+      const pendingQuestion = questions.find(question => !data.branches.some(branch => branch.questionNodeId === question.id));
+      const runningBranch = data.branches.find(branch => {
+        const run = data.runs.find(item => item.branchId === branch.id);
+        const attempt = run?.attempts.find(item => item.id === run.currentAttemptId);
+        return attempt?.status === "running" || attempt?.status === "saving";
+      });
+      let stateText: string;
+      let stateClass: string;
+      if (this.mindSearchBusy) {
+        const activeTitle = this.notes.get(this.mindSearchActiveQuestionNodeId ?? "")?.title ?? this.map.title;
+        const planning = this.mindSearchActivityKind === "planning";
+        stateText = this.mindSearchActivityKind === "clarifying"
+          ? (this.plugin.settings.language === "en" ? "Preparing initial clarification…" : "正在準備開始前的條件釐清…")
+          : t(planning ? "ui.mindsearch_status_planning_0" : "ui.mindsearch_status_researching_0", activeTitle);
+        stateClass = "running";
+      } else if (runningBranch) {
+        const activeTitle = this.notes.get(runningBranch.questionNodeId)?.title ?? this.map.title;
+        stateText = t("ui.mindsearch_status_researching_0", activeTitle); stateClass = "running";
+      } else if (!questions.length) {
+        stateText = t("ui.mindsearch_status_ready"); stateClass = "idea";
+      } else if (pendingQuestion) {
+        stateText = t("ui.mindsearch_status_waiting_answer_0", this.notes.get(pendingQuestion.id)?.title ?? ""); stateClass = "idea";
+      } else if (data.branches.some(branch => branch.results.some(result => result.kind === "conclusion"))) {
+        stateText = t("ui.mindsearch_status_complete"); stateClass = "completed";
+      } else {
+        stateText = t("ui.mindsearch_status_exploring"); stateClass = "idea";
+      }
+      statusbar.createSpan({ cls: "vam-mindsearch-status-title", text: "MindSearch" });
+      statusbar.createSpan({ cls: `vam-mindsearch-status-value vam-status-${stateClass}`, text: stateText });
+      if (this.mindSearchBusy) this.button(statusbar, t("ui.stop_research"), () => { this.mindSearchController?.abort(); });
+      const attribution = this.contentEl.createDiv("vam-mindsearch-attribution");
+      attribution.createSpan({ text: t("ui.mindsearch_attribution") });
+      attribution.createEl("a", { text: t("ui.mindsearch_source_project"), href: "https://github.com/InternLM/MindSearch", attr: { target: "_blank", rel: "noopener noreferrer" } });
+      attribution.createEl("a", { text: t("ui.mindsearch_source_paper"), href: "https://arxiv.org/abs/2407.20183", attr: { target: "_blank", rel: "noopener noreferrer" } });
+    }
+    if (!this.builtIn && this.map?.mindSearch && selectedNode?.mindSearchKind === "question" && selectedNode.mindSearchQuestion) {
+      const actions = toolbar.createDiv("vam-mindsearch-actions");
+      this.button(actions, t("ui.mindsearch_answer_question"), () => this.openMindSearchAnswer(selectedNode), this.mindSearchBusy);
+      if (this.mindSearchFailedReports.has(selectedNode.id)) this.button(actions, t("ui.mindsearch_retry_saved_report"), () => { void this.retryMindSearchFromSavedReport(selectedNode.id); }, this.mindSearchBusy);
     }
     if (!this.map && (this.history.canUndo || this.history.canRedo)) {
       const undo = this.button(toolbar, t("ui.undo"), () => this.enqueue(() => this.travel(false)), !this.history.canUndo); undo.dataset.history = "undo";
@@ -1153,7 +1722,8 @@ export class VisualAgentMapView extends ItemView {
         this.button(actions, t("ui.reconnect_existing_workspace"), () => this.enqueue(() => this.plugin.offerWorkspaceReconnect())).addClass("mod-cta");
         this.button(actions, t("ui.repair_agent_workspace"), () => this.enqueue(() => this.plugin.repairWorkspace()));
       }
-      this.button(actions, t("ui.create_a_new_mind_map"), () => new NameModal(this.app, t("ui.new_mind_map"), t("ui.new_mind_map_from_sample"), title => this.enqueue(async () => this.openMap(await this.plugin.repo.createMap(title)))).open()).addClass("mod-cta");
+      this.button(actions, t("ui.create_a_new_mind_map"), () => this.openNewMindMapModal()).addClass("mod-cta");
+      this.button(actions, t("ui.mindsearch_create_map"), () => this.openMindSearchStart());
       this.button(actions, t("ui.view_sample"), () => this.enqueue(() => this.openBuiltInSample(true)));
       if (this.deletedMap?.deleted) this.button(actions, t("ui.restore_deleted_map"), () => this.enqueue(() => this.restoreDeletedMapFromUi()));
       return;
@@ -1180,17 +1750,22 @@ export class VisualAgentMapView extends ItemView {
       copy.createEl("strong", { text: t("ui.start_using_vam") });
       copy.createEl("p", { text: t("ui.sample_start_hint") });
       const actions = start.createDiv("vam-sample-start-actions");
-      this.button(actions, t("ui.duplicate_to_my_workspace"), () => this.enqueue(async () => this.openMap(await this.plugin.duplicateBuiltInSample()))).addClass("mod-cta");
-      this.button(actions, t("ui.create_an_empty_mind_map"), () => new NameModal(this.app, t("ui.new_mind_map"), t("ui.new_mind_map_from_sample"), title => this.enqueue(async () => this.openMap(await this.plugin.repo.createMap(title)))).open());
+      this.button(actions, t("ui.duplicate_to_my_workspace"), () => this.enqueue(async () => this.openMapInMutation(await this.plugin.duplicateBuiltInSample()))).addClass("mod-cta");
+      this.button(actions, t("ui.create_an_empty_mind_map"), () => new NameModal(this.app, t("ui.new_mind_map"), t("ui.new_mind_map_from_sample"), title => this.enqueue(async () => this.openMapInMutation(await this.plugin.repo.createMap(title)))).open());
       if (!this.plugin.settings.models.trim()) this.button(actions, t("ui.check_codex"), () => this.enqueue(() => this.plugin.recheckCodex()));
     }
     const tools = this.contentEl.createDiv("vam-map-tools");
     if (!this.builtIn) {
-      this.button(tools, t("ui.topic"), () => this.enqueue(() => this.addNode(null))).addClass("mod-cta");
-      this.button(tools, t("ui.organize"), () => this.enqueue(() => this.openOrganizer()));
+      const mindSearchMode = !!this.map.mindSearch;
+      if (!mindSearchMode) this.button(tools, t("ui.topic"), () => this.enqueue(() => this.addNode(null))).addClass("mod-cta");
+      if (mindSearchMode) this.button(tools, t("ui.create_a_new_mind_map"), () => this.openNewMindMapModal());
+      this.button(tools, t("ui.mindsearch_create_map"), () => this.openMindSearchStart());
+      if (!mindSearchMode) this.button(tools, t("ui.organize"), () => this.enqueue(() => this.openOrganizer()));
       this.button(tools, t("ui.auto_layout"), () => this.enqueue(() => this.mapChange(map => { map.nodes = arrangeMap(map.nodes); }, false)));
-      const integrate = this.button(tools, this.integrationMode ? t("ui.finish_topic_selection") : t("ui.select_topics"), () => { this.integrationMode = !this.integrationMode; this.multiSelected.clear(); this.selected = null; this.render(); });
-      if (this.integrationMode) integrate.addClass("is-active");
+      if (!mindSearchMode) {
+        const integrate = this.button(tools, this.integrationMode ? t("ui.finish_topic_selection") : t("ui.select_topics"), () => { this.integrationMode = !this.integrationMode; this.multiSelected.clear(); this.selected = null; this.render(); });
+        if (this.integrationMode) integrate.addClass("is-active");
+      }
     }
     this.button(tools, "−", () => this.zoomBy(1 / 1.2)).setAttr("aria-label", t("ui.zoom_out"));
     this.zoomLabel = tools.createSpan({ text: `${Math.round(this.map.viewport.zoom * 100)}%`, cls: "vam-zoom" });
@@ -1228,13 +1803,24 @@ export class VisualAgentMapView extends ItemView {
       this.button(selection, t("ui.synthesize"), () => this.integrateSelected(), this.multiSelected.size < 2).addClass("mod-cta");
     }
     for (const node of shown) this.renderNode(node);
-    if (!this.map.nodes.length) { const emptyMap = this.viewportEl.createDiv("vam-empty"); emptyMap.createSpan({ text: t("ui.this_mind_map_has_no_topics_click_topic_to_create_the_first") }); this.button(emptyMap, t("ui.topic"), () => this.enqueue(() => this.addNode(null))); }
+    if (!this.map.nodes.length) {
+      const emptyMap = this.viewportEl.createDiv("vam-empty");
+      emptyMap.createSpan({ text: t(this.map.mindSearch ? "ui.mindsearch_empty_map_hint" : "ui.this_mind_map_has_no_topics_click_topic_to_create_the_first") });
+      if (!this.map.mindSearch) this.button(emptyMap, t("ui.topic"), () => this.enqueue(() => this.addNode(null)));
+    }
     this.setupPan(); this.transform(); this.drawEdges();
     if (this.builtIn && this.selected) { const node = this.map.nodes.find(n => n.id === this.selected); if (node) this.renderInspector(workspace, node); }
   }
   private renderNode(node: MapNode): void {
     if (!this.stageEl) return;
     const note = this.notes.get(node.id), card = this.stageEl.createDiv({ cls: `vam-node${node.id === this.selected || this.multiSelected.has(node.id) ? " is-selected" : ""}` });
+    if (node.mindSearchKind) card.setAttr("data-mindsearch-kind", node.mindSearchKind);
+    if (node.mindSearchKind === "conclusion") {
+      const background = createSvg("svg"); background.addClass("vam-conclusion-background");
+      background.setAttribute("viewBox", "0 0 100 100"); background.setAttribute("preserveAspectRatio", "none"); background.setAttribute("aria-hidden", "true"); background.setAttribute("focusable", "false");
+      const shape = createSvg("polygon"); shape.setAttribute("points", "25,0.5 75,0.5 99.5,50 75,99.5 25,99.5 0.5,50"); shape.setAttribute("vector-effect", "non-scaling-stroke");
+      background.appendChild(shape); card.appendChild(background);
+    }
     card.dataset.nodeId = node.id; card.style.left = `${node.x}px`; card.style.top = `${node.y}px`; card.tabIndex = 0; card.setAttr("aria-label", note?.title ?? t("ui.note_missing"));
     const header = card.createDiv("vam-node-header");
     if (this.integrationMode) {
@@ -1243,7 +1829,15 @@ export class VisualAgentMapView extends ItemView {
     }
     const batch = this.plugin.expansionBatches.get(node.path);
     const active = this.plugin.running?.has(node.path) || this.plugin.quickExpandPending?.has(node.path);
-    if (active || !note || note.status !== "completed") header.createSpan({ cls: `vam-status vam-status-${active ? "running" : note?.status ?? "error"}`, text: active ? t("ui.ai_running") : note ? topicStatusLabel(note.status, this.plugin.settings.language) : t("ui.note_missing") });
+    if (node.mindSearchKind === "question" && this.map?.mindSearch) {
+      const status = mindSearchQuestionStatus(this.map, node.id, this.mindSearchActiveQuestionNodeId);
+      const key: Record<MindSearchQuestionStatus, TranslationKey> = { running: "ui.mindsearch_branch_running", completed: "ui.mindsearch_branch_completed", partial: "ui.mindsearch_branch_partial", failed: "ui.mindsearch_branch_failed", cancelled: "ui.mindsearch_branch_cancelled", not_started: "ui.mindsearch_branch_not_started" };
+      header.createSpan({ cls: `vam-status vam-mindsearch-question-status vam-status-${status === "running" ? "running" : status === "completed" ? "completed" : status === "not_started" ? "idea" : "error"}`, text: status === "not_started" && this.map.mindSearch.branches.some(branch => branch.questionNodeId === node.id) ? (this.plugin.settings.language === "en" ? "Answered · research not started" : "已回答・研究尚未開始") : t(key[status]) });
+    } else if (node.mindSearchKind === "topic" && this.map?.mindSearch && this.map.mindSearch.branches.some(branch => branch.questionNodeId === node.id && !branch.parentBranchId)) {
+      const status = mindSearchQuestionStatus(this.map, node.id, this.mindSearchActiveQuestionNodeId);
+      const key: Record<MindSearchQuestionStatus, TranslationKey> = { running: "ui.mindsearch_branch_running", completed: "ui.mindsearch_branch_completed", partial: "ui.mindsearch_branch_partial", failed: "ui.mindsearch_branch_failed", cancelled: "ui.mindsearch_branch_cancelled", not_started: "ui.mindsearch_branch_not_started" };
+      header.createSpan({ cls: `vam-status vam-mindsearch-question-status vam-status-${status === "running" ? "running" : status === "completed" ? "completed" : status === "not_started" ? "idea" : "error"}`, text: status === "not_started" && this.map.mindSearch.branches.some(branch => branch.questionNodeId === node.id) ? (this.plugin.settings.language === "en" ? "Answered · research not started" : "已回答・研究尚未開始") : t(key[status]) });
+    } else if (active || !note || note.status !== "completed") header.createSpan({ cls: `vam-status vam-status-${active ? "running" : note?.status ?? "error"}`, text: active ? t("ui.ai_running") : note ? topicStatusLabel(note.status, this.plugin.settings.language) : t("ui.note_missing") });
     if (batch) {
       const currentNode = batch.currentPath ? this.map?.nodes.find(item => item.path === batch.currentPath) : undefined;
       const currentTitle = currentNode ? this.notes.get(currentNode.id)?.title : undefined;
@@ -1258,22 +1852,93 @@ export class VisualAgentMapView extends ItemView {
     const quickError = this.plugin.quickExpandFailures?.get(node.path);
     if (quickError && !active) { const badge = header.createSpan({ cls: "vam-status vam-status-error", text: t("ui.expansion_failed") }); badge.setAttr("title", quickError); }
     const pendingCount = this.plugin.pendingSuggestions.get(node.path)?.length ?? 0;
-    if (pendingCount && !this.builtIn && !this.integrationMode) this.button(header, t("ui.view_0_expansion_suggestions", pendingCount), () => this.openNodePanel(node, "proposals")).addClass("vam-badge-new");
+    if (pendingCount && !this.builtIn && !this.integrationMode && !this.map?.mindSearch) this.button(header, t("ui.view_0_expansion_suggestions", pendingCount), () => this.openNodePanel(node, "proposals")).addClass("vam-badge-new");
     if (!this.builtIn && !this.integrationMode) {
-      const ai = this.button(header, "✦", () => this.openNextStep(node)); ai.addClass("vam-node-tool"); ai.setAttr("aria-label", t("ui.how_would_you_like_to_explore_next"));
-      const structure = this.button(header, "⚙", () => this.openNodePanel(node, "structure")); structure.addClass("vam-node-tool"); structure.setAttr("aria-label", t("ui.structure_and_links"));
-      if (note) { const rename = this.button(header, "✎", () => new NameModal(this.app, t("ui.new_topic_name"), note.title, title => this.enqueue(() => this.noteChange(node, { title }))).open()); rename.addClass("vam-node-tool"); rename.setAttr("aria-label", t("ui.new_topic_name")); }
+      if (!this.map?.mindSearch) {
+        const ai = this.button(header, "✦", () => this.openNextStep(node)); ai.addClass("vam-node-tool"); ai.setAttr("aria-label", t("ui.how_would_you_like_to_explore_next"));
+        const structure = this.button(header, "⚙", () => this.openNodePanel(node, "structure")); structure.addClass("vam-node-tool"); structure.setAttr("aria-label", t("ui.structure_and_links"));
+        if (note) { const rename = this.button(header, "✎", () => new NameModal(this.app, t("ui.new_topic_name"), note.title, title => this.enqueue(() => this.noteChange(node, { title }))).open()); rename.addClass("vam-node-tool"); rename.setAttr("aria-label", t("ui.new_topic_name")); }
+      }
+      if (node.mindSearchKind === "question") { const remove = this.button(header, "×", () => this.confirmRemoveNode(node)); remove.addClass("vam-node-tool"); remove.setAttr("aria-label", t("ui.remove_from_map")); }
+      if (this.map?.mindSearch && node.mindSearchKind === "synthesis" && this.map.mindSearch.branches.some(branch => branch.results.some(result => result.nodeId === node.id))) {
+        const next = this.button(header, t("ui.mindsearch_new_question"), () => void this.planMindSearchFromSelection(node.id), this.mindSearchBusy);
+        next.addClass("vam-node-tool");
+        next.setAttr("aria-label", t("ui.mindsearch_new_question_hint"));
+        next.setAttr("title", t("ui.mindsearch_new_question_hint"));
+      }
     }
     const details = this.button(header, "↗", () => this.builtIn ? this.selectSampleNode(node.id) : this.openDetails(node)); details.addClass("vam-detail-button"); details.setAttr("aria-label", this.builtIn ? t("ui.view_sample_content") : t("ui.open_details_in_right_sidebar"));
     const count = descendants(this.map!.nodes, node.id).size;
     if (count && !this.builtIn) this.button(header, node.collapsed ? t("ui.expand_0", count) : t("ui.collapse"), () => this.enqueue(() => this.mapChange(map => { const n = map.nodes.find(n => n.id === node.id)!; n.collapsed = !n.collapsed; })));
-    if (!this.builtIn && !this.integrationMode) { const add = this.button(card, "+", () => this.enqueue(() => this.addNode(node))); add.addClass("vam-add-child"); add.setAttr("aria-label", t("ui.add_subtopic_manually")); }
+    if (!this.builtIn && !this.integrationMode && !this.map?.mindSearch) { const add = this.button(card, "+", () => this.enqueue(() => this.addNode(node))); add.addClass("vam-add-child"); add.setAttr("aria-label", t("ui.add_subtopic_manually")); }
     const title = card.createEl("h3", { text: note?.title ?? node.path, cls: "vam-card-title" });
     title.setAttr("title", note?.title ?? node.path);
     card.createEl("p", { cls: "vam-card-summary", text: note?.summary ?? t("ui.the_file_was_moved_or_deleted_you_can_remove_this_node_from") });
+    if (node.mindSearchKind === "conclusion" && this.map?.mindSearch && !this.builtIn) {
+      const branch = this.map.mindSearch.branches.find(item => item.results.some(result => result.nodeId === node.id));
+      const hasFollowup = this.map.nodes.some(item => item.parentId === node.id && item.mindSearchKind === "question");
+      if (branch && !hasFollowup && countMindSearchAnsweredQuestions(this.map, branch.id) < MIN_ANSWERED_QUESTIONS_BEFORE_CONCLUSION) {
+        card.createEl("p", { cls: "vam-hint", text: t("ui.mindsearch_early_conclusion_hint") });
+        this.button(card, t("ui.mindsearch_resume_early_conclusion"), () => void this.planMindSearchFromSelection(node.id), this.mindSearchBusy).addClass("mod-cta");
+      }
+    }
+    if (node.mindSearchKind === "topic" && this.map?.mindSearch && !this.map.nodes.some(item => item.mindSearchKind === "question")) {
+      const initialBranch = this.map.mindSearch.branches.find(item => item.questionNodeId === node.id && !item.parentBranchId);
+      const initialRuns = initialBranch ? this.map.mindSearch.runs.filter(item => item.branchId === initialBranch.id) : [];
+      const activeInitialRun = initialRuns.some(run => { const attempt = run.attempts.find(item => item.id === run.currentAttemptId); return attempt?.status === "running" || attempt?.status === "saving"; });
+      const terminalResult = initialBranch ? [...initialBranch.results].reverse().find(result => result.kind !== "research") : undefined;
+      const terminalRun = terminalResult ? initialRuns.find(item => item.id === terminalResult.runId) : undefined;
+      const terminalAttempt = terminalResult && terminalRun ? terminalRun.attempts.find(item => item.id === terminalResult.attemptId) : undefined;
+      if (!initialBranch) {
+        const start = this.button(card, t("ui.mindsearch_start_exploration"), () => { void this.planMindSearchFromSelection(node.id); }, this.mindSearchBusy);
+        start.addClass("mod-cta"); start.addClass("vam-mindsearch-start");
+      } else if (!activeInitialRun && terminalAttempt?.status === "partial" && terminalRun) {
+        this.button(card, t("ui.mindsearch_continue_research"), () => void this.continueMindSearchResearch(node.id, terminalRun.id), this.mindSearchBusy).addClass("vam-mindsearch-retry");
+      } else if (!activeInitialRun && !terminalResult) {
+        this.renderMindSearchFailure(card, initialBranch);
+        const label = initialBranch.researchPlan || initialBranch.results.length ? t("ui.mindsearch_continue_research") : t("ui.mindsearch_retry_subtopics");
+        this.button(card, label, () => void this.retryMindSearchSubtopics(initialBranch.id), this.mindSearchBusy).addClass("vam-mindsearch-retry");
+      }
+    }
+    if (node.mindSearchKind === "question" && this.map?.mindSearch) {
+      const branch = this.map.mindSearch.branches.find(item => item.questionNodeId === node.id);
+      if (branch) {
+        this.renderMindSearchFailure(card, branch);
+        const labels = node.mindSearchQuestion?.options.filter(option => branch.answerSnapshot.selections.includes(option.id)).map(option => option.label) ?? branch.answerSnapshot.selections;
+        const answer = [...labels, branch.answerSnapshot.freeText].filter(Boolean).join(" — ");
+        card.createEl("p", { cls: "vam-mindsearch-answer-snapshot", text: `${t("ui.mindsearch_answer_snapshot")}: ${answer || t("ui.mindsearch_unknown_answer")}` });
+        const branchRuns = this.map.mindSearch.runs.filter(item => item.branchId === branch.id);
+        const activeBranchRun = branchRuns.some(run => { const current = run.attempts.find(item => item.id === run.currentAttemptId); return current?.status === "running" || current?.status === "saving"; });
+        const terminalResult = [...branch.results].reverse().find(result => result.kind !== "research");
+        const terminalRun = terminalResult && branchRuns.find(item => item.id === terminalResult.runId);
+        const terminalAttempt = terminalRun?.attempts.find(item => item.id === terminalResult?.attemptId);
+        if (!activeBranchRun && terminalAttempt?.status === "partial" && terminalRun) {
+          this.button(card, t("ui.mindsearch_continue_research"), () => void this.continueMindSearchResearch(node.id, terminalRun.id), this.mindSearchBusy).addClass("vam-mindsearch-retry");
+        }
+        if (!branch.researchPlan && branch.results.length === 0) {
+          const status = card.createEl("p", { cls: "vam-mindsearch-plan-error", text: t("ui.mindsearch_research_not_generated") });
+          if (branch.researchPlanError) status.setAttr("title", branch.researchPlanError);
+          if (!activeBranchRun && !terminalResult) {
+            const retry = this.button(card, t("ui.mindsearch_retry_subtopics"), () => void this.retryMindSearchSubtopics(branch.id));
+            retry.addClass("vam-mindsearch-retry"); retry.disabled = this.mindSearchBusy;
+          }
+        } else if (!activeBranchRun && !terminalResult) {
+          this.button(card, t(branch.deliveryRecovery ? "ui.mindsearch_resume_stage" : "ui.mindsearch_continue_research"), () => void this.retryMindSearchSubtopics(branch.id), this.mindSearchBusy).addClass("vam-mindsearch-retry");
+        }
+      }
+    }
+    if (node.mindSearchKind === "answer" && this.map?.mindSearch) {
+      const branch = this.map.mindSearch.branches.find(item => item.answerNodeId === node.id);
+      const question = branch && this.map.nodes.find(item => item.id === branch.questionNodeId);
+      if (branch) {
+        const labels = question?.mindSearchQuestion?.options.filter(option => branch.answerSnapshot.selections.includes(option.id)).map(option => option.label) ?? branch.answerSnapshot.selections;
+        const answer = [...labels, branch.answerSnapshot.freeText].filter(Boolean).join(" — ");
+        card.createEl("p", { cls: "vam-mindsearch-answer-snapshot", text: `${t("ui.mindsearch_answer_snapshot")}: ${answer || t("ui.mindsearch_unknown_answer")}` });
+      }
+    }
     if (!this.builtIn) this.enableDrag(card, node); else card.addClass("is-readonly");
-    card.addEventListener("click", event => { if (Date.now() < this.suppressClickUntil) return; if ((event.target as Element).closest("button") || event.metaKey || event.ctrlKey) return; if (this.integrationMode) { if (this.multiSelected.has(node.id)) this.multiSelected.delete(node.id); else this.multiSelected.add(node.id); this.render(); return; } if (this.builtIn) this.selectSampleNode(node.id); else this.openDetails(node); });
-    card.addEventListener("keydown", event => { if (event.key === "Enter" && event.target === card) { if (this.integrationMode) { if (this.multiSelected.has(node.id)) this.multiSelected.delete(node.id); else this.multiSelected.add(node.id); this.render(); } else if (this.builtIn) this.selectSampleNode(node.id); else this.openDetails(node); } });
+    card.addEventListener("click", event => { if (Date.now() < this.suppressClickUntil) return; if ((event.target as Element).closest("button") || event.metaKey || event.ctrlKey) return; if (this.integrationMode) { if (this.multiSelected.has(node.id)) this.multiSelected.delete(node.id); else this.multiSelected.add(node.id); this.render(); return; } if (this.builtIn) this.selectSampleNode(node.id); else { this.selectMapNode(node); this.openDetails(node); } });
+    card.addEventListener("keydown", event => { if (event.key === "Enter" && event.target === card) { if (this.integrationMode) { if (this.multiSelected.has(node.id)) this.multiSelected.delete(node.id); else this.multiSelected.add(node.id); this.render(); } else if (this.builtIn) this.selectSampleNode(node.id); else { this.selectMapNode(node); if (node.mindSearchKind === "question") this.openMindSearchAnswer(node); else this.openDetails(node); } } });
     card.addEventListener("mouseenter", () => { if (!note || this.integrationMode || this.dragging) return; this.clearHoverTimer(); this.hoverTimer = window.setTimeout(() => { if (!this.dragging && card.isConnected) this.showHoverCard(card, note); }, 700); });
     card.addEventListener("mouseleave", () => this.hideHoverCardSoon());
   }
@@ -1284,6 +1949,10 @@ export class VisualAgentMapView extends ItemView {
   private selectSampleNode(id: string): void {
     const node = this.map?.nodes.find(item => item.id === id); if (!node) return;
     this.selected = id; this.render(); this.focusNode(node);
+  }
+  private selectMapNode(node: MapNode): void {
+    if (this.selected === node.id && this.multiSelected.size === 0) return;
+    this.selected = node.id; this.multiSelected.clear(); this.render();
   }
   private hideHoverCardSoon(): void {
     this.clearHoverTimer();
@@ -1430,7 +2099,7 @@ export class VisualAgentMapView extends ItemView {
     parents.addEventListener("change", () => { const parentId = parents.value || null; close?.(); this.enqueue(() => this.mapChange(map => { if (!canParent(map.nodes, node.id, parentId)) throw new Error(t("ui.circular_links_are_not_allowed")); map.nodes.find(n => n.id === node.id)!.parentId = parentId; })); });
     this.button(relationship, t("ui.remove_parent_link"), () => { close?.(); this.enqueue(() => this.mapChange(map => { map.nodes.find(n => n.id === node.id)!.parentId = null; })); }, !node.parentId);
     relationship.createEl("p", { cls: "vam-hint", text: t("ui.changing_the_parent_affects_context_for_the_next_ai_task_the") });
-    this.button(relationship, t("ui.remove_from_map"), () => { close?.(); new ChoiceModal(this.app, t("ui.remove_from_map"), t("ui.the_note_will_move_to_this_topic_s_unassigned_folder_you_can"), [{ label: t("ui.remove_only_this_node_children_become_roots"), action: () => this.enqueue(() => this.removeToUnassigned(node, false)) }, { label: t("ui.remove_entire_branch"), action: () => this.enqueue(() => this.removeToUnassigned(node, true)) }]).open(); });
+    this.button(relationship, t("ui.remove_from_map"), () => { close?.(); this.confirmRemoveNode(node); });
   }
   private renderPendingProposals(panel: HTMLElement, node: MapNode, note: Note, close?: () => void): void {
     const suggestions = this.plugin.pendingSuggestions.get(node.path);
@@ -1501,7 +2170,7 @@ export class VisualAgentMapView extends ItemView {
     const description = t("ui.create_0_topic_folders_move_1_map_notes_and_move_2_orphan_no", plan.maps.length, noteCount, plan.orphanPaths.length);
     new ChoiceModal(this.app, t("ui.migrate_legacy_data"), description, [{ label: t("ui.confirm_migration"), action: () => this.enqueue(async () => {
       const current = this.path, mapping = await this.plugin.repo.migrateLegacyWorkspace(plan), next = mapping.get(current);
-      this.history.clear(); if (next) await this.openMap(next); else this.render(); new Notice(t("ui.old_data_was_migrated_into_topic_folders"));
+      this.history.clear(); if (next) await this.openMapInMutation(next); else this.render(); new Notice(t("ui.old_data_was_migrated_into_topic_folders"));
     }) }]).open();
   }
   private async repairMissingTopic(): Promise<void> {
@@ -1509,10 +2178,10 @@ export class VisualAgentMapView extends ItemView {
     if (!broken.length) { new Notice(t("ui.no_topics_with_a_missing_map_md")); return; }
     new ChoiceModal(this.app, t("ui.repair_missing_map"), t("ui.choose_a_topic_to_repair"), broken.map(topic => ({ label: t("ui.0_1_notes", topic.title, topic.noteCount), action: () => {
       new ChoiceModal(this.app, topic.title, t("ui.rebuild_a_map_from_notes_as_root_nodes_or_relink_an_existing"), [
-        { label: t("ui.rebuild_from_notes"), action: () => this.enqueue(async () => this.openMap(await this.plugin.repo.rebuildMissingMap(topic.root))) },
+        { label: t("ui.rebuild_from_notes"), action: () => this.enqueue(async () => this.openMapInMutation(await this.plugin.repo.rebuildMissingMap(topic.root))) },
         { label: t("ui.relink_existing_map"), action: () => this.enqueue(async () => {
           const candidates = (await this.plugin.repo.mapFiles()).filter(file => !file.path.startsWith(`${this.plugin.settings.topicsFolder}/`));
-          new ChoiceModal(this.app, t("ui.choose_existing_map"), t("ui.move_the_selected_map_into_this_topic_and_rebuild_node_paths"), candidates.map(file => ({ label: file.path, action: () => this.enqueue(async () => this.openMap(await this.plugin.repo.relinkMissingMap(topic.root, file.path))) }))).open();
+          new ChoiceModal(this.app, t("ui.choose_existing_map"), t("ui.move_the_selected_map_into_this_topic_and_rebuild_node_paths"), candidates.map(file => ({ label: file.path, action: () => this.enqueue(async () => this.openMapInMutation(await this.plugin.repo.relinkMissingMap(topic.root, file.path))) }))).open();
         }) }
       ]).open();
     } }))).open();
@@ -2002,7 +2671,7 @@ export class VisualAgentMapView extends ItemView {
       const start = { x: event.clientX, y: event.clientY }, origin = { x: currentNode.x, y: currentNode.y }; let position = { ...origin }, moved = false;
       card.setPointerCapture(event.pointerId);
       const move = (e: PointerEvent): void => { moved ||= Math.hypot(e.clientX - start.x, e.clientY - start.y) > 3; if (!moved) return; position = { x: origin.x + (e.clientX - start.x) / this.map!.viewport.zoom, y: origin.y + (e.clientY - start.y) / this.map!.viewport.zoom }; card.style.left = `${position.x}px`; card.style.top = `${position.y}px`; this.drawEdges(); };
-      const finish = (e: PointerEvent): void => { this.dragging = false; this.suppressClickUntil = Date.now() + 250; card.removeEventListener("pointermove", move); card.removeEventListener("pointerup", finish); card.removeEventListener("pointercancel", finish); if (e.type === "pointercancel") { card.style.left = `${origin.x}px`; card.style.top = `${origin.y}px`; this.drawEdges(); return; } if (moved) this.enqueue(() => this.mapChange(map => { const current = map.nodes.find(n => n.id === node.id); if (!current) return; current.x = Math.round(position.x); current.y = Math.round(position.y); })); else if (e.metaKey || e.ctrlKey) { if (this.multiSelected.has(node.id)) this.multiSelected.delete(node.id); else this.multiSelected.add(node.id); this.selected = node.id; this.render(); } else { this.multiSelected.clear(); this.selected = node.id; this.render(); this.openDetails(node); } };
+      const finish = (e: PointerEvent): void => { this.dragging = false; this.suppressClickUntil = Date.now() + 250; card.removeEventListener("pointermove", move); card.removeEventListener("pointerup", finish); card.removeEventListener("pointercancel", finish); if (e.type === "pointercancel") { card.style.left = `${origin.x}px`; card.style.top = `${origin.y}px`; this.drawEdges(); return; } if (moved) this.enqueue(() => this.mapChange(map => { const current = map.nodes.find(n => n.id === node.id); if (!current) return; current.x = Math.round(position.x); current.y = Math.round(position.y); })); else if (e.metaKey || e.ctrlKey) { if (this.multiSelected.has(node.id)) this.multiSelected.delete(node.id); else this.multiSelected.add(node.id); this.selected = node.id; this.render(); } else { this.multiSelected.clear(); this.selected = node.id; this.render(); if (node.mindSearchKind === "question") this.openMindSearchAnswer(node); else this.openDetails(node); } };
       card.addEventListener("pointermove", move); card.addEventListener("pointerup", finish); card.addEventListener("pointercancel", finish);
     });
   }
@@ -2010,10 +2679,12 @@ export class VisualAgentMapView extends ItemView {
     if (!this.edgesEl || !this.stageEl || !this.map) return;
     this.edgesEl.replaceChildren();
     for (const node of visibleNodes(this.map.nodes)) {
-      if (!node.parentId) continue;
-      const parent = this.stageEl.querySelector<HTMLElement>(`[data-node-id="${CSS.escape(node.parentId)}"]`), child = this.stageEl.querySelector<HTMLElement>(`[data-node-id="${CSS.escape(node.id)}"]`); if (!parent || !child) continue;
-      const x1 = parent.offsetLeft + parent.offsetWidth, y1 = parent.offsetTop + parent.offsetHeight / 2, x2 = child.offsetLeft, y2 = child.offsetTop + child.offsetHeight / 2, bend = Math.max(60, Math.abs(x2 - x1) / 2);
-      const path = createSvg("path"); path.setAttribute("d", `M ${x1} ${y1} C ${x1 + bend} ${y1}, ${x2 - bend} ${y2}, ${x2} ${y2}`); path.addClass("vam-edge"); this.edgesEl.appendChild(path);
+      const parents = parentIdsForNode(node);
+      for (const parentId of parents) {
+        const parent = this.stageEl.querySelector<HTMLElement>(`[data-node-id="${CSS.escape(parentId)}"]`), child = this.stageEl.querySelector<HTMLElement>(`[data-node-id="${CSS.escape(node.id)}"]`); if (!parent || !child) continue;
+        const x1 = parent.offsetLeft + parent.offsetWidth, y1 = parent.offsetTop + parent.offsetHeight / 2, x2 = child.offsetLeft, y2 = child.offsetTop + child.offsetHeight / 2, bend = Math.max(60, Math.abs(x2 - x1) / 2);
+        const path = createSvg("path"); path.setAttribute("d", `M ${x1} ${y1} C ${x1 + bend} ${y1}, ${x2 - bend} ${y2}, ${x2} ${y2}`); path.addClass("vam-edge"); if (parentId !== node.parentId) path.addClass("vam-edge-convergence"); this.edgesEl.appendChild(path);
+      }
     }
   }
   private async runAgent(node: MapNode, done?: (result: AiResult) => void, failed?: (message: string) => void, overrides?: Partial<TaskContext>, onLaunchAccepted?: () => void): Promise<AgentTaskHandle | null> {

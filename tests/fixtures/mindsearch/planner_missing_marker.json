@@ -1,0 +1,15 @@
+{
+  "provenance": {
+    "artifact": "mindsearch-partial-continuation-retry-20261005130856-863f1bbd.json",
+    "turnIndex": 2,
+    "mode": "local",
+    "model": "gpt-6-luna",
+    "reasoning": "low"
+  },
+  "result": {
+    "summary": "約 1.5 吋無骨牛排可先煎上色，再以中心溫度控制；三分熟與官方安全溫度需擇一。",
+    "detail": "### 核心結論\n在所提供的情境下（約 1.5 吋無骨牛排、爐上鑄鐵鍋、即讀溫度計、無烤箱），可先以熱鍋煎出兩面焦褐，再轉中低火並頻繁翻面，以中心溫度決定離火時機。這回答了單鍋煎製方法。若以三分熟為目標，常見參考離火溫度約為 120–125°F（49–52°C）；這低於來源所列整塊牛排安全建議 145°F（63°C）並靜置至少 3 分鐘，兩者不能同時滿足。\n\n### 關鍵知識\n- 煎前擦乾牛排表面並調味；鑄鐵鍋中高火預熱後加入高煙點油。Lodge 建議每面先煎約 2 分鐘上色；其後續烤箱步驟不適用於此無烤箱情境。\n- 兩面上色後轉中低火繼續煎，定期翻面，並從側面將溫度計插入最厚處中心；接近目標時增加測量頻率。固定時間只能作估計，應以實測溫度為準。\n- 離鍋後置於乾淨砧板或盤中，鬆蓋靜置約 5–10 分鐘，再逆紋切片。中心溫度可能在靜置時上升，但上升幅度會因牛排與烹調條件而異。\n- 若選擇遵從官方安全建議，整塊牛排應達 145°F（63°C），再靜置至少 3 分鐘；這是安全指引，不是三分熟品質目標。\n\n### 證據與來源\n- Lodge Cast Iron 的鑄鐵鍋指引支持擦乾牛排、預熱鍋具、每面先煎約兩分鐘、使用高煙點油及以即讀溫度計檢查；其 1.5 吋示範包含烤箱步驟，因此不等於完整的無烤箱流程。[Lodge Cast Iron](https://www.lodgecastiron.com/blogs/story/how-sear-a-steak-cast-iron)\n- Food Network 的爐上方法涵蓋無骨牛排、鑄鐵鍋、側插溫度計與靜置；其中時間及熟度數值屬概略參考。[Food Network](https://www.foodnetwork.com/how-to/packages/food-network-essentials/how-to-cook-steak-on-the-stove)\n- AmazingRibs 說明翻面對受熱的影響，但內容主要針對烤架，沒有直接驗證本情境的爐上鑄鐵鍋火力或時間。[AmazingRibs](https://amazingribs.com/flipping-meat/)\n- FoodSafety.gov 與 FDA 列出整塊牛排的安全最低溫 145°F（63°C）及至少 3 分鐘靜置建議。[FoodSafety.gov](https://www.foodsafety.gov/food-safety-charts/safe-minimum-internal-temperatures)；[FDA](https://www.fda.gov/food/buy-store-serve-safe-food/safe-food-handling)\n\n### 取捨與限制\n- 三分熟參考溫度與官方安全最低溫不同；選擇低於安全建議的熟度會增加食品安全風險，孕婦、幼童、長者及免疫力較弱者尤其需要審慎。\n- 預熱程度、牛排起始溫度、切肉部位、厚度與爐具功率都會影響熟成速度。現有資料不足以支持適用所有爐具與肉塊的固定總烹調時間。\n- 翻面建議部分來自烤架資料；本次來源支持基本煎製與量溫原則，但未直接驗證整套無烤箱流程，也不能保證每塊牛排的實際中心熟度。\n\n### 待確認事項\n本分支提供的熟度與器材條件屬合成測試情境，可作條件式回答，不代表真實使用者的偏好。若要給出適用個別爐具的精確時間，仍需更多實際烹調條件；目前可用溫度計逐次量測控制。\n\n### 更新紀錄\n整合既有報告，確認單鍋煎製方法已回答，並保留熟度與食品安全溫度的取捨及來源限制。",
+    "suggestions": [],
+    "visualReferences": []
+  }
+}

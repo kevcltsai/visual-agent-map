@@ -1,3 +1,4 @@
+import { registerInternalMarkerPresentation } from "./experiences/markdown-context/internal-markers";
 import { CoffeeTablesView, COFFEE_TABLES_VIEW_TYPE, COFFEE_TABLES_NAME } from "./experiences/coffee-tables/view";
 import type { CoffeeRequest, CoffeeSession } from "./experiences/coffee-tables/types";
 import { CoffeeManager } from "./experiences/coffee-tables/engine";
@@ -21,7 +22,7 @@ import { PendingSuggestions } from "./pending-suggestions";
 import { OutlineView, OUTLINE_VIEW_TYPE } from "./ui/outline-view";
 import { groupRibbonIcons } from "./ui/ribbon-group";
 import { randomUUID } from "node:crypto";
-import { CodexAppServerRuntime } from "./ai/runtime/codex-app-server";
+import { CodexAppServerRuntime, type CodexWebSearchEvent } from "./ai/runtime/codex-app-server";
 import { ClaudeCodeCliRuntime } from "./ai/runtime/claude-code-cli";
 import { CLAUDE_MODEL_CHOICES, providerForModel, providerModelId } from "./ai/providers/provider";
 import { ThinkingCore } from "./core/thinking-core";
@@ -138,10 +139,11 @@ export default class VisualAgentMapPlugin extends Plugin {
     const legacy: (Partial<Settings> & { cliPath?: string }) | null = saved;
     this.settings = { ...DEFAULT_SETTINGS, coffeeStyles: Array.isArray(saved?.coffeeStyles) ? saved.coffeeStyles.filter((item: unknown): item is { id: string; name: string; prompt: string } => !!item && typeof item === "object" && typeof (item as { id?: unknown }).id === "string" && typeof (item as { name?: unknown }).name === "string" && typeof (item as { prompt?: unknown }).prompt === "string") : [], defaultCoffeeStyleId: typeof saved?.defaultCoffeeStyleId === "string" ? saved.defaultCoffeeStyleId : undefined, language: initialUiLanguage(saved?.language), workspaceFolder: saved?.workspaceFolder || DEFAULT_SETTINGS.workspaceFolder, topicsFolder: saved?.topicsFolder || DEFAULT_SETTINGS.topicsFolder, inboxFolder: saved?.inboxFolder || DEFAULT_SETTINGS.inboxFolder, notesFolder: saved?.notesFolder || DEFAULT_SETTINGS.notesFolder, mapsFolder: saved?.mapsFolder || DEFAULT_SETTINGS.mapsFolder, mapId: saved?.mapId || "default", codexPath: saved?.codexPath || legacy?.cliPath || DEFAULT_SETTINGS.codexPath, claudePath: saved?.claudePath || DEFAULT_SETTINGS.claudePath, cliModel: saved?.cliModel || DEFAULT_SETTINGS.cliModel, cliReasoning: normalizeReasoningLevel(saved?.cliReasoning), previewScale: saved?.previewScale !== undefined ? clampPreviewScale(saved.previewScale) : legacyPreviewScale(saved?.previewSize), models: "", migrated: saved?.migrated === true, structureVersion: saved?.structureVersion ?? (saved ? 1 : DEFAULT_SETTINGS.structureVersion), firstUseNoticeSeen: saved?.firstUseNoticeSeen === true, codexUsageNoticeSeen: saved?.codexUsageNoticeSeen === true, claudeUsageNoticeSeen: saved?.claudeUsageNoticeSeen === true, aiExchangeLoggingEnabled: saved?.aiExchangeLoggingEnabled === true, workspaceInitialized: saved ? saved.workspaceInitialized !== false : false, sampleTourVersionSeen: saved?.sampleTourVersionSeen ?? 0 };
     setUiLanguage(this.settings.language);
+    registerInternalMarkerPresentation(this);
     const markdownSelectionAi = new MarkdownSelectionAi(this.app, {
       model: () => this.settings.cliModel,
       language: () => this.settings.language === "zh-TW" ? "Traditional Chinese" : "English",
-      run: (prompt, model, signal, image) => this.runConfirmedMarkdownContextAi(prompt, model, signal, image)
+      run: (prompt, model, signal, image, webSearch) => this.runConfirmedMarkdownContextAi(prompt, model, signal, image, webSearch)
     });
     this.addChild(markdownSelectionAi);
     this.addCommand({ id: "markdown-selection-ai", name: t("ui.context_ai_open"), checkCallback: checking => markdownSelectionAi.openForSelection(checking) });
@@ -185,6 +187,7 @@ export default class VisualAgentMapPlugin extends Plugin {
     const mapRibbonIcon = this.ribbonIcon;
     this.app.workspace.onLayoutReady(() => this.register(groupRibbonIcons(mapRibbonIcon, coffeeRibbonIcon)));
     this.addLocalizedCommand("open-map", "ui.open_map", () => { void this.activateView().catch(error => new Notice(String(error))); });
+    this.addLocalizedCommand("create-mindsearch-map", "ui.mindsearch_create_map", () => { void this.activateView().then(() => this.views()[0]?.openMindSearchStart()).catch(error => new Notice(String(error))); });
     this.addLocalizedCommand("open-topic-outline", "ui.open_topic_outline", () => { void this.activateOutline().catch(error => new Notice(String(error))); });
     this.addLocalizedCommand("rebuild-references", "ui.refresh_vam_data", () => { void this.mutate(() => this.fullRebuild()); });
     this.addLocalizedCommand("normalize-note-filenames", "ui.sync_topic_names_and_filenames", () => { void this.mutate(async () => { const count = await this.repo.normalizeGeneratedNoteFilenames(); new Notice(count ? t("ui.synced_0_topic_filenames", count) : t("ui.topic_filenames_are_up_to_date")); }); });
@@ -192,6 +195,7 @@ export default class VisualAgentMapPlugin extends Plugin {
     this.addLocalizedCommand("open-built-in-sample", "ui.open_the_taiwan_travel_sample", () => { void this.activateBuiltInSample(true); });
     this.addLocalizedCommand("repair-workspace", "ui.repair_agent_workspace", () => { void this.mutate(() => this.repairWorkspace()); });
     this.addLocalizedCommand("reconnect-workspace", "ui.reconnect_existing_workspace", () => { void this.offerWorkspaceReconnect(); });
+    this.addLocalizedCommand("open-prompt-monitor", "ui.prompt_monitor", () => new DebugLogModal(this.app, this.logs, this.exchanges, () => this.settings.aiExchangeLoggingEnabled, async enabled => { this.settings.aiExchangeLoggingEnabled = enabled; await this.saveSettings(); }).open());
     this.addLocalizedCommand("open-debug-log", "ui.open_debug_log", () => new DebugLogModal(this.app, this.logs, this.exchanges, () => this.settings.aiExchangeLoggingEnabled).open());
     this.settingTab = new VisualAgentMapSettingTab(this.app, this);
     this.addSettingTab(this.settingTab);
@@ -490,7 +494,7 @@ export default class VisualAgentMapPlugin extends Plugin {
     this.activeTasks.set(key, controller);
     exchanges?.begin({ id, startedAt: new Date().toISOString(), topic: `Coffee Tables · ${session.topic}`, mode: "task", model: session.model, effort });
     try {
-      const controls = { textOnly: true, signal: controller.signal, searchBudget: 0, timeoutMs: 15 * 60 * 1000, onText: (text: string): void => request.onText?.(text), onSteer: (handler: (text: string) => Promise<void>): void => request.registerIntervention?.(handler), onRequest: (data: unknown): void => { if (this.settings.aiExchangeLoggingEnabled) exchanges?.sent(id, JSON.stringify({ request: data, prompt }, null, 2)); } };
+      const controls = { textOnly: true, signal: controller.signal, searchBudget: 0, timeoutMs: 15 * 60 * 1000, onText: (text: string): void => request.onText?.(text), onSteer: (handler: (text: string) => Promise<void>): void => request.registerIntervention?.(handler), onRequest: (data: unknown): void => { if (this.settings.aiExchangeLoggingEnabled) exchanges?.sent(id, JSON.stringify({ request: data, prompt }, null, 2), prompt); } };
       const raw = providerForModel(session.model) === "claude"
         ? await this.claudeCli(directory).runTask(prompt, providerModelId(session.model), effort, undefined, controls)
         : await this.runtime(directory, true).runTask(prompt, session.model, effort, undefined, controls);
@@ -530,14 +534,15 @@ export default class VisualAgentMapPlugin extends Plugin {
     return `data:${mime};base64,${buffer.toString("base64")}`;
   }
 
-  private async runConfirmedMarkdownContextAi(prompt: string, model: string, signal: AbortSignal, image?: HTMLImageElement): Promise<string> {
+  private async runConfirmedMarkdownContextAi(prompt: string, model: string, signal: AbortSignal, image?: HTMLImageElement, webSearch = false): Promise<string> {
     let result: string | undefined;
-    const confirmed = await this.confirmAiUsage(model, async () => { result = await this.runMarkdownContextAi(prompt, model, signal, image); });
+    const confirmed = await this.confirmAiUsage(model, async () => { result = await this.runMarkdownContextAi(prompt, model, signal, image, webSearch); });
     if (!confirmed || result === undefined) throw new Error(t("ui.ai_task_cancelled"));
     return result;
   }
-  private async runMarkdownContextAi(prompt: string, model: string, signal: AbortSignal, image?: HTMLImageElement): Promise<string> {
+  private async runMarkdownContextAi(prompt: string, model: string, signal: AbortSignal, image?: HTMLImageElement, webSearch = false): Promise<string> {
     if (image && providerForModel(model) === "claude") throw new Error(t("ui.context_ai_image_claude"));
+    if (webSearch && providerForModel(model) === "claude") throw new Error(t("ui.context_ai_search_codex"));
     const imageDataUrl = image ? await this.markdownContextImage(image, signal) : undefined;
     if (signal.aborted) throw new Error(t("ui.ai_task_cancelled"));
     const directory = this.pluginDirectory();
@@ -553,15 +558,16 @@ export default class VisualAgentMapPlugin extends Plugin {
     exchanges?.begin({ id, startedAt: new Date().toISOString(), topic: "Markdown selection", mode: "task", model, effort });
     try {
       const controls = {
-        textOnly: true,
+        textOnly: !webSearch,
+        webSearchOnly: webSearch,
         imageDataUrl,
         signal: controller.signal,
-        searchBudget: 0,
-        onRequest: (data: unknown): void => { if (this.settings.aiExchangeLoggingEnabled) exchanges?.sent(id, JSON.stringify({ request: data, prompt }, null, 2)); }
+        searchBudget: webSearch ? 4 : 0,
+        onRequest: (data: unknown): void => { if (this.settings.aiExchangeLoggingEnabled) exchanges?.sent(id, JSON.stringify({ request: data, prompt }, null, 2), prompt); }
       };
       const raw = providerForModel(model) === "claude"
         ? await this.claudeCli(directory).runTask(prompt, providerModelId(model), effort, undefined, controls)
-        : await this.runtime(directory, true).runTask(prompt, model, effort, undefined, controls);
+        : await this.runtime(directory, !webSearch).runTask(prompt, model, effort, undefined, controls);
       if (controller.signal.aborted) throw new Error(t("ui.ai_task_cancelled"));
       if (this.settings.aiExchangeLoggingEnabled) { exchanges?.received(id, raw); exchanges?.completed(id); }
       return raw;
@@ -595,8 +601,8 @@ export default class VisualAgentMapPlugin extends Plugin {
       reasoningEfforts: Object.fromEntries(models.map(item => [item.model, item.supportedReasoningEfforts.map(effort => effort.reasoningEffort).filter(value => ["low", "medium", "high"].includes(value))]))
     };
   }
-  async askModel(context: TaskContext, model: string, reasoning?: unknown, signal?: AbortSignal, onExchange?: (id: string) => void, onRequestAccepted?: () => void): Promise<AiResult> {
-    return this.aiTasks.askModel(context, model, reasoning, signal, onExchange, onRequestAccepted);
+  async askModel(context: TaskContext, model: string, reasoning?: unknown, signal?: AbortSignal, onExchange?: (id: string) => void, onRequestAccepted?: () => void, onWebSearchEvent?: (event: CodexWebSearchEvent) => void): Promise<AiResult> {
+    return this.aiTasks.askModel(context, model, reasoning, signal, onExchange, onRequestAccepted, onWebSearchEvent);
   }
   private pluginDirectory(): string {
     const adapter = this.app.vault.adapter;

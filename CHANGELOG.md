@@ -9,7 +9,7 @@
 - Up to two independent evidence tasks in parallel, with dependent tasks receiving saved prerequisite reports.
 - Persisted section-level document writing and resume, including selective invalidation after evidence changes.
 - Failure reasons, saved execution phases and bounded retry controls, including a ten-minute timeout recovery option.
-- Attribution to the MindSearch project and paper, with bilingual README guidance for AIM (Adaptive Inquiry Map).
+- Attribution to the original research project and paper, with bilingual README guidance for AIM (Adaptive Inquiry Map).
 
 ### Fixed
 
@@ -21,7 +21,7 @@
 ### Validation and limitations
 
 - Codex live backend testing covered parallel searches, dependent reports, audited reuse, section resume and acceptance-only retry. Saved results were reopened in the macOS Obsidian testing vault.
-- The current interface still uses the MindSearch label. Live Claude Code execution and Windows/Linux remain unverified. AI source selection and review do not guarantee factual accuracy.
+- This release uses earlier research interface labels. Live Claude Code execution and Windows/Linux remain unverified. AI source selection and review do not guarantee factual accuracy.
 
 ## [0.13.0] - 2026-10-03
 

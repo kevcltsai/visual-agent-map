@@ -19,7 +19,7 @@
 ### Three ways to explore
 
 - **Visual maps.** Break a question into topics, research a branch with AI, and review suggestions before adding them. Manual mapping needs no AI.
-- **AIM — Adaptive Inquiry Map.** Work from your question and background toward a document with supporting sources. Follow the research in the map, build on useful earlier findings, and resume unfinished work when a step fails. The current interface calls this workflow **MindSearch**.
+- **AIM — Adaptive Inquiry Map.** Work from your question and background toward a document with supporting sources. Follow the research in the map, build on useful earlier findings, and resume unfinished work when a step fails.
 - **Coffee Tables.** Bring an unfinished idea to simulated AI guests. Add `.txt` / `.md` background, choose a conversation style, invite guests with a question, and revisit observer insights and conversation segments.
 
 Coffee Tables guests are simulated, not real experts; their conversations are not automatically fact-checked.
@@ -28,7 +28,7 @@ Coffee Tables guests are simulated, not real experts; their conversations are no
 
 1. In **Obsidian Desktop → Settings → Community plugins → Browse**, find **Visual Agent Map**, then install and enable it. Requires Obsidian **1.13.7+**.
 2. Try the built-in sample or create a visual map. For AI features, install and sign in to [Codex CLI](https://developers.openai.com/codex/cli/) or [Claude Code](https://docs.anthropic.com/en/docs/claude-code/overview), then check the CLI in VAM settings.
-3. Choose **Create MindSearch map** to try AIM. Enter your question and background, answer the questions that matter, and open the connected notes to inspect research and the final document.
+3. Choose **Create Adaptive Inquiry Map (AIM)** to try AIM. Enter your question and background, answer the questions that matter, and open the connected notes to inspect research and the final document.
 
 For detailed setup, manual installation, and troubleshooting, see [INSTALL.md](INSTALL.md).
 
@@ -57,7 +57,7 @@ Outline search covers titles in the current map, not full text. Map undo/redo is
 
 ### Research inspiration
 
-AIM's planning, search, and synthesis approach is inspired by [MindSearch](https://github.com/InternLM/MindSearch) and [Chen et al. (2024)](https://arxiv.org/abs/2407.20183). VAM independently implements and adapts this workflow for Obsidian; this attribution does not imply affiliation or endorsement.
+AIM's planning, search, and synthesis approach is inspired by [the original research project](https://github.com/InternLM/MindSearch) and [Chen et al. (2024)](https://arxiv.org/abs/2407.20183). VAM independently implements and adapts this workflow for Obsidian; this attribution does not imply affiliation or endorsement.
 
 ### Help and license
 
@@ -84,7 +84,7 @@ Copyright © 2026 Kevin Tsai
 ### 三種探索方式
 
 - **視覺化地圖。** 把問題拆成議題，用 AI 深入一個分支；先查看建議，再決定是否加入。手動繪圖不需要 AI。
-- **AIM — Adaptive Inquiry Map。** 從你的問題與背景出發，逐步形成附有來源的文件。在地圖中追蹤研究、沿用有用的既有發現，遇到失敗時接續未完成的工作。目前介面仍將此流程標示為 **MindSearch**。
+- **AIM — Adaptive Inquiry Map。** 從你的問題與背景出發，逐步形成附有來源的文件。在地圖中追蹤研究、沿用有用的既有發現，遇到失敗時接續未完成的工作。
 - **Coffee Tables。** 把未成形的想法帶來，與模擬 AI 來賓對談。加入 `.txt`／`.md` 背景、選擇對談風格、透過追問邀請來賓，並回看觀察者洞見與對話段落。
 
 Coffee Tables 來賓是模擬角色，不是真實專家；對談內容不會自動查證。
@@ -93,7 +93,7 @@ Coffee Tables 來賓是模擬角色，不是真實專家；對談內容不會自
 
 1. 到 **Obsidian 桌面版 → 設定 → 第三方外掛 → 瀏覽** 搜尋 **Visual Agent Map**，安裝並啟用。需要 Obsidian **1.13.7+**。
 2. 先試內建範例，或建立自己的視覺化地圖。使用 AI 功能前，安裝並登入 [Codex CLI](https://developers.openai.com/codex/cli/) 或 [Claude Code](https://docs.anthropic.com/en/docs/claude-code/overview)，再到 VAM 設定檢查 CLI。
-3. 選擇「**建立 MindSearch 心智圖**」體驗 AIM。輸入問題與背景，回答重要的條件問題，再開啟相連的筆記查看研究與最終文件。
+3. 選擇「**建立 Adaptive Inquiry Map（AIM）**」體驗 AIM。輸入問題與背景，回答重要的條件問題，再開啟相連的筆記查看研究與最終文件。
 
 詳細設定、手動安裝與問題排除，請見 [INSTALL.md](INSTALL.md)。
 
@@ -122,7 +122,7 @@ AIM 會搜尋網路並提供來源連結，但找到來源不代表內容已證�
 
 ### 研究流程參考
 
-AIM 的研究規劃、搜尋與整合方式參考 [MindSearch 原專案](https://github.com/InternLM/MindSearch) 與 [Chen 等人（2024）的論文](https://arxiv.org/abs/2407.20183)。VAM 為 Obsidian 獨立實作與調整此流程；此標註不代表隸屬或獲得原專案背書。
+AIM 的研究規劃、搜尋與整合方式參考 [原研究專案](https://github.com/InternLM/MindSearch) 與 [Chen 等人（2024）的論文](https://arxiv.org/abs/2407.20183)。VAM 為 Obsidian 獨立實作與調整此流程；此標註不代表隸屬或獲得原專案背書。
 
 ### 支援與授權
 

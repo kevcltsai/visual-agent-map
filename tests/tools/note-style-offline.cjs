@@ -6,17 +6,20 @@
 //   node tests/tools/note-style-offline.cjs research [--topics=herbs,maillard] [--concurrency=4] [--force]
 //        One web research per topic (Claude Code CLI, WebSearch/WebFetch) -> <task-dir>/fixtures/<slug>.json
 //        (shared workingFindings + sourceContext). Web content: private repo only.
-//   node tests/tools/note-style-offline.cjs run [--topics=...] [--arms=A,B] [--lang=zh|en] [--concurrency=4]
+//   node tests/tools/note-style-offline.cjs run [--topics=...] [--arms=A,B,C] [--lang=zh|en] [--concurrency=4]
 //        [--force] [--regen]   Writes one note per topic and arm with researchMode "local" -> <task-dir>/runs/.
 //        --regen regenerates a failing note (old attempt kept as attemptN, at most one regeneration per note).
 //   node tests/tools/note-style-offline.cjs checks     Prints the automated-check table for every written note.
-//   node tests/tools/note-style-offline.cjs render [--out=<review dir>] [--seed=<text>] [--allow-failed]
+//   node tests/tools/note-style-offline.cjs render [--out=<review dir>] [--seed=<text>] [--allow-failed] [--pair=B,A] [--round=2]
+//        --pair=<new arm>,<base arm> (default B,A; round 2 uses C,A). --round=2 also changes the review text and key file names.
 //        16 notes with random code names + owner-review-key.json (arm mapping; the owner does not open it).
 //   node tests/tools/note-style-offline.cjs review [--out=<review dir>] [--force]   Writes owner-review.md.
 //   node tests/tools/note-style-offline.cjs compare [--out=<review dir>]   Reads owner-review.md back: wins and cost ratio.
 //
 // Arm A: production generalTaskPrompt; reply -> parse -> normalizeDetailHeadings -> resolveDetailReferences ->
 //        canonicalDetail(standard) -> detailWithVisualReferences.
+// Arm C (round 2): the same swap with note-style-offline/hybrid.<lang>.md (textbook-led lead-in + A's categories);
+//        post-processing identical to Arm B.
 // Arm B: the same prompt with the OBSIDIAN_FORMAT block and the detail-structure block replaced by
 //        note-style-offline/textbook.<lang>.md; reply -> parse (neutralizeUnsafeMermaid) -> normalizeDetailHeadings
 //        -> resolveDetailReferences -> neutralizeUnsafeMermaid -> detailWithVisualReferences.
@@ -33,7 +36,9 @@ const { spawn } = require('node:child_process');
 
 const ROOT = path.resolve(__dirname, '..', '..');
 const TOOL_DIR = path.join(__dirname, 'note-style-offline');
-const DEFAULT_TASK_DIR = '/Users/kevintsai/Documents/Projects/Obsdian_VAM/agents-spec/docs/history/tasks/2026-10-19-note-style';
+// The workspace holds agents-spec/ and obsidian-plugin/; worktrees live in <workspace>-worktrees/. Override with VAM_WORKSPACE.
+const WORKSPACE = process.env.VAM_WORKSPACE || path.resolve(ROOT, '..', '..', 'Obsdian_VAM');
+const DEFAULT_TASK_DIR = path.join(WORKSPACE, 'agents-spec', 'docs', 'history', 'tasks', '2026-10-19-note-style');
 const DEFAULT_REVIEW_DIR = '/private/tmp/vam-e2e-note-style-review';
 const MODEL = 'sonnet';
 const EFFORT = 'low';
@@ -54,7 +59,7 @@ const UI_LANGUAGE = { zh: 'zh-TW', en: 'en' };
 // ---- path safety ---------------------------------------------------------------------------------------------
 
 const PROTECTED_ABSOLUTE = ['/private/tmp/vam-e2e-current', '/tmp/vam-e2e-current'];
-const PLUGIN_REPO_PARENTS = [ROOT, '/Users/kevintsai/Documents/Projects/Obsdian_VAM/obsidian-plugin'];
+const PLUGIN_REPO_PARENTS = [ROOT, path.join(WORKSPACE, 'obsidian-plugin')];
 
 /** The real path of the deepest existing ancestor plus the not-yet-existing tail (so symlinks are followed). */
 function realForm(target) {
@@ -160,8 +165,12 @@ function taskContext(topic, fixture, lang) {
   };
 }
 
+const FRAGMENT_FILE = { B: 'textbook', C: 'hybrid' };
+function fragmentFor(arm, lang) {
+  return fs.readFileSync(path.join(TOOL_DIR, `${FRAGMENT_FILE[arm]}.${lang}.md`), 'utf8').replace(/\n$/, '');
+}
 function textbookFragment(lang) {
-  return fs.readFileSync(path.join(TOOL_DIR, `textbook.${lang}.md`), 'utf8').replace(/\n$/, '');
+  return fragmentFor('B', lang);
 }
 
 /** The two blocks Arm B swaps out, joined exactly the way generalTaskPrompt joins them. */
@@ -178,8 +187,10 @@ function buildPrompts(context, lang) {
   const block = replacedBlock(lang);
   const index = prompt.indexOf(block.joined);
   if (index < 0 || prompt.indexOf(block.joined, index + 1) >= 0) throw new Error('the structure + obsidian-format block is not in the prompt exactly once');
-  const fragment = textbookFragment(lang);
-  return { A: prompt, B: prompt.slice(0, index) + fragment + prompt.slice(index + block.joined.length), block, fragment };
+  const swap = fragment => prompt.slice(0, index) + fragment + prompt.slice(index + block.joined.length);
+  const fragment = fragmentFor('B', lang);
+  const hybridFragment = fragmentFor('C', lang);
+  return { A: prompt, B: swap(fragment), C: swap(hybridFragment), block, fragment, hybridFragment };
 }
 
 // ---- model call ----------------------------------------------------------------------------------------------
@@ -413,7 +424,7 @@ function checkNote(arm, result, fixture, topic) {
   if (unconfirmed) failures.push(`${unconfirmed} unconfirmed [S#] source marker(s)`);
   if (neutralizedBlocks) failures.push('mermaid neutralized as unsafe');
   if (syntaxProblems.length) failures.push(`mermaid syntax: ${syntaxProblems.join('; ')}`);
-  if (arm === 'B') {
+  if (arm !== 'A') {
     if (/本次無新增內容|No new content this time|No new information in this task/.test(finalDetail)) failures.push('contains the empty-section filler');
     if (headings > 7) failures.push(`${headings} ### headings (max 7)`);
     if (callouts > 3) failures.push(`${callouts} non-figure callouts (max 3)`);
@@ -437,12 +448,14 @@ function loadFixture(taskDir, slug) {
   return JSON.parse(fs.readFileSync(file, 'utf8'));
 }
 
+const ARMS = ['A', 'B', 'C'];
 const runFile = (taskDir, slug, arm) => path.join(taskDir, 'runs', `${slug}.${arm}.json`);
 
 async function commandRun(args) {
   const lang = args.lang || 'zh';
   const taskDir = args['task-dir'] || DEFAULT_TASK_DIR;
   const arms = String(args.arms || 'A,B').split(',');
+  if (arms.some(arm => !ARMS.includes(arm))) throw new Error(`unknown arms: ${arms.join(',')}`);
   const jobs = pickTopics(args).flatMap(topic => arms.map(arm => ({ topic, arm })));
   await pool(jobs, Number(args.concurrency || 4), async ({ topic, arm }) => {
     const file = runFile(taskDir, topic.slug, arm);
@@ -476,7 +489,7 @@ async function commandRun(args) {
 function loadRuns(taskDir) {
   const runs = {};
   for (const topic of TOPICS)
-    for (const arm of ['A', 'B']) {
+    for (const arm of ARMS) {
       const file = runFile(taskDir, topic.slug, arm);
       if (fs.existsSync(file)) runs[`${topic.slug}.${arm}`] = JSON.parse(fs.readFileSync(file, 'utf8'));
     }
@@ -486,10 +499,11 @@ function loadRuns(taskDir) {
 function commandChecks(args) {
   const taskDir = args['task-dir'] || DEFAULT_TASK_DIR;
   const runs = loadRuns(taskDir);
+  const checkArms = args.arms ? String(args.arms).split(',') : ['A', 'B'];
   const rows = ['| topic | arm | attempt | pass | ### | callouts | fab URL | bad mermaid | chart nums | unseen nums | failures |', '| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |'];
-  let unseenB = 0;
+  const unseen = {};
   for (const topic of TOPICS)
-    for (const arm of ['A', 'B']) {
+    for (const arm of checkArms) {
       const r = runs[`${topic.slug}.${arm}`];
       if (!r) {
         rows.push(`| ${topic.slug} | ${arm} | - | missing | | | | | | | |`);
@@ -497,12 +511,13 @@ function commandChecks(args) {
       }
       const c = (r.checks = checkNote(arm, r, loadFixture(taskDir, topic.slug), topic));
       writeFile(runFile(taskDir, topic.slug, arm), JSON.stringify(r, null, 2) + '\n');
-      if (arm === 'B') unseenB += (c.unseenNumbers || []).length;
+      if (arm !== 'A') unseen[arm] = (unseen[arm] || 0) + (c.unseenNumbers || []).length;
       rows.push(`| ${topic.slug} | ${arm} | ${r.attempt} | ${c.pass ? 'pass' : 'FAIL'} | ${c.headings ?? ''} | ${c.callouts ?? ''} | ${(c.fabricatedUrls || []).length} | ${(c.neutralizedBlocks || 0) + (c.syntaxProblems || []).length} | ${c.chartNumbers ?? ''} | ${(c.unseenNumbers || []).join(' ')} | ${(c.failures || []).join('; ')} |`);
     }
-  rows.push('', `Arm B numbers in tables/charts not found in the input: ${unseenB} (limit 1 across 8 notes)${unseenB > 1 ? ' -> FAIL' : ''}`);
+  rows.push('');
+  for (const [arm, count] of Object.entries(unseen)) rows.push(`Arm ${arm} numbers in tables/charts not found in the input: ${count} (limit 1 across 8 notes)${count > 1 ? ' -> FAIL' : ''}`);
   process.stdout.write(rows.join('\n') + '\n');
-  return { unseenB };
+  return { unseen, unseenB: unseen.B ?? 0 };
 }
 
 // ---- render / review / compare -------------------------------------------------------------------------------
@@ -524,9 +539,11 @@ function commandRender(args) {
   const out = args.out || DEFAULT_REVIEW_DIR;
   assertWritable(out);
   const runs = loadRuns(taskDir);
-  const missing = TOPICS.flatMap(t => ['A', 'B'].filter(arm => !runs[`${t.slug}.${arm}`]).map(arm => `${t.slug}.${arm}`));
+  const [newArm, baseArm] = String(args.pair || 'B,A').split(',');
+  if (!ARMS.includes(newArm) || !ARMS.includes(baseArm) || newArm === baseArm) throw new Error(`bad --pair=${args.pair}`);
+  const missing = TOPICS.flatMap(t => [newArm, baseArm].filter(arm => !runs[`${t.slug}.${arm}`]).map(arm => `${t.slug}.${arm}`));
   if (missing.length) throw new Error(`missing runs: ${missing.join(', ')}`);
-  const failed = Object.entries(runs).filter(([, r]) => !r.checks?.pass).map(([k]) => k);
+  const failed = Object.entries(runs).filter(([k, r]) => [newArm, baseArm].includes(r.arm) && !r.checks?.pass).map(([k]) => k);
   if (failed.length && !args['allow-failed']) throw new Error(`automated checks failed for ${failed.join(', ')}; not handing them to the owner (use --allow-failed to override)`);
   const random = seededRandom(args.seed || crypto.randomBytes(8).toString('hex'));
   const codes = new Set();
@@ -538,16 +555,16 @@ function commandRender(args) {
   };
   const pairs = TOPICS.map((topic, index) => {
     const aFirst = random() < 0.5;
-    const first = aFirst ? 'A' : 'B';
-    const second = aFirst ? 'B' : 'A';
+    const first = aFirst ? baseArm : newArm;
+    const second = aFirst ? newArm : baseArm;
     const entry = { index: index + 1, slug: topic.slug, topic: topic.title, 甲: { arm: first, file: `${code()}.md` }, 乙: { arm: second, file: `${code()}.md` } };
     for (const side of ['甲', '乙']) writeFile(path.join(out, entry[side].file), noteText(runs[`${topic.slug}.${entry[side].arm}`]));
     return entry;
   });
   writeFile(path.join(out, '.obsidian', 'app.json'), '{}\n');
-  const key = { model: `claude:${MODEL}`, arms: { A: 'notes (current six-heading format)', B: 'textbook' }, generatedAt: new Date().toISOString(), pairs };
+  const key = { model: `claude:${MODEL}`, round: args.round ? Number(args.round) : 1, pair: [newArm, baseArm], arms: { A: 'notes (current six-heading format)', B: 'textbook', C: 'hybrid (textbook-led lead-in + categorized sections)' }, generatedAt: new Date().toISOString(), pairs };
   writeFile(path.join(out, 'owner-review-key.json'), JSON.stringify(key, null, 2) + '\n');
-  writeFile(path.join(taskDir, 'owner-review-key.json'), JSON.stringify(key, null, 2) + '\n');
+  writeFile(path.join(taskDir, key.round === 2 ? 'owner-review-key-r2.json' : 'owner-review-key.json'), JSON.stringify(key, null, 2) + '\n');
   process.stdout.write(`rendered 16 notes into ${out}\n`);
 }
 
@@ -561,14 +578,16 @@ function commandReview(args) {
   const key = JSON.parse(fs.readFileSync(path.join(out, 'owner-review-key.json'), 'utf8'));
   const link = entry => `[[${entry.file.replace(/\.md$/, '')}]]`;
   const rows = key.pairs.map(pair => `| ${pair.index} | ${pair.topic} | ${link(pair.甲)} | ${link(pair.乙)} | | |`);
+  const second = key.round === 2;
   const text = [
-    '# Owner review（筆記風格 A/B，盲評）',
+    second ? '# Owner review（筆記風格第 2 輪，盲評）' : '# Owner review（筆記風格 A/B，盲評）',
     '',
-    '約 25 分鐘。每個主題有甲、乙兩篇筆記，內容寫同一個主題，只是寫法不同。不會顯示哪一篇是哪種寫法。',
+    ...(second ? ['這一輪是拿一個新版本和上一輪的重點筆記版本比較。請每一列都填「你的選擇」，因為結果需要每題的選擇才能判斷；約 25 分鐘。', ''] : []),
+    `${second ? '' : '約 25 分鐘。'}每個主題有甲、乙兩篇筆記，內容寫同一個主題，只是寫法不同。不會顯示哪一篇是哪種寫法。`,
     '',
-    '1. 在 Obsidian 開啟這個資料夾（`/private/tmp/vam-e2e-note-style-review`）當 vault，或直接點下表的連結讀。',
+    `1. 在 Obsidian 開啟這個資料夾（\`${out}\`）當 vault，或直接點下表的連結讀。`,
     '2. 每一列讀完甲、乙，在「你的選擇」填 **甲**、**乙**、**都可** 或 **都不對**。',
-    '3. 「一句理由」可留白，但寫了才能修下一版。第一欄請勿修改。',
+    `3. 「一句理由」可留白，但寫了才能${second ? '改進' : '修下一版'}。第一欄請勿修改。`,
     '4. 不要開 `owner-review-key.json`，那是對照表。',
     '',
     '判斷標準：哪一篇比較好讀、比較容易學會這個主題。',
@@ -589,14 +608,15 @@ function median(values) {
   return sorted.length % 2 ? sorted[mid] : (sorted[mid - 1] + sorted[mid]) / 2;
 }
 
-function costSummary(runs) {
+function costSummary(runs, newArm = 'B') {
   const result = {};
-  for (const arm of ['A', 'B']) {
+  for (const arm of ['A', newArm]) {
     const own = Object.values(runs).filter(r => r.arm === arm);
     result[arm] = { notes: own.length, input: median(own.map(r => r.tokens?.input)), freshInput: median(own.map(r => r.tokens?.freshInput)), output: median(own.map(r => r.tokens?.output)), cost: median(own.map(r => r.cost)) };
   }
   const ratio = (b, a) => (a ? b / a : null);
-  result.ratio = { input: ratio(result.B.input, result.A.input), output: ratio(result.B.output, result.A.output), cost: ratio(result.B.cost, result.A.cost) };
+  result.new = result[newArm];
+  result.ratio = { input: ratio(result.new.input, result.A.input), output: ratio(result.new.output, result.A.output), cost: ratio(result.new.cost, result.A.cost) };
   return result;
 }
 
@@ -612,6 +632,7 @@ function parseReview(text) {
 
 function tally(key, answers) {
   const counts = { textbook: 0, notes: 0, either: 0, neither: 0, blank: 0, invalid: 0 };
+  if (key.pair?.includes('C')) counts.hybrid = 0;
   const rows = [];
   for (const pair of key.pairs) {
     const answer = answers.get(pair.index);
@@ -621,24 +642,27 @@ function tally(key, answers) {
     else if (!CHOICES.includes(choice)) outcome = 'invalid';
     else if (choice === '都可') outcome = 'either';
     else if (choice === '都不對') outcome = 'neither';
-    else outcome = pair[choice].arm === 'B' ? 'textbook' : 'notes';
+    else outcome = { A: 'notes', B: 'textbook', C: 'hybrid' }[pair[choice].arm];
     counts[outcome]++;
     rows.push({ index: pair.index, topic: pair.topic, choice, outcome, reason: answer?.reason ?? '' });
   }
   return { counts, rows };
 }
 
-function gate(counts) {
+function gate(counts, { final = false } = {}) {
   if (counts.blank || counts.invalid) return `PENDING: ${counts.blank} blank / ${counts.invalid} invalid answers`;
   const bad = [];
-  if (counts.textbook < 6) bad.push(`textbook wins ${counts.textbook}/8 (need >= 6)`);
+  const name = counts.hybrid !== undefined ? 'hybrid' : 'textbook';
+  const wins = counts[name];
+  if (wins < 6) bad.push(`${name} wins ${wins}/8 (need >= 6)`);
   if (counts.notes > 1) bad.push(`notes wins ${counts.notes}/8 (need <= 1)`);
   if (counts.neither > 1) bad.push(`neither ${counts.neither}/8 (need <= 1)`);
   if (counts.blank || counts.invalid) bad.push(`${counts.blank} blank / ${counts.invalid} invalid answers`);
   if (!bad.length) return 'PASS: preference thresholds met';
-  if (counts.textbook >= 4 && counts.textbook <= 5) return `RETRY (one fragment revision + one more blind round allowed): ${bad.join('; ')}`;
-  if (counts.textbook >= 6) return `treated like 4-5/8 (one fragment revision allowed): ${bad.join('; ')}`;
-  return `STOP (textbook <= 3/8 stops the whole feature): ${bad.join('; ')}`;
+  if (final) return `STOP (final round did not meet the thresholds; the whole feature stops): ${bad.join('; ')}`;
+  if (wins >= 4 && wins <= 5) return `RETRY (one fragment revision + one more blind round allowed): ${bad.join('; ')}`;
+  if (wins >= 6) return `treated like 4-5/8 (one fragment revision allowed): ${bad.join('; ')}`;
+  return `STOP (${name} <= 3/8 stops the whole feature): ${bad.join('; ')}`;
 }
 
 function commandCompare(args) {
@@ -648,17 +672,19 @@ function commandCompare(args) {
   const answers = parseReview(fs.readFileSync(path.join(out, 'owner-review.md'), 'utf8'));
   const { counts, rows } = tally(key, answers);
   const runs = loadRuns(taskDir);
-  const cost = costSummary(runs);
+  const newArm = key.pair?.[0] ?? 'B';
+  const newLabel = { B: 'B 教科書', C: 'C 混合' }[newArm];
+  const cost = costSummary(runs, newArm);
   const fmt = v => (v === null ? 'n/a' : Number.isInteger(v) ? String(v) : v.toFixed(3));
   const text = [
     '# 筆記風格 P1 compare',
     '',
-    `- 教科書勝: ${counts.textbook}/8`,
+    `- ${newArm === 'C' ? '混合版' : '教科書'}勝: ${counts[newArm === 'C' ? 'hybrid' : 'textbook']}/8`,
     `- 重點筆記勝: ${counts.notes}/8`,
     `- 都可: ${counts.either}/8`,
     `- 都不對: ${counts.neither}/8`,
     counts.blank || counts.invalid ? `- 未填 ${counts.blank}、無法辨識 ${counts.invalid}` : '',
-    `- Gate G1: ${gate(counts)}`,
+    `- Gate G1: ${gate(counts, { final: key.round === 2 })}`,
     '',
     '| 題 | 主題 | 選擇 | 結果 | 理由 |',
     '| --- | --- | --- | --- | --- |',
@@ -669,13 +695,13 @@ function commandCompare(args) {
     '| arm | notes | input tokens（含 cache） | 非 cache input | output tokens | cost USD |',
     '| --- | --- | --- | --- | --- | --- |',
     `| A 重點筆記 | ${cost.A.notes} | ${fmt(cost.A.input)} | ${fmt(cost.A.freshInput)} | ${fmt(cost.A.output)} | ${fmt(cost.A.cost)} |`,
-    `| B 教科書 | ${cost.B.notes} | ${fmt(cost.B.input)} | ${fmt(cost.B.freshInput)} | ${fmt(cost.B.output)} | ${fmt(cost.B.cost)} |`,
-    `| B / A | | ${fmt(cost.ratio.input)} | | ${fmt(cost.ratio.output)} | ${fmt(cost.ratio.cost)} |`,
+    `| ${newLabel} | ${cost.new.notes} | ${fmt(cost.new.input)} | ${fmt(cost.new.freshInput)} | ${fmt(cost.new.output)} | ${fmt(cost.new.cost)} |`,
+    `| ${newArm} / A | | ${fmt(cost.ratio.input)} | | ${fmt(cost.ratio.output)} | ${fmt(cost.ratio.cost)} |`,
     ''
   ]
     .filter((line, i, all) => line !== '' || all[i - 1] !== '')
     .join('\n');
-  writeFile(path.join(taskDir, 'compare.md'), text);
+  writeFile(path.join(taskDir, key.round === 2 ? 'compare-r2.md' : 'compare.md'), text);
   process.stdout.write(text + '\n');
 }
 
@@ -698,7 +724,7 @@ async function main() {
   await commands[command](args);
 }
 
-module.exports = { TOPICS, assertWritable, writeFile, buildPrompts, taskContext, replacedBlock, textbookFragment, parseReview, tally, gate, checkNote, mermaidSyntaxProblems, chartNumbers, costSummary, product };
+module.exports = { WORKSPACE, TOPICS, assertWritable, writeFile, buildPrompts, taskContext, replacedBlock, textbookFragment, parseReview, tally, gate, checkNote, mermaidSyntaxProblems, chartNumbers, costSummary, product };
 
 if (require.main === module)
   main().catch(error => {

@@ -120,7 +120,7 @@ async function fitImageForClaude(dataUrl: string, signal: AbortSignal): Promise<
   throw new Error(t("ui.context_ai_image_unavailable"));
 }
 
-/** Chart steps that may run at once; a note written while the limit is reached is simply left without diagrams. */
+/** Chart steps that may run at once; further jobs wait in a first-in-first-out queue. */
 export const CHART_JOB_LIMIT = 3;
 
 export default class VisualAgentMapPlugin extends Plugin {
@@ -132,8 +132,11 @@ export default class VisualAgentMapPlugin extends Plugin {
   readonly running = new Set<string>();
   readonly quickExpandPending = new Set<string>();
   readonly activeTasks = new Map<string, AbortController>();
-  /** Background chart steps, keyed by note path: one per path, at most {@link CHART_JOB_LIMIT} at a time. */
+  /** Background chart steps (running and queued), keyed by note path: one per path, at most {@link CHART_JOB_LIMIT} run at a time. */
   readonly chartJobs = new Map<string, AbortController>();
+  /** Jobs waiting for a free slot, first in first out. */
+  private readonly chartQueue: Array<{ controller: AbortController; start: () => void }> = [];
+  private chartRunning = 0;
   readonly expansionBatches = new Map<string, ExpansionBatchState>();
   readonly expansionCoordinator = new ShallowExpansionCoordinator(this.activeTasks, this.expansionBatches);
   pendingSuggestions: Map<string, Suggestion[]> = new Map();
@@ -1592,7 +1595,16 @@ export default class VisualAgentMapPlugin extends Plugin {
       if (path === undefined || key === path) {
         controller.abort();
         this.chartJobs.delete(key);
+        // A queued job never starts; a running one frees its slot when it settles.
+        const queued = this.chartQueue.findIndex(item => item.controller === controller);
+        if (queued >= 0) this.chartQueue.splice(queued, 1);
       }
+  }
+  private pumpChartQueue(): void {
+    while (this.chartRunning < CHART_JOB_LIMIT && this.chartQueue.length) {
+      this.chartRunning++;
+      this.chartQueue.shift()!.start();
+    }
   }
   /**
    * Runs the chart step in the background for a note that was just written. It never blocks or fails the research:
@@ -1611,14 +1623,10 @@ export default class VisualAgentMapPlugin extends Plugin {
   }): void {
     if (!this.aiTasks.chartEligible(job.context) || !job.detail.trim()) return;
     this.abortChartJobs(job.path);
-    if (this.chartJobs.size >= CHART_JOB_LIMIT) {
-      this.logs.appendLog("info", t("log.chart_job_limit_reached"));
-      return;
-    }
     const controller = new AbortController();
     this.chartJobs.set(job.path, controller);
     let exchangeId = "";
-    void (async () => {
+    const run = async (): Promise<void> => {
       try {
         const detail = await this.aiTasks.chartDetail({
           input: job.context,
@@ -1646,8 +1654,17 @@ export default class VisualAgentMapPlugin extends Plugin {
         }
       } finally {
         if (this.chartJobs.get(job.path) === controller) this.chartJobs.delete(job.path);
+        this.chartRunning--;
+        this.pumpChartQueue();
       }
-    })();
+    };
+    this.chartQueue.push({
+      controller,
+      start: () => {
+        void run();
+      }
+    });
+    this.pumpChartQueue();
   }
   /** The chart step for a finished AIM conclusion; the setting is checked inside, so off returns the detail untouched. */
   async addAimDiagrams(request: {

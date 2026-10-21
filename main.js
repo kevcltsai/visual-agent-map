@@ -1561,7 +1561,6 @@ var english = {
   "log.chart_not_added_0": "Diagrams not added ({0}); the note was left unchanged",
   "log.chart_stale_not_applied": "The note changed after it was written, so the diagrams were not applied.",
   "log.chart_stopped_not_applied": "Adding diagrams stopped; the note was left as written.",
-  "log.chart_job_limit_reached": "Diagram jobs are at the limit; a note written now is left without diagrams.",
   "ui.add_charts_history": "Add diagrams",
   "log.stage_adding_charts": "Adding diagrams",
   "error.ai_reply_missing_summary_0": "{0} did not return a summary and detail",
@@ -3152,7 +3151,6 @@ var traditionalChinese = {
   "log.chart_not_added_0": "\u672A\u52A0\u5165\u914D\u5716\uFF08{0}\uFF09\uFF1B\u7B46\u8A18\u7DAD\u6301\u539F\u6A23",
   "log.chart_stale_not_applied": "\u7B46\u8A18\u5728\u5BEB\u5165\u5F8C\u5DF2\u8B8A\u66F4\uFF0C\u914D\u5716\u672A\u5957\u7528\u3002",
   "log.chart_stopped_not_applied": "\u5DF2\u505C\u6B62\u52A0\u5165\u914D\u5716\uFF1B\u7B46\u8A18\u7DAD\u6301\u5BEB\u5165\u6642\u7684\u6A23\u5B50\u3002",
-  "log.chart_job_limit_reached": "\u914D\u5716\u5DE5\u4F5C\u5DF2\u9054\u4E0A\u9650\uFF1B\u73FE\u5728\u5BEB\u5165\u7684\u7B46\u8A18\u4E0D\u52A0\u914D\u5716\u3002",
   "ui.add_charts_history": "\u52A0\u5165\u914D\u5716",
   "log.stage_adding_charts": "\u52A0\u5165\u914D\u5716",
   "error.ai_reply_missing_summary_0": "{0} \u6C92\u6709\u56DE\u50B3 summary \u8207 detail",
@@ -37834,6 +37832,10 @@ function claudeStructuredOutput(stdout, plainText = false) {
     throw new Error(t("ui.claude_did_not_return_structured_output"));
   return JSON.stringify(record.structured_output);
 }
+function looksLikeAnswer(text11) {
+  const trimmed = text11.trim();
+  return trimmed.startsWith("{") || trimmed.includes('"summary"');
+}
 function claudeTranscriptMilestones(transcript) {
   var _a, _b, _c, _d, _e;
   const milestones = {};
@@ -37856,7 +37858,7 @@ function claudeTranscriptMilestones(transcript) {
     if (record.type === "assistant") {
       for (const block of (_d = (_c = record.message) == null ? void 0 : _c.content) != null ? _d : []) {
         if (block.type === "tool_use" && block.name === "StructuredOutput") structured = true;
-        else if (block.type === "text" && !structured && typeof block.text === "string" && block.text.trim())
+        else if (block.type === "text" && !structured && typeof block.text === "string" && looksLikeAnswer(block.text))
           textBefore = true;
       }
     } else if (record.type === "user" && JSON.stringify((_e = record.message) != null ? _e : "").includes("structured-output-enforce"))
@@ -41572,8 +41574,11 @@ var VisualAgentMapPlugin = class extends import_obsidian34.Plugin {
     __publicField(this, "running", /* @__PURE__ */ new Set());
     __publicField(this, "quickExpandPending", /* @__PURE__ */ new Set());
     __publicField(this, "activeTasks", /* @__PURE__ */ new Map());
-    /** Background chart steps, keyed by note path: one per path, at most {@link CHART_JOB_LIMIT} at a time. */
+    /** Background chart steps (running and queued), keyed by note path: one per path, at most {@link CHART_JOB_LIMIT} run at a time. */
     __publicField(this, "chartJobs", /* @__PURE__ */ new Map());
+    /** Jobs waiting for a free slot, first in first out. */
+    __publicField(this, "chartQueue", []);
+    __publicField(this, "chartRunning", 0);
     __publicField(this, "expansionBatches", /* @__PURE__ */ new Map());
     __publicField(this, "expansionCoordinator", new ShallowExpansionCoordinator(this.activeTasks, this.expansionBatches));
     __publicField(this, "pendingSuggestions", /* @__PURE__ */ new Map());
@@ -42928,7 +42933,15 @@ ${t("ui.organize_link_wait_hint")}`;
       if (path === void 0 || key2 === path) {
         controller.abort();
         this.chartJobs.delete(key2);
+        const queued = this.chartQueue.findIndex((item) => item.controller === controller);
+        if (queued >= 0) this.chartQueue.splice(queued, 1);
       }
+  }
+  pumpChartQueue() {
+    while (this.chartRunning < CHART_JOB_LIMIT && this.chartQueue.length) {
+      this.chartRunning++;
+      this.chartQueue.shift().start();
+    }
   }
   /**
    * Runs the chart step in the background for a note that was just written. It never blocks or fails the research:
@@ -42939,14 +42952,10 @@ ${t("ui.organize_link_wait_hint")}`;
   addChartsAfterWrite(job) {
     if (!this.aiTasks.chartEligible(job.context) || !job.detail.trim()) return;
     this.abortChartJobs(job.path);
-    if (this.chartJobs.size >= CHART_JOB_LIMIT) {
-      this.logs.appendLog("info", t("log.chart_job_limit_reached"));
-      return;
-    }
     const controller = new AbortController();
     this.chartJobs.set(job.path, controller);
     let exchangeId = "";
-    void (async () => {
+    const run = async () => {
       try {
         const detail = await this.aiTasks.chartDetail({
           input: job.context,
@@ -42974,8 +42983,17 @@ ${t("ui.organize_link_wait_hint")}`;
         }
       } finally {
         if (this.chartJobs.get(job.path) === controller) this.chartJobs.delete(job.path);
+        this.chartRunning--;
+        this.pumpChartQueue();
       }
-    })();
+    };
+    this.chartQueue.push({
+      controller,
+      start: () => {
+        void run();
+      }
+    });
+    this.pumpChartQueue();
   }
   /** The chart step for a finished AIM conclusion; the setting is checked inside, so off returns the detail untouched. */
   async addAimDiagrams(request) {

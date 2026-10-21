@@ -122,9 +122,15 @@ export function claudeStructuredOutput(stdout: string, plainText = false): strin
 
 /**
  * Facts read from the `--verbose` transcript array: the token usage of the result record, whether the main agent wrote
- * answer text before its StructuredOutput tool call, and whether the CLI sent a "structured-output-enforce" reminder
+ * answer text (JSON or a "summary" field, not search narration) before its StructuredOutput tool call, and whether the CLI sent a "structured-output-enforce" reminder
  * (the model had to call the tool again). Anything the transcript does not show is left out.
  */
+/** Text that is the answer itself (JSON, or a `"summary"` field), not a short remark such as "Let me search". */
+function looksLikeAnswer(text: string): boolean {
+  const trimmed = text.trim();
+  return trimmed.startsWith("{") || trimmed.includes('"summary"');
+}
+
 export function claudeTranscriptMilestones(transcript: unknown): AiMilestones {
   const milestones: AiMilestones = {};
   if (!Array.isArray(transcript)) return milestones;
@@ -148,7 +154,7 @@ export function claudeTranscriptMilestones(transcript: unknown): AiMilestones {
     if (record.type === "assistant") {
       for (const block of record.message?.content ?? []) {
         if (block.type === "tool_use" && block.name === "StructuredOutput") structured = true;
-        else if (block.type === "text" && !structured && typeof block.text === "string" && block.text.trim())
+        else if (block.type === "text" && !structured && typeof block.text === "string" && looksLikeAnswer(block.text))
           textBefore = true;
       }
     } else if (record.type === "user" && JSON.stringify(record.message ?? "").includes("structured-output-enforce"))

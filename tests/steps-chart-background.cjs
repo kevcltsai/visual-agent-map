@@ -68,13 +68,39 @@ test('unload aborts chart jobs before the repository is disposed', () => {
   assert.deepEqual(order, ['abort', 'dispose']);
 });
 
-test('at most 3 jobs run at once, and a new job on the same path replaces the old one', async () => {
-  const { plugin } = newPlugin({ chart: () => new Promise(() => {}) });
-  for (const p of ['A.md', 'B.md', 'C.md', 'D.md']) plugin.addChartsAfterWrite(job(p));
-  assert.deepEqual([...plugin.chartJobs.keys()], ['A.md', 'B.md', 'C.md'], 'the fourth waits for no one: it is skipped');
-  const old = plugin.chartJobs.get('A.md');
-  plugin.addChartsAfterWrite(job('A.md'));
-  assert.equal(old.signal.aborted, true); assert.equal(plugin.chartJobs.size, 3); assert.notEqual(plugin.chartJobs.get('A.md'), old);
+test('at most 3 jobs run at once; later jobs queue first-in-first-out and start when a slot frees; a new job on the same path replaces the old one', async () => {
+  const gates = new Map(), started = [], applied = [];
+  const { plugin } = newPlugin({ chart: request => { started.push(request.input.title); return new Promise(resolve => gates.set(request.input.title, () => resolve(request.detail + '\n\nCHART'))); } });
+  for (const p of ['A.md', 'B.md', 'C.md', 'D.md', 'E.md']) plugin.addChartsAfterWrite(job(p, { apply: async () => { applied.push(p); return true; } }));
+  assert.deepEqual(started, ['A.md', 'B.md', 'C.md'], 'only three run');
+  assert.deepEqual([...plugin.chartJobs.keys()], ['A.md', 'B.md', 'C.md', 'D.md', 'E.md'], 'the queued ones are tracked too');
+  gates.get('B.md')();
+  await delay(10);
+  assert.deepEqual(started, ['A.md', 'B.md', 'C.md', 'D.md'], 'the 4th starts when a slot frees, before the 5th');
+  assert.deepEqual(applied, ['B.md']);
+  gates.get('A.md')(); gates.get('C.md')(); gates.get('D.md')(); await delay(10); gates.get('E.md')(); await delay(10);
+  assert.deepEqual(applied.slice().sort(), ['A.md', 'B.md', 'C.md', 'D.md', 'E.md']); assert.equal(plugin.chartJobs.size, 0);
+  // Same path: the old job (running or queued) is aborted by the new one.
+  const { plugin: other } = newPlugin({ chart: () => new Promise(() => {}) });
+  for (const p of ['A.md', 'B.md', 'C.md', 'D.md']) other.addChartsAfterWrite(job(p));
+  const queued = other.chartJobs.get('D.md'); other.addChartsAfterWrite(job('D.md'));
+  assert.equal(queued.signal.aborted, true); assert.equal(other.chartJobs.size, 4);
+  const running = other.chartJobs.get('A.md'); other.addChartsAfterWrite(job('A.md'));
+  assert.equal(running.signal.aborted, true);
+});
+
+test('queued jobs are aborted by Stop on their path, unload and reset, and never start', async () => {
+  for (const abort of [p => p.abortChartJobs('D.md'), p => { p.repo = { dispose() {} }; p.onunload(); }, p => { p.expansionCoordinator = { stopAll() {} }; p.modelDiscovery = { invalidate() {} }; p.aiRuntime = { reset() {} }; p.resetCodexRuntime(); }]) {
+    const started = [];
+    const { plugin } = newPlugin({ chart: request => { started.push(request.input.title); return new Promise((_resolve, reject) => request.signal.addEventListener('abort', () => reject(Object.assign(new Error('Aborted'), { name: 'AbortError' })))); } });
+    let applied = 0;
+    for (const p of ['A.md', 'B.md', 'C.md', 'D.md']) plugin.addChartsAfterWrite(job(p, { apply: async () => { applied++; return true; } }));
+    const queued = plugin.chartJobs.get('D.md');
+    abort(plugin);
+    await delay(10);
+    assert.equal(queued.signal.aborted, true); assert.ok(!started.includes('D.md'), 'the queued job never started'); assert.equal(applied, 0);
+    assert.equal(plugin.chartJobs.has('D.md'), false);
+  }
 });
 
 test('a request that is not chart-eligible starts nothing', () => {

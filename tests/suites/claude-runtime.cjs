@@ -204,6 +204,10 @@ test('Claude json mode reports usage, text before the StructuredOutput call and 
   assert.deepEqual(clean, [{ usage: { inputTokens: 120, outputTokens: 45 }, textBeforeTool: false, enforceRetry: false }]);
   const drafted = await run([text('{"summary":"S"}'), tool]);
   assert.equal(drafted[0].textBeforeTool, true); assert.equal(drafted[0].enforceRetry, false);
+  const narration = await run([text('Let me search for that.'), tool]);
+  assert.equal(narration[0].textBeforeTool, false, 'short search narration is not the answer');
+  const summaryText = await run([text('Here is the result: "summary": "S"'), tool]);
+  assert.equal(summaryText[0].textBeforeTool, true, 'text containing a summary field is the answer');
   const afterTool = await run([tool, text('Done.')]);
   assert.equal(afterTool[0].textBeforeTool, false, 'text after the tool call is not a draft');
   const enforced = await run([text(' '), tool, { type: 'user', parent_tool_use_id: null, message: { content: [{ type: 'text', text: '<system-reminder>structured-output-enforce: call the tool</system-reminder>' }] } }, tool]);

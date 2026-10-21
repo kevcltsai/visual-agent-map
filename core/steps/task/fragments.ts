@@ -64,7 +64,8 @@ export const GENERAL_TASK: FragmentPair = pair(GeneralTaskZH, GeneralTaskEN);
 export const JSON_CONTRACT: FragmentPair = pair(JsonZH, JsonEN);
 export const LABEL_DETAIL: FragmentPair = pair(LabelDetailZH, LabelDetailEN);
 export const LABEL_FINDINGS: FragmentPair = pair(LabelFindingsZH, LabelFindingsEN);
-export const OUTPUT_LANGUAGE: FragmentPair = pair(OutputLanguageZH, OutputLanguageEN);
+/** A template, not text: {@link inLanguageNaming} fills its `{{language}}` placeholder with the output language name. */
+export const OUTPUT_LANGUAGE: FragmentPair = { zh: OutputLanguageZH, en: OutputLanguageEN };
 /** Merge mode: organize only what the sources say (no synthesis of agreements, tradeoffs or open questions). */
 export const MERGE: FragmentPair = pair(MergeZH, MergeEN);
 export const SYNTHESIZE: FragmentPair = pair(SynthesizeZH, SynthesizeEN);

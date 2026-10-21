@@ -208,7 +208,10 @@ test('registry prompt names reproduce every language spelling in the prompt file
   assert.equal(name('zh-TW', 'en', 'plain'), 'Traditional Chinese');
   assert.equal(name('zh-TW', 'en', 'region'), 'Traditional Chinese (Taiwan)');
   assert.equal(name('en', 'en', 'plain'), 'English');
-  const files = ['core/steps/aim/language.zh.md', 'core/steps/relevance-grade/language.zh.md', 'core/steps/reframe/language.zh.md', 'experiences/coffee-tables/steps/table/prompt.zh.md'];
+  // The core language fragments take the name from the registry ({{language}}); the Coffee Tables prompt still spells it out.
+  const parameterised = ['core/steps/aim/language.zh.md', 'core/steps/relevance-grade/language.zh.md', 'core/steps/reframe/language.zh.md'];
+  for (const file of parameterised) assert.ok(fs.readFileSync(path.join(root, file), 'utf8').includes('{{language}}'), file);
+  const files = ['experiences/coffee-tables/steps/table/prompt.zh.md'];
   const spellings = new Set(['繁體中文（台灣用法）', '繁體中文（台灣）', 'Traditional Chinese (Taiwan)']);
   for (const file of files) assert.ok([...spellings].some(text => fs.readFileSync(path.join(root, file), 'utf8').includes(text)), file);
 });

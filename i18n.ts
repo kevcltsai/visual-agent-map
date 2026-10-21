@@ -16,7 +16,13 @@ export { LANGUAGES };
 const DICTIONARIES: Record<UiLanguage, Readonly<Partial<Record<TranslationKey, string>>>> = { "zh-TW": zhTW, en };
 
 const registry: ReadonlyArray<LanguageEntry> = LANGUAGES;
-const entryOf = (locale: UiLanguage): LanguageEntry => registry.find(item => item.id === locale) ?? registry.find(item => item.id === "en")!;
+/** The interface language used when a stored or requested language is not registered. */
+const FALLBACK_LANGUAGE: UiLanguage = "en";
+const entryOf = (locale: UiLanguage): LanguageEntry =>
+  registry.find(item => item.id === locale) ?? registry.find(item => item.id === FALLBACK_LANGUAGE)!;
+
+/** Every language fixed note text can be written in (the registry's distinct `note` values), in registry order. */
+export const NOTE_LANGUAGES: readonly NoteLanguage[] = [...new Set(registry.map(item => item.note))];
 
 /**
  * Every language VAM supports, in menu order. Language menus (settings, output language, image translation) read
@@ -51,13 +57,13 @@ export function languagePromptName(locale: UiLanguage, instruction: InstructionL
 /** BCP 47 tag for `Intl` formatting of `locale`. */
 export function intlLocaleOf(locale: UiLanguage): string { return entryOf(locale).intl; }
 
-let language: UiLanguage = "en";
+let language: UiLanguage = FALLBACK_LANGUAGE;
 /** The saved interface language, or English when absent, invalid, or written by a newer version. */
 export function initialUiLanguage(saved: unknown): UiLanguage {
-  return isUiLanguage(saved) ? saved : "en";
+  return isUiLanguage(saved) ? saved : FALLBACK_LANGUAGE;
 }
 /** Normalizes a stored or session language; anything that is not a registered language is English. */
-export function uiLocale(value: unknown): UiLanguage { return isUiLanguage(value) ? value : "en"; }
+export function uiLocale(value: unknown): UiLanguage { return isUiLanguage(value) ? value : FALLBACK_LANGUAGE; }
 export function setUiLanguage(value: UiLanguage): void { language = value; }
 export function getUiLanguage(): UiLanguage { return language; }
 export function t(key: TranslationKey, ...values: unknown[]): string {
@@ -70,6 +76,18 @@ export function translate(locale: UiLanguage, key: TranslationKey, ...values: un
     const value = values[Number(index)];
     return typeof value === "string" || typeof value === "number" || typeof value === "boolean" ? String(value) : `{${index}}`;
   });
+}
+
+/**
+ * Fixed text that is written into a note (`note.*`, `detail.*` keys). It is always spelled in the note language of
+ * `locale`, so a note never gets an interface-only language; read it back with {@link isNoteLanguage}-checked values.
+ */
+export function translateNote(locale: UiLanguage, key: TranslationKey, ...values: unknown[]): string {
+  return translate(noteLanguageOf(locale), key, ...values);
+}
+/** {@link translateNote} for the current interface language. */
+export function tNote(key: TranslationKey, ...values: unknown[]): string {
+  return translateNote(language, key, ...values);
 }
 
 export function topicStatusLabel(status: "idea" | "running" | "completed" | "error", locale: UiLanguage): string {

@@ -1,5 +1,5 @@
 import { App, Modal, setIcon, type Setting } from "obsidian";
-import { t, type TranslationKey } from "../../i18n";
+import { NOTE_LANGUAGES, noteLanguageOf, t, type TranslationKey } from "../../i18n";
 import { modalActions } from "./action-bar";
 import type { Settings } from "../../repository";
 import {
@@ -72,7 +72,8 @@ export function renderDetailTemplatesSetting(
     .setName(t("ui.detail_templates"))
     .setDesc(t("ui.detail_templates_setting_desc"))
     .addDropdown(dropdown => {
-      for (const builtin of builtinTemplates(plugin.settings.language)) dropdown.addOption(builtin.id, builtin.name);
+      for (const builtin of builtinTemplates(noteLanguageOf(plugin.settings.language)))
+        dropdown.addOption(builtin.id, builtin.name);
       for (const template of plugin.settings.detailTemplates) dropdown.addOption(template.id, template.name);
       dropdown.setValue(workspaceDefaultId(plugin.settings));
       dropdown.onChange(value => {
@@ -113,7 +114,7 @@ export class DetailTemplatesModal extends Modal {
   onOpen(): void {
     this.titleEl.setText(t("ui.detail_templates"));
     const initial = this.initialId
-      ? [...builtinTemplates(this.settings.language), ...this.settings.detailTemplates].find(
+      ? [...builtinTemplates(noteLanguageOf(this.settings.language)), ...this.settings.detailTemplates].find(
           template => template.id === this.initialId
         )
       : undefined;
@@ -131,7 +132,7 @@ export class DetailTemplatesModal extends Modal {
 
   private uniqueName(base: string): string {
     const taken = (name: string) =>
-      builtinTemplates(this.settings.language).some(builtin => same(name, builtin.name)) ||
+      builtinTemplates(noteLanguageOf(this.settings.language)).some(builtin => same(name, builtin.name)) ||
       this.settings.detailTemplates.some(template => same(template.name, name));
     let name = base;
     for (let n = 2; taken(name); n++) name = `${base} ${n}`;
@@ -143,7 +144,10 @@ export class DetailTemplatesModal extends Modal {
     contentEl.empty();
     contentEl.createEl("p", { text: t("ui.detail_templates_hint"), cls: "vam-modal-intro" });
     const defaultId = workspaceDefaultId(this.settings);
-    for (const template of [...builtinTemplates(this.settings.language), ...this.settings.detailTemplates]) {
+    for (const template of [
+      ...builtinTemplates(noteLanguageOf(this.settings.language)),
+      ...this.settings.detailTemplates
+    ]) {
       const isStandard = isBuiltinTemplateId(template.id);
       const row = contentEl.createDiv("vam-template-row");
       const info = row.createDiv("vam-template-info");
@@ -169,7 +173,7 @@ export class DetailTemplatesModal extends Modal {
     footer.createEl("button", { text: t("ui.close") }).addEventListener("click", () => this.close());
     footer.createEl("button", { text: t("ui.detail_template_new"), cls: "mod-cta" }).addEventListener("click", () => {
       const fresh = copyTemplate(
-        standardTemplate(this.settings.language),
+        standardTemplate(noteLanguageOf(this.settings.language)),
         this.uniqueName(t("ui.detail_template_new_name")),
         crypto.randomUUID()
       );
@@ -241,9 +245,7 @@ export class DetailTemplatesModal extends Modal {
       .addEventListener("click", () => this.showList());
     const save = readOnly ? null : footer.createEl("button", { text: t("ui.save"), cls: "mod-cta" });
 
-    const builtInNames = (["en", "zh-TW"] as const).flatMap(language =>
-      builtinTemplates(language).map(builtin => builtin.name)
-    );
+    const builtInNames = NOTE_LANGUAGES.flatMap(language => builtinTemplates(language).map(builtin => builtin.name));
     const check = (): TemplateIssue[] => {
       if (readOnly) return [];
       const issues = validateTemplate(draft, others);

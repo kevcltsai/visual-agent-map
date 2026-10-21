@@ -1,5 +1,6 @@
 import { estimateTokens } from "../../../ai/context-builder";
 import { translate, uiLocale, type UiLanguage } from "../../../i18n";
+import { inLanguage, inLanguageNaming } from "../_shared/fragments";
 import type { ReasoningLevel } from "../../../ai/types";
 import {
   OUTLINE_NODE_LIMIT,
@@ -62,7 +63,7 @@ export function applyTopicToPreset(presetText: string, topic: string, language: 
   const quoted = JSON.stringify(topic.trim());
   PLACEHOLDER_PATTERN.lastIndex = 0;
   if (PLACEHOLDER_PATTERN.test(presetText)) return presetText.replace(PLACEHOLDER_PATTERN, () => quoted);
-  const line = renderTemplate(language === "zh-TW" ? topicLineZh : topicLineEn, { topic: quoted });
+  const line = renderTemplate(inLanguage({ zh: topicLineZh, en: topicLineEn }, language), { topic: quoted });
   return `${presetText.trimEnd()}\n\n${line}`;
 }
 
@@ -114,10 +115,10 @@ export const outlineGenerateStep: StepDefinition<OutlineGenerateRequest, Outline
   render: request => {
     const content = request.contentLanguage ?? request.language;
     return renderTemplate(template, {
-      languageInstruction: renderTemplate(content === "zh-TW" ? languageZh : languageEn, {}),
+      languageInstruction: inLanguageNaming({ zh: languageZh, en: languageEn }, content, { language: "region" }, "en"),
       preset: request.limits
         ? `${applyTopicToPreset(request.presetText, request.topic, content)}\n\n${renderTemplate(
-            content === "zh-TW" ? limitsZh : limitsEn,
+            inLanguage({ zh: limitsZh, en: limitsEn }, content),
             { levels: String(request.limits.levels), maxTopics: String(request.limits.maxTopics) }
           )}`
         : applyTopicToPreset(request.presetText, request.topic, content)

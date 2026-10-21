@@ -2,7 +2,7 @@ import { validateAimResearchPlan } from "./experiences/aim/research-plan";
 import { upgradeLegacyAimData } from "./experiences/aim/legacy-names";
 import type { AiResult } from "./ai/types";
 import type { FinalDeliveryCheckpoint } from "./experiences/aim/final-delivery";
-import { t, translate } from "./i18n";
+import { isNoteLanguage, t, translate, type NoteLanguage } from "./i18n";
 
 export interface MapNode {
   id: string;
@@ -304,7 +304,7 @@ export interface AimMapData {
   version: 1;
   creationId?: string;
   /** Language of AIM-generated content, decided once at creation; legacy maps derive it from the title. */
-  contentLanguage?: "en" | "zh-TW";
+  contentLanguage?: NoteLanguage;
   /** Exploration target; legacy field name retained for saved maps. Never forces questions or completion. */
   minimumAnswersBeforeConclusion?: number;
   /**
@@ -517,7 +517,7 @@ function validateAimMap(map: MapDocument): void {
     throw new Error("Invalid AIM map extension.");
   if (data.creationId !== undefined && (typeof data.creationId !== "string" || !data.creationId.trim()))
     throw new Error("Invalid AIM creation identity.");
-  if (data.contentLanguage !== undefined && data.contentLanguage !== "en" && data.contentLanguage !== "zh-TW")
+  if (data.contentLanguage !== undefined && !isNoteLanguage(data.contentLanguage))
     throw new Error("Invalid AIM content language.");
   if (
     data.minimumAnswersBeforeConclusion !== undefined &&
@@ -891,7 +891,7 @@ function validateAimMap(map: MapDocument): void {
       throw new Error("Invalid AIM pending commit.");
   }
 }
-export function serializeMap(map: MapDocument, language: "zh-TW" | "en" = "zh-TW"): string {
+export function serializeMap(map: MapDocument, language: NoteLanguage = "zh-TW"): string {
   const description = translate(language, "ui.map_file_description");
   return `---\nvisual-agent-map: true\n---\n\n# ${map.title.replace(/\n/g, " ")}\n\n${description}\n\n\`\`\`agent-map\n${JSON.stringify(map, null, 2)}\n\`\`\`\n`;
 }

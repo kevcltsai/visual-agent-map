@@ -1,1 +1,1 @@
-Write the reasons in English.
+Write the reasons in {{language}}.

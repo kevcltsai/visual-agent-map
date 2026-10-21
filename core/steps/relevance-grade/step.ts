@@ -1,5 +1,6 @@
 import { estimateTokens } from "../../../ai/context-builder";
 import { translate, uiLocale, type UiLanguage } from "../../../i18n";
+import { inLanguageNaming } from "../_shared/fragments";
 import type { ReasoningLevel } from "../../../ai/types";
 import type { RelevanceLevel, RelevanceTier } from "../../../note-values";
 import {
@@ -261,7 +262,9 @@ export function relevanceHierarchyViolations(
 }
 
 export const languageLine = (request: RelevanceGradeRequest): string =>
-  renderTemplate((request.contentLanguage ?? request.language) === "zh-TW" ? languageZh : languageEn, {});
+  inLanguageNaming({ zh: languageZh, en: languageEn }, request.contentLanguage ?? request.language, {
+    language: "region"
+  });
 
 /**
  * The pins and bounds as the model sees them (position ids), or undefined when nothing is pinned.

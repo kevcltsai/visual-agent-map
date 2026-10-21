@@ -3,7 +3,7 @@ import type VisualAgentMapPlugin from "../../main";
 import { listPresets } from "../../ai/prompt-presets";
 import { PromptPresetsModal } from "../../ui/modals/prompt-presets-modal";
 import { chooseAimContentLanguage } from "../aim/content-language";
-import { supportedLanguageLabel, SUPPORTED_LANGUAGES, t, type TranslationKey } from "../../i18n";
+import { noteLanguageOf, supportedLanguageLabel, SUPPORTED_LANGUAGES, t, type TranslationKey } from "../../i18n";
 import { App, Component, MarkdownRenderer, Modal, Notice, Setting, TFile } from "obsidian";
 import { ReferencePicker, type ReferenceTopic } from "../../ui/reference-picker";
 import { type ReferenceGroup } from "../../ai/reference-materials";
@@ -1451,7 +1451,7 @@ export class NextStepModal extends Modal {
       manageTemplates: (selected, refreshed) => {
         const settings = this.plugin.settings;
         const choices = (): { id: string; name: string }[] =>
-          builtinTemplates(settings.language)
+          builtinTemplates(noteLanguageOf(settings.language))
             .concat(settings.detailTemplates)
             .map(({ id, name }) => ({ id, name }));
         new DetailTemplatesModal(this.app, this.plugin, () => refreshed(choices()), selected).open();

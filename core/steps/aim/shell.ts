@@ -4,6 +4,7 @@ import type { TaskContext } from "../../../ai/types";
 import type { AiProviderId } from "../../../ai/providers/provider";
 import {
   inLanguage,
+  inLanguageNaming,
   LABEL_ANCESTORS,
   LABEL_RULES,
   LABEL_SOURCES,
@@ -74,7 +75,8 @@ import PhaseDeliveryAcceptanceEN from "./phase/delivery-acceptance.en.md";
 const text = (template: string): string => renderTemplate(template, {});
 const pair = (zh: string, en: string): FragmentPair => ({ zh: text(zh), en: text(en) });
 
-const LANGUAGE = pair(LanguageZH, LanguageEN);
+/** A template, not text: {@link inLanguageNaming} fills `{{language}}` and `{{languagePlain}}` with the output language name. */
+const LANGUAGE: FragmentPair = { zh: LanguageZH, en: LanguageEN };
 const JSON_CONTRACT = pair(JsonContractZH, JsonContractEN);
 const WEB_SEARCH_OFF = pair(WebSearchOffZH, WebSearchOffEN);
 const WEB_SEARCH_ON = pair(WebSearchOnZH, WebSearchOnEN);
@@ -136,7 +138,7 @@ export function buildAimPrompt(context: TaskContext, language: UiLanguage, provi
   const phase = aimPhase(context.task);
   const field = (label: string, value: string | undefined) => (value?.trim() ? `${label}:\n${value}` : "");
   const blocks = [
-    inLanguage(LANGUAGE, language),
+    inLanguageNaming(LANGUAGE, language, { language: "region", languagePlain: "plain" }),
     inLanguage(ROLE, language),
     inLanguage(SOURCE_SAFETY, language),
     context.sourceContext ? inLanguage(REFERENCE_CITATIONS, language) : "",

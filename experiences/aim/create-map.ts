@@ -1,7 +1,7 @@
 import type { MapDocument, MapNode } from "../../map-model";
 import type { Repository } from "../../repository";
 import { randomUUID } from "node:crypto";
-import { translate } from "../../i18n";
+import { noteLanguageOf, translate } from "../../i18n";
 import { chooseAimContentLanguage } from "./content-language";
 import { buildAimRootContext, type AimOutcomeExpectation } from "./outcome-expectations";
 
@@ -46,7 +46,7 @@ export async function createAimMap(
     mapPath = await repository.createMap(topic, [], undefined, {
       version: 1,
       creationId: requestId,
-      contentLanguage: detectedLanguage,
+      contentLanguage: noteLanguageOf(detectedLanguage),
       minimumAnswersBeforeConclusion,
       ...(input.interaction === "unattended" ? { interaction: "unattended" as const } : {}),
       branches: [],
@@ -59,8 +59,9 @@ export async function createAimMap(
   if (map.title !== topic) throw new Error("This AIM creation request was already used for another topic.");
   if (!map.aim) throw new Error("The existing map does not contain a AIM creation record.");
 
-  const contentLanguage = map.aim.contentLanguage ?? detectedLanguage;
-  const rootContext = buildAimRootContext(input.context, input.outcomeExpectation, contentLanguage);
+  // The stored value is a note language; the notes below are written in it.
+  const noteLanguage = map.aim.contentLanguage ?? noteLanguageOf(detectedLanguage);
+  const rootContext = buildAimRootContext(input.context, input.outcomeExpectation, noteLanguage);
   let draft = map.aim.rootDraft;
   if (!draft && !map.nodes.some(node => node.aimKind === "topic")) {
     const notePath = repository.unique(repository.topicFolder(mapPath, "Notes"), topic);
@@ -76,7 +77,7 @@ export async function createAimMap(
       reasoning
     };
     map.aim.rootDraft = draft;
-    map.aim.contentLanguage ??= contentLanguage;
+    map.aim.contentLanguage ??= noteLanguage;
     await repository.saveMap(mapPath, map);
   }
   if (draft) {
@@ -91,9 +92,9 @@ export async function createAimMap(
       draft.nodeId,
       {
         summary: draft.title,
-        detail: draft.context ? `${translate(contentLanguage, "note.aim_user_context")}\n\n${draft.context}` : "",
+        detail: draft.context ? `${translate(noteLanguage, "note.aim_user_context")}\n\n${draft.context}` : "",
         reasoning: draft.reasoning ?? input.reasoning ?? "low",
-        contentLanguage
+        contentLanguage: noteLanguage
       }
     );
     const root: MapNode = {

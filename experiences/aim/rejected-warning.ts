@@ -1,4 +1,4 @@
-import { translate, type UiLanguage } from "../../i18n";
+import { type UiLanguage, translateNote } from "../../i18n";
 
 /** Node, evidence and source IDs (UUIDs, often shortened as `9a7207f4-…-v3`) belong to the app, never to the reader. */
 const INTERNAL_ID = /[0-9a-f]{8}-[^\s、，,;；）)\]]*/gi;
@@ -24,8 +24,8 @@ export function rejectedDeliveryWarning(items: readonly string[], language: UiLa
   const lines = itemLines(items);
   if (!lines.length) return "";
   return [
-    `> [!warning] ${translate(language, "note.aim_rejected_warning_title")}`,
-    `> ${translate(language, "note.aim_rejected_warning_intro")}`,
+    `> [!warning] ${translateNote(language, "note.aim_rejected_warning_title")}`,
+    `> ${translateNote(language, "note.aim_rejected_warning_intro")}`,
     ...lines.map(line => `> - ${line}`)
   ].join("\n");
 }
@@ -34,8 +34,8 @@ export function rejectedDeliveryWarning(items: readonly string[], language: UiLa
 export function incompleteResearchWarning(items: readonly string[], language: UiLanguage): string {
   const lines = itemLines(items);
   return [
-    `> [!warning] ${translate(language, "note.aim_incomplete_warning_title")}`,
-    `> ${translate(language, lines.length ? "note.aim_incomplete_warning_intro" : "note.aim_incomplete_warning_no_items")}`,
+    `> [!warning] ${translateNote(language, "note.aim_incomplete_warning_title")}`,
+    `> ${translateNote(language, lines.length ? "note.aim_incomplete_warning_intro" : "note.aim_incomplete_warning_no_items")}`,
     ...lines.map(line => `> - ${line}`)
   ].join("\n");
 }
@@ -43,5 +43,5 @@ export function incompleteResearchWarning(items: readonly string[], language: Ui
 /** The callout that opens an interim result waiting for the user's answer. */
 export function awaitingAnswerCallout(question: string, language: UiLanguage): string {
   const text = readerText(question.replace(/\s*\n\s*/g, " "));
-  return text ? `> [!question] ${translate(language, "note.aim_awaiting_answer_title")}\n> ${text}` : "";
+  return text ? `> [!question] ${translateNote(language, "note.aim_awaiting_answer_title")}\n> ${text}` : "";
 }

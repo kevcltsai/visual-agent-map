@@ -1,4 +1,4 @@
-import { translate, type TranslationKey, type UiLanguage } from "../i18n";
+import { NOTE_LANGUAGES, translate, type NoteLanguage, type TranslationKey, type UiLanguage } from "../i18n";
 import { fencedLines } from "./markdown-blocks";
 import { customDetailRule, customDetailStructure, textbookDetailStructure } from "../core/steps/task/fragments";
 
@@ -37,7 +37,6 @@ export interface CountIssue {
 export const STANDARD_TEMPLATE_ID = "standard";
 /** Built-in template: the Standard sections, written as an intro followed by the sections; empty sections are omitted. */
 export const TEXTBOOK_TEMPLATE_ID = "textbook";
-const LANGUAGES: readonly UiLanguage[] = ["zh-TW", "en"];
 const STANDARD: readonly [string, TranslationKey, TranslationKey, DetailSectionRole][] = [
   ["core", "detail.core_conclusions", "detail.description_core_conclusions", "none"],
   ["knowledge", "detail.key_knowledge", "detail.description_key_knowledge", "none"],
@@ -47,7 +46,7 @@ const STANDARD: readonly [string, TranslationKey, TranslationKey, DetailSectionR
   ["log", "detail.update_log", "detail.description_update_log", "log"]
 ];
 
-export function standardTemplate(language: UiLanguage): DetailTemplate {
+export function standardTemplate(language: NoteLanguage): DetailTemplate {
   return {
     id: STANDARD_TEMPLATE_ID,
     name: translate(language, "ui.detail_template_standard"),
@@ -58,13 +57,13 @@ export function standardTemplate(language: UiLanguage): DetailTemplate {
         name,
         description: translate(language, descriptionKey),
         role,
-        aliases: LANGUAGES.map(locale => translate(locale, key)).filter(alias => alias !== name)
+        aliases: NOTE_LANGUAGES.map(locale => translate(locale, key)).filter(alias => alias !== name)
       };
     })
   };
 }
 
-export function textbookTemplate(language: UiLanguage): DetailTemplate {
+export function textbookTemplate(language: NoteLanguage): DetailTemplate {
   return {
     ...standardTemplate(language),
     id: TEXTBOOK_TEMPLATE_ID,
@@ -77,7 +76,7 @@ export function isBuiltinTemplateId(id: string | undefined): boolean {
 }
 
 /** The built-in templates, in menu order. */
-export function builtinTemplates(language: UiLanguage): DetailTemplate[] {
+export function builtinTemplates(language: NoteLanguage): DetailTemplate[] {
   return [standardTemplate(language), textbookTemplate(language)];
 }
 
@@ -230,7 +229,7 @@ export function normalizeTemplates(value: unknown): DetailTemplate[] {
 export function resolveTemplate(
   templates: DetailTemplate[],
   ids: (string | undefined)[],
-  language: UiLanguage
+  language: NoteLanguage
 ): { template: DetailTemplate; missing: string[] } {
   const missing: string[] = [];
   for (const id of ids) {

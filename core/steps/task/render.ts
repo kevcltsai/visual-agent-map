@@ -2,11 +2,12 @@ import { aimPhase, buildAimPrompt, readerFacingAimPhase } from "../aim/shell";
 import { researchGuidance } from "../../../ai/task-policy";
 import type { TaskContext } from "../../../ai/types";
 import { visualGuidance } from "../../../ai/visual-guidance";
-import type { UiLanguage } from "../../../i18n";
+import { noteLanguageOf, type UiLanguage } from "../../../i18n";
 import type { AiProviderId } from "../../../ai/providers/provider";
 import { detailStructurePrompt, standardTemplate } from "../../../ai/detail-templates";
 import {
   inLanguage,
+  inLanguageNaming,
   LABEL_ANCESTORS,
   LABEL_RULES,
   LABEL_SOURCES,
@@ -61,7 +62,7 @@ export function generalTaskPrompt(
             : DEFAULT_TASK;
   const none = inLanguage(NONE, language);
   return [
-    inLanguage(OUTPUT_LANGUAGE, language),
+    inLanguageNaming(OUTPUT_LANGUAGE, language, { language: "plain" }),
     inLanguage(ROLE, language),
     inLanguage(SOURCE_SAFETY, language),
     context.sourceContext ? inLanguage(REFERENCE_CITATIONS, language) : "",
@@ -73,8 +74,10 @@ export function generalTaskPrompt(
       ? [
           context.detailFormat === "adaptive"
             ? inLanguage(ADAPTIVE_DETAIL_STRUCTURE, language)
-            : detailStructurePrompt(context.detailTemplate ?? standardTemplate(language), language, headings =>
-                detailStructure(language, headings)
+            : detailStructurePrompt(
+                context.detailTemplate ?? standardTemplate(noteLanguageOf(language)),
+                language,
+                headings => detailStructure(language, headings)
               ),
           // A merge keeps the sources' own formatting; the syntax suggestions would invite callouts the sources lack.
           readerFacingDetail(context) && context.mode !== "merge" ? inLanguage(OBSIDIAN_FORMAT, language) : ""

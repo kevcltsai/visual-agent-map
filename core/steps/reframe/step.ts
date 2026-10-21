@@ -1,5 +1,6 @@
 import { estimateTokens } from "../../../ai/context-builder";
 import { translate, uiLocale, type UiLanguage } from "../../../i18n";
+import { inLanguageNaming } from "../_shared/fragments";
 import type { ReasoningLevel } from "../../../ai/types";
 import { renderTemplate, type StepDefinition } from "../../step-runner";
 import languageEn from "./language.en.md";
@@ -58,7 +59,12 @@ export const reframeStep: StepDefinition<ReframeRequest, ReframeDraft> = {
   version: 1,
   render: request =>
     renderTemplate(template, {
-      languageInstruction: renderTemplate(request.language === "zh-TW" ? languageZh : languageEn, {}),
+      languageInstruction: inLanguageNaming(
+        { zh: languageZh, en: languageEn },
+        request.language,
+        { language: "region" },
+        "en"
+      ),
       direction: JSON.stringify({ question: request.question, context: request.context }),
       source: JSON.stringify(request.source)
     }),

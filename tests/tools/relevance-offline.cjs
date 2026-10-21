@@ -483,7 +483,8 @@ function renderTemplate(template, variables) {
   return text;
 }
 
-const languageLine = language => renderTemplate(fs.readFileSync(path.join(PRODUCT_DIR, language === 'zh-TW' ? 'language.zh.md' : 'language.en.md'), 'utf8'), {});
+// The template takes the output language name; these are the spellings the registry gives each language (region form, in the template's own language).
+const languageLine = language => renderTemplate(fs.readFileSync(path.join(PRODUCT_DIR, language === 'zh-TW' ? 'language.zh.md' : 'language.en.md'), 'utf8'), { language: language === 'zh-TW' ? '繁體中文（台灣）' : 'English' });
 
 // Product cards: position ids, and only id/title/summary/parentId/depth (no status), as step.ts promptCards.
 function productNodesForPrompt(tree) {

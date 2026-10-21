@@ -1,5 +1,11 @@
 import { renderTemplate } from "../../step-runner";
-import { instructionLanguageOf, type UiLanguage } from "../../../i18n";
+import {
+  instructionLanguageOf,
+  languagePromptName,
+  type InstructionLanguage,
+  type PromptNameForm,
+  type UiLanguage
+} from "../../../i18n";
 import LabelAncestorsZH from "./label-ancestors.zh.md";
 import LabelAncestorsEN from "./label-ancestors.en.md";
 import LabelRulesZH from "./label-rules.zh.md";
@@ -42,7 +48,25 @@ const pair = (zh: string, en: string): FragmentPair => ({ zh: text(zh), en: text
 
 /** The fragment in the language's instruction language (registry `instruction`): `en` or `zh`. */
 export function inLanguage(fragment: FragmentPair, language: UiLanguage): string {
-  return instructionLanguageOf(language) === "en" ? fragment.en : fragment.zh;
+  return fragment[instructionLanguageOf(language)];
+}
+
+/**
+ * A fragment that names the output language. `names` maps each `{{placeholder}}` to the registry name form it takes; the
+ * name is spelled for the fragment's instruction language unless `spelledIn` says the file is written in the other one
+ * (a few `.zh.md` files carry English sentences).
+ */
+export function inLanguageNaming(
+  fragment: FragmentPair,
+  language: UiLanguage,
+  names: Readonly<Record<string, PromptNameForm>>,
+  spelledIn?: InstructionLanguage
+): string {
+  const instruction = instructionLanguageOf(language);
+  const variables: Record<string, string> = {};
+  for (const [placeholder, form] of Object.entries(names))
+    variables[placeholder] = languagePromptName(language, spelledIn ?? instruction, form);
+  return renderTemplate(fragment[instruction], variables);
 }
 
 /** Claude only: return through the StructuredOutput tool at once, without a text draft first. Codex prompts never include it. */
@@ -71,5 +95,5 @@ export const SOURCE_SAFETY: FragmentPair = pair(SourceSafetyZH, SourceSafetyEN);
  * nothing), so prompts without a tone stay byte-identical to before.
  */
 export function toneBlock(toneText: string, language: UiLanguage): string {
-  return renderTemplate(language === "en" ? ToneEN : ToneZH, { tone: toneText });
+  return renderTemplate(inLanguage({ zh: ToneZH, en: ToneEN }, language), { tone: toneText });
 }

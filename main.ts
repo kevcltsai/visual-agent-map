@@ -7,7 +7,17 @@ import { CoffeeStorage } from "./experiences/coffee-tables/storage";
 import { VisualAgentMapView, VIEW_TYPE } from "./experiences/visual-map/view";
 import { planMathRepair, applyMathRepair } from "./experiences/visual-map/math-repair";
 import type { TaskOptions } from "./experiences/visual-map/modals";
-import { t, setUiLanguage, translate, initialUiLanguage, type TranslationKey, type UiLanguage } from "./i18n";
+import {
+  t,
+  setUiLanguage,
+  translate,
+  initialUiLanguage,
+  languagePromptName,
+  noteLanguageOf,
+  uiLocale,
+  type TranslationKey,
+  type UiLanguage
+} from "./i18n";
 import {
   FileSystemAdapter,
   loadMermaid,
@@ -414,7 +424,7 @@ export default class VisualAgentMapPlugin extends Plugin {
     const markdownSelectionAi = new MarkdownSelectionAi(this.app, {
       model: () => this.settings.cliModel,
       autoOpen: () => this.settings.markdownSelectionAiAutoOpen,
-      language: () => (this.settings.language === "zh-TW" ? "Traditional Chinese" : "English"),
+      language: () => languagePromptName(this.settings.language, "en", "plain"),
       run: (prepared, model, signal, image, webSearch, generateImage) =>
         this.runConfirmedMarkdownContextAi(prepared, model, signal, image, webSearch, generateImage),
       saveImage: (dataUrl, notePath, name) => this.saveGeneratedImage(dataUrl, notePath, name)
@@ -1005,7 +1015,7 @@ export default class VisualAgentMapPlugin extends Plugin {
   async duplicateBuiltInSample(): Promise<string> {
     await this.repo.ensureWorkspace();
     this.settings.workspaceInitialized = true;
-    const sample = builtInSample(this.settings.language, false);
+    const sample = builtInSample(noteLanguageOf(this.settings.language), false);
     let createdRoot: TFolder | undefined;
     try {
       const path = await this.repo.createMap(sample.map.title, [], folder => {
@@ -1111,7 +1121,7 @@ export default class VisualAgentMapPlugin extends Plugin {
     await this.saveData(this.settings);
   }
   async changeLanguage(value: unknown): Promise<boolean> {
-    const next = value === "zh-TW" ? "zh-TW" : "en";
+    const next = uiLocale(value);
     if (this.languageSwitchPending || next === this.settings.language) return false;
     const previous = this.settings.language;
     this.languageSwitchPending = true;

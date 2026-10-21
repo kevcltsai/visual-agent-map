@@ -83,13 +83,11 @@ export const chartStep: StepDefinition<ChartRequest, ChartDraft[]> = {
   version: 1,
   schema: CHART_SCHEMA,
   render: request =>
-    renderTemplate(request.language === "en" ? templateEn : templateZh, {
+    renderTemplate(inLanguage({ zh: templateZh, en: templateEn }, request.language), {
       existingCount: String(request.existingCount),
       existingTypes: request.existingTypes.length
-        ? request.existingTypes.join(request.language === "en" ? ", " : "、")
-        : request.language === "en"
-          ? "none"
-          : "無",
+        ? request.existingTypes.join(inLanguage({ zh: "、", en: ", " }, request.language))
+        : inLanguage({ zh: "無", en: "none" }, request.language),
       remaining: String(request.remaining),
       claudeOutput: request.provider === "claude" ? `\n${inLanguage(CLAUDE_STRUCTURED_OUTPUT, request.language)}` : "",
       title: request.title,

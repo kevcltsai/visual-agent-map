@@ -14,8 +14,8 @@ import type {
 } from "../../map-model";
 import type { Repository } from "../../repository";
 import { managedHeadingValue, managedSectionValue } from "../../note-values";
-import { translate } from "../../i18n";
-import { resolveAimContentLanguage } from "./content-language";
+import { NOTE_LANGUAGES, noteLanguageOf, translate, translateNote } from "../../i18n";
+import { resolveAimContentLanguage, resolveAimNoteLanguage } from "./content-language";
 
 export interface NewAnswerBranch {
   requestId?: string;
@@ -250,7 +250,7 @@ export class AimRunStore {
     await this.repository.updateNote(
       clone.path,
       { title: note.title },
-      { contentLanguage: resolveAimContentLanguage(map, this.repository.settings.language) }
+      { contentLanguage: resolveAimNoteLanguage(map, this.repository.settings.language) }
     );
     const siblingCount = map.nodes.filter(
       node => node.parentId === source.parentId && node.aimKind === "question"
@@ -573,7 +573,7 @@ export class AimRunStore {
       await this.repository.updateNote(
         draft.notePath,
         { summary, detail, status: "idea" },
-        { contentLanguage: resolveAimContentLanguage(map, this.repository.settings.language) }
+        { contentLanguage: resolveAimNoteLanguage(map, this.repository.settings.language) }
       );
       const saved = await this.repository.readNote(draft.notePath);
       if (saved.summary !== managedSectionValue(summary) || saved.detail !== managedSectionValue(detail))
@@ -616,7 +616,7 @@ export class AimRunStore {
       await this.repository.updateNote(
         draft.notePath,
         { title },
-        { contentLanguage: resolveAimContentLanguage(map, this.repository.settings.language) }
+        { contentLanguage: resolveAimNoteLanguage(map, this.repository.settings.language) }
       );
       const note = await this.repository.readNote(draft.notePath);
       if (note.title !== managedHeadingValue(title))
@@ -748,9 +748,9 @@ export class AimRunStore {
       await this.repository.saveMap(mapPath, map);
       const contentLanguage = resolveAimContentLanguage(map, this.repository.settings.language);
       await this.repository.createNoteAt(title, model, map, mapPath, "inherited", notePath, nodeId, {
-        summary: translate(contentLanguage, "note.aim_result_pending"),
+        summary: translateNote(contentLanguage, "note.aim_result_pending"),
         reasoning: reasoning ?? draft.reasoning,
-        contentLanguage
+        contentLanguage: noteLanguageOf(contentLanguage)
       });
       const latestMap = await this.repository.readMap(mapPath),
         latestState = this.state(latestMap),
@@ -894,12 +894,12 @@ export class AimRunStore {
             draft.notePath,
             draft.nodeId,
             {
-              summary: translate(
+              summary: translateNote(
                 resolveAimContentLanguage(map, this.repository.settings.language),
                 "note.aim_result_pending"
               ),
               reasoning: draft.reasoning,
-              contentLanguage: resolveAimContentLanguage(map, this.repository.settings.language)
+              contentLanguage: resolveAimNoteLanguage(map, this.repository.settings.language)
             }
           );
           draft.status = "ready";
@@ -965,7 +965,7 @@ export class AimRunStore {
         detail: pending.detail,
         status: noteStatus
       },
-      { contentLanguage: resolveAimContentLanguage(map, this.repository.settings.language) }
+      { contentLanguage: resolveAimNoteLanguage(map, this.repository.settings.language) }
     );
     const saved = await this.repository.readNote(pending.notePath);
     if (
@@ -1002,17 +1002,16 @@ export class AimRunStore {
     await this.repository.updateNote(
       draft.notePath,
       {
-        title: [
-          translate("en", "note.aim_unpublished_diagnostic"),
-          translate("zh-TW", "note.aim_unpublished_diagnostic")
-        ].some(marker => note.title.includes(marker))
+        title: NOTE_LANGUAGES.map(locale => translate(locale, "note.aim_unpublished_diagnostic")).some(marker =>
+          note.title.includes(marker)
+        )
           ? note.title
-          : `${note.title}${translate(language, "note.aim_unpublished_diagnostic")}`,
-        summary: translate(language, "note.aim_unpublished_diagnostic_summary_0", draft.attemptId),
+          : `${note.title}${translateNote(language, "note.aim_unpublished_diagnostic")}`,
+        summary: translateNote(language, "note.aim_unpublished_diagnostic_summary_0", draft.attemptId),
         detail,
         status: "error"
       },
-      { contentLanguage: language }
+      { contentLanguage: noteLanguageOf(language) }
     );
   }
   private finishCommit(state: AimMapData, pending: AimPendingCommit): void {

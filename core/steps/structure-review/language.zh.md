@@ -1,1 +1,1 @@
-Write in Traditional Chinese (Taiwan).
+Write in {{language}}.

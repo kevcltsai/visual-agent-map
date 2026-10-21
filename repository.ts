@@ -1,7 +1,15 @@
 import { App, Notice, TAbstractFile, TFile, TFolder, normalizePath, parseYaml, stringifyYaml } from "obsidian";
 import { resolveAimContentLanguage } from "./experiences/aim/content-language";
 import { createHash } from "node:crypto";
-import { t, translate, type TranslationKey } from "./i18n";
+import {
+  isNoteLanguage,
+  noteLanguageOf,
+  tNote,
+  translate,
+  type NoteLanguage,
+  type TranslationKey,
+  type UiLanguage
+} from "./i18n";
 import { MapDocument, MapNode, serializeMap, parseMap, type AimReuseRecord } from "./map-model";
 import type { CoffeeStyle } from "./experiences/coffee-tables/types";
 import type { ReasoningLevel, ResearchDepth, ResearchMode, VisualMode } from "./ai/types";
@@ -69,7 +77,7 @@ export interface Settings {
   /** Custom tone/outline presets; built-ins live in ai/prompt-presets.ts. Absent = none. */
   promptPresets?: PromptPreset[];
   defaultCoffeeStyleId?: string;
-  language: "zh-TW" | "en";
+  language: UiLanguage;
   workspaceFolder: string;
   /** Legacy container (pre-0.19): maps here stay openable; new maps go to mindMapsFolder / aimFolder. */
   topicsFolder: string;
@@ -336,7 +344,7 @@ export function safeName(title: string): string {
       cut += part;
     }
   }
-  return cut.replace(/[\s.]+$/, "") || t("note.untitled_topic");
+  return cut.replace(/[\s.]+$/, "") || tNote("note.untitled_topic");
 }
 
 /** Case- and form-insensitive name used to detect a collision on a case-insensitive file system. */
@@ -442,9 +450,8 @@ type NoteSection =
   | "預覽"
   | "Preview"
   | "User Notes";
-type NoteLanguage = Settings["language"];
 const noteContentLanguage = (fm: Record<string, unknown>): NoteLanguage | undefined =>
-  fm["content-language"] === "en" || fm["content-language"] === "zh-TW" ? fm["content-language"] : undefined;
+  isNoteLanguage(fm["content-language"]) ? fm["content-language"] : undefined;
 const placeholder = (language: NoteLanguage): string => translate(language, "detail.no_conclusion_yet");
 export const isPlaceholder = (value: string): boolean =>
   value === translate("zh-TW", "detail.no_conclusion_yet") || value === translate("en", "detail.no_conclusion_yet");
@@ -746,6 +753,33 @@ function normalizeBodyOrder(
 
 const REFERENCE_LABELS = ["所屬主題", "所屬心智圖", "母議題", "子議題", "來源議題", "狀態"];
 const ENGLISH_REFERENCE_LABELS = ["Topic", "Mind map", "Parent topic", "Child topics", "Source topic", "Status"];
+/** The fixed text of a note's relationship lines, by note language (the labels are in the order of {@link REFERENCE_LABELS}). */
+interface ReferenceText {
+  readonly labels: readonly string[];
+  readonly none: string;
+  readonly archived: string;
+  readonly unassigned: string;
+  readonly colon: string;
+  readonly listSeparator: string;
+}
+const REFERENCE_TEXT: Readonly<Record<NoteLanguage, ReferenceText>> = {
+  "zh-TW": {
+    labels: REFERENCE_LABELS,
+    none: "無",
+    archived: "已封存",
+    unassigned: "未歸類",
+    colon: "：",
+    listSeparator: "、"
+  },
+  en: {
+    labels: ENGLISH_REFERENCE_LABELS,
+    none: "None",
+    archived: "Archived",
+    unassigned: "Unassigned",
+    colon: ": ",
+    listSeparator: ", "
+  }
+};
 function localizeReference(value: string, language: NoteLanguage): string {
   const match =
     /^(所屬主題|所屬心智圖|母議題|子議題|來源議題|狀態|Topic|Mind map|Parent topic|Child topics|Source topic|Status)[：:]\s*(.*)$/.exec(
@@ -753,22 +787,16 @@ function localizeReference(value: string, language: NoteLanguage): string {
     );
   if (!match) return value;
   const index = (REFERENCE_LABELS.includes(match[1]) ? REFERENCE_LABELS : ENGLISH_REFERENCE_LABELS).indexOf(match[1]);
-  const labels = language === "en" ? ENGLISH_REFERENCE_LABELS : REFERENCE_LABELS;
+  const target = REFERENCE_TEXT[language];
   const plain =
     match[2] === "無" || match[2] === "None"
-      ? language === "en"
-        ? "None"
-        : "無"
+      ? target.none
       : match[2] === "已封存" || match[2] === "Archived"
-        ? language === "en"
-          ? "Archived"
-          : "已封存"
+        ? target.archived
         : match[2] === "未歸類" || match[2] === "Unassigned"
-          ? language === "en"
-            ? "Unassigned"
-            : "未歸類"
+          ? target.unassigned
           : match[2];
-  return `${labels[index]}${language === "en" ? ": " : "："}${plain}`;
+  return `${target.labels[index]}${target.colon}${plain}`;
 }
 
 /**
@@ -870,7 +898,7 @@ export class Repository {
    * of such text uses this, so no write path can relabel a note just because the UI language differs.
    */
   scaffoldLanguage(content: string, fm: Record<string, unknown>): NoteLanguage {
-    return derivedLabelLanguage(content, fm) ?? this.settings.language;
+    return derivedLabelLanguage(content, fm) ?? this.noteLanguage;
   }
 
   /** Called from onunload: no later write (including a rollback) may happen. */
@@ -885,6 +913,11 @@ export class Repository {
   private pendingContainers: string[] = [];
   /** Called once per vault-wide scan that skipped unreadable maps. */
   onUnreadableMaps?: (failures: { path: string; error: string }[]) => void;
+
+  /** The language fixed note text is written in for the current interface language (always "zh-TW" or "en"). */
+  private get noteLanguage(): NoteLanguage {
+    return noteLanguageOf(this.settings.language);
+  }
 
   private message(key: TranslationKey): string {
     return translate(this.settings.language, key);
@@ -1047,7 +1080,7 @@ export class Repository {
     );
     return {
       title: noteTitle(content, fm, file.basename),
-      summary: section(content, "Current Summary") || text(fm.summary, placeholder(this.settings.language)),
+      summary: section(content, "Current Summary") || text(fm.summary, placeholder(this.noteLanguage)),
       prompt: section(content, "Prompt"),
       rules: section(content, "Rules"),
       detail: detailWithOpenItems(content),
@@ -1212,7 +1245,7 @@ export class Repository {
       "topic-state": "active",
       "agent-map-id": map.id,
       title,
-      summary: placeholder(this.settings.language),
+      summary: placeholder(this.noteLanguage),
       "preview-initialized": false,
       model,
       "model-source": modelSource,
@@ -1224,7 +1257,7 @@ export class Repository {
     const created = await this.createUniqueNote(
       folder,
       title,
-      `---\n${stringifyYaml(metadata)}---\n${noteBody(title, initial.summary ?? placeholder(this.settings.language), this.settings.language, "", "", placeholder(this.settings.language), initial.detail ?? "", "", "", origin)}`,
+      `---\n${stringifyYaml(metadata)}---\n${noteBody(title, initial.summary ?? placeholder(this.noteLanguage), this.noteLanguage, "", "", placeholder(this.noteLanguage), initial.detail ?? "", "", "", origin)}`,
       onCreate
     );
     return { id, path: created.path, parentId: null, x: 80, y: 80, collapsed: false };
@@ -1268,7 +1301,7 @@ export class Repository {
       contentLanguage?: NoteLanguage;
     } = {}
   ): Promise<MapNode> {
-    const textLanguage = initial.contentLanguage ?? this.settings.language;
+    const textLanguage = initial.contentLanguage ?? this.noteLanguage;
     const folder = this.topicFolder(mapPath, "Notes");
     await this.ensureTopicFolders(this.topicRoot(mapPath));
     if (parentPath(path) !== folder || !path.endsWith(".md") || !id.trim())
@@ -1301,7 +1334,7 @@ export class Repository {
     const origin = initial.thinkingOrigin ? `## Thinking Origin\n\n${originMarkdown(initial.thinkingOrigin)}` : "";
     await this.app.vault.create(
       path,
-      `---\n${stringifyYaml(metadata)}---\n${noteBody(title, metadata.summary, this.settings.language, initial.prompt ?? "", "", placeholder(textLanguage), initial.detail ?? "", "", "", origin)}`
+      `---\n${stringifyYaml(metadata)}---\n${noteBody(title, metadata.summary, this.noteLanguage, initial.prompt ?? "", "", placeholder(textLanguage), initial.detail ?? "", "", "", origin)}`
     );
     return { id, path, parentId: null, x: 80, y: 80, collapsed: false };
   }
@@ -1311,7 +1344,7 @@ export class Repository {
     await this.ensureTopicFolders(this.topicRoot(mapPath));
     const source = await this.app.vault.read(this.file(sourcePath));
     const metadata = frontmatter(source);
-    const title = `${text(metadata.title, this.file(sourcePath).basename)} ${translate(this.settings.language, "note.copy_suffix")}`;
+    const title = `${text(metadata.title, this.file(sourcePath).basename)} ${translate(this.noteLanguage, "note.copy_suffix")}`;
     const id = crypto.randomUUID();
     metadata["node-id"] = id;
     metadata["topic-id"] = map.id;
@@ -1423,7 +1456,7 @@ export class Repository {
    */
   private stampAimContentLanguage(map: MapDocument): void {
     if (map.aim && map.aim.contentLanguage === undefined)
-      map.aim.contentLanguage = resolveAimContentLanguage(map, this.settings.language);
+      map.aim.contentLanguage = noteLanguageOf(resolveAimContentLanguage(map, this.settings.language));
   }
 
   async saveMap(path: string, map: MapDocument): Promise<void> {
@@ -1590,7 +1623,7 @@ export class Repository {
       collapsed: false
     }));
     const map: MapDocument = { version: 1, id, title: baseName(root), nodes, viewport: { x: 40, y: 40, zoom: 1 } };
-    await this.app.vault.create(path, serializeMap(map, this.settings.language));
+    await this.app.vault.create(path, serializeMap(map, this.noteLanguage));
     for (const file of files) await this.setLifecycle(file.path, id, id, "active");
     await this.rebuildDerivedData();
     return path;
@@ -1950,7 +1983,7 @@ export class Repository {
     }
     // Notes owned by an AIM map write their placeholder text in the map's content language.
     const textLanguage = owner?.map.aim
-      ? resolveAimContentLanguage(owner.map, language)
+      ? noteLanguageOf(resolveAimContentLanguage(owner.map, language))
       : (noteContentLanguage(fm) ?? language);
     let body = ensurePreview(
       decodeCalloutSections(content.replace(/^---\r?\n[\s\S]*?\r?\n---(?:\r?\n|$)/, "")),
@@ -1964,36 +1997,24 @@ export class Repository {
       if (!body.includes(DETAIL_START)) body = replaceSection(body, "Detail", section(body, "Detail"));
       const parent = owner.node.parentId ? owner.map.nodes.find(item => item.id === owner.node.parentId) : undefined;
       const children = owner.map.nodes.filter(item => item.parentId === owner.node.id);
-      fm["agent-map-references"] =
-        language === "en"
-          ? [
-              `Topic: [[${noteLink(owner.mapPath)}|${linkAlias(owner.map.title, aliasFallback(owner.mapPath))}]]`,
-              `Mind map: [[${noteLink(owner.mapPath)}]]`,
-              parent ? `Parent topic: [[${noteLink(parent.path)}]]` : "Parent topic: None",
-              children.length
-                ? `Child topics: ${children.map(child => `[[${noteLink(child.path)}]]`).join(", ")}`
-                : "Child topics: None"
-            ]
-          : [
-              `所屬主題：[[${noteLink(owner.mapPath)}|${linkAlias(owner.map.title, aliasFallback(owner.mapPath))}]]`,
-              `所屬心智圖：[[${noteLink(owner.mapPath)}]]`,
-              parent ? `母議題：[[${noteLink(parent.path)}]]` : "母議題：無",
-              children.length
-                ? `子議題：${children.map(child => `[[${noteLink(child.path)}]]`).join("、")}`
-                : "子議題：無"
-            ];
+      const ref = REFERENCE_TEXT[language];
+      const [topicLabel, mapLabel, parentLabel, childLabel] = ref.labels;
+      fm["agent-map-references"] = [
+        `${topicLabel}${ref.colon}[[${noteLink(owner.mapPath)}|${linkAlias(owner.map.title, aliasFallback(owner.mapPath))}]]`,
+        `${mapLabel}${ref.colon}[[${noteLink(owner.mapPath)}]]`,
+        `${parentLabel}${ref.colon}${parent ? `[[${noteLink(parent.path)}]]` : ref.none}`,
+        `${childLabel}${ref.colon}${
+          children.length ? children.map(child => `[[${noteLink(child.path)}]]`).join(ref.listSeparator) : ref.none
+        }`
+      ];
       body = withoutReference(body);
     } else if (topic && (state === "unassigned" || state === "archived")) {
-      fm["agent-map-references"] =
-        language === "en"
-          ? [
-              `Topic: [[${noteLink(topic.mapPath)}|${linkAlias(topic.map.title, aliasFallback(topic.mapPath))}]]`,
-              `Status: ${state === "archived" ? "Archived" : "Unassigned"}`
-            ]
-          : [
-              `所屬主題：[[${noteLink(topic.mapPath)}|${linkAlias(topic.map.title, aliasFallback(topic.mapPath))}]]`,
-              `狀態：${state === "archived" ? "已封存" : "未歸類"}`
-            ];
+      const ref = REFERENCE_TEXT[language];
+      const [topicLabel, , , , , statusLabel] = ref.labels;
+      fm["agent-map-references"] = [
+        `${topicLabel}${ref.colon}[[${noteLink(topic.mapPath)}|${linkAlias(topic.map.title, aliasFallback(topic.mapPath))}]]`,
+        `${statusLabel}${ref.colon}${state === "archived" ? ref.archived : ref.unassigned}`
+      ];
       body = withoutReference(body);
     } else {
       delete fm["agent-map-references"];
@@ -2054,7 +2075,7 @@ export class Repository {
       viewport: { x: 40, y: 40, zoom: 1 },
       ...(aim ? { aim } : {})
     };
-    await this.app.vault.create(path, serializeMap(map, this.settings.language));
+    await this.app.vault.create(path, serializeMap(map, this.noteLanguage));
     // Persist the request identity before adding subfolders so a partial setup can be found and resumed.
     if (aim?.creationId) await this.ensureTopicFolders(root);
     return path;

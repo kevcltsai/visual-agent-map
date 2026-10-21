@@ -191,3 +191,161 @@ test('link-rewrite: code is ignored, other files are untouched, and Markdown lin
   assert.equal(result.hits, 2);
   assert.deepEqual([...result.unsupported], ['](A/X.md)']);
 });
+
+// ---- View-layer rollback and undo, with the link index on (the production move path) ----------------------------
+// setLifecycle (not part of the link work) re-writes `agent-map-id:` at the end of the frontmatter after a park and
+// unpark; the line is compared by value elsewhere, so it is dropped here and everything else stays byte-for-byte.
+const withoutUpdated = text => text.replace(/^updated:.*\n/m, '').replace(/^agent-map-id:.*\n/m, '');
+const LEGACY = 'Agent Workspace/Topics';
+
+// Map "M" with Parent, children Alpha, Beta, Gamma; every note cites its siblings and the Parent cites all three.
+async function viewScenario() {
+  const data = fixture('en', { linkIndex: true });
+  const { repo, app, contents } = data;
+  const mapPath = await repo.createMap('M');
+  const doc = await repo.readMap(mapPath);
+  const parent = await repo.createNote('Parent', 'model-a', doc, mapPath, 'workspace');
+  doc.nodes.push(parent);
+  const sources = [];
+  for (const [index, name] of ['Alpha', 'Beta', 'Gamma'].entries()) {
+    const note = await repo.createNote(name, 'model-a', doc, mapPath, 'workspace', { detail: `${name} detail` });
+    note.parentId = parent.id; note.x = 400; note.y = 300 - index * 100;
+    doc.nodes.push(note); sources.push(note);
+  }
+  await repo.saveMap(mapPath, doc);
+  const cite = list => list.map(note => `[[${stem(note.path)}|${note.path.split('/').pop().replace(/\.md$/, '')}]] and [[${stem(note.path)}#Part]]`).join('; ');
+  for (const note of [parent, ...sources])
+    contents.set(note.path, `${contents.get(note.path)}\nCites ${cite([parent, ...sources].filter(other => other !== note))}.\n`);
+  await repo.rebuildDerivedData();
+  const plugin = { repo, settings: { ...DEFAULT_SETTINGS }, rebuildDerivedData: () => repo.rebuildDerivedData(), mutate: work => work(), running: new Set(), abortChartJobs() {}, addChartsAfterWrite() {}, quickExpandPending: new Set(), activeTasks: new Map(), expansionBatches: new Map() };
+  const { VisualAgentMapView } = load('main.ts', { obsidian }, { requestAnimationFrame: run => { run(); return 1; }, cancelAnimationFrame() {} });
+  const view = new VisualAgentMapView({ app }, plugin);
+  view.path = mapPath; view.map = doc; view.render = () => {}; view.focusNode = () => {}; view.drawEdges = () => {}; view.updateHistoryButtons = () => {};
+  await view.hydrate();
+  const calls = { file: [] };
+  const renameFile = app.fileManager.renameFile;
+  app.fileManager.renameFile = async (item, target) => { calls.file.push([item.path, target]); return renameFile(item, target); };
+  const watched = [parent, ...sources].map(note => note.path);
+  const original = new Map(watched.map(path => [path, contents.get(path)]));
+  const select = () => { view.multiSelected = new Set(sources.map(note => note.id)); };
+  const merge = async () => {
+    select();
+    const check = view.mergeCheck();
+    assert.equal(check.ok, true);
+    await view.mergeSelected('Merged', { path: mapPath, mapId: doc.id, sources: check.sources.map(note => ({ id: note.id, path: note.path })) });
+  };
+  return { ...data, calls, mapPath, doc, parent, sources, view, plugin, watched, original, select, merge };
+}
+function assertRestored(h, message) {
+  for (const path of h.watched) {
+    assert.ok(h.files.has(path), `${message}: ${path} is back at its path`);
+    assert.equal(withoutUpdated(h.contents.get(path)), withoutUpdated(h.original.get(path)), `${message}: ${path} is byte-identical`);
+  }
+}
+
+test('view: a merge that fails during the second source move restores every path and link text', async () => {
+  const h = await viewScenario();
+  const rename = h.app.vault.rename, process = h.app.vault.process;
+  let renames = 0, armed = false, injected = false;
+  h.app.vault.rename = async (item, target) => { if (item.path.startsWith(`${h.mapPath.replace(/\/Map\.md$/, '')}/Notes/`) && target.includes('/Unassigned/') && ++renames === 2) armed = true; return rename(item, target); };
+  h.app.vault.process = async (file, change) => {
+    if (armed && file.path === h.parent.path) { armed = false; injected = true; h.contents.set(file.path, h.contents.get(file.path).replace('Cites ', 'Cites edited meanwhile ')); }
+    return process(file, change);
+  };
+  await assert.rejects(h.merge(), /changed/);
+  assert.ok(injected, 'the mid-move edit really happened');
+  h.app.vault.rename = rename; h.app.vault.process = process;
+  assert.ok(renames >= 2, 'the failure came during the second source move');
+  for (const path of h.watched) assert.ok(h.files.has(path), `${path} is back at its path`);
+  for (const path of h.watched) {
+    const expected = path === h.parent.path ? h.original.get(path).replace('Cites ', 'Cites edited meanwhile ') : h.original.get(path);
+    assert.equal(withoutUpdated(h.contents.get(path)), withoutUpdated(expected), `${path} has its original text (only the user's edit differs)`);
+  }
+  const saved = await h.repo.readMap(h.mapPath);
+  assert.deepEqual([...saved.nodes.map(n => n.id).filter(id => h.sources.some(s => s.id === id))].sort(), h.sources.map(s => s.id).sort(), 'the map still lists the three cards');
+  assert.ok(h.view.map.nodes.some(n => n.id === h.sources[0].id));
+});
+
+test('view: merge then undo leaves every note byte-identical except the updated line', async () => {
+  const h = await viewScenario();
+  await h.merge();
+  for (const note of h.sources) assert.ok(!h.files.has(note.path), `${note.path} moved to Unassigned`);
+  assert.notEqual(h.contents.get(h.parent.path), h.original.get(h.parent.path), 'the parent\'s citations followed the moves');
+  await h.view.travel(false);
+  assertRestored(h, 'after undo');
+  assert.equal(h.calls.file.length, 0, 'no Obsidian rename dialog path was used');
+});
+
+test('view: remove then undo leaves every note byte-identical except the updated line', async () => {
+  const h = await viewScenario();
+  h.select();
+  await h.view.removeSelected();
+  for (const note of h.sources) assert.ok(!h.files.has(note.path), `${note.path} moved to Unassigned`);
+  await h.view.travel(false);
+  assertRestored(h, 'after undo');
+  assert.equal(h.calls.file.length, 0);
+});
+
+// ---- Organize and "reported success but not moved", failures injected through vault.rename ------------------------
+async function organizeScenario() {
+  const data = fixture('en', { linkIndex: true });
+  const { repo, app, contents, files } = data;
+  app.vault.modify = async (file, content) => app.vault.process(file, () => content);
+  await repo.folder(LEGACY);
+  const paths = {};
+  for (const title of ['Alpha', 'Beta']) {
+    const mapPath = await repo.renameTopic(await repo.createMap(title), title, `${LEGACY}/${title}`);
+    const doc = await repo.readMap(mapPath);
+    const first = await repo.createNote('First', 'model', doc, mapPath, 'workspace');
+    const second = await repo.createNote('Second', 'model', doc, mapPath, 'inherited');
+    second.parentId = first.id; doc.nodes.push(first, second);
+    await repo.saveMap(mapPath, doc);
+    await repo.updateNote(first.path, { detail: `Links to [[${stem(second.path)}]] and [[Second]].` });
+    await repo.updateNote(second.path, { sourcePaths: [first.path], referencePaths: [first.path] });
+    paths[title] = mapPath;
+  }
+  await repo.rebuildDerivedData();
+  return { ...data, paths, snapshot: () => ({ paths: [...files.keys()].sort(), contents: new Map(contents) }) };
+}
+function assertUnchanged(h, before, message) {
+  assert.deepEqual([...h.files.keys()].sort(), before.paths, `${message}: file and folder paths`);
+  assert.equal(h.contents.size, before.contents.size, `${message}: file count`);
+  for (const [path, content] of before.contents) assert.equal(h.contents.get(path), content, `${message}: ${path}`);
+}
+
+test('organize: a vault.rename failure on a later map restores every moved path and content', async () => {
+  const h = await organizeScenario();
+  const plan = await h.repo.planOrganizeWorkspaceFolders();
+  assert.equal(plan.moves.length, 2);
+  const before = h.snapshot();
+  const rename = h.app.vault.rename;
+  let failed = 0;
+  h.app.vault.rename = async (item, target) => { if (target.startsWith('Agent Workspace/Mind Maps/Beta')) { failed++; throw new Error('injected move failure'); } return rename(item, target); };
+  await assert.rejects(h.repo.organizeWorkspaceFolders(plan), /injected move failure/);
+  h.app.vault.rename = rename;
+  assert.ok(failed >= 1);
+  assertUnchanged(h, before, 'after a failed second move');
+});
+
+test('organize: a vault.rename that reports success without moving is stopped and restored', async () => {
+  const h = await organizeScenario();
+  const plan = await h.repo.planOrganizeWorkspaceFolders();
+  const before = h.snapshot();
+  const rename = h.app.vault.rename;
+  let calls = 0;
+  h.app.vault.rename = async (item, target) => { if (++calls === 2) return; return rename(item, target); };
+  await assert.rejects(h.repo.organizeWorkspaceFolders(plan), /did not take effect on disk/);
+  h.app.vault.rename = rename;
+  assertUnchanged(h, before, 'a silently ignored rename');
+});
+
+test('relocate: a vault.rename that reports success without moving a note throws the localized error and writes nothing', async () => {
+  for (const [language, pattern] of [['en', /did not take effect on disk/], ['zh-TW', /沒有實際生效/]]) {
+    const { repo, app, contents, mapPath, a } = await scenario();
+    repo.settings.language = language;
+    const before = snapshot(contents);
+    app.vault.rename = async () => {};
+    await assert.rejects(repo.moveUnique(a.path, repo.topicFolder(mapPath, 'Unassigned')), pattern, language);
+    assert.deepEqual([...contents.entries()].sort(), [...before.entries()].sort(), `${language}: nothing was written`);
+  }
+});

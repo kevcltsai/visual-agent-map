@@ -846,6 +846,8 @@ var english = {
   "error.map_folder_exists": "Folder name not changed: the new folder already contains a topic with the same name.",
   "error.map_folder_unreadable": "Folder name not changed: a map in the folder cannot be read, so it would be left behind. Fix or move it first.",
   "error.map_folder_rename_failed": "Folder name not changed: the folder could not be renamed.",
+  "error.move_links_note_changed_0": "Links in {0} could not be updated because the note changed.",
+  "error.move_undo_failed_0": "Move failed ({0}); undoing it also failed ({1}).",
   "error.move_not_applied": "A folder move did not take effect on disk, so the operation was stopped and restored.",
   "error.plugin_unloaded": "Visual Agent Map was unloaded, so the operation stopped before its next step.",
   "error.legacy_map_view_only": "This map uses the pre-0.4 structure and is view-only.",
@@ -2451,6 +2453,8 @@ var traditionalChinese = {
   "error.map_folder_exists": "\u8CC7\u6599\u593E\u540D\u7A31\u672A\u8B8A\u66F4\uFF1A\u65B0\u8CC7\u6599\u593E\u5167\u5DF2\u6709\u540C\u540D\u9805\u76EE\u3002",
   "error.map_folder_unreadable": "\u8CC7\u6599\u593E\u540D\u7A31\u672A\u8B8A\u66F4\uFF1A\u8CC7\u6599\u593E\u5167\u6709\u7121\u6CD5\u8B80\u53D6\u7684\u5FC3\u667A\u5716\uFF0C\u6703\u88AB\u7559\u5728\u539F\u8655\u3002\u8ACB\u5148\u4FEE\u5FA9\u6216\u79FB\u8D70\u3002",
   "error.map_folder_rename_failed": "\u8CC7\u6599\u593E\u540D\u7A31\u672A\u8B8A\u66F4\uFF1A\u7121\u6CD5\u91CD\u65B0\u547D\u540D\u8A72\u8CC7\u6599\u593E\u3002",
+  "error.move_links_note_changed_0": "{0} \u5167\u7684\u9023\u7D50\u7121\u6CD5\u66F4\u65B0\uFF0C\u56E0\u70BA\u8A72\u7B46\u8A18\u5DF2\u88AB\u4FEE\u6539\u3002",
+  "error.move_undo_failed_0": "\u642C\u79FB\u5931\u6557\uFF08{0}\uFF09\uFF1B\u9084\u539F\u642C\u79FB\u4E5F\u5931\u6557\uFF08{1}\uFF09\u3002",
   "error.move_not_applied": "\u8CC7\u6599\u593E\u642C\u79FB\u6C92\u6709\u5BE6\u969B\u751F\u6548\uFF0C\u64CD\u4F5C\u5DF2\u505C\u6B62\u4E26\u9084\u539F\u3002",
   "error.plugin_unloaded": "Visual Agent Map \u5DF2\u5378\u8F09\uFF0C\u64CD\u4F5C\u5728\u4E0B\u4E00\u6B65\u4E4B\u524D\u505C\u6B62\u3002",
   "error.legacy_map_view_only": "\u6B64\u5FC3\u667A\u5716\u4F7F\u7528 0.4 \u524D\u7684\u820A\u7D50\u69CB\uFF0C\u53EA\u80FD\u6AA2\u8996\u3002",
@@ -15961,6 +15965,7 @@ ${body}`);
     }
     const origin = item.path;
     await this.app.vault.rename(item, target);
+    if (!this.app.vault.getAbstractFileByPath(target)) throw new Error(this.message("error.move_not_applied"));
     const written = [];
     try {
       for (const edit of plan.edits) {
@@ -15968,7 +15973,7 @@ ${body}`);
         if (!(file instanceof import_obsidian13.TFile)) throw new Error(`${this.message("error.file_not_found")}: ${path}`);
         await this.app.vault.process(file, (current) => {
           if (current !== edit.before)
-            throw new Error(`Links in ${path} could not be updated because the note changed.`);
+            throw new Error(translate(this.settings.language, "error.move_links_note_changed_0", path));
           return edit.after;
         });
         written.push({ path, before: edit.before, after: edit.after });
@@ -15985,7 +15990,12 @@ ${body}`);
       } catch (rollbackError) {
         const original = error instanceof Error ? error.message : String(error);
         throw new Error(
-          `Move failed (${original}); undoing it also failed (${rollbackError instanceof Error ? rollbackError.message : String(rollbackError)}).`
+          translate(
+            this.settings.language,
+            "error.move_undo_failed_0",
+            original,
+            rollbackError instanceof Error ? rollbackError.message : String(rollbackError)
+          )
         );
       }
       throw error;

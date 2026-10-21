@@ -1616,6 +1616,8 @@ export class Repository {
     }
     const origin = item.path;
     await this.app.vault.rename(item, target);
+    // Trust the disk, not the await: the note must really be at its new place before its links are rewritten.
+    if (!this.app.vault.getAbstractFileByPath(target)) throw new Error(this.message("error.move_not_applied"));
     const written: Array<{ path: string; before: string; after: string }> = [];
     try {
       for (const edit of plan.edits) {
@@ -1624,7 +1626,7 @@ export class Repository {
         if (!(file instanceof TFile)) throw new Error(`${this.message("error.file_not_found")}: ${path}`);
         await this.app.vault.process(file, current => {
           if (current !== edit.before)
-            throw new Error(`Links in ${path} could not be updated because the note changed.`);
+            throw new Error(translate(this.settings.language, "error.move_links_note_changed_0", path));
           return edit.after;
         });
         written.push({ path, before: edit.before, after: edit.after });
@@ -1641,7 +1643,12 @@ export class Repository {
       } catch (rollbackError) {
         const original = error instanceof Error ? error.message : String(error);
         throw new Error(
-          `Move failed (${original}); undoing it also failed (${rollbackError instanceof Error ? rollbackError.message : String(rollbackError)}).`
+          translate(
+            this.settings.language,
+            "error.move_undo_failed_0",
+            original,
+            rollbackError instanceof Error ? rollbackError.message : String(rollbackError)
+          )
         );
       }
       throw error;

@@ -38,7 +38,14 @@ import {
   supersededAimNodeIds,
   visibleNodes
 } from "../../map-model";
-import { arrangeMap, arrangeNewBranch, arrangeNewTree, medianHeight } from "../../map-layout";
+import {
+  arrangeMap,
+  arrangeNewBranch,
+  arrangeNewTree,
+  DEFAULT_CARD_HEIGHT,
+  LAYOUT_GAP,
+  medianHeight
+} from "../../map-layout";
 import { inLanguage, NONE } from "../../core/steps/_shared/fragments";
 import { mergeRepair } from "../../core/steps/task/fragments";
 import { checkMergePreservation, findingList, type MergeCheckResult } from "../../core/steps/task/merge-check";
@@ -4795,15 +4802,16 @@ export class VisualAgentMapView extends ItemView {
     if (!this.mergeUnlocked([target.id, ...roots.map(root => root.id)])) return;
     this.assertAimReferencesRemain(this.map!, new Set(roots.map(root => root.id)), true);
     await this.mapChange(map => {
-      let offset = 0;
+      const moved = new Set<string>();
       for (const root of roots) {
         if (!canParent(map.nodes, root.id, target.id)) throw new Error(t("ui.circular_links_are_not_allowed"));
-        const node = map.nodes.find(item => item.id === root.id)!;
-        node.parentId = target.id;
-        node.x = target.x + 340;
-        node.y = target.y + offset++ * 220;
+        map.nodes.find(item => item.id === root.id)!.parentId = target.id;
+        moved.add(root.id);
+        for (const id of descendants(map.nodes, root.id)) moved.add(id);
       }
       map.nodes.find(node => node.id === target.id)!.collapsed = false;
+      // One layout for the moved branches under the target, in the same history entry as the move.
+      map.nodes = arrangeNewBranch(map.nodes, target.id, moved, this.cardHeightOf);
     });
     this.multiSelected.clear();
     this.render();
@@ -4921,6 +4929,7 @@ export class VisualAgentMapView extends ItemView {
       const after = clone(before);
       after.nodes.push(...copies);
       after.nodes.find(node => node.id === target.id)!.collapsed = false;
+      after.nodes = arrangeNewBranch(after.nodes, target.id, new Set(copies.map(copy => copy.id)), this.cardHeightOf);
       await this.plugin.repo.saveMap(this.path, after);
       this.map = after;
       await this.plugin.rebuildDerivedData();
@@ -7326,6 +7335,12 @@ export class VisualAgentMapView extends ItemView {
         await this.mapChange(map => {
           if (!canParent(map.nodes, node.id, parentId)) throw new Error(t("ui.circular_links_are_not_allowed"));
           map.nodes.find(n => n.id === node.id)!.parentId = parentId;
+          const branch = new Set([node.id, ...descendants(map.nodes, node.id)]);
+          const parent = parentId ? map.nodes.find(n => n.id === parentId) : undefined;
+          if (parent) {
+            parent.collapsed = false;
+            map.nodes = arrangeNewBranch(map.nodes, parent.id, branch, this.cardHeightOf);
+          } else map.nodes = arrangeNewTree(map.nodes, node.id, branch, this.cardHeightOf);
         });
       });
     });
@@ -7549,9 +7564,9 @@ export class VisualAgentMapView extends ItemView {
       await this.plugin.repo.updateNote(node.path, { reasoning: parentNote.reasoning });
     }
     node.parentId = parent?.id ?? null;
+    // Provisional spot; the real one is laid out against measured card heights inside the history entry below.
     node.x = parent ? parent.x + 340 : 80;
-    const siblings = this.map.nodes.filter(n => n.parentId === node.parentId);
-    node.y = siblings.length ? Math.max(...siblings.map(n => n.y)) + 220 : (parent?.y ?? 80);
+    node.y = parent?.y ?? 80;
     this.notes.set(
       node.id,
       await this.plugin.repo.readNote(node.path, { ...this.map, nodes: [...this.map.nodes, node] })
@@ -7560,12 +7575,20 @@ export class VisualAgentMapView extends ItemView {
     const previousEntry = this.history.undoEntry;
     const done = await this.mapChangeSnapshots(map => {
       map.nodes.push(node);
-      if (parent) map.nodes.find(n => n.id === parent.id)!.collapsed = false;
+      const owner = parent ? map.nodes.find(n => n.id === parent.id) : undefined;
+      if (owner) {
+        owner.collapsed = false;
+        map.nodes = arrangeNewBranch(map.nodes, owner.id, new Set([node.id]), this.cardHeightOf);
+      } else if (!parent) {
+        const roots = map.nodes.filter(n => n.id !== node.id && !n.parentId);
+        if (roots.length)
+          node.y = Math.max(...roots.map(n => n.y + (this.cardHeightOf(n.id) ?? DEFAULT_CARD_HEIGHT))) + LAYOUT_GAP;
+      }
     }, rebuildDerivedData);
     if (done) this.parkOnUndo(node.id, done.before, done.after, previousEntry);
     if (!focus) return;
     if (this.map) this.map.viewport.zoom = Math.max(this.map.viewport.zoom, 0.7);
-    this.focusNode(node);
+    this.focusNode(this.map?.nodes.find(n => n.id === node.id) ?? node);
   }
   private async proposeChildren(
     parent: MapNode,
@@ -7819,6 +7842,8 @@ export class VisualAgentMapView extends ItemView {
       seen.add(item.title);
     }
     let created = 0;
+    // Every history entry the batch pushes (each child, its settings, the final layout) becomes one undo step.
+    const historyMark = this.history.mark();
     const createdByTitle = new Map<string, MapNode>(),
       newNodes: MapNode[] = [];
     const contributionTemplate = this.mapDetailTemplate(this.plugin.settings.language, detailTemplateId);
@@ -7856,9 +7881,13 @@ export class VisualAgentMapView extends ItemView {
         }, false);
       if (newNodes.length) this.frameBranch([parent.id, ...newNodes.map(node => node.id)]);
       if (created) await this.plugin.rebuildDerivedData();
+      this.history.collapseSince(historyMark);
+      this.updateHistoryButtons();
       return newNodes;
     } catch (error) {
       if (created) {
+        this.history.collapseSince(historyMark);
+        this.updateHistoryButtons();
         await this.plugin.rebuildDerivedData();
         throw new PartialChildBatchError(
           t("ui.some_subtopics_were_created_reopen_this_window_and_check_the") +

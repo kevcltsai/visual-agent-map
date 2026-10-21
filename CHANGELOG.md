@@ -18,6 +18,9 @@
 - After creating subtopics from an expansion, the view now shows the parent and all new subtopics instead of empty canvas.
 - After quick subtopic research finishes, the new subtopic cards you have not moved are re-spaced so grown cards no longer overlap their neighbours.
 - Undoing a topic you just created (the + button, a strengthened topic, or each subtopic of a batch) now also takes its note out of the Notes folder: it is parked in Unassigned like a removed topic, and Redo puts it back at the same place. No stray note is left behind.
+- Move to..., Copy to... and "Apply" in Structure and links now lay out the moved or copied branch under its new parent (or as a new tree when it becomes a root) so cards no longer land on top of the parent's existing children; Undo restores the old positions in one step.
+- A new topic is placed using the measured height of its siblings (or below the lowest top-level topic), so a tall card no longer overlaps the next one.
+- Creating subtopics with AI is now one Undo step instead of one per subtopic: a single Undo removes the whole batch and a single Redo brings it back, also when the batch stopped part-way.
 
 ## [0.24.0] - 2026-10-22
 

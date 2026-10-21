@@ -898,9 +898,18 @@ export function serializeMap(map: MapDocument, language: "zh-TW" | "en" = "zh-TW
 export function inheritModel(parentModel: string | undefined, defaultModel: string): string {
   return parentModel ?? defaultModel;
 }
-export class History<T> {
+export interface HistoryMark {
+  epoch: number;
+  dropped: number;
+  length: number;
+}
+export class History<T extends { undo: () => Promise<void>; redo: () => Promise<void>; label?: string }> {
   private past: T[] = [];
   private future: T[] = [];
+  /** Bumped by clear(), so a mark taken before it can tell the entries it covered are gone. */
+  private epoch = 0;
+  /** Entries pushed out of the front by the 80-entry cap, so a mark's position survives the cap. */
+  private dropped = 0;
   get canUndo(): boolean {
     return this.past.length > 0;
   }
@@ -915,7 +924,10 @@ export class History<T> {
   }
   push(entry: T): void {
     this.past.push(entry);
-    if (this.past.length > 80) this.past.shift();
+    if (this.past.length > 80) {
+      this.past.shift();
+      this.dropped++;
+    }
     this.future = [];
   }
   undo(): T | undefined {
@@ -930,6 +942,46 @@ export class History<T> {
   }
   clear(): void {
     this.past = [];
+    this.future = [];
+    this.epoch++;
+  }
+  /** Marks the present end of the history; collapseSince folds everything pushed after it into one entry. */
+  mark(): HistoryMark {
+    return { epoch: this.epoch, dropped: this.dropped, length: this.past.length };
+  }
+  /**
+   * Folds the entries pushed since `mark` into one undo step: undo runs them newest first, redo oldest first. Does
+   * nothing when the history was cleared since the mark, or when fewer than two entries were pushed. Each entry's
+   * undo/redo is read when it runs, so later patches to an entry (parkOnUndo) still apply.
+   */
+  collapseSince(mark: HistoryMark, label?: string): void {
+    if (mark.epoch !== this.epoch) return;
+    const start = Math.max(0, mark.length - (this.dropped - mark.dropped));
+    if (this.past.length - start < 2) return;
+    const entries = this.past.splice(start);
+    const run = async (list: T[], redo: boolean): Promise<void> => {
+      const done: T[] = [];
+      try {
+        for (const entry of list) {
+          await (redo ? entry.redo() : entry.undo());
+          done.push(entry);
+        }
+      } catch (error) {
+        // Put back what already ran so the map is not left half-way; the original error is what the caller sees.
+        try {
+          for (const entry of done.reverse()) await (redo ? entry.undo() : entry.redo());
+        } catch {
+          // best effort
+        }
+        throw error;
+      }
+    };
+    const combined = {
+      undo: () => run([...entries].reverse(), false),
+      redo: () => run(entries, true),
+      ...(label ? { label } : {})
+    } as T;
+    this.past.push(combined);
     this.future = [];
   }
 }

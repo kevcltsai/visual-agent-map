@@ -6,7 +6,18 @@ import { withThinkingOrigin } from "./thinking-origin";
 import { createHash, randomUUID } from "node:crypto";
 import type VisualAgentMapPlugin from "../../main";
 import { t, topicStatusLabel, translate, type TranslationKey, type UiLanguage } from "../../i18n";
-import { MarkdownRenderer, ItemView, Menu, Modal, Notice, TFile, WorkspaceLeaf, setIcon, setTooltip } from "obsidian";
+import {
+  MarkdownRenderer,
+  ItemView,
+  Menu,
+  Modal,
+  Notice,
+  Scope,
+  TFile,
+  WorkspaceLeaf,
+  setIcon,
+  setTooltip
+} from "obsidian";
 import { readMarkdownFile, type ReferenceGroup } from "../../ai/reference-materials";
 import { NameModal } from "../../ui/modals/name-modal";
 import { ChoiceModal } from "../../ui/modals/choice-modal";
@@ -176,6 +187,11 @@ interface Action {
   label?: string;
 }
 /** Message of any thrown value, without relying on instanceof Error (errors may cross realms). */
+const EDITABLE_SELECTOR = ["input", "textarea", "select", "[contenteditable]:not([contenteditable=false])"].join(",");
+/** True when a key event came from a text control, where the field owns the key (undo, Backspace, typing). */
+function isEditableTarget(target: unknown): boolean {
+  return !!(target as Element | null)?.closest?.(EDITABLE_SELECTOR);
+}
 function errorMessage(error: unknown): string {
   const message = (error as { message?: unknown } | null)?.message;
   return typeof message === "string" ? message : String(error);
@@ -536,6 +552,8 @@ export class VisualAgentMapView extends ItemView {
     private plugin: VisualAgentMapPlugin
   ) {
     super(leaf);
+    // Once, here: Obsidian pushes view.scope when the leaf becomes active, which can be before onOpen() finishes.
+    this.installUndoScope();
     this.aimRuns = new AimRunStore(plugin.repo);
     this.aimManual = new AimManualFlow(
       plugin.repo,
@@ -617,10 +635,6 @@ export class VisualAgentMapView extends ItemView {
         event.target.closest("input, textarea, select, [contenteditable=true]")
       )
         return;
-      if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === "z") {
-        event.preventDefault();
-        this.enqueue(() => this.travel(event.shiftKey));
-      }
       if (event.key === "Escape") {
         const previous = this.selected,
           touched = [...this.multiSelected];
@@ -659,6 +673,28 @@ export class VisualAgentMapView extends ItemView {
         } else this.render();
       }
     }
+  }
+  /**
+   * Mod+Z / Mod+Shift+Z while this view is the active pane, wherever focus is inside it. A text field keeps its own
+   * undo (the handler passes the key through), and IME composition is never touched.
+   */
+  private installUndoScope(): void {
+    const scope = new Scope(this.app.scope);
+    const seen = new WeakSet<object>();
+    const run =
+      (redo: boolean) =>
+      (event: KeyboardEvent): boolean => {
+        if (this.closed || event.isComposing || isEditableTarget(event.target)) return true;
+        // Some hosts match the shifted letter as "Z" as well as "z"; one key press undoes one step.
+        if (seen.has(event)) return false;
+        seen.add(event);
+        this.enqueue(() => this.travel(redo));
+        return false;
+      };
+    scope.register(["Mod"], "z", run(false));
+    scope.register(["Mod", "Shift"], "z", run(true));
+    scope.register(["Mod", "Shift"], "Z", run(true));
+    this.scope = scope;
   }
   async onClose(): Promise<void> {
     this.closed = true;
@@ -1467,7 +1503,7 @@ export class VisualAgentMapView extends ItemView {
         : t("ui.relevance_goal_0", goal)
       : t("ui.relevance_goal_set");
     const button = this.button(parent, label, () => {
-      if (this.relevancePanelOpen) this.closeRelevancePanel(true);
+      if (this.relevancePanelOpen && this.relevancePanelEl) this.closeRelevancePanel(true);
       else this.editRelevanceGoal();
     });
     button.addClass("vam-relevance-goal");
@@ -1519,8 +1555,14 @@ export class VisualAgentMapView extends ItemView {
   }
   /** Open the goal panel under the toolbar button (no-op while a grading run is going). */
   private editRelevanceGoal(): void {
-    if (this.plugin.relevanceGrades.get(this.path)?.status === "running") return;
-    if (!this.relevanceToolsEl) return;
+    if (this.plugin.relevanceGrades.get(this.path)?.status === "running") {
+      new Notice(t("ui.relevance_goal_unavailable_grading"));
+      return;
+    }
+    if (!this.relevanceToolsEl) {
+      new Notice(t("ui.relevance_goal_unavailable_toolbar"));
+      return;
+    }
     this.relevancePanelOpen = true;
     this.relevanceDraft = {
       goal: this.relevanceGoal ?? "",
@@ -1678,8 +1720,9 @@ export class VisualAgentMapView extends ItemView {
       sort
     ])
       control.addEventListener("focusout", (event: FocusEvent) => {
+        // Only focus moving to a real element outside the panel closes it; null (a repaint, a dialog closing) does not.
         const next = event.relatedTarget as Node | null;
-        if (!next || (!panel.contains(next) && next !== this.relevanceButtonEl)) finish(false, false);
+        if (next && !panel.contains(next) && next !== this.relevanceButtonEl) finish(false, false);
       });
     // A press anywhere else (the canvas, another card) closes it too; the toolbar button toggles it itself.
     const doc = this.contentEl?.ownerDocument;
@@ -4581,6 +4624,34 @@ export class VisualAgentMapView extends ItemView {
       [{ label: t("ui.confirm_removal"), warning: true, action: () => this.enqueue(() => this.removeSelected()) }]
     ).open();
   }
+  /**
+   * Delete or Backspace on a focused card. A leaf leaves the map at once with an Undo notice (it only moves to
+   * Unassigned); a card with subtopics asks first, exactly like the remove tool.
+   */
+  private removeByKey(node: MapNode): void {
+    const map = this.map;
+    if (!map || map.aim) return;
+    if (map.nodes.some(item => item.parentId === node.id)) {
+      this.confirmRemoveNode(node);
+      return;
+    }
+    if (!this.mergeUnlocked([node.id])) return;
+    const title = this.notes.get(node.id)?.title ?? node.path;
+    // Focus moves to the next sibling, else the previous one, else the parent, so the keyboard user stays in the tree.
+    const siblings = map.nodes.filter(item => (item.parentId ?? null) === (node.parentId ?? null));
+    const at = siblings.findIndex(item => item.id === node.id);
+    const next = siblings[at + 1] ?? siblings[at - 1] ?? map.nodes.find(item => item.id === node.parentId);
+    this.enqueue(async () => {
+      const previous = this.history.undoEntry;
+      this.focusNodeId = next?.id ?? null;
+      try {
+        await this.removeToUnassigned(node, false);
+      } finally {
+        this.focusNodeId = null;
+      }
+      if (this.history.undoEntry !== previous) this.undoNotice(t("ui.removed_0_undo_available", title), previous);
+    });
+  }
   /** The delete confirmation. `hooks` lets a caller run the chosen removal itself and hear about a cancel. */
   private confirmRemoveNode(
     node: MapNode,
@@ -5557,6 +5628,11 @@ export class VisualAgentMapView extends ItemView {
     const focusedCard = activeDocument.activeElement?.closest<HTMLElement>(".vam-node");
     if (focusedCard && this.contentEl.contains(focusedCard)) this.focusNodeId ??= focusedCard.dataset.nodeId ?? null;
     const restoreRelevanceFocus = this.keepRelevanceBarFocus();
+    // The repaint removes the focused panel field first; its late focusout must not close the panel that is redrawn below.
+    this.relevancePanelGen++;
+    this.relevancePanelCleanup?.();
+    this.relevancePanelCleanup = null;
+    this.relevancePanelEl = null;
     this.contentEl.empty();
     const toolbar = this.contentEl.createDiv("vam-toolbar");
     const switcher = toolbar.createEl("button", { cls: "vam-map-switcher" });
@@ -6330,6 +6406,14 @@ export class VisualAgentMapView extends ItemView {
     }
     const title = card.createEl("h3", { text: note?.title ?? node.path, cls: "vam-card-title" });
     title.setAttr("title", note?.title ?? node.path);
+    // Double-click renames, the same dialog as F2 and the Rename tool.
+    if (note && !this.builtIn && !this.integrationMode && !this.map?.aim)
+      title.addEventListener("dblclick", event => {
+        event.preventDefault();
+        new NameModal(this.app, t("ui.new_topic_name"), note.title, name =>
+          this.enqueue(() => this.noteChange(node, { title: name }))
+        ).open();
+      });
     // An unresearched topic's placeholder summary repeats its status, so the frontier card stays quiet.
     // While a run streams its answer, the unsaved summary preview takes the place of the stored summary.
     if (research?.preview?.summary)
@@ -6496,6 +6580,27 @@ export class VisualAgentMapView extends ItemView {
         event.preventDefault();
         this.moveKeyboardFocus(target);
         return;
+      }
+      const editable = !this.builtIn && !this.integrationMode && !this.map?.aim;
+      const plain = !event.ctrlKey && !event.metaKey && !event.altKey;
+      if (editable && !event.isComposing) {
+        if (plain && !event.shiftKey && (event.key === "Delete" || event.key === "Backspace")) {
+          event.preventDefault();
+          this.removeByKey(node);
+          return;
+        }
+        // Tab stays native: it walks into the card's tools, which have no other keyboard route (collapse, links, AI).
+        if (event.key === "Enter" && (event.ctrlKey || event.metaKey) && !event.altKey && !event.shiftKey) {
+          event.preventDefault();
+          this.enqueue(() => this.addNode(node));
+          return;
+        }
+        if (event.key === "Enter" && event.shiftKey && plain) {
+          event.preventDefault();
+          const parent = this.map?.nodes.find(item => item.id === node.parentId) ?? null;
+          this.enqueue(() => this.addNode(parent));
+          return;
+        }
       }
       if (event.key === "F2" && note && !this.builtIn && !this.integrationMode && !this.map?.aim) {
         event.preventDefault();

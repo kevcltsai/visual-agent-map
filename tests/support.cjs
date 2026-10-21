@@ -80,6 +80,7 @@ function withExpansionCoordinator(plugin) {
 class TFolder { constructor(path) { this.path = path; this.name = path.split('/').at(-1); this.children = []; this.parent = null; } }
 class TFile { constructor(path) { this.path = path; this.name = path.split('/').at(-1); this.basename = this.name.replace(/\.md$/, ''); this.extension = this.name.includes('.') ? this.name.split('.').at(-1) : ''; this.parent = null; this.stat = { mtime: Date.now() }; } }
 const obsidian = { setIcon: (parent, name) => { parent.iconName = name; }, Menu: class { addItem(callback) { callback({ setTitle() { return this; }, setIcon() { return this; }, setWarning() { return this; }, onClick() { return this; } }); return this; } addSeparator() { return this; } showAtMouseEvent() { return this; } },
+  Scope: class { constructor(parent) { this.parent = parent; this.keys = []; } register(modifiers, key, func) { const handler = { modifiers, key, func }; this.keys.push(handler); return handler; } unregister(handler) { this.keys = this.keys.filter(item => item !== handler); } },
   TFile, TFolder, App: class {}, Plugin: class {}, ItemView: class { constructor(leaf) { this.app = leaf.app; } async setState() {} }, PluginSettingTab: class {}, Modal: class {}, FuzzySuggestModal: class {}, Notice: class {}, FileSystemAdapter: class { getBasePath() { return '/vault'; } },
   normalizePath: value => value.replace(/\/+/g, '/').replace(/^\//, ''),
   parseYaml: text => YAML.parse(text, null, {}),

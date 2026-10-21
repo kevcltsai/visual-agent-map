@@ -141,9 +141,8 @@ test('runtime, service and log messages carry no inline Chinese text', () => {
   assert.deepEqual(offenders, []);
 });
 test('all user-facing translations use stable semantic keys', () => {
-  const dictionary = fs.readFileSync(path.join(root, 'i18n.ts'), 'utf8');
-  const english = dictionary.slice(dictionary.indexOf('const english = {'), dictionary.indexOf('} as const;'));
-  const chinese = dictionary.slice(dictionary.indexOf('const traditionalChinese:'), dictionary.lastIndexOf('};'));
+  const english = fs.readFileSync(path.join(root, 'i18n', 'en.ts'), 'utf8');
+  const chinese = fs.readFileSync(path.join(root, 'i18n', 'zh-TW.ts'), 'utf8');
   const extract = value => new Set([...value.matchAll(/^  "((?:[^"\\]|\\.)+)":/gm)].map(match => match[1]));
   const keys = extract(english);
   assert.deepEqual([...extract(chinese)].sort(), [...keys].sort(), 'every locale must define exactly the same semantic keys');
@@ -180,5 +179,72 @@ test('the sample tour names the controls exactly as the map labels them, in both
       assert.ok(tr('ui.tour_2_body').includes(tr(key)), `${lang}: tour step 2 names ${tr(key)}`);
     assert.ok(tr('ui.tour_4_body').includes(tr('ui.select_topics')), `${lang}: tour step 4 names the select button`);
     assert.ok(tr('ui.tour_5_body').includes(tr('ui.topic')), `${lang}: tour step 5 names the add-topic button`);
+  }
+});
+test('language registry helpers resolve the four language axes', () => {
+  const i18n = load('i18n.ts');
+  assert.deepEqual(plain(i18n.LANGUAGES.map(item => item.id)), ['zh-TW', 'en']);
+  assert.equal(i18n.noteLanguageOf('zh-TW'), 'zh-TW');
+  assert.equal(i18n.noteLanguageOf('en'), 'en');
+  assert.equal(i18n.instructionLanguageOf('zh-TW'), 'zh');
+  assert.equal(i18n.instructionLanguageOf('en'), 'en');
+  assert.equal(i18n.isUiLanguage('zh-TW'), true);
+  assert.equal(i18n.isUiLanguage('zh-CN'), false);
+  assert.equal(i18n.isNoteLanguage('en'), true);
+  assert.equal(i18n.isNoteLanguage('unsupported'), false);
+  assert.equal(i18n.contentLocale('zh-TW', 'zh-TW'), 'zh-TW');
+  assert.equal(i18n.contentLocale('zh-TW', 'en'), 'zh-TW');
+  assert.equal(i18n.contentLocale('en', 'zh-TW'), 'en');
+  assert.equal(i18n.intlLocaleOf('zh-TW'), 'zh-TW');
+  assert.equal(i18n.uiLocale('zh-TW'), 'zh-TW');
+  assert.equal(i18n.uiLocale('zh-CN'), 'en');
+  assert.equal(i18n.initialUiLanguage('zh-CN'), 'en');
+});
+test('registry prompt names reproduce every language spelling in the prompt files', () => {
+  const { languagePromptName: name } = load('i18n.ts');
+  assert.equal(name('zh-TW', 'zh', 'plain'), '繁體中文');
+  assert.equal(name('zh-TW', 'zh', 'region'), '繁體中文（台灣）');
+  assert.equal(name('zh-TW', 'zh', 'usage'), '繁體中文（台灣用法）');
+  assert.equal(name('zh-TW', 'en', 'plain'), 'Traditional Chinese');
+  assert.equal(name('zh-TW', 'en', 'region'), 'Traditional Chinese (Taiwan)');
+  assert.equal(name('en', 'en', 'plain'), 'English');
+  const files = ['core/steps/aim/language.zh.md', 'core/steps/relevance-grade/language.zh.md', 'core/steps/reframe/language.zh.md', 'experiences/coffee-tables/steps/table/prompt.zh.md'];
+  const spellings = new Set(['繁體中文（台灣用法）', '繁體中文（台灣）', 'Traditional Chinese (Taiwan)']);
+  for (const file of files) assert.ok([...spellings].some(text => fs.readFileSync(path.join(root, file), 'utf8').includes(text)), file);
+});
+test('inLanguage selects the fragment by instruction language', () => {
+  const { inLanguage } = load('core/steps/_shared/fragments.ts');
+  assert.equal(inLanguage({ zh: '中', en: 'E' }, 'zh-TW'), '中');
+  assert.equal(inLanguage({ zh: '中', en: 'E' }, 'en'), 'E');
+});
+test('translate looks up the language dictionary and falls back to English', () => {
+  const { translate } = load('i18n.ts');
+  assert.equal(translate('zh-TW', 'ui.interface_language'), '介面語言');
+  assert.equal(translate('en', 'ui.expand_0', 2), 'Expand 2');
+});
+test('check:i18n passes on the repository dictionaries and fails on a bad placeholder fixture', () => {
+  const os = require('node:os');
+  const { spawnSync } = require('node:child_process');
+  const script = path.join(root, 'scripts', 'check-i18n.mjs');
+  const real = spawnSync(process.execPath, [script], { cwd: root, encoding: 'utf8' });
+  assert.equal(real.status, 0, real.stderr);
+  const fixture = fs.mkdtempSync(path.join(os.tmpdir(), 'vam-i18n-'));
+  try {
+    fs.mkdirSync(path.join(fixture, 'i18n'));
+    fs.copyFileSync(path.join(root, 'i18n', 'languages.ts'), path.join(fixture, 'i18n', 'languages.ts'));
+    const write = (name, exportName, entries) => fs.writeFileSync(path.join(fixture, 'i18n', name), `export const ${exportName} = {\n  // coffee:begin\n  "coffee.a": "Hello **{0}**",\n  // coffee:end\n${entries}};\n`);
+    write('en.ts', 'en', '  "ui.b": "Count {0} of {1}",\n');
+    write('zh-TW.ts', 'zhTW', '  "ui.b": "第 {0} 項",\n');
+    const bad = spawnSync(process.execPath, [script, '--root', fixture], { cwd: root, encoding: 'utf8' });
+    assert.equal(bad.status, 1);
+    assert.match(bad.stderr, /zh-TW ui\.b: placeholders differ/);
+    write('zh-TW.ts', 'zhTW', '  "ui.b": "第 {0} 項，共 {1}",\n');
+    assert.equal(spawnSync(process.execPath, [script, '--root', fixture], { cwd: root, encoding: 'utf8' }).status, 0);
+    write('zh-TW.ts', 'zhTW', '  "ui.b": "第 {0} 項，共 {1}",\n  "ui.extra": "x",\n');
+    const extra = spawnSync(process.execPath, [script, '--root', fixture], { cwd: root, encoding: 'utf8' });
+    assert.equal(extra.status, 1);
+    assert.match(extra.stderr, /extra key/);
+  } finally {
+    fs.rmSync(fixture, { recursive: true, force: true });
   }
 });

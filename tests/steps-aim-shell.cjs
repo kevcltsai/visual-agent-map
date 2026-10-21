@@ -33,9 +33,9 @@ test('the phase rules are exactly the 14 AIM phases that have rules; evidence-re
   assert.ok(!phases.includes('evidence-reuse-audit'));
   const { buildAimPrompt } = load('ai/aim-prompt.ts');
   const base = { title: 'T', summary: 'S', rules: '', detail: '', ancestors: '', sourceContext: '', mode: 'task', researchMode: 'local', researchDepth: 'fast', visualMode: 'off' };
-  for (const phase of phases) for (const language of ['zh', 'en']) {
+  for (const phase of phases) for (const [language, locale] of [['zh', 'zh-TW'], ['en', 'en']]) {
     const rule = fs.readFileSync(path.join(directory, 'phase', `${phase}.${language}.md`), 'utf8').trimEnd();
-    assert.ok(buildAimPrompt({ ...base, task: `<!-- aim-phase: ${phase} -->\nGo` }, language).includes(rule), `${phase} ${language} rule is in the prompt`);
+    assert.ok(buildAimPrompt({ ...base, task: `<!-- aim-phase: ${phase} -->\nGo` }, locale).includes(rule), `${phase} ${language} rule is in the prompt`);
   }
   const reuse = buildAimPrompt({ ...base, task: '<!-- aim-phase: evidence-reuse-audit -->\nGo' }, 'en');
   const plain = buildAimPrompt({ ...base, task: 'Go' }, 'en');

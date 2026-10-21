@@ -239,7 +239,7 @@ test('collect snapshots: preset instruction strings composed directly from i18n'
 function promptKeyCoverage() {
   const { translate, t } = loadModule('i18n.ts');
   void t;
-  const source = fs.readFileSync(path.join(root, 'i18n.ts'), 'utf8');
+  const source = require('./support.cjs').i18nSource();
   const keys = [...new Set([...source.matchAll(/^\s*"(prompt\.[a-z_]+)":/gm)].map(match => match[1]))].sort();
   const covered = {}, uncovered = [];
   for (const key of keys) {

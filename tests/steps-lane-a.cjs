@@ -122,7 +122,7 @@ test('Visual Map task text comes from fragments and renders the same as the stri
 });
 
 test('the lane keys are gone from i18n.ts and every fragment has a zh and an en file that a module imports', () => {
-  const source = fs.readFileSync(path.join(root, 'i18n.ts'), 'utf8');
+  const source = require('./support.cjs').i18nSource();
   const removed = 'research_topic direct_expansion guided_expansion expansion_direction existing_subtopics avoid_duplicates synthesis_directions synthesis_goal preliminary_map label_current_summary label_visual_references label_full_knowledge label_old_findings no_summary_yet output_language reference_extract reference_reduce json detail_structure adaptive_detail_structure general_task decompose synthesize default_task label_detail label_findings visual_none visual_preserve visual_on visual_auto visual_embed role source_safety reference_citations local_first label_topic label_summary label_rules label_sources label_ancestors label_task none'.split(' ');
   assert.equal(removed.length, 42);
   for (const key of removed) assert.doesNotMatch(source, new RegExp(`"prompt\\.${key}":`), `prompt.${key} must live in a fragment`);

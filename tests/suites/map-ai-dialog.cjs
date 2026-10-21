@@ -405,8 +405,8 @@ integrationTest('localized labels: reasoning levels and model names are never sh
   assert.equal(findAll(adjustOf(h), i => /gpt-test/.test(i.text ?? '') && !/Label of gpt-test/.test(i.text ?? '') && i.tag !== 'option').length, 0, 'no raw id outside the model list');
 });
 integrationTest('map UI in zh-TW says 整合 for synthesis, never 收斂', () => {
-  const source = require('node:fs').readFileSync(require('node:path').join(__dirname, '..', '..', 'i18n.ts'), 'utf8');
-  const zh = source.slice(source.indexOf('const traditionalChinese'));
+  const source = require('../support.cjs').i18nSource('zh-TW');
+  const zh = source;
   const entries = [...zh.matchAll(/^  "(ui\.[^"]+)": "((?:[^"\\]|\\.)*)"/gm)];
   // AIM and the Markdown selection tools have their own vocabulary; the map's synthesis dialogs must say 整合.
   const drift = entries.filter(([, key, text]) => /收斂/.test(text) && /synthes|integrat|merge|direction/.test(key)).map(([, key]) => key);

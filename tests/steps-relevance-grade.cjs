@@ -208,7 +208,7 @@ test('service: stopping before the call, during it and after it returns all fail
 });
 
 test('i18n: every new relevance string exists in English and Traditional Chinese with the same placeholders, and the zh strings avoid 節點 and 地圖', () => {
-  const source = fs.readFileSync(path.join(root, 'i18n.ts'), 'utf8');
+  const source = require('./support.cjs').i18nSource();
   const keys = [...new Set([...source.matchAll(/^\s*"((?:ui\.relevance_(?:goal_set|goal_set_hint|goal_edit_hint|goal_label|goal_placeholder|running|stop|stopped|not_started|failed_0|done_0_1_2|write_failed_0|view_changes|changes_title|changes_none|ungraded|changed_to|history_label|goal_history_label|undo_skipped_0))|error\.relevance_grade_[a-z_]+)":/gm)].map(match => match[1]))];
   assert.equal(keys.length, 25);
   const added = ['goal_level_0_1', 'level_label', 'level_none', 'level_beginner', 'level_intermediate', 'level_familiar', 'context_label', 'context_placeholder', 'grade_button'].map(name => `ui.relevance_${name}`);

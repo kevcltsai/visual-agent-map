@@ -54,5 +54,5 @@ test('runCoffeeRequest, which takes a raw prompt, is only wired into the Coffee 
 });
 
 test('i18n.ts holds no prompt.* keys', () => {
-  assert.deepEqual(fs.readFileSync(path.join(root, 'i18n.ts'), 'utf8').match(/["']prompt\.[a-z0-9_]+["']/g) ?? [], []);
+  assert.deepEqual(require('./support.cjs').i18nSource().match(/["']prompt\.[a-z0-9_]+["']/g) ?? [], []);
 });

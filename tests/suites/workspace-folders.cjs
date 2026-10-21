@@ -65,7 +65,7 @@ integrationTest('Inbox is gone: no setting, no folder, no repository API, no UI 
   assert.equal(typeof repo.migrateLegacyWorkspace, 'undefined');
   await repo.ensureWorkspace();
   assert.ok(!app.vault.getAbstractFileByPath('Agent Workspace/Inbox'));
-  const source = require('node:fs').readFileSync(require('node:path').join(__dirname, '..', '..', 'i18n.ts'), 'utf8');
+  const source = require('../support.cjs').i18nSource();
   assert.ok(!/Inbox|收件匣|migrate_legacy|old_data/.test(source), 'removed strings are gone in both languages');
 });
 

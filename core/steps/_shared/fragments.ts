@@ -1,5 +1,5 @@
 import { renderTemplate } from "../../step-runner";
-import type { UiLanguage } from "../../../i18n";
+import { instructionLanguageOf, type UiLanguage } from "../../../i18n";
 import LabelAncestorsZH from "./label-ancestors.zh.md";
 import LabelAncestorsEN from "./label-ancestors.en.md";
 import LabelRulesZH from "./label-rules.zh.md";
@@ -40,9 +40,9 @@ export interface FragmentPair {
 }
 const pair = (zh: string, en: string): FragmentPair => ({ zh: text(zh), en: text(en) });
 
-/** The fragment in the interface language; `en` selects English, anything else Traditional Chinese (as `translate` does). */
+/** The fragment in the language's instruction language (registry `instruction`): `en` or `zh`. */
 export function inLanguage(fragment: FragmentPair, language: UiLanguage): string {
-  return language === "en" ? fragment.en : fragment.zh;
+  return instructionLanguageOf(language) === "en" ? fragment.en : fragment.zh;
 }
 
 /** Claude only: return through the StructuredOutput tool at once, without a text draft first. Codex prompts never include it. */

@@ -101,8 +101,8 @@ function registerInternalMarkerPresentation(plugin) {
 var import_view2 = require("@codemirror/view");
 var import_obsidian3 = require("obsidian");
 
-// i18n.ts
-var english = {
+// i18n/en.ts
+var en = {
   "ui.output_language": "Answer language for this task",
   "ui.select_proposal_0": "Select proposal: {0}",
   "ui.proposal_name": "Proposal name",
@@ -1222,6 +1222,7 @@ var english = {
   "detail.no_conclusion_yet": "No conclusion yet",
   "detail.preview": "Preview",
   "ui.map_file_description": "This file stores the mind map structure. Full content lives in the topic notes. Choose Open as mind map from the file menu.",
+  // coffee:begin (keep every coffee.* key in this one contiguous block)
   "coffee.delete_this_table": "Delete this table?",
   "coffee.will_be_backed_up_and_moved_to_the_vault_trash": "\u201C{0}\u201D will be backed up and moved to the vault trash.",
   "coffee.fill_segment_summaries": "Fill segment summaries",
@@ -1549,6 +1550,7 @@ var english = {
   "coffee.preferences_must_be_text": "Observer and convergence preferences must be text.",
   "coffee.today": "Today",
   "coffee.yesterday": "Yesterday",
+  // coffee:end
   "ui.coffee_outline_segment": "Segment {0} \xB7 {1}",
   "log.exchange_full_prompt": "Full prompt:",
   "log.exchange_legacy_prompt_missing": "(older record without the full prompt)",
@@ -1706,15 +1708,9 @@ var english = {
   "error.relevance_grade_invalid": "The AI grading could not be used: {0}",
   "error.relevance_grade_hierarchy": "The AI's parent-child tiers were still inconsistent. Click Goal, then press Enter to try again."
 };
-var SUPPORTED_LANGUAGES = [
-  { id: "zh-TW", label: "\u7E41\u9AD4\u4E2D\u6587", name: "Traditional Chinese" },
-  { id: "en", label: "English", name: "English" }
-];
-function supportedLanguageLabel(id) {
-  var _a, _b;
-  return (_b = (_a = SUPPORTED_LANGUAGES.find((item) => item.id === id)) == null ? void 0 : _a.label) != null ? _b : id;
-}
-var traditionalChinese = {
+
+// i18n/zh-TW.ts
+var zhTW = {
   "ui.output_language": "\u672C\u6B21\u56DE\u7B54\u8A9E\u8A00",
   "ui.select_proposal_0": "\u9078\u53D6\u63D0\u6848\uFF1A{0}",
   "ui.proposal_name": "\u63D0\u6848\u540D\u7A31",
@@ -2834,6 +2830,7 @@ var traditionalChinese = {
   "detail.no_conclusion_yet": "\u5C1A\u672A\u5F62\u6210\u7D50\u8AD6",
   "detail.preview": "\u9810\u89BD",
   "ui.map_file_description": "\u6B64\u6A94\u6848\u4FDD\u5B58\u5FC3\u667A\u5716\u7D50\u69CB\uFF1B\u5B8C\u6574\u5167\u5BB9\u4FDD\u5B58\u5728\u5404\u8B70\u984C\u7B46\u8A18\u3002\u5F9E\u6A94\u6848\u9078\u55AE\u9078\u64C7\u300C\u4EE5\u5FC3\u667A\u5716\u958B\u555F\u300D\u3002",
+  // coffee:begin (keep every coffee.* key in this one contiguous block)
   "coffee.delete_this_table": "\u522A\u9664\u9019\u5834\u684C\u804A\uFF1F",
   "coffee.will_be_backed_up_and_moved_to_the_vault_trash": "\u300C{0}\u300D\u7684 Markdown \u8207\u8A2D\u5B9A\u6703\u5148\u5099\u4EFD\uFF0C\u518D\u79FB\u5165\u5783\u573E\u6876\u3002",
   "coffee.fill_segment_summaries": "\u88DC\u9F4A\u6BB5\u843D\u6458\u8981",
@@ -3161,6 +3158,7 @@ var traditionalChinese = {
   "coffee.preferences_must_be_text": "\u89C0\u5BDF\u8005\u8207\u6574\u4F75\u504F\u597D\u5FC5\u9808\u662F\u6587\u5B57\u3002",
   "coffee.today": "\u4ECA\u5929",
   "coffee.yesterday": "\u6628\u5929",
+  // coffee:end
   "ui.coffee_outline_segment": "\u7B2C {0} \u6BB5\u30FB{1}",
   "log.exchange_full_prompt": "\u5B8C\u6574 Prompt\uFF1A",
   "log.exchange_legacy_prompt_missing": "\uFF08\u820A\u7D00\u9304\u672A\u4FDD\u5B58\u5B8C\u6574 prompt\uFF09",
@@ -3318,13 +3316,63 @@ var traditionalChinese = {
   "error.relevance_grade_invalid": "\u7121\u6CD5\u4F7F\u7528 AI \u7684\u5206\u7D1A\u7D50\u679C\uFF1A{0}",
   "error.relevance_grade_hierarchy": "AI \u7684\u4E0A\u4E0B\u5C64\u5206\u7D1A\u4ECD\u4E0D\u4E00\u81F4\uFF0C\u8ACB\u9EDE\u300C\u76EE\u6A19\u300D\u518D\u6309 Enter \u91CD\u8A66"
 };
+
+// i18n/languages.ts
+var LANGUAGES = [
+  {
+    id: "zh-TW",
+    label: "\u7E41\u9AD4\u4E2D\u6587",
+    name: "Traditional Chinese",
+    instruction: "zh",
+    note: "zh-TW",
+    intl: "zh-TW",
+    prompt: {
+      zh: { plain: "\u7E41\u9AD4\u4E2D\u6587", region: "\u7E41\u9AD4\u4E2D\u6587\uFF08\u53F0\u7063\uFF09", usage: "\u7E41\u9AD4\u4E2D\u6587\uFF08\u53F0\u7063\u7528\u6CD5\uFF09" },
+      en: {
+        plain: "Traditional Chinese",
+        region: "Traditional Chinese (Taiwan)",
+        usage: "Traditional Chinese (Taiwan usage)"
+      }
+    }
+  },
+  {
+    id: "en",
+    label: "English",
+    name: "English",
+    instruction: "en",
+    note: "en",
+    intl: "en",
+    prompt: {
+      zh: { plain: "\u82F1\u6587", region: "\u82F1\u6587", usage: "\u82F1\u6587" },
+      en: { plain: "English", region: "English", usage: "English" }
+    }
+  }
+];
+
+// i18n.ts
+var DICTIONARIES = { "zh-TW": zhTW, en };
+var registry = LANGUAGES;
+var entryOf = (locale) => {
+  var _a;
+  return (_a = registry.find((item) => item.id === locale)) != null ? _a : registry.find((item) => item.id === "en");
+};
+var SUPPORTED_LANGUAGES = LANGUAGES.map(({ id, label, name }) => ({ id, label, name }));
+function supportedLanguageLabel(id) {
+  var _a, _b;
+  return (_b = (_a = SUPPORTED_LANGUAGES.find((item) => item.id === id)) == null ? void 0 : _a.label) != null ? _b : id;
+}
+function isUiLanguage(value) {
+  return registry.some((item) => item.id === value);
+}
+function instructionLanguageOf(locale) {
+  return entryOf(locale).instruction;
+}
 var language = "en";
 function initialUiLanguage(saved) {
-  if (saved === "zh-TW" || saved === "en") return saved;
-  return "en";
+  return isUiLanguage(saved) ? saved : "en";
 }
 function uiLocale(value) {
-  return value === "zh-TW" ? "zh-TW" : "en";
+  return isUiLanguage(value) ? value : "en";
 }
 function setUiLanguage(value) {
   language = value;
@@ -3336,8 +3384,9 @@ function t(key2, ...values) {
   return translate(language, key2, ...values);
 }
 function translate(locale, key2, ...values) {
-  const selected = locale === "en" ? english[key2] : traditionalChinese[key2];
-  const translated = selected || english[key2] || String(key2);
+  var _a;
+  const selected = (_a = DICTIONARIES[locale]) == null ? void 0 : _a[key2];
+  const translated = selected || en[key2] || String(key2);
   return translated.replace(/\{(\d+)\}/g, (_, index) => {
     const value = values[Number(index)];
     return typeof value === "string" || typeof value === "number" || typeof value === "boolean" ? String(value) : `{${index}}`;
@@ -4507,7 +4556,7 @@ var table_lead_in_continue_default = "\u9019\u662F\u540C\u4E00\u684C\u7684\u7E8C
 
 // experiences/coffee-tables/steps/_shared/fragments.ts
 var text = (template) => renderTemplate(template, {});
-var pair = (zh, en) => ({ zh: text(zh), en: text(en) });
+var pair = (zh, en2) => ({ zh: text(zh), en: text(en2) });
 var OBSERVER_FORMAT_TEMPLATE = observer_format_default;
 var INSIGHT_UPDATE_FOOTER = pair(insight_update_footer_zh_default, insight_update_footer_en_default);
 var OBSERVER_TITLES = pair(observer_titles_zh_default, observer_titles_en_default);
@@ -5709,7 +5758,7 @@ var ModelDiscovery = class {
 
 // experiences/coffee-tables/handoff-modal.ts
 var registries = /* @__PURE__ */ new WeakMap();
-function registry(plugin) {
+function registry2(plugin) {
   var _a;
   let found = registries.get(plugin);
   if (!found) {
@@ -5724,18 +5773,18 @@ function registry(plugin) {
   return found;
 }
 function notify(plugin) {
-  for (const listener of [...registry(plugin).listeners]) listener();
+  for (const listener of [...registry2(plugin).listeners]) listener();
 }
 function coffeeHandoffTask(plugin, sessionId) {
-  return registry(plugin).tasks.get(sessionId);
+  return registry2(plugin).tasks.get(sessionId);
 }
 function subscribeCoffeeHandoff(plugin, listener) {
-  const { listeners } = registry(plugin);
+  const { listeners } = registry2(plugin);
   listeners.add(listener);
   return () => listeners.delete(listener);
 }
 function dismissCoffeeHandoff(plugin, task) {
-  const { tasks } = registry(plugin);
+  const { tasks } = registry2(plugin);
   if (tasks.get(task.sessionId) !== task || task.state === "running") return;
   tasks.delete(task.sessionId);
   notify(plugin);
@@ -5750,12 +5799,12 @@ function stopTask(plugin, task, announce) {
   if (announce) notify(plugin);
 }
 function stopCoffeeHandoff(plugin, task) {
-  if (registry(plugin).tasks.get(task.sessionId) !== task) return;
+  if (registry2(plugin).tasks.get(task.sessionId) !== task) return;
   stopTask(plugin, task, true);
 }
 async function reopenCoffeeHandoff(plugin, task) {
   var _a;
-  const { tasks } = registry(plugin);
+  const { tasks } = registry2(plugin);
   if (tasks.get(task.sessionId) !== task || task.state === "running") return void 0;
   try {
     await task.store.assertHandoffSnapshot(task.snapshot);
@@ -6044,7 +6093,7 @@ var CoffeeHandoffModal = class extends import_obsidian6.Modal {
       path: this.path,
       ...this.insightId ? { insightId: this.insightId } : {}
     };
-    registry(this.plugin).tasks.set(task.sessionId, task);
+    registry2(this.plugin).tasks.set(task.sessionId, task);
     notify(this.plugin);
     return task;
   }
@@ -6084,7 +6133,7 @@ var CoffeeHandoffModal = class extends import_obsidian6.Modal {
     }
   }
   isCurrent(task) {
-    return registry(this.plugin).tasks.get(task.sessionId) === task;
+    return registry2(this.plugin).tasks.get(task.sessionId) === task;
   }
   async assertTaskSource() {
     const busy = () => {
@@ -6618,8 +6667,8 @@ var CoffeeEngine = class {
     this.session = { ...next, updatedAt: (/* @__PURE__ */ new Date()).toISOString() };
     this.changed();
   }
-  engineError(english2, traditionalChinese2) {
-    return new Error(this.session.language === "zh-TW" ? traditionalChinese2 : english2);
+  engineError(english, traditionalChinese) {
+    return new Error(this.session.language === "zh-TW" ? traditionalChinese : english);
   }
   assertCanEditNotes() {
     if (this.deleting || this.retired)
@@ -12373,11 +12422,11 @@ var PromptPresetsModal = class extends import_obsidian9.Modal {
 // ui/modals/aim-clarification-modal.ts
 var import_obsidian10 = require("obsidian");
 var AimClarificationModal = class extends import_obsidian10.Modal {
-  constructor(app, questions, submit, english2, contentLanguage) {
+  constructor(app, questions, submit, english, contentLanguage) {
     super(app);
     this.questions = questions;
     this.submit = submit;
-    this.english = english2;
+    this.english = english;
     this.contentLanguage = contentLanguage;
   }
   onOpen() {
@@ -12513,9 +12562,9 @@ var tone_en_default = "Tone rule: the tone changes wording and presentation only
 
 // core/steps/_shared/fragments.ts
 var text2 = (template) => renderTemplate(template, {});
-var pair2 = (zh, en) => ({ zh: text2(zh), en: text2(en) });
+var pair2 = (zh, en2) => ({ zh: text2(zh), en: text2(en2) });
 function inLanguage(fragment, language2) {
-  return language2 === "en" ? fragment.en : fragment.zh;
+  return instructionLanguageOf(language2) === "en" ? fragment.en : fragment.zh;
 }
 var CLAUDE_STRUCTURED_OUTPUT = pair2(claude_structured_output_zh_default, claude_structured_output_en_default);
 function withProviderOutput(contract, provider, language2) {
@@ -12624,7 +12673,7 @@ var merge_goal_en_default = 'Merge the provided source topics into this one topi
 
 // experiences/visual-map/steps/fragments.ts
 var text3 = (template) => renderTemplate(template, {});
-var pair3 = (zh, en) => ({ zh: text3(zh), en: text3(en) });
+var pair3 = (zh, en2) => ({ zh: text3(zh), en: text3(en2) });
 var AVOID_DUPLICATES = pair3(avoid_duplicates_zh_default, avoid_duplicates_en_default);
 var EXISTING_SUBTOPICS = pair3(existing_subtopics_zh_default, existing_subtopics_en_default);
 var EXPANSION_DIRECTION = pair3(expansion_direction_zh_default, expansion_direction_en_default);
@@ -12944,7 +12993,7 @@ var visual_preserve_en_default = "When reusing one, preserve its original image 
 
 // core/steps/task/fragments.ts
 var text4 = (template) => renderTemplate(template, {});
-var pair4 = (zh, en) => ({ zh: text4(zh), en: text4(en) });
+var pair4 = (zh, en2) => ({ zh: text4(zh), en: text4(en2) });
 var ADAPTIVE_DETAIL_STRUCTURE = pair4(adaptive_detail_structure_zh_default, adaptive_detail_structure_en_default);
 var DECOMPOSE = pair4(decompose_zh_default, decompose_en_default);
 var DEFAULT_TASK = pair4(default_task_zh_default, default_task_en_default);
@@ -12999,7 +13048,7 @@ function textbookDetailStructure(language2, values) {
 // ai/detail-templates.ts
 var STANDARD_TEMPLATE_ID = "standard";
 var TEXTBOOK_TEMPLATE_ID = "textbook";
-var LANGUAGES = ["zh-TW", "en"];
+var LANGUAGES2 = ["zh-TW", "en"];
 var STANDARD = [
   ["core", "detail.core_conclusions", "detail.description_core_conclusions", "none"],
   ["knowledge", "detail.key_knowledge", "detail.description_key_knowledge", "none"],
@@ -13019,7 +13068,7 @@ function standardTemplate(language2) {
         name,
         description: translate(language2, descriptionKey),
         role,
-        aliases: LANGUAGES.map((locale) => translate(locale, key2)).filter((alias) => alias !== name)
+        aliases: LANGUAGES2.map((locale) => translate(locale, key2)).filter((alias) => alias !== name)
       };
     })
   };
@@ -40601,7 +40650,7 @@ var delivery_acceptance_en_default = "Review the complete deliverable against th
 
 // core/steps/aim/shell.ts
 var text9 = (template) => renderTemplate(template, {});
-var pair5 = (zh, en) => ({ zh: text9(zh), en: text9(en) });
+var pair5 = (zh, en2) => ({ zh: text9(zh), en: text9(en2) });
 var LANGUAGE = pair5(language_zh_default2, language_en_default2);
 var JSON_CONTRACT2 = pair5(json_contract_zh_default, json_contract_en_default);
 var WEB_SEARCH_OFF = pair5(web_search_off_zh_default, web_search_off_en_default);
@@ -42962,11 +43011,11 @@ var search_images_en_default = "Find existing images on the web related to the s
 var search_images_zh_default = "\u641C\u5C0B\u8207\u9078\u53D6\u6587\u5B57\u53CA\u9644\u8FD1\u5167\u5BB9\u76F8\u95DC\u7684\u65E2\u6709\u7DB2\u8DEF\u5716\u7247\uFF0C\u56DE\u50B3\u7CBE\u7C21\u7684\u5716\u7247\u641C\u5C0B\u95DC\u9375\u5B57\u3002\u9664\u975E\u53E6\u6709\u8981\u6C42\uFF0C\u8ACB\u52FF\u52A0\u4E0A\u5716\u8AAA\u3002\n";
 
 // experiences/markdown-context/steps/presets/step.ts
-function presetStep(id, zh, en, usesTarget) {
+function presetStep(id, zh, en2, usesTarget) {
   return {
     id,
     version: 1,
-    render: ({ language: language2, target = "" }) => renderTemplate(language2 === "zh-TW" ? zh : en, usesTarget ? { target } : {}),
+    render: ({ language: language2, target = "" }) => renderTemplate(language2 === "zh-TW" ? zh : en2, usesTarget ? { target } : {}),
     parse: (raw) => raw
   };
 }

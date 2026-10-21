@@ -1588,7 +1588,7 @@ integrationTest('the more-actions menu holds Organize notes and folders; toolbar
 });
 integrationTest('UI wording: quick research, not shallow research; the synthesis draft is reviewed (檢閱) everywhere', () => {
   const { translate } = load('i18n.ts');
-  const source = fs.readFileSync(path.join(root, 'i18n.ts'), 'utf8');
+  const source = require('../support.cjs').i18nSource();
   const values = [...source.matchAll(/^  "((?:ui|notice|modal|settings)\.[^"]+)": "((?:[^"\\]|\\.)*)"/gm)];
   assert.deepEqual(values.filter(([, , text]) => /淺研究|shallow research|檢查整合草稿/i.test(text)).map(([, key]) => key), []);
   assert.equal(translate('zh-TW', 'ui.review_synthesis_draft'), '檢閱整合草稿'); assert.equal(translate('zh-TW', 'ui.review_the_synthesis_draft'), '請檢閱整合草稿。');
@@ -1596,8 +1596,8 @@ integrationTest('UI wording: quick research, not shallow research; the synthesis
 });
 integrationTest('map UI terms in zh-TW say 議題 and 心智圖, not 節點 or 地圖, and keep 工作區 consistent', () => {
   const { translate } = load('i18n.ts');
-  const source = fs.readFileSync(path.join(root, 'i18n.ts'), 'utf8');
-  const zh = source.slice(source.indexOf('const traditionalChinese'));
+  const source = require('../support.cjs').i18nSource('zh-TW');
+  const zh = source;
   const mapUi = [...zh.matchAll(/^  "(ui\.[^"]+)": "((?:[^"\\]|\\.)*)"/gm)].filter(([, key]) => !/aim_/.test(key));
   const drift = mapUi.filter(([, , text]) => /節點|地圖/.test(text)).map(([, key]) => key);
   assert.deepEqual(drift, [], 'no map UI string uses 節點 or 地圖');

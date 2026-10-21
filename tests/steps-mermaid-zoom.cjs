@@ -139,7 +139,7 @@ test('mermaid zoom: a diagram that renders later gets its button when the SVG ap
 });
 
 test('mermaid zoom: i18n has the labels in both languages', () => {
-  const src = fs.readFileSync(path.join(root, 'i18n.ts'), 'utf8');
+  const src = require('./support.cjs').i18nSource();
   for (const key of ['ui.mermaid_zoom_open', 'ui.mermaid_zoom_title', 'ui.mermaid_zoom_in', 'ui.mermaid_zoom_out', 'ui.mermaid_zoom_fit', 'ui.mermaid_zoom_actual', 'ui.mermaid_zoom_canvas_label', 'ui.mermaid_zoom_hint'])
     assert.equal(src.split(`"${key}"`).length - 1, 2, key);
   assert.match(src, /"ui\.mermaid_zoom_open": "放大圖表"/);

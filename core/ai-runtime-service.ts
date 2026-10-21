@@ -65,6 +65,12 @@ export class AiRuntimeService {
     return this.warmPool.size > 0;
   }
 
+  /** Plugin unload: kills the pre-started process and refuses any later pre-start. */
+  dispose(): void {
+    this.warmPool.dispose();
+    this.reset();
+  }
+
   reset(): void {
     this.warmPool.release();
     this.codexRuntime?.stop();

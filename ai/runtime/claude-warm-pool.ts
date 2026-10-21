@@ -25,11 +25,12 @@ interface Slot<T> {
 
 /**
  * At most one idle, already-started Claude CLI (stream-json input, nothing written yet). `take` hands it to a run only
- * when the run would have started the very same command; any other key kills it. Nothing here calls the model: the
+ * when the run would have started the very same command; a run with another key starts cold and leaves the slot alone. Nothing here calls the model: the
  * process waits on stdin until a user message arrives.
  */
 export class ClaudeWarmPool<T extends WarmProcess = WarmProcess> {
   private slot: Slot<T> | null = null;
+  private disposed = false;
   private readonly clock: WarmClock;
   private readonly idleMs: number;
   constructor(options: { clock?: WarmClock; idleMs?: number; onLog?: (message: string) => void } = {}) {
@@ -45,6 +46,7 @@ export class ClaudeWarmPool<T extends WarmProcess = WarmProcess> {
   }
   /** Starts a process for `key` unless one for the same key is already waiting (then only the idle time restarts). */
   prewarm(key: string, start: () => T): boolean {
+    if (this.disposed) return false;
     if (this.slot && this.slot.key === key && !this.slot.exited) {
       this.armIdle(this.slot);
       return true;
@@ -68,7 +70,10 @@ export class ClaudeWarmPool<T extends WarmProcess = WarmProcess> {
     this.armIdle(slot);
     return true;
   }
-  /** The waiting process if it was started for exactly `key`; a process for another key is killed and null returned. */
+  /**
+   * The waiting process if it was started for exactly `key`. Another key gets null and the slot stays: an unrelated
+   * call (chart job, merge, another card) must not kill the process the open dialog is about to use.
+   */
   take(key: string): T | null {
     const slot = this.slot;
     if (!slot) return null;
@@ -76,10 +81,7 @@ export class ClaudeWarmPool<T extends WarmProcess = WarmProcess> {
       this.slot = null;
       return null;
     }
-    if (slot.key !== key) {
-      this.release();
-      return null;
-    }
+    if (slot.key !== key) return null;
     this.slot = null;
     this.clearIdle(slot);
     return slot.child;
@@ -92,6 +94,11 @@ export class ClaudeWarmPool<T extends WarmProcess = WarmProcess> {
     this.clearIdle(slot);
     if (slot.exited) return;
     this.kill(slot);
+  }
+  /** Releases the process for good: after this no prewarm starts anything (plugin unload). */
+  dispose(): void {
+    this.disposed = true;
+    this.release();
   }
   private kill(slot: Slot<T>): void {
     try {

@@ -396,11 +396,12 @@ export class NextStepModal extends Modal {
     return controller.signal.aborted || (this.closed && !this.detached);
   }
   /** Pre-starts the Claude CLI for the research step (no model call); a run that does not use it kills it. */
-  private prewarmAi(): void {
+  private prewarmAi(webSearch = true): void {
     if (this.selectionFlow || this.closed) return;
     this.plugin.prewarmClaude?.(
       this.modelSettings?.model ?? this.plugin.settings.cliModel,
-      this.modelSettings?.reasoning
+      this.modelSettings?.reasoning,
+      webSearch
     );
   }
   onClose(): void {
@@ -1389,6 +1390,13 @@ export class NextStepModal extends Modal {
     );
     // --- Shared options, all under Adjust.
     const sharedSources = this.addReferencePicker(adjustBody);
+    // The research step runs with the web setting of the source picker. Expansion pre-starts one process only for local
+    // (no web search) Quick child research; children run in parallel, so only the first one finds it waiting.
+    const warmForMode = (): void => {
+      if (currentMode === "research") this.prewarmAi(sharedSources?.picker.selection().webSearch ?? true);
+      else if (currentMode === "expand" && shallow.checked && !shallowWeb.checked) this.prewarmAi(false);
+      else if (!this.detached) this.plugin.releaseWarmClaude?.();
+    };
     show = mode => {
       currentMode = mode;
       for (const [name, button, panel] of [
@@ -1403,8 +1411,7 @@ export class NextStepModal extends Modal {
         adjustFor[name].hidden = name !== mode;
       }
       sharedSources?.forMode(mode);
-      if (mode === "research") this.prewarmAi();
-      else if (!this.detached) this.plugin.releaseWarmClaude?.();
+      warmForMode();
       confirm.hidden = mode !== "research";
       expandButton.hidden = mode !== "expand";
       expandFooterText.hidden = mode !== "expand";
@@ -1489,7 +1496,7 @@ export class NextStepModal extends Modal {
     this.contentEl.addEventListener("change", refreshSummary);
     // A changed model or reasoning level changes the command: pre-start again (the old process is killed).
     this.contentEl.addEventListener("change", () => {
-      if (currentMode === "research") this.prewarmAi();
+      warmForMode();
     });
     if (pendingDirections) showDirections(pendingDirections.directions);
     else checkName();

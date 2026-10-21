@@ -1001,6 +1001,30 @@ integrationTest('S6 dialog: switching to another step releases the process, and 
   cards[1].click();
   assert.equal(spy.releases, before + 1, 'leaving the research step releases the process');
 });
+integrationTest('S6 dialog: the pre-start follows the web-search setting (local research pre-starts the local command) and expansion pre-starts it only for local quick child research', () => {
+  const spy = { prewarms: [], releases: 0 };
+  spy.plugin = { prewarmClaude: (model, reasoning, webSearch) => spy.prewarms.push(webSearch), releaseWarmClaude: () => { spy.releases++; } };
+  const h = nextStepHarness({ plugin: spy.plugin, modelSettings: { topicStatus: 'idea' } });
+  assert.deepEqual(spy.prewarms, [true], 'web search is on by default');
+  const checkbox = text => find(find(h.modal.contentEl, i => i.tag === 'label' && findAll(i, c => c.text === text).length > 0), i => i.tag === 'input');
+  const web = checkbox('Allow web search'); web.checked = false; web.change();
+  assert.deepEqual(spy.prewarms, [true, false], 'local research pre-starts without web tools');
+  web.checked = true; web.change();
+  assert.deepEqual(spy.prewarms, [true, false, true]);
+  // expansion: nothing unless quick child research is on with the web option off
+  const cards = findAll(cardsOf(h), i => i.tag === 'button' && i.attrs && i.attrs.role === 'radio');
+  const releases = spy.releases;
+  cards[1].click();
+  assert.equal(spy.releases, releases + 1, 'plain expansion pre-starts nothing');
+  const shallow = checkbox('Run quick research on each created subtopic (does not search the web)');
+  shallow.checked = true; shallow.change();
+  assert.deepEqual(spy.prewarms.at(-1), false, 'quick child research without the web pre-starts the local command');
+  const count = spy.prewarms.length;
+  const childWeb = checkbox('Also search the web for subtopic research');
+  childWeb.checked = true; childWeb.change();
+  assert.equal(spy.prewarms.length, count, 'with web search the child research is not served by the local process');
+  assert.equal(spy.releases, releases + 2);
+});
 integrationTest('S6 dialog: a plugin without the pre-start methods (older test doubles) still opens and closes', () => {
   const h = nextStepHarness({});
   assert.doesNotThrow(() => h.modal.close());

@@ -304,7 +304,7 @@ export class ClaudeCodeCliRuntime {
       args[args.indexOf("json")] = "stream-json";
       args.push("--include-partial-messages");
     }
-    // A process pre-started for exactly this command only needs the prompt; any other pre-started process is killed here.
+    // A process pre-started for exactly this command only needs the prompt; a different pre-started process stays for its own run.
     const pool = this.options.warmPool;
     const warmArgs =
       pool && observed && !controls.onSteer ? claudeWarmArgs(model, effort, outputSchema, webSearch) : null;

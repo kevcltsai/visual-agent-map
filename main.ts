@@ -137,6 +137,8 @@ export default class VisualAgentMapPlugin extends Plugin {
   readonly activeTasks = new Map<string, AbortController>();
   /** Background chart steps (running and queued), keyed by note path: one per path, at most {@link CHART_JOB_LIMIT} run at a time. */
   readonly chartJobs = new Map<string, AbortController>();
+  /** Set by onunload; a late dialog event must not start a pre-warmed process after it. */
+  private unloaded = false;
   /** Stage, elapsed time and the unsaved answer preview of research and chart steps in flight, keyed by note path. */
   readonly researchProgress = new ResearchProgressStore();
   /** The progress entry each background chart job owns (the research run's own entry ends when the note is written). */
@@ -1096,6 +1098,9 @@ export default class VisualAgentMapPlugin extends Plugin {
     this.externalReconcileTimer = null;
     this.externalReconcilePaths.clear();
     this.resetCodexRuntime();
+    // After this no late dialog event can start a pre-warmed process.
+    this.unloaded = true;
+    this.aiRuntime.dispose();
   }
   async saveSettings(): Promise<void> {
     await this.saveData(this.settings);
@@ -1609,9 +1614,10 @@ export default class VisualAgentMapPlugin extends Plugin {
   }
   /**
    * Starts an idle Claude CLI while the research dialog is open, so confirming only has to write the prompt. No model
-   * call happens until then; a run with different settings kills it and starts cold.
+   * call happens until then; a run with different settings starts cold and leaves it for the dialog.
    */
-  prewarmClaude(model: string, reasoning?: unknown): void {
+  prewarmClaude(model: string, reasoning?: unknown, webSearch = true): void {
+    if (this.unloaded) return;
     if (providerForModel(model) !== "claude") {
       this.aiRuntime.releaseWarm();
       return;
@@ -1623,7 +1629,7 @@ export default class VisualAgentMapPlugin extends Plugin {
         providerModelId(model),
         selected === "auto" ? "low" : selected,
         responseSchema,
-        true
+        webSearch
       );
     } catch {
       /* Pre-starting is an optimisation: the run starts the process itself. */

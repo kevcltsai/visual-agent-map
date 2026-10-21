@@ -19348,13 +19348,14 @@ var NextStepModal = class extends import_obsidian21.Modal {
     return controller.signal.aborted || this.closed && !this.detached;
   }
   /** Pre-starts the Claude CLI for the research step (no model call); a run that does not use it kills it. */
-  prewarmAi() {
+  prewarmAi(webSearch = true) {
     var _a, _b, _c, _d, _e;
     if (this.selectionFlow || this.closed) return;
     (_e = (_d = this.plugin).prewarmClaude) == null ? void 0 : _e.call(
       _d,
       (_b = (_a = this.modelSettings) == null ? void 0 : _a.model) != null ? _b : this.plugin.settings.cliModel,
-      (_c = this.modelSettings) == null ? void 0 : _c.reasoning
+      (_c = this.modelSettings) == null ? void 0 : _c.reasoning,
+      webSearch
     );
   }
   onClose() {
@@ -20272,8 +20273,13 @@ var NextStepModal = class extends import_obsidian21.Modal {
       }
     );
     const sharedSources = this.addReferencePicker(adjustBody);
+    const warmForMode = () => {
+      var _a2, _b2, _c2;
+      if (currentMode === "research") this.prewarmAi((_a2 = sharedSources == null ? void 0 : sharedSources.picker.selection().webSearch) != null ? _a2 : true);
+      else if (currentMode === "expand" && shallow.checked && !shallowWeb.checked) this.prewarmAi(false);
+      else if (!this.detached) (_c2 = (_b2 = this.plugin).releaseWarmClaude) == null ? void 0 : _c2.call(_b2);
+    };
     show = (mode) => {
-      var _a2, _b2;
       currentMode = mode;
       for (const [name, button, panel] of [
         ["research", researchCard, research],
@@ -20287,8 +20293,7 @@ var NextStepModal = class extends import_obsidian21.Modal {
         adjustFor[name].hidden = name !== mode;
       }
       sharedSources == null ? void 0 : sharedSources.forMode(mode);
-      if (mode === "research") this.prewarmAi();
-      else if (!this.detached) (_b2 = (_a2 = this.plugin).releaseWarmClaude) == null ? void 0 : _b2.call(_a2);
+      warmForMode();
       confirm.hidden = mode !== "research";
       expandButton.hidden = mode !== "expand";
       expandFooterText.hidden = mode !== "expand";
@@ -20363,7 +20368,7 @@ var NextStepModal = class extends import_obsidian21.Modal {
     };
     this.contentEl.addEventListener("change", refreshSummary);
     this.contentEl.addEventListener("change", () => {
-      if (currentMode === "research") this.prewarmAi();
+      warmForMode();
     });
     if (pendingDirections) showDirections(pendingDirections.directions);
     else checkName();
@@ -38951,6 +38956,7 @@ var realClock = {
 var ClaudeWarmPool = class {
   constructor(options = {}) {
     __publicField(this, "slot", null);
+    __publicField(this, "disposed", false);
     __publicField(this, "clock");
     __publicField(this, "idleMs");
     __publicField(this, "onLog");
@@ -38965,6 +38971,7 @@ var ClaudeWarmPool = class {
   }
   /** Starts a process for `key` unless one for the same key is already waiting (then only the idle time restarts). */
   prewarm(key2, start) {
+    if (this.disposed) return false;
     if (this.slot && this.slot.key === key2 && !this.slot.exited) {
       this.armIdle(this.slot);
       return true;
@@ -38988,7 +38995,10 @@ var ClaudeWarmPool = class {
     this.armIdle(slot);
     return true;
   }
-  /** The waiting process if it was started for exactly `key`; a process for another key is killed and null returned. */
+  /**
+   * The waiting process if it was started for exactly `key`. Another key gets null and the slot stays: an unrelated
+   * call (chart job, merge, another card) must not kill the process the open dialog is about to use.
+   */
   take(key2) {
     const slot = this.slot;
     if (!slot) return null;
@@ -38996,10 +39006,7 @@ var ClaudeWarmPool = class {
       this.slot = null;
       return null;
     }
-    if (slot.key !== key2) {
-      this.release();
-      return null;
-    }
+    if (slot.key !== key2) return null;
     this.slot = null;
     this.clearIdle(slot);
     return slot.child;
@@ -39012,6 +39019,11 @@ var ClaudeWarmPool = class {
     this.clearIdle(slot);
     if (slot.exited) return;
     this.kill(slot);
+  }
+  /** Releases the process for good: after this no prewarm starts anything (plugin unload). */
+  dispose() {
+    this.disposed = true;
+    this.release();
   }
   kill(slot) {
     try {
@@ -39083,6 +39095,11 @@ var AiRuntimeService = class {
   /** True while a pre-started Claude process is waiting. */
   hasWarm() {
     return this.warmPool.size > 0;
+  }
+  /** Plugin unload: kills the pre-started process and refuses any later pre-start. */
+  dispose() {
+    this.warmPool.dispose();
+    this.reset();
   }
   reset() {
     var _a, _b;
@@ -42749,6 +42766,8 @@ var VisualAgentMapPlugin = class extends import_obsidian34.Plugin {
     __publicField(this, "activeTasks", /* @__PURE__ */ new Map());
     /** Background chart steps (running and queued), keyed by note path: one per path, at most {@link CHART_JOB_LIMIT} run at a time. */
     __publicField(this, "chartJobs", /* @__PURE__ */ new Map());
+    /** Set by onunload; a late dialog event must not start a pre-warmed process after it. */
+    __publicField(this, "unloaded", false);
     /** Stage, elapsed time and the unsaved answer preview of research and chart steps in flight, keyed by note path. */
     __publicField(this, "researchProgress", new ResearchProgressStore());
     /** The progress entry each background chart job owns (the research run's own entry ends when the note is written). */
@@ -43659,6 +43678,8 @@ ${t("ui.organize_link_wait_hint")}`;
     this.externalReconcileTimer = null;
     this.externalReconcilePaths.clear();
     this.resetCodexRuntime();
+    this.unloaded = true;
+    this.aiRuntime.dispose();
   }
   async saveSettings() {
     await this.saveData(this.settings);
@@ -44116,9 +44137,10 @@ ${t("ui.organize_link_wait_hint")}`;
   }
   /**
    * Starts an idle Claude CLI while the research dialog is open, so confirming only has to write the prompt. No model
-   * call happens until then; a run with different settings kills it and starts cold.
+   * call happens until then; a run with different settings starts cold and leaves it for the dialog.
    */
-  prewarmClaude(model, reasoning) {
+  prewarmClaude(model, reasoning, webSearch = true) {
+    if (this.unloaded) return;
     if (providerForModel(model) !== "claude") {
       this.aiRuntime.releaseWarm();
       return;
@@ -44129,7 +44151,7 @@ ${t("ui.organize_link_wait_hint")}`;
         providerModelId(model),
         selected === "auto" ? "low" : selected,
         response_schema_default,
-        true
+        webSearch
       );
     } catch (e) {
     }

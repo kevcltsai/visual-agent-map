@@ -278,7 +278,7 @@ test('Claude stream-json: a normal observed call reports the first model event, 
   assert.deepEqual(out.modes, ['stream-json']);
   const m = out.milestones[0];
   assert.equal(m.stream, 'stream-json'); assert.equal(m.structuredCalls, 1); assert.ok(m.firstEventAt && m.structuredStartAt && m.previewSummaryAt && m.acceptedAt);
-  assert.deepEqual(m.stages.map(item => item.stage), ['writing']); assert.deepEqual(m.usage, { inputTokens: 10, outputTokens: 5 });
+  assert.deepEqual(m.stages.map(item => item.stage), ['waiting', 'writing']); assert.equal(m.stages[0].at, m.acceptedAt, 'the first stage is waiting, at acceptance'); assert.deepEqual(m.usage, { inputTokens: 10, outputTokens: 5 });
   assert.equal(m.textBeforeTool, false); assert.equal(m.enforceRetry, false); assert.equal(out.milestones.length, 1, 'milestones are reported once');
 });
 
@@ -312,7 +312,7 @@ test('Claude stream-json: WebSearch then WebFetch report searching with the quer
   const out = await h.run(lines, { webSearch: true, webSearchOnly: true, onWebSearchEvent: event => events.push(event.method) });
   assert.deepEqual(out.stages, [['searching', undefined], ['searching', 'synthetic query'], ['reading', undefined], ['writing', undefined]]);
   const m = out.milestones[0];
-  assert.deepEqual(m.stages.map(item => item.stage), ['searching', 'reading', 'writing']);
+  assert.deepEqual(m.stages.map(item => item.stage), ['waiting', 'searching', 'reading', 'writing']);
   assert.equal(m.searches.length, 2);
   assert.equal(m.searches[0].kind, 'search'); assert.equal(m.searches[0].query, 'synthetic query'); assert.ok(m.searches[0].completedAt); assert.equal(m.searches[0].failed, undefined);
   assert.equal(m.searches[1].kind, 'openPage'); assert.equal(m.searches[1].failed, true);

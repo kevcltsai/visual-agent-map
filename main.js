@@ -1045,7 +1045,7 @@ var english = {
   "ui.deep_aim_for_up_to_6_web_searches_and_10_main_sources_compar": "Deep: compare evidence for agreement and disagreement, and explain important support, limits, and unresolved questions.",
   "ui.web_and_image_searches_share_the_search_limit_search_counts": "There is no fixed query or source count. Continue while a useful search could resolve a decision-relevant uncertainty; stop when evidence is sufficient or further searches have low expected value.",
   "ui.search_for_image_references": "Search for image references",
-  "ui.shallow_research_for_expanded_subtopics_0": "Quick research: {0}",
+  "ui.shallow_research_for_expanded_subtopics_0": "Subtopic research: {0}",
   "ui.shallow_research_local_description": "Answers from the topic and the sources you provide, without searching the web. Tick the box below to search.",
   "ui.select_the_parent_topic_before_its_child": "Select the parent topic before its child.",
   "ui.first_level_topic_names_must_be_unique": "First-level topic names must be unique.",
@@ -2649,7 +2649,7 @@ var traditionalChinese = {
   "ui.deep_aim_for_up_to_6_web_searches_and_10_main_sources_compar": "\u6DF1\u5165\uFF1A\u6BD4\u8F03\u8B49\u64DA\u7684\u4E00\u81F4\u8207\u5206\u6B67\uFF0C\u8AAA\u660E\u91CD\u8981\u4F9D\u64DA\u3001\u9650\u5236\u53CA\u672A\u89E3\u554F\u984C\u3002",
   "ui.web_and_image_searches_share_the_search_limit_search_counts": "\u641C\u5C0B\u6B21\u6578\u8207\u4F86\u6E90\u6578\u6C92\u6709\u56FA\u5B9A\u4E0A\u9650\u3002\u53EA\u8981\u5408\u7406\u7684\u65B0\u641C\u5C0B\u4ECD\u53EF\u80FD\u89E3\u6C7A\u6703\u5F71\u97FF\u5224\u65B7\u7684\u4E0D\u78BA\u5B9A\u6027\uFF0C\u5C31\u7E7C\u7E8C\u67E5\u8B49\uFF1B\u8B49\u64DA\u8DB3\u5920\u6216\u5F8C\u7E8C\u641C\u5C0B\u9810\u671F\u50F9\u503C\u504F\u4F4E\u6642\u505C\u6B62\u3002",
   "ui.search_for_image_references": "\u641C\u5C0B\u5716\u7247\u53C3\u8003",
-  "ui.shallow_research_for_expanded_subtopics_0": "\u5FEB\u901F\u7814\u7A76\uFF1A{0}",
+  "ui.shallow_research_for_expanded_subtopics_0": "\u5B50\u984C\u7814\u7A76\uFF1A{0}",
   "ui.shallow_research_local_description": "\u4F9D\u4E3B\u984C\u8207\u4F60\u63D0\u4F9B\u7684\u4F86\u6E90\u56DE\u7B54\uFF0C\u4E0D\u641C\u5C0B\u7DB2\u8DEF\u3002\u52FE\u9078\u4E0B\u65B9\u9078\u9805\u624D\u6703\u641C\u5C0B\u3002",
   "ui.select_the_parent_topic_before_its_child": "\u8ACB\u5148\u52FE\u9078\u5B50\u8B70\u984C\u7684\u6BCD\u8B70\u984C\u3002",
   "ui.first_level_topic_names_must_be_unique": "\u7B2C\u4E00\u5C64\u5B50\u8B70\u984C\u540D\u7A31\u4E0D\u80FD\u91CD\u8907\u3002",
@@ -38338,7 +38338,9 @@ var ClaudeStreamObserver = class {
   /** Records the moment the prompt was written. */
   accepted() {
     var _a, _b;
-    (_b = (_a = this.milestoneData).acceptedAt) != null ? _b : _a.acceptedAt = this.now();
+    if (this.milestoneData.acceptedAt) return;
+    const at = this.milestoneData.acceptedAt = this.now();
+    ((_b = (_a = this.milestoneData).stages) != null ? _b : _a.stages = []).push({ stage: "waiting", at });
   }
   /** Whether any record showed the model working. */
   sawModel() {
@@ -40205,7 +40207,10 @@ var AiTaskService = class {
             var _a2;
             accepted == null ? void 0 : accepted();
             if (!live()) return;
-            (_a2 = extra.acceptedAt) != null ? _a2 : extra.acceptedAt = iso();
+            if (!extra.acceptedAt) {
+              extra.acceptedAt = iso();
+              ((_a2 = extra.stages) != null ? _a2 : extra.stages = []).push({ stage: "waiting", at: extra.acceptedAt });
+            }
             arm();
           },
           // Without stream events (json mode) the first model event cannot be seen, so the notice would be a false alarm.

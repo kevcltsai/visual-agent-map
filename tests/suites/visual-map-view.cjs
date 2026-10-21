@@ -276,10 +276,12 @@ integrationTest('Next Step reviews first expansion proposals in place and keeps 
   assert.ok(find(expandAdjust, item => item.text === 'Run quick research on each created subtopic (does not search the web)'));
   assert.ok(find(expandAdjust, item => item.text === 'Also search the web for subtopic research'));
   // R1: the hint never claims a web search while the web option is off, and describes it once the option is on.
-  const shallowHint = () => find(expandAdjust, item => /^Quick research: /.test(item.text ?? ''));
+  const shallowHint = () => find(expandAdjust, item => /^Subtopic research: /.test(item.text ?? ''));
   assert.match(shallowHint().text, /without searching the web/); assert.doesNotMatch(shallowHint().text, /web search\b(?! is)/i);
   expandChecks[1].checked = true; expandChecks[1].change();
   assert.match(shallowHint().text, /Quick: answer the core question first/); assert.doesNotMatch(shallowHint().text, /without searching the web/);
+  assert.doesNotMatch(shallowHint().text, /Quick research: Quick/, 'the depth label is not repeated');
+  assert.equal(load('i18n.ts').translate('zh-TW', 'ui.shallow_research_for_expanded_subtopics_0', load('i18n.ts').translate('zh-TW', 'ui.quick_aim_for_up_to_1_web_search_and_2_main_sources_answer_t')).match(/快速/g).length, 1, 'zh hint does not repeat 快速');
   expandChecks[1].checked = false; expandChecks[1].change();
   assert.match(shallowHint().text, /without searching the web/);
   assert.equal(load('i18n.ts').translate('zh-TW', 'ui.shallow_research_local_description'), '依主題與你提供的來源回答，不搜尋網路。勾選下方選項才會搜尋。');

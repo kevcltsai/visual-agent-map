@@ -409,7 +409,11 @@ export class AiTaskService {
           onAccepted: (): void => {
             accepted?.();
             if (!live()) return;
-            extra.acceptedAt ??= iso();
+            if (!extra.acceptedAt) {
+              extra.acceptedAt = iso();
+              // The card shows "waiting for the model" from acceptance, so the stage list starts there (KPI T1).
+              (extra.stages ??= []).push({ stage: "waiting", at: extra.acceptedAt });
+            }
             arm();
           },
           // Without stream events (json mode) the first model event cannot be seen, so the notice would be a false alarm.

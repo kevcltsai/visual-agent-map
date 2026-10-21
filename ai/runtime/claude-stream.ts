@@ -143,7 +143,10 @@ export class ClaudeStreamObserver {
 
   /** Records the moment the prompt was written. */
   accepted(): void {
-    this.milestoneData.acceptedAt ??= this.now();
+    if (this.milestoneData.acceptedAt) return;
+    const at = (this.milestoneData.acceptedAt = this.now());
+    // The card shows "waiting for the model" from this moment, so the stage list starts here (KPI T1 = stages[0] - acceptedAt).
+    (this.milestoneData.stages ??= []).push({ stage: "waiting", at });
   }
 
   /** Whether any record showed the model working. */

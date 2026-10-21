@@ -35,8 +35,9 @@ In our own test vault with Claude Sonnet at low effort (small samples, a few run
 
 - Progress, preview and the pre-start were checked with Claude Code. Codex CLI shows stages and seconds but no query or preview, and its path was covered by automated tests only.
 - The pre-start helps only when the options in the dialog match the request; otherwise the request starts normally. A pre-started process for an expansion serves only the first subtopic, and it expires after 180 seconds.
-- Not checked live: narrow-width layout, keyboard use of the new Stop and Resend buttons, spoken announcements by a screen reader, synthesis of very long sources (more than one batch, which still extracts findings first), and Windows or Linux.
+- Not checked live: narrow-width layout, keyboard use of the new Stop and Resend buttons, spoken announcements by a screen reader, synthesis of very long sources (more than one batch, which still extracts findings first), the 20-second slow notice and Resend themselves (covered by automated tests only), and Windows or Linux.
 - Subtopic research without web search is shallower and has no fresh sources; tick the option when you need them.
+- Synthesis replaces the parent topic's earlier research summary and detail; source links from that earlier research are not kept (use Undo right after to restore). This predates 0.24.0.
 
 ## [0.23.0] - 2026-10-20
 

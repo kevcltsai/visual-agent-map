@@ -28375,6 +28375,7 @@ var VisualAgentMapView = class _VisualAgentMapView extends import_obsidian29.Ite
     __publicField(this, "aimProgressRenderTimer", null);
     __publicField(this, "aimFailedReports", /* @__PURE__ */ new Map());
     __publicField(this, "aimAnswerRequestIds", /* @__PURE__ */ new Map());
+    this.installUndoScope();
     this.aimRuns = new AimRunStore(plugin.repo);
     this.aimManual = new AimManualFlow(
       plugin.repo,
@@ -28431,7 +28432,6 @@ var VisualAgentMapView = class _VisualAgentMapView extends import_obsidian29.Ite
     this.mapOpenEpoch++;
     this.contentEl.addClass("vam-view");
     this.contentEl.tabIndex = 0;
-    this.installUndoScope();
     this.registerDomEvent((_j = this.contentEl.win) != null ? _j : window, "keydown", (event) => {
       if (event.code === "Space" && !(event.target instanceof HTMLElement && event.target.closest("input, textarea, select, [contenteditable=true]")))
         this.spaceHeld = true;

@@ -551,6 +551,8 @@ export class VisualAgentMapView extends ItemView {
     private plugin: VisualAgentMapPlugin
   ) {
     super(leaf);
+    // Once, here: Obsidian pushes view.scope when the leaf becomes active, which can be before onOpen() finishes.
+    this.installUndoScope();
     this.aimRuns = new AimRunStore(plugin.repo);
     this.aimManual = new AimManualFlow(
       plugin.repo,
@@ -610,7 +612,6 @@ export class VisualAgentMapView extends ItemView {
     this.mapOpenEpoch++;
     this.contentEl.addClass("vam-view");
     this.contentEl.tabIndex = 0;
-    this.installUndoScope();
     // Space-drag pans while selecting topics; typing a space in a field never arms it.
     this.registerDomEvent(this.contentEl.win ?? window, "keydown", event => {
       if (

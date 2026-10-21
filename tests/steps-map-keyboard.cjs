@@ -184,7 +184,6 @@ test('A4: the sample, an AIM map and selection mode ignore the new keys and the 
 
 test('A4: Mod+Z / Mod+Shift+Z live on the view scope, run travel once from any focus, and pass through in a text field', async () => {
   const h = await harness();
-  h.view.installUndoScope(); // onOpen() calls this (see the source check below)
   const scope = h.view.scope;
   assert.ok(scope && scope.keys.length, 'the view has its own scope');
   assert.equal(scope.parent, h.app.scope, 'chained to the app scope');
@@ -222,6 +221,7 @@ test('A4: the old contentEl Mod+Z branch is gone (no double undo with the scope)
   const fs = require('node:fs'), path = require('node:path');
   const source = fs.readFileSync(path.join(__dirname, '..', 'experiences/visual-map/view.ts'), 'utf8');
   assert.equal(/key\.toLowerCase\(\) === "z"/.test(source), false);
-  assert.match(source.slice(source.indexOf('async onOpen()'), source.indexOf('async onClose()')), /this\.installUndoScope\(\)/, 'onOpen installs the scope');
+  assert.equal(source.slice(source.indexOf('async onOpen()'), source.indexOf('private installUndoScope')).includes('installUndoScope'), false, 'onOpen does not replace the scope');
+  assert.match(source.slice(source.indexOf('constructor(\n    leaf: WorkspaceLeaf'), source.indexOf('async onOpen()')), /this\.installUndoScope\(\)/, 'the constructor installs the scope once');
   assert.equal((source.match(/this\.travel\(redo\)/g) ?? []).length, 1, 'one undo/redo entry point from the keyboard');
 });

@@ -21893,6 +21893,7 @@ function renderTopicTree(parent, options) {
     button.style.paddingLeft = `${8 + depth * 16}px`;
     button.dataset.id = id;
     button.title = text11;
+    button.setAttr("dir", "auto");
     button.disabled = !enabled;
     button.setAttr("aria-disabled", String(!enabled));
     if (enabled) button.addEventListener("click", () => options.onChoose(id));
@@ -33502,7 +33503,7 @@ ${request.requirements}` : preset.text,
     const toolbar = this.contentEl.createDiv("vam-toolbar");
     const switcher = toolbar.createEl("button", { cls: "vam-map-switcher" });
     switcher.setAttr("aria-label", t("ui.switch_mind_map"));
-    switcher.createSpan({ text: (_h = (_g = this.map) == null ? void 0 : _g.title) != null ? _h : "Visual Agent Map", cls: "vam-map-title" });
+    switcher.createSpan({ text: (_h = (_g = this.map) == null ? void 0 : _g.title) != null ? _h : "Visual Agent Map", cls: "vam-map-title", attr: { dir: "auto" } });
     (0, import_obsidian29.setIcon)(switcher.createSpan("vam-map-switcher-icon"), "chevrons-up-down");
     switcher.addEventListener("click", () => this.openMapSwitcher());
     if (this.builtIn) toolbar.createSpan({ cls: "vam-readonly-badge", text: t("ui.official_sample_read_only") });
@@ -33794,6 +33795,10 @@ ${request.requirements}` : preset.text,
     if (!this.builtIn && !this.map.aim) this.renderMultiResearchStatus(this.contentEl);
     if (!this.builtIn && !this.map.aim) this.renderRelevanceStatus(this.contentEl);
     if (!this.builtIn && !this.map.aim) this.renderBackgroundBars(this.contentEl);
+    if (!this.map.nodes.length && !this.builtIn) {
+      this.integrationMode = false;
+      this.multiSelected.clear();
+    }
     const tools = createDiv("vam-map-tools");
     if (!this.builtIn) {
       const aimMode = !!this.map.aim;
@@ -34196,6 +34201,7 @@ ${request.requirements}` : preset.text,
     }
     const title = card.createEl("h3", { text: (_G = note == null ? void 0 : note.title) != null ? _G : node.path, cls: "vam-card-title" });
     title.setAttr("title", (_H = note == null ? void 0 : note.title) != null ? _H : node.path);
+    title.setAttr("dir", "auto");
     if (note && !this.builtIn && !this.integrationMode && !((_I = this.map) == null ? void 0 : _I.aim))
       card.addEventListener("dblclick", (event) => {
         var _a2;
@@ -34915,7 +34921,7 @@ ${request.requirements}` : preset.text,
     else if (note) panel.createEl("p", { cls: "vam-inspector-topic", text: t("ui.topic_0", note.title) });
     if (note) {
       if (this.builtIn) {
-        panel.createEl("h3", { text: note.title });
+        panel.createEl("h3", { text: note.title, attr: { dir: "auto" } });
         panel.createEl("p", { text: note.summary, cls: "vam-sample-summary" });
         const detail = panel.createDiv("vam-sample-detail");
         void import_obsidian29.MarkdownRenderer.render(this.app, note.detail, detail, "", this);
@@ -35841,7 +35847,13 @@ ${request.requirements}` : preset.text,
       return (_a2 = this.notes.get(id)) == null ? void 0 : _a2.title;
     }).filter(Boolean);
     selection.createSpan({
-      text: this.multiSelected.size ? t("ui.selected_0_1_2", this.multiSelected.size, names2.slice(0, 2).join("\u3001"), names2.length > 2 ? "\u2026" : "") : t("ui.prompt_select_topics")
+      attr: { dir: "auto" },
+      text: this.multiSelected.size ? t(
+        "ui.selected_0_1_2",
+        this.multiSelected.size,
+        names2.slice(0, 2).join(t("ui.list_separator")),
+        names2.length > 2 ? "\u2026" : ""
+      ) : t("ui.prompt_select_topics")
     });
     selection.createSpan({ cls: "vam-hint vam-selection-hint", text: t("ui.drag_to_select_topics_hint") });
     this.button(
@@ -38062,6 +38074,7 @@ var response_schema_default = {
 // ui/outline-view.ts
 var import_obsidian31 = require("obsidian");
 var OUTLINE_VIEW_TYPE = "visual-agent-map-outline";
+var foldOutlineSearch = (text11) => text11.toLocaleLowerCase().replace(/\u0307/g, "");
 var OutlineView = class extends import_obsidian31.ItemView {
   constructor(leaf, openNote) {
     super(leaf);
@@ -38204,11 +38217,11 @@ var OutlineView = class extends import_obsidian31.ItemView {
     const tree = this.contentEl.createDiv("vam-outline-tree");
     const children = /* @__PURE__ */ new Map();
     for (const node of this.map.nodes) children.set(node.parentId, [...(_b = children.get(node.parentId)) != null ? _b : [], node]);
-    const query = this.query.trim().toLocaleLowerCase();
+    const query = foldOutlineSearch(this.query.trim());
     const matches = (node) => {
       var _a2, _b2;
       if (!query) return true;
-      if (((_a2 = this.titles.get(node.id)) != null ? _a2 : node.path).toLocaleLowerCase().includes(query)) return true;
+      if (foldOutlineSearch((_a2 = this.titles.get(node.id)) != null ? _a2 : node.path).includes(query)) return true;
       return ((_b2 = children.get(node.id)) != null ? _b2 : []).some(matches);
     };
     const append = (node, depth) => {
@@ -38234,6 +38247,7 @@ var OutlineView = class extends import_obsidian31.ItemView {
       const title = (_c2 = (_b2 = this.titles.get(node.id)) != null ? _b2 : node.path.split("/").pop()) != null ? _c2 : node.path;
       const button = row.createEl("button", { text: title, cls: "vam-outline-note" });
       button.title = title;
+      button.setAttr("dir", "auto");
       button.setAttr("data-path", node.path);
       if (node.path === this.activePath) {
         button.addClass("is-active");

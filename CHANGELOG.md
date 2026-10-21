@@ -18,6 +18,11 @@
 - After creating subtopics from an expansion, the view now shows the parent and all new subtopics instead of empty canvas.
 - After quick subtopic research finishes, the new subtopic cards you have not moved are re-spaced so grown cards no longer overlap their neighbours.
 - Undoing a topic you just created (the + button, a strengthened topic, or each subtopic of a batch) now also takes its note out of the Notes folder: it is parked in Unassigned like a removed topic, and Redo puts it back at the same place. No stray note is left behind.
+- The "+ Topic" button inside an empty map's hint now works (it ignored clicks).
+- Hebrew, Arabic and other right-to-left text now follows its own direction on topic cards, the map title, the inspector title, the outline and the parent picker; the selection bar joins names with the language's own separator instead of always using "、".
+- Outline search for "istanbul" now finds "İstanbul".
+- Undoing until a map is empty no longer leaves the topic-selection bar open (Synthesize highlighted) on an empty map.
+- A very long word in the hover preview title wraps instead of being clipped at the right edge.
 
 ## [0.24.0] - 2026-10-22
 

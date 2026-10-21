@@ -4,6 +4,8 @@ import type { MapDocument, MapNode } from "../map-model";
 import type { CoffeeNavigationSnapshot } from "../experiences/coffee-tables/segments";
 
 export const OUTLINE_VIEW_TYPE = "visual-agent-map-outline";
+/** Lower-case for outline search; U+0307 is dropped so Turkish "İ" (which lowercases to "i" + a combining dot) finds "i". */
+export const foldOutlineSearch = (text: string): string => text.toLocaleLowerCase().replace(/\u0307/g, "");
 export class OutlineView extends ItemView {
   private map: MapDocument | null = null;
   private titles = new Map<string, string>();
@@ -159,10 +161,10 @@ export class OutlineView extends ItemView {
     const tree = this.contentEl.createDiv("vam-outline-tree");
     const children = new Map<string | null, MapNode[]>();
     for (const node of this.map.nodes) children.set(node.parentId, [...(children.get(node.parentId) ?? []), node]);
-    const query = this.query.trim().toLocaleLowerCase();
+    const query = foldOutlineSearch(this.query.trim());
     const matches = (node: MapNode): boolean => {
       if (!query) return true;
-      if ((this.titles.get(node.id) ?? node.path).toLocaleLowerCase().includes(query)) return true;
+      if (foldOutlineSearch(this.titles.get(node.id) ?? node.path).includes(query)) return true;
       return (children.get(node.id) ?? []).some(matches);
     };
     const append = (node: MapNode, depth: number): void => {
@@ -187,6 +189,7 @@ export class OutlineView extends ItemView {
       const title = this.titles.get(node.id) ?? node.path.split("/").pop() ?? node.path;
       const button = row.createEl("button", { text: title, cls: "vam-outline-note" });
       button.title = title;
+      button.setAttr("dir", "auto");
       button.setAttr("data-path", node.path);
       if (node.path === this.activePath) {
         button.addClass("is-active");

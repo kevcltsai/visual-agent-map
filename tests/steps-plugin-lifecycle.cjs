@@ -99,3 +99,28 @@ test('Reconnect existing workspace (offerWorkspaceReconnect) rebuilds Coffee Tab
   assert.notEqual(plugin.coffeeManager, oldManager);
   assert.deepEqual(rebound, ['New Workspace/Coffee Tables']);
 });
+
+test('S6 plugin: prewarmClaude pre-starts a Claude command (model id, effort, response schema, web tools), a Codex model releases it, and unload resets the runtime service (which disposes the pool)', () => {
+  const plugin = newPlugin();
+  const calls = [];
+  plugin.pluginDirectory = () => '/plugin';
+  plugin.claudeCli = directory => ({ prewarm: (...args) => { calls.push([directory, args[0], args[1], args[2] && args[2].type, args[3]]); return true; } });
+  plugin.settings.cliReasoning = 'auto';
+  plugin.prewarmClaude('claude:sonnet', undefined);
+  plugin.prewarmClaude('claude:opus', 'high');
+  assert.deepEqual(calls, [['/plugin', 'sonnet', 'low', 'object', true], ['/plugin', 'opus', 'high', 'object', true]], 'auto resolves to low like a short-source task');
+  let released = 0;
+  plugin.aiRuntime = { releaseWarm: () => { released++; }, reset: () => { released += 10; } };
+  plugin.prewarmClaude('gpt-test');
+  assert.equal(released, 1, 'a Codex model has nothing to pre-start and drops a waiting process');
+  plugin.releaseWarmClaude();
+  assert.equal(released, 2);
+  plugin.pluginDirectory = () => { throw new Error('no folder'); };
+  assert.doesNotThrow(() => plugin.prewarmClaude('claude:sonnet'), 'pre-starting never fails the dialog');
+  plugin.repo = { dispose() {} };
+  plugin.expansionCoordinator = { stopAll() {} };
+  plugin.modelDiscovery = { invalidate() {} };
+  released = 0;
+  plugin.onunload();
+  assert.equal(released, 10, 'onunload resets the runtime service, which disposes the pool');
+});

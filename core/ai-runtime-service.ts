@@ -1,7 +1,8 @@
 import { existsSync, readdirSync } from "node:fs";
 import { delimiter, dirname, isAbsolute, join } from "node:path";
 import { CodexAppServerRuntime } from "../ai/runtime/codex-app-server";
-import { ClaudeCodeCliRuntime } from "../ai/runtime/claude-code-cli";
+import { ClaudeCodeCliRuntime, type ClaudeProcess, type ClaudeSpawn } from "../ai/runtime/claude-code-cli";
+import { ClaudeWarmPool, type WarmClock } from "../ai/runtime/claude-warm-pool";
 import type { LogLevel } from "../log-manager";
 
 export type ProcessEnvironment = Record<string, string | undefined>;
@@ -35,6 +36,10 @@ export interface AiRuntimeServiceOptions {
   claudePath: () => string;
   clientVersion: () => string;
   onLog: (level: LogLevel, message: string) => void;
+  /** Tests inject a fake clock for the warm pool's idle timeout. */
+  warmClock?: WarmClock;
+  /** Tests replace the process starter. */
+  claudeSpawn?: ClaudeSpawn;
 }
 
 export class AiRuntimeService {
@@ -43,9 +48,25 @@ export class AiRuntimeService {
   /** One Claude runtime per executable and folder, so what it learns about the CLI (stream options) is remembered. */
   private claudeRuntime: { key: string; runtime: ClaudeCodeCliRuntime } | null = null;
 
-  constructor(private readonly options: AiRuntimeServiceOptions) {}
+  /** One idle Claude process at most, started when the research dialog opens (see ClaudeWarmPool). */
+  private readonly warmPool: ClaudeWarmPool<ClaudeProcess>;
+
+  constructor(private readonly options: AiRuntimeServiceOptions) {
+    this.warmPool = new ClaudeWarmPool({ clock: options.warmClock });
+  }
+
+  /** Kills the pre-started Claude process, if any (unused dialog, Stop). */
+  releaseWarm(): void {
+    this.warmPool.release();
+  }
+
+  /** True while a pre-started Claude process is waiting. */
+  hasWarm(): boolean {
+    return this.warmPool.size > 0;
+  }
 
   reset(): void {
+    this.warmPool.release();
     this.codexRuntime?.stop();
     this.localCodexRuntime?.stop();
     this.codexRuntime = null;
@@ -83,6 +104,8 @@ export class AiRuntimeService {
       executable,
       cwd: pluginDirectory,
       env: this.cliEnvironment(executable),
+      warmPool: this.warmPool,
+      ...(this.options.claudeSpawn ? { spawn: this.options.claudeSpawn } : {}),
       onLog: (level, message) => this.options.onLog(level, message)
     });
     this.claudeRuntime = { key, runtime };

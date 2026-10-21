@@ -514,3 +514,29 @@ integrationTest('S4: Codex events map to waiting/searching/reading/writing for t
   assert.deepEqual(plain(events), ['attempt', ['searching', null], ['reading', null], ['writing', null]]);
   runtime.stop();
 });
+
+integrationTest('L2: turn/started is not the first model event; the first item or delta is', async () => {
+  const { EventEmitter } = require('node:events');
+  const child = new EventEmitter(); child.stdout = new EventEmitter(); child.stderr = new EventEmitter(); child.kill = () => {};
+  const emit = message => child.stdout.emit('data', Buffer.from(`${JSON.stringify(message)}\n`));
+  const reply = message => process.nextTick(() => emit(message));
+  child.stdin = { write: line => {
+    const message = JSON.parse(line.trim());
+    if (message.method === 'initialize') reply({ id: message.id, result: {} });
+    else if (message.method === 'thread/start') reply({ id: message.id, result: { thread: { id: 'thread-1' } } });
+    else if (message.method === 'turn/start') { reply({ id: message.id, result: { turn: { id: 'turn-1' } } }); reply({ method: 'turn/started', params: { threadId: 'thread-1', turn: { id: 'turn-1' } } }); }
+    else if (message.method === 'thread/unsubscribe') reply({ id: message.id, result: { status: 'unsubscribed' } });
+  } };
+  const { CodexAppServerRuntime } = load('ai/runtime/codex-app-server.ts', { 'node:child_process': { spawn: () => child } });
+  const runtime = new CodexAppServerRuntime({ executable: 'codex', cwd: '/plugin', env: {}, clientVersion: 'test' });
+  const activity = [];
+  const run = runtime.runTask('p', 'gpt-6-luna', 'low', { type: 'object' }, { onActivity: item => activity.push(item) });
+  for (let i = 0; i < 20; i++) await new Promise(resolve => setImmediate(resolve));
+  assert.deepEqual(activity, [], 'turn/started alone reports nothing, so the slow notice can still appear');
+  emit({ method: 'item/agentMessage/delta', params: { threadId: 'thread-1', itemId: 'a1', delta: '{' } });
+  assert.deepEqual(activity, ['started', 'writing'], 'the first delta is the first model event');
+  emit({ method: 'item/completed', params: { threadId: 'thread-1', turnId: 'turn-1', item: { type: 'agentMessage', id: 'a1', text: '{"summary":"S","detail":"D","suggestions":[],"visualReferences":[]}' } } });
+  emit({ method: 'turn/completed', params: { threadId: 'thread-1', turn: { status: 'completed' } } });
+  assert.match(await run, /"summary":"S"/);
+  runtime.stop();
+});

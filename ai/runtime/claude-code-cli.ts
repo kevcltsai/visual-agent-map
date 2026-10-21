@@ -5,8 +5,9 @@ import type { PartialFields } from "../partial-structured";
 import type { ResearchStageName } from "../research-observer";
 import type { WebSearchEvent } from "../types";
 import { ClaudeStreamObserver, ClaudeTranscriptFacts } from "./claude-stream";
+import type { ClaudeWarmPool } from "./claude-warm-pool";
 
-interface ClaudeProcess {
+export interface ClaudeProcess {
   stdin: {
     write(data: string, callback?: (error?: Error | null) => void): boolean;
     end(data?: string, callback?: (error?: Error | null) => void): void;
@@ -31,6 +32,8 @@ export interface ClaudeCodeCliOptions {
   spawn?: ClaudeSpawn;
   timeoutMs?: number;
   timeoutMessage?: string;
+  /** Shared idle-process pool (see {@link ClaudeCodeCliRuntime.prewarm}); without it every call starts its own process. */
+  warmPool?: ClaudeWarmPool<ClaudeProcess>;
 }
 export interface ClaudeTaskControls {
   signal?: AbortSignal;
@@ -106,6 +109,18 @@ export function claudeTaskArgs(model: string, effort: string, schema: unknown, w
     "--tools",
     webSearch ? "WebSearch,WebFetch" : ""
   ];
+}
+
+/**
+ * The command of an observed research call whose prompt arrives as a stream-json user message, so the process can be
+ * started before the prompt exists. The pre-start and the call build it with this one function, so equal inputs give
+ * an equal command.
+ */
+export function claudeWarmArgs(model: string, effort: string, schema: unknown, webSearch: boolean): string[] {
+  const args = claudeTaskArgs(model, effort, schema, webSearch);
+  args[args.indexOf("json")] = "stream-json";
+  args.push("--include-partial-messages", "--input-format", "stream-json");
+  return args;
 }
 
 export function claudeStructuredOutput(stdout: string, plainText = false): string {
@@ -228,6 +243,28 @@ export class ClaudeCodeCliRuntime {
     this.spawn = options.spawn ?? nodeSpawn;
   }
 
+  private warmKey(args: string[]): string {
+    return [this.options.executable, this.options.cwd, ...args].join("\0");
+  }
+
+  /**
+   * Starts an idle process for an observed research call with these settings (a dialog just opened). It makes no model
+   * call: the CLI waits for a user message on stdin. `runTask` takes it only when its own command is identical.
+   */
+  prewarm(model: string, effort: string, outputSchema: unknown, webSearch: boolean): boolean {
+    const pool = this.options.warmPool;
+    if (!pool || !outputSchema || this.streamUnsupported) return false;
+    const args = claudeWarmArgs(model, effort, outputSchema, webSearch);
+    return pool.prewarm(this.warmKey(args), () =>
+      this.spawn(this.options.executable, args, {
+        cwd: this.options.cwd,
+        env: this.options.env,
+        stdio: ["pipe", "pipe", "pipe"],
+        windowsHide: true
+      })
+    );
+  }
+
   runTask(
     prompt: string,
     model: string,
@@ -246,9 +283,13 @@ export class ClaudeCodeCliRuntime {
     controls: ClaudeTaskControls,
     fallback: boolean
   ): Promise<string> {
-    if (controls.signal?.aborted) throw abortError();
+    if (controls.signal?.aborted) {
+      // A stopped run that never got to use its pre-started process must not leave it waiting.
+      this.options.warmPool?.release();
+      throw abortError();
+    }
     const webSearch = controls.webSearch ?? (controls.searchBudget ?? 0) > 0;
-    const args = claudeTaskArgs(model, effort, outputSchema, webSearch);
+    let args = claudeTaskArgs(model, effort, outputSchema, webSearch);
     // An image travels as a content block, which only the stream-json input format can carry.
     const image = controls.imageDataUrl ? claudeImageSource(controls.imageDataUrl) : null;
     const observed = !!outputSchema && controls.stream === true && !image && !fallback && !this.streamUnsupported;
@@ -263,6 +304,12 @@ export class ClaudeCodeCliRuntime {
       args[args.indexOf("json")] = "stream-json";
       args.push("--include-partial-messages");
     }
+    // A process pre-started for exactly this command only needs the prompt; any other pre-started process is killed here.
+    const pool = this.options.warmPool;
+    const warmArgs =
+      pool && observed && !controls.onSteer ? claudeWarmArgs(model, effort, outputSchema, webSearch) : null;
+    const warm = warmArgs ? pool!.take(this.warmKey(warmArgs)) : null;
+    if (warmArgs && warm) args = warmArgs;
     if (outputSchema && controls.stream === true) {
       try {
         controls.onStreamMode?.(observed ? "stream-json" : fallback ? "json-fallback" : "json");
@@ -287,15 +334,25 @@ export class ClaudeCodeCliRuntime {
       )
     );
 
+    if (warmArgs) {
+      try {
+        controls.onMilestones?.({ prespawned: !!warm });
+      } catch {
+        /* Diagnostics are best effort. */
+      }
+    }
+
     return new Promise<string>((resolve, reject) => {
       let child: ClaudeProcess;
       try {
-        child = this.spawn(this.options.executable, args, {
-          cwd: this.options.cwd,
-          env: this.options.env,
-          stdio: ["pipe", "pipe", "pipe"],
-          windowsHide: true
-        });
+        child =
+          warm ??
+          this.spawn(this.options.executable, args, {
+            cwd: this.options.cwd,
+            env: this.options.env,
+            stdio: ["pipe", "pipe", "pipe"],
+            windowsHide: true
+          });
       } catch (error) {
         reject(error instanceof Error ? error : new Error(String(error)));
         return;
@@ -304,7 +361,7 @@ export class ClaudeCodeCliRuntime {
         stderr = "",
         settled = false,
         accepted = false,
-        inputOpen = Boolean(controls.onSteer || image);
+        inputOpen = Boolean(controls.onSteer || image || warm);
       let streamBuffer = "",
         streamText = "",
         currentText = "",
@@ -518,7 +575,7 @@ export class ClaudeCodeCliRuntime {
         /* Surfaced through the process events. */
       });
       try {
-        if (controls.onSteer || image) {
+        if (controls.onSteer || image || warm) {
           const sendInput = (text: string, accepted?: () => void, withImage = false): void => {
             if (!inputOpen || settled) throw new Error("This Coffee Tables response has already ended.");
             const content = [...(withImage && image ? [{ type: "image", source: image }] : []), { type: "text", text }];

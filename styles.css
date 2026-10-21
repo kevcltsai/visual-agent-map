@@ -131,6 +131,8 @@
 .vam-card-error { margin: 6px 0 0; color: var(--color-red); font-size: var(--font-ui-smaller); line-height: 1.45; overflow-wrap: anywhere; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow: hidden; }
 /* Research frame: open questions read as an unfinished frontier, concluded topics as settled ground. */
 .vam-node:not([data-aim-kind])[data-status="idea"] { border-style: dashed; border-color: var(--background-modifier-border-hover); box-shadow: none; }
+.vam-card-summary.is-preview { font-style: italic; color: var(--text-faint); }
+.vam-card-preview-label { font-style: normal; font-weight: 600; margin-right: 6px; }
 .vam-node:not([data-aim-kind])[data-status="idea"] .vam-card-summary { color: var(--text-faint); }
 .vam-node:not([data-aim-kind])[data-status="running"] { border-color: var(--interactive-accent); }
 .vam-node:not([data-aim-kind])[data-status="queued"] { --vam-card-bg: color-mix(in srgb, var(--interactive-accent) 7%, var(--background-primary)); border-style: dashed; border-color: color-mix(in srgb, var(--interactive-accent) 60%, transparent); }
@@ -1152,3 +1154,5 @@ button.vam-template-section-header:hover { background: var(--background-modifier
 .vam-hover-research-preview { margin: 0 0 10px; padding: 8px 10px; border: 1px dashed var(--background-modifier-border); border-radius: 8px; }
 .vam-hover-research-preview[hidden], .vam-hover-research-detail[hidden] { display: none; }
 .vam-hover-research-summary, .vam-hover-research-detail { margin-top: 4px; white-space: pre-wrap; overflow-wrap: anywhere; font-size: var(--vam-hover-body-size, 13px); line-height: var(--vam-hover-line-height, 1.45); color: var(--text-muted); }
+
+.vam-sr-only { position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0; }

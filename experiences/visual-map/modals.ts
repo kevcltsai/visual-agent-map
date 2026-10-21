@@ -380,6 +380,8 @@ export class NextStepModal extends Modal {
    */
   private detach(controller: AbortController): void {
     this.detached = true;
+    // Stop before the provider took the pre-started process leaves nothing waiting.
+    controller.signal.addEventListener("abort", () => this.plugin.releaseWarmClaude?.(), { once: true });
     this.backgroundBegan = true;
     this.background?.begin(controller);
     this.close();
@@ -393,8 +395,18 @@ export class NextStepModal extends Modal {
   private dead(controller: AbortController): boolean {
     return controller.signal.aborted || (this.closed && !this.detached);
   }
+  /** Pre-starts the Claude CLI for the research step (no model call); a run that does not use it kills it. */
+  private prewarmAi(): void {
+    if (this.selectionFlow || this.closed) return;
+    this.plugin.prewarmClaude?.(
+      this.modelSettings?.model ?? this.plugin.settings.cliModel,
+      this.modelSettings?.reasoning
+    );
+  }
   onClose(): void {
     this.closed = true;
+    // Closed without starting AI: the pre-started process is no longer needed. A started run took (or will take) it.
+    if (!this.detached) this.plugin.releaseWarmClaude?.();
     // A run that the provider already accepted, or that hid this dialog, keeps going in the background; one still
     // starting is stopped.
     if (!this.detached) this.taskController?.abort();
@@ -1391,6 +1403,8 @@ export class NextStepModal extends Modal {
         adjustFor[name].hidden = name !== mode;
       }
       sharedSources?.forMode(mode);
+      if (mode === "research") this.prewarmAi();
+      else if (!this.detached) this.plugin.releaseWarmClaude?.();
       confirm.hidden = mode !== "research";
       expandButton.hidden = mode !== "expand";
       expandFooterText.hidden = mode !== "expand";
@@ -1473,6 +1487,10 @@ export class NextStepModal extends Modal {
     };
     // Select, checkbox and radio changes bubble up, so one listener keeps the summary current.
     this.contentEl.addEventListener("change", refreshSummary);
+    // A changed model or reasoning level changes the command: pre-start again (the old process is killed).
+    this.contentEl.addEventListener("change", () => {
+      if (currentMode === "research") this.prewarmAi();
+    });
     if (pendingDirections) showDirections(pendingDirections.directions);
     else checkName();
     show(initialMode);

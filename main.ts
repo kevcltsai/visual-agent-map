@@ -46,6 +46,7 @@ import {
 import { normalizeTemplates } from "./ai/detail-templates";
 import { normalizePresets } from "./ai/prompt-presets";
 import { effectiveReasoningLevel } from "./ai/task-policy";
+import responseSchema from "./response-schema.json";
 import type { AiResult, Suggestion, TaskContext } from "./ai/types";
 import { clampPreviewScale, legacyPreviewScale } from "./ui/preview-utils";
 import { BUILTIN_SAMPLE_ID, builtInSample } from "./builtin-sample";
@@ -1605,6 +1606,32 @@ export default class VisualAgentMapPlugin extends Plugin {
       onWebSearchEvent,
       observer
     );
+  }
+  /**
+   * Starts an idle Claude CLI while the research dialog is open, so confirming only has to write the prompt. No model
+   * call happens until then; a run with different settings kills it and starts cold.
+   */
+  prewarmClaude(model: string, reasoning?: unknown): void {
+    if (providerForModel(model) !== "claude") {
+      this.aiRuntime.releaseWarm();
+      return;
+    }
+    try {
+      const selected = normalizeReasoningLevel(reasoning ?? this.settings.cliReasoning);
+      // Same rule as a short-source task (effectiveReasoningLevel); a long-source run resolves differently and starts cold.
+      this.claudeCli(this.pluginDirectory()).prewarm(
+        providerModelId(model),
+        selected === "auto" ? "low" : selected,
+        responseSchema,
+        true
+      );
+    } catch {
+      /* Pre-starting is an optimisation: the run starts the process itself. */
+    }
+  }
+  /** Kills the pre-started Claude process (dialog closed unused, run stopped). */
+  releaseWarmClaude(): void {
+    this.aiRuntime.releaseWarm();
   }
   /** Aborts the background chart step of one note (a new run on that note replaces it), or of every note. */
   abortChartJobs(path?: string): void {

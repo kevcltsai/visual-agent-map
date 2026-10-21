@@ -1945,6 +1945,127 @@ test('S4: card helpers show the stage text, tick the seconds as text only and th
   assert.equal(block.hidden, true, 'no preview, no block');
 });
 
+function fakeCardDom() {
+  class El {
+    constructor(cls) { this.cls = new Set(cls ? cls.split(' ') : []); this.kids = []; this.text = ''; this.parent = null; this.renders = 0; }
+    addClass(c) { this.cls.add(c); } removeClass(c) { this.cls.delete(c); } hasClass(c) { return this.cls.has(c); }
+    empty() { this.kids = []; this.text = ''; }
+    setText(v) { this.kids = []; this.text = v; }
+    createEl(_tag, o = {}) { const e = new El(o.cls); e.text = o.text ?? ''; e.parent = this; this.kids.push(e); return e; }
+    createSpan(o = {}) { return this.createEl('span', o); }
+    after(e) { this.parent.kids = this.parent.kids.filter(k => k !== e); this.parent.kids.splice(this.parent.kids.indexOf(this) + 1, 0, e); e.parent = this.parent; }
+    remove() { this.parent.kids = this.parent.kids.filter(k => k !== this); }
+    querySelector(sel) { const c = sel.slice(1); for (const k of this.kids) { if (k.cls.has(c)) return k; const d = k.querySelector(sel); if (d) return d; } return null; }
+    get all() { return this.kids.length ? this.kids.map(k => k.all).join('|') : this.text; }
+  }
+  return El;
+}
+test('S5: the card itself shows the unsaved summary preview as plain text, never renders, and returns to the stored summary', () => {
+  const { VisualAgentMapView } = load('main.ts', { obsidian });
+  const { ResearchProgressStore } = load('experiences/visual-map/research-progress.ts');
+  const El = fakeCardDom();
+  const view = new VisualAgentMapView({ app: {} }, { settings: { ...DEFAULT_SETTINGS, language: 'en' } });
+  const store = new ResearchProgressStore();
+  view.plugin = { researchProgress: store, settings: { ...DEFAULT_SETTINGS, language: 'en' } };
+  const card = new El('vam-node'); const title = card.createEl('h3', { cls: 'vam-card-title', text: 'T' });
+  const stored = card.createEl('p', { cls: 'vam-card-summary', text: 'Stored summary' });
+  view.map = { nodes: [{ id: 'n1', path: 'a.md' }] }; view.cardEls = new Map([['n1', card]]); view.notes = new Map([['n1', { summary: 'Stored summary' }]]);
+  let renders = 0; view.render = () => { renders++; }; view.renderPreservingFocus = () => { renders++; };
+  store.begin('a.md', 'x1', 1);
+  store.preview('a.md', 'x1', { summary: '**raw** streaming' });
+  view.paintCardPreview('a.md');
+  const shown = card.querySelector('.vam-card-summary');
+  assert.equal(shown, stored, 'same element is reused: text only, no re-render');
+  assert.ok(shown.hasClass('is-preview'));
+  assert.equal(shown.querySelector('.vam-card-preview-label').text, 'Preview (not saved yet)');
+  assert.equal(shown.querySelector('.vam-card-preview-text').text, '**raw** streaming');
+  assert.equal(shown.querySelector('.vam-card-preview-text').text.includes('Stored'), false);
+  // a longer preview only changes the text
+  store.preview('a.md', 'x1', { summary: '**raw** streaming more' }); view.paintCardPreview('a.md');
+  assert.equal(shown.querySelector('.vam-card-preview-text').text, '**raw** streaming more');
+  assert.equal(renders, 0, 'no render() for preview text');
+  // retraction / failure: preview gone, the stored summary is back
+  store.preview('a.md', 'x1', {}); view.paintCardPreview('a.md');
+  assert.equal(shown.hasClass('is-preview'), false); assert.equal(shown.text, 'Stored summary');
+  // a card without a stored summary (placeholder) gets one only while previewing
+  view.notes = new Map([['n1', { summary: 'No conclusion yet' }]]);
+  const bare = new El('vam-node'); bare.createEl('h3', { cls: 'vam-card-title', text: 'T' }); view.cardEls = new Map([['n1', bare]]);
+  store.preview('a.md', 'x1', { summary: 'Live' }); view.paintCardPreview('a.md');
+  assert.equal(bare.querySelector('.vam-card-preview-text').text, 'Live');
+  store.end('a.md'); view.paintCardPreview('a.md');
+  assert.equal(bare.querySelector('.vam-card-summary'), null, 'Stop or failure removes the preview and leaves no stored summary to show');
+  assert.equal(renders, 0);
+});
+test('S5: the card preview is not a live region and the throttle keeps updates to one per 200 ms', () => {
+  const { VisualAgentMapView } = load('main.ts', { obsidian });
+  const { ResearchProgressStore } = load('experiences/visual-map/research-progress.ts');
+  const El = fakeCardDom();
+  const view = new VisualAgentMapView({ app: {} }, { settings: { ...DEFAULT_SETTINGS, language: 'en' } });
+  let now = 0; const timers = [];
+  const store = new ResearchProgressStore({ now: () => now, setTimeout: (f, ms) => { timers.push({ f, ms }); return timers.length; }, clearTimeout: () => {} });
+  view.plugin = { researchProgress: store, settings: { ...DEFAULT_SETTINGS, language: 'en' } };
+  const card = new El('vam-node'); card.createEl('h3', { cls: 'vam-card-title', text: 'T' }); card.createEl('p', { cls: 'vam-card-summary', text: 'S' });
+  view.map = { nodes: [{ id: 'n1', path: 'a.md' }] }; view.cardEls = new Map([['n1', card]]); view.notes = new Map([['n1', { summary: 'S' }]]);
+  let notified = 0; store.subscribe(() => notified++);
+  store.begin('a.md', 'x1', 0); notified = 0;
+  for (let i = 0; i < 20; i++) { now += 10; store.preview('a.md', 'x1', { summary: 'word '.repeat(i + 1) }); }
+  assert.equal(notified, 0, 'twenty deltas inside the 200 ms window are held back');
+  assert.equal(timers.length, 1, 'one pending timer, not one per delta');
+  assert.equal(timers[0].ms <= 200, true);
+  now = 200; timers[0].f();
+  assert.equal(notified, 1, 'one notification carries the latest text');
+  assert.equal(store.get('a.md').preview.summary, 'word '.repeat(20));
+  view.paintCardPreview('a.md');
+  const walk = e => [e, ...e.kids.flatMap(walk)];
+  assert.equal(walk(card).some(e => e.live || e.role), false, 'the preview adds no aria-live or role attributes');
+});
+
+integrationTest('L4: startShallowResearch wires the chart decision: a local shallow child gets no chart job, a web-enabled one does', async () => {
+  for (const [shallowWebSearch, expected] of [[false, false], [true, true]]) {
+    const h = await templateHarness({ language: 'en', reply: () => ({ summary: 'Sum', detail: 'Body paragraph.', visualReferences: [], suggestions: [] }) });
+    const child = await h.repo.createNote('Child', 'model-a', h.doc, h.mapPath, 'workspace', h.topic.id);
+    await h.repo.updateNote(child.path, { prompt: 'Research the child' });
+    h.doc.nodes.push(child);
+    const dialog = { researchMode: 'research', researchDepth: 'fast', visualMode: 'auto', referenceGroups: [], shallowResearch: true, outputLanguage: 'en', shallowWebSearch };
+    await h.view.startShallowResearch(h.topic, [child], h.view.shallowChildOptions(dialog));
+    await until(() => h.plugin.expansionBatches.get(h.topic.path).status !== 'running');
+    assert.equal(h.contexts.at(-1).researchMode, shallowWebSearch ? 'research' : 'local');
+    assert.equal(h.contexts.at(-1).addCharts === true, expected, `web search ${shallowWebSearch}`);
+    // The plugin starts a chart step only for a context that asked for charts (chartEligible), so the job's context decides.
+    assert.ok(h.chartJobs.length >= 1 && h.chartJobs.every(job => (job.context.addCharts === true) === expected), `chart request carries addCharts=${expected}`);
+    const { AiTaskService } = load('core/ai-task-service.ts');
+    const service = new AiTaskService({ pluginDirectory: () => '', language: () => 'en', defaultReasoning: () => 'low', exchangeLoggingEnabled: () => false, exchanges: () => null, codexRuntime: () => null, claudeRuntime: () => null });
+    assert.equal(service.chartEligible(h.contexts.at(-1)), expected, 'chartEligible follows the context');
+  }
+});
+test('R2 M2: one persistent announcer speaks a stage only when it changes; the streaming preview and card renders never touch it', () => {
+  const { VisualAgentMapView } = load('main.ts', { obsidian });
+  const { ResearchProgressStore } = load('experiences/visual-map/research-progress.ts');
+  const view = new VisualAgentMapView({ app: {} }, { settings: { ...DEFAULT_SETTINGS, language: 'en' } });
+  const store = new ResearchProgressStore();
+  view.plugin = { researchProgress: store, settings: { ...DEFAULT_SETTINGS, language: 'en' } };
+  view.map = { nodes: [{ id: 'n1', path: 'a.md' }] }; view.notes = new Map([['n1', { title: 'Topic A', summary: 'S' }]]); view.cardEls = new Map();
+  const spoken = []; const announcer = { setText: text => spoken.push(text) };
+  view.announcer = announcer; view.announcedStages = new Map();
+  view.closed = false; view.stageEl = {}; view.paintHoverResearch = () => {}; view.scheduleResearchRender = () => {};
+  store.begin('a.md', 'x', 1);
+  view.onResearchProgress('a.md'); view.onResearchProgress('a.md');
+  assert.deepEqual(spoken, ['Topic A: Waiting for the model'], 'repeated notifications of the same stage speak once');
+  for (let i = 1; i <= 10; i++) { store.preview('a.md', 'x', { summary: 'word '.repeat(i) }); view.onResearchProgress('a.md'); }
+  assert.equal(spoken.length, 1, 'the streaming preview is never announced');
+  store.stage('a.md', 'x', 'searching', 2, 'synthetic query'); view.onResearchProgress('a.md');
+  store.stage('a.md', 'x', 'searching', 3, 'another query'); view.onResearchProgress('a.md');
+  assert.deepEqual(spoken.slice(1), ['Topic A: Searching: synthetic query'], 'a new query inside the same stage is not another announcement');
+  store.markSlow('a.md', 'x', true, () => {}); view.onResearchProgress('a.md');
+  assert.equal(spoken.at(-1), 'Topic A: Responding slowly, still waiting');
+  store.end('a.md'); view.onResearchProgress('a.md');
+  assert.equal(view.announcedStages.size, 0); assert.equal(view.announcer, announcer, 'the same node is kept');
+  // The node lives outside contentEl, which render() empties, and the card chip is not a live region.
+  const source = require('node:fs').readFileSync(require('node:path').join(__dirname, '..', '..', 'experiences/visual-map/view.ts'), 'utf8');
+  assert.match(source, /this\.announcer =\s*\(this\.containerEl as HTMLElement \| undefined\)\?\.createDiv/);
+  const chip = source.slice(source.indexOf('const stageEl = chip.createSpan'), source.indexOf('const elapsedEl'));
+  assert.doesNotMatch(chip, /aria-live|"role"/);
+});
 integrationTest('R1: local shallow child research gets no chart job; web shallow research and ordinary runs keep theirs', async () => {
   for (const [researchMode, expected] of [['local', 0], ['research', 1]]) {
     const h = await templateHarness({ language: 'en', reply: () => ({ summary: 'Sum', detail: 'Body paragraph.', visualReferences: [], suggestions: [] }) });

@@ -469,6 +469,9 @@ export class VisualAgentMapView extends ItemView {
   private researchElapsed = new Map<HTMLElement, number>();
   private researchTick: number | null = null;
   private researchRenderTimer: number | null = null;
+  /** Persistent, visually hidden live region for research stage changes; outside contentEl so a render never rebuilds it. */
+  private announcer: HTMLElement | null = null;
+  private announcedStages = new Map<string, string>();
   private integrationMode = false;
   private dragging = false;
   /** Ends the drag in progress (listeners, pending frame, flag); set only while a card is being dragged. */
@@ -574,6 +577,13 @@ export class VisualAgentMapView extends ItemView {
   }
   async onOpen(): Promise<void> {
     this.closed = false;
+    this.announcer?.remove();
+    // Outside contentEl, which every render empties (test doubles without a container simply have no announcer).
+    this.announcer = (this.containerEl as HTMLElement | undefined)?.createDiv({ cls: "vam-sr-only" }) ?? null;
+    this.announcer?.setAttr("role", "status");
+    this.announcer?.setAttr("aria-live", "polite");
+    this.announcer?.setAttr("aria-atomic", "true");
+    this.announcedStages.clear();
     this.unsubscribeResearch?.();
     this.unsubscribeResearch = this.plugin.researchProgress?.subscribe(path => this.onResearchProgress(path)) ?? null;
     const epoch = ++this.aimViewEpoch;
@@ -647,6 +657,9 @@ export class VisualAgentMapView extends ItemView {
   }
   async onClose(): Promise<void> {
     this.closed = true;
+    this.announcer?.remove();
+    this.announcer = null;
+    this.announcedStages.clear();
     this.unsubscribeResearch?.();
     this.unsubscribeResearch = null;
     if (this.researchTick !== null) window.clearInterval(this.researchTick);
@@ -3364,6 +3377,26 @@ export class VisualAgentMapView extends ItemView {
       y += 120;
     }
   }
+  /** Speaks a stage (or the slow notice) once, when it changes. The streaming preview never goes through here. */
+  private announceResearchStage(path: string): void {
+    const progress = this.plugin.researchProgress?.get(path);
+    if (!progress) {
+      this.announcedStages.delete(path);
+      return;
+    }
+    const signature = `${progress.stage}|${progress.slow ? 1 : 0}`;
+    if (this.announcedStages.get(path) === signature) return;
+    this.announcedStages.set(path, signature);
+    const node = this.map?.nodes.find(item => item.path === path);
+    const title = (node && this.notes.get(node.id)?.title) ?? path;
+    this.announcer?.setText(
+      t(
+        "ui.research_announcement_0_1",
+        title,
+        progress.slow ? t("ui.research_slow_waiting") : this.researchStageText(progress)
+      )
+    );
+  }
   private researchSig(progress: ResearchProgress | undefined): string {
     return progress
       ? [progress.stage, progress.query ?? "", progress.slow ? 1 : 0, progress.resend ? 1 : 0].join("|")
@@ -3408,6 +3441,8 @@ export class VisualAgentMapView extends ItemView {
     if (this.closed || !this.map || !this.stageEl) return;
     if (!this.map.nodes.some(node => node.path === path)) return;
     this.paintHoverResearch();
+    this.paintCardPreview(path);
+    this.announceResearchStage(path);
     if (this.researchSig(this.plugin.researchProgress.get(path)) !== (this.researchSigs.get(path) ?? ""))
       this.scheduleResearchRender();
   }
@@ -3422,6 +3457,42 @@ export class VisualAgentMapView extends ItemView {
       if (this.dragging || typing) this.scheduleResearchRender();
       else this.renderPreservingFocus();
     }, 150);
+  }
+  /** Marks a card summary as the unsaved preview: a label plus plain text (never Markdown). Not a live region. */
+  private fillCardPreview(summary: HTMLElement, text: string): void {
+    summary.addClass("is-preview");
+    summary.empty();
+    summary.createSpan({ cls: "vam-card-preview-label", text: t("ui.research_preview_label") });
+    summary.createSpan({ cls: "vam-card-preview-text", text });
+  }
+  /**
+   * Streams the summary preview into the card itself. Text only: no render, nothing is saved. Once the preview is gone
+   * (Stop, stale, failure, a retraction) the stored summary comes back; success is drawn by the note refresh.
+   */
+  private paintCardPreview(path: string): void {
+    const node = this.map?.nodes.find(item => item.path === path);
+    const card = node && this.cardEls.get(node.id);
+    if (!node || !card) return;
+    const title = card.querySelector<HTMLElement>(".vam-card-title");
+    let summary = card.querySelector<HTMLElement>(".vam-card-summary");
+    const text = this.plugin.researchProgress?.get(path)?.preview?.summary;
+    if (text) {
+      if (!summary && title) {
+        summary = card.createEl("p", { cls: "vam-card-summary" });
+        title.after(summary);
+      }
+      if (!summary) return;
+      if (!summary.hasClass("is-preview")) this.fillCardPreview(summary, text);
+      else summary.querySelector<HTMLElement>(".vam-card-preview-text")?.setText(text);
+      return;
+    }
+    if (!summary?.hasClass("is-preview")) return;
+    const note = this.notes.get(node.id);
+    if (!note || isPlaceholder(note.summary)) summary.remove();
+    else {
+      summary.removeClass("is-preview");
+      summary.setText(note.summary);
+    }
   }
   /** Plain text only (never Markdown): the answer being written, which nothing has saved yet. */
   private paintHoverResearch(): void {
@@ -5913,10 +5984,8 @@ export class VisualAgentMapView extends ItemView {
       // A researched topic is the normal state, so only the other states earn a pill; screen readers still hear it.
       if (research) {
         const chip = header.createSpan({ cls: "vam-status vam-status-running" });
-        // The live region changes on a stage change only; the seconds beside it are hidden from screen readers.
+        // Not a live region: this card is rebuilt on every render. Stage changes go through the view's announcer.
         const stageEl = chip.createSpan({ cls: "vam-research-stage", text: statusText });
-        stageEl.setAttr("role", "status");
-        stageEl.setAttr("aria-live", "polite");
         stageEl.setAttr("title", statusText);
         const elapsedEl = chip.createSpan({
           cls: "vam-research-elapsed",
@@ -5925,9 +5994,7 @@ export class VisualAgentMapView extends ItemView {
         elapsedEl.setAttr("aria-hidden", "true");
         this.trackResearchElapsed(elapsedEl, research.startedAt);
         if (research.slow)
-          header
-            .createSpan({ cls: "vam-status vam-research-slow", text: t("ui.research_slow_waiting") })
-            .setAttr("role", "status");
+          header.createSpan({ cls: "vam-status vam-research-slow", text: t("ui.research_slow_waiting") });
       } else if (!note || note.status !== "completed" || active || queued) {
         const chip = header.createSpan({
           cls: `vam-status vam-status-${active ? "running" : queued ? "queued" : (note?.status ?? "error")}`,
@@ -6150,7 +6217,10 @@ export class VisualAgentMapView extends ItemView {
     const title = card.createEl("h3", { text: note?.title ?? node.path, cls: "vam-card-title" });
     title.setAttr("title", note?.title ?? node.path);
     // An unresearched topic's placeholder summary repeats its status, so the frontier card stays quiet.
-    if (!note || !isPlaceholder(note.summary))
+    // While a run streams its answer, the unsaved summary preview takes the place of the stored summary.
+    if (research?.preview?.summary)
+      this.fillCardPreview(card.createEl("p", { cls: "vam-card-summary" }), research.preview.summary);
+    else if (!note || !isPlaceholder(note.summary))
       card.createEl("p", {
         cls: "vam-card-summary",
         text: note?.summary ?? t("ui.the_file_was_moved_or_deleted_you_can_remove_this_node_from")
@@ -6635,6 +6705,7 @@ export class VisualAgentMapView extends ItemView {
         title.after(summary);
       }
       summary?.setText(note.summary);
+      summary?.removeClass("is-preview");
     }
     const header = card.querySelector<HTMLElement>(".vam-node-header");
     const status = card.querySelector<HTMLElement>(".vam-node-header > .vam-status:not(.vam-aim-question-status)");

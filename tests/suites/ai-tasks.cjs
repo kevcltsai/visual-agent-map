@@ -611,8 +611,13 @@ test('S3: a runtime that ignores the abort cannot hold up the re-send, and its l
   const done = h.ask(); await h.waitFor(() => h.calls.length === 1);
   h.clock.advance(20_000); h.observer.resend();
   assert.equal((await done).summary, 'Synthetic summary');
+  const firstId = [...h.entries.keys()][0];
+  assert.equal(h.entries.get(firstId).status, 'failed', 'the replaced attempt is marked failed');
   h.calls[0].late();
   await new Promise(resolve => setImmediate(resolve));
+  await new Promise(resolve => setImmediate(resolve));
+  assert.equal(h.entries.get(firstId).status, 'failed', 'its late reply does not flip the entry back to received');
+  assert.match(h.entries.get(firstId).error, /./);
 });
 
 test('S3: there is no automatic re-send and only the main call is observed', async () => {

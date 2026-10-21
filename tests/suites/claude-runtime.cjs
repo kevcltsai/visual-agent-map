@@ -327,6 +327,10 @@ test('Claude stream-json: a line that cannot be read stops stage and preview upd
   assert.equal(out.deltas.at(-1), null, 'the preview is cleared and stays cleared');
   assert.deepEqual(out.stages, [['writing', undefined]], 'no stage after the bad line');
   assert.deepEqual(out.milestones[0].usage, { inputTokens: 10, outputTokens: 5 });
+  for (const key of ['textBeforeTool', 'textBeforeToolChars', 'enforceRetry']) assert.equal(key in out.milestones[0], false, `${key} is left unset after a lost line, so it cannot read as a false pass`);
+  // A clean stream still reports them.
+  const clean = await h.run([h.sys, ...h.structuredCall('so2'), h.result()]);
+  assert.equal(clean.milestones[0].textBeforeTool, false); assert.equal(clean.milestones[0].textBeforeToolChars, 0);
 });
 
 test('Claude stream-json: a CLI that rejects the stream flags at boot is run once in json mode and remembered', async () => {
@@ -352,4 +356,196 @@ test('Claude stream-json: a model-side failure is not mistaken for rejected flag
   const out = await h.run([h.sys, h.ev({ type: 'message_start' }), { type: 'result', subtype: 'error_during_execution', is_error: true, errors: ['synthetic model failure'] }], {}, { code: 1, stderr: 'mentions --output-format in a hint' }).catch(error => error);
   assert.equal(out.spawns.length, 1, 'a failure that produced a result record is not rerun');
   assert.match(String(out.message), /--output-format/);
+});
+
+// ---- Segment C: S6 warm pool (pre-started Claude CLI), all synthetic: no process is really started ----
+const warmHarness = () => {
+  const { EventEmitter } = require('node:events');
+  const children = [];
+  const makeChild = () => {
+    const child = new EventEmitter(); child.stdout = new EventEmitter(); child.stderr = new EventEmitter();
+    child.writes = []; child.stdinEnded = false; child.signals = []; child.exited = false;
+    child.stdin = { on() {}, write(text, done) { child.writes.push(text); done?.(); return true; }, end(text, done) { if (text !== undefined) child.writes.push(text); child.stdinEnded = true; done?.(); } };
+    child.kill = signal => { child.signals.push(signal); if (signal === 'SIGTERM' && !child.ignoreTerm || signal === 'SIGKILL') { child.exited = true; process.nextTick(() => child.emit('close', null, signal)); } return true; };
+    children.push(child); return child;
+  };
+  const spawn = (_exe, args) => { const child = makeChild(); child.args = args; return child; };
+  const clock = (() => { let now = 0, id = 0; const timers = new Map();
+    return { setTimeout: (callback, ms) => { timers.set(++id, { at: now + ms, callback }); return id; }, clearTimeout: handle => timers.delete(handle),
+      advance(ms) { now += ms; for (const [key, timer] of [...timers]) if (timer.at <= now) { timers.delete(key); timer.callback(); } }, pending: () => timers.size }; })();
+  const { ClaudeCodeCliRuntime } = load('ai/runtime/claude-code-cli.ts', { 'node:child_process': { spawn } });
+  const { ClaudeWarmPool } = load('ai/runtime/claude-warm-pool.ts');
+  const pool = new ClaudeWarmPool({ clock });
+  const runtime = new ClaudeCodeCliRuntime({ executable: 'claude', cwd: '/plugin', env: {}, spawn, warmPool: pool });
+  const schema = { type: 'object' };
+  const output = { summary: 'Warm summary', detail: 'Warm detail', suggestions: [], visualReferences: [] };
+  const finish = (child, extra = []) => {
+    const lines = [{ type: 'system', subtype: 'init' }, ...extra, { type: 'result', subtype: 'success', is_error: false, structured_output: output }];
+    child.stdout.emit('data', Buffer.from(lines.map(line => JSON.stringify(line)).join('\n') + '\n'));
+    process.nextTick(() => child.emit('close', 0));
+  };
+  return { children, clock, pool, runtime, schema, output, finish, ClaudeCodeCliRuntime, spawn };
+};
+const sentText = child => JSON.parse(child.writes[0]).message.content[0].text;
+
+test('S6 pool: a pre-started process writes nothing until the prompt, and a run with the same command takes it and writes only the prompt', async () => {
+  const h = warmHarness();
+  assert.equal(h.runtime.prewarm('sonnet', 'low', h.schema, true), true);
+  assert.equal(h.children.length, 1);
+  const warm = h.children[0];
+  assert.ok(warm.args.includes('--input-format') && warm.args[warm.args.indexOf('--input-format') + 1] === 'stream-json');
+  assert.equal(warm.args[warm.args.indexOf('--output-format') + 1], 'stream-json');
+  assert.deepEqual(warm.writes, [], 'nothing is written to a waiting process, so it makes no model call');
+  assert.equal(h.pool.size, 1);
+  const milestones = [], modes = [];
+  const run = h.runtime.runTask('the prompt', 'sonnet', 'low', h.schema, { stream: true, webSearch: true, onMilestones: data => milestones.push(data), onStreamMode: mode => modes.push(mode) });
+  await until(() => warm.writes.length === 1);
+  assert.equal(h.children.length, 1, 'no second process: the pre-started one is used');
+  assert.equal(sentText(warm), 'the prompt');
+  assert.equal(JSON.parse(warm.writes[0]).type, 'user');
+  assert.equal(warm.stdinEnded, false, 'stdin stays open until the result');
+  assert.equal(h.pool.size, 0, 'taken: the pool no longer owns it');
+  h.finish(warm);
+  assert.deepEqual(JSON.parse(await run), h.output);
+  assert.equal(warm.stdinEnded, true, 'stdin is closed after the result so the process exits');
+  assert.equal(milestones.find(item => 'prespawned' in item).prespawned, true);
+  assert.deepEqual(modes, ['stream-json']);
+});
+
+test('S6 pool: any difference in model, effort, schema, tools or folder kills the pre-started process and starts cold', async () => {
+  const cases = [
+    ['model', rt => rt.runTask('p', 'haiku', 'low', { type: 'object' }, { stream: true, webSearch: true })],
+    ['effort', rt => rt.runTask('p', 'sonnet', 'high', { type: 'object' }, { stream: true, webSearch: true })],
+    ['schema', rt => rt.runTask('p', 'sonnet', 'low', { type: 'object', required: [] }, { stream: true, webSearch: true })],
+    ['tools', rt => rt.runTask('p', 'sonnet', 'low', { type: 'object' }, { stream: true, webSearch: false })]
+  ];
+  for (const [name, call] of cases) {
+    const h = warmHarness();
+    h.runtime.prewarm('sonnet', 'low', h.schema, true);
+    const warm = h.children[0];
+    const milestones = [];
+    const run = call({ runTask: (prompt, model, effort, schema, controls) => h.runtime.runTask(prompt, model, effort, schema, { ...controls, onMilestones: data => milestones.push(data) }) });
+    await until(() => h.children.length === 2);
+    assert.deepEqual(warm.signals.slice(0, 1), ['SIGTERM'], `${name}: the pre-started process is killed`);
+    assert.equal(warm.writes.length, 0, `${name}: the prompt never reached it`);
+    const cold = h.children[1];
+    assert.ok(!cold.args.includes('--input-format'), `${name}: cold start uses the ordinary command`);
+    h.finish(cold, []);
+    await run.catch(() => {});
+    assert.equal(milestones.find(item => 'prespawned' in item).prespawned, false, `${name}: recorded as not pre-spawned`);
+    assert.equal(h.pool.size, 0);
+  }
+  // another folder is another key
+  const h = warmHarness();
+  h.runtime.prewarm('sonnet', 'low', h.schema, true);
+  const other = new h.ClaudeCodeCliRuntime({ executable: 'claude', cwd: '/elsewhere', env: {}, spawn: h.spawn, warmPool: h.pool });
+  const run = other.runTask('p', 'sonnet', 'low', h.schema, { stream: true, webSearch: true });
+  await until(() => h.children.length === 2);
+  assert.equal(h.children[0].signals[0], 'SIGTERM', 'a different folder is a different key');
+  h.finish(h.children[1]); await run;
+});
+
+test('S6 pool: an idle pre-started process is killed after 180 s by the fake clock, and a later run starts cold', async () => {
+  const h = warmHarness();
+  h.runtime.prewarm('sonnet', 'low', h.schema, true);
+  const warm = h.children[0];
+  h.clock.advance(179_999);
+  assert.deepEqual(warm.signals, [], 'not yet');
+  h.clock.advance(1);
+  assert.deepEqual(warm.signals, ['SIGTERM']);
+  assert.equal(h.pool.size, 0);
+  await until(() => warm.exited); await new Promise(resolve => setImmediate(resolve));
+  assert.equal(h.clock.pending(), 0, 'no timer is left behind once the process has closed');
+  const run = h.runtime.runTask('p', 'sonnet', 'low', h.schema, { stream: true, webSearch: true });
+  await until(() => h.children.length === 2);
+  h.finish(h.children[1]); await run;
+});
+
+test('S6 pool: prewarming again with the same command only restarts the idle time; a new command replaces the process', () => {
+  const h = warmHarness();
+  h.runtime.prewarm('sonnet', 'low', h.schema, true);
+  h.clock.advance(100_000);
+  h.runtime.prewarm('sonnet', 'low', h.schema, true);
+  assert.equal(h.children.length, 1);
+  h.clock.advance(100_000);
+  assert.deepEqual(h.children[0].signals, [], 'the idle time restarted');
+  h.runtime.prewarm('opus', 'low', h.schema, true);
+  assert.equal(h.children.length, 2); assert.equal(h.children[0].signals[0], 'SIGTERM'); assert.equal(h.pool.size, 1);
+});
+
+test('S6 pool: dispose (release) kills the process, escalates to SIGKILL if it ignores SIGTERM, and a dead process is never handed out', async () => {
+  const h = warmHarness();
+  h.runtime.prewarm('sonnet', 'low', h.schema, true);
+  const stubborn = h.children[0]; stubborn.ignoreTerm = true;
+  h.pool.release();
+  assert.deepEqual(stubborn.signals, ['SIGTERM']); assert.equal(h.pool.size, 0);
+  h.clock.advance(1_500);
+  assert.deepEqual(stubborn.signals, ['SIGTERM', 'SIGKILL'], 'no orphan: the stuck process is killed');
+  h.pool.release(); // safe when empty
+  // A process that exits by itself leaves the pool and cannot be taken.
+  const h2 = warmHarness();
+  h2.runtime.prewarm('sonnet', 'low', h2.schema, true);
+  h2.children[0].exited = true; h2.children[0].emit('close', 1);
+  assert.equal(h2.pool.size, 0);
+  const run = h2.runtime.runTask('p', 'sonnet', 'low', h2.schema, { stream: true, webSearch: true });
+  await until(() => h2.children.length === 2);
+  assert.ok(!h2.children[1].args.includes('--input-format'));
+  h2.finish(h2.children[1]); await run;
+});
+
+test('S6 pool: Stop after the process was taken kills it; Stop before the run reaches the CLI releases the waiting process', async () => {
+  const h = warmHarness();
+  h.runtime.prewarm('sonnet', 'low', h.schema, true);
+  const warm = h.children[0];
+  const controller = new AbortController();
+  const run = h.runtime.runTask('p', 'sonnet', 'low', h.schema, { stream: true, webSearch: true, signal: controller.signal });
+  await until(() => warm.writes.length === 1);
+  controller.abort();
+  await assert.rejects(run, error => error.name === 'AbortError');
+  assert.equal(warm.signals[0], 'SIGTERM', 'taken-then-aborted: the process is killed by its own handle');
+  assert.equal(h.children.length, 1);
+  // aborted before the CLI step: the waiting process goes too
+  const h2 = warmHarness();
+  h2.runtime.prewarm('sonnet', 'low', h2.schema, true);
+  const early = new AbortController(); early.abort();
+  await assert.rejects(h2.runtime.runTask('p', 'sonnet', 'low', h2.schema, { stream: true, webSearch: true, signal: early.signal }), error => error.name === 'AbortError');
+  assert.equal(h2.children[0].signals[0], 'SIGTERM'); assert.equal(h2.pool.size, 0);
+});
+
+test('S6 pool: AiRuntimeService.reset() (plugin unload and runtime reset) kills the waiting process; releaseWarm kills it too', () => {
+  const h = warmHarness();
+  const { AiRuntimeService } = load('core/ai-runtime-service.ts', { 'node:child_process': { spawn: h.spawn } });
+  const service = new AiRuntimeService({ codexPath: () => 'codex', claudePath: () => '/bin/claude', clientVersion: () => '1', onLog: () => {}, warmClock: h.clock, claudeSpawn: h.spawn });
+  const warmUp = () => service.claude('/plugin').prewarm('sonnet', 'low', h.schema, true);
+  assert.equal(warmUp(), true); assert.equal(service.hasWarm(), true);
+  service.reset();
+  assert.equal(h.children[0].signals[0], 'SIGTERM'); assert.equal(service.hasWarm(), false);
+  warmUp(); service.releaseWarm();
+  assert.equal(h.children[1].signals[0], 'SIGTERM'); assert.equal(service.hasWarm(), false);
+  warmUp(); h.clock.advance(180_000);
+  assert.equal(h.children[2].signals[0], 'SIGTERM', 'the service pool uses the same 180 s idle limit');
+});
+
+test('S6 pool: a runtime without a pool, or a call that is not an observed schema call, never touches the pool', async () => {
+  const h = warmHarness();
+  const bare = new h.ClaudeCodeCliRuntime({ executable: 'claude', cwd: '/plugin', env: {}, spawn: h.spawn });
+  assert.equal(bare.prewarm('sonnet', 'low', h.schema, true), false);
+  assert.equal(h.runtime.prewarm('sonnet', 'low', undefined, true), false, 'no schema, no pre-start');
+  assert.equal(h.children.length, 0);
+});
+
+test('L4: AiRuntimeService.claude() returns one runtime per executable and folder (so it remembers the CLI), and reset() drops it', () => {
+  const { AiRuntimeService } = load('core/ai-runtime-service.ts');
+  let path = '/bin/claude-a';
+  const service = new AiRuntimeService({ codexPath: () => 'codex', claudePath: () => path, clientVersion: () => '1', onLog: () => {} });
+  const first = service.claude('/plugin');
+  assert.equal(service.claude('/plugin'), first, 'same executable and folder: the same runtime');
+  assert.notEqual(service.claude('/other'), first, 'another folder: another runtime');
+  const other = service.claude('/other');
+  assert.equal(service.claude('/other'), other);
+  path = '/bin/claude-b';
+  assert.notEqual(service.claude('/other'), other, 'another executable: another runtime');
+  const current = service.claude('/other');
+  service.reset();
+  assert.notEqual(service.claude('/other'), current, 'reset() clears the cached runtime');
 });

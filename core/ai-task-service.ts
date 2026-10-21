@@ -61,6 +61,8 @@ interface AttemptSetup {
     "onAccepted" | "stream" | "onStreamMode" | "onFirstEvent" | "onStage" | "onStructuredDelta" | "onActivity"
   >;
   onExchange: (id: string) => void;
+  /** Runs when the reply arrives; throws for a superseded attempt so its entry is not flipped from failed back to received. */
+  afterReply: () => void;
 }
 
 export interface AiTaskServiceOptions {
@@ -227,7 +229,9 @@ export class AiTaskService {
           task: { ...controls, onWebSearchEvent, ...(setup ? { ...setup.hooks, signal: setup.signal } : {}) },
           finish: "caller",
           requestLog: "request",
-          ...(setup ? { exchangeId: setup.exchangeId, extraMilestones: setup.extraMilestones } : {}),
+          ...(setup
+            ? { exchangeId: setup.exchangeId, extraMilestones: setup.extraMilestones, afterReply: setup.afterReply }
+            : {}),
           onExchange: id => {
             exchangeId = id;
             setup?.onExchange(id);
@@ -433,6 +437,9 @@ export class AiTaskService {
         },
         onExchange: id => {
           exchangeId = id;
+        },
+        afterReply: () => {
+          if (!live()) throw cancelled();
         }
       };
       // The race makes the loop independent of a runtime that is slow to honour the abort.

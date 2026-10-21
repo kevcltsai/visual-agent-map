@@ -485,7 +485,8 @@ export class CodexAppServerRuntime {
     const threadId = typeof params?.threadId === "string" ? params.threadId : "";
     const state = this.turns.get(threadId);
     if (!state) return;
-    if (!state.sawActivity) {
+    // The first model item or delta, not the turn bookkeeping (`turn/started` arrives before the model has done anything).
+    if (!state.sawActivity && message.method.startsWith("item/")) {
       state.sawActivity = true;
       this.reportActivity(state, "started");
     }

@@ -1581,6 +1581,7 @@ var english = {
   "ui.research_stage_writing": "Writing",
   "ui.research_stage_charts": "Adding diagrams",
   "ui.research_slow_waiting": "Responding slowly, still waiting",
+  "ui.research_announcement_0_1": "{0}: {1}",
   "ui.research_resend": "Resend",
   "ui.research_preview_label": "Preview (not saved yet)",
   "ui.stop_adding_charts": "Stop adding diagrams",
@@ -3184,6 +3185,7 @@ var traditionalChinese = {
   "ui.research_stage_writing": "\u64B0\u5BEB\u4E2D",
   "ui.research_stage_charts": "\u52A0\u5165\u5716\u8868\u4E2D",
   "ui.research_slow_waiting": "\u56DE\u61C9\u8F03\u6162\uFF0C\u4ECD\u5728\u7B49\u5F85",
+  "ui.research_announcement_0_1": "{0}\uFF1A{1}",
   "ui.research_resend": "\u91CD\u65B0\u9001\u51FA",
   "ui.research_preview_label": "\u9810\u89BD\uFF08\u5C1A\u672A\u5BEB\u5165\uFF09",
   "ui.stop_adding_charts": "\u505C\u6B62\u52A0\u5165\u5716\u8868",
@@ -19327,6 +19329,10 @@ var NextStepModal = class extends import_obsidian21.Modal {
   detach(controller) {
     var _a;
     this.detached = true;
+    controller.signal.addEventListener("abort", () => {
+      var _a2, _b;
+      return (_b = (_a2 = this.plugin).releaseWarmClaude) == null ? void 0 : _b.call(_a2);
+    }, { once: true });
     this.backgroundBegan = true;
     (_a = this.background) == null ? void 0 : _a.begin(controller);
     this.close();
@@ -19341,11 +19347,22 @@ var NextStepModal = class extends import_obsidian21.Modal {
   dead(controller) {
     return controller.signal.aborted || this.closed && !this.detached;
   }
+  /** Pre-starts the Claude CLI for the research step (no model call); a run that does not use it kills it. */
+  prewarmAi() {
+    var _a, _b, _c, _d, _e;
+    if (this.selectionFlow || this.closed) return;
+    (_e = (_d = this.plugin).prewarmClaude) == null ? void 0 : _e.call(
+      _d,
+      (_b = (_a = this.modelSettings) == null ? void 0 : _a.model) != null ? _b : this.plugin.settings.cliModel,
+      (_c = this.modelSettings) == null ? void 0 : _c.reasoning
+    );
+  }
   onClose() {
-    var _a, _b;
+    var _a, _b, _c, _d;
     this.closed = true;
-    if (!this.detached) (_a = this.taskController) == null ? void 0 : _a.abort();
-    (_b = this.unsubscribeModels) == null ? void 0 : _b.call(this);
+    if (!this.detached) (_b = (_a = this.plugin).releaseWarmClaude) == null ? void 0 : _b.call(_a);
+    if (!this.detached) (_c = this.taskController) == null ? void 0 : _c.abort();
+    (_d = this.unsubscribeModels) == null ? void 0 : _d.call(this);
   }
   /** Saves the model and effort chosen in this dialog, once, at the moment a run actually starts. */
   async flushSettings() {
@@ -20256,6 +20273,7 @@ var NextStepModal = class extends import_obsidian21.Modal {
     );
     const sharedSources = this.addReferencePicker(adjustBody);
     show = (mode) => {
+      var _a2, _b2;
       currentMode = mode;
       for (const [name, button, panel] of [
         ["research", researchCard, research],
@@ -20269,6 +20287,8 @@ var NextStepModal = class extends import_obsidian21.Modal {
         adjustFor[name].hidden = name !== mode;
       }
       sharedSources == null ? void 0 : sharedSources.forMode(mode);
+      if (mode === "research") this.prewarmAi();
+      else if (!this.detached) (_b2 = (_a2 = this.plugin).releaseWarmClaude) == null ? void 0 : _b2.call(_a2);
       confirm.hidden = mode !== "research";
       expandButton.hidden = mode !== "expand";
       expandFooterText.hidden = mode !== "expand";
@@ -20342,6 +20362,9 @@ var NextStepModal = class extends import_obsidian21.Modal {
       summaryEl.setText(parts.join(" \xB7 "));
     };
     this.contentEl.addEventListener("change", refreshSummary);
+    this.contentEl.addEventListener("change", () => {
+      if (currentMode === "research") this.prewarmAi();
+    });
     if (pendingDirections) showDirections(pendingDirections.directions);
     else checkName();
     show(initialMode);
@@ -28266,6 +28289,9 @@ var VisualAgentMapView = class _VisualAgentMapView extends import_obsidian29.Ite
     __publicField(this, "researchElapsed", /* @__PURE__ */ new Map());
     __publicField(this, "researchTick", null);
     __publicField(this, "researchRenderTimer", null);
+    /** Persistent, visually hidden live region for research stage changes; outside contentEl so a render never rebuilds it. */
+    __publicField(this, "announcer", null);
+    __publicField(this, "announcedStages", /* @__PURE__ */ new Map());
     __publicField(this, "integrationMode", false);
     __publicField(this, "dragging", false);
     /** Ends the drag in progress (listeners, pending frame, flag); set only while a card is being dragged. */
@@ -28359,22 +28385,28 @@ var VisualAgentMapView = class _VisualAgentMapView extends import_obsidian29.Ite
     await super.setState(state, result);
   }
   async onOpen() {
-    var _a, _b, _c, _d, _e, _f;
+    var _a, _b, _c, _d, _e, _f, _g, _h, _i, _j, _k, _l;
     this.closed = false;
-    (_a = this.unsubscribeResearch) == null ? void 0 : _a.call(this);
-    this.unsubscribeResearch = (_c = (_b = this.plugin.researchProgress) == null ? void 0 : _b.subscribe((path) => this.onResearchProgress(path))) != null ? _c : null;
+    (_a = this.announcer) == null ? void 0 : _a.remove();
+    this.announcer = (_c = (_b = this.containerEl) == null ? void 0 : _b.createDiv({ cls: "vam-sr-only" })) != null ? _c : null;
+    (_d = this.announcer) == null ? void 0 : _d.setAttr("role", "status");
+    (_e = this.announcer) == null ? void 0 : _e.setAttr("aria-live", "polite");
+    (_f = this.announcer) == null ? void 0 : _f.setAttr("aria-atomic", "true");
+    this.announcedStages.clear();
+    (_g = this.unsubscribeResearch) == null ? void 0 : _g.call(this);
+    this.unsubscribeResearch = (_i = (_h = this.plugin.researchProgress) == null ? void 0 : _h.subscribe((path) => this.onResearchProgress(path))) != null ? _i : null;
     const epoch = ++this.aimViewEpoch;
     this.mapOpenEpoch++;
     this.contentEl.addClass("vam-view");
     this.contentEl.tabIndex = 0;
-    this.registerDomEvent((_d = this.contentEl.win) != null ? _d : window, "keydown", (event) => {
+    this.registerDomEvent((_j = this.contentEl.win) != null ? _j : window, "keydown", (event) => {
       if (event.code === "Space" && !(event.target instanceof HTMLElement && event.target.closest("input, textarea, select, [contenteditable=true]")))
         this.spaceHeld = true;
     });
-    this.registerDomEvent((_e = this.contentEl.win) != null ? _e : window, "keyup", (event) => {
+    this.registerDomEvent((_k = this.contentEl.win) != null ? _k : window, "keyup", (event) => {
       if (event.code === "Space") this.spaceHeld = false;
     });
-    this.registerDomEvent((_f = this.contentEl.win) != null ? _f : window, "blur", () => {
+    this.registerDomEvent((_l = this.contentEl.win) != null ? _l : window, "blur", () => {
       this.spaceHeld = false;
     });
     this.registerDomEvent(this.contentEl, "keydown", (event) => {
@@ -28423,9 +28455,12 @@ var VisualAgentMapView = class _VisualAgentMapView extends import_obsidian29.Ite
     }
   }
   async onClose() {
-    var _a, _b, _c, _d;
+    var _a, _b, _c, _d, _e;
     this.closed = true;
-    (_a = this.unsubscribeResearch) == null ? void 0 : _a.call(this);
+    (_a = this.announcer) == null ? void 0 : _a.remove();
+    this.announcer = null;
+    this.announcedStages.clear();
+    (_b = this.unsubscribeResearch) == null ? void 0 : _b.call(this);
     this.unsubscribeResearch = null;
     if (this.researchTick !== null) window.clearInterval(this.researchTick);
     if (this.researchRenderTimer !== null) window.clearTimeout(this.researchRenderTimer);
@@ -28434,7 +28469,7 @@ var VisualAgentMapView = class _VisualAgentMapView extends import_obsidian29.Ite
     this.researchSigs.clear();
     this.hoverResearch = null;
     this.plugin.releaseOutline(this);
-    (_b = this.relevancePanelCleanup) == null ? void 0 : _b.call(this);
+    (_c = this.relevancePanelCleanup) == null ? void 0 : _c.call(this);
     this.relevancePanelCleanup = null;
     this.abortRelevanceGrade();
     for (const task of this.synthesisTasks.values()) if (task.state === "running") task.controller.abort();
@@ -28455,8 +28490,8 @@ var VisualAgentMapView = class _VisualAgentMapView extends import_obsidian29.Ite
     this.stopAimProgress();
     if (this.refreshTimer !== null) window.clearTimeout(this.refreshTimer);
     if (this.hoverTimer !== null) window.clearTimeout(this.hoverTimer);
-    (_c = this.hoverCard) == null ? void 0 : _c.remove();
-    (_d = this.dragCleanup) == null ? void 0 : _d.call(this);
+    (_d = this.hoverCard) == null ? void 0 : _d.remove();
+    (_e = this.dragCleanup) == null ? void 0 : _e.call(this);
     if (this.viewportTimer !== null) {
       window.clearTimeout(this.viewportTimer);
       this.viewportTimer = null;
@@ -30982,6 +31017,27 @@ ${request.requirements}` : preset.text,
       y += 120;
     }
   }
+  /** Speaks a stage (or the slow notice) once, when it changes. The streaming preview never goes through here. */
+  announceResearchStage(path) {
+    var _a, _b, _c, _d, _e;
+    const progress = (_a = this.plugin.researchProgress) == null ? void 0 : _a.get(path);
+    if (!progress) {
+      this.announcedStages.delete(path);
+      return;
+    }
+    const signature = `${progress.stage}|${progress.slow ? 1 : 0}`;
+    if (this.announcedStages.get(path) === signature) return;
+    this.announcedStages.set(path, signature);
+    const node = (_b = this.map) == null ? void 0 : _b.nodes.find((item) => item.path === path);
+    const title = (_d = node && ((_c = this.notes.get(node.id)) == null ? void 0 : _c.title)) != null ? _d : path;
+    (_e = this.announcer) == null ? void 0 : _e.setText(
+      t(
+        "ui.research_announcement_0_1",
+        title,
+        progress.slow ? t("ui.research_slow_waiting") : this.researchStageText(progress)
+      )
+    );
+  }
   researchSig(progress) {
     var _a;
     return progress ? [progress.stage, (_a = progress.query) != null ? _a : "", progress.slow ? 1 : 0, progress.resend ? 1 : 0].join("|") : "";
@@ -31025,6 +31081,8 @@ ${request.requirements}` : preset.text,
     if (this.closed || !this.map || !this.stageEl) return;
     if (!this.map.nodes.some((node) => node.path === path)) return;
     this.paintHoverResearch();
+    this.paintCardPreview(path);
+    this.announceResearchStage(path);
     if (this.researchSig(this.plugin.researchProgress.get(path)) !== ((_a = this.researchSigs.get(path)) != null ? _a : ""))
       this.scheduleResearchRender();
   }
@@ -31038,6 +31096,43 @@ ${request.requirements}` : preset.text,
       if (this.dragging || typing) this.scheduleResearchRender();
       else this.renderPreservingFocus();
     }, 150);
+  }
+  /** Marks a card summary as the unsaved preview: a label plus plain text (never Markdown). Not a live region. */
+  fillCardPreview(summary, text11) {
+    summary.addClass("is-preview");
+    summary.empty();
+    summary.createSpan({ cls: "vam-card-preview-label", text: t("ui.research_preview_label") });
+    summary.createSpan({ cls: "vam-card-preview-text", text: text11 });
+  }
+  /**
+   * Streams the summary preview into the card itself. Text only: no render, nothing is saved. Once the preview is gone
+   * (Stop, stale, failure, a retraction) the stored summary comes back; success is drawn by the note refresh.
+   */
+  paintCardPreview(path) {
+    var _a, _b, _c, _d, _e;
+    const node = (_a = this.map) == null ? void 0 : _a.nodes.find((item) => item.path === path);
+    const card = node && this.cardEls.get(node.id);
+    if (!node || !card) return;
+    const title = card.querySelector(".vam-card-title");
+    let summary = card.querySelector(".vam-card-summary");
+    const text11 = (_d = (_c = (_b = this.plugin.researchProgress) == null ? void 0 : _b.get(path)) == null ? void 0 : _c.preview) == null ? void 0 : _d.summary;
+    if (text11) {
+      if (!summary && title) {
+        summary = card.createEl("p", { cls: "vam-card-summary" });
+        title.after(summary);
+      }
+      if (!summary) return;
+      if (!summary.hasClass("is-preview")) this.fillCardPreview(summary, text11);
+      else (_e = summary.querySelector(".vam-card-preview-text")) == null ? void 0 : _e.setText(text11);
+      return;
+    }
+    if (!(summary == null ? void 0 : summary.hasClass("is-preview"))) return;
+    const note = this.notes.get(node.id);
+    if (!note || isPlaceholder(note.summary)) summary.remove();
+    else {
+      summary.removeClass("is-preview");
+      summary.setText(note.summary);
+    }
   }
   /** Plain text only (never Markdown): the answer being written, which nothing has saved yet. */
   paintHoverResearch() {
@@ -33258,7 +33353,7 @@ ${request.requirements}` : preset.text,
   }
   /** `shownNode` may be a display copy (sorted by relevance): it only supplies where the card is drawn. */
   renderNode(shownNode) {
-    var _a, _b, _c, _d, _e, _f, _g, _h, _i, _j, _k, _l, _m, _n, _o, _p, _q, _r, _s, _t, _u, _v, _w, _x, _y, _z, _A, _B, _C, _D, _E, _F, _G, _H, _I, _J, _K, _L, _M, _N, _O, _P, _Q;
+    var _a, _b, _c, _d, _e, _f, _g, _h, _i, _j, _k, _l, _m, _n, _o, _p, _q, _r, _s, _t, _u, _v, _w, _x, _y, _z, _A, _B, _C, _D, _E, _F, _G, _H, _I, _J, _K, _L, _M, _N, _O, _P, _Q, _R;
     if (!this.stageEl) return;
     const node = (_b = (_a = this.map) == null ? void 0 : _a.nodes.find((item) => item.id === shownNode.id)) != null ? _b : shownNode;
     const note = this.notes.get(node.id), card = this.stageEl.createDiv({
@@ -33331,8 +33426,6 @@ ${request.requirements}` : preset.text,
       if (research) {
         const chip = header.createSpan({ cls: "vam-status vam-status-running" });
         const stageEl = chip.createSpan({ cls: "vam-research-stage", text: statusText });
-        stageEl.setAttr("role", "status");
-        stageEl.setAttr("aria-live", "polite");
         stageEl.setAttr("title", statusText);
         const elapsedEl = chip.createSpan({
           cls: "vam-research-elapsed",
@@ -33341,7 +33434,7 @@ ${request.requirements}` : preset.text,
         elapsedEl.setAttr("aria-hidden", "true");
         this.trackResearchElapsed(elapsedEl, research.startedAt);
         if (research.slow)
-          header.createSpan({ cls: "vam-status vam-research-slow", text: t("ui.research_slow_waiting") }).setAttr("role", "status");
+          header.createSpan({ cls: "vam-status vam-research-slow", text: t("ui.research_slow_waiting") });
       } else if (!note || note.status !== "completed" || active || queued) {
         const chip = header.createSpan({
           cls: `vam-status vam-status-${active ? "running" : queued ? "queued" : (_k = note == null ? void 0 : note.status) != null ? _k : "error"}`,
@@ -33551,16 +33644,18 @@ ${request.requirements}` : preset.text,
     }
     const title = card.createEl("h3", { text: (_G = note == null ? void 0 : note.title) != null ? _G : node.path, cls: "vam-card-title" });
     title.setAttr("title", (_H = note == null ? void 0 : note.title) != null ? _H : node.path);
-    if (!note || !isPlaceholder(note.summary))
+    if ((_I = research == null ? void 0 : research.preview) == null ? void 0 : _I.summary)
+      this.fillCardPreview(card.createEl("p", { cls: "vam-card-summary" }), research.preview.summary);
+    else if (!note || !isPlaceholder(note.summary))
       card.createEl("p", {
         cls: "vam-card-summary",
-        text: (_I = note == null ? void 0 : note.summary) != null ? _I : t("ui.the_file_was_moved_or_deleted_you_can_remove_this_node_from")
+        text: (_J = note == null ? void 0 : note.summary) != null ? _J : t("ui.the_file_was_moved_or_deleted_you_can_remove_this_node_from")
       });
     if (errorDetails.length) {
       const error = card.createEl("p", { cls: "vam-card-error", text: errorDetails[0] });
       error.setAttr("title", errorDetails.join("\n"));
     }
-    if (node.aimKind === "conclusion" && ((_J = this.map) == null ? void 0 : _J.aim) && !this.builtIn) {
+    if (node.aimKind === "conclusion" && ((_K = this.map) == null ? void 0 : _K.aim) && !this.builtIn) {
       const branch = this.map.aim.branches.find((item) => item.results.some((result) => result.nodeId === node.id));
       const hasFollowup = this.map.nodes.some((item) => item.parentId === node.id && item.aimKind === "question");
       if (branch && !hasFollowup && countAimAnsweredQuestions(this.map, branch.id) < MIN_ANSWERED_QUESTIONS_BEFORE_CONCLUSION) {
@@ -33573,7 +33668,7 @@ ${request.requirements}` : preset.text,
         ).addClass("mod-cta");
       }
     }
-    if (node.aimKind === "topic" && ((_K = this.map) == null ? void 0 : _K.aim) && !this.map.nodes.some((item) => item.aimKind === "question")) {
+    if (node.aimKind === "topic" && ((_L = this.map) == null ? void 0 : _L.aim) && !this.map.nodes.some((item) => item.aimKind === "question")) {
       const initialBranch = this.map.aim.branches.find((item) => item.questionNodeId === node.id && !item.parentBranchId);
       const initialRuns = initialBranch ? this.map.aim.runs.filter((item) => item.branchId === initialBranch.id) : [];
       const activeInitialRun = initialRuns.some((run) => {
@@ -33609,11 +33704,11 @@ ${request.requirements}` : preset.text,
         );
       }
     }
-    if (node.aimKind === "question" && ((_L = this.map) == null ? void 0 : _L.aim)) {
+    if (node.aimKind === "question" && ((_M = this.map) == null ? void 0 : _M.aim)) {
       const branch = this.map.aim.branches.find((item) => item.questionNodeId === node.id);
       if (branch) {
         this.renderAimFailure(card, branch);
-        const labels = (_N = (_M = node.aimQuestion) == null ? void 0 : _M.options.filter((option2) => branch.answerSnapshot.selections.includes(option2.id)).map((option2) => option2.label)) != null ? _N : branch.answerSnapshot.selections;
+        const labels = (_O = (_N = node.aimQuestion) == null ? void 0 : _N.options.filter((option2) => branch.answerSnapshot.selections.includes(option2.id)).map((option2) => option2.label)) != null ? _O : branch.answerSnapshot.selections;
         const answer = [...labels, branch.answerSnapshot.freeText].filter(Boolean).join(" \u2014 ");
         card.createEl("p", {
           cls: "vam-aim-answer-snapshot",
@@ -33656,11 +33751,11 @@ ${request.requirements}` : preset.text,
         }
       }
     }
-    if (node.aimKind === "answer" && ((_O = this.map) == null ? void 0 : _O.aim)) {
+    if (node.aimKind === "answer" && ((_P = this.map) == null ? void 0 : _P.aim)) {
       const branch = this.map.aim.branches.find((item) => item.answerNodeId === node.id);
       const question = branch && this.map.nodes.find((item) => item.id === branch.questionNodeId);
       if (branch) {
-        const labels = (_Q = (_P = question == null ? void 0 : question.aimQuestion) == null ? void 0 : _P.options.filter((option2) => branch.answerSnapshot.selections.includes(option2.id)).map((option2) => option2.label)) != null ? _Q : branch.answerSnapshot.selections;
+        const labels = (_R = (_Q = question == null ? void 0 : question.aimQuestion) == null ? void 0 : _Q.options.filter((option2) => branch.answerSnapshot.selections.includes(option2.id)).map((option2) => option2.label)) != null ? _R : branch.answerSnapshot.selections;
         const answer = [...labels, branch.answerSnapshot.freeText].filter(Boolean).join(" \u2014 ");
         card.createEl("p", {
           cls: "vam-aim-answer-snapshot",
@@ -34007,6 +34102,7 @@ ${request.requirements}` : preset.text,
         title.after(summary);
       }
       summary == null ? void 0 : summary.setText(note.summary);
+      summary == null ? void 0 : summary.removeClass("is-preview");
     }
     const header = card.querySelector(".vam-node-header");
     const status = card.querySelector(".vam-node-header > .vam-status:not(.vam-aim-question-status)");
@@ -37181,6 +37277,44 @@ var VisualAgentMapSettingTab = class extends import_obsidian30.PluginSettingTab 
 // main.ts
 var import_node_path2 = require("node:path");
 
+// response-schema.json
+var response_schema_default = {
+  $schema: "https://json-schema.org/draft/2020-12/schema",
+  type: "object",
+  properties: {
+    summary: {
+      type: "string",
+      description: "\u9069\u5408\u5FC3\u667A\u5716\u7684\u4E00\u53E5\u7E41\u9AD4\u4E2D\u6587\u7D50\u8AD6\uFF0C80 \u5B57\u5167"
+    },
+    detail: {
+      type: "string",
+      description: "\u5B8C\u6574\u7684\u7E41\u9AD4\u4E2D\u6587 Markdown \u5206\u6790"
+    },
+    suggestions: {
+      type: "array",
+      items: { type: "object", properties: { title: { type: "string" }, task: { type: "string" }, contribution: { type: "string" }, parentTitle: { type: "string" } }, required: ["title", "task", "contribution", "parentTitle"], additionalProperties: false }
+    },
+    visualReferences: {
+      type: "array",
+      items: {
+        type: "object",
+        properties: {
+          title: { type: "string" },
+          imageUrl: { type: "string" },
+          sourceUrl: { type: "string" },
+          description: { type: "string" },
+          palette: { type: "array", items: { type: "string" } },
+          formula: { type: "string" }
+        },
+        required: ["title", "imageUrl", "sourceUrl", "description", "palette", "formula"],
+        additionalProperties: false
+      }
+    }
+  },
+  required: ["summary", "detail", "suggestions", "visualReferences"],
+  additionalProperties: false
+};
+
 // ui/outline-view.ts
 var import_obsidian31 = require("obsidian");
 var OUTLINE_VIEW_TYPE = "visual-agent-map-outline";
@@ -37786,7 +37920,7 @@ var CodexAppServerRuntime = class {
     const threadId = typeof (params == null ? void 0 : params.threadId) === "string" ? params.threadId : "";
     const state = this.turns.get(threadId);
     if (!state) return;
-    if (!state.sawActivity) {
+    if (!state.sawActivity && message.method.startsWith("item/")) {
       state.sawActivity = true;
       this.reportActivity(state, "started");
     }
@@ -38131,6 +38265,7 @@ var ClaudeTranscriptFacts = class {
     __publicField(this, "usage");
     __publicField(this, "texts", []);
     __publicField(this, "kept", 0);
+    __publicField(this, "incomplete", false);
   }
   textStart() {
     if (!this.structured) this.texts.push("");
@@ -38168,11 +38303,15 @@ var ClaudeTranscriptFacts = class {
     } else if (record.type === "user" && JSON.stringify((_e = record.message) != null ? _e : "").includes("structured-output-enforce"))
       this.enforce = true;
   }
+  /** A record was lost (an unreadable line): what came before a tool call can no longer be claimed either way. */
+  markIncomplete() {
+    this.incomplete = true;
+  }
   milestones() {
     const chars = this.texts.reduce((sum, text11) => sum + text11.trim().length, 0);
     return {
       ...this.usage ? { usage: this.usage } : {},
-      ...this.structured ? {
+      ...this.structured && !this.incomplete ? {
         textBeforeTool: this.texts.some(looksLikeAnswer) || chars > ANSWER_TEXT_CHARS,
         textBeforeToolChars: chars,
         enforceRetry: this.enforce
@@ -38209,6 +38348,7 @@ var ClaudeStreamObserver = class {
   stop() {
     if (this.stopped) return;
     this.stopped = true;
+    this.facts.markIncomplete();
     this.call(() => {
       var _a, _b;
       return (_b = (_a = this.hooks).onStructuredDelta) == null ? void 0 : _b.call(_a, null);
@@ -38400,6 +38540,12 @@ function claudeTaskArgs(model, effort, schema, webSearch) {
     webSearch ? "WebSearch,WebFetch" : ""
   ];
 }
+function claudeWarmArgs(model, effort, schema, webSearch) {
+  const args = claudeTaskArgs(model, effort, schema, webSearch);
+  args[args.indexOf("json")] = "stream-json";
+  args.push("--include-partial-messages", "--input-format", "stream-json");
+  return args;
+}
 function claudeStructuredOutput(stdout, plainText = false) {
   const value = JSON.parse(stdout);
   const events = Array.isArray(value) ? value : [];
@@ -38475,14 +38621,38 @@ var ClaudeCodeCliRuntime = class {
     var _a;
     this.spawn = (_a = options.spawn) != null ? _a : import_node_child_process2.spawn;
   }
+  warmKey(args) {
+    return [this.options.executable, this.options.cwd, ...args].join("\0");
+  }
+  /**
+   * Starts an idle process for an observed research call with these settings (a dialog just opened). It makes no model
+   * call: the CLI waits for a user message on stdin. `runTask` takes it only when its own command is identical.
+   */
+  prewarm(model, effort, outputSchema, webSearch) {
+    const pool = this.options.warmPool;
+    if (!pool || !outputSchema || this.streamUnsupported) return false;
+    const args = claudeWarmArgs(model, effort, outputSchema, webSearch);
+    return pool.prewarm(
+      this.warmKey(args),
+      () => this.spawn(this.options.executable, args, {
+        cwd: this.options.cwd,
+        env: this.options.env,
+        stdio: ["pipe", "pipe", "pipe"],
+        windowsHide: true
+      })
+    );
+  }
   runTask(prompt, model, effort, outputSchema, controls = {}) {
     return this.run(prompt, model, effort, outputSchema, controls, false);
   }
   async run(prompt, model, effort, outputSchema, controls, fallback) {
-    var _a, _b, _c, _d, _e, _f, _g;
-    if ((_a = controls.signal) == null ? void 0 : _a.aborted) throw abortError2();
-    const webSearch = (_c = controls.webSearch) != null ? _c : ((_b = controls.searchBudget) != null ? _b : 0) > 0;
-    const args = claudeTaskArgs(model, effort, outputSchema, webSearch);
+    var _a, _b, _c, _d, _e, _f, _g, _h, _i;
+    if ((_a = controls.signal) == null ? void 0 : _a.aborted) {
+      (_b = this.options.warmPool) == null ? void 0 : _b.release();
+      throw abortError2();
+    }
+    const webSearch = (_d = controls.webSearch) != null ? _d : ((_c = controls.searchBudget) != null ? _c : 0) > 0;
+    let args = claudeTaskArgs(model, effort, outputSchema, webSearch);
     const image = controls.imageDataUrl ? claudeImageSource(controls.imageDataUrl) : null;
     const observed = !!outputSchema && controls.stream === true && !image && !fallback && !this.streamUnsupported;
     if (controls.onText && !outputSchema) {
@@ -38496,13 +38666,17 @@ var ClaudeCodeCliRuntime = class {
       args[args.indexOf("json")] = "stream-json";
       args.push("--include-partial-messages");
     }
+    const pool = this.options.warmPool;
+    const warmArgs = pool && observed && !controls.onSteer ? claudeWarmArgs(model, effort, outputSchema, webSearch) : null;
+    const warm = warmArgs ? pool.take(this.warmKey(warmArgs)) : null;
+    if (warmArgs && warm) args = warmArgs;
     if (outputSchema && controls.stream === true) {
       try {
-        (_d = controls.onStreamMode) == null ? void 0 : _d.call(controls, observed ? "stream-json" : fallback ? "json-fallback" : "json");
+        (_e = controls.onStreamMode) == null ? void 0 : _e.call(controls, observed ? "stream-json" : fallback ? "json-fallback" : "json");
       } catch (e) {
       }
     }
-    (_e = controls.onRequest) == null ? void 0 : _e.call(controls, {
+    (_f = controls.onRequest) == null ? void 0 : _f.call(controls, {
       provider: "claude",
       executable: this.options.executable,
       args: args.map(
@@ -38510,8 +38684,8 @@ var ClaudeCodeCliRuntime = class {
       ),
       input: image ? `<VAM prompt and ${image.media_type} image via stdin>` : "<VAM prompt via stdin>"
     });
-    (_g = (_f = this.options).onLog) == null ? void 0 : _g.call(
-      _f,
+    (_h = (_g = this.options).onLog) == null ? void 0 : _h.call(
+      _g,
       "info",
       t(
         "log.claude_starting_0_1",
@@ -38519,11 +38693,17 @@ var ClaudeCodeCliRuntime = class {
         t(webSearch ? "log.claude_web_search_available" : "log.claude_vam_context_only")
       )
     );
+    if (warmArgs) {
+      try {
+        (_i = controls.onMilestones) == null ? void 0 : _i.call(controls, { prespawned: !!warm });
+      } catch (e) {
+      }
+    }
     return new Promise((resolve, reject) => {
       var _a2, _b2, _c2, _d2, _e2, _f2;
       let child;
       try {
-        child = this.spawn(this.options.executable, args, {
+        child = warm != null ? warm : this.spawn(this.options.executable, args, {
           cwd: this.options.cwd,
           env: this.options.env,
           stdio: ["pipe", "pipe", "pipe"],
@@ -38533,7 +38713,7 @@ var ClaudeCodeCliRuntime = class {
         reject(error instanceof Error ? error : new Error(String(error)));
         return;
       }
-      let stdout = "", stderr = "", settled = false, accepted = false, inputOpen = Boolean(controls.onSteer || image);
+      let stdout = "", stderr = "", settled = false, accepted = false, inputOpen = Boolean(controls.onSteer || image || warm);
       let streamBuffer = "", streamText = "", currentText = "", finalResult = "";
       const streaming = !!controls.onText && !outputSchema || !!image || observed;
       const activity = new ClaudeWebActivity(controls.onWebSearchEvent);
@@ -38543,7 +38723,7 @@ var ClaudeCodeCliRuntime = class {
         onStructuredDelta: controls.onStructuredDelta
       }) : null;
       const readStreamLine = (line) => {
-        var _a3, _b3, _c3, _d3, _e3, _f3, _g2, _h;
+        var _a3, _b3, _c3, _d3, _e3, _f3, _g2, _h2;
         if (!line.trim().startsWith("{")) return;
         let parsedLine;
         try {
@@ -38582,7 +38762,7 @@ var ClaudeCodeCliRuntime = class {
           }).join("\n");
           if (complete && !streamText.endsWith(complete)) {
             currentText = complete;
-            (_h = controls.onText) == null ? void 0 : _h.call(controls, [streamText, currentText].filter(Boolean).join("\n\n"));
+            (_h2 = controls.onText) == null ? void 0 : _h2.call(controls, [streamText, currentText].filter(Boolean).join("\n\n"));
           }
         }
       };
@@ -38724,7 +38904,7 @@ var ClaudeCodeCliRuntime = class {
       (_e2 = (_d2 = child.stdin).on) == null ? void 0 : _e2.call(_d2, "error", () => {
       });
       try {
-        if (controls.onSteer || image) {
+        if (controls.onSteer || image || warm) {
           const sendInput = (text11, accepted2, withImage = false) => {
             if (!inputOpen || settled) throw new Error("This Coffee Tables response has already ended.");
             const content = [...withImage && image ? [{ type: "image", source: image }] : [], { type: "text", text: text11 }];
@@ -38759,6 +38939,111 @@ var ClaudeCodeCliRuntime = class {
   }
 };
 
+// ai/runtime/claude-warm-pool.ts
+var WARM_IDLE_MS = 18e4;
+var KILL_ESCALATION_MS = 1500;
+var realClock = {
+  setTimeout: (callback, ms) => window.setTimeout(callback, ms),
+  clearTimeout: (handle) => window.clearTimeout(handle)
+};
+var ClaudeWarmPool = class {
+  constructor(options = {}) {
+    __publicField(this, "slot", null);
+    __publicField(this, "clock");
+    __publicField(this, "idleMs");
+    __publicField(this, "onLog");
+    var _a, _b;
+    this.clock = (_a = options.clock) != null ? _a : realClock;
+    this.idleMs = (_b = options.idleMs) != null ? _b : WARM_IDLE_MS;
+    this.onLog = options.onLog;
+  }
+  /** True when a warm process is waiting. */
+  get size() {
+    return this.slot ? 1 : 0;
+  }
+  /** Starts a process for `key` unless one for the same key is already waiting (then only the idle time restarts). */
+  prewarm(key2, start) {
+    if (this.slot && this.slot.key === key2 && !this.slot.exited) {
+      this.armIdle(this.slot);
+      return true;
+    }
+    this.release();
+    let child;
+    try {
+      child = start();
+    } catch (e) {
+      return false;
+    }
+    const slot = { key: key2, child, idleTimer: void 0, exited: false };
+    const drop = () => {
+      slot.exited = true;
+      this.clearIdle(slot);
+      if (this.slot === slot) this.slot = null;
+    };
+    child.on("error", drop);
+    child.on("close", drop);
+    this.slot = slot;
+    this.armIdle(slot);
+    return true;
+  }
+  /** The waiting process if it was started for exactly `key`; a process for another key is killed and null returned. */
+  take(key2) {
+    const slot = this.slot;
+    if (!slot) return null;
+    if (slot.exited) {
+      this.slot = null;
+      return null;
+    }
+    if (slot.key !== key2) {
+      this.release();
+      return null;
+    }
+    this.slot = null;
+    this.clearIdle(slot);
+    return slot.child;
+  }
+  /** Kills the waiting process (an unused dialog, Stop, unload, runtime reset). Safe to call at any time. */
+  release() {
+    const slot = this.slot;
+    if (!slot) return;
+    this.slot = null;
+    this.clearIdle(slot);
+    if (slot.exited) return;
+    this.kill(slot);
+  }
+  kill(slot) {
+    try {
+      slot.child.kill("SIGTERM");
+    } catch (e) {
+      return;
+    }
+    const escalate = this.clock.setTimeout(() => {
+      if (slot.exited) return;
+      try {
+        slot.child.kill("SIGKILL");
+      } catch (e) {
+      }
+    }, KILL_ESCALATION_MS);
+    slot.child.on("close", () => this.clock.clearTimeout(escalate));
+  }
+  armIdle(slot) {
+    this.clearIdle(slot);
+    slot.idleTimer = this.clock.setTimeout(() => {
+      var _a;
+      slot.idleTimer = void 0;
+      if (this.slot === slot) {
+        (_a = this.onLog) == null ? void 0 : _a.call(this, "idle");
+        this.release();
+      }
+    }, this.idleMs);
+  }
+  clearIdle(slot) {
+    if (slot.idleTimer === void 0) return;
+    this.clock.clearTimeout(slot.idleTimer);
+    slot.idleTimer = void 0;
+  }
+};
+
 // core/ai-runtime-service.ts
 function currentProcessEnvironment() {
   var _a, _b;
@@ -38785,9 +39070,21 @@ var AiRuntimeService = class {
     __publicField(this, "localCodexRuntime", null);
     /** One Claude runtime per executable and folder, so what it learns about the CLI (stream options) is remembered. */
     __publicField(this, "claudeRuntime", null);
+    /** One idle Claude process at most, started when the research dialog opens (see ClaudeWarmPool). */
+    __publicField(this, "warmPool");
+    this.warmPool = new ClaudeWarmPool({ clock: options.warmClock });
+  }
+  /** Kills the pre-started Claude process, if any (unused dialog, Stop). */
+  releaseWarm() {
+    this.warmPool.release();
+  }
+  /** True while a pre-started Claude process is waiting. */
+  hasWarm() {
+    return this.warmPool.size > 0;
   }
   reset() {
     var _a, _b;
+    this.warmPool.release();
     (_a = this.codexRuntime) == null ? void 0 : _a.stop();
     (_b = this.localCodexRuntime) == null ? void 0 : _b.stop();
     this.codexRuntime = null;
@@ -38823,6 +39120,8 @@ var AiRuntimeService = class {
       executable,
       cwd: pluginDirectory,
       env: this.cliEnvironment(executable),
+      warmPool: this.warmPool,
+      ...this.options.claudeSpawn ? { spawn: this.options.claudeSpawn } : {},
       onLog: (level, message) => this.options.onLog(level, message)
     });
     this.claudeRuntime = { key: key2, runtime };
@@ -38974,13 +39273,13 @@ var ShallowExpansionCoordinator = class {
 // experiences/visual-map/research-progress.ts
 var PREVIEW_THROTTLE_MS = 200;
 var DETAIL_TAIL_CHARS = 600;
-var realClock = {
+var realClock2 = {
   now: () => Date.now(),
   setTimeout: (callback, ms) => window.setTimeout(callback, ms),
   clearTimeout: (handle) => window.clearTimeout(handle)
 };
 var ResearchProgressStore = class {
-  constructor(clock = realClock) {
+  constructor(clock = realClock2) {
     this.clock = clock;
     __publicField(this, "entries", /* @__PURE__ */ new Map());
     __publicField(this, "listeners", /* @__PURE__ */ new Set());
@@ -39138,44 +39437,6 @@ var aim_gap_audit_schema_default = aimGapAuditSchema;
 
 // ai/types.ts
 var SEARCH_STATUSES = ["completed", "failed", "not_attempted"];
-
-// response-schema.json
-var response_schema_default = {
-  $schema: "https://json-schema.org/draft/2020-12/schema",
-  type: "object",
-  properties: {
-    summary: {
-      type: "string",
-      description: "\u9069\u5408\u5FC3\u667A\u5716\u7684\u4E00\u53E5\u7E41\u9AD4\u4E2D\u6587\u7D50\u8AD6\uFF0C80 \u5B57\u5167"
-    },
-    detail: {
-      type: "string",
-      description: "\u5B8C\u6574\u7684\u7E41\u9AD4\u4E2D\u6587 Markdown \u5206\u6790"
-    },
-    suggestions: {
-      type: "array",
-      items: { type: "object", properties: { title: { type: "string" }, task: { type: "string" }, contribution: { type: "string" }, parentTitle: { type: "string" } }, required: ["title", "task", "contribution", "parentTitle"], additionalProperties: false }
-    },
-    visualReferences: {
-      type: "array",
-      items: {
-        type: "object",
-        properties: {
-          title: { type: "string" },
-          imageUrl: { type: "string" },
-          sourceUrl: { type: "string" },
-          description: { type: "string" },
-          palette: { type: "array", items: { type: "string" } },
-          formula: { type: "string" }
-        },
-        required: ["title", "imageUrl", "sourceUrl", "description", "palette", "formula"],
-        additionalProperties: false
-      }
-    }
-  },
-  required: ["summary", "detail", "suggestions", "visualReferences"],
-  additionalProperties: false
-};
 
 // core/steps/task/schemas.ts
 function taskResponseShape(context) {
@@ -39664,7 +39925,7 @@ function cancelled() {
   error.name = "AbortError";
   return error;
 }
-var realClock2 = {
+var realClock3 = {
   now: () => Date.now(),
   setTimeout: (callback, ms) => window.setTimeout(callback, ms),
   clearTimeout: (handle) => window.clearTimeout(handle)
@@ -39773,7 +40034,7 @@ var AiTaskService = class {
           task: { ...controls, onWebSearchEvent, ...setup ? { ...setup.hooks, signal: setup.signal } : {} },
           finish: "caller",
           requestLog: "request",
-          ...setup ? { exchangeId: setup.exchangeId, extraMilestones: setup.extraMilestones } : {},
+          ...setup ? { exchangeId: setup.exchangeId, extraMilestones: setup.extraMilestones, afterReply: setup.afterReply } : {},
           onExchange: (id) => {
             exchangeId = id;
             setup == null ? void 0 : setup.onExchange(id);
@@ -39857,7 +40118,7 @@ var AiTaskService = class {
    */
   async sendObserved(observer, taskSignal, accepted, send) {
     var _a;
-    const clock = (_a = this.options.clock) != null ? _a : realClock2;
+    const clock = (_a = this.options.clock) != null ? _a : realClock3;
     const iso = () => new Date(clock.now()).toISOString();
     const safe = (callback) => {
       try {
@@ -39978,6 +40239,9 @@ var AiTaskService = class {
         },
         onExchange: (id) => {
           exchangeId = id;
+        },
+        afterReply: () => {
+          if (!live()) throw cancelled();
         }
       };
       const replaced = new Promise(
@@ -43844,6 +44108,30 @@ ${t("ui.organize_link_wait_hint")}`;
       onWebSearchEvent,
       observer
     );
+  }
+  /**
+   * Starts an idle Claude CLI while the research dialog is open, so confirming only has to write the prompt. No model
+   * call happens until then; a run with different settings kills it and starts cold.
+   */
+  prewarmClaude(model, reasoning) {
+    if (providerForModel(model) !== "claude") {
+      this.aiRuntime.releaseWarm();
+      return;
+    }
+    try {
+      const selected = normalizeReasoningLevel(reasoning != null ? reasoning : this.settings.cliReasoning);
+      this.claudeCli(this.pluginDirectory()).prewarm(
+        providerModelId(model),
+        selected === "auto" ? "low" : selected,
+        response_schema_default,
+        true
+      );
+    } catch (e) {
+    }
+  }
+  /** Kills the pre-started Claude process (dialog closed unused, run stopped). */
+  releaseWarmClaude() {
+    this.aiRuntime.releaseWarm();
   }
   /** Aborts the background chart step of one note (a new run on that note replaces it), or of every note. */
   abortChartJobs(path) {

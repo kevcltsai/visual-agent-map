@@ -46,6 +46,7 @@ export class ClaudeTranscriptFacts {
   private usage: AiMilestones["usage"];
   private texts: string[] = [];
   private kept = 0;
+  private incomplete = false;
 
   constructor(private readonly fromStream = false) {}
 
@@ -88,11 +89,16 @@ export class ClaudeTranscriptFacts {
       this.enforce = true;
   }
 
+  /** A record was lost (an unreadable line): what came before a tool call can no longer be claimed either way. */
+  markIncomplete(): void {
+    this.incomplete = true;
+  }
+
   milestones(): AiMilestones {
     const chars = this.texts.reduce((sum, text) => sum + text.trim().length, 0);
     return {
       ...(this.usage ? { usage: this.usage } : {}),
-      ...(this.structured
+      ...(this.structured && !this.incomplete
         ? {
             textBeforeTool: this.texts.some(looksLikeAnswer) || chars > ANSWER_TEXT_CHARS,
             textBeforeToolChars: chars,
@@ -149,6 +155,8 @@ export class ClaudeStreamObserver {
   stop(): void {
     if (this.stopped) return;
     this.stopped = true;
+    // The lost line may have held the text or tool call: report neither textBeforeTool nor enforceRetry as false.
+    this.facts.markIncomplete();
     this.call(() => this.hooks.onStructuredDelta?.(null));
   }
 

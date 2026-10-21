@@ -964,3 +964,44 @@ integrationTest('outline import dialog: first option is "Use the default (Standa
   open(true, undefined); await tick();
   assert.equal('toneId' in requests[3], false); assert.equal('detailTemplateId' in requests[3], false);
 });
+
+// ---- S6: the research dialog pre-starts the CLI and releases it when it is not used ----
+const warmSpies = () => { const spy = { prewarms: [], releases: 0 }; spy.plugin = { prewarmClaude: (model, reasoning) => spy.prewarms.push([model, reasoning]), releaseWarmClaude: () => { spy.releases++; } }; return spy; };
+integrationTest('S6 dialog: opening the research step pre-starts the CLI with the dialog\'s model and reasoning; closing it unused releases the process', () => {
+  const spy = warmSpies();
+  const h = nextStepHarness({ plugin: spy.plugin, modelSettings: { topicStatus: 'idea' } });
+  assert.deepEqual(spy.prewarms, [['gpt-test', 'low']], 'one pre-start on open');
+  assert.equal(spy.releases, 0);
+  h.modal.close();
+  assert.equal(spy.releases, 1, 'closed without starting AI: the waiting process is killed');
+});
+integrationTest('S6 dialog: confirm hands the process to the run (closing the hidden dialog does not kill it); only Stop or an abort does', async () => {
+  const spy = warmSpies();
+  const controllers = [];
+  const h = nextStepHarness({ plugin: spy.plugin, modelSettings: { topicStatus: 'idea', background: { begin: controller => controllers.push(controller), end: () => {}, completed: () => {} } } });
+  button(h.actions(), 'Confirm research task').click(); await tick(); await tick();
+  assert.equal(h.calls.research.length, 1);
+  assert.equal(spy.releases, 0, 'the run owns the process now');
+  h.modal.close();
+  assert.equal(spy.releases, 0, 'the dialog hid itself on confirm; closing it must not kill the process the run is about to take');
+  assert.equal(controllers.length, 1);
+  controllers[0].abort();
+  assert.equal(spy.releases, 1, 'Stop before the provider took the process kills it');
+});
+integrationTest('S6 dialog: switching to another step releases the process, and a model change pre-starts the new command', () => {
+  const spy = warmSpies();
+  const h = nextStepHarness({ plugin: spy.plugin, modelSettings: { topicStatus: 'idea' } });
+  const n = spy.prewarms.length;
+  const model = byLabel(h.modal.contentEl, 'Model');
+  model.value = 'gpt-other'; model.fire('change');
+  assert.equal(spy.prewarms.length, n + 1, 'a changed model pre-starts again (the pool kills the old command)');
+  const cards = findAll(cardsOf(h), i => i.tag === 'button' && i.attrs && i.attrs.role === 'radio');
+  assert.equal(cards.length, 3, cards.map(c => c.text).join('|'));
+  const before = spy.releases;
+  cards[1].click();
+  assert.equal(spy.releases, before + 1, 'leaving the research step releases the process');
+});
+integrationTest('S6 dialog: a plugin without the pre-start methods (older test doubles) still opens and closes', () => {
+  const h = nextStepHarness({});
+  assert.doesNotThrow(() => h.modal.close());
+});

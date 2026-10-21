@@ -16133,17 +16133,20 @@ ${body}`);
    * VAM note whose links change. Computed before anything is moved, so a failure writes nothing.
    */
   async planLinkRewrites(item, moves, resolvedLinks) {
-    const owned = (file) => {
+    const owned = async (file) => {
       var _a;
-      const fm = (_a = this.app.metadataCache.getFileCache(file)) == null ? void 0 : _a.frontmatter;
-      return marker2(fm == null ? void 0 : fm["agent-map-node"]) || marker2(fm == null ? void 0 : fm["visual-agent-map"]);
+      const cached = (_a = this.app.metadataCache.getFileCache(file)) == null ? void 0 : _a.frontmatter;
+      if (marker2(cached == null ? void 0 : cached["agent-map-node"]) || marker2(cached == null ? void 0 : cached["visual-agent-map"])) return true;
+      const fm = frontmatter(await this.app.vault.read(file));
+      return marker2(fm["agent-map-node"]) || marker2(fm["visual-agent-map"]);
     };
     const foreign = /* @__PURE__ */ new Set(), candidates = /* @__PURE__ */ new Map();
     for (const [linkerPath, targets] of Object.entries(resolvedLinks)) {
       if (!Object.keys(targets).some((path) => moves.has(path))) continue;
       const linker = this.app.vault.getAbstractFileByPath(linkerPath);
       if (!linker) continue;
-      if (linker instanceof import_obsidian13.TFile && linker.extension === "md" && owned(linker)) candidates.set(linkerPath, linker);
+      if (linker instanceof import_obsidian13.TFile && linker.extension === "md" && await owned(linker))
+        candidates.set(linkerPath, linker);
       else foreign.add(linkerPath);
     }
     const needles = item instanceof import_obsidian13.TFolder ? [`${item.path}/`] : [item.path.replace(/\.md$/i, ""), item.basename];

@@ -169,6 +169,85 @@ test('relocate: renaming a topic folder rewrites full-path links to the notes in
   assert.ok(contents.get(moved(g.path)).includes(`[[${stem(moved(b.path))}]]`));
 });
 
+// The merge move sequence of the view: the parent cites its three children, a new merged note cites them as sources,
+// then each source is parked in turn. `lag` makes the metadata cache forget the frontmatter of every note VAM has
+// created or written (Obsidian's cache lags behind a fresh write), the situation a later move of the same operation sees.
+async function mergeScenario({ lag = true } = {}) {
+  const env = setup();
+  const { repo, app, contents } = env;
+  const touched = new Set();
+  if (lag) {
+    const cache = app.metadataCache.getFileCache, process = app.vault.process, create = app.vault.create;
+    app.metadataCache.getFileCache = file => (touched.has(file.path) ? { frontmatter: undefined } : cache(file));
+    app.vault.process = async (file, change) => { touched.add(file.path); return process(file, change); };
+    app.vault.create = async (path, content) => { touched.add(path); return create(path, content); };
+  }
+  const mapPath = await repo.createMap('M');
+  const doc = await repo.readMap(mapPath);
+  const make = async (title, parent) => {
+    const note = await repo.createNote(title, 'model-a', doc, mapPath, 'workspace');
+    if (parent) note.parentId = parent.id;
+    doc.nodes.push(note);
+    return note;
+  };
+  const core = await make('Core');
+  const sources = [];
+  for (const title of ['M1', 'M2', 'M3']) sources.push(await make(title, core));
+  await repo.saveMap(mapPath, doc);
+  await repo.rebuildDerivedData();
+  const merged = await repo.createNote('Merged', 'model-a', doc, mapPath, 'workspace', { detail: 'x' });
+  const footnotes = sources.map((source, index) => `[^${index + 1}]: [[${source.path}|${source.title}]]`).join('\n');
+  await repo.updateNote(merged.path, { sourcePaths: sources.map(source => source.path), status: 'completed', detail: `Body.[^1]\n\n${footnotes}\n` });
+  touched.add(merged.path);
+  return { ...env, mapPath, core, sources, merged };
+}
+const unresolvedLinks = (env) => {
+  const out = [];
+  for (const [path, text] of env.contents) {
+    if (!path.endsWith('.md')) continue;
+    const body = text.replace(/^---\n[\s\S]*?\n---\n/, '').replace(/`[^`]*`/g, '');
+    for (const match of body.matchAll(/!?\[\[([^\]|#\n]+)/g)) if (!env.app.metadataCache.getFirstLinkpathDest(match[1].trim())) out.push([path, match[1]]);
+  }
+  return out;
+};
+
+for (const lag of [false, true]) {
+  test(`relocate: merging three siblings moves every source without Obsidian's dialog and undo restores them (cache lag: ${lag})`, async () => {
+    const env = await mergeScenario({ lag });
+    const { repo, contents, calls, notices, mapPath, sources, merged } = env;
+    const before = snapshot(contents);
+    const folder = repo.topicFolder(mapPath, 'Unassigned');
+    const parked = [];
+    for (const source of sources) parked.push(await repo.moveUnique(source.path, folder));
+    assert.deepEqual(calls.file, [], 'no Obsidian rename, so no Update links dialog');
+    assert.equal(calls.vault.length, 3);
+    assert.deepEqual(notices, []);
+    assert.deepEqual(unresolvedLinks(env), [], 'every link still resolves');
+    const text = contents.get(merged.path);
+    for (const path of parked) assert.ok(text.includes(stem(path)), 'the merged note follows its source');
+    assert.ok(text.includes('source-notes:'), 'the source-notes frontmatter is left for VAM to repair');
+    for (const [index, source] of sources.entries()) await repo.moveExact(parked[index], source.path);
+    assert.deepEqual(calls.file, [], 'undo also avoids the dialog');
+    assert.deepEqual(unresolvedLinks(env), []);
+    const strip = map => [...map.entries()].map(([path, value]) => [path, withoutUpdated(String(value))]).sort();
+    assert.deepEqual(strip(contents), strip(before), 'undo restores every note except the updated line');
+  });
+}
+
+test('relocate: a note that is not VAM-owned stays foreign even when a VAM note links to the same source', async () => {
+  const env = await mergeScenario({ lag: true });
+  const { repo, app, contents, calls, notices, mapPath, sources } = env;
+  await app.vault.create('My Notes/Plan.md', `Reading [[${stem(sources[1].path)}]] tomorrow.`);
+  const plan = contents.get('My Notes/Plan.md');
+  const folder = repo.topicFolder(mapPath, 'Unassigned');
+  await repo.moveUnique(sources[0].path, folder);
+  assert.deepEqual(calls.file, []);
+  await repo.moveUnique(sources[1].path, folder);
+  assert.equal(calls.file.length, 1, 'the user note hands the second move to Obsidian');
+  assert.equal(notices.length, 1);
+  assert.equal(contents.get('My Notes/Plan.md'), plan, 'VAM never edits a non-VAM note');
+});
+
 test('link-rewrite: retargetWikilink keeps embeds, extension, heading and alias, and refuses relative or partial paths', () => {
   const { retargetWikilink } = linkRewrite;
   assert.equal(retargetWikilink('[[A/B/X]]', 'A/B/X.md', 'C/X.md'), '[[C/X]]');

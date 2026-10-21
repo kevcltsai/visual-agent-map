@@ -341,7 +341,7 @@ export function safeName(title: string): string {
 
 /** Case- and form-insensitive name used to detect a collision on a case-insensitive file system. */
 function foldName(value: string): string {
-  return value.normalize("NFC").toUpperCase().toLowerCase();
+  return value.normalize("NFC").toLowerCase().replace(/ς/g, "σ");
 }
 
 /** Folds a file name without its extension, so a final sigma before ".md" folds as it does inside the name. */
@@ -354,7 +354,7 @@ function foldEntryName(name: string, isFile: boolean): string {
 export function linkAlias(title: string, fallback: string): string {
   const alias = title
     .replace(/[[\]|`\r\n]/g, " ")
-    .replace(/%%/g, "%")
+    .replace(/%{2,}/g, "%")
     .replace(/\s+/g, " ")
     .trim();
   return alias || fallback;
@@ -2346,7 +2346,7 @@ export class Repository {
       : normalizePath(`${parentPath(root.path)}/${safeName(title)}`);
     if (
       desired !== root.path &&
-      (this.app.vault.getAbstractFileByPath(desired) || this.foldedSibling(desired, root.path))
+      (this.app.vault.getAbstractFileByPath(desired) || (!targetRoot && this.foldedSibling(desired, root.path)))
     )
       throw new Error(this.message("error.topic_folder_exists"));
     const originalRoot = root.path;

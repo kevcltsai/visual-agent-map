@@ -7,6 +7,7 @@ const assert = require('node:assert/strict');
 const { load, obsidian, fixture, TFile, TFolder } = require('./support.cjs');
 const { safeName, linkAlias } = load('repository.ts', { obsidian });
 
+const noLoneSurrogate = value => !/[\ud800-\udbff](?![\udc00-\udfff])|(?<![\ud800-\udbff])[\udc00-\udfff]/.test(value) && !value.includes('\ufffd');
 const fold = name => name.normalize('NFC').toUpperCase().toLowerCase();
 function foldingVault(language = 'en') {
   const env = fixture(language);
@@ -115,6 +116,9 @@ test('FG20-13a linkAlias removes link-breaking characters and falls back to the 
   assert.ok(!/[[\]|`\n]/.test(alias)); assert.ok(!alias.includes('%%'));
   assert.equal(linkAlias('a | b\n c', 'folder'), 'a b c');
   assert.equal(linkAlias('[[]]|`', 'folder'), 'folder');
+  assert.equal(linkAlias('a%%%b', 'folder'), 'a%b');
+  assert.equal(linkAlias('a%%%%b', 'folder'), 'a%b');
+  assert.ok(!linkAlias('%%%%%x%%%', 'folder').includes('%%'));
 });
 
 test('FG20-13a the derived Topic link of a note uses the safe alias and the note still parses', async () => {
@@ -146,4 +150,19 @@ test('DP2 existing paths made by the old 80-cut stay byte-identical through open
   await env.repo.rebuildDerivedData(); await env.repo.normalizeGeneratedNoteFilenames();
     assert.deepEqual((await env.repo.readMap(mapPath)).nodes.map(node => node.path), nodePaths);
   assert.deepEqual(env.paths(), before);
+});
+
+test('names fold only case and sigma: Straße and Strasse stay distinct, Greek cases still collide', async () => {
+  const env = foldingVault(); const mapPath = await env.repo.createMap('M'); const doc = await env.repo.readMap(mapPath);
+  const a = await addNote(env, 'Straße', mapPath, doc); const b = await addNote(env, 'Strasse', mapPath, doc);
+  assert.ok(a.path.endsWith('/Straße.md')); assert.ok(b.path.endsWith('/Strasse.md'));
+  const g = await addNote(env, 'λόγος', mapPath, doc);
+  assert.ok((await addNote(env, 'ΛΌΓΟΣ', mapPath, doc)).path.endsWith('ΛΌΓΟΣ 2.md'));
+  assert.ok((await addNote(env, 'λόγοσ', mapPath, doc)).path.endsWith('λόγοσ 3.md')); assert.ok(g);
+});
+
+test('renameTopic with an explicit targetRoot keeps the exact-match check (no case-folded block)', async () => {
+  const env = foldingVault('en'); await env.repo.createMap('Alpha'); const other = await env.repo.createMap('Beta');
+  const desired = 'Agent Workspace/Mind Maps/ALPHA';
+  assert.equal(await env.repo.renameTopic(other, 'Beta', desired), `${desired}/Map.md`);
 });

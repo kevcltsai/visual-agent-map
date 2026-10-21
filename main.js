@@ -14987,14 +14987,14 @@ function safeName(title) {
   return cut.replace(/[\s.]+$/, "") || t("note.untitled_topic");
 }
 function foldName(value) {
-  return value.normalize("NFC").toUpperCase().toLowerCase();
+  return value.normalize("NFC").toLowerCase().replace(/ς/g, "\u03C3");
 }
 function foldEntryName(name, isFile) {
   const dot = isFile ? name.lastIndexOf(".") : -1;
   return dot > 0 ? `${foldName(name.slice(0, dot))}.${name.slice(dot + 1).toLowerCase()}` : foldName(name);
 }
 function linkAlias(title, fallback) {
-  const alias = title.replace(/[[\]|`\r\n]/g, " ").replace(/%%/g, "%").replace(/\s+/g, " ").trim();
+  const alias = title.replace(/[[\]|`\r\n]/g, " ").replace(/%{2,}/g, "%").replace(/\s+/g, " ").trim();
   return alias || fallback;
 }
 function aliasFallback(mapPath) {
@@ -16675,7 +16675,7 @@ ${body}`;
     if (!(root instanceof import_obsidian13.TFolder) || !(isManagedMapPath(this.settings, mapPath) || this.pendingContainers.some((c) => mapPath.startsWith(`${c}/`))))
       throw new Error(this.message("error.legacy_map_view_only"));
     const desired = targetRoot ? (0, import_obsidian13.normalizePath)(targetRoot) : (0, import_obsidian13.normalizePath)(`${parentPath(root.path)}/${safeName(title)}`);
-    if (desired !== root.path && (this.app.vault.getAbstractFileByPath(desired) || this.foldedSibling(desired, root.path)))
+    if (desired !== root.path && (this.app.vault.getAbstractFileByPath(desired) || !targetRoot && this.foldedSibling(desired, root.path)))
       throw new Error(this.message("error.topic_folder_exists"));
     const originalRoot = root.path;
     const originalMapPath = `${originalRoot}/Map.md`, originalContent = await this.app.vault.read(this.file(originalMapPath));

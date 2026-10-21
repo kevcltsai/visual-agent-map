@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### Fixed
+
+- Merging, removing, archiving, renaming and undoing topics no longer pops up Obsidian's "Update links" dialog when only VAM notes link to the moved cards: VAM updates its own links itself. If one of your own notes links to a moved card, VAM shows a short notice first and Obsidian asks as before, so your links are never silently broken.
+
 ## [0.24.0] - 2026-10-22
 
 ### Added

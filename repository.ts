@@ -1,4 +1,4 @@
-import { App, TFile, TFolder, normalizePath, parseYaml, stringifyYaml } from "obsidian";
+import { App, Notice, TFile, TFolder, normalizePath, parseYaml, stringifyYaml } from "obsidian";
 import { resolveAimContentLanguage } from "./experiences/aim/content-language";
 import { createHash } from "node:crypto";
 import { t, translate, type TranslationKey } from "./i18n";
@@ -9,6 +9,7 @@ import { normalizeReasoningLevel } from "./ai/task-policy";
 import type { PromptPreset } from "./ai/prompt-presets";
 import { sourcesHeadingKeys, standardTemplate, type DetailTemplate } from "./ai/detail-templates";
 import { fencedLines } from "./ai/markdown-blocks";
+import { findWikilinks, linkPathOf, rewriteLinkTargets, splitFrontmatter } from "./core/link-rewrite";
 import {
   managedHeadingValue,
   managedSectionValue,
@@ -1562,7 +1563,7 @@ export class Repository {
     const file = this.file(path),
       desired = normalizePath(`${folder}/${baseName(path)}`);
     const target = this.app.vault.getAbstractFileByPath(desired) ? this.unique(folder, file.basename) : desired;
-    await this.app.fileManager.renameFile(file, target);
+    await this.relocate(file, target);
     await this.replaceSourcePath(path, target);
     return target;
   }
@@ -1571,7 +1572,7 @@ export class Repository {
     await this.folder(parentPath(target));
     if (this.app.vault.getAbstractFileByPath(target))
       throw new Error(`${this.message("error.target_exists")}: ${target}`);
-    await this.app.fileManager.renameFile(this.file(path), target);
+    await this.relocate(this.file(path), target);
     await this.replaceSourcePath(path, target);
   }
 
@@ -1582,9 +1583,124 @@ export class Repository {
     if (desired === path) return path;
     const target =
       exactTarget ?? (this.app.vault.getAbstractFileByPath(desired) ? this.unique(folder, title) : desired);
-    await this.app.fileManager.renameFile(this.file(path), target);
+    await this.relocate(this.file(path), target);
     await this.replaceSourcePath(path, target);
     return target;
+  }
+
+  /**
+   * Moves or renames a note or folder. When every note that links to it is a VAM note, the move is made with
+   * `vault.rename` (no "Update links" dialog) and the links in those VAM notes are rewritten here. When any other
+   * note links to it, Obsidian's own `renameFile` runs so the user's link preference is honoured, after one Notice.
+   * The link rewrite reads the notes' current text, not the metadata cache, so a note rewritten a moment ago by the
+   * previous move of the same operation is handled correctly. If a rewrite cannot be applied (the note changed in the
+   * meantime) this undoes its own writes and the move, then throws, so the caller's rollback sees an unmoved note.
+   */
+  private async relocate(item: TFile | TFolder, target: string): Promise<void> {
+    const resolvedLinks = this.app.metadataCache.resolvedLinks as Record<string, Record<string, number>> | undefined;
+    if (!resolvedLinks) {
+      await this.app.fileManager.renameFile(item, target);
+      return;
+    }
+    const moves = new Map<string, string>();
+    const collect = (entry: TFile | TFolder): void => {
+      if (entry instanceof TFile) moves.set(entry.path, `${target}${entry.path.slice(item.path.length)}`);
+      else for (const child of entry.children) if (child instanceof TFile || child instanceof TFolder) collect(child);
+    };
+    collect(item);
+    const plan = await this.planLinkRewrites(item, moves, resolvedLinks);
+    if (plan.foreign > 0) {
+      new Notice(translate(this.settings.language, "ui.move_links_dialog_notice_0", plan.foreign));
+      await this.app.fileManager.renameFile(item, target);
+      return;
+    }
+    const origin = item.path;
+    await this.app.vault.rename(item, target);
+    const written: Array<{ path: string; before: string; after: string }> = [];
+    try {
+      for (const edit of plan.edits) {
+        const path = moves.get(edit.path) ?? edit.path,
+          file = this.app.vault.getAbstractFileByPath(path);
+        if (!(file instanceof TFile)) throw new Error(`${this.message("error.file_not_found")}: ${path}`);
+        await this.app.vault.process(file, current => {
+          if (current !== edit.before)
+            throw new Error(`Links in ${path} could not be updated because the note changed.`);
+          return edit.after;
+        });
+        written.push({ path, before: edit.before, after: edit.after });
+      }
+    } catch (error) {
+      try {
+        for (const entry of written.reverse()) {
+          const file = this.app.vault.getAbstractFileByPath(entry.path);
+          if (file instanceof TFile)
+            await this.app.vault.process(file, current => (current === entry.after ? entry.before : current));
+        }
+        const moved = this.app.vault.getAbstractFileByPath(target);
+        if (moved) await this.app.vault.rename(moved, origin);
+      } catch (rollbackError) {
+        const original = error instanceof Error ? error.message : String(error);
+        throw new Error(
+          `Move failed (${original}); undoing it also failed (${rollbackError instanceof Error ? rollbackError.message : String(rollbackError)}).`
+        );
+      }
+      throw error;
+    }
+  }
+
+  /**
+   * Which notes would have to change for `moves` (old path to new path): `foreign` counts notes Obsidian must update
+   * (any non-VAM note, or a VAM note whose link cannot be rewritten here); `edits` holds the complete new text of each
+   * VAM note whose links change. Computed before anything is moved, so a failure writes nothing.
+   */
+  private async planLinkRewrites(
+    item: TFile | TFolder,
+    moves: ReadonlyMap<string, string>,
+    resolvedLinks: Record<string, Record<string, number>>
+  ): Promise<{ foreign: number; edits: Array<{ path: string; before: string; after: string }> }> {
+    const owned = (file: TFile): boolean => {
+      const fm = this.app.metadataCache.getFileCache(file)?.frontmatter;
+      return marker(fm?.["agent-map-node"]) || marker(fm?.["visual-agent-map"]);
+    };
+    const foreign = new Set<string>(),
+      candidates = new Map<string, TFile>();
+    for (const [linkerPath, targets] of Object.entries(resolvedLinks)) {
+      if (!Object.keys(targets).some(path => moves.has(path))) continue;
+      const linker = this.app.vault.getAbstractFileByPath(linkerPath);
+      // A path that no longer exists is a cache entry that lags behind a move VAM just made; the note is found at its new path below.
+      if (!linker) continue;
+      if (linker instanceof TFile && linker.extension === "md" && owned(linker)) candidates.set(linkerPath, linker);
+      else foreign.add(linkerPath);
+    }
+    // The cache can lag behind VAM's own recent writes, so VAM notes are also found by their current text.
+    // Moving a folder keeps every file name, so only full-path links (which contain the folder path) can change.
+    const needles = item instanceof TFolder ? [`${item.path}/`] : [item.path.replace(/\.md$/i, ""), item.basename];
+    for (const file of await this.markedFiles("agent-map-node")) {
+      if (candidates.has(file.path) || foreign.has(file.path)) continue;
+      const text = await this.app.vault.cachedRead(file);
+      if (needles.some(needle => text.includes(needle))) candidates.set(file.path, file);
+    }
+    const edits: Array<{ path: string; before: string; after: string }> = [];
+    for (const [path, file] of candidates) {
+      const before = await this.app.vault.read(file),
+        resolve = (linkPath: string): string | undefined =>
+          linkPath ? this.app.metadataCache.getFirstLinkpathDest(linkPath, path)?.path : undefined;
+      const { head, body } = splitFrontmatter(before);
+      // Frontmatter links are VAM's own `agent-map-references`, regenerated by rebuildDerivedData; any other key is the user's.
+      const fm = frontmatter(before);
+      const userKeyLink = Object.entries(fm).some(
+        ([key, value]) =>
+          key !== "agent-map-references" &&
+          findWikilinks(JSON.stringify(value)).some(link => moves.has(resolve(linkPathOf(link.target)) ?? ""))
+      );
+      const result = rewriteLinkTargets(body, resolve, moves);
+      if (userKeyLink || result.unsupported.length) {
+        foreign.add(path);
+        continue;
+      }
+      if (result.text !== body) edits.push({ path, before, after: head + result.text });
+    }
+    return { foreign: foreign.size, edits };
   }
 
   async replaceSourcePath(oldPath: string, newPath: string): Promise<void> {
@@ -2152,7 +2268,7 @@ export class Repository {
     let moved = false;
     try {
       if (desired !== originalRoot) {
-        await this.app.fileManager.renameFile(root, desired);
+        await this.relocate(root, desired);
         moved = true;
         if (!(this.app.vault.getAbstractFileByPath(desired) instanceof TFolder))
           throw new Error(this.message("error.move_not_applied"));
@@ -2170,7 +2286,7 @@ export class Repository {
         try {
           const movedRoot = this.app.vault.getAbstractFileByPath(desired);
           if (!(movedRoot instanceof TFolder)) throw new Error("Renamed topic folder was not found for rollback.");
-          await this.app.fileManager.renameFile(movedRoot, originalRoot);
+          await this.relocate(movedRoot, originalRoot);
           const restoredMap = this.app.vault.getAbstractFileByPath(originalMapPath);
           if (!(restoredMap instanceof TFile))
             throw new Error("Original Map.md was not found after restoring the topic folder.");

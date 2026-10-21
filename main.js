@@ -35807,6 +35807,7 @@ ${request.requirements}` : preset.text,
             detail: note.detail,
             task: [task, options == null ? void 0 : options.requirements].filter(Boolean).join("\n\n"),
             ancestors: await this.ancestorContext(node),
+            workingFindings: note.newFindings,
             referenceGroups: [...selectedSources, childSources],
             // Within budget the sources go in as written (one request); only over-budget sources are extracted first.
             referenceDelivery: "direct",
@@ -35882,7 +35883,8 @@ ${request.requirements}` : preset.text,
       note.reasoning,
       note.sourcePaths,
       note.referencePaths,
-      note.thinkingOrigin
+      note.thinkingOrigin,
+      note.newFindings
     ]);
     const selectedSources = (_c = options == null ? void 0 : options.referenceGroups) != null ? _c : [];
     if (!children.length && !selectedSources.some((group) => group.documents.length)) {
@@ -35903,6 +35905,7 @@ ${request.requirements}` : preset.text,
     await this.hydrate();
     this.render();
     const progress = this.startTaskProgress(node.path);
+    let findingsSent = false;
     try {
       const synthesisContext = withThinkingOrigin(
         {
@@ -35912,6 +35915,10 @@ ${request.requirements}` : preset.text,
           detail: note.detail,
           task: [task, options == null ? void 0 : options.requirements].filter(Boolean).join("\n\n"),
           ancestors: await this.ancestorContext(node),
+          workingFindings: note.newFindings,
+          onWorkingFindingsSent: (sent) => {
+            findingsSent = sent === note.newFindings;
+          },
           referenceGroups: [...selectedSources, childSources],
           // Within budget the sources go in as written (one request); only over-budget sources are extracted first.
           referenceDelivery: "direct",
@@ -35962,7 +35969,8 @@ ${request.requirements}` : preset.text,
           latest.reasoning,
           latest.sourcePaths,
           latest.referencePaths,
-          latest.thinkingOrigin
+          latest.thinkingOrigin,
+          latest.newFindings
         ]) !== noteSnapshot)
           throw new Error(t("ui.the_topic_changed_the_synthesis_draft_was_not_saved"));
         const canonicalOnly = canonicalDetail(
@@ -35985,7 +35993,8 @@ ${request.requirements}` : preset.text,
             summary,
             detail: canonical,
             visualReferences: references2,
-            newFindings: "",
+            // The findings are cleared only when the model saw them (the rewrite folds them in); unsent ones stay.
+            ...findingsSent ? { newFindings: "" } : {},
             status: "completed",
             ...formatIssuesPatch(issues, language2)
           },
@@ -40548,7 +40557,7 @@ var AiTaskService = class {
   }
   /** `role` names the two reference rounds so they are logged as their own steps; every other request is a task or AIM step. */
   async execute(input, model, reasoning, signal, onExchange, onRequestAccepted, onWebSearchEvent, observer, role) {
-    var _a, _b;
+    var _a, _b, _c, _d;
     if (input.timeoutMs !== void 0 && (!Number.isInteger(input.timeoutMs) || input.timeoutMs < 18e4 || input.timeoutMs > 6e5))
       throw new Error("Invalid AI task timeout.");
     const provider = providerForModel(model);
@@ -40580,8 +40589,9 @@ var AiTaskService = class {
       throw new Error(t("ui.source_context_exceeds_budget"));
     }
     context = prepared.context;
+    if (!input.countRepair) (_c = input.onWorkingFindingsSent) == null ? void 0 : _c.call(input, (_b = context.workingFindings) != null ? _b : "");
     const pluginDirectory = this.options.pluginDirectory();
-    const outputLanguage = (_b = context.outputLanguage) != null ? _b : this.options.language();
+    const outputLanguage = (_d = context.outputLanguage) != null ? _d : this.options.language();
     const shape = taskResponseShape(context);
     const step = prepareStep(createTaskStep(taskStepId(context, role), shape.schema), {
       context,

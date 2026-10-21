@@ -8185,6 +8185,7 @@ export class VisualAgentMapView extends ItemView {
             detail: note.detail,
             task: [task, options?.requirements].filter(Boolean).join("\n\n"),
             ancestors: await this.ancestorContext(node),
+            workingFindings: note.newFindings,
             referenceGroups: [...selectedSources, childSources],
             // Within budget the sources go in as written (one request); only over-budget sources are extracted first.
             referenceDelivery: "direct",
@@ -8270,7 +8271,8 @@ export class VisualAgentMapView extends ItemView {
       note.reasoning,
       note.sourcePaths,
       note.referencePaths,
-      note.thinkingOrigin
+      note.thinkingOrigin,
+      note.newFindings
     ]);
     const selectedSources = options?.referenceGroups ?? [];
     if (!children.length && !selectedSources.some(group => group.documents.length)) {
@@ -8291,6 +8293,8 @@ export class VisualAgentMapView extends ItemView {
     await this.hydrate();
     this.render();
     const progress = this.startTaskProgress(node.path);
+    // True only when the whole of the parent's Working Findings was in the prompt; otherwise they stay for the next run.
+    let findingsSent = false;
     try {
       const synthesisContext: TaskContext = withThinkingOrigin(
         {
@@ -8300,6 +8304,10 @@ export class VisualAgentMapView extends ItemView {
           detail: note.detail,
           task: [task, options?.requirements].filter(Boolean).join("\n\n"),
           ancestors: await this.ancestorContext(node),
+          workingFindings: note.newFindings,
+          onWorkingFindingsSent: sent => {
+            findingsSent = sent === note.newFindings;
+          },
           referenceGroups: [...selectedSources, childSources],
           // Within budget the sources go in as written (one request); only over-budget sources are extracted first.
           referenceDelivery: "direct",
@@ -8362,7 +8370,8 @@ export class VisualAgentMapView extends ItemView {
               latest.reasoning,
               latest.sourcePaths,
               latest.referencePaths,
-              latest.thinkingOrigin
+              latest.thinkingOrigin,
+              latest.newFindings
             ]) !== noteSnapshot
           )
             throw new Error(t("ui.the_topic_changed_the_synthesis_draft_was_not_saved"));
@@ -8391,7 +8400,8 @@ export class VisualAgentMapView extends ItemView {
               summary,
               detail: canonical,
               visualReferences: references,
-              newFindings: "",
+              // The findings are cleared only when the model saw them (the rewrite folds them in); unsent ones stay.
+              ...(findingsSent ? { newFindings: "" } : {}),
               status: "completed",
               ...formatIssuesPatch(issues, language)
             },

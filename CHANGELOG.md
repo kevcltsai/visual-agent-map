@@ -8,6 +8,7 @@
 - The goal-grading button is now named "Prioritize by goal", and its panel no longer closes by itself when the map repaints or focus returns from a dialog; if it cannot open, a notice says why.
 - Map cards now work from the keyboard: Delete or Backspace removes the focused card (with an Undo notice, or the usual confirmation when it has subtopics), Mod+Enter adds a subtopic, Shift+Enter adds a sibling, double-clicking a title renames it, and Mod+Z / Mod+Shift+Z undo and redo while the map is the active pane.
 - Merging, removing, archiving, renaming and undoing topics no longer pops up Obsidian's "Update links" dialog when only VAM notes link to the moved cards: VAM updates its own links itself. If one of your own notes links to a moved card, VAM shows a short notice first and Obsidian asks as before, so your links are never silently broken.
+- Integrate subtopics now sends the parent topic's Working Findings to the model and clears them only when the model actually received them. Before, they were left out of the request and then deleted when the result was saved; a change to the findings while the synthesis runs now stops the save instead of overwriting them.
 
 ## [0.24.0] - 2026-10-22
 

@@ -1009,7 +1009,7 @@ export const zhCN: Partial<Record<TranslationKey, string>> = {
   "ui.allow_web_search": "允许搜索网络",
   "ui.research_depth": "研究深度",
   "ui.quick_aim_for_up_to_1_web_search_and_2_main_sources_answer_t":
-    "快速：先回答内核问题，再简述相关依据与缺口；若搜索可能厘清重要不确定性，仍可继续研究。",
+    "快速：先回答核心问题，再简述相关依据与缺口；若搜索可能厘清重要不确定性，仍可继续研究。",
   "ui.standard_aim_for_up_to_3_web_searches_and_5_main_sources_sum":
     "标准：整理足以支持结论的主要证据、限制与待确认事项。",
   "ui.deep_aim_for_up_to_6_web_searches_and_10_main_sources_compar":
@@ -1031,7 +1031,7 @@ export const zhCN: Partial<Record<TranslationKey, string>> = {
   "ui.discard_synthesis": "放弃",
   "ui.synthesis_pending_review_first": "请先处理或放弃这个主题待处理的整合结果。",
   "ui.the_topic_changed_the_synthesis_draft_was_not_saved": "议题已变更，整合草稿未写入。",
-  "detail.core_conclusions": "内核结论",
+  "detail.core_conclusions": "核心结论",
   "detail.key_knowledge": "关键知识",
   "detail.evidence_and_sources": "证据与来源",
   "detail.tradeoffs_and_limitations": "取舍与限制",
@@ -1177,7 +1177,7 @@ export const zhCN: Partial<Record<TranslationKey, string>> = {
   "detail.purpose": "用途：{0}",
   "detail.palette": "配色：{0}",
   "detail.reusable_formula": "可应用公式：{0}",
-  "research.fast": "快速概览：先回答内核问题，简短列出关键依据与缺口；不要做完整调查。",
+  "research.fast": "快速概览：先回答核心问题，简短列出关键依据与缺口；不要做完整调查。",
   "research.normal": "一般研究：提供足以支持结论的主要证据、限制与待确认事项。",
   "research.deep": "深入研究：检查来源间的一致与分歧，详列重要证据、限制与待查问题。",
   "research.local":
@@ -1494,7 +1494,7 @@ export const zhCN: Partial<Record<TranslationKey, string>> = {
   "coffee.guest_role_affected": "受影响者",
   "coffee.insight_category_connections": "意外链接",
   "coffee.insight_category_questions": "值得继续想的问题",
-  "coffee.insight_category_disagreements": "内核分歧",
+  "coffee.insight_category_disagreements": "核心分歧",
   "coffee.insight_category_directions": "探索方向",
   "coffee.insight_category_assumptions": "值得查证的假设",
   "coffee.insight_category_solutions": "疑问与可能解方",

@@ -255,7 +255,8 @@ async function main() {
     notE2E: 'Single-node evidence from a restored checkpoint. This is not an end-to-end PASS.',
     mode,
     step, lang, ui, checkpoint,
-    provider: last ? providerForModel(last.model) : providerForModel(model),
+    // The runtime receives the model without its provider prefix, so the provider comes from the requested model.
+    provider: providerForModel(model),
     model: last?.model ?? model, modelSource,
     effort: last?.effort ?? reasoning, effortSource,
     promptSha256: last ? providerCore.sha256(last.prompt) : null,

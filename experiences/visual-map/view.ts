@@ -7517,7 +7517,9 @@ export class VisualAgentMapView extends ItemView {
     return this.plugin.expansionCoordinator.start(
       parent.path,
       children,
-      (child, batchSignal, accepted) => this.researchChild(child, batchSignal, accepted, pendingOptions),
+      // Quick research that reads local context only (the S7 default) is a first look: no diagram call per child.
+      (child, batchSignal, accepted) =>
+        this.researchChild(child, batchSignal, accepted, pendingOptions, pendingOptions.researchMode !== "local"),
       () => {
         const state = this.plugin.expansionBatches.get(parent.path);
         if (state?.status === "running") this.plugin.quickExpandPending.add(parent.path);
@@ -7531,7 +7533,8 @@ export class VisualAgentMapView extends ItemView {
     child: MapNode,
     batchSignal: AbortSignal,
     accepted: () => void,
-    choices: TaskOptions
+    choices: TaskOptions,
+    charts = true
   ): Promise<void> {
     const detailTemplate = await this.detailTemplateFor(child, choices.detailTemplateId, choices.toneId);
     const note = await this.plugin.repo.readNote(child.path, this.map ?? undefined);
@@ -7554,6 +7557,7 @@ export class VisualAgentMapView extends ItemView {
         researchMode: choices.researchMode,
         researchDepth: choices.researchDepth,
         visualMode: choices.visualMode,
+        addCharts: charts,
         task: [note.prompt || researchTopicTask(outputLanguage, note.title), choices.requirements]
           .filter(Boolean)
           .join("\n\n")
@@ -9404,7 +9408,7 @@ export class VisualAgentMapView extends ItemView {
         ...this.toneField(note, overrides),
         ...overrides,
         detailTemplate,
-        addCharts: true
+        addCharts: overrides?.addCharts ?? true
       },
       note
     );

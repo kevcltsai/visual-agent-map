@@ -34830,7 +34830,8 @@ ${request.requirements}` : preset.text,
     return this.plugin.expansionCoordinator.start(
       parent.path,
       children,
-      (child, batchSignal, accepted) => this.researchChild(child, batchSignal, accepted, pendingOptions),
+      // Quick research that reads local context only (the S7 default) is a first look: no diagram call per child.
+      (child, batchSignal, accepted) => this.researchChild(child, batchSignal, accepted, pendingOptions, pendingOptions.researchMode !== "local"),
       () => {
         const state = this.plugin.expansionBatches.get(parent.path);
         if ((state == null ? void 0 : state.status) === "running") this.plugin.quickExpandPending.add(parent.path);
@@ -34840,7 +34841,7 @@ ${request.requirements}` : preset.text,
       signal
     );
   }
-  async researchChild(child, batchSignal, accepted, choices) {
+  async researchChild(child, batchSignal, accepted, choices, charts = true) {
     var _a, _b, _c;
     const detailTemplate = await this.detailTemplateFor(child, choices.detailTemplateId, choices.toneId);
     const note = await this.plugin.repo.readNote(child.path, (_a = this.map) != null ? _a : void 0);
@@ -34862,6 +34863,7 @@ ${request.requirements}` : preset.text,
         researchMode: choices.researchMode,
         researchDepth: choices.researchDepth,
         visualMode: choices.visualMode,
+        addCharts: charts,
         task: [note.prompt || researchTopicTask(outputLanguage, note.title), choices.requirements].filter(Boolean).join("\n\n")
       },
       () => {
@@ -36523,7 +36525,7 @@ ${note.detail.trim()}` : "",
     );
   }
   async runAgent(node, done, failed, overrides, onLaunchAccepted) {
-    var _a, _b, _c, _d, _e, _f;
+    var _a, _b, _c, _d, _e, _f, _g;
     const taskPath = node.path;
     const note = await this.plugin.repo.readNote(node.path, (_a = this.map) != null ? _a : void 0);
     if (!((_b = overrides == null ? void 0 : overrides.task) != null ? _b : note.prompt)) {
@@ -36557,7 +36559,7 @@ ${note.detail.trim()}` : "",
         ...this.toneField(note, overrides),
         ...overrides,
         detailTemplate,
-        addCharts: true
+        addCharts: (_e = overrides == null ? void 0 : overrides.addCharts) != null ? _e : true
       },
       note
     );
@@ -36567,8 +36569,8 @@ ${note.detail.trim()}` : "",
     this.plugin.running.add(node.path);
     const controller = new AbortController();
     const abortFromTaskModal = () => controller.abort();
-    if ((_e = overrides == null ? void 0 : overrides.signal) == null ? void 0 : _e.aborted) controller.abort();
-    else (_f = overrides == null ? void 0 : overrides.signal) == null ? void 0 : _f.addEventListener("abort", abortFromTaskModal, { once: true });
+    if ((_f = overrides == null ? void 0 : overrides.signal) == null ? void 0 : _f.aborted) controller.abort();
+    else (_g = overrides == null ? void 0 : overrides.signal) == null ? void 0 : _g.addEventListener("abort", abortFromTaskModal, { once: true });
     this.plugin.activeTasks.set(taskPath, controller);
     const progress = this.plugin.researchProgress;
     let progressAttempt = "starting";
@@ -36637,7 +36639,7 @@ ${note.detail.trim()}` : "",
       observer
     ).then(
       (result) => this.plugin.mutate(async () => {
-        var _a2, _b2, _c2, _d2, _e2, _f2, _g, _h;
+        var _a2, _b2, _c2, _d2, _e2, _f2, _g2, _h;
         progress == null ? void 0 : progress.end(taskPath, progressAttempt);
         const latest = await this.plugin.repo.readNote(node.path, (_a2 = this.map) != null ? _a2 : void 0);
         const stale = latest.thinkingOrigin !== note.thinkingOrigin || latest.title !== note.title || latest.prompt !== note.prompt || latest.rules !== note.rules || latest.detail !== note.detail || latest.summary !== note.summary || latest.model !== note.model || latest.reasoning !== note.reasoning || latest.researchMode !== note.researchMode || latest.researchDepth !== note.researchDepth || latest.visualMode !== note.visualMode || latest.sourcePaths.join("\n") !== note.sourcePaths.join("\n") || JSON.stringify(latest.referencePaths) !== JSON.stringify(note.referencePaths);
@@ -36696,7 +36698,7 @@ ${note.detail.trim()}` : "",
             result.suggestions.slice(0, 7).map((item) => ({ ...item, thinkingOriginBaseline: originBaseline(note.thinkingOrigin) }))
           );
           try {
-            await ((_h = (_g = this.plugin.pendingSuggestions).flush) == null ? void 0 : _h.call(_g));
+            await ((_h = (_g2 = this.plugin.pendingSuggestions).flush) == null ? void 0 : _h.call(_g2));
           } catch (error) {
             const message = this.plugin.recordFailure(t("log.expansion_suggestions_save_failed"), error);
             new import_obsidian29.Notice(message);

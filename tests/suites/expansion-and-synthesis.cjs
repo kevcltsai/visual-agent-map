@@ -1944,3 +1944,17 @@ test('S4: card helpers show the stage text, tick the seconds as text only and th
   view.plugin = { researchProgress: { get: () => ({}) } }; view.paintHoverResearch();
   assert.equal(block.hidden, true, 'no preview, no block');
 });
+
+integrationTest('R1: local shallow child research gets no chart job; web shallow research and ordinary runs keep theirs', async () => {
+  for (const [researchMode, expected] of [['local', 0], ['research', 1]]) {
+    const h = await templateHarness({ language: 'en', reply: () => ({ summary: 'Sum', detail: 'Body paragraph.', visualReferences: [], suggestions: [] }) });
+    await h.view.researchChild(h.doc.nodes[0], new AbortController().signal, () => {}, { researchMode, researchDepth: 'fast', visualMode: 'off', referenceGroups: [] }, researchMode !== 'local');
+    await until(() => !h.plugin.running.size);
+    assert.equal(h.contexts.at(-1).addCharts, expected === 1);
+    // The plugin decides eligibility from the context, so a context without addCharts means no chart call.
+    assert.equal(h.chartJobs.every(job => job.context.addCharts === (expected === 1)), true, `researchMode ${researchMode}`);
+    const { AiTaskService } = load('core/ai-task-service.ts');
+    const service = new AiTaskService({ pluginDirectory: () => '', language: () => 'en', defaultReasoning: () => 'low', exchangeLoggingEnabled: () => false, exchanges: () => null, codexRuntime: () => null, claudeRuntime: () => null });
+    assert.equal(service.chartEligible(h.contexts.at(-1)), expected === 1);
+  }
+});

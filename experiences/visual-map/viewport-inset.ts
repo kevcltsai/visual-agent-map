@@ -44,12 +44,13 @@ export function focusViewport(
 export function fitViewport(
   bounds: { minX: number; minY: number; maxX: number; maxY: number },
   size: { width: number; height: number },
-  inset: number
+  inset: number,
+  maxZoom = 1.2
 ): MapViewport {
   const availableHeight = Math.max(1, size.height - inset);
   const w = bounds.maxX - bounds.minX,
     h = bounds.maxY - bounds.minY;
-  const zoom = Math.max(0.25, Math.min(1.2, (size.width - 80) / w, (availableHeight - 80) / h));
+  const zoom = Math.max(0.25, Math.min(maxZoom, (size.width - 80) / w, (availableHeight - 80) / h));
   return {
     zoom,
     x: (size.width - w * zoom) / 2 - bounds.minX * zoom,

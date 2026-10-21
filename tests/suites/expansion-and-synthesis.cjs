@@ -1219,17 +1219,17 @@ integrationTest('multi research is not offered on AIM maps and needs at least on
 });
 integrationTest('selection bar shows Research; starting leaves selection mode and the top status bar shows progress and Stop', async () => {
   const h = await multiResearchHarness(['A', 'B']);
-  const element = (tag, o = {}) => ({ tag, text: o.text ?? '', cls: o.cls ?? '', disabled: false, children: [], listeners: {},
+  const element = (tag, o = {}) => ({ tag, text: o.text ?? '', cls: o.cls ?? '', disabled: false, children: [], listeners: {}, attrs: {},
     createDiv(v) { const c = element('div', { cls: typeof v === 'string' ? v : v?.cls }); this.children.push(c); return c; },
     createEl(n, v = {}) { const c = element(n, v); this.children.push(c); return c; }, createSpan(v = {}) { const c = element('span', v); this.children.push(c); return c; },
-    addEventListener(n, fn) { this.listeners[n] = fn; }, addClass(n) { this.cls = `${this.cls} ${n}`.trim(); }, setAttr() {} });
+    addEventListener(n, fn) { this.listeners[n] = fn; }, addClass(n) { this.cls = `${this.cls} ${n}`.trim(); }, setAttr(k, v) { this.attrs[k] = v; } });
   const all = root => [root, ...root.children.flatMap(all)];
   const bar = (view = h.view) => { const root = element('workspace'); view.renderSelectionBar(root); return all(root); };
   const toolbar = () => { const root = element('content'); h.view.renderMultiResearchStatus(root); return all(root); };
   h.view.notes = new Map(h.nodes.map(n => [n.id, { title: n.id }]));
   let items = bar(); const research = () => items.find(i => i.tag === 'button' && /^Research( 1 topic)?$/.test(i.text));
   items = bar(); assert.ok(research()); assert.equal(research().disabled, true);
-  h.view.multiSelected = new Set([h.nodes[0].id]); items = bar(); assert.equal(research().disabled, false); assert.equal(research().text, 'Research 1 topic');
+  h.view.multiSelected = new Set([h.nodes[0].id]); items = bar(); assert.equal(research().disabled, false); assert.equal(research().text, 'Research'); assert.equal(research().attrs['aria-label'], 'Research 1 topic');
   h.view.map.aim = {}; items = bar(); assert.equal(research(), undefined); delete h.view.map.aim;
   assert.equal(toolbar().length, 1);
   h.view.integrationMode = true;

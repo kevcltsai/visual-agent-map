@@ -371,6 +371,7 @@ var english = {
   "ui.aim_retry_subtopics": "Retry subtopic planning",
   "ui.start_using_vam": "Start using VAM",
   "ui.check_codex": "Check Codex",
+  "ui.check_claude_code": "Check Claude Code",
   "ui.codex_allowance_notice": "Codex allowance notice",
   "ui.vam_runs_ai_tasks_through_your_signed_in_codex_account_and_u": "VAM runs AI tasks through your signed-in Codex account and uses that account's Codex allowance. Available usage and limits depend on your ChatGPT plan.",
   "ui.understand_and_run": "Understand and run",
@@ -1975,6 +1976,7 @@ var traditionalChinese = {
   "ui.aim_retry_subtopics": "\u91CD\u65B0\u7522\u751F\u5B50\u8B70\u984C",
   "ui.start_using_vam": "\u958B\u59CB\u4F7F\u7528 VAM",
   "ui.check_codex": "\u6AA2\u67E5 Codex",
+  "ui.check_claude_code": "\u6AA2\u67E5 Claude Code",
   "ui.codex_allowance_notice": "Codex \u984D\u5EA6\u63D0\u9192",
   "ui.vam_runs_ai_tasks_through_your_signed_in_codex_account_and_u": "VAM \u6703\u900F\u904E\u4F60\u76EE\u524D\u767B\u5165\u7684 Codex \u5E33\u865F\u57F7\u884C AI \u4EFB\u52D9\uFF0C\u4E26\u4F7F\u7528\u8A72\u5E33\u865F\u7684 Codex \u4F7F\u7528\u984D\u5EA6\u3002\u53EF\u7528\u984D\u5EA6\u8207\u9650\u5236\u4F9D\u4F60\u7684 ChatGPT \u65B9\u6848\u800C\u5B9A\u3002",
   "ui.understand_and_run": "\u4E86\u89E3\u4E26\u57F7\u884C",
@@ -16603,10 +16605,10 @@ function focusViewport(viewport, point, size, inset) {
     y: inset + (size.height - inset) / 2 - point.y * zoom
   };
 }
-function fitViewport(bounds, size, inset) {
+function fitViewport(bounds, size, inset, maxZoom = 1.2) {
   const availableHeight = Math.max(1, size.height - inset);
   const w = bounds.maxX - bounds.minX, h = bounds.maxY - bounds.minY;
-  const zoom = Math.max(0.25, Math.min(1.2, (size.width - 80) / w, (availableHeight - 80) / h));
+  const zoom = Math.max(0.25, Math.min(maxZoom, (size.width - 80) / w, (availableHeight - 80) / h));
   return {
     zoom,
     x: (size.width - w * zoom) / 2 - bounds.minX * zoom,
@@ -33359,8 +33361,7 @@ ${request.requirements}` : preset.text,
           (title2) => this.enqueue(async () => this.openMapInMutation(await this.plugin.repo.createMap(title2)))
         ).open()
       );
-      if (!this.plugin.settings.models.trim())
-        this.button(actions, t("ui.check_codex"), () => this.enqueue(() => this.plugin.recheckCodex()));
+      if (!this.plugin.settings.models.trim()) this.renderConnectionCheck(actions);
     }
     if (!this.builtIn && !this.map.aim) this.renderMultiResearchStatus(this.contentEl);
     if (!this.builtIn && !this.map.aim) this.renderRelevanceStatus(this.contentEl);
@@ -33397,11 +33398,9 @@ ${request.requirements}` : preset.text,
     if (tools.childElementCount) overlay.appendChild(tools);
     else tools.remove();
     if (this.relevancePanelEl) this.placeRelevancePanel(this.relevancePanelEl);
-    this.hintEl = this.integrationMode || !this.plugin.settings.canvasHintSeen ? overlay.createSpan({
+    this.hintEl = !this.integrationMode && !this.plugin.settings.canvasHintSeen ? overlay.createSpan({
       cls: "vam-hint vam-canvas-hint",
-      text: t(
-        this.integrationMode ? "ui.drag_to_select_topics_hint" : "ui.drag_empty_space_to_pan_scroll_to_zoom_click_a_node_to_open"
-      )
+      text: t("ui.drag_empty_space_to_pan_scroll_to_zoom_click_a_node_to_open")
     }) : null;
     const zoom = overlay.createDiv("vam-zoom-controls");
     this.iconButton(zoom, "minus", t("ui.zoom_out"), () => this.zoomBy(1 / 1.2));
@@ -34716,7 +34715,8 @@ ${request.requirements}` : preset.text,
       }))
     ).open();
   }
-  async addNode(parentNode, suggestedTitle, rebuildDerivedData = true) {
+  /** `focus` false leaves the camera to the caller (a batch frames the whole branch once it is laid out). */
+  async addNode(parentNode, suggestedTitle, rebuildDerivedData = true, focus = true) {
     var _a, _b, _c, _d;
     if (!this.map) return;
     const parent = parentNode && this.map.nodes.find((item) => item.id === parentNode.id) || parentNode;
@@ -34761,6 +34761,7 @@ ${request.requirements}` : preset.text,
       map.nodes.push(node);
       if (parent) map.nodes.find((n) => n.id === parent.id).collapsed = false;
     }, rebuildDerivedData);
+    if (!focus) return;
     if (this.map) this.map.viewport.zoom = Math.max(this.map.viewport.zoom, 0.7);
     this.focusNode(node);
   }
@@ -35004,7 +35005,7 @@ ${request.requirements}` : preset.text,
         if (signal == null ? void 0 : signal.aborted) throw new DOMException("Aborted", "AbortError");
         const owner = item.parentTitle ? createdByTitle.get(item.parentTitle) : parent;
         if (!owner) throw new Error(t("ui.select_the_parent_topic_before_its_child"));
-        await this.addNode(owner, item.title, false);
+        await this.addNode(owner, item.title, false, false);
         created++;
         const child = this.map.nodes.at(-1);
         newNodes.push(child);
@@ -35025,6 +35026,7 @@ ${request.requirements}` : preset.text,
         await this.mapChange((map) => {
           map.nodes = arrangeNewBranch(map.nodes, parent.id, new Set(newNodes.map((node) => node.id)), this.cardHeightOf);
         }, false);
+      if (newNodes.length) this.frameBranch([parent.id, ...newNodes.map((node) => node.id)]);
       if (created) await this.plugin.rebuildDerivedData();
       return newNodes;
     } catch (error) {
@@ -35037,6 +35039,64 @@ ${request.requirements}` : preset.text,
       throw error;
     }
   }
+  /** Camera on the parent and its new children (current zoom kept, or smaller if they do not fit), saved like a pan. */
+  frameBranch(ids) {
+    if (!this.map || !this.viewportEl) return;
+    const shown = this.map.nodes.filter((node) => ids.includes(node.id));
+    if (!shown.length) return;
+    const bounds = {
+      minX: Math.min(...shown.map((n) => n.x)),
+      maxX: Math.max(...shown.map((n) => n.x + 280)),
+      minY: Math.min(...shown.map((n) => n.y)),
+      maxY: Math.max(...shown.map((n) => {
+        var _a;
+        return n.y + ((_a = this.cardHeightOf(n.id)) != null ? _a : 180);
+      }))
+    };
+    this.map.viewport = fitViewport(
+      bounds,
+      { width: this.viewportEl.clientWidth, height: this.viewportEl.clientHeight },
+      this.canvasInset(),
+      Math.max(0.25, Math.min(1.2, this.map.viewport.zoom))
+    );
+    this.saveViewport();
+  }
+  /**
+   * Quick research grows the cards after they were placed with estimated heights. Once the batch ends, the cards the
+   * user has not moved are laid out again against the measured heights (one Map.md write, no undo step, no AI call).
+   */
+  async respaceBatch(parent, placed) {
+    if (this.closed || !this.map || this.builtIn) return;
+    const untouched = new Set(
+      this.map.nodes.filter((n) => {
+        var _a, _b;
+        return ((_a = placed.get(n.id)) == null ? void 0 : _a.x) === n.x && ((_b = placed.get(n.id)) == null ? void 0 : _b.y) === n.y;
+      }).map((n) => n.id)
+    );
+    if (!untouched.size) return;
+    const arranged = arrangeNewBranch(this.map.nodes, parent.id, untouched, this.cardHeightOf);
+    const moved = arranged.filter(
+      (n, index) => untouched.has(n.id) && (n.x !== this.map.nodes[index].x || n.y !== this.map.nodes[index].y)
+    );
+    if (!moved.length) return;
+    const target = new Map(moved.map((n) => [n.id, { x: n.x, y: n.y }]));
+    await this.plugin.mutate(
+      async () => {
+        await this.plugin.repo.updateMap(this.path, (map) => {
+          for (const node of map.nodes) {
+            const point = target.get(node.id);
+            if (point) Object.assign(node, point);
+          }
+        });
+      },
+      { sync: false }
+    );
+    if (!this.map) return;
+    for (const node of this.map.nodes) {
+      const point = target.get(node.id);
+      if (point) Object.assign(node, point);
+    }
+  }
   /**
    * The options of the quick research that follows AI expansion: no web or image search unless the dialog's checkbox
    * is on. The decomposition itself and the notes' stored research settings are not affected.
@@ -35045,8 +35105,15 @@ ${request.requirements}` : preset.text,
     return options.shallowWebSearch ? options : { ...options, researchMode: "local", visualMode: "off" };
   }
   startShallowResearch(parent, children, options) {
+    var _a;
     const signal = options.signal;
     const pendingOptions = this.researchChoices(options);
+    const placed = /* @__PURE__ */ new Map();
+    for (const child of children) {
+      const node = (_a = this.map) == null ? void 0 : _a.nodes.find((item) => item.id === child.id);
+      if (node) placed.set(node.id, { x: node.x, y: node.y });
+    }
+    let respaced = false;
     this.plugin.quickExpandPending.add(parent.path);
     return this.plugin.expansionCoordinator.start(
       parent.path,
@@ -35057,6 +35124,13 @@ ${request.requirements}` : preset.text,
         const state = this.plugin.expansionBatches.get(parent.path);
         if ((state == null ? void 0 : state.status) === "running") this.plugin.quickExpandPending.add(parent.path);
         else this.plugin.quickExpandPending.delete(parent.path);
+        if (state && state.status !== "running" && !respaced) {
+          respaced = true;
+          void this.respaceBatch(parent, placed).catch(() => void 0).then(() => {
+            if (!this.closed) this.render();
+          });
+          return;
+        }
         this.render();
       },
       signal
@@ -35259,6 +35333,15 @@ ${request.requirements}` : preset.text,
       dismiss.setAttr("aria-label", t("ui.dismiss"));
     }
   }
+  /** The sample start's "no models found" button: it checks the CLI of the chosen model (Claude Code or Codex). */
+  renderConnectionCheck(actions) {
+    const claude = providerForModel(this.plugin.settings.cliModel) === "claude";
+    return this.button(
+      actions,
+      t(claude ? "ui.check_claude_code" : "ui.check_codex"),
+      () => claude ? this.plugin.repairConnection() : this.enqueue(() => this.plugin.recheckCodex())
+    );
+  }
   renderSelectionBar(workspace) {
     var _a, _b, _c;
     const selection = workspace.createDiv("vam-selection-bar");
@@ -35283,18 +35366,12 @@ ${request.requirements}` : preset.text,
     this.button(selection, t("ui.move_to"), () => this.chooseSelectedParent(false), !this.multiSelected.size);
     this.button(selection, t("ui.copy_to"), () => this.chooseSelectedParent(true), !this.multiSelected.size);
     const count = this.multiSelected.size;
-    this.button(
-      selection,
-      count > 1 ? t("ui.synthesize_0_topics", count) : t("ui.synthesize"),
-      () => this.integrateSelected(),
-      count < 2
-    ).addClass("mod-cta");
+    const synthesize = this.button(selection, t("ui.synthesize"), () => this.integrateSelected(), count < 2);
+    synthesize.addClass("mod-cta");
+    if (count > 1) synthesize.setAttr("aria-label", t("ui.synthesize_0_topics", count));
     if (!((_a = this.map) == null ? void 0 : _a.aim) && !this.builtIn) {
-      const check = this.mergeCheck(), merge = this.button(
-        selection,
-        count > 1 ? t("ui.merge_0_topics", count) : t("ui.merge"),
-        () => this.openMerge()
-      );
+      const check = this.mergeCheck(), merge = this.button(selection, t("ui.merge"), () => this.openMerge());
+      if (count > 1) merge.setAttr("aria-label", t("ui.merge_0_topics", count));
       if (!check.ok) {
         merge.setAttr("aria-disabled", "true");
         merge.setAttr("title", t(check.reason));
@@ -35302,12 +35379,14 @@ ${request.requirements}` : preset.text,
     }
     if (!((_b = this.map) == null ? void 0 : _b.aim)) {
       const running = ((_c = this.plugin.expansionBatches.get(this.multiResearchKey())) == null ? void 0 : _c.status) === "running";
-      this.button(
+      const research = this.button(
         selection,
-        count > 1 ? t("ui.research_0_topics", count) : count ? t("ui.research_one_topic") : t("ui.multi_research"),
+        t("ui.multi_research"),
         () => this.openMultiResearch(),
         !this.multiSelected.size || running
       );
+      if (count)
+        research.setAttr("aria-label", count > 1 ? t("ui.research_0_topics", count) : t("ui.research_one_topic"));
     }
     return selection;
   }

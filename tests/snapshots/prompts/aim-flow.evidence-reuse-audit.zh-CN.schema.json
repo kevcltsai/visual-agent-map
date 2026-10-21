@@ -1,0 +1,122 @@
+{
+  "type": "object",
+  "properties": {
+    "summary": {
+      "type": "string",
+      "description": "適合心智圖的一句繁體中文結論，80 字內"
+    },
+    "detail": {
+      "type": "string",
+      "description": "完整的繁體中文 Markdown 分析"
+    },
+    "suggestions": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "title": {
+            "type": "string"
+          },
+          "task": {
+            "type": "string"
+          },
+          "contribution": {
+            "type": "string"
+          },
+          "parentTitle": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "title",
+          "task",
+          "contribution",
+          "parentTitle"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "visualReferences": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "title": {
+            "type": "string"
+          },
+          "imageUrl": {
+            "type": "string"
+          },
+          "sourceUrl": {
+            "type": "string"
+          },
+          "description": {
+            "type": "string"
+          },
+          "palette": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "formula": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "title",
+          "imageUrl",
+          "sourceUrl",
+          "description",
+          "palette",
+          "formula"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "aim": {
+      "type": "object",
+      "properties": {
+        "usable": {
+          "type": "boolean"
+        },
+        "rationale": {
+          "type": "string"
+        },
+        "conditionKeys": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "validity": {
+          "type": "string",
+          "description": "Freshness and applicability assessment."
+        },
+        "evidenceRequestIds": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Up to 3 exact evidence IDs whose full reports are needed before deciding; empty when the indexes suffice."
+        }
+      },
+      "required": [
+        "usable",
+        "rationale",
+        "conditionKeys",
+        "validity",
+        "evidenceRequestIds"
+      ],
+      "additionalProperties": false
+    }
+  },
+  "required": [
+    "summary",
+    "detail",
+    "suggestions",
+    "visualReferences",
+    "aim"
+  ],
+  "additionalProperties": false
+}

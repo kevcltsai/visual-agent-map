@@ -1470,3 +1470,63 @@ integrationTest('math repair repairs a BOM note when read() drops the BOM but pr
   assert.equal(after.match(/^﻿---\n[\s\S]*?\n---\n/)[0], ('﻿' + text).match(/^﻿---\n[\s\S]*?\n---\n/)[0]);
   assert.equal((await planMathRepair(vault, [files.get(n.path)])).items.length, 0);
 });
+
+// ---- Simplified Chinese interface (multilingual P3): notes only ever carry zh-TW or en fixed text, never "预览". ----
+const vaultText = contents => [...contents.values()].join('\n');
+const countOf = (text, pattern) => (text.match(pattern) ?? []).length;
+const SIMPLIFIED_FIXED_TEXT = /预览|尚未形成结论|所属主题|来源议题|核心结论/;
+integrationTest('a Simplified Chinese interface creates notes with Traditional fixed text and never writes 预览', async () => {
+  const { repo, contents } = fixture('zh-CN');
+  const mapPath = await repo.createMap('Travel'), map = await repo.readMap(mapPath);
+  const note = await repo.createNote('Route', 'model-a', map, mapPath, 'workspace');
+  map.nodes.push(note); await repo.saveMap(mapPath, map); await repo.rebuildDerivedData();
+  await repo.updateNote(note.path, { summary: '简体结论', detail: '正文', sourcePaths: ['Source.md'] });
+  await repo.rebuildDerivedData();
+  const markdown = contents.get(note.path);
+  assert.match(markdown, /> \[!info\]- 預覽\n> 简体结论/, 'the Preview section heading is the zh-TW one');
+  assert.equal(countOf(markdown, /\[!info\]- 預覽/g), 1);
+  assert.equal(countOf(markdown, /Preview/g), 0);
+  assert.match(markdown, /- 所屬主題：\[\[/, 'relation labels are zh-TW');
+  assert.doesNotMatch(vaultText(contents), SIMPLIFIED_FIXED_TEXT, 'no Simplified fixed text anywhere in the vault');
+  assert.equal(countOf(vaultText(contents), /预览/g), 0, 'vault grep for 预览 finds nothing');
+  const copy = await repo.duplicateNote(note.path, map, mapPath);
+  assert.doesNotMatch(contents.get(copy.path), SIMPLIFIED_FIXED_TEXT);
+  assert.equal((await repo.readNote(note.path)).preview, '简体结论');
+});
+integrationTest('switching the interface to Simplified Chinese keeps exactly one Preview section per note, in the note language', async () => {
+  for (const [created, heading, other, summary] of [['zh-TW', '預覽', 'Preview', '繁體結論'], ['en', 'Preview', '預覽', 'English conclusion']]) {
+    const { repo, contents } = fixture(created);
+    const mapPath = await repo.createMap('Travel'), map = await repo.readMap(mapPath);
+    const note = await repo.createNote('Route', 'model-a', map, mapPath, 'workspace');
+    map.nodes.push(note); await repo.saveMap(mapPath, map);
+    await repo.updateNote(note.path, { summary });
+    repo.settings.language = 'zh-CN';
+    await repo.rebuildDerivedData();
+    await repo.updateNote(note.path, { summary: `${summary} v2`, preview: `${summary} v2`, detail: 'More detail' });
+    await repo.rebuildDerivedData();
+    const markdown = contents.get(note.path);
+    assert.equal(countOf(markdown, new RegExp(`\\[!info\\]- ${heading}`, 'g')), 1, `${created}: one ${heading}`);
+    assert.equal(countOf(markdown, new RegExp(`${other}`, 'g')), 0, `${created}: no ${other}`);
+    assert.equal(countOf(markdown, /预览/g), 0, `${created}: no 预览`);
+    assert.equal((await repo.readNote(note.path)).preview, `${summary} v2`);
+  }
+});
+integrationTest('switching the interface language never rewrites an existing note (content hash)', async () => {
+  const crypto = require('node:crypto');
+  const hashes = contents => Object.fromEntries([...contents].map(([file, text]) => [file, crypto.createHash('sha256').update(text).digest('hex')]));
+  for (const created of ['zh-TW', 'en']) {
+    const { repo, contents } = fixture(created);
+    const mapPath = await repo.createMap('Travel'), map = await repo.readMap(mapPath);
+    const note = await repo.createNote('Route', 'model-a', map, mapPath, 'workspace');
+    map.nodes.push(note); await repo.saveMap(mapPath, map);
+    await repo.updateNote(note.path, { summary: 'Conclusion', detail: 'Detail', sourcePaths: ['Source.md'] });
+    await repo.rebuildDerivedData();
+    const before = hashes(contents);
+    for (const next of ['zh-CN', 'en', 'zh-TW', 'zh-CN']) {
+      repo.settings.language = next;
+      assert.deepEqual(hashes(contents), before, `${created} -> ${next}: switching alone writes nothing`);
+      await repo.rebuildDerivedData();
+      assert.deepEqual(hashes(contents), before, `${created} -> ${next}: a rebuild after the switch keeps every note as it was`);
+    }
+  }
+});

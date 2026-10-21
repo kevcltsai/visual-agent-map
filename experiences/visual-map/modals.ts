@@ -1451,7 +1451,7 @@ export class NextStepModal extends Modal {
       manageTemplates: (selected, refreshed) => {
         const settings = this.plugin.settings;
         const choices = (): { id: string; name: string }[] =>
-          builtinTemplates(noteLanguageOf(settings.language))
+          builtinTemplates(noteLanguageOf(settings.language), settings.language)
             .concat(settings.detailTemplates)
             .map(({ id, name }) => ({ id, name }));
         new DetailTemplatesModal(this.app, this.plugin, () => refreshed(choices()), selected).open();

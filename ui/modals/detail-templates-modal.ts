@@ -1,5 +1,5 @@
 import { App, Modal, setIcon, type Setting } from "obsidian";
-import { NOTE_LANGUAGES, noteLanguageOf, t, type TranslationKey } from "../../i18n";
+import { LANGUAGES, noteLanguageOf, t, type TranslationKey } from "../../i18n";
 import { modalActions } from "./action-bar";
 import type { Settings } from "../../repository";
 import {
@@ -72,7 +72,7 @@ export function renderDetailTemplatesSetting(
     .setName(t("ui.detail_templates"))
     .setDesc(t("ui.detail_templates_setting_desc"))
     .addDropdown(dropdown => {
-      for (const builtin of builtinTemplates(noteLanguageOf(plugin.settings.language)))
+      for (const builtin of builtinTemplates(noteLanguageOf(plugin.settings.language), plugin.settings.language))
         dropdown.addOption(builtin.id, builtin.name);
       for (const template of plugin.settings.detailTemplates) dropdown.addOption(template.id, template.name);
       dropdown.setValue(workspaceDefaultId(plugin.settings));
@@ -114,9 +114,10 @@ export class DetailTemplatesModal extends Modal {
   onOpen(): void {
     this.titleEl.setText(t("ui.detail_templates"));
     const initial = this.initialId
-      ? [...builtinTemplates(noteLanguageOf(this.settings.language)), ...this.settings.detailTemplates].find(
-          template => template.id === this.initialId
-        )
+      ? [
+          ...builtinTemplates(noteLanguageOf(this.settings.language), this.settings.language),
+          ...this.settings.detailTemplates
+        ].find(template => template.id === this.initialId)
       : undefined;
     if (initial) this.showEditor(initial, false, isBuiltinTemplateId(initial.id));
     else this.showList();
@@ -132,8 +133,9 @@ export class DetailTemplatesModal extends Modal {
 
   private uniqueName(base: string): string {
     const taken = (name: string) =>
-      builtinTemplates(noteLanguageOf(this.settings.language)).some(builtin => same(name, builtin.name)) ||
-      this.settings.detailTemplates.some(template => same(template.name, name));
+      builtinTemplates(noteLanguageOf(this.settings.language), this.settings.language).some(builtin =>
+        same(name, builtin.name)
+      ) || this.settings.detailTemplates.some(template => same(template.name, name));
     let name = base;
     for (let n = 2; taken(name); n++) name = `${base} ${n}`;
     return name;
@@ -145,7 +147,7 @@ export class DetailTemplatesModal extends Modal {
     contentEl.createEl("p", { text: t("ui.detail_templates_hint"), cls: "vam-modal-intro" });
     const defaultId = workspaceDefaultId(this.settings);
     for (const template of [
-      ...builtinTemplates(noteLanguageOf(this.settings.language)),
+      ...builtinTemplates(noteLanguageOf(this.settings.language), this.settings.language),
       ...this.settings.detailTemplates
     ]) {
       const isStandard = isBuiltinTemplateId(template.id);
@@ -245,7 +247,10 @@ export class DetailTemplatesModal extends Modal {
       .addEventListener("click", () => this.showList());
     const save = readOnly ? null : footer.createEl("button", { text: t("ui.save"), cls: "mod-cta" });
 
-    const builtInNames = NOTE_LANGUAGES.flatMap(language => builtinTemplates(language).map(builtin => builtin.name));
+    // A name is taken when it matches a built-in name shown in any registered interface language.
+    const builtInNames = LANGUAGES.flatMap(({ id }) =>
+      builtinTemplates(noteLanguageOf(id), id).map(builtin => builtin.name)
+    );
     const check = (): TemplateIssue[] => {
       if (readOnly) return [];
       const issues = validateTemplate(draft, others);

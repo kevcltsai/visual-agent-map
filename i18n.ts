@@ -1,5 +1,4 @@
 import { en, type TranslationKey } from "./i18n/en";
-import { zhTW } from "./i18n/zh-TW";
 import {
   LANGUAGES,
   type InstructionLanguage,
@@ -11,9 +10,6 @@ import {
 
 export type { InstructionLanguage, NoteLanguage, PromptNameForm, TranslationKey, UiLanguage };
 export { LANGUAGES };
-
-/** Dictionaries by language id. A language missing a key falls back to English (`translate`). */
-const DICTIONARIES: Record<UiLanguage, Readonly<Partial<Record<TranslationKey, string>>>> = { "zh-TW": zhTW, en };
 
 const registry: ReadonlyArray<LanguageEntry> = LANGUAGES;
 /** The interface language used when a stored or requested language is not registered. */
@@ -70,7 +66,7 @@ export function t(key: TranslationKey, ...values: unknown[]): string {
   return translate(language, key, ...values);
 }
 export function translate(locale: UiLanguage, key: TranslationKey, ...values: unknown[]): string {
-  const selected: string | undefined = DICTIONARIES[locale]?.[key];
+  const selected: string | undefined = entryOf(locale).dictionary[key];
   const translated = selected || en[key] || String(key);
   return translated.replace(/\{(\d+)\}/g, (_, index: string) => {
     const value = values[Number(index)];

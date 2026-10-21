@@ -1,0 +1,11 @@
+prompt.context_ai_condense: 收斂選取文字，保留核心意思與重要條件。
+
+prompt.context_ai_translate: 將選取文字翻譯成Target language，並盡可能保留名稱與格式。
+
+prompt.context_ai_search_images: 搜尋與選取文字及附近內容相關的既有網路圖片，回傳精簡的圖片搜尋關鍵字。除非另有要求，請勿加上圖說。
+
+prompt.research_topic: 研究「Target language」，補足資訊、來源與不確定處。
+
+prompt.search_budget_exhausted: 網路搜尋預算已用完。請停止搜尋，根據已取得的資料完成答案；不足之處明確列為待確認。
+
+prompt.reference_reduce: 整合所提供的證據摘要，不可遺漏實質不同的事實、分歧、保留條件、來源識別碼或來源對照表。每個原始 [S#] 都留在其支持的主張旁，並逐字保留所有 [S#] 對應完整路徑；不可更換識別碼或改寫路徑。

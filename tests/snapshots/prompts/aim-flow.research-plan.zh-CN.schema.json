@@ -1,0 +1,209 @@
+{
+  "type": "object",
+  "properties": {
+    "summary": {
+      "type": "string",
+      "description": "適合心智圖的一句繁體中文結論，80 字內"
+    },
+    "detail": {
+      "type": "string",
+      "description": "完整的繁體中文 Markdown 分析"
+    },
+    "suggestions": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "title": {
+            "type": "string"
+          },
+          "task": {
+            "type": "string"
+          },
+          "contribution": {
+            "type": "string"
+          },
+          "parentTitle": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "title",
+          "task",
+          "contribution",
+          "parentTitle"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "visualReferences": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "title": {
+            "type": "string"
+          },
+          "imageUrl": {
+            "type": "string"
+          },
+          "sourceUrl": {
+            "type": "string"
+          },
+          "description": {
+            "type": "string"
+          },
+          "palette": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "formula": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "title",
+          "imageUrl",
+          "sourceUrl",
+          "description",
+          "palette",
+          "formula"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "aim": {
+      "type": "object",
+      "properties": {
+        "subtopics": {
+          "type": "array",
+          "description": "0–3 distinct evidence tasks.",
+          "items": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string"
+              },
+              "title": {
+                "type": "string"
+              },
+              "task": {
+                "type": "string"
+              },
+              "expectedValue": {
+                "type": "string"
+              },
+              "action": {
+                "type": "string",
+                "enum": [
+                  "research",
+                  "update",
+                  "reuse"
+                ]
+              },
+              "dependsOn": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                },
+                "description": "Ids of prerequisite targets in this plan; empty when independent."
+              },
+              "rationale": {
+                "type": "string"
+              },
+              "source": {
+                "anyOf": [
+                  {
+                    "type": "object",
+                    "properties": {
+                      "branchId": {
+                        "type": "string"
+                      },
+                      "resultId": {
+                        "type": "string"
+                      },
+                      "notePath": {
+                        "type": "string"
+                      },
+                      "version": {
+                        "type": "integer"
+                      },
+                      "contentHash": {
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "branchId",
+                      "resultId",
+                      "notePath",
+                      "version",
+                      "contentHash"
+                    ],
+                    "additionalProperties": false
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "For reuse/update: the exact source copied from the supplied ancestor report. Null for research."
+              },
+              "validity": {
+                "anyOf": [
+                  {
+                    "type": "object",
+                    "properties": {
+                      "conditionKeys": {
+                        "type": "array",
+                        "items": {
+                          "type": "string"
+                        }
+                      },
+                      "reason": {
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "conditionKeys",
+                      "reason"
+                    ],
+                    "additionalProperties": false
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "For reuse/update: which supplied condition keys the source depends on and why it still applies. Null for research."
+              }
+            },
+            "required": [
+              "id",
+              "title",
+              "task",
+              "expectedValue",
+              "action",
+              "dependsOn",
+              "rationale",
+              "source",
+              "validity"
+            ],
+            "additionalProperties": false
+          }
+        }
+      },
+      "required": [
+        "subtopics"
+      ],
+      "additionalProperties": false
+    }
+  },
+  "required": [
+    "summary",
+    "detail",
+    "suggestions",
+    "visualReferences",
+    "aim"
+  ],
+  "additionalProperties": false
+}

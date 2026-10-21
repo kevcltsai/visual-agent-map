@@ -220,12 +220,15 @@ function templateInLanguage(template: DetailTemplate, language: UiLanguage): Det
     ? builtinTemplates(noteLanguageOf(language)).find(item => item.id === template.id)!
     : template;
 }
-/** Unmet section counts to store on the topic; undefined (no count check ran) clears an earlier mark. */
-function formatIssuesPatch(
+/**
+ * Unmet section counts to store on the topic; undefined (no count check ran) clears an earlier mark. The text is written
+ * into the note's frontmatter, so it is in the note language, never a display-only interface language.
+ */
+export function formatIssuesPatch(
   issues: CountIssue[] | undefined,
   language: UiLanguage
 ): Pick<NotePatch, "detailFormatIssues"> {
-  return { detailFormatIssues: (issues ?? []).map(issue => countIssueText(issue, language)) };
+  return { detailFormatIssues: (issues ?? []).map(issue => countIssueText(issue, noteLanguageOf(language))) };
 }
 const originBaseline = (origin?: string): string =>
   createHash("sha256")
@@ -1113,7 +1116,7 @@ export class VisualAgentMapView extends ItemView {
   /** Built-in Standard and Textbook plus the workspace's custom templates, for the template selects. */
   private templateChoices(): { id: string; name: string }[] {
     const settings = this.plugin.settings;
-    return [...builtinTemplates(noteLanguageOf(settings.language)), ...settings.detailTemplates].map(
+    return [...builtinTemplates(noteLanguageOf(settings.language), settings.language), ...settings.detailTemplates].map(
       ({ id, name }) => ({ id, name })
     );
   }

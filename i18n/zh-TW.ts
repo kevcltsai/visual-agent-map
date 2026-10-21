@@ -1329,8 +1329,6 @@ export const zhTW: Record<TranslationKey, string> = {
   "coffee.home": "回主頁",
   "coffee.older_saved_table_read_only": "舊版桌聊紀錄 · 唯讀",
   "coffee.ai_simulated_perspectives": "AI 虛構模擬視角",
-  "coffee.conversation_english": "對談語言：英文",
-  "coffee.conversation_traditional_chinese": "對談語言：繁體中文",
   "coffee.stop_generation": "停止生成",
   "coffee.retry_saving": "重試保存",
   "coffee.continue_from_saved_draft": "從已保存草稿繼續",

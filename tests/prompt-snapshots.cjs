@@ -5,14 +5,18 @@ const { test } = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
-const { load: loadModule, normalizeText, promptsFor, root } = require('./support-replay.cjs');
+const { load: loadModule, loadSource, normalizeText, promptsFor, root } = require('./support-replay.cjs');
 const support = require('./support.cjs');
 const { runPanel } = require('./support-selection-ai.cjs');
 const { captureAimPhaseVariants } = require('./support-aim-flow-capture.cjs');
 
 const directory = path.join(__dirname, 'snapshots', 'prompts');
 const update = process.env.UPDATE_PROMPT_SNAPSHOTS === '1';
-const LANGUAGES = [['en', 'en'], ['zh-TW', 'zh']];
+// [language id, snapshot tag] for every registered language. The tag is the instruction language for the first language
+// that uses it (so the files stay `.en.` / `.zh.`) and the language id for later ones (`.zh-CN.`).
+const REGISTRY = loadRegistry();
+const LANGUAGES = REGISTRY.map((entry, index) => [entry.id, REGISTRY.findIndex(other => other.instruction === entry.instruction) === index ? entry.instruction : entry.id]);
+function loadRegistry() { return loadModule('i18n/languages.ts').LANGUAGES; }
 const snapshots = new Map(); // name -> { prompt, schema, builder, language }
 
 function record(name, builder, language, prompt, schema) {
@@ -36,7 +40,7 @@ test('collect snapshots: AiTaskService general task prompt', async () => {
     await recordContext(`service.decompose-deep.${tag}`, 'AiTaskService instructions: mode decompose, deep research', language, { ...ctx, mode: 'decompose', researchDepth: 'deep' });
     await recordContext(`service.synthesize-local.${tag}`, 'AiTaskService instructions: mode synthesize, local, visual off', language, { ...ctx, mode: 'synthesize', researchMode: 'local', visualMode: 'off' });
     await recordContext(`service.task-tone.${tag}`, 'AiTaskService instructions: mode task with a resolved tone text (B1)', language, { ...ctx, toneText: language === 'en' ? 'Tone: example voice. Write warmly.' : '寫作語氣：範例語氣。請溫暖地寫作。' });
-    await recordContext(`service.task-textbook.${tag}`, 'AiTaskService instructions: mode task with the built-in Textbook template (intro, six sections, empty sections omitted)', language, { ...ctx, detailTemplate: loadModule('ai/detail-templates.ts').textbookTemplate(language) });
+    await recordContext(`service.task-textbook.${tag}`, 'AiTaskService instructions: mode task with the built-in Textbook template (intro, six sections, empty sections omitted)', language, { ...ctx, detailTemplate: loadModule('ai/detail-templates.ts').textbookTemplate(loadModule('i18n.ts').noteLanguageOf(language)) });
     await recordContext(`service.default-adaptive.${tag}`, 'AiTaskService instructions: no mode, adaptive detail, no sources', language, { ...ctx, mode: undefined, detailFormat: 'adaptive', sourceContext: undefined, workingFindings: undefined, detail: '', rules: '', ancestors: '' });
     await recordContext(`service.reference-groups.${tag}`, 'AiTaskService reference extraction then task', language, { ...ctx, sourceContext: undefined, referenceGroups: [{ id: 'g1', name: 'Group', location: '/refs', documents: [{ path: '/refs/a.md', content: 'Reference body A' }] }] });
   }
@@ -134,16 +138,20 @@ test('collect snapshots: Visual Map expansion and synthesis tasks', async () => 
 });
 
 test('collect snapshots: Coffee Tables, Reframe, Markdown context', async () => {
-  const prompts = support.coffeePrompts, types = support.coffeeTypes;
-  const customization = support.coffeeCustomization;
-  const { convergenceStep } = loadModule('experiences/coffee-tables/steps/convergence/step.ts');
+  // One bundle, so the Coffee modules and setUiLanguage share the same interface-language state (Coffee names the table language from it).
+  const coffeeModules = loadSource(`export * as i18n from './i18n'; export * as prompts from './experiences/coffee-tables/prompts'; export * as types from './experiences/coffee-tables/types'; export * as engine from './experiences/coffee-tables/engine'; export * as customization from './experiences/coffee-tables/customization'; export { convergenceStep } from './experiences/coffee-tables/steps/convergence/step';`);
+  const prompts = coffeeModules.prompts, types = coffeeModules.types;
+  const customization = coffeeModules.customization;
+  const { convergenceStep } = coffeeModules;
   for (const [language, tag] of LANGUAGES) {
+    coffeeModules.i18n.setUiLanguage(language);
+    const noteLanguage = coffeeModules.i18n.noteLanguageOf(language); // a session stores the note language; the table speaks the interface language
     const topic = language === 'en' ? 'Should lunches allow parent top-ups' : '營養午餐是否開放家長加價';
-    const session = types.createSession(topic, 'test-model', 'high', language);
+    const session = types.createSession(topic, 'test-model', 'high', noteLanguage);
     session.id = 'session-fixed'; session.createdAt = '2026-01-01T00:00:00.000Z'; session.updatedAt = session.createdAt;
-    record(`coffee.table-opening.${tag}`, 'coffee-tables/prompts.ts tablePrompt (opening, default guests)', language, prompts.tablePrompt(topic, language));
-    record(`coffee.table-continue.${tag}`, 'coffee-tables/prompts.ts tablePrompt (draft + prior context + invited guest)', language, prompts.tablePrompt(topic, language, session.guests, 'Unfinished draft text', 'Prior discussion text', [{ id: 'g1', name: 'Guest Name', category: 'experts', description: 'Guest background' }]));
-    record(`coffee.opening-preview.${tag}`, 'coffee-tables/prompts.ts openingPromptPreview', language, prompts.openingPromptPreview(topic, language, session.guests));
+    record(`coffee.table-opening.${tag}`, 'coffee-tables/prompts.ts tablePrompt (opening, default guests)', language, prompts.tablePrompt(topic, noteLanguage));
+    record(`coffee.table-continue.${tag}`, 'coffee-tables/prompts.ts tablePrompt (draft + prior context + invited guest)', language, prompts.tablePrompt(topic, noteLanguage, session.guests, 'Unfinished draft text', 'Prior discussion text', [{ id: 'g1', name: 'Guest Name', category: 'experts', description: 'Guest background' }]));
+    record(`coffee.opening-preview.${tag}`, 'coffee-tables/prompts.ts openingPromptPreview', language, prompts.openingPromptPreview(topic, noteLanguage, session.guests));
     session.status = 'completed';
     session.rounds = [{ id: 'round-1', createdAt: session.createdAt, status: 'completed', markdown: '### Host|Host\nOpening line one.\n\n### Expert|Expert\nSecond speaker line.', notes: '' }];
     session.interventions = [{ id: 'iv-1', roundId: 'round-1', afterTurn: 1, text: 'User intervention text', createdAt: session.createdAt }];
@@ -151,15 +159,16 @@ test('collect snapshots: Coffee Tables, Reframe, Markdown context', async () => 
     record(`coffee.observer-only.${tag}`, 'coffee-tables/prompts.ts observerOnlyPrompt', language, prompts.observerOnlyPrompt(session));
     session.questions = [{ id: 'question-1', question: 'Follow-up question text', answer: 'Answer text for the follow-up.', status: 'complete', createdAt: '2026-01-01T00:00:01.000Z' }];
     const navigation = [];
-    const navigationEngine = new support.coffee.CoffeeEngine(JSON.parse(JSON.stringify(session)), async request => { navigation.push(request.prompt); return ''; }, async () => {});
+    const navigationEngine = new coffeeModules.engine.CoffeeEngine(JSON.parse(JSON.stringify(session)), async request => { navigation.push(request.prompt); return ''; }, async () => {});
     await navigationEngine.fillSegmentSummaries();
     assert.equal(navigation.length, 1, 'navigation summary prompt reached the provider once');
     record(`coffee.navigation-summary.${tag}`, 'coffee-tables/engine.ts fillSegmentSummaries (navigation summary request)', language, navigation[0]);
     session.questions = [];
     const baseline = [{ id: 'insight-1', category: 'connections', summary: 'Insight summary one', detail: 'Insight detail one', sources: ['source quote'], question: '', proposedSolution: '', limitations: '' }, { id: 'insight-2', category: 'questions', summary: 'Insight summary two', detail: 'Insight detail two', sources: [], question: '', proposedSolution: '', limitations: '' }];
     session.pinnedInsightIds = ['insight-2'];
-    record(`coffee.convergence.${tag}`, 'coffee-tables/convergence.ts convergencePrompt', language, convergenceStep.render({ session, baseline, customization: customization.defaultCustomization(language) }));
+    record(`coffee.convergence.${tag}`, 'coffee-tables/convergence.ts convergencePrompt', language, convergenceStep.render({ session, baseline, customization: customization.defaultCustomization(noteLanguage) }));
   }
+  coffeeModules.i18n.setUiLanguage('en');
   const { buildReframePrompt } = support.load('core/reframing-service.ts', { obsidian: support.obsidian });
   for (const [language, tag] of LANGUAGES) record(`reframe.${tag}`, 'core/reframing-service.ts buildReframePrompt', language, buildReframePrompt({ language, question: 'Direction question', context: 'Direction context', source: 'Source thinking text' }));
   const { buildOutlineGeneratePrompt } = support.load('core/outline-generation-service.ts', { obsidian: support.obsidian });
@@ -217,8 +226,7 @@ test('collect snapshots: chart step (chart.add@1)', () => {
     const detail = language === 'en' ? 'Larvae hatch in 3 days.\n\n```mermaid\nflowchart TD\nA["Egg"] --> B["Larva"]\n```\n\nThe pupa stage lasts 5 days.' : '幼蟲 3 天孵化。\n\n```mermaid\nflowchart TD\nA["卵"] --> B["幼蟲"]\n```\n\n蛹期持續 5 天。';
     record(`chart.add.${tag}`, 'core/steps/chart/step.ts chartStep (one existing diagram, two remaining)', language, chartStep.render({ title: 'Topic T', detail, language, existingCount: 1, existingTypes: ['flowchart'], remaining: 2 }), chartStep.schema);
   }
-  record('chart.add-none.en', 'core/steps/chart/step.ts chartStep (no existing diagram)', 'en', chartStep.render({ title: 'Topic T', detail: 'Plain text.', language: 'en', existingCount: 0, existingTypes: [], remaining: 3 }), chartStep.schema);
-  record('chart.add-none.zh', 'core/steps/chart/step.ts chartStep (no existing diagram)', 'zh-TW', chartStep.render({ title: 'Topic T', detail: '純文字。', language: 'zh-TW', existingCount: 0, existingTypes: [], remaining: 3 }), chartStep.schema);
+  for (const [language, tag] of LANGUAGES) record(`chart.add-none.${tag}`, 'core/steps/chart/step.ts chartStep (no existing diagram)', language, chartStep.render({ title: 'Topic T', detail: language === 'en' ? 'Plain text.' : '純文字。', language, existingCount: 0, existingTypes: [], remaining: 3 }), chartStep.schema);
 });
 
 test('collect snapshots: preset instruction strings composed directly from i18n', () => {

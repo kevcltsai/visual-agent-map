@@ -15,6 +15,17 @@ function load(entry, overrides = {}, globals = {}) {
   return module.exports;
 }
 
+/**
+ * Bundles TypeScript `contents` (imports resolve from the repository root) into one module, so several product modules
+ * share a single copy of module state such as the interface language. `load` gives every entry its own copy.
+ */
+function loadSource(contents, overrides = {}) {
+  const code = buildSync({ stdin: { contents, resolveDir: root, loader: 'ts', sourcefile: 'support-replay-entry.ts' }, external: ['obsidian', 'node:*'] }).outputFiles[0].text;
+  const module = { exports: {} };
+  vm.runInNewContext(code, { module, exports: module.exports, require: name => overrides[name] || require(name), console: Object.assign(Object.create(console), { debug() {} }), TextDecoder, crypto: crypto.webcrypto, process, AbortController, DOMException, setTimeout, clearTimeout });
+  return module.exports;
+}
+
 const UUID = /[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/gi;
 const ISO_TIME = /\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?Z/g;
 /** Replace values that legitimately change between runs; everything else is compared byte for byte. */
@@ -102,4 +113,4 @@ function replayAsk(steps, fills = {}) {
   return { ask, observed, phases: () => observed.map(item => item.phase), consumed: () => next, unused: () => steps.slice(next) };
 }
 
-module.exports = { replayAsk, root, load, normalizeText, sha256, capturingRuntime, makeService, promptsFor, replayRuntime, ReplayMiss, readJson, EMPTY_RESULT };
+module.exports = { replayAsk, root, load, loadSource, normalizeText, sha256, capturingRuntime, makeService, promptsFor, replayRuntime, ReplayMiss, readJson, EMPTY_RESULT };

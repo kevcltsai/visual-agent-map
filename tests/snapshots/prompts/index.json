@@ -11,6 +11,11 @@
       "language": "zh-TW",
       "schema": true
     },
+    "aim-builder.decision-quality-review.zh-CN": {
+      "builder": "buildAimPrompt via AiTaskService (phase decision-quality-review, legacy marker contract)",
+      "language": "zh-CN",
+      "schema": true
+    },
     "aim-builder.delivery-acceptance.en": {
       "builder": "buildAimPrompt via AiTaskService (phase delivery-acceptance, legacy marker contract)",
       "language": "en",
@@ -19,6 +24,11 @@
     "aim-builder.delivery-acceptance.zh": {
       "builder": "buildAimPrompt via AiTaskService (phase delivery-acceptance, legacy marker contract)",
       "language": "zh-TW",
+      "schema": true
+    },
+    "aim-builder.delivery-acceptance.zh-CN": {
+      "builder": "buildAimPrompt via AiTaskService (phase delivery-acceptance, legacy marker contract)",
+      "language": "zh-CN",
       "schema": true
     },
     "aim-builder.delivery-outline.en": {
@@ -31,6 +41,11 @@
       "language": "zh-TW",
       "schema": true
     },
+    "aim-builder.delivery-outline.zh-CN": {
+      "builder": "buildAimPrompt via AiTaskService (phase delivery-outline, legacy marker contract)",
+      "language": "zh-CN",
+      "schema": true
+    },
     "aim-builder.delivery-research.en": {
       "builder": "buildAimPrompt via AiTaskService (phase delivery-research, legacy marker contract)",
       "language": "en",
@@ -39,6 +54,11 @@
     "aim-builder.delivery-research.zh": {
       "builder": "buildAimPrompt via AiTaskService (phase delivery-research, legacy marker contract)",
       "language": "zh-TW",
+      "schema": true
+    },
+    "aim-builder.delivery-research.zh-CN": {
+      "builder": "buildAimPrompt via AiTaskService (phase delivery-research, legacy marker contract)",
+      "language": "zh-CN",
       "schema": true
     },
     "aim-builder.delivery-writing.en": {
@@ -51,6 +71,11 @@
       "language": "zh-TW",
       "schema": true
     },
+    "aim-builder.delivery-writing.zh-CN": {
+      "builder": "buildAimPrompt via AiTaskService (phase delivery-writing, legacy marker contract)",
+      "language": "zh-CN",
+      "schema": true
+    },
     "aim-builder.format-repair.en": {
       "builder": "buildAimPrompt via AiTaskService (phase format-repair, legacy marker contract)",
       "language": "en",
@@ -59,6 +84,11 @@
     "aim-builder.format-repair.zh": {
       "builder": "buildAimPrompt via AiTaskService (phase format-repair, legacy marker contract)",
       "language": "zh-TW",
+      "schema": true
+    },
+    "aim-builder.format-repair.zh-CN": {
+      "builder": "buildAimPrompt via AiTaskService (phase format-repair, legacy marker contract)",
+      "language": "zh-CN",
       "schema": true
     },
     "aim-builder.initial-clarification.en": {
@@ -71,6 +101,11 @@
       "language": "zh-TW",
       "schema": true
     },
+    "aim-builder.initial-clarification.zh-CN": {
+      "builder": "buildAimPrompt via AiTaskService (phase initial-clarification, legacy marker contract)",
+      "language": "zh-CN",
+      "schema": true
+    },
     "aim-builder.initial-question.en": {
       "builder": "buildAimPrompt via AiTaskService (phase initial-question, legacy marker contract)",
       "language": "en",
@@ -79,6 +114,11 @@
     "aim-builder.initial-question.zh": {
       "builder": "buildAimPrompt via AiTaskService (phase initial-question, legacy marker contract)",
       "language": "zh-TW",
+      "schema": true
+    },
+    "aim-builder.initial-question.zh-CN": {
+      "builder": "buildAimPrompt via AiTaskService (phase initial-question, legacy marker contract)",
+      "language": "zh-CN",
       "schema": true
     },
     "aim-builder.no-phase.en": {
@@ -91,6 +131,11 @@
       "language": "zh-TW",
       "schema": true
     },
+    "aim-builder.no-phase.zh-CN": {
+      "builder": "buildAimPrompt via AiTaskService (phase none, legacy marker contract)",
+      "language": "zh-CN",
+      "schema": true
+    },
     "aim-builder.report-review.en": {
       "builder": "buildAimPrompt via AiTaskService (phase report-review, legacy marker contract)",
       "language": "en",
@@ -99,6 +144,11 @@
     "aim-builder.report-review.zh": {
       "builder": "buildAimPrompt via AiTaskService (phase report-review, legacy marker contract)",
       "language": "zh-TW",
+      "schema": true
+    },
+    "aim-builder.report-review.zh-CN": {
+      "builder": "buildAimPrompt via AiTaskService (phase report-review, legacy marker contract)",
+      "language": "zh-CN",
       "schema": true
     },
     "aim-builder.research-gap-audit.en": {
@@ -111,6 +161,11 @@
       "language": "zh-TW",
       "schema": true
     },
+    "aim-builder.research-gap-audit.zh-CN": {
+      "builder": "buildAimPrompt via AiTaskService (phase research-gap-audit, legacy marker contract)",
+      "language": "zh-CN",
+      "schema": true
+    },
     "aim-builder.research-plan-repair.en": {
       "builder": "buildAimPrompt via AiTaskService (phase research-plan-repair, legacy marker contract)",
       "language": "en",
@@ -119,6 +174,11 @@
     "aim-builder.research-plan-repair.zh": {
       "builder": "buildAimPrompt via AiTaskService (phase research-plan-repair, legacy marker contract)",
       "language": "zh-TW",
+      "schema": true
+    },
+    "aim-builder.research-plan-repair.zh-CN": {
+      "builder": "buildAimPrompt via AiTaskService (phase research-plan-repair, legacy marker contract)",
+      "language": "zh-CN",
       "schema": true
     },
     "aim-builder.research-plan.en": {
@@ -131,6 +191,11 @@
       "language": "zh-TW",
       "schema": true
     },
+    "aim-builder.research-plan.zh-CN": {
+      "builder": "buildAimPrompt via AiTaskService (phase research-plan, legacy marker contract)",
+      "language": "zh-CN",
+      "schema": true
+    },
     "aim-builder.subtopic-research.en": {
       "builder": "buildAimPrompt via AiTaskService (phase subtopic-research, legacy marker contract)",
       "language": "en",
@@ -139,6 +204,11 @@
     "aim-builder.subtopic-research.zh": {
       "builder": "buildAimPrompt via AiTaskService (phase subtopic-research, legacy marker contract)",
       "language": "zh-TW",
+      "schema": true
+    },
+    "aim-builder.subtopic-research.zh-CN": {
+      "builder": "buildAimPrompt via AiTaskService (phase subtopic-research, legacy marker contract)",
+      "language": "zh-CN",
       "schema": true
     },
     "aim-builder.targeted-followup-research.en": {
@@ -151,6 +221,11 @@
       "language": "zh-TW",
       "schema": true
     },
+    "aim-builder.targeted-followup-research.zh-CN": {
+      "builder": "buildAimPrompt via AiTaskService (phase targeted-followup-research, legacy marker contract)",
+      "language": "zh-CN",
+      "schema": true
+    },
     "aim-builder.tone.en": {
       "builder": "buildAimPrompt via AiTaskService with a resolved tone text (B1)",
       "language": "en",
@@ -159,6 +234,11 @@
     "aim-builder.tone.zh": {
       "builder": "buildAimPrompt via AiTaskService with a resolved tone text (B1)",
       "language": "zh-TW",
+      "schema": true
+    },
+    "aim-builder.tone.zh-CN": {
+      "builder": "buildAimPrompt via AiTaskService with a resolved tone text (B1)",
+      "language": "zh-CN",
       "schema": true
     },
     "aim-contract.delivery-research.en": {
@@ -216,6 +296,11 @@
       "language": "zh-TW",
       "schema": true
     },
+    "aim-flow.continuation-review.zh-CN": {
+      "builder": "AimManualFlow/planner-review phase task variant continuation-review through AiTaskService",
+      "language": "zh-CN",
+      "schema": true
+    },
     "aim-flow.continuation-search-unresolved.en": {
       "builder": "AimManualFlow/planner-review phase task variant continuation-search-unresolved through AiTaskService",
       "language": "en",
@@ -224,6 +309,11 @@
     "aim-flow.continuation-search-unresolved.zh": {
       "builder": "AimManualFlow/planner-review phase task variant continuation-search-unresolved through AiTaskService",
       "language": "zh-TW",
+      "schema": true
+    },
+    "aim-flow.continuation-search-unresolved.zh-CN": {
+      "builder": "AimManualFlow/planner-review phase task variant continuation-search-unresolved through AiTaskService",
+      "language": "zh-CN",
       "schema": true
     },
     "aim-flow.continuation-search.en": {
@@ -236,6 +326,11 @@
       "language": "zh-TW",
       "schema": true
     },
+    "aim-flow.continuation-search.zh-CN": {
+      "builder": "AimManualFlow/planner-review phase task variant continuation-search through AiTaskService",
+      "language": "zh-CN",
+      "schema": true
+    },
     "aim-flow.decision-quality-review-answered-goal.en": {
       "builder": "AimManualFlow/planner-review phase task variant decision-quality-review-answered-goal through AiTaskService",
       "language": "en",
@@ -244,6 +339,11 @@
     "aim-flow.decision-quality-review-answered-goal.zh": {
       "builder": "AimManualFlow/planner-review phase task variant decision-quality-review-answered-goal through AiTaskService",
       "language": "zh-TW",
+      "schema": true
+    },
+    "aim-flow.decision-quality-review-answered-goal.zh-CN": {
+      "builder": "AimManualFlow/planner-review phase task variant decision-quality-review-answered-goal through AiTaskService",
+      "language": "zh-CN",
       "schema": true
     },
     "aim-flow.decision-quality-review-below-floor.en": {
@@ -256,6 +356,11 @@
       "language": "zh-TW",
       "schema": true
     },
+    "aim-flow.decision-quality-review-below-floor.zh-CN": {
+      "builder": "AimManualFlow/planner-review phase task variant decision-quality-review-below-floor through AiTaskService",
+      "language": "zh-CN",
+      "schema": true
+    },
     "aim-flow.decision-quality-review-user-condition.en": {
       "builder": "AimManualFlow/planner-review phase task variant decision-quality-review-user-condition through AiTaskService",
       "language": "en",
@@ -264,6 +369,11 @@
     "aim-flow.decision-quality-review-user-condition.zh": {
       "builder": "AimManualFlow/planner-review phase task variant decision-quality-review-user-condition through AiTaskService",
       "language": "zh-TW",
+      "schema": true
+    },
+    "aim-flow.decision-quality-review-user-condition.zh-CN": {
+      "builder": "AimManualFlow/planner-review phase task variant decision-quality-review-user-condition through AiTaskService",
+      "language": "zh-CN",
       "schema": true
     },
     "aim-flow.delivery-acceptance.en": {
@@ -276,6 +386,11 @@
       "language": "zh-TW",
       "schema": true
     },
+    "aim-flow.delivery-acceptance.zh-CN": {
+      "builder": "AimManualFlow/final-delivery phase delivery-acceptance through AiTaskService",
+      "language": "zh-CN",
+      "schema": true
+    },
     "aim-flow.delivery-outline.en": {
       "builder": "AimManualFlow/final-delivery phase delivery-outline through AiTaskService",
       "language": "en",
@@ -284,6 +399,11 @@
     "aim-flow.delivery-outline.zh": {
       "builder": "AimManualFlow/final-delivery phase delivery-outline through AiTaskService",
       "language": "zh-TW",
+      "schema": true
+    },
+    "aim-flow.delivery-outline.zh-CN": {
+      "builder": "AimManualFlow/final-delivery phase delivery-outline through AiTaskService",
+      "language": "zh-CN",
       "schema": true
     },
     "aim-flow.delivery-research.en": {
@@ -296,6 +416,11 @@
       "language": "zh-TW",
       "schema": true
     },
+    "aim-flow.delivery-research.zh-CN": {
+      "builder": "AimManualFlow/final-delivery phase delivery-research through AiTaskService",
+      "language": "zh-CN",
+      "schema": true
+    },
     "aim-flow.delivery-writing.en": {
       "builder": "AimManualFlow/final-delivery phase delivery-writing through AiTaskService",
       "language": "en",
@@ -304,6 +429,11 @@
     "aim-flow.delivery-writing.zh": {
       "builder": "AimManualFlow/final-delivery phase delivery-writing through AiTaskService",
       "language": "zh-TW",
+      "schema": true
+    },
+    "aim-flow.delivery-writing.zh-CN": {
+      "builder": "AimManualFlow/final-delivery phase delivery-writing through AiTaskService",
+      "language": "zh-CN",
       "schema": true
     },
     "aim-flow.evidence-lookup-followup.en": {
@@ -316,6 +446,11 @@
       "language": "zh-TW",
       "schema": true
     },
+    "aim-flow.evidence-lookup-followup.zh-CN": {
+      "builder": "AimManualFlow/planner-review phase task variant evidence-lookup-followup through AiTaskService",
+      "language": "zh-CN",
+      "schema": true
+    },
     "aim-flow.evidence-reuse-audit.en": {
       "builder": "AimManualFlow/planner-review phase task variant evidence-reuse-audit through AiTaskService",
       "language": "en",
@@ -324,6 +459,11 @@
     "aim-flow.evidence-reuse-audit.zh": {
       "builder": "AimManualFlow/planner-review phase task variant evidence-reuse-audit through AiTaskService",
       "language": "zh-TW",
+      "schema": true
+    },
+    "aim-flow.evidence-reuse-audit.zh-CN": {
+      "builder": "AimManualFlow/planner-review phase task variant evidence-reuse-audit through AiTaskService",
+      "language": "zh-CN",
       "schema": true
     },
     "aim-flow.format-repair-answered-without-target.en": {
@@ -336,6 +476,11 @@
       "language": "zh-TW",
       "schema": true
     },
+    "aim-flow.format-repair-answered-without-target.zh-CN": {
+      "builder": "AimManualFlow/planner-review phase task variant format-repair-answered-without-target through AiTaskService",
+      "language": "zh-CN",
+      "schema": true
+    },
     "aim-flow.format-repair-imposed-options.en": {
       "builder": "AimManualFlow/planner-review phase task variant format-repair-imposed-options through AiTaskService",
       "language": "en",
@@ -344,6 +489,11 @@
     "aim-flow.format-repair-imposed-options.zh": {
       "builder": "AimManualFlow/planner-review phase task variant format-repair-imposed-options through AiTaskService",
       "language": "zh-TW",
+      "schema": true
+    },
+    "aim-flow.format-repair-imposed-options.zh-CN": {
+      "builder": "AimManualFlow/planner-review phase task variant format-repair-imposed-options through AiTaskService",
+      "language": "zh-CN",
       "schema": true
     },
     "aim-flow.format-repair-missing-choices.en": {
@@ -356,6 +506,11 @@
       "language": "zh-TW",
       "schema": true
     },
+    "aim-flow.format-repair-missing-choices.zh-CN": {
+      "builder": "AimManualFlow/planner-review phase task variant format-repair-missing-choices through AiTaskService",
+      "language": "zh-CN",
+      "schema": true
+    },
     "aim-flow.format-repair-no-decision.en": {
       "builder": "AimManualFlow/planner-review phase task variant format-repair-no-decision through AiTaskService",
       "language": "en",
@@ -364,6 +519,11 @@
     "aim-flow.format-repair-no-decision.zh": {
       "builder": "AimManualFlow/planner-review phase task variant format-repair-no-decision through AiTaskService",
       "language": "zh-TW",
+      "schema": true
+    },
+    "aim-flow.format-repair-no-decision.zh-CN": {
+      "builder": "AimManualFlow/planner-review phase task variant format-repair-no-decision through AiTaskService",
+      "language": "zh-CN",
       "schema": true
     },
     "aim-flow.format-repair-preserve-decision.en": {
@@ -376,6 +536,11 @@
       "language": "zh-TW",
       "schema": true
     },
+    "aim-flow.format-repair-preserve-decision.zh-CN": {
+      "builder": "AimManualFlow/planner-review phase task variant format-repair-preserve-decision through AiTaskService",
+      "language": "zh-CN",
+      "schema": true
+    },
     "aim-flow.format-repair-state-question.en": {
       "builder": "AimManualFlow/planner-review phase task variant format-repair-state-question through AiTaskService",
       "language": "en",
@@ -384,6 +549,11 @@
     "aim-flow.format-repair-state-question.zh": {
       "builder": "AimManualFlow/planner-review phase task variant format-repair-state-question through AiTaskService",
       "language": "zh-TW",
+      "schema": true
+    },
+    "aim-flow.format-repair-state-question.zh-CN": {
+      "builder": "AimManualFlow/planner-review phase task variant format-repair-state-question through AiTaskService",
+      "language": "zh-CN",
       "schema": true
     },
     "aim-flow.initial-clarification.en": {
@@ -396,6 +566,11 @@
       "language": "zh-TW",
       "schema": true
     },
+    "aim-flow.initial-clarification.zh-CN": {
+      "builder": "AimManualFlow/planner-review phase task variant initial-clarification through AiTaskService",
+      "language": "zh-CN",
+      "schema": true
+    },
     "aim-flow.initial-question-correction.en": {
       "builder": "AimManualFlow/planner-review phase task variant initial-question-correction through AiTaskService",
       "language": "en",
@@ -404,6 +579,11 @@
     "aim-flow.initial-question-correction.zh": {
       "builder": "AimManualFlow/planner-review phase task variant initial-question-correction through AiTaskService",
       "language": "zh-TW",
+      "schema": true
+    },
+    "aim-flow.initial-question-correction.zh-CN": {
+      "builder": "AimManualFlow/planner-review phase task variant initial-question-correction through AiTaskService",
+      "language": "zh-CN",
       "schema": true
     },
     "aim-flow.initial-question-saved-terminal.en": {
@@ -416,6 +596,11 @@
       "language": "zh-TW",
       "schema": true
     },
+    "aim-flow.initial-question-saved-terminal.zh-CN": {
+      "builder": "AimManualFlow/planner-review phase task variant initial-question-saved-terminal through AiTaskService",
+      "language": "zh-CN",
+      "schema": true
+    },
     "aim-flow.initial-question.en": {
       "builder": "AimManualFlow/final-delivery phase initial-question through AiTaskService",
       "language": "en",
@@ -424,6 +609,11 @@
     "aim-flow.initial-question.zh": {
       "builder": "AimManualFlow/final-delivery phase initial-question through AiTaskService",
       "language": "zh-TW",
+      "schema": true
+    },
+    "aim-flow.initial-question.zh-CN": {
+      "builder": "AimManualFlow/final-delivery phase initial-question through AiTaskService",
+      "language": "zh-CN",
       "schema": true
     },
     "aim-flow.report-review-first.en": {
@@ -436,6 +626,11 @@
       "language": "zh-TW",
       "schema": true
     },
+    "aim-flow.report-review-first.zh-CN": {
+      "builder": "AimManualFlow/final-delivery phase report-review-first through AiTaskService",
+      "language": "zh-CN",
+      "schema": true
+    },
     "aim-flow.report-review-later.en": {
       "builder": "AimManualFlow/planner-review phase task variant report-review-later through AiTaskService",
       "language": "en",
@@ -444,6 +639,11 @@
     "aim-flow.report-review-later.zh": {
       "builder": "AimManualFlow/planner-review phase task variant report-review-later through AiTaskService",
       "language": "zh-TW",
+      "schema": true
+    },
+    "aim-flow.report-review-later.zh-CN": {
+      "builder": "AimManualFlow/planner-review phase task variant report-review-later through AiTaskService",
+      "language": "zh-CN",
       "schema": true
     },
     "aim-flow.research-gap-audit-target-only.en": {
@@ -456,6 +656,11 @@
       "language": "zh-TW",
       "schema": true
     },
+    "aim-flow.research-gap-audit-target-only.zh-CN": {
+      "builder": "AimManualFlow/planner-review phase task variant research-gap-audit-target-only through AiTaskService",
+      "language": "zh-CN",
+      "schema": true
+    },
     "aim-flow.research-gap-audit.en": {
       "builder": "AimManualFlow/planner-review phase task variant research-gap-audit through AiTaskService",
       "language": "en",
@@ -464,6 +669,11 @@
     "aim-flow.research-gap-audit.zh": {
       "builder": "AimManualFlow/planner-review phase task variant research-gap-audit through AiTaskService",
       "language": "zh-TW",
+      "schema": true
+    },
+    "aim-flow.research-gap-audit.zh-CN": {
+      "builder": "AimManualFlow/planner-review phase task variant research-gap-audit through AiTaskService",
+      "language": "zh-CN",
       "schema": true
     },
     "aim-flow.research-plan-repair.en": {
@@ -476,6 +686,11 @@
       "language": "zh-TW",
       "schema": true
     },
+    "aim-flow.research-plan-repair.zh-CN": {
+      "builder": "AimManualFlow/planner-review phase task variant research-plan-repair through AiTaskService",
+      "language": "zh-CN",
+      "schema": true
+    },
     "aim-flow.research-plan.en": {
       "builder": "AimManualFlow/final-delivery phase research-plan through AiTaskService",
       "language": "en",
@@ -484,6 +699,11 @@
     "aim-flow.research-plan.zh": {
       "builder": "AimManualFlow/final-delivery phase research-plan through AiTaskService",
       "language": "zh-TW",
+      "schema": true
+    },
+    "aim-flow.research-plan.zh-CN": {
+      "builder": "AimManualFlow/final-delivery phase research-plan through AiTaskService",
+      "language": "zh-CN",
       "schema": true
     },
     "aim-flow.saved-report-followup-search.en": {
@@ -496,6 +716,11 @@
       "language": "zh-TW",
       "schema": true
     },
+    "aim-flow.saved-report-followup-search.zh-CN": {
+      "builder": "AimManualFlow/planner-review phase task variant saved-report-followup-search through AiTaskService",
+      "language": "zh-CN",
+      "schema": true
+    },
     "aim-flow.saved-report-review.en": {
       "builder": "AimManualFlow/planner-review phase task variant saved-report-review through AiTaskService",
       "language": "en",
@@ -504,6 +729,11 @@
     "aim-flow.saved-report-review.zh": {
       "builder": "AimManualFlow/planner-review phase task variant saved-report-review through AiTaskService",
       "language": "zh-TW",
+      "schema": true
+    },
+    "aim-flow.saved-report-review.zh-CN": {
+      "builder": "AimManualFlow/planner-review phase task variant saved-report-review through AiTaskService",
+      "language": "zh-CN",
       "schema": true
     },
     "aim-flow.subtopic-research-reuse-rejected.en": {
@@ -516,6 +746,11 @@
       "language": "zh-TW",
       "schema": true
     },
+    "aim-flow.subtopic-research-reuse-rejected.zh-CN": {
+      "builder": "AimManualFlow/planner-review phase task variant subtopic-research-reuse-rejected through AiTaskService",
+      "language": "zh-CN",
+      "schema": true
+    },
     "aim-flow.subtopic-research-update.en": {
       "builder": "AimManualFlow/planner-review phase task variant subtopic-research-update through AiTaskService",
       "language": "en",
@@ -524,6 +759,11 @@
     "aim-flow.subtopic-research-update.zh": {
       "builder": "AimManualFlow/planner-review phase task variant subtopic-research-update through AiTaskService",
       "language": "zh-TW",
+      "schema": true
+    },
+    "aim-flow.subtopic-research-update.zh-CN": {
+      "builder": "AimManualFlow/planner-review phase task variant subtopic-research-update through AiTaskService",
+      "language": "zh-CN",
       "schema": true
     },
     "aim-flow.subtopic-research.en": {
@@ -536,6 +776,11 @@
       "language": "zh-TW",
       "schema": true
     },
+    "aim-flow.subtopic-research.zh-CN": {
+      "builder": "AimManualFlow/final-delivery phase subtopic-research through AiTaskService",
+      "language": "zh-CN",
+      "schema": true
+    },
     "aim-flow.targeted-followup-research.en": {
       "builder": "AimManualFlow/planner-review phase task variant targeted-followup-research through AiTaskService",
       "language": "en",
@@ -544,6 +789,11 @@
     "aim-flow.targeted-followup-research.zh": {
       "builder": "AimManualFlow/planner-review phase task variant targeted-followup-research through AiTaskService",
       "language": "zh-TW",
+      "schema": true
+    },
+    "aim-flow.targeted-followup-research.zh-CN": {
+      "builder": "AimManualFlow/planner-review phase task variant targeted-followup-research through AiTaskService",
+      "language": "zh-CN",
       "schema": true
     },
     "aim-flow.topic-root-report-review.en": {
@@ -556,6 +806,11 @@
       "language": "zh-TW",
       "schema": true
     },
+    "aim-flow.topic-root-report-review.zh-CN": {
+      "builder": "AimManualFlow/planner-review phase task variant topic-root-report-review through AiTaskService",
+      "language": "zh-CN",
+      "schema": true
+    },
     "aim-flow.topic-root-research-plan.en": {
       "builder": "AimManualFlow/planner-review phase task variant topic-root-research-plan through AiTaskService",
       "language": "en",
@@ -564,6 +819,11 @@
     "aim-flow.topic-root-research-plan.zh": {
       "builder": "AimManualFlow/planner-review phase task variant topic-root-research-plan through AiTaskService",
       "language": "zh-TW",
+      "schema": true
+    },
+    "aim-flow.topic-root-research-plan.zh-CN": {
+      "builder": "AimManualFlow/planner-review phase task variant topic-root-research-plan through AiTaskService",
+      "language": "zh-CN",
       "schema": true
     },
     "chart.add-none.en": {
@@ -576,6 +836,11 @@
       "language": "zh-TW",
       "schema": true
     },
+    "chart.add-none.zh-CN": {
+      "builder": "core/steps/chart/step.ts chartStep (no existing diagram)",
+      "language": "zh-CN",
+      "schema": true
+    },
     "chart.add.en": {
       "builder": "core/steps/chart/step.ts chartStep (one existing diagram, two remaining)",
       "language": "en",
@@ -584,6 +849,11 @@
     "chart.add.zh": {
       "builder": "core/steps/chart/step.ts chartStep (one existing diagram, two remaining)",
       "language": "zh-TW",
+      "schema": true
+    },
+    "chart.add.zh-CN": {
+      "builder": "core/steps/chart/step.ts chartStep (one existing diagram, two remaining)",
+      "language": "zh-CN",
       "schema": true
     },
     "claude.aim-subtopic-research.en": {
@@ -596,6 +866,11 @@
       "language": "zh-TW",
       "schema": true
     },
+    "claude.aim-subtopic-research.zh-CN": {
+      "builder": "buildAimPrompt for Claude (phase subtopic-research)",
+      "language": "zh-CN",
+      "schema": true
+    },
     "claude.chart-add.en": {
       "builder": "core/steps/chart/step.ts chartStep for Claude (StructuredOutput-first sentence)",
       "language": "en",
@@ -604,6 +879,11 @@
     "claude.chart-add.zh": {
       "builder": "core/steps/chart/step.ts chartStep for Claude (StructuredOutput-first sentence)",
       "language": "zh-TW",
+      "schema": true
+    },
+    "claude.chart-add.zh-CN": {
+      "builder": "core/steps/chart/step.ts chartStep for Claude (StructuredOutput-first sentence)",
+      "language": "zh-CN",
       "schema": true
     },
     "claude.task-decompose.en": {
@@ -616,6 +896,11 @@
       "language": "zh-TW",
       "schema": true
     },
+    "claude.task-decompose.zh-CN": {
+      "builder": "AiTaskService instructions for Claude: mode decompose",
+      "language": "zh-CN",
+      "schema": true
+    },
     "claude.task-general.en": {
       "builder": "AiTaskService instructions for Claude: mode task, web research (StructuredOutput-first sentence)",
       "language": "en",
@@ -624,6 +909,11 @@
     "claude.task-general.zh": {
       "builder": "AiTaskService instructions for Claude: mode task, web research (StructuredOutput-first sentence)",
       "language": "zh-TW",
+      "schema": true
+    },
+    "claude.task-general.zh-CN": {
+      "builder": "AiTaskService instructions for Claude: mode task, web research (StructuredOutput-first sentence)",
+      "language": "zh-CN",
       "schema": true
     },
     "claude.task-synthesize.en": {
@@ -636,6 +926,11 @@
       "language": "zh-TW",
       "schema": true
     },
+    "claude.task-synthesize.zh-CN": {
+      "builder": "AiTaskService instructions for Claude: mode synthesize, local",
+      "language": "zh-CN",
+      "schema": true
+    },
     "coffee.convergence.en": {
       "builder": "coffee-tables/convergence.ts convergencePrompt",
       "language": "en",
@@ -644,6 +939,11 @@
     "coffee.convergence.zh": {
       "builder": "coffee-tables/convergence.ts convergencePrompt",
       "language": "zh-TW",
+      "schema": false
+    },
+    "coffee.convergence.zh-CN": {
+      "builder": "coffee-tables/convergence.ts convergencePrompt",
+      "language": "zh-CN",
       "schema": false
     },
     "coffee.navigation-summary.en": {
@@ -656,6 +956,11 @@
       "language": "zh-TW",
       "schema": false
     },
+    "coffee.navigation-summary.zh-CN": {
+      "builder": "coffee-tables/engine.ts fillSegmentSummaries (navigation summary request)",
+      "language": "zh-CN",
+      "schema": false
+    },
     "coffee.observer-only.en": {
       "builder": "coffee-tables/prompts.ts observerOnlyPrompt",
       "language": "en",
@@ -664,6 +969,11 @@
     "coffee.observer-only.zh": {
       "builder": "coffee-tables/prompts.ts observerOnlyPrompt",
       "language": "zh-TW",
+      "schema": false
+    },
+    "coffee.observer-only.zh-CN": {
+      "builder": "coffee-tables/prompts.ts observerOnlyPrompt",
+      "language": "zh-CN",
       "schema": false
     },
     "coffee.opening-preview.en": {
@@ -676,6 +986,11 @@
       "language": "zh-TW",
       "schema": false
     },
+    "coffee.opening-preview.zh-CN": {
+      "builder": "coffee-tables/prompts.ts openingPromptPreview",
+      "language": "zh-CN",
+      "schema": false
+    },
     "coffee.question.en": {
       "builder": "coffee-tables/prompts.ts questionPrompt",
       "language": "en",
@@ -684,6 +999,11 @@
     "coffee.question.zh": {
       "builder": "coffee-tables/prompts.ts questionPrompt",
       "language": "zh-TW",
+      "schema": false
+    },
+    "coffee.question.zh-CN": {
+      "builder": "coffee-tables/prompts.ts questionPrompt",
+      "language": "zh-CN",
       "schema": false
     },
     "coffee.table-continue.en": {
@@ -696,6 +1016,11 @@
       "language": "zh-TW",
       "schema": false
     },
+    "coffee.table-continue.zh-CN": {
+      "builder": "coffee-tables/prompts.ts tablePrompt (draft + prior context + invited guest)",
+      "language": "zh-CN",
+      "schema": false
+    },
     "coffee.table-opening.en": {
       "builder": "coffee-tables/prompts.ts tablePrompt (opening, default guests)",
       "language": "en",
@@ -706,6 +1031,11 @@
       "language": "zh-TW",
       "schema": false
     },
+    "coffee.table-opening.zh-CN": {
+      "builder": "coffee-tables/prompts.ts tablePrompt (opening, default guests)",
+      "language": "zh-CN",
+      "schema": false
+    },
     "i18n-direct.preset-instructions.en": {
       "builder": "i18n translate() of strings assembled in UI/runtime classes (selection-ai presets, view research task, codex search-budget steer, reference reduce round which needs >18k chars of evidence to trigger); weaker than a builder snapshot",
       "language": "en",
@@ -714,6 +1044,11 @@
     "i18n-direct.preset-instructions.zh": {
       "builder": "i18n translate() of strings assembled in UI/runtime classes (selection-ai presets, view research task, codex search-budget steer, reference reduce round which needs >18k chars of evidence to trigger); weaker than a builder snapshot",
       "language": "zh-TW",
+      "schema": false
+    },
+    "i18n-direct.preset-instructions.zh-CN": {
+      "builder": "i18n translate() of strings assembled in UI/runtime classes (selection-ai presets, view research task, codex search-budget steer, reference reduce round which needs >18k chars of evidence to trigger); weaker than a builder snapshot",
+      "language": "zh-CN",
       "schema": false
     },
     "markdown-context.plan-image": {
@@ -741,6 +1076,11 @@
       "language": "zh-TW",
       "schema": false
     },
+    "outline-generate-appended.zh-CN": {
+      "builder": "core/outline-generation-service.ts buildOutlineGeneratePrompt (preset without placeholder)",
+      "language": "zh-CN",
+      "schema": false
+    },
     "outline-generate.en": {
       "builder": "core/outline-generation-service.ts buildOutlineGeneratePrompt (preset with topic placeholder)",
       "language": "en",
@@ -749,6 +1089,11 @@
     "outline-generate.zh": {
       "builder": "core/outline-generation-service.ts buildOutlineGeneratePrompt (preset with topic placeholder)",
       "language": "zh-TW",
+      "schema": false
+    },
+    "outline-generate.zh-CN": {
+      "builder": "core/outline-generation-service.ts buildOutlineGeneratePrompt (preset with topic placeholder)",
+      "language": "zh-CN",
       "schema": false
     },
     "reframe.en": {
@@ -761,6 +1106,11 @@
       "language": "zh-TW",
       "schema": false
     },
+    "reframe.zh-CN": {
+      "builder": "core/reframing-service.ts buildReframePrompt",
+      "language": "zh-CN",
+      "schema": false
+    },
     "relevance-grade-pinned.en": {
       "builder": "core/relevance-grade-service.ts buildRelevanceGradePrompt (one pinned card)",
       "language": "en",
@@ -769,6 +1119,11 @@
     "relevance-grade-pinned.zh": {
       "builder": "core/relevance-grade-service.ts buildRelevanceGradePrompt (one pinned card)",
       "language": "zh-TW",
+      "schema": true
+    },
+    "relevance-grade-pinned.zh-CN": {
+      "builder": "core/relevance-grade-service.ts buildRelevanceGradePrompt (one pinned card)",
+      "language": "zh-CN",
       "schema": true
     },
     "relevance-grade-repair-missing.en": {
@@ -781,6 +1136,11 @@
       "language": "zh-TW",
       "schema": true
     },
+    "relevance-grade-repair-missing.zh-CN": {
+      "builder": "core/relevance-grade-service.ts relevanceGradeMissingRepairStep.render (a bounded card left out)",
+      "language": "zh-CN",
+      "schema": true
+    },
     "relevance-grade-repair-pinned.en": {
       "builder": "core/relevance-grade-service.ts relevanceGradeRepairStep.render (one pinned card, bounds violation)",
       "language": "en",
@@ -789,6 +1149,11 @@
     "relevance-grade-repair-pinned.zh": {
       "builder": "core/relevance-grade-service.ts relevanceGradeRepairStep.render (one pinned card, bounds violation)",
       "language": "zh-TW",
+      "schema": true
+    },
+    "relevance-grade-repair-pinned.zh-CN": {
+      "builder": "core/relevance-grade-service.ts relevanceGradeRepairStep.render (one pinned card, bounds violation)",
+      "language": "zh-CN",
       "schema": true
     },
     "relevance-grade-repair.en": {
@@ -801,6 +1166,11 @@
       "language": "zh-TW",
       "schema": true
     },
+    "relevance-grade-repair.zh-CN": {
+      "builder": "core/relevance-grade-service.ts relevanceGradeRepairStep.render (one hierarchy violation)",
+      "language": "zh-CN",
+      "schema": true
+    },
     "relevance-grade.en": {
       "builder": "core/relevance-grade-service.ts buildRelevanceGradePrompt",
       "language": "en",
@@ -809,6 +1179,11 @@
     "relevance-grade.zh": {
       "builder": "core/relevance-grade-service.ts buildRelevanceGradePrompt",
       "language": "zh-TW",
+      "schema": true
+    },
+    "relevance-grade.zh-CN": {
+      "builder": "core/relevance-grade-service.ts buildRelevanceGradePrompt",
+      "language": "zh-CN",
       "schema": true
     },
     "relevance-recalibrate-repair.en": {
@@ -821,6 +1196,11 @@
       "language": "zh-TW",
       "schema": true
     },
+    "relevance-recalibrate-repair.zh-CN": {
+      "builder": "core/relevance-grade-service.ts relevanceRecalibrateRepairStep.render (bounds violation)",
+      "language": "zh-CN",
+      "schema": true
+    },
     "relevance-recalibrate.en": {
       "builder": "core/relevance-grade-service.ts relevanceRecalibrateStep.render (one pinned card, one card not graded yet)",
       "language": "en",
@@ -829,6 +1209,11 @@
     "relevance-recalibrate.zh": {
       "builder": "core/relevance-grade-service.ts relevanceRecalibrateStep.render (one pinned card, one card not graded yet)",
       "language": "zh-TW",
+      "schema": true
+    },
+    "relevance-recalibrate.zh-CN": {
+      "builder": "core/relevance-grade-service.ts relevanceRecalibrateStep.render (one pinned card, one card not graded yet)",
+      "language": "zh-CN",
       "schema": true
     },
     "service.decompose-deep.en": {
@@ -841,6 +1226,11 @@
       "language": "zh-TW",
       "schema": true
     },
+    "service.decompose-deep.zh-CN": {
+      "builder": "AiTaskService instructions: mode decompose, deep research",
+      "language": "zh-CN",
+      "schema": true
+    },
     "service.default-adaptive.en": {
       "builder": "AiTaskService instructions: no mode, adaptive detail, no sources",
       "language": "en",
@@ -851,6 +1241,11 @@
       "language": "zh-TW",
       "schema": true
     },
+    "service.default-adaptive.zh-CN": {
+      "builder": "AiTaskService instructions: no mode, adaptive detail, no sources",
+      "language": "zh-CN",
+      "schema": true
+    },
     "service.reference-groups.en.1": {
       "builder": "AiTaskService reference extraction then task",
       "language": "en",
@@ -859,6 +1254,16 @@
     "service.reference-groups.en.2": {
       "builder": "AiTaskService reference extraction then task",
       "language": "en",
+      "schema": true
+    },
+    "service.reference-groups.zh-CN.1": {
+      "builder": "AiTaskService reference extraction then task",
+      "language": "zh-CN",
+      "schema": true
+    },
+    "service.reference-groups.zh-CN.2": {
+      "builder": "AiTaskService reference extraction then task",
+      "language": "zh-CN",
       "schema": true
     },
     "service.reference-groups.zh.1": {
@@ -881,6 +1286,11 @@
       "language": "zh-TW",
       "schema": true
     },
+    "service.synthesize-local.zh-CN": {
+      "builder": "AiTaskService instructions: mode synthesize, local, visual off",
+      "language": "zh-CN",
+      "schema": true
+    },
     "service.task-local-fast.en": {
       "builder": "AiTaskService instructions: mode task, local research, fast",
       "language": "en",
@@ -889,6 +1299,11 @@
     "service.task-local-fast.zh": {
       "builder": "AiTaskService instructions: mode task, local research, fast",
       "language": "zh-TW",
+      "schema": true
+    },
+    "service.task-local-fast.zh-CN": {
+      "builder": "AiTaskService instructions: mode task, local research, fast",
+      "language": "zh-CN",
       "schema": true
     },
     "service.task-textbook.en": {
@@ -901,6 +1316,11 @@
       "language": "zh-TW",
       "schema": true
     },
+    "service.task-textbook.zh-CN": {
+      "builder": "AiTaskService instructions: mode task with the built-in Textbook template (intro, six sections, empty sections omitted)",
+      "language": "zh-CN",
+      "schema": true
+    },
     "service.task-tone.en": {
       "builder": "AiTaskService instructions: mode task with a resolved tone text (B1)",
       "language": "en",
@@ -909,6 +1329,11 @@
     "service.task-tone.zh": {
       "builder": "AiTaskService instructions: mode task with a resolved tone text (B1)",
       "language": "zh-TW",
+      "schema": true
+    },
+    "service.task-tone.zh-CN": {
+      "builder": "AiTaskService instructions: mode task with a resolved tone text (B1)",
+      "language": "zh-CN",
       "schema": true
     },
     "service.task-web-visual-on.en": {
@@ -921,6 +1346,11 @@
       "language": "zh-TW",
       "schema": true
     },
+    "service.task-web-visual-on.zh-CN": {
+      "builder": "AiTaskService instructions: mode task, visual on",
+      "language": "zh-CN",
+      "schema": true
+    },
     "service.task-web.en": {
       "builder": "AiTaskService instructions: mode task, web research, visual auto",
       "language": "en",
@@ -929,6 +1359,11 @@
     "service.task-web.zh": {
       "builder": "AiTaskService instructions: mode task, web research, visual auto",
       "language": "zh-TW",
+      "schema": true
+    },
+    "service.task-web.zh-CN": {
+      "builder": "AiTaskService instructions: mode task, web research, visual auto",
+      "language": "zh-CN",
       "schema": true
     },
     "structure-review.en": {
@@ -941,6 +1376,11 @@
       "language": "zh-TW",
       "schema": true
     },
+    "structure-review.zh-CN": {
+      "builder": "core/structure-review-service.ts buildStructureReviewPrompt",
+      "language": "zh-CN",
+      "schema": true
+    },
     "view.guided-empty-direction.en": {
       "builder": "VisualAgentMapView guided-empty-direction TaskContext through AiTaskService",
       "language": "en",
@@ -949,6 +1389,11 @@
     "view.guided-empty-direction.zh": {
       "builder": "VisualAgentMapView guided-empty-direction TaskContext through AiTaskService",
       "language": "zh-TW",
+      "schema": true
+    },
+    "view.guided-empty-direction.zh-CN": {
+      "builder": "VisualAgentMapView guided-empty-direction TaskContext through AiTaskService",
+      "language": "zh-CN",
       "schema": true
     },
     "view.guided.en": {
@@ -961,6 +1406,11 @@
       "language": "zh-TW",
       "schema": true
     },
+    "view.guided.zh-CN": {
+      "builder": "VisualAgentMapView guided TaskContext through AiTaskService",
+      "language": "zh-CN",
+      "schema": true
+    },
     "view.merge-draft.en": {
       "builder": "VisualAgentMapView merge-draft TaskContext through AiTaskService",
       "language": "en",
@@ -969,6 +1419,11 @@
     "view.merge-draft.zh": {
       "builder": "VisualAgentMapView merge-draft TaskContext through AiTaskService",
       "language": "zh-TW",
+      "schema": true
+    },
+    "view.merge-draft.zh-CN": {
+      "builder": "VisualAgentMapView merge-draft TaskContext through AiTaskService",
+      "language": "zh-CN",
       "schema": true
     },
     "view.merge-repair.en": {
@@ -981,6 +1436,11 @@
       "language": "zh-TW",
       "schema": true
     },
+    "view.merge-repair.zh-CN": {
+      "builder": "VisualAgentMapView merge-repair TaskContext through AiTaskService",
+      "language": "zh-CN",
+      "schema": true
+    },
     "view.synthesis-directions.en": {
       "builder": "VisualAgentMapView synthesis-directions TaskContext through AiTaskService",
       "language": "en",
@@ -991,6 +1451,11 @@
       "language": "zh-TW",
       "schema": true
     },
+    "view.synthesis-directions.zh-CN": {
+      "builder": "VisualAgentMapView synthesis-directions TaskContext through AiTaskService",
+      "language": "zh-CN",
+      "schema": true
+    },
     "view.synthesis-draft-default-goal.en": {
       "builder": "VisualAgentMapView synthesis-draft-default-goal TaskContext through AiTaskService",
       "language": "en",
@@ -999,6 +1464,11 @@
     "view.synthesis-draft-default-goal.zh": {
       "builder": "VisualAgentMapView synthesis-draft-default-goal TaskContext through AiTaskService",
       "language": "zh-TW",
+      "schema": true
+    },
+    "view.synthesis-draft-default-goal.zh-CN": {
+      "builder": "VisualAgentMapView synthesis-draft-default-goal TaskContext through AiTaskService",
+      "language": "zh-CN",
       "schema": true
     }
   },

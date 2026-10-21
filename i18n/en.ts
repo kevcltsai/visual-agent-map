@@ -1430,8 +1430,6 @@ export const en = {
   "coffee.home": "Home",
   "coffee.older_saved_table_read_only": "Older saved table · read only",
   "coffee.ai_simulated_perspectives": "AI simulated perspectives",
-  "coffee.conversation_english": "Conversation: English",
-  "coffee.conversation_traditional_chinese": "Conversation: Traditional Chinese",
   "coffee.stop_generation": "Stop",
   "coffee.retry_saving": "Retry saving",
   "coffee.continue_from_saved_draft": "Continue from saved draft",

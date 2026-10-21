@@ -1,7 +1,7 @@
 import type { TranslationKey } from "./en";
 
-/** Simplified Chinese (Mainland usage) dictionary draft. Display strings only; notes keep zh-TW fixed text. Terms: agents-spec docs/product/I18N_GLOSSARY.md. */
-export const zhCN: Partial<Record<TranslationKey, string>> = {
+/** Simplified Chinese (Mainland usage) dictionary. Display strings only; notes keep zh-TW fixed text. Terms: agents-spec docs/product/I18N_GLOSSARY.md. */
+export const zhCN: Record<TranslationKey, string> = {
   "ui.output_language": "本次回答语言",
   "ui.select_proposal_0": "选择提案：{0}",
   "ui.proposal_name": "提案名称",
@@ -1329,8 +1329,6 @@ export const zhCN: Partial<Record<TranslationKey, string>> = {
   "coffee.home": "回主页",
   "coffee.older_saved_table_read_only": "旧版桌聊记录 · 只读",
   "coffee.ai_simulated_perspectives": "AI 虚构模拟视角",
-  "coffee.conversation_english": "对话语言：英文",
-  "coffee.conversation_traditional_chinese": "对话语言：繁体中文",
   "coffee.stop_generation": "停止生成",
   "coffee.retry_saving": "重试保存",
   "coffee.continue_from_saved_draft": "从已保存草稿继续",

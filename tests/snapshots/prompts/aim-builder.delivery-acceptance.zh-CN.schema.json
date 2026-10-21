@@ -1,0 +1,87 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "properties": {
+    "summary": {
+      "type": "string",
+      "description": "A short plain-language preview. Never put machine-readable review markers here."
+    },
+    "detail": {
+      "type": "string",
+      "pattern": "^\\s*<!--\\s*aim-review\\s+\\{[^\\r\\n]*\\}\\s*-->",
+      "description": "Begin with the COMPLETE first-line AIM review marker containing decision and rationale (and stopReason for conclude). Put the marker in detail only, followed by the acceptance explanation. Never split or truncate the marker."
+    },
+    "suggestions": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "title": {
+            "type": "string"
+          },
+          "task": {
+            "type": "string"
+          },
+          "contribution": {
+            "type": "string"
+          },
+          "parentTitle": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "title",
+          "task",
+          "contribution",
+          "parentTitle"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "visualReferences": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "title": {
+            "type": "string"
+          },
+          "imageUrl": {
+            "type": "string"
+          },
+          "sourceUrl": {
+            "type": "string"
+          },
+          "description": {
+            "type": "string"
+          },
+          "palette": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "formula": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "title",
+          "imageUrl",
+          "sourceUrl",
+          "description",
+          "palette",
+          "formula"
+        ],
+        "additionalProperties": false
+      }
+    }
+  },
+  "required": [
+    "summary",
+    "detail",
+    "suggestions",
+    "visualReferences"
+  ],
+  "additionalProperties": false
+}

@@ -46,10 +46,15 @@ const STANDARD: readonly [string, TranslationKey, TranslationKey, DetailSectionR
   ["log", "detail.update_log", "detail.description_update_log", "log"]
 ];
 
-export function standardTemplate(language: NoteLanguage): DetailTemplate {
+/**
+ * `language` is the note language: the section headings and descriptions that notes and prompts carry. `display` is the
+ * interface language the template's own name is shown in (it defaults to `language`); a Simplified Chinese interface
+ * shows "标准" while the headings stay Traditional Chinese.
+ */
+export function standardTemplate(language: NoteLanguage, display: UiLanguage = language): DetailTemplate {
   return {
     id: STANDARD_TEMPLATE_ID,
-    name: translate(language, "ui.detail_template_standard"),
+    name: translate(display, "ui.detail_template_standard"),
     sections: STANDARD.map(([id, key, descriptionKey, role]) => {
       const name = translate(language, key);
       return {
@@ -63,11 +68,11 @@ export function standardTemplate(language: NoteLanguage): DetailTemplate {
   };
 }
 
-export function textbookTemplate(language: NoteLanguage): DetailTemplate {
+export function textbookTemplate(language: NoteLanguage, display: UiLanguage = language): DetailTemplate {
   return {
-    ...standardTemplate(language),
+    ...standardTemplate(language, display),
     id: TEXTBOOK_TEMPLATE_ID,
-    name: translate(language, "ui.detail_template_textbook")
+    name: translate(display, "ui.detail_template_textbook")
   };
 }
 
@@ -76,8 +81,8 @@ export function isBuiltinTemplateId(id: string | undefined): boolean {
 }
 
 /** The built-in templates, in menu order. */
-export function builtinTemplates(language: NoteLanguage): DetailTemplate[] {
-  return [standardTemplate(language), textbookTemplate(language)];
+export function builtinTemplates(language: NoteLanguage, display: UiLanguage = language): DetailTemplate[] {
+  return [standardTemplate(language, display), textbookTemplate(language, display)];
 }
 
 export function copyTemplate(source: DetailTemplate, name: string, id: string): DetailTemplate {

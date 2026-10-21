@@ -31,9 +31,17 @@ export interface PromptPreset {
 export const DEFAULT_TONE_ID = "academic";
 export const AUTO_TONE_ID = "auto";
 export const DEFAULT_OUTLINE_PRESET_ID = "knowledge-tree";
-/** The outline preset's topic placeholder, per language; the outline generator replaces it with the topic. */
+/**
+ * The outline preset's topic placeholder, per interface language; the outline generator replaces it with the topic.
+ * The built-in preset text and the generator's recognised placeholders are written per instruction language (zh or en),
+ * so a language takes the placeholder of the first registered language that shares its instruction language: Simplified
+ * Chinese uses the Traditional placeholder, exactly as it uses the Traditional preset text.
+ */
 export const OUTLINE_TOPIC_PLACEHOLDER: Readonly<Record<UiLanguage, string>> = Object.fromEntries(
-  LANGUAGES.map(item => [item.id, translate(item.id, "ui.outline_topic_placeholder")])
+  LANGUAGES.map(item => [
+    item.id,
+    translate(LANGUAGES.find(other => other.instruction === item.instruction)!.id, "ui.outline_topic_placeholder")
+  ])
 ) as Record<UiLanguage, string>;
 
 const strip = (text: string): string => (text.endsWith("\n") ? text.slice(0, -1) : text);

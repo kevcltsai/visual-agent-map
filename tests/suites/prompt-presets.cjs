@@ -7,7 +7,7 @@ const base = { title: 'T', summary: 'S', rules: 'R', detail: 'D', task: 'Do X', 
 const custom = [{ id: 'mine', kind: 'tone', name: 'Mine', text: 'Tone: be brief.' }, { id: 'tree2', kind: 'outline', name: 'Tree 2', text: 'Outline {x}' }];
 
 test('built-in presets: six tones plus the knowledge-tree outline, localized, academic is the default', () => {
-  for (const language of ['zh-TW', 'en']) {
+  for (const language of ['zh-TW', 'zh-CN', 'en']) {
     const tones = presets.builtinPresets(language, 'tone');
     assert.deepEqual(plain(tones.map(item => item.id)), ['plain', 'magazine', 'summary', 'guide', 'academic', 'auto']);
     assert.ok(tones.every(item => item.name && item.text && !item.text.endsWith('\n')));

@@ -1,3 +1,7 @@
+import { en, type TranslationKey } from "./en";
+import { zhCN } from "./zh-CN";
+import { zhTW } from "./zh-TW";
+
 /**
  * The language registry: the single source of truth for every language VAM supports. Adding a language is one row here
  * plus one dictionary file; everything else (menus, locale lookups, prompt language names) reads this table.
@@ -32,6 +36,8 @@ export interface LanguageEntry {
   /** BCP 47 tag for `Intl` and locale-sensitive formatting. */
   readonly intl: string;
   readonly prompt: PromptNames;
+  /** The language's dictionary; keys it lacks fall back to English at lookup time. */
+  readonly dictionary: Readonly<Partial<Record<TranslationKey, string>>>;
 }
 
 export const LANGUAGES = [
@@ -49,7 +55,27 @@ export const LANGUAGES = [
         region: "Traditional Chinese (Taiwan)",
         usage: "Traditional Chinese (Taiwan usage)"
       }
-    }
+    },
+    dictionary: zhTW
+  },
+  {
+    id: "zh-CN",
+    label: "简体中文",
+    name: "Simplified Chinese",
+    instruction: "zh",
+    note: "zh-TW",
+    intl: "zh-CN",
+    prompt: {
+      // The region form names the Mainland standard (the counterpart of the Taiwan variant above); the usage form is the
+      // Coffee Tables style clause, "usage" in the same sense as the Taiwan row.
+      zh: { plain: "简体中文", region: "简体中文（中国大陆）", usage: "简体中文（中国大陆用法）" },
+      en: {
+        plain: "Simplified Chinese",
+        region: "Simplified Chinese (Mainland China)",
+        usage: "Simplified Chinese (Mainland China usage)"
+      }
+    },
+    dictionary: zhCN
   },
   {
     id: "en",
@@ -61,7 +87,8 @@ export const LANGUAGES = [
     prompt: {
       zh: { plain: "英文", region: "英文", usage: "英文" },
       en: { plain: "English", region: "English", usage: "English" }
-    }
+    },
+    dictionary: en
   }
 ] as const satisfies ReadonlyArray<LanguageEntry>;
 

@@ -1,0 +1,114 @@
+{
+  "type": "object",
+  "properties": {
+    "summary": {
+      "type": "string",
+      "description": "適合心智圖的一句繁體中文結論，80 字內"
+    },
+    "detail": {
+      "type": "string",
+      "description": "完整的繁體中文 Markdown 分析"
+    },
+    "suggestions": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "title": {
+            "type": "string"
+          },
+          "task": {
+            "type": "string"
+          },
+          "contribution": {
+            "type": "string"
+          },
+          "parentTitle": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "title",
+          "task",
+          "contribution",
+          "parentTitle"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "visualReferences": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "title": {
+            "type": "string"
+          },
+          "imageUrl": {
+            "type": "string"
+          },
+          "sourceUrl": {
+            "type": "string"
+          },
+          "description": {
+            "type": "string"
+          },
+          "palette": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "formula": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "title",
+          "imageUrl",
+          "sourceUrl",
+          "description",
+          "palette",
+          "formula"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "aim": {
+      "type": "object",
+      "properties": {
+        "decision": {
+          "type": "string",
+          "enum": [
+            "ask_user"
+          ]
+        },
+        "question": {
+          "type": "string",
+          "description": "The one direct question for the user, written as a question. Ask about the user's goal, preferences, constraints or situation, never about this tool's workflow, counts, nodes or branches. Empty only for no_question."
+        },
+        "answerOptions": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "2–5 distinct answer choices for the question. Empty only for no_question."
+        }
+      },
+      "required": [
+        "decision",
+        "question",
+        "answerOptions"
+      ],
+      "additionalProperties": false
+    }
+  },
+  "required": [
+    "summary",
+    "detail",
+    "suggestions",
+    "visualReferences",
+    "aim"
+  ],
+  "additionalProperties": false
+}

@@ -1,7 +1,7 @@
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
-const { test, root, load, plain, obsidian, DEFAULT_SETTINGS } = require('../support.cjs');
+const { test, root, load, plain, obsidian, DEFAULT_SETTINGS, languageIds } = require('../support.cjs');
 test('UI language switch translates stable semantic keys and placeholders', () => {
   const {t,setUiLanguage,translate}=load('i18n.ts');setUiLanguage('en');assert.equal(t('ui.interface_language'),'Interface language');assert.equal(t('ui.expand_0',3),'Expand 3');assert.equal(translate('en','detail.core_conclusions'),'Core conclusions');assert.equal(translate('zh-TW','detail.core_conclusions'),'核心結論');assert.equal(translate('zh-TW','ui.expand_0'),'展開 {0}');assert.equal(translate('zh-TW','ui.interface_language'),'介面語言');
   assert.equal(translate('zh-TW','missing.runtime.key'), 'missing.runtime.key');
@@ -14,6 +14,7 @@ test('first install defaults to English regardless of Obsidian language while sa
   assert.equal(initialUiLanguage('invalid'), 'en');
   assert.equal(initialUiLanguage('en'), 'en');
   assert.equal(initialUiLanguage('zh-TW'), 'zh-TW');
+  assert.equal(initialUiLanguage('zh-CN'), 'zh-CN');
 });
 test('language change saves before applying and refreshes all views without mutating notes', async () => {
   const { default: Plugin, VisualAgentMapSettingTab } = load('main.ts', { obsidian });
@@ -44,6 +45,24 @@ test('language change saves before applying and refreshes all views without muta
   assert.equal(plugin.settings.language, 'en');
   assert.equal(calls.filter(([kind]) => kind === 'save').length, 1);
   assert.equal(calls.filter(([kind]) => kind === 'view-b').length, 1);
+});
+test('changeLanguage("zh-CN") saves first, then refreshes commands and views without touching Markdown', async () => {
+  const { default: Plugin } = load('main.ts', { obsidian });
+  const plugin = new Plugin(), calls = [];
+  plugin.settings = { ...DEFAULT_SETTINGS, language: 'en' };
+  plugin.saveData = async settings => { calls.push(['save', settings.language, plugin.settings.language]); };
+  plugin.repo = { settings: plugin.settings, syncManagedDetailHeadings: async () => { throw new Error('language switch must not rewrite Markdown'); } };
+  plugin.views = () => [{ refreshFromPlugin: async () => calls.push(['view', plugin.settings.language]) }];
+  plugin.coffeeViews = () => [{ refreshForLanguageChange: async () => calls.push(['coffee', plugin.settings.language]) }];
+  plugin.refreshLocalizedEntrypoints = () => calls.push(['commands', plugin.settings.language]);
+  plugin.recordFailure = (...args) => calls.push(['diagnostic', ...args]);
+  plugin.settingTab = { update() {}, refreshAfterLanguageChange: () => calls.push(['settings', plugin.settings.language]) };
+  assert.equal(await plugin.changeLanguage('zh-CN'), true);
+  assert.equal(plugin.settings.language, 'zh-CN');
+  assert.deepEqual(calls.filter(([kind]) => kind !== 'settings'), [['save', 'zh-CN', 'en'], ['commands', 'zh-CN'], ['view', 'zh-CN'], ['coffee', 'zh-CN']]);
+  assert.equal(calls.filter(([kind]) => kind === 'diagnostic').length, 0);
+  assert.equal(plugin.languageSwitchPending, false);
+  assert.equal(await plugin.changeLanguage('zh-CN'), false, 'selecting the current language is a no-op');
 });
 test('failed language save keeps the old selection and does not refresh views', async () => {
   const { default: Plugin } = load('main.ts', { obsidian });
@@ -142,10 +161,10 @@ test('runtime, service and log messages carry no inline Chinese text', () => {
 });
 test('all user-facing translations use stable semantic keys', () => {
   const english = fs.readFileSync(path.join(root, 'i18n', 'en.ts'), 'utf8');
-  const chinese = fs.readFileSync(path.join(root, 'i18n', 'zh-TW.ts'), 'utf8');
+  const dictionaryFiles = languageIds().filter(id => id !== 'en').map(id => [id, fs.readFileSync(path.join(root, 'i18n', `${id}.ts`), 'utf8')]);
   const extract = value => new Set([...value.matchAll(/^  "((?:[^"\\]|\\.)+)":/gm)].map(match => match[1]));
   const keys = extract(english);
-  assert.deepEqual([...extract(chinese)].sort(), [...keys].sort(), 'every locale must define exactly the same semantic keys');
+  for (const [id, source] of dictionaryFiles) assert.deepEqual([...extract(source)].sort(), [...keys].sort(), `${id} must define exactly the same semantic keys as en`);
   const tsFiles = dir => fs.readdirSync(path.join(root, dir), { withFileTypes: true }).flatMap(entry => entry.isDirectory() ? tsFiles(`${dir}/${entry.name}`) : entry.name.endsWith('.ts') ? [`${dir}/${entry.name}`] : []);
   // Coffee Tables prompt, transcript and Markdown-format modules hold conversation content, not interface text.
   const coffeeContent = /^experiences\/coffee-tables\/(prompts|engine|convergence|storage|insights|types|topics|samples|outline|segments)\.ts$/;
@@ -167,13 +186,16 @@ test('all user-facing translations use stable semantic keys', () => {
     assert.doesNotMatch(source, /\btr\(\s*["`]|this\.zh\b|\bmessage\(\s*["`]/, `${file} must use i18n keys instead of inline bilingual pairs`);
   }
   const dictionaryValues = source => new Map([...source.matchAll(/^  "((?:[^"\\]|\\.)+)": "((?:[^"\\]|\\.)*)",?$/gm)].map(match => [match[1], match[2]]));
-  const englishValues = dictionaryValues(english), chineseValues = dictionaryValues(chinese);
+  const englishValues = dictionaryValues(english);
   const placeholders = value => [...value.matchAll(/\{\d+\}/g)].map(match => match[0]).sort();
-  for (const [key, value] of englishValues) assert.deepEqual(placeholders(chineseValues.get(key)), placeholders(value), `${key} placeholders must match between locales`);
+  for (const [id, source] of dictionaryFiles) {
+    const values = dictionaryValues(source);
+    for (const [key, value] of englishValues) assert.deepEqual(placeholders(values.get(key)), placeholders(value), `${id} ${key} placeholders must match between locales`);
+  }
 });
 test('the sample tour names the controls exactly as the map labels them, in both languages', () => {
   const { translate } = load('i18n.ts');
-  for (const lang of ['en', 'zh-TW']) {
+  for (const lang of ['en', 'zh-TW', 'zh-CN']) {
     const tr = key => translate(lang, key);
     for (const key of ['ui.collapse', 'ui.node_tool_links', 'ui.node_tool_rename', 'ui.node_tool_details', 'ui.ai_explore'])
       assert.ok(tr('ui.tour_2_body').includes(tr(key)), `${lang}: tour step 2 names ${tr(key)}`);
@@ -183,22 +205,37 @@ test('the sample tour names the controls exactly as the map labels them, in both
 });
 test('language registry helpers resolve the four language axes', () => {
   const i18n = load('i18n.ts');
-  assert.deepEqual(plain(i18n.LANGUAGES.map(item => item.id)), ['zh-TW', 'en']);
+  assert.deepEqual(plain(i18n.LANGUAGES.map(item => item.id)), ['zh-TW', 'zh-CN', 'en']);
   assert.equal(i18n.noteLanguageOf('zh-TW'), 'zh-TW');
+  assert.equal(i18n.noteLanguageOf('zh-CN'), 'zh-TW');
   assert.equal(i18n.noteLanguageOf('en'), 'en');
   assert.equal(i18n.instructionLanguageOf('zh-TW'), 'zh');
+  assert.equal(i18n.instructionLanguageOf('zh-CN'), 'zh');
   assert.equal(i18n.instructionLanguageOf('en'), 'en');
   assert.equal(i18n.isUiLanguage('zh-TW'), true);
-  assert.equal(i18n.isUiLanguage('zh-CN'), false);
+  assert.equal(i18n.isUiLanguage('zh-CN'), true);
+  assert.equal(i18n.isUiLanguage('ja'), false);
+  assert.equal(i18n.isNoteLanguage('zh-CN'), false, 'a Simplified Chinese note language is never persisted');
   assert.equal(i18n.isNoteLanguage('en'), true);
   assert.equal(i18n.isNoteLanguage('unsupported'), false);
   assert.equal(i18n.contentLocale('zh-TW', 'zh-TW'), 'zh-TW');
   assert.equal(i18n.contentLocale('zh-TW', 'en'), 'zh-TW');
   assert.equal(i18n.contentLocale('en', 'zh-TW'), 'en');
   assert.equal(i18n.intlLocaleOf('zh-TW'), 'zh-TW');
+  assert.equal(i18n.intlLocaleOf('zh-CN'), 'zh-CN');
   assert.equal(i18n.uiLocale('zh-TW'), 'zh-TW');
-  assert.equal(i18n.uiLocale('zh-CN'), 'en');
-  assert.equal(i18n.initialUiLanguage('zh-CN'), 'en');
+  assert.equal(i18n.uiLocale('zh-CN'), 'zh-CN');
+  assert.equal(i18n.uiLocale('ja'), 'en');
+  assert.equal(i18n.initialUiLanguage('zh-CN'), 'zh-CN');
+  assert.equal(i18n.initialUiLanguage('ja'), 'en', 'a language written by a newer version reads as English');
+});
+test('contentLocale: the interface language when its note language matches, otherwise the note language', () => {
+  const { contentLocale } = load('i18n.ts');
+  const table = [
+    ['zh-TW', 'zh-TW', 'zh-TW'], ['zh-TW', 'zh-CN', 'zh-CN'], ['zh-TW', 'en', 'zh-TW'],
+    ['en', 'zh-TW', 'en'], ['en', 'zh-CN', 'en'], ['en', 'en', 'en']
+  ];
+  for (const [note, ui, expected] of table) assert.equal(contentLocale(note, ui), expected, `contentLocale(${note}, ${ui})`);
 });
 test('registry prompt names reproduce every language spelling in the prompt files', () => {
   const { languagePromptName: name } = load('i18n.ts');
@@ -207,6 +244,12 @@ test('registry prompt names reproduce every language spelling in the prompt file
   assert.equal(name('zh-TW', 'zh', 'usage'), '繁體中文（台灣用法）');
   assert.equal(name('zh-TW', 'en', 'plain'), 'Traditional Chinese');
   assert.equal(name('zh-TW', 'en', 'region'), 'Traditional Chinese (Taiwan)');
+  assert.equal(name('zh-CN', 'zh', 'plain'), '简体中文');
+  assert.equal(name('zh-CN', 'zh', 'region'), '简体中文（中国大陆）');
+  assert.equal(name('zh-CN', 'zh', 'usage'), '简体中文（中国大陆用法）');
+  assert.equal(name('zh-CN', 'en', 'plain'), 'Simplified Chinese');
+  assert.equal(name('zh-CN', 'en', 'region'), 'Simplified Chinese (Mainland China)');
+  assert.equal(name('zh-CN', 'en', 'usage'), 'Simplified Chinese (Mainland China usage)');
   assert.equal(name('en', 'en', 'plain'), 'English');
   // The language fragments (core and Coffee Tables) take the name from the registry ({{language}}) instead of spelling it out.
   const parameterised = ['core/steps/aim/language.zh.md', 'core/steps/relevance-grade/language.zh.md', 'core/steps/reframe/language.zh.md'];
@@ -219,12 +262,14 @@ test('registry prompt names reproduce every language spelling in the prompt file
 test('inLanguage selects the fragment by instruction language', () => {
   const { inLanguage } = load('core/steps/_shared/fragments.ts');
   assert.equal(inLanguage({ zh: '中', en: 'E' }, 'zh-TW'), '中');
+  assert.equal(inLanguage({ zh: '中', en: 'E' }, 'zh-CN'), '中');
   assert.equal(inLanguage({ zh: '中', en: 'E' }, 'en'), 'E');
 });
 test('translate looks up the language dictionary and falls back to English', () => {
   const { translate } = load('i18n.ts');
   assert.equal(translate('zh-TW', 'ui.interface_language'), '介面語言');
   assert.equal(translate('en', 'ui.expand_0', 2), 'Expand 2');
+  assert.equal(translate('zh-CN', 'ui.interface_language'), '界面语言');
 });
 test('check:i18n passes on the repository dictionaries and fails on a bad placeholder fixture', () => {
   const os = require('node:os');
@@ -238,13 +283,14 @@ test('check:i18n passes on the repository dictionaries and fails on a bad placeh
     fs.copyFileSync(path.join(root, 'i18n', 'languages.ts'), path.join(fixture, 'i18n', 'languages.ts'));
     const write = (name, exportName, entries) => fs.writeFileSync(path.join(fixture, 'i18n', name), `export const ${exportName} = {\n  // coffee:begin\n  "coffee.a": "Hello **{0}**",\n  // coffee:end\n${entries}};\n`);
     write('en.ts', 'en', '  "ui.b": "Count {0} of {1}",\n');
-    write('zh-TW.ts', 'zhTW', '  "ui.b": "第 {0} 項",\n');
+    const writeChinese = entries => { write('zh-TW.ts', 'zhTW', entries); write('zh-CN.ts', 'zhCN', entries); };
+    writeChinese('  "ui.b": "第 {0} 項",\n');
     const bad = spawnSync(process.execPath, [script, '--root', fixture], { cwd: root, encoding: 'utf8' });
     assert.equal(bad.status, 1);
     assert.match(bad.stderr, /zh-TW ui\.b: placeholders differ/);
-    write('zh-TW.ts', 'zhTW', '  "ui.b": "第 {0} 項，共 {1}",\n');
+    writeChinese('  "ui.b": "第 {0} 項，共 {1}",\n');
     assert.equal(spawnSync(process.execPath, [script, '--root', fixture], { cwd: root, encoding: 'utf8' }).status, 0);
-    write('zh-TW.ts', 'zhTW', '  "ui.b": "第 {0} 項，共 {1}",\n  "ui.extra": "x",\n');
+    writeChinese('  "ui.b": "第 {0} 項，共 {1}",\n  "ui.extra": "x",\n');
     const extra = spawnSync(process.execPath, [script, '--root', fixture], { cwd: root, encoding: 'utf8' });
     assert.equal(extra.status, 1);
     assert.match(extra.stderr, /extra key/);

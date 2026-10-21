@@ -1,0 +1,121 @@
+{
+  "type": "object",
+  "properties": {
+    "summary": {
+      "type": "string",
+      "description": "適合心智圖的一句繁體中文結論，80 字內"
+    },
+    "detail": {
+      "type": "string",
+      "description": "完整的繁體中文 Markdown 分析"
+    },
+    "suggestions": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "title": {
+            "type": "string"
+          },
+          "task": {
+            "type": "string"
+          },
+          "contribution": {
+            "type": "string"
+          },
+          "parentTitle": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "title",
+          "task",
+          "contribution",
+          "parentTitle"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "visualReferences": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "title": {
+            "type": "string"
+          },
+          "imageUrl": {
+            "type": "string"
+          },
+          "sourceUrl": {
+            "type": "string"
+          },
+          "description": {
+            "type": "string"
+          },
+          "palette": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "formula": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "title",
+          "imageUrl",
+          "sourceUrl",
+          "description",
+          "palette",
+          "formula"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "searchStatus": {
+      "type": "string",
+      "enum": [
+        "completed",
+        "failed",
+        "not_attempted"
+      ],
+      "description": "completed only when at least one web search or page fetch returned usable results for this task; failed when searching was attempted without usable results; not_attempted when no search ran."
+    },
+    "aim": {
+      "type": "object",
+      "properties": {
+        "status": {
+          "type": "string",
+          "enum": [
+            "searched",
+            "unavailable"
+          ],
+          "description": "searched only when web search actually ran for the outline; unavailable when tools failed or were not available."
+        },
+        "evidenceRequestIds": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Up to 3 exact evidence IDs whose full reports are needed before deciding; empty when the indexes suffice."
+        }
+      },
+      "required": [
+        "status",
+        "evidenceRequestIds"
+      ],
+      "additionalProperties": false
+    }
+  },
+  "required": [
+    "summary",
+    "detail",
+    "suggestions",
+    "visualReferences",
+    "searchStatus",
+    "aim"
+  ],
+  "additionalProperties": false
+}

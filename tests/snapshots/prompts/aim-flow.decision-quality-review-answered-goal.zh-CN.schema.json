@@ -1,0 +1,194 @@
+{
+  "type": "object",
+  "properties": {
+    "summary": {
+      "type": "string",
+      "description": "適合心智圖的一句繁體中文結論，80 字內"
+    },
+    "detail": {
+      "type": "string",
+      "description": "完整的繁體中文 Markdown 分析"
+    },
+    "suggestions": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "title": {
+            "type": "string"
+          },
+          "task": {
+            "type": "string"
+          },
+          "contribution": {
+            "type": "string"
+          },
+          "parentTitle": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "title",
+          "task",
+          "contribution",
+          "parentTitle"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "visualReferences": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "title": {
+            "type": "string"
+          },
+          "imageUrl": {
+            "type": "string"
+          },
+          "sourceUrl": {
+            "type": "string"
+          },
+          "description": {
+            "type": "string"
+          },
+          "palette": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "formula": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "title",
+          "imageUrl",
+          "sourceUrl",
+          "description",
+          "palette",
+          "formula"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "aim": {
+      "type": "object",
+      "properties": {
+        "goalAnswered": {
+          "type": "boolean",
+          "description": "true when the supplied reports already answer the original goal under the known conditions; false when a material evidence gap in the goal itself remains."
+        },
+        "decision": {
+          "type": "string",
+          "enum": [
+            "conclude",
+            "ask_user"
+          ]
+        },
+        "rationale": {
+          "type": "string",
+          "description": "Evidence-based reason for the decision."
+        },
+        "stopReason": {
+          "type": "string",
+          "description": "For conclude: why research can stop. Otherwise empty."
+        },
+        "question": {
+          "type": "string",
+          "description": "For ask_user: the one direct question for the user, written as a question. Ask about the user's goal, preferences, constraints or situation, never about this tool's workflow, counts, nodes or branches. Otherwise empty."
+        },
+        "answerOptions": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "For ask_user: 2–5 distinct answer choices. Otherwise empty."
+        },
+        "researchTarget": {
+          "anyOf": [
+            {
+              "type": "object",
+              "properties": {
+                "title": {
+                  "type": "string"
+                },
+                "task": {
+                  "type": "string",
+                  "description": "Search instruction."
+                },
+                "expectedValue": {
+                  "type": "string",
+                  "description": "Uncertainty the search should reduce."
+                }
+              },
+              "required": [
+                "title",
+                "task",
+                "expectedValue"
+              ],
+              "additionalProperties": false
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "For research_more: the one targeted evidence gap. Otherwise null."
+        },
+        "unresolvedConditions": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Decision-changing user conditions that are still unknown and cannot reasonably be assumed. A condition the user said they do not know is resolved by a stated assumption. Empty when none."
+        },
+        "gapKind": {
+          "anyOf": [
+            {
+              "type": "string",
+              "enum": [
+                "searchable",
+                "user_only",
+                "not_decisive"
+              ]
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "For research_more: searchable when public web sources can close the gap; user_only when only the user or someone they must contact can supply it (their own documents, quotes, offers, devices, account or company data); not_decisive when closing it would not change the recommendation. Otherwise null."
+        },
+        "evidenceRequestIds": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Up to 3 exact evidence IDs whose full reports are needed before deciding; empty when the indexes suffice."
+        }
+      },
+      "required": [
+        "goalAnswered",
+        "decision",
+        "rationale",
+        "stopReason",
+        "question",
+        "answerOptions",
+        "researchTarget",
+        "unresolvedConditions",
+        "gapKind",
+        "evidenceRequestIds"
+      ],
+      "additionalProperties": false
+    }
+  },
+  "required": [
+    "summary",
+    "detail",
+    "suggestions",
+    "visualReferences",
+    "aim"
+  ],
+  "additionalProperties": false
+}

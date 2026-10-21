@@ -68,8 +68,20 @@ Topic AI rules (highest priority):
 
 
 Source context:
-Evidence:
-D
+[S1] Vault Markdown; cite as an Obsidian wikilink: Agent Workspace/Topics/map-a/Notes/Child topic.md
+Current summary: Child summary
+
+Existing visual references to reuse only if useful:
+Child detail
+
+![diagram](https://example.org/diagram.png)
+
+Full knowledge:
+Child detail
+
+![diagram](https://example.org/diagram.png)
+
+Older findings to consolidate: Child finding
 
 Source registry (retain these identities in citations):
 [S1] Vault note (wikilink): Agent Workspace/Topics/map-a/Notes/Child topic.md

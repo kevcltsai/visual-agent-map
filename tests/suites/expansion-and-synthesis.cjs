@@ -1470,6 +1470,28 @@ integrationTest('tone: expansion, synthesis directions, draft and integrated top
   await h.view.createIntegratedNode('Plain', [h.topic, other], 'Compare', '');
   assert.equal('toneText' in h.contexts.at(-1), false);
 });
+integrationTest('W1: all four synthesize call sites ask for direct reference delivery; plain research does not', async () => {
+  const reply = (_context, call) => call === 1 || call === 3
+    ? { summary: '', detail: '', visualReferences: [], suggestions: [{ title: 'Angle', task: 'Compare them', contribution: '', parentTitle: '' }] }
+    : { summary: 'Synth', detail: '### Core conclusions\n\nTwo', visualReferences: [], suggestions: [] };
+  const h = await templateHarness({ language: 'en', reply });
+  const child = await h.repo.createNote('Child', 'model-a', h.doc, h.mapPath, 'workspace'); child.parentId = h.topic.id; h.doc.nodes.push(child); await h.repo.saveMap(h.mapPath, h.doc);
+  const other = await h.repo.createNote('Other', 'model-a', h.doc, h.mapPath, 'workspace'); h.doc.nodes.push(other); await h.repo.saveMap(h.mapPath, h.doc);
+  await h.repo.updateNote(h.topic.path, { status: 'completed' });
+  const options = () => ({ researchMode: 'local', researchDepth: 'normal', visualMode: 'off', referenceGroups: [] });
+  await h.view.startSynthesis(h.topic, options(), null, message => assert.fail(message), () => {});
+  assert.equal(h.contexts.at(-1).mode, 'synthesize'); assert.equal(h.contexts.at(-1).referenceDelivery, 'direct', 'child synthesis directions');
+  await h.view.startSynthesis(h.topic, options(), 'Compare them', message => assert.fail(message), () => {});
+  assert.equal(h.contexts.at(-1).referenceDelivery, 'direct', 'child synthesis draft');
+  await h.view.startSelectionSynthesis([h.topic, other], options(), null, message => assert.fail(message), () => {});
+  assert.equal(h.contexts.at(-1).mode, 'synthesize'); assert.equal(h.contexts.at(-1).referenceDelivery, 'direct', 'multi-select directions');
+  h.view.integrationTask = null;
+  await h.view.createIntegratedNode('Combined', [h.topic, other], 'Compare', '');
+  assert.equal(h.contexts.at(-1).referenceDelivery, 'direct', 'multi-select draft');
+  await h.view.researchChild(h.topic, new AbortController().signal, () => {}, options());
+  await until(() => !h.plugin.running.size);
+  assert.equal(h.contexts.at(-1).referenceDelivery, undefined, 'research keeps its extraction behaviour');
+});
 const countedTemplate = () => ({ id: 'K', name: 'Counted', sections: [templateSection('k0', 'Main'), templateSection('k1', 'Examples', { count: { mode: 'exact', n: 3 } })] });
 // Synthesis: call 1 proposes an angle, call 2 drafts; the draft is then saved (optionally edited) through the real save path.
 async function synthesisWithIssues({ settings, mapTemplate, draft }) {

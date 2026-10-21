@@ -7966,6 +7966,8 @@ export class VisualAgentMapView extends ItemView {
             task: [task, options?.requirements].filter(Boolean).join("\n\n"),
             ancestors: await this.ancestorContext(node),
             referenceGroups: [...selectedSources, childSources],
+            // Within budget the sources go in as written (one request); only over-budget sources are extracted first.
+            referenceDelivery: "direct",
             onProgress: options.onProgress,
             outputLanguage: options.outputLanguage,
             ...this.toneField(note, options),
@@ -8074,6 +8076,8 @@ export class VisualAgentMapView extends ItemView {
           task: [task, options?.requirements].filter(Boolean).join("\n\n"),
           ancestors: await this.ancestorContext(node),
           referenceGroups: [...selectedSources, childSources],
+          // Within budget the sources go in as written (one request); only over-budget sources are extracted first.
+          referenceDelivery: "direct",
           onProgress: options?.onProgress,
           outputLanguage: options?.outputLanguage,
           ...this.toneField(note, options),
@@ -8588,6 +8592,8 @@ export class VisualAgentMapView extends ItemView {
           task: [synthesisDirectionsTask(language), runOptions.requirements].filter(Boolean).join("\n\n"),
           ancestors: "",
           referenceGroups: [...(runOptions.referenceGroups ?? []), sourceGroup],
+          // Within budget the sources go in as written (one request); only over-budget sources are extracted first.
+          referenceDelivery: "direct",
           onProgress: runOptions.onProgress,
           outputLanguage: runOptions.outputLanguage,
           ...this.toneField(undefined, runOptions),
@@ -8744,6 +8750,8 @@ export class VisualAgentMapView extends ItemView {
         task: [goal, options?.requirements].filter(Boolean).join("\n\n"),
         ancestors: "",
         referenceGroups: [...(options?.referenceGroups ?? []), sourceGroup],
+        // Within budget the sources go in as written (one request); only over-budget sources are extracted first.
+        referenceDelivery: "direct",
         onProgress: message => {
           if (this.integrationTask !== task) return;
           task.progress = message;

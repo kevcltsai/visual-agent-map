@@ -136,8 +136,8 @@ export class AiTaskService {
             onRequestAccepted();
           }
         : undefined;
-      // A merge that fits one batch sends the documents as they are: an extraction pass would paraphrase (and may drop)
-      // the very text being merged, and costs a second request. Over-budget sources still go through extraction.
+      // A merge or synthesis that fits one batch sends the documents as they are: an extraction pass would paraphrase (and
+      // may drop) the very text being combined, and costs a second request. Over-budget sources still go through extraction.
       const direct = context.referenceDelivery === "direct" ? referenceBatches(referenceGroups) : [];
       const findings =
         direct.length === 1

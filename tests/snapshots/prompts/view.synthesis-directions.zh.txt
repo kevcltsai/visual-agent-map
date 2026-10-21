@@ -68,8 +68,20 @@ Parent detail
 
 
 整合來源背景:
-Evidence:
-D
+[S1] Vault Markdown; cite as an Obsidian wikilink: Agent Workspace/Topics/map-a/Notes/Child topic.md
+目前理解: Child summary
+
+既有圖片參考（有幫助時沿用）：
+Child detail
+
+![diagram](https://example.org/diagram.png)
+
+完整知識：
+Child detail
+
+![diagram](https://example.org/diagram.png)
+
+舊版待整理發現： Child finding
 
 Source registry (retain these identities in citations):
 [S1] Vault note (wikilink): Agent Workspace/Topics/map-a/Notes/Child topic.md

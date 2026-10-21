@@ -981,42 +981,22 @@
       "language": "zh-TW",
       "schema": true
     },
-    "view.synthesis-directions.en.1": {
+    "view.synthesis-directions.en": {
       "builder": "VisualAgentMapView synthesis-directions TaskContext through AiTaskService",
       "language": "en",
       "schema": true
     },
-    "view.synthesis-directions.en.2": {
-      "builder": "VisualAgentMapView synthesis-directions TaskContext through AiTaskService",
-      "language": "en",
-      "schema": true
-    },
-    "view.synthesis-directions.zh.1": {
+    "view.synthesis-directions.zh": {
       "builder": "VisualAgentMapView synthesis-directions TaskContext through AiTaskService",
       "language": "zh-TW",
       "schema": true
     },
-    "view.synthesis-directions.zh.2": {
-      "builder": "VisualAgentMapView synthesis-directions TaskContext through AiTaskService",
-      "language": "zh-TW",
-      "schema": true
-    },
-    "view.synthesis-draft-default-goal.en.1": {
+    "view.synthesis-draft-default-goal.en": {
       "builder": "VisualAgentMapView synthesis-draft-default-goal TaskContext through AiTaskService",
       "language": "en",
       "schema": true
     },
-    "view.synthesis-draft-default-goal.en.2": {
-      "builder": "VisualAgentMapView synthesis-draft-default-goal TaskContext through AiTaskService",
-      "language": "en",
-      "schema": true
-    },
-    "view.synthesis-draft-default-goal.zh.1": {
-      "builder": "VisualAgentMapView synthesis-draft-default-goal TaskContext through AiTaskService",
-      "language": "zh-TW",
-      "schema": true
-    },
-    "view.synthesis-draft-default-goal.zh.2": {
+    "view.synthesis-draft-default-goal.zh": {
       "builder": "VisualAgentMapView synthesis-draft-default-goal TaskContext through AiTaskService",
       "language": "zh-TW",
       "schema": true

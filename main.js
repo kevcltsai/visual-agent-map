@@ -35293,6 +35293,8 @@ ${request.requirements}` : preset.text,
             task: [task, options == null ? void 0 : options.requirements].filter(Boolean).join("\n\n"),
             ancestors: await this.ancestorContext(node),
             referenceGroups: [...selectedSources, childSources],
+            // Within budget the sources go in as written (one request); only over-budget sources are extracted first.
+            referenceDelivery: "direct",
             onProgress: options.onProgress,
             outputLanguage: options.outputLanguage,
             ...this.toneField(note, options),
@@ -35391,6 +35393,8 @@ ${request.requirements}` : preset.text,
           task: [task, options == null ? void 0 : options.requirements].filter(Boolean).join("\n\n"),
           ancestors: await this.ancestorContext(node),
           referenceGroups: [...selectedSources, childSources],
+          // Within budget the sources go in as written (one request); only over-budget sources are extracted first.
+          referenceDelivery: "direct",
           onProgress: options == null ? void 0 : options.onProgress,
           outputLanguage: options == null ? void 0 : options.outputLanguage,
           ...this.toneField(note, options),
@@ -35847,6 +35851,8 @@ ${request.requirements}` : preset.text,
           task: [synthesisDirectionsTask(language2), runOptions.requirements].filter(Boolean).join("\n\n"),
           ancestors: "",
           referenceGroups: [...(_b = runOptions.referenceGroups) != null ? _b : [], sourceGroup],
+          // Within budget the sources go in as written (one request); only over-budget sources are extracted first.
+          referenceDelivery: "direct",
           onProgress: runOptions.onProgress,
           outputLanguage: runOptions.outputLanguage,
           ...this.toneField(void 0, runOptions),
@@ -35986,6 +35992,8 @@ ${note.detail.trim()}` : "",
         task: [goal, options == null ? void 0 : options.requirements].filter(Boolean).join("\n\n"),
         ancestors: "",
         referenceGroups: [...(_d = options == null ? void 0 : options.referenceGroups) != null ? _d : [], sourceGroup],
+        // Within budget the sources go in as written (one request); only over-budget sources are extracted first.
+        referenceDelivery: "direct",
         onProgress: (message) => {
           var _a2;
           if (this.integrationTask !== task) return;

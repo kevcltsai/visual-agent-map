@@ -36,7 +36,7 @@ export interface TaskContext {
   workingFindings?: string;
   sourceContext?: string;
   referenceGroups?: ReferenceGroup[];
-  /** "direct": send the reference documents themselves when they fit one batch, instead of extracting findings first. */
+  /** "direct" (merge and synthesize): send the reference documents themselves when they fit one batch, instead of extracting findings first. */
   referenceDelivery?: "direct";
   onProgress?: (message: string) => void;
   signal?: AbortSignal;

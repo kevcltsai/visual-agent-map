@@ -458,6 +458,45 @@ test('merge request: sources over the batch budget are still extracted first, an
   await makeService(synth, { language: 'en' }).askModel(mergeContext('short', { mode: 'synthesize', referenceDelivery: undefined }), 'claude:sonnet', 'low');
   assert.equal(synth.calls.length, 2, 'synthesize keeps its extraction pass');
 });
+// Synthesis delivery (plan E W1): the four view call sites send referenceDelivery 'direct', so child notes that fit one batch
+// go in as written in the single task request; over-budget sources are still extracted first.
+const synthContext = (content, over = {}) => mergeContext(content, { mode: 'synthesize', task: 'SYNTH-TASK', ...over });
+test('synthesis request (direct): child notes that fit one batch go in as written in a single task request with the Source registry', async () => {
+  const runtime = replayRuntime([{ response: mergeReply }]);
+  await makeService(runtime, { language: 'en' }).askModel(synthContext('child summary: 42 degrees'), 'claude:sonnet', 'low');
+  assert.equal(runtime.calls.length, 1, 'no extraction pass');
+  assert.match(runtime.calls[0].prompt, /child summary: 42 degrees/); assert.match(runtime.calls[0].prompt, /second source/);
+  assert.match(runtime.calls[0].prompt, /\[S1\]/); assert.match(runtime.calls[0].prompt, /Notes\/A\.md/); assert.match(runtime.calls[0].prompt, /SYNTH-TASK/);
+  assert.doesNotMatch(runtime.calls[0].prompt, /task\.reference-extract/);
+});
+test('synthesis request (direct): more than one batch is still extracted first, and [S#] in the reply resolves to the child note links', async () => {
+  const finding = { response: JSON.stringify({ summary: '', detail: 'finding', suggestions: [], visualReferences: [] }) };
+  const main = JSON.stringify({ summary: 'Sum [S1]', detail: '### Core conclusions\n\nA claim [S1] and another [S2].', suggestions: [], visualReferences: [] });
+  const runtime = { calls: [], runTask: async prompt => { runtime.calls.push({ prompt }); return /SYNTH-TASK/.test(prompt) && !/Reference extraction|reference-extract/i.test(prompt) && /Source registry/i.test(prompt) ? main : finding.response; } };
+  const result = await makeService(runtime, { language: 'en' }).askModel(synthContext('x'.repeat(20_000)), 'claude:sonnet', 'low');
+  assert.ok(runtime.calls.length >= 2, 'extraction then the task');
+  assert.match(result.detail, /\[\^1\]: \[\[Notes\/A\.md\|A\]\]/); assert.match(result.detail, /\[\^2\]: \[\[Notes\/B\.md\|B\]\]/);
+});
+test('synthesis request (direct): [S#] in a one-batch reply resolve to child note footnotes, and a copied child footnote keeps its definition', async () => {
+  const detail = '### Core conclusions\n\nClaim [S1]. Copied from the child [^src-0abcdef] and [^1].\n\n### Evidence\n\n[^src-0abcdef]: https://example.org/original\n[^1]: https://example.org/child-one\n';
+  const runtime = replayRuntime([{ response: JSON.stringify({ summary: 'Sum [S2]', detail, suggestions: [], visualReferences: [] }) }]);
+  const result = await makeService(runtime, { language: 'en' }).askModel(synthContext('child with [^src-0abcdef] and [^1]\n\n[^src-0abcdef]: https://example.org/original\n[^1]: https://example.org/child-one'), 'claude:sonnet', 'low');
+  assert.equal(runtime.calls.length, 1);
+  assert.match(result.detail, /\[\[Notes\/A\.md\|A\]\]/); assert.doesNotMatch(result.summary, /\[S\d\]/);
+  const references = [...result.detail.matchAll(/\[\^([^\]\s]+)\](?!:)/g)].map(match => match[1]);
+  const definitions = new Set([...result.detail.matchAll(/^\[\^([^\]\s]+)\]:/gm)].map(match => match[1]));
+  for (const label of references) assert.ok(definitions.has(label), `footnote [^${label}] is defined`);
+});
+test('synthesis request (direct): a reply that copies a child footnote reference without its definition is left as written (finding: resolveDetailReferences does not repair non-source footnotes)', async () => {
+  const detail = '### Core conclusions\n\nClaim [S1]. Copied from the child [^1].\n';
+  const runtime = replayRuntime([{ response: JSON.stringify({ summary: 'Sum', detail, suggestions: [], visualReferences: [] }) }]);
+  const result = await makeService(runtime, { language: 'en' }).askModel(synthContext('child with [^1]\n\n[^1]: https://example.org/child-one'), 'claude:sonnet', 'low');
+  const labels = [...result.detail.matchAll(/\[\^([^\]\s]+)\](?!:)/g)].map(match => match[1]);
+  const defined = new Set([...result.detail.matchAll(/^\[\^([^\]\s]+)\]:/gm)].map(match => match[1]));
+  const undefinedLabels = labels.filter(label => !defined.has(label));
+  // Recorded behaviour: the child's own "[^1]" is kept and stays undefined; [S1] became the numbered source footnote [^2].
+  assert.deepEqual(undefinedLabels, ['1']);
+});
 test('merge prompt never asks for synthesis (agreements, tradeoffs, open questions) or for added callouts; synthesize still does', async () => {
   for (const [language, ask, forbid] of [['en', /agreements, disagreements, tradeoffs/, /Practical tips or examples/], ['zh-TW', /共識、分歧、取捨/, /實用提醒|實用技巧/]]) {
     const merge = replayRuntime([{ response: mergeReply }]), synth = replayRuntime([{ response: JSON.stringify({ summary: '', detail: 'finding', suggestions: [], visualReferences: [] }) }, { response: mergeReply }]);

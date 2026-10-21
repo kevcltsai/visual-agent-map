@@ -270,7 +270,7 @@ test('canonicalDetail: Standard and custom templates still fold leading text int
   assert.ok(utils.canonicalDetail('Lead\n\n### Core conclusions\n\nC', 'en', custom).startsWith('### Core conclusions\n\nLead\n\nC\n\n### Key knowledge\n\nNo new information in this task.'));
 });
 test('canonicalDetail textbook: a placeholder-only evidence section with footnotes keeps the heading and footnotes, drops the placeholder (zh/en, with or without period)', () => {
-  for (const [language, placeholder] of [['en', 'No new information in this task'], ['en', 'No new information in this task.'], ['zh-TW', '本次無新增內容'], ['en', 'No new content this time.']]) {
+  for (const [language, placeholder] of [['en', 'No new information in this task'], ['en', 'No new information in this task.'], ['zh-TW', '本次無新增內容'], ['zh-TW', '本次無新增內容。'], ['en', 'No new content this time.']]) {
     const tb = api.textbookTemplate(language), heading = language === 'en' ? 'Evidence and sources' : '證據與來源';
     const out = utils.canonicalDetail(`Intro\n\n### ${heading}\n\n${placeholder}\n\n[^1]: [[Notes/X|X]]`, language, tb);
     assert.equal(out, `Intro\n\n### ${heading}\n\n[^1]: [[Notes/X|X]]`);

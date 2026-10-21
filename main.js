@@ -13453,6 +13453,23 @@ function sourceDefinitions(detail) {
   });
   return definitions;
 }
+function footnoteDefinitionLabels(content) {
+  const lines = content.split("\n");
+  const code = fencedLines(lines);
+  const labels = /* @__PURE__ */ new Set();
+  lines.forEach((line, index) => {
+    const match = code[index] ? null : /^\[\^([^\]\s]+)\]:/.exec(line);
+    if (match) labels.add(match[1]);
+  });
+  return labels;
+}
+function usesFootnote(content, label) {
+  const lines = content.split("\n");
+  const code = fencedLines(lines);
+  return lines.some(
+    (line, index) => !code[index] && outsideInlineCode(line, (text11) => [...text11.matchAll(FOOTNOTE_REFERENCE)].some((match) => match[1] === label) ? "\0" : "").includes("\0")
+  );
+}
 function definesFootnote(content, label) {
   const lines = content.split("\n");
   const code = fencedLines(lines);
@@ -13478,7 +13495,7 @@ function resolveDetailReferences(detail, groups, previousDetail = "", template) 
   const bodyCode = [];
   const defined = /* @__PURE__ */ new Map();
   const reserved = /* @__PURE__ */ new Set();
-  const ambiguous = /* @__PURE__ */ new Set();
+  const dropped = /* @__PURE__ */ new Set();
   lines.forEach((line, index) => {
     if (!code[index]) {
       const definition = sourceFootnoteDefinition(line);
@@ -13493,6 +13510,7 @@ function resolveDetailReferences(detail, groups, previousDetail = "", template) 
     bodyCode.push(code[index]);
   });
   const previous = sourceDefinitions(previousDetail);
+  const writerLabels = footnoteDefinitionLabels(previousDetail);
   const byLabel = new Map(documents.map((document2) => [sourceFootnoteLabel(document2.path), document2]));
   const targetOf = (label) => {
     var _a, _b;
@@ -13500,15 +13518,17 @@ function resolveDetailReferences(detail, groups, previousDetail = "", template) 
     if (target) return target;
     const document2 = byLabel.get(label);
     if (document2) return footnoteTarget(document2);
+    if (writerLabels.has(label)) return void 0;
     const owners = documents.filter((candidate) => definesFootnote(candidate.content, label));
-    if (owners.length > 1) ambiguous.add(label);
-    return owners.length === 1 ? footnoteTarget(owners[0]) : void 0;
+    if (owners.length === 1) return footnoteTarget(owners[0]);
+    if (owners.length > 1 || documents.some((candidate) => usesFootnote(candidate.content, label))) dropped.add(label);
+    return void 0;
   };
   body.forEach((line, index) => {
     if (bodyCode[index]) return;
     outsideInlineCode(line, (text12) => {
       for (const [, label] of text12.matchAll(FOOTNOTE_REFERENCE))
-        if (!label.startsWith("src-") && !targetOf(label) && !ambiguous.has(label)) reserved.add(label);
+        if (!label.startsWith("src-") && !targetOf(label) && !dropped.has(label)) reserved.add(label);
       return text12;
     });
   });
@@ -13534,7 +13554,7 @@ function resolveDetailReferences(detail, groups, previousDetail = "", template) 
         const target = targetOf(label);
         if (target) return `[^${number(target)}]`;
         if (label.startsWith("src-")) return ` ${t("note.source_unconfirmed_0", label)}`;
-        return ambiguous.has(label) ? "" : original;
+        return dropped.has(label) ? "" : original;
       })
     )
   );

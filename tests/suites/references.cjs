@@ -206,3 +206,14 @@ test('resolveDetailReferences: a copied footnote one note defines becomes that s
   const code = api.resolveDetailReferences('Claim `[^7]`\n\n```\n[^8]\n```', docs('plain'));
   assert.equal(code, 'Claim `[^7]`\n\n```\n[^8]\n```');
 });
+test('resolveDetailReferences: a child that uses [^1] without defining it is dropped; the writer\'s own earlier footnote is never re-pointed at a child', () => {
+  const api = load('ai/reference-materials.ts', { obsidian });
+  const docs = (...contents) => [{ id: 'g', name: 'g', location: '', documents: contents.map((content, i) => ({ path: `Notes/N${i}.md`, content })) }];
+  const undef = api.resolveDetailReferences('Claim[S1] copied[^1]', docs('child says[^1] with no definition'));
+  assert.doesNotMatch(undef, /copied\[\^1\]/);
+  const labels = [...undef.matchAll(/\[\^([^\]\s]+)\](?!:)/g)].map(m => m[1]), defs = new Set([...undef.matchAll(/^\[\^([^\]\s]+)\]:/gm)].map(m => m[1]));
+  for (const label of labels) assert.ok(defs.has(label), `[^${label}] defined`);
+  const previous = 'Claim[^2]\n\n[^2]: my own remark';
+  assert.equal(api.resolveDetailReferences('Claim[^2]', docs('a[^2]\n\n[^2]: child'), previous), 'Claim[^2]');
+  assert.equal(api.resolveDetailReferences('Claim[^2]', docs('a[^2]\n\n[^2]: x', 'b[^2]\n\n[^2]: y'), previous), 'Claim[^2]');
+});

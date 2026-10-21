@@ -59,6 +59,8 @@ Display
 ### Limitations
 
 - Not checked: the new store file handling and Codex saved-image reading on Windows, and Codex saved-image reading through Obsidian's adapter at all.
+- Not checked live: Mod+Enter and Shift+Enter with real keyboard input (tested with simulated keys on macOS only), keys pressed inside text fields, sibling placement next to very tall cards, a live "Prioritize by goal" run, merge speed on maps with about 1,000 topics, undo parking when Unassigned already holds a note whose name differs only by case (covered by automated tests only), and Windows or Linux.
+- Moves made by Coffee Tables and by AIM maps still go through Obsidian's own rename, so Obsidian may still ask to update links there.
 
 ## [0.24.0] - 2026-10-22
 

@@ -261,3 +261,10 @@ test('FG20-10: history cleared during the batch (conflict window) skips the coll
   while (h.view.history.canUndo) { await h.view.travel(false); steps++; }
   assert.ok(steps >= 2, `the surviving entries stay separate (${steps})`);
 });
+
+test('FG20-08: a new child goes after its siblings and clears a cousin tree below them (no new overlap)', async () => {
+  const h = await harness([['A', null, 80, 80], ['A1', 'A', 440, 400], ['B', null, 80, 900], ['B1', 'B', 440, 604]], { A1: 180, B1: 180, A: 180, B: 180 });
+  await h.view.addNode(h.node('A'), 'New');
+  assert.deepEqual(h.overlaps(), []);
+  assert.ok(h.node('New').y >= 400 + 180 + GAP, 'after its sibling, not in the gap above it');
+});

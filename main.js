@@ -14276,7 +14276,7 @@ function arrangeMap(nodes, hidden, heightOf) {
   const placed = positions(laidOut, roots, 80, 80, true, heightOf);
   return nodes.map((node) => ({ ...node, ...placed.get(node.id) }));
 }
-function arrangeNewBranch(nodes, parentId, newIds, heightOf) {
+function arrangeNewBranch(nodes, parentId, newIds, heightOf, minTop) {
   const parent = nodes.find((node) => node.id === parentId);
   if (!parent || !newIds.size) return nodes;
   const fresh = nodes.filter((node) => newIds.has(node.id));
@@ -14285,6 +14285,8 @@ function arrangeNewBranch(nodes, parentId, newIds, heightOf) {
   const centers = roots.map((root) => placed.get(root.id).y + cardHeight(heightOf, root.id) / 2);
   const center = centers.length ? (Math.min(...centers) + Math.max(...centers)) / 2 : 0;
   let offset = parent.y + cardHeight(heightOf, parent.id) / 2 - center;
+  if (minTop !== void 0 && placed.size)
+    offset = Math.max(offset, minTop - Math.min(...[...placed.values()].map((point) => point.y)));
   const fixed = nodes.filter((node) => !newIds.has(node.id));
   for (; ; ) {
     let next = offset;
@@ -35301,17 +35303,12 @@ ${request.requirements}` : preset.text,
       const owner = parent ? map.nodes.find((n) => n.id === parent.id) : void 0;
       if (owner) {
         owner.collapsed = false;
-        map.nodes = arrangeNewBranch(map.nodes, owner.id, /* @__PURE__ */ new Set([node.id]), this.cardHeightOf);
         const siblings = map.nodes.filter((n) => n.parentId === owner.id && n.id !== node.id);
-        const placed = map.nodes.find((n) => n.id === node.id);
-        if (siblings.length)
-          placed.y = Math.max(
-            placed.y,
-            Math.max(...siblings.map((n) => {
-              var _a2;
-              return n.y + ((_a2 = this.cardHeightOf(n.id)) != null ? _a2 : DEFAULT_CARD_HEIGHT);
-            })) + LAYOUT_GAP
-          );
+        const minTop = siblings.length ? Math.max(...siblings.map((n) => {
+          var _a2;
+          return n.y + ((_a2 = this.cardHeightOf(n.id)) != null ? _a2 : DEFAULT_CARD_HEIGHT);
+        })) + LAYOUT_GAP : void 0;
+        map.nodes = arrangeNewBranch(map.nodes, owner.id, /* @__PURE__ */ new Set([node.id]), this.cardHeightOf, minTop);
       } else if (!parent) {
         const roots = map.nodes.filter((n) => n.id !== node.id && !n.parentId);
         if (roots.length)

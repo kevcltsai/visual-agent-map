@@ -115,7 +115,9 @@ export function arrangeNewBranch(
   nodes: MapNode[],
   parentId: string,
   newIds: Set<string>,
-  heightOf?: HeightOf
+  heightOf?: HeightOf,
+  /** The new branch's top edge starts at or below this y (before collision avoidance); undefined keeps the centred start. */
+  minTop?: number
 ): MapNode[] {
   const parent = nodes.find(node => node.id === parentId);
   if (!parent || !newIds.size) return nodes;
@@ -125,6 +127,8 @@ export function arrangeNewBranch(
   const centers = roots.map(root => placed.get(root.id)!.y + cardHeight(heightOf, root.id) / 2);
   const center = centers.length ? (Math.min(...centers) + Math.max(...centers)) / 2 : 0;
   let offset = parent.y + cardHeight(heightOf, parent.id) / 2 - center;
+  if (minTop !== undefined && placed.size)
+    offset = Math.max(offset, minTop - Math.min(...[...placed.values()].map(point => point.y)));
   const fixed = nodes.filter(node => !newIds.has(node.id));
   for (;;) {
     let next = offset;

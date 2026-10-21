@@ -668,13 +668,15 @@ integrationTest('structure review: add, move, merge and remove each apply as one
   await h.view.history.undo().undo();
   assert.equal(await h.parentOf('c'), h.ids.a);
   // Merge: through the delete confirmation; Misc's subtopic moves to Body, Misc leaves the map.
+  // The added topic's note was parked in Unassigned by its undo (D11a), so count only what the merge adds.
+  const parkedBefore = (await h.repo.collectionFiles(h.mapPath, 'Unassigned')).length;
   await apply(2, false); await tick();
   assert.equal(h.opened.at(-1).titleEl.text, 'Merge “Misc” into “Body”');
   await h.choose('Merge and remove “Misc”');
   nodes = await h.saved();
   assert.equal(nodes.some(n => n.id === h.ids.e), false);
   assert.equal(await h.parentOf('f'), h.ids.a);
-  assert.equal((await h.repo.collectionFiles(h.mapPath, 'Unassigned')).length, 1);
+  assert.equal((await h.repo.collectionFiles(h.mapPath, 'Unassigned')).length, parkedBefore + 1);
   await h.view.history.undo().undo();
   assert.equal(await h.parentOf('e'), h.ids.root); assert.equal(await h.parentOf('f'), h.ids.e);
   // Remove: the existing delete confirmation, entire branch.

@@ -8,6 +8,7 @@
 - The goal-grading button is now named "Prioritize by goal", and its panel no longer closes by itself when the map repaints or focus returns from a dialog; if it cannot open, a notice says why.
 - Map cards now work from the keyboard: Delete or Backspace removes the focused card (with an Undo notice, or the usual confirmation when it has subtopics), Mod+Enter adds a subtopic, Shift+Enter adds a sibling, double-clicking a title renames it, and Mod+Z / Mod+Shift+Z undo and redo while the map is the active pane.
 - Merging, removing, archiving, renaming and undoing topics no longer pops up Obsidian's "Update links" dialog when only VAM notes link to the moved cards: VAM updates its own links itself. If one of your own notes links to a moved card, VAM shows a short notice first and Obsidian asks as before, so your links are never silently broken.
+- Undoing a topic you just created (the + button, a strengthened topic, or each subtopic of a batch) now also takes its note out of the Notes folder: it is parked in Unassigned like a removed topic, and Redo puts it back at the same place. No stray note is left behind.
 
 ## [0.24.0] - 2026-10-22
 

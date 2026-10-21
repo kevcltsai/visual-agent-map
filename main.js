@@ -35110,6 +35110,38 @@ ${request.requirements}` : preset.text,
       }))
     ).open();
   }
+  /**
+   * The undo of a created topic must take its note away with it: the history entry mapChange just pushed only
+   * rewrites Map.md, which would leave the new note behind in Notes. Replace it with the remove lifecycle: undo parks
+   * the note in Unassigned, redo moves it back to the exact path it had.
+   */
+  parkOnUndo(nodeId, before, after, previousEntry) {
+    const entry = this.history.undoEntry;
+    if (!entry || entry === previousEntry) return;
+    let move = null;
+    entry.undo = async () => {
+      var _a;
+      const current = (_a = this.map) == null ? void 0 : _a.nodes.find((item) => item.id === nodeId);
+      if (!current) return;
+      const repo = this.plugin.repo, folder = repo.topicFolder(this.path, "Unassigned"), base = current.path.slice(current.path.lastIndexOf("/") + 1).replace(/\.md$/, ""), plain = `${folder}/${base}.md`;
+      move = {
+        activePath: current.path,
+        parkedPath: this.app.vault.getAbstractFileByPath(plain) ? repo.unique(folder, base) : plain,
+        topicId: before.id,
+        parkedState: "unassigned"
+      };
+      await this.restoreLifecycle(this.withCurrentViewport(before), [move], true);
+    };
+    entry.redo = async () => {
+      if (!move) return;
+      await this.restoreLifecycle(this.withCurrentViewport(after), [move], false);
+    };
+  }
+  withCurrentViewport(snapshot) {
+    const next = clone(snapshot);
+    if (this.map) next.viewport = clone(this.map.viewport);
+    return next;
+  }
   async addNode(parentNode, suggestedTitle, rebuildDerivedData = true) {
     var _a, _b, _c, _d;
     if (!this.map) return;
@@ -35151,10 +35183,12 @@ ${request.requirements}` : preset.text,
       await this.plugin.repo.readNote(node.path, { ...this.map, nodes: [...this.map.nodes, node] })
     );
     this.selected = node.id;
+    const previousEntry = this.history.undoEntry, before = clone(this.map);
     await this.mapChange((map) => {
       map.nodes.push(node);
       if (parent) map.nodes.find((n) => n.id === parent.id).collapsed = false;
     }, rebuildDerivedData);
+    if (this.map) this.parkOnUndo(node.id, before, clone(this.map), previousEntry);
     if (this.map) this.map.viewport.zoom = Math.max(this.map.viewport.zoom, 0.7);
     this.focusNode(node);
   }

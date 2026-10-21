@@ -166,7 +166,9 @@ function usesFootnote(content: string, label: string): boolean {
   return lines.some(
     (line, index) =>
       !code[index] &&
-      outsideInlineCode(line, text => ([...text.matchAll(FOOTNOTE_REFERENCE)].some(match => match[1] === label) ? "\u0000" : "")).includes("\u0000")
+      outsideInlineCode(line, text =>
+        [...text.matchAll(FOOTNOTE_REFERENCE)].some(match => match[1] === label) ? "\u0000" : ""
+      ).includes("\u0000")
   );
 }
 

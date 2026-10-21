@@ -13467,7 +13467,10 @@ function usesFootnote(content, label) {
   const lines = content.split("\n");
   const code = fencedLines(lines);
   return lines.some(
-    (line, index) => !code[index] && outsideInlineCode(line, (text11) => [...text11.matchAll(FOOTNOTE_REFERENCE)].some((match) => match[1] === label) ? "\0" : "").includes("\0")
+    (line, index) => !code[index] && outsideInlineCode(
+      line,
+      (text11) => [...text11.matchAll(FOOTNOTE_REFERENCE)].some((match) => match[1] === label) ? "\0" : ""
+    ).includes("\0")
   );
 }
 function definesFootnote(content, label) {

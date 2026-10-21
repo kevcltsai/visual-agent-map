@@ -117,6 +117,8 @@ import type {
 import { renderTopicTree } from "../../ui/topic-tree";
 import { TopicTreeModal } from "../../ui/modals/topic-tree-modal";
 import type { FieldLinks, ModelChoices } from "./research-fields";
+import type { ResearchObserver } from "../../ai/research-observer";
+import type { ResearchProgress } from "./research-progress";
 import { DetailTemplatesModal } from "../../ui/modals/detail-templates-modal";
 import type { ExpansionBatchState } from "./expansion-batch";
 import { AimStartModal } from "../../ui/modals/aim-start-modal";
@@ -459,6 +461,14 @@ export class VisualAgentMapView extends ItemView {
   private viewportTimer: number | null = null;
   private hoverTimer: number | null = null;
   private hoverCard: HTMLElement | null = null;
+  /** The unsaved-answer block of the open hover card, repainted as the preview grows. */
+  private hoverResearch: { path: string; block: HTMLElement; summary: HTMLElement; detail: HTMLElement } | null = null;
+  private unsubscribeResearch: (() => void) | null = null;
+  /** What each card last showed of its research progress; a different signature means the card must be redrawn. */
+  private researchSigs = new Map<string, string>();
+  private researchElapsed = new Map<HTMLElement, number>();
+  private researchTick: number | null = null;
+  private researchRenderTimer: number | null = null;
   private integrationMode = false;
   private dragging = false;
   /** Ends the drag in progress (listeners, pending frame, flag); set only while a card is being dragged. */
@@ -564,6 +574,8 @@ export class VisualAgentMapView extends ItemView {
   }
   async onOpen(): Promise<void> {
     this.closed = false;
+    this.unsubscribeResearch?.();
+    this.unsubscribeResearch = this.plugin.researchProgress?.subscribe(path => this.onResearchProgress(path)) ?? null;
     const epoch = ++this.aimViewEpoch;
     this.mapOpenEpoch++;
     this.contentEl.addClass("vam-view");
@@ -635,6 +647,14 @@ export class VisualAgentMapView extends ItemView {
   }
   async onClose(): Promise<void> {
     this.closed = true;
+    this.unsubscribeResearch?.();
+    this.unsubscribeResearch = null;
+    if (this.researchTick !== null) window.clearInterval(this.researchTick);
+    if (this.researchRenderTimer !== null) window.clearTimeout(this.researchRenderTimer);
+    this.researchTick = this.researchRenderTimer = null;
+    this.researchElapsed.clear();
+    this.researchSigs.clear();
+    this.hoverResearch = null;
     this.plugin.releaseOutline(this);
     this.relevancePanelCleanup?.();
     this.relevancePanelCleanup = null;
@@ -3344,6 +3364,75 @@ export class VisualAgentMapView extends ItemView {
       y += 120;
     }
   }
+  private researchSig(progress: ResearchProgress | undefined): string {
+    return progress
+      ? [progress.stage, progress.query ?? "", progress.slow ? 1 : 0, progress.resend ? 1 : 0].join("|")
+      : "";
+  }
+  private researchStageText(progress: ResearchProgress): string {
+    switch (progress.stage) {
+      case "searching":
+        return progress.query ? t("ui.research_stage_searching_0", progress.query) : t("ui.research_stage_searching");
+      case "reading":
+        return t("ui.research_stage_reading");
+      case "writing":
+        return t("ui.research_stage_writing");
+      case "charts":
+        return t("ui.research_stage_charts");
+      default:
+        return t("ui.research_stage_waiting");
+    }
+  }
+  private researchElapsedText(startedAt: number): string {
+    const seconds = Math.max(0, Math.round((Date.now() - startedAt) / 1000));
+    const clock = `${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, "0")}`;
+    // The stage is a separate element (the screen-reader announcement), so only the separator and the clock are here.
+    return t("ui.aim_stage_with_elapsed_0_1", "", clock);
+  }
+  private trackResearchElapsed(element: HTMLElement, startedAt: number): void {
+    this.researchElapsed.set(element, startedAt);
+    if (this.researchTick === null) this.researchTick = window.setInterval(() => this.tickResearch(), 1000);
+  }
+  /** One-second tick: rewrite only the elapsed texts, never the cards; stops when none is left on screen. */
+  private tickResearch(): void {
+    for (const [element, startedAt] of [...this.researchElapsed]) {
+      if (this.closed || !element.isConnected) this.researchElapsed.delete(element);
+      else element.setText(this.researchElapsedText(startedAt));
+    }
+    if (!this.researchElapsed.size && this.researchTick !== null) {
+      window.clearInterval(this.researchTick);
+      this.researchTick = null;
+    }
+  }
+  private onResearchProgress(path: string): void {
+    if (this.closed || !this.map || !this.stageEl) return;
+    if (!this.map.nodes.some(node => node.path === path)) return;
+    this.paintHoverResearch();
+    if (this.researchSig(this.plugin.researchProgress.get(path)) !== (this.researchSigs.get(path) ?? ""))
+      this.scheduleResearchRender();
+  }
+  private scheduleResearchRender(): void {
+    if (this.researchRenderTimer !== null) return;
+    this.researchRenderTimer = window.setTimeout(() => {
+      this.researchRenderTimer = null;
+      if (this.closed) return;
+      // Like AIM progress: never interrupt a drag or an open input; try again shortly instead.
+      const typing =
+        this.contentEl.contains(document.activeElement) && document.activeElement?.matches("input, textarea, select");
+      if (this.dragging || typing) this.scheduleResearchRender();
+      else this.renderPreservingFocus();
+    }, 150);
+  }
+  /** Plain text only (never Markdown): the answer being written, which nothing has saved yet. */
+  private paintHoverResearch(): void {
+    const hover = this.hoverResearch;
+    if (!hover || !this.hoverCard) return;
+    const preview = this.plugin.researchProgress?.get(hover.path)?.preview;
+    hover.block.hidden = !preview;
+    hover.summary.setText(preview?.summary ?? "");
+    hover.detail.setText(preview?.detailTail ?? "");
+    hover.detail.hidden = !preview?.detailTail;
+  }
   private renderResearchProgress(parent: HTMLElement): void {
     const nodes = this.map?.nodes ?? [];
     const done = nodes.filter(node => this.notes.get(node.id)?.status === "completed").length;
@@ -5774,6 +5863,9 @@ export class VisualAgentMapView extends ItemView {
       });
     }
     const batch = this.plugin.expansionBatches.get(node.path);
+    const research = this.builtIn ? undefined : this.plugin.researchProgress?.get(node.path);
+    if (research) this.researchSigs.set(node.path, this.researchSig(research));
+    else this.researchSigs.delete(node.path);
     const active =
       merging ||
       this.plugin.running?.has(node.path) ||
@@ -5804,20 +5896,39 @@ export class VisualAgentMapView extends ItemView {
             ? t("ui.aim_answered_not_started")
             : t(key[status])
       });
-    } else if (!node.aimKind || active || queued || !note || note.status !== "completed") {
-      const statusText = merging
-        ? t("ui.merging")
-        : active
-          ? t("ui.ai_running")
-          : queued
-            ? t("ui.research_queued")
-            : note?.status === "completed"
-              ? t("ui.researched")
-              : note
-                ? topicStatusLabel(note.status, this.plugin.settings.language)
-                : t("ui.note_missing");
+    } else if (!node.aimKind || active || queued || !note || note.status !== "completed" || research) {
+      const statusText = research
+        ? this.researchStageText(research)
+        : merging
+          ? t("ui.merging")
+          : active
+            ? t("ui.ai_running")
+            : queued
+              ? t("ui.research_queued")
+              : note?.status === "completed"
+                ? t("ui.researched")
+                : note
+                  ? topicStatusLabel(note.status, this.plugin.settings.language)
+                  : t("ui.note_missing");
       // A researched topic is the normal state, so only the other states earn a pill; screen readers still hear it.
-      if (!note || note.status !== "completed" || active || queued) {
+      if (research) {
+        const chip = header.createSpan({ cls: "vam-status vam-status-running" });
+        // The live region changes on a stage change only; the seconds beside it are hidden from screen readers.
+        const stageEl = chip.createSpan({ cls: "vam-research-stage", text: statusText });
+        stageEl.setAttr("role", "status");
+        stageEl.setAttr("aria-live", "polite");
+        stageEl.setAttr("title", statusText);
+        const elapsedEl = chip.createSpan({
+          cls: "vam-research-elapsed",
+          text: this.researchElapsedText(research.startedAt)
+        });
+        elapsedEl.setAttr("aria-hidden", "true");
+        this.trackResearchElapsed(elapsedEl, research.startedAt);
+        if (research.slow)
+          header
+            .createSpan({ cls: "vam-status vam-research-slow", text: t("ui.research_slow_waiting") })
+            .setAttr("role", "status");
+      } else if (!note || note.status !== "completed" || active || queued) {
         const chip = header.createSpan({
           cls: `vam-status vam-status-${active ? "running" : queued ? "queued" : (note?.status ?? "error")}`,
           text: statusText
@@ -5897,6 +6008,10 @@ export class VisualAgentMapView extends ItemView {
         (this.startingTasks.get(node.path) ?? this.plugin.activeTasks.get(node.path))?.abort()
       );
     }
+    if (research?.slow && research.resend)
+      this.button(header, t("ui.research_resend"), () => this.plugin.researchProgress.get(node.path)?.resend?.());
+    if (research?.stage === "charts")
+      this.button(header, t("ui.stop_adding_charts"), () => this.plugin.abortChartJobs(node.path));
     const pendingCount = this.plugin.pendingSuggestions.get(node.path)?.length ?? 0;
     if (pendingCount && !this.builtIn && !this.integrationMode && !this.map?.aim)
       this.button(header, t("ui.view_0_expansion_suggestions", pendingCount), () =>
@@ -6476,8 +6591,21 @@ export class VisualAgentMapView extends ItemView {
     preview.addEventListener("mouseenter", () => this.clearHoverTimer());
     preview.addEventListener("mouseleave", () => this.hideHoverCardSoon());
     preview.createEl("strong", { text: note.title });
-    const content = preview.createDiv("vam-hover-markdown");
     const path = this.map?.nodes.find(node => node.id === card.dataset.nodeId)?.path ?? "";
+    // Only while a run is in flight on this topic (its block is hidden until there is something to show).
+    this.hoverResearch = null;
+    if (this.plugin.researchProgress?.get(path)) {
+      const research = preview.createDiv("vam-hover-research-preview");
+      research.createDiv({ cls: "vam-hover-label", text: t("ui.research_preview_label") });
+      this.hoverResearch = {
+        path,
+        block: research,
+        summary: research.createDiv("vam-hover-research-summary"),
+        detail: research.createDiv("vam-hover-research-detail")
+      };
+      this.paintHoverResearch();
+    }
+    const content = preview.createDiv("vam-hover-markdown");
     void MarkdownRenderer.render(this.app, note.preview || t("ui.no_preview_content_yet"), content, path, this);
     const host = workspace.getBoundingClientRect(),
       rect = card.getBoundingClientRect();
@@ -9290,7 +9418,21 @@ export class VisualAgentMapView extends ItemView {
     if (overrides?.signal?.aborted) controller.abort();
     else overrides?.signal?.addEventListener("abort", abortFromTaskModal, { once: true });
     this.plugin.activeTasks.set(taskPath, controller);
+    // Stage, seconds and the unsaved preview of this run; an attempt id from the service replaces the placeholder.
+    const progress = this.plugin.researchProgress;
+    let progressAttempt = "starting";
+    progress?.begin(taskPath, progressAttempt, Date.now());
+    const observer: ResearchObserver = {
+      onAttempt: id => {
+        progressAttempt = id;
+        progress?.newAttempt(taskPath, id, Date.now());
+      },
+      onStage: (id, stage, query) => progress?.stage(taskPath, id, stage, Date.now(), query),
+      onPreview: (id, fields) => progress?.preview(taskPath, id, fields ?? {}),
+      onSlow: (id, slow, resend) => progress?.markSlow(taskPath, id, slow, resend)
+    };
     const releaseStartup = (): void => {
+      progress?.end(taskPath, progressAttempt);
       overrides?.signal?.removeEventListener("abort", abortFromTaskModal);
       if (this.plugin.activeTasks.get(taskPath) === controller) this.plugin.activeTasks.delete(taskPath);
       this.plugin.running.delete(taskPath);
@@ -9341,10 +9483,14 @@ export class VisualAgentMapView extends ItemView {
         id => {
           exchangeId = id;
         },
-        markAccepted
+        markAccepted,
+        undefined,
+        observer
       )
       .then(result =>
         this.plugin.mutate(async () => {
+          // The answer is final (or about to be dropped): the unsaved preview goes away before anything is written.
+          progress?.end(taskPath, progressAttempt);
           const latest = await this.plugin.repo.readNote(node.path, this.map ?? undefined);
           const stale =
             latest.thinkingOrigin !== note.thinkingOrigin ||
@@ -9428,6 +9574,7 @@ export class VisualAgentMapView extends ItemView {
       )
       .catch(error =>
         this.plugin.mutate(async () => {
+          progress?.end(taskPath, progressAttempt);
           if (controller.signal.aborted || (error instanceof Error && error.name === "AbortError")) {
             await this.plugin.repo.updateNote(node.path, { status: note.status });
             if (failed) failed(t("ui.research_stopped_existing_content_was_preserved"));
@@ -9451,6 +9598,7 @@ export class VisualAgentMapView extends ItemView {
         })
       )
       .finally(() => {
+        progress?.end(taskPath, progressAttempt);
         overrides?.signal?.removeEventListener("abort", abortFromTaskModal);
         if (this.plugin.activeTasks.get(taskPath) === controller) this.plugin.activeTasks.delete(taskPath);
         this.plugin.running.delete(taskPath);

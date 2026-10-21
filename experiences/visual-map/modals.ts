@@ -1104,16 +1104,21 @@ export class NextStepModal extends Modal {
     shallow.checked = false;
     shallowLabel.createSpan({ text: t("ui.run_shallow_research_on_each_created_subtopic") });
     // Shallow research on new subtopics is deliberately Quick: it is a first look at many topics, not a full study.
-    const shallowHint = adjustFor.expand.createEl("p", {
-      cls: "vam-hint",
-      text: t("ui.shallow_research_for_expanded_subtopics_0", researchDepthDescription("fast"))
-    });
+    // Subtopic research does not search the web unless the box below is ticked, and the hint says which applies.
+    const shallowHintText = (): string =>
+      t(
+        "ui.shallow_research_for_expanded_subtopics_0",
+        shallowWeb.checked ? researchDepthDescription("fast") : t("ui.shallow_research_local_description")
+      );
+    const shallowHint = adjustFor.expand.createEl("p", { cls: "vam-hint" });
     shallowHint.hidden = true;
     const shallowWebLabel = adjustFor.expand.createEl("label", { cls: "vam-field vam-next-toggle" });
     const shallowWeb = shallowWebLabel.createEl("input", { type: "checkbox" });
     shallowWeb.checked = false;
     shallowWebLabel.createSpan({ text: t("ui.shallow_research_web_search") });
     shallowWebLabel.hidden = true;
+    shallowHint.setText(shallowHintText());
+    shallowWeb.addEventListener("change", () => shallowHint.setText(shallowHintText()));
     const expandFooterText = actions.createSpan({
       text: t("ui.create_subtopics_after_confirmation_without_running_research"),
       cls: "vam-next-actions-note"

@@ -40,6 +40,8 @@ export interface AiRuntimeServiceOptions {
 export class AiRuntimeService {
   private codexRuntime: CodexAppServerRuntime | null = null;
   private localCodexRuntime: CodexAppServerRuntime | null = null;
+  /** One Claude runtime per executable and folder, so what it learns about the CLI (stream options) is remembered. */
+  private claudeRuntime: { key: string; runtime: ClaudeCodeCliRuntime } | null = null;
 
   constructor(private readonly options: AiRuntimeServiceOptions) {}
 
@@ -48,6 +50,7 @@ export class AiRuntimeService {
     this.localCodexRuntime?.stop();
     this.codexRuntime = null;
     this.localCodexRuntime = null;
+    this.claudeRuntime = null;
   }
 
   diagnostic(configured: string): { executable: string; installed: boolean } {
@@ -74,12 +77,16 @@ export class AiRuntimeService {
 
   claude(pluginDirectory: string): ClaudeCodeCliRuntime {
     const executable = this.resolveExecutable(this.options.claudePath());
-    return new ClaudeCodeCliRuntime({
+    const key = `${executable}\0${pluginDirectory}`;
+    if (this.claudeRuntime?.key === key) return this.claudeRuntime.runtime;
+    const runtime = new ClaudeCodeCliRuntime({
       executable,
       cwd: pluginDirectory,
       env: this.cliEnvironment(executable),
       onLog: (level, message) => this.options.onLog(level, message)
     });
+    this.claudeRuntime = { key, runtime };
+    return runtime;
   }
 
   resolveExecutable(configured: string): string {

@@ -201,13 +201,20 @@ test('Claude json mode reports usage, text before the StructuredOutput call and 
   const text = value => ({ type: 'assistant', parent_tool_use_id: null, message: { content: [{ type: 'text', text: value }] } });
   const tool = { type: 'assistant', parent_tool_use_id: null, message: { content: [{ type: 'tool_use', id: 't1', name: 'StructuredOutput', input: output }] } };
   const clean = await run([tool]);
-  assert.deepEqual(clean, [{ usage: { inputTokens: 120, outputTokens: 45 }, textBeforeTool: false, enforceRetry: false }]);
+  assert.deepEqual(clean, [{ usage: { inputTokens: 120, outputTokens: 45 }, textBeforeTool: false, textBeforeToolChars: 0, enforceRetry: false }]);
   const drafted = await run([text('{"summary":"S"}'), tool]);
   assert.equal(drafted[0].textBeforeTool, true); assert.equal(drafted[0].enforceRetry, false);
   const narration = await run([text('Let me search for that.'), tool]);
   assert.equal(narration[0].textBeforeTool, false, 'short search narration is not the answer');
   const summaryText = await run([text('Here is the result: "summary": "S"'), tool]);
   assert.equal(summaryText[0].textBeforeTool, true, 'text containing a summary field is the answer');
+  // R1: a Markdown prose answer (heading, or more than ~300 characters) before the tool call is an answer; short narration is not.
+  const heading = await run([text('### Core conclusions\nShort.'), tool]);
+  assert.equal(heading[0].textBeforeTool, true, 'a Markdown heading line is answer text');
+  const prose = await run([text('Plain prose without markers. '.repeat(14)), tool]);
+  assert.equal(prose[0].textBeforeTool, true); assert.ok(prose[0].textBeforeToolChars > 300);
+  const narrationChars = await run([text('Let me search for that.'), tool]);
+  assert.equal(narrationChars[0].textBeforeToolChars, 'Let me search for that.'.length);
   const afterTool = await run([tool, text('Done.')]);
   assert.equal(afterTool[0].textBeforeTool, false, 'text after the tool call is not a draft');
   const enforced = await run([text(' '), tool, { type: 'user', parent_tool_use_id: null, message: { content: [{ type: 'text', text: '<system-reminder>structured-output-enforce: call the tool</system-reminder>' }] } }, tool]);
@@ -216,4 +223,133 @@ test('Claude json mode reports usage, text before the StructuredOutput call and 
   assert.equal(subagent[0].textBeforeTool, false, 'only the main agent counts');
   const none = await run([]);
   assert.deepEqual(none, [{ usage: { inputTokens: 120, outputTokens: 45 } }], 'no StructuredOutput call in the transcript: no claim about text before it');
+});
+
+// ---- Segment B: stream-json observation with synthetic JSONL fixtures ----
+const streamHarness = () => {
+  const { EventEmitter } = require('node:events');
+  const output = { summary: 'Synthetic summary', detail: 'Line one\nLine two', suggestions: [], visualReferences: [] };
+  const sys = { type: 'system', subtype: 'init' };
+  const ev = event => ({ type: 'stream_event', event });
+  const start = (index, block) => ev({ type: 'content_block_start', index, content_block: block });
+  const delta = (index, d) => ev({ type: 'content_block_delta', index, delta: d });
+  const json = (index, partial) => delta(index, { type: 'input_json_delta', partial_json: partial });
+  const stop = index => ev({ type: 'content_block_stop', index });
+  const tool = (id, name) => start(0, { type: 'tool_use', id, name, input: {} });
+  const assistantTool = (id, name, input) => ({ type: 'assistant', parent_tool_use_id: null, message: { content: [{ type: 'tool_use', id, name, input }] } });
+  const result = (extra = {}) => ({ type: 'result', subtype: 'success', is_error: false, structured_output: output, usage: { input_tokens: 10, output_tokens: 5 }, ...extra });
+  const toolResult = (id, extra = {}) => ({ type: 'user', parent_tool_use_id: null, message: { content: [{ type: 'tool_result', tool_use_id: id, content: 'ok', ...extra }] } });
+  const structuredCall = id => [ev({ type: 'message_start' }), tool(id, 'StructuredOutput'), json(0, '{"summary":"Syn'), json(0, 'thetic summary","detail":"Line one\\n'), json(0, 'Line two"}'), stop(0), assistantTool(id, 'StructuredOutput', output)];
+  const run = async (chunks, controls = {}, { runtime, code = 0, stderr = '' } = {}) => {
+    const spawns = [];
+    const spawn = (_exe, args) => {
+      const child = new EventEmitter(); child.stdout = new EventEmitter(); child.stderr = new EventEmitter(); child.kill = () => true;
+      const mine = { args, prompt: '' }; spawns.push(mine);
+      child.stdin = { on() {}, end: (text, done) => { mine.prompt = text; done?.(); process.nextTick(() => {
+        const lines = typeof chunks === 'function' ? chunks(spawns.length) : chunks;
+        const body = lines.map(line => typeof line === 'string' ? line : JSON.stringify(line)).join('\n') + '\n';
+        if (Array.isArray(lines) && lines.length) for (let i = 0; i < body.length; i += 37) child.stdout.emit('data', Buffer.from(body.slice(i, i + 37)));
+        if (mine.stderr || (typeof stderr === 'function' ? stderr(spawns.length) : stderr)) child.stderr.emit('data', Buffer.from(typeof stderr === 'function' ? stderr(spawns.length) : stderr));
+        child.emit('close', typeof code === 'function' ? code(spawns.length) : code);
+      }); } };
+      return child;
+    };
+    const { ClaudeCodeCliRuntime } = load('ai/runtime/claude-code-cli.ts', { 'node:child_process': { spawn } });
+    const rt = runtime ?? new ClaudeCodeCliRuntime({ executable: 'claude', cwd: '/plugin', env: {}, spawn, onLog: (level, message) => logs.push([level, message]) });
+    const logs = [], stages = [], deltas = [], milestones = [], modes = []; let firstEvents = 0;
+    const raw = await rt.runTask('p', 'sonnet', 'low', { type: 'object' }, { stream: true, onStage: (stage, query) => stages.push([stage, query]), onStructuredDelta: fields => deltas.push(fields && JSON.parse(JSON.stringify(fields))), onFirstEvent: () => { firstEvents++; }, onMilestones: data => milestones.push(JSON.parse(JSON.stringify(data))), onStreamMode: mode => modes.push(mode), ...controls }).catch(error => { error.spawns = spawns; throw error; });
+    return { raw, spawns, stages, deltas, milestones, firstEvents, modes, logs, rt };
+  };
+  return { output, sys, ev, start, delta, json, stop, tool, assistantTool, result, toolResult, structuredCall, run, EventEmitter, spawnRuntime: () => null };
+};
+
+test('Claude stream-json: a normal observed call reports the first model event, writing stage and the growing preview', async () => {
+  const h = streamHarness();
+  const out = await h.run([h.sys, ...h.structuredCall('so1'), h.result()]);
+  const args = out.spawns[0].args;
+  assert.equal(args[args.indexOf('--output-format') + 1], 'stream-json');
+  assert.ok(args.includes('--include-partial-messages') && args.includes('--verbose'));
+  assert.deepEqual(JSON.parse(out.raw), h.output, 'the result comes from the result record');
+  assert.equal(out.firstEvents, 1, 'the CLI init line is not a model event');
+  assert.deepEqual(out.stages, [['writing', undefined]]);
+  assert.deepEqual(out.deltas[0], { summaryComplete: false, detailComplete: false }, 'a StructuredOutput start resets the preview');
+  assert.ok(out.deltas.some(d => d && d.summary === 'Synthetic summary' && d.summaryComplete));
+  const last = out.deltas.at(-1); assert.equal(last.detail, 'Line one\nLine two'); assert.equal(last.detailComplete, true);
+  assert.deepEqual(out.modes, ['stream-json']);
+  const m = out.milestones[0];
+  assert.equal(m.stream, 'stream-json'); assert.equal(m.structuredCalls, 1); assert.ok(m.firstEventAt && m.structuredStartAt && m.previewSummaryAt && m.acceptedAt);
+  assert.deepEqual(m.stages.map(item => item.stage), ['writing']); assert.deepEqual(m.usage, { inputTokens: 10, outputTokens: 5 });
+  assert.equal(m.textBeforeTool, false); assert.equal(m.enforceRetry, false); assert.equal(out.milestones.length, 1, 'milestones are reported once');
+});
+
+test('Claude stream-json: answer text before the tool call, a rejected call (retraction) and the enforce retry', async () => {
+  const h = streamHarness();
+  const prose = 'Synthetic prose that restates the answer before calling the tool. '.repeat(6);
+  const lines = [
+    h.sys, h.ev({ type: 'message_start' }), h.start(0, { type: 'text', text: '' }), h.delta(0, { type: 'text_delta', text: prose }), h.stop(0),
+    ...h.structuredCall('so1').slice(1), h.toolResult('so1', { is_error: true, content: 'validation failed' }),
+    { type: 'user', parent_tool_use_id: null, message: { content: [{ type: 'text', text: '<system-reminder>structured-output-enforce: call the tool</system-reminder>' }] } },
+    ...h.structuredCall('so2'), h.result()
+  ];
+  const out = await h.run(lines);
+  assert.deepEqual(JSON.parse(out.raw), h.output);
+  const nullIndex = out.deltas.indexOf(null);
+  assert.ok(nullIndex > 0, 'an is_error tool_result clears the preview');
+  assert.deepEqual(out.deltas[nullIndex + 1], { summaryComplete: false, detailComplete: false }, 'the new call starts from nothing');
+  assert.equal(out.deltas.at(-1).summary, 'Synthetic summary');
+  const m = out.milestones[0];
+  assert.equal(m.textBeforeTool, true); assert.ok(m.textBeforeToolChars > 300); assert.equal(m.structuredCalls, 2); assert.equal(m.enforceRetry, true); assert.ok(m.firstTextAt);
+});
+
+test('Claude stream-json: WebSearch then WebFetch report searching with the query, reading and writing, and the searches', async () => {
+  const h = streamHarness();
+  const lines = [
+    h.sys, h.ev({ type: 'message_start' }), h.tool('ws1', 'WebSearch'), h.json(0, '{"query":"synthetic'), h.json(0, ' query"}'), h.stop(0), h.assistantTool('ws1', 'WebSearch', { query: 'synthetic query' }), h.toolResult('ws1'),
+    h.ev({ type: 'message_start' }), h.tool('wf1', 'WebFetch'), h.json(0, '{"url":"https://example.org/a"}'), h.stop(0), h.assistantTool('wf1', 'WebFetch', { url: 'https://example.org/a' }), h.toolResult('wf1', { is_error: true }),
+    ...h.structuredCall('so1'), h.result()
+  ];
+  const events = [];
+  const out = await h.run(lines, { webSearch: true, webSearchOnly: true, onWebSearchEvent: event => events.push(event.method) });
+  assert.deepEqual(out.stages, [['searching', undefined], ['searching', 'synthetic query'], ['reading', undefined], ['writing', undefined]]);
+  const m = out.milestones[0];
+  assert.deepEqual(m.stages.map(item => item.stage), ['searching', 'reading', 'writing']);
+  assert.equal(m.searches.length, 2);
+  assert.equal(m.searches[0].kind, 'search'); assert.equal(m.searches[0].query, 'synthetic query'); assert.ok(m.searches[0].completedAt); assert.equal(m.searches[0].failed, undefined);
+  assert.equal(m.searches[1].kind, 'openPage'); assert.equal(m.searches[1].failed, true);
+  assert.deepEqual(events, ['item/started', 'item/completed', 'item/started'], 'web telemetry keeps its Codex shape; the failed fetch is not a retrieval');
+});
+
+test('Claude stream-json: a line that cannot be read stops stage and preview updates but the result is still taken', async () => {
+  const h = streamHarness();
+  const lines = [h.sys, h.ev({ type: 'message_start' }), h.tool('so1', 'StructuredOutput'), h.json(0, '{"summary":"Part'), '{ this is not json', h.json(0, 'ial"}'), h.tool('ws9', 'WebSearch'), h.result()];
+  const out = await h.run(lines);
+  assert.deepEqual(JSON.parse(out.raw), h.output);
+  assert.equal(out.deltas.at(-1), null, 'the preview is cleared and stays cleared');
+  assert.deepEqual(out.stages, [['writing', undefined]], 'no stage after the bad line');
+  assert.deepEqual(out.milestones[0].usage, { inputTokens: 10, outputTokens: 5 });
+});
+
+test('Claude stream-json: a CLI that rejects the stream flags at boot is run once in json mode and remembered', async () => {
+  const h = streamHarness();
+  const jsonBody = [{ type: 'system', subtype: 'init' }, h.result()];
+  const first = await h.run(count => (count === 1 ? [] : [JSON.stringify(jsonBody)]), {}, { code: count => (count === 1 ? 1 : 0), stderr: count => (count === 1 ? "error: unknown option '--include-partial-messages'" : '') });
+  assert.equal(first.spawns.length, 2);
+  assert.equal(first.spawns[0].args[first.spawns[0].args.indexOf('--output-format') + 1], 'stream-json');
+  assert.equal(first.spawns[1].args[first.spawns[1].args.indexOf('--output-format') + 1], 'json');
+  assert.ok(!first.spawns[1].args.includes('--include-partial-messages'));
+  assert.deepEqual(JSON.parse(first.raw), h.output);
+  assert.deepEqual(first.modes, ['stream-json', 'json-fallback']);
+  assert.equal(first.milestones.at(-1).stream, 'json-fallback');
+  assert.ok(first.logs.some(([level, message]) => level === 'warn' && /stream/i.test(message)), 'the fallback is logged');
+  // The same runtime remembers: the next call goes straight to json.
+  const modes = [];
+  const again = await first.rt.runTask('p', 'sonnet', 'low', { type: 'object' }, { stream: true, onStreamMode: mode => modes.push(mode) });
+  assert.deepEqual(JSON.parse(again), h.output); assert.deepEqual(modes, ['json']);
+});
+
+test('Claude stream-json: a model-side failure is not mistaken for rejected flags and is not rerun', async () => {
+  const h = streamHarness();
+  const out = await h.run([h.sys, h.ev({ type: 'message_start' }), { type: 'result', subtype: 'error_during_execution', is_error: true, errors: ['synthetic model failure'] }], {}, { code: 1, stderr: 'mentions --output-format in a hint' }).catch(error => error);
+  assert.equal(out.spawns.length, 1, 'a failure that produced a result record is not rerun');
+  assert.match(String(out.message), /--output-format/);
 });

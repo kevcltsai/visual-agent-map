@@ -479,3 +479,151 @@ integrationTest('count repair takes only the detail: first summary, suggestions 
   assert.deepEqual(plain(result.visualReferences.map(v => v.imageUrl)), ['https://example.com/pic.jpg']);
   assert.deepEqual(plain(result.formatIssues), []);
 });
+
+// ---- Segment B: observed main call, first-event watchdog and user re-send (fake clock, fake runtime) ----
+function fakeClock() {
+  const clock = { time: 0, timers: new Map(), next: 1 };
+  clock.now = () => clock.time;
+  clock.setTimeout = (callback, ms) => { const id = clock.next++; clock.timers.set(id, { at: clock.time + ms, callback }); return id; };
+  clock.clearTimeout = id => { clock.timers.delete(id); };
+  clock.advance = ms => {
+    const target = clock.time + ms;
+    for (;;) {
+      const due = [...clock.timers.entries()].filter(([, timer]) => timer.at <= target).sort((a, b) => a[1].at - b[1].at)[0];
+      if (!due) break;
+      clock.timers.delete(due[0]); clock.time = due[1].at; due[1].callback();
+    }
+    clock.time = target;
+  };
+  return clock;
+}
+function observedHarness({ attempts, logging = true } = {}) {
+  const { AiTaskService } = load('core/ai-task-service.ts');
+  const clock = fakeClock();
+  const calls = [];
+  const events = [];
+  const entries = new Map();
+  const exchanges = {
+    begin: entry => entries.set(entry.id, { ...entry, status: 'preparing' }),
+    sent: id => { entries.get(id).status = 'sent'; }, received: id => { entries.get(id).status = 'received'; },
+    parsed: id => { entries.get(id).status = 'parsed'; }, completed: id => { entries.get(id).status = 'completed'; },
+    failed: (id, error) => { Object.assign(entries.get(id), { status: 'failed', error }); },
+    milestones: (id, data) => { entries.get(id).milestones = JSON.parse(JSON.stringify(data)); }
+  };
+  const answer = JSON.stringify({ summary: 'Synthetic summary', detail: 'Synthetic detail', suggestions: [], visualReferences: [] });
+  const service = new AiTaskService({
+    pluginDirectory: () => '/plugin', language: () => 'en', defaultReasoning: () => 'low', exchangeLoggingEnabled: () => logging, exchanges: () => exchanges, clock,
+    codexRuntime: () => { throw new Error('unexpected provider'); },
+    claudeRuntime: () => ({ runTask: (prompt, model, effort, schema, controls) => { const call = { prompt, controls, number: calls.length + 1 }; calls.push(call); return attempts(call); } })
+  });
+  const observer = {
+    onAttempt: (id, number) => events.push(['attempt', number]), onStage: (id, stage, query) => events.push(['stage', stage, query]),
+    onPreview: (id, fields) => events.push(['preview', fields]), onSlow: (id, slow, resend) => { events.push(['slow', slow]); observer.resend = resend; }
+  };
+  const context = { title: 'Synthetic topic', summary: '', rules: '', detail: '', task: 'Research the synthetic topic', ancestors: '', mode: 'task', researchMode: 'local', researchDepth: 'fast', visualMode: 'off' };
+  const ask = (signal, accepted) => service.askModel(context, 'claude:sonnet', 'low', signal, undefined, accepted, undefined, observer);
+  const waitFor = async predicate => { for (let i = 0; i < 200 && !predicate(); i++) await new Promise(resolve => setImmediate(resolve)); assert.ok(predicate(), 'condition reached'); };
+  return { clock, calls, events, entries, observer, ask, answer, waitFor };
+}
+const abortOn = (signal, ignore = false) => new Promise((resolve, reject) => { if (!ignore) signal.addEventListener('abort', () => reject(Object.assign(new Error('cancelled'), { name: 'AbortError' }))); });
+
+test('S3: 20 s without a model event shows the slow notice; re-send replaces the attempt with the same prompt and nothing from the old one counts', async () => {
+  const h = observedHarness({ attempts: call => {
+    call.controls.onStreamMode?.('stream-json'); call.controls.onAccepted();
+    if (call.number === 1) return abortOn(call.controls.signal);
+    call.controls.onFirstEvent(); call.controls.onStage('writing'); call.controls.onStructuredDelta({ summary: 'Syn', summaryComplete: false, detailComplete: false });
+    return Promise.resolve(h.answer);
+  } });
+  let accepted = 0;
+  const done = h.ask(undefined, () => { accepted++; });
+  await h.waitFor(() => h.calls.length === 1);
+  assert.equal(h.calls[0].controls.stream, true, 'an observed call asks for stream mode');
+  h.clock.advance(19_999); assert.deepEqual(h.events.filter(e => e[0] === 'slow'), [], 'not before 20 s');
+  h.clock.advance(1); assert.deepEqual(h.events.filter(e => e[0] === 'slow'), [['slow', true]]);
+  const first = h.calls[0];
+  h.observer.resend();
+  const result = await done;
+  assert.equal(result.summary, 'Synthetic summary');
+  assert.equal(h.calls.length, 2); assert.equal(h.calls[1].prompt, first.prompt, 'the same prompt is sent again');
+  assert.ok(first.controls.signal.aborted && !h.calls[1].controls.signal.aborted);
+  assert.deepEqual(h.events.filter(e => e[0] === 'attempt'), [['attempt', 1], ['attempt', 2]]);
+  assert.ok(accepted >= 1);
+  // A late event from the replaced attempt reaches nobody.
+  const before = h.events.length;
+  first.controls.onStage('searching', 'late'); first.controls.onStructuredDelta({ summary: 'OLD' }); first.controls.onFirstEvent();
+  assert.equal(h.events.length, before);
+  const [one, two] = [...h.entries.values()];
+  assert.equal(one.status, 'failed'); assert.match(one.error, /Resent by the user|使用者重新送出/);
+  assert.equal(one.milestones.resentAs, two.id); assert.ok(one.milestones.slowShownAt); assert.ok(one.milestones.acceptedAt);
+  assert.equal(two.milestones.resendOf, one.id); assert.equal(two.milestones.resentAs, undefined); assert.ok(two.milestones.firstEventAt);
+  assert.notEqual(two.status, 'failed');
+  // The new attempt's timer is its own: nothing fires once the first event arrived.
+  h.clock.advance(60_000); assert.equal(h.events.filter(e => e[0] === 'slow').length, 1);
+});
+
+test('S3: the first event cancels the notice, and a notice already shown disappears when the event arrives', async () => {
+  let release;
+  const h = observedHarness({ attempts: call => { call.controls.onStreamMode?.('stream-json'); call.controls.onAccepted(); return new Promise(resolve => { release = () => resolve(h.answer); call.release = release; }); } });
+  const done = h.ask();
+  await h.waitFor(() => h.calls.length === 1);
+  h.clock.advance(10_000); h.calls[0].controls.onFirstEvent(); h.clock.advance(60_000);
+  assert.deepEqual(h.events.filter(e => e[0] === 'slow'), [], 'an early first event means no notice');
+  release(); await done;
+  const slow = observedHarness({ attempts: call => { call.controls.onStreamMode?.('stream-json'); call.controls.onAccepted(); return new Promise(resolve => { call.release = () => resolve(slow.answer); }); } });
+  const second = slow.ask(); await slow.waitFor(() => slow.calls.length === 1);
+  slow.clock.advance(20_000); slow.calls[0].controls.onStage('searching', 'q');
+  assert.deepEqual(slow.events.filter(e => e[0] === 'slow'), [['slow', true], ['slow', false]]);
+  assert.deepEqual(slow.events.filter(e => e[0] === 'stage'), [['stage', 'searching', 'q']]);
+  slow.calls[0].release(); await second;
+  assert.equal([...slow.entries.values()][0].milestones.slowShownAt !== undefined, true);
+});
+
+test('S3: json mode has no model events to wait for, so no notice is raised', async () => {
+  const h = observedHarness({ attempts: call => { call.controls.onStreamMode?.('json'); call.controls.onAccepted(); return new Promise(resolve => { call.release = () => resolve(h.answer); }); } });
+  const done = h.ask(); await h.waitFor(() => h.calls.length === 1);
+  h.clock.advance(120_000); assert.deepEqual(h.events.filter(e => e[0] === 'slow'), []);
+  h.calls[0].release(); await done;
+});
+
+test('S3: Stop wins over re-send, also when both happen together; the old exchange is not resent', async () => {
+  const h = observedHarness({ attempts: call => { call.controls.onStreamMode?.('stream-json'); call.controls.onAccepted(); return abortOn(call.controls.signal); } });
+  const stop = new AbortController();
+  const done = h.ask(stop.signal);
+  const outcome = done.then(() => 'resolved', error => error.name);
+  await h.waitFor(() => h.calls.length === 1);
+  h.clock.advance(20_000);
+  h.observer.resend(); stop.abort();
+  assert.equal(await outcome, 'AbortError');
+  assert.equal(h.calls.length, 1, 'no attempt starts after Stop');
+  const later = observedHarness({ attempts: call => { call.controls.onStreamMode?.('stream-json'); call.controls.onAccepted(); return abortOn(call.controls.signal); } });
+  const stopLater = new AbortController(); const doneLater = later.ask(stopLater.signal); const outcomeLater = doneLater.then(() => 'resolved', error => error.name);
+  await later.waitFor(() => later.calls.length === 1); later.clock.advance(20_000);
+  stopLater.abort(); later.observer.resend();
+  assert.equal(await outcomeLater, 'AbortError'); assert.equal(later.calls.length, 1);
+});
+
+test('S3: a runtime that ignores the abort cannot hold up the re-send, and its late result is discarded', async () => {
+  const h = observedHarness({ attempts: call => {
+    call.controls.onStreamMode?.('stream-json'); call.controls.onAccepted();
+    if (call.number === 1) return new Promise(resolve => { call.late = () => resolve(JSON.stringify({ summary: 'OLD', detail: 'OLD', suggestions: [], visualReferences: [] })); });
+    return Promise.resolve(h.answer);
+  } });
+  const done = h.ask(); await h.waitFor(() => h.calls.length === 1);
+  h.clock.advance(20_000); h.observer.resend();
+  assert.equal((await done).summary, 'Synthetic summary');
+  h.calls[0].late();
+  await new Promise(resolve => setImmediate(resolve));
+});
+
+test('S3: there is no automatic re-send and only the main call is observed', async () => {
+  const h = observedHarness({ attempts: call => { call.controls.onStreamMode?.('stream-json'); call.controls.onAccepted(); return new Promise(resolve => { call.release = () => resolve(h.answer); }); } });
+  const done = h.ask(); await h.waitFor(() => h.calls.length === 1);
+  h.clock.advance(10 * 60_000);
+  assert.equal(h.calls.length, 1, 'waiting never sends again by itself');
+  h.calls[0].release(); await done;
+  // A call without an observer is a plain call: no stream request, no accepted wrapper needed.
+  const { AiTaskService } = load('core/ai-task-service.ts'); let controls;
+  const plain = new AiTaskService({ pluginDirectory: () => '/plugin', language: () => 'en', defaultReasoning: () => 'low', exchangeLoggingEnabled: () => false, exchanges: () => null, codexRuntime: () => { throw new Error('x'); }, claudeRuntime: () => ({ runTask: async (_p, _m, _e, _s, c) => { controls = c; return h.answer; } }) });
+  await plain.askModel({ title: 'T', summary: '', rules: '', detail: '', task: 'Research', ancestors: '', mode: 'task', researchMode: 'local', researchDepth: 'fast', visualMode: 'off' }, 'claude:sonnet', 'low');
+  assert.equal(controls.stream, undefined);
+});

@@ -1046,6 +1046,7 @@ var english = {
   "ui.web_and_image_searches_share_the_search_limit_search_counts": "There is no fixed query or source count. Continue while a useful search could resolve a decision-relevant uncertainty; stop when evidence is sufficient or further searches have low expected value.",
   "ui.search_for_image_references": "Search for image references",
   "ui.shallow_research_for_expanded_subtopics_0": "Quick research: {0}",
+  "ui.shallow_research_local_description": "Answers from the topic and the sources you provide, without searching the web. Tick the box below to search.",
   "ui.select_the_parent_topic_before_its_child": "Select the parent topic before its child.",
   "ui.first_level_topic_names_must_be_unique": "First-level topic names must be unique.",
   "ui.ai_proposed_duplicate_first_level_names_generate_the_proposa": "AI proposed duplicate first-level names. Generate the proposals again.",
@@ -1573,6 +1574,18 @@ var english = {
   "log.codex_search_callback_failed_0": "Native search event callback failed: {0}",
   "log.codex_search_stop_undelivered_0": "The stop-searching reminder was not delivered: {0}",
   "log.claude_starting_0_1": "Starting Claude Code: {0} --print ({1})",
+  "ui.research_stage_waiting": "Waiting for the model",
+  "ui.research_stage_searching": "Searching",
+  "ui.research_stage_searching_0": "Searching: {0}",
+  "ui.research_stage_reading": "Reading sources",
+  "ui.research_stage_writing": "Writing",
+  "ui.research_stage_charts": "Adding diagrams",
+  "ui.research_slow_waiting": "Responding slowly, still waiting",
+  "ui.research_resend": "Resend",
+  "ui.research_preview_label": "Preview (not saved yet)",
+  "ui.stop_adding_charts": "Stop adding diagrams",
+  "log.research_resent_by_user": "Resent by the user; this attempt was replaced and its reply, if any, was discarded.",
+  "log.claude_stream_fallback": "This Claude Code version does not accept the stream options; using json output instead.",
   "log.claude_web_search_available": "web search available",
   "log.claude_vam_context_only": "only VAM-provided content",
   "log.operation_failed_0": "Operation failed: {0}",
@@ -2636,6 +2649,7 @@ var traditionalChinese = {
   "ui.web_and_image_searches_share_the_search_limit_search_counts": "\u641C\u5C0B\u6B21\u6578\u8207\u4F86\u6E90\u6578\u6C92\u6709\u56FA\u5B9A\u4E0A\u9650\u3002\u53EA\u8981\u5408\u7406\u7684\u65B0\u641C\u5C0B\u4ECD\u53EF\u80FD\u89E3\u6C7A\u6703\u5F71\u97FF\u5224\u65B7\u7684\u4E0D\u78BA\u5B9A\u6027\uFF0C\u5C31\u7E7C\u7E8C\u67E5\u8B49\uFF1B\u8B49\u64DA\u8DB3\u5920\u6216\u5F8C\u7E8C\u641C\u5C0B\u9810\u671F\u50F9\u503C\u504F\u4F4E\u6642\u505C\u6B62\u3002",
   "ui.search_for_image_references": "\u641C\u5C0B\u5716\u7247\u53C3\u8003",
   "ui.shallow_research_for_expanded_subtopics_0": "\u5FEB\u901F\u7814\u7A76\uFF1A{0}",
+  "ui.shallow_research_local_description": "\u4F9D\u4E3B\u984C\u8207\u4F60\u63D0\u4F9B\u7684\u4F86\u6E90\u56DE\u7B54\uFF0C\u4E0D\u641C\u5C0B\u7DB2\u8DEF\u3002\u52FE\u9078\u4E0B\u65B9\u9078\u9805\u624D\u6703\u641C\u5C0B\u3002",
   "ui.select_the_parent_topic_before_its_child": "\u8ACB\u5148\u52FE\u9078\u5B50\u8B70\u984C\u7684\u6BCD\u8B70\u984C\u3002",
   "ui.first_level_topic_names_must_be_unique": "\u7B2C\u4E00\u5C64\u5B50\u8B70\u984C\u540D\u7A31\u4E0D\u80FD\u91CD\u8907\u3002",
   "ui.ai_proposed_duplicate_first_level_names_generate_the_proposa": "AI \u63D0\u6848\u7684\u7B2C\u4E00\u5C64\u540D\u7A31\u91CD\u8907\uFF0C\u8ACB\u91CD\u65B0\u7522\u751F\u63D0\u6848\u3002",
@@ -3163,6 +3177,18 @@ var traditionalChinese = {
   "log.codex_search_callback_failed_0": "\u539F\u751F\u641C\u5C0B\u4E8B\u4EF6\u56DE\u547C\u5931\u6557\uFF1A{0}",
   "log.codex_search_stop_undelivered_0": "\u641C\u5C0B\u505C\u6B62\u63D0\u9192\u672A\u9001\u9054\uFF1A{0}",
   "log.claude_starting_0_1": "\u555F\u52D5 Claude Code\uFF1A{0} --print ({1})",
+  "ui.research_stage_waiting": "\u7B49\u5F85\u6A21\u578B",
+  "ui.research_stage_searching": "\u641C\u5C0B\u4E2D",
+  "ui.research_stage_searching_0": "\u641C\u5C0B\u4E2D\uFF1A{0}",
+  "ui.research_stage_reading": "\u95B1\u8B80\u4F86\u6E90",
+  "ui.research_stage_writing": "\u64B0\u5BEB\u4E2D",
+  "ui.research_stage_charts": "\u52A0\u5165\u5716\u8868\u4E2D",
+  "ui.research_slow_waiting": "\u56DE\u61C9\u8F03\u6162\uFF0C\u4ECD\u5728\u7B49\u5F85",
+  "ui.research_resend": "\u91CD\u65B0\u9001\u51FA",
+  "ui.research_preview_label": "\u9810\u89BD\uFF08\u5C1A\u672A\u5BEB\u5165\uFF09",
+  "ui.stop_adding_charts": "\u505C\u6B62\u52A0\u5165\u5716\u8868",
+  "log.research_resent_by_user": "\u4F7F\u7528\u8005\u91CD\u65B0\u9001\u51FA\uFF1B\u6B64\u6B21\u5617\u8A66\u5DF2\u88AB\u53D6\u4EE3\uFF0C\u5176\u56DE\u8986\uFF08\u82E5\u6709\uFF09\u5DF2\u6368\u68C4\u3002",
+  "log.claude_stream_fallback": "\u6B64\u7248\u672C\u7684 Claude Code \u4E0D\u63A5\u53D7\u4E32\u6D41\u53C3\u6578\uFF1B\u6539\u7528 json \u8F38\u51FA\u3002",
   "log.claude_web_search_available": "\u7DB2\u8DEF\u641C\u5C0B\u53EF\u7528",
   "log.claude_vam_context_only": "\u50C5\u4F7F\u7528 VAM \u63D0\u4F9B\u7684\u5167\u5BB9",
   "log.operation_failed_0": "\u64CD\u4F5C\u5931\u6557\uFF1A{0}",
@@ -19960,16 +19986,19 @@ var NextStepModal = class extends import_obsidian21.Modal {
     const shallow = shallowLabel.createEl("input", { type: "checkbox" });
     shallow.checked = false;
     shallowLabel.createSpan({ text: t("ui.run_shallow_research_on_each_created_subtopic") });
-    const shallowHint = adjustFor.expand.createEl("p", {
-      cls: "vam-hint",
-      text: t("ui.shallow_research_for_expanded_subtopics_0", researchDepthDescription("fast"))
-    });
+    const shallowHintText = () => t(
+      "ui.shallow_research_for_expanded_subtopics_0",
+      shallowWeb.checked ? researchDepthDescription("fast") : t("ui.shallow_research_local_description")
+    );
+    const shallowHint = adjustFor.expand.createEl("p", { cls: "vam-hint" });
     shallowHint.hidden = true;
     const shallowWebLabel = adjustFor.expand.createEl("label", { cls: "vam-field vam-next-toggle" });
     const shallowWeb = shallowWebLabel.createEl("input", { type: "checkbox" });
     shallowWeb.checked = false;
     shallowWebLabel.createSpan({ text: t("ui.shallow_research_web_search") });
     shallowWebLabel.hidden = true;
+    shallowHint.setText(shallowHintText());
+    shallowWeb.addEventListener("change", () => shallowHint.setText(shallowHintText()));
     const expandFooterText = actions.createSpan({
       text: t("ui.create_subtopics_after_confirmation_without_running_research"),
       cls: "vam-next-actions-note"
@@ -20975,7 +21004,9 @@ function runtimeStepProvider(options) {
         onExchange,
         finish = "completed",
         requestLog = "request-and-prompt",
-        afterReply
+        afterReply,
+        exchangeId,
+        extraMilestones
       } = call.controls;
       const started = options.exchanges();
       const exchanges = {
@@ -21005,9 +21036,13 @@ function runtimeStepProvider(options) {
       const writeMilestones = () => {
         if (milestonesWritten) return;
         milestonesWritten = true;
+        try {
+          Object.assign(milestones, { ...extraMilestones == null ? void 0 : extraMilestones(), ...milestones });
+        } catch (e) {
+        }
         if (Object.keys(milestones).length) exchanges.milestones(id, milestones);
       };
-      const id = (0, import_node_crypto6.randomUUID)();
+      const id = exchangeId != null ? exchangeId : (0, import_node_crypto6.randomUUID)();
       started == null ? void 0 : started.begin({
         id,
         startedAt: (/* @__PURE__ */ new Date()).toISOString(),
@@ -27991,13 +28026,13 @@ function mergeTitleFromResult(result, fallback) {
   return name && name.length <= MERGE_TITLE_MAX ? name : fallback;
 }
 var MergeTopicsModal = class extends import_obsidian28.Modal {
-  constructor(app, count, value, submit, cancelled = () => {
+  constructor(app, count, value, submit, cancelled2 = () => {
   }, ai, parentName) {
     super(app);
     this.count = count;
     this.value = value;
     this.submit = submit;
-    this.cancelled = cancelled;
+    this.cancelled = cancelled2;
     this.ai = ai;
     this.parentName = parentName;
     __publicField(this, "submitted", false);
@@ -28223,6 +28258,14 @@ var VisualAgentMapView = class _VisualAgentMapView extends import_obsidian29.Ite
     __publicField(this, "viewportTimer", null);
     __publicField(this, "hoverTimer", null);
     __publicField(this, "hoverCard", null);
+    /** The unsaved-answer block of the open hover card, repainted as the preview grows. */
+    __publicField(this, "hoverResearch", null);
+    __publicField(this, "unsubscribeResearch", null);
+    /** What each card last showed of its research progress; a different signature means the card must be redrawn. */
+    __publicField(this, "researchSigs", /* @__PURE__ */ new Map());
+    __publicField(this, "researchElapsed", /* @__PURE__ */ new Map());
+    __publicField(this, "researchTick", null);
+    __publicField(this, "researchRenderTimer", null);
     __publicField(this, "integrationMode", false);
     __publicField(this, "dragging", false);
     /** Ends the drag in progress (listeners, pending frame, flag); set only while a card is being dragged. */
@@ -28316,20 +28359,22 @@ var VisualAgentMapView = class _VisualAgentMapView extends import_obsidian29.Ite
     await super.setState(state, result);
   }
   async onOpen() {
-    var _a, _b, _c;
+    var _a, _b, _c, _d, _e, _f;
     this.closed = false;
+    (_a = this.unsubscribeResearch) == null ? void 0 : _a.call(this);
+    this.unsubscribeResearch = (_c = (_b = this.plugin.researchProgress) == null ? void 0 : _b.subscribe((path) => this.onResearchProgress(path))) != null ? _c : null;
     const epoch = ++this.aimViewEpoch;
     this.mapOpenEpoch++;
     this.contentEl.addClass("vam-view");
     this.contentEl.tabIndex = 0;
-    this.registerDomEvent((_a = this.contentEl.win) != null ? _a : window, "keydown", (event) => {
+    this.registerDomEvent((_d = this.contentEl.win) != null ? _d : window, "keydown", (event) => {
       if (event.code === "Space" && !(event.target instanceof HTMLElement && event.target.closest("input, textarea, select, [contenteditable=true]")))
         this.spaceHeld = true;
     });
-    this.registerDomEvent((_b = this.contentEl.win) != null ? _b : window, "keyup", (event) => {
+    this.registerDomEvent((_e = this.contentEl.win) != null ? _e : window, "keyup", (event) => {
       if (event.code === "Space") this.spaceHeld = false;
     });
-    this.registerDomEvent((_c = this.contentEl.win) != null ? _c : window, "blur", () => {
+    this.registerDomEvent((_f = this.contentEl.win) != null ? _f : window, "blur", () => {
       this.spaceHeld = false;
     });
     this.registerDomEvent(this.contentEl, "keydown", (event) => {
@@ -28378,10 +28423,18 @@ var VisualAgentMapView = class _VisualAgentMapView extends import_obsidian29.Ite
     }
   }
   async onClose() {
-    var _a, _b, _c;
+    var _a, _b, _c, _d;
     this.closed = true;
+    (_a = this.unsubscribeResearch) == null ? void 0 : _a.call(this);
+    this.unsubscribeResearch = null;
+    if (this.researchTick !== null) window.clearInterval(this.researchTick);
+    if (this.researchRenderTimer !== null) window.clearTimeout(this.researchRenderTimer);
+    this.researchTick = this.researchRenderTimer = null;
+    this.researchElapsed.clear();
+    this.researchSigs.clear();
+    this.hoverResearch = null;
     this.plugin.releaseOutline(this);
-    (_a = this.relevancePanelCleanup) == null ? void 0 : _a.call(this);
+    (_b = this.relevancePanelCleanup) == null ? void 0 : _b.call(this);
     this.relevancePanelCleanup = null;
     this.abortRelevanceGrade();
     for (const task of this.synthesisTasks.values()) if (task.state === "running") task.controller.abort();
@@ -28402,8 +28455,8 @@ var VisualAgentMapView = class _VisualAgentMapView extends import_obsidian29.Ite
     this.stopAimProgress();
     if (this.refreshTimer !== null) window.clearTimeout(this.refreshTimer);
     if (this.hoverTimer !== null) window.clearTimeout(this.hoverTimer);
-    (_b = this.hoverCard) == null ? void 0 : _b.remove();
-    (_c = this.dragCleanup) == null ? void 0 : _c.call(this);
+    (_c = this.hoverCard) == null ? void 0 : _c.remove();
+    (_d = this.dragCleanup) == null ? void 0 : _d.call(this);
     if (this.viewportTimer !== null) {
       window.clearTimeout(this.viewportTimer);
       this.viewportTimer = null;
@@ -30929,6 +30982,74 @@ ${request.requirements}` : preset.text,
       y += 120;
     }
   }
+  researchSig(progress) {
+    var _a;
+    return progress ? [progress.stage, (_a = progress.query) != null ? _a : "", progress.slow ? 1 : 0, progress.resend ? 1 : 0].join("|") : "";
+  }
+  researchStageText(progress) {
+    switch (progress.stage) {
+      case "searching":
+        return progress.query ? t("ui.research_stage_searching_0", progress.query) : t("ui.research_stage_searching");
+      case "reading":
+        return t("ui.research_stage_reading");
+      case "writing":
+        return t("ui.research_stage_writing");
+      case "charts":
+        return t("ui.research_stage_charts");
+      default:
+        return t("ui.research_stage_waiting");
+    }
+  }
+  researchElapsedText(startedAt) {
+    const seconds = Math.max(0, Math.round((Date.now() - startedAt) / 1e3));
+    const clock = `${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, "0")}`;
+    return t("ui.aim_stage_with_elapsed_0_1", "", clock);
+  }
+  trackResearchElapsed(element, startedAt) {
+    this.researchElapsed.set(element, startedAt);
+    if (this.researchTick === null) this.researchTick = window.setInterval(() => this.tickResearch(), 1e3);
+  }
+  /** One-second tick: rewrite only the elapsed texts, never the cards; stops when none is left on screen. */
+  tickResearch() {
+    for (const [element, startedAt] of [...this.researchElapsed]) {
+      if (this.closed || !element.isConnected) this.researchElapsed.delete(element);
+      else element.setText(this.researchElapsedText(startedAt));
+    }
+    if (!this.researchElapsed.size && this.researchTick !== null) {
+      window.clearInterval(this.researchTick);
+      this.researchTick = null;
+    }
+  }
+  onResearchProgress(path) {
+    var _a;
+    if (this.closed || !this.map || !this.stageEl) return;
+    if (!this.map.nodes.some((node) => node.path === path)) return;
+    this.paintHoverResearch();
+    if (this.researchSig(this.plugin.researchProgress.get(path)) !== ((_a = this.researchSigs.get(path)) != null ? _a : ""))
+      this.scheduleResearchRender();
+  }
+  scheduleResearchRender() {
+    if (this.researchRenderTimer !== null) return;
+    this.researchRenderTimer = window.setTimeout(() => {
+      var _a;
+      this.researchRenderTimer = null;
+      if (this.closed) return;
+      const typing = this.contentEl.contains(document.activeElement) && ((_a = document.activeElement) == null ? void 0 : _a.matches("input, textarea, select"));
+      if (this.dragging || typing) this.scheduleResearchRender();
+      else this.renderPreservingFocus();
+    }, 150);
+  }
+  /** Plain text only (never Markdown): the answer being written, which nothing has saved yet. */
+  paintHoverResearch() {
+    var _a, _b, _c, _d;
+    const hover = this.hoverResearch;
+    if (!hover || !this.hoverCard) return;
+    const preview = (_b = (_a = this.plugin.researchProgress) == null ? void 0 : _a.get(hover.path)) == null ? void 0 : _b.preview;
+    hover.block.hidden = !preview;
+    hover.summary.setText((_c = preview == null ? void 0 : preview.summary) != null ? _c : "");
+    hover.detail.setText((_d = preview == null ? void 0 : preview.detailTail) != null ? _d : "");
+    hover.detail.hidden = !(preview == null ? void 0 : preview.detailTail);
+  }
   renderResearchProgress(parent) {
     var _a, _b;
     const nodes = (_b = (_a = this.map) == null ? void 0 : _a.nodes) != null ? _b : [];
@@ -33137,7 +33258,7 @@ ${request.requirements}` : preset.text,
   }
   /** `shownNode` may be a display copy (sorted by relevance): it only supplies where the card is drawn. */
   renderNode(shownNode) {
-    var _a, _b, _c, _d, _e, _f, _g, _h, _i, _j, _k, _l, _m, _n, _o, _p, _q, _r, _s, _t, _u, _v, _w, _x, _y, _z, _A, _B, _C, _D, _E, _F, _G, _H, _I, _J, _K, _L, _M, _N, _O, _P;
+    var _a, _b, _c, _d, _e, _f, _g, _h, _i, _j, _k, _l, _m, _n, _o, _p, _q, _r, _s, _t, _u, _v, _w, _x, _y, _z, _A, _B, _C, _D, _E, _F, _G, _H, _I, _J, _K, _L, _M, _N, _O, _P, _Q;
     if (!this.stageEl) return;
     const node = (_b = (_a = this.map) == null ? void 0 : _a.nodes.find((item) => item.id === shownNode.id)) != null ? _b : shownNode;
     const note = this.notes.get(node.id), card = this.stageEl.createDiv({
@@ -33185,7 +33306,10 @@ ${request.requirements}` : preset.text,
       });
     }
     const batch = this.plugin.expansionBatches.get(node.path);
-    const active = merging || ((_h = this.plugin.running) == null ? void 0 : _h.has(node.path)) || ((_i = this.plugin.quickExpandPending) == null ? void 0 : _i.has(node.path)) || this.startingTasks.has(node.path);
+    const research = this.builtIn ? void 0 : (_h = this.plugin.researchProgress) == null ? void 0 : _h.get(node.path);
+    if (research) this.researchSigs.set(node.path, this.researchSig(research));
+    else this.researchSigs.delete(node.path);
+    const active = merging || ((_i = this.plugin.running) == null ? void 0 : _i.has(node.path)) || ((_j = this.plugin.quickExpandPending) == null ? void 0 : _j.has(node.path)) || this.startingTasks.has(node.path);
     const doc = this.map, aimData = doc == null ? void 0 : doc.aim;
     const aimProgress = !!aimData && (node.aimKind === "question" || node.aimKind === "topic" && aimData.branches.some((branch) => branch.questionNodeId === node.id && !branch.parentBranchId));
     if (doc && aimData && aimProgress) {
@@ -33202,18 +33326,32 @@ ${request.requirements}` : preset.text,
         cls: `vam-status vam-aim-question-status vam-status-${status === "running" ? "running" : status === "completed" ? "completed" : status === "not_started" ? "idea" : "error"}`,
         text: status === "not_started" && aimData.branches.some((branch) => branch.questionNodeId === node.id) ? t("ui.aim_answered_not_started") : t(key2[status])
       });
-    } else if (!node.aimKind || active || queued || !note || note.status !== "completed") {
-      const statusText = merging ? t("ui.merging") : active ? t("ui.ai_running") : queued ? t("ui.research_queued") : (note == null ? void 0 : note.status) === "completed" ? t("ui.researched") : note ? topicStatusLabel(note.status, this.plugin.settings.language) : t("ui.note_missing");
-      if (!note || note.status !== "completed" || active || queued) {
+    } else if (!node.aimKind || active || queued || !note || note.status !== "completed" || research) {
+      const statusText = research ? this.researchStageText(research) : merging ? t("ui.merging") : active ? t("ui.ai_running") : queued ? t("ui.research_queued") : (note == null ? void 0 : note.status) === "completed" ? t("ui.researched") : note ? topicStatusLabel(note.status, this.plugin.settings.language) : t("ui.note_missing");
+      if (research) {
+        const chip = header.createSpan({ cls: "vam-status vam-status-running" });
+        const stageEl = chip.createSpan({ cls: "vam-research-stage", text: statusText });
+        stageEl.setAttr("role", "status");
+        stageEl.setAttr("aria-live", "polite");
+        stageEl.setAttr("title", statusText);
+        const elapsedEl = chip.createSpan({
+          cls: "vam-research-elapsed",
+          text: this.researchElapsedText(research.startedAt)
+        });
+        elapsedEl.setAttr("aria-hidden", "true");
+        this.trackResearchElapsed(elapsedEl, research.startedAt);
+        if (research.slow)
+          header.createSpan({ cls: "vam-status vam-research-slow", text: t("ui.research_slow_waiting") }).setAttr("role", "status");
+      } else if (!note || note.status !== "completed" || active || queued) {
         const chip = header.createSpan({
-          cls: `vam-status vam-status-${active ? "running" : queued ? "queued" : (_j = note == null ? void 0 : note.status) != null ? _j : "error"}`,
+          cls: `vam-status vam-status-${active ? "running" : queued ? "queued" : (_k = note == null ? void 0 : note.status) != null ? _k : "error"}`,
           text: statusText
         });
         if (active) chip.setAttr("role", "status");
       }
       if (note) this.labelCard(card, t("ui.topic_card_label_0_1", note.title, statusText));
     }
-    const relevance = !node.aimKind && !((_k = this.map) == null ? void 0 : _k.aim) && !this.builtIn ? note == null ? void 0 : note.relevance : void 0;
+    const relevance = !node.aimKind && !((_l = this.map) == null ? void 0 : _l.aim) && !this.builtIn ? note == null ? void 0 : note.relevance : void 0;
     if (relevance) {
       const tierLabel = t(RELEVANCE_LABEL[relevance.tier]);
       card.dataset.relevance = relevance.tier;
@@ -33225,23 +33363,23 @@ ${request.requirements}` : preset.text,
           tierLabel,
           t("ui.relevance_tag_label_0", tierLabel),
           (button) => this.openRelevanceMenu(node, relevance.tier, button),
-          ((_l = this.plugin.relevanceGrades.get(this.path)) == null ? void 0 : _l.status) === "running"
+          ((_m = this.plugin.relevanceGrades.get(this.path)) == null ? void 0 : _m.status) === "running"
         ),
         reasonText
       );
       card.setAttr("aria-description", t("ui.relevance_description_0_1", tierLabel, reasonText));
-      const named = (_m = cardLabels.get(card)) == null ? void 0 : _m.textContent;
+      const named = (_n = cardLabels.get(card)) == null ? void 0 : _n.textContent;
       if (named) this.labelCard(card, t("ui.topic_card_label_0_1", named, tierLabel));
     }
     const errorDetails = [];
-    if ((_n = note == null ? void 0 : note.detailFormatIssues) == null ? void 0 : _n.length) {
+    if ((_o = note == null ? void 0 : note.detailFormatIssues) == null ? void 0 : _o.length) {
       const issue = header.createSpan({ cls: "vam-status vam-status-error", text: t("ui.detail_format_unmet") });
       issue.setAttr("title", note.detailFormatIssues.join("\n"));
       errorDetails.push(...note.detailFormatIssues);
     }
     if (batch) {
-      const currentNode = batch.currentPath ? (_o = this.map) == null ? void 0 : _o.nodes.find((item) => item.path === batch.currentPath) : void 0;
-      const currentTitle = currentNode ? (_p = this.notes.get(currentNode.id)) == null ? void 0 : _p.title : void 0;
+      const currentNode = batch.currentPath ? (_p = this.map) == null ? void 0 : _p.nodes.find((item) => item.path === batch.currentPath) : void 0;
+      const currentTitle = currentNode ? (_q = this.notes.get(currentNode.id)) == null ? void 0 : _q.title : void 0;
       const label = this.batchProgressLabel(
         t("ui.shallow_research_counts", batch.succeeded, batch.total),
         batch,
@@ -33264,9 +33402,9 @@ ${request.requirements}` : preset.text,
       this.renderRetryFailedButton(header, node.path, batch);
     }
     const ownSynthesis = this.synthesisTasks.get(node.path);
-    const parentNode = node.parentId ? (_q = this.map) == null ? void 0 : _q.nodes.find((item) => item.id === node.parentId) : void 0;
-    const batchChild = !!parentNode && !!((_r = this.plugin.expansionCoordinator) == null ? void 0 : _r.isRunning(parentNode.path));
-    const stoppable = this.startingTasks.has(node.path) || ((_s = this.plugin.quickExpandPending) == null ? void 0 : _s.has(node.path)) || ((_t = this.plugin.running) == null ? void 0 : _t.has(node.path)) && this.plugin.activeTasks.has(node.path) && !batchChild;
+    const parentNode = node.parentId ? (_r = this.map) == null ? void 0 : _r.nodes.find((item) => item.id === node.parentId) : void 0;
+    const batchChild = !!parentNode && !!((_s = this.plugin.expansionCoordinator) == null ? void 0 : _s.isRunning(parentNode.path));
+    const stoppable = this.startingTasks.has(node.path) || ((_t = this.plugin.quickExpandPending) == null ? void 0 : _t.has(node.path)) || ((_u = this.plugin.running) == null ? void 0 : _u.has(node.path)) && this.plugin.activeTasks.has(node.path) && !batchChild;
     if (stoppable && (batch == null ? void 0 : batch.status) !== "running" && !((ownSynthesis == null ? void 0 : ownSynthesis.state) === "running" && ownSynthesis.mapPath === this.path)) {
       this.button(
         header,
@@ -33277,22 +33415,29 @@ ${request.requirements}` : preset.text,
         }
       );
     }
-    const pendingCount = (_v = (_u = this.plugin.pendingSuggestions.get(node.path)) == null ? void 0 : _u.length) != null ? _v : 0;
-    if (pendingCount && !this.builtIn && !this.integrationMode && !((_w = this.map) == null ? void 0 : _w.aim))
+    if ((research == null ? void 0 : research.slow) && research.resend)
+      this.button(header, t("ui.research_resend"), () => {
+        var _a2, _b2;
+        return (_b2 = (_a2 = this.plugin.researchProgress.get(node.path)) == null ? void 0 : _a2.resend) == null ? void 0 : _b2.call(_a2);
+      });
+    if ((research == null ? void 0 : research.stage) === "charts")
+      this.button(header, t("ui.stop_adding_charts"), () => this.plugin.abortChartJobs(node.path));
+    const pendingCount = (_w = (_v = this.plugin.pendingSuggestions.get(node.path)) == null ? void 0 : _v.length) != null ? _w : 0;
+    if (pendingCount && !this.builtIn && !this.integrationMode && !((_x = this.map) == null ? void 0 : _x.aim))
       this.button(
         header,
         t("ui.view_0_expansion_suggestions", pendingCount),
         () => this.openNodePanel(node, "proposals")
       ).addClass("vam-badge-new");
     const waitingOutline = this.quickOutlines.get(node.path);
-    if (waitingOutline && waitingOutline.mapPath === this.path && !this.builtIn && !this.integrationMode && !((_x = this.map) == null ? void 0 : _x.aim))
+    if (waitingOutline && waitingOutline.mapPath === this.path && !this.builtIn && !this.integrationMode && !((_y = this.map) == null ? void 0 : _y.aim))
       this.button(
         header,
         t("ui.review_outline_0", outlineProposals(waitingOutline.nodes).length),
         () => this.openNextStep(node)
       ).addClass("vam-badge-new");
     const synthesis = this.synthesisTasks.get(node.path);
-    if (synthesis && synthesis.mapPath === this.path && !this.builtIn && !this.integrationMode && !((_y = this.map) == null ? void 0 : _y.aim)) {
+    if (synthesis && synthesis.mapPath === this.path && !this.builtIn && !this.integrationMode && !((_z = this.map) == null ? void 0 : _z.aim)) {
       if (synthesis.state === "running") {
         if (synthesis.progress) header.createSpan({ cls: "vam-status vam-status-running", text: synthesis.progress });
         this.button(header, t("ui.stop_research"), () => synthesis.controller.abort());
@@ -33328,7 +33473,7 @@ ${request.requirements}` : preset.text,
       collapse.setAttr("aria-expanded", String(!node.collapsed));
     }
     if (!this.builtIn && !this.integrationMode) {
-      if (!((_z = this.map) == null ? void 0 : _z.aim)) {
+      if (!((_A = this.map) == null ? void 0 : _A.aim)) {
         const structure = this.button(tools, t("ui.node_tool_links"), () => this.openNodePanel(node, "structure"));
         structure.addClass("vam-node-tool", "vam-structure-tool");
         structure.setAttr("aria-label", t("ui.structure_and_links"));
@@ -33354,7 +33499,7 @@ ${request.requirements}` : preset.text,
         remove.addClass("vam-node-tool", "vam-remove-tool");
         remove.setAttr("aria-label", t("ui.remove_from_map"));
       }
-      if (((_A = this.map) == null ? void 0 : _A.aim) && node.aimKind === "synthesis" && this.map.aim.branches.some((branch) => branch.results.some((result) => result.nodeId === node.id))) {
+      if (((_B = this.map) == null ? void 0 : _B.aim) && node.aimKind === "synthesis" && this.map.aim.branches.some((branch) => branch.results.some((result) => result.nodeId === node.id))) {
         const next = this.button(
           header,
           t("ui.aim_new_question"),
@@ -33366,7 +33511,7 @@ ${request.requirements}` : preset.text,
         next.setAttr("title", t("ui.aim_new_question_hint"));
       }
       const assumptions = node.aimKind === "conclusion" && note ? readOpenItems(note.detail) : [];
-      if (((_B = this.map) == null ? void 0 : _B.aim) && assumptions.length) {
+      if (((_C = this.map) == null ? void 0 : _C.aim) && assumptions.length) {
         const correct = this.button(
           header,
           t("ui.aim_correct_assumption"),
@@ -33378,7 +33523,7 @@ ${request.requirements}` : preset.text,
         correct.addClass("vam-node-tool", "vam-pinned-tool");
         correct.setAttr("title", t("ui.aim_correct_assumption_hint"));
       }
-      if (((_C = this.map) == null ? void 0 : _C.aim) && node.aimKind === "conclusion") {
+      if (((_D = this.map) == null ? void 0 : _D.aim) && node.aimKind === "conclusion") {
         const steer = this.button(
           header,
           t("ui.aim_steer"),
@@ -33397,25 +33542,25 @@ ${request.requirements}` : preset.text,
     details.addClass("vam-node-tool", "vam-detail-button");
     if (this.builtIn) details.setAttr("title", t("ui.view_sample_content"));
     else details.setAttr("aria-label", t("ui.open_details_in_right_sidebar"));
-    if (!this.builtIn && !this.integrationMode && !((_D = this.map) == null ? void 0 : _D.aim))
+    if (!this.builtIn && !this.integrationMode && !((_E = this.map) == null ? void 0 : _E.aim))
       this.button(tools, t("ui.ai_explore"), () => this.openNextStep(node)).addClass("vam-node-tool", "vam-ai-explore");
-    if (!this.builtIn && !this.integrationMode && !((_E = this.map) == null ? void 0 : _E.aim)) {
+    if (!this.builtIn && !this.integrationMode && !((_F = this.map) == null ? void 0 : _F.aim)) {
       const add = this.button(card, "+", () => this.enqueue(() => this.addNode(node)));
       add.addClass("vam-add-child");
       add.setAttr("aria-label", t("ui.add_subtopic_manually"));
     }
-    const title = card.createEl("h3", { text: (_F = note == null ? void 0 : note.title) != null ? _F : node.path, cls: "vam-card-title" });
-    title.setAttr("title", (_G = note == null ? void 0 : note.title) != null ? _G : node.path);
+    const title = card.createEl("h3", { text: (_G = note == null ? void 0 : note.title) != null ? _G : node.path, cls: "vam-card-title" });
+    title.setAttr("title", (_H = note == null ? void 0 : note.title) != null ? _H : node.path);
     if (!note || !isPlaceholder(note.summary))
       card.createEl("p", {
         cls: "vam-card-summary",
-        text: (_H = note == null ? void 0 : note.summary) != null ? _H : t("ui.the_file_was_moved_or_deleted_you_can_remove_this_node_from")
+        text: (_I = note == null ? void 0 : note.summary) != null ? _I : t("ui.the_file_was_moved_or_deleted_you_can_remove_this_node_from")
       });
     if (errorDetails.length) {
       const error = card.createEl("p", { cls: "vam-card-error", text: errorDetails[0] });
       error.setAttr("title", errorDetails.join("\n"));
     }
-    if (node.aimKind === "conclusion" && ((_I = this.map) == null ? void 0 : _I.aim) && !this.builtIn) {
+    if (node.aimKind === "conclusion" && ((_J = this.map) == null ? void 0 : _J.aim) && !this.builtIn) {
       const branch = this.map.aim.branches.find((item) => item.results.some((result) => result.nodeId === node.id));
       const hasFollowup = this.map.nodes.some((item) => item.parentId === node.id && item.aimKind === "question");
       if (branch && !hasFollowup && countAimAnsweredQuestions(this.map, branch.id) < MIN_ANSWERED_QUESTIONS_BEFORE_CONCLUSION) {
@@ -33428,7 +33573,7 @@ ${request.requirements}` : preset.text,
         ).addClass("mod-cta");
       }
     }
-    if (node.aimKind === "topic" && ((_J = this.map) == null ? void 0 : _J.aim) && !this.map.nodes.some((item) => item.aimKind === "question")) {
+    if (node.aimKind === "topic" && ((_K = this.map) == null ? void 0 : _K.aim) && !this.map.nodes.some((item) => item.aimKind === "question")) {
       const initialBranch = this.map.aim.branches.find((item) => item.questionNodeId === node.id && !item.parentBranchId);
       const initialRuns = initialBranch ? this.map.aim.runs.filter((item) => item.branchId === initialBranch.id) : [];
       const activeInitialRun = initialRuns.some((run) => {
@@ -33464,11 +33609,11 @@ ${request.requirements}` : preset.text,
         );
       }
     }
-    if (node.aimKind === "question" && ((_K = this.map) == null ? void 0 : _K.aim)) {
+    if (node.aimKind === "question" && ((_L = this.map) == null ? void 0 : _L.aim)) {
       const branch = this.map.aim.branches.find((item) => item.questionNodeId === node.id);
       if (branch) {
         this.renderAimFailure(card, branch);
-        const labels = (_M = (_L = node.aimQuestion) == null ? void 0 : _L.options.filter((option2) => branch.answerSnapshot.selections.includes(option2.id)).map((option2) => option2.label)) != null ? _M : branch.answerSnapshot.selections;
+        const labels = (_N = (_M = node.aimQuestion) == null ? void 0 : _M.options.filter((option2) => branch.answerSnapshot.selections.includes(option2.id)).map((option2) => option2.label)) != null ? _N : branch.answerSnapshot.selections;
         const answer = [...labels, branch.answerSnapshot.freeText].filter(Boolean).join(" \u2014 ");
         card.createEl("p", {
           cls: "vam-aim-answer-snapshot",
@@ -33511,11 +33656,11 @@ ${request.requirements}` : preset.text,
         }
       }
     }
-    if (node.aimKind === "answer" && ((_N = this.map) == null ? void 0 : _N.aim)) {
+    if (node.aimKind === "answer" && ((_O = this.map) == null ? void 0 : _O.aim)) {
       const branch = this.map.aim.branches.find((item) => item.answerNodeId === node.id);
       const question = branch && this.map.nodes.find((item) => item.id === branch.questionNodeId);
       if (branch) {
-        const labels = (_P = (_O = question == null ? void 0 : question.aimQuestion) == null ? void 0 : _O.options.filter((option2) => branch.answerSnapshot.selections.includes(option2.id)).map((option2) => option2.label)) != null ? _P : branch.answerSnapshot.selections;
+        const labels = (_Q = (_P = question == null ? void 0 : question.aimQuestion) == null ? void 0 : _P.options.filter((option2) => branch.answerSnapshot.selections.includes(option2.id)).map((option2) => option2.label)) != null ? _Q : branch.answerSnapshot.selections;
         const answer = [...labels, branch.answerSnapshot.freeText].filter(Boolean).join(" \u2014 ");
         card.createEl("p", {
           cls: "vam-aim-answer-snapshot",
@@ -33803,7 +33948,7 @@ ${request.requirements}` : preset.text,
     }, 220);
   }
   showHoverCard(card, note) {
-    var _a, _b, _c, _d;
+    var _a, _b, _c, _d, _e;
     const workspace = this.contentEl.querySelector(".vam-workspace");
     if (!workspace) return;
     (_a = this.hoverCard) == null ? void 0 : _a.remove();
@@ -33821,8 +33966,20 @@ ${request.requirements}` : preset.text,
     preview.addEventListener("mouseenter", () => this.clearHoverTimer());
     preview.addEventListener("mouseleave", () => this.hideHoverCardSoon());
     preview.createEl("strong", { text: note.title });
-    const content = preview.createDiv("vam-hover-markdown");
     const path = (_d = (_c = (_b = this.map) == null ? void 0 : _b.nodes.find((node) => node.id === card.dataset.nodeId)) == null ? void 0 : _c.path) != null ? _d : "";
+    this.hoverResearch = null;
+    if ((_e = this.plugin.researchProgress) == null ? void 0 : _e.get(path)) {
+      const research = preview.createDiv("vam-hover-research-preview");
+      research.createDiv({ cls: "vam-hover-label", text: t("ui.research_preview_label") });
+      this.hoverResearch = {
+        path,
+        block: research,
+        summary: research.createDiv("vam-hover-research-summary"),
+        detail: research.createDiv("vam-hover-research-detail")
+      };
+      this.paintHoverResearch();
+    }
+    const content = preview.createDiv("vam-hover-markdown");
     void import_obsidian29.MarkdownRenderer.render(this.app, note.preview || t("ui.no_preview_content_yet"), content, path, this);
     const host = workspace.getBoundingClientRect(), rect = card.getBoundingClientRect();
     const availableWidth = Math.max(180, host.width - 24);
@@ -34539,8 +34696,8 @@ ${request.requirements}` : preset.text,
       const partial = error instanceof PartialChildBatchError;
       const currentBatch = this.plugin.expansionBatches.get(parent.path);
       const stoppedBatch = currentBatch !== previousBatch && (currentBatch == null ? void 0 : currentBatch.status) === "stopped";
-      const cancelled = !partial && (controller.signal.aborted || stoppedBatch);
-      if (!cancelled) {
+      const cancelled2 = !partial && (controller.signal.aborted || stoppedBatch);
+      if (!cancelled2) {
         console.error("Visual Agent Map AI split", error);
         const message = this.plugin.recordFailure(t("log.ai_split_failed"), error);
         if (failed) failed(message, !partial);
@@ -36413,8 +36570,21 @@ ${note.detail.trim()}` : "",
     if ((_e = overrides == null ? void 0 : overrides.signal) == null ? void 0 : _e.aborted) controller.abort();
     else (_f = overrides == null ? void 0 : overrides.signal) == null ? void 0 : _f.addEventListener("abort", abortFromTaskModal, { once: true });
     this.plugin.activeTasks.set(taskPath, controller);
+    const progress = this.plugin.researchProgress;
+    let progressAttempt = "starting";
+    progress == null ? void 0 : progress.begin(taskPath, progressAttempt, Date.now());
+    const observer = {
+      onAttempt: (id) => {
+        progressAttempt = id;
+        progress == null ? void 0 : progress.newAttempt(taskPath, id, Date.now());
+      },
+      onStage: (id, stage, query) => progress == null ? void 0 : progress.stage(taskPath, id, stage, Date.now(), query),
+      onPreview: (id, fields) => progress == null ? void 0 : progress.preview(taskPath, id, fields != null ? fields : {}),
+      onSlow: (id, slow, resend) => progress == null ? void 0 : progress.markSlow(taskPath, id, slow, resend)
+    };
     const releaseStartup = () => {
       var _a2;
+      progress == null ? void 0 : progress.end(taskPath, progressAttempt);
       (_a2 = overrides == null ? void 0 : overrides.signal) == null ? void 0 : _a2.removeEventListener("abort", abortFromTaskModal);
       if (this.plugin.activeTasks.get(taskPath) === controller) this.plugin.activeTasks.delete(taskPath);
       this.plugin.running.delete(taskPath);
@@ -36462,10 +36632,13 @@ ${note.detail.trim()}` : "",
       (id) => {
         exchangeId = id;
       },
-      markAccepted
+      markAccepted,
+      void 0,
+      observer
     ).then(
       (result) => this.plugin.mutate(async () => {
         var _a2, _b2, _c2, _d2, _e2, _f2, _g, _h;
+        progress == null ? void 0 : progress.end(taskPath, progressAttempt);
         const latest = await this.plugin.repo.readNote(node.path, (_a2 = this.map) != null ? _a2 : void 0);
         const stale = latest.thinkingOrigin !== note.thinkingOrigin || latest.title !== note.title || latest.prompt !== note.prompt || latest.rules !== note.rules || latest.detail !== note.detail || latest.summary !== note.summary || latest.model !== note.model || latest.reasoning !== note.reasoning || latest.researchMode !== note.researchMode || latest.researchDepth !== note.researchDepth || latest.visualMode !== note.visualMode || latest.sourcePaths.join("\n") !== note.sourcePaths.join("\n") || JSON.stringify(latest.referencePaths) !== JSON.stringify(note.referencePaths);
         if (controller.signal.aborted || stale) {
@@ -36534,6 +36707,7 @@ ${note.detail.trim()}` : "",
     ).catch(
       (error) => this.plugin.mutate(async () => {
         var _a2, _b2;
+        progress == null ? void 0 : progress.end(taskPath, progressAttempt);
         if (controller.signal.aborted || error instanceof Error && error.name === "AbortError") {
           await this.plugin.repo.updateNote(node.path, { status: note.status });
           if (failed) failed(t("ui.research_stopped_existing_content_was_preserved"));
@@ -36553,6 +36727,7 @@ ${note.detail.trim()}` : "",
       })
     ).finally(() => {
       var _a2;
+      progress == null ? void 0 : progress.end(taskPath, progressAttempt);
       (_a2 = overrides == null ? void 0 : overrides.signal) == null ? void 0 : _a2.removeEventListener("abort", abortFromTaskModal);
       if (this.plugin.activeTasks.get(taskPath) === controller) this.plugin.activeTasks.delete(taskPath);
       this.plugin.running.delete(taskPath);
@@ -37232,7 +37407,7 @@ function groupRibbonIcons(map, coffee) {
 }
 
 // main.ts
-var import_node_crypto15 = require("node:crypto");
+var import_node_crypto16 = require("node:crypto");
 
 // core/thinking-core.ts
 var ThinkingCore = class {
@@ -37442,6 +37617,7 @@ var CodexAppServerRuntime = class {
         onRequest: controls == null ? void 0 : controls.onRequest,
         onText: controls == null ? void 0 : controls.onText,
         onWebSearchEvent: controls == null ? void 0 : controls.onWebSearchEvent,
+        onActivity: controls == null ? void 0 : controls.onActivity,
         generateImage: controls == null ? void 0 : controls.generateImage
       });
     });
@@ -37608,7 +37784,12 @@ var CodexAppServerRuntime = class {
     const threadId = typeof (params == null ? void 0 : params.threadId) === "string" ? params.threadId : "";
     const state = this.turns.get(threadId);
     if (!state) return;
+    if (!state.sawActivity) {
+      state.sawActivity = true;
+      this.reportActivity(state, "started");
+    }
     if (message.method === "item/agentMessage/delta" && typeof (params == null ? void 0 : params.delta) === "string") {
+      this.reportActivity(state, "writing");
       if (state.streamItem !== params.itemId) {
         state.streamItem = params.itemId;
         state.streamText = "";
@@ -37620,12 +37801,18 @@ var CodexAppServerRuntime = class {
     }
     if (message.method === "item/started") {
       const item = params == null ? void 0 : params.item;
-      if ((item == null ? void 0 : item.type) === "webSearch") this.forwardWebSearchEvent(state, message.method, params);
+      if ((item == null ? void 0 : item.type) === "webSearch") {
+        this.reportActivity(state, "searching");
+        this.forwardWebSearchEvent(state, message.method, params);
+      }
       return;
     }
     if (message.method === "item/completed") {
       const item = params == null ? void 0 : params.item;
-      if ((item == null ? void 0 : item.type) === "webSearch") this.forwardWebSearchEvent(state, message.method, params);
+      if ((item == null ? void 0 : item.type) === "webSearch") {
+        this.reportActivity(state, "reading");
+        this.forwardWebSearchEvent(state, message.method, params);
+      }
       if ((item == null ? void 0 : item.type) === "webSearch")
         state.webRetrievals.add(typeof item.id === "string" ? item.id : `web-${state.webRetrievals.size}`);
       if ((item == null ? void 0 : item.type) === "webSearch" && ((_c = item.action) == null ? void 0 : _c.type) === "search") {
@@ -37677,6 +37864,13 @@ var CodexAppServerRuntime = class {
             typeof ((_h = turn == null ? void 0 : turn.error) == null ? void 0 : _h.message) === "string" ? turn.error.message : t("ui.codex_turn_0", typeof (turn == null ? void 0 : turn.status) === "string" ? turn.status : t("ui.failed"))
           )
         );
+    }
+  }
+  reportActivity(state, activity) {
+    var _a;
+    try {
+      (_a = state.onActivity) == null ? void 0 : _a.call(state, activity);
+    } catch (e) {
     }
   }
   forwardWebSearchEvent(state, method, params) {
@@ -37780,6 +37974,393 @@ var CodexAppServerRuntime = class {
 
 // ai/runtime/claude-code-cli.ts
 var import_node_child_process2 = require("node:child_process");
+
+// ai/partial-structured.ts
+var isHex = (text11) => /^[0-9a-fA-F]{4}$/.test(text11);
+var isHigh = (code) => code >= 55296 && code <= 56319;
+var isLow = (code) => code >= 56320 && code <= 57343;
+var SIMPLE = { '"': '"', "\\": "\\", "/": "/", b: "\b", f: "\f", n: "\n", r: "\r", t: "	" };
+function decodeString(buffer, start) {
+  let value = "";
+  let i = start;
+  while (i < buffer.length) {
+    const char = buffer[i];
+    if (char === '"') return { value, end: i + 1, complete: true };
+    if (char !== "\\") {
+      value += char;
+      i++;
+      continue;
+    }
+    if (i + 1 >= buffer.length) break;
+    const next = buffer[i + 1];
+    if (next === "u") {
+      const hex = buffer.slice(i + 2, i + 6);
+      if (hex.length < 4 || !isHex(hex)) {
+        if (hex.length < 4 && /^[0-9a-fA-F]*$/.test(hex)) break;
+        value += "u";
+        i += 2;
+        continue;
+      }
+      const code = parseInt(hex, 16);
+      if (isHigh(code)) {
+        const rest = buffer.slice(i + 6, i + 12);
+        if (rest.length < 6) {
+          if ("\\u".startsWith(rest.slice(0, 2)) && /^[0-9a-fA-F]*$/.test(rest.slice(2))) break;
+          value += String.fromCharCode(code);
+          i += 6;
+          continue;
+        }
+        if (rest.startsWith("\\u") && isHex(rest.slice(2)) && isLow(parseInt(rest.slice(2), 16))) {
+          value += String.fromCharCode(code, parseInt(rest.slice(2), 16));
+          i += 12;
+          continue;
+        }
+      }
+      value += String.fromCharCode(code);
+      i += 6;
+      continue;
+    }
+    value += next in SIMPLE ? SIMPLE[next] : next;
+    i += 2;
+  }
+  return { value, end: buffer.length, complete: false };
+}
+function skipValue(buffer, start) {
+  let i = start;
+  let depth = 0;
+  while (i < buffer.length) {
+    const char = buffer[i];
+    if (char === '"') {
+      i++;
+      while (i < buffer.length && buffer[i] !== '"') i += buffer[i] === "\\" ? 2 : 1;
+      if (i >= buffer.length) return -1;
+      i++;
+      if (depth === 0) return i;
+      continue;
+    }
+    if (char === "{" || char === "[") depth++;
+    else if (char === "}" || char === "]") {
+      if (depth === 0) return i;
+      depth--;
+      if (depth === 0) return i + 1;
+    } else if (depth === 0 && char === ",") return i;
+    i++;
+  }
+  return -1;
+}
+var skipSpace = (buffer, from) => {
+  let i = from;
+  while (i < buffer.length && /\s/.test(buffer[i])) i++;
+  return i;
+};
+function partialFields(buffer) {
+  const out = { summaryComplete: false, detailComplete: false };
+  try {
+    if (typeof buffer !== "string") return out;
+    let i = skipSpace(buffer, 0);
+    if (buffer[i] !== "{") return out;
+    i++;
+    while (i < buffer.length) {
+      i = skipSpace(buffer, i);
+      if (buffer[i] === ",") {
+        i = skipSpace(buffer, i + 1);
+      }
+      if (i >= buffer.length || buffer[i] !== '"') break;
+      const key2 = decodeString(buffer, i + 1);
+      if (!key2.complete) break;
+      i = skipSpace(buffer, key2.end);
+      if (buffer[i] !== ":") break;
+      i = skipSpace(buffer, i + 1);
+      if (i >= buffer.length) break;
+      if ((key2.value === "summary" || key2.value === "detail") && buffer[i] === '"') {
+        const text11 = decodeString(buffer, i + 1);
+        if (key2.value === "summary") {
+          out.summary = text11.value;
+          out.summaryComplete = text11.complete;
+        } else {
+          out.detail = text11.value;
+          out.detailComplete = text11.complete;
+        }
+        if (!text11.complete) break;
+        i = text11.end;
+        continue;
+      }
+      const end = skipValue(buffer, i);
+      if (end < 0) break;
+      i = end;
+    }
+  } catch (e) {
+  }
+  return out;
+}
+var StructuredPreview = class {
+  constructor() {
+    __publicField(this, "buffer", "");
+    __publicField(this, "fields", partialFields(""));
+  }
+  start() {
+    this.buffer = "";
+    this.fields = partialFields("");
+  }
+  append(delta) {
+    this.buffer += delta;
+    this.fields = partialFields(this.buffer);
+  }
+  snapshot() {
+    return { ...this.fields };
+  }
+  reject() {
+    this.start();
+  }
+};
+
+// ai/runtime/claude-stream.ts
+function looksLikeAnswer(text11) {
+  const trimmed = text11.trim();
+  return trimmed.startsWith("{") || trimmed.includes('"summary"') || /^#{1,6} /m.test(trimmed);
+}
+var ANSWER_TEXT_CHARS = 300;
+var TEXT_KEEP_CHARS = 2e4;
+var ClaudeTranscriptFacts = class {
+  constructor(fromStream = false) {
+    this.fromStream = fromStream;
+    __publicField(this, "structured", false);
+    __publicField(this, "enforce", false);
+    __publicField(this, "usage");
+    __publicField(this, "texts", []);
+    __publicField(this, "kept", 0);
+  }
+  textStart() {
+    if (!this.structured) this.texts.push("");
+  }
+  textDelta(text11) {
+    if (this.structured || !this.texts.length || this.kept > TEXT_KEEP_CHARS) return;
+    this.texts[this.texts.length - 1] += text11;
+    this.kept += text11.length;
+  }
+  structuredStart() {
+    this.structured = true;
+  }
+  read(item) {
+    var _a, _b, _c, _d, _e;
+    if (!item || typeof item !== "object") return;
+    const record = item;
+    if (record.type === "result") {
+      const input = (_a = record.usage) == null ? void 0 : _a.input_tokens;
+      const output = (_b = record.usage) == null ? void 0 : _b.output_tokens;
+      if (typeof input === "number" || typeof output === "number")
+        this.usage = {
+          ...typeof input === "number" ? { inputTokens: input } : {},
+          ...typeof output === "number" ? { outputTokens: output } : {}
+        };
+      return;
+    }
+    if (record.parent_tool_use_id) return;
+    if (record.type === "assistant") {
+      for (const block of (_d = (_c = record.message) == null ? void 0 : _c.content) != null ? _d : []) {
+        if (block.type === "tool_use" && block.name === "StructuredOutput") this.structured = true;
+        else if (!this.fromStream && block.type === "text" && !this.structured && typeof block.text === "string") {
+          this.texts.push(block.text.slice(0, TEXT_KEEP_CHARS));
+        }
+      }
+    } else if (record.type === "user" && JSON.stringify((_e = record.message) != null ? _e : "").includes("structured-output-enforce"))
+      this.enforce = true;
+  }
+  milestones() {
+    const chars = this.texts.reduce((sum, text11) => sum + text11.trim().length, 0);
+    return {
+      ...this.usage ? { usage: this.usage } : {},
+      ...this.structured ? {
+        textBeforeTool: this.texts.some(looksLikeAnswer) || chars > ANSWER_TEXT_CHARS,
+        textBeforeToolChars: chars,
+        enforceRetry: this.enforce
+      } : {}
+    };
+  }
+};
+var LIST_LIMIT = 20;
+var QUERY_LIMIT = 200;
+var MODEL_RECORDS = /* @__PURE__ */ new Set(["stream_event", "assistant", "user", "result"]);
+var ClaudeStreamObserver = class {
+  constructor(hooks, now = () => (/* @__PURE__ */ new Date()).toISOString()) {
+    this.hooks = hooks;
+    this.now = now;
+    __publicField(this, "facts", new ClaudeTranscriptFacts(true));
+    __publicField(this, "preview", new StructuredPreview());
+    __publicField(this, "blocks", /* @__PURE__ */ new Map());
+    __publicField(this, "tools", /* @__PURE__ */ new Map());
+    __publicField(this, "milestoneData", { stream: "stream-json" });
+    __publicField(this, "stage", "");
+    __publicField(this, "structuredId", "");
+    __publicField(this, "stopped", false);
+  }
+  /** Records the moment the prompt was written. */
+  accepted() {
+    var _a, _b;
+    (_b = (_a = this.milestoneData).acceptedAt) != null ? _b : _a.acceptedAt = this.now();
+  }
+  /** Whether any record showed the model working. */
+  sawModel() {
+    return !!this.milestoneData.firstEventAt;
+  }
+  /** After a line that cannot be read: no more stage or preview updates, and the preview is cleared. */
+  stop() {
+    if (this.stopped) return;
+    this.stopped = true;
+    this.call(() => {
+      var _a, _b;
+      return (_b = (_a = this.hooks).onStructuredDelta) == null ? void 0 : _b.call(_a, null);
+    });
+  }
+  /** The records already read stay; the milestones of the finished call. */
+  milestones() {
+    return { ...this.milestoneData, ...this.facts.milestones() };
+  }
+  read(value) {
+    var _a, _b, _c, _d;
+    if (!value || typeof value !== "object") return;
+    const record = value;
+    if (record.parent_tool_use_id) return;
+    this.facts.read(record);
+    if (this.stopped) return;
+    if (typeof record.type === "string" && MODEL_RECORDS.has(record.type) && !this.milestoneData.firstEventAt) {
+      this.milestoneData.firstEventAt = this.now();
+      this.call(() => {
+        var _a2, _b2;
+        return (_b2 = (_a2 = this.hooks).onFirstEvent) == null ? void 0 : _b2.call(_a2);
+      });
+    }
+    if (record.type === "stream_event") this.event(record.event);
+    else if (record.type === "assistant") {
+      for (const block of (_b = (_a = record.message) == null ? void 0 : _a.content) != null ? _b : [])
+        if (block.type === "tool_use" && typeof block.id === "string" && typeof block.name === "string") {
+          this.toolStart(block.id, block.name);
+          this.toolInput(block.id, block.input);
+        }
+    } else if (record.type === "user") {
+      for (const block of (_d = (_c = record.message) == null ? void 0 : _c.content) != null ? _d : [])
+        if (block.type === "tool_result" && typeof block.tool_use_id === "string")
+          this.toolResult(block.tool_use_id, block.is_error === true);
+    }
+  }
+  event(event) {
+    var _a, _b;
+    if (!event) return;
+    if (event.type === "message_start") this.blocks.clear();
+    else if (event.type === "content_block_start" && typeof event.index === "number") {
+      const block = event.content_block;
+      if ((block == null ? void 0 : block.type) === "text") this.facts.textStart();
+      if ((block == null ? void 0 : block.type) === "tool_use" && typeof block.id === "string" && typeof block.name === "string") {
+        this.blocks.set(event.index, { id: block.id, name: block.name, json: "" });
+        this.toolStart(block.id, block.name);
+      }
+    } else if (event.type === "content_block_delta" && event.delta) {
+      if (event.delta.type === "text_delta") {
+        (_b = (_a = this.milestoneData).firstTextAt) != null ? _b : _a.firstTextAt = this.now();
+        if (typeof event.delta.text === "string") this.facts.textDelta(event.delta.text);
+      } else if (event.delta.type === "input_json_delta" && typeof event.delta.partial_json === "string" && typeof event.index === "number") {
+        const block = this.blocks.get(event.index);
+        if (!block) return;
+        block.json += event.delta.partial_json;
+        if (block.id !== this.structuredId) return;
+        this.preview.append(event.delta.partial_json);
+        const fields = this.preview.snapshot();
+        if (fields.summary && !this.milestoneData.previewSummaryAt) this.milestoneData.previewSummaryAt = this.now();
+        this.call(() => {
+          var _a2, _b2;
+          return (_b2 = (_a2 = this.hooks).onStructuredDelta) == null ? void 0 : _b2.call(_a2, fields);
+        });
+      }
+    } else if (event.type === "content_block_stop" && typeof event.index === "number") {
+      const block = this.blocks.get(event.index);
+      if (block && block.name !== "StructuredOutput" && block.json) {
+        try {
+          this.toolInput(block.id, JSON.parse(block.json));
+        } catch (e) {
+        }
+      }
+    }
+  }
+  toolStart(id, name) {
+    var _a, _b, _c, _d, _e;
+    if (this.tools.has(id)) return;
+    const at = this.now();
+    if (name === "WebSearch" || name === "WebFetch") {
+      const searches = (_b = (_a = this.milestoneData).searches) != null ? _b : _a.searches = [];
+      const entry = { name };
+      if (searches.length < LIST_LIMIT) {
+        searches.push({ kind: name === "WebSearch" ? "search" : "openPage", startedAt: at });
+        entry.search = searches.length - 1;
+      }
+      this.tools.set(id, entry);
+      this.setStage(name === "WebSearch" ? "searching" : "reading");
+    } else if (name === "StructuredOutput") {
+      this.tools.set(id, { name });
+      this.facts.structuredStart();
+      this.structuredId = id;
+      this.milestoneData.structuredCalls = ((_c = this.milestoneData.structuredCalls) != null ? _c : 0) + 1;
+      (_e = (_d = this.milestoneData).structuredStartAt) != null ? _e : _d.structuredStartAt = at;
+      this.preview.start();
+      this.call(() => {
+        var _a2, _b2;
+        return (_b2 = (_a2 = this.hooks).onStructuredDelta) == null ? void 0 : _b2.call(_a2, this.preview.snapshot());
+      });
+      this.setStage("writing");
+    } else this.tools.set(id, { name });
+  }
+  toolInput(id, input) {
+    var _a;
+    const tool = this.tools.get(id);
+    if (!tool || tool.name !== "WebSearch" || !input || typeof input !== "object") return;
+    const query = input.query;
+    if (typeof query !== "string" || !query.trim()) return;
+    const entry = tool.search === void 0 ? void 0 : (_a = this.milestoneData.searches) == null ? void 0 : _a[tool.search];
+    const text11 = query.trim().slice(0, QUERY_LIMIT);
+    if ((entry == null ? void 0 : entry.query) === text11) return;
+    if (entry) entry.query = text11;
+    if (this.stage === "searching") this.call(() => {
+      var _a2, _b;
+      return (_b = (_a2 = this.hooks).onStage) == null ? void 0 : _b.call(_a2, "searching", text11);
+    });
+  }
+  toolResult(id, failed) {
+    var _a;
+    const tool = this.tools.get(id);
+    if (!tool) return;
+    const entry = tool.search === void 0 ? void 0 : (_a = this.milestoneData.searches) == null ? void 0 : _a[tool.search];
+    if (entry) {
+      entry.completedAt = this.now();
+      if (failed) entry.failed = true;
+    }
+    if (tool.name === "WebSearch") this.setStage("reading");
+    else if (tool.name === "StructuredOutput" && failed && id === this.structuredId) {
+      this.preview.reject();
+      this.call(() => {
+        var _a2, _b;
+        return (_b = (_a2 = this.hooks).onStructuredDelta) == null ? void 0 : _b.call(_a2, null);
+      });
+    }
+  }
+  setStage(stage) {
+    var _a, _b;
+    if (this.stage === stage && stage !== "searching") return;
+    this.stage = stage;
+    const stages = (_b = (_a = this.milestoneData).stages) != null ? _b : _a.stages = [];
+    if (stages.length < LIST_LIMIT) stages.push({ stage, at: this.now() });
+    this.call(() => {
+      var _a2, _b2;
+      return (_b2 = (_a2 = this.hooks).onStage) == null ? void 0 : _b2.call(_a2, stage);
+    });
+  }
+  call(callback) {
+    try {
+      callback();
+    } catch (e) {
+    }
+  }
+};
+
+// ai/runtime/claude-code-cli.ts
 function claudeImageSource(dataUrl) {
   const match = /^data:(image\/(?:png|jpeg|gif|webp));base64,([A-Za-z0-9+/=]+)$/.exec(dataUrl);
   if (!match) throw new Error(t("ui.context_ai_image_unavailable"));
@@ -37832,43 +38413,11 @@ function claudeStructuredOutput(stdout, plainText = false) {
     throw new Error(t("ui.claude_did_not_return_structured_output"));
   return JSON.stringify(record.structured_output);
 }
-function looksLikeAnswer(text11) {
-  const trimmed = text11.trim();
-  return trimmed.startsWith("{") || trimmed.includes('"summary"');
-}
 function claudeTranscriptMilestones(transcript) {
-  var _a, _b, _c, _d, _e;
-  const milestones = {};
-  if (!Array.isArray(transcript)) return milestones;
-  let structured = false, textBefore = false, enforce = false;
-  for (const item of transcript) {
-    if (!item || typeof item !== "object") continue;
-    const record = item;
-    if (record.type === "result") {
-      const input = (_a = record.usage) == null ? void 0 : _a.input_tokens;
-      const output = (_b = record.usage) == null ? void 0 : _b.output_tokens;
-      if (typeof input === "number" || typeof output === "number")
-        milestones.usage = {
-          ...typeof input === "number" ? { inputTokens: input } : {},
-          ...typeof output === "number" ? { outputTokens: output } : {}
-        };
-      continue;
-    }
-    if (record.parent_tool_use_id) continue;
-    if (record.type === "assistant") {
-      for (const block of (_d = (_c = record.message) == null ? void 0 : _c.content) != null ? _d : []) {
-        if (block.type === "tool_use" && block.name === "StructuredOutput") structured = true;
-        else if (block.type === "text" && !structured && typeof block.text === "string" && looksLikeAnswer(block.text))
-          textBefore = true;
-      }
-    } else if (record.type === "user" && JSON.stringify((_e = record.message) != null ? _e : "").includes("structured-output-enforce"))
-      enforce = true;
-  }
-  if (structured) {
-    milestones.textBeforeTool = textBefore;
-    milestones.enforceRetry = enforce;
-  }
-  return milestones;
+  if (!Array.isArray(transcript)) return {};
+  const facts = new ClaudeTranscriptFacts();
+  for (const item of transcript) facts.read(item);
+  return facts.milestones();
 }
 var CLAUDE_STDOUT_LIMIT = 64 * 1024 * 1024;
 var ClaudeWebActivity = class {
@@ -37910,19 +38459,30 @@ function abortError2() {
   error.name = "AbortError";
   return error;
 }
+function streamFlagsRejected(stderr) {
+  return /unknown option|unrecognized (option|argument)|argument '[^']*' is invalid|--include-partial-messages|--output-format/i.test(
+    stderr
+  );
+}
 var ClaudeCodeCliRuntime = class {
   constructor(options) {
     this.options = options;
     __publicField(this, "spawn");
+    /** Set when this CLI rejected the stream flags at start-up; later observed calls use json mode straight away. */
+    __publicField(this, "streamUnsupported", false);
     var _a;
     this.spawn = (_a = options.spawn) != null ? _a : import_node_child_process2.spawn;
   }
-  async runTask(prompt, model, effort, outputSchema, controls = {}) {
-    var _a, _b, _c, _d, _e, _f;
+  runTask(prompt, model, effort, outputSchema, controls = {}) {
+    return this.run(prompt, model, effort, outputSchema, controls, false);
+  }
+  async run(prompt, model, effort, outputSchema, controls, fallback) {
+    var _a, _b, _c, _d, _e, _f, _g;
     if ((_a = controls.signal) == null ? void 0 : _a.aborted) throw abortError2();
     const webSearch = (_c = controls.webSearch) != null ? _c : ((_b = controls.searchBudget) != null ? _b : 0) > 0;
     const args = claudeTaskArgs(model, effort, outputSchema, webSearch);
     const image = controls.imageDataUrl ? claudeImageSource(controls.imageDataUrl) : null;
+    const observed = !!outputSchema && controls.stream === true && !image && !fallback && !this.streamUnsupported;
     if (controls.onText && !outputSchema) {
       args[args.indexOf("json")] = "stream-json";
       args.push("--include-partial-messages");
@@ -37930,8 +38490,17 @@ var ClaudeCodeCliRuntime = class {
     } else if (image) {
       args[args.indexOf("json")] = "stream-json";
       args.push("--input-format", "stream-json");
+    } else if (observed) {
+      args[args.indexOf("json")] = "stream-json";
+      args.push("--include-partial-messages");
     }
-    (_d = controls.onRequest) == null ? void 0 : _d.call(controls, {
+    if (outputSchema && controls.stream === true) {
+      try {
+        (_d = controls.onStreamMode) == null ? void 0 : _d.call(controls, observed ? "stream-json" : fallback ? "json-fallback" : "json");
+      } catch (e) {
+      }
+    }
+    (_e = controls.onRequest) == null ? void 0 : _e.call(controls, {
       provider: "claude",
       executable: this.options.executable,
       args: args.map(
@@ -37939,8 +38508,8 @@ var ClaudeCodeCliRuntime = class {
       ),
       input: image ? `<VAM prompt and ${image.media_type} image via stdin>` : "<VAM prompt via stdin>"
     });
-    (_f = (_e = this.options).onLog) == null ? void 0 : _f.call(
-      _e,
+    (_g = (_f = this.options).onLog) == null ? void 0 : _g.call(
+      _f,
       "info",
       t(
         "log.claude_starting_0_1",
@@ -37964,13 +38533,26 @@ var ClaudeCodeCliRuntime = class {
       }
       let stdout = "", stderr = "", settled = false, accepted = false, inputOpen = Boolean(controls.onSteer || image);
       let streamBuffer = "", streamText = "", currentText = "", finalResult = "";
-      const streaming = !!controls.onText && !outputSchema || !!image;
+      const streaming = !!controls.onText && !outputSchema || !!image || observed;
       const activity = new ClaudeWebActivity(controls.onWebSearchEvent);
+      const observer = observed ? new ClaudeStreamObserver({
+        onFirstEvent: controls.onFirstEvent,
+        onStage: controls.onStage,
+        onStructuredDelta: controls.onStructuredDelta
+      }) : null;
       const readStreamLine = (line) => {
-        var _a3, _b3, _c3, _d3, _e3, _f3, _g, _h;
+        var _a3, _b3, _c3, _d3, _e3, _f3, _g2, _h;
         if (!line.trim().startsWith("{")) return;
-        const parsedLine = JSON.parse(line);
+        let parsedLine;
+        try {
+          parsedLine = JSON.parse(line);
+        } catch (error) {
+          if (!observer) throw error;
+          observer.stop();
+          return;
+        }
         activity.read(parsedLine);
+        observer == null ? void 0 : observer.read(parsedLine);
         const record = parsedLine;
         if (record.parent_tool_use_id) return;
         if (record.type === "result") {
@@ -37991,7 +38573,7 @@ var ClaudeCodeCliRuntime = class {
           currentText = "";
           (_f3 = controls.onText) == null ? void 0 : _f3.call(controls, streamText);
         }
-        if (record.type === "assistant" && ((_g = record.message) == null ? void 0 : _g.content)) {
+        if (record.type === "assistant" && ((_g2 = record.message) == null ? void 0 : _g2.content)) {
           const complete = record.message.content.filter((item) => item.type === "text").map((item) => {
             var _a4;
             return (_a4 = item.text) != null ? _a4 : "";
@@ -38007,10 +38589,18 @@ var ClaudeCodeCliRuntime = class {
         window.clearTimeout(timeout);
         (_a3 = controls.signal) == null ? void 0 : _a3.removeEventListener("abort", onAbort);
       };
+      const reportMilestones = (data) => {
+        var _a3;
+        try {
+          if (Object.keys(data).length) (_a3 = controls.onMilestones) == null ? void 0 : _a3.call(controls, data);
+        } catch (e) {
+        }
+      };
       const finish = (error, result) => {
         if (settled) return;
         settled = true;
         cleanup();
+        if (observer) reportMilestones(observer.milestones());
         if (error) reject(error);
         else resolve(result != null ? result : "");
       };
@@ -38018,6 +38608,7 @@ var ClaudeCodeCliRuntime = class {
         var _a3, _b3;
         if (accepted || settled || ((_a3 = controls.signal) == null ? void 0 : _a3.aborted)) return;
         accepted = true;
+        observer == null ? void 0 : observer.accepted();
         (_b3 = controls.onAccepted) == null ? void 0 : _b3.call(controls);
       };
       let killTimer;
@@ -38080,20 +38671,24 @@ var ClaudeCodeCliRuntime = class {
         if (killTimer) window.clearTimeout(killTimer);
         finish(new Error(t("ui.could_not_start_claude_code_0_1", this.options.executable, error.message)));
       });
-      const reportMilestones = (transcript) => {
-        var _a3;
-        try {
-          const data = claudeTranscriptMilestones(transcript);
-          if (Object.keys(data).length) (_a3 = controls.onMilestones) == null ? void 0 : _a3.call(controls, data);
-        } catch (e) {
-        }
-      };
       child.on("close", (code) => {
+        var _a3, _b3;
         if (killTimer) window.clearTimeout(killTimer);
         if (settled) return;
+        if (observer && code !== 0 && !finalResult && !observer.sawModel() && streamFlagsRejected(stderr)) {
+          settled = true;
+          cleanup();
+          this.streamUnsupported = true;
+          (_b3 = (_a3 = this.options).onLog) == null ? void 0 : _b3.call(_a3, "warn", t("log.claude_stream_fallback"));
+          this.run(prompt, model, effort, outputSchema, controls, true).then(resolve, reject);
+          return;
+        }
         if (!streaming && controls.onMilestones) {
           try {
-            reportMilestones(JSON.parse(stdout));
+            reportMilestones({
+              ...outputSchema && controls.stream === true ? { stream: fallback ? "json-fallback" : "json" } : {},
+              ...claudeTranscriptMilestones(JSON.parse(stdout))
+            });
           } catch (e) {
           }
         }
@@ -38146,7 +38741,7 @@ var ClaudeCodeCliRuntime = class {
           (_f2 = controls.onSteer) == null ? void 0 : _f2.call(controls, async (text11) => {
             sendInput(text11);
           });
-        } else if (controls.onAccepted) {
+        } else if (controls.onAccepted || observer) {
           child.stdin.end(prompt, (error) => {
             if (error) {
               stop();
@@ -38186,6 +38781,8 @@ var AiRuntimeService = class {
     this.options = options;
     __publicField(this, "codexRuntime", null);
     __publicField(this, "localCodexRuntime", null);
+    /** One Claude runtime per executable and folder, so what it learns about the CLI (stream options) is remembered. */
+    __publicField(this, "claudeRuntime", null);
   }
   reset() {
     var _a, _b;
@@ -38193,6 +38790,7 @@ var AiRuntimeService = class {
     (_b = this.localCodexRuntime) == null ? void 0 : _b.stop();
     this.codexRuntime = null;
     this.localCodexRuntime = null;
+    this.claudeRuntime = null;
   }
   diagnostic(configured) {
     const executable = this.resolveExecutable(configured);
@@ -38215,13 +38813,18 @@ var AiRuntimeService = class {
     return runtime;
   }
   claude(pluginDirectory) {
+    var _a;
     const executable = this.resolveExecutable(this.options.claudePath());
-    return new ClaudeCodeCliRuntime({
+    const key2 = `${executable}\0${pluginDirectory}`;
+    if (((_a = this.claudeRuntime) == null ? void 0 : _a.key) === key2) return this.claudeRuntime.runtime;
+    const runtime = new ClaudeCodeCliRuntime({
       executable,
       cwd: pluginDirectory,
       env: this.cliEnvironment(executable),
       onLog: (level, message) => this.options.onLog(level, message)
     });
+    this.claudeRuntime = { key: key2, runtime };
+    return runtime;
   }
   resolveExecutable(configured) {
     const environment = currentProcessEnvironment();
@@ -38365,6 +38968,133 @@ var ShallowExpansionCoordinator = class {
       }
   }
 };
+
+// experiences/visual-map/research-progress.ts
+var PREVIEW_THROTTLE_MS = 200;
+var DETAIL_TAIL_CHARS = 600;
+var realClock = {
+  now: () => Date.now(),
+  setTimeout: (callback, ms) => window.setTimeout(callback, ms),
+  clearTimeout: (handle) => window.clearTimeout(handle)
+};
+var ResearchProgressStore = class {
+  constructor(clock = realClock) {
+    this.clock = clock;
+    __publicField(this, "entries", /* @__PURE__ */ new Map());
+    __publicField(this, "listeners", /* @__PURE__ */ new Set());
+    __publicField(this, "lastNotified", /* @__PURE__ */ new Map());
+    __publicField(this, "pending", /* @__PURE__ */ new Map());
+  }
+  begin(path, attemptId, now) {
+    this.cancelPending(path);
+    this.entries.set(path, { attemptId, startedAt: now, stage: "waiting", stageAt: now, slow: false });
+    this.notify(path);
+  }
+  stage(path, attemptId, stage, now, query) {
+    const entry = this.current(path, attemptId);
+    if (!entry) return;
+    entry.stage = stage;
+    entry.stageAt = now;
+    if (query !== void 0) entry.query = query;
+    else if (stage !== "searching") delete entry.query;
+    this.notify(path);
+  }
+  markSlow(path, attemptId, slow, resend) {
+    const entry = this.current(path, attemptId);
+    if (!entry || entry.slow === slow && entry.resend === (slow ? resend : void 0)) return;
+    entry.slow = slow;
+    if (slow && resend) entry.resend = resend;
+    else delete entry.resend;
+    this.notify(path);
+  }
+  preview(path, attemptId, fields) {
+    const entry = this.current(path, attemptId);
+    if (!entry) return;
+    const summary = fields.summary || void 0;
+    const detail = fields.detail || void 0;
+    if (summary === void 0 && detail === void 0) {
+      if (!entry.preview) return;
+      delete entry.preview;
+      this.notify(path);
+      return;
+    }
+    const preview = {};
+    if (summary !== void 0) preview.summary = summary;
+    if (detail !== void 0)
+      preview.detailTail = detail.length > DETAIL_TAIL_CHARS ? detail.slice(-DETAIL_TAIL_CHARS) : detail;
+    entry.preview = preview;
+    this.notifyThrottled(path);
+  }
+  newAttempt(path, attemptId, now) {
+    const entry = this.entries.get(path);
+    if (!entry) return;
+    this.cancelPending(path);
+    entry.attemptId = attemptId;
+    entry.stage = "waiting";
+    entry.stageAt = now;
+    entry.slow = false;
+    delete entry.resend;
+    delete entry.preview;
+    delete entry.query;
+    this.notify(path);
+  }
+  /** Removes the entry (and so its preview). With an attempt id, only if that attempt still owns it (a chart step may have taken over). */
+  end(path, attemptId) {
+    const entry = this.entries.get(path);
+    if (attemptId !== void 0 && entry && entry.attemptId !== attemptId) return;
+    this.cancelPending(path);
+    this.lastNotified.delete(path);
+    if (!this.entries.delete(path)) return;
+    for (const listener of [...this.listeners]) listener(path);
+  }
+  get(path) {
+    return this.entries.get(path);
+  }
+  subscribe(listener) {
+    this.listeners.add(listener);
+    return () => {
+      this.listeners.delete(listener);
+      if (!this.listeners.size) this.clearAllTimers();
+    };
+  }
+  current(path, attemptId) {
+    const entry = this.entries.get(path);
+    return entry && entry.attemptId === attemptId ? entry : void 0;
+  }
+  cancelPending(path) {
+    const handle = this.pending.get(path);
+    if (handle === void 0) return;
+    this.clock.clearTimeout(handle);
+    this.pending.delete(path);
+  }
+  clearAllTimers() {
+    for (const path of [...this.pending.keys()]) this.cancelPending(path);
+  }
+  notify(path) {
+    this.cancelPending(path);
+    this.lastNotified.set(path, this.clock.now());
+    for (const listener of [...this.listeners]) listener(path);
+  }
+  notifyThrottled(path) {
+    var _a;
+    if (this.pending.has(path)) return;
+    const wait = ((_a = this.lastNotified.get(path)) != null ? _a : -Infinity) + PREVIEW_THROTTLE_MS - this.clock.now();
+    if (wait <= 0) {
+      this.notify(path);
+      return;
+    }
+    this.pending.set(
+      path,
+      this.clock.setTimeout(() => {
+        this.pending.delete(path);
+        if (this.entries.has(path)) this.notify(path);
+      }, wait)
+    );
+  }
+};
+
+// core/ai-task-service.ts
+var import_node_crypto14 = require("node:crypto");
 
 // core/steps/reference/extract.zh.md
 var extract_zh_default = "\u5F9E\u6BCF\u500B\u63D0\u4F9B\u7684\u4F86\u6E90\u6BB5\u843D\u64F7\u53D6\u76F8\u95DC\u4E8B\u5BE6\u3001\u8B49\u64DA\u3001\u5206\u6B67\u8207\u9650\u5236\u3002\u4E0D\u53EF\u56E0\u4F86\u6E90\u770B\u4F3C\u4E0D\u76F8\u95DC\u5C31\u7565\u904E\u3002\u6BCF\u9805\u64F7\u53D6\u5167\u5BB9\u90FD\u8981\u5728\u4E3B\u5F35\u65C1\u4FDD\u7559\u539F\u59CB [S#]\uFF0C\u4E26\u9644\u4E0A\u672C\u6279\u6240\u6709 [S#] \u5C0D\u61C9\u539F\u59CB\u5B8C\u6574\u8DEF\u5F91\u7684\u4F86\u6E90\u5C0D\u7167\u8868\u3002\u4FDD\u7559\u6709\u52A9\u8FA8\u8B58\u7AE0\u7BC0\u7684\u6A19\u984C\uFF1B\u6700\u7D42\u7B54\u6848\u9700\u8981\u9019\u4EFD\u5C0D\u7167\u8868\u624D\u80FD\u5F15\u7528\u539F\u6A94\u3002\u4E0D\u53EF\u8D85\u51FA\u539F\u6587\u63A8\u8AD6\u3002\n";
@@ -38926,16 +39656,27 @@ ${inLanguage(CLAUDE_STRUCTURED_OUTPUT, request.language)}` : "",
 };
 
 // core/ai-task-service.ts
+var FIRST_EVENT_WAIT_MS = 2e4;
+function cancelled() {
+  const error = new Error(t("ui.ai_task_cancelled"));
+  error.name = "AbortError";
+  return error;
+}
+var realClock2 = {
+  now: () => Date.now(),
+  setTimeout: (callback, ms) => window.setTimeout(callback, ms),
+  clearTimeout: (handle) => window.clearTimeout(handle)
+};
 var AiTaskService = class {
   constructor(options) {
     this.options = options;
   }
-  async askModel(input, model, reasoning, signal, onExchange, onRequestAccepted, onWebSearchEvent) {
-    return this.execute(input, model, reasoning, signal, onExchange, onRequestAccepted, onWebSearchEvent);
+  async askModel(input, model, reasoning, signal, onExchange, onRequestAccepted, onWebSearchEvent, observer) {
+    return this.execute(input, model, reasoning, signal, onExchange, onRequestAccepted, onWebSearchEvent, observer);
   }
   /** `role` names the two reference rounds so they are logged as their own steps; every other request is a task or AIM step. */
-  async execute(input, model, reasoning, signal, onExchange, onRequestAccepted, onWebSearchEvent, role) {
-    var _a, _b, _c;
+  async execute(input, model, reasoning, signal, onExchange, onRequestAccepted, onWebSearchEvent, observer, role) {
+    var _a, _b;
     if (input.timeoutMs !== void 0 && (!Number.isInteger(input.timeoutMs) || input.timeoutMs < 18e4 || input.timeoutMs > 6e5))
       throw new Error("Invalid AI task timeout.");
     const provider = providerForModel(model);
@@ -39020,19 +39761,25 @@ var AiTaskService = class {
           localCodex: context.researchMode === "local"
         })
       );
-      const { raw } = await runner.send(step, {
-        model,
-        effort,
-        topic: context.title,
-        mode: (_c = context.mode) != null ? _c : "task",
-        task: { ...controls, onWebSearchEvent },
-        finish: "caller",
-        requestLog: "request",
-        onExchange: (id) => {
-          exchangeId = id;
-          onExchange == null ? void 0 : onExchange(id);
-        }
-      });
+      const sendOnce = (setup) => {
+        var _a2;
+        return runner.send(step, {
+          model,
+          effort,
+          topic: context.title,
+          mode: (_a2 = context.mode) != null ? _a2 : "task",
+          task: { ...controls, onWebSearchEvent, ...setup ? { ...setup.hooks, signal: setup.signal } : {} },
+          finish: "caller",
+          requestLog: "request",
+          ...setup ? { exchangeId: setup.exchangeId, extraMilestones: setup.extraMilestones } : {},
+          onExchange: (id) => {
+            exchangeId = id;
+            setup == null ? void 0 : setup.onExchange(id);
+            onExchange == null ? void 0 : onExchange(id);
+          }
+        });
+      };
+      const { raw } = observer && role === void 0 && !input.countRepair ? await this.sendObserved(observer, signal, accepted, sendOnce) : await sendOnce();
       stage = t("log.stage_parsing_reply");
       let result = step.parse(raw);
       if (readerFacingDetail(input)) {
@@ -39070,6 +39817,7 @@ var AiTaskService = class {
               onExchange,
               void 0,
               void 0,
+              void 0,
               role
             );
             result = { ...result, detail: repaired.detail };
@@ -39096,6 +39844,159 @@ var AiTaskService = class {
           t("log.stage_failure_0_1", stage, error instanceof Error ? error.message : String(error))
         );
       throw error;
+    }
+  }
+  /**
+   * The observed main call (S3, D-2026-10-25): each attempt runs one model request. Without a model event for
+   * {@link FIRST_EVENT_WAIT_MS} after the prompt is written the observer is told (`onSlow`), with a handle that replaces
+   * the attempt: it stops the old request, marks its exchange failed and sends the same prompt again inside this same
+   * call, so the caller's stale check and running flag stay as they are and nothing from the old attempt can be written.
+   * Never automatic. The task's own signal wins over a re-send.
+   */
+  async sendObserved(observer, taskSignal, accepted, send) {
+    var _a;
+    const clock = (_a = this.options.clock) != null ? _a : realClock2;
+    const iso = () => new Date(clock.now()).toISOString();
+    const safe = (callback) => {
+      try {
+        callback();
+      } catch (e) {
+      }
+    };
+    let attemptNumber = 0;
+    let promisedId;
+    let previousExchange = "";
+    for (; ; ) {
+      if (taskSignal == null ? void 0 : taskSignal.aborted) throw cancelled();
+      attemptNumber++;
+      const attemptId = (0, import_node_crypto14.randomUUID)();
+      const controller = new AbortController();
+      const onTaskAbort = () => controller.abort();
+      taskSignal == null ? void 0 : taskSignal.addEventListener("abort", onTaskAbort, { once: true });
+      const exchangeIdForAttempt = promisedId;
+      promisedId = void 0;
+      const extra = previousExchange ? { resendOf: previousExchange } : {};
+      let exchangeId = "";
+      let resendRequested = false, firstEvent = false, watching = true, timer;
+      const live = () => !controller.signal.aborted && !resendRequested;
+      const disarm = () => {
+        if (timer === void 0) return;
+        clock.clearTimeout(timer);
+        timer = void 0;
+      };
+      const resend = () => {
+        if ((taskSignal == null ? void 0 : taskSignal.aborted) || !live() || firstEvent) return;
+        resendRequested = true;
+        disarm();
+        promisedId = (0, import_node_crypto14.randomUUID)();
+        extra.resentAs = promisedId;
+        controller.abort();
+      };
+      const arm = () => {
+        disarm();
+        if (!watching || firstEvent || !live()) return;
+        timer = clock.setTimeout(() => {
+          timer = void 0;
+          if (firstEvent || !live()) return;
+          extra.slowShownAt = iso();
+          safe(() => {
+            var _a2;
+            return (_a2 = observer.onSlow) == null ? void 0 : _a2.call(observer, attemptId, true, resend);
+          });
+        }, FIRST_EVENT_WAIT_MS);
+      };
+      const seen = () => {
+        var _a2;
+        if (!live()) return false;
+        if (!firstEvent) {
+          firstEvent = true;
+          disarm();
+          (_a2 = extra.firstEventAt) != null ? _a2 : extra.firstEventAt = iso();
+          if (extra.slowShownAt) safe(() => {
+            var _a3;
+            return (_a3 = observer.onSlow) == null ? void 0 : _a3.call(observer, attemptId, false);
+          });
+        }
+        return true;
+      };
+      const stage = (name, query) => {
+        var _a2, _b;
+        const stages = (_a2 = extra.stages) != null ? _a2 : extra.stages = [];
+        if (stages.length < 20 && ((_b = stages.at(-1)) == null ? void 0 : _b.stage) !== name) stages.push({ stage: name, at: iso() });
+        safe(() => {
+          var _a3;
+          return (_a3 = observer.onStage) == null ? void 0 : _a3.call(observer, attemptId, name, query);
+        });
+      };
+      safe(() => {
+        var _a2;
+        return (_a2 = observer.onAttempt) == null ? void 0 : _a2.call(observer, attemptId, attemptNumber);
+      });
+      const setup = {
+        signal: controller.signal,
+        exchangeId: exchangeIdForAttempt,
+        extraMilestones: () => ({ ...extra }),
+        hooks: {
+          stream: true,
+          onAccepted: () => {
+            var _a2;
+            accepted == null ? void 0 : accepted();
+            if (!live()) return;
+            (_a2 = extra.acceptedAt) != null ? _a2 : extra.acceptedAt = iso();
+            arm();
+          },
+          // Without stream events (json mode) the first model event cannot be seen, so the notice would be a false alarm.
+          onStreamMode: (mode) => {
+            if (mode !== "stream-json") {
+              watching = false;
+              disarm();
+            }
+          },
+          onFirstEvent: () => {
+            seen();
+          },
+          onStage: (name, query) => {
+            if (seen()) safe(() => {
+              var _a2;
+              return (_a2 = observer.onStage) == null ? void 0 : _a2.call(observer, attemptId, name, query);
+            });
+          },
+          onStructuredDelta: (fields) => {
+            if (!seen()) return;
+            const preview = fields ? { summary: fields.summary, detail: fields.detail } : null;
+            safe(() => {
+              var _a2;
+              return (_a2 = observer.onPreview) == null ? void 0 : _a2.call(observer, attemptId, preview);
+            });
+          },
+          onActivity: (activity) => {
+            if (!seen() || activity === "started") return;
+            stage(activity);
+          }
+        },
+        onExchange: (id) => {
+          exchangeId = id;
+        }
+      };
+      const replaced = new Promise(
+        (_resolve, reject) => controller.signal.addEventListener("abort", () => reject(cancelled()), {
+          once: true
+        })
+      );
+      replaced.catch(() => void 0);
+      try {
+        const attempt = send(setup);
+        attempt.catch(() => void 0);
+        const sent = await Promise.race([attempt, replaced]);
+        if (!(resendRequested && !(taskSignal == null ? void 0 : taskSignal.aborted))) return sent;
+      } catch (error) {
+        if ((taskSignal == null ? void 0 : taskSignal.aborted) || !resendRequested) throw error;
+      } finally {
+        disarm();
+        taskSignal == null ? void 0 : taskSignal.removeEventListener("abort", onTaskAbort);
+      }
+      this.failExchange(exchangeId, t("log.research_resent_by_user"));
+      previousExchange = exchangeId;
     }
   }
   /**
@@ -39291,6 +40192,7 @@ var AiTaskService = class {
           void 0,
           onRequestAccepted,
           void 0,
+          void 0,
           round === 1 ? "reference-extract" : "reference-reduce"
         );
         if (!result.detail.trim()) throw new Error(t("ui.reference_processing_empty_result"));
@@ -39311,7 +40213,7 @@ ${value}`).join("\n\n");
 };
 
 // core/reframing-service.ts
-var import_node_crypto14 = require("node:crypto");
+var import_node_crypto15 = require("node:crypto");
 
 // core/steps/reframe/language.en.md
 var language_en_default3 = "Write in English.\n";
@@ -39362,7 +40264,7 @@ var reframeStep = {
 function providerReframeRunner(options, activeTasks) {
   return async (request, _prompt, _schema, signal, prepared) => {
     var _a, _b, _c;
-    const key2 = `reframe:${(0, import_node_crypto14.randomUUID)()}`, controller = new AbortController();
+    const key2 = `reframe:${(0, import_node_crypto15.randomUUID)()}`, controller = new AbortController();
     const abort = () => controller.abort();
     signal.addEventListener("abort", abort, { once: true });
     if (signal.aborted) controller.abort();
@@ -41576,6 +42478,11 @@ var VisualAgentMapPlugin = class extends import_obsidian34.Plugin {
     __publicField(this, "activeTasks", /* @__PURE__ */ new Map());
     /** Background chart steps (running and queued), keyed by note path: one per path, at most {@link CHART_JOB_LIMIT} run at a time. */
     __publicField(this, "chartJobs", /* @__PURE__ */ new Map());
+    /** Stage, elapsed time and the unsaved answer preview of research and chart steps in flight, keyed by note path. */
+    __publicField(this, "researchProgress", new ResearchProgressStore());
+    /** The progress entry each background chart job owns (the research run's own entry ends when the note is written). */
+    __publicField(this, "chartProgressIds", /* @__PURE__ */ new Map());
+    __publicField(this, "chartProgressSeq", 0);
     /** Jobs waiting for a free slot, first in first out. */
     __publicField(this, "chartQueue", []);
     __publicField(this, "chartRunning", 0);
@@ -42708,7 +43615,7 @@ ${t("ui.organize_link_wait_hint")}`;
       normalizeReasoningLevel(session.reasoning)
     );
     const exchanges = this.settings.aiExchangeLoggingEnabled ? this.exchanges : null;
-    const id = (0, import_node_crypto15.randomUUID)();
+    const id = (0, import_node_crypto16.randomUUID)();
     const key2 = `coffee:${id}`;
     const controller = new AbortController();
     const abort = () => controller.abort();
@@ -42828,7 +43735,7 @@ ${t("ui.organize_link_wait_hint")}`;
       normalizeReasoningLevel(this.settings.cliReasoning)
     );
     const exchanges = this.settings.aiExchangeLoggingEnabled ? this.exchanges : null;
-    const key2 = `markdown-context:${(0, import_node_crypto15.randomUUID)()}`;
+    const key2 = `markdown-context:${(0, import_node_crypto16.randomUUID)()}`;
     const controller = new AbortController();
     const abort = () => controller.abort();
     signal.addEventListener("abort", abort, { once: true });
@@ -42924,8 +43831,17 @@ ${t("ui.organize_link_wait_hint")}`;
       )
     };
   }
-  async askModel(context, model, reasoning, signal, onExchange, onRequestAccepted, onWebSearchEvent) {
-    return this.aiTasks.askModel(context, model, reasoning, signal, onExchange, onRequestAccepted, onWebSearchEvent);
+  async askModel(context, model, reasoning, signal, onExchange, onRequestAccepted, onWebSearchEvent, observer) {
+    return this.aiTasks.askModel(
+      context,
+      model,
+      reasoning,
+      signal,
+      onExchange,
+      onRequestAccepted,
+      onWebSearchEvent,
+      observer
+    );
   }
   /** Aborts the background chart step of one note (a new run on that note replaces it), or of every note. */
   abortChartJobs(path) {
@@ -42933,9 +43849,16 @@ ${t("ui.organize_link_wait_hint")}`;
       if (path === void 0 || key2 === path) {
         controller.abort();
         this.chartJobs.delete(key2);
+        this.endChartProgress(key2);
         const queued = this.chartQueue.findIndex((item) => item.controller === controller);
         if (queued >= 0) this.chartQueue.splice(queued, 1);
       }
+  }
+  endChartProgress(path) {
+    const id = this.chartProgressIds.get(path);
+    if (id === void 0) return;
+    this.chartProgressIds.delete(path);
+    this.researchProgress.end(path, id);
   }
   pumpChartQueue() {
     while (this.chartRunning < CHART_JOB_LIMIT && this.chartQueue.length) {
@@ -42950,10 +43873,16 @@ ${t("ui.organize_link_wait_hint")}`;
    * write time or is running again; only then are the diagrams not applied.
    */
   addChartsAfterWrite(job) {
+    var _a, _b;
+    if ((_b = (_a = this.repo) == null ? void 0 : _a.isDisposed) == null ? void 0 : _b.call(_a)) return;
     if (!this.aiTasks.chartEligible(job.context) || !job.detail.trim()) return;
     this.abortChartJobs(job.path);
     const controller = new AbortController();
     this.chartJobs.set(job.path, controller);
+    const progressId = `charts-${++this.chartProgressSeq}`;
+    this.chartProgressIds.set(job.path, progressId);
+    this.researchProgress.begin(job.path, progressId, Date.now());
+    this.researchProgress.stage(job.path, progressId, "charts", Date.now());
     let exchangeId = "";
     const run = async () => {
       try {
@@ -42983,6 +43912,7 @@ ${t("ui.organize_link_wait_hint")}`;
         }
       } finally {
         if (this.chartJobs.get(job.path) === controller) this.chartJobs.delete(job.path);
+        if (this.chartProgressIds.get(job.path) === progressId) this.endChartProgress(job.path);
         this.chartRunning--;
         this.pumpChartQueue();
       }

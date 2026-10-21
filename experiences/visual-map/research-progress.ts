@@ -11,6 +11,8 @@ export interface ResearchProgress {
   stageAt: number;
   query?: string;
   slow: boolean;
+  /** Offered while `slow`: replaces the current attempt with a fresh one. */
+  resend?: () => void;
   preview?: ResearchPreview;
 }
 export interface ResearchProgressClock {
@@ -47,10 +49,12 @@ export class ResearchProgressStore {
     else if (stage !== "searching") delete entry.query;
     this.notify(path);
   }
-  markSlow(path: string, attemptId: string, slow: boolean): void {
+  markSlow(path: string, attemptId: string, slow: boolean, resend?: () => void): void {
     const entry = this.current(path, attemptId);
-    if (!entry || entry.slow === slow) return;
+    if (!entry || (entry.slow === slow && entry.resend === (slow ? resend : undefined))) return;
     entry.slow = slow;
+    if (slow && resend) entry.resend = resend;
+    else delete entry.resend;
     this.notify(path);
   }
   preview(path: string, attemptId: string, fields: { summary?: string; detail?: string }): void {
@@ -79,11 +83,15 @@ export class ResearchProgressStore {
     entry.stage = "waiting";
     entry.stageAt = now;
     entry.slow = false;
+    delete entry.resend;
     delete entry.preview;
     delete entry.query;
     this.notify(path);
   }
-  end(path: string): void {
+  /** Removes the entry (and so its preview). With an attempt id, only if that attempt still owns it (a chart step may have taken over). */
+  end(path: string, attemptId?: string): void {
+    const entry = this.entries.get(path);
+    if (attemptId !== undefined && entry && entry.attemptId !== attemptId) return;
     this.cancelPending(path);
     this.lastNotified.delete(path);
     if (!this.entries.delete(path)) return;

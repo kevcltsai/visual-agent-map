@@ -64,6 +64,8 @@ import { runtimeStepProvider } from "./core/runtime-step-provider";
 import { AiRuntimeService } from "./core/ai-runtime-service";
 import { ModelDiscovery, type ModelDiscoveryState } from "./core/model-discovery";
 import { ShallowExpansionCoordinator, type ExpansionBatchState } from "./experiences/visual-map/expansion-batch";
+import { ResearchProgressStore } from "./experiences/visual-map/research-progress";
+import type { ResearchObserver } from "./ai/research-observer";
 import { AiTaskService } from "./core/ai-task-service";
 import { announceTestOverrides } from "./experiences/aim/flow-limits";
 import { ReframingService, providerReframeRunner } from "./core/reframing-service";
@@ -134,6 +136,11 @@ export default class VisualAgentMapPlugin extends Plugin {
   readonly activeTasks = new Map<string, AbortController>();
   /** Background chart steps (running and queued), keyed by note path: one per path, at most {@link CHART_JOB_LIMIT} run at a time. */
   readonly chartJobs = new Map<string, AbortController>();
+  /** Stage, elapsed time and the unsaved answer preview of research and chart steps in flight, keyed by note path. */
+  readonly researchProgress = new ResearchProgressStore();
+  /** The progress entry each background chart job owns (the research run's own entry ends when the note is written). */
+  private readonly chartProgressIds = new Map<string, string>();
+  private chartProgressSeq = 0;
   /** Jobs waiting for a free slot, first in first out. */
   private readonly chartQueue: Array<{ controller: AbortController; start: () => void }> = [];
   private chartRunning = 0;
@@ -1585,9 +1592,19 @@ export default class VisualAgentMapPlugin extends Plugin {
     signal?: AbortSignal,
     onExchange?: (id: string) => void,
     onRequestAccepted?: () => void,
-    onWebSearchEvent?: (event: CodexWebSearchEvent) => void
+    onWebSearchEvent?: (event: CodexWebSearchEvent) => void,
+    observer?: ResearchObserver
   ): Promise<AiResult> {
-    return this.aiTasks.askModel(context, model, reasoning, signal, onExchange, onRequestAccepted, onWebSearchEvent);
+    return this.aiTasks.askModel(
+      context,
+      model,
+      reasoning,
+      signal,
+      onExchange,
+      onRequestAccepted,
+      onWebSearchEvent,
+      observer
+    );
   }
   /** Aborts the background chart step of one note (a new run on that note replaces it), or of every note. */
   abortChartJobs(path?: string): void {
@@ -1595,10 +1612,17 @@ export default class VisualAgentMapPlugin extends Plugin {
       if (path === undefined || key === path) {
         controller.abort();
         this.chartJobs.delete(key);
+        this.endChartProgress(key);
         // A queued job never starts; a running one frees its slot when it settles.
         const queued = this.chartQueue.findIndex(item => item.controller === controller);
         if (queued >= 0) this.chartQueue.splice(queued, 1);
       }
+  }
+  private endChartProgress(path: string): void {
+    const id = this.chartProgressIds.get(path);
+    if (id === undefined) return;
+    this.chartProgressIds.delete(path);
+    this.researchProgress.end(path, id);
   }
   private pumpChartQueue(): void {
     while (this.chartRunning < CHART_JOB_LIMIT && this.chartQueue.length) {
@@ -1621,10 +1645,16 @@ export default class VisualAgentMapPlugin extends Plugin {
     model: string;
     apply: (detail: string) => Promise<boolean>;
   }): void {
+    // After unload the repository is released: no chart job may start.
+    if (this.repo?.isDisposed?.()) return;
     if (!this.aiTasks.chartEligible(job.context) || !job.detail.trim()) return;
     this.abortChartJobs(job.path);
     const controller = new AbortController();
     this.chartJobs.set(job.path, controller);
+    const progressId = `charts-${++this.chartProgressSeq}`;
+    this.chartProgressIds.set(job.path, progressId);
+    this.researchProgress.begin(job.path, progressId, Date.now());
+    this.researchProgress.stage(job.path, progressId, "charts", Date.now());
     let exchangeId = "";
     const run = async (): Promise<void> => {
       try {
@@ -1654,6 +1684,7 @@ export default class VisualAgentMapPlugin extends Plugin {
         }
       } finally {
         if (this.chartJobs.get(job.path) === controller) this.chartJobs.delete(job.path);
+        if (this.chartProgressIds.get(job.path) === progressId) this.endChartProgress(job.path);
         this.chartRunning--;
         this.pumpChartQueue();
       }

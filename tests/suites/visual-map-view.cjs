@@ -275,6 +275,14 @@ integrationTest('Next Step reviews first expansion proposals in place and keeps 
   assert.equal(expandChecks[0].checked, false); assert.equal(expandChecks[1].checked, false);
   assert.ok(find(expandAdjust, item => item.text === 'Run quick research on each created subtopic (does not search the web)'));
   assert.ok(find(expandAdjust, item => item.text === 'Also search the web for subtopic research'));
+  // R1: the hint never claims a web search while the web option is off, and describes it once the option is on.
+  const shallowHint = () => find(expandAdjust, item => /^Quick research: /.test(item.text ?? ''));
+  assert.match(shallowHint().text, /without searching the web/); assert.doesNotMatch(shallowHint().text, /web search\b(?! is)/i);
+  expandChecks[1].checked = true; expandChecks[1].change();
+  assert.match(shallowHint().text, /Quick: answer the core question first/); assert.doesNotMatch(shallowHint().text, /without searching the web/);
+  expandChecks[1].checked = false; expandChecks[1].change();
+  assert.match(shallowHint().text, /without searching the web/);
+  assert.equal(load('i18n.ts').translate('zh-TW', 'ui.shallow_research_local_description'), '依主題與你提供的來源回答，不搜尋網路。勾選下方選項才會搜尋。');
   assert.equal(all(sources, item => item.tag === 'input' && item.type === 'file').length, 2);
   assert.ok(find(sources, item => item.text === 'Allow web search'));
   assert.ok(find(synthesize, item => /web search is off by default/.test(item.text ?? '')));

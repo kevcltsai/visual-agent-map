@@ -30,6 +30,8 @@ export interface AiMilestones {
   firstTextAt?: string;
   /** Claude wrote answer text before calling the StructuredOutput tool (the duplicated-output pattern). */
   textBeforeTool?: boolean;
+  /** Characters of main-agent text written before the StructuredOutput call. */
+  textBeforeToolChars?: number;
   /** The CLI asked the model to call StructuredOutput again (a structured-output-enforce reminder). */
   enforceRetry?: boolean;
   structuredStartAt?: string;

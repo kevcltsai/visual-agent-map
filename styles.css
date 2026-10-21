@@ -1146,3 +1146,9 @@ button.vam-template-section-header:hover { background: var(--background-modifier
 .markdown-source-view.mod-cm6 .vam-editor-scope .is-unresolved .cm-underline { text-decoration: none; border-bottom: 1px dashed currentcolor; }
 .markdown-rendered a.vam-link-scope.footnote-backref { color: var(--text-muted); }
 .markdown-rendered a.vam-link-scope.footnote-backref:hover { color: var(--text-normal); }
+/* Research progress: stage + seconds on the card, and the unsaved answer preview in the hover card. */
+.vam-research-stage { display: inline-block; max-width: 16em; overflow: hidden; text-overflow: ellipsis; vertical-align: bottom; }
+.vam-research-slow { color: var(--text-warning, var(--text-muted)); }
+.vam-hover-research-preview { margin: 0 0 10px; padding: 8px 10px; border: 1px dashed var(--background-modifier-border); border-radius: 8px; }
+.vam-hover-research-preview[hidden], .vam-hover-research-detail[hidden] { display: none; }
+.vam-hover-research-summary, .vam-hover-research-detail { margin-top: 4px; white-space: pre-wrap; overflow-wrap: anywhere; font-size: var(--vam-hover-body-size, 13px); line-height: var(--vam-hover-line-height, 1.45); color: var(--text-muted); }

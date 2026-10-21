@@ -72,6 +72,8 @@ interface PendingRequest {
   timeout: number;
 }
 export type CodexWebSearchEvent = WebSearchEvent;
+/** What the model is doing, from Codex's own events: any first event is "started"; there is no query and no preview. */
+export type CodexActivity = "started" | "searching" | "reading" | "writing";
 interface TurnState {
   messages: string[];
   visibleMessages: Map<string, string>;
@@ -90,6 +92,8 @@ interface TurnState {
   onRequest?: (request: unknown) => void;
   onText?: (text: string) => void;
   onWebSearchEvent?: (event: CodexWebSearchEvent) => void;
+  onActivity?: (activity: CodexActivity) => void;
+  sawActivity?: boolean;
   /** Image generation turn: the generated image (base64 or a saved file), or why it failed. */
   generateImage?: boolean;
   generatedImage?: { result?: string; savedPath?: string; failure?: string };
@@ -217,6 +221,8 @@ export class CodexAppServerRuntime {
       onAccepted?: () => void;
       onText?: (text: string) => void;
       onWebSearchEvent?: (event: CodexWebSearchEvent) => void;
+      /** Progress for the research card: the first event, then searching, reading and writing. */
+      onActivity?: (activity: CodexActivity) => void;
       onSteer?: (steer: (text: string) => Promise<void>) => void;
       timeoutMs?: number;
       timeoutMessage?: string;
@@ -315,6 +321,7 @@ export class CodexAppServerRuntime {
         onRequest: controls?.onRequest,
         onText: controls?.onText,
         onWebSearchEvent: controls?.onWebSearchEvent,
+        onActivity: controls?.onActivity,
         generateImage: controls?.generateImage
       });
     });
@@ -478,7 +485,12 @@ export class CodexAppServerRuntime {
     const threadId = typeof params?.threadId === "string" ? params.threadId : "";
     const state = this.turns.get(threadId);
     if (!state) return;
+    if (!state.sawActivity) {
+      state.sawActivity = true;
+      this.reportActivity(state, "started");
+    }
     if (message.method === "item/agentMessage/delta" && typeof params?.delta === "string") {
+      this.reportActivity(state, "writing");
       if (state.streamItem !== params.itemId) {
         state.streamItem = params.itemId;
         state.streamText = "";
@@ -490,13 +502,19 @@ export class CodexAppServerRuntime {
     }
     if (message.method === "item/started") {
       const item = params?.item as { type?: unknown } | undefined;
-      if (item?.type === "webSearch") this.forwardWebSearchEvent(state, message.method, params);
+      if (item?.type === "webSearch") {
+        this.reportActivity(state, "searching");
+        this.forwardWebSearchEvent(state, message.method, params);
+      }
       return;
     }
     if (message.method === "item/completed") {
       const item = params?.item as
         { type?: unknown; text?: unknown; id?: unknown; action?: { type?: unknown } } | undefined;
-      if (item?.type === "webSearch") this.forwardWebSearchEvent(state, message.method, params);
+      if (item?.type === "webSearch") {
+        this.reportActivity(state, "reading");
+        this.forwardWebSearchEvent(state, message.method, params);
+      }
       // Opening or searching within a page is live web retrieval too; only queries count toward the search budget.
       if (item?.type === "webSearch")
         state.webRetrievals.add(typeof item.id === "string" ? item.id : `web-${state.webRetrievals.size}`);
@@ -552,6 +570,15 @@ export class CodexAppServerRuntime {
               : t("ui.codex_turn_0", typeof turn?.status === "string" ? turn.status : t("ui.failed"))
           )
         );
+    }
+  }
+
+  private reportActivity(state: TurnState, activity: CodexActivity): void {
+    // Telemetry consumers must not be able to fail the provider task.
+    try {
+      state.onActivity?.(activity);
+    } catch {
+      /* Diagnostics are best effort. */
     }
   }
 

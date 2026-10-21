@@ -109,3 +109,11 @@ test('a request that is not chart-eligible starts nothing', () => {
   plugin.addChartsAfterWrite(job('A.md'));
   assert.equal(plugin.chartJobs.size, 0);
 });
+
+test('R1: no chart job starts once the repository is disposed', async () => {
+  const { plugin } = newPlugin();
+  plugin.repo = { isDisposed: () => true };
+  plugin.addChartsAfterWrite(job('A.md'));
+  assert.equal(plugin.chartJobs.size, 0);
+  assert.equal(plugin.researchProgress.get('A.md'), undefined);
+});

@@ -485,3 +485,32 @@ integrationTest('Codex launch preserves executable as one argument and refuses p
     assert.equal(sent.find(message => message.id === 'server-3').error.code, -32601);
   } finally { runtime.stop(); }
 });
+integrationTest('S4: Codex events map to waiting/searching/reading/writing for the observer, without a query or preview', async () => {
+  const { EventEmitter } = require('node:events');
+  const child = new EventEmitter(); child.stdout = new EventEmitter(); child.stderr = new EventEmitter(); child.kill = () => {};
+  const emit = message => process.nextTick(() => child.stdout.emit('data', Buffer.from(`${JSON.stringify(message)}\n`)));
+  const search = (method, id) => ({ method, params: { threadId: 'thread-1', turnId: 'turn-1', item: { type: 'webSearch', id, query: 'synthetic query', action: method === 'item/started' ? null : { type: 'search' } } } });
+  child.stdin = { write: line => {
+    const message = JSON.parse(line.trim());
+    if (message.method === 'initialize') emit({ id: message.id, result: {} });
+    else if (message.method === 'thread/start') emit({ id: message.id, result: { thread: { id: 'thread-1' } } });
+    else if (message.method === 'turn/start') {
+      emit({ id: message.id, result: { turn: { id: 'turn-1' } } });
+      emit({ method: 'turn/started', params: { threadId: 'thread-1', turn: { id: 'turn-1' } } });
+      emit(search('item/started', 's1')); emit(search('item/completed', 's1'));
+      emit({ method: 'item/agentMessage/delta', params: { threadId: 'thread-1', itemId: 'a1', delta: '{"summary"' } });
+      emit({ method: 'item/completed', params: { threadId: 'thread-1', turnId: 'turn-1', item: { type: 'agentMessage', id: 'a1', text: '{"summary":"S","detail":"D","suggestions":[],"visualReferences":[]}' } } });
+      emit({ method: 'turn/completed', params: { threadId: 'thread-1', turn: { status: 'completed' } } });
+    } else if (message.method === 'thread/unsubscribe') emit({ id: message.id, result: { status: 'unsubscribed' } });
+  } };
+  const { CodexAppServerRuntime } = load('ai/runtime/codex-app-server.ts', { 'node:child_process': { spawn: () => child } });
+  const { AiTaskService } = load('core/ai-task-service.ts');
+  const runtime = new CodexAppServerRuntime({ executable: 'codex', cwd: '/plugin', env: {}, clientVersion: 'test' });
+  const service = new AiTaskService({ pluginDirectory: () => '/plugin', language: () => 'en', defaultReasoning: () => 'low', exchangeLoggingEnabled: () => false, exchanges: () => null, codexRuntime: () => runtime, claudeRuntime: () => { throw new Error('unexpected provider'); } });
+  const events = [];
+  const observer = { onAttempt: () => events.push('attempt'), onStage: (_id, stage, query) => events.push([stage, query]), onPreview: () => events.push('preview'), onSlow: () => events.push('slow') };
+  const result = await service.askModel({ title: 'T', summary: '', rules: '', detail: '', task: 'Research', ancestors: '', mode: 'task', researchMode: 'research', researchDepth: 'fast', visualMode: 'off' }, 'gpt-6-luna', 'low', undefined, undefined, undefined, undefined, observer);
+  assert.equal(result.summary, 'S');
+  assert.deepEqual(plain(events), ['attempt', ['searching', null], ['reading', null], ['writing', null]]);
+  runtime.stop();
+});

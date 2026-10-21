@@ -1866,3 +1866,81 @@ integrationTest('S7: expansion shallow research defaults to local and no images;
   await until(() => plugin.expansionBatches.get(parent.path).status !== 'running');
   assert.deepEqual(plain(runs), [{ researchMode: 'research', visualMode: 'auto' }]);
 });
+
+// ---- Segment B: research progress on the card, the unsaved preview and its clearing ----
+async function progressHarness(askModel) {
+  const h = await templateHarness({ language: 'en' });
+  const { ResearchProgressStore } = load('experiences/visual-map/research-progress.ts');
+  const store = new ResearchProgressStore();
+  h.plugin.researchProgress = store;
+  h.plugin.askModel = async (context, model, reasoning, signal, onExchange, onAccepted, onWeb, observer) => { onAccepted?.(); return askModel({ context, signal, observer, store, h }); };
+  return { ...h, store, noteNow: () => h.repo.readNote(h.topic.path) };
+}
+const FINAL = { summary: 'Final summary', detail: 'Final detail', visualReferences: [], suggestions: [] };
+integrationTest('S5: stage, preview and slow notice reach the store while the run is open; nothing is written before success, and the preview ends with the run', async () => {
+  const seen = [];
+  const h = await progressHarness(async ({ observer, store, h: harness }) => {
+    observer.onAttempt('a1', 1); observer.onStage('a1', 'searching', 'synthetic query'); observer.onSlow('a1', true, () => seen.push('resend'));
+    observer.onPreview('a1', { summary: 'Unsaved summary', detail: 'x'.repeat(900) + 'TAIL' });
+    const entry = JSON.parse(JSON.stringify(store.get(harness.topic.path)));
+    seen.push(entry, (await harness.repo.readNote(harness.topic.path)).detail, (await harness.repo.readNote(harness.topic.path)).summary);
+    store.get(harness.topic.path).resend();
+    return FINAL;
+  });
+  const before = await h.noteNow();
+  await h.run();
+  const [entry, detailDuring, summaryDuring] = seen;
+  assert.equal(entry.stage, 'searching'); assert.equal(entry.query, 'synthetic query'); assert.equal(entry.slow, true); assert.equal(entry.preview.summary, 'Unsaved summary');
+  assert.equal(entry.preview.detailTail.length, 600); assert.ok(entry.preview.detailTail.endsWith('TAIL'));
+  assert.equal(detailDuring, before.detail, 'the note is not written before the final result'); assert.equal(summaryDuring, before.summary);
+  assert.equal(seen[3], 'resend');
+  assert.equal(h.store.get(h.topic.path), undefined, 'the entry (and its preview) is gone when the run ends');
+  const after = await h.noteNow(); assert.match(after.detail, /Final detail/); assert.equal(after.summary, 'Final summary');
+});
+integrationTest('S5: Stop, a stale note and a parse failure all clear the preview and write nothing', async () => {
+  for (const scenario of ['stop', 'stale', 'parse']) {
+    const h = await progressHarness(async ({ observer, signal, store, h: harness }) => {
+      observer.onAttempt('a1', 1); observer.onPreview('a1', { summary: 'Unsaved', detail: 'Unsaved detail' });
+      assert.equal(store.get(harness.topic.path).preview.summary, 'Unsaved');
+      if (scenario === 'stop') { harness.plugin.activeTasks.get(harness.topic.path).abort(); throw Object.assign(new Error('cancelled'), { name: 'AbortError' }); }
+      if (scenario === 'stale') { await harness.repo.updateNote(harness.topic.path, { prompt: 'The user edited the question' }); return FINAL; }
+      throw new Error('The reply could not be parsed');
+    });
+    const before = await h.noteNow();
+    const warn = console.error; console.error = () => {};
+    try { await h.run(); } finally { console.error = warn; }
+    assert.equal(h.store.get(h.topic.path), undefined, `${scenario}: preview cleared`);
+    const after = await h.noteNow();
+    assert.equal(after.detail, before.detail, `${scenario}: nothing written`); assert.equal(after.summary, before.summary);
+    assert.notEqual(after.summary, 'Unsaved');
+  }
+});
+integrationTest('S5: a closed view does not stop the run from clearing its progress, and a chart step that took over the entry keeps it', async () => {
+  const h = await progressHarness(async ({ observer, h: harness }) => { observer.onAttempt('a1', 1); harness.view.closed = true; return FINAL; });
+  await h.run();
+  assert.equal(h.store.get(h.topic.path), undefined);
+  const charts = await progressHarness(async () => FINAL);
+  charts.plugin.addChartsAfterWrite = job => { charts.store.begin(job.path, 'charts-1', Date.now()); charts.store.stage(job.path, 'charts-1', 'charts', Date.now()); };
+  await charts.run();
+  assert.equal(charts.store.get(charts.topic.path).stage, 'charts', 'ending the research run does not remove the chart stage');
+});
+test('S4: card helpers show the stage text, tick the seconds as text only and the hover preview is plain text', () => {
+  let interval = null; const cleared = [];
+  const { VisualAgentMapView } = load('main.ts', { obsidian }, { setInterval: fn => { interval = fn; return 7; }, clearInterval: id => cleared.push(id) });
+  const view = new VisualAgentMapView({ app: {} }, { settings: { ...DEFAULT_SETTINGS, language: 'en' } });
+  assert.equal(view.researchStageText({ stage: 'searching', query: 'synthetic query' }), 'Searching: synthetic query');
+  assert.equal(view.researchStageText({ stage: 'searching' }), 'Searching');
+  assert.deepEqual(['waiting', 'reading', 'writing', 'charts'].map(stage => view.researchStageText({ stage })), ['Waiting for the model', 'Reading sources', 'Writing', 'Adding diagrams']);
+  const el = { isConnected: true, text: '', setText(value) { this.text = value; } };
+  view.trackResearchElapsed(el, Date.now() - 65_000);
+  interval(); assert.match(el.text, /1:0[4-6]/);
+  el.isConnected = false; interval();
+  assert.deepEqual(cleared, [7], 'the tick stops when no seconds are left on screen');
+  const block = { hidden: true }, summary = { setText(v) { this.text = v; } }, detail = { setText(v) { this.text = v; } };
+  view.hoverCard = {}; view.hoverResearch = { path: 'a.md', block, summary, detail };
+  view.plugin = { researchProgress: { get: () => ({ preview: { summary: '**raw** markdown stays literal', detailTail: 'tail' } }) } };
+  view.paintHoverResearch();
+  assert.equal(block.hidden, false); assert.equal(summary.text, '**raw** markdown stays literal'); assert.equal(detail.text, 'tail');
+  view.plugin = { researchProgress: { get: () => ({}) } }; view.paintHoverResearch();
+  assert.equal(block.hidden, true, 'no preview, no block');
+});

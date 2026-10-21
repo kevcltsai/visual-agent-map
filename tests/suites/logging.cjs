@@ -162,7 +162,7 @@ integrationTest('AI exchange log: milestones are optional, validated as an objec
     const file = path.join(directory, 'ai-exchanges.json');
     const valid = { id: '1', startedAt: 'now', topic: 'Topic', mode: 'task', model: 'test', effort: 'low', request: 'prompt', response: 'answer', status: 'completed', error: '' };
     // An older log without milestones loads; unknown keys inside milestones are not an error.
-    fs.writeFileSync(file, JSON.stringify([valid, { ...valid, id: '2', milestones: { receivedAt: '2026-01-01T00:00:00.000Z', futureKey: { a: 1 }, usage: { inputTokens: 3 } } }]));
+    fs.writeFileSync(file, JSON.stringify([valid, { ...valid, id: '2', milestones: { receivedAt: '2026-01-01T00:00:00.000Z', futureKey: { a: 1 }, usage: { inputTokens: 3 }, stream: 'stream-json', acceptedAt: '2026-01-01T00:00:00.000Z', firstEventAt: '2026-01-01T00:00:01.000Z', structuredCalls: 2, textBeforeToolChars: 12, slowShownAt: '2026-01-01T00:00:20.000Z', resendOf: 'old', resentAs: 'new', stages: [{ stage: 'writing', at: '2026-01-01T00:00:02.000Z' }], searches: [{ kind: 'search', startedAt: '2026-01-01T00:00:01.000Z', query: 'synthetic' }] } }]));
     const errors = [];
     const log = new AiExchangeLog(file, error => errors.push(error)); await log.load();
     assert.deepEqual(errors, []); assert.equal(log.getEntries().length, 2);

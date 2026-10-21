@@ -283,7 +283,7 @@ integrationTest('creating an integrated topic runs AI with full sources and keep
   const mapDoc = { id: 'map-a', title: 'map-a', version: 1, nodes: [first, second], viewport: { x: 0, y: 0, zoom: 1 } };
   await app.vault.create(mapPath, core.serializeMap(mapDoc));
   const { VisualAgentMapView } = load('main.ts', { obsidian });
-  const plugin = { repo, settings: { ...DEFAULT_SETTINGS }, rebuildDerivedData: async () => {}, askModel: async context => {
+  const plugin = { abortChartJobs: () => {}, addChartsAfterWrite: () => {}, repo, settings: { ...DEFAULT_SETTINGS }, rebuildDerivedData: async () => {}, askModel: async context => {
     assert.equal(context.mode, 'synthesize'); const allSources = context.referenceGroups.flatMap(group => group.documents).map(document => document.content).join('\n'); assert.match(allSources, /Saved onion note/); assert.match(allSources, /Caramelize slowly/); assert.match(allSources, /Saved bun note/);
     return { summary: 'Integrated answer', detail: 'Integrated detail', suggestions: [] };
   } };
@@ -314,7 +314,7 @@ integrationTest('saved integration is not offered for retry when derived-data re
   const mapDoc = { id: 'map-a', title: 'map-a', version: 1, nodes: [first, second], viewport: { x: 0, y: 0, zoom: 1 } };
   await app.vault.create(mapPath, core.serializeMap(mapDoc));
   const { VisualAgentMapView } = load('main.ts', { obsidian });
-  const plugin = { repo, settings: { ...DEFAULT_SETTINGS }, rebuildDerivedData: async () => { throw new Error('refresh unavailable'); }, askModel: async () => ({ summary: 'Combined', detail: 'Combined knowledge', suggestions: [] }) };
+  const plugin = { abortChartJobs: () => {}, addChartsAfterWrite: () => {}, repo, settings: { ...DEFAULT_SETTINGS }, rebuildDerivedData: async () => { throw new Error('refresh unavailable'); }, askModel: async () => ({ summary: 'Combined', detail: 'Combined knowledge', suggestions: [] }) };
   const view = new VisualAgentMapView({ app }, plugin); view.path = mapPath; view.map = mapDoc; view.render = () => {}; view.focusNode = () => {};
   await view.createIntegratedNode('Combined', [first, second], 'Compare', '');
   assert.equal((await repo.readMap(mapPath)).nodes.length, 3);
@@ -446,7 +446,7 @@ integrationTest('dragging synthesized roots persists coordinates and removal pre
   const {repo,app} = fixture(), path = await repo.createMap('Root operations', []), mapDoc = await repo.readMap(path);
   const first = await repo.createNote('First','a',mapDoc,path,'workspace'), second=await repo.createNote('Second','a',mapDoc,path,'workspace'); mapDoc.nodes.push(first,second);await repo.saveMap(path,mapDoc);
   let pending=Promise.resolve();
-  const plugin={repo,settings:{...DEFAULT_SETTINGS},rebuildDerivedData:()=>repo.rebuildDerivedData(),askModel:async()=>({summary:'Merged',detail:'Knowledge',visualReferences:[],suggestions:[]}),mutate(work){pending=pending.then(work);return pending}};
+  const plugin={abortChartJobs:()=>{},addChartsAfterWrite:()=>{},repo,settings:{...DEFAULT_SETTINGS},rebuildDerivedData:()=>repo.rebuildDerivedData(),askModel:async()=>({summary:'Merged',detail:'Knowledge',visualReferences:[],suggestions:[]}),mutate(work){pending=pending.then(work);return pending}};
   const {VisualAgentMapView}=load('main.ts',{obsidian},{requestAnimationFrame:run=>{run();return 1},cancelAnimationFrame(){}}); const view=new VisualAgentMapView({app},plugin);view.path=path;view.map=mapDoc;view.integrationMode=true;view.render=()=>{};view.focusNode=()=>{};view.drawEdges=()=>{};view.updateHistoryButtons=()=>{};
   await view.createIntegratedNode('Combined',[first,second],'Combine','');
   const root=view.map.nodes.find(n=>n.id!==first.id&&n.id!==second.id); assert.equal(root.parentId,null);assert.equal(view.integrationMode,false);

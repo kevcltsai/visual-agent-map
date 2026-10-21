@@ -1,3 +1,4 @@
+import { randomUUID } from "node:crypto";
 import {
   packReferenceChunks,
   referenceBatches,
@@ -16,7 +17,8 @@ import { CLAUDE_MODEL_CHOICES, providerForModel } from "../ai/providers/provider
 import type { CodexAppServerRuntime, CodexWebSearchEvent } from "../ai/runtime/codex-app-server";
 import type { ClaudeCodeCliRuntime } from "../ai/runtime/claude-code-cli";
 import type { AiExchangeLog, AiMilestones } from "../ai-exchange-log";
-import { runtimeStepProvider, type ExchangeSink } from "./runtime-step-provider";
+import type { ResearchObserver, ResearchStageName } from "../ai/research-observer";
+import { runtimeStepProvider, type ExchangeSink, type RuntimeTaskControls } from "./runtime-step-provider";
 import { prepareStep, StepRunner } from "./step-runner";
 import { referenceTask } from "./steps/reference/step";
 import { taskResponseShape } from "./steps/task/schemas";
@@ -28,7 +30,42 @@ import { readerFacingDetail } from "./steps/task/render";
 
 export { extractJsonObject } from "./steps/task/parse";
 
+/** How long a research request may go without any model event before the slow notice (and the re-send) is offered. */
+export const FIRST_EVENT_WAIT_MS = 20_000;
+
+/** Timer and wall clock of the first-event watchdog; tests replace it with a fake. */
+export interface AttemptClock {
+  now(): number;
+  setTimeout(callback: () => void, ms: number): unknown;
+  clearTimeout(handle: unknown): void;
+}
+function cancelled(): Error {
+  const error = new Error(t("ui.ai_task_cancelled"));
+  error.name = "AbortError";
+  return error;
+}
+const realClock: AttemptClock = {
+  now: () => Date.now(),
+  setTimeout: (callback, ms) => window.setTimeout(callback, ms),
+  clearTimeout: handle => window.clearTimeout(handle as number)
+};
+
+/** What one attempt of the observed main call needs on top of the shared controls. */
+interface AttemptSetup {
+  signal: AbortSignal;
+  /** The exchange id the previous attempt promised when it was replaced. */
+  exchangeId?: string;
+  extraMilestones: () => AiMilestones;
+  hooks: Pick<
+    RuntimeTaskControls,
+    "onAccepted" | "stream" | "onStreamMode" | "onFirstEvent" | "onStage" | "onStructuredDelta" | "onActivity"
+  >;
+  onExchange: (id: string) => void;
+}
+
 export interface AiTaskServiceOptions {
+  /** Clock of the first-event watchdog. Absent: the real one. */
+  clock?: AttemptClock;
   pluginDirectory: () => string;
   language: () => UiLanguage;
   defaultReasoning: () => ReasoningLevel;
@@ -53,9 +90,11 @@ export class AiTaskService {
     onExchange?: (id: string) => void,
     onRequestAccepted?: () => void,
     /** Receives provider web activity in the Codex webSearch event shape; results may contain snippets only, not page bodies. */
-    onWebSearchEvent?: (event: CodexWebSearchEvent) => void
+    onWebSearchEvent?: (event: CodexWebSearchEvent) => void,
+    /** Progress of a research request: stages, the answer being written (never saved) and the slow notice with its re-send. */
+    observer?: ResearchObserver
   ): Promise<AiResult> {
-    return this.execute(input, model, reasoning, signal, onExchange, onRequestAccepted, onWebSearchEvent);
+    return this.execute(input, model, reasoning, signal, onExchange, onRequestAccepted, onWebSearchEvent, observer);
   }
 
   /** `role` names the two reference rounds so they are logged as their own steps; every other request is a task or AIM step. */
@@ -67,6 +106,7 @@ export class AiTaskService {
     onExchange: ((id: string) => void) | undefined,
     onRequestAccepted: (() => void) | undefined,
     onWebSearchEvent: ((event: CodexWebSearchEvent) => void) | undefined,
+    observer: ResearchObserver | undefined,
     role?: TaskStepRole
   ): Promise<AiResult> {
     if (
@@ -178,19 +218,27 @@ export class AiTaskService {
           localCodex: context.researchMode === "local"
         })
       );
-      const { raw } = await runner.send(step, {
-        model,
-        effort,
-        topic: context.title,
-        mode: context.mode ?? "task",
-        task: { ...controls, onWebSearchEvent },
-        finish: "caller",
-        requestLog: "request",
-        onExchange: id => {
-          exchangeId = id;
-          onExchange?.(id);
-        }
-      });
+      const sendOnce = (setup?: AttemptSetup) =>
+        runner.send(step, {
+          model,
+          effort,
+          topic: context.title,
+          mode: context.mode ?? "task",
+          task: { ...controls, onWebSearchEvent, ...(setup ? { ...setup.hooks, signal: setup.signal } : {}) },
+          finish: "caller",
+          requestLog: "request",
+          ...(setup ? { exchangeId: setup.exchangeId, extraMilestones: setup.extraMilestones } : {}),
+          onExchange: id => {
+            exchangeId = id;
+            setup?.onExchange(id);
+            onExchange?.(id);
+          }
+        });
+      // Only the main call of a research request is observed (not reference extraction, a count repair or the chart step).
+      const { raw } =
+        observer && role === undefined && !input.countRepair
+          ? await this.sendObserved(observer, signal, accepted, sendOnce)
+          : await sendOnce();
       stage = t("log.stage_parsing_reply");
       let result = step.parse(raw);
       if (readerFacingDetail(input)) {
@@ -234,6 +282,7 @@ export class AiTaskService {
               onExchange,
               undefined,
               undefined,
+              undefined,
               role
             );
             // Only the detail comes from the repair; it runs local, so its summary, suggestions and visual
@@ -263,6 +312,150 @@ export class AiTaskService {
           t("log.stage_failure_0_1", stage, error instanceof Error ? error.message : String(error))
         );
       throw error;
+    }
+  }
+
+  /**
+   * The observed main call (S3, D-2026-10-25): each attempt runs one model request. Without a model event for
+   * {@link FIRST_EVENT_WAIT_MS} after the prompt is written the observer is told (`onSlow`), with a handle that replaces
+   * the attempt: it stops the old request, marks its exchange failed and sends the same prompt again inside this same
+   * call, so the caller's stale check and running flag stay as they are and nothing from the old attempt can be written.
+   * Never automatic. The task's own signal wins over a re-send.
+   */
+  private async sendObserved<Sent>(
+    observer: ResearchObserver,
+    taskSignal: AbortSignal | undefined,
+    accepted: (() => void) | undefined,
+    send: (setup: AttemptSetup) => Promise<Sent>
+  ): Promise<Sent> {
+    const clock = this.options.clock ?? realClock;
+    const iso = (): string => new Date(clock.now()).toISOString();
+    const safe = (callback: () => void): void => {
+      try {
+        callback();
+      } catch {
+        /* An observer must not be able to fail the request. */
+      }
+    };
+    let attemptNumber = 0;
+    let promisedId: string | undefined;
+    let previousExchange = "";
+    for (;;) {
+      if (taskSignal?.aborted) throw cancelled();
+      attemptNumber++;
+      const attemptId = randomUUID();
+      const controller = new AbortController();
+      const onTaskAbort = (): void => controller.abort();
+      taskSignal?.addEventListener("abort", onTaskAbort, { once: true });
+      const exchangeIdForAttempt = promisedId;
+      promisedId = undefined;
+      const extra: AiMilestones = previousExchange ? { resendOf: previousExchange } : {};
+      let exchangeId = "";
+      let resendRequested = false,
+        firstEvent = false,
+        watching = true,
+        timer: unknown;
+      // After a re-send or a stop, whatever the old attempt still reports is dropped.
+      const live = (): boolean => !controller.signal.aborted && !resendRequested;
+      const disarm = (): void => {
+        if (timer === undefined) return;
+        clock.clearTimeout(timer);
+        timer = undefined;
+      };
+      const resend = (): void => {
+        if (taskSignal?.aborted || !live() || firstEvent) return;
+        resendRequested = true;
+        disarm();
+        promisedId = randomUUID();
+        extra.resentAs = promisedId;
+        controller.abort();
+      };
+      const arm = (): void => {
+        disarm();
+        if (!watching || firstEvent || !live()) return;
+        timer = clock.setTimeout(() => {
+          timer = undefined;
+          if (firstEvent || !live()) return;
+          extra.slowShownAt = iso();
+          safe(() => observer.onSlow?.(attemptId, true, resend));
+        }, FIRST_EVENT_WAIT_MS);
+      };
+      const seen = (): boolean => {
+        if (!live()) return false;
+        if (!firstEvent) {
+          firstEvent = true;
+          disarm();
+          extra.firstEventAt ??= iso();
+          if (extra.slowShownAt) safe(() => observer.onSlow?.(attemptId, false));
+        }
+        return true;
+      };
+      const stage = (name: ResearchStageName, query?: string): void => {
+        const stages = (extra.stages ??= []);
+        if (stages.length < 20 && stages.at(-1)?.stage !== name) stages.push({ stage: name, at: iso() });
+        safe(() => observer.onStage?.(attemptId, name, query));
+      };
+      safe(() => observer.onAttempt?.(attemptId, attemptNumber));
+      const setup: AttemptSetup = {
+        signal: controller.signal,
+        exchangeId: exchangeIdForAttempt,
+        extraMilestones: () => ({ ...extra }),
+        hooks: {
+          stream: true,
+          onAccepted: (): void => {
+            accepted?.();
+            if (!live()) return;
+            extra.acceptedAt ??= iso();
+            arm();
+          },
+          // Without stream events (json mode) the first model event cannot be seen, so the notice would be a false alarm.
+          onStreamMode: mode => {
+            if (mode !== "stream-json") {
+              watching = false;
+              disarm();
+            }
+          },
+          onFirstEvent: () => {
+            seen();
+          },
+          onStage: (name, query) => {
+            if (seen()) safe(() => observer.onStage?.(attemptId, name, query));
+          },
+          onStructuredDelta: fields => {
+            if (!seen()) return;
+            const preview = fields ? { summary: fields.summary, detail: fields.detail } : null;
+            safe(() => observer.onPreview?.(attemptId, preview));
+          },
+          onActivity: activity => {
+            if (!seen() || activity === "started") return;
+            stage(activity);
+          }
+        },
+        onExchange: id => {
+          exchangeId = id;
+        }
+      };
+      // The race makes the loop independent of a runtime that is slow to honour the abort.
+      const replaced = new Promise<never>((_resolve, reject) =>
+        controller.signal.addEventListener("abort", () => reject(cancelled()), {
+          once: true
+        })
+      );
+      replaced.catch(() => undefined);
+      try {
+        const attempt = send(setup);
+        attempt.catch(() => undefined);
+        const sent = await Promise.race([attempt, replaced]);
+        // A reply that arrives after the user replaced this attempt is discarded.
+        if (!(resendRequested && !taskSignal?.aborted)) return sent;
+      } catch (error) {
+        if (taskSignal?.aborted || !resendRequested) throw error;
+      } finally {
+        disarm();
+        taskSignal?.removeEventListener("abort", onTaskAbort);
+      }
+      this.failExchange(exchangeId, t("log.research_resent_by_user"));
+      previousExchange = exchangeId;
     }
   }
 
@@ -501,6 +694,7 @@ export class AiTaskService {
           signal,
           undefined,
           onRequestAccepted,
+          undefined,
           undefined,
           round === 1 ? "reference-extract" : "reference-reduce"
         );

@@ -1,7 +1,10 @@
 import { spawn as nodeSpawn } from "node:child_process";
 import { t } from "../../i18n";
 import type { AiMilestones } from "../../ai-exchange-log";
+import type { PartialFields } from "../partial-structured";
+import type { ResearchStageName } from "../research-observer";
 import type { WebSearchEvent } from "../types";
+import { ClaudeStreamObserver, ClaudeTranscriptFacts } from "./claude-stream";
 
 interface ClaudeProcess {
   stdin: {
@@ -48,6 +51,18 @@ export interface ClaudeTaskControls {
   imageDataUrl?: string;
   /** Receives call facts (usage, text before the StructuredOutput call, an enforce retry) once the transcript is read. */
   onMilestones?: (data: AiMilestones) => void;
+  /**
+   * Observed research: with a response schema, read the CLI's `stream-json --include-partial-messages` output to report
+   * stages, the first model event and the StructuredOutput preview. The result still comes from the `result` record.
+   */
+  stream?: boolean;
+  /** Reports which output mode this call really uses, before the prompt is written. */
+  onStreamMode?: (mode: "stream-json" | "json" | "json-fallback") => void;
+  /** The first record that shows the model is working (stream mode only). */
+  onFirstEvent?: () => void;
+  onStage?: (stage: ResearchStageName, query?: string) => void;
+  /** The StructuredOutput text so far; `null` clears it (stream mode only). */
+  onStructuredDelta?: (fields: PartialFields | null) => void;
 }
 
 /** Splits an image data URL into the Messages API image source; anything else is rejected. */
@@ -120,51 +135,12 @@ export function claudeStructuredOutput(stdout: string, plainText = false): strin
   return JSON.stringify(record.structured_output);
 }
 
-/**
- * Facts read from the `--verbose` transcript array: the token usage of the result record, whether the main agent wrote
- * answer text (JSON or a "summary" field, not search narration) before its StructuredOutput tool call, and whether the CLI sent a "structured-output-enforce" reminder
- * (the model had to call the tool again). Anything the transcript does not show is left out.
- */
-/** Text that is the answer itself (JSON, or a `"summary"` field), not a short remark such as "Let me search". */
-function looksLikeAnswer(text: string): boolean {
-  const trimmed = text.trim();
-  return trimmed.startsWith("{") || trimmed.includes('"summary"');
-}
-
+/** Facts of the `--verbose` transcript array (see {@link ClaudeTranscriptFacts}); anything it does not show is left out. */
 export function claudeTranscriptMilestones(transcript: unknown): AiMilestones {
-  const milestones: AiMilestones = {};
-  if (!Array.isArray(transcript)) return milestones;
-  let structured = false,
-    textBefore = false,
-    enforce = false;
-  for (const item of transcript as unknown[]) {
-    if (!item || typeof item !== "object") continue;
-    const record = item as ClaudeRecord & { usage?: { input_tokens?: unknown; output_tokens?: unknown } };
-    if (record.type === "result") {
-      const input = record.usage?.input_tokens;
-      const output = record.usage?.output_tokens;
-      if (typeof input === "number" || typeof output === "number")
-        milestones.usage = {
-          ...(typeof input === "number" ? { inputTokens: input } : {}),
-          ...(typeof output === "number" ? { outputTokens: output } : {})
-        };
-      continue;
-    }
-    if (record.parent_tool_use_id) continue;
-    if (record.type === "assistant") {
-      for (const block of record.message?.content ?? []) {
-        if (block.type === "tool_use" && block.name === "StructuredOutput") structured = true;
-        else if (block.type === "text" && !structured && typeof block.text === "string" && looksLikeAnswer(block.text))
-          textBefore = true;
-      }
-    } else if (record.type === "user" && JSON.stringify(record.message ?? "").includes("structured-output-enforce"))
-      enforce = true;
-  }
-  if (structured) {
-    milestones.textBeforeTool = textBefore;
-    milestones.enforceRetry = enforce;
-  }
-  return milestones;
+  if (!Array.isArray(transcript)) return {};
+  const facts = new ClaudeTranscriptFacts();
+  for (const item of transcript as unknown[]) facts.read(item);
+  return facts.milestones();
 }
 
 /** Above this the verbose transcript is not kept; a truncated JSON array could not be parsed anyway. */
@@ -237,24 +213,45 @@ function abortError(): Error {
   return error;
 }
 
+/** The CLI refused the stream flags while starting up (an older CLI), as opposed to a failure of the model call. */
+export function streamFlagsRejected(stderr: string): boolean {
+  return /unknown option|unrecognized (option|argument)|argument '[^']*' is invalid|--include-partial-messages|--output-format/i.test(
+    stderr
+  );
+}
+
 export class ClaudeCodeCliRuntime {
   private readonly spawn: ClaudeSpawn;
+  /** Set when this CLI rejected the stream flags at start-up; later observed calls use json mode straight away. */
+  private streamUnsupported = false;
   constructor(private readonly options: ClaudeCodeCliOptions) {
     this.spawn = options.spawn ?? nodeSpawn;
   }
 
-  async runTask(
+  runTask(
     prompt: string,
     model: string,
     effort: string,
     outputSchema: unknown,
     controls: ClaudeTaskControls = {}
   ): Promise<string> {
+    return this.run(prompt, model, effort, outputSchema, controls, false);
+  }
+
+  private async run(
+    prompt: string,
+    model: string,
+    effort: string,
+    outputSchema: unknown,
+    controls: ClaudeTaskControls,
+    fallback: boolean
+  ): Promise<string> {
     if (controls.signal?.aborted) throw abortError();
     const webSearch = controls.webSearch ?? (controls.searchBudget ?? 0) > 0;
     const args = claudeTaskArgs(model, effort, outputSchema, webSearch);
     // An image travels as a content block, which only the stream-json input format can carry.
     const image = controls.imageDataUrl ? claudeImageSource(controls.imageDataUrl) : null;
+    const observed = !!outputSchema && controls.stream === true && !image && !fallback && !this.streamUnsupported;
     if (controls.onText && !outputSchema) {
       args[args.indexOf("json")] = "stream-json";
       args.push("--include-partial-messages");
@@ -262,6 +259,16 @@ export class ClaudeCodeCliRuntime {
     } else if (image) {
       args[args.indexOf("json")] = "stream-json";
       args.push("--input-format", "stream-json");
+    } else if (observed) {
+      args[args.indexOf("json")] = "stream-json";
+      args.push("--include-partial-messages");
+    }
+    if (outputSchema && controls.stream === true) {
+      try {
+        controls.onStreamMode?.(observed ? "stream-json" : fallback ? "json-fallback" : "json");
+      } catch {
+        /* Diagnostics are best effort. */
+      }
     }
     controls.onRequest?.({
       provider: "claude",
@@ -303,13 +310,29 @@ export class ClaudeCodeCliRuntime {
         currentText = "",
         finalResult = "";
       // Image input forces stream-json output, read line by line like a streamed reply.
-      const streaming = (!!controls.onText && !outputSchema) || !!image;
+      const streaming = (!!controls.onText && !outputSchema) || !!image || observed;
       const activity = new ClaudeWebActivity(controls.onWebSearchEvent);
+      const observer = observed
+        ? new ClaudeStreamObserver({
+            onFirstEvent: controls.onFirstEvent,
+            onStage: controls.onStage,
+            onStructuredDelta: controls.onStructuredDelta
+          })
+        : null;
       const readStreamLine = (line: string): void => {
         // The CLI can print plain-text warnings between JSON records; only records carry task state.
         if (!line.trim().startsWith("{")) return;
-        const parsedLine: unknown = JSON.parse(line);
+        let parsedLine: unknown;
+        try {
+          parsedLine = JSON.parse(line);
+        } catch (error) {
+          // A line that cannot be read ends the stage and preview updates only; the result is still taken from `result`.
+          if (!observer) throw error;
+          observer.stop();
+          return;
+        }
         activity.read(parsedLine);
+        observer?.read(parsedLine);
         const record = parsedLine as {
           type?: string;
           parent_tool_use_id?: string | null;
@@ -354,16 +377,26 @@ export class ClaudeCodeCliRuntime {
         window.clearTimeout(timeout);
         controls.signal?.removeEventListener("abort", onAbort);
       };
+      // Best effort: call facts never fail the task.
+      const reportMilestones = (data: AiMilestones): void => {
+        try {
+          if (Object.keys(data).length) controls.onMilestones?.(data);
+        } catch {
+          /* Diagnostics are best effort. */
+        }
+      };
       const finish = (error?: Error, result?: string): void => {
         if (settled) return;
         settled = true;
         cleanup();
+        if (observer) reportMilestones(observer.milestones());
         if (error) reject(error);
         else resolve(result ?? "");
       };
       const markAccepted = (): void => {
         if (accepted || settled || controls.signal?.aborted) return;
         accepted = true;
+        observer?.accepted();
         controls.onAccepted?.();
       };
       let killTimer: number | undefined;
@@ -430,21 +463,25 @@ export class ClaudeCodeCliRuntime {
         if (killTimer) window.clearTimeout(killTimer);
         finish(new Error(t("ui.could_not_start_claude_code_0_1", this.options.executable, error.message)));
       });
-      // Best effort: call facts never fail the task.
-      const reportMilestones = (transcript: unknown): void => {
-        try {
-          const data = claudeTranscriptMilestones(transcript);
-          if (Object.keys(data).length) controls.onMilestones?.(data);
-        } catch {
-          /* Diagnostics are best effort. */
-        }
-      };
       child.on("close", code => {
         if (killTimer) window.clearTimeout(killTimer);
         if (settled) return;
+        if (observer && code !== 0 && !finalResult && !observer.sawModel() && streamFlagsRejected(stderr)) {
+          // This CLI does not know the stream flags (it stopped before any model call): run once more in json mode and
+          // remember it, so later calls do not pay for the failed start.
+          settled = true;
+          cleanup();
+          this.streamUnsupported = true;
+          this.options.onLog?.("warn", t("log.claude_stream_fallback"));
+          this.run(prompt, model, effort, outputSchema, controls, true).then(resolve, reject);
+          return;
+        }
         if (!streaming && controls.onMilestones) {
           try {
-            reportMilestones(JSON.parse(stdout));
+            reportMilestones({
+              ...(outputSchema && controls.stream === true ? { stream: fallback ? "json-fallback" : "json" } : {}),
+              ...claudeTranscriptMilestones(JSON.parse(stdout))
+            });
           } catch {
             /* A broken transcript is reported by the result parsing below. */
           }
@@ -498,7 +535,7 @@ export class ClaudeCodeCliRuntime {
           controls.onSteer?.(async text => {
             sendInput(text);
           });
-        } else if (controls.onAccepted) {
+        } else if (controls.onAccepted || observer) {
           child.stdin.end(prompt, error => {
             if (error) {
               stop();

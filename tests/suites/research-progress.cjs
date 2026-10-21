@@ -151,3 +151,29 @@ test('research progress: end and unsubscribe leave no pending timers', () => {
   assert.doesNotThrow(() => clock.advance(1000));
   store.end('missing.md');
 });
+
+test('research progress: end with an attempt id only removes the entry that attempt still owns', () => {
+  const { store, calls } = setup();
+  store.begin('a.md', 'run', 0);
+  store.begin('a.md', 'charts-1', 5);
+  store.end('a.md', 'run');
+  assert.equal(store.get('a.md').attemptId, 'charts-1', 'the chart step that took over keeps its entry');
+  store.end('a.md', 'charts-1');
+  assert.equal(store.get('a.md'), undefined);
+  assert.ok(calls.length >= 3);
+});
+
+test('research progress: the re-send handle lives only while slow and for the current attempt', () => {
+  const { store } = setup();
+  const resend = () => {};
+  store.begin('a.md', 'a1', 0);
+  store.markSlow('a.md', 'old', true, resend);
+  assert.equal(store.get('a.md').slow, false, 'a stale attempt cannot raise the notice');
+  store.markSlow('a.md', 'a1', true, resend);
+  assert.equal(store.get('a.md').resend, resend);
+  store.markSlow('a.md', 'a1', false);
+  assert.equal(store.get('a.md').resend, undefined);
+  store.markSlow('a.md', 'a1', true, resend);
+  store.newAttempt('a.md', 'a2', 30);
+  assert.equal(store.get('a.md').slow, false); assert.equal(store.get('a.md').resend, undefined);
+});

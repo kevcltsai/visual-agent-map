@@ -34,6 +34,10 @@ export interface RuntimeStepControls {
   requestLog?: "request-and-prompt" | "request";
   /** Runs when the reply arrives, before it is logged as received; throw to refuse it (for example after a stop). */
   afterReply?: () => void;
+  /** Use this id for the exchange log entry instead of a new one (a re-send names the attempt that replaces this one). */
+  exchangeId?: string;
+  /** Facts the caller knows about this call (for example a slow notice or a re-send), merged into the entry when it is written. */
+  extraMilestones?: () => AiMilestones;
 }
 
 /** The part of the exchange log the provider writes; a caller can pass a guarded view of the real log. */
@@ -69,7 +73,9 @@ export function runtimeStepProvider(options: RuntimeStepProviderOptions): StepPr
         onExchange,
         finish = "completed",
         requestLog = "request-and-prompt",
-        afterReply
+        afterReply,
+        exchangeId,
+        extraMilestones
       } = call.controls;
       // Log only when logging was on at the start, and re-check before every later write so turning it off mid-call stops recording.
       const started = options.exchanges();
@@ -91,9 +97,15 @@ export function runtimeStepProvider(options: RuntimeStepProviderOptions): StepPr
       const writeMilestones = (): void => {
         if (milestonesWritten) return;
         milestonesWritten = true;
+        try {
+          // The runtime's own measurements win over the caller's.
+          Object.assign(milestones, { ...extraMilestones?.(), ...milestones });
+        } catch {
+          /* Diagnostics are best effort. */
+        }
         if (Object.keys(milestones).length) exchanges.milestones(id, milestones);
       };
-      const id = randomUUID();
+      const id = exchangeId ?? randomUUID();
       started?.begin({
         id,
         startedAt: new Date().toISOString(),

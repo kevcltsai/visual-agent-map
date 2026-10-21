@@ -8,7 +8,7 @@ const { load, obsidian, fixture, TFile, TFolder } = require('./support.cjs');
 const { safeName, linkAlias } = load('repository.ts', { obsidian });
 
 const noLoneSurrogate = value => !/[\ud800-\udbff](?![\udc00-\udfff])|(?<![\ud800-\udbff])[\udc00-\udfff]/.test(value) && !value.includes('\ufffd');
-const fold = name => name.normalize('NFC').toUpperCase().toLowerCase();
+const fold = name => name.normalize('NFC').toLowerCase().replace(/ς/g, 'σ'); // like APFS: case and sigma only, not ß
 function foldingVault(language = 'en') {
   const env = fixture(language);
   const vault = env.app.vault, create = vault.create, createFolder = vault.createFolder, rename = vault.rename;

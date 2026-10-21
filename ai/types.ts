@@ -39,6 +39,8 @@ export interface TaskContext {
   /** "direct" (merge and synthesize): send the reference documents themselves when they fit one batch, instead of extracting findings first. */
   referenceDelivery?: "direct";
   onProgress?: (message: string) => void;
+  /** Called once with the Working Findings text that was actually put in the prompt, after the context budget step (a count repair does not call it). */
+  onWorkingFindingsSent?: (sent: string) => void;
   signal?: AbortSignal;
   outputLanguage?: UiLanguage;
   mode?: AiTaskKind;

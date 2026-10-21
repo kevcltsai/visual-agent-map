@@ -2358,3 +2358,51 @@ integrationTest('synthesis carry-forward: URLs in a legacy separate Visual Refer
   assert.ok(file.includes('https://legacy-src.example/page'));
   assert.match((await f.repo.readNote(f.parent.path)).detail, /Sources from earlier research[\s\S]*legacy-src\.example/);
 });
+
+// ---- B8: child synthesis sends the parent's Working Findings; they are cleared on save only if they were sent.
+const { capturingRuntime, makeService } = require('../support-replay.cjs');
+async function findingsFixture(findings, language = 'en') {
+  const f = await backgroundSynthesisFixture(async () => assert.fail('replaced below'));
+  const directions = JSON.stringify({ summary: '', detail: '', visualReferences: [], suggestions: [{ title: 'Common ground', task: 'Find shared constraints', contribution: 'A shared view', parentTitle: '' }] });
+  const draft = JSON.stringify({ summary: 'Draft summary', detail: 'Draft detail', visualReferences: [], suggestions: [] });
+  f.runtime = capturingRuntime([directions, draft]);
+  const service = makeService(f.runtime, { language });
+  f.plugin.askModel = (context, _model, _reasoning, signal, _exchange, onAccepted) => service.askModel(context, 'gpt-6-luna', 'low', signal, undefined, onAccepted);
+  await f.repo.updateNote(f.parent.path, { newFindings: findings });
+  const child = f.view.map.nodes.find(item => item.parentId === f.parent.id);
+  await f.repo.updateNote(child.path, { status: 'completed', summary: 'Child summary', detail: 'Child finding.' });
+  return f;
+}
+integrationTest('B8: directions and synthesis prompts carry the parent Working Findings under their label', async () => {
+  const f = await findingsFixture('PARENT_WORKING_FINDING_TEXT');
+  await synthesize(f);
+  assert.equal(f.runtime.calls.length, 2);
+  for (const call of f.runtime.calls) assert.match(call.prompt, /Older findings to consolidate:\nPARENT_WORKING_FINDING_TEXT/);
+  assert.equal((await f.repo.readNote(f.parent.path)).newFindings, '', 'the findings the model saw are folded into the rewrite and cleared');
+});
+integrationTest('B8: empty Working Findings add no label to the prompt and the save is as before', async () => {
+  const f = await findingsFixture('');
+  await synthesize(f);
+  for (const call of f.runtime.calls) assert.doesNotMatch(call.prompt, /Older findings to consolidate/);
+  assert.equal((await f.repo.readNote(f.parent.path)).newFindings, '');
+});
+integrationTest('B8: Working Findings the context budget cut off are kept on save', async () => {
+  const f = await findingsFixture('KEPT_FINDING_START ' + 'x'.repeat(140000));
+  await synthesize(f);
+  assert.equal(f.runtime.calls.length, 2);
+  assert.ok(!f.runtime.calls[1].prompt.includes('x'.repeat(140000)), 'the findings were cut');
+  const saved = await f.repo.readNote(f.parent.path);
+  assert.equal(saved.summary, 'Draft summary');
+  assert.match(saved.newFindings, /^KEPT_FINDING_START x+$/);
+});
+integrationTest('B8: Working Findings edited while the synthesis runs make the save refuse and are not cleared', async () => {
+  const f = await findingsFixture('Original finding');
+  await f.view.startSynthesis(f.parent, f.options(), null, m => assert.fail(m), () => {});
+  const failures = []; let save;
+  await f.view.integrateChildren(f.parent, f.options(), 'Find shared constraints', (_result, commit) => { save = commit; }, m => failures.push(m));
+  await f.repo.updateNote(f.parent.path, { newFindings: 'Edited by the user meanwhile' });
+  await assert.rejects(save('S', 'D'), /changed/i);
+  const saved = await f.repo.readNote(f.parent.path);
+  assert.equal(saved.newFindings, 'Edited by the user meanwhile');
+  assert.notEqual(saved.summary, 'S');
+});

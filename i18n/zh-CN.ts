@@ -413,7 +413,7 @@ export const zhCN: Partial<Record<TranslationKey, string>> = {
   "ui.additional_requirements": "本次附加要求（选填）",
   "ui.ai_subtopic_proposals": "AI 子议题提案",
   "ui.select_subtopics_to_create_you_can_edit_their_names_and_task": "勾选要创建的子议题；创建前可直接修改名称与任务。",
-  "ui.contribution_to_the_parent_topic": "对母议题的贡献",
+  "ui.contribution_to_the_parent_topic": "对父议题的贡献",
   "ui.confirm_topic_synthesis": "确认整合议题",
   "ui.source_topics": "来源议题",
   "ui.expand": "展开",
@@ -431,7 +431,7 @@ export const zhCN: Partial<Record<TranslationKey, string>> = {
   "ui.mind_map_data_was_not_found_keep_the_agent_map_block": "找不到心智图数据区块，请保留 agent-map 区块。",
   "ui.invalid_mind_map_format": "心智图格式不正确。",
   "ui.invalid_node_data_or_duplicate_id": "议题数据不正确或 ID 重复。",
-  "ui.a_link_contains_a_cycle_or_points_to_a_missing_parent_topic": "链接有循环或指向不存在的母议题。",
+  "ui.a_link_contains_a_cycle_or_points_to_a_missing_parent_topic": "链接有循环或指向不存在的父议题。",
   "ui.ai_task_cancelled": "AI 任务已取消",
   "ui.codex_app_server_has_stopped": "Codex App Server 已停止",
   "ui.codex_app_server_did_not_create_a_thread": "Codex App Server 没有创建 thread",
@@ -608,9 +608,9 @@ export const zhCN: Partial<Record<TranslationKey, string>> = {
   "ui.merge": "合并",
   "ui.merge_0_topics": "合并 {0} 个议题",
   "ui.merge_needs_two": "选 2 个以上议题才能合并",
-  "ui.merge_needs_same_parent": "只能合并同一个母议题底下的议题（或都是最上层议题）",
-  "ui.merge_ancestor_selected": "只能合并同一层的议题，或一个母议题和它的直属子议题",
-  "ui.merge_parent_direct_only": "只能合并母议题和它的直属子议题",
+  "ui.merge_needs_same_parent": "只能合并同一个父议题底下的议题（或都是最上层议题）",
+  "ui.merge_ancestor_selected": "只能合并同一层的议题，或一个父议题和它的直属子议题",
+  "ui.merge_parent_direct_only": "只能合并父议题和它的直属子议题",
   "ui.merge_into_parent_desc":
     "{1} 张子议题卡的内容会并进“{0}”并保留它在图上的位置；子议题的原笔记移到这张图的 Unassigned，它们底下的子议题改挂到“{0}”；可以用撤销还原。",
   "ui.merge_into_parent_ai_desc":
@@ -648,7 +648,7 @@ export const zhCN: Partial<Record<TranslationKey, string>> = {
   "ui.selected_branches_leave_the_map_their_notes_move_to_unassign":
     "选择的分支会从图中移除，笔记移到 Unassigned，可撤销。",
   "ui.confirm_removal": "确认移除",
-  "ui.choose_a_new_parent_topic": "选择新的母议题",
+  "ui.choose_a_new_parent_topic": "选择新的父议题",
   "ui.how_would_you_like_to_explore_next": "接下来想怎么探索？",
   "ui.choose_another_note_source_first": "请先选择其他笔记来源。",
   "ui.the_selected_sources_contain_no_markdown_content_to_synthesi": "所选来源没有可整合的 Markdown 内容。",
@@ -665,7 +665,7 @@ export const zhCN: Partial<Record<TranslationKey, string>> = {
   "ui.get_synthesis_draft": "开始整合",
   "ui.get_synthesis_suggestions_first": "先取得整合建议",
   "ui.ai_suggests_synthesis_angles_first_the_parent_topic_changes":
-    "AI 先提出整合角度；选定方向并完成整合后，会直接更新母议题，可撤销。",
+    "AI 先提出整合角度；选定方向并完成整合后，会直接更新父议题，可撤销。",
   "ui.ai_did_not_suggest_a_synthesis_direction_please_retry": "AI 未提出整合方向，请重试。",
   "ui.choose_directions_together": "一起选方向",
   "ui.quickly_explore_a_map": "快速探索心智图",
@@ -679,7 +679,7 @@ export const zhCN: Partial<Record<TranslationKey, string>> = {
   "ui.layout": "排版",
   "ui.expansion_failed": "展开失败",
   "ui.the_map_or_parent_topic_changed_while_ai_was_running_no_subt":
-    "心智图或母议题在 AI 运行期间已变更，未创建子议题。",
+    "心智图或父议题在 AI 运行期间已变更，未创建子议题。",
   "ui.ai_suggests_one_level_of_subtopics_review_or_edit_them_befor":
     "AI 只提出下一层子议题，你选择或修改后才创建；要再往下，之后在子议题上再探索。",
   "ui.create_subtopics_after_confirmation_without_running_research": "确认后只创建子议题，不运行研究",
@@ -723,12 +723,12 @@ export const zhCN: Partial<Record<TranslationKey, string>> = {
   "ui.relink_note": "重新链接笔记",
   "ui.use_this_note": "使用这份笔记",
   "ui.structure_and_links": "结构与链接",
-  "ui.parent_topic": "所属母议题",
-  "ui.parent_topic_link": "母议题／链接",
-  "ui.no_parent_root_topic": "无母议题（根议题）",
+  "ui.parent_topic": "所属父议题",
+  "ui.parent_topic_link": "父议题／链接",
+  "ui.no_parent_root_topic": "无父议题（根议题）",
   "ui.circular_links_are_not_allowed": "不能创建循环链接。",
   "ui.changing_the_parent_affects_context_for_the_next_ai_task_the":
-    "更换母议题会影响下次 AI 任务取得的背景，不会更动模型。",
+    "更换父议题会影响下次 AI 任务取得的背景，不会更动模型。",
   "ui.the_note_will_move_to_this_topic_s_unassigned_folder_you_can":
     "笔记会移至当前主题的 Unassigned，可重新认领或复原。",
   "ui.remove_only_this_node_children_become_roots": "只移除此议题，子议题变成根议题",
@@ -1019,7 +1019,7 @@ export const zhCN: Partial<Record<TranslationKey, string>> = {
   "ui.search_for_image_references": "搜索图片参考",
   "ui.shallow_research_for_expanded_subtopics_0": "子题研究：{0}",
   "ui.shallow_research_local_description": "依主题与你提供的来源回答，不搜索网络。勾选下方选项才会搜索。",
-  "ui.select_the_parent_topic_before_its_child": "请先勾选子议题的母议题。",
+  "ui.select_the_parent_topic_before_its_child": "请先勾选子议题的父议题。",
   "ui.first_level_topic_names_must_be_unique": "第一层子议题名称不能重复。",
   "ui.ai_proposed_duplicate_first_level_names_generate_the_proposa": "AI 提案的第一层名称重复，请重新产生提案。",
   "ui.specify_an_expansion_direction_or_ask_ai_to_suggest_one_prev":

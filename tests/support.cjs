@@ -87,7 +87,7 @@ const obsidian = { setIcon: (parent, name) => { parent.iconName = name; }, Menu:
   stringifyYaml: obj => YAML.stringify(obj, null, { nullStr: '', lineWidth: 0, aliasDuplicateObjects: false })
 };
 const { Repository, DEFAULT_SETTINGS, normalizeReasoningLevel } = load('repository.ts', { obsidian });
-function fixture(language = 'zh-TW') {
+function fixture(language = 'zh-TW', options = {}) {
   const files = new Map(), contents = new Map();
   const attach = item => { const folderPath = item.path.split('/').slice(0, -1).join('/'); item.parent = files.get(folderPath) || null; // Obsidian's vault tree hides dot-files and dot-folders; the adapter (disk) listing below still reports them.
     if (item.parent instanceof TFolder && !item.name.startsWith('.') && !item.parent.children.includes(item)) item.parent.children.push(item); };
@@ -100,6 +100,8 @@ function fixture(language = 'zh-TW') {
     create: async (p, content) => { assert.equal(files.has(p), false); const file = new TFile(p); files.set(p, file); contents.set(p, content); attach(file); return file; },
     createBinary: async (p, content) => { assert.equal(files.has(p), false); const file = new TFile(p); files.set(p, file); contents.set(p, content); attach(file); return file; },
     process: async (file, change) => { contents.set(file.path, change(contents.get(file.path))); },
+    // Moves without touching any link, like Obsidian's Vault.rename.
+    rename: async (item, target) => renameTree(item.path, target),
     adapter: {
       exists: async p => files.has(p),
       mkdir: async p => { if (files.has(p)) throw new Error(`Folder already exists: ${p}`); const folder = new TFolder(p); files.set(p, folder); attach(folder); },
@@ -108,7 +110,9 @@ function fixture(language = 'zh-TW') {
       write: async (p, value) => { if (!files.has(p)) { const file = new TFile(p); files.set(p, file); attach(file); } contents.set(p, value); },
       process: async (p, change) => { if (!contents.has(p)) throw new Error(`Missing file: ${p}`); const next = change(contents.get(p)); contents.set(p, next); return next; }
     }
-  }, metadataCache: { getFileCache: file => { const text = contents.get(file.path) || ''; const block = text.match(/^---\r?\n([\s\S]*?)\r?\n---/)?.[1]; return { frontmatter: block ? obsidian.parseYaml(block) : {} }; }, getFirstLinkpathDest: link => Array.from(files.values()).find(file => file instanceof TFile && (file.basename === link || file.path.replace(/\.md$/, '') === link)) || null }, fileManager: { renameFile: async (item, target) => renameTree(item.path, target), trashFile: async () => {} } };
+  }, metadataCache: { getFileCache: file => { const text = contents.get(file.path) || ''; const block = text.match(/^---\r?\n([\s\S]*?)\r?\n---/)?.[1]; return { frontmatter: block ? obsidian.parseYaml(block) : {} }; }, getFirstLinkpathDest: link => { const key = link.replace(/\.md$/, ''); return Array.from(files.values()).find(file => file instanceof TFile && (file.basename === key || file.path.replace(/\.md$/, '') === key)) || null; } }, fileManager: { renameFile: async (item, target) => renameTree(item.path, target), trashFile: async () => {} } };
+  // Opt-in link index: resolvedLinks is computed from the current text (frontmatter and body wikilinks), like Obsidian's.
+  if (options.linkIndex) Object.defineProperty(app.metadataCache, 'resolvedLinks', { configurable: true, get: () => { const index = {}; for (const [path, text] of contents) { if (!(files.get(path) instanceof TFile) || !path.endsWith('.md')) continue; for (const match of String(text).matchAll(/!?\[\[([^\]|#\n]+)/g)) { const dest = app.metadataCache.getFirstLinkpathDest(match[1].trim()); if (!dest) continue; index[path] ||= {}; index[path][dest.path] = (index[path][dest.path] || 0) + 1; } } return index; } });
   return { app, contents, files, repo: new Repository(app, { ...DEFAULT_SETTINGS, language }) };
 }
 async function topicNote(repo, title = '題目', model = 'model-a', id = 'map-a') {

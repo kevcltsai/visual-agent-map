@@ -7,6 +7,7 @@
 - Integrate subtopics no longer loses the source links of the parent topic's earlier research. Any link (web address, note link or local file) the new summary and detail leave out is kept in a "Sources from earlier research" block at the end of the sources section. This adds no AI request, and Undo still restores the topic exactly as it was.
 - The goal-grading button is now named "Prioritize by goal", and its panel no longer closes by itself when the map repaints or focus returns from a dialog; if it cannot open, a notice says why.
 - Map cards now work from the keyboard: Delete or Backspace removes the focused card (with an Undo notice, or the usual confirmation when it has subtopics), Mod+Enter adds a subtopic, Shift+Enter adds a sibling, double-clicking a title renames it, and Mod+Z / Mod+Shift+Z undo and redo while the map is the active pane.
+- Merging, removing, archiving, renaming and undoing topics no longer pops up Obsidian's "Update links" dialog when only VAM notes link to the moved cards: VAM updates its own links itself. If one of your own notes links to a moved card, VAM shows a short notice first and Obsidian asks as before, so your links are never silently broken.
 
 ## [0.24.0] - 2026-10-22
 

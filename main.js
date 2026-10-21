@@ -706,6 +706,7 @@ var english = {
   "ui.merge_bar_title": "Merging:",
   "ui.merge_locked": "Merging; try again when it finishes",
   "ui.merge_done_0": "Merged into \u201C{0}\u201D. You can undo.",
+  "ui.move_links_dialog_notice_0": "{0} of your other notes link to this card. Obsidian may ask whether to update links; choose Update so they keep working.",
   "ui.merge_check_warning_0": "{0} item(s) of source content may be missing or changed in the merge.",
   "log.merge_check_warning": "AI merge check: source content not preserved",
   "ui.synthesis_written_0": "Synthesis written to \u201C{0}\u201D. You can undo.",
@@ -848,6 +849,8 @@ var english = {
   "error.map_folder_exists": "Folder name not changed: the new folder already contains a topic with the same name.",
   "error.map_folder_unreadable": "Folder name not changed: a map in the folder cannot be read, so it would be left behind. Fix or move it first.",
   "error.map_folder_rename_failed": "Folder name not changed: the folder could not be renamed.",
+  "error.move_links_note_changed_0": "Links in {0} could not be updated because the note changed.",
+  "error.move_undo_failed_0": "Move failed ({0}); undoing it also failed ({1}).",
   "error.move_not_applied": "A folder move did not take effect on disk, so the operation was stopped and restored.",
   "error.plugin_unloaded": "Visual Agent Map was unloaded, so the operation stopped before its next step.",
   "error.legacy_map_view_only": "This map uses the pre-0.4 structure and is view-only.",
@@ -2314,6 +2317,7 @@ var traditionalChinese = {
   "ui.merge_bar_title": "\u5408\u4F75\u4E2D\uFF1A",
   "ui.merge_locked": "\u5408\u4F75\u4E2D\uFF0C\u5B8C\u6210\u5F8C\u518D\u64CD\u4F5C",
   "ui.merge_done_0": "\u5DF2\u5408\u4F75\u6210\u300C{0}\u300D\uFF0C\u53EF\u5FA9\u539F",
+  "ui.move_links_dialog_notice_0": "\u4F60\u6709 {0} \u7BC7\u5176\u4ED6\u7B46\u8A18\u9023\u5230\u9019\u5F35\u5361\uFF1BObsidian \u53EF\u80FD\u6703\u8A62\u554F\u662F\u5426\u66F4\u65B0\u9023\u7D50\uFF0C\u5EFA\u8B70\u9078\u300C\u66F4\u65B0\u300D\uFF0C\u9023\u7D50\u624D\u4E0D\u6703\u5931\u6548\u3002",
   "ui.merge_check_warning_0": "\u5408\u4F75\u5F8C\u6709 {0} \u9805\u4F86\u6E90\u5167\u5BB9\u53EF\u80FD\u907A\u6F0F",
   "log.merge_check_warning": "AI \u5408\u4F75\u6AA2\u67E5\uFF1A\u4F86\u6E90\u5167\u5BB9\u672A\u5B8C\u6574\u4FDD\u7559",
   "ui.synthesis_written_0": "\u5DF2\u6574\u5408\u4E26\u5BEB\u5165\u300C{0}\u300D\uFF0C\u53EF\u5FA9\u539F",
@@ -2456,6 +2460,8 @@ var traditionalChinese = {
   "error.map_folder_exists": "\u8CC7\u6599\u593E\u540D\u7A31\u672A\u8B8A\u66F4\uFF1A\u65B0\u8CC7\u6599\u593E\u5167\u5DF2\u6709\u540C\u540D\u9805\u76EE\u3002",
   "error.map_folder_unreadable": "\u8CC7\u6599\u593E\u540D\u7A31\u672A\u8B8A\u66F4\uFF1A\u8CC7\u6599\u593E\u5167\u6709\u7121\u6CD5\u8B80\u53D6\u7684\u5FC3\u667A\u5716\uFF0C\u6703\u88AB\u7559\u5728\u539F\u8655\u3002\u8ACB\u5148\u4FEE\u5FA9\u6216\u79FB\u8D70\u3002",
   "error.map_folder_rename_failed": "\u8CC7\u6599\u593E\u540D\u7A31\u672A\u8B8A\u66F4\uFF1A\u7121\u6CD5\u91CD\u65B0\u547D\u540D\u8A72\u8CC7\u6599\u593E\u3002",
+  "error.move_links_note_changed_0": "{0} \u5167\u7684\u9023\u7D50\u7121\u6CD5\u66F4\u65B0\uFF0C\u56E0\u70BA\u8A72\u7B46\u8A18\u5DF2\u88AB\u4FEE\u6539\u3002",
+  "error.move_undo_failed_0": "\u642C\u79FB\u5931\u6557\uFF08{0}\uFF09\uFF1B\u9084\u539F\u642C\u79FB\u4E5F\u5931\u6557\uFF08{1}\uFF09\u3002",
   "error.move_not_applied": "\u8CC7\u6599\u593E\u642C\u79FB\u6C92\u6709\u5BE6\u969B\u751F\u6548\uFF0C\u64CD\u4F5C\u5DF2\u505C\u6B62\u4E26\u9084\u539F\u3002",
   "error.plugin_unloaded": "Visual Agent Map \u5DF2\u5378\u8F09\uFF0C\u64CD\u4F5C\u5728\u4E0B\u4E00\u6B65\u4E4B\u524D\u505C\u6B62\u3002",
   "error.legacy_map_view_only": "\u6B64\u5FC3\u667A\u5716\u4F7F\u7528 0.4 \u524D\u7684\u820A\u7D50\u69CB\uFF0C\u53EA\u80FD\u6AA2\u8996\u3002",
@@ -14656,6 +14662,99 @@ function insertAfterBlock(lines, code, start, add, stop, separate = false) {
 var import_obsidian13 = require("obsidian");
 var import_node_crypto4 = require("node:crypto");
 
+// core/link-rewrite.ts
+function linkPathOf(target) {
+  const hash = target.indexOf("#");
+  return (hash < 0 ? target : target.slice(0, hash)).trim();
+}
+function stripMd(path) {
+  return path.replace(/\.md$/i, "");
+}
+function baseOf(path) {
+  return path.slice(path.lastIndexOf("/") + 1);
+}
+function splitFrontmatter(text11) {
+  var _a, _b;
+  const head = (_b = (_a = /^---\r?\n[\s\S]*?\r?\n---[ \t]*(?:\r?\n|$)/.exec(text11)) == null ? void 0 : _a[0]) != null ? _b : "";
+  return { head, body: text11.slice(head.length) };
+}
+function codeRanges(text11) {
+  const ranges = [];
+  let offset = 0, fence = null;
+  for (const line of text11.split(/(?<=\n)/)) {
+    const open = /^ {0,3}(`{3,}|~{3,})/.exec(line);
+    if (open) {
+      const marker5 = open[1];
+      if (!fence) fence = { marker: marker5, start: offset };
+      else if (marker5[0] === fence.marker[0] && marker5.length >= fence.marker.length && !/\S/.test(line.slice(open[0].length))) {
+        ranges.push([fence.start, offset + line.length]);
+        fence = null;
+      }
+    } else if (!fence) {
+      for (const span of line.matchAll(/(`+)(?!`)[\s\S]*?[^`]\1(?!`)/g))
+        ranges.push([offset + span.index, offset + span.index + span[0].length]);
+    }
+    offset += line.length;
+  }
+  if (fence) ranges.push([fence.start, text11.length]);
+  return ranges;
+}
+function findWikilinks(text11) {
+  const code = codeRanges(text11), matches = [];
+  for (const match of text11.matchAll(/!?\[\[([^[\]\n]+)\]\]/g)) {
+    const start = match.index, end = start + match[0].length;
+    if (code.some(([from, to]) => start >= from && start < to)) continue;
+    const inner = match[1], alias = inner.search(/\\?\|/);
+    matches.push({ original: match[0], start, end, target: alias < 0 ? inner : inner.slice(0, alias) });
+  }
+  return matches;
+}
+function retargetWikilink(original, oldPath, newPath) {
+  const parts = /^(!?)\[\[([^[\]\n]+)\]\]$/.exec(original);
+  if (!parts) return null;
+  const inner = parts[2], alias = inner.search(/\\?\|/), target = alias < 0 ? inner : inner.slice(0, alias), aliasPart = alias < 0 ? "" : inner.slice(alias), hash = target.indexOf("#"), pathPart = hash < 0 ? target : target.slice(0, hash), subPart = hash < 0 ? "" : target.slice(hash);
+  const trimmed = pathPart.trim(), hasExt = /\.md$/i.test(trimmed), stem = hasExt ? stripMd(trimmed) : trimmed, oldStem = stripMd(oldPath), newStem = stripMd(newPath);
+  let next;
+  if (stem === oldStem || trimmed === oldPath) next = hasExt ? newPath : newStem;
+  else if (!stem.includes("/") && stem === baseOf(oldStem)) {
+    if (baseOf(newStem) === baseOf(oldStem)) return original;
+    next = hasExt ? `${baseOf(newStem)}.md` : baseOf(newStem);
+  } else return null;
+  return `${parts[1]}[[${next}${subPart}${alias < 0 ? "" : aliasPart}]]`;
+}
+function rewriteLinkTargets(text11, resolve, moves) {
+  const unsupported = [];
+  let hits = 0, out = "", cursor = 0;
+  for (const link of findWikilinks(text11)) {
+    const path = resolve(linkPathOf(link.target));
+    const to = path === void 0 ? void 0 : moves.get(path);
+    if (path === void 0 || to === void 0) continue;
+    hits++;
+    const next = retargetWikilink(link.original, path, to);
+    if (next === null) {
+      unsupported.push(link.original);
+      continue;
+    }
+    out += text11.slice(cursor, link.start) + next;
+    cursor = link.end;
+  }
+  const code = codeRanges(text11);
+  for (const match of text11.matchAll(/\]\(<?([^)\s>]+)>?(?:\s+"[^"]*")?\)/g)) {
+    if (code.some(([from, to]) => match.index >= from && match.index < to)) continue;
+    let decoded2 = match[1];
+    try {
+      decoded2 = decodeURIComponent(match[1]);
+    } catch (e) {
+    }
+    const path = resolve(linkPathOf(decoded2));
+    if (path !== void 0 && moves.has(path)) {
+      hits++;
+      unsupported.push(match[0]);
+    }
+  }
+  return { text: out + text11.slice(cursor), hits, unsupported };
+}
+
 // note-values.ts
 var managedSectionValue = (value) => value.trim();
 var managedHeadingValue = (value) => value.replace(/\n/g, " ").trim();
@@ -15906,7 +16005,7 @@ ${body}`);
     await this.folder(folder);
     const file = this.file(path), desired = (0, import_obsidian13.normalizePath)(`${folder}/${baseName(path)}`);
     const target = this.app.vault.getAbstractFileByPath(desired) ? this.unique(folder, file.basename) : desired;
-    await this.app.fileManager.renameFile(file, target);
+    await this.relocate(file, target);
     await this.replaceSourcePath(path, target);
     return target;
   }
@@ -15914,7 +16013,7 @@ ${body}`);
     await this.folder(parentPath(target));
     if (this.app.vault.getAbstractFileByPath(target))
       throw new Error(`${this.message("error.target_exists")}: ${target}`);
-    await this.app.fileManager.renameFile(this.file(path), target);
+    await this.relocate(this.file(path), target);
     await this.replaceSourcePath(path, target);
   }
   async renameNote(path, title, exactTarget) {
@@ -15922,9 +16021,122 @@ ${body}`);
     const folder = parentPath(path), desired = exactTarget != null ? exactTarget : (0, import_obsidian13.normalizePath)(`${folder}/${safeName(title)}.md`);
     if (desired === path) return path;
     const target = exactTarget != null ? exactTarget : this.app.vault.getAbstractFileByPath(desired) ? this.unique(folder, title) : desired;
-    await this.app.fileManager.renameFile(this.file(path), target);
+    await this.relocate(this.file(path), target);
     await this.replaceSourcePath(path, target);
     return target;
+  }
+  /**
+   * Moves or renames a note or folder. When every note that links to it is a VAM note, the move is made with
+   * `vault.rename` (no "Update links" dialog) and the links in those VAM notes are rewritten here. When any other
+   * note links to it, Obsidian's own `renameFile` runs so the user's link preference is honoured, after one Notice.
+   * The link rewrite reads the notes' current text, not the metadata cache, so a note rewritten a moment ago by the
+   * previous move of the same operation is handled correctly. If a rewrite cannot be applied (the note changed in the
+   * meantime) this undoes its own writes and the move, then throws, so the caller's rollback sees an unmoved note.
+   */
+  async relocate(item, target) {
+    var _a;
+    const resolvedLinks = this.app.metadataCache.resolvedLinks;
+    if (!resolvedLinks) {
+      await this.app.fileManager.renameFile(item, target);
+      return;
+    }
+    const moves = /* @__PURE__ */ new Map();
+    const collect = (entry) => {
+      if (entry instanceof import_obsidian13.TFile) moves.set(entry.path, `${target}${entry.path.slice(item.path.length)}`);
+      else for (const child of entry.children) if (child instanceof import_obsidian13.TFile || child instanceof import_obsidian13.TFolder) collect(child);
+    };
+    collect(item);
+    const plan = await this.planLinkRewrites(item, moves, resolvedLinks);
+    if (plan.foreign > 0) {
+      new import_obsidian13.Notice(translate(this.settings.language, "ui.move_links_dialog_notice_0", plan.foreign));
+      await this.app.fileManager.renameFile(item, target);
+      return;
+    }
+    const origin = item.path;
+    await this.app.vault.rename(item, target);
+    if (!this.app.vault.getAbstractFileByPath(target)) throw new Error(this.message("error.move_not_applied"));
+    const written = [];
+    try {
+      for (const edit of plan.edits) {
+        const path = (_a = moves.get(edit.path)) != null ? _a : edit.path, file = this.app.vault.getAbstractFileByPath(path);
+        if (!(file instanceof import_obsidian13.TFile)) throw new Error(`${this.message("error.file_not_found")}: ${path}`);
+        await this.app.vault.process(file, (current) => {
+          if (current !== edit.before)
+            throw new Error(translate(this.settings.language, "error.move_links_note_changed_0", path));
+          return edit.after;
+        });
+        written.push({ path, before: edit.before, after: edit.after });
+      }
+    } catch (error) {
+      try {
+        for (const entry of written.reverse()) {
+          const file = this.app.vault.getAbstractFileByPath(entry.path);
+          if (file instanceof import_obsidian13.TFile)
+            await this.app.vault.process(file, (current) => current === entry.after ? entry.before : current);
+        }
+        const moved = this.app.vault.getAbstractFileByPath(target);
+        if (moved) await this.app.vault.rename(moved, origin);
+      } catch (rollbackError) {
+        const original = error instanceof Error ? error.message : String(error);
+        throw new Error(
+          translate(
+            this.settings.language,
+            "error.move_undo_failed_0",
+            original,
+            rollbackError instanceof Error ? rollbackError.message : String(rollbackError)
+          )
+        );
+      }
+      throw error;
+    }
+  }
+  /**
+   * Which notes would have to change for `moves` (old path to new path): `foreign` counts notes Obsidian must update
+   * (any non-VAM note, or a VAM note whose link cannot be rewritten here); `edits` holds the complete new text of each
+   * VAM note whose links change. Computed before anything is moved, so a failure writes nothing.
+   */
+  async planLinkRewrites(item, moves, resolvedLinks) {
+    const owned = (file) => {
+      var _a;
+      const fm = (_a = this.app.metadataCache.getFileCache(file)) == null ? void 0 : _a.frontmatter;
+      return marker2(fm == null ? void 0 : fm["agent-map-node"]) || marker2(fm == null ? void 0 : fm["visual-agent-map"]);
+    };
+    const foreign = /* @__PURE__ */ new Set(), candidates = /* @__PURE__ */ new Map();
+    for (const [linkerPath, targets] of Object.entries(resolvedLinks)) {
+      if (!Object.keys(targets).some((path) => moves.has(path))) continue;
+      const linker = this.app.vault.getAbstractFileByPath(linkerPath);
+      if (!linker) continue;
+      if (linker instanceof import_obsidian13.TFile && linker.extension === "md" && owned(linker)) candidates.set(linkerPath, linker);
+      else foreign.add(linkerPath);
+    }
+    const needles = item instanceof import_obsidian13.TFolder ? [`${item.path}/`] : [item.path.replace(/\.md$/i, ""), item.basename];
+    for (const file of await this.markedFiles("agent-map-node")) {
+      if (candidates.has(file.path) || foreign.has(file.path)) continue;
+      const text11 = await this.app.vault.cachedRead(file);
+      if (needles.some((needle) => text11.includes(needle))) candidates.set(file.path, file);
+    }
+    const edits = [];
+    for (const [path, file] of candidates) {
+      const before = await this.app.vault.read(file), resolve = (linkPath) => {
+        var _a;
+        return linkPath ? (_a = this.app.metadataCache.getFirstLinkpathDest(linkPath, path)) == null ? void 0 : _a.path : void 0;
+      };
+      const { head, body } = splitFrontmatter(before);
+      const fm = frontmatter(before);
+      const userKeyLink = Object.entries(fm).some(
+        ([key2, value]) => key2 !== "agent-map-references" && findWikilinks(JSON.stringify(value)).some((link) => {
+          var _a;
+          return moves.has((_a = resolve(linkPathOf(link.target))) != null ? _a : "");
+        })
+      );
+      const result = rewriteLinkTargets(body, resolve, moves);
+      if (userKeyLink || result.unsupported.length) {
+        foreign.add(path);
+        continue;
+      }
+      if (result.text !== body) edits.push({ path, before, after: head + result.text });
+    }
+    return { foreign: foreign.size, edits };
   }
   async replaceSourcePath(oldPath, newPath) {
     var _a, _b;
@@ -16385,7 +16597,7 @@ ${body}`;
     let moved = false;
     try {
       if (desired !== originalRoot) {
-        await this.app.fileManager.renameFile(root, desired);
+        await this.relocate(root, desired);
         moved = true;
         if (!(this.app.vault.getAbstractFileByPath(desired) instanceof import_obsidian13.TFolder))
           throw new Error(this.message("error.move_not_applied"));
@@ -16402,7 +16614,7 @@ ${body}`;
         try {
           const movedRoot = this.app.vault.getAbstractFileByPath(desired);
           if (!(movedRoot instanceof import_obsidian13.TFolder)) throw new Error("Renamed topic folder was not found for rollback.");
-          await this.app.fileManager.renameFile(movedRoot, originalRoot);
+          await this.relocate(movedRoot, originalRoot);
           const restoredMap = this.app.vault.getAbstractFileByPath(originalMapPath);
           if (!(restoredMap instanceof import_obsidian13.TFile))
             throw new Error("Original Map.md was not found after restoring the topic folder.");
@@ -37192,13 +37404,13 @@ ${note.detail.trim()}` : "",
 };
 
 // experiences/visual-map/math-repair.ts
-function splitFrontmatter(content) {
+function splitFrontmatter2(content) {
   var _a, _b;
   const head = (_b = (_a = content.match(/^\uFEFF?---\r?\n[\s\S]*?\r?\n---(?:\r?\n|$)/)) == null ? void 0 : _a[0]) != null ? _b : "";
   return { head, body: content.slice(head.length) };
 }
 function repairNoteMath(content) {
-  const { head, body } = splitFrontmatter(content);
+  const { head, body } = splitFrontmatter2(content);
   return head + normalizeMathDelimiters(body);
 }
 var withoutBom = (text11) => text11.replace(/^\uFEFF/, "");

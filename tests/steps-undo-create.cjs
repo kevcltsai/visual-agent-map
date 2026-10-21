@@ -24,7 +24,9 @@ async function harness() {
   await app.vault.create(MAP, require('./support.cjs').core.serializeMap(mapDoc));
   await repo.rebuildDerivedData();
   const Base = dom.makeModal();
-  const { VisualAgentMapView } = load('main.ts', { obsidian: { ...obsidian, Modal: Base, Notice: dom.makeNotice([]) } }, { createFragment: dom.createFragment });
+  // The map conflict window answers at once with the file's version (closing it does that).
+  class Modal extends Base { open() { super.open(); this.close(); } }
+  const { VisualAgentMapView } = load('main.ts', { obsidian: { ...obsidian, Modal, Notice: dom.makeNotice([]) } }, { createFragment: dom.createFragment });
   const plugin = withExpansionCoordinator({
     repo, settings, running: new Set(), logs: { appendLog() {} }, rebuildDerivedData: () => repo.rebuildDerivedData(), relevanceGrades: new Map(), expansionBatches: new Map(), pendingSuggestions: new Map(), releaseOutline() {}, setOutlineActive() {}, detailsShown: () => false
   });
@@ -63,16 +65,34 @@ test('D11a: undo of a created topic parks its note in Unassigned; redo restores 
   assert.deepEqual(h.orphans(), []);
 });
 
-test('D11a: every child created in one go undoes to Unassigned, none left in Notes', async () => {
+test('D11a: every child of a createChildBatch undoes to Unassigned, none left in Notes', async () => {
   const h = await harness();
-  await h.view.addNode(h.root, 'One', false);
-  await h.view.addNode(h.root, 'Two', false);
-  assert.equal(h.view.map.nodes.length, 3);
-  await h.view.travel(false); await h.view.travel(false);
+  const children = await h.view.createChildBatch(h.root, [{ title: 'One', task: 'a' }, { title: 'Two', task: 'b' }, { title: 'Under one', task: 'c', parentTitle: 'One' }]);
+  assert.equal(children.length, 3); assert.equal(h.view.map.nodes.length, 4);
+  while (h.view.history.canUndo) await h.view.travel(false);
   assert.equal(h.view.map.nodes.length, 1);
   assert.deepEqual(h.orphans(), []);
-  assert.equal(h.notesIn('Unassigned').length, 2);
+  assert.equal(h.notesIn('Unassigned').length, 3);
   assert.equal(h.calls.file.length, 0);
-  await h.view.travel(true); await h.view.travel(true);
-  assert.equal(h.view.map.nodes.length, 3); assert.equal(h.notesIn('Unassigned').length, 0);
+  while (h.view.history.canRedo) await h.view.travel(true);
+  assert.equal(h.view.map.nodes.length, 4); assert.equal(h.notesIn('Unassigned').length, 0);
+});
+
+test('D11a: after a map conflict resolved to the file, undo keeps the node added outside and parks only the new one', async () => {
+  const h = await harness();
+  const disk = await h.repo.readMap(MAP);
+  const outside = await h.repo.createNote('Outside', 'gpt-6-luna', disk, MAP, 'workspace');
+  Object.assign(outside, { parentId: h.root.id, x: 400, y: 80 });
+  disk.nodes.push(outside);
+  await h.repo.saveMap(MAP, disk);
+  assert.equal(h.view.map.nodes.length, 1, 'the view has not seen it yet');
+  await h.view.addNode(h.root, 'Mine');
+  assert.deepEqual(h.view.map.nodes.map(n => n.id).includes(outside.id), true);
+  await h.view.travel(false);
+  assert.equal(JSON.stringify(h.view.map.nodes.map(n => n.id).sort()), JSON.stringify([h.root.id, outside.id].sort()), 'the outside node stays');
+  assert.deepEqual(h.orphans(), [], 'it is not orphaned and the new note is parked');
+  assert.equal(h.notesIn('Unassigned').length, 1);
+  assert.equal(h.contents.has(outside.path), true);
+  await h.view.travel(true);
+  assert.equal(h.view.map.nodes.length, 3);
 });

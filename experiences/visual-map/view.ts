@@ -19,6 +19,7 @@ import {
   setTooltip
 } from "obsidian";
 import { readMarkdownFile, type ReferenceGroup } from "../../ai/reference-materials";
+import { providerForModel } from "../../ai/providers/provider";
 import { NameModal } from "../../ui/modals/name-modal";
 import { ChoiceModal } from "../../ui/modals/choice-modal";
 import {
@@ -3674,8 +3675,15 @@ export class VisualAgentMapView extends ItemView {
     });
     return button;
   }
+  /** Returns the snapshots its history entry restores (taken after any conflict was resolved), or null when nothing ran. */
   private async mapChange(change: (map: MapDocument) => void, rebuildDerivedData = true): Promise<void> {
-    if (!this.map) return;
+    await this.mapChangeSnapshots(change, rebuildDerivedData);
+  }
+  private async mapChangeSnapshots(
+    change: (map: MapDocument) => void,
+    rebuildDerivedData = true
+  ): Promise<{ before: MapDocument; after: MapDocument } | null> {
+    if (!this.map) return null;
     const path = this.path;
     const disk = await this.plugin.repo.readMap(path);
     const structure = (map: MapDocument): string => JSON.stringify({ ...map, viewport: null });
@@ -3713,6 +3721,7 @@ export class VisualAgentMapView extends ItemView {
     };
     this.history.push({ undo: () => restore(before), redo: () => restore(after) });
     this.render();
+    return { before, after };
   }
   private async restoreLifecycle(snapshot: MapDocument, moves: FileMove[], parked: boolean): Promise<void> {
     const previous = clone(this.map!),
@@ -5937,8 +5946,7 @@ export class VisualAgentMapView extends ItemView {
           this.enqueue(async () => this.openMapInMutation(await this.plugin.repo.createMap(title)))
         ).open()
       );
-      if (!this.plugin.settings.models.trim())
-        this.button(actions, t("ui.check_codex"), () => this.enqueue(() => this.plugin.recheckCodex()));
+      if (!this.plugin.settings.models.trim()) this.renderConnectionCheck(actions);
     }
     if (!this.builtIn && !this.map.aim) this.renderMultiResearchStatus(this.contentEl);
     if (!this.builtIn && !this.map.aim) this.renderRelevanceStatus(this.contentEl);
@@ -5976,16 +5984,13 @@ export class VisualAgentMapView extends ItemView {
     if (tools.childElementCount) overlay.appendChild(tools);
     else tools.remove();
     if (this.relevancePanelEl) this.placeRelevancePanel(this.relevancePanelEl);
-    // The gesture hint goes away once the user has panned or zoomed; select mode always explains its own gestures.
+    // The gesture hint goes away once the user has panned or zoomed; select mode keeps its gesture hint inside the selection bar, never over the canvas.
+    // In select mode the selection bar (bottom-left) owns that space, so no hint is drawn there.
     this.hintEl =
-      this.integrationMode || !this.plugin.settings.canvasHintSeen
+      !this.integrationMode && !this.plugin.settings.canvasHintSeen
         ? overlay.createSpan({
             cls: "vam-hint vam-canvas-hint",
-            text: t(
-              this.integrationMode
-                ? "ui.drag_to_select_topics_hint"
-                : "ui.drag_empty_space_to_pan_scroll_to_zoom_click_a_node_to_open"
-            )
+            text: t("ui.drag_empty_space_to_pan_scroll_to_zoom_click_a_node_to_open")
           })
         : null;
     const zoom = overlay.createDiv("vam-zoom-controls");
@@ -7482,7 +7487,13 @@ export class VisualAgentMapView extends ItemView {
     if (this.map) next.viewport = clone(this.map.viewport);
     return next;
   }
-  private async addNode(parentNode: MapNode | null, suggestedTitle?: string, rebuildDerivedData = true): Promise<void> {
+  /** `focus` false leaves the camera to the caller (a batch frames the whole branch once it is laid out). */
+  private async addNode(
+    parentNode: MapNode | null,
+    suggestedTitle?: string,
+    rebuildDerivedData = true,
+    focus = true
+  ): Promise<void> {
     if (!this.map) return;
     // The caller may hold a display copy (sorted by relevance); saved coordinates must come from the real node.
     const parent = (parentNode && this.map.nodes.find(item => item.id === parentNode.id)) || parentNode;
@@ -7520,13 +7531,13 @@ export class VisualAgentMapView extends ItemView {
       await this.plugin.repo.readNote(node.path, { ...this.map, nodes: [...this.map.nodes, node] })
     );
     this.selected = node.id;
-    const previousEntry = this.history.undoEntry,
-      before = clone(this.map);
-    await this.mapChange(map => {
+    const previousEntry = this.history.undoEntry;
+    const done = await this.mapChangeSnapshots(map => {
       map.nodes.push(node);
       if (parent) map.nodes.find(n => n.id === parent.id)!.collapsed = false;
     }, rebuildDerivedData);
-    if (this.map) this.parkOnUndo(node.id, before, clone(this.map), previousEntry);
+    if (done) this.parkOnUndo(node.id, done.before, done.after, previousEntry);
+    if (!focus) return;
     if (this.map) this.map.viewport.zoom = Math.max(this.map.viewport.zoom, 0.7);
     this.focusNode(node);
   }
@@ -7790,7 +7801,7 @@ export class VisualAgentMapView extends ItemView {
         if (signal?.aborted) throw new DOMException("Aborted", "AbortError");
         const owner = item.parentTitle ? createdByTitle.get(item.parentTitle) : parent;
         if (!owner) throw new Error(t("ui.select_the_parent_topic_before_its_child"));
-        await this.addNode(owner, item.title, false);
+        await this.addNode(owner, item.title, false, false);
         created++;
         const child = this.map.nodes.at(-1)!;
         newNodes.push(child);
@@ -7817,6 +7828,7 @@ export class VisualAgentMapView extends ItemView {
         await this.mapChange(map => {
           map.nodes = arrangeNewBranch(map.nodes, parent.id, new Set(newNodes.map(node => node.id)), this.cardHeightOf);
         }, false);
+      if (newNodes.length) this.frameBranch([parent.id, ...newNodes.map(node => node.id)]);
       if (created) await this.plugin.rebuildDerivedData();
       return newNodes;
     } catch (error) {
@@ -7830,6 +7842,62 @@ export class VisualAgentMapView extends ItemView {
       throw error;
     }
   }
+  /** Camera on the parent and its new children (current zoom kept, or smaller if they do not fit), saved like a pan. */
+  private frameBranch(ids: string[]): void {
+    if (!this.map || !this.viewportEl) return;
+    const shown = this.map.nodes.filter(node => ids.includes(node.id));
+    if (!shown.length) return;
+    const bounds = {
+      minX: Math.min(...shown.map(n => n.x)),
+      maxX: Math.max(...shown.map(n => n.x + 280)),
+      minY: Math.min(...shown.map(n => n.y)),
+      maxY: Math.max(...shown.map(n => n.y + (this.cardHeightOf(n.id) ?? 180)))
+    };
+    this.map.viewport = fitViewport(
+      bounds,
+      { width: this.viewportEl.clientWidth, height: this.viewportEl.clientHeight },
+      this.canvasInset(),
+      Math.max(0.25, Math.min(1.2, this.map.viewport.zoom))
+    );
+    this.saveViewport();
+  }
+  /**
+   * Quick research grows the cards after they were placed with estimated heights. Once the batch ends, the cards the
+   * user has not moved are laid out again against the measured heights (one Map.md write, no undo step, no AI call).
+   */
+  private async respaceBatch(parent: MapNode, placed: Map<string, { x: number; y: number }>): Promise<void> {
+    if (this.closed || this.builtIn) return;
+    // Everything runs inside one queued mutation: a drag queued before it has already landed in this.map, so the
+    // "untouched" check, the layout and the write all see the same positions and a dragged card is never overwritten.
+    await this.plugin.mutate(
+      async () => {
+        if (this.closed || !this.map) return;
+        const untouched = new Set(
+          this.map.nodes.filter(n => placed.get(n.id)?.x === n.x && placed.get(n.id)?.y === n.y).map(n => n.id)
+        );
+        if (!untouched.size) return;
+        const current = this.map.nodes;
+        const arranged = arrangeNewBranch(current, parent.id, untouched, this.cardHeightOf);
+        const target = new Map<string, { x: number; y: number }>();
+        arranged.forEach((n, index) => {
+          if (untouched.has(n.id) && (n.x !== current[index].x || n.y !== current[index].y))
+            target.set(n.id, { x: n.x, y: n.y });
+        });
+        if (!target.size) return;
+        await this.plugin.repo.updateMap(this.path, map => {
+          for (const node of map.nodes) {
+            const point = target.get(node.id);
+            if (point) Object.assign(node, point);
+          }
+        });
+        for (const node of this.map.nodes) {
+          const point = target.get(node.id);
+          if (point) Object.assign(node, point);
+        }
+      },
+      { sync: false }
+    );
+  }
   /**
    * The options of the quick research that follows AI expansion: no web or image search unless the dialog's checkbox
    * is on. The decomposition itself and the notes' stored research settings are not affected.
@@ -7840,6 +7908,12 @@ export class VisualAgentMapView extends ItemView {
   private startShallowResearch(parent: MapNode, children: MapNode[], options: TaskOptions): Promise<void> {
     const signal = options.signal;
     const pendingOptions = this.researchChoices(options);
+    const placed = new Map<string, { x: number; y: number }>();
+    for (const child of children) {
+      const node = this.map?.nodes.find(item => item.id === child.id);
+      if (node) placed.set(node.id, { x: node.x, y: node.y });
+    }
+    let respaced = false;
     this.plugin.quickExpandPending.add(parent.path);
     return this.plugin.expansionCoordinator.start(
       parent.path,
@@ -7851,6 +7925,15 @@ export class VisualAgentMapView extends ItemView {
         const state = this.plugin.expansionBatches.get(parent.path);
         if (state?.status === "running") this.plugin.quickExpandPending.add(parent.path);
         else this.plugin.quickExpandPending.delete(parent.path);
+        if (state && state.status !== "running" && !respaced) {
+          respaced = true;
+          void this.respaceBatch(parent, placed)
+            .catch(() => undefined)
+            .then(() => {
+              if (!this.closed) this.render();
+            });
+          return;
+        }
         this.render();
       },
       signal
@@ -8068,6 +8151,13 @@ export class VisualAgentMapView extends ItemView {
       dismiss.setAttr("aria-label", t("ui.dismiss"));
     }
   }
+  /** The sample start's "no models found" button: it checks the CLI of the chosen model (Claude Code or Codex). */
+  private renderConnectionCheck(actions: HTMLElement): HTMLButtonElement {
+    const claude = providerForModel(this.plugin.settings.cliModel) === "claude";
+    return this.button(actions, t(claude ? "ui.check_claude_code" : "ui.check_codex"), () =>
+      claude ? this.plugin.repairConnection() : this.enqueue(() => this.plugin.recheckCodex())
+    );
+  }
   private renderSelectionBar(workspace: HTMLElement): HTMLElement {
     const selection = workspace.createDiv("vam-selection-bar");
     const names = [...this.multiSelected].map(id => this.notes.get(id)?.title).filter(Boolean);
@@ -8076,6 +8166,8 @@ export class VisualAgentMapView extends ItemView {
         ? t("ui.selected_0_1_2", this.multiSelected.size, names.slice(0, 2).join("、"), names.length > 2 ? "…" : "")
         : t("ui.prompt_select_topics")
     });
+    // One fixed line under the names: it cannot cover the canvas and never moves the buttons.
+    selection.createSpan({ cls: "vam-hint vam-selection-hint", text: t("ui.drag_to_select_topics_hint") });
     this.button(
       selection,
       t("ui.clear"),
@@ -8090,18 +8182,16 @@ export class VisualAgentMapView extends ItemView {
     this.button(selection, t("ui.move_to"), () => this.chooseSelectedParent(false), !this.multiSelected.size);
     this.button(selection, t("ui.copy_to"), () => this.chooseSelectedParent(true), !this.multiSelected.size);
     const count = this.multiSelected.size;
-    this.button(
-      selection,
-      count > 1 ? t("ui.synthesize_0_topics", count) : t("ui.synthesize"),
-      () => this.integrateSelected(),
-      count < 2
-    ).addClass("mod-cta");
+    // Labels never carry the count (it would shift every button to the right of it on each selection change);
+    // screen readers still hear it through aria-label.
+    const synthesize = this.button(selection, t("ui.synthesize"), () => this.integrateSelected(), count < 2);
+    synthesize.addClass("mod-cta");
+    if (count > 1) synthesize.setAttr("aria-label", t("ui.synthesize_0_topics", count));
     if (!this.map?.aim && !this.builtIn) {
       // Not natively disabled: a disabled button cannot take focus, so keyboard and screen-reader users could not read why.
       const check = this.mergeCheck(),
-        merge = this.button(selection, count > 1 ? t("ui.merge_0_topics", count) : t("ui.merge"), () =>
-          this.openMerge()
-        );
+        merge = this.button(selection, t("ui.merge"), () => this.openMerge());
+      if (count > 1) merge.setAttr("aria-label", t("ui.merge_0_topics", count));
       if (!check.ok) {
         merge.setAttr("aria-disabled", "true");
         merge.setAttr("title", t(check.reason));
@@ -8109,12 +8199,14 @@ export class VisualAgentMapView extends ItemView {
     }
     if (!this.map?.aim) {
       const running = this.plugin.expansionBatches.get(this.multiResearchKey())?.status === "running";
-      this.button(
+      const research = this.button(
         selection,
-        count > 1 ? t("ui.research_0_topics", count) : count ? t("ui.research_one_topic") : t("ui.multi_research"),
+        t("ui.multi_research"),
         () => this.openMultiResearch(),
         !this.multiSelected.size || running
       );
+      if (count)
+        research.setAttr("aria-label", count > 1 ? t("ui.research_0_topics", count) : t("ui.research_one_topic"));
     }
     return selection;
   }
@@ -8222,6 +8314,7 @@ export class VisualAgentMapView extends ItemView {
             detail: note.detail,
             task: [task, options?.requirements].filter(Boolean).join("\n\n"),
             ancestors: await this.ancestorContext(node),
+            workingFindings: note.newFindings,
             referenceGroups: [...selectedSources, childSources],
             // Within budget the sources go in as written (one request); only over-budget sources are extracted first.
             referenceDelivery: "direct",
@@ -8307,7 +8400,8 @@ export class VisualAgentMapView extends ItemView {
       note.reasoning,
       note.sourcePaths,
       note.referencePaths,
-      note.thinkingOrigin
+      note.thinkingOrigin,
+      note.newFindings
     ]);
     const selectedSources = options?.referenceGroups ?? [];
     if (!children.length && !selectedSources.some(group => group.documents.length)) {
@@ -8328,6 +8422,8 @@ export class VisualAgentMapView extends ItemView {
     await this.hydrate();
     this.render();
     const progress = this.startTaskProgress(node.path);
+    // True only when the whole of the parent's Working Findings was in the prompt; otherwise they stay for the next run.
+    let findingsSent = false;
     try {
       const synthesisContext: TaskContext = withThinkingOrigin(
         {
@@ -8337,6 +8433,10 @@ export class VisualAgentMapView extends ItemView {
           detail: note.detail,
           task: [task, options?.requirements].filter(Boolean).join("\n\n"),
           ancestors: await this.ancestorContext(node),
+          workingFindings: note.newFindings,
+          onWorkingFindingsSent: sent => {
+            findingsSent = sent === note.newFindings;
+          },
           referenceGroups: [...selectedSources, childSources],
           // Within budget the sources go in as written (one request); only over-budget sources are extracted first.
           referenceDelivery: "direct",
@@ -8399,7 +8499,8 @@ export class VisualAgentMapView extends ItemView {
               latest.reasoning,
               latest.sourcePaths,
               latest.referencePaths,
-              latest.thinkingOrigin
+              latest.thinkingOrigin,
+              latest.newFindings
             ]) !== noteSnapshot
           )
             throw new Error(t("ui.the_topic_changed_the_synthesis_draft_was_not_saved"));
@@ -8428,7 +8529,8 @@ export class VisualAgentMapView extends ItemView {
               summary,
               detail: canonical,
               visualReferences: references,
-              newFindings: "",
+              // The findings are cleared only when the model saw them (the rewrite folds them in); unsent ones stay.
+              ...(findingsSent ? { newFindings: "" } : {}),
               status: "completed",
               ...formatIssuesPatch(issues, language)
             },

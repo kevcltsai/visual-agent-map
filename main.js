@@ -371,6 +371,7 @@ var english = {
   "ui.aim_retry_subtopics": "Retry subtopic planning",
   "ui.start_using_vam": "Start using VAM",
   "ui.check_codex": "Check Codex",
+  "ui.check_claude_code": "Check Claude Code",
   "ui.codex_allowance_notice": "Codex allowance notice",
   "ui.vam_runs_ai_tasks_through_your_signed_in_codex_account_and_u": "VAM runs AI tasks through your signed-in Codex account and uses that account's Codex allowance. Available usage and limits depend on your ChatGPT plan.",
   "ui.understand_and_run": "Understand and run",
@@ -1982,6 +1983,7 @@ var traditionalChinese = {
   "ui.aim_retry_subtopics": "\u91CD\u65B0\u7522\u751F\u5B50\u8B70\u984C",
   "ui.start_using_vam": "\u958B\u59CB\u4F7F\u7528 VAM",
   "ui.check_codex": "\u6AA2\u67E5 Codex",
+  "ui.check_claude_code": "\u6AA2\u67E5 Claude Code",
   "ui.codex_allowance_notice": "Codex \u984D\u5EA6\u63D0\u9192",
   "ui.vam_runs_ai_tasks_through_your_signed_in_codex_account_and_u": "VAM \u6703\u900F\u904E\u4F60\u76EE\u524D\u767B\u5165\u7684 Codex \u5E33\u865F\u57F7\u884C AI \u4EFB\u52D9\uFF0C\u4E26\u4F7F\u7528\u8A72\u5E33\u865F\u7684 Codex \u4F7F\u7528\u984D\u5EA6\u3002\u53EF\u7528\u984D\u5EA6\u8207\u9650\u5236\u4F9D\u4F60\u7684 ChatGPT \u65B9\u6848\u800C\u5B9A\u3002",
   "ui.understand_and_run": "\u4E86\u89E3\u4E26\u57F7\u884C",
@@ -13275,15 +13277,16 @@ function sourceFootnoteDefinition(line) {
 }
 function textbookDetail(template, leading, sections, footnotes, sourcesIndex) {
   var _a;
-  if (footnotes.length && sourcesIndex >= 0) {
-    const evidence = ((_a = sections.get(sourcesIndex)) != null ? _a : []).join("\n").trim();
-    sections.set(sourcesIndex, [[evidence, footnotes.join("\n")].filter(Boolean).join("\n\n")]);
-  }
   const placeholders = /* @__PURE__ */ new Set([
     ...["zh-TW", "en"].map((locale) => translate(locale, "note.no_new_information").replace(/[.。]$/, "")),
     "No new content this time",
     "\u672C\u6B21\u7121\u65B0\u589E\u5167\u5BB9"
   ]);
+  if (footnotes.length && sourcesIndex >= 0) {
+    const raw = ((_a = sections.get(sourcesIndex)) != null ? _a : []).join("\n").trim();
+    const evidence = placeholders.has(raw.replace(/[.。]$/, "")) ? "" : raw;
+    sections.set(sourcesIndex, [[evidence, footnotes.join("\n")].filter(Boolean).join("\n\n")]);
+  }
   const blocks = [leading.join("\n").trim()];
   template.sections.forEach((section3, index) => {
     var _a2, _b;
@@ -13466,6 +13469,32 @@ function sourceDefinitions(detail) {
   });
   return definitions;
 }
+function footnoteDefinitionLabels(content) {
+  const lines = content.split("\n");
+  const code = fencedLines(lines);
+  const labels = /* @__PURE__ */ new Set();
+  lines.forEach((line, index) => {
+    const match = code[index] ? null : /^\[\^([^\]\s]+)\]:/.exec(line);
+    if (match) labels.add(match[1]);
+  });
+  return labels;
+}
+function usesFootnote(content, label) {
+  const lines = content.split("\n");
+  const code = fencedLines(lines);
+  return lines.some(
+    (line, index) => !code[index] && outsideInlineCode(
+      line,
+      (text11) => [...text11.matchAll(FOOTNOTE_REFERENCE)].some((match) => match[1] === label) ? "\0" : ""
+    ).includes("\0")
+  );
+}
+function definesFootnote(content, label) {
+  const lines = content.split("\n");
+  const code = fencedLines(lines);
+  const prefix = `[^${label}]:`;
+  return lines.some((line, index) => !code[index] && line.startsWith(prefix));
+}
 function resolveDetailReferences(detail, groups, previousDetail = "", template) {
   const documents = dedupeReferenceGroups(groups).flatMap((group) => group.documents);
   const cited = /* @__PURE__ */ new Map();
@@ -13485,6 +13514,7 @@ function resolveDetailReferences(detail, groups, previousDetail = "", template) 
   const bodyCode = [];
   const defined = /* @__PURE__ */ new Map();
   const reserved = /* @__PURE__ */ new Set();
+  const dropped = /* @__PURE__ */ new Set();
   lines.forEach((line, index) => {
     if (!code[index]) {
       const definition = sourceFootnoteDefinition(line);
@@ -13499,19 +13529,25 @@ function resolveDetailReferences(detail, groups, previousDetail = "", template) 
     bodyCode.push(code[index]);
   });
   const previous = sourceDefinitions(previousDetail);
+  const writerLabels = footnoteDefinitionLabels(previousDetail);
   const byLabel = new Map(documents.map((document2) => [sourceFootnoteLabel(document2.path), document2]));
   const targetOf = (label) => {
     var _a, _b;
     const target = (_b = (_a = cited.get(label)) != null ? _a : defined.get(label)) != null ? _b : previous.get(label);
     if (target) return target;
     const document2 = byLabel.get(label);
-    return document2 ? footnoteTarget(document2) : void 0;
+    if (document2) return footnoteTarget(document2);
+    if (writerLabels.has(label)) return void 0;
+    const owners = documents.filter((candidate) => definesFootnote(candidate.content, label));
+    if (owners.length === 1) return footnoteTarget(owners[0]);
+    if (owners.length > 1 || documents.some((candidate) => usesFootnote(candidate.content, label))) dropped.add(label);
+    return void 0;
   };
   body.forEach((line, index) => {
     if (bodyCode[index]) return;
     outsideInlineCode(line, (text12) => {
       for (const [, label] of text12.matchAll(FOOTNOTE_REFERENCE))
-        if (!label.startsWith("src-") && !targetOf(label)) reserved.add(label);
+        if (!label.startsWith("src-") && !targetOf(label) && !dropped.has(label)) reserved.add(label);
       return text12;
     });
   });
@@ -13536,7 +13572,8 @@ function resolveDetailReferences(detail, groups, previousDetail = "", template) 
         if (reserved.has(label)) return original;
         const target = targetOf(label);
         if (target) return `[^${number(target)}]`;
-        return label.startsWith("src-") ? ` ${t("note.source_unconfirmed_0", label)}` : original;
+        if (label.startsWith("src-")) return ` ${t("note.source_unconfirmed_0", label)}`;
+        return dropped.has(label) ? "" : original;
       })
     )
   );
@@ -16904,10 +16941,10 @@ function focusViewport(viewport, point, size, inset) {
     y: inset + (size.height - inset) / 2 - point.y * zoom
   };
 }
-function fitViewport(bounds, size, inset) {
+function fitViewport(bounds, size, inset, maxZoom = 1.2) {
   const availableHeight = Math.max(1, size.height - inset);
   const w = bounds.maxX - bounds.minX, h = bounds.maxY - bounds.minY;
-  const zoom = Math.max(0.25, Math.min(1.2, (size.width - 80) / w, (availableHeight - 80) / h));
+  const zoom = Math.max(0.25, Math.min(maxZoom, (size.width - 80) / w, (availableHeight - 80) / h));
   return {
     zoom,
     x: (size.width - w * zoom) / 2 - bounds.minX * zoom,
@@ -31617,8 +31654,12 @@ ${request.requirements}` : preset.text,
     });
     return button;
   }
+  /** Returns the snapshots its history entry restores (taken after any conflict was resolved), or null when nothing ran. */
   async mapChange(change, rebuildDerivedData = true) {
-    if (!this.map) return;
+    await this.mapChangeSnapshots(change, rebuildDerivedData);
+  }
+  async mapChangeSnapshots(change, rebuildDerivedData = true) {
+    if (!this.map) return null;
     const path = this.path;
     const disk = await this.plugin.repo.readMap(path);
     const structure = (map) => JSON.stringify({ ...map, viewport: null });
@@ -31655,6 +31696,7 @@ ${request.requirements}` : preset.text,
     };
     this.history.push({ undo: () => restore(before), redo: () => restore(after) });
     this.render();
+    return { before, after };
   }
   async restoreLifecycle(snapshot, moves, parked) {
     const previous = clone(this.map), transitioned = [];
@@ -33723,8 +33765,7 @@ ${request.requirements}` : preset.text,
           (title2) => this.enqueue(async () => this.openMapInMutation(await this.plugin.repo.createMap(title2)))
         ).open()
       );
-      if (!this.plugin.settings.models.trim())
-        this.button(actions, t("ui.check_codex"), () => this.enqueue(() => this.plugin.recheckCodex()));
+      if (!this.plugin.settings.models.trim()) this.renderConnectionCheck(actions);
     }
     if (!this.builtIn && !this.map.aim) this.renderMultiResearchStatus(this.contentEl);
     if (!this.builtIn && !this.map.aim) this.renderRelevanceStatus(this.contentEl);
@@ -33761,11 +33802,9 @@ ${request.requirements}` : preset.text,
     if (tools.childElementCount) overlay.appendChild(tools);
     else tools.remove();
     if (this.relevancePanelEl) this.placeRelevancePanel(this.relevancePanelEl);
-    this.hintEl = this.integrationMode || !this.plugin.settings.canvasHintSeen ? overlay.createSpan({
+    this.hintEl = !this.integrationMode && !this.plugin.settings.canvasHintSeen ? overlay.createSpan({
       cls: "vam-hint vam-canvas-hint",
-      text: t(
-        this.integrationMode ? "ui.drag_to_select_topics_hint" : "ui.drag_empty_space_to_pan_scroll_to_zoom_click_a_node_to_open"
-      )
+      text: t("ui.drag_empty_space_to_pan_scroll_to_zoom_click_a_node_to_open")
     }) : null;
     const zoom = overlay.createDiv("vam-zoom-controls");
     this.iconButton(zoom, "minus", t("ui.zoom_out"), () => this.zoomBy(1 / 1.2));
@@ -35142,7 +35181,8 @@ ${request.requirements}` : preset.text,
     if (this.map) next.viewport = clone(this.map.viewport);
     return next;
   }
-  async addNode(parentNode, suggestedTitle, rebuildDerivedData = true) {
+  /** `focus` false leaves the camera to the caller (a batch frames the whole branch once it is laid out). */
+  async addNode(parentNode, suggestedTitle, rebuildDerivedData = true, focus = true) {
     var _a, _b, _c, _d;
     if (!this.map) return;
     const parent = parentNode && this.map.nodes.find((item) => item.id === parentNode.id) || parentNode;
@@ -35183,12 +35223,13 @@ ${request.requirements}` : preset.text,
       await this.plugin.repo.readNote(node.path, { ...this.map, nodes: [...this.map.nodes, node] })
     );
     this.selected = node.id;
-    const previousEntry = this.history.undoEntry, before = clone(this.map);
-    await this.mapChange((map) => {
+    const previousEntry = this.history.undoEntry;
+    const done = await this.mapChangeSnapshots((map) => {
       map.nodes.push(node);
       if (parent) map.nodes.find((n) => n.id === parent.id).collapsed = false;
     }, rebuildDerivedData);
-    if (this.map) this.parkOnUndo(node.id, before, clone(this.map), previousEntry);
+    if (done) this.parkOnUndo(node.id, done.before, done.after, previousEntry);
+    if (!focus) return;
     if (this.map) this.map.viewport.zoom = Math.max(this.map.viewport.zoom, 0.7);
     this.focusNode(node);
   }
@@ -35432,7 +35473,7 @@ ${request.requirements}` : preset.text,
         if (signal == null ? void 0 : signal.aborted) throw new DOMException("Aborted", "AbortError");
         const owner = item.parentTitle ? createdByTitle.get(item.parentTitle) : parent;
         if (!owner) throw new Error(t("ui.select_the_parent_topic_before_its_child"));
-        await this.addNode(owner, item.title, false);
+        await this.addNode(owner, item.title, false, false);
         created++;
         const child = this.map.nodes.at(-1);
         newNodes.push(child);
@@ -35453,6 +35494,7 @@ ${request.requirements}` : preset.text,
         await this.mapChange((map) => {
           map.nodes = arrangeNewBranch(map.nodes, parent.id, new Set(newNodes.map((node) => node.id)), this.cardHeightOf);
         }, false);
+      if (newNodes.length) this.frameBranch([parent.id, ...newNodes.map((node) => node.id)]);
       if (created) await this.plugin.rebuildDerivedData();
       return newNodes;
     } catch (error) {
@@ -35465,6 +35507,66 @@ ${request.requirements}` : preset.text,
       throw error;
     }
   }
+  /** Camera on the parent and its new children (current zoom kept, or smaller if they do not fit), saved like a pan. */
+  frameBranch(ids) {
+    if (!this.map || !this.viewportEl) return;
+    const shown = this.map.nodes.filter((node) => ids.includes(node.id));
+    if (!shown.length) return;
+    const bounds = {
+      minX: Math.min(...shown.map((n) => n.x)),
+      maxX: Math.max(...shown.map((n) => n.x + 280)),
+      minY: Math.min(...shown.map((n) => n.y)),
+      maxY: Math.max(...shown.map((n) => {
+        var _a;
+        return n.y + ((_a = this.cardHeightOf(n.id)) != null ? _a : 180);
+      }))
+    };
+    this.map.viewport = fitViewport(
+      bounds,
+      { width: this.viewportEl.clientWidth, height: this.viewportEl.clientHeight },
+      this.canvasInset(),
+      Math.max(0.25, Math.min(1.2, this.map.viewport.zoom))
+    );
+    this.saveViewport();
+  }
+  /**
+   * Quick research grows the cards after they were placed with estimated heights. Once the batch ends, the cards the
+   * user has not moved are laid out again against the measured heights (one Map.md write, no undo step, no AI call).
+   */
+  async respaceBatch(parent, placed) {
+    if (this.closed || this.builtIn) return;
+    await this.plugin.mutate(
+      async () => {
+        if (this.closed || !this.map) return;
+        const untouched = new Set(
+          this.map.nodes.filter((n) => {
+            var _a, _b;
+            return ((_a = placed.get(n.id)) == null ? void 0 : _a.x) === n.x && ((_b = placed.get(n.id)) == null ? void 0 : _b.y) === n.y;
+          }).map((n) => n.id)
+        );
+        if (!untouched.size) return;
+        const current = this.map.nodes;
+        const arranged = arrangeNewBranch(current, parent.id, untouched, this.cardHeightOf);
+        const target = /* @__PURE__ */ new Map();
+        arranged.forEach((n, index) => {
+          if (untouched.has(n.id) && (n.x !== current[index].x || n.y !== current[index].y))
+            target.set(n.id, { x: n.x, y: n.y });
+        });
+        if (!target.size) return;
+        await this.plugin.repo.updateMap(this.path, (map) => {
+          for (const node of map.nodes) {
+            const point = target.get(node.id);
+            if (point) Object.assign(node, point);
+          }
+        });
+        for (const node of this.map.nodes) {
+          const point = target.get(node.id);
+          if (point) Object.assign(node, point);
+        }
+      },
+      { sync: false }
+    );
+  }
   /**
    * The options of the quick research that follows AI expansion: no web or image search unless the dialog's checkbox
    * is on. The decomposition itself and the notes' stored research settings are not affected.
@@ -35473,8 +35575,15 @@ ${request.requirements}` : preset.text,
     return options.shallowWebSearch ? options : { ...options, researchMode: "local", visualMode: "off" };
   }
   startShallowResearch(parent, children, options) {
+    var _a;
     const signal = options.signal;
     const pendingOptions = this.researchChoices(options);
+    const placed = /* @__PURE__ */ new Map();
+    for (const child of children) {
+      const node = (_a = this.map) == null ? void 0 : _a.nodes.find((item) => item.id === child.id);
+      if (node) placed.set(node.id, { x: node.x, y: node.y });
+    }
+    let respaced = false;
     this.plugin.quickExpandPending.add(parent.path);
     return this.plugin.expansionCoordinator.start(
       parent.path,
@@ -35485,6 +35594,13 @@ ${request.requirements}` : preset.text,
         const state = this.plugin.expansionBatches.get(parent.path);
         if ((state == null ? void 0 : state.status) === "running") this.plugin.quickExpandPending.add(parent.path);
         else this.plugin.quickExpandPending.delete(parent.path);
+        if (state && state.status !== "running" && !respaced) {
+          respaced = true;
+          void this.respaceBatch(parent, placed).catch(() => void 0).then(() => {
+            if (!this.closed) this.render();
+          });
+          return;
+        }
         this.render();
       },
       signal
@@ -35687,6 +35803,15 @@ ${request.requirements}` : preset.text,
       dismiss.setAttr("aria-label", t("ui.dismiss"));
     }
   }
+  /** The sample start's "no models found" button: it checks the CLI of the chosen model (Claude Code or Codex). */
+  renderConnectionCheck(actions) {
+    const claude = providerForModel(this.plugin.settings.cliModel) === "claude";
+    return this.button(
+      actions,
+      t(claude ? "ui.check_claude_code" : "ui.check_codex"),
+      () => claude ? this.plugin.repairConnection() : this.enqueue(() => this.plugin.recheckCodex())
+    );
+  }
   renderSelectionBar(workspace) {
     var _a, _b, _c;
     const selection = workspace.createDiv("vam-selection-bar");
@@ -35697,6 +35822,7 @@ ${request.requirements}` : preset.text,
     selection.createSpan({
       text: this.multiSelected.size ? t("ui.selected_0_1_2", this.multiSelected.size, names2.slice(0, 2).join("\u3001"), names2.length > 2 ? "\u2026" : "") : t("ui.prompt_select_topics")
     });
+    selection.createSpan({ cls: "vam-hint vam-selection-hint", text: t("ui.drag_to_select_topics_hint") });
     this.button(
       selection,
       t("ui.clear"),
@@ -35711,18 +35837,12 @@ ${request.requirements}` : preset.text,
     this.button(selection, t("ui.move_to"), () => this.chooseSelectedParent(false), !this.multiSelected.size);
     this.button(selection, t("ui.copy_to"), () => this.chooseSelectedParent(true), !this.multiSelected.size);
     const count = this.multiSelected.size;
-    this.button(
-      selection,
-      count > 1 ? t("ui.synthesize_0_topics", count) : t("ui.synthesize"),
-      () => this.integrateSelected(),
-      count < 2
-    ).addClass("mod-cta");
+    const synthesize = this.button(selection, t("ui.synthesize"), () => this.integrateSelected(), count < 2);
+    synthesize.addClass("mod-cta");
+    if (count > 1) synthesize.setAttr("aria-label", t("ui.synthesize_0_topics", count));
     if (!((_a = this.map) == null ? void 0 : _a.aim) && !this.builtIn) {
-      const check = this.mergeCheck(), merge = this.button(
-        selection,
-        count > 1 ? t("ui.merge_0_topics", count) : t("ui.merge"),
-        () => this.openMerge()
-      );
+      const check = this.mergeCheck(), merge = this.button(selection, t("ui.merge"), () => this.openMerge());
+      if (count > 1) merge.setAttr("aria-label", t("ui.merge_0_topics", count));
       if (!check.ok) {
         merge.setAttr("aria-disabled", "true");
         merge.setAttr("title", t(check.reason));
@@ -35730,12 +35850,14 @@ ${request.requirements}` : preset.text,
     }
     if (!((_b = this.map) == null ? void 0 : _b.aim)) {
       const running = ((_c = this.plugin.expansionBatches.get(this.multiResearchKey())) == null ? void 0 : _c.status) === "running";
-      this.button(
+      const research = this.button(
         selection,
-        count > 1 ? t("ui.research_0_topics", count) : count ? t("ui.research_one_topic") : t("ui.multi_research"),
+        t("ui.multi_research"),
         () => this.openMultiResearch(),
         !this.multiSelected.size || running
       );
+      if (count)
+        research.setAttr("aria-label", count > 1 ? t("ui.research_0_topics", count) : t("ui.research_one_topic"));
     }
     return selection;
   }
@@ -35841,6 +35963,7 @@ ${request.requirements}` : preset.text,
             detail: note.detail,
             task: [task, options == null ? void 0 : options.requirements].filter(Boolean).join("\n\n"),
             ancestors: await this.ancestorContext(node),
+            workingFindings: note.newFindings,
             referenceGroups: [...selectedSources, childSources],
             // Within budget the sources go in as written (one request); only over-budget sources are extracted first.
             referenceDelivery: "direct",
@@ -35916,7 +36039,8 @@ ${request.requirements}` : preset.text,
       note.reasoning,
       note.sourcePaths,
       note.referencePaths,
-      note.thinkingOrigin
+      note.thinkingOrigin,
+      note.newFindings
     ]);
     const selectedSources = (_c = options == null ? void 0 : options.referenceGroups) != null ? _c : [];
     if (!children.length && !selectedSources.some((group) => group.documents.length)) {
@@ -35937,6 +36061,7 @@ ${request.requirements}` : preset.text,
     await this.hydrate();
     this.render();
     const progress = this.startTaskProgress(node.path);
+    let findingsSent = false;
     try {
       const synthesisContext = withThinkingOrigin(
         {
@@ -35946,6 +36071,10 @@ ${request.requirements}` : preset.text,
           detail: note.detail,
           task: [task, options == null ? void 0 : options.requirements].filter(Boolean).join("\n\n"),
           ancestors: await this.ancestorContext(node),
+          workingFindings: note.newFindings,
+          onWorkingFindingsSent: (sent) => {
+            findingsSent = sent === note.newFindings;
+          },
           referenceGroups: [...selectedSources, childSources],
           // Within budget the sources go in as written (one request); only over-budget sources are extracted first.
           referenceDelivery: "direct",
@@ -35996,7 +36125,8 @@ ${request.requirements}` : preset.text,
           latest.reasoning,
           latest.sourcePaths,
           latest.referencePaths,
-          latest.thinkingOrigin
+          latest.thinkingOrigin,
+          latest.newFindings
         ]) !== noteSnapshot)
           throw new Error(t("ui.the_topic_changed_the_synthesis_draft_was_not_saved"));
         const canonicalOnly = canonicalDetail(
@@ -36019,7 +36149,8 @@ ${request.requirements}` : preset.text,
             summary,
             detail: canonical,
             visualReferences: references2,
-            newFindings: "",
+            // The findings are cleared only when the model saw them (the rewrite folds them in); unsent ones stay.
+            ...findingsSent ? { newFindings: "" } : {},
             status: "completed",
             ...formatIssuesPatch(issues, language2)
           },
@@ -40582,7 +40713,7 @@ var AiTaskService = class {
   }
   /** `role` names the two reference rounds so they are logged as their own steps; every other request is a task or AIM step. */
   async execute(input, model, reasoning, signal, onExchange, onRequestAccepted, onWebSearchEvent, observer, role) {
-    var _a, _b;
+    var _a, _b, _c, _d;
     if (input.timeoutMs !== void 0 && (!Number.isInteger(input.timeoutMs) || input.timeoutMs < 18e4 || input.timeoutMs > 6e5))
       throw new Error("Invalid AI task timeout.");
     const provider = providerForModel(model);
@@ -40614,8 +40745,9 @@ var AiTaskService = class {
       throw new Error(t("ui.source_context_exceeds_budget"));
     }
     context = prepared.context;
+    if (!input.countRepair) (_c = input.onWorkingFindingsSent) == null ? void 0 : _c.call(input, (_b = context.workingFindings) != null ? _b : "");
     const pluginDirectory = this.options.pluginDirectory();
-    const outputLanguage = (_b = context.outputLanguage) != null ? _b : this.options.language();
+    const outputLanguage = (_d = context.outputLanguage) != null ? _d : this.options.language();
     const shape = taskResponseShape(context);
     const step = prepareStep(createTaskStep(taskStepId(context, role), shape.schema), {
       context,

@@ -943,7 +943,7 @@ async function backgroundSynthesisFixture(askModel) {
   const child = await repo.createNote('Child', 'model-a', mapDoc, mapPath, 'workspace'); child.parentId = parent.id; mapDoc.nodes.push(child); await repo.saveMap(mapPath, mapDoc);
   await repo.updateNote(parent.path, { status: 'completed', summary: 'Existing conclusion', detail: 'Existing knowledge' });
   const contexts = [];
-  const plugin = { repo, settings: { ...DEFAULT_SETTINGS }, running: new Set(), abortChartJobs: () => {}, addChartsAfterWrite: () => {}, activeTasks: new Map(), mutate: async work => work(), recordFailure: (_context, error) => error.message, askModel: (context, model, reasoning, signal, onExchange, onAccepted) => { contexts.push(context); return askModel(contexts.length, signal, onAccepted); } };
+  const plugin = { repo, settings: { ...DEFAULT_SETTINGS }, running: new Set(), abortChartJobs: () => {}, addChartsAfterWrite: () => {}, activeTasks: new Map(), mutate: async work => work(), recordFailure: (_context, error) => error.message, askModel: (context, model, reasoning, signal, onExchange, onAccepted) => { contexts.push(context); context.onWorkingFindingsSent?.(context.workingFindings ?? ''); return askModel(contexts.length, signal, onAccepted); } };
   const { VisualAgentMapView } = load('main.ts', { obsidian });
   const view = new VisualAgentMapView({ app }, plugin); view.path = mapPath; view.map = mapDoc; view.render = () => {}; view.hydrate = async () => {}; view.ancestorContext = async () => '';
   const options = () => ({ researchMode: 'local', researchDepth: 'normal', visualMode: 'off', referenceGroups: [] });
@@ -1219,17 +1219,17 @@ integrationTest('multi research is not offered on AIM maps and needs at least on
 });
 integrationTest('selection bar shows Research; starting leaves selection mode and the top status bar shows progress and Stop', async () => {
   const h = await multiResearchHarness(['A', 'B']);
-  const element = (tag, o = {}) => ({ tag, text: o.text ?? '', cls: o.cls ?? '', disabled: false, children: [], listeners: {},
+  const element = (tag, o = {}) => ({ tag, text: o.text ?? '', cls: o.cls ?? '', disabled: false, children: [], listeners: {}, attrs: {},
     createDiv(v) { const c = element('div', { cls: typeof v === 'string' ? v : v?.cls }); this.children.push(c); return c; },
     createEl(n, v = {}) { const c = element(n, v); this.children.push(c); return c; }, createSpan(v = {}) { const c = element('span', v); this.children.push(c); return c; },
-    addEventListener(n, fn) { this.listeners[n] = fn; }, addClass(n) { this.cls = `${this.cls} ${n}`.trim(); }, setAttr() {} });
+    addEventListener(n, fn) { this.listeners[n] = fn; }, addClass(n) { this.cls = `${this.cls} ${n}`.trim(); }, setAttr(k, v) { this.attrs[k] = v; } });
   const all = root => [root, ...root.children.flatMap(all)];
   const bar = (view = h.view) => { const root = element('workspace'); view.renderSelectionBar(root); return all(root); };
   const toolbar = () => { const root = element('content'); h.view.renderMultiResearchStatus(root); return all(root); };
   h.view.notes = new Map(h.nodes.map(n => [n.id, { title: n.id }]));
   let items = bar(); const research = () => items.find(i => i.tag === 'button' && /^Research( 1 topic)?$/.test(i.text));
   items = bar(); assert.ok(research()); assert.equal(research().disabled, true);
-  h.view.multiSelected = new Set([h.nodes[0].id]); items = bar(); assert.equal(research().disabled, false); assert.equal(research().text, 'Research 1 topic');
+  h.view.multiSelected = new Set([h.nodes[0].id]); items = bar(); assert.equal(research().disabled, false); assert.equal(research().text, 'Research'); assert.equal(research().attrs['aria-label'], 'Research 1 topic');
   h.view.map.aim = {}; items = bar(); assert.equal(research(), undefined); delete h.view.map.aim;
   assert.equal(toolbar().length, 1);
   h.view.integrationMode = true;
@@ -2276,6 +2276,8 @@ integrationTest('synthesis keeps every earlier source link in the parent note fi
   const saved = await f.repo.readNote(f.parent.path);
   const file = await f.repo.app.vault.adapter.read(f.parent.path);
   for (const url of beforeUrls) assert.ok(file.includes(url), `lost ${url}`);
+  assert.equal(saved.newFindings, '', 'the findings were sent, so they are cleared');
+  assert.match(saved.detail, /Sources from earlier research[\s\S]*https:\/\/finding\.example\/w/, 'the cleared findings link is carried into the block');
   assert.match(saved.detail, /#### Sources from earlier research/);
   assert.match(saved.detail, /Draft detail citing only \[the child\]\(https:\/\/child\.example\/z\)/);
   // Every footnote reference has exactly one definition.
@@ -2357,4 +2359,52 @@ integrationTest('synthesis carry-forward: URLs in a legacy separate Visual Refer
   assert.ok(file.includes('https://legacy-img.example/p.png'));
   assert.ok(file.includes('https://legacy-src.example/page'));
   assert.match((await f.repo.readNote(f.parent.path)).detail, /Sources from earlier research[\s\S]*legacy-src\.example/);
+});
+
+// ---- B8: child synthesis sends the parent's Working Findings; they are cleared on save only if they were sent.
+const { capturingRuntime, makeService } = require('../support-replay.cjs');
+async function findingsFixture(findings, language = 'en') {
+  const f = await backgroundSynthesisFixture(async () => assert.fail('replaced below'));
+  const directions = JSON.stringify({ summary: '', detail: '', visualReferences: [], suggestions: [{ title: 'Common ground', task: 'Find shared constraints', contribution: 'A shared view', parentTitle: '' }] });
+  const draft = JSON.stringify({ summary: 'Draft summary', detail: 'Draft detail', visualReferences: [], suggestions: [] });
+  f.runtime = capturingRuntime([directions, draft]);
+  const service = makeService(f.runtime, { language });
+  f.plugin.askModel = (context, _model, _reasoning, signal, _exchange, onAccepted) => service.askModel(context, 'gpt-6-luna', 'low', signal, undefined, onAccepted);
+  await f.repo.updateNote(f.parent.path, { newFindings: findings });
+  const child = f.view.map.nodes.find(item => item.parentId === f.parent.id);
+  await f.repo.updateNote(child.path, { status: 'completed', summary: 'Child summary', detail: 'Child finding.' });
+  return f;
+}
+integrationTest('B8: directions and synthesis prompts carry the parent Working Findings under their label', async () => {
+  const f = await findingsFixture('PARENT_WORKING_FINDING_TEXT');
+  await synthesize(f);
+  assert.equal(f.runtime.calls.length, 2);
+  for (const call of f.runtime.calls) assert.match(call.prompt, /Older findings to consolidate:\nPARENT_WORKING_FINDING_TEXT/);
+  assert.equal((await f.repo.readNote(f.parent.path)).newFindings, '', 'the findings the model saw are folded into the rewrite and cleared');
+});
+integrationTest('B8: empty Working Findings add no label to the prompt and the save is as before', async () => {
+  const f = await findingsFixture('');
+  await synthesize(f);
+  for (const call of f.runtime.calls) assert.doesNotMatch(call.prompt, /Older findings to consolidate/);
+  assert.equal((await f.repo.readNote(f.parent.path)).newFindings, '');
+});
+integrationTest('B8: Working Findings the context budget cut off are kept on save', async () => {
+  const f = await findingsFixture('KEPT_FINDING_START ' + 'x'.repeat(140000));
+  await synthesize(f);
+  assert.equal(f.runtime.calls.length, 2);
+  assert.ok(!f.runtime.calls[1].prompt.includes('x'.repeat(140000)), 'the findings were cut');
+  const saved = await f.repo.readNote(f.parent.path);
+  assert.equal(saved.summary, 'Draft summary');
+  assert.match(saved.newFindings, /^KEPT_FINDING_START x+$/);
+});
+integrationTest('B8: Working Findings edited while the synthesis runs make the save refuse and are not cleared', async () => {
+  const f = await findingsFixture('Original finding');
+  await f.view.startSynthesis(f.parent, f.options(), null, m => assert.fail(m), () => {});
+  const failures = []; let save;
+  await f.view.integrateChildren(f.parent, f.options(), 'Find shared constraints', (_result, commit) => { save = commit; }, m => failures.push(m));
+  await f.repo.updateNote(f.parent.path, { newFindings: 'Edited by the user meanwhile' });
+  await assert.rejects(save('S', 'D'), /changed/i);
+  const saved = await f.repo.readNote(f.parent.path);
+  assert.equal(saved.newFindings, 'Edited by the user meanwhile');
+  assert.notEqual(saved.summary, 'S');
 });

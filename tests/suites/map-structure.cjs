@@ -670,6 +670,7 @@ integrationTest('structure review: add, move, merge and remove each apply as one
   // Merge: through the delete confirmation; Misc's subtopic moves to Body, Misc leaves the map.
   // The added topic's note was parked in Unassigned by its undo (D11a), so count only what the merge adds.
   const parkedBefore = (await h.repo.collectionFiles(h.mapPath, 'Unassigned')).length;
+  assert.equal(parkedBefore, 1, 'the undone add parked its note');
   await apply(2, false); await tick();
   assert.equal(h.opened.at(-1).titleEl.text, 'Merge “Misc” into “Body”');
   await h.choose('Merge and remove “Misc”');

@@ -8,6 +8,15 @@
 - The goal-grading button is now named "Prioritize by goal", and its panel no longer closes by itself when the map repaints or focus returns from a dialog; if it cannot open, a notice says why.
 - Map cards now work from the keyboard: Delete or Backspace removes the focused card (with an Undo notice, or the usual confirmation when it has subtopics), Mod+Enter adds a subtopic, Shift+Enter adds a sibling, double-clicking a title renames it, and Mod+Z / Mod+Shift+Z undo and redo while the map is the active pane.
 - Merging, removing, archiving, renaming and undoing topics no longer pops up Obsidian's "Update links" dialog when only VAM notes link to the moved cards: VAM updates its own links itself. If one of your own notes links to a moved card, VAM shows a short notice first and Obsidian asks as before, so your links are never silently broken.
+- Integrate subtopics now sends the parent topic's Working Findings to the model and clears them only when the model actually received them. Before, they were left out of the request and then deleted when the result was saved; a change to the findings while the synthesis runs now stops the save instead of overwriting them.
+- A research note no longer keeps a copied footnote marker with no definition: it becomes the source note when exactly one reference note defines it, and is removed when several define it or when a reference note uses it without defining it. Your own earlier footnotes are never re-pointed.
+- Textbook-style notes with only the "no new information" placeholder under Evidence and sources now show just the source list, without the placeholder sentence.
+- The gantt critical-task bar text now meets 4.5:1 contrast in AnuPpuccin light.
+- A wide diagram in a VAM note without the `visual-agent-map-node` CSS class scrolls inside the diagram instead of making the whole preview scroll sideways.
+- With a Claude model selected and no models found, the sample start button now reads "Check Claude Code" and checks the Claude connection instead of Codex.
+- The topic-selection bar no longer shifts its buttons as the selection changes: it sits at the bottom left, clear of the zoom controls, the selected names and the gesture hint each have their own line, and the Synthesize, Merge and Research labels no longer carry a count (screen readers still hear it).
+- After creating subtopics from an expansion, the view now shows the parent and all new subtopics instead of empty canvas.
+- After quick subtopic research finishes, the new subtopic cards you have not moved are re-spaced so grown cards no longer overlap their neighbours.
 - Undoing a topic you just created (the + button, a strengthened topic, or each subtopic of a batch) now also takes its note out of the Notes folder: it is parked in Unassigned like a removed topic, and Redo puts it back at the same place. No stray note is left behind.
 
 ## [0.24.0] - 2026-10-22

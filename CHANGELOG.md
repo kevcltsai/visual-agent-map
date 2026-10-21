@@ -2,12 +2,41 @@
 
 ## [Unreleased]
 
+## [0.24.0] - 2026-10-22
+
+### Added
+
+- Research now shows its progress on the topic card: the stage ("Waiting for the model", "Searching the web", "Reading", "Writing") with elapsed seconds, appearing within a fraction of a second. With Claude Code, the summary streams in as an unsaved preview on the card (and hover card) while the answer is being written; nothing is saved until the result is complete, and Stop or a failure clears it.
+- If the model gives no sign of life for 20 seconds, the card says the reply is slow and offers **Resend**. VAM never resends by itself.
+- Integrate subtopics, Integrate N topics and AI merge show the same stage, seconds and preview in the background status line.
+- Expansion option **Also search the web for subtopic research** (off by default; shown when subtopic research is selected).
+- While you choose the model and options in the Next Step dialog, VAM starts the Claude Code process in advance so the request can go out sooner. It is closed when you cancel, change the settings, or leave the step, and after 180 seconds idle.
+
+### Changed
+
+- Subtopic research created by an expansion is now a shallow, local pass without web search unless you tick the option above. The subtopic notes are still stored as research notes.
+- Charts are added after the note is written, in the background, instead of making you wait; the card shows **Stop adding charts**. Shallow local subtopic research does not add charts.
+- Synthesis sends the child notes in a single request instead of extracting findings first when they fit in one batch.
+- Claude Code research asks for the structured answer directly, which removes a repeated-output retry.
+
 ### Fixed
 
 - Coffee Tables work again after the workspace folder is reconnected.
 - The background reconcile timer is cleared when the plugin unloads.
 - Retrying a failed AIM report uses the model and reasoning level of the attempt that failed.
 - The two warnings from the 0.23.0 Obsidian scan are cleared: an unnecessary type assertion in the relevance status bar focus code, and a partially supported `clip-path` in the hidden tag name style.
+- A pre-started Claude Code process is no longer killed by an unrelated Claude call, is not started after the plugin unloads, and local (no web search) research uses a matching one.
+
+### Measured
+
+In our own test vault with Claude Sonnet at low effort (small samples, a few runs each, so treat as indicative): a research run went from about 43.6 s to 21.8 s, an expansion of subtopics from about 79 s to about 24 s, a synthesis from 29.1 s to 13.7 s and an AI merge from 16.7 s to 8.1 s. Your times depend on the model, reasoning level, network and source length.
+
+### Limitations
+
+- Progress, preview and the pre-start were checked with Claude Code. Codex CLI shows stages and seconds but no query or preview, and its path was covered by automated tests only.
+- The pre-start helps only when the options in the dialog match the request; otherwise the request starts normally. A pre-started process for an expansion serves only the first subtopic, and it expires after 180 seconds.
+- Not checked live: narrow-width layout, keyboard use of the new Stop and Resend buttons, spoken announcements by a screen reader, synthesis of very long sources (more than one batch, which still extracts findings first), and Windows or Linux.
+- Subtopic research without web search is shallower and has no fresh sources; tick the option when you need them.
 
 ## [0.23.0] - 2026-10-20
 

@@ -5674,7 +5674,7 @@ export class VisualAgentMapView extends ItemView {
     const toolbar = this.contentEl.createDiv("vam-toolbar");
     const switcher = toolbar.createEl("button", { cls: "vam-map-switcher" });
     switcher.setAttr("aria-label", t("ui.switch_mind_map"));
-    switcher.createSpan({ text: this.map?.title ?? "Visual Agent Map", cls: "vam-map-title" });
+    switcher.createSpan({ text: this.map?.title ?? "Visual Agent Map", cls: "vam-map-title", attr: { dir: "auto" } });
     setIcon(switcher.createSpan("vam-map-switcher-icon"), "chevrons-up-down");
     switcher.addEventListener("click", () => this.openMapSwitcher());
     if (this.builtIn) toolbar.createSpan({ cls: "vam-readonly-badge", text: t("ui.official_sample_read_only") });
@@ -5979,6 +5979,11 @@ export class VisualAgentMapView extends ItemView {
     if (!this.builtIn && !this.map.aim) this.renderMultiResearchStatus(this.contentEl);
     if (!this.builtIn && !this.map.aim) this.renderRelevanceStatus(this.contentEl);
     if (!this.builtIn && !this.map.aim) this.renderBackgroundBars(this.contentEl);
+    // An empty map has nothing to select: leave topic selection (undo can empty a map while the bar is open).
+    if (!this.map.nodes.length && !this.builtIn) {
+      this.integrationMode = false;
+      this.multiSelected.clear();
+    }
     const tools = createDiv("vam-map-tools");
     if (!this.builtIn) {
       const aimMode = !!this.map.aim;
@@ -6439,6 +6444,7 @@ export class VisualAgentMapView extends ItemView {
     }
     const title = card.createEl("h3", { text: note?.title ?? node.path, cls: "vam-card-title" });
     title.setAttr("title", note?.title ?? node.path);
+    title.setAttr("dir", "auto");
     // Double-click renames, the same dialog as F2 and the Rename tool. It is handled on the card: enableDrag captures the
     // pointer on the card, so a real mouse reports the card (not the title) as the dblclick target.
     if (note && !this.builtIn && !this.integrationMode && !this.map?.aim)
@@ -7225,7 +7231,7 @@ export class VisualAgentMapView extends ItemView {
     else if (note) panel.createEl("p", { cls: "vam-inspector-topic", text: t("ui.topic_0", note.title) });
     if (note) {
       if (this.builtIn) {
-        panel.createEl("h3", { text: note.title });
+        panel.createEl("h3", { text: note.title, attr: { dir: "auto" } });
         panel.createEl("p", { text: note.summary, cls: "vam-sample-summary" });
         const detail = panel.createDiv("vam-sample-detail");
         void MarkdownRenderer.render(this.app, note.detail, detail, "", this);
@@ -8222,8 +8228,14 @@ export class VisualAgentMapView extends ItemView {
     const selection = workspace.createDiv("vam-selection-bar");
     const names = [...this.multiSelected].map(id => this.notes.get(id)?.title).filter(Boolean);
     selection.createSpan({
+      attr: { dir: "auto" },
       text: this.multiSelected.size
-        ? t("ui.selected_0_1_2", this.multiSelected.size, names.slice(0, 2).join("、"), names.length > 2 ? "…" : "")
+        ? t(
+            "ui.selected_0_1_2",
+            this.multiSelected.size,
+            names.slice(0, 2).join(t("ui.list_separator")),
+            names.length > 2 ? "…" : ""
+          )
         : t("ui.prompt_select_topics")
     });
     // One fixed line under the names: it cannot cover the canvas and never moves the buttons.

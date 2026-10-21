@@ -32,6 +32,7 @@ export function renderTopicTree(parent: HTMLElement, options: TopicTreeOptions):
     button.style.paddingLeft = `${8 + depth * 16}px`;
     button.dataset.id = id;
     button.title = text;
+    button.setAttr("dir", "auto");
     button.disabled = !enabled;
     button.setAttr("aria-disabled", String(!enabled));
     if (enabled) button.addEventListener("click", () => options.onChoose(id));

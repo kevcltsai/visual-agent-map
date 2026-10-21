@@ -1,4 +1,6 @@
 import { renderTemplate, type StepDefinition } from "../../../../core/step-runner";
+import { coffeeInstruction, coffeeLanguageName, coffeeText } from "../../language";
+import { LABEL_CONVERSATION_STYLE_OBSERVER, LABEL_DIALOGUE_DRAFT, LABEL_NOTES_DRAFT } from "../_shared/fragments";
 import {
   assembleCoffeeContext,
   cleanChatStyle,
@@ -18,8 +20,8 @@ export interface ObserverOnlyInput {
 function history(session: CoffeeSession): string {
   return [
     assembleCoffeeContext(session),
-    session.draftMarkdown ? `未完成對談草稿：\n${session.draftMarkdown}` : "",
-    session.observerDraftMarkdown ? `觀察者整理草稿：\n${session.observerDraftMarkdown}` : ""
+    session.draftMarkdown ? `${LABEL_DIALOGUE_DRAFT}\n${session.draftMarkdown}` : "",
+    session.observerDraftMarkdown ? `${LABEL_NOTES_DRAFT}\n${session.observerDraftMarkdown}` : ""
   ]
     .filter(Boolean)
     .join("\n\n");
@@ -30,32 +32,25 @@ export const observerOnlyStep: StepDefinition<ObserverOnlyInput, string> = {
   id: "coffee.observer-only",
   version: 1,
   render: ({ session }) => {
-    const zhTw = session.language === "zh-TW";
+    const key = coffeeInstruction(session.language);
     const style = session.guests?.customization
       ? cleanChatStyle(conversationStyle(session.language, session.guests))
       : conversationStyle(session.language, session.guests);
-    return renderTemplate(zhTw ? zh : en, {
-      styleSection: style ? `${zhTw ? "聊天室風格" : "Conversation style"}:\n${style}\n` : "",
+    return renderTemplate(key === "zh" ? zh : en, {
+      language: coffeeLanguageName(session.language, "plain"),
+      styleSection: style ? `${LABEL_CONVERSATION_STYLE_OBSERVER[key]}:\n${style}\n` : "",
       references: formatReferenceContext(session.guests?.referenceFiles ?? []),
       history: history(session),
       observerFormat: observerFormat(session.language, true, session.guests?.customization)
     });
   },
   policy: (prompt, { session }) => {
-    const zhTw = session.language === "zh-TW";
+    const language = session.language;
     // Original order: the history limit was checked before the prompt was assembled.
     if (history(session).length > MAX_COFFEE_CONTEXT_CHARS)
-      throw new Error(
-        zhTw
-          ? "這桌的內容太長，無法安全地全部交給模型。舊內容已完整保留。"
-          : "This table is too long to summarize safely in full. The existing conversation is preserved."
-      );
+      throw new Error(coffeeText(language, "coffee.table_too_long_to_summarize"));
     if (prompt.length > MAX_COFFEE_CONTEXT_CHARS)
-      throw new Error(
-        zhTw
-          ? "這桌的內容太長，無法安全地全部交給模型；舊內容已完整保留。"
-          : "This table is too long to summarize safely in full. The existing conversation is preserved."
-      );
+      throw new Error(coffeeText(language, "coffee.table_too_long_to_summarize_prompt"));
   },
   parse: raw => raw
 };

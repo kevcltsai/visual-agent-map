@@ -1,4 +1,5 @@
 import { renderTemplate, type StepDefinition } from "../../../../core/step-runner";
+import { coffeeInstruction, coffeeLanguageName, coffeeText } from "../../language";
 import {
   cleanChatStyle,
   conversationStyle,
@@ -7,7 +8,14 @@ import {
   names,
   observerFormat
 } from "../../prompt-parts";
-import { TABLE_LEAD_IN_CONTINUE, TABLE_LEAD_IN_NEW } from "../_shared/fragments";
+import {
+  LABEL_BACKGROUND,
+  LABEL_CONVERSATION_STYLE,
+  LABEL_PRIOR,
+  LABEL_TABLE_DRAFT,
+  TABLE_LEAD_IN_CONTINUE,
+  TABLE_LEAD_IN_NEW
+} from "../_shared/fragments";
 import { segmentSummaryInstruction } from "../../segments";
 import type { CoffeeGuestInvitation, GuestSettings } from "../../types";
 import en from "./prompt.en.md";
@@ -39,11 +47,12 @@ function variables(input: TableInput): Record<string, string> {
     hostCount: String(settings.hostCount ?? 2),
     topic,
     attendeeRoles: attendeeRoles.join("\n"),
-    background: settings.background.trim() ? `\n補充背景：${settings.background.trim()}` : "",
+    background: settings.background.trim() ? `\n${LABEL_BACKGROUND}${settings.background.trim()}` : "",
+    language: coffeeLanguageName(language, "usage"),
     references: formatReferenceContext(settings.referenceFiles ?? []),
-    custom: style ? `\n\n聊天室風格：\n${style}` : "",
-    prior: priorContext ? `\n\n先前對談與追問：\n${priorContext}` : "",
-    draftText: draft ? `\n\n上次未完成的對談草稿：\n${draft}` : "",
+    custom: style ? `\n\n${LABEL_CONVERSATION_STYLE}\n${style}` : "",
+    prior: priorContext ? `\n\n${LABEL_PRIOR}\n${priorContext}` : "",
+    draftText: draft ? `\n\n${LABEL_TABLE_DRAFT}\n${draft}` : "",
     opening: continuing ? `${TABLE_LEAD_IN_CONTINUE}\n\n` : TABLE_LEAD_IN_NEW,
     notes: observerFormat(language, false, settings.customization) + segmentSummaryInstruction(language)
   };
@@ -53,14 +62,10 @@ function variables(input: TableInput): Record<string, string> {
 export const tableStep: StepDefinition<TableInput, string> = {
   id: "coffee.table",
   version: 1,
-  render: input => renderTemplate(input.language === "zh-TW" ? zh : en, variables(input)),
+  render: input => renderTemplate(coffeeInstruction(input.language) === "zh" ? zh : en, variables(input)),
   policy: (prompt, input) => {
     if (prompt.length > MAX_COFFEE_CONTEXT_CHARS)
-      throw new Error(
-        input.language === "zh-TW"
-          ? "這桌的內容太長，無法安全地全部交給模型。請先開新桌；舊內容已完整保留。"
-          : "This table is too long to send safely in full. Start a new table; the existing conversation is preserved."
-      );
+      throw new Error(coffeeText(input.language, "coffee.table_too_long_start_new"));
   },
   parse: raw => raw
 };

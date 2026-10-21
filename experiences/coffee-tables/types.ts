@@ -1,4 +1,4 @@
-import type { UiLanguage } from "../../i18n";
+import { isNoteLanguage, noteLanguageOf, type NoteLanguage, type UiLanguage } from "../../i18n";
 import type { CoffeeCustomization, CoffeeConvergenceDraft } from "./customization";
 import { normalizeCustomization } from "./customization";
 
@@ -72,7 +72,8 @@ export interface CoffeeSession {
   version: 3;
   id: string;
   topic: string;
-  language: UiLanguage;
+  /** Persisted as the note language (zh-TW or en); the conversation variant is derived from the interface language at run time. */
+  language: NoteLanguage;
   model: string;
   reasoning: string;
   createdAt: string;
@@ -100,7 +101,8 @@ export interface LegacyCoffeeSession {
   version: 1;
   id: string;
   topic: string;
-  language: UiLanguage;
+  /** Persisted as the note language (zh-TW or en); the conversation variant is derived from the interface language at run time. */
+  language: NoteLanguage;
   model: string;
   reasoning: string;
   createdAt: string;
@@ -240,9 +242,10 @@ export function createSession(
   topic: string,
   model: string,
   reasoning: string,
-  language: UiLanguage,
+  uiLanguage: UiLanguage,
   guests?: GuestSettings
 ): CoffeeSession {
+  const language = noteLanguageOf(uiLanguage);
   const now = new Date().toISOString();
   return {
     version: 3,
@@ -363,7 +366,7 @@ export function parseSession(raw: string): AnyCoffeeSession {
     !/^[a-zA-Z0-9-]+$/.test(value.id) ||
     typeof value.topic !== "string" ||
     !value.topic.trim() ||
-    !["en", "zh-TW"].includes(String(value.language)) ||
+    !isNoteLanguage(value.language) ||
     !["ready", "generating", "completed", "error"].includes(String(value.status)) ||
     typeof value.model !== "string" ||
     typeof value.reasoning !== "string" ||

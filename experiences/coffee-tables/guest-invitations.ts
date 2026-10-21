@@ -1,4 +1,4 @@
-import { translate } from "../../i18n";
+import { translate, type NoteLanguage } from "../../i18n";
 import type { CoffeeQuestion, GuestCounts, GuestCategory, CoffeeGuestInvitation } from "./types";
 
 const CATEGORIES: GuestCategory[] = ["experts", "cross-domain", "generalist", "affected"];
@@ -16,7 +16,7 @@ export function validateGuestInvitations(
   questions: CoffeeQuestion[],
   retryQuestionId?: string,
   existingNames: string[] = [],
-  language: "zh-TW" | "en" = "zh-TW"
+  language: NoteLanguage = "zh-TW"
 ): string | null {
   const baseTotal = countGuests(baseCounts);
   if (baseTotal < 1 || baseTotal > 12) return translate(language, "coffee.the_existing_guest_count_is_invalid");

@@ -1,3 +1,4 @@
+import { coffeeInstruction } from "./language";
 import { SEGMENT_SUMMARY } from "./steps/_shared/fragments";
 import type { CoffeeSession } from "./types";
 export interface CoffeeSegment {
@@ -68,7 +69,7 @@ export function extractSegmentSummary(markdown: string): { markdown: string; sum
   return { markdown: clean.trim(), ...(summary ? { summary } : {}) };
 }
 export function segmentSummaryInstruction(language: string): string {
-  return `\n${SEGMENT_SUMMARY[language === "zh-TW" ? "zh" : "en"]}`;
+  return `\n${SEGMENT_SUMMARY[coffeeInstruction(language)]}`;
 }
 export function parseSummaryBatch(response: string, allowed: string[]): Array<{ id: string; summary: string }> {
   const raw = response

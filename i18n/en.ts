@@ -1670,6 +1670,65 @@ export const en = {
   "coffee.preferences_must_be_text": "Observer and convergence preferences must be text.",
   "coffee.today": "Today",
   "coffee.yesterday": "Yesterday",
+  "coffee.note_context": "Context",
+  "coffee.note_original_question": "Question",
+  "coffee.note_possible_solution": "Possible solution",
+  "coffee.default_observer_prompt":
+    "Capture concrete insights with context. Keep differing reasons, conditions and unresolved questions; do not add facts absent from the conversation.",
+  "coffee.default_convergence_prompt":
+    "Keep each item recognizable with its original reasoning. Merge items only when their substance overlaps.",
+  "coffee.conversation_language": "Conversation: {0}",
+  "coffee.table_too_long_start_new":
+    "This table is too long to send safely in full. Start a new table; the existing conversation is preserved.",
+  "coffee.table_too_long_conversation_preserved":
+    "This table is too long to send safely in full; the existing conversation is preserved.",
+  "coffee.table_too_long_to_summarize":
+    "This table is too long to summarize safely in full. The existing conversation is preserved.",
+  "coffee.table_too_long_to_summarize_prompt":
+    "This table is too long to summarize safely in full. The existing conversation is preserved.",
+  "coffee.conversation_too_long_to_summarize":
+    "The conversation is too long to summarize in one request; no content was truncated or changed.",
+  "coffee.insights_too_long_to_preview": "The insights are too long to prepare safely; existing content is preserved.",
+  "coffee.engine_session_deleted": "This Coffee Tables session is being deleted or was deleted",
+  "coffee.engine_sample_read_only": "Built-in sample sessions are read-only",
+  "coffee.engine_wait_for_operation": "Wait for the current Coffee Tables operation to finish",
+  "coffee.engine_style_too_long": "Conversation style must be 30,000 characters or fewer.",
+  "coffee.engine_insight_cannot_be_pinned": "This insight is no longer available to pin",
+  "coffee.engine_empty_convergence_response": "The model returned an empty convergence response",
+  "coffee.engine_notes_changed_during_convergence":
+    "Observer notes changed while convergence was being prepared; the draft was kept for review",
+  "coffee.engine_no_convergence_draft": "There is no convergence draft to apply",
+  "coffee.engine_convergence_baseline_changed":
+    "Observer notes or pinned insights changed; refresh the convergence preview before applying it",
+  "coffee.engine_select_a_proposal": "Select at least one proposal to apply",
+  "coffee.engine_convergence_preview_invalid": "The saved convergence preview is invalid; refresh it before applying",
+  "coffee.engine_convergence_preview_inconsistent":
+    "The saved convergence preview is inconsistent; refresh it before applying",
+  "coffee.engine_edited_proposal_missing": "An edited convergence proposal does not exist",
+  "coffee.engine_pinned_cannot_be_edited": "Pinned insights cannot be edited",
+  "coffee.engine_convergence_proposal_invalid": "The convergence proposal is invalid",
+  "coffee.engine_no_convergence_to_undo": "There is no convergence change to undo",
+  "coffee.engine_undo_unsafe": "Observer notes changed after convergence; undo is no longer safe",
+  "coffee.engine_no_insights_to_converge": "There are no insights to converge yet.",
+  "coffee.engine_pinned_cannot_merge":
+    "Pinned insights must stay unchanged and cannot be merged with other insights. The raw response is preserved.",
+  "coffee.engine_convergence_changed_during_preview":
+    "The table or insights changed while the preview was being prepared. The raw response is preserved; refresh the preview.",
+  "coffee.engine_convergence_format_invalid":
+    "The convergence preview format is invalid; existing insights and the raw response are preserved.",
+  "coffee.engine_convergence_cancelled": "Convergence was cancelled; existing insights are preserved.",
+  "coffee.engine_convergence_failed":
+    "Could not prepare a convergence preview; existing insights and the raw response are preserved.",
+  "coffee.engine_notes_incomplete": "The notes were incomplete. Earlier notes are preserved and the draft is saved.",
+  "coffee.engine_notes_stopped": "Notes stopped; the draft is saved.",
+  "coffee.engine_observer_summary_incomplete":
+    "The conversation arrived without a complete observer summary. This segment is saved as a draft; earlier notes are kept.",
+  "coffee.engine_answer_or_notes_incomplete":
+    "The answer or observer notes are incomplete. The draft is saved for retry.",
+  "coffee.engine_no_valid_summaries": "No valid segment summaries were received; existing data is preserved.",
+  "coffee.engine_summaries_partial":
+    "Received summaries were saved; some segments remain without summaries and can be retried.",
+  "coffee.engine_summaries_cancelled": "Summaries cancelled; existing data is preserved.",
   // coffee:end
   "ui.coffee_outline_segment": "Segment {0} · {1}",
   "log.exchange_full_prompt": "Full prompt:",

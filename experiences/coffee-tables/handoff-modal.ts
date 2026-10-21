@@ -1,7 +1,16 @@
 import { Modal, Notice, type App } from "obsidian";
 import { randomUUID } from "node:crypto";
 import type VisualAgentMapPlugin from "../../main";
-import { translate, uiLocale, type TranslationKey, type UiLanguage } from "../../i18n";
+import {
+  isNoteLanguage,
+  noteLanguageOf,
+  NOTE_LANGUAGES,
+  translate,
+  uiLocale,
+  type NoteLanguage,
+  type TranslationKey,
+  type UiLanguage
+} from "../../i18n";
 import { createThinkingArtifact } from "../../core/thinking-artifact";
 import { isHandoffWriteError, type ExperienceHandoffResult } from "../../core/experience-router";
 import { normalizeReasoningLevel } from "../../ai/task-policy";
@@ -18,7 +27,7 @@ export interface CoffeeHandoffInputs {
   context: string;
   model: string;
   reasoning: string;
-  language: "en" | "zh-TW";
+  language: NoteLanguage;
 }
 
 /** Fields the dialog is reopened with: the original inputs, plus the AI draft when one finished. */
@@ -274,8 +283,8 @@ export class CoffeeHandoffModal extends Modal {
     void this.plugin.refreshModelDiscovery("claude");
     this.reasoning = this.select(choices, this.t("coffee.reasoning"), ["low", "medium", "high", "auto"]);
     this.reasoning.value = normalizeReasoningLevel(this.snapshot.session.reasoning);
-    this.language = this.select(choices, this.t("coffee.output_language"), ["en", "zh-TW"]);
-    this.language.value = this.plugin.settings.language;
+    this.language = this.select(choices, this.t("coffee.output_language"), [...NOTE_LANGUAGES]);
+    this.language.value = noteLanguageOf(this.plugin.settings.language);
     this.status = this.contentEl.createEl("p", {
       cls: "ct-handoff-status",
       attr: { role: "status", "aria-live": "polite" }
@@ -376,7 +385,7 @@ export class CoffeeHandoffModal extends Modal {
     this.controller = controller;
     this.plugin.activeTasks.set(`reframe-modal:${this.operationId}`, controller);
     this.refresh();
-    const language = this.language.value === "zh-TW" ? ("zh-TW" as const) : ("en" as const);
+    const language: NoteLanguage = isNoteLanguage(this.language.value) ? this.language.value : "en";
     const request = {
       targetCore: "understand" as const,
       source: this.source.content,

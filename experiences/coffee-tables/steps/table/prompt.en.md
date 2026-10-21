@@ -1,4 +1,4 @@
-請模擬一場 Coffee Table 式多人對談。主持人 {{hostCount}} 位、觀察者固定 1 位，其餘來賓依下列人數安排。Write in natural, conversational English.
+請模擬一場 Coffee Table 式多人對談。主持人 {{hostCount}} 位、觀察者固定 1 位，其餘來賓依下列人數安排。Write in natural, conversational {{language}}.
 
 使用者原始主題（完整保留，不另取聊天室標題）：
 {{topic}}

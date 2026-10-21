@@ -9,7 +9,7 @@ import {
   validateCustomization,
   type CoffeeCustomization
 } from "./customization";
-import { BUILTIN_COFFEE_STYLE_PROMPT, BUILTIN_COFFEE_STYLE_PROMPT_EN, cleanChatStyle } from "./prompts";
+import { builtinCoffeeStyle, cleanChatStyle } from "./prompts";
 
 export function customizationFields(
   parent: HTMLElement,
@@ -158,7 +158,6 @@ export class CoffeeCustomizationModal extends Modal {
   onOpen(): void {
     this.modalEl.addClass("ct-customization-modal");
     const { contentEl: content, engine } = this,
-      zh = engine.session.language === "zh-TW",
       t = (key: TranslationKey, ...values: unknown[]): string =>
         translate(uiLocale(engine.session.language), key, ...values);
     content.createEl("h2", { text: t("coffee.customize_this_table") });
@@ -173,7 +172,7 @@ export class CoffeeCustomizationModal extends Modal {
     });
     const label = content.createEl("label", { text: t("coffee.conversation_instructions") });
     const style = label.createEl("textarea", { attr: { rows: "6", maxlength: "30000" } });
-    const builtin = cleanChatStyle(zh ? BUILTIN_COFFEE_STYLE_PROMPT : BUILTIN_COFFEE_STYLE_PROMPT_EN);
+    const builtin = cleanChatStyle(builtinCoffeeStyle(engine.session.language));
     style.value = cleanChatStyle(
       engine.session.guests?.stylePrompt ?? [builtin, engine.session.guests?.customPrompt].filter(Boolean).join("\n\n")
     );

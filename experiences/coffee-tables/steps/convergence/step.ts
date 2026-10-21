@@ -1,4 +1,5 @@
 import { renderTemplate, type StepDefinition } from "../../../../core/step-runner";
+import { coffeeInstruction, coffeeText } from "../../language";
 import { enforcePinnedProposals } from "../../convergence";
 import {
   observerGuidance,
@@ -20,7 +21,6 @@ export interface ConvergenceInput {
 }
 
 function variables({ session, baseline, customization }: ConvergenceInput): Record<string, string> {
-  const zhTw = session.language === "zh-TW";
   const pinned = new Set(session.pinnedInsightIds ?? []);
   const items = baseline.map(item => ({
     id: item.id,
@@ -33,7 +33,7 @@ function variables({ session, baseline, customization }: ConvergenceInput): Reco
     limitations: item.limitations,
     pinned: pinned.has(item.id)
   }));
-  const key = zhTw ? "zh" : "en";
+  const key = coffeeInstruction(session.language);
   const level = MERGE_LEVEL[key][customization.mergeLevel];
   const detail = DETAIL_LEVEL[key][customization.detailLevel];
   return {
@@ -66,14 +66,10 @@ export function parseConvergenceResponse(
 export const convergenceStep: StepDefinition<ConvergenceInput, CoffeeConvergenceProposal[]> = {
   id: "coffee.convergence",
   version: 1,
-  render: input => renderTemplate(input.session.language === "zh-TW" ? zh : en, variables(input)),
+  render: input => renderTemplate(coffeeInstruction(input.session.language) === "zh" ? zh : en, variables(input)),
   policy: (prompt, input) => {
     if (prompt.length > MAX_COFFEE_CONTEXT_CHARS)
-      throw new Error(
-        input.session.language === "zh-TW"
-          ? "洞見內容太長，無法安全地產生預覽；原有內容已保留。"
-          : "The insights are too long to prepare safely; existing content is preserved."
-      );
+      throw new Error(coffeeText(input.session.language, "coffee.insights_too_long_to_preview"));
   },
   parse: (raw, input) => parseConvergenceResponse(raw, input)
 };

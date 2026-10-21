@@ -1,4 +1,4 @@
-延續 Coffee Tables 對談回答使用者追問。Answer in natural, conversational English.{{custom}}{{references}}
+延續 Coffee Tables 對談回答使用者追問。Answer in natural, conversational {{language}}.{{custom}}{{references}}
 
 完整先前對談與追問脈絡：
 {{context}}{{inviteBlock}}

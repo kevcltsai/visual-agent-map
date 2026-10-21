@@ -3,8 +3,19 @@ import type { CoffeeGuestInvitation } from "./types";
 import { baselineFromVersions, serializeInsightNotes } from "./insights";
 import { renderTemplate } from "../../core/step-runner";
 import { observerGuidance } from "./customization";
+import { languagePromptName } from "../../i18n";
+import { coffeeContentLocale, coffeeInstruction } from "./language";
 import {
+  BUILTIN_STYLE_TEMPLATE,
+  CATEGORY_LABEL,
+  CONTEXT_ANSWER_PENDING,
   CONTEXT_EXISTING_INSIGHTS,
+  CONTEXT_FOLLOW_UP,
+  CONTEXT_FOLLOW_UP_GUESTS,
+  CONTEXT_INTERVENTION,
+  CONTEXT_REFERENCE_FILE,
+  CONTEXT_TABLE_ANSWER,
+  GUEST_ROLE,
   CONTEXT_INVITED_GUESTS,
   CONTEXT_REFERENCE,
   INSIGHT_UPDATE_FOOTER,
@@ -16,20 +27,23 @@ import {
 
 export const MAX_COFFEE_CONTEXT_CHARS = 180_000;
 export const BUILTIN_COFFEE_STYLE_NAME = "自然交流與跨域探索";
-export const BUILTIN_COFFEE_STYLE_PROMPT_EN = `Use natural, conversational English, plain language and everyday examples. Let participants respond to, question, challenge and revise one another instead of taking turns delivering essays. Hosts should connect ideas without summarizing every turn. With two hosts, one notices contradictions and one asks curious follow-up questions; one host combines both; multiple hosts divide these roles without repetitive summaries. Explain similarities and limits when making cross-domain analogies. For an opening, aim for 10–18 concise turns; for each continuation, add roughly 8–12 concise turns. Explore different angles and unresolved questions, end naturally when ideas begin repeating, and do not force every guest to speak. During continuations, resume naturally from the last sentence without a preamble, process notes or repeated introductions. During follow-ups, let the most relevant guests respond, prioritize anyone the user names, preserve disagreements and focus on the question without replaying the whole discussion. The observer records the table’s evolving insights: unexpected connections, questions worth pursuing, core disagreements, directions to explore, assumptions to verify, and guests’ questions with possible responses. Add no new facts and do not decide for the user.
-
-For an opening, write 2–4 distinct, substantive insights in each of the first five categories: Unexpected connections, Questions worth pursuing, Core disagreements, Directions to explore, and Assumptions to verify. Add the sixth category, Questions and possible solutions, when the table has discussed a guest’s question and a possible response. Each insight starts with a concise one- or two-sentence thought that expresses the connection, tension or turn in thinking, not a retelling of a speech. Expand it with the concrete context, participants’ reasons, examples, applicable conditions and unresolved limits. Avoid generic summaries, repeated points and vague filler. Explain both the similarity and limits of an analogy, preserve differing reasons, and distinguish imagined examples from verified facts.
-
-For each update, use the complete saved conversation, follow-ups, interventions, drafts and existing insights. Retain insights that remain valuable, combine only overlapping ideas, and incorporate new turns and revisions; do not summarize only the latest segment. Explain how new discussion changes a viewpoint. A cross-domain insight can synthesize several utterances.
-
-Follow-up dialogue focuses on the new question. Observer notes cover the whole table. Existing insights have stable program IDs: mark unchanged items with \x3c!-- coffee-insight:keep:ID -->, an edited item with \x3c!-- coffee-insight:update:ID -->, combined items with \x3c!-- coffee-insight:merge:ID1,ID2 -->, and new insights with \x3c!-- coffee-insight:new -->. Reuse supplied IDs exactly. One update can target only one ID. Never omit an existing item because you did not rewrite it; the program retains omitted items. A possible response is a discussed answer, not proof that a question is settled. Cumulative notes have no per-category item cap, and an update need not add a new insight.`;
-export const BUILTIN_COFFEE_STYLE_PROMPT = `請用自然、口語的繁體中文（台灣用法）對話，使用白話與生活例子。人物彼此自然接話、追問、挑戰與修正，不要輪流發表文章。主持人適度串連，不要每輪總結；兩位主持人分工為一位留意矛盾、一位好奇追問，只有一位時兼具兩種方式，多位時則互補分工、不重複總結。跨領域類比要說明相似處與限制。開場全桌以 10–18 次簡短發言為目標；每次續聊新增約 8–12 次簡短發言。涵蓋不同角度與未解問題，出現重複時自然收尾，不強迫每位來賓發言。續聊時從前一句自然接續，不加前言、流程說明或重複人物介紹。使用者追問時由最相關的來賓接話，優先回應被點名者，保留歧見並聚焦問題，不重演整桌。觀察者整理整桌不斷發展的洞見：意外連結、值得繼續想的問題、核心分歧、探索方向、待查證假設，以及來賓提出疑問時對談中出現的可能回應。不添加新事實，也不替使用者下結論。
-
-開場時，原本五類每類整理 2–4 個具體且彼此不同的洞見：意外連結、值得繼續想的問題、核心分歧、探索方向、值得查證的假設。若談到來賓的疑問及可能回應，加入第六類「疑問與可能解方」。每條先用一至兩句凝練表達關鍵關係、張力或思考轉折，不只複述發言；展開脈絡說明具體情境、來賓理由、例子、適用條件及未解限制。不用概括短文取代不同發現，也不以重複或空泛文字湊數。類比說明相似處與限制；保留不同人物的理由；區分虛構例子與已查證事實。
-
-每次更新都整合完整對談、追問、介入、草稿與既有洞見，保留仍有價值的觀點，只合併真正重疊的內容，納入新發展與修正，不只整理最後一段。若新對談改變舊觀點，說明變化脈絡；一項洞見可以綜合多段發言。
-
-追問對談聚焦新問題，觀察者整理涵蓋整桌。既有洞見有程式維持的穩定識別碼：未改變用 \x3c!-- coffee-insight:keep:ID -->，修正一項用 \x3c!-- coffee-insight:update:ID -->，合併多項用 \x3c!-- coffee-insight:merge:ID1,ID2 -->，新增洞見用 \x3c!-- coffee-insight:new -->。沿用輸入的既有識別碼，一次只更新一個識別碼。不能因未重寫而省略既有洞見，程式會保留未提及項目。對談中提出的解方只是可能回應，不代表疑問已經完全解決或經過驗證。續聊與後續整併沒有每類條目總量上限，也不要求每次更新都新增洞見。`;
+/**
+ * The built-in conversation style for a session language. The language phrase is the registry's `usage` name of the
+ * language the table speaks (the interface language when it shares the session's note language); everything else is the
+ * template text. A style the user saved keeps whatever text it was saved with.
+ */
+export function builtinCoffeeStyle(language: string): string {
+  const key = coffeeInstruction(language);
+  return renderTemplate(BUILTIN_STYLE_TEMPLATE[key], {
+    language: languagePromptName(coffeeContentLocale(language), key, "usage")
+  });
+}
+export const BUILTIN_COFFEE_STYLE_PROMPT_EN = renderTemplate(BUILTIN_STYLE_TEMPLATE.en, {
+  language: languagePromptName("en", "en", "usage")
+});
+export const BUILTIN_COFFEE_STYLE_PROMPT = renderTemplate(BUILTIN_STYLE_TEMPLATE.zh, {
+  language: languagePromptName("zh-TW", "zh", "usage")
+});
 /** Assemble every persisted conversational event in timestamp order. Drafts are
  * first-class context so a retry can continue without silently losing text. */
 export function assembleCoffeeContext(session: CoffeeSession): string {
@@ -52,7 +66,7 @@ export function assembleCoffeeContext(session: CoffeeSession): string {
       if (!attached.length || !/^###\s+/m.test(source)) {
         add(
           round.createdAt,
-          [source, ...attached.map(item => `使用者介入：${item.text}`)].filter(Boolean).join("\n\n")
+          [source, ...attached.map(item => `${CONTEXT_INTERVENTION}${item.text}`)].filter(Boolean).join("\n\n")
         );
         continue;
       }
@@ -62,7 +76,7 @@ export function assembleCoffeeContext(session: CoffeeSession): string {
         nextIntervention = 0;
       const inject = (limit: number): void => {
         while (nextIntervention < attached.length && (attached[nextIntervention].afterTurn ?? 0) <= limit)
-          output.push(`使用者介入：${attached[nextIntervention++].text}`);
+          output.push(`${CONTEXT_INTERVENTION}${attached[nextIntervention++].text}`);
       };
       for (const part of parts) {
         if (/^###\s+/.test(part)) {
@@ -82,15 +96,16 @@ export function assembleCoffeeContext(session: CoffeeSession): string {
   for (const question of session.questions) {
     if (question.status === "pending" && !question.answer && !question.draftAnswer) continue;
     const guests = question.invitedGuests?.length
-      ? `\n本題加入並留桌的來賓：\n${question.invitedGuests.map(guest => `- ${guest.name}｜${LABELS[guest.category]}：${guest.description}`).join("\n")}`
+      ? `\n${CONTEXT_FOLLOW_UP_GUESTS}\n${question.invitedGuests.map(guest => `- ${guest.name}｜${CATEGORY_LABEL[guest.category]}：${guest.description}`).join("\n")}`
       : "";
     add(
       question.createdAt,
-      `使用者追問：${question.question}${guests}\n桌上回答：${question.answer || question.draftAnswer || "（回答尚未完成）"}`
+      `${CONTEXT_FOLLOW_UP}${question.question}${guests}\n${CONTEXT_TABLE_ANSWER}${question.answer || question.draftAnswer || CONTEXT_ANSWER_PENDING}`
     );
   }
   for (const intervention of session.interventions ?? [])
-    if (!attachedInterventions.has(intervention.id)) add(intervention.createdAt, `使用者介入：${intervention.text}`);
+    if (!attachedInterventions.has(intervention.id))
+      add(intervention.createdAt, `${CONTEXT_INTERVENTION}${intervention.text}`);
   events.sort((a, b) => a.at - b.at || a.order - b.order);
   const existingInsights = baselineFromVersions(session.observerNotes ?? [], session.language);
   const notes = existingInsights.length
@@ -98,26 +113,20 @@ export function assembleCoffeeContext(session: CoffeeSession): string {
     : "";
   return [...events.map(item => item.text), notes].filter(Boolean).join("\n\n");
 }
-const LABELS = {
-  experts: "主題專家",
-  "cross-domain": "跨領域專家",
-  generalist: "好奇的通才 generalist",
-  affected: "受影響者"
-} as const;
 export function names(guests: GuestSettings, invited: CoffeeGuestInvitation[] = []): string[] {
   return (["experts", "cross-domain", "generalist", "affected"] as const).flatMap(category => [
     ...Array.from({ length: guests.counts[category] }, (_, index) => {
       const named = guests.guests.filter(item => item.category === category)[index];
-      return named ? `${LABELS[category]}：${named.description}` : LABELS[category];
+      return named ? `${CATEGORY_LABEL[category]}：${named.description}` : CATEGORY_LABEL[category];
     }),
     ...invited
       .filter(item => item.category === category)
-      .map(item => `${LABELS[category]}：${item.name}（${item.description}）`)
+      .map(item => `${CATEGORY_LABEL[category]}：${item.name}（${item.description}）`)
   ]);
 }
 export function conversationStyle(language: string, settings?: GuestSettings): string {
   if (typeof settings?.stylePrompt === "string") return settings.stylePrompt.trim();
-  const builtin = language === "zh-TW" ? BUILTIN_COFFEE_STYLE_PROMPT : BUILTIN_COFFEE_STYLE_PROMPT_EN;
+  const builtin = builtinCoffeeStyle(language);
   return settings?.customPrompt.trim() ? `${builtin}\n\n${settings.customPrompt.trim()}` : builtin;
 }
 export { OBSERVER_TITLES };
@@ -126,7 +135,7 @@ export function observerFormat(
   refreshOnly = false,
   customization?: GuestSettings["customization"]
 ): string {
-  const key = language === "zh-TW" ? "zh" : "en";
+  const key = coffeeInstruction(language);
   const preferences = customization ? `${observerGuidance(language, customization)}\n` : "";
   return renderTemplate(OBSERVER_FORMAT_TEMPLATE, {
     operation: refreshOnly ? `${OBSERVER_REFRESH_ONLY[key]}\n` : "",
@@ -138,16 +147,9 @@ export function observerFormat(
 }
 export function invitationContext(invitedGuests: CoffeeGuestInvitation[], language: string): string {
   if (!invitedGuests.length) return "";
-  const role: Record<CoffeeGuestInvitation["category"], string> =
-    language === "zh-TW"
-      ? { experts: "主題專家", "cross-domain": "跨領域專家", generalist: "好奇的通才", affected: "受影響者" }
-      : {
-          experts: "Topic expert",
-          "cross-domain": "Cross-domain expert",
-          generalist: "Curious generalist",
-          affected: "Affected perspective"
-        };
-  return `${CONTEXT_INVITED_GUESTS[language === "zh-TW" ? "zh" : "en"]}\n${invitedGuests.map(guest => `- ${guest.name}｜${role[guest.category]}：${guest.description}`).join("\n")}`;
+  const key = coffeeInstruction(language);
+  const role = GUEST_ROLE[key];
+  return `${CONTEXT_INVITED_GUESTS[key]}\n${invitedGuests.map(guest => `- ${guest.name}｜${role[guest.category]}：${guest.description}`).join("\n")}`;
 }
 /** Remove the legacy internal protocol passage from editable conversation styles. */
 export function readableCoffeeStyle(style: string): string {
@@ -199,5 +201,5 @@ export function cleanChatStyle(style: string): string {
 }
 export function formatReferenceContext(files: Array<{ name: string; content: string }>): string {
   if (!files.length) return "";
-  return `\n\n${CONTEXT_REFERENCE}\n${files.map((file, index) => `\n[文件 ${index + 1}：${file.name}]\n${file.content}`).join("\n")}`;
+  return `\n\n${CONTEXT_REFERENCE}\n${files.map((file, index) => `\n${renderTemplate(CONTEXT_REFERENCE_FILE, { index: String(index + 1), name: file.name })}\n${file.content}`).join("\n")}`;
 }

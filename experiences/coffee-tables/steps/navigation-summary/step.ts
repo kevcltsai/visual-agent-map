@@ -1,4 +1,5 @@
 import { renderTemplate, type StepDefinition } from "../../../../core/step-runner";
+import { coffeeInstruction, coffeeLanguageName, coffeeText } from "../../language";
 import { MAX_COFFEE_CONTEXT_CHARS } from "../../prompt-parts";
 import { parseSummaryBatch } from "../../segments";
 import en from "./prompt.en.md";
@@ -17,16 +18,13 @@ export const navigationSummaryStep: StepDefinition<NavigationSummaryInput, Array
   id: "coffee.navigation-summary",
   version: 1,
   render: ({ language, segments }) =>
-    renderTemplate(language === "zh-TW" ? zh : en, {
+    renderTemplate(coffeeInstruction(language) === "zh" ? zh : en, {
+      language: coffeeLanguageName(language, "plain"),
       segments: JSON.stringify(segments.map(({ id, text }) => ({ id, text })))
     }),
   policy: (prompt, { language }) => {
     if (prompt.length > MAX_COFFEE_CONTEXT_CHARS)
-      throw new Error(
-        language === "zh-TW"
-          ? "對談太長，無法一次補齊摘要；原資料保留，內容未截斷。"
-          : "The conversation is too long to summarize in one request; no content was truncated or changed."
-      );
+      throw new Error(coffeeText(language, "coffee.conversation_too_long_to_summarize"));
   },
   parse: (raw, { segments }) =>
     parseSummaryBatch(

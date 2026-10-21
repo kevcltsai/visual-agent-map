@@ -1,4 +1,6 @@
 import { coffeeSegments, extractSegmentSummary } from "./segments";
+import { translate, type TranslationKey } from "../../i18n";
+import { coffeeInstruction } from "./language";
 import { assembleCoffeeContext, MAX_COFFEE_CONTEXT_CHARS } from "./prompt-parts";
 import { prepareStep, StepRunner, type PreparedStep } from "../../core/step-runner";
 import { coffeeStepProvider, type CoffeeStepControls } from "./step-provider";
@@ -229,31 +231,26 @@ export class CoffeeEngine {
     this.session = { ...next, updatedAt: new Date().toISOString() };
     this.changed();
   }
-  private engineError(english: string, traditionalChinese: string): Error {
-    return new Error(this.session.language === "zh-TW" ? traditionalChinese : english);
+  /** Dictionary text in the session's language. */
+  private text(key: TranslationKey): string {
+    return translate(this.session.language, key);
+  }
+  /** Whether the session is written in a Chinese-instruction language (the messages that only they localize). */
+  private get zh(): boolean {
+    return coffeeInstruction(this.session.language) === "zh";
+  }
+  private engineError(key: TranslationKey): Error {
+    return new Error(this.text(key));
   }
   private assertCanEditNotes(): void {
-    if (this.deleting || this.retired)
-      throw this.engineError(
-        "This Coffee Tables session is being deleted or was deleted",
-        "這個桌聊正在刪除或已刪除。"
-      );
-    if (this.session.id.startsWith("sample-"))
-      throw this.engineError("Built-in sample sessions are read-only", "示範桌聊只能閱讀，不能修改。");
-    if (this.metadataWrite || this.busy || this.pending)
-      throw this.engineError(
-        "Wait for the current Coffee Tables operation to finish",
-        "請等目前的桌聊操作完成後再試。"
-      );
+    if (this.deleting || this.retired) throw this.engineError("coffee.engine_session_deleted");
+    if (this.session.id.startsWith("sample-")) throw this.engineError("coffee.engine_sample_read_only");
+    if (this.metadataWrite || this.busy || this.pending) throw this.engineError("coffee.engine_wait_for_operation");
     if (this.persistenceError) throw new Error(this.persistenceError);
   }
   async setCustomization(stylePrompt: string, customization: CoffeeCustomization): Promise<void> {
     this.assertCanEditNotes();
-    if (stylePrompt.length > 30_000)
-      throw this.engineError(
-        "Conversation style must be 30,000 characters or fewer.",
-        "聊天室風格最多 30,000 個字元。"
-      );
+    if (stylePrompt.length > 30_000) throw this.engineError("coffee.engine_style_too_long");
     const errors = validateCustomization(customization, this.session.language);
     if (errors.length) throw new Error(errors.join("; "));
     this.metadataWrite = true;
@@ -281,8 +278,7 @@ export class CoffeeEngine {
   async togglePinnedInsight(id: string): Promise<void> {
     this.assertCanEditNotes();
     const baseline = baselineFromVersions(this.session.observerNotes ?? [], this.session.language);
-    if (!baseline.some(item => item.id === id))
-      throw this.engineError("This insight is no longer available to pin", "這則洞見已不存在，無法釘選。");
+    if (!baseline.some(item => item.id === id)) throw this.engineError("coffee.engine_insight_cannot_be_pinned");
     this.metadataWrite = true;
     const pinned = new Set(this.session.pinnedInsightIds ?? []);
     if (pinned.has(id)) pinned.delete(id);
@@ -310,10 +306,7 @@ export class CoffeeEngine {
     )
       return this.pending ?? Promise.resolve();
     const baseline = baselineFromVersions(this.session.observerNotes ?? [], this.session.language);
-    if (!baseline.length)
-      throw new Error(
-        this.session.language === "zh-TW" ? "目前沒有可整理的洞見。" : "There are no insights to converge yet."
-      );
+    if (!baseline.length) throw this.engineError("coffee.engine_no_insights_to_converge");
     const requested = customization ?? this.session.guests?.customization;
     const settings = normalizeCustomization(requested, this.session.language);
     const errors = validateCustomization(settings, this.session.language);
@@ -350,18 +343,11 @@ export class CoffeeEngine {
         }
         const raw = response || streamed;
         if (raw) this.setSession({ ...this.session, convergenceRawDraft: raw });
-        else if (!this.session.convergenceRawDraft)
-          throw this.engineError(
-            "The model returned an empty convergence response",
-            "沒有收到整併預覽；原有洞見已保留。"
-          );
+        else if (!this.session.convergenceRawDraft) throw this.engineError("coffee.engine_empty_convergence_response");
         try {
           const proposals = parseConvergenceResponse(raw, { session: this.session, baseline });
           if (convergenceFingerprint(this.session) !== fingerprint)
-            throw this.engineError(
-              "Observer notes changed while convergence was being prepared; the draft was kept for review",
-              "產生預覽期間，桌聊或洞見已有更新。原有洞見與回應草稿已保留，請重新整理預覽。"
-            );
+            throw this.engineError("coffee.engine_notes_changed_during_convergence");
           this.setSession({
             ...this.session,
             convergenceDraft: {
@@ -375,24 +361,23 @@ export class CoffeeEngine {
           await this.flush();
         } catch (error) {
           const message = error instanceof Error ? error.message : String(error);
-          this.error =
-            this.session.language === "zh-TW"
-              ? /Pinned insights/.test(message)
-                ? "釘選洞見必須保持原樣，不能與其他洞見合併。原始回應已保留。"
-                : /changed while convergence/.test(message)
-                  ? "產生預覽期間，桌聊或洞見已有更新。原始回應已保留，請重新整理預覽。"
-                  : "整併預覽格式無效；原有洞見與原始回應已保留。"
-              : message;
+          this.error = this.zh
+            ? this.text(
+                /Pinned insights/.test(message)
+                  ? "coffee.engine_pinned_cannot_merge"
+                  : /changed while convergence/.test(message)
+                    ? "coffee.engine_convergence_changed_during_preview"
+                    : "coffee.engine_convergence_format_invalid"
+              )
+            : message;
           await this.flush().catch(saveError => this.reportPersistenceError(saveError));
         }
       } catch (error) {
         if (this.generation === generation) {
           this.error = controller.signal.aborted
-            ? this.session.language === "zh-TW"
-              ? "整理已取消；原有洞見保留。"
-              : "Convergence was cancelled; existing insights are preserved."
-            : this.session.language === "zh-TW"
-              ? "無法產生整併預覽；原有洞見與原始回應已保留。"
+            ? this.text("coffee.engine_convergence_cancelled")
+            : this.zh
+              ? this.text("coffee.engine_convergence_failed")
               : error instanceof Error
                 ? error.message
                 : String(error);
@@ -417,52 +402,37 @@ export class CoffeeEngine {
   ): Promise<void> {
     this.assertCanEditNotes();
     const draft = this.session.convergenceDraft;
-    if (!draft) throw this.engineError("There is no convergence draft to apply", "目前沒有可套用的整併預覽。");
+    if (!draft) throw this.engineError("coffee.engine_no_convergence_draft");
     if (convergenceFingerprint(this.session) !== draft.baseFingerprint)
-      throw this.engineError(
-        "Observer notes or pinned insights changed; refresh the convergence preview before applying it",
-        "桌聊或釘選洞見已更新，請重新整理預覽後再套用。"
-      );
-    if (!acceptedIndices.length)
-      throw this.engineError("Select at least one proposal to apply", "請至少選擇一項建議再套用。");
+      throw this.engineError("coffee.engine_convergence_baseline_changed");
+    if (!acceptedIndices.length) throw this.engineError("coffee.engine_select_a_proposal");
     const baseline = baselineFromVersions(this.session.observerNotes ?? [], this.session.language);
     let proposals;
     try {
       proposals = parseConvergenceResponse(draft.raw, { session: this.session, baseline });
     } catch {
-      throw this.engineError(
-        "The saved convergence preview is invalid; refresh it before applying",
-        "整併預覽已失效，請重新整理後再套用。"
-      );
+      throw this.engineError("coffee.engine_convergence_preview_invalid");
     }
     if (JSON.stringify(proposals) !== JSON.stringify(draft.proposals))
-      throw this.engineError(
-        "The saved convergence preview is inconsistent; refresh it before applying",
-        "整併預覽資料不一致，請重新整理後再套用。"
-      );
+      throw this.engineError("coffee.engine_convergence_preview_inconsistent");
     const pinned = new Set(this.session.pinnedInsightIds ?? []);
     for (const [rawIndex, edit] of Object.entries(edits)) {
       const index = Number(rawIndex),
         proposal = proposals[index];
-      if (!proposal)
-        throw this.engineError(
-          "An edited convergence proposal does not exist",
-          "編輯的整併建議已不存在，請重新整理預覽。"
-        );
+      if (!proposal) throw this.engineError("coffee.engine_edited_proposal_missing");
       const editErrors = validateConvergenceText(edit.summary, edit.detail, this.session.language);
       if (editErrors.length) throw new Error(editErrors.join(" "));
       if (proposal?.sourceIds.some(id => pinned.has(id))) {
         const source = baseline.find(item => item.id === proposal.sourceIds[0]);
         if (!source || edit.summary !== source.summary || edit.detail !== source.detail)
-          throw this.engineError("Pinned insights cannot be edited", "釘選洞見不能修改。");
+          throw this.engineError("coffee.engine_pinned_cannot_be_edited");
       }
     }
     let nextNotes: string[];
     try {
       nextNotes = applyConvergenceProposals(baseline, proposals, acceptedIndices, edits, this.session.language);
     } catch (error) {
-      if (this.session.language === "zh-TW")
-        throw this.engineError("The convergence proposal is invalid", "整併建議格式無效，請重新整理預覽後再試。");
+      if (this.zh) throw this.engineError("coffee.engine_convergence_proposal_invalid");
       throw error;
     }
     this.metadataWrite = true;
@@ -501,12 +471,9 @@ export class CoffeeEngine {
   async undoConvergence(): Promise<void> {
     this.assertCanEditNotes();
     const undo = this.session.convergenceUndo;
-    if (!undo) throw this.engineError("There is no convergence change to undo", "目前沒有可復原的整併變更。");
+    if (!undo) throw this.engineError("coffee.engine_no_convergence_to_undo");
     if (JSON.stringify(this.session.observerNotes ?? []) !== JSON.stringify(undo.expectedNotes))
-      throw this.engineError(
-        "Observer notes changed after convergence; undo is no longer safe",
-        "洞見在整併後已有更新，為避免覆蓋新內容，無法安全復原。"
-      );
+      throw this.engineError("coffee.engine_undo_unsafe");
     const previous = this.session;
     this.metadataWrite = true;
     this.setSession({ ...previous, observerNotes: [...undo.notes], convergenceUndo: undefined });
@@ -724,12 +691,7 @@ export class CoffeeEngine {
           notes = candidate;
         if (!noteSections(notes).length && noteSections(stripCompletionMarker(streamed)).length)
           notes = stripCompletionMarker(streamed);
-        if (!noteSections(notes).length)
-          throw new Error(
-            this.session.language === "zh-TW"
-              ? "整理未完整收到；原有整理仍保留，草稿已保存。"
-              : "The notes were incomplete. Earlier notes are preserved and the draft is saved."
-          );
+        if (!noteSections(notes).length) throw this.engineError("coffee.engine_notes_incomplete");
         const previousNotes = [...(this.session.observerNotes ?? [])];
         notes = mergeObserverNotes(this.session, notes);
         this.setSession({
@@ -753,9 +715,7 @@ export class CoffeeEngine {
       } catch (error) {
         if (this.generation === generation) {
           this.error = controller.signal.aborted
-            ? this.session.language === "zh-TW"
-              ? "整理已停止；草稿已保存。"
-              : "Notes stopped; the draft is saved."
+            ? this.text("coffee.engine_notes_stopped")
             : error instanceof Error
               ? error.message
               : String(error);
@@ -800,13 +760,7 @@ export class CoffeeEngine {
             .flatMap(question => question.invitedGuests ?? [])
         : [];
     if (context.length + previousDraft.length > MAX_COFFEE_CONTEXT_CHARS)
-      return Promise.reject(
-        new Error(
-          this.session.language === "zh-TW"
-            ? "這桌的內容太長，無法安全地全部交給模型。請先開新桌；舊內容已完整保留。"
-            : "This table is too long to send safely in full. Start a new table; the existing conversation is preserved."
-        )
-      );
+      return Promise.reject(this.engineError("coffee.table_too_long_start_new"));
     const round: CoffeeRound = {
       id: roundId,
       kind: retryRound?.kind ?? ((this.session.rounds?.length ?? 0) === 0 ? "initial" : kind),
@@ -863,11 +817,7 @@ export class CoffeeEngine {
         let { dialogue, notes } = splitObserverNotes(finalText);
         if (!dialogue || !noteSections(notes).length) {
           if (await this.recoverResolvedStreamDraft(previousDraft)) return;
-          throw new Error(
-            this.session.language === "zh-TW"
-              ? "對談已收到，但觀察者整理格式不完整；本段已保留草稿，舊整理仍保留。"
-              : "The conversation arrived without a complete observer summary. This segment is saved as a draft; earlier notes are kept."
-          );
+          throw this.engineError("coffee.engine_observer_summary_incomplete");
         }
         notes = mergeObserverNotes(this.session, notes);
         const resumedDialogue = previousDraft ? splitObserverNotes(previousDraft).dialogue : "";
@@ -1132,11 +1082,7 @@ export class CoffeeEngine {
           }
         }
         if (!dialogue || !noteSections(notes).length)
-          throw new Error(
-            this.session.language === "zh-TW"
-              ? "追問回答或觀察者整理不完整，請保留草稿後重試。"
-              : "The answer or observer notes are incomplete. The draft is saved for retry."
-          );
+          throw this.engineError("coffee.engine_answer_or_notes_incomplete");
         notes = mergeObserverNotes(this.session, notes);
         const previousDialogue = splitObserverNotes(previousDraft).dialogue;
         const answer = appendDraft(previousDialogue, dialogue);
@@ -1216,12 +1162,7 @@ export class CoffeeEngine {
         });
         if (generation !== this.generation || controller.signal.aborted) return;
         const entries = prepared.parse(response);
-        if (!entries.length)
-          throw new Error(
-            this.session.language === "zh-TW"
-              ? "未收到有效段落摘要；原資料保留。"
-              : "No valid segment summaries were received; existing data is preserved."
-          );
+        if (!entries.length) throw this.engineError("coffee.engine_no_valid_summaries");
         const summaries = new Map(entries.map(item => [item.id, item.summary])),
           previous = this.session;
         this.setSession({
@@ -1241,17 +1182,11 @@ export class CoffeeEngine {
           this.setSession(previous);
           throw error;
         }
-        if (entries.length < missing.length)
-          this.error =
-            this.session.language === "zh-TW"
-              ? "已保存收到的摘要；部分段落仍無摘要，可再次補齊。"
-              : "Received summaries were saved; some segments remain without summaries and can be retried.";
+        if (entries.length < missing.length) this.error = this.text("coffee.engine_summaries_partial");
       } catch (error) {
         if (generation === this.generation)
           this.error = controller.signal.aborted
-            ? this.session.language === "zh-TW"
-              ? "摘要已取消；原資料保留。"
-              : "Summaries cancelled; existing data is preserved."
+            ? this.text("coffee.engine_summaries_cancelled")
             : error instanceof Error
               ? error.message
               : String(error);

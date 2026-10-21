@@ -208,12 +208,13 @@ test('registry prompt names reproduce every language spelling in the prompt file
   assert.equal(name('zh-TW', 'en', 'plain'), 'Traditional Chinese');
   assert.equal(name('zh-TW', 'en', 'region'), 'Traditional Chinese (Taiwan)');
   assert.equal(name('en', 'en', 'plain'), 'English');
-  // The core language fragments take the name from the registry ({{language}}); the Coffee Tables prompt still spells it out.
+  // The language fragments (core and Coffee Tables) take the name from the registry ({{language}}) instead of spelling it out.
   const parameterised = ['core/steps/aim/language.zh.md', 'core/steps/relevance-grade/language.zh.md', 'core/steps/reframe/language.zh.md'];
+  for (const step of ['table', 'question', 'observer-only', 'navigation-summary']) for (const lang of ['zh', 'en']) parameterised.push(`experiences/coffee-tables/steps/${step}/prompt.${lang}.md`);
+  for (const lang of ['zh', 'en']) parameterised.push(`experiences/coffee-tables/steps/_shared/builtin-style.${lang}.md`);
   for (const file of parameterised) assert.ok(fs.readFileSync(path.join(root, file), 'utf8').includes('{{language}}'), file);
-  const files = ['experiences/coffee-tables/steps/table/prompt.zh.md'];
-  const spellings = new Set(['繁體中文（台灣用法）', '繁體中文（台灣）', 'Traditional Chinese (Taiwan)']);
-  for (const file of files) assert.ok([...spellings].some(text => fs.readFileSync(path.join(root, file), 'utf8').includes(text)), file);
+  const spelled = ['experiences/coffee-tables/steps/table/prompt.zh.md', 'experiences/coffee-tables/steps/_shared/builtin-style.zh.md'];
+  for (const file of spelled) assert.ok(!/繁體中文|Traditional Chinese/.test(fs.readFileSync(path.join(root, file), 'utf8')), file);
 });
 test('inLanguage selects the fragment by instruction language', () => {
   const { inLanguage } = load('core/steps/_shared/fragments.ts');

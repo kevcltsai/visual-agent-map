@@ -1,3 +1,4 @@
+import type { NoteLanguage } from "../../i18n";
 import type { CoffeeConvergenceProposal } from "./customization";
 import type { CoffeeInsight } from "./insights";
 import { serializeInsightNotes } from "./insights";
@@ -59,7 +60,7 @@ export function applyConvergenceProposals(
   proposals: CoffeeConvergenceProposal[],
   acceptedIndices: number[],
   edits: Record<number, { summary: string; detail: string }>,
-  language: "en" | "zh-TW"
+  language: NoteLanguage
 ): string[] {
   const accepted = new Set(acceptedIndices);
   if ([...accepted].some(index => !Number.isInteger(index) || index < 0 || index >= proposals.length))

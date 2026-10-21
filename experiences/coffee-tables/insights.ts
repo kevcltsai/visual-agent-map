@@ -1,3 +1,4 @@
+import { translate, type NoteLanguage, type TranslationKey } from "../../i18n";
 export type CoffeeInsightCategory =
   "connections" | "questions" | "disagreements" | "directions" | "assumptions" | "solutions";
 
@@ -15,23 +16,13 @@ export interface CoffeeInsight {
   mergedIds: string[];
 }
 
-const TITLES: Record<string, Record<CoffeeInsightCategory, string>> = {
-  "zh-TW": {
-    connections: "意外連結",
-    questions: "值得繼續想的問題",
-    disagreements: "核心分歧",
-    directions: "探索方向",
-    assumptions: "值得查證的假設",
-    solutions: "疑問與可能解方"
-  },
-  en: {
-    connections: "Unexpected connections",
-    questions: "Questions worth pursuing",
-    disagreements: "Core disagreements",
-    directions: "Directions to explore",
-    assumptions: "Assumptions to verify",
-    solutions: "Questions and possible solutions"
-  }
+const TITLE_KEYS: Record<CoffeeInsightCategory, TranslationKey> = {
+  connections: "coffee.insight_category_connections",
+  questions: "coffee.insight_category_questions",
+  disagreements: "coffee.insight_category_disagreements",
+  directions: "coffee.insight_category_directions",
+  assumptions: "coffee.insight_category_assumptions",
+  solutions: "coffee.insight_category_solutions"
 };
 const CATEGORY_ALIASES: Record<string, CoffeeInsightCategory> = {
   意外連結: "connections",
@@ -89,8 +80,8 @@ function normalize(value: string): string {
 function unique(values: string[]): string[] {
   return [...new Set(values.map(value => value.trim()).filter(Boolean))];
 }
-function categoryTitle(category: CoffeeInsightCategory, language: "zh-TW" | "en"): string {
-  return TITLES[language][category];
+function categoryTitle(category: CoffeeInsightCategory, language: NoteLanguage): string {
+  return translate(language, TITLE_KEYS[category]);
 }
 function splitInsightText(value: string): { summary: string; metadata: string[]; sources: string[] } {
   const sources = [...value.matchAll(SOURCE_MARKER)].map(match => match[1].trim()).filter(Boolean);
@@ -267,7 +258,7 @@ function parseOne(markdown: string): CoffeeInsight[] {
   return items;
 }
 
-export function baselineFromVersions(versions: string[], language: "zh-TW" | "en"): CoffeeInsight[] {
+export function baselineFromVersions(versions: string[], language: NoteLanguage): CoffeeInsight[] {
   const result: CoffeeInsight[] = [];
   const byText = new Map<string, CoffeeInsight>();
   for (const version of versions) {
@@ -322,7 +313,7 @@ export function baselineFromVersions(versions: string[], language: "zh-TW" | "en
 export function mergeInsightUpdates(
   current: CoffeeInsight[],
   generated: string,
-  language: "zh-TW" | "en"
+  language: NoteLanguage
 ): CoffeeInsight[] {
   const baseline = current.map(item => ({ ...item, sources: [...item.sources], mergedIds: [...item.mergedIds] }));
   const parsed = parseOne(generated);
@@ -387,8 +378,8 @@ export function mergeInsightUpdates(
   return active;
 }
 
-export function serializeInsightNotes(insights: CoffeeInsight[], language: "zh-TW" | "en"): string {
-  const root = language === "zh-TW" ? "觀察者整理" : "Observer’s notes";
+export function serializeInsightNotes(insights: CoffeeInsight[], language: NoteLanguage): string {
+  const root = translate(language, "coffee.observers_notes");
   const lines = [`# ${root}`, ""];
   const order: CoffeeInsightCategory[] = [
     "connections",
@@ -409,19 +400,13 @@ export function serializeInsightNotes(insights: CoffeeInsight[], language: "zh-T
         .join("");
       lines.push(`- ${item.summary} <!-- coffee-insight:v1:id=${item.id}${merged} -->${sources}`);
       if (item.detail)
-        lines.push(`  - ${language === "zh-TW" ? "脈絡" : "Context"}：${item.detail.split(/\r?\n/).join(" ")}`);
+        lines.push(`  - ${translate(language, "coffee.note_context")}：${item.detail.split(/\r?\n/).join(" ")}`);
       if (category === "solutions") {
-        for (const [label, value] of language === "zh-TW"
-          ? [
-              ["原疑問", item.question],
-              ["可能解方", item.proposedSolution],
-              ["條件與限制", item.limitations]
-            ]
-          : [
-              ["Question", item.question],
-              ["Possible solution", item.proposedSolution],
-              ["Conditions and limits", item.limitations]
-            ]) {
+        for (const [label, value] of [
+          [translate(language, "coffee.note_original_question"), item.question],
+          [translate(language, "coffee.note_possible_solution"), item.proposedSolution],
+          [translate(language, "coffee.conditions_and_limits"), item.limitations]
+        ]) {
           if (value) lines.push(`  - ${label}：${value}`);
         }
       }
@@ -431,7 +416,7 @@ export function serializeInsightNotes(insights: CoffeeInsight[], language: "zh-T
   return lines.join("\n").trim();
 }
 
-export function parseInsightNotes(markdown: string, language: "zh-TW" | "en"): CoffeeInsight[] {
+export function parseInsightNotes(markdown: string, language: NoteLanguage): CoffeeInsight[] {
   void language;
   return parseOne(markdown);
 }

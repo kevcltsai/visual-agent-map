@@ -1,4 +1,4 @@
-請用繁體中文。
+請用{{language}}。
 此操作只更新觀察者整理，不新增或改寫對談。
 {{styleSection}}{{references}}
 

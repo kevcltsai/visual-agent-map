@@ -1,4 +1,6 @@
 import { renderTemplate, type StepDefinition } from "../../../../core/step-runner";
+import { coffeeInstruction, coffeeLanguageName, coffeeText } from "../../language";
+import { LABEL_ANSWER_DRAFT, LABEL_CONVERSATION_STYLE } from "../_shared/fragments";
 import {
   assembleCoffeeContext,
   cleanChatStyle,
@@ -28,12 +30,13 @@ function variables(input: QuestionInput, context: string): Record<string, string
     : conversationStyle(session.language, settings);
   const inviteContext = invitationContext(invitedGuests, session.language);
   return {
-    custom: style ? `\n聊天室風格：\n${style}` : "",
+    language: coffeeLanguageName(session.language, "plain"),
+    custom: style ? `\n${LABEL_CONVERSATION_STYLE}\n${style}` : "",
     references: formatReferenceContext(settings?.referenceFiles ?? []),
     context,
     inviteBlock: inviteContext ? `\n\n${inviteContext}` : "",
     question,
-    draftBlock: draft ? `\n\n上次已保存的回答草稿：\n${draft}` : "",
+    draftBlock: draft ? `\n\n${LABEL_ANSWER_DRAFT}\n${draft}` : "",
     observerFormat: observerFormat(session.language, false, settings?.customization),
     summaryInstruction: segmentSummaryInstruction(session.language)
   };
@@ -45,23 +48,15 @@ export const questionStep: StepDefinition<QuestionInput, string> = {
   version: 1,
   render: input => {
     const context = assembleCoffeeContext(input.session);
-    return renderTemplate(input.session.language === "zh-TW" ? zh : en, variables(input, context));
+    return renderTemplate(coffeeInstruction(input.session.language) === "zh" ? zh : en, variables(input, context));
   },
   policy: (prompt, input) => {
-    const zhTw = input.session.language === "zh-TW";
+    const language = input.session.language;
     // Original order: the context-plus-question limit was checked before the prompt was assembled.
     if (assembleCoffeeContext(input.session).length + input.question.length > MAX_COFFEE_CONTEXT_CHARS)
-      throw new Error(
-        zhTw
-          ? "這桌的內容太長，無法安全地全部交給模型。請先開新桌；舊內容已完整保留。"
-          : "This table is too long to send safely in full. Start a new table; the existing conversation is preserved."
-      );
+      throw new Error(coffeeText(language, "coffee.table_too_long_start_new"));
     if (prompt.length > MAX_COFFEE_CONTEXT_CHARS)
-      throw new Error(
-        zhTw
-          ? "這桌的內容太長，無法安全地全部交給模型；桌聊已保留。"
-          : "This table is too long to send safely in full; the existing conversation is preserved."
-      );
+      throw new Error(coffeeText(language, "coffee.table_too_long_conversation_preserved"));
   },
   parse: raw => raw
 };

@@ -21,79 +21,9 @@
       "reason": "banner written into a migrated legacy transcript, not a prompt"
     },
     {
-      "file": "experiences/coffee-tables/customization.ts",
-      "text": "整理具體洞見與脈絡",
-      "reason": "default observer preference shown and editable in the customization UI"
-    },
-    {
-      "file": "experiences/coffee-tables/customization.ts",
-      "text": "Capture concrete insights",
-      "reason": "default observer preference shown and editable in the customization UI"
-    },
-    {
-      "file": "experiences/coffee-tables/customization.ts",
-      "text": "讓每項整理仍能看出",
-      "reason": "default convergence preference shown and editable in the customization UI"
-    },
-    {
-      "file": "experiences/coffee-tables/customization.ts",
-      "text": "Keep each item recognizable",
-      "reason": "default convergence preference shown and editable in the customization UI"
-    },
-    {
-      "file": "experiences/coffee-tables/engine.ts",
-      "text": "釘選洞見必須保持原樣",
-      "reason": "user-facing status or error message shown in the UI; never sent to a model"
-    },
-    {
-      "file": "experiences/coffee-tables/engine.ts",
-      "text": "產生預覽期間",
-      "reason": "user-facing status or error message shown in the UI; never sent to a model"
-    },
-    {
-      "file": "experiences/coffee-tables/engine.ts",
-      "text": "整併預覽格式無效",
-      "reason": "user-facing status or error message shown in the UI; never sent to a model"
-    },
-    {
-      "file": "experiences/coffee-tables/engine.ts",
-      "text": "Convergence was cancelled",
-      "reason": "user-facing status or error message shown in the UI; never sent to a model"
-    },
-    {
-      "file": "experiences/coffee-tables/engine.ts",
-      "text": "無法產生整併預覽",
-      "reason": "user-facing status or error message shown in the UI; never sent to a model"
-    },
-    {
-      "file": "experiences/coffee-tables/engine.ts",
-      "text": "已保存收到的摘要",
-      "reason": "user-facing status or error message shown in the UI; never sent to a model"
-    },
-    {
-      "file": "experiences/coffee-tables/engine.ts",
-      "text": "Received summaries were saved",
-      "reason": "user-facing status or error message shown in the UI; never sent to a model"
-    },
-    {
-      "file": "experiences/coffee-tables/engine.ts",
-      "text": "Summaries cancelled",
-      "reason": "user-facing status or error message shown in the UI; never sent to a model"
-    },
-    {
       "file": "experiences/coffee-tables/engine.ts",
       "text": "Generation stopped when Obsidian closed",
       "reason": "user-facing status or error message shown in the UI; never sent to a model"
-    },
-    {
-      "file": "experiences/coffee-tables/prompt-parts.ts",
-      "text": "Use natural, conversational English",
-      "reason": "built-in conversation style default shown and editable in the style UI"
-    },
-    {
-      "file": "experiences/coffee-tables/prompt-parts.ts",
-      "text": "請用自然、口語的繁體中文",
-      "reason": "built-in conversation style default shown and editable in the style UI"
     },
     {
       "file": "experiences/coffee-tables/prompt-parts.ts",
@@ -104,26 +34,6 @@
       "file": "experiences/coffee-tables/prompt-parts.ts",
       "text": "The observer records the table",
       "reason": "must equal the observer paragraph of the built-in style so cleanChatStyle can strip it; matching constant, not prompt text"
-    },
-    {
-      "file": "experiences/coffee-tables/prompts.ts",
-      "text": "觀察者整理：保留完整洞見",
-      "reason": "display-only opening preview shown to the user; never sent to a model"
-    },
-    {
-      "file": "experiences/coffee-tables/prompts.ts",
-      "text": "最後以一句話概括",
-      "reason": "display-only opening preview shown to the user; never sent to a model"
-    },
-    {
-      "file": "experiences/coffee-tables/prompts.ts",
-      "text": "Observer notes: retain complete insights",
-      "reason": "display-only opening preview shown to the user; never sent to a model"
-    },
-    {
-      "file": "experiences/coffee-tables/prompts.ts",
-      "text": "End with a one-sentence summary",
-      "reason": "display-only opening preview shown to the user; never sent to a model"
     }
   ]
 }

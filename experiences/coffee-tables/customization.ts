@@ -1,6 +1,14 @@
 import { translate, uiLocale } from "../../i18n";
 import type { CoffeeInsightCategory } from "./insights";
-import { GUIDANCE_DETAIL_LEVEL, GUIDANCE_MERGE_LEVEL } from "./steps/_shared/fragments";
+import { renderTemplate } from "../../core/step-runner";
+import { coffeeInstruction } from "./language";
+import {
+  GUIDANCE_DETAIL_LEVEL,
+  GUIDANCE_MERGE_LEVEL,
+  GUIDANCE_PREFERENCES_TEMPLATE,
+  GUIDANCE_PRESERVE,
+  GUIDANCE_PRESERVE_FALLBACK
+} from "./steps/_shared/fragments";
 
 export type CoffeePreserveRule = "disagreements" | "conditions" | "counterexamples" | "questions" | "sources";
 export interface CoffeeCustomization {
@@ -37,14 +45,10 @@ const PROTECTED_METADATA = /coffee-insight\s*:|coffee-tables-complete|<!--\s*sou
 const MARKDOWN_INJECTION = /<!--|^\s{0,3}#{1,6}\s|^\s*coffee-insight\s*:/im;
 
 export function defaultCustomization(language: string): CoffeeCustomization {
-  const zh = language === "zh-TW";
+  const locale = uiLocale(language);
   return {
-    observerPrompt: zh
-      ? "整理具體洞見與脈絡，保留不同理由、成立條件與尚未解決的問題；不補充對談未提及的事實。"
-      : "Capture concrete insights with context. Keep differing reasons, conditions and unresolved questions; do not add facts absent from the conversation.",
-    convergencePrompt: zh
-      ? "讓每項整理仍能看出原本的想法與來由；只有內容確實重疊時才合併。"
-      : "Keep each item recognizable with its original reasoning. Merge items only when their substance overlaps.",
+    observerPrompt: translate(locale, "coffee.default_observer_prompt"),
+    convergencePrompt: translate(locale, "coffee.default_convergence_prompt"),
     mergeLevel: "balanced",
     detailLevel: "standard",
     preserve: [...PRESERVE_RULES]
@@ -127,26 +131,15 @@ export function validateConvergenceText(summary: string, detail: string, languag
 }
 
 export function observerGuidance(language: string, customization: CoffeeCustomization): string {
-  const zh = language === "zh-TW";
-  const preserveLabels: Record<CoffeePreserveRule, string> = zh
-    ? {
-        disagreements: "歧見",
-        conditions: "成立條件",
-        counterexamples: "反例",
-        questions: "未解問題",
-        sources: "來源脈絡"
-      }
-    : {
-        disagreements: "disagreements",
-        conditions: "conditions",
-        counterexamples: "counterexamples",
-        questions: "open questions",
-        sources: "source context"
-      };
-  const key = zh ? "zh" : "en";
-  const merge = GUIDANCE_MERGE_LEVEL[key][customization.mergeLevel];
-  const detail = GUIDANCE_DETAIL_LEVEL[key][customization.detailLevel];
-  return `${zh ? "使用者觀察者偏好" : "User observer preferences"}:\n${customization.observerPrompt.trim()}\n${merge}\n${detail}\n${zh ? "明確保留" : "Explicitly preserve"}: ${customization.preserve.map(rule => preserveLabels[rule]).join("、") || (zh ? "依洞見脈絡判斷" : "as supported by the insight context")}.`;
+  const key = coffeeInstruction(language);
+  const preserved =
+    customization.preserve.map(rule => GUIDANCE_PRESERVE[key][rule]).join("、") || GUIDANCE_PRESERVE_FALLBACK[key];
+  return renderTemplate(GUIDANCE_PREFERENCES_TEMPLATE[key], {
+    observer: customization.observerPrompt.trim(),
+    merge: GUIDANCE_MERGE_LEVEL[key][customization.mergeLevel],
+    detail: GUIDANCE_DETAIL_LEVEL[key][customization.detailLevel],
+    preserved
+  });
 }
 
 export function parseConvergenceProposals(raw: string, baselineIds: string[]): CoffeeConvergenceProposal[] {

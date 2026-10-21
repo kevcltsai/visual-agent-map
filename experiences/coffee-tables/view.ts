@@ -26,7 +26,16 @@ import {
   type ViewStateResult
 } from "obsidian";
 import type VisualAgentMapPlugin from "../../main";
-import { translate, uiLocale, type TranslationKey, type UiLanguage } from "../../i18n";
+import {
+  instructionLanguageOf,
+  languagePromptName,
+  noteLanguageOf,
+  translate,
+  uiLocale,
+  type NoteLanguage,
+  type TranslationKey,
+  type UiLanguage
+} from "../../i18n";
 import { CoffeeEngine } from "./engine";
 import { CoffeeStorage } from "./storage";
 import {
@@ -42,13 +51,13 @@ import {
 } from "./types";
 import {
   BUILTIN_COFFEE_STYLE_NAME,
-  BUILTIN_COFFEE_STYLE_PROMPT,
-  BUILTIN_COFFEE_STYLE_PROMPT_EN,
+  builtinCoffeeStyle,
   openingPromptPreview,
   cleanChatStyle,
   tablePrompt
 } from "./prompts";
 import { COFFEE_SAMPLE_EN, COFFEE_SAMPLE_ZH } from "./samples";
+import { coffeeContentLocale, coffeeInstruction } from "./language";
 import {
   effectiveTableStatus,
   formatTableTime,
@@ -634,10 +643,8 @@ export class CoffeeTablesView extends ItemView {
         stylePrompt:
           edit.guests?.stylePrompt ??
           (edit.guests?.customPrompt
-            ? `${this.plugin.settings.language === "zh-TW" ? BUILTIN_COFFEE_STYLE_PROMPT : BUILTIN_COFFEE_STYLE_PROMPT_EN}\n\n${edit.guests.customPrompt}`
-            : this.plugin.settings.language === "zh-TW"
-              ? BUILTIN_COFFEE_STYLE_PROMPT
-              : BUILTIN_COFFEE_STYLE_PROMPT_EN),
+            ? `${builtinCoffeeStyle(this.plugin.settings.language)}\n\n${edit.guests.customPrompt}`
+            : builtinCoffeeStyle(this.plugin.settings.language)),
         refs: JSON.stringify(edit.guests?.referenceFiles ?? []),
         invites: JSON.stringify(priorGuests),
         ...Object.fromEntries(
@@ -712,8 +719,7 @@ export class CoffeeTablesView extends ItemView {
         pickCoffeeTopic(this.plugin.settings.language, this.homeForm.previousTopic ?? ""));
     if (!edit && !topicWasEdited && !ideaId)
       this.homeForm.topicIdeaId =
-        COFFEE_TOPICS.find(item => item[this.plugin.settings.language === "en" ? "en" : "zh"] === topic.value)?.id ??
-        "";
+        COFFEE_TOPICS.find(item => item[coffeeInstruction(this.plugin.settings.language)] === topic.value)?.id ?? "";
     const ideas = setup.createEl("details", { cls: "ct-topic-ideas" });
     ideas.open = this.homeForm.topicIdeasOpen === "true";
     ideas.addEventListener("toggle", () => {
@@ -722,7 +728,7 @@ export class CoffeeTablesView extends ItemView {
     ideas.createEl("summary", { text: this.t("coffee.browse_20_topic_ideas") });
     const ideaList = ideas.createDiv("ct-topic-list");
     for (const item of COFFEE_TOPICS) {
-      const value = item[this.plugin.settings.language === "en" ? "en" : "zh"];
+      const value = item[coffeeInstruction(this.plugin.settings.language)];
       this.button(ideaList, value, () => {
         topic.value = value;
         this.homeForm.topicIdeaId = item.id;
@@ -734,8 +740,7 @@ export class CoffeeTablesView extends ItemView {
       const previous = topic.value;
       topic.value = pickCoffeeTopic(this.plugin.settings.language, previous);
       this.homeForm.topicIdeaId =
-        COFFEE_TOPICS.find(item => item[this.plugin.settings.language === "en" ? "en" : "zh"] === topic.value)?.id ??
-        "";
+        COFFEE_TOPICS.find(item => item[coffeeInstruction(this.plugin.settings.language)] === topic.value)?.id ?? "";
       this.homeForm.topicEdited = "false";
       this.homeForm.previousTopic = previous;
       snapshotForm();
@@ -927,9 +932,8 @@ export class CoffeeTablesView extends ItemView {
       this.homeForm.stylePrompt ??
       old?.stylePrompt ??
       (old?.customPrompt
-        ? `${this.plugin.settings.language === "zh-TW" ? BUILTIN_COFFEE_STYLE_PROMPT : BUILTIN_COFFEE_STYLE_PROMPT_EN}\n\n${old.customPrompt}`
-        : (selectedStyle?.prompt ??
-          (this.plugin.settings.language === "zh-TW" ? BUILTIN_COFFEE_STYLE_PROMPT : BUILTIN_COFFEE_STYLE_PROMPT_EN)));
+        ? `${builtinCoffeeStyle(this.plugin.settings.language)}\n\n${old.customPrompt}`
+        : (selectedStyle?.prompt ?? builtinCoffeeStyle(this.plugin.settings.language)));
     const styleNameLabel = styleFields.createEl("label", { text: this.t("coffee.style_name") });
     const styleNameInput = styleNameLabel.createEl("input", {
       attr: {
@@ -1088,10 +1092,7 @@ export class CoffeeTablesView extends ItemView {
     });
     styleSelect.addEventListener("change", () => {
       const item = this.plugin.settings.coffeeStyles?.find(style => style.id === styleSelect.value);
-      stylePrompt.value = cleanChatStyle(
-        item?.prompt ??
-          (this.plugin.settings.language === "zh-TW" ? BUILTIN_COFFEE_STYLE_PROMPT : BUILTIN_COFFEE_STYLE_PROMPT_EN)
-      );
+      stylePrompt.value = cleanChatStyle(item?.prompt ?? builtinCoffeeStyle(this.plugin.settings.language));
       styleNameInput.value = item?.name ?? BUILTIN_COFFEE_STYLE_NAME;
       customization.set(item?.customization);
       snapshotForm();
@@ -1158,9 +1159,7 @@ export class CoffeeTablesView extends ItemView {
           this.plugin.settings.defaultCoffeeStyleId = undefined;
       });
       refreshStyleChoices(builtinId);
-      stylePrompt.value = cleanChatStyle(
-        this.plugin.settings.language === "zh-TW" ? BUILTIN_COFFEE_STYLE_PROMPT : BUILTIN_COFFEE_STYLE_PROMPT_EN
-      );
+      stylePrompt.value = cleanChatStyle(builtinCoffeeStyle(this.plugin.settings.language));
       styleNameInput.value = BUILTIN_COFFEE_STYLE_NAME;
       customization.set(defaultCustomization(this.plugin.settings.language));
       snapshotForm();
@@ -1174,9 +1173,7 @@ export class CoffeeTablesView extends ItemView {
     this.button(styleActions, this.t("coffee.restore_built_in_text"), () => {
       styleSelect.value = builtinId;
       styleNameInput.value = BUILTIN_COFFEE_STYLE_NAME;
-      stylePrompt.value = cleanChatStyle(
-        this.plugin.settings.language === "zh-TW" ? BUILTIN_COFFEE_STYLE_PROMPT : BUILTIN_COFFEE_STYLE_PROMPT_EN
-      );
+      stylePrompt.value = cleanChatStyle(builtinCoffeeStyle(this.plugin.settings.language));
       snapshotForm();
     });
 
@@ -1321,13 +1318,9 @@ export class CoffeeTablesView extends ItemView {
     const samples = home.createDiv("ct-home-section");
     samples.createEl("h3", { text: this.t("coffee.see_a_sample_conversation") });
     for (const sample of [COFFEE_SAMPLE_ZH, COFFEE_SAMPLE_EN])
-      this.button(
-        samples,
-        sample.language === "en"
-          ? this.t("coffee.english_sample_should_our_company_adopt_ai")
-          : this.t("coffee.traditional_chinese_sample_should_our_company_adopt_ai"),
-        async () => this.openSample(sample.language)
-      ).addClass("ct-session-link");
+      this.button(samples, this.t(sample.labelKey), async () => this.openSample(sample.language)).addClass(
+        "ct-session-link"
+      );
     const preview = home.createDiv("ct-preview is-hidden");
     const aside = shell.createDiv("ct-home-sidebar");
     const searchRow = aside.createDiv("ct-list-search");
@@ -1788,8 +1781,8 @@ export class CoffeeTablesView extends ItemView {
       this.plugin.settings.defaultCoffeeStyleId = id;
     });
   }
-  private async openSample(language: "zh-TW" | "en"): Promise<void> {
-    const sample = language === "en" ? COFFEE_SAMPLE_EN : COFFEE_SAMPLE_ZH,
+  private async openSample(language: NoteLanguage): Promise<void> {
+    const sample = [COFFEE_SAMPLE_ZH, COFFEE_SAMPLE_EN].find(item => item.language === language) ?? COFFEE_SAMPLE_EN,
       now = new Date().toISOString();
     const roles = new Map(parseGuests(sample.markdown).map(person => [person.name, person.role]));
     const markdown = sample.markdown.replace(
@@ -1797,7 +1790,7 @@ export class CoffeeTablesView extends ItemView {
       (heading, name: string) => `### ${name}｜${roles.get(name.trim()) ?? "Guest"}`
     );
     const session = createSession(sample.topic, "Built-in sample", "—", language);
-    session.id = `sample-${language === "en" ? "en" : "zh"}`;
+    session.id = `sample-${coffeeInstruction(language)}`;
     session.createdAt = now;
     session.updatedAt = now;
     session.status = "completed";
@@ -1808,7 +1801,7 @@ export class CoffeeTablesView extends ItemView {
     session.observerNotes = [observerNotes(markdown)];
     session.questions = [
       {
-        id: `sample-question-${language === "en" ? "en" : "zh"}`,
+        id: `sample-question-${coffeeInstruction(language)}`,
         question: sample.question,
         answer: sample.answer,
         status: "complete",
@@ -1993,7 +1986,7 @@ export class CoffeeTablesView extends ItemView {
     this.button(actions, this.t("coffee.open_new_table"), () => this.returnHome());
     header.createEl("p", {
       cls: "ct-muted",
-      text: `${this.plugin.modelLabel(engine.session.model)} · ${this.t("coffee.ai_simulated_perspectives")} · ${engine.session.language === "en" ? this.t("coffee.conversation_english") : this.t("coffee.conversation_traditional_chinese")}`
+      text: `${this.plugin.modelLabel(engine.session.model)} · ${this.t("coffee.ai_simulated_perspectives")} · ${this.t("coffee.conversation_language", languagePromptName(coffeeContentLocale(engine.session.language), instructionLanguageOf(uiLocale(this.plugin.settings.language)), "plain"))}`
     });
     const roster = fixed.createDiv("ct-roster"),
       status = fixed.createDiv({ cls: "ct-status", attr: { role: "status", "aria-live": "polite" } });
@@ -2502,7 +2495,10 @@ export class CoffeeTablesView extends ItemView {
     });
   }
   private renderInsightNotes(markdown: string, target: HTMLElement): void {
-    const insights = baselineFromVersions([markdown], this.engine?.session.language ?? this.plugin.settings.language);
+    const insights = baselineFromVersions(
+      [markdown],
+      this.engine?.session.language ?? noteLanguageOf(this.plugin.settings.language)
+    );
     if (!insights.length) {
       this.renderMarkdown(markdown, target.createDiv("ct-insight-latest markdown-rendered"));
       return;

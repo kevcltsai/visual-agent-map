@@ -1,3 +1,4 @@
+import { coffeeInstruction } from "./language";
 export const COFFEE_TOPICS: Array<{ id: string; zh: string; en: string }> = [
   {
     id: "ai-saved-time",
@@ -89,13 +90,13 @@ export const COFFEE_TOPICS: Array<{ id: string; zh: string; en: string }> = [
   }
 ];
 
-export function coffeeTopicText(id: string, language: "zh-TW" | "en"): string | undefined {
+export function coffeeTopicText(id: string, language: string): string | undefined {
   const topic = COFFEE_TOPICS.find(item => item.id === id);
-  return topic?.[language === "en" ? "en" : "zh"];
+  return topic?.[coffeeInstruction(language)];
 }
 
-export function pickCoffeeTopic(language: "zh-TW" | "en", previous = "", random: () => number = Math.random): string {
-  const candidates = COFFEE_TOPICS.filter(item => item[language === "en" ? "en" : "zh"] !== previous);
+export function pickCoffeeTopic(language: string, previous = "", random: () => number = Math.random): string {
+  const candidates = COFFEE_TOPICS.filter(item => item[coffeeInstruction(language)] !== previous);
   const pool = candidates.length ? candidates : COFFEE_TOPICS;
-  return pool[Math.floor(random() * pool.length)][language === "en" ? "en" : "zh"];
+  return pool[Math.floor(random() * pool.length)][coffeeInstruction(language)];
 }

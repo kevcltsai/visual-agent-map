@@ -11,6 +11,7 @@ import {
 import { splitObserverNotes } from "./engine";
 import { baselineFromVersions, serializeInsightNotes } from "./insights";
 import { t } from "../../i18n";
+import { coffeeInstruction } from "./language";
 
 export interface CoffeeHandoffSnapshot {
   session: CoffeeSession;
@@ -508,7 +509,7 @@ export class CoffeeStorage {
     return parseSession(JSON.stringify(session)) as CoffeeSession;
   }
   private encode(session: CoffeeSession): string {
-    const zh = session.language === "zh-TW",
+    const zh = coffeeInstruction(session.language) === "zh",
       count = session.guests?.counts ?? { experts: 4, "cross-domain": 1, generalist: 1, affected: 1 };
     const t = (zhText: string, enText: string): string => (zh ? zhText : enText);
     const lines = [
@@ -738,7 +739,7 @@ export class CoffeeStorage {
     if (!match) throw new Error("Legacy Coffee Tables metadata is missing");
     const stored = JSON.parse(decodeURIComponent(match[1])) as Record<string, unknown>,
       id = String(stored.id),
-      lang = stored.language === "zh-TW",
+      lang = coffeeInstruction(String(stored.language)) === "zh",
       conversationTitle = lang ? "## 對談" : "## Conversation",
       startAt = raw.indexOf(conversationTitle, match.index + match[0].length),
       endAt = raw.indexOf(`<!-- coffee-tables-transcript-end:${id} -->`, startAt);

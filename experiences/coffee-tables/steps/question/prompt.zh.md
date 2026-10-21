@@ -1,4 +1,4 @@
-延續 Coffee Tables 對談回答使用者追問。請用自然、口語的繁體中文回答。{{custom}}{{references}}
+延續 Coffee Tables 對談回答使用者追問。請用自然、口語的{{language}}回答。{{custom}}{{references}}
 
 完整先前對談與追問脈絡：
 {{context}}{{inviteBlock}}

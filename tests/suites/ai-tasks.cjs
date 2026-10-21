@@ -527,6 +527,29 @@ function observedHarness({ attempts, logging = true } = {}) {
 }
 const abortOn = (signal, ignore = false) => new Promise((resolve, reject) => { if (!ignore) signal.addEventListener('abort', () => reject(Object.assign(new Error('cancelled'), { name: 'AbortError' }))); });
 
+test('W2: synthesize and merge are observed on the main request only; reference extraction (when the sources do not fit one batch) is not', async () => {
+  const { AiTaskService } = load('core/ai-task-service.ts');
+  const reply = JSON.stringify({ summary: 'S', detail: 'D', suggestions: [], visualReferences: [] });
+  const run = async (mode, delivery, content) => {
+    const calls = [];
+    const service = new AiTaskService({ pluginDirectory: () => '/plugin', language: () => 'en', defaultReasoning: () => 'low', exchangeLoggingEnabled: () => false, exchanges: () => null, codexRuntime: () => { throw new Error('x'); },
+      claudeRuntime: () => ({ runTask: async (prompt, _m, _e, _s, controls) => { calls.push({ prompt, stream: controls.stream }); controls.onStreamMode?.('stream-json'); controls.onAccepted?.(); return reply; } }) });
+    const attempts = [];
+    const context = { title: 'T', summary: '', rules: '', detail: '', task: 'Combine', ancestors: '', mode, researchMode: 'local', researchDepth: 'normal', visualMode: 'off', ...(delivery ? { referenceDelivery: delivery } : {}), referenceGroups: [{ id: 'g', name: 'Sources', location: 'Map.md', documents: [{ path: 'A.md', content }, { path: 'B.md', content: 'second' }] }] };
+    await service.askModel(context, 'claude:sonnet', 'low', undefined, undefined, undefined, undefined, { onAttempt: id => attempts.push(id) });
+    return { calls, attempts };
+  };
+  for (const mode of ['synthesize', 'merge']) {
+    const direct = await run(mode, 'direct', 'short');
+    assert.equal(direct.calls.length, 1, `${mode}: one request`); assert.equal(direct.calls[0].stream, true, `${mode}: the one request streams`); assert.equal(direct.attempts.length, 1);
+    const extracted = await run(mode, 'direct', 'x'.repeat(20_000));
+    assert.ok(extracted.calls.length >= 2, `${mode}: over-budget sources are extracted first`);
+    assert.deepEqual(extracted.calls.slice(0, -1).map(call => call.stream), extracted.calls.slice(0, -1).map(() => undefined), `${mode}: extraction is not observed`);
+    assert.equal(extracted.calls.at(-1).stream, true, `${mode}: the main request streams`); assert.equal(extracted.attempts.length, 1);
+  }
+  const old = await run('synthesize', undefined, 'short');
+  assert.equal(old.calls.length, 2, 'without the direct flag a synthesis still extracts first'); assert.equal(old.calls[0].stream, undefined); assert.equal(old.calls[1].stream, true);
+});
 test('S3: 20 s without a model event shows the slow notice; re-send replaces the attempt with the same prompt and nothing from the old one counts', async () => {
   const h = observedHarness({ attempts: call => {
     call.controls.onStreamMode?.('stream-json'); call.controls.onAccepted();

@@ -50,6 +50,8 @@ export interface BackgroundStatus {
   review?: BackgroundAction;
   /** Present once the run ended (done, failed or stopped): removes the bar. */
   onDismiss?: () => void;
+  /** Adds elements between the value and the buttons (a stage and its seconds). */
+  detail?: (bar: HTMLElement) => void;
 }
 
 /** The in-view status bar (same markup as the multi-research bar): progress, Stop while running, then Review and ×. */
@@ -61,6 +63,7 @@ export function renderBackgroundStatus(parent: HTMLElement, status: BackgroundSt
     cls: `vam-aim-status-value ${status.running ? "vam-status-running" : ""}`.trim(),
     text: status.value
   });
+  status.detail?.(bar);
   if (status.running && status.onStop) {
     const stop = bar.createEl("button", { text: status.stopLabel ?? t("ui.stop_research") });
     stop.addEventListener("click", status.onStop);

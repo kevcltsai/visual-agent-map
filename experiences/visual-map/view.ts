@@ -302,6 +302,8 @@ interface MergeTask {
   /** The request in flight (tests await it). */
   run?: Promise<void>;
 }
+/** Progress keys for runs that have no card (multi-select synthesis, AI merge); Obsidian file names cannot contain ":". */
+const TASK_PROGRESS_PREFIX = "vam-task:";
 /** How long the "merged, can undo" Notice stays, so its Undo button can be used. */
 const MERGE_DONE_NOTICE_MS = 15000;
 /**
@@ -472,6 +474,8 @@ export class VisualAgentMapView extends ItemView {
   /** Persistent, visually hidden live region for research stage changes; outside contentEl so a render never rebuilds it. */
   private announcer: HTMLElement | null = null;
   private announcedStages = new Map<string, string>();
+  /** The unsaved-summary line of each synthesis/merge status bar (a plain element outside every live region). */
+  private taskPreviewEls = new Map<string, HTMLElement>();
   private integrationMode = false;
   private dragging = false;
   /** Ends the drag in progress (listeners, pending frame, flag); set only while a card is being dragged. */
@@ -667,6 +671,7 @@ export class VisualAgentMapView extends ItemView {
     this.researchTick = this.researchRenderTimer = null;
     this.researchElapsed.clear();
     this.researchSigs.clear();
+    this.taskPreviewEls.clear();
     this.hoverResearch = null;
     this.plugin.releaseOutline(this);
     this.relevancePanelCleanup?.();
@@ -1211,7 +1216,13 @@ export class VisualAgentMapView extends ItemView {
         title: t("ui.merge_bar_title"),
         value: names.join(t("ui.list_separator")),
         running: true,
-        ...(merge.state === "running" ? { onStop: () => this.stopMergeTask(merge), stopLabel: t("ui.merge_stop") } : {})
+        ...(merge.state === "running"
+          ? {
+              onStop: () => this.stopMergeTask(merge),
+              stopLabel: t("ui.merge_stop"),
+              detail: bar => this.renderTaskProgress(bar, parent, this.taskProgressKey("merge", merge.mapPath))
+            }
+          : {})
       });
     }
   }
@@ -3379,16 +3390,18 @@ export class VisualAgentMapView extends ItemView {
   }
   /** Speaks a stage (or the slow notice) once, when it changes. The streaming preview never goes through here. */
   private announceResearchStage(path: string): void {
-    const progress = this.plugin.researchProgress?.get(path);
+    const node = this.map?.nodes.find(item => item.path === path);
+    this.announceStage(path, (node && this.notes.get(node.id)?.title) ?? path);
+  }
+  private announceStage(key: string, title: string): void {
+    const progress = this.plugin.researchProgress?.get(key);
     if (!progress) {
-      this.announcedStages.delete(path);
+      this.announcedStages.delete(key);
       return;
     }
     const signature = `${progress.stage}|${progress.slow ? 1 : 0}`;
-    if (this.announcedStages.get(path) === signature) return;
-    this.announcedStages.set(path, signature);
-    const node = this.map?.nodes.find(item => item.path === path);
-    const title = (node && this.notes.get(node.id)?.title) ?? path;
+    if (this.announcedStages.get(key) === signature) return;
+    this.announcedStages.set(key, signature);
     this.announcer?.setText(
       t(
         "ui.research_announcement_0_1",
@@ -3437,8 +3450,91 @@ export class VisualAgentMapView extends ItemView {
       this.researchTick = null;
     }
   }
+  /** The progress key of this map's multi-select synthesis or AI merge (a name no Vault path can have). */
+  private taskProgressKey(kind: "integration" | "merge", mapPath = this.path): string {
+    return `${TASK_PROGRESS_PREFIX}${kind}:${mapPath}`;
+  }
+  /**
+   * Stage, seconds and the unsaved preview of one synthesis or merge request. `key` is the note path (child synthesis) or a
+   * task key. The entry belongs to the caller: `end()` runs when the answer arrives (before anything is written), and again
+   * in the caller's finally. A key that already has an entry (a chart step of that note) is left alone.
+   */
+  private startTaskProgress(key: string): { observer?: ResearchObserver; end: () => void } {
+    const progress = this.plugin.researchProgress;
+    if (!progress || progress.get(key)) return { end: () => {} };
+    let attempt = "starting";
+    progress.begin(key, attempt, Date.now());
+    return {
+      observer: {
+        onAttempt: id => {
+          attempt = id;
+          progress.newAttempt(key, id, Date.now());
+        },
+        onStage: (id, stage, query) => progress.stage(key, id, stage, Date.now(), query),
+        onPreview: (id, fields) => progress.preview(key, id, fields ?? {})
+      },
+      end: () => progress.end(key, attempt)
+    };
+  }
+  /** Stage text, seconds and the preview line under a synthesis or merge status bar. */
+  private renderTaskProgress(bar: HTMLElement, parent: HTMLElement, key: string): void {
+    const progress = this.plugin.researchProgress?.get(key);
+    if (!progress) {
+      this.researchSigs.delete(key);
+      this.taskPreviewEls.delete(key);
+      return;
+    }
+    this.researchSigs.set(key, this.researchSig(progress));
+    // Both are hidden from screen readers: the stage is spoken by the view's announcer, and the seconds tick every second.
+    const stageEl = bar.createSpan({ cls: "vam-research-stage", text: this.researchStageText(progress) });
+    stageEl.setAttr("aria-hidden", "true");
+    const elapsedEl = bar.createSpan({
+      cls: "vam-research-elapsed",
+      text: this.researchElapsedText(progress.startedAt)
+    });
+    elapsedEl.setAttr("aria-hidden", "true");
+    this.trackResearchElapsed(elapsedEl, progress.startedAt);
+    // A sibling of the bar, not inside it: the live region never reads the streaming text.
+    const preview = parent.createDiv({ cls: "vam-task-preview" });
+    this.taskPreviewEls.set(key, preview);
+    this.paintTaskPreview(key);
+  }
+  /** Plain text only (never Markdown) and no render: the summary being written, which nothing has saved yet. */
+  private paintTaskPreview(key: string): void {
+    const element = this.taskPreviewEls.get(key);
+    if (!element) return;
+    const text = this.plugin.researchProgress?.get(key)?.preview?.summary;
+    element.hidden = !text;
+    if (!text) {
+      if (element.hasClass("is-preview")) {
+        element.removeClass("is-preview");
+        element.empty();
+      }
+      return;
+    }
+    if (!element.hasClass("is-preview")) this.fillCardPreview(element, text);
+    else element.querySelector<HTMLElement>(".vam-card-preview-text")?.setText(text);
+  }
   private onResearchProgress(path: string): void {
     if (this.closed || !this.map || !this.stageEl) return;
+    if (path.startsWith(TASK_PROGRESS_PREFIX)) {
+      const kind =
+        path === this.taskProgressKey("integration")
+          ? "integration"
+          : path === this.taskProgressKey("merge")
+            ? "merge"
+            : null;
+      if (!kind) return;
+      this.paintTaskPreview(path);
+      // The labels end in punctuation ("Merging:", "…") that the "{0}: {1}" announcement would double.
+      this.announceStage(
+        path,
+        t(kind === "integration" ? "ui.integration_running" : "ui.merge_bar_title").replace(/\s*[:：…]+\s*$/u, "")
+      );
+      if (this.researchSig(this.plugin.researchProgress.get(path)) !== (this.researchSigs.get(path) ?? ""))
+        this.scheduleResearchRender();
+      return;
+    }
     if (!this.map.nodes.some(node => node.path === path)) return;
     this.paintHoverResearch();
     this.paintCardPreview(path);
@@ -3840,6 +3936,7 @@ export class VisualAgentMapView extends ItemView {
   /** The model call of an AI merge; a stopped, replaced or late run changes nothing. */
   private async runMergeDraft(task: MergeTask): Promise<void> {
     const language = this.plugin.settings.language;
+    const progress = this.startTaskProgress(this.taskProgressKey("merge", task.mapPath));
     try {
       const sourceGroup = await this.topicReferenceGroup(task.sources, "strong", { origin: false });
       if (!this.isLiveMergeTask(task)) return;
@@ -3867,7 +3964,17 @@ export class VisualAgentMapView extends ItemView {
         detailTemplate: this.mapDetailTemplate(language)
       };
       const ask = (context: TaskContext): Promise<AiResult> =>
-        this.plugin.askModel(context, task.model, this.plugin.settings.cliReasoning, task.controller.signal);
+        // Each request is its own attempt of one entry: the repair request clears the first request's preview.
+        this.plugin.askModel(
+          context,
+          task.model,
+          this.plugin.settings.cliReasoning,
+          task.controller.signal,
+          undefined,
+          undefined,
+          undefined,
+          progress.observer
+        );
       /** The sources must still be what the model was given; a change during any request fails with the stale message. */
       const sourcesUnchanged = async (): Promise<boolean> => {
         if (!this.isLiveMergeTask(task)) return false;
@@ -3908,6 +4015,8 @@ export class VisualAgentMapView extends ItemView {
           this.plugin.recordFailure(t("log.merge_failed"), error);
         }
       }
+      // The result is final: the unsaved preview goes away before anything is written.
+      progress.end();
       task.state = "applying";
       task.draft = result;
       task.progress = "";
@@ -3945,6 +4054,8 @@ export class VisualAgentMapView extends ItemView {
       if (task.controller.signal.aborted || this.closed) return;
       const stale = error instanceof Error && error.message === t("ui.merge_draft_stale");
       new Notice(stale ? t("ui.merge_draft_stale") : this.plugin.recordFailure(t("log.merge_failed"), error));
+    } finally {
+      progress.end();
     }
   }
   /** A done Notice with Undo while the write is still the newest history step (the merge pattern). */
@@ -5643,6 +5754,8 @@ export class VisualAgentMapView extends ItemView {
                   ? task.progress || t("ui.integration_failed")
                   : t("ui.research_stopped_existing_content_was_preserved")
       });
+      if (task.state === "running")
+        this.renderTaskProgress(state, this.contentEl, this.taskProgressKey("integration", task.mapPath));
       if (task.state === "running")
         this.button(state, t("ui.stop_research"), () => {
           task.controller.abort();
@@ -7945,6 +8058,7 @@ export class VisualAgentMapView extends ItemView {
     const note = await this.plugin.repo.readNote(node.path, this.map ?? undefined);
     this.plugin.running.add(node.path);
     this.render();
+    const progress = this.startTaskProgress(node.path);
     try {
       const childSources = await this.topicReferenceGroup(
         children,
@@ -7982,8 +8096,11 @@ export class VisualAgentMapView extends ItemView {
         note.reasoning,
         options.signal,
         undefined,
-        accepted
+        accepted,
+        undefined,
+        progress.observer
       );
+      progress.end();
       accepted?.();
       if (options.signal?.aborted) throw new DOMException("Aborted", "AbortError");
       const angles = result.suggestions.slice(0, 2);
@@ -8000,6 +8117,7 @@ export class VisualAgentMapView extends ItemView {
       console.error("Visual Agent Map integration directions", error);
       failed(this.plugin.recordFailure(t("log.integration_directions_failed"), error));
     } finally {
+      progress.end();
       this.plugin.running.delete(node.path);
       await this.hydrate();
       this.render();
@@ -8066,6 +8184,7 @@ export class VisualAgentMapView extends ItemView {
     await this.plugin.repo.updateNote(node.path, { status: "running" });
     await this.hydrate();
     this.render();
+    const progress = this.startTaskProgress(node.path);
     try {
       const synthesisContext: TaskContext = withThinkingOrigin(
         {
@@ -8096,8 +8215,12 @@ export class VisualAgentMapView extends ItemView {
         note.reasoning,
         options?.signal,
         undefined,
-        accepted
+        accepted,
+        undefined,
+        progress.observer
       );
+      // The answer is final (or about to be dropped): the unsaved preview goes away before anything is written.
+      progress.end();
       accepted?.();
       if (options?.signal?.aborted) throw new DOMException("Aborted", "AbortError");
       await this.plugin.repo.updateNote(node.path, { status: note.status });
@@ -8224,6 +8347,7 @@ export class VisualAgentMapView extends ItemView {
         else new Notice(message);
       }
     } finally {
+      progress.end();
       this.plugin.running.delete(node.path);
       await this.hydrate();
       this.render();
@@ -8503,6 +8627,7 @@ export class VisualAgentMapView extends ItemView {
     if (modalSignal?.aborted) controller.abort();
     else modalSignal?.addEventListener("abort", abortBeforeAcceptance, { once: true });
     let own: NonNullable<VisualAgentMapView["integrationTask"]> | undefined;
+    let progress: { end: () => void } | undefined;
     const runOptions: TaskOptions = {
       ...base,
       requirements: options.requirements || base.requirements,
@@ -8582,6 +8707,8 @@ export class VisualAgentMapView extends ItemView {
       this.integrationTask = task;
       own = task;
       this.render();
+      const taskProgress = this.startTaskProgress(this.taskProgressKey("integration"));
+      progress = taskProgress;
       const language = this.plugin.settings.language;
       const result = await this.plugin.askModel(
         {
@@ -8606,8 +8733,11 @@ export class VisualAgentMapView extends ItemView {
         this.plugin.settings.cliReasoning,
         controller.signal,
         undefined,
-        markAccepted
+        markAccepted,
+        undefined,
+        taskProgress.observer
       );
+      taskProgress.end();
       markAccepted();
       if (this.integrationTask !== task) return;
       if (controller.signal.aborted || this.path !== task.mapPath || this.map?.id !== task.mapId)
@@ -8639,6 +8769,7 @@ export class VisualAgentMapView extends ItemView {
     } catch (error) {
       fail(error);
     } finally {
+      progress?.end();
       this.selectionStarting = false;
       modalSignal?.removeEventListener("abort", abortBeforeAcceptance);
       this.render();
@@ -8738,6 +8869,7 @@ export class VisualAgentMapView extends ItemView {
     };
     this.integrationTask = task;
     this.render();
+    const progress = this.startTaskProgress(this.taskProgressKey("integration"));
     const model = this.plugin.settings.cliModel;
     const language = this.plugin.settings.language;
     const detailTemplate = this.mapDetailTemplate(options?.outputLanguage ?? language, options?.detailTemplateId);
@@ -8773,8 +8905,12 @@ export class VisualAgentMapView extends ItemView {
         this.plugin.settings.cliReasoning,
         controller.signal,
         undefined,
-        flow?.accepted
+        flow?.accepted,
+        undefined,
+        progress.observer
       );
+      // The answer is final (or about to be dropped): the unsaved preview goes away before anything is written.
+      progress.end();
       if (this.integrationTask !== task) return;
       if (controller.signal.aborted || this.path !== mapPath || this.map?.id !== mapId)
         throw new Error(t("ui.the_map_or_parent_topic_changed_while_ai_was_running_no_subt"));
@@ -8824,6 +8960,8 @@ export class VisualAgentMapView extends ItemView {
           : String(error);
       this.render();
       if (!controller.signal.aborted) throw error;
+    } finally {
+      progress.end();
     }
   }
   private async saveIntegratedNode(

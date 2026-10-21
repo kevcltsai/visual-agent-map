@@ -47,7 +47,7 @@ import { normalizeTemplates } from "./ai/detail-templates";
 import { normalizePresets } from "./ai/prompt-presets";
 import { effectiveReasoningLevel } from "./ai/task-policy";
 import responseSchema from "./response-schema.json";
-import type { AiResult, Suggestion, TaskContext } from "./ai/types";
+import type { AiResult, AiTaskKind, Suggestion, TaskContext } from "./ai/types";
 import { clampPreviewScale, legacyPreviewScale } from "./ui/preview-utils";
 import { BUILTIN_SAMPLE_ID, builtInSample } from "./builtin-sample";
 import { debugLog, LogManager } from "./log-manager";
@@ -1616,7 +1616,7 @@ export default class VisualAgentMapPlugin extends Plugin {
    * Starts an idle Claude CLI while the research dialog is open, so confirming only has to write the prompt. No model
    * call happens until then; a run with different settings starts cold and leaves it for the dialog.
    */
-  prewarmClaude(model: string, reasoning?: unknown, webSearch = true): void {
+  prewarmClaude(model: string, reasoning?: unknown, webSearch = true, mode?: AiTaskKind): void {
     if (this.unloaded) return;
     if (providerForModel(model) !== "claude") {
       this.aiRuntime.releaseWarm();
@@ -1624,10 +1624,11 @@ export default class VisualAgentMapPlugin extends Plugin {
     }
     try {
       const selected = normalizeReasoningLevel(reasoning ?? this.settings.cliReasoning);
-      // Same rule as a short-source task (effectiveReasoningLevel); a long-source run resolves differently and starts cold.
+      // Same rule as the run itself (effectiveReasoningLevel): auto is low for a short-source task but medium for a
+      // synthesis. A long-source task resolves differently and starts cold.
       this.claudeCli(this.pluginDirectory()).prewarm(
         providerModelId(model),
-        selected === "auto" ? "low" : selected,
+        effectiveReasoningLevel({ mode } as TaskContext, selected),
         responseSchema,
         webSearch
       );

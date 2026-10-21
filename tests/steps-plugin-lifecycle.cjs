@@ -100,6 +100,25 @@ test('Reconnect existing workspace (offerWorkspaceReconnect) rebuilds Coffee Tab
   assert.deepEqual(rebound, ['New Workspace/Coffee Tables']);
 });
 
+test('W2c plugin: prewarmClaude for a synthesis resolves auto to medium like the run itself; other modes and explicit levels are unchanged', () => {
+  const plugin = newPlugin();
+  const calls = [];
+  plugin.pluginDirectory = () => '/plugin';
+  plugin.claudeCli = () => ({ prewarm: (...args) => { calls.push([args[0], args[1], args[3]]); return true; } });
+  plugin.settings.cliReasoning = 'auto';
+  plugin.prewarmClaude('claude:sonnet', undefined, false, 'synthesize');
+  plugin.prewarmClaude('claude:sonnet', 'auto', true, 'merge');
+  plugin.prewarmClaude('claude:sonnet', 'auto', true, 'task');
+  plugin.prewarmClaude('claude:sonnet', 'auto', true);
+  plugin.prewarmClaude('claude:sonnet', 'high', true, 'synthesize');
+  plugin.prewarmClaude('claude:sonnet', 'low', true, 'synthesize');
+  assert.deepEqual(calls.map(call => call[1]), ['medium', 'medium', 'low', 'low', 'high', 'low']);
+  assert.equal(calls[0][2], false, 'the web setting follows the dialog');
+  // The same level the service resolves for the real synthesis request (so the warm command line matches it).
+  const { effectiveReasoningLevel } = S.load('ai/task-policy.ts');
+  assert.equal(effectiveReasoningLevel({ mode: 'synthesize' }, 'auto'), calls[0][1]);
+});
+
 test('S6 plugin: prewarmClaude pre-starts a Claude command (model id, effort, response schema, web tools), a Codex model releases it, and unload resets the runtime service (which disposes the pool)', () => {
   const plugin = newPlugin();
   const calls = [];

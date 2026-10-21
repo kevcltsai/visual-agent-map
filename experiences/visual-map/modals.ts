@@ -396,12 +396,13 @@ export class NextStepModal extends Modal {
     return controller.signal.aborted || (this.closed && !this.detached);
   }
   /** Pre-starts the Claude CLI for the research step (no model call); a run that does not use it kills it. */
-  private prewarmAi(webSearch = true): void {
+  private prewarmAi(webSearch = true, mode?: "synthesize"): void {
     if (this.selectionFlow || this.closed) return;
     this.plugin.prewarmClaude?.(
       this.modelSettings?.model ?? this.plugin.settings.cliModel,
       this.modelSettings?.reasoning,
-      webSearch
+      webSearch,
+      mode
     );
   }
   onClose(): void {
@@ -1311,6 +1312,8 @@ export class NextStepModal extends Modal {
       synthStatus.setText(t("ui.choose_or_edit_a_synthesis_direction_then_get_a_draft"));
       syncSynthesisStage();
       refreshSummary();
+      // The suggestions call took the pre-started process; the draft is the next call.
+      warmForMode();
     };
     // The result is written by the view (no draft review step); the dialog has nothing left to show.
     const flow = { directions: showDirections, written: () => this.close() };
@@ -1395,6 +1398,9 @@ export class NextStepModal extends Modal {
     const warmForMode = (): void => {
       if (currentMode === "research") this.prewarmAi(sharedSources?.picker.selection().webSearch ?? true);
       else if (currentMode === "expand" && shallow.checked && !shallowWeb.checked) this.prewarmAi(false);
+      // Synthesis of this topic's children (suggestions or the draft): both are mode synthesize with the picker's web setting.
+      else if (currentMode === "synthesize")
+        this.prewarmAi(sharedSources?.picker.selection().webSearch ?? false, "synthesize");
       else if (!this.detached) this.plugin.releaseWarmClaude?.();
     };
     show = mode => {

@@ -2060,6 +2060,158 @@ integrationTest('L4: startShallowResearch wires the chart decision: a local shal
     assert.equal(service.chartEligible(h.contexts.at(-1)), expected, 'chartEligible follows the context');
   }
 });
+// ---- Plan E W2: stage, seconds and unsaved preview for child synthesis, multi-select synthesis and AI merge ----
+async function synthesisProgressHarness(askModel) {
+  const h = await templateHarness({ language: 'en' });
+  const { ResearchProgressStore } = load('experiences/visual-map/research-progress.ts');
+  const store = new ResearchProgressStore();
+  h.plugin.researchProgress = store;
+  const child = await h.repo.createNote('Child', 'model-a', h.doc, h.mapPath, 'workspace'); child.parentId = h.topic.id; h.doc.nodes.push(child); await h.repo.saveMap(h.mapPath, h.doc);
+  const other = await h.repo.createNote('Other', 'model-a', h.doc, h.mapPath, 'workspace'); h.doc.nodes.push(other); await h.repo.saveMap(h.mapPath, h.doc);
+  await h.repo.updateNote(h.topic.path, { status: 'completed' });
+  const atWrite = [], realMutate = h.plugin.mutate;
+  h.plugin.mutate = async work => { atWrite.push({ topic: store.get(h.topic.path), integration: store.get(`vam-task:integration:${h.mapPath}`) }); return realMutate(work); };
+  let full;
+  h.plugin.askModel = async (context, model, reasoning, signal, onExchange, onAccepted, onWeb, observer) => { h.contexts.push(context); onAccepted?.(); return askModel({ context, signal, observer, store, h: full, calls: h.contexts.length }); };
+  const options = () => ({ researchMode: 'local', researchDepth: 'normal', visualMode: 'off', referenceGroups: [] });
+  const topicState = async () => { const note = await h.repo.readNote(h.topic.path); return JSON.stringify([note.summary, note.detail, note.status]); };
+  const mapShape = async () => JSON.stringify((await h.repo.readMap(h.mapPath)).nodes.map(n => n.path));
+  full = { ...h, store, atWrite, options, topicState, mapShape, child, other, key: `vam-task:integration:${h.mapPath}` };
+  return full;
+}
+const SYNTH = { summary: 'Synth summary', detail: '### Core conclusions\n\nTwo', visualReferences: [], suggestions: [] };
+const DIRECTIONS = { summary: '', detail: '', visualReferences: [], suggestions: [{ title: 'Angle', task: 'Compare them', contribution: '', parentTitle: '' }] };
+integrationTest('W2a: child synthesis shows stage and preview on the topic, writes nothing before success and ends the entry before the write', async () => {
+  const seen = [];
+  const h = await synthesisProgressHarness(async ({ observer, store, h: harness, calls }) => {
+    assert.ok(observer, 'the synthesis request is observed');
+    observer.onAttempt('a1', 1); observer.onStage('a1', 'writing'); observer.onPreview('a1', { summary: 'Unsaved synthesis', detail: 'partial detail' });
+    seen.push({ calls, entry: JSON.parse(JSON.stringify(store.get(harness.topic.path))), note: await harness.repo.readNote(harness.topic.path) });
+    return calls === 1 ? DIRECTIONS : SYNTH;
+  });
+  const before = await h.topicState();
+  await h.view.startSynthesis(h.topic, h.options(), null, message => assert.fail(message), () => {});
+  assert.equal(seen[0].entry.stage, 'writing'); assert.equal(seen[0].entry.preview.summary, 'Unsaved synthesis');
+  assert.equal(h.store.get(h.topic.path), undefined, 'directions: entry gone');
+  await h.view.startSynthesis(h.topic, h.options(), 'Compare them', message => assert.fail(message), () => {});
+  assert.equal(seen[1].entry.preview.summary, 'Unsaved synthesis'); assert.equal(seen[1].note.summary, (JSON.parse(before))[0], 'the note is not written before the result');
+  assert.equal(seen[1].note.detail, (JSON.parse(before))[1]);
+  assert.equal(h.store.get(h.topic.path), undefined, 'draft: entry gone');
+  assert.equal(h.atWrite.every(write => write.topic === undefined), true, 'the preview ended before every write started');
+  assert.match((await h.repo.readNote(h.topic.path)).summary, /Synth summary/);
+});
+integrationTest('W2a: Stop, a stale topic and a failed request all clear the synthesis preview and write nothing', async () => {
+  for (const scenario of ['stop', 'stale', 'parse']) {
+    const h = await synthesisProgressHarness(async ({ observer, h: harness }) => {
+      observer.onAttempt('a1', 1); observer.onPreview('a1', { summary: 'Unsaved', detail: 'Unsaved detail' });
+      if (scenario === 'stop') { harness.view.synthesisTasks.get(harness.topic.path).controller.abort(); throw Object.assign(new Error('cancelled'), { name: 'AbortError' }); }
+      if (scenario === 'stale') { await harness.repo.updateNote(harness.topic.path, { prompt: 'The user edited the question' }); return SYNTH; }
+      throw new Error('The reply could not be parsed');
+    });
+    const before = await h.topicState();
+    const warn = console.error; console.error = () => {};
+    try { await h.view.startSynthesis(h.topic, h.options(), 'Compare them', () => {}, () => {}); } finally { console.error = warn; }
+    assert.equal(h.store.get(h.topic.path), undefined, `${scenario}: preview cleared`);
+    const after = JSON.parse(await h.topicState());
+    assert.notEqual(after[0], 'Unsaved'); assert.doesNotMatch(after[1], /Unsaved/);
+    if (scenario !== 'stale') assert.equal(after[1], JSON.parse(before)[1], `${scenario}: detail untouched`);
+  }
+});
+integrationTest('W2a: a chart step that takes over the topic entry after the write keeps it, and a closed view still ends the synthesis entry', async () => {
+  const charts = await synthesisProgressHarness(async ({ calls }) => (calls === 1 ? DIRECTIONS : SYNTH));
+  charts.plugin.addChartsAfterWrite = job => { charts.store.begin(job.path, 'charts-1', Date.now()); charts.store.stage(job.path, 'charts-1', 'charts', Date.now()); };
+  await charts.view.startSynthesis(charts.topic, charts.options(), 'Compare them', message => assert.fail(message), () => {});
+  assert.equal(charts.store.get(charts.topic.path).stage, 'charts', 'ending the synthesis entry does not remove the chart stage');
+  const closed = await synthesisProgressHarness(async ({ observer, h: harness }) => { observer.onAttempt('a1', 1); harness.view.closed = true; return SYNTH; });
+  await closed.view.startSynthesis(closed.topic, closed.options(), 'Compare them', () => {}, () => {});
+  assert.equal(closed.store.get(closed.topic.path), undefined);
+});
+integrationTest('W2a: an existing entry on the topic (a chart step still running) is left alone and the request still runs unobserved', async () => {
+  const h = await synthesisProgressHarness(async ({ observer, calls }) => { assert.equal(observer, undefined); return calls === 1 ? DIRECTIONS : SYNTH; });
+  h.store.begin(h.topic.path, 'charts-9', Date.now()); h.store.stage(h.topic.path, 'charts-9', 'charts', Date.now());
+  await h.view.startSynthesis(h.topic, h.options(), null, message => assert.fail(message), () => {});
+  assert.equal(h.store.get(h.topic.path).stage, 'charts');
+});
+integrationTest('W2b: multi-select synthesis (directions and draft) uses a task key, writes nothing before success and ends the entry before the write', async () => {
+  const seen = [];
+  const h = await synthesisProgressHarness(async ({ observer, store, h: harness, calls }) => {
+    assert.ok(observer);
+    observer.onAttempt('b1', 1); observer.onStage('b1', 'writing'); observer.onPreview('b1', { summary: `Unsaved ${calls}` });
+    seen.push({ calls, entry: JSON.parse(JSON.stringify(store.get(`vam-task:integration:${harness.mapPath}`))), nodes: await harness.mapShape() });
+    return calls === 1 ? DIRECTIONS : SYNTH;
+  });
+  const nodesBefore = await h.mapShape();
+  await h.view.startSelectionSynthesis([h.topic, h.other], h.options(), null, message => assert.fail(message), () => {});
+  assert.equal(seen[0].entry.stage, 'writing'); assert.equal(seen[0].entry.preview.summary, 'Unsaved 1'); assert.equal(seen[0].nodes, nodesBefore);
+  assert.equal(h.store.get(h.key), undefined, 'directions: entry gone');
+  h.view.integrationTask = null;
+  await h.view.startSelectionSynthesis([h.topic, h.other], { ...h.options(), synthesisTitle: 'Combined' }, 'Compare', message => assert.fail(message), () => {});
+  assert.equal(seen[1].entry.preview.summary, 'Unsaved 2'); assert.equal(seen[1].nodes, nodesBefore, 'no node before the result');
+  assert.equal(h.store.get(h.key), undefined);
+  assert.equal(h.atWrite.length > 0 && h.atWrite.every(write => write.integration === undefined), true, 'ended before the write');
+  assert.notEqual(await h.mapShape(), nodesBefore);
+});
+integrationTest('W2b: multi-select synthesis Stop and a failed request clear the preview and add no topic', async () => {
+  for (const scenario of ['stop', 'fail']) {
+    const h = await synthesisProgressHarness(async ({ observer, h: harness }) => {
+      observer.onAttempt('b1', 1); observer.onPreview('b1', { summary: 'Unsaved' });
+      if (scenario === 'stop') { harness.view.integrationTask.controller.abort(); throw Object.assign(new Error('cancelled'), { name: 'AbortError' }); }
+      throw new Error('provider down');
+    });
+    const nodesBefore = await h.mapShape();
+    const warn = console.error; console.error = () => {};
+    try { await h.view.createIntegratedNode('Combined', [h.topic, h.other], 'Compare', '').catch(() => {}); } finally { console.error = warn; }
+    assert.equal(h.store.get(h.key), undefined, `${scenario}: cleared`);
+    assert.equal(await h.mapShape(), nodesBefore, `${scenario}: no topic added`);
+  }
+});
+test('W2b: the synthesis and merge status bars show stage and seconds in hidden spans and the unsaved summary in a line outside every live region', () => {
+  let interval = null;
+  const { VisualAgentMapView } = load('main.ts', { obsidian }, { setInterval: fn => { interval = fn; return 7; }, clearInterval: () => {} });
+  const { ResearchProgressStore } = load('experiences/visual-map/research-progress.ts');
+  class El {
+    constructor(cls) { this.cls = new Set(cls ? cls.split(' ') : []); this.kids = []; this.text = ''; this.attrs = {}; this.parent = null; this.hidden = false; this.isConnected = true; }
+    addClass(c) { this.cls.add(c); } removeClass(c) { this.cls.delete(c); } hasClass(c) { return this.cls.has(c); }
+    empty() { this.kids = []; this.text = ''; } setText(v) { this.kids = []; this.text = v; } setAttr(k, v) { this.attrs[k] = v; }
+    createEl(_tag, o = {}) { const e = new El(o.cls); e.text = o.text ?? ''; Object.assign(e.attrs, o.attr ?? {}); e.parent = this; this.kids.push(e); return e; }
+    createSpan(o = {}) { return this.createEl('span', o); } createDiv(o = {}) { return this.createEl('div', typeof o === 'string' ? { cls: o } : o); }
+    addEventListener() {}
+    querySelector(sel) { const c = sel.slice(1); for (const k of this.kids) { if (k.cls.has(c)) return k; const d = k.querySelector(sel); if (d) return d; } return null; }
+  }
+  const walk = e => [e, ...e.kids.flatMap(walk)];
+  const view = new VisualAgentMapView({ app: {} }, { settings: { ...DEFAULT_SETTINGS, language: 'en' } });
+  const store = new ResearchProgressStore();
+  const spoken = []; view.announcer = { setText: text => spoken.push(text) }; view.announcedStages = new Map();
+  view.plugin = { researchProgress: store, settings: { ...DEFAULT_SETTINGS, language: 'en' } };
+  view.path = 'Map.md'; view.map = { nodes: [] }; view.notes = new Map(); view.closed = false; view.stageEl = {};
+  let renders = 0; view.scheduleResearchRender = () => { renders++; };
+  const key = view.taskProgressKey('merge'); assert.equal(key, 'vam-task:merge:Map.md'); assert.ok(key.includes(':'), 'cannot collide with a Vault path');
+  store.begin(key, 'x', Date.now()); view.onResearchProgress(key);
+  assert.equal(renders, 1, 'a new entry redraws the bar once');
+  const parent = new El('root'); const bar = parent.createDiv({ cls: 'vam-aim-statusbar', attr: { 'aria-live': 'polite' } });
+  view.renderTaskProgress(bar, parent, key);
+  const stage = bar.querySelector('.vam-research-stage'), elapsed = bar.querySelector('.vam-research-elapsed');
+  assert.equal(stage.text, 'Waiting for the model'); assert.equal(stage.attrs['aria-hidden'], 'true'); assert.equal(elapsed.attrs['aria-hidden'], 'true');
+  const preview = parent.querySelector('.vam-task-preview');
+  assert.equal(preview.parent, parent, 'a sibling of the live bar'); assert.equal(walk(bar).includes(preview), false, 'not inside the live region');
+  assert.equal(walk(preview).some(e => e.attrs['aria-live'] || e.attrs.role), false); assert.equal(preview.hidden, true);
+  store.stage(key, 'x', 'writing', Date.now()); view.onResearchProgress(key);
+  assert.deepEqual(spoken, ['Merging: Waiting for the model', 'Merging: Writing'], 'the announcer speaks the stage');
+  view.renderTaskProgress(new El('bar'), new El('root'), key); // the redraw the stage change asked for
+  const rendersBefore = renders;
+  for (let i = 1; i <= 5; i++) { store.preview(key, 'x', { summary: 'word '.repeat(i) }); view.onResearchProgress(key); }
+  assert.equal(spoken.length, 2, 'the streaming text is never announced'); assert.equal(renders, rendersBefore, 'the streaming preview redraws nothing');
+  store.end(key); store.begin(key, 'y', Date.now()); store.preview(key, 'y', { summary: '**raw** summary' }); view.renderTaskProgress(bar, parent, key);
+  const second = parent.kids.filter(k => k.cls.has('vam-task-preview')).at(-1);
+  assert.equal(second.hidden, false); assert.equal(second.querySelector('.vam-card-preview-text').text, '**raw** summary', 'plain text, not rendered');
+  store.preview(key, 'y', { summary: 'longer **raw** summary' }); view.paintTaskPreview(key);
+  assert.equal(second.querySelector('.vam-card-preview-text').text, 'longer **raw** summary'); assert.equal(second.hidden, false);
+  store.end(key); view.paintTaskPreview(key);
+  assert.equal(second.hidden, true, 'the preview disappears with the entry');
+  const settled = renders;
+  store.begin('vam-task:merge:Other.md', 'z', Date.now()); view.onResearchProgress('vam-task:merge:Other.md'); view.onResearchProgress('vam-task:integration:Other.md');
+  assert.equal(renders, settled, 'another map\'s task key is ignored');
+});
 test('R2 M2: one persistent announcer speaks a stage only when it changes; the streaming preview and card renders never touch it', () => {
   const { VisualAgentMapView } = load('main.ts', { obsidian });
   const { ResearchProgressStore } = load('experiences/visual-map/research-progress.ts');

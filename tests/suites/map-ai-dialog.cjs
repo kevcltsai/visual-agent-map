@@ -1025,6 +1025,24 @@ integrationTest('S6 dialog: the pre-start follows the web-search setting (local 
   assert.equal(spy.prewarms.length, count, 'with web search the child research is not served by the local process');
   assert.equal(spy.releases, releases + 2);
 });
+integrationTest('W2c dialog: the synthesis step pre-starts a synthesis command with the picker\'s web setting, again after the directions arrive, and releases it when leaving the step', () => {
+  const spy = { prewarms: [], releases: 0 };
+  spy.plugin = { prewarmClaude: (model, reasoning, webSearch, mode) => spy.prewarms.push([webSearch, mode]), releaseWarmClaude: () => { spy.releases++; } };
+  const h = nextStepHarness({ plugin: spy.plugin, modelSettings: { topicStatus: 'idea' } });
+  const cards = findAll(cardsOf(h), i => i.tag === 'button' && i.attrs && i.attrs.role === 'radio');
+  cards[2].click();
+  assert.deepEqual(spy.prewarms.at(-1), [false, 'synthesize'], 'synthesis is local by default and uses the synthesis effort');
+  const before = spy.prewarms.length;
+  const checkbox = text => find(find(h.modal.contentEl, i => i.tag === 'label' && findAll(i, c => c.text === text).length > 0), i => i.tag === 'input');
+  const web = checkbox('Allow web search'); web.checked = true; web.change();
+  assert.deepEqual(spy.prewarms.at(-1), [true, 'synthesize'], 'the picker\'s web setting is followed');
+  assert.ok(spy.prewarms.length > before);
+  const releases = spy.releases;
+  cards[0].click();
+  assert.equal(spy.prewarms.at(-1)[1], undefined, 'the research step pre-starts a plain research command'); assert.equal(spy.releases, releases);
+  cards[1].click();
+  assert.equal(spy.releases, releases + 1, 'plain expansion releases it');
+});
 integrationTest('S6 dialog: a plugin without the pre-start methods (older test doubles) still opens and closes', () => {
   const h = nextStepHarness({});
   assert.doesNotThrow(() => h.modal.close());

@@ -844,6 +844,54 @@ integrationTest('AI merge check: a dropped number or link and an invented number
   const merged = await h.mergedNode('AI merged'); assert.match((await h.repo.readNote(merged.path)).detail, /Alpha 42 units/);
   assert.equal(h.view.history.undoEntry.label, 'Merge topics'); assert.deepEqual(h.notices.filter(m => /Merged into/.test(m)).length, 1);
 });
+// ---- Plan E W2: the merge request shows stage and unsaved preview under its own task key ----
+const mergeProgress = async (options, ask) => {
+  const h = await aiMergeHarness(options);
+  const { ResearchProgressStore } = load('experiences/visual-map/research-progress.ts');
+  const store = new ResearchProgressStore(); h.plugin.researchProgress = store; h.store = store; h.key = `vam-task:merge:${h.path}`; h.atWrite = []; h.observers = [];
+  const realMutate = h.plugin.mutate; h.plugin.mutate = work => { h.atWrite.push(store.get(h.key)); return realMutate(work); };
+  h.plugin.askModel = async (context, model, reasoning, signal, onExchange, onAccepted, onWeb, observer) => { h.asks.push({ context, model, reasoning }); h.observers.push(observer); return ask({ h, signal, observer, store, call: h.asks.length }); };
+  return h;
+};
+integrationTest('W2b merge: the request is observed, shows stage and preview under the merge key, writes nothing before success and ends the entry before the write', async () => {
+  const seen = [];
+  const h = await mergeProgress({}, async ({ h: harness, observer, store }) => {
+    observer.onAttempt('m1', 1); observer.onStage('m1', 'writing'); observer.onPreview('m1', { summary: 'Unsaved merge summary' });
+    seen.push({ entry: JSON.parse(JSON.stringify(store.get(harness.key))), files: harness.files() });
+    return { summary: 'Merged one-liner', detail: '### Facts\n\nAlpha detail and Gamma detail', visualReferences: [], formatIssues: [], suggestions: [] };
+  });
+  const files = h.files();
+  const { task } = await h.begin(); await h.untilSettled(task);
+  assert.equal(h.asks.length, 1); assert.ok(h.observers[0], 'the merge request is observed');
+  assert.equal(seen[0].entry.stage, 'writing'); assert.equal(seen[0].entry.preview.summary, 'Unsaved merge summary'); assert.deepEqual(seen[0].files, files, 'nothing is written while the preview shows');
+  assert.equal(h.store.get(h.key), undefined, 'the entry is gone'); assert.equal(h.atWrite.length > 0 && h.atWrite.every(entry => entry === undefined), true, 'ended before the write');
+  assert.ok(await h.mergedNode('AI merged'));
+});
+integrationTest('W2b merge: the repair request is a new attempt of the same entry (the first preview is gone) and the repair result is still used exactly as before', async () => {
+  const states = [];
+  const h = await mergeProgress({ details: checkedDetails }, async ({ h: harness, observer, store, call }) => {
+    if (call === 1) { observer.onAttempt('m1', 1); observer.onPreview('m1', { summary: 'First draft preview' }); states.push(JSON.parse(JSON.stringify(store.get(harness.key)))); return lossy; }
+    observer.onAttempt('m2', 2); states.push(JSON.parse(JSON.stringify(store.get(harness.key)))); return good;
+  });
+  const { task } = await h.begin(); await h.untilSettled(task);
+  assert.equal(h.asks.length, 2, 'one merge and one repair, as before'); assert.ok(h.observers[0] && h.observers[1], 'both requests are observed');
+  assert.equal(states[0].preview.summary, 'First draft preview');
+  assert.equal(states[1].preview, undefined, 'the repair attempt starts clean'); assert.equal(states[1].stage, 'waiting');
+  assert.equal(h.store.get(h.key), undefined);
+  const merged = await h.mergedNode('AI merged'); assert.match((await h.repo.readNote(merged.path)).detail, /Alpha 42 units/);
+});
+integrationTest('W2b merge: Stop while a preview shows clears it and writes nothing; a failed request does the same', async () => {
+  for (const scenario of ['stop', 'fail']) {
+    const h = await mergeProgress({}, async ({ h: harness, observer }) => {
+      observer.onAttempt('m1', 1); observer.onPreview('m1', { summary: 'Unsaved' });
+      if (scenario === 'stop') { harness.view.stopMergeTask(harness.view.mergeTasks.get(harness.path)); throw Object.assign(new Error('aborted'), { name: 'AbortError' }); }
+      throw new Error('provider down');
+    });
+    const files = h.files(); const original = await h.shape();
+    const { task } = await h.begin(); if (task) await h.untilSettled(task);
+    assert.equal(h.store.get(h.key), undefined, `${scenario}: cleared`); assert.deepEqual(h.files(), files, `${scenario}: nothing written`); assert.deepEqual(await h.shape(), original);
+  }
+});
 integrationTest('AI merge check: still failing after the repair applies anyway, with a warning Notice that has Undo and the tokens in the failure log', async () => {
   const h = await aiMergeHarness({ details: checkedDetails }); const original = await h.shape();
   h.answer = async () => lossy;

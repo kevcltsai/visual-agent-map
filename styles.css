@@ -133,6 +133,9 @@
 .vam-node:not([data-aim-kind])[data-status="idea"] { border-style: dashed; border-color: var(--background-modifier-border-hover); box-shadow: none; }
 .vam-card-summary.is-preview { font-style: italic; color: var(--text-faint); }
 .vam-card-preview-label { font-style: normal; font-weight: 600; margin-right: 6px; }
+/* Unsaved summary preview under a multi-select synthesis or merge status bar (plain text, outside the live region). */
+.vam-task-preview { margin: 0; padding: 4px 14px 8px; color: var(--text-faint); font-style: italic; font-size: var(--font-ui-small); line-height: 1.45; overflow-wrap: anywhere; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow: hidden; }
+.vam-task-preview[hidden] { display: none; }
 .vam-node:not([data-aim-kind])[data-status="idea"] .vam-card-summary { color: var(--text-faint); }
 .vam-node:not([data-aim-kind])[data-status="running"] { border-color: var(--interactive-accent); }
 .vam-node:not([data-aim-kind])[data-status="queued"] { --vam-card-bg: color-mix(in srgb, var(--interactive-accent) 7%, var(--background-primary)); border-style: dashed; border-color: color-mix(in srgb, var(--interactive-accent) 60%, transparent); }

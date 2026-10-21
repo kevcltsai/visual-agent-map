@@ -3897,7 +3897,7 @@ function backgroundResultNotice(message, action, timeout) {
   return notice;
 }
 function renderBackgroundStatus(parent, status) {
-  var _a;
+  var _a, _b;
   const bar = parent.createDiv(`vam-aim-statusbar vam-background-statusbar${status.running ? " is-active" : ""}`);
   bar.setAttr("aria-live", "polite");
   bar.createSpan({ cls: "vam-aim-status-title", text: status.title });
@@ -3905,8 +3905,9 @@ function renderBackgroundStatus(parent, status) {
     cls: `vam-aim-status-value ${status.running ? "vam-status-running" : ""}`.trim(),
     text: status.value
   });
+  (_a = status.detail) == null ? void 0 : _a.call(status, bar);
   if (status.running && status.onStop) {
-    const stop = bar.createEl("button", { text: (_a = status.stopLabel) != null ? _a : t("ui.stop_research") });
+    const stop = bar.createEl("button", { text: (_b = status.stopLabel) != null ? _b : t("ui.stop_research") });
     stop.addEventListener("click", status.onStop);
   }
   if (status.review) {
@@ -19348,14 +19349,15 @@ var NextStepModal = class extends import_obsidian21.Modal {
     return controller.signal.aborted || this.closed && !this.detached;
   }
   /** Pre-starts the Claude CLI for the research step (no model call); a run that does not use it kills it. */
-  prewarmAi(webSearch = true) {
+  prewarmAi(webSearch = true, mode) {
     var _a, _b, _c, _d, _e;
     if (this.selectionFlow || this.closed) return;
     (_e = (_d = this.plugin).prewarmClaude) == null ? void 0 : _e.call(
       _d,
       (_b = (_a = this.modelSettings) == null ? void 0 : _a.model) != null ? _b : this.plugin.settings.cliModel,
       (_c = this.modelSettings) == null ? void 0 : _c.reasoning,
-      webSearch
+      webSearch,
+      mode
     );
   }
   onClose() {
@@ -20191,6 +20193,7 @@ var NextStepModal = class extends import_obsidian21.Modal {
       synthStatus.setText(t("ui.choose_or_edit_a_synthesis_direction_then_get_a_draft"));
       syncSynthesisStage();
       refreshSummary();
+      warmForMode();
     };
     const flow = { directions: showDirections, written: () => this.close() };
     const needsName = () => !!titleInput && !titleInput.value.trim();
@@ -20274,10 +20277,12 @@ var NextStepModal = class extends import_obsidian21.Modal {
     );
     const sharedSources = this.addReferencePicker(adjustBody);
     const warmForMode = () => {
-      var _a2, _b2, _c2;
+      var _a2, _b2, _c2, _d2;
       if (currentMode === "research") this.prewarmAi((_a2 = sharedSources == null ? void 0 : sharedSources.picker.selection().webSearch) != null ? _a2 : true);
       else if (currentMode === "expand" && shallow.checked && !shallowWeb.checked) this.prewarmAi(false);
-      else if (!this.detached) (_c2 = (_b2 = this.plugin).releaseWarmClaude) == null ? void 0 : _c2.call(_b2);
+      else if (currentMode === "synthesize")
+        this.prewarmAi((_b2 = sharedSources == null ? void 0 : sharedSources.picker.selection().webSearch) != null ? _b2 : false, "synthesize");
+      else if (!this.detached) (_d2 = (_c2 = this.plugin).releaseWarmClaude) == null ? void 0 : _d2.call(_c2);
     };
     show = (mode) => {
       currentMode = mode;
@@ -28206,6 +28211,7 @@ function aimQuestionStatus(map, questionNodeId, activeQuestionNodeId) {
   return "not_started";
 }
 var MERGE_GUARD_FIELDS = ["title", "summary", "detail", "status"];
+var TASK_PROGRESS_PREFIX = "vam-task:";
 var MERGE_DONE_NOTICE_MS = 15e3;
 var cardLabelSequence = 0;
 var cardLabels = /* @__PURE__ */ new WeakMap();
@@ -28297,6 +28303,8 @@ var VisualAgentMapView = class _VisualAgentMapView extends import_obsidian29.Ite
     /** Persistent, visually hidden live region for research stage changes; outside contentEl so a render never rebuilds it. */
     __publicField(this, "announcer", null);
     __publicField(this, "announcedStages", /* @__PURE__ */ new Map());
+    /** The unsaved-summary line of each synthesis/merge status bar (a plain element outside every live region). */
+    __publicField(this, "taskPreviewEls", /* @__PURE__ */ new Map());
     __publicField(this, "integrationMode", false);
     __publicField(this, "dragging", false);
     /** Ends the drag in progress (listeners, pending frame, flag); set only while a card is being dragged. */
@@ -28472,6 +28480,7 @@ var VisualAgentMapView = class _VisualAgentMapView extends import_obsidian29.Ite
     this.researchTick = this.researchRenderTimer = null;
     this.researchElapsed.clear();
     this.researchSigs.clear();
+    this.taskPreviewEls.clear();
     this.hoverResearch = null;
     this.plugin.releaseOutline(this);
     (_c = this.relevancePanelCleanup) == null ? void 0 : _c.call(this);
@@ -28989,7 +28998,11 @@ var VisualAgentMapView = class _VisualAgentMapView extends import_obsidian29.Ite
         title: t("ui.merge_bar_title"),
         value: names2.join(t("ui.list_separator")),
         running: true,
-        ...merge.state === "running" ? { onStop: () => this.stopMergeTask(merge), stopLabel: t("ui.merge_stop") } : {}
+        ...merge.state === "running" ? {
+          onStop: () => this.stopMergeTask(merge),
+          stopLabel: t("ui.merge_stop"),
+          detail: (bar) => this.renderTaskProgress(bar, parent, this.taskProgressKey("merge", merge.mapPath))
+        } : {}
       });
     }
   }
@@ -31024,18 +31037,21 @@ ${request.requirements}` : preset.text,
   }
   /** Speaks a stage (or the slow notice) once, when it changes. The streaming preview never goes through here. */
   announceResearchStage(path) {
-    var _a, _b, _c, _d, _e;
-    const progress = (_a = this.plugin.researchProgress) == null ? void 0 : _a.get(path);
+    var _a, _b, _c;
+    const node = (_a = this.map) == null ? void 0 : _a.nodes.find((item) => item.path === path);
+    this.announceStage(path, (_c = node && ((_b = this.notes.get(node.id)) == null ? void 0 : _b.title)) != null ? _c : path);
+  }
+  announceStage(key2, title) {
+    var _a, _b;
+    const progress = (_a = this.plugin.researchProgress) == null ? void 0 : _a.get(key2);
     if (!progress) {
-      this.announcedStages.delete(path);
+      this.announcedStages.delete(key2);
       return;
     }
     const signature = `${progress.stage}|${progress.slow ? 1 : 0}`;
-    if (this.announcedStages.get(path) === signature) return;
-    this.announcedStages.set(path, signature);
-    const node = (_b = this.map) == null ? void 0 : _b.nodes.find((item) => item.path === path);
-    const title = (_d = node && ((_c = this.notes.get(node.id)) == null ? void 0 : _c.title)) != null ? _d : path;
-    (_e = this.announcer) == null ? void 0 : _e.setText(
+    if (this.announcedStages.get(key2) === signature) return;
+    this.announcedStages.set(key2, signature);
+    (_b = this.announcer) == null ? void 0 : _b.setText(
       t(
         "ui.research_announcement_0_1",
         title,
@@ -31081,14 +31097,92 @@ ${request.requirements}` : preset.text,
       this.researchTick = null;
     }
   }
-  onResearchProgress(path) {
+  /** The progress key of this map's multi-select synthesis or AI merge (a name no Vault path can have). */
+  taskProgressKey(kind, mapPath = this.path) {
+    return `${TASK_PROGRESS_PREFIX}${kind}:${mapPath}`;
+  }
+  /**
+   * Stage, seconds and the unsaved preview of one synthesis or merge request. `key` is the note path (child synthesis) or a
+   * task key. The entry belongs to the caller: `end()` runs when the answer arrives (before anything is written), and again
+   * in the caller's finally. A key that already has an entry (a chart step of that note) is left alone.
+   */
+  startTaskProgress(key2) {
+    const progress = this.plugin.researchProgress;
+    if (!progress || progress.get(key2)) return { end: () => {
+    } };
+    let attempt = "starting";
+    progress.begin(key2, attempt, Date.now());
+    return {
+      observer: {
+        onAttempt: (id) => {
+          attempt = id;
+          progress.newAttempt(key2, id, Date.now());
+        },
+        onStage: (id, stage, query) => progress.stage(key2, id, stage, Date.now(), query),
+        onPreview: (id, fields) => progress.preview(key2, id, fields != null ? fields : {})
+      },
+      end: () => progress.end(key2, attempt)
+    };
+  }
+  /** Stage text, seconds and the preview line under a synthesis or merge status bar. */
+  renderTaskProgress(bar, parent, key2) {
     var _a;
+    const progress = (_a = this.plugin.researchProgress) == null ? void 0 : _a.get(key2);
+    if (!progress) {
+      this.researchSigs.delete(key2);
+      this.taskPreviewEls.delete(key2);
+      return;
+    }
+    this.researchSigs.set(key2, this.researchSig(progress));
+    const stageEl = bar.createSpan({ cls: "vam-research-stage", text: this.researchStageText(progress) });
+    stageEl.setAttr("aria-hidden", "true");
+    const elapsedEl = bar.createSpan({
+      cls: "vam-research-elapsed",
+      text: this.researchElapsedText(progress.startedAt)
+    });
+    elapsedEl.setAttr("aria-hidden", "true");
+    this.trackResearchElapsed(elapsedEl, progress.startedAt);
+    const preview = parent.createDiv({ cls: "vam-task-preview" });
+    this.taskPreviewEls.set(key2, preview);
+    this.paintTaskPreview(key2);
+  }
+  /** Plain text only (never Markdown) and no render: the summary being written, which nothing has saved yet. */
+  paintTaskPreview(key2) {
+    var _a, _b, _c, _d;
+    const element = this.taskPreviewEls.get(key2);
+    if (!element) return;
+    const text11 = (_c = (_b = (_a = this.plugin.researchProgress) == null ? void 0 : _a.get(key2)) == null ? void 0 : _b.preview) == null ? void 0 : _c.summary;
+    element.hidden = !text11;
+    if (!text11) {
+      if (element.hasClass("is-preview")) {
+        element.removeClass("is-preview");
+        element.empty();
+      }
+      return;
+    }
+    if (!element.hasClass("is-preview")) this.fillCardPreview(element, text11);
+    else (_d = element.querySelector(".vam-card-preview-text")) == null ? void 0 : _d.setText(text11);
+  }
+  onResearchProgress(path) {
+    var _a, _b;
     if (this.closed || !this.map || !this.stageEl) return;
+    if (path.startsWith(TASK_PROGRESS_PREFIX)) {
+      const kind = path === this.taskProgressKey("integration") ? "integration" : path === this.taskProgressKey("merge") ? "merge" : null;
+      if (!kind) return;
+      this.paintTaskPreview(path);
+      this.announceStage(
+        path,
+        t(kind === "integration" ? "ui.integration_running" : "ui.merge_bar_title").replace(/\s*[:：…]+\s*$/u, "")
+      );
+      if (this.researchSig(this.plugin.researchProgress.get(path)) !== ((_a = this.researchSigs.get(path)) != null ? _a : ""))
+        this.scheduleResearchRender();
+      return;
+    }
     if (!this.map.nodes.some((node) => node.path === path)) return;
     this.paintHoverResearch();
     this.paintCardPreview(path);
     this.announceResearchStage(path);
-    if (this.researchSig(this.plugin.researchProgress.get(path)) !== ((_a = this.researchSigs.get(path)) != null ? _a : ""))
+    if (this.researchSig(this.plugin.researchProgress.get(path)) !== ((_b = this.researchSigs.get(path)) != null ? _b : ""))
       this.scheduleResearchRender();
   }
   scheduleResearchRender() {
@@ -31462,6 +31556,7 @@ ${request.requirements}` : preset.text,
   /** The model call of an AI merge; a stopped, replaced or late run changes nothing. */
   async runMergeDraft(task) {
     const language2 = this.plugin.settings.language;
+    const progress = this.startTaskProgress(this.taskProgressKey("merge", task.mapPath));
     try {
       const sourceGroup = await this.topicReferenceGroup(task.sources, "strong", { origin: false });
       if (!this.isLiveMergeTask(task)) return;
@@ -31488,7 +31583,19 @@ ${request.requirements}` : preset.text,
         visualMode: "off",
         detailTemplate: this.mapDetailTemplate(language2)
       };
-      const ask = (context) => this.plugin.askModel(context, task.model, this.plugin.settings.cliReasoning, task.controller.signal);
+      const ask = (context) => (
+        // Each request is its own attempt of one entry: the repair request clears the first request's preview.
+        this.plugin.askModel(
+          context,
+          task.model,
+          this.plugin.settings.cliReasoning,
+          task.controller.signal,
+          void 0,
+          void 0,
+          void 0,
+          progress.observer
+        )
+      );
       const sourcesUnchanged = async () => {
         if (!this.isLiveMergeTask(task)) return false;
         const latest = await this.topicReferenceGroup(task.sources, "strong", { origin: false });
@@ -31526,6 +31633,7 @@ ${request.requirements}` : preset.text,
           this.plugin.recordFailure(t("log.merge_failed"), error);
         }
       }
+      progress.end();
       task.state = "applying";
       task.draft = result;
       task.progress = "";
@@ -31561,6 +31669,8 @@ ${request.requirements}` : preset.text,
       if (task.controller.signal.aborted || this.closed) return;
       const stale = error instanceof Error && error.message === t("ui.merge_draft_stale");
       new import_obsidian29.Notice(stale ? t("ui.merge_draft_stale") : this.plugin.recordFailure(t("log.merge_failed"), error));
+    } finally {
+      progress.end();
     }
   }
   /** A done Notice with Undo while the write is still the newest history step (the merge pattern). */
@@ -33128,6 +33238,8 @@ ${request.requirements}` : preset.text,
       state.createSpan({
         text: task.state === "running" ? task.progress || t("ui.integration_running") : task.state === "applying" ? t("ui.integration_running") : task.state === "directions" ? t("ui.choose_synthesis_direction") : task.state === "failed" ? task.progress || t("ui.integration_failed") : t("ui.research_stopped_existing_content_was_preserved")
       });
+      if (task.state === "running")
+        this.renderTaskProgress(state, this.contentEl, this.taskProgressKey("integration", task.mapPath));
       if (task.state === "running")
         this.button(state, t("ui.stop_research"), () => {
           task.controller.abort();
@@ -35272,6 +35384,7 @@ ${request.requirements}` : preset.text,
     const note = await this.plugin.repo.readNote(node.path, (_b = this.map) != null ? _b : void 0);
     this.plugin.running.add(node.path);
     this.render();
+    const progress = this.startTaskProgress(node.path);
     try {
       const childSources = await this.topicReferenceGroup(
         children,
@@ -35309,8 +35422,11 @@ ${request.requirements}` : preset.text,
         note.reasoning,
         options.signal,
         void 0,
-        accepted
+        accepted,
+        void 0,
+        progress.observer
       );
+      progress.end();
       accepted == null ? void 0 : accepted();
       if ((_d = options.signal) == null ? void 0 : _d.aborted) throw new DOMException("Aborted", "AbortError");
       const angles = result.suggestions.slice(0, 2);
@@ -35327,6 +35443,7 @@ ${request.requirements}` : preset.text,
       console.error("Visual Agent Map integration directions", error);
       failed(this.plugin.recordFailure(t("log.integration_directions_failed"), error));
     } finally {
+      progress.end();
       this.plugin.running.delete(node.path);
       await this.hydrate();
       this.render();
@@ -35383,6 +35500,7 @@ ${request.requirements}` : preset.text,
     await this.plugin.repo.updateNote(node.path, { status: "running" });
     await this.hydrate();
     this.render();
+    const progress = this.startTaskProgress(node.path);
     try {
       const synthesisContext = withThinkingOrigin(
         {
@@ -35413,8 +35531,11 @@ ${request.requirements}` : preset.text,
         note.reasoning,
         options == null ? void 0 : options.signal,
         void 0,
-        accepted
+        accepted,
+        void 0,
+        progress.observer
       );
+      progress.end();
       accepted == null ? void 0 : accepted();
       if ((_h = options == null ? void 0 : options.signal) == null ? void 0 : _h.aborted) throw new DOMException("Aborted", "AbortError");
       await this.plugin.repo.updateNote(node.path, { status: note.status });
@@ -35520,6 +35641,7 @@ ${request.requirements}` : preset.text,
         else new import_obsidian29.Notice(message);
       }
     } finally {
+      progress.end();
       this.plugin.running.delete(node.path);
       await this.hydrate();
       this.render();
@@ -35767,6 +35889,7 @@ ${request.requirements}` : preset.text,
     if (modalSignal == null ? void 0 : modalSignal.aborted) controller.abort();
     else modalSignal == null ? void 0 : modalSignal.addEventListener("abort", abortBeforeAcceptance, { once: true });
     let own;
+    let progress;
     const runOptions = {
       ...base,
       requirements: options.requirements || base.requirements,
@@ -35841,6 +35964,8 @@ ${request.requirements}` : preset.text,
       this.integrationTask = task;
       own = task;
       this.render();
+      const taskProgress = this.startTaskProgress(this.taskProgressKey("integration"));
+      progress = taskProgress;
       const language2 = this.plugin.settings.language;
       const result = await this.plugin.askModel(
         {
@@ -35865,8 +35990,11 @@ ${request.requirements}` : preset.text,
         this.plugin.settings.cliReasoning,
         controller.signal,
         void 0,
-        markAccepted
+        markAccepted,
+        void 0,
+        taskProgress.observer
       );
+      taskProgress.end();
       markAccepted();
       if (this.integrationTask !== task) return;
       if (controller.signal.aborted || this.path !== task.mapPath || ((_c = this.map) == null ? void 0 : _c.id) !== task.mapId)
@@ -35898,6 +36026,7 @@ ${request.requirements}` : preset.text,
     } catch (error) {
       fail(error);
     } finally {
+      progress == null ? void 0 : progress.end();
       this.selectionStarting = false;
       modalSignal == null ? void 0 : modalSignal.removeEventListener("abort", abortBeforeAcceptance);
       this.render();
@@ -35980,6 +36109,7 @@ ${note.detail.trim()}` : "",
     };
     this.integrationTask = task;
     this.render();
+    const progress = this.startTaskProgress(this.taskProgressKey("integration"));
     const model = this.plugin.settings.cliModel;
     const language2 = this.plugin.settings.language;
     const detailTemplate = this.mapDetailTemplate((_c = options == null ? void 0 : options.outputLanguage) != null ? _c : language2, options == null ? void 0 : options.detailTemplateId);
@@ -36016,8 +36146,11 @@ ${note.detail.trim()}` : "",
         this.plugin.settings.cliReasoning,
         controller.signal,
         void 0,
-        flow == null ? void 0 : flow.accepted
+        flow == null ? void 0 : flow.accepted,
+        void 0,
+        progress.observer
       );
+      progress.end();
       if (this.integrationTask !== task) return;
       if (controller.signal.aborted || this.path !== mapPath || ((_h = this.map) == null ? void 0 : _h.id) !== mapId)
         throw new Error(t("ui.the_map_or_parent_topic_changed_while_ai_was_running_no_subt"));
@@ -36061,6 +36194,8 @@ ${note.detail.trim()}` : "",
       task.progress = controller.signal.aborted ? t("ui.research_stopped_existing_content_was_preserved") : error instanceof Error ? error.message : String(error);
       this.render();
       if (!controller.signal.aborted) throw error;
+    } finally {
+      progress.end();
     }
   }
   async saveIntegratedNode(title, sources2, goal, rules, model, result, language2, task, context) {
@@ -44147,7 +44282,7 @@ ${t("ui.organize_link_wait_hint")}`;
    * Starts an idle Claude CLI while the research dialog is open, so confirming only has to write the prompt. No model
    * call happens until then; a run with different settings starts cold and leaves it for the dialog.
    */
-  prewarmClaude(model, reasoning, webSearch = true) {
+  prewarmClaude(model, reasoning, webSearch = true, mode) {
     if (this.unloaded) return;
     if (providerForModel(model) !== "claude") {
       this.aiRuntime.releaseWarm();
@@ -44157,7 +44292,7 @@ ${t("ui.organize_link_wait_hint")}`;
       const selected = normalizeReasoningLevel(reasoning != null ? reasoning : this.settings.cliReasoning);
       this.claudeCli(this.pluginDirectory()).prewarm(
         providerModelId(model),
-        selected === "auto" ? "low" : selected,
+        effectiveReasoningLevel({ mode }, selected),
         response_schema_default,
         webSearch
       );

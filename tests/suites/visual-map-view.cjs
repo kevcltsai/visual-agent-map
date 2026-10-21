@@ -1098,14 +1098,22 @@ integrationTest('name dialog ignores Enter while composing, explains an empty na
   const input = find(modal.contentEl, item => item.tag === 'input');
   const save = find(modal.modalEl, item => item.tag === 'button' && item.text === 'Save');
   const status = find(modal.modalEl, item => item.cls.includes('vam-next-status'));
-  input.value = '溫度'; input.keydown({ key: 'Enter', isComposing: true });
+  const press = init => { const event = { ...init, defaultPrevented: false, stopped: false, preventDefault() { this.defaultPrevented = true; }, stopPropagation() { this.stopped = true; } }; input.keydown(event); return event; };
+  input.value = '溫度'; assert.equal(press({ key: 'Enter', isComposing: true }).defaultPrevented, false, 'composing Enter is left alone');
   assert.deepEqual(saved, []); assert.notEqual(modal.closed, true);
   input.value = '   '; input.input();
   assert.equal(save.disabled, true); assert.match(status.text, /Enter a name/);
   input.value = '溫度'; input.input();
   assert.equal(save.disabled, false); assert.equal(status.text, '');
-  input.keydown({ key: 'Enter', isComposing: false });
+  const enter = press({ key: 'Enter', isComposing: false });
+  assert.equal(enter.defaultPrevented, true, 'Enter is default-prevented so its keypress/keyup cannot re-click the opener');
+  assert.equal(enter.stopped, true);
   assert.deepEqual(saved, ['溫度']); assert.equal(modal.closed, true);
+  // Saving by the button is unchanged.
+  const again = new NameModal({}, 'New topic name', 'Heat', value => saved.push(value)); again.onOpen();
+  const button = find(again.modalEl, item => item.tag === 'button' && item.text === 'Save');
+  button.click?.(); 
+  assert.deepEqual(saved, ['溫度', 'Heat'], 'click on Save submits the initial value');
 });
 integrationTest('choice dialog marks destructive choices and starts on Cancel; map conflict explains each choice and keeps merge errors inline', () => {
   const element = (tag, options = {}) => ({

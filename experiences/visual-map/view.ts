@@ -715,6 +715,24 @@ export class VisualAgentMapView extends ItemView {
       this.renameNode(node, note.title);
       return false;
     });
+    // Mod+Enter adds a subtopic and Shift+Enter a sibling of the focused card. Obsidian binds Mod+Enter to "open link in
+    // new tab" and preventDefaults it at window capture before the card ever sees the key, so the view scope claims it
+    // while a card has focus and otherwise lets the default command run.
+    const cardKey =
+      (sibling: boolean) =>
+      (event: KeyboardEvent): boolean => {
+        if (this.closed || event.isComposing || event.defaultPrevented) return true;
+        if (this.builtIn || this.integrationMode || this.map?.aim) return true;
+        const active = this.contentEl.ownerDocument?.activeElement;
+        const entry = active ? [...this.cardEls.entries()].find(([, card]) => card === active) : undefined;
+        const node = entry && this.map?.nodes.find(item => item.id === entry[0]);
+        if (!node) return true;
+        const parent = sibling ? (this.map?.nodes.find(item => item.id === node.parentId) ?? null) : node;
+        this.enqueue(() => this.addNode(parent));
+        return false;
+      };
+    scope.register(["Mod"], "Enter", cardKey(false));
+    scope.register(["Shift"], "Enter", cardKey(true));
     this.scope = scope;
   }
   /** The rename dialog shared by F2, the title double-click and the Rename tool. */
@@ -2528,7 +2546,8 @@ export class VisualAgentMapView extends ItemView {
         const ids = new Set(created.map(node => node.id));
         // The view's normal mutation path: conflict check, Map.md save, undo history and Reference Links.
         try {
-          await this.mapChange(next => {
+          const previousEntry = this.history.undoEntry;
+          const done = await this.mapChangeSnapshots(next => {
             next.nodes.push(...created);
             // The map may have been swapped for the file version by the conflict window: without the parent there,
             // the outline becomes a new tree rather than a node pointing at a missing parent.
@@ -2542,6 +2561,8 @@ export class VisualAgentMapView extends ItemView {
               next.nodes = arrangeNewTree(next.nodes, top.id, ids, this.cardHeightOf);
             }
           });
+          // One Undo takes the whole import's notes out of Notes (parked in Unassigned); Redo puts them back.
+          if (done) this.parkOnUndo([...ids], done.before, done.after, previousEntry);
         } catch (error) {
           // The notes exist but the map does not hold them: list them, like a new map whose Map.md cannot be saved.
           state.saveFailed = true;
@@ -3705,19 +3726,24 @@ export class VisualAgentMapView extends ItemView {
   private async mapChange(change: (map: MapDocument) => void, rebuildDerivedData = true): Promise<void> {
     await this.mapChangeSnapshots(change, rebuildDerivedData);
   }
+  /** Compares Map.md on disk with the map in memory; when they differ the conflict window decides and history is cleared. */
+  private async resolveMapConflict(): Promise<boolean> {
+    if (!this.map) return false;
+    const disk = await this.plugin.repo.readMap(this.path);
+    const structure = (map: MapDocument): string => JSON.stringify({ ...map, viewport: null });
+    if (structure(disk) === structure(this.map)) return false;
+    const local = clone(this.map);
+    this.map = await new Promise<MapDocument>(resolve => new MapConflictModal(this.app, local, disk, resolve).open());
+    this.history.clear();
+    return true;
+  }
   private async mapChangeSnapshots(
     change: (map: MapDocument) => void,
     rebuildDerivedData = true
   ): Promise<{ before: MapDocument; after: MapDocument } | null> {
     if (!this.map) return null;
     const path = this.path;
-    const disk = await this.plugin.repo.readMap(path);
-    const structure = (map: MapDocument): string => JSON.stringify({ ...map, viewport: null });
-    if (structure(disk) !== structure(this.map)) {
-      const local = clone(this.map);
-      this.map = await new Promise<MapDocument>(resolve => new MapConflictModal(this.app, local, disk, resolve).open());
-      this.history.clear();
-    }
+    await this.resolveMapConflict();
     const before = clone(this.map);
     try {
       change(this.map);
@@ -5275,6 +5301,19 @@ export class VisualAgentMapView extends ItemView {
       .catch(error => new Notice(error instanceof Error ? error.message : String(error)));
   }
   private async travel(redo: boolean): Promise<void> {
+    // Undo and redo replace Map.md like any change: an outside edit goes through the same conflict window first.
+    if (
+      this.map &&
+      this.path &&
+      !this.builtIn &&
+      (redo ? this.history.canRedo : this.history.canUndo) &&
+      (await this.resolveMapConflict())
+    ) {
+      await this.persist();
+      await this.hydrate();
+      this.render();
+      return;
+    }
     const action = redo ? this.history.redo() : this.history.undo();
     if (!action) return;
     try {
@@ -6638,11 +6677,13 @@ export class VisualAgentMapView extends ItemView {
         }
         // Tab stays native: it walks into the card's tools, which have no other keyboard route (collapse, links, AI).
         if (event.key === "Enter" && (event.ctrlKey || event.metaKey) && !event.altKey && !event.shiftKey) {
+          if (event.defaultPrevented) return; // the view scope already added the subtopic
           event.preventDefault();
           this.enqueue(() => this.addNode(node));
           return;
         }
         if (event.key === "Enter" && event.shiftKey && plain) {
+          if (event.defaultPrevented) return; // the view scope already added the sibling
           event.preventDefault();
           const parent = this.map?.nodes.find(item => item.id === node.parentId) ?? null;
           this.enqueue(() => this.addNode(parent));
@@ -7505,28 +7546,39 @@ export class VisualAgentMapView extends ItemView {
    * rewrites Map.md, which would leave the new note behind in Notes. Replace it with the remove lifecycle: undo parks
    * the note in Unassigned, redo moves it back to the exact path it had.
    */
-  private parkOnUndo(nodeId: string, before: MapDocument, after: MapDocument, previousEntry: Action | undefined): void {
+  private parkOnUndo(
+    nodeIds: string | string[],
+    before: MapDocument,
+    after: MapDocument,
+    previousEntry: Action | undefined
+  ): void {
     const entry = this.history.undoEntry;
     if (!entry || entry === previousEntry) return;
-    let move: FileMove | null = null;
+    const ids = new Set(typeof nodeIds === "string" ? [nodeIds] : nodeIds);
+    let moves: FileMove[] = [];
     entry.undo = async () => {
-      const current = this.map?.nodes.find(item => item.id === nodeId);
-      if (!current) return;
       const repo = this.plugin.repo,
         folder = repo.topicFolder(this.path, "Unassigned"),
-        base = current.path.slice(current.path.lastIndexOf("/") + 1).replace(/\.md$/, ""),
-        plain = `${folder}/${base}.md`;
-      move = {
-        activePath: current.path,
-        parkedPath: this.app.vault.getAbstractFileByPath(plain) ? repo.unique(folder, base) : plain,
-        topicId: before.id,
-        parkedState: "unassigned"
-      };
-      await this.restoreLifecycle(this.withCurrentViewport(before), [move], true);
+        taken = new Set<string>();
+      moves = [];
+      for (const current of this.map?.nodes.filter(item => ids.has(item.id)) ?? []) {
+        const base = current.path.slice(current.path.lastIndexOf("/") + 1).replace(/\.md$/, "");
+        let parkedPath = `${folder}/${base}.md`;
+        // Several notes of one import can share a file name: the moves have not run yet, so track the names claimed.
+        if (taken.has(parkedPath.toLowerCase()) || this.app.vault.getAbstractFileByPath(parkedPath)) {
+          let counter = 2;
+          parkedPath = repo.unique(folder, base);
+          while (taken.has(parkedPath.toLowerCase())) parkedPath = repo.unique(folder, `${base} ${counter++}`);
+        }
+        taken.add(parkedPath.toLowerCase());
+        moves.push({ activePath: current.path, parkedPath, topicId: before.id, parkedState: "unassigned" });
+      }
+      if (!moves.length) return;
+      await this.restoreLifecycle(this.withCurrentViewport(before), moves, true);
     };
     entry.redo = async () => {
-      if (!move) return;
-      await this.restoreLifecycle(this.withCurrentViewport(after), [move], false);
+      if (!moves.length) return;
+      await this.restoreLifecycle(this.withCurrentViewport(after), moves, false);
     };
   }
   private withCurrentViewport(snapshot: MapDocument): MapDocument {

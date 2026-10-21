@@ -247,3 +247,38 @@ test('A4: the old contentEl Mod+Z branch is gone (no double undo with the scope)
   assert.match(source.slice(source.indexOf('constructor(\n    leaf: WorkspaceLeaf'), source.indexOf('async onOpen()')), /this\.installUndoScope\(\)/, 'the constructor installs the scope once');
   assert.equal((source.match(/this\.travel\(redo\)/g) ?? []).length, 1, 'one undo/redo entry point from the keyboard');
 });
+
+test('0.25 retest: Mod+Enter and Shift+Enter live on the view scope (Obsidian eats Mod+Enter before the card), act only on a focused card, and the card handler does not add twice', async () => {
+  const h = await harness();
+  const scope = h.view.scope;
+  const find = (modifiers, key) => scope.keys.filter(k => k.key === key && k.modifiers.length === modifiers.length && modifiers.every(m => k.modifiers.includes(m)));
+  assert.equal(find(['Mod'], 'Enter').length, 1, 'Mod+Enter is registered on the view scope');
+  assert.equal(find(['Shift'], 'Enter').length, 1, 'Shift+Enter is registered on the view scope');
+  const doc = { activeElement: null }; h.view.contentEl.ownerDocument = doc;
+  const fire = (modifiers, init = {}) => find(modifiers, 'Enter')[0].func({ key: 'Enter', isComposing: false, defaultPrevented: false, ...init }, {});
+  // Pass-through branches: Obsidian's own command still runs.
+  assert.equal(fire(['Mod']), true, 'no focused card'); doc.activeElement = element('div');
+  assert.equal(fire(['Mod']), true, 'focus elsewhere'); await tick();
+  assert.deepEqual(h.added, []);
+  doc.activeElement = h.card('leaf');
+  assert.equal(fire(['Mod'], { isComposing: true }), true, 'IME composition'); assert.equal(fire(['Mod'], { defaultPrevented: true }), true, 'already handled');
+  for (const mode of ['builtIn', 'integrationMode']) { h.view[mode] = true; assert.equal(fire(['Mod']), true, mode); h.view[mode] = false; }
+  h.view.map.aim = {}; assert.equal(fire(['Mod']), true, 'AIM map'); delete h.view.map.aim;
+  h.view.closed = true; assert.equal(fire(['Mod']), true, 'closed view'); h.view.closed = false;
+  await tick(); assert.deepEqual(h.added, [], 'no pass-through branch added anything');
+  // Handled branches.
+  assert.equal(fire(['Mod']), false, 'a focused card: handled'); await tick();
+  assert.deepEqual(h.added, [h.ids.leaf], 'Mod+Enter: child of the focused card');
+  assert.equal(fire(['Shift']), false); await tick();
+  assert.deepEqual(h.added, [h.ids.leaf, h.ids.root], 'Shift+Enter: sibling (the parent as the new parent)');
+  doc.activeElement = h.card('root'); assert.equal(fire(['Shift']), false); await tick();
+  assert.deepEqual(h.added.at(-1), null, 'Shift+Enter on a root: a new root');
+  // The card handler sees the same key after the scope already handled it: no second topic.
+  h.added.length = 0;
+  for (const init of [{ ctrlKey: true }, { metaKey: true }, { shiftKey: true }]) {
+    const target = h.card('leaf');
+    const event = { key: 'Enter', target, isComposing: false, ctrlKey: false, metaKey: false, altKey: false, shiftKey: false, ...init, defaultPrevented: true, preventDefault() {} };
+    target.handlers.get('keydown')(event);
+  }
+  await tick(); assert.deepEqual(h.added, [], 'defaultPrevented key: the card handler adds nothing');
+});

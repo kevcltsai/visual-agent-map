@@ -13635,7 +13635,11 @@ var NameModal = class extends import_obsidian11.Modal {
     };
     input.addEventListener("input", check);
     input.addEventListener("keydown", (event) => {
-      if (event.key === "Enter" && !event.isComposing) save();
+      if (event.key === "Enter" && !event.isComposing) {
+        event.preventDefault();
+        event.stopPropagation();
+        save();
+      }
     });
     saveButton.addEventListener("click", save);
     check();
@@ -28950,6 +28954,20 @@ var VisualAgentMapView = class _VisualAgentMapView extends import_obsidian29.Ite
       this.renameNode(node, note.title);
       return false;
     });
+    const cardKey = (sibling) => (event) => {
+      var _a, _b, _c, _d, _e;
+      if (this.closed || event.isComposing || event.defaultPrevented) return true;
+      if (this.builtIn || this.integrationMode || ((_a = this.map) == null ? void 0 : _a.aim)) return true;
+      const active = (_b = this.contentEl.ownerDocument) == null ? void 0 : _b.activeElement;
+      const entry = active ? [...this.cardEls.entries()].find(([, card]) => card === active) : void 0;
+      const node = entry && ((_c = this.map) == null ? void 0 : _c.nodes.find((item) => item.id === entry[0]));
+      if (!node) return true;
+      const parent = sibling ? (_e = (_d = this.map) == null ? void 0 : _d.nodes.find((item) => item.id === node.parentId)) != null ? _e : null : node;
+      this.enqueue(() => this.addNode(parent));
+      return false;
+    };
+    scope.register(["Mod"], "Enter", cardKey(false));
+    scope.register(["Shift"], "Enter", cardKey(true));
     this.scope = scope;
   }
   /** The rename dialog shared by F2, the title double-click and the Rename tool. */
@@ -30661,7 +30679,8 @@ ${request.requirements}` : preset.text,
         const top2 = created[0];
         const ids2 = new Set(created.map((node) => node.id));
         try {
-          await this.mapChange((next) => {
+          const previousEntry = this.history.undoEntry;
+          const done = await this.mapChangeSnapshots((next) => {
             next.nodes.push(...created);
             const owner2 = parent ? next.nodes.find((node) => node.id === parent.id && !ids2.has(node.id)) : void 0;
             const outlineTop = next.nodes.find((node) => node.id === top2.id);
@@ -30673,6 +30692,7 @@ ${request.requirements}` : preset.text,
               next.nodes = arrangeNewTree(next.nodes, top2.id, ids2, this.cardHeightOf);
             }
           });
+          if (done) this.parkOnUndo([...ids2], done.before, done.after, previousEntry);
         } catch (error) {
           state.saveFailed = true;
           new import_obsidian29.Notice(
@@ -31785,16 +31805,21 @@ ${request.requirements}` : preset.text,
   async mapChange(change, rebuildDerivedData = true) {
     await this.mapChangeSnapshots(change, rebuildDerivedData);
   }
+  /** Compares Map.md on disk with the map in memory; when they differ the conflict window decides and history is cleared. */
+  async resolveMapConflict() {
+    if (!this.map) return false;
+    const disk = await this.plugin.repo.readMap(this.path);
+    const structure = (map) => JSON.stringify({ ...map, viewport: null });
+    if (structure(disk) === structure(this.map)) return false;
+    const local = clone(this.map);
+    this.map = await new Promise((resolve) => new MapConflictModal(this.app, local, disk, resolve).open());
+    this.history.clear();
+    return true;
+  }
   async mapChangeSnapshots(change, rebuildDerivedData = true) {
     if (!this.map) return null;
     const path = this.path;
-    const disk = await this.plugin.repo.readMap(path);
-    const structure = (map) => JSON.stringify({ ...map, viewport: null });
-    if (structure(disk) !== structure(this.map)) {
-      const local = clone(this.map);
-      this.map = await new Promise((resolve) => new MapConflictModal(this.app, local, disk, resolve).open());
-      this.history.clear();
-    }
+    await this.resolveMapConflict();
     const before = clone(this.map);
     try {
       change(this.map);
@@ -33206,6 +33231,12 @@ ${request.requirements}` : preset.text,
     void this.plugin.openDetails(this.plugin.repo.file(node.path)).catch((error) => new import_obsidian29.Notice(error instanceof Error ? error.message : String(error)));
   }
   async travel(redo) {
+    if (this.map && this.path && !this.builtIn && (redo ? this.history.canRedo : this.history.canUndo) && await this.resolveMapConflict()) {
+      await this.persist();
+      await this.hydrate();
+      this.render();
+      return;
+    }
     const action = redo ? this.history.redo() : this.history.undo();
     if (!action) return;
     try {
@@ -34471,11 +34502,13 @@ ${request.requirements}` : preset.text,
           return;
         }
         if (event.key === "Enter" && (event.ctrlKey || event.metaKey) && !event.altKey && !event.shiftKey) {
+          if (event.defaultPrevented) return;
           event.preventDefault();
           this.enqueue(() => this.addNode(node));
           return;
         }
         if (event.key === "Enter" && event.shiftKey && plain) {
+          if (event.defaultPrevented) return;
           event.preventDefault();
           const parent = (_c2 = (_b2 = this.map) == null ? void 0 : _b2.nodes.find((item) => item.id === node.parentId)) != null ? _c2 : null;
           this.enqueue(() => this.addNode(parent));
@@ -35290,26 +35323,32 @@ ${request.requirements}` : preset.text,
    * rewrites Map.md, which would leave the new note behind in Notes. Replace it with the remove lifecycle: undo parks
    * the note in Unassigned, redo moves it back to the exact path it had.
    */
-  parkOnUndo(nodeId, before, after, previousEntry) {
+  parkOnUndo(nodeIds, before, after, previousEntry) {
     const entry = this.history.undoEntry;
     if (!entry || entry === previousEntry) return;
-    let move = null;
+    const ids = new Set(typeof nodeIds === "string" ? [nodeIds] : nodeIds);
+    let moves = [];
     entry.undo = async () => {
-      var _a;
-      const current = (_a = this.map) == null ? void 0 : _a.nodes.find((item) => item.id === nodeId);
-      if (!current) return;
-      const repo = this.plugin.repo, folder = repo.topicFolder(this.path, "Unassigned"), base = current.path.slice(current.path.lastIndexOf("/") + 1).replace(/\.md$/, ""), plain = `${folder}/${base}.md`;
-      move = {
-        activePath: current.path,
-        parkedPath: this.app.vault.getAbstractFileByPath(plain) ? repo.unique(folder, base) : plain,
-        topicId: before.id,
-        parkedState: "unassigned"
-      };
-      await this.restoreLifecycle(this.withCurrentViewport(before), [move], true);
+      var _a, _b;
+      const repo = this.plugin.repo, folder = repo.topicFolder(this.path, "Unassigned"), taken = /* @__PURE__ */ new Set();
+      moves = [];
+      for (const current of (_b = (_a = this.map) == null ? void 0 : _a.nodes.filter((item) => ids.has(item.id))) != null ? _b : []) {
+        const base = current.path.slice(current.path.lastIndexOf("/") + 1).replace(/\.md$/, "");
+        let parkedPath = `${folder}/${base}.md`;
+        if (taken.has(parkedPath.toLowerCase()) || this.app.vault.getAbstractFileByPath(parkedPath)) {
+          let counter = 2;
+          parkedPath = repo.unique(folder, base);
+          while (taken.has(parkedPath.toLowerCase())) parkedPath = repo.unique(folder, `${base} ${counter++}`);
+        }
+        taken.add(parkedPath.toLowerCase());
+        moves.push({ activePath: current.path, parkedPath, topicId: before.id, parkedState: "unassigned" });
+      }
+      if (!moves.length) return;
+      await this.restoreLifecycle(this.withCurrentViewport(before), moves, true);
     };
     entry.redo = async () => {
-      if (!move) return;
-      await this.restoreLifecycle(this.withCurrentViewport(after), [move], false);
+      if (!moves.length) return;
+      await this.restoreLifecycle(this.withCurrentViewport(after), moves, false);
     };
   }
   withCurrentViewport(snapshot) {

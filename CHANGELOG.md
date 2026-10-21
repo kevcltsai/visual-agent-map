@@ -4,6 +4,10 @@
 
 ### Fixed
 
+- Mod+Enter (Cmd+Enter on macOS) now adds a subtopic to the focused card: Obsidian's own "open link in new tab" hotkey swallowed it before the card saw the key. Shift+Enter (sibling) is handled the same way. Both pass through to Obsidian when no card has focus, in a text field, or in the sample, selection mode and AIM maps.
+- Undoing an outline import now takes every imported note out of the Notes folder in one step (parked in Unassigned, like a removed topic), and Redo puts them back at the same paths. No stray notes are left behind.
+- Undo and Redo now check Map.md for outside edits first, like any other change: if the file changed outside the view, the existing conflict window opens and the history is cleared, instead of silently overwriting the outside change.
+- Pressing Enter in the topic-name dialog no longer re-opens an empty dialog from the button that opened it.
 - Integrate subtopics no longer loses the source links of the parent topic's earlier research. Any link (web address, note link or local file) the new summary and detail leave out is kept in a "Sources from earlier research" block at the end of the sources section. This adds no AI request, and Undo still restores the topic exactly as it was.
 - The goal-grading button is now named "Prioritize by goal", and its panel no longer closes by itself when the map repaints or focus returns from a dialog; if it cannot open, a notice says why.
 - Map cards now work from the keyboard: Delete or Backspace removes the focused card (with an Undo notice, or the usual confirmation when it has subtopics), Mod+Enter adds a subtopic, Shift+Enter adds a sibling, double-clicking a title renames it, and Mod+Z / Mod+Shift+Z undo and redo while the map is the active pane.

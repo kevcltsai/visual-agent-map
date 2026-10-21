@@ -34,7 +34,12 @@ export class NameModal extends Modal {
     input.addEventListener("input", check);
     input.addEventListener("keydown", event => {
       // Enter while an input method is composing (e.g. picking Chinese characters) only confirms the characters.
-      if (event.key === "Enter" && !event.isComposing) save();
+      if (event.key === "Enter" && !event.isComposing) {
+        // Without this the Enter that confirmed the name goes on to click the button that opened the dialog.
+        event.preventDefault();
+        event.stopPropagation();
+        save();
+      }
     });
     saveButton.addEventListener("click", save);
     check();

@@ -96,3 +96,61 @@ test('D11a: after a map conflict resolved to the file, undo keeps the node added
   await h.view.travel(true);
   assert.equal(h.view.map.nodes.length, 3);
 });
+
+const outline = (...titles) => titles.map((title, index) => ({ index, title, level: 1, parent: null, line: index }));
+const importRequest = nodes => ({ nodes, source: null, shallowResearch: false });
+
+test('0.25 retest: undo of an outline import parks every created note in Unassigned as one step; redo restores the exact paths', async () => {
+  const h = await harness();
+  h.view.plugin.mutate = async work => { await work(); };
+  h.view.outlineImportTarget = () => ({ map: 'editable' });
+  const paths = () => h.view.map.nodes.map(n => n.path).sort();
+  const beforeEntries = h.view.history.past.length;
+  await h.view.importOutlineIntoMap(importRequest(outline('Topic', 'Topic', 'Three', 'Four', 'Five')), { kind: 'tree' });
+  assert.equal(h.view.map.nodes.length, 6, 'five topics added');
+  assert.equal(h.view.history.past.length, beforeEntries + 1, 'one history step for the whole import');
+  const afterPaths = paths();
+  const notes = new Map(h.view.map.nodes.filter(n => n.id !== h.root.id).map(n => [n.path, h.contents.get(n.path)]));
+  await h.view.travel(false);
+  assert.equal(h.view.map.nodes.length, 1);
+  assert.deepEqual(h.orphans(), [], 'no node note is left in Notes');
+  assert.equal(h.notesIn('Unassigned').length, 5, 'all five are parked, including the two with the same title');
+  assert.equal(h.calls.file.length, 0, 'no Update links dialog');
+  await h.view.travel(true);
+  assert.equal(JSON.stringify(paths()), JSON.stringify(afterPaths), 'redo restores the exact paths');
+  assert.equal(h.notesIn('Unassigned').length, 0);
+  for (const [path, text] of notes) assert.equal(stable(h.contents.get(path)), stable(text), `${path} is unchanged by the round trip`);
+  await h.view.travel(false);
+  assert.deepEqual(h.orphans(), []); assert.equal(h.notesIn('Unassigned').length, 5, 'a second undo parks them again');
+});
+
+test('0.25 retest: undo and redo run the Map.md conflict check; an outside edit is not overwritten and history is cleared', async () => {
+  const h = await harness();
+  await h.view.addNode(h.root, 'Mine');
+  assert.equal(h.view.history.canUndo, true);
+  // Someone edits Map.md outside the view.
+  const disk = await h.repo.readMap(MAP);
+  const outside = await h.repo.createNote('Outside', 'gpt-6-luna', disk, MAP, 'workspace');
+  Object.assign(outside, { parentId: h.root.id, x: 400, y: 300 });
+  disk.nodes.push(outside);
+  await h.repo.saveMap(MAP, disk);
+  await h.view.travel(false);
+  assert.equal(h.view.map.nodes.some(n => n.id === outside.id), true, 'the outside node survives the undo');
+  assert.equal((await h.repo.readMap(MAP)).nodes.some(n => n.id === outside.id), true, 'and so does it on disk');
+  assert.deepEqual(h.orphans(), [], 'its note is not orphaned');
+  assert.equal(h.view.history.canUndo, false, 'history is cleared like after a forward-change conflict');
+  assert.equal(h.view.history.canRedo, false);
+  // Redo side: undo cleanly, edit outside, redo.
+  await h.view.addNode(h.root, 'Second');
+  await h.view.travel(false);
+  assert.equal(h.view.history.canRedo, true);
+  const disk2 = await h.repo.readMap(MAP);
+  const outside2 = await h.repo.createNote('Outside two', 'gpt-6-luna', disk2, MAP, 'workspace');
+  Object.assign(outside2, { parentId: h.root.id, x: 400, y: 600 });
+  disk2.nodes.push(outside2);
+  await h.repo.saveMap(MAP, disk2);
+  await h.view.travel(true);
+  assert.equal(h.view.map.nodes.some(n => n.id === outside2.id), true, 'redo keeps the outside node');
+  assert.equal(h.view.history.canRedo, false);
+  assert.deepEqual(h.orphans(), []);
+});

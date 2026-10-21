@@ -334,6 +334,8 @@ integrationTest('relevance: a card deleted, renamed or moved while the AI worked
   assert.deepEqual(await h.relevanceOf('a'), ['core', 'Body for Goal.']);
   assert.equal(await h.relevanceOf('b'), undefined, 'renamed: skipped'); assert.deepEqual(await h.relevanceOf('c'), ['core', 'Old grade for REM.'], 'moved: the old grade stays');
   assert.equal((await h.repo.readNote(extra.path)).relevance, undefined, 'added later: ungraded');
+  // The in-memory edits above stand for changes that were saved; Undo now checks Map.md like every other change.
+  await h.repo.saveMap(MAP, h.view.map);
   button(h.bar(), 'Undo').click(); await afterTravel(h);
   assert.equal(await h.relevanceOf('a'), undefined);
 });

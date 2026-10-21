@@ -35302,6 +35302,16 @@ ${request.requirements}` : preset.text,
       if (owner) {
         owner.collapsed = false;
         map.nodes = arrangeNewBranch(map.nodes, owner.id, /* @__PURE__ */ new Set([node.id]), this.cardHeightOf);
+        const siblings = map.nodes.filter((n) => n.parentId === owner.id && n.id !== node.id);
+        const placed = map.nodes.find((n) => n.id === node.id);
+        if (siblings.length)
+          placed.y = Math.max(
+            placed.y,
+            Math.max(...siblings.map((n) => {
+              var _a2;
+              return n.y + ((_a2 = this.cardHeightOf(n.id)) != null ? _a2 : DEFAULT_CARD_HEIGHT);
+            })) + LAYOUT_GAP
+          );
       } else if (!parent) {
         const roots = map.nodes.filter((n) => n.id !== node.id && !n.parentId);
         if (roots.length)

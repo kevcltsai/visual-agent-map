@@ -7579,6 +7579,14 @@ export class VisualAgentMapView extends ItemView {
       if (owner) {
         owner.collapsed = false;
         map.nodes = arrangeNewBranch(map.nodes, owner.id, new Set([node.id]), this.cardHeightOf);
+        // A new sibling goes after the existing ones (not into a gap above them), clear of the lowest one's height.
+        const siblings = map.nodes.filter(n => n.parentId === owner.id && n.id !== node.id);
+        const placed = map.nodes.find(n => n.id === node.id)!;
+        if (siblings.length)
+          placed.y = Math.max(
+            placed.y,
+            Math.max(...siblings.map(n => n.y + (this.cardHeightOf(n.id) ?? DEFAULT_CARD_HEIGHT))) + LAYOUT_GAP
+          );
       } else if (!parent) {
         const roots = map.nodes.filter(n => n.id !== node.id && !n.parentId);
         if (roots.length)

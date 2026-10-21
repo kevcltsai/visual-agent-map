@@ -695,7 +695,26 @@ export class VisualAgentMapView extends ItemView {
     scope.register(["Mod"], "z", run(false));
     scope.register(["Mod", "Shift"], "z", run(true));
     scope.register(["Mod", "Shift"], "Z", run(true));
+    // F2 renames the focused map card. Obsidian binds F2 to "Rename file" at the app scope, so the view scope (which is
+    // matched first) claims it only while a card has focus and otherwise lets the default command run.
+    scope.register([], "F2", (event: KeyboardEvent): boolean => {
+      if (this.closed || event.isComposing || event.defaultPrevented) return true;
+      if (this.builtIn || this.integrationMode || this.map?.aim) return true;
+      const active = this.contentEl.ownerDocument?.activeElement;
+      const entry = active ? [...this.cardEls.entries()].find(([, card]) => card === active) : undefined;
+      const node = entry && this.map?.nodes.find(item => item.id === entry[0]);
+      const note = node && this.notes.get(node.id);
+      if (!node || !note) return true;
+      this.renameNode(node, note.title);
+      return false;
+    });
     this.scope = scope;
+  }
+  /** The rename dialog shared by F2, the title double-click and the Rename tool. */
+  private renameNode(node: MapNode, current: string): void {
+    new NameModal(this.app, t("ui.new_topic_name"), current, name =>
+      this.enqueue(() => this.noteChange(node, { title: name }))
+    ).open();
   }
   async onClose(): Promise<void> {
     this.closed = true;
@@ -6411,13 +6430,21 @@ export class VisualAgentMapView extends ItemView {
     }
     const title = card.createEl("h3", { text: note?.title ?? node.path, cls: "vam-card-title" });
     title.setAttr("title", note?.title ?? node.path);
-    // Double-click renames, the same dialog as F2 and the Rename tool.
+    // Double-click renames, the same dialog as F2 and the Rename tool. It is handled on the card: enableDrag captures the
+    // pointer on the card, so a real mouse reports the card (not the title) as the dblclick target.
     if (note && !this.builtIn && !this.integrationMode && !this.map?.aim)
-      title.addEventListener("dblclick", event => {
+      card.addEventListener("dblclick", event => {
+        const target = event.target as Element | null;
+        if (target?.closest?.("button")) return;
+        const box = title.getBoundingClientRect();
+        const inside =
+          event.clientX >= box.left &&
+          event.clientX <= box.right &&
+          event.clientY >= box.top &&
+          event.clientY <= box.bottom;
+        if (target !== title && !inside) return;
         event.preventDefault();
-        new NameModal(this.app, t("ui.new_topic_name"), note.title, name =>
-          this.enqueue(() => this.noteChange(node, { title: name }))
-        ).open();
+        this.renameNode(node, note.title);
       });
     // An unresearched topic's placeholder summary repeats its status, so the frontier card stays quiet.
     // While a run streams its answer, the unsaved summary preview takes the place of the stored summary.
@@ -6608,10 +6635,9 @@ export class VisualAgentMapView extends ItemView {
         }
       }
       if (event.key === "F2" && note && !this.builtIn && !this.integrationMode && !this.map?.aim) {
+        if (event.defaultPrevented) return; // the view scope already handled this F2
         event.preventDefault();
-        new NameModal(this.app, t("ui.new_topic_name"), note.title, title =>
-          this.enqueue(() => this.noteChange(node, { title }))
-        ).open();
+        this.renameNode(node, note.title);
         return;
       }
       if (event.key === "Enter") {

@@ -35663,7 +35663,7 @@ ${request.requirements}` : preset.text,
         const references2 = visualReferencesMarkdown(result.visualReferences, language2);
         const canonical = carryForwardSources(
           canonicalOnly,
-          [latest.summary, latest.detail, latest.newFindings],
+          [latest.summary, latest.detail, latest.newFindings, latest.visualReferences],
           [summary, canonicalOnly, references2],
           (_e2 = options == null ? void 0 : options.outputLanguage) != null ? _e2 : this.plugin.settings.language,
           detailTemplate

@@ -2331,3 +2331,30 @@ integrationTest('synthesis carry-forward on the drafted-callback path: an edited
   await f.view.history.undo().undo();
   assert.deepEqual(plain(await f.repo.readNote(f.parent.path)), plain(before));
 });
+
+const withoutCarried = detail => detail.replace(/\n*#### Sources from earlier research\n\n(?:- .*\n?)+/, '\n');
+integrationTest('synthesis carry-forward: the saved detail minus the carried block equals what main saves for the same result', async () => {
+  const f = await keepSourcesFixture();
+  await synthesize(f);
+  const carried = (await f.repo.readNote(f.parent.path)).detail;
+  assert.match(carried, /#### Sources from earlier research/);
+  const g = await backgroundSynthesisFixture(async call => call === 1 ? g.directionsResult : g.draftResult);
+  g.draftResult = f.draftResult;
+  await synthesize(g);
+  const baseline = (await g.repo.readNote(g.parent.path)).detail;
+  assert.doesNotMatch(baseline, /Sources from earlier research/);
+  assert.equal(withoutCarried(carried).trim(), baseline.trim());
+});
+integrationTest('synthesis carry-forward: URLs in a legacy separate Visual References section are carried', async () => {
+  const f = await keepSourcesFixture();
+  await f.repo.app.vault.process(f.repo.file(f.parent.path), text => `${text.trimEnd()}\n\n## Visual References\n\n**Pic**\n\n![Pic](https://legacy-img.example/p.png)\n\nSource: https://legacy-src.example/page\n`);
+  assert.match((await f.repo.readNote(f.parent.path)).visualReferences, /legacy-src\.example/);
+  // The first status write of a synthesis folds a legacy section into Detail (so the stale fence compares like with like); the carry also reads latest.visualReferences as a guard.
+  await f.repo.updateNote(f.parent.path, { status: 'completed' });
+  assert.match((await f.repo.readNote(f.parent.path)).detail, /legacy-src\.example/);
+  await synthesize(f);
+  const file = await f.repo.app.vault.adapter.read(f.parent.path);
+  assert.ok(file.includes('https://legacy-img.example/p.png'));
+  assert.ok(file.includes('https://legacy-src.example/page'));
+  assert.match((await f.repo.readNote(f.parent.path)).detail, /Sources from earlier research[\s\S]*legacy-src\.example/);
+});

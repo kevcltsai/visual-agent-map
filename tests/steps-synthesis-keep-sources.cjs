@@ -102,3 +102,19 @@ test('no sources section: the block is appended as ### at the end; zh heading fo
 test('merge-check linksOf is shared and keeps its normalisation', () => {
   assert.deepEqual([...linksOf(['https://A.example/x/ [[N#h|a]] [f](docs/f.md) [m](mailto:a@b.c)']).keys()], ['https://a.example/x', 'wiki:n', 'link:docs/f']);
 });
+
+test('removing the inserted span from the output gives back the input exactly', () => {
+  const inputs = [
+    canonicalDetail('Body.\n\n### ' + sourcesName(en) + '\n\n- [Kept](https://keep.example)\n\n### Next\n\ntail', 'en', en),
+    canonicalDetail('Body only.', 'en', en)
+  ];
+  for (const input of inputs) {
+    const out = carry(input, ['', '- [A](https://a.example)\n- [B](https://b.example)', '']);
+    assert.notEqual(out, input);
+    const stripped = out.replace(/\n*#### Sources from earlier research\n\n(?:- .*\n?)+/, '\n');
+    assert.equal(stripped.trim(), input.trim());
+  }
+  const adaptive = { ...en, sections: en.sections.filter(section => section.role !== 'sources') };
+  const out = carry('Plain.', ['', '[A](https://a.example)', ''], ['x'], 'en', adaptive);
+  assert.equal(out.replace(/\n*### Sources from earlier research\n\n(?:- .*\n?)+/, ''), 'Plain.');
+});

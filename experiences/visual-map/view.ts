@@ -8275,7 +8275,7 @@ export class VisualAgentMapView extends ItemView {
           const references = visualReferencesMarkdown(result.visualReferences, language);
           const canonical = carryForwardSources(
             canonicalOnly,
-            [latest.summary, latest.detail, latest.newFindings],
+            [latest.summary, latest.detail, latest.newFindings, latest.visualReferences],
             [summary, canonicalOnly, references],
             options?.outputLanguage ?? this.plugin.settings.language,
             detailTemplate

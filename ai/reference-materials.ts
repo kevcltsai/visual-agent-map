@@ -149,6 +149,13 @@ function sourceDefinitions(detail: string): Map<string, string> {
   return definitions;
 }
 
+function definesFootnote(content: string, label: string): boolean {
+  const lines = content.split("\n");
+  const code = fencedLines(lines);
+  const prefix = `[^${label}]:`;
+  return lines.some((line, index) => !code[index] && line.startsWith(prefix));
+}
+
 /**
  * Detail: `[S#]` becomes a source footnote. Source footnotes are then numbered [^1], [^2]… by first appearance, one
  * number per note, with their definitions at the end of the evidence section (or the detail). A source footnote the
@@ -179,6 +186,7 @@ export function resolveDetailReferences(
   const bodyCode: boolean[] = [];
   const defined = new Map<string, string>();
   const reserved = new Set<string>();
+  const ambiguous = new Set<string>();
   lines.forEach((line, index) => {
     if (!code[index]) {
       const definition = sourceFootnoteDefinition(line);
@@ -198,14 +206,18 @@ export function resolveDetailReferences(
     const target = cited.get(label) ?? defined.get(label) ?? previous.get(label);
     if (target) return target;
     const document = byLabel.get(label);
-    return document ? footnoteTarget(document) : undefined;
+    if (document) return footnoteTarget(document);
+    // A label copied from a reference note: when exactly one reference document defines it, it is that source.
+    const owners = documents.filter(candidate => definesFootnote(candidate.content, label));
+    if (owners.length > 1) ambiguous.add(label);
+    return owners.length === 1 ? footnoteTarget(owners[0]) : undefined;
   };
   // A footnote kept as written (not a source and not resolvable) keeps its number; sources never reuse it.
   body.forEach((line, index) => {
     if (bodyCode[index]) return;
     outsideInlineCode(line, text => {
       for (const [, label] of text.matchAll(FOOTNOTE_REFERENCE))
-        if (!label.startsWith("src-") && !targetOf(label)) reserved.add(label);
+        if (!label.startsWith("src-") && !targetOf(label) && !ambiguous.has(label)) reserved.add(label);
       return text;
     });
   });
@@ -230,7 +242,9 @@ export function resolveDetailReferences(
             if (reserved.has(label)) return original;
             const target = targetOf(label);
             if (target) return `[^${number(target)}]`;
-            return label.startsWith("src-") ? ` ${t("note.source_unconfirmed_0", label)}` : original;
+            if (label.startsWith("src-")) return ` ${t("note.source_unconfirmed_0", label)}`;
+            // Copied from several reference notes that each define it: no single source, so drop the marker.
+            return ambiguous.has(label) ? "" : original;
           })
         )
   );

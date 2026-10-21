@@ -2,6 +2,13 @@
 
 ## [Unreleased]
 
+### Fixed
+
+- A research note no longer keeps a copied footnote marker with no definition: it becomes the source note that defines it, or is removed when several notes define it.
+- Textbook-style notes with only the "no new information" placeholder under Evidence and sources now show just the source list, without the placeholder sentence.
+- The gantt critical-task bar text now meets 4.5:1 contrast in AnuPpuccin light.
+- A wide diagram in a VAM note without the `visual-agent-map-node` CSS class scrolls inside the diagram instead of making the whole preview scroll sideways.
+
 ## [0.24.0] - 2026-10-22
 
 ### Added

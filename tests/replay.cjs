@@ -488,15 +488,15 @@ test('synthesis request (direct): [S#] in a one-batch reply resolve to child not
   const definitions = new Set([...result.detail.matchAll(/^\[\^([^\]\s]+)\]:/gm)].map(match => match[1]));
   for (const label of references) assert.ok(definitions.has(label), `footnote [^${label}] is defined`);
 });
-test('synthesis request (direct): a reply that copies a child footnote reference without its definition is left as written (finding: resolveDetailReferences does not repair non-source footnotes)', async () => {
+test('synthesis request (direct): a reply that copies a child footnote reference without its definition never leaves an undefined footnote (one defining child: that source; ambiguous: removed)', async () => {
   const detail = '### Core conclusions\n\nClaim [S1]. Copied from the child [^1].\n';
   const runtime = replayRuntime([{ response: JSON.stringify({ summary: 'Sum', detail, suggestions: [], visualReferences: [] }) }]);
   const result = await makeService(runtime, { language: 'en' }).askModel(synthContext('child with [^1]\n\n[^1]: https://example.org/child-one'), 'claude:sonnet', 'low');
   const labels = [...result.detail.matchAll(/\[\^([^\]\s]+)\](?!:)/g)].map(match => match[1]);
   const defined = new Set([...result.detail.matchAll(/^\[\^([^\]\s]+)\]:/gm)].map(match => match[1]));
   const undefinedLabels = labels.filter(label => !defined.has(label));
-  // Recorded behaviour: the child's own "[^1]" is kept and stays undefined; [S1] became the numbered source footnote [^2].
-  assert.deepEqual(undefinedLabels, ['1']);
+  // Fixed 0.25 B6: the copied "[^1]" is defined by exactly one reference note, so it becomes that note's numbered source footnote.
+  assert.deepEqual(undefinedLabels, []);
 });
 test('merge prompt never asks for synthesis (agreements, tradeoffs, open questions) or for added callouts; synthesize still does', async () => {
   for (const [language, ask, forbid] of [['en', /agreements, disagreements, tradeoffs/, /Practical tips or examples/], ['zh-TW', /共識、分歧、取捨/, /實用提醒|實用技巧/]]) {

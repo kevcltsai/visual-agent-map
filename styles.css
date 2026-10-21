@@ -426,8 +426,8 @@ button.vam-relevance-tag-button:disabled { cursor: default; opacity: .7; }
 body .workspace-leaf-content.vam-topic-markdown .markdown-source-view.mod-cm6 .metadata-container { display: none; }
 .workspace-leaf-content.vam-topic-markdown .inline-title { display: none; }
 /* A wide AI-written diagram keeps its natural, readable size and scrolls sideways instead of shrinking its text. */
-.visual-agent-map-node .mermaid { overflow-x: auto; }
-.visual-agent-map-node .mermaid svg { max-width: none; height: auto; }
+.visual-agent-map-node .mermaid, .mermaid.vam-mermaid-zoomable { overflow-x: auto; }
+.visual-agent-map-node .mermaid svg, .mermaid.vam-mermaid-zoomable svg { max-width: none; height: auto; }
 @media (max-width: 900px) { .vam-inspector { width: 260px; } .vam-workspace.has-inspector > .vam-canvas-overlay { right: 260px; } }
 @media (max-width: 600px) { .vam-inspector { position: absolute; right: 0; top: 0; bottom: 0; width: min(300px, 85%); z-index: 5; box-shadow: var(--shadow-l); } }
 
@@ -1101,6 +1101,8 @@ button.vam-template-section-header:hover { background: var(--background-modifier
 .theme-dark .mermaid.vam-mermaid-scope > :is(#vam-mermaid-gantt, svg)[aria-roledescription="gantt"] .task[class*="done"] { fill: color-mix(in srgb, var(--text-faint) 30%, var(--text-normal)); }
 .mermaid.vam-mermaid-scope > :is(#vam-mermaid-gantt, svg)[aria-roledescription="gantt"] .task[class*="crit"] { stroke: var(--color-red); }
 .mermaid.vam-mermaid-scope > :is(#vam-mermaid-gantt, svg)[aria-roledescription="gantt"] .task[class*="crit"]:not([class*="active"], [class*="done"]) { fill: color-mix(in srgb, var(--color-red) 28%, var(--background-primary)); }
+/* light themes: a 28% red chip under --text-normal measured 4.38 in AnuPpuccin light (under 4.5); 18% keeps the crit tint and passes */
+.theme-light .mermaid.vam-mermaid-scope > :is(#vam-mermaid-gantt, svg)[aria-roledescription="gantt"] .task[class*="crit"]:not([class*="active"], [class*="done"]) { fill: color-mix(in srgb, var(--color-red) 18%, var(--background-primary)); }
 .mermaid.vam-mermaid-scope > :is(#vam-mermaid-c4, svg)[aria-roledescription="c4"] { filter: none; }
 .mermaid.vam-mermaid-scope > :is(#vam-mermaid-c4, svg)[aria-roledescription="c4"] rect { fill: color-mix(in srgb, var(--text-muted) 16%, var(--background-primary)); stroke: var(--text-muted); }
 .mermaid.vam-mermaid-scope > :is(#vam-mermaid-c4, svg)[aria-roledescription="c4"] rect[fill="none"] { fill: none; }

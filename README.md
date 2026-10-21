@@ -6,7 +6,7 @@
 
 **Start with a question. See the pieces. Follow the ideas worth exploring.** Build a visual research map, let AIM investigate a question, or talk through a new idea in Coffee Tables. Everything you keep is editable Markdown in your vault.
 
-[**Get started**](#get-started) · [See the 0.24.0 release](https://github.com/kevcltsai/visual-agent-map/releases/tag/0.24.0) · [Installation guide](INSTALL.md)
+[**Get started**](#get-started) · [See the 0.25.0 release](https://github.com/kevcltsai/visual-agent-map/releases/tag/0.25.0) · [Installation guide](INSTALL.md)
 
 ![Example Visual Agent Map research map with connected topic cards in Obsidian](assets/screenshots/map-overview.png)
 

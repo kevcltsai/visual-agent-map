@@ -6,7 +6,7 @@
 
 **從一個問題出發，看見各個部分，再追你想探索的線索。** 建立視覺化研究地圖、讓 AIM 深入查證問題，或到 Coffee Tables 聊出新角度。想留下的內容都是 Vault 裡可編輯的 Markdown。
 
-[**開始使用**](#開始使用) · [查看 0.24.0 正式版](https://github.com/kevcltsai/visual-agent-map/releases/tag/0.24.0) · [安裝指南](INSTALL.md)
+[**開始使用**](#開始使用) · [查看 0.25.0 正式版](https://github.com/kevcltsai/visual-agent-map/releases/tag/0.25.0) · [安裝指南](INSTALL.md)
 
 ![Obsidian 中的 Visual Agent Map 研究地圖範例，顯示相連的議題卡片](assets/screenshots/map-overview.png)
 

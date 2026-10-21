@@ -2,37 +2,63 @@
 
 ## [Unreleased]
 
+## [0.25.0] - 2026-10-22
+
+### Added
+
+- Map cards now work from the keyboard: Delete or Backspace removes the focused card (with an Undo notice, or the usual confirmation when it has subtopics), Mod+Enter adds a subtopic, Shift+Enter adds a sibling, double-clicking a title renames it, and Mod+Z / Mod+Shift+Z undo and redo while the map is the active pane.
+- Integrate subtopics keeps the source links of the parent topic's earlier research. Any link (web address, note link or local file) the new summary and detail leave out is kept in a "Sources from earlier research" block at the end of the sources section. This adds no AI request, and Undo still restores the topic exactly as it was.
+
+### Changed
+
+- VAM no longer uses the Node.js `fs` module: its two plugin-folder files (AI exchange log and pending suggestions) are read and written through Obsidian's file adapter, and Codex saved images are read through Obsidian too. File formats and names are unchanged. These files are no longer restricted to owner-only permissions, because Obsidian's adapter has no permission option.
+- The Claude Code CLI check now looks for the program through a short shell probe. If that probe cannot run (for example on Windows), the configured command is treated as installed and any real problem is reported when it is used, instead of always showing "missing".
+- The goal-grading button is now named "Prioritize by goal".
+
 ### Fixed
 
+Keyboard
 - Mod+Enter (Cmd+Enter on macOS) now adds a subtopic to the focused card: Obsidian's own "open link in new tab" hotkey swallowed it before the card saw the key. Shift+Enter (sibling) is handled the same way. Both pass through to Obsidian when no card has focus, in a text field, or in the sample, selection mode and AIM maps.
-- Undoing an outline import now takes every imported note out of the Notes folder in one step (parked in Unassigned, like a removed topic), and Redo puts them back at the same paths. No stray notes are left behind.
-- Undo and Redo now check Map.md for outside edits first, like any other change: if the file changed outside the view, the existing conflict window opens and the history is cleared, instead of silently overwriting the outside change.
 - Pressing Enter in the topic-name dialog no longer re-opens an empty dialog from the button that opened it.
-- Integrate subtopics no longer loses the source links of the parent topic's earlier research. Any link (web address, note link or local file) the new summary and detail leave out is kept in a "Sources from earlier research" block at the end of the sources section. This adds no AI request, and Undo still restores the topic exactly as it was.
-- The goal-grading button is now named "Prioritize by goal", and its panel no longer closes by itself when the map repaints or focus returns from a dialog; if it cannot open, a notice says why.
-- Map cards now work from the keyboard: Delete or Backspace removes the focused card (with an Undo notice, or the usual confirmation when it has subtopics), Mod+Enter adds a subtopic, Shift+Enter adds a sibling, double-clicking a title renames it, and Mod+Z / Mod+Shift+Z undo and redo while the map is the active pane.
+
+Links and moves
 - Merging, removing, archiving, renaming and undoing topics no longer pops up Obsidian's "Update links" dialog when only VAM notes link to the moved cards: VAM updates its own links itself. If one of your own notes links to a moved card, VAM shows a short notice first and Obsidian asks as before, so your links are never silently broken.
+
+Synthesis and notes
 - Integrate subtopics now sends the parent topic's Working Findings to the model and clears them only when the model actually received them. Before, they were left out of the request and then deleted when the result was saved; a change to the findings while the synthesis runs now stops the save instead of overwriting them.
 - A research note no longer keeps a copied footnote marker with no definition: it becomes the source note when exactly one reference note defines it, and is removed when several define it or when a reference note uses it without defining it. Your own earlier footnotes are never re-pointed.
 - Textbook-style notes with only the "no new information" placeholder under Evidence and sources now show just the source list, without the placeholder sentence.
-- The gantt critical-task bar text now meets 4.5:1 contrast in AnuPpuccin light.
-- A wide diagram in a VAM note without the `visual-agent-map-node` CSS class scrolls inside the diagram instead of making the whole preview scroll sideways.
-- With a Claude model selected and no models found, the sample start button now reads "Check Claude Code" and checks the Claude connection instead of Codex.
-- The topic-selection bar no longer shifts its buttons as the selection changes: it sits at the bottom left, clear of the zoom controls, the selected names and the gesture hint each have their own line, and the Synthesize, Merge and Research labels no longer carry a count (screen readers still hear it).
-- After creating subtopics from an expansion, the view now shows the parent and all new subtopics instead of empty canvas.
-- After quick subtopic research finishes, the new subtopic cards you have not moved are re-spaced so grown cards no longer overlap their neighbours.
-- Undoing a topic you just created (the + button, a strengthened topic, or the subtopics of a batch) now also takes its note out of the Notes folder: it is parked in Unassigned like a removed topic, and Redo puts it back at the same place. No stray note is left behind.
-- A topic title can no longer be lost because of its file name: a title cut in the middle of an emoji or a rare character, a title that starts with dots (such as `...second`), and a title that differs from an existing one only by case or Greek final sigma now all create their card. New file names are cut at a whole character with no trailing space or dot, a leading dot is dropped, and a name clash on a case-insensitive disk gets a numeric suffix (retried if the disk still reports a clash). Existing notes and maps are never renamed.
-- Renaming a map to a name that differs from another map only by case now shows "A topic folder with this name already exists." and changes nothing, instead of Obsidian's raw "Destination file already exists!".
 - The "Topic" link a note shows back to its map no longer breaks when the map title contains brackets, a pipe, backticks or line breaks: the link text is cleaned (the map title itself is unchanged).
+
+Layout and undo
+- Undoing an outline import now takes every imported note out of the Notes folder in one step (parked in Unassigned, like a removed topic), and Redo puts them back at the same paths. No stray notes are left behind.
+- Undoing a topic you just created (the + button, a strengthened topic, or the subtopics of a batch) now also takes its note out of the Notes folder: it is parked in Unassigned like a removed topic, and Redo puts it back at the same place. No stray note is left behind.
+- Undo and Redo now check Map.md for outside edits first, like any other change: if the file changed outside the view, the existing conflict window opens and the history is cleared, instead of silently overwriting the outside change.
+- Creating subtopics with AI is now one Undo step instead of one per subtopic: a single Undo removes the whole batch and a single Redo brings it back, also when the batch stopped part-way.
 - Move to..., Copy to... and "Apply" in Structure and links now lay out the moved or copied branch under its new parent (or as a new tree when it becomes a root) so cards no longer land on top of the parent's existing children; Undo restores the old positions in one step.
 - A new topic is placed using the measured height of its siblings (or below the lowest top-level topic), so a tall card no longer overlaps the next one.
-- Creating subtopics with AI is now one Undo step instead of one per subtopic: a single Undo removes the whole batch and a single Redo brings it back, also when the batch stopped part-way.
+- After creating subtopics from an expansion, the view now shows the parent and all new subtopics instead of empty canvas.
+- After quick subtopic research finishes, the new subtopic cards you have not moved are re-spaced so grown cards no longer overlap their neighbours.
+- Undoing until a map is empty no longer leaves the topic-selection bar open (Synthesize highlighted) on an empty map.
+
+File names
+- A topic title can no longer be lost because of its file name: a title cut in the middle of an emoji or a rare character, a title that starts with dots (such as `...second`), and a title that differs from an existing one only by case or Greek final sigma now all create their card. New file names are cut at a whole character with no trailing space or dot, a leading dot is dropped, and a name clash on a case-insensitive disk gets a numeric suffix (retried if the disk still reports a clash). Existing notes and maps are never renamed.
+- Renaming a map to a name that differs from another map only by case now shows "A topic folder with this name already exists." and changes nothing, instead of Obsidian's raw "Destination file already exists!".
+
+Display
+- The goal-grading panel no longer closes by itself when the map repaints or focus returns from a dialog; if it cannot open, a notice says why.
+- The topic-selection bar no longer shifts its buttons as the selection changes: it sits at the bottom left, clear of the zoom controls, the selected names and the gesture hint each have their own line, and the Synthesize, Merge and Research labels no longer carry a count (screen readers still hear it).
 - The "+ Topic" button inside an empty map's hint now works (it ignored clicks).
 - Hebrew, Arabic and other right-to-left text now follows its own direction on topic cards, the map title, the inspector title, the outline and the parent picker; the selection bar joins names with the language's own separator instead of always using "、".
 - Outline search for "istanbul" now finds "İstanbul".
-- Undoing until a map is empty no longer leaves the topic-selection bar open (Synthesize highlighted) on an empty map.
 - A very long word in the hover preview title wraps instead of being clipped at the right edge.
+- The gantt critical-task bar text now meets 4.5:1 contrast in AnuPpuccin light.
+- A wide diagram in a VAM note without the `visual-agent-map-node` CSS class scrolls inside the diagram instead of making the whole preview scroll sideways.
+- With a Claude model selected and no models found, the sample start button now reads "Check Claude Code" and checks the Claude connection instead of Codex.
+
+### Limitations
+
+- Not checked: the new store file handling and Codex saved-image reading on Windows, and Codex saved-image reading through Obsidian's adapter at all.
 
 ## [0.24.0] - 2026-10-22
 

@@ -1,4 +1,4 @@
-import { App, Notice, TFile, TFolder, normalizePath, parseYaml, stringifyYaml } from "obsidian";
+import { App, Notice, TAbstractFile, TFile, TFolder, normalizePath, parseYaml, stringifyYaml } from "obsidian";
 import { resolveAimContentLanguage } from "./experiences/aim/content-language";
 import { createHash } from "node:crypto";
 import { t, translate, type TranslationKey } from "./i18n";
@@ -304,14 +304,65 @@ function ensureNoteCssClass(fm: Record<string, unknown>): boolean {
   return true;
 }
 
+const SAFE_NAME_LIMIT = 80;
+
+type GraphemeSegmenter = new (
+  locale?: string,
+  options?: { granularity: "grapheme" }
+) => { segment(input: string): Iterable<{ segment: string }> };
+
+/** Splits text into grapheme clusters (code points when `Intl.Segmenter` is unavailable). */
+function graphemes(value: string): string[] {
+  const Segmenter = (Intl as { Segmenter?: GraphemeSegmenter }).Segmenter;
+  if (Segmenter)
+    return Array.from(new Segmenter(undefined, { granularity: "grapheme" }).segment(value), part => part.segment);
+  return Array.from(value);
+}
+
+/**
+ * A file or folder name for a NEW note or map. Never applied to existing paths (a stored path is never renamed).
+ * Cuts at 80 UTF-16 units on a grapheme boundary, and never leaves a leading dot (hidden file) or a trailing dot or space.
+ */
 export function safeName(title: string): string {
-  return (
-    title
-      .replace(/[\\/:*?"<>|#^[\]]/g, " ")
-      .replace(/\s+/g, " ")
-      .trim()
-      .slice(0, 80) || t("note.untitled_topic")
-  );
+  const cleaned = title
+    .replace(/[\\/:*?"<>|#^[\]]/g, " ")
+    .replace(/\s+/g, " ")
+    .replace(/^[\s.]+/, "");
+  let cut = cleaned;
+  if (cleaned.length > SAFE_NAME_LIMIT) {
+    cut = "";
+    for (const part of graphemes(cleaned)) {
+      if (cut.length + part.length > SAFE_NAME_LIMIT) break;
+      cut += part;
+    }
+  }
+  return cut.replace(/[\s.]+$/, "") || t("note.untitled_topic");
+}
+
+/** Case- and form-insensitive name used to detect a collision on a case-insensitive file system. */
+function foldName(value: string): string {
+  return value.normalize("NFC").toUpperCase().toLowerCase();
+}
+
+/** Folds a file name without its extension, so a final sigma before ".md" folds as it does inside the name. */
+function foldEntryName(name: string, isFile: boolean): string {
+  const dot = isFile ? name.lastIndexOf(".") : -1;
+  return dot > 0 ? `${foldName(name.slice(0, dot))}.${name.slice(dot + 1).toLowerCase()}` : foldName(name);
+}
+
+/** A link alias safe inside `[[path|alias]]` and a YAML list item: no brackets, pipe, backtick or line breaks. */
+export function linkAlias(title: string, fallback: string): string {
+  const alias = title
+    .replace(/[[\]|`\r\n]/g, " ")
+    .replace(/%%/g, "%")
+    .replace(/\s+/g, " ")
+    .trim();
+  return alias || fallback;
+}
+
+/** Folder name of a map, used as the link alias when the map title has nothing usable in it. */
+function aliasFallback(mapPath: string): string {
+  return parentPath(mapPath).split("/").at(-1) || mapPath;
 }
 
 function frontmatter(content: string): Record<string, unknown> {
@@ -888,28 +939,36 @@ export class Repository {
     await this.folder(this.settings.aimFolder);
   }
 
-  unique(folder: string, name: string): string {
+  unique(folder: string, name: string, avoid?: ReadonlySet<string>): string {
     const base = normalizePath(`${folder}/${safeName(name)}`);
     let path = `${base}.md`,
       number = 2;
-    while (this.pathTaken(path)) path = `${base} ${number++}.md`;
+    while (avoid?.has(path) || this.pathTaken(path)) path = `${base} ${number++}.md`;
     return path;
   }
 
-  /** Taken when the path exists, or when a sibling differs only in case (case-insensitive file systems). */
+  /** Taken when the path exists, or when a sibling has the same name once case and Unicode form are folded. */
   private pathTaken(path: string): boolean {
-    if (this.app.vault.getAbstractFileByPath(path)) return true;
+    return !!this.app.vault.getAbstractFileByPath(path) || !!this.foldedSibling(path, "");
+  }
+
+  /** A child of `path`'s folder whose folded name equals `path`'s, other than `exclude`. */
+  private foldedSibling(path: string, exclude: string): TAbstractFile | null {
     const folder = this.app.vault.getAbstractFileByPath(parentPath(path));
-    if (!(folder instanceof TFolder)) return false;
-    const lower = path.toLowerCase();
-    return folder.children.some(child => child.path.toLowerCase() === lower);
+    if (!(folder instanceof TFolder)) return null;
+    const wanted = foldEntryName(path.split("/").at(-1) ?? path, /\.md$/i.test(path));
+    return (
+      folder.children.find(
+        child => child.path !== exclude && foldEntryName(child.name, child instanceof TFile) === wanted
+      ) ?? null
+    );
   }
 
   uniqueFolder(folder: string, name: string): string {
     const base = normalizePath(`${folder}/${safeName(name)}`);
     let path = base,
       number = 2;
-    while (this.app.vault.getAbstractFileByPath(path)) path = `${base} ${number++}`;
+    while (this.app.vault.getAbstractFileByPath(path) || this.foldedSibling(path, "")) path = `${base} ${number++}`;
     return path;
   }
 
@@ -1145,8 +1204,7 @@ export class Repository {
   ): Promise<MapNode> {
     const folder = this.topicFolder(mapPath, "Notes");
     await this.ensureTopicFolders(this.topicRoot(mapPath));
-    const id = crypto.randomUUID(),
-      path = this.unique(folder, title);
+    const id = crypto.randomUUID();
     const metadata = {
       "agent-map-node": true,
       "node-id": id,
@@ -1163,12 +1221,37 @@ export class Repository {
       cssclasses: [NOTE_CSS_CLASS]
     };
     const origin = initial.thinkingOrigin ? `## Thinking Origin\n\n${originMarkdown(initial.thinkingOrigin)}` : "";
-    onCreate?.(path);
-    await this.app.vault.create(
-      path,
-      `---\n${stringifyYaml(metadata)}---\n${noteBody(title, initial.summary ?? placeholder(this.settings.language), this.settings.language, "", "", placeholder(this.settings.language), initial.detail ?? "", "", "", origin)}`
+    const created = await this.createUniqueNote(
+      folder,
+      title,
+      `---\n${stringifyYaml(metadata)}---\n${noteBody(title, initial.summary ?? placeholder(this.settings.language), this.settings.language, "", "", placeholder(this.settings.language), initial.detail ?? "", "", "", origin)}`,
+      onCreate
     );
-    return { id, path, parentId: null, x: 80, y: 80, collapsed: false };
+    return { id, path: created.path, parentId: null, x: 80, y: 80, collapsed: false };
+  }
+
+  /**
+   * Creates a note at a free name. If the file system still reports "already exists" (a case-insensitive collision
+   * `pathTaken` could not see), it tries the next free suffix, at most 5 times. Returns the file actually created.
+   */
+  private async createUniqueNote(
+    folder: string,
+    title: string,
+    content: string,
+    onCreate?: (path: string) => void
+  ): Promise<TFile> {
+    const failed = new Set<string>();
+    for (let attempt = 1; ; attempt++) {
+      const path = this.unique(folder, title, failed);
+      onCreate?.(path);
+      try {
+        return await this.app.vault.create(path, content);
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error);
+        if (attempt >= 5 || !/already exists/i.test(message)) throw error;
+        failed.add(path);
+      }
+    }
   }
 
   /** Idempotently create a reserved note identity for a journaled AIM result draft. */
@@ -1229,16 +1312,15 @@ export class Repository {
     const source = await this.app.vault.read(this.file(sourcePath));
     const metadata = frontmatter(source);
     const title = `${text(metadata.title, this.file(sourcePath).basename)} ${translate(this.settings.language, "note.copy_suffix")}`;
-    const id = crypto.randomUUID(),
-      path = this.unique(folder, title);
+    const id = crypto.randomUUID();
     metadata["node-id"] = id;
     metadata["topic-id"] = map.id;
     metadata["agent-map-id"] = map.id;
     metadata["topic-state"] = "active";
     metadata.title = title;
     const body = source.replace(/^---\r?\n[\s\S]*?\r?\n---(?:\r?\n|$)/, "").replace(/^# .*$/m, `# ${title}`);
-    await this.app.vault.create(path, `---\n${stringifyYaml(metadata)}---\n${body}`);
-    return { id, path, parentId: null, x: 80, y: 80, collapsed: false };
+    const created = await this.createUniqueNote(folder, title, `---\n${stringifyYaml(metadata)}---\n${body}`);
+    return { id, path: created.path, parentId: null, x: 80, y: 80, collapsed: false };
   }
 
   async readMap(path: string): Promise<MapDocument> {
@@ -1885,7 +1967,7 @@ export class Repository {
       fm["agent-map-references"] =
         language === "en"
           ? [
-              `Topic: [[${noteLink(owner.mapPath)}|${owner.map.title}]]`,
+              `Topic: [[${noteLink(owner.mapPath)}|${linkAlias(owner.map.title, aliasFallback(owner.mapPath))}]]`,
               `Mind map: [[${noteLink(owner.mapPath)}]]`,
               parent ? `Parent topic: [[${noteLink(parent.path)}]]` : "Parent topic: None",
               children.length
@@ -1893,7 +1975,7 @@ export class Repository {
                 : "Child topics: None"
             ]
           : [
-              `所屬主題：[[${noteLink(owner.mapPath)}|${owner.map.title}]]`,
+              `所屬主題：[[${noteLink(owner.mapPath)}|${linkAlias(owner.map.title, aliasFallback(owner.mapPath))}]]`,
               `所屬心智圖：[[${noteLink(owner.mapPath)}]]`,
               parent ? `母議題：[[${noteLink(parent.path)}]]` : "母議題：無",
               children.length
@@ -1905,11 +1987,11 @@ export class Repository {
       fm["agent-map-references"] =
         language === "en"
           ? [
-              `Topic: [[${noteLink(topic.mapPath)}|${topic.map.title}]]`,
+              `Topic: [[${noteLink(topic.mapPath)}|${linkAlias(topic.map.title, aliasFallback(topic.mapPath))}]]`,
               `Status: ${state === "archived" ? "Archived" : "Unassigned"}`
             ]
           : [
-              `所屬主題：[[${noteLink(topic.mapPath)}|${topic.map.title}]]`,
+              `所屬主題：[[${noteLink(topic.mapPath)}|${linkAlias(topic.map.title, aliasFallback(topic.mapPath))}]]`,
               `狀態：${state === "archived" ? "已封存" : "未歸類"}`
             ];
       body = withoutReference(body);
@@ -2262,7 +2344,10 @@ export class Repository {
     const desired = targetRoot
       ? normalizePath(targetRoot)
       : normalizePath(`${parentPath(root.path)}/${safeName(title)}`);
-    if (desired !== root.path && this.app.vault.getAbstractFileByPath(desired))
+    if (
+      desired !== root.path &&
+      (this.app.vault.getAbstractFileByPath(desired) || this.foldedSibling(desired, root.path))
+    )
       throw new Error(this.message("error.topic_folder_exists"));
     const originalRoot = root.path;
     const originalMapPath = `${originalRoot}/Map.md`,

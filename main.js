@@ -14967,8 +14967,38 @@ function ensureNoteCssClass(fm) {
   fm.cssclasses = [...current, NOTE_CSS_CLASS];
   return true;
 }
+var SAFE_NAME_LIMIT = 80;
+function graphemes(value) {
+  const Segmenter = Intl.Segmenter;
+  if (Segmenter)
+    return Array.from(new Segmenter(void 0, { granularity: "grapheme" }).segment(value), (part) => part.segment);
+  return Array.from(value);
+}
 function safeName(title) {
-  return title.replace(/[\\/:*?"<>|#^[\]]/g, " ").replace(/\s+/g, " ").trim().slice(0, 80) || t("note.untitled_topic");
+  const cleaned = title.replace(/[\\/:*?"<>|#^[\]]/g, " ").replace(/\s+/g, " ").replace(/^[\s.]+/, "");
+  let cut = cleaned;
+  if (cleaned.length > SAFE_NAME_LIMIT) {
+    cut = "";
+    for (const part of graphemes(cleaned)) {
+      if (cut.length + part.length > SAFE_NAME_LIMIT) break;
+      cut += part;
+    }
+  }
+  return cut.replace(/[\s.]+$/, "") || t("note.untitled_topic");
+}
+function foldName(value) {
+  return value.normalize("NFC").toUpperCase().toLowerCase();
+}
+function foldEntryName(name, isFile) {
+  const dot = isFile ? name.lastIndexOf(".") : -1;
+  return dot > 0 ? `${foldName(name.slice(0, dot))}.${name.slice(dot + 1).toLowerCase()}` : foldName(name);
+}
+function linkAlias(title, fallback) {
+  const alias = title.replace(/[[\]|`\r\n]/g, " ").replace(/%%/g, "%").replace(/\s+/g, " ").trim();
+  return alias || fallback;
+}
+function aliasFallback(mapPath) {
+  return parentPath(mapPath).split("/").at(-1) || mapPath;
 }
 function frontmatter(content) {
   var _a, _b;
@@ -15451,24 +15481,30 @@ var Repository = class {
     await this.folder(this.settings.mindMapsFolder);
     await this.folder(this.settings.aimFolder);
   }
-  unique(folder, name) {
+  unique(folder, name, avoid) {
     const base = (0, import_obsidian13.normalizePath)(`${folder}/${safeName(name)}`);
     let path = `${base}.md`, number = 2;
-    while (this.pathTaken(path)) path = `${base} ${number++}.md`;
+    while ((avoid == null ? void 0 : avoid.has(path)) || this.pathTaken(path)) path = `${base} ${number++}.md`;
     return path;
   }
-  /** Taken when the path exists, or when a sibling differs only in case (case-insensitive file systems). */
+  /** Taken when the path exists, or when a sibling has the same name once case and Unicode form are folded. */
   pathTaken(path) {
-    if (this.app.vault.getAbstractFileByPath(path)) return true;
+    return !!this.app.vault.getAbstractFileByPath(path) || !!this.foldedSibling(path, "");
+  }
+  /** A child of `path`'s folder whose folded name equals `path`'s, other than `exclude`. */
+  foldedSibling(path, exclude) {
+    var _a, _b;
     const folder = this.app.vault.getAbstractFileByPath(parentPath(path));
-    if (!(folder instanceof import_obsidian13.TFolder)) return false;
-    const lower = path.toLowerCase();
-    return folder.children.some((child) => child.path.toLowerCase() === lower);
+    if (!(folder instanceof import_obsidian13.TFolder)) return null;
+    const wanted = foldEntryName((_a = path.split("/").at(-1)) != null ? _a : path, /\.md$/i.test(path));
+    return (_b = folder.children.find(
+      (child) => child.path !== exclude && foldEntryName(child.name, child instanceof import_obsidian13.TFile) === wanted
+    )) != null ? _b : null;
   }
   uniqueFolder(folder, name) {
     const base = (0, import_obsidian13.normalizePath)(`${folder}/${safeName(name)}`);
     let path = base, number = 2;
-    while (this.app.vault.getAbstractFileByPath(path)) path = `${base} ${number++}`;
+    while (this.app.vault.getAbstractFileByPath(path) || this.foldedSibling(path, "")) path = `${base} ${number++}`;
     return path;
   }
   topicRoot(mapPath) {
@@ -15659,7 +15695,7 @@ ${withReferenceLinks(body, fm, language2)}`;
     var _a, _b, _c;
     const folder = this.topicFolder(mapPath, "Notes");
     await this.ensureTopicFolders(this.topicRoot(mapPath));
-    const id = crypto.randomUUID(), path = this.unique(folder, title);
+    const id = crypto.randomUUID();
     const metadata = {
       "agent-map-node": true,
       "node-id": id,
@@ -15678,14 +15714,33 @@ ${withReferenceLinks(body, fm, language2)}`;
     const origin = initial.thinkingOrigin ? `## Thinking Origin
 
 ${originMarkdown(initial.thinkingOrigin)}` : "";
-    onCreate == null ? void 0 : onCreate(path);
-    await this.app.vault.create(
-      path,
+    const created = await this.createUniqueNote(
+      folder,
+      title,
       `---
 ${(0, import_obsidian13.stringifyYaml)(metadata)}---
-${noteBody(title, (_b = initial.summary) != null ? _b : placeholder(this.settings.language), this.settings.language, "", "", placeholder(this.settings.language), (_c = initial.detail) != null ? _c : "", "", "", origin)}`
+${noteBody(title, (_b = initial.summary) != null ? _b : placeholder(this.settings.language), this.settings.language, "", "", placeholder(this.settings.language), (_c = initial.detail) != null ? _c : "", "", "", origin)}`,
+      onCreate
     );
-    return { id, path, parentId: null, x: 80, y: 80, collapsed: false };
+    return { id, path: created.path, parentId: null, x: 80, y: 80, collapsed: false };
+  }
+  /**
+   * Creates a note at a free name. If the file system still reports "already exists" (a case-insensitive collision
+   * `pathTaken` could not see), it tries the next free suffix, at most 5 times. Returns the file actually created.
+   */
+  async createUniqueNote(folder, title, content, onCreate) {
+    const failed = /* @__PURE__ */ new Set();
+    for (let attempt = 1; ; attempt++) {
+      const path = this.unique(folder, title, failed);
+      onCreate == null ? void 0 : onCreate(path);
+      try {
+        return await this.app.vault.create(path, content);
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error);
+        if (attempt >= 5 || !/already exists/i.test(message)) throw error;
+        failed.add(path);
+      }
+    }
   }
   /** Idempotently create a reserved note identity for a journaled AIM result draft. */
   async createNoteAt(title, model, map, mapPath, modelSource, path, id, initial = {}) {
@@ -15737,17 +15792,17 @@ ${noteBody(title, metadata.summary, this.settings.language, (_d = initial.prompt
     const source = await this.app.vault.read(this.file(sourcePath));
     const metadata = frontmatter(source);
     const title = `${text5(metadata.title, this.file(sourcePath).basename)} ${translate(this.settings.language, "note.copy_suffix")}`;
-    const id = crypto.randomUUID(), path = this.unique(folder, title);
+    const id = crypto.randomUUID();
     metadata["node-id"] = id;
     metadata["topic-id"] = map.id;
     metadata["agent-map-id"] = map.id;
     metadata["topic-state"] = "active";
     metadata.title = title;
     const body = source.replace(/^---\r?\n[\s\S]*?\r?\n---(?:\r?\n|$)/, "").replace(/^# .*$/m, `# ${title}`);
-    await this.app.vault.create(path, `---
+    const created = await this.createUniqueNote(folder, title, `---
 ${(0, import_obsidian13.stringifyYaml)(metadata)}---
 ${body}`);
-    return { id, path, parentId: null, x: 80, y: 80, collapsed: false };
+    return { id, path: created.path, parentId: null, x: 80, y: 80, collapsed: false };
   }
   async readMap(path) {
     return parseMap(await this.app.vault.read(this.file(path)));
@@ -16308,12 +16363,12 @@ ${body}`);
       const parent = owner.node.parentId ? owner.map.nodes.find((item) => item.id === owner.node.parentId) : void 0;
       const children = owner.map.nodes.filter((item) => item.parentId === owner.node.id);
       fm["agent-map-references"] = language2 === "en" ? [
-        `Topic: [[${noteLink(owner.mapPath)}|${owner.map.title}]]`,
+        `Topic: [[${noteLink(owner.mapPath)}|${linkAlias(owner.map.title, aliasFallback(owner.mapPath))}]]`,
         `Mind map: [[${noteLink(owner.mapPath)}]]`,
         parent ? `Parent topic: [[${noteLink(parent.path)}]]` : "Parent topic: None",
         children.length ? `Child topics: ${children.map((child) => `[[${noteLink(child.path)}]]`).join(", ")}` : "Child topics: None"
       ] : [
-        `\u6240\u5C6C\u4E3B\u984C\uFF1A[[${noteLink(owner.mapPath)}|${owner.map.title}]]`,
+        `\u6240\u5C6C\u4E3B\u984C\uFF1A[[${noteLink(owner.mapPath)}|${linkAlias(owner.map.title, aliasFallback(owner.mapPath))}]]`,
         `\u6240\u5C6C\u5FC3\u667A\u5716\uFF1A[[${noteLink(owner.mapPath)}]]`,
         parent ? `\u6BCD\u8B70\u984C\uFF1A[[${noteLink(parent.path)}]]` : "\u6BCD\u8B70\u984C\uFF1A\u7121",
         children.length ? `\u5B50\u8B70\u984C\uFF1A${children.map((child) => `[[${noteLink(child.path)}]]`).join("\u3001")}` : "\u5B50\u8B70\u984C\uFF1A\u7121"
@@ -16321,10 +16376,10 @@ ${body}`);
       body = withoutReference(body);
     } else if (topic && (state === "unassigned" || state === "archived")) {
       fm["agent-map-references"] = language2 === "en" ? [
-        `Topic: [[${noteLink(topic.mapPath)}|${topic.map.title}]]`,
+        `Topic: [[${noteLink(topic.mapPath)}|${linkAlias(topic.map.title, aliasFallback(topic.mapPath))}]]`,
         `Status: ${state === "archived" ? "Archived" : "Unassigned"}`
       ] : [
-        `\u6240\u5C6C\u4E3B\u984C\uFF1A[[${noteLink(topic.mapPath)}|${topic.map.title}]]`,
+        `\u6240\u5C6C\u4E3B\u984C\uFF1A[[${noteLink(topic.mapPath)}|${linkAlias(topic.map.title, aliasFallback(topic.mapPath))}]]`,
         `\u72C0\u614B\uFF1A${state === "archived" ? "\u5DF2\u5C01\u5B58" : "\u672A\u6B78\u985E"}`
       ];
       body = withoutReference(body);
@@ -16620,7 +16675,7 @@ ${body}`;
     if (!(root instanceof import_obsidian13.TFolder) || !(isManagedMapPath(this.settings, mapPath) || this.pendingContainers.some((c) => mapPath.startsWith(`${c}/`))))
       throw new Error(this.message("error.legacy_map_view_only"));
     const desired = targetRoot ? (0, import_obsidian13.normalizePath)(targetRoot) : (0, import_obsidian13.normalizePath)(`${parentPath(root.path)}/${safeName(title)}`);
-    if (desired !== root.path && this.app.vault.getAbstractFileByPath(desired))
+    if (desired !== root.path && (this.app.vault.getAbstractFileByPath(desired) || this.foldedSibling(desired, root.path)))
       throw new Error(this.message("error.topic_folder_exists"));
     const originalRoot = root.path;
     const originalMapPath = `${originalRoot}/Map.md`, originalContent = await this.app.vault.read(this.file(originalMapPath));

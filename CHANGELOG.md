@@ -1,5 +1,14 @@
 # Changelog
 
+## [Unreleased]
+
+### Fixed
+
+- Coffee Tables work again after the workspace folder is reconnected.
+- The background reconcile timer is cleared when the plugin unloads.
+- Retrying a failed AIM report uses the model and reasoning level of the attempt that failed.
+- The two warnings from the 0.23.0 Obsidian scan are cleared: an unnecessary type assertion in the relevance status bar focus code, and a partially supported `clip-path` in the hidden tag name style.
+
 ## [0.23.0] - 2026-10-20
 
 ### Added

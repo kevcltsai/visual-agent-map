@@ -29354,8 +29354,7 @@ ${request.requirements}` : preset.text,
     const bar = (_b = (_a = this.contentEl) == null ? void 0 : _a.querySelector) == null ? void 0 : _b.call(_a, ".vam-relevance-statusbar");
     const hadFocus = !!bar && !!((_e = bar.contains) == null ? void 0 : _e.call(bar, (_d = (_c = this.contentEl.ownerDocument) == null ? void 0 : _c.activeElement) != null ? _d : null));
     this.render();
-    if (focusBar || hadFocus)
-      (_h = (_g = (_f = this.contentEl) == null ? void 0 : _f.querySelector) == null ? void 0 : _g.call(_f, ".vam-relevance-statusbar button")) == null ? void 0 : _h.focus();
+    if (focusBar || hadFocus) (_h = (_g = (_f = this.contentEl) == null ? void 0 : _f.querySelector) == null ? void 0 : _g.call(_f, ".vam-relevance-statusbar button")) == null ? void 0 : _h.focus();
   }
   /**
    * Enter in the goal field. The goal is saved first (its own undo step), then, after the usage confirmation, the

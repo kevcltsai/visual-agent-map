@@ -31,6 +31,16 @@ export default defineConfig([
       "@typescript-eslint/no-unsafe-member-access": "error",
       "@typescript-eslint/no-unsafe-return": "error",
       "depend/ban-dependencies": "error",
+      // Obsidian's scanner runs a newer no-unnecessary-type-assertion that also flags `expr?.() as T | null | undefined`
+      // when the receiver (`?.focus()`) already accepts the original type; typescript-eslint 8.70 does not. Use a
+      // generic call (`querySelector?.<HTMLElement>(...)`) instead of asserting an optional chain to a union.
+      "no-restricted-syntax": [
+        "error",
+        {
+          selector: "TSAsExpression[typeAnnotation.type='TSUnionType'] > ChainExpression > CallExpression",
+          message: "Do not assert an optional call to a union (the Obsidian scanner flags it as an unnecessary assertion). Use a generic call such as querySelector?.<HTMLElement>(...)."
+        }
+      ],
       "obsidianmd/detach-leaves": "error",
       "obsidianmd/no-static-styles-assignment": "error",
       "obsidianmd/no-unsupported-api": "error",

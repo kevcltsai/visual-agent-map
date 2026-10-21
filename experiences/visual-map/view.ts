@@ -1698,25 +1698,23 @@ export class VisualAgentMapView extends ItemView {
    * the repaint) moves focus to what is left of it (its first button, else the goal chip) so it never falls to the page.
    */
   private keepRelevanceBarFocus(): () => void {
-    const bar = this.contentEl?.querySelector?.(".vam-relevance-statusbar") as HTMLElement | null | undefined;
+    const bar = this.contentEl?.querySelector?.<HTMLElement>(".vam-relevance-statusbar");
     const active = this.contentEl?.ownerDocument?.activeElement ?? null;
     if (!bar || !active || !bar.contains?.(active)) return () => {};
     return () => {
       const target =
-        (this.contentEl?.querySelector?.(".vam-relevance-statusbar")?.querySelector?.("button") as
-          HTMLElement | null | undefined) ??
-        (this.contentEl?.querySelector?.(".vam-relevance-goal") as HTMLElement | null | undefined);
+        this.contentEl?.querySelector?.(".vam-relevance-statusbar")?.querySelector?.<HTMLElement>("button") ??
+        this.contentEl?.querySelector?.<HTMLElement>(".vam-relevance-goal");
       target?.focus();
     };
   }
   /** Repaints the map and keeps the keyboard in the status bar when it had it (its buttons come and go). */
   private refreshRelevance(focusBar = false): void {
     if (this.closed) return;
-    const bar = this.contentEl?.querySelector?.(".vam-relevance-statusbar") as HTMLElement | null | undefined;
+    const bar = this.contentEl?.querySelector?.<HTMLElement>(".vam-relevance-statusbar");
     const hadFocus = !!bar && !!bar.contains?.(this.contentEl.ownerDocument?.activeElement ?? null);
     this.render();
-    if (focusBar || hadFocus)
-      (this.contentEl?.querySelector?.(".vam-relevance-statusbar button") as HTMLElement | null | undefined)?.focus();
+    if (focusBar || hadFocus) this.contentEl?.querySelector?.<HTMLElement>(".vam-relevance-statusbar button")?.focus();
   }
   /**
    * Enter in the goal field. The goal is saved first (its own undo step), then, after the usage confirmation, the
@@ -2100,7 +2098,7 @@ export class VisualAgentMapView extends ItemView {
     this.iconButton(bar, "x", t("ui.dismiss"), () => {
       this.plugin.relevanceGrades.delete(this.path);
       this.render();
-      (this.contentEl?.querySelector?.(".vam-relevance-goal") as HTMLElement | null | undefined)?.focus();
+      this.contentEl?.querySelector?.<HTMLElement>(".vam-relevance-goal")?.focus();
     });
   }
   /** The status line of a finished run: a recalibration counts its moves against the pins; a full grade counts cards. */

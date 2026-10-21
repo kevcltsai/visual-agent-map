@@ -143,7 +143,7 @@
 /* Offline relevance grading (mind maps only): a quiet icon + text tag, no fill. Side topics fade but stay in place. */
 .vam-relevance-tag { display: inline-flex; align-items: center; gap: 4px; max-width: 100%; font-size: var(--font-ui-smaller); line-height: 1.4; white-space: nowrap; }
 button.vam-relevance-tag-button { position: relative; appearance: none; margin: 0; padding: 0 4px; margin-left: -4px; border: 0; border-radius: var(--radius-s); background: transparent; box-shadow: none; height: auto; cursor: pointer; font-family: inherit; }
-.vam-relevance-tag-name { position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+.vam-relevance-tag-name { position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0; overflow: hidden; white-space: nowrap; }
 button.vam-relevance-tag-button:hover:not(:disabled) { background: var(--background-modifier-hover); }
 button.vam-relevance-tag-button:focus-visible { outline: 2px solid var(--background-modifier-border-focus); outline-offset: 1px; }
 button.vam-relevance-tag-button:disabled { cursor: default; opacity: .7; }

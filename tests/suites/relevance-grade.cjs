@@ -96,9 +96,9 @@ const frontmatterOf = h => h.contents.get(MAP).match(/^---\n([\s\S]*?)\n---/)[1]
 const afterTravel = async h => { await until(() => h.view.history.canRedo); for (let i = 0; i < 12; i++) await tick(); };
 const graded = async h => Object.values(await h.allRelevance()).filter(Boolean);
 
-integrationTest('relevance: Set goal -> field -> Enter writes the goal and its first history entry, grades every non-top card and shows the result', async () => {
+integrationTest('relevance: Prioritize by goal -> field -> Enter writes the goal and its first history entry, grades every non-top card and shows the result', async () => {
   const h = await harness();
-  assert.equal(h.chip().text, 'Set goal'); assert.ok(hasCls(h.chip(), 'is-empty')); assert.equal(h.bar(), undefined, 'no status bar before any run');
+  assert.equal(h.chip().text, 'Prioritize by goal'); assert.ok(hasCls(h.chip(), 'is-empty')); assert.equal(h.bar(), undefined, 'no status bar before any run');
   h.chip().click();
   const input = h.input();
   assert.equal(input.attrs['aria-label'], 'Map goal'); assert.equal(input.focused, true); assert.equal(h.chip().attrs['aria-expanded'], 'true', 'the panel opens under the toolbar button, which stays');
@@ -365,9 +365,9 @@ integrationTest('relevance: only one run per map; a second Enter, or a second vi
 integrationTest('relevance: Esc and focus leaving the group cancel, an empty Enter never reaches the AI, and Esc returns focus to the chip', async () => {
   const h = await harness();
   h.chip().click(); h.input().value = 'ignored'; h.input().fire('keydown', { key: 'Escape' }); await tick();
-  assert.equal(h.input(), undefined); assert.equal(h.chip().focused, true); assert.equal(h.chip().text, 'Set goal');
-  h.chip().click(); h.input().value = 'ignored too'; h.input().fire('focusout', { relatedTarget: null }); await tick();
-  assert.equal(h.input(), undefined); assert.equal(h.chip().text, 'Set goal');
+  assert.equal(h.input(), undefined); assert.equal(h.chip().focused, true); assert.equal(h.chip().text, 'Prioritize by goal');
+  h.chip().click(); h.input().value = 'ignored too'; h.input().fire('focusout', { relatedTarget: element('button') }); await tick();
+  assert.equal(h.input(), undefined); assert.equal(h.chip().text, 'Prioritize by goal');
   h.chip().click(); h.input().value = '   '; h.input().fire('keydown', { key: 'Enter' }); await tick();
   assert.equal(h.input(), undefined, 'the field closes'); assert.equal(h.chip().focused, true);
   assert.equal(h.control.calls.length, 0); assert.equal(h.control.usageAsks, 0); assert.equal(h.run(), undefined);
@@ -426,15 +426,15 @@ integrationTest('relevance: the suggested-card ring outranks every status rule t
   for (const rule of statusRules) assert.ok(ringSpec > Math.max(...rule.selectors.map(specificity)), `ring beats ${rule.selectors[0]}`);
 });
 
-integrationTest('relevance: the goal chip is named "Goal: <goal>" for assistive tech, and "Set goal" when empty (zh too)', async () => {
+integrationTest('relevance: the goal chip is named "Goal: <goal>" for assistive tech, and "Prioritize by goal" when empty (zh too)', async () => {
   const h = await harness();
-  assert.equal(h.chip().attrs['aria-label'], 'Set goal');
+  assert.equal(h.chip().attrs['aria-label'], 'Prioritize by goal');
   await h.enter('Sleep better'); await h.settled();
   assert.equal(h.chip().attrs['aria-label'], 'Goal: Sleep better');
   // The view builds the name from these two keys; each bundle has its own language, so check the zh strings directly.
   const { translate } = load('i18n.ts');
   assert.equal(translate('zh-TW', 'ui.relevance_goal_0', '睡得更好'), '目標：睡得更好');
-  assert.equal(translate('zh-TW', 'ui.relevance_goal_set'), '設定目標');
+  assert.equal(translate('zh-TW', 'ui.relevance_goal_set'), '依目標排優先');
 });
 
 integrationTest('relevance: focus inside the status bar survives a repaint (Stop vanishing on completion, Undo by keyboard) and is never stolen', async () => {
@@ -674,7 +674,7 @@ const fakeDoc = () => { const doc = { activeElement: null, listeners: {}, addEve
 integrationTest('relevance toolbar: one button, label states, aria-expanded and aria-controls; no separate goal line or sort chip', async () => {
   const h = await harness();
   const chip = h.chip();
-  assert.equal(chip.text, 'Set goal'); assert.equal(chip.attrs['aria-expanded'], 'false'); assert.ok(chip.attrs['aria-controls']);
+  assert.equal(chip.text, 'Prioritize by goal'); assert.equal(chip.attrs['aria-expanded'], 'false'); assert.ok(chip.attrs['aria-controls']);
   assert.equal(findAll(h.rootEl, i => i.tag === 'button' && hasCls(i, 'vam-relevance-goal')).length, 1);
   assert.equal(sortRow(h), undefined, 'no sort chip in the toolbar; it lives in the panel');
   assert.equal(findAll(h.rootEl, i => hasCls(i, 'vam-relevance-goal-slot')).length, 0);
@@ -714,7 +714,8 @@ integrationTest('relevance toolbar: Esc, an outside press and focus leaving each
   doc.listeners.pointerdown[0]({ target: element('div', 'vam-viewport') });
   assert.equal(panelOf(h), undefined, 'a press on the canvas closes it'); assert.equal(h.chip().focused, false);
   open(h); sortRow(h).fire('focusout', { relatedTarget: h.chip() }); assert.ok(panelOf(h), 'focus moving to the button is not leaving');
-  sortRow(h).fire('focusout', { relatedTarget: null }); assert.equal(panelOf(h), undefined);
+  sortRow(h).fire('focusout', { relatedTarget: null }); assert.ok(panelOf(h), '0.25: focus to nowhere (a repaint, a dialog giving focus back) keeps it open');
+  sortRow(h).fire('focusout', { relatedTarget: element('button') }); assert.equal(panelOf(h), undefined, 'focus to another element closes it');
   assert.equal(h.control.calls.length, 0); assert.equal(h.control.usageAsks, 0); assert.equal(await h.repo.readRelevanceGoal(MAP), undefined, 'nothing was written');
 });
 
@@ -740,9 +741,9 @@ integrationTest('relevance toolbar: toggling the sort switch inside the panel ke
   assert.equal(sortRow(h).attrs['aria-pressed'], 'true'); assert.equal(h.input().value, 'Half typed', 'the draft survives the repaint');
   const icon = findAll(h.chip(), i => hasCls(i, 'vam-relevance-sort-icon'))[0];
   assert.ok(icon, 'a drawn indicator on the button'); assert.equal(icon.iconName, 'arrow-down-wide-narrow'); assert.ok(hasCls(h.chip(), 'is-sorted'));
-  assert.equal(h.chip().attrs['aria-label'], 'Set goal (sorted by relevance)');
+  assert.equal(h.chip().attrs['aria-label'], 'Prioritize by goal (sorted by relevance)');
   assert.equal(h.contents.get(MAP), before); assert.deepEqual(writes, [], 'no file write');
-  sortRow(h).click(); assert.equal(sortRow(h).attrs['aria-pressed'], 'false'); assert.equal(h.chip().attrs['aria-label'], 'Set goal');
+  sortRow(h).click(); assert.equal(sortRow(h).attrs['aria-pressed'], 'false'); assert.equal(h.chip().attrs['aria-label'], 'Prioritize by goal');
   assert.equal(findAll(h.chip(), i => hasCls(i, 'vam-relevance-sort-icon')).length, 0);
   assert.equal(view.relevanceSortOn(), false); assert.deepEqual(writes, []);
   h.app.vault.create = create; h.app.vault.modify = modify;

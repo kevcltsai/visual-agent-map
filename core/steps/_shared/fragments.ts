@@ -12,6 +12,8 @@ import LabelTaskZH from "./label-task.zh.md";
 import LabelTaskEN from "./label-task.en.md";
 import LabelTopicZH from "./label-topic.zh.md";
 import LabelTopicEN from "./label-topic.en.md";
+import ClaudeStructuredOutputZH from "./claude-structured-output.zh.md";
+import ClaudeStructuredOutputEN from "./claude-structured-output.en.md";
 import LocalFirstZH from "./local-first.zh.md";
 import LocalFirstEN from "./local-first.en.md";
 import NoneZH from "./none.zh.md";
@@ -41,6 +43,13 @@ const pair = (zh: string, en: string): FragmentPair => ({ zh: text(zh), en: text
 /** The fragment in the interface language; `en` selects English, anything else Traditional Chinese (as `translate` does). */
 export function inLanguage(fragment: FragmentPair, language: UiLanguage): string {
   return language === "en" ? fragment.en : fragment.zh;
+}
+
+/** Claude only: return through the StructuredOutput tool at once, without a text draft first. Codex prompts never include it. */
+export const CLAUDE_STRUCTURED_OUTPUT: FragmentPair = pair(ClaudeStructuredOutputZH, ClaudeStructuredOutputEN);
+/** A response-contract block; Claude's carries the StructuredOutput instruction after it, Codex's is the contract unchanged. */
+export function withProviderOutput(contract: string, provider: "claude" | "codex", language: UiLanguage): string {
+  return provider === "claude" ? `${contract}\n${inLanguage(CLAUDE_STRUCTURED_OUTPUT, language)}` : contract;
 }
 
 export const LABEL_ANCESTORS: FragmentPair = pair(LabelAncestorsZH, LabelAncestorsEN);

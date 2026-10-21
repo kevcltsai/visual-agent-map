@@ -1,4 +1,6 @@
 import type { UiLanguage } from "../../../i18n";
+import type { AiProviderId } from "../../../ai/providers/provider";
+import { CLAUDE_STRUCTURED_OUTPUT, inLanguage } from "../_shared/fragments";
 import { renderTemplate, type StepDefinition } from "../../step-runner";
 import { CHART_SHAPES, type ChartCode, type ChartDraft } from "./insert";
 import templateEn from "./chart.en.md";
@@ -11,6 +13,8 @@ export interface ChartRequest {
   existingCount: number;
   existingTypes: string[];
   remaining: number;
+  /** Claude gets the StructuredOutput instruction after the output line; Codex prompts stay as they were. Absent: Codex. */
+  provider?: AiProviderId;
 }
 
 export const CHART_SCHEMA = {
@@ -87,6 +91,7 @@ export const chartStep: StepDefinition<ChartRequest, ChartDraft[]> = {
           ? "none"
           : "無",
       remaining: String(request.remaining),
+      claudeOutput: request.provider === "claude" ? `\n${inLanguage(CLAUDE_STRUCTURED_OUTPUT, request.language)}` : "",
       title: request.title,
       detail: request.detail
     }),

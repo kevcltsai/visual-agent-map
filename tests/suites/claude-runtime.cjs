@@ -181,3 +181,35 @@ integrationTest('Claude nonzero exit exposes structured provider rejection witho
   const {ClaudeCodeCliRuntime}=load('ai/runtime/claude-code-cli.ts');const runtime=new ClaudeCodeCliRuntime({executable:'claude',cwd:'/test',env:{},spawn});
   await assert.rejects(runtime.runTask('Synthetic source','sonnet','low',{},{}),/Subscription access disabled/);
 });
+test('Claude json mode reports usage, text before the StructuredOutput call and an enforce retry from the verbose transcript', async () => {
+  const { EventEmitter } = require('node:events');
+  const output = { summary: 'S', detail: 'D', suggestions: [], visualReferences: [] };
+  const run = async records => {
+    const spawn = () => {
+      const child = new EventEmitter(); child.stdout = new EventEmitter(); child.stderr = new EventEmitter(); child.kill = () => true;
+      child.stdin = { on: () => {}, end: () => process.nextTick(() => {
+        child.stdout.emit('data', Buffer.from(JSON.stringify([...records, { type: 'result', subtype: 'success', is_error: false, structured_output: output, usage: { input_tokens: 120, output_tokens: 45 } }])));
+        child.emit('close', 0);
+      }) };
+      return child;
+    };
+    const { ClaudeCodeCliRuntime } = load('ai/runtime/claude-code-cli.ts', { 'node:child_process': { spawn } });
+    const seen = [];
+    await new ClaudeCodeCliRuntime({ executable: 'claude', cwd: '/plugin', env: {}, spawn }).runTask('p', 'sonnet', 'low', { type: 'object' }, { onMilestones: data => seen.push(JSON.parse(JSON.stringify(data))) });
+    return seen;
+  };
+  const text = value => ({ type: 'assistant', parent_tool_use_id: null, message: { content: [{ type: 'text', text: value }] } });
+  const tool = { type: 'assistant', parent_tool_use_id: null, message: { content: [{ type: 'tool_use', id: 't1', name: 'StructuredOutput', input: output }] } };
+  const clean = await run([tool]);
+  assert.deepEqual(clean, [{ usage: { inputTokens: 120, outputTokens: 45 }, textBeforeTool: false, enforceRetry: false }]);
+  const drafted = await run([text('{"summary":"S"}'), tool]);
+  assert.equal(drafted[0].textBeforeTool, true); assert.equal(drafted[0].enforceRetry, false);
+  const afterTool = await run([tool, text('Done.')]);
+  assert.equal(afterTool[0].textBeforeTool, false, 'text after the tool call is not a draft');
+  const enforced = await run([text(' '), tool, { type: 'user', parent_tool_use_id: null, message: { content: [{ type: 'text', text: '<system-reminder>structured-output-enforce: call the tool</system-reminder>' }] } }, tool]);
+  assert.equal(enforced[0].enforceRetry, true); assert.equal(enforced[0].textBeforeTool, false, 'whitespace is not text');
+  const subagent = await run([{ ...text('inner draft'), parent_tool_use_id: 'task-1' }, tool]);
+  assert.equal(subagent[0].textBeforeTool, false, 'only the main agent counts');
+  const none = await run([]);
+  assert.deepEqual(none, [{ usage: { inputTokens: 120, outputTokens: 45 } }], 'no StructuredOutput call in the transcript: no claim about text before it');
+});

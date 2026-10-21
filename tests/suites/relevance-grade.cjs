@@ -42,7 +42,7 @@ async function harness({ language = 'en', mapTitle = 'Sleep map' } = {}) {
   // A recalibrate answers with the cards that have no tier yet (none, once the map is graded).
   const control = { decline: false, calls: [], reply: async (request, _signal, prepared) => prepared.step.id.startsWith('relevance-recalibrate') ? recalibrateNew(request) : gradeAll(request), usageAsks: 0 };
   const plugin = withExpansionCoordinator({
-    repo, settings, running: new Set(), logs: { appendLog() {} }, rebuildDerivedData: () => repo.rebuildDerivedData(), relevanceGrades: new Map(), releaseOutline() {},
+    repo, settings, running: new Set(), abortChartJobs: () => {}, addChartsAfterWrite: () => {}, logs: { appendLog() {} }, rebuildDerivedData: () => repo.rebuildDerivedData(), relevanceGrades: new Map(), releaseOutline() {},
     mutate: async work => { await work(); await ctx.view?.hydrate(); },
     runMutation(work) { this.mutate(work).catch(() => {}); },
     confirmAiUsage: async (_model, run) => { control.usageAsks++; if (control.confirmGate) await control.confirmGate; if (control.decline) return false; await run(); return true; }

@@ -23,7 +23,7 @@ Syntax:
 - Do not quote the title line of pie or timeline, or timeline text; timeline text contains no ASCII colon.
 - Never write lines that start with click, link, callback, class, style or classDef, and never use :::, <<…>>, HTML tags such as <br>, %%{}%% or --- configuration, URLs, images or ::icon icons.
 
-Output: return JSON only, shaped {"charts":[{"anchor":"…","shape":"…","mermaid":"…"}]}. shape is one of stages, hierarchy, comparison, proportion, interaction, states, process, matching the seven shapes above.
+Output: return JSON only, shaped {"charts":[{"anchor":"…","shape":"…","mermaid":"…"}]}. shape is one of stages, hierarchy, comparison, proportion, interaction, states, process, matching the seven shapes above.{{claudeOutput}}
 
 Topic: {{title}}
 

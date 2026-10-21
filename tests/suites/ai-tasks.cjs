@@ -104,7 +104,7 @@ integrationTest('a successful AI task immediately updates summary and MD detail'
   let acceptedLaunch = false, acceptedSignal;
   let finishAi;
   const plugin = {
-    repo, settings: { ...DEFAULT_SETTINGS }, running: new Set(), activeTasks: new Map(), pendingSuggestions: new Map(),
+    repo, settings: { ...DEFAULT_SETTINGS }, running: new Set(), abortChartJobs: () => {}, addChartsAfterWrite: () => {}, activeTasks: new Map(), pendingSuggestions: new Map(),
     askModel: (context, _model, _reasoning, signal, _onExchange, onAccepted) => { acceptedSignal = signal; assert.equal(context.mode, 'task'); assert.equal(context.task, 'One-time request'); assert.equal(context.rules, ''); assert.equal(context.detail, 'Existing detail'); assert.equal(context.workingFindings, 'Legacy finding'); assert.equal(context.sourceContext, ''); onAccepted?.(); return new Promise(resolve => { finishAi = () => resolve({ summary: 'Direct summary', detail: '### 核心結論\n\nDirect detail\n\n### 關鍵知識\n\nExisting detail; Legacy finding\n\n### 證據與來源\n\nSource\n\n### 取捨與限制\n\nNone\n\n### 待確認事項\n\nNone\n\n### 更新紀錄\n\n- Updated', suggestions: [] }); }); },
     rebuildDerivedData: async () => {}, mutate: async work => work(), views: () => [view]
   };
@@ -141,7 +141,7 @@ integrationTest('cancelling a node task keeps its earlier Markdown and status', 
   await repo.updateNote(n.path, { prompt: 'Research', detail: 'Keep this' });
   const { VisualAgentMapView } = load('main.ts', { obsidian }); let view;
   const plugin = {
-    repo, settings: { ...DEFAULT_SETTINGS }, running: new Set(), activeTasks: new Map(), pendingSuggestions: new Map(),
+    repo, settings: { ...DEFAULT_SETTINGS }, running: new Set(), abortChartJobs: () => {}, addChartsAfterWrite: () => {}, activeTasks: new Map(), pendingSuggestions: new Map(),
     askModel: (_context, _model, _reasoning, signal, _exchange, accepted) => { accepted?.(); return new Promise((_resolve, reject) => signal.addEventListener('abort', () => { const error = new Error('cancelled'); error.name = 'AbortError'; reject(error); }, { once: true })); },
     mutate: async work => work(), views: () => [view]
   };
@@ -157,7 +157,7 @@ integrationTest('prelaunch AI failures release task ownership and preserve start
   const { repo, app } = fixture(), n = await topicNote(repo, 'Startup cleanup');
   await repo.updateNote(n.path, { prompt: 'Research', detail: 'Keep this' });
   const { VisualAgentMapView } = load('main.ts', { obsidian }); let view;
-  const plugin = { repo, settings: { ...DEFAULT_SETTINGS }, running: new Set(), activeTasks: new Map(), pendingSuggestions: new Map(), askModel: async () => { assert.fail('provider must not start'); }, mutate: async work => work(), views: () => [view] };
+  const plugin = { repo, settings: { ...DEFAULT_SETTINGS }, running: new Set(), abortChartJobs: () => {}, addChartsAfterWrite: () => {}, activeTasks: new Map(), pendingSuggestions: new Map(), askModel: async () => { assert.fail('provider must not start'); }, mutate: async work => work(), views: () => [view] };
   view = new VisualAgentMapView({ app }, plugin); view.path = 'Map.md'; view.map = map([n]); view.render = () => {}; view.hydrate = async () => { throw new Error('hydrate failed'); };
   await assert.rejects(view.runAgent(n), /hydrate failed/);
   assert.equal((await repo.readNote(n.path)).status, 'idea'); assert.equal(plugin.activeTasks.size, 0); assert.equal(plugin.running.size, 0);
@@ -170,7 +170,7 @@ integrationTest('prelaunch AI failures release task ownership and preserve start
     if (enteredRunning && patch.status === 'idea') throw new Error('status restore failed');
     return originalUpdate(path, patch);
   };
-  const abortPlugin = { repo: abortRepo, settings: { ...DEFAULT_SETTINGS }, running: new Set(), activeTasks: new Map(), pendingSuggestions: new Map(), askModel: async () => { assert.fail('provider must not start'); }, mutate: async work => work(), views: () => [abortView] }; let abortView;
+  const abortPlugin = { repo: abortRepo, settings: { ...DEFAULT_SETTINGS }, running: new Set(), abortChartJobs: () => {}, addChartsAfterWrite: () => {}, activeTasks: new Map(), pendingSuggestions: new Map(), askModel: async () => { assert.fail('provider must not start'); }, mutate: async work => work(), views: () => [abortView] }; let abortView;
   abortView = new VisualAgentMapView({ app: abortApp }, abortPlugin); abortView.path = 'Map.md'; abortView.map = map([abortNode]); abortView.render = () => {};
   abortView.hydrate = async () => { abortPlugin.activeTasks.get(abortNode.path).abort(); };
   await assert.rejects(abortView.runAgent(abortNode), /status restore failed/);
@@ -185,7 +185,7 @@ integrationTest('cancelling child synthesis restores the topic status and does n
   await app.vault.create(mapPath, core.serializeMap(mapDoc));
   const controller = new AbortController(); let view, reported = '';
   const plugin = {
-    repo, settings: { ...DEFAULT_SETTINGS }, running: new Set(), activeTasks: new Map(),
+    repo, settings: { ...DEFAULT_SETTINGS }, running: new Set(), abortChartJobs: () => {}, addChartsAfterWrite: () => {}, activeTasks: new Map(),
     askModel: (_context, _model, _reasoning, signal) => new Promise((_resolve, reject) => signal.addEventListener('abort', () => { const error = new Error('cancelled'); error.name = 'AbortError'; reject(error); }, { once: true })),
     mutate: async work => work(), views: () => [view], recordFailure: (_context, error) => { reported = error.message; return error.message; }
   };
@@ -203,7 +203,7 @@ integrationTest('provider failure keeps its original AI log stage during node er
   const entry = { id: 'exchange-1', status: 'failed', error: '等待 AI 回覆：provider timeout' };
   const exchanges = { getEntries: () => [entry], failed: (_id, error) => { entry.error = error; } };
   let view;
-  const plugin = { repo, settings: { ...DEFAULT_SETTINGS, aiExchangeLoggingEnabled: true }, exchanges, running: new Set(), activeTasks: new Map(), pendingSuggestions: new Map(),
+  const plugin = { repo, settings: { ...DEFAULT_SETTINGS, aiExchangeLoggingEnabled: true }, exchanges, running: new Set(), abortChartJobs: () => {}, addChartsAfterWrite: () => {}, activeTasks: new Map(), pendingSuggestions: new Map(),
     askModel: async (_context, _model, _reasoning, _signal, onExchange) => { onExchange(entry.id); throw new Error('provider timeout'); },
     mutate: async work => work(), views: () => [view], recordFailure: (_context, error) => error.message };
   const { VisualAgentMapView } = load('main.ts', { obsidian });
@@ -219,7 +219,7 @@ integrationTest('proposal persistence failure does not erase completed shallow r
   await repo.updateNote(n.path, { prompt: 'Research' });
   const pending = new Map(); pending.flush = async () => { throw new Error('disk unavailable'); };
   let exchangeStatus = 'parsed', view, reported = '';
-  const plugin = { repo, settings: { ...DEFAULT_SETTINGS, aiExchangeLoggingEnabled: true }, exchanges: { completed: () => { exchangeStatus = 'completed'; }, getEntries: () => [{ id: 'exchange-1', status: exchangeStatus }], failed: () => { exchangeStatus = 'failed'; } }, running: new Set(), activeTasks: new Map(), pendingSuggestions: pending,
+  const plugin = { repo, settings: { ...DEFAULT_SETTINGS, aiExchangeLoggingEnabled: true }, exchanges: { completed: () => { exchangeStatus = 'completed'; }, getEntries: () => [{ id: 'exchange-1', status: exchangeStatus }], failed: () => { exchangeStatus = 'failed'; } }, running: new Set(), abortChartJobs: () => {}, addChartsAfterWrite: () => {}, activeTasks: new Map(), pendingSuggestions: pending,
     askModel: async (_context, _model, _reasoning, _signal, onExchange) => { onExchange('exchange-1'); return { summary: 'Researched', detail: 'Result body', suggestions: [{ title: 'Proposal', task: 'Investigate', contribution: '' }], visualReferences: [] }; },
     mutate: async work => work(), views: () => [view], recordFailure: (_context, error) => { reported = error.message; return reported; } };
   const { VisualAgentMapView } = load('main.ts', { obsidian });
@@ -234,7 +234,7 @@ integrationTest('a completed but stale answer cannot overwrite an edited note', 
   await repo.updateNote(n.path, { prompt: 'Research', detail: 'Original' });
   let finish; const { VisualAgentMapView } = load('main.ts', { obsidian }); let view;
   const plugin = {
-    repo, settings: { ...DEFAULT_SETTINGS }, running: new Set(), activeTasks: new Map(), pendingSuggestions: new Map(),
+    repo, settings: { ...DEFAULT_SETTINGS }, running: new Set(), abortChartJobs: () => {}, addChartsAfterWrite: () => {}, activeTasks: new Map(), pendingSuggestions: new Map(),
     askModel: (_context, _model, _reasoning, _signal, _exchange, accepted) => { accepted?.(); return new Promise(resolve => { finish = resolve; }); }, mutate: async work => work(), views: () => [view]
   };
   view = new VisualAgentMapView({ app }, plugin); view.path = 'Map.md'; view.map = map([n]); view.render = () => {}; view.hydrate = async () => {};
@@ -434,7 +434,7 @@ const exchangeFixture = () => {
   const reply = n => JSON.stringify({ summary: 'S', detail: detail(n), suggestions: [], visualReferences: [] });
   const status = {}; const seen = [];
   const exchanges = {
-    begin: e => { status[e.id] = 'begun'; seen.push(e.id); }, sent: id => { status[id] = 'sent'; }, received: id => { status[id] = 'received'; },
+    milestones: () => {}, begin: e => { status[e.id] = 'begun'; seen.push(e.id); }, sent: id => { status[id] = 'sent'; }, received: id => { status[id] = 'received'; },
     parsed: id => { status[id] = 'parsed'; }, completed: id => { status[id] = 'completed'; }, failed: id => { status[id] = 'failed'; }
   };
   const run = async (replies, signal) => {

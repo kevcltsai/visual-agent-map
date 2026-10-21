@@ -316,7 +316,7 @@ integrationTest('one shallow-research startup failure marks that child and does 
   const mapPath = 'Agent Workspace/Topics/map-a/Map.md', mapDoc = map([parent]); mapDoc.id = 'map-a';
   await app.vault.create(mapPath, core.serializeMap(mapDoc));
   const failures = [], started = [];
-  const plugin = withExpansionCoordinator({ repo, settings: { ...DEFAULT_SETTINGS }, running: new Set(), pendingSuggestions: new Map(), pendingResearchOptions: new Map(), rebuildDerivedData: async () => {}, mutate: async work => work(), recordFailure: (context, error) => { failures.push(`${context}: ${error.message}`); return error.message; } });
+  const plugin = withExpansionCoordinator({ repo, settings: { ...DEFAULT_SETTINGS }, running: new Set(), abortChartJobs: () => {}, addChartsAfterWrite: () => {}, pendingSuggestions: new Map(), pendingResearchOptions: new Map(), rebuildDerivedData: async () => {}, mutate: async work => work(), recordFailure: (context, error) => { failures.push(`${context}: ${error.message}`); return error.message; } });
   const { VisualAgentMapView } = load('main.ts', { obsidian });
   const view = new VisualAgentMapView({ app }, plugin); view.path = mapPath; view.map = mapDoc; view.contentEl = { querySelector: () => null }; view.render = () => {}; view.hydrate = async () => {};
   view.runAgent = async (child, _done, failed, _options, accepted) => {
@@ -342,7 +342,7 @@ integrationTest('shallow research uses the research-topic task when a child has 
   const mapPath = 'Agent Workspace/Topics/map-s/Map.md', mapDoc = map([parent]); mapDoc.id = 'map-s';
   await app.vault.create(mapPath, core.serializeMap(mapDoc));
   const tasks = [];
-  const plugin = withExpansionCoordinator({ repo, settings: { ...DEFAULT_SETTINGS, language: 'en' }, running: new Set(), pendingSuggestions: new Map(), pendingResearchOptions: new Map(), rebuildDerivedData: async () => {}, mutate: async work => work(), recordFailure: (_context, error) => error.message });
+  const plugin = withExpansionCoordinator({ repo, settings: { ...DEFAULT_SETTINGS, language: 'en' }, running: new Set(), abortChartJobs: () => {}, addChartsAfterWrite: () => {}, pendingSuggestions: new Map(), pendingResearchOptions: new Map(), rebuildDerivedData: async () => {}, mutate: async work => work(), recordFailure: (_context, error) => error.message });
   const { VisualAgentMapView } = load('main.ts', { obsidian });
   const view = new VisualAgentMapView({ app }, plugin); view.path = mapPath; view.map = mapDoc; view.contentEl = { querySelector: () => null }; view.render = () => {}; view.hydrate = async () => {};
   view.runAgent = async (_child, _done, _failed, options, accepted) => { tasks.push(options.task); accepted?.(); return { finished: Promise.resolve() }; };
@@ -358,7 +358,7 @@ integrationTest('cancelling shallow research stops the batch without marking uns
   const mapPath = 'Agent Workspace/Topics/map-a/Map.md', mapDoc = map([parent]); mapDoc.id = 'map-a';
   await app.vault.create(mapPath, core.serializeMap(mapDoc));
   const failures = [], started = [], controller = new AbortController(); let finishFirst;
-  const plugin = withExpansionCoordinator({ repo, settings: { ...DEFAULT_SETTINGS }, running: new Set(), pendingSuggestions: new Map(), pendingResearchOptions: new Map(), rebuildDerivedData: async () => {}, mutate: async work => work(), recordFailure: (context, error) => { failures.push(`${context}: ${error.message}`); return error.message; } });
+  const plugin = withExpansionCoordinator({ repo, settings: { ...DEFAULT_SETTINGS }, running: new Set(), abortChartJobs: () => {}, addChartsAfterWrite: () => {}, pendingSuggestions: new Map(), pendingResearchOptions: new Map(), rebuildDerivedData: async () => {}, mutate: async work => work(), recordFailure: (context, error) => { failures.push(`${context}: ${error.message}`); return error.message; } });
   const { VisualAgentMapView } = load('main.ts', { obsidian });
   const view = new VisualAgentMapView({ app }, plugin); view.path = mapPath; view.map = mapDoc; view.contentEl = { querySelector: () => null }; view.render = () => {}; view.hydrate = async () => {};
   view.runAgent = async (child, _done, failed, options, accepted) => {
@@ -444,7 +444,7 @@ integrationTest('guided AI wait leaves map mutations free and creates the review
   const mapPath = 'Agent Workspace/Topics/map-a/Map.md', mapDoc = map([parent]); mapDoc.id = 'map-a';
   await app.vault.create(mapPath, core.serializeMap(mapDoc));
   let resolveModel, tail = Promise.resolve();
-  const plugin = withExpansionCoordinator({ repo, settings: { ...DEFAULT_SETTINGS }, running: new Set(), pendingSuggestions: new Map(), pendingResearchOptions: new Map(), rebuildDerivedData: async () => {}, recordFailure: (_context, error) => error.message,
+  const plugin = withExpansionCoordinator({ repo, settings: { ...DEFAULT_SETTINGS }, running: new Set(), abortChartJobs: () => {}, addChartsAfterWrite: () => {}, pendingSuggestions: new Map(), pendingResearchOptions: new Map(), rebuildDerivedData: async () => {}, recordFailure: (_context, error) => error.message,
     askModel: () => new Promise(resolve => { resolveModel = resolve; }), mutate(work) { const job = tail.then(work); tail = job.catch(() => {}); return job; } });
   const { VisualAgentMapView } = load('main.ts', { obsidian });
   const view = new VisualAgentMapView({ app }, plugin); view.path = mapPath; view.map = mapDoc; view.contentEl = { querySelector: () => null }; view.render = () => {}; view.hydrate = async () => {}; view.focusNode = () => {};
@@ -468,7 +468,7 @@ integrationTest('accepted guided expansion closes its modal but still offers a d
   await app.vault.create(mapPath, core.serializeMap(mapDoc));
   const pending = deferred(), modalController = new AbortController(); let accepted = false, offered;
   const plugin = withExpansionCoordinator({
-    repo, settings: { ...DEFAULT_SETTINGS, language: 'en' }, running: new Set(), pendingSuggestions: new Map(), pendingResearchOptions: new Map(),
+    repo, settings: { ...DEFAULT_SETTINGS, language: 'en' }, running: new Set(), abortChartJobs: () => {}, addChartsAfterWrite: () => {}, pendingSuggestions: new Map(), pendingResearchOptions: new Map(),
     rebuildDerivedData: async () => {}, mutate: async work => work(), recordFailure: (_context, error) => error.message,
     askModel: (_context, _model, _reasoning, _signal, _exchange, onAccepted) => { onAccepted?.(); return pending.promise; }
   });
@@ -493,7 +493,7 @@ integrationTest('stopping shallow research on reviewed subtopics before child ac
   const mapPath = 'Agent Workspace/Topics/map-a/Map.md', mapDoc = map([parent]); mapDoc.id = 'map-a';
   await app.vault.create(mapPath, core.serializeMap(mapDoc));
   const failures = [], plugin = withExpansionCoordinator({
-    repo, settings: { ...DEFAULT_SETTINGS }, running: new Set(), pendingSuggestions: new Map(), pendingResearchOptions: new Map(),
+    repo, settings: { ...DEFAULT_SETTINGS }, running: new Set(), abortChartJobs: () => {}, addChartsAfterWrite: () => {}, pendingSuggestions: new Map(), pendingResearchOptions: new Map(),
     rebuildDerivedData: async () => {}, mutate: async work => work(), recordFailure: (context, error) => { failures.push(`${context}: ${error.message}`); return error.message; },
     askModel: async (_context, _model, _reasoning, _signal, _exchange, accepted) => {
       accepted?.();
@@ -528,7 +528,7 @@ integrationTest('guided expansion keeps a genuine provider failure visible after
   const mapPath = 'Agent Workspace/Topics/map-a/Map.md', mapDoc = map([parent]); mapDoc.id = 'map-a';
   await app.vault.create(mapPath, core.serializeMap(mapDoc));
   let attempts = 0;
-  const plugin = withExpansionCoordinator({ repo, settings: { ...DEFAULT_SETTINGS }, running: new Set(), pendingSuggestions: new Map(), pendingResearchOptions: new Map(), rebuildDerivedData: async () => {}, mutate: async work => work(), recordFailure: (_context, error) => error.message,
+  const plugin = withExpansionCoordinator({ repo, settings: { ...DEFAULT_SETTINGS }, running: new Set(), abortChartJobs: () => {}, addChartsAfterWrite: () => {}, pendingSuggestions: new Map(), pendingResearchOptions: new Map(), rebuildDerivedData: async () => {}, mutate: async work => work(), recordFailure: (_context, error) => error.message,
     askModel: async (_context, _model, _reasoning, _signal, _exchange, accepted) => {
       attempts++;
       if (attempts === 1) {
@@ -556,7 +556,7 @@ integrationTest('Map Stop before accepted decomposition ignores a late answer wi
   const mapPath = 'Agent Workspace/Topics/map-a/Map.md', mapDoc = map([parent]); mapDoc.id = 'map-a';
   await app.vault.create(mapPath, core.serializeMap(mapDoc));
   let resolveModel, accepted = false, recorded = [];
-  const plugin = withExpansionCoordinator({ repo, settings: { ...DEFAULT_SETTINGS }, running: new Set(), pendingSuggestions: new Map(), pendingResearchOptions: new Map(), rebuildDerivedData: async () => {}, mutate: async work => work(), recordFailure: (context, error) => { recorded.push(`${context}: ${error.message}`); return error.message; },
+  const plugin = withExpansionCoordinator({ repo, settings: { ...DEFAULT_SETTINGS }, running: new Set(), abortChartJobs: () => {}, addChartsAfterWrite: () => {}, pendingSuggestions: new Map(), pendingResearchOptions: new Map(), rebuildDerivedData: async () => {}, mutate: async work => work(), recordFailure: (context, error) => { recorded.push(`${context}: ${error.message}`); return error.message; },
     askModel: (_context, _model, _reasoning, _signal, _exchange, onAccepted) => { onAccepted?.(); accepted = true; return new Promise(resolve => { resolveModel = resolve; }); } });
   const { VisualAgentMapView } = load('main.ts', { obsidian });
   const view = new VisualAgentMapView({ app }, plugin); view.path = mapPath; view.map = mapDoc; view.contentEl = { querySelector: () => null }; view.render = () => {}; view.hydrate = async () => {}; view.focusNode = () => {};
@@ -580,7 +580,7 @@ integrationTest('Map Stop during accepted decomposition treats provider AbortErr
     const mapPath = 'Agent Workspace/Topics/map-a/Map.md', mapDoc = map([parent]); mapDoc.id = 'map-a';
     await app.vault.create(mapPath, core.serializeMap(mapDoc));
     let accepted = false, failed = [], providerSignal;
-    const plugin = withExpansionCoordinator({ repo, settings: { ...DEFAULT_SETTINGS }, running: new Set(), pendingSuggestions: new Map(), pendingResearchOptions: new Map(), rebuildDerivedData: async () => {}, mutate: async work => work(), recordFailure: (context, error) => { failed.push(`${context}: ${error.message}`); return error.message; },
+    const plugin = withExpansionCoordinator({ repo, settings: { ...DEFAULT_SETTINGS }, running: new Set(), abortChartJobs: () => {}, addChartsAfterWrite: () => {}, pendingSuggestions: new Map(), pendingResearchOptions: new Map(), rebuildDerivedData: async () => {}, mutate: async work => work(), recordFailure: (context, error) => { failed.push(`${context}: ${error.message}`); return error.message; },
       askModel: (_context, _model, _reasoning, signal, _exchange, onAccepted) => {
         providerSignal = signal;
         onAccepted?.(); accepted = true;
@@ -609,7 +609,7 @@ integrationTest('guided expansion lets a terminal render exception after Stop re
   const mapPath = 'Agent Workspace/Topics/map-a/Map.md', mapDoc = map([parent]); mapDoc.id = 'map-a';
   await app.vault.create(mapPath, core.serializeMap(mapDoc));
   let accepted = false, providerSignal, terminalRenderFailed = false;
-  const plugin = withExpansionCoordinator({ repo, settings: { ...DEFAULT_SETTINGS }, running: new Set(), pendingSuggestions: new Map(), pendingResearchOptions: new Map(), rebuildDerivedData: async () => {}, mutate: async work => work(), recordFailure: (_context, error) => error.message,
+  const plugin = withExpansionCoordinator({ repo, settings: { ...DEFAULT_SETTINGS }, running: new Set(), abortChartJobs: () => {}, addChartsAfterWrite: () => {}, pendingSuggestions: new Map(), pendingResearchOptions: new Map(), rebuildDerivedData: async () => {}, mutate: async work => work(), recordFailure: (_context, error) => error.message,
     askModel: (_context, _model, _reasoning, signal, _exchange, onAccepted) => {
       providerSignal = signal;
       onAccepted?.(); accepted = true;
@@ -633,7 +633,7 @@ integrationTest('reviewed subtopics are refused when their parent was removed wh
   const mapPath = 'Agent Workspace/Topics/map-a/Map.md', mapDoc = map([parent]); mapDoc.id = 'map-a';
   await app.vault.create(mapPath, core.serializeMap(mapDoc));
   let resolveModel, tail = Promise.resolve();
-  const plugin = withExpansionCoordinator({ repo, settings: { ...DEFAULT_SETTINGS }, running: new Set(), pendingSuggestions: new Map(), pendingResearchOptions: new Map(), rebuildDerivedData: async () => {}, recordFailure: (_context, failure) => failure.message,
+  const plugin = withExpansionCoordinator({ repo, settings: { ...DEFAULT_SETTINGS }, running: new Set(), abortChartJobs: () => {}, addChartsAfterWrite: () => {}, pendingSuggestions: new Map(), pendingResearchOptions: new Map(), rebuildDerivedData: async () => {}, recordFailure: (_context, failure) => failure.message,
     askModel: () => new Promise(resolve => { resolveModel = resolve; }), mutate(work) { const job = tail.then(work); tail = job.catch(() => {}); return job; } });
   const { VisualAgentMapView } = load('main.ts', { obsidian });
   const view = new VisualAgentMapView({ app }, plugin); view.path = mapPath; view.map = mapDoc; view.contentEl = { querySelector: () => null }; view.render = () => {}; view.hydrate = async () => {}; view.focusNode = () => {};
@@ -712,7 +712,7 @@ integrationTest('synthesis directions and draft are separate steps; only confirm
   const child = await repo.createNote('Child', 'model-a', mapDoc, mapPath, 'workspace'); child.parentId = parent.id; mapDoc.nodes.push(child); await repo.saveMap(mapPath, mapDoc);
   await repo.updateNote(parent.path, { rules: 'Legacy sentinel' });
   const contexts = [];
-  const plugin = { repo, settings: { ...DEFAULT_SETTINGS }, running: new Set(), mutate: async work => work(), askModel: async context => { contexts.push(context); return contexts.length === 1 ? { summary: '', detail: '', visualReferences: [], suggestions: [{ title: 'Common ground', task: 'Find shared constraints', contribution: 'A shared view', parentTitle: '' }] } : { summary: 'Draft summary', detail: 'Draft detail', visualReferences: [], suggestions: [] }; } };
+  const plugin = { repo, settings: { ...DEFAULT_SETTINGS }, running: new Set(), abortChartJobs: () => {}, addChartsAfterWrite: () => {}, mutate: async work => work(), askModel: async context => { contexts.push(context); return contexts.length === 1 ? { summary: '', detail: '', visualReferences: [], suggestions: [{ title: 'Common ground', task: 'Find shared constraints', contribution: 'A shared view', parentTitle: '' }] } : { summary: 'Draft summary', detail: 'Draft detail', visualReferences: [], suggestions: [] }; } };
   const { VisualAgentMapView } = load('main.ts', { obsidian });
   const view = new VisualAgentMapView({ app }, plugin); view.path = mapPath; view.map = mapDoc; view.render = () => {}; view.hydrate = async () => {}; view.ancestorContext = async () => '';
   let choose, save;
@@ -747,7 +747,7 @@ integrationTest('synthesis content is explicit for one, three and four children,
     const selected = { id: 'extra', name: 'Extra', location: '/refs', documents: [{ path: '/refs/extra.md', content: 'EXTRA_FULL_BODY', external: true }] };
     const before = new Map(contents);
     const contexts = [];
-    const plugin = { repo, settings: { ...DEFAULT_SETTINGS }, running: new Set(), mutate: async work => work(), recordFailure: (_label, error) => error.message,
+    const plugin = { repo, settings: { ...DEFAULT_SETTINGS }, running: new Set(), abortChartJobs: () => {}, addChartsAfterWrite: () => {}, mutate: async work => work(), recordFailure: (_label, error) => error.message,
       askModel: async context => { contexts.push(context); return contexts.length === 1 ? { suggestions: [{ title: 'Direction', task: 'Compare evidence', contribution: '' }] } : { summary: 'Draft', detail: 'Draft', visualReferences: [], suggestions: [] }; } };
     const view = new VisualAgentMapView({ app }, plugin); view.map = map([parent, ...children, grandchild, unrelated]); view.render = () => {}; view.hydrate = async () => {}; view.ancestorContext = async () => '';
     let draft, save;
@@ -813,7 +813,7 @@ integrationTest('explicit full Markdown wins over overlapping automatic summarie
   const full = await app.vault.read(repo.file(a.path));
   const extra = { id: 'shared-map', name: 'Other map', location: 'Other/Map.md', documents: [{ path: a.path, content: full }] };
   let calls = 0;
-  const plugin = { repo, settings: { ...DEFAULT_SETTINGS }, running: new Set(), mutate: async work => work(), recordFailure: (_label, error) => error.message, askModel: async context => {
+  const plugin = { repo, settings: { ...DEFAULT_SETTINGS }, running: new Set(), abortChartJobs: () => {}, addChartsAfterWrite: () => {}, mutate: async work => work(), recordFailure: (_label, error) => error.message, askModel: async context => {
     const batches = referenceBatches(context.referenceGroups).join('\n');
     assert.match(batches, /FULL_OVERLAP_CONDITION/);
     assert.equal(batches.split('FULL_OVERLAP_CONDITION').length - 1, 1);
@@ -834,7 +834,7 @@ integrationTest('explicit full Markdown wins over overlapping automatic summarie
 integrationTest('synthesis can use selected notes when a topic has no children', async () => {
   const { repo, app } = fixture(), parent = await topicNote(repo, 'Parent', 'model-a');
   const contexts = [];
-  const plugin = { repo, settings: { ...DEFAULT_SETTINGS }, running: new Set(), mutate: async work => work(), recordFailure: (_context, error) => error.message, askModel: async context => { contexts.push(context); return contexts.length === 1 ? { summary: '', detail: '', suggestions: [{ title: 'Shared view', task: 'Combine notes', contribution: '' }] } : { summary: 'Combined', detail: 'Combined detail', suggestions: [] }; } };
+  const plugin = { repo, settings: { ...DEFAULT_SETTINGS }, running: new Set(), abortChartJobs: () => {}, addChartsAfterWrite: () => {}, mutate: async work => work(), recordFailure: (_context, error) => error.message, askModel: async context => { contexts.push(context); return contexts.length === 1 ? { summary: '', detail: '', suggestions: [{ title: 'Shared view', task: 'Combine notes', contribution: '' }] } : { summary: 'Combined', detail: 'Combined detail', suggestions: [] }; } };
   const { VisualAgentMapView } = load('main.ts', { obsidian });
   const view = new VisualAgentMapView({ app }, plugin); view.map = map([parent]); view.render = () => {}; view.hydrate = async () => {}; view.ancestorContext = async () => '';
   const empty = { researchMode: 'local', researchDepth: 'normal', visualMode: 'off', referenceGroups: [] };
@@ -862,7 +862,7 @@ integrationTest('decomposition accepts 1 to 7 proposals and does not write nodes
   const mapDoc = { id: 'map-a', title: 'map-a', version: 1, nodes: [parent], viewport: { x: 0, y: 0, zoom: 1 } };
   await app.vault.create(mapPath, core.serializeMap(mapDoc));
   const { VisualAgentMapView } = load('main.ts', { obsidian });
-  const plugin = withExpansionCoordinator({ repo, settings: { ...DEFAULT_SETTINGS }, running: new Set(), pendingSuggestions: new Map(), askModel: async () => ({ summary: '', detail: '', visualReferences: [], suggestions: [{ title: 'Only one', task: '', contribution: '' }, { title: 'Only two', task: '', contribution: '' }] }) });
+  const plugin = withExpansionCoordinator({ repo, settings: { ...DEFAULT_SETTINGS }, running: new Set(), abortChartJobs: () => {}, addChartsAfterWrite: () => {}, pendingSuggestions: new Map(), askModel: async () => ({ summary: '', detail: '', visualReferences: [], suggestions: [{ title: 'Only one', task: '', contribution: '' }, { title: 'Only two', task: '', contribution: '' }] }) });
   const view = new VisualAgentMapView({ app }, plugin); view.path = mapPath; view.map = mapDoc; view.render = () => {}; view.hydrate = async () => {}; view.openChildSuggestions = () => {};
   await view.proposeChildren(parent);
   assert.equal(plugin.pendingSuggestions.get(parent.path).length, 2);
@@ -884,7 +884,7 @@ integrationTest('English expansion uses English-generated task instructions', as
   await app.vault.create(mapPath, core.serializeMap(mapDoc, 'en'));
   const { VisualAgentMapView } = load('main.ts', { obsidian });
   let task = '';
-  const plugin = withExpansionCoordinator({ recordFailure: (_label, error) => String(error), repo, settings: { ...DEFAULT_SETTINGS, language: 'en' }, running: new Set(), pendingSuggestions: new Map(), askModel: async context => { task = context.task; return { summary: '', detail: '', visualReferences: [], suggestions: Array.from({ length: 3 }, (_, index) => ({ title: `Idea ${index}`, task: 'Research', contribution: '' })) }; } });
+  const plugin = withExpansionCoordinator({ recordFailure: (_label, error) => String(error), repo, settings: { ...DEFAULT_SETTINGS, language: 'en' }, running: new Set(), abortChartJobs: () => {}, addChartsAfterWrite: () => {}, pendingSuggestions: new Map(), askModel: async context => { task = context.task; return { summary: '', detail: '', visualReferences: [], suggestions: Array.from({ length: 3 }, (_, index) => ({ title: `Idea ${index}`, task: 'Research', contribution: '' })) }; } });
   const view = new VisualAgentMapView({ app }, plugin); view.path = mapPath; view.map = mapDoc; view.render = () => {}; view.hydrate = async () => {}; view.openChildSuggestions = () => {}; view.ancestorContext = async () => '';
   await view.proposeChildren(parent);
   assert.match(task, /Existing direct subtopics/);
@@ -899,7 +899,7 @@ integrationTest('decomposition receives existing child topics to avoid duplicate
   const child = await repo.createNote('交通', 'model-a', mapDoc, mapPath, 'workspace');
   child.parentId = parent.id; mapDoc.nodes.push(child); await repo.saveMap(mapPath, mapDoc);
   let captured;
-  const plugin = withExpansionCoordinator({ repo, settings: { ...DEFAULT_SETTINGS }, running: new Set(), pendingSuggestions: new Map(), askModel: async context => { captured = context; return { summary: 'No split', detail: '', visualReferences: [], suggestions: [] }; } });
+  const plugin = withExpansionCoordinator({ repo, settings: { ...DEFAULT_SETTINGS }, running: new Set(), abortChartJobs: () => {}, addChartsAfterWrite: () => {}, pendingSuggestions: new Map(), askModel: async context => { captured = context; return { summary: 'No split', detail: '', visualReferences: [], suggestions: [] }; } });
   const { VisualAgentMapView } = load('main.ts', { obsidian });
   const view = new VisualAgentMapView({ app }, plugin); view.path = mapPath; view.map = mapDoc; view.notes.set(child.id, await repo.readNote(child.path)); view.render = () => {}; view.hydrate = async () => {};
   await view.proposeChildren(parent);
@@ -916,7 +916,7 @@ integrationTest('guided proposals support zero, one, two and seven, saving selec
     const { repo, app } = fixture('en');
     const path = await repo.createMap('Guided'), doc = await repo.readMap(path);
     const parent = await repo.createNote('Parent', 'model-a', doc, path, 'workspace'); doc.nodes.push(parent); await repo.saveMap(path, doc);
-    const plugin = withExpansionCoordinator({ repo, settings: { ...DEFAULT_SETTINGS }, running: new Set(), pendingSuggestions: new Map(), pendingResearchOptions: new Map(), mutate: async work => work(), rebuildDerivedData: async () => {}, askModel: async () => ({ summary: '', detail: 'No useful split', suggestions: Array.from({length: count}, (_, i) => ({title: 'Child ' + i, task: 'Explore', contribution: ''})) }) });
+    const plugin = withExpansionCoordinator({ repo, settings: { ...DEFAULT_SETTINGS }, running: new Set(), abortChartJobs: () => {}, addChartsAfterWrite: () => {}, pendingSuggestions: new Map(), pendingResearchOptions: new Map(), mutate: async work => work(), rebuildDerivedData: async () => {}, askModel: async () => ({ summary: '', detail: 'No useful split', suggestions: Array.from({length: count}, (_, i) => ({title: 'Child ' + i, task: 'Explore', contribution: ''})) }) });
     const view = new VisualAgentMapView({app}, plugin); Object.assign(view, {path, map: doc, contentEl: {querySelector: () => null}, render() {}, async hydrate() {}, focusNode() {}});
     let offered, confirm, failure, renderedPending;
     view.render = () => { renderedPending = plugin.pendingSuggestions.size; };
@@ -942,7 +942,7 @@ async function backgroundSynthesisFixture(askModel) {
   const child = await repo.createNote('Child', 'model-a', mapDoc, mapPath, 'workspace'); child.parentId = parent.id; mapDoc.nodes.push(child); await repo.saveMap(mapPath, mapDoc);
   await repo.updateNote(parent.path, { status: 'completed', summary: 'Existing conclusion', detail: 'Existing knowledge' });
   const contexts = [];
-  const plugin = { repo, settings: { ...DEFAULT_SETTINGS }, running: new Set(), activeTasks: new Map(), mutate: async work => work(), recordFailure: (_context, error) => error.message, askModel: (context, model, reasoning, signal, onExchange, onAccepted) => { contexts.push(context); return askModel(contexts.length, signal, onAccepted); } };
+  const plugin = { repo, settings: { ...DEFAULT_SETTINGS }, running: new Set(), abortChartJobs: () => {}, addChartsAfterWrite: () => {}, activeTasks: new Map(), mutate: async work => work(), recordFailure: (_context, error) => error.message, askModel: (context, model, reasoning, signal, onExchange, onAccepted) => { contexts.push(context); return askModel(contexts.length, signal, onAccepted); } };
   const { VisualAgentMapView } = load('main.ts', { obsidian });
   const view = new VisualAgentMapView({ app }, plugin); view.path = mapPath; view.map = mapDoc; view.render = () => {}; view.hydrate = async () => {}; view.ancestorContext = async () => '';
   const options = () => ({ researchMode: 'local', researchDepth: 'normal', visualMode: 'off', referenceGroups: [] });
@@ -1024,7 +1024,7 @@ integrationTest('multi-select synthesis: Stop while the sources are re-read afte
   const mapDoc = { id: 'map-a', title: 'map-a', version: 1, nodes: [a, b], viewport: { x: 0, y: 0, zoom: 1 } };
   await app.vault.create(mapPath, core.serializeMap(mapDoc));
   const { VisualAgentMapView } = load('main.ts', { obsidian });
-  const plugin = { repo, settings: { ...DEFAULT_SETTINGS }, running: new Set(), mutate: async work => work(), recordFailure: (_l, error) => error.message, rebuildDerivedData: async () => {}, askModel: async () => ({ summary: 'S', detail: 'D', visualReferences: [], suggestions: [] }) };
+  const plugin = { repo, settings: { ...DEFAULT_SETTINGS }, running: new Set(), abortChartJobs: () => {}, addChartsAfterWrite: () => {}, mutate: async work => work(), recordFailure: (_l, error) => error.message, rebuildDerivedData: async () => {}, askModel: async () => ({ summary: 'S', detail: 'D', visualReferences: [], suggestions: [] }) };
   const view = new VisualAgentMapView({ app }, plugin); view.path = mapPath; view.map = mapDoc; view.render = () => {}; view.hydrate = async () => {}; view.focusNode = () => {};
   const controller = new AbortController();
   const original = view.topicReferenceGroup.bind(view); let reads = 0;
@@ -1099,7 +1099,7 @@ async function multiResearchHarness(titles, overrides = {}) {
   for (const title of titles) { const created = await repo.createNote(title, 'model-a', mapDoc, mapPath, 'workspace'); mapDoc.nodes.push(created); nodes.push(created); }
   await repo.saveMap(mapPath, mapDoc);
   const confirms = [];
-  const plugin = withExpansionCoordinator({ repo, settings: { ...DEFAULT_SETTINGS, language: overrides.language ?? 'en', cliModel: 'gpt-6-luna' }, running: new Set(), pendingSuggestions: new Map(), pendingResearchOptions: new Map(), rebuildDerivedData: async () => {}, mutate: async work => work(), confirmAiUsage: async (model, run) => { confirms.push(model); await run(); return true; }, ...Object.fromEntries(Object.entries(overrides).filter(([key]) => key !== 'language')) });
+  const plugin = withExpansionCoordinator({ repo, settings: { ...DEFAULT_SETTINGS, language: overrides.language ?? 'en', cliModel: 'gpt-6-luna' }, running: new Set(), abortChartJobs: () => {}, addChartsAfterWrite: () => {}, pendingSuggestions: new Map(), pendingResearchOptions: new Map(), rebuildDerivedData: async () => {}, mutate: async work => work(), confirmAiUsage: async (model, run) => { confirms.push(model); await run(); return true; }, ...Object.fromEntries(Object.entries(overrides).filter(([key]) => key !== 'language')) });
   const { VisualAgentMapView } = load('main.ts', { obsidian: { ...obsidian, Notice: class { constructor(message) { notices.push(message); } }, Modal: class { constructor(app) { this.app = app; } open() { opened.push(this); } } } });
   const view = new VisualAgentMapView({ app }, plugin); view.path = mapPath; view.map = mapDoc; view.contentEl = { querySelector: () => null }; view.render = () => {}; view.hydrate = async () => {};
   view.runAgent = async (child, _done, failed, options, accepted) => {
@@ -1309,19 +1309,19 @@ const testTemplate = (id, names) => ({ id, name: `Template ${id}`, sections: nam
 const sampleTemplates = () => [testTemplate('A', ['Alpha']), testTemplate('B', ['Beta']), testTemplate('C', ['Gamma'])];
 // Runs the real runAgent / synthesis save paths; only plugin.askModel is a double (L-001).
 async function templateHarness({ language = 'zh-TW', settings = {}, mapTemplate, reply } = {}) {
-  const { repo, app } = fixture(language), notices = [], contexts = [];
+  const { repo, app } = fixture(language), notices = [], contexts = [], chartJobs = [], chartAborts = [];
   const mapPath = 'Agent Workspace/Topics/map-a/Map.md', doc = { id: 'map-a', title: 'map-a', version: 1, nodes: [], viewport: { x: 0, y: 0, zoom: 1 } };
   if (mapTemplate) doc.detailTemplateId = mapTemplate;
   await repo.ensureTopicFolders('Agent Workspace/Topics/map-a'); await app.vault.create(mapPath, core.serializeMap(doc));
   const topic = await repo.createNote('Topic', 'model-a', doc, mapPath, 'workspace'); doc.nodes.push(topic); await repo.saveMap(mapPath, doc);
   await repo.updateNote(topic.path, { prompt: 'Research the topic' });
   let view;
-  const plugin = withExpansionCoordinator({ repo, settings: { ...DEFAULT_SETTINGS, language, ...settings }, running: new Set(), activeTasks: new Map(), pendingSuggestions: new Map(), pendingResearchOptions: new Map(), rebuildDerivedData: async () => {}, mutate: async work => work(), views: () => [view], recordFailure: (_label, error) => error.message,
+  const plugin = withExpansionCoordinator({ repo, settings: { ...DEFAULT_SETTINGS, language, ...settings }, running: new Set(), abortChartJobs: path => chartAborts.push(path), addChartsAfterWrite: job => chartJobs.push(job), activeTasks: new Map(), pendingSuggestions: new Map(), pendingResearchOptions: new Map(), rebuildDerivedData: async () => {}, mutate: async work => work(), views: () => [view], recordFailure: (_label, error) => error.message,
     askModel: async (context, _model, _reasoning, _signal, _exchange, onAccepted) => { contexts.push(context); onAccepted?.(); return (reply ?? (() => ({ summary: 'Saved summary', detail: 'Saved detail', visualReferences: [], suggestions: [] })))(context, contexts.length); } });
   const { VisualAgentMapView } = load('main.ts', { obsidian: { ...obsidian, Notice: class { constructor(message) { notices.push(message); } } } });
   view = new VisualAgentMapView({ app }, plugin); view.path = mapPath; view.map = doc; view.contentEl = { querySelector: () => null }; view.render = () => {}; view.hydrate = async () => {}; view.ancestorContext = async () => '';
   const run = async (target = topic) => { const handle = await view.runAgent(target); await handle?.finished; await until(() => !plugin.running.size); };
-  return { repo, app, view, plugin, doc, mapPath, topic, notices, contexts, run };
+  return { repo, app, view, plugin, doc, mapPath, topic, notices, contexts, run, chartJobs, chartAborts };
 }
 integrationTest('runAgent: context carries the resolved template (topic > map > workspace > Standard)', async () => {
   const h = await templateHarness({ settings: { detailTemplates: sampleTemplates(), defaultDetailTemplateId: 'C' } });
@@ -1689,7 +1689,7 @@ async function staleModelView(sources, askModel) {
   const nodes = [];
   for (const [index, [source, model]] of sources.entries()) { const created = await repo.createNote(`T${index}`, model ?? 'gpt-5.6-luna', mapDoc, mapPath, source); created.parentId = index ? nodes[index - 1].id : null; mapDoc.nodes.push(created); nodes.push(created); }
   await repo.saveMap(mapPath, mapDoc);
-  const plugin = withExpansionCoordinator({ repo, settings: { ...DEFAULT_SETTINGS, cliModel: 'claude:sonnet' }, running: new Set(), pendingSuggestions: new Map(), pendingResearchOptions: new Map(), rebuildDerivedData: async () => {}, mutate: async work => work(), askModel });
+  const plugin = withExpansionCoordinator({ repo, settings: { ...DEFAULT_SETTINGS, cliModel: 'claude:sonnet' }, running: new Set(), abortChartJobs: () => {}, addChartsAfterWrite: () => {}, pendingSuggestions: new Map(), pendingResearchOptions: new Map(), rebuildDerivedData: async () => {}, mutate: async work => work(), askModel });
   const { VisualAgentMapView } = load('main.ts', { obsidian });
   const view = new VisualAgentMapView({ app }, plugin); view.path = mapPath; view.map = mapDoc; view.contentEl = { querySelector: () => null }; view.render = () => {}; view.hydrate = async () => {}; view.focusNode = () => {}; view.ancestorContext = async () => '';
   return { repo, view, nodes, mapDoc };
@@ -1775,4 +1775,94 @@ integrationTest('Keep current (…) names the effective style: topic, then map, 
   assert.equal(view.currentStyleLabel('standard', 'plain'), 'Plain language');
   assert.equal(view.currentStyleLabel('A', 'magazine'), 'Custom: Template A · Magazine column');
   assert.equal(view.currentStyleLabel('textbook', 'plain'), 'Custom: Textbook · Plain explanation');
+});
+
+// ---- S2: the chart step runs after the write, in the background, on all three write paths.
+const CHART_BLOCK = '\n\n```mermaid\nflowchart TD\nA["x"] --> B["y"]\n```';
+integrationTest('S2: runAgent queues the chart step after the write (aborting that path first); applying it is its own undo entry', async () => {
+  const h = await templateHarness({ language: 'en', reply: () => ({ summary: 'Sum', detail: 'Body paragraph.', visualReferences: [], suggestions: [] }) });
+  await h.run();
+  assert.deepEqual(plain(h.chartAborts), [h.topic.path], 'a new run aborts that path\'s earlier chart job first');
+  assert.equal(h.chartJobs.length, 1);
+  const [job] = h.chartJobs;
+  assert.equal(job.path, h.topic.path); assert.equal(job.context.addCharts, true); assert.equal(job.context.mode, 'task'); assert.equal(job.model, (await h.repo.readNote(h.topic.path)).model, 'the chart step uses the topic\'s own model');
+  const written = (await h.repo.readNote(h.topic.path)).detail;
+  assert.match(written, /Body paragraph/); assert.doesNotMatch(written, /mermaid/);
+  assert.equal(job.detail, written, 'the chart step sees the detail exactly as written');
+  const runEntry = h.view.history.undoEntry;
+  assert.equal(await job.apply(written + CHART_BLOCK), true);
+  assert.match((await h.repo.readNote(h.topic.path)).detail, /```mermaid/);
+  assert.notEqual(h.view.history.undoEntry, runEntry, 'the diagrams are a separate history entry');
+  await h.view.history.undo().undo();
+  const afterUndo = await h.repo.readNote(h.topic.path);
+  assert.equal(afterUndo.detail, written, 'undo removes only the diagrams'); assert.equal(afterUndo.status, 'completed');
+});
+integrationTest('S2: diagrams are dropped when the note changed after the write or a run is active on it', async () => {
+  const h = await templateHarness({ language: 'en', reply: () => ({ summary: 'Sum', detail: 'Body paragraph.', visualReferences: [], suggestions: [] }) });
+  await h.run();
+  const [job] = h.chartJobs, written = (await h.repo.readNote(h.topic.path)).detail;
+  await h.repo.updateNote(h.topic.path, { summary: 'Edited by the user' });
+  assert.equal(await job.apply(written + CHART_BLOCK), false, 'stale: the note no longer equals its snapshot at write time');
+  assert.equal((await h.repo.readNote(h.topic.path)).detail, written);
+  const again = await templateHarness({ language: 'en', reply: () => ({ summary: 'Sum', detail: 'Body paragraph.', visualReferences: [], suggestions: [] }) });
+  await again.run();
+  again.plugin.running.add(again.topic.path);
+  assert.equal(await again.chartJobs[0].apply((await again.repo.readNote(again.topic.path)).detail + CHART_BLOCK), false, 'a path that is running again is not touched');
+  assert.doesNotMatch((await again.repo.readNote(again.topic.path)).detail, /mermaid/);
+});
+integrationTest('S2: a stopped or failed research run queues no chart job', async () => {
+  const h = await templateHarness({ language: 'en', reply: () => { throw new Error('provider down'); } });
+  await h.run();
+  assert.equal(h.chartJobs.length, 0);
+});
+integrationTest('S2: child synthesis and multi-topic synthesis queue the chart step after their write', async () => {
+  const h = await templateHarness({ language: 'en', reply: () => ({ summary: 'Synth', detail: 'Merged paragraph.', visualReferences: [], suggestions: [] }) });
+  const child = await h.repo.createNote('Child', 'model-a', h.doc, h.mapPath, 'workspace'); child.parentId = h.topic.id; h.doc.nodes.push(child); await h.repo.saveMap(h.mapPath, h.doc);
+  await h.repo.updateNote(h.topic.path, { status: 'completed' });
+  const options = () => ({ researchMode: 'local', researchDepth: 'normal', visualMode: 'off', referenceGroups: [] });
+  await h.view.startSynthesis(h.topic, options(), null, message => assert.fail(message), () => {});
+  await h.view.startSynthesis(h.topic, options(), 'Compare them', message => assert.fail(message), () => {});
+  assert.deepEqual(plain(h.chartAborts), [h.topic.path], 'the synthesis start aborts that path\'s chart job');
+  assert.equal(h.chartJobs.length, 1);
+  assert.equal(h.chartJobs[0].path, h.topic.path); assert.equal(h.chartJobs[0].context.mode, 'synthesize');
+  const parentDetail = (await h.repo.readNote(h.topic.path)).detail;
+  assert.equal(h.chartJobs[0].detail, parentDetail);
+  assert.equal(await h.chartJobs[0].apply(parentDetail + CHART_BLOCK), true);
+  assert.match((await h.repo.readNote(h.topic.path)).detail, /```mermaid/);
+  const other = await h.repo.createNote('Other', 'model-a', h.doc, h.mapPath, 'workspace'); h.doc.nodes.push(other); await h.repo.saveMap(h.mapPath, h.doc);
+  await h.view.createIntegratedNode('Combined', [h.topic, other], 'Compare', '');
+  assert.equal(h.chartJobs.length, 2);
+  const saved = await h.repo.readMap(h.mapPath), integrated = saved.nodes.at(-1);
+  assert.equal(h.chartJobs[1].path, integrated.path); assert.equal(h.chartJobs[1].context.mode, 'synthesize');
+  const written = (await h.repo.readNote(integrated.path)).detail;
+  assert.equal(h.chartJobs[1].detail, written);
+  assert.equal(await h.chartJobs[1].apply(written + CHART_BLOCK), true);
+  assert.match((await h.repo.readNote(integrated.path)).detail, /```mermaid/);
+});
+
+// ---- S7: quick research of AI-expanded subtopics reads local context only unless the dialog's checkbox is on.
+integrationTest('S7: expansion shallow research defaults to local and no images; the checkbox restores the dialog choices; stored mode stays research', async () => {
+  const { repo, app } = fixture('en'), parent = await topicNote(repo, 'Parent', 'model-a');
+  const mapPath = 'Agent Workspace/Topics/map-s7/Map.md', mapDoc = map([parent]); mapDoc.id = 'map-s7';
+  await app.vault.create(mapPath, core.serializeMap(mapDoc));
+  const runs = [];
+  const plugin = withExpansionCoordinator({ repo, settings: { ...DEFAULT_SETTINGS, language: 'en' }, running: new Set(), abortChartJobs: () => {}, addChartsAfterWrite: () => {}, pendingSuggestions: new Map(), pendingResearchOptions: new Map(), rebuildDerivedData: async () => {}, mutate: async work => work(), recordFailure: (_context, error) => error.message });
+  const { VisualAgentMapView } = load('main.ts', { obsidian });
+  const view = new VisualAgentMapView({ app }, plugin); view.path = mapPath; view.map = mapDoc; view.contentEl = { querySelector: () => null }; view.render = () => {}; view.hydrate = async () => {};
+  view.runAgent = async (_child, _done, _failed, overrides, accepted) => { runs.push({ researchMode: overrides.researchMode, visualMode: overrides.visualMode }); accepted?.(); return { finished: Promise.resolve() }; };
+  const dialog = { researchMode: 'research', researchDepth: 'fast', visualMode: 'auto', referenceGroups: [], shallowResearch: true, outputLanguage: 'en' };
+  const children = await view.createChildBatch(parent, [{ title: 'One', task: 'Why one?', contribution: '' }], dialog);
+  const stored = await repo.readNote(children[0].path);
+  assert.equal(stored.researchMode, 'research', 'the child note keeps research as its own mode'); assert.equal(stored.visualMode, 'auto');
+  await view.startShallowResearch(parent, children, view.shallowChildOptions(dialog));
+  await until(() => plugin.expansionBatches.get(parent.path).status !== 'running');
+  assert.deepEqual(plain(runs), [{ researchMode: 'local', visualMode: 'off' }]);
+  assert.equal(view.shallowChildOptions({ ...dialog, shallowWebSearch: true }).researchMode, 'research');
+  assert.equal(view.shallowChildOptions({ ...dialog, shallowWebSearch: true }).visualMode, 'auto');
+  // Outline import (not AI expansion) keeps passing the options through startShallowResearch unchanged.
+  runs.length = 0;
+  const second = await view.createChildBatch(parent, [{ title: 'Two', task: 'Why two?', contribution: '' }], dialog);
+  await view.startShallowResearch(parent, second, dialog);
+  await until(() => plugin.expansionBatches.get(parent.path).status !== 'running');
+  assert.deepEqual(plain(runs), [{ researchMode: 'research', visualMode: 'auto' }]);
 });

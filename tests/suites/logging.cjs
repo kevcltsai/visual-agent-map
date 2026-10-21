@@ -155,3 +155,31 @@ test('AIM create command keeps its original command ID so existing hotkeys and U
   assert.match(source, /addLocalizedCommand\(AIM_CREATE_MAP_COMMAND_ID, "ui\.aim_create_map"/);
   assert.equal(AIM_CREATE_MAP_COMMAND_ID, `create-${LEGACY_MARKER_PREFIX}map`);
 });
+integrationTest('AI exchange log: milestones are optional, validated as an object on load, ignore unknown keys, and are printed', async () => {
+  const { AiExchangeLog, formatAiExchange } = load('ai-exchange-log.ts');
+  const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'vam-milestones-'));
+  try {
+    const file = path.join(directory, 'ai-exchanges.json');
+    const valid = { id: '1', startedAt: 'now', topic: 'Topic', mode: 'task', model: 'test', effort: 'low', request: 'prompt', response: 'answer', status: 'completed', error: '' };
+    // An older log without milestones loads; unknown keys inside milestones are not an error.
+    fs.writeFileSync(file, JSON.stringify([valid, { ...valid, id: '2', milestones: { receivedAt: '2026-01-01T00:00:00.000Z', futureKey: { a: 1 }, usage: { inputTokens: 3 } } }]));
+    const errors = [];
+    const log = new AiExchangeLog(file, error => errors.push(error)); await log.load();
+    assert.deepEqual(errors, []); assert.equal(log.getEntries().length, 2);
+    assert.equal(log.getEntries()[0].milestones, undefined);
+    assert.doesNotMatch(formatAiExchange(log.getEntries()[0]), /milestones:/);
+    assert.match(formatAiExchange(log.getEntries()[1]), /milestones: \{"receivedAt":"2026-01-01T00:00:00.000Z"/);
+    // A milestones value that is not an object invalidates the log, like any other bad field.
+    for (const bad of ['text', 5, [], null]) {
+      fs.writeFileSync(file, JSON.stringify([{ ...valid, milestones: bad }]));
+      const failures = []; const broken = new AiExchangeLog(file, error => failures.push(error)); await broken.load();
+      assert.equal(failures.length, 1, JSON.stringify(bad)); assert.equal(broken.getEntries().length, 0);
+    }
+    // milestones() stores the data on the entry and persists it.
+    const writer = new AiExchangeLog(path.join(directory, 'new.json'), error => errors.push(error));
+    writer.begin({ id: 'm', startedAt: new Date().toISOString(), topic: 'T', mode: 'task', model: 'test', effort: 'low' });
+    writer.milestones('m', { receivedAt: 'x', textBeforeTool: false }); await writer.flush();
+    assert.deepEqual(JSON.parse(fs.readFileSync(path.join(directory, 'new.json'), 'utf8'))[0].milestones, { receivedAt: 'x', textBeforeTool: false });
+    assert.deepEqual(errors, []);
+  } finally { fs.rmSync(directory, { recursive: true, force: true }); }
+});

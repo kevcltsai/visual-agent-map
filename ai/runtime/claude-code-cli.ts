@@ -1,5 +1,6 @@
 import { spawn as nodeSpawn } from "node:child_process";
 import { t } from "../../i18n";
+import type { AiMilestones } from "../../ai-exchange-log";
 import type { WebSearchEvent } from "../types";
 
 interface ClaudeProcess {
@@ -45,6 +46,8 @@ export interface ClaudeTaskControls {
   onWebSearchEvent?: (event: WebSearchEvent) => void;
   /** A base64 PNG, JPEG, GIF or WebP data URL sent with the prompt as an image block. */
   imageDataUrl?: string;
+  /** Receives call facts (usage, text before the StructuredOutput call, an enforce retry) once the transcript is read. */
+  onMilestones?: (data: AiMilestones) => void;
 }
 
 /** Splits an image data URL into the Messages API image source; anything else is rejected. */
@@ -117,6 +120,47 @@ export function claudeStructuredOutput(stdout: string, plainText = false): strin
   return JSON.stringify(record.structured_output);
 }
 
+/**
+ * Facts read from the `--verbose` transcript array: the token usage of the result record, whether the main agent wrote
+ * answer text before its StructuredOutput tool call, and whether the CLI sent a "structured-output-enforce" reminder
+ * (the model had to call the tool again). Anything the transcript does not show is left out.
+ */
+export function claudeTranscriptMilestones(transcript: unknown): AiMilestones {
+  const milestones: AiMilestones = {};
+  if (!Array.isArray(transcript)) return milestones;
+  let structured = false,
+    textBefore = false,
+    enforce = false;
+  for (const item of transcript as unknown[]) {
+    if (!item || typeof item !== "object") continue;
+    const record = item as ClaudeRecord & { usage?: { input_tokens?: unknown; output_tokens?: unknown } };
+    if (record.type === "result") {
+      const input = record.usage?.input_tokens;
+      const output = record.usage?.output_tokens;
+      if (typeof input === "number" || typeof output === "number")
+        milestones.usage = {
+          ...(typeof input === "number" ? { inputTokens: input } : {}),
+          ...(typeof output === "number" ? { outputTokens: output } : {})
+        };
+      continue;
+    }
+    if (record.parent_tool_use_id) continue;
+    if (record.type === "assistant") {
+      for (const block of record.message?.content ?? []) {
+        if (block.type === "tool_use" && block.name === "StructuredOutput") structured = true;
+        else if (block.type === "text" && !structured && typeof block.text === "string" && block.text.trim())
+          textBefore = true;
+      }
+    } else if (record.type === "user" && JSON.stringify(record.message ?? "").includes("structured-output-enforce"))
+      enforce = true;
+  }
+  if (structured) {
+    milestones.textBeforeTool = textBefore;
+    milestones.enforceRetry = enforce;
+  }
+  return milestones;
+}
+
 /** Above this the verbose transcript is not kept; a truncated JSON array could not be parsed anyway. */
 const CLAUDE_STDOUT_LIMIT = 64 * 1024 * 1024;
 
@@ -124,7 +168,14 @@ type ClaudeRecord = {
   type?: unknown;
   parent_tool_use_id?: unknown;
   message?: {
-    content?: Array<{ type?: unknown; id?: unknown; name?: unknown; tool_use_id?: unknown; is_error?: unknown }>;
+    content?: Array<{
+      type?: unknown;
+      id?: unknown;
+      name?: unknown;
+      text?: unknown;
+      tool_use_id?: unknown;
+      is_error?: unknown;
+    }>;
   };
 };
 
@@ -373,9 +424,25 @@ export class ClaudeCodeCliRuntime {
         if (killTimer) window.clearTimeout(killTimer);
         finish(new Error(t("ui.could_not_start_claude_code_0_1", this.options.executable, error.message)));
       });
+      // Best effort: call facts never fail the task.
+      const reportMilestones = (transcript: unknown): void => {
+        try {
+          const data = claudeTranscriptMilestones(transcript);
+          if (Object.keys(data).length) controls.onMilestones?.(data);
+        } catch {
+          /* Diagnostics are best effort. */
+        }
+      };
       child.on("close", code => {
         if (killTimer) window.clearTimeout(killTimer);
         if (settled) return;
+        if (!streaming && controls.onMilestones) {
+          try {
+            reportMilestones(JSON.parse(stdout));
+          } catch {
+            /* A broken transcript is reported by the result parsing below. */
+          }
+        }
         if (code !== 0) {
           let message = stderr.trim();
           if (!message) {

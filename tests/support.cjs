@@ -72,6 +72,8 @@ const tree = () => [node('a'), node('b', 'a'), node('c', 'b'), node('d')];
 function withExpansionCoordinator(plugin) {
   const { ShallowExpansionCoordinator } = load('experiences/visual-map/expansion-batch.ts');
   plugin.activeTasks ??= new Map(); plugin.expansionBatches = new Map(); plugin.quickExpandPending ??= new Set();
+  // Background chart jobs belong to the real plugin; the view-level doubles only need the two calls to exist.
+  plugin.abortChartJobs ??= () => {}; plugin.addChartsAfterWrite ??= () => {};
   plugin.expansionCoordinator = new ShallowExpansionCoordinator(plugin.activeTasks, plugin.expansionBatches);
   return plugin;
 }

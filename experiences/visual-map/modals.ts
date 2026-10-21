@@ -55,6 +55,11 @@ export interface TaskOptions {
   researchDepth: ResearchDepth;
   visualMode: VisualMode;
   shallowResearch?: boolean;
+  /**
+   * Shallow research of the new subtopics also searches the web (and images when chosen). Absent or false: those quick
+   * runs use local context only; the parent's decomposition keeps the dialog's own web choice.
+   */
+  shallowWebSearch?: boolean;
   /** This run's explicit content template choice; recorded on the topic when given. */
   detailTemplateId?: string;
   /** This run's explicit writing tone choice; recorded on the topic when given. */
@@ -1104,6 +1109,11 @@ export class NextStepModal extends Modal {
       text: t("ui.shallow_research_for_expanded_subtopics_0", researchDepthDescription("fast"))
     });
     shallowHint.hidden = true;
+    const shallowWebLabel = adjustFor.expand.createEl("label", { cls: "vam-field vam-next-toggle" });
+    const shallowWeb = shallowWebLabel.createEl("input", { type: "checkbox" });
+    shallowWeb.checked = false;
+    shallowWebLabel.createSpan({ text: t("ui.shallow_research_web_search") });
+    shallowWebLabel.hidden = true;
     const expandFooterText = actions.createSpan({
       text: t("ui.create_subtopics_after_confirmation_without_running_research"),
       cls: "vam-next-actions-note"
@@ -1122,6 +1132,7 @@ export class NextStepModal extends Modal {
     };
     shallow.addEventListener("change", () => {
       shallowHint.hidden = !shallow.checked;
+      shallowWebLabel.hidden = !shallow.checked;
       setExpandMode(multiLayer);
     });
     expandButton.addEventListener("click", () => {
@@ -1136,6 +1147,7 @@ export class NextStepModal extends Modal {
             requirements: this.requirements(),
             researchMode: selected?.webSearch ? "research" : "local",
             shallowResearch: shallow.checked,
+            ...(shallow.checked && shallowWeb.checked ? { shallowWebSearch: true } : {}),
             researchDepth: "fast",
             visualMode: shallow.checked && selected?.imageSearch ? "auto" : "off",
             ...(templateId() ? { detailTemplateId: templateId() } : {}),
@@ -1463,7 +1475,9 @@ export class NextStepModal extends Modal {
     if (waitingOutline && quickOutline) {
       // Reopened from the card badge or the Notice: straight into the review of the outline generated in the background.
       shallow.checked = !!waitingOutline.options.shallowResearch;
+      shallowWeb.checked = !!waitingOutline.options.shallowWebSearch;
       shallowHint.hidden = !shallow.checked;
+      shallowWebLabel.hidden = !shallow.checked;
       setExpandMode(true);
       const reviewOptions: TaskOptions = {
         ...waitingOutline.options,

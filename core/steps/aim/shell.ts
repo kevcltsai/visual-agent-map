@@ -1,6 +1,7 @@
 import { renderTemplate } from "../../step-runner";
 import type { UiLanguage } from "../../../i18n";
 import type { TaskContext } from "../../../ai/types";
+import type { AiProviderId } from "../../../ai/providers/provider";
 import {
   inLanguage,
   LABEL_ANCESTORS,
@@ -15,6 +16,7 @@ import {
   ROLE,
   SOURCE_SAFETY,
   toneBlock,
+  withProviderOutput,
   type FragmentPair
 } from "../_shared/fragments";
 import LanguageZH from "./language.zh.md";
@@ -130,7 +132,7 @@ function phaseGuidance(
 }
 
 /** Builds the compact AIM prompt while retaining the regular AiResult JSON contract. */
-export function buildAimPrompt(context: TaskContext, language: UiLanguage): string {
+export function buildAimPrompt(context: TaskContext, language: UiLanguage, provider: AiProviderId = "codex"): string {
   const phase = aimPhase(context.task);
   const field = (label: string, value: string | undefined) => (value?.trim() ? `${label}:\n${value}` : "");
   const blocks = [
@@ -139,7 +141,7 @@ export function buildAimPrompt(context: TaskContext, language: UiLanguage): stri
     inLanguage(SOURCE_SAFETY, language),
     context.sourceContext ? inLanguage(REFERENCE_CITATIONS, language) : "",
     context.sourceContext && context.researchMode !== "local" ? inLanguage(LOCAL_FIRST, language) : "",
-    inLanguage(JSON_CONTRACT, language),
+    withProviderOutput(inLanguage(JSON_CONTRACT, language), provider, language),
     context.toneText ? toneBlock(context.toneText, language) : "",
     phaseGuidance(phase, language, context.responseContract, !!context.aimContract),
     readerFacingAimPhase(phase) ? inLanguage(OBSIDIAN_FORMAT, language) : "",

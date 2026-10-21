@@ -19,8 +19,8 @@ function record(name, builder, language, prompt, schema) {
   assert.ok(!snapshots.has(name), `duplicate snapshot ${name}`);
   snapshots.set(name, { builder, language, prompt: normalizeText(prompt), schema });
 }
-async function recordContext(name, builder, language, context) {
-  const sent = await promptsFor(context, { language });
+async function recordContext(name, builder, language, context, model) {
+  const sent = await promptsFor(context, { language, ...(model ? { model } : {}) });
   assert.ok(sent.length >= 1, `${name}: no prompt reached the provider`);
   sent.forEach((call, index) => record(sent.length === 1 ? name : `${name}.${index + 1}`, builder, language, call.prompt, call.schema));
 }
@@ -99,7 +99,7 @@ test('collect snapshots: Visual Map expansion and synthesis tasks', async () => 
     const child = await repo.createNote('Child topic', 'model-a', mapDoc, mapPath, 'workspace'); child.parentId = parent.id; mapDoc.nodes.push(child);
     await repo.updateNote(child.path, { summary: 'Child summary', detail: 'Child detail', newFindings: 'Child finding', visualReferences: '![diagram](https://example.org/diagram.png)' });
     const contexts = [];
-    const plugin = support.withExpansionCoordinator({ repo, settings: { ...support.DEFAULT_SETTINGS, language }, running: new Set(), pendingSuggestions: new Map(), pendingResearchOptions: new Map(), rebuildDerivedData: async () => {}, mutate: async work => work(), recordFailure: (_label, error) => error.message,
+    const plugin = support.withExpansionCoordinator({ repo, settings: { ...support.DEFAULT_SETTINGS, language }, running: new Set(), abortChartJobs: () => {}, addChartsAfterWrite: () => {}, pendingSuggestions: new Map(), pendingResearchOptions: new Map(), rebuildDerivedData: async () => {}, mutate: async work => work(), recordFailure: (_label, error) => error.message,
       askModel: async context => { contexts.push({ kind: contexts.kind === 'merge-draft' && context.detail ? 'merge-repair' : contexts.kind, context }); return { summary: 'S', detail: 'D', visualReferences: [], suggestions: contexts.suggestions ?? [] }; } });
     const view = new VisualAgentMapView({ app }, plugin); view.path = mapPath; view.map = mapDoc; view.contentEl = { querySelector: () => null }; view.render = () => {}; view.hydrate = async () => {}; view.focusNode = () => {}; view.ancestorContext = async () => 'Ancestor chain A';
     const options = { researchMode: 'research', researchDepth: 'fast', visualMode: 'off', referenceGroups: [], shallowResearch: false, outputLanguage: language };
@@ -191,6 +191,24 @@ test('collect snapshots: Coffee Tables, Reframe, Markdown context', async () => 
   const sentByPanel = await runPanel({ markdown: 'Intro line.\nSelected sentence here.\nOutro line.', selected: 'Selected sentence here.', replies: [planReply, 'Shorter.'] });
   assert.equal(sentByPanel.length, 2, 'the panel asked for a plan, then for the transformation');
   record('markdown-context.run-prompt', 'markdown-context/selection-ai.ts runPrompt via the panel (transform action, not localized)', 'none', sentByPanel[1]);
+});
+
+test('collect snapshots: Claude structured-output instruction (task, AIM phase, chart)', async () => {
+  // Claude prompts add the StructuredOutput-first sentence; the Codex snapshots above stay byte-identical.
+  const claude = 'claude:sonnet';
+  for (const [language, tag] of LANGUAGES) {
+    const ctx = { ...base, outputLanguage: language };
+    await recordContext(`claude.task-general.${tag}`, 'AiTaskService instructions for Claude: mode task, web research (StructuredOutput-first sentence)', language, ctx, claude);
+    await recordContext(`claude.task-decompose.${tag}`, 'AiTaskService instructions for Claude: mode decompose', language, { ...ctx, mode: 'decompose', researchDepth: 'deep' }, claude);
+    await recordContext(`claude.task-synthesize.${tag}`, 'AiTaskService instructions for Claude: mode synthesize, local', language, { ...ctx, mode: 'synthesize', researchMode: 'local', visualMode: 'off' }, claude);
+    const aim = { title: 'Goal G', summary: 'Summary S', rules: 'Rule R', detail: 'Reports D', ancestors: 'Known conditions C', workingFindings: 'Prior findings F', sourceContext: 'Source [S1]: fact', mode: 'task', promptProfile: 'aim', researchMode: 'research', researchDepth: 'normal', visualMode: 'off', task: '<!-- aim-phase: subtopic-research -->\nPhase task text.', outputLanguage: language };
+    await recordContext(`claude.aim-subtopic-research.${tag}`, 'buildAimPrompt for Claude (phase subtopic-research)', language, aim, claude);
+  }
+  const { chartStep } = loadModule('core/steps/chart/step.ts');
+  for (const [language, tag] of LANGUAGES) {
+    const detail = language === 'en' ? 'Larvae hatch in 3 days.\n\nThe pupa stage lasts 5 days.' : '幼蟲 3 天孵化。\n\n蛹期持續 5 天。';
+    record(`claude.chart-add.${tag}`, 'core/steps/chart/step.ts chartStep for Claude (StructuredOutput-first sentence)', language, chartStep.render({ title: 'Topic T', detail, language, existingCount: 0, existingTypes: [], remaining: 3, provider: 'claude' }), chartStep.schema);
+  }
 });
 
 test('collect snapshots: chart step (chart.add@1)', () => {

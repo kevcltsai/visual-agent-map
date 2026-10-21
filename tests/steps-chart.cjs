@@ -169,6 +169,15 @@ test('step: schema, reply parsing (V0) and prompt placeholders', () => {
 });
 
 // ---- AiTaskService integration with a fake runtime
+// The chart step no longer runs inside askModel: the caller runs it after the write (chartEligible, then chartDetail).
+// This helper does what the plugin's background job does, minus the note write, so each case keeps its original shape.
+async function askAndChart(service, input, model, effort, ...rest) {
+  const result = await service.askModel(input, model, effort, ...rest);
+  if (!service.chartEligible(input)) return result;
+  const detail = await service.chartDetail({ input, detail: result.detail, countIssues: result.formatIssues, model, signal: rest[0] });
+  return { ...result, detail };
+}
+
 const TASK_REPLY = detail => JSON.stringify({ summary: 'S', detail, suggestions: [], visualReferences: [] });
 function fixture(replies, { parses, logging = true, template, onCall } = {}) {
   const calls = [];
@@ -202,7 +211,7 @@ const chartEntry = log => log.getEntries().find(entry => entry.step === 'chart.a
 
 test('a valid reply: two calls, the second uses the schema, low effort, no web and no tools; the detail gains the chart', async () => {
   const { calls, service, base, log } = fixture([TASK_REPLY(NOTE), chartReply()], { parses: async () => true });
-  const result = await service.askModel(base, 'claude:sonnet', 'high');
+  const result = await askAndChart(service, base, 'claude:sonnet', 'high');
   assert.equal(calls.length, 2);
   assert.notEqual(calls[0].effort, 'low', 'the main call keeps its own effort');
   assert.equal(calls[1].effort, 'low'); assert.equal(calls[1].model, 'sonnet');
@@ -216,13 +225,13 @@ test('a valid reply: two calls, the second uses the schema, low effort, no web a
 
 test('a Codex model runs the chart step through the same local runtime with text only', async () => {
   const { calls, service, base } = fixture([TASK_REPLY(NOTE), chartReply()]);
-  await service.askModel(base, 'gpt-6-luna', 'low');
+  await askAndChart(service, base, 'gpt-6-luna', 'low');
   assert.equal(calls.length, 2); assert.equal(calls[1].controls.textOnly, true); assert.equal(calls[1].effort, 'low');
 });
 
 test('a number violation: detail unchanged, entry marked failed with the code, one warn, no throw', async () => {
   const { calls, service, base, log } = fixture([TASK_REPLY(NOTE), chartReply(P1, 'timeline\n  title T\n  170 mm : Larva')], { parses: async () => true });
-  const [result, warns] = await withWarn(() => service.askModel(base, 'claude:sonnet', 'low'));
+  const [result, warns] = await withWarn(() => askAndChart(service, base, 'claude:sonnet', 'low'));
   const plain = await fixture([TASK_REPLY(NOTE)], {}).service.askModel({ ...base, addCharts: undefined }, 'claude:sonnet', 'low');
   assert.equal(calls.length, 2);
   assert.equal(result.detail, plain.detail);
@@ -235,7 +244,7 @@ test('an unparsable reply, a runtime error and a timeout leave the detail unchan
   const plain = await fixture([TASK_REPLY(NOTE)]).service.askModel({ ...fixture([]).base, addCharts: undefined }, 'claude:sonnet', 'low');
   for (const [reply, expected] of [['not json', 'invalid_reply'], [new Error('runtime down'), 'runtime_error'], [Object.assign(new Error('AI task exceeded 3 minutes'), { name: 'Error' }), 'runtime_error']]) {
     const { service, base, log } = fixture([TASK_REPLY(NOTE), reply]);
-    const [result, warns] = await withWarn(() => service.askModel(base, 'claude:sonnet', 'low'));
+    const [result, warns] = await withWarn(() => askAndChart(service, base, 'claude:sonnet', 'low'));
     assert.equal(result.detail, plain.detail);
     assert.deepEqual(warns, [['Visual Agent Map chart step', expected]]);
     assert.equal(chartEntry(log).status, 'failed');
@@ -245,29 +254,62 @@ test('an unparsable reply, a runtime error and a timeout leave the detail unchan
 test('abort during the chart step rethrows', async () => {
   const controller = new AbortController();
   const { service, base } = fixture([TASK_REPLY(NOTE), Object.assign(new Error('Aborted'), { name: 'AbortError' })], { onCall: n => { if (n === 2) controller.abort(); } });
-  await assert.rejects(service.askModel({ ...base }, 'claude:sonnet', 'low', controller.signal), error => error.name === 'AbortError');
+  await assert.rejects(askAndChart(service, { ...base }, 'claude:sonnet', 'low', controller.signal), error => error.name === 'AbortError');
 });
 
-test('only one call without the flag, or for decompose, merge, AIM, intermediate and count-repair requests', async () => {
+test('askModel makes exactly one call even when the request is chart-eligible; the chart step is a separate call', async () => {
+  const { calls, service, base } = fixture([TASK_REPLY(NOTE), chartReply()], { parses: async () => true });
+  assert.equal(service.chartEligible(base), true);
+  const result = await service.askModel(base, 'claude:sonnet', 'low');
+  assert.equal(calls.length, 1, 'no inline chart call');
+  assert.doesNotMatch(result.detail, /mermaid/);
+  const detail = await service.chartDetail({ input: base, detail: result.detail, model: 'claude:sonnet' });
+  assert.equal(calls.length, 2);
+  assert.match(detail, /```mermaid\ntimeline/);
+});
+
+test('chartEligible is false without the flag, and for decompose, merge, AIM, intermediate and count-repair requests', async () => {
   const cases = [{ addCharts: undefined }, { mode: 'decompose' }, { mode: 'merge' }, { promptProfile: 'aim' }, { intermediateDetail: true }, { countRepair: true }];
   for (const extra of cases) {
     const { calls, service, base } = fixture([TASK_REPLY(NOTE), chartReply()]);
-    await service.askModel({ ...base, ...extra }, 'claude:sonnet', 'low').catch(() => {});
+    assert.equal(service.chartEligible({ ...base, ...extra }), false, JSON.stringify(extra));
+    await askAndChart(service, { ...base, ...extra }, 'claude:sonnet', 'low').catch(() => {});
     assert.equal(calls.length, 1, JSON.stringify(extra));
+  }
+  assert.equal(fixture([]).service.chartEligible({ ...fixture([]).base, mode: 'synthesize' }), true);
+});
+
+test('chartDetail reports the chart entry id so a caller can mark a stale result failed with its reason', async () => {
+  const { service, base, log } = fixture([TASK_REPLY(NOTE), chartReply()], { parses: async () => true });
+  const result = await service.askModel(base, 'claude:sonnet', 'low');
+  let chartId = '';
+  await service.chartDetail({ input: base, detail: result.detail, model: 'claude:sonnet', onExchange: id => { chartId = id; } });
+  assert.equal(log.getEntries().find(entry => entry.id === chartId).step, 'chart.add@1');
+  service.failExchange(chartId, 'stale reason');
+  const entry = chartEntry(log);
+  assert.equal(entry.status, 'failed'); assert.equal(entry.error, 'stale reason');
+});
+
+test('a Claude chart prompt carries the StructuredOutput-first sentence; a Codex chart prompt does not', async () => {
+  for (const [model, expected] of [['claude:sonnet', true], ['gpt-6-luna', false]]) {
+    const { calls, service, base } = fixture([TASK_REPLY(NOTE), chartReply()]);
+    await askAndChart(service, base, model, 'low');
+    assert.equal(calls[1].prompt.includes('StructuredOutput'), expected, model);
+    assert.equal(calls[0].prompt.includes('StructuredOutput'), expected, `${model} task prompt`);
   }
 });
 
 test('three existing diagrams: no chart call', async () => {
   const d = (n) => `Para ${n}.\n\n\`\`\`mermaid\nflowchart TD\nA-->B\n\`\`\``;
   const { calls, service, base } = fixture([TASK_REPLY([d(1), d(2), d(3)].join('\n\n')), chartReply()]);
-  await service.askModel(base, 'claude:sonnet', 'low');
+  await askAndChart(service, base, 'claude:sonnet', 'low');
   assert.equal(calls.length, 1);
 });
 
 test('onExchange and onRequestAccepted see only the main entry', async () => {
   const { service, base, log } = fixture([TASK_REPLY(NOTE), chartReply()]);
   const ids = []; let accepted = 0;
-  await service.askModel({ ...base }, 'claude:sonnet', 'low', undefined, id => ids.push(id), () => { accepted++; });
+  await askAndChart(service, { ...base }, 'claude:sonnet', 'low', undefined, id => ids.push(id), () => { accepted++; });
   const entries = log.getEntries();
   assert.equal(entries.length, 2);
   assert.deepEqual(ids, [entries.find(entry => entry.step !== 'chart.add@1').id]);
@@ -280,19 +322,19 @@ test('V9: a reply that changes the section counts is refused', async () => {
   const template = { ...standardTemplate('en'), get sections() { return standardTemplate('en').sections.map(s => (s.id === section.id ? { ...s, count: { mode: 'exact', n: flipped ? 2 : 1 } } : s)); } };
   const note = `### ${section.name}\n\n${P1}\n\n- one item`;
   const { calls, service, base } = fixture([TASK_REPLY(note), chartReply(P1, 'timeline\n  title T\n  3 days : Larva')], { template, onCall: n => { if (n === 2) flipped = true; } });
-  const [result, warns] = await withWarn(() => service.askModel(base, 'claude:sonnet', 'low'));
+  const [result, warns] = await withWarn(() => askAndChart(service, base, 'claude:sonnet', 'low'));
   assert.equal(calls.length, 2);
   assert.doesNotMatch(result.detail, /mermaid/);
   assert.deepEqual(warns, [['Visual Agent Map chart step', 'counts_changed']]);
   // unchanged counts: the chart is added
   const fine = fixture([TASK_REPLY(note), chartReply(P1, 'timeline\n  title T\n  3 days : Larva')], { template: { ...standardTemplate('en'), sections: standardTemplate('en').sections.map(s => (s.id === section.id ? { ...s, count: { mode: 'exact', n: 1 } } : s)) } });
-  const ok = await fine.service.askModel(fine.base, 'claude:sonnet', 'low');
+  const ok = await askAndChart(fine.service, fine.base, 'claude:sonnet', 'low');
   assert.match(ok.detail, /```mermaid/);
 });
 
 test('mermaidParses returning false leaves the detail unchanged', async () => {
   const { service, base, log } = fixture([TASK_REPLY(NOTE), chartReply()], { parses: async () => false });
-  const [result, warns] = await withWarn(() => service.askModel(base, 'claude:sonnet', 'low'));
+  const [result, warns] = await withWarn(() => askAndChart(service, base, 'claude:sonnet', 'low'));
   assert.doesNotMatch(result.detail, /mermaid/);
   assert.deepEqual(warns, [['Visual Agent Map chart step', 'unparsable']]);
   assert.equal(chartEntry(log).status, 'failed');

@@ -122,3 +122,37 @@ test('afterReply can refuse a reply before it is logged as received', async () =
   const [entry] = log.getEntries();
   assert.equal(entry.status, 'sent'); assert.equal(entry.response, '');
 });
+
+test('milestones: written once per call with receivedAt and what the runtime reported; a failed call still writes them once', async () => {
+  const written = [];
+  const sink = { begin() {}, sent() {}, received() {}, completed() {}, failed() {}, milestones: (id, data) => written.push([id, JSON.parse(JSON.stringify(data))]) };
+  const claude = fail => ({ runTask: async (...args) => {
+    args[4].onRequest?.({ provider: 'claude' });
+    args[4].onMilestones({ usage: { inputTokens: 12, outputTokens: 34 } });
+    args[4].onMilestones({ textBeforeTool: true, enforceRetry: false });
+    if (fail) throw fail;
+    return 'raw';
+  } });
+  for (const fail of [undefined, new Error('boom')]) {
+    written.length = 0;
+    const provider = runtimeStepProvider({ claude: () => claude(fail), codex: () => { throw new Error('unexpected'); }, exchanges: () => sink });
+    const outcome = provider.complete(call({ model: 'claude:sonnet' }));
+    if (fail) await assert.rejects(outcome, /boom/); else await outcome;
+    assert.equal(written.length, 1, 'one write per call');
+    const data = written[0][1];
+    assert.deepEqual(data.usage, { inputTokens: 12, outputTokens: 34 });
+    assert.equal(data.textBeforeTool, true); assert.equal(data.enforceRetry, false);
+    assert.equal('receivedAt' in data, !fail, 'receivedAt only when a reply arrived');
+  }
+});
+
+test('milestones: a Codex call records receivedAt; no write when logging is off', async () => {
+  const { log, provider } = fixture();
+  await provider.complete(call({}));
+  const [entry] = log.getEntries();
+  assert.match(entry.milestones.receivedAt, /^\d{4}-\d{2}-\d{2}T/);
+  assert.match(formatAiExchange(entry), /milestones: \{"receivedAt":/);
+  const off = fixture({ logging: false });
+  await off.provider.complete(call({}));
+  assert.equal(off.log.getEntries().length, 0);
+});

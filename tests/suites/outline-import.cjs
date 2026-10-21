@@ -286,7 +286,7 @@ test('outline modal: copy format instructions; there is no vault file picker and
 integrationTest('importOutline creates the map, opens it, and starts shallow research only when asked', async () => {
   const { repo, app } = fixture('en');
   const opened = [], researched = [], notices = [];
-  const plugin = { repo, settings: { ...require('../support.cjs').DEFAULT_SETTINGS, language: 'en', cliModel: 'gpt-6-luna' }, running: new Set(), activeTasks: new Map(), rebuildDerivedData: async () => {}, mutate: async work => work(), releaseOutline() {}, confirmAiUsage: async (_model, run) => { await run(); return true; } };
+  const plugin = { repo, settings: { ...require('../support.cjs').DEFAULT_SETTINGS, language: 'en', cliModel: 'gpt-6-luna' }, running: new Set(), abortChartJobs: () => {}, addChartsAfterWrite: () => {}, activeTasks: new Map(), rebuildDerivedData: async () => {}, mutate: async work => work(), releaseOutline() {}, confirmAiUsage: async (_model, run) => { await run(); return true; } };
   const { VisualAgentMapView } = load('main.ts', { obsidian: { ...obsidian, Notice: class { constructor(m) { notices.push(m); } } } });
   const view = new VisualAgentMapView({ app }, plugin); view.render = () => {}; view.fit = () => {};
   view.enqueue = work => work();
@@ -308,7 +308,7 @@ integrationTest('importOutline creates the map, opens it, and starts shallow res
 
 integrationTest('importOutline writes Reference Links (parent, children, map) into every new note', async () => {
   const { repo, app } = fixture('en');
-  const plugin = { repo, settings: { ...require('../support.cjs').DEFAULT_SETTINGS, language: 'en', cliModel: 'gpt-6-luna' }, running: new Set(), activeTasks: new Map(), rebuildDerivedData: async () => {}, mutate: async work => work(), releaseOutline() {}, confirmAiUsage: async (_m, run) => { await run(); return true; } };
+  const plugin = { repo, settings: { ...require('../support.cjs').DEFAULT_SETTINGS, language: 'en', cliModel: 'gpt-6-luna' }, running: new Set(), abortChartJobs: () => {}, addChartsAfterWrite: () => {}, activeTasks: new Map(), rebuildDerivedData: async () => {}, mutate: async work => work(), releaseOutline() {}, confirmAiUsage: async (_m, run) => { await run(); return true; } };
   plugin.rebuildDerivedData = () => repo.rebuildDerivedData();
   const { VisualAgentMapView } = load('main.ts', { obsidian: { ...obsidian, Notice: class {} } });
   const view = new VisualAgentMapView({ app }, plugin); view.render = () => {}; view.fit = () => {}; view.enqueue = work => work();
@@ -327,7 +327,7 @@ integrationTest('importOutline reports a partial creation and does not start res
   const notices = [], researched = [];
   const create = repo.createNote.bind(repo); let calls = 0;
   repo.createNote = async (...args) => { calls++; if (calls === 2) throw new Error('disk full'); return create(...args); };
-  const plugin = { repo, settings: { ...require('../support.cjs').DEFAULT_SETTINGS, language: 'en', cliModel: 'gpt-6-luna' }, running: new Set(), activeTasks: new Map(), rebuildDerivedData: async () => {}, mutate: async work => work(), releaseOutline() {}, confirmAiUsage: async (_m, run) => { await run(); return true; } };
+  const plugin = { repo, settings: { ...require('../support.cjs').DEFAULT_SETTINGS, language: 'en', cliModel: 'gpt-6-luna' }, running: new Set(), abortChartJobs: () => {}, addChartsAfterWrite: () => {}, activeTasks: new Map(), rebuildDerivedData: async () => {}, mutate: async work => work(), releaseOutline() {}, confirmAiUsage: async (_m, run) => { await run(); return true; } };
   const { VisualAgentMapView } = load('main.ts', { obsidian: { ...obsidian, Notice: class { constructor(m) { notices.push(m); } } } });
   const view = new VisualAgentMapView({ app }, plugin); view.render = () => {}; view.fit = () => {}; view.enqueue = work => work();
   view.openMapInMutation = async () => {}; view.startShallowResearch = async () => { researched.push(1); };
@@ -337,7 +337,7 @@ integrationTest('importOutline reports a partial creation and does not start res
 
 integrationTest('importOutline still saves the map when the view switched away during creation', async () => {
   const { repo, app } = fixture('en');
-  const plugin = { repo, settings: { ...require('../support.cjs').DEFAULT_SETTINGS, language: 'en', cliModel: 'gpt-6-luna' }, running: new Set(), activeTasks: new Map(), rebuildDerivedData: async () => {}, mutate: async work => work(), releaseOutline() {}, confirmAiUsage: async () => true };
+  const plugin = { repo, settings: { ...require('../support.cjs').DEFAULT_SETTINGS, language: 'en', cliModel: 'gpt-6-luna' }, running: new Set(), abortChartJobs: () => {}, addChartsAfterWrite: () => {}, activeTasks: new Map(), rebuildDerivedData: async () => {}, mutate: async work => work(), releaseOutline() {}, confirmAiUsage: async () => true };
   const { VisualAgentMapView } = load('main.ts', { obsidian });
   const view = new VisualAgentMapView({ app }, plugin); view.render = () => {}; view.fit = () => {}; view.enqueue = work => work();
   let mapPath; view.openMapInMutation = async path => { mapPath = path; view.closed = true; };
@@ -392,7 +392,7 @@ function importHarness(overrides = {}) {
   const { repo, app } = fixture('en');
   const notices = [], calls = { opened: 0, researched: 0 };
   const NoticeClass = class { constructor(m) { notices.push(m); } };
-  const plugin = { repo, settings: { ...require('../support.cjs').DEFAULT_SETTINGS, language: 'en', cliModel: 'gpt-6-luna' }, running: new Set(), activeTasks: new Map(), rebuildDerivedData: async () => {}, mutate: async work => work(), releaseOutline() {}, confirmAiUsage: async (_m, run) => { await run(); return true; }, ...overrides };
+  const plugin = { repo, settings: { ...require('../support.cjs').DEFAULT_SETTINGS, language: 'en', cliModel: 'gpt-6-luna' }, running: new Set(), abortChartJobs: () => {}, addChartsAfterWrite: () => {}, activeTasks: new Map(), rebuildDerivedData: async () => {}, mutate: async work => work(), releaseOutline() {}, confirmAiUsage: async (_m, run) => { await run(); return true; }, ...overrides };
   const { VisualAgentMapView } = load('main.ts', { obsidian: { ...obsidian, Notice: NoticeClass } });
   const view = new VisualAgentMapView({ app }, plugin); view.render = () => {}; view.fit = () => {}; view.enqueue = work => work();
   view.openMapInMutation = async () => { calls.opened++; };
@@ -477,7 +477,7 @@ integrationTest('importOutline: the chosen template becomes the map default and 
   const template = { id: 't1', name: 'Template one', sections: [
     { id: 's1', name: 'Findings', description: '', role: 'none', aliases: [] },
     { id: 's2', name: 'History', description: '', role: 'log', aliases: [] }] };
-  const plugin = { repo, settings: { ...require('../support.cjs').DEFAULT_SETTINGS, language: 'en', cliModel: 'gpt-6-luna', detailTemplates: [template] }, running: new Set(), activeTasks: new Map(), rebuildDerivedData: async () => {}, mutate: async work => work(), releaseOutline() {}, confirmAiUsage: async (_m, run) => { await run(); return true; } };
+  const plugin = { repo, settings: { ...require('../support.cjs').DEFAULT_SETTINGS, language: 'en', cliModel: 'gpt-6-luna', detailTemplates: [template] }, running: new Set(), abortChartJobs: () => {}, addChartsAfterWrite: () => {}, activeTasks: new Map(), rebuildDerivedData: async () => {}, mutate: async work => work(), releaseOutline() {}, confirmAiUsage: async (_m, run) => { await run(); return true; } };
   repo.settings = plugin.settings;
   const { VisualAgentMapView } = load('main.ts', { obsidian: { ...obsidian, Notice: class {} } });
   const view = new VisualAgentMapView({ app }, plugin); view.render = () => {}; view.fit = () => {}; view.enqueue = work => work();
@@ -578,7 +578,7 @@ async function placementHarness(settingsOverrides = {}, obsidianOverrides = {}, 
   mapDoc.nodes.push(oldRoot, oldChild);
   await app.vault.create(mapPath, core.serializeMap(mapDoc));
   await repo.rebuildDerivedData();
-  const plugin = withExpansionCoordinator({ repo, settings, running: new Set(), rebuildDerivedData: () => repo.rebuildDerivedData(), mutate: async work => work(), releaseOutline() {}, confirmAiUsage: async (model, run) => { confirms.push(model); await run(); return true; } });
+  const plugin = withExpansionCoordinator({ repo, settings, running: new Set(), abortChartJobs: () => {}, addChartsAfterWrite: () => {}, rebuildDerivedData: () => repo.rebuildDerivedData(), mutate: async work => work(), releaseOutline() {}, confirmAiUsage: async (model, run) => { confirms.push(model); await run(); return true; } });
   const { VisualAgentMapView } = load('main.ts', { obsidian: { ...obsidian, Notice: class { constructor(m) { notices.push(m); } }, ...obsidianOverrides } }, globals);
   const view = new VisualAgentMapView({ app }, plugin);
   view.path = mapPath; view.map = await repo.readMap(mapPath); view.contentEl = { querySelector: () => null }; view.render = () => {}; view.hydrate = async () => {};
@@ -666,7 +666,7 @@ integrationTest('quick explore: the real create path researches every created su
   const group = { id: 'group-1', label: 'Sources', documents: [{ path: 'Inbox/source.md', content: 'x' }] };
   const signal = new AbortController().signal;
   await h.view.quickOutline(h.oldRoot).create(nodes, {
-    researchMode: 'local', researchDepth: 'normal', visualMode: 'auto', referenceGroups: [group], outputLanguage: 'zh-TW',
+    researchMode: 'research', researchDepth: 'normal', visualMode: 'auto', referenceGroups: [group], outputLanguage: 'zh-TW',
     toneId: 'tone-1', requirements: 'Keep it short', detailTemplateId: 't1', shallowResearch: true, signal, onProgress: () => {}
   });
   const saved = await h.repo.readMap(h.mapPath);
@@ -677,12 +677,17 @@ integrationTest('quick explore: the real create path researches every created su
   assert.equal(h.researched[0].parent, h.oldRoot.id, 'researched under the topic quick explore ran on');
   assert.deepEqual(plain(h.researched[0].children.slice().sort()), plain([food.id, breakfast.id].sort()), 'the single top heading is researched too');
   const options = h.researched[0].options;
+  // S7: the dialog allowed the web (and images), but the quick pass reads local context only unless "also search the web" is on.
   assert.equal(options.researchMode, 'local'); assert.equal(options.researchDepth, 'fast', 'shallow research stays Quick');
-  assert.equal(options.visualMode, 'auto'); assert.equal(options.outputLanguage, 'zh-TW'); assert.equal(options.toneId, 'tone-1');
+  assert.equal(options.visualMode, 'off'); assert.equal(options.outputLanguage, 'zh-TW'); assert.equal(options.toneId, 'tone-1');
   assert.equal(options.requirements, 'Keep it short'); assert.equal(JSON.stringify(options.referenceGroups), JSON.stringify([group]));
   assert.equal(options.signal, undefined); assert.equal(options.onProgress, undefined);
   assert.equal(options.detailTemplateId, 't1');
   for (const item of [food, breakfast]) assert.equal((await h.repo.readNote(item.path)).detailTemplateId, 't1', 'the chosen template is recorded on each subtopic');
+  // S7: with the checkbox on, the dialog's web and image choices reach the quick research.
+  const web = await placementHarness();
+  await web.view.quickOutline(web.oldRoot).create(nodes, { researchMode: 'research', researchDepth: 'normal', visualMode: 'auto', referenceGroups: [], shallowResearch: true, shallowWebSearch: true });
+  assert.equal(web.researched[0].options.researchMode, 'research'); assert.equal(web.researched[0].options.visualMode, 'auto');
   // Without shallow research nothing is researched.
   const g = await placementHarness();
   await g.view.quickOutline(g.oldRoot).create(nodes, { researchMode: 'local', researchDepth: 'fast', visualMode: 'off', shallowResearch: false });
@@ -984,7 +989,7 @@ integrationTest('importOutline under a manual parent: no chosen model, or the pa
 integrationTest('importOutline: a chosen writing tone becomes the new map default next to the template (never a per-topic field)', async () => {
   const { repo, app } = fixture('en');
   const opened = [];
-  const plugin = { repo, settings: { ...require('../support.cjs').DEFAULT_SETTINGS, language: 'en', cliModel: 'gpt-6-luna' }, running: new Set(), activeTasks: new Map(), rebuildDerivedData: async () => {}, mutate: async work => work(), releaseOutline() {}, confirmAiUsage: async (_m, run) => { await run(); return true; } };
+  const plugin = { repo, settings: { ...require('../support.cjs').DEFAULT_SETTINGS, language: 'en', cliModel: 'gpt-6-luna' }, running: new Set(), abortChartJobs: () => {}, addChartsAfterWrite: () => {}, activeTasks: new Map(), rebuildDerivedData: async () => {}, mutate: async work => work(), releaseOutline() {}, confirmAiUsage: async (_m, run) => { await run(); return true; } };
   const { VisualAgentMapView } = load('main.ts', { obsidian: { ...obsidian, Notice: class {} } });
   const view = new VisualAgentMapView({ app }, plugin); view.render = () => {}; view.fit = () => {}; view.enqueue = work => work();
   view.openMapInMutation = async path => { opened.push(path); view.path = path; view.map = await repo.readMap(path); };

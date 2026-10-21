@@ -1,0 +1,46 @@
+{
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "charts": {
+      "type": "array",
+      "maxItems": 3,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "anchor": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 2000
+          },
+          "shape": {
+            "type": "string",
+            "enum": [
+              "stages",
+              "hierarchy",
+              "comparison",
+              "proportion",
+              "interaction",
+              "states",
+              "process"
+            ]
+          },
+          "mermaid": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 1500
+          }
+        },
+        "required": [
+          "anchor",
+          "shape",
+          "mermaid"
+        ]
+      }
+    }
+  },
+  "required": [
+    "charts"
+  ]
+}

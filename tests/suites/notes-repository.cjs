@@ -626,7 +626,7 @@ const mergeHarness = async ({ details = ['Alpha detail', '', 'Gamma detail'], pa
   const kid = await repo.createNote('Alpha child','a',mapDoc,path,'workspace'); kid.parentId = sources[0].id; mapDoc.nodes.push(kid);
   await repo.saveMap(path, mapDoc);
   let pending=Promise.resolve();
-  const plugin={repo,settings:{...DEFAULT_SETTINGS},rebuildDerivedData:()=>repo.rebuildDerivedData(),mutate(work){pending=pending.then(work);return pending},running:new Set(),quickExpandPending:new Set(),activeTasks:new Map(),expansionBatches:new Map()};
+  const plugin={repo,settings:{...DEFAULT_SETTINGS},rebuildDerivedData:()=>repo.rebuildDerivedData(),mutate(work){pending=pending.then(work);return pending},running:new Set(), abortChartJobs: () => {}, addChartsAfterWrite: () => {},quickExpandPending:new Set(),activeTasks:new Map(),expansionBatches:new Map()};
   const {VisualAgentMapView}=load('main.ts',{obsidian:shim},{requestAnimationFrame:run=>{run();return 1},cancelAnimationFrame(){},...globals}); const view=new VisualAgentMapView({app},plugin);
   view.path=path;view.map=mapDoc;view.render=()=>{};view.focusNode=()=>{};view.drawEdges=()=>{};view.updateHistoryButtons=()=>{};
   await view.hydrate();

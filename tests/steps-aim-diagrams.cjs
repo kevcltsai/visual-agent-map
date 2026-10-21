@@ -126,7 +126,7 @@ test('setting: default on, old data.json loads as on, and the gates and call sit
   assert.doesNotMatch(flow, /[^c] this\.concludedDetail\(finalReview\)/);
 });
 
-test('setting off: a normal task with addCharts makes no chart call; on makes one', async () => {
+test('setting off: a normal task with addCharts is not eligible and makes no chart call; on makes one, after askModel', async () => {
   const run = async enabled => {
     let count = 0;
     const runtime = { runTask: async () => (++count === 1 ? JSON.stringify({ summary: 'S', detail: 'The larva stage lasts 3 days.', suggestions: [], visualReferences: [] }) : JSON.stringify({ charts: [] })) };
@@ -135,7 +135,11 @@ test('setting off: a normal task with addCharts makes no chart call; on makes on
       exchangeLoggingEnabled: () => false, exchanges: () => null,
       codexRuntime: () => runtime, claudeRuntime: () => runtime, diagramsEnabled: () => enabled
     });
-    await service.askModel({ title: 'T', summary: '', rules: '', detail: '', task: 'do', ancestors: '', mode: 'task', researchMode: 'local', researchDepth: 'fast', visualMode: 'auto', outputLanguage: 'en', addCharts: true }, 'claude:sonnet', 'low');
+    const input = { title: 'T', summary: '', rules: '', detail: '', task: 'do', ancestors: '', mode: 'task', researchMode: 'local', researchDepth: 'fast', visualMode: 'auto', outputLanguage: 'en', addCharts: true };
+    const result = await service.askModel(input, 'claude:sonnet', 'low');
+    assert.equal(count, 1, 'askModel itself never runs the chart step');
+    assert.equal(service.chartEligible(input), enabled);
+    if (service.chartEligible(input)) await service.chartDetail({ input, detail: result.detail, model: 'claude:sonnet' });
     return count;
   };
   assert.equal(await run(false), 1);

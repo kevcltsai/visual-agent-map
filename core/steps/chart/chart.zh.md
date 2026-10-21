@@ -23,7 +23,7 @@
 - pie 與 timeline 的 title 行，以及 timeline 的文字，不加雙引號；timeline 的文字裡不要有半形冒號。
 - 不要寫以 click、link、callback、class、style、classDef 開頭的行，也不要用 :::、<<…>>、<br> 等 HTML 標籤、%%{}%% 或 --- 設定、URL、圖片與 ::icon 圖示。
 
-輸出：只回傳 JSON，格式為 {"charts":[{"anchor":"…","shape":"…","mermaid":"…"}]}。shape 填 stages、hierarchy、comparison、proportion、interaction、states、process 其中一個，對應上面的七種形狀。
+輸出：只回傳 JSON，格式為 {"charts":[{"anchor":"…","shape":"…","mermaid":"…"}]}。shape 填 stages、hierarchy、comparison、proportion、interaction、states、process 其中一個，對應上面的七種形狀。{{claudeOutput}}
 
 主題：{{title}}
 

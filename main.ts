@@ -120,6 +120,9 @@ async function fitImageForClaude(dataUrl: string, signal: AbortSignal): Promise<
   throw new Error(t("ui.context_ai_image_unavailable"));
 }
 
+/** Chart steps that may run at once; a note written while the limit is reached is simply left without diagrams. */
+export const CHART_JOB_LIMIT = 3;
+
 export default class VisualAgentMapPlugin extends Plugin {
   /** Diagnostics for the mermaid zoom viewer (observer count); read by UI checks only. */
   mermaidZoom: MermaidZoomHandle | null = null;
@@ -129,6 +132,8 @@ export default class VisualAgentMapPlugin extends Plugin {
   readonly running = new Set<string>();
   readonly quickExpandPending = new Set<string>();
   readonly activeTasks = new Map<string, AbortController>();
+  /** Background chart steps, keyed by note path: one per path, at most {@link CHART_JOB_LIMIT} at a time. */
+  readonly chartJobs = new Map<string, AbortController>();
   readonly expansionBatches = new Map<string, ExpansionBatchState>();
   readonly expansionCoordinator = new ShallowExpansionCoordinator(this.activeTasks, this.expansionBatches);
   pendingSuggestions: Map<string, Suggestion[]> = new Map();
@@ -951,6 +956,7 @@ export default class VisualAgentMapPlugin extends Plugin {
   resetCodexRuntime(): void {
     this.expansionCoordinator.stopAll();
     for (const controller of this.activeTasks.values()) controller.abort();
+    this.abortChartJobs();
     this.modelDiscovery.invalidate("codex");
     this.aiRuntime.reset();
   }
@@ -1068,6 +1074,8 @@ export default class VisualAgentMapPlugin extends Plugin {
     leaf.view.containerEl.toggleClass("vam-topic-markdown", !!leaf.view.file && this.isNode(leaf.view.file));
   }
   onunload(): void {
+    // Background diagram jobs stop before the repository does, so none can apply a result after the vault is released.
+    this.abortChartJobs();
     // In-flight work (a long Obsidian rename, a queued mutation) must not write into the vault after this point.
     this.repo?.dispose();
     void this.coffeeManager?.stop();
@@ -1577,6 +1585,69 @@ export default class VisualAgentMapPlugin extends Plugin {
     onWebSearchEvent?: (event: CodexWebSearchEvent) => void
   ): Promise<AiResult> {
     return this.aiTasks.askModel(context, model, reasoning, signal, onExchange, onRequestAccepted, onWebSearchEvent);
+  }
+  /** Aborts the background chart step of one note (a new run on that note replaces it), or of every note. */
+  abortChartJobs(path?: string): void {
+    for (const [key, controller] of [...this.chartJobs])
+      if (path === undefined || key === path) {
+        controller.abort();
+        this.chartJobs.delete(key);
+      }
+  }
+  /**
+   * Runs the chart step in the background for a note that was just written. It never blocks or fails the research:
+   * a failure, Stop, a stale note or unload leaves the note as written (the chart exchange is marked failed with the
+   * reason). `apply` runs in the mutation queue and returns false when the note no longer equals its snapshot at
+   * write time or is running again; only then are the diagrams not applied.
+   */
+  addChartsAfterWrite(job: {
+    path: string;
+    context: TaskContext;
+    /** The detail exactly as written to the note. */
+    detail: string;
+    countIssues?: AiResult["formatIssues"];
+    model: string;
+    apply: (detail: string) => Promise<boolean>;
+  }): void {
+    if (!this.aiTasks.chartEligible(job.context) || !job.detail.trim()) return;
+    this.abortChartJobs(job.path);
+    if (this.chartJobs.size >= CHART_JOB_LIMIT) {
+      this.logs.appendLog("info", t("log.chart_job_limit_reached"));
+      return;
+    }
+    const controller = new AbortController();
+    this.chartJobs.set(job.path, controller);
+    let exchangeId = "";
+    void (async () => {
+      try {
+        const detail = await this.aiTasks.chartDetail({
+          input: job.context,
+          detail: job.detail,
+          countIssues: job.countIssues,
+          model: job.model,
+          signal: controller.signal,
+          onExchange: id => {
+            exchangeId = id;
+          }
+        });
+        if (controller.signal.aborted) throw new DOMException("Aborted", "AbortError");
+        if (detail === job.detail) return;
+        let applied = false;
+        await this.mutate(async () => {
+          applied = !controller.signal.aborted && (await job.apply(detail));
+        });
+        if (!applied) this.aiTasks.failExchange(exchangeId, t("log.chart_stale_not_applied"));
+      } catch (error) {
+        if (controller.signal.aborted || (error instanceof Error && error.name === "AbortError"))
+          this.aiTasks.failExchange(exchangeId, t("log.chart_stopped_not_applied"));
+        else {
+          console.warn("Visual Agent Map chart step", error);
+          this.aiTasks.failExchange(exchangeId, t("log.chart_not_added_0", "apply_error"));
+        }
+      } finally {
+        if (this.chartJobs.get(job.path) === controller) this.chartJobs.delete(job.path);
+      }
+    })();
   }
   /** The chart step for a finished AIM conclusion; the setting is checked inside, so off returns the detail untouched. */
   async addAimDiagrams(request: {

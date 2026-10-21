@@ -556,7 +556,7 @@ async function viewHarness(reply, { fragments = false } = {}) {
   const Base = dom.makeModal();
   class Modal extends Base { open() { opened.push(this); super.open(); } }
   const control = { gate: null, decline: false };
-  const plugin = withExpansionCoordinator({ repo, settings, running: new Set(), rebuildDerivedData: () => repo.rebuildDerivedData(), mutate: async work => work(), releaseOutline() {}, confirmAiUsage: async (_model, run) => { if (control.decline) return false; await run(); return true; } });
+  const plugin = withExpansionCoordinator({ repo, settings, running: new Set(), abortChartJobs: () => {}, addChartsAfterWrite: () => {}, rebuildDerivedData: () => repo.rebuildDerivedData(), mutate: async work => work(), releaseOutline() {}, confirmAiUsage: async (_model, run) => { if (control.decline) return false; await run(); return true; } });
   const Notice = fragments ? dom.makeNotice(notices) : class { constructor(m) { notices.push(m); } };
   const { VisualAgentMapView } = load('main.ts', { obsidian: { ...obsidian, Modal, Setting, Notice } }, fragments ? { createFragment: dom.createFragment } : {});
   const { StructureReviewService } = load('core/structure-review-service.ts');

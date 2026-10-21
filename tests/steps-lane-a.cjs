@@ -17,9 +17,10 @@ const context = (extra = {}) => ({ title: 'Topic', summary: 'Sum', rules: '', de
 
 /** An exchange log that records every call the service makes, in order. */
 function spyLog() {
-  const events = [];
+  const events = [], milestoneEvents = [];
   const record = name => (...args) => { events.push([name, ...args]); };
-  return { events, begin: record('begin'), sent: record('sent'), received: record('received'), parsed: record('parsed'), completed: record('completed'), failed: record('failed') };
+  // Milestones are written once per call next to the exchange sequence; they are collected apart so the sequence stays comparable.
+  return { events, milestoneEvents, milestones: (...args) => { milestoneEvents.push(args); }, begin: record('begin'), sent: record('sent'), received: record('received'), parsed: record('parsed'), completed: record('completed'), failed: record('failed') };
 }
 /** A runtime that reports its request (as the real runtimes do) and answers with `reply(prompt, call)`. */
 function runtime(reply) {

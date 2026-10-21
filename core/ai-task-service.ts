@@ -15,7 +15,7 @@ import { translate, t, type UiLanguage } from "../i18n";
 import { CLAUDE_MODEL_CHOICES, providerForModel } from "../ai/providers/provider";
 import type { CodexAppServerRuntime, CodexWebSearchEvent } from "../ai/runtime/codex-app-server";
 import type { ClaudeCodeCliRuntime } from "../ai/runtime/claude-code-cli";
-import type { AiExchangeLog } from "../ai-exchange-log";
+import type { AiExchangeLog, AiMilestones } from "../ai-exchange-log";
 import { runtimeStepProvider, type ExchangeSink } from "./runtime-step-provider";
 import { prepareStep, StepRunner } from "./step-runner";
 import { referenceTask } from "./steps/reference/step";
@@ -122,6 +122,7 @@ export class AiTaskService {
     const step = prepareStep(createTaskStep(taskStepId(context, role), shape.schema), {
       context,
       language: outputLanguage,
+      provider,
       providerLabel: provider === "claude" ? "Claude Code" : "Codex App Server",
       strictGapAudit: shape.isAimGapAudit,
       webResearch: shape.isIsolatedWebResearch,
@@ -137,22 +138,10 @@ export class AiTaskService {
     const exchanges = this.options.exchangeLoggingEnabled() ? this.options.exchanges() : null;
     let exchangeId = "";
     // Turning exchange logging off while a task runs stops recording from then on, so every write re-checks the setting.
-    const recording =
-      <Args extends unknown[]>(write: ((...args: Args) => void) | undefined) =>
-      (...args: Args): void => {
-        if (this.options.exchangeLoggingEnabled()) write?.(...args);
-      };
-    const sink: ExchangeSink | null = exchanges && {
-      begin: entry => exchanges.begin(entry),
-      sent: recording((id: string, request: string, prompt?: string) => exchanges.sent(id, request, prompt)),
-      received: recording((id: string, response: string) => exchanges.received(id, response)),
-      completed: recording((id: string) => exchanges.completed(id)),
-      failed: recording((id: string, error: string) => exchanges.failed(id, error))
-    };
+    const sink = this.exchangeSink();
 
     // Set once the first request's entry is closed because the repair request replaced it; the catch must not reopen it.
     let supersededClosed = false;
-    let countIssues: ReturnType<typeof checkCounts> | undefined;
     let stage = t("log.stage_starting_ai");
     try {
       const controls = {
@@ -260,28 +249,6 @@ export class AiTaskService {
           }
         }
         result.formatIssues = issues;
-        countIssues = issues;
-      }
-      if (
-        input.addCharts &&
-        this.diagramsOn() &&
-        !input.countRepair &&
-        !input.intermediateDetail &&
-        input.promptProfile !== "aim" &&
-        (input.mode === "task" || input.mode === "synthesize")
-      ) {
-        stage = t("log.stage_adding_charts");
-        const withCharts = await this.addCharts(
-          input,
-          result.detail,
-          countIssues,
-          outputLanguage,
-          provider,
-          model,
-          signal,
-          sink
-        );
-        result = { ...result, detail: withCharts };
       }
       console.debug("Visual Agent Map AI metrics", {
         ...prepared.metrics,
@@ -297,6 +264,74 @@ export class AiTaskService {
         );
       throw error;
     }
+  }
+
+  /**
+   * Whether a finished note of this request gets the background chart step: the request asked for charts, the setting
+   * is on, and it is a plain research task or synthesis (never a count repair, interim detail, AIM or decompose/merge).
+   */
+  chartEligible(input: TaskContext): boolean {
+    return (
+      !!input.addCharts &&
+      this.diagramsOn() &&
+      !input.countRepair &&
+      !input.intermediateDetail &&
+      input.promptProfile !== "aim" &&
+      (input.mode === "task" || input.mode === "synthesize")
+    );
+  }
+
+  /**
+   * The chart step for a note that was already written: one local, tool-free model call, run after the write. Returns the
+   * detail with the diagrams added, or unchanged when the step finds none or fails; only a stop throws. `onExchange`
+   * receives the chart entry's id so the caller can mark it failed when it decides not to apply the result.
+   */
+  async chartDetail(request: {
+    input: TaskContext;
+    detail: string;
+    /** The count issues of the written note (`AiResult.formatIssues`); the diagrams must not change them. */
+    countIssues?: ReturnType<typeof checkCounts>;
+    model: string;
+    signal?: AbortSignal;
+    onExchange?: (id: string) => void;
+  }): Promise<string> {
+    if (request.signal?.aborted) throw new DOMException("Aborted", "AbortError");
+    return this.addCharts(
+      request.input,
+      request.detail,
+      request.countIssues,
+      request.input.outputLanguage ?? this.options.language(),
+      providerForModel(request.model),
+      request.model,
+      request.signal,
+      this.exchangeSink(),
+      request.onExchange
+    );
+  }
+
+  /** Marks an exchange failed with the caller's reason (for example a stale chart that was not applied). */
+  failExchange(id: string, reason: string): void {
+    if (id && this.options.exchangeLoggingEnabled()) this.options.exchanges()?.failed(id, reason);
+  }
+
+  /** A guarded view of the exchange log: every write re-checks the logging setting. Null when logging is off. */
+  private exchangeSink(): ExchangeSink | null {
+    const exchanges = this.options.exchangeLoggingEnabled() ? this.options.exchanges() : null;
+    const record =
+      <Args extends unknown[]>(write: (...args: Args) => void) =>
+      (...args: Args): void => {
+        if (this.options.exchangeLoggingEnabled()) write(...args);
+      };
+    return (
+      exchanges && {
+        begin: entry => exchanges.begin(entry),
+        sent: record((id: string, body: string, prompt?: string) => exchanges.sent(id, body, prompt)),
+        received: record((id: string, body: string) => exchanges.received(id, body)),
+        completed: record((id: string) => exchanges.completed(id)),
+        failed: record((id: string, error: string) => exchanges.failed(id, error)),
+        milestones: record((id: string, data: AiMilestones) => exchanges.milestones(id, data))
+      }
+    );
   }
 
   private diagramsOn(): boolean {
@@ -330,19 +365,6 @@ export class AiTaskService {
       detailFormat: "adaptive",
       outputLanguage: request.language
     };
-    const exchanges = this.options.exchangeLoggingEnabled() ? this.options.exchanges() : null;
-    const record =
-      <Args extends unknown[]>(write: (...args: Args) => void) =>
-      (...args: Args): void => {
-        if (this.options.exchangeLoggingEnabled()) write(...args);
-      };
-    const sink: ExchangeSink | null = exchanges && {
-      begin: entry => exchanges.begin(entry),
-      sent: record((id: string, body: string, prompt?: string) => exchanges.sent(id, body, prompt)),
-      received: record((id: string, body: string) => exchanges.received(id, body)),
-      completed: record((id: string) => exchanges.completed(id)),
-      failed: record((id: string, error: string) => exchanges.failed(id, error))
-    };
     return this.addCharts(
       input,
       request.detail,
@@ -351,7 +373,7 @@ export class AiTaskService {
       providerForModel(request.model),
       request.model,
       request.signal,
-      sink
+      this.exchangeSink()
     );
   }
 
@@ -367,7 +389,8 @@ export class AiTaskService {
     provider: "claude" | "codex",
     model: string,
     signal: AbortSignal | undefined,
-    sink: ExchangeSink | null
+    sink: ExchangeSink | null,
+    onExchange?: (id: string) => void
   ): Promise<string> {
     const existing = existingDiagrams(detail);
     const remaining = 3 - existing.count;
@@ -379,7 +402,8 @@ export class AiTaskService {
       language,
       existingCount: existing.count,
       existingTypes: existing.types,
-      remaining
+      remaining,
+      provider
     });
     let exchangeId = "";
     const runner = new StepRunner(
@@ -414,6 +438,7 @@ export class AiTaskService {
         requestLog: "request",
         onExchange: id => {
           exchangeId = id;
+          onExchange?.(id);
         }
       });
       if (signal?.aborted) throw new DOMException("Aborted", "AbortError");

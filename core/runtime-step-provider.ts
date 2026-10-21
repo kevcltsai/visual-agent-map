@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import type { AiExchangeLog } from "../ai-exchange-log";
+import type { AiExchangeLog, AiMilestones } from "../ai-exchange-log";
 import { providerForModel, providerModelId } from "../ai/providers/provider";
 import type { ClaudeCodeCliRuntime, ClaudeTaskControls } from "../ai/runtime/claude-code-cli";
 import type { CodexAppServerRuntime } from "../ai/runtime/codex-app-server";
@@ -37,7 +37,7 @@ export interface RuntimeStepControls {
 }
 
 /** The part of the exchange log the provider writes; a caller can pass a guarded view of the real log. */
-export type ExchangeSink = Pick<AiExchangeLog, "begin" | "sent" | "received" | "completed" | "failed">;
+export type ExchangeSink = Pick<AiExchangeLog, "begin" | "sent" | "received" | "completed" | "failed" | "milestones">;
 
 export interface RuntimeStepProviderOptions {
   claude: () => Pick<ClaudeCodeCliRuntime, "runTask">;
@@ -81,7 +81,17 @@ export function runtimeStepProvider(options: RuntimeStepProviderOptions): StepPr
         completed: (...args: Parameters<ExchangeSink["completed"]>): void =>
           started ? options.exchanges()?.completed(...args) : undefined,
         failed: (...args: Parameters<ExchangeSink["failed"]>): void =>
-          started ? options.exchanges()?.failed(...args) : undefined
+          started ? options.exchanges()?.failed(...args) : undefined,
+        milestones: (...args: Parameters<ExchangeSink["milestones"]>): void =>
+          started ? options.exchanges()?.milestones(...args) : undefined
+      };
+      // Milestones are collected in memory and written once, when the call ends (a reply, a failure or a stop).
+      const milestones: AiMilestones = {};
+      let milestonesWritten = false;
+      const writeMilestones = (): void => {
+        if (milestonesWritten) return;
+        milestonesWritten = true;
+        if (Object.keys(milestones).length) exchanges.milestones(id, milestones);
       };
       const id = randomUUID();
       started?.begin({
@@ -97,6 +107,10 @@ export function runtimeStepProvider(options: RuntimeStepProviderOptions): StepPr
       try {
         const controls: RuntimeTaskControls = {
           ...task,
+          onMilestones: (data: AiMilestones): void => {
+            task.onMilestones?.(data);
+            Object.assign(milestones, data);
+          },
           onRequest: (data: unknown): void => {
             task.onRequest?.(data);
             exchanges.sent(
@@ -113,10 +127,13 @@ export function runtimeStepProvider(options: RuntimeStepProviderOptions): StepPr
                 .codex(options.localCodex === true)
                 .runTask(call.prompt, model, effort, call.schema, controls);
         afterReply?.();
+        milestones.receivedAt = new Date().toISOString();
         exchanges.received(id, raw);
+        writeMilestones();
         if (finish === "completed") exchanges.completed(id);
         return raw;
       } catch (error) {
+        writeMilestones();
         if (finish === "completed") exchanges.failed(id, error instanceof Error ? error.message : String(error));
         throw error;
       }

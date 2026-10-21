@@ -3,6 +3,7 @@ import { researchGuidance } from "../../../ai/task-policy";
 import type { TaskContext } from "../../../ai/types";
 import { visualGuidance } from "../../../ai/visual-guidance";
 import type { UiLanguage } from "../../../i18n";
+import type { AiProviderId } from "../../../ai/providers/provider";
 import { detailStructurePrompt, standardTemplate } from "../../../ai/detail-templates";
 import {
   inLanguage,
@@ -18,7 +19,8 @@ import {
   REFERENCE_CITATIONS,
   ROLE,
   SOURCE_SAFETY,
-  toneBlock
+  toneBlock,
+  withProviderOutput
 } from "../_shared/fragments";
 import {
   ADAPTIVE_DETAIL_STRUCTURE,
@@ -42,7 +44,11 @@ export function readerFacingDetail(context: TaskContext): boolean {
 }
 
 /** The regular (non-AIM) task prompt. Empty blocks are kept, so the blank-line layout matches the original builder. */
-export function generalTaskPrompt(context: TaskContext, language: UiLanguage): string {
+export function generalTaskPrompt(
+  context: TaskContext,
+  language: UiLanguage,
+  provider: AiProviderId = "codex"
+): string {
   const modeFragment =
     context.mode === "task"
       ? GENERAL_TASK
@@ -60,7 +66,7 @@ export function generalTaskPrompt(context: TaskContext, language: UiLanguage): s
     inLanguage(SOURCE_SAFETY, language),
     context.sourceContext ? inLanguage(REFERENCE_CITATIONS, language) : "",
     context.sourceContext && context.researchMode !== "local" ? inLanguage(LOCAL_FIRST, language) : "",
-    inLanguage(JSON_CONTRACT, language),
+    withProviderOutput(inLanguage(JSON_CONTRACT, language), provider, language),
     ...(context.toneText ? [toneBlock(context.toneText, language)] : []),
     inLanguage(modeFragment, language),
     context.mode !== "decompose"
@@ -90,6 +96,8 @@ export function generalTaskPrompt(context: TaskContext, language: UiLanguage): s
 }
 
 /** AIM requests use the AIM prompt shell in core/steps/aim; its templates are Markdown files there. */
-export function taskPrompt(context: TaskContext, language: UiLanguage): string {
-  return context.promptProfile === "aim" ? buildAimPrompt(context, language) : generalTaskPrompt(context, language);
+export function taskPrompt(context: TaskContext, language: UiLanguage, provider: AiProviderId = "codex"): string {
+  return context.promptProfile === "aim"
+    ? buildAimPrompt(context, language, provider)
+    : generalTaskPrompt(context, language, provider);
 }

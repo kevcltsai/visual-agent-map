@@ -1215,9 +1215,10 @@ export class VisualAgentMapView extends ItemView {
             ? {
                 researchDepth: "fast" as const,
                 researchOptions: {
-                  researchMode: options.researchMode,
+                  // Quick research of the new topics reads local context only unless the dialog asks for the web.
+                  researchMode: options.shallowWebSearch ? options.researchMode : ("local" as const),
                   referenceGroups: options.referenceGroups ?? [],
-                  visualMode: options.visualMode,
+                  visualMode: options.shallowWebSearch ? options.visualMode : ("off" as const),
                   ...(options.outputLanguage ? { outputLanguage: options.outputLanguage } : {}),
                   ...(options.toneId ? { toneId: options.toneId } : {}),
                   ...(options.requirements ? { requirements: options.requirements } : {})
@@ -4812,6 +4813,67 @@ export class VisualAgentMapView extends ItemView {
     this.notes.set(node.id, await this.plugin.repo.readNote(node.path, this.map ?? undefined));
     this.render();
   }
+  /** What "the note is still as written" means for the background diagram step: every field a user or run can change. */
+  private chartSnapshot(note: Note): string {
+    return JSON.stringify([
+      note.title,
+      note.summary,
+      note.detail,
+      note.prompt,
+      note.rules,
+      note.visualReferences,
+      note.newFindings,
+      note.model,
+      note.reasoning,
+      note.researchMode,
+      note.researchDepth,
+      note.visualMode,
+      note.status,
+      note.sourcePaths,
+      note.referencePaths,
+      note.thinkingOrigin
+    ]);
+  }
+  /**
+   * Starts the diagram step in the background for a note that was just written and returns at once. The diagrams are
+   * applied (as their own undoable entry) only when the note still equals what was written and no run is active on
+   * it; otherwise they are dropped and the note stays as written.
+   */
+  private queueCharts(job: {
+    path: string;
+    saved: Note;
+    context: TaskContext;
+    detail: string;
+    formatIssues?: AiResult["formatIssues"];
+    model: string;
+    language: UiLanguage;
+    template?: DetailTemplate;
+  }): void {
+    const path = job.path;
+    const snapshot = this.chartSnapshot(job.saved);
+    const map = this.map ?? undefined;
+    this.plugin.addChartsAfterWrite({
+      path,
+      context: job.context,
+      detail: job.detail,
+      countIssues: job.formatIssues,
+      model: job.model,
+      apply: async charted => {
+        if (this.plugin.running.has(path)) return false;
+        const latest = await this.plugin.repo.readNote(path, map);
+        if (this.chartSnapshot(latest) !== snapshot) return false;
+        await this.plugin.repo.updateNote(
+          path,
+          { detail: canonicalDetail(charted, job.language, job.template) },
+          { detailTemplate: job.template }
+        );
+        const after = await this.plugin.repo.readNote(path, map);
+        if (!this.closed) this.recordNoteWrite(path, latest, after, ["detail"], t("ui.add_charts_history"));
+        for (const view of this.plugin.views()) if (view !== this) view.history.clear();
+        return true;
+      }
+    });
+  }
   private recordNoteWrite(path: string, before: Note, after: Note, fields: (keyof NotePatch)[], label: string): void {
     const oldValues: NotePatch = {},
       newValues: NotePatch = {};
@@ -6895,7 +6957,7 @@ export class VisualAgentMapView extends ItemView {
             await (this.plugin.pendingSuggestions as PendingSuggestions).flush?.();
           });
           if (researchOptions && createdNodes.length)
-            await this.startShallowResearch(node, createdNodes, researchOptions);
+            await this.startShallowResearch(node, createdNodes, this.shallowChildOptions(researchOptions));
           close?.();
           this.render();
         } catch (error) {
@@ -7073,7 +7135,7 @@ export class VisualAgentMapView extends ItemView {
           this.render();
         });
         if (researchOptions?.shallowResearch && createdNodes.length)
-          await this.startShallowResearch(parent, createdNodes, researchOptions);
+          await this.startShallowResearch(parent, createdNodes, this.shallowChildOptions(researchOptions));
       });
     };
     if (pending?.length) {
@@ -7238,7 +7300,7 @@ export class VisualAgentMapView extends ItemView {
           this.render();
         });
         if (researchOptions?.shallowResearch && createdNodes.length)
-          await this.startShallowResearch(parent, createdNodes, researchOptions);
+          await this.startShallowResearch(parent, createdNodes, this.shallowChildOptions(researchOptions));
       })().catch(error => {
         new Notice(error instanceof Error ? error.message : String(error));
       });
@@ -7314,6 +7376,13 @@ export class VisualAgentMapView extends ItemView {
       }
       throw error;
     }
+  }
+  /**
+   * The options of the quick research that follows AI expansion: no web or image search unless the dialog's checkbox
+   * is on. The decomposition itself and the notes' stored research settings are not affected.
+   */
+  private shallowChildOptions(options: TaskOptions): TaskOptions {
+    return options.shallowWebSearch ? options : { ...options, researchMode: "local", visualMode: "off" };
   }
   private startShallowResearch(parent: MapNode, children: MapNode[], options: TaskOptions): Promise<void> {
     const signal = options.signal;
@@ -7789,33 +7858,35 @@ export class VisualAgentMapView extends ItemView {
       await this.detailTemplateFor(node, options?.detailTemplateId, options?.toneId),
       options?.outputLanguage ?? language
     );
+    this.plugin.abortChartJobs(node.path);
     this.plugin.running.add(node.path);
     await this.plugin.repo.updateNote(node.path, { status: "running" });
     await this.hydrate();
     this.render();
     try {
+      const synthesisContext: TaskContext = withThinkingOrigin(
+        {
+          title: note.title,
+          summary: note.summary,
+          rules: "",
+          detail: note.detail,
+          task: [task, options?.requirements].filter(Boolean).join("\n\n"),
+          ancestors: await this.ancestorContext(node),
+          referenceGroups: [...selectedSources, childSources],
+          onProgress: options?.onProgress,
+          outputLanguage: options?.outputLanguage,
+          ...this.toneField(note, options),
+          mode: "synthesize",
+          researchMode: options?.researchMode ?? "local",
+          researchDepth: options?.researchDepth ?? note.researchDepth,
+          visualMode: options?.visualMode ?? note.visualMode,
+          detailTemplate,
+          addCharts: true
+        },
+        note
+      );
       const result = await this.plugin.askModel(
-        withThinkingOrigin(
-          {
-            title: note.title,
-            summary: note.summary,
-            rules: "",
-            detail: note.detail,
-            task: [task, options?.requirements].filter(Boolean).join("\n\n"),
-            ancestors: await this.ancestorContext(node),
-            referenceGroups: [...selectedSources, childSources],
-            onProgress: options?.onProgress,
-            outputLanguage: options?.outputLanguage,
-            ...this.toneField(note, options),
-            mode: "synthesize",
-            researchMode: options?.researchMode ?? "local",
-            researchDepth: options?.researchDepth ?? note.researchDepth,
-            visualMode: options?.visualMode ?? note.visualMode,
-            detailTemplate,
-            addCharts: true
-          },
-          note
-        ),
+        synthesisContext,
         note.model,
         note.reasoning,
         options?.signal,
@@ -7902,6 +7973,16 @@ export class VisualAgentMapView extends ItemView {
           );
           await this.hydrate();
           this.render();
+          this.queueCharts({
+            path: node.path,
+            saved,
+            context: synthesisContext,
+            detail: saved.detail,
+            formatIssues: issues,
+            model: note.model,
+            language: options?.outputLanguage ?? this.plugin.settings.language,
+            template: detailTemplate
+          });
         });
       // The result is written directly (no draft review); a write that fails or finds the topic changed writes
       // nothing and is reported, without marking the parent topic as failed.
@@ -8454,30 +8535,31 @@ export class VisualAgentMapView extends ItemView {
     const language = this.plugin.settings.language;
     const detailTemplate = this.mapDetailTemplate(options?.outputLanguage ?? language, options?.detailTemplateId);
     try {
-      const result = await this.plugin.askModel(
-        {
-          title,
-          summary: translate(language, "note.no_conclusion_yet"),
-          rules: "",
-          detail: "",
-          task: [goal, options?.requirements].filter(Boolean).join("\n\n"),
-          ancestors: "",
-          referenceGroups: [...(options?.referenceGroups ?? []), sourceGroup],
-          onProgress: message => {
-            if (this.integrationTask !== task) return;
-            task.progress = message;
-            options?.onProgress?.(message);
-            this.render();
-          },
-          outputLanguage: options?.outputLanguage,
-          ...this.toneField(undefined, options),
-          mode: "synthesize",
-          researchMode: options?.researchMode ?? "local",
-          researchDepth: options?.researchDepth ?? "normal",
-          visualMode: options?.visualMode ?? "auto",
-          detailTemplate,
-          addCharts: true
+      const integrationContext: TaskContext = {
+        title,
+        summary: translate(language, "note.no_conclusion_yet"),
+        rules: "",
+        detail: "",
+        task: [goal, options?.requirements].filter(Boolean).join("\n\n"),
+        ancestors: "",
+        referenceGroups: [...(options?.referenceGroups ?? []), sourceGroup],
+        onProgress: message => {
+          if (this.integrationTask !== task) return;
+          task.progress = message;
+          options?.onProgress?.(message);
+          this.render();
         },
+        outputLanguage: options?.outputLanguage,
+        ...this.toneField(undefined, options),
+        mode: "synthesize",
+        researchMode: options?.researchMode ?? "local",
+        researchDepth: options?.researchDepth ?? "normal",
+        visualMode: options?.visualMode ?? "auto",
+        detailTemplate,
+        addCharts: true
+      };
+      const result = await this.plugin.askModel(
+        integrationContext,
         model,
         this.plugin.settings.cliReasoning,
         controller.signal,
@@ -8502,7 +8584,17 @@ export class VisualAgentMapView extends ItemView {
       this.render();
       const previous = this.history.undoEntry;
       const write = (): Promise<void> =>
-        this.saveIntegratedNode(title, sources, goal, rules, model, result, options?.outputLanguage ?? language, task);
+        this.saveIntegratedNode(
+          title,
+          sources,
+          goal,
+          rules,
+          model,
+          result,
+          options?.outputLanguage ?? language,
+          task,
+          integrationContext
+        );
       await (flow ? this.plugin.mutate(write) : write());
       this.undoNotice(t("ui.synthesis_new_topic_0", title), previous);
       if (flow?.observer?.isOpen()) flow.observer.written?.();
@@ -8533,7 +8625,8 @@ export class VisualAgentMapView extends ItemView {
     model: string,
     result: AiResult,
     language: "zh-TW" | "en",
-    task: NonNullable<VisualAgentMapView["integrationTask"]>
+    task: NonNullable<VisualAgentMapView["integrationTask"]>,
+    context: TaskContext
   ): Promise<void> {
     if (
       !this.map ||
@@ -8612,6 +8705,22 @@ export class VisualAgentMapView extends ItemView {
       await this.hydrate();
       this.render();
       this.focusNode(integrated);
+      try {
+        // Best effort: a note that was written is never put at risk by the diagram step.
+        const savedNote = await this.plugin.repo.readNote(integrated.path, this.map ?? undefined);
+        this.queueCharts({
+          path: integrated.path,
+          saved: savedNote,
+          context,
+          detail: savedNote.detail,
+          formatIssues: result.formatIssues,
+          model,
+          language,
+          template: detailTemplate
+        });
+      } catch (error) {
+        console.warn("Visual Agent Map chart step", error);
+      }
     } catch (error) {
       const disk = await this.plugin.repo.readMap(this.path);
       if (!disk.nodes.some(node => node.id === integrated.id)) {
@@ -9175,6 +9284,8 @@ export class VisualAgentMapView extends ItemView {
     );
     const language = this.plugin.settings.language;
     this.plugin.pendingSuggestions.delete(node.path);
+    // A diagram job still running for the previous result of this note must not land on the new run.
+    this.plugin.abortChartJobs(node.path);
     this.plugin.running.add(node.path);
     const controller = new AbortController();
     const abortFromTaskModal = (): void => controller.abort();
@@ -9290,6 +9401,16 @@ export class VisualAgentMapView extends ItemView {
           );
           if (exchangeId && this.plugin.settings.aiExchangeLoggingEnabled) this.plugin.exchanges?.completed(exchangeId);
           for (const view of this.plugin.views()) if (view !== this) view.history.clear();
+          this.queueCharts({
+            path: node.path,
+            saved,
+            context,
+            detail: saved.detail,
+            formatIssues: result.formatIssues,
+            model: note.model,
+            language: context.outputLanguage ?? this.plugin.settings.language,
+            template: context.detailTemplate
+          });
           if (result.suggestions.length) {
             this.plugin.pendingSuggestions.set(
               node.path,

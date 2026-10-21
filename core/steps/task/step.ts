@@ -2,6 +2,7 @@ import { aimPhase } from "../../../ai/aim-prompt";
 import type { AimContract } from "../../../ai/aim-contracts";
 import type { AiResult, TaskContext } from "../../../ai/types";
 import type { UiLanguage } from "../../../i18n";
+import type { AiProviderId } from "../../../ai/providers/provider";
 import type { StepDefinition } from "../../step-runner";
 import { parseAiResult } from "./parse";
 import { taskPrompt } from "./render";
@@ -16,6 +17,8 @@ export interface TaskStepInput {
   strictGapAudit: boolean;
   webResearch: boolean;
   contract?: AimContract;
+  /** Selects provider-specific output instructions; Codex prompts stay as they were. Absent: Codex. */
+  provider?: AiProviderId;
 }
 
 /**
@@ -38,7 +41,7 @@ export function createTaskStep(id: string, schema: unknown): StepDefinition<Task
     id,
     version: 1,
     schema,
-    render: ({ context, language }) => taskPrompt(context, language),
+    render: ({ context, language, provider }) => taskPrompt(context, language, provider),
     parse: (raw, input) =>
       parseAiResult(raw, input.providerLabel, input.language, input.strictGapAudit, input.webResearch, input.contract)
   };

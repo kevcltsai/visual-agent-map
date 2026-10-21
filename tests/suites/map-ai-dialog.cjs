@@ -443,7 +443,7 @@ async function synthesisHarness({ language = 'en' } = {}) {
   const MarkdownRenderer = { render: async (_app, markdown, el) => { el.rendered = markdown; } };
   const modelState = provider => ({ provider, status: 'ready', models: [] });
   let view;
-  const plugin = withExpansionCoordinator({ repo, settings: { ...DEFAULT_SETTINGS, language, cliModel: 'model-a' }, running: new Set(), activeTasks: new Map(), pendingSuggestions: new Map(), pendingResearchOptions: new Map(), quickExpandFailures: new Map(),
+  const plugin = withExpansionCoordinator({ repo, settings: { ...DEFAULT_SETTINGS, language, cliModel: 'model-a' }, running: new Set(), abortChartJobs: () => {}, addChartsAfterWrite: () => {}, activeTasks: new Map(), pendingSuggestions: new Map(), pendingResearchOptions: new Map(), quickExpandFailures: new Map(),
     rebuildDerivedData: async () => {}, mutate: async work => work(), releaseOutline() {}, views: () => [view], recordFailure: (_label, error) => error.message,
     aiReadyForModel: async () => true, confirmAiUsage: async (_model, run) => { await run(); return true; }, saveSettings: async () => {}, availableModels: () => ['model-a'], modelLabel: model => model,
     modelDiscoveryState: modelState, subscribeModelDiscovery: () => () => {}, refreshModelDiscovery: async provider => modelState(provider),

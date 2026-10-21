@@ -586,6 +586,56 @@
       "language": "zh-TW",
       "schema": true
     },
+    "claude.aim-subtopic-research.en": {
+      "builder": "buildAimPrompt for Claude (phase subtopic-research)",
+      "language": "en",
+      "schema": true
+    },
+    "claude.aim-subtopic-research.zh": {
+      "builder": "buildAimPrompt for Claude (phase subtopic-research)",
+      "language": "zh-TW",
+      "schema": true
+    },
+    "claude.chart-add.en": {
+      "builder": "core/steps/chart/step.ts chartStep for Claude (StructuredOutput-first sentence)",
+      "language": "en",
+      "schema": true
+    },
+    "claude.chart-add.zh": {
+      "builder": "core/steps/chart/step.ts chartStep for Claude (StructuredOutput-first sentence)",
+      "language": "zh-TW",
+      "schema": true
+    },
+    "claude.task-decompose.en": {
+      "builder": "AiTaskService instructions for Claude: mode decompose",
+      "language": "en",
+      "schema": true
+    },
+    "claude.task-decompose.zh": {
+      "builder": "AiTaskService instructions for Claude: mode decompose",
+      "language": "zh-TW",
+      "schema": true
+    },
+    "claude.task-general.en": {
+      "builder": "AiTaskService instructions for Claude: mode task, web research (StructuredOutput-first sentence)",
+      "language": "en",
+      "schema": true
+    },
+    "claude.task-general.zh": {
+      "builder": "AiTaskService instructions for Claude: mode task, web research (StructuredOutput-first sentence)",
+      "language": "zh-TW",
+      "schema": true
+    },
+    "claude.task-synthesize.en": {
+      "builder": "AiTaskService instructions for Claude: mode synthesize, local",
+      "language": "en",
+      "schema": true
+    },
+    "claude.task-synthesize.zh": {
+      "builder": "AiTaskService instructions for Claude: mode synthesize, local",
+      "language": "zh-TW",
+      "schema": true
+    },
     "coffee.convergence.en": {
       "builder": "coffee-tables/convergence.ts convergencePrompt",
       "language": "en",

@@ -141,7 +141,7 @@ integrationTest('a topic waiting in a research batch shows a scheduled frame and
   const all = (root, predicate) => [...(predicate(root) ? [root] : []), ...root.children.flatMap(child => all(child, predicate))];
   const topic = node('waiting');
   const queued = new Set(['waiting.md']);
-  const plugin = { repo: {}, settings: { ...DEFAULT_SETTINGS }, expansionBatches: new Map(), running: new Set(), quickExpandPending: new Set(), pendingSuggestions: new Map(), expansionCoordinator: { isQueued: path => queued.has(path) } };
+  const plugin = { repo: {}, settings: { ...DEFAULT_SETTINGS }, expansionBatches: new Map(), running: new Set(), abortChartJobs: () => {}, addChartsAfterWrite: () => {}, quickExpandPending: new Set(), pendingSuggestions: new Map(), expansionCoordinator: { isQueued: path => queued.has(path) } };
   const view = new VisualAgentMapView({ app: {} }, plugin); view.stageEl = element('stage'); view.map = map([topic]);
   view.notes = new Map([[topic.id, { title: 'Waiting topic', summary: '', status: 'idea' }]]);
   view.renderNode(topic);
@@ -269,7 +269,12 @@ integrationTest('Next Step reviews first expansion proposals in place and keeps 
   assert.equal(sourceChecks.length, 2); assert.ok(sourceChecks[0].checked); assert.ok(sourceChecks[1].checked);
   assert.ok(find(sources, item => item.text === 'Search for image references'));
   assert.ok(find(researchAdjust, item => /Standard: provide the main evidence, limits, and open questions/.test(item.text ?? '')));
-  assert.equal(all(expandAdjust, item => item.tag === 'input' && item.type === 'checkbox').length, 1, 'expand keeps only its shallow-research option');
+  // S7: the shallow-research option plus its own "also search the web" option, both off by default; the second shows only with the first.
+  const expandChecks = all(expandAdjust, item => item.tag === 'input' && item.type === 'checkbox');
+  assert.equal(expandChecks.length, 2, 'expand keeps its shallow-research option and the web-search option for it');
+  assert.equal(expandChecks[0].checked, false); assert.equal(expandChecks[1].checked, false);
+  assert.ok(find(expandAdjust, item => item.text === 'Run quick research on each created subtopic (does not search the web)'));
+  assert.ok(find(expandAdjust, item => item.text === 'Also search the web for subtopic research'));
   assert.equal(all(sources, item => item.tag === 'input' && item.type === 'file').length, 2);
   assert.ok(find(sources, item => item.text === 'Allow web search'));
   assert.ok(find(synthesize, item => /web search is off by default/.test(item.text ?? '')));
@@ -701,7 +706,7 @@ test('card shows a Format not met badge with the issues as tooltip', () => {
   });
   const find = (item, predicate) => predicate(item) ? item : item.children.map(child => find(child, predicate)).find(Boolean);
   const topic = node('topic');
-  const plugin = { repo: {}, settings: { ...DEFAULT_SETTINGS }, expansionBatches: new Map(), running: new Set(), quickExpandPending: new Set(), pendingSuggestions: new Map() };
+  const plugin = { repo: {}, settings: { ...DEFAULT_SETTINGS }, expansionBatches: new Map(), running: new Set(), abortChartJobs: () => {}, addChartsAfterWrite: () => {}, quickExpandPending: new Set(), pendingSuggestions: new Map() };
   const render = issues => {
     const view = new VisualAgentMapView({ app: {} }, plugin); view.stageEl = element('stage'); view.map = map([topic]);
     view.notes = new Map([[topic.id, { title: 'Topic', summary: '', status: 'completed', detailFormatIssues: issues }]]);

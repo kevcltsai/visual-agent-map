@@ -18,6 +18,38 @@ function formatElapsed(durationMs: number): string {
   return `${minutes}m ${seconds}s`;
 }
 
+/**
+ * Optional timing and shape facts of one model call, written once when the call ends. Every field is optional so an
+ * older entry (or a provider that cannot report a fact) simply lacks it. Times are ISO strings; no prompt or secret text.
+ */
+export interface AiMilestones {
+  stream?: "stream-json" | "json" | "json-fallback";
+  prespawned?: boolean;
+  acceptedAt?: string;
+  firstEventAt?: string;
+  firstTextAt?: string;
+  /** Claude wrote answer text before calling the StructuredOutput tool (the duplicated-output pattern). */
+  textBeforeTool?: boolean;
+  /** The CLI asked the model to call StructuredOutput again (a structured-output-enforce reminder). */
+  enforceRetry?: boolean;
+  structuredStartAt?: string;
+  structuredCalls?: number;
+  previewSummaryAt?: string;
+  receivedAt?: string;
+  searches?: Array<{
+    kind: "search" | "openPage";
+    startedAt: string;
+    completedAt?: string;
+    query?: string;
+    failed?: boolean;
+  }>;
+  stages?: Array<{ stage: string; at: string }>;
+  slowShownAt?: string;
+  resendOf?: string;
+  resentAs?: string;
+  usage?: { inputTokens?: number; outputTokens?: number };
+}
+
 export interface AiExchange {
   id: string;
   startedAt: string;
@@ -35,6 +67,8 @@ export interface AiExchange {
   response: string;
   status: "preparing" | "sent" | "received" | "parsed" | "completed" | "failed";
   error: string;
+  /** Written once per call by the provider; older entries have none. */
+  milestones?: AiMilestones;
 }
 
 export function promptMetrics(entry: AiExchange): {
@@ -81,9 +115,10 @@ export function formatAiExchange(entry: AiExchange): string {
   const metrics = promptMetrics(entry);
   const step = entry.step ? ` · step: ${entry.step}` : "";
   const timing = `Request ID: ${entry.id}${step} · phase: ${metrics.phase} · prompt: ${metrics.characters} characters · approximately ${metrics.estimatedTokens} tokens (estimate, not billed usage) · sent: ${entry.sentAt ?? "unavailable"} · completed: ${entry.completedAt ?? "unavailable"} · elapsed: ${entry.durationMs === undefined ? "unavailable" : formatElapsed(entry.durationMs)}`;
+  const milestones = entry.milestones ? `milestones: ${JSON.stringify(entry.milestones)}` : "";
   return [
     `[${entry.startedAt}] ${entry.topic} · ${entry.mode} · ${entry.model}/${entry.effort} · ${entry.status}`,
-    timing,
+    ...(milestones ? [timing, milestones] : [timing]),
     `\n${t("log.exchange_full_prompt")}\n`,
     metrics.prompt || t("log.exchange_legacy_prompt_missing"),
     `\n${t("log.exchange_request")}\n`,
@@ -119,6 +154,7 @@ export class AiExchangeLog {
           ) &&
           (entry.prompt === undefined || typeof entry.prompt === "string") &&
           (entry.step === undefined || typeof entry.step === "string") &&
+          (entry.milestones === undefined || isRecord(entry.milestones)) &&
           (entry.sentAt === undefined || typeof entry.sentAt === "string") &&
           (entry.completedAt === undefined || typeof entry.completedAt === "string") &&
           (entry.durationMs === undefined ||
@@ -182,6 +218,10 @@ export class AiExchangeLog {
   }
   received(id: string, response: string): void {
     this.update(id, { response, status: "received" });
+  }
+  /** Stores the call's milestones; the provider writes them once, when the call ends. */
+  milestones(id: string, data: AiMilestones): void {
+    this.update(id, { milestones: data });
   }
   parsed(id: string): void {
     this.finish(id, { status: "parsed" });

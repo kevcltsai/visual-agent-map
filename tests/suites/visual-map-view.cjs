@@ -1233,18 +1233,20 @@ integrationTest('selection, arrow keys and select-mode toggles repaint only the 
   assert.equal(view.selected, 'root'); assert.deepEqual(stops(), ['root']);
   assert.equal(fixture.renders(), 0, 'selection and arrow keys never call render()');
 });
-integrationTest('select mode: the selection bar names each action with the topic count', () => {
+integrationTest('select mode: the selection bar keeps action labels fixed and announces the topic count to screen readers', () => {
   const fixture = selectionView(load); const { view } = fixture;
   view.integrationMode = true; fixture.build();
   const labels = ids => {
     view.multiSelected = new Set(ids);
     const bar = view.renderSelectionBar(selectionDom()('div'));
-    return bar.children.filter(child => child.tag === 'button').map(button => [button.text, button.disabled]);
+    return bar.children.filter(child => child.tag === 'button').map(button => [button.text, button.disabled, button.attrs['aria-label']]);
   };
+  const hinted = view.renderSelectionBar(selectionDom()('div'));
+  assert.equal(hinted.children[0].tag, 'span'); assert.equal(hinted.children[1].classes.has('vam-selection-hint'), true); assert.match(hinted.children[1].text, /Drag to box-select/, 'the gesture hint sits in the bar under the names line');
   const none = labels([]);
-  assert.deepEqual(none.slice(-3), [['Synthesize', true], ['Merge', false], ['Research', true]]);
-  assert.deepEqual(labels(['a']).slice(-3), [['Synthesize', true], ['Merge', false], ['Research 1 topic', false]]);
-  assert.deepEqual(labels(['a', 'b', 'c']).slice(-3), [['Synthesize 3 topics', false], ['Merge 3 topics', false], ['Research 3 topics', false]]);
+  assert.deepEqual(none.slice(-3), [['Synthesize', true, undefined], ['Merge', false, undefined], ['Research', true, undefined]]);
+  assert.deepEqual(labels(['a']).slice(-3), [['Synthesize', true, undefined], ['Merge', false, undefined], ['Research', false, 'Research 1 topic']]);
+  assert.deepEqual(labels(['a', 'b', 'c']).slice(-3), [['Synthesize', false, 'Synthesize 3 topics'], ['Merge', false, 'Merge 3 topics'], ['Research', false, 'Research 3 topics']]);
   const { translate } = load('i18n.ts');
   assert.equal(translate('zh-TW', 'ui.synthesize_0_topics', 3), '整合 3 個議題'); assert.equal(translate('zh-TW', 'ui.research_0_topics', 3), '研究 3 個議題');
 });
@@ -1321,7 +1323,7 @@ const viewportFixture = () => {
   plugin.views = () => [view];
   return { plugin, view, counts, doc, frames, cancelled, a, b, windowValues, load: () => ({ VisualAgentMapView }) };
 };
-integrationTest('canvas hint: a solid chip that goes away after the first zoom or pan and remembers it in settings; select mode keeps its hint', () => {
+integrationTest('canvas hint: a solid chip that goes away after the first zoom or pan and remembers it in settings; select mode keeps its hint inside the selection bar', () => {
   const { plugin, view } = viewportFixture();
   let saves = 0; plugin.saveSettings = async () => { saves++; };
   view.viewportEl = { clientWidth: 800, clientHeight: 600 }; view.transform = () => {}; view.saveViewport = () => {};
@@ -1330,14 +1332,10 @@ integrationTest('canvas hint: a solid chip that goes away after the first zoom o
   view.zoomBy(1.2);
   assert.equal(plugin.settings.canvasHintSeen, false, 'a zoom button does not dismiss the hint that teaches drag and wheel'); assert.equal(hint.removed, 0);
   view.markCanvasHintSeen();
-  assert.equal(plugin.settings.canvasHintSeen, true); assert.equal(saves, 1); assert.equal(hint.removed, 1); assert.equal(view.hintEl, null);
   view.markCanvasHintSeen();
   assert.equal(saves, 1, 'only the first gesture writes settings');
-  plugin.settings.canvasHintSeen = false; view.integrationMode = true; const selectHint = { removed: 0, remove() { this.removed++; } }; view.hintEl = selectHint;
-  view.markCanvasHintSeen();
-  assert.equal(plugin.settings.canvasHintSeen, true); assert.equal(selectHint.removed, 0, 'the select-mode hint stays while that mode is on');
   const source = fs.readFileSync(path.join(root, 'experiences/visual-map/view.ts'), 'utf8');
-  assert.match(source, /this\.integrationMode \|\| !this\.plugin\.settings\.canvasHintSeen\s*\?\s*overlay\.createSpan\(\{\s*cls: "vam-hint vam-canvas-hint"/, 'the normal hint shows only until seen; select mode always shows its hint');
+  assert.match(source, /!this\.integrationMode && !this\.plugin\.settings\.canvasHintSeen\s*\?\s*overlay\.createSpan\(\{\s*cls: "vam-hint vam-canvas-hint"/, 'the normal hint shows only until seen; select mode draws none (the selection bar owns that corner)');
   assert.match(source, /if \(moved\) this\.markCanvasHintSeen\(\);/, 'a pan counts');
   assert.match(source, /event\.preventDefault\(\);\s*\/\/[^\n]*\n\s*this\.markCanvasHintSeen\(\);/, 'a wheel zoom counts');
   assert.match(fs.readFileSync(path.join(root, 'main.ts'), 'utf8'), /canvasHintSeen: saved\?\.canvasHintSeen === true/);

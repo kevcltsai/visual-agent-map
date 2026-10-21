@@ -13,6 +13,10 @@
 - Textbook-style notes with only the "no new information" placeholder under Evidence and sources now show just the source list, without the placeholder sentence.
 - The gantt critical-task bar text now meets 4.5:1 contrast in AnuPpuccin light.
 - A wide diagram in a VAM note without the `visual-agent-map-node` CSS class scrolls inside the diagram instead of making the whole preview scroll sideways.
+- With a Claude model selected and no models found, the sample start button now reads "Check Claude Code" and checks the Claude connection instead of Codex.
+- The topic-selection bar no longer shifts its buttons as the selection changes: it sits at the bottom left, clear of the zoom controls, the selected names and the gesture hint each have their own line, and the Synthesize, Merge and Research labels no longer carry a count (screen readers still hear it).
+- After creating subtopics from an expansion, the view now shows the parent and all new subtopics instead of empty canvas.
+- After quick subtopic research finishes, the new subtopic cards you have not moved are re-spaced so grown cards no longer overlap their neighbours.
 
 ## [0.24.0] - 2026-10-22
 

@@ -1890,6 +1890,15 @@ integrationTest('box selection: Shift+drag enters selection mode, an empty box c
   view.setupPan();
   const down = (over = {}) => viewport.handlers.get('pointerdown')({ target: { closest: () => null }, button: 0, clientX: 150, clientY: -10, pointerId: 1, altKey: false, shiftKey: false, preventDefault() {}, ...over });
   const drag = (x, y) => { viewport.handlers.get('pointermove')({ clientX: x, clientY: y }); viewport.handlers.get('pointerup')({}); };
+  // A pointerdown on a control inside the canvas (the empty-map "+ Topic" button) must not start a pan: capturing the pointer would retarget its click to the viewport.
+  { const captured = []; viewport.setPointerCapture = id => captured.push(id);
+    const interactive = ['button', 'a', 'input', 'select', 'textarea', '[contenteditable="true"]', '[role="button"]'].join(',');
+    const onControl = { closest: selector => (selector === interactive ? {} : null) };
+    down({ target: onControl });
+    assert.deepEqual(captured, [], 'no pointer capture starts from a control'); assert.equal(viewport.classes.has('is-panning'), false);
+    down({ target: onControl, shiftKey: true });
+    assert.deepEqual(captured, [], 'no marquee capture starts from a control either');
+    down(); assert.deepEqual(captured, [1], 'a pointerdown on bare canvas still pans'); viewport.handlers.get('pointerup')({}); }
   // A plain drag in normal mode still pans (no box, viewport moves).
   down(); viewport.handlers.get('pointermove')({ clientX: 170, clientY: 30 });
   assert.equal(viewport.classes.has('is-marquee'), false); assert.equal(view.map.viewport.x, 20); assert.equal(view.map.viewport.y, 40);

@@ -28622,6 +28622,15 @@ var MergeTopicsModal = class extends import_obsidian28.Modal {
 // experiences/visual-map/view.ts
 var VIEW_TYPE = "visual-agent-map-view";
 var EDITABLE_SELECTOR = ["input", "textarea", "select", "[contenteditable]:not([contenteditable=false])"].join(",");
+var INTERACTIVE_SELECTOR = [
+  "button",
+  "a",
+  "input",
+  "select",
+  "textarea",
+  '[contenteditable="true"]',
+  '[role="button"]'
+].join(",");
 function isEditableTarget(target) {
   var _a;
   return !!((_a = target == null ? void 0 : target.closest) == null ? void 0 : _a.call(target, EDITABLE_SELECTOR));
@@ -37275,7 +37284,8 @@ ${note.detail.trim()}` : "",
       { passive: false }
     );
     viewport.addEventListener("pointerdown", (event) => {
-      if (event.target.closest(".vam-node") || !this.map) return;
+      const target = event.target;
+      if (target.closest(".vam-node") || target.closest(INTERACTIVE_SELECTOR) || !this.map) return;
       const intent = canvasPointerIntent({
         button: event.button,
         integrationMode: this.integrationMode,

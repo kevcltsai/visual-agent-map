@@ -196,6 +196,16 @@ interface Action {
 }
 /** Message of any thrown value, without relying on instanceof Error (errors may cross realms). */
 const EDITABLE_SELECTOR = ["input", "textarea", "select", "[contenteditable]:not([contenteditable=false])"].join(",");
+/** Elements that own their own click: a canvas-level pointer capture must never start from inside one. */
+const INTERACTIVE_SELECTOR = [
+  "button",
+  "a",
+  "input",
+  "select",
+  "textarea",
+  '[contenteditable="true"]',
+  '[role="button"]'
+].join(",");
 /** True when a key event came from a text control, where the field owns the key (undo, Backspace, typing). */
 function isEditableTarget(target: unknown): boolean {
   return !!(target as Element | null)?.closest?.(EDITABLE_SELECTOR);
@@ -9678,7 +9688,8 @@ export class VisualAgentMapView extends ItemView {
       { passive: false }
     );
     viewport.addEventListener("pointerdown", event => {
-      if ((event.target as Element).closest(".vam-node") || !this.map) return;
+      const target = event.target as Element;
+      if (target.closest(".vam-node") || target.closest(INTERACTIVE_SELECTOR) || !this.map) return;
       // Normal mode: a drag pans, Shift+drag draws a selection box. Topic selection mode: a drag adds to the selection,
       // Option (Alt)+drag removes from it, and Space+drag or the middle button pans.
       const intent = canvasPointerIntent({

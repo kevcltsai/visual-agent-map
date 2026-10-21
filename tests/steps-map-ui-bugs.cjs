@@ -103,3 +103,19 @@ test('A16: after quick research the untouched batch cards are re-spaced against 
   await view.respaceBatch(nodes[0], placed);
   assert.equal(writes.length, 1, 'a second pass with nothing left to move writes nothing');
 });
+
+test('A16 race: a drag queued before the re-space wins, and memory and disk stay identical (so the next mapChange sees no conflict)', async () => {
+  const mk = (id, parentId, x, y) => ({ id, path: `${id}.md`, parentId, x, y, collapsed: false });
+  const nodes = [mk('p', null, 0, 0), mk('c1', 'p', 340, 0), mk('c2', 'p', 340, 220)];
+  const disk = { nodes: JSON.parse(JSON.stringify(nodes)) };
+  let chain = Promise.resolve();
+  const plugin = { mutate: fn => { const run = chain.then(fn); chain = run.catch(() => {}); return run; }, repo: { updateMap: async (_p, fn) => { fn(disk); } } };
+  const view = bareView(plugin, { map: { nodes }, closed: false, builtIn: false, path: 'Map.md', cardHeightOf: () => 500 });
+  const placed = new Map([['c1', { x: 340, y: 0 }], ['c2', { x: 340, y: 220 }]]);
+  // The user drags c2: the drag is queued first and lands in memory and on disk before the re-space runs.
+  const drag = plugin.mutate(async () => { nodes[2].y = 900; disk.nodes[2].y = 900; });
+  await Promise.all([drag, view.respaceBatch(nodes[0], placed)]);
+  assert.equal(view.map.nodes[2].y, 900, 'the dragged card keeps its position');
+  assert.equal(disk.nodes[2].y, 900);
+  assert.deepEqual(JSON.parse(JSON.stringify(view.map.nodes)), disk.nodes, 'memory equals disk: mapChange raises no conflict dialog and keeps history');
+});

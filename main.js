@@ -35066,36 +35066,38 @@ ${request.requirements}` : preset.text,
    * user has not moved are laid out again against the measured heights (one Map.md write, no undo step, no AI call).
    */
   async respaceBatch(parent, placed) {
-    if (this.closed || !this.map || this.builtIn) return;
-    const untouched = new Set(
-      this.map.nodes.filter((n) => {
-        var _a, _b;
-        return ((_a = placed.get(n.id)) == null ? void 0 : _a.x) === n.x && ((_b = placed.get(n.id)) == null ? void 0 : _b.y) === n.y;
-      }).map((n) => n.id)
-    );
-    if (!untouched.size) return;
-    const arranged = arrangeNewBranch(this.map.nodes, parent.id, untouched, this.cardHeightOf);
-    const moved = arranged.filter(
-      (n, index) => untouched.has(n.id) && (n.x !== this.map.nodes[index].x || n.y !== this.map.nodes[index].y)
-    );
-    if (!moved.length) return;
-    const target = new Map(moved.map((n) => [n.id, { x: n.x, y: n.y }]));
+    if (this.closed || this.builtIn) return;
     await this.plugin.mutate(
       async () => {
+        if (this.closed || !this.map) return;
+        const untouched = new Set(
+          this.map.nodes.filter((n) => {
+            var _a, _b;
+            return ((_a = placed.get(n.id)) == null ? void 0 : _a.x) === n.x && ((_b = placed.get(n.id)) == null ? void 0 : _b.y) === n.y;
+          }).map((n) => n.id)
+        );
+        if (!untouched.size) return;
+        const current = this.map.nodes;
+        const arranged = arrangeNewBranch(current, parent.id, untouched, this.cardHeightOf);
+        const target = /* @__PURE__ */ new Map();
+        arranged.forEach((n, index) => {
+          if (untouched.has(n.id) && (n.x !== current[index].x || n.y !== current[index].y))
+            target.set(n.id, { x: n.x, y: n.y });
+        });
+        if (!target.size) return;
         await this.plugin.repo.updateMap(this.path, (map) => {
           for (const node of map.nodes) {
             const point = target.get(node.id);
             if (point) Object.assign(node, point);
           }
         });
+        for (const node of this.map.nodes) {
+          const point = target.get(node.id);
+          if (point) Object.assign(node, point);
+        }
       },
       { sync: false }
     );
-    if (!this.map) return;
-    for (const node of this.map.nodes) {
-      const point = target.get(node.id);
-      if (point) Object.assign(node, point);
-    }
   }
   /**
    * The options of the quick research that follows AI expansion: no web or image search unless the dialog's checkbox
@@ -35352,6 +35354,7 @@ ${request.requirements}` : preset.text,
     selection.createSpan({
       text: this.multiSelected.size ? t("ui.selected_0_1_2", this.multiSelected.size, names2.slice(0, 2).join("\u3001"), names2.length > 2 ? "\u2026" : "") : t("ui.prompt_select_topics")
     });
+    selection.createSpan({ cls: "vam-hint vam-selection-hint", text: t("ui.drag_to_select_topics_hint") });
     this.button(
       selection,
       t("ui.clear"),

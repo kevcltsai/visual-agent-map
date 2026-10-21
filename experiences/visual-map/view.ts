@@ -5899,7 +5899,7 @@ export class VisualAgentMapView extends ItemView {
     if (tools.childElementCount) overlay.appendChild(tools);
     else tools.remove();
     if (this.relevancePanelEl) this.placeRelevancePanel(this.relevancePanelEl);
-    // The gesture hint goes away once the user has panned or zoomed; select mode shows none (the selection bar explains it).
+    // The gesture hint goes away once the user has panned or zoomed; select mode keeps its gesture hint inside the selection bar, never over the canvas.
     // In select mode the selection bar (bottom-left) owns that space, so no hint is drawn there.
     this.hintEl =
       !this.integrationMode && !this.plugin.settings.canvasHintSeen
@@ -7716,33 +7716,37 @@ export class VisualAgentMapView extends ItemView {
    * user has not moved are laid out again against the measured heights (one Map.md write, no undo step, no AI call).
    */
   private async respaceBatch(parent: MapNode, placed: Map<string, { x: number; y: number }>): Promise<void> {
-    if (this.closed || !this.map || this.builtIn) return;
-    const untouched = new Set(
-      this.map.nodes.filter(n => placed.get(n.id)?.x === n.x && placed.get(n.id)?.y === n.y).map(n => n.id)
-    );
-    if (!untouched.size) return;
-    const arranged = arrangeNewBranch(this.map.nodes, parent.id, untouched, this.cardHeightOf);
-    const moved = arranged.filter(
-      (n, index) => untouched.has(n.id) && (n.x !== this.map!.nodes[index].x || n.y !== this.map!.nodes[index].y)
-    );
-    if (!moved.length) return;
-    const target = new Map(moved.map(n => [n.id, { x: n.x, y: n.y }]));
+    if (this.closed || this.builtIn) return;
+    // Everything runs inside one queued mutation: a drag queued before it has already landed in this.map, so the
+    // "untouched" check, the layout and the write all see the same positions and a dragged card is never overwritten.
     await this.plugin.mutate(
       async () => {
+        if (this.closed || !this.map) return;
+        const untouched = new Set(
+          this.map.nodes.filter(n => placed.get(n.id)?.x === n.x && placed.get(n.id)?.y === n.y).map(n => n.id)
+        );
+        if (!untouched.size) return;
+        const current = this.map.nodes;
+        const arranged = arrangeNewBranch(current, parent.id, untouched, this.cardHeightOf);
+        const target = new Map<string, { x: number; y: number }>();
+        arranged.forEach((n, index) => {
+          if (untouched.has(n.id) && (n.x !== current[index].x || n.y !== current[index].y))
+            target.set(n.id, { x: n.x, y: n.y });
+        });
+        if (!target.size) return;
         await this.plugin.repo.updateMap(this.path, map => {
           for (const node of map.nodes) {
             const point = target.get(node.id);
             if (point) Object.assign(node, point);
           }
         });
+        for (const node of this.map.nodes) {
+          const point = target.get(node.id);
+          if (point) Object.assign(node, point);
+        }
       },
       { sync: false }
     );
-    if (!this.map) return;
-    for (const node of this.map.nodes) {
-      const point = target.get(node.id);
-      if (point) Object.assign(node, point);
-    }
   }
   /**
    * The options of the quick research that follows AI expansion: no web or image search unless the dialog's checkbox
@@ -8012,6 +8016,8 @@ export class VisualAgentMapView extends ItemView {
         ? t("ui.selected_0_1_2", this.multiSelected.size, names.slice(0, 2).join("、"), names.length > 2 ? "…" : "")
         : t("ui.prompt_select_topics")
     });
+    // One fixed line under the names: it cannot cover the canvas and never moves the buttons.
+    selection.createSpan({ cls: "vam-hint vam-selection-hint", text: t("ui.drag_to_select_topics_hint") });
     this.button(
       selection,
       t("ui.clear"),

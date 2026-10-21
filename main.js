@@ -14102,6 +14102,10 @@ var History = class {
   constructor() {
     __publicField(this, "past", []);
     __publicField(this, "future", []);
+    /** Bumped by clear(), so a mark taken before it can tell the entries it covered are gone. */
+    __publicField(this, "epoch", 0);
+    /** Entries pushed out of the front by the 80-entry cap, so a mark's position survives the cap. */
+    __publicField(this, "dropped", 0);
   }
   get canUndo() {
     return this.past.length > 0;
@@ -14117,7 +14121,10 @@ var History = class {
   }
   push(entry) {
     this.past.push(entry);
-    if (this.past.length > 80) this.past.shift();
+    if (this.past.length > 80) {
+      this.past.shift();
+      this.dropped++;
+    }
     this.future = [];
   }
   undo() {
@@ -14132,6 +14139,44 @@ var History = class {
   }
   clear() {
     this.past = [];
+    this.future = [];
+    this.epoch++;
+  }
+  /** Marks the present end of the history; collapseSince folds everything pushed after it into one entry. */
+  mark() {
+    return { epoch: this.epoch, dropped: this.dropped, length: this.past.length };
+  }
+  /**
+   * Folds the entries pushed since `mark` into one undo step: undo runs them newest first, redo oldest first. Does
+   * nothing when the history was cleared since the mark, or when fewer than two entries were pushed. Each entry's
+   * undo/redo is read when it runs, so later patches to an entry (parkOnUndo) still apply.
+   */
+  collapseSince(mark, label) {
+    if (mark.epoch !== this.epoch) return;
+    const start = Math.max(0, mark.length - (this.dropped - mark.dropped));
+    if (this.past.length - start < 2) return;
+    const entries = this.past.splice(start);
+    const run = async (list, redo) => {
+      const done = [];
+      try {
+        for (const entry of list) {
+          await (redo ? entry.redo() : entry.undo());
+          done.push(entry);
+        }
+      } catch (error) {
+        try {
+          for (const entry of done.reverse()) await (redo ? entry.undo() : entry.redo());
+        } catch (e) {
+        }
+        throw error;
+      }
+    };
+    const combined = {
+      undo: () => run([...entries].reverse(), false),
+      redo: () => run(entries, true),
+      ...label ? { label } : {}
+    };
+    this.past.push(combined);
     this.future = [];
   }
 };
@@ -14231,7 +14276,7 @@ function arrangeMap(nodes, hidden, heightOf) {
   const placed = positions(laidOut, roots, 80, 80, true, heightOf);
   return nodes.map((node) => ({ ...node, ...placed.get(node.id) }));
 }
-function arrangeNewBranch(nodes, parentId, newIds, heightOf) {
+function arrangeNewBranch(nodes, parentId, newIds, heightOf, minTop) {
   const parent = nodes.find((node) => node.id === parentId);
   if (!parent || !newIds.size) return nodes;
   const fresh = nodes.filter((node) => newIds.has(node.id));
@@ -14240,6 +14285,8 @@ function arrangeNewBranch(nodes, parentId, newIds, heightOf) {
   const centers = roots.map((root) => placed.get(root.id).y + cardHeight(heightOf, root.id) / 2);
   const center = centers.length ? (Math.min(...centers) + Math.max(...centers)) / 2 : 0;
   let offset = parent.y + cardHeight(heightOf, parent.id) / 2 - center;
+  if (minTop !== void 0 && placed.size)
+    offset = Math.max(offset, minTop - Math.min(...[...placed.values()].map((point) => point.y)));
   const fixed = nodes.filter((node) => !newIds.has(node.id));
   for (; ; ) {
     let next = offset;
@@ -32730,15 +32777,15 @@ ${request.requirements}` : preset.text,
     if (!this.mergeUnlocked([target.id, ...roots.map((root) => root.id)])) return;
     this.assertAimReferencesRemain(this.map, new Set(roots.map((root) => root.id)), true);
     await this.mapChange((map) => {
-      let offset = 0;
+      const moved = /* @__PURE__ */ new Set();
       for (const root of roots) {
         if (!canParent(map.nodes, root.id, target.id)) throw new Error(t("ui.circular_links_are_not_allowed"));
-        const node = map.nodes.find((item) => item.id === root.id);
-        node.parentId = target.id;
-        node.x = target.x + 340;
-        node.y = target.y + offset++ * 220;
+        map.nodes.find((item) => item.id === root.id).parentId = target.id;
+        moved.add(root.id);
+        for (const id of descendants(map.nodes, root.id)) moved.add(id);
       }
       map.nodes.find((node) => node.id === target.id).collapsed = false;
+      map.nodes = arrangeNewBranch(map.nodes, target.id, moved, this.cardHeightOf);
     });
     this.multiSelected.clear();
     this.render();
@@ -32834,6 +32881,7 @@ ${request.requirements}` : preset.text,
       const after = clone(before);
       after.nodes.push(...copies);
       after.nodes.find((node) => node.id === target.id).collapsed = false;
+      after.nodes = arrangeNewBranch(after.nodes, target.id, new Set(copies.map((copy) => copy.id)), this.cardHeightOf);
       await this.plugin.repo.saveMap(this.path, after);
       this.map = after;
       await this.plugin.rebuildDerivedData();
@@ -35080,6 +35128,12 @@ ${request.requirements}` : preset.text,
         await this.mapChange((map) => {
           if (!canParent(map.nodes, node.id, parentId)) throw new Error(t("ui.circular_links_are_not_allowed"));
           map.nodes.find((n) => n.id === node.id).parentId = parentId;
+          const branch = /* @__PURE__ */ new Set([node.id, ...descendants(map.nodes, node.id)]);
+          const parent2 = parentId ? map.nodes.find((n) => n.id === parentId) : void 0;
+          if (parent2) {
+            parent2.collapsed = false;
+            map.nodes = arrangeNewBranch(map.nodes, parent2.id, branch, this.cardHeightOf);
+          } else map.nodes = arrangeNewTree(map.nodes, node.id, branch, this.cardHeightOf);
         });
       });
     });
@@ -35259,7 +35313,7 @@ ${request.requirements}` : preset.text,
   }
   /** `focus` false leaves the camera to the caller (a batch frames the whole branch once it is laid out). */
   async addNode(parentNode, suggestedTitle, rebuildDerivedData = true, focus = true) {
-    var _a, _b, _c, _d;
+    var _a, _b, _c, _d, _e, _f;
     if (!this.map) return;
     const parent = parentNode && this.map.nodes.find((item) => item.id === parentNode.id) || parentNode;
     if (!(suggestedTitle == null ? void 0 : suggestedTitle.trim())) {
@@ -35292,8 +35346,7 @@ ${request.requirements}` : preset.text,
     }
     node.parentId = (_c = parent == null ? void 0 : parent.id) != null ? _c : null;
     node.x = parent ? parent.x + 340 : 80;
-    const siblings = this.map.nodes.filter((n) => n.parentId === node.parentId);
-    node.y = siblings.length ? Math.max(...siblings.map((n) => n.y)) + 220 : (_d = parent == null ? void 0 : parent.y) != null ? _d : 80;
+    node.y = (_d = parent == null ? void 0 : parent.y) != null ? _d : 80;
     this.notes.set(
       node.id,
       await this.plugin.repo.readNote(node.path, { ...this.map, nodes: [...this.map.nodes, node] })
@@ -35302,12 +35355,28 @@ ${request.requirements}` : preset.text,
     const previousEntry = this.history.undoEntry;
     const done = await this.mapChangeSnapshots((map) => {
       map.nodes.push(node);
-      if (parent) map.nodes.find((n) => n.id === parent.id).collapsed = false;
+      const owner = parent ? map.nodes.find((n) => n.id === parent.id) : void 0;
+      if (owner) {
+        owner.collapsed = false;
+        const siblings = map.nodes.filter((n) => n.parentId === owner.id && n.id !== node.id);
+        const minTop = siblings.length ? Math.max(...siblings.map((n) => {
+          var _a2;
+          return n.y + ((_a2 = this.cardHeightOf(n.id)) != null ? _a2 : DEFAULT_CARD_HEIGHT);
+        })) + LAYOUT_GAP : void 0;
+        map.nodes = arrangeNewBranch(map.nodes, owner.id, /* @__PURE__ */ new Set([node.id]), this.cardHeightOf, minTop);
+      } else if (!parent) {
+        const roots = map.nodes.filter((n) => n.id !== node.id && !n.parentId);
+        if (roots.length)
+          node.y = Math.max(...roots.map((n) => {
+            var _a2;
+            return n.y + ((_a2 = this.cardHeightOf(n.id)) != null ? _a2 : DEFAULT_CARD_HEIGHT);
+          })) + LAYOUT_GAP;
+      }
     }, rebuildDerivedData);
     if (done) this.parkOnUndo(node.id, done.before, done.after, previousEntry);
     if (!focus) return;
     if (this.map) this.map.viewport.zoom = Math.max(this.map.viewport.zoom, 0.7);
-    this.focusNode(node);
+    this.focusNode((_f = (_e = this.map) == null ? void 0 : _e.nodes.find((n) => n.id === node.id)) != null ? _f : node);
   }
   async proposeChildren(parent, options, direction = "", found, failed, acceptedCallback) {
     var _a, _b, _c, _d, _e, _f, _g, _h, _i, _j, _k;
@@ -35542,6 +35611,7 @@ ${request.requirements}` : preset.text,
       seen.add(item.title);
     }
     let created = 0;
+    const historyMark = this.history.mark();
     const createdByTitle = /* @__PURE__ */ new Map(), newNodes = [];
     const contributionTemplate = this.mapDetailTemplate(this.plugin.settings.language, detailTemplateId);
     try {
@@ -35572,9 +35642,13 @@ ${request.requirements}` : preset.text,
         }, false);
       if (newNodes.length) this.frameBranch([parent.id, ...newNodes.map((node) => node.id)]);
       if (created) await this.plugin.rebuildDerivedData();
+      this.history.collapseSince(historyMark);
+      this.updateHistoryButtons();
       return newNodes;
     } catch (error) {
       if (created) {
+        this.history.collapseSince(historyMark);
+        this.updateHistoryButtons();
         await this.plugin.rebuildDerivedData();
         throw new PartialChildBatchError(
           t("ui.some_subtopics_were_created_reopen_this_window_and_check_the") + ` ${error instanceof Error ? error.message : String(error)}`

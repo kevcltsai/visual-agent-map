@@ -21,6 +21,9 @@
 - A topic title can no longer be lost because of its file name: a title cut in the middle of an emoji or a rare character, a title that starts with dots (such as `...second`), and a title that differs from an existing one only by case or Greek final sigma now all create their card. New file names are cut at a whole character with no trailing space or dot, a leading dot is dropped, and a name clash on a case-insensitive disk gets a numeric suffix (retried if the disk still reports a clash). Existing notes and maps are never renamed.
 - Renaming a map to a name that differs from another map only by case now shows "A topic folder with this name already exists." and changes nothing, instead of Obsidian's raw "Destination file already exists!".
 - The "Topic" link a note shows back to its map no longer breaks when the map title contains brackets, a pipe, backticks or line breaks: the link text is cleaned (the map title itself is unchanged).
+- Move to..., Copy to... and "Apply" in Structure and links now lay out the moved or copied branch under its new parent (or as a new tree when it becomes a root) so cards no longer land on top of the parent's existing children; Undo restores the old positions in one step.
+- A new topic is placed using the measured height of its siblings (or below the lowest top-level topic), so a tall card no longer overlaps the next one.
+- Creating subtopics with AI is now one Undo step instead of one per subtopic: a single Undo removes the whole batch and a single Redo brings it back, also when the batch stopped part-way.
 
 ## [0.24.0] - 2026-10-22
 

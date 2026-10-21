@@ -660,8 +660,9 @@ integrationTest('relevance sort: adding a child while sorted saves coordinates f
   await view.addNode(display, 'Child while sorted');
   const saved = (await h.saved()).find(n => n.parentId === real.id && !siblingsBefore.some(s => s.id === n.id));
   assert.ok(saved, 'the child was added under the real parent');
-  assert.equal(saved.x, real.x + 340);
-  assert.equal(saved.y, Math.max(...siblingsBefore.map(n => n.y)) + 220, 'below the real siblings');
+  // 0.25 FG20-08: the child is laid out by arrangeNewBranch (one column right of the real parent, clear of its siblings by their card height).
+  assert.equal(saved.x, real.x + 360);
+  assert.ok(saved.y >= Math.max(...siblingsBefore.map(n => n.y)) + 204, 'below the real siblings');
   const realAfter = (await h.saved()).find(n => n.id === real.id);
   assert.deepEqual([realAfter.x, realAfter.y], [real.x, real.y], 'the parent keeps its saved position');
 });

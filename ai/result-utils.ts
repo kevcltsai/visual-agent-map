@@ -64,16 +64,18 @@ function textbookDetail(
   footnotes: string[],
   sourcesIndex: number
 ): string {
-  if (footnotes.length && sourcesIndex >= 0) {
-    const evidence = (sections.get(sourcesIndex) ?? []).join("\n").trim();
-    sections.set(sourcesIndex, [[evidence, footnotes.join("\n")].filter(Boolean).join("\n\n")]);
-  }
   // The note placeholder in both languages, plus the "No new content this time" wording the prompts ask the model to write.
   const placeholders = new Set([
     ...(["zh-TW", "en"] as const).map(locale => translate(locale, "note.no_new_information").replace(/[.。]$/, "")),
     "No new content this time",
     "本次無新增內容"
   ]);
+  if (footnotes.length && sourcesIndex >= 0) {
+    const raw = (sections.get(sourcesIndex) ?? []).join("\n").trim();
+    // A placeholder-only evidence section keeps its heading for the footnotes but drops the placeholder sentence.
+    const evidence = placeholders.has(raw.replace(/[.。]$/, "")) ? "" : raw;
+    sections.set(sourcesIndex, [[evidence, footnotes.join("\n")].filter(Boolean).join("\n\n")]);
+  }
   const blocks = [leading.join("\n").trim()];
   template.sections.forEach((section, index) => {
     const body = sections.get(index)?.join("\n").trim() ?? "";

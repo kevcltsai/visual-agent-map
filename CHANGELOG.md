@@ -9,6 +9,10 @@
 - Map cards now work from the keyboard: Delete or Backspace removes the focused card (with an Undo notice, or the usual confirmation when it has subtopics), Mod+Enter adds a subtopic, Shift+Enter adds a sibling, double-clicking a title renames it, and Mod+Z / Mod+Shift+Z undo and redo while the map is the active pane.
 - Merging, removing, archiving, renaming and undoing topics no longer pops up Obsidian's "Update links" dialog when only VAM notes link to the moved cards: VAM updates its own links itself. If one of your own notes links to a moved card, VAM shows a short notice first and Obsidian asks as before, so your links are never silently broken.
 - Integrate subtopics now sends the parent topic's Working Findings to the model and clears them only when the model actually received them. Before, they were left out of the request and then deleted when the result was saved; a change to the findings while the synthesis runs now stops the save instead of overwriting them.
+- A research note no longer keeps a copied footnote marker with no definition: it becomes the source note when exactly one reference note defines it, and is removed when several define it or when a reference note uses it without defining it. Your own earlier footnotes are never re-pointed.
+- Textbook-style notes with only the "no new information" placeholder under Evidence and sources now show just the source list, without the placeholder sentence.
+- The gantt critical-task bar text now meets 4.5:1 contrast in AnuPpuccin light.
+- A wide diagram in a VAM note without the `visual-agent-map-node` CSS class scrolls inside the diagram instead of making the whole preview scroll sideways.
 
 ## [0.24.0] - 2026-10-22
 

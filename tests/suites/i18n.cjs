@@ -205,7 +205,9 @@ test('the sample tour names the controls exactly as the map labels them, in both
 });
 test('language registry helpers resolve the four language axes', () => {
   const i18n = load('i18n.ts');
-  assert.deepEqual(plain(i18n.LANGUAGES.map(item => item.id)), ['zh-TW', 'zh-CN', 'en']);
+  const ids = plain(i18n.LANGUAGES.map(item => item.id));
+  for (const id of ['zh-TW', 'zh-CN', 'en']) assert.ok(ids.includes(id), `the registry lists ${id}`);
+  assert.ok(ids.indexOf('zh-TW') < ids.indexOf('zh-CN') && ids.indexOf('zh-CN') < ids.indexOf('en'), 'zh-TW, zh-CN, en keep their relative order');
   assert.equal(i18n.noteLanguageOf('zh-TW'), 'zh-TW');
   assert.equal(i18n.noteLanguageOf('zh-CN'), 'zh-TW');
   assert.equal(i18n.noteLanguageOf('en'), 'en');
@@ -214,7 +216,7 @@ test('language registry helpers resolve the four language axes', () => {
   assert.equal(i18n.instructionLanguageOf('en'), 'en');
   assert.equal(i18n.isUiLanguage('zh-TW'), true);
   assert.equal(i18n.isUiLanguage('zh-CN'), true);
-  assert.equal(i18n.isUiLanguage('ja'), false);
+  assert.equal(i18n.isUiLanguage('xx-unregistered'), false);
   assert.equal(i18n.isNoteLanguage('zh-CN'), false, 'a Simplified Chinese note language is never persisted');
   assert.equal(i18n.isNoteLanguage('en'), true);
   assert.equal(i18n.isNoteLanguage('unsupported'), false);
@@ -225,9 +227,9 @@ test('language registry helpers resolve the four language axes', () => {
   assert.equal(i18n.intlLocaleOf('zh-CN'), 'zh-CN');
   assert.equal(i18n.uiLocale('zh-TW'), 'zh-TW');
   assert.equal(i18n.uiLocale('zh-CN'), 'zh-CN');
-  assert.equal(i18n.uiLocale('ja'), 'en');
+  assert.equal(i18n.uiLocale('xx-unregistered'), 'en');
   assert.equal(i18n.initialUiLanguage('zh-CN'), 'zh-CN');
-  assert.equal(i18n.initialUiLanguage('ja'), 'en', 'a language written by a newer version reads as English');
+  assert.equal(i18n.initialUiLanguage('xx-unregistered'), 'en', 'a language written by a newer version reads as English');
 });
 test('contentLocale: the interface language when its note language matches, otherwise the note language', () => {
   const { contentLocale } = load('i18n.ts');
@@ -283,7 +285,10 @@ test('check:i18n passes on the repository dictionaries and fails on a bad placeh
     fs.copyFileSync(path.join(root, 'i18n', 'languages.ts'), path.join(fixture, 'i18n', 'languages.ts'));
     const write = (name, exportName, entries) => fs.writeFileSync(path.join(fixture, 'i18n', name), `export const ${exportName} = {\n  // coffee:begin\n  "coffee.a": "Hello **{0}**",\n  // coffee:end\n${entries}};\n`);
     write('en.ts', 'en', '  "ui.b": "Count {0} of {1}",\n');
-    const writeChinese = entries => { write('zh-TW.ts', 'zhTW', entries); write('zh-CN.ts', 'zhCN', entries); };
+    // One dictionary per non-English registry language, so a new language needs no edit here.
+    const { LANGUAGES } = load('i18n/languages.ts');
+    const exportName = id => id.replace(/-([A-Za-z])/g, (_, letter) => letter.toUpperCase()).replace(/-/g, '');
+    const writeChinese = entries => { for (const { id } of LANGUAGES) if (id !== 'en') write(`${id}.ts`, exportName(id), entries); };
     writeChinese('  "ui.b": "第 {0} 項",\n');
     const bad = spawnSync(process.execPath, [script, '--root', fixture], { cwd: root, encoding: 'utf8' });
     assert.equal(bad.status, 1);

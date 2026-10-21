@@ -5,6 +5,8 @@ import {
   isNoteLanguage,
   noteLanguageOf,
   NOTE_LANGUAGES,
+  contentLocale,
+  supportedLanguageLabel,
   translate,
   uiLocale,
   type NoteLanguage,
@@ -283,7 +285,7 @@ export class CoffeeHandoffModal extends Modal {
     void this.plugin.refreshModelDiscovery("claude");
     this.reasoning = this.select(choices, this.t("coffee.reasoning"), ["low", "medium", "high", "auto"]);
     this.reasoning.value = normalizeReasoningLevel(this.snapshot.session.reasoning);
-    this.language = this.select(choices, this.t("coffee.output_language"), [...NOTE_LANGUAGES]);
+    this.language = this.select(choices, this.t("coffee.output_language"), [...NOTE_LANGUAGES], supportedLanguageLabel);
     this.language.value = noteLanguageOf(this.plugin.settings.language);
     this.status = this.contentEl.createEl("p", {
       cls: "ct-handoff-status",
@@ -338,12 +340,17 @@ export class CoffeeHandoffModal extends Modal {
     this.contentEl.createEl("label", { text: label, attr: { for: id } });
     return this.contentEl.createEl("textarea", { attr: { id, rows: String(rows), "aria-label": label } });
   }
-  private select(parent: HTMLElement, label: string, values: string[]): HTMLSelectElement {
+  private select(
+    parent: HTMLElement,
+    label: string,
+    values: string[],
+    display: (value: string) => string = value => value
+  ): HTMLSelectElement {
     const id = `ct-handoff-${randomUUID()}`;
     const group = parent.createDiv();
     group.createEl("label", { text: label, attr: { for: id } });
     const select = group.createEl("select", { attr: { id, "aria-label": label } });
-    for (const value of values) select.createEl("option", { text: value, value });
+    for (const value of values) select.createEl("option", { text: display(value), value });
     return select;
   }
   private refresh(): void {
@@ -393,7 +400,8 @@ export class CoffeeHandoffModal extends Modal {
       context: this.context.value,
       model: this.model.value,
       reasoning: normalizeReasoningLevel(this.reasoning.value),
-      language
+      // The stored choice stays a NoteLanguage; the prompt names the regional variant the interface language belongs to.
+      language: contentLocale(language, uiLocale(this.plugin.settings.language))
     };
     this.status.setText(this.t("coffee.organizing_a_research_question"));
     try {

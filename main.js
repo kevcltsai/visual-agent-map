@@ -7891,7 +7891,7 @@ var CoffeeHandoffModal = class extends import_obsidian6.Modal {
     void this.plugin.refreshModelDiscovery("claude");
     this.reasoning = this.select(choices, this.t("coffee.reasoning"), ["low", "medium", "high", "auto"]);
     this.reasoning.value = normalizeReasoningLevel(this.snapshot.session.reasoning);
-    this.language = this.select(choices, this.t("coffee.output_language"), [...NOTE_LANGUAGES]);
+    this.language = this.select(choices, this.t("coffee.output_language"), [...NOTE_LANGUAGES], supportedLanguageLabel);
     this.language.value = noteLanguageOf(this.plugin.settings.language);
     this.status = this.contentEl.createEl("p", {
       cls: "ct-handoff-status",
@@ -7943,12 +7943,12 @@ var CoffeeHandoffModal = class extends import_obsidian6.Modal {
     this.contentEl.createEl("label", { text: label, attr: { for: id } });
     return this.contentEl.createEl("textarea", { attr: { id, rows: String(rows), "aria-label": label } });
   }
-  select(parent, label, values) {
+  select(parent, label, values, display = (value) => value) {
     const id = `ct-handoff-${(0, import_node_crypto2.randomUUID)()}`;
     const group = parent.createDiv();
     group.createEl("label", { text: label, attr: { for: id } });
     const select = group.createEl("select", { attr: { id, "aria-label": label } });
-    for (const value of values) select.createEl("option", { text: value, value });
+    for (const value of values) select.createEl("option", { text: display(value), value });
     return select;
   }
   refresh() {
@@ -7999,7 +7999,8 @@ var CoffeeHandoffModal = class extends import_obsidian6.Modal {
       context: this.context.value,
       model: this.model.value,
       reasoning: normalizeReasoningLevel(this.reasoning.value),
-      language: language2
+      // The stored choice stays a NoteLanguage; the prompt names the regional variant the interface language belongs to.
+      language: contentLocale(language2, uiLocale(this.plugin.settings.language))
     };
     this.status.setText(this.t("coffee.organizing_a_research_question"));
     try {

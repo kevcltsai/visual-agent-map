@@ -23,6 +23,7 @@ function positions(text, needles) {
 void count;
 // Dictionary texts that legitimately differ because they are rendered from the dictionary of the output language.
 const DICTIONARY_PREFIXES = ['research.'];
+const RESEARCH_KEYS = Object.keys(zhTW).filter(key => DICTIONARY_PREFIXES.some(prefix => key.startsWith(prefix)));
 const dictionaryPairs = Object.keys(zhTW).filter(key => DICTIONARY_PREFIXES.some(prefix => key.startsWith(prefix))).map(key => [zhCN[key], zhTW[key]]).sort((a, b) => b[0].length - a[0].length);
 const toTraditional = text => {
   let result = text;
@@ -65,4 +66,11 @@ test('zh-CN prompt snapshots differ from zh-TW only on language names (one posit
   }
   assert.deepEqual(unexplained, []);
   assert.ok(total > 0, 'the snapshots parameterise at least one language name');
+});
+
+test('zh-CN prompt snapshots: exactly 17 lines carry a research.* text that differs from zh-TW (the dictionary-sourced instructions)', () => {
+  const simplified = RESEARCH_KEYS.filter(key => zhCN[key] !== zhTW[key]).map(key => zhCN[key]);
+  assert.ok(simplified.length > 0, 'some research.* texts are Simplified');
+  const lines = bases.flatMap(base => fs.readFileSync(path.join(directory, `${base}.zh-CN.txt`), 'utf8').split('\n').filter(line => simplified.some(text => line.includes(text))));
+  assert.equal(lines.length, 17);
 });

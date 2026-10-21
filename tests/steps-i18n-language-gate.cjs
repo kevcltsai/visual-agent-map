@@ -7,6 +7,7 @@ const fs = require('node:fs');
 const path = require('node:path');
 const ts = require('typescript');
 const { root } = require('./support.cjs');
+const { load } = require('./support-replay.cjs');
 
 const SKIPPED_DIRECTORIES = new Set(['node_modules', '.git', 'tests', 'i18n', 'samples', 'assets', 'scripts']);
 function sourceFiles(directory = '') {
@@ -18,15 +19,23 @@ function sourceFiles(directory = '') {
 }
 const FILES = sourceFiles();
 
-const LANGUAGE_IDS = '(?:en|zh-TW|zh-CN)';
-const QUOTE = `["']`;
-// Comparing a language id literal, switching on one, or keying an object by a regional id.
+// Language ids come from the registry, so a language added later is covered without editing this file.
+const escape = text => text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+const REGISTRY_IDS = load('i18n/languages.ts').LANGUAGES.map(item => item.id);
+const LANGUAGE_IDS = `(?:${[...new Set(['en', ...REGISTRY_IDS])].map(escape).join('|')})`;
+const REGIONAL_IDS = `(?:${REGISTRY_IDS.filter(id => id.includes('-')).map(escape).join('|')})`;
+const QUOTE = '["\'`]';
+// Comparing a language id literal, switching on one, testing array membership, or keying an object by a regional id.
 const BRANCH_ON_ID = [
   new RegExp(`[=!]==? ?${QUOTE}${LANGUAGE_IDS}${QUOTE}`),
   new RegExp(`${QUOTE}${LANGUAGE_IDS}${QUOTE} ?[=!]==?`),
   new RegExp(`\\bcase ${QUOTE}${LANGUAGE_IDS}${QUOTE}:`),
-  /startsWith\(["']zh/,
-  /["'](?:zh-TW|zh-CN)["']\s*:/
+  /startsWith\(["'`]zh/,
+  new RegExp(`${QUOTE}${REGIONAL_IDS}${QUOTE}\\s*:`),
+  // [ "zh-TW", "en" ].includes(language) and the reverse, language-like variables only.
+  new RegExp(`\\[[^\\]]*${QUOTE}${LANGUAGE_IDS}${QUOTE}[^\\]]*\\]\\.(?:includes|indexOf|some)\\(`),
+  new RegExp(`\\b\\w*[lL]ang(?:uage)?\\w*\\)?\\.includes\\(${QUOTE}${LANGUAGE_IDS}${QUOTE}\\)`),
+  new RegExp(`\\bnew Set\\(\\[[^\\]]*${QUOTE}${LANGUAGE_IDS}${QUOTE}[^\\]]*\\]\\)\\.has\\(`)
 ];
 // Tables keyed by NoteLanguage are the one allowed shape of per-language data; each is listed with its file and declaration.
 const NOTE_LANGUAGE_TABLES = [{ file: 'repository.ts', declaration: /^const REFERENCE_TEXT: Readonly<Record<NoteLanguage, ReferenceText>>/ }];

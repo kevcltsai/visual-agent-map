@@ -163,6 +163,27 @@ integrationTest('Reframing completion while the dialog is hidden gives one Notic
   assert.equal(handoffField(reopened,'Output language').value,'zh-TW');assert.equal(handoffField(reopened,'Model').value,task.inputs.model);assert.equal(reopened.rationale,'AI rationale');assert.equal(reopened.method,'ai');
   assert.equal(handoff.coffeeHandoffTask(plugin,data.session.id),undefined);
 });
+integrationTest('The handoff asks for the regional variant of the interface language: zh-CN UI writes Simplified, zh-TW and en are unchanged', async () => {
+  const { buildReframePrompt } = load('core/reframing-service.ts');
+  const run = async (uiLanguage, choice) => {
+    const data = await reframingModalFixture(), { modal, plugin, handoff } = data; let seen;
+    plugin.core.reframing = { reframe: async input => { seen = input; return { question: 'Q?', context: 'C', rationale: 'R' }; } };
+    plugin.settings.language = uiLanguage;
+    handoffField(modal, 'Output language').value = choice; organizeButton(modal).onclick();
+    await until(() => handoff.coffeeHandoffTask(plugin, data.session.id)?.state === 'done');
+    return { seen, stored: handoff.coffeeHandoffTask(plugin, data.session.id).inputs.language, modal };
+  };
+  const cn = await run('zh-CN', 'zh-TW');
+  assert.equal(cn.seen.language, 'zh-CN'); assert.equal(cn.stored, 'zh-TW'); assert.match(buildReframePrompt(cn.seen), /简体中文|Simplified Chinese/);
+  const tw = await run('zh-TW', 'zh-TW');
+  assert.equal(tw.seen.language, 'zh-TW'); assert.match(buildReframePrompt(tw.seen), /繁體中文|Traditional Chinese/); assert.doesNotMatch(buildReframePrompt(tw.seen), /简体中文|Simplified Chinese/);
+  const en = await run('en', 'en');
+  assert.equal(en.seen.language, 'en'); assert.match(buildReframePrompt(en.seen), /English/); assert.doesNotMatch(buildReframePrompt(en.seen), /Simplified Chinese/);
+  const cnEnglish = await run('zh-CN', 'en');
+  assert.equal(cnEnglish.seen.language, 'en');
+  const select = handoffField((await reframingModalFixture()).modal, 'Output language');
+  assert.deepEqual(select.children.map(o => [o.value, o.text]), [['zh-TW', '繁體中文'], ['en', 'English']]);
+});
 integrationTest('Starting a handoff for another insight announces the discarded finished AI draft', async () => {
   const data=await reframingModalFixture(),{modal,plugin,handoff,notices}=data;
   plugin.core.reframing={reframe:async()=>({question:'Q?',context:'C',rationale:'R'})};plugin.settings.language='en';

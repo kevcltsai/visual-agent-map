@@ -35334,13 +35334,8 @@ ${request.requirements}` : preset.text,
       moves = [];
       for (const current of (_b = (_a = this.map) == null ? void 0 : _a.nodes.filter((item) => ids.has(item.id))) != null ? _b : []) {
         const base = current.path.slice(current.path.lastIndexOf("/") + 1).replace(/\.md$/, "");
-        let parkedPath = `${folder}/${base}.md`;
-        if (taken.has(parkedPath.toLowerCase()) || this.app.vault.getAbstractFileByPath(parkedPath)) {
-          let counter = 2;
-          parkedPath = repo.unique(folder, base);
-          while (taken.has(parkedPath.toLowerCase())) parkedPath = repo.unique(folder, `${base} ${counter++}`);
-        }
-        taken.add(parkedPath.toLowerCase());
+        const parkedPath = repo.unique(folder, base, taken);
+        taken.add(parkedPath);
         moves.push({ activePath: current.path, parkedPath, topicId: before.id, parkedState: "unassigned" });
       }
       if (!moves.length) return;

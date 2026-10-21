@@ -154,3 +154,30 @@ test('0.25 retest: undo and redo run the Map.md conflict check; an outside edit 
   assert.equal(h.view.history.canRedo, false);
   assert.deepEqual(h.orphans(), []);
 });
+
+test('0.25 final review F1: undo parks under a free name when Unassigned holds the same name in another case (APFS)', async () => {
+  const h = await harness();
+  const { TFolder } = require('./support.cjs');
+  const vault = h.app.vault, rename = vault.rename;
+  const fold = name => name.normalize('NFC').toLowerCase().replace(/ς/g, 'σ');
+  // Like a case-insensitive file system: renaming onto a name that differs only by case fails.
+  vault.rename = async (item, target) => {
+    const folder = vault.getAbstractFileByPath(target.split('/').slice(0, -1).join('/'));
+    if (folder instanceof TFolder && folder.children.some(c => c.path !== item.path && fold(c.name) === fold(target.split('/').at(-1)))) throw new Error('Destination file already exists!');
+    return rename(item, target);
+  };
+  const unassigned = h.repo.topicFolder(MAP, 'Unassigned');
+  await h.repo.ensureTopicFolders('Agent Workspace/Topics/map-u');
+  await vault.create(`${unassigned}/Topic.md`, 'existing parked note');
+  await h.view.addNode(h.root, 'topic');
+  const created = h.view.map.nodes.find(n => n.id !== h.root.id);
+  assert.equal(created.path.endsWith('/topic.md'), true);
+  await h.view.travel(false);
+  assert.equal(h.view.map.nodes.length, 1, 'the undo went through');
+  assert.equal(h.contents.get(`${unassigned}/Topic.md`), 'existing parked note', 'the existing note is untouched');
+  assert.equal(h.contents.has(`${unassigned}/topic 2.md`), true, 'parked under the next free name');
+  assert.deepEqual(h.orphans(), []);
+  await h.view.travel(true);
+  assert.equal(h.view.map.nodes.some(n => n.id === created.id && n.path === created.path), true, 'redo restores the exact path');
+  assert.equal(h.contents.has(`${unassigned}/topic 2.md`), false);
+});

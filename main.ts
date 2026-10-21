@@ -12,6 +12,7 @@ import {
   FileSystemAdapter,
   loadMermaid,
   MarkdownView,
+  normalizePath,
   requestUrl,
   Notice,
   Plugin,
@@ -156,6 +157,7 @@ export default class VisualAgentMapPlugin extends Plugin {
     codexPath: () => this.settings.codexPath,
     claudePath: () => this.settings.claudePath,
     clientVersion: () => this.manifest.version || "0.0.0",
+    readLocalFile: path => FileSystemAdapter.readLocalFile(path),
     onLog: (level, message) => this.logs.appendLog(level, message)
   });
   private readonly aiTaskOptions = {
@@ -432,19 +434,22 @@ export default class VisualAgentMapPlugin extends Plugin {
     });
     this.logs.appendLog("info", t("log.plugin_loaded_0", this.manifest.version || "unknown"));
     if (this.app.vault.adapter instanceof FileSystemAdapter && this.manifest.dir) {
-      const pluginDirectory = join(this.app.vault.adapter.getBasePath(), this.manifest.dir);
-      this.exchanges = new AiExchangeLog(join(pluginDirectory, "ai-exchanges.json"), error =>
+      const adapter = this.app.vault.adapter;
+      this.exchanges = new AiExchangeLog(adapter, normalizePath(`${this.manifest.dir}/ai-exchanges.json`), error =>
         this.logs.appendLog(
           "error",
           t("log.exchange_log_save_failed_0", error instanceof Error ? error.message : String(error))
         )
       );
       await this.exchanges.load();
-      this.pendingSuggestions = new PendingSuggestions(join(pluginDirectory, "pending-suggestions.json"), error =>
-        this.logs.appendLog(
-          "error",
-          t("log.pending_suggestions_save_failed_0", error instanceof Error ? error.message : String(error))
-        )
+      this.pendingSuggestions = new PendingSuggestions(
+        adapter,
+        normalizePath(`${this.manifest.dir}/pending-suggestions.json`),
+        error =>
+          this.logs.appendLog(
+            "error",
+            t("log.pending_suggestions_save_failed_0", error instanceof Error ? error.message : String(error))
+          )
       );
       await (this.pendingSuggestions as PendingSuggestions).load();
     }

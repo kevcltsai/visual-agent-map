@@ -1,5 +1,6 @@
 // S2 lane C: the reframing step and the runtime steering messages.
 const { test } = require('node:test');
+const { nodeFsAdapter } = require('./support-fs-adapter.cjs');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const os = require('node:os');
@@ -38,7 +39,7 @@ test('the step parser keeps the strict reply contract', () => {
 
 function runnerFixture({ reply = goodReply, runTask, model = 'gpt-6-luna' } = {}) {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'vam-lane-c-'));
-  const log = new AiExchangeLog(path.join(dir, 'ai-exchanges.json'), error => { throw error; });
+  const log = new AiExchangeLog(nodeFsAdapter, path.join(dir, 'ai-exchanges.json'), error => { throw error; });
   const calls = [];
   const runtime = { runTask: runTask ?? (async (...args) => { calls.push(args); args[4].onRequest?.({ via: 'runtime' }); return reply; }) };
   const options = { pluginDirectory: () => '/plugin', exchangeLoggingEnabled: () => true, exchanges: () => log, codexRuntime: (_dir, local) => { calls.localCodex = local; return runtime; }, claudeRuntime: () => runtime };

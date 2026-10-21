@@ -1,4 +1,5 @@
 const assert = require('node:assert/strict');
+const { nodeFsAdapter } = require('../support-fs-adapter.cjs');
 const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
@@ -53,14 +54,14 @@ integrationTest('pending child suggestions persist across reload and disappear a
   const file = path.join(directory, 'pending-suggestions.json');
   const errors = [];
   try {
-    const first = new PendingSuggestions(file, error => errors.push(error));
+    const first = new PendingSuggestions(nodeFsAdapter, file, error => errors.push(error));
     first.set('topic.md', [{ title: 'A', task: 'Research A', contribution: 'Scope A', parentTitle: '' }]);
     await first.flush();
-    const second = new PendingSuggestions(file, error => errors.push(error));
+    const second = new PendingSuggestions(nodeFsAdapter, file, error => errors.push(error));
     await second.load();
     assert.equal(second.get('topic.md')[0].title, 'A');
     second.delete('topic.md'); await second.flush();
-    const third = new PendingSuggestions(file, error => errors.push(error)); await third.load();
+    const third = new PendingSuggestions(nodeFsAdapter, file, error => errors.push(error)); await third.load();
     assert.equal(third.has('topic.md'), false);
     assert.deepEqual(errors, []);
   } finally { fs.rmSync(directory, { recursive: true, force: true }); }
@@ -68,7 +69,7 @@ integrationTest('pending child suggestions persist across reload and disappear a
 integrationTest('proposal persistence reports disk write failure to the caller', async () => {
   const { PendingSuggestions } = load('pending-suggestions.ts');
   const errors = [];
-  const store = new PendingSuggestions(path.join(os.tmpdir(), `vam-missing-${Date.now()}`, 'pending.json'), error => errors.push(error));
+  const store = new PendingSuggestions(nodeFsAdapter, path.join(os.tmpdir(), `vam-missing-${Date.now()}`, 'pending.json'), error => errors.push(error));
   store.set('topic.md', [{ title: 'A', task: 'Research A', contribution: '' }]);
   await assert.rejects(store.flush());
   assert.equal(errors.length, 1);

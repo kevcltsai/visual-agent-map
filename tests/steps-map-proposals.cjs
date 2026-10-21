@@ -1,5 +1,6 @@
 // Stages C1/C3 engine: outline generation and AI structure review (pure parsers, steps and services; no UI).
 const { test } = require('node:test');
+const { nodeFsAdapter } = require('./support-fs-adapter.cjs');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const os = require('node:os');
@@ -71,7 +72,7 @@ test('outline reply: bad output is rejected with typed, localized errors', () =>
 
 function serviceFixture(reply, model = 'gpt-6-luna') {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'vam-map-proposals-'));
-  const log = new AiExchangeLog(path.join(dir, 'ai-exchanges.json'), error => { throw error; });
+  const log = new AiExchangeLog(nodeFsAdapter, path.join(dir, 'ai-exchanges.json'), error => { throw error; });
   const calls = [];
   const runtime = { runTask: async (...args) => { calls.push(args); args[4].onRequest?.({ via: 'runtime' }); if (reply instanceof Error) throw reply; return typeof reply === 'function' ? reply() : reply; } };
   const options = { pluginDirectory: () => '/plugin', exchangeLoggingEnabled: () => true, exchanges: () => log, codexRuntime: () => runtime, claudeRuntime: () => runtime };

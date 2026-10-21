@@ -1,6 +1,6 @@
-import { existsSync, readdirSync } from "node:fs";
+import { spawnSync } from "node:child_process";
 import { delimiter, dirname, isAbsolute, join } from "node:path";
-import { CodexAppServerRuntime } from "../ai/runtime/codex-app-server";
+import { CodexAppServerRuntime, type ReadLocalFile } from "../ai/runtime/codex-app-server";
 import { ClaudeCodeCliRuntime, type ClaudeProcess, type ClaudeSpawn } from "../ai/runtime/claude-code-cli";
 import { ClaudeWarmPool, type WarmClock } from "../ai/runtime/claude-warm-pool";
 import type { LogLevel } from "../log-manager";
@@ -31,6 +31,39 @@ export function executableCandidates(
   return [...new Set(dirs)].map(directory => join(directory, configured));
 }
 
+/**
+ * Synchronous filesystem probe without `node:fs`: asks `/bin/sh` for the first existing path among `candidates`
+ * (`[ -e ]`), or for the entry names of `listDirectory`. Any spawn failure (no sh, e.g. on Windows) reads as "nothing".
+ */
+export interface ExecutableProbe {
+  firstExisting(candidates: string[]): string | null;
+  listDirectory(directory: string): string[];
+}
+
+const FIRST_EXISTING_SCRIPT = 'for p in "$@"; do if [ -e "$p" ]; then printf %s "$p"; exit 0; fi; done; exit 1';
+const LIST_DIRECTORY_SCRIPT =
+  'cd "$1" 2>/dev/null || exit 1; for p in *; do [ -e "$p" ] && printf "%s\\n" "$p"; done; exit 0';
+
+function runShell(script: string, args: string[]): string | null {
+  try {
+    const result = spawnSync("/bin/sh", ["-c", script, "sh", ...args], { encoding: "utf8", timeout: 5000 });
+    if (result.error || result.status !== 0) return null;
+    return result.stdout;
+  } catch {
+    return null;
+  }
+}
+
+export const shellExecutableProbe: ExecutableProbe = {
+  firstExisting(candidates) {
+    if (!candidates.length) return null;
+    return runShell(FIRST_EXISTING_SCRIPT, candidates) || null;
+  },
+  listDirectory(directory) {
+    return (runShell(LIST_DIRECTORY_SCRIPT, [directory]) ?? "").split("\n").filter(Boolean);
+  }
+};
+
 export interface AiRuntimeServiceOptions {
   codexPath: () => string;
   claudePath: () => string;
@@ -40,6 +73,10 @@ export interface AiRuntimeServiceOptions {
   warmClock?: WarmClock;
   /** Tests replace the process starter. */
   claudeSpawn?: ClaudeSpawn;
+  /** Tests replace the shell probe that finds the CLI executables. */
+  probe?: ExecutableProbe;
+  /** Obsidian's FileSystemAdapter.readLocalFile, for Codex images saved to disk. */
+  readLocalFile?: ReadLocalFile;
 }
 
 export class AiRuntimeService {
@@ -50,6 +87,10 @@ export class AiRuntimeService {
 
   /** One idle Claude process at most, started when the research dialog opens (see ClaudeWarmPool). */
   private readonly warmPool: ClaudeWarmPool<ClaudeProcess>;
+
+  private get probe(): ExecutableProbe {
+    return this.options.probe ?? shellExecutableProbe;
+  }
 
   constructor(private readonly options: AiRuntimeServiceOptions) {
     this.warmPool = new ClaudeWarmPool({ clock: options.warmClock });
@@ -82,7 +123,7 @@ export class AiRuntimeService {
 
   diagnostic(configured: string): { executable: string; installed: boolean } {
     const executable = this.resolveExecutable(configured);
-    return { executable, installed: existsSync(executable) };
+    return { executable, installed: this.probe.firstExisting([executable]) !== null };
   }
 
   codex(pluginDirectory: string, local = false): CodexAppServerRuntime {
@@ -95,6 +136,7 @@ export class AiRuntimeService {
       env: this.cliEnvironment(executable),
       clientVersion: this.options.clientVersion(),
       webSearchDisabled: local,
+      ...(this.options.readLocalFile ? { readLocalFile: this.options.readLocalFile } : {}),
       onLog: (level, message) => this.options.onLog(level, message)
     });
     if (local) this.localCodexRuntime = runtime;
@@ -121,18 +163,12 @@ export class AiRuntimeService {
   resolveExecutable(configured: string): string {
     const environment = currentProcessEnvironment();
     const home = environment.HOME || "";
-    let nvmVersions: string[] = [];
-    if (home) {
-      try {
-        nvmVersions = readdirSync(join(home, ".nvm/versions/node"));
-      } catch {
-        /* nvm is optional. */
-      }
-    }
+    // nvm is optional: a missing directory lists as nothing.
+    const nvmVersions =
+      home && !/[/\\]/.test(configured) ? this.probe.listDirectory(join(home, ".nvm/versions/node")) : [];
     return (
-      executableCandidates(configured, home, environment.PATH || "", nvmVersions).find(candidate =>
-        existsSync(candidate)
-      ) || configured
+      this.probe.firstExisting(executableCandidates(configured, home, environment.PATH || "", nvmVersions)) ||
+      configured
     );
   }
 

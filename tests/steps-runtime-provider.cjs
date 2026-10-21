@@ -1,5 +1,6 @@
 // core/runtime-step-provider.ts: the shared StepProvider over the Claude and Codex runtimes and the AI exchange log.
 const { test } = require('node:test');
+const { nodeFsAdapter } = require('./support-fs-adapter.cjs');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const os = require('node:os');
@@ -13,7 +14,7 @@ const { AiExchangeLog, formatAiExchange } = load('ai-exchange-log.ts');
 function fixture({ reply = 'raw reply', fail, logging = true } = {}) {
   const runs = [];
   const runtime = name => ({ runTask: async (...args) => { runs.push({ name, args }); args[4].onRequest?.({ provider: name }); if (fail) throw fail; return reply; } });
-  const log = new AiExchangeLog(path.join(fs.mkdtempSync(path.join(os.tmpdir(), 'vam-runtime-provider-')), 'ai-exchanges.json'), error => { throw error; });
+  const log = new AiExchangeLog(nodeFsAdapter, path.join(fs.mkdtempSync(path.join(os.tmpdir(), 'vam-runtime-provider-')), 'ai-exchanges.json'), error => { throw error; });
   const locals = [];
   const provider = runtimeStepProvider({ claude: () => runtime('claude'), codex: local => { locals.push(local); return runtime('codex'); }, exchanges: () => (logging ? log : null) });
   return { runs, log, locals, provider, localProvider: runtimeStepProvider({ claude: () => runtime('claude'), codex: local => { locals.push(local); return runtime('codex'); }, exchanges: () => log, localCodex: true }) };
@@ -105,7 +106,7 @@ test('finish "caller": a runtime error is rethrown unchanged and not logged as f
 
 test('turning logging off during a call stops recording; logging off at the start never begins an entry', async () => {
   let logging = true;
-  const log = new AiExchangeLog(path.join(fs.mkdtempSync(path.join(os.tmpdir(), 'vam-runtime-provider-')), 'ai-exchanges.json'), error => { throw error; });
+  const log = new AiExchangeLog(nodeFsAdapter, path.join(fs.mkdtempSync(path.join(os.tmpdir(), 'vam-runtime-provider-')), 'ai-exchanges.json'), error => { throw error; });
   const runtime = { runTask: async (...args) => { args[4].onRequest?.({ provider: 'codex' }); logging = false; return 'late reply'; } };
   const provider = runtimeStepProvider({ claude: () => runtime, codex: () => runtime, exchanges: () => (logging ? log : null) });
   assert.equal(await provider.complete(call({})), 'late reply');

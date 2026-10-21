@@ -1,4 +1,4 @@
-import { readFile, rename, writeFile } from "node:fs/promises";
+import { readStoreText, writeStoreAtomically, type StoreAdapter } from "./store-adapter";
 import type { Suggestion } from "./ai/types";
 import { t } from "./i18n";
 
@@ -7,6 +7,7 @@ export class PendingSuggestions extends Map<string, Suggestion[]> {
   private writeError: unknown = null;
   private loadError: unknown = null;
   constructor(
+    private readonly adapter: StoreAdapter,
     private readonly path: string,
     private readonly onError: (error: unknown) => void
   ) {
@@ -15,7 +16,9 @@ export class PendingSuggestions extends Map<string, Suggestion[]> {
 
   async load(): Promise<void> {
     try {
-      const parsed: unknown = JSON.parse(await readFile(this.path, "utf8"));
+      const text = await readStoreText(this.adapter, this.path);
+      if (text === null) return;
+      const parsed: unknown = JSON.parse(text);
       if (!Array.isArray(parsed)) throw new Error(t("error.pending_suggestions_invalid"));
       const entries: Array<[string, Suggestion[]]> = [];
       for (const item of parsed as unknown[]) {
@@ -38,10 +41,8 @@ export class PendingSuggestions extends Map<string, Suggestion[]> {
       for (const [key, suggestions] of entries) if (suggestions.length) super.set(key, suggestions);
       this.loadError = null;
     } catch (error: unknown) {
-      if (!(error && typeof error === "object" && "code" in error && error.code === "ENOENT")) {
-        this.loadError = error;
-        this.onError(error);
-      }
+      this.loadError = error;
+      this.onError(error);
     }
   }
 
@@ -73,11 +74,7 @@ export class PendingSuggestions extends Map<string, Suggestion[]> {
     }
     const snapshot = JSON.stringify([...this.entries()]);
     this.writes = this.writes
-      .then(async () => {
-        const temporary = `${this.path}.tmp`;
-        await writeFile(temporary, snapshot, { mode: 0o600 });
-        await rename(temporary, this.path);
-      })
+      .then(() => writeStoreAtomically(this.adapter, this.path, snapshot))
       .then(
         () => {
           this.writeError = null;

@@ -5,6 +5,7 @@
 // "parse" (exchanges-to-replay.mjs --parse-layer): raw replies from a live ai-exchanges.json replayed through the step's own parser only.
 // Set VAM_REPLAY_CORPUS=<dir> to also run every *.replay.json case in that directory (private corpus, optional layer).
 const { test } = require('node:test');
+const { nodeFsAdapter } = require('./support-fs-adapter.cjs');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const os = require('node:os');
@@ -262,7 +263,7 @@ test('record once, convert, replay: the replayed run reproduces the live parsed 
   try {
     const logFile = path.join(directory, 'ai-exchanges.json');
     const errors = [];
-    const log = new AiExchangeLog(logFile, error => errors.push(error));
+    const log = new AiExchangeLog(nodeFsAdapter, logFile, error => errors.push(error));
     const raw = {
       ok: JSON.stringify({ summary: 'Live summary', detail: 'Live detail with [S1]', suggestions: [{ title: 'Next', task: 'Do next', contribution: 'Why' }], visualReferences: [] }),
       review: JSON.stringify({ summary: 'Which option fits?', detail: 'Interim answer.', suggestions: [{ title: 'Option A', task: '', contribution: '' }, { title: 'Option B', task: '', contribution: '' }], visualReferences: [], aim: { goalAnswered: false, decision: 'ask_user', rationale: 'Needs one condition.', stopReason: '', question: 'Which option fits?', answerOptions: ['Option A', 'Option B'], researchTarget: null } })
@@ -328,7 +329,7 @@ test('flow case: converter keeps AiExchange step and order, and the ordered raw 
   const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'vam-flow-'));
   try {
     const logFile = path.join(directory, 'ai-exchanges.json');
-    const log = new AiExchangeLog(logFile, () => {});
+    const log = new AiExchangeLog(nodeFsAdapter, logFile, () => {});
     const replies = { 'Step one topic': JSON.stringify({ summary: 'One', detail: 'First detail', suggestions: [], visualReferences: [] }), 'Step two topic': JSON.stringify({ summary: 'Two', detail: 'Second detail', suggestions: [{ title: 'Next', task: 'Do next', contribution: 'Why' }], visualReferences: [] }) };
     const live = { runTask: async (prompt, _model, _effort, _schema, controls) => { controls.onRequest({ input: [{ type: 'text', text: prompt }] }); return replies[prompt.includes('Step one topic') ? 'Step one topic' : 'Step two topic']; } };
     const contexts = ['Step one topic', 'Step two topic'].map(title => ({ title, summary: '', rules: '', detail: '', task: 'Plain task', ancestors: '', mode: 'task', researchMode: 'local', researchDepth: 'fast', visualMode: 'off' }));
@@ -366,7 +367,7 @@ test('flow case: converter keeps AiExchange step and order, and the ordered raw 
 async function recordSyntheticExchanges(directory) {
   const { AiExchangeLog } = load('ai-exchange-log.ts');
   const logFile = path.join(directory, 'ai-exchanges.json');
-  const log = new AiExchangeLog(logFile, error => { throw error; });
+  const log = new AiExchangeLog(nodeFsAdapter, logFile, error => { throw error; });
   const base = { summary: '', rules: '', detail: '', ancestors: '', mode: 'task', researchMode: 'local', researchDepth: 'fast', visualMode: 'off' };
   const reviewReply = JSON.stringify({ summary: 'Review', detail: 'Interim.', suggestions: [], visualReferences: [], aim: { goalAnswered: true, decision: 'conclude', rationale: 'Enough evidence.', stopReason: 'Goal answered.', question: '', answerOptions: [], researchTarget: null } });
   const auditReply = JSON.stringify({ summary: 'external_evidence', detail: 'A web search can answer it.', suggestions: [], visualReferences: [] });

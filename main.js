@@ -16816,11 +16816,23 @@ function relevanceModeAfterWrite(planned, setupChanged) {
   return planned === "recalibrate" && !setupChanged ? "recalibrate" : "full";
 }
 
+// store-adapter.ts
+async function readStoreText(adapter, path) {
+  if (!await adapter.exists(path)) return null;
+  return adapter.read(path);
+}
+async function writeStoreAtomically(adapter, path, text11) {
+  const temporary = `${path}.tmp`;
+  await adapter.write(temporary, text11);
+  if (await adapter.exists(path)) await adapter.remove(path);
+  await adapter.rename(temporary, path);
+}
+
 // pending-suggestions.ts
-var import_promises = require("node:fs/promises");
 var PendingSuggestions = class extends Map {
-  constructor(path, onError) {
+  constructor(adapter, path, onError) {
     super();
+    this.adapter = adapter;
     this.path = path;
     this.onError = onError;
     __publicField(this, "writes", Promise.resolve());
@@ -16829,7 +16841,9 @@ var PendingSuggestions = class extends Map {
   }
   async load() {
     try {
-      const parsed = JSON.parse(await (0, import_promises.readFile)(this.path, "utf8"));
+      const text11 = await readStoreText(this.adapter, this.path);
+      if (text11 === null) return;
+      const parsed = JSON.parse(text11);
       if (!Array.isArray(parsed)) throw new Error(t("error.pending_suggestions_invalid"));
       const entries = [];
       for (const item of parsed) {
@@ -16846,10 +16860,8 @@ var PendingSuggestions = class extends Map {
       for (const [key2, suggestions] of entries) if (suggestions.length) super.set(key2, suggestions);
       this.loadError = null;
     } catch (error) {
-      if (!(error && typeof error === "object" && "code" in error && error.code === "ENOENT")) {
-        this.loadError = error;
-        this.onError(error);
-      }
+      this.loadError = error;
+      this.onError(error);
     }
   }
   set(key2, value) {
@@ -16879,11 +16891,7 @@ var PendingSuggestions = class extends Map {
       return;
     }
     const snapshot = JSON.stringify([...this.entries()]);
-    this.writes = this.writes.then(async () => {
-      const temporary = `${this.path}.tmp`;
-      await (0, import_promises.writeFile)(temporary, snapshot, { mode: 384 });
-      await (0, import_promises.rename)(temporary, this.path);
-    }).then(
+    this.writes = this.writes.then(() => writeStoreAtomically(this.adapter, this.path, snapshot)).then(
       () => {
         this.writeError = null;
       },
@@ -18412,7 +18420,6 @@ function formatDebugLogs(entries) {
 var debugLog = new LogManager();
 
 // ai-exchange-log.ts
-var import_promises2 = require("node:fs/promises");
 function isRecord(value) {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
@@ -18482,7 +18489,8 @@ ${t("log.exchange_error")}
   ].join("\n");
 }
 var AiExchangeLog = class {
-  constructor(path, onError, limit = 1e3) {
+  constructor(adapter, path, onError, limit = 1e3) {
+    this.adapter = adapter;
     this.path = path;
     this.onError = onError;
     this.limit = limit;
@@ -18493,7 +18501,9 @@ var AiExchangeLog = class {
   }
   async load() {
     try {
-      const parsed = JSON.parse(await (0, import_promises2.readFile)(this.path, "utf8"));
+      const text11 = await readStoreText(this.adapter, this.path);
+      if (text11 === null) return;
+      const parsed = JSON.parse(text11);
       if (!Array.isArray(parsed)) throw new Error(t("error.exchange_log_invalid"));
       const entries = parsed.filter((item) => {
         if (!item || typeof item !== "object") return false;
@@ -18507,10 +18517,8 @@ var AiExchangeLog = class {
       this.loadError = null;
       this.emit();
     } catch (error) {
-      if (!(error && typeof error === "object" && "code" in error && error.code === "ENOENT")) {
-        this.loadError = error;
-        this.onError(error);
-      }
+      this.loadError = error;
+      this.onError(error);
     }
   }
   getEntries() {
@@ -18602,11 +18610,7 @@ var AiExchangeLog = class {
       return;
     }
     const snapshot = JSON.stringify(this.entries);
-    this.writes = this.writes.then(async () => {
-      const temporary = `${this.path}.tmp`;
-      await (0, import_promises2.writeFile)(temporary, snapshot, { mode: 384 });
-      await (0, import_promises2.rename)(temporary, this.path);
-    }).catch(this.onError);
+    this.writes = this.writes.then(() => writeStoreAtomically(this.adapter, this.path, snapshot)).catch(this.onError);
   }
 };
 
@@ -37704,12 +37708,11 @@ var ThinkingCore = class {
 };
 
 // core/ai-runtime-service.ts
-var import_node_fs = require("node:fs");
+var import_node_child_process3 = require("node:child_process");
 var import_node_path = require("node:path");
 
 // ai/runtime/codex-app-server.ts
 var import_node_child_process = require("node:child_process");
-var import_promises3 = require("node:fs/promises");
 
 // ai/runtime/messages/search-budget-exhausted.en.md
 var search_budget_exhausted_en_default = "The web search budget is used up. Stop searching and finish the answer from the information already gathered; list anything missing as unconfirmed.\n";
@@ -37731,15 +37734,22 @@ function describeFailure(failure) {
   const message = failure == null ? void 0 : failure.message;
   return typeof message === "string" ? message : t("ui.context_ai_image_not_generated");
 }
-async function generatedImageDataUrl(image) {
+function bytesToBase64(bytes) {
+  let binary2 = "";
+  for (let offset = 0; offset < bytes.length; offset += 32768)
+    binary2 += String.fromCharCode(...bytes.subarray(offset, offset + 32768));
+  return btoa(binary2);
+}
+async function generatedImageDataUrl(image, readLocalFile) {
   var _a, _b;
   const inline = (_b = (_a = image.result) == null ? void 0 : _a.trim()) != null ? _b : "";
   if (/^data:image\/(?:png|jpeg|webp);base64,/.test(inline)) return inline;
   if (/^[A-Za-z0-9+/=\s]{64,}$/.test(inline)) return `data:image/png;base64,${inline.replace(/\s/g, "")}`;
   if (!image.savedPath) throw new Error(t("ui.context_ai_image_not_generated"));
-  const bytes = await (0, import_promises3.readFile)(image.savedPath);
+  if (!readLocalFile) throw new Error(t("ui.context_ai_image_not_generated"));
+  const bytes = new Uint8Array(await readLocalFile(image.savedPath));
   const mime = image.savedPath.toLowerCase().endsWith(".jpg") || image.savedPath.toLowerCase().endsWith(".jpeg") ? "image/jpeg" : image.savedPath.toLowerCase().endsWith(".webp") ? "image/webp" : "image/png";
-  return `data:${mime};base64,${bytes.toString("base64")}`;
+  return `data:${mime};base64,${bytesToBase64(bytes)}`;
 }
 function cancelledError() {
   const error = new Error(t("ui.ai_task_cancelled"));
@@ -38134,7 +38144,7 @@ var CodexAppServerRuntime = class {
         if (!generated || !generated.result && !generated.savedPath)
           state.reject(new Error((generated == null ? void 0 : generated.failure) || t("ui.context_ai_image_not_generated")));
         else
-          void generatedImageDataUrl(generated).then(
+          void generatedImageDataUrl(generated, this.options.readLocalFile).then(
             state.resolve,
             (error) => state.reject(error instanceof Error ? error : new Error(String(error)))
           );
@@ -39220,6 +39230,27 @@ function executableCandidates(configured, home, pathValue, nvmVersions = []) {
   ].filter(Boolean);
   return [...new Set(dirs)].map((directory) => (0, import_node_path.join)(directory, configured));
 }
+var FIRST_EXISTING_SCRIPT = 'for p in "$@"; do if [ -e "$p" ]; then printf %s "$p"; exit 0; fi; done; exit 1';
+var LIST_DIRECTORY_SCRIPT = 'cd "$1" 2>/dev/null || exit 1; for p in *; do [ -e "$p" ] && printf "%s\\n" "$p"; done; exit 0';
+function runShell(script, args) {
+  try {
+    const result = (0, import_node_child_process3.spawnSync)("/bin/sh", ["-c", script, "sh", ...args], { encoding: "utf8", timeout: 5e3 });
+    if (result.error || result.status !== 0) return null;
+    return result.stdout;
+  } catch (e) {
+    return null;
+  }
+}
+var shellExecutableProbe = {
+  firstExisting(candidates) {
+    if (!candidates.length) return null;
+    return runShell(FIRST_EXISTING_SCRIPT, candidates) || null;
+  },
+  listDirectory(directory) {
+    var _a;
+    return ((_a = runShell(LIST_DIRECTORY_SCRIPT, [directory])) != null ? _a : "").split("\n").filter(Boolean);
+  }
+};
 var AiRuntimeService = class {
   constructor(options) {
     this.options = options;
@@ -39230,6 +39261,10 @@ var AiRuntimeService = class {
     /** One idle Claude process at most, started when the research dialog opens (see ClaudeWarmPool). */
     __publicField(this, "warmPool");
     this.warmPool = new ClaudeWarmPool({ clock: options.warmClock });
+  }
+  get probe() {
+    var _a;
+    return (_a = this.options.probe) != null ? _a : shellExecutableProbe;
   }
   /** Kills the pre-started Claude process, if any (unused dialog, Stop). */
   releaseWarm() {
@@ -39255,7 +39290,7 @@ var AiRuntimeService = class {
   }
   diagnostic(configured) {
     const executable = this.resolveExecutable(configured);
-    return { executable, installed: (0, import_node_fs.existsSync)(executable) };
+    return { executable, installed: this.probe.firstExisting([executable]) !== null };
   }
   codex(pluginDirectory, local = false) {
     if (local && this.localCodexRuntime) return this.localCodexRuntime;
@@ -39267,6 +39302,7 @@ var AiRuntimeService = class {
       env: this.cliEnvironment(executable),
       clientVersion: this.options.clientVersion(),
       webSearchDisabled: local,
+      ...this.options.readLocalFile ? { readLocalFile: this.options.readLocalFile } : {},
       onLog: (level, message) => this.options.onLog(level, message)
     });
     if (local) this.localCodexRuntime = runtime;
@@ -39292,16 +39328,8 @@ var AiRuntimeService = class {
   resolveExecutable(configured) {
     const environment = currentProcessEnvironment();
     const home = environment.HOME || "";
-    let nvmVersions = [];
-    if (home) {
-      try {
-        nvmVersions = (0, import_node_fs.readdirSync)((0, import_node_path.join)(home, ".nvm/versions/node"));
-      } catch (e) {
-      }
-    }
-    return executableCandidates(configured, home, environment.PATH || "", nvmVersions).find(
-      (candidate) => (0, import_node_fs.existsSync)(candidate)
-    ) || configured;
+    const nvmVersions = home && !/[/\\]/.test(configured) ? this.probe.listDirectory((0, import_node_path.join)(home, ".nvm/versions/node")) : [];
+    return this.probe.firstExisting(executableCandidates(configured, home, environment.PATH || "", nvmVersions)) || configured;
   }
   cliEnvironment(executable) {
     const environment = currentProcessEnvironment();
@@ -42928,6 +42956,7 @@ var VisualAgentMapPlugin = class extends import_obsidian34.Plugin {
       codexPath: () => this.settings.codexPath,
       claudePath: () => this.settings.claudePath,
       clientVersion: () => this.manifest.version || "0.0.0",
+      readLocalFile: (path) => import_obsidian34.FileSystemAdapter.readLocalFile(path),
       onLog: (level, message) => this.logs.appendLog(level, message)
     }));
     __publicField(this, "aiTaskOptions", {
@@ -43193,9 +43222,10 @@ var VisualAgentMapPlugin = class extends import_obsidian34.Plugin {
     });
     this.logs.appendLog("info", t("log.plugin_loaded_0", this.manifest.version || "unknown"));
     if (this.app.vault.adapter instanceof import_obsidian34.FileSystemAdapter && this.manifest.dir) {
-      const pluginDirectory = (0, import_node_path2.join)(this.app.vault.adapter.getBasePath(), this.manifest.dir);
+      const adapter = this.app.vault.adapter;
       this.exchanges = new AiExchangeLog(
-        (0, import_node_path2.join)(pluginDirectory, "ai-exchanges.json"),
+        adapter,
+        (0, import_obsidian34.normalizePath)(`${this.manifest.dir}/ai-exchanges.json`),
         (error) => this.logs.appendLog(
           "error",
           t("log.exchange_log_save_failed_0", error instanceof Error ? error.message : String(error))
@@ -43203,7 +43233,8 @@ var VisualAgentMapPlugin = class extends import_obsidian34.Plugin {
       );
       await this.exchanges.load();
       this.pendingSuggestions = new PendingSuggestions(
-        (0, import_node_path2.join)(pluginDirectory, "pending-suggestions.json"),
+        adapter,
+        (0, import_obsidian34.normalizePath)(`${this.manifest.dir}/pending-suggestions.json`),
         (error) => this.logs.appendLog(
           "error",
           t("log.pending_suggestions_save_failed_0", error instanceof Error ? error.message : String(error))

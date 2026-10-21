@@ -1,5 +1,6 @@
 // Relevance grading step (Phase 3): prompt, strict parser, token budget and the service's stop handling. No UI, no AI.
 const { test } = require('node:test');
+const { nodeFsAdapter } = require('./support-fs-adapter.cjs');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const os = require('node:os');
@@ -168,7 +169,7 @@ test('budget: a 132-card synthetic map fits well inside the 32,000-token budget 
 
 function serviceFixture(reply) {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'vam-relevance-grade-'));
-  const log = new AiExchangeLog(path.join(dir, 'ai-exchanges.json'), error => { throw error; });
+  const log = new AiExchangeLog(nodeFsAdapter, path.join(dir, 'ai-exchanges.json'), error => { throw error; });
   const calls = [];
   const runtime = { runTask: async (...args) => { calls.push(args); args[4].onRequest?.({ via: 'runtime' }); if (reply instanceof Error) throw reply; return typeof reply === 'function' ? reply(args) : reply; } };
   const options = { pluginDirectory: () => '/plugin', exchangeLoggingEnabled: () => true, exchanges: () => log, codexRuntime: () => runtime, claudeRuntime: () => runtime };

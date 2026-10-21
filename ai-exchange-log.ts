@@ -1,4 +1,4 @@
-import { readFile, rename, writeFile } from "node:fs/promises";
+import { readStoreText, writeStoreAtomically, type StoreAdapter } from "./store-adapter";
 import { t } from "./i18n";
 import { upgradeLegacyAimText } from "./experiences/aim/legacy-names";
 
@@ -138,6 +138,7 @@ export class AiExchangeLog {
   private listeners = new Set<() => void>();
   private writes: Promise<void> = Promise.resolve();
   constructor(
+    private readonly adapter: StoreAdapter,
     private readonly path: string,
     private readonly onError: (error: unknown) => void,
     private readonly limit = 1000
@@ -145,7 +146,9 @@ export class AiExchangeLog {
 
   async load(): Promise<void> {
     try {
-      const parsed: unknown = JSON.parse(await readFile(this.path, "utf8"));
+      const text = await readStoreText(this.adapter, this.path);
+      if (text === null) return;
+      const parsed: unknown = JSON.parse(text);
       if (!Array.isArray(parsed)) throw new Error(t("error.exchange_log_invalid"));
       const entries = (parsed as unknown[]).filter((item): item is AiExchange => {
         if (!item || typeof item !== "object") return false;
@@ -170,10 +173,8 @@ export class AiExchangeLog {
       this.loadError = null;
       this.emit();
     } catch (error: unknown) {
-      if (!(error && typeof error === "object" && "code" in error && error.code === "ENOENT")) {
-        this.loadError = error;
-        this.onError(error);
-      }
+      this.loadError = error;
+      this.onError(error);
     }
   }
 
@@ -266,12 +267,6 @@ export class AiExchangeLog {
       return;
     }
     const snapshot = JSON.stringify(this.entries);
-    this.writes = this.writes
-      .then(async () => {
-        const temporary = `${this.path}.tmp`;
-        await writeFile(temporary, snapshot, { mode: 0o600 });
-        await rename(temporary, this.path);
-      })
-      .catch(this.onError);
+    this.writes = this.writes.then(() => writeStoreAtomically(this.adapter, this.path, snapshot)).catch(this.onError);
   }
 }

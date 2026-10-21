@@ -2,6 +2,7 @@
 // Runner behaviour is tested with fake steps/providers; Coffee wiring goes through the real engine and the real
 // replay provider (tests/support-replay.cjs) so a recorded reply is parsed by the step's own parser.
 const { test } = require('node:test');
+const { nodeFsAdapter } = require('./support-fs-adapter.cjs');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
@@ -180,13 +181,13 @@ test('exchange log: entries recorded before step labels existed still load, and 
   const file = path.join(fs.mkdtempSync(path.join(os.tmpdir(), 'vam-step-log-')), 'ai-exchanges.json');
   const legacy = { id: 'old', startedAt: '2026-01-01T00:00:00.000Z', topic: 'T', mode: 'task', model: 'm', effort: 'low', request: '', response: 'R', status: 'completed', error: '' };
   fs.writeFileSync(file, JSON.stringify([legacy]));
-  const errors = [], log = new AiExchangeLog(file, error => errors.push(error));
+  const errors = [], log = new AiExchangeLog(nodeFsAdapter, file, error => errors.push(error));
   await log.load();
   assert.deepEqual(errors, []); assert.equal(log.getEntries().length, 1); assert.equal(log.getEntries()[0].step, undefined);
   assert.doesNotMatch(formatAiExchange(log.getEntries()[0]), /step:/);
   log.begin({ id: 'new', startedAt: '2026-01-01T00:00:01.000Z', topic: 'T', mode: 'task', model: 'm', effort: 'low', step: 'coffee.table@1' });
   await log.flush();
-  const reloaded = new AiExchangeLog(file, error => errors.push(error));
+  const reloaded = new AiExchangeLog(nodeFsAdapter, file, error => errors.push(error));
   await reloaded.load();
   assert.deepEqual(errors, []);
   assert.equal(reloaded.getEntries().find(entry => entry.id === 'new').step, 'coffee.table@1');

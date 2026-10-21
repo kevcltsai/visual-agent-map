@@ -1,4 +1,5 @@
 const assert = require('node:assert/strict');
+const { nodeFsAdapter } = require('../support-fs-adapter.cjs');
 const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
@@ -495,19 +496,19 @@ integrationTest('persisted JSON validates all exchange fields and optional sugge
     const valid = { id: '1', startedAt: 'now', topic: 'Topic', mode: 'task', model: 'test', effort: 'low', request: 'prompt', response: 'answer', status: 'completed', error: '' };
     const invalid = Object.keys(valid).map(key => ({ ...valid, [key]: 12 }));
     const text = JSON.stringify([valid, ...invalid, { ...valid, status: 'unknown' }]); fs.writeFileSync(file, text);
-    const errors = []; const log = new AiExchangeLog(file, error => errors.push(error)); await log.load();
+    const errors = []; const log = new AiExchangeLog(nodeFsAdapter, file, error => errors.push(error)); await log.load();
     assert.equal(log.getEntries().length, 0); assert.equal(errors.length, 1);
     log.begin({ ...valid, id: 'new' }); await log.flush(); assert.equal(fs.readFileSync(file, 'utf8'), text);
     const proposals = path.join(directory, 'suggestions.json');
     fs.writeFileSync(proposals, JSON.stringify([['topic.md', [{ title: 'A', task: 'B', contribution: 'C' }, { title: 'A', task: 'B', contribution: 'C', parentTitle: 12 }]]]));
-    const pending = new PendingSuggestions(proposals, error => errors.push(error)); await pending.load();
+    const pending = new PendingSuggestions(nodeFsAdapter, proposals, error => errors.push(error)); await pending.load();
     assert.equal(pending.size, 0); const original = fs.readFileSync(proposals, 'utf8');
     pending.set('new.md', [{ title: 'New', task: '', contribution: '' }]); await assert.rejects(pending.flush());
     assert.equal(fs.readFileSync(proposals, 'utf8'), original);
     for (const Store of [AiExchangeLog, PendingSuggestions]) {
-      const failures = []; const broken = new Store(file, error => failures.push(error));
+      const failures = []; const broken = new Store(nodeFsAdapter, file, error => failures.push(error));
       fs.writeFileSync(file, '{broken'); await broken.load(); assert.equal(failures.length, 1);
-      fs.rmSync(file); const missing = new Store(file, error => failures.push(error)); await missing.load(); assert.equal(failures.length, 1);
+      fs.rmSync(file); const missing = new Store(nodeFsAdapter, file, error => failures.push(error)); await missing.load(); assert.equal(failures.length, 1);
     }
   } finally { fs.rmSync(directory, { recursive: true, force: true }); }
 });

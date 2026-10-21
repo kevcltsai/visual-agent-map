@@ -1,6 +1,5 @@
 import type { WebSearchEvent } from "../types";
 import { spawn as nodeSpawn } from "node:child_process";
-import { readFile } from "node:fs/promises";
 import { t } from "../../i18n";
 import { searchBudgetExhaustedMessage } from "./messages";
 
@@ -43,12 +42,16 @@ export interface CodexModel {
   isDefault: boolean;
 }
 
+export type ReadLocalFile = (path: string) => Promise<ArrayBuffer>;
+
 export interface CodexAppServerOptions {
   executable: string;
   cwd: string;
   env: ProcessEnvironment;
   clientVersion: string;
   webSearchDisabled?: boolean;
+  /** Reads a file outside the vault (Obsidian's FileSystemAdapter.readLocalFile); needed only for generated images saved to disk. */
+  readLocalFile?: ReadLocalFile;
   onLog?: (level: "info" | "warn" | "error", message: string) => void;
 }
 
@@ -106,20 +109,30 @@ function describeFailure(failure: unknown): string {
   const message = (failure as { message?: unknown } | null)?.message;
   return typeof message === "string" ? message : t("ui.context_ai_image_not_generated");
 }
+function bytesToBase64(bytes: Uint8Array): string {
+  let binary = "";
+  for (let offset = 0; offset < bytes.length; offset += 0x8000)
+    binary += String.fromCharCode(...bytes.subarray(offset, offset + 0x8000));
+  return btoa(binary);
+}
 /** The generated image as a data URL: inline base64 (with or without a data: prefix), else the saved file. */
-export async function generatedImageDataUrl(image: { result?: string; savedPath?: string }): Promise<string> {
+export async function generatedImageDataUrl(
+  image: { result?: string; savedPath?: string },
+  readLocalFile?: ReadLocalFile
+): Promise<string> {
   const inline = image.result?.trim() ?? "";
   if (/^data:image\/(?:png|jpeg|webp);base64,/.test(inline)) return inline;
   if (/^[A-Za-z0-9+/=\s]{64,}$/.test(inline)) return `data:image/png;base64,${inline.replace(/\s/g, "")}`;
   if (!image.savedPath) throw new Error(t("ui.context_ai_image_not_generated"));
-  const bytes = await readFile(image.savedPath);
+  if (!readLocalFile) throw new Error(t("ui.context_ai_image_not_generated"));
+  const bytes = new Uint8Array(await readLocalFile(image.savedPath));
   const mime =
     image.savedPath.toLowerCase().endsWith(".jpg") || image.savedPath.toLowerCase().endsWith(".jpeg")
       ? "image/jpeg"
       : image.savedPath.toLowerCase().endsWith(".webp")
         ? "image/webp"
         : "image/png";
-  return `data:${mime};base64,${bytes.toString("base64")}`;
+  return `data:${mime};base64,${bytesToBase64(bytes)}`;
 }
 function cancelledError(): Error {
   const error = new Error(t("ui.ai_task_cancelled"));
@@ -554,7 +567,7 @@ export class CodexAppServerRuntime {
         if (!generated || (!generated.result && !generated.savedPath))
           state.reject(new Error(generated?.failure || t("ui.context_ai_image_not_generated")));
         else
-          void generatedImageDataUrl(generated).then(state.resolve, error =>
+          void generatedImageDataUrl(generated, this.options.readLocalFile).then(state.resolve, error =>
             state.reject(error instanceof Error ? error : new Error(String(error)))
           );
       } else if (turn?.status === "completed")

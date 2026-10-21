@@ -1,5 +1,6 @@
 // core/steps/chart: the chart step (chart.add@1) - pure insert rules, the step definition and the AiTaskService integration.
 const { test } = require('node:test');
+const { nodeFsAdapter } = require('./support-fs-adapter.cjs');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const os = require('node:os');
@@ -191,7 +192,7 @@ function fixture(replies, { parses, logging = true, template, onCall } = {}) {
       return reply;
     }
   };
-  const log = new AiExchangeLog(path.join(fs.mkdtempSync(path.join(os.tmpdir(), 'vam-chart-')), 'ai-exchanges.json'), error => { throw error; });
+  const log = new AiExchangeLog(nodeFsAdapter, path.join(fs.mkdtempSync(path.join(os.tmpdir(), 'vam-chart-')), 'ai-exchanges.json'), error => { throw error; });
   const service = new AiTaskService({
     pluginDirectory: () => '/plugin', language: () => 'en', defaultReasoning: () => 'low',
     exchangeLoggingEnabled: () => logging, exchanges: () => log,

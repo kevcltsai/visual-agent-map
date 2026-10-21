@@ -1,4 +1,5 @@
 const assert = require('node:assert/strict');
+const { nodeFsAdapter } = require('../support-fs-adapter.cjs');
 const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
@@ -21,7 +22,7 @@ integrationTest('AI exchange log persists exact request and reply with a bounded
   const errors = [];
   const sentinel = path.join(directory, 'unrelated.md'); fs.writeFileSync(sentinel, 'preserve');
   try {
-    const exchanges = new AiExchangeLog(file, error => errors.push(error), 2);
+    const exchanges = new AiExchangeLog(nodeFsAdapter, file, error => errors.push(error), 2);
     for (let index = 0; index < 3; index++) {
       const id = String(index);
       exchanges.begin({ id, startedAt: new Date().toISOString(), topic: `Topic ${index}`, mode: 'task', model: 'test', effort: 'low' });
@@ -30,7 +31,7 @@ integrationTest('AI exchange log persists exact request and reply with a bounded
       exchanges.completed(id);
     }
     await exchanges.flush();
-    const restored = new AiExchangeLog(file, error => errors.push(error), 2);
+    const restored = new AiExchangeLog(nodeFsAdapter, file, error => errors.push(error), 2);
     await restored.load();
     assert.deepEqual(plain(restored.getEntries().map(entry => entry.id)), ['1', '2']);
     assert.match(formatAiExchange(restored.getEntries()[1]), /private prompt 2/);
@@ -39,7 +40,7 @@ integrationTest('AI exchange log persists exact request and reply with a bounded
     assert.deepEqual(JSON.parse(fs.readFileSync(file, 'utf8')), []);
     assert.equal(fs.readFileSync(sentinel, 'utf8'), 'preserve');
     assert.deepEqual(fs.readdirSync(directory).sort(), ['ai-exchanges.json', 'unrelated.md']);
-    if (process.platform !== 'win32') assert.equal(fs.statSync(file).mode & 0o777, 0o600);
+    // The file mode (0o600) is no longer asserted: Obsidian's DataAdapter cannot set one (node:fs was removed).
     assert.deepEqual(errors, []);
   } finally { fs.rmSync(directory, { recursive: true, force: true }); }
 });
@@ -62,7 +63,7 @@ integrationTest('AI exchange logging captures the sent payload, raw reply and pa
   try {
     const plugin = new Plugin(); plugin.app = { vault: { adapter: new obsidian.FileSystemAdapter() } }; plugin.manifest = { dir: '.obsidian/plugins/visual-agent-map' };
     plugin.settings.aiExchangeLoggingEnabled = true;
-    plugin.exchanges = new AiExchangeLog(path.join(directory, 'exchanges.json'), error => assert.fail(String(error)));
+    plugin.exchanges = new AiExchangeLog(nodeFsAdapter, path.join(directory, 'exchanges.json'), error => assert.fail(String(error)));
     let reply = '{"summary":"done","detail":"details","suggestions":[],"visualReferences":[]}';
     plugin.runtime = () => ({ runTask: async (prompt, model, effort, _schema, controls) => { controls.onRequest({ input: prompt, model, effort }); return reply; } });
     const context = { title: 'Private topic', summary: 'private summary', rules: '', detail: '', task: 'Analyze this', ancestors: '', mode: 'task', researchMode: 'local', researchDepth: 'fast', visualMode: 'off' };
@@ -83,7 +84,7 @@ integrationTest('turning exchange logging off during a task stops recording its 
   try {
     const plugin = new Plugin(); plugin.app = { vault: { adapter: new obsidian.FileSystemAdapter() } }; plugin.manifest = { dir: '.obsidian/plugins/visual-agent-map' };
     plugin.settings.aiExchangeLoggingEnabled = true;
-    plugin.exchanges = new AiExchangeLog(path.join(directory, 'exchanges.json'), error => assert.fail(String(error)));
+    plugin.exchanges = new AiExchangeLog(nodeFsAdapter, path.join(directory, 'exchanges.json'), error => assert.fail(String(error)));
     let release;
     plugin.runtime = () => ({ runTask: async (_prompt, _model, _effort, _schema, controls) => {
       controls.onRequest({ input: 'sent prompt' });
@@ -108,7 +109,7 @@ integrationTest('a Markdown selection reply that arrives after Stop is logged as
   try {
     const plugin = new Plugin(); plugin.app = { vault: { adapter: new obsidian.FileSystemAdapter() } }; plugin.manifest = { dir: '.obsidian/plugins/visual-agent-map' };
     plugin.settings.aiExchangeLoggingEnabled = true;
-    plugin.exchanges = new AiExchangeLog(path.join(directory, 'exchanges.json'), error => assert.fail(String(error)));
+    plugin.exchanges = new AiExchangeLog(nodeFsAdapter, path.join(directory, 'exchanges.json'), error => assert.fail(String(error)));
     const stop = new AbortController();
     plugin.runtime = () => ({ runTask: async (_prompt, _model, _effort, _schema, controls) => { controls.onRequest({ input: 'sent prompt' }); stop.abort(); return 'late reply'; } });
     const prepared = prepareStep(planStep, { instruction: 'Condense', selected: 'Selected text', context: '', hasImage: false });
@@ -124,13 +125,13 @@ integrationTest('Prompt monitor preserves exact Claude prompts, phases and separ
   const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'vam-prompt-monitor-'));
   try {
     const file = path.join(directory, 'log.json');
-    const log = new AiExchangeLog(file, error => assert.fail(String(error)));
+    const log = new AiExchangeLog(nodeFsAdapter, file, error => assert.fail(String(error)));
     log.begin({ id: 'one', startedAt: new Date().toISOString(), topic: 'Research', mode: 'task', model: 'claude', effort: 'high' });
     const prompt = '<!-- aim-phase: research-plan -->\n完整指令\nprivate context';
     log.sent('one', JSON.stringify({ input: '<VAM prompt via stdin>' }), prompt);
     log.sent('one', JSON.stringify({ input: [{ type: 'text', text: 'Stop and use existing evidence' }] }));
     log.completed('one'); await log.flush();
-    const restored = new AiExchangeLog(file, error => assert.fail(String(error))); await restored.load();
+    const restored = new AiExchangeLog(nodeFsAdapter, file, error => assert.fail(String(error))); await restored.load();
     const entries = restored.getEntries(); assert.equal(entries.length, 2);
     assert.equal(promptMetrics(entries[0]).prompt, prompt);
     assert.equal(promptMetrics(entries[0]).phase, 'research-plan');
@@ -164,7 +165,7 @@ integrationTest('AI exchange log: milestones are optional, validated as an objec
     // An older log without milestones loads; unknown keys inside milestones are not an error.
     fs.writeFileSync(file, JSON.stringify([valid, { ...valid, id: '2', milestones: { receivedAt: '2026-01-01T00:00:00.000Z', futureKey: { a: 1 }, usage: { inputTokens: 3 }, stream: 'stream-json', acceptedAt: '2026-01-01T00:00:00.000Z', firstEventAt: '2026-01-01T00:00:01.000Z', structuredCalls: 2, textBeforeToolChars: 12, slowShownAt: '2026-01-01T00:00:20.000Z', resendOf: 'old', resentAs: 'new', stages: [{ stage: 'writing', at: '2026-01-01T00:00:02.000Z' }], searches: [{ kind: 'search', startedAt: '2026-01-01T00:00:01.000Z', query: 'synthetic' }] } }]));
     const errors = [];
-    const log = new AiExchangeLog(file, error => errors.push(error)); await log.load();
+    const log = new AiExchangeLog(nodeFsAdapter, file, error => errors.push(error)); await log.load();
     assert.deepEqual(errors, []); assert.equal(log.getEntries().length, 2);
     assert.equal(log.getEntries()[0].milestones, undefined);
     assert.doesNotMatch(formatAiExchange(log.getEntries()[0]), /milestones:/);
@@ -172,11 +173,11 @@ integrationTest('AI exchange log: milestones are optional, validated as an objec
     // A milestones value that is not an object invalidates the log, like any other bad field.
     for (const bad of ['text', 5, [], null]) {
       fs.writeFileSync(file, JSON.stringify([{ ...valid, milestones: bad }]));
-      const failures = []; const broken = new AiExchangeLog(file, error => failures.push(error)); await broken.load();
+      const failures = []; const broken = new AiExchangeLog(nodeFsAdapter, file, error => failures.push(error)); await broken.load();
       assert.equal(failures.length, 1, JSON.stringify(bad)); assert.equal(broken.getEntries().length, 0);
     }
     // milestones() stores the data on the entry and persists it.
-    const writer = new AiExchangeLog(path.join(directory, 'new.json'), error => errors.push(error));
+    const writer = new AiExchangeLog(nodeFsAdapter, path.join(directory, 'new.json'), error => errors.push(error));
     writer.begin({ id: 'm', startedAt: new Date().toISOString(), topic: 'T', mode: 'task', model: 'test', effort: 'low' });
     writer.milestones('m', { receivedAt: 'x', textBeforeTool: false }); await writer.flush();
     assert.deepEqual(JSON.parse(fs.readFileSync(path.join(directory, 'new.json'), 'utf8'))[0].milestones, { receivedAt: 'x', textBeforeTool: false });

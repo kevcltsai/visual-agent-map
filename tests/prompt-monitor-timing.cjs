@@ -1,4 +1,5 @@
 const assert = require('node:assert/strict');
+const { nodeFsAdapter } = require('./support-fs-adapter.cjs');
 const fs = require('node:fs/promises');
 const os = require('node:os');
 const path = require('node:path');
@@ -30,7 +31,7 @@ test('persists deterministic send and completion timings across reload', async (
   const file = path.join(directory, 'exchanges.json');
   try {
     setNow('2026-01-01T00:00:00.000Z');
-    const log = new AiExchangeLog(file, error => { throw error; });
+    const log = new AiExchangeLog(nodeFsAdapter, file, error => { throw error; });
     begin(log, 'initial');
     setNow('2026-01-01T00:00:02.000Z');
     log.sent('initial', '{"request":{"prompt":"hello"}}', 'hello');
@@ -38,7 +39,7 @@ test('persists deterministic send and completion timings across reload', async (
     log.completed('initial');
     await log.flush();
 
-    const reloaded = new AiExchangeLog(file, error => { throw error; });
+    const reloaded = new AiExchangeLog(nodeFsAdapter, file, error => { throw error; });
     await reloaded.load();
     const [entry] = reloaded.getEntries();
     assert.equal(entry.sentAt, '2026-01-01T00:00:02.000Z');
@@ -62,7 +63,7 @@ test('the AiTaskService received-to-parsed success path persists its final durat
   const file = path.join(directory, 'exchanges.json');
   try {
     setNow('2026-01-01T00:00:00.000Z');
-    const log = new AiExchangeLog(file, error => { throw error; });
+    const log = new AiExchangeLog(nodeFsAdapter, file, error => { throw error; });
     begin(log, 'parsed-success');
     setNow('2026-01-01T00:00:01.000Z');
     log.sent('parsed-success', '{"request":true}', 'system prompt');
@@ -73,7 +74,7 @@ test('the AiTaskService received-to-parsed success path persists its final durat
     log.parsed('parsed-success');
     await log.flush();
 
-    const reloaded = new AiExchangeLog(file, error => { throw error; });
+    const reloaded = new AiExchangeLog(nodeFsAdapter, file, error => { throw error; });
     await reloaded.load();
     const [entry] = reloaded.getEntries();
     assert.equal(entry.status, 'parsed');
@@ -87,7 +88,7 @@ test('the AiTaskService received-to-parsed success path persists its final durat
 
 test('preparing failures get elapsed time without pretending a request was sent', () => {
   setNow('2026-01-01T00:01:00.000Z');
-  const log = new AiExchangeLog('/unused', () => {});
+  const log = new AiExchangeLog(nodeFsAdapter, '/unused', () => {});
   begin(log, 'preparing-failure');
   setNow('2026-01-01T00:01:03.000Z');
   log.failed('preparing-failure', 'Provider did not start');
@@ -103,7 +104,7 @@ test('legacy records retain missing timing fields and steering does not duplicat
   try {
     const legacy = { id: 'legacy', startedAt: '2025-01-01T00:00:00.000Z', topic: 'Topic', mode: 'task', model: 'Model', effort: 'low', request: '{}', prompt: 'old prompt', response: '', status: 'sent', error: '' };
     await fs.writeFile(file, JSON.stringify([legacy]));
-    const log = new AiExchangeLog(file, error => { throw error; });
+    const log = new AiExchangeLog(nodeFsAdapter, file, error => { throw error; });
     await log.load();
     assert.equal(log.getEntries()[0].sentAt, undefined);
     assert.equal(log.getEntries()[0].completedAt, undefined);

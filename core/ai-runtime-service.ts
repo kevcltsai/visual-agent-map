@@ -38,6 +38,8 @@ export function executableCandidates(
 export interface ExecutableProbe {
   firstExisting(candidates: string[]): string | null;
   listDirectory(directory: string): string[];
+  /** False when the probe cannot run at all (no /bin/sh, e.g. Windows); absent means available. */
+  available?(): boolean;
 }
 
 const FIRST_EXISTING_SCRIPT = 'for p in "$@"; do if [ -e "$p" ]; then printf %s "$p"; exit 0; fi; done; exit 1';
@@ -54,7 +56,20 @@ function runShell(script: string, args: string[]): string | null {
   }
 }
 
+let shellAvailable: boolean | null = null;
+
 export const shellExecutableProbe: ExecutableProbe = {
+  available() {
+    if (shellAvailable === null) {
+      try {
+        const result = spawnSync("/bin/sh", ["-c", "exit 0"], { timeout: 5000 });
+        shellAvailable = !result.error && result.status === 0;
+      } catch {
+        shellAvailable = false;
+      }
+    }
+    return shellAvailable;
+  },
   firstExisting(candidates) {
     if (!candidates.length) return null;
     return runShell(FIRST_EXISTING_SCRIPT, candidates) || null;
@@ -123,6 +138,8 @@ export class AiRuntimeService {
 
   diagnostic(configured: string): { executable: string; installed: boolean } {
     const executable = this.resolveExecutable(configured);
+    // Without a working probe nothing can be judged missing: report installed and let the spawn report its own error.
+    if (this.probe.available && !this.probe.available()) return { executable, installed: true };
     return { executable, installed: this.probe.firstExisting([executable]) !== null };
   }
 

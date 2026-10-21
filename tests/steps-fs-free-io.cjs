@@ -140,3 +140,35 @@ test('Codex image: a saved path is read through the injected local-file reader',
   await assert.rejects(generatedImageDataUrl({}, reader));
   await assert.rejects(generatedImageDataUrl({ savedPath: '/tmp/a.png' }));
 });
+
+test('stores: only <path>.tmp left by an interrupted write is recovered and kept by the next write', async () => {
+  const errors = [];
+  const logAdapter = memoryAdapter({ 'd/ai-exchanges.json.tmp': JSON.stringify([{ ...exchange, request: '', response: '', status: 'sent', error: '' }]) });
+  const log = new AiExchangeLog(logAdapter, 'd/ai-exchanges.json', e => errors.push(e)); await log.load();
+  assert.equal(log.getEntries().length, 1); assert.ok('d/ai-exchanges.json' in logAdapter.files); assert.equal('d/ai-exchanges.json.tmp' in logAdapter.files, false);
+  log.begin({ ...exchange, id: '2' }); await log.flush();
+  assert.deepEqual(JSON.parse(logAdapter.files['d/ai-exchanges.json']).map(e => e.id), ['1', '2']);
+  const pendingAdapter = memoryAdapter({ 'd/p.json.tmp': JSON.stringify([['t.md', [suggestion]]]) });
+  const pending = new PendingSuggestions(pendingAdapter, 'd/p.json', e => errors.push(e)); await pending.load();
+  assert.equal(pending.get('t.md')[0].title, 'A');
+  pending.set('u.md', [suggestion]); await pending.flush();
+  assert.equal(JSON.parse(pendingAdapter.files['d/p.json']).length, 2);
+  const broken = memoryAdapter({ 'd/p.json.tmp': '{broken' });
+  const blocked = new PendingSuggestions(broken, 'd/p.json', e => errors.push(e)); await blocked.load();
+  blocked.set('t.md', [suggestion]); await assert.rejects(blocked.flush());
+  assert.equal(errors.length >= 2, true);
+});
+
+test('diagnostic: an unavailable probe (no /bin/sh) reports installed for explicit paths and bare names', () => {
+  const dead = { available: () => false, listDirectory: () => [], firstExisting: () => null };
+  assert.deepEqual({ ...service(dead, { HOME: '/h', PATH: '' }, 'C:\\tools\\claude.cmd').diagnostic('C:\\tools\\claude.cmd') }, { executable: 'C:\\tools\\claude.cmd', installed: true });
+  assert.equal(service(dead, { HOME: '/h', PATH: '' }).diagnostic('claude').installed, true);
+  assert.equal(service(dead, { HOME: '/h', PATH: '' }).resolveExecutable('claude'), 'claude');
+  const live = { available: () => true, listDirectory: () => [], firstExisting: () => null };
+  assert.equal(service(live, { HOME: '/h', PATH: '' }).diagnostic('claude').installed, false);
+});
+
+test('shell probe: reports unavailable when the shell cannot be spawned', () => {
+  const { shellExecutableProbe: probe } = load('core/ai-runtime-service.ts', { 'node:child_process': { spawnSync: () => ({ error: new Error('ENOENT'), status: null }) } });
+  assert.equal(probe.available(), false);
+});

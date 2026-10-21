@@ -16818,8 +16818,12 @@ function relevanceModeAfterWrite(planned, setupChanged) {
 
 // store-adapter.ts
 async function readStoreText(adapter, path) {
-  if (!await adapter.exists(path)) return null;
-  return adapter.read(path);
+  if (await adapter.exists(path)) return adapter.read(path);
+  const temporary = `${path}.tmp`;
+  if (!await adapter.exists(temporary)) return null;
+  const text11 = await adapter.read(temporary);
+  await adapter.rename(temporary, path);
+  return text11;
 }
 async function writeStoreAtomically(adapter, path, text11) {
   const temporary = `${path}.tmp`;
@@ -39241,7 +39245,19 @@ function runShell(script, args) {
     return null;
   }
 }
+var shellAvailable = null;
 var shellExecutableProbe = {
+  available() {
+    if (shellAvailable === null) {
+      try {
+        const result = (0, import_node_child_process3.spawnSync)("/bin/sh", ["-c", "exit 0"], { timeout: 5e3 });
+        shellAvailable = !result.error && result.status === 0;
+      } catch (e) {
+        shellAvailable = false;
+      }
+    }
+    return shellAvailable;
+  },
   firstExisting(candidates) {
     if (!candidates.length) return null;
     return runShell(FIRST_EXISTING_SCRIPT, candidates) || null;
@@ -39290,6 +39306,7 @@ var AiRuntimeService = class {
   }
   diagnostic(configured) {
     const executable = this.resolveExecutable(configured);
+    if (this.probe.available && !this.probe.available()) return { executable, installed: true };
     return { executable, installed: this.probe.firstExisting([executable]) !== null };
   }
   codex(pluginDirectory, local = false) {

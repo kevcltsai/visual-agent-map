@@ -7,10 +7,18 @@ export interface StoreAdapter {
   remove(path: string): Promise<void>;
 }
 
-/** The file's text, or null when it does not exist yet (the old ENOENT case). */
+/**
+ * The file's text, or null when it does not exist yet (the old ENOENT case). If only `<path>.tmp` exists, a write was
+ * interrupted between removing the old file and renaming the temp file; the temp file is complete (it is written
+ * before the remove), so it is read and moved back into place.
+ */
 export async function readStoreText(adapter: StoreAdapter, path: string): Promise<string | null> {
-  if (!(await adapter.exists(path))) return null;
-  return adapter.read(path);
+  if (await adapter.exists(path)) return adapter.read(path);
+  const temporary = `${path}.tmp`;
+  if (!(await adapter.exists(temporary))) return null;
+  const text = await adapter.read(temporary);
+  await adapter.rename(temporary, path);
+  return text;
 }
 
 /**

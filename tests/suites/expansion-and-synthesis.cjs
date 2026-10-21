@@ -2254,3 +2254,80 @@ integrationTest('R1: local shallow child research gets no chart job; web shallow
     assert.equal(service.chartEligible(h.contexts.at(-1)), expected === 1);
   }
 });
+// ---- Synthesis keeps the parent's earlier source links (carry-forward block), no extra AI call, Undo exact.
+const earlierSources = ['https://one.example/a', 'https://two.example/b?x=1', 'https://three.example/c', 'https://four.example/d', 'https://five.example/e', 'https://six.example/f'];
+const earlierDetail = `Earlier finding [one](${earlierSources[0]}) and [two](${earlierSources[1]})[^1].\n\n### Evidence and sources\n\n${earlierSources.slice(2).map((url, i) => `- [Source ${i + 3}](${url})`).join('\n')}\n\n[^1]: [[Child Note]]`;
+async function keepSourcesFixture(childText = 'Child finding.') {
+  const f = await backgroundSynthesisFixture(async call => call === 1 ? f.directionsResult : f.draftResult);
+  f.draftResult = { summary: 'Draft summary', detail: 'Draft detail citing only [the child](https://child.example/z).', visualReferences: [], suggestions: [] };
+  await f.repo.updateNote(f.parent.path, { detail: earlierDetail, summary: 'Old summary https://summary.example/s', newFindings: 'Working [finding](https://finding.example/w)' });
+  const child = f.view.map.nodes.find(item => item.parentId === f.parent.id);
+  await f.repo.updateNote(child.path, { status: 'completed', summary: 'Child summary', detail: childText });
+  return f;
+}
+const synthesize = async f => { await f.view.startSynthesis(f.parent, f.options(), null, m => assert.fail(m), () => {}); await f.view.startSynthesis(f.parent, f.options(), 'Find shared constraints', m => assert.fail(m), () => {}); };
+const fileUrls = text => new Set([...text.matchAll(/https?:\/\/[^\s<>"'`)\]]+/g)].map(match => match[0]));
+integrationTest('synthesis keeps every earlier source link in the parent note file, with no extra AI call', async () => {
+  const f = await keepSourcesFixture();
+  const before = await f.repo.readNote(f.parent.path);
+  const beforeUrls = fileUrls(JSON.stringify([before.summary, before.detail, before.newFindings]));
+  await synthesize(f);
+  assert.equal(f.contexts.length, 2, 'directions + synthesis only');
+  const saved = await f.repo.readNote(f.parent.path);
+  const file = await f.repo.app.vault.adapter.read(f.parent.path);
+  for (const url of beforeUrls) assert.ok(file.includes(url), `lost ${url}`);
+  assert.match(saved.detail, /#### Sources from earlier research/);
+  assert.match(saved.detail, /Draft detail citing only \[the child\]\(https:\/\/child\.example\/z\)/);
+  // Every footnote reference has exactly one definition.
+  const refs = [...new Set([...saved.detail.matchAll(/\[\^([^\]]+)\](?!:)/g)].map(match => match[1]))];
+  for (const label of refs) assert.equal(saved.detail.split('\n').filter(line => line.startsWith(`[^${label}]:`)).length, 1, label);
+});
+integrationTest('synthesis carry-forward: the child citations equal what the result gives, Undo restores the recorded fields, Redo rewrites the carried version', async () => {
+  const f = await keepSourcesFixture();
+  const before = await f.repo.readNote(f.parent.path);
+  await synthesize(f);
+  const carried = await f.repo.readNote(f.parent.path);
+  const block = carried.detail.indexOf('#### Sources from earlier research');
+  assert.ok(block > 0);
+  await f.view.history.undo().undo();
+  assert.deepEqual(plain(await f.repo.readNote(f.parent.path)), plain(before));
+  await f.view.history.redo().redo();
+  assert.equal((await f.repo.readNote(f.parent.path)).detail, carried.detail);
+});
+integrationTest('synthesis carry-forward: nothing missing leaves the detail as today; a second synthesis does not duplicate the block', async () => {
+  const f = await keepSourcesFixture();
+  f.draftResult = { ...f.draftResult, detail: `Draft ${earlierSources.map(url => `[s](${url})`).join(' ')} https://summary.example/s https://finding.example/w [[Child Note]]` };
+  await synthesize(f);
+  assert.doesNotMatch((await f.repo.readNote(f.parent.path)).detail, /Sources from earlier research/);
+  const g = await keepSourcesFixture();
+  await synthesize(g);
+  const first = (await g.repo.readNote(g.parent.path)).detail;
+  await synthesize(g);
+  const second = await g.repo.readNote(g.parent.path);
+  assert.equal((second.detail.match(/Sources from earlier research/g) || []).length, 1);
+  for (const url of earlierSources) assert.ok(second.detail.includes(url), url);
+  assert.ok(first.includes('Sources from earlier research'));
+});
+integrationTest('synthesis carry-forward with a large (over one batch) child note keeps the earlier links', async () => {
+  const f = await keepSourcesFixture(Array.from({ length: 700 }, (_, i) => `Line ${i} of a long child note with enough words to pass the batch size.`).join('\n'));
+  await synthesize(f);
+  const file = await f.repo.app.vault.adapter.read(f.parent.path);
+  for (const url of earlierSources) assert.ok(file.includes(url), url);
+  // The mock model bypasses AiTaskService, so extraction itself does not run here; the request carries the over-budget source that sends it down that path, and the write path is the same.
+  const sent = f.contexts.at(-1).referenceGroups.flatMap(group => group.documents).map(doc => JSON.stringify(doc)).join('').length;
+  assert.ok(sent > 18000, 'the synthesis request holds more than one 18k batch');
+  assert.match(file, /Sources from earlier research/);
+});
+integrationTest('synthesis carry-forward on the drafted-callback path: an edited detail keeps the earlier links and Undo is exact', async () => {
+  const f = await keepSourcesFixture();
+  const before = await f.repo.readNote(f.parent.path);
+  const calls = [];
+  await f.view.integrateChildren(f.parent, f.options(), 'Find shared constraints', async (_result, write) => { calls.push(1); await write('Edited summary', 'Edited detail with no links.'); }, m => assert.fail(m), () => {});
+  assert.equal(calls.length, 1);
+  const saved = await f.repo.readNote(f.parent.path);
+  assert.match(saved.detail, /Edited detail with no links\./);
+  const file = await f.repo.app.vault.adapter.read(f.parent.path);
+  for (const url of earlierSources) assert.ok(file.includes(url), url);
+  await f.view.history.undo().undo();
+  assert.deepEqual(plain(await f.repo.readNote(f.parent.path)), plain(before));
+});

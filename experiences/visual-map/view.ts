@@ -30,6 +30,7 @@ import { arrangeMap, arrangeNewBranch, arrangeNewTree, medianHeight } from "../.
 import { inLanguage, NONE } from "../../core/steps/_shared/fragments";
 import { mergeRepair } from "../../core/steps/task/fragments";
 import { checkMergePreservation, findingList, type MergeCheckResult } from "../../core/steps/task/merge-check";
+import { carryForwardSources } from "../../core/steps/task/carry-sources";
 import {
   expansionTask,
   labelCurrentSummary,
@@ -8260,7 +8261,7 @@ export class VisualAgentMapView extends ItemView {
             ]) !== noteSnapshot
           )
             throw new Error(t("ui.the_topic_changed_the_synthesis_draft_was_not_saved"));
-          const canonical = canonicalDetail(
+          const canonicalOnly = canonicalDetail(
             detail,
             options?.outputLanguage ?? this.plugin.settings.language,
             detailTemplate
@@ -8268,14 +8269,23 @@ export class VisualAgentMapView extends ItemView {
           // An edited draft is checked again so the topic's format mark matches what is saved.
           const issues =
             result.formatIssues && detail !== result.detail
-              ? checkCounts(canonical, detailTemplate)
+              ? checkCounts(canonicalOnly, detailTemplate)
               : result.formatIssues;
+          // Links the parent's earlier research had and the rewrite dropped are kept (no AI call; part of the saved detail).
+          const references = visualReferencesMarkdown(result.visualReferences, language);
+          const canonical = carryForwardSources(
+            canonicalOnly,
+            [latest.summary, latest.detail, latest.newFindings],
+            [summary, canonicalOnly, references],
+            options?.outputLanguage ?? this.plugin.settings.language,
+            detailTemplate
+          );
           await this.plugin.repo.updateNote(
             node.path,
             {
               summary,
               detail: canonical,
-              visualReferences: visualReferencesMarkdown(result.visualReferences, language),
+              visualReferences: references,
               newFindings: "",
               status: "completed",
               ...formatIssuesPatch(issues, language)

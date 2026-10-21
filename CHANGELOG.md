@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### Fixed
+
+- Integrate subtopics no longer loses the source links of the parent topic's earlier research. Any link (web address, note link or local file) the new summary and detail leave out is kept in a "Sources from earlier research" block at the end of the sources section. This adds no AI request, and Undo still restores the topic exactly as it was.
+
 ## [0.24.0] - 2026-10-22
 
 ### Added

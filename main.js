@@ -1654,6 +1654,7 @@ var english = {
   "note.untitled_topic": "Untitled topic",
   "note.source_unconfirmed_0": "Source to confirm: {0}",
   "note.external_source_0": "External source: {0}",
+  "note.earlier_research_sources": "Sources from earlier research",
   "note.no_new_information": "No new information in this task.",
   "note.visual_reference": "Visual reference",
   "ui.aim_preparing_clarification": "Preparing initial clarification\u2026",
@@ -3258,6 +3259,7 @@ var traditionalChinese = {
   "note.untitled_topic": "\u672A\u547D\u540D\u4E3B\u984C",
   "note.source_unconfirmed_0": "\u4F86\u6E90\u5F85\u78BA\u8A8D\uFF1A{0}",
   "note.external_source_0": "\u5916\u90E8\u4F86\u6E90\uFF1A{0}",
+  "note.earlier_research_sources": "\u5148\u524D\u7814\u7A76\u7684\u4F86\u6E90",
   "note.no_new_information": "\u672C\u6B21\u7121\u65B0\u589E\u5167\u5BB9\u3002",
   "note.visual_reference": "\u8996\u89BA\u53C3\u8003",
   "ui.aim_preparing_clarification": "\u6B63\u5728\u6E96\u5099\u958B\u59CB\u524D\u7684\u689D\u4EF6\u91D0\u6E05\u2026",
@@ -14561,6 +14563,87 @@ function findingList(items, none, limit = 30) {
   const lines = items.slice(0, limit).map((item) => `- ${item}`);
   if (items.length > limit) lines.push(`- \u2026 (+${items.length - limit})`);
   return lines.join("\n");
+}
+
+// core/steps/task/carry-sources.ts
+var HEADING_KEY = "note.earlier_research_sources";
+var ANY_HEADING = /^#{3,4}[ \t]+(?:先前研究的來源|Sources from earlier research)[ \t]*$/i;
+var TOKEN = /!?\[\[[^\]]+\]\]|!?\[[^\]]*\]\(\s*<?[^)\s>]+[^)]*\)|<?https?:\/\/[^\s<>"'`)\]]+>?/g;
+function outsideCode(text11) {
+  const lines = text11.replace(/\r\n/g, "\n").split("\n");
+  const code = fencedLines(lines);
+  return lines.filter((_, index) => !code[index]);
+}
+function keysOf(text11) {
+  return [...linksOf([text11]).keys()];
+}
+function plainLine(line) {
+  const stripped = line.replace(/^[ \t]*(?:>[ \t]*)*/, "").replace(/^(?:[-*+]|\d+[.)])[ \t]+/, "").replace(/\[\^[^\]\s]+\](?!\()/g, "").replace(/!(\[[^\]]*\]\()/g, "$1").replace(/[ \t]{2,}/g, " ").trim();
+  return `- ${stripped}`;
+}
+function linkTokens(line, wanted) {
+  const out = [];
+  for (const match of line.matchAll(TOKEN)) {
+    const token = match[0];
+    if (!wanted(keysOf(token))) continue;
+    if (/^<?https?:/.test(token)) out.push(`<${token.replace(/^<|>$/g, "")}>`);
+    else out.push(token.replace(/^!/, ""));
+  }
+  return out;
+}
+function carriedSourceLines(previousTexts, nextTexts) {
+  const have = new Set(linksOf(nextTexts.flatMap(outsideCode)).keys());
+  const missing = new Set([...linksOf(previousTexts.flatMap(outsideCode)).keys()].filter((key2) => !have.has(key2)));
+  if (!missing.size) return [];
+  const covered = /* @__PURE__ */ new Set();
+  const lines = [];
+  const add = (line) => {
+    if (line.trim() && !lines.includes(line)) lines.push(line);
+  };
+  const open = (keys) => keys.some((key2) => missing.has(key2) && !covered.has(key2));
+  for (const line of previousTexts.flatMap(outsideCode)) {
+    const keys = keysOf(line);
+    if (!open(keys)) continue;
+    const definition = /^[ \t]*\[\^[^\]\s]+\]:[ \t]*(.*)$/.exec(line);
+    if (definition) add(`- ${definition[1].trim()}`);
+    else if (/^[ \t]*(?:\||#{1,6}[ \t])/.test(line)) for (const token of linkTokens(line, open)) add(`- ${token}`);
+    else add(plainLine(line));
+    for (const key2 of keys) covered.add(key2);
+  }
+  return lines;
+}
+function carryForwardSources(detail, previousTexts, nextTexts, language2, template) {
+  const carried = carriedSourceLines(previousTexts, nextTexts);
+  if (!carried.length) return detail;
+  const heading = translate(language2, HEADING_KEY);
+  const lines = detail.split("\n");
+  const code = fencedLines(lines);
+  const existing = lines.findIndex((line, index) => !code[index] && ANY_HEADING.test(line));
+  if (existing >= 0) return insertAfterBlock(lines, code, existing, carried, /^#{1,4}[ \t]/);
+  const keys = sourcesHeadingKeys(template);
+  const start = lines.findIndex((line, index) => {
+    const match = code[index] ? null : /^###\s+(.+?)\s*$/.exec(line);
+    return !!match && keys.has(match[1].toLocaleLowerCase());
+  });
+  if (start < 0) return `${detail.trimEnd()}
+
+### ${heading}
+
+${carried.join("\n")}
+`;
+  return insertAfterBlock(lines, code, start, [`#### ${heading}`, "", ...carried], /^###[ \t]/, true);
+}
+function insertAfterBlock(lines, code, start, add, stop, separate = false) {
+  let end = lines.findIndex((line, index) => index > start && !code[index] && stop.test(line));
+  if (end < 0) end = lines.length;
+  while (end > start + 1 && !lines[end - 1].trim()) end--;
+  return [
+    ...lines.slice(0, end),
+    ...separate ? [""] : [],
+    ...add,
+    ...end < lines.length && lines[end].trim() ? [""] : [],
+    ...lines.slice(end)
+  ].join("\n");
 }
 
 // repository.ts
@@ -35548,7 +35631,7 @@ ${request.requirements}` : preset.text,
       if ((_h = options == null ? void 0 : options.signal) == null ? void 0 : _h.aborted) throw new DOMException("Aborted", "AbortError");
       await this.plugin.repo.updateNote(node.path, { status: note.status });
       const save = async (summary, detail) => this.plugin.mutate(async () => {
-        var _a2, _b2, _c2, _d2, _e2, _f2;
+        var _a2, _b2, _c2, _d2, _e2, _f2, _g2;
         if (((_a2 = options == null ? void 0 : options.signal) == null ? void 0 : _a2.aborted) || this.closed || this.path !== mapPath || ((_b2 = this.map) == null ? void 0 : _b2.id) !== mapId || this.map.nodes.filter((item) => item.parentId === node.id).map((item) => item.id).sort().join("|") !== childIds)
           throw new Error(t("ui.the_topic_changed_the_synthesis_draft_was_not_saved"));
         const currentSources = await this.topicReferenceGroup(
@@ -35571,25 +35654,33 @@ ${request.requirements}` : preset.text,
           latest.thinkingOrigin
         ]) !== noteSnapshot)
           throw new Error(t("ui.the_topic_changed_the_synthesis_draft_was_not_saved"));
-        const canonical = canonicalDetail(
+        const canonicalOnly = canonicalDetail(
           detail,
           (_d2 = options == null ? void 0 : options.outputLanguage) != null ? _d2 : this.plugin.settings.language,
           detailTemplate
         );
-        const issues = result.formatIssues && detail !== result.detail ? checkCounts(canonical, detailTemplate) : result.formatIssues;
+        const issues = result.formatIssues && detail !== result.detail ? checkCounts(canonicalOnly, detailTemplate) : result.formatIssues;
+        const references2 = visualReferencesMarkdown(result.visualReferences, language2);
+        const canonical = carryForwardSources(
+          canonicalOnly,
+          [latest.summary, latest.detail, latest.newFindings],
+          [summary, canonicalOnly, references2],
+          (_e2 = options == null ? void 0 : options.outputLanguage) != null ? _e2 : this.plugin.settings.language,
+          detailTemplate
+        );
         await this.plugin.repo.updateNote(
           node.path,
           {
             summary,
             detail: canonical,
-            visualReferences: visualReferencesMarkdown(result.visualReferences, language2),
+            visualReferences: references2,
             newFindings: "",
             status: "completed",
             ...formatIssuesPatch(issues, language2)
           },
           { detailTemplate }
         );
-        const saved = await this.plugin.repo.readNote(node.path, (_e2 = this.map) != null ? _e2 : void 0);
+        const saved = await this.plugin.repo.readNote(node.path, (_f2 = this.map) != null ? _f2 : void 0);
         this.recordNoteWrite(
           node.path,
           { ...latest, status: note.status },
@@ -35615,7 +35706,7 @@ ${request.requirements}` : preset.text,
           detail: saved.detail,
           formatIssues: issues,
           model: note.model,
-          language: (_f2 = options == null ? void 0 : options.outputLanguage) != null ? _f2 : this.plugin.settings.language,
+          language: (_g2 = options == null ? void 0 : options.outputLanguage) != null ? _g2 : this.plugin.settings.language,
           template: detailTemplate
         });
       });

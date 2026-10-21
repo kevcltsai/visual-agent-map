@@ -89,7 +89,7 @@ function decoded(value: string): string {
 }
 
 /** URLs, wikilink targets (alias and heading dropped) and local link or image targets, in a comparable form. */
-function linksOf(texts: string[]): Map<string, string> {
+export function linksOf(texts: string[]): Map<string, string> {
   const out = new Map<string, string>();
   const add = (kind: string, raw: string): void => {
     const shown = raw.trim().replace(/[.,;:!?*_'"]+$/, "");

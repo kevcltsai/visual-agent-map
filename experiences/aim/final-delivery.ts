@@ -1,5 +1,5 @@
 import { createHash } from "node:crypto";
-import { translate } from "../../i18n";
+import { translateNote } from "../../i18n";
 import type { AiResult, TaskContext } from "../../ai/types";
 import type { AimContract } from "../../ai/aim-contracts";
 import { renderOutlineTask } from "./steps/delivery-outline/step";
@@ -403,7 +403,7 @@ export async function buildFinalDelivery(
   return {
     result: {
       ...result,
-      detail: `${result.detail}\n\n${translate(base.outputLanguage ?? "en", "note.aim_draft_pending")}\n\n${draft.detail}`
+      detail: `${result.detail}\n\n${translateNote(base.outputLanguage ?? "en", "note.aim_draft_pending")}\n\n${draft.detail}`
     },
     evidence,
     draft

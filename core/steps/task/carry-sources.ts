@@ -1,6 +1,6 @@
 import { sourcesHeadingKeys, type DetailTemplate } from "../../../ai/detail-templates";
 import { fencedLines } from "../../../ai/markdown-blocks";
-import { translate, type UiLanguage } from "../../../i18n";
+import { type UiLanguage, translateNote } from "../../../i18n";
 import { linksOf } from "./merge-check";
 
 /**
@@ -78,7 +78,7 @@ export function carryForwardSources(
 ): string {
   const carried = carriedSourceLines(previousTexts, nextTexts);
   if (!carried.length) return detail;
-  const heading = translate(language, HEADING_KEY);
+  const heading = translateNote(language, HEADING_KEY);
   const lines = detail.split("\n");
   const code = fencedLines(lines);
   const existing = lines.findIndex((line, index) => !code[index] && ANY_HEADING.test(line));

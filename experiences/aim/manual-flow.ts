@@ -75,7 +75,7 @@ import {
   type PlannerQualityContext,
   type ResearchGapClassification
 } from "./manual-flow-support";
-import { translate, type UiLanguage } from "../../i18n";
+import { noteLanguageOf, translateNote, type UiLanguage } from "../../i18n";
 import { renderInitialClarificationTask } from "./steps/initial-clarification/step";
 import {
   renderInitialQuestionTask,
@@ -821,7 +821,7 @@ export class AimManualFlow {
           reportDetail: context.reportDetail,
           requiredDecision: "ask_user",
           preferredQuestion: extractPlannerQuestionCandidate(correctedResult),
-          requiredDecisionRationale: translate(
+          requiredDecisionRationale: translateNote(
             context.outputLanguage,
             "note.aim_below_floor_rationale_0_1",
             context.answeredQuestionCount,
@@ -896,7 +896,11 @@ export class AimManualFlow {
     // condition as an assumption to confirm instead.
     const unresolved = checklist && reviewed.decision === "conclude" ? (reviewed.unresolvedConditions ?? []) : [];
     if (unresolved.length) {
-      const rationale = translate(context.outputLanguage, "note.aim_unresolved_conditions_0", unresolved.join("; "));
+      const rationale = translateNote(
+        context.outputLanguage,
+        "note.aim_unresolved_conditions_0",
+        unresolved.join("; ")
+      );
       try {
         reviewed = await this.requireUserConditionQuestion(
           reviewed,
@@ -1109,7 +1113,7 @@ export class AimManualFlow {
         review.question,
         review.rationale,
         answerOptions,
-        translate(language, "note.aim_prompt_recovered_post_report")
+        translateNote(language, "note.aim_prompt_recovered_post_report")
       );
       if (saved.status === "question") created++;
     }
@@ -1197,7 +1201,7 @@ export class AimManualFlow {
         this.runs.createResultDraft(
           mapPath,
           handle,
-          translate(language, "note.aim_answer_research_0", parent.summary),
+          translateNote(language, "note.aim_answer_research_0", parent.summary),
           model,
           reasoning
         )
@@ -1389,19 +1393,19 @@ export class AimManualFlow {
           : this.interimDetail([
               this.interimNotice(finalReview, language),
               this.readerDetail(finalReview),
-              translate(language, "note.aim_supporting_research"),
+              translateNote(language, "note.aim_supporting_research"),
               ...reports.map(report => report.detail),
-              translate(language, "note.aim_source_boundary"),
-              translate(language, "note.aim_source_boundary_not_verified")
+              translateNote(language, "note.aim_source_boundary"),
+              translateNote(language, "note.aim_source_boundary_not_verified")
             ]);
       const presentation =
         finalReview.decision === "conclude"
           ? {
-              title: translate(language, "note.aim_conclusion"),
+              title: translateNote(language, "note.aim_conclusion"),
               kind: "conclusion" as const
             }
           : {
-              title: translate(
+              title: translateNote(
                 language,
                 finalReview.decision === "research_more" ? "note.aim_needs_followup" : "note.aim_synthesis"
               ),
@@ -1441,7 +1445,7 @@ export class AimManualFlow {
           finalReview.question!,
           finalReview.rationale,
           finalReview.answerOptions!,
-          translate(language, "note.aim_prompt_followup_selected"),
+          translateNote(language, "note.aim_prompt_followup_selected"),
           signal
         );
         if (questionResult.status !== "question")
@@ -1664,7 +1668,7 @@ export class AimManualFlow {
             this.runs.createResultDraft(
               mapPath,
               handle,
-              translate(language, "note.aim_title_user_condition_0", parent.summary),
+              translateNote(language, "note.aim_title_user_condition_0", parent.summary),
               modelToUse,
               reasoningToUse,
               earlyOptions
@@ -1736,8 +1740,8 @@ export class AimManualFlow {
         if (!searcher.summary.trim() || !searcher.detail.trim() || reportedSearchFailure(searcher))
           throw new Error("Continuation research did not return a usable searched report.");
         report = {
-          summary: `${report.summary}\n\n${translate(language, "note.aim_followup_report_0", searcher.summary)}`,
-          detail: `${report.detail}\n\n${translate(language, "note.aim_continuation_report")}\n\n${searcher.detail}`
+          summary: `${report.summary}\n\n${translateNote(language, "note.aim_followup_report_0", searcher.summary)}`,
+          detail: `${report.detail}\n\n${translateNote(language, "note.aim_continuation_report")}\n\n${searcher.detail}`
         };
         const savedReport = await this.persist(async () => {
           throwIfAborted(signal);
@@ -1745,7 +1749,7 @@ export class AimManualFlow {
             const created = await this.runs.createResultDraft(
               mapPath,
               handle,
-              translate(language, "note.aim_title_continued_research_0", parent.summary),
+              translateNote(language, "note.aim_title_continued_research_0", parent.summary),
               modelToUse,
               reasoningToUse,
               continuationDraftOptions
@@ -1883,22 +1887,24 @@ export class AimManualFlow {
           : this.interimDetail([
               this.interimNotice(finalReview, language),
               finalReview.decision === "research_more"
-                ? translate(language, "note.aim_research_status_partial")
-                : translate(language, "note.aim_interim_result"),
+                ? translateNote(language, "note.aim_research_status_partial")
+                : translateNote(language, "note.aim_interim_result"),
               this.readerDetail(finalReview),
-              ...(finalReview.decision === "research_more" ? [translate(language, "note.aim_attempt_budget_gap")] : []),
-              translate(language, "note.aim_saved_evidence"),
+              ...(finalReview.decision === "research_more"
+                ? [translateNote(language, "note.aim_attempt_budget_gap")]
+                : []),
+              translateNote(language, "note.aim_saved_evidence"),
               report.detail,
-              translate(language, "note.aim_source_boundary"),
-              translate(language, "note.aim_source_boundary_were_not_verified")
+              translateNote(language, "note.aim_source_boundary"),
+              translateNote(language, "note.aim_source_boundary_were_not_verified")
             ]);
       const finalKind = finalReview.decision === "conclude" ? ("conclusion" as const) : ("synthesis" as const);
       const finalTitle =
         finalReview.decision === "conclude"
-          ? translate(language, "note.aim_conclusion")
+          ? translateNote(language, "note.aim_conclusion")
           : finalReview.decision === "research_more"
-            ? translate(language, "note.aim_needs_followup")
-            : translate(language, "note.aim_synthesis");
+            ? translateNote(language, "note.aim_needs_followup")
+            : translateNote(language, "note.aim_synthesis");
       if (
         !(await this.persist(() =>
           this.runs.updateResultDraftPresentation(mapPath, handle, finalDraft.id, finalTitle, finalKind)
@@ -1914,7 +1920,7 @@ export class AimManualFlow {
           {
             summary:
               finalReview.decision === "research_more"
-                ? translate(language, "note.aim_partial_summary_0", finalReview.summary)
+                ? translateNote(language, "note.aim_partial_summary_0", finalReview.summary)
                 : finalReview.summary,
             detail
           },
@@ -1938,7 +1944,7 @@ export class AimManualFlow {
           review.question!,
           review.rationale,
           answerOptions,
-          translate(language, "note.aim_prompt_question_recovered"),
+          translateNote(language, "note.aim_prompt_question_recovered"),
           signal
         );
         if (question.status !== "question")
@@ -2369,16 +2375,16 @@ export class AimManualFlow {
     const options = labels.map(label => ({ id: this.id(), label }));
     options.push({
       id: AIM_UNKNOWN_OPTION_ID,
-      label: translate(language, "note.aim_unknown_option")
+      label: translateNote(language, "note.aim_unknown_option")
     });
-    const noteTitle = translate(language, "note.aim_question_title_0", questionText);
+    const noteTitle = translateNote(language, "note.aim_question_title_0", questionText);
     const notePath = this.repository.unique(this.repository.topicFolder(mapPath, "Notes"), noteTitle);
     const questionNodeId = this.id();
     const detail = [
       plannerDetail.trim(),
-      translate(language, "note.aim_answer_options_heading"),
+      translateNote(language, "note.aim_answer_options_heading"),
       ...options.map(option => `- ${option.label}`),
-      translate(language, "note.aim_answer_hint")
+      translateNote(language, "note.aim_answer_hint")
     ]
       .filter(Boolean)
       .join("\n\n");
@@ -2461,7 +2467,7 @@ export class AimManualFlow {
       level === "medium" || level === "high" ? level : "low",
       assumption.trim(),
       "",
-      [translate(this.languageOf(map), "note.aim_assumption_corrected")],
+      [translateNote(this.languageOf(map), "note.aim_assumption_corrected")],
       "",
       signal
     );
@@ -2506,7 +2512,7 @@ export class AimManualFlow {
       level === "medium" || level === "high" ? level : "low",
       direction.trim(),
       "",
-      [translate(this.languageOf(map), "note.aim_steer_answer")],
+      [translateNote(this.languageOf(map), "note.aim_steer_answer")],
       "",
       signal
     );
@@ -2693,7 +2699,8 @@ export class AimManualFlow {
     const lineage = await this.branchLineage(map, parentBranchId);
     const inheritedBranch = parentBranchId ? map.aim?.branches.find(branch => branch.id === parentBranchId) : undefined;
     const condition =
-      [answerLabels.join("; "), freeText].filter(Boolean).join(" — ") || translate(language, "note.aim_unknown_option");
+      [answerLabels.join("; "), freeText].filter(Boolean).join(" — ") ||
+      translateNote(language, "note.aim_unknown_option");
     const branch = await this.persist(() =>
       this.runs.createAnswerBranch(mapPath, {
         requestId: input.requestId,
@@ -3490,13 +3497,14 @@ export class AimManualFlow {
               summary: [
                 resumeReports.summary,
                 ...supplementalReports.map(item =>
-                  translate(language, "note.aim_followup_summary_0_1", item.target.title, item.summary)
+                  translateNote(language, "note.aim_followup_summary_0_1", item.target.title, item.summary)
                 )
               ].join("\n"),
               detail: [
                 resumeReports.detail,
                 ...supplementalReports.map(
-                  item => `${translate(language, "note.aim_followup_heading_0", item.target.title)}\n\n${item.detail}`
+                  item =>
+                    `${translateNote(language, "note.aim_followup_heading_0", item.target.title)}\n\n${item.detail}`
                 )
               ].join("\n\n")
             }
@@ -3504,13 +3512,14 @@ export class AimManualFlow {
               summary: [
                 ...reports.map(item => `${item.title}: ${item.summary}`),
                 ...supplementalReports.map(item =>
-                  translate(language, "note.aim_followup_summary_0_1", item.target.title, item.summary)
+                  translateNote(language, "note.aim_followup_summary_0_1", item.target.title, item.summary)
                 )
               ].join("\n"),
               detail: [
                 ...reports.map(item => `## ${item.title}\n\n${item.detail}`),
                 ...supplementalReports.map(
-                  item => `${translate(language, "note.aim_followup_heading_0", item.target.title)}\n\n${item.detail}`
+                  item =>
+                    `${translateNote(language, "note.aim_followup_heading_0", item.target.title)}\n\n${item.detail}`
                 )
               ].join("\n\n")
             };
@@ -3665,7 +3674,7 @@ export class AimManualFlow {
             this.runs.createResultDraft(
               mapPath,
               synthesisHandle,
-              translate(language, "note.aim_followup_draft"),
+              translateNote(language, "note.aim_followup_draft"),
               model,
               undefined,
               {
@@ -3793,7 +3802,7 @@ export class AimManualFlow {
           this.runs.createResultDraft(
             mapPath,
             synthesisHandle,
-            translate(
+            translateNote(
               language,
               isPartial ? "note.aim_needs_followup" : isQuestion ? "note.aim_synthesis" : "note.aim_conclusion"
             ),
@@ -3813,22 +3822,24 @@ export class AimManualFlow {
       const partialSection =
         isPartial && finalReview.researchTarget
           ? [
-              translate(language, "note.aim_partial_heading"),
-              translate(language, "note.aim_pending_task_0", finalReview.researchTarget.task),
-              translate(language, "note.aim_pending_value_0", finalReview.researchTarget.expectedValue)
+              translateNote(language, "note.aim_partial_heading"),
+              translateNote(language, "note.aim_pending_task_0", finalReview.researchTarget.task),
+              translateNote(language, "note.aim_pending_value_0", finalReview.researchTarget.expectedValue)
             ].join("\n\n")
           : "";
       const detail = smokePublish
-        ? [translate(language, "note.aim_smoke_publication_0", finalReview.rationale), finalReview.detail].join("\n\n")
+        ? [translateNote(language, "note.aim_smoke_publication_0", finalReview.rationale), finalReview.detail].join(
+            "\n\n"
+          )
         : isPartial || isQuestion
           ? this.interimDetail([
               this.interimNotice(finalReview, language),
-              partialSection || translate(language, "note.aim_interim_result"),
+              partialSection || translateNote(language, "note.aim_interim_result"),
               this.readerDetail(finalReview),
-              translate(language, "note.aim_supporting_research"),
+              translateNote(language, "note.aim_supporting_research"),
               reportDetail,
-              translate(language, "note.aim_source_boundary"),
-              translate(language, "note.aim_source_boundary_claims")
+              translateNote(language, "note.aim_source_boundary"),
+              translateNote(language, "note.aim_source_boundary_claims")
             ])
           : await this.concludedDetail(finalReview, {
               title: topicNote.title,
@@ -3840,16 +3851,16 @@ export class AimManualFlow {
             });
       const presentation = isPartial
         ? {
-            title: translate(language, "note.aim_needs_followup"),
+            title: translateNote(language, "note.aim_needs_followup"),
             kind: "synthesis" as const
           }
         : isQuestion
           ? {
-              title: translate(language, "note.aim_synthesis"),
+              title: translateNote(language, "note.aim_synthesis"),
               kind: "synthesis" as const
             }
           : {
-              title: translate(language, "note.aim_conclusion"),
+              title: translateNote(language, "note.aim_conclusion"),
               kind: "conclusion" as const
             };
       if (
@@ -3872,7 +3883,7 @@ export class AimManualFlow {
           synthesisDraftId,
           {
             summary: isPartial
-              ? translate(language, "note.aim_partial_summary_0", finalReview.summary)
+              ? translateNote(language, "note.aim_partial_summary_0", finalReview.summary)
               : finalReview.summary,
             detail
           },
@@ -3899,7 +3910,7 @@ export class AimManualFlow {
           finalReview.question!,
           finalReview.rationale,
           finalReview.answerOptions!,
-          translate(language, "note.aim_followup_question_prompt"),
+          translateNote(language, "note.aim_followup_question_prompt"),
           signal
         );
         if (question.status !== "question")
@@ -3944,7 +3955,7 @@ export class AimManualFlow {
         detail: draft.detail,
         prompt: draft.prompt,
         reasoning: draft.reasoning,
-        contentLanguage: this.languageOf(map)
+        contentLanguage: noteLanguageOf(this.languageOf(map))
       }
     );
     const latest = await this.repository.readMap(mapPath),

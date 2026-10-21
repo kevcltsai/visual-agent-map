@@ -5,7 +5,7 @@ import { AimClarificationModal } from "../../ui/modals/aim-clarification-modal";
 import { withThinkingOrigin } from "./thinking-origin";
 import { createHash, randomUUID } from "node:crypto";
 import type VisualAgentMapPlugin from "../../main";
-import { t, topicStatusLabel, translate, type TranslationKey, type UiLanguage } from "../../i18n";
+import { noteLanguageOf, t, topicStatusLabel, translateNote, type TranslationKey, type UiLanguage } from "../../i18n";
 import {
   MarkdownRenderer,
   ItemView,
@@ -217,7 +217,7 @@ function errorMessage(error: unknown): string {
 /** The built-in Standard and Textbook templates follow the output language, as the fixed Detail headings always did. */
 function templateInLanguage(template: DetailTemplate, language: UiLanguage): DetailTemplate {
   return isBuiltinTemplateId(template.id)
-    ? builtinTemplates(language).find(item => item.id === template.id)!
+    ? builtinTemplates(noteLanguageOf(language)).find(item => item.id === template.id)!
     : template;
 }
 /** Unmet section counts to store on the topic; undefined (no count check ran) clears an earlier mark. */
@@ -805,7 +805,7 @@ export class VisualAgentMapView extends ItemView {
   }
   async refreshFromPlugin(): Promise<void> {
     if (this.builtIn) {
-      const sample = builtInSample(this.plugin.settings.language);
+      const sample = builtInSample(noteLanguageOf(this.plugin.settings.language));
       if (this.map) sample.map.viewport = { ...this.map.viewport };
       this.map = sample.map;
       this.notes = sample.notes;
@@ -858,7 +858,7 @@ export class VisualAgentMapView extends ItemView {
     this.aimFailedReports.clear();
     if (this.builtIn) {
       if (isCurrent()) {
-        this.notes = builtInSample(this.plugin.settings.language).notes;
+        this.notes = builtInSample(noteLanguageOf(this.plugin.settings.language)).notes;
         this.relevanceGoal = undefined;
         this.relevanceLevel = undefined;
         this.relevanceContext = undefined;
@@ -1113,7 +1113,9 @@ export class VisualAgentMapView extends ItemView {
   /** Built-in Standard and Textbook plus the workspace's custom templates, for the template selects. */
   private templateChoices(): { id: string; name: string }[] {
     const settings = this.plugin.settings;
-    return [...builtinTemplates(settings.language), ...settings.detailTemplates].map(({ id, name }) => ({ id, name }));
+    return [...builtinTemplates(noteLanguageOf(settings.language)), ...settings.detailTemplates].map(
+      ({ id, name }) => ({ id, name })
+    );
   }
   /** "Keep current (…)" name of the note style a topic (or this map) resolves to: a preset, else "Custom: …". */
   private currentStyleLabel(templateId: string, toneId: string): string {
@@ -2426,7 +2428,7 @@ export class VisualAgentMapView extends ItemView {
     const { template } = resolveTemplate(
       settings.detailTemplates,
       [request.detailTemplateId, settings.defaultDetailTemplateId],
-      settings.language
+      noteLanguageOf(settings.language)
     );
     let result: Awaited<ReturnType<typeof createOutlineMap>>;
     try {
@@ -2967,18 +2969,18 @@ export class VisualAgentMapView extends ItemView {
                       detail:
                         latest.detail +
                         "\n\n<!-- aim-intake-complete -->\n## " +
-                        translate(contentLanguage, "note.aim_initial_clarification") +
+                        translateNote(contentLanguage, "note.aim_initial_clarification") +
                         "\n\n" +
                         answers
                     },
-                    { contentLanguage }
+                    { contentLanguage: noteLanguageOf(contentLanguage) }
                   );
                 }
               });
               await this.hydrate();
               void this.planAimFromSelection(node.id);
             },
-            this.plugin.settings.language === "en",
+            this.plugin.settings.language,
             contentLanguage
           ).open();
           return;
@@ -2988,7 +2990,7 @@ export class VisualAgentMapView extends ItemView {
           await this.plugin.repo.updateNote(
             node.path,
             { detail: latest.detail + "\n\n<!-- aim-intake-complete -->" },
-            { contentLanguage }
+            { contentLanguage: noteLanguageOf(contentLanguage) }
           );
         });
         await this.hydrate();
@@ -3242,7 +3244,7 @@ export class VisualAgentMapView extends ItemView {
     }
     if (!isCurrent()) return;
     this.abortRelevanceGrade();
-    const sample = builtInSample(this.plugin.settings.language);
+    const sample = builtInSample(noteLanguageOf(this.plugin.settings.language));
     if (!this.builtIn) this.plugin.closeStaleDetails();
     this.builtIn = true;
     this.path = "";
@@ -4330,8 +4332,8 @@ export class VisualAgentMapView extends ItemView {
           created.path,
           {
             summary: content.summary,
-            detail: canonicalDetail(content.detail, language, detailTemplate),
-            visualReferences: visualReferencesMarkdown(content.visualReferences, language),
+            detail: canonicalDetail(content.detail, noteLanguageOf(language), detailTemplate),
+            visualReferences: visualReferencesMarkdown(content.visualReferences, noteLanguageOf(language)),
             prompt: mergeGoalTask(language),
             sourcePaths: sources.map(source => source.path),
             status: "completed",
@@ -4459,10 +4461,10 @@ export class VisualAgentMapView extends ItemView {
       sourcePaths = [...new Set([...sourceNotes[0].sourcePaths, ...children.map(child => child.path)])];
     let patch: NotePatch;
     if (content) {
-      const references = visualReferencesMarkdown(content.visualReferences, language);
+      const references = visualReferencesMarkdown(content.visualReferences, noteLanguageOf(language));
       patch = {
         summary: content.summary,
-        detail: canonicalDetail(content.detail, language, detailTemplate),
+        detail: canonicalDetail(content.detail, noteLanguageOf(language), detailTemplate),
         status: "completed",
         sourcePaths,
         ...(references.trim() ? { visualReferences: references } : {}),
@@ -5278,7 +5280,7 @@ export class VisualAgentMapView extends ItemView {
         if (this.chartSnapshot(latest) !== snapshot) return false;
         await this.plugin.repo.updateNote(
           path,
-          { detail: canonicalDetail(charted, job.language, job.template) },
+          { detail: canonicalDetail(charted, noteLanguageOf(job.language), job.template) },
           { detailTemplate: job.template }
         );
         const after = await this.plugin.repo.readNote(path, map);
@@ -7931,7 +7933,7 @@ export class VisualAgentMapView extends ItemView {
           detail: researchOptions
             ? ""
             : item.contribution
-              ? canonicalDetail(item.contribution, this.plugin.settings.language, contributionTemplate)
+              ? canonicalDetail(item.contribution, noteLanguageOf(this.plugin.settings.language), contributionTemplate)
               : "",
           ...(researchOptions
             ? {
@@ -8636,7 +8638,7 @@ export class VisualAgentMapView extends ItemView {
             throw new Error(t("ui.the_topic_changed_the_synthesis_draft_was_not_saved"));
           const canonicalOnly = canonicalDetail(
             detail,
-            options?.outputLanguage ?? this.plugin.settings.language,
+            noteLanguageOf(options?.outputLanguage ?? this.plugin.settings.language),
             detailTemplate
           );
           // An edited draft is checked again so the topic's format mark matches what is saved.
@@ -8645,7 +8647,7 @@ export class VisualAgentMapView extends ItemView {
               ? checkCounts(canonicalOnly, detailTemplate)
               : result.formatIssues;
           // Links the parent's earlier research had and the rewrite dropped are kept (no AI call; part of the saved detail).
-          const references = visualReferencesMarkdown(result.visualReferences, language);
+          const references = visualReferencesMarkdown(result.visualReferences, noteLanguageOf(language));
           const canonical = carryForwardSources(
             canonicalOnly,
             [latest.summary, latest.detail, latest.newFindings, latest.visualReferences],
@@ -9097,7 +9099,7 @@ export class VisualAgentMapView extends ItemView {
       const result = await this.plugin.askModel(
         {
           title,
-          summary: translate(language, "note.no_conclusion_yet"),
+          summary: translateNote(language, "note.no_conclusion_yet"),
           rules: "",
           detail: "",
           task: [synthesisDirectionsTask(language), runOptions.requirements].filter(Boolean).join("\n\n"),
@@ -9196,7 +9198,7 @@ export class VisualAgentMapView extends ItemView {
         .filter(Boolean)
         .join("\n\n");
       const content = [
-        `${labelCurrentSummary(language)}: ${note.summary || translate(language, "detail.no_conclusion_yet")}`,
+        `${labelCurrentSummary(language)}: ${note.summary || translateNote(language, "detail.no_conclusion_yet")}`,
         visuals ? `${labelVisualReferences(language)}\n${visuals}` : "",
         mode === "strong" && note.detail.trim() ? `${labelFullKnowledge(language)}\n${note.detail.trim()}` : "",
         finding ? `${labelOldFindings(language)} ${finding}` : "",
@@ -9260,7 +9262,7 @@ export class VisualAgentMapView extends ItemView {
     try {
       const integrationContext: TaskContext = {
         title,
-        summary: translate(language, "note.no_conclusion_yet"),
+        summary: translateNote(language, "note.no_conclusion_yet"),
         rules: "",
         detail: "",
         task: [goal, options?.requirements].filter(Boolean).join("\n\n"),
@@ -9355,7 +9357,7 @@ export class VisualAgentMapView extends ItemView {
     rules: string,
     model: string,
     result: AiResult,
-    language: "zh-TW" | "en",
+    language: UiLanguage,
     task: NonNullable<VisualAgentMapView["integrationTask"]>,
     context: TaskContext
   ): Promise<void> {
@@ -9385,8 +9387,8 @@ export class VisualAgentMapView extends ItemView {
         integrated.path,
         {
           summary: result.summary,
-          detail: canonicalDetail(result.detail, language, detailTemplate),
-          visualReferences: visualReferencesMarkdown(result.visualReferences, language),
+          detail: canonicalDetail(result.detail, noteLanguageOf(language), detailTemplate),
+          visualReferences: visualReferencesMarkdown(result.visualReferences, noteLanguageOf(language)),
           prompt: goal,
           sourcePaths: sources.map(source => source.path),
           status: "completed",
@@ -9952,7 +9954,7 @@ export class VisualAgentMapView extends ItemView {
     return resolveTemplate(
       settings.detailTemplates,
       [chosenId, note.detailTemplateId, this.map?.detailTemplateId, settings.defaultDetailTemplateId],
-      settings.language
+      noteLanguageOf(settings.language)
     );
   }
   /**
@@ -9965,7 +9967,7 @@ export class VisualAgentMapView extends ItemView {
       resolveTemplate(
         settings.detailTemplates,
         [chosenId, this.map?.detailTemplateId, settings.defaultDetailTemplateId],
-        settings.language
+        noteLanguageOf(settings.language)
       ).template,
       language
     );
@@ -10131,10 +10133,10 @@ export class VisualAgentMapView extends ItemView {
               summary: result.summary,
               detail: canonicalDetail(
                 result.detail,
-                context.outputLanguage ?? this.plugin.settings.language,
+                noteLanguageOf(context.outputLanguage ?? this.plugin.settings.language),
                 context.detailTemplate
               ),
-              visualReferences: visualReferencesMarkdown(result.visualReferences, language),
+              visualReferences: visualReferencesMarkdown(result.visualReferences, noteLanguageOf(language)),
               newFindings: "",
               status: "completed",
               ...formatIssuesPatch(result.formatIssues, language)

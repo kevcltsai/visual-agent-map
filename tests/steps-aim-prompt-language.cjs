@@ -11,7 +11,10 @@ const support = require('./support.cjs');
 const { captureAimPhaseVariants } = require('./support-aim-flow-capture.cjs');
 
 const read = name => fs.readFileSync(path.join(__dirname, '..', 'core', 'steps', 'aim', name), 'utf8').trim();
-const LANGUAGE_LINE = { en: read('language.en.md'), 'zh-TW': read('language.zh.md') };
+// The language line is a template; these are the spellings the registry must put in it for each content language.
+const LANGUAGE_NAMES = { en: { language: 'English', languagePlain: 'English' }, 'zh-TW': { language: '繁體中文（台灣）', languagePlain: '繁體中文' } };
+const filled = (name, content) => read(name).replace(/\{\{(\w+)\}\}/g, (_, key) => LANGUAGE_NAMES[content][key]);
+const LANGUAGE_LINE = { en: filled('language.en.md', 'en'), 'zh-TW': filled('language.zh.md', 'zh-TW') };
 const TOPIC = { en: 'Plan a 5-day Taipei trip', 'zh-TW': '東京五天自由行怎麼排' };
 // Variants captured from fixtures whose repository/map is English by construction (fake `{settings:{language:'en'}}` repos or
 // English fixture maps). Their flow-set outputLanguage is not the topic's, so the test sets it explicitly like the snapshots do.

@@ -12,7 +12,7 @@ import { canonicalDetail } from "../ai/result-utils";
 import { normalizeDetailHeadings, normalizeMathDelimiters } from "../ai/markdown-blocks";
 import { checkCounts, countIssueText } from "../ai/detail-templates";
 import type { AiResult, ReasoningLevel, TaskContext } from "../ai/types";
-import { translate, t, type UiLanguage } from "../i18n";
+import { noteLanguageOf, translate, t, type UiLanguage } from "../i18n";
 import { CLAUDE_MODEL_CHOICES, providerForModel } from "../ai/providers/provider";
 import type { CodexAppServerRuntime, CodexWebSearchEvent } from "../ai/runtime/codex-app-server";
 import type { ClaudeCodeCliRuntime } from "../ai/runtime/claude-code-cli";
@@ -262,7 +262,7 @@ export class AiTaskService {
         input.mode !== "decompose" &&
         input.detailFormat !== "adaptive"
       ) {
-        let issues = checkCounts(canonicalDetail(result.detail, outputLanguage, template), template);
+        let issues = checkCounts(canonicalDetail(result.detail, noteLanguageOf(outputLanguage), template), template);
         if (issues.length && !input.countRepair) {
           const firstExchangeId = exchangeId;
           try {
@@ -293,7 +293,7 @@ export class AiTaskService {
             // Only the detail comes from the repair; it runs local, so its summary, suggestions and visual
             // references would replace the first reply's with less.
             result = { ...result, detail: repaired.detail };
-            issues = checkCounts(canonicalDetail(result.detail, outputLanguage, template), template);
+            issues = checkCounts(canonicalDetail(result.detail, noteLanguageOf(outputLanguage), template), template);
           } catch (error) {
             if (signal?.aborted || (error instanceof Error && error.name === "AbortError")) throw error;
           } finally {
@@ -652,7 +652,7 @@ export class AiTaskService {
       if (!applied.ok) return refuse(applied.code);
       const template = input.detailTemplate;
       if (countIssues && template && input.detailFormat !== "adaptive") {
-        const after = checkCounts(canonicalDetail(applied.detail, language, template), template);
+        const after = checkCounts(canonicalDetail(applied.detail, noteLanguageOf(language), template), template);
         if (JSON.stringify(after) !== JSON.stringify(countIssues)) return refuse("counts_changed");
       }
       if (this.options.exchangeLoggingEnabled() && exchangeId) {

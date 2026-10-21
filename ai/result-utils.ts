@@ -1,5 +1,5 @@
 import type { VisualReference } from "../repository";
-import { translate, type UiLanguage } from "../i18n";
+import { NOTE_LANGUAGES, translate, type NoteLanguage } from "../i18n";
 import type { AiResult } from "./types";
 import { fencedLines } from "./markdown-blocks";
 import { sectionLookup, standardTemplate, TEXTBOOK_TEMPLATE_ID, type DetailTemplate } from "./detail-templates";
@@ -45,7 +45,7 @@ export function sourceFootnoteDefinition(line: string): { label: string; target:
   const match = /^\[\^([^\]\s]+)\]:[ \t]*(.*)$/.exec(line);
   if (!match) return null;
   const target = match[2].trim();
-  const external = (["zh-TW", "en"] as const).some(locale =>
+  const external = NOTE_LANGUAGES.some(locale =>
     target.startsWith(translate(locale, "note.external_source_0", "").trim())
   );
   return match[1].startsWith("src-") || /^\[\[[^\]]+\]\]$/.test(target) || external
@@ -66,7 +66,7 @@ function textbookDetail(
 ): string {
   // The note placeholder in both languages, plus the "No new content this time" wording the prompts ask the model to write.
   const placeholders = new Set([
-    ...(["zh-TW", "en"] as const).map(locale => translate(locale, "note.no_new_information").replace(/[.。]$/, "")),
+    ...NOTE_LANGUAGES.map(locale => translate(locale, "note.no_new_information").replace(/[.。]$/, "")),
     "No new content this time",
     "本次無新增內容"
   ]);
@@ -87,7 +87,7 @@ function textbookDetail(
 
 export function canonicalDetail(
   value: string,
-  language: UiLanguage = "zh-TW",
+  language: NoteLanguage = "zh-TW",
   template: DetailTemplate = standardTemplate(language)
 ): string {
   const detail = value.trim();
@@ -129,7 +129,7 @@ export function canonicalDetail(
   return footnotes.length && sourcesIndex < 0 ? `${body}\n\n${footnotes.join("\n")}` : body;
 }
 
-export function visualReferencesMarkdown(references: VisualReference[] = [], language: UiLanguage = "zh-TW"): string {
+export function visualReferencesMarkdown(references: VisualReference[] = [], language: NoteLanguage = "zh-TW"): string {
   return references
     .map(item => {
       const title = item.title.trim() || translate(language, "detail.visual_reference");

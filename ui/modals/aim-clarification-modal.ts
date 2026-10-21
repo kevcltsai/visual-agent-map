@@ -1,5 +1,5 @@
 import { App, Modal, Setting } from "obsidian";
-import { translate, type TranslationKey, type UiLanguage } from "../../i18n";
+import { translate, type TranslationKey, type UiLanguage, translateNote } from "../../i18n";
 
 /** One optional batch of user conditions, stored on the mother topic rather than as exploration answers. */
 export class AimClarificationModal extends Modal {
@@ -7,14 +7,15 @@ export class AimClarificationModal extends Modal {
     app: App,
     private questions: string[],
     private submit: (answers: string) => Promise<void>,
-    private english: boolean,
+    /** Interface language of the modal itself. */
+    private language: UiLanguage,
     /** Language of the note text this modal writes (blank-answer placeholder); the modal UI stays in the interface language. */
     private contentLanguage: UiLanguage
   ) {
     super(app);
   }
   onOpen(): void {
-    const text = (key: TranslationKey): string => translate(this.english ? "en" : "zh-TW", key);
+    const text = (key: TranslationKey): string => translate(this.language, key);
     this.titleEl.setText(text("ui.aim_clarify_title"));
     this.contentEl.createEl("p", {
       text: text("ui.aim_clarify_intro")
@@ -49,7 +50,7 @@ export class AimClarificationModal extends Modal {
             const answers = fields
               .map(
                 ({ question, input }) =>
-                  `- ${question}\n  ${input.value.trim() || translate(this.contentLanguage, "note.aim_clarify_blank_answer")}`
+                  `- ${question}\n  ${input.value.trim() || translateNote(this.contentLanguage, "note.aim_clarify_blank_answer")}`
               )
               .join("\n\n");
             void this.submit(answers)

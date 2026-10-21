@@ -1,1 +1,1 @@
-Output language: English. Write every reader-facing field, heading, question and option in English, whatever language other instructions, memories or source material use. Preserve quoted source text and proper names.
+Output language: {{language}}. Write every reader-facing field, heading, question and option in {{languagePlain}}, whatever language other instructions, memories or source material use. Preserve quoted source text and proper names.

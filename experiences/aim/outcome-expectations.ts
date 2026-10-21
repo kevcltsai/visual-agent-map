@@ -1,4 +1,4 @@
-import { translate, type UiLanguage } from "../../i18n";
+import { translate, type NoteLanguage } from "../../i18n";
 
 export type AimOutcomeGoal = "auto" | "execute" | "understand" | "explore" | "custom";
 export type AimOutcomeFormat = "steps" | "table" | "images" | "longform";
@@ -32,7 +32,7 @@ export function normalizeAimOutcomeExpectation(value: unknown): AimOutcomeExpect
 }
 
 /** Append the user-provided expectation to the existing durable root context. */
-export function buildAimRootContext(context: string, value: unknown, language: UiLanguage): string {
+export function buildAimRootContext(context: string, value: unknown, language: NoteLanguage): string {
   const expectation = normalizeAimOutcomeExpectation(value);
   const sections: string[] = [context.trim()];
   if (!expectation) return sections[0];

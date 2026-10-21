@@ -1,3 +1,4 @@
+import type { UiLanguage } from "../../i18n";
 import type { AiResult } from "../../ai/types";
 import { DEFAULT_AIM_FLOW_LIMITS } from "./flow-limits";
 import {
@@ -172,7 +173,7 @@ export interface PlannerReviewRecoveryContext {
   /** Fixed rationale supplied by the workflow when it imposes a decision. */
   requiredDecisionRationale?: string;
   /** AIM content language, used only for fixed fallback wording. */
-  outputLanguage?: "en" | "zh-TW";
+  outputLanguage?: UiLanguage;
 }
 
 /** Return an explicitly written interrogative from the current response without deriving one from evidence. */

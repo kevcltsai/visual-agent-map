@@ -1,5 +1,6 @@
 import type { MapDocument } from "./map-model";
 import type { Note } from "./repository";
+import type { NoteLanguage } from "./i18n";
 import compiled from "./samples/taiwan-travel/compiled.json";
 
 export const BUILTIN_SAMPLE_ID = "taiwan-travel";
@@ -19,7 +20,7 @@ export interface BuiltInSample {
   assets: Map<string, ArrayBuffer>;
 }
 
-const sources = compiled.locales as Record<"zh-TW" | "en", SourceSample>;
+const sources = compiled.locales as Record<NoteLanguage, SourceSample>;
 
 function binary(dataUri: string): ArrayBuffer {
   const alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
@@ -48,7 +49,7 @@ function embedAssets(markdown: string): string {
   );
 }
 
-export function builtInSample(language: "zh-TW" | "en", useEmbeddedAssets = true): BuiltInSample {
+export function builtInSample(language: NoteLanguage, useEmbeddedAssets = true): BuiltInSample {
   const source = sources[language];
   const map: MapDocument = {
     version: 1,
@@ -82,7 +83,7 @@ export function builtInSample(language: "zh-TW" | "en", useEmbeddedAssets = true
   return { map, notes, assets: new Map(Object.entries(compiled.assets).map(([name, data]) => [name, binary(data)])) };
 }
 
-export function validateBuiltInSample(language: "zh-TW" | "en"): string[] {
+export function validateBuiltInSample(language: NoteLanguage): string[] {
   const sample = builtInSample(language),
     errors: string[] = [],
     paths = new Set(sample.map.nodes.map(node => node.path));

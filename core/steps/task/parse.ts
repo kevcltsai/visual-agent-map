@@ -2,7 +2,7 @@ import { foldAimContract, type AimContract } from "../../../ai/aim-contracts";
 import { neutralizeUnsafeMermaid } from "../../../ai/mermaid-safety";
 import { truncateSummary } from "../../../ai/result-utils";
 import { SEARCH_STATUSES, type AiResult, type SearchStatus } from "../../../ai/types";
-import { t, translate, type UiLanguage } from "../../../i18n";
+import { t, type UiLanguage, translateNote } from "../../../i18n";
 
 export function extractJsonObject(raw: string): string {
   const candidates: string[] = [];
@@ -107,7 +107,7 @@ export function parseAiResult(
             isRecord(item) && typeof item.imageUrl === "string" && typeof item.sourceUrl === "string"
         )
         .map(item => ({
-          title: typeof item.title === "string" ? item.title.trim() : translate(language, "note.visual_reference"),
+          title: typeof item.title === "string" ? item.title.trim() : translateNote(language, "note.visual_reference"),
           imageUrl: String(item.imageUrl).trim(),
           sourceUrl: String(item.sourceUrl).trim(),
           description: typeof item.description === "string" ? item.description.trim() : "",

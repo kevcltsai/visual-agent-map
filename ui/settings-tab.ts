@@ -66,6 +66,10 @@ export function bindMapFolderInput(
   });
 }
 
+/** True when `values` list every supported interface language, which identifies the language dropdown. */
+const offersEveryLanguage = (values: readonly string[]): boolean =>
+  SUPPORTED_LANGUAGES.every(item => values.includes(item.id));
+
 export class CodexSetupModal extends Modal {
   constructor(
     app: App,
@@ -214,13 +218,11 @@ export class VisualAgentMapSettingTab extends PluginSettingTab {
       document.activeElement &&
       this.containerEl.contains(document.activeElement) &&
       document.activeElement.instanceOf(HTMLSelectElement) &&
-      Array.from(document.activeElement.options).some(option => option.value === "zh-TW") &&
-      Array.from(document.activeElement.options).some(option => option.value === "en");
+      offersEveryLanguage(Array.from(document.activeElement.options).map(option => option.value));
     this.update();
     if (!focused) return;
     const selector = Array.from(this.containerEl.querySelectorAll<HTMLSelectElement>("select")).find(select => {
-      const values = Array.from(select.options).map(option => option.value);
-      return values.includes("en") && values.includes("zh-TW");
+      return offersEveryLanguage(Array.from(select.options).map(option => option.value));
     });
     selector?.focus();
   }

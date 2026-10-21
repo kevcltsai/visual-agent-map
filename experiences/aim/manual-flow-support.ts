@@ -141,6 +141,7 @@ export function parseAimResearchPlan(result: Pick<AiResult, "detail" | "suggesti
 }
 
 /** Every AIM model call carries the map's content language explicitly; the service-level UI fallback must never apply. */
+/** `outputLanguage` is the output content language; fixed note text uses its note language. */
 export type AimTaskContext = TaskContext & { outputLanguage: UiLanguage };
 
 export type PlannerReview = ReturnType<typeof parseAimPlannerReview>;

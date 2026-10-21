@@ -1,4 +1,6 @@
 import { renderTemplate } from "../../../../core/step-runner";
+import { inLanguage } from "../../../../core/steps/_shared/fragments";
+import type { UiLanguage } from "../../../../i18n";
 import stateQuestionTemplate from "./task.state-question.md";
 import imposedOptionsTemplate from "./task.imposed-options.md";
 import missingChoicesTemplate from "./task.missing-choices.md";
@@ -68,5 +70,7 @@ export function renderGeneralRepair(repair: GeneralRepair): string {
 export const CLARIFICATION_REQUIRED_RATIONALE = renderTemplate(defaultRationale, {});
 
 /** The same rationale in the AIM content language (it is shown to the model and may land in a question note). */
-export const clarificationRequiredRationale = (language?: "en" | "zh-TW"): string =>
-  language === "zh-TW" ? renderTemplate(defaultRationaleZh, {}) : CLARIFICATION_REQUIRED_RATIONALE;
+export const clarificationRequiredRationale = (language?: UiLanguage): string =>
+  language
+    ? renderTemplate(inLanguage({ zh: defaultRationaleZh, en: defaultRationale }, language), {})
+    : CLARIFICATION_REQUIRED_RATIONALE;

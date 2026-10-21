@@ -1,4 +1,4 @@
-import type { UiLanguage } from "../i18n";
+import { instructionLanguageOf, LANGUAGES, translate, type TranslationKey, type UiLanguage } from "../i18n";
 import PlainZH from "./prompt-presets/plain.zh.md";
 import PlainEN from "./prompt-presets/plain.en.md";
 import MagazineZH from "./prompt-presets/magazine.zh.md";
@@ -32,43 +32,42 @@ export const DEFAULT_TONE_ID = "academic";
 export const AUTO_TONE_ID = "auto";
 export const DEFAULT_OUTLINE_PRESET_ID = "knowledge-tree";
 /** The outline preset's topic placeholder, per language; the outline generator replaces it with the topic. */
-export const OUTLINE_TOPIC_PLACEHOLDER: Readonly<Record<UiLanguage, string>> = {
-  "zh-TW": "{填入研究主題}",
-  en: "{research topic}"
-};
+export const OUTLINE_TOPIC_PLACEHOLDER: Readonly<Record<UiLanguage, string>> = Object.fromEntries(
+  LANGUAGES.map(item => [item.id, translate(item.id, "ui.outline_topic_placeholder")])
+) as Record<UiLanguage, string>;
 
 const strip = (text: string): string => (text.endsWith("\n") ? text.slice(0, -1) : text);
 
 interface BuiltinDefinition {
   id: string;
   kind: PromptPresetKind;
-  name: Readonly<Record<UiLanguage, string>>;
+  nameKey: TranslationKey;
   zh: string;
   en: string;
 }
 const BUILTINS: readonly BuiltinDefinition[] = [
-  { id: "plain", kind: "tone", name: { "zh-TW": "白話說明", en: "Plain explanation" }, zh: PlainZH, en: PlainEN },
+  { id: "plain", kind: "tone", nameKey: "ui.preset_name_plain", zh: PlainZH, en: PlainEN },
   {
     id: "magazine",
     kind: "tone",
-    name: { "zh-TW": "雜誌專欄", en: "Magazine column" },
+    nameKey: "ui.preset_name_magazine",
     zh: MagazineZH,
     en: MagazineEN
   },
-  { id: "summary", kind: "tone", name: { "zh-TW": "重點摘要", en: "Key-point summary" }, zh: SummaryZH, en: SummaryEN },
-  { id: "guide", kind: "tone", name: { "zh-TW": "實用指南", en: "Practical guide" }, zh: GuideZH, en: GuideEN },
+  { id: "summary", kind: "tone", nameKey: "ui.preset_name_summary", zh: SummaryZH, en: SummaryEN },
+  { id: "guide", kind: "tone", nameKey: "ui.preset_name_guide", zh: GuideZH, en: GuideEN },
   {
     id: DEFAULT_TONE_ID,
     kind: "tone",
-    name: { "zh-TW": "學術嚴謹", en: "Academic rigor" },
+    nameKey: "ui.preset_name_academic",
     zh: AcademicZH,
     en: AcademicEN
   },
-  { id: AUTO_TONE_ID, kind: "tone", name: { "zh-TW": "AI 建議", en: "AI choice" }, zh: AutoZH, en: AutoEN },
+  { id: AUTO_TONE_ID, kind: "tone", nameKey: "ui.preset_name_auto", zh: AutoZH, en: AutoEN },
   {
     id: DEFAULT_OUTLINE_PRESET_ID,
     kind: "outline",
-    name: { "zh-TW": "知識樹生成器", en: "Knowledge tree generator" },
+    nameKey: "ui.preset_name_knowledge_tree",
     zh: KnowledgeTreeZH,
     en: KnowledgeTreeEN
   }
@@ -79,12 +78,12 @@ export function isBuiltinPreset(id: string): boolean {
 }
 
 export function builtinPresets(language: UiLanguage, kind?: PromptPresetKind): PromptPreset[] {
-  const locale: UiLanguage = language === "en" ? "en" : "zh-TW";
+  const instruction = instructionLanguageOf(language);
   return BUILTINS.filter(item => !kind || item.kind === kind).map(item => ({
     id: item.id,
     kind: item.kind,
-    name: item.name[locale],
-    text: strip(locale === "en" ? item.en : item.zh)
+    name: translate(language, item.nameKey),
+    text: strip(item[instruction])
   }));
 }
 
@@ -182,7 +181,7 @@ export function duplicatePreset(
 ): { presets: PromptPreset[]; created?: PromptPreset } {
   const source = [...builtinPresets(language), ...custom].find(item => item.id === sourceId);
   if (!source) return { presets: [...custom] };
-  const suffix = language === "en" ? " copy" : " 副本";
+  const suffix = translate(language, "ui.preset_copy_suffix");
   return createPreset(custom, { kind: source.kind, name: name ?? `${source.name}${suffix}`, text: source.text });
 }
 

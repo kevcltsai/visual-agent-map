@@ -1286,6 +1286,15 @@ export const en = {
   "detail.preview": "Preview",
   "ui.map_file_description":
     "This file stores the mind map structure. Full content lives in the topic notes. Choose Open as mind map from the file menu.",
+  "ui.preset_name_plain": "Plain explanation",
+  "ui.preset_name_magazine": "Magazine column",
+  "ui.preset_name_summary": "Key-point summary",
+  "ui.preset_name_guide": "Practical guide",
+  "ui.preset_name_academic": "Academic rigor",
+  "ui.preset_name_auto": "AI choice",
+  "ui.preset_name_knowledge_tree": "Knowledge tree generator",
+  "ui.outline_topic_placeholder": "{research topic}",
+  "ui.preset_copy_suffix": " copy",
   // coffee:begin (keep every coffee.* key in this one contiguous block)
   "coffee.delete_this_table": "Delete this table?",
   "coffee.will_be_backed_up_and_moved_to_the_vault_trash": "“{0}” will be backed up and moved to the vault trash.",

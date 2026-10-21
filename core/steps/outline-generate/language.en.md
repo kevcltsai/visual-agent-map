@@ -1,1 +1,1 @@
-Write in English.
+Write in {{language}}.

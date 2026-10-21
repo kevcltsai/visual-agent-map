@@ -1,5 +1,6 @@
 import { renderTemplate, type StepDefinition } from "../../../../core/step-runner";
 import type { UiLanguage } from "../../../../i18n";
+import { inLanguage } from "../../../../core/steps/_shared/fragments";
 import condenseEn from "./condense.en.md";
 import condenseZh from "./condense.zh.md";
 import translateEn from "./translate.en.md";
@@ -21,7 +22,8 @@ function presetStep(id: string, zh: string, en: string, usesTarget: boolean): St
   return {
     id,
     version: 1,
-    render: ({ language, target = "" }) => renderTemplate(language === "zh-TW" ? zh : en, usesTarget ? { target } : {}),
+    render: ({ language, target = "" }) =>
+      renderTemplate(inLanguage({ zh, en }, language), usesTarget ? { target } : {}),
     parse: raw => raw
   };
 }

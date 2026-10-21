@@ -42,6 +42,7 @@ export interface TaskContext {
   /** Called once with the Working Findings text that was actually put in the prompt, after the context budget step (a count repair does not call it). */
   onWorkingFindingsSent?: (sent: string) => void;
   signal?: AbortSignal;
+  /** The output content language (a `UiLanguage`): names the language in prompts; the note language is `noteLanguageOf(...)` of it. */
   outputLanguage?: UiLanguage;
   mode?: AiTaskKind;
   /** Let a task choose its Markdown structure while retaining the structured result contract. */

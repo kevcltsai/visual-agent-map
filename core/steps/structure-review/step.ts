@@ -1,5 +1,6 @@
 import { estimateTokens } from "../../../ai/context-builder";
 import { translate, uiLocale, type UiLanguage } from "../../../i18n";
+import { inLanguageNaming } from "../_shared/fragments";
 import type { ReasoningLevel } from "../../../ai/types";
 import { renderTemplate, type StepDefinition } from "../../step-runner";
 import languageEn from "./language.en.md";
@@ -281,9 +282,11 @@ export const structureReviewStep: StepDefinition<StructureReviewRequest, Structu
   version: 1,
   render: request =>
     renderTemplate(template, {
-      languageInstruction: renderTemplate(
-        (request.contentLanguage ?? request.language) === "zh-TW" ? languageZh : languageEn,
-        {}
+      languageInstruction: inLanguageNaming(
+        { zh: languageZh, en: languageEn },
+        request.contentLanguage ?? request.language,
+        { language: "region" },
+        "en"
       ),
       limit: String(STRUCTURE_REVIEW_MAX_SUGGESTIONS),
       question: JSON.stringify(request.rootQuestion),

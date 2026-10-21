@@ -1,5 +1,5 @@
 import { App, TFile } from "obsidian";
-import { t } from "../i18n";
+import { tNote } from "../i18n";
 import { fencedLines, sourceFootnoteDefinition } from "./result-utils";
 import { sourcesHeadingKeys, standardTemplate, type DetailTemplate } from "./detail-templates";
 
@@ -89,9 +89,9 @@ function resolveWikilinks(text: string, documents: ReferenceDocument[]): string 
           const basename = document.path.split("/").pop() ?? document.path;
           return basename === name || basename.replace(/\.md$/i, "") === name;
         });
-    if (matches.length > 1) return t("note.source_unconfirmed_0", name);
+    if (matches.length > 1) return tNote("note.source_unconfirmed_0", name);
     if (matches.length !== 1 || !matches[0].external) return original;
-    return t("note.external_source_0", matches[0].path);
+    return tNote("note.external_source_0", matches[0].path);
   });
 }
 
@@ -121,7 +121,7 @@ const FOOTNOTE_REFERENCE = /\[\^([^\]\s]+)\](?!\()/g;
 
 function footnoteTarget(document: ReferenceDocument): string {
   const basename = (document.path.split("/").pop() ?? document.path).replace(/\.md$/i, "");
-  return document.external ? t("note.external_source_0", document.path) : `[[${document.path}|${basename}]]`;
+  return document.external ? tNote("note.external_source_0", document.path) : `[[${document.path}|${basename}]]`;
 }
 
 /** Same note => same key, whether or not the wikilink carries a display name. */
@@ -196,7 +196,7 @@ export function resolveDetailReferences(
   const source = (line: string): string => {
     const identified = line.replace(/\[S(\d+)\]/g, (original, number: string) => {
       const document = documents[Number(number) - 1];
-      if (!document) return t("note.source_unconfirmed_0", original);
+      if (!document) return tNote("note.source_unconfirmed_0", original);
       const label = sourceFootnoteLabel(document.path);
       cited.set(label, footnoteTarget(document));
       return `[^${label}]`;
@@ -270,7 +270,7 @@ export function resolveDetailReferences(
             if (reserved.has(label)) return original;
             const target = targetOf(label);
             if (target) return `[^${number(target)}]`;
-            if (label.startsWith("src-")) return ` ${t("note.source_unconfirmed_0", label)}`;
+            if (label.startsWith("src-")) return ` ${tNote("note.source_unconfirmed_0", label)}`;
             // Copied from several reference notes that each define it: no single source, so drop the marker.
             return dropped.has(label) ? "" : original;
           })

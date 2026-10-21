@@ -943,7 +943,7 @@ async function backgroundSynthesisFixture(askModel) {
   const child = await repo.createNote('Child', 'model-a', mapDoc, mapPath, 'workspace'); child.parentId = parent.id; mapDoc.nodes.push(child); await repo.saveMap(mapPath, mapDoc);
   await repo.updateNote(parent.path, { status: 'completed', summary: 'Existing conclusion', detail: 'Existing knowledge' });
   const contexts = [];
-  const plugin = { repo, settings: { ...DEFAULT_SETTINGS }, running: new Set(), abortChartJobs: () => {}, addChartsAfterWrite: () => {}, activeTasks: new Map(), mutate: async work => work(), recordFailure: (_context, error) => error.message, askModel: (context, model, reasoning, signal, onExchange, onAccepted) => { contexts.push(context); return askModel(contexts.length, signal, onAccepted); } };
+  const plugin = { repo, settings: { ...DEFAULT_SETTINGS }, running: new Set(), abortChartJobs: () => {}, addChartsAfterWrite: () => {}, activeTasks: new Map(), mutate: async work => work(), recordFailure: (_context, error) => error.message, askModel: (context, model, reasoning, signal, onExchange, onAccepted) => { contexts.push(context); context.onWorkingFindingsSent?.(context.workingFindings ?? ''); return askModel(contexts.length, signal, onAccepted); } };
   const { VisualAgentMapView } = load('main.ts', { obsidian });
   const view = new VisualAgentMapView({ app }, plugin); view.path = mapPath; view.map = mapDoc; view.render = () => {}; view.hydrate = async () => {}; view.ancestorContext = async () => '';
   const options = () => ({ researchMode: 'local', researchDepth: 'normal', visualMode: 'off', referenceGroups: [] });
@@ -2276,6 +2276,8 @@ integrationTest('synthesis keeps every earlier source link in the parent note fi
   const saved = await f.repo.readNote(f.parent.path);
   const file = await f.repo.app.vault.adapter.read(f.parent.path);
   for (const url of beforeUrls) assert.ok(file.includes(url), `lost ${url}`);
+  assert.equal(saved.newFindings, '', 'the findings were sent, so they are cleared');
+  assert.match(saved.detail, /Sources from earlier research[\s\S]*https:\/\/finding\.example\/w/, 'the cleared findings link is carried into the block');
   assert.match(saved.detail, /#### Sources from earlier research/);
   assert.match(saved.detail, /Draft detail citing only \[the child\]\(https:\/\/child\.example\/z\)/);
   // Every footnote reference has exactly one definition.

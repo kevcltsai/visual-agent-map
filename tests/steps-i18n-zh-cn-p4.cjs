@@ -177,3 +177,39 @@ test('N1 counterexamples: zh-TW, en, custom template, body text, wrong level, ne
   for (const text of ['#### 核心结论\n\nx', '## 核心结论\n\nx', '### 核心结论总览\n\nx', '### 新的核心结论\n\nx', '```\n### 核心结论\n```'])
     assert.equal(normalize(text, 'zh-CN', standardZh), text);
 });
+
+// N1b (D-2026-10-69): Simplified observer headings are mapped instead of dropped.
+const coffeeInsights = load('experiences/coffee-tables/insights.ts');
+const coffeeEngine = load('experiences/coffee-tables/engine.ts');
+const SIMPLIFIED_NOTES = ['# 观察者整理', '', '## 意外链接', '- 连结甲。', '', '## 值得继续想的问题', '- 问题乙。', '', '## 核心分歧', '- 分歧丙。', '', '## 探索方向', '- 方向丁。', '', '## 值得查证的假设', '- 假设戊。'].join('\n');
+
+test('N1b: Simplified observer headings parse into the right categories and are not dropped', () => {
+  const parsed = coffeeInsights.baselineFromVersions([SIMPLIFIED_NOTES], 'zh-TW');
+  assert.deepEqual([...parsed.map(item => item.category)], ['connections', 'questions', 'disagreements', 'directions', 'assumptions']);
+  assert.deepEqual([...parsed.map(item => item.summary)], ['连结甲。', '问题乙。', '分歧丙。', '方向丁。', '假设戊。']);
+  const solutions = coffeeInsights.baselineFromVersions(['# 观察者整理\n\n## 疑问与可能解方\n- 解方己。'], 'zh-TW');
+  assert.deepEqual([...solutions.map(item => item.category)], ['solutions']);
+});
+
+test('N1b: a Simplified observer reply is split as complete notes (no incomplete-format path)', () => {
+  const { dialogue, notes } = coffeeEngine.splitObserverNotes(`### 来宾｜甲\n\n发言。\n\n${SIMPLIFIED_NOTES}`);
+  assert.equal(dialogue, '### 来宾｜甲\n\n发言。');
+  assert.ok(notes.startsWith('# 觀察者整理'));
+  for (const heading of ['## 意外連結', '## 值得繼續想的問題', '## 核心分歧', '## 探索方向', '## 值得查證的假設']) assert.ok(notes.includes(heading), heading);
+});
+
+test('N1b counterexamples: Traditional and English unchanged; near matches and body lines are not matched', () => {
+  const traditional = '# 觀察者整理\n\n## 意外連結\n- 甲。\n\n## 核心分歧\n- 乙。';
+  assert.equal(coffeeEngine.splitObserverNotes(`### 來賓｜甲\n\n話。\n\n${traditional}`).notes, traditional);
+  const english = '# Observer’s notes\n\n## Unexpected connections\n- A.';
+  assert.equal(coffeeEngine.splitObserverNotes(`### Guest｜A\n\nHi.\n\n${english}`).notes, english);
+  assert.deepEqual([...coffeeInsights.baselineFromVersions([traditional], 'zh-TW').map(item => item.category)], ['connections', 'disagreements']);
+  // Near match (extra words) and wrong level: not mapped, the section is not recognised as a category.
+  const near = coffeeInsights.baselineFromVersions(['# 观察者整理\n\n## 意外链接总览\n- 甲。\n\n### 意外链接\n- 乙。'], 'zh-TW');
+  assert.ok(near.every(item => item.category === 'questions'));
+  // Body lines containing the words stay as they are.
+  const body = coffeeInsights.baselineFromVersions(['# 观察者整理\n\n## 意外链接\n- 提到意外链接与核心分歧。'], 'zh-TW');
+  assert.equal(body.length, 1);
+  assert.equal(body[0].summary, '提到意外链接与核心分歧。');
+  assert.equal(coffeeEngine.splitObserverNotes('对话里说 ## 意外链接 很有趣\n\n- 意外链接').notes, '');
+});

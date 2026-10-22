@@ -10,7 +10,12 @@ import { observerOnlyStep } from "./steps/observer-only/step";
 import { questionStep } from "./steps/question/step";
 import { tableStep } from "./steps/table/step";
 import { type CoffeeRound, type CoffeeRuntime, type CoffeeSession } from "./types";
-import { baselineFromVersions, mergeInsightUpdates, serializeInsightNotes } from "./insights";
+import {
+  baselineFromVersions,
+  mergeInsightUpdates,
+  outputScriptObserverHeadings,
+  serializeInsightNotes
+} from "./insights";
 import { validateGuestInvitations } from "./guest-invitations";
 import { steerCommentMessage, steerGuestQuestionMessage, steerRedirectMessage } from "./messages";
 import {
@@ -36,10 +41,16 @@ const STANDARD_OBSERVER_HEADINGS = {
   ]
 };
 function normalizeObserverHeadings(markdown: string): string {
-  return markdown.replace(
+  const unwrapped = markdown.replace(
     /^\*\*(#{1,2} (?:觀察者整理|Observer(?:[’']s)? notes|意外連結|值得繼續想的問題|核心分歧|探索方向|值得查證的假設|疑問與可能解方|Unexpected connections|Questions worth pursuing|Core disagreements|Directions to explore|Assumptions to verify|Questions and possible solutions))\*\*\s*$/gm,
     "$1"
   );
+  // A heading written in the output locale's script (zh-CN) maps to the note-language heading (exact match only).
+  const forms = outputScriptObserverHeadings();
+  return unwrapped.replace(/^(#{1,2}) (.+?)[ \t]*$/gm, (line, hashes: string, text: string) => {
+    const form = forms.get(text);
+    return form && hashes.length === (form.category ? 2 : 1) ? `${hashes} ${form.heading}` : line;
+  });
 }
 function mergeObserverNotes(session: CoffeeSession, generated: string): string {
   const baseline = baselineFromVersions(session.observerNotes ?? [], session.language);

@@ -80,13 +80,13 @@ function registerInternalMarkerPresentation(plugin) {
     )
   );
   plugin.registerMarkdownPostProcessor((element) => {
-    var _a, _b, _c;
+    var _a2, _b2, _c;
     const walker = element.ownerDocument.createTreeWalker(element, 4);
     const nodes = [];
     while (walker.nextNode()) nodes.push(walker.currentNode);
     for (const node of nodes) {
-      if ((_a = node.parentElement) == null ? void 0 : _a.closest("pre, code")) continue;
-      const text11 = (_b = node.textContent) != null ? _b : "";
+      if ((_a2 = node.parentElement) == null ? void 0 : _a2.closest("pre, code")) continue;
+      const text11 = (_b2 = node.textContent) != null ? _b2 : "";
       const filtered = text11.split("\n").filter((line) => !markerLine.test(line)).join("\n");
       if (filtered === text11) continue;
       const parent = node.parentElement;
@@ -5132,14 +5132,14 @@ var LANGUAGES = [
 var registry = LANGUAGES;
 var FALLBACK_LANGUAGE = "en";
 var entryOf = (locale) => {
-  var _a;
-  return (_a = registry.find((item) => item.id === locale)) != null ? _a : registry.find((item) => item.id === FALLBACK_LANGUAGE);
+  var _a2;
+  return (_a2 = registry.find((item) => item.id === locale)) != null ? _a2 : registry.find((item) => item.id === FALLBACK_LANGUAGE);
 };
 var NOTE_LANGUAGES = [...new Set(registry.map((item) => item.note))];
 var SUPPORTED_LANGUAGES = LANGUAGES.map(({ id, label, name }) => ({ id, label, name }));
 function supportedLanguageLabel(id) {
-  var _a, _b;
-  return (_b = (_a = SUPPORTED_LANGUAGES.find((item) => item.id === id)) == null ? void 0 : _a.label) != null ? _b : id;
+  var _a2, _b2;
+  return (_b2 = (_a2 = SUPPORTED_LANGUAGES.find((item) => item.id === id)) == null ? void 0 : _a2.label) != null ? _b2 : id;
 }
 function isUiLanguage(value) {
   return registry.some((item) => item.id === value);
@@ -5254,7 +5254,7 @@ function cleanStyle(value) {
   return value.replace(/@import[^;]*;?/gi, "").replace(/url\(\s*(['"]?)(?!#)[^)]*\1\s*\)/gi, "none");
 }
 function cleanAttributes(node) {
-  var _a;
+  var _a2;
   for (const { name, value } of Array.from(node.attributes)) {
     const lower = name.toLowerCase();
     if (lower.startsWith("on")) node.removeAttribute(name);
@@ -5262,7 +5262,7 @@ function cleanAttributes(node) {
       node.removeAttribute(name);
     else if (lower === "style") {
       if (HARD_TO_VET.test(value)) node.removeAttribute(name);
-      else if (cleanStyle(value) !== value) (_a = node.setAttribute) == null ? void 0 : _a.call(node, name, cleanStyle(value));
+      else if (cleanStyle(value) !== value) (_a2 = node.setAttribute) == null ? void 0 : _a2.call(node, name, cleanStyle(value));
     } else if (EXTERNAL_URL.test(value) || HARD_TO_VET.test(value)) node.removeAttribute(name);
   }
 }
@@ -5270,7 +5270,7 @@ function plainLabel(node) {
   return Array.from(node.children).every((child) => LABEL_HTML.has(child.localName) && plainLabel(child));
 }
 function clean(node) {
-  var _a, _b;
+  var _a2, _b2;
   for (const child of Array.from(node.children)) {
     const name = child.localName.toLowerCase();
     if (REMOVED.has(name) || name === "foreignobject" && !plainLabel(child)) {
@@ -5279,7 +5279,7 @@ function clean(node) {
     }
     cleanAttributes(child);
     if (name === "style")
-      child.textContent = HARD_TO_VET.test((_a = child.textContent) != null ? _a : "") ? "" : cleanStyle((_b = child.textContent) != null ? _b : "");
+      child.textContent = HARD_TO_VET.test((_a2 = child.textContent) != null ? _a2 : "") ? "" : cleanStyle((_b2 = child.textContent) != null ? _b2 : "");
     clean(child);
   }
 }
@@ -5346,8 +5346,8 @@ function wheelFactor(deltaY, ctrlKey, deltaMode = 0) {
 // experiences/mermaid-zoom/viewer.ts
 var PAN_STEP = 80;
 function naturalSize(svg) {
-  var _a;
-  const box = ((_a = svg.getAttribute("viewBox")) != null ? _a : "").trim().split(/[\s,]+/).map(Number);
+  var _a2;
+  const box = ((_a2 = svg.getAttribute("viewBox")) != null ? _a2 : "").trim().split(/[\s,]+/).map(Number);
   if (box.length === 4 && box.every(Number.isFinite) && box[2] > 0 && box[3] > 0)
     return { width: box[2], height: box[3] };
   const rect = svg.getBoundingClientRect();
@@ -5420,12 +5420,12 @@ var MermaidZoomModal = class extends import_obsidian2.Modal {
     window.setTimeout(() => viewport.focus(), 50);
   }
   onClose() {
-    var _a, _b, _c;
-    (_a = this.resizeObserver) == null ? void 0 : _a.disconnect();
+    var _a2, _b2, _c;
+    (_a2 = this.resizeObserver) == null ? void 0 : _a2.disconnect();
     this.resizeObserver = null;
     this.pointers.clear();
     this.contentEl.empty();
-    if (((_b = this.trigger) == null ? void 0 : _b.isConnected) !== false) (_c = this.trigger) == null ? void 0 : _c.focus();
+    if (((_b2 = this.trigger) == null ? void 0 : _b2.isConnected) !== false) (_c = this.trigger) == null ? void 0 : _c.focus();
   }
   /** Current view, exposed for tests and for the status readout. */
   currentView() {
@@ -5445,17 +5445,17 @@ var MermaidZoomModal = class extends import_obsidian2.Modal {
     if (icon) (0, import_obsidian2.setIcon)(button, icon);
     if (text11) button.createSpan({ text: text11 });
     button.addEventListener("click", () => {
-      var _a;
+      var _a2;
       run();
-      (_a = this.viewport) == null ? void 0 : _a.focus();
+      (_a2 = this.viewport) == null ? void 0 : _a2.focus();
     });
   }
   apply(animate) {
-    var _a;
+    var _a2;
     if (!this.stage) return;
     this.stage.toggleClass("is-animated", animate);
     this.stage.style.transform = `translate(${this.view.x}px, ${this.view.y}px) scale(${this.view.scale})`;
-    (_a = this.readout) == null ? void 0 : _a.setText(`${Math.round(this.view.scale * 100)}%`);
+    (_a2 = this.readout) == null ? void 0 : _a2.setText(`${Math.round(this.view.scale * 100)}%`);
   }
   zoomStep(factor) {
     const size = this.size();
@@ -5474,9 +5474,9 @@ var MermaidZoomModal = class extends import_obsidian2.Modal {
     this.apply(true);
   }
   local(event) {
-    var _a, _b, _c;
-    const rect = (_a = this.viewport) == null ? void 0 : _a.getBoundingClientRect();
-    return { x: event.clientX - ((_b = rect == null ? void 0 : rect.left) != null ? _b : 0), y: event.clientY - ((_c = rect == null ? void 0 : rect.top) != null ? _c : 0) };
+    var _a2, _b2, _c;
+    const rect = (_a2 = this.viewport) == null ? void 0 : _a2.getBoundingClientRect();
+    return { x: event.clientX - ((_b2 = rect == null ? void 0 : rect.left) != null ? _b2 : 0), y: event.clientY - ((_c = rect == null ? void 0 : rect.top) != null ? _c : 0) };
   }
   onWheel(event) {
     event.preventDefault();
@@ -5486,10 +5486,10 @@ var MermaidZoomModal = class extends import_obsidian2.Modal {
     this.apply(false);
   }
   onPointerDown(event) {
-    var _a, _b, _c;
+    var _a2, _b2, _c;
     if (event.button > 0) return;
     this.pointers.set(event.pointerId, this.local(event));
-    (_b = (_a = this.viewport) == null ? void 0 : _a.setPointerCapture) == null ? void 0 : _b.call(_a, event.pointerId);
+    (_b2 = (_a2 = this.viewport) == null ? void 0 : _a2.setPointerCapture) == null ? void 0 : _b2.call(_a2, event.pointerId);
     (_c = this.viewport) == null ? void 0 : _c.addClass("is-dragging");
     this.pinch = this.pointers.size === 2 ? { distance: this.pointerDistance() } : null;
   }
@@ -5511,10 +5511,10 @@ var MermaidZoomModal = class extends import_obsidian2.Modal {
     this.apply(false);
   }
   onPointerEnd(event) {
-    var _a;
+    var _a2;
     this.pointers.delete(event.pointerId);
     this.pinch = this.pointers.size === 2 ? { distance: this.pointerDistance() } : null;
-    if (this.pointers.size === 0) (_a = this.viewport) == null ? void 0 : _a.removeClass("is-dragging");
+    if (this.pointers.size === 0) (_a2 = this.viewport) == null ? void 0 : _a2.removeClass("is-dragging");
   }
   pointerDistance() {
     const [a, b] = [...this.pointers.values()];
@@ -5573,11 +5573,11 @@ function isVamFrontmatter(frontmatter2) {
   return marker(frontmatter2 == null ? void 0 : frontmatter2["agent-map-node"]) || marker(frontmatter2 == null ? void 0 : frontmatter2["visual-agent-map"]);
 }
 function isVamSource(app, sourcePath) {
-  var _a;
+  var _a2;
   if (!sourcePath) return false;
   const file = app.vault.getAbstractFileByPath(sourcePath);
   if (!file || !("extension" in file)) return false;
-  return isVamFrontmatter((_a = app.metadataCache.getFileCache(file)) == null ? void 0 : _a.frontmatter);
+  return isVamFrontmatter((_a2 = app.metadataCache.getFileCache(file)) == null ? void 0 : _a2.frontmatter);
 }
 function decorateDiagram(app, host) {
   const svg = host.querySelector("svg");
@@ -5640,10 +5640,10 @@ function isDiagramNode(node) {
   return typeof el.matches === "function" && el.matches("svg, .mermaid, .cm-embed-block, .callout, .cm-callout, a");
 }
 function mutationTouchesDiagram(mutation) {
-  var _a;
+  var _a2;
   if (Array.from(mutation.addedNodes).some(isDiagramNode)) return true;
   const target = mutation.target;
-  const element = target && typeof target.closest === "function" ? target : (_a = target == null ? void 0 : target.parentElement) != null ? _a : null;
+  const element = target && typeof target.closest === "function" ? target : (_a2 = target == null ? void 0 : target.parentElement) != null ? _a2 : null;
   return !!(element == null ? void 0 : element.closest(".cm-embed-block, .mermaid, .cm-callout"));
 }
 var EditorWatcher = class {
@@ -5698,8 +5698,8 @@ function registerMermaidZoom(plugin) {
             plugin.app,
             view.dom,
             () => {
-              var _a, _b;
-              return (_b = (_a = view.state.field(import_obsidian3.editorInfoField, false)) == null ? void 0 : _a.file) == null ? void 0 : _b.path;
+              var _a2, _b2;
+              return (_b2 = (_a2 = view.state.field(import_obsidian3.editorInfoField, false)) == null ? void 0 : _a2.file) == null ? void 0 : _b2.path;
             },
             (done) => editors.delete(done)
           );
@@ -5717,8 +5717,8 @@ function registerMermaidZoom(plugin) {
       },
       {
         provide: (plugin2) => import_view2.EditorView.editorAttributes.of((view) => {
-          var _a;
-          return ((_a = view.plugin(plugin2)) == null ? void 0 : _a.isVam) ? { class: EDITOR_SCOPE_CLASS } : null;
+          var _a2;
+          return ((_a2 = view.plugin(plugin2)) == null ? void 0 : _a2.isVam) ? { class: EDITOR_SCOPE_CLASS } : null;
         })
       }
     )
@@ -5766,7 +5766,7 @@ function backgroundResultNotice(message, action, timeout) {
   return notice;
 }
 function renderBackgroundStatus(parent, status) {
-  var _a, _b;
+  var _a2, _b2;
   const bar = parent.createDiv(`vam-aim-statusbar vam-background-statusbar${status.running ? " is-active" : ""}`);
   bar.setAttr("aria-live", "polite");
   bar.createSpan({ cls: "vam-aim-status-title", text: status.title });
@@ -5774,9 +5774,9 @@ function renderBackgroundStatus(parent, status) {
     cls: `vam-aim-status-value ${status.running ? "vam-status-running" : ""}`.trim(),
     text: status.value
   });
-  (_a = status.detail) == null ? void 0 : _a.call(status, bar);
+  (_a2 = status.detail) == null ? void 0 : _a2.call(status, bar);
   if (status.running && status.onStop) {
-    const stop = bar.createEl("button", { text: (_b = status.stopLabel) != null ? _b : t("ui.stop_research") });
+    const stop = bar.createEl("button", { text: (_b2 = status.stopLabel) != null ? _b2 : t("ui.stop_research") });
     stop.addEventListener("click", status.onStop);
   }
   if (status.review) {
@@ -5827,6 +5827,28 @@ var CATEGORY_ALIASES = {
   "questions to pursue": "questions",
   "unresolved core disagreements": "disagreements"
 };
+function outputScriptObserverHeadings() {
+  const forms = /* @__PURE__ */ new Map();
+  const entries = [
+    ["coffee.observers_notes", void 0],
+    ...Object.entries(TITLE_KEYS).map(
+      ([category, key2]) => [key2, category]
+    )
+  ];
+  for (const locale of ["zh-CN"]) {
+    if (!verbatimHeadingLanguage(locale)) continue;
+    const note = noteLanguageOf(locale);
+    for (const [key2, category] of entries) {
+      const written = translate(locale, key2);
+      const heading = translate(note, key2);
+      if (written !== heading) forms.set(written, { heading, category });
+    }
+  }
+  return forms;
+}
+var _a, _b;
+for (const [written, { category }] of outputScriptObserverHeadings())
+  if (category) (_b = CATEGORY_ALIASES[_a = written.toLocaleLowerCase()]) != null ? _b : CATEGORY_ALIASES[_a] = category;
 var MARKER = /<!--\s*coffee-insight:(v1:([^\s>]+)|(keep|update|merge):([^\s>]+))\s*-->/i;
 var ALL_MARKERS = /<!--\s*coffee-insight:(v1:([^\s>]+)|(keep|update|merge):([^\s>]+))\s*-->/gi;
 var SOURCE_MARKER = /<!--\s*source:\s*([\s\S]*?)\s*-->/gi;
@@ -5864,7 +5886,7 @@ function splitInsightText(value) {
   };
 }
 function parseOne(markdown) {
-  var _a, _b, _c, _d, _e, _f, _g, _h;
+  var _a2, _b2, _c, _d, _e, _f, _g, _h;
   const root = ROOT.exec(markdown);
   const body = root ? markdown.slice(root.index + root[0].length) : markdown;
   const lines = body.split(/\r?\n/);
@@ -5892,7 +5914,7 @@ function parseOne(markdown) {
     const heading = /^(?:\*\*##\s+(.+?)\*\*|##\s+(.+?)\s*)$/.exec(line.trim());
     if (heading) {
       flush();
-      category = CATEGORY_ALIASES[((_a = heading[1]) != null ? _a : heading[2]).trim().replace(/^\*\*|\*\*$/g, "").toLocaleLowerCase()];
+      category = CATEGORY_ALIASES[((_a2 = heading[1]) != null ? _a2 : heading[2]).trim().replace(/^\*\*|\*\*$/g, "").toLocaleLowerCase()];
       legacyGrouped = false;
       continue;
     }
@@ -5944,7 +5966,7 @@ function parseOne(markdown) {
       const value = splitInsightText(list[1]);
       const tag = value.metadata.map((metadata) => MARKER.exec(metadata)).find(Boolean);
       const marker5 = (tag == null ? void 0 : tag[0]) ? MARKER.exec(tag[0]) : void 0;
-      const persisted = (_c = (_b = marker5 == null ? void 0 : marker5[2]) == null ? void 0 : _b.split(";")) != null ? _c : [];
+      const persisted = (_c = (_b2 = marker5 == null ? void 0 : marker5[2]) == null ? void 0 : _b2.split(";")) != null ? _c : [];
       const idField = (_d = persisted.find((part) => part.startsWith("id="))) == null ? void 0 : _d.slice(3);
       const mergedField = (_e = persisted.find((part) => part.startsWith("merged="))) == null ? void 0 : _e.slice(7);
       current = {
@@ -6009,7 +6031,7 @@ function parseOne(markdown) {
   return items;
 }
 function baselineFromVersions(versions, language2) {
-  var _a, _b, _c, _d, _e, _f;
+  var _a2, _b2, _c, _d, _e, _f;
   const result = [];
   const byText = /* @__PURE__ */ new Map();
   for (const version of versions) {
@@ -6028,7 +6050,7 @@ function baselineFromVersions(versions, language2) {
       if (previous) {
         previous.sources = unique([...previous.sources, ...insight.sources]);
         previous.detail = [previous.detail, insight.detail].filter(Boolean).filter((value, index, values) => values.indexOf(value) === index).join("\n");
-        previous.question = unique([(_a = previous.question) != null ? _a : "", (_b = insight.question) != null ? _b : ""]).join("\n") || void 0;
+        previous.question = unique([(_a2 = previous.question) != null ? _a2 : "", (_b2 = insight.question) != null ? _b2 : ""]).join("\n") || void 0;
         previous.proposedSolution = unique([(_c = previous.proposedSolution) != null ? _c : "", (_d = insight.proposedSolution) != null ? _d : ""]).join("\n") || void 0;
         previous.limitations = unique([(_e = previous.limitations) != null ? _e : "", (_f = insight.limitations) != null ? _f : ""]).join("\n") || void 0;
         previous.mergedIds = unique([
@@ -6051,7 +6073,7 @@ function baselineFromVersions(versions, language2) {
   return result;
 }
 function mergeInsightUpdates(current, generated, language2) {
-  var _a, _b, _c;
+  var _a2, _b2, _c;
   const baseline = current.map((item) => ({ ...item, sources: [...item.sources], mergedIds: [...item.mergedIds] }));
   const parsed = parseOne(generated);
   const proposed = parsed.length ? parsed : baselineFromVersions([generated], language2);
@@ -6091,18 +6113,18 @@ function mergeInsightUpdates(current, generated, language2) {
       summary: item.summary || first.summary,
       detail: unique([first.detail, ...priorText, item.detail]).join("\n"),
       question: unique(targets.map((target) => {
-        var _a2;
-        return (_a2 = target.question) != null ? _a2 : "";
-      }).concat((_a = item.question) != null ? _a : "")).join("\n"),
+        var _a3;
+        return (_a3 = target.question) != null ? _a3 : "";
+      }).concat((_a2 = item.question) != null ? _a2 : "")).join("\n"),
       proposedSolution: unique(
         targets.map((target) => {
-          var _a2;
-          return (_a2 = target.proposedSolution) != null ? _a2 : "";
-        }).concat((_b = item.proposedSolution) != null ? _b : "")
+          var _a3;
+          return (_a3 = target.proposedSolution) != null ? _a3 : "";
+        }).concat((_b2 = item.proposedSolution) != null ? _b2 : "")
       ).join("\n"),
       limitations: unique(targets.map((target) => {
-        var _a2;
-        return (_a2 = target.limitations) != null ? _a2 : "";
+        var _a3;
+        return (_a3 = target.limitations) != null ? _a3 : "";
       }).concat((_c = item.limitations) != null ? _c : "")).join("\n"),
       sources: unique(targets.flatMap((target) => target.sources).concat(item.sources)),
       mergedIds: unique([
@@ -6179,9 +6201,9 @@ function renderTemplate(template, variables4) {
 }
 var preparedSteps = /* @__PURE__ */ new WeakSet();
 function prepareStep(step, input) {
-  var _a;
+  var _a2;
   const prompt = step.render(input);
-  (_a = step.policy) == null ? void 0 : _a.call(step, prompt, input);
+  (_a2 = step.policy) == null ? void 0 : _a2.call(step, prompt, input);
   const prepared = Object.freeze({
     step,
     input,
@@ -6901,7 +6923,7 @@ var BUILTIN_COFFEE_STYLE_PROMPT = renderTemplate(BUILTIN_STYLE_TEMPLATE.zh, {
   language: languagePromptName("zh-TW", "zh", "usage")
 });
 function assembleCoffeeContext(session) {
-  var _a, _b, _c, _d, _e;
+  var _a2, _b2, _c, _d, _e;
   const events = [];
   let order = 0;
   const add = (at, text11) => {
@@ -6909,14 +6931,14 @@ function assembleCoffeeContext(session) {
     const parsed = at ? Date.parse(at) : Number.NaN;
     events.push({ at: Number.isFinite(parsed) ? parsed : Number.MAX_SAFE_INTEGER, order: order++, text: text11.trim() });
   };
-  const rounds = (_a = session.rounds) != null ? _a : [];
+  const rounds = (_a2 = session.rounds) != null ? _a2 : [];
   const attachedInterventions = /* @__PURE__ */ new Set();
   if (rounds.length) {
     for (const round of rounds) {
       const source = round.markdown || round.draftMarkdown || "";
-      const attached = ((_b = session.interventions) != null ? _b : []).filter((item) => item.roundId === round.id).sort((a, b) => {
-        var _a2, _b2;
-        return ((_a2 = a.afterTurn) != null ? _a2 : 0) - ((_b2 = b.afterTurn) != null ? _b2 : 0) || Date.parse(a.createdAt) - Date.parse(b.createdAt);
+      const attached = ((_b2 = session.interventions) != null ? _b2 : []).filter((item) => item.roundId === round.id).sort((a, b) => {
+        var _a3, _b3;
+        return ((_a3 = a.afterTurn) != null ? _a3 : 0) - ((_b3 = b.afterTurn) != null ? _b3 : 0) || Date.parse(a.createdAt) - Date.parse(b.createdAt);
       });
       for (const item of attached) attachedInterventions.add(item.id);
       if (!attached.length || !/^###\s+/m.test(source)) {
@@ -6929,8 +6951,8 @@ function assembleCoffeeContext(session) {
       const parts = source.split(/(?=^###\s+)/m), output = [];
       let speakerTurns = 0, nextIntervention = 0;
       const inject = (limit) => {
-        var _a2;
-        while (nextIntervention < attached.length && ((_a2 = attached[nextIntervention].afterTurn) != null ? _a2 : 0) <= limit)
+        var _a3;
+        while (nextIntervention < attached.length && ((_a3 = attached[nextIntervention].afterTurn) != null ? _a3 : 0) <= limit)
           output.push(`${CONTEXT_INTERVENTION}${attached[nextIntervention++].text}`);
       };
       for (const part of parts) {
@@ -7014,14 +7036,14 @@ function readableCoffeeStyle(style) {
   return style.replace(/既有洞見有程式維持的穩定識別碼：[\s\S]*?程式會保留未提及項目。/g, "").replace(/Existing insights have stable program IDs:[\s\S]*?the program retains omitted items\./g, "");
 }
 function cleanChatStyle(style) {
-  var _a, _b, _c, _d, _e, _f;
+  var _a2, _b2, _c, _d, _e, _f;
   const zhObserverIntro = "\u89C0\u5BDF\u8005\u6574\u7406\u6574\u684C\u4E0D\u65B7\u767C\u5C55\u7684\u6D1E\u898B\uFF1A\u610F\u5916\u9023\u7D50\u3001\u503C\u5F97\u7E7C\u7E8C\u60F3\u7684\u554F\u984C\u3001\u6838\u5FC3\u5206\u6B67\u3001\u63A2\u7D22\u65B9\u5411\u3001\u5F85\u67E5\u8B49\u5047\u8A2D\uFF0C\u4EE5\u53CA\u4F86\u8CD3\u63D0\u51FA\u7591\u554F\u6642\u5C0D\u8AC7\u4E2D\u51FA\u73FE\u7684\u53EF\u80FD\u56DE\u61C9\u3002\u4E0D\u6DFB\u52A0\u65B0\u4E8B\u5BE6\uFF0C\u4E5F\u4E0D\u66FF\u4F7F\u7528\u8005\u4E0B\u7D50\u8AD6\u3002";
   const enObserverIntro = "The observer records the table\u2019s evolving insights: unexpected connections, questions worth pursuing, core disagreements, directions to explore, assumptions to verify, and guests\u2019 questions with possible responses. Add no new facts and do not decide for the user.";
   const paragraphs = style.split(/\n\s*\n/).map((value) => value.trim()).filter(Boolean);
   const knownObserverParagraphs = new Set(
     [
-      (_a = BUILTIN_COFFEE_STYLE_PROMPT.split(/\n\s*\n/)[1]) == null ? void 0 : _a.trim(),
-      (_b = BUILTIN_COFFEE_STYLE_PROMPT.split(/\n\s*\n/)[2]) == null ? void 0 : _b.trim(),
+      (_a2 = BUILTIN_COFFEE_STYLE_PROMPT.split(/\n\s*\n/)[1]) == null ? void 0 : _a2.trim(),
+      (_b2 = BUILTIN_COFFEE_STYLE_PROMPT.split(/\n\s*\n/)[2]) == null ? void 0 : _b2.trim(),
       (_c = BUILTIN_COFFEE_STYLE_PROMPT.split(/\n\s*\n/)[3]) == null ? void 0 : _c.trim(),
       (_d = BUILTIN_COFFEE_STYLE_PROMPT_EN.split(/\n\s*\n/)[1]) == null ? void 0 : _d.trim(),
       (_e = BUILTIN_COFFEE_STYLE_PROMPT_EN.split(/\n\s*\n/)[2]) == null ? void 0 : _e.trim(),
@@ -7047,20 +7069,20 @@ ${file.content}`).join("\n")}`;
 
 // experiences/coffee-tables/segments.ts
 function coffeeSegments(session) {
-  var _a, _b;
-  const rounds = (_a = session.rounds) != null ? _a : [];
+  var _a2, _b2;
+  const rounds = (_a2 = session.rounds) != null ? _a2 : [];
   const result = rounds.map((round, index) => {
-    var _a2, _b2;
+    var _a3, _b3;
     return {
       id: `round:${round.id}`,
-      kind: (_a2 = round.kind) != null ? _a2 : index === 0 ? round.id === "round-1" ? "legacy" : "initial" : "continuation",
+      kind: (_a3 = round.kind) != null ? _a3 : index === 0 ? round.id === "round-1" ? "legacy" : "initial" : "continuation",
       summary: round.summary,
       status: round.status,
       text: [
         round.markdown || round.draftMarkdown || "",
-        ...((_b2 = session.interventions) != null ? _b2 : []).filter((item) => item.roundId === round.id).map((item) => {
-          var _a3, _b3;
-          return `User intervention after turn ${(_a3 = item.afterTurn) != null ? _a3 : 0} (${(_b3 = item.status) != null ? _b3 : "sent"}): ${item.text}`;
+        ...((_b3 = session.interventions) != null ? _b3 : []).filter((item) => item.roundId === round.id).map((item) => {
+          var _a4, _b4;
+          return `User intervention after turn ${(_a4 = item.afterTurn) != null ? _a4 : 0} (${(_b4 = item.status) != null ? _b4 : "sent"}): ${item.text}`;
         })
       ].filter(Boolean).join("\n\n"),
       createdAt: round.createdAt
@@ -7083,7 +7105,7 @@ function coffeeSegments(session) {
       text: `${question.question}
 
 ${question.answer || question.draftAnswer || ""}`,
-      createdAt: (_b = question.createdAt) != null ? _b : session.createdAt
+      createdAt: (_b2 = question.createdAt) != null ? _b2 : session.createdAt
     });
   return result.sort((a, b) => a.createdAt.localeCompare(b.createdAt));
 }
@@ -7094,10 +7116,10 @@ function summaryText(value) {
 function extractSegmentSummary(markdown) {
   let summary;
   const clean4 = markdown.replace(SUMMARY_MARKER, (_marker, payload) => {
-    var _a;
+    var _a2;
     try {
       const value = JSON.parse(payload);
-      summary = (_a = summaryText(value.summary)) != null ? _a : summary;
+      summary = (_a2 = summaryText(value.summary)) != null ? _a2 : summary;
     } catch (e) {
     }
     return "";
@@ -7143,15 +7165,15 @@ var observerOnlyStep = {
   id: "coffee.observer-only",
   version: 1,
   render: ({ session }) => {
-    var _a, _b, _c, _d;
+    var _a2, _b2, _c, _d;
     const key2 = coffeeInstruction(session.language);
-    const style = ((_a = session.guests) == null ? void 0 : _a.customization) ? cleanChatStyle(conversationStyle(session.language, session.guests)) : conversationStyle(session.language, session.guests);
+    const style = ((_a2 = session.guests) == null ? void 0 : _a2.customization) ? cleanChatStyle(conversationStyle(session.language, session.guests)) : conversationStyle(session.language, session.guests);
     return renderTemplate(key2 === "zh" ? prompt_zh_default : prompt_en_default, {
       language: coffeeLanguageName(session.language, "plain"),
       styleSection: style ? `${LABEL_CONVERSATION_STYLE_OBSERVER[key2]}:
 ${style}
 ` : "",
-      references: formatReferenceContext((_c = (_b = session.guests) == null ? void 0 : _b.referenceFiles) != null ? _c : []),
+      references: formatReferenceContext((_c = (_b2 = session.guests) == null ? void 0 : _b2.referenceFiles) != null ? _c : []),
       history: history(session),
       observerFormat: observerFormat(session.language, true, (_d = session.guests) == null ? void 0 : _d.customization)
     });
@@ -7174,7 +7196,7 @@ var prompt_zh_default2 = "\u5EF6\u7E8C Coffee Tables \u5C0D\u8AC7\u56DE\u7B54\u4
 
 // experiences/coffee-tables/steps/question/step.ts
 function variables(input, context) {
-  var _a;
+  var _a2;
   const { session, question, draft = "", invitedGuests = [] } = input;
   const settings = session.guests;
   const style = (settings == null ? void 0 : settings.customization) ? cleanChatStyle(conversationStyle(session.language, settings)) : conversationStyle(session.language, settings);
@@ -7184,7 +7206,7 @@ function variables(input, context) {
     custom: style ? `
 ${LABEL_CONVERSATION_STYLE}
 ${style}` : "",
-    references: formatReferenceContext((_a = settings == null ? void 0 : settings.referenceFiles) != null ? _a : []),
+    references: formatReferenceContext((_a2 = settings == null ? void 0 : settings.referenceFiles) != null ? _a2 : []),
     context,
     inviteBlock: inviteContext ? `
 
@@ -7223,7 +7245,7 @@ var prompt_zh_default3 = "\u8ACB\u6A21\u64EC\u4E00\u5834 Coffee Table \u5F0F\u59
 
 // experiences/coffee-tables/steps/table/step.ts
 function variables2(input) {
-  var _a, _b;
+  var _a2, _b2;
   const { topic, language: language2, guests, draft = "", priorContext = "", invitedGuests = [] } = input;
   const settings = guests != null ? guests : {
     counts: { experts: 4, "cross-domain": 1, generalist: 1, affected: 1 },
@@ -7235,13 +7257,13 @@ function variables2(input) {
   const style = settings.customization ? cleanChatStyle(conversationStyle(language2, settings)) : conversationStyle(language2, settings);
   const continuing = !!(draft || priorContext);
   return {
-    hostCount: String((_a = settings.hostCount) != null ? _a : 2),
+    hostCount: String((_a2 = settings.hostCount) != null ? _a2 : 2),
     topic,
     attendeeRoles: attendeeRoles.join("\n"),
     background: settings.background.trim() ? `
 ${LABEL_BACKGROUND}${settings.background.trim()}` : "",
     language: coffeeLanguageName(language2, "usage"),
-    references: formatReferenceContext((_b = settings.referenceFiles) != null ? _b : []),
+    references: formatReferenceContext((_b2 = settings.referenceFiles) != null ? _b2 : []),
     custom: style ? `
 
 ${LABEL_CONVERSATION_STYLE}
@@ -7418,7 +7440,7 @@ var CoffeeCustomizationModal = class extends import_obsidian5.Modal {
     __publicField(this, "closed", false);
   }
   onOpen() {
-    var _a, _b, _c, _d;
+    var _a2, _b2, _c, _d;
     this.modalEl.addClass("ct-customization-modal");
     const { contentEl: content, engine } = this, t2 = (key2, ...values) => translate(uiLocale(engine.session.language), key2, ...values);
     content.createEl("h2", { text: t2("coffee.customize_this_table") });
@@ -7435,7 +7457,7 @@ var CoffeeCustomizationModal = class extends import_obsidian5.Modal {
     const style = label.createEl("textarea", { attr: { rows: "6", maxlength: "30000" } });
     const builtin = cleanChatStyle(builtinCoffeeStyle(engine.session.language));
     style.value = cleanChatStyle(
-      (_c = (_a = engine.session.guests) == null ? void 0 : _a.stylePrompt) != null ? _c : [builtin, (_b = engine.session.guests) == null ? void 0 : _b.customPrompt].filter(Boolean).join("\n\n")
+      (_c = (_a2 = engine.session.guests) == null ? void 0 : _a2.stylePrompt) != null ? _c : [builtin, (_b2 = engine.session.guests) == null ? void 0 : _b2.customPrompt].filter(Boolean).join("\n\n")
     );
     const reset = content.createEl("button", { text: t2("coffee.restore_chat_default") });
     reset.onclick = () => {
@@ -7500,7 +7522,7 @@ var CoffeeConvergenceModal = class extends import_obsidian5.Modal {
     this.engine = engine;
   }
   onOpen() {
-    var _a, _b;
+    var _a2, _b2;
     this.modalEl.addClass("ct-customization-modal");
     const content = this.contentEl, engine = this.engine, t2 = (key2, ...values) => translate(uiLocale(engine.session.language), key2, ...values);
     const draft = engine.session.convergenceDraft;
@@ -7514,17 +7536,17 @@ var CoffeeConvergenceModal = class extends import_obsidian5.Modal {
         text: t2("coffee.no_valid_preview_is_available_copy_the_saved_response")
       });
       const raw = content.createEl("textarea", { attr: { rows: "12", readonly: "true" } });
-      raw.value = (_a = engine.session.convergenceRawDraft) != null ? _a : "";
+      raw.value = (_a2 = engine.session.convergenceRawDraft) != null ? _a2 : "";
       return;
     }
-    const baseline = baselineFromVersions((_b = engine.session.observerNotes) != null ? _b : [], engine.session.language);
+    const baseline = baselineFromVersions((_b2 = engine.session.observerNotes) != null ? _b2 : [], engine.session.language);
     const selected = /* @__PURE__ */ new Set(), edits = {};
     for (const [index, item] of draft.proposals.entries()) {
       const prior = item.sourceIds.map((id) => baseline.find((source) => source.id === id)).filter((source) => !!source);
       const unchanged = prior.length === 1 && prior[0].summary === item.summary && prior[0].detail === item.detail && prior[0].category === item.category;
       const pinned = item.sourceIds.some((id) => {
-        var _a2;
-        return (_a2 = engine.session.pinnedInsightIds) == null ? void 0 : _a2.includes(id);
+        var _a3;
+        return (_a3 = engine.session.pinnedInsightIds) == null ? void 0 : _a3.includes(id);
       });
       const block = content.createEl("section", { cls: "ct-convergence-proposal" });
       const label = block.createEl("label");
@@ -7658,10 +7680,10 @@ function researchGuidance(context, language2 = "zh-TW") {
 // experiences/coffee-tables/handoff-source.ts
 var import_node_crypto = require("node:crypto");
 function references(session) {
-  var _a, _b, _c;
+  var _a2, _b2, _c;
   return [
     ...new Map(
-      [...(_a = session.referenceFiles) != null ? _a : [], ...(_c = (_b = session.guests) == null ? void 0 : _b.referenceFiles) != null ? _c : []].map((item) => [
+      [...(_a2 = session.referenceFiles) != null ? _a2 : [], ...(_c = (_b2 = session.guests) == null ? void 0 : _b2.referenceFiles) != null ? _c : []].map((item) => [
         JSON.stringify(item),
         item
       ])
@@ -7669,7 +7691,7 @@ function references(session) {
   ];
 }
 function coffeeCommittedKey(session) {
-  var _a, _b, _c, _d, _e;
+  var _a2, _b2, _c, _d, _e;
   return JSON.stringify({
     id: session.id,
     topic: session.topic,
@@ -7678,10 +7700,10 @@ function coffeeCommittedKey(session) {
     model: session.model,
     reasoning: session.reasoning,
     dirtyNotes: session.dirtyNotes === true,
-    dialogue: ((_a = session.rounds) != null ? _a : []).map((item) => ({ id: item.id, markdown: item.markdown, status: item.status })),
+    dialogue: ((_a2 = session.rounds) != null ? _a2 : []).map((item) => ({ id: item.id, markdown: item.markdown, status: item.status })),
     transcript: session.transcriptMarkdown,
     questions: session.questions.filter((item) => item.status === "complete").map((item) => ({ id: item.id, question: item.question, answer: item.answer })),
-    interventions: (_b = session.interventions) != null ? _b : [],
+    interventions: (_b2 = session.interventions) != null ? _b2 : [],
     insights: (_c = session.observerNotes) != null ? _c : [],
     background: (_e = (_d = session.guests) == null ? void 0 : _d.background) != null ? _e : "",
     references: references(session)
@@ -7692,11 +7714,11 @@ function insightText(item) {
 }
 var normalize2 = (text11) => text11.normalize("NFKC").replace(/[*_`]/g, "").replace(/\s+/g, " ").trim();
 function buildCoffeeSource(session, insightId) {
-  var _a, _b, _c, _d, _e, _f;
-  const insights = baselineFromVersions((_a = session.observerNotes) != null ? _a : [], session.language);
+  var _a2, _b2, _c, _d, _e, _f;
+  const insights = baselineFromVersions((_a2 = session.observerNotes) != null ? _a2 : [], session.language);
   const selected = insightId ? insights.find((item) => item.id === insightId) : void 0;
   if (insightId && !selected) throw new Error("The selected insight changed; reopen the latest table.");
-  const dialogue = (((_b = session.rounds) == null ? void 0 : _b.length) ? session.rounds.filter((item) => item.markdown.trim()).map(
+  const dialogue = (((_b2 = session.rounds) == null ? void 0 : _b2.length) ? session.rounds.filter((item) => item.markdown.trim()).map(
     (item) => item.status === "completed" ? item.markdown : `Saved segment (${item.status}):
 ${item.markdown}`
   ) : [session.transcriptMarkdown]).filter(Boolean);
@@ -7879,13 +7901,13 @@ function modelDiscoverySummary(codex, claude) {
 // experiences/coffee-tables/handoff-modal.ts
 var registries = /* @__PURE__ */ new WeakMap();
 function registry2(plugin) {
-  var _a;
+  var _a2;
   let found = registries.get(plugin);
   if (!found) {
     const created = { tasks: /* @__PURE__ */ new Map(), listeners: /* @__PURE__ */ new Set() };
     found = created;
     registries.set(plugin, created);
-    (_a = plugin.register) == null ? void 0 : _a.call(plugin, () => {
+    (_a2 = plugin.register) == null ? void 0 : _a2.call(plugin, () => {
       for (const task of created.tasks.values()) stopTask(plugin, task, false);
       created.tasks.clear();
     });
@@ -7923,14 +7945,14 @@ function stopCoffeeHandoff(plugin, task) {
   stopTask(plugin, task, true);
 }
 async function reopenCoffeeHandoff(plugin, task) {
-  var _a;
+  var _a2;
   const { tasks } = registry2(plugin);
   if (tasks.get(task.sessionId) !== task || task.state === "running") return void 0;
   try {
     await task.store.assertHandoffSnapshot(task.snapshot);
     const prefill = {
       ...task.inputs,
-      ...task.state === "done" && task.draft ? { question: task.draft.question, context: task.draft.context, rationale: task.draft.rationale, method: "ai" } : { message: (_a = task.message) != null ? _a : "" }
+      ...task.state === "done" && task.draft ? { question: task.draft.question, context: task.draft.context, rationale: task.draft.rationale, method: "ai" } : { message: (_a2 = task.message) != null ? _a2 : "" }
     };
     const modal = await openCoffeeResearchHandoff(
       plugin,
@@ -7951,7 +7973,7 @@ async function reopenCoffeeHandoff(plugin, task) {
   }
 }
 async function openCoffeeResearchHandoff(plugin, store, displayed, path, insightId, prefill) {
-  var _a, _b, _c, _d;
+  var _a2, _b2, _c, _d;
   const waiting = coffeeHandoffTask(plugin, displayed.id);
   if (!prefill && waiting) {
     if (waiting.state === "running") throw new Error(translate(uiLocale(plugin.settings.language), "ui.ai_running_ai"));
@@ -7961,7 +7983,7 @@ async function openCoffeeResearchHandoff(plugin, store, displayed, path, insight
     dismissCoffeeHandoff(plugin, waiting);
   }
   const displayedKey = coffeeCommittedKey(displayed);
-  if ((_b = (_a = plugin.coffeeManager) == null ? void 0 : _a.get(displayed.id)) == null ? void 0 : _b.busy) throw new Error("Wait for this table to finish.");
+  if ((_b2 = (_a2 = plugin.coffeeManager) == null ? void 0 : _a2.get(displayed.id)) == null ? void 0 : _b2.busy) throw new Error("Wait for this table to finish.");
   const snapshot = await store.handoffSnapshot(path, displayed.id);
   if ((_d = (_c = plugin.coffeeManager) == null ? void 0 : _c.get(displayed.id)) == null ? void 0 : _d.busy) throw new Error("Wait for this table to finish.");
   if (displayedKey !== coffeeCommittedKey(snapshot.session))
@@ -8129,17 +8151,17 @@ var CoffeeHandoffModal = class extends import_obsidian6.Modal {
     this.create.disabled = busy || this.blocked;
   }
   cancel() {
-    var _a;
+    var _a2;
     this.epoch++;
-    (_a = this.controller) == null ? void 0 : _a.abort();
+    (_a2 = this.controller) == null ? void 0 : _a2.abort();
     this.plugin.activeTasks.delete(`reframe-modal:${this.operationId}`);
     this.controller = null;
     if (!this.closed) this.refresh();
   }
   async assertSource() {
-    var _a, _b, _c, _d;
+    var _a2, _b2, _c, _d;
     if (this.closed) throw new Error("Research handoff closed");
-    if ((_b = (_a = this.plugin.coffeeManager) == null ? void 0 : _a.get(this.snapshot.session.id)) == null ? void 0 : _b.busy)
+    if ((_b2 = (_a2 = this.plugin.coffeeManager) == null ? void 0 : _a2.get(this.snapshot.session.id)) == null ? void 0 : _b2.busy)
       throw new Error(this.t("coffee.the_table_is_generating_reopen_it_after_it_finishes"));
     await this.store.assertHandoffSnapshot(this.snapshot);
     if (this.closed) throw new Error("Research handoff closed");
@@ -8256,8 +8278,8 @@ var CoffeeHandoffModal = class extends import_obsidian6.Modal {
   }
   async assertTaskSource() {
     const busy = () => {
-      var _a, _b;
-      return !!((_b = (_a = this.plugin.coffeeManager) == null ? void 0 : _a.get(this.snapshot.session.id)) == null ? void 0 : _b.busy);
+      var _a2, _b2;
+      return !!((_b2 = (_a2 = this.plugin.coffeeManager) == null ? void 0 : _a2.get(this.snapshot.session.id)) == null ? void 0 : _b2.busy);
     };
     if (busy()) throw new Error(this.t("coffee.the_table_is_generating_reopen_it_after_it_finishes"));
     await this.store.assertHandoffSnapshot(this.snapshot);
@@ -8334,9 +8356,9 @@ ${error.message}`
     }
   }
   onClose() {
-    var _a;
+    var _a2;
     this.closed = true;
-    (_a = this.unsubscribeModels) == null ? void 0 : _a.call(this);
+    (_a2 = this.unsubscribeModels) == null ? void 0 : _a2.call(this);
     this.unsubscribeModels = void 0;
     if (!this.detached) this.cancel();
     this.contentEl.empty();
@@ -8359,10 +8381,10 @@ function coffeeStepProvider(runtime) {
 
 // experiences/coffee-tables/convergence.ts
 function convergenceFingerprint(session) {
-  var _a, _b, _c, _d;
+  var _a2, _b2, _c, _d;
   const input = JSON.stringify({
-    notes: (_a = session.observerNotes) != null ? _a : [],
-    pinned: [...(_b = session.pinnedInsightIds) != null ? _b : []].sort(),
+    notes: (_a2 = session.observerNotes) != null ? _a2 : [],
+    pinned: [...(_b2 = session.pinnedInsightIds) != null ? _b2 : []].sort(),
     transcriptMarkdown: session.transcriptMarkdown,
     rounds: ((_c = session.rounds) != null ? _c : []).map(({ id, markdown, notes, draftMarkdown, status, createdAt }) => ({
       id,
@@ -8399,7 +8421,7 @@ function enforcePinnedProposals(proposals, baseline, pinnedIds) {
   }
 }
 function applyConvergenceProposals(baseline, proposals, acceptedIndices, edits, language2) {
-  var _a, _b;
+  var _a2, _b2;
   const accepted = new Set(acceptedIndices);
   if ([...accepted].some((index) => !Number.isInteger(index) || index < 0 || index >= proposals.length))
     throw new Error("An accepted convergence proposal does not exist");
@@ -8417,7 +8439,7 @@ function applyConvergenceProposals(baseline, proposals, acceptedIndices, edits, 
     emitted.add(proposalIndex);
     const proposal = proposals[proposalIndex], sources2 = proposal.sourceIds.map((id) => baseline.find((source) => source.id === id)).filter((source) => !!source);
     const edit = edits[proposalIndex];
-    const summary = (_a = edit == null ? void 0 : edit.summary) != null ? _a : proposal.summary, detail = (_b = edit == null ? void 0 : edit.detail) != null ? _b : proposal.detail;
+    const summary = (_a2 = edit == null ? void 0 : edit.summary) != null ? _a2 : proposal.summary, detail = (_b2 = edit == null ? void 0 : edit.detail) != null ? _b2 : proposal.detail;
     if (!summary.trim()) throw new Error("An accepted proposal needs a summary");
     const first = sources2[0];
     const mergedIds = [
@@ -8454,8 +8476,8 @@ var prompt_zh_default4 = '\u6574\u7406\u76EE\u524D\u6574\u684C\u6D1E\u898B\u3002
 
 // experiences/coffee-tables/steps/convergence/step.ts
 function variables3({ session, baseline, customization }) {
-  var _a;
-  const pinned = new Set((_a = session.pinnedInsightIds) != null ? _a : []);
+  var _a2;
+  const pinned = new Set((_a2 = session.pinnedInsightIds) != null ? _a2 : []);
   const items = baseline.map((item) => ({
     id: item.id,
     category: item.category,
@@ -8480,12 +8502,12 @@ function variables3({ session, baseline, customization }) {
   };
 }
 function parseConvergenceResponse(raw, { session, baseline }) {
-  var _a;
+  var _a2;
   const proposals = parseConvergenceProposals(
     raw,
     baseline.map((item) => item.id)
   );
-  enforcePinnedProposals(proposals, baseline, (_a = session.pinnedInsightIds) != null ? _a : []);
+  enforcePinnedProposals(proposals, baseline, (_a2 = session.pinnedInsightIds) != null ? _a2 : []);
   return proposals;
 }
 var convergenceStep = {
@@ -8532,8 +8554,8 @@ function validateGuestInvitations(candidates, baseCounts, questions, retryQuesti
   const baseTotal = countGuests(baseCounts);
   if (baseTotal < 1 || baseTotal > 12) return translate(language2, "coffee.the_existing_guest_count_is_invalid");
   const active = questions.filter((question) => question.status === "complete" && question.id !== retryQuestionId).flatMap((question) => {
-    var _a;
-    return (_a = question.invitedGuests) != null ? _a : [];
+    var _a2;
+    return (_a2 = question.invitedGuests) != null ? _a2 : [];
   });
   const activeIds = /* @__PURE__ */ new Set();
   const activeNames = new Set(existingNames.map(key).filter(Boolean));
@@ -8601,15 +8623,20 @@ var STANDARD_OBSERVER_HEADINGS = {
   ]
 };
 function normalizeObserverHeadings(markdown) {
-  return markdown.replace(
+  const unwrapped = markdown.replace(
     /^\*\*(#{1,2} (?:觀察者整理|Observer(?:[’']s)? notes|意外連結|值得繼續想的問題|核心分歧|探索方向|值得查證的假設|疑問與可能解方|Unexpected connections|Questions worth pursuing|Core disagreements|Directions to explore|Assumptions to verify|Questions and possible solutions))\*\*\s*$/gm,
     "$1"
   );
+  const forms = outputScriptObserverHeadings();
+  return unwrapped.replace(/^(#{1,2}) (.+?)[ \t]*$/gm, (line, hashes, text11) => {
+    const form = forms.get(text11);
+    return form && hashes.length === (form.category ? 2 : 1) ? `${hashes} ${form.heading}` : line;
+  });
 }
 function mergeObserverNotes(session, generated) {
-  var _a, _b;
-  const baseline = baselineFromVersions((_a = session.observerNotes) != null ? _a : [], session.language);
-  const merged = mergeInsightUpdates(baseline, generated, session.language), pinned = new Set((_b = session.pinnedInsightIds) != null ? _b : []);
+  var _a2, _b2;
+  const baseline = baselineFromVersions((_a2 = session.observerNotes) != null ? _a2 : [], session.language);
+  const merged = mergeInsightUpdates(baseline, generated, session.language), pinned = new Set((_b2 = session.pinnedInsightIds) != null ? _b2 : []);
   if (!pinned.size) return serializeInsightNotes(merged, session.language);
   const protectedResults = merged.filter((item) => [item.id, ...item.mergedIds].some((id) => pinned.has(id)));
   const protectedIds = new Set(protectedResults.flatMap((item) => [item.id, ...item.mergedIds]));
@@ -8620,7 +8647,7 @@ function mergeObserverNotes(session, generated) {
   return serializeInsightNotes(result, session.language);
 }
 function rootlessObserverNotes(markdown) {
-  var _a;
+  var _a2;
   const turns = [...markdown.matchAll(/^### .+?(?:｜|\|)\s*(?:中立觀察者|觀察者|Observer)\s*$/gim)];
   const candidates = [];
   for (const turn of turns) {
@@ -8637,12 +8664,12 @@ function rootlessObserverNotes(markdown) {
     const required = isZh ? STANDARD_OBSERVER_HEADINGS.zh : STANDARD_OBSERVER_HEADINGS.en;
     const sections = [...body.matchAll(/^## (.+?)\s*$/gm)];
     const complete = required.every((heading) => {
-      var _a2, _b, _c;
+      var _a3, _b2, _c;
       const sectionIndex = sections.findIndex((item) => item[1].trim() === heading);
       if (sectionIndex < 0) return false;
       const section4 = sections[sectionIndex];
-      const contentStart = ((_a2 = section4.index) != null ? _a2 : 0) + section4[0].length;
-      const contentEnd = (_c = (_b = sections[sectionIndex + 1]) == null ? void 0 : _b.index) != null ? _c : body.length;
+      const contentStart = ((_a3 = section4.index) != null ? _a3 : 0) + section4[0].length;
+      const contentEnd = (_c = (_b2 = sections[sectionIndex + 1]) == null ? void 0 : _b2.index) != null ? _c : body.length;
       return /\S/.test(body.slice(contentStart, contentEnd));
     });
     const notes = `${isZh ? "# \u89C0\u5BDF\u8005\u6574\u7406" : "# Observer\u2019s notes"}
@@ -8657,7 +8684,7 @@ ${body}`;
     });
   }
   const latest = candidates.at(-1);
-  if (!(latest == null ? void 0 : latest.complete) || latest.turnIndex !== ((_a = turns.at(-1)) == null ? void 0 : _a.index)) return null;
+  if (!(latest == null ? void 0 : latest.complete) || latest.turnIndex !== ((_a2 = turns.at(-1)) == null ? void 0 : _a2.index)) return null;
   const dialogueParts = [];
   let cursor = 0;
   for (const candidate of candidates) {
@@ -8686,9 +8713,9 @@ function noteSections(notes) {
   const groups = [...notes.matchAll(/^(?:## .+|\s*[-*]\s+\*\*[^*\n]{2,}\*\*\s*)$/gm)];
   if (groups.length >= 4) {
     const populated = groups.filter((group, index) => {
-      var _a, _b, _c;
-      const start = ((_a = group.index) != null ? _a : 0) + group[0].length;
-      const end = (_c = (_b = groups[index + 1]) == null ? void 0 : _b.index) != null ? _c : notes.length;
+      var _a2, _b2, _c;
+      const start = ((_a2 = group.index) != null ? _a2 : 0) + group[0].length;
+      const end = (_c = (_b2 = groups[index + 1]) == null ? void 0 : _b2.index) != null ? _c : notes.length;
       return /^\s*[-*]\s+\S/m.test(notes.slice(start, end));
     });
     if (populated.length >= 4) return [notes];
@@ -8696,11 +8723,11 @@ function noteSections(notes) {
   const canonical = [...notes.matchAll(/^## (.+?)\s*$/gm)];
   const expected = STANDARD_OBSERVER_HEADINGS.zh.some((title) => canonical.some((section3) => section3[1].trim() === title)) ? STANDARD_OBSERVER_HEADINGS.zh : STANDARD_OBSERVER_HEADINGS.en;
   const completeSections = expected.every((title) => {
-    var _a, _b, _c;
+    var _a2, _b2, _c;
     const index = canonical.findIndex((section4) => section4[1].trim() === title);
     if (index < 0) return false;
     const section3 = canonical[index];
-    const text11 = notes.slice(((_a = section3.index) != null ? _a : 0) + section3[0].length, (_c = (_b = canonical[index + 1]) == null ? void 0 : _b.index) != null ? _c : notes.length).replace(/<!--[\s\S]*?-->/g, "").trim();
+    const text11 = notes.slice(((_a2 = section3.index) != null ? _a2 : 0) + section3[0].length, (_c = (_b2 = canonical[index + 1]) == null ? void 0 : _b2.index) != null ? _c : notes.length).replace(/<!--[\s\S]*?-->/g, "").trim();
     return text11.length >= 15 && /[。！？.!?…](?:[」』”’"\])）】}]*)$/u.test(text11);
   });
   if (completeSections) return [notes];
@@ -8800,14 +8827,14 @@ var CoffeeEngine = class {
     if (this.persistenceError) throw new Error(this.persistenceError);
   }
   async setCustomization(stylePrompt, customization) {
-    var _a;
+    var _a2;
     this.assertCanEditNotes();
     if (stylePrompt.length > 3e4) throw this.engineError("coffee.engine_style_too_long");
     const errors = validateCustomization(customization, this.session.language);
     if (errors.length) throw new Error(errors.join("; "));
     this.metadataWrite = true;
     const previous = this.session, guests = {
-      ...(_a = previous.guests) != null ? _a : {
+      ...(_a2 = previous.guests) != null ? _a2 : {
         counts: { experts: 4, "cross-domain": 1, generalist: 1, affected: 1 },
         guests: [],
         background: "",
@@ -8827,12 +8854,12 @@ var CoffeeEngine = class {
     }
   }
   async togglePinnedInsight(id) {
-    var _a, _b;
+    var _a2, _b2;
     this.assertCanEditNotes();
-    const baseline = baselineFromVersions((_a = this.session.observerNotes) != null ? _a : [], this.session.language);
+    const baseline = baselineFromVersions((_a2 = this.session.observerNotes) != null ? _a2 : [], this.session.language);
     if (!baseline.some((item) => item.id === id)) throw this.engineError("coffee.engine_insight_cannot_be_pinned");
     this.metadataWrite = true;
-    const pinned = new Set((_b = this.session.pinnedInsightIds) != null ? _b : []);
+    const pinned = new Set((_b2 = this.session.pinnedInsightIds) != null ? _b2 : []);
     if (pinned.has(id)) pinned.delete(id);
     else pinned.add(id);
     const previous = this.session;
@@ -8847,10 +8874,10 @@ var CoffeeEngine = class {
     }
   }
   async previewConvergence(customization) {
-    var _a, _b, _c;
+    var _a2, _b2, _c;
     if (this.deleting || this.retired || this.session.id.startsWith("sample-") || this.metadataWrite || this.busy || this.pending || this.persistenceError)
-      return (_a = this.pending) != null ? _a : Promise.resolve();
-    const baseline = baselineFromVersions((_b = this.session.observerNotes) != null ? _b : [], this.session.language);
+      return (_a2 = this.pending) != null ? _a2 : Promise.resolve();
+    const baseline = baselineFromVersions((_b2 = this.session.observerNotes) != null ? _b2 : [], this.session.language);
     if (!baseline.length) throw this.engineError("coffee.engine_no_insights_to_converge");
     const requested = customization != null ? customization : (_c = this.session.guests) == null ? void 0 : _c.customization;
     const settings = normalizeCustomization(requested, this.session.language);
@@ -8928,14 +8955,14 @@ var CoffeeEngine = class {
     return pending;
   }
   async applyConvergence(acceptedIndices, edits = {}) {
-    var _a, _b, _c;
+    var _a2, _b2, _c;
     this.assertCanEditNotes();
     const draft = this.session.convergenceDraft;
     if (!draft) throw this.engineError("coffee.engine_no_convergence_draft");
     if (convergenceFingerprint(this.session) !== draft.baseFingerprint)
       throw this.engineError("coffee.engine_convergence_baseline_changed");
     if (!acceptedIndices.length) throw this.engineError("coffee.engine_select_a_proposal");
-    const baseline = baselineFromVersions((_a = this.session.observerNotes) != null ? _a : [], this.session.language);
+    const baseline = baselineFromVersions((_a2 = this.session.observerNotes) != null ? _a2 : [], this.session.language);
     let proposals;
     try {
       proposals = parseConvergenceResponse(draft.raw, { session: this.session, baseline });
@@ -8944,7 +8971,7 @@ var CoffeeEngine = class {
     }
     if (JSON.stringify(proposals) !== JSON.stringify(draft.proposals))
       throw this.engineError("coffee.engine_convergence_preview_inconsistent");
-    const pinned = new Set((_b = this.session.pinnedInsightIds) != null ? _b : []);
+    const pinned = new Set((_b2 = this.session.pinnedInsightIds) != null ? _b2 : []);
     for (const [rawIndex, edit] of Object.entries(edits)) {
       const index = Number(rawIndex), proposal = proposals[index];
       if (!proposal) throw this.engineError("coffee.engine_edited_proposal_missing");
@@ -8996,11 +9023,11 @@ var CoffeeEngine = class {
     }
   }
   async undoConvergence() {
-    var _a;
+    var _a2;
     this.assertCanEditNotes();
     const undo = this.session.convergenceUndo;
     if (!undo) throw this.engineError("coffee.engine_no_convergence_to_undo");
-    if (JSON.stringify((_a = this.session.observerNotes) != null ? _a : []) !== JSON.stringify(undo.expectedNotes))
+    if (JSON.stringify((_a2 = this.session.observerNotes) != null ? _a2 : []) !== JSON.stringify(undo.expectedNotes))
       throw this.engineError("coffee.engine_undo_unsafe");
     const previous = this.session;
     this.metadataWrite = true;
@@ -9015,12 +9042,12 @@ var CoffeeEngine = class {
     }
   }
   persist() {
-    var _a;
+    var _a2;
     if (this.retired) return Promise.resolve();
     const snapshot = {
       ...this.session,
       questions: this.session.questions.map((question) => ({ ...question })),
-      rounds: ((_a = this.session.rounds) != null ? _a : []).map((round) => ({ ...round }))
+      rounds: ((_a2 = this.session.rounds) != null ? _a2 : []).map((round) => ({ ...round }))
     };
     const summariesOnly = this.summarizing;
     this.persistQueue = this.persistQueue.catch(() => void 0).then(() => this.retired ? void 0 : this.saveSession(snapshot, summariesOnly));
@@ -9060,7 +9087,7 @@ var CoffeeEngine = class {
     await this.persist();
   }
   updateDraft(text11, roundId, questionId) {
-    var _a;
+    var _a2;
     if (questionId)
       this.setSession({
         ...this.session,
@@ -9070,7 +9097,7 @@ var CoffeeEngine = class {
       this.setSession({
         ...this.session,
         draftMarkdown: text11,
-        rounds: ((_a = this.session.rounds) != null ? _a : []).map(
+        rounds: ((_a2 = this.session.rounds) != null ? _a2 : []).map(
           (item) => item.id === roundId ? { ...item, draftMarkdown: text11, status: "generating" } : item
         )
       });
@@ -9078,17 +9105,17 @@ var CoffeeEngine = class {
     this.scheduleCheckpoint();
   }
   start() {
-    var _a, _b, _c;
+    var _a2, _b2, _c;
     if (this.deleting || this.retired || this.session.id.startsWith("sample-") || this.metadataWrite)
       return Promise.resolve();
-    if (this.pending || this.busy) return (_a = this.pending) != null ? _a : Promise.resolve();
+    if (this.pending || this.busy) return (_a2 = this.pending) != null ? _a2 : Promise.resolve();
     if (this.session.status === "completed") return Promise.resolve();
     if (this.session.draftMarkdown && this.recoverCompleteDraft()) return this.pending;
-    return this.runRound(((_c = (_b = this.session.rounds) == null ? void 0 : _b.length) != null ? _c : 0) > 0 ? "continuation" : "initial");
+    return this.runRound(((_c = (_b2 = this.session.rounds) == null ? void 0 : _b2.length) != null ? _c : 0) > 0 ? "continuation" : "initial");
   }
   recoverCompleteDraft() {
-    var _a, _b, _c, _d, _e, _f, _g, _h, _i, _j, _k, _l, _m, _n, _o, _p, _q;
-    const savedDraft = (_d = (_c = this.session.draftMarkdown) != null ? _c : (_b = [...(_a = this.session.rounds) != null ? _a : []].reverse().find((round2) => round2.draftMarkdown)) == null ? void 0 : _b.draftMarkdown) != null ? _d : "";
+    var _a2, _b2, _c, _d, _e, _f, _g, _h, _i, _j, _k, _l, _m, _n, _o, _p, _q;
+    const savedDraft = (_d = (_c = this.session.draftMarkdown) != null ? _c : (_b2 = [...(_a2 = this.session.rounds) != null ? _a2 : []].reverse().find((round2) => round2.draftMarkdown)) == null ? void 0 : _b2.draftMarkdown) != null ? _d : "";
     if (!COMPLETION_MARKER.test(savedDraft)) return null;
     const recoveredSummary = extractSegmentSummary(stripCompletionMarker(savedDraft));
     const draft = recoveredSummary.markdown;
@@ -9148,9 +9175,9 @@ var CoffeeEngine = class {
     return pending;
   }
   async recoverResolvedStreamDraft(previousDraft) {
-    var _a, _b;
-    const draft = (_a = this.session.draftMarkdown) != null ? _a : "", notesHeadings = [...draft.matchAll(/^# (?:觀察者整理|Observer(?:[’']s)? notes)\s*$/gm)], latest = notesHeadings.at(-1);
-    if (!latest || ((_b = latest.index) != null ? _b : 0) < previousDraft.length || !noteSections(draft.slice(latest.index)).length)
+    var _a2, _b2;
+    const draft = (_a2 = this.session.draftMarkdown) != null ? _a2 : "", notesHeadings = [...draft.matchAll(/^# (?:觀察者整理|Observer(?:[’']s)? notes)\s*$/gm)], latest = notesHeadings.at(-1);
+    if (!latest || ((_b2 = latest.index) != null ? _b2 : 0) < previousDraft.length || !noteSections(draft.slice(latest.index)).length)
       return false;
     this.setSession({ ...this.session, draftMarkdown: `${draft.trim()}
 
@@ -9162,17 +9189,17 @@ var CoffeeEngine = class {
     return this.session.status === "completed";
   }
   continueTable() {
-    var _a;
+    var _a2;
     if (this.deleting || this.retired || this.session.id.startsWith("sample-") || this.metadataWrite)
       return Promise.resolve();
-    if (this.pending || this.busy || this.session.status !== "completed") return (_a = this.pending) != null ? _a : Promise.resolve();
+    if (this.pending || this.busy || this.session.status !== "completed") return (_a2 = this.pending) != null ? _a2 : Promise.resolve();
     return this.runRound("continuation");
   }
   refreshObserverNotes() {
-    var _a, _b;
+    var _a2, _b2;
     if (this.deleting || this.retired || this.session.id.startsWith("sample-") || this.metadataWrite || this.pending || this.busy || this.persistenceError)
-      return (_a = this.pending) != null ? _a : Promise.resolve();
-    const previousObserverDraft = (_b = this.session.observerDraftMarkdown) != null ? _b : "", source = prepareStep(observerOnlyStep, { session: this.session }), generation = ++this.generation, controller = new AbortController();
+      return (_a2 = this.pending) != null ? _a2 : Promise.resolve();
+    const previousObserverDraft = (_b2 = this.session.observerDraftMarkdown) != null ? _b2 : "", source = prepareStep(observerOnlyStep, { session: this.session }), generation = ++this.generation, controller = new AbortController();
     this.controller = controller;
     this.busy = true;
     this.startedAt = Date.now();
@@ -9185,7 +9212,7 @@ var CoffeeEngine = class {
       lastGenerationStartedAt: (/* @__PURE__ */ new Date()).toISOString()
     });
     const pending = (async () => {
-      var _a2;
+      var _a3;
       try {
         await this.flush();
         let streamed = previousObserverDraft;
@@ -9204,7 +9231,7 @@ var CoffeeEngine = class {
         if (!noteSections(notes).length && noteSections(stripCompletionMarker(streamed)).length)
           notes = stripCompletionMarker(streamed);
         if (!noteSections(notes).length) throw this.engineError("coffee.engine_notes_incomplete");
-        const previousNotes = [...(_a2 = this.session.observerNotes) != null ? _a2 : []];
+        const previousNotes = [...(_a3 = this.session.observerNotes) != null ? _a3 : []];
         notes = mergeObserverNotes(this.session, notes);
         this.setSession({
           ...this.session,
@@ -9247,16 +9274,16 @@ var CoffeeEngine = class {
     return this.start();
   }
   runRound(kind) {
-    var _a, _b, _c, _d, _e, _f, _g, _h, _i, _j;
+    var _a2, _b2, _c, _d, _e, _f, _g, _h, _i, _j;
     this.steer = null;
     this.queuedSteers = [];
     this.persistenceError = "";
-    const retryRound = this.session.status === "error" ? (_a = this.session.rounds) == null ? void 0 : _a.at(-1) : void 0;
-    const generation = ++this.generation, controller = new AbortController(), roundId = (retryRound == null ? void 0 : retryRound.status) === "error" ? retryRound.id : crypto.randomUUID(), previousDraft = this.session.status === "error" ? (_e = (_d = this.session.draftMarkdown) != null ? _d : (_c = (_b = this.session.rounds) == null ? void 0 : _b.at(-1)) == null ? void 0 : _c.draftMarkdown) != null ? _e : "" : kind === "initial" ? (_f = this.session.draftMarkdown) != null ? _f : "" : "";
+    const retryRound = this.session.status === "error" ? (_a2 = this.session.rounds) == null ? void 0 : _a2.at(-1) : void 0;
+    const generation = ++this.generation, controller = new AbortController(), roundId = (retryRound == null ? void 0 : retryRound.status) === "error" ? retryRound.id : crypto.randomUUID(), previousDraft = this.session.status === "error" ? (_e = (_d = this.session.draftMarkdown) != null ? _d : (_c = (_b2 = this.session.rounds) == null ? void 0 : _b2.at(-1)) == null ? void 0 : _c.draftMarkdown) != null ? _e : "" : kind === "initial" ? (_f = this.session.draftMarkdown) != null ? _f : "" : "";
     const context = kind === "continuation" ? assembleCoffeeContext(this.session) : "";
     const continuingGuests = kind === "continuation" ? this.session.questions.filter((question) => question.status === "complete").flatMap((question) => {
-      var _a2;
-      return (_a2 = question.invitedGuests) != null ? _a2 : [];
+      var _a3;
+      return (_a3 = question.invitedGuests) != null ? _a3 : [];
     }) : [];
     if (context.length + previousDraft.length > MAX_COFFEE_CONTEXT_CHARS)
       return Promise.reject(this.engineError("coffee.table_too_long_start_new"));
@@ -9281,7 +9308,7 @@ var CoffeeEngine = class {
       rounds: [...((_j = this.session.rounds) != null ? _j : []).filter((item) => item.id !== roundId), round]
     });
     const pending = (async () => {
-      var _a2, _b2, _c2;
+      var _a3, _b3, _c2;
       try {
         await this.flush();
         const prepared = prepareStep(tableStep, {
@@ -9323,7 +9350,7 @@ ${text11}` : text11, roundId);
         }
         notes = mergeObserverNotes(this.session, notes);
         const resumedDialogue = previousDraft ? splitObserverNotes(previousDraft).dialogue : "";
-        const completed = ((_a2 = this.session.rounds) != null ? _a2 : []).map(
+        const completed = ((_a3 = this.session.rounds) != null ? _a3 : []).map(
           (item) => item.id === roundId ? {
             ...item,
             markdown: [resumedDialogue, dialogue].filter(Boolean).join("\n\n"),
@@ -9336,12 +9363,12 @@ ${text11}` : text11, roundId);
           (item) => previousDraft && item.id !== roundId && item.draftMarkdown ? { ...item, draftMarkdown: void 0 } : item
         ).filter((item) => item.markdown || item.status !== "error" || item.draftMarkdown);
         const resumedRoundIds = new Set(
-          ((_b2 = this.session.rounds) != null ? _b2 : []).filter((item) => previousDraft && item.draftMarkdown).map((item) => item.id)
+          ((_b3 = this.session.rounds) != null ? _b3 : []).filter((item) => previousDraft && item.draftMarkdown).map((item) => item.id)
         );
         const interventions = ((_c2 = this.session.interventions) != null ? _c2 : []).map(
           (item) => {
-            var _a3;
-            return item.roundId && resumedRoundIds.has(item.roundId) ? { ...item, roundId, afterTurn: (_a3 = item.afterTurn) != null ? _a3 : 0 } : item;
+            var _a4;
+            return item.roundId && resumedRoundIds.has(item.roundId) ? { ...item, roundId, afterTurn: (_a4 = item.afterTurn) != null ? _a4 : 0 } : item;
           }
         );
         this.setSession({
@@ -9375,12 +9402,12 @@ ${text11}` : text11, roundId);
     return pending;
   }
   async intervene(kind, text11, target) {
-    var _a, _b, _c, _d, _e;
+    var _a2, _b2, _c, _d, _e;
     const value = text11.trim();
-    if (this.deleting || this.retired || !this.busy || ((_a = this.controller) == null ? void 0 : _a.signal.aborted) || !value) return;
+    if (this.deleting || this.retired || !this.busy || ((_a2 = this.controller) == null ? void 0 : _a2.signal.aborted) || !value) return;
     const generation = this.generation, controller = this.controller;
     const instruction = kind === "guest-question" ? steerGuestQuestionMessage(value, target) : kind === "redirect" ? steerRedirectMessage(value) : steerCommentMessage(value);
-    const activeRound = [...(_b = this.session.rounds) != null ? _b : []].reverse().find((item) => item.status === "generating");
+    const activeRound = [...(_b2 = this.session.rounds) != null ? _b2 : []].reverse().find((item) => item.status === "generating");
     const streamed = (_c = this.session.draftMarkdown) != null ? _c : "", afterTurn = ((_d = streamed.match(/^### .+$/gm)) != null ? _d : []).length;
     const entry = {
       id: crypto.randomUUID(),
@@ -9402,13 +9429,13 @@ ${instruction}`);
   deliverIntervention(payload, steer, generation, controller) {
     const separator = payload.indexOf("\n"), id = payload.slice(0, separator), instruction = payload.slice(separator + 1);
     const task = (async () => {
-      var _a, _b;
+      var _a2, _b2;
       try {
         await steer(instruction);
         if (generation !== this.generation || controller.signal.aborted) return;
         this.setSession({
           ...this.session,
-          interventions: ((_a = this.session.interventions) != null ? _a : []).map(
+          interventions: ((_a2 = this.session.interventions) != null ? _a2 : []).map(
             (item) => item.id === id ? { ...item, status: "sent" } : item
           )
         });
@@ -9417,7 +9444,7 @@ ${instruction}`);
         if (generation === this.generation && !controller.signal.aborted) {
           this.setSession({
             ...this.session,
-            interventions: ((_b = this.session.interventions) != null ? _b : []).map(
+            interventions: ((_b2 = this.session.interventions) != null ? _b2 : []).map(
               (item) => item.id === id ? { ...item, status: "failed" } : item
             )
           });
@@ -9432,7 +9459,7 @@ ${instruction}`);
     return task;
   }
   async finishInterrupted(error, generation, controller, id, questionId) {
-    var _a;
+    var _a2;
     if (this.generation !== generation) return;
     this.error = this.persistenceError || (controller.signal.aborted ? "" : error instanceof Error ? error.message : String(error));
     if (questionId)
@@ -9448,7 +9475,7 @@ ${instruction}`);
         ...this.session,
         status: "error",
         error: this.error || "Generation stopped",
-        rounds: ((_a = this.session.rounds) != null ? _a : []).map((item) => item.id === id ? { ...item, status: "error" } : item)
+        rounds: ((_a2 = this.session.rounds) != null ? _a2 : []).map((item) => item.id === id ? { ...item, status: "error" } : item)
       });
     try {
       await this.flush();
@@ -9457,12 +9484,12 @@ ${instruction}`);
     }
   }
   async ask(question, id = crypto.randomUUID(), invitedGuests = []) {
-    var _a, _b, _c, _d, _e;
+    var _a2, _b2, _c, _d, _e;
     if (this.session.id.startsWith("sample-") || this.metadataWrite || this.pending || this.busy || this.session.status !== "completed")
       return;
     const value = question.trim();
     if (!value || this.deleting || this.retired) return;
-    const existing = this.session.questions.find((item) => item.id === id), previousDraft = (_a = existing == null ? void 0 : existing.draftAnswer) != null ? _a : "", invitationSnapshot = invitedGuests.length ? invitedGuests : (_b = existing == null ? void 0 : existing.invitedGuests) != null ? _b : [], entry = existing ? {
+    const existing = this.session.questions.find((item) => item.id === id), previousDraft = (_a2 = existing == null ? void 0 : existing.draftAnswer) != null ? _a2 : "", invitationSnapshot = invitedGuests.length ? invitedGuests : (_b2 = existing == null ? void 0 : existing.invitedGuests) != null ? _b2 : [], entry = existing ? {
       ...existing,
       question: value,
       invitedGuests: invitationSnapshot,
@@ -9549,11 +9576,11 @@ ${instruction}`);
           ...this.session,
           questions: this.session.questions.map(
             (item) => {
-              var _a2;
+              var _a3;
               return item.id === id ? {
                 ...item,
                 answer,
-                summary: (_a2 = segmentResult.summary) != null ? _a2 : item.summary,
+                summary: (_a3 = segmentResult.summary) != null ? _a3 : item.summary,
                 draftAnswer: void 0,
                 status: "complete",
                 error: void 0
@@ -9582,9 +9609,9 @@ ${instruction}`);
     await pending;
   }
   fillSegmentSummaries() {
-    var _a;
+    var _a2;
     if (this.deleting || this.retired || this.session.id.startsWith("sample-") || this.metadataWrite || this.busy || this.pending || this.persistenceError)
-      return (_a = this.pending) != null ? _a : Promise.resolve();
+      return (_a2 = this.pending) != null ? _a2 : Promise.resolve();
     const missing = coffeeSegments(this.session).filter(
       (item) => !item.summary && item.text.trim() && item.status !== "generating"
     );
@@ -9607,7 +9634,7 @@ ${instruction}`);
     this.error = "";
     this.changed();
     const pending = (async () => {
-      var _a2;
+      var _a3;
       try {
         const { raw: response } = await this.steps.send(prepared, {
           session: this.session,
@@ -9619,18 +9646,18 @@ ${instruction}`);
         const summaries = new Map(entries.map((item) => [item.id, item.summary])), previous = this.session;
         this.setSession({
           ...this.session,
-          rounds: ((_a2 = this.session.rounds) != null ? _a2 : []).map((item) => {
-            var _a3;
+          rounds: ((_a3 = this.session.rounds) != null ? _a3 : []).map((item) => {
+            var _a4;
             return {
               ...item,
-              summary: (_a3 = item.summary) != null ? _a3 : summaries.get(`round:${item.id}`)
+              summary: (_a4 = item.summary) != null ? _a4 : summaries.get(`round:${item.id}`)
             };
           }),
           questions: this.session.questions.map((item) => {
-            var _a3;
+            var _a4;
             return {
               ...item,
-              summary: (_a3 = item.summary) != null ? _a3 : summaries.get(`question:${item.id}`)
+              summary: (_a4 = item.summary) != null ? _a4 : summaries.get(`question:${item.id}`)
             };
           })
         });
@@ -9658,8 +9685,8 @@ ${instruction}`);
     return pending;
   }
   cancel() {
-    var _a;
-    (_a = this.controller) == null ? void 0 : _a.abort();
+    var _a2;
+    (_a2 = this.controller) == null ? void 0 : _a2.abort();
   }
   async stop() {
     this.cancel();
@@ -9858,7 +9885,7 @@ function normalizeSession(value) {
   };
 }
 function parseSession(raw) {
-  var _a, _b, _c;
+  var _a2, _b2, _c;
   const value = JSON.parse(raw);
   if (value.version === 1) {
     if (typeof value.id !== "string" || typeof value.topic !== "string" || !Array.isArray(value.messages) || !Array.isArray(value.participants))
@@ -9885,14 +9912,14 @@ function parseSession(raw) {
     if (!item || typeof item.id !== "string" || ids.has(item.id) || typeof item.question !== "string" || !item.question.trim() || typeof item.answer !== "string" || item.draftAnswer !== void 0 && typeof item.draftAnswer !== "string" || !["pending", "complete", "error"].includes(item.status))
       throw new Error("Invalid Coffee Tables question");
     ids.add(item.id);
-    for (const guest of (_a = item.invitedGuests) != null ? _a : []) {
+    for (const guest of (_a2 = item.invitedGuests) != null ? _a2 : []) {
       if (!guest || typeof guest.id !== "string" || invitedIds.has(guest.id) || !guest.name.trim() || guest.name.length > 60 || !guest.description.trim() || guest.description.length > 160 || !CATEGORIES3.includes(guest.category))
         throw new Error("Invalid Coffee Tables follow-up guest");
       invitedIds.add(guest.id);
       if (item.status === "complete") invitedTotal++;
     }
   }
-  const total2 = Object.values((_c = (_b = session.guests) == null ? void 0 : _b.counts) != null ? _c : {}).reduce((sum, value2) => sum + value2, 0);
+  const total2 = Object.values((_c = (_b2 = session.guests) == null ? void 0 : _b2.counts) != null ? _c : {}).reduce((sum, value2) => sum + value2, 0);
   if (session.guests && (total2 < 1 || total2 + invitedTotal > 12 || Object.values(session.guests.counts).some((value2) => !Number.isInteger(value2) || value2 < 0 || value2 > 8) || !Number.isInteger(session.guests.hostCount) || session.guests.hostCount < 1 || session.guests.hostCount > 4 || session.guests.guests.some(
     (guest) => session.guests.guests.filter((item) => item.category === guest.category).length > session.guests.counts[guest.category]
   )))
@@ -9914,11 +9941,11 @@ function copyLegacySession(legacy) {
     const titles = ["\u610F\u5916\u9023\u7D50", "\u503C\u5F97\u7E7C\u7E8C\u60F3\u7684\u554F\u984C", "\u6838\u5FC3\u5206\u6B67", "\u63A2\u7D22\u65B9\u5411", "\u503C\u5F97\u67E5\u8B49\u7684\u5047\u8A2D"];
     ["connections", "questions", "disagreements", "directions", "assumptions"].forEach(
       (key2, index) => {
-        var _a, _b;
+        var _a2, _b2;
         return lines.push(
           `### ${titles[index]}`,
           "",
-          ...((_b = (_a = legacy.notes) == null ? void 0 : _a[key2]) != null ? _b : []).map((item) => `- ${item}`),
+          ...((_b2 = (_a2 = legacy.notes) == null ? void 0 : _a2[key2]) != null ? _b2 : []).map((item) => `- ${item}`),
           ""
         );
       }
@@ -9943,11 +9970,11 @@ var CATEGORY_LABELS = {
   affected: ["\u53D7\u5F71\u97FF\u8005", "Affected perspectives"]
 };
 var markdownTopic = (raw) => {
-  var _a, _b;
+  var _a2, _b2;
   let body = raw.replace(/^\uFEFF/, "");
   const frontmatter2 = /^---\r?\n[\s\S]*?\r?\n---(?:\r?\n|$)/.exec(body);
   if (frontmatter2) body = body.slice(frontmatter2[0].length);
-  return ((_b = (_a = /^\s*# ([^\r\n]+)(?:\r?\n|$)/.exec(body)) == null ? void 0 : _a[1]) == null ? void 0 : _b.trim()) || void 0;
+  return ((_b2 = (_a2 = /^\s*# ([^\r\n]+)(?:\r?\n|$)/.exec(body)) == null ? void 0 : _a2[1]) == null ? void 0 : _b2.trim()) || void 0;
 };
 function isCoffeeReferenceList(value) {
   return Array.isArray(value) && value.every(
@@ -10023,14 +10050,14 @@ var CoffeeStorage = class {
     return `${this.hidden}/${id}.json`;
   }
   sessionPath(id) {
-    var _a;
-    return (_a = this.locations.get(id)) != null ? _a : this.path(id);
+    var _a2;
+    return (_a2 = this.locations.get(id)) != null ? _a2 : this.path(id);
   }
   list(archived = false) {
     return this.vault.getFiles().filter(
       (file) => {
-        var _a, _b, _c, _d;
-        return file.extension === "md" && (archived ? ((_a = file.parent) == null ? void 0 : _a.path) === `${this.folder}/Archive` : ((_b = file.parent) == null ? void 0 : _b.path) === this.folder || ((_d = (_c = file.parent) == null ? void 0 : _c.parent) == null ? void 0 : _d.path) === this.folder && !file.parent.name.startsWith(".") && file.parent.name !== "Archive");
+        var _a2, _b2, _c, _d;
+        return file.extension === "md" && (archived ? ((_a2 = file.parent) == null ? void 0 : _a2.path) === `${this.folder}/Archive` : ((_b2 = file.parent) == null ? void 0 : _b2.path) === this.folder || ((_d = (_c = file.parent) == null ? void 0 : _c.parent) == null ? void 0 : _d.path) === this.folder && !file.parent.name.startsWith(".") && file.parent.name !== "Archive");
       }
     ).sort((a, b) => b.stat.mtime - a.stat.mtime);
   }
@@ -10039,8 +10066,8 @@ var CoffeeStorage = class {
     return `${this.folder}/${slug}\uFF08${shortHash(topic.trim())}\uFF09`;
   }
   titlePath(topic, id) {
-    var _a;
-    const directory = ((_a = this.locations.get(id)) == null ? void 0 : _a.startsWith(`${this.folder}/Archive/`)) ? `${this.folder}/Archive` : this.topicFolder(topic), base = `${directory}/${topicSlug(topic)}.md`, stem = base.slice(0, -3);
+    var _a2;
+    const directory = ((_a2 = this.locations.get(id)) == null ? void 0 : _a2.startsWith(`${this.folder}/Archive/`)) ? `${this.folder}/Archive` : this.topicFolder(topic), base = `${directory}/${topicSlug(topic)}.md`, stem = base.slice(0, -3);
     let path = base, suffix = 2;
     while (this.vault.getAbstractFileByPath(path) && this.vault.getAbstractFileByPath(path) !== this.vault.getAbstractFileByPath(this.sessionPath(id)))
       path = `${stem}\uFF08${suffix++}\uFF09.md`;
@@ -10098,7 +10125,7 @@ var CoffeeStorage = class {
     });
   }
   sidecar(session, revision, filePath) {
-    var _a;
+    var _a2;
     const { rounds = [], questions = [] } = session;
     const storedRounds = rounds;
     return {
@@ -10135,12 +10162,12 @@ var CoffeeStorage = class {
       ...session.dirtyNotes ? { dirtyNotes: true } : {},
       revision,
       filePath,
-      transcriptHash: conversationHash(rounds, questions, (_a = session.interventions) != null ? _a : [])
+      transcriptHash: conversationHash(rounds, questions, (_a2 = session.interventions) != null ? _a2 : [])
     };
   }
   parseMarkdown(raw, side) {
-    var _a, _b, _c, _d, _e, _f, _g, _h, _i, _j, _k, _l, _m, _n, _o, _p, _q, _r, _s, _t, _u, _v, _w, _x, _y, _z, _A, _B;
-    const title = (_a = markdownTopic(raw)) != null ? _a : side.topic;
+    var _a2, _b2, _c, _d, _e, _f, _g, _h, _i, _j, _k, _l, _m, _n, _o, _p, _q, _r, _s, _t, _u, _v, _w, _x, _y, _z, _A, _B;
+    const title = (_a2 = markdownTopic(raw)) != null ? _a2 : side.topic;
     const settingsMatch = /^## (?:開桌設定|Table settings)\s*\n([\s\S]*?)(?=^## |$(?![\s\S]))/m.exec(raw);
     const boundary = conversationBoundary(raw);
     const afterTranscript = raw.slice(boundary.index + boundary.heading.length);
@@ -10160,7 +10187,7 @@ var CoffeeStorage = class {
       );
     const rounds = [];
     const questionsById = new Map(
-      ((_b = side.questions) != null ? _b : []).map((question, index) => [question.id, { ...question, question: "", answer: "", index }])
+      ((_b2 = side.questions) != null ? _b2 : []).map((question, index) => [question.id, { ...question, question: "", answer: "", index }])
     );
     for (let i = 0; i < markers.length; i++) {
       const marker5 = markers[i], start = marker5.index + marker5[0].length, end = (_d = (_c = markers[i + 1]) == null ? void 0 : _c.index) != null ? _d : conversation.length, body = conversation.slice(start, end).trim();
@@ -10168,8 +10195,8 @@ var CoffeeStorage = class {
       if (roundMatch) {
         const nth = Number((_e = roundMatch[1]) != null ? _e : roundMatch[2]) - 1, persistedId = (_f = /^<!-- coffee-tables-round:([a-zA-Z0-9-]+) -->$/m.exec(body)) == null ? void 0 : _f[1], meta = persistedId ? (_g = side.rounds) == null ? void 0 : _g.find((item) => item.id === persistedId) : (_h = side.rounds) == null ? void 0 : _h[nth];
         const roundId = (_i = meta == null ? void 0 : meta.id) != null ? _i : `round-${nth + 1}`, roundInterventions = ((_j = side.interventions) != null ? _j : []).filter((item) => item.roundId === roundId).sort((a, b) => {
-          var _a2, _b2;
-          return ((_a2 = a.afterTurn) != null ? _a2 : 0) - ((_b2 = b.afterTurn) != null ? _b2 : 0);
+          var _a3, _b3;
+          return ((_a3 = a.afterTurn) != null ? _a3 : 0) - ((_b3 = b.afterTurn) != null ? _b3 : 0);
         });
         const inputPattern = /^> \*\*你（插話）\*\*：([^\n]*(?:\n> [^\n]*)*)/gm, inputs = [...body.matchAll(inputPattern)];
         inputs.forEach((input, index) => {
@@ -10296,8 +10323,8 @@ var CoffeeStorage = class {
     return parseSession(JSON.stringify(session));
   }
   encode(session) {
-    var _a, _b, _c, _d, _e, _f, _g, _h, _i, _j, _k, _l, _m, _n, _o, _p, _q, _r, _s, _t, _u, _v, _w, _x;
-    const zh = coffeeInstruction(session.language) === "zh", count = (_b = (_a = session.guests) == null ? void 0 : _a.counts) != null ? _b : { experts: 4, "cross-domain": 1, generalist: 1, affected: 1 };
+    var _a2, _b2, _c, _d, _e, _f, _g, _h, _i, _j, _k, _l, _m, _n, _o, _p, _q, _r, _s, _t, _u, _v, _w, _x;
+    const zh = coffeeInstruction(session.language) === "zh", count = (_b2 = (_a2 = session.guests) == null ? void 0 : _a2.counts) != null ? _b2 : { experts: 4, "cross-domain": 1, generalist: 1, affected: 1 };
     const t2 = (zhText, enText) => zh ? zhText : enText;
     const lines = [
       `# ${session.topic}`,
@@ -10359,8 +10386,8 @@ var CoffeeStorage = class {
     let roundNumber = 0;
     for (const round of (_n = session.rounds) != null ? _n : []) {
       const attached = ((_o = session.interventions) != null ? _o : []).filter((item) => item.roundId === round.id).sort((a, b) => {
-        var _a2, _b2;
-        return ((_a2 = a.afterTurn) != null ? _a2 : 0) - ((_b2 = b.afterTurn) != null ? _b2 : 0);
+        var _a3, _b3;
+        return ((_a3 = a.afterTurn) != null ? _a3 : 0) - ((_b3 = b.afterTurn) != null ? _b3 : 0);
       }), body = interleaveInterventions(round.markdown, attached);
       if (!body) continue;
       roundNumber++;
@@ -10511,13 +10538,13 @@ ${session.observerDraftMarkdown}`);
     }
   }
   parseV2(raw) {
-    var _a, _b, _c;
+    var _a2, _b2, _c;
     const match = /^<!-- coffee-tables-data:([\s\S]*?) -->$/mu.exec(raw);
     if (!match) throw new Error("Legacy Coffee Tables metadata is missing");
     const stored = JSON.parse(decodeURIComponent(match[1])), id = String(stored.id), lang = coffeeInstruction(String(stored.language)) === "zh", conversationTitle = lang ? "## \u5C0D\u8AC7" : "## Conversation", startAt = raw.indexOf(conversationTitle, match.index + match[0].length), endAt = raw.indexOf(`<!-- coffee-tables-transcript-end:${id} -->`, startAt);
     if (startAt < 0 || endAt < startAt || stored.version !== 2)
       throw new Error("Legacy Coffee Tables transcript is incomplete");
-    const transcriptMarkdown = raw.slice(startAt + conversationTitle.length, endAt).trim(), questions = ((_a = stored.questionStates) != null ? _a : []).map((state) => {
+    const transcriptMarkdown = raw.slice(startAt + conversationTitle.length, endAt).trim(), questions = ((_a2 = stored.questionStates) != null ? _a2 : []).map((state) => {
       const qid = String(state.id), q = raw.indexOf(`<!-- coffee-tables-question:${qid} -->`, endAt), a = raw.indexOf(`<!-- coffee-tables-answer:${qid} -->`, q), e = raw.indexOf(`<!-- coffee-tables-question-end:${qid} -->`, a);
       if (q < 0 || a < 0 || e < 0) throw new Error("Legacy follow-up is incomplete");
       return {
@@ -10530,7 +10557,7 @@ ${session.observerDraftMarkdown}`);
         createdAt: String(stored.createdAt)
       };
     });
-    const legacyDraft = (_c = (_b = /<!--\s*coffee-tables-draft-start(?:\s*:[^>]+)?\s*-->([\s\S]*?)<!--\s*coffee-tables-draft-end(?:\s*:[^>]+)?\s*-->/i.exec(raw)) == null ? void 0 : _b[1]) == null ? void 0 : _c.trim();
+    const legacyDraft = (_c = (_b2 = /<!--\s*coffee-tables-draft-start(?:\s*:[^>]+)?\s*-->([\s\S]*?)<!--\s*coffee-tables-draft-end(?:\s*:[^>]+)?\s*-->/i.exec(raw)) == null ? void 0 : _b2[1]) == null ? void 0 : _c.trim();
     const session = {
       ...stored,
       version: 3,
@@ -10552,7 +10579,7 @@ ${session.observerDraftMarkdown}`);
     return parseSession(JSON.stringify(session));
   }
   async load(idOrPath) {
-    var _a;
+    var _a2;
     let file = this.vault.getAbstractFileByPath(idOrPath.includes("/") ? idOrPath : `${this.folder}/${idOrPath}.md`);
     if (!(file instanceof import_obsidian7.TFile)) file = this.vault.getAbstractFileByPath(`${this.folder}/${idOrPath}.json`);
     if (!(file instanceof import_obsidian7.TFile) && !idOrPath.includes("/")) {
@@ -10593,7 +10620,7 @@ ${session.observerDraftMarkdown}`);
       await this.ensureFolder(backup);
       const backupPath = `${backup}/${session.id}-v2.md`;
       if (!await this.vault.adapter.exists(backupPath)) await this.writeHidden(backupPath, raw);
-      const path = ((_a = file.parent) == null ? void 0 : _a.path) === `${this.folder}/Archive` ? file.path : this.titlePath(session.topic, session.id);
+      const path = ((_a2 = file.parent) == null ? void 0 : _a2.path) === `${this.folder}/Archive` ? file.path : this.titlePath(session.topic, session.id);
       if (!await this.vault.adapter.exists(this.sidecarPath(session.id))) await this.writeNewSidecar(session, path);
       const clean4 = this.encode(session);
       await this.ensureFolder(path.split("/").slice(0, -1).join("/"));
@@ -10649,7 +10676,7 @@ ${session.observerDraftMarkdown}`);
     return sessionLoaded;
   }
   async findSidecar(path, title) {
-    var _a;
+    var _a2;
     const candidates = await this.hiddenPaths();
     const parsed = [];
     for (const file of candidates) {
@@ -10668,7 +10695,7 @@ ${session.observerDraftMarkdown}`);
       throw new Error(
         "More than one moved Coffee Tables table has this title; choose its original note or restore hidden session data"
       );
-    return (_a = moved[0]) != null ? _a : null;
+    return (_a2 = moved[0]) != null ? _a2 : null;
   }
   async recoverJournal(file, markdown, staged) {
     if (this.activeWrites.has(staged.id))
@@ -10694,13 +10721,13 @@ ${session.observerDraftMarkdown}`);
     return result;
   }
   async stageSidecar(session, path, cleanMarkdown, previousMarkdown) {
-    var _a;
+    var _a2;
     const sidePath = this.sidecarPath(session.id);
     if (!await this.vault.adapter.exists(sidePath))
       throw new Error("Coffee Tables hidden session data is missing; no content was written");
     const original = this.sidecarOriginals.get(session.id);
     if (original === void 0) throw new Error("Reload this table before saving hidden session data");
-    const revision = ((_a = this.revisions.get(session.id)) != null ? _a : 0) + 1, committedObject = this.sidecar(session, revision, path), committed = JSON.stringify(committedObject, null, 2);
+    const revision = ((_a2 = this.revisions.get(session.id)) != null ? _a2 : 0) + 1, committedObject = this.sidecar(session, revision, path), committed = JSON.stringify(committedObject, null, 2);
     const staged = JSON.stringify(
       {
         ...committedObject,
@@ -10770,12 +10797,12 @@ ${session.observerDraftMarkdown}`);
     })();
   }
   async save(sessionInput, summariesOnly = false) {
-    var _a, _b, _c, _d, _e;
+    var _a2, _b2, _c, _d, _e;
     const session = parseSession(JSON.stringify(sessionInput));
     if (session.version !== 3) throw new Error("Unsupported Coffee Tables session version");
     if (this.deletedIds.has(session.id))
       throw new Error("This Coffee Tables session was deleted; reload the restored note before saving");
-    let path = (_a = this.locations.get(session.id)) != null ? _a : this.titlePath(session.topic, session.id);
+    let path = (_a2 = this.locations.get(session.id)) != null ? _a2 : this.titlePath(session.topic, session.id);
     let clean4 = this.encode(session);
     const file = this.vault.getAbstractFileByPath(path), original = this.originals.get(session.id);
     if (!file) {
@@ -10808,7 +10835,7 @@ ${session.observerDraftMarkdown}`);
           "Session changed outside this room. Reload the note to adopt your edits; no content was overwritten."
         );
       if (summariesOnly) {
-        const marker5 = `<!-- coffee-tables-navigation:${encodeURIComponent(JSON.stringify([...((_b = session.rounds) != null ? _b : []).map((item) => ({ id: `round:${item.id}`, summary: item.summary, kind: item.kind })), ...session.questions.map((item) => ({ id: `question:${item.id}`, summary: item.summary }))]))} -->`;
+        const marker5 = `<!-- coffee-tables-navigation:${encodeURIComponent(JSON.stringify([...((_b2 = session.rounds) != null ? _b2 : []).map((item) => ({ id: `round:${item.id}`, summary: item.summary, kind: item.kind })), ...session.questions.map((item) => ({ id: `question:${item.id}`, summary: item.summary }))]))} -->`;
         const boundary = conversationBoundary(current);
         clean4 = boundary.navigation ? current.slice(0, boundary.navigation.index) + marker5 + current.slice(boundary.navigation.index + boundary.navigation[0].trimEnd().length) : current.slice(0, boundary.index) + marker5 + "\n\n" + current.slice(boundary.index);
         if (clean4 === current && !current.includes(marker5))
@@ -10922,8 +10949,8 @@ ${session.observerDraftMarkdown}`);
     return await this.load(path);
   }
   async renameToTopic(id, topic) {
-    var _a;
-    const file = this.vault.getAbstractFileByPath((_a = this.locations.get(id)) != null ? _a : this.path(id));
+    var _a2;
+    const file = this.vault.getAbstractFileByPath((_a2 = this.locations.get(id)) != null ? _a2 : this.path(id));
     if (file instanceof import_obsidian7.TFile && this.renameFile) {
       const target = this.titlePath(topic, id);
       if (target !== file.path) {
@@ -10933,16 +10960,16 @@ ${session.observerDraftMarkdown}`);
     }
   }
   async openMarkdown(id) {
-    var _a;
-    const file = this.vault.getAbstractFileByPath(id.includes("/") ? id : (_a = this.locations.get(id)) != null ? _a : this.path(id));
+    var _a2;
+    const file = this.vault.getAbstractFileByPath(id.includes("/") ? id : (_a2 = this.locations.get(id)) != null ? _a2 : this.path(id));
     if (!(file instanceof import_obsidian7.TFile)) throw new Error("Coffee Tables Markdown note is missing");
     return file;
   }
   async organizeExisting(busyIds = /* @__PURE__ */ new Set()) {
-    var _a, _b;
+    var _a2, _b2;
     let moved = 0, skipped = 0;
     for (const file of [...this.list()]) {
-      if (((_a = file.parent) == null ? void 0 : _a.path) !== this.folder) continue;
+      if (((_a2 = file.parent) == null ? void 0 : _a2.path) !== this.folder) continue;
       try {
         const raw = await this.vault.read(file), heading = markdownTopic(raw), side = await this.findSidecar(file.path, heading);
         const topic = heading != null ? heading : side == null ? void 0 : side.topic;
@@ -10954,7 +10981,7 @@ ${session.observerDraftMarkdown}`);
           skipped++;
           continue;
         }
-        const id = (_b = side == null ? void 0 : side.id) != null ? _b : `legacy-${shortHash(file.path)}`, target = this.titlePath(topic, id);
+        const id = (_b2 = side == null ? void 0 : side.id) != null ? _b2 : `legacy-${shortHash(file.path)}`, target = this.titlePath(topic, id);
         if (!this.renameFile) throw new Error("FileManager rename is unavailable");
         await this.ensureFolder(target.split("/").slice(0, -1).join("/"));
         if (side) await this.moveManagedFile(file, side.id, target);
@@ -10996,14 +11023,14 @@ ${session.observerDraftMarkdown}`);
     if (oldParent && !oldParent.children.length) await this.cleanupEmptyTopicFolders();
   }
   async delete(id, markdownPath) {
-    var _a, _b;
+    var _a2, _b2;
     const safeId = /^[a-zA-Z0-9-]+$/.test(id) ? id : `legacy-${shortHash(id)}`, file = await this.openMarkdown(markdownPath != null ? markdownPath : id), sidePath = `${this.hidden}/${safeId}.json`, trashFolder = `${this.hidden}/trash`, bundlePath = `${trashFolder}/${safeId}-${Date.now()}.json`;
     await this.ensureFolder(trashFolder);
     let raw = await this.vault.read(file), sideRaw = await this.vault.adapter.read(sidePath).catch(() => void 0);
     const record = {
       version: 1,
       id,
-      topic: (_a = markdownTopic(raw)) != null ? _a : file.basename,
+      topic: (_a2 = markdownTopic(raw)) != null ? _a2 : file.basename,
       originalPath: file.path,
       markdown: raw,
       ...sideRaw ? { sidecar: sideRaw } : {},
@@ -11022,7 +11049,7 @@ ${session.observerDraftMarkdown}`);
       raw = latestMarkdown;
       sideRaw = latestSidecar2;
       record.markdown = raw;
-      record.topic = (_b = markdownTopic(raw)) != null ? _b : file.basename;
+      record.topic = (_b2 = markdownTopic(raw)) != null ? _b2 : file.basename;
       if (sideRaw === void 0) delete record.sidecar;
       else record.sidecar = sideRaw;
       const previousBundle = await this.readHidden(bundlePath);
@@ -11092,7 +11119,7 @@ ${session.observerDraftMarkdown}`);
     return result.sort((a, b) => b.deletedAt.localeCompare(a.deletedAt));
   }
   async restoreDeleted(bundlePath) {
-    var _a;
+    var _a2;
     const bundleRaw = await this.readHidden(bundlePath), record = JSON.parse(bundleRaw);
     if (record.restoredPath !== void 0)
       throw new Error("This deleted Coffee Tables record was already restored; no file was changed");
@@ -11102,7 +11129,7 @@ ${session.observerDraftMarkdown}`);
     const sidePath = this.sidecarPath(record.id), originalBundleSidecar = typeof record.sidecar === "string" ? record.sidecar : void 0, currentSidecar = await this.vault.adapter.read(sidePath).catch(() => void 0);
     const base = typeof record.originalPath === "string" ? record.originalPath : this.titlePath(String(record.topic), record.id), stem = base.slice(0, -3);
     let journal = record.restoreJournal;
-    let target = (_a = journal == null ? void 0 : journal.targetPath) != null ? _a : base;
+    let target = (_a2 = journal == null ? void 0 : journal.targetPath) != null ? _a2 : base;
     if (!journal) {
       let suffix = 2;
       while (this.vault.getAbstractFileByPath(target)) target = `${stem}\uFF08${suffix++}\uFF09.md`;
@@ -11198,9 +11225,9 @@ function interleaveInterventions(markdown, interventions) {
   const chunks = markdown.split(/(?=^### .+$)/gm), output = [];
   let turns = 0, inserted = /* @__PURE__ */ new Set();
   const insertThrough = (count) => {
-    var _a;
+    var _a2;
     for (const item of interventions)
-      if (!inserted.has(item.id) && ((_a = item.afterTurn) != null ? _a : 0) <= count) {
+      if (!inserted.has(item.id) && ((_a2 = item.afterTurn) != null ? _a2 : 0) <= count) {
         const quoted = item.text.trim().split("\n").map((line, index) => index === 0 ? `> **\u4F60\uFF08\u63D2\u8A71\uFF09**\uFF1A${line}` : `> ${line}`).join("\n");
         output.push("", quoted, "");
         inserted.add(item.id);
@@ -11229,8 +11256,8 @@ function shortHash(value) {
 }
 function topicSlug(topic) {
   const printable = Array.from(topic.normalize("NFC")).filter((character) => {
-    var _a;
-    return ((_a = character.codePointAt(0)) != null ? _a : 0) >= 32;
+    var _a2;
+    return ((_a2 = character.codePointAt(0)) != null ? _a2 : 0) >= 32;
   }).join("");
   const slug = Array.from(
     printable.replace(/[\\/:*?"<>|#^[\]]/g, " ").replace(/\s+/g, " ").replace(/[. ]+$/g, "").trim()
@@ -11266,9 +11293,9 @@ function itemTime(item) {
   return item.status === "completed" ? completeTime(item) : activityTime(item);
 }
 function effectiveTableStatus(session, busy = false) {
-  var _a, _b;
+  var _a2, _b2;
   if (busy) return "generating";
-  if (session.status === "generating" || session.questions.some((question) => question.status !== "complete") || ((_a = session.rounds) != null ? _a : []).some((round) => round.status !== "completed") || ((_b = session.interventions) != null ? _b : []).some((item) => item.status === "pending" || item.status === "failed"))
+  if (session.status === "generating" || session.questions.some((question) => question.status !== "complete") || ((_a2 = session.rounds) != null ? _a2 : []).some((round) => round.status !== "completed") || ((_b2 = session.interventions) != null ? _b2 : []).some((item) => item.status === "pending" || item.status === "failed"))
     return "error";
   return session.status;
 }
@@ -11464,7 +11491,7 @@ function paragraphTexts(value) {
   return value.split(/\n\s*\n/).flatMap((part) => part.split(/(?<=[。！？!?；;])\s*/u)).map((part) => part.trim()).filter(Boolean);
 }
 function findRelatedSpeech(text11, targets) {
-  var _a;
+  var _a2;
   const query = normalizeText(text11);
   if ([...query].length < 8) return null;
   const usable = targets.map((target) => ({ ...target, normalized: normalizeText(target.text) })).filter((target) => target.id && [...target.normalized].length >= 8);
@@ -11480,10 +11507,10 @@ function findRelatedSpeech(text11, targets) {
   const documents = usable.map((target) => new Set(tokens(target.text)));
   const frequencies = /* @__PURE__ */ new Map();
   for (const document2 of documents)
-    for (const token of document2) frequencies.set(token, ((_a = frequencies.get(token)) != null ? _a : 0) + 1);
+    for (const token of document2) frequencies.set(token, ((_a2 = frequencies.get(token)) != null ? _a2 : 0) + 1);
   const weight = (token) => {
-    var _a2;
-    return Math.log(1 + (documents.length + 1) / (((_a2 = frequencies.get(token)) != null ? _a2 : 0) + 1));
+    var _a3;
+    return Math.log(1 + (documents.length + 1) / (((_a3 = frequencies.get(token)) != null ? _a3 : 0) + 1));
   };
   const queryWeight = [...queryTokens].reduce((total2, token) => total2 + weight(token), 0);
   const scored = usable.map((target, index) => {
@@ -11555,9 +11582,9 @@ var CoffeeDeleteModal = class extends import_obsidian8.Modal {
     };
   }
   onClose() {
-    var _a;
+    var _a2;
     this.contentEl.empty();
-    (_a = this.resolveResult) == null ? void 0 : _a.call(this, this.confirmed);
+    (_a2 = this.resolveResult) == null ? void 0 : _a2.call(this, this.confirmed);
     this.resolveResult = void 0;
   }
 };
@@ -11591,8 +11618,8 @@ var CoffeeSummaryConfirmModal = class extends import_obsidian8.Modal {
     };
   }
   onClose() {
-    var _a;
-    (_a = this.result) == null ? void 0 : _a.call(this, this.confirmed);
+    var _a2;
+    (_a2 = this.result) == null ? void 0 : _a2.call(this, this.confirmed);
     this.result = void 0;
     this.contentEl.empty();
   }
@@ -11628,8 +11655,8 @@ var CoffeeStyleNameModal = class extends import_obsidian8.Modal {
     const save = buttons.createEl("button", { text: this.t("coffee.save") });
     save.addClass("mod-cta");
     save.onclick = () => {
-      var _a;
-      (_a = this.resolveResult) == null ? void 0 : _a.call(this, input.value.trim() || null);
+      var _a2;
+      (_a2 = this.resolveResult) == null ? void 0 : _a2.call(this, input.value.trim() || null);
       this.close();
     };
     input.addEventListener("keydown", (event) => {
@@ -11639,9 +11666,9 @@ var CoffeeStyleNameModal = class extends import_obsidian8.Modal {
     input.select();
   }
   onClose() {
-    var _a;
+    var _a2;
     this.contentEl.empty();
-    (_a = this.resolveResult) == null ? void 0 : _a.call(this, null);
+    (_a2 = this.resolveResult) == null ? void 0 : _a2.call(this, null);
     this.resolveResult = void 0;
   }
 };
@@ -11741,12 +11768,12 @@ function parseGuests(markdown) {
   );
 }
 function rosterFor(session, markdown) {
-  var _a, _b, _c;
+  var _a2, _b2, _c;
   const locale = uiLocale(session.language), settings = session.guests;
   const inviteRoles = Object.fromEntries(CATEGORIES4.map((item) => [item.id, translate(locale, item.role)]));
-  const invited = ((_a = session.questions) != null ? _a : []).filter((question) => question.status === "complete").flatMap((question) => {
-    var _a2;
-    return (_a2 = question.invitedGuests) != null ? _a2 : [];
+  const invited = ((_a2 = session.questions) != null ? _a2 : []).filter((question) => question.status === "complete").flatMap((question) => {
+    var _a3;
+    return (_a3 = question.invitedGuests) != null ? _a3 : [];
   }).map((guest) => ({ name: guest.name, role: inviteRoles[guest.category], bio: guest.description }));
   const people = [
     ...new Map(
@@ -11754,11 +11781,11 @@ function rosterFor(session, markdown) {
     ).values()
   ];
   const roles = [
-    { category: "host", label: "coffee.roster_host", count: (_b = settings == null ? void 0 : settings.hostCount) != null ? _b : 2 },
+    { category: "host", label: "coffee.roster_host", count: (_b2 = settings == null ? void 0 : settings.hostCount) != null ? _b2 : 2 },
     { category: "observer", label: "coffee.roster_observer", count: 1 },
     ...CATEGORIES4.map((item) => {
-      var _a2;
-      return { category: item.id, label: item.label, count: (_a2 = settings == null ? void 0 : settings.counts[item.id]) != null ? _a2 : 0 };
+      var _a3;
+      return { category: item.id, label: item.label, count: (_a3 = settings == null ? void 0 : settings.counts[item.id]) != null ? _a3 : 0 };
     })
   ];
   const textsOf = (keys) => LANGUAGES.flatMap((language2) => keys.map((key2) => translate(language2.id, key2).trim().toLocaleLowerCase())).filter(
@@ -11781,9 +11808,9 @@ function rosterFor(session, markdown) {
     ["experts", [...textsOf(["coffee.guest_role_experts", "coffee.guest_category_experts"]), ...expertTail]]
   ];
   const roleKey = (role) => {
-    var _a2, _b2;
+    var _a3, _b3;
     const text11 = role.toLocaleLowerCase();
-    return (_b2 = (_a2 = roleTexts.find(([, texts2]) => texts2.some((item) => text11.includes(item)))) == null ? void 0 : _a2[0]) != null ? _b2 : "";
+    return (_b3 = (_a3 = roleTexts.find(([, texts2]) => texts2.some((item) => text11.includes(item)))) == null ? void 0 : _a3[0]) != null ? _b3 : "";
   };
   const used = /* @__PURE__ */ new Map();
   for (const person of people) {
@@ -11793,8 +11820,8 @@ function rosterFor(session, markdown) {
   const display = coffeeContentLocale(session.language);
   const placeholders = roles.flatMap(
     (item) => {
-      var _a2;
-      return Array.from({ length: Math.max(0, item.count - ((_a2 = used.get(item.category)) != null ? _a2 : 0)) }, (_, index) => ({
+      var _a3;
+      return Array.from({ length: Math.max(0, item.count - ((_a3 = used.get(item.category)) != null ? _a3 : 0)) }, (_, index) => ({
         name: `${translate(display, item.label)} ${index + 1}`,
         role: translate(display, "coffee.roster_joining"),
         bio: translate(display, "coffee.roster_waiting_for_introduction")
@@ -11804,11 +11831,11 @@ function rosterFor(session, markdown) {
   return [...people, ...placeholders];
 }
 function liveRosterFor(session, draftMarkdown = "") {
-  var _a, _b;
+  var _a2, _b2;
   const history2 = [
     session.transcriptMarkdown,
-    ...((_a = session.rounds) != null ? _a : []).flatMap((round) => [round.markdown, round.draftMarkdown]),
-    ...((_b = session.questions) != null ? _b : []).flatMap((question) => [question.answer, question.draftAnswer])
+    ...((_a2 = session.rounds) != null ? _a2 : []).flatMap((round) => [round.markdown, round.draftMarkdown]),
+    ...((_b2 = session.questions) != null ? _b2 : []).flatMap((question) => [question.answer, question.draftAnswer])
   ];
   return rosterFor(session, [...history2, draftMarkdown].filter(Boolean).join("\n"));
 }
@@ -11882,12 +11909,12 @@ var CoffeeTablesView = class extends import_obsidian8.ItemView {
     return "coffee";
   }
   outlineSnapshot() {
-    var _a;
-    const session = (_a = this.engine) == null ? void 0 : _a.session;
+    var _a2;
+    const session = (_a2 = this.engine) == null ? void 0 : _a2.session;
     return session ? { sessionId: session.id, topic: session.topic, segments: coffeeSegments(session) } : this.legacyNavigation;
   }
   locateSegment(id) {
-    var _a;
+    var _a2;
     const nodes = Array.from(this.contentEl.querySelectorAll("[data-coffee-segment]"));
     const node = nodes.find((item) => item.dataset.coffeeSegment === id);
     const scroller = this.contentEl.querySelector(".ct-chat-scroll");
@@ -11902,7 +11929,7 @@ var CoffeeTablesView = class extends import_obsidian8.ItemView {
       ),
       behavior: "smooth"
     });
-    const message = (_a = node.querySelector(".ct-message")) != null ? _a : node;
+    const message = (_a2 = node.querySelector(".ct-message")) != null ? _a2 : node;
     message.addClass("ct-outline-highlight");
     window.setTimeout(() => message.removeClass("ct-outline-highlight"), 1800);
     return true;
@@ -11919,16 +11946,16 @@ var CoffeeTablesView = class extends import_obsidian8.ItemView {
     await this.plugin.confirmAiUsage(engine.session.model, () => engine.fillSegmentSummaries());
   }
   locateOutlineItem(text11) {
-    var _a;
-    const session = (_a = this.engine) == null ? void 0 : _a.session;
+    var _a2;
+    const session = (_a2 = this.engine) == null ? void 0 : _a2.session;
     if (!session) return false;
     const targetRows = [];
     this.contentEl.querySelectorAll("[data-coffee-speech]").forEach(
       (element, order) => {
-        var _a2, _b;
+        var _a3, _b2;
         return targetRows.push({
-          id: (_a2 = element.getAttribute("data-coffee-speech")) != null ? _a2 : "",
-          text: (_b = element.getAttribute("data-coffee-speech-text")) != null ? _b : "",
+          id: (_a3 = element.getAttribute("data-coffee-speech")) != null ? _a3 : "",
+          text: (_b2 = element.getAttribute("data-coffee-speech-text")) != null ? _b2 : "",
           order
         });
       }
@@ -11949,7 +11976,7 @@ var CoffeeTablesView = class extends import_obsidian8.ItemView {
     return translate(uiLocale(this.plugin.settings.language), key2, ...values);
   }
   async refreshForLanguageChange() {
-    var _a, _b, _c, _d, _e, _f;
+    var _a2, _b2, _c, _d, _e, _f;
     if (this.closed) return;
     if (this.engine) {
       this.render();
@@ -11957,7 +11984,7 @@ var CoffeeTablesView = class extends import_obsidian8.ItemView {
     }
     const active = this.contentEl.ownerDocument.activeElement;
     const field = active == null ? void 0 : active.dataset.ctHomeField, start = active instanceof HTMLInputElement || active instanceof HTMLTextAreaElement ? active.selectionStart : null, end = active instanceof HTMLInputElement || active instanceof HTMLTextAreaElement ? active.selectionEnd : null;
-    this.homeForm.advancedOpen = ((_a = this.contentEl.querySelector(".ct-advanced-settings")) == null ? void 0 : _a.open) ? "true" : (_b = this.homeForm.advancedOpen) != null ? _b : "false";
+    this.homeForm.advancedOpen = ((_a2 = this.contentEl.querySelector(".ct-advanced-settings")) == null ? void 0 : _a2.open) ? "true" : (_b2 = this.homeForm.advancedOpen) != null ? _b2 : "false";
     this.homeForm.topicIdeasOpen = ((_c = this.contentEl.querySelector(".ct-topic-ideas")) == null ? void 0 : _c.open) ? "true" : (_d = this.homeForm.topicIdeasOpen) != null ? _d : "false";
     this.homeMainScrollTop = (_f = (_e = this.contentEl.querySelector(".ct-home-main")) == null ? void 0 : _e.scrollTop) != null ? _f : this.homeMainScrollTop;
     await this.home();
@@ -11975,31 +12002,31 @@ var CoffeeTablesView = class extends import_obsidian8.ItemView {
     }
   }
   async onOpen() {
-    var _a;
+    var _a2;
     await this.plugin.ready;
     this.closed = false;
     this.suppressStateRestore = false;
-    this.store = (_a = this.plugin.coffeeStorage) != null ? _a : new CoffeeStorage(this.app.vault, this.plugin.settings.workspaceFolder);
+    this.store = (_a2 = this.plugin.coffeeStorage) != null ? _a2 : new CoffeeStorage(this.app.vault, this.plugin.settings.workspaceFolder);
     this.contentEl.addClass("ct-view");
     await this.home();
   }
   /** The plugin rebuilt its Coffee Tables storage (workspace folder changed): re-read it and return to the table list. */
   rebindStorage() {
-    var _a;
+    var _a2;
     if (this.closed) return;
-    this.store = (_a = this.plugin.coffeeStorage) != null ? _a : new CoffeeStorage(this.app.vault, this.plugin.settings.workspaceFolder);
+    this.store = (_a2 = this.plugin.coffeeStorage) != null ? _a2 : new CoffeeStorage(this.app.vault, this.plugin.settings.workspaceFolder);
     this.recoveredPendingCreates = false;
     this.suppressStateRestore = true;
     this.homeEdit = null;
     void this.home();
   }
   async onClose() {
-    var _a, _b, _c;
+    var _a2, _b2, _c;
     this.closed = true;
     this.generation++;
-    (_a = this.unsubscribe) == null ? void 0 : _a.call(this);
+    (_a2 = this.unsubscribe) == null ? void 0 : _a2.call(this);
     this.unsubscribe = null;
-    (_b = this.modelUnsubscribe) == null ? void 0 : _b.call(this);
+    (_b2 = this.modelUnsubscribe) == null ? void 0 : _b2.call(this);
     this.modelUnsubscribe = void 0;
     (_c = this.handoffUnsubscribe) == null ? void 0 : _c.call(this);
     this.handoffUnsubscribe = void 0;
@@ -12007,15 +12034,15 @@ var CoffeeTablesView = class extends import_obsidian8.ItemView {
     if (this.statusTimer !== null) window.clearInterval(this.statusTimer);
   }
   getState() {
-    var _a, _b;
-    return { sessionId: (_b = (_a = this.engine) == null ? void 0 : _a.session.id) != null ? _b : null };
+    var _a2, _b2;
+    return { sessionId: (_b2 = (_a2 = this.engine) == null ? void 0 : _a2.session.id) != null ? _b2 : null };
   }
   async setState(state, result) {
-    var _a, _b;
+    var _a2, _b2;
     await this.plugin.ready;
     if (!this.store)
-      this.store = (_a = this.plugin.coffeeStorage) != null ? _a : new CoffeeStorage(this.app.vault, this.plugin.settings.workspaceFolder);
-    if (state.sessionId && !this.suppressStateRestore && state.sessionId !== ((_b = this.engine) == null ? void 0 : _b.session.id))
+      this.store = (_a2 = this.plugin.coffeeStorage) != null ? _a2 : new CoffeeStorage(this.app.vault, this.plugin.settings.workspaceFolder);
+    if (state.sessionId && !this.suppressStateRestore && state.sessionId !== ((_b2 = this.engine) == null ? void 0 : _b2.session.id))
       await this.loadSession(state.sessionId);
     await super.setState(state, result);
   }
@@ -12035,12 +12062,12 @@ var CoffeeTablesView = class extends import_obsidian8.ItemView {
     return button;
   }
   async home(edit) {
-    var _a, _b, _c, _d, _e, _f, _g, _h, _i, _j, _k, _l, _m, _n, _o, _p, _q, _r, _s, _t, _u, _v, _w, _x, _y, _z, _A, _B, _C, _D, _E, _F, _G, _H, _I, _J, _K, _L, _M, _N, _O, _P, _Q;
+    var _a2, _b2, _c, _d, _e, _f, _g, _h, _i, _j, _k, _l, _m, _n, _o, _p, _q, _r, _s, _t, _u, _v, _w, _x, _y, _z, _A, _B, _C, _D, _E, _F, _G, _H, _I, _J, _K, _L, _M, _N, _O, _P, _Q;
     const requestedEdit = !!edit;
     if (!edit && this.homeEdit) edit = this.homeEdit;
     if (requestedEdit && edit) {
       this.homeEdit = edit;
-      const priorGuests = ((_b = (_a = edit.guests) == null ? void 0 : _a.guests) == null ? void 0 : _b.length) ? edit.guests.guests : ((_c = edit.guests) == null ? void 0 : _c.background) ? [{ id: crypto.randomUUID(), category: "experts", description: edit.guests.background }] : [];
+      const priorGuests = ((_b2 = (_a2 = edit.guests) == null ? void 0 : _a2.guests) == null ? void 0 : _b2.length) ? edit.guests.guests : ((_c = edit.guests) == null ? void 0 : _c.background) ? [{ id: crypto.randomUUID(), category: "experts", description: edit.guests.background }] : [];
       this.homeForm = {
         ...this.homeForm,
         topic: edit.topic,
@@ -12060,8 +12087,8 @@ ${edit.guests.customPrompt}` : builtinCoffeeStyle(this.plugin.settings.language)
         invites: JSON.stringify(priorGuests),
         ...Object.fromEntries(
           CATEGORIES4.map((item) => {
-            var _a2, _b2;
-            return [`count-${item.id}`, String((_b2 = (_a2 = edit.guests) == null ? void 0 : _a2.counts[item.id]) != null ? _b2 : defaults()[item.id])];
+            var _a3, _b3;
+            return [`count-${item.id}`, String((_b3 = (_a3 = edit.guests) == null ? void 0 : _a3.counts[item.id]) != null ? _b3 : defaults()[item.id])];
           })
         )
       };
@@ -12144,10 +12171,10 @@ ${edit.guests.customPrompt}` : builtinCoffeeStyle(this.plugin.settings.language)
       });
     }
     this.button(setup, this.t("coffee.surprise_me_with_a_topic"), () => {
-      var _a2, _b2;
+      var _a3, _b3;
       const previous = topic.value;
       topic.value = pickCoffeeTopic(this.plugin.settings.language, previous);
-      this.homeForm.topicIdeaId = (_b2 = (_a2 = COFFEE_TOPICS.find((item) => item[coffeeInstruction(this.plugin.settings.language)] === topic.value)) == null ? void 0 : _a2.id) != null ? _b2 : "";
+      this.homeForm.topicIdeaId = (_b3 = (_a3 = COFFEE_TOPICS.find((item) => item[coffeeInstruction(this.plugin.settings.language)] === topic.value)) == null ? void 0 : _a3.id) != null ? _b3 : "";
       this.homeForm.topicEdited = "false";
       this.homeForm.previousTopic = previous;
       snapshotForm();
@@ -12168,9 +12195,9 @@ ${edit.guests.customPrompt}` : builtinCoffeeStyle(this.plugin.settings.language)
       high: "coffee.reasoning_high"
     };
     const setReasoning = () => {
-      var _a2, _b2, _c2;
+      var _a3, _b3, _c2;
       const selected = reasoning.value || this.homeForm.reasoning || (edit == null ? void 0 : edit.reasoning) || this.plugin.settings.cliReasoning;
-      const status = (_c2 = (_b2 = (_a2 = this.plugin).modelDiscoveryState) == null ? void 0 : _b2.call(_a2, providerForModel(model.value)).status) != null ? _c2 : "ready";
+      const status = (_c2 = (_b3 = (_a3 = this.plugin).modelDiscoveryState) == null ? void 0 : _b3.call(_a3, providerForModel(model.value)).status) != null ? _c2 : "ready";
       const state = reasoningChoiceState(selected, this.plugin.coffeeReasoningEfforts(model.value), status);
       reasoning.empty();
       state.values.forEach(
@@ -12261,16 +12288,16 @@ ${edit.guests.customPrompt}` : builtinCoffeeStyle(this.plugin.settings.language)
     invites.createEl("h4", { text: this.t("coffee.guests_you_have_in_mind") });
     const inviteRows = [];
     const savedInvites = (() => {
-      var _a2;
+      var _a3;
       try {
-        return JSON.parse((_a2 = this.homeForm.invites) != null ? _a2 : "[]");
+        return JSON.parse((_a3 = this.homeForm.invites) != null ? _a3 : "[]");
       } catch (e) {
         return [];
       }
     })();
     const addInvite = (guest) => {
-      var _a2;
-      const row = invites.createDiv("ct-invite-row"), id = (_a2 = guest == null ? void 0 : guest.id) != null ? _a2 : crypto.randomUUID();
+      var _a3;
+      const row = invites.createDiv("ct-invite-row"), id = (_a3 = guest == null ? void 0 : guest.id) != null ? _a3 : crypto.randomUUID();
       const select = row.createEl("select", {
         attr: { "aria-label": this.t("coffee.guest_category"), "data-ct-home-field": `invite-category-${id}` }
       });
@@ -12354,12 +12381,12 @@ ${old.customPrompt}` : (_M = selectedStyle == null ? void 0 : selectedStyle.prom
       text: this.t("coffee.choose_how_people_speak_and_interact_you_can_freely")
     });
     const initialCustomization = (() => {
-      var _a2, _b2;
+      var _a3, _b3;
       try {
         if (this.homeForm.customization) return JSON.parse(this.homeForm.customization);
       } catch (e) {
       }
-      return (_b2 = (_a2 = old == null ? void 0 : old.customization) != null ? _a2 : selectedStyle == null ? void 0 : selectedStyle.customization) != null ? _b2 : defaultCustomization(this.plugin.settings.language);
+      return (_b3 = (_a3 = old == null ? void 0 : old.customization) != null ? _a3 : selectedStyle == null ? void 0 : selectedStyle.customization) != null ? _b3 : defaultCustomization(this.plugin.settings.language);
     })();
     const customization = customizationFields(
       styleSection,
@@ -12398,13 +12425,13 @@ ${old.customPrompt}` : (_M = selectedStyle == null ? void 0 : selectedStyle.prom
       }
     });
     const refreshStyleChoices = (selected) => {
-      var _a2;
+      var _a3;
       styleSelect.empty();
       styleSelect.createEl("option", {
         value: builtinId,
         text: `${BUILTIN_COFFEE_STYLE_NAME} \xB7 ${this.t("coffee.built_in")}`
       });
-      for (const item of (_a2 = this.plugin.settings.coffeeStyles) != null ? _a2 : [])
+      for (const item of (_a3 = this.plugin.settings.coffeeStyles) != null ? _a3 : [])
         styleSelect.createEl("option", { value: item.id, text: item.name });
       styleSelect.value = selected;
     };
@@ -12428,13 +12455,13 @@ ${old.customPrompt}` : (_M = selectedStyle == null ? void 0 : selectedStyle.prom
       };
     };
     const referenceFiles = (() => {
-      var _a2, _b2, _c2;
+      var _a3, _b3, _c2;
       try {
-        const stored = JSON.parse((_a2 = this.homeForm.refs) != null ? _a2 : "");
+        const stored = JSON.parse((_a3 = this.homeForm.refs) != null ? _a3 : "");
         if (Array.isArray(stored)) return stored.filter(isCoffeeReference2);
       } catch (e) {
       }
-      return (_c2 = (_b2 = old == null ? void 0 : old.referenceFiles) == null ? void 0 : _b2.map((item) => ({ ...item }))) != null ? _c2 : [];
+      return (_c2 = (_b3 = old == null ? void 0 : old.referenceFiles) == null ? void 0 : _b3.map((item) => ({ ...item }))) != null ? _c2 : [];
     })();
     const refsSection = advanced.createDiv("ct-reference-files");
     refsSection.createEl("h4", { text: this.t("coffee.background_reference_files") });
@@ -12468,8 +12495,8 @@ ${old.customPrompt}` : (_M = selectedStyle == null ? void 0 : selectedStyle.prom
     renderReferences();
     fileInput.addEventListener("change", () => {
       void (async () => {
-        var _a2;
-        const selected = Array.from((_a2 = fileInput.files) != null ? _a2 : []);
+        var _a3;
+        const selected = Array.from((_a3 = fileInput.files) != null ? _a3 : []);
         for (const file of selected) {
           if (!/\.(txt|md)$/i.test(file.name)) throw new Error(this.t("coffee.unsupported_reference_file", file.name));
           const content = await file.text();
@@ -12485,9 +12512,9 @@ ${old.customPrompt}` : (_M = selectedStyle == null ? void 0 : selectedStyle.prom
       });
     });
     styleSelect.addEventListener("change", () => {
-      var _a2, _b2, _c2;
-      const item = (_a2 = this.plugin.settings.coffeeStyles) == null ? void 0 : _a2.find((style) => style.id === styleSelect.value);
-      stylePrompt.value = cleanChatStyle((_b2 = item == null ? void 0 : item.prompt) != null ? _b2 : builtinCoffeeStyle(this.plugin.settings.language));
+      var _a3, _b3, _c2;
+      const item = (_a3 = this.plugin.settings.coffeeStyles) == null ? void 0 : _a3.find((style) => style.id === styleSelect.value);
+      stylePrompt.value = cleanChatStyle((_b3 = item == null ? void 0 : item.prompt) != null ? _b3 : builtinCoffeeStyle(this.plugin.settings.language));
       styleNameInput.value = (_c2 = item == null ? void 0 : item.name) != null ? _c2 : BUILTIN_COFFEE_STYLE_NAME;
       customization.set(item == null ? void 0 : item.customization);
       snapshotForm();
@@ -12501,24 +12528,24 @@ ${old.customPrompt}` : (_M = selectedStyle == null ? void 0 : selectedStyle.prom
       if (!name || !stylePrompt.value.trim()) throw new Error(this.t("coffee.enter_a_style_name_and_prompt_first"));
       const item = { id: crypto.randomUUID(), name, prompt: stylePrompt.value, customization: customization.read() };
       await this.changeCoffeeStyles(() => {
-        var _a2;
-        this.plugin.settings.coffeeStyles = [...(_a2 = this.plugin.settings.coffeeStyles) != null ? _a2 : [], item];
+        var _a3;
+        this.plugin.settings.coffeeStyles = [...(_a3 = this.plugin.settings.coffeeStyles) != null ? _a3 : [], item];
       });
       refreshStyleChoices(item.id);
       snapshotForm();
       new import_obsidian8.Notice(this.t("coffee.style_saved"));
     });
     this.button(styleActions, this.t("coffee.update_selected_style"), async () => {
-      var _a2;
-      const item = (_a2 = this.plugin.settings.coffeeStyles) == null ? void 0 : _a2.find((style) => style.id === styleSelect.value);
+      var _a3;
+      const item = (_a3 = this.plugin.settings.coffeeStyles) == null ? void 0 : _a3.find((style) => style.id === styleSelect.value);
       if (!item) throw new Error(this.t("coffee.the_built_in_style_cannot_be_overwritten_save_it_as_a"));
       if (!styleNameInput.value.trim() || !stylePrompt.value.trim())
         throw new Error(this.t("coffee.enter_a_style_name_and_prompt_first"));
       const issues = validateCustomization(customization.read(), this.plugin.settings.language);
       if (issues.length) throw new Error(issues.join("\n"));
       await this.changeCoffeeStyles(() => {
-        var _a3;
-        this.plugin.settings.coffeeStyles = ((_a3 = this.plugin.settings.coffeeStyles) != null ? _a3 : []).map(
+        var _a4;
+        this.plugin.settings.coffeeStyles = ((_a4 = this.plugin.settings.coffeeStyles) != null ? _a4 : []).map(
           (style) => style.id === item.id ? {
             ...style,
             name: styleNameInput.value.trim(),
@@ -12532,14 +12559,14 @@ ${old.customPrompt}` : (_M = selectedStyle == null ? void 0 : selectedStyle.prom
       new import_obsidian8.Notice(this.t("coffee.style_updated"));
     });
     this.button(styleActions, this.t("coffee.rename"), async () => {
-      var _a2;
-      const item = (_a2 = this.plugin.settings.coffeeStyles) == null ? void 0 : _a2.find((style) => style.id === styleSelect.value);
+      var _a3;
+      const item = (_a3 = this.plugin.settings.coffeeStyles) == null ? void 0 : _a3.find((style) => style.id === styleSelect.value);
       if (!item) throw new Error(this.t("coffee.choose_a_saved_style_first"));
       const name = await new CoffeeStyleNameModal(this.app, item.name, this.plugin.settings.language).ask();
       if (!name) return;
       await this.changeCoffeeStyles(() => {
-        var _a3;
-        this.plugin.settings.coffeeStyles = ((_a3 = this.plugin.settings.coffeeStyles) != null ? _a3 : []).map(
+        var _a4;
+        this.plugin.settings.coffeeStyles = ((_a4 = this.plugin.settings.coffeeStyles) != null ? _a4 : []).map(
           (style) => style.id === item.id ? { ...style, name } : style
         );
       });
@@ -12548,8 +12575,8 @@ ${old.customPrompt}` : (_M = selectedStyle == null ? void 0 : selectedStyle.prom
       snapshotForm();
     });
     this.button(styleActions, this.t("coffee.delete_style"), async () => {
-      var _a2;
-      const items = (_a2 = this.plugin.settings.coffeeStyles) != null ? _a2 : [], index = items.findIndex((style) => style.id === styleSelect.value);
+      var _a3;
+      const items = (_a3 = this.plugin.settings.coffeeStyles) != null ? _a3 : [], index = items.findIndex((style) => style.id === styleSelect.value);
       if (index < 0) throw new Error(this.t("coffee.choose_a_saved_style_first"));
       await this.changeCoffeeStyles(() => {
         this.plugin.settings.coffeeStyles = items.filter((_, at) => at !== index);
@@ -12646,7 +12673,7 @@ ${old.customPrompt}` : (_M = selectedStyle == null ? void 0 : selectedStyle.prom
         start.disabled = true;
         try {
           await this.plugin.confirmAiUsage(model.value, async () => {
-            var _a2;
+            var _a3;
             if (this.closed || generation !== this.generation) return;
             const settings = {
               counts: finalCounts,
@@ -12672,7 +12699,7 @@ ${old.customPrompt}` : (_M = selectedStyle == null ? void 0 : selectedStyle.prom
             this.homeForm = {};
             this.homeEdit = null;
             this.attach(session);
-            void ((_a2 = this.engine) == null ? void 0 : _a2.start());
+            void ((_a3 = this.engine) == null ? void 0 : _a3.start());
           });
         } finally {
           if (!this.closed && generation === this.generation) start.disabled = false;
@@ -12826,7 +12853,7 @@ ${old.customPrompt}` : (_M = selectedStyle == null ? void 0 : selectedStyle.prom
       selectionBar,
       this.showArchivedTables ? this.t("coffee.unarchive_selected") : this.t("coffee.archive_selected"),
       async () => {
-        var _a2, _b2;
+        var _a3, _b3;
         if (deletingTables || !selectedTables.size) return;
         deletingTables = true;
         updateSelection();
@@ -12837,7 +12864,7 @@ ${old.customPrompt}` : (_M = selectedStyle == null ? void 0 : selectedStyle.prom
             try {
               const inspected = await this.store.inspectReadOnly(item.path);
               if (inspected.id !== item.id) throw new Error(this.t("coffee.this_table_changed_reload_first"));
-              if (((_b2 = (_a2 = this.plugin.coffeeManager) == null ? void 0 : _a2.get(item.id)) == null ? void 0 : _b2.busy) || inspected.status === "generating")
+              if (((_b3 = (_a3 = this.plugin.coffeeManager) == null ? void 0 : _a3.get(item.id)) == null ? void 0 : _b3.busy) || inspected.status === "generating")
                 throw new Error(this.t("coffee.stop_generation_before_archiving"));
               const manager = this.plugin.coffeeManager;
               const held = await (manager == null ? void 0 : manager.prepareDelete(item.id));
@@ -12919,7 +12946,7 @@ ${old.customPrompt}` : (_M = selectedStyle == null ? void 0 : selectedStyle.prom
       this.app.workspace.requestSaveLayout();
     };
     const showPreview = async (path) => {
-      var _a2, _b2, _c2, _d2, _e2, _f2;
+      var _a3, _b3, _c2, _d2, _e2, _f2;
       const token = ++this.navigationGeneration;
       this.homeGeneration++;
       this.homePane = "main";
@@ -12946,7 +12973,7 @@ ${old.customPrompt}` : (_M = selectedStyle == null ? void 0 : selectedStyle.prom
       try {
         const inspected = await this.store.inspectReadOnly(path);
         let session = inspected.version === 1 ? { ...copyLegacySession(inspected), createdAt: inspected.createdAt, updatedAt: inspected.updatedAt } : inspected;
-        const active = (_a2 = this.plugin.coffeeManager) == null ? void 0 : _a2.get(session.id);
+        const active = (_a3 = this.plugin.coffeeManager) == null ? void 0 : _a3.get(session.id);
         if (active) session = active.session;
         if (this.closed || token !== this.navigationGeneration) return;
         body.empty();
@@ -12960,7 +12987,7 @@ ${old.customPrompt}` : (_M = selectedStyle == null ? void 0 : selectedStyle.prom
             cls: "ct-warning",
             text: this.t("coffee.these_notes_predate_later_conversation_changes")
           });
-        const notes = (_f2 = (_e2 = (_b2 = session.observerNotes) == null ? void 0 : _b2[0]) != null ? _e2 : (_d2 = (_c2 = session.rounds) == null ? void 0 : _c2.find((round) => round.notes)) == null ? void 0 : _d2.notes) != null ? _f2 : "";
+        const notes = (_f2 = (_e2 = (_b3 = session.observerNotes) == null ? void 0 : _b3[0]) != null ? _e2 : (_d2 = (_c2 = session.rounds) == null ? void 0 : _c2.find((round) => round.notes)) == null ? void 0 : _d2.notes) != null ? _f2 : "";
         if (notes)
           void import_obsidian8.MarkdownRenderer.render(
             this.app,
@@ -12984,14 +13011,14 @@ ${old.customPrompt}` : (_M = selectedStyle == null ? void 0 : selectedStyle.prom
       }
     };
     const renderList = async () => {
-      var _a2;
+      var _a3;
       if (deletingTables) return;
       const token = ++this.listGeneration, oldTop = listScroller.scrollTop, entries = [];
       for (const file of this.store.list(this.showArchivedTables).filter((item) => item.extension === "md")) {
         try {
           const inspected = await this.store.inspectReadOnly(file.path);
           let session = inspected.version === 1 ? { ...copyLegacySession(inspected), createdAt: inspected.createdAt, updatedAt: inspected.updatedAt } : inspected;
-          const active = (_a2 = this.plugin.coffeeManager) == null ? void 0 : _a2.get(session.id);
+          const active = (_a3 = this.plugin.coffeeManager) == null ? void 0 : _a3.get(session.id);
           if (active) session = active.session;
           entries.push({
             id: inspected.id,
@@ -13120,23 +13147,23 @@ ${timestamp.toLocaleString()}${item.model ? ` \xB7 ${item.model}` : ""}`
     if (style.length > 3e4) throw new Error(this.t("coffee.chat_instructions_must_be_30_000_characters_or_fewer"));
     const id = "customization-default";
     await this.changeCoffeeStyles(() => {
-      var _a;
+      var _a2;
       this.plugin.settings.coffeeStyles = [
-        ...((_a = this.plugin.settings.coffeeStyles) != null ? _a : []).filter((item) => item.id !== id),
+        ...((_a2 = this.plugin.settings.coffeeStyles) != null ? _a2 : []).filter((item) => item.id !== id),
         { id, name: this.t("coffee.my_conversation_defaults"), prompt: style, customization }
       ];
       this.plugin.settings.defaultCoffeeStyleId = id;
     });
   }
   async openSample(language2) {
-    var _a;
-    const sample = (_a = [COFFEE_SAMPLE_ZH, COFFEE_SAMPLE_EN].find((item) => item.language === language2)) != null ? _a : COFFEE_SAMPLE_EN, now = (/* @__PURE__ */ new Date()).toISOString();
+    var _a2;
+    const sample = (_a2 = [COFFEE_SAMPLE_ZH, COFFEE_SAMPLE_EN].find((item) => item.language === language2)) != null ? _a2 : COFFEE_SAMPLE_EN, now = (/* @__PURE__ */ new Date()).toISOString();
     const roles = new Map(parseGuests(sample.markdown).map((person) => [person.name, person.role]));
     const markdown = sample.markdown.replace(
       /^###\s+([^\n|｜]+)$/gm,
       (heading, name) => {
-        var _a2;
-        return `### ${name}\uFF5C${(_a2 = roles.get(name.trim())) != null ? _a2 : "Guest"}`;
+        var _a3;
+        return `### ${name}\uFF5C${(_a3 = roles.get(name.trim())) != null ? _a3 : "Guest"}`;
       }
     );
     const session = createSession(sample.topic, "Built-in sample", "\u2014", language2);
@@ -13161,10 +13188,10 @@ ${timestamp.toLocaleString()}${item.model ? ` \xB7 ${item.model}` : ""}`
     this.attach(session);
   }
   async loadSession(path, startAtTop = false) {
-    var _a, _b;
+    var _a2, _b2;
     const generation = ++this.navigationGeneration;
     this.generation++;
-    (_a = this.unsubscribe) == null ? void 0 : _a.call(this);
+    (_a2 = this.unsubscribe) == null ? void 0 : _a2.call(this);
     let stored;
     try {
       stored = await this.store.load(path);
@@ -13174,7 +13201,7 @@ ${timestamp.toLocaleString()}${item.model ? ` \xB7 ${item.model}` : ""}`
         const latest = await this.store.inspect(path).catch(() => null);
         if (this.closed || generation !== this.navigationGeneration) return;
         if (latest && latest.version === 3) {
-          const cached = (_b = this.plugin.coffeeManager) == null ? void 0 : _b.get(latest.id);
+          const cached = (_b2 = this.plugin.coffeeManager) == null ? void 0 : _b2.get(latest.id);
           if (cached) {
             if (cached.busy) await cached.stop();
             if (this.closed || generation !== this.navigationGeneration) return;
@@ -13194,9 +13221,9 @@ ${timestamp.toLocaleString()}${item.model ? ` \xB7 ${item.model}` : ""}`
     this.attach(stored, startAtTop);
   }
   attachLegacy(legacy) {
-    var _a, _b, _c, _d, _e;
+    var _a2, _b2, _c, _d, _e;
     this.navigationGeneration++;
-    (_a = this.unsubscribe) == null ? void 0 : _a.call(this);
+    (_a2 = this.unsubscribe) == null ? void 0 : _a2.call(this);
     this.unsubscribe = null;
     this.engine = null;
     const transcript = copyLegacySession(legacy).transcriptMarkdown;
@@ -13206,7 +13233,7 @@ ${timestamp.toLocaleString()}${item.model ? ` \xB7 ${item.model}` : ""}`
       readOnly: true,
       segments: [{ id: "legacy", kind: "legacy", status: "completed", text: transcript, createdAt: legacy.createdAt }]
     };
-    if ((_c = (_b = this.plugin).isCoffeeOutlineSource) == null ? void 0 : _c.call(_b, this)) (_e = (_d = this.plugin).refreshCoffeeOutline) == null ? void 0 : _e.call(_d, this);
+    if ((_c = (_b2 = this.plugin).isCoffeeOutlineSource) == null ? void 0 : _c.call(_b2, this)) (_e = (_d = this.plugin).refreshCoffeeOutline) == null ? void 0 : _e.call(_d, this);
     this.contentEl.empty();
     const room = this.contentEl.createDiv("ct-room"), fixed = room.createDiv("ct-fixed"), header = fixed.createDiv("ct-header");
     header.createEl("h2", { text: legacy.topic });
@@ -13227,10 +13254,10 @@ ${timestamp.toLocaleString()}${item.model ? ` \xB7 ${item.model}` : ""}`
     );
   }
   attach(session, startAtTop = true) {
-    var _a, _b, _c, _d, _e, _f, _g, _h;
+    var _a2, _b2, _c, _d, _e, _f, _g, _h;
     this.legacyNavigation = null;
     this.navigationGeneration++;
-    (_a = this.unsubscribe) == null ? void 0 : _a.call(this);
+    (_a2 = this.unsubscribe) == null ? void 0 : _a2.call(this);
     if (this.statusTimer !== null && typeof window.clearInterval === "function") {
       window.clearInterval(this.statusTimer);
       this.statusTimer = null;
@@ -13239,7 +13266,7 @@ ${timestamp.toLocaleString()}${item.model ? ` \xB7 ${item.model}` : ""}`
     this.firstRoomScroll = startAtTop && session.status === "completed" ? "top" : "bottom";
     this.composerValues.clear();
     this.followUpGuests = [];
-    this.engine = (_c = (_b = this.plugin.coffeeManager) == null ? void 0 : _b.open(session)) != null ? _c : new CoffeeEngine(
+    this.engine = (_c = (_b2 = this.plugin.coffeeManager) == null ? void 0 : _b2.open(session)) != null ? _c : new CoffeeEngine(
       session,
       (request) => this.plugin.runCoffeeRequest(request),
       (value, summariesOnly) => this.store.save(value, summariesOnly)
@@ -13255,13 +13282,13 @@ ${timestamp.toLocaleString()}${item.model ? ` \xB7 ${item.model}` : ""}`
   }
   /** The background "organize with AI" run of the handoff dialog: progress and Stop, then Review and dismiss. */
   renderHandoffStatus(parent, sessionId) {
-    var _a;
+    var _a2;
     const task = coffeeHandoffTask(this.plugin, sessionId);
     if (!task) return;
     const running = task.state === "running";
     renderBackgroundStatus(parent, {
       title: this.t("coffee.organize_with_ai"),
-      value: running ? this.t("coffee.organizing_a_research_question") : task.state === "done" ? this.t("coffee.handoff_bar_ready") : (_a = task.message) != null ? _a : "",
+      value: running ? this.t("coffee.organizing_a_research_question") : task.state === "done" ? this.t("coffee.handoff_bar_ready") : (_a2 = task.message) != null ? _a2 : "",
       running,
       ...running ? { onStop: () => stopCoffeeHandoff(this.plugin, task) } : {
         review: {
@@ -13275,13 +13302,13 @@ ${timestamp.toLocaleString()}${item.model ? ` \xB7 ${item.model}` : ""}`
     });
   }
   render() {
-    var _a, _b, _c, _d, _e, _f, _g, _h, _i, _j, _k, _l, _m;
+    var _a2, _b2, _c, _d, _e, _f, _g, _h, _i, _j, _k, _l, _m;
     const engine = this.engine;
     if (!engine || this.closed) return;
     const renderEpoch = ++this.roomRenderEpoch;
     this.liveRenderEpoch++;
     this.speechAnchorIndex = 0;
-    const priorScroll = this.contentEl.querySelector(".ct-chat-scroll"), hadPriorScroll = !!priorScroll, oldTop = (_a = priorScroll == null ? void 0 : priorScroll.scrollTop) != null ? _a : 0, wasBottom = !!priorScroll && priorScroll.scrollHeight - priorScroll.scrollTop - priorScroll.clientHeight < 100, firstScroll = hadPriorScroll ? null : this.firstRoomScroll, scrollEpoch = this.scrollEpoch, active = this.contentEl.ownerDocument.activeElement, activeField = active == null ? void 0 : active.dataset.ctField, activeValue = active == null ? void 0 : active.value, activeStart = active instanceof HTMLInputElement || active instanceof HTMLTextAreaElement ? active.selectionStart : void 0, activeEnd = active instanceof HTMLInputElement || active instanceof HTMLTextAreaElement ? active.selectionEnd : void 0;
+    const priorScroll = this.contentEl.querySelector(".ct-chat-scroll"), hadPriorScroll = !!priorScroll, oldTop = (_a2 = priorScroll == null ? void 0 : priorScroll.scrollTop) != null ? _a2 : 0, wasBottom = !!priorScroll && priorScroll.scrollHeight - priorScroll.scrollTop - priorScroll.clientHeight < 100, firstScroll = hadPriorScroll ? null : this.firstRoomScroll, scrollEpoch = this.scrollEpoch, active = this.contentEl.ownerDocument.activeElement, activeField = active == null ? void 0 : active.dataset.ctField, activeValue = active == null ? void 0 : active.value, activeStart = active instanceof HTMLInputElement || active instanceof HTMLTextAreaElement ? active.selectionStart : void 0, activeEnd = active instanceof HTMLInputElement || active instanceof HTMLTextAreaElement ? active.selectionEnd : void 0;
     this.firstRoomScroll = null;
     this.markdownJobs = [];
     this.contentEl.querySelectorAll("[data-ct-field]").forEach((field) => this.composerValues.set(field.dataset.ctField, field.value));
@@ -13345,13 +13372,13 @@ ${timestamp.toLocaleString()}${item.model ? ` \xB7 ${item.model}` : ""}`
       messages.addClass("ct-live-holding");
     }
     const events = [];
-    ((_b = engine.session.rounds) != null ? _b : []).forEach((round, index) => {
+    ((_b2 = engine.session.rounds) != null ? _b2 : []).forEach((round, index) => {
       if (round.status !== "generating") events.push({ at: round.createdAt, type: "round", index });
     });
     engine.session.questions.forEach(
       (question, index) => {
-        var _a2;
-        return events.push({ at: (_a2 = question.createdAt) != null ? _a2 : engine.session.createdAt, type: "question", index });
+        var _a3;
+        return events.push({ at: (_a3 = question.createdAt) != null ? _a3 : engine.session.createdAt, type: "question", index });
       }
     );
     ((_c = engine.session.interventions) != null ? _c : []).forEach((item, index) => {
@@ -13433,12 +13460,12 @@ ${timestamp.toLocaleString()}${item.model ? ` \xB7 ${item.model}` : ""}`
         composer,
         this.t("coffee.ask"),
         async () => {
-          var _a2, _b2, _c2;
+          var _a3, _b3, _c2;
           const value = question.value.trim();
           if (!value) return;
           const validation = validateGuestInvitations(
             this.followUpGuests,
-            (_b2 = (_a2 = engine.session.guests) == null ? void 0 : _a2.counts) != null ? _b2 : defaults(),
+            (_b3 = (_a3 = engine.session.guests) == null ? void 0 : _a3.counts) != null ? _b3 : defaults(),
             engine.session.questions,
             void 0,
             liveRosterFor(engine.session).map((person) => person.name),
@@ -13511,8 +13538,8 @@ ${timestamp.toLocaleString()}${item.model ? ` \xB7 ${item.model}` : ""}`
       });
       if (engine.session.draftMarkdown)
         this.button(composer, this.t("coffee.copy_draft"), async () => {
-          var _a2;
-          await navigator.clipboard.writeText((_a2 = engine.session.draftMarkdown) != null ? _a2 : "");
+          var _a3;
+          await navigator.clipboard.writeText((_a3 = engine.session.draftMarkdown) != null ? _a3 : "");
           new import_obsidian8.Notice(this.t("coffee.draft_copied"));
         });
       const savedDraft = !engine.persistenceFailed && !!engine.session.draftMarkdown;
@@ -13581,10 +13608,10 @@ ${timestamp.toLocaleString()}${item.model ? ` \xB7 ${item.model}` : ""}`
     }
     if (/changed outside|外部修改|outside this room/i.test(engine.error))
       this.button(composer, this.t("coffee.reload_edits"), async () => {
-        var _a2;
+        var _a3;
         if (engine.busy) await engine.stop();
         const session = await this.store.reload(this.store.sessionPath(engine.session.id));
-        (_a2 = this.plugin.coffeeManager) == null ? void 0 : _a2.forget(engine.session.id);
+        (_a3 = this.plugin.coffeeManager) == null ? void 0 : _a3.forget(engine.session.id);
         this.attach(session);
       });
     const insight = body.createDiv("ct-insight-panel");
@@ -13705,8 +13732,8 @@ ${timestamp.toLocaleString()}${item.model ? ` \xB7 ${item.model}` : ""}`
     void Promise.all(markdownJobs != null ? markdownJobs : []).then(
       () => new Promise(
         (resolve) => window.requestAnimationFrame(() => {
-          var _a2;
-          if (this.closed || ((_a2 = this.engine) == null ? void 0 : _a2.session.id) !== sessionId || renderEpoch !== this.roomRenderEpoch || !scrolling.isConnected) {
+          var _a3;
+          if (this.closed || ((_a3 = this.engine) == null ? void 0 : _a3.session.id) !== sessionId || renderEpoch !== this.roomRenderEpoch || !scrolling.isConnected) {
             resolve();
             return;
           }
@@ -13738,7 +13765,7 @@ ${timestamp.toLocaleString()}${item.model ? ` \xB7 ${item.model}` : ""}`
     );
   }
   renderFollowUpGuests(target, engine) {
-    var _a, _b, _c;
+    var _a2, _b2, _c;
     const details = target.createEl("details", { cls: "ct-follow-up-guests" });
     details.open = this.composerValues.get("follow-up-guests-open") === "true";
     details.addEventListener("toggle", () => this.composerValues.set("follow-up-guests-open", String(details.open)));
@@ -13798,9 +13825,9 @@ ${timestamp.toLocaleString()}${item.model ? ` \xB7 ${item.model}` : ""}`
       },
       engine.busy
     );
-    const totalGuests = Object.values((_b = (_a = engine.session.guests) == null ? void 0 : _a.counts) != null ? _b : defaults()).reduce((sum, value) => sum + value, 0) + ((_c = engine.session.questions) != null ? _c : []).filter((question) => question.status === "complete").reduce((sum, question) => {
-      var _a2, _b2;
-      return sum + ((_b2 = (_a2 = question.invitedGuests) == null ? void 0 : _a2.length) != null ? _b2 : 0);
+    const totalGuests = Object.values((_b2 = (_a2 = engine.session.guests) == null ? void 0 : _a2.counts) != null ? _b2 : defaults()).reduce((sum, value) => sum + value, 0) + ((_c = engine.session.questions) != null ? _c : []).filter((question) => question.status === "complete").reduce((sum, question) => {
+      var _a3, _b3;
+      return sum + ((_b3 = (_a3 = question.invitedGuests) == null ? void 0 : _a3.length) != null ? _b3 : 0);
     }, 0);
     rows.createEl("small", {
       cls: "ct-muted",
@@ -13808,10 +13835,10 @@ ${timestamp.toLocaleString()}${item.model ? ` \xB7 ${item.model}` : ""}`
     });
   }
   renderInsightNotes(markdown, target) {
-    var _a, _b, _c, _d, _e;
+    var _a2, _b2, _c, _d, _e;
     const insights = baselineFromVersions(
       [markdown],
-      (_b = (_a = this.engine) == null ? void 0 : _a.session.language) != null ? _b : noteLanguageOf(this.plugin.settings.language)
+      (_b2 = (_a2 = this.engine) == null ? void 0 : _a2.session.language) != null ? _b2 : noteLanguageOf(this.plugin.settings.language)
     );
     if (!insights.length) {
       this.renderMarkdown(markdown, target.createDiv("ct-insight-latest markdown-rendered"));
@@ -13838,7 +13865,7 @@ ${timestamp.toLocaleString()}${item.model ? ` \xB7 ${item.model}` : ""}`
       renderResults();
     });
     const renderResults = () => {
-      var _a2, _b2, _c2, _d2, _e2;
+      var _a3, _b3, _c2, _d2, _e2;
       results.empty();
       const query = state.query.trim().toLocaleLowerCase();
       const categories = /* @__PURE__ */ new Map();
@@ -13852,7 +13879,7 @@ ${timestamp.toLocaleString()}${item.model ? ` \xB7 ${item.model}` : ""}`
           categoryLabel(item.category, this.plugin.settings.language)
         ].filter(Boolean).join("\n").toLocaleLowerCase();
         if (!query || text11.includes(query))
-          categories.set(item.category, [...(_a2 = categories.get(item.category)) != null ? _a2 : [], item]);
+          categories.set(item.category, [...(_a3 = categories.get(item.category)) != null ? _a3 : [], item]);
       }
       if (!categories.size) results.createEl("p", { cls: "ct-muted", text: this.t("coffee.no_matching_insights") });
       for (const [category, items] of categories) {
@@ -13878,7 +13905,7 @@ ${timestamp.toLocaleString()}${item.model ? ` \xB7 ${item.model}` : ""}`
           });
           details.createEl("summary", { text: item.summary });
           const context = details.createDiv("ct-insight-detail markdown-rendered");
-          const session = (_b2 = this.engine) == null ? void 0 : _b2.session;
+          const session = (_b3 = this.engine) == null ? void 0 : _b3.session;
           if (session && this.engine && !session.id.startsWith("sample-")) {
             const pinned = (_d2 = (_c2 = session.pinnedInsightIds) == null ? void 0 : _c2.includes(item.id)) != null ? _d2 : false;
             const pin = this.button(
@@ -13932,12 +13959,12 @@ ${timestamp.toLocaleString()}${item.model ? ` \xB7 ${item.model}` : ""}`
     renderResults();
   }
   renderRound(markdown, roundId, target) {
-    var _a, _b, _c;
+    var _a2, _b2, _c;
     target = target.createDiv({ cls: "ct-segment", attr: { "data-coffee-segment": `round:${roundId != null ? roundId : "draft"}` } });
     markdown = extractSegmentSummary(markdown).markdown;
-    const speeches = parseSpeeches(markdown), interventions = ((_b = (_a = this.engine) == null ? void 0 : _a.session.interventions) != null ? _b : []).filter((item) => item.roundId && item.roundId === roundId).sort((a, b) => {
-      var _a2, _b2;
-      return ((_a2 = a.afterTurn) != null ? _a2 : 0) - ((_b2 = b.afterTurn) != null ? _b2 : 0);
+    const speeches = parseSpeeches(markdown), interventions = ((_b2 = (_a2 = this.engine) == null ? void 0 : _a2.session.interventions) != null ? _b2 : []).filter((item) => item.roundId && item.roundId === roundId).sort((a, b) => {
+      var _a3, _b3;
+      return ((_a3 = a.afterTurn) != null ? _a3 : 0) - ((_b3 = b.afterTurn) != null ? _b3 : 0);
     });
     if (!speeches.length) {
       if (markdown) this.renderMarkdown(markdown, target.createDiv("ct-live-plain markdown-rendered"));
@@ -13988,12 +14015,12 @@ ${timestamp.toLocaleString()}${item.model ? ` \xB7 ${item.model}` : ""}`
     this.renderMarkdown(text11, content.createDiv("ct-bubble markdown-rendered"));
   }
   renderMarkdown(markdown, target) {
-    var _a, _b, _c;
+    var _a2, _b2, _c;
     const job = import_obsidian8.MarkdownRenderer.render(
       this.app,
       markdown,
       target,
-      this.store.sessionPath((_b = (_a = this.engine) == null ? void 0 : _a.session.id) != null ? _b : ""),
+      this.store.sessionPath((_b2 = (_a2 = this.engine) == null ? void 0 : _a2.session.id) != null ? _b2 : ""),
       this
     ).then(() => void 0);
     (_c = this.markdownJobs) == null ? void 0 : _c.push(job);
@@ -14016,16 +14043,16 @@ ${person.bio}`));
     }
   }
   updateStatus(status, engine) {
-    var _a;
+    var _a2;
     const elapsed = engine.busy ? `${Math.floor((Date.now() - engine.startedAt) / 6e4)} min` : "";
-    const last = parseSpeeches((_a = engine.session.draftMarkdown) != null ? _a : "").at(-1);
+    const last = parseSpeeches((_a2 = engine.session.draftMarkdown) != null ? _a2 : "").at(-1);
     status.setText(
       engine.error || (engine.summarizing ? this.t("coffee.generating_segment_summaries") : engine.busy ? `${last ? `${last.name} \xB7 ` : ""}${this.t("coffee.is_speaking")} \xB7 ${elapsed}` : engine.session.status === "completed" ? this.t("coffee.table_complete") : engine.session.status === "error" ? this.t("coffee.stopped_draft_saved") : this.t("coffee.ready_to_generate"))
     );
   }
   async copySample() {
-    var _a, _b, _c, _d;
-    const source = (_a = this.engine) == null ? void 0 : _a.session;
+    var _a2, _b2, _c, _d;
+    const source = (_a2 = this.engine) == null ? void 0 : _a2.session;
     if (!source || !source.id.startsWith("sample-")) return;
     const copy = createSession(
       source.topic,
@@ -14036,18 +14063,18 @@ ${person.bio}`));
     );
     copy.status = "completed";
     copy.transcriptMarkdown = source.transcriptMarkdown;
-    copy.rounds = (_c = (_b = source.rounds) == null ? void 0 : _b.map((item) => ({ ...item }))) != null ? _c : [];
+    copy.rounds = (_c = (_b2 = source.rounds) == null ? void 0 : _b2.map((item) => ({ ...item }))) != null ? _c : [];
     copy.observerNotes = [...(_d = source.observerNotes) != null ? _d : []];
     copy.questions = source.questions.map((item) => ({ ...item, id: crypto.randomUUID() }));
     await this.store.save(copy);
     this.attach(copy);
   }
   renderSignature(engine) {
-    var _a, _b;
-    return `${engine.session.status}:${engine.busy}:${engine.error}:${engine.session.questions.length}:${engine.busy ? "streaming" : engine.session.updatedAt}:${engine.session.dirtyNotes}:${(_b = (_a = engine.session.observerNotes) == null ? void 0 : _a[0]) != null ? _b : ""}`;
+    var _a2, _b2;
+    return `${engine.session.status}:${engine.busy}:${engine.error}:${engine.session.questions.length}:${engine.busy ? "streaming" : engine.session.updatedAt}:${engine.session.dirtyNotes}:${(_b2 = (_a2 = engine.session.observerNotes) == null ? void 0 : _a2[0]) != null ? _b2 : ""}`;
   }
   refresh() {
-    var _a, _b, _c, _d;
+    var _a2, _b2, _c, _d;
     const engine = this.engine;
     if (!engine || this.closed) return;
     if (engine.deleted) {
@@ -14058,7 +14085,7 @@ ${person.bio}`));
     if (signature !== this.stateSignature) {
       this.stateSignature = signature;
       this.render();
-      if ((_b = (_a = this.plugin).isCoffeeOutlineSource) == null ? void 0 : _b.call(_a, this)) (_d = (_c = this.plugin).refreshCoffeeOutline) == null ? void 0 : _d.call(_c, this);
+      if ((_b2 = (_a2 = this.plugin).isCoffeeOutlineSource) == null ? void 0 : _b2.call(_a2, this)) (_d = (_c = this.plugin).refreshCoffeeOutline) == null ? void 0 : _d.call(_c, this);
       return;
     }
     if (this.renderTimer !== null) return;
@@ -14069,7 +14096,7 @@ ${person.bio}`));
     }, 250);
   }
   refreshLive() {
-    var _a, _b, _c;
+    var _a2, _b2, _c;
     const engine = this.engine;
     if (!engine) return;
     const renderEpoch = ++this.liveRenderEpoch, scrollEpoch = this.scrollEpoch;
@@ -14080,7 +14107,7 @@ ${person.bio}`));
       element.addClass("ct-live-holding");
       held.push(element);
     };
-    const scroller = this.contentEl.querySelector(".ct-chat-scroll"), wasBottom = !scroller || scroller.scrollHeight - scroller.scrollTop - scroller.clientHeight < 100, oldTop = (_a = scroller == null ? void 0 : scroller.scrollTop) != null ? _a : 0;
+    const scroller = this.contentEl.querySelector(".ct-chat-scroll"), wasBottom = !scroller || scroller.scrollHeight - scroller.scrollTop - scroller.clientHeight < 100, oldTop = (_a2 = scroller == null ? void 0 : scroller.scrollTop) != null ? _a2 : 0;
     const waiting = this.contentEl.querySelector(".ct-waiting");
     if (waiting && engine.session.draftMarkdown) waiting.remove();
     const status = this.contentEl.querySelector(".ct-status");
@@ -14089,7 +14116,7 @@ ${person.bio}`));
     if (draft) {
       hold(draft);
       draft.empty();
-      const round = [...(_b = engine.session.rounds) != null ? _b : []].reverse().find((item) => item.status === "generating");
+      const round = [...(_b2 = engine.session.rounds) != null ? _b2 : []].reverse().find((item) => item.status === "generating");
       if (engine.session.status !== "completed" && engine.session.draftMarkdown)
         this.renderRound(engine.session.draftMarkdown, round == null ? void 0 : round.id, draft);
     }
@@ -14114,10 +14141,10 @@ ${person.bio}`));
     this.markdownJobs = null;
     void Promise.all(jobs != null ? jobs : []).then(
       () => window.requestAnimationFrame(() => {
-        var _a2;
+        var _a3;
         if (this.closed || this.engine !== engine || renderEpoch !== this.liveRenderEpoch || (scroller == null ? void 0 : scroller.isConnected) === false)
           return;
-        const currentTop = (_a2 = scroller == null ? void 0 : scroller.scrollTop) != null ? _a2 : oldTop;
+        const currentTop = (_a3 = scroller == null ? void 0 : scroller.scrollTop) != null ? _a3 : oldTop;
         for (const element of held) element.removeClass("ct-live-holding");
         if (scroller)
           scroller.scrollTop = this.scrollEpoch === scrollEpoch ? wasBottom ? scroller.scrollHeight : oldTop : currentTop;
@@ -14126,8 +14153,8 @@ ${person.bio}`));
   }
 };
 function observerNotes(markdown) {
-  var _a, _b;
-  return (_b = (_a = markdown.match(/^# (?:觀察者整理|Observer(?:[’']s)? notes)[\s\S]*$/m)) == null ? void 0 : _a[0]) != null ? _b : "";
+  var _a2, _b2;
+  return (_b2 = (_a2 = markdown.match(/^# (?:觀察者整理|Observer(?:[’']s)? notes)[\s\S]*$/m)) == null ? void 0 : _a2[0]) != null ? _b2 : "";
 }
 function initials(name) {
   return [...name.replace(/[^\p{L}\p{N}]/gu, "")].slice(0, 2).join("") || "\u2022";
@@ -14141,10 +14168,10 @@ function avatarColor(name) {
 // experiences/aim/content-language.ts
 var KANA_OR_HANGUL = /[\p{Script=Hiragana}\p{Script=Katakana}\p{Script=Hangul}]/u;
 function detectAimContentLanguage(text11) {
-  var _a, _b;
+  var _a2, _b2;
   if (KANA_OR_HANGUL.test(text11)) return "unsupported";
-  const han = ((_a = text11.match(/\p{Script=Han}/gu)) != null ? _a : []).length;
-  const latin = ((_b = text11.match(/\p{Script=Latin}+/gu)) != null ? _b : []).length;
+  const han = ((_a2 = text11.match(/\p{Script=Han}/gu)) != null ? _a2 : []).length;
+  const latin = ((_b2 = text11.match(/\p{Script=Latin}+/gu)) != null ? _b2 : []).length;
   if (han > 0 && han >= latin) return "zh-TW";
   if (latin > 0) return "en";
   return void 0;
@@ -14158,8 +14185,8 @@ function chooseAimContentLanguage(uiLanguage, ...sources2) {
   return uiLanguage;
 }
 function resolveAimContentLanguage(map, uiLanguage) {
-  var _a;
-  const stored = (_a = map == null ? void 0 : map.aim) == null ? void 0 : _a.contentLanguage;
+  var _a2;
+  const stored = (_a2 = map == null ? void 0 : map.aim) == null ? void 0 : _a2.contentLanguage;
   if (isNoteLanguage(stored)) return contentLocale(stored, uiLanguage);
   return chooseAimContentLanguage(uiLanguage, map == null ? void 0 : map.title);
 }
@@ -14179,8 +14206,8 @@ function actionStatus(actions) {
   return actions.createSpan({ cls: "vam-next-actions-note vam-next-status", attr: { "aria-live": "polite" } });
 }
 function armDiscard(button, status, discard, blocked = () => false, labels = { confirm: t("ui.discard_confirm"), hint: t("ui.discard_confirm_hint") }) {
-  var _a;
-  const label = (_a = button.textContent) != null ? _a : "";
+  var _a2;
+  const label = (_a2 = button.textContent) != null ? _a2 : "";
   let timer = 0;
   const disarm = () => {
     window.clearTimeout(timer);
@@ -14386,8 +14413,8 @@ var PromptPresetsModal = class extends import_obsidian9.Modal {
     __publicField(this, "disarms", []);
   }
   actionBar() {
-    var _a;
-    (_a = this.bar) == null ? void 0 : _a.remove();
+    var _a2;
+    (_a2 = this.bar) == null ? void 0 : _a2.remove();
     this.bar = modalActions(this);
     return this.bar;
   }
@@ -14405,8 +14432,8 @@ var PromptPresetsModal = class extends import_obsidian9.Modal {
     else this.showList();
   }
   get custom() {
-    var _a;
-    return (_a = this.plugin.settings.promptPresets) != null ? _a : [];
+    var _a2;
+    return (_a2 = this.plugin.settings.promptPresets) != null ? _a2 : [];
   }
   async persist(presets) {
     this.plugin.settings.promptPresets = presets;
@@ -14530,7 +14557,7 @@ var AimClarificationModal = class extends import_obsidian10.Modal {
     this.contentLanguage = contentLanguage;
   }
   onOpen() {
-    var _a;
+    var _a2;
     const text11 = (key2) => translate(this.language, key2);
     this.titleEl.setText(text11("ui.aim_clarify_title"));
     this.contentEl.createEl("p", {
@@ -14572,7 +14599,7 @@ var AimClarificationModal = class extends import_obsidian10.Modal {
         });
       })
     );
-    (_a = fields[0]) == null ? void 0 : _a.input.focus();
+    (_a2 = fields[0]) == null ? void 0 : _a2.input.focus();
   }
 };
 
@@ -14697,8 +14724,8 @@ var thinkingOriginDocumentBlock = (origin) => renderTemplate(thinking_origin_lab
 
 // experiences/visual-map/thinking-origin.ts
 function withThinkingOrigin(context, note) {
-  var _a;
-  if (!((_a = note.thinkingOrigin) == null ? void 0 : _a.trim())) return context;
+  var _a2;
+  if (!((_a2 = note.thinkingOrigin) == null ? void 0 : _a2.trim())) return context;
   return {
     ...context,
     sourceContext: [context.sourceContext, thinkingOriginBlock(note.thinkingOrigin)].filter(Boolean).join("\n\n")
@@ -14731,12 +14758,12 @@ function normalizeDetailHeadings(markdown) {
   const code = fencedLines(lines);
   const parents = [];
   return lines.map((line, index) => {
-    var _a, _b;
+    var _a2, _b2;
     const heading = code[index] ? null : /^(#{1,6})([ \t]+.*|[ \t]*)$/.exec(line);
     if (!heading) return line;
     const original = heading[1].length;
     while (parents.length && parents[parents.length - 1].original >= original) parents.pop();
-    const level = Math.min(6, ((_b = (_a = parents[parents.length - 1]) == null ? void 0 : _a.level) != null ? _b : 2) + 1);
+    const level = Math.min(6, ((_b2 = (_a2 = parents[parents.length - 1]) == null ? void 0 : _a2.level) != null ? _b2 : 2) + 1);
     parents.push({ original, level });
     return `${"#".repeat(level)}${heading[2]}`;
   }).join("\n");
@@ -15255,9 +15282,9 @@ function checkCounts(detail, template) {
   const bodies = sectionBodies(detail, template);
   const issues = [];
   template.sections.forEach((section3, index) => {
-    var _a;
+    var _a2;
     if (!section3.count) return;
-    const actual = countItems((_a = bodies.get(index)) != null ? _a : "");
+    const actual = countItems((_a2 = bodies.get(index)) != null ? _a2 : "");
     const ok = section3.count.mode === "exact" ? actual === section3.count.n : actual >= section3.count.n;
     if (!ok) issues.push({ section: section3.name, mode: section3.count.mode, n: section3.count.n, actual });
   });
@@ -15274,7 +15301,7 @@ function detailStructurePrompt(template, language2, standardText) {
   ].filter(Boolean).join("\n");
 }
 function structureText(template, language2, standardText) {
-  var _a;
+  var _a2;
   const headings = template.sections.map((section3) => `### ${section3.name}`).join(", ");
   const description = (section3) => customDetailRule("description", language2, {
     heading: `### ${section3.name}`,
@@ -15289,7 +15316,7 @@ function structureText(template, language2, standardText) {
     return [
       textbookDetailStructure(language2, {
         headings,
-        log: `### ${((_a = template.sections.find((section3) => section3.role === "log")) != null ? _a : template.sections[template.sections.length - 1]).name}`
+        log: `### ${((_a2 = template.sections.find((section3) => section3.role === "log")) != null ? _a2 : template.sections[template.sections.length - 1]).name}`
       }),
       ...template.sections.filter((section3) => section3.description.trim()).map(description)
     ].join("\n");
@@ -15312,13 +15339,13 @@ ${rules.join("\n")}` : ""
 // ai/result-utils.ts
 var SENTENCE_END = /[。！？；!?;]/;
 function truncateSummary(value, limit = 80) {
-  var _a;
+  var _a2;
   const characters = Array.from(value.trim());
   if (characters.length <= limit) return characters.join("");
   const floor = Math.floor(limit / 2);
   for (let index = limit - 1; index >= floor; index--) {
     const character = characters[index];
-    if (SENTENCE_END.test(character) || character === "." && /\s/.test((_a = characters[index + 1]) != null ? _a : ""))
+    if (SENTENCE_END.test(character) || character === "." && /\s/.test((_a2 = characters[index + 1]) != null ? _a2 : ""))
       return characters.slice(0, index + 1).join("");
   }
   const window2 = characters.slice(0, limit - 1);
@@ -15342,21 +15369,21 @@ function sourceFootnoteDefinition(line) {
   return match[1].startsWith("src-") || /^\[\[[^\]]+\]\]$/.test(target) || external ? { label: match[1], target } : null;
 }
 function textbookDetail(template, leading, sections, footnotes, sourcesIndex) {
-  var _a;
+  var _a2;
   const placeholders = /* @__PURE__ */ new Set([
     ...NOTE_LANGUAGES.map((locale) => translate(locale, "note.no_new_information").replace(/[.。]$/, "")),
     "No new content this time",
     "\u672C\u6B21\u7121\u65B0\u589E\u5167\u5BB9"
   ]);
   if (footnotes.length && sourcesIndex >= 0) {
-    const raw = ((_a = sections.get(sourcesIndex)) != null ? _a : []).join("\n").trim();
+    const raw = ((_a2 = sections.get(sourcesIndex)) != null ? _a2 : []).join("\n").trim();
     const evidence = placeholders.has(raw.replace(/[.。]$/, "")) ? "" : raw;
     sections.set(sourcesIndex, [[evidence, footnotes.join("\n")].filter(Boolean).join("\n\n")]);
   }
   const blocks = [leading.join("\n").trim()];
   template.sections.forEach((section3, index) => {
-    var _a2, _b;
-    const body = (_b = (_a2 = sections.get(index)) == null ? void 0 : _a2.join("\n").trim()) != null ? _b : "";
+    var _a3, _b2;
+    const body = (_b2 = (_a3 = sections.get(index)) == null ? void 0 : _a3.join("\n").trim()) != null ? _b2 : "";
     if (body && !placeholders.has(body.replace(/[.。]$/, ""))) blocks.push(`### ${section3.name}
 
 ${body}`);
@@ -15382,7 +15409,7 @@ function normalizeOutputScriptHeadings(detail, output, template) {
   }).join("\n");
 }
 function canonicalDetail(value, language2 = "zh-TW", template = standardTemplate(language2)) {
-  var _a, _b;
+  var _a2, _b2;
   const detail = value.trim();
   const headings = template.sections.map((section3) => section3.name);
   const aliases = sectionLookup(template);
@@ -15409,17 +15436,17 @@ function canonicalDetail(value, language2 = "zh-TW", template = standardTemplate
   }
   if (template.id === TEXTBOOK_TEMPLATE_ID) return textbookDetail(template, leading, sections, footnotes, sourcesIndex);
   if (sections.size === 0) sections.set(0, [leading.join("\n").trim()]);
-  else if (leading.join("\n").trim()) sections.set(0, [leading.join("\n").trim(), ...(_a = sections.get(0)) != null ? _a : []]);
+  else if (leading.join("\n").trim()) sections.set(0, [leading.join("\n").trim(), ...(_a2 = sections.get(0)) != null ? _a2 : []]);
   if (footnotes.length && sourcesIndex >= 0) {
-    const evidence = ((_b = sections.get(sourcesIndex)) != null ? _b : []).join("\n").trim();
+    const evidence = ((_b2 = sections.get(sourcesIndex)) != null ? _b2 : []).join("\n").trim();
     sections.set(sourcesIndex, [[evidence, footnotes.join("\n")].filter(Boolean).join("\n\n")]);
   }
   const empty = translate(language2, "note.no_new_information");
   const body = headings.map((heading, index) => {
-    var _a2;
+    var _a3;
     return `### ${heading}
 
-${((_a2 = sections.get(index)) == null ? void 0 : _a2.join("\n").trim()) || empty}`;
+${((_a3 = sections.get(index)) == null ? void 0 : _a3.join("\n").trim()) || empty}`;
   }).join("\n\n");
   return footnotes.length && sourcesIndex < 0 ? `${body}
 
@@ -15477,7 +15504,7 @@ function packReferenceChunks(chunks, characterLimit = 18e3) {
   return batches;
 }
 function referenceBatches(groups, documentLimit = 14e3, batchLimit = 18e3) {
-  var _a;
+  var _a2;
   const chunks = [];
   let sourceNumber = 0;
   for (const group of dedupeReferenceGroups(groups))
@@ -15485,7 +15512,7 @@ function referenceBatches(groups, documentLimit = 14e3, batchLimit = 18e3) {
       sourceNumber++;
       const id = `S${sourceNumber}`;
       const citation = document2.external ? "external Markdown; cite the exact path as plain text" : "Vault Markdown; cite as an Obsidian wikilink";
-      const pieces = (_a = document2.content.match(new RegExp(`[\\s\\S]{1,${documentLimit}}`, "g"))) != null ? _a : [""];
+      const pieces = (_a2 = document2.content.match(new RegExp(`[\\s\\S]{1,${documentLimit}}`, "g"))) != null ? _a2 : [""];
       pieces.forEach(
         (piece, index) => chunks.push(
           `[${id}] ${citation}: ${document2.path}${pieces.length > 1 ? ` (part ${index + 1}/${pieces.length})` : ""}
@@ -15506,8 +15533,8 @@ function resolveWikilinks(text11, documents) {
     const name = target.split("|")[0].trim();
     const exact = documents.filter((document2) => document2.path === name);
     const matches = exact.length ? exact : documents.filter((document2) => {
-      var _a;
-      const basename = (_a = document2.path.split("/").pop()) != null ? _a : document2.path;
+      var _a2;
+      const basename = (_a2 = document2.path.split("/").pop()) != null ? _a2 : document2.path;
       return basename === name || basename.replace(/\.md$/i, "") === name;
     });
     if (matches.length > 1) return tNote("note.source_unconfirmed_0", name);
@@ -15531,8 +15558,8 @@ function resolveSummaryReferences(summary, groups) {
 }
 var FOOTNOTE_REFERENCE = /\[\^([^\]\s]+)\](?!\()/g;
 function footnoteTarget(document2) {
-  var _a;
-  const basename = ((_a = document2.path.split("/").pop()) != null ? _a : document2.path).replace(/\.md$/i, "");
+  var _a2;
+  const basename = ((_a2 = document2.path.split("/").pop()) != null ? _a2 : document2.path).replace(/\.md$/i, "");
   return document2.external ? tNote("note.external_source_0", document2.path) : `[[${document2.path}|${basename}]]`;
 }
 function targetKey(target) {
@@ -15615,8 +15642,8 @@ function resolveDetailReferences(detail, groups, previousDetail = "", template) 
   const writerLabels = footnoteDefinitionLabels(previousDetail);
   const byLabel = new Map(documents.map((document2) => [sourceFootnoteLabel(document2.path), document2]));
   const targetOf = (label) => {
-    var _a, _b;
-    const target = (_b = (_a = cited.get(label)) != null ? _a : defined.get(label)) != null ? _b : previous.get(label);
+    var _a2, _b2;
+    const target = (_b2 = (_a2 = cited.get(label)) != null ? _a2 : defined.get(label)) != null ? _b2 : previous.get(label);
     if (target) return target;
     const document2 = byLabel.get(label);
     if (document2) return footnoteTarget(document2);
@@ -15743,8 +15770,8 @@ var ChoiceModal = class extends import_obsidian12.Modal {
     __publicField(this, "chosen", false);
   }
   onClose() {
-    var _a;
-    if (!this.chosen) (_a = this.dismissed) == null ? void 0 : _a.call(this);
+    var _a2;
+    if (!this.chosen) (_a2 = this.dismissed) == null ? void 0 : _a2.call(this);
     this.chosen = true;
   }
   onOpen() {
@@ -15759,8 +15786,8 @@ var ChoiceModal = class extends import_obsidian12.Modal {
       };
       if (choice2.description)
         setting.setName(choice2.label).setDesc(choice2.description).addButton((b) => {
-          var _a;
-          b.setButtonText((_a = choice2.buttonLabel) != null ? _a : t("ui.select")).onClick(run);
+          var _a2;
+          b.setButtonText((_a2 = choice2.buttonLabel) != null ? _a2 : t("ui.select")).onClick(run);
           if (choice2.warning) b.setDestructive();
         });
       else
@@ -15782,18 +15809,18 @@ function researchContentHash(report) {
   return (0, import_node_crypto3.createHash)("sha256").update(JSON.stringify({ summary: report.summary, detail: report.detail })).digest("hex");
 }
 function hoistNestedValidity(item) {
-  var _a;
-  const nested = (_a = item.source) == null ? void 0 : _a.validity;
+  var _a2;
+  const nested = (_a2 = item.source) == null ? void 0 : _a2.validity;
   if (item.validity !== void 0 || !nested || typeof nested !== "object") return item;
   const { validity: _validity, ...source } = item.source;
   return { ...item, source, validity: nested };
 }
 function hasProvenSource(item) {
-  var _a, _b, _c;
+  var _a2, _b2, _c;
   const source = item.source;
   return !(!source || [source.branchId, source.resultId, source.notePath, source.contentHash].some(
     (value) => typeof value !== "string" || !value.trim()
-  ) || !Number.isInteger(source.version) || source.version < 1 || !/^[a-f0-9]{64}$/i.test(source.contentHash) || !((_a = item.rationale) == null ? void 0 : _a.trim()) || !((_c = (_b = item.validity) == null ? void 0 : _b.reason) == null ? void 0 : _c.trim()) || !Array.isArray(item.validity.conditionKeys) || item.validity.conditionKeys.some((key2) => typeof key2 !== "string" || !key2.trim()));
+  ) || !Number.isInteger(source.version) || source.version < 1 || !/^[a-f0-9]{64}$/i.test(source.contentHash) || !((_a2 = item.rationale) == null ? void 0 : _a2.trim()) || !((_c = (_b2 = item.validity) == null ? void 0 : _b2.reason) == null ? void 0 : _c.trim()) || !Array.isArray(item.validity.conditionKeys) || item.validity.conditionKeys.some((key2) => typeof key2 !== "string" || !key2.trim()));
 }
 function researchUnprovenReuse(subtopics) {
   if (!Array.isArray(subtopics)) return subtopics;
@@ -15828,11 +15855,11 @@ function validateAimResearchPlan(subtopics) {
   }
   const visiting = /* @__PURE__ */ new Set(), visited = /* @__PURE__ */ new Set();
   const visit = (id) => {
-    var _a, _b;
+    var _a2, _b2;
     if (visiting.has(id)) throw new Error("Research dependencies cannot contain a cycle.");
     if (visited.has(id)) return;
     visiting.add(id);
-    for (const dependency of (_b = (_a = plan.find((item) => item.id === id)) == null ? void 0 : _a.dependsOn) != null ? _b : []) visit(dependency);
+    for (const dependency of (_b2 = (_a2 = plan.find((item) => item.id === id)) == null ? void 0 : _a2.dependsOn) != null ? _b2 : []) visit(dependency);
     visiting.delete(id);
     visited.add(id);
   };
@@ -15879,14 +15906,14 @@ function clearQuestionConvergenceEdges(map) {
   return changed;
 }
 function parentIdsForNode(node) {
-  var _a;
-  const convergenceParents = node.aimKind === "question" ? [] : (_a = node.aimConvergesFromNodeIds) != null ? _a : [];
+  var _a2;
+  const convergenceParents = node.aimKind === "question" ? [] : (_a2 = node.aimConvergesFromNodeIds) != null ? _a2 : [];
   return [...node.parentId ? [node.parentId] : [], ...convergenceParents.filter((id) => id !== node.parentId)];
 }
 function repairAimResultConvergence(map) {
-  var _a, _b, _c;
+  var _a2, _b2, _c;
   let changed = false;
-  for (const branch of (_b = (_a = map.aim) == null ? void 0 : _a.branches) != null ? _b : []) {
+  for (const branch of (_b2 = (_a2 = map.aim) == null ? void 0 : _a2.branches) != null ? _b2 : []) {
     for (const [index, result] of branch.results.entries()) {
       const node = map.nodes.find((item) => item.id === result.nodeId);
       if (!node || node.aimKind !== "synthesis" && node.aimKind !== "conclusion" || node.parentId !== branch.questionNodeId || ((_c = node.aimConvergesFromNodeIds) == null ? void 0 : _c.length))
@@ -15951,10 +15978,10 @@ function visibleNodes(nodes) {
   return nodes.filter((node) => !hidden.has(node.id));
 }
 function supersededAimNodeIds(map) {
-  var _a, _b;
+  var _a2, _b2;
   const hidden = /* @__PURE__ */ new Set();
   const parents = new Set(map.nodes.map((node) => node.parentId).filter((id) => !!id));
-  for (const branch of (_b = (_a = map.aim) == null ? void 0 : _a.branches) != null ? _b : []) {
+  for (const branch of (_b2 = (_a2 = map.aim) == null ? void 0 : _a2.branches) != null ? _b2 : []) {
     branch.results.forEach((result, index) => {
       if (result.kind !== "synthesis" || parents.has(result.nodeId)) return;
       if (branch.results.some(
@@ -16037,7 +16064,7 @@ function parseMap(content) {
   return map;
 }
 function validateAimMap(map) {
-  var _a, _b, _c, _d, _e, _f, _g;
+  var _a2, _b2, _c, _d, _e, _f, _g;
   const data = map.aim;
   if (!data || data.version !== 1 || !Array.isArray(data.branches) || !Array.isArray(data.runs) || !Array.isArray(data.pendingCommits) || data.resultDrafts !== void 0 && !Array.isArray(data.resultDrafts))
     throw new Error("Invalid AIM map extension.");
@@ -16054,8 +16081,8 @@ function validateAimMap(map) {
   if (data.questionDraft !== void 0) {
     const draft = data.questionDraft;
     if (!draft || typeof draft.requestId !== "string" || !draft.requestId.trim() || map.nodes.some((node) => {
-      var _a2;
-      return ((_a2 = node.aimQuestion) == null ? void 0 : _a2.requestId) === draft.requestId;
+      var _a3;
+      return ((_a3 = node.aimQuestion) == null ? void 0 : _a3.requestId) === draft.requestId;
     }) || typeof draft.nodeId !== "string" || map.nodes.some((node) => node.id === draft.nodeId) || typeof draft.parentId !== "string" || !map.nodes.some((node) => node.id === draft.parentId) || !(draft.parentBranchId === void 0 || draft.parentBranchId === null || typeof draft.parentBranchId === "string") || typeof draft.notePath !== "string" || !draft.notePath.endsWith(".md") || typeof draft.title !== "string" || typeof draft.summary !== "string" || !draft.summary.trim() || typeof draft.detail !== "string" || typeof draft.prompt !== "string" || typeof draft.model !== "string" || draft.reasoning !== void 0 && !["low", "medium", "high"].includes(draft.reasoning) || !Array.isArray(draft.options) || draft.options.length < 2 || draft.options.some(
       (option2) => !option2 || typeof option2.id !== "string" || !option2.id.trim() || typeof option2.label !== "string" || !option2.label.trim()
     ) || new Set(draft.options.map((option2) => option2.id)).size !== draft.options.length || draft.convergesFromNodeIds !== void 0 && (!Array.isArray(draft.convergesFromNodeIds) || new Set(draft.convergesFromNodeIds).size !== draft.convergesFromNodeIds.length || draft.convergesFromNodeIds.some((id) => !map.nodes.some((node) => node.id === id))))
@@ -16074,7 +16101,7 @@ function validateAimMap(map) {
       throw new Error("Invalid AIM retry timeout.");
     if (branch.deliveryRecovery && (typeof branch.deliveryRecovery.fingerprint !== "string" || !branch.deliveryRecovery.planner || typeof branch.deliveryRecovery.planner.detail !== "string" || !validDeliveryCheckpoint(branch.deliveryRecovery.checkpoint)))
       throw new Error("Invalid AIM delivery checkpoint.");
-    if (((_a = branch.deliveryRecovery) == null ? void 0 : _a.evidence) !== void 0) {
+    if (((_a2 = branch.deliveryRecovery) == null ? void 0 : _a2.evidence) !== void 0) {
       const evidence = branch.deliveryRecovery.evidence;
       if (!Array.isArray(evidence) || evidence.some(
         (source) => !source || typeof source.id !== "string" || !source.id.trim() || typeof source.hash !== "string" || !/^[a-f0-9]{64}$/i.test(source.hash) || typeof source.detail !== "string" || !source.detail.trim()
@@ -16095,12 +16122,12 @@ function validateAimMap(map) {
     while (parent) {
       if (seen.has(parent)) throw new Error("AIM answer branches cannot contain cycles.");
       seen.add(parent);
-      parent = (_c = (_b = data.branches.find((item) => item.id === parent)) == null ? void 0 : _b.parentBranchId) != null ? _c : null;
+      parent = (_c = (_b2 = data.branches.find((item) => item.id === parent)) == null ? void 0 : _b2.parentBranchId) != null ? _c : null;
     }
   }
   const runIds = /* @__PURE__ */ new Set();
   const validAttempt = (attempt) => {
-    var _a2;
+    var _a3;
     if (!attempt || typeof attempt.id !== "string" || typeof attempt.inputSnapshotHash !== "string") return false;
     if (!["running", "saving", "completed", "partial", "failed", "cancelled", "superseded"].includes(attempt.status))
       return false;
@@ -16112,7 +16139,7 @@ function validateAimMap(map) {
       return false;
     if (attempt.maxResearchTurns !== void 0 && (!Number.isInteger(attempt.maxResearchTurns) || attempt.maxResearchTurns < 1 || attempt.maxResearchTurns > 3))
       return false;
-    if (attempt.researchTurns !== void 0 && (!Number.isInteger(attempt.researchTurns) || attempt.researchTurns < 0 || attempt.researchTurns > ((_a2 = attempt.maxResearchTurns) != null ? _a2 : 3)))
+    if (attempt.researchTurns !== void 0 && (!Number.isInteger(attempt.researchTurns) || attempt.researchTurns < 0 || attempt.researchTurns > ((_a3 = attempt.maxResearchTurns) != null ? _a3 : 3)))
       return false;
     if (attempt.plannerReviews !== void 0 && (!Array.isArray(attempt.plannerReviews) || attempt.plannerReviews.some(
       (review) => !review || !["research_more", "ask_user", "conclude"].includes(review.decision) || typeof review.rationale !== "string" || !review.rationale.trim() || !Number.isInteger(review.researchTurn) || review.researchTurn < 1 || review.researchTurn > 3 || review.question !== void 0 && (typeof review.question !== "string" || !review.question.trim()) || review.answerOptions !== void 0 && (!Array.isArray(review.answerOptions) || review.answerOptions.some(
@@ -16139,8 +16166,8 @@ function validateAimMap(map) {
       const run = data.runs.find((item) => item.id === (result == null ? void 0 : result.runId)), attempt = run == null ? void 0 : run.attempts.find((item) => item.id === (result == null ? void 0 : result.attemptId));
       if (!result || !validReuse(result.reuse) || typeof result.resultId !== "string" || resultIds.has(result.resultId) || !run || run.branchId !== branch.id || !["completed", "partial"].includes((_d = attempt == null ? void 0 : attempt.status) != null ? _d : "") || typeof result.nodeId !== "string" || typeof result.notePath !== "string" || !Number.isInteger(result.version) || result.version < 1 || result.kind !== void 0 && !["research", "synthesis", "conclusion"].includes(result.kind) || result.subtopicId !== void 0 && (!((_e = branch.researchPlan) == null ? void 0 : _e.some((item) => item.id === result.subtopicId)) || typeof result.subtopicId !== "string") || !map.nodes.some(
         (node) => {
-          var _a2;
-          return node.id === result.nodeId && node.path === result.notePath && (node.parentId === ((_a2 = branch.answerNodeId) != null ? _a2 : branch.questionNodeId) || branch.results.some((parent) => parent.nodeId === node.parentId));
+          var _a3;
+          return node.id === result.nodeId && node.path === result.notePath && (node.parentId === ((_a3 = branch.answerNodeId) != null ? _a3 : branch.questionNodeId) || branch.results.some((parent) => parent.nodeId === node.parentId));
         }
       ))
         throw new Error("Invalid AIM branch result reference.");
@@ -16153,8 +16180,8 @@ function validateAimMap(map) {
     const run = draft && data.runs.find((item) => item.id === draft.runId), attempt = run == null ? void 0 : run.attempts.find((item) => item.id === draft.attemptId);
     if (!draft || !validReuse(draft.reuse) || draft.retainedReports !== void 0 && !validRetainedReports(draft.retainedReports) || typeof draft.id !== "string" || draftIds.has(draft.id) || !branch || typeof draft.nodeId !== "string" || typeof draft.notePath !== "string" || !draft.notePath.endsWith(".md") || typeof draft.title !== "string" || draft.status !== "creating" && draft.status !== "ready" || draft.model !== void 0 && (typeof draft.model !== "string" || !draft.model.trim()) || draft.reasoning !== void 0 && !["low", "medium", "high"].includes(draft.reasoning) || draft.kind !== void 0 && !["research", "synthesis", "conclusion"].includes(draft.kind) || draft.subtopicId !== void 0 && !((_g = branch.researchPlan) == null ? void 0 : _g.some((item) => item.id === draft.subtopicId)) || (run == null ? void 0 : run.branchId) !== branch.id || !attempt || attempt.inputSnapshotHash !== draft.inputSnapshotHash || !map.nodes.some(
       (node) => {
-        var _a2, _b2;
-        return node.id === draft.nodeId && node.path === draft.notePath && node.parentId === ((_b2 = (_a2 = draft.parentNodeId) != null ? _a2 : branch.answerNodeId) != null ? _b2 : branch.questionNodeId);
+        var _a3, _b3;
+        return node.id === draft.nodeId && node.path === draft.notePath && node.parentId === ((_b3 = (_a3 = draft.parentNodeId) != null ? _a3 : branch.answerNodeId) != null ? _b3 : branch.questionNodeId);
       }
     ))
       throw new Error("Invalid AIM result draft.");
@@ -16284,32 +16311,32 @@ var cardHeight = (heightOf, id) => {
   return value !== void 0 && Number.isFinite(value) && value > 0 ? value : DEFAULT_CARD_HEIGHT;
 };
 function positions(nodes, roots, left, top, folded = false, heightOf) {
-  var _a, _b;
+  var _a2, _b2;
   const ids = new Map(nodes.map((node) => [node.id, node]));
   const children = /* @__PURE__ */ new Map();
   const joins = /* @__PURE__ */ new Map();
   const add = (map, key2, node) => {
-    var _a2;
-    return map.set(key2, [...(_a2 = map.get(key2)) != null ? _a2 : [], node]);
+    var _a3;
+    return map.set(key2, [...(_a3 = map.get(key2)) != null ? _a3 : [], node]);
   };
   for (const node of nodes) {
     if (!node.parentId) continue;
-    const sources2 = node.aimKind !== "question" && ((_a = node.aimConvergesFromNodeIds) == null ? void 0 : _a.length) ? parentIdsForNode(node).map((id) => ids.get(id)) : [];
-    const anchor = (_b = sources2[0]) == null ? void 0 : _b.parentId;
+    const sources2 = node.aimKind !== "question" && ((_a2 = node.aimConvergesFromNodeIds) == null ? void 0 : _a2.length) ? parentIdsForNode(node).map((id) => ids.get(id)) : [];
+    const anchor = (_b2 = sources2[0]) == null ? void 0 : _b2.parentId;
     if (anchor && ids.has(anchor) && sources2.every((source) => source && source.parentId === anchor))
       add(joins, anchor, node);
     else add(children, node.parentId, node);
   }
   const result = /* @__PURE__ */ new Map();
   const kidsOf = (node) => {
-    var _a2;
-    return folded && node.collapsed ? [] : (_a2 = children.get(node.id)) != null ? _a2 : [];
+    var _a3;
+    return folded && node.collapsed ? [] : (_a3 = children.get(node.id)) != null ? _a3 : [];
   };
   const joinsOf = (node) => {
-    var _a2;
-    return folded && node.collapsed ? [] : ((_a2 = joins.get(node.id)) != null ? _a2 : []).filter((join3) => {
-      var _a3;
-      return !(folded && ((_a3 = ids.get(join3.parentId)) == null ? void 0 : _a3.collapsed));
+    var _a3;
+    return folded && node.collapsed ? [] : ((_a3 = joins.get(node.id)) != null ? _a3 : []).filter((join3) => {
+      var _a4;
+      return !(folded && ((_a4 = ids.get(join3.parentId)) == null ? void 0 : _a4.collapsed));
     });
   };
   const heightFor = (node) => cardHeight(heightOf, node.id);
@@ -16553,13 +16580,13 @@ function noteNumbers(detail) {
   return new Set(numberTokens(t2));
 }
 function existingDiagrams(detail) {
-  var _a;
+  var _a2;
   const lines = detail.replace(/\r\n/g, "\n").split("\n"), types = [];
   for (let i = 0; i < lines.length; i++) {
     if (/^\s*(`{3,}|~{3,})\s*mermaid\b/.test(lines[i])) {
       let j = i + 1;
       while (j < lines.length && !lines[j].trim()) j++;
-      types.push(((_a = lines[j]) != null ? _a : "").trim().split(/\s+/)[0] || "?");
+      types.push(((_a2 = lines[j]) != null ? _a2 : "").trim().split(/\s+/)[0] || "?");
     }
   }
   return { count: types.length, types };
@@ -16731,10 +16758,10 @@ function linksOf(texts2) {
   return out;
 }
 function checkMergePreservation(input) {
-  var _a, _b, _c, _d;
-  const logs = (_a = input.logHeadings) != null ? _a : [];
+  var _a2, _b2, _c, _d;
+  const logs = (_a2 = input.logHeadings) != null ? _a2 : [];
   const missing = [], added = [];
-  const sourceNumbers = numbersOf(input.sourceTexts, logs), mergedNumbers = numbersOf(input.mergedTexts, logs), allowed = numbersOf((_b = input.allowedTexts) != null ? _b : [], logs);
+  const sourceNumbers = numbersOf(input.sourceTexts, logs), mergedNumbers = numbersOf(input.mergedTexts, logs), allowed = numbersOf((_b2 = input.allowedTexts) != null ? _b2 : [], logs);
   for (const token of sourceNumbers) if (!mergedNumbers.has(token)) missing.push(token);
   for (const token of mergedNumbers) if (!sourceNumbers.has(token) && !allowed.has(token)) added.push(token);
   const sourceLinks = linksOf([...input.sourceTexts, ...(_c = input.sourceLinkTexts) != null ? _c : []]), mergedLinks = linksOf([...input.mergedTexts, ...(_d = input.mergedLinkTexts) != null ? _d : []]);
@@ -16845,8 +16872,8 @@ function baseOf(path) {
   return path.slice(path.lastIndexOf("/") + 1);
 }
 function splitFrontmatter(text11) {
-  var _a, _b;
-  const head = (_b = (_a = /^---\r?\n[\s\S]*?\r?\n---[ \t]*(?:\r?\n|$)/.exec(text11)) == null ? void 0 : _a[0]) != null ? _b : "";
+  var _a2, _b2;
+  const head = (_b2 = (_a2 = /^---\r?\n[\s\S]*?\r?\n---[ \t]*(?:\r?\n|$)/.exec(text11)) == null ? void 0 : _a2[0]) != null ? _b2 : "";
   return { head, body: text11.slice(head.length) };
 }
 function codeRanges(text11) {
@@ -17024,13 +17051,13 @@ function splitOpenItems(value) {
 }
 var NOTE_CSS_CLASS = "visual-agent-map-node";
 function hasActiveAimAttempt(map) {
-  var _a;
-  return !!((_a = map.aim) == null ? void 0 : _a.runs.some(
+  var _a2;
+  return !!((_a2 = map.aim) == null ? void 0 : _a2.runs.some(
     (run) => run.attempts.some((attempt) => attempt.status === "running" || attempt.status === "saving")
   ));
 }
 function rebaseMapNotePaths(map, rebase) {
-  var _a, _b, _c;
+  var _a2, _b2, _c;
   let changed = false;
   const move = (path) => {
     const next = rebase(path);
@@ -17047,7 +17074,7 @@ function rebaseMapNotePaths(map, rebase) {
   for (const branch of aim.branches) {
     const snapshotBefore = JSON.stringify(branch.inputSnapshot);
     for (const result of branch.inputSnapshot.upstreamResults) result.notePath = move(result.notePath);
-    for (const item of (_a = branch.researchPlan) != null ? _a : []) if (item.source) item.source.notePath = move(item.source.notePath);
+    for (const item of (_a2 = branch.researchPlan) != null ? _a2 : []) if (item.source) item.source.notePath = move(item.source.notePath);
     for (const result of branch.results) {
       result.notePath = move(result.notePath);
       moveReuse(result.reuse);
@@ -17058,7 +17085,7 @@ function rebaseMapNotePaths(map, rebase) {
       if (run.branchId !== branch.id) continue;
       for (const attempt of run.attempts) {
         attempt.inputSnapshotHash = hash;
-        for (const draft of (_b = aim.resultDrafts) != null ? _b : [])
+        for (const draft of (_b2 = aim.resultDrafts) != null ? _b2 : [])
           if (draft.runId === run.id && draft.attemptId === attempt.id) draft.inputSnapshotHash = hash;
       }
     }
@@ -17135,12 +17162,12 @@ function aliasFallback(mapPath) {
   return parentPath(mapPath).split("/").at(-1) || mapPath;
 }
 function frontmatter(content) {
-  var _a, _b;
-  const yaml = (_a = content.match(/^---\r?\n([\s\S]*?)\r?\n---(?:\r?\n|$)/)) == null ? void 0 : _a[1];
-  return yaml ? (_b = (0, import_obsidian13.parseYaml)(yaml)) != null ? _b : {} : {};
+  var _a2, _b2;
+  const yaml = (_a2 = content.match(/^---\r?\n([\s\S]*?)\r?\n---(?:\r?\n|$)/)) == null ? void 0 : _a2[1];
+  return yaml ? (_b2 = (0, import_obsidian13.parseYaml)(yaml)) != null ? _b2 : {} : {};
 }
 function setFrontmatterKeys(content, values) {
-  var _a;
+  var _a2;
   const eol = content.includes("\r\n") ? "\r\n" : "\n";
   const render = (key2, value) => typeof value === "boolean" ? [`${key2}: ${value}`] : Array.isArray(value) ? [`${key2}:`, ...value.map((item) => `  - ${JSON.stringify(item)}`)] : [`${key2}: ${JSON.stringify(value)}`];
   const match = /^---\r?\n([\s\S]*?)\r?\n---(?=\r?\n|$)/.exec(content);
@@ -17152,7 +17179,7 @@ function setFrontmatterKeys(content, values) {
   const written = /* @__PURE__ */ new Set();
   let skipping = false;
   for (const line of match[1].split(/\r?\n/)) {
-    const key2 = (_a = /^([A-Za-z][\w-]*):/.exec(line)) == null ? void 0 : _a[1];
+    const key2 = (_a2 = /^([A-Za-z][\w-]*):/.exec(line)) == null ? void 0 : _a2[1];
     if (key2) {
       skipping = Object.keys(values).includes(key2);
       if (skipping && !written.has(key2)) {
@@ -17169,9 +17196,9 @@ function setFrontmatterKeys(content, values) {
 }
 var localDate = (date = /* @__PURE__ */ new Date()) => `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
 function noteTitle(content, fm, fallback) {
-  var _a, _b;
+  var _a2, _b2;
   const body = content.replace(/^---\r?\n[\s\S]*?\r?\n---(?:\r?\n|$)/, "");
-  return ((_b = (_a = /^# (.+)$/m.exec(body)) == null ? void 0 : _a[1]) == null ? void 0 : _b.trim()) || text5(fm.title, fallback);
+  return ((_b2 = (_a2 = /^# (.+)$/m.exec(body)) == null ? void 0 : _a2[1]) == null ? void 0 : _b2.trim()) || text5(fm.title, fallback);
 }
 var noteContentLanguage = (fm) => isNoteLanguage(fm["content-language"]) ? fm["content-language"] : void 0;
 var placeholder = (language2) => translate(language2, "detail.no_conclusion_yet");
@@ -17326,14 +17353,14 @@ function withoutReference(content) {
   return legacy.test(content) ? content.replace(legacy, "\n") : content;
 }
 function detailWithVisualReferences(detail, visualReferences, template) {
-  var _a;
+  var _a2;
   let current = detail.trim();
   const references2 = visualReferences.trim().split(/\n(?=\*\*[^\n]+\*\*\n|### )/).filter(Boolean);
   for (const reference of references2) {
     const image = reference.match(/!\[[^\]]*\]\(([^)]+)\)/);
     if (!image || current.includes(`](${image[1]})`)) continue;
     const block = reference.replace(/^### (.+)$/gm, "**$1**").trim();
-    const title = (_a = block.match(/^\*\*(.+)\*\*/)) == null ? void 0 : _a[1];
+    const title = (_a2 = block.match(/^\*\*(.+)\*\*/)) == null ? void 0 : _a2[1];
     const paragraphs = current.split("\n\n");
     const related = title ? paragraphs.findIndex((text11) => !/^#{1,6} /.test(text11) && text11.includes(title)) : -1;
     if (related >= 0) {
@@ -17353,8 +17380,8 @@ function detailWithVisualReferences(detail, visualReferences, template) {
   return current;
 }
 function initialPreview(summary, detail) {
-  var _a;
-  const image = (_a = detail.match(/!\[[^\]]*\]\((?:https?:\/\/[^)\s]+)\)/)) == null ? void 0 : _a[0];
+  var _a2;
+  const image = (_a2 = detail.match(/!\[[^\]]*\]\((?:https?:\/\/[^)\s]+)\)/)) == null ? void 0 : _a2[0];
   return [summary.trim(), image].filter(Boolean).join("\n\n");
 }
 function noteBody(title, summary, language2, prompt = "", rules = "", preview = "", detail = "", visualReferences = "", newFindings = "", leftover = "", layout = "answer-first") {
@@ -17488,10 +17515,10 @@ function localizeReference(value, language2) {
   return `${target.labels[index]}${target.colon}${plain}`;
 }
 function derivedLabelLanguage(content, fm) {
-  var _a;
+  var _a2;
   if (Array.isArray(fm["agent-map-references"]))
     for (const entry of fm["agent-map-references"]) {
-      const label = (_a = /^([^：:]+)[：:]/.exec(String(entry))) == null ? void 0 : _a[1];
+      const label = (_a2 = /^([^：:]+)[：:]/.exec(String(entry))) == null ? void 0 : _a2[1];
       if (label && REFERENCE_LABELS.includes(label)) return "zh-TW";
       if (label && ENGLISH_REFERENCE_LABELS.includes(label)) return "en";
     }
@@ -17578,8 +17605,8 @@ var Repository = class {
    * of such text uses this, so no write path can relabel a note just because the UI language differs.
    */
   scaffoldLanguage(content, fm) {
-    var _a;
-    return (_a = derivedLabelLanguage(content, fm)) != null ? _a : this.noteLanguage;
+    var _a2;
+    return (_a2 = derivedLabelLanguage(content, fm)) != null ? _a2 : this.noteLanguage;
   }
   /** Called from onunload: no later write (including a rollback) may happen. */
   dispose() {
@@ -17614,12 +17641,12 @@ var Repository = class {
     return this.app.vault.getAbstractFileByPath(this.settings.workspaceFolder) instanceof import_obsidian13.TFolder;
   }
   async workspaceCandidates() {
-    var _a;
+    var _a2;
     const candidates = /* @__PURE__ */ new Set();
     const workspace = `${this.settings.workspaceFolder}/`;
     const names2 = /* @__PURE__ */ new Set(["Topics", "Mind Maps", "AIM"]);
     for (const folder of managedMapContainers(this.settings))
-      names2.add(folder.startsWith(workspace) ? folder.slice(workspace.length) : (_a = folder.split("/").at(-1)) != null ? _a : folder);
+      names2.add(folder.startsWith(workspace) ? folder.slice(workspace.length) : (_a2 = folder.split("/").at(-1)) != null ? _a2 : folder);
     const escape = (value) => value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
     const containerPattern = new RegExp(`^(.*)/(?:${[...names2].map(escape).join("|")})/[^/]+/Map\\.md$`);
     for (const file of this.app.vault.getMarkdownFiles()) {
@@ -17649,13 +17676,13 @@ var Repository = class {
   }
   /** A child of `path`'s folder whose folded name equals `path`'s, other than `exclude`. */
   foldedSibling(path, exclude) {
-    var _a, _b;
+    var _a2, _b2;
     const folder = this.app.vault.getAbstractFileByPath(parentPath(path));
     if (!(folder instanceof import_obsidian13.TFolder)) return null;
-    const wanted = foldEntryName((_a = path.split("/").at(-1)) != null ? _a : path, /\.md$/i.test(path));
-    return (_b = folder.children.find(
+    const wanted = foldEntryName((_a2 = path.split("/").at(-1)) != null ? _a2 : path, /\.md$/i.test(path));
+    return (_b2 = folder.children.find(
       (child) => child.path !== exclude && foldEntryName(child.name, child instanceof import_obsidian13.TFile) === wanted
-    )) != null ? _b : null;
+    )) != null ? _b2 : null;
   }
   uniqueFolder(folder, name) {
     const base = (0, import_obsidian13.normalizePath)(`${folder}/${safeName(name)}`);
@@ -17712,7 +17739,7 @@ var Repository = class {
     return current;
   }
   async readNote(path, map) {
-    var _a;
+    var _a2;
     const file = this.file(path), content = decodeCalloutSections(upgradeLegacyAimText(await this.app.vault.read(file))), fm = frontmatter(content);
     const status = text5(fm.status, "idea");
     const normalized = status === "review" || status === "accepted" ? "completed" : status;
@@ -17737,7 +17764,7 @@ var Repository = class {
       previewInitialized: fm["preview-initialized"] === true,
       model,
       modelSource,
-      reasoning: normalizeReasoningLevel((_a = fm["reasoning-level"]) != null ? _a : this.settings.cliReasoning),
+      reasoning: normalizeReasoningLevel((_a2 = fm["reasoning-level"]) != null ? _a2 : this.settings.cliReasoning),
       researchMode: fm["research-mode"] === "local" ? "local" : "research",
       researchDepth: fm["research-depth"] === "fast" || fm["research-depth"] === "deep" ? fm["research-depth"] : "normal",
       visualMode: fm["visual-mode"] === "on" || fm["visual-mode"] === "off" ? fm["visual-mode"] : "auto",
@@ -17759,7 +17786,7 @@ var Repository = class {
    */
   async updateNote(path, patch, options = {}) {
     await this.app.vault.process(this.file(path), (content) => {
-      var _a, _b, _c, _d;
+      var _a2, _b2, _c, _d;
       const fm = frontmatter(content);
       const language2 = this.scaffoldLanguage(content, fm);
       ensureNoteCssClass(fm);
@@ -17767,7 +17794,7 @@ var Repository = class {
         fm["agent-map-references"] = fm["agent-map-references"].map(
           (value) => localizeReference(String(value), language2)
         );
-      fm.title = (_a = patch.title) != null ? _a : noteTitle(content, fm, baseName(path).replace(/\.md$/, ""));
+      fm.title = (_a2 = patch.title) != null ? _a2 : noteTitle(content, fm, baseName(path).replace(/\.md$/, ""));
       for (const key2 of ["summary", "model", "status"]) if (patch[key2] !== void 0) fm[key2] = patch[key2];
       if (patch.modelSource !== void 0) fm["model-source"] = patch.modelSource;
       if (patch.reasoning !== void 0) fm["reasoning-level"] = normalizeReasoningLevel(patch.reasoning);
@@ -17788,7 +17815,7 @@ var Repository = class {
         patch.sourcePaths.length ? fm["source-notes"] = patch.sourcePaths : delete fm["source-notes"];
       fm.updated = (/* @__PURE__ */ new Date()).toISOString();
       let body = decodeCalloutSections(content.replace(/^---\r?\n[\s\S]*?\r?\n---(?:\r?\n|$)/, ""));
-      const textLanguage = (_c = (_b = options.contentLanguage) != null ? _b : noteContentLanguage(fm)) != null ? _c : language2;
+      const textLanguage = (_c = (_b2 = options.contentLanguage) != null ? _b2 : noteContentLanguage(fm)) != null ? _c : language2;
       if (options.contentLanguage !== void 0 && noteContentLanguage(fm) === void 0)
         fm["content-language"] = options.contentLanguage;
       body = ensurePreview(body, language2, textLanguage);
@@ -17848,7 +17875,7 @@ ${withReferenceLinks(body, fm, language2)}`;
     });
   }
   async createNote(title, model, map, mapPath, modelSource, initial = {}, onCreate) {
-    var _a, _b, _c;
+    var _a2, _b2, _c;
     const folder = this.topicFolder(mapPath, "Notes");
     await this.ensureTopicFolders(this.topicRoot(mapPath));
     const id = crypto.randomUUID();
@@ -17863,7 +17890,7 @@ ${withReferenceLinks(body, fm, language2)}`;
       "preview-initialized": false,
       model,
       "model-source": modelSource,
-      "reasoning-level": (_a = initial.reasoning) != null ? _a : this.settings.cliReasoning,
+      "reasoning-level": (_a2 = initial.reasoning) != null ? _a2 : this.settings.cliReasoning,
       status: "idea",
       cssclasses: [NOTE_CSS_CLASS]
     };
@@ -17875,7 +17902,7 @@ ${originMarkdown(initial.thinkingOrigin)}` : "";
       title,
       `---
 ${(0, import_obsidian13.stringifyYaml)(metadata)}---
-${noteBody(title, (_b = initial.summary) != null ? _b : placeholder(this.noteLanguage), this.noteLanguage, "", "", placeholder(this.noteLanguage), (_c = initial.detail) != null ? _c : "", "", "", origin)}`,
+${noteBody(title, (_b2 = initial.summary) != null ? _b2 : placeholder(this.noteLanguage), this.noteLanguage, "", "", placeholder(this.noteLanguage), (_c = initial.detail) != null ? _c : "", "", "", origin)}`,
       onCreate
     );
     return { id, path: created.path, parentId: null, x: 80, y: 80, collapsed: false };
@@ -17900,8 +17927,8 @@ ${noteBody(title, (_b = initial.summary) != null ? _b : placeholder(this.noteLan
   }
   /** Idempotently create a reserved note identity for a journaled AIM result draft. */
   async createNoteAt(title, model, map, mapPath, modelSource, path, id, initial = {}) {
-    var _a, _b, _c, _d, _e;
-    const textLanguage = (_a = initial.contentLanguage) != null ? _a : this.noteLanguage;
+    var _a2, _b2, _c, _d, _e;
+    const textLanguage = (_a2 = initial.contentLanguage) != null ? _a2 : this.noteLanguage;
     const folder = this.topicFolder(mapPath, "Notes");
     await this.ensureTopicFolders(this.topicRoot(mapPath));
     if (parentPath(path) !== folder || !path.endsWith(".md") || !id.trim())
@@ -17922,7 +17949,7 @@ ${noteBody(title, (_b = initial.summary) != null ? _b : placeholder(this.noteLan
       "topic-state": "active",
       "agent-map-id": map.id,
       title,
-      summary: (_b = initial.summary) != null ? _b : placeholder(textLanguage),
+      summary: (_b2 = initial.summary) != null ? _b2 : placeholder(textLanguage),
       "preview-initialized": false,
       model,
       "model-source": modelSource,
@@ -18007,7 +18034,7 @@ ${body}`);
     let changed = false;
     let setupChanged = false;
     await this.app.vault.process(this.file(mapPath), (content) => {
-      var _a, _b, _c;
+      var _a2, _b2, _c;
       const fm = frontmatter(content);
       previous = {
         goal: typeof fm["relevance-goal"] === "string" ? fm["relevance-goal"] : void 0,
@@ -18015,11 +18042,11 @@ ${body}`);
         level: typeof fm["relevance-level"] === "string" ? fm["relevance-level"] : void 0,
         context: typeof fm["relevance-context"] === "string" ? fm["relevance-context"] : void 0
       };
-      changed = ((_a = previous.goal) == null ? void 0 : _a.trim()) !== next;
+      changed = ((_a2 = previous.goal) == null ? void 0 : _a2.trim()) !== next;
       setupChanged = changed || readRelevanceLevel(fm) !== nextLevel || readRelevanceContext(fm) !== nextContext;
       nextState = {
         goal: next,
-        history: changed ? [...(_b = previous.history) != null ? _b : [], `${localDate()}: ${next}`] : previous.history,
+        history: changed ? [...(_b2 = previous.history) != null ? _b2 : [], `${localDate()}: ${next}`] : previous.history,
         level: nextLevel,
         context: nextContext
       };
@@ -18037,10 +18064,10 @@ ${body}`);
     await this.app.vault.process(
       this.file(mapPath),
       (content) => {
-        var _a, _b, _c, _d;
+        var _a2, _b2, _c, _d;
         return setFrontmatterKeys(content, {
-          "relevance-goal": (_a = state.goal) != null ? _a : null,
-          "relevance-level": (_b = state.level) != null ? _b : null,
+          "relevance-goal": (_a2 = state.goal) != null ? _a2 : null,
+          "relevance-level": (_b2 = state.level) != null ? _b2 : null,
           "relevance-context": (_c = state.context) != null ? _c : null,
           "relevance-goal-history": (_d = state.history) != null ? _d : null
         });
@@ -18082,11 +18109,11 @@ ${body}`);
    * cache has not indexed yet (for example, created moments ago) are read, so a large vault is not read in full.
    */
   async markedFiles(key2) {
-    var _a;
+    var _a2;
     const files = [];
     for (const file of this.app.vault.getMarkdownFiles()) {
       const cache = this.app.metadataCache.getFileCache(file);
-      if (cache ? marker2((_a = cache.frontmatter) == null ? void 0 : _a[key2]) : marker2(frontmatter(await this.app.vault.cachedRead(file))[key2]))
+      if (cache ? marker2((_a2 = cache.frontmatter) == null ? void 0 : _a2[key2]) : marker2(frontmatter(await this.app.vault.cachedRead(file))[key2]))
         files.push(file);
     }
     return files;
@@ -18107,7 +18134,7 @@ ${body}`);
    * fails them loudly instead of being skipped.
    */
   async scanMaps() {
-    var _a;
+    var _a2;
     const readable = [], failures = [];
     for (const file of await this.mapFiles()) {
       try {
@@ -18116,7 +18143,7 @@ ${body}`);
         failures.push({ path: file.path, error: error instanceof Error ? error.message : String(error) });
       }
     }
-    if (failures.length) (_a = this.onUnreadableMaps) == null ? void 0 : _a.call(this, failures);
+    if (failures.length) (_a2 = this.onUnreadableMaps) == null ? void 0 : _a2.call(this, failures);
     return { readable, skippedRoots: failures.map((item) => this.topicRoot(item.path)) };
   }
   /**
@@ -18124,9 +18151,9 @@ ${body}`);
    * reading notes: the file is a VAM note or map, or a VAM note cites the old path. Uncached files count as relevant.
    */
   renameAffectsVam(file, oldPath) {
-    var _a, _b, _c;
+    var _a2, _b2, _c;
     const own = this.app.metadataCache.getFileCache(file);
-    if (!own || marker2((_a = own.frontmatter) == null ? void 0 : _a["agent-map-node"]) || marker2((_b = own.frontmatter) == null ? void 0 : _b["visual-agent-map"]))
+    if (!own || marker2((_a2 = own.frontmatter) == null ? void 0 : _a2["agent-map-node"]) || marker2((_b2 = own.frontmatter) == null ? void 0 : _b2["visual-agent-map"]))
       return true;
     for (const note of this.app.vault.getMarkdownFiles()) {
       const fm = (_c = this.app.metadataCache.getFileCache(note)) == null ? void 0 : _c.frontmatter;
@@ -18142,10 +18169,10 @@ ${body}`);
     return false;
   }
   async reconcileMissingNodePaths() {
-    var _a, _b, _c, _d;
+    var _a2, _b2, _c, _d;
     const candidates = /* @__PURE__ */ new Map();
     for (const file of await this.markedFiles("agent-map-node")) {
-      const fm = (_b = (_a = this.app.metadataCache.getFileCache(file)) == null ? void 0 : _a.frontmatter) != null ? _b : frontmatter(await this.app.vault.read(file));
+      const fm = (_b2 = (_a2 = this.app.metadataCache.getFileCache(file)) == null ? void 0 : _a2.frontmatter) != null ? _b2 : frontmatter(await this.app.vault.read(file));
       const id = text5(fm["node-id"]);
       if (id) candidates.set(id, [...(_c = candidates.get(id)) != null ? _c : [], file.path]);
     }
@@ -18192,8 +18219,8 @@ ${body}`);
     if (this.app.vault.getAbstractFileByPath(path)) throw new Error(this.message("error.map_already_exists"));
     const files = this.app.vault.getMarkdownFiles().filter(
       (file) => {
-        var _a, _b;
-        return file.path.startsWith(`${root}/Notes/`) && marker2((_b = (_a = this.app.metadataCache.getFileCache(file)) == null ? void 0 : _a.frontmatter) == null ? void 0 : _b["agent-map-node"]);
+        var _a2, _b2;
+        return file.path.startsWith(`${root}/Notes/`) && marker2((_b2 = (_a2 = this.app.metadataCache.getFileCache(file)) == null ? void 0 : _a2.frontmatter) == null ? void 0 : _b2["agent-map-node"]);
       }
     );
     const first = files[0] ? await this.readNote(files[0].path) : null, id = (first == null ? void 0 : first.topicId) || crypto.randomUUID();
@@ -18244,8 +18271,8 @@ ${body}`);
     const prefix = `${this.topicFolder(mapPath, collection)}/`;
     return this.app.vault.getMarkdownFiles().filter(
       (file) => {
-        var _a, _b;
-        return file.path.startsWith(prefix) && marker2((_b = (_a = this.app.metadataCache.getFileCache(file)) == null ? void 0 : _a.frontmatter) == null ? void 0 : _b["agent-map-node"]);
+        var _a2, _b2;
+        return file.path.startsWith(prefix) && marker2((_b2 = (_a2 = this.app.metadataCache.getFileCache(file)) == null ? void 0 : _a2.frontmatter) == null ? void 0 : _b2["agent-map-node"]);
       }
     ).sort((a, b) => a.basename.localeCompare(b.basename));
   }
@@ -18282,7 +18309,7 @@ ${body}`);
    * meantime) this undoes its own writes and the move, then throws, so the caller's rollback sees an unmoved note.
    */
   async relocate(item, target) {
-    var _a;
+    var _a2;
     const resolvedLinks = this.app.metadataCache.resolvedLinks;
     if (!resolvedLinks) {
       await this.app.fileManager.renameFile(item, target);
@@ -18306,7 +18333,7 @@ ${body}`);
     const written = [];
     try {
       for (const edit of plan.edits) {
-        const path = (_a = moves.get(edit.path)) != null ? _a : edit.path, file = this.app.vault.getAbstractFileByPath(path);
+        const path = (_a2 = moves.get(edit.path)) != null ? _a2 : edit.path, file = this.app.vault.getAbstractFileByPath(path);
         if (!(file instanceof import_obsidian13.TFile)) throw new Error(`${this.message("error.file_not_found")}: ${path}`);
         await this.app.vault.process(file, (current) => {
           if (current !== edit.before)
@@ -18345,8 +18372,8 @@ ${body}`);
    */
   async planLinkRewrites(item, moves, resolvedLinks) {
     const owned = async (file) => {
-      var _a;
-      const cached = (_a = this.app.metadataCache.getFileCache(file)) == null ? void 0 : _a.frontmatter;
+      var _a2;
+      const cached = (_a2 = this.app.metadataCache.getFileCache(file)) == null ? void 0 : _a2.frontmatter;
       if (marker2(cached == null ? void 0 : cached["agent-map-node"]) || marker2(cached == null ? void 0 : cached["visual-agent-map"])) return true;
       const fm = frontmatter(await this.app.vault.read(file));
       return marker2(fm["agent-map-node"]) || marker2(fm["visual-agent-map"]);
@@ -18369,15 +18396,15 @@ ${body}`);
     const edits = [];
     for (const [path, file] of candidates) {
       const before = await this.app.vault.read(file), resolve = (linkPath) => {
-        var _a;
-        return linkPath ? (_a = this.app.metadataCache.getFirstLinkpathDest(linkPath, path)) == null ? void 0 : _a.path : void 0;
+        var _a2;
+        return linkPath ? (_a2 = this.app.metadataCache.getFirstLinkpathDest(linkPath, path)) == null ? void 0 : _a2.path : void 0;
       };
       const { head, body } = splitFrontmatter(before);
       const fm = frontmatter(before);
       const userKeyLink = Object.entries(fm).some(
         ([key2, value]) => key2 !== "agent-map-references" && findWikilinks(JSON.stringify(value)).some((link) => {
-          var _a;
-          return moves.has((_a = resolve(linkPathOf(link.target))) != null ? _a : "");
+          var _a2;
+          return moves.has((_a2 = resolve(linkPathOf(link.target))) != null ? _a2 : "");
         })
       );
       const result = rewriteLinkTargets(body, resolve, moves);
@@ -18390,16 +18417,16 @@ ${body}`);
     return { foreign: foreign.size, edits };
   }
   async replaceSourcePath(oldPath, newPath) {
-    var _a, _b;
+    var _a2, _b2;
     if (oldPath === newPath) return;
     for (const file of await this.markedFiles("agent-map-node")) {
-      const cached = (_a = this.app.metadataCache.getFileCache(file)) == null ? void 0 : _a.frontmatter;
+      const cached = (_a2 = this.app.metadataCache.getFileCache(file)) == null ? void 0 : _a2.frontmatter;
       if (cached && ![cached["source-notes"], cached["reference-materials"]].some(
         (list) => Array.isArray(list) && list.includes(oldPath)
       ))
         continue;
       const note = await this.readNoteIfManaged(file);
-      if ((_b = note == null ? void 0 : note.referencePaths) == null ? void 0 : _b.includes(oldPath))
+      if ((_b2 = note == null ? void 0 : note.referencePaths) == null ? void 0 : _b2.includes(oldPath))
         await this.updateNote(file.path, {
           referencePaths: note.referencePaths.map((path) => path === oldPath ? newPath : path)
         });
@@ -18449,8 +18476,8 @@ ${body}`);
    * prefix, or several roots plus individual note paths (a move rebuilds only the moved topics and their citing notes).
    */
   async rebuildDerivedData(scope) {
-    var _a, _b;
-    const roots = typeof scope === "string" ? [scope] : (_a = scope == null ? void 0 : scope.roots) != null ? _a : [], extra = new Set(typeof scope === "string" ? [] : (_b = scope == null ? void 0 : scope.paths) != null ? _b : []);
+    var _a2, _b2;
+    const roots = typeof scope === "string" ? [scope] : (_a2 = scope == null ? void 0 : scope.roots) != null ? _a2 : [], extra = new Set(typeof scope === "string" ? [] : (_b2 = scope == null ? void 0 : scope.paths) != null ? _b2 : []);
     const inScope = (path) => !scope || extra.has(path) || roots.some((root) => path.startsWith(`${root}/`));
     const ownership = /* @__PURE__ */ new Map();
     const topics = /* @__PURE__ */ new Map();
@@ -18477,15 +18504,15 @@ ${body}`);
       await this.app.vault.process(
         file,
         (content) => {
-          var _a2;
-          return (_a2 = this.derivedNoteContent(file, content, ownership, topics)) != null ? _a2 : content;
+          var _a3;
+          return (_a3 = this.derivedNoteContent(file, content, ownership, topics)) != null ? _a3 : content;
         }
       );
     }
   }
   /** The node note with derived lifecycle fields and references applied, or null when it is not a VAM node note. */
   derivedNoteContent(file, content, ownership, topics) {
-    var _a;
+    var _a2;
     const fm = frontmatter(content);
     if (!marker2(fm["agent-map-node"])) return null;
     const language2 = this.scaffoldLanguage(content, fm);
@@ -18506,7 +18533,7 @@ ${body}`);
       } else if (fm["topic-state"] !== void 0 || file.path.includes("/Archive/") || file.path.includes("/Unassigned/"))
         fm["topic-state"] = state;
     }
-    const textLanguage = (owner == null ? void 0 : owner.map.aim) ? noteLanguageOf(resolveAimContentLanguage(owner.map, language2)) : (_a = noteContentLanguage(fm)) != null ? _a : language2;
+    const textLanguage = (owner == null ? void 0 : owner.map.aim) ? noteLanguageOf(resolveAimContentLanguage(owner.map, language2)) : (_a2 = noteContentLanguage(fm)) != null ? _a2 : language2;
     let body = ensurePreview(
       decodeCalloutSections(content.replace(/^---\r?\n[\s\S]*?\r?\n---(?:\r?\n|$)/, "")),
       language2,
@@ -18604,7 +18631,7 @@ ${body}`;
    * `busy` lets the caller veto when an open view has AIM work running.
    */
   async changeMapFolder(key2, path, busy = () => false, onProgress) {
-    var _a;
+    var _a2;
     const next = (0, import_obsidian13.normalizePath)(path), current = this.settings[key2];
     if (next === current) return /* @__PURE__ */ new Map();
     const problem = this.mapFolderProblem(key2, next);
@@ -18623,7 +18650,7 @@ ${body}`;
           throw new Error(this.message("error.map_folder_unreadable"));
         }
         if (hasActiveAimAttempt(map) || busy(file.path)) throw new Error(this.message("error.organize_aim_busy"));
-        const toRoot = (0, import_obsidian13.normalizePath)(`${next}/${(_a = root.split("/").at(-1)) != null ? _a : safeName(map.title)}`);
+        const toRoot = (0, import_obsidian13.normalizePath)(`${next}/${(_a2 = root.split("/").at(-1)) != null ? _a2 : safeName(map.title)}`);
         if (this.app.vault.getAbstractFileByPath(toRoot)) throw new Error(this.message("error.map_folder_exists"));
         moves.push({ mapPath: file.path, title: map.title, kind: map.aim ? "aim" : "mind", fromRoot: root, toRoot });
       }
@@ -18656,8 +18683,8 @@ ${body}`;
     try {
       const listing = await this.app.vault.adapter.list(path);
       return listing.folders.every((folder) => allowed.has(folder)) && listing.files.every((file) => {
-        var _a;
-        return OS_LITTER.has(((_a = file.split("/").at(-1)) != null ? _a : file).toLowerCase());
+        var _a2;
+        return OS_LITTER.has(((_a2 = file.split("/").at(-1)) != null ? _a2 : file).toLowerCase());
       });
     } catch (e) {
       return false;
@@ -18668,8 +18695,8 @@ ${body}`;
    * litter aside). Never lists a folder that still holds anything, hidden content included.
    */
   async emptyLegacyFolders(plan) {
-    var _a;
-    const moving = new Set(((_a = plan == null ? void 0 : plan.moves) != null ? _a : []).map((move) => move.fromRoot));
+    var _a2;
+    const moving = new Set(((_a2 = plan == null ? void 0 : plan.moves) != null ? _a2 : []).map((move) => move.fromRoot));
     const empty = [];
     for (const path of this.legacyCleanupFolders()) {
       const folder = this.app.vault.getAbstractFileByPath(path);
@@ -18700,7 +18727,7 @@ ${body}`;
    * AIM attempt anywhere refuses the whole batch.
    */
   async planOrganizeWorkspaceFolders() {
-    var _a;
+    var _a2;
     const plan = { moves: [], skipped: [], busy: [] };
     const reserved = /* @__PURE__ */ new Set();
     for (const file of await this.mapFiles()) {
@@ -18716,7 +18743,7 @@ ${body}`;
       if (hasActiveAimAttempt(map)) plan.busy.push(map.title);
       const container = map.aim ? this.settings.aimFolder : this.settings.mindMapsFolder;
       if (container === this.settings.topicsFolder) continue;
-      const base = (0, import_obsidian13.normalizePath)(`${container}/${(_a = root.split("/").at(-1)) != null ? _a : safeName(map.title)}`);
+      const base = (0, import_obsidian13.normalizePath)(`${container}/${(_a2 = root.split("/").at(-1)) != null ? _a2 : safeName(map.title)}`);
       let toRoot = base, number = 2;
       while (this.app.vault.getAbstractFileByPath(toRoot) || reserved.has(toRoot)) toRoot = `${base} ${number++}`;
       reserved.add(toRoot);
@@ -18800,16 +18827,16 @@ ${body}`;
   }
   /** After a folder move: point note `source-notes`/`reference-materials` and other maps' references at the new prefix. */
   async rebasePathPrefix(from, to, journal) {
-    var _a, _b;
+    var _a2, _b2;
     const rebase = (path) => path.startsWith(`${from}/`) ? `${to}/${path.slice(from.length + 1)}` : path;
     for (const file of await this.markedFiles("agent-map-node")) {
-      const cached = (_a = this.app.metadataCache.getFileCache(file)) == null ? void 0 : _a.frontmatter;
+      const cached = (_a2 = this.app.metadataCache.getFileCache(file)) == null ? void 0 : _a2.frontmatter;
       const mentions = (list) => Array.isArray(list) && list.some((item) => typeof item === "string" && item.startsWith(`${from}/`));
       if (cached && !mentions(cached["source-notes"]) && !mentions(cached["reference-materials"])) continue;
       const note = await this.readNoteIfManaged(file);
       if (!note) continue;
       const patch = {};
-      const references2 = (_b = note.referencePaths) != null ? _b : [];
+      const references2 = (_b2 = note.referencePaths) != null ? _b2 : [];
       if (references2.some((path) => rebase(path) !== path)) patch.referencePaths = references2.map(rebase);
       if (note.sourcePaths.some((path) => rebase(path) !== path)) patch.sourcePaths = note.sourcePaths.map(rebase);
       if (!Object.keys(patch).length) continue;
@@ -18975,8 +19002,8 @@ function markdownImages(markdown, limit = 4) {
   return images;
 }
 function firstMarkdownImage(markdown) {
-  var _a;
-  return (_a = markdownImages(markdown, 1)[0]) != null ? _a : null;
+  var _a2;
+  return (_a2 = markdownImages(markdown, 1)[0]) != null ? _a2 : null;
 }
 function firstMarkdownTable(markdown) {
   const lines = markdown.split(/\r?\n/);
@@ -19025,8 +19052,8 @@ function embedAssets(markdown) {
   return markdown.replace(
     /\.\.\/Attachments\/([^)\s]+)/g,
     (path, name) => {
-      var _a;
-      return (_a = compiled_default.assets[name]) != null ? _a : path;
+      var _a2;
+      return (_a2 = compiled_default.assets[name]) != null ? _a2 : path;
     }
   );
 }
@@ -19117,11 +19144,11 @@ function orderSiblingsByRelevance(siblings, tierOf) {
   return current.sort((a, b) => rank(a.node) - rank(b.node)).map((item) => item.node);
 }
 function relevanceDisplayNodes(nodes, tierOf, hidden) {
-  var _a, _b;
+  var _a2, _b2;
   const groups = /* @__PURE__ */ new Map();
   for (const node of nodes) {
-    const key2 = (_a = node.parentId) != null ? _a : null;
-    groups.set(key2, [...(_b = groups.get(key2)) != null ? _b : [], node]);
+    const key2 = (_a2 = node.parentId) != null ? _a2 : null;
+    groups.set(key2, [...(_b2 = groups.get(key2)) != null ? _b2 : [], node]);
   }
   const slot = /* @__PURE__ */ new Map();
   for (const group of groups.values())
@@ -19187,11 +19214,11 @@ var RelevanceSummaryModal = class extends import_obsidian15.Modal {
     }
   }
   onOpen() {
-    var _a, _b, _c;
+    var _a2, _b2, _c;
     this.modalEl.addClass("vam-relevance-summary-modal");
     this.titleEl.setText(t("ui.relevance_changes_title"));
-    const conflicts = (_a = this.host.conflicts) != null ? _a : [];
-    const pinOf = new Map(((_b = this.host.pins) != null ? _b : []).map((pin) => [pin.id, pin]));
+    const conflicts = (_a2 = this.host.conflicts) != null ? _a2 : [];
+    const pinOf = new Map(((_b2 = this.host.pins) != null ? _b2 : []).map((pin) => [pin.id, pin]));
     const groups = /* @__PURE__ */ new Map();
     const others = [];
     for (const row of this.host.rows) {
@@ -19244,11 +19271,11 @@ var RelevanceSummaryModal = class extends import_obsidian15.Modal {
 var TIER_RANK = { core: 2, support: 1, side: 0 };
 var TIER_BY_RANK = ["side", "support", "core"];
 function relevancePinBounds(tree, pins) {
-  var _a, _b, _c, _d;
+  var _a2, _b2, _c, _d;
   const nodes = new Map(tree.map((node) => [node.id, node]));
   const gradable = (id) => {
-    var _a2;
-    return id !== null && ((_a2 = nodes.get(id)) == null ? void 0 : _a2.parentId) !== null && nodes.has(id);
+    var _a3;
+    return id !== null && ((_a3 = nodes.get(id)) == null ? void 0 : _a3.parentId) !== null && nodes.has(id);
   };
   const pinTier = /* @__PURE__ */ new Map();
   for (const pin of pins) if (gradable(pin.id)) pinTier.set(pin.id, pin.tier);
@@ -19259,7 +19286,7 @@ function relevancePinBounds(tree, pins) {
     if (!tier) continue;
     const path = [node.id];
     const seen = new Set(path);
-    for (let id = node.parentId; id && gradable(id) && !seen.has(id); id = (_b = (_a = nodes.get(id)) == null ? void 0 : _a.parentId) != null ? _b : null) {
+    for (let id = node.parentId; id && gradable(id) && !seen.has(id); id = (_b2 = (_a2 = nodes.get(id)) == null ? void 0 : _a2.parentId) != null ? _b2 : null) {
       seen.add(id);
       path.unshift(id);
       const ancestorTier = pinTier.get(id);
@@ -19352,10 +19379,10 @@ function mergeRelevanceTiers(parts) {
   return merged;
 }
 function relevanceSetupUnchanged(draft, saved) {
-  var _a, _b;
+  var _a2, _b2;
   const goal = normalizeRelevanceGoal(draft.goal);
   if (!goal) return false;
-  return goal === normalizeRelevanceGoal((_a = saved.goal) != null ? _a : "") && normalizeRelevanceLevel(draft.level) === normalizeRelevanceLevel(saved.level) && normalizeRelevanceContext(draft.context) === normalizeRelevanceContext((_b = saved.context) != null ? _b : "");
+  return goal === normalizeRelevanceGoal((_a2 = saved.goal) != null ? _a2 : "") && normalizeRelevanceLevel(draft.level) === normalizeRelevanceLevel(saved.level) && normalizeRelevanceContext(draft.context) === normalizeRelevanceContext((_b2 = saved.context) != null ? _b2 : "");
 }
 function relevanceMode(draft, saved, hasAiGrades) {
   return hasAiGrades && relevanceSetupUnchanged(draft, saved) ? "recalibrate" : "full";
@@ -19506,15 +19533,15 @@ ${details.join("\n")}`);
 
 // experiences/aim/create-map.ts
 async function createAimMap(repository, model, input) {
-  var _a, _b, _c, _d, _e, _f, _g, _h, _i, _j, _k, _l;
+  var _a2, _b2, _c, _d, _e, _f, _g, _h, _i, _j, _k, _l;
   const topic = input.topic.trim();
   if (!topic) throw new Error("AIM topic is required.");
-  const requestId = (_a = input.requestId) == null ? void 0 : _a.trim();
+  const requestId = (_a2 = input.requestId) == null ? void 0 : _a2.trim();
   if (!requestId) throw new Error("AIM creation request identity is required.");
   const detectedLanguage = chooseAimContentLanguage(repository.settings.language, topic, input.context);
   let mapPath = "";
   for (const file of await repository.mapFiles()) {
-    if (((_b = (await repository.readMap(file.path)).aim) == null ? void 0 : _b.creationId) === requestId) {
+    if (((_b2 = (await repository.readMap(file.path)).aim) == null ? void 0 : _b2.creationId) === requestId) {
       mapPath = file.path;
       break;
     }
@@ -19608,8 +19635,8 @@ function outlineTitle(raw) {
   const protectedText = raw.replace(
     /\\([!-/:-@[-`{-~])|(`+)([^`]*?)\2/g,
     (_match, character, _ticks, content) => {
-      var _a;
-      kept.push((_a = character != null ? character : content) != null ? _a : "");
+      var _a2;
+      kept.push((_a2 = character != null ? character : content) != null ? _a2 : "");
       return `${mark}${kept.length - 1}${mark}`;
     }
   );
@@ -19650,7 +19677,7 @@ function unwrapFencedOutline(lines) {
   return lines;
 }
 function parseOutline(input) {
-  var _a, _b, _c;
+  var _a2, _b2, _c;
   const lines = unwrapFencedOutline(
     (input.charCodeAt(0) === 65279 ? input.slice(1) : input).replace(/\r\n?/g, "\n").split("\n")
   );
@@ -19662,7 +19689,7 @@ function parseOutline(input) {
   let block = null;
   let start = 0;
   let vamNote = false;
-  if (((_a = lines[0]) == null ? void 0 : _a.trim()) === "---") {
+  if (((_a2 = lines[0]) == null ? void 0 : _a2.trim()) === "---") {
     const end = lines.findIndex((line, index) => index > 0 && line.trim() === "---");
     if (end > 0) {
       start = end + 1;
@@ -19723,7 +19750,7 @@ function parseOutline(input) {
     }
     headingLines++;
     const level = heading[1].length;
-    const text11 = (_b = heading[2]) != null ? _b : "";
+    const text11 = (_b2 = heading[2]) != null ? _b2 : "";
     const raw = text11.replace(/(^|[ \t]+)#+[ \t]*$/, "");
     const title = outlineTitle(raw);
     if (!title) {
@@ -19790,9 +19817,9 @@ function localDate2(now) {
   return `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}`;
 }
 function outlineRootDetail(language2, template, source, now) {
-  var _a;
+  var _a2;
   const log = source ? translateNote(language2, "ui.outline_import_log_source", localDate2(now), source) : translateNote(language2, "ui.outline_import_log", localDate2(now));
-  const heading = ((_a = template.sections.find((section3) => section3.role === "log")) != null ? _a : template.sections[0]).name;
+  const heading = ((_a2 = template.sections.find((section3) => section3.role === "log")) != null ? _a2 : template.sections[0]).name;
   return canonicalDetail(`### ${heading}
 
 - ${log}`, noteLanguageOf(language2), template);
@@ -19918,7 +19945,7 @@ function researchDepthDescription(depth) {
 }
 var depthGroup = 0;
 function researchDepthField(parent, options = {}) {
-  var _a;
+  var _a2;
   const fieldset = parent.createEl("fieldset", { cls: "vam-next-depth-set" });
   fieldset.createEl("legend", { text: t("ui.research_depth") });
   const group = `vam-depth-${++depthGroup}`;
@@ -19929,8 +19956,8 @@ function researchDepthField(parent, options = {}) {
     for (const { input, label } of radios.values()) label.toggleClass("is-checked", input.checked);
   };
   const value = () => {
-    var _a2, _b;
-    return (_b = (_a2 = [...radios].find(([, item]) => item.input.checked)) == null ? void 0 : _a2[0]) != null ? _b : DEFAULT_RESEARCH_DEPTH;
+    var _a3, _b2;
+    return (_b2 = (_a3 = [...radios].find(([, item]) => item.input.checked)) == null ? void 0 : _a3[0]) != null ? _b2 : DEFAULT_RESEARCH_DEPTH;
   };
   const set = (depth) => {
     for (const [key2, item] of radios) item.input.checked = key2 === depth;
@@ -19947,15 +19974,15 @@ function researchDepthField(parent, options = {}) {
     label.createSpan({ text: t(key2) });
     radios.set(depth, { input, label });
     input.addEventListener("change", () => {
-      var _a2;
+      var _a3;
       if (!input.checked) return;
       set(depth);
-      (_a2 = options.onChange) == null ? void 0 : _a2.call(options, depth);
+      (_a3 = options.onChange) == null ? void 0 : _a3.call(options, depth);
     });
     input.addEventListener("focus", () => label.addClass("is-focused"));
     input.addEventListener("blur", () => label.removeClass("is-focused"));
   }
-  set((_a = options.initial) != null ? _a : DEFAULT_RESEARCH_DEPTH);
+  set((_a2 = options.initial) != null ? _a2 : DEFAULT_RESEARCH_DEPTH);
   return { value, set };
 }
 function linkedField(parent, label) {
@@ -20073,13 +20100,13 @@ function noteStyleField(parent, options) {
   const custom = field.createDiv("vam-note-style-custom");
   custom.hidden = true;
   const refresh = (notify2 = true) => {
-    var _a;
+    var _a2;
     const preset = NOTE_STYLE_PRESETS.find((item) => stylePreset(item.id) === select.value);
     custom.hidden = select.value !== STYLE_CUSTOM;
     const text11 = preset ? t(preset.hint) : select.value === STYLE_CUSTOM ? t("ui.note_style_custom_hint") : "";
     hint.setText(text11);
     hint.hidden = !text11;
-    if (notify2) (_a = options.changed) == null ? void 0 : _a.call(options);
+    if (notify2) (_a2 = options.changed) == null ? void 0 : _a2.call(options);
   };
   const templateId = templateField(
     custom,
@@ -20087,50 +20114,50 @@ function noteStyleField(parent, options) {
     options.templateDefault,
     options.manageTemplates,
     () => {
-      var _a;
-      return (_a = options.changed) == null ? void 0 : _a.call(options);
+      var _a2;
+      return (_a2 = options.changed) == null ? void 0 : _a2.call(options);
     }
   );
   const toneId = toneField(custom, options.tones, options.toneDefault, options.manageTones, () => {
-    var _a;
-    return (_a = options.changed) == null ? void 0 : _a.call(options);
+    var _a2;
+    return (_a2 = options.changed) == null ? void 0 : _a2.call(options);
   });
   select.addEventListener("change", () => refresh());
   refresh(false);
   const chosenPreset = () => NOTE_STYLE_PRESETS.find((item) => stylePreset(item.id) === select.value);
   const nameOf = (list, id, fallback) => {
-    var _a, _b;
-    return (_b = id ? (_a = list.find((item) => item.id === id)) == null ? void 0 : _a.name : void 0) != null ? _b : fallback;
+    var _a2, _b2;
+    return (_b2 = id ? (_a2 = list.find((item) => item.id === id)) == null ? void 0 : _a2.name : void 0) != null ? _b2 : fallback;
   };
   const customName = () => {
-    var _a, _b;
+    var _a2, _b2;
     return t(
       "ui.note_style_custom_0_1",
-      (_a = nameOf(options.templates, templateId(), options.currentTemplate)) != null ? _a : "",
-      (_b = nameOf(options.tones, toneId(), options.currentTone)) != null ? _b : ""
+      (_a2 = nameOf(options.templates, templateId(), options.currentTemplate)) != null ? _a2 : "",
+      (_b2 = nameOf(options.tones, toneId(), options.currentTone)) != null ? _b2 : ""
     );
   };
   return {
     templateId: () => {
-      var _a;
-      return select.value === STYLE_CUSTOM ? templateId() : (_a = chosenPreset()) == null ? void 0 : _a.templateId;
+      var _a2;
+      return select.value === STYLE_CUSTOM ? templateId() : (_a2 = chosenPreset()) == null ? void 0 : _a2.templateId;
     },
     toneId: () => {
-      var _a;
-      return select.value === STYLE_CUSTOM ? toneId() : (_a = chosenPreset()) == null ? void 0 : _a.toneId;
+      var _a2;
+      return select.value === STYLE_CUSTOM ? toneId() : (_a2 = chosenPreset()) == null ? void 0 : _a2.toneId;
     },
     label: () => {
-      var _a;
+      var _a2;
       const preset = chosenPreset();
       if (preset) return t(preset.name);
-      if (select.value !== STYLE_CUSTOM) return options.currentStyle ? options.keepLabel : (_a = options.currentTone) != null ? _a : "";
+      if (select.value !== STYLE_CUSTOM) return options.currentStyle ? options.keepLabel : (_a2 = options.currentTone) != null ? _a2 : "";
       return customName();
     },
     name: () => {
-      var _a, _b;
+      var _a2, _b2;
       const preset = chosenPreset();
       if (preset) return t(preset.name);
-      if (select.value !== STYLE_CUSTOM) return (_b = (_a = options.currentStyle) != null ? _a : options.currentTone) != null ? _b : "";
+      if (select.value !== STYLE_CUSTOM) return (_b2 = (_a2 = options.currentStyle) != null ? _a2 : options.currentTone) != null ? _b2 : "";
       return customName();
     },
     set: (nextTemplate, nextTone) => {
@@ -20193,7 +20220,7 @@ var OutlineImportModal = class extends import_obsidian16.Modal {
     this.placement = initialPlacement === "under" && target.selected ? "under" : "tree";
   }
   onOpen() {
-    var _a;
+    var _a2;
     this.titleEl.setText(t("ui.outline_import"));
     this.modalEl.addClass("vam-outline-import-modal");
     this.contentEl.createEl("p", { text: t("ui.outline_import_hint"), cls: "vam-hint vam-outline-intro" });
@@ -20245,7 +20272,7 @@ var OutlineImportModal = class extends import_obsidian16.Modal {
     this.createButton = footer.createEl("button", { text: t("ui.outline_import_add"), cls: "mod-cta" });
     this.createButton.addEventListener("click", () => void this.submit());
     this.refresh();
-    const prefill = (_a = this.generator) == null ? void 0 : _a.prefill;
+    const prefill = (_a2 = this.generator) == null ? void 0 : _a2.prefill;
     if (prefill) this.restoreChoices(prefill.inputs);
     this.restoreResult();
   }
@@ -20299,10 +20326,10 @@ var OutlineImportModal = class extends import_obsidian16.Modal {
     return { kind: "tree" };
   }
   onClose() {
-    var _a, _b, _c;
-    (_a = this.unwatch) == null ? void 0 : _a.call(this);
+    var _a2, _b2, _c;
+    (_a2 = this.unwatch) == null ? void 0 : _a2.call(this);
     this.unwatch = void 0;
-    if (!this.detached) (_b = this.generation) == null ? void 0 : _b.abort();
+    if (!this.detached) (_b2 = this.generation) == null ? void 0 : _b2.abort();
     this.generation = void 0;
     (_c = this.disarm) == null ? void 0 : _c.call(this);
   }
@@ -20311,20 +20338,20 @@ var OutlineImportModal = class extends import_obsidian16.Modal {
    * box below, where it is previewed and can be edited before anything is added.
    */
   aiSection(parent, generator) {
-    var _a, _b, _c;
+    var _a2, _b2, _c;
     const host = generator.presets;
     const language2 = host.settings.language;
     const custom = () => {
-      var _a2;
-      return (_a2 = host.settings.promptPresets) != null ? _a2 : [];
+      var _a3;
+      return (_a3 = host.settings.promptPresets) != null ? _a3 : [];
     };
     const presets = () => listPresets(custom(), "outline", language2);
     const section3 = parent.createEl("details", { cls: "vam-outline-ai" });
     section3.createEl("summary", { text: t("ui.outline_ai_generate") });
     const topicLabel = section3.createEl("label", { cls: "vam-field" });
     topicLabel.createSpan({ text: t("ui.outline_ai_topic") });
-    const topic = topicLabel.createEl("input", { type: "text", value: (_a = generator.initialTopic) != null ? _a : "" });
-    topic.value = (_b = generator.initialTopic) != null ? _b : "";
+    const topic = topicLabel.createEl("input", { type: "text", value: (_a2 = generator.initialTopic) != null ? _a2 : "" });
+    topic.value = (_b2 = generator.initialTopic) != null ? _b2 : "";
     topic.setAttr("aria-label", t("ui.outline_ai_topic"));
     const presetRow = section3.createDiv("vam-outline-ai-preset");
     const presetLabel = presetRow.createEl("label", { cls: "vam-field" });
@@ -20359,9 +20386,9 @@ var OutlineImportModal = class extends import_obsidian16.Modal {
       load();
     };
     const load = () => {
-      var _a2;
+      var _a3;
       const preset = current();
-      text11.value = (_a2 = preset == null ? void 0 : preset.text) != null ? _a2 : "";
+      text11.value = (_a3 = preset == null ? void 0 : preset.text) != null ? _a3 : "";
       name.value = preset ? isBuiltinPreset(preset.id) ? t("ui.outline_ai_copy_name", preset.name) : preset.name : "";
       const builtin = !preset || isBuiltinPreset(preset.id);
       remove.disabled = builtin;
@@ -20605,8 +20632,8 @@ var MultiResearchModal = class extends import_obsidian17.Modal {
     });
   }
   onClose() {
-    var _a;
-    (_a = this.unwatch) == null ? void 0 : _a.call(this);
+    var _a2;
+    (_a2 = this.unwatch) == null ? void 0 : _a2.call(this);
     this.unwatch = void 0;
   }
 };
@@ -20688,8 +20715,8 @@ var ReferencePicker = class {
     folder.hidden = true;
     addFolder.addEventListener("click", () => folder.click());
     folder.addEventListener("change", () => {
-      var _a;
-      const selected2 = Array.from((_a = folder.files) != null ? _a : []).filter((file) => file.name.toLowerCase().endsWith(".md"));
+      var _a2;
+      const selected2 = Array.from((_a2 = folder.files) != null ? _a2 : []).filter((file) => file.name.toLowerCase().endsWith(".md"));
       if (selected2.length) this.addFolder(selected2);
       else this.report(t("ui.reference_folder_no_markdown"));
       folder.value = "";
@@ -20701,8 +20728,8 @@ var ReferencePicker = class {
     files.hidden = true;
     addFiles.addEventListener("click", () => files.click());
     files.addEventListener("change", () => {
-      var _a;
-      const selected2 = Array.from((_a = files.files) != null ? _a : []).filter((file) => file.name.toLowerCase().endsWith(".md"));
+      var _a2;
+      const selected2 = Array.from((_a2 = files.files) != null ? _a2 : []).filter((file) => file.name.toLowerCase().endsWith(".md"));
       if (selected2.length) this.addFiles(selected2);
       else this.report(t("ui.reference_file_no_markdown"));
       files.value = "";
@@ -20719,8 +20746,8 @@ var ReferencePicker = class {
     });
     this.cancelReadButton.hidden = true;
     this.cancelReadButton.addEventListener("click", () => {
-      var _a;
-      return (_a = this.activeRead) == null ? void 0 : _a.abort();
+      var _a2;
+      return (_a2 = this.activeRead) == null ? void 0 : _a2.abort();
     });
     this.acknowledgeErrorButton = feedback.createEl("button", {
       text: t("ui.reference_error_acknowledge"),
@@ -20734,7 +20761,7 @@ var ReferencePicker = class {
       this.report("");
     });
     this.refresh = () => {
-      var _a;
+      var _a2;
       list.empty();
       const groups = dedupeReferenceGroups(this.groups);
       if (!groups.length) list.createEl("p", { text: t("ui.reference_none"), cls: "vam-hint vam-reference-empty" });
@@ -20763,7 +20790,7 @@ var ReferencePicker = class {
           details.dataset.rendered = "true";
         });
       }
-      if (typeof Event !== "undefined") (_a = area.dispatchEvent) == null ? void 0 : _a.call(area, new Event("change", { bubbles: true }));
+      if (typeof Event !== "undefined") (_a2 = area.dispatchEvent) == null ? void 0 : _a2.call(area, new Event("change", { bubbles: true }));
     };
     area.createEl("p", {
       cls: "vam-hint vam-reference-duration-hint",
@@ -20864,18 +20891,18 @@ var ReferencePicker = class {
     });
   }
   addFolder(files) {
-    var _a;
+    var _a2;
     if (!files.length) return;
     const folderName = files[0].webkitRelativePath.split("/")[0] || t("ui.reference_selected_folder");
-    const nativePath = (_a = files[0].path) == null ? void 0 : _a.replace(/\\/g, "/");
+    const nativePath = (_a2 = files[0].path) == null ? void 0 : _a2.replace(/\\/g, "/");
     const relative = files[0].webkitRelativePath.replace(/\\/g, "/");
     const folderLocation = nativePath && relative && nativePath.endsWith(relative) ? nativePath.slice(0, -relative.length).replace(/\/$/, "") : folderName;
     this.enqueue(async (signal) => {
       const documents = await this.readFiles(files, true, signal);
       if (signal.aborted) throw new DOMException("Aborted", "AbortError");
       const included = documents.filter((document2) => {
-        var _a2;
-        const yaml = (_a2 = document2.content.match(/^---\r?\n([\s\S]*?)\r?\n---(?:\r?\n|$)/)) == null ? void 0 : _a2[1];
+        var _a3;
+        const yaml = (_a3 = document2.content.match(/^---\r?\n([\s\S]*?)\r?\n---(?:\r?\n|$)/)) == null ? void 0 : _a3[1];
         if (!yaml) return true;
         let metadata;
         try {
@@ -20913,8 +20940,8 @@ var ReferencePicker = class {
     return documents;
   }
   async readSelectedFile(file, fromFolder) {
-    var _a;
-    const nativePath = (_a = file.path) == null ? void 0 : _a.replace(/\\/g, "/");
+    var _a2;
+    const nativePath = (_a2 = file.path) == null ? void 0 : _a2.replace(/\\/g, "/");
     const adapter = this.app.vault.adapter;
     const vaultRoot = adapter instanceof import_obsidian18.FileSystemAdapter ? adapter.getBasePath().replace(/\\/g, "/").replace(/\/$/, "") : "";
     const isInVault = !!nativePath && !!vaultRoot && nativePath.startsWith(`${vaultRoot}/`);
@@ -20986,13 +21013,13 @@ function formatElapsed(durationMs) {
   return `${minutes}m ${seconds}s`;
 }
 function promptMetrics(entry) {
-  var _a, _b, _c, _d, _e;
+  var _a2, _b2, _c, _d, _e;
   let prompt = typeof entry.prompt === "string" ? entry.prompt : "";
   if (!prompt && entry.request) {
     try {
       const parsed = JSON.parse(entry.request);
       const parsedRecord = isRecord(parsed) ? parsed : void 0;
-      const requestValue = (_a = parsedRecord == null ? void 0 : parsedRecord.request) != null ? _a : parsed;
+      const requestValue = (_a2 = parsedRecord == null ? void 0 : parsedRecord.request) != null ? _a2 : parsed;
       const request = isRecord(requestValue) ? requestValue : void 0;
       if (typeof (request == null ? void 0 : request.prompt) === "string") prompt = request.prompt;
       else if (request && isUnknownArray(request.input)) {
@@ -21003,7 +21030,7 @@ function promptMetrics(entry) {
   }
   const characters = Array.from(prompt).length;
   const nonAscii = Array.from(prompt).filter((character) => character.charCodeAt(0) > 127).length;
-  const phase = (_c = (_b = upgradeLegacyAimText(prompt).match(/<!--\s*aim-phase:\s*([a-z-]+)\s*-->/)) == null ? void 0 : _b[1]) != null ? _c : entry.mode;
+  const phase = (_c = (_b2 = upgradeLegacyAimText(prompt).match(/<!--\s*aim-phase:\s*([a-z-]+)\s*-->/)) == null ? void 0 : _b2[1]) != null ? _c : entry.mode;
   const repairReason = /repair/i.test(phase) ? (_e = (_d = prompt.match(/(?:Format validation error|Repair reason):\s*([^\r\n]+)/i)) == null ? void 0 : _d[1]) == null ? void 0 : _e.trim() : void 0;
   return {
     prompt,
@@ -21014,10 +21041,10 @@ function promptMetrics(entry) {
   };
 }
 function formatAiExchange(entry) {
-  var _a, _b;
+  var _a2, _b2;
   const metrics = promptMetrics(entry);
   const step = entry.step ? ` \xB7 step: ${entry.step}` : "";
-  const timing = `Request ID: ${entry.id}${step} \xB7 phase: ${metrics.phase} \xB7 prompt: ${metrics.characters} characters \xB7 approximately ${metrics.estimatedTokens} tokens (estimate, not billed usage) \xB7 sent: ${(_a = entry.sentAt) != null ? _a : "unavailable"} \xB7 completed: ${(_b = entry.completedAt) != null ? _b : "unavailable"} \xB7 elapsed: ${entry.durationMs === void 0 ? "unavailable" : formatElapsed(entry.durationMs)}`;
+  const timing = `Request ID: ${entry.id}${step} \xB7 phase: ${metrics.phase} \xB7 prompt: ${metrics.characters} characters \xB7 approximately ${metrics.estimatedTokens} tokens (estimate, not billed usage) \xB7 sent: ${(_a2 = entry.sentAt) != null ? _a2 : "unavailable"} \xB7 completed: ${(_b2 = entry.completedAt) != null ? _b2 : "unavailable"} \xB7 elapsed: ${entry.durationMs === void 0 ? "unavailable" : formatElapsed(entry.durationMs)}`;
   const milestones = entry.milestones ? `milestones: ${JSON.stringify(entry.milestones)}` : "";
   return [
     `[${entry.startedAt}] ${entry.topic} \xB7 ${entry.mode} \xB7 ${entry.model}/${entry.effort} \xB7 ${entry.status}`,
@@ -21144,11 +21171,11 @@ var AiExchangeLog = class {
     this.changed();
   }
   finish(id, patch) {
-    var _a;
+    var _a2;
     const entry = this.entries.find((item) => item.id === id);
     if (!entry) return;
     const completedAt = (/* @__PURE__ */ new Date()).toISOString();
-    const start = (_a = entry.sentAt) != null ? _a : entry.startedAt;
+    const start = (_a2 = entry.sentAt) != null ? _a2 : entry.startedAt;
     const durationMs = Math.max(0, Date.parse(completedAt) - Date.parse(start));
     this.update(id, { ...patch, completedAt, durationMs });
   }
@@ -21178,14 +21205,14 @@ var DebugLogModal = class extends import_obsidian19.Modal {
     __publicField(this, "unsubscribeExchanges", null);
   }
   onOpen() {
-    var _a, _b;
+    var _a2, _b2;
     this.titleEl.setText(t("ui.debug_log"));
     this.renderLogs();
     this.unsubscribe = this.logs.subscribe(() => this.renderLogs());
-    this.unsubscribeExchanges = (_b = (_a = this.exchanges) == null ? void 0 : _a.subscribe(() => this.renderLogs())) != null ? _b : null;
+    this.unsubscribeExchanges = (_b2 = (_a2 = this.exchanges) == null ? void 0 : _a2.subscribe(() => this.renderLogs())) != null ? _b2 : null;
   }
   renderLogs() {
-    var _a, _b;
+    var _a2, _b2;
     this.contentEl.empty();
     this.contentEl.createEl("p", {
       cls: "vam-modal-intro",
@@ -21233,17 +21260,17 @@ var DebugLogModal = class extends import_obsidian19.Modal {
     if (this.setExchangeEnabled)
       exchangeActions.setName(t("ui.record_ai_exchanges")).addToggle(
         (toggle) => toggle.setValue(this.exchangeEnabled()).onChange(async (value) => {
-          var _a2;
-          await ((_a2 = this.setExchangeEnabled) == null ? void 0 : _a2.call(this, value));
+          var _a3;
+          await ((_a3 = this.setExchangeEnabled) == null ? void 0 : _a3.call(this, value));
           this.renderLogs();
         })
       );
     exchangeActions.addButton(
       (button) => button.setButtonText(t("ui.prompt_monitor_copy_all")).onClick(async () => {
-        var _a2, _b2;
+        var _a3, _b3;
         try {
           await navigator.clipboard.writeText(
-            ((_b2 = (_a2 = this.exchanges) == null ? void 0 : _a2.getEntries()) != null ? _b2 : []).map(formatAiExchange).join("\n\n---\n\n")
+            ((_b3 = (_a3 = this.exchanges) == null ? void 0 : _a3.getEntries()) != null ? _b3 : []).map(formatAiExchange).join("\n\n---\n\n")
           );
           new import_obsidian19.Notice(t("ui.ai_exchange_copied"));
         } catch (e) {
@@ -21253,12 +21280,12 @@ var DebugLogModal = class extends import_obsidian19.Modal {
     );
     exchangeActions.addButton(
       (button) => button.setButtonText(t("ui.clear_ai_exchanges")).setDestructive().onClick(() => {
-        var _a2;
-        return (_a2 = this.exchanges) == null ? void 0 : _a2.clear();
+        var _a3;
+        return (_a3 = this.exchanges) == null ? void 0 : _a3.clear();
       })
     );
     const exchangeList = this.contentEl.createDiv("vam-debug-log-list");
-    const exchanges = [...(_b = (_a = this.exchanges) == null ? void 0 : _a.getEntries()) != null ? _b : []].reverse();
+    const exchanges = [...(_b2 = (_a2 = this.exchanges) == null ? void 0 : _a2.getEntries()) != null ? _b2 : []].reverse();
     const sent = exchanges.filter((entry) => !!entry.request);
     const metrics = sent.map(promptMetrics);
     this.contentEl.createEl("p", {
@@ -21306,9 +21333,9 @@ var DebugLogModal = class extends import_obsidian19.Modal {
     return `${minutes}m ${seconds}s`;
   }
   onClose() {
-    var _a, _b;
-    (_a = this.unsubscribe) == null ? void 0 : _a.call(this);
-    (_b = this.unsubscribeExchanges) == null ? void 0 : _b.call(this);
+    var _a2, _b2;
+    (_a2 = this.unsubscribe) == null ? void 0 : _a2.call(this);
+    (_b2 = this.unsubscribeExchanges) == null ? void 0 : _b2.call(this);
     this.unsubscribe = null;
     this.unsubscribeExchanges = null;
     this.contentEl.empty();
@@ -21373,8 +21400,8 @@ var DetailTemplatesModal = class extends import_obsidian20.Modal {
     __publicField(this, "bar");
   }
   actionBar() {
-    var _a;
-    (_a = this.bar) == null ? void 0 : _a.remove();
+    var _a2;
+    (_a2 = this.bar) == null ? void 0 : _a2.remove();
     this.bar = modalActions(this);
     return this.bar;
   }
@@ -21478,7 +21505,7 @@ var DetailTemplatesModal = class extends import_obsidian20.Modal {
    * editor with every field disabled and only Close (used to look at Standard).
    */
   showEditor(original, isNew, readOnly = false) {
-    var _a;
+    var _a2;
     const { contentEl } = this;
     const language2 = this.settings.language;
     const draft = copyTemplate(original, original.name, original.id);
@@ -21513,7 +21540,7 @@ var DetailTemplatesModal = class extends import_obsidian20.Modal {
       return issues;
     };
     const rows = [];
-    let openId = (_a = draft.sections[0]) == null ? void 0 : _a.id;
+    let openId = (_a2 = draft.sections[0]) == null ? void 0 : _a2.id;
     let saving = false;
     const refresh = () => {
       const issues = check();
@@ -21529,8 +21556,8 @@ var DetailTemplatesModal = class extends import_obsidian20.Modal {
         else topIssues.createDiv({ text: text11, cls: "vam-template-issue" });
       }
       rows.forEach((update, index) => {
-        var _a2;
-        return update((_a2 = bySection[index]) != null ? _a2 : []);
+        var _a3;
+        return update((_a3 = bySection[index]) != null ? _a3 : []);
       });
       previewText.setText(detailStructurePrompt(draft, language2, (headings) => detailStructure(language2, headings)));
       if (save) save.disabled = issues.length > 0;
@@ -21599,7 +21626,7 @@ var DetailTemplatesModal = class extends import_obsidian20.Modal {
   }
   /** The expanded accordion row with every field of one section. */
   openSection(parent, draft, section3, index, readOnly, open, refresh) {
-    var _a, _b;
+    var _a2, _b2;
     const row = parent.createDiv("vam-template-section is-open");
     const header = row.createDiv("vam-template-section-header is-open");
     header.createSpan({ text: String(index + 1), cls: "vam-template-section-number" });
@@ -21631,9 +21658,9 @@ var DetailTemplatesModal = class extends import_obsidian20.Modal {
       "trash-2",
       t("ui.detail_section_remove"),
       () => {
-        var _a2;
+        var _a3;
         draft.sections.splice(index, 1);
-        open((_a2 = draft.sections[Math.min(index, draft.sections.length - 1)]) == null ? void 0 : _a2.id);
+        open((_a3 = draft.sections[Math.min(index, draft.sections.length - 1)]) == null ? void 0 : _a3.id);
       },
       false
     );
@@ -21672,11 +21699,11 @@ var DetailTemplatesModal = class extends import_obsidian20.Modal {
     option(mode, "none", t("ui.detail_section_count_none"));
     option(mode, "exact", t("ui.detail_section_count_exact"));
     option(mode, "min", t("ui.detail_section_count_min"));
-    mode.value = (_b = (_a = section3.count) == null ? void 0 : _a.mode) != null ? _b : "none";
+    mode.value = (_b2 = (_a2 = section3.count) == null ? void 0 : _a2.mode) != null ? _b2 : "none";
     mode.addEventListener("change", () => {
-      var _a2, _b2;
+      var _a3, _b3;
       if (mode.value === "none") delete section3.count;
-      else section3.count = { mode: mode.value, n: (_b2 = (_a2 = section3.count) == null ? void 0 : _a2.n) != null ? _b2 : 1 };
+      else section3.count = { mode: mode.value, n: (_b3 = (_a3 = section3.count) == null ? void 0 : _a3.n) != null ? _b3 : 1 };
       open(section3.id);
     });
     if (section3.count) {
@@ -21718,8 +21745,8 @@ var DetailTemplatesModal = class extends import_obsidian20.Modal {
 
 // experiences/visual-map/modals.ts
 function outlineProposals(nodes) {
-  var _a;
-  const root = nodes.filter((node) => node.parent === null).length === 1 ? (_a = nodes[0]) == null ? void 0 : _a.index : void 0;
+  var _a2;
+  const root = nodes.filter((node) => node.parent === null).length === 1 ? (_a2 = nodes[0]) == null ? void 0 : _a2.index : void 0;
   return nodes.filter((node) => node.index !== root).map((node) => ({
     key: String(node.index),
     parentKey: node.parent === null || node.parent === root ? "" : String(node.parent),
@@ -21729,7 +21756,7 @@ function outlineProposals(nodes) {
   }));
 }
 function proposalOutline(items) {
-  var _a;
+  var _a2;
   const index = /* @__PURE__ */ new Map();
   const nodes = [];
   for (const item of items) {
@@ -21742,7 +21769,7 @@ function proposalOutline(items) {
       parent: parent != null ? parent : null,
       line: 0
     };
-    index.set((_a = item.key) != null ? _a : item.title, node.index);
+    index.set((_a2 = item.key) != null ? _a2 : item.title, node.index);
     nodes.push(node);
   }
   return nodes;
@@ -21816,8 +21843,8 @@ var NextStepModal = class extends import_obsidian21.Modal {
   }
   /** Where the shared fields (data sources, template, tone) come from: the topic's settings, or the selection's. */
   get info() {
-    var _a, _b;
-    return (_b = this.modelSettings) != null ? _b : (_a = this.selectionFlow) == null ? void 0 : _a.fields;
+    var _a2, _b2;
+    return (_b2 = this.modelSettings) != null ? _b2 : (_a2 = this.selectionFlow) == null ? void 0 : _a2.fields;
   }
   /** Suggests the next step from where the topic stands: frontier → research, settled leaf → expand, settled branch → synthesize. */
   suggestedMode() {
@@ -21830,8 +21857,8 @@ var NextStepModal = class extends import_obsidian21.Modal {
   }
   /** One data-source picker shared by every step, so choices survive switching steps. */
   addReferencePicker(panel) {
-    var _a;
-    const sources2 = (_a = this.info) == null ? void 0 : _a.sources;
+    var _a2;
+    const sources2 = (_a2 = this.info) == null ? void 0 : _a2.sources;
     if (!sources2) return void 0;
     const disclosure = panel.createEl("details", { cls: "vam-next-source-details" });
     disclosure.open = false;
@@ -21852,16 +21879,16 @@ var NextStepModal = class extends import_obsidian21.Modal {
     pickerContent.addEventListener("change", updateSelection);
     updateSelection();
     const forMode = (mode) => {
-      var _a2;
+      var _a3;
       const synthesize = mode === "synthesize";
-      picker.setCurrentLabel(synthesize ? (_a2 = sources2.synthesisLabel) != null ? _a2 : sources2.currentLabel : sources2.currentLabel);
+      picker.setCurrentLabel(synthesize ? (_a3 = sources2.synthesisLabel) != null ? _a3 : sources2.currentLabel : sources2.currentLabel);
       picker.setNetworkDefault(!synthesize, !synthesize);
       updateSelection();
     };
     return { picker, disclosure, forMode };
   }
   renderRequirements(parent) {
-    var _a, _b;
+    var _a2, _b2;
     const disclosure = parent.createEl("details", { cls: "vam-next-requirements" });
     disclosure.open = false;
     const summary = disclosure.createEl("summary", { text: t("ui.additional_requirements") });
@@ -21875,37 +21902,37 @@ var NextStepModal = class extends import_obsidian21.Modal {
       value.setText(text11 ? text11.length > 24 ? `${text11.slice(0, 24)}\u2026` : text11 : t("ui.not_set"));
     });
     disclosure.createEl("p", { text: t("ui.requirements_this_task_only"), cls: "vam-hint" });
-    if ((_b = (_a = this.modelSettings) == null ? void 0 : _a.rules) == null ? void 0 : _b.trim())
+    if ((_b2 = (_a2 = this.modelSettings) == null ? void 0 : _a2.rules) == null ? void 0 : _b2.trim())
       parent.createEl("p", { text: t("ui.legacy_rules_not_applied"), cls: "vam-hint" });
   }
   requirements() {
-    var _a, _b;
-    return (_b = (_a = this.requirementsInput) == null ? void 0 : _a.value.trim()) != null ? _b : "";
+    var _a2, _b2;
+    return (_b2 = (_a2 = this.requirementsInput) == null ? void 0 : _a2.value.trim()) != null ? _b2 : "";
   }
   get background() {
-    var _a, _b, _c;
-    return (_c = (_a = this.modelSettings) == null ? void 0 : _a.background) != null ? _c : (_b = this.selectionFlow) == null ? void 0 : _b.background;
+    var _a2, _b2, _c;
+    return (_c = (_a2 = this.modelSettings) == null ? void 0 : _a2.background) != null ? _c : (_b2 = this.selectionFlow) == null ? void 0 : _b2.background;
   }
   /**
    * Hides the dialog once AI starts: usage confirmed, settings saved and sources ready (so a validation error still
    * shows in the dialog). The view takes over Stop for `controller` until the provider accepts the request.
    */
   detach(controller) {
-    var _a;
+    var _a2;
     this.detached = true;
     controller.signal.addEventListener("abort", () => {
-      var _a2, _b;
-      return (_b = (_a2 = this.plugin).releaseWarmClaude) == null ? void 0 : _b.call(_a2);
+      var _a3, _b2;
+      return (_b2 = (_a3 = this.plugin).releaseWarmClaude) == null ? void 0 : _b2.call(_a3);
     }, { once: true });
     this.backgroundBegan = true;
-    (_a = this.background) == null ? void 0 : _a.begin(controller);
+    (_a2 = this.background) == null ? void 0 : _a2.begin(controller);
     this.close();
   }
   endBackground() {
-    var _a;
+    var _a2;
     if (!this.backgroundBegan) return;
     this.backgroundBegan = false;
-    (_a = this.background) == null ? void 0 : _a.end();
+    (_a2 = this.background) == null ? void 0 : _a2.end();
   }
   /** True when a started run should stop: it was aborted, or its dialog closed before AI started. */
   dead(controller) {
@@ -21913,20 +21940,20 @@ var NextStepModal = class extends import_obsidian21.Modal {
   }
   /** Pre-starts the Claude CLI for the research step (no model call); a run that does not use it kills it. */
   prewarmAi(webSearch = true, mode) {
-    var _a, _b, _c, _d, _e;
+    var _a2, _b2, _c, _d, _e;
     if (this.selectionFlow || this.closed) return;
     (_e = (_d = this.plugin).prewarmClaude) == null ? void 0 : _e.call(
       _d,
-      (_b = (_a = this.modelSettings) == null ? void 0 : _a.model) != null ? _b : this.plugin.settings.cliModel,
+      (_b2 = (_a2 = this.modelSettings) == null ? void 0 : _a2.model) != null ? _b2 : this.plugin.settings.cliModel,
       (_c = this.modelSettings) == null ? void 0 : _c.reasoning,
       webSearch,
       mode
     );
   }
   onClose() {
-    var _a, _b, _c, _d;
+    var _a2, _b2, _c, _d;
     this.closed = true;
-    if (!this.detached) (_b = (_a = this.plugin).releaseWarmClaude) == null ? void 0 : _b.call(_a);
+    if (!this.detached) (_b2 = (_a2 = this.plugin).releaseWarmClaude) == null ? void 0 : _b2.call(_a2);
     if (!this.detached) (_c = this.taskController) == null ? void 0 : _c.abort();
     (_d = this.unsubscribeModels) == null ? void 0 : _d.call(this);
   }
@@ -21943,7 +21970,7 @@ var NextStepModal = class extends import_obsidian21.Modal {
     }
   }
   renderModelSettings(parent) {
-    var _a;
+    var _a2;
     if (!this.modelSettings) return;
     const settings = this.modelSettings;
     const advanced = parent.createEl("details", { cls: "vam-advanced vam-next-model" });
@@ -21979,7 +22006,7 @@ var NextStepModal = class extends import_obsidian21.Modal {
       );
       syncModels();
     };
-    (_a = this.unsubscribeModels) == null ? void 0 : _a.call(this);
+    (_a2 = this.unsubscribeModels) == null ? void 0 : _a2.call(this);
     this.unsubscribeModels = this.plugin.subscribeModelDiscovery(() => {
       if (!this.closed) updateDiscovery();
     });
@@ -22031,12 +22058,12 @@ var NextStepModal = class extends import_obsidian21.Modal {
     return advanced;
   }
   async run(panel, button, work, needsUsage = true) {
-    var _a, _b;
+    var _a2, _b2;
     if (button.disabled || this.runPending || this.taskController && !this.taskController.signal.aborted) return;
     this.runPending = true;
     button.disabled = true;
     const start = async () => {
-      var _a2, _b2, _c, _d, _e, _f;
+      var _a3, _b3, _c, _d, _e, _f;
       if (this.closed) return;
       button.disabled = true;
       const failureHelp = panel.querySelector(".vam-ai-failure-help");
@@ -22044,7 +22071,7 @@ var NextStepModal = class extends import_obsidian21.Modal {
       const controller = new AbortController();
       this.taskController = controller;
       this.taskSignal = controller.signal;
-      const tasksBefore = new Set((_c = (_b2 = (_a2 = this.plugin.activeTasks) == null ? void 0 : _a2.keys) == null ? void 0 : _b2.call(_a2)) != null ? _c : []);
+      const tasksBefore = new Set((_c = (_b3 = (_a3 = this.plugin.activeTasks) == null ? void 0 : _a3.keys) == null ? void 0 : _b3.call(_a3)) != null ? _c : []);
       const status = panel.querySelector(".vam-next-status");
       status == null ? void 0 : status.setText(t("ui.ai_running_ai"));
       let cancel = panel.querySelector(".vam-task-cancel");
@@ -22077,9 +22104,9 @@ var NextStepModal = class extends import_obsidian21.Modal {
         };
         if (backgroundTaskRunning) {
           const waitForTasks = () => {
-            var _a3, _b3, _c2;
+            var _a4, _b4, _c2;
             if (this.taskController !== controller) return;
-            if ([...(_c2 = (_b3 = (_a3 = this.plugin.activeTasks) == null ? void 0 : _a3.keys) == null ? void 0 : _b3.call(_a3)) != null ? _c2 : []].some((path) => !tasksBefore.has(path)))
+            if ([...(_c2 = (_b4 = (_a4 = this.plugin.activeTasks) == null ? void 0 : _a4.keys) == null ? void 0 : _b4.call(_a4)) != null ? _c2 : []].some((path) => !tasksBefore.has(path)))
               window.setTimeout(waitForTasks, 250);
             else release();
           };
@@ -22088,7 +22115,7 @@ var NextStepModal = class extends import_obsidian21.Modal {
       }
     };
     try {
-      const model = (_b = (_a = this.modelSettings) == null ? void 0 : _a.model) != null ? _b : this.plugin.settings.cliModel;
+      const model = (_b2 = (_a2 = this.modelSettings) == null ? void 0 : _a2.model) != null ? _b2 : this.plugin.settings.cliModel;
       const started = needsUsage ? await this.plugin.confirmAiUsage(model, start) : await this.plugin.aiReadyForModel(model) && (await start(), true);
       if (!started) button.disabled = false;
     } catch (error) {
@@ -22166,9 +22193,9 @@ var NextStepModal = class extends import_obsidian21.Modal {
     });
   }
   failed(panel, button, message) {
-    var _a;
+    var _a2;
     if (this.closed) return;
-    (_a = panel.querySelector(".vam-next-status")) == null ? void 0 : _a.setText(message);
+    (_a2 = panel.querySelector(".vam-next-status")) == null ? void 0 : _a2.setText(message);
     button.disabled = false;
   }
   startedInBackground() {
@@ -22195,7 +22222,7 @@ var NextStepModal = class extends import_obsidian21.Modal {
     help.hidden = false;
   }
   proposals(panel, suggestions, create, button, consumed, options) {
-    var _a;
+    var _a2;
     if (this.closed) return;
     const result = panel.querySelector(".vam-next-result");
     result.empty();
@@ -22214,11 +22241,11 @@ var NextStepModal = class extends import_obsidian21.Modal {
     button.classList.toggle("mod-cta", false);
     confirm.addEventListener("click", () => {
       void (async () => {
-        var _a2;
+        var _a3;
         const picked = list.selected();
         if (typeof picked === "string") {
           if (picked === t("ui.select_at_least_one_subtopic"))
-            (_a2 = panel.querySelector(".vam-next-status")) == null ? void 0 : _a2.setText(picked);
+            (_a3 = panel.querySelector(".vam-next-status")) == null ? void 0 : _a3.setText(picked);
           else this.failed(panel, button, picked);
           return;
         }
@@ -22226,9 +22253,9 @@ var NextStepModal = class extends import_obsidian21.Modal {
           panel,
           confirm,
           async () => {
-            var _a3;
+            var _a4;
             options.signal = this.taskSignal;
-            (_a3 = panel.querySelector(".vam-next-status")) == null ? void 0 : _a3.setText(t("ui.creating_subtopics"));
+            (_a4 = panel.querySelector(".vam-next-status")) == null ? void 0 : _a4.setText(t("ui.creating_subtopics"));
             try {
               await create(picked);
               if (options.shallowResearch) {
@@ -22256,11 +22283,11 @@ var NextStepModal = class extends import_obsidian21.Modal {
         );
       })();
     });
-    (_a = panel.querySelector(".vam-next-status")) == null ? void 0 : _a.setText(t("ui.review_ai_suggested_subtopics"));
+    (_a2 = panel.querySelector(".vam-next-status")) == null ? void 0 : _a2.setText(t("ui.review_ai_suggested_subtopics"));
   }
   /** The generated outline, reviewed here; nothing is created until the user confirms. */
   outlineReview(panel, nodes, button, create, options, dropped = 0) {
-    var _a;
+    var _a2;
     if (this.closed) return;
     const result = panel.querySelector(".vam-next-result");
     result.empty();
@@ -22282,23 +22309,23 @@ var NextStepModal = class extends import_obsidian21.Modal {
     };
     button.classList.toggle("mod-cta", false);
     confirm.addEventListener("click", () => {
-      var _a2;
+      var _a3;
       const picked = list.selected();
       if (typeof picked === "string") {
-        (_a2 = status()) == null ? void 0 : _a2.setText(picked);
+        (_a3 = status()) == null ? void 0 : _a3.setText(picked);
         return;
       }
       void this.run(
         panel,
         confirm,
         async () => {
-          var _a3, _b, _c;
+          var _a4, _b2, _c;
           options.signal = this.taskSignal;
-          (_a3 = status()) == null ? void 0 : _a3.setText(t("ui.creating_subtopics"));
+          (_a4 = status()) == null ? void 0 : _a4.setText(t("ui.creating_subtopics"));
           await create(proposalOutline(picked), options);
           this.taskSignal = void 0;
           this.taskController = void 0;
-          (_c = (_b = this.modelSettings) == null ? void 0 : _b.pendingOutline) == null ? void 0 : _c.discard();
+          (_c = (_b2 = this.modelSettings) == null ? void 0 : _b2.pendingOutline) == null ? void 0 : _c.discard();
           if (options.shallowResearch) {
             this.startedInBackground();
             return;
@@ -22309,16 +22336,16 @@ var NextStepModal = class extends import_obsidian21.Modal {
         false
       );
     });
-    (_a = status()) == null ? void 0 : _a.setText(t("ui.quick_outline_review_hint"));
+    (_a2 = status()) == null ? void 0 : _a2.setText(t("ui.quick_outline_review_hint"));
   }
   onOpen() {
-    var _a, _b, _c, _d, _e, _f, _g, _h, _i, _j, _k, _l, _m, _n, _o, _p, _q, _r, _s, _t, _u, _v, _w, _x, _y, _z, _A, _B, _C, _D;
+    var _a2, _b2, _c, _d, _e, _f, _g, _h, _i, _j, _k, _l, _m, _n, _o, _p, _q, _r, _s, _t, _u, _v, _w, _x, _y, _z, _A, _B, _C, _D;
     this.modalEl.addClass("vam-next-modal");
     const selection = this.selectionFlow;
     this.titleEl.setText(t(selection ? "ui.confirm_topic_synthesis" : "ui.how_would_you_like_to_explore_next"));
     const intro = this.contentEl.createEl("p", { cls: "vam-modal-intro vam-next-topic" });
     if (!selection) intro.createSpan({ text: t("ui.current_topic_0", this.topic) });
-    const topicStatus = (_a = this.modelSettings) == null ? void 0 : _a.topicStatus;
+    const topicStatus = (_a2 = this.modelSettings) == null ? void 0 : _a2.topicStatus;
     if (topicStatus)
       intro.createSpan({
         cls: `vam-status vam-status-${topicStatus}`,
@@ -22333,7 +22360,7 @@ var NextStepModal = class extends import_obsidian21.Modal {
     closeButton.addEventListener("click", () => this.close());
     const confirm = actions.createEl("button", { text: t("ui.confirm_research_task"), cls: "mod-cta" });
     confirm.dataset.topicRun = t("ui.confirm_research_task");
-    confirm.disabled = !!((_b = this.modelSettings) == null ? void 0 : _b.running);
+    confirm.disabled = !!((_b2 = this.modelSettings) == null ? void 0 : _b2.running);
     let synthesisContentSelect;
     const cards = this.contentEl.createDiv("vam-next-cards");
     cards.setAttr("role", "radiogroup");
@@ -22394,8 +22421,8 @@ var NextStepModal = class extends import_obsidian21.Modal {
       running.createSpan({ text: t("ui.ai_running_ai") });
       if (this.modelSettings.stop)
         running.createEl("button", { text: t("ui.stop_research") }).addEventListener("click", () => {
-          var _a2, _b2;
-          return (_b2 = (_a2 = this.modelSettings) == null ? void 0 : _a2.stop) == null ? void 0 : _b2.call(_a2);
+          var _a3, _b3;
+          return (_b3 = (_a3 = this.modelSettings) == null ? void 0 : _a3.stop) == null ? void 0 : _b3.call(_a3);
         });
     }
     const summaryEl = this.contentEl.createEl("p", { cls: "vam-next-summary", attr: { "aria-live": "polite" } });
@@ -22419,12 +22446,12 @@ var NextStepModal = class extends import_obsidian21.Modal {
     research.createEl("p", { cls: "vam-next-status", attr: { "aria-live": "polite" } });
     confirm.addEventListener("click", () => {
       void this.run(research, confirm, async () => {
-        var _a2;
+        var _a3;
         const controller = this.taskController;
         const selected = await (sharedSources == null ? void 0 : sharedSources.picker.ready());
         if (!controller || this.dead(controller)) return;
         const options = {
-          referenceGroups: (_a2 = selected == null ? void 0 : selected.groups) != null ? _a2 : [],
+          referenceGroups: (_a3 = selected == null ? void 0 : selected.groups) != null ? _a3 : [],
           outputLanguage: languageSelect.value,
           researchMode: (selected == null ? void 0 : selected.webSearch) ? "research" : "local",
           researchDepth: depthField.value(),
@@ -22434,9 +22461,9 @@ var NextStepModal = class extends import_obsidian21.Modal {
           ...toneId() ? { toneId: toneId() } : {},
           signal: controller.signal,
           onProgress: (message) => {
-            var _a3;
+            var _a4;
             if (!this.closed && !controller.signal.aborted)
-              (_a3 = research.querySelector(".vam-next-status")) == null ? void 0 : _a3.setText(message);
+              (_a4 = research.querySelector(".vam-next-status")) == null ? void 0 : _a4.setText(message);
           }
         };
         this.detach(controller);
@@ -22467,9 +22494,9 @@ var NextStepModal = class extends import_obsidian21.Modal {
           options,
           "",
           () => {
-            var _a3, _b2;
+            var _a4, _b3;
             if (this.closed) {
-              (_b2 = (_a3 = this.background) == null ? void 0 : _a3.completed) == null ? void 0 : _b2.call(_a3, "research");
+              (_b3 = (_a4 = this.background) == null ? void 0 : _a4.completed) == null ? void 0 : _b3.call(_a4, "research");
               return;
             }
             release();
@@ -22514,7 +22541,7 @@ var NextStepModal = class extends import_obsidian21.Modal {
     }
     let multiLayer = false;
     const setExpandMode = (value) => {
-      var _a2, _b2;
+      var _a3, _b3;
       multiLayer = value;
       guided.classList.toggle("is-active", !value);
       quick.classList.toggle("is-active", value);
@@ -22532,8 +22559,8 @@ var NextStepModal = class extends import_obsidian21.Modal {
       expandButton.setText(
         value ? t("ui.outline_ai_run") : this.pendingCount ? t("ui.review_ai_subtopic_suggestions") : t("ui.get_expansion_directions")
       );
-      expandButton.dataset.topicRun = (_a2 = expandButton.textContent) != null ? _a2 : "";
-      expandButton.disabled = !!((_b2 = this.modelSettings) == null ? void 0 : _b2.running) || value && !quickOutline;
+      expandButton.dataset.topicRun = (_a3 = expandButton.textContent) != null ? _a3 : "";
+      expandButton.disabled = !!((_b3 = this.modelSettings) == null ? void 0 : _b3.running) || value && !quickOutline;
       refreshSummary();
     };
     guided.addEventListener("click", () => setExpandMode(false));
@@ -22608,10 +22635,10 @@ var NextStepModal = class extends import_obsidian21.Modal {
         expandPanel,
         expandButton,
         async () => {
-          var _a2, _b2, _c2, _d2;
+          var _a3, _b3, _c2, _d2;
           const selected = await (sharedSources == null ? void 0 : sharedSources.picker.ready());
           const options = {
-            referenceGroups: (_a2 = selected == null ? void 0 : selected.groups) != null ? _a2 : [],
+            referenceGroups: (_a3 = selected == null ? void 0 : selected.groups) != null ? _a3 : [],
             outputLanguage: languageSelect.value,
             requirements: this.requirements(),
             researchMode: (selected == null ? void 0 : selected.webSearch) ? "research" : "local",
@@ -22623,8 +22650,8 @@ var NextStepModal = class extends import_obsidian21.Modal {
             ...toneId() ? { toneId: toneId() } : {},
             signal: this.taskSignal,
             onProgress: (message) => {
-              var _a3;
-              if (!this.closed) (_a3 = expandPanel.querySelector(".vam-next-status")) == null ? void 0 : _a3.setText(message);
+              var _a4;
+              if (!this.closed) (_a4 = expandPanel.querySelector(".vam-next-status")) == null ? void 0 : _a4.setText(message);
             }
           };
           if (multiLayer) {
@@ -22636,7 +22663,7 @@ var NextStepModal = class extends import_obsidian21.Modal {
             const request = {
               presetId: presetSelect.value,
               requirements: this.requirements(),
-              language: (_b2 = options.outputLanguage) != null ? _b2 : this.plugin.settings.language,
+              language: (_b3 = options.outputLanguage) != null ? _b3 : this.plugin.settings.language,
               limits
             };
             this.detach(controller);
@@ -22659,8 +22686,8 @@ var NextStepModal = class extends import_obsidian21.Modal {
             options,
             "",
             (items, create) => {
-              var _a3, _b3;
-              if (this.closed) (_b3 = (_a3 = this.background) == null ? void 0 : _a3.completed) == null ? void 0 : _b3.call(_a3, "expand");
+              var _a4, _b4;
+              if (this.closed) (_b4 = (_a4 = this.background) == null ? void 0 : _a4.completed) == null ? void 0 : _b4.call(_a4, "expand");
               else this.proposals(expandPanel, items, create, expandButton, consumed, options);
             },
             (message, retryable) => {
@@ -22730,7 +22757,7 @@ var NextStepModal = class extends import_obsidian21.Modal {
     };
     let directionBox;
     const showDirections = (items) => {
-      var _a2, _b2;
+      var _a3, _b3;
       if (this.closed) return;
       stage = "directions";
       synthResult.empty();
@@ -22744,13 +22771,13 @@ var NextStepModal = class extends import_obsidian21.Modal {
       }
       const box = synthResult.createEl("textarea", {
         cls: "vam-next-focus",
-        text: ((_a2 = items[0]) == null ? void 0 : _a2.task) || ((_b2 = items[0]) == null ? void 0 : _b2.title) || ""
+        text: ((_a3 = items[0]) == null ? void 0 : _a3.task) || ((_b3 = items[0]) == null ? void 0 : _b3.title) || ""
       });
       box.setAttr("aria-label", t("ui.synthesis_direction"));
       directionBox = box;
       synthResult.createEl("button", { text: t("ui.discard_synthesis") }).addEventListener("click", () => {
-        var _a3, _b3;
-        (_b3 = selection ? selection.pending : (_a3 = this.modelSettings) == null ? void 0 : _a3.synthesisPending) == null ? void 0 : _b3.discard();
+        var _a4, _b4;
+        (_b4 = selection ? selection.pending : (_a4 = this.modelSettings) == null ? void 0 : _a4.synthesisPending) == null ? void 0 : _b4.discard();
         this.close();
       });
       synthStatus.setText(t("ui.choose_or_edit_a_synthesis_direction_then_get_a_draft"));
@@ -22761,21 +22788,21 @@ var NextStepModal = class extends import_obsidian21.Modal {
     const flow = { directions: showDirections, written: () => this.close() };
     const needsName = () => !!titleInput && !titleInput.value.trim();
     const checkName = () => {
-      var _a2;
+      var _a3;
       if (!titleInput || stage !== "setup") return;
       const missing = needsName();
-      suggestButton.disabled = skipButton.disabled = missing || !!((_a2 = this.modelSettings) == null ? void 0 : _a2.running);
+      suggestButton.disabled = skipButton.disabled = missing || !!((_a3 = this.modelSettings) == null ? void 0 : _a3.running);
       synthStatus.setText(missing ? t("ui.synthesis_needs_name") : "");
     };
     titleInput == null ? void 0 : titleInput.addEventListener("input", checkName);
     const setupOptions = async (signal) => {
-      var _a2, _b2, _c2;
+      var _a3, _b3, _c2;
       const content = (synthesisContentSelect == null ? void 0 : synthesisContentSelect.value) === "summary" ? "summary" : "full";
       if (synthesisContentSelect) synthesisContentSelect.disabled = true;
       const selected = await (sharedSources == null ? void 0 : sharedSources.picker.ready());
       const options = {
         synthesisContent: content,
-        referenceGroups: (_a2 = selected == null ? void 0 : selected.groups) != null ? _a2 : [],
+        referenceGroups: (_a3 = selected == null ? void 0 : selected.groups) != null ? _a3 : [],
         outputLanguage: languageSelect.value,
         requirements: this.requirements(),
         researchMode: (selected == null ? void 0 : selected.webSearch) ? "research" : "local",
@@ -22789,7 +22816,7 @@ var NextStepModal = class extends import_obsidian21.Modal {
           if (!this.closed) synthStatus.setText(message);
         }
       };
-      if (!selection && !this.childrenCount && !((_b2 = options.referenceGroups) == null ? void 0 : _b2.some((group) => group.documents.length)))
+      if (!selection && !this.childrenCount && !((_b3 = options.referenceGroups) == null ? void 0 : _b3.some((group) => group.documents.length)))
         throw new Error(t("ui.choose_another_note_source_first"));
       frozenSummary = (_c2 = summaryEl.textContent) != null ? _c2 : "";
       return options;
@@ -22828,11 +22855,11 @@ var NextStepModal = class extends import_obsidian21.Modal {
     draftButton.addEventListener(
       "click",
       () => {
-        var _a2;
+        var _a3;
         return this.launchSynthesis(
           synthesizePanel,
           draftButton,
-          ((_a2 = directionBox == null ? void 0 : directionBox.value) != null ? _a2 : "").trim(),
+          ((_a3 = directionBox == null ? void 0 : directionBox.value) != null ? _a3 : "").trim(),
           async (signal) => draftOptions(signal),
           flow
         );
@@ -22840,11 +22867,11 @@ var NextStepModal = class extends import_obsidian21.Modal {
     );
     const sharedSources = this.addReferencePicker(adjustBody);
     const warmForMode = () => {
-      var _a2, _b2, _c2, _d2;
-      if (currentMode === "research") this.prewarmAi((_a2 = sharedSources == null ? void 0 : sharedSources.picker.selection().webSearch) != null ? _a2 : true);
+      var _a3, _b3, _c2, _d2;
+      if (currentMode === "research") this.prewarmAi((_a3 = sharedSources == null ? void 0 : sharedSources.picker.selection().webSearch) != null ? _a3 : true);
       else if (currentMode === "expand" && shallow.checked && !shallowWeb.checked) this.prewarmAi(false);
       else if (currentMode === "synthesize")
-        this.prewarmAi((_b2 = sharedSources == null ? void 0 : sharedSources.picker.selection().webSearch) != null ? _b2 : false, "synthesize");
+        this.prewarmAi((_b3 = sharedSources == null ? void 0 : sharedSources.picker.selection().webSearch) != null ? _b3 : false, "synthesize");
       else if (!this.detached) (_d2 = (_c2 = this.plugin).releaseWarmClaude) == null ? void 0 : _d2.call(_c2);
     };
     show = (mode) => {
@@ -22951,8 +22978,8 @@ var NextStepModal = class extends import_obsidian21.Modal {
       const reviewOptions = {
         ...waitingOutline.options,
         onProgress: (message) => {
-          var _a2;
-          return (_a2 = expandPanel.querySelector(".vam-next-status")) == null ? void 0 : _a2.setText(message);
+          var _a3;
+          return (_a3 = expandPanel.querySelector(".vam-next-status")) == null ? void 0 : _a3.setText(message);
         }
       };
       this.outlineReview(
@@ -22988,17 +23015,17 @@ function renderProposalKind(head, row, item) {
   if (item.reason) row.createEl("p", { cls: "vam-proposal-reason", text: item.reason });
 }
 function renderProposalList(parent, suggestions, changed, options = {}) {
-  var _a;
+  var _a2;
   suggestions = suggestions.map(
     (item) => options.rootTitle && item.parentTitle === options.rootTitle ? { ...item, parentTitle: "" } : item
   );
   const keyOf = (item) => {
-    var _a2;
-    return (_a2 = item.key) != null ? _a2 : item.title;
+    var _a3;
+    return (_a3 = item.key) != null ? _a3 : item.title;
   };
   const parentOf = (item) => {
-    var _a2;
-    return (_a2 = item.key !== void 0 ? item.parentKey : item.parentTitle) != null ? _a2 : "";
+    var _a3;
+    return (_a3 = item.key !== void 0 ? item.parentKey : item.parentTitle) != null ? _a3 : "";
   };
   const review = !!options.apply;
   const rows = [];
@@ -23022,10 +23049,10 @@ function renderProposalList(parent, suggestions, changed, options = {}) {
     )
   ];
   const depthOf = (item) => {
-    var _a2;
+    var _a3;
     let depth = 0;
     for (let up = parentOf(item); up && depth < 6; depth++)
-      up = parentOf((_a2 = suggestions.find((other) => keyOf(other) === up)) != null ? _a2 : { title: "", task: "", contribution: "" });
+      up = parentOf((_a3 = suggestions.find((other) => keyOf(other) === up)) != null ? _a3 : { title: "", task: "", contribution: "" });
     return depth;
   };
   const count = () => rows.filter((row) => row.check.checked).length;
@@ -23070,7 +23097,7 @@ function renderProposalList(parent, suggestions, changed, options = {}) {
       contribution.setAttr("aria-label", t("ui.contribution_to_the_parent_topic"));
     }
     rows.push({ item, check, title, task, contribution });
-    (_a = options.apply) == null ? void 0 : _a.call(options, item, { element: row, head, title });
+    (_a2 = options.apply) == null ? void 0 : _a2.call(options, item, { element: row, head, title });
     check.addEventListener("change", () => {
       const uncheckChildren = (key2) => rows.forEach((other) => {
         if (parentOf(other.item) === key2 && other.check.checked) {
@@ -23108,10 +23135,10 @@ function renderProposalList(parent, suggestions, changed, options = {}) {
       if (selected.some((row) => parentOf(row.item) && !renamed.has(parentOf(row.item))))
         return t("ui.select_the_parent_topic_before_its_child");
       return selected.map((row) => {
-        var _a2, _b, _c, _d, _e;
+        var _a3, _b2, _c, _d, _e;
         return {
           title: row.title.value.trim(),
-          task: (_b = (_a2 = row.task) == null ? void 0 : _a2.value.trim()) != null ? _b : row.item.task,
+          task: (_b2 = (_a3 = row.task) == null ? void 0 : _a3.value.trim()) != null ? _b2 : row.item.task,
           contribution: (_d = (_c = row.contribution) == null ? void 0 : _c.value.trim()) != null ? _d : row.item.contribution,
           parentTitle: parentOf(row.item) ? renamed.get(parentOf(row.item)) : "",
           ...row.item.key !== void 0 ? { key: row.item.key, parentKey: (_e = row.item.parentKey) != null ? _e : "" } : {}
@@ -23138,15 +23165,15 @@ var DraftReviewView = class {
   }
   /** Starts on the draft itself: a stray Enter from whatever opened the dialog must not switch to editing. */
   focus() {
-    var _a;
-    (_a = this.intro) == null ? void 0 : _a.focus();
+    var _a2;
+    (_a2 = this.intro) == null ? void 0 : _a2.focus();
   }
   mount(content, actions) {
-    var _a;
+    var _a2;
     this.renderer.load();
     const intro = content.createEl("p", { cls: "vam-draft-intro", text: this.review.intro });
     this.intro = intro;
-    if ((_a = this.review.currentSummary) == null ? void 0 : _a.trim()) {
+    if ((_a2 = this.review.currentSummary) == null ? void 0 : _a2.trim()) {
       const current = content.createEl("details", { cls: "vam-draft-current" });
       current.createEl("summary", { text: t("ui.current_summary") });
       current.createEl("p", { text: this.review.currentSummary });
@@ -23169,8 +23196,8 @@ var DraftReviewView = class {
     const detail = section3(t("ui.draft_detail"), this.detail, 16);
     const generations = /* @__PURE__ */ new WeakMap();
     const show = (target, markdown) => {
-      var _a2, _b;
-      const state = (_a2 = generations.get(target)) != null ? _a2 : { count: 0 };
+      var _a3, _b2;
+      const state = (_a3 = generations.get(target)) != null ? _a3 : { count: 0 };
       const generation = ++state.count;
       if (state.child) this.renderer.removeChild(state.child);
       const child = this.renderer.addChild(new import_obsidian21.Component());
@@ -23183,7 +23210,7 @@ var DraftReviewView = class {
         target.setText(markdown);
       };
       try {
-        void import_obsidian21.MarkdownRenderer.render(this.app, markdown, target, (_b = this.review.sourcePath) != null ? _b : "", child).catch(fallback);
+        void import_obsidian21.MarkdownRenderer.render(this.app, markdown, target, (_b2 = this.review.sourcePath) != null ? _b2 : "", child).catch(fallback);
       } catch (e) {
         fallback();
       }
@@ -23214,8 +23241,8 @@ var DraftReviewView = class {
         discard,
         status,
         () => {
-          var _a2;
-          (_a2 = this.discard) == null ? void 0 : _a2.call(this);
+          var _a3;
+          (_a3 = this.discard) == null ? void 0 : _a3.call(this);
           this.close();
         },
         () => confirm.disabled
@@ -23238,8 +23265,8 @@ var DraftReviewView = class {
     });
   }
   dispose() {
-    var _a;
-    (_a = this.disarm) == null ? void 0 : _a.call(this);
+    var _a2;
+    (_a2 = this.disarm) == null ? void 0 : _a2.call(this);
     this.renderer.unload();
   }
 };
@@ -23252,9 +23279,9 @@ var DraftReviewModal = class extends import_obsidian21.Modal {
     this.view = new DraftReviewView(app, summary, detail, review, confirm, discard, () => this.close());
   }
   onOpen() {
-    var _a;
+    var _a2;
     this.modalEl.addClass("vam-draft-modal");
-    this.titleEl.setText((_a = this.title) != null ? _a : t("ui.review_synthesis_draft"));
+    this.titleEl.setText((_a2 = this.title) != null ? _a2 : t("ui.review_synthesis_draft"));
     this.view.mount(this.contentEl, reviewActions(this));
   }
   onClose() {
@@ -23418,7 +23445,7 @@ var StructureReviewModal = class extends import_obsidian22.Modal {
     __publicField(this, "entries", []);
   }
   onOpen() {
-    var _a;
+    var _a2;
     this.modalEl.addClass("vam-structure-review-modal");
     this.titleEl.setText(t(this.host.scope === "map" ? "ui.structure_review_map" : "ui.structure_review_branch"));
     this.contentEl.createEl("p", { cls: "vam-modal-intro", text: t("ui.structure_review_intro") });
@@ -23429,9 +23456,9 @@ var StructureReviewModal = class extends import_obsidian22.Modal {
     close.addEventListener("click", () => this.close());
     if (this.host.initial) {
       this.showSuggestions(result, this.host.initial);
-      ((_a = Array.from(result.querySelectorAll(".vam-structure-apply")).find(
+      ((_a2 = Array.from(result.querySelectorAll(".vam-structure-apply")).find(
         (button) => !button.disabled
-      )) != null ? _a : close).focus();
+      )) != null ? _a2 : close).focus();
       return;
     }
     const start = footer.createEl("button", { text: t("ui.structure_review_start"), cls: "mod-cta" });
@@ -23454,20 +23481,20 @@ var StructureReviewModal = class extends import_obsidian22.Modal {
         this.detached = true;
         this.close();
       }).then((review) => {
-        var _a2, _b;
+        var _a3, _b2;
         if (this.closed) return;
         if (controller.signal.aborted) {
           ready(t("ui.structure_review_cancelled"));
           return;
         }
         status.setText("");
-        const hadFocus = ((_a2 = start.ownerDocument) == null ? void 0 : _a2.activeElement) === start;
+        const hadFocus = ((_a3 = start.ownerDocument) == null ? void 0 : _a3.activeElement) === start;
         start.remove();
         this.showSuggestions(result, review);
         if (hadFocus)
-          ((_b = Array.from(result.querySelectorAll(".vam-structure-apply")).find(
+          ((_b2 = Array.from(result.querySelectorAll(".vam-structure-apply")).find(
             (button) => !button.disabled
-          )) != null ? _b : close).focus();
+          )) != null ? _b2 : close).focus();
       }).catch((error) => {
         if (this.closed) return;
         ready(controller.signal.aborted ? t("ui.structure_review_cancelled") : messageOf2(error));
@@ -23478,12 +23505,12 @@ var StructureReviewModal = class extends import_obsidian22.Modal {
     close.focus();
   }
   onClose() {
-    var _a, _b, _c;
+    var _a2, _b2, _c;
     this.closed = true;
-    if (!this.detached) (_a = this.controller) == null ? void 0 : _a.abort();
+    if (!this.detached) (_a2 = this.controller) == null ? void 0 : _a2.abort();
     this.controller = void 0;
     this.host.highlight([]);
-    if (this.host.initial) (_c = (_b = this.host).consumed) == null ? void 0 : _c.call(_b);
+    if (this.host.initial) (_c = (_b2 = this.host).consumed) == null ? void 0 : _c.call(_b2);
   }
   targets() {
     return this.entries.filter((entry) => !entry.applied && !this.host.staleReason(entry.suggestion)).flatMap(({ suggestion }) => [
@@ -23508,11 +23535,11 @@ var StructureReviewModal = class extends import_obsidian22.Modal {
       this.host.highlight(this.targets());
     };
     const items = review.suggestions.map((suggestion) => {
-      var _a;
+      var _a2;
       const destination = suggestion.kind === "strengthen" ? suggestion.targetId : suggestion.kind === "move" ? suggestion.newParentId : suggestion.kind === "merge" ? suggestion.mergeIntoId : void 0;
       return {
         kind: KIND[suggestion.kind],
-        title: suggestion.kind === "strengthen" ? (_a = suggestion.title) != null ? _a : "" : this.host.titleOf(suggestion.targetId),
+        title: suggestion.kind === "strengthen" ? (_a2 = suggestion.title) != null ? _a2 : "" : this.host.titleOf(suggestion.targetId),
         task: "",
         contribution: "",
         reason: suggestion.reason,
@@ -23607,24 +23634,24 @@ function runtimeStepProvider(options) {
       const started = options.exchanges();
       const exchanges = {
         sent: (...args) => {
-          var _a;
-          return started ? (_a = options.exchanges()) == null ? void 0 : _a.sent(...args) : void 0;
+          var _a2;
+          return started ? (_a2 = options.exchanges()) == null ? void 0 : _a2.sent(...args) : void 0;
         },
         received: (...args) => {
-          var _a;
-          return started ? (_a = options.exchanges()) == null ? void 0 : _a.received(...args) : void 0;
+          var _a2;
+          return started ? (_a2 = options.exchanges()) == null ? void 0 : _a2.received(...args) : void 0;
         },
         completed: (...args) => {
-          var _a;
-          return started ? (_a = options.exchanges()) == null ? void 0 : _a.completed(...args) : void 0;
+          var _a2;
+          return started ? (_a2 = options.exchanges()) == null ? void 0 : _a2.completed(...args) : void 0;
         },
         failed: (...args) => {
-          var _a;
-          return started ? (_a = options.exchanges()) == null ? void 0 : _a.failed(...args) : void 0;
+          var _a2;
+          return started ? (_a2 = options.exchanges()) == null ? void 0 : _a2.failed(...args) : void 0;
         },
         milestones: (...args) => {
-          var _a;
-          return started ? (_a = options.exchanges()) == null ? void 0 : _a.milestones(...args) : void 0;
+          var _a2;
+          return started ? (_a2 = options.exchanges()) == null ? void 0 : _a2.milestones(...args) : void 0;
         }
       };
       const milestones = {};
@@ -23653,13 +23680,13 @@ function runtimeStepProvider(options) {
         const controls = {
           ...task,
           onMilestones: (data) => {
-            var _a;
-            (_a = task.onMilestones) == null ? void 0 : _a.call(task, data);
+            var _a2;
+            (_a2 = task.onMilestones) == null ? void 0 : _a2.call(task, data);
             Object.assign(milestones, data);
           },
           onRequest: (data) => {
-            var _a;
-            (_a = task.onRequest) == null ? void 0 : _a.call(task, data);
+            var _a2;
+            (_a2 = task.onRequest) == null ? void 0 : _a2.call(task, data);
             exchanges.sent(
               id,
               JSON.stringify(requestLog === "request" ? data : { request: data, prompt: call.prompt }, null, 2),
@@ -23686,7 +23713,7 @@ function runtimeStepProvider(options) {
 // core/provider-step-runner.ts
 function providerStepRunner(options, activeTasks, config) {
   return async (request, signal, prepared) => {
-    var _a, _b, _c;
+    var _a2, _b2, _c;
     const key2 = `${config.name}:${(0, import_node_crypto7.randomUUID)()}`, controller = new AbortController();
     const abort = () => controller.abort();
     signal.addEventListener("abort", abort, { once: true });
@@ -23733,8 +23760,8 @@ function providerStepRunner(options, activeTasks, config) {
       refuseIfStopped();
       prepared.parse(raw);
       if (id) {
-        (_a = log()) == null ? void 0 : _a.parsed(id);
-        (_b = log()) == null ? void 0 : _b.completed(id);
+        (_a2 = log()) == null ? void 0 : _a2.parsed(id);
+        (_b2 = log()) == null ? void 0 : _b2.completed(id);
       }
       return raw;
     } catch (error) {
@@ -23896,24 +23923,24 @@ var clip = (value, limit) => {
   return characters.length > limit ? `${characters.slice(0, limit - 1).join("")}\u2026` : text11;
 };
 function buildStructureReviewNodes(nodes, describe, scopeRootId) {
-  var _a, _b;
+  var _a2, _b2;
   const children = /* @__PURE__ */ new Map();
   const ids = new Set(nodes.map((node) => node.id));
   for (const node of nodes) {
     const key2 = node.parentId !== null && ids.has(node.parentId) ? node.parentId : null;
-    children.set(key2, [...(_a = children.get(key2)) != null ? _a : [], node.id]);
+    children.set(key2, [...(_a2 = children.get(key2)) != null ? _a2 : [], node.id]);
   }
   const result = [];
   const seen = /* @__PURE__ */ new Set();
   const visit = (id, parentId, depth) => {
-    var _a2, _b2, _c, _d;
+    var _a3, _b3, _c, _d;
     if (seen.has(id)) return;
     seen.add(id);
     const info = describe(id);
     result.push({
       id,
-      title: clip((_a2 = info == null ? void 0 : info.title) != null ? _a2 : "", TITLE_LIMIT),
-      summary: clip((_b2 = info == null ? void 0 : info.summary) != null ? _b2 : "", SUMMARY_LIMIT),
+      title: clip((_a3 = info == null ? void 0 : info.title) != null ? _a3 : "", TITLE_LIMIT),
+      summary: clip((_b3 = info == null ? void 0 : info.summary) != null ? _b3 : "", SUMMARY_LIMIT),
       status: (_c = info == null ? void 0 : info.status) != null ? _c : "",
       parentId,
       depth
@@ -23922,7 +23949,7 @@ function buildStructureReviewNodes(nodes, describe, scopeRootId) {
   };
   if (scopeRootId) {
     if (ids.has(scopeRootId)) visit(scopeRootId, null, 0);
-  } else for (const id of (_b = children.get(null)) != null ? _b : []) visit(id, null, 0);
+  } else for (const id of (_b2 = children.get(null)) != null ? _b2 : []) visit(id, null, 0);
   return result;
 }
 function descendantIds(tree, id) {
@@ -24027,11 +24054,11 @@ var structureReviewStep = {
   id: "structure-review",
   version: 1,
   render: (request) => {
-    var _a;
+    var _a2;
     return renderTemplate(prompt_default, {
       languageInstruction: inLanguageNaming(
         { zh: language_zh_default, en: language_en_default },
-        (_a = request.contentLanguage) != null ? _a : request.language,
+        (_a2 = request.contentLanguage) != null ? _a2 : request.language,
         { language: "region" },
         "en"
       ),
@@ -24095,13 +24122,13 @@ var StructureReviewService = class {
 
 // ui/topic-tree.ts
 function renderTopicTree(parent, options) {
-  var _a, _b;
+  var _a2, _b2;
   const tree = parent.createDiv({ cls: "vam-topic-tree", attr: { role: "listbox", "aria-label": options.label } });
   const ids = new Set(options.nodes.map((node) => node.id));
   const children = /* @__PURE__ */ new Map();
   for (const node of options.nodes) {
     const key2 = node.parentId && ids.has(node.parentId) ? node.parentId : null;
-    children.set(key2, [...(_a = children.get(key2)) != null ? _a : [], node]);
+    children.set(key2, [...(_a2 = children.get(key2)) != null ? _a2 : [], node]);
   }
   const rows = [];
   const row = (id, text11, depth, enabled) => {
@@ -24117,14 +24144,14 @@ function renderTopicTree(parent, options) {
   };
   if (options.rootChoice !== void 0) row("", options.rootChoice, 0, true);
   const append = (node, depth, seen2) => {
-    var _a2;
+    var _a3;
     if (seen2.has(node.id)) return;
     seen2.add(node.id);
     row(node.id, options.title(node), depth, options.selectable(node));
-    for (const child of (_a2 = children.get(node.id)) != null ? _a2 : []) append(child, depth + 1, seen2);
+    for (const child of (_a3 = children.get(node.id)) != null ? _a3 : []) append(child, depth + 1, seen2);
   };
   const seen = /* @__PURE__ */ new Set();
-  for (const root of (_b = children.get(null)) != null ? _b : []) append(root, 0, seen);
+  for (const root of (_b2 = children.get(null)) != null ? _b2 : []) append(root, 0, seen);
   const select = (id) => {
     for (const button of rows) {
       const selected = button.dataset.id === id;
@@ -24235,10 +24262,10 @@ var AimStartModal = class extends import_obsidian24.Modal {
     let modelChoices = this.models.length ? [...this.models] : [{ id: this.defaultModel, label: this.defaultModel }];
     const selectedModel = () => model.value;
     const renderModels = (preferred = selectedModel()) => {
-      var _a, _b;
+      var _a2, _b2;
       model.replaceChildren();
       for (const choice2 of modelChoices) model.createEl("option", { value: choice2.id, text: choice2.label });
-      model.value = modelChoices.some((choice2) => choice2.id === preferred) ? preferred : (_b = (_a = modelChoices[0]) == null ? void 0 : _a.id) != null ? _b : this.defaultModel;
+      model.value = modelChoices.some((choice2) => choice2.id === preferred) ? preferred : (_b2 = (_a2 = modelChoices[0]) == null ? void 0 : _a2.id) != null ? _b2 : this.defaultModel;
       return model.value;
     };
     renderModels(this.defaultModel);
@@ -24249,7 +24276,7 @@ var AimStartModal = class extends import_obsidian24.Modal {
     refreshButton.disabled = !this.refreshModels;
     refreshButton.addEventListener("click", () => {
       void (async () => {
-        var _a;
+        var _a2;
         if (!this.refreshModels || refreshButton.disabled) return;
         refreshingModels = true;
         const previousSelection = selectedModel();
@@ -24273,7 +24300,7 @@ var AimStartModal = class extends import_obsidian24.Modal {
           const currentSelection = renderModels(previousSelection);
           if (currentSelection !== previousSelection) newRequest();
           modelRefreshStatus.setText(
-            Array.isArray(result) ? t("ui.aim_models_refreshed") : (_a = result.message) != null ? _a : t("ui.aim_models_refreshed")
+            Array.isArray(result) ? t("ui.aim_models_refreshed") : (_a2 = result.message) != null ? _a2 : t("ui.aim_models_refreshed")
           );
         } catch (error) {
           if (!this.contentEl.isConnected) return;
@@ -24644,8 +24671,8 @@ var renderEvidenceLookupFollowup = (task, evidence) => renderTemplate(evidence_l
 
 // experiences/aim/evidence-context.ts
 function evidenceCard(id, summary, detail) {
-  var _a;
-  const urls = [...new Set((_a = detail.match(/https?:\/\/[^\s)<>\]"']+/g)) != null ? _a : [])];
+  var _a2;
+  const urls = [...new Set((_a2 = detail.match(/https?:\/\/[^\s)<>\]"']+/g)) != null ? _a2 : [])];
   const limits = detail.split(/\n\n/).filter((part) => /uncertain|unresolved|limitation|unknown|不足|不確定|限制|缺口|尚未|待確認/i.test(part));
   return renderEvidenceCard({
     id,
@@ -24787,14 +24814,14 @@ function parseAcceptance(result) {
   return { marker: acceptance[0].trim(), decision: decision.decision };
 }
 async function buildFinalDelivery(base, ask, options = {}) {
-  var _a, _b, _c, _d, _e, _f, _g, _h, _i, _j, _k, _l, _m, _n, _o, _p;
+  var _a2, _b2, _c, _d, _e, _f, _g, _h, _i, _j, _k, _l, _m, _n, _o, _p;
   const baseFingerprint = fingerprint({
     title: base.title,
     rules: base.rules,
-    conditions: (_a = options.knownConditions) != null ? _a : base.detail,
+    conditions: (_a2 = options.knownConditions) != null ? _a2 : base.detail,
     language: base.outputLanguage
   });
-  const savedBaseValid = ((_b = options.checkpoint) == null ? void 0 : _b.baseFingerprint) === baseFingerprint || !((_c = options.checkpoint) == null ? void 0 : _c.baseFingerprint) && options.evidence === void 0;
+  const savedBaseValid = ((_b2 = options.checkpoint) == null ? void 0 : _b2.baseFingerprint) === baseFingerprint || !((_c = options.checkpoint) == null ? void 0 : _c.baseFingerprint) && options.evidence === void 0;
   const savedCheckpoint = savedBaseValid ? options.checkpoint : void 0;
   const checkpoint = {
     baseFingerprint,
@@ -24802,8 +24829,8 @@ async function buildFinalDelivery(base, ask, options = {}) {
   };
   let reuseRemaining = true;
   const stage = async (key2, produce, validate = validateContent) => {
-    var _a2, _b2, _c2, _d2;
-    (_a2 = base.signal) == null ? void 0 : _a2.throwIfAborted();
+    var _a3, _b3, _c2, _d2;
+    (_a3 = base.signal) == null ? void 0 : _a3.throwIfAborted();
     const saved = reuseRemaining ? savedCheckpoint == null ? void 0 : savedCheckpoint[key2] : void 0;
     if (saved) {
       try {
@@ -24818,16 +24845,16 @@ async function buildFinalDelivery(base, ask, options = {}) {
     const result2 = await produce();
     validateContent(result2);
     validate(result2);
-    (_b2 = base.signal) == null ? void 0 : _b2.throwIfAborted();
+    (_b3 = base.signal) == null ? void 0 : _b3.throwIfAborted();
     checkpoint[key2] = result2;
     await ((_c2 = options.onCheckpoint) == null ? void 0 : _c2.call(options, { ...checkpoint }));
     (_d2 = base.signal) == null ? void 0 : _d2.throwIfAborted();
     return result2;
   };
   const run = async (phase, task, research2 = false) => {
-    var _a2, _b2, _c2, _d2, _e2;
-    (_a2 = base.signal) == null ? void 0 : _a2.throwIfAborted();
-    await ((_b2 = options.onPhase) == null ? void 0 : _b2.call(options, phase));
+    var _a3, _b3, _c2, _d2, _e2;
+    (_a3 = base.signal) == null ? void 0 : _a3.throwIfAborted();
+    await ((_b3 = options.onPhase) == null ? void 0 : _b3.call(options, phase));
     (_c2 = base.signal) == null ? void 0 : _c2.throwIfAborted();
     const writingScope = phase === "delivery-writing" && options.evidence ? {
       detail: (_d2 = options.knownConditions) != null ? _d2 : "",
@@ -24868,8 +24895,8 @@ ${source.detail}`).join("\n\n");
   const needsResearch = sections.some((section3) => section3.searchTask.trim());
   const researchFingerprint = fingerprint(
     sections.filter((section3) => section3.searchTask.trim()).map((section3) => {
-      var _a2, _b2, _c2, _d2;
-      const ids = [.../* @__PURE__ */ new Set([...(_a2 = section3.evidenceIds) != null ? _a2 : [], ...(_b2 = section3.dependencies) != null ? _b2 : []])];
+      var _a3, _b3, _c2, _d2;
+      const ids = [.../* @__PURE__ */ new Set([...(_a3 = section3.evidenceIds) != null ? _a3 : [], ...(_b3 = section3.dependencies) != null ? _b3 : []])];
       const scoped = section3.evidenceIds === void 0 && section3.dependencies === void 0 ? (_c2 = options.evidence) != null ? _c2 : [] : ((_d2 = options.evidence) != null ? _d2 : []).filter((source) => ids.includes(source.id));
       return {
         heading: section3.heading,
@@ -25036,14 +25063,14 @@ function createSearchDiagnostic(researchTurn) {
     otherCompletedActions: 0
   };
   const onEvent = (event) => {
-    var _a, _b;
+    var _a2, _b2;
     if (event.method === "item/started") {
       diagnostic.startedEvents++;
       return;
     }
     const params = event.params;
     diagnostic.completedEvents++;
-    if (((_b = (_a = params == null ? void 0 : params.item) == null ? void 0 : _a.action) == null ? void 0 : _b.type) === "search") diagnostic.completedSearchActions++;
+    if (((_b2 = (_a2 = params == null ? void 0 : params.item) == null ? void 0 : _a2.action) == null ? void 0 : _b2.type) === "search") diagnostic.completedSearchActions++;
     else diagnostic.otherCompletedActions++;
   };
   return { diagnostic, onEvent };
@@ -25413,7 +25440,7 @@ function isDecision(value) {
   return value === "research_more" || value === "ask_user" || value === "conclude";
 }
 function extractExplicitOptions(body, question) {
-  var _a, _b;
+  var _a2, _b2;
   const onlyQuestionAndChoices = body.startsWith(question) ? body.slice(question.length).trim().split(/\r?\n/).map((line) => line.trim()).filter(Boolean) : [];
   if (onlyQuestionAndChoices.length >= 2 && onlyQuestionAndChoices.length <= 5 && onlyQuestionAndChoices.every((line) => /^[-*•]\s+\S/.test(line))) {
     const choices = [...new Set(onlyQuestionAndChoices.map((line) => line.replace(/^[-*•]\s+/, "")))];
@@ -25433,7 +25460,7 @@ function extractExplicitOptions(body, question) {
       continue;
     }
     if (!inOptions) continue;
-    const option2 = (_b = (_a = trimmed.match(/^(?:[-*•]|\d+[.)、])\s+(.+?)\s*$/)) == null ? void 0 : _a[1]) == null ? void 0 : _b.trim();
+    const option2 = (_b2 = (_a2 = trimmed.match(/^(?:[-*•]|\d+[.)、])\s+(.+?)\s*$/)) == null ? void 0 : _a2[1]) == null ? void 0 : _b2.trim();
     if (!option2) break;
     options.push(option2);
     if (options.length > 5) return [];
@@ -25498,11 +25525,11 @@ function parseAimPlannerReview(result) {
   return { decision, rationale, question, answerOptions, summary, detail, ...answered };
 }
 function extractPlannerQuestionCandidate(result) {
-  var _a;
+  var _a2;
   const marked = readMarker(result.detail);
   if ((marked == null ? void 0 : marked.raw.decision) === "ask_user" && typeof marked.raw.question === "string" && marked.raw.question.trim())
     return marked.raw.question.trim();
-  const body = (_a = marked == null ? void 0 : marked.body) != null ? _a : result.detail;
+  const body = (_a2 = marked == null ? void 0 : marked.body) != null ? _a2 : result.detail;
   const lines = body.split(/\r?\n/).map((line) => line.trim());
   const label = /^(?:\*\*|__)?(?:question|問題)\s*[:：]\s*(?:\*\*|__)?\s*/i;
   const labeledQuestion = lines.find((line) => label.test(line) && /[?？]\s*$/.test(line.replace(label, "")));
@@ -25518,7 +25545,7 @@ function extractPlannerQuestionCandidate(result) {
   return void 0;
 }
 async function parseAimPlannerReviewWithRecovery(original, context, recover) {
-  var _a, _b, _c, _d, _e, _f, _g, _h, _i, _j, _k, _l, _m, _n;
+  var _a2, _b2, _c, _d, _e, _f, _g, _h, _i, _j, _k, _l, _m, _n;
   try {
     const parsed = parseAimPlannerReview(original);
     if (context.requiredDecision && parsed.decision !== context.requiredDecision) {
@@ -25531,7 +25558,7 @@ async function parseAimPlannerReviewWithRecovery(original, context, recover) {
     const originalRationale = typeof (originalMarker == null ? void 0 : originalMarker.raw.rationale) === "string" ? originalMarker.raw.rationale.trim() : "";
     const originalQuestion = typeof (originalMarker == null ? void 0 : originalMarker.raw.question) === "string" ? originalMarker.raw.question.trim() : "";
     const originalSummary = typeof original.summary === "string" ? original.summary.trim() : "";
-    const originalBody = (_a = originalMarker == null ? void 0 : originalMarker.body) != null ? _a : "";
+    const originalBody = (_a2 = originalMarker == null ? void 0 : originalMarker.body) != null ? _a2 : "";
     if (context.requiredDecision) {
       if (originalDecision && originalDecision !== context.requiredDecision) {
         throw new Error(`Planner response violated the required ${context.requiredDecision} decision.`);
@@ -25539,7 +25566,7 @@ async function parseAimPlannerReviewWithRecovery(original, context, recover) {
       if (context.requiredDecision !== "ask_user") {
         throw new Error(`Format recovery does not support an imposed ${context.requiredDecision} decision.`);
       }
-      let question = ((_b = context.preferredQuestion) == null ? void 0 : _b.trim()) || originalQuestion;
+      let question = ((_b2 = context.preferredQuestion) == null ? void 0 : _b2.trim()) || originalQuestion;
       const preservedBody = (_c = originalMarker == null ? void 0 : originalMarker.body) != null ? _c : original.detail.replace(/^\s*<!--\s*aim-review\s+[^\n]*?-->\s*/, "").trim();
       let stated;
       if (!question) {
@@ -25683,7 +25710,7 @@ function structuredReports(attempt, notePath) {
   }));
 }
 function extractAimFailedReport(note, attempt, notePath) {
-  var _a, _b, _c, _d;
+  var _a2, _b2, _c, _d;
   if (note.status !== "error" || !note.detail.trim()) return null;
   if (attempt.retainedReports) return structuredReports(attempt, notePath);
   const reportMarker = "**Source boundary:** ";
@@ -25711,7 +25738,7 @@ function extractAimFailedReport(note, attempt, notePath) {
   const headings = [...body.matchAll(/^## Searcher report (\d+)\s*$/gm)];
   if (!headings.length || headings.length !== summaries.length) return null;
   for (let index = 0; index < headings.length; index++) {
-    const number = Number(headings[index][1]), next = (_b = (_a = headings[index + 1]) == null ? void 0 : _a.index) != null ? _b : body.length;
+    const number = Number(headings[index][1]), next = (_b2 = (_a2 = headings[index + 1]) == null ? void 0 : _a2.index) != null ? _b2 : body.length;
     const section3 = body.slice(headings[index].index + headings[index][0].length, next).trim();
     if (number !== index + 1 || ((_c = summaries[index]) == null ? void 0 : _c.index) !== number || !((_d = summaries[index]) == null ? void 0 : _d.summary) || !section3)
       return null;
@@ -25720,15 +25747,15 @@ function extractAimFailedReport(note, attempt, notePath) {
   return reports;
 }
 function matchAimFailedReportTargets(map, candidates) {
-  var _a, _b, _c, _d, _e, _f;
-  const currentFailed = (_b = (_a = map.aim) == null ? void 0 : _a.runs.flatMap((run) => {
+  var _a2, _b2, _c, _d, _e, _f;
+  const currentFailed = (_b2 = (_a2 = map.aim) == null ? void 0 : _a2.runs.flatMap((run) => {
     const attempt = run.attempts.find((item) => item.id === run.currentAttemptId);
     return (attempt == null ? void 0 : attempt.status) === "failed" ? [{ runId: run.id, attempt }] : [];
-  })) != null ? _b : [];
+  })) != null ? _b2 : [];
   const failed = (_d = (_c = map.aim) == null ? void 0 : _c.runs.flatMap((run) => {
-    var _a2;
+    var _a3;
     const attempt = run.attempts.find((item) => item.id === run.currentAttemptId);
-    const branch = (_a2 = map.aim) == null ? void 0 : _a2.branches.find((item) => item.id === run.branchId);
+    const branch = (_a3 = map.aim) == null ? void 0 : _a3.branches.find((item) => item.id === run.branchId);
     const question = branch && map.nodes.find((item) => item.id === branch.questionNodeId);
     return (attempt == null ? void 0 : attempt.status) === "failed" && branch && (question == null ? void 0 : question.aimKind) === "question" ? [{ runId: run.id, attempt, branchId: branch.id, questionNodeId: question.id }] : [];
   })) != null ? _d : [];
@@ -25737,8 +25764,8 @@ function matchAimFailedReportTargets(map, candidates) {
     const isWrapped = note.detail.includes("**Status:** Diagnostic only.");
     let selected = failed.filter(
       (item) => {
-        var _a2;
-        return ((_a2 = item.attempt.retainedReports) == null ? void 0 : _a2.notePath) === path && extractAimFailedReport(note, item.attempt, path) !== null;
+        var _a3;
+        return ((_a3 = item.attempt.retainedReports) == null ? void 0 : _a3.notePath) === path && extractAimFailedReport(note, item.attempt, path) !== null;
       }
     );
     if (selected.length) {
@@ -25778,10 +25805,10 @@ function abortError() {
   return error;
 }
 async function scheduleAimResearch(plan, execute, signal, options = {}) {
-  var _a, _b;
+  var _a2, _b2;
   validateAimResearchPlan(plan);
   const parallel = plan.every((item) => Array.isArray(item.dependsOn));
-  const limit = parallel ? Math.max(1, (_a = options.parallelism) != null ? _a : DEFAULT_AIM_FLOW_LIMITS.researchParallelism) : 1;
+  const limit = parallel ? Math.max(1, (_a2 = options.parallelism) != null ? _a2 : DEFAULT_AIM_FLOW_LIMITS.researchParallelism) : 1;
   const controller = new AbortController();
   const abort = () => controller.abort();
   signal == null ? void 0 : signal.addEventListener("abort", abort, { once: true });
@@ -25793,12 +25820,12 @@ async function scheduleAimResearch(plan, execute, signal, options = {}) {
       if (controller.signal.aborted) throw abortError();
       while (active.size < limit) {
         const index = pending.findIndex((target2) => {
-          var _a2;
-          return ((_a2 = target2.dependsOn) != null ? _a2 : []).every((id) => completed.has(id));
+          var _a3;
+          return ((_a3 = target2.dependsOn) != null ? _a3 : []).every((id) => completed.has(id));
         });
         if (index === -1) break;
         const target = pending.splice(index, 1)[0];
-        const predecessors = new Map(((_b = target.dependsOn) != null ? _b : []).map((id) => [id, completed.get(id)]));
+        const predecessors = new Map(((_b2 = target.dependsOn) != null ? _b2 : []).map((id) => [id, completed.get(id)]));
         const task = Promise.resolve().then(() => {
           if (controller.signal.aborted) throw abortError();
           return execute(target, predecessors, controller.signal);
@@ -25913,19 +25940,19 @@ function phaseTask(phase, task) {
 ${task}`;
 }
 function countAimAnsweredQuestions(map, branchId) {
-  var _a, _b, _c;
-  let count = 0, current = branchId ? (_a = map.aim) == null ? void 0 : _a.branches.find((branch) => branch.id === branchId) : void 0;
+  var _a2, _b2, _c;
+  let count = 0, current = branchId ? (_a2 = map.aim) == null ? void 0 : _a2.branches.find((branch) => branch.id === branchId) : void 0;
   while (current) {
-    if (((_b = map.nodes.find((node) => node.id === current.questionNodeId)) == null ? void 0 : _b.aimKind) === "question") count++;
+    if (((_b2 = map.nodes.find((node) => node.id === current.questionNodeId)) == null ? void 0 : _b2.aimKind) === "question") count++;
     current = current.parentBranchId ? (_c = map.aim) == null ? void 0 : _c.branches.find((branch) => branch.id === current.parentBranchId) : void 0;
   }
   return count;
 }
 function lineageWithoutRepeatedReports(lineage, reportDetail) {
   return lineage.split(/\n\n(?=(?:User answer to |Saved research result v))/g).filter((section3) => {
-    var _a, _b;
+    var _a2, _b2;
     if (!section3.startsWith("Saved research result ")) return true;
-    const report = (_b = (_a = section3.match(/\nReport:\n([\s\S]*)$/)) == null ? void 0 : _a[1]) == null ? void 0 : _b.trim();
+    const report = (_b2 = (_a2 = section3.match(/\nReport:\n([\s\S]*)$/)) == null ? void 0 : _a2[1]) == null ? void 0 : _b2.trim();
     return !report || !reportDetail.includes(report);
   }).join("\n\n");
 }
@@ -25948,10 +25975,10 @@ function normalizePersistedAnswerOptions(options) {
   });
 }
 function parseAimResearchPlan(result) {
-  var _a;
+  var _a2;
   const marked = result.detail.match(/<!--\s*aim-plan\s+([\s\S]*?)\s*-->/);
   const unmarked = marked ? null : result.detail.match(/\{\s*"subtopics"\s*:\s*\[[\s\S]*?\]\s*\}/);
-  const payload = (_a = marked == null ? void 0 : marked[1]) != null ? _a : unmarked == null ? void 0 : unmarked[0];
+  const payload = (_a2 = marked == null ? void 0 : marked[1]) != null ? _a2 : unmarked == null ? void 0 : unmarked[0];
   let markerError;
   if (payload) {
     try {
@@ -26356,9 +26383,9 @@ var _AimManualFlow = class _AimManualFlow {
     __publicField(this, "addDiagrams");
   }
   emitProgress(event) {
-    var _a;
+    var _a2;
     try {
-      (_a = this.onProgress) == null ? void 0 : _a.call(this, event);
+      (_a2 = this.onProgress) == null ? void 0 : _a2.call(this, event);
     } catch (e) {
     }
   }
@@ -26380,8 +26407,8 @@ var _AimManualFlow = class _AimManualFlow {
   }
   /** An unattended run answers the intake once and never waits for the user again. */
   isUnattended(map) {
-    var _a;
-    return ((_a = map.aim) == null ? void 0 : _a.interaction) === "unattended";
+    var _a2;
+    return ((_a2 = map.aim) == null ? void 0 : _a2.interaction) === "unattended";
   }
   /** Review decisions the schema allows: an unattended run cannot ask the user, so it researches or concludes. */
   reviewDecisions(answeredQuestionCount, floor, map) {
@@ -26392,8 +26419,8 @@ var _AimManualFlow = class _AimManualFlow {
    * open item of a conditional conclusion: the document states it for the user to confirm instead of stopping.
    */
   withOpenItems(review, language2) {
-    var _a;
-    const openItems = [...(_a = review.openItems) != null ? _a : [], ...review.researchTarget ? [review.researchTarget] : []].filter(
+    var _a2;
+    const openItems = [...(_a2 = review.openItems) != null ? _a2 : [], ...review.researchTarget ? [review.researchTarget] : []].filter(
       (item, index, all) => all.findIndex((other) => other.title === item.title) === index
     );
     return {
@@ -26428,12 +26455,12 @@ var _AimManualFlow = class _AimManualFlow {
   }
   /** The document a review stands for: the draft a final review rejected, never the reviewer's critique of it. */
   readerDetail(review) {
-    var _a, _b;
-    return (_b = (_a = this.deliveryRejections.get(review)) == null ? void 0 : _a.detail) != null ? _b : review.detail;
+    var _a2, _b2;
+    return (_b2 = (_a2 = this.deliveryRejections.get(review)) == null ? void 0 : _a2.detail) != null ? _b2 : review.detail;
   }
   /** A conclusion note keeps its open items in a hidden marker, so the user can correct them later. */
   async concludedDetail(review, charts) {
-    var _a;
+    var _a2;
     const { mapPath, branchId, ...request } = charts;
     const body = this.addDiagrams ? await this.addDiagrams({
       ...request,
@@ -26441,7 +26468,7 @@ var _AimManualFlow = class _AimManualFlow {
       // Called only when the step really runs (the setting is on), so the UI never shows a stage that is skipped.
       onStart: () => this.emitProgress({ kind: "stage", mapPath, branchId, stage: "add-diagrams" })
     }) : review.detail;
-    return ((_a = review.openItems) == null ? void 0 : _a.length) ? `${body}
+    return ((_a2 = review.openItems) == null ? void 0 : _a2.length) ? `${body}
 
 ${openItemsMarker(review.openItems.map((item) => item.title))}` : body;
   }
@@ -26513,10 +26540,10 @@ ${written.detail}` : written.detail,
     return [...new Set(questions.map((q) => q.trim()))];
   }
   async askAimModel(context, model, reasoning, signal, onWebSearchEvent) {
-    var _a, _b, _c, _d, _e, _f, _g;
+    var _a2, _b2, _c, _d, _e, _f, _g;
     const visibleEvidence = [context.task, context.detail, context.ancestors].filter((value) => typeof value === "string").join("\n");
     const visibleEvidenceIds = new Set(
-      (_b = (_a = visibleEvidence.match(/Evidence ID: ([^\s]+)/g)) == null ? void 0 : _a.map((line) => line.slice(13))) != null ? _b : []
+      (_b2 = (_a2 = visibleEvidence.match(/Evidence ID: ([^\s]+)/g)) == null ? void 0 : _a2.map((line) => line.slice(13))) != null ? _b2 : []
     );
     const canLookupEvidence = ((_c = context.aimEvidenceIds) != null ? _c : []).some((id) => visibleEvidenceIds.has(id));
     const structuredLookup = canLookupEvidence && !!context.aimContract;
@@ -26617,8 +26644,8 @@ ${note.detail}`;
         const step = taskContext.aimContract;
         const allowed = recoveryContext.requiredDecision ? [recoveryContext.requiredDecision] : (step == null ? void 0 : step.kind) === "review" ? step.decisions : ALL_DECISIONS;
         const decisions = allowed.filter((decision) => {
-          var _a;
-          return !((_a = options == null ? void 0 : options.excludeDecisions) == null ? void 0 : _a.includes(decision));
+          var _a2;
+          return !((_a2 = options == null ? void 0 : options.excludeDecisions) == null ? void 0 : _a2.includes(decision));
         });
         if (!decisions.length) throw new Error("AIM format repair has no permitted decision left.");
         const repaired = await this.askAimModel(
@@ -26648,7 +26675,7 @@ ${note.detail}`;
   }
   /** Classifies a proposed search gap without exposing reports outside the current branch or invoking search. */
   async classifyResearchGap(candidate, context, model, reasoning, signal, targetOnly = false) {
-    var _a;
+    var _a2;
     const task = renderResearchGapAuditTask({
       goal: context.goal,
       currentQuestion: context.currentQuestion,
@@ -26659,7 +26686,7 @@ ${note.detail}`;
       candidateGap: { rationale: candidate.rationale, target: candidate.researchTarget, summary: candidate.summary },
       researchTarget: candidate.researchTarget
     });
-    await ((_a = context.setPhase) == null ? void 0 : _a.call(context, "research-gap-audit"));
+    await ((_a2 = context.setPhase) == null ? void 0 : _a2.call(context, "research-gap-audit"));
     const result = await this.askAimModel(
       {
         timeoutMs: context.timeoutMs,
@@ -26746,8 +26773,8 @@ ${note.detail}`;
       throw new Error("AIM could not preserve the required user-condition question; no search was started.");
     if (context.questionHistory.some(
       (question2) => {
-        var _a;
-        return question2.trim().toLocaleLowerCase() === ((_a = repaired.question) == null ? void 0 : _a.trim().toLocaleLowerCase());
+        var _a2;
+        return question2.trim().toLocaleLowerCase() === ((_a2 = repaired.question) == null ? void 0 : _a2.trim().toLocaleLowerCase());
       }
     )) {
       if (allowReconciliation) {
@@ -26768,14 +26795,14 @@ ${note.detail}`;
    * returns), gets one more pass as a conclusion with that item open for the user to confirm.
    */
   async reviewPlannerDecisionQuality(candidate, context, model, reasoning, signal) {
-    var _a, _b, _c;
+    var _a2, _b2, _c;
     const reviewed = await this.reviewDecisionOnce(candidate, context, model, reasoning, signal);
     const pastLimit = !!context.unattended || context.goalDetail.includes(AIM_INTAKE_COMPLETE) && context.answeredQuestionCount >= CHECKLIST_QUESTION_LIMIT;
     const asksUser = reviewed.decision === "ask_user" || reviewed.decision === "research_more" && reviewed.gapKind === "user_only";
     if (!(pastLimit && asksUser) && !(reviewed.decision === "research_more" && reviewed.gapKind === "not_decisive"))
       return reviewed;
     throwIfAborted(signal);
-    const written = (_b = (_a = this.deliveryRejections.get(reviewed)) == null ? void 0 : _a.openItems) != null ? _b : [];
+    const written = (_b2 = (_a2 = this.deliveryRejections.get(reviewed)) == null ? void 0 : _a2.openItems) != null ? _b2 : [];
     const carried = written.length ? { ...reviewed, openItems: [...written, ...(_c = reviewed.openItems) != null ? _c : []] } : reviewed;
     return this.reviewDecisionOnce(this.limitToOpenItems(carried, context), context, model, reasoning, signal);
   }
@@ -26791,14 +26818,14 @@ ${note.detail}`;
   }
   /** Past the question limit (or unattended), a question, user-only gap or unresolved condition becomes an open item. */
   assumeInsteadOfAsking(review, context) {
-    var _a, _b;
+    var _a2, _b2;
     const assumed = review.decision === "ask_user" && review.question || review.decision === "research_more" && review.gapKind === "user_only" ? this.limitToOpenItems(review, context) : review;
-    if (assumed.decision !== "conclude" || !((_a = assumed.unresolvedConditions) == null ? void 0 : _a.length)) return assumed;
+    if (assumed.decision !== "conclude" || !((_a2 = assumed.unresolvedConditions) == null ? void 0 : _a2.length)) return assumed;
     return {
       ...assumed,
       unresolvedConditions: [],
       openItems: [
-        ...(_b = assumed.openItems) != null ? _b : [],
+        ...(_b2 = assumed.openItems) != null ? _b2 : [],
         ...assumed.unresolvedConditions.map((condition) => ({
           title: condition,
           task: assumed.rationale,
@@ -26808,7 +26835,7 @@ ${note.detail}`;
     };
   }
   async reviewDecisionOnce(candidate, context, model, reasoning, signal) {
-    var _a, _b, _c, _d, _e, _f, _g, _h, _i, _j, _k, _l, _m;
+    var _a2, _b2, _c, _d, _e, _f, _g, _h, _i, _j, _k, _l, _m;
     throwIfAborted(signal);
     const uniqueLineage = lineageWithoutRepeatedReports(context.lineage, context.reportDetail);
     const taskContext = {
@@ -26833,8 +26860,8 @@ ${note.detail}`;
       reviewed = this.assumeInsteadOfAsking(reviewed, context);
     const repeatsKnownQuestion = context.questionHistory.some(
       (question) => {
-        var _a2;
-        return question.trim().toLocaleLowerCase() === ((_a2 = reviewed.question) == null ? void 0 : _a2.trim().toLocaleLowerCase());
+        var _a3;
+        return question.trim().toLocaleLowerCase() === ((_a3 = reviewed.question) == null ? void 0 : _a3.trim().toLocaleLowerCase());
       }
     );
     const floor = context.unattended ? 0 : this.floorFor(context.goalDetail);
@@ -26891,8 +26918,8 @@ ${note.detail}`;
       );
       const repeatsQuestion = context.questionHistory.some(
         (question) => {
-          var _a2;
-          return question.trim().toLocaleLowerCase() === ((_a2 = reviewed.question) == null ? void 0 : _a2.trim().toLocaleLowerCase());
+          var _a3;
+          return question.trim().toLocaleLowerCase() === ((_a3 = reviewed.question) == null ? void 0 : _a3.trim().toLocaleLowerCase());
         }
       );
       if (reviewed.decision !== "ask_user" || repeatsQuestion)
@@ -26941,8 +26968,8 @@ ${note.detail}`;
       );
       const repeatsQuestion = context.questionHistory.some(
         (question) => {
-          var _a2;
-          return question.trim().toLocaleLowerCase() === ((_a2 = reviewed.question) == null ? void 0 : _a2.trim().toLocaleLowerCase());
+          var _a3;
+          return question.trim().toLocaleLowerCase() === ((_a3 = reviewed.question) == null ? void 0 : _a3.trim().toLocaleLowerCase());
         }
       );
       if (reviewed.decision === "research_more" || repeatsQuestion)
@@ -26951,7 +26978,7 @@ ${note.detail}`;
         );
       if (context.unattended) reviewed = this.assumeInsteadOfAsking(reviewed, context);
     }
-    const unresolved = checklist && reviewed.decision === "conclude" ? (_a = reviewed.unresolvedConditions) != null ? _a : [] : [];
+    const unresolved = checklist && reviewed.decision === "conclude" ? (_a2 = reviewed.unresolvedConditions) != null ? _a2 : [] : [];
     if (unresolved.length) {
       const rationale = translateNote(
         context.outputLanguage,
@@ -26975,7 +27002,7 @@ ${note.detail}`;
           ...reviewed,
           unresolvedConditions: [],
           openItems: [
-            ...(_b = reviewed.openItems) != null ? _b : [],
+            ...(_b2 = reviewed.openItems) != null ? _b2 : [],
             ...unresolved.map((condition) => ({ title: condition, task: rationale, expectedValue: condition }))
           ]
         };
@@ -27024,14 +27051,14 @@ ${renderOpenItemsContext(openItems)}` : ""}`
           }),
           ...openItems ? { openItems } : {},
           onPhase: async (current) => {
-            var _a2;
+            var _a3;
             phase = current;
-            await ((_a2 = context.saveDeliveryRecovery) == null ? void 0 : _a2.call(context, checkpoint, phase));
+            await ((_a3 = context.saveDeliveryRecovery) == null ? void 0 : _a3.call(context, checkpoint, phase));
           },
           onCheckpoint: async (saved) => {
-            var _a2;
+            var _a3;
             checkpoint = saved;
-            await ((_a2 = context.saveDeliveryRecovery) == null ? void 0 : _a2.call(context, checkpoint, phase));
+            await ((_a3 = context.saveDeliveryRecovery) == null ? void 0 : _a3.call(context, checkpoint, phase));
           }
         }
       );
@@ -27090,11 +27117,11 @@ ${delivery.evidence}` },
     return countAimAnsweredQuestions(map, branchId);
   }
   async savedTerminalResult(mapPath, branchId) {
-    var _a, _b, _c;
-    const map = await this.repository.readMap(mapPath), branch = (_a = map.aim) == null ? void 0 : _a.branches.find((item) => item.id === branchId);
+    var _a2, _b2, _c;
+    const map = await this.repository.readMap(mapPath), branch = (_a2 = map.aim) == null ? void 0 : _a2.branches.find((item) => item.id === branchId);
     const resultRef = branch && [...branch.results].reverse().find((item) => item.kind === "conclusion" || item.kind === "synthesis");
     if (!branch || !resultRef) return void 0;
-    const attempt = (_c = (_b = map.aim) == null ? void 0 : _b.runs.find((item) => item.id === resultRef.runId)) == null ? void 0 : _c.attempts.find((item) => item.id === resultRef.attemptId);
+    const attempt = (_c = (_b2 = map.aim) == null ? void 0 : _b2.runs.find((item) => item.id === resultRef.runId)) == null ? void 0 : _c.attempts.find((item) => item.id === resultRef.attemptId);
     const result = {
       status: "committed",
       resultId: resultRef.resultId,
@@ -27103,27 +27130,27 @@ ${delivery.evidence}` },
     };
     const question = map.nodes.find(
       (node) => {
-        var _a2;
-        return node.parentId === resultRef.nodeId && ((_a2 = node.aimQuestion) == null ? void 0 : _a2.parentBranchId) === branchId;
+        var _a3;
+        return node.parentId === resultRef.nodeId && ((_a3 = node.aimQuestion) == null ? void 0 : _a3.parentBranchId) === branchId;
       }
     );
     if (question) return { status: "waiting-user", branchId, result, questionNodeId: question.id };
     return (attempt == null ? void 0 : attempt.status) === "partial" ? { status: "partial", branchId, result } : { status: "completed", branchId, result };
   }
   async recoverQuestionDraft(mapPath) {
-    var _a;
-    const map = await this.repository.readMap(mapPath), draft = (_a = map.aim) == null ? void 0 : _a.questionDraft;
+    var _a2;
+    const map = await this.repository.readMap(mapPath), draft = (_a2 = map.aim) == null ? void 0 : _a2.questionDraft;
     if (!draft) return false;
     await this.persist(() => this.commitQuestionDraft(mapPath, map, draft));
     return true;
   }
   async recoverPostReportQuestions(mapPath) {
-    var _a, _b, _c, _d, _e, _f, _g, _h, _i;
+    var _a2, _b2, _c, _d, _e, _f, _g, _h, _i;
     let created = 0;
     const initial = await this.repository.readMap(mapPath);
     const language2 = this.languageOf(initial);
-    if ((_a = initial.aim) == null ? void 0 : _a.questionDraft) return 0;
-    for (const run of (_c = (_b = initial.aim) == null ? void 0 : _b.runs) != null ? _c : []) {
+    if ((_a2 = initial.aim) == null ? void 0 : _a2.questionDraft) return 0;
+    for (const run of (_c = (_b2 = initial.aim) == null ? void 0 : _b2.runs) != null ? _c : []) {
       const attempt = run.attempts.find((item) => item.id === run.currentAttemptId);
       const review = (_d = attempt == null ? void 0 : attempt.plannerReviews) == null ? void 0 : _d.find((item) => item.decision === "ask_user");
       if (!attempt || attempt.status !== "completed" && attempt.status !== "partial" || !(review == null ? void 0 : review.question) || !((_e = review.answerOptions) == null ? void 0 : _e.length))
@@ -27135,8 +27162,8 @@ ${delivery.evidence}` },
       if ((_g = resultNode == null ? void 0 : resultNode.aimDismissedQuestionRequestIds) == null ? void 0 : _g.includes(`post-${run.id}-${attempt.id}`)) continue;
       const existing = latest.nodes.some(
         (node) => {
-          var _a2, _b2;
-          return ((_a2 = node.aimQuestion) == null ? void 0 : _a2.parentBranchId) === branch.id && (node.parentId === result.nodeId || ((_b2 = node.aimConvergesFromNodeIds) == null ? void 0 : _b2.includes(result.nodeId)));
+          var _a3, _b3;
+          return ((_a3 = node.aimQuestion) == null ? void 0 : _a3.parentBranchId) === branch.id && (node.parentId === result.nodeId || ((_b3 = node.aimConvergesFromNodeIds) == null ? void 0 : _b3.includes(result.nodeId)));
         }
       );
       if (existing) continue;
@@ -27160,14 +27187,14 @@ ${delivery.evidence}` },
   }
   /** Reviews a saved diagnostic Searcher report without repeating that already completed research turn. */
   async reviewFailedAttemptReport(mapPath, runId, diagnosticNotePath, signal) {
-    var _a, _b, _c, _d, _e, _f, _g, _h, _i, _j;
+    var _a2, _b2, _c, _d, _e, _f, _g, _h, _i, _j;
     throwIfAborted(signal);
-    const map = await this.repository.readMap(mapPath), run = (_a = map.aim) == null ? void 0 : _a.runs.find((item) => item.id === runId);
+    const map = await this.repository.readMap(mapPath), run = (_a2 = map.aim) == null ? void 0 : _a2.runs.find((item) => item.id === runId);
     const language2 = this.languageOf(map);
     const priorAttempt = run == null ? void 0 : run.attempts.find((item) => item.id === run.currentAttemptId);
     if (!run || !priorAttempt || priorAttempt.status !== "failed")
       throw new Error("A saved failed AIM attempt is required to review a diagnostic report.");
-    const branch = (_b = map.aim) == null ? void 0 : _b.branches.find((item) => item.id === run.branchId), questionNode = branch && map.nodes.find((item) => item.id === branch.questionNodeId);
+    const branch = (_b2 = map.aim) == null ? void 0 : _b2.branches.find((item) => item.id === run.branchId), questionNode = branch && map.nodes.find((item) => item.id === branch.questionNodeId);
     if (!branch || !questionNode) throw new Error("The failed run's answer branch or question is missing.");
     const expectedFolder = this.repository.topicFolder(mapPath, "Notes");
     if (!diagnosticNotePath.startsWith(`${expectedFolder}/`))
@@ -27522,9 +27549,9 @@ ${runId}`, fingerprint2 = JSON.stringify({ model, reasoning });
     return promise;
   }
   async runPartialContinuation(mapPath, runId, model, reasoning, signal) {
-    var _a, _b, _c, _d, _e, _f, _g, _h, _i, _j, _k, _l;
+    var _a2, _b2, _c, _d, _e, _f, _g, _h, _i, _j, _k, _l;
     throwIfAborted(signal);
-    const map = await this.repository.readMap(mapPath), run = (_a = map.aim) == null ? void 0 : _a.runs.find((item) => item.id === runId);
+    const map = await this.repository.readMap(mapPath), run = (_a2 = map.aim) == null ? void 0 : _a2.runs.find((item) => item.id === runId);
     const language2 = this.languageOf(map);
     const currentAttempt = run == null ? void 0 : run.attempts.find((item) => item.id === run.currentAttemptId);
     if (!run || !currentAttempt || ["running", "saving"].includes(currentAttempt.status) || !["partial", "failed", "cancelled"].includes(currentAttempt.status))
@@ -27536,7 +27563,7 @@ ${runId}`, fingerprint2 = JSON.stringify({ model, reasoning });
     if (!branch || !questionNode || !priorRef)
       throw new Error("The partial result or its answer branch is missing; it cannot be continued safely.");
     const priorNote = await this.repository.readNote(priorRef.notePath, map), parent = await this.repository.readNote(questionNode.path, map);
-    const topicNode = (_b = map.nodes.find((item) => item.aimKind === "topic")) != null ? _b : map.nodes.find((item) => item.parentId === null);
+    const topicNode = (_b2 = map.nodes.find((item) => item.aimKind === "topic")) != null ? _b2 : map.nodes.find((item) => item.parentId === null);
     const topicNote = topicNode ? await this.repository.readNote(topicNode.path, map) : parent;
     const lineage = await this.branchLineage(map, branch.parentBranchId);
     const savedResearchNodeIds = [
@@ -28019,24 +28046,24 @@ ${requestId}`, fingerprint2 = JSON.stringify({ parentNodeId, parentBranchId, mod
     });
   }
   async createPlannerQuestion(mapPath, parentNodeId, model, reasoning, requestId, parentBranchId, signal) {
-    var _a, _b, _c, _d;
+    var _a2, _b2, _c, _d;
     throwIfAborted(signal);
     if (!requestId.trim()) throw new Error("Planner question request identity is required.");
     const map = await this.repository.readMap(mapPath), state = map.aim;
     if (!state) throw new Error("AIM map data is missing.");
     const existingQuestion = map.nodes.find((node) => {
-      var _a2;
-      return ((_a2 = node.aimQuestion) == null ? void 0 : _a2.requestId) === requestId;
+      var _a3;
+      return ((_a3 = node.aimQuestion) == null ? void 0 : _a3.requestId) === requestId;
     });
     if (existingQuestion == null ? void 0 : existingQuestion.aimQuestion) {
-      if (existingQuestion.parentId !== parentNodeId || ((_a = existingQuestion.aimQuestion.parentBranchId) != null ? _a : null) !== parentBranchId)
+      if (existingQuestion.parentId !== parentNodeId || ((_a2 = existingQuestion.aimQuestion.parentBranchId) != null ? _a2 : null) !== parentBranchId)
         throw new Error("This Planner question identity was already used for another parent node or branch.");
       return { status: "question", node: existingQuestion, options: existingQuestion.aimQuestion.options };
     }
     if (state.questionDraft) {
       if (state.questionDraft.requestId !== requestId)
         throw new Error("A previous Planner question save must be recovered before planning another question.");
-      if (state.questionDraft.parentId !== parentNodeId || ((_b = state.questionDraft.parentBranchId) != null ? _b : null) !== parentBranchId)
+      if (state.questionDraft.parentId !== parentNodeId || ((_b2 = state.questionDraft.parentBranchId) != null ? _b2 : null) !== parentBranchId)
         throw new Error("This Planner question identity was already saved for another parent node or branch.");
       throwIfAborted(signal);
       await this.persist(() => this.commitQuestionDraft(mapPath, map, state.questionDraft));
@@ -28075,20 +28102,20 @@ ${requestId}`, fingerprint2 = JSON.stringify({ parentNodeId, parentBranchId, mod
     const siblingQuestions = isSavedTerminalResult ? await Promise.all(
       map.nodes.filter(
         (node) => {
-          var _a2;
-          return node.parentId === parentNodeId && node.aimKind === "question" && ((_a2 = node.aimQuestion) == null ? void 0 : _a2.parentBranchId) === parentBranchId;
+          var _a3;
+          return node.parentId === parentNodeId && node.aimKind === "question" && ((_a3 = node.aimQuestion) == null ? void 0 : _a3.parentBranchId) === parentBranchId;
         }
       ).map(async (node) => (await this.repository.readNote(node.path)).summary)
     ) : [];
     const dismissedQuestions = isSavedTerminalResult ? state.runs.flatMap((run) => {
       if (run.branchId !== parentBranchId) return [];
       return run.attempts.flatMap((attempt) => {
-        var _a2, _b2;
-        if (!((_a2 = parentNode.aimDismissedQuestionRequestIds) == null ? void 0 : _a2.includes(`post-${run.id}-${attempt.id}`))) return [];
+        var _a3, _b3;
+        if (!((_a3 = parentNode.aimDismissedQuestionRequestIds) == null ? void 0 : _a3.includes(`post-${run.id}-${attempt.id}`))) return [];
         const result2 = parentBranch == null ? void 0 : parentBranch.results.find(
           (item) => item.runId === run.id && item.attemptId === attempt.id && item.nodeId === parentNodeId
         );
-        const review = (_b2 = attempt.plannerReviews) == null ? void 0 : _b2.find((item) => item.decision === "ask_user" && item.question);
+        const review = (_b3 = attempt.plannerReviews) == null ? void 0 : _b3.find((item) => item.decision === "ask_user" && item.question);
         return result2 && (review == null ? void 0 : review.question) ? [review.question] : [];
       });
     }) : [];
@@ -28236,9 +28263,9 @@ ${requestId}`, fingerprint2 = JSON.stringify({ parentNodeId, parentBranchId, mod
     ))
       throw new Error("A follow-up Manual question must attach to a saved result in its answer branch.");
     const matchesExpectedResultBranch = (document2) => {
-      var _a;
+      var _a2;
       if (expectedResultBranchSnapshot === void 0 || !parentBranchId) return true;
-      const branch = (_a = document2.aim) == null ? void 0 : _a.branches.find((item) => item.id === parentBranchId);
+      const branch = (_a2 = document2.aim) == null ? void 0 : _a2.branches.find((item) => item.id === parentBranchId);
       if (!branch) return false;
       const current = JSON.stringify({
         inputSnapshot: branch.inputSnapshot,
@@ -28285,7 +28312,7 @@ ${requestId}`, fingerprint2 = JSON.stringify({ parentNodeId, parentBranchId, mod
     if (!latest.aim) throw new Error("AIM map data is missing.");
     if (latest.aim.questionDraft) throw new Error("Another Planner question was saved while this turn was running.");
     const committedQuestionId = await this.persist(async () => {
-      var _a;
+      var _a2;
       throwIfAborted(signal);
       const current = await this.repository.readMap(mapPath);
       throwIfAborted(signal);
@@ -28295,11 +28322,11 @@ ${requestId}`, fingerprint2 = JSON.stringify({ parentNodeId, parentBranchId, mod
           "The saved answer or research changed while Planner was creating a new question; refresh the result and try again."
         );
       const concurrentlyCommitted = current.nodes.find((node2) => {
-        var _a2;
-        return ((_a2 = node2.aimQuestion) == null ? void 0 : _a2.requestId) === requestId;
+        var _a3;
+        return ((_a3 = node2.aimQuestion) == null ? void 0 : _a3.requestId) === requestId;
       });
       if (concurrentlyCommitted == null ? void 0 : concurrentlyCommitted.aimQuestion) {
-        if (concurrentlyCommitted.parentId !== parentNodeId || ((_a = concurrentlyCommitted.aimQuestion.parentBranchId) != null ? _a : null) !== parentBranchId)
+        if (concurrentlyCommitted.parentId !== parentNodeId || ((_a2 = concurrentlyCommitted.aimQuestion.parentBranchId) != null ? _a2 : null) !== parentBranchId)
           throw new Error("This Planner question identity was concurrently used for another parent node or branch.");
         return concurrentlyCommitted.id;
       }
@@ -28318,9 +28345,9 @@ ${requestId}`, fingerprint2 = JSON.stringify({ parentNodeId, parentBranchId, mod
    * so the next round reuses evidence that still holds and rewrites the document with the user's real situation.
    */
   async correctAssumption(mapPath, conclusionNodeId, assumption, correction, model, reasoning, signal) {
-    var _a;
+    var _a2;
     const map = await this.repository.readMap(mapPath);
-    const branch = (_a = map.aim) == null ? void 0 : _a.branches.find(
+    const branch = (_a2 = map.aim) == null ? void 0 : _a2.branches.find(
       (item) => item.results.some((result) => result.nodeId === conclusionNodeId && result.kind === "conclusion")
     );
     if (!branch) throw new Error("Only a saved AIM conclusion can have its assumptions corrected.");
@@ -28388,8 +28415,8 @@ ${requestId}`, fingerprint2 = JSON.stringify({ parentNodeId, parentBranchId, mod
   }
   /** Where a new direction attaches: the chosen saved result, else the latest saved result of the run, else its start. */
   steerAnchor(map, from) {
-    var _a, _b, _c, _d;
-    const branches = (_b = (_a = map.aim) == null ? void 0 : _a.branches) != null ? _b : [];
+    var _a2, _b2, _c, _d;
+    const branches = (_b2 = (_a2 = map.aim) == null ? void 0 : _a2.branches) != null ? _b2 : [];
     const topic = (_c = map.nodes.find((node) => node.aimKind === "topic" && !node.parentId)) != null ? _c : map.nodes.find((node) => node.aimKind === "topic");
     if (!topic) throw new Error("This AIM map has no topic to change direction from.");
     const owning = from.nodeId ? branches.find((branch2) => branch2.results.some((result) => result.nodeId === from.nodeId)) : void 0;
@@ -28426,15 +28453,15 @@ ${input.requestId}`;
     return work;
   }
   async retryAnswerResearch(mapPath, branchId, model, reasoning, signal) {
-    var _a, _b, _c, _d;
+    var _a2, _b2, _c, _d;
     throwIfAborted(signal);
     await this.persist(() => this.runs.recoverAnswerBranches(mapPath));
-    const map = await this.repository.readMap(mapPath), branch = (_a = map.aim) == null ? void 0 : _a.branches.find((item) => item.id === branchId);
+    const map = await this.repository.readMap(mapPath), branch = (_a2 = map.aim) == null ? void 0 : _a2.branches.find((item) => item.id === branchId);
     if (!branch || branch.researchPlan || branch.results.length)
       throw new Error("Only an answered branch without a saved research plan can retry subtopic planning.");
     const question = map.nodes.find((node) => node.id === branch.questionNodeId);
     if (!question) throw new Error("The saved answer's question is missing.");
-    const topicNode = (_b = map.nodes.find((node) => node.aimKind === "topic")) != null ? _b : map.nodes.find((node) => node.parentId === null);
+    const topicNode = (_b2 = map.nodes.find((node) => node.aimKind === "topic")) != null ? _b2 : map.nodes.find((node) => node.parentId === null);
     const topicNote = topicNode ? await this.repository.readNote(topicNode.path, map) : await this.repository.readNote(question.path, map);
     const lineage = await this.branchLineage(map, branch.parentBranchId);
     const labels = (_d = (_c = question.aimQuestion) == null ? void 0 : _c.options.filter((option2) => branch.answerSnapshot.selections.includes(option2.id)).map((option2) => option2.label)) != null ? _d : branch.answerSnapshot.selections;
@@ -28453,15 +28480,15 @@ ${input.requestId}`;
   }
   /** Resumes a cancelled or incomplete answer branch from its immutable plan and saved reports. */
   async resumeAnswerResearch(mapPath, branchId, model, reasoning, signal) {
-    var _a, _b, _c, _d;
+    var _a2, _b2, _c, _d;
     throwIfAborted(signal);
     await this.persist(() => this.runs.recoverAnswerBranches(mapPath));
-    const map = await this.repository.readMap(mapPath), branch = (_a = map.aim) == null ? void 0 : _a.branches.find((item) => item.id === branchId);
+    const map = await this.repository.readMap(mapPath), branch = (_a2 = map.aim) == null ? void 0 : _a2.branches.find((item) => item.id === branchId);
     if (!branch || !branch.researchPlan && branch.results.length === 0)
       throw new Error("Only an answer branch with a saved research plan or report can resume.");
     const parent = map.nodes.find((node) => node.id === branch.questionNodeId);
     if (!parent) throw new Error("The saved answer branch's topic or question is missing.");
-    const topicNode = (_b = map.nodes.find((node) => node.aimKind === "topic")) != null ? _b : map.nodes.find((node) => node.parentId === null);
+    const topicNode = (_b2 = map.nodes.find((node) => node.aimKind === "topic")) != null ? _b2 : map.nodes.find((node) => node.parentId === null);
     const topicNote = topicNode ? await this.repository.readNote(topicNode.path, map) : await this.repository.readNote(parent.path, map);
     const parentNote = await this.repository.readNote(parent.path, map);
     const lineage = await this.branchLineage(map, branch.parentBranchId);
@@ -28480,7 +28507,7 @@ ${input.requestId}`;
     );
   }
   async runAnswer(mapPath, questionNodeId, input, model, reasoning, signal, onBranchStarted) {
-    var _a, _b, _c, _d, _e, _f, _g, _h, _i;
+    var _a2, _b2, _c, _d, _e, _f, _g, _h, _i;
     throwIfAborted(signal);
     const map = await this.repository.readMap(mapPath), questionNode = map.nodes.find((node) => node.id === questionNodeId), contract = questionNode == null ? void 0 : questionNode.aimQuestion;
     const language2 = this.languageOf(map);
@@ -28497,15 +28524,15 @@ ${input.requestId}`;
     if (selections.includes(AIM_UNKNOWN_OPTION_ID) && selections.length > 1)
       throw new Error("Unknown / no preference cannot be combined with another selected option.");
     const parent = await this.repository.readNote(questionNode.path, map);
-    const topicNode = (_a = map.nodes.find((node) => node.aimKind === "topic")) != null ? _a : map.nodes.find((node) => node.parentId === null);
+    const topicNode = (_a2 = map.nodes.find((node) => node.aimKind === "topic")) != null ? _a2 : map.nodes.find((node) => node.parentId === null);
     const topicNote = topicNode ? await this.repository.readNote(topicNode.path, map) : parent;
-    const parentBranchId = (_b = contract.parentBranchId) != null ? _b : null;
+    const parentBranchId = (_b2 = contract.parentBranchId) != null ? _b2 : null;
     const lineage = await this.branchLineage(map, parentBranchId);
     const inheritedBranch = parentBranchId ? (_c = map.aim) == null ? void 0 : _c.branches.find((branch2) => branch2.id === parentBranchId) : void 0;
     const condition = [answerLabels.join("; "), freeText].filter(Boolean).join(" \u2014 ") || translateNote(language2, "note.aim_unknown_option");
     const branch = await this.persist(
       () => {
-        var _a2, _b2;
+        var _a3, _b3;
         return this.runs.createAnswerBranch(mapPath, {
           requestId: input.requestId,
           questionNodeId,
@@ -28513,8 +28540,8 @@ ${input.requestId}`;
           answerSnapshot: { selections, freeText },
           inputSnapshot: {
             topic: map.title,
-            conditions: { ...(_a2 = inheritedBranch == null ? void 0 : inheritedBranch.inputSnapshot.conditions) != null ? _a2 : {}, [parent.summary]: condition },
-            upstreamResults: [...(_b2 = inheritedBranch == null ? void 0 : inheritedBranch.inputSnapshot.upstreamResults) != null ? _b2 : [], ...lineage.resultRefs].filter(
+            conditions: { ...(_a3 = inheritedBranch == null ? void 0 : inheritedBranch.inputSnapshot.conditions) != null ? _a3 : {}, [parent.summary]: condition },
+            upstreamResults: [...(_b3 = inheritedBranch == null ? void 0 : inheritedBranch.inputSnapshot.upstreamResults) != null ? _b3 : [], ...lineage.resultRefs].filter(
               (item, index, all) => all.findIndex((other) => other.notePath === item.notePath && other.version === item.version) === index
             )
           }
@@ -28527,8 +28554,8 @@ ${input.requestId}`;
     if (completedResult) {
       let followup = refreshed.nodes.find(
         (node) => {
-          var _a2;
-          return node.parentId === completedResult.nodeId && ((_a2 = node.aimQuestion) == null ? void 0 : _a2.parentBranchId) === branch.id;
+          var _a3;
+          return node.parentId === completedResult.nodeId && ((_a3 = node.aimQuestion) == null ? void 0 : _a3.parentBranchId) === branch.id;
         }
       );
       const result = {
@@ -28542,8 +28569,8 @@ ${input.requestId}`;
         refreshed = await this.repository.readMap(mapPath);
         followup = refreshed.nodes.find(
           (node) => {
-            var _a2;
-            return node.parentId === completedResult.nodeId && ((_a2 = node.aimQuestion) == null ? void 0 : _a2.parentBranchId) === branch.id;
+            var _a3;
+            return node.parentId === completedResult.nodeId && ((_a3 = node.aimQuestion) == null ? void 0 : _a3.parentBranchId) === branch.id;
           }
         );
       }
@@ -28572,14 +28599,14 @@ ${input.requestId}`;
    * this branch's conditions, so research tied to a different answer is not carried over.
    */
   async reusableResearchCandidates(map, branch) {
-    var _a, _b, _c, _d, _e, _f;
+    var _a2, _b2, _c, _d, _e, _f;
     const candidates = [], visited = /* @__PURE__ */ new Set([branch.id]), lineage = [];
-    let next = (_a = map.aim) == null ? void 0 : _a.branches.find((item) => item.id === branch.parentBranchId);
+    let next = (_a2 = map.aim) == null ? void 0 : _a2.branches.find((item) => item.id === branch.parentBranchId);
     while (next && !visited.has(next.id)) {
       visited.add(next.id);
       lineage.push(next);
       const parentBranchId = next.parentBranchId;
-      next = (_b = map.aim) == null ? void 0 : _b.branches.find((item) => item.id === parentBranchId);
+      next = (_b2 = map.aim) == null ? void 0 : _b2.branches.find((item) => item.id === parentBranchId);
     }
     const otherRoutes = [...(_d = (_c = map.aim) == null ? void 0 : _c.branches) != null ? _d : []].reverse().filter((item) => !visited.has(item.id));
     let fromLineage = 0;
@@ -28641,8 +28668,8 @@ ${note.detail}`
     return candidates;
   }
   async verifyResearchSource(mapPath, branchId, target) {
-    var _a;
-    const map = await this.repository.readMap(mapPath), branch = (_a = map.aim) == null ? void 0 : _a.branches.find((item) => item.id === branchId);
+    var _a2;
+    const map = await this.repository.readMap(mapPath), branch = (_a2 = map.aim) == null ? void 0 : _a2.branches.find((item) => item.id === branchId);
     if (!branch || !target.source) throw new ReuseEvidenceRejected("Research source is missing.");
     const candidate = (await this.reusableResearchCandidates(map, branch)).find(
       (item) => item.source.branchId === target.source.branchId && item.source.resultId === target.source.resultId && item.source.notePath === target.source.notePath && item.source.version === target.source.version
@@ -28654,8 +28681,8 @@ ${note.detail}`
     return candidate;
   }
   async assessReusableResearch(target, candidate, conditions, context, model, reasoning, signal) {
-    var _a, _b;
-    const keys = (_b = (_a = target.validity) == null ? void 0 : _a.conditionKeys) != null ? _b : [];
+    var _a2, _b2;
+    const keys = (_b2 = (_a2 = target.validity) == null ? void 0 : _a2.conditionKeys) != null ? _b2 : [];
     const sameCondition = (key2) => Object.hasOwn(candidate.conditions, key2) && Object.hasOwn(conditions, key2) && candidate.conditions[key2] === conditions[key2];
     if (keys.some((key2) => !sameCondition(key2)))
       throw new ReuseEvidenceRejected(
@@ -28736,13 +28763,13 @@ ${note.detail}`
     }
   }
   async executeSubtopicWorkflow(mapPath, branchId, parent, topicNote, answerLabels, freeText, lineageContext, model, reasoning, signal) {
-    var _a, _b, _c, _d, _e, _f, _g, _h, _i, _j, _k, _l;
+    var _a2, _b2, _c, _d, _e, _f, _g, _h, _i, _j, _k, _l;
     let map = await this.repository.readMap(mapPath);
     const language2 = this.languageOf(map);
-    let branch = (_a = map.aim) == null ? void 0 : _a.branches.find((item) => item.id === branchId);
+    let branch = (_a2 = map.aim) == null ? void 0 : _a2.branches.find((item) => item.id === branchId);
     if (!branch) throw new Error("AIM answer branch disappeared before planning its research.");
     const questionNodeId = branch.questionNodeId;
-    const answerDescription = ((_b = map.nodes.find((node) => node.id === questionNodeId)) == null ? void 0 : _b.aimKind) === "topic" ? TOPIC_ROOT_ANSWER : JSON.stringify({ selectedOptions: answerLabels, freeText: freeText || null });
+    const answerDescription = ((_b2 = map.nodes.find((node) => node.id === questionNodeId)) == null ? void 0 : _b2.aimKind) === "topic" ? TOPIC_ROOT_ANSWER : JSON.stringify({ selectedOptions: answerLabels, freeText: freeText || null });
     const contextBase = {
       timeoutMs: branch.retryTimeoutMs,
       aimEvidenceIds: this.lineageEvidenceIds(map, branch.parentBranchId),
@@ -28899,9 +28926,9 @@ Planner format diagnostic: ${JSON.stringify({ initial: { detail: planned.detail.
       scheduled = await scheduleAimResearch(
         executionPlan,
         async (target, predecessors, taskSignal) => {
-          var _a2, _b2, _c2, _d2;
+          var _a3, _b3, _c2, _d2;
           throwIfAborted(taskSignal);
-          const currentMap = await this.repository.readMap(mapPath), currentBranch = (_a2 = currentMap.aim) == null ? void 0 : _a2.branches.find((item) => item.id === branchId);
+          const currentMap = await this.repository.readMap(mapPath), currentBranch = (_a3 = currentMap.aim) == null ? void 0 : _a3.branches.find((item) => item.id === branchId);
           if (!currentBranch) throw new Error("AIM answer branch disappeared during subtopic research.");
           const savedRef = currentBranch.results.find(
             (item) => item.subtopicId === target.id && item.kind === "research"
@@ -28971,7 +28998,7 @@ ${report.detail}`
             ).join("\n\n");
             if (target.action === "reuse" && source) {
               try {
-                reuse = (_b2 = preparedReuse.get(target.id)) != null ? _b2 : await this.assessReusableResearch(
+                reuse = (_b3 = preparedReuse.get(target.id)) != null ? _b3 : await this.assessReusableResearch(
                   target,
                   source,
                   currentBranch.inputSnapshot.conditions,
@@ -29168,10 +29195,10 @@ ${dependencyReports}` : "")
       const initialDeliveryEvidence = [
         ...new Map(
           reports.map((report) => {
-            var _a2, _b2, _c2;
+            var _a3, _b3, _c2;
             const ref = branch.results.find((item) => item.nodeId === report.nodeId);
             const evidence = {
-              id: (_c2 = (_b2 = (_a2 = ref == null ? void 0 : ref.reuse) == null ? void 0 : _a2.sourceResultId) != null ? _b2 : ref == null ? void 0 : ref.resultId) != null ? _c2 : report.subtopicId,
+              id: (_c2 = (_b3 = (_a3 = ref == null ? void 0 : ref.reuse) == null ? void 0 : _a3.sourceResultId) != null ? _b3 : ref == null ? void 0 : ref.resultId) != null ? _c2 : report.subtopicId,
               hash: researchContentHash(report),
               detail: `## ${report.title}
 
@@ -29186,9 +29213,9 @@ ${report.detail}`
       const deliveryLineage = (await this.branchLineage(map, branch.parentBranchId)).sources;
       const resumeReports = resumeDelivery == null ? void 0 : resumeDelivery.reports;
       const deliveryEvidence = () => {
-        var _a2;
+        var _a3;
         return [
-          ...(_a2 = resumeDelivery == null ? void 0 : resumeDelivery.evidence) != null ? _a2 : initialDeliveryEvidence,
+          ...(_a3 = resumeDelivery == null ? void 0 : resumeDelivery.evidence) != null ? _a3 : initialDeliveryEvidence,
           ...supplementalReports.map((item) => ({
             id: `followup-${(0, import_node_crypto11.createHash)("sha256").update(JSON.stringify(item.target)).digest("hex")}`,
             hash: researchContentHash(item),
@@ -29643,19 +29670,19 @@ ${beforeSearch.detail}`,
     await this.repository.saveMap(mapPath, latest);
   }
   lineageEvidenceIds(map, branchId) {
-    var _a, _b;
+    var _a2, _b2;
     const ids = [];
     const visited = /* @__PURE__ */ new Set();
-    let current = (_a = map.aim) == null ? void 0 : _a.branches.find((branch) => branch.id === branchId);
+    let current = (_a2 = map.aim) == null ? void 0 : _a2.branches.find((branch) => branch.id === branchId);
     while (current && !visited.has(current.id)) {
       visited.add(current.id);
       ids.push(...current.results.map((result) => `${result.nodeId}-v${result.version}`));
-      current = (_b = map.aim) == null ? void 0 : _b.branches.find((branch) => branch.id === current.parentBranchId);
+      current = (_b2 = map.aim) == null ? void 0 : _b2.branches.find((branch) => branch.id === current.parentBranchId);
     }
     return ids;
   }
   async branchLineage(map, branchId) {
-    var _a, _b, _c;
+    var _a2, _b2, _c;
     const data = map.aim;
     if (!branchId || !data) return { context: "", resultRefs: [], evidence: [], sources: [] };
     const chain = [];
@@ -29668,7 +29695,7 @@ ${beforeSearch.detail}`,
     for (const branch of chain) {
       const question = map.nodes.find((node) => node.id === branch.questionNodeId);
       const questionNote = question ? await this.repository.readNote(question.path) : void 0;
-      const choices = (_b = (_a = question == null ? void 0 : question.aimQuestion) == null ? void 0 : _a.options.filter((option2) => branch.answerSnapshot.selections.includes(option2.id)).map((option2) => option2.label)) != null ? _b : branch.answerSnapshot.selections;
+      const choices = (_b2 = (_a2 = question == null ? void 0 : question.aimQuestion) == null ? void 0 : _a2.options.filter((option2) => branch.answerSnapshot.selections.includes(option2.id)).map((option2) => option2.label)) != null ? _b2 : branch.answerSnapshot.selections;
       if ((question == null ? void 0 : question.aimKind) === "question")
         sections.push(
           `User answer to ${(_c = questionNote == null ? void 0 : questionNote.summary) != null ? _c : "question"}: ${JSON.stringify({ selections: choices, freeText: branch.answerSnapshot.freeText || null })}`
@@ -29718,8 +29745,8 @@ ${note.detail}`
     return { context: sections.join("\n\n"), resultRefs, evidence, sources: sources2 };
   }
   async questionHistory(map, branchId) {
-    var _a;
-    const branches = (_a = map.aim) == null ? void 0 : _a.branches;
+    var _a2;
+    const branches = (_a2 = map.aim) == null ? void 0 : _a2.branches;
     if (!branches || !branchId) return [];
     const chain = [];
     let current = branches.find((branch) => branch.id === branchId);
@@ -29763,12 +29790,12 @@ var _AimRunStore = class _AimRunStore {
   }
   async createAnswerBranch(mapPath, input) {
     return this.locked(mapPath, async () => {
-      var _a, _b, _c;
+      var _a2, _b2, _c;
       const map = await this.repository.readMap(mapPath), state = this.state(map);
-      const requestId = (_a = input.requestId) == null ? void 0 : _a.trim();
+      const requestId = (_a2 = input.requestId) == null ? void 0 : _a2.trim();
       const existing = requestId ? state.branches.find((branch2) => branch2.submissionId === requestId) : void 0;
       if (existing) {
-        const sameSubmission = ((_b = existing.sourceQuestionNodeId) != null ? _b : existing.questionNodeId) === input.questionNodeId && existing.parentBranchId === input.parentBranchId && JSON.stringify(existing.answerSnapshot) === JSON.stringify(input.answerSnapshot) && JSON.stringify(existing.inputSnapshot) === JSON.stringify(input.inputSnapshot);
+        const sameSubmission = ((_b2 = existing.sourceQuestionNodeId) != null ? _b2 : existing.questionNodeId) === input.questionNodeId && existing.parentBranchId === input.parentBranchId && JSON.stringify(existing.answerSnapshot) === JSON.stringify(input.answerSnapshot) && JSON.stringify(existing.inputSnapshot) === JSON.stringify(input.inputSnapshot);
         if (!sameSubmission) throw new Error("This answer submission identity was already used for different input.");
         await this.recoverAnswerBranchesInMap(mapPath, map);
         return JSON.parse(JSON.stringify(existing));
@@ -29821,7 +29848,7 @@ var _AimRunStore = class _AimRunStore {
     });
   }
   async recoverAnswerBranchesInMap(mapPath, map) {
-    var _a, _b;
+    var _a2, _b2;
     const state = this.state(map);
     let changed = await this.splitSharedQuestionPivots(mapPath, map);
     const removedPivots = /* @__PURE__ */ new Set();
@@ -29832,7 +29859,7 @@ var _AimRunStore = class _AimRunStore {
         const pivot = map.nodes.find((node) => node.id === branch.answerNodeId && node.aimKind === "answer");
         if (pivot) {
           for (const node of map.nodes) if (node.parentId === pivot.id) node.parentId = question.id;
-          for (const draft of (_a = state.resultDrafts) != null ? _a : []) {
+          for (const draft of (_a2 = state.resultDrafts) != null ? _a2 : []) {
             if (draft.branchId === branch.id && draft.parentNodeId === pivot.id) delete draft.parentNodeId;
           }
           removedPivots.add(pivot.id);
@@ -29842,7 +29869,7 @@ var _AimRunStore = class _AimRunStore {
       }
       for (const result of branch.results) {
         const node = map.nodes.find((item) => item.id === result.nodeId);
-        if (node && removedPivots.has((_b = node.parentId) != null ? _b : "")) {
+        if (node && removedPivots.has((_b2 = node.parentId) != null ? _b2 : "")) {
           node.parentId = question.id;
           changed++;
         }
@@ -29860,10 +29887,10 @@ var _AimRunStore = class _AimRunStore {
   }
   /** Give each saved answer its own question pivot before continuing legacy shared-question branches. */
   async splitSharedQuestionPivots(mapPath, map) {
-    var _a, _b, _c;
+    var _a2, _b2, _c;
     const state = this.state(map), grouped = /* @__PURE__ */ new Map();
     for (const branch of state.branches) {
-      const group = (_a = grouped.get(branch.questionNodeId)) != null ? _a : [];
+      const group = (_a2 = grouped.get(branch.questionNodeId)) != null ? _a2 : [];
       group.push(branch);
       grouped.set(branch.questionNodeId, group);
     }
@@ -29874,7 +29901,7 @@ var _AimRunStore = class _AimRunStore {
       if (!source) throw new Error("The answer's question node is missing.");
       for (const branch of branches.slice(1)) {
         const copy = await this.cloneQuestionForBranch(mapPath, map, source);
-        (_b = branch.sourceQuestionNodeId) != null ? _b : branch.sourceQuestionNodeId = source.id;
+        (_b2 = branch.sourceQuestionNodeId) != null ? _b2 : branch.sourceQuestionNodeId = source.id;
         branch.questionNodeId = copy.id;
         if (branch.answerNodeId) {
           const answer = map.nodes.find((node) => node.id === branch.answerNodeId);
@@ -29930,14 +29957,14 @@ var _AimRunStore = class _AimRunStore {
   }
   async saveResearchPlan(mapPath, branchId, plan) {
     return this.locked(mapPath, async () => {
-      var _a;
+      var _a2;
       const map = await this.repository.readMap(mapPath), state = this.state(map), branch = state.branches.find((item) => item.id === branchId);
       if (!branch) throw new Error("Answer branch does not exist.");
-      const replaceEmptyPlan = ((_a = branch.researchPlan) == null ? void 0 : _a.length) === 0 && !branch.results.length && !state.runs.some(
+      const replaceEmptyPlan = ((_a2 = branch.researchPlan) == null ? void 0 : _a2.length) === 0 && !branch.results.length && !state.runs.some(
         (run) => {
-          var _a2, _b;
+          var _a3, _b2;
           return run.branchId === branchId && ["running", "saving"].includes(
-            (_b = (_a2 = run.attempts.find((attempt) => attempt.id === run.currentAttemptId)) == null ? void 0 : _a2.status) != null ? _b : ""
+            (_b2 = (_a3 = run.attempts.find((attempt) => attempt.id === run.currentAttemptId)) == null ? void 0 : _a3.status) != null ? _b2 : ""
           );
         }
       );
@@ -29974,7 +30001,7 @@ var _AimRunStore = class _AimRunStore {
   }
   async startAttempt(mapPath, branchId, runId, config) {
     return this.locked(mapPath, async () => {
-      var _a, _b, _c;
+      var _a2, _b2, _c;
       const map = await this.repository.readMap(mapPath), state = this.state(map), branch = state.branches.find((item) => item.id === branchId);
       if (!branch) throw new Error("Answer branch does not exist.");
       {
@@ -29987,10 +30014,10 @@ var _AimRunStore = class _AimRunStore {
             return (attempt == null ? void 0 : attempt.status) === "running" || (attempt == null ? void 0 : attempt.status) === "saving";
           })()
         );
-        const blocked = (_a = activeRuns.find((item) => {
+        const blocked = (_a2 = activeRuns.find((item) => {
           const attempt = item.attempts.find((candidate) => candidate.id === item.currentAttemptId);
           return !(config == null ? void 0 : config.subtopicId) || !attempt.subtopicId || attempt.subtopicId === config.subtopicId;
-        })) != null ? _a : activeRuns.length >= ACTIVE_AIM_FLOW_LIMITS.researchParallelism ? activeRuns[0] : void 0;
+        })) != null ? _a2 : activeRuns.length >= ACTIVE_AIM_FLOW_LIMITS.researchParallelism ? activeRuns[0] : void 0;
         if (blocked) {
           const activeAttempt = blocked.attempts.find((item) => item.id === blocked.currentAttemptId);
           return {
@@ -30018,7 +30045,7 @@ var _AimRunStore = class _AimRunStore {
         });
         current.status = "superseded";
         current.stopReason = "A newer attempt started for this run.";
-        const staleDrafts = ((_b = state.resultDrafts) != null ? _b : []).filter(
+        const staleDrafts = ((_b2 = state.resultDrafts) != null ? _b2 : []).filter(
           (item) => item.runId === id && item.attemptId === current.id
         );
         const staleNodes = new Set(staleDrafts.map((item) => item.nodeId));
@@ -30063,8 +30090,8 @@ var _AimRunStore = class _AimRunStore {
       if (!branch) throw new Error("AIM branch is missing.");
       if (state.runs.some(
         (run) => {
-          var _a, _b;
-          return run.branchId === branchId && ["running", "saving"].includes((_b = (_a = run.attempts.find((item) => item.id === run.currentAttemptId)) == null ? void 0 : _a.status) != null ? _b : "");
+          var _a2, _b2;
+          return run.branchId === branchId && ["running", "saving"].includes((_b2 = (_a2 = run.attempts.find((item) => item.id === run.currentAttemptId)) == null ? void 0 : _a2.status) != null ? _b2 : "");
         }
       ))
         throw new Error("AIM branch is still running.");
@@ -30096,12 +30123,12 @@ var _AimRunStore = class _AimRunStore {
   }
   async recordResearchTurn(mapPath, handle) {
     return this.locked(mapPath, async () => {
-      var _a, _b;
+      var _a2, _b2;
       const map = await this.repository.readMap(mapPath), state = this.state(map), run = state.runs.find((item) => item.id === handle.runId), attempt = run == null ? void 0 : run.attempts.find((item) => item.id === handle.attemptId);
       if (!run || !attempt || !isRunningAttempt(run, attempt, handle))
         throw new Error("The AIM attempt is no longer current.");
-      const next = ((_a = attempt.researchTurns) != null ? _a : 0) + 1;
-      if (next > ((_b = attempt.maxResearchTurns) != null ? _b : 1)) throw new Error("The bounded AIM research-turn budget is exhausted.");
+      const next = ((_a2 = attempt.researchTurns) != null ? _a2 : 0) + 1;
+      if (next > ((_b2 = attempt.maxResearchTurns) != null ? _b2 : 1)) throw new Error("The bounded AIM research-turn budget is exhausted.");
       attempt.researchTurns = next;
       map.aim = state;
       await this.repository.saveMap(mapPath, map);
@@ -30110,14 +30137,14 @@ var _AimRunStore = class _AimRunStore {
   }
   async recordPlannerReview(mapPath, handle, review, stopReason) {
     return this.locked(mapPath, async () => {
-      var _a, _b;
+      var _a2, _b2;
       const map = await this.repository.readMap(mapPath), state = this.state(map), run = state.runs.find((item) => item.id === handle.runId), attempt = run == null ? void 0 : run.attempts.find((item) => item.id === handle.attemptId);
       if (!run || !attempt || !isRunningAttempt(run, attempt, handle))
         throw new Error("The AIM attempt is no longer current.");
-      const reviews = (_a = attempt.plannerReviews) != null ? _a : [];
+      const reviews = (_a2 = attempt.plannerReviews) != null ? _a2 : [];
       if (reviews.some((item) => item.researchTurn === review.researchTurn))
         throw new Error("A Planner review is already recorded for this research turn.");
-      if (review.researchTurn !== ((_b = attempt.researchTurns) != null ? _b : 0))
+      if (review.researchTurn !== ((_b2 = attempt.researchTurns) != null ? _b2 : 0))
         throw new Error("Planner review must follow a completed research turn.");
       reviews.push(JSON.parse(JSON.stringify(review)));
       attempt.plannerReviews = reviews;
@@ -30128,11 +30155,11 @@ var _AimRunStore = class _AimRunStore {
   }
   async recordSearchDiagnostic(mapPath, handle, diagnostic) {
     return this.locked(mapPath, async () => {
-      var _a;
+      var _a2;
       const map = await this.repository.readMap(mapPath), state = this.state(map), run = state.runs.find((item) => item.id === handle.runId), attempt = run == null ? void 0 : run.attempts.find((item) => item.id === handle.attemptId);
       if (!run || !attempt || !isRunningAttempt(run, attempt, handle))
         throw new Error("The AIM attempt is no longer current.");
-      const diagnostics = (_a = attempt.searchDiagnostics) != null ? _a : [];
+      const diagnostics = (_a2 = attempt.searchDiagnostics) != null ? _a2 : [];
       const existing = diagnostics.find((item) => item.researchTurn === diagnostic.researchTurn);
       if (existing) Object.assign(existing, JSON.parse(JSON.stringify(diagnostic)));
       else diagnostics.push(JSON.parse(JSON.stringify(diagnostic)));
@@ -30143,8 +30170,8 @@ var _AimRunStore = class _AimRunStore {
   }
   async updateResultDraftReport(mapPath, handle, draftId, summary, detail, reports) {
     return this.locked(mapPath, async () => {
-      var _a;
-      const map = await this.repository.readMap(mapPath), state = this.state(map), run = state.runs.find((item) => item.id === handle.runId), attempt = run == null ? void 0 : run.attempts.find((item) => item.id === handle.attemptId), draft = (_a = state.resultDrafts) == null ? void 0 : _a.find((item) => item.id === draftId);
+      var _a2;
+      const map = await this.repository.readMap(mapPath), state = this.state(map), run = state.runs.find((item) => item.id === handle.runId), attempt = run == null ? void 0 : run.attempts.find((item) => item.id === handle.attemptId), draft = (_a2 = state.resultDrafts) == null ? void 0 : _a2.find((item) => item.id === draftId);
       if (!run || !attempt || !isRunningAttempt(run, attempt, handle) || !draft || draft.runId !== run.id || draft.attemptId !== attempt.id || draft.status !== "ready")
         return false;
       await this.repository.updateNote(
@@ -30166,8 +30193,8 @@ var _AimRunStore = class _AimRunStore {
   /** Retitles/reclassifies a saved synthesis draft after its bounded Planner review selects the final state. */
   async updateResultDraftPresentation(mapPath, handle, draftId, title, kind) {
     return this.locked(mapPath, async () => {
-      var _a;
-      const map = await this.repository.readMap(mapPath), state = this.state(map), run = state.runs.find((item) => item.id === handle.runId), attempt = run == null ? void 0 : run.attempts.find((item) => item.id === handle.attemptId), draft = (_a = state.resultDrafts) == null ? void 0 : _a.find((item) => item.id === draftId);
+      var _a2;
+      const map = await this.repository.readMap(mapPath), state = this.state(map), run = state.runs.find((item) => item.id === handle.runId), attempt = run == null ? void 0 : run.attempts.find((item) => item.id === handle.attemptId), draft = (_a2 = state.resultDrafts) == null ? void 0 : _a2.find((item) => item.id === draftId);
       if (!run || !attempt || !isRunningAttempt(run, attempt, handle) || !draft || draft.runId !== run.id || draft.attemptId !== attempt.id || draft.status !== "ready")
         return false;
       const node = map.nodes.find((item) => item.id === draft.nodeId && item.path === draft.notePath);
@@ -30190,7 +30217,7 @@ var _AimRunStore = class _AimRunStore {
   }
   async failAttempt(mapPath, handle, reason) {
     return this.locked(mapPath, async () => {
-      var _a, _b;
+      var _a2, _b2;
       const map = await this.repository.readMap(mapPath), state = this.state(map);
       const run = state.runs.find((item) => item.id === handle.runId), attempt = run == null ? void 0 : run.attempts.find((item) => item.id === handle.attemptId);
       if (!run || !attempt || !isRunningAttempt(run, attempt, handle)) return false;
@@ -30199,18 +30226,18 @@ var _AimRunStore = class _AimRunStore {
       attempt.status = "failed";
       attempt.stopReason = reason;
       this.releaseAttempt(mapPath, handle);
-      const drafts = ((_a = state.resultDrafts) != null ? _a : []).filter(
+      const drafts = ((_a2 = state.resultDrafts) != null ? _a2 : []).filter(
         (item) => item.runId === handle.runId && item.attemptId === handle.attemptId
       );
       for (const draft of drafts) await this.retireDraftNote(map, draft, reason, "incomplete");
       const retained = drafts.find((item) => {
-        var _a2;
-        return (_a2 = item.retainedReports) == null ? void 0 : _a2.length;
+        var _a3;
+        return (_a3 = item.retainedReports) == null ? void 0 : _a3.length;
       });
       if ((retained == null ? void 0 : retained.retainedReports) && hasCompletedWebRetrieval(attempt.searchDiagnostics))
         attempt.retainedReports = { notePath: retained.notePath, reports: retained.retainedReports };
       const staleNodes = new Set(drafts.map((item) => item.nodeId));
-      state.resultDrafts = ((_b = state.resultDrafts) != null ? _b : []).filter((item) => !staleNodes.has(item.nodeId));
+      state.resultDrafts = ((_b2 = state.resultDrafts) != null ? _b2 : []).filter((item) => !staleNodes.has(item.nodeId));
       map.nodes = map.nodes.filter((node) => !staleNodes.has(node.id));
       map.aim = state;
       await this.repository.saveMap(mapPath, map);
@@ -30219,7 +30246,7 @@ var _AimRunStore = class _AimRunStore {
   }
   async cancelAttempt(mapPath, handle, reason) {
     return this.locked(mapPath, async () => {
-      var _a, _b;
+      var _a2, _b2;
       const map = await this.repository.readMap(mapPath), state = this.state(map);
       const run = state.runs.find((item) => item.id === handle.runId), attempt = run == null ? void 0 : run.attempts.find((item) => item.id === handle.attemptId);
       if (!run || !attempt || !isRunningAttempt(run, attempt, handle)) return false;
@@ -30228,12 +30255,12 @@ var _AimRunStore = class _AimRunStore {
       attempt.status = "cancelled";
       attempt.stopReason = reason;
       this.releaseAttempt(mapPath, handle);
-      const staleDrafts = ((_a = state.resultDrafts) != null ? _a : []).filter(
+      const staleDrafts = ((_a2 = state.resultDrafts) != null ? _a2 : []).filter(
         (item) => item.runId === handle.runId && item.attemptId === handle.attemptId
       );
       const staleNodes = new Set(staleDrafts.map((item) => item.nodeId));
       for (const draft of staleDrafts) await this.retireDraftNote(map, draft, reason, "incomplete");
-      state.resultDrafts = ((_b = state.resultDrafts) != null ? _b : []).filter((item) => !staleNodes.has(item.nodeId));
+      state.resultDrafts = ((_b2 = state.resultDrafts) != null ? _b2 : []).filter((item) => !staleNodes.has(item.nodeId));
       state.pendingCommits = state.pendingCommits.filter(
         (item) => item.runId !== handle.runId || item.attemptId !== handle.attemptId
       );
@@ -30245,7 +30272,7 @@ var _AimRunStore = class _AimRunStore {
   }
   async createResultDraft(mapPath, handle, title, model, reasoning, options = {}) {
     return this.locked(mapPath, async () => {
-      var _a, _b, _c, _d, _e, _f, _g, _h;
+      var _a2, _b2, _c, _d, _e, _f, _g, _h;
       const map = await this.repository.readMap(mapPath), state = this.state(map), run = state.runs.find((item) => item.id === handle.runId), attempt = run == null ? void 0 : run.attempts.find((item) => item.id === handle.attemptId);
       if (!run || !attempt || !isRunningAttempt(run, attempt, handle))
         return { status: "stale", runId: handle.runId, attemptId: handle.attemptId };
@@ -30254,10 +30281,10 @@ var _AimRunStore = class _AimRunStore {
       const folder = this.repository.topicFolder(mapPath, "Notes");
       await this.repository.ensureTopicFolders(this.repository.topicRoot(mapPath));
       const notePath = this.repository.unique(folder, title), nodeId = this.id();
-      const parentNodeId = (_a = options.parentNodeId) != null ? _a : branch.questionNodeId, parent = map.nodes.find((item) => item.id === parentNodeId);
+      const parentNodeId = (_a2 = options.parentNodeId) != null ? _a2 : branch.questionNodeId, parent = map.nodes.find((item) => item.id === parentNodeId);
       if (!parent) throw new Error("AIM result parent does not exist.");
       const siblingCount = map.nodes.filter((item) => item.parentId === parentNodeId).length;
-      const kind = (_b = options.kind) != null ? _b : "research";
+      const kind = (_b2 = options.kind) != null ? _b2 : "research";
       const node = {
         id: nodeId,
         path: notePath,
@@ -30319,16 +30346,16 @@ var _AimRunStore = class _AimRunStore {
   }
   async commitResult(mapPath, handle, resultDraftId, result, resultStatus = "completed") {
     return this.locked(mapPath, async () => {
-      var _a;
+      var _a2;
       const map = await this.repository.readMap(mapPath), state = this.state(map), run = state.runs.find((item) => item.id === handle.runId), attempt = run == null ? void 0 : run.attempts.find((item) => item.id === handle.attemptId);
       if (!run || !attempt || !isRunningAttempt(run, attempt, handle))
         return { status: "stale", runId: handle.runId, attemptId: handle.attemptId };
       const branch = state.branches.find((item) => item.id === run.branchId);
-      const draft = (_a = state.resultDrafts) == null ? void 0 : _a.find((item) => item.id === resultDraftId && item.branchId === branch.id);
+      const draft = (_a2 = state.resultDrafts) == null ? void 0 : _a2.find((item) => item.id === resultDraftId && item.branchId === branch.id);
       if (!draft || draft.status !== "ready" || draft.runId !== run.id || draft.attemptId !== attempt.id || !map.nodes.some(
         (node) => {
-          var _a2;
-          return node.id === draft.nodeId && node.path === draft.notePath && node.parentId === ((_a2 = draft.parentNodeId) != null ? _a2 : branch.questionNodeId);
+          var _a3;
+          return node.id === draft.nodeId && node.path === draft.notePath && node.parentId === ((_a3 = draft.parentNodeId) != null ? _a3 : branch.questionNodeId);
         }
       ) || branch.results.some((item) => item.notePath === draft.notePath) || state.pendingCommits.some((item) => item.notePath === draft.notePath))
         throw new Error("AIM result must use a fresh, registered result draft owned by this answer attempt.");
@@ -30374,9 +30401,9 @@ var _AimRunStore = class _AimRunStore {
   }
   async recoverPending(mapPath) {
     return this.locked(mapPath, async () => {
-      var _a, _b, _c, _d;
+      var _a2, _b2, _c, _d;
       const recovered = [], stale = [], map = await this.repository.readMap(mapPath), state = this.state(map);
-      for (const draft of [...(_a = state.resultDrafts) != null ? _a : []]) {
+      for (const draft of [...(_a2 = state.resultDrafts) != null ? _a2 : []]) {
         const run = state.runs.find((item) => item.id === draft.runId), attempt = run == null ? void 0 : run.attempts.find((item) => item.id === draft.attemptId);
         if (run && attempt && _AimRunStore.liveAttempts.has(this.liveKey(mapPath, run.id, attempt.id))) continue;
         const hasPendingCommit = state.pendingCommits.some(
@@ -30385,7 +30412,7 @@ var _AimRunStore = class _AimRunStore {
         const validRunningDraft = (attempt == null ? void 0 : attempt.status) === "running" && (draft.status === "creating" || draft.status === "ready");
         const validSavingDraft = (attempt == null ? void 0 : attempt.status) === "saving" && draft.status === "ready" && hasPendingCommit;
         if (!run || run.currentAttemptId !== draft.attemptId || !validRunningDraft && !validSavingDraft || attempt.inputSnapshotHash !== draft.inputSnapshotHash) {
-          await this.retireDraftNote(map, draft, (_b = attempt == null ? void 0 : attempt.stopReason) != null ? _b : "The attempt is no longer current.");
+          await this.retireDraftNote(map, draft, (_b2 = attempt == null ? void 0 : attempt.stopReason) != null ? _b2 : "The attempt is no longer current.");
           state.resultDrafts = ((_c = state.resultDrafts) != null ? _c : []).filter((item) => item.id !== draft.id);
           map.nodes = map.nodes.filter((node) => node.id !== draft.nodeId);
           stale.push(draft.id);
@@ -30432,7 +30459,7 @@ var _AimRunStore = class _AimRunStore {
   }
   async failInterrupted(mapPath) {
     return this.locked(mapPath, async () => {
-      var _a, _b;
+      var _a2, _b2;
       const map = await this.repository.readMap(mapPath), state = this.state(map), interrupted = [];
       for (const run of state.runs) {
         const attempt = run.attempts.find((item) => item.id === run.currentAttemptId);
@@ -30442,12 +30469,12 @@ var _AimRunStore = class _AimRunStore {
         attempt.status = "failed";
         attempt.stopReason = reason;
         interrupted.push(run.id);
-        const drafts = ((_a = state.resultDrafts) != null ? _a : []).filter(
+        const drafts = ((_a2 = state.resultDrafts) != null ? _a2 : []).filter(
           (item) => item.runId === run.id && item.attemptId === attempt.id
         );
         for (const draft of drafts) await this.retireDraftNote(map, draft, reason, "incomplete");
         const staleNodes = new Set(drafts.map((item) => item.nodeId));
-        state.resultDrafts = ((_b = state.resultDrafts) != null ? _b : []).filter((item) => !staleNodes.has(item.nodeId));
+        state.resultDrafts = ((_b2 = state.resultDrafts) != null ? _b2 : []).filter((item) => !staleNodes.has(item.nodeId));
         map.nodes = map.nodes.filter((node) => !staleNodes.has(node.id));
       }
       if (interrupted.length) {
@@ -30502,11 +30529,11 @@ var _AimRunStore = class _AimRunStore {
     );
   }
   finishCommit(state, pending) {
-    var _a, _b;
+    var _a2, _b2;
     const branch = state.branches.find((item) => item.id === pending.branchId);
     const run = state.runs.find((item) => item.id === pending.runId);
     const attempt = run.attempts.find((item) => item.id === pending.attemptId);
-    const draft = ((_a = state.resultDrafts) != null ? _a : []).find((item) => item.id === pending.resultDraftId);
+    const draft = ((_a2 = state.resultDrafts) != null ? _a2 : []).find((item) => item.id === pending.resultDraftId);
     if (!branch.results.some((item) => item.resultId === pending.resultId))
       branch.results.push({
         resultId: pending.resultId,
@@ -30521,12 +30548,12 @@ var _AimRunStore = class _AimRunStore {
       });
     attempt.status = pending.resultStatus === "partial" ? "partial" : "completed";
     state.pendingCommits = state.pendingCommits.filter((item) => item.resultId !== pending.resultId);
-    state.resultDrafts = ((_b = state.resultDrafts) != null ? _b : []).filter((item) => item.id !== pending.resultDraftId);
+    state.resultDrafts = ((_b2 = state.resultDrafts) != null ? _b2 : []).filter((item) => item.id !== pending.resultDraftId);
   }
   state(map) {
-    var _a, _b;
-    const state = (_a = map.aim) != null ? _a : { version: 1, branches: [], runs: [], pendingCommits: [] };
-    (_b = state.resultDrafts) != null ? _b : state.resultDrafts = [];
+    var _a2, _b2;
+    const state = (_a2 = map.aim) != null ? _a2 : { version: 1, branches: [], runs: [], pendingCommits: [] };
+    (_b2 = state.resultDrafts) != null ? _b2 : state.resultDrafts = [];
     return state;
   }
   snapshotHash(value) {
@@ -30538,8 +30565,8 @@ ${runId}
 ${attemptId}`;
   }
   async locked(mapPath, operation) {
-    var _a;
-    const previous = (_a = this.locks.get(mapPath)) != null ? _a : Promise.resolve();
+    var _a2;
+    const previous = (_a2 = this.locks.get(mapPath)) != null ? _a2 : Promise.resolve();
     let release;
     const current = new Promise((resolve) => {
       release = resolve;
@@ -30615,8 +30642,8 @@ function mergedStatus(detail) {
 }
 function hasMergeContent(notes) {
   return notes.some((note) => {
-    var _a;
-    return ((_a = note == null ? void 0 : note.detail) != null ? _a : "").trim() !== "";
+    var _a2;
+    return ((_a2 = note == null ? void 0 : note.detail) != null ? _a2 : "").trim() !== "";
   });
 }
 function resolveMergeModel(parentModel, workspaceModel) {
@@ -30624,8 +30651,8 @@ function resolveMergeModel(parentModel, workspaceModel) {
 }
 var MERGE_TITLE_MAX = 60;
 function mergeTitleFromResult(result, fallback) {
-  var _a, _b, _c;
-  const raw = ((_c = (_b = (_a = result.suggestions) == null ? void 0 : _a[0]) == null ? void 0 : _b.title) != null ? _c : "").replace(/\s+/g, " ").trim();
+  var _a2, _b2, _c;
+  const raw = ((_c = (_b2 = (_a2 = result.suggestions) == null ? void 0 : _a2[0]) == null ? void 0 : _b2.title) != null ? _c : "").replace(/\s+/g, " ").trim();
   const name = raw.replace(/^["'“”‘’「」『』]+|["'“”‘’「」『』]+$/g, "").trim();
   return name && name.length <= MERGE_TITLE_MAX ? name : fallback;
 }
@@ -30747,8 +30774,8 @@ var INTERACTIVE_SELECTOR = [
   '[role="button"]'
 ].join(",");
 function isEditableTarget(target) {
-  var _a;
-  return !!((_a = target == null ? void 0 : target.closest) == null ? void 0 : _a.call(target, EDITABLE_SELECTOR));
+  var _a2;
+  return !!((_a2 = target == null ? void 0 : target.closest) == null ? void 0 : _a2.call(target, EDITABLE_SELECTOR));
 }
 function errorMessage(error) {
   const message = error == null ? void 0 : error.message;
@@ -30762,13 +30789,13 @@ function formatIssuesPatch(issues, language2) {
 }
 var originBaseline = (origin) => (0, import_node_crypto13.createHash)("sha256").update(origin != null ? origin : "").digest("hex");
 function aimQuestionStatus(map, questionNodeId, activeQuestionNodeId) {
-  var _a, _b;
+  var _a2, _b2;
   if (activeQuestionNodeId === questionNodeId) return "running";
-  const branches = (_b = (_a = map.aim) == null ? void 0 : _a.branches.filter((branch) => branch.questionNodeId === questionNodeId)) != null ? _b : [];
+  const branches = (_b2 = (_a2 = map.aim) == null ? void 0 : _a2.branches.filter((branch) => branch.questionNodeId === questionNodeId)) != null ? _b2 : [];
   const statuses = branches.map((branch) => {
-    var _a2, _b2, _c;
+    var _a3, _b3, _c;
     if (branch.researchPlanError && !branch.researchPlan) return "failed";
-    const runs = ((_b2 = (_a2 = map.aim) == null ? void 0 : _a2.runs) != null ? _b2 : []).filter((item) => item.branchId === branch.id);
+    const runs = ((_b3 = (_a3 = map.aim) == null ? void 0 : _a3.runs) != null ? _b3 : []).filter((item) => item.branchId === branch.id);
     if (runs.some((run) => {
       const attempt = run.attempts.find((item) => item.id === run.currentAttemptId);
       return (attempt == null ? void 0 : attempt.status) === "running" || (attempt == null ? void 0 : attempt.status) === "saving";
@@ -30909,8 +30936,8 @@ var VisualAgentMapView = class _VisualAgentMapView extends import_obsidian29.Ite
     __publicField(this, "cardEls", /* @__PURE__ */ new Map());
     /** Rendered card height in canvas units (offsetHeight ignores zoom). A card not on screen yet gets the median of the rendered ones; undefined when nothing is rendered. */
     __publicField(this, "cardHeightOf", (id) => {
-      var _a;
-      return ((_a = this.cardEls.get(id)) == null ? void 0 : _a.offsetHeight) || medianHeight([...this.cardEls.values()].map((card) => card.offsetHeight));
+      var _a2;
+      return ((_a2 = this.cardEls.get(id)) == null ? void 0 : _a2.offsetHeight) || medianHeight([...this.cardEls.values()].map((card) => card.offsetHeight));
     });
     __publicField(this, "cardChecks", /* @__PURE__ */ new Map());
     __publicField(this, "selectionBarEl", null);
@@ -30969,8 +30996,8 @@ var VisualAgentMapView = class _VisualAgentMapView extends import_obsidian29.Ite
     return VIEW_TYPE;
   }
   getDisplayText() {
-    var _a, _b;
-    return (_b = (_a = this.map) == null ? void 0 : _a.title) != null ? _b : "Visual Agent Map";
+    var _a2, _b2;
+    return (_b2 = (_a2 = this.map) == null ? void 0 : _a2.title) != null ? _b2 : "Visual Agent Map";
   }
   getIcon() {
     return "brain-circuit";
@@ -30984,10 +31011,10 @@ var VisualAgentMapView = class _VisualAgentMapView extends import_obsidian29.Ite
     await super.setState(state, result);
   }
   async onOpen() {
-    var _a, _b, _c, _d, _e, _f, _g, _h, _i, _j, _k, _l;
+    var _a2, _b2, _c, _d, _e, _f, _g, _h, _i, _j, _k, _l;
     this.closed = false;
-    (_a = this.announcer) == null ? void 0 : _a.remove();
-    this.announcer = (_c = (_b = this.containerEl) == null ? void 0 : _b.createDiv({ cls: "vam-sr-only" })) != null ? _c : null;
+    (_a2 = this.announcer) == null ? void 0 : _a2.remove();
+    this.announcer = (_c = (_b2 = this.containerEl) == null ? void 0 : _b2.createDiv({ cls: "vam-sr-only" })) != null ? _c : null;
     (_d = this.announcer) == null ? void 0 : _d.setAttr("role", "status");
     (_e = this.announcer) == null ? void 0 : _e.setAttr("aria-live", "polite");
     (_f = this.announcer) == null ? void 0 : _f.setAttr("aria-atomic", "true");
@@ -31067,10 +31094,10 @@ var VisualAgentMapView = class _VisualAgentMapView extends import_obsidian29.Ite
     scope.register(["Mod", "Shift"], "z", run(true));
     scope.register(["Mod", "Shift"], "Z", run(true));
     scope.register([], "F2", (event) => {
-      var _a, _b, _c;
+      var _a2, _b2, _c;
       if (this.closed || event.isComposing || event.defaultPrevented) return true;
-      if (this.builtIn || this.integrationMode || ((_a = this.map) == null ? void 0 : _a.aim)) return true;
-      const active = (_b = this.contentEl.ownerDocument) == null ? void 0 : _b.activeElement;
+      if (this.builtIn || this.integrationMode || ((_a2 = this.map) == null ? void 0 : _a2.aim)) return true;
+      const active = (_b2 = this.contentEl.ownerDocument) == null ? void 0 : _b2.activeElement;
       const entry = active ? [...this.cardEls.entries()].find(([, card]) => card === active) : void 0;
       const node = entry && ((_c = this.map) == null ? void 0 : _c.nodes.find((item) => item.id === entry[0]));
       const note = node && this.notes.get(node.id);
@@ -31079,10 +31106,10 @@ var VisualAgentMapView = class _VisualAgentMapView extends import_obsidian29.Ite
       return false;
     });
     const cardKey = (sibling) => (event) => {
-      var _a, _b, _c, _d, _e;
+      var _a2, _b2, _c, _d, _e;
       if (this.closed || event.isComposing || event.defaultPrevented) return true;
-      if (this.builtIn || this.integrationMode || ((_a = this.map) == null ? void 0 : _a.aim)) return true;
-      const active = (_b = this.contentEl.ownerDocument) == null ? void 0 : _b.activeElement;
+      if (this.builtIn || this.integrationMode || ((_a2 = this.map) == null ? void 0 : _a2.aim)) return true;
+      const active = (_b2 = this.contentEl.ownerDocument) == null ? void 0 : _b2.activeElement;
       const entry = active ? [...this.cardEls.entries()].find(([, card]) => card === active) : void 0;
       const node = entry && ((_c = this.map) == null ? void 0 : _c.nodes.find((item) => item.id === entry[0]));
       if (!node) return true;
@@ -31104,12 +31131,12 @@ var VisualAgentMapView = class _VisualAgentMapView extends import_obsidian29.Ite
     ).open();
   }
   async onClose() {
-    var _a, _b, _c, _d, _e;
+    var _a2, _b2, _c, _d, _e;
     this.closed = true;
-    (_a = this.announcer) == null ? void 0 : _a.remove();
+    (_a2 = this.announcer) == null ? void 0 : _a2.remove();
     this.announcer = null;
     this.announcedStages.clear();
-    (_b = this.unsubscribeResearch) == null ? void 0 : _b.call(this);
+    (_b2 = this.unsubscribeResearch) == null ? void 0 : _b2.call(this);
     this.unsubscribeResearch = null;
     if (this.researchTick !== null) window.clearInterval(this.researchTick);
     if (this.researchRenderTimer !== null) window.clearTimeout(this.researchRenderTimer);
@@ -31201,7 +31228,7 @@ var VisualAgentMapView = class _VisualAgentMapView extends import_obsidian29.Ite
     if (!this.builtIn && this.map && this.path) await this.plugin.repo.saveMap(this.path, this.map);
   }
   async hydrate(isCurrent = () => true) {
-    var _a, _b, _c, _d;
+    var _a2, _b2, _c, _d;
     this.aimFailedReports.clear();
     if (this.builtIn) {
       if (isCurrent()) {
@@ -31215,14 +31242,14 @@ var VisualAgentMapView = class _VisualAgentMapView extends import_obsidian29.Ite
     let goal;
     let level;
     let context;
-    if (this.path && !((_a = this.map) == null ? void 0 : _a.aim)) {
+    if (this.path && !((_a2 = this.map) == null ? void 0 : _a2.aim)) {
       try {
         ({ goal, level, context } = await this.plugin.repo.readRelevanceSetup(this.path));
       } catch (e) {
       }
     }
     const loaded = /* @__PURE__ */ new Map();
-    for (const node of (_c = (_b = this.map) == null ? void 0 : _b.nodes) != null ? _c : []) {
+    for (const node of (_c = (_b2 = this.map) == null ? void 0 : _b2.nodes) != null ? _c : []) {
       if (!isCurrent()) return;
       try {
         loaded.set(node.id, await this.plugin.repo.readNote(node.path, (_d = this.map) != null ? _d : void 0));
@@ -31237,13 +31264,13 @@ var VisualAgentMapView = class _VisualAgentMapView extends import_obsidian29.Ite
     await this.hydrateFailedReportTargets(isCurrent);
   }
   async hydrateFailedReportTargets(isCurrent) {
-    var _a;
+    var _a2;
     const map = this.map, mapPath = this.path;
     if (!mapPath || !(map == null ? void 0 : map.aim)) return;
     const failed = map.aim.runs.some(
       (run) => {
-        var _a2;
-        return ((_a2 = run.attempts.find((item) => item.id === run.currentAttemptId)) == null ? void 0 : _a2.status) === "failed";
+        var _a3;
+        return ((_a3 = run.attempts.find((item) => item.id === run.currentAttemptId)) == null ? void 0 : _a3.status) === "failed";
       }
     );
     if (!failed) return;
@@ -31252,7 +31279,7 @@ var VisualAgentMapView = class _VisualAgentMapView extends import_obsidian29.Ite
       if (!file.path.startsWith(`${notesFolder}/`)) continue;
       if (!isCurrent()) return;
       try {
-        candidates.push({ path: file.path, note: await this.plugin.repo.readNote(file.path, (_a = this.map) != null ? _a : void 0) });
+        candidates.push({ path: file.path, note: await this.plugin.repo.readNote(file.path, (_a2 = this.map) != null ? _a2 : void 0) });
       } catch (e) {
       }
     }
@@ -31276,7 +31303,7 @@ var VisualAgentMapView = class _VisualAgentMapView extends import_obsidian29.Ite
     await this.plugin.mutate(() => this.openMapInMutation(path));
   }
   async openMapInMutation(path) {
-    var _a, _b;
+    var _a2, _b2;
     const viewEpoch = this.aimViewEpoch, openEpoch = ++this.mapOpenEpoch;
     const isCurrent = () => !this.closed && this.aimViewEpoch === viewEpoch && this.mapOpenEpoch === openEpoch;
     if (!isCurrent()) return;
@@ -31292,7 +31319,7 @@ var VisualAgentMapView = class _VisualAgentMapView extends import_obsidian29.Ite
     }
     let map = await this.plugin.repo.readMap(path);
     if (!isCurrent()) return;
-    if (((_a = map.aim) == null ? void 0 : _a.creationId) && map.aim.rootDraft) {
+    if (((_a2 = map.aim) == null ? void 0 : _a2.creationId) && map.aim.rootDraft) {
       const resumed = await createAimMap(this.plugin.repo, this.plugin.settings.cliModel, {
         requestId: map.aim.creationId,
         topic: map.title,
@@ -31303,7 +31330,7 @@ var VisualAgentMapView = class _VisualAgentMapView extends import_obsidian29.Ite
       if (!isCurrent()) return;
       map = resumed.map;
     }
-    if ((_b = map.aim) == null ? void 0 : _b.questionDraft) {
+    if ((_b2 = map.aim) == null ? void 0 : _b2.questionDraft) {
       await this.aimRecovery.recoverQuestionDraft(path);
       if (!isCurrent()) return;
       map = await this.plugin.repo.readMap(path);
@@ -31340,12 +31367,12 @@ var VisualAgentMapView = class _VisualAgentMapView extends import_obsidian29.Ite
     this.app.workspace.requestSaveLayout();
   }
   openAimStart() {
-    var _a;
+    var _a2;
     if (this.closed) return;
     const epoch = this.aimViewEpoch;
     const isCurrent = () => !this.closed && this.aimViewEpoch === epoch;
     const availableModels = typeof this.plugin.availableModels === "function" ? this.plugin.availableModels() : [];
-    const configuredModel = ((_a = this.plugin.settings.cliModel) == null ? void 0 : _a.trim()) || "gpt-5.6-luna";
+    const configuredModel = ((_a2 = this.plugin.settings.cliModel) == null ? void 0 : _a2.trim()) || "gpt-5.6-luna";
     const configuredReasoning = normalizeReasoningLevel(this.plugin.settings.cliReasoning);
     const defaultReasoning = configuredReasoning === "medium" || configuredReasoning === "high" ? configuredReasoning : "low";
     const modelIds = [...new Set([configuredModel, ...availableModels].filter(Boolean))];
@@ -31356,7 +31383,7 @@ var VisualAgentMapView = class _VisualAgentMapView extends import_obsidian29.Ite
     new AimStartModal(
       this.app,
       (input) => this.plugin.mutate(async () => {
-        var _a2;
+        var _a3;
         if (!isCurrent()) return;
         await this.plugin.repo.ensureWorkspace();
         if (!isCurrent()) return;
@@ -31364,7 +31391,7 @@ var VisualAgentMapView = class _VisualAgentMapView extends import_obsidian29.Ite
         await this.plugin.rebuildDerivedData();
         if (!isCurrent()) return;
         await this.openMapInMutation(created.mapPath);
-        if (!isCurrent() || this.path !== created.mapPath || ((_a2 = this.map) == null ? void 0 : _a2.id) !== created.map.id) return;
+        if (!isCurrent() || this.path !== created.mapPath || ((_a3 = this.map) == null ? void 0 : _a3.id) !== created.map.id) return;
         this.selected = created.root.id;
         this.render();
         this.focusNode(created.root);
@@ -31406,15 +31433,15 @@ var VisualAgentMapView = class _VisualAgentMapView extends import_obsidian29.Ite
   }
   /** `{ toneText }` for a TaskContext, or nothing when the resolved tone is academic. */
   toneField(note, options) {
-    var _a;
-    const toneText = this.toneTextFor(note, options == null ? void 0 : options.toneId, (_a = options == null ? void 0 : options.outputLanguage) != null ? _a : this.plugin.settings.language);
+    var _a2;
+    const toneText = this.toneTextFor(note, options == null ? void 0 : options.toneId, (_a2 = options == null ? void 0 : options.outputLanguage) != null ? _a2 : this.plugin.settings.language);
     return toneText ? { toneText } : {};
   }
   /** The name of the tone this topic resolves to now (topic override, else map default, else academic). */
   toneLabelFor(note) {
-    var _a;
+    var _a2;
     const settings = this.plugin.settings;
-    const ids = [note.toneId, (_a = this.map) == null ? void 0 : _a.toneId];
+    const ids = [note.toneId, (_a2 = this.map) == null ? void 0 : _a2.toneId];
     for (const id of ids) {
       const found = listPresets(settings.promptPresets, "tone", settings.language).find((item) => item.id === id);
       if (found) return found.name;
@@ -31431,8 +31458,8 @@ var VisualAgentMapView = class _VisualAgentMapView extends import_obsidian29.Ite
    * (and nothing chosen) yields undefined so prompts stay unchanged.
    */
   toneTextFor(note, chosenId, language2 = this.plugin.settings.language) {
-    var _a;
-    return resolveToneText(this.plugin.settings.promptPresets, [chosenId, note == null ? void 0 : note.toneId, (_a = this.map) == null ? void 0 : _a.toneId], language2);
+    var _a2;
+    return resolveToneText(this.plugin.settings.promptPresets, [chosenId, note == null ? void 0 : note.toneId, (_a2 = this.map) == null ? void 0 : _a2.toneId], language2);
   }
   /** The repair and edit-templates links beside a dialog's model and template fields. */
   fieldLinks() {
@@ -31452,8 +31479,8 @@ var VisualAgentMapView = class _VisualAgentMapView extends import_obsidian29.Ite
   /** "Keep current (…)" name of the note style a topic (or this map) resolves to: a preset, else "Custom: …". */
   currentStyleLabel(templateId, toneId) {
     const names2 = (list) => (id) => {
-      var _a, _b;
-      return (_b = (_a = list.find((item) => item.id === id)) == null ? void 0 : _a.name) != null ? _b : id;
+      var _a2, _b2;
+      return (_b2 = (_a2 = list.find((item) => item.id === id)) == null ? void 0 : _a2.name) != null ? _b2 : id;
     };
     return styleLabel(
       templateId,
@@ -31464,22 +31491,22 @@ var VisualAgentMapView = class _VisualAgentMapView extends import_obsidian29.Ite
   }
   /** Name of the workspace default note style (default template, academic tone) for "Use the default (…)". */
   defaultStyleLabel() {
-    var _a;
+    var _a2;
     return this.currentStyleLabel(
-      (_a = this.plugin.settings.defaultDetailTemplateId) != null ? _a : STANDARD_TEMPLATE_ID,
+      (_a2 = this.plugin.settings.defaultDetailTemplateId) != null ? _a2 : STANDARD_TEMPLATE_ID,
       DEFAULT_TONE_ID
     );
   }
   /** The tone id a topic resolves to now (topic override, else map default, else academic), as toneLabelFor names it. */
   effectiveToneId(note) {
-    var _a, _b;
+    var _a2, _b2;
     const settings = this.plugin.settings;
     const known = listPresets(settings.promptPresets, "tone", settings.language);
-    return (_b = [note.toneId, (_a = this.map) == null ? void 0 : _a.toneId].find((id) => known.some((item) => item.id === id))) != null ? _b : DEFAULT_TONE_ID;
+    return (_b2 = [note.toneId, (_a2 = this.map) == null ? void 0 : _a2.toneId].find((id) => known.some((item) => item.id === id))) != null ? _b2 : DEFAULT_TONE_ID;
   }
   /** Adds an outline to the open map: under the selected topic, else as a new tree. A new map starts from + New mind map. */
   openOutlineImport(prefill) {
-    var _a;
+    var _a2;
     const target = prefill ? this.reopenedImportTarget(prefill.inputs) : this.outlineImportTarget();
     if (target.map !== "editable") {
       new import_obsidian29.Notice(target.map === "aim" ? t("ui.outline_import_placement_aim") : t("ui.outline_import_placement_no_map"));
@@ -31493,7 +31520,7 @@ var VisualAgentMapView = class _VisualAgentMapView extends import_obsidian29.Ite
       this.templateChoices(),
       target,
       placement,
-      this.outlineGenerator(prefill ? prefill.inputs.topic : (_a = target.selected) == null ? void 0 : _a.title, prefill),
+      this.outlineGenerator(prefill ? prefill.inputs.topic : (_a2 = target.selected) == null ? void 0 : _a2.title, prefill),
       this.fieldLinks(),
       this.toneChoices(),
       this.defaultStyleLabel()
@@ -31501,12 +31528,12 @@ var VisualAgentMapView = class _VisualAgentMapView extends import_obsidian29.Ite
   }
   /** The import target a reopened window keeps: its selected topic while that topic is still on the map. */
   reopenedImportTarget(inputs) {
-    var _a, _b, _c;
+    var _a2, _b2, _c;
     const current = this.outlineImportTarget();
     const selected = inputs.target.selected;
     if (current.map !== "editable" || !selected) return current;
-    const node = (_a = this.map) == null ? void 0 : _a.nodes.find((item) => item.id === selected.id);
-    return node ? { map: "editable", selected: { id: node.id, title: (_c = (_b = this.notes.get(node.id)) == null ? void 0 : _b.title) != null ? _c : node.path } } : { map: "editable" };
+    const node = (_a2 = this.map) == null ? void 0 : _a2.nodes.find((item) => item.id === selected.id);
+    return node ? { map: "editable", selected: { id: node.id, title: (_c = (_b2 = this.notes.get(node.id)) == null ? void 0 : _b2.title) != null ? _c : node.path } } : { map: "editable" };
   }
   /**
    * The AI outline generator for the import window: workspace model, after the usual AI usage check. Once AI starts
@@ -31518,8 +31545,8 @@ var VisualAgentMapView = class _VisualAgentMapView extends import_obsidian29.Ite
       initialTopic,
       ...prefill ? { prefill } : {},
       generate: async (request, signal, started) => {
-        var _a, _b;
-        if (((_a = this.outlineDraftTask) == null ? void 0 : _a.state) === "running") throw new Error(t("ui.ai_running_ai"));
+        var _a2, _b2;
+        if (((_a2 = this.outlineDraftTask) == null ? void 0 : _a2.state) === "running") throw new Error(t("ui.ai_running_ai"));
         const settings = this.plugin.settings;
         const model = settings.cliModel;
         const controller = new AbortController();
@@ -31567,28 +31594,28 @@ var VisualAgentMapView = class _VisualAgentMapView extends import_obsidian29.Ite
         });
         signal.removeEventListener("abort", forward);
         if (!ran || !run.task) throw new Error(t("ui.outline_ai_not_started"));
-        return (_b = run.task.markdown) != null ? _b : "";
+        return (_b2 = run.task.markdown) != null ? _b2 : "";
       }
     };
   }
   /** Reopens the import window from a finished, failed or stopped AI outline; the waiting task is consumed. */
   reopenOutlineDraft(task) {
-    var _a;
+    var _a2;
     if (this.outlineDraftTask !== task || task.state === "running" || this.closed) return;
     this.outlineDraftTask = null;
     this.render();
     this.openOutlineImport({
       inputs: task.inputs,
-      ...task.state === "done" && task.markdown !== void 0 ? { markdown: task.markdown } : { message: (_a = task.message) != null ? _a : t("ui.outline_ai_stopped") }
+      ...task.state === "done" && task.markdown !== void 0 ? { markdown: task.markdown } : { message: (_a2 = task.message) != null ? _a2 : t("ui.outline_ai_stopped") }
     });
   }
   /** The status bars for background AI work on the open map: structure review and AI outline generation. */
   renderBackgroundBars(parent) {
-    var _a, _b, _c, _d;
+    var _a2, _b2, _c, _d;
     const review = this.structureReviewTask;
     if (review && review.mapPath === this.path) {
       const running = review.state === "running";
-      const count = (_b = (_a = review.result) == null ? void 0 : _a.suggestions.length) != null ? _b : 0;
+      const count = (_b2 = (_a2 = review.result) == null ? void 0 : _a2.suggestions.length) != null ? _b2 : 0;
       renderBackgroundStatus(parent, {
         title: t(review.scopeId ? "ui.structure_review_branch" : "ui.structure_review_map"),
         value: running ? t("ui.structure_review_running") : review.state === "done" ? t("ui.structure_review_ready_0", count) : (_c = review.message) != null ? _c : "",
@@ -31629,8 +31656,8 @@ var VisualAgentMapView = class _VisualAgentMapView extends import_obsidian29.Ite
     const merge = this.mergeTasks.get(this.path);
     if (merge) {
       const names2 = merge.sources.map((source) => {
-        var _a2, _b2;
-        return (_b2 = (_a2 = this.notes.get(source.id)) == null ? void 0 : _a2.title) != null ? _b2 : source.path;
+        var _a3, _b3;
+        return (_b3 = (_a3 = this.notes.get(source.id)) == null ? void 0 : _a3.title) != null ? _b3 : source.path;
       });
       renderBackgroundStatus(parent, {
         title: t("ui.merge_bar_title"),
@@ -31650,8 +31677,8 @@ var VisualAgentMapView = class _VisualAgentMapView extends import_obsidian29.Ite
     return {
       presets: listPresets(settings.promptPresets, "outline", settings.language).map(({ id, name }) => ({ id, name })),
       generate: async (request, signal) => {
-        var _a, _b;
-        const note = await this.plugin.repo.readNote(node.path, (_a = this.map) != null ? _a : void 0);
+        var _a2, _b2;
+        const note = await this.plugin.repo.readNote(node.path, (_a2 = this.map) != null ? _a2 : void 0);
         const { preset } = resolvePreset(settings.promptPresets, "outline", request.presetId, request.language);
         const result = await this.plugin.outlineGeneration.generate(
           {
@@ -31661,7 +31688,7 @@ var VisualAgentMapView = class _VisualAgentMapView extends import_obsidian29.Ite
 ${request.requirements}` : preset.text,
             language: request.language,
             model: note.model,
-            reasoning: normalizeReasoningLevel((_b = note.reasoning) != null ? _b : settings.cliReasoning),
+            reasoning: normalizeReasoningLevel((_b2 = note.reasoning) != null ? _b2 : settings.cliReasoning),
             limits: request.limits
           },
           signal
@@ -31669,7 +31696,7 @@ ${request.requirements}` : preset.text,
         return result.nodes;
       },
       create: (nodes, options) => {
-        var _a;
+        var _a2;
         return this.importOutline({
           nodes,
           placement: { kind: "under", parentId: node.id },
@@ -31682,7 +31709,7 @@ ${request.requirements}` : preset.text,
             researchOptions: {
               // Quick research of the new topics reads local context only unless the dialog asks for the web.
               researchMode: options.shallowWebSearch ? options.researchMode : "local",
-              referenceGroups: (_a = options.referenceGroups) != null ? _a : [],
+              referenceGroups: (_a2 = options.referenceGroups) != null ? _a2 : [],
               visualMode: options.shallowWebSearch ? options.visualMode : "off",
               ...options.outputLanguage ? { outputLanguage: options.outputLanguage } : {},
               ...options.toneId ? { toneId: options.toneId } : {},
@@ -31705,15 +31732,15 @@ ${request.requirements}` : preset.text,
   }
   /** The AI sees each card's title, summary and status only; never a note body. */
   describeForReview(id) {
-    var _a, _b, _c, _d;
-    const node = (_a = this.map) == null ? void 0 : _a.nodes.find((item) => item.id === id);
+    var _a2, _b2, _c, _d;
+    const node = (_a2 = this.map) == null ? void 0 : _a2.nodes.find((item) => item.id === id);
     if (!node) return void 0;
     const note = this.notes.get(id);
-    return { title: (_b = note == null ? void 0 : note.title) != null ? _b : node.path, summary: (_c = note == null ? void 0 : note.summary) != null ? _c : "", status: (_d = note == null ? void 0 : note.status) != null ? _d : "idea" };
+    return { title: (_b2 = note == null ? void 0 : note.title) != null ? _b2 : node.path, summary: (_c = note == null ? void 0 : note.summary) != null ? _c : "", status: (_d = note == null ? void 0 : note.status) != null ? _d : "idea" };
   }
   /** AI structure review of the whole map (`scopeId` null) or one branch; each suggestion is applied on its own. */
   openStructureReview(scopeId) {
-    var _a, _b;
+    var _a2, _b2;
     if (!this.map || this.outlineImportTarget().map !== "editable") return;
     const existing = this.structureReviewTask;
     if (existing && existing.mapPath === this.path) {
@@ -31729,14 +31756,14 @@ ${request.requirements}` : preset.text,
     const mapPath = this.path;
     const tree = () => this.path === mapPath && this.map ? buildStructureReviewNodes(this.map.nodes, (id) => this.describeForReview(id), scopeId) : [];
     const nodes = tree();
-    const rootQuestion = scopeId ? (_b = (_a = this.describeForReview(scopeId)) == null ? void 0 : _a.title) != null ? _b : "" : this.map.title;
+    const rootQuestion = scopeId ? (_b2 = (_a2 = this.describeForReview(scopeId)) == null ? void 0 : _a2.title) != null ? _b2 : "" : this.map.title;
     const staleReason = (suggestion) => {
-      var _a2;
+      var _a3;
       const current = tree();
       if (!isSuggestionStale(suggestion, current)) return null;
       const byId = new Map(current.map((item) => [item.id, item]));
       const target = byId.get(suggestion.targetId);
-      const destination = (_a2 = suggestion.newParentId) != null ? _a2 : suggestion.mergeIntoId;
+      const destination = (_a3 = suggestion.newParentId) != null ? _a3 : suggestion.mergeIntoId;
       if (!target || destination && !byId.has(destination)) return t("ui.structure_review_stale_missing");
       if (target.title !== suggestion.basis.targetTitle || target.parentId !== suggestion.basis.targetParentId)
         return t("ui.structure_review_stale_changed");
@@ -31745,8 +31772,8 @@ ${request.requirements}` : preset.text,
     const showWindow = (extra) => new StructureReviewModal(this.app, {
       scope: scopeId ? "branch" : "map",
       titleOf: (id) => {
-        var _a2, _b2;
-        return (_b2 = (_a2 = this.describeForReview(id)) == null ? void 0 : _a2.title) != null ? _b2 : "";
+        var _a3, _b3;
+        return (_b3 = (_a3 = this.describeForReview(id)) == null ? void 0 : _a3.title) != null ? _b3 : "";
       },
       staleReason,
       apply: (suggestion, title) => this.applyStructureSuggestion(suggestion, title, staleReason),
@@ -31829,10 +31856,10 @@ ${request.requirements}` : preset.text,
   }
   /** Marks the suggested cards in place; an empty list clears every mark. */
   highlightStructure(ids) {
-    var _a;
+    var _a2;
     const next = new Set(ids);
     for (const id of /* @__PURE__ */ new Set([...this.structureHighlight, ...next]))
-      (_a = this.cardEls.get(id)) == null ? void 0 : _a.toggleClass("vam-structure-suggested", next.has(id));
+      (_a2 = this.cardEls.get(id)) == null ? void 0 : _a2.toggleClass("vam-structure-suggested", next.has(id));
     this.structureHighlight = next;
   }
   // ---- Relevance grading: goal chip, status bar and change summary ----------------------------------------------
@@ -31845,15 +31872,15 @@ ${request.requirements}` : preset.text,
    * level, context, a "Grade with this" button and the display-only sort switch.
    */
   renderRelevanceGoalControl(parent) {
-    var _a, _b, _c;
+    var _a2, _b2, _c;
     this.relevancePanelGen++;
-    (_a = this.relevancePanelCleanup) == null ? void 0 : _a.call(this);
+    (_a2 = this.relevancePanelCleanup) == null ? void 0 : _a2.call(this);
     this.relevancePanelCleanup = null;
     this.relevancePanelEl = null;
     this.relevanceToolsEl = parent;
     this.drawRelevanceButton(parent);
     if (!this.relevancePanelOpen) return;
-    if (((_b = this.plugin.relevanceGrades.get(this.path)) == null ? void 0 : _b.status) === "running") {
+    if (((_b2 = this.plugin.relevanceGrades.get(this.path)) == null ? void 0 : _b2.status) === "running") {
       this.relevancePanelOpen = false;
       this.relevanceDraft = null;
       (_c = this.relevanceButtonEl) == null ? void 0 : _c.setAttr("aria-expanded", "false");
@@ -31869,7 +31896,7 @@ ${request.requirements}` : preset.text,
     return this.relevanceGradeable() && relevanceSortedMaps.has(this.path);
   }
   drawRelevanceButton(parent) {
-    var _a;
+    var _a2;
     const goal = this.relevanceGoal;
     const level = this.relevanceLevel;
     const sorted = this.relevanceSortOn();
@@ -31890,13 +31917,13 @@ ${request.requirements}` : preset.text,
       goal ? [label, this.relevanceContext].filter(Boolean).join("\n") : t("ui.relevance_goal_set_hint")
     );
     button.setAttr("aria-label", sorted ? `${label}${t("ui.relevance_sorted_suffix")}` : label);
-    button.disabled = ((_a = this.plugin.relevanceGrades.get(this.path)) == null ? void 0 : _a.status) === "running";
+    button.disabled = ((_a2 = this.plugin.relevanceGrades.get(this.path)) == null ? void 0 : _a2.status) === "running";
     button.addEventListener("mousedown", (event) => event.preventDefault());
     button.addEventListener("focusout", (event) => {
-      var _a2;
+      var _a3;
       if (!this.relevancePanelOpen || this.relevanceButtonEl !== button) return;
       const next = event.relatedTarget;
-      if (next && (next === button || ((_a2 = this.relevancePanelEl) == null ? void 0 : _a2.contains(next)))) return;
+      if (next && (next === button || ((_a3 = this.relevancePanelEl) == null ? void 0 : _a3.contains(next)))) return;
       this.closeRelevancePanel(false);
     });
     button.addEventListener("keydown", (event) => {
@@ -31913,11 +31940,11 @@ ${request.requirements}` : preset.text,
     this.relevanceButtonEl = button;
   }
   closeRelevancePanel(refocus) {
-    var _a, _b, _c, _d, _e;
+    var _a2, _b2, _c, _d, _e;
     this.relevancePanelGen++;
-    (_a = this.relevancePanelCleanup) == null ? void 0 : _a.call(this);
+    (_a2 = this.relevancePanelCleanup) == null ? void 0 : _a2.call(this);
     this.relevancePanelCleanup = null;
-    (_b = this.relevancePanelEl) == null ? void 0 : _b.remove();
+    (_b2 = this.relevancePanelEl) == null ? void 0 : _b2.remove();
     this.relevancePanelEl = null;
     this.relevancePanelOpen = false;
     this.relevanceDraft = null;
@@ -31926,8 +31953,8 @@ ${request.requirements}` : preset.text,
   }
   /** Open the goal panel under the toolbar button (no-op while a grading run is going). */
   editRelevanceGoal() {
-    var _a, _b, _c, _d, _e;
-    if (((_a = this.plugin.relevanceGrades.get(this.path)) == null ? void 0 : _a.status) === "running") {
+    var _a2, _b2, _c, _d, _e;
+    if (((_a2 = this.plugin.relevanceGrades.get(this.path)) == null ? void 0 : _a2.status) === "running") {
       new import_obsidian29.Notice(t("ui.relevance_goal_unavailable_grading"));
       return;
     }
@@ -31937,7 +31964,7 @@ ${request.requirements}` : preset.text,
     }
     this.relevancePanelOpen = true;
     this.relevanceDraft = {
-      goal: (_b = this.relevanceGoal) != null ? _b : "",
+      goal: (_b2 = this.relevanceGoal) != null ? _b2 : "",
       level: (_c = this.relevanceLevel) != null ? _c : "",
       context: (_d = this.relevanceContext) != null ? _d : ""
     };
@@ -31950,13 +31977,13 @@ ${request.requirements}` : preset.text,
    * Tab inside the panel does not. The sort switch does not close it.
    */
   drawRelevancePanel(focus) {
-    var _a, _b, _c, _d, _e, _f;
+    var _a2, _b2, _c, _d, _e, _f;
     const tools = this.relevanceToolsEl;
     if (!tools) return;
-    (_a = this.relevancePanelEl) == null ? void 0 : _a.remove();
+    (_a2 = this.relevancePanelEl) == null ? void 0 : _a2.remove();
     const gen = ++this.relevancePanelGen;
     const draft = (_e = this.relevanceDraft) != null ? _e : this.relevanceDraft = {
-      goal: (_b = this.relevanceGoal) != null ? _b : "",
+      goal: (_b2 = this.relevanceGoal) != null ? _b2 : "",
       level: (_c = this.relevanceLevel) != null ? _c : "",
       context: (_d = this.relevanceContext) != null ? _d : ""
     };
@@ -32091,9 +32118,9 @@ ${request.requirements}` : preset.text,
     const doc = (_f = this.contentEl) == null ? void 0 : _f.ownerDocument;
     if (doc == null ? void 0 : doc.addEventListener) {
       const outside = (event) => {
-        var _a2;
+        var _a3;
         const target = event.target;
-        if (target && (panel.contains(target) || ((_a2 = this.relevanceButtonEl) == null ? void 0 : _a2.contains(target)))) return;
+        if (target && (panel.contains(target) || ((_a3 = this.relevanceButtonEl) == null ? void 0 : _a3.contains(target)))) return;
         finish(false, false);
       };
       doc.addEventListener("pointerdown", outside, true);
@@ -32140,22 +32167,22 @@ ${request.requirements}` : preset.text,
    * the repaint) moves focus to what is left of it (its first button, else the goal chip) so it never falls to the page.
    */
   keepRelevanceBarFocus() {
-    var _a, _b, _c, _d, _e, _f;
-    const bar = (_b = (_a = this.contentEl) == null ? void 0 : _a.querySelector) == null ? void 0 : _b.call(_a, ".vam-relevance-statusbar");
+    var _a2, _b2, _c, _d, _e, _f;
+    const bar = (_b2 = (_a2 = this.contentEl) == null ? void 0 : _a2.querySelector) == null ? void 0 : _b2.call(_a2, ".vam-relevance-statusbar");
     const active = (_e = (_d = (_c = this.contentEl) == null ? void 0 : _c.ownerDocument) == null ? void 0 : _d.activeElement) != null ? _e : null;
     if (!bar || !active || !((_f = bar.contains) == null ? void 0 : _f.call(bar, active))) return () => {
     };
     return () => {
-      var _a2, _b2, _c2, _d2, _e2, _f2, _g;
-      const target = (_g = (_d2 = (_c2 = (_b2 = (_a2 = this.contentEl) == null ? void 0 : _a2.querySelector) == null ? void 0 : _b2.call(_a2, ".vam-relevance-statusbar")) == null ? void 0 : _c2.querySelector) == null ? void 0 : _d2.call(_c2, "button")) != null ? _g : (_f2 = (_e2 = this.contentEl) == null ? void 0 : _e2.querySelector) == null ? void 0 : _f2.call(_e2, ".vam-relevance-goal");
+      var _a3, _b3, _c2, _d2, _e2, _f2, _g;
+      const target = (_g = (_d2 = (_c2 = (_b3 = (_a3 = this.contentEl) == null ? void 0 : _a3.querySelector) == null ? void 0 : _b3.call(_a3, ".vam-relevance-statusbar")) == null ? void 0 : _c2.querySelector) == null ? void 0 : _d2.call(_c2, "button")) != null ? _g : (_f2 = (_e2 = this.contentEl) == null ? void 0 : _e2.querySelector) == null ? void 0 : _f2.call(_e2, ".vam-relevance-goal");
       target == null ? void 0 : target.focus();
     };
   }
   /** Repaints the map and keeps the keyboard in the status bar when it had it (its buttons come and go). */
   refreshRelevance(focusBar = false) {
-    var _a, _b, _c, _d, _e, _f, _g, _h;
+    var _a2, _b2, _c, _d, _e, _f, _g, _h;
     if (this.closed) return;
-    const bar = (_b = (_a = this.contentEl) == null ? void 0 : _a.querySelector) == null ? void 0 : _b.call(_a, ".vam-relevance-statusbar");
+    const bar = (_b2 = (_a2 = this.contentEl) == null ? void 0 : _a2.querySelector) == null ? void 0 : _b2.call(_a2, ".vam-relevance-statusbar");
     const hadFocus = !!bar && !!((_e = bar.contains) == null ? void 0 : _e.call(bar, (_d = (_c = this.contentEl.ownerDocument) == null ? void 0 : _c.activeElement) != null ? _d : null));
     this.render();
     if (focusBar || hadFocus) (_h = (_g = (_f = this.contentEl) == null ? void 0 : _f.querySelector) == null ? void 0 : _g.call(_f, ".vam-relevance-statusbar button")) == null ? void 0 : _h.focus();
@@ -32166,13 +32193,13 @@ ${request.requirements}` : preset.text,
    * fails or returns anything but exactly one valid grade for every card.
    */
   async submitRelevanceGoal(raw, levelRaw, contextRaw, planned = "full") {
-    var _a;
+    var _a2;
     const goal = normalizeRelevanceGoal(raw);
     const level = normalizeRelevanceLevel(levelRaw);
     const context = contextRaw === void 0 ? void 0 : normalizeRelevanceContext(contextRaw);
     const mapPath = this.path;
     if (!goal || !this.relevanceGradeable()) return;
-    if (((_a = this.plugin.relevanceGrades.get(mapPath)) == null ? void 0 : _a.status) === "running") return;
+    if (((_a2 = this.plugin.relevanceGrades.get(mapPath)) == null ? void 0 : _a2.status) === "running") return;
     const run = {
       token: ++relevanceRunToken,
       owner: this,
@@ -32260,7 +32287,7 @@ ${request.requirements}` : preset.text,
    * ungraded. A note that cannot be written is counted; the undo step covers only the notes actually written.
    */
   async applyRelevanceGrade(run, mapPath, basis, graded, meta) {
-    var _a, _b, _c, _d, _e;
+    var _a2, _b2, _c, _d, _e;
     if (!this.relevanceRunIsCurrent(run, mapPath) || !this.map) return;
     const items = graded.items;
     run.writing = true;
@@ -32291,15 +32318,15 @@ ${request.requirements}` : preset.text,
       pinned: 0,
       mode: meta.mode,
       pins: meta.pins.map((pin) => {
-        var _a2;
-        return { id: pin.id, title: (_a2 = titleOf.get(pin.id)) != null ? _a2 : "", tier: pin.tier };
+        var _a3;
+        return { id: pin.id, title: (_a3 = titleOf.get(pin.id)) != null ? _a3 : "", tier: pin.tier };
       }),
-      conflicts: ((_a = graded.conflicts) != null ? _a : []).map((conflict) => {
-        var _a2, _b2;
+      conflicts: ((_a2 = graded.conflicts) != null ? _a2 : []).map((conflict) => {
+        var _a3, _b3;
         return {
-          ancestor: (_a2 = titleOf.get(conflict.ancestorId)) != null ? _a2 : "",
+          ancestor: (_a3 = titleOf.get(conflict.ancestorId)) != null ? _a3 : "",
           ancestorTier: conflict.ancestorTier,
-          descendant: (_b2 = titleOf.get(conflict.descendantId)) != null ? _b2 : "",
+          descendant: (_b3 = titleOf.get(conflict.descendantId)) != null ? _b3 : "",
           descendantTier: conflict.descendantTier
         };
       }),
@@ -32316,7 +32343,7 @@ ${request.requirements}` : preset.text,
           outcome.skipped++;
           continue;
         }
-        if ((_b = note.relevance) == null ? void 0 : _b.manual) {
+        if ((_b2 = note.relevance) == null ? void 0 : _b2.manual) {
           pinned.add(base.id);
           continue;
         }
@@ -32391,8 +32418,8 @@ ${request.requirements}` : preset.text,
    * in progress for this map, as the tag itself is.
    */
   openRelevanceMenu(node, current, anchor) {
-    var _a;
-    if (((_a = this.plugin.relevanceGrades.get(this.path)) == null ? void 0 : _a.status) === "running") return;
+    var _a2;
+    if (((_a2 = this.plugin.relevanceGrades.get(this.path)) == null ? void 0 : _a2.status) === "running") return;
     const menu = new import_obsidian29.Menu();
     for (const tier of ["core", "support", "side"])
       menu.addItem(
@@ -32400,18 +32427,18 @@ ${request.requirements}` : preset.text,
       );
     menu.addSeparator();
     menu.addItem((item) => {
-      var _a2, _b;
+      var _a3, _b2;
       item.setTitle(t("ui.relevance_clear")).setIcon("x").onClick(() => this.setManualRelevance(node, null));
-      (_b = (_a2 = item.dom) == null ? void 0 : _a2.setAttribute) == null ? void 0 : _b.call(_a2, "title", t("ui.relevance_clear_hint"));
+      (_b2 = (_a3 = item.dom) == null ? void 0 : _a3.setAttribute) == null ? void 0 : _b2.call(_a3, "title", t("ui.relevance_clear_hint"));
     });
     const rect = anchor.getBoundingClientRect();
     menu.showAtPosition({ x: rect.left, y: rect.bottom });
   }
   /** The gradable cards whose tier the learner set by hand (pinned), in map order, from the notes this view holds. */
   relevancePinList() {
-    var _a, _b, _c;
+    var _a2, _b2, _c;
     const pins = [];
-    for (const node of (_b = (_a = this.map) == null ? void 0 : _a.nodes) != null ? _b : []) {
+    for (const node of (_b2 = (_a2 = this.map) == null ? void 0 : _a2.nodes) != null ? _b2 : []) {
       const relevance = node.parentId === null ? void 0 : (_c = this.notes.get(node.id)) == null ? void 0 : _c.relevance;
       if (relevance == null ? void 0 : relevance.manual) pins.push({ id: node.id, tier: relevance.tier });
     }
@@ -32419,9 +32446,9 @@ ${request.requirements}` : preset.text,
   }
   /** The gradable cards with an AI tier (not pinned): what a recalibration starts from. */
   relevanceAiGrades() {
-    var _a, _b, _c;
+    var _a2, _b2, _c;
     const grades = [];
-    for (const node of (_b = (_a = this.map) == null ? void 0 : _a.nodes) != null ? _b : []) {
+    for (const node of (_b2 = (_a2 = this.map) == null ? void 0 : _a2.nodes) != null ? _b2 : []) {
       const relevance = node.parentId === null ? void 0 : (_c = this.notes.get(node.id)) == null ? void 0 : _c.relevance;
       if (relevance && !relevance.manual) grades.push({ id: node.id, tier: relevance.tier });
     }
@@ -32432,9 +32459,9 @@ ${request.requirements}` : preset.text,
    * pins back on cards that are still ungraded.
    */
   unpinAllRelevance() {
-    var _a, _b, _c;
-    if (((_a = this.plugin.relevanceGrades.get(this.path)) == null ? void 0 : _a.status) === "running") return;
-    const paths = new Map(((_c = (_b = this.map) == null ? void 0 : _b.nodes) != null ? _c : []).map((node) => [node.id, node.path]));
+    var _a2, _b2, _c;
+    if (((_a2 = this.plugin.relevanceGrades.get(this.path)) == null ? void 0 : _a2.status) === "running") return;
+    const paths = new Map(((_c = (_b2 = this.map) == null ? void 0 : _b2.nodes) != null ? _c : []).map((node) => [node.id, node.path]));
     const entries = this.relevancePinList().flatMap((pin) => {
       const path = paths.get(pin.id);
       return path ? [{ path, tier: pin.tier }] : [];
@@ -32465,8 +32492,8 @@ ${request.requirements}` : preset.text,
    * child check, no viewport or Map.md write: only the three relevance keys of that one note change.
    */
   setManualRelevance(node, tier) {
-    var _a;
-    if (((_a = this.plugin.relevanceGrades.get(this.path)) == null ? void 0 : _a.status) === "running") return;
+    var _a2;
+    if (((_a2 = this.plugin.relevanceGrades.get(this.path)) == null ? void 0 : _a2.status) === "running") return;
     this.plugin.runMutation(
       () => this.plugin.repo.writeRelevance(node.path, tier ? { tier, reason: "", manual: true } : null)
     );
@@ -32481,7 +32508,7 @@ ${request.requirements}` : preset.text,
   }
   /** Status bar under the toolbar, same place and look as the AIM and multi-research bars. */
   renderRelevanceStatus(parent) {
-    var _a, _b;
+    var _a2, _b2;
     const run = this.plugin.relevanceGrades.get(this.path);
     if (!run) return;
     const running = run.status === "running";
@@ -32495,23 +32522,23 @@ ${request.requirements}` : preset.text,
       this.relevanceDoneText(outcome),
       outcome.pinned && outcome.mode !== "recalibrate" ? t("ui.relevance_pinned_kept_0", outcome.pinned) : "",
       outcome.failed ? t("ui.relevance_write_failed_0", outcome.failed) : ""
-    ].filter(Boolean).join(" ") : (_a = run.message) != null ? _a : "";
+    ].filter(Boolean).join(" ") : (_a2 = run.message) != null ? _a2 : "";
     const tone = running ? " vam-status-running" : run.status === "failed" || (outcome == null ? void 0 : outcome.failed) ? " vam-status-error" : "";
     bar.createSpan({ cls: `vam-aim-status-value${tone}`, text: text11 });
     if (running) {
       if (!run.writing) this.button(bar, t("ui.relevance_stop"), () => this.stopRelevanceGrade());
       return;
     }
-    if ((outcome == null ? void 0 : outcome.changes.length) || ((_b = outcome == null ? void 0 : outcome.conflicts) == null ? void 0 : _b.length)) {
+    if ((outcome == null ? void 0 : outcome.changes.length) || ((_b2 = outcome == null ? void 0 : outcome.conflicts) == null ? void 0 : _b2.length)) {
       this.button(bar, t("ui.relevance_view_changes"), () => this.openRelevanceSummary(run));
       if (this.history.undoEntry && this.history.undoEntry === run.historyEntry)
         this.button(bar, t("ui.undo"), () => this.enqueue(() => this.travel(false)));
     }
     this.iconButton(bar, "x", t("ui.dismiss"), () => {
-      var _a2, _b2, _c;
+      var _a3, _b3, _c;
       this.plugin.relevanceGrades.delete(this.path);
       this.render();
-      (_c = (_b2 = (_a2 = this.contentEl) == null ? void 0 : _a2.querySelector) == null ? void 0 : _b2.call(_a2, ".vam-relevance-goal")) == null ? void 0 : _c.focus();
+      (_c = (_b3 = (_a3 = this.contentEl) == null ? void 0 : _a3.querySelector) == null ? void 0 : _b3.call(_a3, ".vam-relevance-goal")) == null ? void 0 : _c.focus();
     });
   }
   /** The status line of a finished run: a recalibration counts its moves against the pins; a full grade counts cards. */
@@ -32522,17 +32549,17 @@ ${request.requirements}` : preset.text,
     return outcome.pinned ? t("ui.relevance_recalibrated_0_1", outcome.pinned, outcome.changes.length) : t("ui.relevance_done_0_1_2", outcome.graded, outcome.changes.length, outcome.skipped);
   }
   openRelevanceSummary(run) {
-    var _a, _b, _c;
+    var _a2, _b2, _c;
     const outcome = run.outcome;
     new RelevanceSummaryModal(this.app, {
-      rows: ((_a = outcome == null ? void 0 : outcome.changes) != null ? _a : []).map((change) => ({
+      rows: ((_a2 = outcome == null ? void 0 : outcome.changes) != null ? _a2 : []).map((change) => ({
         id: change.id,
         title: change.title,
         before: change.before,
         after: change.after,
         ...change.anchor ? { anchor: change.anchor } : {}
       })),
-      pins: (_b = outcome == null ? void 0 : outcome.pins) != null ? _b : [],
+      pins: (_b2 = outcome == null ? void 0 : outcome.pins) != null ? _b2 : [],
       conflicts: (_c = outcome == null ? void 0 : outcome.conflicts) != null ? _c : [],
       highlight: (ids) => this.highlightStructure(ids)
     }).open();
@@ -32552,8 +32579,8 @@ ${request.requirements}` : preset.text,
       }
     };
     const nodeOf = (id) => {
-      var _a;
-      const node = (_a = this.map) == null ? void 0 : _a.nodes.find((item) => item.id === id);
+      var _a2;
+      const node = (_a2 = this.map) == null ? void 0 : _a2.nodes.find((item) => item.id === id);
       if (!node) throw new Error(t("ui.structure_review_stale_missing"));
       return node;
     };
@@ -32570,13 +32597,13 @@ ${request.requirements}` : preset.text,
       return write(() => this.addNode(nodeOf(suggestion.targetId), title)).then(() => true);
     if (suggestion.kind === "move")
       return write(() => {
-        var _a;
-        return this.moveTopic(nodeOf(suggestion.targetId), nodeOf((_a = suggestion.newParentId) != null ? _a : ""));
+        var _a2;
+        return this.moveTopic(nodeOf(suggestion.targetId), nodeOf((_a2 = suggestion.newParentId) != null ? _a2 : ""));
       }).then(
         () => true
       );
     return new Promise((resolve, reject) => {
-      var _a;
+      var _a2;
       const run = (work) => {
         write(work).then(() => resolve(true), reject);
       };
@@ -32585,10 +32612,10 @@ ${request.requirements}` : preset.text,
         this.confirmRemoveNode(node, { run, dismissed: () => resolve(false) });
         return;
       }
-      const into = nodeOf((_a = suggestion.mergeIntoId) != null ? _a : "");
+      const into = nodeOf((_a2 = suggestion.mergeIntoId) != null ? _a2 : "");
       const name = (item) => {
-        var _a2, _b;
-        return (_b = (_a2 = this.describeForReview(item.id)) == null ? void 0 : _a2.title) != null ? _b : item.path;
+        var _a3, _b2;
+        return (_b2 = (_a3 = this.describeForReview(item.id)) == null ? void 0 : _a3.title) != null ? _b2 : item.path;
       };
       new ChoiceModal(
         this.app,
@@ -32635,8 +32662,8 @@ ${request.requirements}` : preset.text,
       const preview = clone(this.map.nodes);
       applyCollapseLevel(preview, shownLevels);
       const changed = preview.some((node, index) => {
-        var _a;
-        return !!node.collapsed !== !!((_a = this.map.nodes[index]) == null ? void 0 : _a.collapsed);
+        var _a2;
+        return !!node.collapsed !== !!((_a2 = this.map.nodes[index]) == null ? void 0 : _a2.collapsed);
       });
       if (changed) {
         await this.mapChange((map) => {
@@ -32676,16 +32703,16 @@ ${request.requirements}` : preset.text,
   }
   /** Whether the open map can take an imported outline, and the selected topic for "under the selected topic". */
   outlineImportTarget() {
-    var _a, _b;
+    var _a2, _b2;
     if (!this.map || this.builtIn || !isManagedMapPath(this.plugin.settings, this.path)) return { map: "none" };
     if (this.map.aim) return { map: "aim" };
     const node = this.map.nodes.find((item) => item.id === this.selected);
     if (!node) return { map: "editable" };
-    return { map: "editable", selected: { id: node.id, title: (_b = (_a = this.notes.get(node.id)) == null ? void 0 : _a.title) != null ? _b : node.path } };
+    return { map: "editable", selected: { id: node.id, title: (_b2 = (_a2 = this.notes.get(node.id)) == null ? void 0 : _a2.title) != null ? _b2 : node.path } };
   }
   async importOutline(request) {
-    var _a;
-    const placement = (_a = request.placement) != null ? _a : { kind: "new" };
+    var _a2;
+    const placement = (_a2 = request.placement) != null ? _a2 : { kind: "new" };
     if (placement.kind !== "new") return this.importOutlineIntoMap(request, placement);
     const model = request.shallowResearch && request.model || this.plugin.settings.cliModel;
     const settings = this.plugin.settings;
@@ -32735,10 +32762,10 @@ ${request.requirements}` : preset.text,
     void this.plugin.confirmAiUsage(
       model,
       () => {
-        var _a2;
+        var _a3;
         return this.startShallowResearch(root, children, {
           researchMode: "research",
-          researchDepth: (_a2 = request.researchDepth) != null ? _a2 : "fast",
+          researchDepth: (_a3 = request.researchDepth) != null ? _a3 : "fast",
           referenceGroups: [],
           visualMode: "off"
         });
@@ -32747,7 +32774,7 @@ ${request.requirements}` : preset.text,
   }
   /** Adds the outline to the open map, as a new top-level tree or under the selected topic; existing nodes stay put. */
   async importOutlineIntoMap(request, placement) {
-    var _a, _b, _c;
+    var _a2, _b2, _c;
     const settings = this.plugin.settings;
     const repo = this.plugin.repo;
     const target = () => {
@@ -32767,7 +32794,7 @@ ${request.requirements}` : preset.text,
     let written = true;
     try {
       await this.plugin.mutate(async () => {
-        var _a2, _b2;
+        var _a3, _b3;
         let current;
         try {
           current = target();
@@ -32786,7 +32813,7 @@ ${request.requirements}` : preset.text,
           model,
           request.nodes,
           request.source,
-          (_a2 = parent == null ? void 0 : parent.id) != null ? _a2 : null,
+          (_a3 = parent == null ? void 0 : parent.id) != null ? _a3 : null,
           template,
           request.detailTemplateId,
           void 0,
@@ -32829,7 +32856,7 @@ ${request.requirements}` : preset.text,
           );
           return;
         }
-        const placed = (_b2 = this.map) == null ? void 0 : _b2.nodes.find((node) => node.id === top2.id);
+        const placed = (_b3 = this.map) == null ? void 0 : _b3.nodes.find((node) => node.id === top2.id);
         if (placed) {
           this.selected = placed.id;
           this.render();
@@ -32847,21 +32874,21 @@ ${request.requirements}` : preset.text,
     if (outcome.failure || state.saveFailed || !written || !request.shallowResearch || !outcome.created.length) return;
     const owner = placement.kind === "under" ? placement.parentId : null;
     const several = owner !== null && (!!request.researchEveryTopic || request.nodes.filter((node) => node.parent === null).length > 1);
-    const top = (_a = this.map) == null ? void 0 : _a.nodes.find((node) => node.id === (several ? owner : outcome.created[0].id));
+    const top = (_a2 = this.map) == null ? void 0 : _a2.nodes.find((node) => node.id === (several ? owner : outcome.created[0].id));
     if (!top) return;
     const ids = new Set((several ? outcome.created : outcome.created.slice(1)).map((node) => node.id));
-    const children = ((_c = (_b = this.map) == null ? void 0 : _b.nodes) != null ? _c : []).filter((node) => ids.has(node.id));
+    const children = ((_c = (_b2 = this.map) == null ? void 0 : _b2.nodes) != null ? _c : []).filter((node) => ids.has(node.id));
     if (!children.length) return;
     void this.plugin.confirmAiUsage(
       model,
       () => {
-        var _a2;
+        var _a3;
         return this.startShallowResearch(top, children, {
           researchMode: "research",
           referenceGroups: [],
           visualMode: "off",
           ...request.researchOptions,
-          researchDepth: (_a2 = request.researchDepth) != null ? _a2 : "fast",
+          researchDepth: (_a3 = request.researchDepth) != null ? _a3 : "fast",
           ...request.detailTemplateId ? { detailTemplateId: request.detailTemplateId } : {},
           ...request.toneId ? { toneId: request.toneId } : {}
         });
@@ -32969,8 +32996,8 @@ ${request.requirements}` : preset.text,
     }
   }
   renderAimFailure(card, branch) {
-    var _a, _b, _c, _d, _e, _f, _g, _h;
-    const runs = (_c = (_b = (_a = this.map) == null ? void 0 : _a.aim) == null ? void 0 : _b.runs.filter((run) => run.branchId === branch.id)) != null ? _c : [];
+    var _a2, _b2, _c, _d, _e, _f, _g, _h;
+    const runs = (_c = (_b2 = (_a2 = this.map) == null ? void 0 : _a2.aim) == null ? void 0 : _b2.runs.filter((run) => run.branchId === branch.id)) != null ? _c : [];
     const latest = runs.at(-1), attempt = latest == null ? void 0 : latest.attempts.find((item) => item.id === latest.currentAttemptId);
     if ((attempt == null ? void 0 : attempt.status) !== "failed" && !branch.researchPlanError) return;
     const box = card.createDiv({ cls: "vam-aim-failure" });
@@ -33004,8 +33031,8 @@ ${request.requirements}` : preset.text,
       ).addClass("mod-cta");
   }
   async retryAimSubtopics(branchId, timeoutMs) {
-    var _a, _b, _c, _d, _e, _f, _g;
-    const branch = (_b = (_a = this.map) == null ? void 0 : _a.aim) == null ? void 0 : _b.branches.find((item) => item.id === branchId), question = branch && ((_c = this.map) == null ? void 0 : _c.nodes.find((item) => item.id === branch.questionNodeId));
+    var _a2, _b2, _c, _d, _e, _f, _g;
+    const branch = (_b2 = (_a2 = this.map) == null ? void 0 : _a2.aim) == null ? void 0 : _b2.branches.find((item) => item.id === branchId), question = branch && ((_c = this.map) == null ? void 0 : _c.nodes.find((item) => item.id === branch.questionNodeId));
     const note = question && this.notes.get(question.id);
     if (this.closed || !this.path || !branch || !question || !note || this.aimBusy) return;
     const branchRuns = ((_f = (_e = (_d = this.map) == null ? void 0 : _d.aim) == null ? void 0 : _e.runs) != null ? _f : []).filter((item) => item.branchId === branch.id);
@@ -33093,9 +33120,9 @@ ${request.requirements}` : preset.text,
   }
   /** Change direction: during a run it stops that run first (finished research stays), then follows the new focus. */
   async steerAim(from, direction) {
-    var _a, _b;
+    var _a2, _b2;
     if (this.aimBusy) {
-      (_a = this.aimController) == null ? void 0 : _a.abort();
+      (_a2 = this.aimController) == null ? void 0 : _a2.abort();
       for (let waited = 0; this.aimBusy && waited < 3e4; waited += 100)
         await new Promise((resolve) => window.setTimeout(resolve, 100));
       if (this.aimBusy) {
@@ -33104,15 +33131,15 @@ ${request.requirements}` : preset.text,
       }
     }
     await this.runAimFollowup(
-      (_b = from.nodeId) != null ? _b : null,
+      (_b2 = from.nodeId) != null ? _b2 : null,
       (mapPath, model, reasoning, signal) => this.aimManual.steer(mapPath, from, direction, model, reasoning, signal)
     );
   }
   /** Runs one AIM follow-up from a node (or the topic) with the usual busy state, notices and refresh. */
   async runAimFollowup(nodeId, run) {
-    var _a, _b, _c, _d, _e;
-    const topic = (_a = this.map) == null ? void 0 : _a.nodes.find((item) => item.aimKind === "topic");
-    const node = (_c = (_b = this.map) == null ? void 0 : _b.nodes.find((item) => item.id === nodeId)) != null ? _c : topic;
+    var _a2, _b2, _c, _d, _e;
+    const topic = (_a2 = this.map) == null ? void 0 : _a2.nodes.find((item) => item.aimKind === "topic");
+    const node = (_c = (_b2 = this.map) == null ? void 0 : _b2.nodes.find((item) => item.id === nodeId)) != null ? _c : topic;
     const note = (_d = node && this.notes.get(node.id)) != null ? _d : topic && this.notes.get(topic.id);
     if (this.closed || !node || !note || !this.path || !((_e = this.map) == null ? void 0 : _e.aim)) return;
     if (this.aimBusy) {
@@ -33152,9 +33179,9 @@ ${request.requirements}` : preset.text,
     }
   }
   async planAimFromSelection(nodeId = this.selected) {
-    var _a, _b, _c, _d, _e, _f;
-    const node = (_a = this.map) == null ? void 0 : _a.nodes.find((item) => item.id === nodeId);
-    if (this.closed || !node || !this.path || !((_b = this.map) == null ? void 0 : _b.aim) || this.aimBusy) return;
+    var _a2, _b2, _c, _d, _e, _f;
+    const node = (_a2 = this.map) == null ? void 0 : _a2.nodes.find((item) => item.id === nodeId);
+    if (this.closed || !node || !this.path || !((_b2 = this.map) == null ? void 0 : _b2.aim) || this.aimBusy) return;
     const epoch = this.aimViewEpoch, mapPath = this.path, controller = new AbortController();
     const contentLanguage = resolveAimContentLanguage(this.map, this.plugin.settings.language);
     const parentBranchId = (_d = (_c = this.map.aim.branches.find((branch) => branch.results.some((result) => result.nodeId === node.id))) == null ? void 0 : _c.id) != null ? _d : null;
@@ -33177,8 +33204,8 @@ ${request.requirements}` : preset.text,
             async (answers) => {
               if (!this.aimViewIsCurrent(epoch, mapPath)) throw new Error("Reopen the original AIM map to continue.");
               await this.plugin.mutate(async () => {
-                var _a2;
-                const latest = await this.plugin.repo.readNote(node.path, (_a2 = this.map) != null ? _a2 : void 0);
+                var _a3;
+                const latest = await this.plugin.repo.readNote(node.path, (_a3 = this.map) != null ? _a3 : void 0);
                 if (!latest.detail.includes("<!-- aim-intake-complete -->")) {
                   await this.plugin.repo.updateNote(
                     node.path,
@@ -33198,8 +33225,8 @@ ${request.requirements}` : preset.text,
           return;
         }
         await this.plugin.mutate(async () => {
-          var _a2;
-          const latest = await this.plugin.repo.readNote(node.path, (_a2 = this.map) != null ? _a2 : void 0);
+          var _a3;
+          const latest = await this.plugin.repo.readNote(node.path, (_a3 = this.map) != null ? _a3 : void 0);
           await this.plugin.repo.updateNote(
             node.path,
             { detail: latest.detail + "\n\n<!-- aim-intake-complete -->" },
@@ -33252,9 +33279,9 @@ ${request.requirements}` : preset.text,
     }
   }
   async retryAimFromSavedReport(questionNodeId) {
-    var _a, _b;
+    var _a2, _b2;
     const target = this.aimFailedReports.get(questionNodeId), mapPath = this.path, epoch = this.aimViewEpoch;
-    if (this.closed || !target || !mapPath || !((_a = this.map) == null ? void 0 : _a.aim) || this.aimBusy || this.builtIn) return;
+    if (this.closed || !target || !mapPath || !((_a2 = this.map) == null ? void 0 : _a2.aim) || this.aimBusy || this.builtIn) return;
     const run = this.map.aim.runs.find((item) => item.id === target.runId);
     const currentAttempt = run == null ? void 0 : run.attempts.find((item) => item.id === run.currentAttemptId);
     const branch = run && this.map.aim.branches.find((item) => item.id === run.branchId);
@@ -33274,7 +33301,7 @@ ${request.requirements}` : preset.text,
       this.noticeDocumentReadyElsewhere(result.status, epoch, mapPath);
       if (!this.aimViewIsCurrent(epoch, mapPath) || this.aimController !== controller) return;
       if (result.status === "waiting-user") {
-        const question = (_b = this.map) == null ? void 0 : _b.nodes.find((item) => item.id === result.questionNodeId);
+        const question = (_b2 = this.map) == null ? void 0 : _b2.nodes.find((item) => item.id === result.questionNodeId);
         if (question) {
           this.selected = question.id;
           this.render();
@@ -33300,9 +33327,9 @@ ${request.requirements}` : preset.text,
     }
   }
   async continueAimResearch(questionNodeId, runId, timeoutMs) {
-    var _a, _b, _c;
+    var _a2, _b2, _c;
     const mapPath = this.path, epoch = this.aimViewEpoch;
-    if (this.closed || !mapPath || !((_a = this.map) == null ? void 0 : _a.aim) || this.aimBusy || this.builtIn) return;
+    if (this.closed || !mapPath || !((_a2 = this.map) == null ? void 0 : _a2.aim) || this.aimBusy || this.builtIn) return;
     const run = this.map.aim.runs.find((item) => item.id === runId);
     const branch = run && this.map.aim.branches.find((item) => item.id === run.branchId);
     if (!run || (branch == null ? void 0 : branch.questionNodeId) !== questionNodeId) return;
@@ -33319,7 +33346,7 @@ ${request.requirements}` : preset.text,
       const result = await this.aimManual.continuePartial(
         mapPath,
         runId,
-        (_b = this.notes.get(questionNodeId)) == null ? void 0 : _b.model,
+        (_b2 = this.notes.get(questionNodeId)) == null ? void 0 : _b2.model,
         (_c = this.notes.get(questionNodeId)) == null ? void 0 : _c.reasoning,
         controller.signal
       );
@@ -33364,20 +33391,20 @@ ${request.requirements}` : preset.text,
     }
   }
   openAimAnswer(node) {
-    var _a, _b, _c, _d;
+    var _a2, _b2, _c, _d;
     const contract = node.aimQuestion, note = this.notes.get(node.id);
     if (this.closed || !contract || !note || this.aimBusy) return;
     const epoch = this.aimViewEpoch, mapPath = this.path, requestId = contract.requestId;
-    if (mapPath && ((_c = (_b = (_a = this.map) == null ? void 0 : _a.aim) == null ? void 0 : _b.branches.filter((branch) => branch.questionNodeId === node.id).length) != null ? _c : 0) > 1) {
+    if (mapPath && ((_c = (_b2 = (_a2 = this.map) == null ? void 0 : _a2.aim) == null ? void 0 : _b2.branches.filter((branch) => branch.questionNodeId === node.id).length) != null ? _c : 0) > 1) {
       void this.plugin.mutate(async () => {
-        var _a2;
+        var _a3;
         const repaired = await this.aimRuns.recoverAnswerBranches(mapPath);
         if (!repaired || !this.aimViewIsCurrent(epoch, mapPath)) return;
         this.map = await this.plugin.repo.readMap(mapPath);
         await this.hydrate(() => this.aimViewIsCurrent(epoch, mapPath));
         if (!this.aimViewIsCurrent(epoch, mapPath)) return;
         this.render();
-        const current = (_a2 = this.map) == null ? void 0 : _a2.nodes.find((item) => item.id === node.id);
+        const current = (_a3 = this.map) == null ? void 0 : _a3.nodes.find((item) => item.id === node.id);
         if (current) this.openAimAnswer(current);
       }).catch((error) => {
         if (this.aimViewIsCurrent(epoch, mapPath)) new import_obsidian29.Notice(error instanceof Error ? error.message : String(error));
@@ -33389,9 +33416,9 @@ ${request.requirements}` : preset.text,
       note.summary,
       contract.options,
       async (input) => {
-        var _a2, _b2, _c2;
-        const currentQuestion = (_a2 = this.map) == null ? void 0 : _a2.nodes.find((item) => item.id === node.id);
-        if (!this.aimViewIsCurrent(epoch, mapPath) || ((_b2 = currentQuestion == null ? void 0 : currentQuestion.aimQuestion) == null ? void 0 : _b2.requestId) !== requestId || this.aimBusy)
+        var _a3, _b3, _c2;
+        const currentQuestion = (_a3 = this.map) == null ? void 0 : _a3.nodes.find((item) => item.id === node.id);
+        if (!this.aimViewIsCurrent(epoch, mapPath) || ((_b3 = currentQuestion == null ? void 0 : currentQuestion.aimQuestion) == null ? void 0 : _b3.requestId) !== requestId || this.aimBusy)
           return;
         const controller = new AbortController();
         this.aimBusy = true;
@@ -33461,17 +33488,17 @@ ${request.requirements}` : preset.text,
     this.app.workspace.requestSaveLayout();
   }
   changed(file) {
-    var _a;
-    if (file.path !== this.path && !((_a = this.map) == null ? void 0 : _a.nodes.some((node) => node.path === file.path))) return;
+    var _a2;
+    if (file.path !== this.path && !((_a2 = this.map) == null ? void 0 : _a2.nodes.some((node) => node.path === file.path))) return;
     if (this.refreshTimer !== null) window.clearTimeout(this.refreshTimer);
     this.refreshTimer = window.setTimeout(() => {
-      var _a2;
+      var _a3;
       if (this.closed) return;
       if (this.dragging) {
         this.changed(file);
         return;
       }
-      if (this.contentEl.contains(document.activeElement) && ((_a2 = document.activeElement) == null ? void 0 : _a2.matches("input, textarea, select"))) {
+      if (this.contentEl.contains(document.activeElement) && ((_a3 = document.activeElement) == null ? void 0 : _a3.matches("input, textarea, select"))) {
         this.changed(file);
         return;
       }
@@ -33488,8 +33515,8 @@ ${request.requirements}` : preset.text,
   }
   /** Whether this view is running or saving AIM work for the map at `path`. */
   hasActiveAimWork(path) {
-    var _a;
-    return this.path === path && !!((_a = this.map) == null ? void 0 : _a.aim) && (this.aimBusy || this.map.aim.runs.some(
+    var _a2;
+    return this.path === path && !!((_a2 = this.map) == null ? void 0 : _a2.aim) && (this.aimBusy || this.map.aim.runs.some(
       (run) => run.attempts.some((attempt) => attempt.status === "running" || attempt.status === "saving")
     ));
   }
@@ -33510,11 +33537,11 @@ ${request.requirements}` : preset.text,
     }
   }
   deleted(file) {
-    var _a;
+    var _a2;
     if (file.path === this.path) {
       this.map = null;
       this.path = "";
-      if (((_a = this.deletedMap) == null ? void 0 : _a.path) !== file.path) this.history.clear();
+      if (((_a2 = this.deletedMap) == null ? void 0 : _a2.path) !== file.path) this.history.clear();
       this.render();
     } else this.changed(file);
   }
@@ -33567,14 +33594,14 @@ ${request.requirements}` : preset.text,
   }
   /** Research coverage is the map's headline fact: how much of the frontier already has a conclusion. */
   onAimProgress(event) {
-    var _a;
+    var _a2;
     if (this.closed || event.mapPath !== this.path) return;
     let structural = false;
     if (event.kind === "plan") {
       this.aimProgress = {
         branchId: event.branchId,
         stage: "research",
-        startedAt: ((_a = this.aimProgress) == null ? void 0 : _a.branchId) === event.branchId ? this.aimProgress.startedAt : Date.now(),
+        startedAt: ((_a2 = this.aimProgress) == null ? void 0 : _a2.branchId) === event.branchId ? this.aimProgress.startedAt : Date.now(),
         targets: new Map(
           event.targets.map((target) => [target.id, { title: target.title, state: "queued", searches: 0 }])
         )
@@ -33603,10 +33630,10 @@ ${request.requirements}` : preset.text,
   scheduleAimProgressRender() {
     if (this.aimProgressRenderTimer !== null) return;
     this.aimProgressRenderTimer = window.setTimeout(() => {
-      var _a;
+      var _a2;
       this.aimProgressRenderTimer = null;
       if (this.closed) return;
-      const typing = this.contentEl.contains(document.activeElement) && ((_a = document.activeElement) == null ? void 0 : _a.matches("input, textarea, select"));
+      const typing = this.contentEl.contains(document.activeElement) && ((_a2 = document.activeElement) == null ? void 0 : _a2.matches("input, textarea, select"));
       if (this.dragging || typing) this.scheduleAimProgressRender();
       else this.renderPreservingFocus();
     }, 300);
@@ -33619,18 +33646,18 @@ ${request.requirements}` : preset.text,
     this.aimProgressTimer = this.aimProgressRenderTimer = null;
   }
   aimTargetText(target) {
-    var _a;
+    var _a2;
     if (target.state === "queued") return t("ui.aim_progress_queued");
     if (target.state === "done") return t("ui.aim_progress_done");
     if (target.state === "skipped") return t("ui.aim_progress_skipped");
     return t(
       "ui.aim_progress_searching_0_1",
       target.searches,
-      Math.round((Date.now() - ((_a = target.startedAt) != null ? _a : Date.now())) / 1e3)
+      Math.round((Date.now() - ((_a2 = target.startedAt) != null ? _a2 : Date.now())) / 1e3)
     );
   }
   aimStageText() {
-    var _a;
+    var _a2;
     const progress = this.aimProgress;
     if (!progress) return "";
     const elapsed = Math.round((Date.now() - progress.startedAt) / 1e3);
@@ -33640,25 +33667,25 @@ ${request.requirements}` : preset.text,
       "ui.aim_stage_research_0_1",
       targets.filter((item) => item.state === "done" || item.state === "skipped").length,
       targets.length
-    ) : t((_a = AIM_STAGE_KEYS[progress.stage]) != null ? _a : "ui.aim_stage_research");
+    ) : t((_a2 = AIM_STAGE_KEYS[progress.stage]) != null ? _a2 : "ui.aim_stage_research");
     return t("ui.aim_stage_with_elapsed_0_1", stage, clock);
   }
   /** One-second tick: rewrite only the progress texts; stop when the run is over. */
   paintAimProgress() {
-    var _a, _b;
+    var _a2, _b2;
     if (this.closed || !this.aimBusy || !this.aimProgress) {
       if (!this.aimBusy) this.stopAimProgress();
       return;
     }
-    (_a = this.aimProgressEls.get("status")) == null ? void 0 : _a.setText(this.aimStageText());
+    (_a2 = this.aimProgressEls.get("status")) == null ? void 0 : _a2.setText(this.aimStageText());
     for (const [id, target] of this.aimProgress.targets)
-      (_b = this.aimProgressEls.get(id)) == null ? void 0 : _b.setText(this.aimTargetText(target));
+      (_b2 = this.aimProgressEls.get(id)) == null ? void 0 : _b2.setText(this.aimTargetText(target));
   }
   /** Cards for the planned subtopics whose research notes do not exist yet, beside their question. */
   renderAimPendingCards(shown) {
-    var _a;
+    var _a2;
     const progress = this.aimProgress;
-    if (!progress || !this.aimBusy || !this.stageEl || !((_a = this.map) == null ? void 0 : _a.aim)) return;
+    if (!progress || !this.aimBusy || !this.stageEl || !((_a2 = this.map) == null ? void 0 : _a2.aim)) return;
     const branch = this.map.aim.branches.find((item) => item.id === progress.branchId);
     const question = branch && shown.find((node) => node.id === branch.questionNodeId);
     if (!branch || !question) return;
@@ -33683,13 +33710,13 @@ ${request.requirements}` : preset.text,
   }
   /** Speaks a stage (or the slow notice) once, when it changes. The streaming preview never goes through here. */
   announceResearchStage(path) {
-    var _a, _b, _c;
-    const node = (_a = this.map) == null ? void 0 : _a.nodes.find((item) => item.path === path);
-    this.announceStage(path, (_c = node && ((_b = this.notes.get(node.id)) == null ? void 0 : _b.title)) != null ? _c : path);
+    var _a2, _b2, _c;
+    const node = (_a2 = this.map) == null ? void 0 : _a2.nodes.find((item) => item.path === path);
+    this.announceStage(path, (_c = node && ((_b2 = this.notes.get(node.id)) == null ? void 0 : _b2.title)) != null ? _c : path);
   }
   announceStage(key2, title) {
-    var _a, _b;
-    const progress = (_a = this.plugin.researchProgress) == null ? void 0 : _a.get(key2);
+    var _a2, _b2;
+    const progress = (_a2 = this.plugin.researchProgress) == null ? void 0 : _a2.get(key2);
     if (!progress) {
       this.announcedStages.delete(key2);
       return;
@@ -33697,7 +33724,7 @@ ${request.requirements}` : preset.text,
     const signature = `${progress.stage}|${progress.slow ? 1 : 0}`;
     if (this.announcedStages.get(key2) === signature) return;
     this.announcedStages.set(key2, signature);
-    (_b = this.announcer) == null ? void 0 : _b.setText(
+    (_b2 = this.announcer) == null ? void 0 : _b2.setText(
       t(
         "ui.research_announcement_0_1",
         title,
@@ -33706,8 +33733,8 @@ ${request.requirements}` : preset.text,
     );
   }
   researchSig(progress) {
-    var _a;
-    return progress ? [progress.stage, (_a = progress.query) != null ? _a : "", progress.slow ? 1 : 0, progress.resend ? 1 : 0].join("|") : "";
+    var _a2;
+    return progress ? [progress.stage, (_a2 = progress.query) != null ? _a2 : "", progress.slow ? 1 : 0, progress.resend ? 1 : 0].join("|") : "";
   }
   researchStageText(progress) {
     switch (progress.stage) {
@@ -33772,8 +33799,8 @@ ${request.requirements}` : preset.text,
   }
   /** Stage text, seconds and the preview line under a synthesis or merge status bar. */
   renderTaskProgress(bar, parent, key2) {
-    var _a;
-    const progress = (_a = this.plugin.researchProgress) == null ? void 0 : _a.get(key2);
+    var _a2;
+    const progress = (_a2 = this.plugin.researchProgress) == null ? void 0 : _a2.get(key2);
     if (!progress) {
       this.researchSigs.delete(key2);
       this.taskPreviewEls.delete(key2);
@@ -33794,10 +33821,10 @@ ${request.requirements}` : preset.text,
   }
   /** Plain text only (never Markdown) and no render: the summary being written, which nothing has saved yet. */
   paintTaskPreview(key2) {
-    var _a, _b, _c, _d;
+    var _a2, _b2, _c, _d;
     const element = this.taskPreviewEls.get(key2);
     if (!element) return;
-    const text11 = (_c = (_b = (_a = this.plugin.researchProgress) == null ? void 0 : _a.get(key2)) == null ? void 0 : _b.preview) == null ? void 0 : _c.summary;
+    const text11 = (_c = (_b2 = (_a2 = this.plugin.researchProgress) == null ? void 0 : _a2.get(key2)) == null ? void 0 : _b2.preview) == null ? void 0 : _c.summary;
     element.hidden = !text11;
     if (!text11) {
       if (element.hasClass("is-preview")) {
@@ -33810,7 +33837,7 @@ ${request.requirements}` : preset.text,
     else (_d = element.querySelector(".vam-card-preview-text")) == null ? void 0 : _d.setText(text11);
   }
   onResearchProgress(path) {
-    var _a, _b;
+    var _a2, _b2;
     if (this.closed || !this.map || !this.stageEl) return;
     if (path.startsWith(TASK_PROGRESS_PREFIX)) {
       const kind = path === this.taskProgressKey("integration") ? "integration" : path === this.taskProgressKey("merge") ? "merge" : null;
@@ -33820,7 +33847,7 @@ ${request.requirements}` : preset.text,
         path,
         t(kind === "integration" ? "ui.integration_running" : "ui.merge_bar_title").replace(/\s*[:：…]+\s*$/u, "")
       );
-      if (this.researchSig(this.plugin.researchProgress.get(path)) !== ((_a = this.researchSigs.get(path)) != null ? _a : ""))
+      if (this.researchSig(this.plugin.researchProgress.get(path)) !== ((_a2 = this.researchSigs.get(path)) != null ? _a2 : ""))
         this.scheduleResearchRender();
       return;
     }
@@ -33828,16 +33855,16 @@ ${request.requirements}` : preset.text,
     this.paintHoverResearch();
     this.paintCardPreview(path);
     this.announceResearchStage(path);
-    if (this.researchSig(this.plugin.researchProgress.get(path)) !== ((_b = this.researchSigs.get(path)) != null ? _b : ""))
+    if (this.researchSig(this.plugin.researchProgress.get(path)) !== ((_b2 = this.researchSigs.get(path)) != null ? _b2 : ""))
       this.scheduleResearchRender();
   }
   scheduleResearchRender() {
     if (this.researchRenderTimer !== null) return;
     this.researchRenderTimer = window.setTimeout(() => {
-      var _a;
+      var _a2;
       this.researchRenderTimer = null;
       if (this.closed) return;
-      const typing = this.contentEl.contains(document.activeElement) && ((_a = document.activeElement) == null ? void 0 : _a.matches("input, textarea, select"));
+      const typing = this.contentEl.contains(document.activeElement) && ((_a2 = document.activeElement) == null ? void 0 : _a2.matches("input, textarea, select"));
       if (this.dragging || typing) this.scheduleResearchRender();
       else this.renderPreservingFocus();
     }, 150);
@@ -33854,13 +33881,13 @@ ${request.requirements}` : preset.text,
    * (Stop, stale, failure, a retraction) the stored summary comes back; success is drawn by the note refresh.
    */
   paintCardPreview(path) {
-    var _a, _b, _c, _d, _e;
-    const node = (_a = this.map) == null ? void 0 : _a.nodes.find((item) => item.path === path);
+    var _a2, _b2, _c, _d, _e;
+    const node = (_a2 = this.map) == null ? void 0 : _a2.nodes.find((item) => item.path === path);
     const card = node && this.cardEls.get(node.id);
     if (!node || !card) return;
     const title = card.querySelector(".vam-card-title");
     let summary = card.querySelector(".vam-card-summary");
-    const text11 = (_d = (_c = (_b = this.plugin.researchProgress) == null ? void 0 : _b.get(path)) == null ? void 0 : _c.preview) == null ? void 0 : _d.summary;
+    const text11 = (_d = (_c = (_b2 = this.plugin.researchProgress) == null ? void 0 : _b2.get(path)) == null ? void 0 : _c.preview) == null ? void 0 : _d.summary;
     if (text11) {
       if (!summary && title) {
         summary = card.createEl("p", { cls: "vam-card-summary" });
@@ -33881,21 +33908,21 @@ ${request.requirements}` : preset.text,
   }
   /** Plain text only (never Markdown): the answer being written, which nothing has saved yet. */
   paintHoverResearch() {
-    var _a, _b, _c, _d;
+    var _a2, _b2, _c, _d;
     const hover = this.hoverResearch;
     if (!hover || !this.hoverCard) return;
-    const preview = (_b = (_a = this.plugin.researchProgress) == null ? void 0 : _a.get(hover.path)) == null ? void 0 : _b.preview;
+    const preview = (_b2 = (_a2 = this.plugin.researchProgress) == null ? void 0 : _a2.get(hover.path)) == null ? void 0 : _b2.preview;
     hover.block.hidden = !preview;
     hover.summary.setText((_c = preview == null ? void 0 : preview.summary) != null ? _c : "");
     hover.detail.setText((_d = preview == null ? void 0 : preview.detailTail) != null ? _d : "");
     hover.detail.hidden = !(preview == null ? void 0 : preview.detailTail);
   }
   renderResearchProgress(parent) {
-    var _a, _b;
-    const nodes = (_b = (_a = this.map) == null ? void 0 : _a.nodes) != null ? _b : [];
+    var _a2, _b2;
+    const nodes = (_b2 = (_a2 = this.map) == null ? void 0 : _a2.nodes) != null ? _b2 : [];
     const done = nodes.filter((node) => {
-      var _a2;
-      return ((_a2 = this.notes.get(node.id)) == null ? void 0 : _a2.status) === "completed";
+      var _a3;
+      return ((_a3 = this.notes.get(node.id)) == null ? void 0 : _a3.status) === "completed";
     }).length;
     const progress = parent.createDiv("vam-research-progress");
     progress.setAttr("role", "progressbar");
@@ -33911,8 +33938,8 @@ ${request.requirements}` : preset.text,
     fill.style.width = `${nodes.length ? done / nodes.length * 100 : 0}%`;
     const running = nodes.filter(
       (node) => {
-        var _a2, _b2;
-        return ((_a2 = this.plugin.running) == null ? void 0 : _a2.has(node.path)) || ((_b2 = this.plugin.quickExpandPending) == null ? void 0 : _b2.has(node.path));
+        var _a3, _b3;
+        return ((_a3 = this.plugin.running) == null ? void 0 : _a3.has(node.path)) || ((_b3 = this.plugin.quickExpandPending) == null ? void 0 : _b3.has(node.path));
       }
     ).length;
     if (running) progress.createSpan({ cls: "vam-status vam-status-running", text: t("ui.researching_0", running) });
@@ -34073,14 +34100,14 @@ ${request.requirements}` : preset.text,
     }
   }
   mergeBusy(node, except) {
-    var _a, _b, _c, _d, _e, _f;
-    const batch = (_a = this.plugin.expansionBatches) == null ? void 0 : _a.get(this.multiResearchKey()), task = this.integrationTask;
-    return !!(((_c = (_b = this.plugin.relevanceGrades) == null ? void 0 : _b.get(this.path)) == null ? void 0 : _c.status) === "running" || ((_d = this.plugin.running) == null ? void 0 : _d.has(node.path)) || ((_e = this.plugin.quickExpandPending) == null ? void 0 : _e.has(node.path)) || ((_f = this.plugin.activeTasks) == null ? void 0 : _f.has(node.path)) || (batch == null ? void 0 : batch.status) === "running" && (batch.currentPath === node.path || batch.queuedPaths.includes(node.path)) || (task == null ? void 0 : task.state) === "running" && task.mapPath === this.path && task.sources.some((source) => source.id === node.id) || this.isMerging(node.id, except));
+    var _a2, _b2, _c, _d, _e, _f;
+    const batch = (_a2 = this.plugin.expansionBatches) == null ? void 0 : _a2.get(this.multiResearchKey()), task = this.integrationTask;
+    return !!(((_c = (_b2 = this.plugin.relevanceGrades) == null ? void 0 : _b2.get(this.path)) == null ? void 0 : _c.status) === "running" || ((_d = this.plugin.running) == null ? void 0 : _d.has(node.path)) || ((_e = this.plugin.quickExpandPending) == null ? void 0 : _e.has(node.path)) || ((_f = this.plugin.activeTasks) == null ? void 0 : _f.has(node.path)) || (batch == null ? void 0 : batch.status) === "running" && (batch.currentPath === node.path || batch.queuedPaths.includes(node.path)) || (task == null ? void 0 : task.state) === "running" && task.mapPath === this.path && task.sources.some((source) => source.id === node.id) || this.isMerging(node.id, except));
   }
   /** True while an AI merge on this map still holds the card (running or being written): the card is locked. */
   isMerging(nodeId, except) {
-    var _a, _b;
-    return [...(_b = (_a = this.mergeTasks) == null ? void 0 : _a.values()) != null ? _b : []].some(
+    var _a2, _b2;
+    return [...(_b2 = (_a2 = this.mergeTasks) == null ? void 0 : _a2.values()) != null ? _b2 : []].some(
       (merge) => merge !== except && merge.mapPath === this.path && merge.sources.some((source) => source.id === nodeId)
     );
   }
@@ -34098,17 +34125,17 @@ ${request.requirements}` : preset.text,
     return true;
   }
   mergeCheck(ids = this.multiSelected, except) {
-    var _a, _b;
+    var _a2, _b2;
     return mergeEligibility({
       ids,
-      nodes: (_b = (_a = this.map) == null ? void 0 : _a.nodes) != null ? _b : [],
+      nodes: (_b2 = (_a2 = this.map) == null ? void 0 : _a2.nodes) != null ? _b2 : [],
       hasNote: (id) => this.notes.has(id),
       busy: (node) => this.mergeBusy(node, except)
     });
   }
   /** Asks for the merged topic's name, then merges in the write queue (which checks everything again). */
   openMerge() {
-    var _a, _b, _c, _d;
+    var _a2, _b2, _c, _d;
     if (!this.map || this.map.aim || this.builtIn || this.mergeOpen || !this.multiSelected.size) return;
     if (this.mergeTasks.has(this.path)) {
       new import_obsidian29.Notice(t("ui.merge_locked"));
@@ -34131,7 +34158,7 @@ ${request.requirements}` : preset.text,
     new MergeTopicsModal(
       this.app,
       snapshot.sources.length,
-      (_b = (_a = this.notes.get(check.sources[0].id)) == null ? void 0 : _a.title) != null ? _b : "",
+      (_b2 = (_a2 = this.notes.get(check.sources[0].id)) == null ? void 0 : _a2.title) != null ? _b2 : "",
       (title) => this.enqueue(async () => {
         try {
           await this.mergeSelected(title, snapshot);
@@ -34151,10 +34178,10 @@ ${request.requirements}` : preset.text,
    * the parent topic itself is the one whose model counts.
    */
   async mergeModel(parentId) {
-    var _a, _b;
-    const parent = parentId ? (_a = this.map) == null ? void 0 : _a.nodes.find((node) => node.id === parentId) : void 0;
+    var _a2, _b2;
+    const parent = parentId ? (_a2 = this.map) == null ? void 0 : _a2.nodes.find((node) => node.id === parentId) : void 0;
     return resolveMergeModel(
-      parent ? (await this.plugin.repo.readNote(parent.path, (_b = this.map) != null ? _b : void 0)).model : void 0,
+      parent ? (await this.plugin.repo.readNote(parent.path, (_b2 = this.map) != null ? _b2 : void 0)).model : void 0,
       this.plugin.settings.cliModel
     );
   }
@@ -34164,29 +34191,29 @@ ${request.requirements}` : preset.text,
    * merged result is written (no draft review). Resolves false when AI did not start.
    */
   async startMergeDraft(title, snapshot, started, signal) {
-    var _a;
+    var _a2;
     const stillValid = () => {
-      var _a2;
+      var _a3;
       const check = this.mergeCheck(snapshot.sources.map((source) => source.id));
-      return !this.closed && !!this.map && this.path === snapshot.path && this.map.id === snapshot.mapId && check.ok && check.targetId === ((_a2 = snapshot.targetId) != null ? _a2 : null) && check.sources.every((node) => {
-        var _a3;
-        return ((_a3 = snapshot.sources.find((source) => source.id === node.id)) == null ? void 0 : _a3.path) === node.path;
+      return !this.closed && !!this.map && this.path === snapshot.path && this.map.id === snapshot.mapId && check.ok && check.targetId === ((_a3 = snapshot.targetId) != null ? _a3 : null) && check.sources.every((node) => {
+        var _a4;
+        return ((_a4 = snapshot.sources.find((source) => source.id === node.id)) == null ? void 0 : _a4.path) === node.path;
       });
     };
     if (!stillValid()) {
       new import_obsidian29.Notice(t("ui.merge_draft_stale"));
       return false;
     }
-    const model = await this.mergeModel((_a = snapshot.targetId) != null ? _a : snapshot.parentId);
+    const model = await this.mergeModel((_a2 = snapshot.targetId) != null ? _a2 : snapshot.parentId);
     let began = false;
     const accepted = await this.plugin.confirmAiUsage(model, async () => {
-      var _a2, _b, _c;
+      var _a3, _b2, _c;
       if (signal.aborted || !stillValid()) return;
       began = true;
       const task = {
         mapPath: snapshot.path,
         mapId: snapshot.mapId,
-        mapTitle: (_b = (_a2 = this.map) == null ? void 0 : _a2.title) != null ? _b : "",
+        mapTitle: (_b2 = (_a3 = this.map) == null ? void 0 : _a3.title) != null ? _b2 : "",
         title,
         sources: snapshot.sources,
         parentId: snapshot.parentId,
@@ -34355,8 +34382,8 @@ ${request.requirements}` : preset.text,
   async checkMergeResult(task, result) {
     const notes = await Promise.all(
       task.sources.map((source) => {
-        var _a;
-        return this.plugin.repo.readNote(source.path, (_a = this.map) != null ? _a : void 0);
+        var _a2;
+        return this.plugin.repo.readNote(source.path, (_a2 = this.map) != null ? _a2 : void 0);
       })
     );
     return checkMergePreservation({
@@ -34400,7 +34427,7 @@ ${request.requirements}` : preset.text,
    * notes go to Unassigned, their subtopics move under the new topic. One history step; a failure puts everything back.
    */
   async mergeSelected(title, snapshot, content) {
-    var _a, _b, _c;
+    var _a2, _b2, _c;
     const stale = () => {
       throw new Error(t("ui.merge_draft_stale"));
     };
@@ -34418,9 +34445,9 @@ ${request.requirements}` : preset.text,
       new import_obsidian29.Notice(t(check.reason));
       return;
     }
-    if (((_a = snapshot.targetId) != null ? _a : null) !== check.targetId || check.sources.some((node) => {
-      var _a2;
-      return ((_a2 = snapshot.sources.find((source) => source.id === node.id)) == null ? void 0 : _a2.path) !== node.path;
+    if (((_a2 = snapshot.targetId) != null ? _a2 : null) !== check.targetId || check.sources.some((node) => {
+      var _a3;
+      return ((_a3 = snapshot.sources.find((source) => source.id === node.id)) == null ? void 0 : _a3.path) !== node.path;
     })) {
       if (content) stale();
       new import_obsidian29.Notice(t("ui.merge_missing_note"));
@@ -34444,7 +34471,7 @@ ${request.requirements}` : preset.text,
         sources2.map((_, index) => ({ title: sourceNotes[index].title, detail: sourceNotes[index].detail }))
       );
     }
-    const model = (_b = content == null ? void 0 : content.task.model) != null ? _b : await this.mergeModel(check.parentId);
+    const model = (_b2 = content == null ? void 0 : content.task.model) != null ? _b2 : await this.mergeModel(check.parentId);
     const created = await repo.createNote(
       title,
       model,
@@ -34562,7 +34589,7 @@ ${request.requirements}` : preset.text,
    * the parent's exact text.
    */
   async mergeIntoParent(title, sources2, content, before) {
-    var _a;
+    var _a2;
     const [target, ...children] = sources2, mapPath = this.path, repo = this.plugin.repo, language2 = this.plugin.settings.language, detailTemplate = this.mapDetailTemplate(language2);
     const beforeText = await this.readNoteText(target.path), sourceNotes = [];
     for (const source of sources2) sourceNotes.push(await repo.readNote(source.path, before));
@@ -34647,7 +34674,7 @@ ${request.requirements}` : preset.text,
       await this.plugin.rebuildDerivedData();
       await this.hydrate();
       this.render();
-      const merged = (_a = this.map) == null ? void 0 : _a.nodes.find((item) => item.id === target.id);
+      const merged = (_a2 = this.map) == null ? void 0 : _a2.nodes.find((item) => item.id === target.id);
       if (merged) this.focusNode(merged);
     } catch (e) {
       this.render();
@@ -34794,7 +34821,7 @@ ${request.requirements}` : preset.text,
    * Unassigned); a card with subtopics asks first, exactly like the remove tool.
    */
   removeByKey(node) {
-    var _a, _b, _c, _d;
+    var _a2, _b2, _c, _d;
     const map = this.map;
     if (!map || map.aim) return;
     if (map.nodes.some((item) => item.parentId === node.id)) {
@@ -34802,17 +34829,17 @@ ${request.requirements}` : preset.text,
       return;
     }
     if (!this.mergeUnlocked([node.id])) return;
-    const title = (_b = (_a = this.notes.get(node.id)) == null ? void 0 : _a.title) != null ? _b : node.path;
+    const title = (_b2 = (_a2 = this.notes.get(node.id)) == null ? void 0 : _a2.title) != null ? _b2 : node.path;
     const siblings = map.nodes.filter((item) => {
-      var _a2, _b2;
-      return ((_a2 = item.parentId) != null ? _a2 : null) === ((_b2 = node.parentId) != null ? _b2 : null);
+      var _a3, _b3;
+      return ((_a3 = item.parentId) != null ? _a3 : null) === ((_b3 = node.parentId) != null ? _b3 : null);
     });
     const at = siblings.findIndex((item) => item.id === node.id);
     const next = (_d = (_c = siblings[at + 1]) != null ? _c : siblings[at - 1]) != null ? _d : map.nodes.find((item) => item.id === node.parentId);
     this.enqueue(async () => {
-      var _a2;
+      var _a3;
       const previous = this.history.undoEntry;
-      this.focusNodeId = (_a2 = next == null ? void 0 : next.id) != null ? _a2 : null;
+      this.focusNodeId = (_a3 = next == null ? void 0 : next.id) != null ? _a3 : null;
       try {
         await this.removeToUnassigned(node, false);
       } finally {
@@ -34823,12 +34850,12 @@ ${request.requirements}` : preset.text,
   }
   /** The delete confirmation. `hooks` lets a caller run the chosen removal itself and hear about a cancel. */
   confirmRemoveNode(node, hooks = {}) {
-    var _a, _b, _c;
+    var _a2, _b2, _c;
     if (!this.mergeUnlocked(this.branchIds(node.id))) {
-      (_a = hooks.dismissed) == null ? void 0 : _a.call(hooks);
+      (_a2 = hooks.dismissed) == null ? void 0 : _a2.call(hooks);
       return;
     }
-    const run = (_b = hooks.run) != null ? _b : (work) => this.enqueue(work);
+    const run = (_b2 = hooks.run) != null ? _b2 : (work) => this.enqueue(work);
     new ChoiceModal(
       this.app,
       t("ui.remove_from_map"),
@@ -34917,8 +34944,8 @@ ${request.requirements}` : preset.text,
       t("ui.choose_a_new_parent_topic"),
       this.map.nodes,
       (target) => {
-        var _a, _b;
-        return (_b = (_a = this.notes.get(target.id)) == null ? void 0 : _a.title) != null ? _b : target.path;
+        var _a2, _b2;
+        return (_b2 = (_a2 = this.notes.get(target.id)) == null ? void 0 : _a2.title) != null ? _b2 : target.path;
       },
       (target) => copyNodes || roots.every((root) => canParent(this.map.nodes, root.id, target.id)),
       (target) => this.enqueue(() => copyNodes ? this.copySelected(target) : this.moveSelected(target))
@@ -34943,7 +34970,7 @@ ${request.requirements}` : preset.text,
     this.render();
   }
   assertAimReferencesRemain(map, ids, moving = false, removableQuestionNodeIds = /* @__PURE__ */ new Set()) {
-    var _a, _b, _c;
+    var _a2, _b2, _c;
     const data = map.aim;
     if (!data) return;
     const protectedIds = /* @__PURE__ */ new Set();
@@ -34956,11 +34983,11 @@ ${request.requirements}` : preset.text,
         for (const result of branch.results) protectedIds.add(result.nodeId);
       }
     }
-    for (const draft of (_a = data.resultDrafts) != null ? _a : [])
+    for (const draft of (_a2 = data.resultDrafts) != null ? _a2 : [])
       if (!removableBranchIds.has(draft.branchId)) protectedIds.add(draft.nodeId);
     for (const pending of data.pendingCommits)
       if (!removableBranchIds.has(pending.branchId)) protectedIds.add(pending.nodeId);
-    if (data.questionDraft && (ids.has(data.questionDraft.parentId) || removableBranchIds.has((_b = data.questionDraft.parentBranchId) != null ? _b : "")))
+    if (data.questionDraft && (ids.has(data.questionDraft.parentId) || removableBranchIds.has((_b2 = data.questionDraft.parentBranchId) != null ? _b2 : "")))
       throw new Error("A AIM question is still being saved and cannot be removed yet.");
     if (((_c = data.resultDrafts) != null ? _c : []).some((draft) => removableBranchIds.has(draft.branchId)) || data.pendingCommits.some((commit) => removableBranchIds.has(commit.branchId)))
       throw new Error("A AIM result is still being saved and cannot be removed yet.");
@@ -34973,14 +35000,14 @@ ${request.requirements}` : preset.text,
         throw new Error("A AIM branch is still running and cannot be removed yet.");
   }
   removeAimReferences(map, removedNodeIds, originalNodes = map.nodes) {
-    var _a, _b, _c;
+    var _a2, _b2, _c;
     const data = map.aim;
     if (!data) return;
     for (const question of originalNodes.filter((node) => removedNodeIds.has(node.id) && node.aimQuestion)) {
       const parent = map.nodes.find((node) => node.id === question.parentId && !removedNodeIds.has(node.id));
       if (parent)
         parent.aimDismissedQuestionRequestIds = [
-          .../* @__PURE__ */ new Set([...(_a = parent.aimDismissedQuestionRequestIds) != null ? _a : [], question.aimQuestion.requestId])
+          .../* @__PURE__ */ new Set([...(_a2 = parent.aimDismissedQuestionRequestIds) != null ? _a2 : [], question.aimQuestion.requestId])
         ];
     }
     const removedBranchIds = new Set(
@@ -34997,7 +35024,7 @@ ${request.requirements}` : preset.text,
     data.pendingCommits = data.pendingCommits.filter(
       (commit) => !removedBranchIds.has(commit.branchId) && !removedNodeIds.has(commit.nodeId)
     );
-    if (data.questionDraft && (removedNodeIds.has(data.questionDraft.parentId) || removedBranchIds.has((_b = data.questionDraft.parentBranchId) != null ? _b : "")))
+    if (data.questionDraft && (removedNodeIds.has(data.questionDraft.parentId) || removedBranchIds.has((_b2 = data.questionDraft.parentBranchId) != null ? _b2 : "")))
       delete data.questionDraft;
     for (const node of map.nodes) {
       if (node.aimConvergesFromNodeIds)
@@ -35007,7 +35034,7 @@ ${request.requirements}` : preset.text,
     }
   }
   async copySelected(target) {
-    var _a;
+    var _a2;
     if (!this.map) return;
     const roots = this.selectedRoots(), before = clone(this.map);
     if (!this.mergeUnlocked([target.id, ...roots.flatMap((root) => [root.id, ...descendants(before.nodes, root.id)])]))
@@ -35024,7 +35051,7 @@ ${request.requirements}` : preset.text,
         for (const original of branch) {
           const copy = await this.plugin.repo.duplicateNote(original.path, before, this.path);
           replacement.set(original.id, copy.id);
-          copy.parentId = original.id === root.id ? target.id : (_a = replacement.get(original.parentId)) != null ? _a : target.id;
+          copy.parentId = original.id === root.id ? target.id : (_a2 = replacement.get(original.parentId)) != null ? _a2 : target.id;
           copy.x = target.x + 340 + (original.x - root.x);
           copy.y = target.y + roots.indexOf(root) * 220 + (original.y - root.y);
           copies.push(copy);
@@ -35100,9 +35127,9 @@ ${request.requirements}` : preset.text,
     }
   }
   async claimToCurrent(file) {
-    var _a;
+    var _a2;
     if (!this.map) return;
-    const before = clone(this.map), previous = await this.plugin.repo.readNote(file.path, (_a = this.map) != null ? _a : void 0), original = file.path;
+    const before = clone(this.map), previous = await this.plugin.repo.readNote(file.path, (_a2 = this.map) != null ? _a2 : void 0), original = file.path;
     const target = await this.plugin.repo.moveUnique(original, this.plugin.repo.topicFolder(this.path, "Notes"));
     await this.plugin.repo.setLifecycle(target, this.map.id, this.map.id, "active");
     const node = {
@@ -35143,9 +35170,9 @@ ${request.requirements}` : preset.text,
     this.focusNode(node);
   }
   async relinkMissingNode(node, file) {
-    var _a;
+    var _a2;
     if (!this.map) return;
-    const before = clone(this.map), previous = await this.plugin.repo.readNote(file.path, (_a = this.map) != null ? _a : void 0), original = file.path;
+    const before = clone(this.map), previous = await this.plugin.repo.readNote(file.path, (_a2 = this.map) != null ? _a2 : void 0), original = file.path;
     const target = await this.plugin.repo.moveUnique(original, this.plugin.repo.topicFolder(this.path, "Notes"));
     await this.plugin.repo.setLifecycle(target, this.map.id, this.map.id, "active");
     const after = clone(before), replacement = after.nodes.find((item) => item.id === node.id);
@@ -35177,9 +35204,9 @@ ${request.requirements}` : preset.text,
     this.render();
   }
   async parkFile(file, collection, state) {
-    var _a;
+    var _a2;
     if (!this.map) return;
-    const before = await this.plugin.repo.readNote(file.path, (_a = this.map) != null ? _a : void 0), original = file.path;
+    const before = await this.plugin.repo.readNote(file.path, (_a2 = this.map) != null ? _a2 : void 0), original = file.path;
     const target = await this.plugin.repo.moveUnique(original, this.plugin.repo.topicFolder(this.path, collection));
     await this.plugin.repo.setLifecycle(target, this.map.id, "", state);
     await this.plugin.rebuildDerivedData();
@@ -35199,8 +35226,8 @@ ${request.requirements}` : preset.text,
     this.render();
   }
   async transferToTopic(file, topic) {
-    var _a;
-    const before = await this.plugin.repo.readNote(file.path, (_a = this.map) != null ? _a : void 0), original = file.path, folder = `${topic.root}/Unassigned`;
+    var _a2;
+    const before = await this.plugin.repo.readNote(file.path, (_a2 = this.map) != null ? _a2 : void 0), original = file.path, folder = `${topic.root}/Unassigned`;
     const target = await this.plugin.repo.moveUnique(original, folder);
     await this.plugin.repo.setLifecycle(target, topic.id, "", "unassigned");
     await this.plugin.rebuildDerivedData();
@@ -35220,8 +35247,8 @@ ${request.requirements}` : preset.text,
     this.render();
   }
   async transferAndAdd(file, topic) {
-    var _a;
-    const previous = await this.plugin.repo.readNote(file.path, (_a = this.map) != null ? _a : void 0), original = file.path, before = await this.plugin.repo.readMap(topic.mapPath);
+    var _a2;
+    const previous = await this.plugin.repo.readNote(file.path, (_a2 = this.map) != null ? _a2 : void 0), original = file.path, before = await this.plugin.repo.readMap(topic.mapPath);
     const target = await this.plugin.repo.moveUnique(original, `${topic.root}/Notes`);
     await this.plugin.repo.setLifecycle(target, topic.id, topic.id, "active");
     const node = {
@@ -35254,8 +35281,8 @@ ${request.requirements}` : preset.text,
     this.render();
   }
   async noteChange(node, patch) {
-    var _a, _b, _c, _d;
-    const current = await this.plugin.repo.readNote(node.path, (_a = this.map) != null ? _a : void 0), before = {};
+    var _a2, _b2, _c, _d;
+    const current = await this.plugin.repo.readNote(node.path, (_a2 = this.map) != null ? _a2 : void 0), before = {};
     for (const key2 of Object.keys(patch)) before[key2] = current[key2];
     if (Object.keys(patch).every((key2) => current[key2] === patch[key2])) return;
     await this.plugin.repo.updateNote(node.path, patch);
@@ -35276,7 +35303,7 @@ ${request.requirements}` : preset.text,
       "sourcePaths",
       "referencePaths"
     ].some((key2) => key2 in patch))
-      (_c = (_b = this.plugin.activeTasks) == null ? void 0 : _b.get(node.path)) == null ? void 0 : _c.abort();
+      (_c = (_b2 = this.plugin.activeTasks) == null ? void 0 : _b2.get(node.path)) == null ? void 0 : _c.abort();
     this.history.push({
       undo: () => this.plugin.repo.updateNote(node.path, before),
       redo: () => this.plugin.repo.updateNote(node.path, patch)
@@ -35311,10 +35338,10 @@ ${request.requirements}` : preset.text,
    * it; otherwise they are dropped and the note stays as written.
    */
   queueCharts(job) {
-    var _a;
+    var _a2;
     const path = job.path;
     const snapshot = this.chartSnapshot(job.saved);
-    const map = (_a = this.map) != null ? _a : void 0;
+    const map = (_a2 = this.map) != null ? _a2 : void 0;
     this.plugin.addChartsAfterWrite({
       path,
       context: job.context,
@@ -35376,8 +35403,8 @@ ${request.requirements}` : preset.text,
     }
   }
   updateHistoryButtons() {
-    var _a, _b, _c, _d;
-    const undo = (_a = this.contentEl) == null ? void 0 : _a.querySelector("[data-history=undo]"), redo = (_b = this.contentEl) == null ? void 0 : _b.querySelector("[data-history=redo]");
+    var _a2, _b2, _c, _d;
+    const undo = (_a2 = this.contentEl) == null ? void 0 : _a2.querySelector("[data-history=undo]"), redo = (_b2 = this.contentEl) == null ? void 0 : _b2.querySelector("[data-history=redo]");
     const label = (button, text11) => {
       if (button.dataset.icon) button.setAttr("aria-label", text11);
       else button.setText(text11);
@@ -35392,7 +35419,7 @@ ${request.requirements}` : preset.text,
     }
   }
   async synchronize() {
-    var _a;
+    var _a2;
     if (this.builtIn) return;
     if (!this.path || !this.map || this.closed) return;
     if (!(this.app.vault.getAbstractFileByPath(this.path) instanceof import_obsidian29.TFile)) {
@@ -35412,7 +35439,7 @@ ${request.requirements}` : preset.text,
     const before = JSON.stringify(Array.from(this.notes));
     await this.hydrate();
     if (structureChanged || before !== JSON.stringify(Array.from(this.notes))) {
-      const editing = this.contentEl.contains(document.activeElement) && ((_a = document.activeElement) == null ? void 0 : _a.matches("input, textarea, select"));
+      const editing = this.contentEl.contains(document.activeElement) && ((_a2 = document.activeElement) == null ? void 0 : _a2.matches("input, textarea, select"));
       if ((!editing || structureChanged) && !this.dragging) this.render();
       else for (const node of this.map.nodes) this.refreshCard(node);
     }
@@ -35460,7 +35487,7 @@ ${request.requirements}` : preset.text,
   }
   /** The map's default note style: both stored values (template and tone) are set or cleared together. */
   chooseMapStyle() {
-    var _a, _b;
+    var _a2, _b2;
     const apply = (templateId2, toneId2) => this.enqueue(
       () => this.mapChange((map) => {
         if (templateId2) map.detailTemplateId = templateId2;
@@ -35469,8 +35496,8 @@ ${request.requirements}` : preset.text,
         else delete map.toneId;
       }, false)
     );
-    const templateId = (_a = this.map) == null ? void 0 : _a.detailTemplateId;
-    const toneId = (_b = this.map) == null ? void 0 : _b.toneId;
+    const templateId = (_a2 = this.map) == null ? void 0 : _a2.detailTemplateId;
+    const toneId = (_b2 = this.map) == null ? void 0 : _b2.toneId;
     const unset = !templateId && !toneId;
     const matched = unset ? void 0 : matchPreset(templateId, toneId);
     const current = { description: t("ui.detail_template_current") };
@@ -35504,14 +35531,14 @@ ${request.requirements}` : preset.text,
     ]).open();
   }
   chooseMapTone() {
-    var _a;
+    var _a2;
     const apply = (id) => this.enqueue(
       () => this.mapChange((map) => {
         if (id) map.toneId = id;
         else delete map.toneId;
       }, false)
     );
-    const current = (_a = this.map) == null ? void 0 : _a.toneId;
+    const current = (_a2 = this.map) == null ? void 0 : _a2.toneId;
     const mark = (id) => id === current ? { description: t("ui.detail_template_current") } : {};
     new ChoiceModal(this.app, t("ui.tone_map_default"), t("ui.tone_map_default_desc"), [
       { label: t("ui.tone_use_default"), ...mark(void 0), action: () => apply(void 0) },
@@ -35519,14 +35546,14 @@ ${request.requirements}` : preset.text,
     ]).open();
   }
   chooseMapTemplate() {
-    var _a;
+    var _a2;
     const apply = (id) => this.enqueue(
       () => this.mapChange((map) => {
         if (id) map.detailTemplateId = id;
         else delete map.detailTemplateId;
       }, false)
     );
-    const current = (_a = this.map) == null ? void 0 : _a.detailTemplateId;
+    const current = (_a2 = this.map) == null ? void 0 : _a2.detailTemplateId;
     const mark = (id) => id === current ? { description: t("ui.detail_template_current") } : {};
     new ChoiceModal(this.app, t("ui.detail_template_map_default"), t("ui.detail_template_map_default_desc"), [
       { label: t("ui.detail_template_use_workspace"), ...mark(void 0), action: () => apply(void 0) },
@@ -35535,9 +35562,9 @@ ${request.requirements}` : preset.text,
   }
   aimActiveForPath(path) {
     return this.app.workspace.getLeavesOfType(VIEW_TYPE).some((leaf) => {
-      var _a;
+      var _a2;
       const view = leaf.view;
-      if (!(view instanceof _VisualAgentMapView) || view.path !== path || !((_a = view.map) == null ? void 0 : _a.aim)) return false;
+      if (!(view instanceof _VisualAgentMapView) || view.path !== path || !((_a2 = view.map) == null ? void 0 : _a2.aim)) return false;
       return view.aimBusy || view.map.aim.runs.some((run) => {
         const attempt = run.attempts.find((item) => item.id === run.currentAttemptId);
         return (attempt == null ? void 0 : attempt.status) === "running" || (attempt == null ? void 0 : attempt.status) === "saving";
@@ -35655,13 +35682,13 @@ ${request.requirements}` : preset.text,
     this.render();
   }
   async restoreDeletedMapFromUi() {
-    var _a;
+    var _a2;
     if (this.viewportTimer !== null) {
       window.clearTimeout(this.viewportTimer);
       this.viewportTimer = null;
       await this.persistViewport();
     }
-    if (this.history.undoEntry === ((_a = this.deletedMap) == null ? void 0 : _a.deleteAction)) await this.travel(false);
+    if (this.history.undoEntry === ((_a2 = this.deletedMap) == null ? void 0 : _a2.deleteAction)) await this.travel(false);
     else {
       await this.restoreDeletedMap();
       this.history.clear();
@@ -35700,8 +35727,8 @@ ${request.requirements}` : preset.text,
         label: t("ui.move_to_another_topic"),
         run: (file) => this.enqueue(async () => {
           const topics = (await this.plugin.repo.topics()).filter((topic) => {
-            var _a;
-            return topic.id !== ((_a = this.map) == null ? void 0 : _a.id);
+            var _a2;
+            return topic.id !== ((_a2 = this.map) == null ? void 0 : _a2.id);
           });
           new TopicPickerModal(
             this.app,
@@ -35715,8 +35742,8 @@ ${request.requirements}` : preset.text,
         label: t("ui.move_and_add_to_another_topic"),
         run: (file) => this.enqueue(async () => {
           const topics = (await this.plugin.repo.topics()).filter((topic) => {
-            var _a;
-            return topic.id !== ((_a = this.map) == null ? void 0 : _a.id);
+            var _a2;
+            return topic.id !== ((_a2 = this.map) == null ? void 0 : _a2.id);
           });
           new TopicPickerModal(
             this.app,
@@ -35734,16 +35761,16 @@ ${request.requirements}` : preset.text,
     ]).open();
   }
   render() {
-    var _a, _b, _c, _d, _e, _f, _g, _h, _i, _j, _k, _l, _m, _n, _o, _p, _q, _r, _s, _t, _u, _v, _w, _x;
+    var _a2, _b2, _c, _d, _e, _f, _g, _h, _i, _j, _k, _l, _m, _n, _o, _p, _q, _r, _s, _t, _u, _v, _w, _x;
     this.aimProgressEls.clear();
-    (_a = this.dragCleanup) == null ? void 0 : _a.call(this);
+    (_a2 = this.dragCleanup) == null ? void 0 : _a2.call(this);
     if (this.closed) return;
     this.plugin.syncOutline(this.builtIn ? null : this.map, this.notes, this.builtIn, this);
     if (this.hoverTimer !== null) {
       window.clearTimeout(this.hoverTimer);
       this.hoverTimer = null;
     }
-    (_b = this.hoverCard) == null ? void 0 : _b.remove();
+    (_b2 = this.hoverCard) == null ? void 0 : _b2.remove();
     this.hoverCard = null;
     const title = this.getDisplayText();
     if (title !== this.headerTitle) {
@@ -35841,8 +35868,8 @@ ${request.requirements}` : preset.text,
       }
       if (this.aimBusy) {
         this.button(statusbar, t("ui.stop_research"), () => {
-          var _a2;
-          (_a2 = this.aimController) == null ? void 0 : _a2.abort();
+          var _a3;
+          (_a3 = this.aimController) == null ? void 0 : _a3.abort();
         });
         const from = { nodeId: this.aimActiveQuestionNodeId, branchId: (_s = (_r = this.aimProgress) == null ? void 0 : _r.branchId) != null ? _s : null };
         const steer = this.button(
@@ -35927,8 +35954,8 @@ ${request.requirements}` : preset.text,
       state.setAttr("aria-live", "polite");
       state.createSpan({ text: t("ui.integration_running") });
       this.button(state, t("ui.stop_research"), () => {
-        var _a2;
-        return (_a2 = this.startingTasks.get(this.selectionTaskKey())) == null ? void 0 : _a2.abort();
+        var _a3;
+        return (_a3 = this.startingTasks.get(this.selectionTaskKey())) == null ? void 0 : _a3.abort();
       });
     }
     if (this.integrationTask && this.integrationTask.mapPath === this.path && !(startingSelection && this.integrationTask.state !== "running")) {
@@ -36170,9 +36197,9 @@ ${request.requirements}` : preset.text,
   }
   /** `shownNode` may be a display copy (sorted by relevance): it only supplies where the card is drawn. */
   renderNode(shownNode) {
-    var _a, _b, _c, _d, _e, _f, _g, _h, _i, _j, _k, _l, _m, _n, _o, _p, _q, _r, _s, _t, _u, _v, _w, _x, _y, _z, _A, _B, _C, _D, _E, _F, _G, _H, _I, _J, _K, _L, _M, _N, _O, _P, _Q, _R, _S;
+    var _a2, _b2, _c, _d, _e, _f, _g, _h, _i, _j, _k, _l, _m, _n, _o, _p, _q, _r, _s, _t, _u, _v, _w, _x, _y, _z, _A, _B, _C, _D, _E, _F, _G, _H, _I, _J, _K, _L, _M, _N, _O, _P, _Q, _R, _S;
     if (!this.stageEl) return;
-    const node = (_b = (_a = this.map) == null ? void 0 : _a.nodes.find((item) => item.id === shownNode.id)) != null ? _b : shownNode;
+    const node = (_b2 = (_a2 = this.map) == null ? void 0 : _a2.nodes.find((item) => item.id === shownNode.id)) != null ? _b2 : shownNode;
     const note = this.notes.get(node.id), card = this.stageEl.createDiv({
       cls: `vam-node${node.id === this.selected || this.multiSelected.has(node.id) ? " is-selected" : ""}`
     });
@@ -36320,15 +36347,15 @@ ${request.requirements}` : preset.text,
         header,
         t("ui.stop_research"),
         () => {
-          var _a2, _b2;
-          return (_b2 = (_a2 = this.startingTasks.get(node.path)) != null ? _a2 : this.plugin.activeTasks.get(node.path)) == null ? void 0 : _b2.abort();
+          var _a3, _b3;
+          return (_b3 = (_a3 = this.startingTasks.get(node.path)) != null ? _a3 : this.plugin.activeTasks.get(node.path)) == null ? void 0 : _b3.abort();
         }
       );
     }
     if ((research == null ? void 0 : research.slow) && research.resend)
       this.button(header, t("ui.research_resend"), () => {
-        var _a2, _b2;
-        return (_b2 = (_a2 = this.plugin.researchProgress.get(node.path)) == null ? void 0 : _a2.resend) == null ? void 0 : _b2.call(_a2);
+        var _a3, _b3;
+        return (_b3 = (_a3 = this.plugin.researchProgress.get(node.path)) == null ? void 0 : _a3.resend) == null ? void 0 : _b3.call(_a3);
       });
     if ((research == null ? void 0 : research.stage) === "charts")
       this.button(header, t("ui.stop_adding_charts"), () => this.plugin.abortChartJobs(node.path));
@@ -36464,9 +36491,9 @@ ${request.requirements}` : preset.text,
     title.setAttr("dir", "auto");
     if (note && !this.builtIn && !this.integrationMode && !((_I = this.map) == null ? void 0 : _I.aim))
       card.addEventListener("dblclick", (event) => {
-        var _a2;
+        var _a3;
         const target = event.target;
-        if ((_a2 = target == null ? void 0 : target.closest) == null ? void 0 : _a2.call(target, "button")) return;
+        if ((_a3 = target == null ? void 0 : target.closest) == null ? void 0 : _a3.call(target, "button")) return;
         const box = title.getBoundingClientRect();
         const inside = event.clientX >= box.left && event.clientX <= box.right && event.clientY >= box.top && event.clientY <= box.bottom;
         if (target !== title && !inside) return;
@@ -36611,7 +36638,7 @@ ${request.requirements}` : preset.text,
       }
     });
     card.addEventListener("keydown", (event) => {
-      var _a2, _b2, _c2, _d2;
+      var _a3, _b3, _c2, _d2;
       if (event.target !== card) return;
       const target = this.keyboardNeighbor(node, event.key);
       if (target) {
@@ -36619,7 +36646,7 @@ ${request.requirements}` : preset.text,
         this.moveKeyboardFocus(target);
         return;
       }
-      const editable = !this.builtIn && !this.integrationMode && !((_a2 = this.map) == null ? void 0 : _a2.aim);
+      const editable = !this.builtIn && !this.integrationMode && !((_a3 = this.map) == null ? void 0 : _a3.aim);
       const plain = !event.ctrlKey && !event.metaKey && !event.altKey;
       if (editable && !event.isComposing) {
         if (plain && !event.shiftKey && (event.key === "Delete" || event.key === "Backspace")) {
@@ -36636,7 +36663,7 @@ ${request.requirements}` : preset.text,
         if (event.key === "Enter" && event.shiftKey && plain) {
           if (event.defaultPrevented) return;
           event.preventDefault();
-          const parent = (_c2 = (_b2 = this.map) == null ? void 0 : _b2.nodes.find((item) => item.id === node.parentId)) != null ? _c2 : null;
+          const parent = (_c2 = (_b3 = this.map) == null ? void 0 : _b3.nodes.find((item) => item.id === node.parentId)) != null ? _c2 : null;
           this.enqueue(() => this.addNode(parent));
           return;
         }
@@ -36691,15 +36718,15 @@ ${request.requirements}` : preset.text,
     const shown = visibleNodes(this.map.nodes);
     const nodes = superseded.size ? shown.filter((node) => !superseded.has(node.id)) : shown;
     return this.relevanceSortOn() ? relevanceDisplayNodes(nodes, (id) => {
-      var _a, _b;
-      return (_b = (_a = this.notes.get(id)) == null ? void 0 : _a.relevance) == null ? void 0 : _b.tier;
+      var _a2, _b2;
+      return (_b2 = (_a2 = this.notes.get(id)) == null ? void 0 : _a2.relevance) == null ? void 0 : _b2.tier;
     }, superseded) : nodes;
   }
   /** Arrow keys walk the tree: left to the parent, right to the first child, up/down among siblings. */
   keyboardNeighbor(node, key2) {
-    var _a, _b;
+    var _a2, _b2;
     const target = this.displayedNeighbor(node, key2);
-    return target && ((_b = (_a = this.map) == null ? void 0 : _a.nodes.find((item) => item.id === target.id)) != null ? _b : target);
+    return target && ((_b2 = (_a2 = this.map) == null ? void 0 : _a2.nodes.find((item) => item.id === target.id)) != null ? _b2 : target);
   }
   displayedNeighbor(node, key2) {
     if (!this.map || !["ArrowLeft", "ArrowRight", "ArrowUp", "ArrowDown"].includes(key2)) return void 0;
@@ -36708,15 +36735,15 @@ ${request.requirements}` : preset.text,
     if (key2 === "ArrowLeft") return shown.find((item) => item.id === node.parentId);
     if (key2 === "ArrowRight") return shown.filter((item) => item.parentId === node.id).sort(byY)[0];
     const siblings = shown.filter((item) => {
-      var _a, _b;
-      return ((_a = item.parentId) != null ? _a : null) === ((_b = node.parentId) != null ? _b : null);
+      var _a2, _b2;
+      return ((_a2 = item.parentId) != null ? _a2 : null) === ((_b2 = node.parentId) != null ? _b2 : null);
     }).sort(byY);
     const index = siblings.findIndex((item) => item.id === node.id);
     return siblings[index + (key2 === "ArrowUp" ? -1 : 1)];
   }
   moveKeyboardFocus(target) {
-    var _a, _b, _c, _d, _e;
-    const card = (_b = this.cardEls.get(target.id)) != null ? _b : (_a = this.stageEl) == null ? void 0 : _a.querySelector(`[data-node-id="${CSS.escape(target.id)}"]`);
+    var _a2, _b2, _c, _d, _e;
+    const card = (_b2 = this.cardEls.get(target.id)) != null ? _b2 : (_a2 = this.stageEl) == null ? void 0 : _a2.querySelector(`[data-node-id="${CSS.escape(target.id)}"]`);
     const view = (_c = this.viewportEl) == null ? void 0 : _c.getBoundingClientRect(), rect = card == null ? void 0 : card.getBoundingClientRect();
     if (view && rect && (rect.left < view.left || rect.right > view.right || rect.top < view.top || rect.bottom > view.bottom))
       this.focusNode(target, false);
@@ -36742,18 +36769,18 @@ ${request.requirements}` : preset.text,
   }
   /** The tab stop when nothing moved it: the selected card, else the first root, else the first card. */
   defaultTabStop(shown) {
-    var _a, _b, _c, _d, _e;
-    return (_e = (_d = (_b = this.selected && shown.some((node) => node.id === this.selected) ? this.selected : null) != null ? _b : (_a = shown.find((node) => !node.parentId)) == null ? void 0 : _a.id) != null ? _d : (_c = shown[0]) == null ? void 0 : _c.id) != null ? _e : null;
+    var _a2, _b2, _c, _d, _e;
+    return (_e = (_d = (_b2 = this.selected && shown.some((node) => node.id === this.selected) ? this.selected : null) != null ? _b2 : (_a2 = shown.find((node) => !node.parentId)) == null ? void 0 : _a2.id) != null ? _d : (_c = shown[0]) == null ? void 0 : _c.id) != null ? _e : null;
   }
   /** Nesting level of a topic, 1 for a root; guards against a corrupt parent cycle. */
   nodeDepth(node) {
-    var _a, _b, _c;
+    var _a2, _b2, _c;
     let depth = 1;
     const seen = /* @__PURE__ */ new Set([node.id]);
     for (let parent = node.parentId; parent; depth++) {
       if (seen.has(parent)) break;
       seen.add(parent);
-      parent = (_c = (_b = (_a = this.map) == null ? void 0 : _a.nodes.find((item) => item.id === parent)) == null ? void 0 : _b.parentId) != null ? _c : null;
+      parent = (_c = (_b2 = (_a2 = this.map) == null ? void 0 : _a2.nodes.find((item) => item.id === parent)) == null ? void 0 : _b2.parentId) != null ? _c : null;
     }
     return depth;
   }
@@ -36775,11 +36802,11 @@ ${request.requirements}` : preset.text,
    * cards and the two tab stops are repainted, and the selection bar is refreshed in selection mode.
    */
   applySelectionState(prevId, nextId, touched = []) {
-    var _a;
+    var _a2;
     const previousStop = this.tabStopId;
     this.tabStopId = this.defaultTabStop(this.map ? this.canvasNodes() : []);
     this.paintCards([prevId, nextId, previousStop, this.tabStopId, ...touched]);
-    if (this.integrationMode && ((_a = this.selectionBarEl) == null ? void 0 : _a.isConnected)) {
+    if (this.integrationMode && ((_a2 = this.selectionBarEl) == null ? void 0 : _a2.isConnected)) {
       const workspace = this.selectionBarEl.parentElement;
       if (workspace) {
         const bar = this.renderSelectionBar(workspace);
@@ -36791,14 +36818,14 @@ ${request.requirements}` : preset.text,
   }
   /** The outline highlights the selected topic; with no selection it falls back to the opened note. */
   syncOutlineActive(nextId) {
-    var _a, _b, _c, _d, _e, _f, _g;
-    const selected = nextId ? (_b = (_a = this.map) == null ? void 0 : _a.nodes.find((node) => node.id === nextId)) == null ? void 0 : _b.path : void 0;
+    var _a2, _b2, _c, _d, _e, _f, _g;
+    const selected = nextId ? (_b2 = (_a2 = this.map) == null ? void 0 : _a2.nodes.find((node) => node.id === nextId)) == null ? void 0 : _b2.path : void 0;
     this.plugin.setOutlineActive((_g = selected != null ? selected : (_f = (_e = (_d = (_c = this.app) == null ? void 0 : _c.workspace) == null ? void 0 : _d.getActiveFile) == null ? void 0 : _e.call(_d)) == null ? void 0 : _f.path) != null ? _g : "");
   }
   /** Selection changed: repaint in place, or render fully where selection also drives other chrome (AIM, sample). */
   commitSelection(prevId, nextId, touched = []) {
-    var _a;
-    if (((_a = this.map) == null ? void 0 : _a.aim) || this.builtIn || !this.cardEls.size) {
+    var _a2;
+    if (((_a2 = this.map) == null ? void 0 : _a2.aim) || this.builtIn || !this.cardEls.size) {
       this.render();
       this.syncOutlineActive(nextId);
       return;
@@ -36811,8 +36838,8 @@ ${request.requirements}` : preset.text,
   }
   /** A topic waiting in a batch (multi-topic or shallow research) for a free slot; it is not running yet. */
   isResearchQueued(node) {
-    var _a, _b;
-    return !((_a = this.plugin.running) == null ? void 0 : _a.has(node.path)) && !!((_b = this.plugin.expansionCoordinator) == null ? void 0 : _b.isQueued(node.path));
+    var _a2, _b2;
+    return !((_a2 = this.plugin.running) == null ? void 0 : _a2.has(node.path)) && !!((_b2 = this.plugin.expansionCoordinator) == null ? void 0 : _b2.isQueued(node.path));
   }
   /** Names a card for assistive tech without Obsidian showing `aria-label` as a hover tooltip beside the preview. */
   labelCard(card, text11) {
@@ -36830,12 +36857,12 @@ ${request.requirements}` : preset.text,
    * Multi-select keeps its selection; the outline only moves the camera there. False when the map lacks the topic.
    */
   hasPath(path) {
-    var _a;
-    return !!((_a = this.map) == null ? void 0 : _a.nodes.some((item) => item.path === path));
+    var _a2;
+    return !!((_a2 = this.map) == null ? void 0 : _a2.nodes.some((item) => item.path === path));
   }
   async revealPath(path) {
-    var _a, _b;
-    const node = (_a = this.map) == null ? void 0 : _a.nodes.find((item) => item.path === path);
+    var _a2, _b2;
+    const node = (_a2 = this.map) == null ? void 0 : _a2.nodes.find((item) => item.path === path);
     if (!this.map || !node) return false;
     const collapsed = [];
     for (let parent = node.parentId; parent; ) {
@@ -36853,7 +36880,7 @@ ${request.requirements}` : preset.text,
         })
       );
     }
-    const current = (_b = this.map) == null ? void 0 : _b.nodes.find((item) => item.id === node.id);
+    const current = (_b2 = this.map) == null ? void 0 : _b2.nodes.find((item) => item.id === node.id);
     if (!current) return false;
     if (!this.integrationMode) {
       const previous = this.selected, touched = [...this.multiSelected];
@@ -36866,8 +36893,8 @@ ${request.requirements}` : preset.text,
     return true;
   }
   selectSampleNode(id) {
-    var _a;
-    const node = (_a = this.map) == null ? void 0 : _a.nodes.find((item) => item.id === id);
+    var _a2;
+    const node = (_a2 = this.map) == null ? void 0 : _a2.nodes.find((item) => item.id === id);
     if (!node) return;
     this.selected = id;
     this.render();
@@ -36883,17 +36910,17 @@ ${request.requirements}` : preset.text,
   hideHoverCardSoon() {
     this.clearHoverTimer();
     this.hoverTimer = window.setTimeout(() => {
-      var _a;
-      (_a = this.hoverCard) == null ? void 0 : _a.remove();
+      var _a2;
+      (_a2 = this.hoverCard) == null ? void 0 : _a2.remove();
       this.hoverCard = null;
       this.hoverTimer = null;
     }, 220);
   }
   showHoverCard(card, note) {
-    var _a, _b, _c, _d, _e;
+    var _a2, _b2, _c, _d, _e;
     const workspace = this.contentEl.querySelector(".vam-workspace");
     if (!workspace) return;
-    (_a = this.hoverCard) == null ? void 0 : _a.remove();
+    (_a2 = this.hoverCard) == null ? void 0 : _a2.remove();
     const preview = workspace.createDiv("vam-hover-card");
     this.hoverCard = preview;
     const size = previewMetrics(this.plugin.settings.previewScale);
@@ -36908,7 +36935,7 @@ ${request.requirements}` : preset.text,
     preview.addEventListener("mouseenter", () => this.clearHoverTimer());
     preview.addEventListener("mouseleave", () => this.hideHoverCardSoon());
     preview.createEl("strong", { text: note.title });
-    const path = (_d = (_c = (_b = this.map) == null ? void 0 : _b.nodes.find((node) => node.id === card.dataset.nodeId)) == null ? void 0 : _c.path) != null ? _d : "";
+    const path = (_d = (_c = (_b2 = this.map) == null ? void 0 : _b2.nodes.find((node) => node.id === card.dataset.nodeId)) == null ? void 0 : _c.path) != null ? _d : "";
     this.hoverResearch = null;
     if ((_e = this.plugin.researchProgress) == null ? void 0 : _e.get(path)) {
       const research = preview.createDiv("vam-hover-research-preview");
@@ -36935,8 +36962,8 @@ ${request.requirements}` : preset.text,
     preview.style.top = `${Math.max(12, Math.min(rect.top - host.top, maxTop))}px`;
   }
   refreshCard(node) {
-    var _a, _b, _c;
-    const card = (_a = this.stageEl) == null ? void 0 : _a.querySelector(`[data-node-id="${CSS.escape(node.id)}"]`), note = this.notes.get(node.id);
+    var _a2, _b2, _c;
+    const card = (_a2 = this.stageEl) == null ? void 0 : _a2.querySelector(`[data-node-id="${CSS.escape(node.id)}"]`), note = this.notes.get(node.id);
     if (!card || !note) return;
     const title = card.querySelector(".vam-card-title");
     title == null ? void 0 : title.setAttr("title", note.title);
@@ -36964,7 +36991,7 @@ ${request.requirements}` : preset.text,
           cls: `vam-status vam-status-${note.status}`,
           text: topicStatusLabel(note.status, this.plugin.settings.language)
         });
-    } else if (!this.isMerging(node.id) && !((_b = this.plugin.running) == null ? void 0 : _b.has(node.path)) && !((_c = this.plugin.quickExpandPending) == null ? void 0 : _c.has(node.path)) && !this.isResearchQueued(node)) {
+    } else if (!this.isMerging(node.id) && !((_b2 = this.plugin.running) == null ? void 0 : _b2.has(node.path)) && !((_c = this.plugin.quickExpandPending) == null ? void 0 : _c.has(node.path)) && !this.isResearchQueued(node)) {
       const label = note.status === "completed" ? t("ui.researched") : topicStatusLabel(note.status, this.plugin.settings.language);
       card.dataset.status = note.status;
       this.labelCard(card, t("ui.topic_card_label_0_1", note.title, label));
@@ -36976,7 +37003,7 @@ ${request.requirements}` : preset.text,
     }
     this.drawEdges();
   }
-  taskSourceSettings(currentLabel, currentTopicId = ((_b) => (_b = ((_a) => (_a = this.map) == null ? void 0 : _a.id)()) != null ? _b : "")(), synthesisLabel) {
+  taskSourceSettings(currentLabel, currentTopicId = ((_b2) => (_b2 = ((_a2) => (_a2 = this.map) == null ? void 0 : _a2.id)()) != null ? _b2 : "")(), synthesisLabel) {
     return {
       currentTopicId,
       currentLabel,
@@ -37032,10 +37059,10 @@ ${request.requirements}` : preset.text,
         if (!this.closed) this.render();
       },
       outlineReady: (outline) => {
-        var _a, _b;
+        var _a2, _b2;
         if (!node || this.closed || this.path !== mapPath) return;
         this.quickOutlines.set(node.path, { mapPath, ...outline });
-        const title = (_b = (_a = this.notes.get(node.id)) == null ? void 0 : _a.title) != null ? _b : node.path;
+        const title = (_b2 = (_a2 = this.notes.get(node.id)) == null ? void 0 : _a2.title) != null ? _b2 : node.path;
         const count = outlineProposals(outline.nodes).length;
         backgroundResultNotice(t("ui.background_outline_ready_0", title), {
           label: t("ui.review_outline_0", count),
@@ -37044,9 +37071,9 @@ ${request.requirements}` : preset.text,
         this.render();
       },
       completed: (kind) => {
-        var _a, _b, _c, _d;
+        var _a2, _b2, _c, _d;
         if (!node || this.closed || this.path !== mapPath) return;
-        const title = (_b = (_a = this.notes.get(node.id)) == null ? void 0 : _a.title) != null ? _b : node.path;
+        const title = (_b2 = (_a2 = this.notes.get(node.id)) == null ? void 0 : _a2.title) != null ? _b2 : node.path;
         if (kind === "research")
           backgroundResultNotice(t("ui.background_research_done_0", title), {
             label: t("ui.background_view"),
@@ -37067,14 +37094,14 @@ ${request.requirements}` : preset.text,
   }
   openNextStep(node) {
     this.enqueue(async () => {
-      var _a, _b, _c, _d, _e, _f, _g, _h, _i, _j, _k;
-      const note = await this.plugin.repo.readNote(node.path, (_a = this.map) != null ? _a : void 0);
+      var _a2, _b2, _c, _d, _e, _f, _g, _h, _i, _j, _k;
+      const note = await this.plugin.repo.readNote(node.path, (_a2 = this.map) != null ? _a2 : void 0);
       const currentLabel = t("ui.reference_current_topic_included", note.title);
       const synthesisLabel = t("ui.reference_synthesis_topics_included", note.title);
-      const sources2 = this.taskSourceSettings(currentLabel, (_b = this.map) == null ? void 0 : _b.id, synthesisLabel);
+      const sources2 = this.taskSourceSettings(currentLabel, (_b2 = this.map) == null ? void 0 : _b2.id, synthesisLabel);
       sources2.synthesisTopics = (_d = (_c = this.map) == null ? void 0 : _c.nodes.filter((item) => item.parentId === node.id).map((item) => {
-        var _a2, _b2;
-        return (_b2 = (_a2 = this.notes.get(item.id)) == null ? void 0 : _a2.title) != null ? _b2 : item.path;
+        var _a3, _b3;
+        return (_b3 = (_a3 = this.notes.get(item.id)) == null ? void 0 : _a3.title) != null ? _b3 : item.path;
       })) != null ? _d : [];
       new NextStepModal(
         this.app,
@@ -37084,8 +37111,8 @@ ${request.requirements}` : preset.text,
         (_h = (_g = this.plugin.pendingSuggestions.get(node.path)) == null ? void 0 : _g.length) != null ? _h : 0,
         this.plugin,
         async (options, focus, done, failed, accepted) => {
-          var _a2;
-          const latest = await this.plugin.repo.readNote(node.path, (_a2 = this.map) != null ? _a2 : void 0);
+          var _a3;
+          const latest = await this.plugin.repo.readNote(node.path, (_a3 = this.map) != null ? _a3 : void 0);
           const task = researchTopicTask(this.plugin.settings.language, latest.title);
           const detailTemplate = await this.detailTemplateFor(node, options.detailTemplateId, options.toneId);
           await this.runAgent(
@@ -37118,8 +37145,8 @@ ${request.requirements}` : preset.text,
           save: (patch) => this.plugin.mutate(() => this.noteChange(node, patch)),
           running: this.plugin.running.has(node.path) || this.plugin.quickExpandPending.has(node.path) || this.startingTasks.has(node.path),
           stop: this.startingTasks.has(node.path) || this.plugin.activeTasks.has(node.path) ? () => {
-            var _a2, _b2;
-            return (_b2 = (_a2 = this.startingTasks.get(node.path)) != null ? _a2 : this.plugin.activeTasks.get(node.path)) == null ? void 0 : _b2.abort();
+            var _a3, _b3;
+            return (_b3 = (_a3 = this.startingTasks.get(node.path)) != null ? _a3 : this.plugin.activeTasks.get(node.path)) == null ? void 0 : _b3.abort();
           } : void 0,
           background: this.backgroundHooks(node.path, node),
           quickOutline: this.quickOutline(node),
@@ -37147,8 +37174,8 @@ ${request.requirements}` : preset.text,
           currentTemplate: templateInLanguage(this.resolveTopicTemplate(note).template, this.plugin.settings.language).name,
           topicStatus: note.status,
           childrenCompleted: (_k = (_j = this.map) == null ? void 0 : _j.nodes.filter((item) => {
-            var _a2;
-            return item.parentId === node.id && ((_a2 = this.notes.get(item.id)) == null ? void 0 : _a2.status) === "completed";
+            var _a3;
+            return item.parentId === node.id && ((_a3 = this.notes.get(item.id)) == null ? void 0 : _a3.status) === "completed";
           }).length) != null ? _k : 0,
           synthesisPending: (() => {
             const pending = this.synthesisTasks.get(node.path);
@@ -37168,7 +37195,7 @@ ${request.requirements}` : preset.text,
     }(this.app).open();
   }
   renderInspector(parent, node, mode = "structure", close, host) {
-    var _a, _b, _c, _d, _e, _f, _g;
+    var _a2, _b2, _c, _d, _e, _f, _g;
     if (this.builtIn) parent.addClass("has-inspector");
     const panel = parent.createDiv(this.builtIn ? "vam-inspector" : "vam-topic-panel"), note = this.notes.get(node.id);
     const heading = panel.createDiv("vam-inspector-heading");
@@ -37191,9 +37218,9 @@ ${request.requirements}` : preset.text,
           const sources2 = panel.createDiv("vam-reference-sources");
           sources2.createEl("strong", { text: t("ui.source_topics") });
           for (const path of note.sourcePaths) {
-            const source = (_a = this.map) == null ? void 0 : _a.nodes.find((item) => item.path === path);
+            const source = (_a2 = this.map) == null ? void 0 : _a2.nodes.find((item) => item.path === path);
             if (source)
-              this.button(sources2, (_c = (_b = this.notes.get(source.id)) == null ? void 0 : _b.title) != null ? _c : path, () => this.selectSampleNode(source.id));
+              this.button(sources2, (_c = (_b2 = this.notes.get(source.id)) == null ? void 0 : _b2.title) != null ? _c : path, () => this.selectSampleNode(source.id));
           }
         }
         return;
@@ -37245,8 +37272,8 @@ ${request.requirements}` : preset.text,
     const parentTree = renderTopicTree(relationship, {
       nodes: this.map.nodes,
       title: (candidate) => {
-        var _a2, _b2;
-        return (_b2 = (_a2 = this.notes.get(candidate.id)) == null ? void 0 : _a2.title) != null ? _b2 : candidate.path;
+        var _a3, _b3;
+        return (_b3 = (_a3 = this.notes.get(candidate.id)) == null ? void 0 : _a3.title) != null ? _b3 : candidate.path;
       },
       label: t("ui.parent_topic_link"),
       selectable: (candidate) => canParent(this.map.nodes, node.id, candidate.id),
@@ -37275,12 +37302,12 @@ ${request.requirements}` : preset.text,
     actions.createEl("button", { text: t("ui.close") }).addEventListener("click", () => close == null ? void 0 : close());
     const apply = actions.createEl("button", { text: t("ui.apply_parent"), cls: "mod-cta" });
     describe = () => {
-      var _a2, _b2, _c2;
+      var _a3, _b3, _c2;
       const parentId = chosenParent || null;
-      const changed = parentId !== ((_a2 = node.parentId) != null ? _a2 : null);
+      const changed = parentId !== ((_a3 = node.parentId) != null ? _a3 : null);
       apply.disabled = !changed;
       status.setText(
-        !changed ? "" : parentId ? t("ui.will_move_under_0", (_c2 = (_b2 = this.notes.get(parentId)) == null ? void 0 : _b2.title) != null ? _c2 : "") : t("ui.will_become_root_topic")
+        !changed ? "" : parentId ? t("ui.will_move_under_0", (_c2 = (_b3 = this.notes.get(parentId)) == null ? void 0 : _b3.title) != null ? _c2 : "") : t("ui.will_become_root_topic")
       );
     };
     describe();
@@ -37304,7 +37331,7 @@ ${request.requirements}` : preset.text,
     });
   }
   renderPendingProposals(panel, node, note, close, host) {
-    var _a;
+    var _a2;
     const suggestions = this.plugin.pendingSuggestions.get(node.path);
     if (!(suggestions == null ? void 0 : suggestions.length)) return;
     const section3 = panel.createDiv("vam-inspector-proposals");
@@ -37314,7 +37341,7 @@ ${request.requirements}` : preset.text,
     const list = renderProposalList(section3, suggestions, (count) => showCount(count), { rootTitle: note.title });
     const researchLabel = section3.createEl("label", { cls: "vam-field vam-next-toggle" });
     const shallow = researchLabel.createEl("input", { type: "checkbox" });
-    shallow.checked = !!((_a = this.plugin.pendingResearchOptions.get(node.path)) == null ? void 0 : _a.shallowResearch);
+    shallow.checked = !!((_a2 = this.plugin.pendingResearchOptions.get(node.path)) == null ? void 0 : _a2.shallowResearch);
     researchLabel.createSpan({ text: t("ui.run_shallow_research_on_each_created_subtopic") });
     const actions = (host != null ? host : section3).createDiv("vam-next-actions");
     const discard = actions.createEl("button", { text: t("ui.discard_these_suggestions"), cls: "vam-discard" });
@@ -37331,7 +37358,7 @@ ${request.requirements}` : preset.text,
     };
     create.addEventListener("click", () => {
       void (async () => {
-        var _a2;
+        var _a3;
         if (this.plugin.expansionCoordinator.isRunning(node.path)) {
           status.setText(t("ui.ai_running_ai"));
           return;
@@ -37346,7 +37373,7 @@ ${request.requirements}` : preset.text,
         try {
           let createdNodes = [];
           const researchOptions = shallow.checked ? {
-            ...(_a2 = this.plugin.pendingResearchOptions.get(node.path)) != null ? _a2 : {
+            ...(_a3 = this.plugin.pendingResearchOptions.get(node.path)) != null ? _a3 : {
               researchMode: "research",
               researchDepth: "fast",
               referenceGroups: [],
@@ -37355,8 +37382,8 @@ ${request.requirements}` : preset.text,
             shallowResearch: true
           } : void 0;
           await this.plugin.mutate(async () => {
-            var _a3, _b, _c;
-            const current = (_a3 = this.map) == null ? void 0 : _a3.nodes.find((item) => item.id === node.id && item.path === node.path);
+            var _a4, _b2, _c;
+            const current = (_a4 = this.map) == null ? void 0 : _a4.nodes.find((item) => item.id === node.id && item.path === node.path);
             if (!current) throw new Error(t("ui.the_topic_changed_select_it_again"));
             if (this.plugin.pendingSuggestions.get(node.path) !== suggestions)
               throw new Error(t("ui.expansion_suggestions_changed_open_them_again"));
@@ -37369,7 +37396,7 @@ ${request.requirements}` : preset.text,
             }
             this.plugin.pendingSuggestions.delete(node.path);
             this.plugin.pendingResearchOptions.delete(node.path);
-            await ((_c = (_b = this.plugin.pendingSuggestions).flush) == null ? void 0 : _c.call(_b));
+            await ((_c = (_b2 = this.plugin.pendingSuggestions).flush) == null ? void 0 : _c.call(_b2));
           });
           if (researchOptions && createdNodes.length)
             await this.startShallowResearch(node, createdNodes, this.shallowChildOptions(researchOptions));
@@ -37387,12 +37414,12 @@ ${request.requirements}` : preset.text,
       () => void (async () => {
         try {
           await this.plugin.mutate(async () => {
-            var _a2, _b;
+            var _a3, _b2;
             if (this.plugin.pendingSuggestions.get(node.path) !== suggestions)
               throw new Error(t("ui.expansion_suggestions_changed_open_them_again"));
             this.plugin.pendingSuggestions.delete(node.path);
             this.plugin.pendingResearchOptions.delete(node.path);
-            await ((_b = (_a2 = this.plugin.pendingSuggestions).flush) == null ? void 0 : _b.call(_a2));
+            await ((_b2 = (_a3 = this.plugin.pendingSuggestions).flush) == null ? void 0 : _b2.call(_a3));
           });
           close == null ? void 0 : close();
           this.render();
@@ -37455,10 +37482,10 @@ ${request.requirements}` : preset.text,
     const ids = new Set(typeof nodeIds === "string" ? [nodeIds] : nodeIds);
     let moves = [];
     entry.undo = async () => {
-      var _a, _b;
+      var _a2, _b2;
       const repo = this.plugin.repo, folder = repo.topicFolder(this.path, "Unassigned"), taken = /* @__PURE__ */ new Set();
       moves = [];
-      for (const current of (_b = (_a = this.map) == null ? void 0 : _a.nodes.filter((item) => ids.has(item.id))) != null ? _b : []) {
+      for (const current of (_b2 = (_a2 = this.map) == null ? void 0 : _a2.nodes.filter((item) => ids.has(item.id))) != null ? _b2 : []) {
         const base = current.path.slice(current.path.lastIndexOf("/") + 1).replace(/\.md$/, "");
         const parkedPath = repo.unique(folder, base, taken);
         taken.add(parkedPath);
@@ -37479,7 +37506,7 @@ ${request.requirements}` : preset.text,
   }
   /** `focus` false leaves the camera to the caller (a batch frames the whole branch once it is laid out). */
   async addNode(parentNode, suggestedTitle, rebuildDerivedData = true, focus = true) {
-    var _a, _b, _c, _d, _e, _f;
+    var _a2, _b2, _c, _d, _e, _f;
     if (!this.map) return;
     const parent = parentNode && this.map.nodes.find((item) => item.id === parentNode.id) || parentNode;
     if (!(suggestedTitle == null ? void 0 : suggestedTitle.trim())) {
@@ -37492,7 +37519,7 @@ ${request.requirements}` : preset.text,
       return;
     }
     const model = inheritModel(
-      parent ? (await this.plugin.repo.readNote(parent.path, (_a = this.map) != null ? _a : void 0)).model : void 0,
+      parent ? (await this.plugin.repo.readNote(parent.path, (_a2 = this.map) != null ? _a2 : void 0)).model : void 0,
       this.plugin.settings.cliModel
     );
     if (!isManagedMapPath(this.plugin.settings, this.path)) {
@@ -37507,7 +37534,7 @@ ${request.requirements}` : preset.text,
       parent ? "inherited" : "workspace"
     );
     if (parent) {
-      const parentNote = await this.plugin.repo.readNote(parent.path, (_b = this.map) != null ? _b : void 0);
+      const parentNote = await this.plugin.repo.readNote(parent.path, (_b2 = this.map) != null ? _b2 : void 0);
       await this.plugin.repo.updateNote(node.path, { reasoning: parentNote.reasoning });
     }
     node.parentId = (_c = parent == null ? void 0 : parent.id) != null ? _c : null;
@@ -37526,16 +37553,16 @@ ${request.requirements}` : preset.text,
         owner.collapsed = false;
         const siblings = map.nodes.filter((n) => n.parentId === owner.id && n.id !== node.id);
         const minTop = siblings.length ? Math.max(...siblings.map((n) => {
-          var _a2;
-          return n.y + ((_a2 = this.cardHeightOf(n.id)) != null ? _a2 : DEFAULT_CARD_HEIGHT);
+          var _a3;
+          return n.y + ((_a3 = this.cardHeightOf(n.id)) != null ? _a3 : DEFAULT_CARD_HEIGHT);
         })) + LAYOUT_GAP : void 0;
         map.nodes = arrangeNewBranch(map.nodes, owner.id, /* @__PURE__ */ new Set([node.id]), this.cardHeightOf, minTop);
       } else if (!parent) {
         const roots = map.nodes.filter((n) => n.id !== node.id && !n.parentId);
         if (roots.length)
           node.y = Math.max(...roots.map((n) => {
-            var _a2;
-            return n.y + ((_a2 = this.cardHeightOf(n.id)) != null ? _a2 : DEFAULT_CARD_HEIGHT);
+            var _a3;
+            return n.y + ((_a3 = this.cardHeightOf(n.id)) != null ? _a3 : DEFAULT_CARD_HEIGHT);
           })) + LAYOUT_GAP;
       }
     }, rebuildDerivedData);
@@ -37545,7 +37572,7 @@ ${request.requirements}` : preset.text,
     this.focusNode((_f = (_e = this.map) == null ? void 0 : _e.nodes.find((n) => n.id === node.id)) != null ? _f : node);
   }
   async proposeChildren(parent, options, direction = "", found, failed, acceptedCallback) {
-    var _a, _b, _c, _d, _e, _f, _g, _h, _i, _j, _k;
+    var _a2, _b2, _c, _d, _e, _f, _g, _h, _i, _j, _k;
     if (this.plugin.expansionCoordinator.isRunning(parent.path)) {
       failed == null ? void 0 : failed(t("ui.ai_running_ai"));
       return;
@@ -37573,7 +37600,7 @@ ${request.requirements}` : preset.text,
         const savedOptions = this.plugin.pendingResearchOptions.get(parent.path);
         const researchOptions = savedOptions ? { ...savedOptions, signal: options == null ? void 0 : options.signal, onProgress: options == null ? void 0 : options.onProgress } : void 0;
         await this.plugin.mutate(async () => {
-          var _a2, _b2, _c2;
+          var _a3, _b3, _c2;
           if (!version || this.plugin.pendingSuggestions.get(parent.path) !== version)
             throw new Error(t("ui.expansion_suggestions_changed_open_them_again"));
           await this.assertSuggestionOrigin(parent, version);
@@ -37583,7 +37610,7 @@ ${request.requirements}` : preset.text,
               selected,
               researchOptions,
               void 0,
-              (_a2 = options == null ? void 0 : options.detailTemplateId) != null ? _a2 : researchOptions == null ? void 0 : researchOptions.detailTemplateId
+              (_a3 = options == null ? void 0 : options.detailTemplateId) != null ? _a3 : researchOptions == null ? void 0 : researchOptions.detailTemplateId
             );
           } catch (error) {
             if (error instanceof PartialChildBatchError) await this.clearPartialSuggestions(parent.path, error);
@@ -37591,7 +37618,7 @@ ${request.requirements}` : preset.text,
           }
           this.plugin.pendingSuggestions.delete(parent.path);
           this.plugin.pendingResearchOptions.delete(parent.path);
-          await ((_c2 = (_b2 = this.plugin.pendingSuggestions).flush) == null ? void 0 : _c2.call(_b2));
+          await ((_c2 = (_b3 = this.plugin.pendingSuggestions).flush) == null ? void 0 : _c2.call(_b3));
           this.render();
         });
         if ((researchOptions == null ? void 0 : researchOptions.shallowResearch) && createdNodes.length)
@@ -37633,9 +37660,9 @@ ${request.requirements}` : preset.text,
     this.plugin.activeTasks.set(parent.path, controller);
     this.render();
     try {
-      const note = await this.plugin.repo.readNote(parent.path, (_a = this.map) != null ? _a : void 0);
+      const note = await this.plugin.repo.readNote(parent.path, (_a2 = this.map) != null ? _a2 : void 0);
       if (controller.signal.aborted) throw new DOMException("Aborted", "AbortError");
-      const outputLanguage2 = (_b = options == null ? void 0 : options.outputLanguage) != null ? _b : this.plugin.settings.language;
+      const outputLanguage2 = (_b2 = options == null ? void 0 : options.outputLanguage) != null ? _b2 : this.plugin.settings.language;
       const existing = ((_c = this.map) == null ? void 0 : _c.nodes.filter((item) => item.parentId === parent.id).map((item) => {
         const child = this.notes.get(item.id);
         return `- ${(child == null ? void 0 : child.title) || item.path}: ${(child == null ? void 0 : child.summary) || noSummaryYet(outputLanguage2)}`;
@@ -37711,8 +37738,8 @@ ${request.requirements}` : preset.text,
     }
   }
   async assertSuggestionOrigin(parent, suggestions) {
-    var _a, _b, _c, _d;
-    const origin = (_b = (await this.plugin.repo.readNote(parent.path, (_a = this.map) != null ? _a : void 0)).thinkingOrigin) != null ? _b : "";
+    var _a2, _b2, _c, _d;
+    const origin = (_b2 = (await this.plugin.repo.readNote(parent.path, (_a2 = this.map) != null ? _a2 : void 0)).thinkingOrigin) != null ? _b2 : "";
     if (suggestions.every(
       (item) => item.thinkingOriginBaseline === originBaseline(origin) || item.thinkingOriginBaseline === void 0 && !origin
     ))
@@ -37736,7 +37763,7 @@ ${request.requirements}` : preset.text,
         if (this.plugin.expansionCoordinator.isRunning(parent.path)) throw new Error(t("ui.ai_running_ai"));
         let researchOptions, createdNodes = [];
         await this.plugin.mutate(async () => {
-          var _a, _b;
+          var _a2, _b2;
           if (!version || this.plugin.pendingSuggestions.get(parent.path) !== version)
             throw new Error(t("ui.expansion_suggestions_changed_open_them_again"));
           await this.assertSuggestionOrigin(parent, version);
@@ -37749,7 +37776,7 @@ ${request.requirements}` : preset.text,
           }
           this.plugin.pendingSuggestions.delete(parent.path);
           this.plugin.pendingResearchOptions.delete(parent.path);
-          await ((_b = (_a = this.plugin.pendingSuggestions).flush) == null ? void 0 : _b.call(_a));
+          await ((_b2 = (_a2 = this.plugin.pendingSuggestions).flush) == null ? void 0 : _b2.call(_a2));
           this.render();
         });
         if ((researchOptions == null ? void 0 : researchOptions.shallowResearch) && createdNodes.length)
@@ -37761,9 +37788,9 @@ ${request.requirements}` : preset.text,
   }
   /** `detailTemplateId` is the dialog's template choice: it shapes contributions and is recorded on each new child. */
   async createChildBatch(parent, items, researchOptions, signal, detailTemplateId = researchOptions == null ? void 0 : researchOptions.detailTemplateId) {
-    var _a;
+    var _a2;
     if (this.plugin.expansionCoordinator.isRunning(parent.path)) throw new Error(t("ui.ai_running_ai"));
-    if (!((_a = this.map) == null ? void 0 : _a.nodes.some((node) => node.id === parent.id && node.path === parent.path)))
+    if (!((_a2 = this.map) == null ? void 0 : _a2.nodes.some((node) => node.id === parent.id && node.path === parent.path)))
       throw new Error(t("ui.the_map_or_parent_topic_changed_while_ai_was_running_no_subt"));
     if (!items.length) throw new Error(t("ui.select_at_least_one_subtopic"));
     const rootTitles = new Set(items.filter((item) => !item.parentTitle).map((item) => item.title));
@@ -37833,8 +37860,8 @@ ${request.requirements}` : preset.text,
       maxX: Math.max(...shown.map((n) => n.x + 280)),
       minY: Math.min(...shown.map((n) => n.y)),
       maxY: Math.max(...shown.map((n) => {
-        var _a;
-        return n.y + ((_a = this.cardHeightOf(n.id)) != null ? _a : 180);
+        var _a2;
+        return n.y + ((_a2 = this.cardHeightOf(n.id)) != null ? _a2 : 180);
       }))
     };
     this.map.viewport = fitViewport(
@@ -37856,8 +37883,8 @@ ${request.requirements}` : preset.text,
         if (this.closed || !this.map) return;
         const untouched = new Set(
           this.map.nodes.filter((n) => {
-            var _a, _b;
-            return ((_a = placed.get(n.id)) == null ? void 0 : _a.x) === n.x && ((_b = placed.get(n.id)) == null ? void 0 : _b.y) === n.y;
+            var _a2, _b2;
+            return ((_a2 = placed.get(n.id)) == null ? void 0 : _a2.x) === n.x && ((_b2 = placed.get(n.id)) == null ? void 0 : _b2.y) === n.y;
           }).map((n) => n.id)
         );
         if (!untouched.size) return;
@@ -37891,12 +37918,12 @@ ${request.requirements}` : preset.text,
     return options.shallowWebSearch ? options : { ...options, researchMode: "local", visualMode: "off" };
   }
   startShallowResearch(parent, children, options) {
-    var _a;
+    var _a2;
     const signal = options.signal;
     const pendingOptions = this.researchChoices(options);
     const placed = /* @__PURE__ */ new Map();
     for (const child of children) {
-      const node = (_a = this.map) == null ? void 0 : _a.nodes.find((item) => item.id === child.id);
+      const node = (_a2 = this.map) == null ? void 0 : _a2.nodes.find((item) => item.id === child.id);
       if (node) placed.set(node.id, { x: node.x, y: node.y });
     }
     let respaced = false;
@@ -37923,10 +37950,10 @@ ${request.requirements}` : preset.text,
     );
   }
   async researchChild(child, batchSignal, accepted, choices, charts = true) {
-    var _a, _b, _c;
+    var _a2, _b2, _c;
     const detailTemplate = await this.detailTemplateFor(child, choices.detailTemplateId, choices.toneId);
-    const note = await this.plugin.repo.readNote(child.path, (_a = this.map) != null ? _a : void 0);
-    const outputLanguage2 = (_b = choices.outputLanguage) != null ? _b : chooseAimContentLanguage(this.plugin.settings.language, note.title);
+    const note = await this.plugin.repo.readNote(child.path, (_a2 = this.map) != null ? _a2 : void 0);
+    const outputLanguage2 = (_b2 = choices.outputLanguage) != null ? _b2 : chooseAimContentLanguage(this.plugin.settings.language, note.title);
     let started = false;
     let failure;
     const handle = await this.runAgent(
@@ -37962,8 +37989,8 @@ ${request.requirements}` : preset.text,
   openMultiResearch(retryBatchKey) {
     if (!this.map || this.map.aim || !this.multiSelected.size) return;
     const names2 = [...this.multiSelected].map((id) => {
-      var _a;
-      return (_a = this.notes.get(id)) == null ? void 0 : _a.title;
+      var _a2;
+      return (_a2 = this.notes.get(id)) == null ? void 0 : _a2.title;
     }).filter((name) => !!name);
     new MultiResearchModal(
       this.app,
@@ -37980,7 +38007,7 @@ ${request.requirements}` : preset.text,
     this.plugin.expansionCoordinator.stop(this.multiResearchKey());
   }
   async startMultiResearch(request, retryBatchKey) {
-    var _a;
+    var _a2;
     if (!this.map || this.map.aim || this.builtIn || !this.multiSelected.size) return;
     const key2 = this.multiResearchKey();
     if (this.plugin.expansionCoordinator.isRunning(key2)) {
@@ -37989,8 +38016,8 @@ ${request.requirements}` : preset.text,
     }
     const selected = [...this.multiSelected].map((id) => this.map.nodes.find((node) => node.id === id)).filter((node) => !!node);
     try {
-      await this.plugin.confirmAiUsage((_a = request.model) != null ? _a : this.plugin.settings.cliModel, async () => {
-        var _a2;
+      await this.plugin.confirmAiUsage((_a2 = request.model) != null ? _a2 : this.plugin.settings.cliModel, async () => {
+        var _a3;
         if (this.plugin.expansionCoordinator.isRunning(key2)) {
           new import_obsidian29.Notice(t("ui.multi_research_already_running"));
           return;
@@ -38017,7 +38044,7 @@ ${request.requirements}` : preset.text,
           ...request.detailTemplateId ? { detailTemplateId: request.detailTemplateId } : {},
           ...request.toneId ? { toneId: request.toneId } : {}
         };
-        if (retryBatchKey && ((_a2 = this.plugin.expansionBatches.get(retryBatchKey)) == null ? void 0 : _a2.status) !== "running")
+        if (retryBatchKey && ((_a3 = this.plugin.expansionBatches.get(retryBatchKey)) == null ? void 0 : _a3.status) !== "running")
           this.plugin.expansionBatches.delete(retryBatchKey);
         let reported = false;
         let skipped = 0;
@@ -38090,7 +38117,7 @@ ${request.requirements}` : preset.text,
   }
   /** Status bar under the toolbar (same place and look as the AIM status bar) with progress, Stop, and Retry/Dismiss after failures. */
   renderMultiResearchStatus(parent) {
-    var _a, _b;
+    var _a2, _b2;
     const key2 = this.multiResearchKey();
     const state = this.plugin.expansionBatches.get(key2);
     if (!state) return;
@@ -38098,8 +38125,8 @@ ${request.requirements}` : preset.text,
     if (!running && !state.failures.length) return;
     const bar = parent.createDiv(`vam-aim-statusbar vam-multi-research-statusbar${running ? " is-active" : ""}`);
     bar.setAttr("aria-live", "polite");
-    const current = state.currentPath ? (_a = this.map) == null ? void 0 : _a.nodes.find((node) => node.path === state.currentPath) : void 0;
-    const title = current ? (_b = this.notes.get(current.id)) == null ? void 0 : _b.title : void 0;
+    const current = state.currentPath ? (_a2 = this.map) == null ? void 0 : _a2.nodes.find((node) => node.path === state.currentPath) : void 0;
+    const title = current ? (_b2 = this.notes.get(current.id)) == null ? void 0 : _b2.title : void 0;
     bar.createSpan({ cls: "vam-aim-status-title", text: t("ui.multi_research") });
     bar.createSpan({
       cls: `vam-aim-status-value ${running ? "vam-status-running" : "vam-status-error"}`,
@@ -38129,11 +38156,11 @@ ${request.requirements}` : preset.text,
     );
   }
   renderSelectionBar(workspace) {
-    var _a, _b, _c;
+    var _a2, _b2, _c;
     const selection = workspace.createDiv("vam-selection-bar");
     const names2 = [...this.multiSelected].map((id) => {
-      var _a2;
-      return (_a2 = this.notes.get(id)) == null ? void 0 : _a2.title;
+      var _a3;
+      return (_a3 = this.notes.get(id)) == null ? void 0 : _a3.title;
     }).filter(Boolean);
     selection.createSpan({
       attr: { dir: "auto" },
@@ -38162,7 +38189,7 @@ ${request.requirements}` : preset.text,
     const synthesize = this.button(selection, t("ui.synthesize"), () => this.integrateSelected(), count < 2);
     synthesize.addClass("mod-cta");
     if (count > 1) synthesize.setAttr("aria-label", t("ui.synthesize_0_topics", count));
-    if (!((_a = this.map) == null ? void 0 : _a.aim) && !this.builtIn) {
+    if (!((_a2 = this.map) == null ? void 0 : _a2.aim) && !this.builtIn) {
       const check = this.mergeCheck(), merge = this.button(selection, t("ui.merge"), () => this.openMerge());
       if (count > 1) merge.setAttr("aria-label", t("ui.merge_0_topics", count));
       if (!check.ok) {
@@ -38170,7 +38197,7 @@ ${request.requirements}` : preset.text,
         merge.setAttr("title", t(check.reason));
       }
     }
-    if (!((_b = this.map) == null ? void 0 : _b.aim)) {
+    if (!((_b2 = this.map) == null ? void 0 : _b2.aim)) {
       const running = ((_c = this.plugin.expansionBatches.get(this.multiResearchKey())) == null ? void 0 : _c.status) === "running";
       const research = this.button(
         selection,
@@ -38185,16 +38212,16 @@ ${request.requirements}` : preset.text,
   }
   /** The dialog's choices for each child's research; the data sources the user picked go to every child. */
   researchChoices(options) {
-    var _a;
+    var _a2;
     const { signal: _signal, onProgress: _onProgress, ...choices } = options;
-    return { ...choices, signal: void 0, onProgress: void 0, referenceGroups: (_a = options.referenceGroups) != null ? _a : [] };
+    return { ...choices, signal: void 0, onProgress: void 0, referenceGroups: (_a2 = options.referenceGroups) != null ? _a2 : [] };
   }
   async clearPendingSuggestions(path) {
-    var _a, _b;
+    var _a2, _b2;
     this.plugin.pendingSuggestions.delete(path);
     this.plugin.pendingResearchOptions.delete(path);
     try {
-      await ((_b = (_a = this.plugin.pendingSuggestions).flush) == null ? void 0 : _b.call(_a));
+      await ((_b2 = (_a2 = this.plugin.pendingSuggestions).flush) == null ? void 0 : _b2.call(_a2));
     } catch (error) {
       throw new Error(this.plugin.recordFailure(t("ui.expansion_suggestions_changed_open_them_again"), error));
     }
@@ -38208,18 +38235,18 @@ ${request.requirements}` : preset.text,
     }
   }
   async ancestorContext(node) {
-    var _a, _b, _c, _d;
+    var _a2, _b2, _c, _d;
     const chain = [], seen = /* @__PURE__ */ new Set([node.id]);
     let parent = node.parentId;
     while (parent && !seen.has(parent)) {
       seen.add(parent);
-      const n = (_a = this.map) == null ? void 0 : _a.nodes.find((item) => item.id === parent);
+      const n = (_a2 = this.map) == null ? void 0 : _a2.nodes.find((item) => item.id === parent);
       if (!n) break;
       chain.unshift(n);
       parent = n.parentId;
     }
     const ancestors = [];
-    const language2 = (_c = (_b = this.plugin.settings) == null ? void 0 : _b.language) != null ? _c : "zh-TW";
+    const language2 = (_c = (_b2 = this.plugin.settings) == null ? void 0 : _b2.language) != null ? _c : "zh-TW";
     for (const n of chain) {
       const info = await this.plugin.repo.readNote(n.path, (_d = this.map) != null ? _d : void 0);
       ancestors.push(`- ${info.title}
@@ -38239,15 +38266,15 @@ ${request.requirements}` : preset.text,
     if (!marker5) return [];
     const section3 = note.detail.slice(note.detail.indexOf(marker5) + marker5.length);
     const paths = [...section3.matchAll(/\[\[([^\]|#]+)(?:[|#][^\]]*)?\]\]/g)].map((match) => {
-      var _a, _b;
+      var _a2, _b2;
       const link = match[1], direct = link.endsWith(".md") ? link : `${link}.md`;
       if (this.app.vault.getAbstractFileByPath(direct) instanceof import_obsidian29.TFile) return direct;
-      return (_b = (_a = this.app.metadataCache.getFirstLinkpathDest(link, ownerPath)) == null ? void 0 : _a.path) != null ? _b : direct;
+      return (_b2 = (_a2 = this.app.metadataCache.getFirstLinkpathDest(link, ownerPath)) == null ? void 0 : _a2.path) != null ? _b2 : direct;
     });
     return [...new Set(paths)];
   }
   async proposeIntegrationDirections(node, options, found, failed, accepted) {
-    var _a, _b, _c, _d, _e;
+    var _a2, _b2, _c, _d, _e;
     if (!this.map) {
       failed(t("ui.no_mind_map_is_available"));
       return;
@@ -38257,11 +38284,11 @@ ${request.requirements}` : preset.text,
       return;
     }
     const children = this.map.nodes.filter((item) => item.parentId === node.id);
-    if (!children.length && !((_a = options.referenceGroups) == null ? void 0 : _a.some((group) => group.documents.length))) {
+    if (!children.length && !((_a2 = options.referenceGroups) == null ? void 0 : _a2.some((group) => group.documents.length))) {
       failed(t("ui.choose_another_note_source_first"));
       return;
     }
-    const note = await this.plugin.repo.readNote(node.path, (_b = this.map) != null ? _b : void 0);
+    const note = await this.plugin.repo.readNote(node.path, (_b2 = this.map) != null ? _b2 : void 0);
     this.plugin.running.add(node.path);
     this.render();
     const progress = this.startTaskProgress(node.path);
@@ -38331,14 +38358,14 @@ ${request.requirements}` : preset.text,
     }
   }
   async integrateChildren(node, options, direction = "", drafted, failed, accepted) {
-    var _a, _b, _c, _d, _e, _f, _g, _h, _i, _j;
+    var _a2, _b2, _c, _d, _e, _f, _g, _h, _i, _j;
     if (!this.map || this.plugin.running.has(node.path)) {
       failed == null ? void 0 : failed(t("ui.ai_running_ai"));
       return;
     }
-    const note = await this.plugin.repo.readNote(node.path, (_a = this.map) != null ? _a : void 0);
+    const note = await this.plugin.repo.readNote(node.path, (_a2 = this.map) != null ? _a2 : void 0);
     const children = this.map.nodes.filter((item) => item.parentId === node.id);
-    if (!children.length && !((_b = options == null ? void 0 : options.referenceGroups) == null ? void 0 : _b.some((group) => group.documents.length))) {
+    if (!children.length && !((_b2 = options == null ? void 0 : options.referenceGroups) == null ? void 0 : _b2.some((group) => group.documents.length))) {
       const message = t("ui.choose_another_note_source_first");
       if (failed) failed(message);
       else new import_obsidian29.Notice(message);
@@ -38427,8 +38454,8 @@ ${request.requirements}` : preset.text,
       if ((_h = options == null ? void 0 : options.signal) == null ? void 0 : _h.aborted) throw new DOMException("Aborted", "AbortError");
       await this.plugin.repo.updateNote(node.path, { status: note.status });
       const save = async (summary, detail) => this.plugin.mutate(async () => {
-        var _a2, _b2, _c2, _d2, _e2, _f2, _g2;
-        if (((_a2 = options == null ? void 0 : options.signal) == null ? void 0 : _a2.aborted) || this.closed || this.path !== mapPath || ((_b2 = this.map) == null ? void 0 : _b2.id) !== mapId || this.map.nodes.filter((item) => item.parentId === node.id).map((item) => item.id).sort().join("|") !== childIds)
+        var _a3, _b3, _c2, _d2, _e2, _f2, _g2;
+        if (((_a3 = options == null ? void 0 : options.signal) == null ? void 0 : _a3.aborted) || this.closed || this.path !== mapPath || ((_b3 = this.map) == null ? void 0 : _b3.id) !== mapId || this.map.nodes.filter((item) => item.parentId === node.id).map((item) => item.id).sort().join("|") !== childIds)
           throw new Error(t("ui.the_topic_changed_the_synthesis_draft_was_not_saved"));
         const currentSources = await this.topicReferenceGroup(
           children,
@@ -38594,20 +38621,20 @@ ${request.requirements}` : preset.text,
       ...step === "draft" ? { ...task.options, requirements: options.requirements || task.options.requirements } : options,
       signal: controller.signal,
       onProgress: (message) => {
-        var _a;
+        var _a2;
         task.progress = message;
-        (_a = options.onProgress) == null ? void 0 : _a.call(options, message);
+        (_a2 = options.onProgress) == null ? void 0 : _a2.call(options, message);
         if (this.synthesisTasks.get(path) === task) this.render();
       }
     };
     let launched = false;
     let outcome = null;
     const markAccepted = () => {
-      var _a;
+      var _a2;
       if (launched || controller.signal.aborted) return;
       launched = true;
       modalSignal == null ? void 0 : modalSignal.removeEventListener("abort", abortBeforeAcceptance);
-      (_a = observer == null ? void 0 : observer.accepted) == null ? void 0 : _a.call(observer, () => controller.abort());
+      (_a2 = observer == null ? void 0 : observer.accepted) == null ? void 0 : _a2.call(observer, () => controller.abort());
       accepted();
     };
     const fail = (message) => {
@@ -38651,13 +38678,13 @@ ${request.requirements}` : preset.text,
           runOptions,
           direction != null ? direction : "",
           async (_result, save, summary, detail) => {
-            var _a, _b, _c;
+            var _a2, _b2, _c;
             if (controller.signal.aborted || this.synthesisTasks.get(path) !== task) return;
             const previous = this.history.undoEntry;
             await save(summary, detail);
             outcome = "written";
             if (this.synthesisTasks.get(path) === task) this.synthesisTasks.delete(path);
-            this.undoNotice(t("ui.synthesis_written_0", (_b = (_a = this.notes.get(node.id)) == null ? void 0 : _a.title) != null ? _b : ""), previous);
+            this.undoNotice(t("ui.synthesis_written_0", (_b2 = (_a2 = this.notes.get(node.id)) == null ? void 0 : _a2.title) != null ? _b2 : ""), previous);
             if (observer == null ? void 0 : observer.isOpen()) (_c = observer.written) == null ? void 0 : _c.call(observer);
           },
           fail,
@@ -38685,10 +38712,10 @@ ${request.requirements}` : preset.text,
     this.render();
   }
   retrySynthesis(node) {
-    var _a;
+    var _a2;
     const task = this.synthesisTasks.get(node.path);
     if (!task || task.state !== "failed" && task.state !== "cancelled") return;
-    void this.plugin.repo.readNote(node.path, (_a = this.map) != null ? _a : void 0).then(
+    void this.plugin.repo.readNote(node.path, (_a2 = this.map) != null ? _a2 : void 0).then(
       (note) => this.plugin.confirmAiUsage(note.model, async () => {
         await this.startSynthesis(
           node,
@@ -38716,12 +38743,12 @@ ${request.requirements}` : preset.text,
   }
   /** Opens the synthesis dialog for the selected topics, or for the waiting task's topics with its directions. */
   openSelectionSynthesis(pending) {
-    var _a, _b;
+    var _a2, _b2;
     if (!this.map) return;
-    const nodes = (_a = pending == null ? void 0 : pending.sources) != null ? _a : [...this.multiSelected].map((id) => this.map.nodes.find((node) => node.id === id)).filter((node) => !!node);
+    const nodes = (_a2 = pending == null ? void 0 : pending.sources) != null ? _a2 : [...this.multiSelected].map((id) => this.map.nodes.find((node) => node.id === id)).filter((node) => !!node);
     const names2 = nodes.map((node) => {
-      var _a2, _b2;
-      return (_b2 = (_a2 = this.notes.get(node.id)) == null ? void 0 : _a2.title) != null ? _b2 : node.path;
+      var _a3, _b3;
+      return (_b3 = (_a3 = this.notes.get(node.id)) == null ? void 0 : _a3.title) != null ? _b3 : node.path;
     });
     const selectedLabel = t("ui.reference_selected_topics_included", names2.join(", "));
     const sources2 = this.taskSourceSettings(selectedLabel, this.map.id, selectedLabel);
@@ -38741,7 +38768,7 @@ ${request.requirements}` : preset.text,
       void 0,
       {
         names: names2,
-        initialTitle: (_b = pending == null ? void 0 : pending.title) != null ? _b : names2.length > 2 ? t("ui.synthesis_of_0_and_1_more", names2[0], names2.length) : t("ui.synthesis_of_0", names2.join(t("ui.list_separator"))),
+        initialTitle: (_b2 = pending == null ? void 0 : pending.title) != null ? _b2 : names2.length > 2 ? t("ui.synthesis_of_0_and_1_more", names2[0], names2.length) : t("ui.synthesis_of_0", names2.join(t("ui.list_separator"))),
         defaultDirection: t("ui.identify_shared_conclusions_key_differences_tradeoffs_and_ne"),
         background: this.backgroundHooks(this.selectionTaskKey()),
         fields: {
@@ -38761,7 +38788,7 @@ ${request.requirements}` : preset.text,
    * report to the open dialog through `observer`; once it is closed the run carries on and the selection bar shows it.
    */
   async startSelectionSynthesis(sources2, options, direction, failed, accepted, observer) {
-    var _a, _b, _c;
+    var _a2, _b2, _c;
     if (!this.map || sources2.length < 2) {
       failed(t("ui.select_at_least_two_topics"));
       return;
@@ -38778,7 +38805,7 @@ ${request.requirements}` : preset.text,
     }
     const continuing = step === "draft" && !!(existing == null ? void 0 : existing.directions.length) && (existing.state === "directions" || !!options.continuesDirections);
     const base = continuing && existing ? existing.options : options;
-    const title = (continuing && existing ? existing.title : (_a = options.synthesisTitle) == null ? void 0 : _a.trim()) || (existing == null ? void 0 : existing.title) || "";
+    const title = (continuing && existing ? existing.title : (_a2 = options.synthesisTitle) == null ? void 0 : _a2.trim()) || (existing == null ? void 0 : existing.title) || "";
     this.selectionStarting = true;
     const controller = new AbortController();
     const modalSignal = options.signal;
@@ -38792,19 +38819,19 @@ ${request.requirements}` : preset.text,
       requirements: options.requirements || base.requirements,
       signal: controller.signal,
       onProgress: (message) => {
-        var _a2;
+        var _a3;
         if (this.integrationTask) this.integrationTask.progress = message;
-        (_a2 = options.onProgress) == null ? void 0 : _a2.call(options, message);
+        (_a3 = options.onProgress) == null ? void 0 : _a3.call(options, message);
         this.render();
       }
     };
     let launched = false;
     const markAccepted = () => {
-      var _a2;
+      var _a3;
       if (launched || controller.signal.aborted) return;
       launched = true;
       modalSignal == null ? void 0 : modalSignal.removeEventListener("abort", abortBeforeAcceptance);
-      (_a2 = observer == null ? void 0 : observer.accepted) == null ? void 0 : _a2.call(observer, () => controller.abort());
+      (_a3 = observer == null ? void 0 : observer.accepted) == null ? void 0 : _a3.call(observer, () => controller.abort());
       accepted();
     };
     const fail = (error) => {
@@ -38872,7 +38899,7 @@ ${request.requirements}` : preset.text,
           detail: "",
           task: [synthesisDirectionsTask(language2), runOptions.requirements].filter(Boolean).join("\n\n"),
           ancestors: "",
-          referenceGroups: [...(_b = runOptions.referenceGroups) != null ? _b : [], sourceGroup],
+          referenceGroups: [...(_b2 = runOptions.referenceGroups) != null ? _b2 : [], sourceGroup],
           // Within budget the sources go in as written (one request); only over-budget sources are extracted first.
           referenceDelivery: "direct",
           onProgress: runOptions.onProgress,
@@ -38950,12 +38977,12 @@ ${request.requirements}` : preset.text,
     });
   }
   async topicReferenceGroup(sources2, mode = "strong", options = {}) {
-    var _a, _b, _c, _d;
-    const language2 = (_b = (_a = this.plugin.settings) == null ? void 0 : _a.language) != null ? _b : "zh-TW";
+    var _a2, _b2, _c, _d;
+    const language2 = (_b2 = (_a2 = this.plugin.settings) == null ? void 0 : _a2.language) != null ? _b2 : "zh-TW";
     const notes = await Promise.all(
       sources2.map((source) => {
-        var _a2;
-        return this.plugin.repo.readNote(source.path, (_a2 = this.map) != null ? _a2 : void 0);
+        var _a3;
+        return this.plugin.repo.readNote(source.path, (_a3 = this.map) != null ? _a3 : void 0);
       })
     );
     const documents = sources2.map((source, index) => {
@@ -38981,9 +39008,9 @@ ${note.detail.trim()}` : "",
     };
   }
   async createIntegratedNode(title, sources2, goal, rules, options, flow) {
-    var _a, _b, _c, _d, _e, _f, _g, _h, _i, _j, _k, _l;
+    var _a2, _b2, _c, _d, _e, _f, _g, _h, _i, _j, _k, _l;
     if (!this.map || sources2.length < 2) return;
-    const controller = (_a = flow == null ? void 0 : flow.controller) != null ? _a : new AbortController();
+    const controller = (_a2 = flow == null ? void 0 : flow.controller) != null ? _a2 : new AbortController();
     const mapPath = this.path, mapId = this.map.id;
     const sourceGroup = await this.topicReferenceGroup(
       sources2,
@@ -39001,7 +39028,7 @@ ${note.detail.trim()}` : "",
       controller,
       state: "running",
       step: "draft",
-      directions: (_b = flow == null ? void 0 : flow.directions) != null ? _b : [],
+      directions: (_b2 = flow == null ? void 0 : flow.directions) != null ? _b2 : [],
       progress: ""
     };
     this.integrationTask = task;
@@ -39022,10 +39049,10 @@ ${note.detail.trim()}` : "",
         // Within budget the sources go in as written (one request); only over-budget sources are extracted first.
         referenceDelivery: "direct",
         onProgress: (message) => {
-          var _a2;
+          var _a3;
           if (this.integrationTask !== task) return;
           task.progress = message;
-          (_a2 = options == null ? void 0 : options.onProgress) == null ? void 0 : _a2.call(options, message);
+          (_a3 = options == null ? void 0 : options.onProgress) == null ? void 0 : _a3.call(options, message);
           this.render();
         },
         outputLanguage: options == null ? void 0 : options.outputLanguage,
@@ -39063,7 +39090,7 @@ ${note.detail.trim()}` : "",
       this.render();
       const previous = this.history.undoEntry;
       const write = () => {
-        var _a2;
+        var _a3;
         return this.saveIntegratedNode(
           title,
           sources2,
@@ -39071,7 +39098,7 @@ ${note.detail.trim()}` : "",
           rules,
           model,
           result,
-          (_a2 = options == null ? void 0 : options.outputLanguage) != null ? _a2 : language2,
+          (_a3 = options == null ? void 0 : options.outputLanguage) != null ? _a3 : language2,
           task,
           integrationContext
         );
@@ -39096,7 +39123,7 @@ ${note.detail.trim()}` : "",
     }
   }
   async saveIntegratedNode(title, sources2, goal, rules, model, result, language2, task, context) {
-    var _a;
+    var _a2;
     if (!this.map || this.integrationTask !== task || this.closed || task.controller.signal.aborted || this.path !== task.mapPath || this.map.id !== task.mapId || task.state !== "applying")
       throw new Error(t("ui.the_topic_changed_the_synthesis_draft_was_not_saved"));
     const latest = await this.topicReferenceGroup(
@@ -39104,8 +39131,8 @@ ${note.detail.trim()}` : "",
       task.options.synthesisContent === "summary" ? "summary" : "strong"
     );
     if (JSON.stringify(latest.documents) !== task.sourceContent || sources2.some((source) => {
-      var _a2;
-      return !((_a2 = this.map) == null ? void 0 : _a2.nodes.some((node) => node.id === source.id && node.path === source.path));
+      var _a3;
+      return !((_a3 = this.map) == null ? void 0 : _a3.nodes.some((node) => node.id === source.id && node.path === source.path));
     }))
       throw new Error(t("ui.the_topic_changed_the_synthesis_draft_was_not_saved"));
     const integrated = await this.plugin.repo.createNote(title, model, this.map, this.path, "workspace");
@@ -39165,7 +39192,7 @@ ${note.detail.trim()}` : "",
       this.render();
       this.focusNode(integrated);
       try {
-        const savedNote = await this.plugin.repo.readNote(integrated.path, (_a = this.map) != null ? _a : void 0);
+        const savedNote = await this.plugin.repo.readNote(integrated.path, (_a2 = this.map) != null ? _a2 : void 0);
         this.queueCharts({
           path: integrated.path,
           saved: savedNote,
@@ -39209,12 +39236,12 @@ ${note.detail.trim()}` : "",
     }
   }
   transform() {
-    var _a, _b;
+    var _a2, _b2;
     if (!this.map || !this.stageEl) return;
     const { x, y, zoom } = this.map.viewport;
     this.stageEl.style.transform = `translate(${x}px, ${y}px) scale(${zoom})`;
-    (_a = this.zoomLabel) == null ? void 0 : _a.setText(`${Math.round(zoom * 100)}%`);
-    (_b = this.zoomLabel) == null ? void 0 : _b.setAttr("aria-label", t("ui.zoom_level_0_reset", `${Math.round(zoom * 100)}%`));
+    (_a2 = this.zoomLabel) == null ? void 0 : _a2.setText(`${Math.round(zoom * 100)}%`);
+    (_b2 = this.zoomLabel) == null ? void 0 : _b2.setAttr("aria-label", t("ui.zoom_level_0_reset", `${Math.round(zoom * 100)}%`));
   }
   saveViewport() {
     if (this.viewportTimer !== null) window.clearTimeout(this.viewportTimer);
@@ -39239,23 +39266,23 @@ ${note.detail.trim()}` : "",
   }
   /** Pan/zoom writes only the viewport onto the current file, never this view's possibly older map copy. */
   async persistViewport() {
-    var _a, _b;
+    var _a2, _b2;
     if (this.builtIn || !this.map || !this.path) return;
     const viewport = { ...this.map.viewport };
     const written = await this.plugin.repo.updateMap(this.path, (map) => {
       map.viewport = viewport;
     });
-    const stamped = (_a = written == null ? void 0 : written.aim) == null ? void 0 : _a.contentLanguage;
-    if (stamped !== void 0 && ((_b = this.map) == null ? void 0 : _b.aim) && this.map.aim.contentLanguage === void 0)
+    const stamped = (_a2 = written == null ? void 0 : written.aim) == null ? void 0 : _a2.contentLanguage;
+    if (stamped !== void 0 && ((_b2 = this.map) == null ? void 0 : _b2.aim) && this.map.aim.contentLanguage === void 0)
       this.map.aim.contentLanguage = stamped;
   }
   markCanvasHintSeen() {
-    var _a;
+    var _a2;
     if (this.plugin.settings.canvasHintSeen) return;
     this.plugin.settings.canvasHintSeen = true;
     void this.plugin.saveSettings();
     if (this.integrationMode) return;
-    (_a = this.hintEl) == null ? void 0 : _a.remove();
+    (_a2 = this.hintEl) == null ? void 0 : _a2.remove();
     this.hintEl = null;
   }
   zoomBy(factor, point) {
@@ -39274,16 +39301,16 @@ ${note.detail.trim()}` : "",
    * that touches nothing changes nothing.
    */
   startMarquee(viewport, event, mode = "marquee-add") {
-    var _a, _b;
+    var _a2, _b2;
     const host = viewport.getBoundingClientRect();
     const startX = event.clientX, startY = event.clientY;
     const already = new Set(this.multiSelected);
-    const cards = Array.from((_b = (_a = this.stageEl) == null ? void 0 : _a.querySelectorAll(".vam-node[data-node-id]")) != null ? _b : []).map(
+    const cards = Array.from((_b2 = (_a2 = this.stageEl) == null ? void 0 : _a2.querySelectorAll(".vam-node[data-node-id]")) != null ? _b2 : []).map(
       (card) => {
-        var _a2;
+        var _a3;
         return {
           card,
-          id: (_a2 = card.dataset.nodeId) != null ? _a2 : "",
+          id: (_a3 = card.dataset.nodeId) != null ? _a3 : "",
           rect: card.getBoundingClientRect()
         };
       }
@@ -39340,8 +39367,8 @@ ${note.detail.trim()}` : "",
   }
   /** Safe area under the floating toolbar, measured so a wrapped toolbar is covered too. */
   canvasInset() {
-    var _a, _b, _c, _d, _e;
-    const canvas = (_b = (_a = this.viewportEl) == null ? void 0 : _a.getBoundingClientRect) == null ? void 0 : _b.call(_a);
+    var _a2, _b2, _c, _d, _e;
+    const canvas = (_b2 = (_a2 = this.viewportEl) == null ? void 0 : _a2.getBoundingClientRect) == null ? void 0 : _b2.call(_a2);
     const tools = (_e = (_d = (_c = this.contentEl) == null ? void 0 : _c.querySelector(".vam-map-tools")) == null ? void 0 : _d.getBoundingClientRect) == null ? void 0 : _e.call(_d);
     return canvas ? insetFromRects(canvas.top, tools) : 0;
   }
@@ -39352,9 +39379,9 @@ ${note.detail.trim()}` : "",
   }
   /** `persist` false is keyboard navigation: the camera follows in memory and Map.md is not written. */
   focusNode(target, persist = true) {
-    var _a;
+    var _a2;
     if (!this.map || !this.viewportEl) return;
-    const node = this.relevanceSortOn() ? (_a = this.canvasNodes().find((item) => item.id === target.id)) != null ? _a : target : target;
+    const node = this.relevanceSortOn() ? (_a2 = this.canvasNodes().find((item) => item.id === target.id)) != null ? _a2 : target : target;
     this.map.viewport = focusViewport(
       this.map.viewport,
       { x: node.x + 140, y: node.y + 80 },
@@ -39372,8 +39399,8 @@ ${note.detail.trim()}` : "",
     const minY = Math.min(...nodes.map((n) => n.y)), maxY = Math.max(
       ...nodes.map(
         (n) => {
-          var _a, _b, _c;
-          return n.y + ((_c = (_b = (_a = this.stageEl) == null ? void 0 : _a.querySelector(`[data-node-id="${CSS.escape(n.id)}"]`)) == null ? void 0 : _b.offsetHeight) != null ? _c : 180);
+          var _a2, _b2, _c;
+          return n.y + ((_c = (_b2 = (_a2 = this.stageEl) == null ? void 0 : _a2.querySelector(`[data-node-id="${CSS.escape(n.id)}"]`)) == null ? void 0 : _b2.offsetHeight) != null ? _c : 180);
         }
       )
     );
@@ -39462,13 +39489,13 @@ ${note.detail.trim()}` : "",
   }
   enableDrag(card, node) {
     card.addEventListener("pointerdown", (event) => {
-      var _a, _b;
+      var _a2, _b2;
       if (this.integrationMode || event.target.closest("button") || event.button !== 0 || !this.map)
         return;
       this.clearHoverTimer();
-      (_a = this.hoverCard) == null ? void 0 : _a.remove();
+      (_a2 = this.hoverCard) == null ? void 0 : _a2.remove();
       this.hoverCard = null;
-      (_b = this.dragCleanup) == null ? void 0 : _b.call(this);
+      (_b2 = this.dragCleanup) == null ? void 0 : _b2.call(this);
       const currentNode = this.map.nodes.find((item) => item.id === node.id);
       if (!currentNode) return;
       this.dragging = true;
@@ -39485,7 +39512,7 @@ ${note.detail.trim()}` : "",
       const locked = this.isMerging(node.id);
       let warned = false;
       const move = (e) => {
-        var _a2;
+        var _a3;
         if (this.relevanceSortOn()) return;
         moved || (moved = Math.hypot(e.clientX - start.x, e.clientY - start.y) > 3);
         if (moved && locked) {
@@ -39497,7 +39524,7 @@ ${note.detail.trim()}` : "",
           x: origin.x + (e.clientX - start.x) / this.map.viewport.zoom,
           y: origin.y + (e.clientY - start.y) / this.map.viewport.zoom
         };
-        (_a2 = this.dragFrame) != null ? _a2 : this.dragFrame = window.requestAnimationFrame(paint);
+        (_a3 = this.dragFrame) != null ? _a3 : this.dragFrame = window.requestAnimationFrame(paint);
       };
       const settle = () => {
         this.dragging = false;
@@ -39596,7 +39623,7 @@ ${note.detail.trim()}` : "",
     };
   }
   drawEdges() {
-    var _a, _b;
+    var _a2, _b2;
     if (!this.edgesEl || !this.stageEl || !this.map) return;
     this.edgesEl.replaceChildren();
     this.edgeEls.clear();
@@ -39617,7 +39644,7 @@ ${note.detail.trim()}` : "",
         );
         path.addClass("vam-edge");
         if (parentId !== node.parentId) path.addClass("vam-edge-convergence");
-        if (!this.map.aim && !this.builtIn && ((_b = (_a = this.notes.get(node.id)) == null ? void 0 : _a.relevance) == null ? void 0 : _b.tier) === "side")
+        if (!this.map.aim && !this.builtIn && ((_b2 = (_a2 = this.notes.get(node.id)) == null ? void 0 : _a2.relevance) == null ? void 0 : _b2.tier) === "side")
           path.addClass("vam-edge-side");
         this.edgesEl.appendChild(path);
         this.edgeEls.set(`${parentId}\0${node.id}`, path);
@@ -39629,10 +39656,10 @@ ${note.detail.trim()}` : "",
    * Only an explicit choice is written to the topic; a topic template that no longer exists is reported once and cleared.
    */
   async detailTemplateFor(node, chosenId, chosenToneId) {
-    var _a;
+    var _a2;
     if (chosenToneId) await this.plugin.repo.updateNote(node.path, { toneId: chosenToneId });
     if (chosenId) await this.plugin.repo.updateNote(node.path, { detailTemplateId: chosenId });
-    const note = await this.plugin.repo.readNote(node.path, (_a = this.map) != null ? _a : void 0);
+    const note = await this.plugin.repo.readNote(node.path, (_a2 = this.map) != null ? _a2 : void 0);
     const { template, missing } = this.resolveTopicTemplate(note, chosenId);
     if (note.detailTemplateId && missing.includes(note.detailTemplateId)) {
       new import_obsidian29.Notice(t("ui.detail_template_missing_0", note.detailTemplateId));
@@ -39642,11 +39669,11 @@ ${note.detail.trim()}` : "",
   }
   /** Resolves the topic's content template without notifying or writing anything (see detailTemplateFor). */
   resolveTopicTemplate(note, chosenId) {
-    var _a;
+    var _a2;
     const settings = this.plugin.settings;
     return resolveTemplate(
       settings.detailTemplates,
-      [chosenId, note.detailTemplateId, (_a = this.map) == null ? void 0 : _a.detailTemplateId, settings.defaultDetailTemplateId],
+      [chosenId, note.detailTemplateId, (_a2 = this.map) == null ? void 0 : _a2.detailTemplateId, settings.defaultDetailTemplateId],
       noteLanguageOf(settings.language)
     );
   }
@@ -39655,22 +39682,22 @@ ${note.detail.trim()}` : "",
    * choice comes first.
    */
   mapDetailTemplate(language2, chosenId) {
-    var _a;
+    var _a2;
     const settings = this.plugin.settings;
     return templateInLanguage(
       resolveTemplate(
         settings.detailTemplates,
-        [chosenId, (_a = this.map) == null ? void 0 : _a.detailTemplateId, settings.defaultDetailTemplateId],
+        [chosenId, (_a2 = this.map) == null ? void 0 : _a2.detailTemplateId, settings.defaultDetailTemplateId],
         noteLanguageOf(settings.language)
       ).template,
       language2
     );
   }
   async runAgent(node, done, failed, overrides, onLaunchAccepted) {
-    var _a, _b, _c, _d, _e, _f, _g;
+    var _a2, _b2, _c, _d, _e, _f, _g;
     const taskPath = node.path;
-    const note = await this.plugin.repo.readNote(node.path, (_a = this.map) != null ? _a : void 0);
-    if (!((_b = overrides == null ? void 0 : overrides.task) != null ? _b : note.prompt)) {
+    const note = await this.plugin.repo.readNote(node.path, (_a2 = this.map) != null ? _a2 : void 0);
+    if (!((_b2 = overrides == null ? void 0 : overrides.task) != null ? _b2 : note.prompt)) {
       const message = t("ui.enter_a_question_or_task_for_ai_first");
       if (failed) failed(message);
       else new import_obsidian29.Notice(message);
@@ -39727,9 +39754,9 @@ ${note.detail.trim()}` : "",
       onSlow: (id, slow, resend) => progress == null ? void 0 : progress.markSlow(taskPath, id, slow, resend)
     };
     const releaseStartup = () => {
-      var _a2;
+      var _a3;
       progress == null ? void 0 : progress.end(taskPath, progressAttempt);
-      (_a2 = overrides == null ? void 0 : overrides.signal) == null ? void 0 : _a2.removeEventListener("abort", abortFromTaskModal);
+      (_a3 = overrides == null ? void 0 : overrides.signal) == null ? void 0 : _a3.removeEventListener("abort", abortFromTaskModal);
       if (this.plugin.activeTasks.get(taskPath) === controller) this.plugin.activeTasks.delete(taskPath);
       this.plugin.running.delete(taskPath);
     };
@@ -39781,14 +39808,14 @@ ${note.detail.trim()}` : "",
       observer
     ).then(
       (result) => this.plugin.mutate(async () => {
-        var _a2, _b2, _c2, _d2, _e2, _f2, _g2, _h;
+        var _a3, _b3, _c2, _d2, _e2, _f2, _g2, _h;
         progress == null ? void 0 : progress.end(taskPath, progressAttempt);
-        const latest = await this.plugin.repo.readNote(node.path, (_a2 = this.map) != null ? _a2 : void 0);
+        const latest = await this.plugin.repo.readNote(node.path, (_a3 = this.map) != null ? _a3 : void 0);
         const stale = latest.thinkingOrigin !== note.thinkingOrigin || latest.title !== note.title || latest.prompt !== note.prompt || latest.rules !== note.rules || latest.detail !== note.detail || latest.summary !== note.summary || latest.model !== note.model || latest.reasoning !== note.reasoning || latest.researchMode !== note.researchMode || latest.researchDepth !== note.researchDepth || latest.visualMode !== note.visualMode || latest.sourcePaths.join("\n") !== note.sourcePaths.join("\n") || JSON.stringify(latest.referencePaths) !== JSON.stringify(note.referencePaths);
         if (controller.signal.aborted || stale) {
           await this.plugin.repo.updateNote(node.path, { status: note.status });
           if (exchangeId && this.plugin.settings.aiExchangeLoggingEnabled)
-            (_b2 = this.plugin.exchanges) == null ? void 0 : _b2.failed(
+            (_b3 = this.plugin.exchanges) == null ? void 0 : _b3.failed(
               exchangeId,
               t(stale ? "log.stale_result_not_written" : "log.stopped_result_not_written")
             );
@@ -39850,7 +39877,7 @@ ${note.detail.trim()}` : "",
       })
     ).catch(
       (error) => this.plugin.mutate(async () => {
-        var _a2, _b2;
+        var _a3, _b3;
         progress == null ? void 0 : progress.end(taskPath, progressAttempt);
         if (controller.signal.aborted || error instanceof Error && error.name === "AbortError") {
           await this.plugin.repo.updateNote(node.path, { status: note.status });
@@ -39859,7 +39886,7 @@ ${note.detail.trim()}` : "",
           return;
         }
         console.error("Visual Agent Map AI task", error);
-        if (exchangeId && this.plugin.settings.aiExchangeLoggingEnabled && ((_b2 = (_a2 = this.plugin.exchanges) == null ? void 0 : _a2.getEntries().find((item) => item.id === exchangeId)) == null ? void 0 : _b2.status) === "parsed")
+        if (exchangeId && this.plugin.settings.aiExchangeLoggingEnabled && ((_b3 = (_a3 = this.plugin.exchanges) == null ? void 0 : _a3.getEntries().find((item) => item.id === exchangeId)) == null ? void 0 : _b3.status) === "parsed")
           this.plugin.exchanges.failed(
             exchangeId,
             t("log.topic_write_failed_0", error instanceof Error ? error.message : String(error))
@@ -39870,9 +39897,9 @@ ${note.detail.trim()}` : "",
         else new import_obsidian29.Notice(message);
       })
     ).finally(() => {
-      var _a2;
+      var _a3;
       progress == null ? void 0 : progress.end(taskPath, progressAttempt);
-      (_a2 = overrides == null ? void 0 : overrides.signal) == null ? void 0 : _a2.removeEventListener("abort", abortFromTaskModal);
+      (_a3 = overrides == null ? void 0 : overrides.signal) == null ? void 0 : _a3.removeEventListener("abort", abortFromTaskModal);
       if (this.plugin.activeTasks.get(taskPath) === controller) this.plugin.activeTasks.delete(taskPath);
       this.plugin.running.delete(taskPath);
       for (const view of this.plugin.views())
@@ -39893,8 +39920,8 @@ ${note.detail.trim()}` : "",
 
 // experiences/visual-map/math-repair.ts
 function splitFrontmatter2(content) {
-  var _a, _b;
-  const head = (_b = (_a = content.match(/^\uFEFF?---\r?\n[\s\S]*?\r?\n---(?:\r?\n|$)/)) == null ? void 0 : _a[0]) != null ? _b : "";
+  var _a2, _b2;
+  const head = (_b2 = (_a2 = content.match(/^\uFEFF?---\r?\n[\s\S]*?\r?\n---(?:\r?\n|$)/)) == null ? void 0 : _a2[0]) != null ? _b2 : "";
   return { head, body: content.slice(head.length) };
 }
 function repairNoteMath(content) {
@@ -39940,7 +39967,7 @@ function bindMapFolderInput(plugin, key2, input) {
   const relative = (path) => path.startsWith(`${workspace}/`) ? path.slice(workspace.length + 1) : path;
   let running = false;
   const apply = () => {
-    var _a;
+    var _a2;
     if (running) return;
     const name = input.getValue().trim().replace(/[\\/]+/g, "/").replace(/^\/+|\/+$/g, "");
     const target = `${workspace}/${name}`;
@@ -39949,7 +39976,7 @@ function bindMapFolderInput(plugin, key2, input) {
     input.inputEl.disabled = true;
     const settingsWindow = plugin.app.setting;
     try {
-      (_a = settingsWindow == null ? void 0 : settingsWindow.close) == null ? void 0 : _a.call(settingsWindow);
+      (_a2 = settingsWindow == null ? void 0 : settingsWindow.close) == null ? void 0 : _a2.call(settingsWindow);
     } catch (e) {
     }
     void plugin.mutate(() => plugin.changeMapFolder(key2, target)).catch(() => {
@@ -40436,12 +40463,12 @@ var OutlineView = class extends import_obsidian31.ItemView {
     }
   }
   render() {
-    var _a, _b, _c, _d;
+    var _a2, _b2, _c, _d;
     this.contentEl.empty();
     this.contentEl.addClass("vam-outline");
     const heading = this.contentEl.createDiv("vam-outline-heading");
     heading.createEl("strong", {
-      text: this.coffeeActive ? (_b = (_a = this.coffee) == null ? void 0 : _a.topic) != null ? _b : "Coffee Tables" : (_d = (_c = this.map) == null ? void 0 : _c.title) != null ? _d : t("ui.topic_outline")
+      text: this.coffeeActive ? (_b2 = (_a2 = this.coffee) == null ? void 0 : _a2.topic) != null ? _b2 : "Coffee Tables" : (_d = (_c = this.map) == null ? void 0 : _c.title) != null ? _d : t("ui.topic_outline")
     });
     if (this.coffeeActive) {
       this.renderCoffee();
@@ -40476,13 +40503,13 @@ var OutlineView = class extends import_obsidian31.ItemView {
     if (!snapshot.readOnly && snapshot.segments.some((item) => !item.summary && item.text.trim() && item.status !== "generating")) {
       const fill = this.contentEl.createEl("button", { text: t("ui.coffee_fill_summaries") });
       fill.addEventListener("click", () => {
-        var _a;
-        return (_a = this.fillCoffee) == null ? void 0 : _a.call(this);
+        var _a2;
+        return (_a2 = this.fillCoffee) == null ? void 0 : _a2.call(this);
       });
     }
     const tree = this.contentEl.createDiv("vam-outline-tree");
     snapshot.segments.forEach((item, index) => {
-      var _a;
+      var _a2;
       const button = tree.createEl("button", { cls: "vam-coffee-segment" });
       const kind = t(
         item.kind === "question" ? "ui.coffee_segment_question" : item.kind === "continuation" ? "ui.coffee_segment_continuation" : item.kind === "legacy" ? "ui.coffee_segment_legacy" : "ui.coffee_segment_initial"
@@ -40491,33 +40518,33 @@ var OutlineView = class extends import_obsidian31.ItemView {
         text: t("ui.coffee_outline_segment", index + 1, kind)
       });
       button.createSpan({
-        text: item.status === "generating" ? t("ui.coffee_segment_generating") : (_a = item.summary) != null ? _a : t("ui.coffee_segment_no_summary")
+        text: item.status === "generating" ? t("ui.coffee_segment_generating") : (_a2 = item.summary) != null ? _a2 : t("ui.coffee_segment_no_summary")
       });
       if (item.status === "error") button.createEl("small", { text: t("ui.coffee_segment_incomplete") });
       button.addEventListener("click", () => {
-        var _a2;
-        if (!((_a2 = this.locateCoffee) == null ? void 0 : _a2.call(this, item.id))) new import_obsidian31.Notice(t("ui.coffee_segment_no_content"));
+        var _a3;
+        if (!((_a3 = this.locateCoffee) == null ? void 0 : _a3.call(this, item.id))) new import_obsidian31.Notice(t("ui.coffee_segment_no_content"));
       });
     });
   }
   renderTree() {
-    var _a, _b, _c;
-    (_a = this.contentEl.querySelector(".vam-outline-tree")) == null ? void 0 : _a.remove();
+    var _a2, _b2, _c;
+    (_a2 = this.contentEl.querySelector(".vam-outline-tree")) == null ? void 0 : _a2.remove();
     if (!this.map) return;
     const tree = this.contentEl.createDiv("vam-outline-tree");
     const children = /* @__PURE__ */ new Map();
-    for (const node of this.map.nodes) children.set(node.parentId, [...(_b = children.get(node.parentId)) != null ? _b : [], node]);
+    for (const node of this.map.nodes) children.set(node.parentId, [...(_b2 = children.get(node.parentId)) != null ? _b2 : [], node]);
     const query = foldOutlineSearch(this.query.trim());
     const matches = (node) => {
-      var _a2, _b2;
+      var _a3, _b3;
       if (!query) return true;
-      if (foldOutlineSearch((_a2 = this.titles.get(node.id)) != null ? _a2 : node.path).includes(query)) return true;
-      return ((_b2 = children.get(node.id)) != null ? _b2 : []).some(matches);
+      if (foldOutlineSearch((_a3 = this.titles.get(node.id)) != null ? _a3 : node.path).includes(query)) return true;
+      return ((_b3 = children.get(node.id)) != null ? _b3 : []).some(matches);
     };
     const append = (node, depth) => {
-      var _a2, _b2, _c2;
+      var _a3, _b3, _c2;
       if (!matches(node)) return;
-      const descendants2 = (_a2 = children.get(node.id)) != null ? _a2 : [];
+      const descendants2 = (_a3 = children.get(node.id)) != null ? _a3 : [];
       const row = tree.createDiv("vam-outline-row");
       row.style.paddingLeft = `${8 + depth * 16}px`;
       if (descendants2.length) {
@@ -40534,7 +40561,7 @@ var OutlineView = class extends import_obsidian31.ItemView {
           this.renderTree();
         });
       } else row.createSpan("vam-outline-spacer");
-      const title = (_c2 = (_b2 = this.titles.get(node.id)) != null ? _b2 : node.path.split("/").pop()) != null ? _c2 : node.path;
+      const title = (_c2 = (_b3 = this.titles.get(node.id)) != null ? _b3 : node.path.split("/").pop()) != null ? _c2 : node.path;
       const button = row.createEl("button", { text: title, cls: "vam-outline-note" });
       button.title = title;
       button.setAttr("dir", "auto");
@@ -40569,7 +40596,7 @@ function groupRibbonIcons(map, coffee) {
   const classes = ["vam-ribbon-group", "vam-ribbon-group-start", "vam-ribbon-group-end"];
   parent.classList.add("vam-ribbon-container");
   const update = () => {
-    var _a, _b;
+    var _a2, _b2;
     observer.disconnect();
     for (const icon of [map, coffee]) icon.classList.remove(...classes);
     const present = [map, coffee].filter((icon) => icon.parentElement === parent);
@@ -40577,8 +40604,8 @@ function groupRibbonIcons(map, coffee) {
       if (icon !== parent.lastElementChild) parent.appendChild(icon);
     }
     for (const icon of present) icon.classList.add("vam-ribbon-group");
-    (_a = present[0]) == null ? void 0 : _a.classList.add("vam-ribbon-group-start");
-    (_b = present.at(-1)) == null ? void 0 : _b.classList.add("vam-ribbon-group-end");
+    (_a2 = present[0]) == null ? void 0 : _a2.classList.add("vam-ribbon-group-start");
+    (_b2 = present.at(-1)) == null ? void 0 : _b2.classList.add("vam-ribbon-group-end");
     observer.observe(parent, { childList: true });
   };
   const observer = new window.MutationObserver(() => update());
@@ -40640,8 +40667,8 @@ function bytesToBase64(bytes) {
   return btoa(binary2);
 }
 async function generatedImageDataUrl(image, readLocalFile) {
-  var _a, _b;
-  const inline = (_b = (_a = image.result) == null ? void 0 : _a.trim()) != null ? _b : "";
+  var _a2, _b2;
+  const inline = (_b2 = (_a2 = image.result) == null ? void 0 : _a2.trim()) != null ? _b2 : "";
   if (/^data:image\/(?:png|jpeg|webp);base64,/.test(inline)) return inline;
   if (/^[A-Za-z0-9+/=\s]{64,}$/.test(inline)) return `data:image/png;base64,${inline.replace(/\s/g, "")}`;
   if (!image.savedPath) throw new Error(t("ui.context_ai_image_not_generated"));
@@ -40683,7 +40710,7 @@ var CodexAppServerRuntime = class {
     }
   }
   stop() {
-    var _a;
+    var _a2;
     const error = new Error(t("ui.codex_app_server_has_stopped"));
     for (const entry of this.pending.values()) {
       window.clearTimeout(entry.timeout);
@@ -40695,18 +40722,18 @@ var CodexAppServerRuntime = class {
     }
     this.pending.clear();
     this.turns.clear();
-    (_a = this.child) == null ? void 0 : _a.kill();
+    (_a2 = this.child) == null ? void 0 : _a2.kill();
     this.child = null;
     this.initializing = null;
   }
   async listModels() {
-    var _a;
+    var _a2;
     await this.start();
     const models = [];
     let cursor = null;
     do {
       const response = await this.request("model/list", { cursor, limit: 100, includeHidden: false });
-      for (const value of (_a = response.data) != null ? _a : []) {
+      for (const value of (_a2 = response.data) != null ? _a2 : []) {
         if (!value || typeof value !== "object") continue;
         const item = value;
         const model = typeof item.model === "string" ? item.model.trim() : "";
@@ -40729,10 +40756,10 @@ var CodexAppServerRuntime = class {
     return [...new Map(models.map((model) => [model.model, model])).values()];
   }
   async runTask(prompt, model, effort, outputSchema, controls) {
-    var _a, _b, _c, _d, _e, _f, _g, _h, _i, _j, _k, _l, _m, _n, _o, _p, _q;
-    if ((_a = controls == null ? void 0 : controls.signal) == null ? void 0 : _a.aborted) throw cancelledError();
+    var _a2, _b2, _c, _d, _e, _f, _g, _h, _i, _j, _k, _l, _m, _n, _o, _p, _q;
+    if ((_a2 = controls == null ? void 0 : controls.signal) == null ? void 0 : _a2.aborted) throw cancelledError();
     await this.start();
-    if ((_b = controls == null ? void 0 : controls.signal) == null ? void 0 : _b.aborted) throw cancelledError();
+    if ((_b2 = controls == null ? void 0 : controls.signal) == null ? void 0 : _b2.aborted) throw cancelledError();
     let textConfig;
     if ((controls == null ? void 0 : controls.textOnly) || (controls == null ? void 0 : controls.webSearchOnly) || (controls == null ? void 0 : controls.generateImage)) {
       const effective = await this.request("config/read", { includeLayers: false, cwd: this.options.cwd });
@@ -40782,18 +40809,18 @@ var CodexAppServerRuntime = class {
     if (!threadId) throw new Error(t("ui.codex_app_server_did_not_create_a_thread"));
     let timedOut = false, interruptRequested = false;
     const completed = new Promise((resolve, reject) => {
-      var _a2, _b2;
+      var _a3, _b3;
       const timeout = window.setTimeout(() => {
-        var _a3;
+        var _a4;
         this.turns.delete(threadId);
         timedOut = true;
         interrupt(5e3, t("error.ai_task_stop_after_timeout_failed"));
         reject(
           new Error(
-            (_a3 = controls == null ? void 0 : controls.timeoutMessage) != null ? _a3 : (controls == null ? void 0 : controls.timeoutMs) ? t("ui.ai_task_exceeded_0_minutes", Math.ceil(controls.timeoutMs / 6e4)) : t("ui.the_ai_task_exceeded_3_minutes_vam_attempts_to_interrupt_it")
+            (_a4 = controls == null ? void 0 : controls.timeoutMessage) != null ? _a4 : (controls == null ? void 0 : controls.timeoutMs) ? t("ui.ai_task_exceeded_0_minutes", Math.ceil(controls.timeoutMs / 6e4)) : t("ui.the_ai_task_exceeded_3_minutes_vam_attempts_to_interrupt_it")
           )
         );
-      }, (_a2 = controls == null ? void 0 : controls.timeoutMs) != null ? _a2 : TURN_TIMEOUT_MS);
+      }, (_a3 = controls == null ? void 0 : controls.timeoutMs) != null ? _a3 : TURN_TIMEOUT_MS);
       this.turns.set(threadId, {
         messages: [],
         visibleMessages: /* @__PURE__ */ new Map(),
@@ -40805,7 +40832,7 @@ var CodexAppServerRuntime = class {
         countedSearchIds: /* @__PURE__ */ new Set(),
         webRetrievals: /* @__PURE__ */ new Set(),
         requireSearch: (controls == null ? void 0 : controls.webSearchOnly) === true,
-        searchBudget: (_b2 = controls == null ? void 0 : controls.searchBudget) != null ? _b2 : 0,
+        searchBudget: (_b3 = controls == null ? void 0 : controls.searchBudget) != null ? _b3 : 0,
         steered: false,
         onRequest: controls == null ? void 0 : controls.onRequest,
         onText: controls == null ? void 0 : controls.onText,
@@ -40821,8 +40848,8 @@ var CodexAppServerRuntime = class {
       interruptRequested = true;
       void this.request("turn/interrupt", { threadId, turnId: state.turnId }, timeoutMs).catch(
         (error) => {
-          var _a2, _b2;
-          return (_b2 = (_a2 = this.options).onLog) == null ? void 0 : _b2.call(_a2, "warn", `${failure}\uFF1A${error instanceof Error ? error.message : String(error)}`);
+          var _a3, _b3;
+          return (_b3 = (_a3 = this.options).onLog) == null ? void 0 : _b3.call(_a3, "warn", `${failure}\uFF1A${error instanceof Error ? error.message : String(error)}`);
         }
       );
     };
@@ -40854,10 +40881,10 @@ var CodexAppServerRuntime = class {
       if (!state.turnId) throw new Error("Codex App Server accepted no turn id.");
       if (!timedOut && !((_i = controls == null ? void 0 : controls.signal) == null ? void 0 : _i.aborted) && this.turns.get(threadId) === state) (_j = controls == null ? void 0 : controls.onAccepted) == null ? void 0 : _j.call(controls);
       (_k = controls == null ? void 0 : controls.onSteer) == null ? void 0 : _k.call(controls, async (text11) => {
-        var _a2, _b2;
-        if (((_a2 = controls.signal) == null ? void 0 : _a2.aborted) || this.turns.get(threadId) !== state || !state.turnId) throw cancelledError();
+        var _a3, _b3;
+        if (((_a3 = controls.signal) == null ? void 0 : _a3.aborted) || this.turns.get(threadId) !== state || !state.turnId) throw cancelledError();
         const steerRequest = { threadId, expectedTurnId: state.turnId, input: [{ type: "text", text: text11 }] };
-        (_b2 = controls == null ? void 0 : controls.onRequest) == null ? void 0 : _b2.call(controls, steerRequest);
+        (_b3 = controls == null ? void 0 : controls.onRequest) == null ? void 0 : _b3.call(controls, steerRequest);
         await this.request("turn/steer", steerRequest);
       });
       if (timedOut) interrupt(5e3, t("error.ai_task_stop_after_timeout_failed"));
@@ -40890,8 +40917,8 @@ var CodexAppServerRuntime = class {
     }
   }
   async startProcess() {
-    var _a, _b, _c, _d;
-    (_b = (_a = this.options).onLog) == null ? void 0 : _b.call(_a, "info", t("log.codex_starting_0", this.options.executable));
+    var _a2, _b2, _c, _d;
+    (_b2 = (_a2 = this.options).onLog) == null ? void 0 : _b2.call(_a2, "info", t("log.codex_starting_0", this.options.executable));
     this.buffer = "";
     this.stderr = "";
     const child = spawnProcess(
@@ -40958,7 +40985,7 @@ var CodexAppServerRuntime = class {
     }
   }
   handle(message) {
-    var _a, _b, _c, _d, _e, _f, _g, _h;
+    var _a2, _b2, _c, _d, _e, _f, _g, _h;
     if ("id" in message && "method" in message) {
       this.respondToServerRequest(message);
       return;
@@ -40987,9 +41014,9 @@ var CodexAppServerRuntime = class {
         state.streamItem = params.itemId;
         state.streamText = "";
       }
-      state.streamText = ((_a = state.streamText) != null ? _a : "") + params.delta;
+      state.streamText = ((_a2 = state.streamText) != null ? _a2 : "") + params.delta;
       if (typeof params.itemId === "string") state.visibleMessages.set(params.itemId, state.streamText);
-      (_b = state.onText) == null ? void 0 : _b.call(state, [...state.visibleMessages.values()].join("\n\n"));
+      (_b2 = state.onText) == null ? void 0 : _b2.call(state, [...state.visibleMessages.values()].join("\n\n"));
       return;
     }
     if (message.method === "item/started") {
@@ -41060,28 +41087,28 @@ var CodexAppServerRuntime = class {
     }
   }
   reportActivity(state, activity) {
-    var _a;
+    var _a2;
     try {
-      (_a = state.onActivity) == null ? void 0 : _a.call(state, activity);
+      (_a2 = state.onActivity) == null ? void 0 : _a2.call(state, activity);
     } catch (e) {
     }
   }
   forwardWebSearchEvent(state, method, params) {
-    var _a, _b;
+    var _a2, _b2;
     if (!state.onWebSearchEvent) return;
     try {
       const snapshot = JSON.parse(JSON.stringify(params));
       state.onWebSearchEvent({ method, params: snapshot });
     } catch (error) {
-      (_b = (_a = this.options).onLog) == null ? void 0 : _b.call(
-        _a,
+      (_b2 = (_a2 = this.options).onLog) == null ? void 0 : _b2.call(
+        _a2,
         "warn",
         t("log.codex_search_callback_failed_0", error instanceof Error ? error.message : String(error))
       );
     }
   }
   steerIfNeeded(threadId, state) {
-    var _a;
+    var _a2;
     if (this.turns.get(threadId) !== state || state.steered || !state.searchBudget || state.searches < state.searchBudget || !state.turnId)
       return;
     state.steered = true;
@@ -41090,12 +41117,12 @@ var CodexAppServerRuntime = class {
       expectedTurnId: state.turnId,
       input: [{ type: "text", text: searchBudgetExhaustedMessage() }]
     };
-    (_a = state.onRequest) == null ? void 0 : _a.call(state, steerRequest);
+    (_a2 = state.onRequest) == null ? void 0 : _a2.call(state, steerRequest);
     void this.request("turn/steer", steerRequest).catch(
       (error) => {
-        var _a2, _b;
-        return (_b = (_a2 = this.options).onLog) == null ? void 0 : _b.call(
-          _a2,
+        var _a3, _b2;
+        return (_b2 = (_a3 = this.options).onLog) == null ? void 0 : _b2.call(
+          _a3,
           "warn",
           t("log.codex_search_stop_undelivered_0", error instanceof Error ? error.message : String(error))
         );
@@ -41133,8 +41160,8 @@ var CodexAppServerRuntime = class {
 `);
   }
   failTurnOf(message, error) {
-    var _a, _b, _c;
-    (_b = (_a = this.options).onLog) == null ? void 0 : _b.call(_a, "warn", `Codex App Server turn failed while handling a message: ${error.message}`);
+    var _a2, _b2, _c;
+    (_b2 = (_a2 = this.options).onLog) == null ? void 0 : _b2.call(_a2, "warn", `Codex App Server turn failed while handling a message: ${error.message}`);
     const threadId = "params" in message && typeof ((_c = message.params) == null ? void 0 : _c.threadId) === "string" ? message.params.threadId : "";
     const state = threadId ? this.turns.get(threadId) : void 0;
     if (!state) return;
@@ -41146,9 +41173,9 @@ var CodexAppServerRuntime = class {
     state.reject(error);
   }
   failProcess(child, error) {
-    var _a, _b;
+    var _a2, _b2;
     if (this.child !== child) return;
-    (_b = (_a = this.options).onLog) == null ? void 0 : _b.call(_a, "error", error.message);
+    (_b2 = (_a2 = this.options).onLog) == null ? void 0 : _b2.call(_a2, "error", error.message);
     for (const entry of this.pending.values()) {
       window.clearTimeout(entry.timeout);
       entry.reject(error);
@@ -41336,12 +41363,12 @@ var ClaudeTranscriptFacts = class {
     this.structured = true;
   }
   read(item) {
-    var _a, _b, _c, _d, _e;
+    var _a2, _b2, _c, _d, _e;
     if (!item || typeof item !== "object") return;
     const record = item;
     if (record.type === "result") {
-      const input = (_a = record.usage) == null ? void 0 : _a.input_tokens;
-      const output = (_b = record.usage) == null ? void 0 : _b.output_tokens;
+      const input = (_a2 = record.usage) == null ? void 0 : _a2.input_tokens;
+      const output = (_b2 = record.usage) == null ? void 0 : _b2.output_tokens;
       if (typeof input === "number" || typeof output === "number")
         this.usage = {
           ...typeof input === "number" ? { inputTokens: input } : {},
@@ -41394,10 +41421,10 @@ var ClaudeStreamObserver = class {
   }
   /** Records the moment the prompt was written. */
   accepted() {
-    var _a, _b;
+    var _a2, _b2;
     if (this.milestoneData.acceptedAt) return;
     const at = this.milestoneData.acceptedAt = this.now();
-    ((_b = (_a = this.milestoneData).stages) != null ? _b : _a.stages = []).push({ stage: "waiting", at });
+    ((_b2 = (_a2 = this.milestoneData).stages) != null ? _b2 : _a2.stages = []).push({ stage: "waiting", at });
   }
   /** Whether any record showed the model working. */
   sawModel() {
@@ -41409,8 +41436,8 @@ var ClaudeStreamObserver = class {
     this.stopped = true;
     this.facts.markIncomplete();
     this.call(() => {
-      var _a, _b;
-      return (_b = (_a = this.hooks).onStructuredDelta) == null ? void 0 : _b.call(_a, null);
+      var _a2, _b2;
+      return (_b2 = (_a2 = this.hooks).onStructuredDelta) == null ? void 0 : _b2.call(_a2, null);
     });
   }
   /** The records already read stay; the milestones of the finished call. */
@@ -41418,7 +41445,7 @@ var ClaudeStreamObserver = class {
     return { ...this.milestoneData, ...this.facts.milestones() };
   }
   read(value) {
-    var _a, _b, _c, _d;
+    var _a2, _b2, _c, _d;
     if (!value || typeof value !== "object") return;
     const record = value;
     if (record.parent_tool_use_id) return;
@@ -41427,13 +41454,13 @@ var ClaudeStreamObserver = class {
     if (typeof record.type === "string" && MODEL_RECORDS.has(record.type) && !this.milestoneData.firstEventAt) {
       this.milestoneData.firstEventAt = this.now();
       this.call(() => {
-        var _a2, _b2;
-        return (_b2 = (_a2 = this.hooks).onFirstEvent) == null ? void 0 : _b2.call(_a2);
+        var _a3, _b3;
+        return (_b3 = (_a3 = this.hooks).onFirstEvent) == null ? void 0 : _b3.call(_a3);
       });
     }
     if (record.type === "stream_event") this.event(record.event);
     else if (record.type === "assistant") {
-      for (const block of (_b = (_a = record.message) == null ? void 0 : _a.content) != null ? _b : [])
+      for (const block of (_b2 = (_a2 = record.message) == null ? void 0 : _a2.content) != null ? _b2 : [])
         if (block.type === "tool_use" && typeof block.id === "string" && typeof block.name === "string") {
           this.toolStart(block.id, block.name);
           this.toolInput(block.id, block.input);
@@ -41445,7 +41472,7 @@ var ClaudeStreamObserver = class {
     }
   }
   event(event) {
-    var _a, _b;
+    var _a2, _b2;
     if (!event) return;
     if (event.type === "message_start") this.blocks.clear();
     else if (event.type === "content_block_start" && typeof event.index === "number") {
@@ -41457,7 +41484,7 @@ var ClaudeStreamObserver = class {
       }
     } else if (event.type === "content_block_delta" && event.delta) {
       if (event.delta.type === "text_delta") {
-        (_b = (_a = this.milestoneData).firstTextAt) != null ? _b : _a.firstTextAt = this.now();
+        (_b2 = (_a2 = this.milestoneData).firstTextAt) != null ? _b2 : _a2.firstTextAt = this.now();
         if (typeof event.delta.text === "string") this.facts.textDelta(event.delta.text);
       } else if (event.delta.type === "input_json_delta" && typeof event.delta.partial_json === "string" && typeof event.index === "number") {
         const block = this.blocks.get(event.index);
@@ -41468,8 +41495,8 @@ var ClaudeStreamObserver = class {
         const fields = this.preview.snapshot();
         if (fields.summary && !this.milestoneData.previewSummaryAt) this.milestoneData.previewSummaryAt = this.now();
         this.call(() => {
-          var _a2, _b2;
-          return (_b2 = (_a2 = this.hooks).onStructuredDelta) == null ? void 0 : _b2.call(_a2, fields);
+          var _a3, _b3;
+          return (_b3 = (_a3 = this.hooks).onStructuredDelta) == null ? void 0 : _b3.call(_a3, fields);
         });
       }
     } else if (event.type === "content_block_stop" && typeof event.index === "number") {
@@ -41483,11 +41510,11 @@ var ClaudeStreamObserver = class {
     }
   }
   toolStart(id, name) {
-    var _a, _b, _c, _d, _e;
+    var _a2, _b2, _c, _d, _e;
     if (this.tools.has(id)) return;
     const at = this.now();
     if (name === "WebSearch" || name === "WebFetch") {
-      const searches = (_b = (_a = this.milestoneData).searches) != null ? _b : _a.searches = [];
+      const searches = (_b2 = (_a2 = this.milestoneData).searches) != null ? _b2 : _a2.searches = [];
       const entry = { name };
       if (searches.length < LIST_LIMIT) {
         searches.push({ kind: name === "WebSearch" ? "search" : "openPage", startedAt: at });
@@ -41503,32 +41530,32 @@ var ClaudeStreamObserver = class {
       (_e = (_d = this.milestoneData).structuredStartAt) != null ? _e : _d.structuredStartAt = at;
       this.preview.start();
       this.call(() => {
-        var _a2, _b2;
-        return (_b2 = (_a2 = this.hooks).onStructuredDelta) == null ? void 0 : _b2.call(_a2, this.preview.snapshot());
+        var _a3, _b3;
+        return (_b3 = (_a3 = this.hooks).onStructuredDelta) == null ? void 0 : _b3.call(_a3, this.preview.snapshot());
       });
       this.setStage("writing");
     } else this.tools.set(id, { name });
   }
   toolInput(id, input) {
-    var _a;
+    var _a2;
     const tool = this.tools.get(id);
     if (!tool || tool.name !== "WebSearch" || !input || typeof input !== "object") return;
     const query = input.query;
     if (typeof query !== "string" || !query.trim()) return;
-    const entry = tool.search === void 0 ? void 0 : (_a = this.milestoneData.searches) == null ? void 0 : _a[tool.search];
+    const entry = tool.search === void 0 ? void 0 : (_a2 = this.milestoneData.searches) == null ? void 0 : _a2[tool.search];
     const text11 = query.trim().slice(0, QUERY_LIMIT);
     if ((entry == null ? void 0 : entry.query) === text11) return;
     if (entry) entry.query = text11;
     if (this.stage === "searching") this.call(() => {
-      var _a2, _b;
-      return (_b = (_a2 = this.hooks).onStage) == null ? void 0 : _b.call(_a2, "searching", text11);
+      var _a3, _b2;
+      return (_b2 = (_a3 = this.hooks).onStage) == null ? void 0 : _b2.call(_a3, "searching", text11);
     });
   }
   toolResult(id, failed) {
-    var _a;
+    var _a2;
     const tool = this.tools.get(id);
     if (!tool) return;
-    const entry = tool.search === void 0 ? void 0 : (_a = this.milestoneData.searches) == null ? void 0 : _a[tool.search];
+    const entry = tool.search === void 0 ? void 0 : (_a2 = this.milestoneData.searches) == null ? void 0 : _a2[tool.search];
     if (entry) {
       entry.completedAt = this.now();
       if (failed) entry.failed = true;
@@ -41537,20 +41564,20 @@ var ClaudeStreamObserver = class {
     else if (tool.name === "StructuredOutput" && failed && id === this.structuredId) {
       this.preview.reject();
       this.call(() => {
-        var _a2, _b;
-        return (_b = (_a2 = this.hooks).onStructuredDelta) == null ? void 0 : _b.call(_a2, null);
+        var _a3, _b2;
+        return (_b2 = (_a3 = this.hooks).onStructuredDelta) == null ? void 0 : _b2.call(_a3, null);
       });
     }
   }
   setStage(stage) {
-    var _a, _b;
+    var _a2, _b2;
     if (this.stage === stage && stage !== "searching") return;
     this.stage = stage;
-    const stages = (_b = (_a = this.milestoneData).stages) != null ? _b : _a.stages = [];
+    const stages = (_b2 = (_a2 = this.milestoneData).stages) != null ? _b2 : _a2.stages = [];
     if (stages.length < LIST_LIMIT) stages.push({ stage, at: this.now() });
     this.call(() => {
-      var _a2, _b2;
-      return (_b2 = (_a2 = this.hooks).onStage) == null ? void 0 : _b2.call(_a2, stage);
+      var _a3, _b3;
+      return (_b3 = (_a3 = this.hooks).onStage) == null ? void 0 : _b3.call(_a3, stage);
     });
   }
   call(callback) {
@@ -41634,10 +41661,10 @@ var ClaudeWebActivity = class {
     __publicField(this, "retrievals", 0);
   }
   read(value) {
-    var _a, _b;
+    var _a2, _b2;
     const record = value;
     if (!record || typeof record !== "object" || record.parent_tool_use_id) return;
-    for (const item of (_b = (_a = record.message) == null ? void 0 : _a.content) != null ? _b : []) {
+    for (const item of (_b2 = (_a2 = record.message) == null ? void 0 : _a2.content) != null ? _b2 : []) {
       if (record.type === "assistant" && item.type === "tool_use" && typeof item.id === "string" && (item.name === "WebSearch" || item.name === "WebFetch")) {
         this.pending.set(item.id, item.name === "WebSearch" ? "search" : "openPage");
         this.send({ method: "item/started", params: { item: { id: item.id, type: "webSearch", action: null } } });
@@ -41654,9 +41681,9 @@ var ClaudeWebActivity = class {
     }
   }
   send(event) {
-    var _a;
+    var _a2;
     try {
-      (_a = this.emit) == null ? void 0 : _a.call(this, event);
+      (_a2 = this.emit) == null ? void 0 : _a2.call(this, event);
     } catch (e) {
     }
   }
@@ -41677,8 +41704,8 @@ var ClaudeCodeCliRuntime = class {
     __publicField(this, "spawn");
     /** Set when this CLI rejected the stream flags at start-up; later observed calls use json mode straight away. */
     __publicField(this, "streamUnsupported", false);
-    var _a;
-    this.spawn = (_a = options.spawn) != null ? _a : import_node_child_process2.spawn;
+    var _a2;
+    this.spawn = (_a2 = options.spawn) != null ? _a2 : import_node_child_process2.spawn;
   }
   warmKey(args) {
     return [this.options.executable, this.options.cwd, ...args].join("\0");
@@ -41705,9 +41732,9 @@ var ClaudeCodeCliRuntime = class {
     return this.run(prompt, model, effort, outputSchema, controls, false);
   }
   async run(prompt, model, effort, outputSchema, controls, fallback) {
-    var _a, _b, _c, _d, _e, _f, _g, _h, _i;
-    if ((_a = controls.signal) == null ? void 0 : _a.aborted) {
-      (_b = this.options.warmPool) == null ? void 0 : _b.release();
+    var _a2, _b2, _c, _d, _e, _f, _g, _h, _i;
+    if ((_a2 = controls.signal) == null ? void 0 : _a2.aborted) {
+      (_b2 = this.options.warmPool) == null ? void 0 : _b2.release();
       throw abortError2();
     }
     const webSearch = (_d = controls.webSearch) != null ? _d : ((_c = controls.searchBudget) != null ? _c : 0) > 0;
@@ -41759,7 +41786,7 @@ var ClaudeCodeCliRuntime = class {
       }
     }
     return new Promise((resolve, reject) => {
-      var _a2, _b2, _c2, _d2, _e2, _f2;
+      var _a3, _b3, _c2, _d2, _e2, _f2;
       let child;
       try {
         child = warm != null ? warm : this.spawn(this.options.executable, args, {
@@ -41782,7 +41809,7 @@ var ClaudeCodeCliRuntime = class {
         onStructuredDelta: controls.onStructuredDelta
       }) : null;
       const readStreamLine = (line) => {
-        var _a3, _b3, _c3, _d3, _e3, _f3, _g2, _h2;
+        var _a4, _b4, _c3, _d3, _e3, _f3, _g2, _h2;
         if (!line.trim().startsWith("{")) return;
         let parsedLine;
         try {
@@ -41804,8 +41831,8 @@ var ClaudeCodeCliRuntime = class {
           }
           return;
         }
-        if (record.type === "stream_event" && ((_a3 = record.event) == null ? void 0 : _a3.type) === "message_start") currentText = "";
-        if (record.type === "stream_event" && ((_c3 = (_b3 = record.event) == null ? void 0 : _b3.delta) == null ? void 0 : _c3.type) === "text_delta" && typeof record.event.delta.text === "string") {
+        if (record.type === "stream_event" && ((_a4 = record.event) == null ? void 0 : _a4.type) === "message_start") currentText = "";
+        if (record.type === "stream_event" && ((_c3 = (_b4 = record.event) == null ? void 0 : _b4.delta) == null ? void 0 : _c3.type) === "text_delta" && typeof record.event.delta.text === "string") {
           currentText += record.event.delta.text;
           (_d3 = controls.onText) == null ? void 0 : _d3.call(controls, [streamText, currentText].filter(Boolean).join("\n\n"));
         }
@@ -41816,8 +41843,8 @@ var ClaudeCodeCliRuntime = class {
         }
         if (record.type === "assistant" && ((_g2 = record.message) == null ? void 0 : _g2.content)) {
           const complete = record.message.content.filter((item) => item.type === "text").map((item) => {
-            var _a4;
-            return (_a4 = item.text) != null ? _a4 : "";
+            var _a5;
+            return (_a5 = item.text) != null ? _a5 : "";
           }).join("\n");
           if (complete && !streamText.endsWith(complete)) {
             currentText = complete;
@@ -41826,14 +41853,14 @@ var ClaudeCodeCliRuntime = class {
         }
       };
       const cleanup = () => {
-        var _a3;
+        var _a4;
         window.clearTimeout(timeout);
-        (_a3 = controls.signal) == null ? void 0 : _a3.removeEventListener("abort", onAbort);
+        (_a4 = controls.signal) == null ? void 0 : _a4.removeEventListener("abort", onAbort);
       };
       const reportMilestones = (data) => {
-        var _a3;
+        var _a4;
         try {
-          if (Object.keys(data).length) (_a3 = controls.onMilestones) == null ? void 0 : _a3.call(controls, data);
+          if (Object.keys(data).length) (_a4 = controls.onMilestones) == null ? void 0 : _a4.call(controls, data);
         } catch (e) {
         }
       };
@@ -41846,11 +41873,11 @@ var ClaudeCodeCliRuntime = class {
         else resolve(result != null ? result : "");
       };
       const markAccepted = () => {
-        var _a3, _b3;
-        if (accepted || settled || ((_a3 = controls.signal) == null ? void 0 : _a3.aborted)) return;
+        var _a4, _b4;
+        if (accepted || settled || ((_a4 = controls.signal) == null ? void 0 : _a4.aborted)) return;
         accepted = true;
         observer == null ? void 0 : observer.accepted();
-        (_b3 = controls.onAccepted) == null ? void 0 : _b3.call(controls);
+        (_b4 = controls.onAccepted) == null ? void 0 : _b4.call(controls);
       };
       let killTimer;
       const stop = () => {
@@ -41871,15 +41898,15 @@ var ClaudeCodeCliRuntime = class {
       };
       const timeout = window.setTimeout(
         () => {
-          var _a3;
+          var _a4;
           stop();
           finish(
             new Error(
-              (_a3 = controls.timeoutMessage) != null ? _a3 : controls.timeoutMs ? t("ui.ai_task_exceeded_0_minutes", Math.ceil(controls.timeoutMs / 6e4)) : t("ui.the_ai_task_exceeded_3_minutes_vam_attempts_to_interrupt_it")
+              (_a4 = controls.timeoutMessage) != null ? _a4 : controls.timeoutMs ? t("ui.ai_task_exceeded_0_minutes", Math.ceil(controls.timeoutMs / 6e4)) : t("ui.the_ai_task_exceeded_3_minutes_vam_attempts_to_interrupt_it")
             )
           );
         },
-        (_b2 = (_a2 = controls.timeoutMs) != null ? _a2 : this.options.timeoutMs) != null ? _b2 : CLAUDE_TASK_TIMEOUT_MS
+        (_b3 = (_a3 = controls.timeoutMs) != null ? _a3 : this.options.timeoutMs) != null ? _b3 : CLAUDE_TASK_TIMEOUT_MS
       );
       (_c2 = controls.signal) == null ? void 0 : _c2.addEventListener("abort", onAbort, { once: true });
       child.stdout.on("data", (chunk) => {
@@ -41913,14 +41940,14 @@ var ClaudeCodeCliRuntime = class {
         finish(new Error(t("ui.could_not_start_claude_code_0_1", this.options.executable, error.message)));
       });
       child.on("close", (code) => {
-        var _a3, _b3;
+        var _a4, _b4;
         if (killTimer) window.clearTimeout(killTimer);
         if (settled) return;
         if (observer && code !== 0 && !finalResult && !observer.sawModel() && streamFlagsRejected(stderr)) {
           settled = true;
           cleanup();
           this.streamUnsupported = true;
-          (_b3 = (_a3 = this.options).onLog) == null ? void 0 : _b3.call(_a3, "warn", t("log.claude_stream_fallback"));
+          (_b4 = (_a4 = this.options).onLog) == null ? void 0 : _b4.call(_a4, "warn", t("log.claude_stream_fallback"));
           this.run(prompt, model, effort, outputSchema, controls, true).then(resolve, reject);
           return;
         }
@@ -41969,13 +41996,13 @@ var ClaudeCodeCliRuntime = class {
             const content = [...withImage && image ? [{ type: "image", source: image }] : [], { type: "text", text: text11 }];
             child.stdin.write(`${JSON.stringify({ type: "user", message: { role: "user", content } })}
 `, (error) => {
-              var _a3;
+              var _a4;
               if (error) {
                 stop();
                 finish(error);
                 return;
               }
-              if (!settled && !((_a3 = controls.signal) == null ? void 0 : _a3.aborted)) accepted2 == null ? void 0 : accepted2();
+              if (!settled && !((_a4 = controls.signal) == null ? void 0 : _a4.aborted)) accepted2 == null ? void 0 : accepted2();
             });
           };
           sendInput(prompt, markAccepted, true);
@@ -42012,9 +42039,9 @@ var ClaudeWarmPool = class {
     __publicField(this, "clock");
     __publicField(this, "idleMs");
     __publicField(this, "onLog");
-    var _a, _b;
-    this.clock = (_a = options.clock) != null ? _a : realClock;
-    this.idleMs = (_b = options.idleMs) != null ? _b : WARM_IDLE_MS;
+    var _a2, _b2;
+    this.clock = (_a2 = options.clock) != null ? _a2 : realClock;
+    this.idleMs = (_b2 = options.idleMs) != null ? _b2 : WARM_IDLE_MS;
     this.onLog = options.onLog;
   }
   /** True when a warm process is waiting. */
@@ -42095,10 +42122,10 @@ var ClaudeWarmPool = class {
   armIdle(slot) {
     this.clearIdle(slot);
     slot.idleTimer = this.clock.setTimeout(() => {
-      var _a;
+      var _a2;
       slot.idleTimer = void 0;
       if (this.slot === slot) {
-        (_a = this.onLog) == null ? void 0 : _a.call(this, "idle");
+        (_a2 = this.onLog) == null ? void 0 : _a2.call(this, "idle");
         this.release();
       }
     }, this.idleMs);
@@ -42112,8 +42139,8 @@ var ClaudeWarmPool = class {
 
 // core/ai-runtime-service.ts
 function currentProcessEnvironment() {
-  var _a, _b;
-  return (_b = (_a = window.process) == null ? void 0 : _a.env) != null ? _b : {};
+  var _a2, _b2;
+  return (_b2 = (_a2 = window.process) == null ? void 0 : _a2.env) != null ? _b2 : {};
 }
 function executableCandidates(configured, home, pathValue, nvmVersions = []) {
   if (configured.includes("/") || configured.includes("\\")) return [configured];
@@ -42158,8 +42185,8 @@ var shellExecutableProbe = {
     return runShell(FIRST_EXISTING_SCRIPT, candidates) || null;
   },
   listDirectory(directory) {
-    var _a;
-    return ((_a = runShell(LIST_DIRECTORY_SCRIPT, [directory])) != null ? _a : "").split("\n").filter(Boolean);
+    var _a2;
+    return ((_a2 = runShell(LIST_DIRECTORY_SCRIPT, [directory])) != null ? _a2 : "").split("\n").filter(Boolean);
   }
 };
 var AiRuntimeService = class {
@@ -42174,8 +42201,8 @@ var AiRuntimeService = class {
     this.warmPool = new ClaudeWarmPool({ clock: options.warmClock });
   }
   get probe() {
-    var _a;
-    return (_a = this.options.probe) != null ? _a : shellExecutableProbe;
+    var _a2;
+    return (_a2 = this.options.probe) != null ? _a2 : shellExecutableProbe;
   }
   /** Kills the pre-started Claude process, if any (unused dialog, Stop). */
   releaseWarm() {
@@ -42191,10 +42218,10 @@ var AiRuntimeService = class {
     this.reset();
   }
   reset() {
-    var _a, _b;
+    var _a2, _b2;
     this.warmPool.release();
-    (_a = this.codexRuntime) == null ? void 0 : _a.stop();
-    (_b = this.localCodexRuntime) == null ? void 0 : _b.stop();
+    (_a2 = this.codexRuntime) == null ? void 0 : _a2.stop();
+    (_b2 = this.localCodexRuntime) == null ? void 0 : _b2.stop();
     this.codexRuntime = null;
     this.localCodexRuntime = null;
     this.claudeRuntime = null;
@@ -42222,10 +42249,10 @@ var AiRuntimeService = class {
     return runtime;
   }
   claude(pluginDirectory) {
-    var _a;
+    var _a2;
     const executable = this.resolveExecutable(this.options.claudePath());
     const key2 = `${executable}\0${pluginDirectory}`;
-    if (((_a = this.claudeRuntime) == null ? void 0 : _a.key) === key2) return this.claudeRuntime.runtime;
+    if (((_a2 = this.claudeRuntime) == null ? void 0 : _a2.key) === key2) return this.claudeRuntime.runtime;
     const runtime = new ClaudeCodeCliRuntime({
       executable,
       cwd: pluginDirectory,
@@ -42360,8 +42387,8 @@ var ShallowExpansionCoordinator = class {
     return false;
   }
   isRunning(parentPath2) {
-    var _a;
-    return ((_a = this.states.get(parentPath2)) == null ? void 0 : _a.status) === "running";
+    var _a2;
+    return ((_a2 = this.states.get(parentPath2)) == null ? void 0 : _a2.status) === "running";
   }
   stopAll() {
     for (const state of this.states.values())
@@ -42479,9 +42506,9 @@ var ResearchProgressStore = class {
     for (const listener of [...this.listeners]) listener(path);
   }
   notifyThrottled(path) {
-    var _a;
+    var _a2;
     if (this.pending.has(path)) return;
-    const wait = ((_a = this.lastNotified.get(path)) != null ? _a : -Infinity) + PREVIEW_THROTTLE_MS - this.clock.now();
+    const wait = ((_a2 = this.lastNotified.get(path)) != null ? _a2 : -Infinity) + PREVIEW_THROTTLE_MS - this.clock.now();
     if (wait <= 0) {
       this.notify(path);
       return;
@@ -42756,8 +42783,8 @@ function readerFacingAimPhase(phase) {
   return !!phase && READER_FACING_PHASES.has(phase);
 }
 function aimPhase(task) {
-  var _a;
-  return (_a = task.match(/<!--\s*aim-phase:\s*([a-z-]+)\s*-->/)) == null ? void 0 : _a[1];
+  var _a2;
+  return (_a2 = task.match(/<!--\s*aim-phase:\s*([a-z-]+)\s*-->/)) == null ? void 0 : _a2[1];
 }
 function phaseGuidance(phase, language2, responseContract, structured = false) {
   const gapAuditContract = phase === "research-gap-audit" && responseContract === "aim-gap-audit";
@@ -42891,7 +42918,7 @@ function readerFacingDetail(context) {
   return context.promptProfile === "aim" ? readerFacingAimPhase(aimPhase(context.task)) : context.mode !== "decompose" && !context.intermediateDetail;
 }
 function generalTaskPrompt(context, language2, provider = "codex") {
-  var _a;
+  var _a2;
   const modeFragment = context.mode === "task" ? GENERAL_TASK : context.mode === "decompose" ? DECOMPOSE : context.mode === "synthesize" ? SYNTHESIZE : context.mode === "merge" ? MERGE : DEFAULT_TASK;
   const none = inLanguage(NONE, language2);
   return [
@@ -42905,7 +42932,7 @@ function generalTaskPrompt(context, language2, provider = "codex") {
     inLanguage(modeFragment, language2),
     context.mode !== "decompose" ? [
       context.detailFormat === "adaptive" ? inLanguage(ADAPTIVE_DETAIL_STRUCTURE, language2) : detailStructurePrompt(
-        (_a = context.detailTemplate) != null ? _a : standardTemplate(noteLanguageOf(language2)),
+        (_a2 = context.detailTemplate) != null ? _a2 : standardTemplate(noteLanguageOf(language2)),
         language2,
         (headings) => detailStructure(language2, headings)
       ),
@@ -42938,9 +42965,9 @@ function taskPrompt(context, language2, provider = "codex") {
 
 // core/steps/task/step.ts
 function taskStepId(context, role) {
-  var _a;
+  var _a2;
   if (role) return `task.${role}`;
-  return context.promptProfile === "aim" ? `aim.${(_a = aimPhase(context.task)) != null ? _a : "unspecified"}` : "task.run";
+  return context.promptProfile === "aim" ? `aim.${(_a2 = aimPhase(context.task)) != null ? _a2 : "unspecified"}` : "task.run";
 }
 function createTaskStep(id, schema) {
   return {
@@ -43041,7 +43068,7 @@ var AiTaskService = class {
   }
   /** `role` names the two reference rounds so they are logged as their own steps; every other request is a task or AIM step. */
   async execute(input, model, reasoning, signal, onExchange, onRequestAccepted, onWebSearchEvent, observer, role) {
-    var _a, _b, _c, _d;
+    var _a2, _b2, _c, _d;
     if (input.timeoutMs !== void 0 && (!Number.isInteger(input.timeoutMs) || input.timeoutMs < 18e4 || input.timeoutMs > 6e5))
       throw new Error("Invalid AI task timeout.");
     const provider = providerForModel(model);
@@ -43051,7 +43078,7 @@ var AiTaskService = class {
     if (estimateTokens(input.sourceContext) > 32e3) throw new Error(t("ui.source_context_exceeds_budget"));
     let context = input;
     let accepted = onRequestAccepted;
-    const referenceGroups = (_a = context.referenceGroups) != null ? _a : [];
+    const referenceGroups = (_a2 = context.referenceGroups) != null ? _a2 : [];
     if (referenceGroups.some((group) => group.documents.length)) {
       let acceptedOnce = false;
       accepted = onRequestAccepted ? () => {
@@ -43073,7 +43100,7 @@ var AiTaskService = class {
       throw new Error(t("ui.source_context_exceeds_budget"));
     }
     context = prepared.context;
-    if (!input.countRepair) (_c = input.onWorkingFindingsSent) == null ? void 0 : _c.call(input, (_b = context.workingFindings) != null ? _b : "");
+    if (!input.countRepair) (_c = input.onWorkingFindingsSent) == null ? void 0 : _c.call(input, (_b2 = context.workingFindings) != null ? _b2 : "");
     const pluginDirectory = this.options.pluginDirectory();
     const outputLanguage2 = (_d = context.outputLanguage) != null ? _d : this.options.language();
     const shape = taskResponseShape(context);
@@ -43128,12 +43155,12 @@ var AiTaskService = class {
         })
       );
       const sendOnce = (setup) => {
-        var _a2;
+        var _a3;
         return runner.send(step, {
           model,
           effort,
           topic: context.title,
-          mode: (_a2 = context.mode) != null ? _a2 : "task",
+          mode: (_a3 = context.mode) != null ? _a3 : "task",
           task: { ...controls, onWebSearchEvent, ...setup ? { ...setup.hooks, signal: setup.signal } : {} },
           finish: "caller",
           requestLog: "request",
@@ -43221,8 +43248,8 @@ var AiTaskService = class {
    * Never automatic. The task's own signal wins over a re-send.
    */
   async sendObserved(observer, taskSignal, accepted, send) {
-    var _a;
-    const clock = (_a = this.options.clock) != null ? _a : realClock3;
+    var _a2;
+    const clock = (_a2 = this.options.clock) != null ? _a2 : realClock3;
     const iso = () => new Date(clock.now()).toISOString();
     const safe = (callback) => {
       try {
@@ -43267,37 +43294,37 @@ var AiTaskService = class {
           if (firstEvent || !live()) return;
           extra.slowShownAt = iso();
           safe(() => {
-            var _a2;
-            return (_a2 = observer.onSlow) == null ? void 0 : _a2.call(observer, attemptId, true, resend);
+            var _a3;
+            return (_a3 = observer.onSlow) == null ? void 0 : _a3.call(observer, attemptId, true, resend);
           });
         }, FIRST_EVENT_WAIT_MS);
       };
       const seen = () => {
-        var _a2;
+        var _a3;
         if (!live()) return false;
         if (!firstEvent) {
           firstEvent = true;
           disarm();
-          (_a2 = extra.firstEventAt) != null ? _a2 : extra.firstEventAt = iso();
+          (_a3 = extra.firstEventAt) != null ? _a3 : extra.firstEventAt = iso();
           if (extra.slowShownAt) safe(() => {
-            var _a3;
-            return (_a3 = observer.onSlow) == null ? void 0 : _a3.call(observer, attemptId, false);
+            var _a4;
+            return (_a4 = observer.onSlow) == null ? void 0 : _a4.call(observer, attemptId, false);
           });
         }
         return true;
       };
       const stage = (name, query) => {
-        var _a2, _b;
-        const stages = (_a2 = extra.stages) != null ? _a2 : extra.stages = [];
-        if (stages.length < 20 && ((_b = stages.at(-1)) == null ? void 0 : _b.stage) !== name) stages.push({ stage: name, at: iso() });
+        var _a3, _b2;
+        const stages = (_a3 = extra.stages) != null ? _a3 : extra.stages = [];
+        if (stages.length < 20 && ((_b2 = stages.at(-1)) == null ? void 0 : _b2.stage) !== name) stages.push({ stage: name, at: iso() });
         safe(() => {
-          var _a3;
-          return (_a3 = observer.onStage) == null ? void 0 : _a3.call(observer, attemptId, name, query);
+          var _a4;
+          return (_a4 = observer.onStage) == null ? void 0 : _a4.call(observer, attemptId, name, query);
         });
       };
       safe(() => {
-        var _a2;
-        return (_a2 = observer.onAttempt) == null ? void 0 : _a2.call(observer, attemptId, attemptNumber);
+        var _a3;
+        return (_a3 = observer.onAttempt) == null ? void 0 : _a3.call(observer, attemptId, attemptNumber);
       });
       const setup = {
         signal: controller.signal,
@@ -43306,12 +43333,12 @@ var AiTaskService = class {
         hooks: {
           stream: true,
           onAccepted: () => {
-            var _a2;
+            var _a3;
             accepted == null ? void 0 : accepted();
             if (!live()) return;
             if (!extra.acceptedAt) {
               extra.acceptedAt = iso();
-              ((_a2 = extra.stages) != null ? _a2 : extra.stages = []).push({ stage: "waiting", at: extra.acceptedAt });
+              ((_a3 = extra.stages) != null ? _a3 : extra.stages = []).push({ stage: "waiting", at: extra.acceptedAt });
             }
             arm();
           },
@@ -43327,16 +43354,16 @@ var AiTaskService = class {
           },
           onStage: (name, query) => {
             if (seen()) safe(() => {
-              var _a2;
-              return (_a2 = observer.onStage) == null ? void 0 : _a2.call(observer, attemptId, name, query);
+              var _a3;
+              return (_a3 = observer.onStage) == null ? void 0 : _a3.call(observer, attemptId, name, query);
             });
           },
           onStructuredDelta: (fields) => {
             if (!seen()) return;
             const preview = fields ? { summary: fields.summary, detail: fields.detail } : null;
             safe(() => {
-              var _a2;
-              return (_a2 = observer.onPreview) == null ? void 0 : _a2.call(observer, attemptId, preview);
+              var _a3;
+              return (_a3 = observer.onPreview) == null ? void 0 : _a3.call(observer, attemptId, preview);
             });
           },
           onActivity: (activity) => {
@@ -43385,13 +43412,13 @@ var AiTaskService = class {
    * receives the chart entry's id so the caller can mark it failed when it decides not to apply the result.
    */
   async chartDetail(request) {
-    var _a, _b;
-    if ((_a = request.signal) == null ? void 0 : _a.aborted) throw new DOMException("Aborted", "AbortError");
+    var _a2, _b2;
+    if ((_a2 = request.signal) == null ? void 0 : _a2.aborted) throw new DOMException("Aborted", "AbortError");
     return this.addCharts(
       request.input,
       request.detail,
       request.countIssues,
-      (_b = request.input.outputLanguage) != null ? _b : this.options.language(),
+      (_b2 = request.input.outputLanguage) != null ? _b2 : this.options.language(),
       providerForModel(request.model),
       request.model,
       request.signal,
@@ -43401,8 +43428,8 @@ var AiTaskService = class {
   }
   /** Marks an exchange failed with the caller's reason (for example a stale chart that was not applied). */
   failExchange(id, reason) {
-    var _a;
-    if (id && this.options.exchangeLoggingEnabled()) (_a = this.options.exchanges()) == null ? void 0 : _a.failed(id, reason);
+    var _a2;
+    if (id && this.options.exchangeLoggingEnabled()) (_a2 = this.options.exchanges()) == null ? void 0 : _a2.failed(id, reason);
   }
   /** A guarded view of the exchange log: every write re-checks the logging setting. Null when logging is off. */
   exchangeSink() {
@@ -43420,18 +43447,18 @@ var AiTaskService = class {
     };
   }
   diagramsOn() {
-    var _a, _b;
-    return ((_b = (_a = this.options).diagramsEnabled) == null ? void 0 : _b.call(_a)) !== false;
+    var _a2, _b2;
+    return ((_b2 = (_a2 = this.options).diagramsEnabled) == null ? void 0 : _b2.call(_a2)) !== false;
   }
   /**
    * The chart step for a finished AIM conclusion (its final detail only, never interim or gap-audit text). Returns the
    * detail unchanged when diagrams are off or the step fails; only a stop throws.
    */
   async addDiagramsToDetail(request) {
-    var _a, _b;
+    var _a2, _b2;
     if (!this.diagramsOn()) return request.detail;
-    if ((_a = request.signal) == null ? void 0 : _a.aborted) throw new DOMException("Aborted", "AbortError");
-    (_b = request.onStart) == null ? void 0 : _b.call(request);
+    if ((_a2 = request.signal) == null ? void 0 : _a2.aborted) throw new DOMException("Aborted", "AbortError");
+    (_b2 = request.onStart) == null ? void 0 : _b2.call(request);
     const input = {
       title: request.title,
       summary: "",
@@ -43459,7 +43486,7 @@ var AiTaskService = class {
    * a stop leaves the detail unchanged, so a note is never worse for having been offered diagrams.
    */
   async addCharts(input, detail, countIssues, language2, provider, model, signal, sink, onExchange) {
-    var _a, _b, _c, _d;
+    var _a2, _b2, _c, _d;
     const existing = existingDiagrams(detail);
     const remaining = 3 - existing.count;
     if (remaining <= 0 || !detail.trim()) return detail;
@@ -43483,10 +43510,10 @@ var AiTaskService = class {
       })
     );
     const refuse = (code) => {
-      var _a2;
+      var _a3;
       console.warn("Visual Agent Map chart step", code);
       if (exchangeId && this.options.exchangeLoggingEnabled())
-        (_a2 = this.options.exchanges()) == null ? void 0 : _a2.failed(exchangeId, translate(this.options.language(), "log.chart_not_added_0", code));
+        (_a3 = this.options.exchanges()) == null ? void 0 : _a3.failed(exchangeId, translate(this.options.language(), "log.chart_not_added_0", code));
       return detail;
     };
     try {
@@ -43494,7 +43521,7 @@ var AiTaskService = class {
         model,
         effort: "low",
         topic: input.title,
-        mode: (_a = input.mode) != null ? _a : "task",
+        mode: (_a2 = input.mode) != null ? _a2 : "task",
         task: {
           signal,
           timeoutMs: 18e4,
@@ -43520,7 +43547,7 @@ var AiTaskService = class {
         if (JSON.stringify(after) !== JSON.stringify(countIssues)) return refuse("counts_changed");
       }
       if (this.options.exchangeLoggingEnabled() && exchangeId) {
-        (_b = this.options.exchanges()) == null ? void 0 : _b.parsed(exchangeId);
+        (_b2 = this.options.exchanges()) == null ? void 0 : _b2.parsed(exchangeId);
         (_c = this.options.exchanges()) == null ? void 0 : _c.completed(exchangeId);
       }
       return applied.detail;
@@ -43534,8 +43561,8 @@ var AiTaskService = class {
     }
   }
   async extractReferenceFindings(context, model, reasoning, signal, onRequestAccepted) {
-    var _a, _b, _c;
-    let working = referenceBatches((_a = context.referenceGroups) != null ? _a : []);
+    var _a2, _b2, _c;
+    let working = referenceBatches((_a2 = context.referenceGroups) != null ? _a2 : []);
     let round = 0;
     while (true) {
       round++;
@@ -43543,7 +43570,7 @@ var AiTaskService = class {
       const findings = [];
       for (let index = 0; index < batches.length; index++) {
         if (signal == null ? void 0 : signal.aborted) throw new DOMException("Aborted", "AbortError");
-        (_b = context.onProgress) == null ? void 0 : _b.call(context, t("ui.reference_processing_progress", index + 1, batches.length));
+        (_b2 = context.onProgress) == null ? void 0 : _b2.call(context, t("ui.reference_processing_progress", index + 1, batches.length));
         const result = await this.execute(
           {
             title: context.title,
@@ -43641,7 +43668,7 @@ var reframeStep = {
 // core/reframing-service.ts
 function providerReframeRunner(options, activeTasks) {
   return async (request, _prompt, _schema, signal, prepared) => {
-    var _a, _b, _c;
+    var _a2, _b2, _c;
     const key2 = `reframe:${(0, import_node_crypto15.randomUUID)()}`, controller = new AbortController();
     const abort = () => controller.abort();
     signal.addEventListener("abort", abort, { once: true });
@@ -43687,8 +43714,8 @@ function providerReframeRunner(options, activeTasks) {
       const { raw } = await new StepRunner(provider).send(prepared, controls);
       prepared.parse(raw);
       if (id) {
-        (_a = log()) == null ? void 0 : _a.parsed(id);
-        (_b = log()) == null ? void 0 : _b.completed(id);
+        (_a2 = log()) == null ? void 0 : _a2.parsed(id);
+        (_b2 = log()) == null ? void 0 : _b2.completed(id);
       }
       return raw;
     } catch (error) {
@@ -43796,8 +43823,8 @@ var outlineGenerateStep = {
   id: "outline-generate",
   version: 1,
   render: (request) => {
-    var _a;
-    const content = (_a = request.contentLanguage) != null ? _a : request.language;
+    var _a2;
+    const content = (_a2 = request.contentLanguage) != null ? _a2 : request.language;
     return renderTemplate(prompt_default3, {
       languageInstruction: inLanguageNaming({ zh: language_zh_default4, en: language_en_default4 }, content, { language: "region" }, "en"),
       preset: request.limits ? `${applyTopicToPreset(request.presetText, request.topic, content)}
@@ -44088,8 +44115,8 @@ function parseRelevanceGrade(raw, tree, language2 = "en", pinList = []) {
   return result;
 }
 var languageLine = (request) => {
-  var _a;
-  return inLanguageNaming({ zh: language_zh_default5, en: language_en_default5 }, (_a = request.contentLanguage) != null ? _a : request.language, {
+  var _a2;
+  return inLanguageNaming({ zh: language_zh_default5, en: language_en_default5 }, (_a2 = request.contentLanguage) != null ? _a2 : request.language, {
     language: "region"
   });
 };
@@ -44098,8 +44125,8 @@ var promptPinParts = (nodes, pinList) => {
   if (!pins.length) return void 0;
   const ids = positionIds(nodes.map((node) => node.id));
   const label = (id) => {
-    var _a;
-    return (_a = ids.short(id)) != null ? _a : id;
+    var _a2;
+    return (_a2 = ids.short(id)) != null ? _a2 : id;
   };
   const bounds = relevancePinBounds(nodes, pins).bounds;
   const boundOf = (bound) => ({
@@ -44116,8 +44143,8 @@ var promptPinParts = (nodes, pinList) => {
 var promptCards = (nodes, pinned) => {
   const ids = positionIds(nodes.map((node) => node.id));
   const label = (id) => {
-    var _a;
-    return (_a = ids.short(id)) != null ? _a : id;
+    var _a2;
+    return (_a2 = ids.short(id)) != null ? _a2 : id;
   };
   return nodes.map((node) => ({
     id: label(node.id),
@@ -44129,7 +44156,7 @@ var promptCards = (nodes, pinned) => {
   }));
 };
 var gradePrompt = (request) => {
-  var _a, _b, _c;
+  var _a2, _b2, _c;
   const parts = promptPinParts(request.nodes, request.pins);
   return renderTemplate(prompt_default4, {
     languageInstruction: languageLine(request),
@@ -44137,8 +44164,8 @@ var gradePrompt = (request) => {
 
 ` : "",
     goal: JSON.stringify(request.goal),
-    level: JSON.stringify((_a = request.level) != null ? _a : null),
-    context: JSON.stringify((_b = request.context) != null ? _b : null),
+    level: JSON.stringify((_a2 = request.level) != null ? _a2 : null),
+    context: JSON.stringify((_b2 = request.context) != null ? _b2 : null),
     nodes: JSON.stringify(promptCards(request.nodes, (_c = parts == null ? void 0 : parts.pinned) != null ? _c : /* @__PURE__ */ new Map()))
   });
 };
@@ -44164,26 +44191,26 @@ var relevanceGradeStep = {
 };
 var RELEVANCE_REPAIR_MAX_ROUNDS = 2;
 var ancestorChain = (nodes, tiers, parentId) => {
-  var _a;
+  var _a2;
   const ids = positionIds(nodes.map((node) => node.id));
   const label = (id) => {
-    var _a2;
-    return (_a2 = ids.short(id)) != null ? _a2 : id;
+    var _a3;
+    return (_a3 = ids.short(id)) != null ? _a3 : id;
   };
   const parentOf = new Map(nodes.map((node) => [node.id, node.parentId]));
   const result = [];
   const seen = /* @__PURE__ */ new Set();
   for (let id = parentId; id && !seen.has(id); id = parentOf.get(id)) {
     seen.add(id);
-    result.push({ id: label(id), tier: (_a = tiers.get(id)) != null ? _a : null });
+    result.push({ id: label(id), tier: (_a2 = tiers.get(id)) != null ? _a2 : null });
   }
   return result;
 };
 var promptViolations = (nodes, tiers, violations) => {
   const ids = positionIds(nodes.map((node) => node.id));
   const label = (id) => {
-    var _a;
-    return (_a = ids.short(id)) != null ? _a : id;
+    var _a2;
+    return (_a2 = ids.short(id)) != null ? _a2 : id;
   };
   return violations.map((violation) => ({
     ...violation,
@@ -44195,8 +44222,8 @@ var promptViolations = (nodes, tiers, violations) => {
 var promptItem = (nodes, item) => {
   const ids = positionIds(nodes.map((node) => node.id));
   const label = (id) => {
-    var _a;
-    return (_a = ids.short(id)) != null ? _a : id;
+    var _a2;
+    return (_a2 = ids.short(id)) != null ? _a2 : id;
   };
   const { anchor, ...rest } = item;
   return { ...rest, id: label(item.id), ...anchor ? { anchor: label(anchor) } : {} };
@@ -44224,11 +44251,11 @@ var relevanceGradeRepairStep = {
   parse: (raw, request) => parseRelevanceGrade(raw, request.nodes, request.language, request.pins)
 };
 var repairMissingPrompt = (request) => {
-  var _a;
+  var _a2;
   const ids = positionIds(request.nodes.map((node) => node.id));
   const label = (id) => {
-    var _a2;
-    return (_a2 = ids.short(id)) != null ? _a2 : id;
+    var _a3;
+    return (_a3 = ids.short(id)) != null ? _a3 : id;
   };
   const bounds = relevancePinBounds(request.nodes, effectivePins(request.nodes, request.pins)).bounds;
   const titleOf = new Map(request.nodes.map((node) => [node.id, node.title]));
@@ -44236,12 +44263,12 @@ var repairMissingPrompt = (request) => {
     originalPrompt: gradePrompt(request),
     previousReply: JSON.stringify({ items: request.previousReply.items.map((item) => promptItem(request.nodes, item)) }),
     missing: JSON.stringify(
-      ((_a = request.missing) != null ? _a : []).map((id) => {
-        var _a2, _b, _c, _d, _e;
+      ((_a2 = request.missing) != null ? _a2 : []).map((id) => {
+        var _a3, _b2, _c, _d, _e;
         return {
           id: label(id),
-          title: (_a2 = titleOf.get(id)) != null ? _a2 : "",
-          ...((_b = bounds.get(id)) == null ? void 0 : _b.min) ? { min: (_c = bounds.get(id)) == null ? void 0 : _c.min } : {},
+          title: (_a3 = titleOf.get(id)) != null ? _a3 : "",
+          ...((_b2 = bounds.get(id)) == null ? void 0 : _b2.min) ? { min: (_c = bounds.get(id)) == null ? void 0 : _c.min } : {},
           ...((_d = bounds.get(id)) == null ? void 0 : _d.max) ? { max: (_e = bounds.get(id)) == null ? void 0 : _e.max } : {}
         };
       })
@@ -44429,32 +44456,32 @@ var cardsToRecalibrate = (request) => cardsToGrade(request);
 var promptCards2 = (request) => {
   const ids = positionIds(request.nodes.map((node) => node.id));
   const label = (id) => {
-    var _a;
-    return (_a = ids.short(id)) != null ? _a : id;
+    var _a2;
+    return (_a2 = ids.short(id)) != null ? _a2 : id;
   };
   const pins = new Map(effectivePins(request.nodes, request.pins).map((pin) => [pin.id, pin.tier]));
   const tiers = new Map(currentTiers(request).map((entry) => [entry.id, entry.tier]));
   return request.nodes.map((node) => {
-    var _a, _b;
+    var _a2, _b2;
     return {
       id: label(node.id),
       title: node.title,
       summary: node.summary,
       parentId: node.parentId === null ? null : label(node.parentId),
       depth: node.depth,
-      ...node.parentId === null ? {} : { tier: (_b = (_a = pins.get(node.id)) != null ? _a : tiers.get(node.id)) != null ? _b : null },
+      ...node.parentId === null ? {} : { tier: (_b2 = (_a2 = pins.get(node.id)) != null ? _a2 : tiers.get(node.id)) != null ? _b2 : null },
       ...pins.has(node.id) ? { pinned: true } : {}
     };
   });
 };
 var recalibratePrompt = (request) => {
-  var _a, _b, _c, _d;
+  var _a2, _b2, _c, _d;
   const parts = promptPinParts(request.nodes, request.pins);
   return renderTemplate(prompt_default5, {
     languageInstruction: languageLine(request),
     goal: JSON.stringify(request.goal),
-    level: JSON.stringify((_a = request.level) != null ? _a : null),
-    context: JSON.stringify((_b = request.context) != null ? _b : null),
+    level: JSON.stringify((_a2 = request.level) != null ? _a2 : null),
+    context: JSON.stringify((_b2 = request.context) != null ? _b2 : null),
     pins: (_c = parts == null ? void 0 : parts.pins) != null ? _c : "[]",
     bounds: (_d = parts == null ? void 0 : parts.bounds) != null ? _d : "[]",
     nodes: JSON.stringify(promptCards2(request))
@@ -44581,12 +44608,12 @@ var RelevanceGradeService = class {
     }
   }
   async repair(request, signal, hooks, first, stopped, repairStep, repairRequest, send) {
-    var _a, _b;
+    var _a2, _b2;
     let failure = first;
     for (let round = 1; ; round++) {
       const prepared = prepareStep(repairStep(failure), repairRequest(failure));
       if (signal.aborted) throw stopped();
-      (_a = hooks.onRepair) == null ? void 0 : _a.call(hooks, round, failure.missing ? "missing-bounded" : "hierarchy");
+      (_a2 = hooks.onRepair) == null ? void 0 : _a2.call(hooks, round, failure.missing ? "missing-bounded" : "hierarchy");
       let raw = "";
       let failed;
       try {
@@ -44603,7 +44630,7 @@ var RelevanceGradeService = class {
       } catch (error) {
         if (!(error instanceof RelevanceGradeError) || !error.hierarchy) throw error;
         if (round >= RELEVANCE_REPAIR_MAX_ROUNDS)
-          throw error.hierarchy.missing ? new RelevanceGradeError("invalid", error.message, void 0, (_b = error.detail) != null ? _b : error.message) : new RelevanceGradeError(
+          throw error.hierarchy.missing ? new RelevanceGradeError("invalid", error.message, void 0, (_b2 = error.detail) != null ? _b2 : error.message) : new RelevanceGradeError(
             "invalid",
             translate(uiLocale(request.language), "error.relevance_grade_hierarchy"),
             void 0,
@@ -44626,12 +44653,12 @@ async function receiveVisualMapHandoff(artifact, options) {
   };
   try {
     await options.mutate(async () => {
-      var _a, _b, _c, _d, _e;
-      await ((_a = options.beforeWrite) == null ? void 0 : _a.call(options));
+      var _a2, _b2, _c, _d, _e;
+      await ((_a2 = options.beforeWrite) == null ? void 0 : _a2.call(options));
       targetPath = await options.repo.createMap(artifact.title.trim(), [], (folder) => record(folder.path));
       record(targetPath);
       const map = await options.repo.readMap(targetPath);
-      const model = typeof ((_b = artifact.metadata) == null ? void 0 : _b.model) === "string" ? artifact.metadata.model : options.defaultModel();
+      const model = typeof ((_b2 = artifact.metadata) == null ? void 0 : _b2.model) === "string" ? artifact.metadata.model : options.defaultModel();
       const reasoning = normalizeReasoningLevel((_c = artifact.metadata) == null ? void 0 : _c.reasoning);
       const links = artifact.sources.filter((source) => source.path).map((source) => `[[${source.path}|${source.label}]]`);
       const statement = "Simulated / unverified thinking source; not an adopted user conclusion.";
@@ -44645,8 +44672,8 @@ async function receiveVisualMapHandoff(artifact, options) {
         ...links,
         ...artifact.sources.map(
           (source) => {
-            var _a2, _b2;
-            return `Source identity: ${JSON.stringify({ experience: source.experience, sessionId: source.sessionId, artifactId: source.artifactId, path: source.path, identityKind: (_b2 = (_a2 = artifact.metadata) == null ? void 0 : _a2.sourceIdentityKind) != null ? _b2 : "unknown" })}`;
+            var _a3, _b3;
+            return `Source identity: ${JSON.stringify({ experience: source.experience, sessionId: source.sessionId, artifactId: source.artifactId, path: source.path, identityKind: (_b3 = (_a3 = artifact.metadata) == null ? void 0 : _a3.sourceIdentityKind) != null ? _b3 : "unknown" })}`;
           }
         ),
         `Insight snapshot:
@@ -44683,13 +44710,13 @@ var import_obsidian33 = require("obsidian");
 
 // experiences/markdown-context/action-plan.ts
 function parsePlan(raw) {
-  var _a, _b;
+  var _a2, _b2;
   const value = JSON.parse(
     raw.trim().replace(/^```(?:json)?\s*/, "").replace(/\s*```$/, "")
   );
   if (!value || typeof value !== "object") throw new Error("Invalid AI action plan");
   const plan = value;
-  if (!["transform", "research", "image_search", "diagram", "image_generate", "clarify"].includes((_a = plan.action) != null ? _a : "") || typeof plan.captionInstruction !== "string" || typeof plan.query !== "string" || typeof plan.instruction !== "string" || !["after", "replace"].includes((_b = plan.placement) != null ? _b : ""))
+  if (!["transform", "research", "image_search", "diagram", "image_generate", "clarify"].includes((_a2 = plan.action) != null ? _a2 : "") || typeof plan.captionInstruction !== "string" || typeof plan.query !== "string" || typeof plan.instruction !== "string" || !["after", "replace"].includes((_b2 = plan.placement) != null ? _b2 : ""))
     throw new Error("Invalid AI action plan");
   return plan;
 }
@@ -44800,14 +44827,14 @@ var ImageTranslateAction = class extends import_obsidian32.Component {
     const source = image.getAttribute("src");
     let current = image;
     const follow = () => {
-      var _a;
+      var _a2;
       if (!current.isConnected) {
         const again = Array.from(container.querySelectorAll("img")).find((item) => item.getAttribute("src") === source);
         if (again) current = again;
       }
       const image2 = current;
       const rect = image2.getBoundingClientRect();
-      const pane = (_a = image2.closest(".view-content")) == null ? void 0 : _a.getBoundingClientRect();
+      const pane = (_a2 = image2.closest(".view-content")) == null ? void 0 : _a2.getBoundingClientRect();
       const visible = image2.isConnected && rect.width > 0 && rect.height > 0;
       halo.toggleClass("is-hidden", !visible);
       if (visible) {
@@ -44828,9 +44855,9 @@ var ImageTranslateAction = class extends import_obsidian32.Component {
     follow();
   }
   stopHalo() {
-    var _a;
+    var _a2;
     window.cancelAnimationFrame(this.haloFrame);
-    (_a = this.halo) == null ? void 0 : _a.remove();
+    (_a2 = this.halo) == null ? void 0 : _a2.remove();
     this.halo = null;
   }
   /** Shows the action beside `image`; a translation already in progress keeps running in the background. */
@@ -44847,10 +44874,10 @@ var ImageTranslateAction = class extends import_obsidian32.Component {
     this.place(pill, rect.right - 8, rect.top + 8, "right");
   }
   hide() {
-    var _a, _b;
-    (_a = this.pill) == null ? void 0 : _a.remove();
+    var _a2, _b2;
+    (_a2 = this.pill) == null ? void 0 : _a2.remove();
     this.pill = null;
-    (_b = this.popover) == null ? void 0 : _b.remove();
+    (_b2 = this.popover) == null ? void 0 : _b2.remove();
     this.popover = null;
   }
   /** Fixed position near a point, kept inside the window; `align` says which edge the point marks. */
@@ -44862,7 +44889,7 @@ var ImageTranslateAction = class extends import_obsidian32.Component {
     element.style.top = `${Math.max(8, Math.min(y, window.innerHeight - height - 8))}px`;
   }
   openPopover() {
-    var _a;
+    var _a2;
     const target = this.target;
     const pill = this.pill;
     if (!target || !pill) return;
@@ -44884,7 +44911,7 @@ var ImageTranslateAction = class extends import_obsidian32.Component {
     field.createSpan({ text: t("ui.image_translate_language") });
     const select = field.createEl("select", { cls: "dropdown" });
     for (const option2 of SUPPORTED_LANGUAGES) select.createEl("option", { value: option2.id, text: option2.label });
-    select.value = (_a = this.language) != null ? _a : getUiLanguage();
+    select.value = (_a2 = this.language) != null ? _a2 : getUiLanguage();
     const status = popover.createDiv({ cls: "vam-image-action-status" });
     status.setAttribute("role", "status");
     status.setAttribute("aria-live", "polite");
@@ -44910,19 +44937,19 @@ var ImageTranslateAction = class extends import_obsidian32.Component {
     status.addClass("is-running");
     actions.empty();
     actions.createEl("button", { text: t("ui.context_ai_stop") }).addEventListener("click", () => {
-      var _a;
-      (_a = this.running) == null ? void 0 : _a.abort();
+      var _a2;
+      (_a2 = this.running) == null ? void 0 : _a2.abort();
       this.hide();
     });
   }
   async translate(target, language2, placement, status, actions) {
-    var _a, _b, _c;
+    var _a2, _b2, _c;
     if (this.running) return;
     const controller = new AbortController();
     this.running = controller;
     this.showRunning(status, actions);
     this.startHalo(target.image, target.view.containerEl);
-    const name = (_b = (_a = SUPPORTED_LANGUAGES.find((item) => item.id === language2)) == null ? void 0 : _a.name) != null ? _b : language2;
+    const name = (_b2 = (_a2 = SUPPORTED_LANGUAGES.find((item) => item.id === language2)) == null ? void 0 : _a2.name) != null ? _b2 : language2;
     let saved = null;
     try {
       const dataUrl = await this.options.run(
@@ -44966,10 +44993,10 @@ var ImageTranslateAction = class extends import_obsidian32.Component {
   async write(target, note, embed, placement) {
     let outcome = "ui.image_translate_appended";
     const edit = (text11) => {
-      var _a, _b, _c, _d;
+      var _a2, _b2, _c, _d;
       const copies = target.token ? occurrences(text11, target.token.text) : [];
       const at = target.token && copies.length === target.token.count ? copies[target.token.occurrence] : copies.length === 1 ? copies[0] : -1;
-      const token = (_b = (_a = target.token) == null ? void 0 : _a.text) != null ? _b : "";
+      const token = (_b2 = (_a2 = target.token) == null ? void 0 : _a2.text) != null ? _b2 : "";
       const unique2 = at >= 0;
       if (unique2 && placement === "replace") {
         outcome = "ui.image_translate_replaced";
@@ -44999,8 +45026,8 @@ ${embed}
 `;
     };
     const open = this.app.workspace.getLeavesOfType("markdown").map((leaf) => leaf.view).find((view) => {
-      var _a;
-      return view instanceof import_obsidian32.MarkdownView && ((_a = view.file) == null ? void 0 : _a.path) === note.path;
+      var _a2;
+      return view instanceof import_obsidian32.MarkdownView && ((_a2 = view.file) == null ? void 0 : _a2.path) === note.path;
     });
     if (open) {
       const editor = open.editor;
@@ -45160,8 +45187,8 @@ function locateImageToken(view, image, markdown, matches) {
     const from = lineOffset(Number(block.dataset.vamLineStart));
     const to = lineOffset(Number(block.dataset.vamLineEnd) + 1);
     const inside = matches.filter((match) => {
-      var _a, _b;
-      return ((_a = match.index) != null ? _a : -1) >= from && ((_b = match.index) != null ? _b : -1) < to;
+      var _a2, _b2;
+      return ((_a2 = match.index) != null ? _a2 : -1) >= from && ((_b2 = match.index) != null ? _b2 : -1) < to;
     });
     if (inside.length === 1) return toToken(inside[0]);
   }
@@ -45170,8 +45197,8 @@ function locateImageToken(view, image, markdown, matches) {
     const pos = cm == null ? void 0 : cm.posAtDOM(image);
     if (typeof pos === "number" && pos >= 0) {
       const nearest = [...matches].sort((a, b) => {
-        var _a, _b;
-        return Math.abs(((_a = a.index) != null ? _a : 0) - pos) - Math.abs(((_b = b.index) != null ? _b : 0) - pos);
+        var _a2, _b2;
+        return Math.abs(((_a2 = a.index) != null ? _a2 : 0) - pos) - Math.abs(((_b2 = b.index) != null ? _b2 : 0) - pos);
       })[0];
       if (nearest) return toToken(nearest);
     }
@@ -45214,59 +45241,59 @@ var MarkdownSelectionAi = class extends import_obsidian33.Component {
       this.app.workspace.on("editor-change", () => window.requestAnimationFrame(() => this.onSelectionActivity()))
     );
     this.registerDomEvent(document, "click", (event) => {
-      var _a;
+      var _a2;
       const image = event.target;
       if (!(image instanceof HTMLImageElement) || !this.options.autoOpen()) return;
       if (image.closest(".vam-context-ai-panel, .vam-image-action")) return;
       const view = this.app.workspace.getLeavesOfType("markdown").map((leaf) => leaf.view).find((candidate) => candidate instanceof import_obsidian33.MarkdownView && candidate.containerEl.contains(image));
       if (!(view instanceof import_obsidian33.MarkdownView) || !view.file) return;
       const markdown = view.editor.getValue();
-      const embeddedPath = (_a = image.closest(".internal-embed")) == null ? void 0 : _a.getAttribute("src");
+      const embeddedPath = (_a2 = image.closest(".internal-embed")) == null ? void 0 : _a2.getAttribute("src");
       const tokens2 = [...markdown.matchAll(/!\[\[[^\]\n]+\]\]|!\[[^\]\n]*\]\([^\n]+?\)/g)].filter((match) => {
-        var _a2, _b;
+        var _a3, _b2;
         if (embeddedPath) {
           const target2 = match[0].startsWith("![[") ? match[0].slice(3, -2).split("|")[0] : "";
           const source = this.app.metadataCache.getFirstLinkpathDest(embeddedPath.split("#")[0], view.file.path);
           const candidate = this.app.metadataCache.getFirstLinkpathDest(target2.split("#")[0], view.file.path);
           return !!source && source === candidate;
         }
-        const target = (_b = (_a2 = match[0].match(/\]\(([^)]+)\)$/)) == null ? void 0 : _a2[1]) == null ? void 0 : _b.replace(/^<|>$/g, "");
+        const target = (_b2 = (_a3 = match[0].match(/\]\(([^)]+)\)$/)) == null ? void 0 : _a3[1]) == null ? void 0 : _b2.replace(/^<|>$/g, "");
         return target === image.currentSrc || target === image.src;
       });
       this.imageAction.show(view, image, locateImageToken(view, image, markdown, tokens2));
     });
     this.registerDomEvent(window, "resize", () => {
-      var _a;
-      (_a = this.panel) == null ? void 0 : _a.reposition();
+      var _a2;
+      (_a2 = this.panel) == null ? void 0 : _a2.reposition();
       this.onSelectionActivity();
     });
     this.registerDomEvent(
       document,
       "scroll",
       (event) => {
-        var _a, _b;
+        var _a2, _b2;
         if (event.target instanceof Element && event.target.closest(".vam-context-ai-panel")) return;
         this.hideLauncher();
-        if (!((_a = this.panel) == null ? void 0 : _a.hasWork)) (_b = this.panel) == null ? void 0 : _b.close();
+        if (!((_a2 = this.panel) == null ? void 0 : _a2.hasWork)) (_b2 = this.panel) == null ? void 0 : _b2.close();
       },
       true
     );
   }
   onunload() {
-    var _a, _b;
-    (_a = this.panel) == null ? void 0 : _a.close();
-    (_b = this.launcher) == null ? void 0 : _b.remove();
+    var _a2, _b2;
+    (_a2 = this.panel) == null ? void 0 : _a2.close();
+    (_b2 = this.launcher) == null ? void 0 : _b2.remove();
     this.launcher = null;
   }
   onSelectionActivity() {
-    var _a;
+    var _a2;
     if (this.options.autoOpen()) this.updateLauncher();
-    else if (!((_a = this.panel) == null ? void 0 : _a.isOpen)) this.hideLauncher();
+    else if (!((_a2 = this.panel) == null ? void 0 : _a2.isOpen)) this.hideLauncher();
   }
   /** Captures the current selection; shows the launcher only when `showLauncher` is true. */
   updateLauncher(showLauncher = true) {
-    var _a, _b;
-    if ((_a = this.panel) == null ? void 0 : _a.isOpen) return;
+    var _a2, _b2;
+    if ((_a2 = this.panel) == null ? void 0 : _a2.isOpen) return;
     if (this.launcher && !this.launcher.isConnected) {
       this.app.workspace.containerEl.appendChild(this.launcher);
     }
@@ -45279,7 +45306,7 @@ var MarkdownSelectionAi = class extends import_obsidian33.Component {
       this.hideLauncher();
       return;
     }
-    const text11 = (view.getMode() === "source" ? view.editor.getSelection() : (_b = selection == null ? void 0 : selection.toString()) != null ? _b : "").trim();
+    const text11 = (view.getMode() === "source" ? view.editor.getSelection() : (_b2 = selection == null ? void 0 : selection.toString()) != null ? _b2 : "").trim();
     const rects = range == null ? void 0 : range.getClientRects();
     const editorSelection = view.containerEl.querySelector(".cm-selectionBackground");
     const rangeRect = (rects == null ? void 0 : rects.length) ? rects[rects.length - 1] : range == null ? void 0 : range.getBoundingClientRect();
@@ -45310,8 +45337,8 @@ var MarkdownSelectionAi = class extends import_obsidian33.Component {
     this.snapshot = null;
   }
   openForSelection(checking = false) {
-    var _a;
-    if ((_a = this.panel) == null ? void 0 : _a.isOpen) {
+    var _a2;
+    if ((_a2 = this.panel) == null ? void 0 : _a2.isOpen) {
       if (!checking) this.panel.focus();
       return true;
     }
@@ -45334,12 +45361,12 @@ var MarkdownSelectionAi = class extends import_obsidian33.Component {
     return true;
   }
   openForCurrentSelection() {
-    var _a;
+    var _a2;
     const snapshot = this.snapshot;
     if (!snapshot) return;
     this.hideLauncher();
     const model = this.options.model();
-    (_a = this.panel) == null ? void 0 : _a.close();
+    (_a2 = this.panel) == null ? void 0 : _a2.close();
     this.panel = new SelectionAiPanel(this.app, snapshot, model, this.options.language(), this.options.run);
     this.panel.open();
   }
@@ -45417,21 +45444,21 @@ var SelectionAiPanel = class extends import_obsidian33.Component {
     this.focus();
   }
   focus() {
-    var _a;
-    (_a = this.instruction) == null ? void 0 : _a.focus();
+    var _a2;
+    (_a2 = this.instruction) == null ? void 0 : _a2.focus();
   }
   /** Whether closing would lose something: a request in flight or a draft or image not yet inserted. */
   get hasWork() {
     return !!this.controller || !!this.resultActions && !this.resultActions.hidden;
   }
   reposition() {
-    var _a, _b, _c, _d, _e;
+    var _a2, _b2, _c, _d, _e;
     if (!this.isOpen) return;
     const rect = this.snapshot.rect;
     const width = Math.min(480, window.innerWidth - 24);
     this.modalEl.style.width = `${width}px`;
     this.modalEl.style.left = `${Math.max(12, Math.min(rect.left, window.innerWidth - width - 12))}px`;
-    const header = (_c = (_b = (_a = this.titleEl) == null ? void 0 : _a.parentElement) == null ? void 0 : _b.offsetHeight) != null ? _c : 0;
+    const header = (_c = (_b2 = (_a2 = this.titleEl) == null ? void 0 : _a2.parentElement) == null ? void 0 : _b2.offsetHeight) != null ? _c : 0;
     const natural = header + ((_e = (_d = this.contentEl) == null ? void 0 : _d.scrollHeight) != null ? _e : this.modalEl.scrollHeight);
     const height = Math.min(natural, window.innerHeight - 24);
     const top = Math.max(12, Math.min(rect.bottom + 8, window.innerHeight - height - 12));
@@ -45439,12 +45466,12 @@ var SelectionAiPanel = class extends import_obsidian33.Component {
     this.modalEl.style.maxHeight = `${window.innerHeight - top - 12}px`;
   }
   close(restoreFocus = true) {
-    var _a;
+    var _a2;
     if (!this.isOpen) return;
     this.isOpen = false;
     this.unload();
     this.modalEl.remove();
-    if (restoreFocus && ((_a = this.previousFocus) == null ? void 0 : _a.isConnected)) this.previousFocus.focus();
+    if (restoreFocus && ((_a2 = this.previousFocus) == null ? void 0 : _a2.isConnected)) this.previousFocus.focus();
   }
   onload() {
     this.titleEl.setText(t("ui.context_ai_title"));
@@ -45542,10 +45569,10 @@ var SelectionAiPanel = class extends import_obsidian33.Component {
     this.showResult(false);
   }
   onunload() {
-    var _a, _b;
-    (_a = this.controller) == null ? void 0 : _a.abort();
+    var _a2, _b2;
+    (_a2 = this.controller) == null ? void 0 : _a2.abort();
     this.controller = null;
-    (_b = this.previewChild) == null ? void 0 : _b.unload();
+    (_b2 = this.previewChild) == null ? void 0 : _b2.unload();
     this.contentEl.empty();
   }
   runCustom() {
@@ -45560,8 +45587,8 @@ var SelectionAiPanel = class extends import_obsidian33.Component {
   }
   /** Stops the running request and keeps the panel, the typed instruction and any earlier draft. */
   stop() {
-    var _a;
-    (_a = this.controller) == null ? void 0 : _a.abort();
+    var _a2;
+    (_a2 = this.controller) == null ? void 0 : _a2.abort();
     this.controller = null;
     this.setBusy(null);
     this.status.setText(t("ui.ai_task_cancelled"));
@@ -45600,14 +45627,14 @@ var SelectionAiPanel = class extends import_obsidian33.Component {
     if (visible) this.reposition();
   }
   async generate(prompt, label, requestedAction, trigger) {
-    var _a;
+    var _a2;
     if (this.controller) return;
     const controller = new AbortController();
     this.controller = controller;
     const output = this.output, status = this.status;
     const previousDraft = output.value;
     const previousInsertAfter = this.insertAfter;
-    (_a = this.previewChild) == null ? void 0 : _a.unload();
+    (_a2 = this.previewChild) == null ? void 0 : _a2.unload();
     this.previewChild = null;
     this.preview.empty();
     this.setBusy(trigger);
@@ -45658,9 +45685,9 @@ var SelectionAiPanel = class extends import_obsidian33.Component {
           choose.addEventListener("click", () => {
             if (this.controller) return;
             grid.querySelectorAll(".vam-context-ai-image-choice").forEach((item) => {
-              var _a2;
+              var _a3;
               item.toggleClass("is-selected", item === card);
-              (_a2 = item.querySelector("button")) == null ? void 0 : _a2.setAttribute("aria-checked", String(item === card));
+              (_a3 = item.querySelector("button")) == null ? void 0 : _a3.setAttribute("aria-checked", String(item === card));
             });
             const choice2 = new AbortController();
             this.controller = choice2;
@@ -45771,10 +45798,10 @@ ${caption.trim()}`;
     this.applyResult(this.output.value, action, this.status);
   }
   applyResult(result, action, status) {
-    var _a;
+    var _a2;
     const { view, path, markdown, text: text11, matchAt } = this.snapshot;
     const viewStillOpen = this.app.workspace.getLeavesOfType("markdown").some((leaf) => leaf.view === view);
-    if (!viewStillOpen || ((_a = view.file) == null ? void 0 : _a.path) !== path || view.editor.getValue() !== markdown) {
+    if (!viewStillOpen || ((_a2 = view.file) == null ? void 0 : _a2.path) !== path || view.editor.getValue() !== markdown) {
       status.setText(t("ui.context_ai_note_changed"));
       return;
     }
@@ -46001,21 +46028,21 @@ var VisualAgentMapPlugin = class extends import_obsidian34.Plugin {
       if (leaf.view instanceof OutlineView) leaf.view.setActive(path);
   }
   syncCoffeeOutline(view) {
-    var _a, _b;
+    var _a2, _b2;
     this.coffeeOutlineSource = view != null ? view : null;
     this.coffeeOutlineActive = !!view;
     for (const leaf of this.app.workspace.getLeavesOfType(OUTLINE_VIEW_TYPE))
       if (leaf.view instanceof OutlineView) {
         leaf.view.setCoffeeOutline(
-          (_b = (_a = this.coffeeOutlineSource) == null ? void 0 : _a.outlineSnapshot()) != null ? _b : null,
+          (_b2 = (_a2 = this.coffeeOutlineSource) == null ? void 0 : _a2.outlineSnapshot()) != null ? _b2 : null,
           this.coffeeOutlineActive,
           (id) => {
-            var _a2, _b2;
-            return (_b2 = (_a2 = this.coffeeOutlineSource) == null ? void 0 : _a2.locateSegment(id)) != null ? _b2 : false;
+            var _a3, _b3;
+            return (_b3 = (_a3 = this.coffeeOutlineSource) == null ? void 0 : _a3.locateSegment(id)) != null ? _b3 : false;
           },
           () => {
-            var _a2;
-            void ((_a2 = this.coffeeOutlineSource) == null ? void 0 : _a2.confirmFillSummaries());
+            var _a3;
+            void ((_a3 = this.coffeeOutlineSource) == null ? void 0 : _a3.confirmFillSummaries());
           }
         );
         if (!this.coffeeOutlineActive) leaf.view.setMap(this.outlineMap, this.outlineTitles, this.outlineSample);
@@ -46023,11 +46050,11 @@ var VisualAgentMapPlugin = class extends import_obsidian34.Plugin {
   }
   /** Called when a map view closes: the outline falls back to another open map, or empties. */
   releaseOutline(view) {
-    var _a;
+    var _a2;
     if (this.outlineSourceView !== view) return;
     this.outlineSourceView = null;
     const views = this.views().filter((other) => other !== view);
-    const next = (_a = views.find((other) => other === this.app.workspace.getActiveViewOfType(VisualAgentMapView))) != null ? _a : views[0];
+    const next = (_a2 = views.find((other) => other === this.app.workspace.getActiveViewOfType(VisualAgentMapView))) != null ? _a2 : views[0];
     if (next) this.useOutlineSource(next);
     else this.syncOutline(null, /* @__PURE__ */ new Map());
   }
@@ -46052,14 +46079,14 @@ var VisualAgentMapPlugin = class extends import_obsidian34.Plugin {
         );
   }
   async activateOutline(source) {
-    var _a, _b, _c, _d;
+    var _a2, _b2, _c, _d;
     const activeCoffeeView = this.app.workspace.getActiveViewOfType(CoffeeTablesView);
     if (activeCoffeeView) this.syncCoffeeOutline(activeCoffeeView);
-    let leaf = (_a = this.app.workspace.getLeavesOfType(OUTLINE_VIEW_TYPE)[0]) != null ? _a : null;
+    let leaf = (_a2 = this.app.workspace.getLeavesOfType(OUTLINE_VIEW_TYPE)[0]) != null ? _a2 : null;
     if (!leaf) leaf = this.app.workspace.getLeftLeaf(true);
     if (!leaf) throw new Error(t("ui.could_not_open_the_left_sidebar"));
     await leaf.setViewState({ type: OUTLINE_VIEW_TYPE, active: true });
-    this.syncCoffeeOutline((_b = this.coffeeOutlineSource) != null ? _b : void 0);
+    this.syncCoffeeOutline((_b2 = this.coffeeOutlineSource) != null ? _b2 : void 0);
     const mapView = (_d = (_c = source != null ? source : this.app.workspace.getActiveViewOfType(VisualAgentMapView)) != null ? _c : this.outlineSourceView) != null ? _d : this.views()[0];
     if (mapView) this.useOutlineSource(mapView);
     await this.app.workspace.revealLeaf(leaf);
@@ -46081,7 +46108,7 @@ var VisualAgentMapPlugin = class extends import_obsidian34.Plugin {
     void leaf.setViewState({ type: VIEW_TYPE, state: { file: path }, active: true }).catch((error) => new import_obsidian34.Notice(error instanceof Error ? error.message : String(error)));
   }
   async onload() {
-    var _a, _b;
+    var _a2, _b2;
     announceTestOverrides((message) => new import_obsidian34.Notice(message, 0));
     const saved = await this.loadData();
     const legacy = saved;
@@ -46109,7 +46136,7 @@ var VisualAgentMapPlugin = class extends import_obsidian34.Plugin {
       previewScale: (saved == null ? void 0 : saved.previewScale) !== void 0 ? clampPreviewScale(saved.previewScale) : legacyPreviewScale(saved == null ? void 0 : saved.previewSize),
       models: "",
       migrated: (saved == null ? void 0 : saved.migrated) === true,
-      structureVersion: (_a = saved == null ? void 0 : saved.structureVersion) != null ? _a : saved ? 1 : DEFAULT_SETTINGS.structureVersion,
+      structureVersion: (_a2 = saved == null ? void 0 : saved.structureVersion) != null ? _a2 : saved ? 1 : DEFAULT_SETTINGS.structureVersion,
       firstUseNoticeSeen: (saved == null ? void 0 : saved.firstUseNoticeSeen) === true,
       codexUsageNoticeSeen: (saved == null ? void 0 : saved.codexUsageNoticeSeen) === true,
       claudeUsageNoticeSeen: (saved == null ? void 0 : saved.claudeUsageNoticeSeen) === true,
@@ -46117,7 +46144,7 @@ var VisualAgentMapPlugin = class extends import_obsidian34.Plugin {
       markdownSelectionAiAutoOpen: (saved == null ? void 0 : saved.markdownSelectionAiAutoOpen) !== false,
       addDiagramsAfterResearch: (saved == null ? void 0 : saved.addDiagramsAfterResearch) !== false,
       workspaceInitialized: saved ? saved.workspaceInitialized !== false : false,
-      sampleTourVersionSeen: (_b = saved == null ? void 0 : saved.sampleTourVersionSeen) != null ? _b : 0,
+      sampleTourVersionSeen: (_b2 = saved == null ? void 0 : saved.sampleTourVersionSeen) != null ? _b2 : 0,
       canvasHintSeen: (saved == null ? void 0 : saved.canvasHintSeen) === true
     };
     setUiLanguage(this.settings.language);
@@ -46242,14 +46269,14 @@ var VisualAgentMapPlugin = class extends import_obsidian34.Plugin {
     });
     this.addLocalizedCommand(AIM_CREATE_MAP_COMMAND_ID, "ui.aim_create_map", () => {
       void this.activateView().then(() => {
-        var _a2;
-        return (_a2 = this.views()[0]) == null ? void 0 : _a2.openAimStart();
+        var _a3;
+        return (_a3 = this.views()[0]) == null ? void 0 : _a3.openAimStart();
       }).catch((error) => new import_obsidian34.Notice(String(error)));
     });
     this.addLocalizedCommand("import-outline", "ui.outline_import", () => {
       void this.activateView().then(() => {
-        var _a2;
-        return (_a2 = this.views()[0]) == null ? void 0 : _a2.openOutlineImport();
+        var _a3;
+        return (_a3 = this.views()[0]) == null ? void 0 : _a3.openOutlineImport();
       }).catch((error) => new import_obsidian34.Notice(String(error)));
     });
     this.addLocalizedCommand("open-topic-outline", "ui.open_topic_outline", () => {
@@ -46323,10 +46350,10 @@ var VisualAgentMapPlugin = class extends import_obsidian34.Plugin {
     this.registerEvent(this.app.workspace.on("active-leaf-change", (leaf) => this.onActiveLeafChange(leaf)));
     this.registerEvent(
       this.app.workspace.on("file-open", (file) => {
-        var _a2;
+        var _a3;
         for (const leaf of this.app.workspace.getLeavesOfType("markdown")) this.styleNodeLeaf(leaf);
         for (const leaf of this.app.workspace.getLeavesOfType(OUTLINE_VIEW_TYPE))
-          if (leaf.view instanceof OutlineView) leaf.view.setActive((_a2 = file == null ? void 0 : file.path) != null ? _a2 : "");
+          if (leaf.view instanceof OutlineView) leaf.view.setActive((_a3 = file == null ? void 0 : file.path) != null ? _a3 : "");
       })
     );
     this.app.workspace.onLayoutReady(() => {
@@ -46375,7 +46402,7 @@ var VisualAgentMapPlugin = class extends import_obsidian34.Plugin {
         if (file.path === oldPath) return;
         const external = !this.writing;
         this.runMutation(async () => {
-          var _a;
+          var _a2;
           await this.repo.replaceSourcePath(oldPath, file.path);
           let mapChanged = false;
           for (const { file: mapFile, map } of await this.repo.readableMaps()) {
@@ -46384,7 +46411,7 @@ var VisualAgentMapPlugin = class extends import_obsidian34.Plugin {
               mapChanged = true;
             }
           }
-          const frontmatter2 = (_a = this.app.metadataCache.getFileCache(file)) == null ? void 0 : _a.frontmatter;
+          const frontmatter2 = (_a2 = this.app.metadataCache.getFileCache(file)) == null ? void 0 : _a2.frontmatter;
           const vamFile = [frontmatter2 == null ? void 0 : frontmatter2["agent-map-node"], frontmatter2 == null ? void 0 : frontmatter2["visual-agent-map"]].some(
             (value) => value === true || value === "true"
           );
@@ -46396,12 +46423,12 @@ var VisualAgentMapPlugin = class extends import_obsidian34.Plugin {
   }
   /** One Notice and log line per scan; the same map and error is not repeated within a few seconds (one rename = two scans). */
   reportUnreadableMaps(failures) {
-    var _a;
+    var _a2;
     const now = Date.now();
     for (const { path, error } of failures) {
       const key2 = `${path}
 ${error}`;
-      if (now - ((_a = this.unreadableReported.get(key2)) != null ? _a : 0) < 5e3) continue;
+      if (now - ((_a2 = this.unreadableReported.get(key2)) != null ? _a2 : 0) < 5e3) continue;
       this.unreadableReported.set(key2, now);
       const message = t("ui.map_unreadable_skipped_0_1", path, error);
       this.logs.appendLog("warn", message);
@@ -46635,21 +46662,21 @@ ${t("ui.organize_link_wait_hint")}`;
     return [...new Set(models)];
   }
   async refreshCoffeeModels() {
-    var _a;
+    var _a2;
     const states = await Promise.all([this.refreshModelDiscovery("codex"), this.refreshModelDiscovery("claude")]);
     for (const state of states)
       if (state.status === "error")
-        this.logs.appendLog("warn", `${state.provider} model discovery failed: ${(_a = state.error) != null ? _a : "unknown error"}`);
+        this.logs.appendLog("warn", `${state.provider} model discovery failed: ${(_a2 = state.error) != null ? _a2 : "unknown error"}`);
     return this.availableModels();
   }
   coffeeReasoningEfforts(model) {
-    var _a, _b;
+    var _a2, _b2;
     if (providerForModel(model) === "claude") return ["low", "medium", "high"];
-    return (_b = (_a = this.modelDiscovery.state("codex").reasoningEfforts) == null ? void 0 : _a[model]) != null ? _b : [];
+    return (_b2 = (_a2 = this.modelDiscovery.state("codex").reasoningEfforts) == null ? void 0 : _a2[model]) != null ? _b2 : [];
   }
   modelLabel(model) {
-    var _a, _b;
-    return (_b = (_a = CLAUDE_MODEL_CHOICES.find((choice2) => choice2.id === model)) == null ? void 0 : _a.label) != null ? _b : `${t("ui.codex_provider_label")} \xB7 ${model}`;
+    var _a2, _b2;
+    return (_b2 = (_a2 = CLAUDE_MODEL_CHOICES.find((choice2) => choice2.id === model)) == null ? void 0 : _a2.label) != null ? _b2 : `${t("ui.codex_provider_label")} \xB7 ${model}`;
   }
   usageNoticeSeen(model) {
     return providerForModel(model) === "claude" ? this.settings.claudeUsageNoticeSeen : this.settings.codexUsageNoticeSeen;
@@ -46673,7 +46700,7 @@ ${t("ui.organize_link_wait_hint")}`;
     }).open();
   }
   async recheckCodex(showGuide = true) {
-    var _a;
+    var _a2;
     const diagnostic = this.codexDiagnostic();
     if (!diagnostic.installed) {
       if (showGuide) this.openCodexSetupGuide();
@@ -46686,7 +46713,7 @@ ${t("ui.organize_link_wait_hint")}`;
       new import_obsidian34.Notice(
         t(
           "ui.codex_app_server_check_failed_0",
-          this.recordFailure(t("log.codex_recheck_failed"), (_a = state.error) != null ? _a : "unknown error")
+          this.recordFailure(t("log.codex_recheck_failed"), (_a2 = state.error) != null ? _a2 : "unknown error")
         )
       );
     else new import_obsidian34.Notice(t("ui.codex_cli_was_not_found_0_set_the_codex_cli_path_in_vam_sett", diagnostic.executable));
@@ -46755,13 +46782,13 @@ ${t("ui.organize_link_wait_hint")}`;
     }
   }
   isMap(file) {
-    var _a, _b;
-    const marker5 = (_b = (_a = this.app.metadataCache.getFileCache(file)) == null ? void 0 : _a.frontmatter) == null ? void 0 : _b["visual-agent-map"];
+    var _a2, _b2;
+    const marker5 = (_b2 = (_a2 = this.app.metadataCache.getFileCache(file)) == null ? void 0 : _a2.frontmatter) == null ? void 0 : _b2["visual-agent-map"];
     return marker5 === true || marker5 === "true" || file.extension === "md" && (file.path.startsWith(`${this.settings.mapsFolder}/`) || isManagedMapPath(this.settings, file.path) && file.name === "Map.md");
   }
   isNode(file) {
-    var _a, _b;
-    const marker5 = (_b = (_a = this.app.metadataCache.getFileCache(file)) == null ? void 0 : _a.frontmatter) == null ? void 0 : _b["agent-map-node"];
+    var _a2, _b2;
+    const marker5 = (_b2 = (_a2 = this.app.metadataCache.getFileCache(file)) == null ? void 0 : _a2.frontmatter) == null ? void 0 : _b2["agent-map-node"];
     return marker5 === true || marker5 === "true" || file.extension === "md" && (file.path.startsWith(`${this.settings.notesFolder}/`) || isManagedMapPath(this.settings, file.path));
   }
   styleNodeLeaf(leaf) {
@@ -46769,10 +46796,10 @@ ${t("ui.organize_link_wait_hint")}`;
     leaf.view.containerEl.toggleClass("vam-topic-markdown", !!leaf.view.file && this.isNode(leaf.view.file));
   }
   onunload() {
-    var _a, _b;
+    var _a2, _b2;
     this.abortChartJobs();
-    (_a = this.repo) == null ? void 0 : _a.dispose();
-    void ((_b = this.coffeeManager) == null ? void 0 : _b.stop());
+    (_a2 = this.repo) == null ? void 0 : _a2.dispose();
+    void ((_b2 = this.coffeeManager) == null ? void 0 : _b2.stop());
     this.coffeeManager = null;
     if (this.externalReconcileTimer !== null) window.clearTimeout(this.externalReconcileTimer);
     this.externalReconcileTimer = null;
@@ -46785,13 +46812,13 @@ ${t("ui.organize_link_wait_hint")}`;
     await this.saveData(this.settings);
   }
   async changeLanguage(value) {
-    var _a, _b;
+    var _a2, _b2;
     const next = uiLocale(value);
     if (this.languageSwitchPending || next === this.settings.language) return false;
     const previous = this.settings.language;
     this.languageSwitchPending = true;
     try {
-      (_a = this.settingTab) == null ? void 0 : _a.refreshAfterLanguageChange();
+      (_a2 = this.settingTab) == null ? void 0 : _a2.refreshAfterLanguageChange();
       const nextSettings = { ...this.settings, language: next };
       try {
         await this.saveData(nextSettings);
@@ -46830,16 +46857,16 @@ ${t("ui.organize_link_wait_hint")}`;
       return true;
     } finally {
       this.languageSwitchPending = false;
-      (_b = this.settingTab) == null ? void 0 : _b.refreshAfterLanguageChange();
+      (_b2 = this.settingTab) == null ? void 0 : _b2.refreshAfterLanguageChange();
     }
   }
   addLocalizedCommand(id, key2, callback) {
     this.localizedCommands.push({ command: this.addCommand({ id, name: t(key2), callback }), key: key2 });
   }
   refreshLocalizedEntrypoints() {
-    var _a, _b;
-    (_a = this.ribbonIcon) == null ? void 0 : _a.setAttribute("aria-label", translate(this.settings.language, "ui.open_map"));
-    (_b = this.coffeeRibbonIcon) == null ? void 0 : _b.setAttribute("aria-label", translate(this.settings.language, "ui.open_coffee_tables"));
+    var _a2, _b2;
+    (_a2 = this.ribbonIcon) == null ? void 0 : _a2.setAttribute("aria-label", translate(this.settings.language, "ui.open_map"));
+    (_b2 = this.coffeeRibbonIcon) == null ? void 0 : _b2.setAttribute("aria-label", translate(this.settings.language, "ui.open_coffee_tables"));
     for (const { command, key: key2 } of this.localizedCommands)
       command.name = `Visual Agent Map (VAM): ${translate(this.settings.language, key2)}`;
   }
@@ -46951,25 +46978,25 @@ ${t("ui.organize_link_wait_hint")}`;
     if (split.collapsed) return false;
     return this.app.workspace.getLeavesOfType("markdown").some(
       (leaf) => {
-        var _a, _b;
-        return leaf.getRoot() === split && leaf.view instanceof import_obsidian34.MarkdownView && !!leaf.view.file && ((_b = (_a = this.app.metadataCache.getFileCache(leaf.view.file)) == null ? void 0 : _a.frontmatter) == null ? void 0 : _b["agent-map-node"]) === true && leaf.view.containerEl.isShown();
+        var _a2, _b2;
+        return leaf.getRoot() === split && leaf.view instanceof import_obsidian34.MarkdownView && !!leaf.view.file && ((_b2 = (_a2 = this.app.metadataCache.getFileCache(leaf.view.file)) == null ? void 0 : _a2.frontmatter) == null ? void 0 : _b2["agent-map-node"]) === true && leaf.view.containerEl.isShown();
       }
     );
   }
   async openDetails(file) {
-    var _a, _b;
+    var _a2, _b2;
     const markdownLeaves = this.app.workspace.getLeavesOfType("markdown");
     if (this.detailsLeaf && (!markdownLeaves.includes(this.detailsLeaf) || this.detailsLeaf.getRoot() !== this.app.workspace.rightSplit))
       this.detailsLeaf = null;
     if (!this.detailsLeaf) {
-      this.detailsLeaf = (_b = (_a = markdownLeaves.filter(
+      this.detailsLeaf = (_b2 = (_a2 = markdownLeaves.filter(
         (leaf) => {
-          var _a2, _b2;
-          return leaf.getRoot() === this.app.workspace.rightSplit && leaf.view instanceof import_obsidian34.MarkdownView && !!leaf.view.file && ((_b2 = (_a2 = this.app.metadataCache.getFileCache(leaf.view.file)) == null ? void 0 : _a2.frontmatter) == null ? void 0 : _b2["agent-map-node"]) === true;
+          var _a3, _b3;
+          return leaf.getRoot() === this.app.workspace.rightSplit && leaf.view instanceof import_obsidian34.MarkdownView && !!leaf.view.file && ((_b3 = (_a3 = this.app.metadataCache.getFileCache(leaf.view.file)) == null ? void 0 : _a3.frontmatter) == null ? void 0 : _b3["agent-map-node"]) === true;
         }
       ).sort(
         (a, b) => a.view.containerEl.getBoundingClientRect().top - b.view.containerEl.getBoundingClientRect().top
-      )[0]) != null ? _a : this.app.workspace.getRightLeaf(false)) != null ? _b : this.app.workspace.getRightLeaf(true);
+      )[0]) != null ? _a2 : this.app.workspace.getRightLeaf(false)) != null ? _b2 : this.app.workspace.getRightLeaf(true);
     }
     if (!this.detailsLeaf) throw new Error(t("ui.unable_to_open_the_right_details_sidebar"));
     await this.detailsLeaf.openFile(file);
@@ -46978,8 +47005,8 @@ ${t("ui.organize_link_wait_hint")}`;
     await this.app.workspace.revealLeaf(this.detailsLeaf);
   }
   closeStaleDetails() {
-    var _a, _b, _c, _d;
-    const closed = ((_a = this.detailsLeaf) == null ? void 0 : _a.view) instanceof import_obsidian34.MarkdownView && ((_b = this.detailsLeaf.view.file) == null ? void 0 : _b.path) === this.detailsPath;
+    var _a2, _b2, _c, _d;
+    const closed = ((_a2 = this.detailsLeaf) == null ? void 0 : _a2.view) instanceof import_obsidian34.MarkdownView && ((_b2 = this.detailsLeaf.view.file) == null ? void 0 : _b2.path) === this.detailsPath;
     if (closed) {
       this.detailsLeaf.detach();
       this.app.workspace.trigger("file-open", null);
@@ -47032,12 +47059,12 @@ ${t("ui.organize_link_wait_hint")}`;
         timeoutMs: 15 * 60 * 1e3,
         timeoutMessage: t("ui.coffee_generation_timed_out"),
         onText: (text11) => {
-          var _a;
-          return (_a = request.onText) == null ? void 0 : _a.call(request, text11);
+          var _a2;
+          return (_a2 = request.onText) == null ? void 0 : _a2.call(request, text11);
         },
         onSteer: (handler) => {
-          var _a;
-          return (_a = request.registerIntervention) == null ? void 0 : _a.call(request, handler);
+          var _a2;
+          return (_a2 = request.registerIntervention) == null ? void 0 : _a2.call(request, handler);
         },
         onRequest: (data) => {
           if (this.settings.aiExchangeLoggingEnabled)
@@ -47061,7 +47088,7 @@ ${t("ui.organize_link_wait_hint")}`;
     }
   }
   async markdownContextImage(image, signal) {
-    var _a, _b, _c, _d;
+    var _a2, _b2, _c, _d;
     if (signal.aborted || !image.complete || !image.naturalWidth) throw new Error(t("ui.context_ai_image_unavailable"));
     try {
       const canvas = createEl("canvas");
@@ -47076,7 +47103,7 @@ ${t("ui.organize_link_wait_hint")}`;
     } catch (e) {
     }
     let bytes;
-    const embeddedPath = (_b = (_a = image.closest(".internal-embed")) == null ? void 0 : _a.getAttribute("src")) == null ? void 0 : _b.split("#")[0];
+    const embeddedPath = (_b2 = (_a2 = image.closest(".internal-embed")) == null ? void 0 : _a2.getAttribute("src")) == null ? void 0 : _b2.split("#")[0];
     const view = this.app.workspace.getLeavesOfType("markdown").map((leaf) => leaf.view).find((view2) => view2 instanceof import_obsidian34.MarkdownView && view2.containerEl.contains(image));
     const file = embeddedPath ? this.app.metadataCache.getFirstLinkpathDest(
       embeddedPath,
@@ -47291,8 +47318,8 @@ ${t("ui.organize_link_wait_hint")}`;
    * write time or is running again; only then are the diagrams not applied.
    */
   addChartsAfterWrite(job) {
-    var _a, _b;
-    if ((_b = (_a = this.repo) == null ? void 0 : _a.isDisposed) == null ? void 0 : _b.call(_a)) return;
+    var _a2, _b2;
+    if ((_b2 = (_a2 = this.repo) == null ? void 0 : _a2.isDisposed) == null ? void 0 : _b2.call(_a2)) return;
     if (!this.aiTasks.chartEligible(job.context) || !job.detail.trim()) return;
     this.abortChartJobs(job.path);
     const controller = new AbortController();

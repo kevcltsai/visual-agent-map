@@ -1,4 +1,11 @@
-import { translate, type NoteLanguage, type TranslationKey } from "../../i18n";
+import {
+  noteLanguageOf,
+  translate,
+  verbatimHeadingLanguage,
+  type NoteLanguage,
+  type TranslationKey,
+  type UiLanguage
+} from "../../i18n";
 export type CoffeeInsightCategory =
   "connections" | "questions" | "disagreements" | "directions" | "assumptions" | "solutions";
 
@@ -51,6 +58,33 @@ const CATEGORY_ALIASES: Record<string, CoffeeInsightCategory> = {
   "questions to pursue": "questions",
   "unresolved core disagreements": "disagreements"
 };
+/**
+ * A locale whose note language differs from itself (zh-CN) can have the model write an observer heading in its own
+ * script (`## 意外链接`) instead of the verbatim note heading. Without an alias the whole section would be dropped, so
+ * the dictionary form of each heading in such a locale maps to the note-language heading (exact match only). Derived
+ * from the dictionaries; headings that are spelled the same in both are left out.
+ */
+export function outputScriptObserverHeadings(): Map<string, { heading: string; category?: CoffeeInsightCategory }> {
+  const forms = new Map<string, { heading: string; category?: CoffeeInsightCategory }>();
+  const entries: [TranslationKey, CoffeeInsightCategory | undefined][] = [
+    ["coffee.observers_notes", undefined],
+    ...(Object.entries(TITLE_KEYS) as [CoffeeInsightCategory, TranslationKey][]).map(
+      ([category, key]): [TranslationKey, CoffeeInsightCategory] => [key, category]
+    )
+  ];
+  for (const locale of ["zh-CN"] as UiLanguage[]) {
+    if (!verbatimHeadingLanguage(locale)) continue;
+    const note = noteLanguageOf(locale);
+    for (const [key, category] of entries) {
+      const written = translate(locale, key);
+      const heading = translate(note, key);
+      if (written !== heading) forms.set(written, { heading, category });
+    }
+  }
+  return forms;
+}
+for (const [written, { category }] of outputScriptObserverHeadings())
+  if (category) CATEGORY_ALIASES[written.toLocaleLowerCase()] ??= category;
 const MARKER = /<!--\s*coffee-insight:(v1:([^\s>]+)|(keep|update|merge):([^\s>]+))\s*-->/i;
 const ALL_MARKERS = /<!--\s*coffee-insight:(v1:([^\s>]+)|(keep|update|merge):([^\s>]+))\s*-->/gi;
 const SOURCE_MARKER = /<!--\s*source:\s*([\s\S]*?)\s*-->/gi;

@@ -33,11 +33,13 @@ const cleanedNotes = (includeDetail = true) => {
   const assets = clean.createAssetRegistry();
   const ctx = { titleOf: target => titles[target.replace(/\.md$/, '')], assets };
   const notesById = {};
+  const cleaned = {};
   for (const [id, { fm, detail }] of Object.entries(rawByNode)) {
     const result = clean.cleanShareMarkdown(detail, ctx);
-    notesById[id] = { title: fm.title, summary: fm.summary, status: fm.status, relevance: fm['relevance-tier'] ? { tier: fm['relevance-tier'], ...(fm['relevance-manual'] ? { manual: true } : {}) } : undefined, detail: result.markdown, detailHtml: `<p>${fm.title} html</p>` };
+    notesById[id] = { title: fm.title, summary: fm.summary, status: fm.status, relevance: fm['relevance-tier'] ? { tier: fm['relevance-tier'], ...(fm['relevance-manual'] ? { manual: true } : {}) } : undefined, detailHtml: `<p>${fm.title} html</p>` };
+    cleaned[id] = result.markdown;
   }
-  return { notesById, assets, models };
+  return { notesById, cleaned, assets, models };
 };
 const options = overrides => ({ includeDetail: true, includeImages: true, language: 'en', vamVersion: '0.25.0', exportedAt: '2026-10-23T00:00:00.000Z', assets: { 'image-1': 'data:image/webp;base64,AAAA' }, ...overrides });
 
@@ -49,12 +51,13 @@ test('sharing: payload has only the Spec fields and the 7 content kinds survive 
   assert.deepEqual(plain(Object.keys(payload).sort()), ['assets', 'exportedAt', 'format', 'goal', 'language', 'nodes', 'source', 'title', 'version', 'viewport']);
   assert.deepEqual(plain(payload.source), { vamVersion: '0.25.0', mapId: 'share-fixture' });
   const rich = payload.nodes.find(n => n.id === 'rich');
-  assert.deepEqual(plain(Object.keys(rich).sort()), ['collapsed', 'detail', 'detailHtml', 'id', 'manual', 'parentId', 'status', 'summary', 'tier', 'title', 'x', 'y']);
+  assert.deepEqual(plain(Object.keys(rich).sort()), ['collapsed', 'detailHtml', 'id', 'manual', 'parentId', 'status', 'summary', 'tier', 'title', 'x', 'y']);
   assert.equal(rich.tier, 'support');
   assert.equal(rich.manual, true);
-  assert.match(rich.detail, /```mermaid/);
-  assert.match(rich.detail, /\| a \| b \|/);
-  assert.match(rich.detail, /\[!note\] Callout/);
+  const cleanedRich = cleanedNotes().cleaned.rich;
+  assert.match(cleanedRich, /```mermaid/);
+  assert.match(cleanedRich, /\| a \| b \|/);
+  assert.match(cleanedRich, /\[!note\] Callout/);
   assert.equal(payload.nodes.find(n => n.id === 'links').status, 'idea');
 });
 
@@ -70,6 +73,16 @@ test('sharing: structure-only mode drops detail and detailHtml; no-images mode e
   assert.deepEqual(plain(noImages.assets), {});
   assert.ok(noImages.nodes.some(n => n.detailHtml));
   assert.equal(format.SHARE_DEFAULT_INCLUDE_DETAIL, true);
+});
+
+test('sharing D-2026-10-110: the P1 payload never carries a Markdown detail, even when the input has one', () => {
+  const { notesById } = cleanedNotes();
+  notesById.rich.detail = 'SECRET-MARKDOWN [[Diary/secret]]';
+  for (const includeDetail of [true, false]) {
+    const payload = format.buildSharePayload(fixtureMap(), notesById, options({ includeDetail }));
+    for (const node of payload.nodes) assert.equal('detail' in node, false);
+    assert.equal(format.serializeShareJson(payload).includes('SECRET-MARKDOWN'), false);
+  }
 });
 
 test('sharing: AIM maps are refused with an explicit error', () => {
@@ -92,19 +105,19 @@ test('sharing: serialized JSON never contains "</" or "<!--" and round-trips', (
 });
 
 test('sharing: wikilinks keep the alias or the title as plain text and never leave "[["', () => {
-  const { notesById } = cleanedNotes();
-  const links = notesById.links.detail;
+  const { cleaned } = cleanedNotes();
+  const links = cleaned.links;
   assert.equal(links.includes('[['), false);
   assert.match(links, /See Private and alias text and Root\./);
-  assert.match(notesById.root.detail, /the private idea/);
+  assert.match(cleaned.root, /the private idea/);
 });
 
 test('sharing: note embeds become the plain title and bring no embedded content', () => {
-  const { notesById } = cleanedNotes();
-  const all = ['root', 'rich', 'links'].map(id => notesById[id].detail).join('\n');
+  const { cleaned } = cleanedNotes();
+  const all = ['root', 'rich', 'links'].map(id => cleaned[id]).join('\n');
   assert.equal(all.includes('SECRET-PRIVATE-BODY'), false);
-  assert.match(notesById.links.detail, /^Private$/m);
-  assert.equal(notesById.links.detail.includes('!['), false);
+  assert.match(cleaned.links, /^Private$/m);
+  assert.equal(cleaned.links.includes('!['), false);
 });
 
 test('sharing: vault attachments are listed for embedding, web images keep their link, vault links lose their path', () => {
@@ -121,7 +134,7 @@ test('sharing: vault attachments are listed for embedding, web images keep their
   assert.match(rich.markdown, /!\[web\]\(https:\/\/example\.org\/pic\.jpg\)/);
   assert.equal(rich.markdown.includes('Attachments'), false);
   const links = clean.cleanShareMarkdown('Link [guide](Private Vault Folder/Notes/P.md) and [site](https://example.org) %%secret%% end', ctx);
-  assert.equal(links.markdown, 'Link guide and [site](https://example.org)  end');
+  assert.equal(links.markdown, 'Link guide and [site](https://example.org) %%secret%% end', 'comments are left to the renderer (D-110 step 4)');
   assert.equal(assets.nameFor('../Attachments/photo.png'), 'image-1');
   assert.equal(clean.replaceAssetImages('a ![x](vam-asset:image-1) b', '[image omitted]'), 'a [image omitted] b');
 });
@@ -190,7 +203,7 @@ test('sharing: size classes and image fitting', () => {
   assert.throws(() => format.fitWithin(0, 10), /Image dimensions/);
 });
 
-// D-2026-10-107/108: only a `[[` inside well-formed code is allowed; every other category looks at all text, code included.
+// D-2026-10-107/108, narrowed by D-2026-10-110: only a `[[` inside <pre>/<code> of detailHtml is allowed (the P1 payload has no Markdown); every other category looks at all text, code included.
 const leakForbidden = () => scan.forbiddenStringsFor({ vaultPath: '/Users/someone/Vault One', mapFolder: 'Private Vault Folder/Share Map' }, fixtureMap(), [{ model: 'claude:sonnet-secret' }]);
 const payloadWith = fields => {
   const payload = format.buildSharePayload(fixtureMap(), {}, options());
@@ -200,38 +213,28 @@ const payloadWith = fields => {
 const leakCategories = fields => new Set(scan.scanPayloadForLeaks(payloadWith(fields), leakForbidden()).map(hit => hit.category));
 const notePath = () => fixtureMap().nodes[0].path;
 
-test('sharing leak: [[ inside fenced code, inline code, mermaid and <pre>/<code> is allowed', () => {
-  assert.equal(leakCategories({ detail: 'x\n```js\nconst a = [[1,[2]]];\n```\ny `[[z]]` w\n~~~\nA[[x]]\n~~~' }).size, 0);
+test('sharing leak: [[ inside <pre>/<code> (code, mermaid source) is allowed; a Markdown detail field is not scanned as code any more', () => {
+  assert.ok(leakCategories({ detail: 'x\n```js\nconst a = [[1,[2]]];\n```' }).has('wikilink'), 'no Markdown code carve-out');
   assert.equal(leakCategories({ detailHtml: '<pre><code>[[1,[2]]]</code></pre><p>a <code>A[[x]]</code></p>' }).size, 0);
 });
 
 test('sharing leak: [[ outside code is blocked, including next to code in the same field', () => {
-  assert.ok(leakCategories({ detail: 'see [[私人]]' }).has('wikilink'));
-  assert.ok(leakCategories({ detail: '`[[x]]` and [[y]]' }).has('wikilink'));
+  assert.ok(leakCategories({ detailHtml: '<p>see [[私人]]</p>' }).has('wikilink'));
   assert.ok(leakCategories({ detailHtml: '<code>[[x]]</code> [[y]]' }).has('wikilink'));
-  assert.ok(leakCategories({ summary: '`[[x]]`' }).has('wikilink'), 'only detail and detailHtml are code-aware');
+  assert.ok(leakCategories({ summary: '`[[x]]`' }).has('wikilink'), 'only detailHtml is code-aware');
   assert.ok(leakCategories({ title: '[[x]]' }).has('wikilink'));
 });
 
 test('sharing leak: vault path and note path inside code are still blocked', () => {
-  assert.ok(leakCategories({ detail: '```\n/Users/someone/Vault One/x\n```' }).has('vault-path'));
-  assert.ok(leakCategories({ detail: '```\n' + notePath() + '\n```' }).has('note-path'));
-  assert.ok(leakCategories({ detail: 'a `' + notePath() + '` b' }).has('note-path'));
   assert.ok(leakCategories({ detailHtml: '<pre>' + notePath() + '</pre>' }).has('note-path'));
   assert.ok(leakCategories({ detailHtml: '<code>' + notePath() + '</code>' }).has('note-path'));
   assert.ok(leakCategories({ detailHtml: '<pre>/Users/someone/Vault One/x</pre>' }).has('vault-path'));
 });
 
-test('sharing leak: unclosed or unpaired code never hides what follows', () => {
-  assert.ok(leakCategories({ detail: '```js\nconst a = 1;\n[[y]]' }).has('wikilink'), 'unclosed fence');
-  assert.ok(leakCategories({ detail: '~~~\n[[y]]' }).has('wikilink'), 'unclosed tilde fence');
-  assert.ok(leakCategories({ detail: '```\ncode\n~~~\n[[y]]' }).has('wikilink'), 'mismatched fence characters');
-  assert.ok(leakCategories({ detail: '````\ncode\n```\n[[y]]' }).has('wikilink'), 'shorter closing fence');
-  assert.ok(leakCategories({ detail: 'a ` b\n\n[[y]] `' }).has('wikilink'), 'backticks do not pair across paragraphs');
-  assert.ok(leakCategories({ detail: 'a ` b [[y]]' }).has('wikilink'), 'single unpaired backtick');
-  assert.ok(leakCategories({ detail: '`` a ` [[y]]' }).has('wikilink'), 'unequal backtick runs');
-  assert.ok(leakCategories({ detail: '```\n' + notePath() }).has('note-path'));
-  assert.equal(scan.stripMarkdownCode('a\n```\nb\n```\nc'), 'a\n \nc');
+test('sharing leak: unclosed or mismatched <pre>/<code> never hides what follows', () => {
+  assert.ok(leakCategories({ detailHtml: '<pre><code>const a = 1;\n[[y]]' }).has('wikilink'), 'unclosed pre');
+  assert.ok(leakCategories({ detailHtml: '<pre>a</code> [[y]]' }).has('wikilink'), 'mismatched close');
+  assert.ok(leakCategories({ detailHtml: '<pre>' + notePath() }).has('note-path'));
 });
 
 test('sharing leak: HTML code stripping is conservative about tag shape', () => {
@@ -247,8 +250,6 @@ test('sharing leak: HTML code stripping is conservative about tag shape', () => 
 test('sharing leak: URL schemes, internal fields and model names inside code are still blocked', () => {
   const cases = { 'obsidian-url': 'obsidian://open', 'app-url': 'app://x/y.png', 'file-url': 'file:///etc/passwd', 'internal-field': 'source-notes', 'model-name': 'claude:sonnet-secret' };
   for (const [category, text] of Object.entries(cases)) {
-    assert.ok(leakCategories({ detail: '```\n' + text + '\n```' }).has(category), `${category} in fenced code`);
-    assert.ok(leakCategories({ detail: '`' + text + '`' }).has(category), `${category} in inline code`);
     assert.ok(leakCategories({ detailHtml: '<pre><code>' + text + '</code></pre>' }).has(category), `${category} in pre/code`);
   }
 });
@@ -262,52 +263,99 @@ test('sharing leak: scanPayloadForLeaks reports category and position only and c
   for (const hit of hits) assert.deepEqual(plain(Object.keys(hit).sort()), ['category', 'index']);
 });
 
-// Review F-A: a backslash-escaped backtick is not a code opener, in the cleaner and the scanner alike.
+// Review F-A, re-based on D-2026-10-110: the cleaner is the only user of the code heuristic, and any line with a backslash has no inline code.
 const cleanMd = md => clean.cleanShareMarkdown(md, { titleOf: () => undefined, assets: clean.createAssetRegistry() });
+const SECRET = 'Diary/secret';
+const cleanedKeepsSecret = md => cleanMd(md).markdown.includes(SECRET);
 
-test('sharing F-A: escaped backtick does not open a code span (cleaner and scanner agree)', () => {
-  const md = 'see \\`[[Diary/Secret plan]]` here';
-  assert.ok(leakCategories({ detail: md }).has('wikilink'), 'scanner still sees the wikilink');
-  assert.equal(cleanMd(md).markdown.includes('[['), false, 'cleaner removes the wikilink');
-  assert.ok(leakCategories({ detail: '\\`[[x]]`' }).has('wikilink'));
+test('sharing F-A: escaped backtick does not open a code span', () => {
+  assert.equal(cleanMd('see \\`[[Diary/Secret plan]]` here').markdown.includes('[['), false);
   assert.equal(cleanMd('\\`[[x]]`').markdown.includes('[['), false);
   assert.equal(cleanMd('\\![[Diary/Secret.png]]').markdown.includes('[['), false);
   assert.equal(cleanMd('\\`![[Diary/Secret.png]]`').markdown.includes('[['), false);
-  assert.ok(leakCategories({ detail: '\\`![[x]]`' }).has('wikilink'));
 });
 
-test('sharing F-A: an escaped backslash leaves the backtick real, so `\\\\`code [[x]]`` is code in both', () => {
-  const md = 'a \\\\`code [[x]]` b';
-  assert.equal(leakCategories({ detail: md }).has('wikilink'), false);
-  assert.equal(cleanMd(md).markdown, md, 'cleaner leaves it untouched as code');
-  assert.equal(scan.stripMarkdownCode(md), 'a \\\\  b');
-  // an odd run of backslashes (three) escapes again
-  assert.ok(leakCategories({ detail: 'a \\\\\\`[[x]]` b' }).has('wikilink'));
+test('sharing F-A: a line with a backslash holds no inline code (adjusted: `\\\\`code [[x]]`` used to be code, now prose)', () => {
+  assert.equal(cleanMd('a \\\\`code [[x]]` b').markdown.includes('[['), false);
+  assert.equal(cleanMd('a \\\\\\`[[x]]` b').markdown.includes('[['), false);
+  assert.equal(cleanMd('`a\\` [[Secret]] `b`').markdown.includes('[['), false);
 });
 
-test('sharing F-A: an escaped closer does not let a later backtick swallow prose', () => {
-  const md = '`a\\` [[Secret]] `b`';
-  assert.ok(leakCategories({ detail: md }).has('wikilink'));
-  assert.equal(cleanMd(md).markdown.includes('[['), false);
+// D-2026-10-110 / advisor Diagnostic Reset: the invariant is that the secret does not survive the cleaner.
+test('sharing D-110: F-C cases (heading, list, table, setext, indented fence line, CRLF blank line) never keep the link', () => {
+  const cases = {
+    heading: '# Title `a\n[[Diary/secret]] b`',
+    list: '- item `a\n- [[Diary/secret]] `',
+    table: '| a `x |\n|---|\n| [[Diary/secret]] ` |',
+    setext: 'para `a\n===\n[[Diary/secret]] `',
+    indentFence: 'x `a\n    ```\n[[Diary/secret]] `',
+    crlfBlank: 'a `x\r\n\r\n[[Diary/secret]] `',
+    crlfOnly: 'a `x\r[[Diary/secret]] `'
+  };
+  for (const [name, md] of Object.entries(cases)) assert.equal(cleanedKeepsSecret(md), false, name);
 });
 
-// Review F-B: comments are removed before code is split off.
-test('sharing F-B: %% comments with inline code or fences inside disappear entirely', () => {
-  assert.equal(cleanMd('a %% secret `code` [[Diary/x]] %% b').markdown, 'a  b');
-  assert.equal(cleanMd('a %% line\n```js\nsecret\n```\nmore %% b').markdown, 'a  b');
-  assert.equal(cleanMd('a\n%%\nmulti\n`x`\n%%\nb').markdown, 'a\n\nb');
+test('sharing D-110: fence info with a backtick, table pipes, autolinks, raw HTML attributes, HTML blocks and blockquotes never keep the link', () => {
+  const cases = {
+    fenceInfoBacktick: '``` a`b\n[[Diary/secret]]\n```',
+    tablePipeLine: '| `a | [[Diary/secret]] | b` |\n|---|---|---|',
+    autolink: '<http://a`b> [[Diary/secret]] `',
+    htmlAttribute: '<span title="`">[[Diary/secret]]`</span>',
+    htmlBlockFence: '<div>\n\n```\n[[Diary/secret]]\n```\n\n</div>',
+    htmlBlockSameParagraph: '<div>\n```\n[[Diary/secret]]\n```\n</div>',
+    blockquoteFence: '> ```\n> [[Diary/secret]]\n> ```',
+    blockquoteInline: '> a `x\n\n> [[Diary/secret]] `',
+    escapedBacktick: 'a\\\\\\`b [[Diary/secret]] `c`',
+    dollar: '$a `b$ [[Diary/secret]] c`'
+  };
+  for (const [name, md] of Object.entries(cases)) assert.equal(cleanedKeepsSecret(md), false, name);
 });
 
-test('sharing F-B: HTML comments outside code disappear, inside code stay', () => {
-  assert.equal(cleanMd('a <!-- secret --> b').markdown, 'a  b');
-  assert.equal(cleanMd('a <!-- secret `x` [[y]]\n```\nz\n```\n--> b').markdown, 'a  b');
-  assert.equal(cleanMd('a `<!-- keep -->` b').markdown, 'a `<!-- keep -->` b');
-  assert.equal(cleanMd('```\n<!-- keep -->\n```').markdown, '```\n<!-- keep -->\n```');
+test('sharing D-110: reference definitions with a local target disappear, web and mail targets and footnotes stay', () => {
+  for (const md of ['see [x][r]\n\n[r]: Diary/secret.md', '[r]: Diary/secret.md', '[r]: <Diary/secret.md> "t"', '[r]:\n  Diary/secret.md', '  [R]: #Diary/secret']) {
+    assert.equal(cleanedKeepsSecret(md), false, md);
+    assert.equal(cleanMd(md).markdown.includes('Diary'), false, md);
+  }
+  assert.equal(cleanMd('[r]: https://example.org/a "t"\n[m]: mailto:a@b.c\n[^1]: note text\n').markdown, '[r]: https://example.org/a "t"\n[m]: mailto:a@b.c\n[^1]: note text\n');
+  assert.equal(cleanMd('```\n[r]: Diary/secret.md\n```').markdown, '```\n[r]: Diary/secret.md\n```', 'inside a fence it is code');
+  assert.equal(cleanMd('a\n[r]: Diary/secret.md\nb').markdown, 'a\nb');
 });
 
-test('sharing F-B: a literal %% inside code that pairs with another %% is removed (conservative, recorded)', () => {
-  assert.equal(cleanMd('`50%%` and 100%% done').markdown.includes('%%'), false);
-  assert.equal(cleanMd('code `a %% b` alone').markdown, 'code `a %% b` alone', 'a single %% in code stays');
+test('sharing D-110: no false blocking of real code (mermaid after a paragraph, single-line inline code, plain fences)', () => {
+  const mermaid = 'Intro paragraph\n```mermaid\ngraph TD\nA[[x]] --> B\n```\n';
+  assert.equal(cleanMd(mermaid).markdown, mermaid, 'mermaid subroutine A[[x]] stays intact');
+  assert.equal(cleanMd('use `[[x]]` here').markdown, 'use `[[x]]` here');
+  assert.equal(cleanMd('x\n```js\nconst a = [[1,[2]]];\n```\ny').markdown, 'x\n```js\nconst a = [[1,[2]]];\n```\ny');
+  assert.equal(cleanMd('x\n~~~\nA[[x]]\n~~~').markdown, 'x\n~~~\nA[[x]]\n~~~');
+  assert.equal(cleanMd('a <br> b\n\n```\n[[k]]\n```').markdown, 'a <br> b\n\n```\n[[k]]\n```', 'a lone inline tag does not turn later fences into prose');
+  assert.equal(cleanMd('<http://example.org>\n```\n[[k]]\n```').markdown, '<http://example.org>\n```\n[[k]]\n```', 'an autolink is not an HTML block');
+});
+
+test('sharing D-110: code ranges follow the narrowed heuristic', () => {
+  const code = load('experiences/sharing/share-code.ts');
+  const ranges = md => plain(code.markdownCodeRanges(md)).map(r => md.slice(r.start, r.end));
+  assert.deepEqual(ranges('a `b` c'), ['`b`']);
+  assert.deepEqual(ranges('a `b\nc` d'), [], 'inline code is single-line');
+  assert.deepEqual(ranges('a `b | c` d'), []);
+  assert.deepEqual(ranges('a `b < c` d'), []);
+  assert.deepEqual(ranges('a `b $ c` d'), []);
+  assert.deepEqual(ranges('a `b \\ c` d'), []);
+  assert.deepEqual(ranges('    `b` d'), [], 'indented code line is not inline code');
+  assert.deepEqual(ranges('``` a`b\nx\n```'), [], 'backtick fence info with a backtick');
+  assert.deepEqual(ranges('~~~ a`b\nx\n~~~'), ['~~~ a`b\nx\n~~~'], 'tilde fence info may hold backticks');
+  assert.deepEqual(ranges('```js\nx\n'), [], 'unclosed fence is prose');
+  assert.equal(code.normalizeNewlines('a\r\nb\rc'), 'a\nb\nc');
+});
+
+// Review F-B, re-based on D-2026-10-110 step 4: the renderer hides comments (live-checked), the cleaner leaves them alone.
+test('sharing F-B: the cleaner no longer deletes %% or <!-- --> comments (the renderer hides them; verified live)', () => {
+  assert.equal(cleanMd('a %% secret `code` %% b').markdown, 'a %% secret `code` %% b');
+  assert.equal(cleanMd('a <!-- secret --> b').markdown, 'a <!-- secret --> b');
+  assert.equal(cleanMd('keep\n%% never closed\ntext').markdown, 'keep\n%% never closed\ntext');
+  assert.equal(cleanMd('a `x %% hidden` and\n# h `b\n%% secret rest').markdown.includes('secret rest'), true, 'division of labor: hiding is the renderer\'s job (live case)');
+  // a link inside a comment is still rewritten, so no `[[` survives even if some renderer showed the comment
+  assert.equal(cleanMd('%% [[Diary/secret]] %%').markdown, '%% secret %%');
+  assert.equal(cleanMd('<!-- [[Diary/secret]] -->').markdown, '<!-- secret -->');
 });
 
 test('sharing: leak categories have localized labels in every language', () => {
@@ -320,12 +368,3 @@ test('sharing: leak categories have localized labels in every language', () => {
   }
 });
 
-test('sharing F-B: an unclosed %% or <!-- outside code cuts everything after it', () => {
-  const a = cleanMd('keep\n%% never closed\n[[私人]] and text');
-  assert.equal(a.markdown, 'keep\n');
-  assert.equal(cleanMd('keep <!-- never closed [[私人]] text').markdown, 'keep ');
-  assert.equal(cleanMd('x %% a %% y %% tail [[私人]]').markdown, 'x  y ');
-  assert.equal(cleanMd('keep `a %% b` then [[Real]]').markdown, 'keep `a %% b` then Real', 'unpaired %% in code is not a comment');
-  assert.equal(cleanMd('```\n%%\n```\nafter').markdown, '```\n%%\n```\nafter');
-  assert.equal(cleanMd('`<!--` still here').markdown, '`<!--` still here');
-});

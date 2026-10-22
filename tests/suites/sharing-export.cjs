@@ -96,6 +96,60 @@ test('share dom: a mermaid SVG keeps its inert style and label markup, and loses
   assert.equal(dom.cssIsInert('a{fill:url(#g)}'), true);
 });
 
+test('share dom D-110: countLocalReferences counts internal links and non-web hrefs, and nothing else', () => {
+  const count = (...children) => dom.countLocalReferences(el('div', {}, [el('p', {}, children)]));
+  assert.equal(count(el('a', { class: 'internal-link', 'data-href': 'Diary/secret', href: 'Diary/secret' })), 1);
+  assert.equal(count(el('a', { class: 'internal-link', 'data-href': 'Diary/secret' })), 1, 'data-href alone');
+  assert.equal(count(el('a', { class: 'internal-link', href: 'Diary/secret' })), 1, 'href alone');
+  assert.equal(count(el('a', { href: 'Diary/x.md' })), 1);
+  assert.equal(count(el('a', { href: 'app://abc/x.md' })), 1);
+  assert.equal(count(el('a', { href: 'obsidian://open?vault=V' })), 1);
+  assert.equal(count(el('a', { href: ' JaVa\nScript:alert(1)' })), 1);
+  assert.equal(count(el('a', { 'xlink:href': 'Diary/x' })), 1, 'svg anchors');
+  assert.equal(count(el('span', {}, [el('a', { href: 'Diary/x.md' })])), 1, 'nested');
+  assert.equal(count(el('a', { class: 'internal-link', 'data-href': 'Diary/secret' }), el('a', { href: 'Diary/y' })), 2);
+  // not counted
+  assert.equal(count(el('a', { class: 'internal-link', 'data-href': '#heading', href: '#heading' })), 0, 'in-page heading link');
+  assert.equal(count(el('a', { class: 'tag', href: '#tag' })), 0);
+  assert.equal(count(el('a', { class: 'footnote-link', href: '#fn-1-abc' })), 0);
+  assert.equal(count(el('a', { class: 'external-link', href: 'https://example.org/a' })), 0);
+  assert.equal(count(el('a', { href: 'HTTP://example.org' })), 0);
+  assert.equal(count(el('a', { href: 'mailto:a@b.c' })), 0);
+  assert.equal(count(el('a', { name: 'anchor' })), 0, 'no href');
+  assert.equal(count(el('a', { href: '' })), 0, 'empty href');
+  assert.equal(count(el('img', { src: 'vam-asset:image-1' })), 0);
+  assert.equal(count(el('img', { src: 'Diary/secret.png' })), 0, 'images are not links (the scrub drops unknown sources)');
+  assert.equal(dom.countLocalReferences(el('div')), 0);
+});
+
+test('share dom D-110: the scrub removes comment nodes, in the tree and inside an SVG', () => {
+  const comment = () => ({ nodeType: 8, parent: null, remove() { this.parent.children = this.parent.children.filter(c => c !== this); } });
+  // FakeEl keeps children and childNodes together, so a comment node can sit beside the elements.
+  const root = el('div', {}, [el('p')]);
+  const c1 = comment(); root.append(c1);
+  const inner = el('p'); const c2 = comment(); inner.append(c2); root.append(inner);
+  const svg = el('svg'); const c3 = comment(); svg.append(c3);
+  dom.scrubShareTree(root);
+  assert.equal(root.children.includes(c1), false);
+  assert.equal(inner.children.includes(c2), false);
+  dom.scrubMermaidSvg(svg);
+  assert.equal(svg.children.includes(c3), false);
+});
+
+test('share build D-110: images only a hidden comment used are not among the note html assets', () => {
+  assert.deepEqual(plain(build.assetNamesInHtml('<p><img src="vam-asset:image-1" alt="a"> <img alt="b" src="vam-asset:image-3"><img src="https://x.example/p.png"></p>')), ['image-1', 'image-3']);
+  assert.deepEqual(plain(build.assetNamesInHtml('<p>%% ![](vam-asset:image-2) %%</p>')), []);
+});
+
+test('share build D-110: any rendered note with a local link blocks a file that carries notes, with the wikilink category', () => {
+  const none = [{ localRefs: 0 }, { localRefs: 0 }];
+  assert.deepEqual(plain(build.renderedLeakCategories(none, { includeDetail: true })), []);
+  assert.deepEqual(plain(build.renderedLeakCategories([{ localRefs: 0 }, { localRefs: 3 }], { includeDetail: true })), ['wikilink']);
+  assert.deepEqual(plain(build.renderedLeakCategories(new Map([['a', { localRefs: 1 }]]).values(), { includeDetail: true })), ['wikilink']);
+  assert.deepEqual(plain(build.renderedLeakCategories([{ localRefs: 5 }], { includeDetail: false })), [], 'structure-only files carry no note HTML');
+  assert.deepEqual(plain(build.renderedLeakCategories([], { includeDetail: true })), []);
+});
+
 test('share dom: mermaid sources are taken from the fences in order', () => {
   const md = 'Intro\n\n```mermaid\ngraph TD\n  A-->B\n```\n\n```js\nnope\n```\n\n~~~mermaid\nsequenceDiagram\n  A->>B: hi\n~~~\n';
   assert.deepEqual(plain(dom.extractMermaidSources(md)), ['graph TD\n  A-->B', 'sequenceDiagram\n  A->>B: hi']);

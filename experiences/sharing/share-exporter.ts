@@ -5,16 +5,22 @@ import { translate } from "../../i18n";
 import { createAssetRegistry, cleanShareMarkdown } from "./share-clean";
 import {
   assertCurrent,
-  assetNamesIn,
+  assetNamesInHtml,
   omitAssetImages,
   pause,
   plainWikilinks,
-  replaceAssetRefs,
+  renderedLeakCategories,
   resolveRelative,
   scopeCountsToMode,
   type BuildTicket
 } from "./share-build";
-import { extractMermaidSources, scrubMermaidSvg, scrubShareTree, unwrapLocalLinks } from "./share-dom";
+import {
+  countLocalReferences,
+  extractMermaidSources,
+  scrubMermaidSvg,
+  scrubShareTree,
+  unwrapLocalLinks
+} from "./share-dom";
 import {
   buildSharePayload,
   fitWithin,
@@ -66,8 +72,9 @@ export interface ShareBuildResult {
 }
 
 interface RenderedNote {
-  markdown: string;
   html: string;
+  /** Links in the renderer's output (before sanitizing) that lead outside the page; above 0 blocks a file with notes. */
+  localRefs: number;
   attachments: string[];
   mermaidUndrawn: number;
   mermaidBlocked: number;
@@ -251,10 +258,12 @@ export class ShareExporter {
       assertCurrent(ticket);
       await this.settleMermaid(host, ticket);
       const finished = this.finish(host, cleaned.markdown);
+      const used = new Set(assetNamesInHtml(finished.html));
       return {
-        markdown: cleaned.markdown,
         html: finished.html,
-        attachments: cleaned.attachments.map(item => item.name),
+        localRefs: finished.localRefs,
+        // Only images the final HTML shows: a picture used inside a hidden comment must not travel in the file.
+        attachments: cleaned.attachments.map(item => item.name).filter(name => used.has(name)),
         mermaidUndrawn: finished.undrawn,
         mermaidBlocked: finished.blocked
       };
@@ -276,7 +285,12 @@ export class ShareExporter {
   }
 
   /** Mermaid out, sanitize, scrub, mermaid back in. See share-dom.ts for why the diagrams take this detour. */
-  private finish(host: HTMLElement, markdown: string): { html: string; undrawn: number; blocked: number } {
+  private finish(
+    host: HTMLElement,
+    markdown: string
+  ): { html: string; undrawn: number; blocked: number; localRefs: number } {
+    // The privacy decision about note links: count on the renderer's own output, before anything is rewritten.
+    const localRefs = countLocalReferences(host);
     const sources = extractMermaidSources(markdown);
     const diagrams: Element[] = [];
     let undrawn = 0;
@@ -334,7 +348,7 @@ export class ShareExporter {
       if (diagram) slot.replaceWith(diagram);
       else slot.remove();
     });
-    return { html: clean.innerHTML, undrawn, blocked };
+    return { html: clean.innerHTML, undrawn, blocked, localRefs };
   }
 
   private resolveImage(name: string): { bytes: Promise<ArrayBuffer>; mime: string } | null {
@@ -424,9 +438,6 @@ export class ShareExporter {
       }
       if (options.includeDetail && rendered) {
         const dropNames = options.includeImages ? failed : null;
-        entry.detail = options.includeImages
-          ? replaceAssetRefs(rendered.markdown, failed, omitted)
-          : replaceAssetRefs(rendered.markdown, new Set(assetNamesIn(rendered.markdown)), omitted);
         entry.detailHtml = omitAssetImages(rendered.html, dropNames, omitted);
       }
       notesById[node.id] = entry;
@@ -448,7 +459,8 @@ export class ShareExporter {
     if (!this.shellText || this.shellText.language !== language)
       this.shellText = { language, text: renderShareShell(ui) };
     const hits = [...scanPayloadForLeaks(payload, forbidden), ...scanForLeaks(this.shellText.text, forbidden)];
-    const leakCategories = [...new Set(hits.map(hit => hit.category))];
+    const renderedLeaks = renderedLeakCategories(this.rendered.values(), options);
+    const leakCategories = [...new Set<LeakCategory>([...hits.map(hit => hit.category), ...renderedLeaks])];
     const scoped = scopeCountsToMode(options, { notesWithContent, failedImages: failed.size });
     const counts = {
       topics: payload.nodes.length,
@@ -463,7 +475,7 @@ export class ShareExporter {
       mermaidUndrawn: undrawn,
       mermaidBlocked: blocked
     };
-    if (hits.length) return { ...shared, bytes: 0 };
+    if (leakCategories.length) return { ...shared, bytes: 0 };
     const html = renderShareHtml(payload, ui);
     return { ...shared, html, bytes: new TextEncoder().encode(html).length };
   }

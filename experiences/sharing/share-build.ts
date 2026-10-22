@@ -5,6 +5,7 @@ import {
   type SizeClass
 } from "./share-format";
 import { SHARE_ASSET_SCHEME } from "./share-clean";
+import type { LeakCategory } from "./share-leak-scan";
 
 /**
  * Pure helpers for the share dialog's build lifecycle. No obsidian import.
@@ -113,6 +114,11 @@ export function assetNamesIn(markdown: string): string[] {
   return names;
 }
 
+/** Names of the vault images the rendered note HTML refers to (`src="vam-asset:<name>"`). Images that only a hidden comment used are not among them. */
+export function assetNamesInHtml(html: string): string[] {
+  return [...html.matchAll(/\ssrc="vam-asset:([^"]*)"/g)].map(match => match[1]);
+}
+
 /** Wikilinks in a plain-text field (a summary) become their alias or target text. */
 export function plainWikilinks(text: string): string {
   return text.replace(/\[\[([^\]\n]+)\]\]/g, (_all, inner: string) => {
@@ -177,4 +183,18 @@ export function scopeCountsToMode(
     notesWithContent: options.includeDetail ? raw.notesWithContent : 0,
     failedImages: options.includeDetail && options.includeImages ? raw.failedImages : 0
   };
+}
+
+/**
+ * Leak categories decided from the rendered notes themselves (not from the payload text): when the file carries note
+ * content and any rendered note still contains a link to something that is not web, mail or in-page, the export is
+ * blocked (fail closed) with the wikilink category. Structure-only files carry no note HTML, so nothing blocks them.
+ */
+export function renderedLeakCategories(
+  rendered: Iterable<{ localRefs: number }>,
+  options: { includeDetail: boolean }
+): LeakCategory[] {
+  if (!options.includeDetail) return [];
+  for (const note of rendered) if (note.localRefs > 0) return ["wikilink"];
+  return [];
 }

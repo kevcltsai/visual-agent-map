@@ -14,6 +14,11 @@ export const SHARE_IMAGE_MAX_EDGE = 1600;
 /** OQ-1 (owner decision): shares include the full note content unless the exporter turns it off. */
 export const SHARE_DEFAULT_INCLUDE_DETAIL = true;
 
+/**
+ * P1 carries no Markdown `detail` (D-2026-10-110): the viewer reads `detailHtml` only, and whatever is not rendered
+ * (comments, reference definitions) can then never travel. The field was removed from the types rather than left
+ * optional-but-unused; P2 can add an optional `detail?: string` back without changing `version`.
+ */
 export interface ShareNodePayload {
   id: string;
   parentId: string | null;
@@ -26,8 +31,6 @@ export interface ShareNodePayload {
   tier?: RelevanceTier;
   reason?: string;
   manual?: true;
-  /** Markdown source of the cleaned note detail (kept so a later import can recreate the note). */
-  detail?: string;
   /** Detail rendered to sanitized HTML at export time; images reference `assets` by name. */
   detailHtml?: string;
 }
@@ -53,8 +56,6 @@ export interface ShareNoteInput {
   relevance?: { tier: RelevanceTier; manual?: true };
   /** Legacy `relevance-reason`, still shown when an older note has one. */
   reason?: string;
-  /** Cleaned Markdown (see cleanShareMarkdown). */
-  detail?: string;
   /** Rendered, sanitized HTML (supplied by the Obsidian-side exporter). */
   detailHtml?: string;
 }
@@ -113,7 +114,6 @@ export function buildSharePayload(
       if (reason) out.reason = reason;
     }
     if (options.includeDetail) {
-      if (note?.detail?.trim()) out.detail = note.detail;
       if (note?.detailHtml?.trim()) out.detailHtml = note.detailHtml;
     }
     return out;

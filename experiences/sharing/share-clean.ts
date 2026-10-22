@@ -1,9 +1,11 @@
 /**
  * Cleans a note's Markdown before it is rendered and shared: wikilinks become plain text, note embeds become their
- * title only, vault attachments are replaced by `vam-asset:<name>` references (the exporter embeds the files), `%%`
- * comments are dropped. Web images keep their link. Fenced and inline code is left untouched.
+ * title only, vault attachments are replaced by `vam-asset:<name>` references (the exporter embeds the files), local
+ * reference definitions are dropped. Web images keep their link. Fenced and inline code is left untouched.
+ * `%%` and `<!-- -->` comments are NOT removed here: the renderer hides them (live-checked, D-2026-10-110), and what it
+ * does not hide shows as plain text the author sees too.
  */
-import { cutUnclosedPercentComment, markdownCodeRanges, stripHtmlComments } from "./share-code";
+import { markdownCodeRanges, normalizeNewlines } from "./share-code";
 
 export interface ShareCleanContext {
   /** Title of the note a link target points at, if known. */
@@ -86,8 +88,7 @@ function cleanSegment(text: string, ctx: ShareCleanContext, out: ShareCleanResul
     return ctx.titleOf(pathPart) ?? basename(pathPart);
   };
   // One pass over the original text, so replacement output is never rescanned.
-  const pattern =
-    /%%[\s\S]*?%%|!\[\[([^\]\n]+)\]\]|\[\[([^\]\n]+)\]\]|!\[([^\]\n]*)\]\(([^)\n]+)\)|\[([^\]\n]*)\]\(([^)\n]+)\)/g;
+  const pattern = /!\[\[([^\]\n]+)\]\]|\[\[([^\]\n]+)\]\]|!\[([^\]\n]*)\]\(([^)\n]+)\)|\[([^\]\n]*)\]\(([^)\n]+)\)/g;
   return text.replace(
     pattern,
     (
@@ -99,7 +100,6 @@ function cleanSegment(text: string, ctx: ShareCleanContext, out: ShareCleanResul
       label: string | undefined,
       href: string | undefined
     ) => {
-      if (all.startsWith("%%")) return "";
       if (embed !== undefined) {
         const { target, alias } = splitWikilink(embed);
         const pathPart = target.split("#")[0].trim();
@@ -135,13 +135,30 @@ function cleanSegment(text: string, ctx: ShareCleanContext, out: ShareCleanResul
 }
 
 /**
- * `%%` and `<!-- -->` comments go first, wherever they sit and even when they contain code (a hidden comment is
- * private by intent; an unclosed `%%` or `<!--` outside code hides the rest of the note in a reader, so the rest is cut; a literal `%%` inside code that pairs with another `%%` is removed too, the conservative side).
- * The rest is split on code (share-code.ts, the same definition the leak scanner uses) so only prose is rewritten.
+ * Deletes reference-style link definitions (`[label]: target`, also with the target on the next line) whose target is
+ * not a web or mail address: a `[text][label]` that uses one renders as a link to a private path. Lines inside code
+ * stay. Footnote definitions (`[^1]: …`) are not link definitions.
+ */
+function removeLocalReferenceDefinitions(text: string): string {
+  const definition = /^ {0,3}\[(?!\^)[^\]\n]+\]:[ \t]*(?:\n[ \t]*)?(?:<([^>\n]*)>|(\S+))[^\n]*(?:\n|$)/gm;
+  const ranges = markdownCodeRanges(text);
+  return text.replace(
+    definition,
+    (all: string, bracketed: string | undefined, bare: string | undefined, at: number) => {
+      if (ranges.some(range => at >= range.start && at < range.end)) return all;
+      const target = (bracketed ?? bare ?? "").trim();
+      return isWeb(target) || /^mailto:/i.test(target) ? all : "";
+    }
+  );
+}
+
+/**
+ * Wikilinks, embeds, vault images and local links are rewritten in prose; code (share-code.ts) and local reference
+ * definitions are handled as described there. Line endings are normalized first.
  */
 export function cleanShareMarkdown(md: string, ctx: ShareCleanContext): ShareCleanResult {
   const out: ShareCleanResult = { markdown: "", attachments: [], webImages: [] };
-  const text = stripHtmlComments(cutUnclosedPercentComment(md.replace(/%%[\s\S]*?%%/g, "")));
+  const text = removeLocalReferenceDefinitions(normalizeNewlines(md));
   let result = "";
   let from = 0;
   for (const range of markdownCodeRanges(text)) {

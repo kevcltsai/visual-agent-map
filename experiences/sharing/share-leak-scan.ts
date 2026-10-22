@@ -1,5 +1,4 @@
 import type { MapDocument } from "../../map-model";
-import { replaceMarkdownCode } from "./share-code";
 import type { SharePayload } from "./share-format";
 
 /** Last gate before writing a share file: any forbidden string in the final HTML blocks the export (fail closed). */
@@ -86,22 +85,15 @@ export function forbiddenStringsFor(
   });
 }
 
-/**
- * Removes only well-formed Markdown code (see share-code.ts, shared with the cleaner). Anything unclosed, unpaired or
- * backslash-escaped stays in the text (treated as not code), so it can never hide a `[[` that follows it.
- */
-export function stripMarkdownCode(markdown: string): string {
-  return replaceMarkdownCode(markdown, " ");
-}
-
 /** Removes `<pre>…</pre>` and `<code>…</code>` contents (any case, any attributes). Unclosed or mismatched tags stay as text. */
 export function stripHtmlCode(html: string): string {
   return html.replace(/<(pre|code)(?=[\s>/])[^>]*>[\s\S]*?<\/\1\s*>/gi, " ");
 }
 
 /**
- * Scans the payload field by field. Only the wikilink category ignores code (detail Markdown and detailHtml code
- * and pre contents); every other category looks at the full text of every string field, code included.
+ * Scans the payload field by field. Only the wikilink category ignores code (`detailHtml` code and pre contents);
+ * every other category looks at the full text of every string field, code included. The payload carries no Markdown
+ * (D-2026-10-110), so no Markdown code heuristic is involved here; the real link check is the DOM gate in the exporter.
  */
 export function scanPayloadForLeaks(payload: SharePayload, forbidden: readonly ForbiddenString[]): LeakHit[] {
   const hits: LeakHit[] = [];
@@ -113,8 +105,7 @@ export function scanPayloadForLeaks(payload: SharePayload, forbidden: readonly F
   };
   const visit = (value: unknown, key: string): void => {
     if (typeof value === "string") {
-      const codeFree =
-        key === "detail" ? stripMarkdownCode(value) : key === "detailHtml" ? stripHtmlCode(value) : value;
+      const codeFree = key === "detailHtml" ? stripHtmlCode(value) : value;
       scanText(value, codeFree);
     } else if (Array.isArray(value)) for (const item of value) visit(item, key);
     else if (value && typeof value === "object")

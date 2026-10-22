@@ -38089,8 +38089,8 @@ ${request.requirements}` : preset.text,
         const target = event.target;
         if ((_a3 = target == null ? void 0 : target.closest) == null ? void 0 : _a3.call(target, "button")) return;
         const box = title.getBoundingClientRect();
-        const inside = event.clientX >= box.left && event.clientX <= box.right && event.clientY >= box.top && event.clientY <= box.bottom;
-        if (target !== title && !inside) return;
+        const inside2 = event.clientX >= box.left && event.clientX <= box.right && event.clientY >= box.top && event.clientY <= box.bottom;
+        if (target !== title && !inside2) return;
         event.preventDefault();
         this.renameNode(node, note.title);
       });
@@ -42243,7 +42243,7 @@ function buildSharePayload(map, notesById, options) {
   if (map.aim || map.nodes.some((node) => node.aimKind !== void 0))
     throw new ShareError("aim-map", "AIM maps cannot be shared.");
   const nodes = map.nodes.map((node) => {
-    var _a2, _b2, _c, _d, _e;
+    var _a2, _b2, _c, _d;
     const note = notesById[node.id];
     const fallbackTitle = (_b2 = (_a2 = node.path.split("/").pop()) == null ? void 0 : _a2.replace(/\.md$/i, "")) != null ? _b2 : node.id;
     const out = {
@@ -42263,8 +42263,7 @@ function buildSharePayload(map, notesById, options) {
       if (reason) out.reason = reason;
     }
     if (options.includeDetail) {
-      if ((_d = note == null ? void 0 : note.detail) == null ? void 0 : _d.trim()) out.detail = note.detail;
-      if ((_e = note == null ? void 0 : note.detailHtml) == null ? void 0 : _e.trim()) out.detailHtml = note.detailHtml;
+      if ((_d = note == null ? void 0 : note.detailHtml) == null ? void 0 : _d.trim()) out.detailHtml = note.detailHtml;
     }
     return out;
   });
@@ -42304,20 +42303,58 @@ function fitWithin(width, height, max = SHARE_IMAGE_MAX_EDGE) {
 
 // experiences/sharing/share-code.ts
 var FENCE_LINE = /^ {0,3}(`{3,}|~{3,})/;
-var BLANK_LINE = /\n[ \t]*\n/;
-function fenceRanges(markdown) {
-  const ranges = [];
-  const lines = markdown.split("\n");
-  const offsets = [];
-  let at = 0;
-  for (const line of lines) {
-    offsets.push(at);
-    at += line.length + 1;
+var VOID_TAGS = /* @__PURE__ */ new Set([
+  "br",
+  "hr",
+  "img",
+  "input",
+  "meta",
+  "link",
+  "area",
+  "base",
+  "col",
+  "embed",
+  "source",
+  "wbr"
+]);
+function htmlBlockLines(lines) {
+  var _a2;
+  const blocks = [];
+  let i = 0;
+  while (i < lines.length) {
+    const line = lines[i];
+    const open = /^ {0,3}<(!--|\/?([A-Za-z][A-Za-z0-9-]*)(?=[\s/>]|$))/.exec(line);
+    if (!open) {
+      i++;
+      continue;
+    }
+    let last = i;
+    if (open[1] === "!--") {
+      while (last < lines.length && !lines[last].includes("-->")) last++;
+    } else {
+      const name = ((_a2 = open[2]) != null ? _a2 : "").toLowerCase();
+      const closes = (text11) => text11.toLowerCase().includes(`</${name}`);
+      if (open[1].startsWith("/") || VOID_TAGS.has(name) || closes(line)) {
+        while (last + 1 < lines.length && lines[last + 1].trim() !== "") last++;
+      } else {
+        while (last < lines.length && !closes(lines[last])) last++;
+      }
+    }
+    last = Math.min(last, lines.length - 1);
+    blocks.push([i, last]);
+    i = last + 1;
   }
+  return blocks;
+}
+var FENCE_OPEN2 = /^ {0,3}(`{3,}|~{3,})(.*)$/;
+function fenceRanges(lines, offsets, html) {
+  const ranges = [];
+  const inHtml = (line) => html.some(([first, last]) => line >= first && line <= last);
   for (let i = 0; i < lines.length; i++) {
-    const open = FENCE_LINE.exec(lines[i]);
-    if (!open) continue;
+    const open = FENCE_OPEN2.exec(lines[i]);
+    if (!open || inHtml(i)) continue;
     const mark = open[1];
+    if (mark[0] === "`" && open[2].includes("`")) continue;
     for (let j = i + 1; j < lines.length; j++) {
       const run = FENCE_LINE.exec(lines[j]);
       if (run && run[1][0] === mark[0] && run[1].length >= mark.length && lines[j].slice(run[0].length).trim() === "") {
@@ -42329,24 +42366,16 @@ function fenceRanges(markdown) {
   }
   return ranges;
 }
-function inlineRanges(text11, base) {
+function inlineRangesOfLine(line, base) {
   var _a2;
+  if (/[|<$\\]/.test(line) || FENCE_LINE.test(line) || /^ {4}|^\t/.test(line)) return [];
   const runs = [];
-  for (const match of text11.matchAll(/`+/g)) runs.push({ start: (_a2 = match.index) != null ? _a2 : 0, length: match[0].length });
+  for (const match of line.matchAll(/`+/g)) runs.push({ start: (_a2 = match.index) != null ? _a2 : 0, length: match[0].length });
   const ranges = [];
   for (let i = 0; i < runs.length; i++) {
-    let { start, length } = runs[i];
-    let slashes = 0;
-    while (start - slashes > 0 && text11[start - slashes - 1] === "\\") slashes++;
-    if (slashes % 2 === 1) {
-      start += 1;
-      length -= 1;
-      if (length === 0) continue;
-    }
     for (let j = i + 1; j < runs.length; j++) {
-      if (BLANK_LINE.test(text11.slice(runs[i].start + runs[i].length, runs[j].start))) break;
-      if (runs[j].length === length) {
-        ranges.push({ start: base + start, end: base + runs[j].start + runs[j].length });
+      if (runs[j].length === runs[i].length) {
+        ranges.push({ start: base + runs[i].start, end: base + runs[j].start + runs[j].length });
         i = j;
         break;
       }
@@ -42354,46 +42383,24 @@ function inlineRanges(text11, base) {
   }
   return ranges;
 }
+var inside = (ranges, at) => ranges.some((range) => at >= range.start && at < range.end);
 function markdownCodeRanges(markdown) {
-  const fences = fenceRanges(markdown);
-  const ranges = [...fences];
-  let from = 0;
-  for (const fence of [...fences, { start: markdown.length, end: markdown.length }]) {
-    ranges.push(...inlineRanges(markdown.slice(from, fence.start), from));
-    from = fence.end;
+  const lines = markdown.split("\n");
+  const offsets = [];
+  let at = 0;
+  for (const line of lines) {
+    offsets.push(at);
+    at += line.length + 1;
   }
+  const fences = fenceRanges(lines, offsets, htmlBlockLines(lines));
+  const ranges = [...fences];
+  lines.forEach((line, index) => {
+    if (inside(fences, offsets[index])) return;
+    ranges.push(...inlineRangesOfLine(line, offsets[index]));
+  });
   return ranges.sort((a, b) => a.start - b.start);
 }
-function replaceMarkdownCode(markdown, replacement) {
-  let out = "";
-  let from = 0;
-  for (const range of markdownCodeRanges(markdown)) {
-    out += markdown.slice(from, range.start) + replacement;
-    from = range.end;
-  }
-  return out + markdown.slice(from);
-}
-function stripHtmlComments(markdown) {
-  let text11 = markdown;
-  let searchFrom = 0;
-  for (; ; ) {
-    const ranges = markdownCodeRanges(text11);
-    let start = text11.indexOf("<!--", searchFrom);
-    while (start >= 0 && ranges.some((range) => start >= range.start && start < range.end))
-      start = text11.indexOf("<!--", start + 1);
-    if (start < 0) return text11;
-    const close = text11.indexOf("-->", start + 4);
-    if (close < 0) return text11.slice(0, start);
-    text11 = text11.slice(0, start) + text11.slice(close + 3);
-    searchFrom = start;
-  }
-}
-function cutUnclosedPercentComment(markdown) {
-  const ranges = markdownCodeRanges(markdown);
-  let at = markdown.indexOf("%%");
-  while (at >= 0 && ranges.some((range) => at >= range.start && at < range.end)) at = markdown.indexOf("%%", at + 1);
-  return at < 0 ? markdown : markdown.slice(0, at);
-}
+var normalizeNewlines = (text11) => text11.replace(/\r\n?/g, "\n");
 
 // experiences/sharing/share-clean.ts
 var SHARE_ASSET_SCHEME = "vam-asset:";
@@ -42445,12 +42452,11 @@ function cleanSegment(text11, ctx, out) {
     if (!pathPart) return target.replace(/^#\^?/, "").trim();
     return (_a2 = ctx.titleOf(pathPart)) != null ? _a2 : basename(pathPart);
   };
-  const pattern = /%%[\s\S]*?%%|!\[\[([^\]\n]+)\]\]|\[\[([^\]\n]+)\]\]|!\[([^\]\n]*)\]\(([^)\n]+)\)|\[([^\]\n]*)\]\(([^)\n]+)\)/g;
+  const pattern = /!\[\[([^\]\n]+)\]\]|\[\[([^\]\n]+)\]\]|!\[([^\]\n]*)\]\(([^)\n]+)\)|\[([^\]\n]*)\]\(([^)\n]+)\)/g;
   return text11.replace(
     pattern,
     (all, embed, link, alt, src, label, href) => {
       var _a2;
-      if (all.startsWith("%%")) return "";
       if (embed !== void 0) {
         const { target, alias } = splitWikilink(embed);
         const pathPart = target.split("#")[0].trim();
@@ -42480,9 +42486,22 @@ function cleanSegment(text11, ctx, out) {
     }
   );
 }
+function removeLocalReferenceDefinitions(text11) {
+  const definition = /^ {0,3}\[(?!\^)[^\]\n]+\]:[ \t]*(?:\n[ \t]*)?(?:<([^>\n]*)>|(\S+))[^\n]*(?:\n|$)/gm;
+  const ranges = markdownCodeRanges(text11);
+  return text11.replace(
+    definition,
+    (all, bracketed, bare, at) => {
+      var _a2;
+      if (ranges.some((range) => at >= range.start && at < range.end)) return all;
+      const target = ((_a2 = bracketed != null ? bracketed : bare) != null ? _a2 : "").trim();
+      return isWeb(target) || /^mailto:/i.test(target) ? all : "";
+    }
+  );
+}
 function cleanShareMarkdown(md, ctx) {
   const out = { markdown: "", attachments: [], webImages: [] };
-  const text11 = stripHtmlComments(cutUnclosedPercentComment(md.replace(/%%[\s\S]*?%%/g, "")));
+  const text11 = removeLocalReferenceDefinitions(normalizeNewlines(md));
   let result = "";
   let from = 0;
   for (const range of markdownCodeRanges(text11)) {
@@ -42558,18 +42577,8 @@ function formatBytes(bytes) {
   if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 }
-function replaceAssetRefs(markdown, names3, label) {
-  if (!names3.size) return markdown;
-  return markdown.replace(
-    /!\[[^\]\n]*\]\(vam-asset:([^)\n]*)\)/g,
-    (all, name) => names3.has(name.trim()) ? label : all
-  );
-}
-function assetNamesIn(markdown) {
-  const names3 = [];
-  for (const match of markdown.matchAll(new RegExp(`\\]\\(${SHARE_ASSET_SCHEME}([^)\\n]*)\\)`, "g")))
-    names3.push(match[1].trim());
-  return names3;
+function assetNamesInHtml(html) {
+  return [...html.matchAll(/\ssrc="vam-asset:([^"]*)"/g)].map((match) => match[1]);
 }
 function plainWikilinks(text11) {
   return text11.replace(/\[\[([^\]\n]+)\]\]/g, (_all, inner) => {
@@ -42609,6 +42618,11 @@ function scopeCountsToMode(options, raw) {
     notesWithContent: options.includeDetail ? raw.notesWithContent : 0,
     failedImages: options.includeDetail && options.includeImages ? raw.failedImages : 0
   };
+}
+function renderedLeakCategories(rendered, options) {
+  if (!options.includeDetail) return [];
+  for (const note of rendered) if (note.localRefs > 0) return ["wikilink"];
+  return [];
 }
 
 // experiences/sharing/share-exporter.ts
@@ -42719,8 +42733,14 @@ function hasChromeClass(element) {
   const classes = ((_a2 = element.getAttribute("class")) != null ? _a2 : "").split(/\s+/);
   return classes.some((name) => CHROME_CLASSES.has(name));
 }
+var COMMENT_NODE = 8;
 function scrubChildren(parent, options, report) {
   var _a2, _b2;
+  for (const node of Array.from(parent.childNodes))
+    if (node.nodeType === COMMENT_NODE) {
+      node.remove();
+      report.elements++;
+    }
   for (const child of Array.from(parent.children)) {
     const tag = child.localName.toLowerCase();
     let keep = !BLOCKED_TAGS.has(tag) && !hasChromeClass(child);
@@ -42768,6 +42788,27 @@ function scrubMermaidSvg(root) {
   scrubShareTree(root, { allowStyle: true });
   dropRemoteReferences(root);
   return true;
+}
+function countLocalReferences(root) {
+  let count = 0;
+  const local = (value) => {
+    const url = normalizeUrl(value != null ? value : "");
+    return !!url && !url.startsWith("#") && !/^https?:\/\//.test(url) && !url.startsWith("mailto:");
+  };
+  const visit = (parent) => {
+    var _a2;
+    for (const child of Array.from(parent.children)) {
+      if (child.localName.toLowerCase() === "a") {
+        const internal = ((_a2 = child.getAttribute("class")) != null ? _a2 : "").split(/\s+/).includes("internal-link");
+        const refs = [child.getAttribute("href"), child.getAttribute("xlink:href")];
+        if (internal) refs.push(child.getAttribute("data-href"));
+        if (refs.some(local)) count++;
+      }
+      visit(child);
+    }
+  };
+  visit(root);
+  return count;
 }
 function unwrapLocalLinks(root, createSpan2) {
   let count = 0;
@@ -42886,9 +42927,6 @@ function forbiddenStringsFor(vault, map, notes = []) {
     return true;
   });
 }
-function stripMarkdownCode(markdown) {
-  return replaceMarkdownCode(markdown, " ");
-}
 function stripHtmlCode(html) {
   return html.replace(/<(pre|code)(?=[\s>/])[^>]*>[\s\S]*?<\/\1\s*>/gi, " ");
 }
@@ -42902,7 +42940,7 @@ function scanPayloadForLeaks(payload, forbidden) {
   };
   const visit = (value, key2) => {
     if (typeof value === "string") {
-      const codeFree = key2 === "detail" ? stripMarkdownCode(value) : key2 === "detailHtml" ? stripHtmlCode(value) : value;
+      const codeFree = key2 === "detailHtml" ? stripHtmlCode(value) : value;
       scanText(value, codeFree);
     } else if (Array.isArray(value)) for (const item of value) visit(item, key2);
     else if (value && typeof value === "object")
@@ -43116,10 +43154,12 @@ var ShareExporter = class {
       assertCurrent(ticket);
       await this.settleMermaid(host, ticket);
       const finished = this.finish(host, cleaned.markdown);
+      const used = new Set(assetNamesInHtml(finished.html));
       return {
-        markdown: cleaned.markdown,
         html: finished.html,
-        attachments: cleaned.attachments.map((item) => item.name),
+        localRefs: finished.localRefs,
+        // Only images the final HTML shows: a picture used inside a hidden comment must not travel in the file.
+        attachments: cleaned.attachments.map((item) => item.name).filter((name) => used.has(name)),
         mermaidUndrawn: finished.undrawn,
         mermaidBlocked: finished.blocked
       };
@@ -43141,6 +43181,7 @@ var ShareExporter = class {
   /** Mermaid out, sanitize, scrub, mermaid back in. See share-dom.ts for why the diagrams take this detour. */
   finish(host, markdown) {
     var _a2;
+    const localRefs = countLocalReferences(host);
     const sources2 = extractMermaidSources(markdown);
     const diagrams = [];
     let undrawn = 0;
@@ -43194,7 +43235,7 @@ var ShareExporter = class {
       if (diagram) slot.replaceWith(diagram);
       else slot.remove();
     });
-    return { html: clean4.innerHTML, undrawn, blocked };
+    return { html: clean4.innerHTML, undrawn, blocked, localRefs };
   }
   resolveImage(name) {
     var _a2, _b2, _c;
@@ -43282,7 +43323,6 @@ var ShareExporter = class {
       }
       if (options.includeDetail && rendered) {
         const dropNames = options.includeImages ? failed : null;
-        entry.detail = options.includeImages ? replaceAssetRefs(rendered.markdown, failed, omitted) : replaceAssetRefs(rendered.markdown, new Set(assetNamesIn(rendered.markdown)), omitted);
         entry.detailHtml = omitAssetImages(rendered.html, dropNames, omitted);
       }
       notesById[node.id] = entry;
@@ -43305,7 +43345,8 @@ var ShareExporter = class {
     if (!this.shellText || this.shellText.language !== language2)
       this.shellText = { language: language2, text: renderShareShell(ui) };
     const hits = [...scanPayloadForLeaks(payload, forbidden), ...scanForLeaks(this.shellText.text, forbidden)];
-    const leakCategories = [...new Set(hits.map((hit) => hit.category))];
+    const renderedLeaks = renderedLeakCategories(this.rendered.values(), options);
+    const leakCategories = [.../* @__PURE__ */ new Set([...hits.map((hit) => hit.category), ...renderedLeaks])];
     const scoped = scopeCountsToMode(options, { notesWithContent, failedImages: failed.size });
     const counts = {
       topics: payload.nodes.length,
@@ -43320,7 +43361,7 @@ var ShareExporter = class {
       mermaidUndrawn: undrawn,
       mermaidBlocked: blocked
     };
-    if (hits.length) return { ...shared2, bytes: 0 };
+    if (leakCategories.length) return { ...shared2, bytes: 0 };
     const html = renderShareHtml(payload, ui);
     return { ...shared2, html, bytes: new TextEncoder().encode(html).length };
   }
@@ -47068,8 +47109,8 @@ var ImageTranslateAction = class extends import_obsidian34.Component {
   }
   onload() {
     this.registerDomEvent(document, "pointerdown", (event) => {
-      const inside = event.target instanceof Element && event.target.closest(".vam-image-action");
-      if (!inside) this.hide();
+      const inside2 = event.target instanceof Element && event.target.closest(".vam-image-action");
+      if (!inside2) this.hide();
     });
     this.registerDomEvent(document, "scroll", () => this.hide(), true);
     this.registerDomEvent(window, "resize", () => this.hide());
@@ -47456,11 +47497,11 @@ function locateImageToken(view, image, markdown, matches) {
     };
     const from = lineOffset(Number(block.dataset.vamLineStart));
     const to = lineOffset(Number(block.dataset.vamLineEnd) + 1);
-    const inside = matches.filter((match) => {
+    const inside2 = matches.filter((match) => {
       var _a2, _b2;
       return ((_a2 = match.index) != null ? _a2 : -1) >= from && ((_b2 = match.index) != null ? _b2 : -1) < to;
     });
-    if (inside.length === 1) return toToken(inside[0]);
+    if (inside2.length === 1) return toToken(inside2[0]);
   }
   const cm = view.editor.cm;
   try {

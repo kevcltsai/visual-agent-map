@@ -128,7 +128,15 @@ function hasChromeClass(element: Element): boolean {
   return classes.some(name => CHROME_CLASSES.has(name));
 }
 
+const COMMENT_NODE = 8;
+
 function scrubChildren(parent: Element, options: ScrubOptions, report: ScrubReport): void {
+  // HTML comments never reach the file, whatever the renderer left in the tree.
+  for (const node of Array.from(parent.childNodes))
+    if (node.nodeType === COMMENT_NODE) {
+      node.remove();
+      report.elements++;
+    }
   for (const child of Array.from(parent.children)) {
     const tag = child.localName.toLowerCase();
     let keep = !BLOCKED_TAGS.has(tag) && !hasChromeClass(child);
@@ -187,6 +195,34 @@ export function scrubMermaidSvg(root: Element): boolean {
   scrubShareTree(root, { allowStyle: true });
   dropRemoteReferences(root);
   return true;
+}
+
+/**
+ * How many links in the rendered tree lead somewhere that is not a web page, a mail address or the page itself:
+ * Obsidian's `internal-link` anchors (unless they point inside the page) and any `<a>` whose href is not http(s),
+ * mailto or `#…`. Run on the renderer's output BEFORE sanitizing: this is the privacy decision for note links, so it
+ * does not depend on how the Markdown was cleaned. Tags (`#tag`), footnotes (`#fn…`), external links, anchors
+ * without a target and `vam-asset:` images are not counted.
+ */
+export function countLocalReferences(root: Element): number {
+  let count = 0;
+  const local = (value: string | null): boolean => {
+    const url = normalizeUrl(value ?? "");
+    return !!url && !url.startsWith("#") && !/^https?:\/\//.test(url) && !url.startsWith("mailto:");
+  };
+  const visit = (parent: Element): void => {
+    for (const child of Array.from(parent.children)) {
+      if (child.localName.toLowerCase() === "a") {
+        const internal = (child.getAttribute("class") ?? "").split(/\s+/).includes("internal-link");
+        const refs = [child.getAttribute("href"), child.getAttribute("xlink:href")];
+        if (internal) refs.push(child.getAttribute("data-href"));
+        if (refs.some(local)) count++;
+      }
+      visit(child);
+    }
+  };
+  visit(root);
+  return count;
 }
 
 /**

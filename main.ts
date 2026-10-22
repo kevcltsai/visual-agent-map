@@ -7,6 +7,7 @@ import { CoffeeStorage } from "./experiences/coffee-tables/storage";
 import { VisualAgentMapView, VIEW_TYPE } from "./experiences/visual-map/view";
 import { planMathRepair, applyMathRepair } from "./experiences/visual-map/math-repair";
 import type { TaskOptions } from "./experiences/visual-map/modals";
+import { selectionOutputLanguage } from "./experiences/aim/content-language";
 import {
   t,
   setUiLanguage,
@@ -16,7 +17,7 @@ import {
   noteLanguageOf,
   uiLocale,
   type TranslationKey,
-  type UiLanguage
+  type ContentLanguage
 } from "./i18n";
 import {
   FileSystemAdapter,
@@ -425,7 +426,8 @@ export default class VisualAgentMapPlugin extends Plugin {
     const markdownSelectionAi = new MarkdownSelectionAi(this.app, {
       model: () => this.settings.cliModel,
       autoOpen: () => this.settings.markdownSelectionAiAutoOpen,
-      language: () => languagePromptName(this.settings.language, "en", "plain"),
+      language: selected =>
+        languagePromptName(selectionOutputLanguage(this.settings.language, selected), "en", "plain"),
       run: (prepared, model, signal, image, webSearch, generateImage) =>
         this.runConfirmedMarkdownContextAi(prepared, model, signal, image, webSearch, generateImage),
       saveImage: (dataUrl, notePath, name) => this.saveGeneratedImage(dataUrl, notePath, name)
@@ -1756,7 +1758,7 @@ export default class VisualAgentMapPlugin extends Plugin {
   async addAimDiagrams(request: {
     title: string;
     detail: string;
-    language: UiLanguage;
+    language: ContentLanguage;
     model: string;
     signal?: AbortSignal;
     onStart?: () => void;

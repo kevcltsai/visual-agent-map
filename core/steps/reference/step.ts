@@ -1,4 +1,4 @@
-import type { UiLanguage } from "../../../i18n";
+import type { ContentLanguage } from "../../../i18n";
 import { renderTemplate } from "../../step-runner";
 import { inLanguage, type FragmentPair } from "../_shared/fragments";
 import ExtractZH from "./extract.zh.md";
@@ -15,6 +15,6 @@ const REDUCE: FragmentPair = { zh: text(ReduceZH), en: text(ReduceEN) };
  * (step `task.reference-extract`); later rounds merge the extracted evidence (step `task.reference-reduce`). Each
  * round is sent as an ordinary task step with this text as its task, so its prompt is the regular task prompt.
  */
-export function referenceTask(round: "extract" | "reduce", language: UiLanguage): string {
+export function referenceTask(round: "extract" | "reduce", language: ContentLanguage): string {
   return inLanguage(round === "extract" ? EXTRACT : REDUCE, language);
 }

@@ -5,7 +5,14 @@ import { AimClarificationModal } from "../../ui/modals/aim-clarification-modal";
 import { withThinkingOrigin } from "./thinking-origin";
 import { createHash, randomUUID } from "node:crypto";
 import type VisualAgentMapPlugin from "../../main";
-import { noteLanguageOf, t, topicStatusLabel, translateNote, type TranslationKey, type UiLanguage } from "../../i18n";
+import {
+  noteLanguageOf,
+  t,
+  topicStatusLabel,
+  translateNote,
+  type TranslationKey,
+  type ContentLanguage
+} from "../../i18n";
 import {
   MarkdownRenderer,
   ItemView,
@@ -218,7 +225,7 @@ function errorMessage(error: unknown): string {
  * The built-in Standard and Textbook templates follow the output language, as the fixed Detail headings always did; their
  * display name uses `language` itself, so a Simplified Chinese interface labels the template "标准", not "標準".
  */
-function templateInLanguage(template: DetailTemplate, language: UiLanguage): DetailTemplate {
+function templateInLanguage(template: DetailTemplate, language: ContentLanguage): DetailTemplate {
   return isBuiltinTemplateId(template.id)
     ? builtinTemplates(noteLanguageOf(language), language).find(item => item.id === template.id)!
     : template;
@@ -229,7 +236,7 @@ function templateInLanguage(template: DetailTemplate, language: UiLanguage): Det
  */
 export function formatIssuesPatch(
   issues: CountIssue[] | undefined,
-  language: UiLanguage
+  language: ContentLanguage
 ): Pick<NotePatch, "detailFormatIssues"> {
   return { detailFormatIssues: (issues ?? []).map(issue => countIssueText(issue, noteLanguageOf(language))) };
 }
@@ -1102,7 +1109,7 @@ export class VisualAgentMapView extends ItemView {
   private toneTextFor(
     note: Pick<Note, "toneId"> | undefined,
     chosenId?: string,
-    language: UiLanguage = this.plugin.settings.language
+    language: ContentLanguage = this.plugin.settings.language
   ): string | undefined {
     return resolveToneText(this.plugin.settings.promptPresets, [chosenId, note?.toneId, this.map?.toneId], language);
   }
@@ -5268,7 +5275,7 @@ export class VisualAgentMapView extends ItemView {
     detail: string;
     formatIssues?: AiResult["formatIssues"];
     model: string;
-    language: UiLanguage;
+    language: ContentLanguage;
     template?: DetailTemplate;
   }): void {
     const path = job.path;
@@ -7237,6 +7244,7 @@ export class VisualAgentMapView extends ItemView {
           currentTone: this.toneLabelFor(note),
           currentStyle: this.currentStyleLabel(this.resolveTopicTemplate(note).template.id, this.effectiveToneId(note)),
           currentSummary: note.summary,
+          ...(note.contentLanguage ? { contentLanguage: note.contentLanguage } : {}),
           // Only a label: a missing topic template is reported at the next AI update, not when the dialog opens.
           currentTemplate: templateInLanguage(this.resolveTopicTemplate(note).template, this.plugin.settings.language)
             .name,
@@ -9364,7 +9372,7 @@ export class VisualAgentMapView extends ItemView {
     rules: string,
     model: string,
     result: AiResult,
-    language: UiLanguage,
+    language: ContentLanguage,
     task: NonNullable<VisualAgentMapView["integrationTask"]>,
     context: TaskContext
   ): Promise<void> {
@@ -9531,6 +9539,9 @@ export class VisualAgentMapView extends ItemView {
     const stamped = written?.aim?.contentLanguage;
     if (stamped !== undefined && this.map?.aim && this.map.aim.contentLanguage === undefined)
       this.map.aim.contentLanguage = stamped;
+    const stampedOutput = written?.aim?.outputLanguage;
+    if (stampedOutput !== undefined && this.map?.aim && this.map.aim.outputLanguage === undefined)
+      this.map.aim.outputLanguage = stampedOutput;
   }
   private markCanvasHintSeen(): void {
     if (this.plugin.settings.canvasHintSeen) return;
@@ -9968,7 +9979,7 @@ export class VisualAgentMapView extends ItemView {
    * Template for content that has no topic choice of its own (new integrated topics, child contributions); a dialog
    * choice comes first.
    */
-  private mapDetailTemplate(language: UiLanguage, chosenId?: string): DetailTemplate {
+  private mapDetailTemplate(language: ContentLanguage, chosenId?: string): DetailTemplate {
     const settings = this.plugin.settings;
     return templateInLanguage(
       resolveTemplate(

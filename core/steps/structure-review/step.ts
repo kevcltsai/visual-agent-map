@@ -1,5 +1,5 @@
 import { estimateTokens } from "../../../ai/context-builder";
-import { translate, uiLocale, type UiLanguage } from "../../../i18n";
+import { translate, uiLocale, type ContentLanguage } from "../../../i18n";
 import { inLanguageNaming } from "../_shared/fragments";
 import type { ReasoningLevel } from "../../../ai/types";
 import { renderTemplate, type StepDefinition } from "../../step-runner";
@@ -26,9 +26,9 @@ export interface StructureNode {
 export interface StructureReviewRequest {
   rootQuestion: string;
   nodes: StructureNode[];
-  language: UiLanguage;
+  language: ContentLanguage;
   /** Language of the prompt and model output; defaults to `language`, which stays the interface language for errors. */
-  contentLanguage?: UiLanguage;
+  contentLanguage?: ContentLanguage;
   model: string;
   reasoning: ReasoningLevel;
 }
@@ -160,7 +160,7 @@ function descendantIds(tree: ReadonlyArray<{ id: string; parentId: string | null
   return found;
 }
 
-const invalid = (locale: UiLanguage, detail: string): StructureReviewError =>
+const invalid = (locale: ContentLanguage, detail: string): StructureReviewError =>
   new StructureReviewError("invalid", translate(locale, "error.structure_review_invalid", detail));
 
 /**
@@ -177,7 +177,7 @@ const invalid = (locale: UiLanguage, detail: string): StructureReviewError =>
 export function parseStructureReview(
   raw: string,
   tree: ReadonlyArray<StructureNode>,
-  language: UiLanguage = "en"
+  language: ContentLanguage = "en"
 ): StructureReviewResult {
   const locale = uiLocale(language);
   let value: unknown;

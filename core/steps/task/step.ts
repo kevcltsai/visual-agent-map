@@ -1,7 +1,7 @@
 import { aimPhase } from "../../../ai/aim-prompt";
 import type { AimContract } from "../../../ai/aim-contracts";
 import type { AiResult, TaskContext } from "../../../ai/types";
-import type { UiLanguage } from "../../../i18n";
+import type { ContentLanguage } from "../../../i18n";
 import type { AiProviderId } from "../../../ai/providers/provider";
 import type { StepDefinition } from "../../step-runner";
 import { parseAiResult } from "./parse";
@@ -11,7 +11,7 @@ import { taskPrompt } from "./render";
 export interface TaskStepInput {
   context: TaskContext;
   /** Output language of the prompt. */
-  language: UiLanguage;
+  language: ContentLanguage;
   /** Provider label used in parse error messages, for example `Claude Code`. */
   providerLabel: string;
   strictGapAudit: boolean;

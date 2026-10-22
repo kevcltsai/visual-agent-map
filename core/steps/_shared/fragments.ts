@@ -5,7 +5,7 @@ import {
   verbatimHeadingLanguage,
   type InstructionLanguage,
   type PromptNameForm,
-  type UiLanguage
+  type ContentLanguage
 } from "../../../i18n";
 import LabelAncestorsZH from "./label-ancestors.zh.md";
 import LabelAncestorsEN from "./label-ancestors.en.md";
@@ -52,7 +52,7 @@ export interface FragmentPair {
 const pair = (zh: string, en: string): FragmentPair => ({ zh: text(zh), en: text(en) });
 
 /** The fragment in the language's instruction language (registry `instruction`): `en` or `zh`. */
-export function inLanguage(fragment: FragmentPair, language: UiLanguage): string {
+export function inLanguage(fragment: FragmentPair, language: ContentLanguage): string {
   return fragment[instructionLanguageOf(language)];
 }
 
@@ -63,7 +63,7 @@ export function inLanguage(fragment: FragmentPair, language: UiLanguage): string
  */
 export function inLanguageNaming(
   fragment: FragmentPair,
-  language: UiLanguage,
+  language: ContentLanguage,
   names: Readonly<Record<string, PromptNameForm>>,
   spelledIn?: InstructionLanguage
 ): string {
@@ -78,9 +78,9 @@ export function inLanguageNaming(
  * default, for the instruction language of `instructionOf` (the language the prompt is written for).
  */
 export function languageVariables(
-  language: UiLanguage,
+  language: ContentLanguage,
   names: Readonly<Record<string, PromptNameForm>>,
-  instructionOf: UiLanguage = language,
+  instructionOf: ContentLanguage = language,
   spelledIn?: InstructionLanguage
 ): Record<string, string> {
   const variables: Record<string, string> = {};
@@ -92,7 +92,7 @@ export function languageVariables(
 /** Claude only: return through the StructuredOutput tool at once, without a text draft first. Codex prompts never include it. */
 export const CLAUDE_STRUCTURED_OUTPUT: FragmentPair = pair(ClaudeStructuredOutputZH, ClaudeStructuredOutputEN);
 /** A response-contract block; Claude's carries the StructuredOutput instruction after it, Codex's is the contract unchanged. */
-export function withProviderOutput(contract: string, provider: "claude" | "codex", language: UiLanguage): string {
+export function withProviderOutput(contract: string, provider: "claude" | "codex", language: ContentLanguage): string {
   return provider === "claude" ? `${contract}\n${inLanguage(CLAUDE_STRUCTURED_OUTPUT, language)}` : contract;
 }
 
@@ -114,7 +114,7 @@ export const SOURCE_SAFETY: FragmentPair = pair(SourceSafetyZH, SourceSafetyEN);
  * The tone rule plus the resolved tone text. Callers add it only when a tone text exists (academic or absent adds
  * nothing), so prompts without a tone stay byte-identical to before.
  */
-export function toneBlock(toneText: string, language: UiLanguage): string {
+export function toneBlock(toneText: string, language: ContentLanguage): string {
   return renderTemplate(inLanguage({ zh: ToneZH, en: ToneEN }, language), { tone: toneText });
 }
 
@@ -125,7 +125,7 @@ const HEADINGS_VERBATIM_CUSTOM: FragmentPair = { zh: HeadingsVerbatimCustomZH, e
  * the clause that tells the model to copy the fixed headings exactly as listed while writing the content in the output
  * language. Empty for languages whose note language is themselves, so those prompts stay unchanged.
  */
-export function headingsVerbatim(output: UiLanguage, instruction?: InstructionLanguage, custom = false): string {
+export function headingsVerbatim(output: ContentLanguage, instruction?: InstructionLanguage, custom = false): string {
   const note = verbatimHeadingLanguage(output);
   if (!note) return "";
   const spelled = instruction ?? instructionLanguageOf(output);

@@ -1,4 +1,4 @@
-import type { UiLanguage } from "../../../i18n";
+import type { ContentLanguage } from "../../../i18n";
 import { renderTemplate } from "../../../core/step-runner";
 import { inLanguage, type FragmentPair } from "../../../core/steps/_shared/fragments";
 import ThinkingOriginLabelTemplate from "./thinking-origin-label.md";
@@ -52,24 +52,26 @@ const SYNTHESIS_DIRECTIONS: FragmentPair = pair(SynthesisDirectionsZH, Synthesis
 const SYNTHESIS_GOAL: FragmentPair = pair(SynthesisGoalZH, SynthesisGoalEN);
 const MERGE_GOAL: FragmentPair = pair(MergeGoalZH, MergeGoalEN);
 
-export const researchTopicTask = (language: UiLanguage, title: string): string =>
+export const researchTopicTask = (language: ContentLanguage, title: string): string =>
   renderTemplate(inLanguage(RESEARCH_TOPIC, language), { title });
 
 /** The task for a guided expansion of a topic in the requested `direction`. */
-export function expansionTask(language: UiLanguage, existing: string, direction: string | undefined): string {
+export function expansionTask(language: ContentLanguage, existing: string, direction: string | undefined): string {
   const lead = direction || inLanguage(EXPANSION_DIRECTION, language);
   return `${lead}\n${inLanguage(EXISTING_SUBTOPICS, language)}\n${existing}\n${inLanguage(AVOID_DUPLICATES, language)} ${inLanguage(GUIDED_EXPANSION, language)}`;
 }
 
-export const synthesisDirectionsTask = (language: UiLanguage): string => inLanguage(SYNTHESIS_DIRECTIONS, language);
-export const synthesisGoalTask = (language: UiLanguage): string => inLanguage(SYNTHESIS_GOAL, language);
+export const synthesisDirectionsTask = (language: ContentLanguage): string =>
+  inLanguage(SYNTHESIS_DIRECTIONS, language);
+export const synthesisGoalTask = (language: ContentLanguage): string => inLanguage(SYNTHESIS_GOAL, language);
 /** The task of an AI merge of selected sibling topics into one (prompt.merge_goal). */
-export const mergeGoalTask = (language: UiLanguage): string => inLanguage(MERGE_GOAL, language);
-export const noSummaryYet = (language: UiLanguage): string => inLanguage(NO_SUMMARY_YET, language);
-export const labelCurrentSummary = (language: UiLanguage): string => inLanguage(LABEL_CURRENT_SUMMARY, language);
-export const labelVisualReferences = (language: UiLanguage): string => inLanguage(LABEL_VISUAL_REFERENCES, language);
-export const labelFullKnowledge = (language: UiLanguage): string => inLanguage(LABEL_FULL_KNOWLEDGE, language);
-export const labelOldFindings = (language: UiLanguage): string => inLanguage(LABEL_OLD_FINDINGS, language);
+export const mergeGoalTask = (language: ContentLanguage): string => inLanguage(MERGE_GOAL, language);
+export const noSummaryYet = (language: ContentLanguage): string => inLanguage(NO_SUMMARY_YET, language);
+export const labelCurrentSummary = (language: ContentLanguage): string => inLanguage(LABEL_CURRENT_SUMMARY, language);
+export const labelVisualReferences = (language: ContentLanguage): string =>
+  inLanguage(LABEL_VISUAL_REFERENCES, language);
+export const labelFullKnowledge = (language: ContentLanguage): string => inLanguage(LABEL_FULL_KNOWLEDGE, language);
+export const labelOldFindings = (language: ContentLanguage): string => inLanguage(LABEL_OLD_FINDINGS, language);
 
 /** Source-context blocks that carry a note's Thinking Origin to the model as unverified data. */
 export const thinkingOriginBlock = (origin: string): string => renderTemplate(ThinkingOriginSourceTemplate, { origin });

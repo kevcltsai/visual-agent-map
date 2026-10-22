@@ -1,5 +1,5 @@
 // Prompt rules, constants and parsers for the Manual AIM flow; moved from manual-flow.ts unchanged.
-import type { UiLanguage } from "../../i18n";
+import type { ContentLanguage } from "../../i18n";
 import type { AiResult, TaskContext } from "../../ai/types";
 import type { MapDocument, MapNode, AimBranchRecord } from "../../map-model";
 import { type CommitResult } from "./research-run-store";
@@ -142,7 +142,7 @@ export function parseAimResearchPlan(result: Pick<AiResult, "detail" | "suggesti
 
 /** Every AIM model call carries the map's content language explicitly; the service-level UI fallback must never apply. */
 /** `outputLanguage` is the output content language; fixed note text uses its note language. */
-export type AimTaskContext = TaskContext & { outputLanguage: UiLanguage };
+export type AimTaskContext = TaskContext & { outputLanguage: ContentLanguage };
 
 export type PlannerReview = ReturnType<typeof parseAimPlannerReview>;
 
@@ -185,7 +185,7 @@ export type PlannerQualityContext = {
   /** The map runs unattended: no question may stop it, so what is unknown becomes an assumption to confirm. */
   unattended?: boolean;
   /** AIM content language of the map; every model call in the review pipeline uses it. */
-  outputLanguage: UiLanguage;
+  outputLanguage: ContentLanguage;
   /** Writing tone for the final delivery only; review and classification calls are structured and ignore it. */
   toneText?: string;
   conditions: Record<string, string>;

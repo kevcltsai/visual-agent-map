@@ -1,6 +1,6 @@
 import { sourcesHeadingKeys, type DetailTemplate } from "../../../ai/detail-templates";
 import { fencedLines } from "../../../ai/markdown-blocks";
-import { type UiLanguage, translateNote } from "../../../i18n";
+import { type ContentLanguage, translateNote } from "../../../i18n";
 import { linksOf } from "./merge-check";
 
 /**
@@ -73,7 +73,7 @@ export function carryForwardSources(
   detail: string,
   previousTexts: string[],
   nextTexts: string[],
-  language: UiLanguage,
+  language: ContentLanguage,
   template: DetailTemplate
 ): string {
   const carried = carriedSourceLines(previousTexts, nextTexts);

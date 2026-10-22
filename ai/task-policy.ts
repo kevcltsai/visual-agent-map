@@ -1,6 +1,6 @@
 import type { ReasoningLevel } from "./types";
 import type { TaskContext } from "./types";
-import { translate, type UiLanguage } from "../i18n";
+import { translate, type ContentLanguage } from "../i18n";
 
 export function normalizeReasoningLevel(value: unknown): ReasoningLevel {
   return value === "auto" || value === "medium" || value === "high" ? value : "low";
@@ -14,7 +14,7 @@ export function effectiveReasoningLevel(
   return context.sourceContext && context.sourceContext.length > 6_000 ? "medium" : "low";
 }
 
-export function researchGuidance(context: TaskContext, language: UiLanguage = "zh-TW"): string {
+export function researchGuidance(context: TaskContext, language: ContentLanguage = "zh-TW"): string {
   const depth = translate(
     language,
     context.researchDepth === "fast"

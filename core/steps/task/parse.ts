@@ -2,7 +2,7 @@ import { foldAimContract, type AimContract } from "../../../ai/aim-contracts";
 import { neutralizeUnsafeMermaid } from "../../../ai/mermaid-safety";
 import { truncateSummary } from "../../../ai/result-utils";
 import { SEARCH_STATUSES, type AiResult, type SearchStatus } from "../../../ai/types";
-import { t, type UiLanguage, translateNote } from "../../../i18n";
+import { t, type ContentLanguage, translateNote } from "../../../i18n";
 
 export function extractJsonObject(raw: string): string {
   const candidates: string[] = [];
@@ -48,7 +48,7 @@ export function extractJsonObject(raw: string): string {
 export function parseAiResult(
   raw: string,
   label: string,
-  language: UiLanguage,
+  language: ContentLanguage,
   strictGapAudit = false,
   webResearch = false,
   contract?: AimContract

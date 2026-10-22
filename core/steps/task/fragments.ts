@@ -1,5 +1,5 @@
 import { renderTemplate } from "../../step-runner";
-import type { UiLanguage } from "../../../i18n";
+import type { ContentLanguage } from "../../../i18n";
 import { inLanguage, languageVariables, type FragmentPair } from "../_shared/fragments";
 import { verbatimHeadingLanguage } from "../../../i18n";
 import SourceRegistryTemplate from "./source-registry.md";
@@ -77,7 +77,7 @@ const HEADING_RULE_NOTE: FragmentPair = { zh: HeadingRuleNoteZH, en: HeadingRule
  * The output-language paragraph. The standard Detail headings follow the interface language when it is also the note
  * language; when they differ (Simplified Chinese), they stay in the note language and only the content follows the output.
  */
-export function outputLanguage(language: UiLanguage): string {
+export function outputLanguage(language: ContentLanguage): string {
   const note = verbatimHeadingLanguage(language);
   const names = languageVariables(language, { language: "plain" });
   const headingRule = note
@@ -98,13 +98,13 @@ export const VISUAL_ON: FragmentPair = pair(VisualOnZH, VisualOnEN);
 export const VISUAL_PRESERVE: FragmentPair = pair(VisualPreserveZH, VisualPreserveEN);
 
 /** The six standard Detail headings are interface text, so the caller builds them; this fills the structure sentence. */
-export function detailStructure(language: UiLanguage, headings: string): string {
+export function detailStructure(language: ContentLanguage, headings: string): string {
   return renderTemplate(inLanguage(DETAIL_STRUCTURE_TEMPLATE, language), { headings });
 }
 const CUSTOM_DETAIL_STRUCTURE_TEMPLATE: FragmentPair = { zh: CustomDetailStructureZH, en: CustomDetailStructureEN };
 /** A custom template's structure sentence: `{{count}}` headings, the heading list, then any per-section rules. */
 export function customDetailStructure(
-  language: UiLanguage,
+  language: ContentLanguage,
   values: { count: string; headings: string; rules: string }
 ): string {
   return renderTemplate(inLanguage(CUSTOM_DETAIL_STRUCTURE_TEMPLATE, language), values);
@@ -117,19 +117,19 @@ const CUSTOM_DETAIL_RULES: Record<"log" | "description" | "exact" | "min", Fragm
 };
 export function customDetailRule(
   kind: "log" | "description" | "exact" | "min",
-  language: UiLanguage,
+  language: ContentLanguage,
   values: Record<string, string>
 ): string {
   return renderTemplate(inLanguage(CUSTOM_DETAIL_RULES[kind], language), values);
 }
 const REPAIR_COUNTS_TEMPLATE: FragmentPair = { zh: RepairCountsZH, en: RepairCountsEN };
 /** The single follow-up request that asks the model to fix sections whose item counts missed the template. */
-export function repairCounts(language: UiLanguage, issues: string): string {
+export function repairCounts(language: ContentLanguage, issues: string): string {
   return renderTemplate(inLanguage(REPAIR_COUNTS_TEMPLATE, language), { issues });
 }
 const MERGE_REPAIR_TEMPLATE: FragmentPair = { zh: MergeRepairZH, en: MergeRepairEN };
 /** The single follow-up request of an AI merge whose result lost or invented numbers, links or embeds. */
-export function mergeRepair(language: UiLanguage, missing: string, added: string, title: string): string {
+export function mergeRepair(language: ContentLanguage, missing: string, added: string, title: string): string {
   return renderTemplate(inLanguage(MERGE_REPAIR_TEMPLATE, language), { missing, added, title });
 }
 export function sourceRegistry(catalog: string): string {
@@ -141,6 +141,6 @@ const TEXTBOOK_DETAIL_STRUCTURE_TEMPLATE: FragmentPair = {
   en: TextbookDetailStructureEN
 };
 /** The Textbook template's structure text: lead-in, `{{headings}}` in order, omit-empty override, self-check before `{{log}}`. */
-export function textbookDetailStructure(language: UiLanguage, values: { headings: string; log: string }): string {
+export function textbookDetailStructure(language: ContentLanguage, values: { headings: string; log: string }): string {
   return renderTemplate(inLanguage(TEXTBOOK_DETAIL_STRUCTURE_TEMPLATE, language), values);
 }

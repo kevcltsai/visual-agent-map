@@ -1,5 +1,5 @@
 import { App, Notice, TAbstractFile, TFile, TFolder, normalizePath, parseYaml, stringifyYaml } from "obsidian";
-import { resolveAimContentLanguage } from "./experiences/aim/content-language";
+import { isOutputOnlyLanguage, resolveAimContentLanguage } from "./experiences/aim/content-language";
 import { createHash } from "node:crypto";
 import {
   isNoteLanguage,
@@ -39,6 +39,8 @@ export type ModelSource = "workspace" | "inherited" | "manual";
 export type TopicState = "active" | "unassigned" | "archived" | "inbox";
 export type TopicCollection = "Notes" | "Unassigned" | "Archive";
 export interface Note {
+  /** The note's stored `content-language` frontmatter, when present. */
+  contentLanguage?: NoteLanguage;
   title: string;
   summary: string;
   prompt: string;
@@ -1101,6 +1103,7 @@ export class Repository {
         ? { detailTemplateId: fm["detail-template"] }
         : {}),
       ...(typeof fm.tone === "string" && fm.tone ? { toneId: fm.tone } : {}),
+      ...(noteContentLanguage(fm) ? { contentLanguage: noteContentLanguage(fm) } : {}),
       ...(readRelevance(fm) ? { relevance: readRelevance(fm) } : {}),
       detailFormatIssues: Array.isArray(fm["detail-format-issues"])
         ? fm["detail-format-issues"].filter((v): v is string => typeof v === "string")
@@ -1455,8 +1458,12 @@ export class Repository {
    * anyway (never on open), so later interface-language changes cannot change it.
    */
   private stampAimContentLanguage(map: MapDocument): void {
-    if (map.aim && map.aim.contentLanguage === undefined)
-      map.aim.contentLanguage = noteLanguageOf(resolveAimContentLanguage(map, this.settings.language));
+    if (!map.aim) return;
+    const resolved = resolveAimContentLanguage(map, this.settings.language);
+    if (map.aim.contentLanguage === undefined) map.aim.contentLanguage = noteLanguageOf(resolved);
+    // Both fields are written together on the first write; a map upgraded from the note-language-only form gets the
+    // output-only language pinned here so a later title edit cannot change it.
+    if (map.aim.outputLanguage === undefined && isOutputOnlyLanguage(resolved)) map.aim.outputLanguage = resolved;
   }
 
   async saveMap(path: string, map: MapDocument): Promise<void> {

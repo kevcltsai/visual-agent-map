@@ -1,5 +1,5 @@
 import { renderTemplate, type StepDefinition } from "../../../../core/step-runner";
-import type { UiLanguage } from "../../../../i18n";
+import type { ContentLanguage } from "../../../../i18n";
 import { inLanguage } from "../../../../core/steps/_shared/fragments";
 import condenseEn from "./condense.en.md";
 import condenseZh from "./condense.zh.md";
@@ -9,7 +9,7 @@ import searchImagesEn from "./search-images.en.md";
 import searchImagesZh from "./search-images.zh.md";
 
 export interface PresetInput {
-  language: UiLanguage;
+  language: ContentLanguage;
   /** Language name to translate into; only the translate presets take it. */
   target?: string;
 }

@@ -75,7 +75,7 @@ import {
   type PlannerQualityContext,
   type ResearchGapClassification
 } from "./manual-flow-support";
-import { noteLanguageOf, translateNote, type UiLanguage } from "../../i18n";
+import { noteLanguageOf, translateNote, type ContentLanguage } from "../../i18n";
 import { renderInitialClarificationTask } from "./steps/initial-clarification/step";
 import {
   renderInitialQuestionTask,
@@ -172,7 +172,7 @@ export class AimManualFlow {
   addDiagrams?: (request: {
     title: string;
     detail: string;
-    language: UiLanguage;
+    language: ContentLanguage;
     model: string;
     signal?: AbortSignal;
     onStart?: () => void;
@@ -223,7 +223,7 @@ export class AimManualFlow {
    * A gap that would not change the advice, or that is still open when the research budget is spent, becomes an
    * open item of a conditional conclusion: the document states it for the user to confirm instead of stopping.
    */
-  private withOpenItems(review: PlannerReview, language: UiLanguage): PlannerReview {
+  private withOpenItems(review: PlannerReview, language: ContentLanguage): PlannerReview {
     const openItems = [...(review.openItems ?? []), ...(review.researchTarget ? [review.researchTarget] : [])].filter(
       (item, index, all) => all.findIndex(other => other.title === item.title) === index
     );
@@ -241,7 +241,7 @@ export class AimManualFlow {
   }
 
   /** At the research budget a rejected final delivery is published (smoke limits keep their own exits). */
-  private atBudget(review: PlannerReview, language: UiLanguage): PlannerReview {
+  private atBudget(review: PlannerReview, language: ContentLanguage): PlannerReview {
     return review.decision === "research_more" &&
       this.deliveryRejections.has(review) &&
       !this.limits.acceptGapAtBudget &&
@@ -254,7 +254,7 @@ export class AimManualFlow {
    * What an interim note says to the reader in place of the reviewer's rationale and the stop reason (both stay in the
    * run records): the evidence still missing, or the question it waits on.
    */
-  private interimNotice(review: PlannerReview, language: UiLanguage): string {
+  private interimNotice(review: PlannerReview, language: ContentLanguage): string {
     if (review.decision === "ask_user") return review.question ? awaitingAnswerCallout(review.question, language) : "";
     if (review.decision === "research_more")
       return incompleteResearchWarning(review.researchTarget ? [review.researchTarget.title] : [], language);
@@ -276,7 +276,7 @@ export class AimManualFlow {
     review: PlannerReview,
     charts: {
       title: string;
-      language: UiLanguage;
+      language: ContentLanguage;
       model: string;
       signal?: AbortSignal;
       mapPath: string;
@@ -302,7 +302,7 @@ export class AimManualFlow {
    * rejected gap in reader words, which is also listed as an open item, instead of a draft left pending. The
    * reviewer's rationale stays in the run records; it can name internal IDs and critiques the draft, not the topic.
    */
-  private publishRejectedDelivery(review: PlannerReview, language: UiLanguage): PlannerReview {
+  private publishRejectedDelivery(review: PlannerReview, language: ContentLanguage): PlannerReview {
     const written = this.deliveryRejections.get(review);
     if (!written) return this.withOpenItems(review, language);
     const warning = rejectedDeliveryWarning(review.researchTarget ? [review.researchTarget.title] : [], language);
@@ -321,18 +321,18 @@ export class AimManualFlow {
    * Tone text for prose-producing AIM calls (research and final delivery). Structured Planner/review calls carry an
    * aimContract and never get it (askAimModel drops it), so tone cannot disturb their schemas.
    */
-  private toneOf(map: MapDocument, language: UiLanguage): string | undefined {
+  private toneOf(map: MapDocument, language: ContentLanguage): string | undefined {
     return resolveToneText(this.repository.settings.promptPresets, [map.toneId], language);
   }
 
   /** Content language of the map as read now; never cached on the flow, so a UI language switch cannot change it. */
-  private languageOf(map: MapDocument): UiLanguage {
+  private languageOf(map: MapDocument): ContentLanguage {
     return resolveAimContentLanguage(map, this.repository.settings.language);
   }
 
   async prepareClarification(
     topic: { title: string; detail: string; model: string; reasoning?: unknown },
-    contentLanguage: UiLanguage,
+    contentLanguage: ContentLanguage,
     signal?: AbortSignal
   ): Promise<string[]> {
     const result = await this.askAimModel(
@@ -492,7 +492,7 @@ export class AimManualFlow {
       detail: string;
       ancestors: string;
       task?: string;
-      outputLanguage: UiLanguage;
+      outputLanguage: ContentLanguage;
       detailFormat?: TaskContext["detailFormat"];
       aimContract?: AimContract;
     },

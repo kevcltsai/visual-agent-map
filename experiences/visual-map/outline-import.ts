@@ -3,7 +3,7 @@ import { safeName, type Repository } from "../../repository";
 import { arrangeMap } from "../../map-layout";
 import { canonicalDetail } from "../../ai/result-utils";
 import { standardTemplate, type DetailTemplate } from "../../ai/detail-templates";
-import { noteLanguageOf, translate, translateNote, type UiLanguage } from "../../i18n";
+import { noteLanguageOf, translate, translateNote, type ContentLanguage } from "../../i18n";
 
 export const OUTLINE_NODE_LIMIT = 100;
 export const OUTLINE_TITLE_LIMIT = 200;
@@ -267,7 +267,12 @@ function localDate(now: Date): string {
 }
 
 /** The outline root's import line, in the template's log section (or its first section when it has none). */
-function outlineRootDetail(language: UiLanguage, template: DetailTemplate, source: string | null, now: Date): string {
+function outlineRootDetail(
+  language: ContentLanguage,
+  template: DetailTemplate,
+  source: string | null,
+  now: Date
+): string {
   const log = source
     ? translateNote(language, "ui.outline_import_log_source", localDate(now), source)
     : translateNote(language, "ui.outline_import_log", localDate(now));

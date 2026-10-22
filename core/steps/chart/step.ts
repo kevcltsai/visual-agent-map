@@ -1,4 +1,4 @@
-import type { UiLanguage } from "../../../i18n";
+import type { ContentLanguage } from "../../../i18n";
 import type { AiProviderId } from "../../../ai/providers/provider";
 import { CLAUDE_STRUCTURED_OUTPUT, inLanguage } from "../_shared/fragments";
 import { renderTemplate, type StepDefinition } from "../../step-runner";
@@ -9,7 +9,7 @@ import templateZh from "./chart.zh.md";
 export interface ChartRequest {
   title: string;
   detail: string;
-  language: UiLanguage;
+  language: ContentLanguage;
   existingCount: number;
   existingTypes: string[];
   remaining: number;

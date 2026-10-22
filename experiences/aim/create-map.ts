@@ -2,7 +2,7 @@ import type { MapDocument, MapNode } from "../../map-model";
 import type { Repository } from "../../repository";
 import { randomUUID } from "node:crypto";
 import { noteLanguageOf, translate } from "../../i18n";
-import { chooseAimContentLanguage } from "./content-language";
+import { chooseAimContentLanguage, isOutputOnlyLanguage } from "./content-language";
 import { buildAimRootContext, type AimOutcomeExpectation } from "./outcome-expectations";
 
 export interface AimStartInput {
@@ -47,6 +47,8 @@ export async function createAimMap(
       version: 1,
       creationId: requestId,
       contentLanguage: noteLanguageOf(detectedLanguage),
+      // A language without an interface dictionary (ja, ko, ar...) is kept beside its note language (en).
+      ...(isOutputOnlyLanguage(detectedLanguage) ? { outputLanguage: detectedLanguage } : {}),
       minimumAnswersBeforeConclusion,
       ...(input.interaction === "unattended" ? { interaction: "unattended" as const } : {}),
       branches: [],

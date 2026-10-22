@@ -1,6 +1,7 @@
 /** English dictionary: the source of every `TranslationKey` and the fallback for any language missing a key. */
 export const en = {
   "ui.output_language": "Answer language for this task",
+  "ui.output_language_more": "More languages (answers only)",
   "ui.select_proposal_0": "Select proposal: {0}",
   "ui.proposal_name": "Proposal name",
   "ui.proposal_task": "Proposal task",

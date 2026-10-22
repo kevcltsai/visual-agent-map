@@ -12,7 +12,7 @@ import { canonicalDetail, normalizeOutputScriptHeadings } from "../ai/result-uti
 import { normalizeDetailHeadings, normalizeMathDelimiters } from "../ai/markdown-blocks";
 import { checkCounts, countIssueText } from "../ai/detail-templates";
 import type { AiResult, ReasoningLevel, TaskContext } from "../ai/types";
-import { noteLanguageOf, translate, t, type UiLanguage } from "../i18n";
+import { noteLanguageOf, translate, t, type ContentLanguage } from "../i18n";
 import { CLAUDE_MODEL_CHOICES, providerForModel } from "../ai/providers/provider";
 import type { CodexAppServerRuntime, CodexWebSearchEvent } from "../ai/runtime/codex-app-server";
 import type { ClaudeCodeCliRuntime } from "../ai/runtime/claude-code-cli";
@@ -69,7 +69,7 @@ export interface AiTaskServiceOptions {
   /** Clock of the first-event watchdog. Absent: the real one. */
   clock?: AttemptClock;
   pluginDirectory: () => string;
-  language: () => UiLanguage;
+  language: () => ContentLanguage;
   defaultReasoning: () => ReasoningLevel;
   exchangeLoggingEnabled: () => boolean;
   exchanges: () => AiExchangeLog | null;
@@ -551,7 +551,7 @@ export class AiTaskService {
   async addDiagramsToDetail(request: {
     title: string;
     detail: string;
-    language: UiLanguage;
+    language: ContentLanguage;
     model: string;
     signal?: AbortSignal;
     /** Called once, right before the step starts; never when diagrams are off. */
@@ -591,7 +591,7 @@ export class AiTaskService {
     input: TaskContext,
     detail: string,
     countIssues: ReturnType<typeof checkCounts> | undefined,
-    language: UiLanguage,
+    language: ContentLanguage,
     provider: "claude" | "codex",
     model: string,
     signal: AbortSignal | undefined,

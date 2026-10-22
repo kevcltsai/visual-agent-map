@@ -5,6 +5,7 @@
 ### Added
 
 - Simplified Chinese interface. Notes created with it keep their fixed headings (Preview, Detail sections) in Traditional Chinese, so a vault never mixes heading languages.
+- AI output follows the language of your map or topic for Japanese, Korean, Arabic and Thai (the AI writes in that language instead of falling back to your interface language), including the Markdown selection AI when the selected text is in one of them. The note's fixed headings stay in English. The "Answer language for this task" menu also lists Japanese, Korean, Spanish, French, German, Portuguese, Russian, Arabic, Thai and Vietnamese under "More languages (answers only)"; these add no interface language.
 
 ### Changed
 

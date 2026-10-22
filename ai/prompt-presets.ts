@@ -1,4 +1,11 @@
-import { instructionLanguageOf, LANGUAGES, translate, type TranslationKey, type UiLanguage } from "../i18n";
+import {
+  instructionLanguageOf,
+  LANGUAGES,
+  translate,
+  type TranslationKey,
+  type ContentLanguage,
+  type UiLanguage
+} from "../i18n";
 import PlainZH from "./prompt-presets/plain.zh.md";
 import PlainEN from "./prompt-presets/plain.en.md";
 import MagazineZH from "./prompt-presets/magazine.zh.md";
@@ -85,7 +92,7 @@ export function isBuiltinPreset(id: string): boolean {
   return BUILTINS.some(item => item.id === id);
 }
 
-export function builtinPresets(language: UiLanguage, kind?: PromptPresetKind): PromptPreset[] {
+export function builtinPresets(language: ContentLanguage, kind?: PromptPresetKind): PromptPreset[] {
   const instruction = instructionLanguageOf(language);
   return BUILTINS.filter(item => !kind || item.kind === kind).map(item => ({
     id: item.id,
@@ -115,7 +122,7 @@ export function normalizePresets(value: unknown): PromptPreset[] {
 export function listPresets(
   custom: readonly PromptPreset[] | undefined,
   kind: PromptPresetKind,
-  language: UiLanguage
+  language: ContentLanguage
 ): PromptPreset[] {
   return [...builtinPresets(language, kind), ...(custom ?? []).filter(item => item.kind === kind)];
 }
@@ -124,7 +131,7 @@ export function findPreset(
   custom: readonly PromptPreset[] | undefined,
   kind: PromptPresetKind,
   id: string | undefined,
-  language: UiLanguage
+  language: ContentLanguage
 ): PromptPreset | undefined {
   return id ? listPresets(custom, kind, language).find(item => item.id === id) : undefined;
 }
@@ -134,7 +141,7 @@ export function resolvePreset(
   custom: readonly PromptPreset[] | undefined,
   kind: PromptPresetKind,
   id: string | undefined,
-  language: UiLanguage
+  language: ContentLanguage
 ): { preset: PromptPreset; missing: boolean } {
   const found = findPreset(custom, kind, id, language);
   const fallbackId = kind === "tone" ? DEFAULT_TONE_ID : DEFAULT_OUTLINE_PRESET_ID;
@@ -148,7 +155,7 @@ export function resolvePreset(
 export function resolveToneText(
   custom: readonly PromptPreset[] | undefined,
   ids: readonly (string | undefined)[],
-  language: UiLanguage
+  language: ContentLanguage
 ): string | undefined {
   for (const id of ids) {
     const found = findPreset(custom, "tone", id, language);
@@ -184,7 +191,7 @@ export function createPreset(
 export function duplicatePreset(
   custom: readonly PromptPreset[],
   sourceId: string,
-  language: UiLanguage,
+  language: ContentLanguage,
   name?: string
 ): { presets: PromptPreset[]; created?: PromptPreset } {
   const source = [...builtinPresets(language), ...custom].find(item => item.id === sourceId);

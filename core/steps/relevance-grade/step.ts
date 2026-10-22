@@ -1,5 +1,5 @@
 import { estimateTokens } from "../../../ai/context-builder";
-import { translate, uiLocale, type UiLanguage } from "../../../i18n";
+import { translate, uiLocale, type ContentLanguage } from "../../../i18n";
 import { inLanguageNaming } from "../_shared/fragments";
 import type { ReasoningLevel } from "../../../ai/types";
 import type { RelevanceLevel, RelevanceTier } from "../../../note-values";
@@ -38,9 +38,9 @@ export interface RelevanceGradeRequest {
   context?: string;
   /** The whole map, parent before child. Cards whose `parentId` is null are context only and are never graded. */
   nodes: StructureNode[];
-  language: UiLanguage;
+  language: ContentLanguage;
   /** Language of the prompt and the model's reasons; defaults to `language`, which stays the interface language for errors. */
-  contentLanguage?: UiLanguage;
+  contentLanguage?: ContentLanguage;
   model: string;
   reasoning: ReasoningLevel;
   /** Cards the learner set by hand. Their tier is final: the AI never grades them, but they steer the cards around them. */
@@ -113,7 +113,7 @@ export const RELEVANCE_GRADE_SCHEMA = {
 export const gradableNodes = (nodes: ReadonlyArray<StructureNode>): StructureNode[] =>
   nodes.filter(node => node.parentId !== null);
 
-export const invalid = (locale: UiLanguage, detail: string): RelevanceGradeError =>
+export const invalid = (locale: ContentLanguage, detail: string): RelevanceGradeError =>
   new RelevanceGradeError("invalid", translate(locale, "error.relevance_grade_invalid", detail));
 
 /** The pins that name a gradable card of this map, in map order, one per card (the last entry for a card wins). */
@@ -132,7 +132,7 @@ export function effectivePins(
 
 /** The failure for a reply whose only problem is parent-child order (or a pin's bounds); a repair round can fix it. */
 export function hierarchyError(
-  locale: UiLanguage,
+  locale: ContentLanguage,
   violations: TierViolation[],
   reply: RelevanceGradeResult
 ): RelevanceGradeError {
@@ -166,7 +166,7 @@ export function hierarchyError(
 export function parseRelevanceGrade(
   raw: string,
   tree: ReadonlyArray<StructureNode>,
-  language: UiLanguage = "en",
+  language: ContentLanguage = "en",
   pinList: ReadonlyArray<RelevancePin> = []
 ): RelevanceGradeResult {
   const locale = uiLocale(language);

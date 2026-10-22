@@ -1,4 +1,4 @@
-import { NOTE_LANGUAGES, translate, type NoteLanguage, type TranslationKey, type UiLanguage } from "../i18n";
+import { NOTE_LANGUAGES, translate, type NoteLanguage, type TranslationKey, type ContentLanguage } from "../i18n";
 import { fencedLines } from "./markdown-blocks";
 import { headingsVerbatim } from "../core/steps/_shared/fragments";
 import { customDetailRule, customDetailStructure, textbookDetailStructure } from "../core/steps/task/fragments";
@@ -52,7 +52,7 @@ export const STANDARD: readonly [string, TranslationKey, TranslationKey, DetailS
  * interface language the template's own name is shown in (it defaults to `language`); a Simplified Chinese interface
  * shows "标准" while the headings stay Traditional Chinese.
  */
-export function standardTemplate(language: NoteLanguage, display: UiLanguage = language): DetailTemplate {
+export function standardTemplate(language: NoteLanguage, display: ContentLanguage = language): DetailTemplate {
   return {
     id: STANDARD_TEMPLATE_ID,
     name: translate(display, "ui.detail_template_standard"),
@@ -69,7 +69,7 @@ export function standardTemplate(language: NoteLanguage, display: UiLanguage = l
   };
 }
 
-export function textbookTemplate(language: NoteLanguage, display: UiLanguage = language): DetailTemplate {
+export function textbookTemplate(language: NoteLanguage, display: ContentLanguage = language): DetailTemplate {
   return {
     ...standardTemplate(language, display),
     id: TEXTBOOK_TEMPLATE_ID,
@@ -82,7 +82,7 @@ export function isBuiltinTemplateId(id: string | undefined): boolean {
 }
 
 /** The built-in templates, in menu order. */
-export function builtinTemplates(language: NoteLanguage, display: UiLanguage = language): DetailTemplate[] {
+export function builtinTemplates(language: NoteLanguage, display: ContentLanguage = language): DetailTemplate[] {
   return [standardTemplate(language, display), textbookTemplate(language, display)];
 }
 
@@ -290,7 +290,7 @@ export function checkCounts(detail: string, template: DetailTemplate): CountIssu
   return issues;
 }
 
-export function countIssueText(issue: CountIssue, language: UiLanguage): string {
+export function countIssueText(issue: CountIssue, language: ContentLanguage): string {
   const key = issue.mode === "exact" ? "ui.detail_count_issue_exact" : "ui.detail_count_issue_min";
   return translate(language, key, issue.section, issue.n, issue.actual);
 }
@@ -298,7 +298,7 @@ export function countIssueText(issue: CountIssue, language: UiLanguage): string 
 /** The structure text for a template, plus (only when the output language's note language differs, i.e. zh-CN) the clause that keeps the fixed headings verbatim. */
 export function detailStructurePrompt(
   template: DetailTemplate,
-  language: UiLanguage,
+  language: ContentLanguage,
   standardText: (headings: string) => string
 ): string {
   return [
@@ -311,7 +311,7 @@ export function detailStructurePrompt(
 
 function structureText(
   template: DetailTemplate,
-  language: UiLanguage,
+  language: ContentLanguage,
   standardText: (headings: string) => string
 ): string {
   const headings = template.sections.map(section => `### ${section.name}`).join(", ");

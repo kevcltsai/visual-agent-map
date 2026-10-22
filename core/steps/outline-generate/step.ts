@@ -1,5 +1,5 @@
 import { estimateTokens } from "../../../ai/context-builder";
-import { translate, uiLocale, type UiLanguage } from "../../../i18n";
+import { translate, uiLocale, type ContentLanguage } from "../../../i18n";
 import { inLanguage, inLanguageNaming } from "../_shared/fragments";
 import type { ReasoningLevel } from "../../../ai/types";
 import {
@@ -21,9 +21,9 @@ export interface OutlineGenerateRequest {
   topic: string;
   /** The preset's instruction text; may contain a topic placeholder. */
   presetText: string;
-  language: UiLanguage;
+  language: ContentLanguage;
   /** Language of the prompt and model output; defaults to `language`, which stays the interface language for errors. */
-  contentLanguage?: UiLanguage;
+  contentLanguage?: ContentLanguage;
   model: string;
   reasoning: ReasoningLevel;
   /** Quick explore's chosen levels and size; they override the preset's own and are enforced after parsing. */
@@ -59,7 +59,7 @@ const PLACEHOLDER_PATTERN = new RegExp(
  * Put the topic into the preset. Every placeholder is replaced by the topic as a JSON string, so the model sees it
  * as quoted data; a preset without a placeholder gets a labelled topic line appended.
  */
-export function applyTopicToPreset(presetText: string, topic: string, language: UiLanguage): string {
+export function applyTopicToPreset(presetText: string, topic: string, language: ContentLanguage): string {
   const quoted = JSON.stringify(topic.trim());
   PLACEHOLDER_PATTERN.lastIndex = 0;
   if (PLACEHOLDER_PATTERN.test(presetText)) return presetText.replace(PLACEHOLDER_PATTERN, () => quoted);
@@ -80,7 +80,7 @@ export function stripWrappingFence(raw: string): string {
  * parser reports as an error, any non-heading line, comment, fenced block or front matter, no heading at all, or
  * more than the 100-heading limit rejects the whole reply.
  */
-export function parseOutlineReply(raw: string, language: UiLanguage): OutlineGenerateResult {
+export function parseOutlineReply(raw: string, language: ContentLanguage): OutlineGenerateResult {
   const locale = uiLocale(language);
   const text = stripWrappingFence(raw);
   const parsed = parseOutline(text);

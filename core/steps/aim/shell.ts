@@ -1,5 +1,5 @@
 import { renderTemplate } from "../../step-runner";
-import type { UiLanguage } from "../../../i18n";
+import type { ContentLanguage } from "../../../i18n";
 import type { TaskContext } from "../../../ai/types";
 import type { AiProviderId } from "../../../ai/providers/provider";
 import {
@@ -122,7 +122,7 @@ export function aimPhase(task: string): string | undefined {
 
 function phaseGuidance(
   phase: string | undefined,
-  language: UiLanguage,
+  language: ContentLanguage,
   responseContract?: TaskContext["responseContract"],
   structured = false
 ): string {
@@ -134,7 +134,11 @@ function phaseGuidance(
 }
 
 /** Builds the compact AIM prompt while retaining the regular AiResult JSON contract. */
-export function buildAimPrompt(context: TaskContext, language: UiLanguage, provider: AiProviderId = "codex"): string {
+export function buildAimPrompt(
+  context: TaskContext,
+  language: ContentLanguage,
+  provider: AiProviderId = "codex"
+): string {
   const phase = aimPhase(context.task);
   const field = (label: string, value: string | undefined) => (value?.trim() ? `${label}:\n${value}` : "");
   const blocks = [

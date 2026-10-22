@@ -1,4 +1,4 @@
-import { translate, type TranslationKey, type UiLanguage } from "../../i18n";
+import { translate, type TranslationKey, type ContentLanguage } from "../../i18n";
 import { STANDARD_TEMPLATE_ID, TEXTBOOK_TEMPLATE_ID } from "../../ai/detail-templates";
 import { DEFAULT_TONE_ID } from "../../ai/prompt-presets";
 
@@ -74,7 +74,7 @@ export function styleLabel(
   templateId: string | undefined,
   toneId: string | undefined,
   names: { template: (id: string) => string; tone: (id: string) => string },
-  language: UiLanguage
+  language: ContentLanguage
 ): string {
   const preset = matchPreset(templateId, toneId);
   if (preset) return translate(language, preset.short);

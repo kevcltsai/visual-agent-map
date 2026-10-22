@@ -24,7 +24,8 @@ interface SelectionAiOptions {
   model: () => string;
   /** Show the selection button and open the panel on image clicks; the command opens the panel either way. */
   autoOpen: () => boolean;
-  language: () => string;
+  /** Name of the language the AI writes in for this selection (the interface language unless the text is in another). */
+  language: (selectedText: string) => string;
   run: <Input, Output>(
     prepared: PreparedStep<Input, Output>,
     model: string,
@@ -297,7 +298,13 @@ export class MarkdownSelectionAi extends Component {
     this.hideLauncher();
     const model = this.options.model();
     this.panel?.close();
-    this.panel = new SelectionAiPanel(this.app, snapshot, model, this.options.language(), this.options.run);
+    this.panel = new SelectionAiPanel(
+      this.app,
+      snapshot,
+      model,
+      this.options.language(snapshot.text),
+      this.options.run
+    );
     this.panel.open();
   }
 }

@@ -2,8 +2,18 @@
 import type VisualAgentMapPlugin from "../../main";
 import { listPresets } from "../../ai/prompt-presets";
 import { PromptPresetsModal } from "../../ui/modals/prompt-presets-modal";
-import { chooseAimContentLanguage } from "../aim/content-language";
-import { noteLanguageOf, supportedLanguageLabel, SUPPORTED_LANGUAGES, t, type TranslationKey } from "../../i18n";
+import { chooseAimContentLanguage, isOutputOnlyLanguage } from "../aim/content-language";
+import {
+  noteLanguageOf,
+  OUTPUT_LANGUAGE_CHOICES,
+  supportedLanguageLabel,
+  SUPPORTED_LANGUAGES,
+  t,
+  type ContentLanguage,
+  type NoteLanguage,
+  type TranslationKey,
+  type UiLanguage
+} from "../../i18n";
 import { App, Component, MarkdownRenderer, Modal, Notice, Setting, TFile } from "obsidian";
 import { ReferencePicker, type ReferenceTopic } from "../../ui/reference-picker";
 import { type ReferenceGroup } from "../../ai/reference-materials";
@@ -18,7 +28,6 @@ import {
   type NotePatch,
   type ResearchDepth,
   type ResearchMode,
-  type Settings,
   type TopicInfo,
   type VisualMode
 } from "../../repository";
@@ -49,7 +58,7 @@ export interface TaskOptions {
   referenceGroups?: ReferenceGroup[];
   onProgress?: (message: string) => void;
   signal?: AbortSignal;
-  outputLanguage?: Settings["language"];
+  outputLanguage?: ContentLanguage;
   requirements?: string;
   researchMode: ResearchMode;
   researchDepth: ResearchDepth;
@@ -105,6 +114,8 @@ export interface PendingOutline {
   discard: () => void;
 }
 export interface NextStepSettings {
+  /** The topic note's stored `content-language` (note language of its fixed text), when it has one. */
+  contentLanguage?: NoteLanguage;
   model: string;
   modelSource: ModelSource;
   reasoning: string;
@@ -139,7 +150,7 @@ export interface QuickOutline {
   presets: { id: string; name: string }[];
   /** Generates the outline for this topic; the outline's root is the topic itself. */
   generate: (
-    request: { presetId: string; requirements: string; language: Settings["language"]; limits: OutlineLimits },
+    request: { presetId: string; requirements: string; language: ContentLanguage; limits: OutlineLimits },
     signal: AbortSignal
   ) => Promise<OutlineNode[]>;
   /** Adds the reviewed outline under this topic. */
@@ -253,6 +264,18 @@ export interface TaskSourceSettings {
   synthesisLabel?: string;
   synthesisTopics?: string[];
 }
+/**
+ * The output language a task dialog preselects: what the topic text is written in. A topic note that already carries a
+ * `content-language` keeps the previous default (the interface language) when the detected output-only language would
+ * write its fixed text in a different note language, so a Chinese-note topic is not suddenly answered in English-noted
+ * Japanese.
+ */
+export function defaultOutputLanguage(ui: UiLanguage, topic: string, noteLanguage?: NoteLanguage): ContentLanguage {
+  const chosen = chooseAimContentLanguage(ui, topic);
+  if (noteLanguage !== undefined && isOutputOnlyLanguage(chosen) && noteLanguageOf(chosen) !== noteLanguage) return ui;
+  return chosen;
+}
+
 export class NextStepModal extends Modal {
   private closed = false;
   /** AI started and this dialog hid itself; closing no longer stops the run (Stop is on the card or bar). */
@@ -960,7 +983,7 @@ export class NextStepModal extends Modal {
         if (!controller || this.dead(controller)) return;
         const options: TaskOptions = {
           referenceGroups: selected?.groups ?? [],
-          outputLanguage: languageSelect.value as Settings["language"],
+          outputLanguage: languageSelect.value as ContentLanguage,
           researchMode: selected?.webSearch ? "research" : "local",
           researchDepth: depthField.value(),
           visualMode: selected?.imageSearch ? "auto" : "off",
@@ -1162,7 +1185,7 @@ export class NextStepModal extends Modal {
           const selected = await sharedSources?.picker.ready();
           const options: TaskOptions = {
             referenceGroups: selected?.groups ?? [],
-            outputLanguage: languageSelect.value as Settings["language"],
+            outputLanguage: languageSelect.value as ContentLanguage,
             requirements: this.requirements(),
             researchMode: selected?.webSearch ? "research" : "local",
             shallowResearch: shallow.checked,
@@ -1333,7 +1356,7 @@ export class NextStepModal extends Modal {
       const options: TaskOptions = {
         synthesisContent: content,
         referenceGroups: selected?.groups ?? [],
-        outputLanguage: languageSelect.value as Settings["language"],
+        outputLanguage: languageSelect.value as ContentLanguage,
         requirements: this.requirements(),
         researchMode: selected?.webSearch ? "research" : "local",
         researchDepth: this.depth,
@@ -1353,7 +1376,7 @@ export class NextStepModal extends Modal {
     };
     const draftOptions = (signal: AbortSignal): TaskOptions => ({
       continuesDirections: true,
-      outputLanguage: languageSelect.value as Settings["language"],
+      outputLanguage: languageSelect.value as ContentLanguage,
       requirements: this.requirements(),
       researchMode: "local",
       researchDepth: this.depth,
@@ -1437,7 +1460,15 @@ export class NextStepModal extends Modal {
     const languageSelect = languageLabel.createEl("select");
     for (const option of SUPPORTED_LANGUAGES)
       languageSelect.createEl("option", { value: option.id, text: option.label });
-    languageSelect.value = chooseAimContentLanguage(this.plugin.settings.language, this.topic);
+    // Languages with no interface dictionary: the AI can write in them, so they are choosable here only.
+    const moreLanguages = languageSelect.createEl("optgroup", { attr: { label: t("ui.output_language_more") } });
+    for (const option of OUTPUT_LANGUAGE_CHOICES)
+      moreLanguages.createEl("option", { value: option.id, text: option.label });
+    languageSelect.value = defaultOutputLanguage(
+      this.plugin.settings.language,
+      this.topic,
+      this.modelSettings?.contentLanguage
+    );
     languageSelect.setAttr("aria-label", t("ui.output_language"));
     const style = noteStyleField(compactSettings, {
       templates: this.info?.templates ?? [],

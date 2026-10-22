@@ -3,6 +3,7 @@ import type { TranslationKey } from "./en";
 /** Simplified Chinese (Mainland usage) dictionary. Display strings only; notes keep zh-TW fixed text. Terms: agents-spec docs/product/I18N_GLOSSARY.md. */
 export const zhCN: Record<TranslationKey, string> = {
   "ui.output_language": "本次回答语言",
+  "ui.output_language_more": "更多语言（仅限回答）",
   "ui.select_proposal_0": "选择提案：{0}",
   "ui.proposal_name": "提案名称",
   "ui.proposal_task": "提案任务",

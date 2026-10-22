@@ -1,4 +1,4 @@
-import { type UiLanguage, translateNote } from "../../i18n";
+import { type ContentLanguage, translateNote } from "../../i18n";
 
 /** Node, evidence and source IDs (UUIDs, often shortened as `9a7207f4-…-v3`) belong to the app, never to the reader. */
 const INTERNAL_ID = /[0-9a-f]{8}-[^\s、，,;；）)\]]*/gi;
@@ -20,7 +20,7 @@ function itemLines(items: readonly string[]): string[] {
  * The warning that opens a document the final review rejected but that is still given as the answer: what the reader
  * must fill in or confirm, in reader words. The reviewer's own reasoning stays in the run records, not in the note.
  */
-export function rejectedDeliveryWarning(items: readonly string[], language: UiLanguage): string {
+export function rejectedDeliveryWarning(items: readonly string[], language: ContentLanguage): string {
   const lines = itemLines(items);
   if (!lines.length) return "";
   return [
@@ -31,7 +31,7 @@ export function rejectedDeliveryWarning(items: readonly string[], language: UiLa
 }
 
 /** The warning that opens an interim result whose research stopped with evidence still missing. */
-export function incompleteResearchWarning(items: readonly string[], language: UiLanguage): string {
+export function incompleteResearchWarning(items: readonly string[], language: ContentLanguage): string {
   const lines = itemLines(items);
   return [
     `> [!warning] ${translateNote(language, "note.aim_incomplete_warning_title")}`,
@@ -41,7 +41,7 @@ export function incompleteResearchWarning(items: readonly string[], language: Ui
 }
 
 /** The callout that opens an interim result waiting for the user's answer. */
-export function awaitingAnswerCallout(question: string, language: UiLanguage): string {
+export function awaitingAnswerCallout(question: string, language: ContentLanguage): string {
   const text = readerText(question.replace(/\s*\n\s*/g, " "));
   return text ? `> [!question] ${translateNote(language, "note.aim_awaiting_answer_title")}\n> ${text}` : "";
 }

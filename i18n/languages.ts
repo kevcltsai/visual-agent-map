@@ -98,3 +98,137 @@ export const LANGUAGES = [
 ] as const satisfies ReadonlyArray<LanguageEntry>;
 
 export type UiLanguage = (typeof LANGUAGES)[number]["id"];
+
+/**
+ * Script-based detection data for one output-only language: `script` must match, and `exclude` (when set) names letters
+ * of a sibling language that share the script (Persian and Urdu write Arabic script), in which case there is no signal.
+ */
+export interface OutputLanguageDetection {
+  readonly script: RegExp;
+  readonly exclude?: RegExp;
+}
+
+/**
+ * A language VAM can write AI content in but has no interface dictionary for. It is deliberately a separate table from
+ * {@link LANGUAGES}: it adds no interface language, no prompt snapshot tag and no dictionary, so it needs no new
+ * translations. Fixed text written into notes and the instruction language are always English. Rows with `detect` are
+ * recognised from the map or topic text; the rest (Latin and Cyrillic scripts) are only chosen by hand in the output
+ * language menu. A language that gains a dictionary moves to {@link LANGUAGES}.
+ */
+export interface OutputLanguageEntry {
+  readonly id: string;
+  readonly label: string;
+  readonly name: string;
+  readonly instruction: "en";
+  readonly note: "en";
+  readonly intl: string;
+  readonly prompt: PromptNames;
+  readonly detect?: OutputLanguageDetection;
+}
+
+/** Prompt names are the same in all three forms: these languages have no regional or usage variants. */
+const names = (zh: string, en: string): PromptNames => ({
+  zh: { plain: zh, region: zh, usage: zh },
+  en: { plain: en, region: en, usage: en }
+});
+
+/** Order is menu order; detection tries rows in this order, so kana (Japanese) is tested before anything else. */
+export const OUTPUT_LANGUAGES = [
+  {
+    id: "ja",
+    label: "日本語",
+    name: "Japanese",
+    instruction: "en",
+    note: "en",
+    intl: "ja",
+    prompt: names("日文", "Japanese"),
+    detect: { script: /[\p{Script=Hiragana}\p{Script=Katakana}]/u }
+  },
+  {
+    id: "ko",
+    label: "한국어",
+    name: "Korean",
+    instruction: "en",
+    note: "en",
+    intl: "ko",
+    prompt: names("韓文", "Korean"),
+    detect: { script: /\p{Script=Hangul}/u }
+  },
+  {
+    id: "es",
+    label: "Español",
+    name: "Spanish",
+    instruction: "en",
+    note: "en",
+    intl: "es",
+    prompt: names("西班牙文", "Spanish")
+  },
+  {
+    id: "fr",
+    label: "Français",
+    name: "French",
+    instruction: "en",
+    note: "en",
+    intl: "fr",
+    prompt: names("法文", "French")
+  },
+  {
+    id: "de",
+    label: "Deutsch",
+    name: "German",
+    instruction: "en",
+    note: "en",
+    intl: "de",
+    prompt: names("德文", "German")
+  },
+  {
+    id: "pt",
+    label: "Português",
+    name: "Portuguese",
+    instruction: "en",
+    note: "en",
+    intl: "pt",
+    prompt: names("葡萄牙文", "Portuguese")
+  },
+  {
+    id: "ru",
+    label: "Русский",
+    name: "Russian",
+    instruction: "en",
+    note: "en",
+    intl: "ru",
+    prompt: names("俄文", "Russian")
+  },
+  {
+    id: "ar",
+    label: "العربية",
+    name: "Arabic",
+    instruction: "en",
+    note: "en",
+    intl: "ar",
+    prompt: names("阿拉伯文", "Arabic"),
+    // Persian and Urdu share the script; their own letters mean the text is not Arabic.
+    detect: { script: /\p{Script=Arabic}/u, exclude: /[پچژگکیٹڈڑںے]/u }
+  },
+  {
+    id: "th",
+    label: "ไทย",
+    name: "Thai",
+    instruction: "en",
+    note: "en",
+    intl: "th",
+    prompt: names("泰文", "Thai"),
+    detect: { script: /\p{Script=Thai}/u }
+  },
+  {
+    id: "vi",
+    label: "Tiếng Việt",
+    name: "Vietnamese",
+    instruction: "en",
+    note: "en",
+    intl: "vi",
+    prompt: names("越南文", "Vietnamese")
+  }
+] as const satisfies ReadonlyArray<OutputLanguageEntry>;
+
+export type OutputOnlyId = (typeof OUTPUT_LANGUAGES)[number]["id"];

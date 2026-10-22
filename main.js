@@ -104,6 +104,7 @@ var import_obsidian3 = require("obsidian");
 // i18n/en.ts
 var en = {
   "ui.output_language": "Answer language for this task",
+  "ui.output_language_more": "More languages (answers only)",
   "ui.select_proposal_0": "Select proposal: {0}",
   "ui.proposal_name": "Proposal name",
   "ui.proposal_task": "Proposal task",
@@ -1762,6 +1763,7 @@ var en = {
 // i18n/zh-CN.ts
 var zhCN = {
   "ui.output_language": "\u672C\u6B21\u56DE\u7B54\u8BED\u8A00",
+  "ui.output_language_more": "\u66F4\u591A\u8BED\u8A00\uFF08\u4EC5\u9650\u56DE\u7B54\uFF09",
   "ui.select_proposal_0": "\u9009\u62E9\u63D0\u6848\uFF1A{0}",
   "ui.proposal_name": "\u63D0\u6848\u540D\u79F0",
   "ui.proposal_task": "\u63D0\u6848\u4EFB\u52A1",
@@ -3420,6 +3422,7 @@ var zhCN = {
 // i18n/zh-TW.ts
 var zhTW = {
   "ui.output_language": "\u672C\u6B21\u56DE\u7B54\u8A9E\u8A00",
+  "ui.output_language_more": "\u66F4\u591A\u8A9E\u8A00\uFF08\u50C5\u9650\u56DE\u7B54\uFF09",
   "ui.select_proposal_0": "\u9078\u53D6\u63D0\u6848\uFF1A{0}",
   "ui.proposal_name": "\u63D0\u6848\u540D\u7A31",
   "ui.proposal_task": "\u63D0\u6848\u4EFB\u52D9",
@@ -5127,19 +5130,122 @@ var LANGUAGES = [
     dictionary: en
   }
 ];
+var names = (zh, en2) => ({
+  zh: { plain: zh, region: zh, usage: zh },
+  en: { plain: en2, region: en2, usage: en2 }
+});
+var OUTPUT_LANGUAGES = [
+  {
+    id: "ja",
+    label: "\u65E5\u672C\u8A9E",
+    name: "Japanese",
+    instruction: "en",
+    note: "en",
+    intl: "ja",
+    prompt: names("\u65E5\u6587", "Japanese"),
+    detect: { script: /[\p{Script=Hiragana}\p{Script=Katakana}]/u }
+  },
+  {
+    id: "ko",
+    label: "\uD55C\uAD6D\uC5B4",
+    name: "Korean",
+    instruction: "en",
+    note: "en",
+    intl: "ko",
+    prompt: names("\u97D3\u6587", "Korean"),
+    detect: { script: /\p{Script=Hangul}/u }
+  },
+  {
+    id: "es",
+    label: "Espa\xF1ol",
+    name: "Spanish",
+    instruction: "en",
+    note: "en",
+    intl: "es",
+    prompt: names("\u897F\u73ED\u7259\u6587", "Spanish")
+  },
+  {
+    id: "fr",
+    label: "Fran\xE7ais",
+    name: "French",
+    instruction: "en",
+    note: "en",
+    intl: "fr",
+    prompt: names("\u6CD5\u6587", "French")
+  },
+  {
+    id: "de",
+    label: "Deutsch",
+    name: "German",
+    instruction: "en",
+    note: "en",
+    intl: "de",
+    prompt: names("\u5FB7\u6587", "German")
+  },
+  {
+    id: "pt",
+    label: "Portugu\xEAs",
+    name: "Portuguese",
+    instruction: "en",
+    note: "en",
+    intl: "pt",
+    prompt: names("\u8461\u8404\u7259\u6587", "Portuguese")
+  },
+  {
+    id: "ru",
+    label: "\u0420\u0443\u0441\u0441\u043A\u0438\u0439",
+    name: "Russian",
+    instruction: "en",
+    note: "en",
+    intl: "ru",
+    prompt: names("\u4FC4\u6587", "Russian")
+  },
+  {
+    id: "ar",
+    label: "\u0627\u0644\u0639\u0631\u0628\u064A\u0629",
+    name: "Arabic",
+    instruction: "en",
+    note: "en",
+    intl: "ar",
+    prompt: names("\u963F\u62C9\u4F2F\u6587", "Arabic"),
+    // Persian and Urdu share the script; their own letters mean the text is not Arabic.
+    detect: { script: /\p{Script=Arabic}/u, exclude: /[پچژگکیٹڈڑںے]/u }
+  },
+  {
+    id: "th",
+    label: "\u0E44\u0E17\u0E22",
+    name: "Thai",
+    instruction: "en",
+    note: "en",
+    intl: "th",
+    prompt: names("\u6CF0\u6587", "Thai"),
+    detect: { script: /\p{Script=Thai}/u }
+  },
+  {
+    id: "vi",
+    label: "Ti\u1EBFng Vi\u1EC7t",
+    name: "Vietnamese",
+    instruction: "en",
+    note: "en",
+    intl: "vi",
+    prompt: names("\u8D8A\u5357\u6587", "Vietnamese")
+  }
+];
 
 // i18n.ts
 var registry = LANGUAGES;
 var FALLBACK_LANGUAGE = "en";
+var outputRegistry = OUTPUT_LANGUAGES;
 var entryOf = (locale) => {
-  var _a2;
-  return (_a2 = registry.find((item) => item.id === locale)) != null ? _a2 : registry.find((item) => item.id === FALLBACK_LANGUAGE);
+  var _a2, _b2;
+  return (_b2 = (_a2 = registry.find((item) => item.id === locale)) != null ? _a2 : outputRegistry.find((item) => item.id === locale)) != null ? _b2 : registry.find((item) => item.id === FALLBACK_LANGUAGE);
 };
 var NOTE_LANGUAGES = [...new Set(registry.map((item) => item.note))];
 var SUPPORTED_LANGUAGES = LANGUAGES.map(({ id, label, name }) => ({ id, label, name }));
+var OUTPUT_LANGUAGE_CHOICES = OUTPUT_LANGUAGES.map(({ id, label, name }) => ({ id, label, name }));
 function supportedLanguageLabel(id) {
-  var _a2, _b2;
-  return (_b2 = (_a2 = SUPPORTED_LANGUAGES.find((item) => item.id === id)) == null ? void 0 : _a2.label) != null ? _b2 : id;
+  var _a2, _b2, _c, _d;
+  return (_d = (_c = (_a2 = SUPPORTED_LANGUAGES.find((item) => item.id === id)) == null ? void 0 : _a2.label) != null ? _c : (_b2 = OUTPUT_LANGUAGE_CHOICES.find((item) => item.id === id)) == null ? void 0 : _b2.label) != null ? _d : id;
 }
 function isUiLanguage(value) {
   return registry.some((item) => item.id === value);
@@ -5183,7 +5289,8 @@ function t(key2, ...values) {
   return translate(language, key2, ...values);
 }
 function translate(locale, key2, ...values) {
-  const selected = entryOf(locale).dictionary[key2];
+  const entry = entryOf(locale);
+  const selected = "dictionary" in entry ? entry.dictionary[key2] : void 0;
   const translated = selected || en[key2] || String(key2);
   return translated.replace(/\{(\d+)\}/g, (_, index) => {
     const value = values[Number(index)];
@@ -6859,15 +6966,15 @@ var pair2 = (zh, en2) => ({ zh: text2(zh), en: text2(en2) });
 function inLanguage(fragment, language2) {
   return fragment[instructionLanguageOf(language2)];
 }
-function inLanguageNaming(fragment, language2, names2, spelledIn) {
+function inLanguageNaming(fragment, language2, names3, spelledIn) {
   return renderTemplate(
     fragment[instructionLanguageOf(language2)],
-    languageVariables(language2, names2, void 0, spelledIn)
+    languageVariables(language2, names3, void 0, spelledIn)
   );
 }
-function languageVariables(language2, names2, instructionOf = language2, spelledIn) {
+function languageVariables(language2, names3, instructionOf = language2, spelledIn) {
   const variables4 = {};
-  for (const [placeholder2, form] of Object.entries(names2))
+  for (const [placeholder2, form] of Object.entries(names3))
     variables4[placeholder2] = languagePromptName(language2, spelledIn != null ? spelledIn : instructionLanguageOf(instructionOf), form);
   return variables4;
 }
@@ -6990,7 +7097,7 @@ ${CONTEXT_TABLE_ANSWER}${question.answer || question.draftAnswer || CONTEXT_ANSW
 ${serializeInsightNotes(existingInsights, session.language)}` : "";
   return [...events.map((item) => item.text), notes].filter(Boolean).join("\n\n");
 }
-function names(guests, invited = []) {
+function names2(guests, invited = []) {
   return ["experts", "cross-domain", "generalist", "affected"].flatMap((category) => [
     ...Array.from({ length: guests.counts[category] }, (_, index) => {
       const named = guests.guests.filter((item) => item.category === category)[index];
@@ -7253,7 +7360,7 @@ function variables2(input) {
     background: "",
     customPrompt: ""
   };
-  const attendeeRoles = names(settings, invitedGuests).map((role) => `- ${role}`);
+  const attendeeRoles = names2(settings, invitedGuests).map((role) => `- ${role}`);
   const style = settings.customization ? cleanChatStyle(conversationStyle(language2, settings)) : conversationStyle(language2, settings);
   const continuing = !!(draft || priorContext);
   return {
@@ -11751,7 +11858,7 @@ var CATEGORIES4 = [
   }
 ];
 function categoryLabel(category, language2) {
-  const names2 = {
+  const names3 = {
     connections: "coffee.insight_category_connections",
     questions: "coffee.insight_category_questions",
     disagreements: "coffee.insight_category_disagreements",
@@ -11759,7 +11866,7 @@ function categoryLabel(category, language2) {
     assumptions: "coffee.insight_category_assumptions",
     solutions: "coffee.insight_category_solutions"
   };
-  const key2 = names2[category];
+  const key2 = names3[category];
   return key2 ? translate(uiLocale(language2), key2) : category;
 }
 function parseGuests(markdown) {
@@ -14166,12 +14273,16 @@ function avatarColor(name) {
 }
 
 // experiences/aim/content-language.ts
-var KANA_OR_HANGUL = /[\p{Script=Hiragana}\p{Script=Katakana}\p{Script=Hangul}]/u;
+var OUTPUT_ROWS = OUTPUT_LANGUAGES;
+var isOutputOnlyLanguage = (value) => OUTPUT_LANGUAGES.some((item) => item.id === value);
 function detectAimContentLanguage(text11) {
-  var _a2, _b2;
-  if (KANA_OR_HANGUL.test(text11)) return "unsupported";
-  const han = ((_a2 = text11.match(/\p{Script=Han}/gu)) != null ? _a2 : []).length;
-  const latin = ((_b2 = text11.match(/\p{Script=Latin}+/gu)) != null ? _b2 : []).length;
+  var _a2, _b2, _c;
+  for (const entry of OUTPUT_ROWS) {
+    if (!entry.detect || !entry.detect.script.test(text11)) continue;
+    return ((_a2 = entry.detect.exclude) == null ? void 0 : _a2.test(text11)) ? void 0 : entry.id;
+  }
+  const han = ((_b2 = text11.match(/\p{Script=Han}/gu)) != null ? _b2 : []).length;
+  const latin = ((_c = text11.match(/\p{Script=Latin}+/gu)) != null ? _c : []).length;
   if (han > 0 && han >= latin) return "zh-TW";
   if (latin > 0) return "en";
   return void 0;
@@ -14179,15 +14290,25 @@ function detectAimContentLanguage(text11) {
 function chooseAimContentLanguage(uiLanguage, ...sources2) {
   for (const source of sources2) {
     const result = detectAimContentLanguage(source != null ? source : "");
-    if (result === "unsupported") return uiLanguage;
-    if (result) return contentLocale(result, uiLanguage);
+    if (result === void 0) continue;
+    return isNoteLanguage(result) ? contentLocale(result, uiLanguage) : result;
   }
   return uiLanguage;
 }
+function selectionOutputLanguage(uiLanguage, selected) {
+  const detected = detectAimContentLanguage(selected);
+  return isOutputOnlyLanguage(detected) ? detected : uiLanguage;
+}
 function resolveAimContentLanguage(map, uiLanguage) {
-  var _a2;
-  const stored = (_a2 = map == null ? void 0 : map.aim) == null ? void 0 : _a2.contentLanguage;
-  if (isNoteLanguage(stored)) return contentLocale(stored, uiLanguage);
+  var _a2, _b2, _c;
+  const output = (_a2 = map == null ? void 0 : map.aim) == null ? void 0 : _a2.outputLanguage;
+  if (isOutputOnlyLanguage(output)) return output;
+  const stored = (_b2 = map == null ? void 0 : map.aim) == null ? void 0 : _b2.contentLanguage;
+  if (isNoteLanguage(stored)) {
+    const detected = detectAimContentLanguage((_c = map == null ? void 0 : map.title) != null ? _c : "");
+    if (detected !== void 0 && !isNoteLanguage(detected) && noteLanguageOf(detected) === stored) return detected;
+    return contentLocale(stored, uiLanguage);
+  }
   return chooseAimContentLanguage(uiLanguage, map == null ? void 0 : map.title);
 }
 function resolveAimNoteLanguage(map, uiLanguage) {
@@ -15035,12 +15156,12 @@ var HEADING_RULE_UI = pair4(heading_rule_ui_zh_default, heading_rule_ui_en_defau
 var HEADING_RULE_NOTE = { zh: heading_rule_note_zh_default, en: heading_rule_note_en_default };
 function outputLanguage(language2) {
   const note = verbatimHeadingLanguage(language2);
-  const names2 = languageVariables(language2, { language: "plain" });
+  const names3 = languageVariables(language2, { language: "plain" });
   const headingRule = note ? renderTemplate(inLanguage(HEADING_RULE_NOTE, language2), {
-    ...names2,
+    ...names3,
     ...languageVariables(note, { note: "plain" }, language2)
   }) : inLanguage(HEADING_RULE_UI, language2);
-  return renderTemplate(inLanguage(OUTPUT_LANGUAGE, language2), { language: names2.language, headingRule });
+  return renderTemplate(inLanguage(OUTPUT_LANGUAGE, language2), { language: names3.language, headingRule });
 }
 var MERGE = pair4(merge_zh_default, merge_en_default);
 var SYNTHESIZE = pair4(synthesize_zh_default, synthesize_en_default);
@@ -15152,11 +15273,11 @@ function sourcesHeadingKeys(template) {
   return new Set([...sectionLookup(template)].filter(([, target]) => target === index).map(([key2]) => key2));
 }
 function withoutConflictingAliases(sections) {
-  const names2 = new Set(sections.map((section3) => headingKey(section3.name)));
+  const names3 = new Set(sections.map((section3) => headingKey(section3.name)));
   return sections.map((section3) => {
     const aliases = [];
     for (const alias of section3.aliases)
-      if (alias.trim() && !names2.has(headingKey(alias)) && !aliases.some((existing) => headingKey(existing) === headingKey(alias)))
+      if (alias.trim() && !names3.has(headingKey(alias)) && !aliases.some((existing) => headingKey(existing) === headingKey(alias)))
         aliases.push(alias);
     return { ...section3, aliases };
   });
@@ -16695,12 +16816,12 @@ async function applyCharts(detail, charts, options) {
 var UPDATE_LOG_HEADING = /^(#{1,6})[ \t]+.*(?:更新紀錄|更新记录|Update log)/i;
 var HEADING = /^(#{1,6})[ \t]+\S/;
 function withoutUpdateLog(text11, logHeadings) {
-  const names2 = new Set(logHeadings.map((name) => name.trim().toLocaleLowerCase()).filter(Boolean));
+  const names3 = new Set(logHeadings.map((name) => name.trim().toLocaleLowerCase()).filter(Boolean));
   const isLog = (line) => {
     const match = UPDATE_LOG_HEADING.exec(line);
     if (match) return match;
     const heading = /^(#{1,6})[ \t]+(.*?)[ \t]*#*[ \t]*$/.exec(line);
-    return heading && names2.has(heading[2].trim().toLocaleLowerCase()) ? heading : null;
+    return heading && names3.has(heading[2].trim().toLocaleLowerCase()) ? heading : null;
   };
   const lines = text11.replace(/\r\n/g, "\n").split("\n"), kept = [];
   let skipping = 0;
@@ -17645,11 +17766,11 @@ var Repository = class {
     var _a2;
     const candidates = /* @__PURE__ */ new Set();
     const workspace = `${this.settings.workspaceFolder}/`;
-    const names2 = /* @__PURE__ */ new Set(["Topics", "Mind Maps", "AIM"]);
+    const names3 = /* @__PURE__ */ new Set(["Topics", "Mind Maps", "AIM"]);
     for (const folder of managedMapContainers(this.settings))
-      names2.add(folder.startsWith(workspace) ? folder.slice(workspace.length) : (_a2 = folder.split("/").at(-1)) != null ? _a2 : folder);
+      names3.add(folder.startsWith(workspace) ? folder.slice(workspace.length) : (_a2 = folder.split("/").at(-1)) != null ? _a2 : folder);
     const escape = (value) => value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-    const containerPattern = new RegExp(`^(.*)/(?:${[...names2].map(escape).join("|")})/[^/]+/Map\\.md$`);
+    const containerPattern = new RegExp(`^(.*)/(?:${[...names3].map(escape).join("|")})/[^/]+/Map\\.md$`);
     for (const file of this.app.vault.getMarkdownFiles()) {
       const match = file.path.match(containerPattern);
       if (!(match == null ? void 0 : match[1])) continue;
@@ -17771,6 +17892,7 @@ var Repository = class {
       visualMode: fm["visual-mode"] === "on" || fm["visual-mode"] === "off" ? fm["visual-mode"] : "auto",
       ...typeof fm["detail-template"] === "string" && fm["detail-template"] ? { detailTemplateId: fm["detail-template"] } : {},
       ...typeof fm.tone === "string" && fm.tone ? { toneId: fm.tone } : {},
+      ...noteContentLanguage(fm) ? { contentLanguage: noteContentLanguage(fm) } : {},
       ...readRelevance(fm) ? { relevance: readRelevance(fm) } : {},
       detailFormatIssues: Array.isArray(fm["detail-format-issues"]) ? fm["detail-format-issues"].filter((v) => typeof v === "string") : [],
       status: ["idea", "running", "completed", "error"].includes(normalized) ? normalized : "idea",
@@ -18080,8 +18202,10 @@ ${body}`);
    * anyway (never on open), so later interface-language changes cannot change it.
    */
   stampAimContentLanguage(map) {
-    if (map.aim && map.aim.contentLanguage === void 0)
-      map.aim.contentLanguage = noteLanguageOf(resolveAimContentLanguage(map, this.settings.language));
+    if (!map.aim) return;
+    const resolved = resolveAimContentLanguage(map, this.settings.language);
+    if (map.aim.contentLanguage === void 0) map.aim.contentLanguage = noteLanguageOf(resolved);
+    if (map.aim.outputLanguage === void 0 && isOutputOnlyLanguage(resolved)) map.aim.outputLanguage = resolved;
   }
   async saveMap(path, map) {
     this.stampAimContentLanguage(map);
@@ -18960,14 +19084,14 @@ function matchPreset(templateId, toneId) {
   const tone = toneId || DEFAULT_TONE_ID;
   return NOTE_STYLE_PRESETS.find((preset) => preset.templateId === template && preset.toneId === tone);
 }
-function styleLabel(templateId, toneId, names2, language2) {
+function styleLabel(templateId, toneId, names3, language2) {
   const preset = matchPreset(templateId, toneId);
   if (preset) return translate(language2, preset.short);
   return translate(
     language2,
     "ui.note_style_custom_0_1",
-    names2.template(templateId || STANDARD_TEMPLATE_ID),
-    names2.tone(toneId || DEFAULT_TONE_ID)
+    names3.template(templateId || STANDARD_TEMPLATE_ID),
+    names3.tone(toneId || DEFAULT_TONE_ID)
   );
 }
 
@@ -19553,6 +19677,8 @@ async function createAimMap(repository, model, input) {
       version: 1,
       creationId: requestId,
       contentLanguage: noteLanguageOf(detectedLanguage),
+      // A language without an interface dictionary (ja, ko, ar...) is kept beside its note language (en).
+      ...isOutputOnlyLanguage(detectedLanguage) ? { outputLanguage: detectedLanguage } : {},
       minimumAnswersBeforeConclusion,
       ...input.interaction === "unattended" ? { interaction: "unattended" } : {},
       branches: [],
@@ -20562,9 +20688,9 @@ var OutlineImportModal = class extends import_obsidian16.Modal {
 // experiences/visual-map/multi-research-modal.ts
 var import_obsidian17 = require("obsidian");
 var MultiResearchModal = class extends import_obsidian17.Modal {
-  constructor(app, names2, models, templates, submit, tones = [], manageTones, links = {}) {
+  constructor(app, names3, models, templates, submit, tones = [], manageTones, links = {}) {
     super(app);
-    this.names = names2;
+    this.names = names3;
     this.models = models;
     this.templates = templates;
     this.submit = submit;
@@ -21817,6 +21943,11 @@ function reasoningLabel(level) {
 }
 var PartialChildBatchError = class extends Error {
 };
+function defaultOutputLanguage(ui, topic, noteLanguage) {
+  const chosen = chooseAimContentLanguage(ui, topic);
+  if (noteLanguage !== void 0 && isOutputOnlyLanguage(chosen) && noteLanguageOf(chosen) !== noteLanguage) return ui;
+  return chosen;
+}
 var NextStepModal = class extends import_obsidian21.Modal {
   constructor(app, topic, depth, childrenCount, pendingCount, plugin, research, expand, synthesize, modelSettings, selectionFlow) {
     super(app);
@@ -22340,7 +22471,7 @@ var NextStepModal = class extends import_obsidian21.Modal {
     (_a2 = status()) == null ? void 0 : _a2.setText(t("ui.quick_outline_review_hint"));
   }
   onOpen() {
-    var _a2, _b2, _c, _d, _e, _f, _g, _h, _i, _j, _k, _l, _m, _n, _o, _p, _q, _r, _s, _t, _u, _v, _w, _x, _y, _z, _A, _B, _C, _D;
+    var _a2, _b2, _c, _d, _e, _f, _g, _h, _i, _j, _k, _l, _m, _n, _o, _p, _q, _r, _s, _t, _u, _v, _w, _x, _y, _z, _A, _B, _C, _D, _E;
     this.modalEl.addClass("vam-next-modal");
     const selection = this.selectionFlow;
     this.titleEl.setText(t(selection ? "ui.confirm_topic_synthesis" : "ui.how_would_you_like_to_explore_next"));
@@ -22908,17 +23039,24 @@ var NextStepModal = class extends import_obsidian21.Modal {
     const languageSelect = languageLabel.createEl("select");
     for (const option2 of SUPPORTED_LANGUAGES)
       languageSelect.createEl("option", { value: option2.id, text: option2.label });
-    languageSelect.value = chooseAimContentLanguage(this.plugin.settings.language, this.topic);
+    const moreLanguages = languageSelect.createEl("optgroup", { attr: { label: t("ui.output_language_more") } });
+    for (const option2 of OUTPUT_LANGUAGE_CHOICES)
+      moreLanguages.createEl("option", { value: option2.id, text: option2.label });
+    languageSelect.value = defaultOutputLanguage(
+      this.plugin.settings.language,
+      this.topic,
+      (_p = this.modelSettings) == null ? void 0 : _p.contentLanguage
+    );
     languageSelect.setAttr("aria-label", t("ui.output_language"));
     const style = noteStyleField(compactSettings, {
-      templates: (_q = (_p = this.info) == null ? void 0 : _p.templates) != null ? _q : [],
-      tones: (_s = (_r = this.info) == null ? void 0 : _r.tones) != null ? _s : [],
-      keepLabel: t("ui.note_style_keep_0", (_u = (_t = this.info) == null ? void 0 : _t.currentStyle) != null ? _u : ""),
-      templateDefault: t("ui.detail_template_keep_0", (_w = (_v = this.info) == null ? void 0 : _v.currentTemplate) != null ? _w : ""),
-      toneDefault: t("ui.tone_keep_0", (_y = (_x = this.info) == null ? void 0 : _x.currentTone) != null ? _y : ""),
-      currentTemplate: (_z = this.info) == null ? void 0 : _z.currentTemplate,
-      currentTone: (_A = this.info) == null ? void 0 : _A.currentTone,
-      currentStyle: (_B = this.info) == null ? void 0 : _B.currentStyle,
+      templates: (_r = (_q = this.info) == null ? void 0 : _q.templates) != null ? _r : [],
+      tones: (_t = (_s = this.info) == null ? void 0 : _s.tones) != null ? _t : [],
+      keepLabel: t("ui.note_style_keep_0", (_v = (_u = this.info) == null ? void 0 : _u.currentStyle) != null ? _v : ""),
+      templateDefault: t("ui.detail_template_keep_0", (_x = (_w = this.info) == null ? void 0 : _w.currentTemplate) != null ? _x : ""),
+      toneDefault: t("ui.tone_keep_0", (_z = (_y = this.info) == null ? void 0 : _y.currentTone) != null ? _z : ""),
+      currentTemplate: (_A = this.info) == null ? void 0 : _A.currentTemplate,
+      currentTone: (_B = this.info) == null ? void 0 : _B.currentTone,
+      currentStyle: (_C = this.info) == null ? void 0 : _C.currentStyle,
       manageTemplates: (selected, refreshed) => {
         const settings = this.plugin.settings;
         const choices = () => builtinTemplates(noteLanguageOf(settings.language), settings.language).concat(settings.detailTemplates).map(({ id, name }) => ({ id, name }));
@@ -22969,7 +23107,7 @@ var NextStepModal = class extends import_obsidian21.Modal {
     if (pendingDirections) showDirections(pendingDirections.directions);
     else checkName();
     show(initialMode);
-    const waitingOutline = (_C = this.modelSettings) == null ? void 0 : _C.pendingOutline;
+    const waitingOutline = (_D = this.modelSettings) == null ? void 0 : _D.pendingOutline;
     if (waitingOutline && quickOutline) {
       shallow.checked = !!waitingOutline.options.shallowResearch;
       shallowWeb.checked = !!waitingOutline.options.shallowWebSearch;
@@ -22993,7 +23131,7 @@ var NextStepModal = class extends import_obsidian21.Modal {
       );
     }
     (titleInput != null ? titleInput : cardFor[initialMode]).focus();
-    ((_D = this.renderModelSettings(adjustBody)) != null ? _D : adjustBody).createEl("p", {
+    ((_E = this.renderModelSettings(adjustBody)) != null ? _E : adjustBody).createEl("p", {
       text: t("ui.if_an_ai_task_exceeds_3_minutes_vam_attempts_to_interrupt_it"),
       cls: "vam-hint"
     });
@@ -23131,8 +23269,8 @@ function renderProposalList(parent, suggestions, changed, options = {}) {
       const selected = rows.filter((row) => row.check.checked && row.title.value.trim());
       if (!selected.length) return t("ui.select_at_least_one_subtopic");
       const renamed = new Map(selected.map((row) => [keyOf(row.item), row.title.value.trim()]));
-      const names2 = selected.filter((row) => !parentOf(row.item)).map((row) => row.title.value.trim());
-      if (new Set(names2).size !== names2.length) return t("ui.first_level_topic_names_must_be_unique");
+      const names3 = selected.filter((row) => !parentOf(row.item)).map((row) => row.title.value.trim());
+      if (new Set(names3).size !== names3.length) return t("ui.first_level_topic_names_must_be_unique");
       if (selected.some((row) => parentOf(row.item) && !renamed.has(parentOf(row.item))))
         return t("ui.select_the_parent_topic_before_its_child");
       return selected.map((row) => {
@@ -31479,14 +31617,14 @@ var VisualAgentMapView = class _VisualAgentMapView extends import_obsidian29.Ite
   }
   /** "Keep current (…)" name of the note style a topic (or this map) resolves to: a preset, else "Custom: …". */
   currentStyleLabel(templateId, toneId) {
-    const names2 = (list) => (id) => {
+    const names3 = (list) => (id) => {
       var _a2, _b2;
       return (_b2 = (_a2 = list.find((item) => item.id === id)) == null ? void 0 : _a2.name) != null ? _b2 : id;
     };
     return styleLabel(
       templateId,
       toneId,
-      { template: names2(this.templateChoices()), tone: names2(this.toneChoices()) },
+      { template: names3(this.templateChoices()), tone: names3(this.toneChoices()) },
       this.plugin.settings.language
     );
   }
@@ -31656,13 +31794,13 @@ var VisualAgentMapView = class _VisualAgentMapView extends import_obsidian29.Ite
     }
     const merge = this.mergeTasks.get(this.path);
     if (merge) {
-      const names2 = merge.sources.map((source) => {
+      const names3 = merge.sources.map((source) => {
         var _a3, _b3;
         return (_b3 = (_a3 = this.notes.get(source.id)) == null ? void 0 : _a3.title) != null ? _b3 : source.path;
       });
       renderBackgroundStatus(parent, {
         title: t("ui.merge_bar_title"),
-        value: names2.join(t("ui.list_separator")),
+        value: names3.join(t("ui.list_separator")),
         running: true,
         ...merge.state === "running" ? {
           onStop: () => this.stopMergeTask(merge),
@@ -37171,6 +37309,7 @@ ${request.requirements}` : preset.text,
           currentTone: this.toneLabelFor(note),
           currentStyle: this.currentStyleLabel(this.resolveTopicTemplate(note).template.id, this.effectiveToneId(note)),
           currentSummary: note.summary,
+          ...note.contentLanguage ? { contentLanguage: note.contentLanguage } : {},
           // Only a label: a missing topic template is reported at the next AI update, not when the dialog opens.
           currentTemplate: templateInLanguage(this.resolveTopicTemplate(note).template, this.plugin.settings.language).name,
           topicStatus: note.status,
@@ -37582,8 +37721,8 @@ ${request.requirements}` : preset.text,
     const pending = this.plugin.pendingSuggestions.get(parent.path);
     const present = (items) => {
       const version = this.plugin.pendingSuggestions.get(parent.path);
-      const names2 = items.filter((item) => !item.parentTitle).map((item) => item.title);
-      if (new Set(names2).size !== names2.length) {
+      const names3 = items.filter((item) => !item.parentTitle).map((item) => item.title);
+      if (new Set(names3).size !== names3.length) {
         this.plugin.pendingSuggestions.delete(parent.path);
         this.plugin.pendingResearchOptions.delete(parent.path);
         const message = t("ui.ai_proposed_duplicate_first_level_names_generate_the_proposa");
@@ -37989,13 +38128,13 @@ ${request.requirements}` : preset.text,
   }
   openMultiResearch(retryBatchKey) {
     if (!this.map || this.map.aim || !this.multiSelected.size) return;
-    const names2 = [...this.multiSelected].map((id) => {
+    const names3 = [...this.multiSelected].map((id) => {
       var _a2;
       return (_a2 = this.notes.get(id)) == null ? void 0 : _a2.title;
     }).filter((name) => !!name);
     new MultiResearchModal(
       this.app,
-      names2,
+      names3,
       this.modelChoices(),
       this.templateChoices(),
       (request) => void this.startMultiResearch(request, retryBatchKey),
@@ -38159,7 +38298,7 @@ ${request.requirements}` : preset.text,
   renderSelectionBar(workspace) {
     var _a2, _b2, _c;
     const selection = workspace.createDiv("vam-selection-bar");
-    const names2 = [...this.multiSelected].map((id) => {
+    const names3 = [...this.multiSelected].map((id) => {
       var _a3;
       return (_a3 = this.notes.get(id)) == null ? void 0 : _a3.title;
     }).filter(Boolean);
@@ -38168,8 +38307,8 @@ ${request.requirements}` : preset.text,
       text: this.multiSelected.size ? t(
         "ui.selected_0_1_2",
         this.multiSelected.size,
-        names2.slice(0, 2).join(t("ui.list_separator")),
-        names2.length > 2 ? "\u2026" : ""
+        names3.slice(0, 2).join(t("ui.list_separator")),
+        names3.length > 2 ? "\u2026" : ""
       ) : t("ui.prompt_select_topics")
     });
     selection.createSpan({ cls: "vam-hint vam-selection-hint", text: t("ui.drag_to_select_topics_hint") });
@@ -38747,11 +38886,11 @@ ${request.requirements}` : preset.text,
     var _a2, _b2;
     if (!this.map) return;
     const nodes = (_a2 = pending == null ? void 0 : pending.sources) != null ? _a2 : [...this.multiSelected].map((id) => this.map.nodes.find((node) => node.id === id)).filter((node) => !!node);
-    const names2 = nodes.map((node) => {
+    const names3 = nodes.map((node) => {
       var _a3, _b3;
       return (_b3 = (_a3 = this.notes.get(node.id)) == null ? void 0 : _a3.title) != null ? _b3 : node.path;
     });
-    const selectedLabel = t("ui.reference_selected_topics_included", names2.join(", "));
+    const selectedLabel = t("ui.reference_selected_topics_included", names3.join(", "));
     const sources2 = this.taskSourceSettings(selectedLabel, this.map.id, selectedLabel);
     const settings = this.plugin.settings;
     new NextStepModal(
@@ -38768,8 +38907,8 @@ ${request.requirements}` : preset.text,
       (options, direction, failed, accepted, observer) => this.startSelectionSynthesis(nodes, options, direction, failed, accepted, observer),
       void 0,
       {
-        names: names2,
-        initialTitle: (_b2 = pending == null ? void 0 : pending.title) != null ? _b2 : names2.length > 2 ? t("ui.synthesis_of_0_and_1_more", names2[0], names2.length) : t("ui.synthesis_of_0", names2.join(t("ui.list_separator"))),
+        names: names3,
+        initialTitle: (_b2 = pending == null ? void 0 : pending.title) != null ? _b2 : names3.length > 2 ? t("ui.synthesis_of_0_and_1_more", names3[0], names3.length) : t("ui.synthesis_of_0", names3.join(t("ui.list_separator"))),
         defaultDirection: t("ui.identify_shared_conclusions_key_differences_tradeoffs_and_ne"),
         background: this.backgroundHooks(this.selectionTaskKey()),
         fields: {
@@ -39267,7 +39406,7 @@ ${note.detail.trim()}` : "",
   }
   /** Pan/zoom writes only the viewport onto the current file, never this view's possibly older map copy. */
   async persistViewport() {
-    var _a2, _b2;
+    var _a2, _b2, _c, _d;
     if (this.builtIn || !this.map || !this.path) return;
     const viewport = { ...this.map.viewport };
     const written = await this.plugin.repo.updateMap(this.path, (map) => {
@@ -39276,6 +39415,9 @@ ${note.detail.trim()}` : "",
     const stamped = (_a2 = written == null ? void 0 : written.aim) == null ? void 0 : _a2.contentLanguage;
     if (stamped !== void 0 && ((_b2 = this.map) == null ? void 0 : _b2.aim) && this.map.aim.contentLanguage === void 0)
       this.map.aim.contentLanguage = stamped;
+    const stampedOutput = (_c = written == null ? void 0 : written.aim) == null ? void 0 : _c.outputLanguage;
+    if (stampedOutput !== void 0 && ((_d = this.map) == null ? void 0 : _d.aim) && this.map.aim.outputLanguage === void 0)
+      this.map.aim.outputLanguage = stampedOutput;
   }
   markCanvasHintSeen() {
     var _a2;
@@ -45368,7 +45510,13 @@ var MarkdownSelectionAi = class extends import_obsidian33.Component {
     this.hideLauncher();
     const model = this.options.model();
     (_a2 = this.panel) == null ? void 0 : _a2.close();
-    this.panel = new SelectionAiPanel(this.app, snapshot, model, this.options.language(), this.options.run);
+    this.panel = new SelectionAiPanel(
+      this.app,
+      snapshot,
+      model,
+      this.options.language(snapshot.text),
+      this.options.run
+    );
     this.panel.open();
   }
 };
@@ -46154,7 +46302,7 @@ var VisualAgentMapPlugin = class extends import_obsidian34.Plugin {
     const markdownSelectionAi = new MarkdownSelectionAi(this.app, {
       model: () => this.settings.cliModel,
       autoOpen: () => this.settings.markdownSelectionAiAutoOpen,
-      language: () => languagePromptName(this.settings.language, "en", "plain"),
+      language: (selected) => languagePromptName(selectionOutputLanguage(this.settings.language, selected), "en", "plain"),
       run: (prepared, model, signal, image, webSearch, generateImage) => this.runConfirmedMarkdownContextAi(prepared, model, signal, image, webSearch, generateImage),
       saveImage: (dataUrl, notePath, name) => this.saveGeneratedImage(dataUrl, notePath, name)
     });

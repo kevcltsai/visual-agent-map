@@ -1,5 +1,5 @@
 import { estimateTokens } from "../../../ai/context-builder";
-import { translate, uiLocale, type UiLanguage } from "../../../i18n";
+import { translate, uiLocale, type ContentLanguage } from "../../../i18n";
 import { inLanguageNaming } from "../_shared/fragments";
 import type { ReasoningLevel } from "../../../ai/types";
 import { renderTemplate, type StepDefinition } from "../../step-runner";
@@ -12,7 +12,7 @@ export interface ReframeRequest {
   source: string;
   question: string;
   context: string;
-  language: UiLanguage;
+  language: ContentLanguage;
   model: string;
   reasoning: ReasoningLevel;
 }

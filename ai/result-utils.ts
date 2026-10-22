@@ -5,7 +5,7 @@ import {
   translate,
   verbatimHeadingLanguage,
   type NoteLanguage,
-  type UiLanguage
+  type ContentLanguage
 } from "../i18n";
 import type { AiResult } from "./types";
 import { fencedLines } from "./markdown-blocks";
@@ -109,7 +109,7 @@ function textbookDetail(
  */
 export function normalizeOutputScriptHeadings(
   detail: string,
-  output: UiLanguage,
+  output: ContentLanguage,
   template?: Pick<DetailTemplate, "id">,
   context: { detailFormat?: string; promptProfile?: string } = {}
 ): string {

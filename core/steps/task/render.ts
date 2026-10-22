@@ -2,7 +2,7 @@ import { aimPhase, buildAimPrompt, readerFacingAimPhase } from "../aim/shell";
 import { researchGuidance } from "../../../ai/task-policy";
 import type { TaskContext } from "../../../ai/types";
 import { visualGuidance } from "../../../ai/visual-guidance";
-import { noteLanguageOf, type UiLanguage } from "../../../i18n";
+import { noteLanguageOf, type ContentLanguage } from "../../../i18n";
 import type { AiProviderId } from "../../../ai/providers/provider";
 import { detailStructurePrompt, standardTemplate } from "../../../ai/detail-templates";
 import {
@@ -46,7 +46,7 @@ export function readerFacingDetail(context: TaskContext): boolean {
 /** The regular (non-AIM) task prompt. Empty blocks are kept, so the blank-line layout matches the original builder. */
 export function generalTaskPrompt(
   context: TaskContext,
-  language: UiLanguage,
+  language: ContentLanguage,
   provider: AiProviderId = "codex"
 ): string {
   const modeFragment =
@@ -98,7 +98,7 @@ export function generalTaskPrompt(
 }
 
 /** AIM requests use the AIM prompt shell in core/steps/aim; its templates are Markdown files there. */
-export function taskPrompt(context: TaskContext, language: UiLanguage, provider: AiProviderId = "codex"): string {
+export function taskPrompt(context: TaskContext, language: ContentLanguage, provider: AiProviderId = "codex"): string {
   return context.promptProfile === "aim"
     ? buildAimPrompt(context, language, provider)
     : generalTaskPrompt(context, language, provider);

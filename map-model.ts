@@ -2,7 +2,7 @@ import { validateAimResearchPlan } from "./experiences/aim/research-plan";
 import { upgradeLegacyAimData } from "./experiences/aim/legacy-names";
 import type { AiResult } from "./ai/types";
 import type { FinalDeliveryCheckpoint } from "./experiences/aim/final-delivery";
-import { isNoteLanguage, t, translate, type NoteLanguage } from "./i18n";
+import { isNoteLanguage, t, translate, type NoteLanguage, type OutputOnlyId } from "./i18n";
 
 export interface MapNode {
   id: string;
@@ -305,6 +305,12 @@ export interface AimMapData {
   creationId?: string;
   /** Language of AIM-generated content, decided once at creation; legacy maps derive it from the title. */
   contentLanguage?: NoteLanguage;
+  /**
+   * Output-only language (ja, ko, ar, ...) the AI writes in, when the map's language has no interface dictionary.
+   * `contentLanguage` still holds the note language of the fixed text. Older plugin versions ignore this field; unknown
+   * values are ignored on read.
+   */
+  outputLanguage?: OutputOnlyId;
   /** Exploration target; legacy field name retained for saved maps. Never forces questions or completion. */
   minimumAnswersBeforeConclusion?: number;
   /**

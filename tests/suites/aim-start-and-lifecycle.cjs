@@ -724,16 +724,16 @@ integrationTest('AIM recovers a Map commit interrupted after its Note was writte
   assert.equal(Array.from(files.keys()).filter(path => path === result.notePath).length, 1);
 });
 
-test('AIM content language detector follows the character rules and falls back to the interface language', () => {
+test('AIM content language detector follows the character rules; Japanese and Korean are detected, no signal falls back to the interface language', () => {
   const { detectAimContentLanguage, chooseAimContentLanguage, resolveAimContentLanguage } = load('experiences/aim/content-language.ts');
   const cases = [
     ['東京五天自由行怎麼排', 'zh-TW'], ['Plan a 5-day Taipei trip', 'en'], ['Python 的 async 怎麼用', 'zh-TW'],
-    ['What does 侘寂 mean', 'en'], ['东京五天自由行怎么排', 'zh-TW'], ['東京の旅行', 'unsupported'], ['한국 여행', 'unsupported'], ['🍜', undefined], ['2026', undefined], ['', undefined]
+    ['What does 侘寂 mean', 'en'], ['东京五天自由行怎么排', 'zh-TW'], ['東京の旅行', 'ja'], ['한국 여행', 'ko'], ['🍜', undefined], ['2026', undefined], ['', undefined]
   ];
   for (const [text, expected] of cases) assert.equal(detectAimContentLanguage(text), expected, text);
   for (const ui of ['en', 'zh-TW']) {
-    assert.equal(chooseAimContentLanguage(ui, '東京の旅行'), ui);
-    assert.equal(chooseAimContentLanguage(ui, '東京の旅行', '中文內容'), ui, 'Japanese topic must not fall through to a later source');
+    assert.equal(chooseAimContentLanguage(ui, '東京の旅行'), 'ja');
+    assert.equal(chooseAimContentLanguage(ui, '東京の旅行', '中文內容'), 'ja', 'Japanese topic must not fall through to a later source');
     assert.equal(chooseAimContentLanguage(ui, '🍜', ''), ui);
     assert.equal(chooseAimContentLanguage(ui, '2026', '中文背景'), 'zh-TW');
     assert.equal(chooseAimContentLanguage(ui, '2026', 'Some English context'), 'en');

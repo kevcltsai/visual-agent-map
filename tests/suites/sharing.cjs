@@ -261,3 +261,62 @@ test('sharing leak: scanPayloadForLeaks reports category and position only and c
   assert.ok(hits.some(hit => hit.category === 'obsidian-url'));
   for (const hit of hits) assert.deepEqual(plain(Object.keys(hit).sort()), ['category', 'index']);
 });
+
+// Review F-A: a backslash-escaped backtick is not a code opener, in the cleaner and the scanner alike.
+const cleanMd = md => clean.cleanShareMarkdown(md, { titleOf: () => undefined, assets: clean.createAssetRegistry() });
+
+test('sharing F-A: escaped backtick does not open a code span (cleaner and scanner agree)', () => {
+  const md = 'see \\`[[Diary/Secret plan]]` here';
+  assert.ok(leakCategories({ detail: md }).has('wikilink'), 'scanner still sees the wikilink');
+  assert.equal(cleanMd(md).markdown.includes('[['), false, 'cleaner removes the wikilink');
+  assert.ok(leakCategories({ detail: '\\`[[x]]`' }).has('wikilink'));
+  assert.equal(cleanMd('\\`[[x]]`').markdown.includes('[['), false);
+  assert.equal(cleanMd('\\![[Diary/Secret.png]]').markdown.includes('[['), false);
+  assert.equal(cleanMd('\\`![[Diary/Secret.png]]`').markdown.includes('[['), false);
+  assert.ok(leakCategories({ detail: '\\`![[x]]`' }).has('wikilink'));
+});
+
+test('sharing F-A: an escaped backslash leaves the backtick real, so `\\\\`code [[x]]`` is code in both', () => {
+  const md = 'a \\\\`code [[x]]` b';
+  assert.equal(leakCategories({ detail: md }).has('wikilink'), false);
+  assert.equal(cleanMd(md).markdown, md, 'cleaner leaves it untouched as code');
+  assert.equal(scan.stripMarkdownCode(md), 'a \\\\  b');
+  // an odd run of backslashes (three) escapes again
+  assert.ok(leakCategories({ detail: 'a \\\\\\`[[x]]` b' }).has('wikilink'));
+});
+
+test('sharing F-A: an escaped closer does not let a later backtick swallow prose', () => {
+  const md = '`a\\` [[Secret]] `b`';
+  assert.ok(leakCategories({ detail: md }).has('wikilink'));
+  assert.equal(cleanMd(md).markdown.includes('[['), false);
+});
+
+// Review F-B: comments are removed before code is split off.
+test('sharing F-B: %% comments with inline code or fences inside disappear entirely', () => {
+  assert.equal(cleanMd('a %% secret `code` [[Diary/x]] %% b').markdown, 'a  b');
+  assert.equal(cleanMd('a %% line\n```js\nsecret\n```\nmore %% b').markdown, 'a  b');
+  assert.equal(cleanMd('a\n%%\nmulti\n`x`\n%%\nb').markdown, 'a\n\nb');
+});
+
+test('sharing F-B: HTML comments outside code disappear, inside code stay', () => {
+  assert.equal(cleanMd('a <!-- secret --> b').markdown, 'a  b');
+  assert.equal(cleanMd('a <!-- secret `x` [[y]]\n```\nz\n```\n--> b').markdown, 'a  b');
+  assert.equal(cleanMd('a `<!-- keep -->` b').markdown, 'a `<!-- keep -->` b');
+  assert.equal(cleanMd('```\n<!-- keep -->\n```').markdown, '```\n<!-- keep -->\n```');
+  assert.equal(cleanMd('a <!-- unclosed').markdown, 'a <!-- unclosed', 'unclosed comment is left alone');
+});
+
+test('sharing F-B: a literal %% inside code that pairs with another %% is removed (conservative, recorded)', () => {
+  assert.equal(cleanMd('`50%%` and 100%% done').markdown.includes('%%'), false);
+  assert.equal(cleanMd('code `a %% b` alone').markdown, 'code `a %% b` alone', 'a single %% in code stays');
+});
+
+test('sharing: leak categories have localized labels in every language', () => {
+  const cats = ['vault-path', 'map-folder', 'note-path', 'wikilink', 'app-url', 'obsidian-url', 'file-url', 'internal-field', 'model-name'];
+  for (const lang of ['en', 'zh-TW', 'zh-CN']) {
+    const dict = load(`i18n/${lang}.ts`);
+    const table = Object.values(dict).find(v => v && typeof v === 'object' && 'share.leak_blocked_0' in v);
+    assert.ok(table, lang);
+    for (const cat of cats) assert.ok(table[`share.leak_category_${cat}`], `${lang} ${cat}`);
+  }
+});

@@ -190,6 +190,8 @@ export class ShareModal extends Modal {
     this.imagesToggle.setDisabled(imagesOff);
     const input = this.imagesToggle.toggleEl.querySelector("input");
     if (input) input.disabled = imagesOff;
+    // Obsidian's switch label is tabindex=0 on its own: take it out of the Tab order while disabled.
+    this.imagesToggle.toggleEl.setAttribute("tabindex", imagesOff ? "-1" : "0");
     this.statusEl.setText(this.savedText);
     this.saveButton.disabled = this.busy || this.saving || this.failed || !result?.html;
     this.saveButton.setText(this.saving ? t("share.saving") : t("share.save"));
@@ -200,7 +202,13 @@ export class ShareModal extends Modal {
     const add = (text: string, cls = ""): void =>
       void this.warningsEl.createDiv({ text, cls: `vam-share-note ${cls}`.trim() });
     if (result.leakCategories.length) {
-      add(t("share.leak_blocked_0", result.leakCategories.join(", ")), "vam-share-error");
+      add(
+        t(
+          "share.leak_blocked_0",
+          result.leakCategories.map(category => t(`share.leak_category_${category}`)).join(", ")
+        ),
+        "vam-share-error"
+      );
       return;
     }
     const thresholds = this.options.sizeThresholds ?? {

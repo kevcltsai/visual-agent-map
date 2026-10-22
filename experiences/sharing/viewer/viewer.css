@@ -126,5 +126,6 @@ button:focus-visible, a:focus-visible, [tabindex]:focus-visible { outline: 2px s
 .vam-resizing, .vam-resizing * { cursor: col-resize !important; user-select: none; }
 @media (max-width: 700px) { .vam-canvas-overlay > .vam-canvas-hint { display: none; } }
 @media (max-width: 600px) { .vam-workspace.has-inspector > .vam-canvas-overlay { right: 0; } .vam-inspector { width: 100%; box-shadow: none; } }
+@media (max-width: 600px) { .vam-inspector-heading { position: sticky; top: 0; z-index: 3; background: var(--background-primary); padding: 8px 0; margin-bottom: 6px; } }
 @media (max-width: 600px) { .vam-inspector-resizer { display: none; } .vam-toolbar .vam-map-switcher { max-width: 100%; } .vam-made-with { display: none; } }
 @media (prefers-reduced-motion: reduce) { * { transition: none !important; } }

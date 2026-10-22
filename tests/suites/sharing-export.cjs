@@ -213,7 +213,7 @@ function modalHarness({ exporter, thresholds, saveEnvironment } = {}) {
   class Setting {
     constructor(parent) { this.row = parent.createDiv('setting'); Setting.all.push(this); this.disabled = false; }
     setName(v) { this.name = v; return this; } setDesc() { return this; } setDisabled(v) { this.disabled = v; return this; }
-    addToggle(cb) { const input = { disabled: false }; const toggle = { value: false, input, off: false, toggleEl: { querySelector: () => input }, setDisabled(v) { this.off = v; return this; }, setValue(v) { this.value = v; return this; }, onChange(fn) { this.fn = fn; return this; } }; this.toggle = toggle; cb(toggle); return this; }
+    addToggle(cb) { const input = { disabled: false }; const toggle = { value: false, input, off: false, toggleEl: { attrs: {}, setAttribute(k, v) { this.attrs[k] = v; }, querySelector: () => input }, setDisabled(v) { this.off = v; return this; }, setValue(v) { this.value = v; return this; }, onChange(fn) { this.fn = fn; return this; } }; this.toggle = toggle; cb(toggle); return this; }
   }
   Setting.all = [];
   class Notice { constructor(text) { notices.push(text); } }
@@ -324,7 +324,8 @@ test('share dialog: a leak hit blocks saving, names only the category, and shows
   const h = modalHarness({ exporter });
   h.modal.open();
   await tick(); await tick();
-  assert.match(h.text(), /Not saved: the file would contain private information \(vault-path, note-path\)\. Nothing was written\./);
+  assert.match(h.text(), /Not saved: the file would contain private information \(the vault's location on this computer, a note's file path\)\. Nothing was written\./);
+  assert.doesNotMatch(h.text(), /vault-path|note-path/, 'category ids are localized, never shown raw');
   assert.doesNotMatch(h.text(), /File size/);
   assert.equal(h.button('Save…').disabled, true);
 });
@@ -415,9 +416,11 @@ test('share dialog: with full notes off the Include images switch is really disa
   assert.equal(images.disabled, true);
   assert.equal(images.toggle.off, true);
   assert.equal(images.toggle.input.disabled, true, 'the checkbox input itself is disabled');
+  assert.equal(images.toggle.toggleEl.attrs.tabindex, '-1', 'disabled switch is out of the Tab order');
   h.Setting.all[0].toggle.fn(true);
   await tick(); await tick();
   assert.equal(images.toggle.input.disabled, false);
+  assert.equal(images.toggle.toggleEl.attrs.tabindex, '0', 'Tab order restored when enabled again');
 });
 
 test('share dialog: the download fallback does not claim where the file went', async () => {

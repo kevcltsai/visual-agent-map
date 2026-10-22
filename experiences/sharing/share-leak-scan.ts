@@ -1,4 +1,5 @@
 import type { MapDocument } from "../../map-model";
+import { replaceMarkdownCode } from "./share-code";
 import type { SharePayload } from "./share-format";
 
 /** Last gate before writing a share file: any forbidden string in the final HTML blocks the export (fail closed). */
@@ -85,38 +86,12 @@ export function forbiddenStringsFor(
   });
 }
 
-/** A fence line: up to 3 spaces, then 3+ backticks or tildes. */
-const FENCE_LINE = /^ {0,3}(`{3,}|~{3,})/;
-
 /**
- * Removes only well-formed Markdown code: fenced blocks that are closed by a matching fence, and inline code whose
- * backtick runs pair up on one paragraph. Anything unclosed or unpaired stays in the text (treated as not code),
- * so it can never hide a `[[` that follows it.
+ * Removes only well-formed Markdown code (see share-code.ts, shared with the cleaner). Anything unclosed, unpaired or
+ * backslash-escaped stays in the text (treated as not code), so it can never hide a `[[` that follows it.
  */
 export function stripMarkdownCode(markdown: string): string {
-  const lines = markdown.split("\n");
-  const kept: string[] = [];
-  for (let i = 0; i < lines.length; i++) {
-    const open = FENCE_LINE.exec(lines[i]);
-    if (open) {
-      const mark = open[1];
-      let close = -1;
-      for (let j = i + 1; j < lines.length && close < 0; j++) {
-        const run = FENCE_LINE.exec(lines[j]);
-        if (run && run[1][0] === mark[0] && run[1].length >= mark.length && lines[j].slice(run[0].length).trim() === "")
-          close = j;
-      }
-      if (close >= 0) {
-        kept.push(" ");
-        i = close;
-        continue;
-      }
-    }
-    kept.push(lines[i]);
-  }
-  return kept
-    .join("\n")
-    .replace(/(?<!`)(`+)(?!`)([\s\S]*?[^`])\1(?!`)/g, match => (/\n[ \t]*\n/.test(match) ? match : " "));
+  return replaceMarkdownCode(markdown, " ");
 }
 
 /** Removes `<pre>…</pre>` and `<code>…</code>` contents (any case, any attributes). Unclosed or mismatched tags stay as text. */

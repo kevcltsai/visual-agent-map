@@ -7024,10 +7024,6 @@ export class VisualAgentMapView extends ItemView {
     label.textContent = text;
     card.setAttr("aria-labelledby", label.id);
   }
-  /**
-   * Brings an outline topic into view: expands collapsed ancestors, centers the card and selects it.
-   * Multi-select keeps its selection; the outline only moves the camera there. False when the map lacks the topic.
-   */
   /** What the share dialog may read: a snapshot of the open map, or the reason it cannot be shared. */
   shareSnapshot():
     | { map: MapDocument; notes: Map<string, Note>; goal?: string; mapPath: string }
@@ -7049,6 +7045,10 @@ export class VisualAgentMapView extends ItemView {
   hasPath(path: string): boolean {
     return !!this.map?.nodes.some(item => item.path === path);
   }
+  /**
+   * Brings an outline topic into view: expands collapsed ancestors, centers the card and selects it.
+   * Multi-select keeps its selection; the outline only moves the camera there. False when the map lacks the topic.
+   */
   async revealPath(path: string): Promise<boolean> {
     const node = this.map?.nodes.find(item => item.path === path);
     if (!this.map || !node) return false;

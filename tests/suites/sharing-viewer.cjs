@@ -229,3 +229,12 @@ test('sharing viewer: at phone width the side panel covers the whole workspace a
   assert.match(css, /@media \(max-width: 600px\) \{ \.vam-workspace\.has-inspector > \.vam-canvas-overlay \{ right: 0; \} \.vam-inspector \{ width: 100%;/);
   assert.ok(css.indexOf('.vam-workspace.has-inspector > .vam-canvas-overlay { right: 0; }') > css.indexOf('.vam-workspace.has-inspector > .vam-canvas-overlay { right: 300px; }'), 'the narrow rule comes later and wins');
 });
+
+test('sharing viewer O-4: at phone width the panel heading (with Close) is sticky so it stays reachable', () => {
+  const css = bundle.SHARE_VIEWER_CSS;
+  const rule = css.match(/@media \(max-width: 600px\) \{ \.vam-inspector-heading \{([^}]*)\}/);
+  assert.ok(rule, 'narrow sticky heading rule exists');
+  assert.match(rule[1], /position: sticky/);
+  assert.match(rule[1], /top: 0/);
+  assert.match(rule[1], /background: var\(--background-primary\)/);
+});

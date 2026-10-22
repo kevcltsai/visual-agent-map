@@ -188,6 +188,29 @@ function nextStepHarness({ settings = {}, modelSettings = {}, topic = 'Parent', 
   const actions = () => find(modal.modalEl, i => hasCls(i, 'vam-next-actions'));
   return { modal, plugin, notices, saved, calls, actions, settings: settingsArg, sources };
 }
+integrationTest('Next Step: the model select starts with Follow default; saves only modelSource and never pins a model', async () => {
+  const pick = (h, value) => { const select = byLabel(h.modal.contentEl, 'Model'); select.value = value; select.fire('change'); };
+  const run = async h => { button(h.actions(), 'Confirm research task').click(); await tick(); await tick(); };
+  const untouched = nextStepHarness({ modelSettings: { topicStatus: 'idea' } });
+  const select = byLabel(untouched.modal.contentEl, 'Model');
+  const first = select.children.find(c => c.tag === 'option');
+  assert.equal(first.value, '__follow_default__', 'the follow option is the first option');
+  assert.equal(select.value, '__follow_default__', 'a non-manual topic shows it selected');
+  assert.match(first.text, /Follow default \(now: gpt-test\)/);
+  await run(untouched);
+  assert.deepEqual(plain(untouched.saved), [], 'an untouched topic writes nothing');
+  const manual = nextStepHarness({ modelSettings: { topicStatus: 'idea', model: 'gpt-other', modelSource: 'manual' } });
+  assert.equal(byLabel(manual.modal.contentEl, 'Model').value, 'gpt-other');
+  pick(manual, '__follow_default__'); await run(manual);
+  assert.deepEqual(plain(manual.saved), [{ modelSource: 'workspace' }]);
+  const child = nextStepHarness({ modelSettings: { topicStatus: 'idea', modelSource: 'manual', followDefault: { source: 'inherited', model: 'gpt-test' } } });
+  pick(child, '__follow_default__'); await run(child);
+  assert.deepEqual(plain(child.saved), [{ modelSource: 'inherited' }]);
+  const back = nextStepHarness({ modelSettings: { topicStatus: 'idea' } });
+  pick(back, 'gpt-other'); pick(back, '__follow_default__'); await run(back);
+  assert.deepEqual(plain(back.saved), [{ modelSource: 'workspace' }], 'a specific model picked then dropped is not written');
+});
+
 integrationTest('Next Step: the tone select defaults to keeping the topic tone and its choice reaches the run options', async () => {
   const h = nextStepHarness({ modelSettings: { tones: [{ id: 'plain', name: 'Plain explanation' }, { id: 'academic', name: 'Academic rigor' }], currentTone: 'Academic rigor' } });
   const tone = byLabel(h.modal.contentEl, 'Writing tone');

@@ -576,6 +576,8 @@ export class NextStepModal extends Modal {
           )
         );
         save({ modelSource: settings.modelSource });
+        // Follow-default pins nothing: a specific model picked earlier in this dialog is not written.
+        delete this.pendingSettings.model;
         describeModel();
         return;
       }

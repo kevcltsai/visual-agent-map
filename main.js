@@ -22460,6 +22460,7 @@ var NextStepModal = class extends import_obsidian21.Modal {
           )
         );
         save({ modelSource: settings.modelSource });
+        delete this.pendingSettings.model;
         describeModel();
         return;
       }

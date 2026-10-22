@@ -6,6 +6,7 @@ function element(tag, options = {}) {
   const el = {
     tag, text: opts.text ?? '', cls: opts.cls ?? '', type: opts.type, children: [], listeners: {}, attrs: { ...(opts.attr ?? {}) }, dataset: {},
     disabled: false, hidden: false, open: false, checked: false, style: {}, parent: null,
+    get firstChild() { return this.children[0] ?? null; },
     get textContent() { return this.text; },
     get classes() { return this.cls.split(/\s+/).filter(Boolean); },
     get value() { if (this._value !== undefined) return this._value; if (tag === 'select') { const first = this.children.find(c => c.tag === 'option'); return first ? (first.optionValue ?? first.value ?? '') : ''; } return this._initial ?? ''; },

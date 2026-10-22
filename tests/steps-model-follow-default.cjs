@@ -43,12 +43,7 @@ test('child follow default resolves through the nearest manual ancestor and is s
   assert.equal((await repo.readNote(child.path, map)).model, 'claude:sonnet');
 });
 
-test('the model select offers a top follow-default option, selects it when not manual, and keeps manual choices manual', () => {
-  const modals = read('experiences/visual-map/modals.ts');
-  assert.match(modals, /new Option\(followLabel\(\), FOLLOW_DEFAULT_MODEL\)/);
-  assert.match(modals, /settings\.modelSource === "manual" \? settings\.model : FOLLOW_DEFAULT_MODEL/);
-  assert.match(modals, /if \(model\.value === FOLLOW_DEFAULT_MODEL\)[\s\S]*?settings\.modelSource = follow\.source;[\s\S]*?save\(\{ modelSource: settings\.modelSource \}\)/);
-  assert.match(modals, /settings\.modelSource = "manual";/);
+test('the dialog wiring and strings exist', () => {
   assert.match(read('experiences/visual-map/view.ts'), /followDefault: await this\.plugin\.repo\.followDefaultModel\(/);
   for (const lang of ['en', 'zh-TW', 'zh-CN']) assert.match(read(`i18n/${lang}.ts`), /"ui\.follow_default_model": ".*\{0\}/);
 });

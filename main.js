@@ -42073,6 +42073,16 @@ var import_node_path = require("node:path");
 // ai/runtime/codex-app-server.ts
 var import_node_child_process = require("node:child_process");
 
+// ai/runtime/utf8-stream.ts
+var import_node_string_decoder = require("node:string_decoder");
+function createUtf8StreamDecoder() {
+  const decoder = new import_node_string_decoder.StringDecoder("utf8");
+  return {
+    write: (chunk) => ArrayBuffer.isView(chunk) ? decoder.write(chunk) : chunk.toString("utf8"),
+    end: () => decoder.end()
+  };
+}
+
 // ai/runtime/messages/search-budget-exhausted.en.md
 var search_budget_exhausted_en_default = "The web search budget is used up. Stop searching and finish the answer from the information already gathered; list anything missing as unconfirmed.\n";
 
@@ -42367,9 +42377,11 @@ var CodexAppServerRuntime = class {
       }
     );
     this.child = child;
-    child.stdout.on("data", (chunk) => this.consume(child, chunk.toString("utf8")));
+    const stdoutDecoder = createUtf8StreamDecoder();
+    const stderrDecoder = createUtf8StreamDecoder();
+    child.stdout.on("data", (chunk) => this.consume(child, stdoutDecoder.write(chunk)));
     child.stderr.on("data", (chunk) => {
-      if (this.child === child) this.stderr = `${this.stderr}${chunk.toString("utf8")}`.slice(-16384);
+      if (this.child === child) this.stderr = `${this.stderr}${stderrDecoder.write(chunk)}`.slice(-16384);
     });
     child.on(
       "error",
@@ -42378,13 +42390,13 @@ var CodexAppServerRuntime = class {
         new Error(t("ui.could_not_start_codex_app_server_0_1", this.options.executable, error.message))
       )
     );
-    child.on(
-      "close",
-      (code) => this.failProcess(
+    child.on("close", (code) => {
+      if (this.child === child) this.stderr = `${this.stderr}${stderrDecoder.end()}`.slice(-16384);
+      this.failProcess(
         child,
         new Error(this.stderr.trim() || t("ui.codex_app_server_exit_code_0", code != null ? code : t("ui.unknown")))
-      )
-    );
+      );
+    });
     await this.request("initialize", {
       clientInfo: { name: "visual-agent-map", title: "Visual Agent Map", version: this.options.clientVersion },
       capabilities: { experimentalApi: false, requestAttestation: false }
@@ -43367,17 +43379,19 @@ var ClaudeCodeCliRuntime = class {
         (_b3 = (_a3 = controls.timeoutMs) != null ? _a3 : this.options.timeoutMs) != null ? _b3 : CLAUDE_TASK_TIMEOUT_MS
       );
       (_c2 = controls.signal) == null ? void 0 : _c2.addEventListener("abort", onAbort, { once: true });
+      const stdoutDecoder = createUtf8StreamDecoder();
+      const stderrDecoder = createUtf8StreamDecoder();
       child.stdout.on("data", (chunk) => {
         if (settled) return;
         if (!streaming) {
-          stdout += chunk.toString("utf8");
+          stdout += stdoutDecoder.write(chunk);
           if (stdout.length > CLAUDE_STDOUT_LIMIT) {
             stop();
             finish(new Error(t("ui.claude_returned_an_invalid_response")));
           }
           return;
         }
-        streamBuffer += chunk.toString("utf8");
+        streamBuffer += stdoutDecoder.write(chunk);
         try {
           let newline;
           while ((newline = streamBuffer.indexOf("\n")) >= 0) {
@@ -43391,7 +43405,7 @@ var ClaudeCodeCliRuntime = class {
         }
       });
       child.stderr.on("data", (chunk) => {
-        if (!settled) stderr = `${stderr}${chunk.toString("utf8")}`.slice(-16384);
+        if (!settled) stderr = `${stderr}${stderrDecoder.write(chunk)}`.slice(-16384);
       });
       child.on("error", (error) => {
         if (killTimer) window.clearTimeout(killTimer);

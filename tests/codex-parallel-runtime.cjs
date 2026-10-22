@@ -65,3 +65,16 @@ test('two simultaneous turns share initialization and cancelling one preserves t
   assert.equal(requests.filter(request => request.method === 'thread/unsubscribe').length, 2);
   runtime.stop();
 });
+test('Codex stdout and stderr keep a multi-byte character split across chunks', async () => {
+  const { runtime, children } = fixture();
+  await runtime.start();
+  const child = children[0];
+  const split = (stream, text) => { const bytes = Buffer.from(text); const cut = bytes.indexOf(Buffer.from('點')) + 1; stream.emit('data', bytes.subarray(0, cut)); stream.emit('data', bytes.subarray(cut)); };
+  const seen = [];
+  runtime.consume = (_child, chunk) => { seen.push(chunk); };
+  split(child.stdout, `${JSON.stringify({ method: 'x', params: { text: '請點選' } })}\n`);
+  assert.equal(seen.join(''), `${JSON.stringify({ method: 'x', params: { text: '請點選' } })}\n`);
+  assert.ok(!seen.join('').includes('�'));
+  split(child.stderr, '錯誤：點');
+  assert.equal(runtime.stderr, '錯誤：點');
+});

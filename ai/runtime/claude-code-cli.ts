@@ -1,5 +1,6 @@
 import { spawn as nodeSpawn } from "node:child_process";
 import { t } from "../../i18n";
+import { createUtf8StreamDecoder } from "./utf8-stream";
 import type { AiMilestones } from "../../ai-exchange-log";
 import type { PartialFields } from "../partial-structured";
 import type { ResearchStageName } from "../research-observer";
@@ -493,17 +494,19 @@ export class ClaudeCodeCliRuntime {
         controls.timeoutMs ?? this.options.timeoutMs ?? CLAUDE_TASK_TIMEOUT_MS
       );
       controls.signal?.addEventListener("abort", onAbort, { once: true });
+      const stdoutDecoder = createUtf8StreamDecoder();
+      const stderrDecoder = createUtf8StreamDecoder();
       child.stdout.on("data", chunk => {
         if (settled) return;
         if (!streaming) {
-          stdout += chunk.toString("utf8");
+          stdout += stdoutDecoder.write(chunk);
           if (stdout.length > CLAUDE_STDOUT_LIMIT) {
             stop();
             finish(new Error(t("ui.claude_returned_an_invalid_response")));
           }
           return;
         }
-        streamBuffer += chunk.toString("utf8");
+        streamBuffer += stdoutDecoder.write(chunk);
         try {
           let newline: number;
           while ((newline = streamBuffer.indexOf("\n")) >= 0) {
@@ -517,7 +520,7 @@ export class ClaudeCodeCliRuntime {
         }
       });
       child.stderr.on("data", chunk => {
-        if (!settled) stderr = `${stderr}${chunk.toString("utf8")}`.slice(-16_384);
+        if (!settled) stderr = `${stderr}${stderrDecoder.write(chunk)}`.slice(-16_384);
       });
       child.on("error", error => {
         if (killTimer) window.clearTimeout(killTimer);

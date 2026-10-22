@@ -1,5 +1,6 @@
 import type { WebSearchEvent } from "../types";
 import { spawn as nodeSpawn } from "node:child_process";
+import { createUtf8StreamDecoder } from "./utf8-stream";
 import { t } from "../../i18n";
 import { searchBudgetExhaustedMessage } from "./messages";
 
@@ -423,9 +424,11 @@ export class CodexAppServerRuntime {
       }
     );
     this.child = child;
-    child.stdout.on("data", chunk => this.consume(child, chunk.toString("utf8")));
+    const stdoutDecoder = createUtf8StreamDecoder();
+    const stderrDecoder = createUtf8StreamDecoder();
+    child.stdout.on("data", chunk => this.consume(child, stdoutDecoder.write(chunk)));
     child.stderr.on("data", chunk => {
-      if (this.child === child) this.stderr = `${this.stderr}${chunk.toString("utf8")}`.slice(-16_384);
+      if (this.child === child) this.stderr = `${this.stderr}${stderrDecoder.write(chunk)}`.slice(-16_384);
     });
     child.on("error", error =>
       this.failProcess(
@@ -433,12 +436,13 @@ export class CodexAppServerRuntime {
         new Error(t("ui.could_not_start_codex_app_server_0_1", this.options.executable, error.message))
       )
     );
-    child.on("close", code =>
+    child.on("close", code => {
+      if (this.child === child) this.stderr = `${this.stderr}${stderrDecoder.end()}`.slice(-16_384);
       this.failProcess(
         child,
         new Error(this.stderr.trim() || t("ui.codex_app_server_exit_code_0", code ?? t("ui.unknown")))
-      )
-    );
+      );
+    });
     await this.request("initialize", {
       clientInfo: { name: "visual-agent-map", title: "Visual Agent Map", version: this.options.clientVersion },
       capabilities: { experimentalApi: false, requestAttestation: false }

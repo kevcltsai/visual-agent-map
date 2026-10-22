@@ -631,3 +631,28 @@ test('L4: AiRuntimeService.claude() returns one runtime per executable and folde
   service.reset();
   assert.notEqual(service.claude('/other'), current, 'reset() clears the cached runtime');
 });
+test('Claude stdout keeps a multi-byte character split across chunks (stream and json modes)', async () => {
+  const { EventEmitter } = require('node:events');
+  const text = '請點選這個節點';
+  const run = async streaming => {
+    const spawn = () => {
+      const child = new EventEmitter(); child.stdout = new EventEmitter(); child.stderr = new EventEmitter(); child.kill = () => true;
+      child.stdin = { end: () => process.nextTick(() => {
+        const body = Buffer.from(streaming
+          ? JSON.stringify({ type: 'result', subtype: 'success', is_error: false, result: text }) + '\n'
+          : JSON.stringify({ result: text }));
+        const cut = body.indexOf(Buffer.from('點')) + 1; // inside the 3-byte character: 1 + 2 bytes
+        child.stdout.emit('data', body.subarray(0, cut)); child.stdout.emit('data', body.subarray(cut));
+        child.emit('close', 0);
+      }) };
+      return child;
+    };
+    const { ClaudeCodeCliRuntime } = load('ai/runtime/claude-code-cli.ts', { 'node:child_process': { spawn } });
+    return new ClaudeCodeCliRuntime({ executable: 'claude', cwd: '/plugin', env: {}, spawn }).runTask('hi', 'sonnet', 'low', undefined, streaming ? { onText: () => {} } : {});
+  };
+  for (const streaming of [true, false]) {
+    const out = await run(streaming);
+    assert.ok(!out.includes('�'), `streaming=${streaming}`);
+    assert.equal(out, text);
+  }
+});

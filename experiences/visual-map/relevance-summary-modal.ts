@@ -35,7 +35,7 @@ export interface RelevanceSummaryHost {
 }
 
 /**
- * Read-only list of what a grading run changed: one row per card with its old tag, its new tag and the reason. Moves
+ * Read-only list of what a grading run changed: one row per card with its old tag and its new tag. Moves
  * the AI tied to a pinned card are grouped under it ("Because you set X to ..."); the rest are "Other changes" (or the
  * plain list when nothing is grouped). Pins that disagree with each other are named once at the end. The changed cards
  * are marked on the map while the window is open.
@@ -62,7 +62,6 @@ export class RelevanceSummaryModal extends Modal {
       arrow.setAttr("aria-label", t("ui.relevance_changed_to"));
       setIcon(arrow, "arrow-right");
       renderRelevanceTag(tags, row.after.tier, t(RELEVANCE_LABEL[row.after.tier]));
-      item.createEl("p", { cls: "vam-relevance-change-reason", text: row.after.reason });
     }
   }
 

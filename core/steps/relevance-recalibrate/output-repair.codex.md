@@ -1,0 +1,1 @@
+Reply with ONLY one complete JSON object holding ALL the changes you now propose (the earlier ones that still stand as well as the new ones), and every card whose tier is null; no prose, no code fence, in the same format:

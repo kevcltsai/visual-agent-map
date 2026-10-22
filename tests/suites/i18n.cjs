@@ -254,7 +254,7 @@ test('registry prompt names reproduce every language spelling in the prompt file
   assert.equal(name('zh-CN', 'en', 'usage'), 'Simplified Chinese (Mainland China usage)');
   assert.equal(name('en', 'en', 'plain'), 'English');
   // The language fragments (core and Coffee Tables) take the name from the registry ({{language}}) instead of spelling it out.
-  const parameterised = ['core/steps/aim/language.zh.md', 'core/steps/relevance-grade/language.zh.md', 'core/steps/reframe/language.zh.md'];
+  const parameterised = ['core/steps/aim/language.zh.md', 'core/steps/reframe/language.zh.md'];
   for (const step of ['table', 'question', 'observer-only', 'navigation-summary']) for (const lang of ['zh', 'en']) parameterised.push(`experiences/coffee-tables/steps/${step}/prompt.${lang}.md`);
   for (const lang of ['zh', 'en']) parameterised.push(`experiences/coffee-tables/steps/_shared/builtin-style.${lang}.md`);
   for (const file of parameterised) assert.ok(fs.readFileSync(path.join(root, file), 'utf8').includes('{{language}}'), file);

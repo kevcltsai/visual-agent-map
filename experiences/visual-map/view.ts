@@ -148,6 +148,7 @@ import type {
   RelevanceGradeResult,
   RelevanceGradeRun
 } from "../../core/relevance-grade-service";
+import { RELEVANCE_GRADE_SCHEMA, RELEVANCE_RECALIBRATE_SCHEMA } from "../../core/relevance-grade-service";
 import { renderTopicTree } from "../../ui/topic-tree";
 import { TopicTreeModal } from "../../ui/modals/topic-tree-modal";
 import type { FieldLinks, ModelChoices } from "./research-fields";
@@ -428,6 +429,8 @@ export class VisualAgentMapView extends ItemView {
   private multiSelected = new Set<string>();
   /** Cards named by the open structure review; marked with a class, cleared when the review closes. */
   private structureHighlight = new Set<string>();
+  /** How many times the map was repainted; a run compares it to repaint once, not twice. */
+  private paintCount = 0;
   /** True once this view has started a relevance grading run (so closing it has a run to abort). */
   private startedRelevance = false;
   private readonly relevancePanelId = `vam-relevance-panel-${++relevancePanelSeq}`;
@@ -793,6 +796,8 @@ export class VisualAgentMapView extends ItemView {
     this.plugin.releaseOutline(this);
     this.relevancePanelCleanup?.();
     this.relevancePanelCleanup = null;
+    // An open panel pre-started the CLI for a grade that will never be sent.
+    if (this.relevancePanelOpen) this.plugin.releaseWarmClaude?.();
     this.abortRelevanceGrade();
     for (const task of this.synthesisTasks.values()) if (task.state === "running") task.controller.abort();
     this.synthesisTasks.clear();
@@ -980,6 +985,7 @@ export class VisualAgentMapView extends ItemView {
     }
     if (path !== this.path) {
       this.stopAimProgress();
+      if (this.relevancePanelOpen) this.plugin.releaseWarmClaude?.();
       this.abortRelevanceGrade();
     }
     let map = await this.plugin.repo.readMap(path);
@@ -1637,7 +1643,21 @@ export class VisualAgentMapView extends ItemView {
     }
     this.relevanceButtonEl = button;
   }
-  private closeRelevancePanel(refocus: boolean): void {
+  /**
+   * Starts the Claude CLI for the grade the open panel would run (no model call; a Codex model starts nothing). The
+   * very same command the run uses, so sending only has to write the prompt.
+   */
+  private prewarmRelevance(mode: RelevanceMode): void {
+    const settings = this.plugin.settings;
+    this.plugin.prewarmClaudeStep?.(
+      settings.cliModel,
+      normalizeReasoningLevel(settings.cliReasoning),
+      mode === "recalibrate" ? RELEVANCE_RECALIBRATE_SCHEMA : RELEVANCE_GRADE_SCHEMA
+    );
+  }
+  /** `keepWarm`: the panel closes to send, so the pre-started process stays for that run; otherwise it is killed. */
+  private closeRelevancePanel(refocus: boolean, keepWarm = false): void {
+    if (!keepWarm) this.plugin.releaseWarmClaude?.();
     this.relevancePanelGen++;
     this.relevancePanelCleanup?.();
     this.relevancePanelCleanup = null;
@@ -1719,10 +1739,18 @@ export class VisualAgentMapView extends ItemView {
       cls: "vam-relevance-grade-button mod-cta",
       text: t(planMode() === "recalibrate" ? "ui.relevance_recalibrate_button" : "ui.relevance_grade_button")
     });
-    const showMode = (): void =>
-      submitButton.setText(
-        t(planMode() === "recalibrate" ? "ui.relevance_recalibrate_button" : "ui.relevance_grade_button")
-      );
+    // Opening the panel pre-starts the CLI for the grade it would run; changing the mode (full or recalibrate) changes
+    // the schema, so the process is started again for the new mode.
+    let warmedMode = planMode();
+    if (focus && this.relevanceGradeable()) this.prewarmRelevance(warmedMode);
+    const showMode = (): void => {
+      const mode = planMode();
+      submitButton.setText(t(mode === "recalibrate" ? "ui.relevance_recalibrate_button" : "ui.relevance_grade_button"));
+      if (mode !== warmedMode) {
+        warmedMode = mode;
+        if (this.relevanceGradeable()) this.prewarmRelevance(mode);
+      }
+    };
     input.addEventListener("input", () => {
       draft.goal = input.value;
       showMode();
@@ -1771,7 +1799,7 @@ export class VisualAgentMapView extends ItemView {
       const level = normalizeRelevanceLevel(levelSelect.value);
       const extra = context.value;
       const planned = planMode();
-      this.closeRelevancePanel(refocus);
+      this.closeRelevancePanel(refocus, submit && !!normalizeRelevanceGoal(value));
       if (submit) void this.submitRelevanceGoal(value, level, extra, planned);
     };
     const confirm = (): void => finish(true, !normalizeRelevanceGoal(input.value));
@@ -1873,6 +1901,7 @@ export class VisualAgentMapView extends ItemView {
     message: string
   ): void {
     if (!this.relevanceRunIsCurrent(run, mapPath)) return;
+    this.plugin.releaseWarmClaude?.();
     run.status = status;
     run.message = message;
     this.refreshRelevance();
@@ -1927,6 +1956,8 @@ export class VisualAgentMapView extends ItemView {
     // Claim the map before the first await, so a second Enter cannot start another run.
     this.plugin.relevanceGrades.set(mapPath, run);
     this.startedRelevance = true;
+    // Stop, closing the view or switching maps before the run took the pre-started process leaves nothing waiting.
+    run.controller.signal.addEventListener("abort", () => this.plugin.releaseWarmClaude?.(), { once: true });
     this.refreshRelevance(true);
     const settings = this.plugin.settings;
     let result: RelevanceGradeResult | undefined;
@@ -1948,6 +1979,8 @@ export class VisualAgentMapView extends ItemView {
         this.relevanceContext = context;
         // The repository has the last word: a setup that changed after all is graded in full.
         mode = relevanceModeAfterWrite(planned, setupChanged);
+        // The pre-started process was for the planned mode's schema; another mode starts cold.
+        if (mode !== planned) this.plugin.releaseWarmClaude?.();
         // Goal, level and context are one undo step; none changed means nothing to undo.
         if (!setupChanged) return;
         this.history.push({
@@ -1960,13 +1993,18 @@ export class VisualAgentMapView extends ItemView {
       const model = settings.cliModel;
       // The run stays "running" (the map is locked and Stop works) but the bar must not claim grading while the
       // usage notice waits for an answer.
-      run.awaitingUsage = true;
-      this.refreshRelevance();
+      // Only a notice that really opens needs the bar to say so; otherwise this is not repainted at all.
+      if (this.plugin.usageNoticePending?.(model)) {
+        run.awaitingUsage = true;
+        this.refreshRelevance();
+      }
       const started = await this.plugin.confirmAiUsage(model, async () => {
         // Stopped, or the map changed, while the usage dialog was open.
         if (!this.relevanceRunIsCurrent(run, mapPath) || !this.map) return;
-        run.awaitingUsage = false;
-        this.refreshRelevance();
+        if (run.awaitingUsage) {
+          run.awaitingUsage = false;
+          this.refreshRelevance();
+        }
         basis = buildStructureReviewNodes(this.map.nodes, id => this.describeForReview(id));
         // Pinned (hand-set) cards are the learner's: the AI sees them as anchors and never grades them.
         pins = this.relevancePinList();
@@ -1976,7 +2014,6 @@ export class VisualAgentMapView extends ItemView {
           ...(context ? { context } : {}),
           nodes: basis,
           language: settings.language,
-          contentLanguage: outputLanguageForMap(this.map, settings.language, this.map.title, goal),
           model,
           reasoning: normalizeReasoningLevel(settings.cliReasoning),
           ...(pins.length ? { pins } : {})
@@ -2002,8 +2039,11 @@ export class VisualAgentMapView extends ItemView {
       if (!started) return this.finishRelevance(run, mapPath, "declined", t("ui.relevance_not_started"));
       const graded = result;
       if (!graded) return;
+      // Writing the notes makes the view synchronize, which repaints when a note changed (the run is already "done"
+      // by then); repaint here only when it did not, so a run costs one repaint after the write.
+      const paintedBefore = this.paintCount;
       await this.plugin.mutate(() => this.applyRelevanceGrade(run, mapPath, basis, graded, { mode, pins, repairs }));
-      this.refreshRelevance();
+      if (this.paintCount === paintedBefore) this.refreshRelevance();
     } catch (error) {
       this.finishRelevance(run, mapPath, "failed", t("ui.relevance_failed_0", errorMessage(error)));
     }
@@ -2028,7 +2068,7 @@ export class VisualAgentMapView extends ItemView {
     const fresh = new Map<string, Note>();
     for (const node of this.map.nodes) {
       try {
-        fresh.set(node.id, await repo.readNote(node.path));
+        fresh.set(node.id, await repo.readNote(node.path, this.map));
       } catch {
         /* A card whose note cannot be read counts as changed and is skipped below. */
       }
@@ -2077,9 +2117,9 @@ export class VisualAgentMapView extends ItemView {
           pinned.add(base.id);
           continue;
         }
-        const after = { tier: item.tier, reason: item.reason };
-        const before = note.relevance ? { tier: note.relevance.tier, reason: note.relevance.reason } : undefined;
-        if (before && before.tier === after.tier && before.reason === after.reason) {
+        const after = { tier: item.tier };
+        const before = note.relevance ? { tier: note.relevance.tier } : undefined;
+        if (before && before.tier === after.tier) {
           outcome.graded++;
           continue;
         }
@@ -2127,7 +2167,7 @@ export class VisualAgentMapView extends ItemView {
   private async restoreRelevance(changes: RelevanceGradeChange[], direction: "undo" | "redo"): Promise<void> {
     let skipped = 0;
     const same = (a: NoteRelevance | undefined, b: NoteRelevance | undefined): boolean =>
-      a === b || (!!a && !!b && a.tier === b.tier && a.reason === b.reason && !!a.manual === !!b.manual);
+      a === b || (!!a && !!b && a.tier === b.tier && !!a.manual === !!b.manual);
     for (const change of changes) {
       const expected = direction === "undo" ? change.after : change.before;
       const replacement = direction === "undo" ? change.before : change.after;
@@ -2208,7 +2248,7 @@ export class VisualAgentMapView extends ItemView {
         undo: async () => {
           for (const entry of entries)
             if (!(await repo.readNote(entry.path)).relevance)
-              await repo.writeRelevance(entry.path, { tier: entry.tier, reason: "", manual: true });
+              await repo.writeRelevance(entry.path, { tier: entry.tier, manual: true });
         },
         redo: async () => {
           for (const entry of entries) {
@@ -2226,9 +2266,7 @@ export class VisualAgentMapView extends ItemView {
    */
   private setManualRelevance(node: MapNode, tier: RelevanceTier | null): void {
     if (this.plugin.relevanceGrades.get(this.path)?.status === "running") return;
-    this.plugin.runMutation(() =>
-      this.plugin.repo.writeRelevance(node.path, tier ? { tier, reason: "", manual: true } : null)
-    );
+    this.plugin.runMutation(() => this.plugin.repo.writeRelevance(node.path, tier ? { tier, manual: true } : null));
   }
   private stopRelevanceGrade(): void {
     const run = this.plugin.relevanceGrades.get(this.path);
@@ -5733,6 +5771,7 @@ export class VisualAgentMapView extends ItemView {
     ]).open();
   }
   private render(): void {
+    this.paintCount++;
     this.aimProgressEls.clear();
     // The dragged card is about to be replaced, so its pointer events would never arrive and the drag would stay "on".
     this.dragCleanup?.();
@@ -6327,19 +6366,20 @@ export class VisualAgentMapView extends ItemView {
     if (relevance) {
       const tierLabel = t(RELEVANCE_LABEL[relevance.tier]);
       card.dataset.relevance = relevance.tier;
-      const reasonText = relevance.manual ? t("ui.relevance_manual_reason") : relevance.reason;
-      setTooltip(
-        renderRelevanceTagButton(
-          header,
-          relevance.tier,
-          tierLabel,
-          t("ui.relevance_tag_label_0", tierLabel),
-          button => this.openRelevanceMenu(node, relevance.tier, button),
-          this.plugin.relevanceGrades.get(this.path)?.status === "running"
-        ),
-        reasonText
+      const tagButton = renderRelevanceTagButton(
+        header,
+        relevance.tier,
+        tierLabel,
+        t("ui.relevance_tag_label_0", tierLabel),
+        button => this.openRelevanceMenu(node, relevance.tier, button),
+        this.plugin.relevanceGrades.get(this.path)?.status === "running"
       );
-      card.setAttr("aria-description", t("ui.relevance_description_0_1", tierLabel, reasonText));
+      // An AI grade carries no explanation; only a hand-set tier says where it came from.
+      if (relevance.manual) {
+        const manualText = t("ui.relevance_manual_reason");
+        setTooltip(tagButton, manualText);
+        card.setAttr("aria-description", t("ui.relevance_description_0_1", tierLabel, manualText));
+      }
       const named = cardLabels.get(card)?.textContent;
       if (named) this.labelCard(card, t("ui.topic_card_label_0_1", named, tierLabel));
     }

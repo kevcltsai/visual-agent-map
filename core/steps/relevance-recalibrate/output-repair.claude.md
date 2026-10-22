@@ -1,0 +1,1 @@
+When you finish, call the StructuredOutput tool directly to return ONE complete result holding ALL the changes you now propose (the earlier ones that still stand as well as the new ones), and every card whose tier is null, in the same format; do not write the answer or JSON as text first. Its shape:

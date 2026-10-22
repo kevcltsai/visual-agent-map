@@ -14,7 +14,7 @@ import {
   gradableNodes,
   hierarchyError,
   invalid,
-  languageLine,
+  relevanceProviderText,
   promptItem,
   promptPinParts,
   promptViolations,
@@ -28,6 +28,10 @@ import {
 import type { StructureNode } from "../structure-review/step";
 import template from "./prompt.md";
 import repairTemplate from "./repair.md";
+import outputClaude from "./output-recalibrate.claude.md";
+import outputCodex from "./output-recalibrate.codex.md";
+import outputRepairClaude from "./output-repair.claude.md";
+import outputRepairCodex from "./output-repair.codex.md";
 
 /**
  * Recalibrate a map that is already graded: the model sees every card with its current tier and the learner's pins, and
@@ -55,10 +59,9 @@ export const RELEVANCE_RECALIBRATE_SCHEMA = {
         properties: {
           id: { type: "string", minLength: 1 },
           tier: { type: "string", enum: [...RELEVANCE_TIERS] },
-          reason: { type: "string", minLength: 1 },
           anchor: { type: ["string", "null"] }
         },
-        required: ["id", "tier", "reason", "anchor"]
+        required: ["id", "tier", "anchor"]
       }
     }
   },
@@ -74,8 +77,8 @@ const currentTiers = (request: RelevanceRecalibrateRequest): RelevancePin[] => {
 
 /**
  * Strict parser. The WHOLE reply is refused when it is not JSON; is not exactly `{"changes": [...]}`; has an entry that
- * is not an object with exactly `id`, `tier`, `reason` and `anchor` (a string or null); has a tier other than core,
- * support or side; has an empty reason; repeats an id; names an id that is not on the map or belongs to a top-level
+ * is not an object with exactly `id`, `tier` and `anchor` (a string or null; a `reason` key refuses it); has a tier other
+ * than core, support or side; repeats an id; names an id that is not on the map or belongs to a top-level
  * card; leaves a card without a tier unrated; or, with the changes and the pins merged into the current tiers, ranks a
  * card above its parent or outside its bounds (these go to a repair round).
  * Allowed but not used: an entry for a pinned card (counted), an entry whose tier equals the current one (counted), an
@@ -112,13 +115,12 @@ export function parseRelevanceRecalibrate(
     if (!entry || typeof entry !== "object" || Array.isArray(entry)) throw invalid(locale, where);
     const change = entry as Record<string, unknown>;
     const keys = Object.keys(change);
-    if (keys.length !== 4 || !["id", "tier", "reason", "anchor"].every(key => keys.includes(key)))
+    if (keys.length !== 3 || !["id", "tier", "anchor"].every(key => keys.includes(key)))
       throw invalid(locale, `${where} keys`);
-    const { id: label, tier, reason, anchor } = change;
+    const { id: label, tier, anchor } = change;
     if (typeof label !== "string" || !label) throw invalid(locale, `${where} id`);
     if (typeof tier !== "string" || !(RELEVANCE_TIERS as readonly string[]).includes(tier))
       throw invalid(locale, `${where} tier`);
-    if (typeof reason !== "string" || !reason.trim()) throw invalid(locale, `${where} reason`);
     if (anchor !== null && typeof anchor !== "string") throw invalid(locale, `${where} anchor`);
     const id = ids.real(label);
     if (id === undefined) throw invalid(locale, `${where} id ${label}`);
@@ -139,7 +141,6 @@ export function parseRelevanceRecalibrate(
     items.push({
       id,
       tier: tier as RelevanceTier,
-      reason: reason.replace(/\s+/g, " ").trim(),
       ...(anchored ? { anchor: anchorId } : {})
     });
   });
@@ -180,8 +181,10 @@ const promptCards = (request: RelevanceRecalibrateRequest) => {
 
 const recalibratePrompt = (request: RelevanceRecalibrateRequest): string => {
   const parts = promptPinParts(request.nodes, request.pins);
+  const text = relevanceProviderText(request.model, { claude: outputClaude, codex: outputCodex });
   return renderTemplate(template, {
-    languageInstruction: languageLine(request),
+    toolLine: text.tools,
+    outputLine: text.output,
     goal: JSON.stringify(request.goal),
     level: JSON.stringify(request.level ?? null),
     context: JSON.stringify(request.context ?? null),
@@ -193,7 +196,7 @@ const recalibratePrompt = (request: RelevanceRecalibrateRequest): string => {
 
 export const relevanceRecalibrateStep: StepDefinition<RelevanceRecalibrateRequest, RelevanceRecalibrateResult> = {
   id: "relevance-recalibrate",
-  version: 1,
+  version: 2,
   render: recalibratePrompt,
   schema: RELEVANCE_RECALIBRATE_SCHEMA,
   policy: (prompt, request) => refuseIfTooBig(prompt, request, RELEVANCE_RECALIBRATE_SCHEMA),
@@ -207,6 +210,7 @@ export interface RelevanceRecalibrateRepairRequest
 const repairPrompt = (request: RelevanceRecalibrateRepairRequest): string => {
   const pins = effectivePins(request.nodes, request.pins);
   const tiers = mergeRelevanceTiers({ previous: currentTiers(request), items: request.previousReply.items, pins });
+  const text = relevanceProviderText(request.model, { claude: outputRepairClaude, codex: outputRepairCodex });
   return renderTemplate(repairTemplate, {
     originalPrompt: recalibratePrompt(request),
     previousReply: JSON.stringify({
@@ -216,7 +220,8 @@ const repairPrompt = (request: RelevanceRecalibrateRepairRequest): string => {
       })
     }),
     violations: JSON.stringify(promptViolations(request.nodes, tiers, request.violations)),
-    languageInstruction: languageLine(request)
+    toolLine: text.tools,
+    outputLine: text.output
   });
 };
 export const relevanceRecalibrateRepairStep: StepDefinition<
@@ -224,7 +229,7 @@ export const relevanceRecalibrateRepairStep: StepDefinition<
   RelevanceRecalibrateResult
 > = {
   id: "relevance-recalibrate-repair",
-  version: 1,
+  version: 2,
   render: repairPrompt,
   schema: RELEVANCE_RECALIBRATE_SCHEMA,
   policy: (prompt, request) => refuseIfTooBig(prompt, request, RELEVANCE_RECALIBRATE_SCHEMA),

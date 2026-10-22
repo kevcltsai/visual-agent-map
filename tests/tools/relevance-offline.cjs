@@ -456,9 +456,9 @@ function promptPath(version) {
   return path.join(TOOL_DIR, file);
 }
 
-// The prompt hash covers every file that shapes the text (product: prompt, repair and both language lines).
+// The prompt hash covers every file that shapes the text (product: prompt, repair and the Codex wording of the tools and output sentences).
 function promptFiles(version) {
-  if (version === 'product') return ['prompt.md', 'repair.md', 'language.zh.md', 'language.en.md'].map(f => path.join(PRODUCT_DIR, f));
+  if (version === 'product') return ['prompt.md', 'repair.md', 'tools.codex.md', 'output-grade.codex.md', 'output-repair.codex.md'].map(f => path.join(PRODUCT_DIR, f));
   return [promptPath(version), ...(version === 'v1' ? [] : [path.join(TOOL_DIR, 'repair.md')])];
 }
 
@@ -483,8 +483,12 @@ function renderTemplate(template, variables) {
   return text;
 }
 
-// The template takes the output language name; these are the spellings the registry gives each language (region form, in the template's own language).
-const languageLine = language => renderTemplate(fs.readFileSync(path.join(PRODUCT_DIR, language === 'zh-TW' ? 'language.zh.md' : 'language.en.md'), 'utf8'), { language: language === 'zh-TW' ? '繁體中文（台灣）' : 'English' });
+// The product prompt has no language line since D-2026-10-99..103; the tool renders the Codex wording of the two sentences
+// that differ per provider (the `language` argument of buildPrompt/buildRepairPrompt is accepted and ignored).
+const productText = output => ({
+  toolLine: fs.readFileSync(path.join(PRODUCT_DIR, 'tools.codex.md'), 'utf8').replace(/\n$/, ''),
+  outputLine: fs.readFileSync(path.join(PRODUCT_DIR, output), 'utf8').replace(/\n$/, '')
+});
 
 // Product cards: position ids, and only id/title/summary/parentId/depth (no status), as step.ts promptCards.
 function productNodesForPrompt(tree) {
@@ -513,7 +517,7 @@ function shortNodesForPrompt(tree) {
 function buildPrompt({ version, goal, level, context, tree, language = 'zh-TW' }) {
   if (version === 'product')
     return renderTemplate(fs.readFileSync(promptPath('product'), 'utf8'), {
-      languageInstruction: languageLine(language),
+      ...productText('output-grade.codex.md'),
       pinsSection: '',
       goal: JSON.stringify(goal),
       level: JSON.stringify(level ?? null),
@@ -559,7 +563,7 @@ function buildRepairPrompt({ prompt, value, violations, tree, version, language 
       previousReply: JSON.stringify({ items: value.items.map(i => ({ ...i, id: lab(i.id) })) }),
       violations: JSON.stringify(violations.map(v => ({ childId: lab(v.child), childTier: v.childTier, parentId: lab(v.parent), parentTier: v.parentTier, ancestors: chainOf(v.parent) }))),
       pinsNote: '',
-      languageInstruction: languageLine(language)
+      ...productText('output-repair.codex.md')
     });
   }
   const template = fs.readFileSync(path.join(TOOL_DIR, 'repair.md'), 'utf8');

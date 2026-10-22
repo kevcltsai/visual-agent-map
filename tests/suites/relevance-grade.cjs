@@ -9,13 +9,13 @@ const { hasCls, element, find, findAll, button, tick } = dom;
 
 const MAP = 'Agent Workspace/Topics/map-a/Map.md';
 const tierFor = title => ({ Body: 'core', Mind: 'support', REM: 'side', Dreams: 'support', Extra: 'support' })[title] ?? 'support';
-// The default fake AI: a valid grade for every gradable card, with a reason that names the goal.
+// The default fake AI: a valid grade for every gradable card (tier only: a grade carries no reason).
 // The model speaks position ids (c1..cN in map order), never UUIDs.
 const labelOf = (request, id) => `c${request.nodes.findIndex(n => n.id === id) + 1}`;
 const nodeOfLabel = (request, label) => request.nodes[Number(label.slice(1)) - 1];
-const gradeAll = (request, pick = tierFor) => ({ items: request.nodes.filter(n => n.parentId !== null).map(n => ({ id: labelOf(request, n.id), tier: pick(n.title), reason: `${n.title} for ${request.goal}.` })) });
+const gradeAll = (request, pick = tierFor) => ({ items: request.nodes.filter(n => n.parentId !== null).map(n => ({ id: labelOf(request, n.id), tier: pick(n.title) })) });
 
-const recalibrateNew = request => ({ changes: request.nodes.filter(n => n.parentId !== null && !request.previous.some(p => p.id === n.id) && !(request.pins ?? []).some(p => p.id === n.id)).map(n => ({ id: labelOf(request, n.id), tier: tierFor(n.title), reason: `${n.title} for ${request.goal}.`, anchor: null })) });
+const recalibrateNew = request => ({ changes: request.nodes.filter(n => n.parentId !== null && !request.previous.some(p => p.id === n.id) && !(request.pins ?? []).some(p => p.id === n.id)).map(n => ({ id: labelOf(request, n.id), tier: tierFor(n.title), anchor: null })) });
 
 async function harness({ language = 'en', mapTitle = 'Sleep map' } = {}) {
   const { repo, app, contents } = fixture(language);
@@ -40,11 +40,20 @@ async function harness({ language = 'en', mapTitle = 'Sleep map' } = {}) {
   class Modal extends Base { open() { opened.push(this); super.open(); } }
   const ctx = {};
   // A recalibrate answers with the cards that have no tier yet (none, once the map is graded).
-  const control = { decline: false, calls: [], reply: async (request, _signal, prepared) => prepared.step.id.startsWith('relevance-recalibrate') ? recalibrateNew(request) : gradeAll(request), usageAsks: 0 };
+  const control = { decline: false, calls: [], reply: async (request, _signal, prepared) => prepared.step.id.startsWith('relevance-recalibrate') ? recalibrateNew(request) : gradeAll(request), usageAsks: 0, prewarms: [], releases: 0 };
   const plugin = withExpansionCoordinator({
     repo, settings, running: new Set(), abortChartJobs: () => {}, addChartsAfterWrite: () => {}, logs: { appendLog() {} }, rebuildDerivedData: () => repo.rebuildDerivedData(), relevanceGrades: new Map(), releaseOutline() {},
-    mutate: async work => { await work(); await ctx.view?.hydrate(); },
+    // Like the real mutate: after the work the view synchronizes, which repaints only when a note changed.
+    mutate: async work => {
+      await work();
+      const view = ctx.view; if (!view) return;
+      const before = JSON.stringify(Array.from(view.notes));
+      await view.hydrate();
+      if (before !== JSON.stringify(Array.from(view.notes))) view.render();
+    },
     runMutation(work) { this.mutate(work).catch(() => {}); },
+    usageNoticePending: () => !!control.confirmGate,
+    prewarmClaudeStep: (...args) => control.prewarms.push(args), releaseWarmClaude: () => { control.releases++; },
     confirmAiUsage: async (_model, run) => { control.usageAsks++; if (control.confirmGate) await control.confirmGate; if (control.decline) return false; await run(); return true; }
   });
   const { VisualAgentMapView } = load('main.ts', { obsidian: { ...obsidian, Modal, Notice: class { constructor(m) { notices.push(m); } }, Menu, setTooltip(el, text) { tips.set(el, text); } } });
@@ -64,7 +73,7 @@ async function harness({ language = 'en', mapTitle = 'Sleep map' } = {}) {
   };
   view.path = MAP; view.map = await repo.readMap(MAP); view.contentEl = rootEl; view.focusNode = () => {}; view.hydrate = reload;
   let renders = 0;
-  view.render = () => { renders++; rootEl.empty(); view.renderRelevanceStatus(rootEl); view.renderRelevanceGoalControl(rootEl.createDiv('vam-map-tools')); };
+  view.render = () => { renders++; view.paintCount++; rootEl.empty(); view.renderRelevanceStatus(rootEl); view.renderRelevanceGoalControl(rootEl.createDiv('vam-map-tools')); };
   await reload(); view.render();
   const cards = new Map(view.map.nodes.map(n => [n.id, element('div', 'vam-node')]));
   for (const [id, card] of cards) view.cardEls.set(id, card);
@@ -78,7 +87,7 @@ async function harness({ language = 'en', mapTitle = 'Sleep map' } = {}) {
     barButtons: () => findAll(h.bar() ?? element('div'), i => i.tag === 'button').map(b => b.text || b.attrs['aria-label']),
     run: () => plugin.relevanceGrades.get(MAP),
     note: key => repo.readNote(view.map.nodes.find(n => n.id === ids[key]).path),
-    relevanceOf: async key => { const n = await h.note(key); return n.relevance ? [n.relevance.tier, n.relevance.reason] : undefined; },
+    relevanceOf: async key => { const n = await h.note(key); return n.relevance?.tier; },
     allRelevance: async () => Object.fromEntries(await Promise.all(Object.keys(ids).map(async key => [key, await h.relevanceOf(key)]))),
     // Click the goal chip, type, press Enter: the keyboard path.
     enter: async (goal, key = 'Enter') => {
@@ -109,13 +118,14 @@ integrationTest('relevance: Prioritize by goal -> field -> Enter writes the goal
   assert.equal(await h.repo.readRelevanceGoal(MAP), 'Sleep better through the night', 'newlines are removed');
   assert.match(frontmatterOf(h), /relevance-goal-history:\n  - "\d{4}-\d{2}-\d{2}: Sleep better through the night"/);
   const request = h.control.calls[0].request;
-  assert.equal(request.goal, 'Sleep better through the night'); assert.equal(request.language, 'en'); assert.equal(request.contentLanguage, 'same-as-input');
+  assert.equal(request.goal, 'Sleep better through the night'); assert.equal(request.language, 'en'); assert.equal('contentLanguage' in request, false, 'the grade has no output language');
   assert.equal(request.nodes.length, 5, 'the whole map is sent, the top-level card as context');
   assert.deepEqual(Object.keys(request.nodes[0]).sort(), ['depth', 'id', 'parentId', 'status', 'summary', 'title']);
   const all = await h.allRelevance();
   assert.equal(all.root, undefined, 'the top-level card is never graded');
-  for (const key of ['a', 'b', 'c', 'd']) { assert.ok(['core', 'support', 'side'].includes(all[key][0])); assert.ok(all[key][1].trim()); }
-  assert.deepEqual(all.c, ['side', 'REM for Sleep better through the night.']);
+  for (const key of ['a', 'b', 'c', 'd']) assert.ok(['core', 'support', 'side'].includes(all[key]));
+  assert.equal(all.c, 'side');
+  for (const key of ['a', 'b', 'c', 'd']) assert.doesNotMatch(rawNote(h, key), /relevance-reason/, 'no reason is written');
   assert.equal(h.view.notes.get(h.ids.a).relevance.tier, 'core', 'the view reads the new grade');
   assert.equal(h.barText(), 'Graded 4 topics, 4 changed (0 skipped)');
   assert.deepEqual(h.barButtons(), ['View changes', 'Undo', 'Dismiss']);
@@ -124,38 +134,39 @@ integrationTest('relevance: Prioritize by goal -> field -> Enter writes the goal
   assert.equal(h.view.history.past.length, 2, 'goal and grading are two undo steps');
 });
 
-integrationTest('relevance: the map language, not the interface language, chooses the language of the reasons', async () => {
+integrationTest('relevance: the prompt names no output language whatever the map or interface language is (no reason is asked for)', async () => {
   const h = await harness({ language: 'en', mapTitle: '要如何在陽台養香草' });
   await h.enter('養出香草'); await h.settled();
-  assert.equal(h.control.calls[0].request.contentLanguage, 'zh-TW'); assert.equal(h.control.calls[0].request.language, 'en');
-  assert.match(load('core/relevance-grade-service.ts').buildRelevanceGradePrompt(h.control.calls[0].request), /繁體中文/);
+  assert.equal(h.control.calls[0].request.language, 'en'); assert.equal('contentLanguage' in h.control.calls[0].request, false);
+  const prompt = load('core/relevance-grade-service.ts').buildRelevanceGradePrompt(h.control.calls[0].request);
+  assert.doesNotMatch(prompt, /繁體中文|Write the reasons|reason/i);
 });
 
-integrationTest('relevance: changing the goal appends history and regrades; the summary lists only cards whose tier or reason changed', async () => {
+integrationTest('relevance: changing the goal appends history and regrades; the summary lists only cards whose tier changed', async () => {
   const h = await harness();
   await h.enter('First goal'); await h.settled();
-  // Second run: Body and Mind keep tier and reason, REM changes tier, Dreams changes only the reason.
+  // Second run: Body and Mind keep their tier, REM changes tier; Dreams keeps its tier too (a reason no longer counts).
   h.control.reply = async request => ({ items: request.nodes.filter(n => n.parentId !== null).map(n => {
-    if (n.title === 'Body') return { id: labelOf(request, n.id), tier: 'core', reason: 'Body for First goal.' };
-    if (n.title === 'Mind') return { id: labelOf(request, n.id), tier: 'support', reason: 'Mind for First goal.' };
-    if (n.title === 'REM') return { id: labelOf(request, n.id), tier: 'core', reason: 'REM for First goal.' };
-    return { id: labelOf(request, n.id), tier: 'support', reason: 'A new reason.' };
+    if (n.title === 'Body') return { id: labelOf(request, n.id), tier: 'core' };
+    if (n.title === 'Mind') return { id: labelOf(request, n.id), tier: 'support' };
+    if (n.title === 'REM') return { id: labelOf(request, n.id), tier: 'core' };
+    return { id: labelOf(request, n.id), tier: 'support' };
   }) });
   await h.enter('Second goal'); await h.settled();
   assert.match(h.contents.get(MAP), /- "[\d-]+: First goal"\n  - "[\d-]+: Second goal"/);
   assert.equal(h.contents.get(MAP).match(/^  - "/gm).length, 2, 'both goals are in the history');
-  assert.equal(h.barText(), 'Graded 4 topics, 2 changed (0 skipped)');
+  assert.equal(h.barText(), 'Graded 4 topics, 1 changed (0 skipped)');
   button(h.bar(), 'View changes').click();
   const modal = h.opened.at(-1);
   assert.equal(modal.titleEl.text, 'Relevance changes'); assert.ok(button(modal.modalEl, 'Close').focused, 'focus starts on Close');
   const rows = findAll(modal.contentEl, i => hasCls(i, 'vam-relevance-change'));
-  assert.deepEqual(rows.map(r => find(r, i => hasCls(i, 'vam-relevance-change-title')).text), ['REM', 'Dreams']);
+  assert.deepEqual(rows.map(r => find(r, i => hasCls(i, 'vam-relevance-change-title')).text), ['REM']);
   const tagTexts = row => findAll(row, i => hasCls(i, 'vam-relevance-tag')).map(tag => tag.children[1].text);
-  assert.deepEqual(tagTexts(rows[0]), ['Skippable', 'Must learn']); assert.deepEqual(tagTexts(rows[1]), ['Learn when needed', 'Learn when needed']);
-  assert.deepEqual(rows.map(r => find(r, i => hasCls(i, 'vam-relevance-change-reason')).text), ['REM for First goal.', 'A new reason.']);
+  assert.deepEqual(tagTexts(rows[0]), ['Skippable', 'Must learn']);
+  assert.equal(findAll(modal.contentEl, i => hasCls(i, 'vam-relevance-change-reason')).length, 0, 'the summary has no reason line');
   assert.equal(find(rows[0], i => hasCls(i, 'vam-relevance-arrow')).attrs['aria-label'], 'changed to');
   assert.equal(find(modal.contentEl, i => i.tag === 'ul').attrs['aria-label'], 'Relevance changes');
-  assert.deepEqual([...h.cards].filter(([, card]) => hasCls(card, 'vam-structure-suggested')).map(([id]) => id).sort(), [h.ids.c, h.ids.d].sort(), 'changed cards are marked');
+  assert.deepEqual([...h.cards].filter(([, card]) => hasCls(card, 'vam-structure-suggested')).map(([id]) => id).sort(), [h.ids.c].sort(), 'changed cards are marked');
   modal.close();
   assert.equal([...h.cards.values()].filter(card => hasCls(card, 'vam-structure-suggested')).length, 0, 'closing clears the marks');
 });
@@ -176,7 +187,7 @@ integrationTest('relevance: a first grade shows "Not graded" as the old tag; Ent
 
 integrationTest('relevance: one undo restores every graded note (absent before means removed); the goal is a separate undo step', async () => {
   const h = await harness();
-  await h.repo.writeRelevance(h.view.map.nodes.find(n => n.id === h.ids.a).path, { tier: 'side', reason: 'Old reason.' });
+  await h.repo.writeRelevance(h.view.map.nodes.find(n => n.id === h.ids.a).path, { tier: 'side' });
   await h.view.hydrate();
   const before = await h.allRelevance();
   await h.enter('Goal'); await h.settled();
@@ -190,7 +201,7 @@ integrationTest('relevance: one undo restores every graded note (absent before m
   assert.equal(await h.repo.readRelevanceGoal(MAP), undefined, 'the second undo removes the goal');
   assert.doesNotMatch(h.contents.get(MAP), /relevance-goal/);
   await h.view.travel(true); await h.view.travel(true);
-  assert.equal(await h.repo.readRelevanceGoal(MAP), 'Goal'); assert.equal((await h.relevanceOf('c'))?.[0], 'side', 'redo grades again');
+  assert.equal(await h.repo.readRelevanceGoal(MAP), 'Goal'); assert.equal(await h.relevanceOf('c'), 'side', 'redo grades again');
 });
 
 integrationTest('relevance: undo and redo never overwrite a note the owner edited after grading; they say how many were left', async () => {
@@ -198,14 +209,14 @@ integrationTest('relevance: undo and redo never overwrite a note the owner edite
   await h.enter('Goal'); await h.settled();
   const afterGrading = await h.allRelevance();
   const dreams = h.view.map.nodes.find(n => n.id === h.ids.d);
-  await h.repo.writeRelevance(dreams.path, { tier: 'side', reason: 'My own opinion.' });
+  await h.repo.writeRelevance(dreams.path, { tier: 'side' });
   button(h.bar(), 'Undo').click(); await afterTravel(h);
-  assert.deepEqual(await h.relevanceOf('d'), ['side', 'My own opinion.'], 'the owner edit stays');
+  assert.equal(await h.relevanceOf('d'), 'side', 'the owner edit stays');
   assert.equal(await h.relevanceOf('a'), undefined); assert.equal(await h.relevanceOf('c'), undefined, 'the untouched notes are put back');
   assert.deepEqual(h.notices, ['1 topics were edited after grading and were left as they are.']);
   h.notices.length = 0;
   await h.view.travel(true);
-  assert.deepEqual(await h.relevanceOf('d'), ['side', 'My own opinion.'], 'redo leaves it alone too');
+  assert.equal(await h.relevanceOf('d'), 'side', 'redo leaves it alone too');
   assert.deepEqual(await h.relevanceOf('a'), afterGrading.a);
   assert.equal(h.notices.length, 1);
 });
@@ -249,10 +260,10 @@ integrationTest('relevance: a reply that is not exactly one valid grade per card
     'not JSON': () => 'sorry, I cannot',
     'a missing card': r => { const o = gradeAll(r); o.items.pop(); return o; },
     'a duplicate card': r => { const o = gradeAll(r); o.items.push(o.items[0]); return o; },
-    'an unknown card': r => { const o = gradeAll(r); o.items.push({ id: 'ghost', tier: 'core', reason: 'x' }); return o; },
-    'the top-level card': r => { const o = gradeAll(r); o.items.push({ id: 'c1', tier: 'core', reason: 'x' }); return o; },
+    'an unknown card': r => { const o = gradeAll(r); o.items.push({ id: 'ghost', tier: 'core' }); return o; },
+    'the top-level card': r => { const o = gradeAll(r); o.items.push({ id: 'c1', tier: 'core' }); return o; },
     'a bad tier': r => { const o = gradeAll(r); o.items[0].tier = 'must'; return o; },
-    'a blank reason': r => { const o = gradeAll(r); o.items[0].reason = '  '; return o; },
+    'a reason key': r => { const o = gradeAll(r); o.items[0].reason = 'Because.'; return o; },
     'an extra key': r => { const o = gradeAll(r); o.items[0].title = 'x'; return o; },
     'an extra top-level key': r => ({ ...gradeAll(r), goal: 'x' }),
     'a child above its parent': r => { const o = gradeAll(r); o.items.find(i => nodeOfLabel(r, i.id).title === 'Dreams').tier = 'core'; return o; }
@@ -319,7 +330,7 @@ integrationTest('relevance: a result for a map the view has since left is droppe
 integrationTest('relevance: a card deleted, renamed or moved while the AI worked is skipped and counted; a card added meanwhile stays ungraded', async () => {
   const h = await harness();
   const gate = deferred(); h.control.reply = request => gate.promise.then(() => gradeAll(request));
-  await h.repo.writeRelevance(h.view.map.nodes.find(n => n.id === h.ids.c).path, { tier: 'core', reason: 'Old grade for REM.' });
+  await h.repo.writeRelevance(h.view.map.nodes.find(n => n.id === h.ids.c).path, { tier: 'core' });
   await h.enter('Goal'); await until(() => h.control.calls.length);
   // While the AI works: Mind is renamed, REM is moved under Mind, Dreams is deleted, and a new card appears under Body.
   const mind = h.view.map.nodes.find(n => n.id === h.ids.b);
@@ -331,8 +342,8 @@ integrationTest('relevance: a card deleted, renamed or moved while the AI worked
   Object.assign(extra, { parentId: h.ids.a, x: 400, y: 900 }); h.view.map.nodes.push(extra);
   gate.resolve(); await h.settled();
   assert.equal(h.barText(), 'Graded 1 topics, 1 changed (3 skipped)');
-  assert.deepEqual(await h.relevanceOf('a'), ['core', 'Body for Goal.']);
-  assert.equal(await h.relevanceOf('b'), undefined, 'renamed: skipped'); assert.deepEqual(await h.relevanceOf('c'), ['core', 'Old grade for REM.'], 'moved: the old grade stays');
+  assert.equal(await h.relevanceOf('a'), 'core');
+  assert.equal(await h.relevanceOf('b'), undefined, 'renamed: skipped'); assert.equal(await h.relevanceOf('c'), 'core', 'moved: the old grade stays');
   assert.equal((await h.repo.readNote(extra.path)).relevance, undefined, 'added later: ungraded');
   // The in-memory edits above stand for changes that were saved; Undo now checks Map.md like every other change.
   await h.repo.saveMap(MAP, h.view.map);
@@ -583,9 +594,7 @@ integrationTest('relevance repair: a parent-child violation sends ONE repair req
     seen.push(prepared.step.id);
     if (prepared.step.id === 'relevance-grade') return dreamsAboveParent(request);
     seen.push(h.barText());
-    const o = gradeAll(request);
-    o.items.find(i => nodeOfLabel(request, i.id).title === 'Dreams').reason = 'Dreams, fixed.';
-    return o;
+    return gradeAll(request);
   };
   await h.enter('Goal'); await h.settled();
   assert.deepEqual(h.control.calls.map(c => c.step), ['relevance-grade', 'relevance-grade-repair']);
@@ -594,7 +603,7 @@ integrationTest('relevance repair: a parent-child violation sends ONE repair req
   assert.ok(h.control.calls[1].prompt.includes(`{"childId":"${dreams}","childTier":"core","parentId":"${mind}","parentTier":"support","ancestors":[{"id":"${mind}","tier":"support"}`), 'the pair and its ancestor chain (parent first) are in the repair prompt');
   assert.equal(seen[2], 'Fixing parent-child order…', 'the bar shows the repair text while it runs');
   assert.equal(h.run().status, 'done'); assert.equal(h.barText(), 'Graded 4 topics, 4 changed (0 skipped)');
-  assert.deepEqual(await h.relevanceOf('d'), ['support', 'Dreams, fixed.']);
+  assert.equal(await h.relevanceOf('d'), 'support');
   assert.equal(h.view.history.past.length, 2, 'goal step plus ONE grading step');
   assert.equal(h.control.usageAsks, 1, 'one usage notice for both requests');
 });
@@ -648,7 +657,7 @@ integrationTest('relevance sort: adding a child while sorted saves coordinates f
   const h = await harness();
   const { view } = h;
   // Give the cards tiers so the display order differs from the saved one.
-  for (const [key, tier] of [['a', 'side'], ['b', 'core'], ['c', 'core'], ['d', 'support']]) view.notes.get(h.ids[key]).relevance = { tier, reason: 'r' };
+  for (const [key, tier] of [['a', 'side'], ['b', 'core'], ['c', 'core'], ['d', 'support']]) view.notes.get(h.ids[key]).relevance = { tier };
   open(h);
   const toggle = find(h.rootEl, i => hasCls(i, 'vam-relevance-sort'));
   assert.equal(toggle.attrs['aria-pressed'], 'false'); toggle.click();
@@ -734,7 +743,7 @@ integrationTest('relevance toolbar: submit closes the panel, disables the button
 integrationTest('relevance toolbar: toggling the sort switch inside the panel keeps the panel and your typing, shows the indicator and the accessible name, and writes nothing', async () => {
   const h = await harness();
   const { view } = h;
-  for (const [key, tier] of [['a', 'side'], ['b', 'core']]) view.notes.get(h.ids[key]).relevance = { tier, reason: 'r' };
+  for (const [key, tier] of [['a', 'side'], ['b', 'core']]) view.notes.get(h.ids[key]).relevance = { tier };
   const before = h.contents.get(MAP), writes = [];
   const create = h.app.vault.create, modify = h.app.vault.modify; h.app.vault.create = (...a) => { writes.push(a[0]); return create.apply(h.app.vault, a); }; h.app.vault.modify = (...a) => { writes.push(a[0]); return modify.apply(h.app.vault, a); };
   view.renderPreservingFocus = () => view.render();
@@ -836,7 +845,7 @@ integrationTest('relevance manual: the tag is a keyboard-reachable button with a
   assert.equal(h.opened.length, 0);
 });
 
-integrationTest('relevance manual: a hand-set tier writes only tier + manual (reason removed), then change, then clear touch only those keys; no Map.md or viewport write', async () => {
+integrationTest('relevance manual: a hand-set tier writes only tier + manual, then change, then clear touch only those keys; no Map.md or viewport write', async () => {
   const h = await harness();
   await h.enter('Goal'); await h.settled();
   const mapBefore = h.contents.get(MAP), viewportBefore = JSON.stringify(h.view.map.viewport);
@@ -847,14 +856,14 @@ integrationTest('relevance manual: a hand-set tier writes only tier + manual (re
   h.app.vault.modify = (...a) => { writes.push(a[0]); return modify.apply(h.app.vault, a); };
   h.app.vault.process = (file, ...a) => { writes.push(file.path); return process.call(h.app.vault, file, ...a); };
   const start = rawNote(h, 'c');
-  assert.match(start, /relevance-reason:/);
+  assert.doesNotMatch(start, /relevance-reason:/, 'an AI grade writes no reason');
   const stripped = text => text.replace(manualKeys, '');
   const before = h.view.map.nodes.length;
   paintCard(h, 'c').tag.click(); pick(h.menus.at(-1), 'Must learn').click(); await afterWrite();
   let now = rawNote(h, 'c');
   assert.match(now, /^relevance-tier: "core"$/m); assert.match(now, /^relevance-manual: true$/m); assert.doesNotMatch(now, /relevance-reason/);
   assert.equal(stripped(now), stripped(start), 'nothing else in the note changed');
-  assert.deepEqual(JSON.parse(JSON.stringify((await h.note('c')).relevance)), { tier: 'core', reason: '', manual: true });
+  assert.deepEqual(JSON.parse(JSON.stringify((await h.note('c')).relevance)), { tier: 'core', manual: true });
   // Change it again, to a third tier.
   paintCard(h, 'c').tag.click(); pick(h.menus.at(-1), 'Learn when needed').click(); await afterWrite();
   now = rawNote(h, 'c');
@@ -874,10 +883,11 @@ integrationTest('relevance manual: a hand-set tier writes only tier + manual (re
   h.app.vault.create = create; h.app.vault.modify = modify; h.app.vault.process = process;
 });
 
-integrationTest('relevance manual: the tag tooltip and description say you set it instead of an AI reason; parent-child order is not enforced', async () => {
+integrationTest('relevance manual: an AI tag has no tooltip or description, a hand-set one says you set it; parent-child order is not enforced', async () => {
   const h = await harness();
   await h.enter('Goal'); await h.settled();
-  assert.equal(h.tips.get(paintCard(h, 'a').tag), 'Body for Goal.');
+  const aiCard = paintCard(h, 'a');
+  assert.equal(h.tips.has(aiCard.tag), false, 'an AI grade has no tooltip'); assert.equal(aiCard.card.attrs['aria-description'], undefined, 'and no description');
   // Parent (a) Skippable while its child (c) stays Skippable-or-higher: nothing is checked or repaired.
   paintCard(h, 'a').tag.click(); pick(h.menus.at(-1), 'Skippable').click(); await afterWrite();
   paintCard(h, 'c').tag.click(); pick(h.menus.at(-1), 'Must learn').click(); await afterWrite();
@@ -911,26 +921,27 @@ integrationTest('relevance manual: the tag and its menu are disabled while this 
 integrationTest('relevance manual: readRelevance and the frontmatter writer handle relevance-manual', async () => {
   const { readRelevance } = load('note-values.ts');
   const plainOf = v => JSON.parse(JSON.stringify(v));
-  assert.deepEqual(plainOf(readRelevance({ 'relevance-tier': 'side', 'relevance-manual': true })), { tier: 'side', reason: '', manual: true });
-  assert.deepEqual(plainOf(readRelevance({ 'relevance-tier': 'side', 'relevance-reason': ' r ', 'relevance-manual': false })), { tier: 'side', reason: 'r' });
-  assert.equal(readRelevance({ 'relevance-tier': 'side' }), undefined, 'a tier alone still reads as nothing');
+  assert.deepEqual(plainOf(readRelevance({ 'relevance-tier': 'side', 'relevance-manual': true })), { tier: 'side', manual: true });
+  assert.deepEqual(plainOf(readRelevance({ 'relevance-tier': 'side', 'relevance-reason': ' r ', 'relevance-manual': false })), { tier: 'side' }, 'a leftover reason is ignored');
+  assert.deepEqual(plainOf(readRelevance({ 'relevance-tier': 'support' })), { tier: 'support' }, 'a valid tier alone is a grade');
+  assert.equal(readRelevance({ 'relevance-reason': 'only a reason' }), undefined, 'a reason without a tier reads as nothing');
   assert.equal(readRelevance({ 'relevance-tier': 'huge', 'relevance-manual': true }), undefined);
-  assert.equal(readRelevance({ 'relevance-tier': 'side', 'relevance-manual': 'true' }), undefined, 'only a real true counts');
+  assert.deepEqual(plainOf(readRelevance({ 'relevance-tier': 'side', 'relevance-manual': 'true' })), { tier: 'side' }, 'only a real true makes it manual');
   const { repo } = fixture('en');
-  await assert.rejects(() => repo.writeRelevance('missing.md', { tier: 'core', reason: '' }), /reason is required|not found|missing/i);
+  await assert.rejects(() => repo.writeRelevance('missing.md', { tier: 'core' }), /not found|missing/i);
 });
 
 integrationTest('relevance manual: the AI never writes a pinned (hand-set) card, whether its tier differs or not; the flag stays; undo touches only written cards', async () => {
   const h = await harness();
   const set = async (key, value) => { await h.repo.writeRelevance(pathOfKey(h, key), value); };
-  await set('a', { tier: 'side', reason: '', manual: true });      // Body: AI will say core -> still untouched
-  await set('b', { tier: 'support', reason: '', manual: true });   // Mind: AI will say support (same tier) -> still untouched, flag kept
-  await set('c', { tier: 'support', reason: 'Old AI reason.' });   // REM: not manual, AI says side -> ordinary change
+  await set('a', { tier: 'side', manual: true });      // Body: AI will say core -> still untouched
+  await set('b', { tier: 'support', manual: true });   // Mind: AI will say support (same tier) -> still untouched, flag kept
+  await set('c', { tier: 'support' });                 // REM: not manual, AI says side -> ordinary change
   await h.view.hydrate();
   const rawBefore = Object.fromEntries(['a', 'b', 'c', 'd'].map(k => [k, rawNote(h, k)]));
   await h.enter('Goal'); await h.settled();
   for (const key of ['a', 'b']) { assert.equal(rawNote(h, key), rawBefore[key], `${key} is byte-identical`); assert.match(rawNote(h, key), /relevance-manual: true/); assert.doesNotMatch(rawNote(h, key), /relevance-reason/); }
-  assert.deepEqual(await h.allRelevance(), { root: undefined, a: ['side', ''], b: ['support', ''], c: ['side', 'REM for Goal.'], d: ['support', 'Dreams for Goal.'] });
+  assert.deepEqual(await h.allRelevance(), { root: undefined, a: 'side', b: 'support', c: 'side', d: 'support' });
   assert.equal(h.barText(), 'Graded 2 topics, 2 changed (0 skipped) Kept 2 you set.', 'pinned cards are neither graded, changed nor skipped');
   button(h.bar(), 'View changes').click();
   const modal = h.opened.at(-1);
@@ -944,7 +955,7 @@ integrationTest('relevance manual: the AI never writes a pinned (hand-set) card,
   assert.match(rawNote(h, 'a'), /relevance-manual: true/);
   // Redo re-applies only what was written; the pinned cards stay as they were.
   await h.view.travel(true); await h.view.travel(true);
-  assert.deepEqual(await h.relevanceOf('c'), ['side', 'REM for Goal.']);
+  assert.equal(await h.relevanceOf('c'), 'side');
   for (const key of ['a', 'b']) assert.equal(rawNote(h, key), rawBefore[key]);
 });
 
@@ -958,7 +969,7 @@ integrationTest('relevance manual: an AI grade of a non-manual card is unchanged
 });
 
 // ---- Recalibrate: pins as anchors, one button whose words follow the mode, hand back to the AI ---------------------
-const pinNote = async (h, key, tier) => { await h.repo.writeRelevance(pathOfKey(h, key), { tier, reason: '', manual: true }); await h.view.hydrate(); };
+const pinNote = async (h, key, tier) => { await h.repo.writeRelevance(pathOfKey(h, key), { tier, manual: true }); await h.view.hydrate(); };
 const marked = h => [...h.cards].filter(([, card]) => hasCls(card, 'vam-structure-suggested')).map(([id]) => id).sort();
 const keyOfId = (h, id) => Object.entries(h.ids).find(([, value]) => value === id)[0];
 const pinsRow = h => find(h.rootEl, i => hasCls(i, 'vam-relevance-pins-row'));
@@ -994,7 +1005,7 @@ integrationTest('relevance recalibrate: the AI gets the pins, the current tiers 
   await pinNote(h, 'b', 'side');   // Mind pinned Skippable; Dreams (support) is now above its pinned parent
   const rawBefore = Object.fromEntries(['a', 'b', 'c', 'd'].map(k => [k, rawNote(h, k)]));
   const past = h.view.history.past.length;
-  h.control.reply = async request => ({ changes: [{ id: labelOf(request, h.ids.d), tier: 'side', reason: 'Dreams follow Mind.', anchor: labelOf(request, h.ids.b) }] });
+  h.control.reply = async request => ({ changes: [{ id: labelOf(request, h.ids.d), tier: 'side', anchor: labelOf(request, h.ids.b) }] });
   await h.enter('Goal'); await h.settled();
   const call = h.control.calls.at(-1);
   assert.equal(call.step, 'relevance-recalibrate'); assert.equal(h.control.calls.length, 2);
@@ -1002,7 +1013,7 @@ integrationTest('relevance recalibrate: the AI gets the pins, the current tiers 
   assert.deepEqual(JSON.parse(JSON.stringify(call.request.previous.map(p => [keyOfId(h, p.id), p.tier]).sort())), [['a', 'core'], ['c', 'side'], ['d', 'support']], 'the current AI tiers, the pinned card is not among them');
   assert.ok(call.prompt.includes(`{"id":"${labelOf(call.request, h.ids.d)}","max":"side"}`), 'Dreams may be at most Skippable');
   assert.ok(call.prompt.includes('"pinned":true'));
-  assert.deepEqual(await h.allRelevance(), { root: undefined, a: ['core', 'Body for Goal.'], b: ['side', ''], c: ['side', 'REM for Goal.'], d: ['side', 'Dreams follow Mind.'] });
+  assert.deepEqual(await h.allRelevance(), { root: undefined, a: 'core', b: 'side', c: 'side', d: 'side' });
   for (const key of ['a', 'b', 'c']) assert.equal(rawNote(h, key), rawBefore[key], `${key} was not written`);
   assert.match(rawNote(h, 'b'), /relevance-manual: true/);
   assert.equal(h.barText(), 'Adjusted 1 topics based on your 1 settings');
@@ -1015,12 +1026,12 @@ integrationTest('relevance recalibrate: the AI gets the pins, the current tiers 
   const rows = findAll(modal.contentEl, i => hasCls(i, 'vam-relevance-change'));
   assert.deepEqual(rows.map(r => find(r, i => hasCls(i, 'vam-relevance-change-title')).text), ['Dreams']);
   assert.deepEqual(findAll(rows[0], i => hasCls(i, 'vam-relevance-tag')).map(tag => tag.children[1].text), ['Learn when needed', 'Skippable'], 'old to new');
-  assert.equal(find(rows[0], i => hasCls(i, 'vam-relevance-change-reason')).text, 'Dreams follow Mind.');
+  assert.equal(find(rows[0], i => hasCls(i, 'vam-relevance-change-reason')), undefined, 'no reason line');
   assert.deepEqual(marked(h), [h.ids.d], 'the moved card is marked on the map while the window is open');
   modal.close();
   assert.deepEqual(marked(h), [], 'closing clears the marks');
   button(h.bar(), 'Undo').click(); await afterTravel(h);
-  assert.deepEqual(await h.relevanceOf('d'), ['support', 'Dreams for Goal.']);
+  assert.equal(await h.relevanceOf('d'), 'support');
   for (const key of ['a', 'b', 'c']) assert.equal(rawNote(h, key), rawBefore[key]);
 });
 
@@ -1028,7 +1039,7 @@ integrationTest('relevance recalibrate: an answer that leaves a card outside a p
   const h = await harness();
   await h.enter('Goal'); await h.settled();
   await pinNote(h, 'b', 'side');
-  const replies = [{ changes: [] }, { changes: [{ id: '', tier: 'side', reason: 'Dreams follow Mind.', anchor: null }] }];
+  const replies = [{ changes: [] }, { changes: [{ id: '', tier: 'side', anchor: null }] }];
   h.control.reply = async request => {
     const next = replies.shift();
     next.changes.forEach(change => { change.id = labelOf(request, h.ids.d); change.anchor = labelOf(request, h.ids.b); });
@@ -1037,7 +1048,7 @@ integrationTest('relevance recalibrate: an answer that leaves a card outside a p
   await h.enter('Goal'); await h.settled();
   assert.deepEqual(h.control.calls.slice(1).map(c => c.step), ['relevance-recalibrate', 'relevance-recalibrate-repair']);
   assert.ok(h.control.calls.at(-1).prompt.includes('A pinned card cannot move'));
-  assert.deepEqual(await h.relevanceOf('d'), ['side', 'Dreams follow Mind.']);
+  assert.equal(await h.relevanceOf('d'), 'side');
   assert.equal(h.barText(), 'Adjusted 1 topics based on your 1 settings');
 });
 
@@ -1046,7 +1057,7 @@ integrationTest('relevance recalibrate: nothing to adjust says so; an entry for 
   await h.enter('Goal'); await h.settled();
   await pinNote(h, 'a', 'side');
   const rawBefore = Object.fromEntries(['a', 'b', 'c', 'd'].map(k => [k, rawNote(h, k)]));
-  h.control.reply = async request => ({ changes: [{ id: labelOf(request, h.ids.a), tier: 'core', reason: 'Body is central.', anchor: null }] });
+  h.control.reply = async request => ({ changes: [{ id: labelOf(request, h.ids.a), tier: 'core', anchor: null }] });
   await h.enter('Goal'); await h.settled();
   assert.equal(h.barText(), 'No topics needed adjusting'); assert.deepEqual(h.barButtons(), ['Dismiss']);
   for (const key of ['a', 'b', 'c', 'd']) assert.equal(rawNote(h, key), rawBefore[key], `${key} byte-identical`);
@@ -1062,9 +1073,9 @@ integrationTest('relevance recalibrate: a card that has no tier yet must be grad
   const h = await harness();
   await h.enter('Goal'); await h.settled();
   await h.repo.writeRelevance(pathOfKey(h, 'c'), null); await h.view.hydrate();   // REM handed back
-  h.control.reply = async request => ({ changes: [{ id: labelOf(request, h.ids.c), tier: 'support', reason: 'REM matters now.', anchor: null }] });
+  h.control.reply = async request => ({ changes: [{ id: labelOf(request, h.ids.c), tier: 'support', anchor: null }] });
   await h.enter('Goal'); await h.settled();
-  assert.deepEqual(await h.relevanceOf('c'), ['support', 'REM matters now.']);
+  assert.equal(await h.relevanceOf('c'), 'support');
   assert.equal(h.barText(), 'Graded 1 topics, 1 changed (0 skipped)', 'no pins: the plain wording');
   const missing = await harness();
   await missing.enter('Goal'); await missing.settled();
@@ -1089,8 +1100,8 @@ integrationTest('relevance pins: a full grade keeps pinned cards, asks only abou
   await pinNote(h, 'c', 'core');   // ... with REM under it Must learn: the learner's own disagreement
   const rawBefore = { a: rawNote(h, 'a'), c: rawNote(h, 'c') };
   h.control.reply = async request => ({ items: [
-    { id: labelOf(request, h.ids.b), tier: 'support', reason: 'Mind is useful.' },
-    { id: labelOf(request, h.ids.d), tier: 'support', reason: 'Dreams ride on REM.', anchor: labelOf(request, h.ids.c) }
+    { id: labelOf(request, h.ids.b), tier: 'support' },
+    { id: labelOf(request, h.ids.d), tier: 'support', anchor: labelOf(request, h.ids.c) }
   ] });
   await h.enter('Goal'); await h.settled();
   const call = h.control.calls[0];
@@ -1098,7 +1109,7 @@ integrationTest('relevance pins: a full grade keeps pinned cards, asks only abou
   assert.deepEqual(JSON.parse(JSON.stringify(call.request.pins)), [{ id: h.ids.a, tier: 'side' }, { id: h.ids.c, tier: 'core' }]);
   assert.equal(call.request.previous, undefined);
   assert.ok(call.prompt.includes('never output a pinned card'));
-  assert.deepEqual(await h.allRelevance(), { root: undefined, a: ['side', ''], b: ['support', 'Mind is useful.'], c: ['core', ''], d: ['support', 'Dreams ride on REM.'] });
+  assert.deepEqual(await h.allRelevance(), { root: undefined, a: 'side', b: 'support', c: 'core', d: 'support' });
   for (const key of ['a', 'c']) assert.equal(rawNote(h, key), rawBefore[key], `${key} byte-identical`);
   assert.equal(h.barText(), 'Graded 2 topics, 2 changed (0 skipped) Kept 2 you set.');
   assert.deepEqual(h.barButtons(), ['View changes', 'Undo', 'Dismiss']);
@@ -1187,4 +1198,101 @@ integrationTest('relevance pins: undo never writes a card that was pinned after 
   assert.match(rawNote(h, 'c'), /relevance-manual: true/);
   assert.equal(await h.relevanceOf('a'), undefined, 'the other cards were put back');
   assert.deepEqual(h.notices, ['1 topics were edited after grading and were left as they are.']);
+});
+
+// ---- Grade without a reason: old notes, repaint count and the pre-started Claude CLI (D-2026-10-99..103) ------------
+const withOldReason = (h, key, tier, reason) => {
+  const file = pathOfKey(h, key);
+  h.contents.set(file, h.contents.get(file).replace('---\n', `---\nrelevance-tier: ${tier}\nrelevance-reason: ${JSON.stringify(reason)}\n`));
+};
+
+integrationTest('relevance: notes graded by an older version read as their tier only; a run rewrites a note only when its tier changes, and then drops the old reason', async () => {
+  const h = await harness();
+  withOldReason(h, 'a', 'core', 'Old reason for Body.');   // the AI will say core again: nothing to write
+  withOldReason(h, 'c', 'support', 'Old reason for REM.'); // the AI will say side: tier changes, the old reason goes
+  await h.view.hydrate();
+  assert.equal(await h.relevanceOf('a'), 'core'); assert.equal(await h.relevanceOf('c'), 'support');
+  assert.equal(paintCard(h, 'a').tag !== undefined, true);
+  assert.equal(h.tips.has(paintCard(h, 'a').tag), false, 'the old reason is not shown');
+  assert.equal(paintCard(h, 'a').card.attrs['aria-description'], undefined);
+  const untouched = rawNote(h, 'a');
+  await h.enter('Goal'); await h.settled();
+  assert.equal(rawNote(h, 'a'), untouched, 'same tier: the file is not written, the old reason stays until the tier changes');
+  assert.doesNotMatch(rawNote(h, 'c'), /relevance-reason|Old reason/); assert.match(rawNote(h, 'c'), /^relevance-tier: "side"$/m);
+  assert.equal(h.barText(), 'Graded 4 topics, 3 changed (0 skipped)', 'Body kept its tier; the other three changed');
+  button(h.bar(), 'View changes').click();
+  const modal = h.opened.at(-1);
+  assert.deepEqual(findAll(modal.contentEl, i => hasCls(i, 'vam-relevance-change-title')).map(i => i.text), ['REM', 'Mind', 'Dreams']);
+  modal.close();
+  // Undo puts back the tier only (an older reason is not kept in memory); an unchanged note stays as it was.
+  button(h.bar(), 'Undo').click(); await afterTravel(h);
+  assert.equal(await h.relevanceOf('c'), 'support'); assert.doesNotMatch(rawNote(h, 'c'), /relevance-reason/);
+  assert.equal(rawNote(h, 'a'), untouched);
+});
+
+integrationTest('relevance: one run repaints the map at most twice when the usage notice was already seen and no repair is needed, and apply reads notes with the map', async () => {
+  const h = await harness();
+  const mapsSeen = []; const readNote = h.repo.readNote.bind(h.repo);
+  h.repo.readNote = (file, map) => { mapsSeen.push(map); return readNote(file, map); };
+  const startRenders = h.renders();
+  await h.enter('Goal'); await h.settled();
+  assert.ok(h.renders() - startRenders <= 2, `a full grade repaints ${h.renders() - startRenders} times`);
+  assert.equal(h.control.usageAsks, 1);
+  // The apply step reads every card's note with the map (no extra read of the map file per card).
+  const withMap = mapsSeen.filter(Boolean);
+  assert.equal(withMap.length, h.view.map.nodes.length, 'one read per card carries the map'); assert.ok(withMap.every(map => map === h.view.map));
+  // A recalibrate that changes nothing repaints twice too: the start and the end.
+  const second = h.renders();
+  await h.enter('Goal'); await h.settled();
+  assert.ok(h.renders() - second <= 2, `a recalibrate with nothing to change repaints ${h.renders() - second} times`);
+  // The notice still shows its own state when it really opens.
+  const waiting = await harness();
+  waiting.control.confirmGate = deferred().promise;
+  await waiting.enter('Goal'); await until(() => waiting.control.usageAsks === 1);
+  assert.equal(waiting.barText(), 'Waiting for AI usage confirmation…');
+});
+
+integrationTest('relevance: opening the panel pre-starts the CLI for the grade it would run, switching to a recalibration starts the other schema, and closing without sending kills it', async () => {
+  const h = await harness();
+  h.plugin.settings.cliReasoning = 'auto';
+  h.chip().click();
+  const mode = () => h.control.prewarms.map(([model, reasoning, schema]) => [model, reasoning, schema.properties.changes ? 'recalibrate' : schema.properties.items ? 'grade' : 'other']);
+  assert.deepEqual(mode(), [['gpt-6-luna', 'auto', 'grade']], 'one pre-start on open, with the grade schema');
+  // Nothing graded yet: typing cannot change the mode. After a grade, the same setup is a recalibration.
+  h.input().value = 'Goal'; h.input().fire('input');
+  assert.equal(h.control.prewarms.length, 1, 'same mode: no second start');
+  h.input().fire('keydown', { key: 'Escape' });
+  assert.equal(h.control.releases, 1, 'Escape closes the panel and kills the waiting process');
+  await h.enter('Goal'); await h.settled();
+  assert.equal(h.control.releases, 1, 'sending keeps the pre-started process for the run');
+  h.control.prewarms.length = 0;
+  h.chip().click();
+  assert.deepEqual(mode(), [['gpt-6-luna', 'auto', 'recalibrate']], 'an unchanged setup after a grade pre-starts the recalibration');
+  h.input().value = 'Another goal'; h.input().fire('input');
+  assert.deepEqual(mode(), [['gpt-6-luna', 'auto', 'recalibrate'], ['gpt-6-luna', 'auto', 'grade']], 'a new goal needs a full grade: the other schema starts');
+  h.chip().click();
+  assert.equal(h.control.releases, 2, 'toggling the panel shut kills it too');
+});
+
+integrationTest('relevance: Stop, a declined notice, a failed run and closing the view with the panel open each leave no pre-started process; a run that finishes does not kill another', async () => {
+  const stopped = await harness();
+  const gate = deferred(); stopped.control.reply = request => gate.promise.then(() => gradeAll(request));
+  await stopped.enter('Goal'); await until(() => stopped.control.calls.length);
+  const before = stopped.control.releases;
+  button(stopped.bar(), 'Stop').click();
+  assert.equal(stopped.control.releases, before + 1, 'Stop');
+  gate.resolve(); await tick();
+  const declined = await harness(); declined.control.decline = true;
+  await declined.enter('Goal'); await declined.settled();
+  assert.ok(declined.control.releases >= 1, 'a declined notice');
+  const failed = await harness(); failed.control.reply = async () => { throw new Error('boom'); };
+  await failed.enter('Goal'); await failed.settled();
+  assert.equal(failed.run().status, 'failed'); assert.ok(failed.control.releases >= 1, 'a failed run');
+  const closing = await harness();
+  closing.chip().click(); const open = closing.control.releases;
+  await closing.view.onClose();
+  assert.equal(closing.control.releases, open + 1, 'closing the view while the panel is open');
+  const quiet = await harness();
+  await quiet.enter('Goal'); await quiet.settled();
+  assert.equal(quiet.control.releases, 0, 'a run that finishes leaves the pool alone (it took its process)');
 });

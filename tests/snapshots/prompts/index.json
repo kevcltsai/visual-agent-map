@@ -886,6 +886,96 @@
       "language": "zh-CN",
       "schema": true
     },
+    "claude.relevance-grade-pinned.en": {
+      "builder": "core/relevance-grade-service.ts buildRelevanceGradePrompt for Claude (one pinned card)",
+      "language": "en",
+      "schema": true
+    },
+    "claude.relevance-grade-pinned.zh": {
+      "builder": "core/relevance-grade-service.ts buildRelevanceGradePrompt for Claude (one pinned card)",
+      "language": "zh-TW",
+      "schema": true
+    },
+    "claude.relevance-grade-pinned.zh-CN": {
+      "builder": "core/relevance-grade-service.ts buildRelevanceGradePrompt for Claude (one pinned card)",
+      "language": "zh-CN",
+      "schema": true
+    },
+    "claude.relevance-grade-repair-missing.en": {
+      "builder": "core/relevance-grade-service.ts relevanceGradeMissingRepairStep.render for Claude (a bounded card left out)",
+      "language": "en",
+      "schema": true
+    },
+    "claude.relevance-grade-repair-missing.zh": {
+      "builder": "core/relevance-grade-service.ts relevanceGradeMissingRepairStep.render for Claude (a bounded card left out)",
+      "language": "zh-TW",
+      "schema": true
+    },
+    "claude.relevance-grade-repair-missing.zh-CN": {
+      "builder": "core/relevance-grade-service.ts relevanceGradeMissingRepairStep.render for Claude (a bounded card left out)",
+      "language": "zh-CN",
+      "schema": true
+    },
+    "claude.relevance-grade-repair.en": {
+      "builder": "core/relevance-grade-service.ts relevanceGradeRepairStep.render for Claude (one hierarchy violation)",
+      "language": "en",
+      "schema": true
+    },
+    "claude.relevance-grade-repair.zh": {
+      "builder": "core/relevance-grade-service.ts relevanceGradeRepairStep.render for Claude (one hierarchy violation)",
+      "language": "zh-TW",
+      "schema": true
+    },
+    "claude.relevance-grade-repair.zh-CN": {
+      "builder": "core/relevance-grade-service.ts relevanceGradeRepairStep.render for Claude (one hierarchy violation)",
+      "language": "zh-CN",
+      "schema": true
+    },
+    "claude.relevance-grade.en": {
+      "builder": "core/relevance-grade-service.ts buildRelevanceGradePrompt for Claude (StructuredOutput wording, no reason)",
+      "language": "en",
+      "schema": true
+    },
+    "claude.relevance-grade.zh": {
+      "builder": "core/relevance-grade-service.ts buildRelevanceGradePrompt for Claude (StructuredOutput wording, no reason)",
+      "language": "zh-TW",
+      "schema": true
+    },
+    "claude.relevance-grade.zh-CN": {
+      "builder": "core/relevance-grade-service.ts buildRelevanceGradePrompt for Claude (StructuredOutput wording, no reason)",
+      "language": "zh-CN",
+      "schema": true
+    },
+    "claude.relevance-recalibrate-repair.en": {
+      "builder": "core/relevance-grade-service.ts relevanceRecalibrateRepairStep.render for Claude (bounds violation)",
+      "language": "en",
+      "schema": true
+    },
+    "claude.relevance-recalibrate-repair.zh": {
+      "builder": "core/relevance-grade-service.ts relevanceRecalibrateRepairStep.render for Claude (bounds violation)",
+      "language": "zh-TW",
+      "schema": true
+    },
+    "claude.relevance-recalibrate-repair.zh-CN": {
+      "builder": "core/relevance-grade-service.ts relevanceRecalibrateRepairStep.render for Claude (bounds violation)",
+      "language": "zh-CN",
+      "schema": true
+    },
+    "claude.relevance-recalibrate.en": {
+      "builder": "core/relevance-grade-service.ts relevanceRecalibrateStep.render for Claude",
+      "language": "en",
+      "schema": true
+    },
+    "claude.relevance-recalibrate.zh": {
+      "builder": "core/relevance-grade-service.ts relevanceRecalibrateStep.render for Claude",
+      "language": "zh-TW",
+      "schema": true
+    },
+    "claude.relevance-recalibrate.zh-CN": {
+      "builder": "core/relevance-grade-service.ts relevanceRecalibrateStep.render for Claude",
+      "language": "zh-CN",
+      "schema": true
+    },
     "claude.task-decompose.en": {
       "builder": "AiTaskService instructions for Claude: mode decompose",
       "language": "en",

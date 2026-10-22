@@ -1,6 +1,6 @@
 import { estimateTokens } from "../../../ai/context-builder";
 import { translate, uiLocale, type ContentLanguage } from "../../../i18n";
-import { inLanguageNaming } from "../_shared/fragments";
+import { providerForModel } from "../../../ai/providers/provider";
 import type { ReasoningLevel } from "../../../ai/types";
 import type { RelevanceLevel, RelevanceTier } from "../../../note-values";
 import {
@@ -16,13 +16,19 @@ import {
 import { positionIds } from "../../short-ids";
 import { renderTemplate, type StepDefinition } from "../../step-runner";
 import type { StructureNode } from "../structure-review/step";
-import languageEn from "./language.en.md";
-import languageZh from "./language.zh.md";
 import template from "./prompt.md";
 import pinsTemplate from "./pins.md";
 import repairPinsNote from "./repair-pins.md";
 import repairMissingTemplate from "./repair-missing.md";
 import repairTemplate from "./repair.md";
+import toolsClaude from "./tools.claude.md";
+import toolsCodex from "./tools.codex.md";
+import outputGradeClaude from "./output-grade.claude.md";
+import outputGradeCodex from "./output-grade.codex.md";
+import outputRepairClaude from "./output-repair.claude.md";
+import outputRepairCodex from "./output-repair.codex.md";
+import outputRepairMissingClaude from "./output-repair-missing.claude.md";
+import outputRepairMissingCodex from "./output-repair-missing.codex.md";
 
 export type { PinConflict, RelevancePin };
 export const RELEVANCE_TIERS: readonly RelevanceTier[] = ["core", "support", "side"];
@@ -38,9 +44,8 @@ export interface RelevanceGradeRequest {
   context?: string;
   /** The whole map, parent before child. Cards whose `parentId` is null are context only and are never graded. */
   nodes: StructureNode[];
+  /** The interface language, used for error messages. The prompt itself has no language instruction. */
   language: ContentLanguage;
-  /** Language of the prompt and the model's reasons; defaults to `language`, which stays the interface language for errors. */
-  contentLanguage?: ContentLanguage;
   model: string;
   reasoning: ReasoningLevel;
   /** Cards the learner set by hand. Their tier is final: the AI never grades them, but they steer the cards around them. */
@@ -49,7 +54,6 @@ export interface RelevanceGradeRequest {
 export interface RelevanceGradeItem {
   id: string;
   tier: RelevanceTier;
-  reason: string;
   /** The pinned card this tier follows from, when the AI named one that really is pinned. */
   anchor?: string;
 }
@@ -69,7 +73,7 @@ export type RelevanceHierarchyViolation = TierViolation;
 /** Set on an "invalid" error whose ONLY problem is parent-child violations; carries what a repair round needs. */
 export interface RelevanceHierarchyFailure {
   violations: RelevanceHierarchyViolation[];
-  /** The reply as the parser read it (trimmed reasons), otherwise valid and complete. */
+  /** The reply as the parser read it, otherwise valid and complete. */
   reply: RelevanceGradeResult;
   /** Set when cards are missing from the reply and every one of them is a non-pinned card with a bound. */
   missing?: string[];
@@ -99,10 +103,9 @@ export const RELEVANCE_GRADE_SCHEMA = {
         properties: {
           id: { type: "string", minLength: 1 },
           tier: { type: "string", enum: [...RELEVANCE_TIERS] },
-          reason: { type: "string", minLength: 1 },
           anchor: { type: ["string", "null"] }
         },
-        required: ["id", "tier", "reason"]
+        required: ["id", "tier"]
       }
     }
   },
@@ -151,9 +154,9 @@ export function hierarchyError(
 
 /**
  * Strict parser. The WHOLE reply is refused (with `RelevanceGradeError`, nothing written, no partial result) when it is
- * not JSON; is not exactly `{"items": [...]}`; has an item that is not an object with `id`, `tier` and `reason` (and
- * optionally `anchor`, a string or null); has a tier other than core, support or side; has a reason that is empty after
- * trimming; repeats an id; names an id that is not on the map or belongs to a top-level card; leaves any gradable card
+ * not JSON; is not exactly `{"items": [...]}`; has an item that is not an object with `id` and `tier` (and
+ * optionally `anchor`, a string or null; any other key, a `reason` included, refuses it); has a tier other than core,
+ * support or side; repeats an id; names an id that is not on the map or belongs to a top-level card; leaves any gradable card
  * that is not pinned out; or, once the pins are merged in, ranks a card above its parent (core > support > side; a
  * top-level parent is context and not compared) or outside the bounds the pins give it.
  * Pinned cards are the learner's and are not graded: an entry for one is ignored and counted. An `anchor` that is not
@@ -161,7 +164,7 @@ export function hierarchyError(
  * The reply uses the short position ids of {@link gradePrompt} (c1..cN, in map order); each is turned back into the real
  * id here, so everything returned or reported (items, violations, error details) carries real ids. A real id (UUID) in
  * the reply is not a position id and is refused like any unknown id.
- * Nothing is coerced, dropped or truncated except surrounding whitespace in a reason.
+ * Nothing is coerced, dropped or truncated.
  */
 export function parseRelevanceGrade(
   raw: string,
@@ -193,13 +196,12 @@ export function parseRelevanceGrade(
     const item = entry as Record<string, unknown>;
     const keys = Object.keys(item);
     const withAnchor = keys.includes("anchor");
-    if (keys.length !== (withAnchor ? 4 : 3) || !["id", "tier", "reason"].every(key => keys.includes(key)))
+    if (keys.length !== (withAnchor ? 3 : 2) || !["id", "tier"].every(key => keys.includes(key)))
       throw invalid(locale, `${where} keys`);
-    const { id: label, tier, reason, anchor } = item;
+    const { id: label, tier, anchor } = item;
     if (typeof label !== "string" || !label) throw invalid(locale, `${where} id`);
     if (typeof tier !== "string" || !(RELEVANCE_TIERS as readonly string[]).includes(tier))
       throw invalid(locale, `${where} tier`);
-    if (typeof reason !== "string" || !reason.trim()) throw invalid(locale, `${where} reason`);
     if (withAnchor && anchor !== null && typeof anchor !== "string") throw invalid(locale, `${where} anchor`);
     const id = ids.real(label);
     if (id === undefined) throw invalid(locale, `${where} id ${label}`);
@@ -216,7 +218,6 @@ export function parseRelevanceGrade(
     items.push({
       id,
       tier: tier as RelevanceTier,
-      reason: reason.replace(/\s+/g, " ").trim(),
       ...(anchored ? { anchor: anchorId } : {})
     });
   });
@@ -261,14 +262,18 @@ export function relevanceHierarchyViolations(
   return violations;
 }
 
-export const languageLine = (request: RelevanceGradeRequest): string =>
-  inLanguageNaming(
-    { zh: languageZh, en: languageEn },
-    request.contentLanguage ?? request.language,
-    { language: "region" },
-    undefined,
-    { kind: "topic", text: request.goal }
-  );
+/** The wording that differs per provider: the tools sentence and the sentence that introduces the reply's shape. */
+export type RelevanceProviderText = { tools: string; output: string };
+const trimmed = (text: string): string => text.replace(/\n$/, "");
+export const relevanceProviderText = (
+  model: string,
+  output: { claude: string; codex: string }
+): RelevanceProviderText =>
+  providerForModel(model) === "claude"
+    ? { tools: trimmed(toolsClaude), output: trimmed(output.claude) }
+    : { tools: trimmed(toolsCodex), output: trimmed(output.codex) };
+export const gradeProviderText = (model: string): RelevanceProviderText =>
+  relevanceProviderText(model, { claude: outputGradeClaude, codex: outputGradeCodex });
 
 /**
  * The pins and bounds as the model sees them (position ids), or undefined when nothing is pinned.
@@ -311,8 +316,10 @@ const promptCards = (nodes: ReadonlyArray<StructureNode>, pinned: ReadonlyMap<st
 
 const gradePrompt = (request: RelevanceGradeRequest): string => {
   const parts = promptPinParts(request.nodes, request.pins);
+  const text = gradeProviderText(request.model);
   return renderTemplate(template, {
-    languageInstruction: languageLine(request),
+    toolLine: text.tools,
+    outputLine: text.output,
     pinsSection: parts
       ? `${renderTemplate(pinsTemplate, { pins: parts.pins, bounds: parts.bounds, mustInclude: parts.mustInclude })}\n\n`
       : "",
@@ -345,7 +352,7 @@ export const cardsToGrade = (request: RelevanceGradeRequest): StructureNode[] =>
 /** Grade every card of a map against the learner's goal. Input is titles, summaries and structure; the reply is strict JSON. */
 export const relevanceGradeStep: StepDefinition<RelevanceGradeRequest, RelevanceGradeResult> = {
   id: "relevance-grade",
-  version: 10,
+  version: 11,
   render: gradePrompt,
   schema: RELEVANCE_GRADE_SCHEMA,
   policy: (prompt, request) => refuseIfTooBig(prompt, request, RELEVANCE_GRADE_SCHEMA),
@@ -410,17 +417,19 @@ export const promptItem = (nodes: ReadonlyArray<StructureNode>, item: RelevanceG
 const repairPrompt = (request: RelevanceRepairRequest): string => {
   const pins = effectivePins(request.nodes, request.pins);
   const tiers = mergeRelevanceTiers({ items: request.previousReply.items, pins });
+  const text = relevanceProviderText(request.model, { claude: outputRepairClaude, codex: outputRepairCodex });
   return renderTemplate(repairTemplate, {
     originalPrompt: gradePrompt(request),
     previousReply: JSON.stringify({ items: request.previousReply.items.map(item => promptItem(request.nodes, item)) }),
     violations: JSON.stringify(promptViolations(request.nodes, tiers, request.violations)),
     pinsNote: pins.length ? `${renderTemplate(repairPinsNote, {})}\n` : "",
-    languageInstruction: languageLine(request)
+    toolLine: text.tools,
+    outputLine: text.output
   });
 };
 export const relevanceGradeRepairStep: StepDefinition<RelevanceRepairRequest, RelevanceGradeResult> = {
   id: "relevance-grade-repair",
-  version: 4,
+  version: 5,
   render: repairPrompt,
   schema: RELEVANCE_GRADE_SCHEMA,
   policy: (prompt, request) => refuseIfTooBig(prompt, request, RELEVANCE_GRADE_SCHEMA),
@@ -438,6 +447,10 @@ const repairMissingPrompt = (request: RelevanceRepairRequest): string => {
   const label = (id: string): string => ids.short(id) ?? id;
   const bounds = relevancePinBounds(request.nodes, effectivePins(request.nodes, request.pins)).bounds;
   const titleOf = new Map(request.nodes.map(node => [node.id, node.title]));
+  const text = relevanceProviderText(request.model, {
+    claude: outputRepairMissingClaude,
+    codex: outputRepairMissingCodex
+  });
   return renderTemplate(repairMissingTemplate, {
     originalPrompt: gradePrompt(request),
     previousReply: JSON.stringify({ items: request.previousReply.items.map(item => promptItem(request.nodes, item)) }),
@@ -449,12 +462,13 @@ const repairMissingPrompt = (request: RelevanceRepairRequest): string => {
         ...(bounds.get(id)?.max ? { max: bounds.get(id)?.max } : {})
       }))
     ),
-    languageInstruction: languageLine(request)
+    toolLine: text.tools,
+    outputLine: text.output
   });
 };
 export const relevanceGradeMissingRepairStep: StepDefinition<RelevanceRepairRequest, RelevanceGradeResult> = {
   id: "relevance-grade-repair-missing",
-  version: 1,
+  version: 2,
   render: repairMissingPrompt,
   schema: RELEVANCE_GRADE_SCHEMA,
   policy: (prompt, request) => refuseIfTooBig(prompt, request, RELEVANCE_GRADE_SCHEMA),

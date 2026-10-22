@@ -65,8 +65,8 @@ export interface RelevanceGradeChange {
   id: string;
   path: string;
   title: string;
-  before: { tier: RelevanceGradeItem["tier"]; reason: string } | undefined;
-  after: { tier: RelevanceGradeItem["tier"]; reason: string };
+  before: { tier: RelevanceGradeItem["tier"] } | undefined;
+  after: { tier: RelevanceGradeItem["tier"] };
   /** The pinned card this change follows from, when the AI named one. */
   anchor?: string;
 }
@@ -136,7 +136,8 @@ export function providerRelevanceGradeRunner(
     name: "relevance-grade",
     topic: request =>
       `Relevance ${"previous" in request ? "recalibrate" : "grade"} · ${request.goal.trim().slice(0, 80)}`,
-    stopped: () => new RelevanceGradeError("stopped", "Relevance grading stopped")
+    stopped: () => new RelevanceGradeError("stopped", "Relevance grading stopped"),
+    stream: true
   });
 }
 export class RelevanceGradeService {

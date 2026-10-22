@@ -206,7 +206,6 @@ button.vam-relevance-tag-button:disabled { cursor: default; opacity: .7; }
 .vam-relevance-pins-row { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 4px 8px; font-size: var(--font-ui-small); color: var(--text-muted); }
 .vam-relevance-unpin-all { font-size: var(--font-ui-small); }
 .vam-relevance-unpin-all:focus-visible { outline: 2px solid var(--interactive-accent); outline-offset: 1px; }
-.vam-relevance-change-reason { margin: 4px 0 0; font-size: var(--font-ui-small); color: var(--text-muted); overflow-wrap: anywhere; }
 @media (prefers-reduced-motion: reduce) {
   .vam-relevance-panel { animation: none; }
   /* Same selector weight as the scan animation rule above, otherwise that rule keeps winning. */

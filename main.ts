@@ -58,6 +58,8 @@ import {
 import { normalizeTemplates } from "./ai/detail-templates";
 import { normalizePresets } from "./ai/prompt-presets";
 import { effectiveReasoningLevel } from "./ai/task-policy";
+import { stepEffort } from "./core/provider-step-runner";
+import type { ReasoningLevel } from "./ai/types";
 import responseSchema from "./response-schema.json";
 import type { AiResult, AiTaskKind, Suggestion, TaskContext } from "./ai/types";
 import { clampPreviewScale, legacyPreviewScale } from "./ui/preview-utils";
@@ -982,6 +984,10 @@ export default class VisualAgentMapPlugin extends Plugin {
       CLAUDE_MODEL_CHOICES.find(choice => choice.id === model)?.label ?? `${t("ui.codex_provider_label")} · ${model}`
     );
   }
+  /** True when running AI with this model first asks the user to confirm the usage notice. */
+  usageNoticePending(model: string): boolean {
+    return !this.usageNoticeSeen(model);
+  }
   private usageNoticeSeen(model: string): boolean {
     return providerForModel(model) === "claude"
       ? this.settings.claudeUsageNoticeSeen
@@ -1659,6 +1665,22 @@ export default class VisualAgentMapPlugin extends Plugin {
         responseSchema,
         webSearch
       );
+    } catch {
+      /* Pre-starting is an optimisation: the run starts the process itself. */
+    }
+  }
+  /**
+   * Starts an idle Claude CLI for a step that has not been sent yet (the relevance panel just opened), with the very
+   * command the step will use: its schema, the effort {@link stepEffort} gives, no web search. No model call happens.
+   */
+  prewarmClaudeStep(model: string, reasoning: ReasoningLevel, schema: unknown): void {
+    if (this.unloaded) return;
+    if (providerForModel(model) !== "claude") {
+      this.aiRuntime.releaseWarm();
+      return;
+    }
+    try {
+      this.claudeCli(this.pluginDirectory()).prewarm(providerModelId(model), stepEffort(reasoning), schema, false);
     } catch {
       /* Pre-starting is an optimisation: the run starts the process itself. */
     }

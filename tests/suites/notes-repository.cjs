@@ -1315,17 +1315,22 @@ integrationTest('relevance frontmatter reads when valid, is absent when missing 
   const original = contents.get(n.path);
   assert.equal((await repo.readNote(n.path)).relevance, undefined, 'missing: no relevance');
   const withKeys = (tier, reason) => original.replace('---\n', `---\nrelevance-tier: ${tier}\nrelevance-reason: ${reason}\n`);
+  // A valid tier is a grade; a reason written by an older version is ignored (it is neither shown nor required).
   for (const tier of ['core', 'support', 'side']) {
     contents.set(n.path, withKeys(tier, '"Because: it matters"'));
-    assert.deepEqual(plain((await repo.readNote(n.path)).relevance), { tier, reason: 'Because: it matters' });
+    assert.deepEqual(plain((await repo.readNote(n.path)).relevance), { tier });
+    contents.set(n.path, original.replace('---\n', `---\nrelevance-tier: ${tier}\n`));
+    assert.deepEqual(plain((await repo.readNote(n.path)).relevance), { tier }, 'a tier alone is a grade');
+    contents.set(n.path, withKeys(tier, '""'));
+    assert.deepEqual(plain((await repo.readNote(n.path)).relevance), { tier }, 'an empty old reason is ignored too');
   }
-  for (const bad of [withKeys('huge', 'ok'), withKeys('core', '""'), withKeys('[core]', 'ok'), original.replace('---\n', '---\nrelevance-tier: core\n')]) {
+  for (const bad of [withKeys('huge', 'ok'), withKeys('[core]', 'ok'), original.replace('---\n', '---\nrelevance-reason: only a reason\n')]) {
     contents.set(n.path, bad);
     assert.equal((await repo.readNote(n.path)).relevance, undefined, 'invalid or incomplete: no relevance');
   }
   contents.set(n.path, withKeys('side', 'Skip it'));
   await repo.updateNote(n.path, { status: 'completed' });
-  assert.deepEqual(plain((await repo.readNote(n.path)).relevance), { tier: 'side', reason: 'Skip it' });
+  assert.deepEqual(plain((await repo.readNote(n.path)).relevance), { tier: 'side' });
 });
 integrationTest('relevance goal reads from map file frontmatter and is absent when missing or blank', async () => {
   const { repo, contents } = fixture(); const n = await topicNote(repo, 'Goal host');
@@ -1346,28 +1351,37 @@ integrationTest('relevance writer sets, replaces and removes only its two keys; 
   const bodyOf = text => text.replace(/^---\r?\n[\s\S]*?\r?\n---/, '');
   const keysOf = text => text.match(/^---\r?\n([\s\S]*?)\r?\n---/)[1].split('\n').filter(line => !/^relevance-/.test(line)).join('\n');
   const original = contents.get(n.path);
-  await repo.writeRelevance(n.path, { tier: 'core', reason: 'Why: "quoted" and\nmultiline' });
+  await repo.writeRelevance(n.path, { tier: 'core' });
   const written = contents.get(n.path);
-  assert.deepEqual(plain((await repo.readNote(n.path)).relevance), { tier: 'core', reason: 'Why: "quoted" and multiline' });
+  assert.deepEqual(plain((await repo.readNote(n.path)).relevance), { tier: 'core' });
+  assert.doesNotMatch(written, /relevance-reason/, 'no reason key is written');
   assert.equal(bodyOf(written), bodyOf(original), 'body unchanged'); assert.equal(keysOf(written), keysOf(original), 'other keys unchanged');
   assert.equal((await repo.readNote(n.path)).updated, before.updated, '`updated` is not bumped');
-  await repo.writeRelevance(n.path, { tier: 'side', reason: 'Skip' });
+  await repo.writeRelevance(n.path, { tier: 'side' });
   assert.equal(written.match(/relevance-tier/g).length, 1); assert.equal(contents.get(n.path).match(/relevance-tier/g).length, 1, 'replaced in place, not duplicated');
-  assert.deepEqual(plain((await repo.readNote(n.path)).relevance), { tier: 'side', reason: 'Skip' });
+  assert.deepEqual(plain((await repo.readNote(n.path)).relevance), { tier: 'side' });
   await repo.writeRelevance(n.path, null);
   assert.equal(contents.get(n.path), original, 'removing restores the file byte for byte');
   assert.equal((await repo.readNote(n.path)).relevance, undefined);
-  await assert.rejects(repo.writeRelevance(n.path, { tier: 'core', reason: '   ' }), /reason/);
-  assert.equal(contents.get(n.path), original, 'a blank reason writes nothing');
+  // Every write removes the reason an older version left behind, for an AI grade and for a hand-set tier alike.
+  contents.set(n.path, original.replace('---\n', '---\nrelevance-tier: core\nrelevance-reason: "Old reason"\n'));
+  await repo.writeRelevance(n.path, { tier: 'support' });
+  assert.doesNotMatch(contents.get(n.path), /relevance-reason|Old reason/);
+  assert.deepEqual(plain((await repo.readNote(n.path)).relevance), { tier: 'support' });
+  contents.set(n.path, original.replace('---\n', '---\nrelevance-tier: core\nrelevance-reason: "Old reason"\n'));
+  await repo.writeRelevance(n.path, { tier: 'core', manual: true });
+  assert.doesNotMatch(contents.get(n.path), /relevance-reason|Old reason/);
+  await repo.writeRelevance(n.path, null);
+  assert.equal(contents.get(n.path), original);
 });
 integrationTest('relevance writer keeps CRLF files CRLF and drops a stale multi-line value of its own key', async () => {
   const { repo, contents } = fixture(); const n = await topicNote(repo, 'Windows');
   contents.set(n.path, contents.get(n.path).replace(/\n/g, '\r\n').replace('---\r\n', '---\r\nrelevance-tier: core\r\nrelevance-reason: >-\r\n  folded old\r\n  value\r\n'));
-  await repo.writeRelevance(n.path, { tier: 'support', reason: 'New' });
+  await repo.writeRelevance(n.path, { tier: 'support' });
   const text = contents.get(n.path);
   assert.equal(/[^\r]\n/.test(text.replace(/^[\s\S]*?$/, m => m)), false, 'no bare LF introduced');
   assert.doesNotMatch(text, /folded old/);
-  assert.deepEqual(plain((await repo.readNote(n.path)).relevance), { tier: 'support', reason: 'New' });
+  assert.deepEqual(plain((await repo.readNote(n.path)).relevance), { tier: 'support' });
 });
 async function mapFile(language = 'en') {
   const { repo, app, contents } = fixture(language);

@@ -20,10 +20,6 @@
               "side"
             ]
           },
-          "reason": {
-            "type": "string",
-            "minLength": 1
-          },
           "anchor": {
             "type": [
               "string",
@@ -33,8 +29,7 @@
         },
         "required": [
           "id",
-          "tier",
-          "reason"
+          "tier"
         ]
       }
     }

@@ -1393,18 +1393,17 @@ export class Repository {
   }
 
   /**
-   * Sets or removes only the relevance keys of a note's frontmatter (`relevance-tier`, `relevance-reason`,
-   * `relevance-manual`). An AI grade writes the tier and reason and removes the manual flag; a tier set by hand
-   * (`manual`) writes the tier and `relevance-manual: true` and removes the reason; null removes all three. The body
+   * Sets or removes only the relevance keys of a note's frontmatter (`relevance-tier`, `relevance-manual`, and the
+   * `relevance-reason` that older versions wrote). An AI grade writes the tier and removes the manual flag; a tier set by
+   * hand (`manual`) writes the tier and `relevance-manual: true`; null removes the keys. Every write removes
+   * `relevance-reason`. The body
    * and every other key stay as they were, and `updated` is not bumped: grading is not an edit of the note.
    */
   async writeRelevance(path: string, value: NoteRelevance | null): Promise<void> {
-    const reason = value && !value.manual ? value.reason.replace(/\s+/g, " ").trim() : "";
-    if (value && !value.manual && !reason) throw new Error("A relevance reason is required.");
     await this.app.vault.process(this.file(path), content =>
       setFrontmatterKeys(content, {
         "relevance-tier": value ? value.tier : null,
-        "relevance-reason": value && !value.manual ? reason : null,
+        "relevance-reason": null,
         "relevance-manual": value?.manual ? true : null
       })
     );

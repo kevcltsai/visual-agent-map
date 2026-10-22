@@ -1,0 +1,1 @@
+When you finish, call the StructuredOutput tool directly to return ONE complete result for ALL cards (not only the changed ones), in the same format; do not write the answer or JSON as text first. Its shape:

@@ -1,6 +1,6 @@
 import type { MapDocument } from "../../map-model";
 import { isUiLanguage, translate, uiLocale, type ContentLanguage, type UiLanguage } from "../../i18n";
-import { detectAimContentLanguage, resolveAimContentLanguage } from "../aim/content-language";
+import { detectAimContentLanguage, resolveMapOutputLanguage } from "../aim/content-language";
 
 /**
  * "Map text language": the registry language (an interface language with a dictionary) that fixed text VAM makes up for
@@ -12,20 +12,20 @@ export function mapTextLanguage(language: ContentLanguage | undefined): UiLangua
 }
 
 /**
- * HOOK (D-2026-10-88/89): the one place that names the language a map is in. It delegates to
- * {@link resolveAimContentLanguage}, which is where a map-level `outputLanguage` is read once the map model has the
- * field; extend that resolver (or this function) and every fixed-text caller follows. Read on every call, never cached.
+ * The one place that names the language a map is in (D-2026-10-88/89). It delegates to {@link resolveMapOutputLanguage},
+ * which reads the map's `outputLanguage`, then the AIM content language, then the title; the follow-the-input row and
+ * output-only languages have no dictionary, so {@link mapTextLanguage} turns them into English. Read on every call.
  */
 export function mapContentLanguage(
-  map: Pick<MapDocument, "title" | "aim"> | undefined | null,
+  map: Pick<MapDocument, "title" | "aim" | "outputLanguage"> | undefined | null,
   uiLanguage: UiLanguage
 ): ContentLanguage {
-  return resolveAimContentLanguage(map, uiLanguage);
+  return resolveMapOutputLanguage(map, uiLanguage);
 }
 
 /** The map text language of a map (see {@link mapTextLanguage}). */
 export function resolveMapTextLanguage(
-  map: Pick<MapDocument, "title" | "aim"> | undefined | null,
+  map: Pick<MapDocument, "title" | "aim" | "outputLanguage"> | undefined | null,
   uiLanguage: UiLanguage
 ): UiLanguage {
   return mapTextLanguage(mapContentLanguage(map, uiLanguage));
@@ -33,7 +33,7 @@ export function resolveMapTextLanguage(
 
 /**
  * The language of one piece of text such as a note title, as a registry language; `fallback` when the text has no
- * decisive signal (digits, emoji, empty). Output-only scripts read English, like {@link mapTextLanguage}.
+ * decisive signal (digits, emoji, empty). Output-only scripts and the follow-the-input row read English, like {@link mapTextLanguage}.
  */
 export function textLanguageOf(text: string, fallback: UiLanguage): UiLanguage {
   const detected = detectAimContentLanguage(text);

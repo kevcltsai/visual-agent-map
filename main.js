@@ -14438,6 +14438,7 @@ function outputLanguageForMap(map, uiLanguage, ...sources2) {
   var _a2;
   return (_a2 = rememberedOutputLanguage(map)) != null ? _a2 : chooseAimContentLanguage(uiLanguage, ...sources2);
 }
+var resolveMapOutputLanguage = resolveAimContentLanguage;
 function resolveAimNoteLanguage(map, uiLanguage) {
   return noteLanguageOf(resolveAimContentLanguage(map, uiLanguage));
 }
@@ -14447,7 +14448,7 @@ function mapTextLanguage(language2) {
   return isUiLanguage(language2) ? language2 : uiLocale(void 0);
 }
 function mapContentLanguage(map, uiLanguage) {
-  return resolveAimContentLanguage(map, uiLanguage);
+  return resolveMapOutputLanguage(map, uiLanguage);
 }
 function resolveMapTextLanguage(map, uiLanguage) {
   return mapTextLanguage(mapContentLanguage(map, uiLanguage));

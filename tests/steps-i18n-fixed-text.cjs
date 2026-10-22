@@ -27,8 +27,11 @@ test('synthesis default name: zh-TW, zh-CN, en and ja maps use that language\'s 
   assert.equal(nameFor(mapOf('Trip to Tokyo'), 'zh-TW', ['A', 'B']), 'Synthesis: A, B');
   assert.equal(nameFor(mapOf('Trip to Tokyo'), 'zh-TW', names), 'Synthesis: A and others (4 topics)');
   // A Japanese map has no dictionary: English text, even in a Chinese interface.
-  assert.equal(nameFor(mapOf('東京の旅行'), 'zh-TW', ['A', 'B']), 'Synthesis: A, B');
-  assert.equal(nameFor(mapOf('x', { contentLanguage: 'en', outputLanguage: 'ja' }), 'zh-CN', names), 'Synthesis: A and others (4 topics)');
+  assert.equal(nameFor(mapOf('ありがとうございます東京'), 'zh-TW', ['A', 'B']), 'Synthesis: A, B');
+  assert.equal(nameFor({ ...mapOf('x'), outputLanguage: 'ja' }, 'zh-CN', names), 'Synthesis: A and others (4 topics)');
+  // A Spanish map (follow-the-input row) and a remembered follow-the-input choice read English too.
+  assert.equal(nameFor(mapOf('Viaje a Tokio'), 'zh-TW', ['A', 'B']), 'Synthesis: A, B');
+  assert.equal(nameFor({ ...mapOf('東京五天自由行'), outputLanguage: 'same-as-input' }, 'zh-TW', ['A']), 'Synthesis: A');
   // The map decides, not the interface: an English map in a zh-TW interface is English.
   assert.equal(nameFor(mapOf('Trip to Tokyo'), 'zh-CN', ['A']), 'Synthesis: A');
 });
@@ -50,8 +53,11 @@ test('synthesis default name stays short: more than two names show the first nam
 test('title language: a note title reads as its own registry language, signal-free text uses the fallback', () => {
   assert.equal(textLanguageOf('路線', 'en'), 'zh-TW');
   assert.equal(textLanguageOf('Route', 'zh-TW'), 'en');
-  assert.equal(textLanguageOf('東京の旅行', 'zh-TW'), 'en');
+  assert.equal(textLanguageOf('ありがとうございます東京', 'zh-TW'), 'en');
   assert.equal(textLanguageOf('2026', 'zh-CN'), 'zh-CN');
+  // The follow-the-input row (Latin or Cyrillic text) has no dictionary: English fixed text.
+  assert.equal(textLanguageOf('Ruta de viaje', 'zh-TW'), 'en');
+  assert.equal(textLanguageOf('Маршрут', 'zh-CN'), 'en');
 });
 
 async function copyOf(ui, mapTitle, noteTitle, aim) {
@@ -69,7 +75,7 @@ test('Copy-to suffix is note text (zh-CN reads zh-TW) and follows the source not
   assert.equal(await copyOf('en', 'Travel', 'Route'), 'Route copy.md');
   assert.equal(await copyOf('zh-TW', 'Travel', 'Route'), 'Route copy.md', 'English title in a Chinese interface');
   assert.equal(await copyOf('en', 'Travel', '路線'), '路線 副本.md', 'Chinese title in an English interface');
-  assert.equal(await copyOf('zh-TW', '東京の旅行', '東京の旅行'), '東京の旅行 copy.md', 'ja title: output-only reads English');
+  assert.equal(await copyOf('zh-TW', 'ありがとうございます東京', 'ありがとうございます東京'), 'ありがとうございます東京 copy.md', 'ja title: output-only reads English');
   assert.equal(await copyOf('zh-TW', '旅行', '2026'), '2026 副本.md', 'no signal: the map language');
   assert.equal(await copyOf('en', 'Travel', '2026'), '2026 copy.md');
 });
@@ -80,7 +86,7 @@ test('image-translate menu lists the output-only languages in their own group an
   const { LANGUAGES, OUTPUT_LANGUAGES } = load('i18n/languages.ts');
   const choices = imageLanguageChoices();
   assert.deepEqual([...choices.registry.map(item => item.id)], [...LANGUAGES.map(item => item.id)]);
-  assert.deepEqual([...choices.outputOnly.map(item => item.id)], [...OUTPUT_LANGUAGES.map(item => item.id)]);
+  assert.deepEqual([...choices.outputOnly.map(item => item.id)], [...OUTPUT_LANGUAGES.filter(item => !item.followsInput).map(item => item.id)]);
   assert.ok(choices.outputOnly.length > 0 && !choices.outputOnly.some(item => item.id.includes('same')), 'no follow-input row');
   assert.ok(choices.outputOnly.every(item => item.label && item.name));
   for (const id of [...choices.registry, ...choices.outputOnly].map(item => item.id)) {

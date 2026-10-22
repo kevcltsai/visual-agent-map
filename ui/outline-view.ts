@@ -1,11 +1,13 @@
 import { ItemView, Notice, WorkspaceLeaf } from "obsidian";
 import { t } from "../i18n";
+import { toSimplifiedFold } from "../i18n/han-fold";
 import type { MapDocument, MapNode } from "../map-model";
 import type { CoffeeNavigationSnapshot } from "../experiences/coffee-tables/segments";
 
 export const OUTLINE_VIEW_TYPE = "visual-agent-map-outline";
-/** Lower-case for outline search; U+0307 is dropped so Turkish "İ" (which lowercases to "i" + a combining dot) finds "i". */
-export const foldOutlineSearch = (text: string): string => text.toLocaleLowerCase().replace(/\u0307/g, "");
+/** Lower-case for outline search; U+0307 is dropped so Turkish "İ" (which lowercases to "i" + a combining dot) finds "i". Traditional Chinese folds to Simplified so 图 finds 圖 and vice versa. */
+export const foldOutlineSearch = (text: string): string =>
+  toSimplifiedFold(text.toLocaleLowerCase().replace(/\u0307/g, ""));
 export class OutlineView extends ItemView {
   private map: MapDocument | null = null;
   private titles = new Map<string, string>();

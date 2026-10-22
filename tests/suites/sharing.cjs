@@ -135,9 +135,8 @@ test('sharing: code is left untouched', () => {
 test('sharing: leak scan passes the cleaned fixture payload', () => {
   const { notesById, models } = cleanedNotes();
   const payload = format.buildSharePayload(fixtureMap(), notesById, options());
-  const html = `<html><script type="application/json" id="vam-map">${format.serializeShareJson(payload)}</script></html>`;
   const forbidden = scan.forbiddenStringsFor({ vaultPath: '/Users/someone/Vault One', vaultName: 'Vault One', mapFolder: 'Private Vault Folder/Share Map' }, fixtureMap(), models);
-  assert.deepEqual(plain(scan.scanForLeaks(html, forbidden)), []);
+  assert.deepEqual(plain(scan.scanPayloadForLeaks(payload, forbidden)), []);
 });
 
 test('sharing: leak scan blocks every forbidden category and reports category and position only', () => {
@@ -145,7 +144,6 @@ test('sharing: leak scan blocks every forbidden category and reports category an
   const forbidden = scan.forbiddenStringsFor({ vaultPath: '/Users/someone/Vault One', vaultName: 'Vault One', mapFolder: 'Private Vault Folder/Share Map' }, map, [{ model: 'claude:sonnet-secret' }, {}]);
   const cases = {
     'vault-path': '/Users/someone/Vault One/x',
-    'vault-name': 'in Vault One',
     'map-folder': 'Private Vault Folder/Share Map',
     'note-path': 'Private Vault Folder/Share Map/Notes/Rich.md',
     wikilink: 'see [[Private]]',
@@ -162,7 +160,8 @@ test('sharing: leak scan blocks every forbidden category and reports category an
   }
   assert.ok(scan.scanForLeaks('source-notes: x', forbidden).some(h => h.category === 'internal-field'));
   assert.equal(scan.scanForLeaks('<p>nothing private</p>', forbidden).length, 0);
-  assert.equal(scan.scanForLeaks('x', [{ category: 'vault-name', value: '' }]).length, 0);
+  assert.equal(scan.scanForLeaks('x', [{ category: 'wikilink', value: '' }]).length, 0);
+  assert.equal(forbidden.some(item => item.value === 'Vault One' && item.category !== 'vault-path'), false, 'a vault name alone is not scanned');
 });
 
 test('sharing: leak scan catches a field deliberately left in the payload', () => {
@@ -189,4 +188,76 @@ test('sharing: size classes and image fitting', () => {
   assert.deepEqual(plain(format.fitWithin(1000, 4000)), { width: 400, height: 1600 });
   assert.deepEqual(plain(format.fitWithin(10000, 1)), { width: 1600, height: 1 });
   assert.throws(() => format.fitWithin(0, 10), /Image dimensions/);
+});
+
+// D-2026-10-107/108: only a `[[` inside well-formed code is allowed; every other category looks at all text, code included.
+const leakForbidden = () => scan.forbiddenStringsFor({ vaultPath: '/Users/someone/Vault One', mapFolder: 'Private Vault Folder/Share Map' }, fixtureMap(), [{ model: 'claude:sonnet-secret' }]);
+const payloadWith = fields => {
+  const payload = format.buildSharePayload(fixtureMap(), {}, options());
+  Object.assign(payload.nodes[0], fields);
+  return payload;
+};
+const leakCategories = fields => new Set(scan.scanPayloadForLeaks(payloadWith(fields), leakForbidden()).map(hit => hit.category));
+const notePath = () => fixtureMap().nodes[0].path;
+
+test('sharing leak: [[ inside fenced code, inline code, mermaid and <pre>/<code> is allowed', () => {
+  assert.equal(leakCategories({ detail: 'x\n```js\nconst a = [[1,[2]]];\n```\ny `[[z]]` w\n~~~\nA[[x]]\n~~~' }).size, 0);
+  assert.equal(leakCategories({ detailHtml: '<pre><code>[[1,[2]]]</code></pre><p>a <code>A[[x]]</code></p>' }).size, 0);
+});
+
+test('sharing leak: [[ outside code is blocked, including next to code in the same field', () => {
+  assert.ok(leakCategories({ detail: 'see [[私人]]' }).has('wikilink'));
+  assert.ok(leakCategories({ detail: '`[[x]]` and [[y]]' }).has('wikilink'));
+  assert.ok(leakCategories({ detailHtml: '<code>[[x]]</code> [[y]]' }).has('wikilink'));
+  assert.ok(leakCategories({ summary: '`[[x]]`' }).has('wikilink'), 'only detail and detailHtml are code-aware');
+  assert.ok(leakCategories({ title: '[[x]]' }).has('wikilink'));
+});
+
+test('sharing leak: vault path and note path inside code are still blocked', () => {
+  assert.ok(leakCategories({ detail: '```\n/Users/someone/Vault One/x\n```' }).has('vault-path'));
+  assert.ok(leakCategories({ detail: '```\n' + notePath() + '\n```' }).has('note-path'));
+  assert.ok(leakCategories({ detail: 'a `' + notePath() + '` b' }).has('note-path'));
+  assert.ok(leakCategories({ detailHtml: '<pre>' + notePath() + '</pre>' }).has('note-path'));
+  assert.ok(leakCategories({ detailHtml: '<code>' + notePath() + '</code>' }).has('note-path'));
+  assert.ok(leakCategories({ detailHtml: '<pre>/Users/someone/Vault One/x</pre>' }).has('vault-path'));
+});
+
+test('sharing leak: unclosed or unpaired code never hides what follows', () => {
+  assert.ok(leakCategories({ detail: '```js\nconst a = 1;\n[[y]]' }).has('wikilink'), 'unclosed fence');
+  assert.ok(leakCategories({ detail: '~~~\n[[y]]' }).has('wikilink'), 'unclosed tilde fence');
+  assert.ok(leakCategories({ detail: '```\ncode\n~~~\n[[y]]' }).has('wikilink'), 'mismatched fence characters');
+  assert.ok(leakCategories({ detail: '````\ncode\n```\n[[y]]' }).has('wikilink'), 'shorter closing fence');
+  assert.ok(leakCategories({ detail: 'a ` b\n\n[[y]] `' }).has('wikilink'), 'backticks do not pair across paragraphs');
+  assert.ok(leakCategories({ detail: 'a ` b [[y]]' }).has('wikilink'), 'single unpaired backtick');
+  assert.ok(leakCategories({ detail: '`` a ` [[y]]' }).has('wikilink'), 'unequal backtick runs');
+  assert.ok(leakCategories({ detail: '```\n' + notePath() }).has('note-path'));
+  assert.equal(scan.stripMarkdownCode('a\n```\nb\n```\nc'), 'a\n \nc');
+});
+
+test('sharing leak: HTML code stripping is conservative about tag shape', () => {
+  assert.ok(leakCategories({ detailHtml: '<pre\nclass="x">[[ok]]</pre> [[y]]' }).has('wikilink') && !leakCategories({ detailHtml: '<pre\nclass="x">[[ok]]</pre>' }).has('wikilink'), 'attribute variant is code');
+  assert.equal(leakCategories({ detailHtml: '<CODE>[[ok]]</CODE>' }).size, 0);
+  assert.ok(leakCategories({ detailHtml: '<code>[[ok]]</code><code>x [[y]]' }).has('wikilink'), 'unclosed code');
+  assert.ok(leakCategories({ detailHtml: '<code><code>a</code> [[y]]</code>' }).has('wikilink'), 'nested code: text after the first close is not code');
+  assert.ok(leakCategories({ detailHtml: '<pre><code>a</code> [[y]]' }).has('wikilink'), 'unclosed pre');
+  assert.ok(leakCategories({ detailHtml: '<preview>[[y]]</preview>' }).has('wikilink'), '<preview> is not <pre>');
+  assert.ok(leakCategories({ detailHtml: '<codex>[[y]]</codex>' }).has('wikilink'));
+});
+
+test('sharing leak: URL schemes, internal fields and model names inside code are still blocked', () => {
+  const cases = { 'obsidian-url': 'obsidian://open', 'app-url': 'app://x/y.png', 'file-url': 'file:///etc/passwd', 'internal-field': 'source-notes', 'model-name': 'claude:sonnet-secret' };
+  for (const [category, text] of Object.entries(cases)) {
+    assert.ok(leakCategories({ detail: '```\n' + text + '\n```' }).has(category), `${category} in fenced code`);
+    assert.ok(leakCategories({ detail: '`' + text + '`' }).has(category), `${category} in inline code`);
+    assert.ok(leakCategories({ detailHtml: '<pre><code>' + text + '</code></pre>' }).has(category), `${category} in pre/code`);
+  }
+});
+
+test('sharing leak: scanPayloadForLeaks reports category and position only and covers asset names and values', () => {
+  const payload = payloadWith({});
+  payload.assets['obsidian://x'] = 'data:image/webp;base64,AAAA';
+  payload.title = 'ok';
+  const hits = scan.scanPayloadForLeaks(payload, leakForbidden());
+  assert.ok(hits.some(hit => hit.category === 'obsidian-url'));
+  for (const hit of hits) assert.deepEqual(plain(Object.keys(hit).sort()), ['category', 'index']);
 });

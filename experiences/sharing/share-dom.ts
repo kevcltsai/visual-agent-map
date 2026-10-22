@@ -253,10 +253,13 @@ export function unwrapLocalLinks(root: Element, createSpan: () => Element): numb
   return count;
 }
 
-/** The sources of the ```mermaid fences in a Markdown text, in document order (used to restore a diagram that did not render). */
-export function extractMermaidSources(markdown: string): string[] {
-  const sources: string[] = [];
-  const pattern = /^ {0,3}(`{3,}|~{3,})[ \t]*mermaid[^\n]*\n([\s\S]*?)^ {0,3}\1[`~]*[ \t]*$/gm;
-  for (const match of markdown.matchAll(pattern)) sources.push(match[2].replace(/\n$/, ""));
-  return sources;
+/**
+ * The source to show under a diagram that did not draw. Candidates come from that diagram's own DOM, in preference
+ * order; the first non-blank one wins. Never pass Markdown text here: the renderer hides fences inside `%%` and
+ * `<!-- -->`, so a Markdown index does not line up with the DOM (D-2026-10-110: the final content is the DOM).
+ * Returns "" when the DOM carries no source: the caller then shows only the explanatory note.
+ */
+export function pickMermaidFallbackSource(candidates: ReadonlyArray<string | null | undefined>): string {
+  for (const text of candidates) if (text && text.trim()) return text.replace(/\n$/, "");
+  return "";
 }

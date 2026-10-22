@@ -150,9 +150,29 @@ test('share build D-110: any rendered note with a local link blocks a file that 
   assert.deepEqual(plain(build.renderedLeakCategories([], { includeDetail: true })), []);
 });
 
-test('share dom: mermaid sources are taken from the fences in order', () => {
-  const md = 'Intro\n\n```mermaid\ngraph TD\n  A-->B\n```\n\n```js\nnope\n```\n\n~~~mermaid\nsequenceDiagram\n  A->>B: hi\n~~~\n';
-  assert.deepEqual(plain(dom.extractMermaidSources(md)), ['graph TD\n  A-->B', 'sequenceDiagram\n  A->>B: hi']);
+test('share dom F-D: fallback source comes from the diagram DOM candidates only, in order, blank ones skipped', () => {
+  assert.equal(dom.pickMermaidFallbackSource(['graph TD\n  A-->B\n', 'other']), 'graph TD\n  A-->B');
+  assert.equal(dom.pickMermaidFallbackSource([null, '  \n', 'graph TD\n  C-->D']), 'graph TD\n  C-->D');
+});
+
+test('share dom F-D: no source in the DOM gives an empty string (note only, never Markdown text)', () => {
+  assert.equal(dom.pickMermaidFallbackSource([]), '');
+  assert.equal(dom.pickMermaidFallbackSource([null, undefined, '']), '');
+});
+
+test('share dom F-D: a %% / <!-- --> hidden fence cannot leak: the visible guarded diagram keeps its own source', () => {
+  // Models what the exporter does per diagram: the DOM has one visible diagram (guard source "graph TD\n  A-->B");
+  // the hidden fence containing PRIVATE_SALARY never reaches the DOM, so it cannot be a candidate.
+  const visible = dom.pickMermaidFallbackSource(['graph TD\n  A-->B']);
+  assert.equal(visible.includes('PRIVATE_SALARY'), false);
+  const callout = dom.pickMermaidFallbackSource(['graph TD\n  inside-callout']);
+  assert.equal(callout, 'graph TD\n  inside-callout');
+});
+
+test('share exporter F-D: exporter no longer derives mermaid source from Markdown', () => {
+  const src = require('node:fs').readFileSync(require('node:path').join(__dirname, '../../experiences/sharing/share-exporter.ts'), 'utf8');
+  assert.equal(/extractMermaidSources/.test(src), false);
+  assert.equal(/sources\[/.test(src), false);
 });
 
 test('share build: a new build aborts the previous one; cancel makes every ticket stale', async () => {

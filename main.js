@@ -42834,11 +42834,9 @@ function unwrapLocalLinks(root, createSpan2) {
   visit(root);
   return count;
 }
-function extractMermaidSources(markdown) {
-  const sources2 = [];
-  const pattern = /^ {0,3}(`{3,}|~{3,})[ \t]*mermaid[^\n]*\n([\s\S]*?)^ {0,3}\1[`~]*[ \t]*$/gm;
-  for (const match of markdown.matchAll(pattern)) sources2.push(match[2].replace(/\n$/, ""));
-  return sources2;
+function pickMermaidFallbackSource(candidates) {
+  for (const text11 of candidates) if (text11 && text11.trim()) return text11.replace(/\n$/, "");
+  return "";
 }
 
 // experiences/sharing/viewer-bundle.generated.ts
@@ -43153,7 +43151,7 @@ var ShareExporter = class {
       await import_obsidian32.MarkdownRenderer.render(this.app, cleaned.markdown, host, "", child);
       assertCurrent(ticket);
       await this.settleMermaid(host, ticket);
-      const finished = this.finish(host, cleaned.markdown);
+      const finished = this.finish(host);
       const used = new Set(assetNamesInHtml(finished.html));
       return {
         html: finished.html,
@@ -43179,16 +43177,15 @@ var ShareExporter = class {
     }
   }
   /** Mermaid out, sanitize, scrub, mermaid back in. See share-dom.ts for why the diagrams take this detour. */
-  finish(host, markdown) {
+  finish(host) {
     var _a2;
     const localRefs = countLocalReferences(host);
-    const sources2 = extractMermaidSources(markdown);
     const diagrams = [];
     let undrawn = 0;
     let blocked = 0;
     const note = (key2) => translate(this.config.language, key2);
-    topLevelMermaid(host).forEach((unit, index) => {
-      var _a3, _b2, _c;
+    topLevelMermaid(host).forEach((unit) => {
+      var _a3, _b2;
       const svg = drawnSvg(unit);
       if (svg) {
         const copy = svg.cloneNode(true);
@@ -43200,21 +43197,27 @@ var ShareExporter = class {
           return;
         }
       }
-      const guardSource = (_b2 = (_a3 = unit.querySelector(".mermaid-guard-source code")) == null ? void 0 : _a3.textContent) != null ? _b2 : "";
-      const code = (_c = sources2[index]) != null ? _c : guardSource;
+      const code = pickMermaidFallbackSource([
+        (_a3 = unit.querySelector(".mermaid-guard-source code")) == null ? void 0 : _a3.textContent,
+        unit.matches("code.language-mermaid") ? unit.textContent : (_b2 = unit.querySelector("pre > code.language-mermaid")) == null ? void 0 : _b2.textContent,
+        unit.matches(".mermaid") && !unit.children.length ? unit.textContent : null
+      ]);
       const wasBlocked = isBlocked(unit);
       if (wasBlocked) blocked++;
       else undrawn++;
       const fallback = createDiv();
-      const pre = createEl("pre");
-      const codeEl = createEl("code");
-      codeEl.className = "language-mermaid";
-      codeEl.textContent = code;
-      pre.append(codeEl);
+      if (code) {
+        const pre = createEl("pre");
+        const codeEl = createEl("code");
+        codeEl.className = "language-mermaid";
+        codeEl.textContent = code;
+        pre.append(codeEl);
+        fallback.append(pre);
+      }
       const caption = createEl("p");
       caption.className = "vam-mermaid-note";
       caption.textContent = note(wasBlocked ? "share.mermaid_blocked_note" : "share.mermaid_undrawn_note");
-      fallback.append(pre, caption);
+      fallback.append(caption);
       unit.replaceWith(fallback);
     });
     for (const pre of Array.from(host.querySelectorAll("pre")))

@@ -16,7 +16,7 @@ import {
 } from "./share-build";
 import {
   countLocalReferences,
-  extractMermaidSources,
+  pickMermaidFallbackSource,
   scrubMermaidSvg,
   scrubShareTree,
   unwrapLocalLinks
@@ -257,7 +257,7 @@ export class ShareExporter {
       await MarkdownRenderer.render(this.app, cleaned.markdown, host, "", child);
       assertCurrent(ticket);
       await this.settleMermaid(host, ticket);
-      const finished = this.finish(host, cleaned.markdown);
+      const finished = this.finish(host);
       const used = new Set(assetNamesInHtml(finished.html));
       return {
         html: finished.html,
@@ -285,19 +285,15 @@ export class ShareExporter {
   }
 
   /** Mermaid out, sanitize, scrub, mermaid back in. See share-dom.ts for why the diagrams take this detour. */
-  private finish(
-    host: HTMLElement,
-    markdown: string
-  ): { html: string; undrawn: number; blocked: number; localRefs: number } {
+  private finish(host: HTMLElement): { html: string; undrawn: number; blocked: number; localRefs: number } {
     // The privacy decision about note links: count on the renderer's own output, before anything is rewritten.
     const localRefs = countLocalReferences(host);
-    const sources = extractMermaidSources(markdown);
     const diagrams: Element[] = [];
     let undrawn = 0;
     let blocked = 0;
     const note = (key: "share.mermaid_blocked_note" | "share.mermaid_undrawn_note"): string =>
       translate(this.config.language, key);
-    topLevelMermaid(host).forEach((unit, index) => {
+    topLevelMermaid(host).forEach(unit => {
       const svg = drawnSvg(unit);
       if (svg) {
         const copy = svg.cloneNode(true) as SVGSVGElement;
@@ -309,21 +305,30 @@ export class ShareExporter {
           return;
         }
       }
-      const guardSource = unit.querySelector(".mermaid-guard-source code")?.textContent ?? "";
-      const code = sources[index] ?? guardSource;
+      // The source comes from this diagram's own DOM, never from the Markdown (hidden fences would misalign).
+      const code = pickMermaidFallbackSource([
+        unit.querySelector(".mermaid-guard-source code")?.textContent,
+        unit.matches("code.language-mermaid")
+          ? unit.textContent
+          : unit.querySelector("pre > code.language-mermaid")?.textContent,
+        unit.matches(".mermaid") && !unit.children.length ? unit.textContent : null
+      ]);
       const wasBlocked = isBlocked(unit);
       if (wasBlocked) blocked++;
       else undrawn++;
       const fallback = createDiv();
-      const pre = createEl("pre");
-      const codeEl = createEl("code");
-      codeEl.className = "language-mermaid";
-      codeEl.textContent = code;
-      pre.append(codeEl);
+      if (code) {
+        const pre = createEl("pre");
+        const codeEl = createEl("code");
+        codeEl.className = "language-mermaid";
+        codeEl.textContent = code;
+        pre.append(codeEl);
+        fallback.append(pre);
+      }
       const caption = createEl("p");
       caption.className = "vam-mermaid-note";
       caption.textContent = note(wasBlocked ? "share.mermaid_blocked_note" : "share.mermaid_undrawn_note");
-      fallback.append(pre, caption);
+      fallback.append(caption);
       unit.replaceWith(fallback);
     });
     // A code block still waiting for the renderer when time ran out.

@@ -1,5 +1,6 @@
 import { App, Modal } from "obsidian";
 import { t } from "../../i18n";
+import { titleProblemText } from "./title-check";
 import { actionStatus, modalActions } from "./action-bar";
 
 export class NameModal extends Modal {
@@ -21,15 +22,16 @@ export class NameModal extends Modal {
     const saveButton = actions.createEl("button", { text: t("ui.save"), cls: "mod-cta" });
     const save = (): void => {
       const value = input.value.trim();
-      if (!value) return;
+      if (!value || titleProblemText(value)) return;
       this.close();
       this.submit(value);
     };
     // An empty name cannot be saved; say so instead of ignoring the press.
     const check = (): void => {
       const empty = !input.value.trim();
-      saveButton.disabled = empty;
-      status.setText(empty ? t("ui.name_required") : "");
+      const problem = empty ? "" : titleProblemText(input.value);
+      saveButton.disabled = empty || !!problem;
+      status.setText(empty ? t("ui.name_required") : problem);
     };
     input.addEventListener("input", check);
     input.addEventListener("keydown", event => {

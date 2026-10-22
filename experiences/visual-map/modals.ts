@@ -49,6 +49,7 @@ import {
 } from "./research-fields";
 import { DetailTemplatesModal } from "../../ui/modals/detail-templates-modal";
 import { builtinTemplates } from "../../ai/detail-templates";
+import { titleProblemText } from "../../ui/modals/title-check";
 
 export { researchDepthDescription };
 
@@ -1372,12 +1373,13 @@ export class NextStepModal extends Modal {
     };
     // The result is written by the view (no draft review step); the dialog has nothing left to show.
     const flow = { directions: showDirections, written: () => this.close() };
-    const needsName = (): boolean => !!titleInput && !titleInput.value.trim();
+    const nameProblem = (): string => (titleInput ? titleProblemText(titleInput.value) : "");
+    const needsName = (): boolean => !!titleInput && (!titleInput.value.trim() || !!nameProblem());
     const checkName = (): void => {
       if (!titleInput || stage !== "setup") return;
       const missing = needsName();
       suggestButton.disabled = skipButton.disabled = missing || !!this.modelSettings?.running;
-      synthStatus.setText(missing ? t("ui.synthesis_needs_name") : "");
+      synthStatus.setText(missing ? nameProblem() || t("ui.synthesis_needs_name") : "");
     };
     titleInput?.addEventListener("input", checkName);
     // Setup and draft options: the setup step reads every field; the draft step reads only the extra requirements.
@@ -1421,7 +1423,7 @@ export class NextStepModal extends Modal {
     });
     const guard = (): boolean => {
       if (!needsName()) return true;
-      synthStatus.setText(t("ui.synthesis_needs_name"));
+      synthStatus.setText(nameProblem() || t("ui.synthesis_needs_name"));
       return false;
     };
     suggestButton.addEventListener("click", () => {

@@ -868,6 +868,8 @@ export const zhTW: Record<TranslationKey, string> = {
   "ui.conflict_merge_by_hand": "進階：手動合併 JSON",
   "ui.conflict_close_uses_file": "直接關閉視窗等同使用檔案內容。",
   "ui.name_required": "請輸入名稱才能儲存。",
+  "ui.title_problem_fence": "標題不能包含三個反引號（```），否則整份筆記會變成程式碼區塊。",
+  "ui.title_problem_brackets": "標題不能包含 [[ 或 ]]，否則會弄壞筆記的連結。",
   "ui.multi_research_start_0": "開始研究 {0} 個議題",
   "ui.topic_0": "議題：{0}",
   "ui.apply_parent": "套用",

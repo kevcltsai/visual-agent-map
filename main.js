@@ -919,6 +919,8 @@ var en = {
   "ui.conflict_merge_by_hand": "Advanced: merge the JSON by hand",
   "ui.conflict_close_uses_file": "Closing this window uses the file contents.",
   "ui.name_required": "Enter a name to save.",
+  "ui.title_problem_fence": "A title cannot contain three backticks (```); they would turn the note into a code block.",
+  "ui.title_problem_brackets": "A title cannot contain [[ or ]]; they would break the note's links.",
   "ui.multi_research_start_0": "Start research ({0})",
   "ui.topic_0": "Topic: {0}",
   "ui.apply_parent": "Apply",
@@ -2579,6 +2581,8 @@ var zhCN = {
   "ui.conflict_merge_by_hand": "\u9AD8\u7EA7\uFF1A\u624B\u52A8\u5408\u5E76 JSON",
   "ui.conflict_close_uses_file": "\u76F4\u63A5\u5173\u95ED\u7A97\u53E3\u7B49\u540C\u4F7F\u7528\u6587\u4EF6\u5185\u5BB9\u3002",
   "ui.name_required": "\u8BF7\u8F93\u5165\u540D\u79F0\u624D\u80FD\u4FDD\u5B58\u3002",
+  "ui.title_problem_fence": "\u6807\u9898\u4E0D\u80FD\u5305\u542B\u4E09\u4E2A\u53CD\u5F15\u53F7\uFF08```\uFF09\uFF0C\u5426\u5219\u6574\u4EFD\u7B14\u8BB0\u4F1A\u53D8\u6210\u4EE3\u7801\u5757\u3002",
+  "ui.title_problem_brackets": "\u6807\u9898\u4E0D\u80FD\u5305\u542B [[ \u6216 ]]\uFF0C\u5426\u5219\u4F1A\u5F04\u574F\u7B14\u8BB0\u7684\u94FE\u63A5\u3002",
   "ui.multi_research_start_0": "\u5F00\u59CB\u7814\u7A76 {0} \u4E2A\u8BAE\u9898",
   "ui.topic_0": "\u8BAE\u9898\uFF1A{0}",
   "ui.apply_parent": "\u5E94\u7528",
@@ -4239,6 +4243,8 @@ var zhTW = {
   "ui.conflict_merge_by_hand": "\u9032\u968E\uFF1A\u624B\u52D5\u5408\u4F75 JSON",
   "ui.conflict_close_uses_file": "\u76F4\u63A5\u95DC\u9589\u8996\u7A97\u7B49\u540C\u4F7F\u7528\u6A94\u6848\u5167\u5BB9\u3002",
   "ui.name_required": "\u8ACB\u8F38\u5165\u540D\u7A31\u624D\u80FD\u5132\u5B58\u3002",
+  "ui.title_problem_fence": "\u6A19\u984C\u4E0D\u80FD\u5305\u542B\u4E09\u500B\u53CD\u5F15\u865F\uFF08```\uFF09\uFF0C\u5426\u5247\u6574\u4EFD\u7B46\u8A18\u6703\u8B8A\u6210\u7A0B\u5F0F\u78BC\u5340\u584A\u3002",
+  "ui.title_problem_brackets": "\u6A19\u984C\u4E0D\u80FD\u5305\u542B [[ \u6216 ]]\uFF0C\u5426\u5247\u6703\u5F04\u58DE\u7B46\u8A18\u7684\u9023\u7D50\u3002",
   "ui.multi_research_start_0": "\u958B\u59CB\u7814\u7A76 {0} \u500B\u8B70\u984C",
   "ui.topic_0": "\u8B70\u984C\uFF1A{0}",
   "ui.apply_parent": "\u5957\u7528",
@@ -15985,6 +15991,28 @@ ${ordered.join("\n")}
 
 // ui/modals/name-modal.ts
 var import_obsidian11 = require("obsidian");
+
+// core/title-safety.ts
+function titleProblem(text11) {
+  if (text11.includes("```")) return "fence";
+  if (text11.includes("[[") || text11.includes("]]")) return "brackets";
+  return void 0;
+}
+function sanitizeGeneratedTitle(text11) {
+  let out = text11.replace(/`{3,}/g, "");
+  while (out.includes("[[") || out.includes("]]")) out = out.replace(/\[\[/g, "[").replace(/\]\]/g, "]");
+  return out;
+}
+
+// ui/modals/title-check.ts
+function titleProblemText(text11) {
+  const problem = titleProblem(text11);
+  if (problem === "fence") return t("ui.title_problem_fence");
+  if (problem === "brackets") return t("ui.title_problem_brackets");
+  return "";
+}
+
+// ui/modals/name-modal.ts
 var NameModal = class extends import_obsidian11.Modal {
   constructor(app, titleText, value, submit) {
     super(app);
@@ -16002,14 +16030,15 @@ var NameModal = class extends import_obsidian11.Modal {
     const saveButton = actions.createEl("button", { text: t("ui.save"), cls: "mod-cta" });
     const save = () => {
       const value = input.value.trim();
-      if (!value) return;
+      if (!value || titleProblemText(value)) return;
       this.close();
       this.submit(value);
     };
     const check = () => {
       const empty = !input.value.trim();
-      saveButton.disabled = empty;
-      status.setText(empty ? t("ui.name_required") : "");
+      const problem = empty ? "" : titleProblemText(input.value);
+      saveButton.disabled = empty || !!problem;
+      status.setText(empty ? t("ui.name_required") : problem);
     };
     input.addEventListener("input", check);
     input.addEventListener("keydown", (event) => {
@@ -19825,7 +19854,7 @@ async function createAimMap(repository, model, input) {
   if (!mapPath) {
     const minimumAnswersBeforeConclusion = (_d = input.minimumAnswersBeforeConclusion) != null ? _d : 3;
     mapPath = await repository.createMap(
-      topic,
+      sanitizeGeneratedTitle(topic) || topic,
       [],
       void 0,
       {
@@ -20112,7 +20141,7 @@ async function createOutlineNotes(repository, map, mapPath, model, nodes, rootDe
     try {
       const top = node.parent === null;
       const note = await repository.createNote(
-        node.title,
+        sanitizeGeneratedTitle(node.title) || node.title,
         model,
         map,
         mapPath,
@@ -20136,7 +20165,7 @@ async function createOutlineMap(repository, model, nodes, source, now = /* @__PU
   const language2 = repository.settings.language;
   const detailTemplate = template != null ? template : standardTemplate(noteLanguageOf(language2));
   if (!nodes.length) throw new Error(translate(language2, "ui.outline_error_no_headings"));
-  const mapPath = await repository.createMap(nodes[0].title, []);
+  const mapPath = await repository.createMap(sanitizeGeneratedTitle(nodes[0].title) || nodes[0].title, []);
   let map;
   try {
     map = await repository.readMap(mapPath);
@@ -23083,13 +23112,14 @@ var NextStepModal = class extends import_obsidian21.Modal {
       warmForMode();
     };
     const flow = { directions: showDirections, written: () => this.close() };
-    const needsName = () => !!titleInput && !titleInput.value.trim();
+    const nameProblem = () => titleInput ? titleProblemText(titleInput.value) : "";
+    const needsName = () => !!titleInput && (!titleInput.value.trim() || !!nameProblem());
     const checkName = () => {
       var _a3;
       if (!titleInput || stage !== "setup") return;
       const missing = needsName();
       suggestButton.disabled = skipButton.disabled = missing || !!((_a3 = this.modelSettings) == null ? void 0 : _a3.running);
-      synthStatus.setText(missing ? t("ui.synthesis_needs_name") : "");
+      synthStatus.setText(missing ? nameProblem() || t("ui.synthesis_needs_name") : "");
     };
     titleInput == null ? void 0 : titleInput.addEventListener("input", checkName);
     const setupOptions = async (signal) => {
@@ -23133,7 +23163,7 @@ var NextStepModal = class extends import_obsidian21.Modal {
     });
     const guard = () => {
       if (!needsName()) return true;
-      synthStatus.setText(t("ui.synthesis_needs_name"));
+      synthStatus.setText(nameProblem() || t("ui.synthesis_needs_name"));
       return false;
     };
     suggestButton.addEventListener("click", () => {
@@ -24712,6 +24742,12 @@ var AimStartModal = class extends import_obsidian24.Modal {
           if (pending || refreshingModels) return;
           if (!topic.value.trim()) {
             status.setText(t("ui.aim_topic_required"));
+            topic.focus();
+            return;
+          }
+          const topicProblem = titleProblemText(topic.value);
+          if (topicProblem) {
+            status.setText(topicProblem);
             topic.focus();
             return;
           }
@@ -30983,9 +31019,9 @@ function resolveMergeModel(parentModel, workspaceModel) {
 var MERGE_TITLE_MAX = 60;
 function mergeTitleFromResult(result, fallback) {
   var _a2, _b2, _c;
-  const raw = ((_c = (_b2 = (_a2 = result.suggestions) == null ? void 0 : _a2[0]) == null ? void 0 : _b2.title) != null ? _c : "").replace(/\s+/g, " ").trim();
+  const raw = sanitizeGeneratedTitle((_c = (_b2 = (_a2 = result.suggestions) == null ? void 0 : _a2[0]) == null ? void 0 : _b2.title) != null ? _c : "").replace(/\s+/g, " ").trim();
   const name = raw.replace(/^["'“”‘’「」『』]+|["'“”‘’「」『』]+$/g, "").trim();
-  return name && name.length <= MERGE_TITLE_MAX ? name : fallback;
+  return name && name.length <= MERGE_TITLE_MAX ? name : sanitizeGeneratedTitle(fallback);
 }
 var MergeTopicsModal = class extends import_obsidian28.Modal {
   constructor(app, count, value, submit, cancelled2 = () => {
@@ -31038,6 +31074,7 @@ var MergeTopicsModal = class extends import_obsidian28.Modal {
     const save = () => {
       const value = input.value.trim();
       if (!value && !useAi() || pending) return;
+      if (!useAi() && titleProblemText(value)) return;
       if (useAi() && this.ai) {
         pending = true;
         confirm.disabled = true;
@@ -31060,8 +31097,9 @@ var MergeTopicsModal = class extends import_obsidian28.Modal {
     };
     const check = () => {
       const empty = !useAi() && !input.value.trim();
-      confirm.disabled = empty || pending;
-      if (!pending) status.setText(empty ? t("ui.name_required") : "");
+      const problem = !useAi() && !empty ? titleProblemText(input.value) : "";
+      confirm.disabled = empty || !!problem || pending;
+      if (!pending) status.setText(empty ? t("ui.name_required") : problem);
     };
     skipAi == null ? void 0 : skipAi.addEventListener("change", () => {
       confirm.setText(useAi() ? t("ui.merge_with_ai") : t("ui.merge_confirm"));
@@ -34816,7 +34854,7 @@ ${request.requirements}` : preset.text,
     }
     const model = (_b2 = content == null ? void 0 : content.task.model) != null ? _b2 : await this.mergeModel(check.parentId);
     const created = await repo.createNote(
-      title,
+      sanitizeGeneratedTitle(title),
       model,
       before,
       mapPath,
@@ -37851,7 +37889,7 @@ ${request.requirements}` : preset.text,
   }
   /** `focus` false leaves the camera to the caller (a batch frames the whole branch once it is laid out). */
   async addNode(parentNode, suggestedTitle, rebuildDerivedData = true, focus = true) {
-    var _a2, _b2, _c, _d, _e, _f;
+    var _a2, _b2, _c, _d, _e, _f, _g;
     if (!this.map) return;
     const parent = parentNode && this.map.nodes.find((item) => item.id === parentNode.id) || parentNode;
     if (!(suggestedTitle == null ? void 0 : suggestedTitle.trim())) {
@@ -37872,19 +37910,19 @@ ${request.requirements}` : preset.text,
       return;
     }
     const node = await this.plugin.repo.createNote(
-      (suggestedTitle == null ? void 0 : suggestedTitle.trim()) || (parent ? t("ui.new_subtopic") : t("ui.my_core_topic")),
+      sanitizeGeneratedTitle((_b2 = suggestedTitle == null ? void 0 : suggestedTitle.trim()) != null ? _b2 : "").trim() || (parent ? t("ui.new_subtopic") : t("ui.my_core_topic")),
       model,
       this.map,
       this.path,
       parent ? "inherited" : "workspace"
     );
     if (parent) {
-      const parentNote = await this.plugin.repo.readNote(parent.path, (_b2 = this.map) != null ? _b2 : void 0);
+      const parentNote = await this.plugin.repo.readNote(parent.path, (_c = this.map) != null ? _c : void 0);
       await this.plugin.repo.updateNote(node.path, { reasoning: parentNote.reasoning });
     }
-    node.parentId = (_c = parent == null ? void 0 : parent.id) != null ? _c : null;
+    node.parentId = (_d = parent == null ? void 0 : parent.id) != null ? _d : null;
     node.x = parent ? parent.x + 340 : 80;
-    node.y = (_d = parent == null ? void 0 : parent.y) != null ? _d : 80;
+    node.y = (_e = parent == null ? void 0 : parent.y) != null ? _e : 80;
     this.notes.set(
       node.id,
       await this.plugin.repo.readNote(node.path, { ...this.map, nodes: [...this.map.nodes, node] })
@@ -37914,7 +37952,7 @@ ${request.requirements}` : preset.text,
     if (done) this.parkOnUndo(node.id, done.before, done.after, previousEntry);
     if (!focus) return;
     if (this.map) this.map.viewport.zoom = Math.max(this.map.viewport.zoom, 0.7);
-    this.focusNode((_f = (_e = this.map) == null ? void 0 : _e.nodes.find((n) => n.id === node.id)) != null ? _f : node);
+    this.focusNode((_g = (_f = this.map) == null ? void 0 : _f.nodes.find((n) => n.id === node.id)) != null ? _g : node);
   }
   async proposeChildren(parent, options, direction = "", found, failed, acceptedCallback) {
     var _a2, _b2, _c, _d, _e, _f, _g, _h, _i, _j, _k;
@@ -39481,7 +39519,13 @@ ${note.detail.trim()}` : "",
       return !((_a3 = this.map) == null ? void 0 : _a3.nodes.some((node) => node.id === source.id && node.path === source.path));
     }))
       throw new Error(t("ui.the_topic_changed_the_synthesis_draft_was_not_saved"));
-    const integrated = await this.plugin.repo.createNote(title, model, this.map, this.path, "workspace");
+    const integrated = await this.plugin.repo.createNote(
+      sanitizeGeneratedTitle(title),
+      model,
+      this.map,
+      this.path,
+      "workspace"
+    );
     const detailTemplate = this.mapDetailTemplate(language2, task.options.detailTemplateId);
     try {
       await this.plugin.repo.updateNote(
@@ -45004,7 +45048,11 @@ async function receiveVisualMapHandoff(artifact, options) {
     await options.mutate(async () => {
       var _a2, _b2, _c, _d, _e;
       await ((_a2 = options.beforeWrite) == null ? void 0 : _a2.call(options));
-      targetPath = await options.repo.createMap(artifact.title.trim(), [], (folder) => record(folder.path));
+      targetPath = await options.repo.createMap(
+        sanitizeGeneratedTitle(artifact.title.trim()),
+        [],
+        (folder) => record(folder.path)
+      );
       record(targetPath);
       const map = await options.repo.readMap(targetPath);
       const model = typeof ((_b2 = artifact.metadata) == null ? void 0 : _b2.model) === "string" ? artifact.metadata.model : options.defaultModel();
@@ -45029,7 +45077,7 @@ async function receiveVisualMapHandoff(artifact, options) {
 ${artifact.sourceSnapshot || "No insight snapshot was supplied."}`
       ].join("\n\n");
       const node = await options.repo.createNote(
-        artifact.title.trim(),
+        sanitizeGeneratedTitle(artifact.title.trim()),
         model,
         map,
         targetPath,

@@ -1,3 +1,4 @@
+import { sanitizeGeneratedTitle } from "../../core/title-safety";
 import type { MapDocument, MapNode } from "../../map-model";
 import { safeName, type Repository } from "../../repository";
 import { arrangeMap } from "../../map-layout";
@@ -302,7 +303,7 @@ async function createOutlineNotes(
     try {
       const top = node.parent === null;
       const note = await repository.createNote(
-        node.title,
+        sanitizeGeneratedTitle(node.title) || node.title,
         model,
         map,
         mapPath,
@@ -336,7 +337,7 @@ export async function createOutlineMap(
   const language = repository.settings.language;
   const detailTemplate = template ?? standardTemplate(noteLanguageOf(language));
   if (!nodes.length) throw new Error(translate(language, "ui.outline_error_no_headings"));
-  const mapPath = await repository.createMap(nodes[0].title, []);
+  const mapPath = await repository.createMap(sanitizeGeneratedTitle(nodes[0].title) || nodes[0].title, []);
   let map;
   try {
     map = await repository.readMap(mapPath);

@@ -1,3 +1,4 @@
+import { sanitizeGeneratedTitle } from "../../core/title-safety";
 import type { MapDocument, MapNode } from "../../map-model";
 import type { Repository } from "../../repository";
 import { randomUUID } from "node:crypto";
@@ -52,7 +53,7 @@ export async function createAimMap(
   if (!mapPath) {
     const minimumAnswersBeforeConclusion = input.minimumAnswersBeforeConclusion ?? 3;
     mapPath = await repository.createMap(
-      topic,
+      sanitizeGeneratedTitle(topic) || topic,
       [],
       undefined,
       {

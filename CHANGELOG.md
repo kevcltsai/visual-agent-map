@@ -46,6 +46,7 @@ Synthesis and notes
 - A research note no longer keeps a copied footnote marker with no definition: it becomes the source note when exactly one reference note defines it, and is removed when several define it or when a reference note uses it without defining it. Your own earlier footnotes are never re-pointed.
 - Textbook-style notes with only the "no new information" placeholder under Evidence and sources now show just the source list, without the placeholder sentence.
 - The "Topic" link a note shows back to its map no longer breaks when the map title contains brackets, a pipe, backticks or line breaks: the link text is cleaned (the map title itself is unchanged).
+- A card or map title that contains three backticks (```), `[[` or `]]` is now refused with the reason shown beside the field (new card, rename, new map, rename map, synthesis name, merge name, AIM topic); your text is never rewritten and `#` is still allowed. Titles the AI writes (outline import, subtopics, structure suggestions, merge and synthesis names) have those sequences removed instead, so a title can no longer turn the note into a code block or break its links. Existing notes are not changed.
 
 Layout and undo
 - Undoing an outline import now takes every imported note out of the Notes folder in one step (parked in Unassigned, like a removed topic), and Redo puts them back at the same paths. No stray notes are left behind.

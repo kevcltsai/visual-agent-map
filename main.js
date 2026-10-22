@@ -14442,6 +14442,24 @@ function resolveAimNoteLanguage(map, uiLanguage) {
   return noteLanguageOf(resolveAimContentLanguage(map, uiLanguage));
 }
 
+// experiences/visual-map/map-text-language.ts
+function mapTextLanguage(language2) {
+  return isUiLanguage(language2) ? language2 : uiLocale(void 0);
+}
+function mapContentLanguage(map, uiLanguage) {
+  return resolveAimContentLanguage(map, uiLanguage);
+}
+function resolveMapTextLanguage(map, uiLanguage) {
+  return mapTextLanguage(mapContentLanguage(map, uiLanguage));
+}
+function textLanguageOf(text11, fallback) {
+  const detected = detectAimContentLanguage(text11);
+  return detected === void 0 ? fallback : mapTextLanguage(detected);
+}
+function synthesisDefaultName(language2, names3) {
+  return names3.length > 2 ? translate(language2, "ui.synthesis_of_0_and_1_more", names3[0], names3.length) : translate(language2, "ui.synthesis_of_0", names3.join(translate(language2, "ui.list_separator")));
+}
+
 // ui/modals/prompt-presets-modal.ts
 var import_obsidian9 = require("obsidian");
 
@@ -18225,7 +18243,9 @@ ${noteBody(title, metadata.summary, this.noteLanguage, (_d = initial.prompt) != 
     await this.ensureTopicFolders(this.topicRoot(mapPath));
     const source = await this.app.vault.read(this.file(sourcePath));
     const metadata = frontmatter(source);
-    const title = `${text5(metadata.title, this.file(sourcePath).basename)} ${translate(this.noteLanguage, "note.copy_suffix")}`;
+    const sourceTitle = text5(metadata.title, this.file(sourcePath).basename);
+    const suffixLanguage = textLanguageOf(sourceTitle, resolveMapTextLanguage(map, this.settings.language));
+    const title = `${sourceTitle} ${translateNote(suffixLanguage, "note.copy_suffix")}`;
     const id = crypto.randomUUID();
     metadata["node-id"] = id;
     metadata["topic-id"] = map.id;
@@ -39092,7 +39112,7 @@ ${request.requirements}` : preset.text,
       void 0,
       {
         names: names3,
-        initialTitle: (_b2 = pending == null ? void 0 : pending.title) != null ? _b2 : names3.length > 2 ? t("ui.synthesis_of_0_and_1_more", names3[0], names3.length) : t("ui.synthesis_of_0", names3.join(t("ui.list_separator"))),
+        initialTitle: (_b2 = pending == null ? void 0 : pending.title) != null ? _b2 : synthesisDefaultName(resolveMapTextLanguage(this.map, this.plugin.settings.language), names3),
         defaultDirection: t("ui.identify_shared_conclusions_key_differences_tradeoffs_and_ne"),
         background: this.backgroundHooks(this.selectionTaskKey()),
         fields: {
@@ -45114,6 +45134,13 @@ function occurrences(source, text11) {
   for (let at = source.indexOf(text11); at >= 0; at = source.indexOf(text11, at + text11.length)) found.push(at);
   return found;
 }
+function imageLanguageChoices() {
+  return { registry: SUPPORTED_LANGUAGES, outputOnly: OUTPUT_LANGUAGE_CHOICES };
+}
+var languageIdsPattern = () => [...SUPPORTED_LANGUAGES, ...OUTPUT_LANGUAGE_CHOICES].map((item) => item.id.replace(/[-]/g, "\\-")).join("|");
+function imageFileBase(alt) {
+  return (alt || "image").replace(/\.(?:png|jpe?g|gif|webp)$/i, "").replace(new RegExp(`-(?:${languageIdsPattern()})(?:[ -]\\d+)?$`), "").replace(/[^\p{L}\p{N}_-]+/gu, "-").replace(/^-+|-+$/g, "").slice(0, 40);
+}
 var ImageTranslateAction = class extends import_obsidian32.Component {
   constructor(app, options) {
     super();
@@ -45238,7 +45265,10 @@ var ImageTranslateAction = class extends import_obsidian32.Component {
     const field = popover.createEl("label", { cls: "vam-image-action-field" });
     field.createSpan({ text: t("ui.image_translate_language") });
     const select = field.createEl("select", { cls: "dropdown" });
+    const choices = imageLanguageChoices();
     for (const option2 of SUPPORTED_LANGUAGES) select.createEl("option", { value: option2.id, text: option2.label });
+    const more = select.createEl("optgroup", { attr: { label: t("ui.output_language_more") } });
+    for (const option2 of choices.outputOnly) more.createEl("option", { value: option2.id, text: option2.label });
     select.value = (_a2 = this.language) != null ? _a2 : getUiLanguage();
     const status = popover.createDiv({ cls: "vam-image-action-status" });
     status.setAttribute("role", "status");
@@ -45277,7 +45307,8 @@ var ImageTranslateAction = class extends import_obsidian32.Component {
     this.running = controller;
     this.showRunning(status, actions);
     this.startHalo(target.image, target.view.containerEl);
-    const name = (_b2 = (_a2 = SUPPORTED_LANGUAGES.find((item) => item.id === language2)) == null ? void 0 : _a2.name) != null ? _b2 : language2;
+    const choices = imageLanguageChoices();
+    const name = (_b2 = (_a2 = [...choices.registry, ...choices.outputOnly].find((item) => item.id === language2)) == null ? void 0 : _a2.name) != null ? _b2 : language2;
     let saved = null;
     try {
       const dataUrl = await this.options.run(
@@ -45291,8 +45322,7 @@ var ImageTranslateAction = class extends import_obsidian32.Component {
       if (controller.signal.aborted) return;
       if (!/^data:image\/(?:png|jpeg|webp);base64,/.test(dataUrl))
         throw new Error(t("ui.context_ai_image_not_generated"));
-      const languages = SUPPORTED_LANGUAGES.map((item) => item.id.replace(/[-]/g, "\\-")).join("|");
-      const base = (target.image.alt || "image").replace(/\.(?:png|jpe?g|gif|webp)$/i, "").replace(new RegExp(`-(?:${languages})(?:[ -]\\d+)?$`), "").replace(/[^\p{L}\p{N}_-]+/gu, "-").replace(/^-+|-+$/g, "").slice(0, 40);
+      const base = imageFileBase(target.image.alt);
       const path = await this.options.saveImage(dataUrl, target.path, `${base || "image"}-${language2}`);
       saved = this.app.vault.getFileByPath(path);
       if (controller.signal.aborted) throw new Error(t("ui.ai_task_cancelled"));

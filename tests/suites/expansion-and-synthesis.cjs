@@ -99,7 +99,7 @@ integrationTest('selected subtopics move together and copied notes keep their co
   assert.equal(note.detail, 'Original knowledge'); assert.equal(note.preview, 'My handwritten preview');
   await view.history.undo().undo();
   assert.equal((await repo.readMap(mapPath)).nodes.length, 3);
-  assert.equal((await repo.readNote('Agent Workspace/Topics/map-a/Unassigned/First 副本.md')).topicState, 'unassigned');
+  assert.equal((await repo.readNote('Agent Workspace/Topics/map-a/Unassigned/First copy.md')).topicState, 'unassigned');
   await view.history.redo().redo();
   assert.equal((await repo.readMap(mapPath)).nodes.length, 4);
   assert.equal((await repo.readNote(copied.path)).topicState, 'active');
@@ -110,8 +110,8 @@ integrationTest('copying a legacy note without a title field keeps its filename 
   const mapDoc = { id: 'map-a', title: 'map-a', version: 1, nodes: [], viewport: { x: 0, y: 0, zoom: 1 } };
   await app.vault.create('Agent Workspace/Topics/map-a/Notes/budget.md', '---\nagent-map-node: true\nnode-id: original\ntopic-id: map-a\n---\n# budget\n\nOriginal content\n');
   const copy = await repo.duplicateNote('Agent Workspace/Topics/map-a/Notes/budget.md', mapDoc, mapPath);
-  assert.equal((await repo.readNote(copy.path)).title, 'budget 副本');
-  assert.match(await app.vault.read(app.vault.getAbstractFileByPath(copy.path)), /^---[\s\S]*# budget 副本/m);
+  assert.equal((await repo.readNote(copy.path)).title, 'budget copy');
+  assert.match(await app.vault.read(app.vault.getAbstractFileByPath(copy.path)), /^---[\s\S]*# budget copy/m);
 });
 integrationTest('failed batch copy parks created notes and leaves the map unchanged', async () => {
   const { repo, app } = fixture(), root = await topicNote(repo, 'Root', 'a');
@@ -129,7 +129,7 @@ integrationTest('failed batch copy parks created notes and leaves the map unchan
   repo.duplicateNote = async (...args) => { if (++count === 2) throw new Error('injected duplicate failure'); return duplicate(...args); };
   await assert.rejects(view.copySelected(root), /injected duplicate failure/);
   assert.equal((await repo.readMap(mapPath)).nodes.length, 3);
-  assert.equal((await repo.readNote('Agent Workspace/Topics/map-a/Unassigned/First 副本.md')).topicState, 'unassigned');
+  assert.equal((await repo.readNote('Agent Workspace/Topics/map-a/Unassigned/First copy.md')).topicState, 'unassigned');
   assert.equal(view.history.canUndo, false);
 });
 integrationTest('failed map save during copy parks the duplicate without changing the map', async () => {
@@ -145,7 +145,7 @@ integrationTest('failed map save during copy parks the duplicate without changin
   repo.saveMap = async (...args) => { if (fail) { fail = false; throw new Error('injected map save failure'); } return save(...args); };
   await assert.rejects(view.copySelected(root), /injected map save failure/);
   assert.equal((await repo.readMap(mapPath)).nodes.length, 1);
-  assert.equal((await repo.readNote('Agent Workspace/Topics/map-a/Unassigned/Root 副本.md')).topicState, 'unassigned');
+  assert.equal((await repo.readNote('Agent Workspace/Topics/map-a/Unassigned/Root copy.md')).topicState, 'unassigned');
   assert.equal(view.history.canUndo, false);
 });
 integrationTest('removing selected subtopic branches parks notes and can be undone', async () => {

@@ -1,5 +1,5 @@
 import { Component, MarkdownView, Notice, setIcon, type App, type TFile } from "obsidian";
-import { getUiLanguage, SUPPORTED_LANGUAGES, t, type UiLanguage } from "../../i18n";
+import { getUiLanguage, OUTPUT_LANGUAGE_CHOICES, SUPPORTED_LANGUAGES, t, type ContentLanguage } from "../../i18n";
 import { prepareStep, type PreparedStep } from "../../core/step-runner";
 import { imageTranslateStep } from "./steps/image-translate/step";
 
@@ -41,6 +41,28 @@ function occurrences(source: string, text: string): number[] {
 
 type Placement = "replace" | "new";
 
+/** Interface languages first, then the output-only languages (the menu puts those in their own group). */
+export function imageLanguageChoices(): {
+  registry: ReadonlyArray<{ id: ContentLanguage; label: string; name: string }>;
+  outputOnly: ReadonlyArray<{ id: ContentLanguage; label: string; name: string }>;
+} {
+  return { registry: SUPPORTED_LANGUAGES, outputOnly: OUTPUT_LANGUAGE_CHOICES };
+}
+
+/** A language id in a file name; the ids of every choice are matched, with `-` escaped. */
+const languageIdsPattern = (): string =>
+  [...SUPPORTED_LANGUAGES, ...OUTPUT_LANGUAGE_CHOICES].map(item => item.id.replace(/[-]/g, "\\-")).join("|");
+
+/** Base of a translated image's file name: the alt text without extension or an earlier language suffix. */
+export function imageFileBase(alt: string): string {
+  return (alt || "image")
+    .replace(/\.(?:png|jpe?g|gif|webp)$/i, "")
+    .replace(new RegExp(`-(?:${languageIdsPattern()})(?:[ -]\\d+)?$`), "")
+    .replace(/[^\p{L}\p{N}_-]+/gu, "-")
+    .replace(/^-+|-+$/g, "")
+    .slice(0, 40);
+}
+
 /**
  * Clicking an image in a note shows one action: make a translated version of the image. The person picks a
  * language and whether the new image replaces the embed or goes below it; the result is written directly.
@@ -50,7 +72,7 @@ export class ImageTranslateAction extends Component {
   private popover: HTMLElement | null = null;
   private target: ImageTarget | null = null;
   private running: AbortController | null = null;
-  private language: UiLanguage | null = null;
+  private language: ContentLanguage | null = null;
   private halo: HTMLElement | null = null;
   private haloFrame = 0;
 
@@ -180,7 +202,10 @@ export class ImageTranslateAction extends Component {
     const field = popover.createEl("label", { cls: "vam-image-action-field" });
     field.createSpan({ text: t("ui.image_translate_language") });
     const select = field.createEl("select", { cls: "dropdown" });
+    const choices = imageLanguageChoices();
     for (const option of SUPPORTED_LANGUAGES) select.createEl("option", { value: option.id, text: option.label });
+    const more = select.createEl("optgroup", { attr: { label: t("ui.output_language_more") } });
+    for (const option of choices.outputOnly) more.createEl("option", { value: option.id, text: option.label });
     select.value = this.language ?? getUiLanguage();
 
     const status = popover.createDiv({ cls: "vam-image-action-status" });
@@ -196,7 +221,7 @@ export class ImageTranslateAction extends Component {
     }
     if (this.running) this.showRunning(status, actions);
     const start = (placement: Placement): void => {
-      this.language = select.value as UiLanguage;
+      this.language = select.value as ContentLanguage;
       void this.translate(target, this.language, placement, status, actions);
     };
     replace.addEventListener("click", () => start("replace"));
@@ -217,7 +242,7 @@ export class ImageTranslateAction extends Component {
 
   private async translate(
     target: ImageTarget,
-    language: UiLanguage,
+    language: ContentLanguage,
     placement: Placement,
     status: HTMLElement,
     actions: HTMLElement
@@ -227,7 +252,8 @@ export class ImageTranslateAction extends Component {
     this.running = controller;
     this.showRunning(status, actions);
     this.startHalo(target.image, target.view.containerEl);
-    const name = SUPPORTED_LANGUAGES.find(item => item.id === language)?.name ?? language;
+    const choices = imageLanguageChoices();
+    const name = [...choices.registry, ...choices.outputOnly].find(item => item.id === language)?.name ?? language;
     let saved: TFile | null = null;
     try {
       const dataUrl = await this.options.run(
@@ -242,13 +268,7 @@ export class ImageTranslateAction extends Component {
       if (!/^data:image\/(?:png|jpeg|webp);base64,/.test(dataUrl))
         throw new Error(t("ui.context_ai_image_not_generated"));
       // Name after the original without its extension or an earlier language suffix, so names do not pile up.
-      const languages = SUPPORTED_LANGUAGES.map(item => item.id.replace(/[-]/g, "\\-")).join("|");
-      const base = (target.image.alt || "image")
-        .replace(/\.(?:png|jpe?g|gif|webp)$/i, "")
-        .replace(new RegExp(`-(?:${languages})(?:[ -]\\d+)?$`), "")
-        .replace(/[^\p{L}\p{N}_-]+/gu, "-")
-        .replace(/^-+|-+$/g, "")
-        .slice(0, 40);
+      const base = imageFileBase(target.image.alt);
       const path = await this.options.saveImage(dataUrl, target.path, `${base || "image"}-${language}`);
       saved = this.app.vault.getFileByPath(path);
       // Stopped while the file was written: keep the note as it was.

@@ -1,3 +1,4 @@
+import { titleProblemText } from "./title-check";
 import { App, Modal, Setting } from "obsidian";
 import { randomUUID } from "node:crypto";
 import {
@@ -250,6 +251,12 @@ export class AimStartModal extends Modal {
               if (pending || refreshingModels) return;
               if (!topic.value.trim()) {
                 status.setText(t("ui.aim_topic_required"));
+                topic.focus();
+                return;
+              }
+              const topicProblem = titleProblemText(topic.value);
+              if (topicProblem) {
+                status.setText(topicProblem);
                 topic.focus();
                 return;
               }

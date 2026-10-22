@@ -34,6 +34,7 @@ import {
 import { readMarkdownFile, type ReferenceGroup } from "../../ai/reference-materials";
 import { providerForModel } from "../../ai/providers/provider";
 import { NameModal } from "../../ui/modals/name-modal";
+import { sanitizeGeneratedTitle } from "../../core/title-safety";
 import { ChoiceModal } from "../../ui/modals/choice-modal";
 import {
   applyCollapseLevel,
@@ -4348,7 +4349,7 @@ export class VisualAgentMapView extends ItemView {
     }
     const model = content?.task.model ?? (await this.mergeModel(check.parentId));
     const created = await repo.createNote(
-      title,
+      sanitizeGeneratedTitle(title),
       model,
       before,
       mapPath,
@@ -7655,7 +7656,8 @@ export class VisualAgentMapView extends ItemView {
       return;
     }
     const node = await this.plugin.repo.createNote(
-      suggestedTitle?.trim() || (parent ? t("ui.new_subtopic") : t("ui.my_core_topic")),
+      sanitizeGeneratedTitle(suggestedTitle?.trim() ?? "").trim() ||
+        (parent ? t("ui.new_subtopic") : t("ui.my_core_topic")),
       model,
       this.map,
       this.path,
@@ -9415,7 +9417,13 @@ export class VisualAgentMapView extends ItemView {
       sources.some(source => !this.map?.nodes.some(node => node.id === source.id && node.path === source.path))
     )
       throw new Error(t("ui.the_topic_changed_the_synthesis_draft_was_not_saved"));
-    const integrated = await this.plugin.repo.createNote(title, model, this.map, this.path, "workspace");
+    const integrated = await this.plugin.repo.createNote(
+      sanitizeGeneratedTitle(title),
+      model,
+      this.map,
+      this.path,
+      "workspace"
+    );
     const detailTemplate = this.mapDetailTemplate(language, task.options.detailTemplateId);
     try {
       await this.plugin.repo.updateNote(

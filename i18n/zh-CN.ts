@@ -867,6 +867,8 @@ export const zhCN: Record<TranslationKey, string> = {
   "ui.conflict_merge_by_hand": "高级：手动合并 JSON",
   "ui.conflict_close_uses_file": "直接关闭窗口等同使用文件内容。",
   "ui.name_required": "请输入名称才能保存。",
+  "ui.title_problem_fence": "标题不能包含三个反引号（```），否则整份笔记会变成代码块。",
+  "ui.title_problem_brackets": "标题不能包含 [[ 或 ]]，否则会弄坏笔记的链接。",
   "ui.multi_research_start_0": "开始研究 {0} 个议题",
   "ui.topic_0": "议题：{0}",
   "ui.apply_parent": "应用",

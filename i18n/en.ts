@@ -935,6 +935,8 @@ export const en = {
   "ui.conflict_merge_by_hand": "Advanced: merge the JSON by hand",
   "ui.conflict_close_uses_file": "Closing this window uses the file contents.",
   "ui.name_required": "Enter a name to save.",
+  "ui.title_problem_fence": "A title cannot contain three backticks (```); they would turn the note into a code block.",
+  "ui.title_problem_brackets": "A title cannot contain [[ or ]]; they would break the note's links.",
   "ui.multi_research_start_0": "Start research ({0})",
   "ui.topic_0": "Topic: {0}",
   "ui.apply_parent": "Apply",

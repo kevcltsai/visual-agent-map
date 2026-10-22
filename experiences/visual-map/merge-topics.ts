@@ -2,6 +2,8 @@ import { App, Modal } from "obsidian";
 import { t } from "../../i18n";
 import { descendants, inheritModel, type MapNode } from "../../map-model";
 import { actionStatus, modalActions } from "../../ui/modals/action-bar";
+import { titleProblemText } from "../../ui/modals/title-check";
+import { sanitizeGeneratedTitle } from "../../core/title-safety";
 
 /** Why the selection cannot be merged; the first condition that fails, as the i18n key that explains it. */
 export type MergeBlock =
@@ -99,9 +101,11 @@ export const MERGE_TITLE_MAX = 60;
  * wrapping quotes. A missing, blank or over-long title falls back to `fallback` (the first source card's title).
  */
 export function mergeTitleFromResult(result: { suggestions?: { title?: string }[] }, fallback: string): string {
-  const raw = (result.suggestions?.[0]?.title ?? "").replace(/\s+/g, " ").trim();
+  const raw = sanitizeGeneratedTitle(result.suggestions?.[0]?.title ?? "")
+    .replace(/\s+/g, " ")
+    .trim();
   const name = raw.replace(/^["'“”‘’「」『』]+|["'“”‘’「」『』]+$/g, "").trim();
-  return name && name.length <= MERGE_TITLE_MAX ? name : fallback;
+  return name && name.length <= MERGE_TITLE_MAX ? name : sanitizeGeneratedTitle(fallback);
 }
 
 /** What the dialog needs to start an AI merge; the host owns the usage notice and the background task. */
@@ -176,6 +180,7 @@ export class MergeTopicsModal extends Modal {
     const save = (): void => {
       const value = input.value.trim();
       if ((!value && !useAi()) || pending) return;
+      if (!useAi() && titleProblemText(value)) return;
       if (useAi() && this.ai) {
         pending = true;
         confirm.disabled = true;
@@ -202,8 +207,9 @@ export class MergeTopicsModal extends Modal {
     };
     const check = (): void => {
       const empty = !useAi() && !input.value.trim();
-      confirm.disabled = empty || pending;
-      if (!pending) status.setText(empty ? t("ui.name_required") : "");
+      const problem = !useAi() && !empty ? titleProblemText(input.value) : "";
+      confirm.disabled = empty || !!problem || pending;
+      if (!pending) status.setText(empty ? t("ui.name_required") : problem);
     };
     skipAi?.addEventListener("change", () => {
       confirm.setText(useAi() ? t("ui.merge_with_ai") : t("ui.merge_confirm"));

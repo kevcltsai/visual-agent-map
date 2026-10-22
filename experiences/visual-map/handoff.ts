@@ -1,3 +1,4 @@
+import { sanitizeGeneratedTitle } from "../../core/title-safety";
 import { normalizeReasoningLevel, type Repository, originMarkdown } from "../../repository";
 import type { ThinkingArtifact } from "../../core/thinking-artifact";
 import { HandoffWriteError, type ExperienceHandoffResult } from "../../core/experience-router";
@@ -26,7 +27,9 @@ export async function receiveVisualMapHandoff(
   try {
     await options.mutate(async () => {
       await options.beforeWrite?.();
-      targetPath = await options.repo.createMap(artifact.title.trim(), [], folder => record(folder.path));
+      targetPath = await options.repo.createMap(sanitizeGeneratedTitle(artifact.title.trim()), [], folder =>
+        record(folder.path)
+      );
       record(targetPath);
       const map = await options.repo.readMap(targetPath);
       const model = typeof artifact.metadata?.model === "string" ? artifact.metadata.model : options.defaultModel();
@@ -49,7 +52,7 @@ export async function receiveVisualMapHandoff(
         `Insight snapshot:\n${artifact.sourceSnapshot || "No insight snapshot was supplied."}`
       ].join("\n\n");
       const node = await options.repo.createNote(
-        artifact.title.trim(),
+        sanitizeGeneratedTitle(artifact.title.trim()),
         model,
         map,
         targetPath,

@@ -7,6 +7,9 @@
 - Simplified Chinese interface. Notes created with it keep their fixed headings (Preview, Detail sections) in Traditional Chinese, so a vault never mixes heading languages.
 - AI output follows the language of your map or topic for Japanese, Korean, Arabic and Thai (the AI writes in that language instead of falling back to your interface language), including the Markdown selection AI when the selected text is in one of them. The note's fixed headings stay in English. The "Answer language for this task" menu also lists Japanese, Korean, Spanish, French, German, Portuguese, Russian, Arabic, Thai and Vietnamese under "More languages (answers only)"; these add no interface language.
 
+- The AI now writes in the language of your own text. Japanese (needs at least two kana besides の), Korean, Arabic, Thai, Vietnamese and Simplified or Traditional Chinese characters are recognised from the letters; any other text (English, Spanish, French, Russian...) makes the AI follow the language you wrote in. A new "Same language as my text" choice sits at the top of the answer-language menu, and the language you pick is remembered for that map. The AIM start dialog has the same menu. Titles such as 台灣の旅 stay Chinese; pick Japanese by hand when you want it. English topics now carry the same "follow the language of the text" instruction instead of a fixed "English".
+- Fixed text in notes stays English for these languages (and Traditional Chinese for Simplified Chinese). A note that already uses Traditional Chinese headings keeps that default even when its topic is in another language.
+
 ### Changed
 
 - The model status line in Settings, Coffee Tables and the hand-off dialog now reads the same everywhere ("Codex: ready · Claude CLI candidates: ready") and follows the interface language.

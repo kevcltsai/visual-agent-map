@@ -210,8 +210,8 @@ integrationTest('Next Step: the answer language follows the topic text, and a ma
   assert.equal(langOf(zhTopic), 'zh-TW', 'English UI + Chinese topic answers in Chinese');
   button(zhTopic.actions(), 'Confirm research task').click(); await tick(); await tick();
   assert.equal(zhTopic.calls.research[0].outputLanguage, 'zh-TW');
-  assert.equal(langOf(nextStepHarness({ topic: 'Balcony herbs', language: 'en' })), 'en');
-  assert.equal(langOf(nextStepHarness({ topic: 'Balcony herbs', language: 'zh-TW' })), 'en', 'Chinese UI + English topic answers in English');
+  assert.equal(langOf(nextStepHarness({ topic: 'Balcony herbs', language: 'en' })), 'same-as-input');
+  assert.equal(langOf(nextStepHarness({ topic: 'Balcony herbs', language: 'zh-TW' })), 'same-as-input', 'Chinese UI + English topic follows the language of the text');
   const manual = nextStepHarness({ topic: '要如何在陽台養香草', language: 'en' });
   const select = selectOf(manual); select.value = 'en'; select.fire('change');
   button(manual.actions(), 'Confirm research task').click(); await tick(); await tick();
@@ -226,7 +226,7 @@ const cardsOf = h => find(h.modal.contentEl, i => i.cls === 'vam-next-cards');
 
 integrationTest('one-click dialog: research is open then one confirm; the summary line states depth, web, language and tone, and every option sits under Adjust', async () => {
   const h = nextStepHarness({ modelSettings: { tones, currentTone: 'Magazine column', topicStatus: 'idea' } });
-  assert.equal(summaryOf(h), 'Standard research · Web search · English · Magazine column');
+  assert.equal(summaryOf(h), 'Standard research · Web search · Same language as my text · Magazine column');
   // Everything adjustable is inside the one disclosure, which starts closed.
   const adjust = adjustOf(h);
   assert.equal(adjust.open, false); assert.equal(adjust.children[0].text, 'Adjust');
@@ -236,9 +236,9 @@ integrationTest('one-click dialog: research is open then one confirm; the summar
   // Changing a field updates the summary line.
   const depths = findAll(adjust, i => i.tag === 'input' && i.type === 'radio');
   depths[2].checked = true; depths[2].fire('change');
-  assert.equal(summaryOf(h), 'Deep research · Web search · English · Magazine column');
+  assert.equal(summaryOf(h), 'Deep research · Web search · Same language as my text · Magazine column');
   byLabel(h.modal.contentEl, 'Note style').value = 'preset:plain'; byLabel(h.modal.contentEl, 'Note style').fire('change');
-  assert.equal(summaryOf(h), 'Deep research · Web search · English · Plain language');
+  assert.equal(summaryOf(h), 'Deep research · Web search · Same language as my text · Plain language');
   byLabel(h.modal.contentEl, 'Answer language for this task').value = 'zh-TW'; byLabel(h.modal.contentEl, 'Answer language for this task').fire('change');
   assert.match(summaryOf(h), /繁體中文/);
   // One click on the primary action runs it and closes: with the opening click that is two clicks in all.
@@ -250,13 +250,13 @@ integrationTest('one-click dialog: each step shows only its own section under Ad
   const sections = findAll(adjustOf(h), i => i.cls === 'vam-next-adjust-section');
   assert.equal(sections.length, 3);
   assert.deepEqual(sections.map(s => s.hidden), [true, false, true], 'a researched leaf opens on Expand');
-  assert.equal(summaryOf(h), 'Choose directions together · Web search · English · Academic rigor');
+  assert.equal(summaryOf(h), 'Choose directions together · Web search · Same language as my text · Academic rigor');
   cardsOf(h).children[2].click();
   assert.deepEqual(sections.map(s => s.hidden), [true, true, false]);
-  assert.equal(summaryOf(h), 'Full content · No web search · English · Academic rigor', 'synthesis defaults to no web search');
+  assert.equal(summaryOf(h), 'Full content · No web search · Same language as my text · Academic rigor', 'synthesis defaults to no web search');
   cardsOf(h).children[0].click();
   assert.deepEqual(sections.map(s => s.hidden), [false, true, true]);
-  assert.equal(summaryOf(h), 'Standard research · Web search · English · Academic rigor');
+  assert.equal(summaryOf(h), 'Standard research · Web search · Same language as my text · Academic rigor');
 });
 integrationTest('one-click dialog: quick-explore numbers live under Adjust and stay hidden while guided directions are the default', () => {
   const h = nextStepHarness({ modelSettings: { topicStatus: 'completed' }, children: 0 });
@@ -266,7 +266,7 @@ integrationTest('one-click dialog: quick-explore numbers live under Adjust and s
   assert.equal(button(h.actions(), 'Get expansion directions').hidden, false);
   button(adjustOf(h), 'Quickly explore a map').click();
   assert.equal(hasCls(limits, 'is-hidden'), false);
-  assert.equal(summaryOf(h), 'Quick explore · 2 levels · up to 15 · Web search · English', 'the summary names the chosen levels and size');
+  assert.equal(summaryOf(h), 'Quick explore · 2 levels · up to 15 · Web search · Same language as my text', 'the summary names the chosen levels and size');
 });
 integrationTest('one-click dialog: waiting proposals are reviewed in place (no AI starts) and the dialog closes itself once the subtopics are created', async () => {
   // Owner decision 2026-10-19: a press that starts AI hides the dialog; reviewing proposals that already wait starts none.

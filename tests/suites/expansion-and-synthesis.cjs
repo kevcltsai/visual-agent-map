@@ -1134,7 +1134,7 @@ integrationTest('multi research without an explicit language answers each topic 
   h.view.multiSelected = new Set(h.nodes.map(n => n.id));
   await h.view.startMultiResearch(h.request); await until(() => h.runs.length === 2);
   assert.equal(h.runs.find(r => r.title === '要如何在陽台養香草').options.outputLanguage, 'zh-TW');
-  assert.equal(h.runs.find(r => r.title === 'Balcony herbs').options.outputLanguage, 'en');
+  assert.equal(h.runs.find(r => r.title === 'Balcony herbs').options.outputLanguage, 'same-as-input');
   assert.match(h.runs.find(r => r.title === '要如何在陽台養香草').options.task, /[\u4e00-\u9fff]/);
   h.finish.get('要如何在陽台養香草')(); h.finish.get('Balcony herbs')();
 });

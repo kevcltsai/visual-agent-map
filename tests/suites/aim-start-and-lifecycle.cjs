@@ -752,7 +752,7 @@ integrationTest('AIM start stores the content language once and keeps it when th
     { ui: 'en', topic: '東京五天自由行怎麼排', context: '', expected: 'zh-TW', heading: '## 使用者提供的背景' },
     { ui: 'zh-TW', topic: 'Plan a 5-day Taipei trip', context: '', expected: 'en', heading: '## User-provided context' },
     { ui: 'zh-TW', topic: '2026', context: 'Budget is limited', expected: 'en', heading: '## User-provided context' },
-    { ui: 'en', topic: '東京の旅行', context: '', expected: 'en', heading: '## User-provided context' }
+    { ui: 'en', topic: '東京ラーメンの旅', context: '', expected: 'en', heading: '## User-provided context' }
   ];
   for (const [index, item] of cases.entries()) {
     const { repo } = fixture(item.ui);

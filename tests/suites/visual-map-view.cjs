@@ -250,14 +250,14 @@ integrationTest('Next Step reviews first expansion proposals in place and keeps 
   assert.equal(depthSet.children[0].tag, 'legend');
   assert.equal(all(modal.contentEl, item => item.tag === 'fieldset').length, 1, 'one research-depth widget');
   const summaryLine = find(modal.contentEl, item => item.cls === 'vam-next-summary');
-  assert.equal(summaryLine.text, 'Standard research · Web search · English');
+  assert.equal(summaryLine.text, 'Standard research · Web search · Same language as my text');
   const sourceDisclosures = all(modal.contentEl, item => item.cls.includes('vam-next-source-details'));
   assert.equal(sourceDisclosures.length, 1, 'one data-source picker serves every step');
   const [sources] = sourceDisclosures;
   assert.equal(sources.open, false);
   assert.ok(sources.children[0].children[0].children[1].text.includes('0 Markdown files'));
   const outputLanguage = find(modal.contentEl, item => item['aria-label'] === 'Answer language for this task');
-  assert.equal(outputLanguage.value, 'en');
+  assert.equal(outputLanguage.value, 'same-as-input');
   outputLanguage.value = 'zh-TW';
   assert.equal(plugin.settings.language, 'en'); assert.equal(activeCard(), 0);
   const requirements = find(modal.contentEl, item => item.tag === 'textarea');

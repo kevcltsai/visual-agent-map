@@ -109,7 +109,7 @@ integrationTest('relevance: Prioritize by goal -> field -> Enter writes the goal
   assert.equal(await h.repo.readRelevanceGoal(MAP), 'Sleep better through the night', 'newlines are removed');
   assert.match(frontmatterOf(h), /relevance-goal-history:\n  - "\d{4}-\d{2}-\d{2}: Sleep better through the night"/);
   const request = h.control.calls[0].request;
-  assert.equal(request.goal, 'Sleep better through the night'); assert.equal(request.language, 'en'); assert.equal(request.contentLanguage, 'en');
+  assert.equal(request.goal, 'Sleep better through the night'); assert.equal(request.language, 'en'); assert.equal(request.contentLanguage, 'same-as-input');
   assert.equal(request.nodes.length, 5, 'the whole map is sent, the top-level card as context');
   assert.deepEqual(Object.keys(request.nodes[0]).sort(), ['depth', 'id', 'parentId', 'status', 'summary', 'title']);
   const all = await h.allRelevance();

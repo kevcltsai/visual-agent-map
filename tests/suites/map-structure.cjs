@@ -282,7 +282,7 @@ integrationTest('quick explore: Generate hides the dialog; the outline is review
   });
   byLabel(h.adjust, 'Outline preset').value = 'mine';
   button(h.actions(), 'Generate outline').click(); await tick(); await tick();
-  assert.equal(requests.length, 1); assert.equal(requests[0].presetId, 'mine'); assert.equal(requests[0].language, 'en');
+  assert.equal(requests.length, 1); assert.equal(requests[0].presetId, 'mine'); assert.equal(requests[0].language, 'same-as-input');
   assert.equal(h.modal.closeCount, 1, 'the dialog hides itself once the outline starts');
   assert.deepEqual(created, [], 'nothing is created before review');
   assert.equal(h.expandCalls.length, 0, 'the old quick expansion is not used');
@@ -632,7 +632,7 @@ integrationTest('structure review: suggestions follow the map language while err
   const english = await viewHarness({ suggestions: [] });
   english.view.openStructureReview(null);
   button(english.opened.at(-1).modalEl, 'Start review').click(); await until(() => english.requests.length);
-  assert.equal(english.requests[0].contentLanguage, 'en');
+  assert.equal(english.requests[0].contentLanguage, 'same-as-input');
   assert.doesNotMatch(buildStructureReviewPrompt(english.requests[0]), /Traditional Chinese/);
 });
 

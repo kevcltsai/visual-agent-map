@@ -363,7 +363,7 @@ integrationTest('coverage: interface zh with an English question keeps every sta
   const outcome = await subject.flow.answerAndResearch(subject.created.mapPath, first.id, { requestId: 'language-answer-1', selections: [first.aimQuestion.options[0].id], freeText: 'Specific condition 1' }, 'gpt-6-luna', 'low');
   assert.equal(outcome.status, 'waiting-user');
   subject.repo.settings.language = 'zh-TW';
-  assert.deepEqual([...new Set(subject.calls.map(call => call.language))], ['en']);
+  assert.deepEqual([...new Set(subject.calls.map(call => call.language))], ['en', 'same-as-input']);
   const saved = await subject.repo.readMap(subject.created.mapPath);
   assert.equal(saved.aim.contentLanguage, 'en');
   const text = await allNoteText(subject);
@@ -392,7 +392,7 @@ integrationTest('coverage: a legacy map whose title has no language signal persi
   for (const title of ['🍜', '2026']) {
     const subject = await languageSubject('zh-TW', title);
     const legacy = await subject.repo.readMap(subject.created.mapPath);
-    delete legacy.aim.contentLanguage;
+    delete legacy.aim.contentLanguage; delete legacy.outputLanguage;
     const stamp = subject.repo.stampAimContentLanguage; subject.repo.stampAimContentLanguage = () => {};
     await subject.repo.saveMap(subject.created.mapPath, legacy);
     subject.repo.stampAimContentLanguage = stamp;

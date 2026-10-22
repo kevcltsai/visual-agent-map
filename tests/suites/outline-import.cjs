@@ -827,7 +827,7 @@ integrationTest('the import window generator answers in the typed topic language
   await generator.generate({ topic: '要如何在陽台養香草', presetText: 'p' }, new AbortController().signal, () => draftInputs());
   await generator.generate({ topic: 'Balcony herbs', presetText: 'p' }, new AbortController().signal, () => draftInputs());
   assert.deepEqual(calls.map(c => c.language), ['en', 'en'], 'errors stay in the interface language');
-  assert.deepEqual(calls.map(c => c.contentLanguage), ['zh-TW', 'en']);
+  assert.deepEqual(calls.map(c => c.contentLanguage), ['zh-TW', 'same-as-input']);
   const { outlineGenerateStep } = load('core/steps/outline-generate/step.ts', { obsidian });
   const prompt = outlineGenerateStep.render({ ...calls[0], topic: '要如何在陽台養香草', presetText: 'p', model: 'm', reasoning: 'low' });
   assert.match(prompt, /Traditional Chinese/);

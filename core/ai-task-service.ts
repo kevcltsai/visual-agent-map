@@ -8,7 +8,7 @@ import {
 } from "../ai/reference-materials";
 import { buildPreparedTaskContext, estimateTokens } from "../ai/context-builder";
 import { effectiveReasoningLevel, normalizeReasoningLevel } from "../ai/task-policy";
-import { canonicalDetail } from "../ai/result-utils";
+import { canonicalDetail, normalizeOutputScriptHeadings } from "../ai/result-utils";
 import { normalizeDetailHeadings, normalizeMathDelimiters } from "../ai/markdown-blocks";
 import { checkCounts, countIssueText } from "../ai/detail-templates";
 import type { AiResult, ReasoningLevel, TaskContext } from "../ai/types";
@@ -248,6 +248,7 @@ export class AiTaskService {
       let result = step.parse(raw);
       if (readerFacingDetail(input)) {
         result.detail = normalizeMathDelimiters(normalizeDetailHeadings(result.detail));
+        result.detail = normalizeOutputScriptHeadings(result.detail, outputLanguage, input.detailTemplate);
         result.summary = normalizeMathDelimiters(result.summary);
       }
       if (referenceGroups.length) result.summary = resolveSummaryReferences(result.summary, referenceGroups);

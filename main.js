@@ -15364,6 +15364,23 @@ ${body}`);
   if (footnotes.length && sourcesIndex < 0) blocks.push(footnotes.join("\n"));
   return blocks.filter(Boolean).join("\n\n");
 }
+function normalizeOutputScriptHeadings(detail, output, template) {
+  if (!verbatimHeadingLanguage(output) || template && !isBuiltinTemplateId(template.id)) return detail;
+  const note = noteLanguageOf(output);
+  const forms = /* @__PURE__ */ new Map();
+  for (const [, key2] of STANDARD) {
+    const canonical = translate(note, key2);
+    const written = translate(output, key2);
+    if (written !== canonical) forms.set(written, canonical);
+  }
+  const lines = detail.split("\n");
+  const code = fencedLines(lines);
+  return lines.map((line, index) => {
+    const heading = code[index] ? null : /^###([ \t]+)(.+?)([ \t]*)$/.exec(line);
+    const canonical = heading ? forms.get(heading[2]) : void 0;
+    return heading && canonical ? `###${heading[1]}${canonical}${heading[3]}` : line;
+  }).join("\n");
+}
 function canonicalDetail(value, language2 = "zh-TW", template = standardTemplate(language2)) {
   var _a, _b;
   const detail = value.trim();
@@ -43133,6 +43150,7 @@ var AiTaskService = class {
       let result = step.parse(raw);
       if (readerFacingDetail(input)) {
         result.detail = normalizeMathDelimiters(normalizeDetailHeadings(result.detail));
+        result.detail = normalizeOutputScriptHeadings(result.detail, outputLanguage2, input.detailTemplate);
         result.summary = normalizeMathDelimiters(result.summary);
       }
       if (referenceGroups.length) result.summary = resolveSummaryReferences(result.summary, referenceGroups);

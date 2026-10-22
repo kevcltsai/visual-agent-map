@@ -38,7 +38,7 @@ export interface CountIssue {
 export const STANDARD_TEMPLATE_ID = "standard";
 /** Built-in template: the Standard sections, written as an intro followed by the sections; empty sections are omitted. */
 export const TEXTBOOK_TEMPLATE_ID = "textbook";
-const STANDARD: readonly [string, TranslationKey, TranslationKey, DetailSectionRole][] = [
+export const STANDARD: readonly [string, TranslationKey, TranslationKey, DetailSectionRole][] = [
   ["core", "detail.core_conclusions", "detail.description_core_conclusions", "none"],
   ["knowledge", "detail.key_knowledge", "detail.description_key_knowledge", "none"],
   ["sources", "detail.evidence_and_sources", "detail.description_evidence_and_sources", "sources"],

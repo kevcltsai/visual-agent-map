@@ -1,8 +1,22 @@
 import type { VisualReference } from "../repository";
-import { NOTE_LANGUAGES, translate, type NoteLanguage } from "../i18n";
+import {
+  NOTE_LANGUAGES,
+  noteLanguageOf,
+  translate,
+  verbatimHeadingLanguage,
+  type NoteLanguage,
+  type UiLanguage
+} from "../i18n";
 import type { AiResult } from "./types";
 import { fencedLines } from "./markdown-blocks";
-import { sectionLookup, standardTemplate, TEXTBOOK_TEMPLATE_ID, type DetailTemplate } from "./detail-templates";
+import {
+  isBuiltinTemplateId,
+  sectionLookup,
+  STANDARD,
+  standardTemplate,
+  TEXTBOOK_TEMPLATE_ID,
+  type DetailTemplate
+} from "./detail-templates";
 
 export { fencedLines } from "./markdown-blocks";
 
@@ -83,6 +97,38 @@ function textbookDetail(
   });
   if (footnotes.length && sourcesIndex < 0) blocks.push(footnotes.join("\n"));
   return blocks.filter(Boolean).join("\n\n");
+}
+
+/**
+ * Narrow repair for an output locale whose note language differs from it (today zh-CN): the model sometimes writes a
+ * built-in section heading in the output script (`### 核心结论`) instead of the verbatim note heading (`### 核心結論`).
+ * Only a `###` line outside code whose text is exactly the output locale's form of one of the fixed built-in headings
+ * is rewritten to the note-language heading. A missing template means the default Standard one; a custom template, a
+ * locale without a differing note language, near matches, other heading levels and body text are left alone. If both
+ * forms are present, `canonicalDetail` then merges them under the one section in reading order.
+ */
+export function normalizeOutputScriptHeadings(
+  detail: string,
+  output: UiLanguage,
+  template?: Pick<DetailTemplate, "id">
+): string {
+  if (!verbatimHeadingLanguage(output) || (template && !isBuiltinTemplateId(template.id))) return detail;
+  const note = noteLanguageOf(output);
+  const forms = new Map<string, string>();
+  for (const [, key] of STANDARD) {
+    const canonical = translate(note, key);
+    const written = translate(output, key);
+    if (written !== canonical) forms.set(written, canonical);
+  }
+  const lines = detail.split("\n");
+  const code = fencedLines(lines);
+  return lines
+    .map((line, index) => {
+      const heading = code[index] ? null : /^###([ \t]+)(.+?)([ \t]*)$/.exec(line);
+      const canonical = heading ? forms.get(heading[2]) : undefined;
+      return heading && canonical ? `###${heading[1]}${canonical}${heading[3]}` : line;
+    })
+    .join("\n");
 }
 
 export function canonicalDetail(

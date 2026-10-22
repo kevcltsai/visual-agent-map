@@ -135,3 +135,45 @@ test('B6: the built-in template name used for "keep current" is the interface-la
   assert.match(source, /currentTemplate: templateInLanguage\(/);
   assert.equal(templates.builtinTemplates('zh-TW', 'zh-CN')[0].name, '标准');
 });
+
+// N1: the model sometimes writes a Simplified built-in heading under zh-CN; it is mapped to the verbatim note heading.
+const resultUtils = load('ai/result-utils.ts');
+const normalize = (detail, output, template) => resultUtils.normalizeOutputScriptHeadings(detail, output, template);
+const standardZh = templates.standardTemplate('zh-TW', 'zh-CN');
+const textbookZh = templates.textbookTemplate('zh-TW', 'zh-CN');
+
+test('N1: zh-CN standard Simplified heading becomes the canonical heading and keeps its content', () => {
+  const out = normalize('### 核心結論\n\n### 核心结论\n\n真正的内容', 'zh-CN', standardZh);
+  assert.equal(out, '### 核心結論\n\n### 核心結論\n\n真正的内容');
+  const canonical = resultUtils.canonicalDetail(out, 'zh-TW', standardZh);
+  assert.equal(canonical.match(/### 核心結論/g).length, 1);
+  assert.ok(canonical.includes('真正的内容'));
+  assert.ok(!canonical.includes('核心结论'));
+  assert.equal(normalize('### 证据与来源\n\n- a', 'zh-CN', standardZh), '### 證據與來源\n\n- a');
+  assert.equal(normalize('### 核心结论\n\nx', 'zh-CN'), '### 核心結論\n\nx');
+});
+
+test('N1: zh-CN textbook Simplified heading is mapped too', () => {
+  const out = normalize('导言\n\n### 关键知识\n\n内容', 'zh-CN', textbookZh);
+  assert.equal(out, '导言\n\n### 關鍵知識\n\n内容');
+  assert.ok(resultUtils.canonicalDetail(out, 'zh-TW', textbookZh).includes('### 關鍵知識\n\n内容'));
+});
+
+test('N1: mixed Traditional and Simplified duplicates merge into one section without losing text', () => {
+  const out = normalize('### 核心結論\n\n繁體段落\n\n### 核心结论\n\n简体段落', 'zh-CN', standardZh);
+  const canonical = resultUtils.canonicalDetail(out, 'zh-TW', standardZh);
+  assert.equal(canonical.match(/### 核心結論/g).length, 1);
+  assert.ok(canonical.indexOf('繁體段落') >= 0 && canonical.indexOf('简体段落') > canonical.indexOf('繁體段落'));
+});
+
+test('N1 counterexamples: zh-TW, en, custom template, body text, wrong level, near match, code and tilde stay untouched', () => {
+  const simplified = '### 核心结论\n\n内容';
+  assert.equal(normalize(simplified, 'zh-TW', standardZh), simplified);
+  assert.equal(normalize(simplified, 'en', standardZh), simplified);
+  const custom = { ...standardZh, id: 'custom-1', name: '自订' };
+  assert.equal(normalize(simplified, 'zh-CN', custom), simplified);
+  const body = '### 核心結論\n\n核心结论是这样。\n\n- 核心结论';
+  assert.equal(normalize(body, 'zh-CN', standardZh), body);
+  for (const text of ['#### 核心结论\n\nx', '## 核心结论\n\nx', '### 核心结论总览\n\nx', '### 新的核心结论\n\nx', '```\n### 核心结论\n```'])
+    assert.equal(normalize(text, 'zh-CN', standardZh), text);
+});

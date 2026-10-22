@@ -524,3 +524,17 @@ test('missing-bounded repair: the two-round limit is shared with hierarchy repai
   assert.equal(error.message, translate('en', 'error.relevance_grade_hierarchy'));
   assert.equal(none.calls.length, 3);
 });
+
+test('recalibrate progress: reports the changes received so far, with no total', async () => {
+  let now = 5_000_000;
+  {
+    const seen = [];
+    const service = new grade.RelevanceGradeService(async (_req, _signal, _prepared, onJson) => {
+      onJson('');
+      now += 300; onJson('{"changes":[{"id":"c3","tier":"core","anchor":null},{"id":"c4","tier":null,"anchor":null}');
+      return changes();
+    }, () => now);
+    await service.recalibrate(recalRequest(), new AbortController().signal, { onProgress: p => seen.push(p && plain(p)) });
+    assert.deepEqual(seen, [{ received: 0 }, { received: 1 }], 'a null tier is not a change');
+  }
+});

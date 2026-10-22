@@ -562,6 +562,8 @@ export const zhCN: Record<TranslationKey, string> = {
   "ui.relevance_running": "依目标分级中…",
   "ui.relevance_awaiting_usage": "等待确认 AI 用量…",
   "ui.relevance_repairing": "修正上下层一致中…",
+  "ui.relevance_received_0_1": "已收到 {0}／{1} 张",
+  "ui.relevance_received_changes_0": "已收到 {0} 张变动",
   "ui.relevance_stop": "停止",
   "ui.relevance_stopped": "已停止分级，没有任何议题被改变。",
   "ui.relevance_not_started": "分级没有开始。目标已保存，没有任何议题被改变。",

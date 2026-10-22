@@ -111,6 +111,10 @@ export interface RelevanceGradeRun {
   outcome?: RelevanceGradeOutcome;
   /** True once the notes are being written; Stop no longer applies because nothing can be half-applied. */
   writing?: boolean;
+  /** When the model request began (after the usage notice was answered); the status bar counts seconds from here. */
+  startedAt?: number;
+  /** Tiers received so far (Claude streaming only); shown in the status bar, never persisted. */
+  received?: RelevanceReceived;
   /** True while the AI usage notice is waiting for the user's answer; the map stays locked but nothing is being graded yet. */
   awaitingUsage?: boolean;
   /** True while a repair request (parent-child order, at most two rounds) is in flight. */
@@ -120,7 +124,20 @@ export interface RelevanceGradeRun {
 }
 /** Runs the grade or recalibrate step, and the repair steps (whose requests extend the grade request). */
 export type RelevanceGradeRunner = ProviderStepRunner<RelevanceGradeRequest, RelevanceGradeResult>;
+/** How far the model's reply has come: tiers received so far, and (a full grade) how many cards it must cover. */
+export interface RelevanceReceived {
+  received: number;
+  total?: number;
+}
+const TIER_FIELD = /"tier"\s*:\s*"(?:core|support|side)"/g;
+const PROGRESS_INTERVAL_MS = 200;
+
 export interface RelevanceGradeHooks {
+  /**
+   * Claude only (the reply streams): tiers received so far, at most every 200 ms; `null` clears it. A repair request
+   * counts from zero again. Never called for Codex.
+   */
+  onProgress?: (progress: RelevanceReceived | null) => void;
   /** Called just before each repair request is sent (at most {@link RELEVANCE_REPAIR_MAX_ROUNDS} times); `round` starts at 1. */
   onRepair?: (round: number, kind: "hierarchy" | "missing-bounded") => void;
 }
@@ -141,7 +158,11 @@ export function providerRelevanceGradeRunner(
   });
 }
 export class RelevanceGradeService {
-  constructor(private readonly run: RelevanceGradeRunner) {}
+  constructor(
+    private readonly run: RelevanceGradeRunner,
+    /** The clock the progress throttle reads; tests pass their own. */
+    private readonly now: () => number = Date.now
+  ) {}
   /**
    * Grade a map against a goal. Throws {@link RelevanceGradeError} (localized message, `code` for the reason) for a map
    * with nothing to grade, an over-budget map, a stop, or any reply that is not exactly one valid grade per card that is
@@ -170,7 +191,8 @@ export class RelevanceGradeService {
         violations: failure.violations,
         ...(failure.missing ? { missing: failure.missing } : {})
       }),
-      cardsToGrade(request).length === 0
+      cardsToGrade(request).length === 0,
+      cardsToGrade(request).length
     );
   }
   /**
@@ -198,6 +220,41 @@ export class RelevanceGradeService {
       cardsToRecalibrate(request).length === 0
     );
   }
+  /** Turns the stream of StructuredOutput JSON into a throttled "tiers received" count. */
+  private progressListener(
+    hooks: RelevanceGradeHooks,
+    total: number | undefined
+  ): ((buffer: string | null) => void) | undefined {
+    const report = hooks.onProgress;
+    if (!report) return undefined;
+    let last = 0;
+    let shown = -1;
+    const emit = (received: number): void => {
+      if (received === shown) return;
+      shown = received;
+      last = this.now();
+      try {
+        report({ received, ...(total === undefined ? {} : { total }) });
+      } catch {
+        /* Progress is cosmetic and must not fail the grade. */
+      }
+    };
+    return buffer => {
+      if (buffer === null) {
+        shown = -1;
+        try {
+          report(null);
+        } catch {
+          /* see above */
+        }
+        return;
+      }
+      if (buffer === "") return emit(0);
+      const now = this.now();
+      if (now - last < PROGRESS_INTERVAL_MS) return;
+      emit(buffer.match(TIER_FIELD)?.length ?? 0);
+    };
+  }
   private async drive<
     Request extends RelevanceGradeRequest,
     Repair extends Request,
@@ -209,7 +266,8 @@ export class RelevanceGradeService {
     step: StepDefinition<Request, Output>,
     repairStep: (failure: RelevanceHierarchyFailure) => StepDefinition<Repair, Output>,
     repairRequest: (failure: RelevanceHierarchyFailure) => Repair,
-    nothingToAsk: boolean
+    nothingToAsk: boolean,
+    total?: number
   ): Promise<Output> {
     const stopped = (): RelevanceGradeError =>
       new RelevanceGradeError("stopped", translate(uiLocale(request.language), "error.relevance_grade_stopped"));
@@ -220,7 +278,7 @@ export class RelevanceGradeService {
       return { items: [], ...(conflicts.length ? { conflicts } : {}) } as unknown as Output;
     }
     const send = (made: PreparedStep<Request, Output> | PreparedStep<Repair, Output>): Promise<string> =>
-      this.run(request, signal, made);
+      this.run(request, signal, made, this.progressListener(hooks, total));
     let raw: string;
     try {
       raw = await send(prepared);

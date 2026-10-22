@@ -145,6 +145,7 @@ import type {
   RelevanceGradeChange,
   RelevanceGradeItem,
   RelevanceGradeOutcome,
+  RelevanceReceived,
   RelevanceGradeResult,
   RelevanceGradeRun
 } from "../../core/relevance-grade-service";
@@ -533,6 +534,8 @@ export class VisualAgentMapView extends ItemView {
   private researchSigs = new Map<string, string>();
   private researchElapsed = new Map<HTMLElement, number>();
   private researchTick: number | null = null;
+  /** The status bar's "N of M received" text of the running grade; painted in place, never by a repaint. */
+  private relevanceReceivedEl: HTMLElement | null = null;
   private researchRenderTimer: number | null = null;
   /** Persistent, visually hidden live region for research stage changes; outside contentEl so a render never rebuilds it. */
   private announcer: HTMLElement | null = null;
@@ -1902,6 +1905,7 @@ export class VisualAgentMapView extends ItemView {
   ): void {
     if (!this.relevanceRunIsCurrent(run, mapPath)) return;
     this.plugin.releaseWarmClaude?.();
+    run.received = undefined;
     run.status = status;
     run.message = message;
     this.refreshRelevance();
@@ -1951,7 +1955,8 @@ export class VisualAgentMapView extends ItemView {
       owner: this,
       controller: new AbortController(),
       goal,
-      status: "running"
+      status: "running",
+      startedAt: Date.now()
     };
     // Claim the map before the first await, so a second Enter cannot start another run.
     this.plugin.relevanceGrades.set(mapPath, run);
@@ -2003,6 +2008,8 @@ export class VisualAgentMapView extends ItemView {
         if (!this.relevanceRunIsCurrent(run, mapPath) || !this.map) return;
         if (run.awaitingUsage) {
           run.awaitingUsage = false;
+          // The seconds count the model's work, not the wait for the usage notice.
+          run.startedAt = Date.now();
           this.refreshRelevance();
         }
         basis = buildStructureReviewNodes(this.map.nodes, id => this.describeForReview(id));
@@ -2023,7 +2030,15 @@ export class VisualAgentMapView extends ItemView {
             repairs.push(kind);
             if (!this.relevanceRunIsCurrent(run, mapPath)) return;
             run.repairing = true;
+            // A repair request answers from the start again.
+            run.received = undefined;
             this.refreshRelevance();
+          },
+          // Text only: the count changes in place, the map is not repainted for it.
+          onProgress: (progress: RelevanceReceived | null) => {
+            if (!this.relevanceRunIsCurrent(run, mapPath)) return;
+            run.received = progress ?? undefined;
+            this.paintRelevanceReceived(run);
           }
         };
         result =
@@ -2063,6 +2078,7 @@ export class VisualAgentMapView extends ItemView {
     if (!this.relevanceRunIsCurrent(run, mapPath) || !this.map) return;
     const items: RelevanceGradeItem[] = graded.items;
     run.writing = true;
+    run.received = undefined;
     const startedAt = Date.now();
     const repo = this.plugin.repo;
     const fresh = new Map<string, Note>();
@@ -2272,6 +2288,7 @@ export class VisualAgentMapView extends ItemView {
     const run = this.plugin.relevanceGrades.get(this.path);
     if (!run || run.status !== "running" || run.writing) return;
     run.status = "stopped";
+    run.received = undefined;
     run.message = t("ui.relevance_stopped");
     run.controller.abort();
     this.refreshRelevance();
@@ -2308,6 +2325,22 @@ export class VisualAgentMapView extends ItemView {
         ? " vam-status-error"
         : "";
     bar.createSpan({ cls: `vam-aim-status-value${tone}`, text });
+    this.relevanceReceivedEl = null;
+    if (running && !run.awaitingUsage && !run.writing) {
+      // Both are hidden from screen readers (the bar is a live region and they change every few hundred ms or second).
+      const received = bar.createSpan({ cls: "vam-relevance-received" });
+      received.setAttr("aria-hidden", "true");
+      this.relevanceReceivedEl = received;
+      this.paintRelevanceReceived(run);
+      if (run.startedAt !== undefined) {
+        const elapsed = bar.createSpan({
+          cls: "vam-research-elapsed vam-relevance-elapsed",
+          text: this.researchElapsedText(run.startedAt)
+        });
+        elapsed.setAttr("aria-hidden", "true");
+        this.trackResearchElapsed(elapsed, run.startedAt);
+      }
+    }
     if (running) {
       if (!run.writing) this.button(bar, t("ui.relevance_stop"), () => this.stopRelevanceGrade());
       return;
@@ -2322,6 +2355,18 @@ export class VisualAgentMapView extends ItemView {
       this.render();
       this.contentEl?.querySelector?.<HTMLElement>(".vam-relevance-goal")?.focus();
     });
+  }
+  /** Rewrites only the "N of M received" text; nothing is repainted. Empty (and hidden) until the first tier arrives. */
+  private paintRelevanceReceived(run: RelevanceGradeRun): void {
+    const element = this.relevanceReceivedEl;
+    if (!element) return;
+    const progress = run.received;
+    const text = progress
+      ? progress.total === undefined
+        ? t("ui.relevance_received_changes_0", progress.received)
+        : t("ui.relevance_received_0_1", progress.received, progress.total)
+      : "";
+    element.setText(text ? t("ui.aim_stage_with_elapsed_0_1", "", text) : "");
   }
   /** The status line of a finished run: a recalibration counts its moves against the pins; a full grade counts cards. */
   private relevanceDoneText(outcome: RelevanceGradeOutcome): string {
@@ -3319,6 +3364,8 @@ export class VisualAgentMapView extends ItemView {
       await this.persistViewport();
     }
     if (!isCurrent()) return;
+    // Leaving the map for the sample frees the pre-started CLI, like opening another map does.
+    if (this.relevancePanelOpen) this.plugin.releaseWarmClaude?.();
     this.abortRelevanceGrade();
     const sample = builtInSample(noteLanguageOf(this.plugin.settings.language));
     if (!this.builtIn) this.plugin.closeStaleDetails();

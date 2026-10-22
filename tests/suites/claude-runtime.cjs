@@ -301,6 +301,24 @@ test('Claude stream-json: answer text before the tool call, a rejected call (ret
   assert.equal(m.textBeforeTool, true); assert.ok(m.textBeforeToolChars > 300); assert.equal(m.structuredCalls, 2); assert.equal(m.enforceRetry, true); assert.ok(m.firstTextAt);
 });
 
+test('Claude stream-json: the raw StructuredOutput JSON accumulates, resets for a new call and clears when the CLI rejects one', async () => {
+  const h = streamHarness();
+  const call = id => [h.ev({ type: 'message_start' }), h.tool(id, 'StructuredOutput'), h.json(0, '{"items":[{"id":"c1","tier":"core"},'), h.json(0, '{"id":"c2","tier":"side"}]}'), h.stop(0), h.assistantTool(id, 'StructuredOutput', h.output)];
+  const buffers = [];
+  const out = await h.run([h.sys, ...call('so1'), h.toolResult('so1', { is_error: true, content: 'validation failed' }), ...call('so2'), h.result()], { onStructuredJson: buffer => buffers.push(buffer) });
+  assert.deepEqual(JSON.parse(out.raw), h.output, 'the result still comes from the result record');
+  assert.deepEqual(buffers, [
+    '', '{"items":[{"id":"c1","tier":"core"},', '{"items":[{"id":"c1","tier":"core"},{"id":"c2","tier":"side"}]}',
+    null,
+    '', '{"items":[{"id":"c1","tier":"core"},', '{"items":[{"id":"c1","tier":"core"},{"id":"c2","tier":"side"}]}'
+  ], 'a new call starts from "", is_error gives null, and the second call never continues the first one\'s text');
+  const quiet = await h.run([h.sys, ...call('so1'), h.result()]);
+  assert.deepEqual(JSON.parse(quiet.raw), h.output, 'no hook, no change');
+  const lost = [];
+  await h.run([h.sys, h.ev({ type: 'message_start' }), h.tool('so1', 'StructuredOutput'), h.json(0, '{"items":[{"id":"c1","tier":"core"}'), '{ this is not json', h.result()], { onStructuredJson: buffer => lost.push(buffer) });
+  assert.equal(lost.at(-1), null, 'a line that cannot be read clears the count');
+});
+
 test('Claude stream-json: WebSearch then WebFetch report searching with the query, reading and writing, and the searches', async () => {
   const h = streamHarness();
   const lines = [

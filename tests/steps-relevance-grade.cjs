@@ -479,7 +479,7 @@ test('service repair through the real runner: a bounded card left out three time
   const error = await realRunnerService(fx).grade(request({ nodes, pins: [{ id: 'a1', tier: 'core' }] }), new AbortController().signal).then(() => null, e => e);
   assert.equal(error.code, 'invalid'); assert.match(error.message, /missing 1/);
   assert.equal(fx.calls.length, 3);
-  assert.deepEqual(plain(fx.log.getEntries().map(e => e.step)), ['relevance-grade@11', 'relevance-grade-repair-missing@2', 'relevance-grade-repair-missing@2']);
+  assert.deepEqual(plain(fx.log.getEntries().map(e => e.step)), ['relevance-grade@11', 'relevance-grade-repair-missing@3', 'relevance-grade-repair-missing@3']);
 });
 
 test('i18n: the repair status text exists in both languages', () => {
@@ -568,4 +568,61 @@ test('short ids: the shared helper is a one-to-one position map in the given ord
   assert.deepEqual(['u-a', 'u-b', 'u-c'].map(ids.short), ['c1', 'c2', 'c3']);
   assert.deepEqual(['c1', 'c2', 'c3', 'c4', 'u-a', undefined].map(label => ids.real(label)), ['u-a', 'u-b', 'u-c', undefined, undefined, undefined]);
   assert.equal(ids.short('nope'), undefined);
+});
+
+// ---- Progress: tiers received so far (Packet B, F5 minimal) -------------------------------------------------------
+// A hand-driven clock: the service takes it as its second constructor argument.
+const clock = () => { let now = 1_000_000; return { now: () => now, advance: ms => { now += ms; } }; };
+const tierJson = count => `{"items":[${Array.from({ length: count }, (_, i) => `{"id":"c${i + 2}","tier":"core"}`).join(',')}`;
+
+test('progress: the runner gets the raw JSON, the service reports "tiers received" (total = cards to grade) at most every 200 ms and 0 at a new call', async () => {
+  {
+    const { now, advance } = clock();
+    const seen = [];
+    const service = new grade.RelevanceGradeService(async (_req, _signal, _prepared, onJson) => {
+      assert.equal(typeof onJson, 'function', 'a progress listener is passed when the caller asked for progress');
+      onJson('');
+      advance(250); onJson(tierJson(1));
+      advance(50); onJson(tierJson(2));
+      advance(250); onJson(tierJson(3));
+      return full();
+    }, now);
+    await service.grade(request(), new AbortController().signal, { onProgress: p => seen.push(p && plain(p)) });
+    assert.deepEqual(seen, [{ received: 0, total: 3 }, { received: 1, total: 3 }, { received: 3, total: 3 }], 'the update 50 ms after the last one is skipped');
+  }
+});
+
+test('progress: without a listener the runner gets none; a throwing listener cannot fail the grade; a rejected call (null) clears it', async () => {
+  const plainService = new grade.RelevanceGradeService(async (_req, _signal, _prepared, onJson) => { assert.equal(onJson, undefined); return full(); });
+  await plainService.grade(request(), new AbortController().signal);
+  const seen = [];
+  const service = new grade.RelevanceGradeService(async (_req, _signal, _prepared, onJson) => { onJson(''); onJson(null); onJson(''); return full(); });
+  const result = await service.grade(request(), new AbortController().signal, { onProgress: p => { seen.push(p && plain(p)); if (p && seen.length === 1) throw new Error('boom'); } });
+  assert.equal(result.items.length, 3);
+  assert.deepEqual(seen, [{ received: 0, total: 3 }, null, { received: 0, total: 3 }]);
+});
+
+test('progress: a repair request counts from zero again (every request has its own listener)', async () => {
+  {
+    const { now, advance } = clock();
+    const seen = [];
+    let call = 0;
+    const service = new grade.RelevanceGradeService(async (_req, _signal, _prepared, onJson) => {
+      call++;
+      onJson(''); advance(300); onJson(tierJson(2));
+      return call === 1 ? badDeep() : goodDeep();
+    }, now);
+    await service.grade(repairRequest(), new AbortController().signal, { onRepair: () => seen.push('repair'), onProgress: p => seen.push(p && plain(p)) });
+    assert.deepEqual(seen, [{ received: 0, total: 4 }, { received: 2, total: 4 }, 'repair', { received: 0, total: 4 }, { received: 2, total: 4 }]);
+  }
+});
+
+test('repair-missing prompt: Claude is told to return the result, Codex keeps the original sentence; neither asks for text JSON from Claude', () => {
+  const input = { ...request({ nodes: deepTree, pins: [{ id: 'p', tier: 'side' }] }), previousReply: { items: [{ id: 'x', tier: 'core' }] }, violations: [], missing: ['y'] };
+  const codex = grade.relevanceGradeMissingRepairStep.render({ ...input, model: 'gpt-6-luna' });
+  assert.ok(codex.includes('Reply with ONE complete JSON object for ALL cards that are not pinned: the cards of your previous reply (change them only if needed) plus every card listed above. Write each id only'));
+  const claude = grade.relevanceGradeMissingRepairStep.render({ ...input, model: 'claude:sonnet' });
+  assert.ok(claude.includes('Return ONE complete result for ALL cards that are not pinned: the cards of your previous reply (change them only if needed) plus every card listed above. Write each id only'));
+  assert.doesNotMatch(claude, /Reply with ONE|JSON object|Reply with ONLY/);
+  assert.equal(grade.relevanceGradeMissingRepairStep.version, 3);
 });

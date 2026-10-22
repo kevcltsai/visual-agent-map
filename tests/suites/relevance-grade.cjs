@@ -40,7 +40,7 @@ async function harness({ language = 'en', mapTitle = 'Sleep map' } = {}) {
   class Modal extends Base { open() { opened.push(this); super.open(); } }
   const ctx = {};
   // A recalibrate answers with the cards that have no tier yet (none, once the map is graded).
-  const control = { decline: false, calls: [], reply: async (request, _signal, prepared) => prepared.step.id.startsWith('relevance-recalibrate') ? recalibrateNew(request) : gradeAll(request), usageAsks: 0, prewarms: [], releases: 0 };
+  const control = { decline: false, calls: [], reply: async (request, _signal, prepared) => prepared.step.id.startsWith('relevance-recalibrate') ? recalibrateNew(request) : gradeAll(request), usageAsks: 0, prewarms: [], releases: 0, intervals: [] };
   const plugin = withExpansionCoordinator({
     repo, settings, running: new Set(), abortChartJobs: () => {}, addChartsAfterWrite: () => {}, logs: { appendLog() {} }, rebuildDerivedData: () => repo.rebuildDerivedData(), relevanceGrades: new Map(), releaseOutline() {},
     // Like the real mutate: after the work the view synchronizes, which repaints only when a note changed.
@@ -56,11 +56,11 @@ async function harness({ language = 'en', mapTitle = 'Sleep map' } = {}) {
     prewarmClaudeStep: (...args) => control.prewarms.push(args), releaseWarmClaude: () => { control.releases++; },
     confirmAiUsage: async (_model, run) => { control.usageAsks++; if (control.confirmGate) await control.confirmGate; if (control.decline) return false; await run(); return true; }
   });
-  const { VisualAgentMapView } = load('main.ts', { obsidian: { ...obsidian, Modal, Notice: class { constructor(m) { notices.push(m); } }, Menu, setTooltip(el, text) { tips.set(el, text); } } });
+  const { VisualAgentMapView } = load('main.ts', { obsidian: { ...obsidian, Modal, Notice: class { constructor(m) { notices.push(m); } }, Menu, setTooltip(el, text) { tips.set(el, text); } } }, { setInterval: fn => { control.intervals.push(fn); return control.intervals.length; }, clearInterval: () => {} });
   const gradeModule = load('core/relevance-grade-service.ts');
   const { RelevanceGradeService } = gradeModule;
-  plugin.relevanceGrade = new RelevanceGradeService(async (request, signal, prepared) => {
-    control.calls.push({ request, signal, step: prepared.step.id, prompt: prepared.prompt });
+  plugin.relevanceGrade = new RelevanceGradeService(async (request, signal, prepared, onJson) => {
+    control.calls.push({ request, signal, step: prepared.step.id, prompt: prepared.prompt, onJson });
     const out = await control.reply(request, signal, prepared);
     return typeof out === 'string' ? out : JSON.stringify(out);
   });
@@ -1295,4 +1295,92 @@ integrationTest('relevance: Stop, a declined notice, a failed run and closing th
   const quiet = await harness();
   await quiet.enter('Goal'); await quiet.settled();
   assert.equal(quiet.control.releases, 0, 'a run that finishes leaves the pool alone (it took its process)');
+});
+
+// ---- Status bar progress: "N of M received" and seconds (Packet B, F5 minimal) ------------------------------------
+const receivedEl = h => find(h.bar(), i => hasCls(i, 'vam-relevance-received'));
+const elapsedEl = h => find(h.bar(), i => hasCls(i, 'vam-relevance-elapsed'));
+const tiersJson = count => `{"items":[${Array.from({ length: count }, (_, i) => `{"id":"c${i + 2}","tier":"core"}`).join(',')}`;
+// A fake clock for the service's 200 ms throttle is not needed here: each test spaces its updates with real waits of 0, so
+// only the first count after "" passes; tests that need more feed the service through a service built with a hand clock.
+async function progressHarness() {
+  const h = await harness();
+  let now = 1_000_000;
+  h.plugin.relevanceGrade = new h.gradeModule.RelevanceGradeService(async (request, signal, prepared, onJson) => {
+    h.control.calls.push({ request, signal, step: prepared.step.id, onJson });
+    const out = await h.control.reply(request, signal, prepared);
+    return JSON.stringify(out);
+  }, () => now);
+  h.advance = ms => { now += ms; };
+  return h;
+}
+
+integrationTest('relevance: while Claude streams, the status bar shows "N of M received" and seconds, changed in place without a repaint, hidden from the live region, and cleared when the run ends', async () => {
+  const h = await progressHarness();
+  const gate = deferred(); h.control.reply = request => gate.promise.then(() => gradeAll(request));
+  await h.enter('Goal'); await until(() => h.control.calls.length);
+  assert.ok(elapsedEl(h), 'seconds are on screen as soon as the request is out'); assert.equal(elapsedEl(h).attrs['aria-hidden'], 'true'); assert.match(elapsedEl(h).text, /0:0\d$/); assert.equal(h.control.intervals.length, 1, 'the shared one-second tick rewrites the seconds');
+  assert.equal(receivedEl(h).attrs['aria-hidden'], 'true'); assert.equal(receivedEl(h).text, '', 'nothing yet: seconds only');
+  assert.equal(h.barText(), 'Grading by goal…', 'the live-region text is unchanged by progress');
+  const onJson = h.control.calls[0].onJson; const rendersBefore = h.renders(); const bar = h.bar();
+  onJson('');
+  assert.equal(receivedEl(h).text, ' · 0 of 4 cards received');
+  h.advance(300); onJson(tiersJson(3));
+  assert.equal(receivedEl(h).text, ' · 3 of 4 cards received');
+  assert.equal(h.renders(), rendersBefore, 'text only: no repaint'); assert.equal(h.bar(), bar, 'the same status bar element');
+  assert.equal(h.barText(), 'Grading by goal…');
+  gate.resolve(); await h.settled();
+  assert.equal(receivedEl(h), undefined, 'the finished run shows its result, not the count'); assert.equal(elapsedEl(h), undefined);
+  assert.equal(h.run().received, undefined);
+});
+
+integrationTest('relevance: a repair request restarts the count; a recalibration says "changes received"; Stop, failure and Codex show no count', async () => {
+  const h = await progressHarness();
+  const gate = deferred(); h.control.reply = request => gate.promise.then(() => gradeAll(request));
+  await h.enter('Goal'); await until(() => h.control.calls.length);
+  h.control.calls[0].onJson(''); h.advance(300); h.control.calls[0].onJson(tiersJson(2));
+  assert.equal(receivedEl(h).text, ' · 2 of 4 cards received');
+  h.run().repairing = true; h.run().received = undefined; h.view.refreshRelevance();
+  assert.equal(receivedEl(h).text, '', 'after the repair starts there is nothing counted yet');
+  h.advance(300); h.control.calls[0].onJson('');
+  assert.equal(receivedEl(h).text, ' · 0 of 4 cards received');
+  button(h.bar(), 'Stop').click();
+  assert.equal(receivedEl(h), undefined, 'Stop clears it'); assert.equal(h.run().received, undefined);
+  gate.resolve(); await tick();
+  // Codex: the runner never calls the listener, so only the seconds are there.
+  const codex = await progressHarness();
+  const hold = deferred(); codex.control.reply = request => hold.promise.then(() => gradeAll(request));
+  await codex.enter('Goal'); await until(() => codex.control.calls.length);
+  assert.equal(receivedEl(codex).text, ''); assert.ok(elapsedEl(codex));
+  hold.resolve(); await codex.settled();
+  // A failed run clears it as well.
+  const failed = await progressHarness();
+  failed.control.reply = async () => { failed.control.calls[0].onJson(''); throw new Error('boom'); };
+  await failed.enter('Goal'); await failed.settled();
+  assert.equal(failed.run().status, 'failed'); assert.equal(receivedEl(failed), undefined); assert.equal(failed.run().received, undefined);
+});
+
+integrationTest('relevance: a recalibration counts changes received, without a total; waiting for the usage notice shows no seconds or count', async () => {
+  const h = await progressHarness();
+  await h.enter('Goal'); await h.settled();
+  const gate = deferred(); h.control.reply = request => gate.promise.then(() => recalibrateNew(request));
+  await h.enter('Goal'); await until(() => h.control.calls.length === 2);
+  assert.equal(h.run().mode ?? 'recalibrate', 'recalibrate');
+  h.control.calls[1].onJson('');
+  h.advance(300); h.control.calls[1].onJson('{"changes":[{"id":"c2","tier":"core","anchor":null},{"id":"c3","tier":"side","anchor":null}');
+  assert.equal(receivedEl(h).text, ' · 2 changes received');
+  gate.resolve(); await h.settled();
+  const waiting = await progressHarness();
+  waiting.control.confirmGate = deferred().promise;
+  await waiting.enter('Goal'); await until(() => waiting.control.usageAsks === 1);
+  assert.equal(receivedEl(waiting), undefined); assert.equal(elapsedEl(waiting), undefined);
+});
+
+integrationTest('relevance: switching to the built-in sample with the panel open kills the pre-started CLI', async () => {
+  const h = await harness();
+  h.plugin.closeStaleDetails = () => {}; h.view.app.workspace = { requestSaveLayout() {} };
+  h.chip().click();
+  const open = h.control.releases;
+  await h.view.openBuiltInSample();
+  assert.equal(h.control.releases, open + 1);
 });

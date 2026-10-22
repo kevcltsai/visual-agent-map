@@ -562,6 +562,8 @@ export const zhTW: Record<TranslationKey, string> = {
   "ui.relevance_running": "依目標分級中…",
   "ui.relevance_awaiting_usage": "等待確認 AI 用量…",
   "ui.relevance_repairing": "修正上下層一致中…",
+  "ui.relevance_received_0_1": "已收到 {0}／{1} 張",
+  "ui.relevance_received_changes_0": "已收到 {0} 張變動",
   "ui.relevance_stop": "停止",
   "ui.relevance_stopped": "已停止分級，沒有任何議題被改變。",
   "ui.relevance_not_started": "分級沒有開始。目標已儲存，沒有任何議題被改變。",

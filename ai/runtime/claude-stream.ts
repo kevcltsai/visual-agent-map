@@ -115,6 +115,11 @@ export interface ClaudeStreamHooks {
   onStage?: (stage: ResearchStageName, query?: string) => void;
   /** The StructuredOutput text so far; `null` when the call was retracted or replaced. */
   onStructuredDelta?: (fields: PartialFields | null) => void;
+  /**
+   * The raw StructuredOutput JSON received so far: "" when a new call starts (it replaces the earlier one), `null` when the
+   * CLI rejected the call. For progress counting only; the result still comes from the `result` record.
+   */
+  onStructuredJson?: (buffer: string | null) => void;
 }
 
 const LIST_LIMIT = 20;
@@ -134,6 +139,7 @@ export class ClaudeStreamObserver {
   private readonly milestoneData: AiMilestones = { stream: "stream-json" };
   private stage: ResearchStageName | "" = "";
   private structuredId = "";
+  private structuredJson = "";
   private stopped = false;
 
   constructor(
@@ -161,6 +167,7 @@ export class ClaudeStreamObserver {
     // The lost line may have held the text or tool call: report neither textBeforeTool nor enforceRetry as false.
     this.facts.markIncomplete();
     this.call(() => this.hooks.onStructuredDelta?.(null));
+    this.call(() => this.hooks.onStructuredJson?.(null));
   }
 
   /** The records already read stay; the milestones of the finished call. */
@@ -216,6 +223,9 @@ export class ClaudeStreamObserver {
         block.json += event.delta.partial_json;
         if (block.id !== this.structuredId) return;
         this.preview.append(event.delta.partial_json);
+        this.structuredJson += event.delta.partial_json;
+        const json = this.structuredJson;
+        this.call(() => this.hooks.onStructuredJson?.(json));
         const fields = this.preview.snapshot();
         if (fields.summary && !this.milestoneData.previewSummaryAt) this.milestoneData.previewSummaryAt = this.now();
         this.call(() => this.hooks.onStructuredDelta?.(fields));
@@ -252,6 +262,8 @@ export class ClaudeStreamObserver {
       this.milestoneData.structuredCalls = (this.milestoneData.structuredCalls ?? 0) + 1;
       this.milestoneData.structuredStartAt ??= at;
       this.preview.start();
+      this.structuredJson = "";
+      this.call(() => this.hooks.onStructuredJson?.(""));
       this.call(() => this.hooks.onStructuredDelta?.(this.preview.snapshot()));
       this.setStage("writing");
     } else this.tools.set(id, { name });
@@ -281,6 +293,8 @@ export class ClaudeStreamObserver {
     else if (tool.name === "StructuredOutput" && failed && id === this.structuredId) {
       // The CLI rejected the call (validation): the model will call the tool again, so show nothing meanwhile.
       this.preview.reject();
+      this.structuredJson = "";
+      this.call(() => this.hooks.onStructuredJson?.(null));
       this.call(() => this.hooks.onStructuredDelta?.(null));
     }
   }

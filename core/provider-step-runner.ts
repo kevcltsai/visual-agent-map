@@ -16,7 +16,9 @@ export const stepEffort = (reasoning: ReasoningLevel): string => (reasoning === 
 export type ProviderStepRunner<Request, Output> = (
   request: Request,
   signal: AbortSignal,
-  prepared: PreparedStep<Request, Output>
+  prepared: PreparedStep<Request, Output>,
+  /** Claude stream only: the raw StructuredOutput JSON so far ("" = a new call began, null = the CLI rejected it). */
+  onStructuredJson?: (buffer: string | null) => void
 ) => Promise<string>;
 
 export function providerStepRunner<Request extends { model: string; reasoning: ReasoningLevel }, Output>(
@@ -30,7 +32,7 @@ export function providerStepRunner<Request extends { model: string; reasoning: R
     stream?: boolean;
   }
 ): ProviderStepRunner<Request, Output> {
-  return async (request, signal, prepared) => {
+  return async (request, signal, prepared, onStructuredJson) => {
     const key = `${config.name}:${randomUUID()}`,
       controller = new AbortController();
     const abort = (): void => controller.abort();
@@ -80,7 +82,8 @@ export function providerStepRunner<Request extends { model: string; reasoning: R
         textOnly: true,
         searchBudget: 0,
         signal: controller.signal,
-        ...(config.stream ? { stream: true } : {})
+        ...(config.stream ? { stream: true } : {}),
+        ...(config.stream && onStructuredJson ? { onStructuredJson } : {})
       }
     };
     try {

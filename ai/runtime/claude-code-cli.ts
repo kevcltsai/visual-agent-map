@@ -66,6 +66,8 @@ export interface ClaudeTaskControls {
   onStage?: (stage: ResearchStageName, query?: string) => void;
   /** The StructuredOutput text so far; `null` clears it (stream mode only). */
   onStructuredDelta?: (fields: PartialFields | null) => void;
+  /** The raw StructuredOutput JSON so far; "" for a new call, `null` when rejected (stream mode only). */
+  onStructuredJson?: (buffer: string | null) => void;
 }
 
 /** Splits an image data URL into the Messages API image source; anything else is rejected. */
@@ -373,7 +375,8 @@ export class ClaudeCodeCliRuntime {
         ? new ClaudeStreamObserver({
             onFirstEvent: controls.onFirstEvent,
             onStage: controls.onStage,
-            onStructuredDelta: controls.onStructuredDelta
+            onStructuredDelta: controls.onStructuredDelta,
+            onStructuredJson: controls.onStructuredJson
           })
         : null;
       const readStreamLine = (line: string): void => {

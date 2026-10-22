@@ -613,6 +613,8 @@ export const en = {
   "ui.relevance_running": "Grading by goal…",
   "ui.relevance_awaiting_usage": "Waiting for AI usage confirmation…",
   "ui.relevance_repairing": "Fixing parent-child order…",
+  "ui.relevance_received_0_1": "{0} of {1} cards received",
+  "ui.relevance_received_changes_0": "{0} changes received",
   "ui.relevance_stop": "Stop",
   "ui.relevance_stopped": "Grading stopped. No topic was changed.",
   "ui.relevance_not_started": "Grading did not start. The goal was saved; no topic was changed.",

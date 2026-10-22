@@ -29,6 +29,8 @@ import outputRepairClaude from "./output-repair.claude.md";
 import outputRepairCodex from "./output-repair.codex.md";
 import outputRepairMissingClaude from "./output-repair-missing.claude.md";
 import outputRepairMissingCodex from "./output-repair-missing.codex.md";
+import askRepairMissingClaude from "./ask-repair-missing.claude.md";
+import askRepairMissingCodex from "./ask-repair-missing.codex.md";
 
 export type { PinConflict, RelevancePin };
 export const RELEVANCE_TIERS: readonly RelevanceTier[] = ["core", "support", "side"];
@@ -462,13 +464,14 @@ const repairMissingPrompt = (request: RelevanceRepairRequest): string => {
         ...(bounds.get(id)?.max ? { max: bounds.get(id)?.max } : {})
       }))
     ),
+    askLine: trimmed(providerForModel(request.model) === "claude" ? askRepairMissingClaude : askRepairMissingCodex),
     toolLine: text.tools,
     outputLine: text.output
   });
 };
 export const relevanceGradeMissingRepairStep: StepDefinition<RelevanceRepairRequest, RelevanceGradeResult> = {
   id: "relevance-grade-repair-missing",
-  version: 2,
+  version: 3,
   render: repairMissingPrompt,
   schema: RELEVANCE_GRADE_SCHEMA,
   policy: (prompt, request) => refuseIfTooBig(prompt, request, RELEVANCE_GRADE_SCHEMA),

@@ -57,6 +57,7 @@ test('final delivery base, research and draft fingerprints keep their pinned val
 
 test('manual-flow sourceFingerprint and the delivery checkpoint digests it carries keep their pinned values', async () => {
   const subject = fixture({ depth: 1 });
+  const stamped = subject.getMap(); stamped.aim.contentLanguage = 'en'; await subject.repository.saveMap('Map.md', stamped); // a 0.24-shaped map: its stored note language keeps the pinned language
   const ask = async context => {
     const phase = phaseOf(context);
     if (phase === 'subtopic-research') return answer('Method found', 'Research status: search completed\nEvidence https://example.org/a');
@@ -95,6 +96,7 @@ test('AIM checkpoint fingerprints do not change when the interface language chan
   const run = async uiLanguage => {
     const subject = fixture({ depth: 1 });
     subject.repository.settings.language = uiLanguage;
+      const stamped = subject.getMap(); stamped.aim.contentLanguage = 'en'; await subject.repository.saveMap('Map.md', stamped); // a 0.24-shaped map: its stored note language keeps the pinned language
     const ask = async context => {
       const phase = phaseOf(context);
       assert.equal(context.outputLanguage, 'en');

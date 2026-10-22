@@ -229,14 +229,14 @@ function errorMessage(error: unknown): string {
   const message = (error as { message?: unknown } | null)?.message;
   return typeof message === "string" ? message : String(error);
 }
-/**
- * The built-in Standard and Textbook templates follow the output language, as the fixed Detail headings always did; their
- * display name uses `language` itself, so a Simplified Chinese interface labels the template "标准", not "標準".
- */
 /** A note's stored "no conclusion yet" placeholder is written in the note's own language; in an AI prompt it is shown in the task's output language. */
 function summaryForPrompt(summary: string, language: ContentLanguage): string {
   return isPlaceholder(summary) ? translateNote(noteLanguageOf(language), "note.no_conclusion_yet") : summary;
 }
+/**
+ * The built-in Standard and Textbook templates follow the output language, as the fixed Detail headings always did; their
+ * display name uses `language` itself, so a Simplified Chinese interface labels the template "标准", not "標準".
+ */
 function templateInLanguage(template: DetailTemplate, language: ContentLanguage): DetailTemplate {
   return isBuiltinTemplateId(template.id)
     ? builtinTemplates(noteLanguageOf(language), language).find(item => item.id === template.id)!
@@ -8481,16 +8481,18 @@ export class VisualAgentMapView extends ItemView {
         failed(t("ui.the_selected_sources_contain_no_markdown_content_to_synthesi"));
         return;
       }
-      const task = synthesisDirectionsTask(this.plugin.settings.language);
+      // Task text, placeholders and ancestor labels follow the output note language, as in the other task paths.
+      const promptLanguage = options.outputLanguage ?? this.plugin.settings.language;
+      const task = synthesisDirectionsTask(promptLanguage);
       const result = await this.plugin.askModel(
         withThinkingOrigin(
           {
             title: note.title,
-            summary: summaryForPrompt(note.summary, this.plugin.settings.language),
+            summary: summaryForPrompt(note.summary, promptLanguage),
             rules: "",
             detail: note.detail,
             task: [task, options?.requirements].filter(Boolean).join("\n\n"),
-            ancestors: await this.ancestorContext(node, this.plugin.settings.language),
+            ancestors: await this.ancestorContext(node, promptLanguage),
             workingFindings: note.newFindings,
             referenceGroups: [...selectedSources, childSources],
             // Within budget the sources go in as written (one request); only over-budget sources are extracted first.
@@ -9149,7 +9151,9 @@ export class VisualAgentMapView extends ItemView {
           summary: translateNote(runOptions.outputLanguage ?? language, "note.no_conclusion_yet"),
           rules: "",
           detail: "",
-          task: [synthesisDirectionsTask(language), runOptions.requirements].filter(Boolean).join("\n\n"),
+          task: [synthesisDirectionsTask(runOptions.outputLanguage ?? language), runOptions.requirements]
+            .filter(Boolean)
+            .join("\n\n"),
           ancestors: "",
           referenceGroups: [...(runOptions.referenceGroups ?? []), sourceGroup],
           // Within budget the sources go in as written (one request); only over-budget sources are extracted first.

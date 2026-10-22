@@ -38737,7 +38737,7 @@ ${request.requirements}` : preset.text,
     return [...new Set(paths)];
   }
   async proposeIntegrationDirections(node, options, found, failed, accepted) {
-    var _a2, _b2, _c, _d, _e;
+    var _a2, _b2, _c, _d, _e, _f;
     if (!this.map) {
       failed(t("ui.no_mind_map_is_available"));
       return;
@@ -38765,16 +38765,17 @@ ${request.requirements}` : preset.text,
         failed(t("ui.the_selected_sources_contain_no_markdown_content_to_synthesi"));
         return;
       }
-      const task = synthesisDirectionsTask(this.plugin.settings.language);
+      const promptLanguage = (_d = options.outputLanguage) != null ? _d : this.plugin.settings.language;
+      const task = synthesisDirectionsTask(promptLanguage);
       const result = await this.plugin.askModel(
         withThinkingOrigin(
           {
             title: note.title,
-            summary: summaryForPrompt(note.summary, this.plugin.settings.language),
+            summary: summaryForPrompt(note.summary, promptLanguage),
             rules: "",
             detail: note.detail,
             task: [task, options == null ? void 0 : options.requirements].filter(Boolean).join("\n\n"),
-            ancestors: await this.ancestorContext(node, this.plugin.settings.language),
+            ancestors: await this.ancestorContext(node, promptLanguage),
             workingFindings: note.newFindings,
             referenceGroups: [...selectedSources, childSources],
             // Within budget the sources go in as written (one request); only over-budget sources are extracted first.
@@ -38799,7 +38800,7 @@ ${request.requirements}` : preset.text,
       );
       progress.end();
       accepted == null ? void 0 : accepted();
-      if ((_d = options.signal) == null ? void 0 : _d.aborted) throw new DOMException("Aborted", "AbortError");
+      if ((_e = options.signal) == null ? void 0 : _e.aborted) throw new DOMException("Aborted", "AbortError");
       const angles = result.suggestions.slice(0, 2);
       if (!angles.length) {
         failed(t("ui.ai_did_not_suggest_a_synthesis_direction_please_retry"));
@@ -38807,7 +38808,7 @@ ${request.requirements}` : preset.text,
       }
       found(angles);
     } catch (error) {
-      if (((_e = options.signal) == null ? void 0 : _e.aborted) || error instanceof Error && error.name === "AbortError") {
+      if (((_f = options.signal) == null ? void 0 : _f.aborted) || error instanceof Error && error.name === "AbortError") {
         failed(t("ui.research_stopped_existing_content_was_preserved"));
         return;
       }
@@ -39254,7 +39255,7 @@ ${request.requirements}` : preset.text,
    * report to the open dialog through `observer`; once it is closed the run carries on and the selection bar shows it.
    */
   async startSelectionSynthesis(sources2, options, direction, failed, accepted, observer) {
-    var _a2, _b2, _c, _d;
+    var _a2, _b2, _c, _d, _e;
     if (!this.map || sources2.length < 2) {
       failed(t("ui.select_at_least_two_topics"));
       return;
@@ -39364,9 +39365,9 @@ ${request.requirements}` : preset.text,
           summary: translateNote((_b2 = runOptions.outputLanguage) != null ? _b2 : language2, "note.no_conclusion_yet"),
           rules: "",
           detail: "",
-          task: [synthesisDirectionsTask(language2), runOptions.requirements].filter(Boolean).join("\n\n"),
+          task: [synthesisDirectionsTask((_c = runOptions.outputLanguage) != null ? _c : language2), runOptions.requirements].filter(Boolean).join("\n\n"),
           ancestors: "",
-          referenceGroups: [...(_c = runOptions.referenceGroups) != null ? _c : [], sourceGroup],
+          referenceGroups: [...(_d = runOptions.referenceGroups) != null ? _d : [], sourceGroup],
           // Within budget the sources go in as written (one request); only over-budget sources are extracted first.
           referenceDelivery: "direct",
           onProgress: runOptions.onProgress,
@@ -39388,7 +39389,7 @@ ${request.requirements}` : preset.text,
       taskProgress.end();
       markAccepted();
       if (this.integrationTask !== task) return;
-      if (controller.signal.aborted || this.path !== task.mapPath || ((_d = this.map) == null ? void 0 : _d.id) !== task.mapId)
+      if (controller.signal.aborted || this.path !== task.mapPath || ((_e = this.map) == null ? void 0 : _e.id) !== task.mapId)
         throw new DOMException("Aborted", "AbortError");
       const latest = await this.topicReferenceGroup(
         sources2,
@@ -44282,7 +44283,7 @@ function stripWrappingFence(raw) {
 }
 function parseOutlineReply(raw, language2) {
   const locale = uiLocale(language2);
-  const text11 = stripWrappingFence(raw);
+  const text11 = sanitizeOutlineDraft(stripWrappingFence(raw));
   const parsed = parseOutline(text11);
   if (parsed.nodes.length > OUTLINE_NODE_LIMIT)
     throw new OutlineGenerateError(

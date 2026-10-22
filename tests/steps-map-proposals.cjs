@@ -70,6 +70,18 @@ test('outline reply: bad output is rejected with typed, localized errors', () =>
   assert.throws(() => outline.parseOutlineReply(`${hundred}\n## x`, 'en'), error => error.message === translate('en', 'error.outline_generate_too_many', 101, 100));
 });
 
+test('outline reply: a heading title that would break a note is cleaned, not fatal; a pasted outline stays strict', () => {
+  const cleaned = (heading) => outline.parseOutlineReply(`# Root\n${heading}`, 'en');
+  assert.equal(cleaned('## a [[ b').markdown, '# Root\n## a [ b\n');
+  assert.equal(cleaned('## Array ]] end').markdown, '# Root\n## Array ] end\n');
+  const fenced = '## Fence \\`\\`\\` x';
+  assert.equal(cleaned(fenced).nodes.length, 2);
+  assert.ok(!cleaned(fenced).markdown.includes('```') && !cleaned(fenced).markdown.includes('\\`'), 'an escaped fence in a heading is cleaned');
+  const strict = load('experiences/visual-map/outline-import.ts', { obsidian });
+  const pasted = strict.parseOutline('# Root\n## a [[ b');
+  assert.ok(pasted.errors.length && pasted.errors[0].line === 2, 'a user-pasted outline is still refused with its line number');
+});
+
 function serviceFixture(reply, model = 'gpt-6-luna') {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'vam-map-proposals-'));
   const log = new AiExchangeLog(nodeFsAdapter, path.join(dir, 'ai-exchanges.json'), error => { throw error; });

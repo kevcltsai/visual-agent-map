@@ -5,6 +5,7 @@ import type { ReasoningLevel } from "../../../ai/types";
 import {
   OUTLINE_NODE_LIMIT,
   parseOutline,
+  sanitizeOutlineDraft,
   type OutlineLimits,
   type OutlineNode
 } from "../../../experiences/visual-map/outline-import";
@@ -76,13 +77,15 @@ export function stripWrappingFence(raw: string): string {
 }
 
 /**
- * Accept only heading-only Markdown: wrapping fence removed, then `parseOutline` (not relaxed). Anything the
+ * Accept only heading-only Markdown: wrapping fence removed, headings cleaned with `sanitizeOutlineDraft`, then `parseOutline` (not relaxed). Anything the
  * parser reports as an error, any non-heading line, comment, fenced block or front matter, no heading at all, or
  * more than the 100-heading limit rejects the whole reply.
  */
 export function parseOutlineReply(raw: string, language: ContentLanguage): OutlineGenerateResult {
   const locale = uiLocale(language);
-  const text = stripWrappingFence(raw);
+  // A heading title that would break a note (unpaired [[ ]], an escaped fence) is cleaned here, as the outline box does,
+  // so one such heading does not fail the whole AI reply; the user's own pasted outline still goes through the strict parser.
+  const text = sanitizeOutlineDraft(stripWrappingFence(raw));
   const parsed = parseOutline(text);
   if (parsed.nodes.length > OUTLINE_NODE_LIMIT)
     throw new OutlineGenerateError(

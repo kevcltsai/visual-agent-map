@@ -314,7 +314,7 @@ const words = (list: string): readonly string[] => list.split(" ");
  *
  * Shared words are in neither list: a, in, no, on (French "on"), an, as, at, per, plus, par, van, met, op, was, am, fur,
  * os, med, si, den, and the words that are also common in English text or names: do, die, come (Italian), et (Smith et al.), mit (MIT), los (Los Angeles), la, lo, non (non-profit), da (Da Vinci), des (Des Moines), al (Al Gore, Spanish "al" beside English), ve (the "ve" of we've). A word that is plainly a foreign function word goes in `foreign` even when a rare English homograph exists
- * (con, die, em, um), because a wrong "English" costs more than a missed one: a missed one only keeps
+ * (con, em, um), because a wrong "English" costs more than a missed one: a missed one only keeps
  * the model following the input text. Dutch "is" is covered by the Dutch words beside it in `foreign`.
  */
 export const LATIN_TEXT_DETECTION = {

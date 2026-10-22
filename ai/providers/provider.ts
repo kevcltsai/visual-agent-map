@@ -2,7 +2,8 @@ export type AiProviderId = "codex" | "claude";
 
 export const CLAUDE_MODEL_CHOICES = [
   { id: "claude:sonnet", label: "Claude · Sonnet", model: "sonnet" },
-  { id: "claude:opus", label: "Claude · Opus", model: "opus" }
+  { id: "claude:opus", label: "Claude · Opus", model: "opus" },
+  { id: "claude:haiku", label: "Claude · Haiku", model: "haiku" }
 ] as const;
 
 export function providerForModel(model: string): AiProviderId {

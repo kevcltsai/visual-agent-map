@@ -30,6 +30,9 @@ test('model identifiers select one provider and preserve stable Claude aliases',
   assert.equal(providers.providerModelId('claude:opus'), 'opus');
   assert.equal(providers.claudeModelChoice('claude:sonnet').model, 'sonnet');
   assert.equal(providers.claudeModelChoice('claude:unknown'), undefined);
+  assert.equal(providers.providerModelId('claude:haiku'), 'haiku');
+  assert.equal(providers.claudeModelChoice('claude:haiku').label, 'Claude · Haiku');
+  assert.deepEqual([...providers.CLAUDE_MODEL_CHOICES.map(choice => choice.id)], ['claude:sonnet', 'claude:opus', 'claude:haiku']);
 });
 test('stale Codex discovery cannot replace the current models or reasoning catalog', async () => {
   const { ModelDiscovery } = load('core/model-discovery.ts');

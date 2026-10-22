@@ -59,6 +59,18 @@ integrationTest('Claude Code uses the shared task prompt and structured result p
   assert.equal(call[4].webSearch, true);
   assert.deepEqual(plain(result), { summary: 'Claude result', detail: 'Claude detail', suggestions: [], visualReferences: [] });
 });
+integrationTest('Claude Haiku is accepted by the AI task service and runs as the haiku alias', async () => {
+  const { default: Plugin } = load('main.ts', { obsidian });
+  const plugin = new Plugin(); plugin.app = { vault: { adapter: new obsidian.FileSystemAdapter() } }; plugin.manifest = { dir: '.obsidian/plugins/visual-agent-map' };
+  let call;
+  plugin.claudeCli = () => ({ runTask: async (...args) => { call = args; return JSON.stringify({ summary: 'Haiku result', detail: 'Haiku detail', suggestions: [], visualReferences: [] }); } });
+  plugin.runtime = () => { assert.fail('Claude selection must not fall back to Codex'); };
+  const result = await plugin.askModel({ title: 'Topic', summary: '', rules: '', detail: '', task: 'Haiku task', ancestors: '', mode: 'synthesize', researchMode: 'local', researchDepth: 'fast', visualMode: 'off' }, 'claude:haiku', 'medium');
+  assert.equal(call[1], 'haiku'); assert.equal(call[2], 'medium');
+  assert.equal(result.summary, 'Haiku result');
+  assert.equal(plugin.modelLabel('claude:haiku'), 'Claude · Haiku');
+  assert.equal(plugin.coffeeReasoningEfforts('claude:haiku').join(), 'low,medium,high');
+});
 integrationTest('AI response fallback keeps the language captured when the task started', async () => {
   const { default: Plugin } = load('main.ts', { obsidian });
   const plugin = new Plugin(); plugin.app = { vault: { adapter: new obsidian.FileSystemAdapter() } }; plugin.manifest = { dir: '.obsidian/plugins/visual-agent-map' };

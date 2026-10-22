@@ -7987,7 +7987,8 @@ ${item.content}`)
 // ai/providers/provider.ts
 var CLAUDE_MODEL_CHOICES = [
   { id: "claude:sonnet", label: "Claude \xB7 Sonnet", model: "sonnet" },
-  { id: "claude:opus", label: "Claude \xB7 Opus", model: "opus" }
+  { id: "claude:opus", label: "Claude \xB7 Opus", model: "opus" },
+  { id: "claude:haiku", label: "Claude \xB7 Haiku", model: "haiku" }
 ];
 function providerForModel(model) {
   return model.startsWith("claude:") ? "claude" : "codex";

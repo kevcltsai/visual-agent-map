@@ -92,7 +92,8 @@ export function replaceMarkdownCode(markdown: string, replacement: string): stri
 
 /**
  * Removes `<!-- … -->` comments that start outside code. The comment ends at the first `-->` after it, even when
- * code sits inside the comment (the whole comment is hidden from readers, so it goes). An unclosed `<!--` stays.
+ * code sits inside the comment (the whole comment is hidden from readers, so it goes). An unclosed `<!--` outside code
+ * hides everything after it when rendered, so it is cut to the end of the text.
  */
 export function stripHtmlComments(markdown: string): string {
   let text = markdown;
@@ -104,8 +105,16 @@ export function stripHtmlComments(markdown: string): string {
       start = text.indexOf("<!--", start + 1);
     if (start < 0) return text;
     const close = text.indexOf("-->", start + 4);
-    if (close < 0) return text;
+    if (close < 0) return text.slice(0, start);
     text = text.slice(0, start) + text.slice(close + 3);
     searchFrom = start;
   }
+}
+
+/** Cuts the text at the first `%%` that sits outside code: an unclosed Obsidian comment hides everything after it. */
+export function cutUnclosedPercentComment(markdown: string): string {
+  const ranges = markdownCodeRanges(markdown);
+  let at = markdown.indexOf("%%");
+  while (at >= 0 && ranges.some(range => at >= range.start && at < range.end)) at = markdown.indexOf("%%", at + 1);
+  return at < 0 ? markdown : markdown.slice(0, at);
 }

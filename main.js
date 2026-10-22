@@ -42383,10 +42383,16 @@ function stripHtmlComments(markdown) {
       start = text11.indexOf("<!--", start + 1);
     if (start < 0) return text11;
     const close = text11.indexOf("-->", start + 4);
-    if (close < 0) return text11;
+    if (close < 0) return text11.slice(0, start);
     text11 = text11.slice(0, start) + text11.slice(close + 3);
     searchFrom = start;
   }
+}
+function cutUnclosedPercentComment(markdown) {
+  const ranges = markdownCodeRanges(markdown);
+  let at = markdown.indexOf("%%");
+  while (at >= 0 && ranges.some((range) => at >= range.start && at < range.end)) at = markdown.indexOf("%%", at + 1);
+  return at < 0 ? markdown : markdown.slice(0, at);
 }
 
 // experiences/sharing/share-clean.ts
@@ -42476,7 +42482,7 @@ function cleanSegment(text11, ctx, out) {
 }
 function cleanShareMarkdown(md, ctx) {
   const out = { markdown: "", attachments: [], webImages: [] };
-  const text11 = stripHtmlComments(md.replace(/%%[\s\S]*?%%/g, ""));
+  const text11 = stripHtmlComments(cutUnclosedPercentComment(md.replace(/%%[\s\S]*?%%/g, "")));
   let result = "";
   let from = 0;
   for (const range of markdownCodeRanges(text11)) {

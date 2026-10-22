@@ -3,7 +3,7 @@
  * title only, vault attachments are replaced by `vam-asset:<name>` references (the exporter embeds the files), `%%`
  * comments are dropped. Web images keep their link. Fenced and inline code is left untouched.
  */
-import { markdownCodeRanges, stripHtmlComments } from "./share-code";
+import { cutUnclosedPercentComment, markdownCodeRanges, stripHtmlComments } from "./share-code";
 
 export interface ShareCleanContext {
   /** Title of the note a link target points at, if known. */
@@ -136,12 +136,12 @@ function cleanSegment(text: string, ctx: ShareCleanContext, out: ShareCleanResul
 
 /**
  * `%%` and `<!-- -->` comments go first, wherever they sit and even when they contain code (a hidden comment is
- * private by intent; a literal `%%` inside code that pairs with another `%%` is removed too, the conservative side).
+ * private by intent; an unclosed `%%` or `<!--` outside code hides the rest of the note in a reader, so the rest is cut; a literal `%%` inside code that pairs with another `%%` is removed too, the conservative side).
  * The rest is split on code (share-code.ts, the same definition the leak scanner uses) so only prose is rewritten.
  */
 export function cleanShareMarkdown(md: string, ctx: ShareCleanContext): ShareCleanResult {
   const out: ShareCleanResult = { markdown: "", attachments: [], webImages: [] };
-  const text = stripHtmlComments(md.replace(/%%[\s\S]*?%%/g, ""));
+  const text = stripHtmlComments(cutUnclosedPercentComment(md.replace(/%%[\s\S]*?%%/g, "")));
   let result = "";
   let from = 0;
   for (const range of markdownCodeRanges(text)) {

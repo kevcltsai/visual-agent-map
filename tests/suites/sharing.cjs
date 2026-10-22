@@ -303,7 +303,6 @@ test('sharing F-B: HTML comments outside code disappear, inside code stay', () =
   assert.equal(cleanMd('a <!-- secret `x` [[y]]\n```\nz\n```\n--> b').markdown, 'a  b');
   assert.equal(cleanMd('a `<!-- keep -->` b').markdown, 'a `<!-- keep -->` b');
   assert.equal(cleanMd('```\n<!-- keep -->\n```').markdown, '```\n<!-- keep -->\n```');
-  assert.equal(cleanMd('a <!-- unclosed').markdown, 'a <!-- unclosed', 'unclosed comment is left alone');
 });
 
 test('sharing F-B: a literal %% inside code that pairs with another %% is removed (conservative, recorded)', () => {
@@ -319,4 +318,14 @@ test('sharing: leak categories have localized labels in every language', () => {
     assert.ok(table, lang);
     for (const cat of cats) assert.ok(table[`share.leak_category_${cat}`], `${lang} ${cat}`);
   }
+});
+
+test('sharing F-B: an unclosed %% or <!-- outside code cuts everything after it', () => {
+  const a = cleanMd('keep\n%% never closed\n[[私人]] and text');
+  assert.equal(a.markdown, 'keep\n');
+  assert.equal(cleanMd('keep <!-- never closed [[私人]] text').markdown, 'keep ');
+  assert.equal(cleanMd('x %% a %% y %% tail [[私人]]').markdown, 'x  y ');
+  assert.equal(cleanMd('keep `a %% b` then [[Real]]').markdown, 'keep `a %% b` then Real', 'unpaired %% in code is not a comment');
+  assert.equal(cleanMd('```\n%%\n```\nafter').markdown, '```\n%%\n```\nafter');
+  assert.equal(cleanMd('`<!--` still here').markdown, '`<!--` still here');
 });

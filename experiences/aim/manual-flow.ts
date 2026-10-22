@@ -76,6 +76,7 @@ import {
   type ResearchGapClassification
 } from "./manual-flow-support";
 import { noteLanguageOf, translateNote, type ContentLanguage } from "../../i18n";
+import { sanitizeGeneratedTitle } from "../../core/title-safety";
 import { renderInitialClarificationTask } from "./steps/initial-clarification/step";
 import {
   renderInitialQuestionTask,
@@ -2377,7 +2378,8 @@ export class AimManualFlow {
       id: AIM_UNKNOWN_OPTION_ID,
       label: translateNote(language, "note.aim_unknown_option")
     });
-    const noteTitle = translateNote(language, "note.aim_question_title_0", questionText);
+    // The question text comes from the AI; it becomes a note title, so it is cleaned (D-2026-10-95).
+    const noteTitle = sanitizeGeneratedTitle(translateNote(language, "note.aim_question_title_0", questionText));
     const notePath = this.repository.unique(this.repository.topicFolder(mapPath, "Notes"), noteTitle);
     const questionNodeId = this.id();
     const detail = [

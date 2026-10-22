@@ -1,6 +1,6 @@
 import { App, Modal, Notice } from "obsidian";
 import { t } from "../../i18n";
-import { parseOutline, type OutlineIssue, type OutlineNode } from "./outline-import";
+import { parseOutline, sanitizeOutlineDraft, type OutlineIssue, type OutlineNode } from "./outline-import";
 import type { ResearchDepth } from "../../ai/types";
 import type { TaskOptions } from "./modals";
 import { modelField, noteStyleField, researchDepthField, type FieldLinks, type ModelChoices } from "./research-fields";
@@ -416,7 +416,7 @@ export class OutlineImportModal extends Modal {
         .then(markdown => {
           if (this.detached) return;
           if (controller.signal.aborted) throw new Error(t("ui.outline_ai_stopped"));
-          this.textarea.value = markdown.trimEnd();
+          this.textarea.value = sanitizeOutlineDraft(markdown).trimEnd();
           this.refresh();
           status.setText(t("ui.outline_ai_filled", this.nodes.length));
         })
@@ -439,7 +439,7 @@ export class OutlineImportModal extends Modal {
       // The outline box is built after this section, so the result is put in once the window is complete.
       this.restoreResult = () => {
         if (prefill.markdown !== undefined) {
-          this.textarea.value = prefill.markdown.trimEnd();
+          this.textarea.value = sanitizeOutlineDraft(prefill.markdown).trimEnd();
           this.refresh();
           status.setText(t("ui.outline_ai_filled", this.nodes.length));
         } else if (prefill.message) status.setText(prefill.message);

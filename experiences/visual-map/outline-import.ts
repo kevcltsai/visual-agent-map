@@ -1,4 +1,4 @@
-import { sanitizeGeneratedTitle } from "../../core/title-safety";
+import { sanitizeGeneratedTitle, titleProblem } from "../../core/title-safety";
 import type { MapDocument, MapNode } from "../../map-model";
 import { safeName, type Repository } from "../../repository";
 import { arrangeMap } from "../../map-layout";
@@ -22,6 +22,8 @@ export type OutlineIssueKey =
   | "ui.outline_error_multiple_roots"
   | "ui.outline_error_too_many_nodes"
   | "ui.outline_error_title_too_long"
+  | "ui.outline_error_title_fence"
+  | "ui.outline_error_title_brackets"
   | "ui.outline_error_vam_note"
   | "ui.outline_warning_skipped_level"
   | "ui.outline_warning_duplicate_title"
@@ -114,6 +116,23 @@ function unwrapFencedOutline(lines: string[]): string[] {
   return lines;
 }
 
+/**
+ * Cleans the headings of an AI-written outline draft before it is put in the outline box, where the user sees and can
+ * edit it. Only headings whose title would break a note change; everything else is kept exactly.
+ */
+export function sanitizeOutlineDraft(markdown: string): string {
+  return markdown
+    .split("\n")
+    .map(line => {
+      const heading = HEADING.exec(line);
+      if (!heading) return line;
+      const title = outlineTitle((heading[2] ?? "").replace(/(^|[ \t]+)#+[ \t]*$/, ""));
+      if (!titleProblem(title)) return line;
+      return `${heading[1]} ${sanitizeGeneratedTitle(title)}`;
+    })
+    .join("\n");
+}
+
 export function parseOutline(input: string): OutlineParse {
   const lines = unwrapFencedOutline(
     (input.charCodeAt(0) === 0xfeff ? input.slice(1) : input).replace(/\r\n?/g, "\n").split("\n")
@@ -203,6 +222,9 @@ export function parseOutline(input: string): OutlineParse {
         key: "ui.outline_error_title_too_long",
         values: [lineNumber, OUTLINE_TITLE_LIMIT]
       });
+    // The user's text is never rewritten: a title that would break the note is refused with the reason (D-2026-10-95).
+    const problem = titleProblem(title);
+    if (problem) errors.push({ line: lineNumber, key: `ui.outline_error_title_${problem}`, values: [lineNumber] });
     if (!nodes.length) rootLevel = level;
     else if (level <= rootLevel) {
       errors.push({ line: lineNumber, key: "ui.outline_error_multiple_roots", values: [lineNumber] });
@@ -303,7 +325,7 @@ async function createOutlineNotes(
     try {
       const top = node.parent === null;
       const note = await repository.createNote(
-        sanitizeGeneratedTitle(node.title) || node.title,
+        node.title,
         model,
         map,
         mapPath,
@@ -337,7 +359,7 @@ export async function createOutlineMap(
   const language = repository.settings.language;
   const detailTemplate = template ?? standardTemplate(noteLanguageOf(language));
   if (!nodes.length) throw new Error(translate(language, "ui.outline_error_no_headings"));
-  const mapPath = await repository.createMap(sanitizeGeneratedTitle(nodes[0].title) || nodes[0].title, []);
+  const mapPath = await repository.createMap(nodes[0].title, []);
   let map;
   try {
     map = await repository.readMap(mapPath);

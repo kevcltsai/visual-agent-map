@@ -313,7 +313,7 @@ const words = (list: string): readonly string[] => list.split(" ");
  * anything else stays on the follow-the-input row. The comparison is on whole lower-cased words.
  *
  * Shared words are in neither list: a, in, no, on (French "on"), an, as, at, per, plus, par, van, met, op, was, am, fur,
- * os, med, si, den. A word that is plainly a foreign function word goes in `foreign` even when a rare English homograph exists
+ * os, med, si, den, and the words that are also common in English text or names: do, die, come (Italian), et (Smith et al.), mit (MIT), los (Los Angeles), la, lo, non (non-profit), da (Da Vinci), des (Des Moines), al (Al Gore, Spanish "al" beside English), ve (the "ve" of we've). A word that is plainly a foreign function word goes in `foreign` even when a rare English homograph exists
  * (con, die, em, um), because a wrong "English" costs more than a missed one: a missed one only keeps
  * the model following the input text. Dutch "is" is covered by the Dutch words beside it in `foreign`.
  */
@@ -324,19 +324,19 @@ export const LATIN_TEXT_DETECTION = {
   ),
   foreign: words(
     // Spanish
-    "de la el los las del lo al un una uno que por para con se es su sus como y mas entre sobre" +
+    "de el las del un una uno que por para con se es su sus como y mas entre sobre" +
       " " +
       // French
-      "le les des du et est sont pour avec dans sur au aux cette ces qui pas ne sans vers chez comme mais ou une je tu nous vous" +
+      "le les du est sont pour avec dans sur au aux cette ces qui pas ne sans vers chez comme mais ou une je tu nous vous" +
       " " +
       // German
-      "der die das und ist mit von zu dem ein eine einer nicht auf aus bei nach wie oder wir im zum zur ich sie als auch aber wenn wer" +
+      "der das und ist von zu dem ein eine einer nicht auf aus bei nach wie oder wir im zum zur ich sie als auch aber wenn wer" +
       " " +
       // Portuguese
-      "da do dos em um uma nao na nas pelo pela sao ao aos" +
+      "dos em um uma nao na nas pelo pela sao ao aos" +
       " " +
       // Italian
-      "il gli di della dei delle dello degli che sono nel nella non come anche alla" +
+      "il gli di della dei delle dello degli che sono nel nella anche alla" +
       " " +
       // Dutch
       "het een voor aan naar ook dit dat maar zijn wat hoe waarom ik wij niet uit bij om" +
@@ -345,7 +345,7 @@ export const LATIN_TEXT_DETECTION = {
       "och att det som inte jeg ikke hvordan og" +
       " " +
       // Indonesian and Turkish
-      "yang dan untuk dengan dari tidak adalah pada apa bagaimana ve bir icin ile nasil neden" +
+      "yang dan untuk dengan dari tidak adalah pada apa bagaimana bir icin ile nasil neden" +
       " " +
       // Polish, Czech and Romanian
       "jest nie dla jak czy oraz pentru este"

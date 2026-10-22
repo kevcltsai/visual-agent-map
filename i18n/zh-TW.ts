@@ -79,6 +79,9 @@ export const zhTW: Record<TranslationKey, string> = {
   "ui.outline_error_multiple_roots": "第 {0} 行：只能有一個最高層標題。請只用一個 # 當主題。",
   "ui.outline_error_too_many_nodes": "大綱有 {0} 個標題，上限是 {1} 個。",
   "ui.outline_error_title_too_long": "第 {0} 行：標題最多 {1} 個字。",
+  "ui.outline_error_title_fence":
+    "第 {0} 行：標題不能包含三個反引號（```），否則整份筆記會變成程式碼區塊。請修改該行後再試。",
+  "ui.outline_error_title_brackets": "第 {0} 行：標題不能包含 [[ 或 ]]，否則會弄壞筆記的連結。請修改該行後再試。",
   "ui.outline_error_vam_note": "這看起來是 Visual Agent Map 的筆記或心智圖檔，不是大綱。",
   "ui.outline_warning_skipped_level": "第 {0} 行：標題跳了層級，會掛在最近的上一層下面。",
   "ui.outline_warning_duplicate_title": "第 {0} 行：「{1}」重複出現，每一個都會建立成獨立議題。",

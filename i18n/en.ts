@@ -85,6 +85,10 @@ export const en = {
   "ui.outline_error_multiple_roots": "Line {0}: only one top-level heading is allowed. Use a single # as the topic.",
   "ui.outline_error_too_many_nodes": "The outline has {0} headings; the limit is {1}.",
   "ui.outline_error_title_too_long": "Line {0}: a heading can be at most {1} characters.",
+  "ui.outline_error_title_fence":
+    "Line {0}: a heading cannot contain three backticks (```); they would turn the note into a code block. Edit the line and try again.",
+  "ui.outline_error_title_brackets":
+    "Line {0}: a heading cannot contain [[ or ]]; they would break the note's links. Edit the line and try again.",
   "ui.outline_error_vam_note": "This looks like a Visual Agent Map note or map file, not an outline.",
   "ui.outline_warning_skipped_level":
     "Line {0}: a heading level was skipped; it is placed under the nearest higher heading.",

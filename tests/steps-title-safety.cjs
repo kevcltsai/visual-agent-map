@@ -58,17 +58,33 @@ test('the AI merge title is cleaned (result and fallback)', () => {
   assert.equal(merge.mergeTitleFromResult({}, 'F ``` [[x]]'), 'F  [x]');
 });
 
-test('outline import (AI/pasted outline) writes cleaned titles into the H1 and the map title', async () => {
-  const { createOutlineMap } = load('experiences/visual-map/outline-import.ts', { obsidian });
+test('outline import refuses a pasted title that would break the note, with the reason, and never rewrites it (D-2026-10-95)', () => {
+  const { parseOutline, sanitizeOutlineDraft } = load('experiences/visual-map/outline-import.ts', { obsidian });
+  const fence = parseOutline('# Fence \\`\\`\\` here\n## ok');
+  assert.deepEqual([...fence.errors.map(e => `${e.key}:${e.line}`)], ['ui.outline_error_title_fence:1']);
+  assert.equal(fence.nodes[0].title, 'Fence ``` here', 'the text is reported as typed, not cleaned');
+  const brackets = parseOutline('# Root\n## half [[ open\n## close ]] half');
+  assert.deepEqual([...brackets.errors.map(e => `${e.key}:${e.line}`)], ['ui.outline_error_title_brackets:2', 'ui.outline_error_title_brackets:3']);
+  assert.equal(parseOutline('# Root\n## #tag [x] `code`').errors.length, 0);
+  // An AI draft is cleaned before it reaches the outline box; headings that are fine and all other lines stay as they were.
+  const draft = '```markdown\n# Fence \\`\\`\\` and [[L]] [[\n## child \\`\\`\\` fence\n## [[Note|Alias]] kept\nplain ``` text\n```';
+  const cleaned = sanitizeOutlineDraft(draft);
+  assert.equal(cleaned, '```markdown\n# Fence  and L [\n## child  fence\n## [[Note|Alias]] kept\nplain ``` text\n```');
+  assert.equal(parseOutline(cleaned).errors.length, 0);
+  assert.equal(parseOutline(sanitizeOutlineDraft('# a [[ b')).errors.length, 0);
+});
+
+test('AIM start refuses an unsafe topic before anything is written (D-2026-10-95)', async () => {
+  const { createAimMap } = load('experiences/aim/create-map.ts', { obsidian });
   const { repo } = fixture('en');
-  const nodes = [
-    { level: 1, title: 'Fence ``` and [[L]]', parent: null, line: 1 },
-    { level: 2, title: 'child ``` fence', parent: 0, line: 2 }
-  ];
-  const result = await createOutlineMap(repo, 'gpt-6-luna', nodes, null, new Date('2026-10-13T09:00:00+08:00'));
-  assert.equal(result.failure, undefined);
-  const map = await repo.readMap(result.mapPath);
-  assert.equal(map.title, 'Fence  and [L]');
-  const notes = await Promise.all(map.nodes.map(n => repo.readNote(n.path)));
-  assert.deepEqual(notes.map(n => n.title), ['Fence  and [L]', 'child  fence']);
+  const before = (await repo.mapFiles()).length;
+  await assert.rejects(
+    createAimMap(repo, 'gpt-6-luna', { topic: 'Topic ``` x', context: '', requestId: 'r1' }),
+    /three backticks/
+  );
+  await assert.rejects(
+    createAimMap(repo, 'gpt-6-luna', { topic: 'Topic [[x]]', context: '', requestId: 'r2' }),
+    /\[\[ or \]\]/
+  );
+  assert.equal((await repo.mapFiles()).length, before);
 });

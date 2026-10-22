@@ -79,6 +79,9 @@ export const zhCN: Record<TranslationKey, string> = {
   "ui.outline_error_multiple_roots": "第 {0} 行：只能有一个最高层标题。请只用一个 # 当主题。",
   "ui.outline_error_too_many_nodes": "大纲有 {0} 个标题，上限是 {1} 个。",
   "ui.outline_error_title_too_long": "第 {0} 行：标题最多 {1} 个字。",
+  "ui.outline_error_title_fence":
+    "第 {0} 行：标题不能包含三个反引号（```），否则整份笔记会变成代码块。请修改该行后再试。",
+  "ui.outline_error_title_brackets": "第 {0} 行：标题不能包含 [[ 或 ]]，否则会弄坏笔记的链接。请修改该行后再试。",
   "ui.outline_error_vam_note": "这看起来是 Visual Agent Map 的笔记或心智图档，不是大纲。",
   "ui.outline_warning_skipped_level": "第 {0} 行：标题跳了层级，会挂在最近的上一层下面。",
   "ui.outline_warning_duplicate_title": "第 {0} 行：“{1}”重复出现，每一个都会创建成独立议题。",

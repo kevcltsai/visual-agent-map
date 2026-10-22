@@ -1,3 +1,4 @@
+import { sanitizeGeneratedTitle } from "../../core/title-safety";
 import { hasCompletedWebRetrieval } from "./search-diagnostic";
 import { validateAimResearchPlan } from "./research-plan";
 import { ACTIVE_AIM_FLOW_LIMITS } from "./flow-limits";
@@ -592,9 +593,11 @@ export class AimRunStore {
     mapPath: string,
     handle: AttemptHandle,
     draftId: string,
-    title: string,
+    generatedTitle: string,
     kind: "synthesis" | "conclusion"
   ): Promise<boolean> {
+    // AI-written titles become note titles (D-2026-10-95).
+    const title = sanitizeGeneratedTitle(generatedTitle) || generatedTitle;
     return this.locked(mapPath, async () => {
       const map = await this.repository.readMap(mapPath),
         state = this.state(map),
@@ -690,11 +693,13 @@ export class AimRunStore {
   async createResultDraft(
     mapPath: string,
     handle: AttemptHandle,
-    title: string,
+    generatedTitle: string,
     model: string,
     reasoning?: "low" | "medium" | "high",
     options: AimResultDraftOptions = {}
   ): Promise<ResultDraftCreation> {
+    // AI-written titles become note titles (D-2026-10-95).
+    const title = sanitizeGeneratedTitle(generatedTitle) || generatedTitle;
     return this.locked(mapPath, async () => {
       const map = await this.repository.readMap(mapPath),
         state = this.state(map),

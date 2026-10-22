@@ -176,6 +176,8 @@ var en = {
   "ui.outline_error_multiple_roots": "Line {0}: only one top-level heading is allowed. Use a single # as the topic.",
   "ui.outline_error_too_many_nodes": "The outline has {0} headings; the limit is {1}.",
   "ui.outline_error_title_too_long": "Line {0}: a heading can be at most {1} characters.",
+  "ui.outline_error_title_fence": "Line {0}: a heading cannot contain three backticks (```); they would turn the note into a code block. Edit the line and try again.",
+  "ui.outline_error_title_brackets": "Line {0}: a heading cannot contain [[ or ]]; they would break the note's links. Edit the line and try again.",
   "ui.outline_error_vam_note": "This looks like a Visual Agent Map note or map file, not an outline.",
   "ui.outline_warning_skipped_level": "Line {0}: a heading level was skipped; it is placed under the nearest higher heading.",
   "ui.outline_warning_duplicate_title": 'Line {0}: "{1}" appears more than once; each copy becomes its own topic.',
@@ -1838,6 +1840,8 @@ var zhCN = {
   "ui.outline_error_multiple_roots": "\u7B2C {0} \u884C\uFF1A\u53EA\u80FD\u6709\u4E00\u4E2A\u6700\u9AD8\u5C42\u6807\u9898\u3002\u8BF7\u53EA\u7528\u4E00\u4E2A # \u5F53\u4E3B\u9898\u3002",
   "ui.outline_error_too_many_nodes": "\u5927\u7EB2\u6709 {0} \u4E2A\u6807\u9898\uFF0C\u4E0A\u9650\u662F {1} \u4E2A\u3002",
   "ui.outline_error_title_too_long": "\u7B2C {0} \u884C\uFF1A\u6807\u9898\u6700\u591A {1} \u4E2A\u5B57\u3002",
+  "ui.outline_error_title_fence": "\u7B2C {0} \u884C\uFF1A\u6807\u9898\u4E0D\u80FD\u5305\u542B\u4E09\u4E2A\u53CD\u5F15\u53F7\uFF08```\uFF09\uFF0C\u5426\u5219\u6574\u4EFD\u7B14\u8BB0\u4F1A\u53D8\u6210\u4EE3\u7801\u5757\u3002\u8BF7\u4FEE\u6539\u8BE5\u884C\u540E\u518D\u8BD5\u3002",
+  "ui.outline_error_title_brackets": "\u7B2C {0} \u884C\uFF1A\u6807\u9898\u4E0D\u80FD\u5305\u542B [[ \u6216 ]]\uFF0C\u5426\u5219\u4F1A\u5F04\u574F\u7B14\u8BB0\u7684\u94FE\u63A5\u3002\u8BF7\u4FEE\u6539\u8BE5\u884C\u540E\u518D\u8BD5\u3002",
   "ui.outline_error_vam_note": "\u8FD9\u770B\u8D77\u6765\u662F Visual Agent Map \u7684\u7B14\u8BB0\u6216\u5FC3\u667A\u56FE\u6863\uFF0C\u4E0D\u662F\u5927\u7EB2\u3002",
   "ui.outline_warning_skipped_level": "\u7B2C {0} \u884C\uFF1A\u6807\u9898\u8DF3\u4E86\u5C42\u7EA7\uFF0C\u4F1A\u6302\u5728\u6700\u8FD1\u7684\u4E0A\u4E00\u5C42\u4E0B\u9762\u3002",
   "ui.outline_warning_duplicate_title": "\u7B2C {0} \u884C\uFF1A\u201C{1}\u201D\u91CD\u590D\u51FA\u73B0\uFF0C\u6BCF\u4E00\u4E2A\u90FD\u4F1A\u521B\u5EFA\u6210\u72EC\u7ACB\u8BAE\u9898\u3002",
@@ -3500,6 +3504,8 @@ var zhTW = {
   "ui.outline_error_multiple_roots": "\u7B2C {0} \u884C\uFF1A\u53EA\u80FD\u6709\u4E00\u500B\u6700\u9AD8\u5C64\u6A19\u984C\u3002\u8ACB\u53EA\u7528\u4E00\u500B # \u7576\u4E3B\u984C\u3002",
   "ui.outline_error_too_many_nodes": "\u5927\u7DB1\u6709 {0} \u500B\u6A19\u984C\uFF0C\u4E0A\u9650\u662F {1} \u500B\u3002",
   "ui.outline_error_title_too_long": "\u7B2C {0} \u884C\uFF1A\u6A19\u984C\u6700\u591A {1} \u500B\u5B57\u3002",
+  "ui.outline_error_title_fence": "\u7B2C {0} \u884C\uFF1A\u6A19\u984C\u4E0D\u80FD\u5305\u542B\u4E09\u500B\u53CD\u5F15\u865F\uFF08```\uFF09\uFF0C\u5426\u5247\u6574\u4EFD\u7B46\u8A18\u6703\u8B8A\u6210\u7A0B\u5F0F\u78BC\u5340\u584A\u3002\u8ACB\u4FEE\u6539\u8A72\u884C\u5F8C\u518D\u8A66\u3002",
+  "ui.outline_error_title_brackets": "\u7B2C {0} \u884C\uFF1A\u6A19\u984C\u4E0D\u80FD\u5305\u542B [[ \u6216 ]]\uFF0C\u5426\u5247\u6703\u5F04\u58DE\u7B46\u8A18\u7684\u9023\u7D50\u3002\u8ACB\u4FEE\u6539\u8A72\u884C\u5F8C\u518D\u8A66\u3002",
   "ui.outline_error_vam_note": "\u9019\u770B\u8D77\u4F86\u662F Visual Agent Map \u7684\u7B46\u8A18\u6216\u5FC3\u667A\u5716\u6A94\uFF0C\u4E0D\u662F\u5927\u7DB1\u3002",
   "ui.outline_warning_skipped_level": "\u7B2C {0} \u884C\uFF1A\u6A19\u984C\u8DF3\u4E86\u5C64\u7D1A\uFF0C\u6703\u639B\u5728\u6700\u8FD1\u7684\u4E0A\u4E00\u5C64\u4E0B\u9762\u3002",
   "ui.outline_warning_duplicate_title": "\u7B2C {0} \u884C\uFF1A\u300C{1}\u300D\u91CD\u8907\u51FA\u73FE\uFF0C\u6BCF\u4E00\u500B\u90FD\u6703\u5EFA\u7ACB\u6210\u7368\u7ACB\u8B70\u984C\u3002",
@@ -5284,7 +5290,7 @@ var LATIN_TEXT_DETECTION = {
   ),
   foreign: words(
     // Spanish
-    "de la el los las del lo al un una uno que por para con se es su sus como y mas entre sobre le les des du et est sont pour avec dans sur au aux cette ces qui pas ne sans vers chez comme mais ou une je tu nous vous der die das und ist mit von zu dem ein eine einer nicht auf aus bei nach wie oder wir im zum zur ich sie als auch aber wenn wer da do dos em um uma nao na nas pelo pela sao ao aos il gli di della dei delle dello degli che sono nel nella non come anche alla het een voor aan naar ook dit dat maar zijn wat hoe waarom ik wij niet uit bij om och att det som inte jeg ikke hvordan og yang dan untuk dengan dari tidak adalah pada apa bagaimana ve bir icin ile nasil neden jest nie dla jak czy oraz pentru este"
+    "de el las del un una uno que por para con se es su sus como y mas entre sobre le les du est sont pour avec dans sur au aux cette ces qui pas ne sans vers chez comme mais ou une je tu nous vous der das und ist von zu dem ein eine einer nicht auf aus bei nach wie oder wir im zum zur ich sie als auch aber wenn wer dos em um uma nao na nas pelo pela sao ao aos il gli di della dei delle dello degli che sono nel nella anche alla het een voor aan naar ook dit dat maar zijn wat hoe waarom ik wij niet uit bij om och att det som inte jeg ikke hvordan og yang dan untuk dengan dari tidak adalah pada apa bagaimana bir icin ile nasil neden jest nie dla jak czy oraz pentru este"
   )
 };
 
@@ -5334,7 +5340,7 @@ function languagePromptName(locale, instruction, form, anchor) {
   const anchored = "anchored" in entry ? entry.anchored : void 0;
   const quoted = anchor && anchored ? quoteAnchor(anchor.text) : "";
   if (!anchor || !anchored || !quoted) return entry.prompt[instruction][form];
-  return anchored[instruction].replace("{kind}", () => FOLLOW_ANCHOR_KINDS[anchor.kind][instruction]).replace("{anchor}", () => quoted);
+  return anchored[instruction].replace("{kind}", () => FOLLOW_ANCHOR_KINDS[anchor.kind][instruction]).replace("{anchor}", () => instruction === "zh" ? quoted.replace(/「/g, "\u300E").replace(/」/g, "\u300F") : quoted);
 }
 function quoteAnchor(text11) {
   const flat = text11.replace(/\s+/g, " ").trim();
@@ -19892,6 +19898,8 @@ async function createAimMap(repository, model, input) {
   var _a2, _b2, _c, _d, _e, _f, _g, _h, _i, _j, _k, _l, _m;
   const topic = input.topic.trim();
   if (!topic) throw new Error("AIM topic is required.");
+  const problem = titleProblem(topic);
+  if (problem) throw new Error(translate(repository.settings.language, `ui.title_problem_${problem}`));
   const requestId = (_a2 = input.requestId) == null ? void 0 : _a2.trim();
   if (!requestId) throw new Error("AIM creation request identity is required.");
   const detectedLanguage = (_b2 = input.outputLanguage) != null ? _b2 : chooseAimContentLanguage(repository.settings.language, topic, input.context);
@@ -19906,7 +19914,7 @@ async function createAimMap(repository, model, input) {
   if (!mapPath) {
     const minimumAnswersBeforeConclusion = (_d = input.minimumAnswersBeforeConclusion) != null ? _d : 3;
     mapPath = await repository.createMap(
-      sanitizeGeneratedTitle(topic) || topic,
+      topic,
       [],
       void 0,
       {
@@ -20039,6 +20047,16 @@ function unwrapFencedOutline(lines) {
   }
   return lines;
 }
+function sanitizeOutlineDraft(markdown) {
+  return markdown.split("\n").map((line) => {
+    var _a2;
+    const heading = HEADING2.exec(line);
+    if (!heading) return line;
+    const title = outlineTitle(((_a2 = heading[2]) != null ? _a2 : "").replace(/(^|[ \t]+)#+[ \t]*$/, ""));
+    if (!titleProblem(title)) return line;
+    return `${heading[1]} ${sanitizeGeneratedTitle(title)}`;
+  }).join("\n");
+}
 function parseOutline(input) {
   var _a2, _b2, _c;
   const lines = unwrapFencedOutline(
@@ -20126,6 +20144,8 @@ function parseOutline(input) {
         key: "ui.outline_error_title_too_long",
         values: [lineNumber, OUTLINE_TITLE_LIMIT]
       });
+    const problem = titleProblem(title);
+    if (problem) errors.push({ line: lineNumber, key: `ui.outline_error_title_${problem}`, values: [lineNumber] });
     if (!nodes.length) rootLevel = level;
     else if (level <= rootLevel) {
       errors.push({ line: lineNumber, key: "ui.outline_error_multiple_roots", values: [lineNumber] });
@@ -20193,7 +20213,7 @@ async function createOutlineNotes(repository, map, mapPath, model, nodes, rootDe
     try {
       const top = node.parent === null;
       const note = await repository.createNote(
-        sanitizeGeneratedTitle(node.title) || node.title,
+        node.title,
         model,
         map,
         mapPath,
@@ -20217,7 +20237,7 @@ async function createOutlineMap(repository, model, nodes, source, now = /* @__PU
   const language2 = repository.settings.language;
   const detailTemplate = template != null ? template : standardTemplate(noteLanguageOf(language2));
   if (!nodes.length) throw new Error(translate(language2, "ui.outline_error_no_headings"));
-  const mapPath = await repository.createMap(sanitizeGeneratedTitle(nodes[0].title) || nodes[0].title, []);
+  const mapPath = await repository.createMap(nodes[0].title, []);
   let map;
   try {
     map = await repository.readMap(mapPath);
@@ -20836,7 +20856,7 @@ var OutlineImportModal = class extends import_obsidian16.Modal {
       }).then((markdown) => {
         if (this.detached) return;
         if (controller.signal.aborted) throw new Error(t("ui.outline_ai_stopped"));
-        this.textarea.value = markdown.trimEnd();
+        this.textarea.value = sanitizeOutlineDraft(markdown).trimEnd();
         this.refresh();
         status.setText(t("ui.outline_ai_filled", this.nodes.length));
       }).catch((error) => {
@@ -20855,7 +20875,7 @@ var OutlineImportModal = class extends import_obsidian16.Modal {
       text11.value = prefill.inputs.presetText;
       this.restoreResult = () => {
         if (prefill.markdown !== void 0) {
-          this.textarea.value = prefill.markdown.trimEnd();
+          this.textarea.value = sanitizeOutlineDraft(prefill.markdown).trimEnd();
           this.refresh();
           status.setText(t("ui.outline_ai_filled", this.nodes.length));
         } else if (prefill.message) status.setText(prefill.message);
@@ -28702,7 +28722,7 @@ ${requestId}`, fingerprint2 = JSON.stringify({ parentNodeId, parentBranchId, mod
       id: AIM_UNKNOWN_OPTION_ID,
       label: translateNote(language2, "note.aim_unknown_option")
     });
-    const noteTitle2 = translateNote(language2, "note.aim_question_title_0", questionText);
+    const noteTitle2 = sanitizeGeneratedTitle(translateNote(language2, "note.aim_question_title_0", questionText));
     const notePath = this.repository.unique(this.repository.topicFolder(mapPath, "Notes"), noteTitle2);
     const questionNodeId = this.id();
     const detail = [
@@ -30611,7 +30631,8 @@ var _AimRunStore = class _AimRunStore {
     });
   }
   /** Retitles/reclassifies a saved synthesis draft after its bounded Planner review selects the final state. */
-  async updateResultDraftPresentation(mapPath, handle, draftId, title, kind) {
+  async updateResultDraftPresentation(mapPath, handle, draftId, generatedTitle, kind) {
+    const title = sanitizeGeneratedTitle(generatedTitle) || generatedTitle;
     return this.locked(mapPath, async () => {
       var _a2;
       const map = await this.repository.readMap(mapPath), state = this.state(map), run = state.runs.find((item) => item.id === handle.runId), attempt = run == null ? void 0 : run.attempts.find((item) => item.id === handle.attemptId), draft = (_a2 = state.resultDrafts) == null ? void 0 : _a2.find((item) => item.id === draftId);
@@ -30690,7 +30711,8 @@ var _AimRunStore = class _AimRunStore {
       return true;
     });
   }
-  async createResultDraft(mapPath, handle, title, model, reasoning, options = {}) {
+  async createResultDraft(mapPath, handle, generatedTitle, model, reasoning, options = {}) {
+    const title = sanitizeGeneratedTitle(generatedTitle) || generatedTitle;
     return this.locked(mapPath, async () => {
       var _a2, _b2, _c, _d, _e, _f, _g, _h;
       const map = await this.repository.readMap(mapPath), state = this.state(map), run = state.runs.find((item) => item.id === handle.runId), attempt = run == null ? void 0 : run.attempts.find((item) => item.id === handle.attemptId);

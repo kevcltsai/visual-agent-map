@@ -398,7 +398,7 @@ test('output languages: an English topic with function words is the en path; one
 });
 
 test('output languages: plain English is told from other Latin text by function words (D-2026-10-94)', () => {
-  const expectEn = ['How to plan a trip', 'What is the best way to learn', 'Why are bridges built with arches', 'The history of Rome', 'My notes from this trip', 'Plan for the week'];
+  const expectEn = ['How do vaccines work', 'Why do cats purr', 'Do you need a VPN', 'Smith et al. 2020 review of the evidence', 'History of Los Angeles', 'MIT courses for beginners', 'How to come up with ideas', 'The Da Vinci Code analysis', 'Visit the Des Moines zoo', 'Non-profit management for the arts', 'Why cells die', 'How to plan a trip', 'What is the best way to learn', 'Why are bridges built with arches', 'The history of Rome', 'My notes from this trip', 'Plan for the week'];
   for (const text of expectEn) assert.equal(detectAimContentLanguage(text), 'en', text);
   const expectFollow = [
     'Ancient Egypt', // no function word either way
@@ -485,4 +485,9 @@ test('output languages: the single-card task line and the selection AI use the r
   const main = fs.readFileSync(path.join(__dirname, '..', 'main.ts'), 'utf8');
   assert.match(main, /kind: "selection",\s+text: selected/);
   assert.equal(i18n.languagePromptName(selectionOutputLanguage('en', 'Texto sin acentos'), 'en', 'plain', { kind: 'selection', text: 'Texto sin acentos' }), anchoredEn('selected text', 'Texto sin acentos'));
+});
+
+test('the Chinese follow-the-input clause keeps the user\'s own 「」 from closing its quote (D-2026-10-95)', () => {
+  const text = i18n.languagePromptName('same-as-input', 'zh', 'plain', { kind: 'topic', text: '他說「好」' });
+  assert.ok(text.includes('「他說『好』」'), text);
 });

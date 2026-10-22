@@ -1,4 +1,4 @@
-import { sanitizeGeneratedTitle } from "../../core/title-safety";
+import { titleProblem } from "../../core/title-safety";
 import type { MapDocument, MapNode } from "../../map-model";
 import type { Repository } from "../../repository";
 import { randomUUID } from "node:crypto";
@@ -33,6 +33,9 @@ export async function createAimMap(
 ): Promise<AimStartResult> {
   const topic = input.topic.trim();
   if (!topic) throw new Error("AIM topic is required.");
+  // The topic is the user's own text and becomes the map title: refuse it before anything is written (D-2026-10-95).
+  const problem = titleProblem(topic);
+  if (problem) throw new Error(translate(repository.settings.language, `ui.title_problem_${problem}`));
   const requestId = input.requestId?.trim();
   if (!requestId) throw new Error("AIM creation request identity is required.");
   // Decided once from the user's own words (before the expectation labels are appended).
@@ -53,7 +56,7 @@ export async function createAimMap(
   if (!mapPath) {
     const minimumAnswersBeforeConclusion = input.minimumAnswersBeforeConclusion ?? 3;
     mapPath = await repository.createMap(
-      sanitizeGeneratedTitle(topic) || topic,
+      topic,
       [],
       undefined,
       {

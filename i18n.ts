@@ -102,7 +102,8 @@ export function languagePromptName(
   if (!anchor || !anchored || !quoted) return entry.prompt[instruction][form];
   return anchored[instruction]
     .replace("{kind}", () => FOLLOW_ANCHOR_KINDS[anchor.kind][instruction])
-    .replace("{anchor}", () => quoted);
+    // The Chinese clause is wrapped in 「」, so the user's own 「」 become 『』 to keep the quote unambiguous.
+    .replace("{anchor}", () => (instruction === "zh" ? quoted.replace(/「/g, "『").replace(/」/g, "』") : quoted));
 }
 /** The user's own words as they are quoted inside the follow-the-input clause: one line, cut to the limit, quotes escaped. */
 function quoteAnchor(text: string): string {

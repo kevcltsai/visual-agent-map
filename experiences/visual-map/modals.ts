@@ -2,8 +2,9 @@
 import type VisualAgentMapPlugin from "../../main";
 import { listPresets } from "../../ai/prompt-presets";
 import { PromptPresetsModal } from "../../ui/modals/prompt-presets-modal";
-import { chooseAimContentLanguage, isOutputOnlyLanguage } from "../aim/content-language";
+import { defaultOutputLanguage } from "../aim/content-language";
 import {
+  FOLLOW_INPUT_ID,
   noteLanguageOf,
   OUTPUT_LANGUAGE_CHOICES,
   supportedLanguageLabel,
@@ -11,8 +12,7 @@ import {
   t,
   type ContentLanguage,
   type NoteLanguage,
-  type TranslationKey,
-  type UiLanguage
+  type TranslationKey
 } from "../../i18n";
 import { App, Component, MarkdownRenderer, Modal, Notice, Setting, TFile } from "obsidian";
 import { ReferencePicker, type ReferenceTopic } from "../../ui/reference-picker";
@@ -113,8 +113,18 @@ export interface PendingOutline {
   /** Called once the reviewed outline was created: drops the waiting result. */
   discard: () => void;
 }
-export interface NextStepSettings {
-  /** The topic note's stored `content-language` (note language of its fixed text), when it has one. */
+/** The map's remembered output language and how to record a manual choice (D-2026-10-88). */
+export interface OutputLanguageMemory {
+  /** What the map remembers today; unknown stored values are already dropped. */
+  outputLanguage?: ContentLanguage;
+  /** Records the language picked by hand in this dialog; called once, when a run starts. */
+  rememberOutputLanguage?: (language: ContentLanguage) => Promise<void>;
+}
+export interface NextStepSettings extends OutputLanguageMemory {
+  /**
+   * The note language the topic note already uses: its stored `content-language`, or the language of its standard Detail
+   * headings when it has none (D-2026-10-84). A detected output language with another note language is not preselected.
+   */
   contentLanguage?: NoteLanguage;
   model: string;
   modelSource: ModelSource;
@@ -197,7 +207,14 @@ export interface SelectionSynthesis {
   defaultDirection: string;
   fields: Pick<
     NextStepSettings,
-    "sources" | "templates" | "currentTemplate" | "tones" | "currentTone" | "currentStyle"
+    | "sources"
+    | "templates"
+    | "currentTemplate"
+    | "tones"
+    | "currentTone"
+    | "currentStyle"
+    | "outputLanguage"
+    | "rememberOutputLanguage"
   >;
   /** Reopened from the selection bar with directions waiting. */
   pending?: { directions: Suggestion[]; discard: () => void };
@@ -264,17 +281,7 @@ export interface TaskSourceSettings {
   synthesisLabel?: string;
   synthesisTopics?: string[];
 }
-/**
- * The output language a task dialog preselects: what the topic text is written in. A topic note that already carries a
- * `content-language` keeps the previous default (the interface language) when the detected output-only language would
- * write its fixed text in a different note language, so a Chinese-note topic is not suddenly answered in English-noted
- * Japanese.
- */
-export function defaultOutputLanguage(ui: UiLanguage, topic: string, noteLanguage?: NoteLanguage): ContentLanguage {
-  const chosen = chooseAimContentLanguage(ui, topic);
-  if (noteLanguage !== undefined && isOutputOnlyLanguage(chosen) && noteLanguageOf(chosen) !== noteLanguage) return ui;
-  return chosen;
-}
+export { defaultOutputLanguage };
 
 export class NextStepModal extends Modal {
   private closed = false;
@@ -284,6 +291,8 @@ export class NextStepModal extends Modal {
   private runPending = false;
   /** Model and effort edits wait here; they are saved when a run starts, never when the dialog is cancelled. */
   private pendingSettings: NotePatch = {};
+  /** The output language the person picked in this dialog; saved on the map when a run starts. */
+  private manualOutputLanguage?: ContentLanguage;
   constructor(
     app: App,
     private topic: string,
@@ -320,7 +329,17 @@ export class NextStepModal extends Modal {
   }
   /** Where the shared fields (data sources, template, tone) come from: the topic's settings, or the selection's. */
   private get info():
-    | Pick<NextStepSettings, "sources" | "templates" | "currentTemplate" | "tones" | "currentTone" | "currentStyle">
+    | Pick<
+        NextStepSettings,
+        | "sources"
+        | "templates"
+        | "currentTemplate"
+        | "tones"
+        | "currentTone"
+        | "currentStyle"
+        | "outputLanguage"
+        | "rememberOutputLanguage"
+      >
     | undefined {
     return this.modelSettings ?? this.selectionFlow?.fields;
   }
@@ -440,13 +459,26 @@ export class NextStepModal extends Modal {
   /** Saves the model and effort chosen in this dialog, once, at the moment a run actually starts. */
   private async flushSettings(): Promise<void> {
     const patch = this.pendingSettings;
-    if (!Object.keys(patch).length || !this.modelSettings) return;
-    this.pendingSettings = {};
-    try {
-      await this.modelSettings.save(patch);
-    } catch (error) {
-      this.pendingSettings = { ...patch, ...this.pendingSettings };
-      throw error;
+    if (Object.keys(patch).length && this.modelSettings) {
+      this.pendingSettings = {};
+      try {
+        await this.modelSettings.save(patch);
+      } catch (error) {
+        this.pendingSettings = { ...patch, ...this.pendingSettings };
+        throw error;
+      }
+    }
+    // The output language picked by hand is remembered on the map (never when the dialog is cancelled).
+    const manual = this.manualOutputLanguage;
+    const remember = this.info?.rememberOutputLanguage;
+    if (manual !== undefined && remember) {
+      this.manualOutputLanguage = undefined;
+      try {
+        await remember(manual);
+      } catch (error) {
+        this.manualOutputLanguage ??= manual;
+        throw error;
+      }
     }
   }
   private renderModelSettings(parent: HTMLElement): HTMLElement | undefined {
@@ -1458,6 +1490,8 @@ export class NextStepModal extends Modal {
     const languageLabel = compactSettings.createEl("label", { cls: "vam-next-language" });
     languageLabel.createSpan({ text: t("ui.output_language") });
     const languageSelect = languageLabel.createEl("select");
+    // Top row: the model follows the language of the user's text; not a language, so it sits above the list.
+    languageSelect.createEl("option", { value: FOLLOW_INPUT_ID, text: supportedLanguageLabel(FOLLOW_INPUT_ID) });
     for (const option of SUPPORTED_LANGUAGES)
       languageSelect.createEl("option", { value: option.id, text: option.label });
     // Languages with no interface dictionary: the AI can write in them, so they are choosable here only.
@@ -1467,9 +1501,13 @@ export class NextStepModal extends Modal {
     languageSelect.value = defaultOutputLanguage(
       this.plugin.settings.language,
       this.topic,
-      this.modelSettings?.contentLanguage
+      this.modelSettings?.contentLanguage,
+      this.info?.outputLanguage
     );
     languageSelect.setAttr("aria-label", t("ui.output_language"));
+    languageSelect.addEventListener("change", () => {
+      this.manualOutputLanguage = languageSelect.value as ContentLanguage;
+    });
     const style = noteStyleField(compactSettings, {
       templates: this.info?.templates ?? [],
       tones: this.info?.tones ?? [],

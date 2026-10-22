@@ -2,6 +2,7 @@
 export const en = {
   "ui.output_language": "Answer language for this task",
   "ui.output_language_more": "More languages (answers only)",
+  "ui.output_language_follow_input": "Same language as my text",
   "ui.select_proposal_0": "Select proposal: {0}",
   "ui.proposal_name": "Proposal name",
   "ui.proposal_task": "Proposal task",

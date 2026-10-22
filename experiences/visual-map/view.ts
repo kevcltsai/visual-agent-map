@@ -1,4 +1,9 @@
-import { chooseAimContentLanguage, resolveAimContentLanguage } from "../aim/content-language";
+import {
+  existingNoteLanguage,
+  outputLanguageForMap,
+  rememberedOutputLanguage,
+  resolveAimContentLanguage
+} from "../aim/content-language";
 import { backgroundResultNotice, renderBackgroundStatus } from "../../ui/background-run";
 import { PromptPresetsModal } from "../../ui/modals/prompt-presets-modal";
 import { AimClarificationModal } from "../../ui/modals/aim-clarification-modal";
@@ -183,6 +188,7 @@ import {
   AgentTaskHandle,
   TaskSourceSettings,
   NextStepModal,
+  type OutputLanguageMemory,
   type BackgroundHooks,
   type PendingOutline,
   outlineProposals,
@@ -864,6 +870,19 @@ export class VisualAgentMapView extends ItemView {
   private enqueue(work: () => Promise<void>): void {
     void this.plugin.mutate(work).catch(() => {});
   }
+  /** What the next-step dialogs need to preselect and record this map's output language (D-2026-10-88). */
+  private outputLanguageMemory(): OutputLanguageMemory {
+    const remembered = rememberedOutputLanguage(this.map);
+    return {
+      ...(remembered ? { outputLanguage: remembered } : {}),
+      rememberOutputLanguage: language =>
+        this.plugin.mutate(() =>
+          this.mapChange(map => {
+            map.outputLanguage = language;
+          }, false)
+        )
+    };
+  }
   private async persist(): Promise<void> {
     if (!this.builtIn && this.map && this.path) await this.plugin.repo.saveMap(this.path, this.map);
   }
@@ -1221,7 +1240,7 @@ export class VisualAgentMapView extends ItemView {
               {
                 ...request,
                 language: settings.language,
-                contentLanguage: chooseAimContentLanguage(settings.language, request.topic),
+                contentLanguage: outputLanguageForMap(this.map, settings.language, request.topic),
                 model,
                 reasoning: normalizeReasoningLevel(settings.cliReasoning)
               },
@@ -1483,7 +1502,7 @@ export class VisualAgentMapView extends ItemView {
                 rootQuestion,
                 nodes,
                 language: settings.language,
-                contentLanguage: chooseAimContentLanguage(settings.language, rootQuestion),
+                contentLanguage: outputLanguageForMap(this.map, settings.language, rootQuestion),
                 model,
                 reasoning: normalizeReasoningLevel(settings.cliReasoning)
               },
@@ -1951,7 +1970,7 @@ export class VisualAgentMapView extends ItemView {
           ...(context ? { context } : {}),
           nodes: basis,
           language: settings.language,
-          contentLanguage: chooseAimContentLanguage(settings.language, this.map.title),
+          contentLanguage: outputLanguageForMap(this.map, settings.language, this.map.title, goal),
           model,
           reasoning: normalizeReasoningLevel(settings.cliReasoning),
           ...(pins.length ? { pins } : {})
@@ -7244,7 +7263,8 @@ export class VisualAgentMapView extends ItemView {
           currentTone: this.toneLabelFor(note),
           currentStyle: this.currentStyleLabel(this.resolveTopicTemplate(note).template.id, this.effectiveToneId(note)),
           currentSummary: note.summary,
-          ...(note.contentLanguage ? { contentLanguage: note.contentLanguage } : {}),
+          ...(existingNoteLanguage(note) ? { contentLanguage: existingNoteLanguage(note) } : {}),
+          ...this.outputLanguageMemory(),
           // Only a label: a missing topic template is reported at the next AI update, not when the dialog opens.
           currentTemplate: templateInLanguage(this.resolveTopicTemplate(note).template, this.plugin.settings.language)
             .name,
@@ -8090,7 +8110,7 @@ export class VisualAgentMapView extends ItemView {
     const detailTemplate = await this.detailTemplateFor(child, choices.detailTemplateId, choices.toneId);
     const note = await this.plugin.repo.readNote(child.path, this.map ?? undefined);
     const outputLanguage =
-      choices.outputLanguage ?? chooseAimContentLanguage(this.plugin.settings.language, note.title);
+      choices.outputLanguage ?? outputLanguageForMap(this.map, this.plugin.settings.language, note.title);
     let started = false;
     let failure: string | undefined;
     const handle = await this.runAgent(
@@ -8979,7 +8999,8 @@ export class VisualAgentMapView extends ItemView {
           currentTemplate: this.mapDetailTemplate(settings.language).name,
           tones: this.toneChoices(),
           currentTone: this.toneLabelFor({}),
-          currentStyle: this.currentStyleLabel(this.mapDetailTemplate(settings.language).id, this.effectiveToneId({}))
+          currentStyle: this.currentStyleLabel(this.mapDetailTemplate(settings.language).id, this.effectiveToneId({})),
+          ...this.outputLanguageMemory()
         },
         ...(pending
           ? { pending: { directions: pending.directions, discard: () => this.discardSelectionSynthesis() } }
@@ -9539,9 +9560,9 @@ export class VisualAgentMapView extends ItemView {
     const stamped = written?.aim?.contentLanguage;
     if (stamped !== undefined && this.map?.aim && this.map.aim.contentLanguage === undefined)
       this.map.aim.contentLanguage = stamped;
-    const stampedOutput = written?.aim?.outputLanguage;
-    if (stampedOutput !== undefined && this.map?.aim && this.map.aim.outputLanguage === undefined)
-      this.map.aim.outputLanguage = stampedOutput;
+    const stampedOutput = written?.outputLanguage;
+    if (stampedOutput !== undefined && this.map && this.map.outputLanguage === undefined)
+      this.map.outputLanguage = stampedOutput;
   }
   private markCanvasHintSeen(): void {
     if (this.plugin.settings.canvasHintSeen) return;

@@ -2,7 +2,7 @@ import { validateAimResearchPlan } from "./experiences/aim/research-plan";
 import { upgradeLegacyAimData } from "./experiences/aim/legacy-names";
 import type { AiResult } from "./ai/types";
 import type { FinalDeliveryCheckpoint } from "./experiences/aim/final-delivery";
-import { isNoteLanguage, t, translate, type NoteLanguage, type OutputOnlyId } from "./i18n";
+import { isContentLanguage, isNoteLanguage, t, translate, type ContentLanguage, type NoteLanguage } from "./i18n";
 
 export interface MapNode {
   id: string;
@@ -31,6 +31,12 @@ export interface MapDocument {
   nodes: MapNode[];
   viewport: { x: number; y: number; zoom: number };
   aim?: AimMapData;
+  /**
+   * The language the AI writes this map's content in, remembered per map (D-2026-10-88): the language chosen by hand in a
+   * task menu or the AIM start dialog, or recorded when an AIM map was created in a language other than its note
+   * language. Any content language, including the follow-the-input row. Unknown values are ignored (dropped on read).
+   */
+  outputLanguage?: ContentLanguage;
   detailTemplateId?: string;
   /** Default tone preset id for the map; absent = academic. */
   toneId?: string;
@@ -305,12 +311,6 @@ export interface AimMapData {
   creationId?: string;
   /** Language of AIM-generated content, decided once at creation; legacy maps derive it from the title. */
   contentLanguage?: NoteLanguage;
-  /**
-   * Output-only language (ja, ko, ar, ...) the AI writes in, when the map's language has no interface dictionary.
-   * `contentLanguage` still holds the note language of the fixed text. Older plugin versions ignore this field; unknown
-   * values are ignored on read.
-   */
-  outputLanguage?: OutputOnlyId;
   /** Exploration target; legacy field name retained for saved maps. Never forces questions or completion. */
   minimumAnswersBeforeConclusion?: number;
   /**
@@ -428,6 +428,7 @@ export function parseMap(content: string): MapDocument {
     throw new Error(t("ui.invalid_mind_map_format"));
   if (map.detailTemplateId !== undefined && typeof map.detailTemplateId !== "string") delete map.detailTemplateId;
   if (map.toneId !== undefined && typeof map.toneId !== "string") delete map.toneId;
+  if (map.outputLanguage !== undefined && !isContentLanguage(map.outputLanguage)) delete map.outputLanguage;
   const ids = new Set<string>(),
     aimQuestionRequests = new Set<string>();
   for (const n of map.nodes) {

@@ -16,6 +16,10 @@ const LANGUAGE_NAMES = { en: { language: 'English', languagePlain: 'English' }, 
 const filled = (name, content) => read(name).replace(/\{\{(\w+)\}\}/g, (_, key) => LANGUAGE_NAMES[content][key]);
 const LANGUAGE_LINE = { en: filled('language.en.md', 'en'), 'zh-TW': filled('language.zh.md', 'zh-TW') };
 const TOPIC = { en: 'Plan a 5-day Taipei trip', 'zh-TW': '東京五天自由行怎麼排' };
+// The language the flow derives from the topic text (D-2026-10-83/90): an English sentence cannot be told from Spanish or
+// French by letters, so a map created today carries the follow-the-text language, while a fixture map holding only the 0.24-shaped
+// `contentLanguage` resolves to its note language; the audit below renders both as the content language to check the fixed frame.
+const FLOW_LANGUAGE = { en: 'same-as-input', 'zh-TW': 'zh-TW' };
 // Variants captured from fixtures whose repository/map is English by construction (fake `{settings:{language:'en'}}` repos or
 // English fixture maps). Their flow-set outputLanguage is not the topic's, so the test sets it explicitly like the snapshots do.
 const SYNTHETIC_ENGLISH_FIXTURE = new Set(['evidence-reuse-audit', 'subtopic-research-update', 'subtopic-research-reuse-rejected', 'research-plan-repair', 'topic-root-research-plan', 'topic-root-report-review', 'saved-report-review', 'saved-report-followup-search',
@@ -70,7 +74,7 @@ for (const content of ['zh-TW', 'en']) for (const ui of ['en', 'zh-TW']) {
     const variants = await gather(content, ui);
     assert.ok(variants.size >= 35, `expected the full AIM phase set, saw ${variants.size}: ${[...variants.keys()].join(', ')}`);
     for (const [variant, captured] of variants) {
-      if (!SYNTHETIC_ENGLISH_FIXTURE.has(variant)) assert.equal(captured.outputLanguage, content, `${variant}: the flow must set outputLanguage to the map's content language, not the interface language`);
+      if (!SYNTHETIC_ENGLISH_FIXTURE.has(variant)) assert.ok([content, FLOW_LANGUAGE[content]].includes(captured.outputLanguage), `${variant}: the flow must set outputLanguage to the map's content language, not the interface language`);
       const context = { ...captured, outputLanguage: content };
       // The AiTaskService used for the capture runs with the interface language; the prompt must not depend on it.
       const sent = await promptsFor(context, { language: ui });

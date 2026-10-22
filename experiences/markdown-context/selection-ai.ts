@@ -24,8 +24,16 @@ interface SelectionAiOptions {
   model: () => string;
   /** Show the selection button and open the panel on image clicks; the command opens the panel either way. */
   autoOpen: () => boolean;
-  /** Name of the language the AI writes in for this selection (the interface language unless the text is in another). */
+  /**
+   * Name of the language the AI writes in for this selection: the language its letters settle, else a clause telling
+   * the model to follow the selected text, else the interface language (D-2026-10-83).
+   */
   language: (selectedText: string) => string;
+  /**
+   * Name of the language the Translate quick action translates into: the interface language (absent: `language`), because the
+   * selection's own language is what is being translated away from (and `language` may be a follow-the-text clause).
+   */
+  translateTarget?: () => string;
   run: <Input, Output>(
     prepared: PreparedStep<Input, Output>,
     model: string,
@@ -303,6 +311,7 @@ export class MarkdownSelectionAi extends Component {
       snapshot,
       model,
       this.options.language(snapshot.text),
+      this.options.translateTarget?.() ?? this.options.language(snapshot.text),
       this.options.run
     );
     this.panel.open();
@@ -340,6 +349,7 @@ class SelectionAiPanel extends Component {
     private readonly snapshot: SelectionSnapshot,
     private readonly model: string,
     private readonly language: string,
+    private readonly translateTarget: string,
     private readonly run: SelectionAiOptions["run"]
   ) {
     super();
@@ -452,7 +462,7 @@ class SelectionAiPanel extends Component {
     const language = getUiLanguage();
     preset("condense", "minimize-2", t("ui.context_ai_condense"), () => condensePresetStep.render({ language }));
     preset("translate", "languages", t("ui.context_ai_translate"), () =>
-      translatePresetStep.render({ language, target: this.language })
+      translatePresetStep.render({ language, target: this.translateTarget })
     );
     preset("search_images", "image", t("ui.context_ai_search_images"), () =>
       searchImagesPresetStep.render({ language })

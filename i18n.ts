@@ -1,5 +1,6 @@
 import { en, type TranslationKey } from "./i18n/en";
 import {
+  FOLLOW_INPUT_ID,
   LANGUAGES,
   OUTPUT_LANGUAGES,
   type InstructionLanguage,
@@ -17,7 +18,7 @@ import {
  */
 export type ContentLanguage = UiLanguage | OutputOnlyId;
 export type { InstructionLanguage, NoteLanguage, OutputLanguageEntry, OutputOnlyId, PromptNameForm, TranslationKey, UiLanguage };
-export { LANGUAGES, OUTPUT_LANGUAGES };
+export { FOLLOW_INPUT_ID, LANGUAGES, OUTPUT_LANGUAGES };
 
 const registry: ReadonlyArray<LanguageEntry> = LANGUAGES;
 /** The interface language used when a stored or requested language is not registered. */
@@ -36,9 +37,20 @@ export const NOTE_LANGUAGES: readonly NoteLanguage[] = [...new Set(registry.map(
  * this list, so a newly supported language appears in all of them. `name` is the English name used in AI prompts.
  */
 export const SUPPORTED_LANGUAGES: ReadonlyArray<{ id: UiLanguage; label: string; name: string }> = LANGUAGES.map(({ id, label, name }) => ({ id, label, name }));
-/** Output-only languages, in menu order: selectable as an output language but never as the interface language. */
-export const OUTPUT_LANGUAGE_CHOICES: ReadonlyArray<{ id: OutputOnlyId; label: string; name: string }> = OUTPUT_LANGUAGES.map(({ id, label, name }) => ({ id, label, name }));
+/**
+ * Output-only languages, in menu order: selectable as an output language but never as the interface language. The
+ * "same as the input" row is not a language and is left out; menus list it separately (see {@link isFollowInputLanguage}).
+ */
+export const OUTPUT_LANGUAGE_CHOICES: ReadonlyArray<{ id: OutputOnlyId; label: string; name: string }> = outputRegistry
+  .filter(item => !item.followsInput)
+  .map(({ id, label, name }) => ({ id: id as OutputOnlyId, label, name }));
+/** True for the virtual "same language as the user's own text" row (not a language of its own). */
+export function isFollowInputLanguage(value: unknown): boolean {
+  return outputRegistry.some(item => item.id === value && item.followsInput === true);
+}
+/** Name of a language for menus and summaries; the follow-the-input row is named in the interface language. */
 export function supportedLanguageLabel(id: string): string {
+  if (isFollowInputLanguage(id)) return t("ui.output_language_follow_input");
   return (
     SUPPORTED_LANGUAGES.find(item => item.id === id)?.label ?? OUTPUT_LANGUAGE_CHOICES.find(item => item.id === id)?.label ?? id
   );
@@ -115,7 +127,7 @@ export function tNote(key: TranslationKey, ...values: unknown[]): string {
   return translateNote(language, key, ...values);
 }
 
-export function topicStatusLabel(status: "idea" | "running" | "completed" | "error", locale: ContentLanguage): string {
+export function topicStatusLabel(status: "idea" | "running" | "completed" | "error", locale: UiLanguage): string {
   const keys: Record<typeof status, TranslationKey> = {
     idea: "ui.to_research",
     running: "ui.ai_running",

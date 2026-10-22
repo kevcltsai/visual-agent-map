@@ -4,6 +4,7 @@ import type { TranslationKey } from "./en";
 export const zhTW: Record<TranslationKey, string> = {
   "ui.output_language": "本次回答語言",
   "ui.output_language_more": "更多語言（僅限回答）",
+  "ui.output_language_follow_input": "跟隨輸入語言",
   "ui.select_proposal_0": "選取提案：{0}",
   "ui.proposal_name": "提案名稱",
   "ui.proposal_task": "提案任務",

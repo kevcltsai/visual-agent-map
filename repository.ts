@@ -6,6 +6,7 @@ import {
   noteLanguageOf,
   tNote,
   translate,
+  type ContentLanguage,
   type NoteLanguage,
   type TranslationKey,
   type UiLanguage
@@ -1461,9 +1462,9 @@ export class Repository {
     if (!map.aim) return;
     const resolved = resolveAimContentLanguage(map, this.settings.language);
     if (map.aim.contentLanguage === undefined) map.aim.contentLanguage = noteLanguageOf(resolved);
-    // Both fields are written together on the first write; a map upgraded from the note-language-only form gets the
-    // output-only language pinned here so a later title edit cannot change it.
-    if (map.aim.outputLanguage === undefined && isOutputOnlyLanguage(resolved)) map.aim.outputLanguage = resolved;
+    // Both are written together on the first write; a map in an output-only language (ja, ko, the follow-the-input
+    // row...) gets it pinned here so a later title edit cannot change it. Registry languages are re-derived as before.
+    if (map.outputLanguage === undefined && isOutputOnlyLanguage(resolved)) map.outputLanguage = resolved;
   }
 
   async saveMap(path: string, map: MapDocument): Promise<void> {
@@ -2055,7 +2056,8 @@ export class Repository {
     title: string,
     nodes: MapNode[] = [],
     onRootCreated?: (folder: TFolder) => void,
-    aim?: MapDocument["aim"]
+    aim?: MapDocument["aim"],
+    outputLanguage?: ContentLanguage
   ): Promise<string> {
     const container = aim ? this.settings.aimFolder : this.settings.mindMapsFolder;
     await this.folder(container);
@@ -2080,7 +2082,8 @@ export class Repository {
       title,
       nodes,
       viewport: { x: 40, y: 40, zoom: 1 },
-      ...(aim ? { aim } : {})
+      ...(aim ? { aim } : {}),
+      ...(outputLanguage ? { outputLanguage } : {})
     };
     await this.app.vault.create(path, serializeMap(map, this.noteLanguage));
     // Persist the request identity before adding subfolders so a partial setup can be found and resumed.

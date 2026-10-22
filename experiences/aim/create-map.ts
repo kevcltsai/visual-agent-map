@@ -1,13 +1,15 @@
 import type { MapDocument, MapNode } from "../../map-model";
 import type { Repository } from "../../repository";
 import { randomUUID } from "node:crypto";
-import { noteLanguageOf, translate } from "../../i18n";
-import { chooseAimContentLanguage, isOutputOnlyLanguage } from "./content-language";
+import { noteLanguageOf, translate, type ContentLanguage } from "../../i18n";
+import { chooseAimContentLanguage } from "./content-language";
 import { buildAimRootContext, type AimOutcomeExpectation } from "./outcome-expectations";
 
 export interface AimStartInput {
   topic: string;
   context: string;
+  /** The language picked by hand in the start dialog; absent means detect it from the topic and context. */
+  outputLanguage?: ContentLanguage;
   outcomeExpectation?: AimOutcomeExpectation;
   requestId?: string;
   model?: string;
@@ -33,7 +35,13 @@ export async function createAimMap(
   const requestId = input.requestId?.trim();
   if (!requestId) throw new Error("AIM creation request identity is required.");
   // Decided once from the user's own words (before the expectation labels are appended).
-  const detectedLanguage = chooseAimContentLanguage(repository.settings.language, topic, input.context);
+  const detectedLanguage =
+    input.outputLanguage ?? chooseAimContentLanguage(repository.settings.language, topic, input.context);
+  // Recorded on the map when it was picked by hand, or when it differs from the note language (D-2026-10-88).
+  const outputLanguage =
+    input.outputLanguage !== undefined || detectedLanguage !== noteLanguageOf(detectedLanguage)
+      ? detectedLanguage
+      : undefined;
   let mapPath = "";
   for (const file of await repository.mapFiles()) {
     if ((await repository.readMap(file.path)).aim?.creationId === requestId) {
@@ -43,19 +51,23 @@ export async function createAimMap(
   }
   if (!mapPath) {
     const minimumAnswersBeforeConclusion = input.minimumAnswersBeforeConclusion ?? 3;
-    mapPath = await repository.createMap(topic, [], undefined, {
-      version: 1,
-      creationId: requestId,
-      contentLanguage: noteLanguageOf(detectedLanguage),
-      // A language without an interface dictionary (ja, ko, ar...) is kept beside its note language (en).
-      ...(isOutputOnlyLanguage(detectedLanguage) ? { outputLanguage: detectedLanguage } : {}),
-      minimumAnswersBeforeConclusion,
-      ...(input.interaction === "unattended" ? { interaction: "unattended" as const } : {}),
-      branches: [],
-      runs: [],
-      resultDrafts: [],
-      pendingCommits: []
-    });
+    mapPath = await repository.createMap(
+      topic,
+      [],
+      undefined,
+      {
+        version: 1,
+        creationId: requestId,
+        contentLanguage: noteLanguageOf(detectedLanguage),
+        minimumAnswersBeforeConclusion,
+        ...(input.interaction === "unattended" ? { interaction: "unattended" as const } : {}),
+        branches: [],
+        runs: [],
+        resultDrafts: [],
+        pendingCommits: []
+      },
+      outputLanguage
+    );
   }
   const map = await repository.readMap(mapPath);
   if (map.title !== topic) throw new Error("This AIM creation request was already used for another topic.");

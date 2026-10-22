@@ -106,14 +106,20 @@ export type UiLanguage = (typeof LANGUAGES)[number]["id"];
 export interface OutputLanguageDetection {
   readonly script: RegExp;
   readonly exclude?: RegExp;
+  /**
+   * An extra rule on the whole text once `script` matched (the Japanese kana rule, D-2026-10-86); when it says no, the
+   * text gives no signal for this language and detection moves on.
+   */
+  readonly accept?: (text: string) => boolean;
 }
 
 /**
  * A language VAM can write AI content in but has no interface dictionary for. It is deliberately a separate table from
  * {@link LANGUAGES}: it adds no interface language, no prompt snapshot tag and no dictionary, so it needs no new
  * translations. Fixed text written into notes and the instruction language are always English. Rows with `detect` are
- * recognised from the map or topic text; the rest (Latin and Cyrillic scripts) are only chosen by hand in the output
- * language menu. A language that gains a dictionary moves to {@link LANGUAGES}.
+ * recognised from the map or topic text; the rest (Latin and Cyrillic scripts) are chosen by hand in the output
+ * language menu, or reached through the `followsInput` row when the text has letters nothing recognises. A language that
+ * gains a dictionary moves to {@link LANGUAGES}.
  */
 export interface OutputLanguageEntry {
   readonly id: string;
@@ -124,7 +130,30 @@ export interface OutputLanguageEntry {
   readonly intl: string;
   readonly prompt: PromptNames;
   readonly detect?: OutputLanguageDetection;
+  /**
+   * A virtual row, not a language: its prompt names are a clause that tells the model to write in the language of the
+   * user's own text. It is chosen when the text has letters no row recognises (D-2026-10-83); it is never offered in
+   * the image translation menu and is listed first, under its own label, in the output language menu.
+   */
+  readonly followsInput?: true;
 }
+
+/** Id of the "same language as the user's text" virtual row of {@link OUTPUT_LANGUAGES}. */
+export const FOLLOW_INPUT_ID = "same-as-input";
+
+const KANA = /[\p{Script=Hiragana}\p{Script=Katakana}\u30FC]/gu;
+/**
+ * Whether kana in `text` mean Japanese (D-2026-10-86): at least two kana other than the particle の (which Chinese
+ * titles borrow, as in 台灣の旅), and kana plus Han make up at least twice the number of Latin words, so a Latin
+ * sentence that quotes a katakana word is not Japanese.
+ */
+const japaneseKanaRule = (text: string): boolean => {
+  const kana = text.match(KANA) ?? [];
+  if (kana.filter(char => char !== "の").length < 2) return false;
+  const han = (text.match(/\p{Script=Han}/gu) ?? []).length;
+  const latinWords = (text.match(/\p{Script=Latin}+/gu) ?? []).length;
+  return kana.length + han >= 2 * latinWords;
+};
 
 /** Prompt names are the same in all three forms: these languages have no regional or usage variants. */
 const names = (zh: string, en: string): PromptNames => ({
@@ -142,7 +171,7 @@ export const OUTPUT_LANGUAGES = [
     note: "en",
     intl: "ja",
     prompt: names("日文", "Japanese"),
-    detect: { script: /[\p{Script=Hiragana}\p{Script=Katakana}]/u }
+    detect: { script: /[\p{Script=Hiragana}\p{Script=Katakana}\u30FC]/u, accept: japaneseKanaRule }
   },
   {
     id: "ko",
@@ -227,7 +256,30 @@ export const OUTPUT_LANGUAGES = [
     instruction: "en",
     note: "en",
     intl: "vi",
-    prompt: names("越南文", "Vietnamese")
+    prompt: names("越南文", "Vietnamese"),
+    // Letters only Vietnamese uses: ơ, ư and the stacked-diacritic block U+1EA0-1EF9. A lone đ or ă also occurs elsewhere.
+    detect: { script: /[ơưƠƯ\u{1EA0}-\u{1EF9}]/u }
+  },
+  {
+    id: FOLLOW_INPUT_ID,
+    label: "Same as input",
+    name: "Same as input",
+    instruction: "en",
+    note: "en",
+    intl: "en",
+    followsInput: true,
+    prompt: {
+      zh: {
+        plain: "與使用者自己輸入的文字（主題、問題或選取文字）相同的語言",
+        region: "與使用者自己輸入的文字（主題、問題或選取文字）相同的語言",
+        usage: "與使用者自己輸入的文字（主題、問題或選取文字）相同的語言"
+      },
+      en: {
+        plain: "the same language as the user's own text (topic, question or selection)",
+        region: "the same language as the user's own text (topic, question or selection)",
+        usage: "the same language as the user's own text (topic, question or selection)"
+      }
+    }
   }
 ] as const satisfies ReadonlyArray<OutputLanguageEntry>;
 

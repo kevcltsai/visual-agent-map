@@ -727,22 +727,22 @@ integrationTest('AIM recovers a Map commit interrupted after its Note was writte
 test('AIM content language detector follows the character rules; Japanese and Korean are detected, no signal falls back to the interface language', () => {
   const { detectAimContentLanguage, chooseAimContentLanguage, resolveAimContentLanguage } = load('experiences/aim/content-language.ts');
   const cases = [
-    ['東京五天自由行怎麼排', 'zh-TW'], ['Plan a 5-day Taipei trip', 'en'], ['Python 的 async 怎麼用', 'zh-TW'],
-    ['What does 侘寂 mean', 'en'], ['东京五天自由行怎么排', 'zh-TW'], ['東京の旅行', 'ja'], ['한국 여행', 'ko'], ['🍜', undefined], ['2026', undefined], ['', undefined]
+    ['東京五天自由行怎麼排', 'zh-TW'], ['Plan a 5-day Taipei trip', 'same-as-input'], ['Python 的 async 怎麼用', 'zh-TW'],
+    ['What does 侘寂 mean', 'same-as-input'], ['东京五天自由行怎么排', 'zh-CN'], ['東京ラーメンの旅', 'ja'], ['東京の旅行', 'zh-TW'], ['한국 여행', 'ko'], ['🍜', undefined], ['2026', undefined], ['', undefined]
   ];
   for (const [text, expected] of cases) assert.equal(detectAimContentLanguage(text), expected, text);
   for (const ui of ['en', 'zh-TW']) {
-    assert.equal(chooseAimContentLanguage(ui, '東京の旅行'), 'ja');
-    assert.equal(chooseAimContentLanguage(ui, '東京の旅行', '中文內容'), 'ja', 'Japanese topic must not fall through to a later source');
+    assert.equal(chooseAimContentLanguage(ui, '東京ラーメンの旅'), 'ja');
+    assert.equal(chooseAimContentLanguage(ui, '東京ラーメンの旅', '中文內容'), 'ja', 'Japanese topic must not fall through to a later source');
     assert.equal(chooseAimContentLanguage(ui, '🍜', ''), ui);
     assert.equal(chooseAimContentLanguage(ui, '2026', '中文背景'), 'zh-TW');
-    assert.equal(chooseAimContentLanguage(ui, '2026', 'Some English context'), 'en');
-    assert.equal(chooseAimContentLanguage(ui, 'Plan a trip', '中文背景'), 'en', 'topic wins over context');
+    assert.equal(chooseAimContentLanguage(ui, '2026', 'Some English context'), 'same-as-input');
+    assert.equal(chooseAimContentLanguage(ui, 'Plan a trip', '中文背景'), 'same-as-input', 'topic wins over context');
   }
   // Stored value wins; maps without one (legacy and upgraded mindSearch maps) derive from the title; no map falls back to the UI language.
   assert.equal(resolveAimContentLanguage({ title: 'Plan a trip', aim: { contentLanguage: 'zh-TW' } }, 'en'), 'zh-TW');
   assert.equal(resolveAimContentLanguage({ title: '東京五天自由行', aim: { version: 1 } }, 'en'), 'zh-TW');
-  assert.equal(resolveAimContentLanguage({ title: 'Plan a trip' }, 'zh-TW'), 'en');
+  assert.equal(resolveAimContentLanguage({ title: 'Plan a trip' }, 'zh-TW'), 'same-as-input');
   assert.equal(resolveAimContentLanguage({ title: '🍜' }, 'zh-TW'), 'zh-TW');
   assert.equal(resolveAimContentLanguage(undefined, 'en'), 'en');
 });

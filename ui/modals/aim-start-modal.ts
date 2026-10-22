@@ -1,6 +1,15 @@
 import { App, Modal, Setting } from "obsidian";
 import { randomUUID } from "node:crypto";
-import { t } from "../../i18n";
+import {
+  FOLLOW_INPUT_ID,
+  getUiLanguage,
+  OUTPUT_LANGUAGE_CHOICES,
+  supportedLanguageLabel,
+  SUPPORTED_LANGUAGES,
+  t,
+  type ContentLanguage
+} from "../../i18n";
+import { chooseAimContentLanguage } from "../../experiences/aim/content-language";
 import type {
   AimOutcomeExpectation,
   AimOutcomeFormat,
@@ -10,6 +19,8 @@ import type {
 export interface AimStartInput {
   topic: string;
   context: string;
+  /** Only when the language was picked by hand; absent means detect it from the topic and context. */
+  outputLanguage?: ContentLanguage;
   outcomeExpectation: AimOutcomeExpectation;
   requestId: string;
   model: string;
@@ -44,6 +55,25 @@ export class AimStartModal extends Modal {
     contextLabel.createSpan({ text: t("ui.aim_context_label") });
     const context = contextLabel.createEl("textarea", { cls: "vam-aim-context", attr: { rows: "4" } });
     context.setAttr("aria-label", t("ui.aim_context_label"));
+    const languageLabel = this.contentEl.createEl("label", { cls: "vam-field" });
+    languageLabel.createSpan({ text: t("ui.output_language") });
+    const language = languageLabel.createEl("select");
+    language.setAttr("aria-label", t("ui.output_language"));
+    language.createEl("option", { value: FOLLOW_INPUT_ID, text: supportedLanguageLabel(FOLLOW_INPUT_ID) });
+    for (const option of SUPPORTED_LANGUAGES) language.createEl("option", { value: option.id, text: option.label });
+    const moreLanguages = language.createEl("optgroup", { attr: { label: t("ui.output_language_more") } });
+    for (const option of OUTPUT_LANGUAGE_CHOICES)
+      moreLanguages.createEl("option", { value: option.id, text: option.label });
+    // Until the person picks one, the menu shows what detection gives for the words typed so far.
+    let languagePicked = false;
+    const showDetectedLanguage = (): void => {
+      if (!languagePicked) language.value = chooseAimContentLanguage(getUiLanguage(), topic.value, context.value);
+    };
+    showDetectedLanguage();
+    language.addEventListener("change", () => {
+      languagePicked = true;
+      newRequest();
+    });
     const outcomeLabel = this.contentEl.createEl("label", { cls: "vam-field" });
     outcomeLabel.createSpan({ text: t("ui.aim_outcome_goal") });
     const outcome = outcomeLabel.createEl("select");
@@ -175,6 +205,8 @@ export class AimStartModal extends Modal {
     };
     topic.addEventListener("input", newRequest);
     context.addEventListener("input", newRequest);
+    topic.addEventListener("input", showDetectedLanguage);
+    context.addEventListener("input", showDetectedLanguage);
     model.addEventListener("change", newRequest);
     reasoning.addEventListener("change", newRequest);
     answerCount.addEventListener("input", newRequest);
@@ -242,6 +274,7 @@ export class AimStartModal extends Modal {
               const controls = [
                 topic,
                 context,
+                language,
                 outcome,
                 customDescription,
                 ...formatInputs.map(item => item.checkbox),
@@ -264,6 +297,7 @@ export class AimStartModal extends Modal {
                 await this.submit({
                   topic: topic.value.trim(),
                   context: context.value.trim(),
+                  ...(languagePicked ? { outputLanguage: language.value as ContentLanguage } : {}),
                   outcomeExpectation,
                   requestId: this.requestId,
                   model: model.value,

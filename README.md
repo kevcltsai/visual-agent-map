@@ -22,6 +22,8 @@
 2. Open the built-in sample or create a map. For AI features, install and sign in to [Codex CLI](https://developers.openai.com/codex/cli/) or [Claude Code](https://docs.anthropic.com/en/docs/claude-code/overview), then check the CLI in VAM settings.
 3. Choose **＋ New map → New AIM** to try AIM.
 
+The interface is available in English, Traditional Chinese and Simplified Chinese. AI answers follow the language you write in, including Japanese, Korean, Spanish and other languages.
+
 Setup details, troubleshooting, and known limitations are in [INSTALL.md](INSTALL.md).
 
 ## Contributing checks

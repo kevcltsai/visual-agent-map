@@ -27,7 +27,7 @@ Do not install files from the repository's `main` branch into a production vault
 
 ## 2. Start your first map
 
-1. Explore the built-in read-only sample and its five-step tour. A fresh install starts in English regardless of Obsidian's language. You can choose Traditional Chinese in VAM settings; that choice is saved across restarts.
+1. Explore the built-in read-only sample and its five-step tour. A fresh install starts in English regardless of Obsidian's language. You can choose Traditional Chinese or Simplified Chinese in VAM settings; that choice is saved across restarts. The Simplified Chinese interface uses the Traditional Chinese sample.
 2. Select **Duplicate to my workspace** to start from the sample, or **Create empty mind map**. You can edit either map without an AI service.
 3. Changing VAM's interface language also changes the built-in sample. Existing maps and notes keep their original titles and writing.
 
@@ -106,7 +106,7 @@ VAM 不需要專屬 API key。獨立 CLI 不需要 npm；只有從原始碼建�
 
 ## 2. 開始第一張心智圖
 
-1. 先探索內建唯讀範例與五步導覽。全新安裝預設英文，與 Obsidian 語言無關；可在 VAM 設定選擇繁體中文，選擇會跨重啟保留。
+1. 先探索內建唯讀範例與五步導覽。全新安裝預設英文，與 Obsidian 語言無關；可在 VAM 設定選擇繁體中文或簡體中文，選擇會跨重啟保留。簡體中文介面使用繁體中文版範例。
 2. 選擇 **複製到我的工作區**，或選擇 **建立空白心智圖**。沒有 AI 服務也能編輯。
 3. 切換 VAM 介面語言也會更換內建唯讀範例。既有地圖與筆記的名稱及內容不會改變。
 

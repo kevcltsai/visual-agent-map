@@ -248,7 +248,7 @@ export class AiTaskService {
       let result = step.parse(raw);
       if (readerFacingDetail(input)) {
         result.detail = normalizeMathDelimiters(normalizeDetailHeadings(result.detail));
-        result.detail = normalizeOutputScriptHeadings(result.detail, outputLanguage, input.detailTemplate);
+        result.detail = normalizeOutputScriptHeadings(result.detail, outputLanguage, input.detailTemplate, input);
         result.summary = normalizeMathDelimiters(result.summary);
       }
       if (referenceGroups.length) result.summary = resolveSummaryReferences(result.summary, referenceGroups);

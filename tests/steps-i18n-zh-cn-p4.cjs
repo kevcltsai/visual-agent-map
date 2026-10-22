@@ -150,7 +150,7 @@ test('N1: zh-CN standard Simplified heading becomes the canonical heading and ke
   assert.ok(canonical.includes('真正的内容'));
   assert.ok(!canonical.includes('核心结论'));
   assert.equal(normalize('### 证据与来源\n\n- a', 'zh-CN', standardZh), '### 證據與來源\n\n- a');
-  assert.equal(normalize('### 核心结论\n\nx', 'zh-CN'), '### 核心結論\n\nx');
+  assert.equal(resultUtils.normalizeOutputScriptHeadings('### 核心结论\n\nx', 'zh-CN', undefined, { detailFormat: undefined, promptProfile: undefined }), '### 核心結論\n\nx');
 });
 
 test('N1: zh-CN textbook Simplified heading is mapped too', () => {
@@ -182,6 +182,15 @@ test('N1 counterexamples: zh-TW, en, custom template, body text, wrong level, ne
 const coffeeInsights = load('experiences/coffee-tables/insights.ts');
 const coffeeEngine = load('experiences/coffee-tables/engine.ts');
 const SIMPLIFIED_NOTES = ['# 观察者整理', '', '## 意外链接', '- 连结甲。', '', '## 值得继续想的问题', '- 问题乙。', '', '## 核心分歧', '- 分歧丙。', '', '## 探索方向', '- 方向丁。', '', '## 值得查证的假设', '- 假设戊。'].join('\n');
+
+test('N1 counterexamples: adaptive format and AIM profile under zh-CN are not rewritten', () => {
+  const simplified = '### 核心结论\n\n内容';
+  const run = context => resultUtils.normalizeOutputScriptHeadings(simplified, 'zh-CN', undefined, context);
+  assert.equal(run({ detailFormat: 'adaptive' }), simplified);
+  assert.equal(run({ promptProfile: 'aim' }), simplified);
+  assert.equal(run({ promptProfile: 'aim', detailFormat: 'adaptive' }), simplified);
+  assert.equal(run({}), '### 核心結論\n\n内容');
+});
 
 test('N1b: Simplified observer headings parse into the right categories and are not dropped', () => {
   const parsed = coffeeInsights.baselineFromVersions([SIMPLIFIED_NOTES], 'zh-TW');

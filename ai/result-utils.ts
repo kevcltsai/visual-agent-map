@@ -102,7 +102,7 @@ function textbookDetail(
 /**
  * Narrow repair for an output locale whose note language differs from it (today zh-CN): the model sometimes writes a
  * built-in section heading in the output script (`### 核心结论`) instead of the verbatim note heading (`### 核心結論`).
- * Only a `###` line outside code whose text is exactly the output locale's form of one of the fixed built-in headings
+ * Adaptive-format and AIM-profile requests are skipped. Only a `###` line outside code whose text is exactly the output locale's form of one of the fixed built-in headings
  * is rewritten to the note-language heading. A missing template means the default Standard one; a custom template, a
  * locale without a differing note language, near matches, other heading levels and body text are left alone. If both
  * forms are present, `canonicalDetail` then merges them under the one section in reading order.
@@ -110,8 +110,11 @@ function textbookDetail(
 export function normalizeOutputScriptHeadings(
   detail: string,
   output: UiLanguage,
-  template?: Pick<DetailTemplate, "id">
+  template?: Pick<DetailTemplate, "id">,
+  context: { detailFormat?: string; promptProfile?: string } = {}
 ): string {
+  // Adaptive and AIM details have no fixed template: their headings are the model's own choice and stay as written.
+  if (context.detailFormat === "adaptive" || context.promptProfile === "aim") return detail;
   if (!verbatimHeadingLanguage(output) || (template && !isBuiltinTemplateId(template.id))) return detail;
   const note = noteLanguageOf(output);
   const forms = new Map<string, string>();

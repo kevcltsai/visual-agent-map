@@ -15391,7 +15391,8 @@ ${body}`);
   if (footnotes.length && sourcesIndex < 0) blocks.push(footnotes.join("\n"));
   return blocks.filter(Boolean).join("\n\n");
 }
-function normalizeOutputScriptHeadings(detail, output, template) {
+function normalizeOutputScriptHeadings(detail, output, template, context = {}) {
+  if (context.detailFormat === "adaptive" || context.promptProfile === "aim") return detail;
   if (!verbatimHeadingLanguage(output) || template && !isBuiltinTemplateId(template.id)) return detail;
   const note = noteLanguageOf(output);
   const forms = /* @__PURE__ */ new Map();
@@ -43177,7 +43178,7 @@ var AiTaskService = class {
       let result = step.parse(raw);
       if (readerFacingDetail(input)) {
         result.detail = normalizeMathDelimiters(normalizeDetailHeadings(result.detail));
-        result.detail = normalizeOutputScriptHeadings(result.detail, outputLanguage2, input.detailTemplate);
+        result.detail = normalizeOutputScriptHeadings(result.detail, outputLanguage2, input.detailTemplate, input);
         result.summary = normalizeMathDelimiters(result.summary);
       }
       if (referenceGroups.length) result.summary = resolveSummaryReferences(result.summary, referenceGroups);

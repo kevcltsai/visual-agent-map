@@ -40,6 +40,11 @@ export interface LanguageEntry {
   readonly dictionary: Readonly<Partial<Record<TranslationKey, string>>>;
 }
 
+/**
+ * Row order matters: the first row of each instruction family (`zh-TW` for `zh`, `en` for `en`) owns that family's
+ * prompt snapshot tag (`.zh.`, `.en.`). A new row must not be placed before the existing first row of its instruction
+ * family; appending at the end is always safe.
+ */
 export const LANGUAGES = [
   {
     id: "zh-TW",

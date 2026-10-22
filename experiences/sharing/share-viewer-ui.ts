@@ -38,6 +38,8 @@ export interface ShareViewerUi {
   subtopics: string;
   noContent: string;
   imageOmitted: string;
+  /** `{0}` is the web address the image came from (shown as a link under the image). */
+  imageSource: string;
   resizePanel: string;
   untitledMap: string;
 }
@@ -72,6 +74,7 @@ export const SHARE_VIEWER_UI_DEFAULT: Readonly<ShareViewerUi> = {
   subtopics: "Subtopics",
   noContent: "This topic has no notes in the shared file.",
   imageOmitted: "[image not included]",
+  imageSource: "Source: {0}",
   resizePanel: "Resize the side panel",
   untitledMap: "Untitled map"
 };

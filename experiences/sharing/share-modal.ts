@@ -1,4 +1,4 @@
-import { Modal, Notice, Setting, type App } from "obsidian";
+import { Modal, Notice, Setting, type App, type ToggleComponent } from "obsidian";
 import { t } from "../../i18n";
 import { actionStatus, modalActions } from "../../ui/modals/action-bar";
 import {
@@ -57,6 +57,7 @@ export class ShareModal extends Modal {
   private statusEl!: HTMLElement;
   private fullSetting!: Setting;
   private imagesSetting!: Setting;
+  private imagesToggle!: ToggleComponent;
   private saveButton!: HTMLButtonElement;
   private cancelButton!: HTMLButtonElement;
   private progressText = "";
@@ -91,12 +92,13 @@ export class ShareModal extends Modal {
     this.imagesSetting = new Setting(this.contentEl)
       .setName(t("share.option_images_name"))
       .setDesc(t("share.option_images_desc"))
-      .addToggle(toggle =>
+      .addToggle(toggle => {
+        this.imagesToggle = toggle;
         toggle.setValue(this.includeImages).onChange(value => {
           this.includeImages = value;
           this.restart();
-        })
-      );
+        });
+      });
     this.detailsEl = this.contentEl.createDiv({ cls: "vam-share-preview", attr: { "aria-live": "polite" } });
     this.warningsEl = this.contentEl.createDiv({ cls: "vam-share-warnings" });
     const actions = modalActions(this);
@@ -182,7 +184,12 @@ export class ShareModal extends Modal {
     }
     if (!this.busy && result) this.renderWarnings(result);
     this.fullSetting.setDisabled(this.saving);
-    this.imagesSetting.setDisabled(this.saving || !this.includeDetail);
+    const imagesOff = this.saving || !this.includeDetail;
+    this.imagesSetting.setDisabled(imagesOff);
+    // The class alone leaves the checkbox focusable and switchable by keyboard; disable the real input too.
+    this.imagesToggle.setDisabled(imagesOff);
+    const input = this.imagesToggle.toggleEl.querySelector("input");
+    if (input) input.disabled = imagesOff;
     this.statusEl.setText(this.savedText);
     this.saveButton.disabled = this.busy || this.saving || this.failed || !result?.html;
     this.saveButton.setText(this.saving ? t("share.saving") : t("share.save"));

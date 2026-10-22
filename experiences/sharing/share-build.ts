@@ -167,3 +167,14 @@ export function resolveRelative(folder: string, ref: string): string | null {
   }
   return parts.join("/");
 }
+
+/** Note and image problem counts only matter for what the chosen mode puts in the file: no notes means no note content or unreadable images. */
+export function scopeCountsToMode(
+  options: { includeDetail: boolean; includeImages: boolean },
+  raw: { notesWithContent: number; failedImages: number }
+): { notesWithContent: number; failedImages: number } {
+  return {
+    notesWithContent: options.includeDetail ? raw.notesWithContent : 0,
+    failedImages: options.includeDetail && options.includeImages ? raw.failedImages : 0
+  };
+}

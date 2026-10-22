@@ -1924,6 +1924,7 @@ export const en = {
   "share.viewer_subtopics": "Subtopics",
   "share.viewer_no_content": "This topic has no notes in the shared file.",
   "share.viewer_image_omitted": "[image not included]",
+  "share.viewer_image_source_0": "Source: {0}",
   "share.viewer_resize_panel": "Resize the side panel",
   "share.viewer_untitled": "Untitled map",
   // Share dialog
@@ -1958,7 +1959,7 @@ export const en = {
   "share.save": "Save…",
   "share.saving": "Saving…",
   "share.saved_0_1": "Saved {0} ({1})",
-  "share.downloaded_0_1": "Downloaded {0} ({1}). Look in your downloads folder.",
+  "share.downloaded_0_1": "Save requested for {0} ({1}). If a save window appears, choose where to keep the file.",
   "share.save_failed": "The file could not be saved.",
   "share.unavailable_no_map": "Open a mind map first, then share it.",
   "share.unavailable_sample": "The built-in sample is read-only and cannot be shared.",

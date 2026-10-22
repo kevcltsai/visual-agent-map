@@ -1767,6 +1767,7 @@ export const zhTW: Record<TranslationKey, string> = {
   "share.viewer_subtopics": "子議題",
   "share.viewer_no_content": "這個議題在分享檔中沒有筆記內容。",
   "share.viewer_image_omitted": "[圖片未包含]",
+  "share.viewer_image_source_0": "來源：{0}",
   "share.viewer_resize_panel": "調整側欄寬度",
   "share.viewer_untitled": "未命名的地圖",
   // Share dialog
@@ -1799,7 +1800,7 @@ export const zhTW: Record<TranslationKey, string> = {
   "share.save": "儲存…",
   "share.saving": "儲存中…",
   "share.saved_0_1": "已儲存 {0}（{1}）",
-  "share.downloaded_0_1": "已下載 {0}（{1}），請到下載資料夾查看。",
+  "share.downloaded_0_1": "已送出存檔 {0}（{1}）。若出現存檔視窗，請選擇要存放的位置。",
   "share.save_failed": "無法儲存檔案。",
   "share.unavailable_no_map": "請先開啟一張心智圖再分享。",
   "share.unavailable_sample": "內建範例為唯讀，無法分享。",

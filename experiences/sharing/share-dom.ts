@@ -160,10 +160,32 @@ export function scrubShareTree(root: Element, options: ScrubOptions = {}): Scrub
   return report;
 }
 
+/**
+ * A diagram must load nothing when the file opens. After the shared pass (which already cleans the HTML inside
+ * `foreignObject`: scripts, frames, handlers, script URLs), drop every remote reference except clickable `<a>` links:
+ * an `<img>` in a label, a `<use>`/`<feImage>` pointing at a web address.
+ */
+function dropRemoteReferences(parent: Element): void {
+  for (const child of Array.from(parent.children)) {
+    const tag = child.localName.toLowerCase();
+    const remote = (value: string | null): boolean => /^(?:https?:)?\/\//.test(normalizeUrl(value ?? ""));
+    if (tag === "img" && !/^(?:vam-asset:|data:image\/)/.test(normalizeUrl(child.getAttribute("src") ?? ""))) {
+      child.remove();
+      continue;
+    }
+    if (tag !== "a") {
+      for (const name of ["href", "xlink:href", "src", "srcset"])
+        if (remote(child.getAttribute(name))) child.removeAttribute(name);
+    }
+    dropRemoteReferences(child);
+  }
+}
+
 /** True when `root` is an `<svg>` and was scrubbed (style kept when inert). False means the SVG cannot be used. */
 export function scrubMermaidSvg(root: Element): boolean {
   if (root.localName.toLowerCase() !== "svg") return false;
   scrubShareTree(root, { allowStyle: true });
+  dropRemoteReferences(root);
   return true;
 }
 

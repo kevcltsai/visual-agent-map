@@ -1766,6 +1766,7 @@ export const zhCN: Record<TranslationKey, string> = {
   "share.viewer_subtopics": "子议题",
   "share.viewer_no_content": "这个议题在分享文件中没有笔记内容。",
   "share.viewer_image_omitted": "[图片未包含]",
+  "share.viewer_image_source_0": "来源：{0}",
   "share.viewer_resize_panel": "调整侧栏宽度",
   "share.viewer_untitled": "未命名的地图",
   // Share dialog
@@ -1798,7 +1799,7 @@ export const zhCN: Record<TranslationKey, string> = {
   "share.save": "保存…",
   "share.saving": "保存中…",
   "share.saved_0_1": "已保存 {0}（{1}）",
-  "share.downloaded_0_1": "已下载 {0}（{1}），请到下载文件夹查看。",
+  "share.downloaded_0_1": "已送出存档 {0}（{1}）。若出现存档窗口，请选择要存放的位置。",
   "share.save_failed": "无法保存文件。",
   "share.unavailable_no_map": "请先打开一张思维导图再分享。",
   "share.unavailable_sample": "内置示例为只读，无法分享。",

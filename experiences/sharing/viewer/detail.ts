@@ -1,5 +1,27 @@
 import type { ShareViewerUi } from "../share-viewer-ui";
 
+/** The pieces of the "Source: host" line shown under a web image: text before, link label, text after. */
+export function imageSourceParts(src: string, ui: Pick<ShareViewerUi, "imageSource">): [string, string, string] {
+  // Plain text parsing (no URL constructor): the label is the host, without credentials or port.
+  const match = /^https?:\/\/(?:[^/?#@]*@)?([^/?#:]+)/i.exec(src);
+  const host = match?.[1] ?? src;
+  const [before, after = ""] = ui.imageSource.split("{0}");
+  return [before, host, after];
+}
+
+function sourceLine(doc: Document, src: string, ui: ShareViewerUi): HTMLElement {
+  const [before, host, after] = imageSourceParts(src, ui);
+  const line = doc.createElement("span");
+  line.className = "vam-image-source";
+  const link = doc.createElement("a");
+  link.setAttribute("href", src);
+  link.setAttribute("target", "_blank");
+  link.setAttribute("rel", "noopener noreferrer");
+  link.textContent = host;
+  line.append(doc.createTextNode(before), link, doc.createTextNode(after));
+  return line;
+}
+
 /**
  * Puts the exported note HTML into `target`. The exporter already sanitized it; this pass repeats the cheap checks
  * (no script, no event attributes, no script URLs) and does the viewer's own work: asset images, links, wide tables.
@@ -44,6 +66,9 @@ export function fillDetail(
     } else if (/^https?:\/\//i.test(src)) {
       image.setAttribute("referrerpolicy", "no-referrer");
       image.setAttribute("loading", "lazy");
+      // A web image can fail to load (offline, blocked): keep a visible line that names where it came from.
+      const anchor = image.closest("a");
+      (anchor ?? image).after(sourceLine(doc, src, ui));
     } else if (!/^data:image\//i.test(src)) image.replaceWith(omitted());
   }
   for (const link of Array.from(root.querySelectorAll("a"))) {

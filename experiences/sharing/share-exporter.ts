@@ -11,6 +11,7 @@ import {
   plainWikilinks,
   replaceAssetRefs,
   resolveRelative,
+  scopeCountsToMode,
   type BuildTicket
 } from "./share-build";
 import { extractMermaidSources, scrubMermaidSvg, scrubShareTree, unwrapLocalLinks } from "./share-dom";
@@ -448,16 +449,17 @@ export class ShareExporter {
       this.shellText = { language, text: renderShareShell(ui) };
     const hits = [...scanPayloadForLeaks(payload, forbidden), ...scanForLeaks(this.shellText.text, forbidden)];
     const leakCategories = [...new Set(hits.map(hit => hit.category))];
+    const scoped = scopeCountsToMode(options, { notesWithContent, failedImages: failed.size });
     const counts = {
       topics: payload.nodes.length,
-      notesWithContent,
+      notesWithContent: scoped.notesWithContent,
       images: Object.keys(payload.assets).length
     };
     const shared = {
       payload,
       counts,
       leakCategories,
-      failedImages: failed.size,
+      failedImages: scoped.failedImages,
       mermaidUndrawn: undrawn,
       mermaidBlocked: blocked
     };

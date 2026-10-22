@@ -175,7 +175,7 @@ test('sharing viewer: interface text exists in all three languages and the Engli
     assert.equal(ui.lang, lang);
     assert.deepEqual(Object.keys(ui).sort(), Object.keys(english).sort());
     for (const [key, value] of Object.entries(ui)) assert.ok(typeof value === 'string' && value.trim(), `${lang}.${key}`);
-    for (const key of ['goal', 'expandToLevel', 'zoomReset', 'expandCount']) assert.match(ui[key], /\{0\}/, `${lang}.${key}`);
+    for (const key of ['goal', 'expandToLevel', 'zoomReset', 'expandCount', 'imageSource']) assert.match(ui[key], /\{0\}/, `${lang}.${key}`);
     assert.ok(!/\{[1-9]\}/.test(JSON.stringify(ui)));
   }
   for (const lang of ['zh-TW', 'zh-CN']) for (const key of ['install', 'madeWithVam', 'readOnly', 'tierCore', 'topicDetails']) assert.notEqual(text.shareViewerUiFor(lang)[key], english[key], `${lang}.${key} is translated`);
@@ -206,4 +206,26 @@ test('sharing viewer: the demo payload covers table, callout, SVG, data-URL imag
   assert.ok(data.nodes.some(node => node.tier === 'side') && data.nodes.some(node => node.manual) && data.nodes.some(node => node.status === 'idea'));
   const depth = id => { let d = 0; for (let n = data.nodes.find(x => x.id === id); n.parentId; n = data.nodes.find(x => x.id === n.parentId)) d++; return d; };
   assert.ok(Math.max(...data.nodes.map(node => depth(node.id))) >= 4, 'deep enough to test "expand to level N"');
+});
+
+test('sharing viewer: a web image gets a visible, localized source line with the original link', () => {
+  const detail = load('experiences/sharing/viewer/detail.ts');
+  for (const lang of LANGUAGES) {
+    const ui = text.shareViewerUiFor(lang);
+    assert.match(ui.imageSource, /\{0\}/, `${lang}.imageSource`);
+    const [before, host, after] = detail.imageSourceParts('https://example.org/a/pic.jpg?x=1', ui);
+    assert.equal(host, 'example.org');
+    assert.equal(before + '{0}' + after, ui.imageSource);
+  }
+  assert.deepEqual(plain(detail.imageSourceParts('https://example.org/p.jpg', text.shareViewerUiFor('zh-TW'))), ['來源：', 'example.org', '']);
+  assert.equal(detail.imageSourceParts('not a url', text.shareViewerUiFor('en'))[1], 'not a url');
+  const js = bundle.SHARE_VIEWER_JS;
+  assert.ok(js.includes('vam-image-source') && js.includes('noopener noreferrer'), 'the generated viewer builds the source line');
+  assert.ok(bundle.SHARE_VIEWER_CSS.includes('.vam-sample-detail .vam-image-source'));
+});
+
+test('sharing viewer: at phone width the side panel covers the whole workspace and the map is not squeezed', () => {
+  const css = bundle.SHARE_VIEWER_CSS;
+  assert.match(css, /@media \(max-width: 600px\) \{ \.vam-workspace\.has-inspector > \.vam-canvas-overlay \{ right: 0; \} \.vam-inspector \{ width: 100%;/);
+  assert.ok(css.indexOf('.vam-workspace.has-inspector > .vam-canvas-overlay { right: 0; }') > css.indexOf('.vam-workspace.has-inspector > .vam-canvas-overlay { right: 300px; }'), 'the narrow rule comes later and wins');
 });

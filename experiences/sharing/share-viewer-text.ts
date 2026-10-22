@@ -34,6 +34,7 @@ export function shareViewerUiFor(language: ShareLanguage): ShareViewerUi {
     subtopics: text("share.viewer_subtopics"),
     noContent: text("share.viewer_no_content"),
     imageOmitted: text("share.viewer_image_omitted"),
+    imageSource: text("share.viewer_image_source_0"),
     resizePanel: text("share.viewer_resize_panel"),
     untitledMap: text("share.viewer_untitled")
   };

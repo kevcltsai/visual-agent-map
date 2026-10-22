@@ -213,7 +213,7 @@ function modalHarness({ exporter, thresholds, saveEnvironment } = {}) {
   class Setting {
     constructor(parent) { this.row = parent.createDiv('setting'); Setting.all.push(this); this.disabled = false; }
     setName(v) { this.name = v; return this; } setDesc() { return this; } setDisabled(v) { this.disabled = v; return this; }
-    addToggle(cb) { const toggle = { value: false, setValue(v) { this.value = v; return this; }, onChange(fn) { this.fn = fn; return this; } }; this.toggle = toggle; cb(toggle); return this; }
+    addToggle(cb) { const input = { disabled: false }; const toggle = { value: false, input, off: false, toggleEl: { querySelector: () => input }, setDisabled(v) { this.off = v; return this; }, setValue(v) { this.value = v; return this; }, onChange(fn) { this.fn = fn; return this; } }; this.toggle = toggle; cb(toggle); return this; }
   }
   Setting.all = [];
   class Notice { constructor(text) { notices.push(text); } }
@@ -363,4 +363,74 @@ test('share dialog: image and diagram problems are reported, and a failed build 
   assert.match(h2.text(), /The file could not be prepared/);
   assert.doesNotMatch(h2.text(), /someone/);
   assert.equal(h2.button('Save…').disabled, true);
+});
+
+test('share dom: foreignObject content in a mermaid SVG loses scripts, frames, handlers, script URLs and remote loads', () => {
+  const svg = el('svg', { viewBox: '0 0 10 10' }, [
+    el('g', {}, [el('foreignObject', { onload: 'x()' }, [
+      el('div', { xmlns: 'http://www.w3.org/1999/xhtml', onmouseover: 'x()' }, [
+        el('span', { class: 'nodeLabel' }, [], 'Start'),
+        el('script'), el('iframe', { src: 'https://evil.example' }), el('object', { data: 'https://evil.example' }), el('embed', { src: 'https://evil.example' }),
+        el('img', { src: 'https://tracker.example/p.gif', onerror: 'x()' }), el('img', { src: 'javascript:alert(1)' }), el('img', { src: 'data:image/png;base64,AAAA' }),
+        el('a', { href: 'javascript:alert(1)' }), el('a', { href: 'https://example.org' }, [], 'ok'),
+        el('div', { style: 'background:url(https://evil.example/x.png)' }),
+        el('svg', {}, [el('use', { href: 'https://evil.example/s.svg#a' }), el('script'), el('animate', { href: '#x' })])
+      ])
+    ])])
+  ]);
+  assert.equal(dom.scrubMermaidSvg(svg), true);
+  const names = tags(svg);
+  for (const banned of ['script', 'iframe', 'object', 'embed', 'animate']) assert.ok(!names.includes(banned), banned);
+  assert.ok(names.includes('foreignObject') && names.includes('span'), 'labels survive');
+  const find = (root, tag) => root.children.flatMap(c => [...(c.localName === tag ? [c] : []), ...find(c, tag)]);
+  assert.equal(find(svg, 'foreignObject')[0].getAttribute('onload'), null);
+  assert.equal(find(svg, 'div')[0].getAttribute('onmouseover'), null);
+  const images = find(svg, 'img');
+  assert.equal(images.length, 1, 'remote and script images are removed');
+  assert.match(images[0].getAttribute('src'), /^data:image\/png/);
+  const links = find(svg, 'a');
+  assert.equal(links[0].getAttribute('href'), null);
+  assert.equal(links[1].getAttribute('href'), 'https://example.org', 'plain web links stay clickable');
+  assert.equal(find(svg, 'div')[1].getAttribute('style'), null, 'style that fetches is dropped');
+  assert.equal(find(svg, 'use')[0].getAttribute('href'), null, 'no remote use reference');
+});
+
+test('share build: problem counts follow the chosen mode', () => {
+  const raw = { notesWithContent: 4, failedImages: 2 };
+  assert.deepEqual(plain(build.scopeCountsToMode({ includeDetail: true, includeImages: true }, raw)), raw);
+  assert.deepEqual(plain(build.scopeCountsToMode({ includeDetail: true, includeImages: false }, raw)), { notesWithContent: 4, failedImages: 0 });
+  assert.deepEqual(plain(build.scopeCountsToMode({ includeDetail: false, includeImages: true }, raw)), { notesWithContent: 0, failedImages: 0 });
+});
+
+test('share dialog: with full notes off the Include images switch is really disabled, not just styled', async () => {
+  const exporter = fakeExporter();
+  const h = modalHarness({ exporter });
+  h.modal.open();
+  await tick(); await tick();
+  const images = h.Setting.all[1];
+  assert.equal(images.toggle.input.disabled, false);
+  assert.equal(images.toggle.off, false);
+  h.Setting.all[0].toggle.fn(false);
+  await tick(); await tick();
+  assert.equal(images.disabled, true);
+  assert.equal(images.toggle.off, true);
+  assert.equal(images.toggle.input.disabled, true, 'the checkbox input itself is disabled');
+  h.Setting.all[0].toggle.fn(true);
+  await tick(); await tick();
+  assert.equal(images.toggle.input.disabled, false);
+});
+
+test('share dialog: the download fallback does not claim where the file went', async () => {
+  const { env } = saveEnv({});
+  const exporter = fakeExporter();
+  const h = modalHarness({ exporter, saveEnvironment: env });
+  h.modal.open();
+  await tick(); await tick();
+  h.button('Save…').listeners.click();
+  await tick(); await tick();
+  const message = h.notices.at(-1);
+  assert.match(message, /My Map\.html/);
+  assert.doesNotMatch(message, /downloads? folder/i);
+  assert.match(message, /save window/i);
+  for (const lang of ['zh-TW', 'zh-CN']) assert.doesNotMatch(load('i18n.ts').translate(lang, 'share.downloaded_0_1', 'a', 'b'), /下載資料夾|下载文件夹/);
 });

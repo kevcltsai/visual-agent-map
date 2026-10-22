@@ -120,9 +120,11 @@ button:focus-visible, a:focus-visible, [tabindex]:focus-visible { outline: 2px s
 .vam-sample-detail .callout-icon { display: inline-flex; flex: none; }
 .vam-sample-detail .callout-icon svg { width: 16px; height: 16px; }
 .vam-sample-detail .callout-content p:first-child { margin-top: 4px; }
+.vam-sample-detail .vam-image-source { display: block; margin: 2px 0 8px; color: var(--text-faint); font-size: var(--font-ui-smaller); overflow-wrap: anywhere; }
 .vam-sample-detail .vam-image-omitted { color: var(--text-faint); font-size: var(--font-ui-smaller); }
 .vam-sample-detail .internal-link { color: inherit; text-decoration: none; }
 .vam-resizing, .vam-resizing * { cursor: col-resize !important; user-select: none; }
 @media (max-width: 700px) { .vam-canvas-overlay > .vam-canvas-hint { display: none; } }
+@media (max-width: 600px) { .vam-workspace.has-inspector > .vam-canvas-overlay { right: 0; } .vam-inspector { width: 100%; box-shadow: none; } }
 @media (max-width: 600px) { .vam-inspector-resizer { display: none; } .vam-toolbar .vam-map-switcher { max-width: 100%; } .vam-made-with { display: none; } }
 @media (prefers-reduced-motion: reduce) { * { transition: none !important; } }

@@ -1,4 +1,5 @@
 import { chooseAimContentLanguage, resolveAimContentLanguage } from "../aim/content-language";
+import { resolveMapTextLanguage, synthesisDefaultName } from "./map-text-language";
 import { backgroundResultNotice, renderBackgroundStatus } from "../../ui/background-run";
 import { PromptPresetsModal } from "../../ui/modals/prompt-presets-modal";
 import { AimClarificationModal } from "../../ui/modals/aim-clarification-modal";
@@ -8968,9 +8969,7 @@ export class VisualAgentMapView extends ItemView {
         names,
         initialTitle:
           pending?.title ??
-          (names.length > 2
-            ? t("ui.synthesis_of_0_and_1_more", names[0], names.length)
-            : t("ui.synthesis_of_0", names.join(t("ui.list_separator")))),
+          synthesisDefaultName(resolveMapTextLanguage(this.map, this.plugin.settings.language), names),
         defaultDirection: t("ui.identify_shared_conclusions_key_differences_tradeoffs_and_ne"),
         background: this.backgroundHooks(this.selectionTaskKey()),
         fields: {

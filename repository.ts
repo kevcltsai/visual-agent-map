@@ -1,11 +1,13 @@
 import { App, Notice, TAbstractFile, TFile, TFolder, normalizePath, parseYaml, stringifyYaml } from "obsidian";
 import { isOutputOnlyLanguage, resolveAimContentLanguage } from "./experiences/aim/content-language";
+import { resolveMapTextLanguage, textLanguageOf } from "./experiences/visual-map/map-text-language";
 import { createHash } from "node:crypto";
 import {
   isNoteLanguage,
   noteLanguageOf,
   tNote,
   translate,
+  translateNote,
   type NoteLanguage,
   type TranslationKey,
   type UiLanguage
@@ -1347,7 +1349,9 @@ export class Repository {
     await this.ensureTopicFolders(this.topicRoot(mapPath));
     const source = await this.app.vault.read(this.file(sourcePath));
     const metadata = frontmatter(source);
-    const title = `${text(metadata.title, this.file(sourcePath).basename)} ${translate(this.noteLanguage, "note.copy_suffix")}`;
+    const sourceTitle = text(metadata.title, this.file(sourcePath).basename);
+    const suffixLanguage = textLanguageOf(sourceTitle, resolveMapTextLanguage(map, this.settings.language));
+    const title = `${sourceTitle} ${translateNote(suffixLanguage, "note.copy_suffix")}`;
     const id = crypto.randomUUID();
     metadata["node-id"] = id;
     metadata["topic-id"] = map.id;

@@ -1162,3 +1162,13 @@ button.vam-template-section-header:hover { background: var(--background-modifier
 .vam-hover-research-summary, .vam-hover-research-detail { margin-top: 4px; white-space: pre-wrap; overflow-wrap: anywhere; font-size: var(--vam-hover-body-size, 13px); line-height: var(--vam-hover-line-height, 1.45); color: var(--text-muted); }
 
 .vam-sr-only { position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0; }
+
+/* Share dialog (Sharing P1) */
+.vam-share-render-host { position: fixed; left: -10000px; top: 0; width: 800px; visibility: hidden; pointer-events: none; }
+.vam-share-preview { margin: 12px 0 4px; font-variant-numeric: tabular-nums; }
+.vam-share-size { font-weight: var(--font-semibold); }
+.vam-share-progress { color: var(--text-muted); }
+.vam-share-error { color: var(--text-error); }
+.vam-share-note { margin-top: 6px; color: var(--text-muted); font-size: var(--font-ui-smaller); line-height: 1.5; }
+.vam-share-note.vam-share-warning { color: var(--text-warning, var(--text-normal)); }
+.vam-share-note.vam-share-error { color: var(--text-error); }

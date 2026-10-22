@@ -5880,6 +5880,8 @@ export class VisualAgentMapView extends ItemView {
       redo.disabled = !this.history.canRedo;
       redo.dataset.history = "redo";
       this.updateHistoryButtons();
+      if (!this.map.aim)
+        this.iconButton(headerActions, "share-2", t("share.button"), () => this.plugin.openShare(this));
       this.iconButton(headerActions, "more-vertical", t("ui.more_mind_map_actions"), () => this.openMapActions());
     }
     const selectedNode = this.map?.nodes.find(node => node.id === this.selected);
@@ -7026,6 +7028,24 @@ export class VisualAgentMapView extends ItemView {
    * Brings an outline topic into view: expands collapsed ancestors, centers the card and selects it.
    * Multi-select keeps its selection; the outline only moves the camera there. False when the map lacks the topic.
    */
+  /** What the share dialog may read: a snapshot of the open map, or the reason it cannot be shared. */
+  shareSnapshot():
+    | { map: MapDocument; notes: Map<string, Note>; goal?: string; mapPath: string }
+    | "none"
+    | "sample"
+    | "aim"
+    | "empty" {
+    if (this.builtIn) return "sample";
+    if (!this.map || !this.path) return "none";
+    if (this.map.aim || this.map.nodes.some(node => node.aimKind !== undefined)) return "aim";
+    if (!this.map.nodes.length) return "empty";
+    return {
+      map: JSON.parse(JSON.stringify(this.map)) as MapDocument,
+      notes: new Map(this.notes),
+      ...(this.relevanceGoal ? { goal: this.relevanceGoal } : {}),
+      mapPath: this.path
+    };
+  }
   hasPath(path: string): boolean {
     return !!this.map?.nodes.some(item => item.path === path);
   }

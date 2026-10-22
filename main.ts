@@ -68,6 +68,7 @@ import { debugLog, LogManager } from "./log-manager";
 import { AiExchangeLog } from "./ai-exchange-log";
 import { PendingSuggestions } from "./pending-suggestions";
 import { OutlineView, OUTLINE_VIEW_TYPE } from "./ui/outline-view";
+import { ShareModal } from "./experiences/sharing/share-modal";
 import { groupRibbonIcons } from "./ui/ribbon-group";
 import { randomUUID } from "node:crypto";
 import { CodexAppServerRuntime, type CodexWebSearchEvent } from "./ai/runtime/codex-app-server";
@@ -341,6 +342,20 @@ export default class VisualAgentMapPlugin extends Plugin {
           }
         );
   }
+  /** Opens the share dialog for a map view (the active one by default), or says why this map cannot be shared. */
+  openShare(source?: VisualAgentMapView): void {
+    const view = source ?? this.app.workspace.getActiveViewOfType(VisualAgentMapView) ?? this.views()[0];
+    const snapshot = view?.shareSnapshot();
+    if (!snapshot || snapshot === "none") return void new Notice(t("share.unavailable_no_map"));
+    if (snapshot === "sample") return void new Notice(t("share.unavailable_sample"));
+    if (snapshot === "aim") return void new Notice(t("share.unavailable_aim"));
+    if (snapshot === "empty") return void new Notice(t("share.unavailable_empty"));
+    new ShareModal(this.app, {
+      source: snapshot,
+      vamVersion: this.manifest.version || "0.0.0",
+      language: this.settings.language
+    }).open();
+  }
   async activateOutline(source?: VisualAgentMapView): Promise<void> {
     const activeCoffeeView = this.app.workspace.getActiveViewOfType(CoffeeTablesView);
     if (activeCoffeeView) this.syncCoffeeOutline(activeCoffeeView);
@@ -564,6 +579,7 @@ export default class VisualAgentMapPlugin extends Plugin {
         .then(() => this.views()[0]?.openOutlineImport())
         .catch(error => new Notice(String(error)));
     });
+    this.addLocalizedCommand("share-map", "share.command", () => this.openShare());
     this.addLocalizedCommand("open-topic-outline", "ui.open_topic_outline", () => {
       void this.activateOutline().catch(error => new Notice(String(error)));
     });

@@ -1779,7 +1779,42 @@ var en = {
   "share.viewer_no_content": "This topic has no notes in the shared file.",
   "share.viewer_image_omitted": "[image not included]",
   "share.viewer_resize_panel": "Resize the side panel",
-  "share.viewer_untitled": "Untitled map"
+  "share.viewer_untitled": "Untitled map",
+  // Share dialog
+  "share.command": "Share this map",
+  "share.button": "Share this map",
+  "share.title": "Share this map",
+  "share.intro": "Creates one HTML file that opens in any browser, even offline. You choose where it is saved. Nothing is uploaded.",
+  "share.option_full_name": "Include full notes",
+  "share.option_full_desc": "Off: only the map structure and topic summaries are shared.",
+  "share.option_images_name": "Include images",
+  "share.option_images_desc": "Off: pictures in notes are left out and marked in the text.",
+  "share.preview_topics_0": "{0} topics",
+  "share.preview_counts_0_1_2": "{0} topics \xB7 {1} with note content \xB7 {2} images",
+  "share.preview_size_0": "File size: {0}",
+  "share.progress_start": "Preparing\u2026",
+  "share.progress_render_0_1": "Preparing notes\u2026 {0} of {1}",
+  "share.progress_images_0_1": "Converting images\u2026 {0} of {1}",
+  "share.progress_check": "Checking the file for private information\u2026",
+  "share.size_warn_0": "This file is larger than {0}. Some email services and chat apps may refuse it.",
+  "share.size_large_0": "This file is larger than {0}. Turning off Include images makes it much smaller.",
+  "share.email_hint": "Some email services block HTML attachments. If yours does, send the file another way.",
+  "share.images_failed_0": "{0} images could not be read and are marked in the text instead.",
+  "share.mermaid_blocked_warning_0": "{0} diagrams are shown as source text because Mermaid is not allowed in this vault. Open a note with a diagram, press Allow, then open this dialog again.",
+  "share.mermaid_undrawn_warning_0": "{0} diagrams did not finish drawing in time and are shown as source text.",
+  "share.mermaid_blocked_note": "[Diagram not drawn: Mermaid was not allowed when this file was made. Source shown instead.]",
+  "share.mermaid_undrawn_note": "[Diagram did not finish drawing. Source shown instead.]",
+  "share.leak_blocked_0": "Not saved: the file would contain private information ({0}). Nothing was written.",
+  "share.build_failed": "The file could not be prepared. Close this window and try again.",
+  "share.save": "Save\u2026",
+  "share.saving": "Saving\u2026",
+  "share.saved_0_1": "Saved {0} ({1})",
+  "share.downloaded_0_1": "Downloaded {0} ({1}). Look in your downloads folder.",
+  "share.save_failed": "The file could not be saved.",
+  "share.unavailable_no_map": "Open a mind map first, then share it.",
+  "share.unavailable_sample": "The built-in sample is read-only and cannot be shared.",
+  "share.unavailable_aim": "AI research maps cannot be shared yet.",
+  "share.unavailable_empty": "This map has no topics to share yet."
 };
 
 // i18n/zh-CN.ts
@@ -3460,7 +3495,42 @@ var zhCN = {
   "share.viewer_no_content": "\u8FD9\u4E2A\u8BAE\u9898\u5728\u5206\u4EAB\u6587\u4EF6\u4E2D\u6CA1\u6709\u7B14\u8BB0\u5185\u5BB9\u3002",
   "share.viewer_image_omitted": "[\u56FE\u7247\u672A\u5305\u542B]",
   "share.viewer_resize_panel": "\u8C03\u6574\u4FA7\u680F\u5BBD\u5EA6",
-  "share.viewer_untitled": "\u672A\u547D\u540D\u7684\u5730\u56FE"
+  "share.viewer_untitled": "\u672A\u547D\u540D\u7684\u5730\u56FE",
+  // Share dialog
+  "share.command": "\u5206\u4EAB\u8FD9\u5F20\u5730\u56FE",
+  "share.button": "\u5206\u4EAB\u8FD9\u5F20\u5730\u56FE",
+  "share.title": "\u5206\u4EAB\u8FD9\u5F20\u5730\u56FE",
+  "share.intro": "\u751F\u6210\u4E00\u4E2A HTML \u6587\u4EF6\uFF0C\u4EFB\u4F55\u6D4F\u89C8\u5668\u90FD\u80FD\u6253\u5F00\uFF0C\u79BB\u7EBF\u4E5F\u53EF\u4EE5\u3002\u5B58\u653E\u4F4D\u7F6E\u7531\u4F60\u51B3\u5B9A\uFF0C\u4E0D\u4F1A\u4E0A\u4F20\u4EFB\u4F55\u5185\u5BB9\u3002",
+  "share.option_full_name": "\u5305\u542B\u5B8C\u6574\u7B14\u8BB0",
+  "share.option_full_desc": "\u5173\u95ED\u65F6\u53EA\u5206\u4EAB\u5730\u56FE\u7ED3\u6784\u4E0E\u8BAE\u9898\u6458\u8981\u3002",
+  "share.option_images_name": "\u5305\u542B\u56FE\u7247",
+  "share.option_images_desc": "\u5173\u95ED\u65F6\u7B14\u8BB0\u91CC\u7684\u56FE\u7247\u4E0D\u653E\u8FDB\u6587\u4EF6\uFF0C\u5E76\u5728\u6587\u5B57\u4E2D\u6807\u793A\u3002",
+  "share.preview_topics_0": "{0} \u4E2A\u8BAE\u9898",
+  "share.preview_counts_0_1_2": "{0} \u4E2A\u8BAE\u9898\u30FB{1} \u7BC7\u6709\u7B14\u8BB0\u5185\u5BB9\u30FB{2} \u5F20\u56FE\u7247",
+  "share.preview_size_0": "\u6587\u4EF6\u5927\u5C0F\uFF1A{0}",
+  "share.progress_start": "\u51C6\u5907\u4E2D\u2026",
+  "share.progress_render_0_1": "\u51C6\u5907\u7B14\u8BB0\u4E2D\u2026 {0} / {1}",
+  "share.progress_images_0_1": "\u8F6C\u6362\u56FE\u7247\u4E2D\u2026 {0} / {1}",
+  "share.progress_check": "\u6B63\u5728\u68C0\u67E5\u6587\u4EF6\u662F\u5426\u542B\u6709\u79C1\u4EBA\u4FE1\u606F\u2026",
+  "share.size_warn_0": "\u8FD9\u4E2A\u6587\u4EF6\u8D85\u8FC7 {0}\uFF0C\u90E8\u5206\u90AE\u7BB1\u4E0E\u804A\u5929\u8F6F\u4EF6\u53EF\u80FD\u4E0D\u63A5\u53D7\u3002",
+  "share.size_large_0": "\u8FD9\u4E2A\u6587\u4EF6\u8D85\u8FC7 {0}\u3002\u5173\u95ED\u201C\u5305\u542B\u56FE\u7247\u201D\u53EF\u4EE5\u5927\u5E45\u7F29\u5C0F\u3002",
+  "share.email_hint": "\u90E8\u5206\u90AE\u7BB1\u4F1A\u62E6\u622A HTML \u9644\u4EF6\uFF1B\u82E5\u88AB\u62E6\u622A\uFF0C\u8BF7\u6539\u7528\u5176\u4ED6\u65B9\u5F0F\u53D1\u9001\u6587\u4EF6\u3002",
+  "share.images_failed_0": "\u6709 {0} \u5F20\u56FE\u7247\u65E0\u6CD5\u8BFB\u53D6\uFF0C\u6539\u4EE5\u6587\u5B57\u6807\u793A\u3002",
+  "share.mermaid_blocked_warning_0": "\u6709 {0} \u5F20\u56FE\u8868\u56E0\u4E3A\u8FD9\u4E2A vault \u5C1A\u672A\u5141\u8BB8 Mermaid\uFF0C\u53EA\u4EE5\u6E90\u7801\u5448\u73B0\u3002\u8BF7\u6253\u5F00\u542B\u56FE\u8868\u7684\u7B14\u8BB0\u5E76\u70B9\u201CAllow\u201D\uFF0C\u518D\u91CD\u65B0\u6253\u5F00\u8FD9\u4E2A\u7A97\u53E3\u3002",
+  "share.mermaid_undrawn_warning_0": "\u6709 {0} \u5F20\u56FE\u8868\u672A\u80FD\u5728\u65F6\u9650\u5185\u753B\u5B8C\uFF0C\u53EA\u4EE5\u6E90\u7801\u5448\u73B0\u3002",
+  "share.mermaid_blocked_note": "\uFF3B\u56FE\u8868\u672A\u7ED8\u5236\uFF1A\u5236\u4F5C\u6B64\u6587\u4EF6\u65F6\u5C1A\u672A\u5141\u8BB8 Mermaid\uFF0C\u6539\u663E\u793A\u6E90\u7801\u3002\uFF3D",
+  "share.mermaid_undrawn_note": "\uFF3B\u56FE\u8868\u672A\u80FD\u753B\u5B8C\uFF0C\u6539\u663E\u793A\u6E90\u7801\u3002\uFF3D",
+  "share.leak_blocked_0": "\u672A\u4FDD\u5B58\uFF1A\u6587\u4EF6\u4F1A\u542B\u6709\u79C1\u4EBA\u4FE1\u606F\uFF08{0}\uFF09\uFF0C\u6CA1\u6709\u5199\u5165\u4EFB\u4F55\u5185\u5BB9\u3002",
+  "share.build_failed": "\u65E0\u6CD5\u51C6\u5907\u6587\u4EF6\uFF0C\u8BF7\u5173\u95ED\u7A97\u53E3\u540E\u518D\u8BD5\u4E00\u6B21\u3002",
+  "share.save": "\u4FDD\u5B58\u2026",
+  "share.saving": "\u4FDD\u5B58\u4E2D\u2026",
+  "share.saved_0_1": "\u5DF2\u4FDD\u5B58 {0}\uFF08{1}\uFF09",
+  "share.downloaded_0_1": "\u5DF2\u4E0B\u8F7D {0}\uFF08{1}\uFF09\uFF0C\u8BF7\u5230\u4E0B\u8F7D\u6587\u4EF6\u5939\u67E5\u770B\u3002",
+  "share.save_failed": "\u65E0\u6CD5\u4FDD\u5B58\u6587\u4EF6\u3002",
+  "share.unavailable_no_map": "\u8BF7\u5148\u6253\u5F00\u4E00\u5F20\u601D\u7EF4\u5BFC\u56FE\u518D\u5206\u4EAB\u3002",
+  "share.unavailable_sample": "\u5185\u7F6E\u793A\u4F8B\u4E3A\u53EA\u8BFB\uFF0C\u65E0\u6CD5\u5206\u4EAB\u3002",
+  "share.unavailable_aim": "AI \u7814\u7A76\u5730\u56FE\u6682\u65F6\u65E0\u6CD5\u5206\u4EAB\u3002",
+  "share.unavailable_empty": "\u8FD9\u5F20\u5730\u56FE\u8FD8\u6CA1\u6709\u8BAE\u9898\u53EF\u4EE5\u5206\u4EAB\u3002"
 };
 
 // i18n/zh-TW.ts
@@ -5141,7 +5211,42 @@ var zhTW = {
   "share.viewer_no_content": "\u9019\u500B\u8B70\u984C\u5728\u5206\u4EAB\u6A94\u4E2D\u6C92\u6709\u7B46\u8A18\u5167\u5BB9\u3002",
   "share.viewer_image_omitted": "[\u5716\u7247\u672A\u5305\u542B]",
   "share.viewer_resize_panel": "\u8ABF\u6574\u5074\u6B04\u5BEC\u5EA6",
-  "share.viewer_untitled": "\u672A\u547D\u540D\u7684\u5730\u5716"
+  "share.viewer_untitled": "\u672A\u547D\u540D\u7684\u5730\u5716",
+  // Share dialog
+  "share.command": "\u5206\u4EAB\u9019\u5F35\u5730\u5716",
+  "share.button": "\u5206\u4EAB\u9019\u5F35\u5730\u5716",
+  "share.title": "\u5206\u4EAB\u9019\u5F35\u5730\u5716",
+  "share.intro": "\u7522\u751F\u4E00\u500B HTML \u6A94\uFF0C\u4EFB\u4F55\u700F\u89BD\u5668\u90FD\u80FD\u958B\u555F\uFF0C\u96E2\u7DDA\u4E5F\u53EF\u4EE5\u3002\u5B58\u653E\u4F4D\u7F6E\u7531\u4F60\u6C7A\u5B9A\uFF0C\u4E0D\u6703\u4E0A\u50B3\u4EFB\u4F55\u6771\u897F\u3002",
+  "share.option_full_name": "\u5305\u542B\u5B8C\u6574\u7B46\u8A18",
+  "share.option_full_desc": "\u95DC\u9589\u6642\u53EA\u5206\u4EAB\u5730\u5716\u7D50\u69CB\u8207\u8B70\u984C\u6458\u8981\u3002",
+  "share.option_images_name": "\u5305\u542B\u5716\u7247",
+  "share.option_images_desc": "\u95DC\u9589\u6642\u7B46\u8A18\u88E1\u7684\u5716\u7247\u4E0D\u653E\u9032\u6A94\u6848\uFF0C\u4E26\u5728\u6587\u5B57\u4E2D\u6A19\u793A\u3002",
+  "share.preview_topics_0": "{0} \u500B\u8B70\u984C",
+  "share.preview_counts_0_1_2": "{0} \u500B\u8B70\u984C\u30FB{1} \u7BC7\u6709\u7B46\u8A18\u5167\u5BB9\u30FB{2} \u5F35\u5716\u7247",
+  "share.preview_size_0": "\u6A94\u6848\u5927\u5C0F\uFF1A{0}",
+  "share.progress_start": "\u6E96\u5099\u4E2D\u2026",
+  "share.progress_render_0_1": "\u6E96\u5099\u7B46\u8A18\u4E2D\u2026 {0} / {1}",
+  "share.progress_images_0_1": "\u8F49\u63DB\u5716\u7247\u4E2D\u2026 {0} / {1}",
+  "share.progress_check": "\u6B63\u5728\u6AA2\u67E5\u6A94\u6848\u662F\u5426\u542B\u6709\u79C1\u4EBA\u8CC7\u8A0A\u2026",
+  "share.size_warn_0": "\u9019\u500B\u6A94\u6848\u8D85\u904E {0}\uFF0C\u90E8\u5206\u4FE1\u7BB1\u8207\u804A\u5929\u8EDF\u9AD4\u53EF\u80FD\u4E0D\u63A5\u53D7\u3002",
+  "share.size_large_0": "\u9019\u500B\u6A94\u6848\u8D85\u904E {0}\u3002\u95DC\u9589\u300C\u5305\u542B\u5716\u7247\u300D\u53EF\u4EE5\u5927\u5E45\u7E2E\u5C0F\u3002",
+  "share.email_hint": "\u90E8\u5206\u4FE1\u7BB1\u6703\u64CB HTML \u9644\u4EF6\uFF1B\u82E5\u88AB\u64CB\uFF0C\u8ACB\u6539\u7528\u5176\u4ED6\u65B9\u5F0F\u50B3\u9001\u6A94\u6848\u3002",
+  "share.images_failed_0": "\u6709 {0} \u5F35\u5716\u7247\u7121\u6CD5\u8B80\u53D6\uFF0C\u6539\u4EE5\u6587\u5B57\u6A19\u793A\u3002",
+  "share.mermaid_blocked_warning_0": "\u6709 {0} \u5F35\u5716\u8868\u56E0\u70BA\u9019\u500B vault \u5C1A\u672A\u5141\u8A31 Mermaid\uFF0C\u53EA\u4EE5\u539F\u59CB\u78BC\u5448\u73FE\u3002\u8ACB\u958B\u555F\u542B\u5716\u8868\u7684\u7B46\u8A18\u4E26\u6309\u300CAllow\u300D\uFF0C\u518D\u91CD\u65B0\u958B\u555F\u9019\u500B\u8996\u7A97\u3002",
+  "share.mermaid_undrawn_warning_0": "\u6709 {0} \u5F35\u5716\u8868\u672A\u80FD\u5728\u6642\u9650\u5167\u756B\u5B8C\uFF0C\u53EA\u4EE5\u539F\u59CB\u78BC\u5448\u73FE\u3002",
+  "share.mermaid_blocked_note": "\uFF3B\u5716\u8868\u672A\u7E6A\u88FD\uFF1A\u88FD\u4F5C\u6B64\u6A94\u6642\u5C1A\u672A\u5141\u8A31 Mermaid\uFF0C\u6539\u986F\u793A\u539F\u59CB\u78BC\u3002\uFF3D",
+  "share.mermaid_undrawn_note": "\uFF3B\u5716\u8868\u672A\u80FD\u756B\u5B8C\uFF0C\u6539\u986F\u793A\u539F\u59CB\u78BC\u3002\uFF3D",
+  "share.leak_blocked_0": "\u672A\u5B58\u6A94\uFF1A\u6A94\u6848\u6703\u542B\u6709\u79C1\u4EBA\u8CC7\u8A0A\uFF08{0}\uFF09\uFF0C\u6C92\u6709\u5BEB\u5165\u4EFB\u4F55\u6771\u897F\u3002",
+  "share.build_failed": "\u7121\u6CD5\u6E96\u5099\u6A94\u6848\uFF0C\u8ACB\u95DC\u9589\u8996\u7A97\u5F8C\u518D\u8A66\u4E00\u6B21\u3002",
+  "share.save": "\u5132\u5B58\u2026",
+  "share.saving": "\u5132\u5B58\u4E2D\u2026",
+  "share.saved_0_1": "\u5DF2\u5132\u5B58 {0}\uFF08{1}\uFF09",
+  "share.downloaded_0_1": "\u5DF2\u4E0B\u8F09 {0}\uFF08{1}\uFF09\uFF0C\u8ACB\u5230\u4E0B\u8F09\u8CC7\u6599\u593E\u67E5\u770B\u3002",
+  "share.save_failed": "\u7121\u6CD5\u5132\u5B58\u6A94\u6848\u3002",
+  "share.unavailable_no_map": "\u8ACB\u5148\u958B\u555F\u4E00\u5F35\u5FC3\u667A\u5716\u518D\u5206\u4EAB\u3002",
+  "share.unavailable_sample": "\u5167\u5EFA\u7BC4\u4F8B\u70BA\u552F\u8B80\uFF0C\u7121\u6CD5\u5206\u4EAB\u3002",
+  "share.unavailable_aim": "AI \u7814\u7A76\u5730\u5716\u66AB\u6642\u7121\u6CD5\u5206\u4EAB\u3002",
+  "share.unavailable_empty": "\u9019\u5F35\u5730\u5716\u9084\u6C92\u6709\u8B70\u984C\u53EF\u4EE5\u5206\u4EAB\u3002"
 };
 
 // i18n/languages.ts
@@ -15918,8 +16023,8 @@ function resolveWikilinks(text11, documents) {
     const exact = documents.filter((document2) => document2.path === name);
     const matches = exact.length ? exact : documents.filter((document2) => {
       var _a2;
-      const basename = (_a2 = document2.path.split("/").pop()) != null ? _a2 : document2.path;
-      return basename === name || basename.replace(/\.md$/i, "") === name;
+      const basename2 = (_a2 = document2.path.split("/").pop()) != null ? _a2 : document2.path;
+      return basename2 === name || basename2.replace(/\.md$/i, "") === name;
     });
     if (matches.length > 1) return tNote("note.source_unconfirmed_0", name);
     if (matches.length !== 1 || !matches[0].external) return original;
@@ -15943,8 +16048,8 @@ function resolveSummaryReferences(summary, groups) {
 var FOOTNOTE_REFERENCE = /\[\^([^\]\s]+)\](?!\()/g;
 function footnoteTarget(document2) {
   var _a2;
-  const basename = ((_a2 = document2.path.split("/").pop()) != null ? _a2 : document2.path).replace(/\.md$/i, "");
-  return document2.external ? tNote("note.external_source_0", document2.path) : `[[${document2.path}|${basename}]]`;
+  const basename2 = ((_a2 = document2.path.split("/").pop()) != null ? _a2 : document2.path).replace(/\.md$/i, "");
+  return document2.external ? tNote("note.external_source_0", document2.path) : `[[${document2.path}|${basename2}]]`;
 }
 function targetKey(target) {
   const link = /^\[\[([^\]|]+)/.exec(target);
@@ -37277,6 +37382,8 @@ ${request.requirements}` : preset.text,
       redo.disabled = !this.history.canRedo;
       redo.dataset.history = "redo";
       this.updateHistoryButtons();
+      if (!this.map.aim)
+        this.iconButton(headerActions, "share-2", t("share.button"), () => this.plugin.openShare(this));
       this.iconButton(headerActions, "more-vertical", t("ui.more_mind_map_actions"), () => this.openMapActions());
     }
     const selectedNode = (_i = this.map) == null ? void 0 : _i.nodes.find((node) => node.id === this.selected);
@@ -38313,6 +38420,19 @@ ${request.requirements}` : preset.text,
    * Brings an outline topic into view: expands collapsed ancestors, centers the card and selects it.
    * Multi-select keeps its selection; the outline only moves the camera there. False when the map lacks the topic.
    */
+  /** What the share dialog may read: a snapshot of the open map, or the reason it cannot be shared. */
+  shareSnapshot() {
+    if (this.builtIn) return "sample";
+    if (!this.map || !this.path) return "none";
+    if (this.map.aim || this.map.nodes.some((node) => node.aimKind !== void 0)) return "aim";
+    if (!this.map.nodes.length) return "empty";
+    return {
+      map: JSON.parse(JSON.stringify(this.map)),
+      notes: new Map(this.notes),
+      ...this.relevanceGoal ? { goal: this.relevanceGoal } : {},
+      mapPath: this.path
+    };
+  }
   hasPath(path) {
     var _a2;
     return !!((_a2 = this.map) == null ? void 0 : _a2.nodes.some((item) => item.path === path));
@@ -41436,7 +41556,7 @@ async function applyMathRepair(vault, plan) {
 }
 
 // main.ts
-var import_obsidian34 = require("obsidian");
+var import_obsidian36 = require("obsidian");
 
 // ui/settings-tab.ts
 var import_obsidian30 = require("obsidian");
@@ -42065,6 +42185,1232 @@ var OutlineView = class extends import_obsidian31.ItemView {
           this.render();
         });
     }
+  }
+};
+
+// experiences/sharing/share-modal.ts
+var import_obsidian33 = require("obsidian");
+
+// experiences/sharing/share-format.ts
+var SHARE_FORMAT = "vam-share";
+var SHARE_VERSION = 1;
+var SHARE_SIZE_WARN_BYTES = 10 * 1024 * 1024;
+var SHARE_SIZE_SUGGEST_NO_IMAGES_BYTES = 20 * 1024 * 1024;
+var SHARE_IMAGE_MAX_EDGE = 1600;
+var SHARE_DEFAULT_INCLUDE_DETAIL = true;
+var ShareError = class extends Error {
+  constructor(code, message) {
+    super(message);
+    this.code = code;
+    this.name = "ShareError";
+  }
+};
+var optionalText = (value) => {
+  const trimmed2 = value == null ? void 0 : value.trim();
+  return trimmed2 ? trimmed2 : void 0;
+};
+function buildSharePayload(map, notesById, options) {
+  if (map.aim || map.nodes.some((node) => node.aimKind !== void 0))
+    throw new ShareError("aim-map", "AIM maps cannot be shared.");
+  const nodes = map.nodes.map((node) => {
+    var _a2, _b2, _c, _d, _e;
+    const note = notesById[node.id];
+    const fallbackTitle = (_b2 = (_a2 = node.path.split("/").pop()) == null ? void 0 : _a2.replace(/\.md$/i, "")) != null ? _b2 : node.id;
+    const out = {
+      id: node.id,
+      parentId: node.parentId,
+      x: node.x,
+      y: node.y,
+      collapsed: node.collapsed,
+      status: (note == null ? void 0 : note.status) === "completed" ? "completed" : "idea",
+      title: (note == null ? void 0 : note.title) || fallbackTitle,
+      summary: (_c = note == null ? void 0 : note.summary) != null ? _c : ""
+    };
+    if (note == null ? void 0 : note.relevance) {
+      out.tier = note.relevance.tier;
+      if (note.relevance.manual) out.manual = true;
+      const reason = optionalText(note.reason);
+      if (reason) out.reason = reason;
+    }
+    if (options.includeDetail) {
+      if ((_d = note == null ? void 0 : note.detail) == null ? void 0 : _d.trim()) out.detail = note.detail;
+      if ((_e = note == null ? void 0 : note.detailHtml) == null ? void 0 : _e.trim()) out.detailHtml = note.detailHtml;
+    }
+    return out;
+  });
+  const goal = optionalText(options.goal);
+  return {
+    format: SHARE_FORMAT,
+    version: SHARE_VERSION,
+    title: map.title,
+    ...goal ? { goal } : {},
+    language: options.language,
+    exportedAt: options.exportedAt,
+    source: { vamVersion: options.vamVersion, mapId: map.id },
+    viewport: { x: map.viewport.x, y: map.viewport.y, zoom: map.viewport.zoom },
+    nodes,
+    assets: options.includeImages ? { ...options.assets } : {}
+  };
+}
+function serializeShareJson(payload) {
+  return JSON.stringify(payload).replace(/</g, "\\u003c").replace(/[\u2028\u2029]/g, (ch) => ch === "\u2028" ? "\\u2028" : "\\u2029");
+}
+function classifySize(bytes, thresholds = {
+  warn: SHARE_SIZE_WARN_BYTES,
+  large: SHARE_SIZE_SUGGEST_NO_IMAGES_BYTES
+}) {
+  if (bytes > thresholds.large) return "large";
+  if (bytes > thresholds.warn) return "warn";
+  return "ok";
+}
+function fitWithin(width, height, max = SHARE_IMAGE_MAX_EDGE) {
+  if (!(width > 0) || !(height > 0) || !Number.isFinite(width) || !Number.isFinite(height))
+    throw new RangeError("Image dimensions must be positive.");
+  const longest = Math.max(width, height);
+  if (longest <= max) return { width: Math.round(width), height: Math.round(height) };
+  const scale = max / longest;
+  return { width: Math.max(1, Math.round(width * scale)), height: Math.max(1, Math.round(height * scale)) };
+}
+
+// experiences/sharing/share-clean.ts
+var SHARE_ASSET_SCHEME = "vam-asset:";
+var IMAGE_EXT = /\.(png|jpe?g|gif|webp|svg|bmp|avif)$/i;
+var isWeb = (value) => /^https?:\/\//i.test(value);
+function createAssetRegistry() {
+  const byRef = /* @__PURE__ */ new Map();
+  return {
+    nameFor(ref) {
+      const existing = byRef.get(ref);
+      if (existing) return existing;
+      const name = `image-${byRef.size + 1}`;
+      byRef.set(ref, name);
+      return name;
+    },
+    entries: () => [...byRef].map(([ref, name]) => ({ ref, name }))
+  };
+}
+var basename = (target) => {
+  var _a2;
+  const noAnchor = target.split("#")[0].trim();
+  return ((_a2 = noAnchor.split("/").pop()) != null ? _a2 : noAnchor).replace(/\.md$/i, "");
+};
+var decodeRef = (ref) => {
+  try {
+    return decodeURIComponent(ref);
+  } catch (e) {
+    return ref;
+  }
+};
+var escapeMd = (text11) => text11.replace(/([\\`*_[\]])/g, "\\$1");
+function splitWikilink(inner) {
+  const bar = inner.search(/\\?\|/);
+  if (bar < 0) return { target: inner.trim(), alias: void 0 };
+  const target = inner.slice(0, bar).trim();
+  const alias = inner.slice(bar).replace(/^\\?\|/, "").trim();
+  return { target, alias: alias || void 0 };
+}
+function cleanSegment(text11, ctx, out) {
+  const attach = (ref) => {
+    const decoded2 = decodeRef(ref.trim());
+    const name = ctx.assets.nameFor(decoded2);
+    if (!out.attachments.some((item) => item.name === name)) out.attachments.push({ ref: decoded2, name });
+    return name;
+  };
+  const titleFor = (target) => {
+    var _a2;
+    const pathPart = target.split("#")[0].trim();
+    if (!pathPart) return target.replace(/^#\^?/, "").trim();
+    return (_a2 = ctx.titleOf(pathPart)) != null ? _a2 : basename(pathPart);
+  };
+  const pattern = /%%[\s\S]*?%%|!\[\[([^\]\n]+)\]\]|\[\[([^\]\n]+)\]\]|!\[([^\]\n]*)\]\(([^)\n]+)\)|\[([^\]\n]*)\]\(([^)\n]+)\)/g;
+  return text11.replace(
+    pattern,
+    (all, embed, link, alt, src, label, href) => {
+      var _a2;
+      if (all.startsWith("%%")) return "";
+      if (embed !== void 0) {
+        const { target, alias } = splitWikilink(embed);
+        const pathPart = target.split("#")[0].trim();
+        if (IMAGE_EXT.test(pathPart)) {
+          const altText = alias && !/^\d+(x\d+)?$/.test(alias) ? escapeMd(alias) : "";
+          return `![${altText}](${SHARE_ASSET_SCHEME}${attach(pathPart)})`;
+        }
+        if (/\.[a-z0-9]{1,5}$/i.test(pathPart) && !/\.md$/i.test(pathPart))
+          return escapeMd((_a2 = pathPart.split("/").pop()) != null ? _a2 : pathPart);
+        return escapeMd(titleFor(target));
+      }
+      if (link !== void 0) {
+        const { target, alias } = splitWikilink(link);
+        return escapeMd(alias != null ? alias : titleFor(target));
+      }
+      if (src !== void 0) {
+        const raw2 = src.trim().replace(/^<|>$/g, "").replace(/\s+"[^"]*"$/, "");
+        if (isWeb(raw2)) {
+          out.webImages.push({ url: raw2, alt: alt != null ? alt : "" });
+          return `![${alt != null ? alt : ""}](${raw2})`;
+        }
+        return `![${alt != null ? alt : ""}](${SHARE_ASSET_SCHEME}${attach(raw2)})`;
+      }
+      const raw = (href != null ? href : "").trim();
+      if (isWeb(raw) || /^(mailto:|#)/i.test(raw)) return all;
+      return label != null ? label : "";
+    }
+  );
+}
+function cleanShareMarkdown(md, ctx) {
+  const out = { markdown: "", attachments: [], webImages: [] };
+  const parts = md.split(/(^(?:```|~~~)[^\n]*\n[\s\S]*?^(?:```|~~~)[ \t]*$|`[^`\n]+`)/m);
+  out.markdown = parts.map((part, index) => index % 2 === 1 ? part : cleanSegment(part, ctx, out)).join("");
+  return out;
+}
+
+// experiences/sharing/share-build.ts
+var BuildController = class {
+  constructor() {
+    __publicField(this, "generationCount", 0);
+    __publicField(this, "active", null);
+  }
+  begin() {
+    var _a2;
+    (_a2 = this.active) == null ? void 0 : _a2.abort();
+    const abort = new AbortController();
+    this.active = abort;
+    const generation = ++this.generationCount;
+    return {
+      generation,
+      signal: abort.signal,
+      isCurrent: () => generation === this.generationCount && !abort.signal.aborted
+    };
+  }
+  /** Aborts the running build and makes every outstanding ticket stale. */
+  cancel() {
+    var _a2;
+    (_a2 = this.active) == null ? void 0 : _a2.abort();
+    this.active = null;
+    this.generationCount++;
+  }
+  get generation() {
+    return this.generationCount;
+  }
+};
+var StaleBuildError = class extends Error {
+  constructor() {
+    super("The share build was superseded or cancelled.");
+    this.name = "StaleBuildError";
+  }
+};
+function assertCurrent(ticket) {
+  if (!ticket.isCurrent()) throw new StaleBuildError();
+}
+var isStaleBuild = (error) => (error == null ? void 0 : error.name) === "StaleBuildError";
+function pause(ticket, ms) {
+  return new Promise((resolve, reject) => {
+    if (!ticket.isCurrent()) return reject(new StaleBuildError());
+    const timer = window.setTimeout(() => {
+      ticket.signal.removeEventListener("abort", onAbort);
+      resolve();
+    }, ms);
+    const onAbort = () => {
+      window.clearTimeout(timer);
+      reject(new StaleBuildError());
+    };
+    ticket.signal.addEventListener("abort", onAbort, { once: true });
+  });
+}
+function sizeAdvice(bytes, includeImages, thresholds = {
+  warn: SHARE_SIZE_WARN_BYTES,
+  large: SHARE_SIZE_SUGGEST_NO_IMAGES_BYTES
+}) {
+  const level = classifySize(bytes, thresholds);
+  return { level, suggestNoImages: level === "large" && includeImages };
+}
+function formatBytes(bytes) {
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+}
+function replaceAssetRefs(markdown, names3, label) {
+  if (!names3.size) return markdown;
+  return markdown.replace(
+    /!\[[^\]\n]*\]\(vam-asset:([^)\n]*)\)/g,
+    (all, name) => names3.has(name.trim()) ? label : all
+  );
+}
+function assetNamesIn(markdown) {
+  const names3 = [];
+  for (const match of markdown.matchAll(new RegExp(`\\]\\(${SHARE_ASSET_SCHEME}([^)\\n]*)\\)`, "g")))
+    names3.push(match[1].trim());
+  return names3;
+}
+function plainWikilinks(text11) {
+  return text11.replace(/\[\[([^\]\n]+)\]\]/g, (_all, inner) => {
+    var _a2;
+    const bar = inner.search(/\\?\|/);
+    if (bar >= 0)
+      return inner.slice(bar).replace(/^\\?\|/, "").trim() || inner.slice(0, bar).trim();
+    const target = inner.split("#")[0].trim() || inner.replace(/^#\^?/, "").trim();
+    return ((_a2 = target.split("/").pop()) != null ? _a2 : target).replace(/\.md$/i, "");
+  });
+}
+function shareFileName(title) {
+  const base = title.replace(/[\p{Cc}\\/:*?"<>|]/gu, " ").replace(/\s+/g, " ").trim().replace(/^\.+/, "").slice(0, 80).trim();
+  return `${base || "map"}.html`;
+}
+var escapeHtml = (text11) => text11.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+function omitAssetImages(html, names3, label) {
+  if (names3 && !names3.size) return html;
+  return html.replace(
+    /<img\b[^>]*?\ssrc="vam-asset:([^"]*)"[^>]*>/g,
+    (all, name) => !names3 || names3.has(name) ? `<span class="vam-image-omitted">${escapeHtml(label)}</span>` : all
+  );
+}
+function resolveRelative(folder, ref) {
+  const parts = [];
+  for (const part of `${folder}/${ref}`.split("/")) {
+    if (!part || part === ".") continue;
+    if (part === "..") {
+      if (!parts.length) return null;
+      parts.pop();
+    } else parts.push(part);
+  }
+  return parts.join("/");
+}
+
+// experiences/sharing/share-exporter.ts
+var import_obsidian32 = require("obsidian");
+
+// experiences/sharing/share-dom.ts
+var BLOCKED_TAGS = /* @__PURE__ */ new Set([
+  "script",
+  "iframe",
+  "frame",
+  "frameset",
+  "object",
+  "embed",
+  "applet",
+  "link",
+  "meta",
+  "base",
+  "form",
+  "button",
+  "textarea",
+  "select",
+  "option",
+  "audio",
+  "video",
+  "source",
+  "track",
+  "portal",
+  "template",
+  "noscript",
+  "slot",
+  "canvas",
+  "animate",
+  "animatetransform",
+  "animatemotion",
+  "set",
+  "image"
+]);
+var CHROME_CLASSES = /* @__PURE__ */ new Set([
+  "copy-code-button",
+  "edit-block-button",
+  "frontmatter-container",
+  "metadata-container",
+  "mermaid-guard-header",
+  "heading-collapse-indicator",
+  "collapse-indicator",
+  "callout-fold",
+  "markdown-embed",
+  "internal-embed",
+  "file-embed"
+]);
+var URL_ATTRIBUTES = /* @__PURE__ */ new Set([
+  "href",
+  "src",
+  "xlink:href",
+  "srcset",
+  "data",
+  "poster",
+  "action",
+  "formaction",
+  "background",
+  "cite",
+  "longdesc",
+  "ping",
+  "manifest",
+  "codebase",
+  "usemap"
+]);
+var FORBIDDEN_SCHEMES = /(?:app|obsidian|file|capacitor):\/\//i;
+var SAFE_DATA_IMAGE = /^data:image\/(?:png|jpe?g|gif|webp|avif|bmp)[;,]/;
+var normalizeUrl = (value) => value.replace(/[\p{Cc}\s]/gu, "").toLowerCase();
+function allowedUrl(tag, name, value) {
+  const url = normalizeUrl(value);
+  if (!url) return false;
+  const isLink = name === "href" || name === "xlink:href";
+  if (isLink && url.startsWith("#")) return true;
+  if (/^https?:\/\//.test(url)) return name !== "data" && name !== "action" && name !== "formaction";
+  if (name === "href" && tag === "a" && url.startsWith("mailto:")) return true;
+  if (name === "src" && tag === "img") return url.startsWith("vam-asset:") || SAFE_DATA_IMAGE.test(url);
+  return false;
+}
+function cssIsInert(css) {
+  const lower = css.toLowerCase();
+  if (lower.includes("@import") || lower.includes("expression(") || lower.includes("javascript:")) return false;
+  if (lower.includes("behavior:") || lower.includes("-moz-binding")) return false;
+  for (const match of lower.matchAll(/url\(\s*(['"]?)([^'")]*)\1\s*\)/g))
+    if (!match[2].trim().startsWith("#")) return false;
+  return !FORBIDDEN_SCHEMES.test(lower);
+}
+function scrubAttributes(element, tag, report) {
+  var _a2;
+  for (const name of element.getAttributeNames()) {
+    const lower = name.toLowerCase();
+    const value = (_a2 = element.getAttribute(name)) != null ? _a2 : "";
+    let drop = false;
+    if (lower.startsWith("on") || lower === "srcdoc") drop = true;
+    else if (lower.startsWith("data-") && !lower.startsWith("data-callout")) drop = true;
+    else if (URL_ATTRIBUTES.has(lower)) drop = !allowedUrl(tag, lower, value);
+    else if (lower === "style") drop = !cssIsInert(value);
+    else if (FORBIDDEN_SCHEMES.test(value)) drop = true;
+    if (drop) {
+      element.removeAttribute(name);
+      report.attributes++;
+    }
+  }
+}
+function hasChromeClass(element) {
+  var _a2;
+  const classes = ((_a2 = element.getAttribute("class")) != null ? _a2 : "").split(/\s+/);
+  return classes.some((name) => CHROME_CLASSES.has(name));
+}
+function scrubChildren(parent, options, report) {
+  var _a2, _b2;
+  for (const child of Array.from(parent.children)) {
+    const tag = child.localName.toLowerCase();
+    let keep = !BLOCKED_TAGS.has(tag) && !hasChromeClass(child);
+    if (tag === "input") keep = ((_a2 = child.getAttribute("type")) != null ? _a2 : "").toLowerCase() === "checkbox";
+    if (keep && tag === "style") keep = !!options.allowStyle && cssIsInert((_b2 = child.textContent) != null ? _b2 : "");
+    if (!keep) {
+      child.remove();
+      report.elements++;
+      continue;
+    }
+    scrubAttributes(child, tag, report);
+    if (tag === "input") child.setAttribute("disabled", "");
+    if (tag === "img" && !child.getAttribute("src")) {
+      child.remove();
+      report.elements++;
+      continue;
+    }
+    scrubChildren(child, options, report);
+  }
+}
+function scrubShareTree(root, options = {}) {
+  const report = { elements: 0, attributes: 0 };
+  scrubAttributes(root, root.localName.toLowerCase(), report);
+  scrubChildren(root, options, report);
+  return report;
+}
+function scrubMermaidSvg(root) {
+  if (root.localName.toLowerCase() !== "svg") return false;
+  scrubShareTree(root, { allowStyle: true });
+  return true;
+}
+function unwrapLocalLinks(root, createSpan2) {
+  let count = 0;
+  const visit = (parent) => {
+    var _a2, _b2;
+    for (const child of Array.from(parent.children)) {
+      if (child.localName.toLowerCase() === "a") {
+        const href = normalizeUrl((_a2 = child.getAttribute("href")) != null ? _a2 : "");
+        const classes = ((_b2 = child.getAttribute("class")) != null ? _b2 : "").split(/\s+/);
+        const web = /^https?:\/\//.test(href) || href.startsWith("mailto:") || href.startsWith("#");
+        if (classes.includes("internal-link") || !web) {
+          const span = createSpan2();
+          span.append(...Array.from(child.childNodes));
+          child.replaceWith(span);
+          count++;
+          visit(span);
+          continue;
+        }
+      }
+      visit(child);
+    }
+  };
+  visit(root);
+  return count;
+}
+function extractMermaidSources(markdown) {
+  const sources2 = [];
+  const pattern = /^ {0,3}(`{3,}|~{3,})[ \t]*mermaid[^\n]*\n([\s\S]*?)^ {0,3}\1[`~]*[ \t]*$/gm;
+  for (const match of markdown.matchAll(pattern)) sources2.push(match[2].replace(/\n$/, ""));
+  return sources2;
+}
+
+// experiences/sharing/viewer-bundle.generated.ts
+var SHARE_VIEWER_JS = '(()=>{function kt(r){var l;let i=r.aimKind==="question"?[]:(l=r.aimConvergesFromNodeIds)!=null?l:[];return[...r.parentId?[r.parentId]:[],...i.filter(c=>c!==r.parentId)]}function Tt(r,i){let l=new Set,c=[i];for(;c.length;){let x=c.pop();for(let p of r)p.parentId===x&&p.id!==i&&!l.has(p.id)&&(l.add(p.id),c.push(p.id))}return l}function Mt(r,i){let l=new Map(r.map(p=>[p.id,p])),c=p=>{let m=0,L=new Set([p.id]);for(let I=p.parentId;I&&l.has(I)&&!L.has(I);I=l.get(I).parentId)L.add(I),m++;return m},x=new Set(r.map(p=>p.parentId).filter(p=>!!p&&l.has(p)));for(let p of r)x.has(p.id)&&(p.collapsed=i===null?!1:c(p)>=i)}var $t=360;var wt=24,qt=180;var Kt=(r,i)=>{let l=r==null?void 0:r(i);return l!==void 0&&Number.isFinite(l)&&l>0?l:qt};function Gt(r,i,l,c,x=!1,p){var b,U;let m=new Map(r.map(d=>[d.id,d])),L=new Map,I=new Map,s=(d,y,w)=>{var A;return d.set(y,[...(A=d.get(y))!=null?A:[],w])};for(let d of r){if(!d.parentId)continue;let y=d.aimKind!=="question"&&((b=d.aimConvergesFromNodeIds)!=null&&b.length)?kt(d).map(A=>m.get(A)):[],w=(U=y[0])==null?void 0:U.parentId;w&&m.has(w)&&y.every(A=>A&&A.parentId===w)?s(I,w,d):s(L,d.parentId,d)}let B=new Map,u=d=>{var y;return x&&d.collapsed?[]:(y=L.get(d.id))!=null?y:[]},M=d=>{var y;return x&&d.collapsed?[]:((y=I.get(d.id))!=null?y:[]).filter(w=>{var A;return!(x&&((A=m.get(w.parentId))!=null&&A.collapsed))})},C=d=>Kt(p,d.id),V=new Map,$=new Map,q=d=>d.reduce((y,w)=>y+V.get(w.id),0)+Math.max(0,d.length-1)*wt,Z=d=>{let y=u(d),w=M(d);for(let A of[...y,...w])Z(A);V.set(d.id,Math.max(C(d),q(y),q(w))),$.set(d.id,1+Math.max(0,...y.map(A=>$.get(A.id))))},K=(d,y,w)=>{let A=u(d),it=M(d),D=V.get(d.id),X=(Y,E)=>{let rt=w+(D-q(Y))/2;return Y.map(ot=>{let at=K(ot,E,rt);return rt+=V.get(ot.id)+wt,at})},H=X(A,y+1),k=X(it,y+$.get(d.id)),v=H.length?A:it,f=H.length?H:k,O=C(d),G=w+(D-O)/2;if(f.length){let Y=f[0]+C(v[0])/2,E=f[f.length-1]+C(v[v.length-1])/2;G=(Y+E)/2-O/2}return B.set(d.id,{x:l+y*$t,y:c+G}),G},F=0;for(let d of i)Z(d),K(d,0,F),F+=V.get(d.id)+wt;return B}function zt(r,i,l){let c=i!=null&&i.size?r.filter(m=>!i.has(m.id)):r,x=c.filter(m=>!m.parentId),p=Gt(c,x,80,80,!0,l);return r.map(m=>({...m,...p.get(m.id)}))}function Ct(r,i){return!i||!(i.bottom>i.top)?0:Math.max(0,Math.ceil(i.bottom-r))+8}function Ht(r,i,l,c){let x=r.zoom;return{zoom:x,x:l.width/2-i.x*x,y:c+(l.height-c)/2-i.y*x}}function Pt(r,i,l,c=1.2){let x=Math.max(1,i.height-l),p=r.maxX-r.minX,m=r.maxY-r.minY,L=Math.max(.25,Math.min(c,(i.width-80)/p,(x-80)/m));return{zoom:L,x:(i.width-p*L)/2-r.minX*L,y:l+(x-m*L)/2-r.minY*L}}var Rt={lang:"en",readOnly:"Shared map \\xB7 read-only",madeWithVam:"Made with VAM",install:"Install VAM",goal:"Goal: {0}",hint:"Drag empty space to pan \\xB7 Scroll to zoom \\xB7 Click a topic to read it",layout:"Layout",collapseAll:"Collapse all",expandAll:"Expand all",expandToLevel:"Expand to level {0}",autoLayout:"Auto layout",zoomIn:"Zoom in",zoomOut:"Zoom out",zoomReset:"Zoom {0}, reset to 100%",showAll:"Show all",toResearch:"To research",tierCore:"Must learn",tierSupport:"Learn when needed",tierSide:"Skippable",manualReason:"You set this",topicDetails:"Topic details",detailsButton:"Details",close:"Close",collapse:"Collapse",expandCount:"Expand {0}",subtopics:"Subtopics",noContent:"This topic has no notes in the shared file.",imageOmitted:"[image not included]",resizePanel:"Resize the side panel",untitledMap:"Untitled map"};function Vt(r,i,l,c,x){var L,I,s,B;let p=new DOMParser().parseFromString(l,"text/html").body;for(let u of Array.from(p.querySelectorAll("script, iframe, frame, object, embed, applet, link, meta, base")))u.remove();for(let u of Array.from(p.querySelectorAll("*")))for(let M of u.getAttributeNames()){let C=(L=u.getAttribute(M))!=null?L:"",V=M.toLowerCase();(V.startsWith("on")||/^(href|src|xlink:href|action|formaction)$/.test(V)&&/^\\s*(javascript|vbscript):/i.test(C))&&u.removeAttribute(M)}let m=()=>{let u=r.createElement("span");return u.className="vam-image-omitted",u.textContent=x.imageOmitted,u};for(let u of Array.from(p.querySelectorAll("img"))){let M=(I=u.getAttribute("src"))!=null?I:"";if(M.startsWith("vam-asset:")){let C=c[M.slice(10)];typeof C=="string"&&C.startsWith("data:image/")?u.setAttribute("src",C):u.replaceWith(m())}else/^https?:\\/\\//i.test(M)?(u.setAttribute("referrerpolicy","no-referrer"),u.setAttribute("loading","lazy")):/^data:image\\//i.test(M)||u.replaceWith(m())}for(let u of Array.from(p.querySelectorAll("a"))){let M=(s=u.getAttribute("href"))!=null?s:"";/^(https?:|mailto:)/i.test(M)?(u.setAttribute("target","_blank"),u.setAttribute("rel","noopener noreferrer")):M.startsWith("#")||u.removeAttribute("href")}for(let u of Array.from(p.querySelectorAll("table"))){if((B=u.parentElement)!=null&&B.classList.contains("vam-table-scroll"))continue;let M=r.createElement("div");M.className="vam-table-scroll",u.replaceWith(M),M.append(u)}i.append(...Array.from(p.childNodes).map(u=>r.importNode(u,!0)))}function Dt(r,i,l,c){let x=Math.max(60,Math.abs(l-r)/2);return`M ${r} ${i} C ${r+x} ${i}, ${l-x} ${c}, ${l} ${c}`}var jt="https://github.com/kevcltsai/visual-agent-map?ref=share",ut="http://www.w3.org/2000/svg",Wt="vam-share-panel-width",Zt=300,At=240,Jt=.25,Qt=2,te=280,ee=4,ne={target:["circle|cx=12|cy=12|r=10","circle|cx=12|cy=12|r=6","circle|cx=12|cy=12|r=2"],library:["path|d=m16 6 4 14","path|d=M12 6v14","path|d=M8 8v12","path|d=M4 4v16"],skip:["polygon|points=5 4 15 12 5 20 5 4","line|x1=19|x2=19|y1=5|y2=19"],minus:["path|d=M5 12h14"],plus:["path|d=M5 12h14","path|d=M12 5v14"],max:["path|d=M8 3H5a2 2 0 0 0-2 2v3","path|d=M21 8V5a2 2 0 0 0-2-2h-3","path|d=M3 16v3a2 2 0 0 0 2 2h3","path|d=M16 21h3a2 2 0 0 0 2-2v-3"]},ie={core:"target",support:"library",side:"skip"},Ot=r=>r==="core"||r==="support"||r==="side",mt=(r,i)=>r.replace("{0}",String(i));function _t(r,i){var c;let l=(c=r.getElementById(i))==null?void 0:c.textContent;if(l)try{return JSON.parse(l)}catch{return}}function re(r){let i=_t(r,"vam-ui"),l={...Rt};if(i&&typeof i=="object")for(let c of Object.keys(l))typeof i[c]=="string"&&(l[c]=i[c]);return l}function oe(r){try{return window.localStorage.getItem(r)}catch{return null}}function ae(r,i){try{window.localStorage.setItem(r,i)}catch{}}function Bt(r){var St;let i=re(r);r.documentElement.lang=i.lang;let l=r.getElementById("vam-app"),c=_t(r,"vam-map");if(!l)return;if(!c||c.format!=="vam-share"||c.version!==1||!Array.isArray(c.nodes)){l.replaceChildren(r.createTextNode("This is not a Visual Agent Map share file."));return}let x=c.assets&&typeof c.assets=="object"?c.assets:{},p=new Map,m=[];for(let t of c.nodes)!t||typeof t.id!="string"||p.has(t.id)||(p.set(t.id,t),m.push({id:t.id,path:t.id,parentId:typeof t.parentId=="string"?t.parentId:null,x:Number.isFinite(t.x)?t.x:0,y:Number.isFinite(t.y)?t.y:0,collapsed:!!t.collapsed}));let L=new Map(m.map(t=>[t.id,t]));for(let t of m)t.parentId&&(!L.has(t.parentId)||t.parentId===t.id)&&(t.parentId=null);let I=new Map;for(let t of m)t.parentId&&I.set(t.parentId,[...(St=I.get(t.parentId))!=null?St:[],t]);try{let t=window.matchMedia("(prefers-color-scheme: dark)"),e=()=>{r.documentElement.classList.toggle("theme-dark",t.matches)};e(),t.addEventListener("change",e)}catch{}let s=(t,e,n)=>{let o=r.createElement(t);return e&&(o.className=e),n!==void 0&&(o.textContent=n),o},B=t=>{let e=r.createElementNS(ut,"svg");e.setAttribute("class","svg-icon"),e.setAttribute("viewBox","0 0 24 24"),e.setAttribute("aria-hidden","true");for(let n of ne[t]){let[o,...a]=n.split("|"),h=r.createElementNS(ut,o);for(let S of a)h.setAttribute(S.slice(0,S.indexOf("=")),S.slice(S.indexOf("=")+1));e.append(h)}return e},u=(t,e,n,o)=>{let a=s("button",n,e);return a.type="button",a.addEventListener("click",h=>{h.stopPropagation(),o()}),t.append(a),a},M=(t,e,n,o)=>{let a=s("button");return a.type="button",a.setAttribute("aria-label",n),a.title=n,a.append(B(e)),a.addEventListener("click",h=>{h.stopPropagation(),o()}),t.append(a),a},C=t=>t==="core"?i.tierCore:t==="support"?i.tierSupport:i.tierSide,V=(t,e)=>{let n=s("span","vam-relevance-tag");n.dataset.tier=t,e&&(n.title=e);let o=s("span","vam-relevance-icon");return o.append(B(ie[t])),n.append(o,s("span",void 0,C(t))),n},$=typeof c.title=="string"&&c.title.trim()||i.untitledMap;r.title=$,l.className="vam-app";let q=s("div","vam-toolbar");q.append(s("h1","vam-map-switcher",$),s("span","vam-shared",i.readOnly));let Z=s("div","vam-toolbar-actions");Z.append(s("span","vam-made-with",i.madeWithVam));let K=s("a","vam-install",i.install);K.href=jt,K.target="_blank",K.rel="noopener noreferrer",Z.append(K),q.append(Z);let F=s("div","vam-workspace"),b=s("div","vam-viewport"),U=s("div","vam-stage");U.setAttribute("role","tree"),U.setAttribute("aria-label",$);let d=r.createElementNS(ut,"svg");d.setAttribute("class","vam-edges"),d.setAttribute("aria-hidden","true"),U.append(d),b.append(U);let y=s("div","vam-canvas-overlay"),w=s("div","vam-map-tools"),A=typeof c.goal=="string"?c.goal.trim():"";if(A){let t=s("span","vam-goal");t.append(B("target"),s("span","vam-goal-text",mt(i.goal,A))),t.title=A,w.append(t)}else w.hidden=!0;let it=s("span","vam-canvas-hint",i.hint),D=s("div","vam-zoom-controls");M(D,"minus",i.zoomOut,()=>J(1/1.2));let X=s("button","vam-zoom","100%");X.type="button",X.addEventListener("click",t=>{t.stopPropagation(),J(1/f.zoom)}),D.append(X),M(D,"plus",i.zoomIn,()=>J(1.2)),M(D,"max",i.showAll,()=>Q());let H=s("button","vam-layout-button",i.layout);H.type="button",H.setAttribute("aria-haspopup","menu"),H.setAttribute("aria-expanded","false"),D.append(H);let k=s("div","vam-layout-menu");k.setAttribute("role","menu"),k.hidden=!0,D.append(k),y.append(w,it,D);let v=s("aside","vam-inspector");v.hidden=!0,v.setAttribute("aria-label",i.topicDetails),F.append(b,y,v),l.replaceChildren(q,F);let f={x:0,y:0,zoom:1},O=null,G=!1,Y=Number(oe(Wt))||Zt,E=new Map,rt=()=>{let t=new Set,e=(n,o)=>{var a;for(let h of(a=I.get(n.id))!=null?a:[])o&&t.add(h.id),e(h,o||h.collapsed)};for(let n of m)n.parentId||e(n,n.collapsed);return t},ot=t=>{var n,o;let e=0;for(let a=t.parentId;a&&!(++e>m.length);a=(o=(n=L.get(a))==null?void 0:n.parentId)!=null?o:null);return e},at=()=>Ct(b.getBoundingClientRect().top,w.hidden?void 0:w.getBoundingClientRect());function j(){U.style.transform=`translate(${f.x}px, ${f.y}px) scale(${f.zoom})`;let t=`${Math.round(f.zoom*100)}%`;X.textContent=t,X.setAttribute("aria-label",mt(i.zoomReset,t))}function J(t,e){let n=e!=null?e:{x:b.clientWidth/2,y:b.clientHeight/2},o=Math.min(Qt,Math.max(Jt,f.zoom*t)),a=o/f.zoom;f={x:n.x-(n.x-f.x)*a,y:n.y-(n.y-f.y)*a,zoom:o},j()}let ft=!1;function Q(){if(!E.size)return;if(!b.clientWidth||!b.clientHeight){ft=!0;return}let t=1/0,e=1/0,n=-1/0,o=-1/0;for(let a of E.values())t=Math.min(t,a.offsetLeft),e=Math.min(e,a.offsetTop),n=Math.max(n,a.offsetLeft+(a.offsetWidth||te)),o=Math.max(o,a.offsetTop+a.offsetHeight);f=Pt({minX:t,minY:e,maxX:n,maxY:o},{width:b.clientWidth,height:b.clientHeight},at()),j()}function Ut(t){let e=E.get(t);e&&(f=Ht(f,{x:e.offsetLeft+e.offsetWidth/2,y:e.offsetTop+e.offsetHeight/2},{width:b.clientWidth,height:b.clientHeight},at()),j())}function tt(){var t;d.replaceChildren();for(let e of m){let n=e.parentId?E.get(e.parentId):void 0,o=E.get(e.id);if(!n||!o)continue;let a=r.createElementNS(ut,"path");a.setAttribute("d",Dt(n.offsetLeft+n.offsetWidth,n.offsetTop+n.offsetHeight/2,o.offsetLeft,o.offsetTop+o.offsetHeight/2)),a.setAttribute("class",((t=p.get(e.id))==null?void 0:t.tier)==="side"?"vam-edge vam-edge-side":"vam-edge"),d.append(a)}}let gt=0,Yt=()=>{gt||(gt=window.requestAnimationFrame(()=>{gt=0,tt()}))},ht=t=>{let e=E.get(t),n=L.get(t);!e||!n||(e.style.left=`${n.x}px`,e.style.top=`${n.y}px`)};function Et(){var e,n;for(let o of E.values())o.remove();E.clear();let t=rt();for(let o of m){if(t.has(o.id))continue;let a=p.get(o.id),h=Tt(m,o.id).size,S=Ot(a.tier)?a.tier:void 0,g=s("div",`vam-node${o.id===O?" is-selected":""}`);g.dataset.nodeId=o.id,g.dataset.status=a.status==="completed"?"completed":"idea",S&&(g.dataset.relevance=S),g.tabIndex=0,g.setAttribute("role","treeitem"),g.setAttribute("aria-level",String(ot(o)+1)),g.setAttribute("aria-selected",String(o.id===O)),g.setAttribute("aria-label",String((e=a.title)!=null?e:"")),h&&g.setAttribute("aria-expanded",String(!o.collapsed));let _=s("div","vam-node-header");g.append(_),a.status!=="completed"&&_.append(s("span","vam-status vam-status-idea",i.toResearch)),S&&_.append(V(S,typeof a.reason=="string"?a.reason:void 0));let W=s("div","vam-node-tools");g.append(W),h&&u(o.collapsed?_:W,o.collapsed?mt(i.expandCount,h):i.collapse,"vam-collapse-button",()=>{o.collapsed=!o.collapsed,yt(o.id)}).setAttribute("aria-expanded",String(!o.collapsed)),u(W,i.detailsButton,void 0,()=>ct(o.id)),g.append(s("h3","vam-card-title",String((n=a.title)!=null?n:""))),typeof a.summary=="string"&&a.summary.trim()&&g.append(s("p","vam-card-summary",a.summary)),g.addEventListener("click",()=>{G||ct(o.id)}),g.addEventListener("keydown",T=>{T.target===g&&(T.key==="Enter"||T.key===" ")&&(T.preventDefault(),ct(o.id))}),g.addEventListener("pointerdown",T=>Ft(T,o,g)),U.append(g),E.set(o.id,g),ht(o.id)}}function st(){zt(m,void 0,e=>{var n;return(n=E.get(e))==null?void 0:n.offsetHeight}).forEach((e,n)=>{m[n].x=e.x,m[n].y=e.y});for(let e of E.keys())ht(e)}function yt(t){var o;let e=t?(o=E.get(t))==null?void 0:o.getBoundingClientRect():void 0;Et(),st(),tt();let n=t?E.get(t):void 0;if(n){if(e){let a=n.getBoundingClientRect();f={...f,x:f.x+e.left-a.left,y:f.y+e.top-a.top},j()}n.focus({preventScroll:!0})}}function Ft(t,e,n){if(t.button!==0||!t.isPrimary||t.target.closest("button"))return;let o=t.clientX,a=t.clientY,h=e.x,S=e.y,g=!1,_=T=>{let z=T.clientX-o,R=T.clientY-a;if(!g){if(Math.hypot(z,R)<=ee)return;g=!0,n.classList.add("is-dragging"),n.setPointerCapture(T.pointerId)}e.x=h+z/f.zoom,e.y=S+R/f.zoom,ht(e.id),Yt()},W=()=>{n.removeEventListener("pointermove",_),n.removeEventListener("pointerup",W),n.removeEventListener("pointercancel",W),n.classList.remove("is-dragging"),g&&(G=!0,window.setTimeout(()=>G=!1,0))};n.addEventListener("pointermove",_),n.addEventListener("pointerup",W),n.addEventListener("pointercancel",W)}let bt=t=>Math.round(Math.min(Math.max(At,t),Math.max(At,F.clientWidth*.7)));function dt(){let t=window.matchMedia("(max-width: 600px)").matches;if(v.hidden||t){v.style.removeProperty("width"),y.style.removeProperty("right");return}let e=bt(Y);v.style.width=`${e}px`,y.style.right=`${e}px`,N.setAttribute("aria-valuenow",String(e)),N.setAttribute("aria-valuemax",String(bt(1/0)))}let N=s("div","vam-inspector-resizer");N.setAttribute("role","separator"),N.setAttribute("aria-orientation","vertical"),N.setAttribute("aria-label",i.resizePanel),N.setAttribute("aria-valuemin",String(At)),N.tabIndex=0;let lt=(t,e)=>{Y=bt(t),dt(),e&&ae(Wt,String(Y))};N.addEventListener("pointerdown",t=>{t.preventDefault();let e=t.clientX,n=v.offsetWidth;N.setPointerCapture(t.pointerId),N.classList.add("is-resizing"),r.body.classList.add("vam-resizing");let o=h=>lt(n+e-h.clientX,!1),a=()=>{N.removeEventListener("pointermove",o),N.removeEventListener("pointerup",a),N.removeEventListener("pointercancel",a),N.classList.remove("is-resizing"),r.body.classList.remove("vam-resizing"),lt(Y,!0)};N.addEventListener("pointermove",o),N.addEventListener("pointerup",a),N.addEventListener("pointercancel",a)}),N.addEventListener("keydown",t=>{let e=t.shiftKey?48:16;if(t.key==="ArrowLeft")lt(v.offsetWidth+e,!0);else if(t.key==="ArrowRight")lt(v.offsetWidth-e,!0);else return;t.preventDefault()}),window.addEventListener("resize",()=>{dt(),j()});function vt(){O=null;for(let t of E.values())t.classList.remove("is-selected"),t.setAttribute("aria-selected","false");v.hidden=!0,F.classList.remove("has-inspector"),v.replaceChildren(),dt()}function ct(t){var g,_,W,T;let e=L.get(t),n=p.get(t);if(!e||!n)return;O=t;for(let[z,R]of E)R.classList.toggle("is-selected",z===t),R.setAttribute("aria-selected",String(z===t));v.replaceChildren(N);let o=s("div","vam-inspector-heading");o.append(s("strong",void 0,i.topicDetails)),u(o,i.close,void 0,vt),v.append(o,s("h3",void 0,String((g=n.title)!=null?g:"")));let a=Ot(n.tier)?n.tier:void 0;if(a){let z=s("div","vam-inspector-why");z.append(V(a));let R=typeof n.reason=="string"&&n.reason.trim()?n.reason:n.manual?i.manualReason:"";R&&z.append(s("span",void 0,R)),v.append(z)}typeof n.summary=="string"&&n.summary.trim()&&v.append(s("p","vam-sample-summary",n.summary));let h=s("div","vam-sample-detail");typeof n.detailHtml=="string"&&n.detailHtml.trim()?Vt(r,h,n.detailHtml,x,i):h.append(s("p","vam-inspector-empty",i.noContent)),v.append(h);let S=(_=I.get(t))!=null?_:[];if(S.length){let z=s("div","vam-subtopics");z.append(s("strong",void 0,i.subtopics));for(let R of S)u(z,String((T=(W=p.get(R.id))==null?void 0:W.title)!=null?T:""),void 0,()=>{e.collapsed&&(e.collapsed=!1,yt(e.id)),ct(R.id),Ut(R.id)});v.append(z)}v.hidden=!1,F.classList.add("has-inspector"),dt(),v.scrollTop=0}let xt=t=>{Mt(m,t),yt(),Q()},Xt=[{label:i.collapseAll,run:()=>xt(0)},{label:i.expandAll,run:()=>xt(null)},...[1,2,3].map(t=>({label:mt(i.expandToLevel,t),run:()=>xt(t)})),null,{label:i.autoLayout,run:()=>{st(),tt()}}],et=t=>{k.hidden||(k.hidden=!0,H.setAttribute("aria-expanded","false"),t&&H.focus())};for(let t of Xt){if(!t){k.append(s("hr"));continue}let e=s("button",void 0,t.label);e.type="button",e.setAttribute("role","menuitem"),e.addEventListener("click",n=>{n.stopPropagation(),et(!0),t.run()}),k.append(e)}let Lt=()=>Array.from(k.querySelectorAll("button"));H.addEventListener("click",t=>{var e;if(t.stopPropagation(),!k.hidden)return et(!0);k.hidden=!1,H.setAttribute("aria-expanded","true"),(e=Lt()[0])==null||e.focus()}),k.addEventListener("keydown",t=>{let e=Lt(),n=e.indexOf(r.activeElement);if(t.key==="ArrowDown")e[(n+1)%e.length].focus();else if(t.key==="ArrowUp")e[(n-1+e.length)%e.length].focus();else if(t.key==="Home")e[0].focus();else if(t.key==="End")e[e.length-1].focus();else return t.key==="Tab"?et(!1):void 0;t.preventDefault()}),r.addEventListener("pointerdown",t=>{!k.hidden&&!D.contains(t.target)&&et(!1)}),r.addEventListener("keydown",t=>{if(t.key==="Escape"){if(!k.hidden)et(!0);else if(!v.hidden){let e=O?E.get(O):void 0;vt(),e==null||e.focus({preventScroll:!0})}}});let P=new Map,nt=0,pt=!1;b.addEventListener("pointerdown",t=>{if(!(t.target.closest(".vam-node")||t.pointerType==="mouse"&&t.button!==0)&&(b.setPointerCapture(t.pointerId),P.set(t.pointerId,{x:t.clientX,y:t.clientY}),b.classList.add("is-panning"),P.size===1&&(pt=!1),P.size===2)){let[e,n]=Array.from(P.values());nt=Math.hypot(e.x-n.x,e.y-n.y)}}),b.addEventListener("pointermove",t=>{let e=P.get(t.pointerId);if(!e)return;if(P.set(t.pointerId,{x:t.clientX,y:t.clientY}),P.size===2&&nt){let[a,h]=Array.from(P.values()),S=Math.hypot(a.x-h.x,a.y-h.y),g=b.getBoundingClientRect();J(S/nt,{x:(a.x+h.x)/2-g.left,y:(a.y+h.y)/2-g.top}),nt=S,pt=!0;return}let n=t.clientX-e.x,o=t.clientY-e.y;pt||(pt=Math.abs(n)+Math.abs(o)>0),f={...f,x:f.x+n,y:f.y+o},j()});let Nt=t=>{P.delete(t.pointerId)&&(P.size<2&&(nt=0),P.size||(b.classList.remove("is-panning"),!pt&&t.type==="pointerup"&&!v.hidden&&vt()))};b.addEventListener("pointerup",Nt),b.addEventListener("pointercancel",Nt),b.addEventListener("wheel",t=>{t.preventDefault();let e=b.getBoundingClientRect();t.ctrlKey||t.metaKey||t.deltaMode===1||!t.deltaX&&Math.abs(t.deltaY)>=50?J(Math.exp(-t.deltaY*(t.deltaMode===0?.0015:.04)),{x:t.clientX-e.left,y:t.clientY-e.top}):(f={...f,x:f.x-t.deltaX,y:f.y-t.deltaY},j())},{passive:!1}),typeof ResizeObserver!="undefined"&&new ResizeObserver(()=>{ft&&(ft=!1,Q())}).observe(b),Mt(m,1),Et(),st(),tt(),Q();let It=r.fonts;It&&It.ready.then(()=>{O!==null||P.size||(st(),tt(),Q())})}Bt(document);})();';
+var SHARE_VIEWER_CSS = '/* Share viewer styles. Order: tokens and base (this part), the card, canvas and inspector rules extracted from styles.css, then the viewer-only parts below the marker. */\n:root {\n  color-scheme: light;\n  --background-primary: #ffffff;\n  --background-secondary: #f6f6f6;\n  --background-modifier-border: #e0e0e0;\n  --background-modifier-border-hover: #cfcfcf;\n  --background-modifier-border-focus: #8a5cf5;\n  --background-modifier-hover: rgba(0, 0, 0, 0.05);\n  --background-modifier-active-hover: rgba(138, 92, 245, 0.15);\n  --text-normal: #222222;\n  --text-muted: #5c5c5c;\n  --text-faint: #8a8a8a;\n  --text-on-accent: #ffffff;\n  --text-error: #d1243c;\n  --interactive-accent: #8a5cf5;\n  --text-accent: #6f42e0;\n  --color-red: #e93147;\n  --color-red-rgb: 233, 49, 71;\n  --color-orange: #e9973f;\n  --shadow-s: 0 1px 2px rgba(0, 0, 0, 0.06), 0 2px 8px rgba(0, 0, 0, 0.05);\n  --shadow-l: 0 8px 28px rgba(0, 0, 0, 0.16);\n  --radius-s: 4px;\n  --radius-m: 8px;\n  --font-ui-smaller: 12px;\n  --font-ui-small: 13px;\n  --font-ui-medium: 15px;\n  --input-height: 30px;\n  --size-4-3: 12px;\n  --font-interface: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang TC", "PingFang SC", "Noto Sans TC", "Noto Sans SC", "Microsoft JhengHei", Roboto, sans-serif;\n  --font-monospace: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;\n}\n@media (prefers-color-scheme: dark) {\n  :root {\n    color-scheme: dark;\n    --background-primary: #1e1e1e;\n    --background-secondary: #262626;\n    --background-modifier-border: #363636;\n    --background-modifier-border-hover: #4a4a4a;\n    --background-modifier-border-focus: #a88bfa;\n    --background-modifier-hover: rgba(255, 255, 255, 0.06);\n    --background-modifier-active-hover: rgba(168, 139, 250, 0.2);\n    --text-normal: #dadada;\n    --text-muted: #b3b3b3;\n    --text-faint: #8c8c8c;\n    --text-error: #fb464c;\n    --text-accent: #a88bfa;\n    --color-red: #fb464c;\n    --color-red-rgb: 251, 70, 76;\n    --shadow-s: 0 1px 2px rgba(0, 0, 0, 0.3), 0 2px 8px rgba(0, 0, 0, 0.25);\n    --shadow-l: 0 8px 28px rgba(0, 0, 0, 0.5);\n  }\n}\n*, *::before, *::after { box-sizing: border-box; }\nhtml, body { height: 100%; margin: 0; }\nbody { background: var(--background-primary); color: var(--text-normal); font-family: var(--font-interface); font-size: var(--font-ui-small); overflow: hidden; -webkit-text-size-adjust: 100%; }\nbutton { font: inherit; font-size: var(--font-ui-small); color: var(--text-normal); background: var(--background-primary); border: 1px solid var(--background-modifier-border); border-radius: var(--radius-s); padding: 4px 10px; height: 30px; cursor: pointer; display: inline-flex; align-items: center; gap: 4px; white-space: nowrap; }\nbutton:hover { background: var(--background-modifier-hover); }\nbutton:focus-visible, a:focus-visible, [tabindex]:focus-visible { outline: 2px solid var(--interactive-accent); outline-offset: 1px; }\n.svg-icon { width: 16px; height: 16px; stroke: currentColor; fill: none; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; flex: none; }\n.vam-app { display: flex; flex-direction: column; height: 100%; }\n/* From styles.css, unchanged. */\n.vam-toolbar { display: flex; align-items: center; flex-wrap: wrap; gap: 6px 14px; min-height: 48px; padding: 6px 10px 6px 6px; border-bottom: 1px solid var(--background-modifier-border); background: var(--background-primary); flex-shrink: 0; }\n.vam-toolbar button, .vam-map-tools button, .vam-actions button { font-size: var(--font-ui-small); }\n.vam-toolbar .vam-map-switcher { display: inline-flex; align-items: center; gap: 6px; font-size: var(--font-ui-medium); min-width: 0; max-width: min(460px, 45%); height: auto; padding: 6px 8px; border: 0; border-radius: var(--radius-m); background: transparent; box-shadow: none; color: var(--text-normal); cursor: pointer; }\n.vam-toolbar .vam-map-switcher:hover { background: var(--background-modifier-hover); }\n.vam-map-switcher:focus-visible { outline: 2px solid var(--interactive-accent); outline-offset: 1px; }\n.vam-map-switcher-icon { display: inline-flex; flex-shrink: 0; color: var(--text-faint); }\n.vam-map-switcher-icon svg { width: 14px; height: 14px; }\n.vam-toolbar-actions { display: flex; align-items: center; gap: 2px; margin-left: auto; }\n.vam-canvas-overlay { position: absolute; z-index: 4; inset: 0; pointer-events: none; }\n.vam-workspace.has-inspector > .vam-canvas-overlay { right: 300px; }\n.vam-canvas-overlay > * { pointer-events: auto; }\n.vam-map-tools, .vam-zoom-controls { position: absolute; display: flex; align-items: center; gap: 2px; padding: 4px; border: 1px solid var(--background-modifier-border); border-radius: var(--radius-m); background: var(--background-primary); box-shadow: var(--shadow-s); }\n.vam-map-tools { top: 12px; left: 12px; flex-wrap: wrap; max-width: calc(100% - 24px); }\n.vam-map-tools button:not(.mod-cta), .vam-zoom-controls button { background: transparent; box-shadow: none; }\n.vam-map-tools button:focus-visible, .vam-zoom-controls button:focus-visible, .vam-node-tools button:focus-visible { outline: 2px solid var(--interactive-accent); outline-offset: 1px; }\n.vam-map-tools button:not(.mod-cta):hover, .vam-zoom-controls button:hover { background: var(--background-modifier-hover); }\n.vam-map-tools button.is-active { background: var(--background-modifier-active-hover); box-shadow: inset 0 0 0 1px var(--interactive-accent); color: var(--text-accent); }\n.vam-zoom-controls { right: 12px; bottom: 12px; }\n.vam-zoom-controls > .vam-layout-button { padding: 0 8px; font-size: var(--font-ui-small); }\n.vam-layout-button::after { content: "\u25BE" / ""; margin-left: 4px; color: var(--text-muted); }\n.vam-zoom { min-width: 52px; padding: 0 6px; text-align: center; font-variant-numeric: tabular-nums; color: var(--text-muted); }\n.vam-canvas-overlay > .vam-canvas-hint { position: absolute; left: 12px; bottom: 12px; max-width: 50%; padding: 6px 10px; border: 1px solid var(--background-modifier-border); border-radius: var(--radius-m); background: var(--background-primary); box-shadow: var(--shadow-s); color: var(--text-muted); pointer-events: none; }\n.vam-workspace { display: flex; flex: 1; min-height: 0; min-width: 0; position: relative; }\n.vam-viewport { position: relative; flex: 1; min-width: 0; overflow: hidden; cursor: grab; touch-action: none; background-color: var(--background-secondary); background-image: radial-gradient(var(--background-modifier-border) 1px, transparent 1px); background-size: 24px 24px; }\n.vam-viewport.is-panning { cursor: grabbing; }\n.vam-stage { position: absolute; left: 0; top: 0; width: 1px; height: 1px; transform-origin: 0 0; }\n.vam-edges { position: absolute; left: 0; top: 0; width: 1px; height: 1px; overflow: visible; pointer-events: none; }\n.vam-edge { fill: none; stroke: var(--interactive-accent); stroke-width: 2; opacity: 0.55; }\n.vam-node { --vam-card-bg: var(--background-primary); position: absolute; box-sizing: border-box; width: 280px; padding: 12px 14px 14px; border: 1px solid var(--background-modifier-border); border-radius: 12px; background: var(--vam-card-bg); box-shadow: var(--shadow-s); cursor: grab; user-select: none; transition: border-color 160ms ease-out, box-shadow 160ms ease-out; }\n.vam-node:hover { border-color: var(--background-modifier-border-hover); }\n.vam-node > .vam-card-label { position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0; overflow: hidden; white-space: nowrap; border: 0; }\n.vam-edge-convergence { stroke: var(--interactive-accent); stroke-dasharray: 5 5; opacity: .8; }\n.vam-node:active { cursor: grabbing; }\n.vam-node.is-selected { border-color: var(--interactive-accent); outline: 2px solid var(--interactive-accent); outline-offset: 2px; }\n.vam-node:focus-visible { outline: 2px dashed var(--interactive-accent); outline-offset: 5px; }\n.vam-node-header { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 6px; }\n.vam-node-header button { font-size: var(--font-ui-smaller); height: 24px; padding: 2px 8px; }\n.vam-node-header > .vam-collapse-button { margin-left: auto; font-variant-numeric: tabular-nums; }\n.vam-node > .vam-node-tools { position: absolute; right: 10px; bottom: calc(100% - 6px); z-index: 3; display: flex; align-items: center; gap: 2px; padding: 3px; border: 1px solid var(--background-modifier-border); border-radius: 8px; background: var(--background-primary); box-shadow: var(--shadow-s); opacity: 0; pointer-events: none; transform: translateY(4px); transition: opacity 120ms ease-out, transform 120ms ease-out; width: max-content; }\n.vam-node-tools button { font-size: var(--font-ui-smaller); height: 26px; padding: 2px 8px; }\n.vam-node-tools > .vam-collapse-button { order: -1; }\n.vam-status { display: inline-block; max-width: 100%; overflow: hidden; text-overflow: ellipsis; padding: 0; font-size: var(--font-ui-smaller); color: var(--text-muted); white-space: nowrap; }\n.vam-status::before { content: ""; display: inline-block; margin-right: 6px; vertical-align: 1px; width: 7px; height: 7px; box-sizing: border-box; border-radius: 50%; background: var(--text-faint); }\n.vam-status-idea::before { border: 1.5px solid var(--text-faint); background: transparent; }\n.vam-status-running { color: var(--text-accent); }\n.vam-status-running::before { background: var(--interactive-accent); animation: vam-pulse 1.4s ease-in-out infinite; }\n.vam-status-completed::before { background: var(--interactive-accent); }\n.vam-status-queued { color: var(--text-accent); }\n.vam-status-queued::before { border: 1.5px solid var(--interactive-accent); background: transparent; }\n.vam-status-error { color: var(--color-red); }\n.vam-status-error::before { background: var(--color-red); }\n.vam-node-header button.vam-badge-new { border: 0; cursor: pointer; }\n.vam-card-title { color: var(--text-normal); font-size: var(--font-ui-medium); font-weight: 650; line-height: 1.4; margin: 8px 0 4px; overflow-wrap: anywhere; }\n.vam-card-summary { margin: 0; color: var(--text-muted); font-size: var(--font-ui-small); line-height: 1.55; overflow-wrap: anywhere; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 3; overflow: hidden; }\n.vam-card-error { margin: 6px 0 0; color: var(--color-red); font-size: var(--font-ui-smaller); line-height: 1.45; overflow-wrap: anywhere; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow: hidden; }\n.vam-node:not([data-aim-kind])[data-status="idea"] { border-style: dashed; border-color: var(--background-modifier-border-hover); box-shadow: none; }\n.vam-card-summary.is-preview { font-style: italic; color: var(--text-faint); }\n.vam-card-preview-label { font-style: normal; font-weight: 600; margin-right: 6px; }\n.vam-node:not([data-aim-kind])[data-status="idea"] .vam-card-summary { color: var(--text-faint); }\n.vam-node:not([data-aim-kind])[data-status="running"] { border-color: var(--interactive-accent); }\n.vam-node:not([data-aim-kind])[data-status="queued"] { --vam-card-bg: color-mix(in srgb, var(--interactive-accent) 7%, var(--background-primary)); border-style: dashed; border-color: color-mix(in srgb, var(--interactive-accent) 60%, transparent); }\n.vam-node:not([data-aim-kind])[data-status="running"]::after { content: ""; position: absolute; left: 14px; right: 14px; top: -1px; height: 2px; border-radius: 2px; background: linear-gradient(90deg, transparent, var(--interactive-accent), transparent); background-size: 50% 100%; background-repeat: no-repeat; animation: vam-scan 1.6s ease-in-out infinite; }\n.vam-node:not([data-aim-kind])[data-status="error"] { border-color: rgba(var(--color-red-rgb), 0.55); }\n.vam-relevance-tag { display: inline-flex; align-items: center; gap: 4px; max-width: 100%; font-size: var(--font-ui-smaller); line-height: 1.4; white-space: nowrap; }\n.vam-relevance-tag-name { position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0; overflow: hidden; white-space: nowrap; }\n.vam-relevance-tag > .vam-relevance-icon { display: inline-flex; flex: none; }\n.vam-relevance-tag .svg-icon { width: 14px; height: 14px; }\n.vam-relevance-tag[data-tier="core"] { color: var(--text-accent); }\n.vam-relevance-tag[data-tier="support"] { color: var(--text-muted); }\n.vam-relevance-tag[data-tier="side"] { color: var(--text-faint); }\n.vam-node[data-relevance="side"] { opacity: .5; transition: border-color 160ms ease-out, box-shadow 160ms ease-out, opacity 160ms ease-out; }\n.vam-node[data-relevance="side"]:hover, .vam-node[data-relevance="side"]:focus-within, .vam-node[data-relevance="side"].is-selected { opacity: 1; }\n.vam-edge.vam-edge-side { opacity: .2; }\n.theme-dark .vam-viewport { background-color: var(--background-primary); }\n.theme-dark .vam-node { --vam-card-bg: var(--background-secondary); }\n.vam-inspector { width: 300px; flex-shrink: 0; padding: 16px; overflow-y: auto; border-left: 1px solid var(--background-modifier-border); background: var(--background-primary); }\n.vam-inspector-heading { display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px; }\n.vam-inspector-heading strong { font-size: var(--font-ui-medium); }\n.vam-node.is-readonly, .vam-node.is-readonly:active { cursor: pointer; }\n.vam-sample-summary { color: var(--text-muted); line-height: 1.6; }\n.vam-sample-detail { line-height: 1.6; }\n@media (max-width: 900px) {\n  .vam-inspector { width: 260px; }\n  .vam-workspace.has-inspector > .vam-canvas-overlay { right: 260px; }\n}\n@media (max-width: 600px) {\n  .vam-inspector { position: absolute; right: 0; top: 0; bottom: 0; width: min(300px, 85%); z-index: 5; box-shadow: var(--shadow-l); }\n}\n@keyframes vam-pulse { 50% { opacity: 0.35; } }\n@keyframes vam-scan { from { background-position: -100% 0; } to { background-position: 200% 0; } }\n/* Viewer-only parts: the pieces Obsidian would otherwise provide. */\n.vam-toolbar { padding-left: max(10px, env(safe-area-inset-left, 0px)); padding-right: max(10px, env(safe-area-inset-right, 0px)); }\n.vam-toolbar .vam-map-switcher { cursor: default; margin: 0; font-weight: 600; font-family: inherit; line-height: 1.3; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; display: block; }\n.vam-toolbar .vam-map-switcher:hover { background: transparent; }\n.vam-shared { font-size: var(--font-ui-smaller); color: var(--text-faint); }\n.vam-toolbar-actions { gap: 10px; flex-wrap: wrap; justify-content: flex-end; }\n.vam-made-with { font-size: var(--font-ui-smaller); color: var(--text-faint); }\n.vam-install { display: inline-flex; align-items: center; height: 30px; padding: 4px 12px; border-radius: var(--radius-s); background: var(--interactive-accent); color: var(--text-on-accent); font-size: var(--font-ui-small); text-decoration: none; white-space: nowrap; }\n.vam-install:hover { filter: brightness(1.08); }\n.vam-goal { display: inline-flex; align-items: center; gap: 6px; min-width: 0; max-width: 22em; padding: 0 6px; line-height: var(--input-height); font-size: var(--font-ui-small); color: var(--text-normal); }\n.vam-goal-text { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }\n.vam-goal .svg-icon { color: var(--text-accent); }\n.vam-map-tools[hidden] { display: none; }\n.vam-zoom-controls { right: max(12px, env(safe-area-inset-right, 0px)); bottom: max(12px, env(safe-area-inset-bottom, 0px)); }\n.vam-zoom-controls button { background: transparent; }\n.vam-node { touch-action: none; }\n.vam-node.is-dragging { cursor: grabbing; z-index: 2; }\n.vam-node .vam-node-tools button, .vam-node-header button { background: transparent; border: 0; }\n.vam-node-header > .vam-collapse-button { border: 1px solid var(--background-modifier-border); background: var(--background-primary); }\n.vam-layout-menu { position: absolute; right: 0; bottom: calc(100% + 6px); z-index: 6; display: flex; flex-direction: column; min-width: 190px; padding: 4px; border: 1px solid var(--background-modifier-border); border-radius: var(--radius-m); background: var(--background-primary); box-shadow: var(--shadow-l); }\n.vam-layout-menu[hidden] { display: none; }\n.vam-layout-menu button { justify-content: flex-start; width: 100%; border: 0; background: transparent; height: 30px; }\n.vam-layout-menu hr { width: 100%; margin: 4px 0; border: 0; border-top: 1px solid var(--background-modifier-border); }\n.vam-zoom-controls { overflow: visible; }\n.vam-inspector { font-size: 14px; line-height: 1.6; color: var(--text-normal); }\n@media (min-width: 601px) { .vam-inspector { position: relative; } }\n.vam-inspector[hidden] { display: none; }\n.vam-inspector-heading button { height: 26px; }\n.vam-inspector h3 { font-size: 18px; line-height: 1.35; margin: 0 0 8px; overflow-wrap: anywhere; }\n.vam-inspector-why { display: flex; flex-direction: column; gap: 4px; padding: 8px 10px; margin: 0 0 12px; border: 1px solid var(--background-modifier-border); border-radius: var(--radius-m); color: var(--text-muted); font-size: var(--font-ui-small); }\n.vam-inspector-resizer { position: absolute; left: -4px; top: 0; bottom: 0; width: 8px; cursor: col-resize; touch-action: none; z-index: 2; }\n.vam-inspector-resizer:hover, .vam-inspector-resizer.is-resizing { background: var(--background-modifier-active-hover); }\n.vam-inspector-empty { color: var(--text-muted); }\n.vam-subtopics { display: flex; flex-direction: column; gap: 4px; margin-top: 16px; padding-top: 10px; border-top: 1px solid var(--background-modifier-border); }\n.vam-subtopics strong { font-size: var(--font-ui-small); color: var(--text-muted); font-weight: 500; }\n.vam-subtopics button { justify-content: flex-start; height: auto; min-height: 30px; white-space: normal; text-align: left; }\n/* Reading styles for the note HTML that Obsidian rendered at export time. */\n.vam-sample-detail { overflow-wrap: anywhere; }\n.vam-sample-detail h1, .vam-sample-detail h2, .vam-sample-detail h3, .vam-sample-detail h4, .vam-sample-detail h5, .vam-sample-detail h6 { margin: 18px 0 6px; line-height: 1.35; }\n.vam-sample-detail h1 { font-size: 18px; }\n.vam-sample-detail h2 { font-size: 16px; }\n.vam-sample-detail h3, .vam-sample-detail h4, .vam-sample-detail h5, .vam-sample-detail h6 { font-size: 15px; }\n.vam-sample-detail p { margin: 8px 0; }\n.vam-sample-detail ul, .vam-sample-detail ol { padding-left: 22px; margin: 8px 0; }\n.vam-sample-detail a { color: var(--text-accent); }\n.vam-sample-detail blockquote { margin: 10px 0; padding: 2px 12px; border-left: 3px solid var(--background-modifier-border-hover); color: var(--text-muted); }\n.vam-sample-detail hr { border: 0; border-top: 1px solid var(--background-modifier-border); margin: 14px 0; }\n.vam-sample-detail code { font-family: var(--font-monospace); font-size: 12px; background: var(--background-secondary); padding: 1px 4px; border-radius: 3px; }\n.vam-sample-detail pre { overflow-x: auto; background: var(--background-secondary); padding: 8px; border-radius: 6px; }\n.vam-sample-detail pre code { background: transparent; padding: 0; }\n.vam-sample-detail img { max-width: 100%; height: auto; }\n.vam-sample-detail svg { max-width: 100%; height: auto; }\n.vam-sample-detail .mermaid, .vam-sample-detail .vam-table-scroll { overflow-x: auto; margin: 10px 0; }\n.vam-sample-detail table { border-collapse: collapse; font-size: 12.5px; min-width: 100%; }\n.vam-sample-detail th, .vam-sample-detail td { border: 1px solid var(--background-modifier-border); padding: 4px 6px; text-align: left; vertical-align: top; min-width: 5em; overflow-wrap: normal; word-break: normal; }\n.vam-sample-detail .callout { margin: 10px 0; padding: 8px 12px; border-radius: var(--radius-m); background: color-mix(in srgb, var(--interactive-accent) 9%, transparent); border-left: 3px solid var(--interactive-accent); }\n.vam-sample-detail .callout-title { display: flex; align-items: center; gap: 6px; font-weight: 600; color: var(--text-accent); }\n.vam-sample-detail .callout-icon { display: inline-flex; flex: none; }\n.vam-sample-detail .callout-icon svg { width: 16px; height: 16px; }\n.vam-sample-detail .callout-content p:first-child { margin-top: 4px; }\n.vam-sample-detail .vam-image-omitted { color: var(--text-faint); font-size: var(--font-ui-smaller); }\n.vam-sample-detail .internal-link { color: inherit; text-decoration: none; }\n.vam-resizing, .vam-resizing * { cursor: col-resize !important; user-select: none; }\n@media (max-width: 700px) { .vam-canvas-overlay > .vam-canvas-hint { display: none; } }\n@media (max-width: 600px) { .vam-inspector-resizer { display: none; } .vam-toolbar .vam-map-switcher { max-width: 100%; } .vam-made-with { display: none; } }\n@media (prefers-reduced-motion: reduce) { * { transition: none !important; } }\n';
+
+// experiences/sharing/share-html.ts
+var CONTENT_SECURITY_POLICY = "default-src 'none'; img-src data: https:; style-src 'unsafe-inline'; script-src 'unsafe-inline'; base-uri 'none'; form-action 'none'";
+var escapeText = (text11) => text11.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+var jsonForScript = (value) => JSON.stringify(value).replace(/</g, "\\u003c").replace(/\u2028/g, "\\u2028").replace(/\u2029/g, "\\u2029");
+function buildHtml(title, ui, mapJson) {
+  return [
+    "<!doctype html>",
+    `<html lang="${escapeText(ui.lang)}">`,
+    "<head>",
+    '<meta charset="utf-8">',
+    '<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">',
+    '<meta name="color-scheme" content="light dark">',
+    `<meta http-equiv="Content-Security-Policy" content="${CONTENT_SECURITY_POLICY}">`,
+    `<title>${escapeText(title)}</title>`,
+    `<style>${SHARE_VIEWER_CSS}</style>`,
+    "</head>",
+    "<body>",
+    '<div id="vam-app"></div>',
+    `<script type="application/json" id="vam-ui">${jsonForScript(ui)}<\/script>`,
+    `<script type="application/json" id="vam-map">${mapJson}<\/script>`,
+    `<script>${SHARE_VIEWER_JS}<\/script>`,
+    "</body>",
+    "</html>",
+    ""
+  ].join("\n");
+}
+function renderShareHtml(payload, ui) {
+  return buildHtml(payload.title, ui, serializeShareJson(payload));
+}
+function renderShareShell(ui) {
+  return buildHtml("", ui, "null");
+}
+
+// experiences/sharing/share-leak-scan.ts
+var INTERNAL_FIELD_NAMES = [
+  "agent-map-references",
+  "source-notes",
+  "relevance-tier",
+  "relevance-reason",
+  "relevance-manual",
+  "relevance-goal",
+  "relevance-level",
+  "relevance-context",
+  "content-language"
+];
+function scanForLeaks(html, forbidden) {
+  const hits = [];
+  for (const { category, value } of forbidden) {
+    if (!value) continue;
+    let from = 0;
+    for (; ; ) {
+      const index = html.indexOf(value, from);
+      if (index < 0) break;
+      hits.push({ category, index });
+      from = index + value.length;
+    }
+  }
+  return hits.sort((a, b) => a.index - b.index);
+}
+function forbiddenStringsFor(vault, map, notes = []) {
+  const list = [];
+  const add = (category, value) => {
+    const text11 = value == null ? void 0 : value.trim();
+    if (text11) list.push({ category, value: text11 });
+  };
+  add("vault-path", vault.vaultPath);
+  add("map-folder", vault.mapFolder);
+  for (const node of map.nodes) add("note-path", node.path);
+  add("wikilink", "[[");
+  add("app-url", "app://");
+  add("obsidian-url", "obsidian://");
+  add("file-url", "file://");
+  for (const name of INTERNAL_FIELD_NAMES) add("internal-field", name);
+  for (const note of notes) add("model-name", note.model);
+  const seen = /* @__PURE__ */ new Set();
+  return list.filter((item) => {
+    const key2 = `${item.category}\0${item.value}`;
+    if (seen.has(key2)) return false;
+    seen.add(key2);
+    return true;
+  });
+}
+var FENCE_LINE = /^ {0,3}(`{3,}|~{3,})/;
+function stripMarkdownCode(markdown) {
+  const lines = markdown.split("\n");
+  const kept = [];
+  for (let i = 0; i < lines.length; i++) {
+    const open = FENCE_LINE.exec(lines[i]);
+    if (open) {
+      const mark = open[1];
+      let close = -1;
+      for (let j = i + 1; j < lines.length && close < 0; j++) {
+        const run = FENCE_LINE.exec(lines[j]);
+        if (run && run[1][0] === mark[0] && run[1].length >= mark.length && lines[j].slice(run[0].length).trim() === "")
+          close = j;
+      }
+      if (close >= 0) {
+        kept.push(" ");
+        i = close;
+        continue;
+      }
+    }
+    kept.push(lines[i]);
+  }
+  return kept.join("\n").replace(/(?<!`)(`+)(?!`)([\s\S]*?[^`])\1(?!`)/g, (match) => /\n[ \t]*\n/.test(match) ? match : " ");
+}
+function stripHtmlCode(html) {
+  return html.replace(/<(pre|code)(?=[\s>/])[^>]*>[\s\S]*?<\/\1\s*>/gi, " ");
+}
+function scanPayloadForLeaks(payload, forbidden) {
+  const hits = [];
+  const scanText = (text11, codeFree) => {
+    for (const item of forbidden) {
+      const found = scanForLeaks(item.category === "wikilink" ? codeFree : text11, [item]);
+      hits.push(...found);
+    }
+  };
+  const visit = (value, key2) => {
+    if (typeof value === "string") {
+      const codeFree = key2 === "detail" ? stripMarkdownCode(value) : key2 === "detailHtml" ? stripHtmlCode(value) : value;
+      scanText(value, codeFree);
+    } else if (Array.isArray(value)) for (const item of value) visit(item, key2);
+    else if (value && typeof value === "object")
+      for (const [name, item] of Object.entries(value)) {
+        scanText(name, name);
+        visit(item, name);
+      }
+  };
+  visit(payload, "");
+  return hits;
+}
+
+// experiences/sharing/share-viewer-text.ts
+function shareViewerUiFor(language2) {
+  const text11 = (key2) => translate(language2, key2);
+  return {
+    lang: language2,
+    readOnly: text11("share.viewer_read_only"),
+    madeWithVam: text11("share.viewer_made_with"),
+    install: text11("share.viewer_install"),
+    goal: text11("share.viewer_goal_0"),
+    hint: text11("share.viewer_hint"),
+    layout: text11("ui.layout"),
+    collapseAll: text11("ui.collapse_all"),
+    expandAll: text11("ui.expand_all"),
+    expandToLevel: text11("ui.expand_to_level_0"),
+    autoLayout: text11("ui.auto_layout"),
+    zoomIn: text11("ui.zoom_in"),
+    zoomOut: text11("ui.zoom_out"),
+    zoomReset: text11("ui.zoom_level_0_reset"),
+    showAll: text11("ui.show_all"),
+    toResearch: text11("ui.to_research"),
+    tierCore: text11("ui.relevance_core"),
+    tierSupport: text11("ui.relevance_support"),
+    tierSide: text11("ui.relevance_side"),
+    manualReason: text11("ui.relevance_manual_reason"),
+    topicDetails: text11("share.viewer_topic_details"),
+    detailsButton: text11("share.viewer_details_button"),
+    close: text11("ui.close"),
+    collapse: text11("ui.collapse"),
+    expandCount: text11("share.viewer_expand_0"),
+    subtopics: text11("share.viewer_subtopics"),
+    noContent: text11("share.viewer_no_content"),
+    imageOmitted: text11("share.viewer_image_omitted"),
+    resizePanel: text11("share.viewer_resize_panel"),
+    untitledMap: text11("share.viewer_untitled")
+  };
+}
+
+// experiences/sharing/share-exporter.ts
+var IMAGE_MIME = {
+  png: "image/png",
+  jpg: "image/jpeg",
+  jpeg: "image/jpeg",
+  gif: "image/gif",
+  webp: "image/webp",
+  svg: "image/svg+xml",
+  bmp: "image/bmp",
+  avif: "image/avif"
+};
+var SHARE_WEBP_QUALITY = 0.82;
+var MERMAID_UNIT = ".mermaid-wrapper, .mermaid";
+var blobToDataUrl = (blob) => new Promise((resolve, reject) => {
+  const reader = new FileReader();
+  reader.onload = () => resolve(typeof reader.result === "string" ? reader.result : "");
+  reader.onerror = () => {
+    var _a2;
+    return reject((_a2 = reader.error) != null ? _a2 : new Error("read failed"));
+  };
+  reader.readAsDataURL(blob);
+});
+async function drawable(bytes, mime) {
+  const blob = new Blob([bytes], { type: mime });
+  if (mime !== "image/svg+xml") {
+    const bitmap = await createImageBitmap(blob);
+    return { source: bitmap, width: bitmap.width, height: bitmap.height, release: () => bitmap.close() };
+  }
+  const url = URL.createObjectURL(blob);
+  const image = new Image();
+  try {
+    image.src = url;
+    await image.decode();
+  } catch (error) {
+    URL.revokeObjectURL(url);
+    throw error;
+  }
+  const markup = new TextDecoder().decode(bytes);
+  const box = /<svg\b[^>]*\sviewBox\s*=\s*["']\s*[-\d.]+[\s,]+[-\d.]+[\s,]+([\d.]+)[\s,]+([\d.]+)/i.exec(markup);
+  const sized = /<svg\b[^>]*\swidth\s*=/i.test(markup);
+  const fromBox = !sized && box && Number(box[1]) > 0 && Number(box[2]) > 0;
+  return {
+    source: image,
+    width: fromBox ? Number(box[1]) : image.naturalWidth || 1024,
+    height: fromBox ? Number(box[2]) : image.naturalHeight || 768,
+    release: () => URL.revokeObjectURL(url)
+  };
+}
+async function encodeShareImage(bytes, mime) {
+  let picture = null;
+  try {
+    picture = await drawable(bytes, mime);
+    const size = fitWithin(picture.width, picture.height, SHARE_IMAGE_MAX_EDGE);
+    const canvas = createEl("canvas");
+    canvas.width = size.width;
+    canvas.height = size.height;
+    const context = canvas.getContext("2d");
+    if (!context) return null;
+    context.drawImage(picture.source, 0, 0, size.width, size.height);
+    const blob = await new Promise((resolve) => canvas.toBlob(resolve, "image/webp", SHARE_WEBP_QUALITY));
+    if (blob) return await blobToDataUrl(blob);
+    const png = await new Promise((resolve) => canvas.toBlob(resolve, "image/png"));
+    return png ? await blobToDataUrl(png) : null;
+  } catch (e) {
+    return null;
+  } finally {
+    picture == null ? void 0 : picture.release();
+  }
+}
+var topLevelMermaid = (host) => Array.from(host.querySelectorAll(MERMAID_UNIT)).filter(
+  (unit) => {
+    var _a2;
+    return !((_a2 = unit.parentElement) == null ? void 0 : _a2.closest(MERMAID_UNIT));
+  }
+);
+var isBlocked = (unit) => unit.classList.contains("is-guarded");
+var drawnSvg = (unit) => isBlocked(unit) ? null : unit.matches(".mermaid") ? unit.querySelector("svg") : unit.querySelector(".mermaid svg");
+var undrawnCodeBlocks = (host) => Array.from(host.querySelectorAll("pre > code.language-mermaid")).filter((code) => !code.closest(".is-guarded")).length;
+var ShareExporter = class {
+  constructor(app, source, config) {
+    this.app = app;
+    this.source = source;
+    this.config = config;
+    __publicField(this, "rendered", /* @__PURE__ */ new Map());
+    /** name -> data URL, or null when the file could not be read or decoded. */
+    __publicField(this, "images", /* @__PURE__ */ new Map());
+    __publicField(this, "registry", createAssetRegistry());
+    __publicField(this, "ownerPath", /* @__PURE__ */ new Map());
+    __publicField(this, "component", new import_obsidian32.Component());
+    __publicField(this, "container", null);
+    __publicField(this, "disposed", false);
+    __publicField(this, "forbidden", null);
+    __publicField(this, "shellText", null);
+    this.component.load();
+  }
+  /** Removes the hidden render container and stops everything the render started. Later results are dropped. */
+  dispose() {
+    var _a2;
+    this.disposed = true;
+    this.component.unload();
+    (_a2 = this.container) == null ? void 0 : _a2.remove();
+    this.container = null;
+    this.rendered.clear();
+    this.images.clear();
+  }
+  host() {
+    if (!this.container) {
+      this.container = activeDocument.body.createDiv({
+        cls: "vam-share-render-host markdown-preview-view markdown-rendered"
+      });
+      this.container.setAttribute("aria-hidden", "true");
+    }
+    return this.container;
+  }
+  titles() {
+    var _a2, _b2, _c;
+    const titles = /* @__PURE__ */ new Map();
+    for (const node of this.source.map.nodes) {
+      const title = (_a2 = this.source.notes.get(node.id)) == null ? void 0 : _a2.title;
+      if (!title) continue;
+      titles.set(node.path.replace(/\.md$/i, ""), title);
+      titles.set((_c = (_b2 = node.path.split("/").pop()) == null ? void 0 : _b2.replace(/\.md$/i, "")) != null ? _c : node.path, title);
+      titles.set(title, title);
+    }
+    return titles;
+  }
+  /** Renders every note's detail once; later builds reuse the result. */
+  async ensureRendered(ticket, onProgress) {
+    var _a2, _b2;
+    const nodes = this.source.map.nodes.filter(
+      (node) => {
+        var _a3, _b3;
+        return !this.rendered.has(node.id) && ((_b3 = (_a3 = this.source.notes.get(node.id)) == null ? void 0 : _a3.detail) == null ? void 0 : _b3.trim());
+      }
+    );
+    const total2 = this.source.map.nodes.filter((node) => {
+      var _a3, _b3;
+      return (_b3 = (_a3 = this.source.notes.get(node.id)) == null ? void 0 : _a3.detail) == null ? void 0 : _b3.trim();
+    }).length;
+    let done = total2 - nodes.length;
+    const titles = this.titles();
+    for (const node of nodes) {
+      assertCurrent(ticket);
+      onProgress({ phase: "render", done, total: total2 });
+      const result = await this.renderOne((_b2 = (_a2 = this.source.notes.get(node.id)) == null ? void 0 : _a2.detail) != null ? _b2 : "", titles, ticket);
+      assertCurrent(ticket);
+      if (this.disposed) return;
+      this.rendered.set(node.id, result);
+      for (const name of result.attachments) if (!this.ownerPath.has(name)) this.ownerPath.set(name, node.path);
+      done++;
+    }
+    onProgress({ phase: "render", done: total2, total: total2 });
+  }
+  async renderOne(detail, titles, ticket) {
+    const cleaned = cleanShareMarkdown(detail, { titleOf: (target) => titles.get(target), assets: this.registry });
+    const host = this.host().createDiv();
+    const child = new import_obsidian32.Component();
+    this.component.addChild(child);
+    try {
+      await import_obsidian32.MarkdownRenderer.render(this.app, cleaned.markdown, host, "", child);
+      assertCurrent(ticket);
+      await this.settleMermaid(host, ticket);
+      const finished = this.finish(host, cleaned.markdown);
+      return {
+        markdown: cleaned.markdown,
+        html: finished.html,
+        attachments: cleaned.attachments.map((item) => item.name),
+        mermaidUndrawn: finished.undrawn,
+        mermaidBlocked: finished.blocked
+      };
+    } finally {
+      this.component.removeChild(child);
+      host.remove();
+    }
+  }
+  /** Waits until every diagram has drawn, or the per-note timeout passes. A vault that has not allowed Mermaid never draws; do not wait for it. */
+  async settleMermaid(host, ticket) {
+    var _a2;
+    const deadline = Date.now() + ((_a2 = this.config.mermaidTimeoutMs) != null ? _a2 : 1e4);
+    for (; ; ) {
+      const pending = undrawnCodeBlocks(host) + topLevelMermaid(host).filter((unit) => !isBlocked(unit) && !drawnSvg(unit)).length;
+      if (!pending || Date.now() >= deadline) return;
+      await pause(ticket, 100);
+    }
+  }
+  /** Mermaid out, sanitize, scrub, mermaid back in. See share-dom.ts for why the diagrams take this detour. */
+  finish(host, markdown) {
+    var _a2;
+    const sources2 = extractMermaidSources(markdown);
+    const diagrams = [];
+    let undrawn = 0;
+    let blocked = 0;
+    const note = (key2) => translate(this.config.language, key2);
+    topLevelMermaid(host).forEach((unit, index) => {
+      var _a3, _b2, _c;
+      const svg = drawnSvg(unit);
+      if (svg) {
+        const copy = svg.cloneNode(true);
+        if (scrubMermaidSvg(copy)) {
+          diagrams.push(copy);
+          const slot = createDiv();
+          slot.className = "vam-mermaid-slot";
+          unit.replaceWith(slot);
+          return;
+        }
+      }
+      const guardSource = (_b2 = (_a3 = unit.querySelector(".mermaid-guard-source code")) == null ? void 0 : _a3.textContent) != null ? _b2 : "";
+      const code = (_c = sources2[index]) != null ? _c : guardSource;
+      const wasBlocked = isBlocked(unit);
+      if (wasBlocked) blocked++;
+      else undrawn++;
+      const fallback = createDiv();
+      const pre = createEl("pre");
+      const codeEl = createEl("code");
+      codeEl.className = "language-mermaid";
+      codeEl.textContent = code;
+      pre.append(codeEl);
+      const caption = createEl("p");
+      caption.className = "vam-mermaid-note";
+      caption.textContent = note(wasBlocked ? "share.mermaid_blocked_note" : "share.mermaid_undrawn_note");
+      fallback.append(pre, caption);
+      unit.replaceWith(fallback);
+    });
+    for (const pre of Array.from(host.querySelectorAll("pre")))
+      if (pre.querySelector("code.language-mermaid") && !((_a2 = pre.nextElementSibling) == null ? void 0 : _a2.classList.contains("vam-mermaid-note"))) {
+        undrawn++;
+        const caption = createEl("p");
+        caption.className = "vam-mermaid-note";
+        caption.textContent = note("share.mermaid_undrawn_note");
+        pre.after(caption);
+      }
+    const clean4 = createDiv();
+    clean4.append((0, import_obsidian32.sanitizeHTMLToDom)(host.innerHTML));
+    unwrapLocalLinks(clean4, () => createSpan());
+    scrubShareTree(clean4);
+    const slots = Array.from(clean4.querySelectorAll(".vam-mermaid-slot"));
+    slots.forEach((slot, index) => {
+      const diagram = diagrams[index];
+      if (diagram) slot.replaceWith(diagram);
+      else slot.remove();
+    });
+    return { html: clean4.innerHTML, undrawn, blocked };
+  }
+  resolveImage(name) {
+    var _a2, _b2, _c;
+    const entry = this.registry.entries().find((item) => item.name === name);
+    const fromPath = this.ownerPath.get(name);
+    if (!entry || fromPath === void 0) return null;
+    const ext = (_b2 = (_a2 = entry.ref.split("#")[0].split(".").pop()) == null ? void 0 : _a2.toLowerCase()) != null ? _b2 : "";
+    const mime = IMAGE_MIME[ext];
+    if (!mime) return null;
+    const folder = fromPath.split("/").slice(0, -1).join("/");
+    const relative = resolveRelative(folder, entry.ref);
+    const candidates = [
+      (_c = this.app.metadataCache.getFirstLinkpathDest(entry.ref, fromPath)) == null ? void 0 : _c.path,
+      relative ? (0, import_obsidian32.normalizePath)(relative) : void 0,
+      (0, import_obsidian32.normalizePath)(entry.ref)
+    ];
+    for (const path of candidates) {
+      const file = path ? this.app.vault.getFileByPath(path) : null;
+      if (file) return { bytes: this.app.vault.readBinary(file), mime };
+    }
+    return null;
+  }
+  /** Converts every vault image the rendered notes use, once. */
+  async ensureImages(ticket, onProgress) {
+    const names3 = [...new Set([...this.rendered.values()].flatMap((note) => note.attachments))];
+    const todo = names3.filter((name) => !this.images.has(name));
+    let done = names3.length - todo.length;
+    for (const name of todo) {
+      assertCurrent(ticket);
+      onProgress({ phase: "images", done, total: names3.length });
+      let data = null;
+      try {
+        const found = this.resolveImage(name);
+        if (found) data = await encodeShareImage(await found.bytes, found.mime);
+      } catch (e) {
+        data = null;
+      }
+      assertCurrent(ticket);
+      if (this.disposed) return;
+      this.images.set(name, data);
+      done++;
+    }
+    onProgress({ phase: "images", done: names3.length, total: names3.length });
+  }
+  forbiddenStrings() {
+    if (!this.forbidden) {
+      const adapter = this.app.vault.adapter;
+      const folder = this.source.mapPath.split("/").slice(0, -1).join("/");
+      this.forbidden = forbiddenStringsFor(
+        {
+          vaultPath: adapter instanceof import_obsidian32.FileSystemAdapter ? adapter.getBasePath() : void 0,
+          vaultName: this.app.vault.getName(),
+          mapFolder: folder
+        },
+        this.source.map,
+        [...this.source.notes.values()]
+      );
+    }
+    return this.forbidden;
+  }
+  /** Builds the payload and file text from what is cached, and runs both leak scans. Writes nothing. */
+  assemble(options) {
+    var _a2, _b2, _c, _d;
+    const language2 = this.config.language;
+    const omitted = translate(language2, "share.viewer_image_omitted");
+    const failed = new Set([...this.images].filter(([, data]) => data === null).map(([name]) => name));
+    const notesById = {};
+    let notesWithContent = 0;
+    let undrawn = 0;
+    let blocked = 0;
+    for (const node of this.source.map.nodes) {
+      const note = this.source.notes.get(node.id);
+      if (!note) continue;
+      const entry = {
+        title: plainWikilinks(note.title),
+        summary: plainWikilinks(note.summary),
+        status: note.status,
+        ...note.relevance ? { relevance: note.relevance } : {}
+      };
+      const rendered = this.rendered.get(node.id);
+      if ((_a2 = note.detail) == null ? void 0 : _a2.trim()) notesWithContent++;
+      if (rendered && options.includeDetail) {
+        undrawn += rendered.mermaidUndrawn;
+        blocked += rendered.mermaidBlocked;
+      }
+      if (options.includeDetail && rendered) {
+        const dropNames = options.includeImages ? failed : null;
+        entry.detail = options.includeImages ? replaceAssetRefs(rendered.markdown, failed, omitted) : replaceAssetRefs(rendered.markdown, new Set(assetNamesIn(rendered.markdown)), omitted);
+        entry.detailHtml = omitAssetImages(rendered.html, dropNames, omitted);
+      }
+      notesById[node.id] = entry;
+    }
+    const assets = {};
+    if (options.includeDetail && options.includeImages) {
+      for (const [name, data] of this.images) if (data) assets[name] = data;
+    }
+    const payload = buildSharePayload(this.source.map, notesById, {
+      includeDetail: options.includeDetail,
+      includeImages: options.includeImages && options.includeDetail,
+      language: language2,
+      vamVersion: this.config.vamVersion,
+      exportedAt: ((_d = (_c = (_b2 = this.config).now) == null ? void 0 : _c.call(_b2)) != null ? _d : /* @__PURE__ */ new Date()).toISOString(),
+      goal: this.source.goal,
+      assets
+    });
+    const ui = shareViewerUiFor(language2);
+    const forbidden = this.forbiddenStrings();
+    if (!this.shellText || this.shellText.language !== language2)
+      this.shellText = { language: language2, text: renderShareShell(ui) };
+    const hits = [...scanPayloadForLeaks(payload, forbidden), ...scanForLeaks(this.shellText.text, forbidden)];
+    const leakCategories = [...new Set(hits.map((hit) => hit.category))];
+    const counts = {
+      topics: payload.nodes.length,
+      notesWithContent,
+      images: Object.keys(payload.assets).length
+    };
+    const shared2 = {
+      payload,
+      counts,
+      leakCategories,
+      failedImages: failed.size,
+      mermaidUndrawn: undrawn,
+      mermaidBlocked: blocked
+    };
+    if (hits.length) return { ...shared2, bytes: 0 };
+    const html = renderShareHtml(payload, ui);
+    return { ...shared2, html, bytes: new TextEncoder().encode(html).length };
+  }
+};
+
+// experiences/sharing/share-save.ts
+var isAbort = (error) => (error == null ? void 0 : error.name) === "AbortError";
+function browserSaveEnvironment() {
+  const picker = window.showSaveFilePicker;
+  return {
+    showSaveFilePicker: picker ? (options) => picker.call(window, options) : void 0,
+    triggerDownload: (url, name) => {
+      const anchor = createEl("a", { attr: { href: url, download: name } });
+      activeDocument.body.appendChild(anchor);
+      anchor.click();
+      anchor.remove();
+    },
+    createObjectURL: (blob) => URL.createObjectURL(blob),
+    revokeObjectURL: (url) => URL.revokeObjectURL(url),
+    setTimeout: (handler, ms) => window.setTimeout(handler, ms)
+  };
+}
+async function saveShareFile(html, suggestedName, shouldWrite, env = browserSaveEnvironment()) {
+  const blob = new Blob([html], { type: "text/html;charset=utf-8" });
+  if (env.showSaveFilePicker) {
+    try {
+      const handle = await env.showSaveFilePicker({
+        suggestedName,
+        types: [{ description: "HTML", accept: { "text/html": [".html"] } }]
+      });
+      if (!shouldWrite()) return "cancelled";
+      const writable = await handle.createWritable();
+      await writable.write(blob);
+      await writable.close();
+      return "saved";
+    } catch (error) {
+      if (isAbort(error)) return "cancelled";
+    }
+  }
+  if (!shouldWrite()) return "cancelled";
+  const url = env.createObjectURL(blob);
+  env.triggerDownload(url, suggestedName);
+  env.setTimeout(() => env.revokeObjectURL(url), 3e4);
+  return "downloaded";
+}
+
+// experiences/sharing/share-modal.ts
+var ShareModal = class extends import_obsidian33.Modal {
+  constructor(app, options) {
+    var _a2, _b2;
+    super(app);
+    this.options = options;
+    __publicField(this, "controller", new BuildController());
+    __publicField(this, "exporter");
+    __publicField(this, "includeDetail", SHARE_DEFAULT_INCLUDE_DETAIL);
+    __publicField(this, "includeImages", true);
+    __publicField(this, "result", null);
+    __publicField(this, "busy", false);
+    __publicField(this, "saving", false);
+    __publicField(this, "closed", false);
+    __publicField(this, "failed", false);
+    __publicField(this, "detailsEl");
+    __publicField(this, "warningsEl");
+    __publicField(this, "statusEl");
+    __publicField(this, "fullSetting");
+    __publicField(this, "imagesSetting");
+    __publicField(this, "saveButton");
+    __publicField(this, "cancelButton");
+    __publicField(this, "progressText", "");
+    __publicField(this, "savedText", "");
+    this.exporter = (_b2 = (_a2 = options.createExporter) == null ? void 0 : _a2.call(options, app, options.source)) != null ? _b2 : new ShareExporter(app, options.source, {
+      vamVersion: options.vamVersion,
+      language: options.language,
+      mermaidTimeoutMs: options.mermaidTimeoutMs
+    });
+  }
+  onOpen() {
+    this.titleEl.setText(t("share.title"));
+    this.contentEl.createEl("p", { text: t("share.intro"), cls: "vam-modal-intro" });
+    this.fullSetting = new import_obsidian33.Setting(this.contentEl).setName(t("share.option_full_name")).setDesc(t("share.option_full_desc")).addToggle(
+      (toggle) => toggle.setValue(this.includeDetail).onChange((value) => {
+        this.includeDetail = value;
+        this.restart();
+      })
+    );
+    this.imagesSetting = new import_obsidian33.Setting(this.contentEl).setName(t("share.option_images_name")).setDesc(t("share.option_images_desc")).addToggle(
+      (toggle) => toggle.setValue(this.includeImages).onChange((value) => {
+        this.includeImages = value;
+        this.restart();
+      })
+    );
+    this.detailsEl = this.contentEl.createDiv({ cls: "vam-share-preview", attr: { "aria-live": "polite" } });
+    this.warningsEl = this.contentEl.createDiv({ cls: "vam-share-warnings" });
+    const actions = modalActions(this);
+    this.statusEl = actionStatus(actions);
+    this.cancelButton = actions.createEl("button", { text: t("ui.cancel") });
+    this.cancelButton.addEventListener("click", () => this.close());
+    this.saveButton = actions.createEl("button", { text: t("share.save"), cls: "mod-cta" });
+    this.saveButton.addEventListener("click", () => void this.save());
+    this.render();
+    this.restart();
+  }
+  onClose() {
+    this.closed = true;
+    this.controller.cancel();
+    this.exporter.dispose();
+    this.result = null;
+    this.contentEl.empty();
+  }
+  restart() {
+    if (this.saving || this.closed) return;
+    this.savedText = "";
+    void this.build(this.controller.begin());
+  }
+  async build(ticket) {
+    this.busy = true;
+    this.failed = false;
+    this.result = null;
+    this.progressText = t("share.progress_start");
+    this.render();
+    const progress = (value) => {
+      if (!ticket.isCurrent()) return;
+      this.progressText = value.phase === "render" ? t("share.progress_render_0_1", value.done, value.total) : t("share.progress_images_0_1", value.done, value.total);
+      this.render();
+    };
+    try {
+      if (this.includeDetail) {
+        await this.exporter.ensureRendered(ticket, progress);
+        if (this.includeImages) await this.exporter.ensureImages(ticket, progress);
+      }
+      if (ticket.isCurrent()) {
+        this.progressText = t("share.progress_check");
+        this.render();
+      }
+      await pause(ticket, 0);
+      const result = this.exporter.assemble({ includeDetail: this.includeDetail, includeImages: this.includeImages });
+      if (!ticket.isCurrent()) return;
+      this.result = result;
+      this.busy = false;
+    } catch (error) {
+      if (isStaleBuild(error) || !ticket.isCurrent()) return;
+      this.failed = true;
+      this.busy = false;
+    }
+    this.render();
+  }
+  render() {
+    if (this.closed) return;
+    const result = this.result;
+    this.detailsEl.empty();
+    this.warningsEl.empty();
+    const topics = this.options.source.map.nodes.length;
+    if (this.busy) {
+      this.detailsEl.createDiv({ text: this.progressText, cls: "vam-share-progress" });
+    } else if (this.failed) {
+      this.detailsEl.createDiv({ text: t("share.build_failed"), cls: "vam-share-error" });
+    } else if (result) {
+      const { counts } = result;
+      this.detailsEl.createDiv({
+        text: t("share.preview_counts_0_1_2", counts.topics, counts.notesWithContent, counts.images)
+      });
+      if (result.html)
+        this.detailsEl.createDiv({ text: t("share.preview_size_0", formatBytes(result.bytes)), cls: "vam-share-size" });
+    } else {
+      this.detailsEl.createDiv({ text: t("share.preview_topics_0", topics) });
+    }
+    if (!this.busy && result) this.renderWarnings(result);
+    this.fullSetting.setDisabled(this.saving);
+    this.imagesSetting.setDisabled(this.saving || !this.includeDetail);
+    this.statusEl.setText(this.savedText);
+    this.saveButton.disabled = this.busy || this.saving || this.failed || !(result == null ? void 0 : result.html);
+    this.saveButton.setText(this.saving ? t("share.saving") : t("share.save"));
+    this.cancelButton.setText(this.savedText ? t("ui.close") : t("ui.cancel"));
+  }
+  renderWarnings(result) {
+    var _a2;
+    const add = (text11, cls = "") => void this.warningsEl.createDiv({ text: text11, cls: `vam-share-note ${cls}`.trim() });
+    if (result.leakCategories.length) {
+      add(t("share.leak_blocked_0", result.leakCategories.join(", ")), "vam-share-error");
+      return;
+    }
+    const thresholds = (_a2 = this.options.sizeThresholds) != null ? _a2 : {
+      warn: SHARE_SIZE_WARN_BYTES,
+      large: SHARE_SIZE_SUGGEST_NO_IMAGES_BYTES
+    };
+    const advice = sizeAdvice(result.bytes, this.includeImages && this.includeDetail, thresholds);
+    if (advice.level !== "ok") add(t("share.size_warn_0", formatBytes(thresholds.warn)), "vam-share-warning");
+    if (advice.suggestNoImages) add(t("share.size_large_0", formatBytes(thresholds.large)), "vam-share-warning");
+    if (result.failedImages) add(t("share.images_failed_0", result.failedImages), "vam-share-warning");
+    if (result.mermaidBlocked) add(t("share.mermaid_blocked_warning_0", result.mermaidBlocked), "vam-share-warning");
+    if (result.mermaidUndrawn) add(t("share.mermaid_undrawn_warning_0", result.mermaidUndrawn), "vam-share-warning");
+    add(t("share.email_hint"));
+  }
+  async save() {
+    const result = this.result;
+    if (!(result == null ? void 0 : result.html) || this.saving || this.busy || result.leakCategories.length) return;
+    const html = result.html;
+    this.saving = true;
+    this.render();
+    const name = shareFileName(this.options.source.map.title);
+    try {
+      const outcome = await saveShareFile(
+        html,
+        name,
+        // The dialog may have been closed while the system file dialog was open: then nothing is written.
+        () => !this.closed && this.result === result,
+        this.options.saveEnvironment
+      );
+      if (this.closed) return;
+      if (outcome === "cancelled") this.savedText = "";
+      else {
+        const size = formatBytes(result.bytes);
+        this.savedText = t(outcome === "saved" ? "share.saved_0_1" : "share.downloaded_0_1", name, size);
+        new import_obsidian33.Notice(this.savedText);
+      }
+    } catch (e) {
+      if (!this.closed) {
+        this.savedText = "";
+        new import_obsidian33.Notice(t("share.save_failed"));
+      }
+    }
+    this.saving = false;
+    this.render();
   }
 };
 
@@ -45474,7 +46820,7 @@ ${artifact.sourceSnapshot || "No insight snapshot was supplied."}`
 }
 
 // experiences/markdown-context/selection-ai.ts
-var import_obsidian33 = require("obsidian");
+var import_obsidian35 = require("obsidian");
 
 // experiences/markdown-context/action-plan.ts
 function parsePlan(raw) {
@@ -45535,7 +46881,7 @@ function parseImageCandidates(raw) {
 }
 
 // experiences/markdown-context/image-translate-action.ts
-var import_obsidian32 = require("obsidian");
+var import_obsidian34 = require("obsidian");
 
 // experiences/markdown-context/steps/image-translate/prompt.md
 var prompt_default7 = "Edit the attached image: create the same image with every piece of visible text translated into {{target}}.\nKeep the layout, illustrations, colors, arrows, icons and style the same; only replace the text, in a matching size and weight that fits each original text area. Do not add, remove or redraw other content. Leave proper names, numbers and units as they are unless they are normally translated.\nGenerate the image with the image generation tool, then reply with one short sentence describing the result in {{target}}.\n";
@@ -45561,7 +46907,7 @@ var languageIdsPattern = () => [...SUPPORTED_LANGUAGES, ...OUTPUT_LANGUAGE_CHOIC
 function imageFileBase(alt) {
   return (alt || "image").replace(/\.(?:png|jpe?g|gif|webp)$/i, "").replace(new RegExp(`-(?:${languageIdsPattern()})(?:[ -]\\d+)?$`), "").replace(/[^\p{L}\p{N}_-]+/gu, "-").replace(/^-+|-+$/g, "").slice(0, 40);
 }
-var ImageTranslateAction = class extends import_obsidian32.Component {
+var ImageTranslateAction = class extends import_obsidian34.Component {
   constructor(app, options) {
     super();
     this.app = app;
@@ -45642,7 +46988,7 @@ var ImageTranslateAction = class extends import_obsidian32.Component {
     this.target = { view, path: view.file.path, image, token };
     const rect = image.getBoundingClientRect();
     const pill = this.app.workspace.containerEl.createEl("button", { cls: "vam-image-action vam-image-action-pill" });
-    (0, import_obsidian32.setIcon)(pill.createSpan({ cls: "vam-image-action-icon" }), "wand-sparkles");
+    (0, import_obsidian34.setIcon)(pill.createSpan({ cls: "vam-image-action-icon" }), "wand-sparkles");
     pill.createSpan({ text: t("ui.image_translate_action") });
     pill.addEventListener("click", () => this.openPopover());
     this.pill = pill;
@@ -45680,7 +47026,7 @@ var ImageTranslateAction = class extends import_obsidian32.Component {
     header.createEl("strong", { text: t("ui.image_translate_action"), attr: { id: titleId } });
     const close = header.createEl("button", { cls: "clickable-icon" });
     close.setAttribute("aria-label", t("ui.close"));
-    (0, import_obsidian32.setIcon)(close, "x");
+    (0, import_obsidian34.setIcon)(close, "x");
     close.addEventListener("click", () => this.hide());
     const field = popover.createEl("label", { cls: "vam-image-action-field" });
     field.createSpan({ text: t("ui.image_translate_language") });
@@ -45751,10 +47097,10 @@ var ImageTranslateAction = class extends import_obsidian32.Component {
       const link = this.app.fileManager.generateMarkdownLink(saved, target.path);
       const embed = link.startsWith("!") ? link : `!${link}`;
       const outcome = await this.write(target, note, embed, placement);
-      new import_obsidian32.Notice(t(outcome, saved.path));
+      new import_obsidian34.Notice(t(outcome, saved.path));
       saved = null;
     } catch (error) {
-      if (!controller.signal.aborted) new import_obsidian32.Notice(error instanceof Error ? error.message : String(error));
+      if (!controller.signal.aborted) new import_obsidian34.Notice(error instanceof Error ? error.message : String(error));
       if (saved) await this.app.fileManager.trashFile(saved);
     } finally {
       if (this.running === controller) {
@@ -45805,7 +47151,7 @@ ${embed}
     };
     const open = this.app.workspace.getLeavesOfType("markdown").map((leaf) => leaf.view).find((view) => {
       var _a2;
-      return view instanceof import_obsidian32.MarkdownView && ((_a2 = view.file) == null ? void 0 : _a2.path) === note.path;
+      return view instanceof import_obsidian34.MarkdownView && ((_a2 = view.file) == null ? void 0 : _a2.path) === note.path;
     });
     if (open) {
       const editor = open.editor;
@@ -45988,7 +47334,7 @@ function locateImageToken(view, image, markdown, matches) {
   return rendered.length === matches.length ? toToken(matches[rendered.indexOf(image)]) : null;
 }
 var panelSequence = 0;
-var MarkdownSelectionAi = class extends import_obsidian33.Component {
+var MarkdownSelectionAi = class extends import_obsidian35.Component {
   constructor(app, options) {
     super();
     this.app = app;
@@ -46023,8 +47369,8 @@ var MarkdownSelectionAi = class extends import_obsidian33.Component {
       const image = event.target;
       if (!(image instanceof HTMLImageElement) || !this.options.autoOpen()) return;
       if (image.closest(".vam-context-ai-panel, .vam-image-action")) return;
-      const view = this.app.workspace.getLeavesOfType("markdown").map((leaf) => leaf.view).find((candidate) => candidate instanceof import_obsidian33.MarkdownView && candidate.containerEl.contains(image));
-      if (!(view instanceof import_obsidian33.MarkdownView) || !view.file) return;
+      const view = this.app.workspace.getLeavesOfType("markdown").map((leaf) => leaf.view).find((candidate) => candidate instanceof import_obsidian35.MarkdownView && candidate.containerEl.contains(image));
+      if (!(view instanceof import_obsidian35.MarkdownView) || !view.file) return;
       const markdown = view.editor.getValue();
       const embeddedPath = (_a2 = image.closest(".internal-embed")) == null ? void 0 : _a2.getAttribute("src");
       const tokens2 = [...markdown.matchAll(/!\[\[[^\]\n]+\]\]|!\[[^\]\n]*\]\([^\n]+?\)/g)].filter((match) => {
@@ -46078,9 +47424,9 @@ var MarkdownSelectionAi = class extends import_obsidian33.Component {
     const selection = window.getSelection();
     const range = selection && !selection.isCollapsed && selection.rangeCount ? selection.getRangeAt(0) : null;
     const view = this.app.workspace.getLeavesOfType("markdown").map((leaf) => leaf.view).find(
-      (candidate) => candidate instanceof import_obsidian33.MarkdownView && candidate.file && (range ? candidate.containerEl.contains(range.commonAncestorContainer) : candidate.getMode() === "source" && candidate.containerEl.contains(document.activeElement))
+      (candidate) => candidate instanceof import_obsidian35.MarkdownView && candidate.file && (range ? candidate.containerEl.contains(range.commonAncestorContainer) : candidate.getMode() === "source" && candidate.containerEl.contains(document.activeElement))
     );
-    if (!(view instanceof import_obsidian33.MarkdownView) || !view.file) {
+    if (!(view instanceof import_obsidian35.MarkdownView) || !view.file) {
       this.hideLauncher();
       return;
     }
@@ -46122,7 +47468,7 @@ var MarkdownSelectionAi = class extends import_obsidian33.Component {
     }
     this.updateLauncher(this.options.autoOpen());
     if (!this.snapshot) {
-      const view = this.app.workspace.getActiveViewOfType(import_obsidian33.MarkdownView);
+      const view = this.app.workspace.getActiveViewOfType(import_obsidian35.MarkdownView);
       if (!(view == null ? void 0 : view.file) || view.getMode() !== "source") return false;
       const markdown = view.editor.getValue();
       const matchAt = view.editor.posToOffset(view.editor.getCursor());
@@ -46156,7 +47502,7 @@ var MarkdownSelectionAi = class extends import_obsidian33.Component {
     this.panel.open();
   }
 };
-var SelectionAiPanel = class extends import_obsidian33.Component {
+var SelectionAiPanel = class extends import_obsidian35.Component {
   constructor(app, snapshot, model, language2, translateTarget, run) {
     super();
     this.app = app;
@@ -46200,7 +47546,7 @@ var SelectionAiPanel = class extends import_obsidian33.Component {
     this.titleEl.id = titleId;
     const close = header.createEl("button", { cls: "clickable-icon vam-context-ai-close" });
     close.setAttribute("aria-label", t("ui.close"));
-    (0, import_obsidian33.setIcon)(close, "x");
+    (0, import_obsidian35.setIcon)(close, "x");
     close.addEventListener("click", () => this.close());
     this.contentEl = this.modalEl.createDiv({ cls: "vam-context-ai-body" });
     this.load();
@@ -46274,7 +47620,7 @@ var SelectionAiPanel = class extends import_obsidian33.Component {
     const preset = (id, icon, label, prompt) => {
       const button = this.presets.createEl("button", { cls: "vam-context-ai-preset" });
       button.dataset.preset = id;
-      (0, import_obsidian33.setIcon)(button.createSpan({ cls: "vam-context-ai-preset-icon" }), icon);
+      (0, import_obsidian35.setIcon)(button.createSpan({ cls: "vam-context-ai-preset-icon" }), icon);
       button.createSpan({ text: label });
       button.addEventListener(
         "click",
@@ -46343,7 +47689,7 @@ var SelectionAiPanel = class extends import_obsidian33.Component {
     const bar = footer.createDiv({ cls: "vam-context-ai-bar" });
     bar.createSpan({
       cls: "vam-context-ai-shortcut",
-      text: t("ui.context_ai_shortcut", import_obsidian33.Platform.isMacOS ? "\u2318" : "Ctrl")
+      text: t("ui.context_ai_shortcut", import_obsidian35.Platform.isMacOS ? "\u2318" : "Ctrl")
     });
     this.stopButton = bar.createEl("button", { text: t("ui.cancel") });
     this.stopButton.addEventListener("click", () => {
@@ -46519,9 +47865,9 @@ var SelectionAiPanel = class extends import_obsidian33.Component {
           result = result.replace(/\r\n?/g, "\n");
           if (!/^```mermaid[ \t]*\n(?:(?!```)[\s\S])+\n```$/.test(result.trim()) || unsafeMermaid(result.trim().split("\n").slice(1, -1)) || /(?:%%\{|@\{|\bimg\s*:|\bimage\s*:|\burl\s*\(|https?:|data:|file:|javascript:)/i.test(result))
             throw new Error(t("ui.context_ai_invalid_diagram"));
-          this.previewChild = new import_obsidian33.Component();
+          this.previewChild = new import_obsidian35.Component();
           this.previewChild.load();
-          await import_obsidian33.MarkdownRenderer.render(this.app, result, this.preview, this.snapshot.path, this.previewChild);
+          await import_obsidian35.MarkdownRenderer.render(this.app, result, this.preview, this.snapshot.path, this.previewChild);
         }
       }
       if (controller.signal.aborted || !this.modalEl.isConnected) return;
@@ -46622,7 +47968,7 @@ ${value}
       editor.replaceRange(addition, end, end);
     }
     this.close();
-    new import_obsidian33.Notice(action === "replace" ? t("ui.context_ai_replaced") : t("ui.context_ai_appended"));
+    new import_obsidian35.Notice(action === "replace" ? t("ui.context_ai_replaced") : t("ui.context_ai_appended"));
   }
 };
 
@@ -46658,7 +48004,7 @@ async function fitImageForClaude(dataUrl, signal) {
   throw new Error(t("ui.context_ai_image_unavailable"));
 }
 var CHART_JOB_LIMIT = 3;
-var VisualAgentMapPlugin = class extends import_obsidian34.Plugin {
+var VisualAgentMapPlugin = class extends import_obsidian36.Plugin {
   constructor() {
     super(...arguments);
     /** Diagnostics for the mermaid zoom viewer (observer count); read by UI checks only. */
@@ -46690,7 +48036,7 @@ var VisualAgentMapPlugin = class extends import_obsidian34.Plugin {
       codexPath: () => this.settings.codexPath,
       claudePath: () => this.settings.claudePath,
       clientVersion: () => this.manifest.version || "0.0.0",
-      readLocalFile: (path) => import_obsidian34.FileSystemAdapter.readLocalFile(path),
+      readLocalFile: (path) => import_obsidian36.FileSystemAdapter.readLocalFile(path),
       onLog: (level, message) => this.logs.appendLog(level, message)
     }));
     __publicField(this, "aiTaskOptions", {
@@ -46704,7 +48050,7 @@ var VisualAgentMapPlugin = class extends import_obsidian34.Plugin {
       claudeRuntime: (directory) => this.claudeCli(directory),
       mermaidParses: async (code) => {
         try {
-          const mermaid = await (0, import_obsidian34.loadMermaid)();
+          const mermaid = await (0, import_obsidian36.loadMermaid)();
           await mermaid.parse(code);
           return true;
         } catch (e) {
@@ -46781,7 +48127,7 @@ var VisualAgentMapPlugin = class extends import_obsidian34.Plugin {
       const message = error instanceof Error ? error.message : String(error);
       this.logs.appendLog("error", t("log.operation_failed_0", message));
       console.error("Visual Agent Map", error);
-      new import_obsidian34.Notice(message);
+      new import_obsidian36.Notice(message);
     });
     return result;
   }
@@ -46864,6 +48210,21 @@ var VisualAgentMapPlugin = class extends import_obsidian34.Plugin {
           }
         );
   }
+  /** Opens the share dialog for a map view (the active one by default), or says why this map cannot be shared. */
+  openShare(source) {
+    var _a2;
+    const view = (_a2 = source != null ? source : this.app.workspace.getActiveViewOfType(VisualAgentMapView)) != null ? _a2 : this.views()[0];
+    const snapshot = view == null ? void 0 : view.shareSnapshot();
+    if (!snapshot || snapshot === "none") return void new import_obsidian36.Notice(t("share.unavailable_no_map"));
+    if (snapshot === "sample") return void new import_obsidian36.Notice(t("share.unavailable_sample"));
+    if (snapshot === "aim") return void new import_obsidian36.Notice(t("share.unavailable_aim"));
+    if (snapshot === "empty") return void new import_obsidian36.Notice(t("share.unavailable_empty"));
+    new ShareModal(this.app, {
+      source: snapshot,
+      vamVersion: this.manifest.version || "0.0.0",
+      language: this.settings.language
+    }).open();
+  }
   async activateOutline(source) {
     var _a2, _b2, _c, _d;
     const activeCoffeeView = this.app.workspace.getActiveViewOfType(CoffeeTablesView);
@@ -46889,13 +48250,13 @@ var VisualAgentMapPlugin = class extends import_obsidian34.Plugin {
       this.useOutlineSource(leaf.view);
       return;
     }
-    if (!((leaf == null ? void 0 : leaf.view) instanceof import_obsidian34.MarkdownView) || !leaf.view.file || !this.isMap(leaf.view.file)) return;
+    if (!((leaf == null ? void 0 : leaf.view) instanceof import_obsidian36.MarkdownView) || !leaf.view.file || !this.isMap(leaf.view.file)) return;
     const path = leaf.view.file.path;
-    void leaf.setViewState({ type: VIEW_TYPE, state: { file: path }, active: true }).catch((error) => new import_obsidian34.Notice(error instanceof Error ? error.message : String(error)));
+    void leaf.setViewState({ type: VIEW_TYPE, state: { file: path }, active: true }).catch((error) => new import_obsidian36.Notice(error instanceof Error ? error.message : String(error)));
   }
   async onload() {
     var _a2, _b2;
-    announceTestOverrides((message) => new import_obsidian34.Notice(message, 0));
+    announceTestOverrides((message) => new import_obsidian36.Notice(message, 0));
     const saved = await this.loadData();
     const legacy = saved;
     const savedWorkspace = (saved == null ? void 0 : saved.workspaceFolder) || DEFAULT_SETTINGS.workspaceFolder;
@@ -46963,11 +48324,11 @@ var VisualAgentMapPlugin = class extends import_obsidian34.Plugin {
       key: "ui.context_ai_open"
     });
     this.logs.appendLog("info", t("log.plugin_loaded_0", this.manifest.version || "unknown"));
-    if (this.app.vault.adapter instanceof import_obsidian34.FileSystemAdapter && this.manifest.dir) {
+    if (this.app.vault.adapter instanceof import_obsidian36.FileSystemAdapter && this.manifest.dir) {
       const adapter = this.app.vault.adapter;
       this.exchanges = new AiExchangeLog(
         adapter,
-        (0, import_obsidian34.normalizePath)(`${this.manifest.dir}/ai-exchanges.json`),
+        (0, import_obsidian36.normalizePath)(`${this.manifest.dir}/ai-exchanges.json`),
         (error) => this.logs.appendLog(
           "error",
           t("log.exchange_log_save_failed_0", error instanceof Error ? error.message : String(error))
@@ -46976,7 +48337,7 @@ var VisualAgentMapPlugin = class extends import_obsidian34.Plugin {
       await this.exchanges.load();
       this.pendingSuggestions = new PendingSuggestions(
         adapter,
-        (0, import_obsidian34.normalizePath)(`${this.manifest.dir}/pending-suggestions.json`),
+        (0, import_obsidian36.normalizePath)(`${this.manifest.dir}/pending-suggestions.json`),
         (error) => this.logs.appendLog(
           "error",
           t("log.pending_suggestions_save_failed_0", error instanceof Error ? error.message : String(error))
@@ -47008,7 +48369,7 @@ var VisualAgentMapPlugin = class extends import_obsidian34.Plugin {
         const count = await this.repo.normalizeGeneratedNoteFilenames();
         this.settings.structureVersion = 2;
         await this.saveSettings();
-        if (count) new import_obsidian34.Notice(t("ui.synced_0_subtopic_filenames_with_their_names", count));
+        if (count) new import_obsidian36.Notice(t("ui.synced_0_subtopic_filenames_with_their_names", count));
       }
     });
     this.ready = initialize;
@@ -47028,7 +48389,7 @@ var VisualAgentMapPlugin = class extends import_obsidian34.Plugin {
     this.registerView(COFFEE_TABLES_VIEW_TYPE, (leaf) => new CoffeeTablesView(leaf, this));
     this.buildCoffee();
     const openCoffee = () => {
-      void this.activateCoffeeTables().catch((error) => new import_obsidian34.Notice(String(error)));
+      void this.activateCoffeeTables().catch((error) => new import_obsidian36.Notice(String(error)));
     };
     const coffeeRibbonIcon = this.addRibbonIcon("coffee", t("ui.open_coffee_tables"), openCoffee);
     this.coffeeRibbonIcon = coffeeRibbonIcon;
@@ -47045,32 +48406,33 @@ var VisualAgentMapPlugin = class extends import_obsidian34.Plugin {
           }
           await this.openDetails(this.repo.file(path));
         } catch (error) {
-          new import_obsidian34.Notice(error instanceof Error ? error.message : String(error));
+          new import_obsidian36.Notice(error instanceof Error ? error.message : String(error));
         }
       })
     );
     this.ribbonIcon = this.addRibbonIcon("brain-circuit", t("ui.open_map"), () => {
-      void this.activateView().catch((error) => new import_obsidian34.Notice(String(error)));
+      void this.activateView().catch((error) => new import_obsidian36.Notice(String(error)));
     });
     const mapRibbonIcon = this.ribbonIcon;
     this.app.workspace.onLayoutReady(() => this.register(groupRibbonIcons(mapRibbonIcon, coffeeRibbonIcon)));
     this.addLocalizedCommand("open-map", "ui.open_map", () => {
-      void this.activateView().catch((error) => new import_obsidian34.Notice(String(error)));
+      void this.activateView().catch((error) => new import_obsidian36.Notice(String(error)));
     });
     this.addLocalizedCommand(AIM_CREATE_MAP_COMMAND_ID, "ui.aim_create_map", () => {
       void this.activateView().then(() => {
         var _a3;
         return (_a3 = this.views()[0]) == null ? void 0 : _a3.openAimStart();
-      }).catch((error) => new import_obsidian34.Notice(String(error)));
+      }).catch((error) => new import_obsidian36.Notice(String(error)));
     });
     this.addLocalizedCommand("import-outline", "ui.outline_import", () => {
       void this.activateView().then(() => {
         var _a3;
         return (_a3 = this.views()[0]) == null ? void 0 : _a3.openOutlineImport();
-      }).catch((error) => new import_obsidian34.Notice(String(error)));
+      }).catch((error) => new import_obsidian36.Notice(String(error)));
     });
+    this.addLocalizedCommand("share-map", "share.command", () => this.openShare());
     this.addLocalizedCommand("open-topic-outline", "ui.open_topic_outline", () => {
-      void this.activateOutline().catch((error) => new import_obsidian34.Notice(String(error)));
+      void this.activateOutline().catch((error) => new import_obsidian36.Notice(String(error)));
     });
     this.addLocalizedCommand("rebuild-references", "ui.refresh_vam_data", () => {
       this.runMutation(() => this.fullRebuild());
@@ -47078,23 +48440,23 @@ var VisualAgentMapPlugin = class extends import_obsidian34.Plugin {
     this.addLocalizedCommand("normalize-note-filenames", "ui.sync_topic_names_and_filenames", () => {
       this.runMutation(async () => {
         const count = await this.repo.normalizeGeneratedNoteFilenames();
-        new import_obsidian34.Notice(count ? t("ui.synced_0_topic_filenames", count) : t("ui.topic_filenames_are_up_to_date"));
+        new import_obsidian36.Notice(count ? t("ui.synced_0_topic_filenames", count) : t("ui.topic_filenames_are_up_to_date"));
       });
     });
     this.addLocalizedCommand("repair-note-presentation", "ui.repair_topic_note_display", () => {
       this.runMutation(async () => {
         await this.repo.ensureNodePresentation();
-        new import_obsidian34.Notice(t("ui.topic_note_display_repaired"));
+        new import_obsidian36.Notice(t("ui.topic_note_display_repaired"));
       });
     });
     this.addLocalizedCommand("fix-math-formulas", "ui.fix_math_formulas", () => {
       void this.offerFixMathFormulas().catch(
-        (error) => new import_obsidian34.Notice(error instanceof Error ? error.message : String(error))
+        (error) => new import_obsidian36.Notice(error instanceof Error ? error.message : String(error))
       );
     });
     this.addLocalizedCommand("organize-workspace-folders", "ui.organize_workspace_folders", () => {
       void this.offerOrganizeWorkspaceFolders().catch(
-        (error) => new import_obsidian34.Notice(error instanceof Error ? error.message : String(error))
+        (error) => new import_obsidian36.Notice(error instanceof Error ? error.message : String(error))
       );
     });
     this.addLocalizedCommand("open-built-in-sample", "ui.open_the_taiwan_travel_sample", () => {
@@ -47129,7 +48491,7 @@ var VisualAgentMapPlugin = class extends import_obsidian34.Plugin {
     this.addSettingTab(this.settingTab);
     this.registerEvent(
       this.app.workspace.on("file-menu", (menu, file) => {
-        if (file instanceof import_obsidian34.TFile && this.isMap(file))
+        if (file instanceof import_obsidian36.TFile && this.isMap(file))
           menu.addItem(
             (item) => item.setTitle(t("ui.open_as_mind_map")).setIcon("brain-circuit").onClick(() => {
               void this.activateView(file.path);
@@ -47173,13 +48535,13 @@ var VisualAgentMapPlugin = class extends import_obsidian34.Plugin {
   registerVaultEvents() {
     this.registerEvent(
       this.app.vault.on("modify", (file) => {
-        if (!this.writing && file instanceof import_obsidian34.TFile) for (const view of this.views()) view.changed(file);
+        if (!this.writing && file instanceof import_obsidian36.TFile) for (const view of this.views()) view.changed(file);
       })
     );
     this.registerEvent(
       this.app.vault.on("delete", (file) => {
-        if (file instanceof import_obsidian34.TFile) this.scheduleExternalReconciliation(file.path);
-        if (!this.writing && file instanceof import_obsidian34.TFile) {
+        if (file instanceof import_obsidian36.TFile) this.scheduleExternalReconciliation(file.path);
+        if (!this.writing && file instanceof import_obsidian36.TFile) {
           for (const view of this.views()) view.deleted(file);
           if (file.path.startsWith(`${this.settings.mapsFolder}/`) || isManagedMapPath(this.settings, file.path) && file.name === "Map.md")
             this.runMutation(() => this.repo.rebuildDerivedData());
@@ -47188,7 +48550,7 @@ var VisualAgentMapPlugin = class extends import_obsidian34.Plugin {
     );
     this.registerEvent(
       this.app.vault.on("rename", (file, oldPath) => {
-        if (!(file instanceof import_obsidian34.TFile) || !this.repo.renameAffectsVam(file, oldPath)) return;
+        if (!(file instanceof import_obsidian36.TFile) || !this.repo.renameAffectsVam(file, oldPath)) return;
         if (file.path === oldPath) return;
         const external = !this.writing;
         this.runMutation(async () => {
@@ -47222,7 +48584,7 @@ ${error}`;
       this.unreadableReported.set(key2, now);
       const message = t("ui.map_unreadable_skipped_0_1", path, error);
       this.logs.appendLog("warn", message);
-      new import_obsidian34.Notice(message);
+      new import_obsidian36.Notice(message);
     }
   }
   consumeFirstInstallSample() {
@@ -47240,7 +48602,7 @@ ${error}`;
       report: (done, total2, title) => {
         const message = t("ui.organize_progress_0_1_2", done, total2, title);
         if (notice) notice.setMessage(message);
-        else notice = new import_obsidian34.Notice(message, 0);
+        else notice = new import_obsidian36.Notice(message, 0);
       },
       done: () => notice == null ? void 0 : notice.hide()
     };
@@ -47275,12 +48637,12 @@ ${error}`;
         cleaned = await this.repo.removeEmptyLegacyFolders();
       });
       const base = plan.skipped.length ? t("ui.organize_only_skipped_0", plan.skipped.length) : t("ui.organize_nothing_to_do");
-      new import_obsidian34.Notice(cleaned.length ? `${base} ${t("ui.organize_cleaned_0", cleaned.join(", "))}` : base);
+      new import_obsidian36.Notice(cleaned.length ? `${base} ${t("ui.organize_cleaned_0", cleaned.join(", "))}` : base);
       return;
     }
     const busyOpen = this.views().some((view) => plan.moves.some((move) => view.hasActiveAimWork(move.mapPath)));
     if (plan.busy.length || busyOpen) {
-      new import_obsidian34.Notice(t("error.organize_aim_busy"));
+      new import_obsidian36.Notice(t("error.organize_aim_busy"));
       return;
     }
     const mind = plan.moves.filter((move) => move.kind === "mind").length;
@@ -47314,7 +48676,7 @@ ${t("ui.organize_link_wait_hint")}`;
           for (const view of this.views()) view.relocate(mapping);
           this.app.workspace.requestSaveLayout();
           const cleaned = await this.repo.removeEmptyLegacyFolders();
-          new import_obsidian34.Notice(
+          new import_obsidian36.Notice(
             cleaned.length ? `${t("ui.organize_done_0", mapping.size)} ${t("ui.organize_cleaned_0", cleaned.join(", "))}` : t("ui.organize_done_0", mapping.size)
           );
         })
@@ -47327,7 +48689,7 @@ ${t("ui.organize_link_wait_hint")}`;
     const files = (await this.repo.markedFiles("agent-map-node")).filter((file) => file.path.startsWith(prefix));
     const plan = await planMathRepair(this.app.vault, files);
     if (!plan.items.length) {
-      new import_obsidian34.Notice(t("ui.fix_math_none"));
+      new import_obsidian36.Notice(t("ui.fix_math_none"));
       return;
     }
     new ChoiceModal(
@@ -47338,10 +48700,10 @@ ${t("ui.organize_link_wait_hint")}`;
         {
           label: t("ui.fix_math_start"),
           action: () => void applyMathRepair(this.app.vault, plan).then(
-            (result) => new import_obsidian34.Notice(
+            (result) => new import_obsidian36.Notice(
               result.skipped ? t("ui.fix_math_done_0_1", result.changed, result.skipped) : t("ui.fix_math_done_0", result.changed)
             )
-          ).catch((error) => new import_obsidian34.Notice(error instanceof Error ? error.message : String(error)))
+          ).catch((error) => new import_obsidian36.Notice(error instanceof Error ? error.message : String(error)))
         }
       ]
     ).open();
@@ -47351,13 +48713,13 @@ ${t("ui.organize_link_wait_hint")}`;
     this.settings.workspaceInitialized = true;
     await this.saveSettings();
     for (const view of this.views()) await view.refreshFromPlugin();
-    new import_obsidian34.Notice(t("ui.agent_workspace_is_ready"));
+    new import_obsidian36.Notice(t("ui.agent_workspace_is_ready"));
   }
   async fullRebuild() {
     await this.repo.reconcileMissingNodePaths();
     await this.repo.rebuildDerivedData();
     for (const view of this.views()) await view.refreshFromPlugin();
-    new import_obsidian34.Notice(t("ui.vam_data_has_been_refreshed"));
+    new import_obsidian36.Notice(t("ui.vam_data_has_been_refreshed"));
   }
   /** Builds Coffee Tables storage and manager for the current workspace folder (CoffeeStorage fixes its folder at construction). */
   buildCoffee() {
@@ -47404,7 +48766,7 @@ ${t("ui.organize_link_wait_hint")}`;
     const candidates = known != null ? known : await this.repo.workspaceCandidates();
     this.workspaceRecoveryCandidates = [];
     if (!candidates.length) {
-      new import_obsidian34.Notice(t("ui.no_recognizable_existing_vam_workspace_was_found"));
+      new import_obsidian36.Notice(t("ui.no_recognizable_existing_vam_workspace_was_found"));
       return;
     }
     new ChoiceModal(
@@ -47419,7 +48781,7 @@ ${t("ui.organize_link_wait_hint")}`;
           await this.rebuildCoffee();
           await this.repo.rebuildDerivedData();
           for (const view of this.views()) await view.refreshFromPlugin();
-          new import_obsidian34.Notice(t("ui.reconnected_workspace_0", root));
+          new import_obsidian36.Notice(t("ui.reconnected_workspace_0", root));
         })
       }))
     ).open();
@@ -47498,19 +48860,19 @@ ${t("ui.organize_link_wait_hint")}`;
     const diagnostic = this.codexDiagnostic();
     if (!diagnostic.installed) {
       if (showGuide) this.openCodexSetupGuide();
-      else new import_obsidian34.Notice(t("ui.codex_cli_was_not_found_0_set_the_codex_cli_path_in_vam_sett", diagnostic.executable));
+      else new import_obsidian36.Notice(t("ui.codex_cli_was_not_found_0_set_the_codex_cli_path_in_vam_sett", diagnostic.executable));
       return;
     }
     const state = await this.refreshModelDiscovery("codex");
-    if (state.status === "ready") new import_obsidian34.Notice(t("ui.codex_app_server_is_ready_0", diagnostic.executable));
+    if (state.status === "ready") new import_obsidian36.Notice(t("ui.codex_app_server_is_ready_0", diagnostic.executable));
     else if (state.status === "error")
-      new import_obsidian34.Notice(
+      new import_obsidian36.Notice(
         t(
           "ui.codex_app_server_check_failed_0",
           this.recordFailure(t("log.codex_recheck_failed"), (_a2 = state.error) != null ? _a2 : "unknown error")
         )
       );
-    else new import_obsidian34.Notice(t("ui.codex_cli_was_not_found_0_set_the_codex_cli_path_in_vam_sett", diagnostic.executable));
+    else new import_obsidian36.Notice(t("ui.codex_cli_was_not_found_0_set_the_codex_cli_path_in_vam_sett", diagnostic.executable));
   }
   async duplicateBuiltInSample() {
     await this.repo.ensureWorkspace();
@@ -47558,7 +48920,7 @@ ${t("ui.organize_link_wait_hint")}`;
       await this.repo.saveMap(path, map);
       await this.repo.rebuildDerivedData(root);
       await this.saveSettings();
-      new import_obsidian34.Notice(t("ui.created_an_editable_copy_of_the_sample"));
+      new import_obsidian36.Notice(t("ui.created_an_editable_copy_of_the_sample"));
       return path;
     } catch (error) {
       if (createdRoot) {
@@ -47586,7 +48948,7 @@ ${t("ui.organize_link_wait_hint")}`;
     return marker5 === true || marker5 === "true" || file.extension === "md" && (file.path.startsWith(`${this.settings.notesFolder}/`) || isManagedMapPath(this.settings, file.path));
   }
   styleNodeLeaf(leaf) {
-    if (!((leaf == null ? void 0 : leaf.view) instanceof import_obsidian34.MarkdownView)) return;
+    if (!((leaf == null ? void 0 : leaf.view) instanceof import_obsidian36.MarkdownView)) return;
     leaf.view.containerEl.toggleClass("vam-topic-markdown", !!leaf.view.file && this.isNode(leaf.view.file));
   }
   onunload() {
@@ -47618,7 +48980,7 @@ ${t("ui.organize_link_wait_hint")}`;
         await this.saveData(nextSettings);
       } catch (error) {
         this.recordFailure(translate(previous, "ui.language_change_save_failed"), error);
-        new import_obsidian34.Notice(translate(previous, "ui.language_change_save_failed"));
+        new import_obsidian36.Notice(translate(previous, "ui.language_change_save_failed"));
         return false;
       }
       Object.assign(this.settings, nextSettings);
@@ -47645,7 +49007,7 @@ ${t("ui.organize_link_wait_hint")}`;
         failures.push(error);
       }
       for (const error of failures) this.recordFailure(t("ui.language_view_refresh_failed"), error);
-      new import_obsidian34.Notice(
+      new import_obsidian36.Notice(
         failures.length ? t("ui.language_change_partial_failure") : t("ui.language_changed_content_preserved")
       );
       return true;
@@ -47687,7 +49049,7 @@ ${t("ui.organize_link_wait_hint")}`;
         this.openCodexSetupGuide();
         return false;
       }
-      new import_obsidian34.Notice(t("ui.current_model_is_unavailable"));
+      new import_obsidian36.Notice(t("ui.current_model_is_unavailable"));
     } catch (error) {
       this.logs.appendLog("warn", t("log.codex_not_ready_0", error instanceof Error ? error.message : String(error)));
     }
@@ -47716,10 +49078,10 @@ ${t("ui.organize_link_wait_hint")}`;
     const diagnostic = this.claudeDiagnostic();
     const state = await this.refreshModelDiscovery("claude");
     if (!diagnostic.installed) {
-      new import_obsidian34.Notice(t("ui.claude_cli_was_not_found_follow_the_installation_guide_to_install_it"));
+      new import_obsidian36.Notice(t("ui.claude_cli_was_not_found_follow_the_installation_guide_to_install_it"));
       return;
     }
-    new import_obsidian34.Notice(t("ui.claude_cli_found_0", diagnostic.executable));
+    new import_obsidian36.Notice(t("ui.claude_cli_found_0", diagnostic.executable));
     if (state.status !== "ready") this.logs.appendLog("warn", `Claude model discovery status: ${state.status}`);
   }
   async confirmAiUsage(model, run) {
@@ -47741,7 +49103,7 @@ ${t("ui.organize_link_wait_hint")}`;
       await this.repo.rebuildDerivedData();
     } catch (error) {
       console.error("Visual Agent Map reference rebuild", error);
-      new import_obsidian34.Notice(
+      new import_obsidian36.Notice(
         t("ui.map_saved_but_reference_update_failed_0", error instanceof Error ? error.message : String(error))
       );
     }
@@ -47773,7 +49135,7 @@ ${t("ui.organize_link_wait_hint")}`;
     return this.app.workspace.getLeavesOfType("markdown").some(
       (leaf) => {
         var _a2, _b2;
-        return leaf.getRoot() === split && leaf.view instanceof import_obsidian34.MarkdownView && !!leaf.view.file && ((_b2 = (_a2 = this.app.metadataCache.getFileCache(leaf.view.file)) == null ? void 0 : _a2.frontmatter) == null ? void 0 : _b2["agent-map-node"]) === true && leaf.view.containerEl.isShown();
+        return leaf.getRoot() === split && leaf.view instanceof import_obsidian36.MarkdownView && !!leaf.view.file && ((_b2 = (_a2 = this.app.metadataCache.getFileCache(leaf.view.file)) == null ? void 0 : _a2.frontmatter) == null ? void 0 : _b2["agent-map-node"]) === true && leaf.view.containerEl.isShown();
       }
     );
   }
@@ -47786,7 +49148,7 @@ ${t("ui.organize_link_wait_hint")}`;
       this.detailsLeaf = (_b2 = (_a2 = markdownLeaves.filter(
         (leaf) => {
           var _a3, _b3;
-          return leaf.getRoot() === this.app.workspace.rightSplit && leaf.view instanceof import_obsidian34.MarkdownView && !!leaf.view.file && ((_b3 = (_a3 = this.app.metadataCache.getFileCache(leaf.view.file)) == null ? void 0 : _a3.frontmatter) == null ? void 0 : _b3["agent-map-node"]) === true;
+          return leaf.getRoot() === this.app.workspace.rightSplit && leaf.view instanceof import_obsidian36.MarkdownView && !!leaf.view.file && ((_b3 = (_a3 = this.app.metadataCache.getFileCache(leaf.view.file)) == null ? void 0 : _a3.frontmatter) == null ? void 0 : _b3["agent-map-node"]) === true;
         }
       ).sort(
         (a, b) => a.view.containerEl.getBoundingClientRect().top - b.view.containerEl.getBoundingClientRect().top
@@ -47800,11 +49162,11 @@ ${t("ui.organize_link_wait_hint")}`;
   }
   closeStaleDetails() {
     var _a2, _b2, _c, _d;
-    const closed = ((_a2 = this.detailsLeaf) == null ? void 0 : _a2.view) instanceof import_obsidian34.MarkdownView && ((_b2 = this.detailsLeaf.view.file) == null ? void 0 : _b2.path) === this.detailsPath;
+    const closed = ((_a2 = this.detailsLeaf) == null ? void 0 : _a2.view) instanceof import_obsidian36.MarkdownView && ((_b2 = this.detailsLeaf.view.file) == null ? void 0 : _b2.path) === this.detailsPath;
     if (closed) {
       this.detailsLeaf.detach();
       this.app.workspace.trigger("file-open", null);
-      this.app.workspace.trigger("active-leaf-change", (_d = (_c = this.app.workspace.getActiveViewOfType(import_obsidian34.View)) == null ? void 0 : _c.leaf) != null ? _d : null);
+      this.app.workspace.trigger("active-leaf-change", (_d = (_c = this.app.workspace.getActiveViewOfType(import_obsidian36.View)) == null ? void 0 : _c.leaf) != null ? _d : null);
     }
     this.detailsLeaf = null;
     this.detailsPath = null;
@@ -47820,7 +49182,7 @@ ${t("ui.organize_link_wait_hint")}`;
     if (leaf.view instanceof CoffeeTablesView) this.syncCoffeeOutline(leaf.view);
   }
   async runCoffeeRequest(request) {
-    if (!(this.app.vault.adapter instanceof import_obsidian34.FileSystemAdapter) || !this.manifest.dir)
+    if (!(this.app.vault.adapter instanceof import_obsidian36.FileSystemAdapter) || !this.manifest.dir)
       throw new Error("Coffee Tables requires the desktop runtime");
     const { session, signal, prompt } = request;
     const directory = (0, import_node_path2.join)(this.app.vault.adapter.getBasePath(), this.manifest.dir);
@@ -47898,16 +49260,16 @@ ${t("ui.organize_link_wait_hint")}`;
     }
     let bytes;
     const embeddedPath = (_b2 = (_a2 = image.closest(".internal-embed")) == null ? void 0 : _a2.getAttribute("src")) == null ? void 0 : _b2.split("#")[0];
-    const view = this.app.workspace.getLeavesOfType("markdown").map((leaf) => leaf.view).find((view2) => view2 instanceof import_obsidian34.MarkdownView && view2.containerEl.contains(image));
+    const view = this.app.workspace.getLeavesOfType("markdown").map((leaf) => leaf.view).find((view2) => view2 instanceof import_obsidian36.MarkdownView && view2.containerEl.contains(image));
     const file = embeddedPath ? this.app.metadataCache.getFirstLinkpathDest(
       embeddedPath,
-      view instanceof import_obsidian34.MarkdownView ? (_d = (_c = view.file) == null ? void 0 : _c.path) != null ? _d : "" : ""
+      view instanceof import_obsidian36.MarkdownView ? (_d = (_c = view.file) == null ? void 0 : _c.path) != null ? _d : "" : ""
     ) : null;
     const remote = image.currentSrc || image.src;
-    if (file instanceof import_obsidian34.TFile) bytes = await this.app.vault.readBinary(file);
+    if (file instanceof import_obsidian36.TFile) bytes = await this.app.vault.readBinary(file);
     else if (/^https?:\/\//i.test(remote)) {
       try {
-        bytes = (await (0, import_obsidian34.requestUrl)({ url: remote, method: "GET", throw: true })).arrayBuffer;
+        bytes = (await (0, import_obsidian36.requestUrl)({ url: remote, method: "GET", throw: true })).arrayBuffer;
       } catch (e) {
         throw new Error(t("ui.context_ai_image_download_failed"));
       }
@@ -48003,7 +49365,7 @@ ${t("ui.organize_link_wait_hint")}`;
       if (!this.coffeeStorage) throw new Error("Coffee storage is not ready");
       await openCoffeeResearchHandoff(this, this.coffeeStorage, session, sourcePath, insightId);
     } catch (error) {
-      new import_obsidian34.Notice(error instanceof Error ? error.message : String(error));
+      new import_obsidian36.Notice(error instanceof Error ? error.message : String(error));
     }
   }
   async openResearchMap(path) {
@@ -48031,7 +49393,7 @@ ${t("ui.organize_link_wait_hint")}`;
   }
   async loadCodexModels() {
     const adapter = this.app.vault.adapter;
-    if (!(adapter instanceof import_obsidian34.FileSystemAdapter) || !this.manifest.dir)
+    if (!(adapter instanceof import_obsidian36.FileSystemAdapter) || !this.manifest.dir)
       throw new Error("Codex model discovery requires desktop Obsidian");
     const pluginDirectory = (0, import_node_path2.join)(adapter.getBasePath(), this.manifest.dir);
     const models = await this.runtime(pluginDirectory).listModels();
@@ -48185,7 +49547,7 @@ ${t("ui.organize_link_wait_hint")}`;
   }
   pluginDirectory() {
     const adapter = this.app.vault.adapter;
-    if (!(adapter instanceof import_obsidian34.FileSystemAdapter)) throw new Error(t("ui.cli_mode_requires_desktop_obsidian"));
+    if (!(adapter instanceof import_obsidian36.FileSystemAdapter)) throw new Error(t("ui.cli_mode_requires_desktop_obsidian"));
     if (!this.manifest.dir) throw new Error(t("ui.plugin_folder_not_found"));
     return (0, import_node_path2.join)(adapter.getBasePath(), this.manifest.dir);
   }

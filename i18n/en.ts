@@ -1925,7 +1925,45 @@ export const en = {
   "share.viewer_no_content": "This topic has no notes in the shared file.",
   "share.viewer_image_omitted": "[image not included]",
   "share.viewer_resize_panel": "Resize the side panel",
-  "share.viewer_untitled": "Untitled map"
+  "share.viewer_untitled": "Untitled map",
+  // Share dialog
+  "share.command": "Share this map",
+  "share.button": "Share this map",
+  "share.title": "Share this map",
+  "share.intro":
+    "Creates one HTML file that opens in any browser, even offline. You choose where it is saved. Nothing is uploaded.",
+  "share.option_full_name": "Include full notes",
+  "share.option_full_desc": "Off: only the map structure and topic summaries are shared.",
+  "share.option_images_name": "Include images",
+  "share.option_images_desc": "Off: pictures in notes are left out and marked in the text.",
+  "share.preview_topics_0": "{0} topics",
+  "share.preview_counts_0_1_2": "{0} topics · {1} with note content · {2} images",
+  "share.preview_size_0": "File size: {0}",
+  "share.progress_start": "Preparing…",
+  "share.progress_render_0_1": "Preparing notes… {0} of {1}",
+  "share.progress_images_0_1": "Converting images… {0} of {1}",
+  "share.progress_check": "Checking the file for private information…",
+  "share.size_warn_0": "This file is larger than {0}. Some email services and chat apps may refuse it.",
+  "share.size_large_0": "This file is larger than {0}. Turning off Include images makes it much smaller.",
+  "share.email_hint": "Some email services block HTML attachments. If yours does, send the file another way.",
+  "share.images_failed_0": "{0} images could not be read and are marked in the text instead.",
+  "share.mermaid_blocked_warning_0":
+    "{0} diagrams are shown as source text because Mermaid is not allowed in this vault. Open a note with a diagram, press Allow, then open this dialog again.",
+  "share.mermaid_undrawn_warning_0": "{0} diagrams did not finish drawing in time and are shown as source text.",
+  "share.mermaid_blocked_note":
+    "[Diagram not drawn: Mermaid was not allowed when this file was made. Source shown instead.]",
+  "share.mermaid_undrawn_note": "[Diagram did not finish drawing. Source shown instead.]",
+  "share.leak_blocked_0": "Not saved: the file would contain private information ({0}). Nothing was written.",
+  "share.build_failed": "The file could not be prepared. Close this window and try again.",
+  "share.save": "Save…",
+  "share.saving": "Saving…",
+  "share.saved_0_1": "Saved {0} ({1})",
+  "share.downloaded_0_1": "Downloaded {0} ({1}). Look in your downloads folder.",
+  "share.save_failed": "The file could not be saved.",
+  "share.unavailable_no_map": "Open a mind map first, then share it.",
+  "share.unavailable_sample": "The built-in sample is read-only and cannot be shared.",
+  "share.unavailable_aim": "AI research maps cannot be shared yet.",
+  "share.unavailable_empty": "This map has no topics to share yet."
 } as const;
 
 export type TranslationKey = keyof typeof en;

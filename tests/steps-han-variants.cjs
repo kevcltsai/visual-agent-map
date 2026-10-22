@@ -26,6 +26,10 @@ test('han votes: simplified-only, traditional-only and shared characters', () =>
   assert.deepEqual(votes('圖書館'), { simplified: 0, traditional: 3 });
   assert.deepEqual(votes('中人'), { simplified: 0, traditional: 0 });
   assert.deepEqual(votes('Hello'), { simplified: 0, traditional: 0 });
+  assert.deepEqual(votes('台北'), { simplified: 0, traditional: 0 });
+  assert.deepEqual(votes('台灣'), { simplified: 0, traditional: 1 });
+  assert.deepEqual(votes('图书'), { simplified: 2, traditional: 0 });
+  assert.deepEqual(votes('后面'), { simplified: 1, traditional: 0 });
   assert.deepEqual(votes('發髮'), { simplified: 0, traditional: 2 });
   assert.deepEqual(votes('发'), { simplified: 1, traditional: 0 });
 });

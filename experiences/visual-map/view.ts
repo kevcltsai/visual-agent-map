@@ -214,10 +214,13 @@ function errorMessage(error: unknown): string {
   const message = (error as { message?: unknown } | null)?.message;
   return typeof message === "string" ? message : String(error);
 }
-/** The built-in Standard and Textbook templates follow the output language, as the fixed Detail headings always did. */
+/**
+ * The built-in Standard and Textbook templates follow the output language, as the fixed Detail headings always did; their
+ * display name uses `language` itself, so a Simplified Chinese interface labels the template "标准", not "標準".
+ */
 function templateInLanguage(template: DetailTemplate, language: UiLanguage): DetailTemplate {
   return isBuiltinTemplateId(template.id)
-    ? builtinTemplates(noteLanguageOf(language)).find(item => item.id === template.id)!
+    ? builtinTemplates(noteLanguageOf(language), language).find(item => item.id === template.id)!
     : template;
 }
 /**
@@ -7235,7 +7238,8 @@ export class VisualAgentMapView extends ItemView {
           currentStyle: this.currentStyleLabel(this.resolveTopicTemplate(note).template.id, this.effectiveToneId(note)),
           currentSummary: note.summary,
           // Only a label: a missing topic template is reported at the next AI update, not when the dialog opens.
-          currentTemplate: this.resolveTopicTemplate(note).template.name,
+          currentTemplate: templateInLanguage(this.resolveTopicTemplate(note).template, this.plugin.settings.language)
+            .name,
           topicStatus: note.status,
           childrenCompleted:
             this.map?.nodes.filter(item => item.parentId === node.id && this.notes.get(item.id)?.status === "completed")

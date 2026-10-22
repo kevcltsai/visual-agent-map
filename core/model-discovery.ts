@@ -1,3 +1,4 @@
+import { t, type TranslationKey } from "../i18n";
 import { CLAUDE_MODEL_CHOICES, type AiProviderId } from "../ai/providers/provider";
 
 export type ModelDiscoveryStatus = "idle" | "loading" | "ready" | "missing" | "error";
@@ -126,4 +127,14 @@ export class ModelDiscovery {
     this.states[provider] = { ...state, models: [...state.models] };
     for (const listener of this.listeners) listener(this.state(provider));
   }
+}
+
+/** The Codex / Claude CLI discovery status line, in the interface language; an error message follows the Codex status. */
+export function modelDiscoverySummary(codex: ModelDiscoveryState, claude: ModelDiscoveryState): string {
+  const status = (state: ModelDiscoveryState): string => t(`ui.model_status_${state.status}` as TranslationKey);
+  return t(
+    "ui.model_discovery_summary_0_1",
+    `${status(codex)}${codex.error ? ` · ${codex.error}` : ""}`,
+    status(claude)
+  );
 }

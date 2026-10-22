@@ -7,7 +7,6 @@ import type { AiProviderId } from "../../../ai/providers/provider";
 import { detailStructurePrompt, standardTemplate } from "../../../ai/detail-templates";
 import {
   inLanguage,
-  inLanguageNaming,
   LABEL_ANCESTORS,
   LABEL_RULES,
   LABEL_SOURCES,
@@ -33,7 +32,7 @@ import {
   LABEL_DETAIL,
   LABEL_FINDINGS,
   MERGE,
-  OUTPUT_LANGUAGE,
+  outputLanguage,
   SYNTHESIZE
 } from "./fragments";
 
@@ -62,7 +61,7 @@ export function generalTaskPrompt(
             : DEFAULT_TASK;
   const none = inLanguage(NONE, language);
   return [
-    inLanguageNaming(OUTPUT_LANGUAGE, language, { language: "plain" }),
+    outputLanguage(language),
     inLanguage(ROLE, language),
     inLanguage(SOURCE_SAFETY, language),
     context.sourceContext ? inLanguage(REFERENCE_CITATIONS, language) : "",

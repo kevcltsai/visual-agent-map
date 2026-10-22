@@ -19,7 +19,7 @@ import { normalizeReasoningLevel } from "../../ai/task-policy";
 import { buildCoffeeSource, coffeeCommittedKey, type CoffeeSource } from "./handoff-source";
 import type { CoffeeSession } from "./types";
 import type { CoffeeHandoffSnapshot, CoffeeStorage } from "./storage";
-import { syncModelSelect } from "../../core/model-discovery";
+import { modelDiscoverySummary, syncModelSelect } from "../../core/model-discovery";
 import type { ReframeRequest } from "../../core/reframing-service";
 import { backgroundResultNotice } from "../../ui/background-run";
 
@@ -270,9 +270,7 @@ export class CoffeeHandoffModal extends Modal {
       this.model.value = selected;
       const codex = this.plugin.modelDiscoveryState("codex"),
         claude = this.plugin.modelDiscoveryState("claude");
-      discoveryText.setText(
-        `Codex: ${codex.status}${codex.error ? ` · ${codex.error}` : ""} | Claude CLI candidates: ${claude.status}`
-      );
+      discoveryText.setText(modelDiscoverySummary(codex, claude));
       retry.disabled = codex.status === "loading";
     };
     this.unsubscribeModels = this.plugin.subscribeModelDiscovery(updateModels);

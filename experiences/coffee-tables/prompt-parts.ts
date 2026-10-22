@@ -2,6 +2,7 @@ import type { CoffeeSession, GuestSettings } from "./types";
 import type { CoffeeGuestInvitation } from "./types";
 import { baselineFromVersions, serializeInsightNotes } from "./insights";
 import { renderTemplate } from "../../core/step-runner";
+import { headingsVerbatim } from "../../core/steps/_shared/fragments";
 import { observerGuidance } from "./customization";
 import { languagePromptName } from "../../i18n";
 import { coffeeContentLocale, coffeeInstruction } from "./language";
@@ -130,6 +131,16 @@ export function conversationStyle(language: string, settings?: GuestSettings): s
   return settings?.customPrompt.trim() ? `${builtin}\n\n${settings.customPrompt.trim()}` : builtin;
 }
 export { OBSERVER_TITLES };
+/**
+ * The fixed observer headings as the prompt lists them. When the table speaks a language whose note language differs
+ * (Simplified Chinese), a clause follows the list so the model copies the headings exactly and writes only the content
+ * in that language; for zh-TW and English it is the list alone.
+ */
+export function observerTitles(language: string): string {
+  const key = coffeeInstruction(language);
+  const clause = headingsVerbatim(coffeeContentLocale(language), key);
+  return clause ? `${OBSERVER_TITLES[key]}\n${clause}` : OBSERVER_TITLES[key];
+}
 export function observerFormat(
   language: string,
   refreshOnly = false,
@@ -142,7 +153,7 @@ export function observerFormat(
     preferences,
     source: OBSERVER_SOURCE[key],
     update: INSIGHT_UPDATE_FOOTER[key],
-    titles: OBSERVER_TITLES[key]
+    titles: observerTitles(language)
   });
 }
 export function invitationContext(invitedGuests: CoffeeGuestInvitation[], language: string): string {

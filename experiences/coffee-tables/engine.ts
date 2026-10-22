@@ -1,6 +1,6 @@
 import { coffeeSegments, extractSegmentSummary } from "./segments";
 import { translate, type TranslationKey } from "../../i18n";
-import { coffeeInstruction } from "./language";
+import { coffeeContentLocale, coffeeInstruction } from "./language";
 import { assembleCoffeeContext, MAX_COFFEE_CONTEXT_CHARS } from "./prompt-parts";
 import { prepareStep, StepRunner, type PreparedStep } from "../../core/step-runner";
 import { coffeeStepProvider, type CoffeeStepControls } from "./step-provider";
@@ -233,7 +233,8 @@ export class CoffeeEngine {
   }
   /** Dictionary text in the session's language. */
   private text(key: TranslationKey): string {
-    return translate(this.session.language, key);
+    // Messages are display text: they follow the interface language when it shares the session's note language.
+    return translate(coffeeContentLocale(this.session.language), key);
   }
   /** Whether the session is written in a Chinese-instruction language (the messages that only they localize). */
   private get zh(): boolean {

@@ -2,7 +2,7 @@ import { prepareStep, renderTemplate } from "../../core/step-runner";
 import { coffeeInstruction } from "./language";
 import { PREVIEW_OBSERVER_NOTES_TEMPLATE } from "./steps/_shared/fragments";
 import { observerGuidance } from "./customization";
-import { cleanChatStyle, conversationStyle, observerFormat, OBSERVER_TITLES } from "./prompt-parts";
+import { cleanChatStyle, conversationStyle, observerFormat, observerTitles } from "./prompt-parts";
 import { segmentSummaryInstruction } from "./segments";
 import { observerOnlyStep } from "./steps/observer-only/step";
 import { questionStep } from "./steps/question/step";
@@ -39,7 +39,7 @@ export function openingPromptPreview(topic: string, language: string, guests: Gu
   const style = cleanChatStyle(conversationStyle(language, guests));
   const prompt = tablePrompt(topic, language, { ...guests, stylePrompt: style });
   const guidance = guests.customization ? `${observerGuidance(language, guests.customization)}\n` : "";
-  const readableNotes = `\n\n${renderTemplate(PREVIEW_OBSERVER_NOTES_TEMPLATE[key], { guidance, titles: OBSERVER_TITLES[key] })}`;
+  const readableNotes = `\n\n${renderTemplate(PREVIEW_OBSERVER_NOTES_TEMPLATE[key], { guidance, titles: observerTitles(language) })}`;
   const protocol = observerFormat(language, false, guests.customization) + segmentSummaryInstruction(language);
   return prompt.slice(0, -protocol.length) + readableNotes;
 }

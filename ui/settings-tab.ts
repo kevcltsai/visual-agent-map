@@ -1,7 +1,7 @@
 import type VisualAgentMapPlugin from "../main";
 import { SUPPORTED_LANGUAGES, t } from "../i18n";
 import { normalizeReasoningLevel } from "../repository";
-import { syncModelSelect } from "../core/model-discovery";
+import { modelDiscoverySummary, syncModelSelect } from "../core/model-discovery";
 import { renderDetailTemplatesSetting } from "./modals/detail-templates-modal";
 import { renderTonePresetsSetting } from "./modals/prompt-presets-modal";
 import { clampPreviewScale } from "./preview-utils";
@@ -205,7 +205,7 @@ export class VisualAgentMapSettingTab extends PluginSettingTab {
       }
       const codex = plugin.modelDiscoveryState("codex"),
         claude = plugin.modelDiscoveryState("claude");
-      const status = `Codex ${codex.status}${codex.error ? `: ${codex.error}` : ""}; Claude CLI candidates ${claude.status}`;
+      const status = modelDiscoverySummary(codex, claude);
       for (const element of [...this.modelStatusEls]) {
         if (!element.isConnected) this.modelStatusEls.delete(element);
         else element.setText(status);
@@ -305,7 +305,7 @@ export class VisualAgentMapSettingTab extends PluginSettingTab {
             );
           this.modelStatusEls.add(setting.descEl);
           setting.descEl.setText(
-            `Codex ${this.plugin.modelDiscoveryState("codex").status}; Claude CLI candidates ${this.plugin.modelDiscoveryState("claude").status}`
+            modelDiscoverySummary(this.plugin.modelDiscoveryState("codex"), this.plugin.modelDiscoveryState("claude"))
           );
           if (this.plugin.modelDiscoveryState("codex").status === "idle")
             void this.plugin.refreshModelDiscovery("codex");

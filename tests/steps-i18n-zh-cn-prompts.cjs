@@ -25,6 +25,18 @@ void count;
 const DICTIONARY_PREFIXES = ['research.'];
 const RESEARCH_KEYS = Object.keys(zhTW).filter(key => DICTIONARY_PREFIXES.some(prefix => key.startsWith(prefix)));
 const dictionaryPairs = Object.keys(zhTW).filter(key => DICTIONARY_PREFIXES.some(prefix => key.startsWith(prefix))).map(key => [zhCN[key], zhTW[key]]).sort((a, b) => b[0].length - a[0].length);
+// The R1 heading-verbatim additions (zh-CN only): the output-language sentence names the note language for the standard
+// headings, and a clause after the fixed heading list says to copy them exactly. Both are removed before comparing.
+const NOTE = entry('zh-CN').note, NOTE_ZH = entry(NOTE).prompt.zh.plain, CN_ZH = entry('zh-CN').prompt.zh.plain;
+const HEADING_RULE_CN = `六個標準 Detail 標題固定使用筆記語言（${NOTE_ZH}），逐字照 detail 結構寫出；內文仍使用${CN_ZH}。`;
+const HEADING_RULE_TW = '六個標準 Detail 標題固定跟隨介面語言。';
+const CLAUSE_CN = `固定標題必須逐字照上列寫出（${NOTE_ZH}，不要轉成${CN_ZH}），不可增加另一套標題；只有標題底下的內容使用${CN_ZH}撰寫。`;
+// Returns the text without the additions, and how many of each it carried.
+const stripVerbatim = text => {
+  const rules = text.split(HEADING_RULE_CN).length - 1;
+  const lines = text.split('\n'), kept = lines.filter(line => line !== CLAUSE_CN);
+  return { text: kept.join('\n').split(HEADING_RULE_CN).join(HEADING_RULE_TW), rules, clauses: lines.length - kept.length };
+};
 const toTraditional = text => {
   let result = text;
   CN.forEach(name => { result = result.split(name).join(`\u0000${CN.indexOf(name)}\u0000`); });
@@ -50,7 +62,7 @@ test('zh-CN prompt snapshots differ from zh-TW only on language names (one posit
   let total = 0;
   for (const base of bases) {
     const zh = fs.readFileSync(path.join(directory, `${base}.zh.txt`), 'utf8');
-    const cn = fs.readFileSync(path.join(directory, `${base}.zh-CN.txt`), 'utf8');
+    const cn = stripVerbatim(fs.readFileSync(path.join(directory, `${base}.zh-CN.txt`), 'utf8')).text;
     const twPositions = positions(zh, TW);
     const cnPositions = positions(cn, CN);
     if (twPositions !== cnPositions) unexplained.push(`${base}: ${twPositions} zh-TW name positions vs ${cnPositions} zh-CN`);
@@ -73,4 +85,15 @@ test('zh-CN prompt snapshots: exactly 17 lines carry a research.* text that diff
   assert.ok(simplified.length > 0, 'some research.* texts are Simplified');
   const lines = bases.flatMap(base => fs.readFileSync(path.join(directory, `${base}.zh-CN.txt`), 'utf8').split('\n').filter(line => simplified.some(text => line.includes(text))));
   assert.equal(lines.length, 17);
+});
+
+test('zh-CN prompt snapshots: the heading-verbatim additions are exactly 19 output-language sentences and 19 clauses, none in zh-TW', () => {
+  const total = { rules: 0, clauses: 0 };
+  for (const file of fs.readdirSync(directory).filter(name => /\.zh-CN(\.\d+)?\.txt$/.test(name))) {
+    const found = stripVerbatim(fs.readFileSync(path.join(directory, file), 'utf8'));
+    total.rules += found.rules; total.clauses += found.clauses;
+  }
+  for (const file of fs.readdirSync(directory).filter(name => /\.zh(\.\d+)?\.txt$/.test(name)))
+    assert.equal(fs.readFileSync(path.join(directory, file), 'utf8').includes('固定標題必須逐字'), false, `${file}: zh-TW has no clause`);
+  assert.deepEqual(total, { rules: 19, clauses: 19 });
 });

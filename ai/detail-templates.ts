@@ -1,5 +1,6 @@
 import { NOTE_LANGUAGES, translate, type NoteLanguage, type TranslationKey, type UiLanguage } from "../i18n";
 import { fencedLines } from "./markdown-blocks";
+import { headingsVerbatim } from "../core/steps/_shared/fragments";
 import { customDetailRule, customDetailStructure, textbookDetailStructure } from "../core/steps/task/fragments";
 
 export type DetailSectionRole = "none" | "sources" | "log";
@@ -294,7 +295,16 @@ export function countIssueText(issue: CountIssue, language: UiLanguage): string 
   return translate(language, key, issue.section, issue.n, issue.actual);
 }
 
+/** The structure text for a template, plus (only when the output language's note language differs, i.e. zh-CN) the clause that keeps the fixed headings verbatim. */
 export function detailStructurePrompt(
+  template: DetailTemplate,
+  language: UiLanguage,
+  standardText: (headings: string) => string
+): string {
+  return [structureText(template, language, standardText), headingsVerbatim(language)].filter(Boolean).join("\n");
+}
+
+function structureText(
   template: DetailTemplate,
   language: UiLanguage,
   standardText: (headings: string) => string

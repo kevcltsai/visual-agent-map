@@ -2,6 +2,7 @@ import { renderTemplate } from "../../step-runner";
 import {
   instructionLanguageOf,
   languagePromptName,
+  verbatimHeadingLanguage,
   type InstructionLanguage,
   type PromptNameForm,
   type UiLanguage
@@ -32,6 +33,8 @@ import RoleZH from "./role.zh.md";
 import RoleEN from "./role.en.md";
 import SourceSafetyZH from "./source-safety.zh.md";
 import SourceSafetyEN from "./source-safety.en.md";
+import HeadingsVerbatimZH from "./headings-verbatim.zh.md";
+import HeadingsVerbatimEN from "./headings-verbatim.en.md";
 import ToneZH from "./tone.zh.md";
 import ToneEN from "./tone.en.md";
 
@@ -62,11 +65,26 @@ export function inLanguageNaming(
   names: Readonly<Record<string, PromptNameForm>>,
   spelledIn?: InstructionLanguage
 ): string {
-  const instruction = instructionLanguageOf(language);
+  return renderTemplate(
+    fragment[instructionLanguageOf(language)],
+    languageVariables(language, names, undefined, spelledIn)
+  );
+}
+
+/**
+ * Template variables naming `language`: each placeholder maps to a registry name form, spelled for `spelledIn` or, by
+ * default, for the instruction language of `instructionOf` (the language the prompt is written for).
+ */
+export function languageVariables(
+  language: UiLanguage,
+  names: Readonly<Record<string, PromptNameForm>>,
+  instructionOf: UiLanguage = language,
+  spelledIn?: InstructionLanguage
+): Record<string, string> {
   const variables: Record<string, string> = {};
   for (const [placeholder, form] of Object.entries(names))
-    variables[placeholder] = languagePromptName(language, spelledIn ?? instruction, form);
-  return renderTemplate(fragment[instruction], variables);
+    variables[placeholder] = languagePromptName(language, spelledIn ?? instructionLanguageOf(instructionOf), form);
+  return variables;
 }
 
 /** Claude only: return through the StructuredOutput tool at once, without a text draft first. Codex prompts never include it. */
@@ -96,4 +114,20 @@ export const SOURCE_SAFETY: FragmentPair = pair(SourceSafetyZH, SourceSafetyEN);
  */
 export function toneBlock(toneText: string, language: UiLanguage): string {
   return renderTemplate(inLanguage({ zh: ToneZH, en: ToneEN }, language), { tone: toneText });
+}
+
+const HEADINGS_VERBATIM: FragmentPair = { zh: HeadingsVerbatimZH, en: HeadingsVerbatimEN };
+/**
+ * When the output language is written in a different note language (Simplified Chinese interface, Traditional headings),
+ * the clause that tells the model to copy the fixed headings exactly as listed while writing the content in the output
+ * language. Empty for languages whose note language is themselves, so those prompts stay unchanged.
+ */
+export function headingsVerbatim(output: UiLanguage, instruction?: InstructionLanguage): string {
+  const note = verbatimHeadingLanguage(output);
+  if (!note) return "";
+  const spelled = instruction ?? instructionLanguageOf(output);
+  return renderTemplate(HEADINGS_VERBATIM[spelled], {
+    note: languagePromptName(note, spelled, "plain"),
+    language: languagePromptName(output, spelled, "plain")
+  });
 }

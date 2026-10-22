@@ -1,6 +1,6 @@
 import { registerInternalMarkerPresentation } from "./experiences/markdown-context/internal-markers";
 import { registerMermaidZoom, type MermaidZoomHandle } from "./experiences/mermaid-zoom/register";
-import { CoffeeTablesView, COFFEE_TABLES_VIEW_TYPE, COFFEE_TABLES_NAME } from "./experiences/coffee-tables/view";
+import { CoffeeTablesView, COFFEE_TABLES_VIEW_TYPE } from "./experiences/coffee-tables/view";
 import type { CoffeeRequest, CoffeeSession } from "./experiences/coffee-tables/types";
 import { CoffeeManager } from "./experiences/coffee-tables/engine";
 import { CoffeeStorage } from "./experiences/coffee-tables/storage";
@@ -225,6 +225,7 @@ export default class VisualAgentMapPlugin extends Plugin {
   private detailsLeaf: WorkspaceLeaf | null = null;
   private detailsPath: string | null = null;
   private ribbonIcon: HTMLElement | null = null;
+  private coffeeRibbonIcon: HTMLElement | null = null;
   private localizedCommands: { command: Command; key: TranslationKey }[] = [];
   private queue: Promise<void> = Promise.resolve();
   private writing = 0;
@@ -437,10 +438,13 @@ export default class VisualAgentMapPlugin extends Plugin {
       element.dataset.vamLineStart = String(section.lineStart);
       element.dataset.vamLineEnd = String(section.lineEnd);
     });
-    this.addCommand({
-      id: "markdown-selection-ai",
-      name: t("ui.context_ai_open"),
-      checkCallback: checking => markdownSelectionAi.openForSelection(checking)
+    this.localizedCommands.push({
+      command: this.addCommand({
+        id: "markdown-selection-ai",
+        name: t("ui.context_ai_open"),
+        checkCallback: checking => markdownSelectionAi.openForSelection(checking)
+      }),
+      key: "ui.context_ai_open"
     });
     this.logs.appendLog("info", t("log.plugin_loaded_0", this.manifest.version || "unknown"));
     if (this.app.vault.adapter instanceof FileSystemAdapter && this.manifest.dir) {
@@ -512,8 +516,9 @@ export default class VisualAgentMapPlugin extends Plugin {
     const openCoffee = (): void => {
       void this.activateCoffeeTables().catch((error: unknown) => new Notice(String(error)));
     };
-    const coffeeRibbonIcon = this.addRibbonIcon("coffee", `Open ${COFFEE_TABLES_NAME}`, openCoffee);
-    this.addCommand({ id: "open-coffee-tables", name: `Open ${COFFEE_TABLES_NAME}`, callback: openCoffee });
+    const coffeeRibbonIcon = this.addRibbonIcon("coffee", t("ui.open_coffee_tables"), openCoffee);
+    this.coffeeRibbonIcon = coffeeRibbonIcon;
+    this.addLocalizedCommand("open-coffee-tables", "ui.open_coffee_tables", openCoffee);
     this.registerView(VIEW_TYPE, leaf => new VisualAgentMapView(leaf, this));
     this.registerView(
       OUTLINE_VIEW_TYPE,
@@ -1173,6 +1178,7 @@ export default class VisualAgentMapPlugin extends Plugin {
   }
   refreshLocalizedEntrypoints(): void {
     this.ribbonIcon?.setAttribute("aria-label", translate(this.settings.language, "ui.open_map"));
+    this.coffeeRibbonIcon?.setAttribute("aria-label", translate(this.settings.language, "ui.open_coffee_tables"));
     for (const { command, key } of this.localizedCommands)
       command.name = `Visual Agent Map (VAM): ${translate(this.settings.language, key)}`;
   }

@@ -35,6 +35,8 @@ export const en = {
   "ui.interface_language_description":
     "Controls VAM and Coffee Tables only; it is independent of Obsidian’s language. Existing notes and conversation text are preserved.",
   "ui.open_map": "Open mind map",
+  "ui.open_coffee_tables": "Open Coffee Tables",
+  "ui.model_discovery_summary_0_1": "Codex: {0} · Claude CLI candidates: {1}",
   "ui.my_editable_mind_map": "My editable mind map",
   "ui.sample_start_hint":
     "Duplicate this sample or create an empty mind map to start. An AI provider is only needed for AI tasks.",

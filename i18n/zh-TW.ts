@@ -35,6 +35,8 @@ export const zhTW: Record<TranslationKey, string> = {
   "ui.interface_language_description":
     "只控制 VAM 與 Coffee Tables，和 Obsidian 的語言設定分開。既有筆記及對談內容會保留原文。",
   "ui.open_map": "開啟心智圖",
+  "ui.open_coffee_tables": "開啟 Coffee Tables",
+  "ui.model_discovery_summary_0_1": "Codex：{0} · Claude CLI 候選模型：{1}",
   "ui.my_editable_mind_map": "我的可編輯心智圖",
   "ui.sample_start_hint": "複製這份範例或建立空白心智圖即可開始；只有 AI 任務需要選擇 AI 服務。",
   "ui.language_changed_content_preserved": "VAM 與 Coffee Tables 已切換為繁體中文。既有筆記及對談內容會保留原文。",

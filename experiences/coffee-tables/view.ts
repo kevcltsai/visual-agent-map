@@ -71,7 +71,7 @@ import { COFFEE_TOPICS, coffeeTopicText, pickCoffeeTopic } from "./topics";
 import { findRelatedSpeech, type CoffeeSpeechTarget } from "./outline";
 import { baselineFromVersions } from "./insights";
 import { validateGuestInvitations } from "./guest-invitations";
-import { syncModelSelect } from "../../core/model-discovery";
+import { modelDiscoverySummary, syncModelSelect } from "../../core/model-discovery";
 import { providerForModel } from "../../ai/providers/provider";
 
 export const COFFEE_TABLES_NAME = "Coffee Tables";
@@ -359,11 +359,13 @@ export function rosterFor(
     const key = roleKey(person.role);
     if (key) used.set(key, (used.get(key) ?? 0) + 1);
   }
+  // Placeholders are display-only, so they follow the interface language; the roles of real guests stay as stored.
+  const display = coffeeContentLocale(session.language);
   const placeholders = roles.flatMap(item =>
     Array.from({ length: Math.max(0, item.count - (used.get(item.category) ?? 0)) }, (_, index) => ({
-      name: `${translate(locale, item.label)} ${index + 1}`,
-      role: translate(locale, "coffee.roster_joining"),
-      bio: translate(locale, "coffee.roster_waiting_for_introduction")
+      name: `${translate(display, item.label)} ${index + 1}`,
+      role: translate(display, "coffee.roster_joining"),
+      bio: translate(display, "coffee.roster_waiting_for_introduction")
     }))
   );
   return [...people, ...placeholders];
@@ -1305,7 +1307,7 @@ export class CoffeeTablesView extends ItemView {
         setModels(available);
         updateAdvancedSummary();
         modelStatus.setText(
-          `${this.t("ui.codex_provider_label")}: ${this.plugin.modelDiscoveryState("codex").status} · ${this.t("coffee.claude_cli_candidates")}: ${this.plugin.modelDiscoveryState("claude").status}`
+          modelDiscoverySummary(this.plugin.modelDiscoveryState("codex"), this.plugin.modelDiscoveryState("claude"))
         );
         model.disabled = false;
         reasoning.disabled = false;

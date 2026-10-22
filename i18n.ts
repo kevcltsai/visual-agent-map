@@ -46,6 +46,14 @@ export function instructionLanguageOf(locale: UiLanguage): InstructionLanguage {
  * (so a Simplified Chinese interface keeps writing Simplified Chinese prose), otherwise `note` itself.
  */
 export function contentLocale(note: NoteLanguage, ui: UiLanguage): UiLanguage { return noteLanguageOf(ui) === note ? ui : note; }
+/**
+ * The note language whose fixed headings a prompt must have the model copy verbatim, or null when the output locale
+ * already is its note language (zh-TW, en). Only a locale whose note language differs (zh-CN) needs the extra rule.
+ */
+export function verbatimHeadingLanguage(output: UiLanguage): NoteLanguage | null {
+  const note = noteLanguageOf(output);
+  return note === output ? null : note;
+}
 /** How a prompt written in `instruction` names language `locale`, in the given `form`. */
 export function languagePromptName(locale: UiLanguage, instruction: InstructionLanguage, form: PromptNameForm): string {
   return entryOf(locale).prompt[instruction][form];

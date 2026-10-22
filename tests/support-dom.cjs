@@ -23,6 +23,7 @@ function element(tag, options = {}) {
     hasClass(name) { return this.classes.includes(name); },
     classList: { toggle(name, on) { const el2 = this._owner; on === undefined ? (el2.hasClass(name) ? el2.removeClass(name) : el2.addClass(name)) : el2.toggleClass(name, on); }, contains(name) { return this._owner.hasClass(name); }, add(name) { this._owner.addClass(name); }, remove(name) { this._owner.removeClass(name); } },
     contains(other) { return findAll(this, x => x === other).length > 0; },
+    insertBefore(node, ref) { node.parent = this; const at = ref ? this.children.indexOf(ref) : -1; at < 0 ? this.children.push(node) : this.children.splice(at, 0, node); return node; },
     empty() { this.children = []; }, replaceChildren(...next) { this.children = next; }, add(option) { this.children.push(option); },
     remove() { if (this.parent) this.parent.children = this.parent.children.filter(c => c !== this); },
     addEventListener(name, fn) { (this.listeners[name] ??= []).push(fn); },

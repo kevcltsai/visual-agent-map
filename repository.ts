@@ -1068,6 +1068,19 @@ export class Repository {
     return current;
   }
 
+  /**
+   * What "follow the default" resolves to for a topic: a root follows the workspace model, a child follows its upper
+   * topic (nearest manual ancestor, else the workspace model).
+   */
+  async followDefaultModel(
+    path: string,
+    map?: MapDocument
+  ): Promise<{ source: Exclude<ModelSource, "manual">; model: string }> {
+    const node = map?.nodes.find(item => item.path === path);
+    if (!node?.parentId) return { source: "workspace", model: this.settings.cliModel };
+    return { source: "inherited", model: await this.effectiveModel(path, undefined, "inherited", map) };
+  }
+
   async readNote(path: string, map?: MapDocument): Promise<Note> {
     const file = this.file(path),
       content = decodeCalloutSections(upgradeLegacyAimText(await this.app.vault.read(file))),

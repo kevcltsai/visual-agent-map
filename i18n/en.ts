@@ -787,6 +787,7 @@ export const en = {
   "ui.workspace_default": "Workspace default",
   "ui.inherited_at_creation": "Follows upper topic",
   "ui.manually_selected": "Manually selected",
+  "ui.follow_default_model": "Follow default (now: {0})",
   "ui.this_node_s_note_is_missing_relink_an_unassigned_note_or_rem":
     "This node's note is missing. Relink an unassigned note or remove it from the map.",
   "ui.relink_note": "Relink note",

@@ -726,6 +726,7 @@ export const zhTW: Record<TranslationKey, string> = {
   "ui.workspace_default": "工作區預設",
   "ui.inherited_at_creation": "跟隨上層議題",
   "ui.manually_selected": "手動指定",
+  "ui.follow_default_model": "跟隨預設（目前：{0}）",
   "ui.this_node_s_note_is_missing_relink_an_unassigned_note_or_rem":
     "此議題的筆記不存在，可重新連結未歸類筆記或從圖中移除。",
   "ui.relink_note": "重新連結筆記",

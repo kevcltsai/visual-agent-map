@@ -121,6 +121,8 @@ export interface OutputLanguageMemory {
   /** Records the language picked by hand in this dialog; called once, when a run starts. */
   rememberOutputLanguage?: (language: ContentLanguage) => Promise<void>;
 }
+/** Option value of the model select that means "follow the default" instead of pinning a model. */
+export const FOLLOW_DEFAULT_MODEL = "__follow_default__";
 export interface NextStepSettings extends OutputLanguageMemory {
   /**
    * The note language the topic note already uses: its stored `content-language`, or the language of its standard Detail
@@ -129,6 +131,11 @@ export interface NextStepSettings extends OutputLanguageMemory {
   contentLanguage?: NoteLanguage;
   model: string;
   modelSource: ModelSource;
+  /**
+   * What "follow the default" means for this topic: a root follows the workspace model, a child follows its upper
+   * topic. `model` is the model that choice would run on now. Absent: the dialog assumes a root and the plugin setting.
+   */
+  followDefault?: { source: Exclude<ModelSource, "manual">; model: string };
   reasoning: string;
   rules?: string;
   path?: string;
@@ -505,19 +512,27 @@ export class NextStepModal extends Modal {
             .map((value: string) => value.trim())
             .filter(Boolean);
     const options = new Set<string>(optionList);
+    const follow = settings.followDefault ?? { source: "workspace" as const, model: this.plugin.settings.cliModel };
+    const followLabel = (): string => t("ui.follow_default_model", this.plugin.modelLabel(follow.model));
     const syncModels = (): void => {
+      const chosen = settings.modelSource === "manual" ? model.value : FOLLOW_DEFAULT_MODEL;
+      if (chosen === FOLLOW_DEFAULT_MODEL) model.value = "";
       syncModelSelect(
         model,
         this.plugin.availableModels(),
         id => this.plugin.modelLabel(id),
         t("ui.current_model_is_unavailable")
       );
+      model.insertBefore(new Option(followLabel(), FOLLOW_DEFAULT_MODEL), model.firstChild);
+      model.value = chosen;
       options.clear();
       this.plugin.availableModels().forEach(id => options.add(id));
     };
     syncModels();
     // One way to recover: the link opens the setup guide when the CLI is missing, otherwise checks again.
-    fieldLink(modelHead, t("ui.connection_repair"), () => this.plugin.repairConnection(model.value));
+    fieldLink(modelHead, t("ui.connection_repair"), () =>
+      this.plugin.repairConnection(model.value === FOLLOW_DEFAULT_MODEL ? follow.model : model.value)
+    );
     const discovery = advanced.createDiv("vam-model-discovery-status");
     const discoveryText = discovery.createSpan({ cls: "vam-hint" });
     const updateDiscovery = (): void => {
@@ -548,8 +563,22 @@ export class NextStepModal extends Modal {
         sourceLabels[settings.modelSource]
       )
     });
-    model.value = settings.model;
+    model.value = settings.modelSource === "manual" ? settings.model : FOLLOW_DEFAULT_MODEL;
     model.addEventListener("change", () => {
+      if (model.value === FOLLOW_DEFAULT_MODEL) {
+        settings.model = follow.model;
+        settings.modelSource = follow.source;
+        modelSummary.setText(
+          t(
+            "ui.0_1_reasoning_can_be_adjusted_per_topic",
+            this.plugin.modelLabel(settings.model),
+            sourceLabels[settings.modelSource]
+          )
+        );
+        save({ modelSource: settings.modelSource });
+        describeModel();
+        return;
+      }
       if (!options.has(model.value)) return;
       settings.model = model.value;
       settings.modelSource = "manual";

@@ -793,6 +793,7 @@ var en = {
   "ui.workspace_default": "Workspace default",
   "ui.inherited_at_creation": "Follows upper topic",
   "ui.manually_selected": "Manually selected",
+  "ui.follow_default_model": "Follow default (now: {0})",
   "ui.this_node_s_note_is_missing_relink_an_unassigned_note_or_rem": "This node's note is missing. Relink an unassigned note or remove it from the map.",
   "ui.relink_note": "Relink note",
   "ui.use_this_note": "Use this note",
@@ -2457,6 +2458,7 @@ var zhCN = {
   "ui.workspace_default": "\u5DE5\u4F5C\u533A\u9ED8\u8BA4",
   "ui.inherited_at_creation": "\u8DDF\u968F\u4E0A\u5C42\u8BAE\u9898",
   "ui.manually_selected": "\u624B\u52A8\u6307\u5B9A",
+  "ui.follow_default_model": "\u8DDF\u968F\u9ED8\u8BA4\uFF08\u5F53\u524D\uFF1A{0}\uFF09",
   "ui.this_node_s_note_is_missing_relink_an_unassigned_note_or_rem": "\u6B64\u8BAE\u9898\u7684\u7B14\u8BB0\u4E0D\u5B58\u5728\uFF0C\u53EF\u91CD\u65B0\u94FE\u63A5\u672A\u5F52\u7C7B\u7B14\u8BB0\u6216\u4ECE\u56FE\u4E2D\u79FB\u9664\u3002",
   "ui.relink_note": "\u91CD\u65B0\u94FE\u63A5\u7B14\u8BB0",
   "ui.use_this_note": "\u4F7F\u7528\u8FD9\u4EFD\u7B14\u8BB0",
@@ -4121,6 +4123,7 @@ var zhTW = {
   "ui.workspace_default": "\u5DE5\u4F5C\u5340\u9810\u8A2D",
   "ui.inherited_at_creation": "\u8DDF\u96A8\u4E0A\u5C64\u8B70\u984C",
   "ui.manually_selected": "\u624B\u52D5\u6307\u5B9A",
+  "ui.follow_default_model": "\u8DDF\u96A8\u9810\u8A2D\uFF08\u76EE\u524D\uFF1A{0}\uFF09",
   "ui.this_node_s_note_is_missing_relink_an_unassigned_note_or_rem": "\u6B64\u8B70\u984C\u7684\u7B46\u8A18\u4E0D\u5B58\u5728\uFF0C\u53EF\u91CD\u65B0\u9023\u7D50\u672A\u6B78\u985E\u7B46\u8A18\u6216\u5F9E\u5716\u4E2D\u79FB\u9664\u3002",
   "ui.relink_note": "\u91CD\u65B0\u9023\u7D50\u7B46\u8A18",
   "ui.use_this_note": "\u4F7F\u7528\u9019\u4EFD\u7B46\u8A18",
@@ -18094,6 +18097,15 @@ var Repository = class {
     }
     return current;
   }
+  /**
+   * What "follow the default" resolves to for a topic: a root follows the workspace model, a child follows its upper
+   * topic (nearest manual ancestor, else the workspace model).
+   */
+  async followDefaultModel(path, map) {
+    const node = map == null ? void 0 : map.nodes.find((item) => item.path === path);
+    if (!(node == null ? void 0 : node.parentId)) return { source: "workspace", model: this.settings.cliModel };
+    return { source: "inherited", model: await this.effectiveModel(path, void 0, "inherited", map) };
+  }
   async readNote(path, map) {
     var _a2;
     const file = this.file(path), content = decodeCalloutSections(upgradeLegacyAimText(await this.app.vault.read(file))), fm = frontmatter(content);
@@ -22127,6 +22139,7 @@ var DetailTemplatesModal = class extends import_obsidian20.Modal {
 };
 
 // experiences/visual-map/modals.ts
+var FOLLOW_DEFAULT_MODEL = "__follow_default__";
 function outlineProposals(nodes) {
   var _a2;
   const root = nodes.filter((node) => node.parent === null).length === 1 ? (_a2 = nodes[0]) == null ? void 0 : _a2.index : void 0;
@@ -22368,7 +22381,7 @@ var NextStepModal = class extends import_obsidian21.Modal {
     }
   }
   renderModelSettings(parent) {
-    var _a2;
+    var _a2, _b2;
     if (!this.modelSettings) return;
     const settings = this.modelSettings;
     const advanced = parent.createEl("details", { cls: "vam-advanced vam-next-model" });
@@ -22383,18 +22396,28 @@ var NextStepModal = class extends import_obsidian21.Modal {
     model.value = settings.model;
     const optionList = typeof this.plugin.availableModels === "function" ? this.plugin.availableModels() : this.plugin.settings.models.split(/[\n,]/).map((value) => value.trim()).filter(Boolean);
     const options = new Set(optionList);
+    const follow = (_a2 = settings.followDefault) != null ? _a2 : { source: "workspace", model: this.plugin.settings.cliModel };
+    const followLabel = () => t("ui.follow_default_model", this.plugin.modelLabel(follow.model));
     const syncModels = () => {
+      const chosen = settings.modelSource === "manual" ? model.value : FOLLOW_DEFAULT_MODEL;
+      if (chosen === FOLLOW_DEFAULT_MODEL) model.value = "";
       syncModelSelect(
         model,
         this.plugin.availableModels(),
         (id) => this.plugin.modelLabel(id),
         t("ui.current_model_is_unavailable")
       );
+      model.insertBefore(new Option(followLabel(), FOLLOW_DEFAULT_MODEL), model.firstChild);
+      model.value = chosen;
       options.clear();
       this.plugin.availableModels().forEach((id) => options.add(id));
     };
     syncModels();
-    fieldLink(modelHead, t("ui.connection_repair"), () => this.plugin.repairConnection(model.value));
+    fieldLink(
+      modelHead,
+      t("ui.connection_repair"),
+      () => this.plugin.repairConnection(model.value === FOLLOW_DEFAULT_MODEL ? follow.model : model.value)
+    );
     const discovery = advanced.createDiv("vam-model-discovery-status");
     const discoveryText = discovery.createSpan({ cls: "vam-hint" });
     const updateDiscovery = () => {
@@ -22404,7 +22427,7 @@ var NextStepModal = class extends import_obsidian21.Modal {
       );
       syncModels();
     };
-    (_a2 = this.unsubscribeModels) == null ? void 0 : _a2.call(this);
+    (_b2 = this.unsubscribeModels) == null ? void 0 : _b2.call(this);
     this.unsubscribeModels = this.plugin.subscribeModelDiscovery(() => {
       if (!this.closed) updateDiscovery();
     });
@@ -22424,8 +22447,22 @@ var NextStepModal = class extends import_obsidian21.Modal {
         sourceLabels[settings.modelSource]
       )
     });
-    model.value = settings.model;
+    model.value = settings.modelSource === "manual" ? settings.model : FOLLOW_DEFAULT_MODEL;
     model.addEventListener("change", () => {
+      if (model.value === FOLLOW_DEFAULT_MODEL) {
+        settings.model = follow.model;
+        settings.modelSource = follow.source;
+        modelSummary.setText(
+          t(
+            "ui.0_1_reasoning_can_be_adjusted_per_topic",
+            this.plugin.modelLabel(settings.model),
+            sourceLabels[settings.modelSource]
+          )
+        );
+        save({ modelSource: settings.modelSource });
+        describeModel();
+        return;
+      }
       if (!options.has(model.value)) return;
       settings.model = model.value;
       settings.modelSource = "manual";
@@ -37553,7 +37590,7 @@ ${request.requirements}` : preset.text,
   }
   openNextStep(node) {
     this.enqueue(async () => {
-      var _a2, _b2, _c, _d, _e, _f, _g, _h, _i, _j, _k;
+      var _a2, _b2, _c, _d, _e, _f, _g, _h, _i, _j, _k, _l;
       const note = await this.plugin.repo.readNote(node.path, (_a2 = this.map) != null ? _a2 : void 0);
       const currentLabel = t("ui.reference_current_topic_included", note.title);
       const synthesisLabel = t("ui.reference_synthesis_topics_included", note.title);
@@ -37599,7 +37636,8 @@ ${request.requirements}` : preset.text,
         {
           model: note.model,
           modelSource: note.modelSource,
-          reasoning: (_i = note.reasoning) != null ? _i : this.plugin.settings.cliReasoning,
+          followDefault: await this.plugin.repo.followDefaultModel(node.path, (_i = this.map) != null ? _i : void 0),
+          reasoning: (_j = note.reasoning) != null ? _j : this.plugin.settings.cliReasoning,
           rules: note.rules,
           path: node.path,
           save: (patch) => this.plugin.mutate(() => this.noteChange(node, patch)),
@@ -37635,10 +37673,10 @@ ${request.requirements}` : preset.text,
           // Only a label: a missing topic template is reported at the next AI update, not when the dialog opens.
           currentTemplate: templateInLanguage(this.resolveTopicTemplate(note).template, this.plugin.settings.language).name,
           topicStatus: note.status,
-          childrenCompleted: (_k = (_j = this.map) == null ? void 0 : _j.nodes.filter((item) => {
+          childrenCompleted: (_l = (_k = this.map) == null ? void 0 : _k.nodes.filter((item) => {
             var _a3;
             return item.parentId === node.id && ((_a3 = this.notes.get(item.id)) == null ? void 0 : _a3.status) === "completed";
-          }).length) != null ? _k : 0,
+          }).length) != null ? _l : 0,
           synthesisPending: (() => {
             const pending = this.synthesisTasks.get(node.path);
             return (pending == null ? void 0 : pending.state) === "directions" && pending.mapPath === this.path ? { directions: pending.directions, discard: () => this.discardSynthesis(node) } : void 0;

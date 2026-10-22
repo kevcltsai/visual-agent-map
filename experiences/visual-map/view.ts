@@ -7237,6 +7237,7 @@ export class VisualAgentMapView extends ItemView {
         {
           model: note.model,
           modelSource: note.modelSource,
+          followDefault: await this.plugin.repo.followDefaultModel(node.path, this.map ?? undefined),
           reasoning: note.reasoning ?? this.plugin.settings.cliReasoning,
           rules: note.rules,
           path: node.path,

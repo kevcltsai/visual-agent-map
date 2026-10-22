@@ -725,6 +725,7 @@ export const zhCN: Record<TranslationKey, string> = {
   "ui.workspace_default": "工作区默认",
   "ui.inherited_at_creation": "跟随上层议题",
   "ui.manually_selected": "手动指定",
+  "ui.follow_default_model": "跟随默认（当前：{0}）",
   "ui.this_node_s_note_is_missing_relink_an_unassigned_note_or_rem":
     "此议题的笔记不存在，可重新链接未归类笔记或从图中移除。",
   "ui.relink_note": "重新链接笔记",

@@ -4,7 +4,16 @@
 
 ### Added
 
-- Simplified Chinese interface.
+- Simplified Chinese interface. Notes created with it keep their fixed headings (Preview, Detail sections) in Traditional Chinese, so a vault never mixes heading languages.
+
+### Changed
+
+- The model status line in Settings, Coffee Tables and the hand-off dialog now reads the same everywhere ("Codex: ready · Claude CLI candidates: ready") and follows the interface language.
+- "Open Coffee Tables" (ribbon and command) now follows the interface language.
+
+### Fixed
+
+- The selection AI and Coffee Tables command names now update when you switch the interface language, without reloading.
 
 ## [0.25.0] - 2026-10-22
 

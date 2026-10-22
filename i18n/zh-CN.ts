@@ -1753,5 +1753,19 @@ export const zhCN: Record<TranslationKey, string> = {
   "error.relevance_grade_over_budget": "心智图太大，无法一次分级，没有任何改变。",
   "error.relevance_grade_stopped": "分级已停止。",
   "error.relevance_grade_invalid": "无法使用 AI 的分级结果：{0}",
-  "error.relevance_grade_hierarchy": "AI 的上下层分级仍不一致，请点“目标”再按 Enter 重试"
+  "error.relevance_grade_hierarchy": "AI 的上下层分级仍不一致，请点“目标”再按 Enter 重试",
+  // Share viewer (shipped inside the exported HTML file)
+  "share.viewer_read_only": "分享的地图・只读",
+  "share.viewer_made_with": "由 VAM 制作",
+  "share.viewer_install": "安装 VAM",
+  "share.viewer_goal_0": "目标：{0}",
+  "share.viewer_hint": "拖拽空白处平移 · 滚轮缩放 · 点击议题查看内容",
+  "share.viewer_topic_details": "议题内容",
+  "share.viewer_details_button": "详情",
+  "share.viewer_expand_0": "展开 {0}",
+  "share.viewer_subtopics": "子议题",
+  "share.viewer_no_content": "这个议题在分享文件中没有笔记内容。",
+  "share.viewer_image_omitted": "[图片未包含]",
+  "share.viewer_resize_panel": "调整侧栏宽度",
+  "share.viewer_untitled": "未命名的地图"
 };

@@ -6,7 +6,7 @@
   "scripts": {
     "dev": "node esbuild.config.mjs",
     "compile:sample": "node scripts/compile-sample.mjs",
-    "build": "npm run compile:sample && tsc -noEmit -skipLibCheck && node esbuild.config.mjs production",
+    "build": "node scripts/build-viewer.mjs && npm run compile:sample && tsc -noEmit -skipLibCheck && node esbuild.config.mjs production",
     "check:artifacts": "node scripts/check-artifacts.mjs",
     "check:i18n": "node scripts/check-i18n.mjs",
     "test:vault": "npm run test:ui:prepare",
@@ -26,7 +26,7 @@
     "test:ui:update": "node scripts/test-harness.mjs --update-current",
     "format": "prettier --write \"**/*.ts\"",
     "format:check": "prettier --check \"**/*.ts\"",
-    "verify": "npm run lint && npm run format:check && npm run check:i18n && npm test && git diff --exit-code -- main.js samples/taiwan-travel/compiled.json && npm run check:artifacts"
+    "verify": "npm run lint && npm run format:check && npm run check:i18n && npm test && git diff --exit-code -- main.js samples/taiwan-travel/compiled.json experiences/sharing/viewer-bundle.generated.ts && npm run check:artifacts"
   },
   "devDependencies": {
     "@codemirror/state": "6.5.0",

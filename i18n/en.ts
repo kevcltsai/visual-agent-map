@@ -1911,7 +1911,21 @@ export const en = {
   "error.relevance_grade_stopped": "Grading stopped.",
   "error.relevance_grade_invalid": "The AI grading could not be used: {0}",
   "error.relevance_grade_hierarchy":
-    "The AI's parent-child tiers were still inconsistent. Click Goal, then press Enter to try again."
+    "The AI's parent-child tiers were still inconsistent. Click Goal, then press Enter to try again.",
+  // Share viewer (shipped inside the exported HTML file)
+  "share.viewer_read_only": "Shared map · read-only",
+  "share.viewer_made_with": "Made with VAM",
+  "share.viewer_install": "Install VAM",
+  "share.viewer_goal_0": "Goal: {0}",
+  "share.viewer_hint": "Drag empty space to pan · Scroll to zoom · Click a topic to read it",
+  "share.viewer_topic_details": "Topic details",
+  "share.viewer_details_button": "Details",
+  "share.viewer_expand_0": "Expand {0}",
+  "share.viewer_subtopics": "Subtopics",
+  "share.viewer_no_content": "This topic has no notes in the shared file.",
+  "share.viewer_image_omitted": "[image not included]",
+  "share.viewer_resize_panel": "Resize the side panel",
+  "share.viewer_untitled": "Untitled map"
 } as const;
 
 export type TranslationKey = keyof typeof en;

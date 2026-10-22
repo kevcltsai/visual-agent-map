@@ -1,0 +1,128 @@
+/* Share viewer styles. Order: tokens and base (this part), the card, canvas and inspector rules extracted from styles.css, then the viewer-only parts below the marker. */
+:root {
+  color-scheme: light;
+  --background-primary: #ffffff;
+  --background-secondary: #f6f6f6;
+  --background-modifier-border: #e0e0e0;
+  --background-modifier-border-hover: #cfcfcf;
+  --background-modifier-border-focus: #8a5cf5;
+  --background-modifier-hover: rgba(0, 0, 0, 0.05);
+  --background-modifier-active-hover: rgba(138, 92, 245, 0.15);
+  --text-normal: #222222;
+  --text-muted: #5c5c5c;
+  --text-faint: #8a8a8a;
+  --text-on-accent: #ffffff;
+  --text-error: #d1243c;
+  --interactive-accent: #8a5cf5;
+  --text-accent: #6f42e0;
+  --color-red: #e93147;
+  --color-red-rgb: 233, 49, 71;
+  --color-orange: #e9973f;
+  --shadow-s: 0 1px 2px rgba(0, 0, 0, 0.06), 0 2px 8px rgba(0, 0, 0, 0.05);
+  --shadow-l: 0 8px 28px rgba(0, 0, 0, 0.16);
+  --radius-s: 4px;
+  --radius-m: 8px;
+  --font-ui-smaller: 12px;
+  --font-ui-small: 13px;
+  --font-ui-medium: 15px;
+  --input-height: 30px;
+  --size-4-3: 12px;
+  --font-interface: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang TC", "PingFang SC", "Noto Sans TC", "Noto Sans SC", "Microsoft JhengHei", Roboto, sans-serif;
+  --font-monospace: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    color-scheme: dark;
+    --background-primary: #1e1e1e;
+    --background-secondary: #262626;
+    --background-modifier-border: #363636;
+    --background-modifier-border-hover: #4a4a4a;
+    --background-modifier-border-focus: #a88bfa;
+    --background-modifier-hover: rgba(255, 255, 255, 0.06);
+    --background-modifier-active-hover: rgba(168, 139, 250, 0.2);
+    --text-normal: #dadada;
+    --text-muted: #b3b3b3;
+    --text-faint: #8c8c8c;
+    --text-error: #fb464c;
+    --text-accent: #a88bfa;
+    --color-red: #fb464c;
+    --color-red-rgb: 251, 70, 76;
+    --shadow-s: 0 1px 2px rgba(0, 0, 0, 0.3), 0 2px 8px rgba(0, 0, 0, 0.25);
+    --shadow-l: 0 8px 28px rgba(0, 0, 0, 0.5);
+  }
+}
+*, *::before, *::after { box-sizing: border-box; }
+html, body { height: 100%; margin: 0; }
+body { background: var(--background-primary); color: var(--text-normal); font-family: var(--font-interface); font-size: var(--font-ui-small); overflow: hidden; -webkit-text-size-adjust: 100%; }
+button { font: inherit; font-size: var(--font-ui-small); color: var(--text-normal); background: var(--background-primary); border: 1px solid var(--background-modifier-border); border-radius: var(--radius-s); padding: 4px 10px; height: 30px; cursor: pointer; display: inline-flex; align-items: center; gap: 4px; white-space: nowrap; }
+button:hover { background: var(--background-modifier-hover); }
+button:focus-visible, a:focus-visible, [tabindex]:focus-visible { outline: 2px solid var(--interactive-accent); outline-offset: 1px; }
+.svg-icon { width: 16px; height: 16px; stroke: currentColor; fill: none; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; flex: none; }
+.vam-app { display: flex; flex-direction: column; height: 100%; }
+/* @@vam-extracted-rules@@ */
+/* Viewer-only parts: the pieces Obsidian would otherwise provide. */
+.vam-toolbar { padding-left: max(10px, env(safe-area-inset-left, 0px)); padding-right: max(10px, env(safe-area-inset-right, 0px)); }
+.vam-toolbar .vam-map-switcher { cursor: default; margin: 0; font-weight: 600; font-family: inherit; line-height: 1.3; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; display: block; }
+.vam-toolbar .vam-map-switcher:hover { background: transparent; }
+.vam-shared { font-size: var(--font-ui-smaller); color: var(--text-faint); }
+.vam-toolbar-actions { gap: 10px; flex-wrap: wrap; justify-content: flex-end; }
+.vam-made-with { font-size: var(--font-ui-smaller); color: var(--text-faint); }
+.vam-install { display: inline-flex; align-items: center; height: 30px; padding: 4px 12px; border-radius: var(--radius-s); background: var(--interactive-accent); color: var(--text-on-accent); font-size: var(--font-ui-small); text-decoration: none; white-space: nowrap; }
+.vam-install:hover { filter: brightness(1.08); }
+.vam-goal { display: inline-flex; align-items: center; gap: 6px; min-width: 0; max-width: 22em; padding: 0 6px; line-height: var(--input-height); font-size: var(--font-ui-small); color: var(--text-normal); }
+.vam-goal-text { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
+.vam-goal .svg-icon { color: var(--text-accent); }
+.vam-map-tools[hidden] { display: none; }
+.vam-zoom-controls { right: max(12px, env(safe-area-inset-right, 0px)); bottom: max(12px, env(safe-area-inset-bottom, 0px)); }
+.vam-zoom-controls button { background: transparent; }
+.vam-node { touch-action: none; }
+.vam-node.is-dragging { cursor: grabbing; z-index: 2; }
+.vam-node .vam-node-tools button, .vam-node-header button { background: transparent; border: 0; }
+.vam-node-header > .vam-collapse-button { border: 1px solid var(--background-modifier-border); background: var(--background-primary); }
+.vam-layout-menu { position: absolute; right: 0; bottom: calc(100% + 6px); z-index: 6; display: flex; flex-direction: column; min-width: 190px; padding: 4px; border: 1px solid var(--background-modifier-border); border-radius: var(--radius-m); background: var(--background-primary); box-shadow: var(--shadow-l); }
+.vam-layout-menu[hidden] { display: none; }
+.vam-layout-menu button { justify-content: flex-start; width: 100%; border: 0; background: transparent; height: 30px; }
+.vam-layout-menu hr { width: 100%; margin: 4px 0; border: 0; border-top: 1px solid var(--background-modifier-border); }
+.vam-zoom-controls { overflow: visible; }
+.vam-inspector { font-size: 14px; line-height: 1.6; color: var(--text-normal); }
+@media (min-width: 601px) { .vam-inspector { position: relative; } }
+.vam-inspector[hidden] { display: none; }
+.vam-inspector-heading button { height: 26px; }
+.vam-inspector h3 { font-size: 18px; line-height: 1.35; margin: 0 0 8px; overflow-wrap: anywhere; }
+.vam-inspector-why { display: flex; flex-direction: column; gap: 4px; padding: 8px 10px; margin: 0 0 12px; border: 1px solid var(--background-modifier-border); border-radius: var(--radius-m); color: var(--text-muted); font-size: var(--font-ui-small); }
+.vam-inspector-resizer { position: absolute; left: -4px; top: 0; bottom: 0; width: 8px; cursor: col-resize; touch-action: none; z-index: 2; }
+.vam-inspector-resizer:hover, .vam-inspector-resizer.is-resizing { background: var(--background-modifier-active-hover); }
+.vam-inspector-empty { color: var(--text-muted); }
+.vam-subtopics { display: flex; flex-direction: column; gap: 4px; margin-top: 16px; padding-top: 10px; border-top: 1px solid var(--background-modifier-border); }
+.vam-subtopics strong { font-size: var(--font-ui-small); color: var(--text-muted); font-weight: 500; }
+.vam-subtopics button { justify-content: flex-start; height: auto; min-height: 30px; white-space: normal; text-align: left; }
+/* Reading styles for the note HTML that Obsidian rendered at export time. */
+.vam-sample-detail { overflow-wrap: anywhere; }
+.vam-sample-detail h1, .vam-sample-detail h2, .vam-sample-detail h3, .vam-sample-detail h4, .vam-sample-detail h5, .vam-sample-detail h6 { margin: 18px 0 6px; line-height: 1.35; }
+.vam-sample-detail h1 { font-size: 18px; }
+.vam-sample-detail h2 { font-size: 16px; }
+.vam-sample-detail h3, .vam-sample-detail h4, .vam-sample-detail h5, .vam-sample-detail h6 { font-size: 15px; }
+.vam-sample-detail p { margin: 8px 0; }
+.vam-sample-detail ul, .vam-sample-detail ol { padding-left: 22px; margin: 8px 0; }
+.vam-sample-detail a { color: var(--text-accent); }
+.vam-sample-detail blockquote { margin: 10px 0; padding: 2px 12px; border-left: 3px solid var(--background-modifier-border-hover); color: var(--text-muted); }
+.vam-sample-detail hr { border: 0; border-top: 1px solid var(--background-modifier-border); margin: 14px 0; }
+.vam-sample-detail code { font-family: var(--font-monospace); font-size: 12px; background: var(--background-secondary); padding: 1px 4px; border-radius: 3px; }
+.vam-sample-detail pre { overflow-x: auto; background: var(--background-secondary); padding: 8px; border-radius: 6px; }
+.vam-sample-detail pre code { background: transparent; padding: 0; }
+.vam-sample-detail img { max-width: 100%; height: auto; }
+.vam-sample-detail svg { max-width: 100%; height: auto; }
+.vam-sample-detail .mermaid, .vam-sample-detail .vam-table-scroll { overflow-x: auto; margin: 10px 0; }
+.vam-sample-detail table { border-collapse: collapse; font-size: 12.5px; min-width: 100%; }
+.vam-sample-detail th, .vam-sample-detail td { border: 1px solid var(--background-modifier-border); padding: 4px 6px; text-align: left; vertical-align: top; min-width: 5em; overflow-wrap: normal; word-break: normal; }
+.vam-sample-detail .callout { margin: 10px 0; padding: 8px 12px; border-radius: var(--radius-m); background: color-mix(in srgb, var(--interactive-accent) 9%, transparent); border-left: 3px solid var(--interactive-accent); }
+.vam-sample-detail .callout-title { display: flex; align-items: center; gap: 6px; font-weight: 600; color: var(--text-accent); }
+.vam-sample-detail .callout-icon { display: inline-flex; flex: none; }
+.vam-sample-detail .callout-icon svg { width: 16px; height: 16px; }
+.vam-sample-detail .callout-content p:first-child { margin-top: 4px; }
+.vam-sample-detail .vam-image-omitted { color: var(--text-faint); font-size: var(--font-ui-smaller); }
+.vam-sample-detail .internal-link { color: inherit; text-decoration: none; }
+.vam-resizing, .vam-resizing * { cursor: col-resize !important; user-select: none; }
+@media (max-width: 700px) { .vam-canvas-overlay > .vam-canvas-hint { display: none; } }
+@media (max-width: 600px) { .vam-inspector-resizer { display: none; } .vam-toolbar .vam-map-switcher { max-width: 100%; } .vam-made-with { display: none; } }
+@media (prefers-reduced-motion: reduce) { * { transition: none !important; } }

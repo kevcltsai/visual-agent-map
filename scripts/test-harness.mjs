@@ -227,7 +227,7 @@ function sessionMain(args) {
 
 export function sourceFingerprint(directory = root) {
   const git = (...args) => execFileSync("git", args, { cwd: directory, encoding: "utf8" });
-  const generated = new Set(["main.js", "samples/taiwan-travel/compiled.json"]);
+  const generated = new Set(["main.js", "samples/taiwan-travel/compiled.json", "experiences/sharing/viewer-bundle.generated.ts"]);
   const files = [...new Set(git("ls-files", "--cached", "--others", "--exclude-standard", "-z").split("\0").filter(name => name && !generated.has(name)))].sort();
   return hash(JSON.stringify({ commit: git("rev-parse", "HEAD").trim(), branch: git("branch", "--show-current").trim(), files: files.map(name => [name, existsSync(join(directory, name)) ? hash(readFileSync(join(directory, name))) : null]) }));
 }

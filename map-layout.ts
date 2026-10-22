@@ -1,4 +1,4 @@
-import { parentIdsForNode, type MapNode } from "./map-model";
+import { parentIdsForNode, type MapNode } from "./map-graph";
 
 const COLUMN = 360;
 const WIDTH = 300;

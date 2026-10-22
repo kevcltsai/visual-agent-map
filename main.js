@@ -1765,7 +1765,21 @@ var en = {
   "error.relevance_grade_over_budget": "The map is too large to grade at once. Nothing was changed.",
   "error.relevance_grade_stopped": "Grading stopped.",
   "error.relevance_grade_invalid": "The AI grading could not be used: {0}",
-  "error.relevance_grade_hierarchy": "The AI's parent-child tiers were still inconsistent. Click Goal, then press Enter to try again."
+  "error.relevance_grade_hierarchy": "The AI's parent-child tiers were still inconsistent. Click Goal, then press Enter to try again.",
+  // Share viewer (shipped inside the exported HTML file)
+  "share.viewer_read_only": "Shared map \xB7 read-only",
+  "share.viewer_made_with": "Made with VAM",
+  "share.viewer_install": "Install VAM",
+  "share.viewer_goal_0": "Goal: {0}",
+  "share.viewer_hint": "Drag empty space to pan \xB7 Scroll to zoom \xB7 Click a topic to read it",
+  "share.viewer_topic_details": "Topic details",
+  "share.viewer_details_button": "Details",
+  "share.viewer_expand_0": "Expand {0}",
+  "share.viewer_subtopics": "Subtopics",
+  "share.viewer_no_content": "This topic has no notes in the shared file.",
+  "share.viewer_image_omitted": "[image not included]",
+  "share.viewer_resize_panel": "Resize the side panel",
+  "share.viewer_untitled": "Untitled map"
 };
 
 // i18n/zh-CN.ts
@@ -3432,7 +3446,21 @@ var zhCN = {
   "error.relevance_grade_over_budget": "\u5FC3\u667A\u56FE\u592A\u5927\uFF0C\u65E0\u6CD5\u4E00\u6B21\u5206\u7EA7\uFF0C\u6CA1\u6709\u4EFB\u4F55\u6539\u53D8\u3002",
   "error.relevance_grade_stopped": "\u5206\u7EA7\u5DF2\u505C\u6B62\u3002",
   "error.relevance_grade_invalid": "\u65E0\u6CD5\u4F7F\u7528 AI \u7684\u5206\u7EA7\u7ED3\u679C\uFF1A{0}",
-  "error.relevance_grade_hierarchy": "AI \u7684\u4E0A\u4E0B\u5C42\u5206\u7EA7\u4ECD\u4E0D\u4E00\u81F4\uFF0C\u8BF7\u70B9\u201C\u76EE\u6807\u201D\u518D\u6309 Enter \u91CD\u8BD5"
+  "error.relevance_grade_hierarchy": "AI \u7684\u4E0A\u4E0B\u5C42\u5206\u7EA7\u4ECD\u4E0D\u4E00\u81F4\uFF0C\u8BF7\u70B9\u201C\u76EE\u6807\u201D\u518D\u6309 Enter \u91CD\u8BD5",
+  // Share viewer (shipped inside the exported HTML file)
+  "share.viewer_read_only": "\u5206\u4EAB\u7684\u5730\u56FE\u30FB\u53EA\u8BFB",
+  "share.viewer_made_with": "\u7531 VAM \u5236\u4F5C",
+  "share.viewer_install": "\u5B89\u88C5 VAM",
+  "share.viewer_goal_0": "\u76EE\u6807\uFF1A{0}",
+  "share.viewer_hint": "\u62D6\u62FD\u7A7A\u767D\u5904\u5E73\u79FB \xB7 \u6EDA\u8F6E\u7F29\u653E \xB7 \u70B9\u51FB\u8BAE\u9898\u67E5\u770B\u5185\u5BB9",
+  "share.viewer_topic_details": "\u8BAE\u9898\u5185\u5BB9",
+  "share.viewer_details_button": "\u8BE6\u60C5",
+  "share.viewer_expand_0": "\u5C55\u5F00 {0}",
+  "share.viewer_subtopics": "\u5B50\u8BAE\u9898",
+  "share.viewer_no_content": "\u8FD9\u4E2A\u8BAE\u9898\u5728\u5206\u4EAB\u6587\u4EF6\u4E2D\u6CA1\u6709\u7B14\u8BB0\u5185\u5BB9\u3002",
+  "share.viewer_image_omitted": "[\u56FE\u7247\u672A\u5305\u542B]",
+  "share.viewer_resize_panel": "\u8C03\u6574\u4FA7\u680F\u5BBD\u5EA6",
+  "share.viewer_untitled": "\u672A\u547D\u540D\u7684\u5730\u56FE"
 };
 
 // i18n/zh-TW.ts
@@ -5099,7 +5127,21 @@ var zhTW = {
   "error.relevance_grade_over_budget": "\u5FC3\u667A\u5716\u592A\u5927\uFF0C\u7121\u6CD5\u4E00\u6B21\u5206\u7D1A\uFF0C\u6C92\u6709\u4EFB\u4F55\u6539\u8B8A\u3002",
   "error.relevance_grade_stopped": "\u5206\u7D1A\u5DF2\u505C\u6B62\u3002",
   "error.relevance_grade_invalid": "\u7121\u6CD5\u4F7F\u7528 AI \u7684\u5206\u7D1A\u7D50\u679C\uFF1A{0}",
-  "error.relevance_grade_hierarchy": "AI \u7684\u4E0A\u4E0B\u5C64\u5206\u7D1A\u4ECD\u4E0D\u4E00\u81F4\uFF0C\u8ACB\u9EDE\u300C\u76EE\u6A19\u300D\u518D\u6309 Enter \u91CD\u8A66"
+  "error.relevance_grade_hierarchy": "AI \u7684\u4E0A\u4E0B\u5C64\u5206\u7D1A\u4ECD\u4E0D\u4E00\u81F4\uFF0C\u8ACB\u9EDE\u300C\u76EE\u6A19\u300D\u518D\u6309 Enter \u91CD\u8A66",
+  // Share viewer (shipped inside the exported HTML file)
+  "share.viewer_read_only": "\u5206\u4EAB\u7684\u5730\u5716\u30FB\u552F\u8B80",
+  "share.viewer_made_with": "\u7531 VAM \u88FD\u4F5C",
+  "share.viewer_install": "\u5B89\u88DD VAM",
+  "share.viewer_goal_0": "\u76EE\u6A19\uFF1A{0}",
+  "share.viewer_hint": "\u62D6\u66F3\u7A7A\u767D\u8655\u5E73\u79FB \xB7 \u6EFE\u8F2A\u7E2E\u653E \xB7 \u9EDE\u8B70\u984C\u770B\u5167\u5BB9",
+  "share.viewer_topic_details": "\u8B70\u984C\u5167\u5BB9",
+  "share.viewer_details_button": "\u8A73\u60C5",
+  "share.viewer_expand_0": "\u5C55\u958B {0}",
+  "share.viewer_subtopics": "\u5B50\u8B70\u984C",
+  "share.viewer_no_content": "\u9019\u500B\u8B70\u984C\u5728\u5206\u4EAB\u6A94\u4E2D\u6C92\u6709\u7B46\u8A18\u5167\u5BB9\u3002",
+  "share.viewer_image_omitted": "[\u5716\u7247\u672A\u5305\u542B]",
+  "share.viewer_resize_panel": "\u8ABF\u6574\u5074\u6B04\u5BEC\u5EA6",
+  "share.viewer_untitled": "\u672A\u547D\u540D\u7684\u5730\u5716"
 };
 
 // i18n/languages.ts
@@ -16260,6 +16302,49 @@ function upgradeLegacyAimData(value) {
   return upgraded;
 }
 
+// map-graph.ts
+function parentIdsForNode(node) {
+  var _a2;
+  const convergenceParents = node.aimKind === "question" ? [] : (_a2 = node.aimConvergesFromNodeIds) != null ? _a2 : [];
+  return [...node.parentId ? [node.parentId] : [], ...convergenceParents.filter((id) => id !== node.parentId)];
+}
+function descendants(nodes, id) {
+  const found = /* @__PURE__ */ new Set();
+  const pending = [id];
+  while (pending.length) {
+    const parent = pending.pop();
+    for (const node of nodes) {
+      if (node.parentId === parent && node.id !== id && !found.has(node.id)) {
+        found.add(node.id);
+        pending.push(node.id);
+      }
+    }
+  }
+  return found;
+}
+function visibleNodes(nodes) {
+  const hidden = /* @__PURE__ */ new Set();
+  for (const node of nodes) if (node.collapsed) for (const id of descendants(nodes, node.id)) hidden.add(id);
+  return nodes.filter((node) => !hidden.has(node.id));
+}
+function applyCollapseLevel(nodes, shownLevels) {
+  const byId = new Map(nodes.map((node) => [node.id, node]));
+  const depthOf = (node) => {
+    let depth = 0;
+    const seen = /* @__PURE__ */ new Set([node.id]);
+    for (let parent = node.parentId; parent && byId.has(parent) && !seen.has(parent); parent = byId.get(parent).parentId) {
+      seen.add(parent);
+      depth++;
+    }
+    return depth;
+  };
+  const parents = new Set(nodes.map((node) => node.parentId).filter((id) => !!id && byId.has(id)));
+  for (const node of nodes) {
+    if (!parents.has(node.id)) continue;
+    node.collapsed = shownLevels === null ? false : depthOf(node) >= shownLevels;
+  }
+}
+
 // map-model.ts
 function clearQuestionConvergenceEdges(map) {
   let changed = false;
@@ -16269,11 +16354,6 @@ function clearQuestionConvergenceEdges(map) {
     changed = true;
   }
   return changed;
-}
-function parentIdsForNode(node) {
-  var _a2;
-  const convergenceParents = node.aimKind === "question" ? [] : (_a2 = node.aimConvergesFromNodeIds) != null ? _a2 : [];
-  return [...node.parentId ? [node.parentId] : [], ...convergenceParents.filter((id) => id !== node.parentId)];
 }
 function repairAimResultConvergence(map) {
   var _a2, _b2, _c;
@@ -16320,27 +16400,8 @@ function validDeliveryCheckpoint(checkpoint) {
   ));
 }
 var clone = (value) => JSON.parse(JSON.stringify(value));
-function descendants(nodes, id) {
-  const found = /* @__PURE__ */ new Set();
-  const pending = [id];
-  while (pending.length) {
-    const parent = pending.pop();
-    for (const node of nodes) {
-      if (node.parentId === parent && node.id !== id && !found.has(node.id)) {
-        found.add(node.id);
-        pending.push(node.id);
-      }
-    }
-  }
-  return found;
-}
 function canParent(nodes, id, parentId) {
   return parentId === null || parentId !== id && nodes.some((n) => n.id === parentId) && !descendants(nodes, id).has(parentId);
-}
-function visibleNodes(nodes) {
-  const hidden = /* @__PURE__ */ new Set();
-  for (const node of nodes) if (node.collapsed) for (const id of descendants(nodes, node.id)) hidden.add(id);
-  return nodes.filter((node) => !hidden.has(node.id));
 }
 function supersededAimNodeIds(map) {
   var _a2, _b2;
@@ -16356,23 +16417,6 @@ function supersededAimNodeIds(map) {
     });
   }
   return hidden;
-}
-function applyCollapseLevel(nodes, shownLevels) {
-  const byId = new Map(nodes.map((node) => [node.id, node]));
-  const depthOf = (node) => {
-    let depth = 0;
-    const seen = /* @__PURE__ */ new Set([node.id]);
-    for (let parent = node.parentId; parent && byId.has(parent) && !seen.has(parent); parent = byId.get(parent).parentId) {
-      seen.add(parent);
-      depth++;
-    }
-    return depth;
-  };
-  const parents = new Set(nodes.map((node) => node.parentId).filter((id) => !!id && byId.has(id)));
-  for (const node of nodes) {
-    if (!parents.has(node.id)) continue;
-    node.collapsed = shownLevels === null ? false : depthOf(node) >= shownLevels;
-  }
 }
 function removeNodes(nodes, id, branch) {
   const removed = branch ? descendants(nodes, id) : /* @__PURE__ */ new Set();

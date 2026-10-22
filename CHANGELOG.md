@@ -20,7 +20,7 @@
 
 ### Fixed
 
-- A single-topic research run now names the chosen answer language (or the map's remembered one) instead of the interface language, and the "no conclusion yet" placeholder in integration prompts follows the answer language too.
+- A single-topic research run now names the chosen answer language (or the map's remembered one) instead of the interface language, and the "no conclusion yet" placeholder in research, expansion and integration prompts (the current topic, its ancestors and the source notes) follows the answer language too.
 - The selection AI and Coffee Tables command names now update when you switch the interface language, without reloading.
 
 ## [0.25.0] - 2026-10-22

@@ -94,6 +94,24 @@ integrationTest('new notes omit inactive rules and working findings; clearing le
   assert.doesNotMatch(contents.get(n.path), /## Working Findings/);
   assert.equal((await repo.readNote(n.path)).newFindings, '');
 });
+integrationTest('the "no conclusion yet" placeholder in a task prompt follows the output language, not the interface language (D-2026-10-96)', async () => {
+  const { isPlaceholder } = load('repository.ts', { obsidian });
+  for (const [outputLanguage, expected, absent] of [['en', /No conclusion yet/, /尚未形成結論/], ['zh-TW', /尚未形成結論/, /No conclusion yet/]]) {
+    const { repo, app } = fixture(), n = await topicNote(repo, 'How to plan a trip to Taipei', 'a'), root = await topicNote(repo, 'Root', 'a');
+    n.parentId = root.id; await repo.updateNote(n.path, { prompt: 'Research this' });
+    assert.equal(isPlaceholder((await repo.readNote(n.path)).summary), true);
+    const mapPath = 'Agent Workspace/Topics/map-a/Map.md', mapDoc = { id: 'map-a', title: 'map-a', version: 1, nodes: [root, n], viewport: { x: 0, y: 0, zoom: 1 } };
+    await app.vault.create(mapPath, core.serializeMap(mapDoc));
+    const { VisualAgentMapView } = load('main.ts', { obsidian }); let view, seen;
+    const plugin = { repo, settings: { ...DEFAULT_SETTINGS, language: 'zh-TW' }, running: new Set(), abortChartJobs: () => {}, addChartsAfterWrite: () => {}, activeTasks: new Map(), pendingSuggestions: new Map(),
+      askModel: async context => { seen = context; const error = new Error('stop'); error.name = 'AbortError'; throw error; }, mutate: async work => work(), views: () => [view] };
+    view = new VisualAgentMapView({ app }, plugin); view.path = mapPath; view.map = mapDoc; view.render = () => {}; view.hydrate = async () => {};
+    try { await view.runAgent(n, undefined, undefined, { task: 'Research it', outputLanguage }); } catch { /* the model call is the stop point */ }
+    assert.ok(seen, 'the model was asked');
+    assert.match(seen.summary, expected); assert.doesNotMatch(seen.summary, absent);
+    assert.match(seen.ancestors, expected); assert.doesNotMatch(seen.ancestors, absent);
+  }
+});
 integrationTest('a successful AI task immediately updates summary and MD detail', async () => {
   const { repo, app, contents } = fixture(), n = await topicNote(repo, 'Direct write', 'a');
   await repo.updateNote(n.path, { prompt: 'Research this', rules: 'Use a comparison table.', detail: 'Existing detail', newFindings: 'Legacy finding', sourcePaths: ['Other.md'] });

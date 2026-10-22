@@ -233,6 +233,10 @@ function errorMessage(error: unknown): string {
  * The built-in Standard and Textbook templates follow the output language, as the fixed Detail headings always did; their
  * display name uses `language` itself, so a Simplified Chinese interface labels the template "标准", not "標準".
  */
+/** A note's stored "no conclusion yet" placeholder is written in the note's own language; in an AI prompt it is shown in the task's output language. */
+function summaryForPrompt(summary: string, language: ContentLanguage): string {
+  return isPlaceholder(summary) ? translateNote(noteLanguageOf(language), "note.no_conclusion_yet") : summary;
+}
 function templateInLanguage(template: DetailTemplate, language: ContentLanguage): DetailTemplate {
   return isBuiltinTemplateId(template.id)
     ? builtinTemplates(noteLanguageOf(language), language).find(item => item.id === template.id)!
@@ -7805,7 +7809,7 @@ export class VisualAgentMapView extends ItemView {
           .filter(item => item.parentId === parent.id)
           .map(item => {
             const child = this.notes.get(item.id);
-            return `- ${child?.title || item.path}: ${child?.summary || noSummaryYet(outputLanguage)}`;
+            return `- ${child?.title || item.path}: ${summaryForPrompt(child?.summary || noSummaryYet(outputLanguage), outputLanguage)}`;
           })
           .join("\n") || inLanguage(NONE, outputLanguage);
       const task = expansionTask(outputLanguage, existing, direction);
@@ -7813,11 +7817,11 @@ export class VisualAgentMapView extends ItemView {
         withThinkingOrigin(
           {
             title: note.title,
-            summary: note.summary,
+            summary: summaryForPrompt(note.summary, outputLanguage),
             rules: "",
             detail: note.detail,
             task: [task, options?.requirements].filter(Boolean).join("\n\n"),
-            ancestors: await this.ancestorContext(parent),
+            ancestors: await this.ancestorContext(parent, outputLanguage),
             referenceGroups: options?.referenceGroups,
             outputLanguage: options?.outputLanguage,
             ...this.toneField(note, options),
@@ -8404,7 +8408,7 @@ export class VisualAgentMapView extends ItemView {
       throw new PartialChildBatchError(`${partial.message} ${detail}`);
     }
   }
-  private async ancestorContext(node: MapNode): Promise<string> {
+  private async ancestorContext(node: MapNode, language: ContentLanguage): Promise<string> {
     const chain: MapNode[] = [],
       seen = new Set([node.id]);
     let parent = node.parentId;
@@ -8416,10 +8420,11 @@ export class VisualAgentMapView extends ItemView {
       parent = n.parentId;
     }
     const ancestors: string[] = [];
-    const language = this.plugin.settings?.language ?? "zh-TW";
     for (const n of chain) {
       const info = await this.plugin.repo.readNote(n.path, this.map ?? undefined);
-      ancestors.push(`- ${info.title}\n  ${labelCurrentSummary(language)}: ${info.summary}`);
+      ancestors.push(
+        `- ${info.title}\n  ${labelCurrentSummary(language)}: ${summaryForPrompt(info.summary, language)}`
+      );
     }
     return ancestors.join("\n");
   }
@@ -8481,11 +8486,11 @@ export class VisualAgentMapView extends ItemView {
         withThinkingOrigin(
           {
             title: note.title,
-            summary: note.summary,
+            summary: summaryForPrompt(note.summary, this.plugin.settings.language),
             rules: "",
             detail: note.detail,
             task: [task, options?.requirements].filter(Boolean).join("\n\n"),
-            ancestors: await this.ancestorContext(node),
+            ancestors: await this.ancestorContext(node, this.plugin.settings.language),
             workingFindings: note.newFindings,
             referenceGroups: [...selectedSources, childSources],
             // Within budget the sources go in as written (one request); only over-budget sources are extracted first.
@@ -8553,7 +8558,8 @@ export class VisualAgentMapView extends ItemView {
     }
     const childSources = await this.topicReferenceGroup(
       children,
-      options?.synthesisContent === "summary" ? "summary" : "strong"
+      options?.synthesisContent === "summary" ? "summary" : "strong",
+      { language: options?.outputLanguage }
     );
     const sourceSnapshot = JSON.stringify(childSources.documents);
     const childIds = children
@@ -8600,11 +8606,11 @@ export class VisualAgentMapView extends ItemView {
       const synthesisContext: TaskContext = withThinkingOrigin(
         {
           title: note.title,
-          summary: note.summary,
+          summary: summaryForPrompt(note.summary, options?.outputLanguage ?? language),
           rules: "",
           detail: note.detail,
           task: [task, options?.requirements].filter(Boolean).join("\n\n"),
-          ancestors: await this.ancestorContext(node),
+          ancestors: await this.ancestorContext(node, options?.outputLanguage ?? language),
           workingFindings: note.newFindings,
           onWorkingFindingsSent: sent => {
             findingsSent = sent === note.newFindings;
@@ -8655,7 +8661,8 @@ export class VisualAgentMapView extends ItemView {
             throw new Error(t("ui.the_topic_changed_the_synthesis_draft_was_not_saved"));
           const currentSources = await this.topicReferenceGroup(
             children,
-            options?.synthesisContent === "summary" ? "summary" : "strong"
+            options?.synthesisContent === "summary" ? "summary" : "strong",
+            { language: options?.outputLanguage }
           );
           if (JSON.stringify(currentSources.documents) !== sourceSnapshot)
             throw new Error(t("ui.the_topic_changed_the_synthesis_draft_was_not_saved"));
@@ -9112,7 +9119,8 @@ export class VisualAgentMapView extends ItemView {
       }
       const sourceGroup = await this.topicReferenceGroup(
         sources,
-        base.synthesisContent === "summary" ? "summary" : "strong"
+        base.synthesisContent === "summary" ? "summary" : "strong",
+        { language: runOptions.outputLanguage }
       );
       const task: NonNullable<VisualAgentMapView["integrationTask"]> = {
         title,
@@ -9169,7 +9177,8 @@ export class VisualAgentMapView extends ItemView {
         throw new DOMException("Aborted", "AbortError");
       const latest = await this.topicReferenceGroup(
         sources,
-        base.synthesisContent === "summary" ? "summary" : "strong"
+        base.synthesisContent === "summary" ? "summary" : "strong",
+        { language: runOptions.outputLanguage }
       );
       if (JSON.stringify(latest.documents) !== task.sourceContent)
         throw new Error(t("ui.the_topic_changed_the_synthesis_draft_was_not_saved"));
@@ -9224,9 +9233,9 @@ export class VisualAgentMapView extends ItemView {
     sources: Pick<MapNode, "path">[],
     mode: "strong" | "summary" = "strong",
     /** `origin: false` leaves each note's Thinking Origin out (an AI merge never sends it). */
-    options: { origin?: boolean } = {}
+    options: { origin?: boolean; language?: ContentLanguage } = {}
   ): Promise<ReferenceGroup> {
-    const language = this.plugin.settings?.language ?? "zh-TW";
+    const language = options.language ?? this.plugin.settings?.language ?? "zh-TW";
     const notes = await Promise.all(
       sources.map(source => this.plugin.repo.readNote(source.path, this.map ?? undefined))
     );
@@ -9237,7 +9246,7 @@ export class VisualAgentMapView extends ItemView {
         .filter(Boolean)
         .join("\n\n");
       const content = [
-        `${labelCurrentSummary(language)}: ${note.summary || translateNote(language, "detail.no_conclusion_yet")}`,
+        `${labelCurrentSummary(language)}: ${summaryForPrompt(note.summary, language) || translateNote(noteLanguageOf(language), "detail.no_conclusion_yet")}`,
         visuals ? `${labelVisualReferences(language)}\n${visuals}` : "",
         mode === "strong" && note.detail.trim() ? `${labelFullKnowledge(language)}\n${note.detail.trim()}` : "",
         finding ? `${labelOldFindings(language)} ${finding}` : "",
@@ -9273,7 +9282,8 @@ export class VisualAgentMapView extends ItemView {
       mapId = this.map.id;
     const sourceGroup = await this.topicReferenceGroup(
       sources,
-      options?.synthesisContent === "summary" ? "summary" : "strong"
+      options?.synthesisContent === "summary" ? "summary" : "strong",
+      { language: options?.outputLanguage }
     );
     const task: NonNullable<VisualAgentMapView["integrationTask"]> = {
       title,
@@ -9341,7 +9351,8 @@ export class VisualAgentMapView extends ItemView {
         throw new Error(t("ui.the_map_or_parent_topic_changed_while_ai_was_running_no_subt"));
       const latest = await this.topicReferenceGroup(
         sources,
-        options?.synthesisContent === "summary" ? "summary" : "strong"
+        options?.synthesisContent === "summary" ? "summary" : "strong",
+        { language: options?.outputLanguage }
       );
       if (JSON.stringify(latest.documents) !== task.sourceContent)
         throw new Error(t("ui.the_topic_changed_the_synthesis_draft_was_not_saved"));
@@ -9412,7 +9423,8 @@ export class VisualAgentMapView extends ItemView {
       throw new Error(t("ui.the_topic_changed_the_synthesis_draft_was_not_saved"));
     const latest = await this.topicReferenceGroup(
       sources,
-      task.options.synthesisContent === "summary" ? "summary" : "strong"
+      task.options.synthesisContent === "summary" ? "summary" : "strong",
+      { language: task.options.outputLanguage }
     );
     if (
       JSON.stringify(latest.documents) !== task.sourceContent ||
@@ -10046,11 +10058,11 @@ export class VisualAgentMapView extends ItemView {
     const context: TaskContext = withThinkingOrigin(
       {
         title: note.title,
-        summary: note.summary,
+        summary: summaryForPrompt(note.summary, overrides?.outputLanguage ?? this.plugin.settings.language),
         rules: "",
         detail: note.detail,
         task: note.prompt,
-        ancestors: await this.ancestorContext(node),
+        ancestors: await this.ancestorContext(node, overrides?.outputLanguage ?? this.plugin.settings.language),
         workingFindings: note.newFindings,
         sourceContext: "",
         mode: "task",

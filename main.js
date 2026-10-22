@@ -31225,6 +31225,9 @@ function errorMessage(error) {
   const message = error == null ? void 0 : error.message;
   return typeof message === "string" ? message : String(error);
 }
+function summaryForPrompt(summary, language2) {
+  return isPlaceholder(summary) ? translateNote(noteLanguageOf(language2), "note.no_conclusion_yet") : summary;
+}
 function templateInLanguage(template, language2) {
   return isBuiltinTemplateId(template.id) ? builtinTemplates(noteLanguageOf(language2), language2).find((item) => item.id === template.id) : template;
 }
@@ -38124,18 +38127,18 @@ ${request.requirements}` : preset.text,
       const outputLanguage2 = (_b2 = options == null ? void 0 : options.outputLanguage) != null ? _b2 : this.plugin.settings.language;
       const existing = ((_c = this.map) == null ? void 0 : _c.nodes.filter((item) => item.parentId === parent.id).map((item) => {
         const child = this.notes.get(item.id);
-        return `- ${(child == null ? void 0 : child.title) || item.path}: ${(child == null ? void 0 : child.summary) || noSummaryYet(outputLanguage2)}`;
+        return `- ${(child == null ? void 0 : child.title) || item.path}: ${summaryForPrompt((child == null ? void 0 : child.summary) || noSummaryYet(outputLanguage2), outputLanguage2)}`;
       }).join("\n")) || inLanguage(NONE, outputLanguage2);
       const task = expansionTask(outputLanguage2, existing, direction);
       const result = await this.plugin.askModel(
         withThinkingOrigin(
           {
             title: note.title,
-            summary: note.summary,
+            summary: summaryForPrompt(note.summary, outputLanguage2),
             rules: "",
             detail: note.detail,
             task: [task, options == null ? void 0 : options.requirements].filter(Boolean).join("\n\n"),
-            ancestors: await this.ancestorContext(parent),
+            ancestors: await this.ancestorContext(parent, outputLanguage2),
             referenceGroups: options == null ? void 0 : options.referenceGroups,
             outputLanguage: options == null ? void 0 : options.outputLanguage,
             ...this.toneField(note, options),
@@ -38693,8 +38696,8 @@ ${request.requirements}` : preset.text,
       throw new PartialChildBatchError(`${partial.message} ${detail}`);
     }
   }
-  async ancestorContext(node) {
-    var _a2, _b2, _c, _d;
+  async ancestorContext(node, language2) {
+    var _a2, _b2;
     const chain = [], seen = /* @__PURE__ */ new Set([node.id]);
     let parent = node.parentId;
     while (parent && !seen.has(parent)) {
@@ -38705,11 +38708,12 @@ ${request.requirements}` : preset.text,
       parent = n.parentId;
     }
     const ancestors = [];
-    const language2 = (_c = (_b2 = this.plugin.settings) == null ? void 0 : _b2.language) != null ? _c : "zh-TW";
     for (const n of chain) {
-      const info = await this.plugin.repo.readNote(n.path, (_d = this.map) != null ? _d : void 0);
-      ancestors.push(`- ${info.title}
-  ${labelCurrentSummary(language2)}: ${info.summary}`);
+      const info = await this.plugin.repo.readNote(n.path, (_b2 = this.map) != null ? _b2 : void 0);
+      ancestors.push(
+        `- ${info.title}
+  ${labelCurrentSummary(language2)}: ${summaryForPrompt(info.summary, language2)}`
+      );
     }
     return ancestors.join("\n");
   }
@@ -38766,11 +38770,11 @@ ${request.requirements}` : preset.text,
         withThinkingOrigin(
           {
             title: note.title,
-            summary: note.summary,
+            summary: summaryForPrompt(note.summary, this.plugin.settings.language),
             rules: "",
             detail: note.detail,
             task: [task, options == null ? void 0 : options.requirements].filter(Boolean).join("\n\n"),
-            ancestors: await this.ancestorContext(node),
+            ancestors: await this.ancestorContext(node, this.plugin.settings.language),
             workingFindings: note.newFindings,
             referenceGroups: [...selectedSources, childSources],
             // Within budget the sources go in as written (one request); only over-budget sources are extracted first.
@@ -38817,7 +38821,7 @@ ${request.requirements}` : preset.text,
     }
   }
   async integrateChildren(node, options, direction = "", drafted, failed, accepted) {
-    var _a2, _b2, _c, _d, _e, _f, _g, _h, _i, _j;
+    var _a2, _b2, _c, _d, _e, _f, _g, _h, _i, _j, _k, _l;
     if (!this.map || this.plugin.running.has(node.path)) {
       failed == null ? void 0 : failed(t("ui.ai_running_ai"));
       return;
@@ -38832,7 +38836,8 @@ ${request.requirements}` : preset.text,
     }
     const childSources = await this.topicReferenceGroup(
       children,
-      (options == null ? void 0 : options.synthesisContent) === "summary" ? "summary" : "strong"
+      (options == null ? void 0 : options.synthesisContent) === "summary" ? "summary" : "strong",
+      { language: options == null ? void 0 : options.outputLanguage }
     );
     const sourceSnapshot = JSON.stringify(childSources.documents);
     const childIds = children.map((child) => child.id).sort().join("|");
@@ -38874,11 +38879,11 @@ ${request.requirements}` : preset.text,
       const synthesisContext = withThinkingOrigin(
         {
           title: note.title,
-          summary: note.summary,
+          summary: summaryForPrompt(note.summary, (_e = options == null ? void 0 : options.outputLanguage) != null ? _e : language2),
           rules: "",
           detail: note.detail,
           task: [task, options == null ? void 0 : options.requirements].filter(Boolean).join("\n\n"),
-          ancestors: await this.ancestorContext(node),
+          ancestors: await this.ancestorContext(node, (_f = options == null ? void 0 : options.outputLanguage) != null ? _f : language2),
           workingFindings: note.newFindings,
           onWorkingFindingsSent: (sent) => {
             findingsSent = sent === note.newFindings;
@@ -38890,9 +38895,9 @@ ${request.requirements}` : preset.text,
           outputLanguage: options == null ? void 0 : options.outputLanguage,
           ...this.toneField(note, options),
           mode: "synthesize",
-          researchMode: (_e = options == null ? void 0 : options.researchMode) != null ? _e : "local",
-          researchDepth: (_f = options == null ? void 0 : options.researchDepth) != null ? _f : note.researchDepth,
-          visualMode: (_g = options == null ? void 0 : options.visualMode) != null ? _g : note.visualMode,
+          researchMode: (_g = options == null ? void 0 : options.researchMode) != null ? _g : "local",
+          researchDepth: (_h = options == null ? void 0 : options.researchDepth) != null ? _h : note.researchDepth,
+          visualMode: (_i = options == null ? void 0 : options.visualMode) != null ? _i : note.visualMode,
           detailTemplate,
           addCharts: true
         },
@@ -38910,7 +38915,7 @@ ${request.requirements}` : preset.text,
       );
       progress.end();
       accepted == null ? void 0 : accepted();
-      if ((_h = options == null ? void 0 : options.signal) == null ? void 0 : _h.aborted) throw new DOMException("Aborted", "AbortError");
+      if ((_j = options == null ? void 0 : options.signal) == null ? void 0 : _j.aborted) throw new DOMException("Aborted", "AbortError");
       await this.plugin.repo.updateNote(node.path, { status: note.status });
       const save = async (summary, detail) => this.plugin.mutate(async () => {
         var _a3, _b3, _c2, _d2, _e2, _f2, _g2;
@@ -38918,7 +38923,8 @@ ${request.requirements}` : preset.text,
           throw new Error(t("ui.the_topic_changed_the_synthesis_draft_was_not_saved"));
         const currentSources = await this.topicReferenceGroup(
           children,
-          (options == null ? void 0 : options.synthesisContent) === "summary" ? "summary" : "strong"
+          (options == null ? void 0 : options.synthesisContent) === "summary" ? "summary" : "strong",
+          { language: options == null ? void 0 : options.outputLanguage }
         );
         if (JSON.stringify(currentSources.documents) !== sourceSnapshot)
           throw new Error(t("ui.the_topic_changed_the_synthesis_draft_was_not_saved"));
@@ -39001,7 +39007,7 @@ ${request.requirements}` : preset.text,
           this.undoNotice(t("ui.synthesis_written_0", note.title), previous);
         })(result, save, result.summary, result.detail);
       } catch (error) {
-        if (((_i = options == null ? void 0 : options.signal) == null ? void 0 : _i.aborted) || error instanceof Error && error.name === "AbortError") {
+        if (((_k = options == null ? void 0 : options.signal) == null ? void 0 : _k.aborted) || error instanceof Error && error.name === "AbortError") {
           if (failed) failed(t("ui.research_stopped_existing_content_was_preserved"));
           else new import_obsidian29.Notice(t("ui.research_stopped_existing_content_was_preserved"));
         } else {
@@ -39012,7 +39018,7 @@ ${request.requirements}` : preset.text,
         }
       }
     } catch (error) {
-      if (((_j = options == null ? void 0 : options.signal) == null ? void 0 : _j.aborted) || error instanceof Error && error.name === "AbortError") {
+      if (((_l = options == null ? void 0 : options.signal) == null ? void 0 : _l.aborted) || error instanceof Error && error.name === "AbortError") {
         await this.plugin.repo.updateNote(node.path, { status: note.status });
         if (failed) failed(t("ui.research_stopped_existing_content_was_preserved"));
         else new import_obsidian29.Notice(t("ui.research_stopped_existing_content_was_preserved"));
@@ -39328,7 +39334,8 @@ ${request.requirements}` : preset.text,
       }
       const sourceGroup = await this.topicReferenceGroup(
         sources2,
-        base.synthesisContent === "summary" ? "summary" : "strong"
+        base.synthesisContent === "summary" ? "summary" : "strong",
+        { language: runOptions.outputLanguage }
       );
       const task = {
         title,
@@ -39385,7 +39392,8 @@ ${request.requirements}` : preset.text,
         throw new DOMException("Aborted", "AbortError");
       const latest = await this.topicReferenceGroup(
         sources2,
-        base.synthesisContent === "summary" ? "summary" : "strong"
+        base.synthesisContent === "summary" ? "summary" : "strong",
+        { language: runOptions.outputLanguage }
       );
       if (JSON.stringify(latest.documents) !== task.sourceContent)
         throw new Error(t("ui.the_topic_changed_the_synthesis_draft_was_not_saved"));
@@ -39437,8 +39445,8 @@ ${request.requirements}` : preset.text,
     });
   }
   async topicReferenceGroup(sources2, mode = "strong", options = {}) {
-    var _a2, _b2, _c, _d;
-    const language2 = (_b2 = (_a2 = this.plugin.settings) == null ? void 0 : _a2.language) != null ? _b2 : "zh-TW";
+    var _a2, _b2, _c, _d, _e;
+    const language2 = (_c = (_b2 = options.language) != null ? _b2 : (_a2 = this.plugin.settings) == null ? void 0 : _a2.language) != null ? _c : "zh-TW";
     const notes = await Promise.all(
       sources2.map((source) => {
         var _a3;
@@ -39450,7 +39458,7 @@ ${request.requirements}` : preset.text,
       const finding = note.newFindings.trim();
       const visuals = [note.visualReferences.trim(), imageReferencesFromMarkdown(note.detail)].filter(Boolean).join("\n\n");
       const content = [
-        `${labelCurrentSummary(language2)}: ${note.summary || translateNote(language2, "detail.no_conclusion_yet")}`,
+        `${labelCurrentSummary(language2)}: ${summaryForPrompt(note.summary, language2) || translateNote(noteLanguageOf(language2), "detail.no_conclusion_yet")}`,
         visuals ? `${labelVisualReferences(language2)}
 ${visuals}` : "",
         mode === "strong" && note.detail.trim() ? `${labelFullKnowledge(language2)}
@@ -39461,7 +39469,7 @@ ${note.detail.trim()}` : "",
       return { path: source.path, content };
     });
     return {
-      id: `mind-map:${(_d = (_c = this.map) == null ? void 0 : _c.id) != null ? _d : "selected"}`,
+      id: `mind-map:${(_e = (_d = this.map) == null ? void 0 : _d.id) != null ? _e : "selected"}`,
       name: t("ui.selected_mind_map_notes"),
       location: this.path,
       documents
@@ -39474,7 +39482,8 @@ ${note.detail.trim()}` : "",
     const mapPath = this.path, mapId = this.map.id;
     const sourceGroup = await this.topicReferenceGroup(
       sources2,
-      (options == null ? void 0 : options.synthesisContent) === "summary" ? "summary" : "strong"
+      (options == null ? void 0 : options.synthesisContent) === "summary" ? "summary" : "strong",
+      { language: options == null ? void 0 : options.outputLanguage }
     );
     const task = {
       title,
@@ -39540,7 +39549,8 @@ ${note.detail.trim()}` : "",
         throw new Error(t("ui.the_map_or_parent_topic_changed_while_ai_was_running_no_subt"));
       const latest = await this.topicReferenceGroup(
         sources2,
-        (options == null ? void 0 : options.synthesisContent) === "summary" ? "summary" : "strong"
+        (options == null ? void 0 : options.synthesisContent) === "summary" ? "summary" : "strong",
+        { language: options == null ? void 0 : options.outputLanguage }
       );
       if (JSON.stringify(latest.documents) !== task.sourceContent)
         throw new Error(t("ui.the_topic_changed_the_synthesis_draft_was_not_saved"));
@@ -39588,7 +39598,8 @@ ${note.detail.trim()}` : "",
       throw new Error(t("ui.the_topic_changed_the_synthesis_draft_was_not_saved"));
     const latest = await this.topicReferenceGroup(
       sources2,
-      task.options.synthesisContent === "summary" ? "summary" : "strong"
+      task.options.synthesisContent === "summary" ? "summary" : "strong",
+      { language: task.options.outputLanguage }
     );
     if (JSON.stringify(latest.documents) !== task.sourceContent || sources2.some((source) => {
       var _a3;
@@ -40163,7 +40174,7 @@ ${note.detail.trim()}` : "",
     );
   }
   async runAgent(node, done, failed, overrides, onLaunchAccepted) {
-    var _a2, _b2, _c, _d, _e, _f, _g;
+    var _a2, _b2, _c, _d, _e, _f, _g, _h, _i;
     const taskPath = node.path;
     const note = await this.plugin.repo.readNote(node.path, (_a2 = this.map) != null ? _a2 : void 0);
     if (!((_b2 = overrides == null ? void 0 : overrides.task) != null ? _b2 : note.prompt)) {
@@ -40183,11 +40194,11 @@ ${note.detail.trim()}` : "",
     const context = withThinkingOrigin(
       {
         title: note.title,
-        summary: note.summary,
+        summary: summaryForPrompt(note.summary, (_e = overrides == null ? void 0 : overrides.outputLanguage) != null ? _e : this.plugin.settings.language),
         rules: "",
         detail: note.detail,
         task: note.prompt,
-        ancestors: await this.ancestorContext(node),
+        ancestors: await this.ancestorContext(node, (_f = overrides == null ? void 0 : overrides.outputLanguage) != null ? _f : this.plugin.settings.language),
         workingFindings: note.newFindings,
         sourceContext: "",
         mode: "task",
@@ -40197,7 +40208,7 @@ ${note.detail.trim()}` : "",
         ...this.toneField(note, overrides),
         ...overrides,
         detailTemplate,
-        addCharts: (_e = overrides == null ? void 0 : overrides.addCharts) != null ? _e : true
+        addCharts: (_g = overrides == null ? void 0 : overrides.addCharts) != null ? _g : true
       },
       note
     );
@@ -40207,8 +40218,8 @@ ${note.detail.trim()}` : "",
     this.plugin.running.add(node.path);
     const controller = new AbortController();
     const abortFromTaskModal = () => controller.abort();
-    if ((_f = overrides == null ? void 0 : overrides.signal) == null ? void 0 : _f.aborted) controller.abort();
-    else (_g = overrides == null ? void 0 : overrides.signal) == null ? void 0 : _g.addEventListener("abort", abortFromTaskModal, { once: true });
+    if ((_h = overrides == null ? void 0 : overrides.signal) == null ? void 0 : _h.aborted) controller.abort();
+    else (_i = overrides == null ? void 0 : overrides.signal) == null ? void 0 : _i.addEventListener("abort", abortFromTaskModal, { once: true });
     this.plugin.activeTasks.set(taskPath, controller);
     const progress = this.plugin.researchProgress;
     let progressAttempt = "starting";
@@ -40277,7 +40288,7 @@ ${note.detail.trim()}` : "",
       observer
     ).then(
       (result) => this.plugin.mutate(async () => {
-        var _a3, _b3, _c2, _d2, _e2, _f2, _g2, _h;
+        var _a3, _b3, _c2, _d2, _e2, _f2, _g2, _h2;
         progress == null ? void 0 : progress.end(taskPath, progressAttempt);
         const latest = await this.plugin.repo.readNote(node.path, (_a3 = this.map) != null ? _a3 : void 0);
         const stale = latest.thinkingOrigin !== note.thinkingOrigin || latest.title !== note.title || latest.prompt !== note.prompt || latest.rules !== note.rules || latest.detail !== note.detail || latest.summary !== note.summary || latest.model !== note.model || latest.reasoning !== note.reasoning || latest.researchMode !== note.researchMode || latest.researchDepth !== note.researchDepth || latest.visualMode !== note.visualMode || latest.sourcePaths.join("\n") !== note.sourcePaths.join("\n") || JSON.stringify(latest.referencePaths) !== JSON.stringify(note.referencePaths);
@@ -40336,7 +40347,7 @@ ${note.detail.trim()}` : "",
             result.suggestions.slice(0, 7).map((item) => ({ ...item, thinkingOriginBaseline: originBaseline(note.thinkingOrigin) }))
           );
           try {
-            await ((_h = (_g2 = this.plugin.pendingSuggestions).flush) == null ? void 0 : _h.call(_g2));
+            await ((_h2 = (_g2 = this.plugin.pendingSuggestions).flush) == null ? void 0 : _h2.call(_g2));
           } catch (error) {
             const message = this.plugin.recordFailure(t("log.expansion_suggestions_save_failed"), error);
             new import_obsidian29.Notice(message);

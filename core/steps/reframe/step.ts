@@ -63,7 +63,8 @@ export const reframeStep: StepDefinition<ReframeRequest, ReframeDraft> = {
         { zh: languageZh, en: languageEn },
         request.language,
         { language: "region" },
-        "en"
+        "en",
+        { kind: "question", text: request.question }
       ),
       direction: JSON.stringify({ question: request.question, context: request.context }),
       source: JSON.stringify(request.source)

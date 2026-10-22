@@ -2,7 +2,7 @@ import { aimPhase, buildAimPrompt, readerFacingAimPhase } from "../aim/shell";
 import { researchGuidance } from "../../../ai/task-policy";
 import type { TaskContext } from "../../../ai/types";
 import { visualGuidance } from "../../../ai/visual-guidance";
-import { noteLanguageOf, type ContentLanguage } from "../../../i18n";
+import { noteLanguageOf, type ContentLanguage, type FollowAnchor } from "../../../i18n";
 import type { AiProviderId } from "../../../ai/providers/provider";
 import { detailStructurePrompt, standardTemplate } from "../../../ai/detail-templates";
 import {
@@ -60,8 +60,9 @@ export function generalTaskPrompt(
             ? MERGE
             : DEFAULT_TASK;
   const none = inLanguage(NONE, language);
+  const topicAnchor: FollowAnchor = { kind: "topic", text: context.title };
   return [
-    outputLanguage(language),
+    outputLanguage(language, topicAnchor),
     inLanguage(ROLE, language),
     inLanguage(SOURCE_SAFETY, language),
     context.sourceContext ? inLanguage(REFERENCE_CITATIONS, language) : "",
@@ -76,7 +77,8 @@ export function generalTaskPrompt(
             : detailStructurePrompt(
                 context.detailTemplate ?? standardTemplate(noteLanguageOf(language)),
                 language,
-                headings => detailStructure(language, headings)
+                headings => detailStructure(language, headings),
+                topicAnchor
               ),
           // A merge keeps the sources' own formatting; the syntax suggestions would invite callouts the sources lack.
           readerFacingDetail(context) && context.mode !== "merge" ? inLanguage(OBSIDIAN_FORMAT, language) : ""

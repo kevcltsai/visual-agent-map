@@ -1336,6 +1336,16 @@
       "language": "zh-CN",
       "schema": true
     },
+    "service.task-topic-english.detected-en": {
+      "builder": "AiTaskService instructions: general task, English topic detected as en (D-2026-10-94)",
+      "language": "en",
+      "schema": true
+    },
+    "service.task-topic-french.follow-input": {
+      "builder": "AiTaskService instructions: general task, French topic on the follow-input row with the anchored clause (D-2026-10-94)",
+      "language": "same-as-input",
+      "schema": true
+    },
     "service.task-web-visual-on.en": {
       "builder": "AiTaskService instructions: mode task, visual on",
       "language": "en",

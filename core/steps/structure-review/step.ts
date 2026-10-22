@@ -286,7 +286,8 @@ export const structureReviewStep: StepDefinition<StructureReviewRequest, Structu
         { zh: languageZh, en: languageEn },
         request.contentLanguage ?? request.language,
         { language: "region" },
-        "en"
+        "en",
+        { kind: "question", text: request.rootQuestion }
       ),
       limit: String(STRUCTURE_REVIEW_MAX_SUGGESTIONS),
       question: JSON.stringify(request.rootQuestion),

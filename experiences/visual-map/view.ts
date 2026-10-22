@@ -7203,7 +7203,9 @@ export class VisualAgentMapView extends ItemView {
         this.plugin,
         async (options, focus, done, failed, accepted) => {
           const latest = await this.plugin.repo.readNote(node.path, this.map ?? undefined);
-          const task = researchTopicTask(this.plugin.settings.language, latest.title);
+          const taskLanguage =
+            options.outputLanguage ?? outputLanguageForMap(this.map, this.plugin.settings.language, latest.title);
+          const task = researchTopicTask(taskLanguage, latest.title);
           const detailTemplate = await this.detailTemplateFor(node, options.detailTemplateId, options.toneId);
           await this.runAgent(
             node,
@@ -9136,7 +9138,7 @@ export class VisualAgentMapView extends ItemView {
       const result = await this.plugin.askModel(
         {
           title,
-          summary: translateNote(language, "note.no_conclusion_yet"),
+          summary: translateNote(runOptions.outputLanguage ?? language, "note.no_conclusion_yet"),
           rules: "",
           detail: "",
           task: [synthesisDirectionsTask(language), runOptions.requirements].filter(Boolean).join("\n\n"),
@@ -9299,7 +9301,7 @@ export class VisualAgentMapView extends ItemView {
     try {
       const integrationContext: TaskContext = {
         title,
-        summary: translateNote(language, "note.no_conclusion_yet"),
+        summary: translateNote(options?.outputLanguage ?? language, "note.no_conclusion_yet"),
         rules: "",
         detail: "",
         task: [goal, options?.requirements].filter(Boolean).join("\n\n"),

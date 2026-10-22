@@ -115,7 +115,10 @@ export const outlineGenerateStep: StepDefinition<OutlineGenerateRequest, Outline
   render: request => {
     const content = request.contentLanguage ?? request.language;
     return renderTemplate(template, {
-      languageInstruction: inLanguageNaming({ zh: languageZh, en: languageEn }, content, { language: "region" }, "en"),
+      languageInstruction: inLanguageNaming({ zh: languageZh, en: languageEn }, content, { language: "region" }, "en", {
+        kind: "topic",
+        text: request.topic
+      }),
       preset: request.limits
         ? `${applyTopicToPreset(request.presetText, request.topic, content)}\n\n${renderTemplate(
             inLanguage({ zh: limitsZh, en: limitsEn }, content),

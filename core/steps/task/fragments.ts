@@ -1,7 +1,7 @@
 import { renderTemplate } from "../../step-runner";
 import type { ContentLanguage } from "../../../i18n";
 import { inLanguage, languageVariables, type FragmentPair } from "../_shared/fragments";
-import { verbatimHeadingLanguage } from "../../../i18n";
+import { isFollowInputLanguage, verbatimHeadingLanguage, type FollowAnchor } from "../../../i18n";
 import SourceRegistryTemplate from "./source-registry.md";
 import AdaptiveDetailStructureZH from "./adaptive-detail-structure.zh.md";
 import AdaptiveDetailStructureEN from "./adaptive-detail-structure.en.md";
@@ -37,6 +37,8 @@ import OutputLanguageZH from "./output-language.zh.md";
 import OutputLanguageEN from "./output-language.en.md";
 import HeadingRuleUiZH from "./heading-rule-ui.zh.md";
 import HeadingRuleUiEN from "./heading-rule-ui.en.md";
+import HeadingRuleFollowZH from "./heading-rule-follow.zh.md";
+import HeadingRuleFollowEN from "./heading-rule-follow.en.md";
 import HeadingRuleNoteZH from "./heading-rule-note.zh.md";
 import HeadingRuleNoteEN from "./heading-rule-note.en.md";
 import MergeZH from "./merge.zh.md";
@@ -72,20 +74,24 @@ export const LABEL_FINDINGS: FragmentPair = pair(LabelFindingsZH, LabelFindingsE
 /** A template, not text: {@link outputLanguage} fills its `{{language}}` and `{{headingRule}}` placeholders. */
 const OUTPUT_LANGUAGE: FragmentPair = { zh: OutputLanguageZH, en: OutputLanguageEN };
 const HEADING_RULE_UI: FragmentPair = pair(HeadingRuleUiZH, HeadingRuleUiEN);
+const HEADING_RULE_FOLLOW: FragmentPair = { zh: HeadingRuleFollowZH, en: HeadingRuleFollowEN };
 const HEADING_RULE_NOTE: FragmentPair = { zh: HeadingRuleNoteZH, en: HeadingRuleNoteEN };
 /**
  * The output-language paragraph. The standard Detail headings follow the interface language when it is also the note
  * language; when they differ (Simplified Chinese), they stay in the note language and only the content follows the output.
  */
-export function outputLanguage(language: ContentLanguage): string {
+export function outputLanguage(language: ContentLanguage, anchor?: FollowAnchor): string {
   const note = verbatimHeadingLanguage(language);
-  const names = languageVariables(language, { language: "plain" });
-  const headingRule = note
-    ? renderTemplate(inLanguage(HEADING_RULE_NOTE, language), {
-        ...names,
-        ...languageVariables(note, { note: "plain" }, language)
-      })
-    : inLanguage(HEADING_RULE_UI, language);
+  const names = languageVariables(language, { language: "plain" }, language, undefined, anchor);
+  // Following the input has no language to contrast the fixed headings with: they are simply copied as listed.
+  const headingRule = isFollowInputLanguage(language)
+    ? renderTemplate(inLanguage(HEADING_RULE_FOLLOW, language), names)
+    : note
+      ? renderTemplate(inLanguage(HEADING_RULE_NOTE, language), {
+          ...names,
+          ...languageVariables(note, { note: "plain" }, language)
+        })
+      : inLanguage(HEADING_RULE_UI, language);
   return renderTemplate(inLanguage(OUTPUT_LANGUAGE, language), { language: names.language, headingRule });
 }
 /** Merge mode: organize only what the sources say (no synthesis of agreements, tradeoffs or open questions). */

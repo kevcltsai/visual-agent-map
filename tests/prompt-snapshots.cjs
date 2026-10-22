@@ -46,6 +46,18 @@ test('collect snapshots: AiTaskService general task prompt', async () => {
   }
 });
 
+test('collect snapshots: topics whose language is read from the text (D-2026-10-94)', async () => {
+  // The existing snapshots name an explicit language id; these two start from the topic text. An English topic with function
+  // words is detected as en (the en path); a French topic keeps the follow-input row, whose clause quotes the topic.
+  const { chooseAimContentLanguage } = loadModule('experiences/aim/content-language.ts');
+  const english = 'How to plan a trip to Taipei', french = 'Histoire de la Révolution française';
+  const englishLanguage = chooseAimContentLanguage('zh-TW', english), frenchLanguage = chooseAimContentLanguage('zh-TW', french);
+  assert.equal(englishLanguage, 'en');
+  assert.equal(frenchLanguage, 'same-as-input');
+  await recordContext('service.task-topic-english.detected-en', 'AiTaskService instructions: general task, English topic detected as en (D-2026-10-94)', englishLanguage, { ...base, title: english, outputLanguage: englishLanguage });
+  await recordContext('service.task-topic-french.follow-input', 'AiTaskService instructions: general task, French topic on the follow-input row with the anchored clause (D-2026-10-94)', frenchLanguage, { ...base, title: french, outputLanguage: frenchLanguage });
+});
+
 test('collect snapshots: AIM prompt builder per phase', async () => {
   const phases = ['research-gap-audit', 'initial-clarification', 'initial-question', 'research-plan', 'research-plan-repair', 'subtopic-research', 'targeted-followup-research', 'report-review', 'decision-quality-review', 'format-repair', 'delivery-outline', 'delivery-research', 'delivery-writing', 'delivery-acceptance'];
   const aimBase = { title: 'Goal G', summary: 'Summary S', rules: 'Rule R', detail: 'Reports D', ancestors: 'Known conditions C', workingFindings: 'Prior findings F', sourceContext: 'Source [S1]: fact', mode: 'task', promptProfile: 'aim', researchMode: 'local', researchDepth: 'normal', visualMode: 'off' };

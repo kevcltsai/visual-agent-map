@@ -427,7 +427,10 @@ export default class VisualAgentMapPlugin extends Plugin {
       model: () => this.settings.cliModel,
       autoOpen: () => this.settings.markdownSelectionAiAutoOpen,
       language: selected =>
-        languagePromptName(selectionOutputLanguage(this.settings.language, selected), "en", "plain"),
+        languagePromptName(selectionOutputLanguage(this.settings.language, selected), "en", "plain", {
+          kind: "selection",
+          text: selected
+        }),
       translateTarget: () => languagePromptName(this.settings.language, "en", "plain"),
       run: (prepared, model, signal, image, webSearch, generateImage) =>
         this.runConfirmedMarkdownContextAi(prepared, model, signal, image, webSearch, generateImage),

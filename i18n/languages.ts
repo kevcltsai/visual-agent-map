@@ -136,7 +136,29 @@ export interface OutputLanguageEntry {
    * the image translation menu and is listed first, under its own label, in the output language menu.
    */
   readonly followsInput?: true;
+  /**
+   * Only on the follow-the-input row: the clause naming the user's own text instead of describing it, so the model finds
+   * the text to follow even when it is written in the language of the instructions. `{kind}` is one of
+   * {@link FOLLOW_ANCHOR_KINDS}, `{anchor}` the quoted text itself.
+   */
+  readonly anchored?: Readonly<Record<InstructionLanguage, string>>;
 }
+
+/** What the quoted anchor of the follow-the-input clause is: the card's topic, an AIM or review question, or selected text. */
+export type FollowAnchorKind = "topic" | "question" | "selection";
+/** The anchor of the follow-the-input clause: the user's own words the model must answer in the language of. */
+export interface FollowAnchor {
+  readonly kind: FollowAnchorKind;
+  readonly text: string;
+}
+/** How each anchor kind is spelled in the clause of each instruction language. */
+export const FOLLOW_ANCHOR_KINDS: Readonly<Record<FollowAnchorKind, Readonly<Record<InstructionLanguage, string>>>> = {
+  topic: { zh: "主題", en: "topic" },
+  question: { zh: "問題", en: "question" },
+  selection: { zh: "選取文字", en: "selected text" }
+};
+/** Longest anchor quoted in a prompt, in characters; longer text is cut and ends with an ellipsis. */
+export const FOLLOW_ANCHOR_MAX = 80;
 
 /** Id of the "same language as the user's text" virtual row of {@link OUTPUT_LANGUAGES}. */
 export const FOLLOW_INPUT_ID = "same-as-input";
@@ -268,19 +290,64 @@ export const OUTPUT_LANGUAGES = [
     note: "en",
     intl: "en",
     followsInput: true,
-    prompt: {
-      zh: {
-        plain: "與使用者自己輸入的文字（主題、問題或選取文字）相同的語言",
-        region: "與使用者自己輸入的文字（主題、問題或選取文字）相同的語言",
-        usage: "與使用者自己輸入的文字（主題、問題或選取文字）相同的語言"
-      },
-      en: {
-        plain: "the same language as the user's own text (topic, question or selection)",
-        region: "the same language as the user's own text (topic, question or selection)",
-        usage: "the same language as the user's own text (topic, question or selection)"
-      }
+    // Without an anchor (no text to quote) the clause can only describe the text.
+    prompt: names(
+      "使用者自己輸入的文字（主題、問題或選取文字）所使用的語言（不是這些指示或固定標題的語言）",
+      "the language in which the user's own text (topic, question or selection) is written (not the language of these instructions or of the fixed headings)"
+    ),
+    anchored: {
+      zh: "使用者的{kind}「{anchor}」所使用的語言（不是這些指示或固定標題的語言）",
+      en: 'the language in which the user\'s {kind} "{anchor}" is written (not the language of these instructions or of the fixed headings)'
     }
   }
 ] as const satisfies ReadonlyArray<OutputLanguageEntry>;
 
 export type OutputOnlyId = (typeof OUTPUT_LANGUAGES)[number]["id"];
+
+/** Splits a space-separated word list (one line per language keeps the table readable). */
+const words = (list: string): readonly string[] => list.split(" ");
+
+/**
+ * Function-word data that tells plain English from other Latin-script text when letters alone cannot (D-2026-10-94).
+ * Text whose letters are all ASCII, with at least one `words` entry and no `foreign` entry, is the language `language`;
+ * anything else stays on the follow-the-input row. The comparison is on whole lower-cased words.
+ *
+ * Shared words are in neither list: a, in, no, on (French "on"), an, as, at, per, plus, par, van, met, op, was, am, fur,
+ * os, med, si, den. A word that is plainly a foreign function word goes in `foreign` even when a rare English homograph exists
+ * (con, die, em, um), because a wrong "English" costs more than a missed one: a missed one only keeps
+ * the model following the input text. Dutch "is" is covered by the Dutch words beside it in `foreign`.
+ */
+export const LATIN_TEXT_DETECTION = {
+  language: "en",
+  words: words(
+    "the of and to for how what is are with why when from your my this that these those which who where you we they it be can will would should not if than there their about into between have does our its"
+  ),
+  foreign: words(
+    // Spanish
+    "de la el los las del lo al un una uno que por para con se es su sus como y mas entre sobre" +
+      " " +
+      // French
+      "le les des du et est sont pour avec dans sur au aux cette ces qui pas ne sans vers chez comme mais ou une je tu nous vous" +
+      " " +
+      // German
+      "der die das und ist mit von zu dem ein eine einer nicht auf aus bei nach wie oder wir im zum zur ich sie als auch aber wenn wer" +
+      " " +
+      // Portuguese
+      "da do dos em um uma nao na nas pelo pela sao ao aos" +
+      " " +
+      // Italian
+      "il gli di della dei delle dello degli che sono nel nella non come anche alla" +
+      " " +
+      // Dutch
+      "het een voor aan naar ook dit dat maar zijn wat hoe waarom ik wij niet uit bij om" +
+      " " +
+      // Scandinavian
+      "och att det som inte jeg ikke hvordan og" +
+      " " +
+      // Indonesian and Turkish
+      "yang dan untuk dengan dari tidak adalah pada apa bagaimana ve bir icin ile nasil neden" +
+      " " +
+      // Polish, Czech and Romanian
+      "jest nie dla jak czy oraz pentru este"
+  )
+} as const;

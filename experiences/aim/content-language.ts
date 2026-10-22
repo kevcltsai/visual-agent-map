@@ -17,12 +17,13 @@ import {
   type UiLanguage
 } from "../../i18n";
 import { hanScriptVotes } from "../../i18n/han-fold";
+import { LATIN_TEXT_DETECTION } from "../../i18n/languages";
 
 /**
- * What {@link detectAimContentLanguage} can name: an output-only language (including the follow-the-input row), or a Han
- * script (Traditional or Simplified).
+ * What {@link detectAimContentLanguage} can name: an output-only language (including the follow-the-input row), a Han
+ * script (Traditional or Simplified), or plain English.
  */
-export type DetectedLanguage = OutputOnlyId | "zh-TW" | "zh-CN";
+export type DetectedLanguage = OutputOnlyId | "zh-TW" | "zh-CN" | typeof LATIN_TEXT_DETECTION.language;
 
 const OUTPUT_ROWS: ReadonlyArray<OutputLanguageEntry> = OUTPUT_LANGUAGES;
 
@@ -40,9 +41,11 @@ type Signal = DetectedLanguage | typeof UNDECIDED_HAN;
  *    after the kana rule, hangul, Arabic script without Persian or Urdu letters, Thai, Vietnamese letters);
  * 2. Han text (at least as many Han characters as Latin words) is Chinese: Simplified or Traditional when the characters
  *    decide it, otherwise {@link UNDECIDED_HAN};
- * 3. any other letters (Latin, Cyrillic, Greek, Hebrew, Persian or Urdu Arabic) cannot be told apart reliably, so the
+ * 3. plain English: every letter is ASCII, at least one English function word and no foreign one (see
+ *    {@link englishByFunctionWords}), so the output is named exactly instead of by a follow-the-input clause;
+ * 4. any other letters (Latin, Cyrillic, Greek, Hebrew, Persian or Urdu Arabic) cannot be told apart reliably, so the
  *    answer is the follow-the-input row: the model writes in the language of the text;
- * 4. undefined when there is no letter at all (empty, digits, emoji).
+ * 5. undefined when there is no letter at all (empty, digits, emoji).
  */
 function signalOf(text: string): Signal | undefined {
   for (const entry of OUTPUT_ROWS) {
@@ -59,8 +62,22 @@ function signalOf(text: string): Signal | undefined {
     if (votes.traditional > votes.simplified) return "zh-TW";
     return UNDECIDED_HAN;
   }
+  if (englishByFunctionWords(text)) return LATIN_TEXT_DETECTION.language;
   if (/\p{L}/u.test(text)) return FOLLOW_INPUT_ID;
   return undefined;
+}
+
+/**
+ * Whether `text` is plain English (D-2026-10-94): all its letters are ASCII, and by the function-word data of
+ * {@link LATIN_TEXT_DETECTION} it has an English function word and no foreign one. Text with accents, or with no function
+ * word either way ("Ancient Egypt"), is not decided here.
+ */
+function englishByFunctionWords(text: string): boolean {
+  if (/\p{L}/u.test(text.replace(/[A-Za-z]/g, ""))) return false;
+  const words = text.toLowerCase().match(/[a-z]+/g) ?? [];
+  const english: readonly string[] = LATIN_TEXT_DETECTION.words;
+  const foreign: readonly string[] = LATIN_TEXT_DETECTION.foreign;
+  return words.some(word => english.includes(word)) && !words.some(word => foreign.includes(word));
 }
 
 /**

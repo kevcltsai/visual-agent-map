@@ -1,8 +1,12 @@
 import { en, type TranslationKey } from "./i18n/en";
 import {
+  FOLLOW_ANCHOR_KINDS,
+  FOLLOW_ANCHOR_MAX,
   FOLLOW_INPUT_ID,
   LANGUAGES,
   OUTPUT_LANGUAGES,
+  type FollowAnchor,
+  type FollowAnchorKind,
   type InstructionLanguage,
   type LanguageEntry,
   type OutputLanguageEntry,
@@ -17,7 +21,7 @@ import {
  * Interface surfaces (`UiLanguage`) never take the output-only ids.
  */
 export type ContentLanguage = UiLanguage | OutputOnlyId;
-export type { InstructionLanguage, NoteLanguage, OutputLanguageEntry, OutputOnlyId, PromptNameForm, TranslationKey, UiLanguage };
+export type { FollowAnchor, FollowAnchorKind, InstructionLanguage, NoteLanguage, OutputLanguageEntry, OutputOnlyId, PromptNameForm, TranslationKey, UiLanguage };
 export { FOLLOW_INPUT_ID, LANGUAGES, OUTPUT_LANGUAGES };
 
 const registry: ReadonlyArray<LanguageEntry> = LANGUAGES;
@@ -86,8 +90,27 @@ export function verbatimHeadingLanguage(output: ContentLanguage): NoteLanguage |
   return note === output ? null : note;
 }
 /** How a prompt written in `instruction` names language `locale`, in the given `form`. */
-export function languagePromptName(locale: ContentLanguage, instruction: InstructionLanguage, form: PromptNameForm): string {
-  return entryOf(locale).prompt[instruction][form];
+export function languagePromptName(
+  locale: ContentLanguage,
+  instruction: InstructionLanguage,
+  form: PromptNameForm,
+  anchor?: FollowAnchor
+): string {
+  const entry = entryOf(locale);
+  const anchored = "anchored" in entry ? entry.anchored : undefined;
+  const quoted = anchor && anchored ? quoteAnchor(anchor.text) : "";
+  if (!anchor || !anchored || !quoted) return entry.prompt[instruction][form];
+  return anchored[instruction]
+    .replace("{kind}", () => FOLLOW_ANCHOR_KINDS[anchor.kind][instruction])
+    .replace("{anchor}", () => quoted);
+}
+/** The user's own words as they are quoted inside the follow-the-input clause: one line, cut to the limit, quotes escaped. */
+function quoteAnchor(text: string): string {
+  const flat = text.replace(/\s+/g, " ").trim();
+  if (!flat) return "";
+  const chars = Array.from(flat);
+  const cut = chars.length > FOLLOW_ANCHOR_MAX ? `${chars.slice(0, FOLLOW_ANCHOR_MAX).join("").trimEnd()}…` : flat;
+  return cut.replace(/\\/g, "\\\\").replace(/"/g, '\\"');
 }
 /** BCP 47 tag for `Intl` formatting of `locale`. */
 export function intlLocaleOf(locale: ContentLanguage): string { return entryOf(locale).intl; }

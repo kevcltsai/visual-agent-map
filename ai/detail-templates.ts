@@ -1,4 +1,11 @@
-import { NOTE_LANGUAGES, translate, type NoteLanguage, type TranslationKey, type ContentLanguage } from "../i18n";
+import {
+  NOTE_LANGUAGES,
+  translate,
+  type NoteLanguage,
+  type TranslationKey,
+  type ContentLanguage,
+  type FollowAnchor
+} from "../i18n";
 import { fencedLines } from "./markdown-blocks";
 import { headingsVerbatim } from "../core/steps/_shared/fragments";
 import { customDetailRule, customDetailStructure, textbookDetailStructure } from "../core/steps/task/fragments";
@@ -299,11 +306,12 @@ export function countIssueText(issue: CountIssue, language: ContentLanguage): st
 export function detailStructurePrompt(
   template: DetailTemplate,
   language: ContentLanguage,
-  standardText: (headings: string) => string
+  standardText: (headings: string) => string,
+  anchor?: FollowAnchor
 ): string {
   return [
     structureText(template, language, standardText),
-    headingsVerbatim(language, undefined, !isBuiltinTemplateId(template.id))
+    headingsVerbatim(language, undefined, !isBuiltinTemplateId(template.id), anchor)
   ]
     .filter(Boolean)
     .join("\n");

@@ -262,9 +262,13 @@ export function relevanceHierarchyViolations(
 }
 
 export const languageLine = (request: RelevanceGradeRequest): string =>
-  inLanguageNaming({ zh: languageZh, en: languageEn }, request.contentLanguage ?? request.language, {
-    language: "region"
-  });
+  inLanguageNaming(
+    { zh: languageZh, en: languageEn },
+    request.contentLanguage ?? request.language,
+    { language: "region" },
+    undefined,
+    { kind: "topic", text: request.goal }
+  );
 
 /**
  * The pins and bounds as the model sees them (position ids), or undefined when nothing is pinned.

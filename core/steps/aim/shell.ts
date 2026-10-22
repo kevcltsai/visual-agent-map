@@ -142,7 +142,10 @@ export function buildAimPrompt(
   const phase = aimPhase(context.task);
   const field = (label: string, value: string | undefined) => (value?.trim() ? `${label}:\n${value}` : "");
   const blocks = [
-    inLanguageNaming(LANGUAGE, language, { language: "region", languagePlain: "plain" }),
+    inLanguageNaming(LANGUAGE, language, { language: "region", languagePlain: "plain" }, undefined, {
+      kind: "topic",
+      text: context.title
+    }),
     inLanguage(ROLE, language),
     inLanguage(SOURCE_SAFETY, language),
     context.sourceContext ? inLanguage(REFERENCE_CITATIONS, language) : "",

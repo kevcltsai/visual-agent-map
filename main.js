@@ -5139,6 +5139,12 @@ var LANGUAGES = [
     dictionary: en
   }
 ];
+var FOLLOW_ANCHOR_KINDS = {
+  topic: { zh: "\u4E3B\u984C", en: "topic" },
+  question: { zh: "\u554F\u984C", en: "question" },
+  selection: { zh: "\u9078\u53D6\u6587\u5B57", en: "selected text" }
+};
+var FOLLOW_ANCHOR_MAX = 80;
 var FOLLOW_INPUT_ID = "same-as-input";
 var KANA = /[\p{Script=Hiragana}\p{Script=Katakana}\u30FC]/gu;
 var japaneseKanaRule = (text11) => {
@@ -5259,20 +5265,28 @@ var OUTPUT_LANGUAGES = [
     note: "en",
     intl: "en",
     followsInput: true,
-    prompt: {
-      zh: {
-        plain: "\u8207\u4F7F\u7528\u8005\u81EA\u5DF1\u8F38\u5165\u7684\u6587\u5B57\uFF08\u4E3B\u984C\u3001\u554F\u984C\u6216\u9078\u53D6\u6587\u5B57\uFF09\u76F8\u540C\u7684\u8A9E\u8A00",
-        region: "\u8207\u4F7F\u7528\u8005\u81EA\u5DF1\u8F38\u5165\u7684\u6587\u5B57\uFF08\u4E3B\u984C\u3001\u554F\u984C\u6216\u9078\u53D6\u6587\u5B57\uFF09\u76F8\u540C\u7684\u8A9E\u8A00",
-        usage: "\u8207\u4F7F\u7528\u8005\u81EA\u5DF1\u8F38\u5165\u7684\u6587\u5B57\uFF08\u4E3B\u984C\u3001\u554F\u984C\u6216\u9078\u53D6\u6587\u5B57\uFF09\u76F8\u540C\u7684\u8A9E\u8A00"
-      },
-      en: {
-        plain: "the same language as the user's own text (topic, question or selection)",
-        region: "the same language as the user's own text (topic, question or selection)",
-        usage: "the same language as the user's own text (topic, question or selection)"
-      }
+    // Without an anchor (no text to quote) the clause can only describe the text.
+    prompt: names(
+      "\u4F7F\u7528\u8005\u81EA\u5DF1\u8F38\u5165\u7684\u6587\u5B57\uFF08\u4E3B\u984C\u3001\u554F\u984C\u6216\u9078\u53D6\u6587\u5B57\uFF09\u6240\u4F7F\u7528\u7684\u8A9E\u8A00\uFF08\u4E0D\u662F\u9019\u4E9B\u6307\u793A\u6216\u56FA\u5B9A\u6A19\u984C\u7684\u8A9E\u8A00\uFF09",
+      "the language in which the user's own text (topic, question or selection) is written (not the language of these instructions or of the fixed headings)"
+    ),
+    anchored: {
+      zh: "\u4F7F\u7528\u8005\u7684{kind}\u300C{anchor}\u300D\u6240\u4F7F\u7528\u7684\u8A9E\u8A00\uFF08\u4E0D\u662F\u9019\u4E9B\u6307\u793A\u6216\u56FA\u5B9A\u6A19\u984C\u7684\u8A9E\u8A00\uFF09",
+      en: `the language in which the user's {kind} "{anchor}" is written (not the language of these instructions or of the fixed headings)`
     }
   }
 ];
+var words = (list) => list.split(" ");
+var LATIN_TEXT_DETECTION = {
+  language: "en",
+  words: words(
+    "the of and to for how what is are with why when from your my this that these those which who where you we they it be can will would should not if than there their about into between have does our its"
+  ),
+  foreign: words(
+    // Spanish
+    "de la el los las del lo al un una uno que por para con se es su sus como y mas entre sobre le les des du et est sont pour avec dans sur au aux cette ces qui pas ne sans vers chez comme mais ou une je tu nous vous der die das und ist mit von zu dem ein eine einer nicht auf aus bei nach wie oder wir im zum zur ich sie als auch aber wenn wer da do dos em um uma nao na nas pelo pela sao ao aos il gli di della dei delle dello degli che sono nel nella non come anche alla het een voor aan naar ook dit dat maar zijn wat hoe waarom ik wij niet uit bij om och att det som inte jeg ikke hvordan og yang dan untuk dengan dari tidak adalah pada apa bagaimana ve bir icin ile nasil neden jest nie dla jak czy oraz pentru este"
+  )
+};
 
 // i18n.ts
 var registry = LANGUAGES;
@@ -5315,8 +5329,19 @@ function verbatimHeadingLanguage(output) {
   const note = noteLanguageOf(output);
   return note === output ? null : note;
 }
-function languagePromptName(locale, instruction, form) {
-  return entryOf(locale).prompt[instruction][form];
+function languagePromptName(locale, instruction, form, anchor) {
+  const entry = entryOf(locale);
+  const anchored = "anchored" in entry ? entry.anchored : void 0;
+  const quoted = anchor && anchored ? quoteAnchor(anchor.text) : "";
+  if (!anchor || !anchored || !quoted) return entry.prompt[instruction][form];
+  return anchored[instruction].replace("{kind}", () => FOLLOW_ANCHOR_KINDS[anchor.kind][instruction]).replace("{anchor}", () => quoted);
+}
+function quoteAnchor(text11) {
+  const flat = text11.replace(/\s+/g, " ").trim();
+  if (!flat) return "";
+  const chars = Array.from(flat);
+  const cut = chars.length > FOLLOW_ANCHOR_MAX ? `${chars.slice(0, FOLLOW_ANCHOR_MAX).join("").trimEnd()}\u2026` : flat;
+  return cut.replace(/\\/g, "\\\\").replace(/"/g, '\\"');
 }
 function intlLocaleOf(locale) {
   return entryOf(locale).intl;
@@ -6997,6 +7022,12 @@ var headings_verbatim_zh_default = "\u56FA\u5B9A\u6A19\u984C\u5FC5\u9808\u9010\u
 // core/steps/_shared/headings-verbatim.en.md
 var headings_verbatim_en_default = "Write the fixed headings exactly as listed ({{note}}; do not convert them to {{language}}) and add no second set of headings; only the content under the headings is written in {{language}}.\n";
 
+// core/steps/_shared/headings-verbatim-follow.zh.md
+var headings_verbatim_follow_zh_default = "\u56FA\u5B9A\u6A19\u984C\u5FC5\u9808\u9010\u5B57\u7167\u4E0A\u5217\u5BEB\u51FA\uFF0C\u4E0D\u8981\u7FFB\u8B6F\uFF0C\u4E0D\u53EF\u589E\u52A0\u53E6\u4E00\u5957\u6A19\u984C\uFF1B\u53EA\u6709\u6A19\u984C\u5E95\u4E0B\u7684\u5167\u5BB9\u4F7F\u7528{{language}}\u64B0\u5BEB\u3002\n";
+
+// core/steps/_shared/headings-verbatim-follow.en.md
+var headings_verbatim_follow_en_default = "Write the fixed headings exactly as listed and do not translate them; add no second set of headings; only the content under the headings is written in {{language}}.\n";
+
 // core/steps/_shared/headings-verbatim-custom.zh.md
 var headings_verbatim_custom_zh_default = "\u56FA\u5B9A\u6A19\u984C\u5FC5\u9808\u9010\u5B57\u7167\u4E0A\u5217\u5BEB\u51FA\uFF0C\u4E0D\u53EF\u589E\u52A0\u53E6\u4E00\u5957\u6A19\u984C\uFF1B\u53EA\u6709\u6A19\u984C\u5E95\u4E0B\u7684\u5167\u5BB9\u4F7F\u7528{{language}}\u64B0\u5BEB\u3002\n";
 
@@ -7015,16 +7046,21 @@ var pair2 = (zh, en2) => ({ zh: text2(zh), en: text2(en2) });
 function inLanguage(fragment, language2) {
   return fragment[instructionLanguageOf(language2)];
 }
-function inLanguageNaming(fragment, language2, names3, spelledIn) {
+function inLanguageNaming(fragment, language2, names3, spelledIn, anchor) {
   return renderTemplate(
     fragment[instructionLanguageOf(language2)],
-    languageVariables(language2, names3, void 0, spelledIn)
+    languageVariables(language2, names3, void 0, spelledIn, anchor)
   );
 }
-function languageVariables(language2, names3, instructionOf = language2, spelledIn) {
+function languageVariables(language2, names3, instructionOf = language2, spelledIn, anchor) {
   const variables4 = {};
   for (const [placeholder2, form] of Object.entries(names3))
-    variables4[placeholder2] = languagePromptName(language2, spelledIn != null ? spelledIn : instructionLanguageOf(instructionOf), form);
+    variables4[placeholder2] = languagePromptName(
+      language2,
+      spelledIn != null ? spelledIn : instructionLanguageOf(instructionOf),
+      form,
+      anchor
+    );
   return variables4;
 }
 var CLAUDE_STRUCTURED_OUTPUT = pair2(claude_structured_output_zh_default, claude_structured_output_en_default);
@@ -7048,18 +7084,18 @@ function toneBlock(toneText, language2) {
   return renderTemplate(inLanguage({ zh: tone_zh_default, en: tone_en_default }, language2), { tone: toneText });
 }
 var HEADINGS_VERBATIM = { zh: headings_verbatim_zh_default, en: headings_verbatim_en_default };
+var HEADINGS_VERBATIM_FOLLOW = { zh: headings_verbatim_follow_zh_default, en: headings_verbatim_follow_en_default };
 var HEADINGS_VERBATIM_CUSTOM = { zh: headings_verbatim_custom_zh_default, en: headings_verbatim_custom_en_default };
-function headingsVerbatim(output, instruction, custom = false) {
+function headingsVerbatim(output, instruction, custom = false, anchor) {
   const note = verbatimHeadingLanguage(output);
   if (!note) return "";
   const spelled = instruction != null ? instruction : instructionLanguageOf(output);
-  if (custom)
-    return renderTemplate(HEADINGS_VERBATIM_CUSTOM[spelled], {
-      language: languagePromptName(output, spelled, "plain")
-    });
+  const language2 = languagePromptName(output, spelled, "plain", anchor);
+  if (custom) return renderTemplate(HEADINGS_VERBATIM_CUSTOM[spelled], { language: language2 });
+  if (isFollowInputLanguage(output)) return renderTemplate(HEADINGS_VERBATIM_FOLLOW[spelled], { language: language2 });
   return renderTemplate(HEADINGS_VERBATIM[spelled], {
     note: languagePromptName(note, spelled, "plain"),
-    language: languagePromptName(output, spelled, "plain")
+    language: language2
   });
 }
 
@@ -14372,8 +14408,17 @@ function signalOf(text11) {
     if (votes.traditional > votes.simplified) return "zh-TW";
     return UNDECIDED_HAN;
   }
+  if (englishByFunctionWords(text11)) return LATIN_TEXT_DETECTION.language;
   if (/\p{L}/u.test(text11)) return FOLLOW_INPUT_ID;
   return void 0;
+}
+function englishByFunctionWords(text11) {
+  var _a2;
+  if (/\p{L}/u.test(text11.replace(/[A-Za-z]/g, ""))) return false;
+  const words2 = (_a2 = text11.toLowerCase().match(/[a-z]+/g)) != null ? _a2 : [];
+  const english = LATIN_TEXT_DETECTION.words;
+  const foreign = LATIN_TEXT_DETECTION.foreign;
+  return words2.some((word) => english.includes(word)) && !words2.some((word) => foreign.includes(word));
 }
 function detectAimContentLanguage(text11) {
   const signal = signalOf(text11);
@@ -15237,6 +15282,12 @@ var heading_rule_ui_zh_default = "\u516D\u500B\u6A19\u6E96 Detail \u6A19\u984C\u
 // core/steps/task/heading-rule-ui.en.md
 var heading_rule_ui_en_default = "The six standard Detail headings must follow the interface language. \n";
 
+// core/steps/task/heading-rule-follow.zh.md
+var heading_rule_follow_zh_default = "\u516D\u500B\u6A19\u6E96 Detail \u6A19\u984C\u56FA\u5B9A\uFF0C\u9010\u5B57\u7167 detail \u7D50\u69CB\u5BEB\u51FA\uFF0C\u4E0D\u7FFB\u8B6F\uFF1B\u5167\u6587\u4F7F\u7528{{language}}\u3002\n";
+
+// core/steps/task/heading-rule-follow.en.md
+var heading_rule_follow_en_default = "The six standard Detail headings are fixed exactly as listed in the detail structure and are copied verbatim, not translated; the body is written in {{language}}. \n";
+
 // core/steps/task/heading-rule-note.zh.md
 var heading_rule_note_zh_default = "\u516D\u500B\u6A19\u6E96 Detail \u6A19\u984C\u56FA\u5B9A\u4F7F\u7528\u7B46\u8A18\u8A9E\u8A00\uFF08{{note}}\uFF09\uFF0C\u9010\u5B57\u7167 detail \u7D50\u69CB\u5BEB\u51FA\uFF1B\u5167\u6587\u4ECD\u4F7F\u7528{{language}}\u3002\n";
 
@@ -15305,11 +15356,12 @@ var LABEL_DETAIL = pair4(label_detail_zh_default, label_detail_en_default);
 var LABEL_FINDINGS = pair4(label_findings_zh_default, label_findings_en_default);
 var OUTPUT_LANGUAGE = { zh: output_language_zh_default, en: output_language_en_default };
 var HEADING_RULE_UI = pair4(heading_rule_ui_zh_default, heading_rule_ui_en_default);
+var HEADING_RULE_FOLLOW = { zh: heading_rule_follow_zh_default, en: heading_rule_follow_en_default };
 var HEADING_RULE_NOTE = { zh: heading_rule_note_zh_default, en: heading_rule_note_en_default };
-function outputLanguage(language2) {
+function outputLanguage(language2, anchor) {
   const note = verbatimHeadingLanguage(language2);
-  const names3 = languageVariables(language2, { language: "plain" });
-  const headingRule = note ? renderTemplate(inLanguage(HEADING_RULE_NOTE, language2), {
+  const names3 = languageVariables(language2, { language: "plain" }, language2, void 0, anchor);
+  const headingRule = isFollowInputLanguage(language2) ? renderTemplate(inLanguage(HEADING_RULE_FOLLOW, language2), names3) : note ? renderTemplate(inLanguage(HEADING_RULE_NOTE, language2), {
     ...names3,
     ...languageVariables(note, { note: "plain" }, language2)
   }) : inLanguage(HEADING_RULE_UI, language2);
@@ -15567,10 +15619,10 @@ function countIssueText(issue, language2) {
   const key2 = issue.mode === "exact" ? "ui.detail_count_issue_exact" : "ui.detail_count_issue_min";
   return translate(language2, key2, issue.section, issue.n, issue.actual);
 }
-function detailStructurePrompt(template, language2, standardText) {
+function detailStructurePrompt(template, language2, standardText, anchor) {
   return [
     structureText(template, language2, standardText),
-    headingsVerbatim(language2, void 0, !isBuiltinTemplateId(template.id))
+    headingsVerbatim(language2, void 0, !isBuiltinTemplateId(template.id), anchor)
   ].filter(Boolean).join("\n");
 }
 function structureText(template, language2, standardText) {
@@ -24399,7 +24451,8 @@ var structureReviewStep = {
         { zh: language_zh_default, en: language_en_default },
         (_a2 = request.contentLanguage) != null ? _a2 : request.language,
         { language: "region" },
-        "en"
+        "en",
+        { kind: "question", text: request.rootQuestion }
       ),
       limit: String(STRUCTURE_REVIEW_MAX_SUGGESTIONS),
       question: JSON.stringify(request.rootQuestion),
@@ -37492,9 +37545,10 @@ ${request.requirements}` : preset.text,
         (_h = (_g = this.plugin.pendingSuggestions.get(node.path)) == null ? void 0 : _g.length) != null ? _h : 0,
         this.plugin,
         async (options, focus, done, failed, accepted) => {
-          var _a3;
+          var _a3, _b3;
           const latest = await this.plugin.repo.readNote(node.path, (_a3 = this.map) != null ? _a3 : void 0);
-          const task = researchTopicTask(this.plugin.settings.language, latest.title);
+          const taskLanguage = (_b3 = options.outputLanguage) != null ? _b3 : outputLanguageForMap(this.map, this.plugin.settings.language, latest.title);
+          const task = researchTopicTask(taskLanguage, latest.title);
           const detailTemplate = await this.detailTemplateFor(node, options.detailTemplateId, options.toneId);
           await this.runAgent(
             node,
@@ -39172,7 +39226,7 @@ ${request.requirements}` : preset.text,
    * report to the open dialog through `observer`; once it is closed the run carries on and the selection bar shows it.
    */
   async startSelectionSynthesis(sources2, options, direction, failed, accepted, observer) {
-    var _a2, _b2, _c;
+    var _a2, _b2, _c, _d;
     if (!this.map || sources2.length < 2) {
       failed(t("ui.select_at_least_two_topics"));
       return;
@@ -39278,12 +39332,12 @@ ${request.requirements}` : preset.text,
       const result = await this.plugin.askModel(
         {
           title,
-          summary: translateNote(language2, "note.no_conclusion_yet"),
+          summary: translateNote((_b2 = runOptions.outputLanguage) != null ? _b2 : language2, "note.no_conclusion_yet"),
           rules: "",
           detail: "",
           task: [synthesisDirectionsTask(language2), runOptions.requirements].filter(Boolean).join("\n\n"),
           ancestors: "",
-          referenceGroups: [...(_b2 = runOptions.referenceGroups) != null ? _b2 : [], sourceGroup],
+          referenceGroups: [...(_c = runOptions.referenceGroups) != null ? _c : [], sourceGroup],
           // Within budget the sources go in as written (one request); only over-budget sources are extracted first.
           referenceDelivery: "direct",
           onProgress: runOptions.onProgress,
@@ -39305,7 +39359,7 @@ ${request.requirements}` : preset.text,
       taskProgress.end();
       markAccepted();
       if (this.integrationTask !== task) return;
-      if (controller.signal.aborted || this.path !== task.mapPath || ((_c = this.map) == null ? void 0 : _c.id) !== task.mapId)
+      if (controller.signal.aborted || this.path !== task.mapPath || ((_d = this.map) == null ? void 0 : _d.id) !== task.mapId)
         throw new DOMException("Aborted", "AbortError");
       const latest = await this.topicReferenceGroup(
         sources2,
@@ -39392,7 +39446,7 @@ ${note.detail.trim()}` : "",
     };
   }
   async createIntegratedNode(title, sources2, goal, rules, options, flow) {
-    var _a2, _b2, _c, _d, _e, _f, _g, _h, _i, _j, _k, _l;
+    var _a2, _b2, _c, _d, _e, _f, _g, _h, _i, _j, _k, _l, _m;
     if (!this.map || sources2.length < 2) return;
     const controller = (_a2 = flow == null ? void 0 : flow.controller) != null ? _a2 : new AbortController();
     const mapPath = this.path, mapId = this.map.id;
@@ -39424,12 +39478,12 @@ ${note.detail.trim()}` : "",
     try {
       const integrationContext = {
         title,
-        summary: translateNote(language2, "note.no_conclusion_yet"),
+        summary: translateNote((_d = options == null ? void 0 : options.outputLanguage) != null ? _d : language2, "note.no_conclusion_yet"),
         rules: "",
         detail: "",
         task: [goal, options == null ? void 0 : options.requirements].filter(Boolean).join("\n\n"),
         ancestors: "",
-        referenceGroups: [...(_d = options == null ? void 0 : options.referenceGroups) != null ? _d : [], sourceGroup],
+        referenceGroups: [...(_e = options == null ? void 0 : options.referenceGroups) != null ? _e : [], sourceGroup],
         // Within budget the sources go in as written (one request); only over-budget sources are extracted first.
         referenceDelivery: "direct",
         onProgress: (message) => {
@@ -39442,9 +39496,9 @@ ${note.detail.trim()}` : "",
         outputLanguage: options == null ? void 0 : options.outputLanguage,
         ...this.toneField(void 0, options),
         mode: "synthesize",
-        researchMode: (_e = options == null ? void 0 : options.researchMode) != null ? _e : "local",
-        researchDepth: (_f = options == null ? void 0 : options.researchDepth) != null ? _f : "normal",
-        visualMode: (_g = options == null ? void 0 : options.visualMode) != null ? _g : "auto",
+        researchMode: (_f = options == null ? void 0 : options.researchMode) != null ? _f : "local",
+        researchDepth: (_g = options == null ? void 0 : options.researchDepth) != null ? _g : "normal",
+        visualMode: (_h = options == null ? void 0 : options.visualMode) != null ? _h : "auto",
         detailTemplate,
         addCharts: true
       };
@@ -39460,7 +39514,7 @@ ${note.detail.trim()}` : "",
       );
       progress.end();
       if (this.integrationTask !== task) return;
-      if (controller.signal.aborted || this.path !== mapPath || ((_h = this.map) == null ? void 0 : _h.id) !== mapId)
+      if (controller.signal.aborted || this.path !== mapPath || ((_i = this.map) == null ? void 0 : _i.id) !== mapId)
         throw new Error(t("ui.the_map_or_parent_topic_changed_while_ai_was_running_no_subt"));
       const latest = await this.topicReferenceGroup(
         sources2,
@@ -39489,10 +39543,10 @@ ${note.detail.trim()}` : "",
       };
       await (flow ? this.plugin.mutate(write) : write());
       this.undoNotice(t("ui.synthesis_new_topic_0", title), previous);
-      if ((_i = flow == null ? void 0 : flow.observer) == null ? void 0 : _i.isOpen()) (_k = (_j = flow.observer).written) == null ? void 0 : _k.call(_j);
+      if ((_j = flow == null ? void 0 : flow.observer) == null ? void 0 : _j.isOpen()) (_l = (_k = flow.observer).written) == null ? void 0 : _l.call(_k);
     } catch (error) {
       if (this.integrationTask !== task) return;
-      if (flow && controller.signal.aborted && ((_l = flow.observer) == null ? void 0 : _l.isOpen())) {
+      if (flow && controller.signal.aborted && ((_m = flow.observer) == null ? void 0 : _m.isOpen())) {
         if (task.directions.length) task.state = "directions";
         else this.integrationTask = null;
         this.render();
@@ -43190,7 +43244,10 @@ function buildAimPrompt(context, language2, provider = "codex") {
   const field = (label, value) => (value == null ? void 0 : value.trim()) ? `${label}:
 ${value}` : "";
   const blocks = [
-    inLanguageNaming(LANGUAGE, language2, { language: "region", languagePlain: "plain" }),
+    inLanguageNaming(LANGUAGE, language2, { language: "region", languagePlain: "plain" }, void 0, {
+      kind: "topic",
+      text: context.title
+    }),
     inLanguage(ROLE, language2),
     inLanguage(SOURCE_SAFETY, language2),
     context.sourceContext ? inLanguage(REFERENCE_CITATIONS, language2) : "",
@@ -43314,8 +43371,9 @@ function generalTaskPrompt(context, language2, provider = "codex") {
   var _a2;
   const modeFragment = context.mode === "task" ? GENERAL_TASK : context.mode === "decompose" ? DECOMPOSE : context.mode === "synthesize" ? SYNTHESIZE : context.mode === "merge" ? MERGE : DEFAULT_TASK;
   const none = inLanguage(NONE, language2);
+  const topicAnchor = { kind: "topic", text: context.title };
   return [
-    outputLanguage(language2),
+    outputLanguage(language2, topicAnchor),
     inLanguage(ROLE, language2),
     inLanguage(SOURCE_SAFETY, language2),
     context.sourceContext ? inLanguage(REFERENCE_CITATIONS, language2) : "",
@@ -43327,7 +43385,8 @@ function generalTaskPrompt(context, language2, provider = "codex") {
       context.detailFormat === "adaptive" ? inLanguage(ADAPTIVE_DETAIL_STRUCTURE, language2) : detailStructurePrompt(
         (_a2 = context.detailTemplate) != null ? _a2 : standardTemplate(noteLanguageOf(language2)),
         language2,
-        (headings) => detailStructure(language2, headings)
+        (headings) => detailStructure(language2, headings),
+        topicAnchor
       ),
       // A merge keeps the sources' own formatting; the syntax suggestions would invite callouts the sources lack.
       readerFacingDetail(context) && context.mode !== "merge" ? inLanguage(OBSIDIAN_FORMAT, language2) : ""
@@ -44045,7 +44104,8 @@ var reframeStep = {
       { zh: language_zh_default3, en: language_en_default3 },
       request.language,
       { language: "region" },
-      "en"
+      "en",
+      { kind: "question", text: request.question }
     ),
     direction: JSON.stringify({ question: request.question, context: request.context }),
     source: JSON.stringify(request.source)
@@ -44219,7 +44279,10 @@ var outlineGenerateStep = {
     var _a2;
     const content = (_a2 = request.contentLanguage) != null ? _a2 : request.language;
     return renderTemplate(prompt_default3, {
-      languageInstruction: inLanguageNaming({ zh: language_zh_default4, en: language_en_default4 }, content, { language: "region" }, "en"),
+      languageInstruction: inLanguageNaming({ zh: language_zh_default4, en: language_en_default4 }, content, { language: "region" }, "en", {
+        kind: "topic",
+        text: request.topic
+      }),
       preset: request.limits ? `${applyTopicToPreset(request.presetText, request.topic, content)}
 
 ${renderTemplate(
@@ -44509,9 +44572,13 @@ function parseRelevanceGrade(raw, tree, language2 = "en", pinList = []) {
 }
 var languageLine = (request) => {
   var _a2;
-  return inLanguageNaming({ zh: language_zh_default5, en: language_en_default5 }, (_a2 = request.contentLanguage) != null ? _a2 : request.language, {
-    language: "region"
-  });
+  return inLanguageNaming(
+    { zh: language_zh_default5, en: language_en_default5 },
+    (_a2 = request.contentLanguage) != null ? _a2 : request.language,
+    { language: "region" },
+    void 0,
+    { kind: "topic", text: request.goal }
+  );
 };
 var promptPinParts = (nodes, pinList) => {
   const pins = effectivePins(nodes, pinList);
@@ -46568,7 +46635,10 @@ var VisualAgentMapPlugin = class extends import_obsidian34.Plugin {
     const markdownSelectionAi = new MarkdownSelectionAi(this.app, {
       model: () => this.settings.cliModel,
       autoOpen: () => this.settings.markdownSelectionAiAutoOpen,
-      language: (selected) => languagePromptName(selectionOutputLanguage(this.settings.language, selected), "en", "plain"),
+      language: (selected) => languagePromptName(selectionOutputLanguage(this.settings.language, selected), "en", "plain", {
+        kind: "selection",
+        text: selected
+      }),
       translateTarget: () => languagePromptName(this.settings.language, "en", "plain"),
       run: (prepared, model, signal, image, webSearch, generateImage) => this.runConfirmedMarkdownContextAi(prepared, model, signal, image, webSearch, generateImage),
       saveImage: (dataUrl, notePath, name) => this.saveGeneratedImage(dataUrl, notePath, name)

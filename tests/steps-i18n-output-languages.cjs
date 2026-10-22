@@ -14,16 +14,26 @@ const i18n = load('i18n.ts');
 const { LANGUAGES, OUTPUT_LANGUAGES } = load('i18n/languages.ts');
 const content = load('experiences/aim/content-language.ts');
 const { detectAimContentLanguage, chooseAimContentLanguage, resolveAimContentLanguage, selectionOutputLanguage, defaultOutputLanguage, outputLanguageForMap, noteLanguageFromBody } = content;
-const CLAUSE_EN = "the same language as the user's own text (topic, question or selection)";
-const CLAUSE_ZH = '與使用者自己輸入的文字（主題、問題或選取文字）相同的語言';
+// The clause without an anchor (nothing to quote), then the anchored one that names and quotes the user's own text (D-2026-10-94).
+const CLAUSE_EN = "the language in which the user's own text (topic, question or selection) is written (not the language of these instructions or of the fixed headings)";
+const CLAUSE_ZH = '使用者自己輸入的文字（主題、問題或選取文字）所使用的語言（不是這些指示或固定標題的語言）';
+const anchoredEn = (kind, text) => `the language in which the user's ${kind} "${text}" is written (not the language of these instructions or of the fixed headings)`;
+const escapeRe = text => text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 
 const RULE_JA = /The six standard Detail headings are fixed in the note language \(English\) and are copied exactly from the detail structure; the body stays in Japanese\./g;
 const RULE_EN = 'The six standard Detail headings must follow the interface language.';
 const CLAUSE_JA = 'Write the fixed headings exactly as listed (English; do not convert them to Japanese) and add no second set of headings; only the content under the headings is written in Japanese.';
-// The same-as-input prompt differs from the en prompt exactly as ja does, with the clause where the language name was.
-const RULE_FOLLOW = new RegExp(`The six standard Detail headings are fixed in the note language \\(English\\) and are copied exactly from the detail structure; the body stays in ${CLAUSE_EN.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\.`, 'g');
-const CLAUSE_FOLLOW = `Write the fixed headings exactly as listed (English; do not convert them to ${CLAUSE_EN}) and add no second set of headings; only the content under the headings is written in ${CLAUSE_EN}.`;
-const FLAVOURS = { ja: { name: 'Japanese', rule: RULE_JA, clause: CLAUSE_JA }, 'same-as-input': { name: CLAUSE_EN, rule: RULE_FOLLOW, clause: CLAUSE_FOLLOW } };
+// The same-as-input prompt differs from the en prompt with the anchored clause where the language name was, and its own
+// heading wording (no "English versus another language" contrast, D-2026-10-94), for the anchor `kind`/`text` it was built from.
+const followFlavour = (kind, text) => {
+  const name = anchoredEn(kind, text);
+  return {
+    name,
+    rule: new RegExp(`The six standard Detail headings are fixed exactly as listed in the detail structure and are copied verbatim, not translated; the body is written in ${escapeRe(name)}\\.`, 'g'),
+    clause: `Write the fixed headings exactly as listed and do not translate them; add no second set of headings; only the content under the headings is written in ${name}.`
+  };
+};
+const FLAVOURS = { ja: { name: 'Japanese', rule: RULE_JA, clause: CLAUSE_JA } };
 /** The prompt reduced to the en prompt: drop the heading clauses, restore the en heading rule, rename the language. */
 function reduce(ja, flavour = FLAVOURS.ja) {
   const lines = ja.split('\n'), kept = lines.filter(line => line !== flavour.clause);
@@ -68,7 +78,17 @@ test('output languages: the same-as-input row is a virtual row with the exact cl
   for (const form of ['plain', 'region', 'usage']) {
     assert.equal(i18n.languagePromptName('same-as-input', 'en', form), CLAUSE_EN);
     assert.equal(i18n.languagePromptName('same-as-input', 'zh', form), CLAUSE_ZH);
+    assert.equal(i18n.languagePromptName('same-as-input', 'en', form, { kind: 'topic', text: '  ' }), CLAUSE_EN, 'a blank anchor falls back to the unanchored clause');
   }
+  // Anchored: names and quotes the user's text; other languages ignore the anchor (D-2026-10-94).
+  assert.equal(i18n.languagePromptName('same-as-input', 'en', 'plain', { kind: 'topic', text: 'Histoire de la Révolution' }), anchoredEn('topic', 'Histoire de la Révolution'));
+  assert.equal(i18n.languagePromptName('same-as-input', 'en', 'plain', { kind: 'question', text: 'Pourquoi?' }), anchoredEn('question', 'Pourquoi?'));
+  assert.equal(i18n.languagePromptName('same-as-input', 'en', 'plain', { kind: 'selection', text: 'Texto' }), anchoredEn('selected text', 'Texto'));
+  assert.equal(i18n.languagePromptName('same-as-input', 'zh', 'plain', { kind: 'topic', text: 'La vie' }), '使用者的主題「La vie」所使用的語言（不是這些指示或固定標題的語言）');
+  assert.equal(i18n.languagePromptName('same-as-input', 'en', 'plain', { kind: 'topic', text: 'Say "hi"\nthen {anchor} \\ ok' }), anchoredEn('topic', 'Say \\"hi\\" then {anchor} \\\\ ok'), 'one line, quotes and backslashes escaped, placeholders in the text are not re-expanded');
+  const long = 'x'.repeat(200);
+  assert.equal(i18n.languagePromptName('same-as-input', 'en', 'plain', { kind: 'topic', text: long }), anchoredEn('topic', `${'x'.repeat(80)}…`), 'long anchors are cut to 80 characters');
+  assert.equal(i18n.languagePromptName('ja', 'en', 'plain', { kind: 'topic', text: 'Topic' }), 'Japanese');
   assert.equal(i18n.isFollowInputLanguage('same-as-input'), true);
   for (const id of ['ja', 'en', 'zh-TW', 'xx', undefined]) assert.equal(i18n.isFollowInputLanguage(id), false);
   assert.equal(i18n.noteLanguageOf('same-as-input'), 'en', 'fixed note text is English (D-2026-10-84)');
@@ -181,16 +201,18 @@ test('output languages: same-as-input task prompts equal the en prompts except t
     const en = await promptsFor({ ...base, ...extra, outputLanguage: 'en' }, { language: 'en' });
     const follow = await promptsFor({ ...base, ...extra, outputLanguage: 'same-as-input' }, { language: 'en' });
     assert.equal(follow.length, en.length);
-    follow.forEach((call, i) => assertReduces(`task variant ${index}`, call.prompt, en[i].prompt, undefined, FLAVOURS['same-as-input']));
+    follow.forEach((call, i) => assertReduces(`task variant ${index}`, call.prompt, en[i].prompt, undefined, followFlavour('topic', 'Topic T')));
   }
   const follow = (await promptsFor({ ...base, outputLanguage: 'same-as-input' }, { language: 'en' }))[0].prompt;
-  assert.ok(follow.includes(`Write newly generated content in ${CLAUSE_EN} by default`), 'carries the clause where the language name was');
-  assert.ok(follow.includes(CLAUSE_FOLLOW), 'carries the fixed-heading clause');
-  assert.match(follow, RULE_FOLLOW);
+  const flavour = followFlavour('topic', 'Topic T');
+  assert.ok(follow.includes(`Write newly generated content in ${flavour.name} by default`), 'carries the anchored clause where the language name was');
+  assert.ok(follow.includes(flavour.clause), 'carries the fixed-heading clause');
+  assert.match(follow, flavour.rule);
+  assert.doesNotMatch(follow, /note language|do not convert them to/, 'no English-versus-other-language contrast in follow-input mode');
   assert.ok(follow.includes('Topic T') && follow.includes('Do task X'), 'the prompt contains the user text the clause refers to');
   // Under a zh-TW interface the instruction language stays English for this row (the clause is spelled for the instruction language).
   const zhUi = (await promptsFor({ ...base, outputLanguage: 'same-as-input' }, { language: 'zh-TW' }))[0].prompt;
-  assert.ok(zhUi.includes(CLAUSE_EN) && !zhUi.includes(CLAUSE_ZH));
+  assert.ok(zhUi.includes(flavour.name) && !zhUi.includes('使用者的主題'));
 });
 
 test('output languages: same-as-input AIM shell prompts equal the en prompts except the clause (no heading clause, as for ja)', async () => {
@@ -200,8 +222,8 @@ test('output languages: same-as-input AIM shell prompts equal the en prompts exc
     const en = await promptsFor({ ...aimBase, task, outputLanguage: 'en' }, { language: 'en' });
     const follow = await promptsFor({ ...aimBase, task, outputLanguage: 'same-as-input' }, { language: 'en' });
     assert.equal(follow.length, en.length, String(phase));
-    follow.forEach((call, i) => assertReduces(`aim ${phase}`, call.prompt, en[i].prompt, undefined, FLAVOURS['same-as-input']));
-    assert.ok(follow[0].prompt.includes(CLAUSE_EN), `aim ${phase} carries the clause`);
+    follow.forEach((call, i) => assertReduces(`aim ${phase}`, call.prompt, en[i].prompt, undefined, followFlavour('topic', 'Goal G')));
+    assert.ok(follow[0].prompt.includes(anchoredEn('topic', 'Goal G')), `aim ${phase} carries the anchored clause`);
     assert.ok(follow[0].prompt.includes('Goal G'), `aim ${phase}: the prompt contains the user text (the goal)`);
   }
 });
@@ -212,15 +234,15 @@ test('output languages: same-as-input outline, structure-review and relevance pr
   const { buildRelevanceGradePrompt } = support.load('core/relevance-grade-service.ts', { obsidian: support.obsidian });
   const nodes = [{ id: 'n1', title: 'Root topic', summary: 'Root summary', status: 'completed', parentId: null, depth: 0 }, { id: 'n2', title: 'Child topic', summary: 'Child summary', status: 'idea', parentId: 'n1', depth: 1 }];
   const calls = {
-    outline: [contentLanguage => buildOutlineGeneratePrompt({ language: 'en', contentLanguage, topic: 'Topic under study', presetText: 'Build a knowledge tree for {Enter research topic} in three levels.', model: 'm', reasoning: 'low' }), 'Topic under study'],
-    structure: [contentLanguage => buildStructureReviewPrompt({ language: 'en', contentLanguage, rootQuestion: 'Root question text', nodes, model: 'm', reasoning: 'low' }), 'Root question text'],
-    relevance: [contentLanguage => buildRelevanceGradePrompt({ language: 'en', contentLanguage, goal: 'Learner goal text', nodes, model: 'm', reasoning: 'low' }), 'Learner goal text']
+    outline: ['topic', contentLanguage => buildOutlineGeneratePrompt({ language: 'en', contentLanguage, topic: 'Topic under study', presetText: 'Build a knowledge tree for {Enter research topic} in three levels.', model: 'm', reasoning: 'low' }), 'Topic under study'],
+    structure: ['question', contentLanguage => buildStructureReviewPrompt({ language: 'en', contentLanguage, rootQuestion: 'Root question text', nodes, model: 'm', reasoning: 'low' }), 'Root question text'],
+    relevance: ['topic', contentLanguage => buildRelevanceGradePrompt({ language: 'en', contentLanguage, goal: 'Learner goal text', nodes, model: 'm', reasoning: 'low' }), 'Learner goal text']
   };
-  for (const [name, [build, userText]] of Object.entries(calls)) {
+  for (const [name, [kind, build, userText]] of Object.entries(calls)) {
     const en = build('en'), follow = build('same-as-input');
-    assert.ok(follow.includes(CLAUSE_EN), `${name} carries the clause`);
+    assert.ok(follow.includes(anchoredEn(kind, userText)), `${name} carries the anchored clause`);
     assert.ok(follow.includes(userText), `${name}: the prompt contains the user text the clause refers to`);
-    assertReduces(name, follow, en, undefined, FLAVOURS['same-as-input']);
+    assertReduces(name, follow, en, undefined, followFlavour(kind, userText));
   }
 });
 
@@ -356,14 +378,49 @@ test('output languages: the note language guard reads content-language, else the
   assert.equal(defaultOutputLanguage('en', '東京ラーメンの旅', content.existingNoteLanguage({ detail: body('en', 'detail.core_conclusions') })), 'ja');
 });
 
-test('output languages: follow-input and an English topic are compared with the English prompt (D-2026-10-90)', async () => {
-  const base = { title: 'Plan a 5-day Taipei trip', summary: 'S', rules: '', detail: '', task: 'Research Plan a 5-day Taipei trip', ancestors: '', mode: 'task', researchMode: 'local', researchDepth: 'normal', visualMode: 'off' };
-  const en = (await promptsFor({ ...base, outputLanguage: 'en' }, { language: 'en' }))[0].prompt;
-  const follow = (await promptsFor({ ...base, outputLanguage: chooseAimContentLanguage('en', base.title) }, { language: 'en' }))[0].prompt;
-  assert.equal(chooseAimContentLanguage('en', base.title), 'same-as-input');
-  assert.notEqual(normalizeText(follow), normalizeText(en), 'the runtime prompt of an English topic changed: the clause replaces the language name');
-  assertReduces('english topic', follow, en, undefined, FLAVOURS['same-as-input']);
+test('output languages: an English topic with function words is the en path; one without keeps the anchored follow-input clause (D-2026-10-90, D-2026-10-94)', async () => {
+  const task = title => ({ title, summary: 'S', rules: '', detail: '', task: `Research ${title}`, ancestors: '', mode: 'task', researchMode: 'local', researchDepth: 'normal', visualMode: 'off' });
+  // Function words and no foreign function word: detected as English, so the prompt is exactly the explicit-en prompt.
+  const plain = task('How to plan a 5-day Taipei trip');
+  assert.equal(chooseAimContentLanguage('zh-TW', plain.title), 'en');
+  const detectedEn = (await promptsFor({ ...plain, outputLanguage: chooseAimContentLanguage('en', plain.title) }, { language: 'en' }))[0].prompt;
+  const explicitEn = (await promptsFor({ ...plain, outputLanguage: 'en' }, { language: 'en' }))[0].prompt;
+  assert.equal(normalizeText(detectedEn), normalizeText(explicitEn));
+  assert.doesNotMatch(detectedEn, /the language in which the user's/);
+  // No function word either way: the model follows the quoted text.
+  const bare = task('Plan a 5-day Taipei trip');
+  assert.equal(chooseAimContentLanguage('en', bare.title), 'same-as-input');
+  const en = (await promptsFor({ ...bare, outputLanguage: 'en' }, { language: 'en' }))[0].prompt;
+  const follow = (await promptsFor({ ...bare, outputLanguage: chooseAimContentLanguage('en', bare.title) }, { language: 'en' }))[0].prompt;
+  assert.notEqual(normalizeText(follow), normalizeText(en), 'the runtime prompt of such a topic changed: the anchored clause replaces the language name');
+  assertReduces('english topic', follow, en, undefined, followFlavour('topic', bare.title));
   assert.equal(i18n.noteLanguageOf('same-as-input'), i18n.noteLanguageOf('en'));
+});
+
+test('output languages: plain English is told from other Latin text by function words (D-2026-10-94)', () => {
+  const expectEn = ['How to plan a trip', 'What is the best way to learn', 'Why are bridges built with arches', 'The history of Rome', 'My notes from this trip', 'Plan for the week'];
+  for (const text of expectEn) assert.equal(detectAimContentLanguage(text), 'en', text);
+  const expectFollow = [
+    'Ancient Egypt', // no function word either way
+    'Historia de Roma', // Spanish function word
+    'Histoire de la Révolution française', // accents and French function words
+    'La vie en rose', // French function words
+    'The history of el Camino', // mixed: a foreign function word wins
+    'Der Weg of the Samurai', 'Wat is the best', 'Plan para the trip', // foreign word beside an English one
+    'Café and the city', // an accent: not plain ASCII, so not decided by word lists
+    'Notes on ラーメン shops', // the kana rule says no (too many Latin words); non-ASCII, so no English
+    'Что is the', 'a in no', 'on an as' // other script; shared words are in neither list
+  ];
+  for (const text of expectFollow) assert.equal(detectAimContentLanguage(text), 'same-as-input', text);
+  // Digits, punctuation and spaces around ASCII letters do not matter; the rest of the priority order is unchanged.
+  assert.equal(detectAimContentLanguage('  How-to: 5 steps for 2026!  '), 'en');
+  assert.equal(detectAimContentLanguage('東京の旅 and the food'), 'zh-TW', 'Han text outweighing Latin words stays Chinese');
+  assert.equal(detectAimContentLanguage('🍜 123'), undefined);
+  // Every word list entry is a lower-case ASCII word, the two lists never overlap, and shared words are in neither.
+  const { LATIN_TEXT_DETECTION: data } = load('i18n/languages.ts');
+  for (const word of [...data.words, ...data.foreign]) assert.match(word, /^[a-z]+$/, word);
+  assert.equal(data.words.filter(word => data.foreign.includes(word)).length, 0);
+  for (const word of ['a', 'in', 'no', 'on', 'an', 'as', 'at', 'per', 'plus', 'par', 'van', 'met', 'op', 'was', 'am', 'den']) assert.ok(!data.words.includes(word) && !data.foreign.includes(word), `${word} is shared and listed nowhere`);
 });
 
 test('output languages: the menu offers the follow-input row first, then registry languages, then an optgroup of output-only languages', () => {
@@ -414,4 +471,18 @@ test('output languages: no existing prompt snapshot changed (the new languages a
   const directory = path.join(__dirname, 'snapshots', 'prompts');
   const names = fs.readdirSync(directory);
   for (const entry of OUTPUT_LANGUAGES) assert.equal(names.some(name => new RegExp(`\\.${entry.id}(\\.\\d+)?\\.(txt|schema\\.json)$`).test(name)), false, entry.id);
+});
+
+test('output languages: the single-card task line and the selection AI use the resolved output language and the selected text (D-2026-10-94)', () => {
+  const view = fs.readFileSync(path.join(__dirname, '..', 'experiences/visual-map/view.ts'), 'utf8');
+  // Single card (B2): the dialog's language, else the map's, never the interface language (the batch path reads the same way).
+  assert.match(view, /const taskLanguage =\s+options\.outputLanguage \?\? outputLanguageForMap\(this\.map, this\.plugin\.settings\.language, latest\.title\);\s+const task = researchTopicTask\(taskLanguage, latest\.title\);/);
+  assert.equal(view.includes('researchTopicTask(this.plugin.settings.language'), false);
+  // The "no conclusion yet" summary placeholder of the synthesis prompts is written in the output language's note language.
+  assert.match(view, /summary: translateNote\(runOptions\.outputLanguage \?\? language, "note\.no_conclusion_yet"\)/);
+  assert.match(view, /summary: translateNote\(options\?\.outputLanguage \?\? language, "note\.no_conclusion_yet"\)/);
+  // Selection AI: the follow-the-text clause quotes the selection.
+  const main = fs.readFileSync(path.join(__dirname, '..', 'main.ts'), 'utf8');
+  assert.match(main, /kind: "selection",\s+text: selected/);
+  assert.equal(i18n.languagePromptName(selectionOutputLanguage('en', 'Texto sin acentos'), 'en', 'plain', { kind: 'selection', text: 'Texto sin acentos' }), anchoredEn('selected text', 'Texto sin acentos'));
 });

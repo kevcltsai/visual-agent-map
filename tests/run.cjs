@@ -39,7 +39,8 @@ const suites = [
   'workspace-folders.cjs',
   'upgrade-0.18.cjs',
   'partial-structured.cjs',
-  'research-progress.cjs'
+  'research-progress.cjs',
+  'sharing.cjs'
 ];
 const directory = path.join(__dirname, 'suites');
 assert.deepEqual(fs.readdirSync(directory).filter(file => file.endsWith('.cjs')).sort(), suites.slice().sort(), 'tests/run.cjs must list every file in tests/suites');

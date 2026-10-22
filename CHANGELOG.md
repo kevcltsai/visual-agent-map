@@ -1,32 +1,19 @@
 # Changelog
 
-## [Unreleased]
+## [0.25.0] - 2026-10-22
 
 ### Added
 
+Languages
 - Simplified Chinese interface. Notes created with it keep their fixed headings (Preview, Detail sections) in Traditional Chinese, so a vault never mixes heading languages.
 - AI output follows the language of your map or topic for Japanese, Korean, Arabic and Thai (the AI writes in that language instead of falling back to your interface language), including the Markdown selection AI when the selected text is in one of them. The note's fixed headings stay in English. The "Answer language for this task" menu also lists Japanese, Korean, Spanish, French, German, Portuguese, Russian, Arabic, Thai and Vietnamese under "More languages (answers only)"; these add no interface language.
-
 - The AI now writes in the language of your own text. Japanese (needs at least two kana besides の), Korean, Arabic, Thai, Vietnamese and Simplified or Traditional Chinese characters are recognised from the letters; any other text (English, Spanish, French, Russian...) makes the AI follow the language you wrote in. A new "Same language as my text" choice sits at the top of the answer-language menu, and the language you pick is remembered for that map. The AIM start dialog has the same menu. Titles such as 台灣の旅 stay Chinese; pick Japanese by hand when you want it. Plain English topics (an English function word such as "the", "how" or "of" and no word from another language) are recognised as English and keep the plain "English" instruction; other text without a clear signal gets an instruction that quotes your topic, question or selection and asks for that text's language, not the language of the instructions.
 - The default name of a synthesis note and the suffix added by Copy to... follow the language of the map or title, not the interface language (copying an English card while the interface is Traditional Chinese gives "copy", not the Chinese word).
 - Searching an outline finds Simplified and Traditional Chinese variants of the same word, so typing one form matches the other.
 - The image-translate menu now also lists the output-only languages (Japanese, Korean, Arabic, Thai and the other answer languages), not only the interface languages.
 - Fixed text in notes stays English for these languages (and Traditional Chinese for Simplified Chinese). A note that already uses Traditional Chinese headings keeps that default even when its topic is in another language.
 
-### Changed
-
-- The model status line in Settings, Coffee Tables and the hand-off dialog now reads the same everywhere ("Codex: ready · Claude CLI candidates: ready") and follows the interface language.
-- "Open Coffee Tables" (ribbon and command) now follows the interface language.
-
-### Fixed
-
-- A single-topic research run now names the chosen answer language (or the map's remembered one) instead of the interface language, and the "no conclusion yet" placeholder in research, expansion and integration prompts (the current topic, its ancestors and the source notes) follows the answer language too.
-- The selection AI and Coffee Tables command names now update when you switch the interface language, without reloading.
-
-## [0.25.0] - 2026-10-22
-
-### Added
-
+Maps and synthesis
 - Map cards now work from the keyboard: Delete or Backspace removes the focused card (with an Undo notice, or the usual confirmation when it has subtopics), Mod+Enter adds a subtopic, Shift+Enter adds a sibling, double-clicking a title renames it, and Mod+Z / Mod+Shift+Z undo and redo while the map is the active pane.
 - Integrate subtopics keeps the source links of the parent topic's earlier research. Any link (web address, note link or local file) the new summary and detail leave out is kept in a "Sources from earlier research" block at the end of the sources section. This adds no AI request, and Undo still restores the topic exactly as it was.
 
@@ -35,8 +22,14 @@
 - VAM no longer uses the Node.js `fs` module: its two plugin-folder files (AI exchange log and pending suggestions) are read and written through Obsidian's file adapter, and Codex saved images are read through Obsidian too. File formats and names are unchanged. These files are no longer restricted to owner-only permissions, because Obsidian's adapter has no permission option.
 - The Claude Code CLI check now looks for the program through a short shell probe. If that probe cannot run (for example on Windows), the configured command is treated as installed and any real problem is reported when it is used, instead of always showing "missing".
 - The goal-grading button is now named "Prioritize by goal".
+- The model status line in Settings, Coffee Tables and the hand-off dialog now reads the same everywhere ("Codex: ready · Claude CLI candidates: ready") and follows the interface language.
+- "Open Coffee Tables" (ribbon and command) now follows the interface language.
 
 ### Fixed
+
+Languages
+- A single-topic research run now names the chosen answer language (or the map's remembered one) instead of the interface language, and the "no conclusion yet" placeholder in research, expansion and integration prompts (the current topic, its ancestors and the source notes) follows the answer language too.
+- The selection AI and Coffee Tables command names now update when you switch the interface language, without reloading.
 
 Keyboard
 - Mod+Enter (Cmd+Enter on macOS) now adds a subtopic to the focused card: Obsidian's own "open link in new tab" hotkey swallowed it before the card saw the key. Shift+Enter (sibling) is handled the same way. Both pass through to Obsidian when no card has focus, in a text field, or in the sample, selection mode and AIM maps.
@@ -83,6 +76,7 @@ Display
 - Not checked: the new store file handling and Codex saved-image reading on Windows, and Codex saved-image reading through Obsidian's adapter at all.
 - Not checked live: Mod+Enter and Shift+Enter with real keyboard input (tested with simulated keys on macOS only), keys pressed inside text fields, sibling placement next to very tall cards, a live "Prioritize by goal" run, merge speed on maps with about 1,000 topics, and Windows or Linux.
 - Moves made by Coffee Tables and by AIM maps still go through Obsidian's own rename, so Obsidian may still ask to update links there.
+- Languages: a title with only Chinese characters and の (such as 東京の旅行) is read as Chinese; pick Japanese in the answer-language menu when you want it. Languages written in Latin or Cyrillic letters other than plain English rely on the AI following your text. With the Simplified Chinese interface, a Traditional Chinese topic now gets a Traditional Chinese answer. Coffee Tables search does not match Simplified and Traditional variants. Not checked live: image translation into the new languages, Thai, German and Portuguese answers, and AIM beyond its first questions.
 
 ## [0.24.0] - 2026-10-22
 

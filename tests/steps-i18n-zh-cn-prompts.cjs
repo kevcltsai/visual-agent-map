@@ -45,14 +45,18 @@ const toTraditional = text => {
   return result;
 };
 
-const bases = fs.readdirSync(directory).filter(file => file.endsWith('.zh.txt')).map(file => file.slice(0, -'.zh.txt'.length));
+// A base is a snapshot stem, optionally numbered (service.reference-groups.zh.1.txt pairs with ...zh-CN.1.txt).
+const bases = fs.readdirSync(directory).map(file => /^(.+)\.zh(\.\d+)?\.txt$/.exec(file)).filter(Boolean).map(match => `${match[1]}${match[2] ?? ''}`);
+const twFile = base => { const m = /^(.+?)(\.\d+)?$/.exec(base); return `${m[1]}.zh${m[2] ?? ''}.txt`; };
+const cnFile = base => twFile(base).replace('.zh', '.zh-CN');
+const schemaFile = (base, tag) => twFile(base).replace('.zh', `.${tag}`).replace(/\.txt$/, '.schema.json');
 
 test('zh-CN prompt snapshots: every zh snapshot has a zh-CN twin (prompt and schema)', () => {
-  const missing = bases.filter(base => !fs.existsSync(path.join(directory, `${base}.zh-CN.txt`)));
+  const missing = bases.filter(base => !fs.existsSync(path.join(directory, cnFile(base))));
   assert.deepEqual(missing, []);
   for (const base of bases) {
-    const schema = path.join(directory, `${base}.zh.schema.json`);
-    if (fs.existsSync(schema)) assert.equal(fs.readFileSync(path.join(directory, `${base}.zh-CN.schema.json`), 'utf8'), fs.readFileSync(schema, 'utf8'), `${base} schema`);
+    const schema = path.join(directory, schemaFile(base, 'zh'));
+    if (fs.existsSync(schema)) assert.equal(fs.readFileSync(path.join(directory, schemaFile(base, 'zh-CN')), 'utf8'), fs.readFileSync(schema, 'utf8'), `${base} schema`);
   }
 });
 
@@ -61,8 +65,8 @@ test('zh-CN prompt snapshots differ from zh-TW only on language names (one posit
   const unexplained = [];
   let total = 0;
   for (const base of bases) {
-    const zh = fs.readFileSync(path.join(directory, `${base}.zh.txt`), 'utf8');
-    const cn = stripVerbatim(fs.readFileSync(path.join(directory, `${base}.zh-CN.txt`), 'utf8')).text;
+    const zh = fs.readFileSync(path.join(directory, twFile(base)), 'utf8');
+    const cn = stripVerbatim(fs.readFileSync(path.join(directory, cnFile(base)), 'utf8')).text;
     const twPositions = positions(zh, TW);
     const cnPositions = positions(cn, CN);
     if (twPositions !== cnPositions) unexplained.push(`${base}: ${twPositions} zh-TW name positions vs ${cnPositions} zh-CN`);
@@ -80,11 +84,11 @@ test('zh-CN prompt snapshots differ from zh-TW only on language names (one posit
   assert.ok(total > 0, 'the snapshots parameterise at least one language name');
 });
 
-test('zh-CN prompt snapshots: exactly 17 lines carry a research.* text that differs from zh-TW (the dictionary-sourced instructions)', () => {
+test('zh-CN prompt snapshots: exactly 19 lines carry a research.* text that differs from zh-TW (the dictionary-sourced instructions)', () => {
   const simplified = RESEARCH_KEYS.filter(key => zhCN[key] !== zhTW[key]).map(key => zhCN[key]);
   assert.ok(simplified.length > 0, 'some research.* texts are Simplified');
-  const lines = bases.flatMap(base => fs.readFileSync(path.join(directory, `${base}.zh-CN.txt`), 'utf8').split('\n').filter(line => simplified.some(text => line.includes(text))));
-  assert.equal(lines.length, 17);
+  const lines = bases.flatMap(base => fs.readFileSync(path.join(directory, cnFile(base)), 'utf8').split('\n').filter(line => simplified.some(text => line.includes(text))));
+  assert.equal(lines.length, 19);
 });
 
 test('zh-CN prompt snapshots: the heading-verbatim additions are exactly 19 output-language sentences and 19 clauses, none in zh-TW', () => {

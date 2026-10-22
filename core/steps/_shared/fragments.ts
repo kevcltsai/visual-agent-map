@@ -35,6 +35,8 @@ import SourceSafetyZH from "./source-safety.zh.md";
 import SourceSafetyEN from "./source-safety.en.md";
 import HeadingsVerbatimZH from "./headings-verbatim.zh.md";
 import HeadingsVerbatimEN from "./headings-verbatim.en.md";
+import HeadingsVerbatimCustomZH from "./headings-verbatim-custom.zh.md";
+import HeadingsVerbatimCustomEN from "./headings-verbatim-custom.en.md";
 import ToneZH from "./tone.zh.md";
 import ToneEN from "./tone.en.md";
 
@@ -117,15 +119,21 @@ export function toneBlock(toneText: string, language: UiLanguage): string {
 }
 
 const HEADINGS_VERBATIM: FragmentPair = { zh: HeadingsVerbatimZH, en: HeadingsVerbatimEN };
+const HEADINGS_VERBATIM_CUSTOM: FragmentPair = { zh: HeadingsVerbatimCustomZH, en: HeadingsVerbatimCustomEN };
 /**
  * When the output language is written in a different note language (Simplified Chinese interface, Traditional headings),
  * the clause that tells the model to copy the fixed headings exactly as listed while writing the content in the output
  * language. Empty for languages whose note language is themselves, so those prompts stay unchanged.
  */
-export function headingsVerbatim(output: UiLanguage, instruction?: InstructionLanguage): string {
+export function headingsVerbatim(output: UiLanguage, instruction?: InstructionLanguage, custom = false): string {
   const note = verbatimHeadingLanguage(output);
   if (!note) return "";
   const spelled = instruction ?? instructionLanguageOf(output);
+  // A custom template's headings are whatever the user wrote, so its clause does not name a heading language.
+  if (custom)
+    return renderTemplate(HEADINGS_VERBATIM_CUSTOM[spelled], {
+      language: languagePromptName(output, spelled, "plain")
+    });
   return renderTemplate(HEADINGS_VERBATIM[spelled], {
     note: languagePromptName(note, spelled, "plain"),
     language: languagePromptName(output, spelled, "plain")

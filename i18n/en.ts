@@ -1381,7 +1381,6 @@ export const en = {
     "More guests can mean more waiting and less room for each person to go deeper.",
   "coffee.open_a_new_table_with_these_settings": "Open a new table with these settings",
   "coffee.open_table": "Open table",
-  "coffee.claude_cli_candidates": "Claude CLI candidates",
   "coffee.could_not_load_models_check_provider_setup_and_try_again":
     "Could not load models. Check provider setup and try again.",
   "coffee.see_a_sample_conversation": "See a sample conversation",

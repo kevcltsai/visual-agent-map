@@ -1306,7 +1306,6 @@ var en = {
   "coffee.more_guests_can_mean_more_waiting_and_less_room_for": "More guests can mean more waiting and less room for each person to go deeper.",
   "coffee.open_a_new_table_with_these_settings": "Open a new table with these settings",
   "coffee.open_table": "Open table",
-  "coffee.claude_cli_candidates": "Claude CLI candidates",
   "coffee.could_not_load_models_check_provider_setup_and_try_again": "Could not load models. Check provider setup and try again.",
   "coffee.see_a_sample_conversation": "See a sample conversation",
   "coffee.english_sample_should_our_company_adopt_ai": "English sample \xB7 Should Our Company Adopt AI?",
@@ -2965,7 +2964,6 @@ var zhCN = {
   "coffee.more_guests_can_mean_more_waiting_and_less_room_for": "\u5609\u5BBE\u8D8A\u591A\uFF0C\u7B49\u5F85\u53EF\u80FD\u8D8A\u4E45\uFF0C\u6BCF\u4E2A\u4EBA\u6DF1\u5165\u63A5\u8BDD\u7684\u7A7A\u95F4\u4E5F\u53EF\u80FD\u53D8\u5C11\u3002",
   "coffee.open_a_new_table_with_these_settings": "\u7528\u8FD9\u4E9B\u8BBE\u7F6E\u5F00\u65B0\u684C",
   "coffee.open_table": "\u5F00\u4E00\u684C",
-  "coffee.claude_cli_candidates": "Claude CLI \u5019\u9009\u6A21\u578B",
   "coffee.could_not_load_models_check_provider_setup_and_try_again": "\u65E0\u6CD5\u52A0\u8F7D\u6A21\u578B\uFF0C\u8BF7\u68C0\u67E5 provider \u8BBE\u7F6E\u540E\u91CD\u8BD5\u3002",
   "coffee.see_a_sample_conversation": "\u770B\u770B\u793A\u8303\u684C\u804A",
   "coffee.english_sample_should_our_company_adopt_ai": "\u82F1\u6587\u793A\u4F8B \xB7 \u516C\u53F8\u5E94\u8BE5\u5BFC\u5165 AI \u5417\uFF1F",
@@ -4624,7 +4622,6 @@ var zhTW = {
   "coffee.more_guests_can_mean_more_waiting_and_less_room_for": "\u4F86\u8CD3\u8D8A\u591A\uFF0C\u7B49\u5F85\u53EF\u80FD\u8D8A\u4E45\uFF0C\u6BCF\u500B\u4EBA\u6DF1\u5165\u63A5\u8A71\u7684\u7A7A\u9593\u4E5F\u53EF\u80FD\u8B8A\u5C11\u3002",
   "coffee.open_a_new_table_with_these_settings": "\u7528\u9019\u4E9B\u8A2D\u5B9A\u958B\u65B0\u684C",
   "coffee.open_table": "\u958B\u4E00\u684C",
-  "coffee.claude_cli_candidates": "Claude CLI \u5019\u9078\u6A21\u578B",
   "coffee.could_not_load_models_check_provider_setup_and_try_again": "\u7121\u6CD5\u8F09\u5165\u6A21\u578B\uFF0C\u8ACB\u6AA2\u67E5 provider \u8A2D\u5B9A\u5F8C\u91CD\u8A66\u3002",
   "coffee.see_a_sample_conversation": "\u770B\u770B\u793A\u7BC4\u684C\u804A",
   "coffee.english_sample_should_our_company_adopt_ai": "\u82F1\u6587\u7BC4\u4F8B \xB7 \u516C\u53F8\u61C9\u8A72\u5C0E\u5165 AI \u55CE\uFF1F",
@@ -6822,6 +6819,12 @@ var headings_verbatim_zh_default = "\u56FA\u5B9A\u6A19\u984C\u5FC5\u9808\u9010\u
 // core/steps/_shared/headings-verbatim.en.md
 var headings_verbatim_en_default = "Write the fixed headings exactly as listed ({{note}}; do not convert them to {{language}}) and add no second set of headings; only the content under the headings is written in {{language}}.\n";
 
+// core/steps/_shared/headings-verbatim-custom.zh.md
+var headings_verbatim_custom_zh_default = "\u56FA\u5B9A\u6A19\u984C\u5FC5\u9808\u9010\u5B57\u7167\u4E0A\u5217\u5BEB\u51FA\uFF0C\u4E0D\u53EF\u589E\u52A0\u53E6\u4E00\u5957\u6A19\u984C\uFF1B\u53EA\u6709\u6A19\u984C\u5E95\u4E0B\u7684\u5167\u5BB9\u4F7F\u7528{{language}}\u64B0\u5BEB\u3002\n";
+
+// core/steps/_shared/headings-verbatim-custom.en.md
+var headings_verbatim_custom_en_default = "Write the headings exactly as listed above and add no second set of headings; only the content under the headings is written in {{language}}.\n";
+
 // core/steps/_shared/tone.zh.md
 var tone_zh_default = "\u8A9E\u6C23\u898F\u5247\uFF1A\u8A9E\u6C23\u53EA\u6539\u8B8A\u63AA\u8FAD\u8207\u5448\u73FE\u65B9\u5F0F\uFF0C\u7D55\u4E0D\u964D\u4F4E\u4F86\u6E90\u3001\u5F15\u7528\u8207\u6E96\u78BA\u6027\u7684\u8981\u6C42\uFF1B\u5176\u4ED6\u6240\u6709\u898F\u5247\uFF08\u4F86\u6E90\u6A19\u793A\u3001\u5F15\u7528\u3001\u4E8B\u5BE6\u67E5\u6838\u3001JSON \u5951\u7D04\uFF09\u7167\u5E38\u9069\u7528\u3002\n{{tone}}\n";
 
@@ -6867,10 +6870,15 @@ function toneBlock(toneText, language2) {
   return renderTemplate(inLanguage({ zh: tone_zh_default, en: tone_en_default }, language2), { tone: toneText });
 }
 var HEADINGS_VERBATIM = { zh: headings_verbatim_zh_default, en: headings_verbatim_en_default };
-function headingsVerbatim(output, instruction) {
+var HEADINGS_VERBATIM_CUSTOM = { zh: headings_verbatim_custom_zh_default, en: headings_verbatim_custom_en_default };
+function headingsVerbatim(output, instruction, custom = false) {
   const note = verbatimHeadingLanguage(output);
   if (!note) return "";
   const spelled = instruction != null ? instruction : instructionLanguageOf(output);
+  if (custom)
+    return renderTemplate(HEADINGS_VERBATIM_CUSTOM[spelled], {
+      language: languagePromptName(output, spelled, "plain")
+    });
   return renderTemplate(HEADINGS_VERBATIM[spelled], {
     note: languagePromptName(note, spelled, "plain"),
     language: languagePromptName(output, spelled, "plain")
@@ -11753,7 +11761,30 @@ function rosterFor(session, markdown) {
       return { category: item.id, label: item.label, count: (_a2 = settings == null ? void 0 : settings.counts[item.id]) != null ? _a2 : 0 };
     })
   ];
-  const roleKey = (role) => /主持|host/i.test(role) ? "host" : /觀察|observer/i.test(role) ? "observer" : /跨領域|cross.domain/i.test(role) ? "cross-domain" : /通才|generalist/i.test(role) ? "generalist" : /受影響|當事|affected|lived/i.test(role) ? "affected" : /專家|expert/i.test(role) ? "experts" : "";
+  const textsOf = (keys) => LANGUAGES.flatMap((language2) => keys.map((key2) => translate(language2.id, key2).trim().toLocaleLowerCase())).filter(
+    Boolean
+  );
+  const expertTail = LANGUAGES.map((language2) => {
+    const left = translate(language2.id, "coffee.guest_role_experts").trim().toLocaleLowerCase();
+    const right = translate(language2.id, "coffee.guest_role_cross_domain").trim().toLocaleLowerCase();
+    let size = 0;
+    while (size < left.length && size < right.length && left[left.length - 1 - size] === right[right.length - 1 - size])
+      size++;
+    return left.slice(left.length - size).trim();
+  }).filter((text11) => text11.length >= 2);
+  const roleTexts = [
+    ["host", textsOf(["coffee.roster_host"])],
+    ["observer", textsOf(["coffee.roster_observer"])],
+    ["cross-domain", textsOf(["coffee.guest_role_cross_domain", "coffee.guest_category_cross_domain"])],
+    ["generalist", textsOf(["coffee.guest_role_generalist", "coffee.guest_category_generalist"])],
+    ["affected", textsOf(["coffee.guest_role_affected", "coffee.guest_category_affected"])],
+    ["experts", [...textsOf(["coffee.guest_role_experts", "coffee.guest_category_experts"]), ...expertTail]]
+  ];
+  const roleKey = (role) => {
+    var _a2, _b2;
+    const text11 = role.toLocaleLowerCase();
+    return (_b2 = (_a2 = roleTexts.find(([, texts2]) => texts2.some((item) => text11.includes(item)))) == null ? void 0 : _a2[0]) != null ? _b2 : "";
+  };
   const used = /* @__PURE__ */ new Map();
   for (const person of people) {
     const key2 = roleKey(person.role);
@@ -15237,7 +15268,10 @@ function countIssueText(issue, language2) {
   return translate(language2, key2, issue.section, issue.n, issue.actual);
 }
 function detailStructurePrompt(template, language2, standardText) {
-  return [structureText(template, language2, standardText), headingsVerbatim(language2)].filter(Boolean).join("\n");
+  return [
+    structureText(template, language2, standardText),
+    headingsVerbatim(language2, void 0, !isBuiltinTemplateId(template.id))
+  ].filter(Boolean).join("\n");
 }
 function structureText(template, language2, standardText) {
   var _a;

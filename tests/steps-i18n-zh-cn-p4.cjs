@@ -21,6 +21,17 @@ test('B2: only a language whose note language differs from itself asks for verba
   assert.match(fragments.headingsVerbatim('zh-CN'), /逐字照上列寫出（繁體中文，不要轉成简体中文）/);
 });
 
+test('B2b: a custom template under zh-CN gets the verbatim clause without naming a heading language; zh-TW and en add nothing', () => {
+  const custom = { ...templates.standardTemplate('zh-TW', 'zh-CN'), id: 'custom-1', name: '自订' };
+  const build = (template, language) => templates.detailStructurePrompt(template, language, headings => taskFragments.detailStructure(language, headings));
+  const last = build(custom, 'zh-CN').split('\n').pop();
+  assert.ok(last.startsWith('固定標題必須逐字照上列寫出，'), last);
+  assert.ok(!last.includes('繁體中文'), last);
+  assert.equal(build(custom, 'zh-TW').includes('逐字'), false);
+  assert.equal(build(custom, 'en').includes('exactly as listed'), false);
+  assert.match(fragments.headingsVerbatim('zh-CN', 'en', true), /^Write the headings exactly as listed above/);
+});
+
 test('B2: the Detail prompt under zh-CN names the note language for headings and lists them as Traditional text', () => {
   const standard = templates.standardTemplate('zh-TW', 'zh-CN');
   const prompt = templates.detailStructurePrompt(standard, 'zh-CN', headings => taskFragments.detailStructure('zh-CN', headings));
@@ -95,6 +106,26 @@ test('B3: Coffee roster placeholders follow the interface language while real gu
     assert.equal(roster[0].role, '主持人');
     i18n.setUiLanguage('zh-TW');
     assert.equal(rosterFor(session, '').find(person => person.role === '即將登場').role, '即將登場');
+  } finally { i18n.setUiLanguage('en'); }
+});
+
+test('B3b: Simplified, Traditional and English roles of real guests count toward the roster (no duplicate placeholders)', () => {
+  const { rosterFor, ui: i18n } = loadSource("export * as ui from './i18n'; export { rosterFor } from './experiences/coffee-tables/view';", { obsidian });
+  const session = language => ({ id: 's', language, guests: { hostCount: 1, counts: { experts: 1, 'cross-domain': 1, generalist: 1, affected: 1 }, guests: [], background: '', customPrompt: '' } });
+  const placeholders = (roster, joining) => roster.filter(person => person.role === joining);
+  try {
+    i18n.setUiLanguage('zh-CN');
+    const cn = ['主持人', '中立观察者', '主题专家', '跨领域专家', '好奇的通才', '受影响者'].map((role, index) => `- **林${index}｜${role}**：简介${index}。`).join('\n');
+    const roster = rosterFor(session('zh-CN'), cn);
+    assert.equal(roster.length, 6);
+    assert.equal(placeholders(roster, '即将登场').length, 0);
+    assert.equal(rosterFor(session('zh-CN'), '').length, 6);
+    i18n.setUiLanguage('zh-TW');
+    const tw = ['主持人', '觀察者', '主題專家', '跨領域專家', '好奇的通才', '受影響者'].map((role, index) => `- **林${index}｜${role}**：簡介${index}。`).join('\n');
+    assert.equal(placeholders(rosterFor(session('zh-TW'), tw), '即將登場').length, 0);
+    i18n.setUiLanguage('en');
+    const en = ['Host', 'Observer', 'Topic expert', 'Cross-domain expert', 'Curious generalist', 'Affected perspective'].map((role, index) => `- **Lin ${index}｜${role}**: Bio ${index}.`).join('\n');
+    assert.equal(placeholders(rosterFor(session('en'), en), 'Joining').length, 0);
   } finally { i18n.setUiLanguage('en'); }
 });
 

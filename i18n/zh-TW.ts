@@ -1284,7 +1284,6 @@ export const zhTW: Record<TranslationKey, string> = {
     "來賓越多，等待可能越久，每個人深入接話的空間也可能變少。",
   "coffee.open_a_new_table_with_these_settings": "用這些設定開新桌",
   "coffee.open_table": "開一桌",
-  "coffee.claude_cli_candidates": "Claude CLI 候選模型",
   "coffee.could_not_load_models_check_provider_setup_and_try_again": "無法載入模型，請檢查 provider 設定後重試。",
   "coffee.see_a_sample_conversation": "看看示範桌聊",
   "coffee.english_sample_should_our_company_adopt_ai": "英文範例 · 公司應該導入 AI 嗎？",

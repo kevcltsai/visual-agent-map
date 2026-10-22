@@ -301,7 +301,12 @@ export function detailStructurePrompt(
   language: UiLanguage,
   standardText: (headings: string) => string
 ): string {
-  return [structureText(template, language, standardText), headingsVerbatim(language)].filter(Boolean).join("\n");
+  return [
+    structureText(template, language, standardText),
+    headingsVerbatim(language, undefined, !isBuiltinTemplateId(template.id))
+  ]
+    .filter(Boolean)
+    .join("\n");
 }
 
 function structureText(

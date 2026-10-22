@@ -1284,7 +1284,6 @@ export const zhCN: Record<TranslationKey, string> = {
     "嘉宾越多，等待可能越久，每个人深入接话的空间也可能变少。",
   "coffee.open_a_new_table_with_these_settings": "用这些设置开新桌",
   "coffee.open_table": "开一桌",
-  "coffee.claude_cli_candidates": "Claude CLI 候选模型",
   "coffee.could_not_load_models_check_provider_setup_and_try_again": "无法加载模型，请检查 provider 设置后重试。",
   "coffee.see_a_sample_conversation": "看看示范桌聊",
   "coffee.english_sample_should_our_company_adopt_ai": "英文示例 · 公司应该导入 AI 吗？",

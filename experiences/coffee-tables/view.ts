@@ -29,6 +29,7 @@ import type VisualAgentMapPlugin from "../../main";
 import {
   instructionLanguageOf,
   languagePromptName,
+  LANGUAGES,
   noteLanguageOf,
   translate,
   uiLocale,
@@ -340,20 +341,33 @@ export function rosterFor(
     { category: "observer", label: "coffee.roster_observer" as TranslationKey, count: 1 },
     ...CATEGORIES.map(item => ({ category: item.id, label: item.label, count: settings?.counts[item.id] ?? 0 }))
   ];
-  const roleKey = (role: string): string =>
-    /主持|host/i.test(role)
-      ? "host"
-      : /觀察|observer/i.test(role)
-        ? "observer"
-        : /跨領域|cross.domain/i.test(role)
-          ? "cross-domain"
-          : /通才|generalist/i.test(role)
-            ? "generalist"
-            : /受影響|當事|affected|lived/i.test(role)
-              ? "affected"
-              : /專家|expert/i.test(role)
-                ? "experts"
-                : "";
+  // Display-only counting: a stored role belongs to a category when it contains that category's role or label text in
+  // any registered language, so real guests of every language are matched (not a production parser).
+  const textsOf = (keys: TranslationKey[]): string[] =>
+    LANGUAGES.flatMap(language => keys.map(key => translate(language.id, key).trim().toLocaleLowerCase())).filter(
+      Boolean
+    );
+  // "expert" is the tail the topic-expert and cross-domain roles share in each language (e.g. "专家").
+  const expertTail = LANGUAGES.map(language => {
+    const left = translate(language.id, "coffee.guest_role_experts").trim().toLocaleLowerCase();
+    const right = translate(language.id, "coffee.guest_role_cross_domain").trim().toLocaleLowerCase();
+    let size = 0;
+    while (size < left.length && size < right.length && left[left.length - 1 - size] === right[right.length - 1 - size])
+      size++;
+    return left.slice(left.length - size).trim();
+  }).filter(text => text.length >= 2);
+  const roleTexts: Array<[string, string[]]> = [
+    ["host", textsOf(["coffee.roster_host"])],
+    ["observer", textsOf(["coffee.roster_observer"])],
+    ["cross-domain", textsOf(["coffee.guest_role_cross_domain", "coffee.guest_category_cross_domain"])],
+    ["generalist", textsOf(["coffee.guest_role_generalist", "coffee.guest_category_generalist"])],
+    ["affected", textsOf(["coffee.guest_role_affected", "coffee.guest_category_affected"])],
+    ["experts", [...textsOf(["coffee.guest_role_experts", "coffee.guest_category_experts"]), ...expertTail]]
+  ];
+  const roleKey = (role: string): string => {
+    const text = role.toLocaleLowerCase();
+    return roleTexts.find(([, texts]) => texts.some(item => text.includes(item)))?.[0] ?? "";
+  };
   const used = new Map<string, number>();
   for (const person of people) {
     const key = roleKey(person.role);

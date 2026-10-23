@@ -1,5 +1,40 @@
 # Changelog
 
+## [0.26.0] - 2026-10-23
+
+### Added
+
+Sharing
+- Share this map (command and button in the map view): saves the map, and optionally its notes and images, as one HTML file that opens in any browser, even offline (pictures that link to a web address need a connection to show). You choose where it is saved; VAM does not upload anything. The share dialog shows the number of topics, notes and images and the file size before you save. Turn off "Include full notes" to share only the map structure and topic summaries, and turn off "Include images" to leave pictures out (they are marked in the text) and get a much smaller file. Diagrams are drawn into the file; if Mermaid is not allowed in the vault or a diagram does not finish drawing, its source is shown instead, with a warning in the dialog.
+- Before anything is written, the file is checked for private information: the vault's location on your computer, a note's file path, a map folder name, `[[note links]]` left in the text, `app://`, `obsidian://` and `file://` addresses, internal VAM field names and AI model names. If one is found nothing is saved and the dialog says what it was. Links between notes are decided on the text readers actually see, and text hidden in Markdown comments or after an unclosed comment marker is not shared.
+- "Copy the GitHub publishing instructions" button after saving: copies a ready-to-paste instruction for your own Claude Code or Codex that publishes the saved file to GitHub Pages and gives you a link. The button only copies text. Publishing is up to you, and everyone who has the link can see the content.
+- The shared page shows the map with a side panel for each topic and a link back to Visual Agent Map. Apart from images in your notes that link to a web address (the reader's browser fetches them from that site, and each shows its source), it loads nothing from the internet, and it works in a narrow window. AIM research maps and the built-in sample cannot be shared yet.
+
+Translated share files
+- The share dialog can add translated versions: tick the languages to add, see the number of AI calls and the estimated minutes, then press "Translate and save…". Progress shows the language and batch, Cancel stops the translation and saves nothing, and results are listed per language (complete, incomplete, failed or blocked) before you save with "Save file…". Everything selected that was already translated in the same session is reused with no new AI calls. Translations are scanned for private information like the original, and text inside images is not translated.
+- Choose the language the file opens in. Readers get a language menu in the viewer, the file opens in the reader's browser language when it is included, and the reader's choice is remembered for that shared file. Translated text carries an "AI-translated" notice, and quality is marked as not checked by a native speaker for the languages listed in the dialog.
+
+Models
+- The Claude model menu now includes Claude Haiku.
+- The model menu has a "Follow default" choice for a topic you pinned to one model: it returns the topic to the workspace model, or to the model of the topic above it, and shows the model that is in effect now.
+
+### Changed
+
+- Prioritize by goal is faster: it no longer writes a reason for each grade, and the status bar now shows how many cards or changes have been received and the seconds elapsed. With Claude it starts the CLI ahead of time and repaints less often.
+- AIM prompts were corrected for outdated facts and dated wording. AIM answers can read slightly different.
+
+### Fixed
+
+- Text from Codex and Claude no longer shows garbled characters: output is now decoded as a stream, so Chinese and other multi-byte characters that arrived split between two chunks are no longer replaced with the "�" symbol. Text already saved with garbled characters is not repaired; run the step (for example Prioritize by goal) again to overwrite it.
+
+### Limitations
+
+- Not tested: opening a share file from a local file on desktop Safari, and on a phone from a local file (iOS cannot open a local HTML file; open it from a web address such as GitHub Pages, which works). Dragging, zooming and opening topics in the viewer on a real phone were not checked item by item.
+- Not tested: the translation quality of Japanese, Korean and Spanish share files, the shared page in a private (incognito) window, and an original-language file whose language cannot be told (its viewer interface is in English).
+- A few diagram labels may stay untranslated, and a diagram whose labels could not be translated keeps its original labels (the dialog says how many).
+- Not checked live: the share dialog's private-information messages in Simplified Chinese and English, and Windows or Linux.
+- Pictures from the web are not embedded in a share file: they keep their original web address and are shown only when the reader is online. Web references inside diagrams are removed.
+
 ## [0.25.0] - 2026-10-22
 
 ### Added

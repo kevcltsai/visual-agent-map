@@ -1,0 +1,1 @@
+.markdown-rendered a.vam-link-scope.is-unresolved { color: color-mix(in srgb, var(--link-unresolved-color) 60%, var(--text-normal)); opacity: 1; text-decoration-style: dashed; }

@@ -514,7 +514,6 @@ test('share dialog: the download fallback does not claim where the file went', a
 
 // ---- W-E: copy the "publish to GitHub" instructions (D-2026-10-117) ----
 const publishCopy = 'Copy the GitHub publishing instructions';
-const publishFile = 'agents-spec/docs/history/tasks/2026-10-23-share-translate/publish-instructions.md';
 async function savedHarness(extra = {}) {
   const { env } = saveEnv({});
   const h = modalHarness({ exporter: fakeExporter(), saveEnvironment: env, ...extra });
@@ -587,11 +586,8 @@ test('share publish: instructions per language, zh-TW is the owner baseline verb
   const fs = require('node:fs');
   const path = require('node:path');
   const i18n = load('i18n.ts');
-  const baselinePath = path.resolve(__dirname, '../../../../Obsdian_VAM/agents-spec/docs/history/tasks/2026-10-23-share-translate/publish-instructions.md');
-  if (fs.existsSync(baselinePath)) {
-    const baseline = fs.readFileSync(baselinePath, 'utf8').split('```')[1].replace(/^\n|\n$/g, '');
-    assert.equal(i18n.translate('zh-TW', 'share.publish_instructions', '<路徑>'), baseline);
-  }
+  const baseline = fs.readFileSync(path.resolve(__dirname, '../fixtures/sharing/publish-instructions.zh-TW.txt'), 'utf8');
+  assert.equal(i18n.translate('zh-TW', 'share.publish_instructions', '<路徑>'), baseline);
   for (const lang of ['en', 'zh-TW', 'zh-CN']) {
     const text = i18n.translate(lang, 'share.publish_instructions', 'P');
     assert.doesNotMatch(text, /kevcltsai/i, lang);

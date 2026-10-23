@@ -24,6 +24,7 @@ import {
   type ShareTranslationLanguage
 } from "./share-format";
 import type { ForbiddenString } from "./share-leak-scan";
+import { publishInstructions } from "./share-publish";
 import { saveShareFile, type SaveEnvironment } from "./share-save";
 import type { ShareTranslationCache } from "./share-translate-plan";
 import type {
@@ -93,6 +94,8 @@ export interface ShareModalOptions {
   sizeThresholds?: { warn: number; large: number };
   mermaidTimeoutMs?: number;
   saveEnvironment?: SaveEnvironment;
+  /** Tests inject a clipboard; default is the system clipboard. */
+  writeClipboard?: (text: string) => Promise<void>;
   createExporter?: (app: App, source: ShareSource) => ShareExporterLike;
   /** Absent: the dialog offers no translated versions. */
   translation?: ShareTranslationHost;
@@ -131,6 +134,8 @@ export class ShareModal extends Modal {
   private failed = false;
   private detailsEl!: HTMLElement;
   private warningsEl!: HTMLElement;
+  private publishEl!: HTMLElement;
+  private publishFallback = false;
   private statusEl!: HTMLElement;
   private fullSetting!: Setting;
   private imagesSetting!: Setting;
@@ -183,6 +188,7 @@ export class ShareModal extends Modal {
     if (this.options.translation && this.exporter.translationSource) this.openTranslationSection();
     this.detailsEl = this.contentEl.createDiv({ cls: "vam-share-preview", attr: { "aria-live": "polite" } });
     this.warningsEl = this.contentEl.createDiv({ cls: "vam-share-warnings" });
+    this.publishEl = this.contentEl.createDiv({ cls: "vam-share-publish" });
     const actions = modalActions(this);
     this.statusEl = actionStatus(actions);
     this.cancelButton = actions.createEl("button", { text: t("ui.cancel") });
@@ -210,6 +216,7 @@ export class ShareModal extends Modal {
   private restart(): void {
     if (this.saving || this.closed || this.phase === "translating") return;
     this.savedText = "";
+    this.publishFallback = false;
     // The notes or images in the file changed: translated text no longer fits it (the session cache still does).
     this.phase = "idle";
     this.translation = null;
@@ -617,6 +624,7 @@ export class ShareModal extends Modal {
     const result = this.result;
     this.detailsEl.empty();
     this.warningsEl.empty();
+    this.renderPublish();
     const topics = this.options.source.map.nodes.length;
     if (this.busy) {
       this.detailsEl.createDiv({ text: this.progressText, cls: "vam-share-progress" });
@@ -653,6 +661,34 @@ export class ShareModal extends Modal {
     this.cancelButton.setText(
       this.translating ? t("share.translate_cancel") : this.savedText ? t("ui.close") : t("ui.cancel")
     );
+  }
+
+  /** After a save: a button that copies the "publish to GitHub" instructions. VAM sends nothing anywhere. */
+  private renderPublish(): void {
+    this.publishEl.empty();
+    if (!this.savedText) return;
+    this.publishEl.createDiv({ text: t("share.publish_note"), cls: "vam-share-note" });
+    const button = this.publishEl.createEl("button", { text: t("share.publish_copy") });
+    button.addEventListener("click", () => void this.copyPublish());
+    if (this.publishFallback)
+      this.publishEl.createEl("textarea", {
+        text: publishInstructions(),
+        cls: "vam-share-publish-text",
+        attr: { readonly: "true", rows: "10", "aria-label": t("share.publish_copy") }
+      });
+  }
+
+  private async copyPublish(): Promise<void> {
+    try {
+      const write = this.options.writeClipboard ?? ((text: string) => navigator.clipboard.writeText(text));
+      // The saved file's full path is not available from the save dialog or a download, so the placeholder stays.
+      await write(publishInstructions());
+      new Notice(t("share.publish_done"));
+    } catch {
+      new Notice(t("share.publish_fail"));
+      this.publishFallback = true;
+      if (!this.closed) this.render();
+    }
   }
 
   private renderWarnings(result: ShareBuildResult): void {

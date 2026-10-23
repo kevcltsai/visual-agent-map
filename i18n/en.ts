@@ -1973,6 +1973,14 @@ export const en = {
   "share.saved_0_1": "Saved {0} ({1})",
   "share.downloaded_0_1": "Save requested for {0} ({1}). If a save window appears, choose where to keep the file.",
   "share.save_failed": "The file could not be saved.",
+  "share.publish_copy": "Copy the GitHub publishing instructions",
+  "share.publish_done": "Instructions copied. Paste them into your own Claude Code or Codex.",
+  "share.publish_fail": "Could not copy automatically. Select the text below and copy it yourself.",
+  "share.publish_note":
+    "VAM does not go online or upload anything. This button only copies text. Replace [path] in the instructions with the path of the file you just saved, then paste them into your own Claude Code or Codex.",
+  "share.publish_path_placeholder": "[path]",
+  "share.publish_instructions":
+    'Please publish a VAM share file (.html) to GitHub Pages and give me a link I can share.\nShare file path: {0}\n1. Check the environment: make sure git and the GitHub CLI (gh) are installed and that I am signed in (`gh auth status`). If not, tell me how to install or sign in, and wait until I am done before continuing.\n2. Prepare the repo (vam-shared-maps): if it does not exist yet, first warn me "this creates a public repo, and anyone can see the maps in it"; after I agree, create it with a README and an empty .nojekyll. If it already exists, clone it or pull the latest.\n3. Add the share file: first skim it, and if you see private information such as an email, phone number, address, account name, password or a file path on my computer, list it and ask me. Copy it into maps/ with a name made of "a short English name + 6 random letters or digits"; if I say this updates an older map, overwrite the original file name. Commit only this file (the first time, also the README and .nojekyll) and push to main.\n4. Turn on GitHub Pages (first time only): gh api -X POST repos/[my-account]/vam-shared-maps/pages -f "source[branch]=main" -f "source[path]=/"\n5. Wait for the site to go live: every 10 seconds check https://[my-account].github.io/vam-shared-maps/maps/[file-name].html until it returns 200, for at most 5 minutes; use gh api repos/[my-account]/vam-shared-maps/pages/builds/latest to see the status, and report the error if it is errored.\n6. Report: give me the final link, remind me that everyone who has the link can see the content; to stop sharing, delete the file from maps/ and push again.',
   "share.unavailable_no_map": "Open a mind map first, then share it.",
   "share.unavailable_sample": "The built-in sample is read-only and cannot be shared.",
   "share.unavailable_aim": "AI research maps cannot be shared yet.",

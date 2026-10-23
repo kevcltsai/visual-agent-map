@@ -1814,6 +1814,14 @@ export const zhTW: Record<TranslationKey, string> = {
   "share.saved_0_1": "已儲存 {0}（{1}）",
   "share.downloaded_0_1": "已送出存檔 {0}（{1}）。若出現存檔視窗，請選擇要存放的位置。",
   "share.save_failed": "無法儲存檔案。",
+  "share.publish_copy": "複製發佈到 GitHub 的指令",
+  "share.publish_done": "已複製指令，請貼到你自己的 Claude Code 或 Codex。",
+  "share.publish_fail": "無法自動複製，請選取下方文字自行複製。",
+  "share.publish_note":
+    "VAM 不會連網或上傳任何東西，這個按鈕只是複製文字。請把剛才存的檔案路徑貼到指令中的〈路徑〉，再貼到你自己的 Claude Code 或 Codex。",
+  "share.publish_path_placeholder": "<路徑>",
+  "share.publish_instructions":
+    '請幫我把一個 VAM 分享檔（.html）發佈到 GitHub Pages，並給我一個可以分享的網址。\n分享檔路徑：{0}\n1. 檢查環境：確認已安裝 git 和 GitHub CLI（gh），並已用 `gh auth status` 登入；沒有就告訴我怎麼裝／登入，等我完成再繼續。\n2. 準備 repo（vam-shared-maps）：還沒有就先提醒「這會建立一個公開 repo，任何人都看得到裡面的地圖」，我同意後再建立，加 README 與空的 .nojekyll；已存在就 clone 或 pull 最新。\n3. 放入分享檔：先快速看一遍，看到 email、電話、地址、帳號、密碼、電腦檔案路徑等私人資訊就先列出問我；複製到 maps/，檔名用「英文短名稱 + 6 碼隨機英數字」；若我說是更新舊地圖就覆蓋原檔名；只 commit 這個檔案（第一次另含 README、.nojekyll），push 到 main。\n4. 開啟 GitHub Pages（只有第一次）：gh api -X POST repos/<我的帳號>/vam-shared-maps/pages -f "source[branch]=main" -f "source[path]=/"\n5. 等網站上線：每 10 秒檢查 https://<我的帳號>.github.io/vam-shared-maps/maps/<檔名>.html 直到 200，最多 5 分鐘；用 gh api repos/<我的帳號>/vam-shared-maps/pages/builds/latest 看狀態，errored 就回報錯誤。\n6. 回報：給我最終網址，提醒拿到網址的人都看得到內容；取消分享就把檔案從 maps/ 刪掉再 push。',
   "share.unavailable_no_map": "請先開啟一張心智圖再分享。",
   "share.unavailable_sample": "內建範例為唯讀，無法分享。",
   "share.unavailable_aim": "AI 研究地圖暫時無法分享。",

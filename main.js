@@ -1824,6 +1824,12 @@ var en = {
   "share.saved_0_1": "Saved {0} ({1})",
   "share.downloaded_0_1": "Save requested for {0} ({1}). If a save window appears, choose where to keep the file.",
   "share.save_failed": "The file could not be saved.",
+  "share.publish_copy": "Copy the GitHub publishing instructions",
+  "share.publish_done": "Instructions copied. Paste them into your own Claude Code or Codex.",
+  "share.publish_fail": "Could not copy automatically. Select the text below and copy it yourself.",
+  "share.publish_note": "VAM does not go online or upload anything. This button only copies text. Replace [path] in the instructions with the path of the file you just saved, then paste them into your own Claude Code or Codex.",
+  "share.publish_path_placeholder": "[path]",
+  "share.publish_instructions": 'Please publish a VAM share file (.html) to GitHub Pages and give me a link I can share.\nShare file path: {0}\n1. Check the environment: make sure git and the GitHub CLI (gh) are installed and that I am signed in (`gh auth status`). If not, tell me how to install or sign in, and wait until I am done before continuing.\n2. Prepare the repo (vam-shared-maps): if it does not exist yet, first warn me "this creates a public repo, and anyone can see the maps in it"; after I agree, create it with a README and an empty .nojekyll. If it already exists, clone it or pull the latest.\n3. Add the share file: first skim it, and if you see private information such as an email, phone number, address, account name, password or a file path on my computer, list it and ask me. Copy it into maps/ with a name made of "a short English name + 6 random letters or digits"; if I say this updates an older map, overwrite the original file name. Commit only this file (the first time, also the README and .nojekyll) and push to main.\n4. Turn on GitHub Pages (first time only): gh api -X POST repos/[my-account]/vam-shared-maps/pages -f "source[branch]=main" -f "source[path]=/"\n5. Wait for the site to go live: every 10 seconds check https://[my-account].github.io/vam-shared-maps/maps/[file-name].html until it returns 200, for at most 5 minutes; use gh api repos/[my-account]/vam-shared-maps/pages/builds/latest to see the status, and report the error if it is errored.\n6. Report: give me the final link, remind me that everyone who has the link can see the content; to stop sharing, delete the file from maps/ and push again.',
   "share.unavailable_no_map": "Open a mind map first, then share it.",
   "share.unavailable_sample": "The built-in sample is read-only and cannot be shared.",
   "share.unavailable_aim": "AI research maps cannot be shared yet.",
@@ -3582,6 +3588,12 @@ var zhCN = {
   "share.saved_0_1": "\u5DF2\u4FDD\u5B58 {0}\uFF08{1}\uFF09",
   "share.downloaded_0_1": "\u5DF2\u9001\u51FA\u5B58\u6863 {0}\uFF08{1}\uFF09\u3002\u82E5\u51FA\u73B0\u5B58\u6863\u7A97\u53E3\uFF0C\u8BF7\u9009\u62E9\u8981\u5B58\u653E\u7684\u4F4D\u7F6E\u3002",
   "share.save_failed": "\u65E0\u6CD5\u4FDD\u5B58\u6587\u4EF6\u3002",
+  "share.publish_copy": "\u590D\u5236\u53D1\u5E03\u5230 GitHub \u7684\u6307\u4EE4",
+  "share.publish_done": "\u5DF2\u590D\u5236\u6307\u4EE4\uFF0C\u8BF7\u8D34\u5230\u4F60\u81EA\u5DF1\u7684 Claude Code \u6216 Codex\u3002",
+  "share.publish_fail": "\u65E0\u6CD5\u81EA\u52A8\u590D\u5236\uFF0C\u8BF7\u9009\u53D6\u4E0B\u65B9\u6587\u5B57\u81EA\u884C\u590D\u5236\u3002",
+  "share.publish_note": "VAM \u4E0D\u4F1A\u8054\u7F51\u6216\u4E0A\u4F20\u4EFB\u4F55\u4E1C\u897F\uFF0C\u8FD9\u4E2A\u6309\u94AE\u53EA\u662F\u590D\u5236\u6587\u5B57\u3002\u8BF7\u628A\u521A\u624D\u4FDD\u5B58\u7684\u6587\u4EF6\u8DEF\u5F84\u8D34\u5230\u6307\u4EE4\u4E2D\u7684\u3008\u8DEF\u5F84\u3009\uFF0C\u518D\u8D34\u5230\u4F60\u81EA\u5DF1\u7684 Claude Code \u6216 Codex\u3002",
+  "share.publish_path_placeholder": "<\u8DEF\u5F84>",
+  "share.publish_instructions": '\u8BF7\u5E2E\u6211\u628A\u4E00\u4E2A VAM \u5206\u4EAB\u6587\u4EF6\uFF08.html\uFF09\u53D1\u5E03\u5230 GitHub Pages\uFF0C\u5E76\u7ED9\u6211\u4E00\u4E2A\u53EF\u4EE5\u5206\u4EAB\u7684\u7F51\u5740\u3002\n\u5206\u4EAB\u6587\u4EF6\u8DEF\u5F84\uFF1A{0}\n1. \u68C0\u67E5\u73AF\u5883\uFF1A\u786E\u8BA4\u5DF2\u5B89\u88C5 git \u548C GitHub CLI\uFF08gh\uFF09\uFF0C\u5E76\u5DF2\u7528 `gh auth status` \u767B\u5F55\uFF1B\u6CA1\u6709\u5C31\u544A\u8BC9\u6211\u600E\u4E48\u88C5\uFF0F\u767B\u5F55\uFF0C\u7B49\u6211\u5B8C\u6210\u518D\u7EE7\u7EED\u3002\n2. \u51C6\u5907 repo\uFF08vam-shared-maps\uFF09\uFF1A\u8FD8\u6CA1\u6709\u5C31\u5148\u63D0\u9192\u201C\u8FD9\u4F1A\u521B\u5EFA\u4E00\u4E2A\u516C\u5F00 repo\uFF0C\u4EFB\u4F55\u4EBA\u90FD\u770B\u5F97\u5230\u91CC\u9762\u7684\u5730\u56FE\u201D\uFF0C\u6211\u540C\u610F\u540E\u518D\u521B\u5EFA\uFF0C\u52A0 README \u4E0E\u7A7A\u7684 .nojekyll\uFF1B\u5DF2\u5B58\u5728\u5C31 clone \u6216 pull \u6700\u65B0\u3002\n3. \u653E\u5165\u5206\u4EAB\u6587\u4EF6\uFF1A\u5148\u5FEB\u901F\u770B\u4E00\u904D\uFF0C\u770B\u5230 email\u3001\u7535\u8BDD\u3001\u5730\u5740\u3001\u8D26\u53F7\u3001\u5BC6\u7801\u3001\u7535\u8111\u6587\u4EF6\u8DEF\u5F84\u7B49\u79C1\u4EBA\u4FE1\u606F\u5C31\u5148\u5217\u51FA\u95EE\u6211\uFF1B\u590D\u5236\u5230 maps/\uFF0C\u6587\u4EF6\u540D\u7528\u201C\u82F1\u6587\u77ED\u540D\u79F0 + 6 \u4F4D\u968F\u673A\u82F1\u6570\u5B57\u201D\uFF1B\u82E5\u6211\u8BF4\u662F\u66F4\u65B0\u65E7\u5730\u56FE\u5C31\u8986\u76D6\u539F\u6587\u4EF6\u540D\uFF1B\u53EA commit \u8FD9\u4E2A\u6587\u4EF6\uFF08\u7B2C\u4E00\u6B21\u53E6\u542B README\u3001.nojekyll\uFF09\uFF0Cpush \u5230 main\u3002\n4. \u5F00\u542F GitHub Pages\uFF08\u53EA\u6709\u7B2C\u4E00\u6B21\uFF09\uFF1Agh api -X POST repos/<\u6211\u7684\u8D26\u53F7>/vam-shared-maps/pages -f "source[branch]=main" -f "source[path]=/"\n5. \u7B49\u7F51\u7AD9\u4E0A\u7EBF\uFF1A\u6BCF 10 \u79D2\u68C0\u67E5 https://<\u6211\u7684\u8D26\u53F7>.github.io/vam-shared-maps/maps/<\u6587\u4EF6\u540D>.html \u76F4\u5230 200\uFF0C\u6700\u591A 5 \u5206\u949F\uFF1B\u7528 gh api repos/<\u6211\u7684\u8D26\u53F7>/vam-shared-maps/pages/builds/latest \u770B\u72B6\u6001\uFF0Cerrored \u5C31\u62A5\u544A\u9519\u8BEF\u3002\n6. \u62A5\u544A\uFF1A\u7ED9\u6211\u6700\u7EC8\u7F51\u5740\uFF0C\u63D0\u9192\u62FF\u5230\u7F51\u5740\u7684\u4EBA\u90FD\u770B\u5F97\u5230\u5185\u5BB9\uFF1B\u53D6\u6D88\u5206\u4EAB\u5C31\u628A\u6587\u4EF6\u4ECE maps/ \u5220\u6389\u518D push\u3002',
   "share.unavailable_no_map": "\u8BF7\u5148\u6253\u5F00\u4E00\u5F20\u601D\u7EF4\u5BFC\u56FE\u518D\u5206\u4EAB\u3002",
   "share.unavailable_sample": "\u5185\u7F6E\u793A\u4F8B\u4E3A\u53EA\u8BFB\uFF0C\u65E0\u6CD5\u5206\u4EAB\u3002",
   "share.unavailable_aim": "AI \u7814\u7A76\u5730\u56FE\u6682\u65F6\u65E0\u6CD5\u5206\u4EAB\u3002",
@@ -5340,6 +5352,12 @@ var zhTW = {
   "share.saved_0_1": "\u5DF2\u5132\u5B58 {0}\uFF08{1}\uFF09",
   "share.downloaded_0_1": "\u5DF2\u9001\u51FA\u5B58\u6A94 {0}\uFF08{1}\uFF09\u3002\u82E5\u51FA\u73FE\u5B58\u6A94\u8996\u7A97\uFF0C\u8ACB\u9078\u64C7\u8981\u5B58\u653E\u7684\u4F4D\u7F6E\u3002",
   "share.save_failed": "\u7121\u6CD5\u5132\u5B58\u6A94\u6848\u3002",
+  "share.publish_copy": "\u8907\u88FD\u767C\u4F48\u5230 GitHub \u7684\u6307\u4EE4",
+  "share.publish_done": "\u5DF2\u8907\u88FD\u6307\u4EE4\uFF0C\u8ACB\u8CBC\u5230\u4F60\u81EA\u5DF1\u7684 Claude Code \u6216 Codex\u3002",
+  "share.publish_fail": "\u7121\u6CD5\u81EA\u52D5\u8907\u88FD\uFF0C\u8ACB\u9078\u53D6\u4E0B\u65B9\u6587\u5B57\u81EA\u884C\u8907\u88FD\u3002",
+  "share.publish_note": "VAM \u4E0D\u6703\u9023\u7DB2\u6216\u4E0A\u50B3\u4EFB\u4F55\u6771\u897F\uFF0C\u9019\u500B\u6309\u9215\u53EA\u662F\u8907\u88FD\u6587\u5B57\u3002\u8ACB\u628A\u525B\u624D\u5B58\u7684\u6A94\u6848\u8DEF\u5F91\u8CBC\u5230\u6307\u4EE4\u4E2D\u7684\u3008\u8DEF\u5F91\u3009\uFF0C\u518D\u8CBC\u5230\u4F60\u81EA\u5DF1\u7684 Claude Code \u6216 Codex\u3002",
+  "share.publish_path_placeholder": "<\u8DEF\u5F91>",
+  "share.publish_instructions": '\u8ACB\u5E6B\u6211\u628A\u4E00\u500B VAM \u5206\u4EAB\u6A94\uFF08.html\uFF09\u767C\u4F48\u5230 GitHub Pages\uFF0C\u4E26\u7D66\u6211\u4E00\u500B\u53EF\u4EE5\u5206\u4EAB\u7684\u7DB2\u5740\u3002\n\u5206\u4EAB\u6A94\u8DEF\u5F91\uFF1A{0}\n1. \u6AA2\u67E5\u74B0\u5883\uFF1A\u78BA\u8A8D\u5DF2\u5B89\u88DD git \u548C GitHub CLI\uFF08gh\uFF09\uFF0C\u4E26\u5DF2\u7528 `gh auth status` \u767B\u5165\uFF1B\u6C92\u6709\u5C31\u544A\u8A34\u6211\u600E\u9EBC\u88DD\uFF0F\u767B\u5165\uFF0C\u7B49\u6211\u5B8C\u6210\u518D\u7E7C\u7E8C\u3002\n2. \u6E96\u5099 repo\uFF08vam-shared-maps\uFF09\uFF1A\u9084\u6C92\u6709\u5C31\u5148\u63D0\u9192\u300C\u9019\u6703\u5EFA\u7ACB\u4E00\u500B\u516C\u958B repo\uFF0C\u4EFB\u4F55\u4EBA\u90FD\u770B\u5F97\u5230\u88E1\u9762\u7684\u5730\u5716\u300D\uFF0C\u6211\u540C\u610F\u5F8C\u518D\u5EFA\u7ACB\uFF0C\u52A0 README \u8207\u7A7A\u7684 .nojekyll\uFF1B\u5DF2\u5B58\u5728\u5C31 clone \u6216 pull \u6700\u65B0\u3002\n3. \u653E\u5165\u5206\u4EAB\u6A94\uFF1A\u5148\u5FEB\u901F\u770B\u4E00\u904D\uFF0C\u770B\u5230 email\u3001\u96FB\u8A71\u3001\u5730\u5740\u3001\u5E33\u865F\u3001\u5BC6\u78BC\u3001\u96FB\u8166\u6A94\u6848\u8DEF\u5F91\u7B49\u79C1\u4EBA\u8CC7\u8A0A\u5C31\u5148\u5217\u51FA\u554F\u6211\uFF1B\u8907\u88FD\u5230 maps/\uFF0C\u6A94\u540D\u7528\u300C\u82F1\u6587\u77ED\u540D\u7A31 + 6 \u78BC\u96A8\u6A5F\u82F1\u6578\u5B57\u300D\uFF1B\u82E5\u6211\u8AAA\u662F\u66F4\u65B0\u820A\u5730\u5716\u5C31\u8986\u84CB\u539F\u6A94\u540D\uFF1B\u53EA commit \u9019\u500B\u6A94\u6848\uFF08\u7B2C\u4E00\u6B21\u53E6\u542B README\u3001.nojekyll\uFF09\uFF0Cpush \u5230 main\u3002\n4. \u958B\u555F GitHub Pages\uFF08\u53EA\u6709\u7B2C\u4E00\u6B21\uFF09\uFF1Agh api -X POST repos/<\u6211\u7684\u5E33\u865F>/vam-shared-maps/pages -f "source[branch]=main" -f "source[path]=/"\n5. \u7B49\u7DB2\u7AD9\u4E0A\u7DDA\uFF1A\u6BCF 10 \u79D2\u6AA2\u67E5 https://<\u6211\u7684\u5E33\u865F>.github.io/vam-shared-maps/maps/<\u6A94\u540D>.html \u76F4\u5230 200\uFF0C\u6700\u591A 5 \u5206\u9418\uFF1B\u7528 gh api repos/<\u6211\u7684\u5E33\u865F>/vam-shared-maps/pages/builds/latest \u770B\u72C0\u614B\uFF0Cerrored \u5C31\u56DE\u5831\u932F\u8AA4\u3002\n6. \u56DE\u5831\uFF1A\u7D66\u6211\u6700\u7D42\u7DB2\u5740\uFF0C\u63D0\u9192\u62FF\u5230\u7DB2\u5740\u7684\u4EBA\u90FD\u770B\u5F97\u5230\u5167\u5BB9\uFF1B\u53D6\u6D88\u5206\u4EAB\u5C31\u628A\u6A94\u6848\u5F9E maps/ \u522A\u6389\u518D push\u3002',
   "share.unavailable_no_map": "\u8ACB\u5148\u958B\u555F\u4E00\u5F35\u5FC3\u667A\u5716\u518D\u5206\u4EAB\u3002",
   "share.unavailable_sample": "\u5167\u5EFA\u7BC4\u4F8B\u70BA\u552F\u8B80\uFF0C\u7121\u6CD5\u5206\u4EAB\u3002",
   "share.unavailable_aim": "AI \u7814\u7A76\u5730\u5716\u66AB\u6642\u7121\u6CD5\u5206\u4EAB\u3002",
@@ -44052,6 +44070,12 @@ ${fence}`, host, "", child);
   }
 };
 
+// experiences/sharing/share-publish.ts
+function publishInstructions(savedPath) {
+  const path = savedPath == null ? void 0 : savedPath.trim();
+  return t("share.publish_instructions", path || t("share.publish_path_placeholder"));
+}
+
 // experiences/sharing/share-save.ts
 var isAbort = (error) => (error == null ? void 0 : error.name) === "AbortError";
 function browserSaveEnvironment() {
@@ -44137,6 +44161,8 @@ var ShareModal = class extends import_obsidian33.Modal {
     __publicField(this, "failed", false);
     __publicField(this, "detailsEl");
     __publicField(this, "warningsEl");
+    __publicField(this, "publishEl");
+    __publicField(this, "publishFallback", false);
     __publicField(this, "statusEl");
     __publicField(this, "fullSetting");
     __publicField(this, "imagesSetting");
@@ -44172,6 +44198,7 @@ var ShareModal = class extends import_obsidian33.Modal {
     if (this.options.translation && this.exporter.translationSource) this.openTranslationSection();
     this.detailsEl = this.contentEl.createDiv({ cls: "vam-share-preview", attr: { "aria-live": "polite" } });
     this.warningsEl = this.contentEl.createDiv({ cls: "vam-share-warnings" });
+    this.publishEl = this.contentEl.createDiv({ cls: "vam-share-publish" });
     const actions = modalActions(this);
     this.statusEl = actionStatus(actions);
     this.cancelButton = actions.createEl("button", { text: t("ui.cancel") });
@@ -44197,6 +44224,7 @@ var ShareModal = class extends import_obsidian33.Modal {
   restart() {
     if (this.saving || this.closed || this.phase === "translating") return;
     this.savedText = "";
+    this.publishFallback = false;
     this.phase = "idle";
     this.translation = null;
     this.translateSource = null;
@@ -44562,6 +44590,7 @@ var ShareModal = class extends import_obsidian33.Modal {
     const result = this.result;
     this.detailsEl.empty();
     this.warningsEl.empty();
+    this.renderPublish();
     const topics = this.options.source.map.nodes.length;
     if (this.busy) {
       this.detailsEl.createDiv({ text: this.progressText, cls: "vam-share-progress" });
@@ -44594,6 +44623,32 @@ var ShareModal = class extends import_obsidian33.Modal {
     this.cancelButton.setText(
       this.translating ? t("share.translate_cancel") : this.savedText ? t("ui.close") : t("ui.cancel")
     );
+  }
+  /** After a save: a button that copies the "publish to GitHub" instructions. VAM sends nothing anywhere. */
+  renderPublish() {
+    this.publishEl.empty();
+    if (!this.savedText) return;
+    this.publishEl.createDiv({ text: t("share.publish_note"), cls: "vam-share-note" });
+    const button = this.publishEl.createEl("button", { text: t("share.publish_copy") });
+    button.addEventListener("click", () => void this.copyPublish());
+    if (this.publishFallback)
+      this.publishEl.createEl("textarea", {
+        text: publishInstructions(),
+        cls: "vam-share-publish-text",
+        attr: { readonly: "true", rows: "10", "aria-label": t("share.publish_copy") }
+      });
+  }
+  async copyPublish() {
+    var _a2;
+    try {
+      const write = (_a2 = this.options.writeClipboard) != null ? _a2 : (text11) => navigator.clipboard.writeText(text11);
+      await write(publishInstructions());
+      new import_obsidian33.Notice(t("share.publish_done"));
+    } catch (e) {
+      new import_obsidian33.Notice(t("share.publish_fail"));
+      this.publishFallback = true;
+      if (!this.closed) this.render();
+    }
   }
   renderWarnings(result) {
     var _a2;

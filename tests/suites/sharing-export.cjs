@@ -271,7 +271,7 @@ test('share save: nothing is written when the dialog was closed while the system
 
 // ---- the dialog ----
 
-function modalHarness({ exporter, thresholds, saveEnvironment } = {}) {
+function modalHarness({ exporter, thresholds, saveEnvironment, writeClipboard } = {}) {
   const element = (tag, options = {}) => ({
     tag, text: options.text ?? '', cls: options.cls ?? '', disabled: false, children: [], listeners: {},
     createDiv(value) { const c = element('div', typeof value === 'string' ? { cls: value } : value); this.children.push(c); return c; },
@@ -293,7 +293,7 @@ function modalHarness({ exporter, thresholds, saveEnvironment } = {}) {
   class Notice { constructor(text) { notices.push(text); } }
   const mod = load('experiences/sharing/share-modal.ts', { obsidian: { ...obsidian, Modal, Setting, Notice } });
   const source = { map: { id: 'm', title: 'My: Map', nodes: [{ id: 'a' }, { id: 'b' }] }, notes: new Map(), mapPath: 'Folder/Map.md' };
-  const modal = new mod.ShareModal({}, { source, vamVersion: '0.25.0', language: 'en', sizeThresholds: thresholds, saveEnvironment, createExporter: () => exporter });
+  const modal = new mod.ShareModal({}, { source, vamVersion: '0.25.0', language: 'en', sizeThresholds: thresholds, saveEnvironment, writeClipboard, createExporter: () => exporter });
   const button = text => find(modal.modalEl, i => i.tag === 'button' && i.text === text);
   const text = () => all(modal.contentEl, i => i.text).map(i => i.text).concat(all(modal.modalEl, i => i.text).map(i => i.text)).join(' | ');
   return { modal, Setting, button, text, notices, find, all };
@@ -510,4 +510,97 @@ test('share dialog: the download fallback does not claim where the file went', a
   assert.doesNotMatch(message, /downloads? folder/i);
   assert.match(message, /save window/i);
   for (const lang of ['zh-TW', 'zh-CN']) assert.doesNotMatch(load('i18n.ts').translate(lang, 'share.downloaded_0_1', 'a', 'b'), /下載資料夾|下载文件夹/);
+});
+
+// ---- W-E: copy the "publish to GitHub" instructions (D-2026-10-117) ----
+const publishCopy = 'Copy the GitHub publishing instructions';
+const publishFile = 'agents-spec/docs/history/tasks/2026-10-23-share-translate/publish-instructions.md';
+async function savedHarness(extra = {}) {
+  const { env } = saveEnv({});
+  const h = modalHarness({ exporter: fakeExporter(), saveEnvironment: env, ...extra });
+  h.modal.open();
+  await tick(); await tick();
+  return h;
+}
+const saveNow = async h => { h.button('Save…').listeners.click(); await tick(); await tick(); };
+
+test('share publish: no copy button before saving, one after (download path)', async () => {
+  const h = await savedHarness();
+  assert.equal(h.button(publishCopy), undefined);
+  await saveNow(h);
+  assert.ok(h.button(publishCopy));
+  assert.match(h.text(), /VAM does not go online or upload anything/);
+});
+
+test('share publish: also present after the system-dialog save path', async () => {
+  const log = { written: [] };
+  const { env } = saveEnv({});
+  env.showSaveFilePicker = picker(log);
+  const h = modalHarness({ exporter: fakeExporter(), saveEnvironment: env });
+  h.modal.open(); await tick(); await tick();
+  assert.equal(h.button(publishCopy), undefined);
+  await saveNow(h);
+  assert.equal(log.written.length, 1);
+  assert.ok(h.button(publishCopy));
+});
+
+test('share publish: a cancelled save shows no copy button', async () => {
+  const { env } = saveEnv({});
+  env.showSaveFilePicker = async () => { const e = new Error('x'); e.name = 'AbortError'; throw e; };
+  const h = modalHarness({ exporter: fakeExporter(), saveEnvironment: env });
+  h.modal.open(); await tick(); await tick();
+  await saveNow(h);
+  assert.equal(h.button(publishCopy), undefined);
+});
+
+test('share publish: copying writes the i18n instructions with the path placeholder kept (the path is never known), and notices', async () => {
+  const written = [];
+  const h = await savedHarness({ writeClipboard: async text => { written.push(text); } });
+  await saveNow(h);
+  h.button(publishCopy).listeners.click();
+  await tick();
+  assert.deepEqual(written, [load('i18n.ts').translate('en', 'share.publish_instructions', '[path]')]);
+  assert.match(written[0], /Share file path: \[path\]/);
+  assert.equal(h.notices.at(-1), 'Instructions copied. Paste them into your own Claude Code or Codex.');
+});
+
+test('share publish: clipboard failure tells the user and falls back to a selectable text block', async () => {
+  const h = await savedHarness({ writeClipboard: async () => { throw new Error('denied'); } });
+  await saveNow(h);
+  assert.equal(h.all(h.modal.modalEl, i => i.tag === 'textarea').length, 0);
+  h.button(publishCopy).listeners.click();
+  await tick();
+  assert.match(h.notices.at(-1), /Could not copy automatically/);
+  const area = h.all(h.modal.modalEl, i => i.tag === 'textarea');
+  assert.equal(area.length, 1);
+  assert.equal(area[0].text, load('i18n.ts').translate('en', 'share.publish_instructions', '[path]'));
+});
+
+test('share publish: a known path is filled in; unknown stays a placeholder (helper)', () => {
+  const { publishInstructions } = load('experiences/sharing/share-publish.ts');
+  assert.match(publishInstructions('/Users/me/Desktop/My Map.html'), /Share file path: \/Users\/me\/Desktop\/My Map\.html\n/);
+  assert.match(publishInstructions(), /Share file path: \[path\]\n/);
+  assert.match(publishInstructions('   '), /Share file path: \[path\]\n/);
+});
+
+test('share publish: instructions per language, zh-TW is the owner baseline verbatim, nothing hard-coded to an account', () => {
+  const fs = require('node:fs');
+  const path = require('node:path');
+  const i18n = load('i18n.ts');
+  const baselinePath = path.resolve(__dirname, '../../../../Obsdian_VAM/agents-spec/docs/history/tasks/2026-10-23-share-translate/publish-instructions.md');
+  if (fs.existsSync(baselinePath)) {
+    const baseline = fs.readFileSync(baselinePath, 'utf8').split('```')[1].replace(/^\n|\n$/g, '');
+    assert.equal(i18n.translate('zh-TW', 'share.publish_instructions', '<路徑>'), baseline);
+  }
+  for (const lang of ['en', 'zh-TW', 'zh-CN']) {
+    const text = i18n.translate(lang, 'share.publish_instructions', 'P');
+    assert.doesNotMatch(text, /kevcltsai/i, lang);
+    assert.match(text, /gh api -X POST repos\/[<\[][^>\]]+[>\]]\/vam-shared-maps\/pages -f "source\[branch\]=main" -f "source\[path\]=\/"/, lang);
+    assert.match(text, /\.nojekyll/, lang);
+    assert.match(text, /maps\//, lang);
+    assert.match(text, /https:\/\/[<\[][^>\]]+[>\]]\.github\.io\/vam-shared-maps\/maps\/[<\[]/, lang);
+    assert.match(text, /\bP\n/, lang);
+    assert.notEqual(i18n.translate(lang, 'share.publish_note'), i18n.translate(lang === 'en' ? 'zh-TW' : 'en', 'share.publish_note'));
+  }
+  assert.match(i18n.translate('zh-TW', 'share.publish_instructions', 'P'), /<我的帳號>/);
 });

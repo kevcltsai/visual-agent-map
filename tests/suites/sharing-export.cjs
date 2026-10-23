@@ -324,8 +324,8 @@ test('share dialog: builds a preview with counts and exact size, defaults to ful
   await tick(); await tick();
   assert.deepEqual(exporter.calls.assemble, [{ includeDetail: true, includeImages: true }]);
   assert.match(h.text(), /2 topics · 1 with note content · 1 images/);
-  assert.match(h.text(), /File size: 1\.5 KB/);
-  assert.match(h.text(), /Some email services block HTML attachments/);
+  assert.match(h.text(), /File size: +\| 1\.5 KB/);
+  assert.doesNotMatch(h.text(), /Some email services block HTML attachments/, 'no email hint while the size is fine');
   assert.equal(h.button('Save…').disabled, false);
   h.button('Save…').listeners.click();
   await tick(); await tick();
@@ -350,7 +350,7 @@ test('share dialog: flipping a switch starts a new build and the older build nev
   release();
   await tick(); await tick();
   assert.deepEqual(exporter.calls.assemble, [{ includeDetail: true, includeImages: false }], 'the first build was dropped before it assembled anything');
-  assert.match(h.text(), /File size: 2\.0 KB/);
+  assert.match(h.text(), /File size: +\| 2\.0 KB/);
   assert.doesNotMatch(h.text(), /4\.0 KB/);
   h.Setting.all[0].toggle.fn(false);
   await tick(); await tick();
@@ -411,6 +411,7 @@ test('share dialog: size notices appear at the injected thresholds, the no-image
   h.modal.open();
   await tick(); await tick();
   assert.match(h.text(), /larger than 1000 B/);
+  assert.match(h.text(), /Some email services block HTML attachments/, 'email hint once over the threshold');
   assert.doesNotMatch(h.text(), /Turning off Include images/);
   h.Setting.all[0].toggle.fn(true);
   await tick(); await tick();

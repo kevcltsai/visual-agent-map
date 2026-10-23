@@ -1988,10 +1988,14 @@ export const en = {
   "share.unavailable_aim": "AI research maps cannot be shared yet.",
   "share.unavailable_empty": "This map has no topics to share yet.",
   "share.translate_section": "Translated versions",
+  "share.intro_translatable":
+    "Creates one HTML file that opens in any browser, even offline. You choose where it is saved. Unless you tick a translation, nothing is uploaded.",
   "share.translate_intro":
-    "The file always includes the original. Tick the languages to add: AI translates them when you press the save button, and nothing is translated before that.",
+    "Tick the languages to add. Your note content is sent to the AI model for translation only after you press save; nothing is sent before that.",
+  "share.translate_original_desc": "Always included, no need to tick.",
   "share.translate_original_0": "{0} (original)",
   "share.translate_unverified_0": "The quality of the {0} translation has not been checked by a native speaker.",
+  "share.translate_unverified_list_0": "The quality of the {0} translation has not been checked by a native speaker.",
   "share.translate_model_name": "Translation model",
   "share.translate_model_desc": "The AI model that translates the notes.",
   "share.translate_button": "Translate and save…",

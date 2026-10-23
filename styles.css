@@ -1165,7 +1165,7 @@ button.vam-template-section-header:hover { background: var(--background-modifier
 
 /* Share dialog (Sharing P1) */
 .vam-share-render-host { position: fixed; left: -10000px; top: 0; width: 800px; visibility: hidden; pointer-events: none; }
-.vam-share-preview { margin: 12px 0 4px; font-variant-numeric: tabular-nums; }
+.vam-share-preview { margin: 12px 0 4px; font-variant-numeric: tabular-nums; font-size: var(--font-ui-small); }
 .vam-share-size { font-weight: var(--font-semibold); }
 .vam-share-progress { color: var(--text-muted); }
 .vam-share-error { color: var(--text-error); }
@@ -1174,3 +1174,14 @@ button.vam-template-section-header:hover { background: var(--background-modifier
 .vam-share-note.vam-share-error { color: var(--text-error); }
 .vam-share-publish { margin-top: 10px; }
 .vam-share-publish-text { display: block; width: 100%; margin-top: 8px; font-size: var(--font-ui-smaller); }
+
+/* Share dialog: scoped polish; the global .vam-modal-intro stays as it is. */
+.vam-share-modal .vam-modal-intro { font-size: var(--font-ui-small); }
+.vam-share-modal .setting-item-heading { padding-left: 0; padding-right: 0; }
+.vam-share-modal select.dropdown { min-width: 240px; }
+.vam-share-translate { margin: 8px 0 0; }
+.vam-share-translate-heading { margin: 10px 0 4px; font-weight: var(--font-semibold); }
+.vam-share-translate-row { margin: 6px 0; }
+.vam-share-warnings { margin: 6px 0 0; }
+.vam-share-estimate { margin: 10px 0 0; }
+.vam-share-estimate-text { color: var(--text-normal); font-size: var(--font-ui-small); line-height: 1.5; }

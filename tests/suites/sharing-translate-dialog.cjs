@@ -130,20 +130,63 @@ test('share dialog T1: a map with no ticked language behaves exactly like P1 and
   assert.deepEqual(plain(d.log.written), ['<html>{"languages":null,"defaultLanguage":null,"ja":null,"en":null,"svgs":0}</html>']);
 });
 
-test('share dialog T1: the original language box is switched on, disabled and marked, the others start off', async () => {
+test('share dialog T1: the original language row has no control and says it is always included, the others start off', async () => {
   const d = dialog();
   await open(d);
   const original = d.lang('zh-TW');
   assert.equal(original.name, '繁體中文 (original)');
-  assert.equal(original.toggle.value, true);
-  assert.equal(original.toggle.off, true, 'disabled');
-  assert.equal(original.toggle.input.disabled, true);
+  assert.equal(original.desc, 'Always included, no need to tick.');
+  assert.equal(original.toggle, undefined, 'no switch on the original row');
   for (const id of ['zh-CN', 'en', 'ja', 'ko', 'es']) {
     assert.equal(d.lang(id).toggle.value, false, id);
     assert.equal(d.lang(id).toggle.off, false, id);
+    assert.equal(d.lang(id).desc, undefined, `${id} has no per-row quality text`);
   }
-  assert.match(d.lang('ja').desc, /has not been checked by a native speaker/);
-  assert.equal(d.lang('en').desc, undefined);
+  assert.equal(d.modal.selected().includes('zh-TW'), false, 'the original is never picked');
+  d.tick('en');
+  assert.equal(d.modal.selected().includes('zh-TW'), false);
+  assert.deepEqual(plain(d.modal.selected()), ['en']);
+});
+
+test('share dialog polish: the intro promises no upload only until a translation is ticked, and only with a translation host', async () => {
+  const d = dialog();
+  await open(d);
+  assert.match(d.text(), /Unless you tick a translation, nothing is uploaded\./);
+  assert.doesNotMatch(d.text(), /Always includes the original|The file always includes the original/);
+  const plainDialog = dialog();
+  plainDialog.modal.options.translation = undefined;
+  plainDialog.modal.open();
+  await until(() => plainDialog.button('Save…') && !plainDialog.button('Save…').disabled, 'build');
+  assert.match(plainDialog.text(), /Nothing is uploaded\./);
+  assert.doesNotMatch(plainDialog.text(), /Unless you tick/);
+});
+
+test('share dialog polish: one merged quality note appears only for ticked unverified languages and lists just those', async () => {
+  const d = dialog();
+  await open(d);
+  const note = () => d.text().match(/The quality of the [^|]*?translation has not been checked by a native speaker\./)?.[0];
+  assert.equal(note(), undefined, 'nothing ticked');
+  d.tick('en');
+  assert.equal(note(), undefined, 'English is verified');
+  d.tick('ja');
+  assert.match(note(), /the 日本語 translation/);
+  assert.doesNotMatch(note(), /English/);
+  d.tick('ko');
+  assert.match(note(), /日本語, 한국어/);
+  d.untick('ja'); d.untick('ko');
+  assert.equal(note(), undefined, 'cleared when unticked');
+});
+
+test('share dialog polish: the email hint shows only when the file is over the size threshold', async () => {
+  const small = dialog();
+  await open(small);
+  assert.doesNotMatch(small.text(), /email/i);
+  const big = dialog({ exporter: fakeExporter() });
+  const original = big.exporter.assemble;
+  big.exporter.assemble = (...args) => ({ ...original(...args), bytes: 100 * 1024 * 1024 });
+  big.modal.open();
+  await until(() => /email/i.test(big.text()), 'email hint');
+  assert.match(big.text(), /Some email services block HTML attachments/);
 });
 
 test('share dialog T1: ticking languages shows the estimate and the translate button; the picker opens only on the second press', async () => {
@@ -210,7 +253,8 @@ test('share dialog T1: while AI works the switches and the model are locked and 
   assert.equal(d.button(translateLabel).disabled, true);
   assert.equal(d.Setting.all[0].toggle.input.disabled, true, 'full notes switch');
   assert.equal(d.Setting.all[1].toggle.input.disabled, true, 'images switch');
-  for (const id of ['zh-TW', 'zh-CN', 'en', 'ja', 'ko', 'es']) assert.equal(d.lang(id).toggle.input.disabled, true, id);
+  for (const id of ['zh-CN', 'en', 'ja', 'ko', 'es']) assert.equal(d.lang(id).toggle.input.disabled, true, id);
+  assert.equal(d.lang('zh-TW').toggle, undefined, 'the original row has no switch to lock');
   assert.equal(d.setting('Translation model').dropdown.selectEl.disabled, true);
   d.button('Cancel translation').listeners.click();
   await until(() => d.button(translateLabel) && !d.button(translateLabel).disabled, 'stopped');
@@ -438,7 +482,7 @@ test('share dialog F1: a same-as-input map with a Chinese title has a Traditiona
   const d = dialog({ map: followMap('東京五天自由行') });
   await open(d);
   assert.equal(d.lang('zh-TW').name, '繁體中文 (original)');
-  assert.equal(d.lang('zh-TW').toggle.off, true);
+  assert.equal(d.lang('zh-TW').toggle, undefined, 'the original row has no switch');
   assert.equal(d.lang('en').name, 'English', 'English is a normal, switchable box');
   assert.equal(d.lang('en').toggle.off, false);
   d.tick('en');
@@ -456,7 +500,7 @@ test('share dialog F1: a same-as-input map whose language cannot be told lets al
   await open(d);
   const ids = ['zh-TW', 'zh-CN', 'en', 'ja', 'ko', 'es'];
   for (const id of ids) {
-    assert.equal(d.lang(id).toggle.off, false, `${id} can be ticked`);
+    assert.equal(d.lang(id).toggle?.off, false, `${id} can be ticked`);
     assert.equal(d.lang(id).toggle.value, false, `${id} starts off`);
     assert.doesNotMatch(d.lang(id).name, /original/i, id);
   }
@@ -485,7 +529,7 @@ test('share dialog F1: the unknown-original id is the one the viewer reads, and 
 const originalIs = async (options, id) => {
   const d = dialog(options);
   await open(d);
-  const locked = ['zh-TW', 'zh-CN', 'en', 'ja', 'ko', 'es'].filter(code => d.lang(code).toggle.off);
+  const locked = ['zh-TW', 'zh-CN', 'en', 'ja', 'ko', 'es'].filter(code => !d.lang(code).toggle);
   assert.deepEqual(locked, id === 'und' ? [] : [id], JSON.stringify(options.map.title));
 };
 

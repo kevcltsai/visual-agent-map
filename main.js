@@ -1837,9 +1837,12 @@ var en = {
   "share.unavailable_aim": "AI research maps cannot be shared yet.",
   "share.unavailable_empty": "This map has no topics to share yet.",
   "share.translate_section": "Translated versions",
-  "share.translate_intro": "The file always includes the original. Tick the languages to add: AI translates them when you press the save button, and nothing is translated before that.",
+  "share.intro_translatable": "Creates one HTML file that opens in any browser, even offline. You choose where it is saved. Unless you tick a translation, nothing is uploaded.",
+  "share.translate_intro": "Tick the languages to add. Your note content is sent to the AI model for translation only after you press save; nothing is sent before that.",
+  "share.translate_original_desc": "Always included, no need to tick.",
   "share.translate_original_0": "{0} (original)",
   "share.translate_unverified_0": "The quality of the {0} translation has not been checked by a native speaker.",
+  "share.translate_unverified_list_0": "The quality of the {0} translation has not been checked by a native speaker.",
   "share.translate_model_name": "Translation model",
   "share.translate_model_desc": "The AI model that translates the notes.",
   "share.translate_button": "Translate and save\u2026",
@@ -3605,9 +3608,12 @@ var zhCN = {
   "share.unavailable_aim": "AI \u7814\u7A76\u5730\u56FE\u6682\u65F6\u65E0\u6CD5\u5206\u4EAB\u3002",
   "share.unavailable_empty": "\u8FD9\u5F20\u5730\u56FE\u8FD8\u6CA1\u6709\u8BAE\u9898\u53EF\u4EE5\u5206\u4EAB\u3002",
   "share.translate_section": "\u7FFB\u8BD1\u7248\u672C",
-  "share.translate_intro": "\u6587\u4EF6\u4E00\u5B9A\u5305\u542B\u539F\u6587\u3002\u52FE\u9009\u8981\u52A0\u5165\u7684\u8BED\u8A00\uFF1A\u6309\u4E0B\u4FDD\u5B58\u6309\u94AE\u540E\u624D\u7531 AI \u7FFB\u8BD1\uFF0C\u5728\u90A3\u4E4B\u524D\u4E0D\u4F1A\u7FFB\u8BD1\u4EFB\u4F55\u5185\u5BB9\u3002",
+  "share.intro_translatable": "\u751F\u6210\u4E00\u4E2A HTML \u6587\u4EF6\uFF0C\u4EFB\u4F55\u6D4F\u89C8\u5668\u90FD\u80FD\u6253\u5F00\uFF0C\u79BB\u7EBF\u4E5F\u53EF\u4EE5\u3002\u5B58\u653E\u4F4D\u7F6E\u7531\u4F60\u51B3\u5B9A\uFF1B\u9664\u975E\u52FE\u9009\u7FFB\u8BD1\uFF0C\u4E0D\u4F1A\u4E0A\u4F20\u4EFB\u4F55\u5185\u5BB9\u3002",
+  "share.translate_intro": "\u52FE\u9009\u8981\u52A0\u5165\u7684\u8BED\u8A00\u3002\u6309\u4E0B\u4FDD\u5B58\u540E\uFF0C\u7B14\u8BB0\u5185\u5BB9\u624D\u4F1A\u53D1\u9001\u5230 AI \u6A21\u578B\u7FFB\u8BD1\uFF1B\u5728\u90A3\u4E4B\u524D\u4E0D\u4F1A\u53D1\u9001\u4EFB\u4F55\u5185\u5BB9\u3002",
+  "share.translate_original_desc": "\u4E00\u5B9A\u5305\u542B\uFF0C\u4E0D\u9700\u52FE\u9009\u3002",
   "share.translate_original_0": "{0}\uFF08\u539F\u6587\uFF09",
   "share.translate_unverified_0": "{0}\u7FFB\u8BD1\u7684\u8D28\u91CF\u5C1A\u672A\u7ECF\u6BCD\u8BED\u4EBA\u58EB\u68C0\u67E5\u3002",
+  "share.translate_unverified_list_0": "{0}\u7684\u7FFB\u8BD1\u8D28\u91CF\u5C1A\u672A\u7ECF\u6BCD\u8BED\u4EBA\u58EB\u68C0\u67E5\u3002",
   "share.translate_model_name": "\u7FFB\u8BD1\u7528\u7684\u6A21\u578B",
   "share.translate_model_desc": "\u8D1F\u8D23\u7FFB\u8BD1\u7B14\u8BB0\u7684 AI \u6A21\u578B\u3002",
   "share.translate_button": "\u7FFB\u8BD1\u5E76\u4FDD\u5B58\u2026",
@@ -5373,9 +5379,12 @@ var zhTW = {
   "share.unavailable_aim": "AI \u7814\u7A76\u5730\u5716\u66AB\u6642\u7121\u6CD5\u5206\u4EAB\u3002",
   "share.unavailable_empty": "\u9019\u5F35\u5730\u5716\u9084\u6C92\u6709\u8B70\u984C\u53EF\u4EE5\u5206\u4EAB\u3002",
   "share.translate_section": "\u7FFB\u8B6F\u7248\u672C",
-  "share.translate_intro": "\u6A94\u6848\u4E00\u5B9A\u5305\u542B\u539F\u6587\u3002\u52FE\u9078\u8981\u52A0\u5165\u7684\u8A9E\u8A00\uFF1A\u6309\u4E0B\u5132\u5B58\u6309\u9215\u5F8C\u624D\u7531 AI \u7FFB\u8B6F\uFF0C\u5728\u90A3\u4E4B\u524D\u4E0D\u6703\u7FFB\u8B6F\u4EFB\u4F55\u5167\u5BB9\u3002",
+  "share.intro_translatable": "\u7522\u751F\u4E00\u500B HTML \u6A94\uFF0C\u4EFB\u4F55\u700F\u89BD\u5668\u90FD\u80FD\u958B\u555F\uFF0C\u96E2\u7DDA\u4E5F\u53EF\u4EE5\u3002\u5B58\u653E\u4F4D\u7F6E\u7531\u4F60\u6C7A\u5B9A\uFF1B\u9664\u975E\u52FE\u9078\u7FFB\u8B6F\uFF0C\u4E0D\u6703\u4E0A\u50B3\u4EFB\u4F55\u6771\u897F\u3002",
+  "share.translate_intro": "\u52FE\u9078\u8981\u52A0\u5165\u7684\u8A9E\u8A00\u3002\u6309\u4E0B\u5132\u5B58\u5F8C\uFF0C\u7B46\u8A18\u5167\u5BB9\u624D\u6703\u9001\u5230 AI \u6A21\u578B\u7FFB\u8B6F\uFF1B\u5728\u90A3\u4E4B\u524D\u4E0D\u6703\u9001\u51FA\u4EFB\u4F55\u5167\u5BB9\u3002",
+  "share.translate_original_desc": "\u4E00\u5B9A\u5305\u542B\uFF0C\u4E0D\u9700\u52FE\u9078\u3002",
   "share.translate_original_0": "{0}\uFF08\u539F\u6587\uFF09",
   "share.translate_unverified_0": "{0}\u7FFB\u8B6F\u7684\u54C1\u8CEA\u5C1A\u672A\u7D93\u6BCD\u8A9E\u4EBA\u58EB\u6AA2\u67E5\u3002",
+  "share.translate_unverified_list_0": "{0}\u7684\u7FFB\u8B6F\u54C1\u8CEA\u5C1A\u672A\u7D93\u6BCD\u8A9E\u4EBA\u58EB\u6AA2\u67E5\u3002",
   "share.translate_model_name": "\u7FFB\u8B6F\u7528\u7684\u6A21\u578B",
   "share.translate_model_desc": "\u8CA0\u8CAC\u7FFB\u8B6F\u7B46\u8A18\u7684 AI \u6A21\u578B\u3002",
   "share.translate_button": "\u7FFB\u8B6F\u4E26\u5132\u5B58\u2026",
@@ -44575,6 +44584,8 @@ var ShareModal = class extends import_obsidian33.Modal {
     __publicField(this, "modelSetting", null);
     __publicField(this, "modelDropdown", null);
     __publicField(this, "translateInfoEl", null);
+    __publicField(this, "unverifiedEl", null);
+    __publicField(this, "estimateEl", null);
     __publicField(this, "openLangEl", null);
     __publicField(this, "openLangSetting", null);
     __publicField(this, "openLangDropdown", null);
@@ -44604,7 +44615,12 @@ var ShareModal = class extends import_obsidian33.Modal {
   }
   onOpen() {
     this.titleEl.setText(t("share.title"));
-    this.contentEl.createEl("p", { text: t("share.intro"), cls: "vam-modal-intro" });
+    this.modalEl.addClass("vam-share-modal");
+    const translatable = !!(this.options.translation && this.exporter.translationSource);
+    this.contentEl.createEl("p", {
+      text: t(translatable ? "share.intro_translatable" : "share.intro"),
+      cls: "vam-modal-intro"
+    });
     this.fullSetting = new import_obsidian33.Setting(this.contentEl).setName(t("share.option_full_name")).setDesc(t("share.option_full_desc")).addToggle((toggle) => {
       this.fullToggle = toggle;
       toggle.setValue(this.includeDetail).onChange((value) => {
@@ -44619,10 +44635,11 @@ var ShareModal = class extends import_obsidian33.Modal {
         this.restart();
       });
     });
-    if (this.options.translation && this.exporter.translationSource) this.openTranslationSection();
+    if (translatable) this.openTranslationSection();
     this.detailsEl = this.contentEl.createDiv({ cls: "vam-share-preview", attr: { "aria-live": "polite" } });
     this.warningsEl = this.contentEl.createDiv({ cls: "vam-share-warnings" });
     this.publishEl = this.contentEl.createDiv({ cls: "vam-share-publish" });
+    this.estimateEl = this.contentEl.createDiv({ cls: "vam-share-estimate", attr: { "aria-live": "polite" } });
     const actions = modalActions(this);
     this.statusEl = actionStatus(actions);
     this.cancelButton = actions.createEl("button", { text: t("ui.cancel") });
@@ -44684,27 +44701,27 @@ var ShareModal = class extends import_obsidian33.Modal {
     this.contentEl.createEl("p", { text: t("share.translate_intro"), cls: "vam-modal-intro" });
     for (const language2 of SHARE_TRANSLATION_LANGUAGES) {
       const original = language2 === this.sourceLanguage;
-      const setting = new import_obsidian33.Setting(this.contentEl).setName(
-        original ? t("share.translate_original_0", this.languageLabel(language2)) : this.languageLabel(language2)
-      );
-      if (!original && UNVERIFIED_LANGUAGES.includes(language2))
-        setting.setDesc(t("share.translate_unverified_0", this.languageLabel(language2)));
+      if (original) {
+        new import_obsidian33.Setting(this.contentEl).setName(t("share.translate_original_0", this.languageLabel(language2))).setDesc(t("share.translate_original_desc"));
+        continue;
+      }
+      const setting = new import_obsidian33.Setting(this.contentEl).setName(this.languageLabel(language2));
       setting.addToggle((toggle) => {
-        toggle.setValue(original);
-        if (!original)
-          toggle.onChange((value) => {
-            if (value) this.picked.add(language2);
-            else this.picked.delete(language2);
-            if (!value && this.defaultChoice === language2) {
-              this.defaultChoice = AUTO_LANGUAGE;
-              new import_obsidian33.Notice(t("share.translate_open_reset_0", this.languageLabel(language2)));
-            }
-            this.renderOpenLanguage();
-            this.selectionChanged();
-          });
+        toggle.setValue(false);
+        toggle.onChange((value) => {
+          if (value) this.picked.add(language2);
+          else this.picked.delete(language2);
+          if (!value && this.defaultChoice === language2) {
+            this.defaultChoice = AUTO_LANGUAGE;
+            new import_obsidian33.Notice(t("share.translate_open_reset_0", this.languageLabel(language2)));
+          }
+          this.renderOpenLanguage();
+          this.selectionChanged();
+        });
         this.languageToggles.set(language2, { setting, toggle });
       });
     }
+    this.unverifiedEl = this.contentEl.createDiv();
     this.openLangEl = this.contentEl.createDiv();
     this.renderOpenLanguage();
     this.modelSetting = new import_obsidian33.Setting(this.contentEl).setName(t("share.translate_model_name")).setDesc(t("share.translate_model_desc")).addDropdown((dropdown) => {
@@ -44931,19 +44948,21 @@ var ShareModal = class extends import_obsidian33.Modal {
     }
   }
   renderTranslation() {
-    var _a2, _b2, _c;
+    var _a2, _b2, _c, _d;
     const container = this.translateInfoEl;
     const host = this.options.translation;
     if (!container || !host) return;
     const focusIndex = this.focusedIndex(container);
     container.empty();
+    (_a2 = this.estimateEl) == null ? void 0 : _a2.empty();
+    this.renderUnverifiedList();
     const note = (text11, cls = "") => void container.createDiv({ text: text11, cls: `vam-share-note ${cls}`.trim() });
     if (this.translating) {
       container.createDiv({ text: this.translateProgress || t("share.progress_start"), cls: "vam-share-progress" });
     } else if (this.phase === "done" && this.translation) {
       container.createDiv({ text: t("share.translate_results"), cls: "vam-share-translate-heading" });
       for (const item of this.translation.languages) this.renderLanguageResult(container, item, host, note);
-      const pieces = (_b2 = (_a2 = this.translationArg()) == null ? void 0 : _a2.pieces) != null ? _b2 : [];
+      const pieces = (_c = (_b2 = this.translationArg()) == null ? void 0 : _b2.pieces) != null ? _c : [];
       if (pieces.length) {
         note(
           t(
@@ -44951,26 +44970,39 @@ var ShareModal = class extends import_obsidian33.Modal {
             [String(this.sourceLanguage), ...pieces.map((piece) => piece.language)].map((id) => this.languageLabel(id)).join(t("ui.list_separator"))
           )
         );
-        if ((_c = this.result) == null ? void 0 : _c.html) note(t("share.translate_total_size_0", formatBytes(this.result.bytes)));
+        if ((_d = this.result) == null ? void 0 : _d.html) note(t("share.translate_total_size_0", formatBytes(this.result.bytes)));
       }
       note(t("share.translate_images_note"));
     } else if (this.wantsTranslation) {
       const estimate = this.estimate();
-      if (estimate)
-        note(
-          estimate.calls === 0 ? t("share.translate_estimate_cached") : t(
+      if (estimate && this.estimateEl)
+        this.estimateEl.createDiv({
+          text: estimate.calls === 0 ? t("share.translate_estimate_cached") : t(
             "share.translate_estimate_0_1_2",
             estimate.calls,
             estimate.minutes,
             host.modelLabel(this.resolvedModel())
-          )
-        );
+          ),
+          cls: "vam-share-estimate-text"
+        });
       note(t("share.translate_images_note"));
       if (this.translateNote) note(this.translateNote, "vam-share-warning");
     } else if (this.translateNote) {
       note(this.translateNote, "vam-share-warning");
     }
     this.restoreFocus(container, focusIndex);
+  }
+  /** One reminder under the language list, only for ticked languages whose translation quality has not been checked. */
+  renderUnverifiedList() {
+    const el = this.unverifiedEl;
+    if (!el) return;
+    el.empty();
+    const names3 = this.selected().filter((language2) => UNVERIFIED_LANGUAGES.includes(language2)).map((language2) => this.languageLabel(language2));
+    if (names3.length)
+      el.createDiv({
+        text: t("share.translate_unverified_list_0", names3.join(t("ui.list_separator"))),
+        cls: "vam-share-note"
+      });
   }
   renderLanguageResult(container, item, host, note) {
     const label = this.languageLabel(item.language);
@@ -45045,6 +45077,20 @@ var ShareModal = class extends import_obsidian33.Modal {
     }
     this.render();
   }
+  /** One line, regular weight; only the number itself is bold. */
+  renderSizeLine(container, bytes) {
+    const marker5 = "\0";
+    const value = formatBytes(bytes);
+    const parts = t("share.preview_size_0", marker5).split(marker5);
+    const line = container.createDiv();
+    if (parts.length !== 2) {
+      line.setText(t("share.preview_size_0", value));
+      return;
+    }
+    if (parts[0]) line.createSpan({ text: parts[0] });
+    line.createSpan({ text: value, cls: "vam-share-size" });
+    if (parts[1]) line.createSpan({ text: parts[1] });
+  }
   render() {
     var _a2, _b2;
     if (this.closed) return;
@@ -45062,8 +45108,7 @@ var ShareModal = class extends import_obsidian33.Modal {
       this.detailsEl.createDiv({
         text: t("share.preview_counts_0_1_2", counts.topics, counts.notesWithContent, counts.images)
       });
-      if (result.html)
-        this.detailsEl.createDiv({ text: t("share.preview_size_0", formatBytes(result.bytes)), cls: "vam-share-size" });
+      if (result.html) this.renderSizeLine(this.detailsEl, result.bytes);
     } else {
       this.detailsEl.createDiv({ text: t("share.preview_topics_0", topics) });
     }
@@ -45071,8 +45116,7 @@ var ShareModal = class extends import_obsidian33.Modal {
     const locked = this.saving || this.translating;
     this.lockToggle(this.fullSetting, this.fullToggle, locked);
     this.lockToggle(this.imagesSetting, this.imagesToggle, locked || !this.includeDetail);
-    for (const [language2, { setting, toggle }] of this.languageToggles)
-      this.lockToggle(setting, toggle, locked || language2 === this.sourceLanguage);
+    for (const { setting, toggle } of this.languageToggles.values()) this.lockToggle(setting, toggle, locked);
     (_a2 = this.modelSetting) == null ? void 0 : _a2.setDisabled(locked);
     (_b2 = this.openLangSetting) == null ? void 0 : _b2.setDisabled(locked || !this.selected().length);
     if (this.openLangDropdown) this.openLangDropdown.selectEl.disabled = locked || !this.selected().length;
@@ -45136,7 +45180,7 @@ var ShareModal = class extends import_obsidian33.Modal {
     if (result.failedImages) add(t("share.images_failed_0", result.failedImages), "vam-share-warning");
     if (result.mermaidBlocked) add(t("share.mermaid_blocked_warning_0", result.mermaidBlocked), "vam-share-warning");
     if (result.mermaidUndrawn) add(t("share.mermaid_undrawn_warning_0", result.mermaidUndrawn), "vam-share-warning");
-    add(t("share.email_hint"));
+    if (advice.level !== "ok") add(t("share.email_hint"));
   }
   async save() {
     const result = this.result;

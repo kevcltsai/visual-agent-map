@@ -147,6 +147,8 @@ export class ShareModal extends Modal {
   private modelSetting: Setting | null = null;
   private modelDropdown: DropdownComponent | null = null;
   private translateInfoEl: HTMLElement | null = null;
+  private unverifiedEl: HTMLElement | null = null;
+  private estimateEl: HTMLElement | null = null;
   private openLangEl: HTMLElement | null = null;
   private openLangSetting: Setting | null = null;
   private openLangDropdown: DropdownComponent | null = null;
@@ -185,7 +187,12 @@ export class ShareModal extends Modal {
 
   onOpen(): void {
     this.titleEl.setText(t("share.title"));
-    this.contentEl.createEl("p", { text: t("share.intro"), cls: "vam-modal-intro" });
+    this.modalEl.addClass("vam-share-modal");
+    const translatable = !!(this.options.translation && this.exporter.translationSource);
+    this.contentEl.createEl("p", {
+      text: t(translatable ? "share.intro_translatable" : "share.intro"),
+      cls: "vam-modal-intro"
+    });
     this.fullSetting = new Setting(this.contentEl)
       .setName(t("share.option_full_name"))
       .setDesc(t("share.option_full_desc"))
@@ -206,10 +213,11 @@ export class ShareModal extends Modal {
           this.restart();
         });
       });
-    if (this.options.translation && this.exporter.translationSource) this.openTranslationSection();
+    if (translatable) this.openTranslationSection();
     this.detailsEl = this.contentEl.createDiv({ cls: "vam-share-preview", attr: { "aria-live": "polite" } });
     this.warningsEl = this.contentEl.createDiv({ cls: "vam-share-warnings" });
     this.publishEl = this.contentEl.createDiv({ cls: "vam-share-publish" });
+    this.estimateEl = this.contentEl.createDiv({ cls: "vam-share-estimate", attr: { "aria-live": "polite" } });
     const actions = modalActions(this);
     this.statusEl = actionStatus(actions);
     this.cancelButton = actions.createEl("button", { text: t("ui.cancel") });
@@ -276,27 +284,30 @@ export class ShareModal extends Modal {
     this.contentEl.createEl("p", { text: t("share.translate_intro"), cls: "vam-modal-intro" });
     for (const language of SHARE_TRANSLATION_LANGUAGES) {
       const original = language === this.sourceLanguage;
-      const setting = new Setting(this.contentEl).setName(
-        original ? t("share.translate_original_0", this.languageLabel(language)) : this.languageLabel(language)
-      );
-      if (!original && UNVERIFIED_LANGUAGES.includes(language))
-        setting.setDesc(t("share.translate_unverified_0", this.languageLabel(language)));
+      if (original) {
+        // The original language is always in the file: a row without a control, not a switch that cannot be turned off.
+        new Setting(this.contentEl)
+          .setName(t("share.translate_original_0", this.languageLabel(language)))
+          .setDesc(t("share.translate_original_desc"));
+        continue;
+      }
+      const setting = new Setting(this.contentEl).setName(this.languageLabel(language));
       setting.addToggle(toggle => {
-        toggle.setValue(original);
-        if (!original)
-          toggle.onChange(value => {
-            if (value) this.picked.add(language);
-            else this.picked.delete(language);
-            if (!value && this.defaultChoice === language) {
-              this.defaultChoice = AUTO_LANGUAGE;
-              new Notice(t("share.translate_open_reset_0", this.languageLabel(language)));
-            }
-            this.renderOpenLanguage();
-            this.selectionChanged();
-          });
+        toggle.setValue(false);
+        toggle.onChange(value => {
+          if (value) this.picked.add(language);
+          else this.picked.delete(language);
+          if (!value && this.defaultChoice === language) {
+            this.defaultChoice = AUTO_LANGUAGE;
+            new Notice(t("share.translate_open_reset_0", this.languageLabel(language)));
+          }
+          this.renderOpenLanguage();
+          this.selectionChanged();
+        });
         this.languageToggles.set(language, { setting, toggle });
       });
     }
+    this.unverifiedEl = this.contentEl.createDiv();
     this.openLangEl = this.contentEl.createDiv();
     this.renderOpenLanguage();
     this.modelSetting = new Setting(this.contentEl)
@@ -550,6 +561,8 @@ export class ShareModal extends Modal {
     // Rebuilding the list must not drop keyboard focus from the control the user just used.
     const focusIndex = this.focusedIndex(container);
     container.empty();
+    this.estimateEl?.empty();
+    this.renderUnverifiedList();
     const note = (text: string, cls = ""): void =>
       void container.createDiv({ text, cls: `vam-share-note ${cls}`.trim() });
     if (this.translating) {
@@ -572,23 +585,40 @@ export class ShareModal extends Modal {
       note(t("share.translate_images_note"));
     } else if (this.wantsTranslation) {
       const estimate = this.estimate();
-      if (estimate)
-        note(
-          estimate.calls === 0
-            ? t("share.translate_estimate_cached")
-            : t(
-                "share.translate_estimate_0_1_2",
-                estimate.calls,
-                estimate.minutes,
-                host.modelLabel(this.resolvedModel())
-              )
-        );
+      if (estimate && this.estimateEl)
+        this.estimateEl.createDiv({
+          text:
+            estimate.calls === 0
+              ? t("share.translate_estimate_cached")
+              : t(
+                  "share.translate_estimate_0_1_2",
+                  estimate.calls,
+                  estimate.minutes,
+                  host.modelLabel(this.resolvedModel())
+                ),
+          cls: "vam-share-estimate-text"
+        });
       note(t("share.translate_images_note"));
       if (this.translateNote) note(this.translateNote, "vam-share-warning");
     } else if (this.translateNote) {
       note(this.translateNote, "vam-share-warning");
     }
     this.restoreFocus(container, focusIndex);
+  }
+
+  /** One reminder under the language list, only for ticked languages whose translation quality has not been checked. */
+  private renderUnverifiedList(): void {
+    const el = this.unverifiedEl;
+    if (!el) return;
+    el.empty();
+    const names = this.selected()
+      .filter(language => UNVERIFIED_LANGUAGES.includes(language))
+      .map(language => this.languageLabel(language));
+    if (names.length)
+      el.createDiv({
+        text: t("share.translate_unverified_list_0", names.join(t("ui.list_separator"))),
+        cls: "vam-share-note"
+      });
   }
 
   private renderLanguageResult(
@@ -678,6 +708,21 @@ export class ShareModal extends Modal {
     this.render();
   }
 
+  /** One line, regular weight; only the number itself is bold. */
+  private renderSizeLine(container: HTMLElement, bytes: number): void {
+    const marker = "\u0000";
+    const value = formatBytes(bytes);
+    const parts = t("share.preview_size_0", marker).split(marker);
+    const line = container.createDiv();
+    if (parts.length !== 2) {
+      line.setText(t("share.preview_size_0", value));
+      return;
+    }
+    if (parts[0]) line.createSpan({ text: parts[0] });
+    line.createSpan({ text: value, cls: "vam-share-size" });
+    if (parts[1]) line.createSpan({ text: parts[1] });
+  }
+
   private render(): void {
     if (this.closed) return;
     const result = this.result;
@@ -694,8 +739,7 @@ export class ShareModal extends Modal {
       this.detailsEl.createDiv({
         text: t("share.preview_counts_0_1_2", counts.topics, counts.notesWithContent, counts.images)
       });
-      if (result.html)
-        this.detailsEl.createDiv({ text: t("share.preview_size_0", formatBytes(result.bytes)), cls: "vam-share-size" });
+      if (result.html) this.renderSizeLine(this.detailsEl, result.bytes);
     } else {
       this.detailsEl.createDiv({ text: t("share.preview_topics_0", topics) });
     }
@@ -703,8 +747,7 @@ export class ShareModal extends Modal {
     const locked = this.saving || this.translating;
     this.lockToggle(this.fullSetting, this.fullToggle, locked);
     this.lockToggle(this.imagesSetting, this.imagesToggle, locked || !this.includeDetail);
-    for (const [language, { setting, toggle }] of this.languageToggles)
-      this.lockToggle(setting, toggle, locked || language === this.sourceLanguage);
+    for (const { setting, toggle } of this.languageToggles.values()) this.lockToggle(setting, toggle, locked);
     this.modelSetting?.setDisabled(locked);
     this.openLangSetting?.setDisabled(locked || !this.selected().length);
     if (this.openLangDropdown) this.openLangDropdown.selectEl.disabled = locked || !this.selected().length;
@@ -775,7 +818,7 @@ export class ShareModal extends Modal {
     if (result.failedImages) add(t("share.images_failed_0", result.failedImages), "vam-share-warning");
     if (result.mermaidBlocked) add(t("share.mermaid_blocked_warning_0", result.mermaidBlocked), "vam-share-warning");
     if (result.mermaidUndrawn) add(t("share.mermaid_undrawn_warning_0", result.mermaidUndrawn), "vam-share-warning");
-    add(t("share.email_hint"));
+    if (advice.level !== "ok") add(t("share.email_hint"));
   }
 
   private async save(): Promise<void> {

@@ -349,14 +349,22 @@ test('sharing viewer language: a translated file carries the interface text of e
 
 /** Runs headless Chrome over CDP with the colour scheme pinned to light, so the DOM does not depend on the OS appearance. */
 async function dumpDomLight(chrome, directory, url, timeoutMs = 60000) {
-  const port = 20000 + Math.floor(Math.random() * 20000);
-  const child = spawn(chrome, ['--headless=new', '--disable-gpu', '--no-sandbox', `--remote-debugging-port=${port}`, `--user-data-dir=${path.join(directory, 'profile')}`, '--window-size=1280,800', 'about:blank'], { stdio: 'ignore', detached: true }); // own process group, so cleanup can end Chrome's helper processes too
+  const profile = path.join(directory, 'profile');
+  const child = spawn(chrome, ['--headless=new', '--disable-gpu', '--no-sandbox', '--remote-debugging-port=0', `--user-data-dir=${profile}`, '--window-size=1280,800', 'about:blank'], { stdio: 'ignore', detached: true }); // own process group, so cleanup can end Chrome's helper processes too
   let timer;
+  let stopped = false;
+  let exitInfo = null;
+  child.once('exit', (code, signal) => { exitInfo = { code, signal }; });
   const deadline = new Promise((_, reject) => { timer = setTimeout(() => reject(new Error(`dumpDomLight timed out after ${timeoutMs} ms`)), timeoutMs); });
   const work = async () => {
+    // Chrome picks a free port itself (port 0) and writes it to DevToolsActivePort; wait for that within the overall timeout.
     let target;
-    for (let i = 0; i < 100 && !target; i++) {
-      try { target = (await (await fetch(`http://127.0.0.1:${port}/json`)).json()).find(item => item.type === 'page'); } catch { /* not up yet */ }
+    while (!target && !stopped) {
+      if (exitInfo) throw new Error(`Chrome exited before its debugging endpoint was up (code ${exitInfo.code}, signal ${exitInfo.signal})`);
+      try {
+        const port = Number(fs.readFileSync(path.join(profile, 'DevToolsActivePort'), 'utf8').split('\n')[0]);
+        if (port > 0) target = (await (await fetch(`http://127.0.0.1:${port}/json`)).json()).find(item => item.type === 'page');
+      } catch { /* not up yet */ }
       if (!target) await new Promise(resolve => setTimeout(resolve, 100));
     }
     assert.ok(target, 'Chrome debugging endpoint is up');
@@ -386,12 +394,13 @@ async function dumpDomLight(chrome, directory, url, timeoutMs = 60000) {
     return await Promise.race([running, deadline]);
   } finally {
     clearTimeout(timer);
-    const exited = new Promise(resolve => child.once('exit', resolve));
+    stopped = true;
+    const exited = exitInfo ? Promise.resolve() : new Promise(resolve => child.once('exit', resolve));
     // Chrome's crashpad/renderer helpers keep writing to the profile after the main process dies: end the whole group.
     try { process.kill(-child.pid, 'SIGKILL'); } catch { try { child.kill('SIGKILL'); } catch { /* already gone */ } }
     await exited;
     // Removing the temp profile is not tested behaviour: a leftover temp directory must not fail the test.
-    try { fs.rmSync(path.join(directory, 'profile'), { recursive: true, force: true, maxRetries: 10, retryDelay: 200 }); } catch (error) { console.warn(`dumpDomLight: could not remove temp profile: ${error.message}`); }
+    try { fs.rmSync(profile, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 }); } catch (error) { console.warn(`dumpDomLight: could not remove temp profile: ${error.message}`); }
   }
 }
 

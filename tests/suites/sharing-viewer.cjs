@@ -3,7 +3,7 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
-const { execFileSync } = require('node:child_process');
+const { execFileSync, spawn } = require('node:child_process');
 const { pathToFileURL } = require('node:url');
 const { test, load, root, plain } = require('../support.cjs');
 const { buildSync } = require('../build.cjs');
@@ -347,7 +347,44 @@ test('sharing viewer language: a translated file carries the interface text of e
   assert.ok(html.renderShareShell(ui, translated.languages).includes('"uiByLanguage"'));
 });
 
-test('sharing viewer language: a plain file shows exactly the P1 page (same DOM in headless Chrome)', t => {
+/** Runs headless Chrome over CDP with the colour scheme pinned to light, so the DOM does not depend on the OS appearance. */
+async function dumpDomLight(chrome, directory, url) {
+  const port = 20000 + Math.floor(Math.random() * 20000);
+  const child = spawn(chrome, ['--headless=new', '--disable-gpu', '--no-sandbox', `--remote-debugging-port=${port}`, `--user-data-dir=${path.join(directory, 'profile')}`, '--window-size=1280,800', 'about:blank'], { stdio: 'ignore' });
+  try {
+    let target;
+    for (let i = 0; i < 100 && !target; i++) {
+      try { target = (await (await fetch(`http://127.0.0.1:${port}/json`)).json()).find(item => item.type === 'page'); } catch { /* not up yet */ }
+      if (!target) await new Promise(resolve => setTimeout(resolve, 100));
+    }
+    assert.ok(target, 'Chrome debugging endpoint is up');
+    const socket = new WebSocket(target.webSocketDebuggerUrl);
+    await new Promise((resolve, reject) => { socket.onopen = resolve; socket.onerror = reject; });
+    let id = 0;
+    const pending = new Map();
+    socket.onmessage = event => { const message = JSON.parse(event.data); pending.get(message.id)?.(message); };
+    const send = (method, params = {}) => new Promise((resolve, reject) => {
+      const mine = ++id;
+      pending.set(mine, message => (message.error ? reject(new Error(message.error.message)) : resolve(message.result)));
+      socket.send(JSON.stringify({ id: mine, method, params }));
+    });
+    await send('Page.enable');
+    await send('Emulation.setEmulatedMedia', { features: [{ name: 'prefers-color-scheme', value: 'light' }] });
+    const loaded = new Promise(resolve => { const previous = socket.onmessage; socket.onmessage = event => { previous(event); if (JSON.parse(event.data).method === 'Page.loadEventFired') resolve(); }; });
+    await send('Page.navigate', { url });
+    await loaded;
+    await new Promise(resolve => setTimeout(resolve, 1500));
+    const result = await send('Runtime.evaluate', { expression: 'document.documentElement.outerHTML', returnByValue: true });
+    socket.close();
+    return result.result.value;
+  } finally {
+    const exited = new Promise(resolve => child.once('exit', resolve));
+    child.kill();
+    await exited;
+  }
+}
+
+test('sharing viewer language: a plain file shows exactly the P1 page (same DOM in headless Chrome, light scheme pinned)', async t => {
   const candidates = [process.env.CHROME_BIN, '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome', '/usr/bin/google-chrome', '/usr/bin/google-chrome-stable', '/usr/bin/chromium'].filter(Boolean);
   const chrome = candidates.find(file => fs.existsSync(file));
   if (!chrome) return t.skip('no Chrome found (set CHROME_BIN)'); // The page DOM is also compared by the viewer's own manual check; this layer needs a browser.
@@ -355,13 +392,13 @@ test('sharing viewer language: a plain file shows exactly the P1 page (same DOM 
   try {
     const out = path.join(directory, 'p1.html');
     execFileSync(process.execPath, [path.join(root, 'scripts', 'make-share-demo.mjs'), '--out', out, '--lang', 'en'], { cwd: root });
-    const dom = execFileSync(chrome, ['--headless=new', '--disable-gpu', '--no-sandbox', `--user-data-dir=${path.join(directory, 'profile')}`, '--window-size=1280,800', '--virtual-time-budget=3000', '--dump-dom', pathToFileURL(out).href], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'], timeout: 60000 });
+    const dom = await dumpDomLight(chrome, directory, pathToFileURL(out).href);
     const clean = value => value.replace(/transform: translate\([^)]*\) scale\([^)]*\);/, 'transform: T;');
     const app = dom.slice(dom.indexOf('<div id="vam-app"'), dom.indexOf('<script type="application/json" id="vam-ui">')).trimEnd() + '\n';
     assert.equal(clean(app), clean(read('tests/fixtures/sharing/viewer-p1-app.html')));
     assert.match(dom, /<html lang="en">/);
   } finally {
-    fs.rmSync(directory, { recursive: true, force: true });
+    fs.rmSync(directory, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 });
   }
 });
 

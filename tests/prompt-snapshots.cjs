@@ -183,6 +183,15 @@ test('collect snapshots: Coffee Tables, Reframe, Markdown context', async () => 
   coffeeModules.i18n.setUiLanguage('en');
   const { buildReframePrompt } = support.load('core/reframing-service.ts', { obsidian: support.obsidian });
   for (const [language, tag] of LANGUAGES) record(`reframe.${tag}`, 'core/reframing-service.ts buildReframePrompt', language, buildReframePrompt({ language, question: 'Direction question', context: 'Direction context', source: 'Source thinking text' }));
+  // Share translation prompts are written in English for every target; the target and source languages are named inside.
+  const { buildShareTranslatePrompt, buildShareTranslateLabelsPrompt, SHARE_TRANSLATE_SCHEMA } = support.load('experiences/sharing/share-translate-service.ts', { obsidian: support.obsidian });
+  const shareItems = [{ id: '1', text: 'Heat changes \u27e61/\u27e7 and \u27e62\u27e7starches\u27e6/2\u27e7.' }, { id: '2', text: 'Roast' }];
+  const shareLabels = [{ id: '1', text: 'Start here' }, { id: '2', text: 'Heat the pan' }];
+  for (const target of ['zh-TW', 'zh-CN', 'en', 'ja', 'ko', 'es']) {
+    const sourceLanguage = target === 'en' ? 'zh-TW' : 'en';
+    record(`share-translate.target-${target}`, 'experiences/sharing/share-translate-service.ts buildShareTranslatePrompt', target, buildShareTranslatePrompt({ items: shareItems, sourceLanguage, targetLanguage: target, model: 'm', reasoning: 'low' }), SHARE_TRANSLATE_SCHEMA);
+    record(`share-translate-labels.target-${target}`, 'experiences/sharing/share-translate-service.ts buildShareTranslateLabelsPrompt', target, buildShareTranslateLabelsPrompt({ items: shareLabels, sourceLanguage, targetLanguage: target, model: 'm', reasoning: 'low' }), SHARE_TRANSLATE_SCHEMA);
+  }
   const { buildOutlineGeneratePrompt } = support.load('core/outline-generation-service.ts', { obsidian: support.obsidian });
   const { buildStructureReviewPrompt, STRUCTURE_REVIEW_SCHEMA } = support.load('core/structure-review-service.ts', { obsidian: support.obsidian });
   const { buildRelevanceGradePrompt, RELEVANCE_GRADE_SCHEMA, relevanceGradeRepairStep, relevanceGradeMissingRepairStep, RELEVANCE_RECALIBRATE_SCHEMA, relevanceRecalibrateStep, relevanceRecalibrateRepairStep } = support.load('core/relevance-grade-service.ts', { obsidian: support.obsidian });

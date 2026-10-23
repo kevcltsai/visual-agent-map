@@ -1466,6 +1466,66 @@
       "language": "zh-CN",
       "schema": true
     },
+    "share-translate-labels.target-en": {
+      "builder": "experiences/sharing/share-translate-service.ts buildShareTranslateLabelsPrompt",
+      "language": "en",
+      "schema": true
+    },
+    "share-translate-labels.target-es": {
+      "builder": "experiences/sharing/share-translate-service.ts buildShareTranslateLabelsPrompt",
+      "language": "es",
+      "schema": true
+    },
+    "share-translate-labels.target-ja": {
+      "builder": "experiences/sharing/share-translate-service.ts buildShareTranslateLabelsPrompt",
+      "language": "ja",
+      "schema": true
+    },
+    "share-translate-labels.target-ko": {
+      "builder": "experiences/sharing/share-translate-service.ts buildShareTranslateLabelsPrompt",
+      "language": "ko",
+      "schema": true
+    },
+    "share-translate-labels.target-zh-CN": {
+      "builder": "experiences/sharing/share-translate-service.ts buildShareTranslateLabelsPrompt",
+      "language": "zh-CN",
+      "schema": true
+    },
+    "share-translate-labels.target-zh-TW": {
+      "builder": "experiences/sharing/share-translate-service.ts buildShareTranslateLabelsPrompt",
+      "language": "zh-TW",
+      "schema": true
+    },
+    "share-translate.target-en": {
+      "builder": "experiences/sharing/share-translate-service.ts buildShareTranslatePrompt",
+      "language": "en",
+      "schema": true
+    },
+    "share-translate.target-es": {
+      "builder": "experiences/sharing/share-translate-service.ts buildShareTranslatePrompt",
+      "language": "es",
+      "schema": true
+    },
+    "share-translate.target-ja": {
+      "builder": "experiences/sharing/share-translate-service.ts buildShareTranslatePrompt",
+      "language": "ja",
+      "schema": true
+    },
+    "share-translate.target-ko": {
+      "builder": "experiences/sharing/share-translate-service.ts buildShareTranslatePrompt",
+      "language": "ko",
+      "schema": true
+    },
+    "share-translate.target-zh-CN": {
+      "builder": "experiences/sharing/share-translate-service.ts buildShareTranslatePrompt",
+      "language": "zh-CN",
+      "schema": true
+    },
+    "share-translate.target-zh-TW": {
+      "builder": "experiences/sharing/share-translate-service.ts buildShareTranslatePrompt",
+      "language": "zh-TW",
+      "schema": true
+    },
     "structure-review.en": {
       "builder": "core/structure-review-service.ts buildStructureReviewPrompt",
       "language": "en",

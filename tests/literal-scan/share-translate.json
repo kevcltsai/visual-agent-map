@@ -1,0 +1,10 @@
+{
+  "dirs": [
+    "core/steps/share-translate",
+    "experiences/sharing/share-translate-service.ts",
+    "experiences/sharing/share-translate-segments.ts",
+    "experiences/sharing/share-translate-mermaid.ts",
+    "experiences/sharing/share-translate-plan.ts"
+  ],
+  "allow": []
+}

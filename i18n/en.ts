@@ -1927,6 +1927,9 @@ export const en = {
   "share.viewer_image_source_0": "Source: {0}",
   "share.viewer_resize_panel": "Resize the side panel",
   "share.viewer_untitled": "Untitled map",
+  "share.viewer_language": "Language",
+  "share.viewer_ai_translated_0": "Translated by AI from {0}",
+  "share.viewer_image_text_untranslated": "Text inside images is not translated.",
   // Share dialog
   "share.command": "Share this map",
   "share.button": "Share this map",
@@ -1973,7 +1976,39 @@ export const en = {
   "share.unavailable_no_map": "Open a mind map first, then share it.",
   "share.unavailable_sample": "The built-in sample is read-only and cannot be shared.",
   "share.unavailable_aim": "AI research maps cannot be shared yet.",
-  "share.unavailable_empty": "This map has no topics to share yet."
+  "share.unavailable_empty": "This map has no topics to share yet.",
+  "share.translate_section": "Translated versions",
+  "share.translate_intro":
+    "The file always includes the original. Tick the languages to add: AI translates them when you press the save button, and nothing is translated before that.",
+  "share.translate_original_0": "{0} (original)",
+  "share.translate_unverified_0": "The quality of the {0} translation has not been checked by a native speaker.",
+  "share.translate_model_name": "Translation model",
+  "share.translate_model_desc": "The AI model that translates the notes.",
+  "share.translate_button": "Translate and save…",
+  "share.translate_estimate_0_1_2": "About {0} AI calls, around {1} minutes ({2}).",
+  "share.translate_estimate_cached":
+    "Everything selected was already translated in this session. No new AI calls are needed.",
+  "share.translate_progress_0_1_2_3_4": "Translating {0}: language {1} of {2}, batch {3} of {4}",
+  "share.translate_cancel": "Cancel translation",
+  "share.translate_stopped":
+    "Translation cancelled. Nothing was saved. Parts already translated are kept for this session.",
+  "share.translate_failed_0": "Translation stopped: {0} Nothing was saved.",
+  "share.translate_done": "Translation finished. Press “Save file…” to choose where to keep it.",
+  "share.translate_results": "Translation results",
+  "share.translate_status_complete": "Complete",
+  "share.translate_status_incomplete_0_1": "Incomplete: {0} of {1} parts stayed in the original language",
+  "share.translate_status_failed": "Failed: nothing was translated",
+  "share.translate_status_blocked_0": "Blocked: the translation would contain private information ({0})",
+  "share.translate_result_model_0": "Model: {0}",
+  "share.translate_include_incomplete": "Include in the file anyway",
+  "share.translate_default_language": "Opens in",
+  "share.translate_default_auto": "The reader's browser language",
+  "share.translate_default_desc": "Readers can switch language in the viewer.",
+  "share.translate_save_file": "Save file…",
+  "share.translate_diagrams_kept_0": "{0} diagrams could not be translated and keep their original labels.",
+  "share.translate_images_note": "Text inside images is not translated.",
+  "share.translate_total_size_0": "Total size with these languages: {0}",
+  "share.translate_languages_included_0": "Languages in the file: {0}"
 } as const;
 
 export type TranslationKey = keyof typeof en;

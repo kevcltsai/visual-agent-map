@@ -1,10 +1,41 @@
 import type { MapDocument } from "../../map-model";
 import type { RelevanceTier } from "../../note-values";
+import type { ContentLanguage } from "../../i18n";
 
 /** The `vam-share` v1 file format: one self-contained HTML file carrying this payload in `<script id="vam-map">`. */
 export const SHARE_FORMAT = "vam-share";
 export const SHARE_VERSION = 1;
 export type ShareLanguage = "en" | "zh-TW" | "zh-CN";
+
+/**
+ * The languages a share can be translated into (D-2026-10-114): the three interface languages plus Japanese, Korean
+ * and Spanish from the output-only table. A literal list, not a runtime import of `i18n/languages.ts`, so the viewer
+ * bundle never pulls the dictionaries in; the type check and a unit test keep it equal to the registry ids.
+ */
+export const SHARE_TRANSLATION_LANGUAGES = [
+  "zh-TW",
+  "zh-CN",
+  "en",
+  "ja",
+  "ko",
+  "es"
+] as const satisfies readonly ContentLanguage[];
+export type ShareTranslationLanguage = (typeof SHARE_TRANSLATION_LANGUAGES)[number];
+export const isShareTranslationLanguage = (value: unknown): value is ShareTranslationLanguage =>
+  typeof value === "string" && (SHARE_TRANSLATION_LANGUAGES as readonly string[]).includes(value);
+
+/** One note's text in a translated language. `detailHtml` keeps the field name so the leak scan treats it like the original. */
+export interface ShareNodeTranslation {
+  title: string;
+  summary: string;
+  reason?: string;
+  detailHtml?: string;
+}
+/** The map-level text in a translated language. */
+export interface ShareMapTranslation {
+  title: string;
+  goal?: string;
+}
 
 /** Size thresholds (bytes) for the preview warning and the "leave the images out" suggestion. */
 export const SHARE_SIZE_WARN_BYTES = 10 * 1024 * 1024;
@@ -33,6 +64,8 @@ export interface ShareNodePayload {
   manual?: true;
   /** Detail rendered to sanitized HTML at export time; images reference `assets` by name. */
   detailHtml?: string;
+  /** Optional (D-2026-10-116): this note's text per translated language, keyed by language id. The original stays in the fields above. */
+  translations?: Record<string, ShareNodeTranslation>;
 }
 
 export interface SharePayload {
@@ -46,6 +79,14 @@ export interface SharePayload {
   viewport: { x: number; y: number; zoom: number };
   nodes: ShareNodePayload[];
   assets: Record<string, string>;
+  /** Optional (D-2026-10-116). Language id of the original text; any registry language, so it may lie outside the six. */
+  contentLanguage?: string;
+  /** Optional. Every language the file carries, the original first. Absent means the original only. */
+  languages?: string[];
+  /** Optional. The language to open in; absent means follow the reader's browser, then fall back to the original. */
+  defaultLanguage?: string;
+  /** Optional. Map-level text per translated language. */
+  translations?: Record<string, ShareMapTranslation>;
 }
 
 /** What the exporter hands over per note. Only these fields can reach the file. */

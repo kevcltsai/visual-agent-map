@@ -2,10 +2,13 @@ import {
   classifySize,
   SHARE_SIZE_SUGGEST_NO_IMAGES_BYTES,
   SHARE_SIZE_WARN_BYTES,
+  type ShareMapTranslation,
+  type ShareNodeTranslation,
+  type SharePayload,
   type SizeClass
 } from "./share-format";
 import { SHARE_ASSET_SCHEME } from "./share-clean";
-import type { LeakCategory } from "./share-leak-scan";
+import { scanPayloadForLeaks, type ForbiddenString, type LeakCategory } from "./share-leak-scan";
 
 /**
  * Pure helpers for the share dialog's build lifecycle. No obsidian import.
@@ -197,4 +200,67 @@ export function renderedLeakCategories(
   if (!options.includeDetail) return [];
   for (const note of rendered) if (note.localRefs > 0) return ["wikilink"];
   return [];
+}
+
+/** One translated language as the translation service returns it. */
+export interface ShareTranslationPiece {
+  top: ShareMapTranslation;
+  nodes: Readonly<Record<string, ShareNodeTranslation>>;
+}
+
+/**
+ * Leak categories found in one language's translated text. It runs the payload scan itself on a payload that holds
+ * only this language, so the translated fields (`detailHtml` included) get every rule of the original text and no rule
+ * is written twice (D-2026-10-116, DP4). Categories only, never the matched text.
+ */
+export function leakCategoriesInTranslation(
+  language: string,
+  piece: ShareTranslationPiece,
+  forbidden: readonly ForbiddenString[]
+): LeakCategory[] {
+  const shaped = {
+    translations: { [language]: piece.top },
+    nodes: Object.entries(piece.nodes).map(([id, translation]) => ({ id, translations: { [language]: translation } }))
+  } as unknown as SharePayload;
+  return [...new Set(scanPayloadForLeaks(shaped, forbidden).map(hit => hit.category))];
+}
+
+export interface AttachTranslationsOptions {
+  /** Language id of the original text. */
+  contentLanguage: string;
+  /** Languages to carry, in menu order; each needs a piece. The original is listed first in the file. */
+  pieces: ReadonlyArray<{ language: string; piece: ShareTranslationPiece }>;
+  /** The language to open in; ignored unless the file carries it. */
+  defaultLanguage?: string;
+}
+
+/**
+ * The payload with its translated languages added (D-2026-10-116). The original fields are never touched; the optional
+ * `contentLanguage`, `languages`, `defaultLanguage` and `translations` fields appear only when there is at least one
+ * translated language, so a file without translations is byte-identical to the P1 file.
+ */
+export function attachTranslations(payload: SharePayload, options: AttachTranslationsOptions): SharePayload {
+  const pieces = options.pieces.filter(item => item.language !== options.contentLanguage);
+  if (!pieces.length) return payload;
+  const languages = [options.contentLanguage, ...pieces.map(item => item.language)];
+  const translations: Record<string, ShareMapTranslation> = {};
+  for (const item of pieces) translations[item.language] = item.piece.top;
+  const nodes = payload.nodes.map(node => {
+    const byLanguage: Record<string, ShareNodeTranslation> = {};
+    for (const item of pieces) {
+      const translation = item.piece.nodes[node.id];
+      if (translation) byLanguage[item.language] = translation;
+    }
+    return Object.keys(byLanguage).length ? { ...node, translations: byLanguage } : node;
+  });
+  return {
+    ...payload,
+    nodes,
+    contentLanguage: options.contentLanguage,
+    languages,
+    ...(options.defaultLanguage && languages.includes(options.defaultLanguage)
+      ? { defaultLanguage: options.defaultLanguage }
+      : {}),
+    translations
+  };
 }

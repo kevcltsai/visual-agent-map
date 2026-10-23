@@ -1781,6 +1781,9 @@ var en = {
   "share.viewer_image_source_0": "Source: {0}",
   "share.viewer_resize_panel": "Resize the side panel",
   "share.viewer_untitled": "Untitled map",
+  "share.viewer_language": "Language",
+  "share.viewer_ai_translated_0": "Translated by AI from {0}",
+  "share.viewer_image_text_untranslated": "Text inside images is not translated.",
   // Share dialog
   "share.command": "Share this map",
   "share.button": "Share this map",
@@ -1824,7 +1827,36 @@ var en = {
   "share.unavailable_no_map": "Open a mind map first, then share it.",
   "share.unavailable_sample": "The built-in sample is read-only and cannot be shared.",
   "share.unavailable_aim": "AI research maps cannot be shared yet.",
-  "share.unavailable_empty": "This map has no topics to share yet."
+  "share.unavailable_empty": "This map has no topics to share yet.",
+  "share.translate_section": "Translated versions",
+  "share.translate_intro": "The file always includes the original. Tick the languages to add: AI translates them when you press the save button, and nothing is translated before that.",
+  "share.translate_original_0": "{0} (original)",
+  "share.translate_unverified_0": "The quality of the {0} translation has not been checked by a native speaker.",
+  "share.translate_model_name": "Translation model",
+  "share.translate_model_desc": "The AI model that translates the notes.",
+  "share.translate_button": "Translate and save\u2026",
+  "share.translate_estimate_0_1_2": "About {0} AI calls, around {1} minutes ({2}).",
+  "share.translate_estimate_cached": "Everything selected was already translated in this session. No new AI calls are needed.",
+  "share.translate_progress_0_1_2_3_4": "Translating {0}: language {1} of {2}, batch {3} of {4}",
+  "share.translate_cancel": "Cancel translation",
+  "share.translate_stopped": "Translation cancelled. Nothing was saved. Parts already translated are kept for this session.",
+  "share.translate_failed_0": "Translation stopped: {0} Nothing was saved.",
+  "share.translate_done": "Translation finished. Press \u201CSave file\u2026\u201D to choose where to keep it.",
+  "share.translate_results": "Translation results",
+  "share.translate_status_complete": "Complete",
+  "share.translate_status_incomplete_0_1": "Incomplete: {0} of {1} parts stayed in the original language",
+  "share.translate_status_failed": "Failed: nothing was translated",
+  "share.translate_status_blocked_0": "Blocked: the translation would contain private information ({0})",
+  "share.translate_result_model_0": "Model: {0}",
+  "share.translate_include_incomplete": "Include in the file anyway",
+  "share.translate_default_language": "Opens in",
+  "share.translate_default_auto": "The reader's browser language",
+  "share.translate_default_desc": "Readers can switch language in the viewer.",
+  "share.translate_save_file": "Save file\u2026",
+  "share.translate_diagrams_kept_0": "{0} diagrams could not be translated and keep their original labels.",
+  "share.translate_images_note": "Text inside images is not translated.",
+  "share.translate_total_size_0": "Total size with these languages: {0}",
+  "share.translate_languages_included_0": "Languages in the file: {0}"
 };
 
 // i18n/zh-CN.ts
@@ -3507,6 +3539,9 @@ var zhCN = {
   "share.viewer_image_source_0": "\u6765\u6E90\uFF1A{0}",
   "share.viewer_resize_panel": "\u8C03\u6574\u4FA7\u680F\u5BBD\u5EA6",
   "share.viewer_untitled": "\u672A\u547D\u540D\u7684\u5730\u56FE",
+  "share.viewer_language": "\u8BED\u8A00",
+  "share.viewer_ai_translated_0": "\u7531 AI \u7FFB\u8BD1\u81EA{0}",
+  "share.viewer_image_text_untranslated": "\u56FE\u7247\u91CC\u7684\u6587\u5B57\u6CA1\u6709\u7FFB\u8BD1\u3002",
   // Share dialog
   "share.command": "\u5206\u4EAB\u8FD9\u5F20\u5730\u56FE",
   "share.button": "\u5206\u4EAB\u8FD9\u5F20\u5730\u56FE",
@@ -3550,7 +3585,36 @@ var zhCN = {
   "share.unavailable_no_map": "\u8BF7\u5148\u6253\u5F00\u4E00\u5F20\u601D\u7EF4\u5BFC\u56FE\u518D\u5206\u4EAB\u3002",
   "share.unavailable_sample": "\u5185\u7F6E\u793A\u4F8B\u4E3A\u53EA\u8BFB\uFF0C\u65E0\u6CD5\u5206\u4EAB\u3002",
   "share.unavailable_aim": "AI \u7814\u7A76\u5730\u56FE\u6682\u65F6\u65E0\u6CD5\u5206\u4EAB\u3002",
-  "share.unavailable_empty": "\u8FD9\u5F20\u5730\u56FE\u8FD8\u6CA1\u6709\u8BAE\u9898\u53EF\u4EE5\u5206\u4EAB\u3002"
+  "share.unavailable_empty": "\u8FD9\u5F20\u5730\u56FE\u8FD8\u6CA1\u6709\u8BAE\u9898\u53EF\u4EE5\u5206\u4EAB\u3002",
+  "share.translate_section": "\u7FFB\u8BD1\u7248\u672C",
+  "share.translate_intro": "\u6587\u4EF6\u4E00\u5B9A\u5305\u542B\u539F\u6587\u3002\u52FE\u9009\u8981\u52A0\u5165\u7684\u8BED\u8A00\uFF1A\u6309\u4E0B\u4FDD\u5B58\u6309\u94AE\u540E\u624D\u7531 AI \u7FFB\u8BD1\uFF0C\u5728\u90A3\u4E4B\u524D\u4E0D\u4F1A\u7FFB\u8BD1\u4EFB\u4F55\u5185\u5BB9\u3002",
+  "share.translate_original_0": "{0}\uFF08\u539F\u6587\uFF09",
+  "share.translate_unverified_0": "{0}\u7FFB\u8BD1\u7684\u8D28\u91CF\u5C1A\u672A\u7ECF\u6BCD\u8BED\u4EBA\u58EB\u68C0\u67E5\u3002",
+  "share.translate_model_name": "\u7FFB\u8BD1\u7528\u7684\u6A21\u578B",
+  "share.translate_model_desc": "\u8D1F\u8D23\u7FFB\u8BD1\u7B14\u8BB0\u7684 AI \u6A21\u578B\u3002",
+  "share.translate_button": "\u7FFB\u8BD1\u5E76\u4FDD\u5B58\u2026",
+  "share.translate_estimate_0_1_2": "\u9884\u4F30\u7EA6 {0} \u6B21 AI \u8C03\u7528\u3001\u7EA6 {1} \u5206\u949F\uFF08{2}\uFF09\u3002",
+  "share.translate_estimate_cached": "\u52FE\u9009\u7684\u5185\u5BB9\u5728\u8FD9\u6B21\u4F7F\u7528\u4E2D\u90FD\u5DF2\u7FFB\u8BD1\u8FC7\uFF0C\u4E0D\u9700\u8981\u65B0\u7684 AI \u8C03\u7528\u3002",
+  "share.translate_progress_0_1_2_3_4": "\u6B63\u5728\u7FFB\u8BD1{0}\uFF1A\u7B2C {1} / {2} \u79CD\u8BED\u8A00\uFF0C\u7B2C {3} / {4} \u6279",
+  "share.translate_cancel": "\u53D6\u6D88\u7FFB\u8BD1",
+  "share.translate_stopped": "\u5DF2\u53D6\u6D88\u7FFB\u8BD1\uFF0C\u6CA1\u6709\u4FDD\u5B58\u4EFB\u4F55\u6587\u4EF6\u3002\u5DF2\u7FFB\u597D\u7684\u90E8\u5206\u4F1A\u4FDD\u7559\u5230\u8FD9\u6B21\u4F7F\u7528\u7ED3\u675F\u3002",
+  "share.translate_failed_0": "\u7FFB\u8BD1\u4E2D\u6B62\uFF1A{0}\u6CA1\u6709\u4FDD\u5B58\u4EFB\u4F55\u6587\u4EF6\u3002",
+  "share.translate_done": "\u7FFB\u8BD1\u5B8C\u6210\uFF0C\u8BF7\u6309\u201C\u4FDD\u5B58\u6587\u4EF6\u2026\u201D\u9009\u62E9\u5B58\u653E\u4F4D\u7F6E\u3002",
+  "share.translate_results": "\u7FFB\u8BD1\u7ED3\u679C",
+  "share.translate_status_complete": "\u5B8C\u6210",
+  "share.translate_status_incomplete_0_1": "\u4E0D\u5B8C\u6574\uFF1A{1} \u6BB5\u4E2D\u6709 {0} \u6BB5\u4FDD\u7559\u539F\u6587",
+  "share.translate_status_failed": "\u5931\u8D25\uFF1A\u6CA1\u6709\u7FFB\u5230\u4EFB\u4F55\u5185\u5BB9",
+  "share.translate_status_blocked_0": "\u5DF2\u62E6\u4E0B\uFF1A\u8BD1\u6587\u4F1A\u542B\u6709\u79C1\u4EBA\u4FE1\u606F\uFF08{0}\uFF09",
+  "share.translate_result_model_0": "\u6A21\u578B\uFF1A{0}",
+  "share.translate_include_incomplete": "\u4ECD\u7136\u653E\u8FDB\u6587\u4EF6",
+  "share.translate_default_language": "\u9ED8\u8BA4\u8BED\u8A00",
+  "share.translate_default_auto": "\u8DDF\u968F\u8BFB\u8005\u7684\u6D4F\u89C8\u5668\u8BED\u8A00",
+  "share.translate_default_desc": "\u8BFB\u8005\u53EF\u4EE5\u5728\u67E5\u770B\u5668\u91CC\u5207\u6362\u8BED\u8A00\u3002",
+  "share.translate_save_file": "\u4FDD\u5B58\u6587\u4EF6\u2026",
+  "share.translate_diagrams_kept_0": "{0} \u5F20\u56FE\u8868\u65E0\u6CD5\u7FFB\u8BD1\uFF0C\u4FDD\u7559\u539F\u672C\u7684\u6807\u7B7E\u3002",
+  "share.translate_images_note": "\u56FE\u7247\u91CC\u7684\u6587\u5B57\u4E0D\u4F1A\u7FFB\u8BD1\u3002",
+  "share.translate_total_size_0": "\u52A0\u4E0A\u8FD9\u4E9B\u8BED\u8A00\u540E\u7684\u6587\u4EF6\u5927\u5C0F\uFF1A{0}",
+  "share.translate_languages_included_0": "\u6587\u4EF6\u5305\u542B\u7684\u8BED\u8A00\uFF1A{0}"
 };
 
 // i18n/zh-TW.ts
@@ -5233,6 +5297,9 @@ var zhTW = {
   "share.viewer_image_source_0": "\u4F86\u6E90\uFF1A{0}",
   "share.viewer_resize_panel": "\u8ABF\u6574\u5074\u6B04\u5BEC\u5EA6",
   "share.viewer_untitled": "\u672A\u547D\u540D\u7684\u5730\u5716",
+  "share.viewer_language": "\u8A9E\u8A00",
+  "share.viewer_ai_translated_0": "\u7531 AI \u7FFB\u8B6F\u81EA{0}",
+  "share.viewer_image_text_untranslated": "\u5716\u7247\u88E1\u7684\u6587\u5B57\u6C92\u6709\u7FFB\u8B6F\u3002",
   // Share dialog
   "share.command": "\u5206\u4EAB\u9019\u5F35\u5730\u5716",
   "share.button": "\u5206\u4EAB\u9019\u5F35\u5730\u5716",
@@ -5276,7 +5343,36 @@ var zhTW = {
   "share.unavailable_no_map": "\u8ACB\u5148\u958B\u555F\u4E00\u5F35\u5FC3\u667A\u5716\u518D\u5206\u4EAB\u3002",
   "share.unavailable_sample": "\u5167\u5EFA\u7BC4\u4F8B\u70BA\u552F\u8B80\uFF0C\u7121\u6CD5\u5206\u4EAB\u3002",
   "share.unavailable_aim": "AI \u7814\u7A76\u5730\u5716\u66AB\u6642\u7121\u6CD5\u5206\u4EAB\u3002",
-  "share.unavailable_empty": "\u9019\u5F35\u5730\u5716\u9084\u6C92\u6709\u8B70\u984C\u53EF\u4EE5\u5206\u4EAB\u3002"
+  "share.unavailable_empty": "\u9019\u5F35\u5730\u5716\u9084\u6C92\u6709\u8B70\u984C\u53EF\u4EE5\u5206\u4EAB\u3002",
+  "share.translate_section": "\u7FFB\u8B6F\u7248\u672C",
+  "share.translate_intro": "\u6A94\u6848\u4E00\u5B9A\u5305\u542B\u539F\u6587\u3002\u52FE\u9078\u8981\u52A0\u5165\u7684\u8A9E\u8A00\uFF1A\u6309\u4E0B\u5132\u5B58\u6309\u9215\u5F8C\u624D\u7531 AI \u7FFB\u8B6F\uFF0C\u5728\u90A3\u4E4B\u524D\u4E0D\u6703\u7FFB\u8B6F\u4EFB\u4F55\u5167\u5BB9\u3002",
+  "share.translate_original_0": "{0}\uFF08\u539F\u6587\uFF09",
+  "share.translate_unverified_0": "{0}\u7FFB\u8B6F\u7684\u54C1\u8CEA\u5C1A\u672A\u7D93\u6BCD\u8A9E\u4EBA\u58EB\u6AA2\u67E5\u3002",
+  "share.translate_model_name": "\u7FFB\u8B6F\u7528\u7684\u6A21\u578B",
+  "share.translate_model_desc": "\u8CA0\u8CAC\u7FFB\u8B6F\u7B46\u8A18\u7684 AI \u6A21\u578B\u3002",
+  "share.translate_button": "\u7FFB\u8B6F\u4E26\u5132\u5B58\u2026",
+  "share.translate_estimate_0_1_2": "\u9810\u4F30\u7D04 {0} \u6B21 AI \u547C\u53EB\u3001\u7D04 {1} \u5206\u9418\uFF08{2}\uFF09\u3002",
+  "share.translate_estimate_cached": "\u52FE\u9078\u7684\u5167\u5BB9\u5728\u9019\u6B21\u4F7F\u7528\u4E2D\u90FD\u5DF2\u7FFB\u8B6F\u904E\uFF0C\u4E0D\u9700\u8981\u65B0\u7684 AI \u547C\u53EB\u3002",
+  "share.translate_progress_0_1_2_3_4": "\u6B63\u5728\u7FFB\u8B6F{0}\uFF1A\u7B2C {1} / {2} \u7A2E\u8A9E\u8A00\uFF0C\u7B2C {3} / {4} \u6279",
+  "share.translate_cancel": "\u53D6\u6D88\u7FFB\u8B6F",
+  "share.translate_stopped": "\u5DF2\u53D6\u6D88\u7FFB\u8B6F\uFF0C\u6C92\u6709\u5132\u5B58\u4EFB\u4F55\u6A94\u6848\u3002\u5DF2\u7FFB\u597D\u7684\u90E8\u5206\u6703\u4FDD\u7559\u5230\u9019\u6B21\u4F7F\u7528\u7D50\u675F\u3002",
+  "share.translate_failed_0": "\u7FFB\u8B6F\u4E2D\u6B62\uFF1A{0}\u6C92\u6709\u5132\u5B58\u4EFB\u4F55\u6A94\u6848\u3002",
+  "share.translate_done": "\u7FFB\u8B6F\u5B8C\u6210\uFF0C\u8ACB\u6309\u300C\u5132\u5B58\u6A94\u6848\u2026\u300D\u9078\u64C7\u5B58\u653E\u4F4D\u7F6E\u3002",
+  "share.translate_results": "\u7FFB\u8B6F\u7D50\u679C",
+  "share.translate_status_complete": "\u5B8C\u6210",
+  "share.translate_status_incomplete_0_1": "\u4E0D\u5B8C\u6574\uFF1A{1} \u6BB5\u4E2D\u6709 {0} \u6BB5\u4FDD\u7559\u539F\u6587",
+  "share.translate_status_failed": "\u5931\u6557\uFF1A\u6C92\u6709\u7FFB\u5230\u4EFB\u4F55\u5167\u5BB9",
+  "share.translate_status_blocked_0": "\u5DF2\u64CB\u4E0B\uFF1A\u8B6F\u6587\u6703\u542B\u6709\u79C1\u4EBA\u8CC7\u8A0A\uFF08{0}\uFF09",
+  "share.translate_result_model_0": "\u6A21\u578B\uFF1A{0}",
+  "share.translate_include_incomplete": "\u4ECD\u7136\u653E\u9032\u6A94\u6848",
+  "share.translate_default_language": "\u9810\u8A2D\u8A9E\u8A00",
+  "share.translate_default_auto": "\u8DDF\u8457\u8B80\u8005\u7684\u700F\u89BD\u5668\u8A9E\u8A00",
+  "share.translate_default_desc": "\u8B80\u8005\u53EF\u4EE5\u5728\u6AA2\u8996\u5668\u88E1\u5207\u63DB\u8A9E\u8A00\u3002",
+  "share.translate_save_file": "\u5132\u5B58\u6A94\u6848\u2026",
+  "share.translate_diagrams_kept_0": "{0} \u5F35\u5716\u8868\u7121\u6CD5\u7FFB\u8B6F\uFF0C\u4FDD\u7559\u539F\u672C\u7684\u6A19\u7C64\u3002",
+  "share.translate_images_note": "\u5716\u7247\u88E1\u7684\u6587\u5B57\u4E0D\u6703\u7FFB\u8B6F\u3002",
+  "share.translate_total_size_0": "\u52A0\u4E0A\u9019\u4E9B\u8A9E\u8A00\u5F8C\u7684\u6A94\u6848\u5927\u5C0F\uFF1A{0}",
+  "share.translate_languages_included_0": "\u6A94\u6848\u5305\u542B\u7684\u8A9E\u8A00\uFF1A{0}"
 };
 
 // i18n/languages.ts
@@ -42512,6 +42608,81 @@ function cleanShareMarkdown(md, ctx) {
   return out;
 }
 
+// experiences/sharing/share-leak-scan.ts
+var INTERNAL_FIELD_NAMES = [
+  "agent-map-references",
+  "source-notes",
+  "relevance-tier",
+  "relevance-reason",
+  "relevance-manual",
+  "relevance-goal",
+  "relevance-level",
+  "relevance-context",
+  "content-language"
+];
+function scanForLeaks(html, forbidden) {
+  const hits = [];
+  for (const { category, value } of forbidden) {
+    if (!value) continue;
+    let from = 0;
+    for (; ; ) {
+      const index = html.indexOf(value, from);
+      if (index < 0) break;
+      hits.push({ category, index });
+      from = index + value.length;
+    }
+  }
+  return hits.sort((a, b) => a.index - b.index);
+}
+function forbiddenStringsFor(vault, map, notes = []) {
+  const list = [];
+  const add = (category, value) => {
+    const text11 = value == null ? void 0 : value.trim();
+    if (text11) list.push({ category, value: text11 });
+  };
+  add("vault-path", vault.vaultPath);
+  add("map-folder", vault.mapFolder);
+  for (const node of map.nodes) add("note-path", node.path);
+  add("wikilink", "[[");
+  add("app-url", "app://");
+  add("obsidian-url", "obsidian://");
+  add("file-url", "file://");
+  for (const name of INTERNAL_FIELD_NAMES) add("internal-field", name);
+  for (const note of notes) add("model-name", note.model);
+  const seen = /* @__PURE__ */ new Set();
+  return list.filter((item) => {
+    const key2 = `${item.category}\0${item.value}`;
+    if (seen.has(key2)) return false;
+    seen.add(key2);
+    return true;
+  });
+}
+function stripHtmlCode(html) {
+  return html.replace(/<(pre|code)(?=[\s>/])[^>]*>[\s\S]*?<\/\1\s*>/gi, " ");
+}
+function scanPayloadForLeaks(payload, forbidden) {
+  const hits = [];
+  const scanText = (text11, codeFree) => {
+    for (const item of forbidden) {
+      const found = scanForLeaks(item.category === "wikilink" ? codeFree : text11, [item]);
+      hits.push(...found);
+    }
+  };
+  const visit = (value, key2) => {
+    if (typeof value === "string") {
+      const codeFree = key2 === "detailHtml" ? stripHtmlCode(value) : value;
+      scanText(value, codeFree);
+    } else if (Array.isArray(value)) for (const item of value) visit(item, key2);
+    else if (value && typeof value === "object")
+      for (const [name, item] of Object.entries(value)) {
+        scanText(name, name);
+        visit(item, name);
+      }
+  };
+  visit(payload, "");
+  return hits;
+}
+
 // experiences/sharing/share-build.ts
 var BuildController = class {
   constructor() {
@@ -42874,81 +43045,6 @@ function renderShareHtml(payload, ui) {
 }
 function renderShareShell(ui) {
   return buildHtml("", ui, "null");
-}
-
-// experiences/sharing/share-leak-scan.ts
-var INTERNAL_FIELD_NAMES = [
-  "agent-map-references",
-  "source-notes",
-  "relevance-tier",
-  "relevance-reason",
-  "relevance-manual",
-  "relevance-goal",
-  "relevance-level",
-  "relevance-context",
-  "content-language"
-];
-function scanForLeaks(html, forbidden) {
-  const hits = [];
-  for (const { category, value } of forbidden) {
-    if (!value) continue;
-    let from = 0;
-    for (; ; ) {
-      const index = html.indexOf(value, from);
-      if (index < 0) break;
-      hits.push({ category, index });
-      from = index + value.length;
-    }
-  }
-  return hits.sort((a, b) => a.index - b.index);
-}
-function forbiddenStringsFor(vault, map, notes = []) {
-  const list = [];
-  const add = (category, value) => {
-    const text11 = value == null ? void 0 : value.trim();
-    if (text11) list.push({ category, value: text11 });
-  };
-  add("vault-path", vault.vaultPath);
-  add("map-folder", vault.mapFolder);
-  for (const node of map.nodes) add("note-path", node.path);
-  add("wikilink", "[[");
-  add("app-url", "app://");
-  add("obsidian-url", "obsidian://");
-  add("file-url", "file://");
-  for (const name of INTERNAL_FIELD_NAMES) add("internal-field", name);
-  for (const note of notes) add("model-name", note.model);
-  const seen = /* @__PURE__ */ new Set();
-  return list.filter((item) => {
-    const key2 = `${item.category}\0${item.value}`;
-    if (seen.has(key2)) return false;
-    seen.add(key2);
-    return true;
-  });
-}
-function stripHtmlCode(html) {
-  return html.replace(/<(pre|code)(?=[\s>/])[^>]*>[\s\S]*?<\/\1\s*>/gi, " ");
-}
-function scanPayloadForLeaks(payload, forbidden) {
-  const hits = [];
-  const scanText = (text11, codeFree) => {
-    for (const item of forbidden) {
-      const found = scanForLeaks(item.category === "wikilink" ? codeFree : text11, [item]);
-      hits.push(...found);
-    }
-  };
-  const visit = (value, key2) => {
-    if (typeof value === "string") {
-      const codeFree = key2 === "detailHtml" ? stripHtmlCode(value) : value;
-      scanText(value, codeFree);
-    } else if (Array.isArray(value)) for (const item of value) visit(item, key2);
-    else if (value && typeof value === "object")
-      for (const [name, item] of Object.entries(value)) {
-        scanText(name, name);
-        visit(item, name);
-      }
-  };
-  visit(payload, "");
-  return hits;
 }
 
 // experiences/sharing/share-viewer-text.ts

@@ -4,7 +4,7 @@ Choose research_more only when one specific evidence gap could materially change
 
 {{plannerCoverageRule}}
 
-Hard floor: {{answeredQuestionCount}} answered question node(s) on this branch path; do not conclude before {{minimumAnswers}}. At the floor, the configured exploration target ({{explorationTarget}}) is a soft depth preference; do not require reaching 10 or add quota filler. Below the floor, ask one meaningful new question about an unknown decision-relevant dimension. {{floorAskRule}} {{userQuestionRule}}
+Hard floor: {{answeredQuestionCount}} answered question node(s) on this branch path; do not conclude before {{minimumAnswers}}. At the floor, the configured exploration target ({{explorationTarget}}) is a soft depth preference; do not require reaching it or add quota filler. Below the floor, ask one meaningful new question about an unknown decision-relevant dimension. {{floorAskRule}} {{userQuestionRule}}
 
 Do not search in this Planner turn. Preserve source-reported claims, inference, conditions, contradictions, and uncertainty. VAM does not independently verify sources.
 

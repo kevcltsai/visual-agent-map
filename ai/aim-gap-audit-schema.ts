@@ -1,11 +1,11 @@
 const aimGapAuditSchema = {
   type: "object",
   properties: {
-    detail: { type: "string", minLength: 1, description: "A short rationale, written before the decision label." },
+    detail: { type: "string", minLength: 1, description: "A short rationale for the classification." },
     summary: {
       type: "string",
       enum: ["user_condition", "external_evidence"],
-      description: "The exact final classification, written after the rationale."
+      description: "The exact classification."
     },
     suggestions: { type: "array", maxItems: 0, items: { type: "string" } },
     visualReferences: { type: "array", maxItems: 0, items: { type: "string" } }

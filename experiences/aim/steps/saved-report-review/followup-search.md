@@ -1,4 +1,4 @@
-Use the built-in web search tool available in this Codex turn directly. This is one bounded Planner-directed follow-up search; no VAM-specific research tool is required. Report search status accurately and preserve source attribution and uncertainty.
+Use the available web search tool directly. This is one bounded Planner-directed follow-up search; no VAM-specific research tool is required. Report search status accurately and preserve source attribution and uncertainty.
 
 {{searcherTargetRule}}
 

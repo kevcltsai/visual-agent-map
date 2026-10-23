@@ -70,7 +70,7 @@ test('research-gap-audit: the two scopes and the review corrections keep their m
   const review = step('decision-quality-review');
   const common = { userQuestionRule: 'RULE', goal: 'G', goalDetail: 'GD', currentQuestion: 'Q', currentAnswer: 'A', conditions: {}, questionHistory: ['q1'], lineage: '', reportSummary: 'RS', reportDetail: 'RD', candidate: { decision: 'research_more' } };
   const below = review.renderBelowFloorReviewTask({ ...common, answeredQuestionCount: 2, minimumAnswers: 3 });
-  assert.ok(below.startsWith(marker('decision-quality-review')) && below.includes('HARD RULE: the current answer path has 2 answered question node(s), minimum for conclusion is 3.') && below.includes('Earlier answers: None.'));
+  assert.ok(below.startsWith(marker('decision-quality-review')) && below.includes('The current answer path has 2 answered question node(s), minimum for conclusion is 3.') && below.includes('Earlier answers: None.'));
   const answered = review.renderAnsweredGoalReviewTask(common);
   assert.ok(answered.includes('single bounded corrective pass; do not search.') && answered.endsWith('Candidate to correct: {"decision":"research_more"}'));
   const userCondition = review.renderUserConditionReviewTask({ userQuestionRule: 'RULE', rationale: 'why', goal: 'G', currentQuestion: 'Q', currentAnswer: 'A', conditions: {}, questionHistory: [], candidateSummary: 'CS', candidateBody: 'CB', candidateGap: { rationale: 'R', target: null } });

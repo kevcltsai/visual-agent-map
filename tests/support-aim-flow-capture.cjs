@@ -61,6 +61,31 @@ function variantOf(context) {
   }
 }
 
+// Live L2 sends §12/§13 to a real provider, so with a custom topic the research target must be a question that topic's
+// traveller would ask and that needs current web facts, in the topic's language; without one the snapshot text stays.
+const SEARCH_TARGETS = {
+  '東京五天自由行怎麼排': {
+    question: '東京五天自由行該買 JR Pass 還是 Tokyo Subway Ticket？', options: ['JR Pass', 'Tokyo Subway Ticket'],
+    gap: { title: 'JR Pass 與 Tokyo Subway Ticket 比較', task: '查詢目前 JR Pass 與 Tokyo Subway Ticket 的官方票價、可搭乘範圍與限制，比較東京五天自由行哪個較划算。', contribution: '釐清兩種票券的現行價格與適用範圍。' },
+    answer: '住新宿，五天主要在東京市區移動，偶爾一日往返箱根或日光。', conditionKey: '行程條件', condition: '五天；住新宿',
+    summary: '已整理東京五天的景點分區，但還缺 JR Pass 與 Tokyo Subway Ticket 的現行票價比較。',
+    detail: '已存內容：東京五天行程可依區域分天安排；JR Pass 與 Tokyo Subway Ticket 的現行票價與適用範圍尚未查證。',
+    continuationQuestion: '五天東京行程怎麼買交通票券？',
+    target: { title: 'JR Pass 與 Tokyo Subway Ticket 現行票價', task: '查詢目前 JR Pass 與 Tokyo Subway Ticket 的官方票價與適用路線，判斷東京五天自由行哪個較划算。', expectedValue: '可據此建議交通票券。' },
+    rationale: '目前 JR Pass 與 Tokyo Subway Ticket 的官方票價可能改變票券建議。', auditReason: '現行票價是外部事實。'
+  },
+  'Plan a 5-day Taipei trip': {
+    question: 'For a 5-day Taipei trip, is a Taipei Metro pass or an EasyCard better?', options: ['Taipei Metro pass', 'EasyCard'],
+    gap: { title: 'Taipei Metro pass vs EasyCard', task: 'Find the current official fares and coverage of the Taipei Metro passes and the EasyCard, and compare which is cheaper for a 5-day Taipei trip.', contribution: 'Settle the current prices and coverage of both options.' },
+    answer: 'Staying near Taipei Main Station, mostly using the metro and buses, with one day trip to Jiufen.', conditionKey: 'Trip constraints', condition: '5 days; staying near Taipei Main Station',
+    summary: 'The saved research covers a 5-day Taipei area plan but needs a current Metro pass vs EasyCard fare comparison.',
+    detail: 'Persisted summary: the 5-day Taipei plan is grouped by area; current Taipei Metro pass and EasyCard fares and coverage are still unverified.',
+    continuationQuestion: 'How should the 5-day Taipei trip pay for transit?',
+    target: { title: 'Taipei Metro pass vs EasyCard fares', task: 'Find the current official fares and coverage of the Taipei Metro passes and the EasyCard to decide which suits a 5-day Taipei trip.', expectedValue: 'Could support a transit ticket recommendation.' },
+    rationale: 'Current official Metro pass and EasyCard fares could change the ticket recommendation.', auditReason: 'Current fares are an external fact.'
+  }
+};
+
 /**
  * `options.topic` / `options.ui` re-run the same flows on a map with another topic (and so content language) and
  * interface language; without options the capture is byte-for-byte what the prompt snapshots use.
@@ -267,24 +292,26 @@ async function captureAimPhaseVariants(options = {}) {
     const { repo, mapPath, question, store } = await support.aimMapFixture();
     let map = await repo.readMap(mapPath);
     const questionNode = map.nodes.find(item => item.id === question.id);
+    const search = SEARCH_TARGETS[options.topic];
+    if (search) { questionNode.title = search.question; await repo.updateNote(questionNode.path, { title: search.question, summary: search.question }); }
     questionNode.aimKind = 'question';
-    questionNode.aimQuestion = { requestId: 'snapshot-saved-report-question', parentBranchId: null, options: [{ id: 'a', label: 'Synthetic A' }, { id: 'b', label: 'Synthetic B' }], allowMultiple: false, allowFreeText: true };
+    questionNode.aimQuestion = { requestId: 'snapshot-saved-report-question', parentBranchId: null, options: [{ id: 'a', label: search?.options[0] ?? 'Synthetic A' }, { id: 'b', label: search?.options[1] ?? 'Synthetic B' }], allowMultiple: false, allowFreeText: true };
     await repo.saveMap(mapPath, map);
-    const branch = await store.createAnswerBranch(mapPath, { requestId: 'snapshot-saved-report-branch', questionNodeId: question.id, parentBranchId: null, answerSnapshot: { selections: [], freeText: 'Synthetic scenario only.' }, inputSnapshot: { topic: 'Synthetic topic', conditions: { provenance: 'synthetic fixture' }, upstreamResults: [] } });
+    const branch = await store.createAnswerBranch(mapPath, { requestId: 'snapshot-saved-report-branch', questionNodeId: question.id, parentBranchId: null, answerSnapshot: { selections: [], freeText: search?.answer ?? 'Synthetic scenario only.' }, inputSnapshot: { topic: options.topic ?? 'Synthetic topic', conditions: { provenance: 'synthetic fixture' }, upstreamResults: [] } });
     const handle = await store.startAttempt(mapPath, branch.id, 'snapshot-saved-report-run', { model: MODEL, reasoning: 'low', maxResearchTurns: 2 });
     await store.recordResearchTurn(mapPath, handle);
     const draft = (await store.createResultDraft(mapPath, handle, 'Synthetic saved report', MODEL, 'low')).draft;
     await store.updateResultDraftReport(mapPath, handle, draft.id, 'Report 1: Synthetic report summary.', '## Searcher report 1\n\nResearch status: search completed\n\n### Findings\nPersisted report content; synthetic contract fixture only.');
     await store.recordSearchDiagnostic(mapPath, handle, { researchTurn: 1, startedEvents: 1, completedEvents: 1, completedSearchActions: 1, otherCompletedActions: 0 });
     await store.failAttempt(mapPath, handle, 'Synthetic contract fixture: Planner response was invalid.');
-    const gap = { title: 'Option comparison', task: 'Find one published comparison of the two options.', contribution: 'Reduce uncertainty about the trade-off.' };
+    const gap = search?.gap ?? { title: 'Option comparison', task: 'Find one published comparison of the two options.', contribution: 'Reduce uncertainty about the trade-off.' };
     let reviews = 0;
     const flow = new AimManualFlow(repo, store, async context => {
       note(context);
-      if (aimPhase(context, 'research-gap-audit')) return support.researchGapAudit('external_evidence', 'A published comparison is an external fact.');
+      if (aimPhase(context, 'research-gap-audit')) return support.researchGapAudit('external_evidence', search?.auditReason ?? 'A published comparison is an external fact.');
       if (context.researchMode === 'research') return answer('Comparison found.', 'Research status: search completed\nPublished comparison with limits.');
       reviews++;
-      if (reviews === 1) return plannerReview('research_more', { rationale: 'One published comparison could change the answer.' }, 'The saved report supports a conditional answer.', 'Keep the saved report.', [gap]);
+      if (reviews === 1) return plannerReview('research_more', { rationale: search?.rationale ?? 'One published comparison could change the answer.' }, 'The saved report supports a conditional answer.', 'Keep the saved report.', [gap]);
       return plannerReview('ask_user', { rationale: 'The remaining preference changes the result.', question: 'Which option should the result prioritize?' }, 'Conditional answer.', 'Keep both reports.', ['Option A', 'Option B']);
     });
     await flow.reviewFailedAttemptReport(mapPath, 'snapshot-saved-report-run', draft.notePath);
@@ -295,21 +322,22 @@ async function captureAimPhaseVariants(options = {}) {
   // review and no stop reason, so the search is sent without a target (the Planner's unresolved-gap fallback text).
   for (const withTarget of [true, false]) {
     const { repo } = support.fixture(ui);
+    const search = SEARCH_TARGETS[options.topic];
     const created = await createAimMap(repo, MODEL, { requestId: 'snapshot-continuation-map', topic: options.topic ?? 'Synthetic roast chicken', context: 'Synthetic regression only.' });
     const store = new AimRunStore(repo);
-    const planned = await new AimManualFlow(repo, store, async () => answer('What serving time?', 'Synthetic question.', [{ title: 'Evening' }, { title: 'Lunch' }])).planNextQuestion(created.mapPath, created.root.id, MODEL, 'low', 'snapshot-continuation-question');
-    const branch = await store.createAnswerBranch(created.mapPath, { requestId: 'snapshot-continuation-answer', questionNodeId: planned.node.id, parentBranchId: null, answerSnapshot: { selections: [], freeText: 'Synthetic constraints only.' }, inputSnapshot: { topic: options.topic ?? 'Synthetic roast chicken', conditions: { 'Serving time': 'evening; synthetic' }, upstreamResults: [] } });
+    const planned = await new AimManualFlow(repo, store, async () => answer(search?.continuationQuestion ?? 'What serving time?', 'Synthetic question.', [{ title: 'Evening' }, { title: 'Lunch' }])).planNextQuestion(created.mapPath, created.root.id, MODEL, 'low', 'snapshot-continuation-question');
+    const branch = await store.createAnswerBranch(created.mapPath, { requestId: 'snapshot-continuation-answer', questionNodeId: planned.node.id, parentBranchId: null, answerSnapshot: { selections: [], freeText: search?.answer ?? 'Synthetic constraints only.' }, inputSnapshot: { topic: options.topic ?? 'Synthetic roast chicken', conditions: { [search?.conditionKey ?? 'Serving time']: search?.condition ?? 'evening; synthetic' }, upstreamResults: [] } });
     const original = await store.startAttempt(created.mapPath, branch.id, 'snapshot-continuation-run', { model: MODEL, reasoning: 'low', maxResearchTurns: 2 });
     await store.recordResearchTurn(created.mapPath, original);
     const seedDraft = (await store.createResultDraft(created.mapPath, original, 'Earlier partial report', MODEL, 'low', { kind: 'synthesis' })).draft;
-    const seedSummary = 'The saved research covers seasoning but needs a cooking-time source.';
-    const seedDetail = 'Persisted summary: research supports seasoning options; a published cooking-time source is still missing.';
+    const seedSummary = search?.summary ?? 'The saved research covers seasoning but needs a cooking-time source.';
+    const seedDetail = search?.detail ?? 'Persisted summary: research supports seasoning options; a published cooking-time source is still missing.';
     await store.updateResultDraftReport(created.mapPath, original, seedDraft.id, seedSummary, seedDetail);
-    if (withTarget) await store.recordPlannerReview(created.mapPath, original, { decision: 'research_more', rationale: 'A published cooking-time source could materially improve the estimate.', researchTurn: 1, researchTarget: { title: 'Cooking time source', task: 'Find a published cooking time for this setup.', expectedValue: 'Could improve the estimate.' } }, 'The saved research lacks a cooking-time source.');
+    if (withTarget) await store.recordPlannerReview(created.mapPath, original, { decision: 'research_more', rationale: search?.rationale ?? 'A published cooking-time source could materially improve the estimate.', researchTurn: 1, researchTarget: search?.target ?? { title: 'Cooking time source', task: 'Find a published cooking time for this setup.', expectedValue: 'Could improve the estimate.' } }, 'The saved research lacks a cooking-time source.');
     await store.commitResult(created.mapPath, original, seedDraft.id, { summary: seedSummary, detail: seedDetail }, 'partial');
     const continuation = new AimManualFlow(repo, store, async context => {
       note(context);
-      if (aimPhase(context, 'research-gap-audit')) return support.researchGapAudit('external_evidence', 'A published cooking time is an external fact.');
+      if (aimPhase(context, 'research-gap-audit')) return support.researchGapAudit('external_evidence', search?.auditReason ?? 'A published cooking time is an external fact.');
       if (context.researchMode === 'research') return answer('Cooking time found.', 'Research status: search completed\nPublished cooking time with limits.');
       return plannerReview('ask_user', { rationale: 'The remaining serving preference changes the result.', question: 'How hands-on do you want the instructions?' }, 'Conditional answer.', 'Keep the saved evidence.', ['Step-by-step', 'Brief overview']);
     });

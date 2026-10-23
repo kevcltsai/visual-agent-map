@@ -5,11 +5,13 @@ import type { ShareNodePayload, SharePayload } from "../share-format";
 import { SHARE_VIEWER_UI_DEFAULT, type ShareViewerUi } from "../share-viewer-ui";
 import { fillDetail } from "./detail";
 import { edgePathData } from "./edge-path";
+import { pickShareLanguage } from "./language";
 
 /** Where "Install VAM" points. The only link the viewer itself carries. */
 export const INSTALL_URL = "https://github.com/kevcltsai/visual-agent-map?ref=share";
 const SVG_NS = "http://www.w3.org/2000/svg";
 const PANEL_WIDTH_KEY = "vam-share-panel-width";
+const LANGUAGE_KEY = "vam-share-language";
 const PANEL_DEFAULT = 300;
 const PANEL_MIN = 240;
 const ZOOM_MIN = 0.25;
@@ -48,14 +50,33 @@ function readJson(doc: Document, id: string): unknown {
 }
 
 /** Files edited by hand may miss strings; fall back to English per field. */
-function readUi(doc: Document): ShareViewerUi {
-  const raw = readJson(doc, "vam-ui") as Partial<Record<keyof ShareViewerUi, unknown>> | undefined;
+function uiFrom(raw: unknown): ShareViewerUi {
   const ui: ShareViewerUi = { ...SHARE_VIEWER_UI_DEFAULT };
   if (raw && typeof raw === "object")
-    for (const key of Object.keys(ui) as (keyof ShareViewerUi)[])
-      if (typeof raw[key] === "string") (ui as unknown as Record<string, string>)[key] = raw[key];
+    for (const key of Object.keys(ui) as (keyof ShareViewerUi)[]) {
+      const value = (raw as Record<string, unknown>)[key];
+      if (typeof value === "string") (ui as unknown as Record<string, string>)[key] = value;
+    }
   return ui;
 }
+
+/** The interface text per language and the language names of a translated file (absent in a plain one). */
+function readUiExtras(doc: Document): { sets: Map<string, ShareViewerUi>; names: Record<string, string> } {
+  const raw = readJson(doc, "vam-ui") as
+    { uiByLanguage?: Record<string, unknown>; languageNames?: Record<string, unknown> } | undefined;
+  const sets = new Map<string, ShareViewerUi>();
+  const names: Record<string, string> = {};
+  if (raw && typeof raw === "object") {
+    if (raw.uiByLanguage && typeof raw.uiByLanguage === "object")
+      for (const [language, value] of Object.entries(raw.uiByLanguage)) sets.set(language, uiFrom(value));
+    if (raw.languageNames && typeof raw.languageNames === "object")
+      for (const [language, value] of Object.entries(raw.languageNames))
+        if (typeof value === "string" && value) names[language] = value;
+  }
+  return { sets, names };
+}
+
+const isText = (value: unknown): value is string => typeof value === "string" && value.trim() !== "";
 
 function storageGet(key: string): string | null {
   try {
@@ -73,7 +94,8 @@ function storageSet(key: string, value: string): void {
 }
 
 export function startViewer(doc: Document): void {
-  const ui = readUi(doc);
+  const baseUi = uiFrom(readJson(doc, "vam-ui"));
+  let ui = baseUi;
   doc.documentElement.lang = ui.lang;
   const app = doc.getElementById("vam-app");
   const data = readJson(doc, "vam-map") as SharePayload | undefined;
@@ -102,6 +124,64 @@ export function startViewer(doc: Document): void {
     if (node.parentId && (!byId.has(node.parentId) || node.parentId === node.id)) node.parentId = null;
   const kidsOf = new Map<string, MapNode[]>();
   for (const node of nodes) if (node.parentId) kidsOf.set(node.parentId, [...(kidsOf.get(node.parentId) ?? []), node]);
+
+  // ---- language: a translated file lists its languages (the original first); a plain file has one and no menu.
+  const extras = readUiExtras(doc);
+  const languages = Array.isArray(data.languages) ? Array.from(new Set(data.languages.filter(isText))) : [];
+  const multilingual = languages.length >= 2;
+  const original = multilingual ? languages[0] : "";
+  let language = original;
+  if (multilingual) {
+    let browser: string[] = [];
+    try {
+      browser = Array.from(window.navigator.languages ?? [window.navigator.language]).filter(isText);
+    } catch {
+      /* no navigator language: the original is shown */
+    }
+    language = pickShareLanguage({
+      languages,
+      stored: storageGet(LANGUAGE_KEY),
+      defaultLanguage: isText(data.defaultLanguage) ? data.defaultLanguage : undefined,
+      browser
+    });
+  }
+  const uiOf = (code: string): ShareViewerUi => extras.sets.get(code) ?? baseUi;
+  const isTranslated = (): boolean => multilingual && language !== original;
+  if (multilingual) {
+    ui = uiOf(language);
+    doc.documentElement.lang = language;
+  }
+  type Shown = Pick<ShareNodePayload, "title" | "summary" | "reason" | "detailHtml">;
+  /** A note's text in the language on screen; a field the translation lacks shows the original. */
+  const textOf = (item: ShareNodePayload): Shown => {
+    const translation = isTranslated() ? item.translations?.[language] : undefined;
+    if (!translation || typeof translation !== "object") return item;
+    return {
+      title: isText(translation.title) ? translation.title : item.title,
+      summary: isText(translation.summary) ? translation.summary : item.summary,
+      reason: isText(translation.reason) ? translation.reason : item.reason,
+      detailHtml: isText(translation.detailHtml) ? translation.detailHtml : item.detailHtml
+    };
+  };
+  const mapTextNow = (): { title: string; goal: string } => {
+    const translation = isTranslated() ? data.translations?.[language] : undefined;
+    const rawTitle = isText(translation?.title) ? translation.title : data.title;
+    const rawGoal = isText(translation?.goal) ? translation.goal : data.goal;
+    return {
+      title: (typeof rawTitle === "string" && rawTitle.trim()) || ui.untitledMap,
+      goal: typeof rawGoal === "string" ? rawGoal.trim() : ""
+    };
+  };
+  /** A language's name for the menu; the platform's name in the interface language when the file gave none. */
+  const nameOf = (code: string, inLanguage?: string): string => {
+    try {
+      const display = new Intl.DisplayNames([inLanguage ?? code], { type: "language" }).of(code);
+      if (display && display !== code) return display;
+    } catch {
+      /* no Intl.DisplayNames */
+    }
+    return extras.names[code] ?? code;
+  };
 
   // ---- theme: styles.css dark rules key off `.theme-dark`, which Obsidian sets; here it follows the browser.
   try {
@@ -180,24 +260,36 @@ export function startViewer(doc: Document): void {
   };
 
   // ---- page skeleton
-  const title = (typeof data.title === "string" && data.title.trim()) || ui.untitledMap;
-  doc.title = title;
   app.className = "vam-app";
   const toolbar = make("div", "vam-toolbar");
-  toolbar.append(make("h1", "vam-map-switcher", title), make("span", "vam-shared", ui.readOnly));
+  const mapHeading = make("h1", "vam-map-switcher");
+  const sharedLabel = make("span", "vam-shared");
+  toolbar.append(mapHeading, sharedLabel);
   const actions = make("div", "vam-toolbar-actions");
-  actions.append(make("span", "vam-made-with", ui.madeWithVam));
-  const install = make("a", "vam-install", ui.install);
+  const languageSelect = make("select", "vam-language");
+  if (multilingual) {
+    for (const code of languages) {
+      const option = make("option", undefined, extras.names[code] ?? nameOf(code));
+      option.value = code;
+      languageSelect.append(option);
+    }
+    languageSelect.value = language;
+    actions.append(languageSelect);
+  }
+  const madeWith = make("span", "vam-made-with");
+  const install = make("a", "vam-install");
   install.href = INSTALL_URL;
   install.target = "_blank";
   install.rel = "noopener noreferrer";
-  actions.append(install);
+  actions.append(madeWith, install);
   toolbar.append(actions);
+  // Shown while a translated version is open: who translated it, and that pictures keep their text.
+  const translateNote = make("div", "vam-translate-note");
+  translateNote.hidden = true;
   const workspace = make("div", "vam-workspace");
   const viewport = make("div", "vam-viewport");
   const stage = make("div", "vam-stage");
   stage.setAttribute("role", "tree");
-  stage.setAttribute("aria-label", title);
   const edges = doc.createElementNS(SVG_NS, "svg");
   edges.setAttribute("class", "vam-edges");
   edges.setAttribute("aria-hidden", "true");
@@ -205,16 +297,12 @@ export function startViewer(doc: Document): void {
   viewport.append(stage);
   const overlay = make("div", "vam-canvas-overlay");
   const tools = make("div", "vam-map-tools");
-  const goalText = typeof data.goal === "string" ? data.goal.trim() : "";
-  if (goalText) {
-    const goal = make("span", "vam-goal");
-    goal.append(icon("target"), make("span", "vam-goal-text", fill(ui.goal, goalText)));
-    goal.title = goalText;
-    tools.append(goal);
-  } else tools.hidden = true;
-  const hint = make("span", "vam-canvas-hint", ui.hint);
+  const goal = make("span", "vam-goal");
+  const goalLabel = make("span", "vam-goal-text");
+  goal.append(icon("target"), goalLabel);
+  const hint = make("span", "vam-canvas-hint");
   const zoomBar = make("div", "vam-zoom-controls");
-  iconButton(zoomBar, "minus", ui.zoomOut, () => zoomBy(1 / 1.2));
+  const zoomOutButton = iconButton(zoomBar, "minus", "", () => zoomBy(1 / 1.2));
   const zoomLabel = make("button", "vam-zoom", "100%");
   zoomLabel.type = "button";
   zoomLabel.addEventListener("click", event => {
@@ -222,9 +310,9 @@ export function startViewer(doc: Document): void {
     zoomBy(1 / view.zoom);
   });
   zoomBar.append(zoomLabel);
-  iconButton(zoomBar, "plus", ui.zoomIn, () => zoomBy(1.2));
-  iconButton(zoomBar, "max", ui.showAll, () => fit());
-  const layoutButton = make("button", "vam-layout-button", ui.layout);
+  const zoomInButton = iconButton(zoomBar, "plus", "", () => zoomBy(1.2));
+  const showAllButton = iconButton(zoomBar, "max", "", () => fit());
+  const layoutButton = make("button", "vam-layout-button");
   layoutButton.type = "button";
   layoutButton.setAttribute("aria-haspopup", "menu");
   layoutButton.setAttribute("aria-expanded", "false");
@@ -236,9 +324,8 @@ export function startViewer(doc: Document): void {
   overlay.append(tools, hint, zoomBar);
   const inspector = make("aside", "vam-inspector");
   inspector.hidden = true;
-  inspector.setAttribute("aria-label", ui.topicDetails);
   workspace.append(viewport, overlay, inspector);
-  app.replaceChildren(toolbar, workspace);
+  app.replaceChildren(...(multilingual ? [toolbar, translateNote, workspace] : [toolbar, workspace]));
 
   // ---- state
   let view: MapViewport = { x: 0, y: 0, zoom: 1 };
@@ -360,6 +447,7 @@ export function startViewer(doc: Document): void {
     for (const node of nodes) {
       if (hidden.has(node.id)) continue;
       const item = info.get(node.id)!;
+      const shown = textOf(item);
       const count = descendants(nodes, node.id).size;
       const tier = isTier(item.tier) ? item.tier : undefined;
       const card = make("div", `vam-node${node.id === selected ? " is-selected" : ""}`);
@@ -370,12 +458,12 @@ export function startViewer(doc: Document): void {
       card.setAttribute("role", "treeitem");
       card.setAttribute("aria-level", String(depthOf(node) + 1));
       card.setAttribute("aria-selected", String(node.id === selected));
-      card.setAttribute("aria-label", String(item.title ?? ""));
+      card.setAttribute("aria-label", String(shown.title ?? ""));
       if (count) card.setAttribute("aria-expanded", String(!node.collapsed));
       const header = make("div", "vam-node-header");
       card.append(header);
       if (item.status !== "completed") header.append(make("span", "vam-status vam-status-idea", ui.toResearch));
-      if (tier) header.append(tierTag(tier, typeof item.reason === "string" ? item.reason : undefined));
+      if (tier) header.append(tierTag(tier, typeof shown.reason === "string" ? shown.reason : undefined));
       const cardTools = make("div", "vam-node-tools");
       card.append(cardTools);
       if (count) {
@@ -391,9 +479,9 @@ export function startViewer(doc: Document): void {
         toggle.setAttribute("aria-expanded", String(!node.collapsed));
       }
       button(cardTools, ui.detailsButton, undefined, () => select(node.id));
-      card.append(make("h3", "vam-card-title", String(item.title ?? "")));
-      if (typeof item.summary === "string" && item.summary.trim())
-        card.append(make("p", "vam-card-summary", item.summary));
+      card.append(make("h3", "vam-card-title", String(shown.title ?? "")));
+      if (typeof shown.summary === "string" && shown.summary.trim())
+        card.append(make("p", "vam-card-summary", shown.summary));
       card.addEventListener("click", () => {
         if (!suppressClick) select(node.id);
       });
@@ -543,8 +631,9 @@ export function startViewer(doc: Document): void {
   }
   function select(id: string): void {
     const node = byId.get(id);
-    const item = info.get(id);
-    if (!node || !item) return;
+    const source = info.get(id);
+    if (!node || !source) return;
+    const item = { ...source, ...textOf(source) };
     selected = id;
     for (const [key, card] of cards) {
       card.classList.toggle("is-selected", key === id);
@@ -576,7 +665,7 @@ export function startViewer(doc: Document): void {
       const list = make("div", "vam-subtopics");
       list.append(make("strong", undefined, ui.subtopics));
       for (const kid of kids)
-        button(list, String(info.get(kid.id)?.title ?? ""), undefined, () => {
+        button(list, String(textOf(info.get(kid.id)!).title ?? ""), undefined, () => {
           if (node.collapsed) {
             node.collapsed = false;
             relayout(node.id);
@@ -598,39 +687,42 @@ export function startViewer(doc: Document): void {
     relayout();
     fit();
   };
-  const menuItems: ({ label: string; run: () => void } | null)[] = [
-    { label: ui.collapseAll, run: () => collapseTo(0) },
-    { label: ui.expandAll, run: () => collapseTo(null) },
-    ...[1, 2, 3].map(level => ({ label: fill(ui.expandToLevel, level), run: () => collapseTo(level) })),
-    null,
-    {
-      label: ui.autoLayout,
-      run: () => {
-        layout();
-        drawEdges();
-      }
-    }
-  ];
   const closeMenu = (restoreFocus: boolean): void => {
     if (menu.hidden) return;
     menu.hidden = true;
     layoutButton.setAttribute("aria-expanded", "false");
     if (restoreFocus) layoutButton.focus();
   };
-  for (const entry of menuItems) {
-    if (!entry) {
-      menu.append(make("hr"));
-      continue;
+  function buildMenu(): void {
+    menu.replaceChildren();
+    const menuItems: ({ label: string; run: () => void } | null)[] = [
+      { label: ui.collapseAll, run: () => collapseTo(0) },
+      { label: ui.expandAll, run: () => collapseTo(null) },
+      ...[1, 2, 3].map(level => ({ label: fill(ui.expandToLevel, level), run: () => collapseTo(level) })),
+      null,
+      {
+        label: ui.autoLayout,
+        run: () => {
+          layout();
+          drawEdges();
+        }
+      }
+    ];
+    for (const entry of menuItems) {
+      if (!entry) {
+        menu.append(make("hr"));
+        continue;
+      }
+      const item = make("button", undefined, entry.label);
+      item.type = "button";
+      item.setAttribute("role", "menuitem");
+      item.addEventListener("click", event => {
+        event.stopPropagation();
+        closeMenu(true);
+        entry.run();
+      });
+      menu.append(item);
     }
-    const item = make("button", undefined, entry.label);
-    item.type = "button";
-    item.setAttribute("role", "menuitem");
-    item.addEventListener("click", event => {
-      event.stopPropagation();
-      closeMenu(true);
-      entry.run();
-    });
-    menu.append(item);
   }
   const menuButtons = (): HTMLButtonElement[] => Array.from(menu.querySelectorAll("button"));
   layoutButton.addEventListener("click", event => {
@@ -663,6 +755,64 @@ export function startViewer(doc: Document): void {
       card?.focus({ preventScroll: true });
     }
   });
+
+  // ---- text in the language on screen
+  /** Sets every piece of text the reader sees from `ui` and the language on screen; run at start and on each switch. */
+  function applyText(): void {
+    const mapText = mapTextNow();
+    doc.title = mapText.title;
+    mapHeading.textContent = mapText.title;
+    stage.setAttribute("aria-label", mapText.title);
+    sharedLabel.textContent = ui.readOnly;
+    madeWith.textContent = ui.madeWithVam;
+    install.textContent = ui.install;
+    languageSelect.setAttribute("aria-label", ui.language);
+    languageSelect.title = ui.language;
+    if (mapText.goal) {
+      goalLabel.textContent = fill(ui.goal, mapText.goal);
+      goal.title = mapText.goal;
+      if (!goal.parentElement) tools.append(goal);
+      tools.hidden = false;
+    } else {
+      goal.remove();
+      tools.hidden = true;
+    }
+    hint.textContent = ui.hint;
+    const setLabel = (item: HTMLElement, label: string): void => {
+      item.setAttribute("aria-label", label);
+      item.title = label;
+    };
+    setLabel(zoomOutButton, ui.zoomOut);
+    setLabel(zoomInButton, ui.zoomIn);
+    setLabel(showAllButton, ui.showAll);
+    layoutButton.textContent = ui.layout;
+    inspector.setAttribute("aria-label", ui.topicDetails);
+    resizer.setAttribute("aria-label", ui.resizePanel);
+    buildMenu();
+    if (isTranslated()) {
+      translateNote.textContent = `${fill(ui.aiTranslated, nameOf(original, language))} ${ui.imageTextUntranslated}`;
+      translateNote.hidden = false;
+    } else translateNote.hidden = true;
+    transform();
+  }
+  /** Switches the whole page to `code`: cards, side panel, goal, title, interface text and `<html lang>`. */
+  function switchLanguage(code: string): void {
+    if (code === language || !languages.includes(code)) return;
+    language = code;
+    ui = uiOf(code);
+    storageSet(LANGUAGE_KEY, code);
+    doc.documentElement.lang = code;
+    const scroll = inspector.scrollTop;
+    applyText();
+    renderCards();
+    drawEdges();
+    if (selected !== null && byId.has(selected)) {
+      select(selected);
+      inspector.scrollTop = scroll;
+    }
+    scheduleEdges();
+  }
+  languageSelect.addEventListener("change", () => switchLanguage(languageSelect.value));
 
   // ---- pan, pinch and wheel
   const pointers = new Map<number, { x: number; y: number }>();
@@ -737,6 +887,7 @@ export function startViewer(doc: Document): void {
     }).observe(viewport);
 
   // ---- first view: every root and its first level, zoomed to show all
+  applyText();
   applyCollapseLevel(nodes, 1);
   renderCards();
   layout();

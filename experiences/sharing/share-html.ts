@@ -1,5 +1,6 @@
 import { serializeShareJson, type SharePayload } from "./share-format";
 import type { ShareViewerUi } from "./share-viewer-ui";
+import { shareViewerUiExtras } from "./share-viewer-text";
 import { SHARE_VIEWER_CSS, SHARE_VIEWER_JS } from "./viewer-bundle.generated";
 
 /**
@@ -18,10 +19,25 @@ const jsonForScript = (value: unknown): string =>
     .replace(/\u2028/g, "\\u2028")
     .replace(/\u2029/g, "\\u2029");
 
-function buildHtml(title: string, ui: ShareViewerUi, mapJson: string): string {
+/**
+ * A file with translations carries the interface text of each of its languages inside the same `vam-ui` block (a file
+ * without them is unchanged, byte for byte).
+ */
+function uiBlockFor(ui: ShareViewerUi, languages: readonly string[] | undefined): Record<string, unknown> {
+  return languages && languages.length >= 2 ? { ...ui, ...shareViewerUiExtras(languages) } : { ...ui };
+}
+
+function buildHtml(
+  title: string,
+  ui: ShareViewerUi,
+  mapJson: string,
+  languages?: readonly string[],
+  contentLanguage?: string
+): string {
   return [
     "<!doctype html>",
-    `<html lang="${escapeText(ui.lang)}">`,
+    // The page language is the language of the content (the viewer updates it when the reader switches).
+    `<html lang="${escapeText(contentLanguage || ui.lang)}">`,
     "<head>",
     '<meta charset="utf-8">',
     '<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">',
@@ -32,7 +48,7 @@ function buildHtml(title: string, ui: ShareViewerUi, mapJson: string): string {
     "</head>",
     "<body>",
     '<div id="vam-app"></div>',
-    `<script type="application/json" id="vam-ui">${jsonForScript(ui)}</script>`,
+    `<script type="application/json" id="vam-ui">${jsonForScript(uiBlockFor(ui, languages))}</script>`,
     `<script type="application/json" id="vam-map">${mapJson}</script>`,
     `<script>${SHARE_VIEWER_JS}</script>`,
     "</body>",
@@ -46,15 +62,16 @@ function buildHtml(title: string, ui: ShareViewerUi, mapJson: string): string {
  * Pure: no Obsidian, no I/O. `ui` is the viewer's interface text in the exporter's language (see shareViewerUiFor).
  */
 export function renderShareHtml(payload: SharePayload, ui: ShareViewerUi): string {
-  return buildHtml(payload.title, ui, serializeShareJson(payload));
+  const languages = Array.isArray(payload.languages) ? payload.languages : undefined;
+  return buildHtml(payload.title, ui, serializeShareJson(payload), languages, payload.contentLanguage);
 }
 
 /**
- * Everything in the file except the map payload (page, viewer script and style, interface text). The leak gate scans
+ * Everything in the file except the map payload (page, viewer script and style, interface text). Pass `languages` for a translated file so the extra interface text is scanned too. The leak gate scans
  * this whole text; the payload is scanned field by field with scanPayloadForLeaks.
  */
-export function renderShareShell(ui: ShareViewerUi): string {
-  return buildHtml("", ui, "null");
+export function renderShareShell(ui: ShareViewerUi, languages?: readonly string[]): string {
+  return buildHtml("", ui, "null", languages, languages?.[0]);
 }
 
 /** Reads the payload back out of a share file (the same single block VAM import will read). */

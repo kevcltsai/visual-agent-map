@@ -1,6 +1,8 @@
 import { translate } from "../../i18n";
-import type { ShareViewerUi } from "./share-viewer-ui";
+import type { ShareViewerUi, ShareViewerUiExtras } from "./share-viewer-ui";
 import type { ShareLanguage } from "./share-format";
+import { SHARE_VIEWER_UI_EXTRA, type ShareExtraUiLanguage } from "./share-viewer-dictionaries";
+import { LANGUAGES, OUTPUT_LANGUAGES } from "../../i18n/languages";
 
 /** The viewer's interface text in `language` (the exporter's interface language), from the plugin dictionaries. */
 export function shareViewerUiFor(language: ShareLanguage): ShareViewerUi {
@@ -36,6 +38,46 @@ export function shareViewerUiFor(language: ShareLanguage): ShareViewerUi {
     imageOmitted: text("share.viewer_image_omitted"),
     imageSource: text("share.viewer_image_source_0"),
     resizePanel: text("share.viewer_resize_panel"),
-    untitledMap: text("share.viewer_untitled")
+    untitledMap: text("share.viewer_untitled"),
+    language: text("share.viewer_language"),
+    aiTranslated: text("share.viewer_ai_translated_0"),
+    imageTextUntranslated: text("share.viewer_image_text_untranslated")
   };
+}
+
+// Which dictionary a language has comes from the registry and the dictionary table, not from ids written here.
+const PLUGIN_LANGUAGE_IDS: readonly string[] = LANGUAGES.map(item => item.id);
+const EXTRA_LANGUAGE_IDS: readonly string[] = Object.keys(SHARE_VIEWER_UI_EXTRA);
+const isPluginLanguage = (value: string): value is ShareLanguage => PLUGIN_LANGUAGE_IDS.includes(value);
+const isExtraLanguage = (value: string): value is ShareExtraUiLanguage => EXTRA_LANGUAGE_IDS.includes(value);
+
+/** A language's own name: the table first, then the platform's, then the tag itself. */
+function nativeNameOf(language: string): string {
+  const known = [...LANGUAGES, ...OUTPUT_LANGUAGES].find(item => item.id === language);
+  if (known) return known.label;
+  try {
+    const display: string | undefined = new Intl.DisplayNames([language], { type: "language" }).of(language);
+    return display ?? language;
+  } catch {
+    return language;
+  }
+}
+
+/**
+ * The viewer text of every language a translated file carries (zh-TW, zh-CN and en from the plugin dictionaries, ja, ko
+ * and es from share-viewer-dictionaries.ts, anything else shows English) and each language's own name, so the viewer
+ * switches the whole page without a dictionary of its own.
+ */
+export function shareViewerUiExtras(languages: readonly string[]): ShareViewerUiExtras {
+  const uiByLanguage: Record<string, ShareViewerUi> = {};
+  const languageNames: Record<string, string> = {};
+  for (const language of languages) {
+    uiByLanguage[language] = isPluginLanguage(language)
+      ? shareViewerUiFor(language)
+      : isExtraLanguage(language)
+        ? { ...SHARE_VIEWER_UI_EXTRA[language] }
+        : { ...shareViewerUiFor("en"), lang: language };
+    languageNames[language] = nativeNameOf(language);
+  }
+  return { uiByLanguage, languageNames };
 }

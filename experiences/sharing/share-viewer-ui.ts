@@ -4,8 +4,8 @@
  * No imports: the viewer bundle shares this type.
  */
 export interface ShareViewerUi {
-  /** BCP 47 tag for `<html lang>`. */
-  lang: "en" | "zh-TW" | "zh-CN";
+  /** BCP 47 tag of this text (the file's own page language follows the content language, see the viewer). */
+  lang: string;
   readOnly: string;
   madeWithVam: string;
   install: string;
@@ -42,6 +42,21 @@ export interface ShareViewerUi {
   imageSource: string;
   resizePanel: string;
   untitledMap: string;
+  /** Label of the language menu in the toolbar. */
+  language: string;
+  /** `{0}` is the name of the original language. Shown while a translated version is open. */
+  aiTranslated: string;
+  /** Shown beside the AI notice: pictures keep their original text. */
+  imageTextUntranslated: string;
+}
+
+/**
+ * What a translated file adds next to the plain interface text (inside the same `vam-ui` block, so a file without
+ * translations is unchanged): the interface text per language of the file, and each language's own name.
+ */
+export interface ShareViewerUiExtras {
+  uiByLanguage?: Record<string, ShareViewerUi>;
+  languageNames?: Record<string, string>;
 }
 
 /** English text, the fallback when a field is missing or not a string in a hand-edited file (a test keeps it equal to the en dictionary). */
@@ -76,5 +91,8 @@ export const SHARE_VIEWER_UI_DEFAULT: Readonly<ShareViewerUi> = {
   imageOmitted: "[image not included]",
   imageSource: "Source: {0}",
   resizePanel: "Resize the side panel",
-  untitledMap: "Untitled map"
+  untitledMap: "Untitled map",
+  language: "Language",
+  aiTranslated: "Translated by AI from {0}",
+  imageTextUntranslated: "Text inside images is not translated."
 };

@@ -78,20 +78,28 @@ const errorMessage = (error: unknown): string => {
 
 /**
  * The language the shared text is written in. A map with a language of its own says it. The "same as the input" row is
- * not a language, so the map's own words decide (title, goal, then topic titles and summaries, the first that has a
- * recognisable script or plain English); when nothing decides, the original is {@link SHARE_UNKNOWN_LANGUAGE}: it
- * takes none of the six boxes, so all six can be added and the viewer names no wrong source language.
+ * not a language, so the map's own words decide, in this order and with no later step overriding an earlier one:
+ * 1. the map title, then the goal: the first of them that has any letter decides. A script or plain English names the
+ *    language; Latin text nothing recognises (German, French...) is unknown, and a note never overrules it;
+ * 2. only when neither has a letter, the topic titles and summaries: they must all agree on one language, otherwise
+ *    (any unrecognised text, or two different languages) it is unknown.
+ * Unknown is {@link SHARE_UNKNOWN_LANGUAGE}: it takes none of the six boxes, so all six can be added and the viewer names
+ * no wrong source language.
  */
 export function originalLanguage(source: ShareSource, uiLanguage: ShareLanguage): ShareOriginalLanguage {
   const language = mapContentLanguage(source.map, uiLanguage);
   if (!isFollowInputLanguage(language)) return language;
-  const texts: string[] = [source.map.title, source.goal ?? ""];
-  for (const note of Array.from(source.notes.values()).slice(0, 30)) texts.push(note.title, note.summary);
-  for (const text of texts) {
-    const detected = typeof text === "string" ? detectAimContentLanguage(text) : undefined;
-    if (detected !== undefined && !isFollowInputLanguage(detected)) return detected;
-  }
-  return SHARE_UNKNOWN_LANGUAGE;
+  const hasLetter = (text: unknown): text is string => typeof text === "string" && /\p{L}/u.test(text);
+  const named = (text: string): ShareOriginalLanguage => {
+    const detected = detectAimContentLanguage(text);
+    return detected === undefined || isFollowInputLanguage(detected) ? SHARE_UNKNOWN_LANGUAGE : detected;
+  };
+  const own = [source.map.title, source.goal].find(hasLetter);
+  if (own !== undefined) return named(own);
+  const found = new Set<string>();
+  for (const note of Array.from(source.notes.values()).slice(0, 30))
+    for (const text of [note.title, note.summary]) if (hasLetter(text)) found.add(named(text));
+  return found.size === 1 ? ([...found][0] as ShareOriginalLanguage) : SHARE_UNKNOWN_LANGUAGE;
 }
 
 type TranslatePhase = "idle" | "translating" | "done";

@@ -14,7 +14,7 @@ export const TRANSLATE_CONCURRENCY = 3;
 /** A failed batch is sent once more (the failed items only). */
 export const TRANSLATE_RETRIES = 1;
 /** Estimated wall time of one call; the estimate shown to the user is calls / concurrency * this. */
-export const TRANSLATE_SECONDS_PER_CALL = 40;
+export const TRANSLATE_SECONDS_PER_CALL = 56;
 /** More than this share of segments left in the original language marks a language incomplete. */
 export const TRANSLATE_INCOMPLETE_RATIO = 0.1;
 /** Maps whose translations stay in the session cache. */

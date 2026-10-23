@@ -187,6 +187,7 @@ test('share translate plan: batches, hash, estimate and the three-map session ca
   assert.ok(calls >= 11 && calls <= 15, `one more language is about 13 calls, got ${calls}`);
   assert.equal(planModule.estimateCallsFromWorkload({ bodyChars: 0, fieldChars: 0, labelChars: 0 }), 0);
   assert.equal(planModule.estimateMinutes(0), 0);
+  assert.equal(planModule.estimateMinutes(11), 3, 'live run: 11 calls, 3 at a time, took 204 s');
   assert.equal(planModule.estimateMinutes(13), Math.round((13 / 3) * planModule.TRANSLATE_SECONDS_PER_CALL / 60) || 1);
   assert.equal(planModule.isIncomplete(1, 10), false);
   assert.equal(planModule.isIncomplete(2, 10), true);

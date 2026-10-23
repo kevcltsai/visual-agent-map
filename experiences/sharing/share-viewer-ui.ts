@@ -97,8 +97,8 @@ export const SHARE_VIEWER_UI_DEFAULT: Readonly<ShareViewerUi> = {
   resizePanel: "Resize the side panel",
   untitledMap: "Untitled map",
   language: "Language",
-  aiTranslated: "Translated by AI from {0}",
-  aiTranslatedUnknown: "Translated by AI",
+  aiTranslated: "Translated by AI from {0}.",
+  aiTranslatedUnknown: "Translated by AI.",
   originalText: "Original",
   imageTextUntranslated: "Text inside images is not translated."
 };

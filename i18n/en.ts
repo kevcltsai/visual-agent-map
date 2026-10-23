@@ -1928,8 +1928,8 @@ export const en = {
   "share.viewer_resize_panel": "Resize the side panel",
   "share.viewer_untitled": "Untitled map",
   "share.viewer_language": "Language",
-  "share.viewer_ai_translated_0": "Translated by AI from {0}",
-  "share.viewer_ai_translated_unknown": "Translated by AI",
+  "share.viewer_ai_translated_0": "Translated by AI from {0}.",
+  "share.viewer_ai_translated_unknown": "Translated by AI.",
   "share.viewer_original_text": "Original",
   "share.viewer_image_text_untranslated": "Text inside images is not translated.",
   // Share dialog

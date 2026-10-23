@@ -63,7 +63,7 @@ function fakeExporter({ nodes = manyNodes(6), diagramResult = null } = {}) {
   };
 }
 
-function dialog({ exporter = fakeExporter(), runner = fakeRunner(), host = {}, cache = new planModule.ShareTranslationCache(), map = baseMap, picker = true } = {}) {
+function dialog({ exporter = fakeExporter(), runner = fakeRunner(), host = {}, cache = new planModule.ShareTranslationCache(), map = baseMap, picker = true, notes = [], goal } = {}) {
   const element = (tag, options = {}) => ({
     tag, text: options.text ?? '', cls: options.cls ?? '', disabled: false, children: [], listeners: {}, focused: 0,
     createDiv(value) { const c = element('div', typeof value === 'string' ? { cls: value } : value); this.children.push(c); return c; },
@@ -101,7 +101,7 @@ function dialog({ exporter = fakeExporter(), runner = fakeRunner(), host = {}, c
     confirmAiUsage: async (model, run) => { confirmLog.push(model); await run(); return true; },
     ...host
   };
-  const modal = new mod.ShareModal({}, { source: { map, notes: new Map(), mapPath: 'Folder/Map.md' }, vamVersion: '0.25.0', language: 'en', saveEnvironment: env, createExporter: () => exporter, translation });
+  const modal = new mod.ShareModal({}, { source: { map, notes: new Map(notes.map((note, i) => [`n${i}`, { summary: '', ...note }])), ...(goal ? { goal } : {}), mapPath: 'Folder/Map.md' }, vamVersion: '0.25.0', language: 'en', saveEnvironment: env, createExporter: () => exporter, translation });
   const button = text => find(modal.modalEl, i => i.tag === 'button' && i.text === text);
   const text = () => all(modal.modalEl, i => i.text).map(i => i.text).join(' | ');
   const setting = name => [...Setting.all].reverse().find(item => item.name === name || item.name?.startsWith(`${name}: `));
@@ -477,4 +477,30 @@ test('share dialog F1: the unknown-original id is the one the viewer reads, and 
   const step = load('core/steps/share-translate/step.ts');
   const prompt = step.shareTranslateStep.render({ items: [{ id: '1', text: 'Hola' }], sourceLanguage: 'und', targetLanguage: 'en', model: 'm', reasoning: 'low' });
   assert.match(prompt, /from the original language of the text \(detect it from the text itself\) into English/);
+});
+
+// ---- reviewer F1b: title and goal decide; notes only when both have no letter, and only when they agree ----
+const originalIs = async (options, id) => {
+  const d = dialog(options);
+  await open(d);
+  const locked = ['zh-TW', 'zh-CN', 'en', 'ja', 'ko', 'es'].filter(code => d.lang(code).toggle.off);
+  assert.deepEqual(locked, id === 'und' ? [] : [id], JSON.stringify(options.map.title));
+};
+
+test('share dialog F1b: a German or French title is unknown even when a note is in Chinese or English', async () => {
+  await originalIs({ map: followMap('Einführung in die Kartografie'), notes: [{ title: 'Taipei 101 (台北101)' }] }, 'und');
+  await originalIs({ map: followMap('Introduction à la cartographie'), notes: [{ title: 'The first chapter of the book' }] }, 'und');
+  await originalIs({ map: followMap('Einführung in die Kartografie'), goal: '台北旅行', notes: [] }, 'und');
+});
+
+test('share dialog F1b: a Chinese title is Traditional Chinese whatever the notes say; the goal is used when the title has no letter', async () => {
+  await originalIs({ map: followMap('東京五天自由行'), notes: [{ title: 'The first chapter of the book' }, { title: 'Les chapitres' }] }, 'zh-TW');
+  await originalIs({ map: followMap('2024'), goal: '學會地圖', notes: [{ title: 'The first chapter of the book' }] }, 'zh-TW');
+});
+
+test('share dialog F1b: with no letter in title or goal, notes decide only when they all agree', async () => {
+  await originalIs({ map: followMap('2024'), notes: [{ title: '東京', summary: '五天自由行' }, { title: '大阪' }] }, 'zh-TW');
+  await originalIs({ map: followMap('2024'), notes: [{ title: '東京五天' }, { title: 'The first chapter of the book' }] }, 'und');
+  await originalIs({ map: followMap('2024'), notes: [{ title: '東京五天' }, { title: 'Einführung in die Kartografie' }] }, 'und');
+  await originalIs({ map: followMap('2024'), notes: [] }, 'und');
 });

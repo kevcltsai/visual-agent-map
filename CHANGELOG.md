@@ -21,7 +21,7 @@ Models
 ### Changed
 
 - Prioritize by goal is faster: it no longer writes a reason for each grade, and the status bar now shows how many cards or changes have been received and the seconds elapsed. With Claude it starts the CLI ahead of time and repaints less often.
-- AIM prompts were corrected for outdated facts and dated wording. AIM answers can read slightly different; existing AIM runs in progress start the affected steps again.
+- AIM prompts were corrected for outdated facts and dated wording. AIM answers can read slightly different.
 
 ### Fixed
 

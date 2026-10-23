@@ -350,7 +350,7 @@ test('sharing viewer language: a translated file carries the interface text of e
 /** Runs headless Chrome over CDP with the colour scheme pinned to light, so the DOM does not depend on the OS appearance. */
 async function dumpDomLight(chrome, directory, url, timeoutMs = 60000) {
   const port = 20000 + Math.floor(Math.random() * 20000);
-  const child = spawn(chrome, ['--headless=new', '--disable-gpu', '--no-sandbox', `--remote-debugging-port=${port}`, `--user-data-dir=${path.join(directory, 'profile')}`, '--window-size=1280,800', 'about:blank'], { stdio: 'ignore' });
+  const child = spawn(chrome, ['--headless=new', '--disable-gpu', '--no-sandbox', `--remote-debugging-port=${port}`, `--user-data-dir=${path.join(directory, 'profile')}`, '--window-size=1280,800', 'about:blank'], { stdio: 'ignore', detached: true }); // own process group, so cleanup can end Chrome's helper processes too
   let timer;
   const deadline = new Promise((_, reject) => { timer = setTimeout(() => reject(new Error(`dumpDomLight timed out after ${timeoutMs} ms`)), timeoutMs); });
   const work = async () => {
@@ -387,9 +387,11 @@ async function dumpDomLight(chrome, directory, url, timeoutMs = 60000) {
   } finally {
     clearTimeout(timer);
     const exited = new Promise(resolve => child.once('exit', resolve));
-    child.kill('SIGKILL');
+    // Chrome's crashpad/renderer helpers keep writing to the profile after the main process dies: end the whole group.
+    try { process.kill(-child.pid, 'SIGKILL'); } catch { try { child.kill('SIGKILL'); } catch { /* already gone */ } }
     await exited;
-    fs.rmSync(path.join(directory, 'profile'), { recursive: true, force: true, maxRetries: 10, retryDelay: 200 });
+    // Removing the temp profile is not tested behaviour: a leftover temp directory must not fail the test.
+    try { fs.rmSync(path.join(directory, 'profile'), { recursive: true, force: true, maxRetries: 10, retryDelay: 200 }); } catch (error) { console.warn(`dumpDomLight: could not remove temp profile: ${error.message}`); }
   }
 }
 
@@ -407,7 +409,7 @@ test('sharing viewer language: a plain file shows exactly the P1 page (same DOM 
     assert.equal(clean(app), clean(read('tests/fixtures/sharing/viewer-p1-app.html')));
     assert.match(dom, /<html lang="en">/);
   } finally {
-    fs.rmSync(directory, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 });
+    try { fs.rmSync(directory, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 }); } catch (error) { console.warn(`could not remove temp directory: ${error.message}`); }
   }
 });
 

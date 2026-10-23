@@ -1860,7 +1860,6 @@ var en = {
   "share.translate_open_language": "Opens in",
   "share.translate_open_reset_0": `The language "{0}" was unticked, so the file opens in the reader's browser language.`,
   "share.translate_open_dropped_0_1": '"{0}" could not be added to the file, so it opens in {1}.',
-  "share.translate_open_dropped_unknown_0": `"{0}" could not be added to the file, and the original language is unknown, so it opens in the reader's browser language.`,
   "share.translate_default_auto": "The reader's browser language",
   "share.translate_default_desc": "Readers can switch language in the viewer.",
   "share.translate_save_file": "Save file\u2026",
@@ -3629,7 +3628,6 @@ var zhCN = {
   "share.translate_open_language": "\u6253\u5F00\u65F6\u7684\u8BED\u8A00",
   "share.translate_open_reset_0": "\u5DF2\u53D6\u6D88\u52FE\u9009\u201C{0}\u201D\uFF0C\u6587\u4EF6\u6539\u4E3A\u8DDF\u968F\u8BFB\u8005\u7684\u6D4F\u89C8\u5668\u8BED\u8A00\u6253\u5F00\u3002",
   "share.translate_open_dropped_0_1": "\u201C{0}\u201D\u6CA1\u6709\u5199\u5165\u6587\u4EF6\uFF0C\u6587\u4EF6\u6539\u4E3A\u4EE5{1}\u6253\u5F00\u3002",
-  "share.translate_open_dropped_unknown_0": "\u201C{0}\u201D\u6CA1\u6709\u5199\u5165\u6587\u4EF6\uFF0C\u4E14\u539F\u6587\u8BED\u8A00\u672A\u77E5\uFF0C\u6587\u4EF6\u6539\u4E3A\u8DDF\u968F\u8BFB\u8005\u7684\u6D4F\u89C8\u5668\u8BED\u8A00\u6253\u5F00\u3002",
   "share.translate_default_auto": "\u8DDF\u968F\u8BFB\u8005\u7684\u6D4F\u89C8\u5668\u8BED\u8A00",
   "share.translate_default_desc": "\u8BFB\u8005\u53EF\u4EE5\u5728\u67E5\u770B\u5668\u91CC\u5207\u6362\u8BED\u8A00\u3002",
   "share.translate_save_file": "\u4FDD\u5B58\u6587\u4EF6\u2026",
@@ -5398,7 +5396,6 @@ var zhTW = {
   "share.translate_open_language": "\u958B\u555F\u6642\u7684\u8A9E\u8A00",
   "share.translate_open_reset_0": "\u5DF2\u53D6\u6D88\u52FE\u9078\u300C{0}\u300D\uFF0C\u6A94\u6848\u6539\u70BA\u8DDF\u8457\u8B80\u8005\u7684\u700F\u89BD\u5668\u8A9E\u8A00\u958B\u555F\u3002",
   "share.translate_open_dropped_0_1": "\u300C{0}\u300D\u6C92\u6709\u5BEB\u9032\u6A94\u6848\uFF0C\u6A94\u6848\u6539\u70BA\u4EE5{1}\u958B\u555F\u3002",
-  "share.translate_open_dropped_unknown_0": "\u300C{0}\u300D\u6C92\u6709\u5BEB\u9032\u6A94\u6848\uFF0C\u4E14\u539F\u6587\u8A9E\u8A00\u672A\u77E5\uFF0C\u6A94\u6848\u6539\u70BA\u8DDF\u8457\u8B80\u8005\u7684\u700F\u89BD\u5668\u8A9E\u8A00\u958B\u555F\u3002",
   "share.translate_default_auto": "\u8DDF\u8457\u8B80\u8005\u7684\u700F\u89BD\u5668\u8A9E\u8A00",
   "share.translate_default_desc": "\u8B80\u8005\u53EF\u4EE5\u5728\u6AA2\u8996\u5668\u88E1\u5207\u63DB\u8A9E\u8A00\u3002",
   "share.translate_save_file": "\u5132\u5B58\u6A94\u6848\u2026",
@@ -44551,11 +44548,11 @@ var ShareModal = class extends import_obsidian33.Modal {
       ...this.effectiveDefault(carried)
     };
   }
-  /** The chosen opening language when the file carries it; one that was not written falls back to the original (none when that is unknown). */
+  /** The chosen opening language when the file carries it; one that was not written falls back to the original (also "und": the file always carries it and the viewer finds it). */
   effectiveDefault(carried) {
     if (this.defaultChoice === AUTO_LANGUAGE) return {};
     if (carried.includes(this.defaultChoice)) return { defaultLanguage: this.defaultChoice };
-    return String(this.sourceLanguage) === SHARE_UNKNOWN_LANGUAGE ? {} : { defaultLanguage: String(this.sourceLanguage) };
+    return { defaultLanguage: String(this.sourceLanguage) };
   }
   /** Before saving: the chosen opening language did not make it into the file, so say that readers get the original. */
   warnDroppedOpenLanguage() {
@@ -44565,11 +44562,7 @@ var ShareModal = class extends import_obsidian33.Modal {
     const carried = ((_b2 = (_a2 = this.translationArg()) == null ? void 0 : _a2.pieces) != null ? _b2 : []).map((item) => item.language);
     if (carried.includes(choice2)) return;
     new import_obsidian33.Notice(
-      t(
-        String(this.sourceLanguage) === SHARE_UNKNOWN_LANGUAGE ? "share.translate_open_dropped_unknown_0" : "share.translate_open_dropped_0_1",
-        this.languageLabel(choice2),
-        this.languageLabel(String(this.sourceLanguage))
-      )
+      t("share.translate_open_dropped_0_1", this.languageLabel(choice2), this.languageLabel(String(this.sourceLanguage)))
     );
   }
   /** Builds the file with the chosen translated languages and scans all of it again (fail closed). */

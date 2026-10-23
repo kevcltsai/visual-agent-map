@@ -495,13 +495,11 @@ export class ShareModal extends Modal {
     };
   }
 
-  /** The chosen opening language when the file carries it; one that was not written falls back to the original (none when that is unknown). */
+  /** The chosen opening language when the file carries it; one that was not written falls back to the original (also "und": the file always carries it and the viewer finds it). */
   private effectiveDefault(carried: string[]): { defaultLanguage?: string } {
     if (this.defaultChoice === AUTO_LANGUAGE) return {};
     if (carried.includes(this.defaultChoice)) return { defaultLanguage: this.defaultChoice };
-    return String(this.sourceLanguage) === SHARE_UNKNOWN_LANGUAGE
-      ? {}
-      : { defaultLanguage: String(this.sourceLanguage) };
+    return { defaultLanguage: String(this.sourceLanguage) };
   }
 
   /** Before saving: the chosen opening language did not make it into the file, so say that readers get the original. */
@@ -511,13 +509,7 @@ export class ShareModal extends Modal {
     const carried = (this.translationArg()?.pieces ?? []).map(item => item.language);
     if (carried.includes(choice)) return;
     new Notice(
-      t(
-        String(this.sourceLanguage) === SHARE_UNKNOWN_LANGUAGE
-          ? "share.translate_open_dropped_unknown_0"
-          : "share.translate_open_dropped_0_1",
-        this.languageLabel(choice),
-        this.languageLabel(String(this.sourceLanguage))
-      )
+      t("share.translate_open_dropped_0_1", this.languageLabel(choice), this.languageLabel(String(this.sourceLanguage)))
     );
   }
 

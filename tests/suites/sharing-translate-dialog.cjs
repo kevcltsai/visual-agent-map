@@ -577,3 +577,19 @@ test('share dialog D-120: a chosen language that was blocked is warned about bef
   assert.ok(d.notices.slice(before).some(n => n.includes('日本語') && n.includes('繁體中文')), plain(d.notices));
   assert.equal(JSON.parse(d.log.written[0].replace(/^<html>|<\/html>$/g, '')).defaultLanguage, 'zh-TW');
 });
+
+test('share dialog D-120: an undetermined original (und) is the fallback too: a blocked chosen language warns before saving and defaultLanguage is "und"', async () => {
+  const d = dialog({ map: followMap('Ancient Egypt'), runner: fakeRunner({ transform: (text, target) => target === 'ja' ? `see /Users/me/Vault/Folder/A.md ${text}` : `T:${text}` }) });
+  await open(d);
+  d.tick('en'); d.tick('ja');
+  openMenu(d).dropdown.fn('ja');
+  d.button(translateLabel).listeners.click();
+  await until(() => d.button(saveFileLabel), 'done');
+  assert.equal(d.exporter.calls.assemble.at(-1).defaultLanguage, 'und', 'falls back to the undetermined original');
+  const before = d.notices.length;
+  d.button(saveFileLabel).listeners.click();
+  await until(() => d.log.written.length === 1, 'write');
+  const shown = d.notices.slice(before);
+  assert.ok(shown.some(n => n.includes('日本語') && n.includes('Original') && !n.includes('browser')), plain(shown));
+  assert.equal(JSON.parse(d.log.written[0].replace(/^<html>|<\/html>$/g, '')).defaultLanguage, 'und');
+});

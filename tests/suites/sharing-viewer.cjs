@@ -348,10 +348,12 @@ test('sharing viewer language: a translated file carries the interface text of e
 });
 
 /** Runs headless Chrome over CDP with the colour scheme pinned to light, so the DOM does not depend on the OS appearance. */
-async function dumpDomLight(chrome, directory, url) {
+async function dumpDomLight(chrome, directory, url, timeoutMs = 60000) {
   const port = 20000 + Math.floor(Math.random() * 20000);
   const child = spawn(chrome, ['--headless=new', '--disable-gpu', '--no-sandbox', `--remote-debugging-port=${port}`, `--user-data-dir=${path.join(directory, 'profile')}`, '--window-size=1280,800', 'about:blank'], { stdio: 'ignore' });
-  try {
+  let timer;
+  const deadline = new Promise((_, reject) => { timer = setTimeout(() => reject(new Error(`dumpDomLight timed out after ${timeoutMs} ms`)), timeoutMs); });
+  const work = async () => {
     let target;
     for (let i = 0; i < 100 && !target; i++) {
       try { target = (await (await fetch(`http://127.0.0.1:${port}/json`)).json()).find(item => item.type === 'page'); } catch { /* not up yet */ }
@@ -377,10 +379,17 @@ async function dumpDomLight(chrome, directory, url) {
     const result = await send('Runtime.evaluate', { expression: 'document.documentElement.outerHTML', returnByValue: true });
     socket.close();
     return result.result.value;
+  };
+  try {
+    const running = work();
+    running.catch(() => {}); // after a timeout the killed Chrome makes it reject; that is already reported
+    return await Promise.race([running, deadline]);
   } finally {
+    clearTimeout(timer);
     const exited = new Promise(resolve => child.once('exit', resolve));
-    child.kill();
+    child.kill('SIGKILL');
     await exited;
+    fs.rmSync(path.join(directory, 'profile'), { recursive: true, force: true, maxRetries: 10, retryDelay: 200 });
   }
 }
 

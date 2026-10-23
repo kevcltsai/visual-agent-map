@@ -2015,8 +2015,6 @@ export const en = {
   "share.translate_open_reset_0":
     'The language "{0}" was unticked, so the file opens in the reader\'s browser language.',
   "share.translate_open_dropped_0_1": '"{0}" could not be added to the file, so it opens in {1}.',
-  "share.translate_open_dropped_unknown_0":
-    '"{0}" could not be added to the file, and the original language is unknown, so it opens in the reader\'s browser language.',
   "share.translate_default_auto": "The reader's browser language",
   "share.translate_default_desc": "Readers can switch language in the viewer.",
   "share.translate_save_file": "Save file…",

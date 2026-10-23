@@ -1852,7 +1852,6 @@ export const zhTW: Record<TranslationKey, string> = {
   "share.translate_open_language": "開啟時的語言",
   "share.translate_open_reset_0": "已取消勾選「{0}」，檔案改為跟著讀者的瀏覽器語言開啟。",
   "share.translate_open_dropped_0_1": "「{0}」沒有寫進檔案，檔案改為以{1}開啟。",
-  "share.translate_open_dropped_unknown_0": "「{0}」沒有寫進檔案，且原文語言未知，檔案改為跟著讀者的瀏覽器語言開啟。",
   "share.translate_default_auto": "跟著讀者的瀏覽器語言",
   "share.translate_default_desc": "讀者可以在檢視器裡切換語言。",
   "share.translate_save_file": "儲存檔案…",

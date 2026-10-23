@@ -1851,7 +1851,6 @@ export const zhCN: Record<TranslationKey, string> = {
   "share.translate_open_language": "打开时的语言",
   "share.translate_open_reset_0": "已取消勾选“{0}”，文件改为跟随读者的浏览器语言打开。",
   "share.translate_open_dropped_0_1": "“{0}”没有写入文件，文件改为以{1}打开。",
-  "share.translate_open_dropped_unknown_0": "“{0}”没有写入文件，且原文语言未知，文件改为跟随读者的浏览器语言打开。",
   "share.translate_default_auto": "跟随读者的浏览器语言",
   "share.translate_default_desc": "读者可以在查看器里切换语言。",
   "share.translate_save_file": "保存文件…",

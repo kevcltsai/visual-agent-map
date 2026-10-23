@@ -147,6 +147,9 @@ export class ShareModal extends Modal {
   private modelSetting: Setting | null = null;
   private modelDropdown: DropdownComponent | null = null;
   private translateInfoEl: HTMLElement | null = null;
+  private openLangEl: HTMLElement | null = null;
+  private openLangSetting: Setting | null = null;
+  private openLangDropdown: DropdownComponent | null = null;
   private result: ShareBuildResult | null = null;
   private busy = false;
   private saving = false;
@@ -284,11 +287,18 @@ export class ShareModal extends Modal {
           toggle.onChange(value => {
             if (value) this.picked.add(language);
             else this.picked.delete(language);
+            if (!value && this.defaultChoice === language) {
+              this.defaultChoice = AUTO_LANGUAGE;
+              new Notice(t("share.translate_open_reset_0", this.languageLabel(language)));
+            }
+            this.renderOpenLanguage();
             this.selectionChanged();
           });
         this.languageToggles.set(language, { setting, toggle });
       });
     }
+    this.openLangEl = this.contentEl.createDiv();
+    this.renderOpenLanguage();
     this.modelSetting = new Setting(this.contentEl)
       .setName(t("share.translate_model_name"))
       .setDesc(t("share.translate_model_desc"))
@@ -303,6 +313,36 @@ export class ShareModal extends Modal {
         });
       });
     this.translateInfoEl = this.contentEl.createDiv({ cls: "vam-share-translate", attr: { "aria-live": "polite" } });
+  }
+
+  /**
+   * "Opens in": which language a reader sees first. It is there before anything is translated and follows the ticked
+   * languages. With none ticked the file only has the original, so the menu stays visible but disabled.
+   */
+  private renderOpenLanguage(): void {
+    const container = this.openLangEl;
+    if (!container) return;
+    container.empty();
+    const ids = [String(this.sourceLanguage), ...this.selected()];
+    this.openLangSetting = new Setting(container)
+      .setName(t("share.translate_open_language"))
+      .setDesc(t("share.translate_default_desc"))
+      .addDropdown(dropdown => {
+        this.openLangDropdown = dropdown;
+        dropdown.addOption(AUTO_LANGUAGE, t("share.translate_default_auto"));
+        for (const id of ids) dropdown.addOption(id, this.languageLabel(id));
+        dropdown.setValue(ids.includes(this.defaultChoice) ? this.defaultChoice : AUTO_LANGUAGE);
+        dropdown.onChange(value => {
+          this.defaultChoice = value;
+          if (this.phase === "done") {
+            this.applyTranslation();
+            this.render();
+          }
+        });
+      });
+    const locked = this.saving || this.translating || !this.selected().length;
+    this.openLangSetting.setDisabled(locked);
+    this.openLangDropdown!.selectEl.disabled = locked;
   }
 
   /** Languages or model changed: a finished translation no longer matches, so the file goes back to the original until it is translated again. */
@@ -451,10 +491,34 @@ export class ShareModal extends Modal {
     return {
       contentLanguage: String(this.sourceLanguage),
       pieces,
-      ...(this.defaultChoice !== AUTO_LANGUAGE && carried.includes(this.defaultChoice)
-        ? { defaultLanguage: this.defaultChoice }
-        : {})
+      ...this.effectiveDefault(carried)
     };
+  }
+
+  /** The chosen opening language when the file carries it; one that was not written falls back to the original (none when that is unknown). */
+  private effectiveDefault(carried: string[]): { defaultLanguage?: string } {
+    if (this.defaultChoice === AUTO_LANGUAGE) return {};
+    if (carried.includes(this.defaultChoice)) return { defaultLanguage: this.defaultChoice };
+    return String(this.sourceLanguage) === SHARE_UNKNOWN_LANGUAGE
+      ? {}
+      : { defaultLanguage: String(this.sourceLanguage) };
+  }
+
+  /** Before saving: the chosen opening language did not make it into the file, so say that readers get the original. */
+  private warnDroppedOpenLanguage(): void {
+    const choice = this.defaultChoice;
+    if (choice === AUTO_LANGUAGE || choice === String(this.sourceLanguage)) return;
+    const carried = (this.translationArg()?.pieces ?? []).map(item => item.language);
+    if (carried.includes(choice)) return;
+    new Notice(
+      t(
+        String(this.sourceLanguage) === SHARE_UNKNOWN_LANGUAGE
+          ? "share.translate_open_dropped_unknown_0"
+          : "share.translate_open_dropped_0_1",
+        this.languageLabel(choice),
+        this.languageLabel(String(this.sourceLanguage))
+      )
+    );
   }
 
   /** Builds the file with the chosen translated languages and scans all of it again (fail closed). */
@@ -503,21 +567,6 @@ export class ShareModal extends Modal {
       for (const item of this.translation.languages) this.renderLanguageResult(container, item, host, note);
       const pieces = this.translationArg()?.pieces ?? [];
       if (pieces.length) {
-        new Setting(container)
-          .setName(t("share.translate_default_language"))
-          .setDesc(t("share.translate_default_desc"))
-          .addDropdown(dropdown => {
-            dropdown.addOption(AUTO_LANGUAGE, t("share.translate_default_auto"));
-            for (const id of [String(this.sourceLanguage), ...pieces.map(piece => piece.language)])
-              dropdown.addOption(id, this.languageLabel(id));
-            const valid = this.translationArg()?.defaultLanguage;
-            dropdown.setValue(valid ?? AUTO_LANGUAGE);
-            dropdown.onChange(value => {
-              this.defaultChoice = value;
-              this.applyTranslation();
-              this.render();
-            });
-          });
         note(
           t(
             "share.translate_languages_included_0",
@@ -665,6 +714,8 @@ export class ShareModal extends Modal {
     for (const [language, { setting, toggle }] of this.languageToggles)
       this.lockToggle(setting, toggle, locked || language === this.sourceLanguage);
     this.modelSetting?.setDisabled(locked);
+    this.openLangSetting?.setDisabled(locked || !this.selected().length);
+    if (this.openLangDropdown) this.openLangDropdown.selectEl.disabled = locked || !this.selected().length;
     if (this.modelDropdown) this.modelDropdown.selectEl.disabled = locked;
     this.renderTranslation();
     this.statusEl.setText(this.savedText);
@@ -739,6 +790,7 @@ export class ShareModal extends Modal {
     const result = this.result;
     if (!result?.html || this.saving || this.busy || result.leakCategories.length) return;
     const html = result.html;
+    this.warnDroppedOpenLanguage();
     this.saving = true;
     this.render();
     const name = shareFileName(this.options.source.map.title);

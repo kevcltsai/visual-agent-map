@@ -49,3 +49,11 @@ export function pickShareLanguage(input: PickLanguageInput): string {
   }
   return original;
 }
+
+/**
+ * Where a reader's language choice is remembered: one key per shared file (its map id), so a choice in one file never
+ * changes another. The old shared key is never read. A file without a map id remembers nothing (undefined).
+ */
+export function shareLanguageKey(mapId: unknown): string | undefined {
+  return typeof mapId === "string" && mapId.trim() !== "" ? `vam-share-language:${mapId}` : undefined;
+}

@@ -168,7 +168,7 @@ test('share dialog T1: ticking languages shows the estimate and the translate bu
   assert.match(d.text(), /Languages in the file: 繁體中文, English, 日本語/);
   assert.match(d.text(), /Total size with these languages: \d+ B/);
   assert.match(d.text(), /Text inside images is not translated\./);
-  assert.match(d.text(), /Opens in/);
+  assert.equal(d.text().split(' | ').filter(x => x === 'Opens in').length, 1, 'one menu only');
   const assembled = d.exporter.calls.assemble.at(-1);
   assert.deepEqual(assembled.languages, ['en', 'ja']);
   d.button(saveFileLabel).listeners.click();
@@ -503,4 +503,77 @@ test('share dialog F1b: with no letter in title or goal, notes decide only when 
   await originalIs({ map: followMap('2024'), notes: [{ title: '東京五天' }, { title: 'The first chapter of the book' }] }, 'und');
   await originalIs({ map: followMap('2024'), notes: [{ title: '東京五天' }, { title: 'Einführung in die Kartografie' }] }, 'und');
   await originalIs({ map: followMap('2024'), notes: [] }, 'und');
+});
+
+// ---- D-2026-10-120: "Opens in" is there before translating
+const openMenu = d => d.setting('Opens in');
+const openValues = d => plain(openMenu(d).dropdown.options.map(item => item[0]));
+
+test('share dialog D-120: the opening-language menu exists before translating, disabled with only the original', async () => {
+  const d = dialog();
+  await open(d);
+  assert.deepEqual(openValues(d), ['auto', 'zh-TW']);
+  assert.equal(openMenu(d).disabled, true);
+  assert.equal(openMenu(d).dropdown.selectEl.disabled, true);
+});
+
+test('share dialog D-120: the options follow the ticked languages at once', async () => {
+  const d = dialog();
+  await open(d);
+  d.tick('ja');
+  assert.deepEqual(openValues(d), ['auto', 'zh-TW', 'ja']);
+  assert.equal(openMenu(d).disabled, false);
+  d.tick('en');
+  assert.deepEqual(openValues(d), ['auto', 'zh-TW', 'en', 'ja']);
+  d.untick('ja');
+  assert.deepEqual(openValues(d), ['auto', 'zh-TW', 'en']);
+});
+
+test('share dialog D-120: unticking the chosen language falls back to the reader browser and says so', async () => {
+  const d = dialog();
+  await open(d);
+  d.tick('ja');
+  openMenu(d).dropdown.fn('ja');
+  d.untick('ja');
+  assert.equal(openMenu(d).dropdown.value, 'auto');
+  assert.ok(d.notices.some(n => n.includes('日本語') && n.includes('browser language')), plain(d.notices));
+});
+
+test('share dialog D-120: after translating there is still one menu and its value is kept', async () => {
+  const d = dialog();
+  await open(d);
+  d.tick('en'); d.tick('ja');
+  openMenu(d).dropdown.fn('ja');
+  d.button(translateLabel).listeners.click();
+  await until(() => d.button(saveFileLabel), 'done');
+  assert.equal(d.text().split(' | ').filter(x => x === 'Opens in').length, 1);
+  assert.equal(d.exporter.calls.assemble.at(-1).defaultLanguage, 'ja');
+});
+
+test('share dialog D-120: choosing the original writes it as defaultLanguage', async () => {
+  const d = dialog();
+  await open(d);
+  d.tick('en');
+  openMenu(d).dropdown.fn('zh-TW');
+  d.button(translateLabel).listeners.click();
+  await until(() => d.button(saveFileLabel), 'done');
+  assert.equal(d.exporter.calls.assemble.at(-1).defaultLanguage, 'zh-TW');
+  d.button(saveFileLabel).listeners.click();
+  await until(() => d.log.written.length === 1, 'write');
+  assert.equal(JSON.parse(d.log.written[0].replace(/^<html>|<\/html>$/g, '')).defaultLanguage, 'zh-TW');
+});
+
+test('share dialog D-120: a chosen language that was blocked is warned about before saving and the file opens in the original', async () => {
+  const d = dialog({ runner: fakeRunner({ transform: (text, target) => target === 'ja' ? `see /Users/me/Vault/Folder/A.md ${text}` : `T:${text}` }) });
+  await open(d);
+  d.tick('en'); d.tick('ja');
+  openMenu(d).dropdown.fn('ja');
+  d.button(translateLabel).listeners.click();
+  await until(() => d.button(saveFileLabel), 'done');
+  assert.equal(d.exporter.calls.assemble.at(-1).defaultLanguage, 'zh-TW', 'falls back to the original');
+  const before = d.notices.length;
+  d.button(saveFileLabel).listeners.click();
+  await until(() => d.log.written.length === 1, 'write');
+  assert.ok(d.notices.slice(before).some(n => n.includes('日本語') && n.includes('繁體中文')), plain(d.notices));
+  assert.equal(JSON.parse(d.log.written[0].replace(/^<html>|<\/html>$/g, '')).defaultLanguage, 'zh-TW');
 });

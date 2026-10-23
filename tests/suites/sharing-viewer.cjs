@@ -115,8 +115,8 @@ test('sharing viewer: the viewer program has no eval and writes titles and summa
   // Storage is only touched inside try/catch.
   const main = sources[0];
   assert.equal((main.match(/localStorage/g) ?? []).length, 2);
-  assert.match(main, /storageGet\(LANGUAGE_KEY\)/);
-  assert.match(main, /storageSet\(LANGUAGE_KEY, code\)/);
+  assert.match(main, /storageGet\(languageStorageKey\)/);
+  assert.match(main, /storageSet\(languageStorageKey, code\)/);
   for (const name of ['storageGet', 'storageSet']) assert.match(main, new RegExp(`function ${name}[\\s\\S]*?try \\{[\\s\\S]*?localStorage[\\s\\S]*?catch`));
   assert.match(main, /vam-share-panel-width/);
 });
@@ -285,6 +285,20 @@ test('sharing viewer language: a throwing localStorage never stops the viewer fr
   assert.equal(pick(['fr', 'en'], { stored: undefined, browser: ['en'] }), 'en');
   // The navigator read is guarded too.
   assert.match(main, /try \{\s*browser = Array\.from\(window\.navigator\.languages/);
+});
+
+test('sharing viewer language: the remembered choice is per file; the old global key is never read; no map id remembers nothing', () => {
+  assert.equal(language.shareLanguageKey('map-a'), 'vam-share-language:map-a');
+  assert.notEqual(language.shareLanguageKey('map-a'), language.shareLanguageKey('map-b'));
+  assert.equal(language.shareLanguageKey(undefined), undefined);
+  assert.equal(language.shareLanguageKey(''), undefined);
+  assert.equal(language.shareLanguageKey(42), undefined);
+  const main = read('experiences/sharing/viewer/main.ts');
+  assert.ok(!/["'`]vam-share-language["'`]/.test(main), 'the old global key is not referenced');
+  assert.match(main, /stored: languageStorageKey \? storageGet\(languageStorageKey\) : null/);
+  assert.match(main, /if \(languageStorageKey\) storageSet\(languageStorageKey, code\)/);
+  // A stored choice for another file is simply not looked up; storage that throws still falls through to defaultLanguage.
+  assert.equal(pick(['fr', 'en'], { stored: null, defaultLanguage: 'en', browser: ['fr'] }), 'en');
 });
 
 test('sharing viewer language: interface text for ja, ko and es is complete and marked as not native-reviewed', () => {

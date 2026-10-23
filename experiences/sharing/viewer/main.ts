@@ -5,7 +5,7 @@ import type { ShareNodePayload, SharePayload } from "../share-format";
 import { SHARE_VIEWER_UI_DEFAULT, type ShareViewerUi } from "../share-viewer-ui";
 import { fillDetail } from "./detail";
 import { edgePathData } from "./edge-path";
-import { pickShareLanguage } from "./language";
+import { pickShareLanguage, shareLanguageKey } from "./language";
 
 /** Where "Install VAM" points. The only link the viewer itself carries. */
 export const INSTALL_URL = "https://github.com/kevcltsai/visual-agent-map?ref=share";
@@ -13,7 +13,6 @@ export const INSTALL_URL = "https://github.com/kevcltsai/visual-agent-map?ref=sh
 const UNKNOWN_ORIGINAL = "und";
 const SVG_NS = "http://www.w3.org/2000/svg";
 const PANEL_WIDTH_KEY = "vam-share-panel-width";
-const LANGUAGE_KEY = "vam-share-language";
 const PANEL_DEFAULT = 300;
 const PANEL_MIN = 240;
 const ZOOM_MIN = 0.25;
@@ -130,6 +129,7 @@ export function startViewer(doc: Document): void {
   // ---- language: a translated file lists its languages (the original first); a plain file has one and no menu.
   const extras = readUiExtras(doc);
   const languages = Array.isArray(data.languages) ? Array.from(new Set(data.languages.filter(isText))) : [];
+  const languageStorageKey = shareLanguageKey(data.source?.mapId);
   const multilingual = languages.length >= 2;
   const original = multilingual ? languages[0] : "";
   let language = original;
@@ -142,7 +142,7 @@ export function startViewer(doc: Document): void {
     }
     language = pickShareLanguage({
       languages,
-      stored: storageGet(LANGUAGE_KEY),
+      stored: languageStorageKey ? storageGet(languageStorageKey) : null,
       defaultLanguage: isText(data.defaultLanguage) ? data.defaultLanguage : undefined,
       browser
     });
@@ -809,7 +809,7 @@ export function startViewer(doc: Document): void {
     if (code === language || !languages.includes(code)) return;
     language = code;
     ui = uiOf(code);
-    storageSet(LANGUAGE_KEY, code);
+    if (languageStorageKey) storageSet(languageStorageKey, code);
     doc.documentElement.lang = code;
     const scroll = inspector.scrollTop;
     applyText();

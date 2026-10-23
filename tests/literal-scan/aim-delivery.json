@@ -91,12 +91,7 @@
     },
     {
       "file": "ai/aim-gap-audit-schema.ts",
-      "text": "A short rationale, written before the de",
-      "reason": "JSON response-schema field description for the gap-audit contract (checked by the aim-flow.research-gap-audit .schema.json snapshots), not a prompt template; schema text stays in TypeScript"
-    },
-    {
-      "file": "ai/aim-gap-audit-schema.ts",
-      "text": "The exact final classification, written ",
+      "text": "A short rationale for the classification",
       "reason": "JSON response-schema field description for the gap-audit contract (checked by the aim-flow.research-gap-audit .schema.json snapshots), not a prompt template; schema text stays in TypeScript"
     },
     {

@@ -654,7 +654,7 @@ integrationTest('AIM gap audit uses a strict rationale-first schema for both pro
   assert.equal(seen[0].properties.visualReferences.maxItems, 0);
   const auditPrompt = buildAimPrompt({ ...auditContext, task: '<!-- aim-phase: research-gap-audit -->\nAudit the proposed gap.' }, 'en');
   assert.match(auditPrompt, /dedicated response schema/);
-  assert.match(auditPrompt, /rationale first in detail, then set summary to exactly user_condition or external_evidence/);
+  assert.match(auditPrompt, /concise rationale in detail and set summary to exactly user_condition or external_evidence/);
   assert.doesNotMatch(auditPrompt, /machine-readable marker/);
 
   for (const response of [

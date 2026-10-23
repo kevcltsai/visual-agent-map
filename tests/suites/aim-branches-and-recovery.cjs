@@ -551,7 +551,7 @@ integrationTest('AIM researches every planned subtopic independently and keeps r
       synthesisCalls++;
       if (synthesisCalls === 1) {
         assert.match(context.task, /Prior questions:/);
-        assert.match(context.task, /do not require reaching 10 or add quota filler/);
+        assert.match(context.task, /do not require reaching it or add quota filler/);
         assert.match(context.task, /Ask only for a genuinely missing user condition/);
       }
       return synthesisCalls < 3

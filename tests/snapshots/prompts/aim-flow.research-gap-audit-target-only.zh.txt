@@ -8,7 +8,7 @@
 
 嚴格遵循本階段任務與專用回應 schema。不要增加標記、建議或視覺參考；不要套用固定標題模板，也不要把稽核改寫成完整知識頁。
 
-先在 detail 撰寫簡短理由，再將 summary 設為完全相同的 user_condition 或 external_evidence。suggestions 與 visualReferences 必須是空陣列。
+在 detail 寫簡短理由，並將 summary 設為完全相同的 user_condition 或 external_evidence。suggestions 與 visualReferences 必須是空陣列。
 
 此階段僅使用本次提供的內容，不要進行網路搜尋。
 
@@ -24,7 +24,7 @@ Use external_evidence only when the gap is an external factual or technical clai
 
 Classify the assigned search target, not every uncertainty mentioned in the Planner rationale. A supplied range is a known condition. Finding published guidance for that range is external_evidence; obtaining this user's exact value is user_condition. Do not silently replace one task with the other.
 
-First write a concise rationale in detail, then set summary to exactly user_condition or external_evidence as the final decision. Return no suggestions or visual references. Do not use an HTML comment or replace the exact enum with prose.
+Put a concise rationale in detail and set summary to exactly user_condition or external_evidence as the decision. Return no suggestions or visual references. Do not use an HTML comment or replace the exact enum with prose.
 
 Original user goal: Prepare a herb roast chicken
 Current question: How much does the chicken weigh?

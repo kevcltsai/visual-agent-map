@@ -1,4 +1,4 @@
-The candidate skipped user input, but this answer path has a hard minimum of three answered question nodes before conclusion. Create the next meaningful question now; do not answer the goal or search.
+The candidate skipped user input, but this answer path needs more answered question nodes before it can conclude. Create the next meaningful question now; do not answer the goal or search.
 
 This path currently has {{answeredQuestionCount}} answered question node(s), so ask_user is mandatory until it reaches {{minimumAnswers}}. Ask about one genuinely unknown, decision-relevant dimension such as constraints, goals, current skills, resources, or success criteria. No quota filler and no repeated known condition.
 

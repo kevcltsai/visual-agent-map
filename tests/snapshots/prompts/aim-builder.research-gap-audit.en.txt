@@ -10,7 +10,7 @@ Return JSON only, matching the supplied response schema and including every requ
 
 Follow the phase task and the dedicated response schema exactly. Do not add a marker, suggestions, or visual references. Do not impose a fixed heading template or turn this audit into a complete knowledge page.
 
-Write the rationale first in detail, then set summary to exactly user_condition or external_evidence. Return empty suggestions and visualReferences arrays.
+Put a concise rationale in detail and set summary to exactly user_condition or external_evidence. Return empty suggestions and visualReferences arrays.
 
 Do not use web search in this local-only phase.
 

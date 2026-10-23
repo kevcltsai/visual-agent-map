@@ -16,7 +16,10 @@ import {
   assetNamesInHtml,
   attachTranslations,
   type AttachTranslationsOptions,
+  leakCategoriesInTranslation,
   omitAssetImages,
+  rebuildTranslationsForPayload,
+  type RebuildDom,
   pause,
   plainWikilinks,
   renderedLeakCategories,
@@ -102,7 +105,15 @@ interface ExporterConfig {
   /** Per-note wait for Mermaid diagrams. */
   mermaidTimeoutMs?: number;
   now?: () => Date;
+  /** Parses and serializes note HTML to rebuild compact translations; defaults to the platform's DOMParser. */
+  rebuildDom?: RebuildDom;
 }
+
+const platformRebuildDom: RebuildDom = {
+  parse: html => new DOMParser().parseFromString(html, "text/html").body,
+  serialize: root => root.innerHTML,
+  createDiv: () => createDiv()
+};
 
 const IMAGE_MIME: Record<string, string> = {
   png: "image/png",
@@ -684,7 +695,18 @@ export class ShareExporter {
     const language = this.config.language;
     const base = this.buildPayload(options);
     const { failed, notesWithContent, undrawn, blocked } = base;
-    const payload = translation ? attachTranslations(base.payload, translation) : base.payload;
+    // Compact translations are rebuilt from this payload's own notes, and the gates scan what the viewer will show (D-2026-10-122).
+    const rebuiltTranslations = translation
+      ? rebuildTranslationsForPayload(
+          base.payload.nodes,
+          translation.pieces,
+          this.config.rebuildDom ?? platformRebuildDom
+        )
+      : null;
+    const payload =
+      translation && rebuiltTranslations
+        ? attachTranslations(base.payload, { ...translation, pieces: rebuiltTranslations.pieces })
+        : base.payload;
     const ui = shareViewerUiFor(language);
     const forbidden = this.forbiddenStrings();
     // The shell text covers the interface text of every language the file carries.
@@ -693,7 +715,15 @@ export class ShareExporter {
       this.shellText = { key: shellKey, text: renderShareShell(ui, payload.languages) };
     const hits = [...scanPayloadForLeaks(payload, forbidden), ...scanForLeaks(this.shellText.text, forbidden)];
     const renderedLeaks = renderedLeakCategories(this.rendered.values(), options);
-    const leakCategories = [...new Set<LeakCategory>([...hits.map(hit => hit.category), ...renderedLeaks])];
+    const rebuiltLeaks: LeakCategory[] = [];
+    if (rebuiltTranslations) {
+      for (const { language: id, piece } of rebuiltTranslations.pieces)
+        rebuiltLeaks.push(...leakCategoriesInTranslation(id, piece, forbidden, rebuiltTranslations.rebuilt[id]));
+      if (rebuiltTranslations.localRefs > 0) rebuiltLeaks.push("wikilink");
+    }
+    const leakCategories = [
+      ...new Set<LeakCategory>([...hits.map(hit => hit.category), ...renderedLeaks, ...rebuiltLeaks])
+    ];
     const scoped = scopeCountsToMode(options, { notesWithContent, failedImages: failed.size });
     const counts = {
       topics: payload.nodes.length,

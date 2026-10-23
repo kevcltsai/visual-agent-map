@@ -12,9 +12,10 @@ import {
   type ShareTranslateRequest
 } from "../../core/steps/share-translate/step";
 import type { ReasoningLevel } from "../../ai/types";
-import { countLocalReferences, scrubMermaidSvg, scrubShareTree, unwrapLocalLinks } from "./share-dom";
+import { countLocalReferences, scrubMermaidSvg } from "./share-dom";
 import { leakCategoriesInTranslation } from "./share-build";
 import type {
+  ShareDiagramTranslation,
   ShareMapTranslation,
   ShareNodeTranslation,
   ShareOriginalLanguage,
@@ -35,15 +36,16 @@ import {
   type TranslateItem
 } from "./share-translate-plan";
 import { prepareMermaidTranslation, type MermaidPrepared } from "./share-translate-mermaid";
+import { placeholdersMatch, PLACEHOLDER_OPEN, type SegmentExtraction } from "./share-translate-segments";
 import {
-  applyTranslations,
-  elementsWithClass,
-  extractSegments,
-  placeholdersMatch,
-  topLevelSvgs,
-  PLACEHOLDER_OPEN,
-  type SegmentExtraction
-} from "./share-translate-segments";
+  canonicalChildren,
+  detailCheckOf,
+  diagramEntryFor,
+  normalizeSvgId,
+  prepareDetail,
+  reconstructTranslatedDetail,
+  type CompactDetailEntry
+} from "./share-translate-compact";
 
 export { parseShareTranslation, SHARE_TRANSLATE_SCHEMA, ShareTranslateParseError };
 export type { ShareTranslateItem, ShareTranslateOutput, ShareTranslateRequest };
@@ -148,6 +150,8 @@ export interface ShareLanguageResult {
   failedSegments: number;
   /** Diagrams that keep their original labels. */
   diagramsKept: number;
+  /** Notes whose rebuilt text did not survive the sanitizer unchanged and so show the original text (D-2026-10-122). */
+  fallbackNodes: number;
   /** Set for `blocked`: categories only, never the matched text. */
   leakCategories: LeakCategory[];
   /** The first error message a call raised, when anything failed; for a log, not for the file. */
@@ -175,7 +179,6 @@ interface PreparedNode {
   root: Element | null;
   extraction: SegmentExtraction | null;
   svgs: Element[];
-  slots: Element[];
   plans: Array<MermaidPrepared | null>;
 }
 interface Prepared {
@@ -195,7 +198,6 @@ interface Group {
 }
 
 const unique = (texts: Iterable<string>): string[] => [...new Set(texts)];
-const SLOT_CLASS = "vam-mermaid-slot";
 
 function prepareSource(
   source: ShareTranslateSource,
@@ -206,19 +208,14 @@ function prepareSource(
   const labels: string[] = [];
   const nodes: PreparedNode[] = source.nodes.map(input => {
     for (const text of [input.title, input.summary, input.reason]) if (text?.trim()) fieldTexts.push(text);
-    const prepared: PreparedNode = { input, root: null, extraction: null, svgs: [], slots: [], plans: [] };
+    const prepared: PreparedNode = { input, root: null, extraction: null, svgs: [], plans: [] };
     if (!input.detailHtml?.trim()) return prepared;
     const root = options.dom.parse(input.detailHtml);
     prepared.root = root;
-    prepared.svgs = topLevelSvgs(root);
-    // Diagrams leave the tree while it is translated and cleaned (the sanitizer would strip their labels) and return after.
-    prepared.slots = prepared.svgs.map(svg => {
-      const slot = options.dom.createDiv();
-      slot.setAttribute("class", SLOT_CLASS);
-      svg.parentNode?.replaceChild(slot, svg);
-      return slot;
-    });
-    prepared.extraction = extractSegments(root);
+    // Diagrams leave the tree while its text is cut (the sanitizer would strip their labels) and are never changed here.
+    const detail = prepareDetail(root, () => options.dom.createDiv());
+    prepared.svgs = detail.svgs;
+    prepared.extraction = detail.extraction;
     for (const unit of prepared.extraction.units) body.push(unit.text);
     if (options.renderMermaid)
       for (const diagram of input.diagrams ?? []) {
@@ -293,8 +290,10 @@ const flatten = (text: string): string => text.replace(/\s*[\r\n]+\s*/g, " ").tr
  * - Cancelling (the signal) stops new calls at once and throws `ShareTranslateError("stopped")`; what finished is
  *   already in the cache, so running again only translates the rest.
  * - A batch that fails is sent once more (only its unfinished items); items still unfinished keep the original text.
- * - Every language is rebuilt from the cleaned HTML by text-node replacement, cleaned again (sanitizer, link unwrap,
- *   scrub), checked for local links, and scanned against the forbidden strings; a hit blocks the whole language.
+ * - A language is stored compactly (D-2026-10-122): the translated text units and diagram patches, not the whole note.
+ *   Each note is rebuilt from the cleaned HTML with the viewer's own function; the sanitizer must leave the rebuilt
+ *   text unchanged (else the note shows its original text), the rebuilt note is checked for local links, and it is
+ *   scanned against the forbidden strings together with the stored fields; a hit blocks the whole language.
  */
 export class ShareTranslateService {
   constructor(private readonly run: ShareTranslateRunner) {}
@@ -406,12 +405,29 @@ export class ShareTranslateService {
     };
 
     let localRefs = 0;
+    let fallbackNodes = 0;
     // Diagrams that could not be redrawn at all (no source) keep their original labels too.
     let diagramsKept = prepared.nodes.reduce(
       (sum, node) => sum + (node.root ? (node.input.diagramsUnsourced ?? 0) : 0),
       0
     );
     const nodes: Record<string, ShareNodeTranslation> = {};
+    // What a viewer will show for each note once it has rebuilt it; this, not the work above, is what the gates scan.
+    const rebuilt: Record<string, string> = {};
+    const { dom } = options;
+    const serializeSvg = (svg: Element): string => {
+      const holder = dom.createDiv();
+      holder.appendChild(svg.cloneNode(true));
+      return dom.serialize(holder);
+    };
+    // The sanitizer must leave the rebuilt text exactly as it is (compared without attribute order); otherwise the
+    // note keeps its original text. Diagrams are still empty slots here: the sanitizer would strip their labels.
+    const untouchedBySanitizer = (root: Element): boolean => {
+      const reference = dom.parse(dom.serialize(root));
+      const copy = dom.parse(dom.serialize(root));
+      dom.sanitize(copy);
+      return canonicalChildren(copy) === canonicalChildren(reference);
+    };
     for (const node of prepared.nodes) {
       const { input } = node;
       const entry: ShareNodeTranslation = {
@@ -420,38 +436,63 @@ export class ShareTranslateService {
       };
       const reason = field(input.reason, false);
       if (reason !== undefined) entry.reason = reason;
-      if (node.root && node.extraction) {
-        const { root } = node;
-        applyTranslations(node.extraction, unit => body.results.get(unit.text));
-        // The privacy decision on links, taken on the assembled tree before anything is rewritten (D-2026-10-110).
-        localRefs += countLocalReferences(root);
-        options.dom.sanitize(root);
-        unwrapLocalLinks(root, () => options.dom.createSpan());
-        scrubShareTree(root);
-        const slots = elementsWithClass(root, SLOT_CLASS);
-        for (const [index, slot] of slots.entries()) {
+      if (node.root && node.extraction && input.detailHtml) {
+        const segments = node.extraction.units.map(unit => {
+          const translated = body.results.get(unit.text);
+          return translated !== undefined && translated !== unit.text && placeholdersMatch(unit.text, translated)
+            ? translated
+            : null;
+        });
+        const compact: CompactDetailEntry = {};
+        if (segments.some(text => text !== null)) {
+          compact.detailSegments = segments;
+          compact.detailCheck = detailCheckOf(node.extraction);
+        }
+        const diagrams: ShareDiagramTranslation[] = [];
+        for (const [index, original] of node.svgs.entries()) {
           if (signal.aborted) throw stopped();
-          let chosen: Element = node.svgs[index] ?? slot;
+          let stored: ShareDiagramTranslation = null;
           const plan = node.plans[index];
           let replaced = false;
           if (plan?.ok && options.renderMermaid) {
-            const rebuilt = plan.rebuild(plan.labels.map(text => labels.results.get(text)));
-            if (rebuilt.applied > 0) {
+            const rebuiltSource = plan.rebuild(plan.labels.map(text => labels.results.get(text)));
+            if (rebuiltSource.applied > 0) {
               try {
-                const drawn = await options.renderMermaid(rebuilt.source);
+                const drawn = await options.renderMermaid(rebuiltSource.source);
                 if (drawn && scrubMermaidSvg(drawn)) {
-                  chosen = drawn;
+                  normalizeSvgId(drawn, original.getAttribute("id"));
+                  stored = diagramEntryFor(original, drawn, serializeSvg);
                   replaced = true;
                 }
               } catch {
                 replaced = false;
+                stored = null;
               }
             }
           }
           if (!replaced && plan !== undefined) diagramsKept++;
-          if (chosen !== slot) slot.parentNode?.replaceChild(chosen, slot);
+          diagrams.push(stored);
         }
-        entry.detailHtml = options.dom.serialize(root);
+        if (diagrams.some(item => item !== null)) compact.detailDiagrams = diagrams;
+        // The note as a viewer rebuilds it, with the same function; a sanitizer change sends the text back to the original.
+        const parse = (html: string): Element => dom.parse(html);
+        let root = dom.parse(input.detailHtml);
+        const first = reconstructTranslatedDetail(root, compact, {
+          parse,
+          createSlot: () => dom.createDiv(),
+          afterText: untouchedBySanitizer
+        });
+        if (first.fallback && compact.detailSegments) {
+          fallbackNodes++;
+          delete compact.detailSegments;
+          delete compact.detailCheck;
+          root = dom.parse(input.detailHtml);
+          reconstructTranslatedDetail(root, compact, { parse, createSlot: () => dom.createDiv() });
+        }
+        // The privacy decision on links, taken on the tree that is displayed (D-2026-10-110, D-2026-10-122).
+        localRefs += countLocalReferences(root);
+        rebuilt[input.id] = dom.serialize(root);
+        Object.assign(entry, compact);
       }
       nodes[input.id] = entry;
     }
@@ -467,17 +508,23 @@ export class ShareTranslateService {
       totalSegments,
       failedSegments,
       diagramsKept,
+      fallbackNodes,
       calls: languageCalls,
       cacheHits: hits,
       ...(firstError ? { firstError } : {})
     };
-    const leakCategories: LeakCategory[] = leakCategoriesInTranslation(language, { top, nodes }, options.forbidden);
+    const leakCategories: LeakCategory[] = leakCategoriesInTranslation(
+      language,
+      { top, nodes },
+      options.forbidden,
+      rebuilt
+    );
     if (localRefs > 0 && !leakCategories.includes("wikilink")) leakCategories.push("wikilink");
     if (leakCategories.length) return { ...base, status: "blocked", leakCategories };
     const status: ShareLanguageStatus =
       totalSegments > 0 && failedSegments === totalSegments
         ? "failed"
-        : isIncomplete(failedSegments, totalSegments)
+        : isIncomplete(failedSegments, totalSegments) || fallbackNodes > 0
           ? "incomplete"
           : "complete";
     return { ...base, status, leakCategories: [], top, nodes };

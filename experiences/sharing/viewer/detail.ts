@@ -1,4 +1,6 @@
+import type { ShareNodeTranslation } from "../share-format";
 import type { ShareViewerUi } from "../share-viewer-ui";
+import { reconstructTranslatedDetail } from "../share-translate-compact";
 
 /** The pieces of the "Source: host" line shown under a web image: text before, link label, text after. */
 export function imageSourceParts(src: string, ui: Pick<ShareViewerUi, "imageSource">): [string, string, string] {
@@ -23,7 +25,7 @@ function sourceLine(doc: Document, src: string, ui: ShareViewerUi): HTMLElement 
 }
 
 /**
- * Puts the exported note HTML into `target`. The exporter already sanitized it; this pass repeats the cheap checks
+ * Puts the exported note HTML into `target` (see {@link fillDetailRoot} for the part after parsing). The exporter already sanitized it; this pass repeats the cheap checks
  * (no script, no event attributes, no script URLs) and does the viewer's own work: asset images, links, wide tables.
  * The HTML is parsed with DOMParser (an inert document), so nothing loads before it is cleaned.
  */
@@ -35,7 +37,17 @@ export function fillDetail(
   ui: ShareViewerUi
 ): void {
   // A parsed document is inert: no script runs and no image loads until the nodes are adopted below.
-  const root = new DOMParser().parseFromString(html, "text/html").body;
+  fillDetailRoot(doc, target, new DOMParser().parseFromString(html, "text/html").body, assets, ui);
+}
+
+/** The same clean-up and adoption for a note tree that is already parsed (a rebuilt translated note, D-2026-10-122). */
+export function fillDetailRoot(
+  doc: Document,
+  target: HTMLElement,
+  root: HTMLElement,
+  assets: Readonly<Record<string, string>>,
+  ui: ShareViewerUi
+): void {
   for (const node of Array.from(
     root.querySelectorAll("script, iframe, frame, object, embed, applet, link, meta, base")
   ))
@@ -86,4 +98,28 @@ export function fillDetail(
     wrap.append(table);
   }
   target.append(...Array.from(root.childNodes).map(child => doc.importNode(child, true)));
+}
+
+/**
+ * Shows a note in a translated language from its compact translation (D-2026-10-122): the original HTML is parsed,
+ * rebuilt with the stored text units and diagrams (text nodes only, no new element), and then goes through the same
+ * clean-up as any note. Fail closed: a translation that does not fit, or any error, shows the original note.
+ */
+export function fillTranslatedDetail(
+  doc: Document,
+  target: HTMLElement,
+  originalHtml: string,
+  translation: ShareNodeTranslation,
+  assets: Readonly<Record<string, string>>,
+  ui: ShareViewerUi
+): void {
+  const parse = (html: string): HTMLElement => new DOMParser().parseFromString(html, "text/html").body;
+  try {
+    const root = parse(originalHtml);
+    reconstructTranslatedDetail(root, translation, { parse, createSlot: () => doc.createElement("div") });
+    fillDetailRoot(doc, target, root, assets, ui);
+  } catch {
+    target.replaceChildren();
+    fillDetail(doc, target, originalHtml, assets, ui);
+  }
 }

@@ -9,6 +9,8 @@ import {
 } from "./share-format";
 import { SHARE_ASSET_SCHEME } from "./share-clean";
 import { scanPayloadForLeaks, type ForbiddenString, type LeakCategory } from "./share-leak-scan";
+import { countLocalReferences } from "./share-dom";
+import { detailCheckOf, prepareDetail, reconstructTranslatedDetail } from "./share-translate-compact";
 
 /**
  * Pure helpers for the share dialog's build lifecycle. No obsidian import.
@@ -210,19 +212,95 @@ export interface ShareTranslationPiece {
 
 /**
  * Leak categories found in one language's translated text. It runs the payload scan itself on a payload that holds
- * only this language, so the translated fields (`detailHtml` included) get every rule of the original text and no rule
- * is written twice (D-2026-10-116, DP4). Categories only, never the matched text.
+ * only this language, so the translated fields get every rule of the original text and no rule is written twice
+ * (D-2026-10-116, DP4). `rebuilt` is what a compact translation shows once the viewer has rebuilt each note
+ * (node id to HTML, D-2026-10-122); it is scanned under the `detailHtml` key, the same as the original note text.
+ * Categories only, never the matched text.
  */
 export function leakCategoriesInTranslation(
   language: string,
   piece: ShareTranslationPiece,
-  forbidden: readonly ForbiddenString[]
+  forbidden: readonly ForbiddenString[],
+  rebuilt?: Readonly<Record<string, string>>
 ): LeakCategory[] {
   const shaped = {
     translations: { [language]: piece.top },
-    nodes: Object.entries(piece.nodes).map(([id, translation]) => ({ id, translations: { [language]: translation } }))
+    nodes: Object.entries(piece.nodes).map(([id, translation]) => ({
+      id,
+      translations: {
+        [language]: rebuilt?.[id] !== undefined ? { ...translation, detailHtml: rebuilt[id] } : translation
+      }
+    }))
   } as unknown as SharePayload;
   return [...new Set(scanPayloadForLeaks(shaped, forbidden).map(hit => hit.category))];
+}
+
+/** The DOM pieces the rebuild needs; Obsidian's DOMParser and `innerHTML`, or a stand-in in tests. */
+export interface RebuildDom {
+  parse(html: string): Element;
+  serialize(root: Element): string;
+  createDiv(): Element;
+}
+export interface RebuiltTranslations {
+  /** The pieces with every compact note that does not fit its original (check mismatch, no original note) stripped of its compact fields. */
+  pieces: AttachTranslationsOptions["pieces"];
+  /** Language, then node id: the note HTML a viewer will display. Only notes with a compact translation are listed. */
+  rebuilt: Record<string, Record<string, string>>;
+  /** Links in the rebuilt notes that lead outside the page; above 0 blocks the file. */
+  localRefs: number;
+}
+
+/**
+ * Rebuilds every compact translated note from the payload's own note HTML with the viewer's function (D-2026-10-122,
+ * DP4): the privacy gates scan this result, not what the translation service saw earlier. A compact note whose check
+ * no longer fits the note HTML (the image option changed, say) is dropped back to its title and summary.
+ */
+export function rebuildTranslationsForPayload(
+  nodes: ReadonlyArray<{ id: string; detailHtml?: string }>,
+  pieces: AttachTranslationsOptions["pieces"],
+  dom: RebuildDom
+): RebuiltTranslations {
+  const original = new Map(nodes.map(node => [node.id, node.detailHtml]));
+  const rebuilt: Record<string, Record<string, string>> = {};
+  let localRefs = 0;
+  const next = pieces.map(({ language, piece }) => {
+    const entries: Record<string, ShareNodeTranslation> = {};
+    for (const [id, entry] of Object.entries(piece.nodes)) {
+      const compact = Array.isArray(entry.detailSegments) || Array.isArray(entry.detailDiagrams);
+      const html = original.get(id);
+      if (!compact && entry.detailCheck === undefined) {
+        entries[id] = entry;
+        continue;
+      }
+      const bare: ShareNodeTranslation = { ...entry };
+      delete bare.detailSegments;
+      delete bare.detailCheck;
+      delete bare.detailDiagrams;
+      try {
+        const fits =
+          !!html?.trim() &&
+          (entry.detailSegments === undefined ||
+            entry.detailCheck === detailCheckOf(prepareDetail(dom.parse(html), () => dom.createDiv()).extraction));
+        if (!html || !fits) {
+          entries[id] = bare;
+          continue;
+        }
+        const root = dom.parse(html);
+        reconstructTranslatedDetail(root, entry, {
+          parse: text => dom.parse(text),
+          createSlot: () => dom.createDiv()
+        });
+        localRefs += countLocalReferences(root);
+        (rebuilt[language] ??= {})[id] = dom.serialize(root);
+        entries[id] = entry;
+      } catch {
+        // Fail closed: a note that cannot be rebuilt here shows its original in the viewer too.
+        entries[id] = bare;
+      }
+    }
+    return { language, piece: { top: piece.top, nodes: entries } };
+  });
+  return { pieces: next, rebuilt, localRefs };
 }
 
 export interface AttachTranslationsOptions {

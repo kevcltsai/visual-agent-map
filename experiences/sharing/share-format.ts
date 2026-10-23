@@ -32,12 +32,28 @@ export type ShareTranslationLanguage = (typeof SHARE_TRANSLATION_LANGUAGES)[numb
 export const isShareTranslationLanguage = (value: unknown): value is ShareTranslationLanguage =>
   typeof value === "string" && (SHARE_TRANSLATION_LANGUAGES as readonly string[]).includes(value);
 
-/** One note's text in a translated language. `detailHtml` keeps the field name so the leak scan treats it like the original. */
+/** One edit to a diagram's flat node list (elements and text nodes in document order, the `<svg>` itself first): a text node's new text, or an element's attributes (a value of null removes the attribute). */
+export type ShareDiagramPatchOp = [number, string] | [number, Record<string, string | null>];
+/**
+ * A translated diagram (D-2026-10-122): null keeps the original drawing; `{check, patch}` edits the original drawing
+ * (`check` ties the patch to it); `{svg}` carries the whole translated drawing when a patch cannot describe it.
+ */
+export type ShareDiagramTranslation = { check: string; patch: ShareDiagramPatchOp[] } | { svg: string } | null;
+
+/**
+ * One note's text in a translated language. New files carry the compact form (D-2026-10-122): `detailSegments` holds
+ * the translated text units of the original `detailHtml` (null keeps the original unit), `detailCheck` ties them to
+ * that original, and `detailDiagrams` the diagrams; the viewer rebuilds the note from the original. `detailHtml` is
+ * the legacy whole-note form: read-only, never written any more.
+ */
 export interface ShareNodeTranslation {
   title: string;
   summary: string;
   reason?: string;
   detailHtml?: string;
+  detailSegments?: Array<string | null>;
+  detailCheck?: string;
+  detailDiagrams?: ShareDiagramTranslation[];
 }
 /** The map-level text in a translated language. */
 export interface ShareMapTranslation {

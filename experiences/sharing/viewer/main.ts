@@ -1,9 +1,10 @@
 import { applyCollapseLevel, descendants, type MapNode } from "../../../map-graph";
 import { arrangeMap } from "../../../map-layout";
 import { fitViewport, focusViewport, insetFromRects, type MapViewport } from "../../visual-map/viewport-inset";
-import type { ShareNodePayload, SharePayload } from "../share-format";
+import type { ShareNodePayload, ShareNodeTranslation, SharePayload } from "../share-format";
 import { SHARE_VIEWER_UI_DEFAULT, type ShareViewerUi } from "../share-viewer-ui";
-import { fillDetail } from "./detail";
+import { isCompactEntry } from "../share-translate-compact";
+import { fillDetail, fillTranslatedDetail } from "./detail";
 import { edgePathData } from "./edge-path";
 import { pickShareLanguage, shareLanguageKey } from "./language";
 
@@ -155,7 +156,10 @@ export function startViewer(doc: Document): void {
     ui = uiOf(language);
     doc.documentElement.lang = language;
   }
-  type Shown = Pick<ShareNodePayload, "title" | "summary" | "reason" | "detailHtml">;
+  type Shown = Pick<ShareNodePayload, "title" | "summary" | "reason" | "detailHtml"> & {
+    /** A compact translation (D-2026-10-122): the note is rebuilt from `detailHtml`, the original, with it. */
+    compact?: ShareNodeTranslation;
+  };
   /** A note's text in the language on screen; a field the translation lacks shows the original. */
   const textOf = (item: ShareNodePayload): Shown => {
     const translation = isTranslated() ? item.translations?.[language] : undefined;
@@ -164,7 +168,10 @@ export function startViewer(doc: Document): void {
       title: isText(translation.title) ? translation.title : item.title,
       summary: isText(translation.summary) ? translation.summary : item.summary,
       reason: isText(translation.reason) ? translation.reason : item.reason,
-      detailHtml: isText(translation.detailHtml) ? translation.detailHtml : item.detailHtml
+      detailHtml: isText(translation.detailHtml) ? translation.detailHtml : item.detailHtml,
+      ...(isCompactEntry(translation) && isText(item.detailHtml)
+        ? { compact: translation, detailHtml: item.detailHtml }
+        : {})
     };
   };
   const mapTextNow = (): { title: string; goal: string } => {
@@ -661,9 +668,10 @@ export function startViewer(doc: Document): void {
     if (typeof item.summary === "string" && item.summary.trim())
       inspector.append(make("p", "vam-sample-summary", item.summary));
     const detail = make("div", "vam-sample-detail");
-    if (typeof item.detailHtml === "string" && item.detailHtml.trim())
-      fillDetail(doc, detail, item.detailHtml, assets, ui);
-    else detail.append(make("p", "vam-inspector-empty", ui.noContent));
+    if (typeof item.detailHtml === "string" && item.detailHtml.trim()) {
+      if (item.compact) fillTranslatedDetail(doc, detail, item.detailHtml, item.compact, assets, ui);
+      else fillDetail(doc, detail, item.detailHtml, assets, ui);
+    } else detail.append(make("p", "vam-inspector-empty", ui.noContent));
     inspector.append(detail);
     const kids = kidsOf.get(id) ?? [];
     if (kids.length) {

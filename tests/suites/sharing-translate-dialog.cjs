@@ -49,11 +49,13 @@ function fakeExporter({ nodes = manyNodes(6), diagramResult = null } = {}) {
     async ensureImages() { calls.images++; },
     assemble(options, translation) {
       calls.assemble.push({ options: plain(options), languages: translation ? plain(translation.pieces.map(item => item.language)) : [], defaultLanguage: translation?.defaultLanguage });
-      const full = translation ? build.attachTranslations(payload, translation) : payload;
-      const hits = scan.scanPayloadForLeaks(full, forbidden);
+      // Like the real exporter: compact translations are rebuilt from the payload's own notes and the rebuilt notes are what is scanned.
+      const rebuilt = translation ? build.rebuildTranslationsForPayload(payload.nodes, translation.pieces, { parse: html.parse, serialize: html.serialize, createDiv: () => html.makeDom().createDiv() }) : null;
+      const full = translation ? build.attachTranslations(payload, { ...translation, pieces: rebuilt.pieces }) : payload;
+      const hits = [...scan.scanPayloadForLeaks(full, forbidden), ...(rebuilt ? rebuilt.pieces.flatMap(item => build.leakCategoriesInTranslation(item.language, item.piece, forbidden, rebuilt.rebuilt[item.language]).map(category => ({ category }))) : [])];
       const base = { payload: full, bytes: 0, counts: { topics: nodes.length, notesWithContent: nodes.length, images: 0 }, leakCategories: [...new Set(hits.map(hit => hit.category))], failedImages: 0, mermaidUndrawn: 0, mermaidBlocked: 0 };
       if (base.leakCategories.length) return base;
-      const text = `<html>${JSON.stringify({ languages: full.languages ?? null, defaultLanguage: full.defaultLanguage ?? null, ja: full.translations?.ja?.title ?? null, en: full.translations?.en?.title ?? null, svgs: (full.nodes[0].translations?.en?.detailHtml ?? full.nodes[0].translations?.ja?.detailHtml ?? '').match(/<svg/g)?.length ?? 0 })}</html>`;
+      const text = `<html>${JSON.stringify({ languages: full.languages ?? null, defaultLanguage: full.defaultLanguage ?? null, ja: full.translations?.ja?.title ?? null, en: full.translations?.en?.title ?? null, svgs: (rebuilt?.rebuilt.en?.a ?? rebuilt?.rebuilt.ja?.a ?? '').match(/<svg/g)?.length ?? 0 })}</html>`;
       return { ...base, html: text, bytes: text.length };
     },
     dispose() { calls.disposed++; },
@@ -592,4 +594,48 @@ test('share dialog D-120: an undetermined original (und) is the fallback too: a 
   const shown = d.notices.slice(before);
   assert.ok(shown.some(n => n.includes('日本語') && n.includes('Original') && !n.includes('browser')), plain(shown));
   assert.equal(JSON.parse(d.log.written[0].replace(/^<html>|<\/html>$/g, '')).defaultLanguage, 'und');
+});
+
+// ---- compact translated notes (D-2026-10-122): the real exporter's assemble rebuilds and scans what the viewer will show ----
+test('share exporter assemble: compact translations are rebuilt from the payload notes and every gate scans the rebuilt text', () => {
+  const compact = load('experiences/sharing/share-translate-compact.ts');
+  const segs = load('experiences/sharing/share-translate-segments.ts');
+  class FileSystemAdapter { getBasePath() { return '/Users/me/Vault'; } }
+  const module = load('experiences/sharing/share-exporter.ts', { obsidian: { ...obsidian, FileSystemAdapter, Component: class { load() {} unload() {} addChild() {} removeChild() {} } } });
+  const detailHtml = '<p>Salt the water <strong>before</strong> it boils.</p><p>Second paragraph here.</p>';
+  const map = { id: 'map-1', title: 'Map', outputLanguage: 'en', viewport: { x: 0, y: 0, zoom: 1 }, nodes: [{ id: 'a', path: 'Folder/A.md', parentId: null, x: 0, y: 0, collapsed: false }] };
+  const note = { title: 'A', summary: 'S', status: 'idea', model: '', detail: 'x' };
+  const make = () => {
+    const exporter = new module.ShareExporter({ vault: { adapter: new FileSystemAdapter(), getName: () => 'V' } }, { map, notes: new Map([['a', note]]), mapPath: 'Folder/Map.md' }, { vamVersion: '1', language: 'en', rebuildDom: { parse: html.parse, serialize: html.serialize, createDiv: () => html.makeDom().createDiv() } });
+    exporter.rendered.set('a', { html: detailHtml, diagrams: [], diagramsUnsourced: 0, localRefs: 0, attachments: [], mermaidUndrawn: 0, mermaidBlocked: 0 });
+    return exporter;
+  };
+  const extraction = segs.extractSegments(html.parse(detailHtml));
+  const entry = overrides => ({ title: 'A2', summary: 'S2', detailSegments: extraction.units.map(unit => `T:${unit.text}`), detailCheck: compact.detailCheckOf(extraction), ...overrides });
+  const withEntry = value => ({ contentLanguage: 'en', pieces: [{ language: 'ja', piece: { top: { title: 'Map2' }, nodes: { a: value } } }] });
+  const options = { includeDetail: true, includeImages: false };
+
+  const ok = make().assemble(options, withEntry(entry()));
+  assert.deepEqual(plain(ok.leakCategories), []);
+  assert.ok(ok.html, 'the file is written');
+  assert.equal(ok.payload.nodes[0].translations.ja.detailHtml, undefined, 'no whole-note html travels');
+  assert.equal(ok.payload.nodes[0].translations.ja.detailSegments.length, 2);
+  // A unit with a wikilink, a patch with the vault path, a stored drawing with a model name: blocked, nothing written.
+  const wikilink = make().assemble(options, withEntry(entry({ detailSegments: ['see [[Private]]', 'T:b'] })));
+  assert.ok(wikilink.leakCategories.includes('wikilink') && !wikilink.html);
+  const patch = make().assemble(options, withEntry(entry({ detailDiagrams: [{ check: 'c', patch: [[1, '/Users/me/Vault/x']] }] })));
+  assert.ok(patch.leakCategories.includes('vault-path') && !patch.html);
+  // The note changed after translating (a stale check): the compact fields are dropped and the file still builds.
+  const stale = make().assemble(options, withEntry(entry({ detailCheck: '9.zzz' })));
+  assert.deepEqual(plain(stale.leakCategories), []);
+  assert.deepEqual(Object.keys(stale.payload.nodes[0].translations.ja).sort(), ['summary', 'title']);
+  // A legacy entry with a whole detailHtml is still scanned like the original text.
+  const legacy = make().assemble(options, withEntry({ title: 'A2', summary: 'S2', detailHtml: '<p>see [[Private]]</p>' }));
+  assert.ok(legacy.leakCategories.includes('wikilink'));
+  // The rebuilt note linking to a local file blocks the file.
+  const linked = make();
+  linked.rendered.set('a', { html: '<p>See <a href="Diary/secret.md">my diary</a> today.</p>', diagrams: [], diagramsUnsourced: 0, localRefs: 0, attachments: [], mermaidUndrawn: 0, mermaidBlocked: 0 });
+  const linkedExtraction = segs.extractSegments(html.parse('<p>See <a href="Diary/secret.md">my diary</a> today.</p>'));
+  const blocked = linked.assemble(options, withEntry({ title: 'A2', summary: 'S2', detailSegments: linkedExtraction.units.map(unit => `T:${unit.text}`), detailCheck: compact.detailCheckOf(linkedExtraction) }));
+  assert.ok(blocked.leakCategories.includes('wikilink') && !blocked.html);
 });

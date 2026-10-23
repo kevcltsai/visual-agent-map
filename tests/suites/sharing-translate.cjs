@@ -10,6 +10,7 @@ const segments = load('experiences/sharing/share-translate-segments.ts');
 const mermaid = load('experiences/sharing/share-translate-mermaid.ts');
 const planModule = load('experiences/sharing/share-translate-plan.ts');
 const format = load('experiences/sharing/share-format.ts');
+const compact = load('experiences/sharing/share-translate-compact.ts');
 const build = load('experiences/sharing/share-build.ts');
 const scan = load('experiences/sharing/share-leak-scan.ts');
 const languages = load('i18n/languages.ts');
@@ -23,6 +24,12 @@ const FIXTURES = ['rich.html', 'inline.html', 'code-diagram.html'];
 const elementCount = el => el.children.reduce((sum, child) => sum + 1 + elementCount(child), 0);
 const tagList = el => el.children.flatMap(child => [child.localName, ...tagList(child)]);
 const tagged = text => `T:${text}`;
+// The note a viewer shows for a compact translation: the viewer's own rebuild of the ORIGINAL note html.
+const shown = (originalHtml, entry) => {
+  const root = html.parse(originalHtml);
+  compact.reconstructTranslatedDetail(root, entry, { parse: html.parse, createSlot: () => new html.El('div', root.ownerDocument) });
+  return html.serialize(root);
+};
 
 test('share translate: the translation languages are the six registry languages', () => {
   assert.deepEqual(plain(format.SHARE_TRANSLATION_LANGUAGES), ['zh-TW', 'zh-CN', 'en', 'ja', 'ko', 'es']);
@@ -281,7 +288,9 @@ test('share translate service: translates every field and paragraph, at most 3 c
   assert.equal(ja.failedSegments, 0);
   assert.equal(ja.nodes.n0.title, 'T:Topic 0');
   assert.equal(ja.nodes.n3.summary, 'T:Summary of topic 3');
-  assert.ok(ja.nodes.n7.detailHtml.startsWith('<p>T:Paragraph 7'), ja.nodes.n7.detailHtml.slice(0, 40));
+  const n7 = shown(source.nodes.find(node => node.id === 'n7').detailHtml, ja.nodes.n7);
+  assert.ok(n7.startsWith('<p>T:Paragraph 7'), n7.slice(0, 40));
+  assert.equal(ja.nodes.n7.detailHtml, undefined, 'a new file carries no whole-note detailHtml');
   assert.equal(ja.top.title, 'T:My map');
   assert.equal(ja.top.goal, 'T:Learn it');
   assert.ok(state.maxInFlight <= 3 && state.maxInFlight >= 2, `parallelism ${state.maxInFlight}`);
@@ -365,10 +374,11 @@ test('share translate service: a failed batch is sent once more; what still fail
     raw.segments = raw.segments.filter(segment => segment.text !== 'T:null' && segment.text !== null);
     return JSON.stringify(raw);
   };
-  const partial = await new ShareTranslateService(run).translate(baseSource(manyNodes(3)), ['es'], baseOptions());
+  const partialSource = baseSource(manyNodes(3));
+  const partial = await new ShareTranslateService(run).translate(partialSource, ['es'], baseOptions());
   const result = partial.languages[0];
   assert.ok(result.failedSegments >= 1);
-  assert.ok(result.nodes.n1.detailHtml.includes('Paragraph 1'), 'the failed paragraph is still the original');
+  assert.ok(shown(partialSource.nodes[1].detailHtml, result.nodes.n1).includes('Paragraph 1'), 'the failed paragraph is still the original');
 
   // More than 10% failing marks the language incomplete; all failing marks it failed.
   let count = 0;
@@ -393,7 +403,8 @@ test('share translate service: a placeholder the model breaks is not used, not c
   const cache = new planModule.ShareTranslationCache();
   const result = (await new ShareTranslateService(run).translate(source, ['es'], baseOptions({ cache }))).languages[0];
   assert.equal(result.failedSegments, 1);
-  assert.equal(result.nodes.a.detailHtml, '<p>Salt the water <strong>before</strong> it boils.</p><p>T:Plain second paragraph here.</p>');
+  assert.equal(shown(source.nodes[0].detailHtml, result.nodes.a), '<p>Salt the water <strong>before</strong> it boils.</p><p>T:Plain second paragraph here.</p>');
+  assert.deepEqual(plain(result.nodes.a.detailSegments), [null, 'T:Plain second paragraph here.'], 'the broken unit is stored as "keep the original"');
   assert.equal(cache.get('map-1', 'es', 'claude:sonnet', planModule.segmentHash('Salt the water ⟦1⟧before⟦/1⟧ it boils.')), undefined);
 });
 
@@ -424,7 +435,7 @@ test('share translate service: hostile replies become text, the cleaned tree gai
   const { run } = fakeRunner({ transform: text => (text.includes('⟦') ? text.replace(/[^⟦⟧\/\d]+/g, m => (m.trim() ? '<script>x</script><a href="obsidian://x">q</a> ' : m)) : `<a href="obsidian://x">${text}</a>`) });
   const forbidden = scan.forbiddenStringsFor({ mapFolder: 'Private Map' }, { nodes: [] });
   const result = (await new ShareTranslateService(run).translate(source, ['ja'], baseOptions())).languages[0];
-  const out = result.nodes.a.detailHtml;
+  const out = shown(source.nodes[0].detailHtml, result.nodes.a);
   assert.ok(!/<script|<a href="obsidian/.test(out), out.slice(0, 300));
   const original = html.parse(fixture('rich.html'));
   assert.deepEqual(plain(tagList(html.parse(out)).sort()), plain(tagList(original).sort()), 'same elements as the original, none more');
@@ -441,13 +452,14 @@ test('share translate service: diagrams are translated through the injected rend
   const { run, state } = fakeRunner({ transform: text => `L:${text}` });
   const result = (await new ShareTranslateService(run).translate(source, ['ja'], baseOptions({ renderMermaid }))).languages[0];
   assert.deepEqual(plain(sources), ['flowchart TD\n  A[L:Start here] --> B[L:Heat the pan]'], 'comment lines are gone before the source is drawn');
-  assert.ok(result.nodes.a.detailHtml.includes('translated drawing') && !result.nodes.a.detailHtml.includes('<text class="t"'), 'the new drawing replaced the old one');
+  const drawing = shown(source.nodes[0].detailHtml, result.nodes.a);
+  assert.ok(drawing.includes('translated drawing') && !drawing.includes('<text class="t"'), 'the new drawing replaced the old one');
   assert.equal(result.diagramsKept, 0);
   assert.ok(state.calls.some(call => call.stepId === 'share-translate.labels'), 'labels use the labels step');
   for (const failing of [async () => null, async () => { throw new Error('mermaid failed'); }, async () => html.parse('<div>not an svg</div>').children[0]]) {
     const again = fakeRunner({ transform: text => `L:${text}` });
     const kept = (await new ShareTranslateService(again.run).translate(source, ['ja'], baseOptions({ renderMermaid: failing }))).languages[0];
-    assert.ok(kept.nodes.a.detailHtml.includes('<text class="t" x="14" y="33">Start</text>'), 'the original drawing stays');
+    assert.ok(shown(source.nodes[0].detailHtml, kept.nodes.a).includes('<text class="t" x="14" y="33">Start</text>'), 'the original drawing stays');
     assert.equal(kept.diagramsKept, 1);
     assert.equal(kept.status, 'complete');
   }
@@ -455,7 +467,7 @@ test('share translate service: diagrams are translated through the injected rend
   const unsourced = baseSource([{ id: 'a', title: 'A', summary: 'S', detailHtml: fixture('code-diagram.html'), diagramsUnsourced: 1 }]);
   const noSource = (await new ShareTranslateService(fakeRunner().run).translate(unsourced, ['ja'], baseOptions({ renderMermaid: async () => null }))).languages[0];
   assert.equal(noSource.diagramsKept, 1);
-  assert.ok(noSource.nodes.a.detailHtml.includes('<text class="t" x="14" y="33">Start</text>'), 'the original drawing stays');
+  assert.ok(shown(unsourced.nodes[0].detailHtml, noSource.nodes.a).includes('<text class="t" x="14" y="33">Start</text>'), 'the original drawing stays');
   // click statements: never translated, never drawn.
   const hostile = baseSource([{ id: 'a', title: 'A', summary: 'S', detailHtml: fixture('code-diagram.html'), diagrams: [{ svgIndex: 0, source: 'flowchart TD\n  A[Start here] --> B[Heat]\n  click A "https://evil.example"' }] }]);
   const calledWith = [];
@@ -495,4 +507,197 @@ test('share translate service: a note that still carries a local link blocks the
   assert.equal(ok.length, 2);
   assert.equal(seen.length, 2, 'the sanitizer ran once per language and note');
   assert.ok(seen[0].includes('T:Hello <a href="https://example.org">there</a> friend.'), seen[0]);
+});
+
+// ---- compact translated notes (D-2026-10-122): the stored form, the shared rebuild, the gates on what is displayed ----
+// The pre-compact way to build a translated note (slot the diagrams out, replace the text units, put the diagrams back),
+// written out independently so the rebuild is compared with it and not with itself.
+const oldWayShown = (originalHtml, translate) => {
+  const root = html.parse(originalHtml);
+  const svgs = segments.topLevelSvgs(root);
+  for (const svg of svgs) { const slot = new html.El('div', root.ownerDocument); slot.setAttribute('class', 'vam-mermaid-slot'); svg.parentNode.replaceChild(slot, svg); }
+  segments.applyTranslations(segments.extractSegments(root), unit => translate(unit.text));
+  segments.elementsWithClass(root, 'vam-mermaid-slot').forEach((slot, index) => slot.parentNode.replaceChild(svgs[index], slot));
+  return compact.canonicalChildren(root);
+};
+const canonicalOf = originalHtml => compact.canonicalChildren(html.parse(originalHtml));
+const serviceEntry = async (detailHtml, { transform = tagged, extra = {}, options = {} } = {}) => {
+  const source = baseSource([{ id: 'a', title: 'A', summary: 'S', detailHtml, ...extra }]);
+  const { run } = fakeRunner({ transform });
+  const result = (await new ShareTranslateService(run).translate(source, ['ja'], baseOptions(options))).languages[0];
+  return { source, result, entry: result.nodes?.a };
+};
+
+test('share translate compact: the rebuilt note equals the pre-compact translated note for every fixture (attribute order aside)', async () => {
+  const heat = viewerPayload.nodes.find(node => node.id === 'heat').detailHtml;
+  for (const [label, detailHtml] of [...FIXTURES.map(name => [name, fixture(name)]), ['viewer heat', heat]]) {
+    const { entry, result } = await serviceEntry(detailHtml);
+    assert.equal(result.status, 'complete', label);
+    assert.equal(entry.detailHtml, undefined, `${label}: no whole-note html is stored`);
+    assert.ok(Array.isArray(entry.detailSegments) && typeof entry.detailCheck === 'string', label);
+    const expected = oldWayShown(detailHtml, text => (segments.hasTranslatableText(text) ? tagged(text) : undefined));
+    assert.equal(compact.canonicalChildren(html.parse(shown(detailHtml, entry))), expected, label);
+  }
+});
+
+test('share translate compact: a new file stores segments, not the note; unchanged units are null and the stored size is far below the whole note', async () => {
+  const detailHtml = `<h2>Heading words</h2>${Array.from({ length: 30 }, (_, i) => `<p>Paragraph number ${i} has <strong>bold</strong> and <a href="https://example.org/${i}">a link</a> to keep.</p>`).join('')}<table><tr><td>Only</td><td>12</td></tr></table>`;
+  const { entry } = await serviceEntry(detailHtml);
+  assert.deepEqual(Object.keys(entry).sort(), ['detailCheck', 'detailSegments', 'summary', 'title']);
+  assert.ok(entry.detailSegments.every(text => typeof text === 'string' && text.startsWith('T:')));
+  assert.ok(JSON.stringify(entry).length < detailHtml.length, 'smaller than the whole note');
+  // A unit the model returned unchanged is stored as null.
+  const same = await serviceEntry('<p>Keep this exactly.</p><p>Change this one.</p>', { transform: text => (text.startsWith('Keep') ? text : tagged(text)) });
+  assert.deepEqual(plain(same.entry.detailSegments), [null, 'T:Change this one.']);
+  // Nothing translated: no segment list at all.
+  const none = await serviceEntry('<p>Only this.</p>', { transform: text => text });
+  assert.equal(none.entry.detailSegments, undefined);
+  assert.equal(none.entry.detailCheck, undefined);
+});
+
+test('share translate compact: the rebuild fails closed (count, check, one unit, legacy entry)', async () => {
+  const detailHtml = '<p>Salt the water <strong>before</strong> it boils.</p><p>Plain second paragraph here.</p><p><img src="data:image/png;base64,AAAA" alt="a picture of salt"></p>';
+  const { entry } = await serviceEntry(detailHtml);
+  const original = html.serialize(html.parse(detailHtml));
+  assert.equal(entry.detailSegments.length, 3, 'two paragraphs and the image alt');
+  assert.ok(shown(detailHtml, entry).includes('T:Plain second paragraph here.'));
+  // The wrong number of segments, a wrong check, a missing check: the whole text shows the original.
+  assert.equal(shown(detailHtml, { ...entry, detailSegments: entry.detailSegments.slice(1) }), original);
+  assert.equal(shown(detailHtml, { ...entry, detailCheck: 'x' + entry.detailCheck }), original);
+  assert.equal(shown(detailHtml, { detailSegments: entry.detailSegments }), original);
+  assert.equal(shown(detailHtml, { ...entry, detailSegments: 'nope' }), original);
+  // The original changed after the translation: the check no longer fits.
+  assert.equal(shown(detailHtml.replace('Plain second', 'Plain third'), entry), html.serialize(html.parse(detailHtml.replace('Plain second', 'Plain third'))));
+  // One unit with broken placeholders: only that unit shows its original text.
+  const broken = entry.detailSegments.slice();
+  broken[segments.extractSegments(html.parse(detailHtml)).units.findIndex(unit => unit.text.includes('⟦'))] = 'Salz vorher es kocht.';
+  const out = shown(detailHtml, { ...entry, detailSegments: broken });
+  assert.ok(out.includes('Salt the water <strong>before</strong> it boils.') && out.includes('T:Plain second paragraph here.'));
+  // A legacy entry (whole detailHtml, no compact fields) changes nothing in the rebuild and is not compact.
+  assert.equal(shown(detailHtml, { title: 'x', summary: 'y' }), original);
+  assert.equal(compact.isCompactEntry({ title: 'x', summary: 'y', detailHtml: '<p>old</p>' }), false);
+  assert.equal(compact.isCompactEntry(entry), true);
+  // The rebuild adds no element: same tags as the original.
+  assert.deepEqual(plain(tagList(html.parse(shown(detailHtml, entry)))), plain(tagList(html.parse(detailHtml))));
+});
+
+test('share translate compact: diagram patch, id normalization and the whole-drawing fallback', () => {
+  const svg = text => html.parse(text).children[0];
+  const original = svg('<svg id="mermaid-1" viewBox="0 0 10 10"><style>#mermaid-1 .n{fill:red}</style><g id="mermaid-1-g"><text class="t" x="1">Start</text></g></svg>');
+  const drawn = svg('<svg id="mermaid-9" viewBox="0 0 10 10"><style>#mermaid-9 .n{fill:red}</style><g id="mermaid-9-g"><text class="t" x="1">Anfang</text></g></svg>');
+  assert.equal(compact.normalizeSvgId(drawn, original.getAttribute('id')), true);
+  assert.equal(drawn.getAttribute('id'), 'mermaid-1');
+  assert.ok(html.serialize({ childNodes: [drawn] }).includes('#mermaid-1 .n{fill:red}') && html.serialize({ childNodes: [drawn] }).includes('id="mermaid-1-g"'), 'ids inside styles and attributes follow');
+  const patch = compact.diffSvg(original, drawn);
+  assert.deepEqual(plain(patch), [[5, 'Anfang']], 'only the label differs after normalization');
+  const serialize = element => html.serialize({ childNodes: [element] });
+  const stored = compact.diagramEntryFor(original, drawn, serialize);
+  assert.deepEqual(plain(stored), { check: compact.svgCheckOf(original), patch: [[5, 'Anfang']] });
+  // Applying the patch to the original gives the translated drawing (attribute order aside).
+  const copy = original.cloneNode(true);
+  assert.equal(compact.applySvgPatch(copy, patch), true);
+  assert.equal(compact.canonicalElement(copy), compact.canonicalElement(drawn));
+  // Attribute changes and removals travel in the patch too.
+  const moved = svg('<svg id="mermaid-1" viewBox="0 0 12 10" data-x="1"><style>#mermaid-1 .n{fill:red}</style><g id="mermaid-1-g"><text class="t">Start</text></g></svg>');
+  assert.deepEqual(plain(compact.diffSvg(original, moved)), [[0, { viewBox: '0 0 12 10', 'data-x': '1' }], [4, { x: null }]], 'changed, added and removed attributes');
+  // A different shape cannot be patched: the whole drawing is stored.
+  const reshaped = svg('<svg id="mermaid-1"><text>only</text></svg>');
+  assert.equal(compact.diffSvg(original, reshaped), null);
+  assert.deepEqual(plain(compact.diagramEntryFor(original, reshaped, serialize)), { svg: serialize(reshaped) });
+  // A drawing equal to the original needs no entry.
+  assert.equal(compact.diagramEntryFor(original, original.cloneNode(true), serialize), null);
+  // Patches that do not fit are refused.
+  for (const bad of [[[99, 'x']], [[0, 'text on an element']], [[5, { a: 'b' }]], [[1.5, 'x']], 'nope', [[0]], [[0, { a: 1 }]]])
+    assert.equal(compact.applySvgPatch(original.cloneNode(true), bad), false, JSON.stringify(bad));
+});
+
+test('share translate compact: diagrams in a note come back from the original, a patch, or a whole drawing; a wrong check keeps the original', async () => {
+  const detailHtml = fixture('code-diagram.html');
+  const drawn = text => html.parse(text).children[0];
+  for (const [label, drawing, kind] of [
+    ['patch', '<svg id="m7" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 220 60" role="img" aria-label="flow"><style>.n{fill:#8a5cf5}</style><rect class="n" x="2" y="12" width="60" height="32"></rect><text class="t" x="14" y="33">Anfang</text></svg>', 'patch'],
+    ['whole', '<svg id="m7"><text>translated drawing</text></svg>', 'svg']
+  ]) {
+    const { entry } = await serviceEntry(detailHtml, { transform: text => `L:${text}`, extra: { diagrams: [{ svgIndex: 0, source: 'flowchart TD\n  A[Start here] --> B[Heat the pan]' }] }, options: { renderMermaid: async () => drawn(drawing) } });
+    assert.ok(kind in entry.detailDiagrams[0], `${label}: ${JSON.stringify(entry.detailDiagrams)}`);
+    const out = shown(detailHtml, entry);
+    assert.ok(out.includes(label === 'patch' ? '>Anfang</text>' : 'translated drawing'), label);
+    assert.ok(!out.includes('id="m7"'), `${label}: the drawing carries the original id`);
+    // The original drawing changed after the translation: a patch no longer fits and the original stays.
+    if (kind === 'patch') {
+      const changed = detailHtml.replace('x="14" y="33"', 'x="15" y="33"');
+      assert.ok(shown(changed, { detailDiagrams: entry.detailDiagrams }).includes('>Start</text>'));
+    }
+  }
+  // A failed drawing is simply not stored.
+  const { entry } = await serviceEntry(detailHtml, { extra: { diagrams: [{ svgIndex: 0, source: 'flowchart TD\n  A[Start here] --> B[Heat the pan]' }] }, options: { renderMermaid: async () => null } });
+  assert.equal(entry.detailDiagrams, undefined);
+});
+
+test('share translate compact: the gates scan what is displayed and the stored fields', async () => {
+  const forbidden = scan.forbiddenStringsFor({ vaultPath: '/Users/me/Vault', mapFolder: 'Private Map' }, { nodes: [{ path: 'Private Map/Note.md' }] }, [{ model: 'claude-sonnet-4-5' }]);
+  const piece = nodes => ({ top: { title: 'T' }, nodes });
+  // A segment with a wikilink, a patch with a vault path: the language is blocked (scanned under their own keys, code not stripped).
+  assert.ok(build.leakCategoriesInTranslation('ja', piece({ a: { title: 'x', summary: 'y', detailSegments: ['see [[Private Note]]'], detailCheck: '1.x' } }), forbidden).includes('wikilink'));
+  assert.ok(build.leakCategoriesInTranslation('ja', piece({ a: { title: 'x', summary: 'y', detailDiagrams: [{ check: 'c', patch: [[3, 'in /Users/me/Vault/x']] }] } }), forbidden).includes('vault-path'));
+  assert.ok(build.leakCategoriesInTranslation('ja', piece({ a: { title: 'x', summary: 'y', detailDiagrams: [{ svg: '<svg><text>claude-sonnet-4-5</text></svg>' }] } }), forbidden).includes('model-name'));
+  assert.deepEqual(plain(build.leakCategoriesInTranslation('ja', piece({ a: { title: 'x', summary: 'y', detailSegments: ['fine'], detailCheck: '1.x' } }), forbidden)), []);
+  // Through the service: a unit that becomes a wikilink blocks the language and nothing travels.
+  const blocked = await serviceEntry('<p>Hello world, nice day.</p>', { transform: text => (text.startsWith('Hello') ? 'see [[Private Note]]' : tagged(text)), options: { forbidden } });
+  assert.equal(blocked.result.status, 'blocked');
+  assert.ok(blocked.result.leakCategories.includes('wikilink'));
+  assert.equal(blocked.result.nodes, undefined);
+  // What is scanned is the rebuilt note: a forbidden string only the rebuilt html contains (a model name inside a code
+  // block of the original is shown by the viewer as well) is found even though no stored field carries it.
+  const code = await serviceEntry('<p>Plain words here.</p><pre><code>claude-sonnet-4-5</code></pre>', { options: { forbidden } });
+  assert.equal(code.result.status, 'blocked');
+  assert.ok(code.result.leakCategories.includes('model-name'));
+});
+
+test('share translate compact: a local link in the rebuilt note blocks the file; a stale check drops the compact fields', () => {
+  const dom = { parse: html.parse, serialize: html.serialize, createDiv: () => html.makeDom().createDiv() };
+  const original = '<p>Salt the water first.</p><p>See <a href="Diary/secret.md">my diary</a> today.</p>';
+  const entry = { title: 'x', summary: 'y' };
+  const extraction = segments.extractSegments(html.parse(original));
+  const withSegments = { ...entry, detailSegments: extraction.units.map(unit => `T:${unit.text}`), detailCheck: compact.detailCheckOf(extraction) };
+  const piece = { top: { title: 'T' }, nodes: { a: withSegments } };
+  const linked = build.rebuildTranslationsForPayload([{ id: 'a', detailHtml: original }], [{ language: 'ja', piece }], dom);
+  assert.ok(linked.localRefs > 0, 'the rebuilt note still links to a local file');
+  // The note changed (or its images were left out) after translating: the compact fields are dropped, the rest stays.
+  const stale = build.rebuildTranslationsForPayload([{ id: 'a', detailHtml: original.replace('first', 'second') }], [{ language: 'ja', piece }], dom);
+  assert.deepEqual(plain(stale.pieces[0].piece.nodes.a), plain(entry));
+  assert.deepEqual(plain(stale.rebuilt), {});
+  // A note with no original html loses them too; the caller's piece is not mutated.
+  const gone = build.rebuildTranslationsForPayload([{ id: 'a' }], [{ language: 'ja', piece }], dom);
+  assert.deepEqual(plain(gone.pieces[0].piece.nodes.a), plain(entry));
+  assert.ok(Array.isArray(piece.nodes.a.detailSegments), 'the input piece still has its segments');
+  // A fitting note is kept and its displayed html is listed.
+  const fine = build.rebuildTranslationsForPayload([{ id: 'a', detailHtml: '<p>Salt the water first.</p>' }], [{ language: 'ja', piece: { top: { title: 'T' }, nodes: { a: { ...entry, detailSegments: ['T:Salt the water first.'], detailCheck: compact.detailCheckOf(segments.extractSegments(html.parse('<p>Salt the water first.</p>'))) } } } }], dom);
+  assert.equal(fine.localRefs, 0);
+  assert.equal(fine.rebuilt.ja.a, '<p>T:Salt the water first.</p>');
+  // Legacy entries (whole detailHtml) pass through untouched.
+  const legacy = { top: { title: 'T' }, nodes: { a: { title: 'x', summary: 'y', detailHtml: '<p>old</p>' } } };
+  const kept = build.rebuildTranslationsForPayload([{ id: 'a', detailHtml: '<p>new</p>' }], [{ language: 'ja', piece: legacy }], dom);
+  assert.deepEqual(plain(kept.pieces[0].piece), plain(legacy));
+});
+
+test('share translate compact: when the sanitizer changes the rebuilt text the note keeps its original text and is counted', async () => {
+  const detailHtml = '<p>Salt the water <strong>before</strong> it boils.</p><p>Second paragraph here.</p>';
+  // The sanitizer removes an element: the translated text may not travel on.
+  const removing = html.makeDom({ sanitize: root => { for (const el of root.children) for (const child of el.children) child.remove(); } });
+  const { result, entry } = await serviceEntry(detailHtml, { options: { dom: removing } });
+  assert.equal(result.fallbackNodes, 1);
+  assert.equal(result.status, 'incomplete', 'the user is told this language is not fully translated');
+  assert.equal(entry.detailSegments, undefined);
+  assert.equal(entry.detailCheck, undefined);
+  assert.equal(shown(detailHtml, entry), html.serialize(html.parse(detailHtml)), 'the original text is shown');
+  assert.equal(entry.title, 'T:A', 'title and summary stay translated');
+  // The sanitizer changes a text: same outcome.
+  const rewriting = html.makeDom({ sanitize: root => { root.children[0].childNodes[0].nodeValue = 'changed'; } });
+  assert.equal((await serviceEntry(detailHtml, { options: { dom: rewriting } })).result.fallbackNodes, 1);
+  // A sanitizer that only reorders attributes passes (the comparison ignores attribute order).
+  const reordering = html.makeDom({ sanitize: root => { const walk = el => { const attrs = [...el.attrs]; el.attrs = new Map(attrs.reverse()); el.children.forEach(walk); }; root.children.forEach(walk); } });
+  const ok = await serviceEntry('<p class="a" id="b">Hello there friend.</p>', { options: { dom: reordering } });
+  assert.equal(ok.result.fallbackNodes, 0);
+  assert.ok(Array.isArray(ok.entry.detailSegments));
 });

@@ -260,7 +260,7 @@ export class ShareExporter {
   private container: HTMLElement | null = null;
   private disposed = false;
   private forbidden: ForbiddenString[] | null = null;
-  private shellText: { language: ShareLanguage; text: string } | null = null;
+  private shellText: { key: string; text: string } | null = null;
 
   constructor(
     private readonly app: App,
@@ -607,8 +607,10 @@ export class ShareExporter {
     const payload = translation ? attachTranslations(base.payload, translation) : base.payload;
     const ui = shareViewerUiFor(language);
     const forbidden = this.forbiddenStrings();
-    if (!this.shellText || this.shellText.language !== language)
-      this.shellText = { language, text: renderShareShell(ui) };
+    // The shell text covers the interface text of every language the file carries.
+    const shellKey = `${language}|${(payload.languages ?? []).join(",")}`;
+    if (!this.shellText || this.shellText.key !== shellKey)
+      this.shellText = { key: shellKey, text: renderShareShell(ui, payload.languages) };
     const hits = [...scanPayloadForLeaks(payload, forbidden), ...scanForLeaks(this.shellText.text, forbidden)];
     const renderedLeaks = renderedLeakCategories(this.rendered.values(), options);
     const leakCategories = [...new Set<LeakCategory>([...hits.map(hit => hit.category), ...renderedLeaks])];

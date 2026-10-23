@@ -15,6 +15,9 @@ const uiModule = load('experiences/sharing/share-viewer-ui.ts');
 const scan = load('experiences/sharing/share-leak-scan.ts');
 const edge = load('experiences/sharing/viewer/edge-path.ts');
 const { parseMap } = load('map-model.ts');
+const language = load('experiences/sharing/viewer/language.ts');
+const dictionaries = load('experiences/sharing/share-viewer-dictionaries.ts');
+const build = load('experiences/sharing/share-build.ts');
 const cssTools = import(pathToFileURL(path.join(root, 'scripts', 'viewer-css.mjs')).href);
 
 const read = relative => fs.readFileSync(path.join(root, relative), 'utf8');
@@ -66,7 +69,7 @@ test('sharing viewer: the edge curve is the plugin\'s edgePathData', () => {
 test('sharing viewer: the bundle is built from the plugin\'s own layout and nothing from Obsidian', () => {
   const result = buildSync({ entryPoints: [path.join(root, 'experiences/sharing/viewer/index.ts')], platform: 'browser', format: 'iife', metafile: true, external: [] });
   const inputs = Object.keys(result.metafile.inputs).map(file => path.relative(root, path.resolve(process.cwd(), file)).split(path.sep).join('/')).sort();
-  assert.deepEqual(inputs, ['experiences/sharing/share-viewer-ui.ts', 'experiences/sharing/viewer/detail.ts', 'experiences/sharing/viewer/edge-path.ts', 'experiences/sharing/viewer/index.ts', 'experiences/sharing/viewer/main.ts', 'experiences/visual-map/viewport-inset.ts', 'map-graph.ts', 'map-layout.ts']);
+  assert.deepEqual(inputs, ['experiences/sharing/share-viewer-ui.ts', 'experiences/sharing/viewer/detail.ts', 'experiences/sharing/viewer/edge-path.ts', 'experiences/sharing/viewer/index.ts', 'experiences/sharing/viewer/language.ts', 'experiences/sharing/viewer/main.ts', 'experiences/visual-map/viewport-inset.ts', 'map-graph.ts', 'map-layout.ts']);
   const graph = load('map-graph.ts');
   const model = load('map-model.ts');
   const node = { id: 'a', path: 'a', parentId: 'p', x: 0, y: 0, collapsed: false, aimKind: 'answer', aimConvergesFromNodeIds: ['p', 'q'] };
@@ -112,6 +115,8 @@ test('sharing viewer: the viewer program has no eval and writes titles and summa
   // Storage is only touched inside try/catch.
   const main = sources[0];
   assert.equal((main.match(/localStorage/g) ?? []).length, 2);
+  assert.match(main, /storageGet\(LANGUAGE_KEY\)/);
+  assert.match(main, /storageSet\(LANGUAGE_KEY, code\)/);
   for (const name of ['storageGet', 'storageSet']) assert.match(main, new RegExp(`function ${name}[\\s\\S]*?try \\{[\\s\\S]*?localStorage[\\s\\S]*?catch`));
   assert.match(main, /vam-share-panel-width/);
 });
@@ -237,4 +242,121 @@ test('sharing viewer O-4: at phone width the panel heading (with Close) is stick
   assert.match(rule[1], /position: sticky/);
   assert.match(rule[1], /top: 0/);
   assert.match(rule[1], /background: var\(--background-primary\)/);
+});
+
+// ---- Sharing translation T1 (W-B): the viewer's language choice, menu text and the unchanged P1 page.
+const pick = (languages, input = {}) => language.pickShareLanguage({ languages, browser: [], ...input });
+
+test('sharing viewer language: order is stored, then defaultLanguage, then the browser, then the original', () => {
+  const langs = ['fr', 'en', 'ja', 'zh-TW'];
+  assert.equal(pick(langs), 'fr');
+  assert.equal(pick(langs, { browser: ['de-DE', 'en-US'] }), 'en');
+  assert.equal(pick(langs, { browser: ['ja'], defaultLanguage: 'zh-TW' }), 'zh-TW');
+  assert.equal(pick(langs, { browser: ['en'], defaultLanguage: 'ja', stored: 'zh-TW' }), 'zh-TW');
+  assert.equal(pick(langs, { browser: ['en'], defaultLanguage: 'ja', stored: 'ko' }), 'ja', 'a stored language the file lacks is ignored');
+  assert.equal(pick(langs, { browser: ['en'], defaultLanguage: 'ko' }), 'en', 'a default the file lacks is ignored');
+  assert.equal(pick(langs, { browser: ['de', 'it'] }), 'fr', 'nothing matches: the original');
+  assert.equal(pick(langs, { stored: null, defaultLanguage: undefined, browser: [] }), 'fr');
+  assert.equal(pick(['de', 'en'], { defaultLanguage: 'en', browser: ['de'] }), 'en', 'defaultLanguage beats the browser');
+});
+
+test('sharing viewer language: Chinese variants and region tags map the way the plan says', () => {
+  const both = ['en', 'zh-TW', 'zh-CN'];
+  for (const tag of ['zh-Hant', 'zh-TW', 'zh-HK', 'zh-MO', 'zh-Hant-TW', 'zh-hant-hk', 'zh_TW']) assert.equal(language.matchBrowserLanguage(tag, both), 'zh-TW', tag);
+  for (const tag of ['zh-Hans', 'zh-CN', 'zh-SG', 'zh', 'zh-Hans-CN', 'ZH']) assert.equal(language.matchBrowserLanguage(tag, both), 'zh-CN', tag);
+  assert.equal(language.matchBrowserLanguage('zh-CN', ['en', 'zh-TW']), undefined, 'no Simplified in the file: no match, the next browser language is tried');
+  assert.equal(pick(['en', 'zh-TW'], { browser: ['zh-CN', 'zh-TW'] }), 'zh-TW');
+  assert.equal(language.matchBrowserLanguage('en-US', both), 'en');
+  assert.equal(language.matchBrowserLanguage('ja-JP', ['fr', 'ja']), 'ja');
+  // A region tag falls back to its main language code; an exact tag the file carries wins first.
+  assert.equal(language.matchBrowserLanguage('pt-BR', ['fr', 'pt']), 'pt');
+  assert.equal(language.matchBrowserLanguage('pt-PT', ['fr', 'pt-BR']), 'pt-BR');
+  assert.equal(language.matchBrowserLanguage('pt-BR', ['pt', 'pt-BR']), 'pt-BR');
+  assert.equal(language.matchBrowserLanguage('pt-BR', ['fr', 'es']), undefined);
+  assert.equal(language.matchBrowserLanguage('', both), undefined);
+  assert.equal(language.matchBrowserLanguage(undefined, both), undefined);
+});
+
+test('sharing viewer language: a throwing localStorage never stops the viewer from choosing a language', () => {
+  const main = read('experiences/sharing/viewer/main.ts');
+  // storageGet returns null on any error, and pickShareLanguage treats null/undefined stored as "no choice yet".
+  assert.match(main, /function storageGet[\s\S]*?try \{[\s\S]*?catch \{\s*return null;/);
+  assert.equal(pick(['fr', 'en'], { stored: null, browser: ['en'] }), 'en');
+  assert.equal(pick(['fr', 'en'], { stored: undefined, browser: ['en'] }), 'en');
+  // The navigator read is guarded too.
+  assert.match(main, /try \{\s*browser = Array\.from\(window\.navigator\.languages/);
+});
+
+test('sharing viewer language: interface text for ja, ko and es is complete and marked as not native-reviewed', () => {
+  const english = text.shareViewerUiFor('en');
+  for (const code of ['ja', 'ko', 'es']) {
+    const ui = dictionaries.SHARE_VIEWER_UI_EXTRA[code];
+    assert.equal(ui.lang, code);
+    assert.deepEqual(Object.keys(ui).sort(), Object.keys(english).sort(), code);
+    for (const [key, value] of Object.entries(ui)) assert.ok(typeof value === 'string' && value.trim(), `${code}.${key}`);
+    for (const key of ['goal', 'expandToLevel', 'zoomReset', 'expandCount', 'imageSource', 'aiTranslated']) assert.match(ui[key], /\{0\}/, `${code}.${key}`);
+    assert.ok(!/\{[1-9]\}/.test(JSON.stringify(ui)));
+  }
+  assert.match(read('experiences/sharing/share-viewer-dictionaries.ts'), /NOT[\s*]+native-reviewed/);
+  // The three new strings exist in the plugin dictionaries for every interface language.
+  for (const lang of LANGUAGES) {
+    const ui = text.shareViewerUiFor(lang);
+    assert.ok(ui.language && ui.aiTranslated.includes('{0}') && ui.imageTextUntranslated, lang);
+  }
+});
+
+test('sharing viewer language: a translated file carries the interface text of each of its languages, a plain file nothing extra', () => {
+  const data = payload();
+  const ui = text.shareViewerUiFor('en');
+  const plainOutput = html.renderShareHtml(data, ui);
+  const plainBlock = JSON.parse(/<script type="application\/json" id="vam-ui">([\s\S]*?)<\/script>/.exec(plainOutput)[1]);
+  assert.deepEqual(Object.keys(plainBlock).sort(), Object.keys(ui).sort(), 'no extra fields without translations');
+  assert.match(plainOutput, /^<!doctype html>\n<html lang="en">/);
+  const pieces = ['en', 'ja', 'ko', 'es', 'zh-TW'].map(lang => ({ language: lang, piece: { top: { title: `T ${lang}` }, nodes: {} } }));
+  const translated = build.attachTranslations(data, { contentLanguage: 'fr', pieces, defaultLanguage: 'ja' });
+  const output = html.renderShareHtml(translated, ui);
+  assert.match(output, /<html lang="fr">/, '<html lang> is the content language');
+  assert.equal((output.match(/<script\b/g) ?? []).length, 3);
+  const block = JSON.parse(/<script type="application\/json" id="vam-ui">([\s\S]*?)<\/script>/.exec(output)[1]);
+  assert.deepEqual(Object.keys(block.uiByLanguage).sort(), ['en', 'es', 'fr', 'ja', 'ko', 'zh-TW']);
+  assert.equal(block.uiByLanguage.ja.install, dictionaries.SHARE_VIEWER_UI_EXTRA.ja.install);
+  assert.equal(block.uiByLanguage.fr.install, ui.install, 'a language outside the six shows English interface text');
+  assert.equal(block.languageNames.ja, '日本語');
+  assert.equal(block.languageNames['zh-TW'], '繁體中文');
+  assert.equal(block.languageNames.en, 'English');
+  assert.equal(block.languageNames.fr, 'Français');
+  assert.equal(block.install, ui.install, 'the plain fields are unchanged');
+  assert.deepEqual(plain(html.parseShareHtml(output)), plain(translated));
+  // The leak gate scans the same text.
+  const forbidden = forbiddenFor();
+  assert.deepEqual(plain(scan.scanForLeaks(html.renderShareShell(ui, translated.languages), forbidden)), []);
+  assert.ok(html.renderShareShell(ui, translated.languages).includes('"uiByLanguage"'));
+});
+
+test('sharing viewer language: a plain file shows exactly the P1 page (same DOM in headless Chrome)', () => {
+  const candidates = [process.env.CHROME_BIN, '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome', '/usr/bin/google-chrome', '/usr/bin/google-chrome-stable', '/usr/bin/chromium'].filter(Boolean);
+  const chrome = candidates.find(file => fs.existsSync(file));
+  if (!chrome) return; // The page DOM is also compared by the viewer's own manual check; this layer needs a browser.
+  const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'vam-share-p1-'));
+  try {
+    const out = path.join(directory, 'p1.html');
+    execFileSync(process.execPath, [path.join(root, 'scripts', 'make-share-demo.mjs'), '--out', out, '--lang', 'en'], { cwd: root });
+    const dom = execFileSync(chrome, ['--headless=new', '--disable-gpu', '--no-sandbox', `--user-data-dir=${path.join(directory, 'profile')}`, '--window-size=1280,800', '--virtual-time-budget=3000', '--dump-dom', pathToFileURL(out).href], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'], timeout: 60000 });
+    const clean = value => value.replace(/transform: translate\([^)]*\) scale\([^)]*\);/, 'transform: T;');
+    const app = dom.slice(dom.indexOf('<div id="vam-app"'), dom.indexOf('<script type="application/json" id="vam-ui">')).trimEnd() + '\n';
+    assert.equal(clean(app), clean(read('tests/fixtures/sharing/viewer-p1-app.html')));
+    assert.match(dom, /<html lang="en">/);
+  } finally {
+    fs.rmSync(directory, { recursive: true, force: true });
+  }
+});
+
+test('sharing viewer language: switching goes through the same text and detail paths as the original', () => {
+  const main = read('experiences/sharing/viewer/main.ts');
+  // A translated note's detailHtml reaches fillDetail (DOMParser clean-up) exactly like the original's, and every text is set with textContent.
+  assert.match(main, /fillDetail\(doc, detail, item\.detailHtml, assets, ui\)/);
+  assert.match(main, /detailHtml: isText\(translation\.detailHtml\) \? translation\.detailHtml : item\.detailHtml/);
+  assert.doesNotMatch(main, /innerHTML|insertAdjacentHTML/);
+  assert.match(main, /doc\.documentElement\.lang = code/);
+  assert.match(main, /languageSelect\.setAttribute\("aria-label", ui\.language\)/);
 });

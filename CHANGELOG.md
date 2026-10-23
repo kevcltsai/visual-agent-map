@@ -5,10 +5,10 @@
 ### Added
 
 Sharing
-- Share this map (command and button in the map view): saves the map, and optionally its notes and images, as one HTML file that opens in any browser, even offline. You choose where it is saved; VAM does not upload anything. The share dialog shows the number of topics, notes and images and the file size before you save. Turn off "Include full notes" to share only the map structure and topic summaries, and turn off "Include images" to leave pictures out (they are marked in the text) and get a much smaller file. Diagrams are drawn into the file; if Mermaid is not allowed in the vault or a diagram does not finish drawing, its source is shown instead, with a warning in the dialog.
+- Share this map (command and button in the map view): saves the map, and optionally its notes and images, as one HTML file that opens in any browser, even offline (pictures that link to a web address need a connection to show). You choose where it is saved; VAM does not upload anything. The share dialog shows the number of topics, notes and images and the file size before you save. Turn off "Include full notes" to share only the map structure and topic summaries, and turn off "Include images" to leave pictures out (they are marked in the text) and get a much smaller file. Diagrams are drawn into the file; if Mermaid is not allowed in the vault or a diagram does not finish drawing, its source is shown instead, with a warning in the dialog.
 - Before anything is written, the file is checked for private information: the vault's location on your computer, a note's file path, a map folder name, `[[note links]]` left in the text, `app://`, `obsidian://` and `file://` addresses, internal VAM field names and AI model names. If one is found nothing is saved and the dialog says what it was. Links between notes are decided on the text readers actually see, and text hidden in Markdown comments or after an unclosed comment marker is not shared.
 - "Copy the GitHub publishing instructions" button after saving: copies a ready-to-paste instruction for your own Claude Code or Codex that publishes the saved file to GitHub Pages and gives you a link. The button only copies text. Publishing is up to you, and everyone who has the link can see the content.
-- The shared page shows the map with a side panel for each topic and a link back to Visual Agent Map. It loads nothing from the internet and works in a narrow window. AIM research maps and the built-in sample cannot be shared yet.
+- The shared page shows the map with a side panel for each topic and a link back to Visual Agent Map. Apart from images in your notes that link to a web address (the reader's browser fetches them from that site, and each shows its source), it loads nothing from the internet, and it works in a narrow window. AIM research maps and the built-in sample cannot be shared yet.
 
 Translated share files
 - The share dialog can add translated versions: tick the languages to add, see the number of AI calls and the estimated minutes, then press "Translate and save…". Progress shows the language and batch, Cancel stops the translation and saves nothing, and results are listed per language (complete, incomplete, failed or blocked) before you save with "Save file…". Everything selected that was already translated in the same session is reused with no new AI calls. Translations are scanned for private information like the original, and text inside images is not translated.
@@ -33,7 +33,7 @@ Models
 - Not tested: the translation quality of Japanese, Korean and Spanish share files, the shared page in a private (incognito) window, and an original-language file whose language cannot be told (its viewer interface is in English).
 - A few diagram labels may stay untranslated, and a diagram whose labels could not be translated keeps its original labels (the dialog says how many).
 - Not checked live: the share dialog's private-information messages in Simplified Chinese and English, and Windows or Linux.
-- Pictures from the web are not embedded in a share file: remote image addresses are removed, so those images do not appear.
+- Pictures from the web are not embedded in a share file: they keep their original web address and are shown only when the reader is online. Web references inside diagrams are removed.
 
 ## [0.25.0] - 2026-10-22
 

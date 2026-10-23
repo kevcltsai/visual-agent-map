@@ -48,7 +48,7 @@ CLI detection alone does not verify authentication, organization access or struc
 
 ## Share a map
 
-Open a mind map and choose **Share this map** (command or button). VAM saves one HTML file that opens in any browser, even offline; you choose where it is saved. The dialog lets you leave out full notes or images, and AI can add translated versions (needs Codex or Claude Code). Before saving, VAM checks the file for private information such as your vault's location or `[[note links]]`, and saves nothing if it finds any. **Copy the GitHub publishing instructions** only copies text for you to paste into your own Claude Code or Codex. See [Known limitations](#known-limitations) for what is not shared.
+Open a mind map and choose **Share this map** (command or button). VAM saves one HTML file that opens in any browser, even offline (images that link to the web need a connection); you choose where it is saved. The dialog lets you leave out full notes or images, and AI can add translated versions (needs Codex or Claude Code). Before saving, VAM checks the file for private information such as your vault's location or `[[note links]]`, and saves nothing if it finds any. **Copy the GitHub publishing instructions** only copies text for you to paste into your own Claude Code or Codex. See [Known limitations](#known-limitations) for what is not shared.
 
 ## If setup does not complete
 
@@ -77,7 +77,7 @@ Images found by AI web search may not be free to reuse; check each source page. 
 
 New mind maps are created in `Mind Maps/` and new AIM maps in `AIM/` inside your workspace folder (both names can be changed in settings, which renames the existing folder and closes the Settings window while it runs; Obsidian may ask about links for each map). Existing maps in `Topics/` keep working where they are; VAM never moves them on its own. To move them, run the command "Organize workspace folders", which shows a preview first and restores everything if a step fails. The Inbox is no longer managed: notes in an existing `Inbox/` folder are left untouched. When "Organize workspace folders" leaves the legacy `Topics/` folder or the `Inbox/` folder completely empty, it moves that empty folder to the trash (following your Obsidian trash setting); a folder that still contains anything is never touched. Maps saved with the pre-0.4 structure (outside these folders) can still be opened and viewed, but cannot be renamed, edited structurally, or organized. If Obsidian is closed or VAM is disabled while a move is running, some maps may be left in their new folder with outdated links inside VAM; run "Refresh VAM data" (it repairs those paths first) or start "Organize workspace folders" again.
 
-Share files: AIM research maps and the built-in sample cannot be shared yet, and web image addresses are not embedded. Translations are made by AI and their quality is not checked by a native speaker. iOS cannot open a local HTML file, so view a shared file on a phone through a web address such as GitHub Pages. Opening a share file from a local file on desktop Safari was not tested.
+Share files: AIM research maps and the built-in sample cannot be shared yet, and web images are not embedded: they keep their original address and are shown only when the reader is online. Translations are made by AI and their quality is not checked by a native speaker. iOS cannot open a local HTML file, so view a shared file on a phone through a web address such as GitHub Pages. Opening a share file from a local file on desktop Safari was not tested.
 
 Coffee Tables stores what it needs to continue a conversation in the hidden `Coffee Tables/.sessions` folder. Obsidian Sync skips hidden folders, so on other devices you can read synced conversations but not continue them; continue them on the device where they started.
 
@@ -133,7 +133,7 @@ VAM 不會自行安裝或更新任一 CLI；至少需要一個服務，另一個
 
 ## 分享地圖
 
-開啟心智圖後，選擇 **Share this map**（分享這張地圖，指令或按鈕皆可）。VAM 會存成一個 HTML 檔，可在任何瀏覽器開啟（也能離線），存放位置由你選擇。對話框可選擇不含完整筆記或圖片，也可用 AI 加上翻譯版本（需要 Codex 或 Claude Code）。存檔前 VAM 會檢查檔案是否含有私人資訊，例如 vault 的位置或 `[[筆記連結]]`；若有就不會存檔。**複製發佈到 GitHub 的指令**只會複製文字，讓你貼到自己的 Claude Code 或 Codex。哪些內容不會分享，請見 [已知限制](#已知限制)。
+開啟心智圖後，選擇 **Share this map**（分享這張地圖，指令或按鈕皆可）。VAM 會存成一個 HTML 檔，可在任何瀏覽器開啟（也能離線；連到網路的圖片需要連線），存放位置由你選擇。對話框可選擇不含完整筆記或圖片，也可用 AI 加上翻譯版本（需要 Codex 或 Claude Code）。存檔前 VAM 會檢查檔案是否含有私人資訊，例如 vault 的位置或 `[[筆記連結]]`；若有就不會存檔。**複製發佈到 GitHub 的指令**只會複製文字，讓你貼到自己的 Claude Code 或 Codex。哪些內容不會分享，請見 [已知限制](#已知限制)。
 
 ## 設定沒有完成時
 
@@ -162,6 +162,6 @@ AI 從網路找到的圖片不一定能自由使用，請查看各自的來源�
 
 新的心智圖會建立在工作區資料夾內的 `Mind Maps/`，新的 AIM 會建立在 `AIM/`（資料夾名稱可在設定中修改，會一併重新命名既有資料夾，執行時設定視窗會關閉，Obsidian 可能會逐份詢問連結處理方式）。`Topics/` 內既有的地圖維持原位、照常可用；VAM 不會自行搬動它們。要搬移請執行「整理工作區資料夾」指令，它會先顯示預覽，任一步失敗會還原全部。收件匣（Inbox）不再由 VAM 管理：既有 `Inbox/` 內的筆記原封不動。當「整理工作區資料夾」讓舊的 `Topics/` 或 `Inbox/` 資料夾完全清空時，會把該空資料夾移到垃圾桶（依你的 Obsidian 垃圾桶設定）；仍有任何內容的資料夾絕不會被動到。以 0.4 前舊結構儲存的地圖（不在上述資料夾內）仍可開啟與檢視，但不能改名、不能修改結構，也不會被整理。若搬移進行中關閉了 Obsidian 或停用了 VAM，部分地圖可能已在新資料夾但 VAM 內的路徑尚未更新；請執行「重新整理 VAM 資料」（會先修復這些路徑），或再次執行「整理工作區資料夾」。
 
-分享檔：AIM 研究地圖與內建範例目前不能分享，網路圖片位址不會內嵌；翻譯由 AI 產生，品質未經母語者檢查。iOS 無法開啟本機 HTML 檔，手機請透過網址（例如 GitHub Pages）檢視；桌面 Safari 開啟本機分享檔尚未測試。
+分享檔：AIM 研究地圖與內建範例目前不能分享，網路圖片不會內嵌，保留原網址，讀者連線時才顯示；翻譯由 AI 產生，品質未經母語者檢查。iOS 無法開啟本機 HTML 檔，手機請透過網址（例如 GitHub Pages）檢視；桌面 Safari 開啟本機分享檔尚未測試。
 
 Coffee Tables 把接續對談所需的資料存在隱藏資料夾 `Coffee Tables/.sessions`。Obsidian Sync 不同步隱藏資料夾，因此在其他裝置上可以閱讀同步過去的對談，但無法接著聊；請回到開始對談的裝置繼續。

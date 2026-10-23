@@ -19,12 +19,11 @@ export type SaveOutcome = "saved" | "downloaded" | "cancelled";
 const isAbort = (error: unknown): boolean => (error as { name?: unknown } | null)?.name === "AbortError";
 
 export function browserSaveEnvironment(): SaveEnvironment {
-  const picker = (window as unknown as { showSaveFilePicker?: SaveEnvironment["showSaveFilePicker"] })
-    .showSaveFilePicker;
+  // Call through `host` so the picker keeps `window` as `this` (a detached call throws "Illegal invocation").
+  const host = window as unknown as { showSaveFilePicker: NonNullable<SaveEnvironment["showSaveFilePicker"]> };
   return {
-    showSaveFilePicker: picker
-      ? options => picker.call(window, options) as ReturnType<NonNullable<SaveEnvironment["showSaveFilePicker"]>>
-      : undefined,
+    showSaveFilePicker:
+      typeof host.showSaveFilePicker === "function" ? options => host.showSaveFilePicker(options) : undefined,
     triggerDownload: (url, name) => {
       const anchor = createEl("a", { attr: { href: url, download: name } });
       activeDocument.body.appendChild(anchor);

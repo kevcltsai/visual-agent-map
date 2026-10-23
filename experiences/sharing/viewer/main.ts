@@ -6,6 +6,7 @@ import { SHARE_VIEWER_UI_DEFAULT, type ShareViewerUi } from "../share-viewer-ui"
 import { isCompactEntry } from "../share-translate-compact";
 import { fillDetail, fillTranslatedDetail } from "./detail";
 import { edgePathData } from "./edge-path";
+import { createViewerElement } from "./dom";
 import { pickShareLanguage, shareLanguageKey } from "./language";
 
 /** Where "Install VAM" points. The only link the viewer itself carries. */
@@ -212,7 +213,7 @@ export function startViewer(doc: Document): void {
     cls?: string,
     text?: string
   ): HTMLElementTagNameMap[K] => {
-    const element = doc.createElement(tag);
+    const element = createViewerElement(doc, tag);
     if (cls) element.className = cls;
     if (text !== undefined) element.textContent = text;
     return element;

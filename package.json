@@ -14,7 +14,7 @@
     "test:vault:normal": "node scripts/test-harness.mjs --prepare --profile=normal",
     "test:vault:reinstall": "node scripts/test-harness.mjs --prepare --profile=reinstall",
     "verify:vault:reinstall": "node scripts/verify-reinstall-test-vault.mjs",
-    "lint": "eslint . --max-warnings=0",
+    "lint": "eslint . --max-warnings=0 && node scripts/check-css.mjs",
     "test": "node scripts/test-harness.mjs",
     "test:unit": "npm run compile:sample && node tests/run.cjs --layer=unit && node --test tests/compliance-gates.mjs tests/prompt-snapshots.cjs tests/replay.cjs tests/markdown-selection-auto-open.cjs tests/step-runner.cjs tests/relevance-offline.cjs tests/steps-*.cjs",
     "test:aim": "node --test --test-name-pattern='AIM|Manual Planner|Planner reviews|saved-report Planner|captured malformed|coverage:|final delivery|missing or unavailable|invalid and duplicate|cancellation stops|acceptance can retain' tests/run.cjs tests/aim-final-delivery.cjs && node --test tests/aim-review-repair.cjs tests/aim-prompt-contract.cjs tests/aim-evidence-context.cjs tests/aim-delivery-resume.cjs tests/aim-delivery-lineage.cjs tests/aim-lineage-delivery-flow.cjs tests/aim-section-delivery.cjs tests/aim-parallel-store.cjs tests/codex-parallel-runtime.cjs tests/aim-research-pipeline.cjs tests/aim-contracts.cjs tests/prompt-monitor-timing.cjs tests/aim-fingerprints.cjs tests/aim-checkpoint-resume.cjs tests/steps-aim-prompt-language.cjs tests/steps-aim-literal-inventory.cjs tests/steps-aim-node-replay.cjs",

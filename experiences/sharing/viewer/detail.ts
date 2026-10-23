@@ -1,6 +1,7 @@
 import type { ShareNodeTranslation } from "../share-format";
 import type { ShareViewerUi } from "../share-viewer-ui";
 import { reconstructTranslatedDetail } from "../share-translate-compact";
+import { createViewerElement } from "./dom";
 
 /** The pieces of the "Source: host" line shown under a web image: text before, link label, text after. */
 export function imageSourceParts(src: string, ui: Pick<ShareViewerUi, "imageSource">): [string, string, string] {
@@ -13,9 +14,9 @@ export function imageSourceParts(src: string, ui: Pick<ShareViewerUi, "imageSour
 
 function sourceLine(doc: Document, src: string, ui: ShareViewerUi): HTMLElement {
   const [before, host, after] = imageSourceParts(src, ui);
-  const line = doc.createElement("span");
+  const line = createViewerElement(doc, "span");
   line.className = "vam-image-source";
-  const link = doc.createElement("a");
+  const link = createViewerElement(doc, "a");
   link.setAttribute("href", src);
   link.setAttribute("target", "_blank");
   link.setAttribute("rel", "noopener noreferrer");
@@ -64,7 +65,7 @@ export function fillDetailRoot(
     }
   }
   const omitted = (): HTMLElement => {
-    const span = doc.createElement("span");
+    const span = createViewerElement(doc, "span");
     span.className = "vam-image-omitted";
     span.textContent = ui.imageOmitted;
     return span;
@@ -92,7 +93,7 @@ export function fillDetailRoot(
   }
   for (const table of Array.from(root.querySelectorAll("table"))) {
     if (table.parentElement?.classList.contains("vam-table-scroll")) continue;
-    const wrap = doc.createElement("div");
+    const wrap = createViewerElement(doc, "div");
     wrap.className = "vam-table-scroll";
     table.replaceWith(wrap);
     wrap.append(table);
@@ -116,7 +117,7 @@ export function fillTranslatedDetail(
   const parse = (html: string): HTMLElement => new DOMParser().parseFromString(html, "text/html").body;
   try {
     const root = parse(originalHtml);
-    reconstructTranslatedDetail(root, translation, { parse, createSlot: () => doc.createElement("div") });
+    reconstructTranslatedDetail(root, translation, { parse, createSlot: () => createViewerElement(doc, "div") });
     fillDetailRoot(doc, target, root, assets, ui);
   } catch {
     target.replaceChildren();

@@ -60,11 +60,6 @@ export default defineConfig([
     rules: { "depend/ban-dependencies": "error" },
   },
   {
-    // The share viewer runs in a plain browser page, where Obsidian's global createEl/createDiv helpers do not exist.
-    files: ["experiences/sharing/viewer/**/*.ts"],
-    rules: { "obsidianmd/prefer-create-el": "off" }
-  },
-  {
     // These two tools create/verify our disposable Vault with its default config
     // directory. They do not address a user's existing Vault configuration.
     files: ["scripts/create-onboarding-test-vault.mjs", "scripts/test-harness.mjs"],

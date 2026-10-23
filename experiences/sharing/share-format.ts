@@ -20,6 +20,14 @@ export const SHARE_TRANSLATION_LANGUAGES = [
   "ko",
   "es"
 ] as const satisfies readonly ContentLanguage[];
+/**
+ * `contentLanguage` of a file whose original language could not be told (a map with Latin or other text nothing
+ * recognises). BCP 47 "undetermined": it takes none of the six translation languages' places, and the viewer names no
+ * source language for it.
+ */
+export const SHARE_UNKNOWN_LANGUAGE = "und";
+/** The language of a file's original text: a registry language, or {@link SHARE_UNKNOWN_LANGUAGE}. */
+export type ShareOriginalLanguage = ContentLanguage | typeof SHARE_UNKNOWN_LANGUAGE;
 export type ShareTranslationLanguage = (typeof SHARE_TRANSLATION_LANGUAGES)[number];
 export const isShareTranslationLanguage = (value: unknown): value is ShareTranslationLanguage =>
   typeof value === "string" && (SHARE_TRANSLATION_LANGUAGES as readonly string[]).includes(value);

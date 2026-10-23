@@ -12,10 +12,14 @@ import {
   type ShareTranslateRequest
 } from "../../core/steps/share-translate/step";
 import type { ReasoningLevel } from "../../ai/types";
-import type { ContentLanguage } from "../../i18n";
 import { countLocalReferences, scrubMermaidSvg, scrubShareTree, unwrapLocalLinks } from "./share-dom";
 import { leakCategoriesInTranslation } from "./share-build";
-import type { ShareMapTranslation, ShareNodeTranslation, ShareTranslationLanguage } from "./share-format";
+import type {
+  ShareMapTranslation,
+  ShareNodeTranslation,
+  ShareOriginalLanguage,
+  ShareTranslationLanguage
+} from "./share-format";
 import type { ForbiddenString, LeakCategory } from "./share-leak-scan";
 import {
   estimateMinutes,
@@ -87,13 +91,15 @@ export interface ShareTranslateNodeInput {
   /** The cleaned `detailHtml` exactly as the original payload carries it. */
   detailHtml?: string;
   diagrams?: ShareTranslateDiagram[];
+  /** Drawn diagrams with no captured source: they keep their original drawing and count as kept (D-2026-10-116 DP8). */
+  diagramsUnsourced?: number;
 }
 export interface ShareTranslateSource {
   /** Keys the session cache. */
   mapId: string;
   title: string;
   goal?: string;
-  sourceLanguage: ContentLanguage;
+  sourceLanguage: ShareOriginalLanguage;
   nodes: ShareTranslateNodeInput[];
 }
 /** The DOM the service needs, supplied by the Obsidian side (and by a small stand-in in tests). */
@@ -400,7 +406,11 @@ export class ShareTranslateService {
     };
 
     let localRefs = 0;
-    let diagramsKept = 0;
+    // Diagrams that could not be redrawn at all (no source) keep their original labels too.
+    let diagramsKept = prepared.nodes.reduce(
+      (sum, node) => sum + (node.root ? (node.input.diagramsUnsourced ?? 0) : 0),
+      0
+    );
     const nodes: Record<string, ShareNodeTranslation> = {};
     for (const node of prepared.nodes) {
       const { input } = node;

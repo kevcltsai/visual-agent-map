@@ -153,6 +153,10 @@ test('share translate mermaid: comments go, click and links are refused, labels 
   assert.equal(mermaid.isSafeMermaidLabel('Zeile<br/>zwei', false), true);
   assert.equal(mermaid.isSafeMermaidLabel('<img src=x onerror=alert(1)>', false), false);
   assert.equal(mermaid.isSafeMermaidLabel('javascript:alert(1)', true), false);
+  for (const bad of ['Tom #amp; Jerry', 'Say #quot;hi#quot;', 'Code #35;1', 'R&D', 'a &lt; b', 'x &amp; y']) {
+    assert.equal(mermaid.isSafeMermaidLabel(bad, false), false, bad);
+    assert.equal(mermaid.isSafeMermaidLabel(bad, true), false, `${bad} (quoted)`);
+  }
   assert.equal(mermaid.isSafeMermaidLabel('Link building', false), true, 'ordinary words that start like a keyword are fine');
   for (const bad of ['flowchart TD\n A --> B\n click A "https://evil.example"', 'graph LR\n A-->B\n click A call alert()', 'flowchart TD\n A[x]-->B\n click B href "https://e.example"', 'sequenceDiagram\n link A: Dashboard @ https://e.example', 'flowchart TD\n A["<a href=javascript:alert(1)>x</a>"]'])
     assert.deepEqual(plain(mermaid.prepareMermaidTranslation(bad)), { ok: false, reason: 'unsafe' }, bad);
@@ -446,6 +450,11 @@ test('share translate service: diagrams are translated through the injected rend
     assert.equal(kept.diagramsKept, 1);
     assert.equal(kept.status, 'complete');
   }
+  // A drawn diagram whose source was not captured cannot be redrawn: it stays as it is and counts as kept (DP8).
+  const unsourced = baseSource([{ id: 'a', title: 'A', summary: 'S', detailHtml: fixture('code-diagram.html'), diagramsUnsourced: 1 }]);
+  const noSource = (await new ShareTranslateService(fakeRunner().run).translate(unsourced, ['ja'], baseOptions({ renderMermaid: async () => null }))).languages[0];
+  assert.equal(noSource.diagramsKept, 1);
+  assert.ok(noSource.nodes.a.detailHtml.includes('<text class="t" x="14" y="33">Start</text>'), 'the original drawing stays');
   // click statements: never translated, never drawn.
   const hostile = baseSource([{ id: 'a', title: 'A', summary: 'S', detailHtml: fixture('code-diagram.html'), diagrams: [{ svgIndex: 0, source: 'flowchart TD\n  A[Start here] --> B[Heat]\n  click A "https://evil.example"' }] }]);
   const calledWith = [];

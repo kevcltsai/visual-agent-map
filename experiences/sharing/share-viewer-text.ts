@@ -41,6 +41,8 @@ export function shareViewerUiFor(language: ShareLanguage): ShareViewerUi {
     untitledMap: text("share.viewer_untitled"),
     language: text("share.viewer_language"),
     aiTranslated: text("share.viewer_ai_translated_0"),
+    aiTranslatedUnknown: text("share.viewer_ai_translated_unknown"),
+    originalText: text("share.viewer_original_text"),
     imageTextUntranslated: text("share.viewer_image_text_untranslated")
   };
 }

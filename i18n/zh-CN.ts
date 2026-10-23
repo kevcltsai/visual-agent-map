@@ -1771,6 +1771,8 @@ export const zhCN: Record<TranslationKey, string> = {
   "share.viewer_untitled": "未命名的地图",
   "share.viewer_language": "语言",
   "share.viewer_ai_translated_0": "由 AI 翻译自{0}",
+  "share.viewer_ai_translated_unknown": "由 AI 翻译",
+  "share.viewer_original_text": "原文",
   "share.viewer_image_text_untranslated": "图片里的文字没有翻译。",
   // Share dialog
   "share.command": "分享这张地图",

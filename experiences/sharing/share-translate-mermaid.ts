@@ -161,6 +161,8 @@ export function isSafeMermaidLabel(translated: string, quoted: boolean): boolean
   const text = translated.replace(BR_TAG, " ");
   if (!text.trim() || /[\r\n]/.test(text)) return false;
   if (text.includes("%%") || UNSAFE_TEXT.test(text)) return false;
+  // Mermaid entity codes (`#quot;`, `#35;`) and HTML entities (`&amp;`) are decoded into characters the checks above refuse.
+  if (/#\w+;/.test(text) || /&/.test(text)) return false;
   return quoted ? !/["<>`]/.test(text) : !/[[\]{}()|"`;<>#%]/.test(text);
 }
 

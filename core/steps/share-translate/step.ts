@@ -4,6 +4,10 @@ import { languagePromptName, type ContentLanguage } from "../../../i18n";
 import { renderTemplate, type StepDefinition } from "../../step-runner";
 import mermaidTemplate from "./mermaid-prompt.md";
 import template from "./prompt.md";
+import unknownSourceName from "./unknown-source.md";
+
+/** BCP 47 "undetermined"; the same value as the share file's `contentLanguage` for an original nothing could name. */
+export const UNKNOWN_SOURCE_LANGUAGE = "und";
 
 export const SHARE_TRANSLATE_TOKEN_BUDGET = 32_000;
 
@@ -14,8 +18,11 @@ export interface ShareTranslateItem {
 }
 export interface ShareTranslateRequest {
   items: ShareTranslateItem[];
-  /** Language of the original text; named in the prompt through its registry `region` form. */
-  sourceLanguage: ContentLanguage;
+  /**
+   * Language of the original text; named in the prompt through its registry `region` form. "und" means the share could
+   * not tell (Latin text nothing recognises): the prompt then asks the model to read the language from the text.
+   */
+  sourceLanguage: ContentLanguage | typeof UNKNOWN_SOURCE_LANGUAGE;
   /** Language to write; one of the six share languages. */
   targetLanguage: ContentLanguage;
   model: string;
@@ -97,7 +104,10 @@ export function parseShareTranslation(
 }
 
 const variables = (request: ShareTranslateRequest): Record<string, string> => ({
-  sourceLanguage: languagePromptName(request.sourceLanguage, "en", "region"),
+  sourceLanguage:
+    request.sourceLanguage === UNKNOWN_SOURCE_LANGUAGE
+      ? unknownSourceName.trim()
+      : languagePromptName(request.sourceLanguage, "en", "region"),
   targetLanguage: languagePromptName(request.targetLanguage, "en", "region"),
   segments: JSON.stringify(request.items.map(item => ({ id: item.id, text: item.text })))
 });

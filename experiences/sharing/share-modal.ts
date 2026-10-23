@@ -1,9 +1,10 @@
 import { Modal, Notice, Setting, type App, type DropdownComponent, type ToggleComponent } from "obsidian";
 import type { ReasoningLevel } from "../../ai/types";
 import { FOLLOW_DEFAULT_MODEL } from "../../core/model-discovery";
-import { isFollowInputLanguage, supportedLanguageLabel, t, type ContentLanguage } from "../../i18n";
+import { isFollowInputLanguage, supportedLanguageLabel, t } from "../../i18n";
 import { actionStatus, modalActions } from "../../ui/modals/action-bar";
-import { mapContentLanguage, mapTextLanguage } from "../visual-map/map-text-language";
+import { detectAimContentLanguage } from "../aim/content-language";
+import { mapContentLanguage } from "../visual-map/map-text-language";
 import {
   BuildController,
   type AttachTranslationsOptions,
@@ -20,7 +21,9 @@ import {
   SHARE_SIZE_SUGGEST_NO_IMAGES_BYTES,
   SHARE_SIZE_WARN_BYTES,
   SHARE_TRANSLATION_LANGUAGES,
+  SHARE_UNKNOWN_LANGUAGE,
   type ShareLanguage,
+  type ShareOriginalLanguage,
   type ShareTranslationLanguage
 } from "./share-format";
 import type { ForbiddenString } from "./share-leak-scan";
@@ -48,7 +51,7 @@ export interface ShareExporterLike {
   /** Translation only: what the service translates, a diagram drawer, and the strings every translated language is scanned for. */
   translationSource?(
     options: { includeDetail: boolean; includeImages: boolean },
-    sourceLanguage: ContentLanguage
+    sourceLanguage: ShareOriginalLanguage
   ): ShareTranslateSource;
   renderDiagram?(source: string, signal: AbortSignal): Promise<Element | null>;
   forbiddenStrings?(): ForbiddenString[];
@@ -74,12 +77,21 @@ const errorMessage = (error: unknown): string => {
 };
 
 /**
- * The language the shared text is written in. The "same as the input" row is not a language of its own (it means the map
- * has Latin text nothing recognises), so it reads as the registry fallback, English, like the rest of VAM's fixed text.
+ * The language the shared text is written in. A map with a language of its own says it. The "same as the input" row is
+ * not a language, so the map's own words decide (title, goal, then topic titles and summaries, the first that has a
+ * recognisable script or plain English); when nothing decides, the original is {@link SHARE_UNKNOWN_LANGUAGE}: it
+ * takes none of the six boxes, so all six can be added and the viewer names no wrong source language.
  */
-function originalLanguage(map: ShareSource["map"], uiLanguage: ShareLanguage): ContentLanguage {
-  const language = mapContentLanguage(map, uiLanguage);
-  return isFollowInputLanguage(language) ? mapTextLanguage(language) : language;
+export function originalLanguage(source: ShareSource, uiLanguage: ShareLanguage): ShareOriginalLanguage {
+  const language = mapContentLanguage(source.map, uiLanguage);
+  if (!isFollowInputLanguage(language)) return language;
+  const texts: string[] = [source.map.title, source.goal ?? ""];
+  for (const note of Array.from(source.notes.values()).slice(0, 30)) texts.push(note.title, note.summary);
+  for (const text of texts) {
+    const detected = typeof text === "string" ? detectAimContentLanguage(text) : undefined;
+    if (detected !== undefined && !isFollowInputLanguage(detected)) return detected;
+  }
+  return SHARE_UNKNOWN_LANGUAGE;
 }
 
 type TranslatePhase = "idle" | "translating" | "done";
@@ -111,7 +123,7 @@ export class ShareModal extends Modal {
   private includeDetail = SHARE_DEFAULT_INCLUDE_DETAIL;
   private includeImages = true;
   private fullToggle!: ToggleComponent;
-  private readonly sourceLanguage: ContentLanguage;
+  private readonly sourceLanguage: ShareOriginalLanguage;
   private picked = new Set<ShareTranslationLanguage>();
   private modelChoice = FOLLOW_DEFAULT_MODEL;
   private defaultChoice = AUTO_LANGUAGE;
@@ -150,9 +162,7 @@ export class ShareModal extends Modal {
     private readonly options: ShareModalOptions
   ) {
     super(app);
-    this.sourceLanguage = options.translation
-      ? originalLanguage(options.source.map, options.language)
-      : options.language;
+    this.sourceLanguage = options.translation ? originalLanguage(options.source, options.language) : options.language;
     this.exporter =
       options.createExporter?.(app, options.source) ??
       new ShareExporter(app, options.source, {
@@ -245,7 +255,7 @@ export class ShareModal extends Modal {
     return !host || this.modelChoice === FOLLOW_DEFAULT_MODEL ? (host?.defaultModel() ?? "") : this.modelChoice;
   }
   private languageLabel(language: string): string {
-    return supportedLanguageLabel(language);
+    return language === SHARE_UNKNOWN_LANGUAGE ? t("share.viewer_original_text") : supportedLanguageLabel(language);
   }
 
   private openTranslationSection(): void {

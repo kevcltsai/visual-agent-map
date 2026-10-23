@@ -428,3 +428,53 @@ test('share exporter T1: a diagram is found by its place among the final top-lev
   const placed = exporterModule.placeDiagrams(svgs, [svgs[1], svgs[2], html.parse('<svg id="removed"></svg>').children[0]], ['flowchart TD\n A-->B', '', 'graph TD\n C-->D']);
   assert.deepEqual(plain(placed), [{ svgIndex: 1, source: 'flowchart TD\n A-->B' }], 'no source or no place: not translated');
 });
+
+// ---- reviewer F1: the original language of a "same as the input" map ----
+const followMap = title => ({ ...baseMap, title, outputLanguage: 'same-as-input' });
+
+test('share dialog F1: a same-as-input map with a Chinese title has a Traditional Chinese original, English can be added', async () => {
+  const d = dialog({ map: followMap('東京五天自由行') });
+  await open(d);
+  assert.equal(d.lang('zh-TW').name, '繁體中文 (original)');
+  assert.equal(d.lang('zh-TW').toggle.off, true);
+  assert.equal(d.lang('en').name, 'English', 'English is a normal, switchable box');
+  assert.equal(d.lang('en').toggle.off, false);
+  d.tick('en');
+  d.button(translateLabel).listeners.click();
+  await until(() => d.button(saveFileLabel), 'translation finished');
+  assert.ok(d.runner.state.calls.every(call => call.sourceLanguage === 'zh-TW'), 'the prompt names the real original');
+  assert.deepEqual(plain(d.exporter.calls.assemble.at(-1).languages), ['en']);
+  d.button(saveFileLabel).listeners.click();
+  await until(() => d.log.written.length === 1, 'write');
+  assert.deepEqual(JSON.parse(d.log.written[0].replace(/^<html>|<\/html>$/g, '')).languages, ['zh-TW', 'en']);
+});
+
+test('share dialog F1: a same-as-input map whose language cannot be told lets all six languages be ticked and names no wrong original', async () => {
+  const d = dialog({ map: followMap('Ancient Egypt') });
+  await open(d);
+  const ids = ['zh-TW', 'zh-CN', 'en', 'ja', 'ko', 'es'];
+  for (const id of ids) {
+    assert.equal(d.lang(id).toggle.off, false, `${id} can be ticked`);
+    assert.equal(d.lang(id).toggle.value, false, `${id} starts off`);
+    assert.doesNotMatch(d.lang(id).name, /original/i, id);
+  }
+  assert.doesNotMatch(d.text(), /\(original\)/);
+  d.tick('en');
+  d.button(translateLabel).listeners.click();
+  await until(() => d.button(saveFileLabel), 'translation finished');
+  assert.ok(d.runner.state.calls.length > 0 && d.runner.state.calls.every(call => call.sourceLanguage === 'und'), 'the request says the original is undetermined');
+  assert.deepEqual(plain(d.exporter.calls.assemble.at(-1).languages), ['en']);
+  assert.match(d.text(), /Languages in the file: Original, English/);
+  d.button(saveFileLabel).listeners.click();
+  await until(() => d.log.written.length === 1, 'write');
+  assert.deepEqual(JSON.parse(d.log.written[0].replace(/^<html>|<\/html>$/g, '')).languages, ['und', 'en']);
+});
+
+test('share dialog F1: the unknown-original id is the one the viewer reads, and the prompt asks the model to detect it', () => {
+  const format = load('experiences/sharing/share-format.ts');
+  assert.equal(format.SHARE_UNKNOWN_LANGUAGE, 'und');
+  assert.match(require('node:fs').readFileSync(require('node:path').join(__dirname, '../../experiences/sharing/viewer/main.ts'), 'utf8'), /UNKNOWN_ORIGINAL = "und"/);
+  const step = load('core/steps/share-translate/step.ts');
+  const prompt = step.shareTranslateStep.render({ items: [{ id: '1', text: 'Hola' }], sourceLanguage: 'und', targetLanguage: 'en', model: 'm', reasoning: 'low' });
+  assert.match(prompt, /from the original language of the text \(detect it from the text itself\) into English/);
+});

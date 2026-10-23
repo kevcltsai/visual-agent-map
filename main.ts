@@ -69,6 +69,7 @@ import { AiExchangeLog } from "./ai-exchange-log";
 import { PendingSuggestions } from "./pending-suggestions";
 import { OutlineView, OUTLINE_VIEW_TYPE } from "./ui/outline-view";
 import { ShareModal } from "./experiences/sharing/share-modal";
+import { releaseMermaidCapture } from "./experiences/sharing/share-exporter";
 import { ShareTranslationCache } from "./experiences/sharing/share-translate-plan";
 import { obsidianTranslateDom } from "./experiences/sharing/share-translate-dom";
 import { providerShareTranslateRunner, ShareTranslateService } from "./experiences/sharing/share-translate-service";
@@ -1164,6 +1165,8 @@ export default class VisualAgentMapPlugin extends Plugin {
     this.externalReconcileTimer = null;
     this.externalReconcilePaths.clear();
     this.shareTranslationCache.clear();
+    // A share build still running must not leave its wrapper on Obsidian's shared Mermaid object.
+    releaseMermaidCapture();
     this.resetCodexRuntime();
     // After this no late dialog event can start a pre-warmed process.
     this.unloaded = true;

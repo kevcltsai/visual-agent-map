@@ -9,6 +9,8 @@ import { pickShareLanguage } from "./language";
 
 /** Where "Install VAM" points. The only link the viewer itself carries. */
 export const INSTALL_URL = "https://github.com/kevcltsai/visual-agent-map?ref=share";
+/** `contentLanguage` of a file whose original language is unknown; a test keeps it equal to SHARE_UNKNOWN_LANGUAGE (no runtime import: the viewer bundle stays free of plugin modules). */
+const UNKNOWN_ORIGINAL = "und";
 const SVG_NS = "http://www.w3.org/2000/svg";
 const PANEL_WIDTH_KEY = "vam-share-panel-width";
 const LANGUAGE_KEY = "vam-share-language";
@@ -146,6 +148,8 @@ export function startViewer(doc: Document): void {
     });
   }
   const uiOf = (code: string): ShareViewerUi => extras.sets.get(code) ?? baseUi;
+  // An original whose language is unknown has no name: the menu says "Original" and the notice names no source.
+  const originalUnknown = multilingual && original === UNKNOWN_ORIGINAL;
   const isTranslated = (): boolean => multilingual && language !== original;
   if (multilingual) {
     ui = uiOf(language);
@@ -271,6 +275,7 @@ export function startViewer(doc: Document): void {
     for (const code of languages) {
       const option = make("option", undefined, extras.names[code] ?? nameOf(code));
       option.value = code;
+      if (originalUnknown && code === original) option.dataset.original = "1";
       languageSelect.append(option);
     }
     languageSelect.value = language;
@@ -768,6 +773,9 @@ export function startViewer(doc: Document): void {
     install.textContent = ui.install;
     languageSelect.setAttribute("aria-label", ui.language);
     languageSelect.title = ui.language;
+    if (originalUnknown)
+      for (const option of Array.from(languageSelect.options))
+        if (option.dataset.original) option.textContent = ui.originalText;
     if (mapText.goal) {
       goalLabel.textContent = fill(ui.goal, mapText.goal);
       goal.title = mapText.goal;
@@ -790,7 +798,8 @@ export function startViewer(doc: Document): void {
     resizer.setAttribute("aria-label", ui.resizePanel);
     buildMenu();
     if (isTranslated()) {
-      translateNote.textContent = `${fill(ui.aiTranslated, nameOf(original, language))} ${ui.imageTextUntranslated}`;
+      const notice = originalUnknown ? ui.aiTranslatedUnknown : fill(ui.aiTranslated, nameOf(original, language));
+      translateNote.textContent = `${notice} ${ui.imageTextUntranslated}`;
       translateNote.hidden = false;
     } else translateNote.hidden = true;
     transform();

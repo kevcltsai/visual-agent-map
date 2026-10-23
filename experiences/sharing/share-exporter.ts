@@ -36,6 +36,7 @@ import {
   fitWithin,
   SHARE_IMAGE_MAX_EDGE,
   type ShareLanguage,
+  type ShareOriginalLanguage,
   type SharePayload,
   type ShareNoteInput
 } from "./share-format";
@@ -50,7 +51,6 @@ import {
 import { shareViewerUiFor } from "./share-viewer-text";
 import type { ShareTranslateDiagram, ShareTranslateSource } from "./share-translate-service";
 import { topLevelSvgs } from "./share-translate-segments";
-import type { ContentLanguage } from "../../i18n";
 
 /** Everything the exporter reads from the open map. A snapshot: later edits to the map do not change an export in progress. */
 export interface ShareSource {
@@ -88,6 +88,8 @@ interface RenderedNote {
   html: string;
   /** Diagrams in the final html: the place among its top-level `<svg>` elements and the source the renderer showed. */
   diagrams: ShareTranslateDiagram[];
+  /** Drawn diagrams in the final html whose source was not captured: a translation cannot redraw them (they keep their original drawing). */
+  diagramsUnsourced: number;
   /** Links in the renderer's output (before sanitizing) that lead outside the page; above 0 blocks a file with notes. */
   localRefs: number;
   attachments: string[];
@@ -219,35 +221,99 @@ const domDiagramSource = (unit: HTMLElement): string =>
     unit.matches(".mermaid") && !unit.children.length ? unit.textContent : null
   ]);
 
-type MermaidLike = { render?: (id: string, text: string, ...rest: unknown[]) => unknown };
+type MermaidRender = (id: string, text: string, ...rest: unknown[]) => unknown;
+type MermaidLike = { render?: MermaidRender };
+
+/**
+ * One capture's record of the diagram sources Mermaid was asked to draw, keyed by the id it gives each SVG. Ids are
+ * Mermaid's own counter, not something this file guarantees to be unique across notes, so an id that was drawn from two
+ * different sources is ambiguous: it is dropped, and that diagram keeps its original drawing instead of being matched
+ * to another note's source.
+ */
+class MermaidCaptureScope {
+  readonly sources = new Map<string, string>();
+  private readonly ambiguous = new Set<string>();
+  record(id: string, text: string): void {
+    if (this.ambiguous.has(id)) return;
+    const known = this.sources.get(id);
+    if (known === undefined) this.sources.set(id, text);
+    else if (known !== text) {
+      this.sources.delete(id);
+      this.ambiguous.add(id);
+    }
+  }
+}
+
+// One wrapper on Obsidian's shared Mermaid object for the whole plugin, however many builds overlap: each capture
+// registers its own scope, and the original `render` is put back when the last scope leaves (or the plugin unloads).
+const captureScopes = new Set<MermaidCaptureScope>();
+let installedWrapper: { mermaid: MermaidLike; original: MermaidRender; wrapped: MermaidRender } | null = null;
+let installing: Promise<void> | null = null;
+
+function uninstallWrapper(): void {
+  const current = installedWrapper;
+  if (!current) return;
+  // If something else wrapped `render` on top of ours, ours stays in its chain (a passthrough with no scopes) and is reused.
+  if (current.mermaid.render === current.wrapped) {
+    current.mermaid.render = current.original;
+    installedWrapper = null;
+  }
+}
+
+async function installWrapper(): Promise<void> {
+  if (installedWrapper) return;
+  installing ??= (async () => {
+    try {
+      const mermaid = (await loadMermaid()) as MermaidLike;
+      const original = mermaid.render;
+      if (typeof original === "function" && !installedWrapper) {
+        const wrapped = function (this: unknown, id: string, text: string, ...rest: unknown[]): unknown {
+          if (typeof id === "string" && typeof text === "string")
+            for (const scope of captureScopes) scope.record(id, text);
+          return original.call(this, id, text, ...rest);
+        };
+        mermaid.render = wrapped;
+        installedWrapper = { mermaid, original, wrapped };
+      }
+    } catch {
+      // Without Mermaid nothing is drawn either; the diagrams keep what they have.
+    } finally {
+      installing = null;
+    }
+    // Every capture left (or the plugin unloaded) while Mermaid was loading.
+    if (!captureScopes.size) uninstallWrapper();
+  })();
+  await installing;
+}
 
 /**
  * A drawn diagram's SVG does not carry its source, and the renderer shows a finished diagram in one step, so the source
  * is taken from the call that drew it: while a note renders, Mermaid's `render(id, text)` is wrapped to note each call's
  * text under the id it gives the SVG. The source is then matched to the diagram by that id (the DOM's own id, never a
  * Markdown position), so a fence hidden in a comment cannot shift it. If Mermaid is not available, no source is
- * known and the diagrams keep their original drawing (D-2026-10-116).
+ * known and the diagrams keep their original drawing (D-2026-10-116). `restore()` is safe to call more than once.
  */
-async function captureMermaidSources(): Promise<{ sources: Map<string, string>; restore(): void }> {
-  const sources = new Map<string, string>();
-  let restore = (): void => undefined;
+export async function captureMermaidSources(): Promise<{ sources: Map<string, string>; restore(): void }> {
+  const scope = new MermaidCaptureScope();
+  captureScopes.add(scope);
   try {
-    const mermaid = (await loadMermaid()) as MermaidLike;
-    const original = mermaid.render;
-    if (typeof original === "function") {
-      const wrapped = function (this: unknown, id: string, text: string, ...rest: unknown[]): unknown {
-        if (typeof id === "string" && typeof text === "string") sources.set(id, text);
-        return original.call(this, id, text, ...rest);
-      };
-      mermaid.render = wrapped;
-      restore = (): void => {
-        if (mermaid.render === wrapped) mermaid.render = original;
-      };
-    }
+    await installWrapper();
   } catch {
-    // Without Mermaid nothing is drawn either; the diagrams keep what they have.
+    // installWrapper does not throw; kept so a capture can never fail a build.
   }
-  return { sources, restore };
+  return {
+    sources: scope.sources,
+    restore: (): void => {
+      captureScopes.delete(scope);
+      if (!captureScopes.size && !installing) uninstallWrapper();
+    }
+  };
+}
+
+/** Plugin unload: puts Mermaid's original `render` back whatever builds are still running and forgets what they noted. */
+export function releaseMermaidCapture(): void {
+  captureScopes.clear();
+  if (!installing) uninstallWrapper();
 }
 
 export class ShareExporter {
@@ -328,7 +394,8 @@ export class ShareExporter {
     const host = this.host().createDiv();
     const child = new Component();
     this.component.addChild(child);
-    const hasDiagram = /(^|\n)[ \t]*(`{3,}|~{3,})[ \t]*mermaid\b/i.test(cleaned.markdown);
+    // Not anchored to the line start: a fence inside a callout, quote or list item starts with `>` or a list marker.
+    const hasDiagram = /(`{3,}|~{3,})[ \t]*mermaid\b/i.test(cleaned.markdown);
     const capture = hasDiagram ? await captureMermaidSources() : { sources: new Map<string, string>(), restore() {} };
     try {
       await MarkdownRenderer.render(this.app, cleaned.markdown, host, "", child);
@@ -339,6 +406,7 @@ export class ShareExporter {
       return {
         html: finished.html,
         diagrams: finished.diagrams,
+        diagramsUnsourced: finished.unsourced,
         localRefs: finished.localRefs,
         // Only images the final HTML shows: a picture used inside a hidden comment must not travel in the file.
         attachments: cleaned.attachments.map(item => item.name).filter(name => used.has(name)),
@@ -392,7 +460,14 @@ export class ShareExporter {
   private finish(
     host: HTMLElement,
     sources: ReadonlyMap<string, string>
-  ): { html: string; undrawn: number; blocked: number; localRefs: number; diagrams: ShareTranslateDiagram[] } {
+  ): {
+    html: string;
+    undrawn: number;
+    blocked: number;
+    localRefs: number;
+    diagrams: ShareTranslateDiagram[];
+    unsourced: number;
+  } {
     // The privacy decision about note links: count on the renderer's own output, before anything is rewritten.
     const localRefs = countLocalReferences(host);
     const diagrams: Element[] = [];
@@ -457,8 +532,10 @@ export class ShareExporter {
       else slot.remove();
     });
     // A diagram's place is its order among the top-level svg elements of the final html (a note's own svg counts too).
-    const placed = placeDiagrams(topLevelSvgs(clean), diagrams, diagramSources);
-    return { html: clean.innerHTML, undrawn, blocked, localRefs, diagrams: placed };
+    const finalSvgs = topLevelSvgs(clean);
+    const placed = placeDiagrams(finalSvgs, diagrams, diagramSources);
+    const unsourced = diagrams.filter((diagram, index) => !diagramSources[index] && finalSvgs.includes(diagram)).length;
+    return { html: clean.innerHTML, undrawn, blocked, localRefs, diagrams: placed, unsourced };
   }
 
   private resolveImage(name: string): { bytes: Promise<ArrayBuffer>; mime: string } | null {
@@ -526,7 +603,7 @@ export class ShareExporter {
    * What the translation service translates: exactly the text the original payload carries (so a field the payload
    * leaves out is never translated), plus the source of each drawn diagram. Needs the notes rendered and the images read.
    */
-  translationSource(options: ShareOptionsInput, sourceLanguage: ContentLanguage): ShareTranslateSource {
+  translationSource(options: ShareOptionsInput, sourceLanguage: ShareOriginalLanguage): ShareTranslateSource {
     const { payload } = this.buildPayload(options);
     return {
       mapId: this.source.map.id,
@@ -541,6 +618,9 @@ export class ShareExporter {
         ...(node.detailHtml ? { detailHtml: node.detailHtml } : {}),
         ...(node.detailHtml && this.rendered.get(node.id)?.diagrams.length
           ? { diagrams: this.rendered.get(node.id)?.diagrams }
+          : {}),
+        ...(node.detailHtml && this.rendered.get(node.id)?.diagramsUnsourced
+          ? { diagramsUnsourced: this.rendered.get(node.id)?.diagramsUnsourced }
           : {})
       }))
     };

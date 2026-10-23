@@ -42,6 +42,8 @@ export const SHARE_VIEWER_UI_EXTRA: Readonly<Record<ShareExtraUiLanguage, ShareV
     untitledMap: "無題のマップ",
     language: "言語",
     aiTranslated: "{0}から AI が翻訳しました",
+    aiTranslatedUnknown: "AI が翻訳しました",
+    originalText: "原文",
     imageTextUntranslated: "画像内の文字は翻訳されません。"
   },
   ko: {
@@ -78,6 +80,8 @@ export const SHARE_VIEWER_UI_EXTRA: Readonly<Record<ShareExtraUiLanguage, ShareV
     untitledMap: "제목 없는 맵",
     language: "언어",
     aiTranslated: "{0}에서 AI가 번역했습니다",
+    aiTranslatedUnknown: "AI가 번역했습니다",
+    originalText: "원문",
     imageTextUntranslated: "이미지 안의 글자는 번역되지 않습니다."
   },
   es: {
@@ -114,6 +118,8 @@ export const SHARE_VIEWER_UI_EXTRA: Readonly<Record<ShareExtraUiLanguage, ShareV
     untitledMap: "Mapa sin título",
     language: "Idioma",
     aiTranslated: "Traducido por IA desde {0}",
+    aiTranslatedUnknown: "Traducido por IA",
+    originalText: "Original",
     imageTextUntranslated: "El texto dentro de las imágenes no está traducido."
   }
 };

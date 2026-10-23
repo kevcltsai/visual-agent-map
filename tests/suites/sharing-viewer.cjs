@@ -333,10 +333,10 @@ test('sharing viewer language: a translated file carries the interface text of e
   assert.ok(html.renderShareShell(ui, translated.languages).includes('"uiByLanguage"'));
 });
 
-test('sharing viewer language: a plain file shows exactly the P1 page (same DOM in headless Chrome)', () => {
+test('sharing viewer language: a plain file shows exactly the P1 page (same DOM in headless Chrome)', t => {
   const candidates = [process.env.CHROME_BIN, '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome', '/usr/bin/google-chrome', '/usr/bin/google-chrome-stable', '/usr/bin/chromium'].filter(Boolean);
   const chrome = candidates.find(file => fs.existsSync(file));
-  if (!chrome) return; // The page DOM is also compared by the viewer's own manual check; this layer needs a browser.
+  if (!chrome) return t.skip('no Chrome found (set CHROME_BIN)'); // The page DOM is also compared by the viewer's own manual check; this layer needs a browser.
   const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'vam-share-p1-'));
   try {
     const out = path.join(directory, 'p1.html');

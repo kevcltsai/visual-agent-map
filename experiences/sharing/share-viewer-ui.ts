@@ -46,6 +46,10 @@ export interface ShareViewerUi {
   language: string;
   /** `{0}` is the name of the original language. Shown while a translated version is open. */
   aiTranslated: string;
+  /** Same notice when the original language is unknown (no `{0}`). */
+  aiTranslatedUnknown: string;
+  /** Menu name of the original text when its language is unknown. */
+  originalText: string;
   /** Shown beside the AI notice: pictures keep their original text. */
   imageTextUntranslated: string;
 }
@@ -94,5 +98,7 @@ export const SHARE_VIEWER_UI_DEFAULT: Readonly<ShareViewerUi> = {
   untitledMap: "Untitled map",
   language: "Language",
   aiTranslated: "Translated by AI from {0}",
+  aiTranslatedUnknown: "Translated by AI",
+  originalText: "Original",
   imageTextUntranslated: "Text inside images is not translated."
 };

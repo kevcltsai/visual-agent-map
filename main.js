@@ -45001,7 +45001,7 @@ var ShareModal = class extends import_obsidian33.Modal {
     if (names3.length)
       el.createDiv({
         text: t("share.translate_unverified_list_0", names3.join(t("ui.list_separator"))),
-        cls: "vam-share-note"
+        cls: "vam-share-note vam-share-unverified"
       });
   }
   renderLanguageResult(container, item, host, note) {

@@ -617,7 +617,7 @@ export class ShareModal extends Modal {
     if (names.length)
       el.createDiv({
         text: t("share.translate_unverified_list_0", names.join(t("ui.list_separator"))),
-        cls: "vam-share-note"
+        cls: "vam-share-note vam-share-unverified"
       });
   }
 

@@ -39,7 +39,7 @@ import {
   type OutlineLimits,
   type OutlineNode
 } from "./outline-import";
-import { syncModelSelect } from "../../core/model-discovery";
+import { FOLLOW_DEFAULT_MODEL, syncModelSelect } from "../../core/model-discovery";
 import {
   fieldLink,
   linkedField,
@@ -121,8 +121,7 @@ export interface OutputLanguageMemory {
   /** Records the language picked by hand in this dialog; called once, when a run starts. */
   rememberOutputLanguage?: (language: ContentLanguage) => Promise<void>;
 }
-/** Option value of the model select that means "follow the default" instead of pinning a model. */
-export const FOLLOW_DEFAULT_MODEL = "__follow_default__";
+export { FOLLOW_DEFAULT_MODEL };
 export interface NextStepSettings extends OutputLanguageMemory {
   /**
    * The note language the topic note already uses: its stored `content-language`, or the language of its standard Detail

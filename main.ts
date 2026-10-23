@@ -69,6 +69,9 @@ import { AiExchangeLog } from "./ai-exchange-log";
 import { PendingSuggestions } from "./pending-suggestions";
 import { OutlineView, OUTLINE_VIEW_TYPE } from "./ui/outline-view";
 import { ShareModal } from "./experiences/sharing/share-modal";
+import { ShareTranslationCache } from "./experiences/sharing/share-translate-plan";
+import { obsidianTranslateDom } from "./experiences/sharing/share-translate-dom";
+import { providerShareTranslateRunner, ShareTranslateService } from "./experiences/sharing/share-translate-service";
 import { groupRibbonIcons } from "./ui/ribbon-group";
 import { randomUUID } from "node:crypto";
 import { CodexAppServerRuntime, type CodexWebSearchEvent } from "./ai/runtime/codex-app-server";
@@ -208,6 +211,11 @@ export default class VisualAgentMapPlugin extends Plugin {
   );
   readonly relevanceGrade = new RelevanceGradeService(
     providerRelevanceGradeRunner(this.aiTaskOptions, this.activeTasks)
+  );
+  /** Translated share text kept for this Obsidian session only (never written to disk); emptied on unload. */
+  readonly shareTranslationCache = new ShareTranslationCache();
+  readonly shareTranslate = new ShareTranslateService(
+    providerShareTranslateRunner(this.aiTaskOptions, this.activeTasks)
   );
   /** The relevance grading run of each map, by map path. A view shows it; only one run per map. */
   readonly relevanceGrades = new Map<string, RelevanceGradeRun>();
@@ -353,7 +361,17 @@ export default class VisualAgentMapPlugin extends Plugin {
     new ShareModal(this.app, {
       source: snapshot,
       vamVersion: this.manifest.version || "0.0.0",
-      language: this.settings.language
+      language: this.settings.language,
+      translation: {
+        service: this.shareTranslate,
+        cache: this.shareTranslationCache,
+        dom: obsidianTranslateDom(),
+        models: () => this.availableModels(),
+        modelLabel: model => this.modelLabel(model),
+        defaultModel: () => this.settings.cliModel,
+        reasoning: () => normalizeReasoningLevel(this.settings.cliReasoning),
+        confirmAiUsage: (model, run) => this.confirmAiUsage(model, run)
+      }
     }).open();
   }
   async activateOutline(source?: VisualAgentMapView): Promise<void> {
@@ -1145,6 +1163,7 @@ export default class VisualAgentMapPlugin extends Plugin {
     if (this.externalReconcileTimer !== null) window.clearTimeout(this.externalReconcileTimer);
     this.externalReconcileTimer = null;
     this.externalReconcilePaths.clear();
+    this.shareTranslationCache.clear();
     this.resetCodexRuntime();
     // After this no late dialog event can start a pre-warmed process.
     this.unloaded = true;

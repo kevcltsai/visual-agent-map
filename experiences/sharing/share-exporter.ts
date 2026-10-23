@@ -1,4 +1,12 @@
-import { Component, FileSystemAdapter, MarkdownRenderer, normalizePath, sanitizeHTMLToDom, type App } from "obsidian";
+import {
+  Component,
+  FileSystemAdapter,
+  loadMermaid,
+  MarkdownRenderer,
+  normalizePath,
+  sanitizeHTMLToDom,
+  type App
+} from "obsidian";
 import type { MapDocument } from "../../map-model";
 import type { Note } from "../../repository";
 import { translate } from "../../i18n";
@@ -6,6 +14,8 @@ import { createAssetRegistry, cleanShareMarkdown } from "./share-clean";
 import {
   assertCurrent,
   assetNamesInHtml,
+  attachTranslations,
+  type AttachTranslationsOptions,
   omitAssetImages,
   pause,
   plainWikilinks,
@@ -38,6 +48,9 @@ import {
   type LeakCategory
 } from "./share-leak-scan";
 import { shareViewerUiFor } from "./share-viewer-text";
+import type { ShareTranslateDiagram, ShareTranslateSource } from "./share-translate-service";
+import { topLevelSvgs } from "./share-translate-segments";
+import type { ContentLanguage } from "../../i18n";
 
 /** Everything the exporter reads from the open map. A snapshot: later edits to the map do not change an export in progress. */
 export interface ShareSource {
@@ -73,6 +86,8 @@ export interface ShareBuildResult {
 
 interface RenderedNote {
   html: string;
+  /** Diagrams in the final html: the place among its top-level `<svg>` elements and the source the renderer showed. */
+  diagrams: ShareTranslateDiagram[];
   /** Links in the renderer's output (before sanitizing) that lead outside the page; above 0 blocks a file with notes. */
   localRefs: number;
   attachments: string[];
@@ -175,6 +190,66 @@ const drawnSvg = (unit: HTMLElement): SVGSVGElement | null =>
 const undrawnCodeBlocks = (host: HTMLElement): number =>
   Array.from(host.querySelectorAll("pre > code.language-mermaid")).filter(code => !code.closest(".is-guarded")).length;
 
+/**
+ * Where each drawn diagram ended up in the final note html: `svgIndex` is its order among the html's top-level `<svg>`
+ * elements (a note's own `<svg>` counts too), `texts` runs parallel to `diagrams`. A diagram without a source, or one
+ * the cleaning removed, is left out (it keeps its original drawing).
+ */
+export function placeDiagrams(
+  finalSvgs: readonly Element[],
+  diagrams: readonly Element[],
+  texts: readonly string[]
+): ShareTranslateDiagram[] {
+  const placed: ShareTranslateDiagram[] = [];
+  diagrams.forEach((diagram, index) => {
+    const svgIndex = finalSvgs.indexOf(diagram);
+    const source = texts[index];
+    if (svgIndex >= 0 && source) placed.push({ svgIndex, source });
+  });
+  return placed;
+}
+
+/** The source a diagram's own DOM still carries (guard source, an undrawn code block, or the text of an unfinished `.mermaid`). */
+const domDiagramSource = (unit: HTMLElement): string =>
+  pickMermaidFallbackSource([
+    unit.querySelector(".mermaid-guard-source code")?.textContent,
+    unit.matches("code.language-mermaid")
+      ? unit.textContent
+      : unit.querySelector("pre > code.language-mermaid")?.textContent,
+    unit.matches(".mermaid") && !unit.children.length ? unit.textContent : null
+  ]);
+
+type MermaidLike = { render?: (id: string, text: string, ...rest: unknown[]) => unknown };
+
+/**
+ * A drawn diagram's SVG does not carry its source, and the renderer shows a finished diagram in one step, so the source
+ * is taken from the call that drew it: while a note renders, Mermaid's `render(id, text)` is wrapped to note each call's
+ * text under the id it gives the SVG. The source is then matched to the diagram by that id (the DOM's own id, never a
+ * Markdown position), so a fence hidden in a comment cannot shift it. If Mermaid is not available, no source is
+ * known and the diagrams keep their original drawing (D-2026-10-116).
+ */
+async function captureMermaidSources(): Promise<{ sources: Map<string, string>; restore(): void }> {
+  const sources = new Map<string, string>();
+  let restore = (): void => undefined;
+  try {
+    const mermaid = (await loadMermaid()) as MermaidLike;
+    const original = mermaid.render;
+    if (typeof original === "function") {
+      const wrapped = function (this: unknown, id: string, text: string, ...rest: unknown[]): unknown {
+        if (typeof id === "string" && typeof text === "string") sources.set(id, text);
+        return original.call(this, id, text, ...rest);
+      };
+      mermaid.render = wrapped;
+      restore = (): void => {
+        if (mermaid.render === wrapped) mermaid.render = original;
+      };
+    }
+  } catch {
+    // Without Mermaid nothing is drawn either; the diagrams keep what they have.
+  }
+  return { sources, restore };
+}
+
 export class ShareExporter {
   private readonly rendered = new Map<string, RenderedNote>();
   /** name -> data URL, or null when the file could not be read or decoded. */
@@ -253,20 +328,49 @@ export class ShareExporter {
     const host = this.host().createDiv();
     const child = new Component();
     this.component.addChild(child);
+    const hasDiagram = /(^|\n)[ \t]*(`{3,}|~{3,})[ \t]*mermaid\b/i.test(cleaned.markdown);
+    const capture = hasDiagram ? await captureMermaidSources() : { sources: new Map<string, string>(), restore() {} };
     try {
       await MarkdownRenderer.render(this.app, cleaned.markdown, host, "", child);
       assertCurrent(ticket);
       await this.settleMermaid(host, ticket);
-      const finished = this.finish(host);
+      const finished = this.finish(host, capture.sources);
       const used = new Set(assetNamesInHtml(finished.html));
       return {
         html: finished.html,
+        diagrams: finished.diagrams,
         localRefs: finished.localRefs,
         // Only images the final HTML shows: a picture used inside a hidden comment must not travel in the file.
         attachments: cleaned.attachments.map(item => item.name).filter(name => used.has(name)),
         mermaidUndrawn: finished.undrawn,
         mermaidBlocked: finished.blocked
       };
+    } finally {
+      capture.restore();
+      this.component.removeChild(child);
+      host.remove();
+    }
+  }
+
+  /**
+   * Draws a (translated) diagram source in the hidden host the same way a note's diagrams are drawn and returns the
+   * SVG, or null when it did not draw (blocked, timed out, error). The service scrubs it before it is used.
+   */
+  async renderDiagram(source: string, signal: AbortSignal): Promise<Element | null> {
+    if (this.disposed || signal.aborted) return null;
+    const ticket: BuildTicket = { generation: 0, signal, isCurrent: () => !signal.aborted && !this.disposed };
+    const host = this.host().createDiv();
+    const child = new Component();
+    this.component.addChild(child);
+    try {
+      const fence = source.includes("```") ? "~~~~" : "```";
+      await MarkdownRenderer.render(this.app, `${fence}mermaid\n${source}\n${fence}`, host, "", child);
+      await this.settleMermaid(host, ticket);
+      const unit = topLevelMermaid(host)[0];
+      const svg = unit ? drawnSvg(unit) : null;
+      return svg ? (svg.cloneNode(true) as Element) : null;
+    } catch {
+      return null;
     } finally {
       this.component.removeChild(child);
       host.remove();
@@ -285,10 +389,14 @@ export class ShareExporter {
   }
 
   /** Mermaid out, sanitize, scrub, mermaid back in. See share-dom.ts for why the diagrams take this detour. */
-  private finish(host: HTMLElement): { html: string; undrawn: number; blocked: number; localRefs: number } {
+  private finish(
+    host: HTMLElement,
+    sources: ReadonlyMap<string, string>
+  ): { html: string; undrawn: number; blocked: number; localRefs: number; diagrams: ShareTranslateDiagram[] } {
     // The privacy decision about note links: count on the renderer's own output, before anything is rewritten.
     const localRefs = countLocalReferences(host);
     const diagrams: Element[] = [];
+    const diagramSources: string[] = [];
     let undrawn = 0;
     let blocked = 0;
     const note = (key: "share.mermaid_blocked_note" | "share.mermaid_undrawn_note"): string =>
@@ -299,6 +407,7 @@ export class ShareExporter {
         const copy = svg.cloneNode(true) as SVGSVGElement;
         if (scrubMermaidSvg(copy)) {
           diagrams.push(copy);
+          diagramSources.push(sources.get(copy.getAttribute("id") ?? "") ?? "");
           const slot = createDiv();
           slot.className = "vam-mermaid-slot";
           unit.replaceWith(slot);
@@ -306,13 +415,7 @@ export class ShareExporter {
         }
       }
       // The source comes from this diagram's own DOM, never from the Markdown (hidden fences would misalign).
-      const code = pickMermaidFallbackSource([
-        unit.querySelector(".mermaid-guard-source code")?.textContent,
-        unit.matches("code.language-mermaid")
-          ? unit.textContent
-          : unit.querySelector("pre > code.language-mermaid")?.textContent,
-        unit.matches(".mermaid") && !unit.children.length ? unit.textContent : null
-      ]);
+      const code = domDiagramSource(unit);
       const wasBlocked = isBlocked(unit);
       if (wasBlocked) blocked++;
       else undrawn++;
@@ -353,7 +456,9 @@ export class ShareExporter {
       if (diagram) slot.replaceWith(diagram);
       else slot.remove();
     });
-    return { html: clean.innerHTML, undrawn, blocked, localRefs };
+    // A diagram's place is its order among the top-level svg elements of the final html (a note's own svg counts too).
+    const placed = placeDiagrams(topLevelSvgs(clean), diagrams, diagramSources);
+    return { html: clean.innerHTML, undrawn, blocked, localRefs, diagrams: placed };
   }
 
   private resolveImage(name: string): { bytes: Promise<ArrayBuffer>; mime: string } | null {
@@ -400,7 +505,7 @@ export class ShareExporter {
     onProgress({ phase: "images", done: names.length, total: names.length });
   }
 
-  private forbiddenStrings(): ForbiddenString[] {
+  forbiddenStrings(): ForbiddenString[] {
     if (!this.forbidden) {
       const adapter = this.app.vault.adapter;
       const folder = this.source.mapPath.split("/").slice(0, -1).join("/");
@@ -417,8 +522,37 @@ export class ShareExporter {
     return this.forbidden;
   }
 
-  /** Builds the payload and file text from what is cached, and runs both leak scans. Writes nothing. */
-  assemble(options: ShareOptionsInput): ShareBuildResult {
+  /**
+   * What the translation service translates: exactly the text the original payload carries (so a field the payload
+   * leaves out is never translated), plus the source of each drawn diagram. Needs the notes rendered and the images read.
+   */
+  translationSource(options: ShareOptionsInput, sourceLanguage: ContentLanguage): ShareTranslateSource {
+    const { payload } = this.buildPayload(options);
+    return {
+      mapId: this.source.map.id,
+      title: payload.title,
+      ...(payload.goal ? { goal: payload.goal } : {}),
+      sourceLanguage,
+      nodes: payload.nodes.map(node => ({
+        id: node.id,
+        title: node.title,
+        summary: node.summary,
+        ...(node.reason ? { reason: node.reason } : {}),
+        ...(node.detailHtml ? { detailHtml: node.detailHtml } : {}),
+        ...(node.detailHtml && this.rendered.get(node.id)?.diagrams.length
+          ? { diagrams: this.rendered.get(node.id)?.diagrams }
+          : {})
+      }))
+    };
+  }
+
+  private buildPayload(options: ShareOptionsInput): {
+    payload: SharePayload;
+    failed: Set<string>;
+    notesWithContent: number;
+    undrawn: number;
+    blocked: number;
+  } {
     const language = this.config.language;
     const omitted = translate(language, "share.viewer_image_omitted");
     const failed = new Set([...this.images].filter(([, data]) => data === null).map(([name]) => name));
@@ -459,6 +593,18 @@ export class ShareExporter {
       goal: this.source.goal,
       assets
     });
+    return { payload, failed, notesWithContent, undrawn, blocked };
+  }
+
+  /**
+   * Builds the payload and file text from what is cached, and runs both leak scans on the whole payload, the translated
+   * languages included (fail closed). Writes nothing.
+   */
+  assemble(options: ShareOptionsInput, translation?: AttachTranslationsOptions): ShareBuildResult {
+    const language = this.config.language;
+    const base = this.buildPayload(options);
+    const { failed, notesWithContent, undrawn, blocked } = base;
+    const payload = translation ? attachTranslations(base.payload, translation) : base.payload;
     const ui = shareViewerUiFor(language);
     const forbidden = this.forbiddenStrings();
     if (!this.shellText || this.shellText.language !== language)

@@ -14,6 +14,9 @@ export interface CodexModelCatalog {
   reasoningEfforts: Record<string, string[]>;
 }
 
+/** Option value of a model select that means "follow the default" instead of pinning a model (shared by the topic dialogs and the share dialog). */
+export const FOLLOW_DEFAULT_MODEL = "__follow_default__";
+
 export function syncModelSelect(
   select: HTMLSelectElement,
   models: string[],

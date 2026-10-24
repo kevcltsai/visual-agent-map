@@ -376,3 +376,27 @@ test('discardSince after clear drops what was pushed since the clear and leaves 
   assert.equal(plainHistory.undo().label, 'y');
   assert.equal(plainHistory.redo().label, 'y');
 });
+
+// ---- Packet C1: answer style ----
+test('C1: concise and detailed prompts differ in both languages, and no style means concise', () => {
+  for (const language of ['en', 'zh-TW']) {
+    const none = mapChatStep.render(request({ language }));
+    const concise = mapChatStep.render(request({ language, style: 'concise' }));
+    const detailed = mapChatStep.render(request({ language, style: 'detailed' }));
+    assert.equal(none, concise, language); assert.notEqual(concise, detailed, language);
+    assert.ok(!/\{\{[a-zA-Z]+\}\}/.test(detailed), language);
+  }
+  assert.match(mapChatStep.render(request({ style: 'concise' })), /single sentence/);
+  assert.match(mapChatStep.render(request({ style: 'detailed' })), /Explain fully/);
+  assert.match(mapChatStep.render(request({ language: 'zh-TW', style: 'concise' })), /一句話確認/);
+  assert.ok(!/一句話確認/.test(mapChatStep.render(request({ language: 'zh-TW', style: 'detailed' }))));
+});
+test('C1: a redo prompt says not to repeat the applied actions; a normal prompt does not', () => {
+  assert.match(mapChatStep.render(request({ style: 'detailed', redo: true })), /do not repeat them/);
+  assert.ok(!/do not repeat them/.test(mapChatStep.render(request({ style: 'detailed' }))));
+  assert.match(mapChatStep.render(request({ language: 'zh-TW', style: 'detailed', redo: true })), /不要重複那些動作/);
+});
+test('C1: the action schema is unchanged and the step version moved to 2', () => {
+  assert.equal(mapChatStep.version, 2);
+  assert.equal(JSON.stringify(MAP_CHAT_SCHEMA).includes('style'), false);
+});

@@ -37,6 +37,15 @@ import { upgradeLegacyAimText } from "./experiences/aim/legacy-names";
 export type { ReasoningLevel, ResearchDepth, ResearchMode, VisualMode, VisualReference } from "./ai/types";
 export { normalizeReasoningLevel } from "./ai/task-policy";
 
+/** Saved map-chat answer length: anything but "detailed" is the default "concise". */
+export function normalizeMapChatStyle(value: unknown): "concise" | "detailed" {
+  return value === "detailed" ? "detailed" : "concise";
+}
+/** Saved map-chat model: a trimmed string; empty (also for any non-string) follows the workspace default model. */
+export function normalizeMapChatModel(value: unknown): string {
+  return typeof value === "string" ? value.trim() : "";
+}
+
 export type Status = "idea" | "running" | "completed" | "error";
 export type ModelSource = "workspace" | "inherited" | "manual";
 export type TopicState = "active" | "unassigned" | "archived" | "inbox";
@@ -94,6 +103,10 @@ export interface Settings {
   codexPath: string;
   claudePath: string;
   cliModel: string;
+  /** Answer length of the map AI chat; remembered between sessions. */
+  mapChatStyle: "concise" | "detailed";
+  /** Model of the map AI chat; empty follows cliModel. */
+  mapChatModel: string;
   cliReasoning: ReasoningLevel;
   previewSize?: "small" | "medium" | "large";
   previewScale: number;
@@ -192,6 +205,8 @@ export const DEFAULT_SETTINGS: Settings = {
   codexPath: "codex",
   claudePath: "claude",
   cliModel: "gpt-5.6-luna",
+  mapChatStyle: "concise",
+  mapChatModel: "",
   cliReasoning: "low",
   previewScale: 120,
   models: "",

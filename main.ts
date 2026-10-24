@@ -49,6 +49,8 @@ import {
   isManagedMapPath,
   moveNotePath,
   normalizeReasoningLevel,
+  normalizeMapChatStyle,
+  normalizeMapChatModel,
   rebaseMapNotePaths,
   resolveMapFolders,
   type Note,
@@ -440,6 +442,8 @@ export default class VisualAgentMapPlugin extends Plugin {
       codexPath: saved?.codexPath || legacy?.cliPath || DEFAULT_SETTINGS.codexPath,
       claudePath: saved?.claudePath || DEFAULT_SETTINGS.claudePath,
       cliModel: saved?.cliModel || DEFAULT_SETTINGS.cliModel,
+      mapChatStyle: normalizeMapChatStyle(saved?.mapChatStyle),
+      mapChatModel: normalizeMapChatModel(saved?.mapChatModel),
       cliReasoning: normalizeReasoningLevel(saved?.cliReasoning),
       previewScale:
         saved?.previewScale !== undefined

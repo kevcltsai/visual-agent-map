@@ -83,6 +83,7 @@ import {
   isManagedMapPath,
   moveNotePath,
   normalizeReasoningLevel,
+  normalizeMapChatStyle,
   rebaseMapNotePaths,
   type Note,
   type NotePatch,
@@ -121,7 +122,7 @@ import { RELEVANCE_LABEL, renderRelevanceTagButton } from "./relevance-tag";
 import { relevanceDisplayNodes } from "./relevance-order";
 import { fitViewport, focusViewport, initialViewport, insetFromRects } from "./viewport-inset";
 import { RelevanceSummaryModal } from "./relevance-summary-modal";
-import { MapChatPanel, type MapChatChip, type MapChatHost, type MapChatLine } from "./map-chat";
+import { MapChatPanel, type MapChatChip, type MapChatHost, type MapChatLine, type MapChatOrigin } from "./map-chat";
 import {
   buildMapChatContext,
   contentHash,
@@ -10004,6 +10005,20 @@ export class VisualAgentMapView extends ItemView {
         void this.sendMapChat();
       },
       stop: () => this.stopMapChat(),
+      style: () => normalizeMapChatStyle(this.plugin.settings.mapChatStyle),
+      setStyle: style => {
+        this.plugin.settings.mapChatStyle = style;
+        void this.plugin.saveSettings();
+      },
+      modelChoices: () => this.chatModelChoices(),
+      model: () => this.plugin.settings.mapChatModel ?? "",
+      setModel: model => {
+        this.plugin.settings.mapChatModel = model;
+        void this.plugin.saveSettings();
+      },
+      moreDetail: origin => {
+        void this.sendMapChat(origin);
+      },
       resolveLink: link => {
         const file = this.app.metadataCache.getFirstLinkpathDest(link, this.activeMarkdownFile()?.path ?? "");
         return file && file.extension === "md" ? file.path : null;
@@ -10012,6 +10027,21 @@ export class VisualAgentMapView extends ItemView {
       activeElement: () => this.contentEl.ownerDocument?.activeElement ?? null,
       layoutChanged: open => this.chatWorkspaceEl?.toggleClass("has-map-chat-open", open)
     };
+  }
+  /** The chat's model list: the follow-default entry first, then the settings page's list (and a saved model that has gone). */
+  private chatModelChoices(): { value: string; label: string }[] {
+    const settings = this.plugin.settings;
+    const choices = [
+      { value: "", label: t("ui.map_chat_model_follow_0", this.plugin.modelLabel(settings.cliModel)) },
+      ...this.plugin.availableModels().map(id => ({ value: id, label: this.plugin.modelLabel(id) }))
+    ];
+    const saved = settings.mapChatModel;
+    if (saved && !choices.some(choice => choice.value === saved))
+      choices.push({
+        value: saved,
+        label: `${this.plugin.modelLabel(saved)} (${t("ui.current_model_is_unavailable")})`
+      });
+    return choices;
   }
   /** The cards the user has selected: they count as chat references without being dragged in. */
   private chatSelectionIds(): string[] {
@@ -10115,7 +10145,12 @@ export class VisualAgentMapView extends ItemView {
       ...(seen.detailHash !== undefined ? { detailHash: contentHash(now.detail) } : {})
     };
   }
-  private async buildChatRequest(message: string, chat: MapChatPanel): Promise<MapChatRequest> {
+  private async buildChatRequest(
+    message: string,
+    chat: MapChatPanel,
+    origin: MapChatOrigin,
+    redo = false
+  ): Promise<MapChatRequest> {
     const map = this.map!;
     const settings = this.plugin.settings;
     const byId = new Map(map.nodes.map(node => [node.id, node]));
@@ -10150,8 +10185,8 @@ export class VisualAgentMapView extends ItemView {
         : null;
     };
     const notNull = <T>(value: T | null): value is T => value !== null;
-    const selectedIds = this.chatSelectionIds();
-    const attached = chat.attachments();
+    const selectedIds = origin.selectedIds;
+    const attached = origin.chips;
     const snippets: NonNullable<Parameters<typeof buildMapChatContext>[0]["snippets"]> = [];
     const files: NonNullable<Parameters<typeof buildMapChatContext>[0]["files"]> = [];
     for (const chip of attached) {
@@ -10189,7 +10224,9 @@ export class VisualAgentMapView extends ItemView {
       context,
       language: settings.language,
       contentLanguage: outputLanguageForMap(map, settings.language, message),
-      model: settings.cliModel,
+      style: redo ? "detailed" : normalizeMapChatStyle(settings.mapChatStyle),
+      ...(redo ? { redo: true } : {}),
+      model: settings.mapChatModel?.trim() || settings.cliModel,
       reasoning: normalizeReasoningLevel(settings.cliReasoning)
     };
   }
@@ -10204,16 +10241,22 @@ export class VisualAgentMapView extends ItemView {
     return t("ui.map_chat_error_failed_0", errorMessage(error));
   }
   /** Sends the draft: usage notice, one request, a streamed answer, then every action it asked for, once. */
-  private async sendMapChat(): Promise<void> {
+  private async sendMapChat(again?: MapChatOrigin): Promise<void> {
     const chat = this.chat;
     if (!chat || chat.isBusy || this.closed || !this.map || this.builtIn) return;
-    const message = chat.draft.trim();
+    // "Say it in more detail" sends the same question with the same references again; a normal send reads the draft.
+    const message = again ? again.text : chat.draft.trim();
     if (!message) return;
+    const origin: MapChatOrigin = again ?? {
+      text: message,
+      chips: chat.attachments(),
+      selectedIds: this.chatSelectionIds()
+    };
     const mapPath = this.path;
     const mapId = this.map.id;
     let request: MapChatRequest;
     try {
-      request = await this.buildChatRequest(message, chat);
+      request = await this.buildChatRequest(message, chat, origin, Boolean(again));
     } catch (error) {
       new Notice(errorMessage(error));
       return;
@@ -10228,7 +10271,7 @@ export class VisualAgentMapView extends ItemView {
       // A reply that arrives after Stop, closing the view or switching maps changes nothing.
       const alive = (): boolean =>
         !this.closed && !controller.signal.aborted && this.chatController === controller && this.path === mapPath;
-      chat.begin(message);
+      chat.begin(again ? t("ui.map_chat_more_detail_asked") : message, origin, Boolean(again));
       try {
         const result = await this.plugin.mapChat.chat(request, controller.signal, text => {
           if (alive()) chat.streamReply(text);

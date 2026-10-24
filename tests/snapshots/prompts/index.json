@@ -1141,6 +1141,36 @@
       "language": "zh-CN",
       "schema": false
     },
+    "map-chat-detailed.en": {
+      "builder": "core/map-chat-service.ts buildMapChatPrompt (detailed style)",
+      "language": "en",
+      "schema": true
+    },
+    "map-chat-detailed.zh": {
+      "builder": "core/map-chat-service.ts buildMapChatPrompt (detailed style)",
+      "language": "zh-TW",
+      "schema": true
+    },
+    "map-chat-detailed.zh-CN": {
+      "builder": "core/map-chat-service.ts buildMapChatPrompt (detailed style)",
+      "language": "zh-CN",
+      "schema": true
+    },
+    "map-chat-redo.en": {
+      "builder": "core/map-chat-service.ts buildMapChatPrompt (detailed re-send of an answered question)",
+      "language": "en",
+      "schema": true
+    },
+    "map-chat-redo.zh": {
+      "builder": "core/map-chat-service.ts buildMapChatPrompt (detailed re-send of an answered question)",
+      "language": "zh-TW",
+      "schema": true
+    },
+    "map-chat-redo.zh-CN": {
+      "builder": "core/map-chat-service.ts buildMapChatPrompt (detailed re-send of an answered question)",
+      "language": "zh-CN",
+      "schema": true
+    },
     "map-chat.en": {
       "builder": "core/map-chat-service.ts buildMapChatPrompt",
       "language": "en",

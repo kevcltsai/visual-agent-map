@@ -14,6 +14,8 @@
 
 規則：所有議題 id 必須逐字複製自下方 context。不可寫入 ".obsidian" 資料夾、不可寫到 Vault 之外、不可用 create_md_file 覆蓋既有檔案。不可更動議題筆記 front matter 的 agent-map-node、node-id、topic-id。不要捏造事實或來源；寫文字時以提供的 context 為依據。"actions" 要精簡，只放使用者要求的內容。
 
+{{styleInstruction}}
+
 只回傳 JSON：{"reply":"","actions":[{"kind":"","nodeId":"","parentId":"","newParentId":"","title":"","summary":"","detail":"","path":"","find":"","replace":"","content":"","nodeIds":[],"all":false,"branch":false,"action":"","goal":"","direction":""}]}。不要加其他欄位。所有 context 都已提供；不要檢視檔案、使用工具或搜尋網路。
 
 {{languageInstruction}}

@@ -1,0 +1,1 @@
+This is the detailed re-send of the same question the user asked earlier. The earlier turns are in the context, and the actions of that turn were already applied: do not repeat them; put only still-needed new actions in "actions", usually an empty list.

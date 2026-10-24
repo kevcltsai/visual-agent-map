@@ -1,0 +1,115 @@
+{
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "reply": {
+      "type": "string"
+    },
+    "actions": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "kind": {
+            "type": "string",
+            "enum": [
+              "add_child",
+              "rename_topic",
+              "update_summary",
+              "edit_topic_note",
+              "move_topic",
+              "delete_topic",
+              "edit_md_file",
+              "create_md_file",
+              "select_topics",
+              "run_map_action"
+            ]
+          },
+          "nodeId": {
+            "type": "string"
+          },
+          "parentId": {
+            "type": "string"
+          },
+          "newParentId": {
+            "type": "string"
+          },
+          "title": {
+            "type": "string"
+          },
+          "summary": {
+            "type": "string"
+          },
+          "detail": {
+            "type": "string"
+          },
+          "path": {
+            "type": "string"
+          },
+          "find": {
+            "type": "string"
+          },
+          "replace": {
+            "type": "string"
+          },
+          "content": {
+            "type": "string"
+          },
+          "nodeIds": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "all": {
+            "type": "boolean"
+          },
+          "branch": {
+            "type": "boolean"
+          },
+          "action": {
+            "type": "string",
+            "enum": [
+              "research_standard",
+              "expand",
+              "synthesize",
+              "rate_by_goal",
+              "merge",
+              ""
+            ]
+          },
+          "goal": {
+            "type": "string"
+          },
+          "direction": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "kind",
+          "nodeId",
+          "parentId",
+          "newParentId",
+          "title",
+          "summary",
+          "detail",
+          "path",
+          "find",
+          "replace",
+          "content",
+          "nodeIds",
+          "all",
+          "branch",
+          "action",
+          "goal",
+          "direction"
+        ]
+      }
+    }
+  },
+  "required": [
+    "reply",
+    "actions"
+  ]
+}

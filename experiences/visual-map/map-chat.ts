@@ -13,8 +13,18 @@ export interface MapChatLine {
   text: string;
 }
 
+/** What a question was sent with, kept so "say it in more detail" can send the same question again. */
+export interface MapChatOrigin {
+  text: string;
+  chips: MapChatChip[];
+  selectedIds: string[];
+}
+export type MapChatStyleChoice = "concise" | "detailed";
+
 export interface MapChatMessage {
   role: "user" | "assistant";
+  /** On a user message: the question and references it was sent with. */
+  origin?: MapChatOrigin;
   text: string;
   /** One line per applied, skipped or failed action. */
   lines: MapChatLine[];
@@ -38,6 +48,18 @@ export interface MapChatHost {
   activeNotePath(): string | null;
   /** The element that has keyboard focus right now. */
   activeElement(): Element | null;
+  /** Remembered answer length (from settings). */
+  style(): MapChatStyleChoice;
+  /** The user picked an answer length; the view remembers it. */
+  setStyle(style: MapChatStyleChoice): void;
+  /** Models the chat can use; `value` "" follows the default model and its label names that model. */
+  modelChoices(): { value: string; label: string }[];
+  /** Remembered chat model ("" follows the default). */
+  model(): string;
+  /** The user picked a chat model; the view remembers it. */
+  setModel(model: string): void;
+  /** "Say it in more detail": send `origin` again with the detailed style. */
+  moreDetail(origin: MapChatOrigin): void;
   /** The panel opened or closed; the view makes room for it. */
   layoutChanged(open: boolean): void;
 }
@@ -95,6 +117,8 @@ export class MapChatPanel {
   private statusEl!: HTMLElement;
   private inputEl!: HTMLTextAreaElement;
   private sendEl!: HTMLButtonElement;
+  private modelEl!: HTMLSelectElement;
+  private styleEls: Record<MapChatStyleChoice, HTMLButtonElement> | null = null;
   private stopEl!: HTMLButtonElement;
   private built = false;
   private messageEls: HTMLElement[] = [];
@@ -142,6 +166,7 @@ export class MapChatPanel {
     else parent.appendChild(this.el);
     this.applyOpen();
     this.renderChips();
+    this.refreshControls();
   }
   /** Takes the panel out of the page; the next {@link mount} puts it back with all state intact. */
   detach(): void {
@@ -221,11 +246,11 @@ export class MapChatPanel {
   }
 
   /** A turn starts: the user's text, an empty answer, and the busy state. */
-  begin(userText: string): void {
-    this.messages.push({ role: "user", text: userText, lines: [] });
+  begin(userText: string, origin?: MapChatOrigin, keepDraft = false): void {
+    this.messages.push({ role: "user", text: userText, lines: [], ...(origin ? { origin } : {}) });
     this.messages.push({ role: "assistant", text: "", lines: [], streaming: true });
     this.busy = true;
-    if (this.built) this.inputEl.value = "";
+    if (this.built && !keepDraft) this.inputEl.value = "";
     this.renderLog();
     this.renderBusy();
   }
@@ -315,6 +340,12 @@ export class MapChatPanel {
     });
     setIcon(close, "x");
     close.addEventListener("click", () => this.setOpen(false, true));
+    const modelRow = this.bodyEl.createDiv("vam-map-chat-model-row");
+    this.modelEl = modelRow.createEl("select", {
+      cls: "vam-map-chat-model dropdown",
+      attr: { "aria-label": t("ui.map_chat_model_label") }
+    });
+    this.modelEl.addEventListener("change", () => this.host.setModel(this.modelEl.value));
     this.logEl = this.bodyEl.createDiv({
       cls: "vam-map-chat-log",
       attr: { role: "log", "aria-live": "polite", tabindex: "0" }
@@ -329,12 +360,31 @@ export class MapChatPanel {
       cls: "vam-map-chat-input",
       attr: { rows: "3", "aria-label": t("ui.map_chat_input_label"), placeholder: t("ui.map_chat_input_placeholder") }
     });
-    this.sendEl = form.createEl("button", {
+    const side = form.createDiv("vam-map-chat-side");
+    const styleGroup = side.createDiv({
+      cls: "vam-map-chat-style",
+      attr: { role: "group", "aria-label": t("ui.map_chat_style_label") }
+    });
+    const styleButton = (style: MapChatStyleChoice): HTMLButtonElement => {
+      const label = t(style === "concise" ? "ui.map_chat_style_concise" : "ui.map_chat_style_detailed");
+      const button = styleGroup.createEl("button", {
+        cls: "vam-map-chat-style-option",
+        text: label,
+        attr: { type: "button", "aria-pressed": "false" }
+      });
+      button.addEventListener("click", () => {
+        this.host.setStyle(style);
+        this.refreshControls();
+      });
+      return button;
+    };
+    this.styleEls = { concise: styleButton("concise"), detailed: styleButton("detailed") };
+    this.sendEl = side.createEl("button", {
       cls: "vam-map-chat-send mod-cta",
       text: t("ui.map_chat_send"),
       attr: { "aria-label": t("ui.map_chat_send") }
     });
-    this.stopEl = form.createEl("button", {
+    this.stopEl = side.createEl("button", {
       cls: "vam-map-chat-stop",
       text: t("ui.map_chat_stop"),
       attr: { "aria-label": t("ui.map_chat_stop") }
@@ -404,6 +454,20 @@ export class MapChatPanel {
     this.toggleEl.setAttr("aria-label", t(this.open ? "ui.map_chat_close" : "ui.map_chat_open"));
   }
 
+  /** Puts the answer-length buttons and the model list back in step with what the view remembers. */
+  private refreshControls(): void {
+    if (!this.built || !this.styleEls) return;
+    const style = this.host.style();
+    for (const choice of ["concise", "detailed"] as const) {
+      this.styleEls[choice].setAttr("aria-pressed", String(style === choice));
+      this.styleEls[choice].toggleClass("is-active", style === choice);
+    }
+    const choices = this.host.modelChoices();
+    this.modelEl.empty();
+    for (const choice of choices) this.modelEl.createEl("option", { text: choice.label, value: choice.value });
+    this.modelEl.value = this.host.model();
+  }
+
   private chipLabel(chip: MapChatChip): string {
     if (chip.kind === "topic") {
       const title = this.host.topicTitle(chip.id);
@@ -450,6 +514,25 @@ export class MapChatPanel {
         text: t(message.role === "user" ? "ui.map_chat_role_you" : "ui.map_chat_role_ai")
       });
       row.createDiv({ cls: "vam-map-chat-text", text: message.text });
+      const asked = this.messages[this.messages.indexOf(message) - 1];
+      if (
+        message.role === "assistant" &&
+        !message.streaming &&
+        !message.error &&
+        message.text.trim() &&
+        asked?.origin
+      ) {
+        const origin = asked.origin;
+        const more = row.createEl("button", {
+          cls: "vam-map-chat-more",
+          text: t("ui.map_chat_more_detail"),
+          attr: { type: "button" }
+        });
+        more.disabled = this.busy;
+        more.addEventListener("click", () => {
+          if (!this.busy) this.host.moreDetail(origin);
+        });
+      }
       if (message.lines.length) {
         const list = row.createDiv({ cls: "vam-map-chat-lines" });
         for (const line of message.lines)

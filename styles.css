@@ -1208,3 +1208,12 @@ button.vam-template-section-header:hover { background: var(--background-modifier
 .vam-share-note.vam-share-error { color: var(--text-error); }
 .vam-share-publish { margin-top: 10px; }
 .vam-share-publish-text { display: block; width: 100%; margin-top: 8px; font-size: var(--font-ui-smaller); }
+.vam-map-chat-model-row { display: flex; }
+.vam-map-chat-model { flex: 1 1 auto; min-width: 0; }
+.vam-map-chat-side { display: flex; flex-direction: column; gap: 4px; align-items: stretch; }
+.vam-map-chat-style { display: flex; border: 1px solid var(--background-modifier-border); border-radius: var(--radius-s); overflow: hidden; }
+.vam-map-chat-style-option { flex: 1 1 auto; height: auto; padding: 2px 6px; border: 0; border-radius: 0; box-shadow: none; background: transparent; font-size: var(--font-ui-smaller); }
+.vam-map-chat-style-option.is-active { background: var(--interactive-accent); color: var(--text-on-accent); }
+.vam-map-chat-style-option:focus-visible, .vam-map-chat-more:focus-visible, .vam-map-chat-model:focus-visible { outline: 2px solid var(--interactive-accent); outline-offset: 1px; }
+.vam-map-chat-more { align-self: flex-start; height: auto; margin-top: 4px; padding: 0 6px; border: 0; background: transparent; box-shadow: none; color: var(--text-accent); font-size: var(--font-ui-smaller); }
+.vam-map-chat-more:disabled { color: var(--text-faint); cursor: default; }

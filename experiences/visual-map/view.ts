@@ -693,6 +693,19 @@ export class VisualAgentMapView extends ItemView {
     else if (typeof state.file === "string" && state.file !== this.path) await this.openMap(state.file);
     await super.setState(state, result);
   }
+  /** Keeps the chat's current-note chip and the source-note guess in step with which notes are open and shown. */
+  private registerWorkspaceEvents(): void {
+    const workspace = this.app.workspace;
+    if (typeof workspace?.on !== "function" || typeof this.registerEvent !== "function") return;
+    this.registerEvent(
+      workspace.on("active-leaf-change", leaf => {
+        if (leaf?.view instanceof MarkdownView && leaf.view.file) this.lastMarkdownPath = leaf.view.file.path;
+        this.chat?.refreshNote();
+      })
+    );
+    // A tab can be shown or hidden, or moved to another window, without the active leaf changing.
+    this.registerEvent(workspace.on("layout-change", () => this.chat?.refreshNote()));
+  }
   async onOpen(): Promise<void> {
     this.closed = false;
     this.announcer?.remove();
@@ -708,14 +721,7 @@ export class VisualAgentMapView extends ItemView {
     this.mapOpenEpoch++;
     this.contentEl.addClass("vam-view");
     this.contentEl.tabIndex = 0;
-    const workspace = this.app.workspace;
-    if (typeof workspace?.on === "function" && typeof this.registerEvent === "function")
-      this.registerEvent(
-        workspace.on("active-leaf-change", leaf => {
-          if (leaf?.view instanceof MarkdownView && leaf.view.file) this.lastMarkdownPath = leaf.view.file.path;
-          this.chat?.refreshNote();
-        })
-      );
+    this.registerWorkspaceEvents();
     // Space-drag pans while selecting topics; typing a space in a field never arms it.
     this.registerDomEvent(this.contentEl.win ?? window, "keydown", event => {
       if (
@@ -10049,11 +10055,14 @@ export class VisualAgentMapView extends ItemView {
         void this.sendMapChat(origin);
       },
       resolveLink: link => {
-        const file = this.app.metadataCache.getFirstLinkpathDest(link, this.activeMarkdownFile()?.path ?? "");
+        const file = this.app.metadataCache.getFirstLinkpathDest(link, this.sourceMarkdownFile()?.path ?? "");
         return file && file.extension === "md" ? file.path : null;
       },
-      activeNotePath: () => this.activeMarkdownFile()?.path ?? null,
-      visibleNotePath: () => this.activeMarkdownFile()?.path ?? null,
+      activeNotePath: () => this.sourceMarkdownFile()?.path ?? null,
+      visibleNotePath: () => this.visibleMarkdownFile()?.path ?? null,
+      openLink: (href, newLeaf) => {
+        void this.app.workspace.openLinkText(href, this.path, newLeaf);
+      },
       renderMarkdown: (text, el, owner) => MarkdownRenderer.render(this.app, text, el, this.path, owner),
       activeElement: () => this.contentEl.ownerDocument?.activeElement ?? null,
       layoutChanged: open => this.chatWorkspaceEl?.toggleClass("has-map-chat-open", open)
@@ -10084,7 +10093,7 @@ export class VisualAgentMapView extends ItemView {
    * in this map's window). Background tabs, other windows and closed notes never count. With several on screen: the one the
    * user touched last, then one of this map's own topic notes, then the first.
    */
-  private activeMarkdownFile(): TFile | null {
+  private visibleMarkdownFile(): TFile | null {
     const shown: string[] = [];
     const doc = this.contentEl.ownerDocument;
     for (const leaf of this.app.workspace.getLeavesOfType?.("markdown") ?? []) {
@@ -10099,6 +10108,27 @@ export class VisualAgentMapView extends ItemView {
       this.lastMarkdownPath && shown.includes(this.lastMarkdownPath) ? this.lastMarkdownPath : null,
       shown.find(path => topicPaths.has(path)),
       ...shown
+    ];
+    for (const path of candidates) {
+      const file = path ? this.app.vault.getAbstractFileByPath(path) : null;
+      if (file instanceof TFile && file.extension === "md") return file;
+    }
+    return null;
+  }
+  /**
+   * Where dragged-in text most likely came from: the active note, else the one touched last (if still open), else any open
+   * note, wherever it is. Only a guess for a snippet's source; what a message is sent with is {@link visibleMarkdownFile}.
+   */
+  private sourceMarkdownFile(): TFile | null {
+    const workspace = this.app.workspace;
+    const open = new Set<string>();
+    for (const leaf of workspace.getLeavesOfType?.("markdown") ?? [])
+      if (leaf.view instanceof MarkdownView && leaf.view.file) open.add(leaf.view.file.path);
+    const live = workspace.getActiveViewOfType?.(MarkdownView)?.file?.path;
+    const candidates = [
+      live,
+      this.lastMarkdownPath && open.has(this.lastMarkdownPath) ? this.lastMarkdownPath : null,
+      ...open
     ];
     for (const path of candidates) {
       const file = path ? this.app.vault.getAbstractFileByPath(path) : null;

@@ -1,6 +1,7 @@
-import { Component, setIcon } from "obsidian";
+import { Component, Keymap, setIcon } from "obsidian";
 import { t } from "../../i18n";
 import type { MapChatTurn } from "../../core/map-chat-context";
+import { sanitizeChatMarkdown } from "../../core/map-chat-markdown";
 
 /** What the user attached to the next message. Topic chips come from a dragged card; snippets and files from a drop. */
 export type MapChatChip =
@@ -50,6 +51,8 @@ export interface MapChatHost {
   visibleNotePath(): string | null;
   /** Lays `text` out as Markdown into `el`; `owner` carries whatever the layout registers and is unloaded by the panel. */
   renderMarkdown(text: string, el: HTMLElement, owner: Component): Promise<void>;
+  /** Opens the note a `[[link]]` in a reply names (`newLeaf`: in a new tab). */
+  openLink(href: string, newLeaf: boolean | "tab" | "split" | "window"): void;
   /** The element that has keyboard focus right now. */
   activeElement(): Element | null;
   /** Remembered answer length (from settings). */
@@ -129,10 +132,9 @@ export class MapChatPanel {
   private built = false;
   private stopWatching: (() => void) | null = null;
   private messageEls: HTMLElement[] = [];
-  private renderOwners = new Map<number, Component>();
   private bodyEls: HTMLElement[] = [];
   private markdownBodies: boolean[] = [];
-  private paints: { busy: boolean; pending: string | null }[] = [];
+  private paints: { busy: boolean; pending: string | null; owner: Component | null }[] = [];
   /** The visible note the user took off the chip; it stays off until another note is visible. */
   private dismissedNote: string | null = null;
   private noteChip: string | null = null;
@@ -201,8 +203,10 @@ export class MapChatPanel {
     this.unloadOwners();
   }
   private unloadOwners(): void {
-    for (const owner of this.renderOwners.values()) owner.unload();
-    this.renderOwners.clear();
+    for (const state of this.paints) {
+      state.owner?.unload();
+      state.owner = null;
+    }
   }
   /** Takes the panel out of the page; the next {@link mount} puts it back with all state intact. */
   detach(): void {
@@ -390,6 +394,16 @@ export class MapChatPanel {
       cls: "vam-map-chat-log",
       attr: { role: "log", "aria-live": "polite", tabindex: "0" }
     });
+    // A [[link]] in a reply is an internal link anchor; Obsidian's own handler is not attached to this panel, so open it here.
+    this.logEl.addEventListener("click", event => {
+      const target = event.target as { closest?: (selector: string) => Element | null } | null;
+      const anchor = target?.closest?.("a");
+      if (!anchor?.classList.contains("internal-link")) return;
+      const href = anchor.getAttribute("data-href") ?? anchor.getAttribute("href");
+      if (!href) return;
+      event.preventDefault();
+      this.host.openLink(href, Keymap.isModEvent(event));
+    });
     this.chipsEl = this.bodyEl.createDiv({
       cls: "vam-map-chat-chips",
       attr: { role: "group", "aria-label": t("ui.map_chat_references") }
@@ -564,8 +578,8 @@ export class MapChatPanel {
     this.messageEls = [];
     this.bodyEls = [];
     this.markdownBodies = [];
-    this.paints = [];
     this.unloadOwners();
+    this.paints = [];
     for (const message of this.messages) {
       const row = this.logEl.createDiv({
         cls: `vam-map-chat-msg is-${message.role}${message.error ? " is-error" : ""}`
@@ -579,7 +593,7 @@ export class MapChatPanel {
       const index = this.messageEls.length;
       this.bodyEls.push(body);
       this.markdownBodies.push(markdown);
-      this.paints.push({ busy: false, pending: null });
+      this.paints.push({ busy: false, pending: null, owner: null });
       if (markdown) this.paintMarkdown(index, message.text);
       else body.setText(message.text);
       const asked = this.messages[this.messages.indexOf(message) - 1];
@@ -621,20 +635,22 @@ export class MapChatPanel {
       return;
     }
     state.busy = true;
+    // The log may be repainted while a layout is in flight; then this paint is stale and must not touch anything current.
+    const current = () => this.paints[index] === state && this.bodyEls[index] === body;
     void (async () => {
       let next: string | null = text;
-      while (next !== null) {
-        const current = next;
+      while (next !== null && current()) {
+        const raw = next;
         state.pending = null;
         const owner = new Component();
         owner.load();
-        this.renderOwners.get(index)?.unload();
-        this.renderOwners.set(index, owner);
+        state.owner?.unload();
+        state.owner = owner;
         body.empty();
         try {
-          await this.host.renderMarkdown(current, body, owner);
+          await this.host.renderMarkdown(sanitizeChatMarkdown(raw), body, owner);
         } catch {
-          body.setText(current);
+          if (current()) body.setText(raw);
         }
         next = state.pending;
       }

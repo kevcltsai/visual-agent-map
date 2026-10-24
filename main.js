@@ -20186,6 +20186,78 @@ var RelevanceSummaryModal = class extends import_obsidian15.Modal {
 
 // experiences/visual-map/map-chat.ts
 var import_obsidian16 = require("obsidian");
+
+// core/map-chat-markdown.ts
+var FENCE_OPEN = /^( {0,3})(`{3,}|~{3,})(.*)$/;
+function cleanText(text11) {
+  return text11.replace(/!\[\[/g, "[[").replace(/!\[([^\]]*)\]\(\s*<?\s*((?:https?:)?\/\/[^)\s>]*)>?([^)]*)\)/gi, "[$1]($2$3)").replace(/!\[([^[\]]*)\](?=\[|[^(\w]|$)/g, "[$1]").replace(/</g, "&lt;");
+}
+function cleanParagraph(paragraph) {
+  let out = "";
+  let from = 0;
+  let at = 0;
+  while (at < paragraph.length) {
+    if (paragraph[at] !== "`") {
+      at++;
+      continue;
+    }
+    let end = at;
+    while (paragraph[end] === "`") end++;
+    const run = paragraph.slice(at, end);
+    let close = -1;
+    for (let search = end; search < paragraph.length; ) {
+      const next = paragraph.indexOf("`", search);
+      if (next < 0) break;
+      let stop = next;
+      while (paragraph[stop] === "`") stop++;
+      if (stop - next === run.length) {
+        close = stop;
+        break;
+      }
+      search = stop;
+    }
+    if (close < 0) {
+      at = end;
+      continue;
+    }
+    out += cleanText(paragraph.slice(from, at)) + paragraph.slice(at, close);
+    from = close;
+    at = close;
+  }
+  return out + cleanText(paragraph.slice(from));
+}
+function cleanProse(text11) {
+  return text11.split(/(\n[ \t]*\n)/).map((part, index) => index % 2 ? part : cleanParagraph(part)).join("");
+}
+function sanitizeChatMarkdown(text11) {
+  const lines = text11.split("\n");
+  const out = [];
+  let prose = [];
+  const flush = () => {
+    if (prose.length) out.push(cleanProse(prose.join("\n")));
+    prose = [];
+  };
+  for (let at = 0; at < lines.length; at++) {
+    const open = FENCE_OPEN.exec(lines[at]);
+    if (!open || open[2][0] === "`" && open[3].includes("`")) {
+      prose.push(lines[at]);
+      continue;
+    }
+    flush();
+    out.push(open[1] + open[2]);
+    const mark = open[2][0];
+    const length = open[2].length;
+    for (at++; at < lines.length; at++) {
+      out.push(lines[at]);
+      const close = /^ {0,3}(`{3,}|~{3,})[ \t]*$/.exec(lines[at]);
+      if (close && close[1][0] === mark && close[1].length >= length) break;
+    }
+  }
+  flush();
+  return out.join("\n");
+}
+
+// experiences/visual-map/map-chat.ts
 var LABEL_LIMIT = 40;
 var clip = (value, limit = LABEL_LIMIT) => {
   const text11 = value.replace(/\s+/g, " ").trim();
@@ -20239,7 +20311,6 @@ var MapChatPanel = class {
     __publicField(this, "built", false);
     __publicField(this, "stopWatching", null);
     __publicField(this, "messageEls", []);
-    __publicField(this, "renderOwners", /* @__PURE__ */ new Map());
     __publicField(this, "bodyEls", []);
     __publicField(this, "markdownBodies", []);
     __publicField(this, "paints", []);
@@ -20308,8 +20379,11 @@ var MapChatPanel = class {
     this.unloadOwners();
   }
   unloadOwners() {
-    for (const owner of this.renderOwners.values()) owner.unload();
-    this.renderOwners.clear();
+    var _a2;
+    for (const state of this.paints) {
+      (_a2 = state.owner) == null ? void 0 : _a2.unload();
+      state.owner = null;
+    }
   }
   /** Takes the panel out of the page; the next {@link mount} puts it back with all state intact. */
   detach() {
@@ -20486,6 +20560,16 @@ var MapChatPanel = class {
       cls: "vam-map-chat-log",
       attr: { role: "log", "aria-live": "polite", tabindex: "0" }
     });
+    this.logEl.addEventListener("click", (event) => {
+      var _a2, _b2;
+      const target = event.target;
+      const anchor = (_a2 = target == null ? void 0 : target.closest) == null ? void 0 : _a2.call(target, "a");
+      if (!(anchor == null ? void 0 : anchor.classList.contains("internal-link"))) return;
+      const href = (_b2 = anchor.getAttribute("data-href")) != null ? _b2 : anchor.getAttribute("href");
+      if (!href) return;
+      event.preventDefault();
+      this.host.openLink(href, import_obsidian16.Keymap.isModEvent(event));
+    });
     this.chipsEl = this.bodyEl.createDiv({
       cls: "vam-map-chat-chips",
       attr: { role: "group", "aria-label": t("ui.map_chat_references") }
@@ -20652,8 +20736,8 @@ var MapChatPanel = class {
     this.messageEls = [];
     this.bodyEls = [];
     this.markdownBodies = [];
-    this.paints = [];
     this.unloadOwners();
+    this.paints = [];
     for (const message of this.messages) {
       const row = this.logEl.createDiv({
         cls: `vam-map-chat-msg is-${message.role}${message.error ? " is-error" : ""}`
@@ -20667,7 +20751,7 @@ var MapChatPanel = class {
       const index = this.messageEls.length;
       this.bodyEls.push(body);
       this.markdownBodies.push(markdown);
-      this.paints.push({ busy: false, pending: null });
+      this.paints.push({ busy: false, pending: null, owner: null });
       if (markdown) this.paintMarkdown(index, message.text);
       else body.setText(message.text);
       const asked = this.messages[this.messages.indexOf(message) - 1];
@@ -20702,21 +20786,22 @@ var MapChatPanel = class {
       return;
     }
     state.busy = true;
+    const current = () => this.paints[index] === state && this.bodyEls[index] === body;
     void (async () => {
       var _a2;
       let next = text11;
-      while (next !== null) {
-        const current = next;
+      while (next !== null && current()) {
+        const raw = next;
         state.pending = null;
         const owner = new import_obsidian16.Component();
         owner.load();
-        (_a2 = this.renderOwners.get(index)) == null ? void 0 : _a2.unload();
-        this.renderOwners.set(index, owner);
+        (_a2 = state.owner) == null ? void 0 : _a2.unload();
+        state.owner = owner;
         body.empty();
         try {
-          await this.host.renderMarkdown(current, body, owner);
+          await this.host.renderMarkdown(sanitizeChatMarkdown(raw), body, owner);
         } catch (e) {
-          body.setText(current);
+          if (current()) body.setText(raw);
         }
         next = state.pending;
       }
@@ -21308,7 +21393,7 @@ ${draft.context}` : "",
 var OUTLINE_NODE_LIMIT = 100;
 var OUTLINE_TITLE_LIMIT = 200;
 var HEADING2 = /^ {0,3}(#{1,6})(?:[ \t]+(.*?))?[ \t]*$/;
-var FENCE_OPEN = /^ {0,3}(`{3,}|~{3,})(.*)$/;
+var FENCE_OPEN2 = /^ {0,3}(`{3,}|~{3,})(.*)$/;
 var FENCE_CLOSE = /^ {0,3}(`{3,}|~{3,})[ \t]*$/;
 var MARKDOWN_FENCE = /^ {0,3}(`{3,}|~{3,})[ \t]*(markdown|md)?[ \t]*$/i;
 function outlineTitle(raw) {
@@ -21331,7 +21416,7 @@ function unwrapFencedOutline(lines) {
   const firstContent = lines.findIndex((line) => line.trim() !== "");
   let index = 0;
   while (index < lines.length) {
-    const open = FENCE_OPEN.exec(lines[index]);
+    const open = FENCE_OPEN2.exec(lines[index]);
     if (!open || open[1][0] === "`" && open[2].includes("`")) {
       index++;
       continue;
@@ -21411,7 +21496,7 @@ function parseOutline(input) {
       if (line.includes(end)) block = null;
       continue;
     }
-    const open = FENCE_OPEN.exec(line);
+    const open = FENCE_OPEN2.exec(line);
     if (open && !(open[1][0] === "`" && open[2].includes("`"))) {
       skippedLines++;
       fence = open[1];
@@ -33660,6 +33745,22 @@ var VisualAgentMapView = class _VisualAgentMapView extends import_obsidian30.Ite
     else if (typeof state.file === "string" && state.file !== this.path) await this.openMap(state.file);
     await super.setState(state, result);
   }
+  /** Keeps the chat's current-note chip and the source-note guess in step with which notes are open and shown. */
+  registerWorkspaceEvents() {
+    const workspace = this.app.workspace;
+    if (typeof (workspace == null ? void 0 : workspace.on) !== "function" || typeof this.registerEvent !== "function") return;
+    this.registerEvent(
+      workspace.on("active-leaf-change", (leaf) => {
+        var _a2;
+        if ((leaf == null ? void 0 : leaf.view) instanceof import_obsidian30.MarkdownView && leaf.view.file) this.lastMarkdownPath = leaf.view.file.path;
+        (_a2 = this.chat) == null ? void 0 : _a2.refreshNote();
+      })
+    );
+    this.registerEvent(workspace.on("layout-change", () => {
+      var _a2;
+      return (_a2 = this.chat) == null ? void 0 : _a2.refreshNote();
+    }));
+  }
   async onOpen() {
     var _a2, _b2, _c, _d, _e, _f, _g, _h, _i, _j, _k, _l;
     this.closed = false;
@@ -33675,15 +33776,7 @@ var VisualAgentMapView = class _VisualAgentMapView extends import_obsidian30.Ite
     this.mapOpenEpoch++;
     this.contentEl.addClass("vam-view");
     this.contentEl.tabIndex = 0;
-    const workspace = this.app.workspace;
-    if (typeof (workspace == null ? void 0 : workspace.on) === "function" && typeof this.registerEvent === "function")
-      this.registerEvent(
-        workspace.on("active-leaf-change", (leaf) => {
-          var _a3;
-          if ((leaf == null ? void 0 : leaf.view) instanceof import_obsidian30.MarkdownView && leaf.view.file) this.lastMarkdownPath = leaf.view.file.path;
-          (_a3 = this.chat) == null ? void 0 : _a3.refreshNote();
-        })
-      );
+    this.registerWorkspaceEvents();
     this.registerDomEvent((_j = this.contentEl.win) != null ? _j : window, "keydown", (event) => {
       if (event.code === "Space" && !(event.target instanceof HTMLElement && event.target.closest("input, textarea, select, [contenteditable=true]")))
         this.spaceHeld = true;
@@ -42336,16 +42429,19 @@ ${note.detail.trim()}` : "",
       },
       resolveLink: (link) => {
         var _a2, _b2;
-        const file = this.app.metadataCache.getFirstLinkpathDest(link, (_b2 = (_a2 = this.activeMarkdownFile()) == null ? void 0 : _a2.path) != null ? _b2 : "");
+        const file = this.app.metadataCache.getFirstLinkpathDest(link, (_b2 = (_a2 = this.sourceMarkdownFile()) == null ? void 0 : _a2.path) != null ? _b2 : "");
         return file && file.extension === "md" ? file.path : null;
       },
       activeNotePath: () => {
         var _a2, _b2;
-        return (_b2 = (_a2 = this.activeMarkdownFile()) == null ? void 0 : _a2.path) != null ? _b2 : null;
+        return (_b2 = (_a2 = this.sourceMarkdownFile()) == null ? void 0 : _a2.path) != null ? _b2 : null;
       },
       visibleNotePath: () => {
         var _a2, _b2;
-        return (_b2 = (_a2 = this.activeMarkdownFile()) == null ? void 0 : _a2.path) != null ? _b2 : null;
+        return (_b2 = (_a2 = this.visibleMarkdownFile()) == null ? void 0 : _a2.path) != null ? _b2 : null;
+      },
+      openLink: (href, newLeaf) => {
+        void this.app.workspace.openLinkText(href, this.path, newLeaf);
       },
       renderMarkdown: (text11, el, owner) => import_obsidian30.MarkdownRenderer.render(this.app, text11, el, this.path, owner),
       activeElement: () => {
@@ -42383,7 +42479,7 @@ ${note.detail.trim()}` : "",
    * in this map's window). Background tabs, other windows and closed notes never count. With several on screen: the one the
    * user touched last, then one of this map's own topic notes, then the first.
    */
-  activeMarkdownFile() {
+  visibleMarkdownFile() {
     var _a2, _b2, _c, _d, _e;
     const shown = [];
     const doc = this.contentEl.ownerDocument;
@@ -42399,6 +42495,28 @@ ${note.detail.trim()}` : "",
       this.lastMarkdownPath && shown.includes(this.lastMarkdownPath) ? this.lastMarkdownPath : null,
       shown.find((path) => topicPaths.has(path)),
       ...shown
+    ];
+    for (const path of candidates) {
+      const file = path ? this.app.vault.getAbstractFileByPath(path) : null;
+      if (file instanceof import_obsidian30.TFile && file.extension === "md") return file;
+    }
+    return null;
+  }
+  /**
+   * Where dragged-in text most likely came from: the active note, else the one touched last (if still open), else any open
+   * note, wherever it is. Only a guess for a snippet's source; what a message is sent with is {@link visibleMarkdownFile}.
+   */
+  sourceMarkdownFile() {
+    var _a2, _b2, _c, _d, _e;
+    const workspace = this.app.workspace;
+    const open = /* @__PURE__ */ new Set();
+    for (const leaf of (_b2 = (_a2 = workspace.getLeavesOfType) == null ? void 0 : _a2.call(workspace, "markdown")) != null ? _b2 : [])
+      if (leaf.view instanceof import_obsidian30.MarkdownView && leaf.view.file) open.add(leaf.view.file.path);
+    const live = (_e = (_d = (_c = workspace.getActiveViewOfType) == null ? void 0 : _c.call(workspace, import_obsidian30.MarkdownView)) == null ? void 0 : _d.file) == null ? void 0 : _e.path;
+    const candidates = [
+      live,
+      this.lastMarkdownPath && open.has(this.lastMarkdownPath) ? this.lastMarkdownPath : null,
+      ...open
     ];
     for (const path of candidates) {
       const file = path ? this.app.vault.getAbstractFileByPath(path) : null;
@@ -44255,12 +44373,12 @@ function htmlBlockLines(lines) {
   }
   return blocks;
 }
-var FENCE_OPEN2 = /^ {0,3}(`{3,}|~{3,})(.*)$/;
+var FENCE_OPEN3 = /^ {0,3}(`{3,}|~{3,})(.*)$/;
 function fenceRanges(lines, offsets, html) {
   const ranges = [];
   const inHtml = (line) => html.some(([first, last]) => line >= first && line <= last);
   for (let i = 0; i < lines.length; i++) {
-    const open = FENCE_OPEN2.exec(lines[i]);
+    const open = FENCE_OPEN3.exec(lines[i]);
     if (!open || inHtml(i)) continue;
     const mark = open[1];
     if (mark[0] === "`" && open[2].includes("`")) continue;

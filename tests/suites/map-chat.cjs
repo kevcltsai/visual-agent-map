@@ -25,9 +25,9 @@ function page() {
 function panelFixture(overrides = {}) {
   const owners = [];
   class Component { constructor() { this.loaded = false; this.unloaded = false; owners.push(this); } load() { this.loaded = true; } unload() { this.unloaded = true; } }
-  const { MapChatPanel } = load('experiences/visual-map/map-chat.ts', { obsidian: { ...obsidian, Component } });
+  const { MapChatPanel } = load('experiences/visual-map/map-chat.ts', { obsidian: { ...obsidian, Component, Keymap: { isModEvent: event => !!event.ctrlKey } } });
   const p = page(); const overlay = p.attach(p.root.createDiv('vam-canvas-overlay'));
-  const calls = { send: 0, stop: 0, layout: [], more: [] };
+  const calls = { send: 0, stop: 0, layout: [], more: [], links: [] };
   const topics = { a: 'Topic A', b: 'Topic B' };
   let selected = [];
   let visibleNote = null;
@@ -41,7 +41,7 @@ function panelFixture(overrides = {}) {
     topicTitle: id => topics[id] ?? null, selectedIds: () => selected, send: () => { calls.send++; }, stop: () => { calls.stop++; },
     resolveLink: link => ({ Note: 'Notes/Note.md', Other: 'Notes/Other.md' })[link] ?? null, activeNotePath: () => 'Notes/Active.md', visibleNotePath: () => visibleNote,
     renderMarkdown: async (text, el, owner) => { rendered.push({ text, el, owner }); el.setText(text); },
-    activeElement: () => p.doc.activeElement, layoutChanged: open => calls.layout.push(open), ...overrides
+    openLink: (href, newLeaf) => { calls.links.push([href, newLeaf]); }, activeElement: () => p.doc.activeElement, layoutChanged: open => calls.layout.push(open), ...overrides
   };
   const panel = new MapChatPanel(host);
   panel.mount(overlay);
@@ -265,7 +265,8 @@ async function harness({ aim = false, document = false } = {}) {
     mapChat: { chat: async (request, signal, onReply) => { control.calls.push('chat'); control.requests.push(request); return control.reply(request, signal, onReply); } }
   });
   const leaves = []; let activeMarkdown = null;
-  app.workspace = { getLeavesOfType: type => type === 'markdown' ? leaves : [], getActiveViewOfType: () => activeMarkdown, on() {} };
+  const handlers = []; const linkOpens = [];
+  app.workspace = { getLeavesOfType: type => type === 'markdown' ? leaves : [], getActiveViewOfType: () => activeMarkdown, on(name, fn) { const ref = { name, fn }; handlers.push(ref); return ref; }, openLinkText(link, source, newLeaf) { linkOpens.push([link, source, newLeaf]); } };
   class Notice { constructor(message) { notices.push(message); } hide() {} }
   const { VisualAgentMapView } = load('main.ts', { obsidian: { ...obsidian, MarkdownView, Notice, Component: class { load() {} unload() {} }, MarkdownRenderer: { render: async (_app, text, el, sourcePath, owner) => { control.markdown.push({ text, el, sourcePath, owner }); el.setText(text); } } } }, { ...(document ? { document: { documentElement: { style: {} }, get activeElement() { return ctx.page?.doc.activeElement ?? null; } } } : {}), CSS: { escape: value => String(value) }, createSvg: tag => ({ tag, attrs: {}, classes: [], setAttribute(name, value) { this.attrs[name] = value; }, addClass(name) { this.classes.push(name); } }), requestAnimationFrame: run => { run(); return 1; }, cancelAnimationFrame() {}, setTimeout: fn => { ctx.timers.push(fn); return ctx.timers.length; }, clearTimeout() {} });
   ctx.timers = [];
@@ -289,7 +290,7 @@ async function harness({ aim = false, document = false } = {}) {
   };
   await reload();
   const h = {
-    repo, app, contents, files, view, plugin, ids, control, notices, opened, leaves, page: p, rootEl, get timers() { return ctx.timers; }, repaint, renders: () => renders, workspace: () => workspaceEl,
+    repo, app, contents, files, view, plugin, ids, control, notices, opened, leaves, handlers, linkOpens, page: p, rootEl, get timers() { return ctx.timers; }, repaint, renders: () => renders, workspace: () => workspaceEl,
     setActive: (file, text, editor) => { const v = h.leaf(file, { editor }); activeMarkdown = v; leaves.splice(0, leaves.length, { view: v }); return v; },
     // A markdown leaf; `shown` false is a background tab, `doc` another window. Not made active.
     leaf: (file, { shown = true, doc = p.doc, editor = null } = {}) => Object.assign(new MarkdownView(), { file: app.vault.getAbstractFileByPath(file), editor, containerEl: { ownerDocument: doc, isShown: () => shown } }),
@@ -1238,7 +1239,7 @@ integrationTest('map chat D1: a note open in a background tab is not sent and ge
   const h = await harness(); await h.view.hydrate();
   h.setLeaves(h.leaf('Notes/Other.md', { shown: false }));
   const chat = h.open();
-  eq(noteLabel(chat), []); assert.equal(h.view.activeMarkdownFile(), null);
+  eq(noteLabel(chat), []); assert.equal(h.view.visibleMarkdownFile(), null);
   assert.equal(sentActive(await send(h)), null, 'a hidden tab is not context');
 });
 
@@ -1262,14 +1263,14 @@ integrationTest('map chat D1: with several notes shown, the last one touched win
   const h = await harness(); await h.view.hydrate();
   const topicPath = h.node('b').path;
   h.setLeaves(h.leaf('Notes/Other.md'), h.leaf(topicPath), h.leaf('Notes/Research.md'));
-  assert.equal(h.view.activeMarkdownFile().path, topicPath, 'topic note beats the first shown');
+  assert.equal(h.view.visibleMarkdownFile().path, topicPath, 'topic note beats the first shown');
   h.view.lastMarkdownPath = 'Notes/Research.md';
-  assert.equal(h.view.activeMarkdownFile().path, 'Notes/Research.md', 'last touched, while still shown');
+  assert.equal(h.view.visibleMarkdownFile().path, 'Notes/Research.md', 'last touched, while still shown');
   h.setLeaves(h.leaf('Notes/Other.md'), h.leaf('Notes/Research.md', { shown: false }));
-  assert.equal(h.view.activeMarkdownFile().path, 'Notes/Other.md', 'last touched is hidden now: the first shown');
+  assert.equal(h.view.visibleMarkdownFile().path, 'Notes/Other.md', 'last touched is hidden now: the first shown');
   h.setLeaves(h.leaf('Notes/Other.md'), h.leaf('Notes/Research.md'));
   h.view.lastMarkdownPath = null;
-  assert.equal(h.view.activeMarkdownFile().path, 'Notes/Other.md', 'no topic note, no history: the first shown');
+  assert.equal(h.view.visibleMarkdownFile().path, 'Notes/Other.md', 'no topic note, no history: the first shown');
 });
 
 integrationTest('map chat D1: removing the chip sends no active note, and an edit of that note has no baseline and is skipped', async () => {
@@ -1328,7 +1329,7 @@ test('map chat D1: assistant replies are laid out by the Markdown renderer; the 
   const f = panelFixture(); f.panel.setOpen(true);
   f.panel.begin('**not bold**');
   f.panel.streamReply('Hi **bo'); f.panel.streamReply('Hi **bold** and <script>x</script> <img src=x onerror=y>'); await tick();
-  assert.equal(f.rendered.at(-1).text, 'Hi **bold** and <script>x</script> <img src=x onerror=y>', 'the newest streamed text is the one laid out');
+  assert.equal(f.rendered.at(-1).text, 'Hi **bold** and &lt;script>x&lt;/script> &lt;img src=x onerror=y>', 'the newest streamed text is the one laid out, with its raw HTML escaped (D3 F3)');
   f.panel.finish('Done **bold** [[Note]]', [{ status: 'done', text: '**line**' }]); await tick(); await tick();
   assert.equal(f.rendered.at(-1).text, 'Done **bold** [[Note]]', 'the last layout is the complete answer');
   assert.ok(f.rendered.every(r => r.text !== '**not bold**' && r.text !== '**line**'), 'only the reply goes through the renderer');
@@ -1436,4 +1437,142 @@ integrationTest('map chat: closing the view mid-drag with a pending repaint neit
   assert.equal(d.view.renderAfterDrag, false); assert.equal(d.view.dragging, false);
   d.view.render();
   assert.equal(probe.count, 0, 'a closed view is never repainted');
+});
+
+// ---- Packet D3: review fixes F1-F5 ---------------------------------------------------------------------------------------------
+
+const { sanitizeChatMarkdown } = load('core/map-chat-markdown.ts');
+const replyBody = f => find(f.parts.log(), i => hasClass(i, 'is-assistant')).children.find(c => hasClass(c, 'vam-map-chat-text'));
+
+test('map chat D3 F1: a slow layout that finishes late never unloads the owner of the layout that is on screen', async () => {
+  const pend = [];
+  const f = panelFixture({ renderMarkdown: (text, el, owner) => new Promise(resolve => pend.push({ text, owner, el, done: () => { el.setText(text); resolve(); } })) });
+  f.panel.setOpen(true);
+  f.panel.begin('q'); f.panel.streamReply('a'); f.panel.streamReply('b'); // 'a' is in flight, 'b' waits
+  f.panel.finish('final', []);                                              // the log repaints: a new paint of 'final'
+  const finalOwner = pend.at(-1).owner;
+  pend[0].done(); await tick(); await tick();                               // the old paint resolves and would go on to 'b'
+  assert.equal(finalOwner.unloaded, false, 'the owner of the layout on screen is still loaded');
+  assert.ok(pend.every(item => item.text !== 'b'), 'the replaced paint stops instead of laying out its pending text into a detached element');
+  for (const item of pend) item.done(); await tick(); await tick();
+  assert.equal(finalOwner.unloaded, false);
+  assert.ok(pend.every(item => item.text !== 'b' || item.owner.unloaded), 'a layout the repaint replaced does not keep a live owner');
+  assert.equal(replyBody(f).text, 'final', 'the final reply is what is shown');
+});
+
+test('map chat D3 F2: a [[link]] in a reply opens the note; a modifier click opens it in a new tab; external links and other clicks are left alone', () => {
+  const f = panelFixture(); f.panel.setOpen(true);
+  const anchor = (cls, href) => { const a = element('a', { cls }); a.attrs['data-href'] = href; a.attrs.href = href; a.getAttribute = name => a.attrs[name] ?? null; a.closest = selector => selector === 'a' ? a : null; return a; };
+  const click = (target, extra = {}) => { let prevented = false; f.parts.log().fire('click', { target, preventDefault() { prevented = true; }, ...extra }); return prevented; };
+  assert.equal(click(anchor('internal-link', 'Notes/Note')), true, 'the click is taken over');
+  eq(f.calls.links, [['Notes/Note', false]]);
+  assert.equal(click(anchor('internal-link', 'Other#Heading'), { ctrlKey: true }), true);
+  eq(f.calls.links.at(-1), ['Other#Heading', true]);
+  assert.equal(click(anchor('external-link', 'https://example.com')), false, 'external links keep the default behaviour');
+  const plain = element('span'); plain.closest = () => null;
+  assert.equal(click(plain), false); assert.equal(f.calls.links.length, 2);
+});
+
+integrationTest('map chat D3 F2: the view opens a clicked internal link from the map file, in a new tab only for a modifier click', async () => {
+  const h = await harness(); await h.view.hydrate(); const chat = h.open();
+  chat.host.openLink('Notes/Note', false); chat.host.openLink('Notes/Other', true);
+  eq(h.linkOpens, [['Notes/Note', MAP, false], ['Notes/Other', MAP, true]]);
+});
+
+test('map chat D3 F3: remote images become plain links, and embeds become plain links to the note', () => {
+  assert.equal(sanitizeChatMarkdown('see ![chart](https://evil.test/p.png?x=1) now'), 'see [chart](https://evil.test/p.png?x=1) now');
+  assert.equal(sanitizeChatMarkdown('![a](HTTP://evil.test/p.png "t")'), '[a](HTTP://evil.test/p.png "t")');
+  assert.equal(sanitizeChatMarkdown('![a](<https://evil.test/p.png>)'), '[a](https://evil.test/p.png)');
+  assert.equal(sanitizeChatMarkdown('![](//evil.test/p.png)'), '[](//evil.test/p.png)', 'a protocol-relative address is remote too');
+  assert.equal(sanitizeChatMarkdown('![a][ref]\n\n[ref]: https://evil.test/p.png'), '[a][ref]\n\n[ref]: https://evil.test/p.png', 'a reference-style image would load too');
+  assert.equal(sanitizeChatMarkdown('![ref]\n\n[ref]: https://evil.test/p.png'), '[ref]\n\n[ref]: https://evil.test/p.png');
+  assert.equal(sanitizeChatMarkdown('![[Secret note]] and ![[pic.png|200]] and ![[Note#Heading]]'), '[[Secret note]] and [[pic.png|200]] and [[Note#Heading]]');
+  assert.equal(sanitizeChatMarkdown('a plain [link](https://ok.test) and [[Note]]'), 'a plain [link](https://ok.test) and [[Note]]', 'links are not touched');
+  assert.equal(sanitizeChatMarkdown('![local](Attachments/p.png)'), '![local](Attachments/p.png)', 'a vault-relative image is not remote');
+});
+
+test('map chat D3 F3: raw HTML is escaped so iframe, img and script are text', () => {
+  assert.equal(sanitizeChatMarkdown('<iframe src="https://evil.test"></iframe>'), '&lt;iframe src="https://evil.test">&lt;/iframe>');
+  assert.equal(sanitizeChatMarkdown('a <img src=x onerror=y> b <script>x</script>'), 'a &lt;img src=x onerror=y> b &lt;script>x&lt;/script>');
+  assert.equal(sanitizeChatMarkdown('1 < 2 and **bold**'), '1 &lt; 2 and **bold**');
+});
+
+test('map chat D3 F3: a code fence loses its language (so no external processor runs it) but keeps its content', () => {
+  assert.equal(sanitizeChatMarkdown('```dataviewjs\ndv.paragraph(app.vault.getFiles())\n```'), '```\ndv.paragraph(app.vault.getFiles())\n```');
+  assert.equal(sanitizeChatMarkdown('~~~mermaid title\ngraph TD\n~~~'), '~~~\ngraph TD\n~~~');
+  assert.equal(sanitizeChatMarkdown('  ````js {1}\nx\n````\nafter'), '  ````\nx\n````\nafter');
+  assert.equal(sanitizeChatMarkdown('```\nplain\n```'), '```\nplain\n```', 'a fence without a language is unchanged');
+  assert.equal(sanitizeChatMarkdown('```js\nno closing fence'), '```\nno closing fence', 'an unclosed fence runs to the end, as Markdown reads it');
+  assert.equal(sanitizeChatMarkdown('````md\n```dataview\nTABLE\n```\n````'), '````\n```dataview\nTABLE\n```\n````', 'a shorter fence inside a longer one is content');
+});
+
+test('map chat D3 F3: nothing inside a code fence or inline code is rewritten', () => {
+  const fence = '```\n![x](https://evil.test/p.png)\n![[Note]]\n<b>x</b>\n```';
+  assert.equal(sanitizeChatMarkdown(fence), fence);
+  assert.equal(sanitizeChatMarkdown('~~~\n<div>\n~~~'), '~~~\n<div>\n~~~');
+  assert.equal(sanitizeChatMarkdown('use `<div>` and `![x](https://evil.test/p.png)` and ``![[Note]]``'), 'use `<div>` and `![x](https://evil.test/p.png)` and ``![[Note]]``');
+  assert.equal(sanitizeChatMarkdown('`<a>` then <b> and ![x](https://e.test/p.png)'), '`<a>` then &lt;b> and [x](https://e.test/p.png)', 'text outside the span is still cleaned');
+  assert.equal(sanitizeChatMarkdown('stray ` then <b>\n\nnext `<c>`'), 'stray ` then &lt;b>\n\nnext `<c>`', 'an unmatched backtick does not shield the rest of its paragraph or the next one');
+  assert.equal(sanitizeChatMarkdown('before\n```js\n<x>\n```\n<y>'), 'before\n```\n<x>\n```\n&lt;y>', 'text after a fence is cleaned again');
+});
+
+test('map chat D3 F3: the panel hands the renderer only sanitised text, while the stored reply stays as the model wrote it', async () => {
+  const f = panelFixture(); f.panel.setOpen(true);
+  f.panel.begin('q');
+  f.panel.finish('![x](https://evil.test/p.png) <img src=x> ![[Secret]]\n```dataviewjs\nrun()\n```', []); await tick(); await tick();
+  assert.equal(f.rendered.at(-1).text, '[x](https://evil.test/p.png) &lt;img src=x> [[Secret]]\n```\nrun()\n```');
+  assert.equal(f.panel.transcript().at(-1).text, '![x](https://evil.test/p.png) <img src=x> ![[Secret]]\n```dataviewjs\nrun()\n```', 'history for the next request is untouched');
+});
+
+integrationTest('map chat D3 F4: text dragged in while the note is in another window or a background tab still names its source note, with the file and a baseline', async () => {
+  for (const setup of [
+    h => h.setLeaves(h.leaf('Notes/Other.md', { doc: { other: true } })),
+    h => h.setLeaves(h.leaf('Notes/Other.md', { shown: false })),
+    h => { h.setActive('Notes/Other.md', '', null); h.leaves[0].view.containerEl.ownerDocument = { other: true }; }
+  ]) {
+    const h = await harness(); await h.view.hydrate(); setup(h);
+    const chat = h.open();
+    eq(noteLabel(chat), [], 'no current-note chip: the note is not beside the map');
+    drop(chat.el, 'naps');
+    eq(chat.attachments(), [{ kind: 'snippet', path: 'Notes/Other.md', text: 'naps', pathGuessed: true }]);
+    assert.deepEqual(findAll(chat.chipsEl, i => hasClass(i, 'vam-map-chat-chip-label')).map(i => i.text), ['Text from Other']);
+    h.control.reply = async () => ({ reply: 'r', actions: [{ kind: 'edit_md_file', path: 'Notes/Other.md', find: 'naps', replace: 'sleep' }], rejected: [] });
+    const request = await send(h);
+    const snippet = JSON.parse(request.context.json).snippets[0];
+    assert.equal(snippet.path, 'Notes/Other.md'); assert.equal(snippet.contentHash, contentHash('Other note about naps.\n'), 'the file was read, so the snippet carries its hash');
+    assert.equal(sentActive(request), null, 'the note is still not sent as the current note');
+    assert.match(h.contents.get('Notes/Other.md'), /about sleep/, 'its file content gave the edit a baseline');
+  }
+});
+
+integrationTest('map chat D3 F4: the source guess falls back from the active note to the last touched note to any open note', async () => {
+  const h = await harness(); await h.view.hydrate();
+  h.setLeaves(); assert.equal(h.view.sourceMarkdownFile(), null, 'nothing open');
+  h.setLeaves(h.leaf('Notes/Other.md', { shown: false }), h.leaf('Notes/Research.md', { shown: false }));
+  assert.equal(h.view.sourceMarkdownFile().path, 'Notes/Other.md', 'any open note');
+  h.view.lastMarkdownPath = 'Notes/Research.md';
+  assert.equal(h.view.sourceMarkdownFile().path, 'Notes/Research.md', 'the last touched, while open');
+  h.setActive('Notes/Other.md', '', null);
+  assert.equal(h.view.sourceMarkdownFile().path, 'Notes/Other.md', 'the active note first');
+});
+
+integrationTest('map chat D3 F4: a dropped [[link]] resolves from the source note even when that note is not visible', async () => {
+  const h = await harness(); await h.view.hydrate();
+  h.setLeaves(h.leaf('Notes/Other.md', { doc: { other: true } }));
+  const seen = []; h.app.metadataCache.getFirstLinkpathDest = (link, from) => { seen.push([link, from]); return h.app.vault.getAbstractFileByPath('Notes/Research.md'); };
+  const chat = h.open(); drop(chat.el, '[[Research]]');
+  eq(seen, [['Research', 'Notes/Other.md']]); eq(chat.attachments(), [{ kind: 'file', path: 'Notes/Research.md' }]);
+});
+
+integrationTest('map chat D3 F5: the chip follows the layout too: a tab shown or hidden without a leaf change updates it', async () => {
+  const h = await harness(); await h.view.hydrate();
+  h.view.registerEvent = ref => ref; h.view.registerWorkspaceEvents();
+  eq(h.handlers.map(x => x.name).sort(), ['active-leaf-change', 'layout-change']);
+  let shown = true; const leaf = h.leaf('Notes/Other.md'); leaf.containerEl.isShown = () => shown;
+  h.setLeaves(leaf);
+  const chat = h.open(); eq(noteLabel(chat), ['Current note: Other']);
+  shown = false; h.handlers.find(x => x.name === 'layout-change').fn(); eq(noteLabel(chat), [], 'the tab was hidden');
+  shown = true; h.handlers.find(x => x.name === 'layout-change').fn(); eq(noteLabel(chat), ['Current note: Other'], 'the tab is shown again');
+  h.setLeaves(h.leaf('Notes/Research.md')); h.handlers.find(x => x.name === 'active-leaf-change').fn({ view: h.leaves[0].view });
+  eq(noteLabel(chat), ['Current note: Research']); assert.equal(h.view.lastMarkdownPath, 'Notes/Research.md');
 });

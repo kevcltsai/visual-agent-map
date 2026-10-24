@@ -145,7 +145,6 @@ async function fitImageForClaude(dataUrl: string, signal: AbortSignal): Promise<
   throw new Error(t("ui.context_ai_image_unavailable"));
 }
 
-/** Chart steps that may run at once; further jobs wait in a first-in-first-out queue. */
 /** The settings in effect for what was saved: every field is checked, and a missing or invalid one takes its default. */
 export function settingsFromSaved(saved: Partial<Settings> | null): Settings {
   const legacy: (Partial<Settings> & { cliPath?: string }) | null = saved;
@@ -199,6 +198,7 @@ export function settingsFromSaved(saved: Partial<Settings> | null): Settings {
   };
 }
 
+/** Chart steps that may run at once; further jobs wait in a first-in-first-out queue. */
 export const CHART_JOB_LIMIT = 3;
 
 export default class VisualAgentMapPlugin extends Plugin {

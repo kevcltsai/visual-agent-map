@@ -36282,13 +36282,18 @@ ${request.requirements}` : preset.text,
     if (this.aimProgressTimer === null) this.aimProgressTimer = window.setInterval(() => this.paintAimProgress(), 1e3);
     if (structural) this.scheduleAimProgressRender();
   }
+  /** True while the user is typing in a text field of the view. The chat field counts only during IME composition (as in changed()). */
+  typingInField() {
+    var _a2, _b2, _c;
+    const active = (_b2 = (_a2 = this.contentEl.ownerDocument) == null ? void 0 : _a2.activeElement) != null ? _b2 : null;
+    return ((_c = this.chat) == null ? void 0 : _c.isInput(active)) ? this.chat.isComposing : this.contentEl.contains(active) && !!(active == null ? void 0 : active.matches("input, textarea, select"));
+  }
   scheduleAimProgressRender() {
     if (this.aimProgressRenderTimer !== null) return;
     this.aimProgressRenderTimer = window.setTimeout(() => {
-      var _a2;
       this.aimProgressRenderTimer = null;
       if (this.closed) return;
-      const typing = this.contentEl.contains(document.activeElement) && ((_a2 = document.activeElement) == null ? void 0 : _a2.matches("input, textarea, select"));
+      const typing = this.typingInField();
       if (this.dragging || typing) this.scheduleAimProgressRender();
       else this.renderPreservingFocus();
     }, 300);
@@ -36516,10 +36521,9 @@ ${request.requirements}` : preset.text,
   scheduleResearchRender() {
     if (this.researchRenderTimer !== null) return;
     this.researchRenderTimer = window.setTimeout(() => {
-      var _a2;
       this.researchRenderTimer = null;
       if (this.closed) return;
-      const typing = this.contentEl.contains(document.activeElement) && ((_a2 = document.activeElement) == null ? void 0 : _a2.matches("input, textarea, select"));
+      const typing = this.typingInField();
       if (this.dragging || typing) this.scheduleResearchRender();
       else this.renderPreservingFocus();
     }, 150);

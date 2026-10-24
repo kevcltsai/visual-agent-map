@@ -262,7 +262,7 @@ async function harness({ aim = false } = {}) {
   const leaves = []; let activeMarkdown = null;
   app.workspace = { getLeavesOfType: type => type === 'markdown' ? leaves : [], getActiveViewOfType: () => activeMarkdown, on() {} };
   class Notice { constructor(message) { notices.push(message); } hide() {} }
-  const { VisualAgentMapView } = load('main.ts', { obsidian: { ...obsidian, MarkdownView, Notice } }, { CSS: { escape: value => String(value) }, requestAnimationFrame: run => { run(); return 1; }, cancelAnimationFrame() {}, setTimeout: fn => { ctx.timers.push(fn); return ctx.timers.length; }, clearTimeout() {} });
+  const { VisualAgentMapView } = load('main.ts', { obsidian: { ...obsidian, MarkdownView, Notice } }, { CSS: { escape: value => String(value) }, createSvg: tag => ({ tag, attrs: {}, classes: [], setAttribute(name, value) { this.attrs[name] = value; }, addClass(name) { this.classes.push(name); } }), requestAnimationFrame: run => { run(); return 1; }, cancelAnimationFrame() {}, setTimeout: fn => { ctx.timers.push(fn); return ctx.timers.length; }, clearTimeout() {} });
   ctx.timers = [];
   const view = new VisualAgentMapView({ app }, plugin);
   ctx.view = view;
@@ -894,6 +894,38 @@ integrationTest('map chat C2: a single refreshCard outside a batch still redraws
   view.refreshCard(view.map.nodes[0]); assert.equal(drawn, 1);
   view.refreshCard(view.map.nodes[0], false); assert.equal(drawn, 1, 'a batched refresh leaves the redraw to its caller');
 });
+integrationTest('map chat C3: the batched sync (editing branch) leaves the same edges as refreshing every card one by one, with the real drawEdges', async () => {
+  const { h, chat, view, changeNote } = await syncFixture();
+  const realDraw = Object.getPrototypeOf(view).drawEdges; let draws = 0;
+  view.drawEdges = function () { draws++; return realDraw.call(this); };
+  // Fake layout: every card gets its own box, so each edge has distinct coordinates.
+  view.cardEls = new Map(view.map.nodes.map((n, i) => [n.id, { offsetLeft: 100 * i, offsetTop: 40 * i + 7, offsetWidth: 90, offsetHeight: 30 }]));
+  const makeEdges = () => { const edges = { kids: [], replaceChildren() { this.kids = []; }, appendChild(p) { this.kids.push(p); } }; view.edgesEl = edges; view.edgeEls = new Map(); return edges; };
+  const snapshot = edges => edges.kids.map(p => JSON.stringify({ attrs: p.attrs, classes: p.classes }));
+  // Old behaviour: each card refresh redraws all edges.
+  const oldEdges = makeEdges(); for (const node of view.map.nodes) view.refreshCard(node); const oldDraws = draws; const oldSnap = snapshot(oldEdges);
+  // New behaviour: synchronize on the editing branch (IME composition in the chat field).
+  const newEdges = makeEdges(); chat.inputEl.focus(); chat.inputEl.fire('compositionstart'); await changeNote(); draws = 0; await view.synchronize();
+  assert.ok(oldSnap.length >= 3, 'the map has edges to compare'); assert.equal(newEdges.kids.length, oldSnap.length, 'same number of edges');
+  assert.ok(JSON.parse(oldSnap[0]).attrs.d, 'the path data is real, not empty'); assert.deepEqual(snapshot(newEdges), oldSnap, 'every edge has the same path and classes');
+  assert.equal(draws, 1); assert.equal(oldDraws, view.map.nodes.length);
+});
+async function scheduleFixture() {
+  const { h, chat, view } = await syncFixture();
+  let painted = 0; view.renderPreservingFocus = () => { painted++; };
+  const run = name => { h.timers.length = 0; view[name](); const fire = h.timers.pop(); assert.ok(fire, 'a repaint was scheduled'); painted = 0; const left = h.timers.length; fire(); return { painted, rescheduled: h.timers.length > left || h.timers.length > 0 }; };
+  return { h, chat, view, run, reset: () => { view.aimProgressRenderTimer = null; view.researchRenderTimer = null; } };
+}
+for (const name of ['scheduleResearchRender', 'scheduleAimProgressRender'])
+  integrationTest(`map chat C3: ${name} paints while the chat field has focus, waits for IME composition and for other text fields`, async () => {
+    const { h, chat, view, run, reset } = await scheduleFixture();
+    chat.inputEl.focus(); let r = run(name); assert.equal(r.painted, 1, 'chat focus (not composing): repaint runs'); reset();
+    chat.inputEl.fire('compositionstart'); r = run(name); assert.equal(r.painted, 0, 'composing: deferred'); assert.ok(r.rescheduled); reset();
+    chat.inputEl.fire('compositionend'); r = run(name); assert.equal(r.painted, 1); reset();
+    const other = h.rootEl.createDiv(); other.matches = selector => /input/.test(selector); h.page.doc.activeElement = other;
+    r = run(name); assert.equal(r.painted, 0, 'card title / goal input: deferred'); assert.ok(r.rescheduled); reset();
+    h.page.doc.activeElement = null; r = run(name); assert.equal(r.painted, 1);
+  });
 integrationTest('map chat: keys inside the chat field are not taken by the view scope', async () => {
   const h = await harness();
   const keys = h.view.scope.keys;

@@ -3592,14 +3592,20 @@ export class VisualAgentMapView extends ItemView {
     if (this.aimProgressTimer === null) this.aimProgressTimer = window.setInterval(() => this.paintAimProgress(), 1000);
     if (structural) this.scheduleAimProgressRender();
   }
+  /** True while the user is typing in a text field of the view. The chat field counts only during IME composition (as in changed()). */
+  private typingInField(): boolean {
+    const active = this.contentEl.ownerDocument?.activeElement ?? null;
+    return this.chat?.isInput(active)
+      ? this.chat.isComposing
+      : this.contentEl.contains(active) && !!active?.matches("input, textarea, select");
+  }
   private scheduleAimProgressRender(): void {
     if (this.aimProgressRenderTimer !== null) return;
     this.aimProgressRenderTimer = window.setTimeout(() => {
       this.aimProgressRenderTimer = null;
       if (this.closed) return;
       // Like changed(): never interrupt a drag or an open input; try again shortly instead.
-      const typing =
-        this.contentEl.contains(document.activeElement) && document.activeElement?.matches("input, textarea, select");
+      const typing = this.typingInField();
       if (this.dragging || typing) this.scheduleAimProgressRender();
       else this.renderPreservingFocus();
     }, 300);
@@ -3833,8 +3839,7 @@ export class VisualAgentMapView extends ItemView {
       this.researchRenderTimer = null;
       if (this.closed) return;
       // Like AIM progress: never interrupt a drag or an open input; try again shortly instead.
-      const typing =
-        this.contentEl.contains(document.activeElement) && document.activeElement?.matches("input, textarea, select");
+      const typing = this.typingInField();
       if (this.dragging || typing) this.scheduleResearchRender();
       else this.renderPreservingFocus();
     }, 150);

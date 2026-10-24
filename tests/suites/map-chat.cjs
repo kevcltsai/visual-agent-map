@@ -1917,18 +1917,29 @@ test('map chat E1: the panel gives the note in the reader\'s language, and all t
   const note = find(f.parts.log(), i => hasClass(i, 'vam-map-chat-overflow-note')); assert.ok(note); assert.match(note.text, /too long/i);
   for (const lang of ['en', 'zh-TW', 'zh-CN']) assert.match(fs.readFileSync(path.join(root, 'i18n', `${lang}.ts`), 'utf8'), /"ui\.map_chat_overflow_note": "[^"]+"/, lang);
 });
-test('map chat E1: a long dense reply streamed in 10 chunks, then a short reply, lays out in a small fraction of the old time', () => {
-  const clock = frames(); const f = panelFixture({}, clock.window); f.panel.setOpen(true);
-  const dense = DENSE.repeat(1850); const short = 'word '.repeat(400); const start = process.hrtime.bigint();
-  for (const [q, text] of [['q1', dense], ['q2', short]]) {
-    f.panel.begin(q); for (let i = 1; i <= 10; i++) { f.panel.streamReply(text.slice(0, Math.ceil(text.length * i / 10))); clock.run(); }
-    f.panel.finish(text, []);
-  }
-  const ms = Number(process.hrtime.bigint() - start) / 1e6; console.log(`E1 timing: ${ms.toFixed(0)} ms`);
-  assert.ok(ms < LIMIT_MS, `${ms.toFixed(0)} ms`);
+test('map chat E1: long dense replies streamed in bursts of chunks, then a short reply, lay out in a small multiple of one parse', () => {
+  const dense = DENSE.repeat(1850); const short = 'word '.repeat(400);
+  const once = run => { const start = process.hrtime.bigint(); run(); return Number(process.hrtime.bigint() - start) / 1e6; };
+  const best = (count, run) => { let min = Infinity; for (let i = 0; i < count; i++) min = Math.min(min, once(run)); return min; };
+  // Six dense turns kept in the log, each streamed as 30 chunks with a frame after every third chunk, then a short turn.
+  const streamed = () => {
+    const clock = frames(); const f = panelFixture({}, clock.window); f.panel.setOpen(true);
+    for (const [q, text] of [...Array.from({ length: 6 }, (_, i) => [`d${i}`, dense]), ['s', short]]) {
+      f.panel.begin(q);
+      for (let i = 1; i <= 30; i++) { f.panel.streamReply(text.slice(0, Math.ceil(text.length * i / 30))); if (i % 3 === 0) clock.run(); }
+      f.panel.finish(text, []);
+    }
+  };
+  streamed(); // warm up
+  // The bound is relative, measured in this process: one inline parse of the head of the same dense reply is the unit (it does not depend on the element budget), so a slow machine moves both sides.
+  const { parseInline } = load('core/map-chat-render.ts'); const unit = best(5, () => parseInline(dense.slice(0, 50000)));
+  const ms = best(5, streamed); const ratio = ms / unit;
+  console.log(`E1 timing: ${ms.toFixed(0)} ms for the streamed run, ${unit.toFixed(1)} ms for one parse, ratio ${ratio.toFixed(1)}`);
+  assert.ok(ratio <= STREAM_RATIO_LIMIT, `${ms.toFixed(0)} ms is ${ratio.toFixed(1)} times one parse (${unit.toFixed(1)} ms)`);
 });
-// Before the change the same run took about 630 ms in this fake DOM (and seconds in a real one, where layout dominates); the limit is loose on purpose (the run now takes about 90 ms).
-const LIMIT_MS = 200;
+// Ratio of the streamed run to one inline parse. Measured here: 160 to 185 with the row cache, the frame coalescing and the element budget; 330 to 500 without the row cache,
+// 410 to 460 with a layout for every chunk, 770 to 850 with a 2,000,000 element budget. 260 sits between; a slower machine moves both sides of the ratio.
+const STREAM_RATIO_LIMIT = 260;
 
 // ---- Packet E2: one parse for the cut, the view's own window, language, plain-text edges --------------------------------------------
 

@@ -936,6 +936,7 @@ export const zhTW: Record<TranslationKey, string> = {
   "ui.map_chat_model_follow_0": "跟隨預設（目前：{0}）",
   "ui.map_chat_more_detail": "說詳細一點",
   "ui.map_chat_more_detail_asked": "說詳細一點。",
+  "ui.map_chat_redo_actions_ignored": "詳細版回答不會再次套用動作。",
   "ui.map_chat_replying": "AI 正在回覆…",
   "ui.map_chat_stopped": "已停止。",
   "ui.map_chat_remove_ref_0": "移除引用：{0}",

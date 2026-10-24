@@ -849,6 +849,7 @@ export class VisualAgentMapView extends ItemView {
     this.hoverResearch = null;
     this.plugin.releaseOutline(this);
     this.abortMapChat();
+    this.chat?.dispose();
     this.relevancePanelCleanup?.();
     this.relevancePanelCleanup = null;
     // An open panel pre-started the CLI for a grade that will never be sent.
@@ -10016,6 +10017,12 @@ export class VisualAgentMapView extends ItemView {
         this.plugin.settings.mapChatModel = model;
         void this.plugin.saveSettings();
       },
+      watchModels: changed => {
+        const unsubscribe = this.plugin.subscribeModelDiscovery(changed);
+        void this.plugin.refreshModelDiscovery("codex");
+        void this.plugin.refreshModelDiscovery("claude");
+        return unsubscribe;
+      },
       moreDetail: origin => {
         void this.sendMapChat(origin);
       },
@@ -10277,7 +10284,12 @@ export class VisualAgentMapView extends ItemView {
           if (alive()) chat.streamReply(text);
         });
         if (!alive()) return;
-        const lines = await this.applyMapChatActions(result, request.context, alive);
+        // A detail re-send only explains: the actions of the first answer were applied already, so whatever it lists is dropped.
+        const lines = again
+          ? result.actions.length
+            ? [{ status: "skipped" as const, text: t("ui.map_chat_redo_actions_ignored") }]
+            : []
+          : await this.applyMapChatActions(result, request.context, alive);
         if (alive() && chat.isBusy) chat.finish(result.reply, lines);
       } catch (error) {
         if (alive()) chat.fail(this.chatErrorText(error));

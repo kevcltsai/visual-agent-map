@@ -935,6 +935,7 @@ export const zhCN: Record<TranslationKey, string> = {
   "ui.map_chat_model_follow_0": "跟随默认（当前：{0}）",
   "ui.map_chat_more_detail": "说详细一点",
   "ui.map_chat_more_detail_asked": "说详细一点。",
+  "ui.map_chat_redo_actions_ignored": "详细版回答不会再次应用操作。",
   "ui.map_chat_replying": "AI 正在回复…",
   "ui.map_chat_stopped": "已停止。",
   "ui.map_chat_remove_ref_0": "移除引用：{0}",

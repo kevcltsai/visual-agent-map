@@ -58,6 +58,8 @@ export interface MapChatHost {
   model(): string;
   /** The user picked a chat model; the view remembers it. */
   setModel(model: string): void;
+  /** Calls `changed` whenever the available models change and starts a refresh; the returned function stops listening. */
+  watchModels(changed: () => void): () => void;
   /** "Say it in more detail": send `origin` again with the detailed style. */
   moreDetail(origin: MapChatOrigin): void;
   /** The panel opened or closed; the view makes room for it. */
@@ -121,6 +123,7 @@ export class MapChatPanel {
   private styleEls: Record<MapChatStyleChoice, HTMLButtonElement> | null = null;
   private stopEl!: HTMLButtonElement;
   private built = false;
+  private stopWatching: (() => void) | null = null;
   private messageEls: HTMLElement[] = [];
 
   constructor(private readonly host: MapChatHost) {}
@@ -168,6 +171,11 @@ export class MapChatPanel {
     this.renderChips();
     this.refreshControls();
   }
+  /** The view is closing: stop listening for model changes. */
+  dispose(): void {
+    this.stopWatching?.();
+    this.stopWatching = null;
+  }
   /** Takes the panel out of the page; the next {@link mount} puts it back with all state intact. */
   detach(): void {
     if (this.built) this.el.remove();
@@ -190,6 +198,7 @@ export class MapChatPanel {
     if (open === this.open && !focus) return;
     this.open = open;
     this.applyOpen();
+    if (open) this.refreshControls();
     this.host.layoutChanged(open);
     if (!this.built) return;
     if (open && focus) this.inputEl.focus();
@@ -404,6 +413,7 @@ export class MapChatPanel {
     this.el.addEventListener("drop", event => this.onDrop(event));
     this.renderLog();
     this.renderBusy();
+    this.stopWatching = this.host.watchModels(() => this.refreshControls());
   }
 
   private onKey(event: KeyboardEvent): void {

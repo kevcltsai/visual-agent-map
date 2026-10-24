@@ -15,7 +15,7 @@ Action kinds (fill only the fields of the kind; every other field must be an emp
 Rules: every card id must be copied exactly from the supplied context. Never write inside the ".obsidian" folder, outside the vault, or over an existing file with create_md_file. Never change the front matter keys agent-map-node, node-id or topic-id of a card note. Do not invent facts or sources; when you write text, base it on the supplied context. Keep "actions" short and only include what the user asked for.
 
 Answer style: detailed. Explain fully; you may use several paragraphs, examples and the reasons behind your points.
-This is the detailed re-send of the same question the user asked earlier. The earlier turns are in the context, and the actions of that turn were already applied: do not repeat them; put only still-needed new actions in "actions", usually an empty list.
+This is the detailed re-send of the same question the user asked earlier. The earlier turns are in the context, and the actions of that turn were already applied. Only explain in more detail: "actions" must be an empty list.
 
 Return only JSON: {"reply":"","actions":[{"kind":"","nodeId":"","parentId":"","newParentId":"","title":"","summary":"","detail":"","path":"","find":"","replace":"","content":"","nodeIds":[],"all":false,"branch":false,"action":"","goal":"","direction":""}]}. Do not add other fields. All context is supplied; do not inspect files, use tools or search the web.
 

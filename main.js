@@ -35,6 +35,7 @@ __export(main_exports, {
   firstMarkdownImage: () => firstMarkdownImage,
   firstMarkdownTable: () => firstMarkdownTable,
   markdownImages: () => markdownImages,
+  settingsFromSaved: () => settingsFromSaved,
   visualReferencesMarkdown: () => visualReferencesMarkdown
 });
 module.exports = __toCommonJS(main_exports);
@@ -983,6 +984,7 @@ var en = {
   "ui.map_chat_model_follow_0": "Follow default (now: {0})",
   "ui.map_chat_more_detail": "Say it in more detail",
   "ui.map_chat_more_detail_asked": "Say it in more detail.",
+  "ui.map_chat_redo_actions_ignored": "Actions are not applied again in a more-detail answer.",
   "ui.map_chat_replying": "The AI is replying\u2026",
   "ui.map_chat_stopped": "Stopped.",
   "ui.map_chat_remove_ref_0": "Remove reference: {0}",
@@ -2821,6 +2823,7 @@ var zhCN = {
   "ui.map_chat_model_follow_0": "\u8DDF\u968F\u9ED8\u8BA4\uFF08\u5F53\u524D\uFF1A{0}\uFF09",
   "ui.map_chat_more_detail": "\u8BF4\u8BE6\u7EC6\u4E00\u70B9",
   "ui.map_chat_more_detail_asked": "\u8BF4\u8BE6\u7EC6\u4E00\u70B9\u3002",
+  "ui.map_chat_redo_actions_ignored": "\u8BE6\u7EC6\u7248\u56DE\u7B54\u4E0D\u4F1A\u518D\u6B21\u5E94\u7528\u64CD\u4F5C\u3002",
   "ui.map_chat_replying": "AI \u6B63\u5728\u56DE\u590D\u2026",
   "ui.map_chat_stopped": "\u5DF2\u505C\u6B62\u3002",
   "ui.map_chat_remove_ref_0": "\u79FB\u9664\u5F15\u7528\uFF1A{0}",
@@ -4659,6 +4662,7 @@ var zhTW = {
   "ui.map_chat_model_follow_0": "\u8DDF\u96A8\u9810\u8A2D\uFF08\u76EE\u524D\uFF1A{0}\uFF09",
   "ui.map_chat_more_detail": "\u8AAA\u8A73\u7D30\u4E00\u9EDE",
   "ui.map_chat_more_detail_asked": "\u8AAA\u8A73\u7D30\u4E00\u9EDE\u3002",
+  "ui.map_chat_redo_actions_ignored": "\u8A73\u7D30\u7248\u56DE\u7B54\u4E0D\u6703\u518D\u6B21\u5957\u7528\u52D5\u4F5C\u3002",
   "ui.map_chat_replying": "AI \u6B63\u5728\u56DE\u8986\u2026",
   "ui.map_chat_stopped": "\u5DF2\u505C\u6B62\u3002",
   "ui.map_chat_remove_ref_0": "\u79FB\u9664\u5F15\u7528\uFF1A{0}",
@@ -20230,6 +20234,7 @@ var MapChatPanel = class {
     __publicField(this, "styleEls", null);
     __publicField(this, "stopEl");
     __publicField(this, "built", false);
+    __publicField(this, "stopWatching", null);
     __publicField(this, "messageEls", []);
   }
   get isOpen() {
@@ -20273,6 +20278,12 @@ var MapChatPanel = class {
     this.renderChips();
     this.refreshControls();
   }
+  /** The view is closing: stop listening for model changes. */
+  dispose() {
+    var _a2;
+    (_a2 = this.stopWatching) == null ? void 0 : _a2.call(this);
+    this.stopWatching = null;
+  }
   /** Takes the panel out of the page; the next {@link mount} puts it back with all state intact. */
   detach() {
     if (this.built) this.el.remove();
@@ -20295,6 +20306,7 @@ var MapChatPanel = class {
     if (open === this.open && !focus) return;
     this.open = open;
     this.applyOpen();
+    if (open) this.refreshControls();
     this.host.layoutChanged(open);
     if (!this.built) return;
     if (open && focus) this.inputEl.focus();
@@ -20498,6 +20510,7 @@ var MapChatPanel = class {
     this.el.addEventListener("drop", (event) => this.onDrop(event));
     this.renderLog();
     this.renderBusy();
+    this.stopWatching = this.host.watchModels(() => this.refreshControls());
   }
   onKey(event) {
     if (event.key === "Escape" && !event.isComposing && !this.composing) {
@@ -33685,7 +33698,7 @@ var VisualAgentMapView = class _VisualAgentMapView extends import_obsidian30.Ite
     ).open();
   }
   async onClose() {
-    var _a2, _b2, _c, _d, _e, _f, _g;
+    var _a2, _b2, _c, _d, _e, _f, _g, _h;
     this.closed = true;
     (_a2 = this.announcer) == null ? void 0 : _a2.remove();
     this.announcer = null;
@@ -33701,9 +33714,10 @@ var VisualAgentMapView = class _VisualAgentMapView extends import_obsidian30.Ite
     this.hoverResearch = null;
     this.plugin.releaseOutline(this);
     this.abortMapChat();
-    (_c = this.relevancePanelCleanup) == null ? void 0 : _c.call(this);
+    (_c = this.chat) == null ? void 0 : _c.dispose();
+    (_d = this.relevancePanelCleanup) == null ? void 0 : _d.call(this);
     this.relevancePanelCleanup = null;
-    if (this.relevancePanelOpen) (_e = (_d = this.plugin).releaseWarmClaude) == null ? void 0 : _e.call(_d);
+    if (this.relevancePanelOpen) (_f = (_e = this.plugin).releaseWarmClaude) == null ? void 0 : _f.call(_e);
     this.abortRelevanceGrade();
     for (const task of this.synthesisTasks.values()) if (task.state === "running") task.controller.abort();
     this.synthesisTasks.clear();
@@ -33723,8 +33737,8 @@ var VisualAgentMapView = class _VisualAgentMapView extends import_obsidian30.Ite
     this.stopAimProgress();
     if (this.refreshTimer !== null) window.clearTimeout(this.refreshTimer);
     if (this.hoverTimer !== null) window.clearTimeout(this.hoverTimer);
-    (_f = this.hoverCard) == null ? void 0 : _f.remove();
-    (_g = this.dragCleanup) == null ? void 0 : _g.call(this);
+    (_g = this.hoverCard) == null ? void 0 : _g.remove();
+    (_h = this.dragCleanup) == null ? void 0 : _h.call(this);
     if (this.viewportTimer !== null) {
       window.clearTimeout(this.viewportTimer);
       this.viewportTimer = null;
@@ -42206,6 +42220,12 @@ ${note.detail.trim()}` : "",
         this.plugin.settings.mapChatModel = model;
         void this.plugin.saveSettings();
       },
+      watchModels: (changed) => {
+        const unsubscribe = this.plugin.subscribeModelDiscovery(changed);
+        void this.plugin.refreshModelDiscovery("codex");
+        void this.plugin.refreshModelDiscovery("claude");
+        return unsubscribe;
+      },
       moreDetail: (origin) => {
         void this.sendMapChat(origin);
       },
@@ -42460,7 +42480,7 @@ ${note.detail.trim()}` : "",
           if (alive()) chat.streamReply(text11);
         });
         if (!alive()) return;
-        const lines = await this.applyMapChatActions(result, request.context, alive);
+        const lines = again ? result.actions.length ? [{ status: "skipped", text: t("ui.map_chat_redo_actions_ignored") }] : [] : await this.applyMapChatActions(result, request.context, alive);
         if (alive() && chat.isBusy) chat.finish(result.reply, lines);
       } catch (error) {
         if (alive()) chat.fail(this.chatErrorText(error));
@@ -50766,10 +50786,10 @@ var style_detailed_en_default = "Answer style: detailed. Explain fully; you may 
 var style_detailed_zh_default = "\u56DE\u7B54\u98A8\u683C\uFF1A\u8A73\u7D30\u3002\u5B8C\u6574\u8AAA\u660E\uFF0C\u53EF\u4EE5\u5206\u6BB5\u3001\u8209\u4F8B\u3001\u5217\u51FA\u7406\u7531\u3002";
 
 // core/steps/map-chat/redo.en.md
-var redo_en_default = 'This is the detailed re-send of the same question the user asked earlier. The earlier turns are in the context, and the actions of that turn were already applied: do not repeat them; put only still-needed new actions in "actions", usually an empty list.';
+var redo_en_default = 'This is the detailed re-send of the same question the user asked earlier. The earlier turns are in the context, and the actions of that turn were already applied. Only explain in more detail: "actions" must be an empty list.';
 
 // core/steps/map-chat/redo.zh.md
-var redo_zh_default = '\u9019\u662F\u4F7F\u7528\u8005\u4E0A\u4E00\u500B\u76F8\u540C\u554F\u984C\u7684\u8A73\u7D30\u7248\u91CD\u9001\uFF1A\u5148\u524D\u7684\u5C0D\u8A71\u5DF2\u5217\u5728 context \u7684\u5148\u524D\u5C0D\u8A71\u88E1\uFF0C\u90A3\u4E00\u8F2A\u7684\u52D5\u4F5C\u5DF2\u7D93\u5957\u7528\u904E\u4E86\uFF0C\u4E0D\u8981\u91CD\u8907\u90A3\u4E9B\u52D5\u4F5C\uFF0C"actions" \u53EA\u653E\u9084\u9700\u8981\u7684\u65B0\u52D5\u4F5C\uFF0C\u901A\u5E38\u662F\u7A7A\u6E05\u55AE\u3002';
+var redo_zh_default = '\u9019\u662F\u4F7F\u7528\u8005\u5148\u524D\u76F8\u540C\u554F\u984C\u7684\u8A73\u7D30\u7248\u91CD\u9001\uFF1A\u5148\u524D\u7684\u5C0D\u8A71\u5DF2\u5217\u5728 context \u7684\u5148\u524D\u5C0D\u8A71\u88E1\uFF0C\u90A3\u4E00\u8F2A\u7684\u52D5\u4F5C\u5DF2\u7D93\u5957\u7528\u904E\u4E86\u3002\u9019\u6B21\u53EA\u505A\u66F4\u8A73\u7D30\u7684\u8AAA\u660E\uFF0C"actions" \u5FC5\u9808\u662F\u7A7A\u6E05\u55AE\u3002';
 
 // core/steps/map-chat/step.ts
 var MAP_CHAT_ACTION_KINDS = [
@@ -52403,6 +52423,47 @@ async function fitImageForClaude(dataUrl, signal) {
   }
   throw new Error(t("ui.context_ai_image_unavailable"));
 }
+function settingsFromSaved(saved) {
+  var _a2, _b2;
+  const legacy = saved;
+  const savedWorkspace = (saved == null ? void 0 : saved.workspaceFolder) || DEFAULT_SETTINGS.workspaceFolder;
+  return {
+    ...DEFAULT_SETTINGS,
+    detailTemplates: normalizeTemplates(saved == null ? void 0 : saved.detailTemplates),
+    promptPresets: normalizePresets(saved == null ? void 0 : saved.promptPresets),
+    defaultDetailTemplateId: typeof (saved == null ? void 0 : saved.defaultDetailTemplateId) === "string" ? saved.defaultDetailTemplateId : void 0,
+    coffeeStyles: Array.isArray(saved == null ? void 0 : saved.coffeeStyles) ? saved.coffeeStyles.filter(
+      (item) => !!item && typeof item === "object" && typeof item.id === "string" && typeof item.name === "string" && typeof item.prompt === "string"
+    ) : [],
+    defaultCoffeeStyleId: typeof (saved == null ? void 0 : saved.defaultCoffeeStyleId) === "string" ? saved.defaultCoffeeStyleId : void 0,
+    language: initialUiLanguage(saved == null ? void 0 : saved.language),
+    workspaceFolder: savedWorkspace,
+    topicsFolder: (saved == null ? void 0 : saved.topicsFolder) || DEFAULT_SETTINGS.topicsFolder,
+    ...resolveMapFolders(saved),
+    notesFolder: (saved == null ? void 0 : saved.notesFolder) || DEFAULT_SETTINGS.notesFolder,
+    mapsFolder: (saved == null ? void 0 : saved.mapsFolder) || DEFAULT_SETTINGS.mapsFolder,
+    mapId: (saved == null ? void 0 : saved.mapId) || "default",
+    codexPath: (saved == null ? void 0 : saved.codexPath) || (legacy == null ? void 0 : legacy.cliPath) || DEFAULT_SETTINGS.codexPath,
+    claudePath: (saved == null ? void 0 : saved.claudePath) || DEFAULT_SETTINGS.claudePath,
+    cliModel: (saved == null ? void 0 : saved.cliModel) || DEFAULT_SETTINGS.cliModel,
+    mapChatStyle: normalizeMapChatStyle(saved == null ? void 0 : saved.mapChatStyle),
+    mapChatModel: normalizeMapChatModel(saved == null ? void 0 : saved.mapChatModel),
+    cliReasoning: normalizeReasoningLevel(saved == null ? void 0 : saved.cliReasoning),
+    previewScale: (saved == null ? void 0 : saved.previewScale) !== void 0 ? clampPreviewScale(saved.previewScale) : legacyPreviewScale(saved == null ? void 0 : saved.previewSize),
+    models: "",
+    migrated: (saved == null ? void 0 : saved.migrated) === true,
+    structureVersion: (_a2 = saved == null ? void 0 : saved.structureVersion) != null ? _a2 : saved ? 1 : DEFAULT_SETTINGS.structureVersion,
+    firstUseNoticeSeen: (saved == null ? void 0 : saved.firstUseNoticeSeen) === true,
+    codexUsageNoticeSeen: (saved == null ? void 0 : saved.codexUsageNoticeSeen) === true,
+    claudeUsageNoticeSeen: (saved == null ? void 0 : saved.claudeUsageNoticeSeen) === true,
+    aiExchangeLoggingEnabled: (saved == null ? void 0 : saved.aiExchangeLoggingEnabled) === true,
+    markdownSelectionAiAutoOpen: (saved == null ? void 0 : saved.markdownSelectionAiAutoOpen) !== false,
+    addDiagramsAfterResearch: (saved == null ? void 0 : saved.addDiagramsAfterResearch) !== false,
+    workspaceInitialized: saved ? saved.workspaceInitialized !== false : false,
+    sampleTourVersionSeen: (_b2 = saved == null ? void 0 : saved.sampleTourVersionSeen) != null ? _b2 : 0,
+    canvasHintSeen: (saved == null ? void 0 : saved.canvasHintSeen) === true
+  };
+}
 var CHART_JOB_LIMIT = 3;
 var VisualAgentMapPlugin = class extends import_obsidian38.Plugin {
   constructor() {
@@ -52671,47 +52732,9 @@ var VisualAgentMapPlugin = class extends import_obsidian38.Plugin {
     void leaf.setViewState({ type: VIEW_TYPE, state: { file: path }, active: true }).catch((error) => new import_obsidian38.Notice(error instanceof Error ? error.message : String(error)));
   }
   async onload() {
-    var _a2, _b2;
     announceTestOverrides((message) => new import_obsidian38.Notice(message, 0));
     const saved = await this.loadData();
-    const legacy = saved;
-    const savedWorkspace = (saved == null ? void 0 : saved.workspaceFolder) || DEFAULT_SETTINGS.workspaceFolder;
-    this.settings = {
-      ...DEFAULT_SETTINGS,
-      detailTemplates: normalizeTemplates(saved == null ? void 0 : saved.detailTemplates),
-      promptPresets: normalizePresets(saved == null ? void 0 : saved.promptPresets),
-      defaultDetailTemplateId: typeof (saved == null ? void 0 : saved.defaultDetailTemplateId) === "string" ? saved.defaultDetailTemplateId : void 0,
-      coffeeStyles: Array.isArray(saved == null ? void 0 : saved.coffeeStyles) ? saved.coffeeStyles.filter(
-        (item) => !!item && typeof item === "object" && typeof item.id === "string" && typeof item.name === "string" && typeof item.prompt === "string"
-      ) : [],
-      defaultCoffeeStyleId: typeof (saved == null ? void 0 : saved.defaultCoffeeStyleId) === "string" ? saved.defaultCoffeeStyleId : void 0,
-      language: initialUiLanguage(saved == null ? void 0 : saved.language),
-      workspaceFolder: savedWorkspace,
-      topicsFolder: (saved == null ? void 0 : saved.topicsFolder) || DEFAULT_SETTINGS.topicsFolder,
-      ...resolveMapFolders(saved),
-      notesFolder: (saved == null ? void 0 : saved.notesFolder) || DEFAULT_SETTINGS.notesFolder,
-      mapsFolder: (saved == null ? void 0 : saved.mapsFolder) || DEFAULT_SETTINGS.mapsFolder,
-      mapId: (saved == null ? void 0 : saved.mapId) || "default",
-      codexPath: (saved == null ? void 0 : saved.codexPath) || (legacy == null ? void 0 : legacy.cliPath) || DEFAULT_SETTINGS.codexPath,
-      claudePath: (saved == null ? void 0 : saved.claudePath) || DEFAULT_SETTINGS.claudePath,
-      cliModel: (saved == null ? void 0 : saved.cliModel) || DEFAULT_SETTINGS.cliModel,
-      mapChatStyle: normalizeMapChatStyle(saved == null ? void 0 : saved.mapChatStyle),
-      mapChatModel: normalizeMapChatModel(saved == null ? void 0 : saved.mapChatModel),
-      cliReasoning: normalizeReasoningLevel(saved == null ? void 0 : saved.cliReasoning),
-      previewScale: (saved == null ? void 0 : saved.previewScale) !== void 0 ? clampPreviewScale(saved.previewScale) : legacyPreviewScale(saved == null ? void 0 : saved.previewSize),
-      models: "",
-      migrated: (saved == null ? void 0 : saved.migrated) === true,
-      structureVersion: (_a2 = saved == null ? void 0 : saved.structureVersion) != null ? _a2 : saved ? 1 : DEFAULT_SETTINGS.structureVersion,
-      firstUseNoticeSeen: (saved == null ? void 0 : saved.firstUseNoticeSeen) === true,
-      codexUsageNoticeSeen: (saved == null ? void 0 : saved.codexUsageNoticeSeen) === true,
-      claudeUsageNoticeSeen: (saved == null ? void 0 : saved.claudeUsageNoticeSeen) === true,
-      aiExchangeLoggingEnabled: (saved == null ? void 0 : saved.aiExchangeLoggingEnabled) === true,
-      markdownSelectionAiAutoOpen: (saved == null ? void 0 : saved.markdownSelectionAiAutoOpen) !== false,
-      addDiagramsAfterResearch: (saved == null ? void 0 : saved.addDiagramsAfterResearch) !== false,
-      workspaceInitialized: saved ? saved.workspaceInitialized !== false : false,
-      sampleTourVersionSeen: (_b2 = saved == null ? void 0 : saved.sampleTourVersionSeen) != null ? _b2 : 0,
-      canvasHintSeen: (saved == null ? void 0 : saved.canvasHintSeen) === true
-    };
+    this.settings = settingsFromSaved(saved);
     setUiLanguage(this.settings.language);
     registerInternalMarkerPresentation(this);
     this.mermaidZoom = registerMermaidZoom(this);
@@ -52838,14 +52861,14 @@ var VisualAgentMapPlugin = class extends import_obsidian38.Plugin {
     });
     this.addLocalizedCommand(AIM_CREATE_MAP_COMMAND_ID, "ui.aim_create_map", () => {
       void this.activateView().then(() => {
-        var _a3;
-        return (_a3 = this.views()[0]) == null ? void 0 : _a3.openAimStart();
+        var _a2;
+        return (_a2 = this.views()[0]) == null ? void 0 : _a2.openAimStart();
       }).catch((error) => new import_obsidian38.Notice(String(error)));
     });
     this.addLocalizedCommand("import-outline", "ui.outline_import", () => {
       void this.activateView().then(() => {
-        var _a3;
-        return (_a3 = this.views()[0]) == null ? void 0 : _a3.openOutlineImport();
+        var _a2;
+        return (_a2 = this.views()[0]) == null ? void 0 : _a2.openOutlineImport();
       }).catch((error) => new import_obsidian38.Notice(String(error)));
     });
     this.addLocalizedCommand("share-map", "share.command", () => this.openShare());
@@ -52920,10 +52943,10 @@ var VisualAgentMapPlugin = class extends import_obsidian38.Plugin {
     this.registerEvent(this.app.workspace.on("active-leaf-change", (leaf) => this.onActiveLeafChange(leaf)));
     this.registerEvent(
       this.app.workspace.on("file-open", (file) => {
-        var _a3;
+        var _a2;
         for (const leaf of this.app.workspace.getLeavesOfType("markdown")) this.styleNodeLeaf(leaf);
         for (const leaf of this.app.workspace.getLeavesOfType(OUTLINE_VIEW_TYPE))
-          if (leaf.view instanceof OutlineView) leaf.view.setActive((_a3 = file == null ? void 0 : file.path) != null ? _a3 : "");
+          if (leaf.view instanceof OutlineView) leaf.view.setActive((_a2 = file == null ? void 0 : file.path) != null ? _a2 : "");
       })
     );
     this.app.workspace.onLayoutReady(() => {

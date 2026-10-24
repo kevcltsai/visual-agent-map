@@ -391,10 +391,10 @@ test('C1: concise and detailed prompts differ in both languages, and no style me
   assert.match(mapChatStep.render(request({ language: 'zh-TW', style: 'concise' })), /一句話確認/);
   assert.ok(!/一句話確認/.test(mapChatStep.render(request({ language: 'zh-TW', style: 'detailed' }))));
 });
-test('C1: a redo prompt says not to repeat the applied actions; a normal prompt does not', () => {
-  assert.match(mapChatStep.render(request({ style: 'detailed', redo: true })), /do not repeat them/);
-  assert.ok(!/do not repeat them/.test(mapChatStep.render(request({ style: 'detailed' }))));
-  assert.match(mapChatStep.render(request({ language: 'zh-TW', style: 'detailed', redo: true })), /不要重複那些動作/);
+test('C1: a redo prompt says actions must be empty; a normal prompt does not', () => {
+  assert.match(mapChatStep.render(request({ style: 'detailed', redo: true })), /actions" must be an empty list/);
+  assert.ok(!/actions" must be an empty list/.test(mapChatStep.render(request({ style: 'detailed' }))));
+  assert.match(mapChatStep.render(request({ language: 'zh-TW', style: 'detailed', redo: true })), /"actions" 必須是空清單/);
 });
 test('C1: the action schema is unchanged and the step version moved to 2', () => {
   assert.equal(mapChatStep.version, 2);

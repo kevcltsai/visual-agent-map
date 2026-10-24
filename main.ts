@@ -146,6 +146,59 @@ async function fitImageForClaude(dataUrl: string, signal: AbortSignal): Promise<
 }
 
 /** Chart steps that may run at once; further jobs wait in a first-in-first-out queue. */
+/** The settings in effect for what was saved: every field is checked, and a missing or invalid one takes its default. */
+export function settingsFromSaved(saved: Partial<Settings> | null): Settings {
+  const legacy: (Partial<Settings> & { cliPath?: string }) | null = saved;
+  const savedWorkspace = saved?.workspaceFolder || DEFAULT_SETTINGS.workspaceFolder;
+  return {
+    ...DEFAULT_SETTINGS,
+    detailTemplates: normalizeTemplates(saved?.detailTemplates),
+    promptPresets: normalizePresets(saved?.promptPresets),
+    defaultDetailTemplateId:
+      typeof saved?.defaultDetailTemplateId === "string" ? saved.defaultDetailTemplateId : undefined,
+    coffeeStyles: Array.isArray(saved?.coffeeStyles)
+      ? saved.coffeeStyles.filter(
+          (item: unknown): item is { id: string; name: string; prompt: string } =>
+            !!item &&
+            typeof item === "object" &&
+            typeof (item as { id?: unknown }).id === "string" &&
+            typeof (item as { name?: unknown }).name === "string" &&
+            typeof (item as { prompt?: unknown }).prompt === "string"
+        )
+      : [],
+    defaultCoffeeStyleId: typeof saved?.defaultCoffeeStyleId === "string" ? saved.defaultCoffeeStyleId : undefined,
+    language: initialUiLanguage(saved?.language),
+    workspaceFolder: savedWorkspace,
+    topicsFolder: saved?.topicsFolder || DEFAULT_SETTINGS.topicsFolder,
+    ...resolveMapFolders(saved),
+    notesFolder: saved?.notesFolder || DEFAULT_SETTINGS.notesFolder,
+    mapsFolder: saved?.mapsFolder || DEFAULT_SETTINGS.mapsFolder,
+    mapId: saved?.mapId || "default",
+    codexPath: saved?.codexPath || legacy?.cliPath || DEFAULT_SETTINGS.codexPath,
+    claudePath: saved?.claudePath || DEFAULT_SETTINGS.claudePath,
+    cliModel: saved?.cliModel || DEFAULT_SETTINGS.cliModel,
+    mapChatStyle: normalizeMapChatStyle(saved?.mapChatStyle),
+    mapChatModel: normalizeMapChatModel(saved?.mapChatModel),
+    cliReasoning: normalizeReasoningLevel(saved?.cliReasoning),
+    previewScale:
+      saved?.previewScale !== undefined
+        ? clampPreviewScale(saved.previewScale)
+        : legacyPreviewScale(saved?.previewSize),
+    models: "",
+    migrated: saved?.migrated === true,
+    structureVersion: saved?.structureVersion ?? (saved ? 1 : DEFAULT_SETTINGS.structureVersion),
+    firstUseNoticeSeen: saved?.firstUseNoticeSeen === true,
+    codexUsageNoticeSeen: saved?.codexUsageNoticeSeen === true,
+    claudeUsageNoticeSeen: saved?.claudeUsageNoticeSeen === true,
+    aiExchangeLoggingEnabled: saved?.aiExchangeLoggingEnabled === true,
+    markdownSelectionAiAutoOpen: saved?.markdownSelectionAiAutoOpen !== false,
+    addDiagramsAfterResearch: saved?.addDiagramsAfterResearch !== false,
+    workspaceInitialized: saved ? saved.workspaceInitialized !== false : false,
+    sampleTourVersionSeen: saved?.sampleTourVersionSeen ?? 0,
+    canvasHintSeen: saved?.canvasHintSeen === true
+  };
+}
+
 export const CHART_JOB_LIMIT = 3;
 
 export default class VisualAgentMapPlugin extends Plugin {
@@ -413,55 +466,7 @@ export default class VisualAgentMapPlugin extends Plugin {
   async onload(): Promise<void> {
     announceTestOverrides(message => new Notice(message, 0));
     const saved = (await this.loadData()) as Partial<Settings> | null;
-    const legacy: (Partial<Settings> & { cliPath?: string }) | null = saved;
-    const savedWorkspace = saved?.workspaceFolder || DEFAULT_SETTINGS.workspaceFolder;
-    this.settings = {
-      ...DEFAULT_SETTINGS,
-      detailTemplates: normalizeTemplates(saved?.detailTemplates),
-      promptPresets: normalizePresets(saved?.promptPresets),
-      defaultDetailTemplateId:
-        typeof saved?.defaultDetailTemplateId === "string" ? saved.defaultDetailTemplateId : undefined,
-      coffeeStyles: Array.isArray(saved?.coffeeStyles)
-        ? saved.coffeeStyles.filter(
-            (item: unknown): item is { id: string; name: string; prompt: string } =>
-              !!item &&
-              typeof item === "object" &&
-              typeof (item as { id?: unknown }).id === "string" &&
-              typeof (item as { name?: unknown }).name === "string" &&
-              typeof (item as { prompt?: unknown }).prompt === "string"
-          )
-        : [],
-      defaultCoffeeStyleId: typeof saved?.defaultCoffeeStyleId === "string" ? saved.defaultCoffeeStyleId : undefined,
-      language: initialUiLanguage(saved?.language),
-      workspaceFolder: savedWorkspace,
-      topicsFolder: saved?.topicsFolder || DEFAULT_SETTINGS.topicsFolder,
-      ...resolveMapFolders(saved),
-      notesFolder: saved?.notesFolder || DEFAULT_SETTINGS.notesFolder,
-      mapsFolder: saved?.mapsFolder || DEFAULT_SETTINGS.mapsFolder,
-      mapId: saved?.mapId || "default",
-      codexPath: saved?.codexPath || legacy?.cliPath || DEFAULT_SETTINGS.codexPath,
-      claudePath: saved?.claudePath || DEFAULT_SETTINGS.claudePath,
-      cliModel: saved?.cliModel || DEFAULT_SETTINGS.cliModel,
-      mapChatStyle: normalizeMapChatStyle(saved?.mapChatStyle),
-      mapChatModel: normalizeMapChatModel(saved?.mapChatModel),
-      cliReasoning: normalizeReasoningLevel(saved?.cliReasoning),
-      previewScale:
-        saved?.previewScale !== undefined
-          ? clampPreviewScale(saved.previewScale)
-          : legacyPreviewScale(saved?.previewSize),
-      models: "",
-      migrated: saved?.migrated === true,
-      structureVersion: saved?.structureVersion ?? (saved ? 1 : DEFAULT_SETTINGS.structureVersion),
-      firstUseNoticeSeen: saved?.firstUseNoticeSeen === true,
-      codexUsageNoticeSeen: saved?.codexUsageNoticeSeen === true,
-      claudeUsageNoticeSeen: saved?.claudeUsageNoticeSeen === true,
-      aiExchangeLoggingEnabled: saved?.aiExchangeLoggingEnabled === true,
-      markdownSelectionAiAutoOpen: saved?.markdownSelectionAiAutoOpen !== false,
-      addDiagramsAfterResearch: saved?.addDiagramsAfterResearch !== false,
-      workspaceInitialized: saved ? saved.workspaceInitialized !== false : false,
-      sampleTourVersionSeen: saved?.sampleTourVersionSeen ?? 0,
-      canvasHintSeen: saved?.canvasHintSeen === true
-    };
+    this.settings = settingsFromSaved(saved);
     setUiLanguage(this.settings.language);
     registerInternalMarkerPresentation(this);
     this.mermaidZoom = registerMermaidZoom(this);

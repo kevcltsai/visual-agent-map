@@ -28,10 +28,11 @@ function panelFixture(overrides = {}) {
   const calls = { send: 0, stop: 0, layout: [], more: [] };
   const topics = { a: 'Topic A', b: 'Topic B' };
   let selected = [];
-  const prefs = { style: 'concise', model: '', saved: [] };
+  const prefs = { style: 'concise', model: '', saved: [], watchers: [] };
   const host = {
     style: () => prefs.style, setStyle: style => { prefs.style = style; prefs.saved.push(['style', style]); },
     modelChoices: () => [{ value: '', label: 'Follow default (now: X)' }, { value: 'claude:haiku', label: 'Haiku' }, { value: 'gpt-6', label: 'GPT 6' }],
+    watchModels: changed => { prefs.watchers.push(changed); return () => { prefs.watchers.splice(prefs.watchers.indexOf(changed), 1); }; },
     model: () => prefs.model, setModel: model => { prefs.model = model; prefs.saved.push(['model', model]); }, moreDetail: origin => { calls.more.push(origin); },
     topicTitle: id => topics[id] ?? null, selectedIds: () => selected, send: () => { calls.send++; }, stop: () => { calls.stop++; },
     resolveLink: link => ({ Note: 'Notes/Note.md', Other: 'Notes/Other.md' })[link] ?? null, activeNotePath: () => 'Notes/Active.md',
@@ -235,7 +236,7 @@ async function harness({ aim = false } = {}) {
     await app.vault.create(file, text);
   }
   const notices = [], opened = [];
-  const control = { reply: async () => ({ reply: 'ok', actions: [], rejected: [] }), requests: [], models: [], usageAsks: 0, decline: false, nested: 0, mutates: 0, depth: 0, calls: [] };
+  const control = { reply: async () => ({ reply: 'ok', actions: [], rejected: [] }), requests: [], models: [], claudeReady: true, listeners: [], refreshes: [], usageAsks: 0, decline: false, nested: 0, mutates: 0, depth: 0, calls: [] };
   let queue = Promise.resolve();
   const ctx = {};
   const plugin = withExpansionCoordinator({
@@ -252,7 +253,9 @@ async function harness({ aim = false } = {}) {
       return result;
     },
     saveSettings: async () => { control.saves = (control.saves ?? 0) + 1; },
-    availableModels: () => ['gpt-6-luna', 'claude:sonnet', 'claude:haiku'], modelLabel: id => `label(${id})`,
+    availableModels: () => control.claudeReady ? ['gpt-6-luna', 'claude:sonnet', 'claude:haiku'] : ['gpt-6-luna'], modelLabel: id => `label(${id})`,
+    subscribeModelDiscovery: listener => { control.listeners.push(listener); return () => { control.listeners.splice(control.listeners.indexOf(listener), 1); }; },
+    refreshModelDiscovery: async provider => { control.refreshes.push(provider); return { provider, status: 'ready', models: [] }; },
     confirmAiUsage: async (model, run) => { control.usageAsks++; control.models.push(model); control.calls.push('confirm'); if (control.decline) return false; await run(); return true; },
     mapChat: { chat: async (request, signal, onReply) => { control.calls.push('chat'); control.requests.push(request); return control.reply(request, signal, onReply); } }
   });
@@ -1071,4 +1074,60 @@ integrationTest('map chat C1: during a reply a direct more-detail call does not 
   assert.equal(moreButtons({ panel: chat }).every(b => b.disabled), true);
   await h.view.sendMapChat(origin); assert.equal(h.control.requests.length, 2, 'only one request at a time');
   gate.resolve(); await sending;
+});
+
+// ---- Packet C1 review fixes ----------------------------------------------------------------------------------------------------
+
+integrationTest('map chat C1 F1: a "more detail" re-send never applies actions, even when the model lists some', async () => {
+  const h = await harness(); await h.view.hydrate(); const chat = h.open();
+  h.type('what is REM'); await h.view.sendMapChat();
+  const nodes = h.view.map.nodes.length; const researches = []; const realApply = h.view.applyMapChatActions.bind(h.view); h.view.applyMapChatActions = (...args) => { researches.push('apply'); return realApply(...args); };
+  h.control.reply = async () => ({ reply: 'Long answer.', actions: [{ kind: 'add_child', parentId: h.ids.a, title: 'Sneaky', summary: '' }, { kind: 'run_map_action', action: 'expand', nodeIds: [], title: '', goal: '', direction: '' }], rejected: [] });
+  h.control.mutates = 0;
+  moreButtons({ panel: chat })[0].click(); await until(() => h.control.requests.length === 2 && !chat.isBusy);
+  assert.equal(h.control.mutates, 0, 'nothing was written'); assert.equal((await h.saved()).length, nodes, 'no card was added');
+  assert.equal(h.view.map.nodes.length, nodes); eq(researches, []);
+  const last = chat.transcript().at(-1);
+  assert.equal(last.text, 'Long answer.'); eq(last.lines.map(l => l.text), ['Actions are not applied again in a more-detail answer.']);
+  assert.equal(h.contents.has('Agent Workspace/Topics/map-a/Sneaky.md'), false);
+});
+
+test('map chat C1 F1: the redo prompt tells the model that actions must be an empty list', () => {
+  const { mapChatStep } = load('core/steps/map-chat/step.ts');
+  const context = buildMapChatContext({ mapTitle: 'm', outline: [], selected: [], references: [], snippets: [], files: [], history: [] });
+  const base = { message: 'q', context, model: 'm', reasoning: 'low', style: 'detailed', redo: true };
+  assert.match(mapChatStep.render({ ...base, language: 'en' }), /"actions" must be an empty list/);
+  assert.match(mapChatStep.render({ ...base, language: 'zh-TW' }), /"actions" 必須是空清單/);
+});
+
+test('map chat C1 F2: the panel listens for model changes while built, repaints its model list on a change, and stops on dispose', () => {
+  const f = panelFixture(); f.panel.setOpen(true);
+  assert.equal(f.prefs.watchers.length, 1);
+  let choices = [{ value: '', label: 'Follow default (now: X)' }];
+  const host = f.panel.host; host.modelChoices = () => choices;
+  f.panel.refreshControls(); eq(f.panel.modelEl.children.map(o => o.text), ['Follow default (now: X)']);
+  choices = [{ value: '', label: 'Follow default (now: Y)' }, { value: 'claude:haiku', label: 'Haiku' }];
+  f.prefs.watchers[0]();
+  eq(f.panel.modelEl.children.map(o => o.text), ['Follow default (now: Y)', 'Haiku'], 'the list and the follow-default label were refreshed');
+  f.panel.dispose(); assert.equal(f.prefs.watchers.length, 0);
+});
+
+integrationTest('map chat C1 F2: model discovery going from idle to ready makes the Claude models appear; closing the view unsubscribes', async () => {
+  const h = await harness(); h.control.claudeReady = false; await h.view.hydrate(); const chat = h.open();
+  eq(chat.modelEl.children.map(o => o.optionValue), ['', 'gpt-6-luna']);
+  assert.equal(h.control.listeners.length, 1); assert.ok(h.control.refreshes.includes('claude'), 'a refresh was started');
+  h.control.claudeReady = true; for (const listener of [...h.control.listeners]) listener();
+  eq(chat.modelEl.children.map(o => o.optionValue), ['', 'gpt-6-luna', 'claude:sonnet', 'claude:haiku']);
+  h.plugin.settings.cliModel = 'gpt-6-luna'; chat.setOpen(false); chat.setOpen(true);
+  assert.equal(chat.modelEl.children[0].text, 'Follow default (now: label(gpt-6-luna))', 'the label follows cliModel when the window is opened');
+  await h.view.onClose(); assert.equal(h.control.listeners.length, 0);
+});
+
+test('map chat C1 F3: loading saved settings sanitises an invalid chat style and model, and keeps valid ones', () => {
+  const { settingsFromSaved } = load('main.ts', { obsidian: { ...obsidian, MarkdownView } });
+  const bad = settingsFromSaved({ mapChatStyle: 'long', mapChatModel: 7 });
+  assert.equal(bad.mapChatStyle, 'concise'); assert.equal(bad.mapChatModel, '');
+  const good = settingsFromSaved({ mapChatStyle: 'detailed', mapChatModel: ' claude:haiku ' });
+  assert.equal(good.mapChatStyle, 'detailed'); assert.equal(good.mapChatModel, 'claude:haiku');
+  const none = settingsFromSaved(null); assert.equal(none.mapChatStyle, 'concise'); assert.equal(none.mapChatModel, '');
 });

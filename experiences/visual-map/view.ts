@@ -902,24 +902,24 @@ export class VisualAgentMapView extends ItemView {
     this.renderPreservingFocus();
   }
   private renderPreservingFocus(): void {
-    if (typeof document === "undefined" || !this.contentEl.contains(document.activeElement)) {
+    const doc = this.contentEl?.ownerDocument;
+    const current = doc?.activeElement ?? null;
+    // The chat field is restored by render() itself (captureFocus / restoreChatFocus); an index lookup would land on another control.
+    if (!doc || !current || !this.contentEl.contains(current) || this.chat?.isInput(current)) {
       this.render();
       return;
     }
-    const focusedContainer = document.activeElement === this.contentEl;
-    const before = Array.from(
-      this.contentEl.querySelectorAll<HTMLElement>("button, input, select, textarea, [tabindex]:not([tabindex='-1'])")
-    );
-    const activeIndex = before.indexOf(document.activeElement as HTMLElement);
-    const active = document.activeElement as HTMLInputElement;
+    const focusedContainer = current === this.contentEl;
+    const focusables = "button, input, select, textarea, [tabindex]:not([tabindex='-1'])";
+    const before = Array.from(this.contentEl.querySelectorAll<HTMLElement>(focusables));
+    const activeIndex = before.indexOf(current as HTMLElement);
+    const active = current as HTMLInputElement;
     const selection =
       active.tagName === "INPUT" || active.tagName === "TEXTAREA"
         ? ([active.selectionStart, active.selectionEnd] as const)
         : null;
     this.render();
-    const after = Array.from(
-      this.contentEl.querySelectorAll<HTMLElement>("button, input, select, textarea, [tabindex]:not([tabindex='-1'])")
-    );
+    const after = Array.from(this.contentEl.querySelectorAll<HTMLElement>(focusables));
     const target = after[activeIndex];
     if (focusedContainer) this.contentEl.focus();
     else target?.focus();

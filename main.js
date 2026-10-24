@@ -33766,21 +33766,21 @@ var VisualAgentMapView = class _VisualAgentMapView extends import_obsidian30.Ite
     this.renderPreservingFocus();
   }
   renderPreservingFocus() {
-    if (typeof document === "undefined" || !this.contentEl.contains(document.activeElement)) {
+    var _a2, _b2, _c;
+    const doc = (_a2 = this.contentEl) == null ? void 0 : _a2.ownerDocument;
+    const current = (_b2 = doc == null ? void 0 : doc.activeElement) != null ? _b2 : null;
+    if (!doc || !current || !this.contentEl.contains(current) || ((_c = this.chat) == null ? void 0 : _c.isInput(current))) {
       this.render();
       return;
     }
-    const focusedContainer = document.activeElement === this.contentEl;
-    const before = Array.from(
-      this.contentEl.querySelectorAll("button, input, select, textarea, [tabindex]:not([tabindex='-1'])")
-    );
-    const activeIndex = before.indexOf(document.activeElement);
-    const active = document.activeElement;
+    const focusedContainer = current === this.contentEl;
+    const focusables = "button, input, select, textarea, [tabindex]:not([tabindex='-1'])";
+    const before = Array.from(this.contentEl.querySelectorAll(focusables));
+    const activeIndex = before.indexOf(current);
+    const active = current;
     const selection = active.tagName === "INPUT" || active.tagName === "TEXTAREA" ? [active.selectionStart, active.selectionEnd] : null;
     this.render();
-    const after = Array.from(
-      this.contentEl.querySelectorAll("button, input, select, textarea, [tabindex]:not([tabindex='-1'])")
-    );
+    const after = Array.from(this.contentEl.querySelectorAll(focusables));
     const target = after[activeIndex];
     if (focusedContainer) this.contentEl.focus();
     else target == null ? void 0 : target.focus();

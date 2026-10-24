@@ -213,7 +213,7 @@ test('map chat: a failed or stopped turn shows its own text and does not become 
 
 class MarkdownView {}
 
-async function harness({ aim = false } = {}) {
+async function harness({ aim = false, document = false } = {}) {
   const { repo, app, contents, files } = fixture('en');
   app.vault.configDir = '.obsidian';
   const settings = { ...DEFAULT_SETTINGS, language: 'en', cliModel: 'claude:sonnet' };
@@ -262,11 +262,11 @@ async function harness({ aim = false } = {}) {
   const leaves = []; let activeMarkdown = null;
   app.workspace = { getLeavesOfType: type => type === 'markdown' ? leaves : [], getActiveViewOfType: () => activeMarkdown, on() {} };
   class Notice { constructor(message) { notices.push(message); } hide() {} }
-  const { VisualAgentMapView } = load('main.ts', { obsidian: { ...obsidian, MarkdownView, Notice } }, { CSS: { escape: value => String(value) }, createSvg: tag => ({ tag, attrs: {}, classes: [], setAttribute(name, value) { this.attrs[name] = value; }, addClass(name) { this.classes.push(name); } }), requestAnimationFrame: run => { run(); return 1; }, cancelAnimationFrame() {}, setTimeout: fn => { ctx.timers.push(fn); return ctx.timers.length; }, clearTimeout() {} });
+  const { VisualAgentMapView } = load('main.ts', { obsidian: { ...obsidian, MarkdownView, Notice } }, { ...(document ? { document: { documentElement: { style: {} }, get activeElement() { return ctx.page?.doc.activeElement ?? null; } } } : {}), CSS: { escape: value => String(value) }, createSvg: tag => ({ tag, attrs: {}, classes: [], setAttribute(name, value) { this.attrs[name] = value; }, addClass(name) { this.classes.push(name); } }), requestAnimationFrame: run => { run(); return 1; }, cancelAnimationFrame() {}, setTimeout: fn => { ctx.timers.push(fn); return ctx.timers.length; }, clearTimeout() {} });
   ctx.timers = [];
   const view = new VisualAgentMapView({ app }, plugin);
   ctx.view = view;
-  const p = page(); const rootEl = p.root;
+  const p = page(); const rootEl = p.root; ctx.page = p;
   Object.assign(view, { path: MAP, contentEl: rootEl, focusNode() {}, closed: false });
   view.map = await repo.readMap(MAP);
   if (aim) view.map.aim = { version: 1, branches: [], runs: [], pendingCommits: [] };
@@ -903,9 +903,13 @@ integrationTest('map chat C3: the batched sync (editing branch) leaves the same 
   const makeEdges = () => { const edges = { kids: [], replaceChildren() { this.kids = []; }, appendChild(p) { this.kids.push(p); } }; view.edgesEl = edges; view.edgeEls = new Map(); return edges; };
   const snapshot = edges => edges.kids.map(p => JSON.stringify({ attrs: p.attrs, classes: p.classes }));
   // Old behaviour: each card refresh redraws all edges.
+  // A refreshed card changes height (its content grew), so an edge drawn before the cards are refreshed has the wrong end points.
+  const resetBoxes = () => { for (const [id, box] of view.cardEls) { box.offsetHeight = 30; box.grew = false; } };
+  const innerRefresh = view.refreshCard; view.refreshCard = function (node, ...rest) { const box = view.cardEls.get(node.id); if (box && !box.grew) { box.grew = true; box.offsetHeight += 11 * (1 + view.map.nodes.indexOf(node)); } return innerRefresh.call(this, node, ...rest); };
+  resetBoxes();
   const oldEdges = makeEdges(); for (const node of view.map.nodes) view.refreshCard(node); const oldDraws = draws; const oldSnap = snapshot(oldEdges);
   // New behaviour: synchronize on the editing branch (IME composition in the chat field).
-  const newEdges = makeEdges(); chat.inputEl.focus(); chat.inputEl.fire('compositionstart'); await changeNote(); draws = 0; await view.synchronize();
+  resetBoxes(); const newEdges = makeEdges(); chat.inputEl.focus(); chat.inputEl.fire('compositionstart'); await changeNote(); draws = 0; await view.synchronize();
   assert.ok(oldSnap.length >= 3, 'the map has edges to compare'); assert.equal(newEdges.kids.length, oldSnap.length, 'same number of edges');
   assert.ok(JSON.parse(oldSnap[0]).attrs.d, 'the path data is real, not empty'); assert.deepEqual(snapshot(newEdges), oldSnap, 'every edge has the same path and classes');
   assert.equal(draws, 1); assert.equal(oldDraws, view.map.nodes.length);
@@ -919,6 +923,7 @@ async function scheduleFixture() {
 for (const name of ['scheduleResearchRender', 'scheduleAimProgressRender'])
   integrationTest(`map chat C3: ${name} paints while the chat field has focus, waits for IME composition and for other text fields`, async () => {
     const { h, chat, view, run, reset } = await scheduleFixture();
+    chat.inputEl.matches = selector => /textarea/.test(selector); // the real field is a textarea: the old "any text field" rule would defer
     chat.inputEl.focus(); let r = run(name); assert.equal(r.painted, 1, 'chat focus (not composing): repaint runs'); reset();
     chat.inputEl.fire('compositionstart'); r = run(name); assert.equal(r.painted, 0, 'composing: deferred'); assert.ok(r.rescheduled); reset();
     chat.inputEl.fire('compositionend'); r = run(name); assert.equal(r.painted, 1); reset();
@@ -926,6 +931,18 @@ for (const name of ['scheduleResearchRender', 'scheduleAimProgressRender'])
     r = run(name); assert.equal(r.painted, 0, 'card title / goal input: deferred'); assert.ok(r.rescheduled); reset();
     h.page.doc.activeElement = null; r = run(name); assert.equal(r.painted, 1);
   });
+integrationTest('map chat C4: repainting with the chat field focused keeps focus in the field even when the number of controls changes', async () => {
+  const h = await harness({ document: true }); const chat = h.open(); const view = h.view;
+  const other = h.rootEl.createEl('button'); const stop = h.rootEl.createEl('button');
+  let list = [other, chat.inputEl];
+  h.rootEl.querySelectorAll = () => list;
+  const baseRender = view.render; let renders = 0;
+  view.render = () => { renders++; baseRender(); list = [stop, other, chat.inputEl]; /* the repaint adds a stop-research button in front */ };
+  chat.inputEl.value = 'half-typed'; chat.inputEl.selectionStart = 2; chat.inputEl.selectionEnd = 5; chat.inputEl.focus();
+  view.renderPreservingFocus();
+  assert.equal(renders, 1);
+  assert.ok(h.page.doc.activeElement === chat.inputEl, 'focus is still in the chat field, not on another control'); assert.equal(chat.inputEl.selectionStart, 2); assert.equal(chat.inputEl.selectionEnd, 5);
+});
 integrationTest('map chat: keys inside the chat field are not taken by the view scope', async () => {
   const h = await harness();
   const keys = h.view.scope.keys;

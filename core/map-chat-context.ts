@@ -7,6 +7,8 @@ import { normalizeVaultPath } from "./map-chat-guard";
  * `edit_md_file` is checked against.
  */
 export const MAP_CHAT_DEFAULT_TURNS = 6;
+/** Total characters of card Detail sent in one turn; cards past it go without Detail (and without a Detail baseline). */
+export const MAP_CHAT_DETAIL_BUDGET = 60000;
 const TITLE_LIMIT = 200;
 const SUMMARY_LIMIT = 240;
 
@@ -52,6 +54,8 @@ export interface MapChatContextInput {
   history: MapChatTurn[];
   /** Question and answer rounds to keep; default {@link MAP_CHAT_DEFAULT_TURNS}. */
   maxTurns?: number;
+  /** Total characters of card Detail to send; default {@link MAP_CHAT_DETAIL_BUDGET}. */
+  detailBudget?: number;
 }
 export interface MapChatContext {
   /** The context as the JSON text put in the prompt. */
@@ -115,20 +119,23 @@ export function buildMapChatContext(input: MapChatContextInput): MapChatContext 
     const node = byId.get(id);
     return node ? { id: node.id, title: clip(node.title, TITLE_LIMIT) } : null;
   };
+  let detailLeft = input.detailBudget ?? MAP_CHAT_DETAIL_BUDGET;
   const topic = (ref: MapChatTopicRef, withLinks: boolean): Record<string, unknown> => {
     ids.add(ref.id);
     const node = byId.get(ref.id);
+    const withDetail = ref.detail.length <= detailLeft;
+    if (withDetail) detailLeft -= ref.detail.length;
     topicHashes[ref.id] = {
       title: ref.title,
       parentId: node?.parentId ?? null,
       summary: ref.summary,
-      detailHash: contentHash(ref.detail)
+      ...(withDetail ? { detailHash: contentHash(ref.detail) } : {})
     };
     return {
       id: ref.id,
       title: ref.title,
       summary: ref.summary,
-      detail: ref.detail,
+      ...(withDetail ? { detail: ref.detail } : { detailOmitted: true }),
       path: ref.path,
       ...(withLinks
         ? {

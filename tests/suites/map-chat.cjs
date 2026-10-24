@@ -874,3 +874,47 @@ test('map chat: render() detaches the panel before it clears the page and mounts
   assert.ok(order.every(at => at > 0), `render() mentions all four: ${order}`);
   eq([...order].sort((a, b) => a - b), order, 'in that order');
 });
+
+integrationTest('map chat R2 N1: Detail edited in the file during the reply, view cache not refreshed -> edit_topic_note skips (PROBE R2)', async () => {
+  const h = await harness(); await h.view.hydrate();
+  await h.repo.updateNote(h.node('a').path, { detail: 'Original body' }); await h.view.hydrate();
+  const baseline = topicBaseline(h);
+  await h.repo.updateNote(h.node('a').path, { detail: 'User typed this meanwhile' }); // no hydrate: the modify event's refresh is still pending
+  const lines = await apply(h, [{ kind: 'edit_topic_note', nodeId: h.ids.a, detail: 'AI text' }], {}, undefined, baseline);
+  assert.equal(lines[0].status, 'skipped', JSON.stringify(plain(lines)));
+  assert.equal((await h.note('a')).detail.trim(), 'User typed this meanwhile');
+});
+integrationTest('map chat R2 N1: summary edited in the file, cache not refreshed -> update_summary skips (PROBE R2)', async () => {
+  const h = await harness(); await h.view.hydrate();
+  const baseline = topicBaseline(h);
+  await h.repo.updateNote(h.node('a').path, { summary: 'User wrote this' });
+  const lines = await apply(h, [{ kind: 'update_summary', nodeId: h.ids.a, summary: 'AI summary' }], {}, undefined, baseline);
+  assert.equal(lines[0].status, 'skipped', JSON.stringify(plain(lines)));
+  assert.equal((await h.note('a')).summary, 'User wrote this');
+});
+
+integrationTest('map chat R2 N2: an edit that adds an identity key says so, not "new file"', async () => {
+  const h = await harness(); await h.view.hydrate();
+  const lines = await apply(h, [{ kind: 'edit_md_file', path: 'Notes/Other.md', find: 'Other note', replace: '---\nagent-map-node: x\n---\nOther note' }], h.hashes('Notes/Other.md'));
+  assert.equal(lines[0].status, 'skipped', JSON.stringify(plain(lines)));
+  assert.match(lines[0].text, /would add the topic fields reserved by this plugin to a regular note/);
+  assert.doesNotMatch(lines[0].text, /new file/);
+  assert.equal(h.contents.get('Notes/Other.md'), 'Other note about naps.\n');
+});
+
+test('map chat R2 N3: Detail past the budget is sent without detail or detailHash', () => {
+  const ref = (id, detail) => ({ id, title: id, summary: '', detail, path: `${id}.md` });
+  const outline = ['a', 'b', 'c'].map(id => ({ id, title: id, summary: '', parentId: null, depth: 0 }));
+  const ctx = buildMapChatContext({ mapTitle: 'm', outline, selected: [ref('a', 'x'.repeat(60)), ref('b', 'y'.repeat(60))], references: [ref('c', 'z'.repeat(10))], snippets: [], files: [], history: [], detailBudget: 100 });
+  const sent = JSON.parse(ctx.json);
+  assert.equal(sent.selected[0].detail.length, 60); assert.ok(ctx.topicHashes.a.detailHash);
+  assert.equal(sent.selected[1].detail, undefined); assert.equal(ctx.topicHashes.b.detailHash, undefined); assert.equal(sent.selected[1].detailOmitted, true);
+  assert.equal(sent.references[0].detail.length, 10, 'a later, smaller card still fits'); assert.ok(ctx.topicHashes.c.detailHash);
+  assert.equal(load('core/map-chat-context.ts').MAP_CHAT_DETAIL_BUDGET, 60000);
+});
+integrationTest('map chat R2 N3: edit_topic_note on a card whose Detail was over budget is skipped as not seen', async () => {
+  const h = await harness(); await h.view.hydrate();
+  const baseline = topicBaseline(h); delete baseline[h.ids.a].detailHash;
+  const lines = await apply(h, [{ kind: 'edit_topic_note', nodeId: h.ids.a, detail: 'AI' }], {}, undefined, baseline);
+  assert.equal(lines[0].status, 'skipped', JSON.stringify(plain(lines)));
+});

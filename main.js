@@ -998,6 +998,7 @@ var en = {
   "ui.map_chat_guard_map_unparseable": "the edit would break the map file",
   "ui.map_chat_guard_topic_identity_changed": "the edit would change the topic's identity fields",
   "ui.map_chat_guard_reserved_frontmatter": "the new file would use fields reserved by this plugin",
+  "ui.map_chat_guard_identity_added": "this edit would add the topic fields reserved by this plugin to a regular note",
   "ui.map_chat_guard_map_file": "the file is a map file; use the topic actions instead",
   "ui.map_chat_guard_duplicate_identity_key": "the file repeats an identity field in its front matter",
   "ui.map_chat_skip_topic_not_seen": "the AI was not shown this topic's note in full",
@@ -2828,6 +2829,7 @@ var zhCN = {
   "ui.map_chat_guard_map_unparseable": "\u8FD9\u4E2A\u4FEE\u6539\u4F1A\u5F04\u574F\u5FC3\u667A\u56FE\u6587\u4EF6",
   "ui.map_chat_guard_topic_identity_changed": "\u8FD9\u4E2A\u4FEE\u6539\u4F1A\u6539\u5230\u8BAE\u9898\u7684\u8BC6\u522B\u5B57\u6BB5",
   "ui.map_chat_guard_reserved_frontmatter": "\u65B0\u6587\u4EF6\u4F1A\u7528\u5230\u63D2\u4EF6\u4FDD\u7559\u7684\u5B57\u6BB5",
+  "ui.map_chat_guard_identity_added": "\u8FD9\u6B21\u4FEE\u6539\u4F1A\u7ED9\u666E\u901A\u7B14\u8BB0\u52A0\u4E0A\u63D2\u4EF6\u4FDD\u7559\u7684\u8BAE\u9898\u5B57\u6BB5",
   "ui.map_chat_guard_map_file": "\u8FD9\u662F\u5FC3\u667A\u56FE\u6587\u4EF6\uFF0C\u8BF7\u6539\u7528\u8BAE\u9898\u52A8\u4F5C",
   "ui.map_chat_guard_duplicate_identity_key": "\u6587\u4EF6\u7684 front matter \u91CD\u590D\u4E86\u8BC6\u522B\u5B57\u6BB5",
   "ui.map_chat_skip_topic_not_seen": "AI \u6CA1\u6709\u770B\u5230\u8FD9\u4E2A\u8BAE\u9898\u7684\u5B8C\u6574\u7B14\u8BB0",
@@ -4658,6 +4660,7 @@ var zhTW = {
   "ui.map_chat_guard_map_unparseable": "\u9019\u500B\u4FEE\u6539\u6703\u5F04\u58DE\u5FC3\u667A\u5716\u6A94",
   "ui.map_chat_guard_topic_identity_changed": "\u9019\u500B\u4FEE\u6539\u6703\u6539\u5230\u8B70\u984C\u7684\u8B58\u5225\u6B04\u4F4D",
   "ui.map_chat_guard_reserved_frontmatter": "\u65B0\u6A94\u6848\u6703\u7528\u5230\u5916\u639B\u4FDD\u7559\u7684\u6B04\u4F4D",
+  "ui.map_chat_guard_identity_added": "\u9019\u6B21\u4FEE\u6539\u6703\u66FF\u4E00\u822C\u7B46\u8A18\u52A0\u4E0A\u5916\u639B\u4FDD\u7559\u7684\u8B70\u984C\u6B04\u4F4D",
   "ui.map_chat_guard_map_file": "\u9019\u662F\u5FC3\u667A\u5716\u6A94\uFF0C\u8ACB\u6539\u7528\u8B70\u984C\u52D5\u4F5C",
   "ui.map_chat_guard_duplicate_identity_key": "\u6A94\u6848\u7684 front matter \u91CD\u8907\u4E86\u8B58\u5225\u6B04\u4F4D",
   "ui.map_chat_skip_topic_not_seen": "AI \u6C92\u6709\u770B\u5230\u9019\u500B\u8B70\u984C\u7684\u5B8C\u6574\u7B46\u8A18",
@@ -20636,6 +20639,7 @@ function applyMdEdit(content, find, replace) {
 
 // core/map-chat-context.ts
 var MAP_CHAT_DEFAULT_TURNS = 6;
+var MAP_CHAT_DETAIL_BUDGET = 6e4;
 var TITLE_LIMIT = 200;
 var SUMMARY_LIMIT = 240;
 function contentHash2(text11) {
@@ -20660,7 +20664,7 @@ var clip2 = (value, limit) => {
   return characters.length > limit ? `${characters.slice(0, limit - 1).join("")}\u2026` : text11;
 };
 function buildMapChatContext(input) {
-  var _a2, _b2;
+  var _a2, _b2, _c;
   const hashes = {};
   const topicHashes = {};
   const byId = new Map(input.outline.map((node) => [node.id, node]));
@@ -20672,21 +20676,24 @@ function buildMapChatContext(input) {
     const node = byId.get(id);
     return node ? { id: node.id, title: clip2(node.title, TITLE_LIMIT) } : null;
   };
+  let detailLeft = (_b2 = input.detailBudget) != null ? _b2 : MAP_CHAT_DETAIL_BUDGET;
   const topic = (ref, withLinks) => {
     var _a3, _b3;
     ids.add(ref.id);
     const node = byId.get(ref.id);
+    const withDetail = ref.detail.length <= detailLeft;
+    if (withDetail) detailLeft -= ref.detail.length;
     topicHashes[ref.id] = {
       title: ref.title,
       parentId: (_a3 = node == null ? void 0 : node.parentId) != null ? _a3 : null,
       summary: ref.summary,
-      detailHash: contentHash2(ref.detail)
+      ...withDetail ? { detailHash: contentHash2(ref.detail) } : {}
     };
     return {
       id: ref.id,
       title: ref.title,
       summary: ref.summary,
-      detail: ref.detail,
+      ...withDetail ? { detail: ref.detail } : { detailOmitted: true },
       path: ref.path,
       ...withLinks ? {
         parent: (node == null ? void 0 : node.parentId) ? brief(node.parentId) : null,
@@ -20724,7 +20731,7 @@ function buildMapChatContext(input) {
       text: snippet.text
     };
   });
-  const turns = Math.max(0, (_b2 = input.maxTurns) != null ? _b2 : MAP_CHAT_DEFAULT_TURNS) * 2;
+  const turns = Math.max(0, (_c = input.maxTurns) != null ? _c : MAP_CHAT_DEFAULT_TURNS) * 2;
   const history2 = turns ? input.history.slice(-turns) : [];
   const json = JSON.stringify({
     mapTitle: input.mapTitle,
@@ -33291,7 +33298,7 @@ var GUARD_REASON = {
   exists: "ui.map_chat_guard_exists",
   no_baseline: "ui.map_chat_guard_no_baseline"
 };
-var guardSkipped = (code) => skipped(GUARD_REASON[code]);
+var guardSkipped = (code, editing = false) => skipped(editing && code === "reserved_frontmatter" ? "ui.map_chat_guard_identity_added" : GUARD_REASON[code]);
 var mapChatTaskSequence = 0;
 var VisualAgentMapView = class _VisualAgentMapView extends import_obsidian30.ItemView {
   constructor(leaf, plugin) {
@@ -42160,11 +42167,11 @@ ${note.detail.trim()}` : "",
     return { file, editor, text: editor ? editor.getValue() : await this.app.vault.read(file) };
   }
   /** What a chat turn sees of a card right now: the values the turn's baseline hashes are compared with. */
-  chatTopicState(id) {
+  chatTopicState(id, fresh) {
     var _a2, _b2, _c, _d;
     const node = (_a2 = this.map) == null ? void 0 : _a2.nodes.find((item) => item.id === id);
     if (!node) return null;
-    const note = this.notes.get(id);
+    const note = fresh != null ? fresh : this.notes.get(id);
     const summary = (_b2 = note == null ? void 0 : note.summary) != null ? _b2 : "";
     return {
       title: (_c = note == null ? void 0 : note.title) != null ? _c : node.path,
@@ -42173,14 +42180,28 @@ ${note.detail.trim()}` : "",
       parentId: node.parentId
     };
   }
+  /** The card as the vault has it right now (the view's cache can be a debounce behind a user's edit); the cache is refreshed too. */
+  async chatTopicNow(id) {
+    var _a2, _b2;
+    const node = (_a2 = this.map) == null ? void 0 : _a2.nodes.find((item) => item.id === id);
+    if (!node) return null;
+    let fresh;
+    try {
+      fresh = await this.plugin.repo.readNote(node.path, (_b2 = this.map) != null ? _b2 : void 0);
+    } catch (e) {
+      return null;
+    }
+    this.notes.set(id, fresh);
+    return this.chatTopicState(id, fresh);
+  }
   /**
    * The reason to skip a card action, or null when the card is as the model saw it. Title and parent are always compared;
    * the summary and the Detail text only when the card was sent in full. `edit_topic_note` replaces the whole body, so it
    * needs a Detail baseline: a card the model saw only in the outline is never overwritten.
    */
-  chatTopicStale(id, topicHashes, needsDetail = false) {
+  async chatTopicStale(id, topicHashes, needsDetail = false) {
     const seen = Object.prototype.hasOwnProperty.call(topicHashes, id) ? topicHashes[id] : void 0;
-    const now = this.chatTopicState(id);
+    const now = await this.chatTopicNow(id);
     if (!seen || !now) return skipped("ui.map_chat_skip_topic_changed");
     if (needsDetail && seen.detailHash === void 0) return skipped("ui.map_chat_skip_topic_not_seen");
     if (seen.title !== now.title || seen.parentId !== now.parentId || seen.summary !== void 0 && seen.summary !== now.summary || seen.detailHash !== void 0 && seen.detailHash !== contentHash2(now.detail))
@@ -42188,9 +42209,9 @@ ${note.detail.trim()}` : "",
     return null;
   }
   /** After this reply's own write to a card, its baseline follows, so a second action in the same reply is not mistaken for a user edit. */
-  chatTopicAccept(id, topicHashes) {
+  async chatTopicAccept(id, topicHashes) {
     const seen = topicHashes[id];
-    const now = this.chatTopicState(id);
+    const now = await this.chatTopicNow(id);
     if (!seen || !now) return;
     topicHashes[id] = {
       title: now.title,
@@ -42499,13 +42520,13 @@ ${note.detail.trim()}` : "",
         const node = nodeOf(action.nodeId);
         if (!node) return gone;
         if (this.isMerging(node.id)) return skipped("ui.map_chat_skip_merge_locked");
-        const changed = this.chatTopicStale(node.id, baseline.topicHashes, action.kind === "edit_topic_note");
+        const changed = await this.chatTopicStale(node.id, baseline.topicHashes, action.kind === "edit_topic_note");
         if (changed) return changed;
         await this.noteChange(
           node,
           action.kind === "rename_topic" ? { title: action.title } : action.kind === "update_summary" ? { summary: action.summary } : { detail: action.detail }
         );
-        this.chatTopicAccept(node.id, baseline.topicHashes);
+        await this.chatTopicAccept(node.id, baseline.topicHashes);
         return done;
       }
       case "move_topic": {
@@ -42513,18 +42534,18 @@ ${note.detail.trim()}` : "",
         const parent = nodeOf(action.newParentId);
         if (!node || !parent) return gone;
         if (this.isMerging(node.id) || this.isMerging(parent.id)) return skipped("ui.map_chat_skip_merge_locked");
-        const changed = this.chatTopicStale(node.id, baseline.topicHashes);
+        const changed = await this.chatTopicStale(node.id, baseline.topicHashes);
         if (changed) return changed;
         if (!canParent(this.map.nodes, node.id, parent.id)) return skipped("ui.map_chat_skip_cycle");
         await this.moveTopic(node, parent);
-        this.chatTopicAccept(node.id, baseline.topicHashes);
+        await this.chatTopicAccept(node.id, baseline.topicHashes);
         return done;
       }
       case "delete_topic": {
         const node = nodeOf(action.nodeId);
         if (!node) return gone;
         if (this.isMerging(node.id)) return skipped("ui.map_chat_skip_merge_locked");
-        const changed = this.chatTopicStale(node.id, baseline.topicHashes);
+        const changed = await this.chatTopicStale(node.id, baseline.topicHashes);
         if (changed) return changed;
         await this.removeToUnassigned(node, action.branch);
         return done;
@@ -42551,7 +42572,7 @@ ${note.detail.trim()}` : "",
           knownHashes: hashes,
           configDir
         });
-        if (!verdict.ok) return guardSkipped(verdict.code);
+        if (!verdict.ok) return guardSkipped(verdict.code, true);
         if (source.editor) {
           const at = source.text.indexOf(action.find);
           source.editor.replaceRange(

@@ -950,6 +950,7 @@ export const zhCN: Record<TranslationKey, string> = {
   "ui.map_chat_guard_map_unparseable": "这个修改会弄坏心智图文件",
   "ui.map_chat_guard_topic_identity_changed": "这个修改会改到议题的识别字段",
   "ui.map_chat_guard_reserved_frontmatter": "新文件会用到插件保留的字段",
+  "ui.map_chat_guard_identity_added": "这次修改会给普通笔记加上插件保留的议题字段",
   "ui.map_chat_guard_map_file": "这是心智图文件，请改用议题动作",
   "ui.map_chat_guard_duplicate_identity_key": "文件的 front matter 重复了识别字段",
   "ui.map_chat_skip_topic_not_seen": "AI 没有看到这个议题的完整笔记",

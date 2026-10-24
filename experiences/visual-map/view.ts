@@ -448,7 +448,8 @@ const GUARD_REASON: Record<MapChatGuardCode, TranslationKey> = {
   exists: "ui.map_chat_guard_exists",
   no_baseline: "ui.map_chat_guard_no_baseline"
 };
-const guardSkipped = (code: MapChatGuardCode): ChatOutcome => skipped(GUARD_REASON[code]);
+const guardSkipped = (code: MapChatGuardCode, editing = false): ChatOutcome =>
+  skipped(editing && code === "reserved_frontmatter" ? "ui.map_chat_guard_identity_added" : GUARD_REASON[code]);
 let mapChatTaskSequence = 0;
 
 export class VisualAgentMapView extends ItemView {
@@ -10050,11 +10051,12 @@ export class VisualAgentMapView extends ItemView {
   }
   /** What a chat turn sees of a card right now: the values the turn's baseline hashes are compared with. */
   private chatTopicState(
-    id: string
+    id: string,
+    fresh?: Note
   ): { title: string; summary: string; detail: string; parentId: string | null } | null {
     const node = this.map?.nodes.find(item => item.id === id);
     if (!node) return null;
-    const note = this.notes.get(id);
+    const note = fresh ?? this.notes.get(id);
     const summary = note?.summary ?? "";
     return {
       title: note?.title ?? node.path,
@@ -10063,18 +10065,33 @@ export class VisualAgentMapView extends ItemView {
       parentId: node.parentId
     };
   }
+  /** The card as the vault has it right now (the view's cache can be a debounce behind a user's edit); the cache is refreshed too. */
+  private async chatTopicNow(
+    id: string
+  ): Promise<{ title: string; summary: string; detail: string; parentId: string | null } | null> {
+    const node = this.map?.nodes.find(item => item.id === id);
+    if (!node) return null;
+    let fresh: Note | undefined;
+    try {
+      fresh = await this.plugin.repo.readNote(node.path, this.map ?? undefined);
+    } catch {
+      return null;
+    }
+    this.notes.set(id, fresh);
+    return this.chatTopicState(id, fresh);
+  }
   /**
    * The reason to skip a card action, or null when the card is as the model saw it. Title and parent are always compared;
    * the summary and the Detail text only when the card was sent in full. `edit_topic_note` replaces the whole body, so it
    * needs a Detail baseline: a card the model saw only in the outline is never overwritten.
    */
-  private chatTopicStale(
+  private async chatTopicStale(
     id: string,
     topicHashes: Readonly<Record<string, MapChatTopicHash>>,
     needsDetail = false
-  ): ChatOutcome | null {
+  ): Promise<ChatOutcome | null> {
     const seen = Object.prototype.hasOwnProperty.call(topicHashes, id) ? topicHashes[id] : undefined;
-    const now = this.chatTopicState(id);
+    const now = await this.chatTopicNow(id);
     if (!seen || !now) return skipped("ui.map_chat_skip_topic_changed");
     if (needsDetail && seen.detailHash === undefined) return skipped("ui.map_chat_skip_topic_not_seen");
     if (
@@ -10087,9 +10104,9 @@ export class VisualAgentMapView extends ItemView {
     return null;
   }
   /** After this reply's own write to a card, its baseline follows, so a second action in the same reply is not mistaken for a user edit. */
-  private chatTopicAccept(id: string, topicHashes: Record<string, MapChatTopicHash>): void {
+  private async chatTopicAccept(id: string, topicHashes: Record<string, MapChatTopicHash>): Promise<void> {
     const seen = topicHashes[id];
-    const now = this.chatTopicState(id);
+    const now = await this.chatTopicNow(id);
     if (!seen || !now) return;
     topicHashes[id] = {
       title: now.title,
@@ -10398,7 +10415,7 @@ export class VisualAgentMapView extends ItemView {
         const node = nodeOf(action.nodeId);
         if (!node) return gone;
         if (this.isMerging(node.id)) return skipped("ui.map_chat_skip_merge_locked");
-        const changed = this.chatTopicStale(node.id, baseline.topicHashes, action.kind === "edit_topic_note");
+        const changed = await this.chatTopicStale(node.id, baseline.topicHashes, action.kind === "edit_topic_note");
         if (changed) return changed;
         await this.noteChange(
           node,
@@ -10408,7 +10425,7 @@ export class VisualAgentMapView extends ItemView {
               ? { summary: action.summary }
               : { detail: action.detail }
         );
-        this.chatTopicAccept(node.id, baseline.topicHashes);
+        await this.chatTopicAccept(node.id, baseline.topicHashes);
         return done;
       }
       case "move_topic": {
@@ -10416,18 +10433,18 @@ export class VisualAgentMapView extends ItemView {
         const parent = nodeOf(action.newParentId);
         if (!node || !parent) return gone;
         if (this.isMerging(node.id) || this.isMerging(parent.id)) return skipped("ui.map_chat_skip_merge_locked");
-        const changed = this.chatTopicStale(node.id, baseline.topicHashes);
+        const changed = await this.chatTopicStale(node.id, baseline.topicHashes);
         if (changed) return changed;
         if (!canParent(this.map.nodes, node.id, parent.id)) return skipped("ui.map_chat_skip_cycle");
         await this.moveTopic(node, parent);
-        this.chatTopicAccept(node.id, baseline.topicHashes);
+        await this.chatTopicAccept(node.id, baseline.topicHashes);
         return done;
       }
       case "delete_topic": {
         const node = nodeOf(action.nodeId);
         if (!node) return gone;
         if (this.isMerging(node.id)) return skipped("ui.map_chat_skip_merge_locked");
-        const changed = this.chatTopicStale(node.id, baseline.topicHashes);
+        const changed = await this.chatTopicStale(node.id, baseline.topicHashes);
         if (changed) return changed;
         await this.removeToUnassigned(node, action.branch);
         return done;
@@ -10455,7 +10472,7 @@ export class VisualAgentMapView extends ItemView {
           knownHashes: hashes,
           configDir
         });
-        if (!verdict.ok) return guardSkipped(verdict.code);
+        if (!verdict.ok) return guardSkipped(verdict.code, true);
         if (source.editor) {
           const at = source.text.indexOf(action.find);
           source.editor.replaceRange(

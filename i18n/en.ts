@@ -1022,6 +1022,7 @@ export const en = {
   "ui.map_chat_guard_map_unparseable": "the edit would break the map file",
   "ui.map_chat_guard_topic_identity_changed": "the edit would change the topic's identity fields",
   "ui.map_chat_guard_reserved_frontmatter": "the new file would use fields reserved by this plugin",
+  "ui.map_chat_guard_identity_added": "this edit would add the topic fields reserved by this plugin to a regular note",
   "ui.map_chat_guard_map_file": "the file is a map file; use the topic actions instead",
   "ui.map_chat_guard_duplicate_identity_key": "the file repeats an identity field in its front matter",
   "ui.map_chat_skip_topic_not_seen": "the AI was not shown this topic's note in full",

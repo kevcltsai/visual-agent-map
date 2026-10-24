@@ -1,4 +1,4 @@
-import { setIcon } from "obsidian";
+import { Component, setIcon } from "obsidian";
 import { t } from "../../i18n";
 import type { MapChatTurn } from "../../core/map-chat-context";
 
@@ -46,6 +46,10 @@ export interface MapChatHost {
   resolveLink(link: string): string | null;
   /** The note the user most recently had open (best guess for where dropped text came from), or null. */
   activeNotePath(): string | null;
+  /** The note that is visible beside the map right now (the one a message would be sent with), or null. */
+  visibleNotePath(): string | null;
+  /** Lays `text` out as Markdown into `el`; `owner` carries whatever the layout registers and is unloaded by the panel. */
+  renderMarkdown(text: string, el: HTMLElement, owner: Component): Promise<void>;
   /** The element that has keyboard focus right now. */
   activeElement(): Element | null;
   /** Remembered answer length (from settings). */
@@ -125,6 +129,13 @@ export class MapChatPanel {
   private built = false;
   private stopWatching: (() => void) | null = null;
   private messageEls: HTMLElement[] = [];
+  private renderOwners = new Map<number, Component>();
+  private bodyEls: HTMLElement[] = [];
+  private markdownBodies: boolean[] = [];
+  private paints: { busy: boolean; pending: string | null }[] = [];
+  /** The visible note the user took off the chip; it stays off until another note is visible. */
+  private dismissedNote: string | null = null;
+  private noteChip: string | null = null;
 
   constructor(private readonly host: MapChatHost) {}
 
@@ -143,6 +154,18 @@ export class MapChatPanel {
   /** True when `element` is the message field. */
   isInput(element: unknown): boolean {
     return this.built && element === this.inputEl;
+  }
+  /** Path of the visible note the next message goes with (the chip's note), or null. */
+  currentNote(): string | null {
+    this.refreshNote();
+    return this.noteChip;
+  }
+  /** The visible note may have changed: update which note the chip names and repaint the chips. */
+  refreshNote(): void {
+    const visible = this.host.visibleNotePath();
+    if (visible && visible !== this.dismissedNote) this.dismissedNote = null;
+    this.noteChip = visible && visible !== this.dismissedNote ? visible : null;
+    this.renderChips();
   }
   attachments(): MapChatChip[] {
     return this.chips.map(chip => ({ ...chip }));
@@ -168,13 +191,18 @@ export class MapChatPanel {
     if (!this.built) this.build(parent);
     else parent.appendChild(this.el);
     this.applyOpen();
-    this.renderChips();
+    this.refreshNote();
     this.refreshControls();
   }
   /** The view is closing: stop listening for model changes. */
   dispose(): void {
     this.stopWatching?.();
     this.stopWatching = null;
+    this.unloadOwners();
+  }
+  private unloadOwners(): void {
+    for (const owner of this.renderOwners.values()) owner.unload();
+    this.renderOwners.clear();
   }
   /** Takes the panel out of the page; the next {@link mount} puts it back with all state intact. */
   detach(): void {
@@ -268,9 +296,10 @@ export class MapChatPanel {
     const last = this.messages.at(-1);
     if (!last || !last.streaming) return;
     last.text = text;
-    const target = this.messageEls.at(-1);
-    const body = target?.querySelector<HTMLElement>(".vam-map-chat-text");
-    body?.setText(text);
+    const index = this.messageEls.length - 1;
+    const body = this.bodyEls[index];
+    if (body && this.markdownBodies[index]) this.paintMarkdown(index, text);
+    else body?.setText(text);
     this.scrollToEnd();
   }
   /** The turn ended with an answer and the outcome of each action. */
@@ -316,6 +345,8 @@ export class MapChatPanel {
   reset(): void {
     this.messages = [];
     this.chips = [];
+    this.dismissedNote = null;
+    this.noteChip = null;
     this.busy = false;
     if (this.built) this.inputEl.value = "";
     this.renderLog();
@@ -498,6 +529,22 @@ export class MapChatPanel {
       const chip = this.chipsEl.createDiv({ cls: "vam-map-chat-chip is-auto" });
       chip.createSpan({ cls: "vam-map-chat-chip-label", text: t("ui.map_chat_ref_selected_0", clip(title)) });
     }
+    if (this.noteChip) {
+      const note = this.noteChip;
+      const label = t("ui.map_chat_ref_note_0", clip(baseName(note)));
+      const chip = this.chipsEl.createDiv({ cls: "vam-map-chat-chip is-note" });
+      chip.createSpan({ cls: "vam-map-chat-chip-label", text: label });
+      const remove = chip.createEl("button", {
+        cls: "vam-map-chat-note-remove",
+        text: "×",
+        attr: { "aria-label": t("ui.map_chat_remove_ref_0", label), type: "button" }
+      });
+      remove.addEventListener("click", () => {
+        this.dismissedNote = note;
+        this.refreshNote();
+        this.inputEl.focus();
+      });
+    }
     for (const entry of this.chips) {
       const label = this.chipLabel(entry);
       const chip = this.chipsEl.createDiv({ cls: `vam-map-chat-chip is-${entry.kind}` });
@@ -515,6 +562,10 @@ export class MapChatPanel {
     if (!this.built) return;
     this.logEl.empty();
     this.messageEls = [];
+    this.bodyEls = [];
+    this.markdownBodies = [];
+    this.paints = [];
+    this.unloadOwners();
     for (const message of this.messages) {
       const row = this.logEl.createDiv({
         cls: `vam-map-chat-msg is-${message.role}${message.error ? " is-error" : ""}`
@@ -523,7 +574,14 @@ export class MapChatPanel {
         cls: "vam-map-chat-role",
         text: t(message.role === "user" ? "ui.map_chat_role_you" : "ui.map_chat_role_ai")
       });
-      row.createDiv({ cls: "vam-map-chat-text", text: message.text });
+      const markdown = message.role === "assistant" && !message.error;
+      const body = row.createDiv({ cls: `vam-map-chat-text${markdown ? " is-markdown" : ""}` });
+      const index = this.messageEls.length;
+      this.bodyEls.push(body);
+      this.markdownBodies.push(markdown);
+      this.paints.push({ busy: false, pending: null });
+      if (markdown) this.paintMarkdown(index, message.text);
+      else body.setText(message.text);
       const asked = this.messages[this.messages.indexOf(message) - 1];
       if (
         message.role === "assistant" &&
@@ -551,6 +609,37 @@ export class MapChatPanel {
       this.messageEls.push(row);
     }
     this.scrollToEnd();
+  }
+
+  /** Lays message `index` out as Markdown. One layout runs at a time per message; the newest text always gets its turn. */
+  private paintMarkdown(index: number, text: string): void {
+    const state = this.paints[index];
+    const body = this.bodyEls[index];
+    if (!state || !body) return;
+    if (state.busy) {
+      state.pending = text;
+      return;
+    }
+    state.busy = true;
+    void (async () => {
+      let next: string | null = text;
+      while (next !== null) {
+        const current = next;
+        state.pending = null;
+        const owner = new Component();
+        owner.load();
+        this.renderOwners.get(index)?.unload();
+        this.renderOwners.set(index, owner);
+        body.empty();
+        try {
+          await this.host.renderMarkdown(current, body, owner);
+        } catch {
+          body.setText(current);
+        }
+        next = state.pending;
+      }
+      state.busy = false;
+    })();
   }
 
   private renderBusy(): void {

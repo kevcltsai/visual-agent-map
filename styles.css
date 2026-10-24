@@ -415,7 +415,7 @@ button.vam-relevance-tag-button:disabled { cursor: default; opacity: .7; }
 .has-map-chat-open > .vam-selection-bar { bottom: 392px; }
 .vam-map-chat-toggle { display: inline-flex; align-items: center; justify-content: center; width: 36px; height: 36px; padding: 0; border: 1px solid var(--background-modifier-border); border-radius: var(--radius-m); background: var(--background-primary); box-shadow: var(--shadow-s); }
 .vam-map-chat-toggle:hover { background: var(--background-modifier-hover); }
-.vam-map-chat-toggle:focus-visible, .vam-map-chat-close:focus-visible, .vam-map-chat-chip-remove:focus-visible, .vam-map-chat-log:focus-visible { outline: 2px solid var(--interactive-accent); outline-offset: 1px; }
+.vam-map-chat-toggle:focus-visible, .vam-map-chat-close:focus-visible, .vam-map-chat-chip-remove:focus-visible, .vam-map-chat-note-remove:focus-visible, .vam-map-chat-log:focus-visible { outline: 2px solid var(--interactive-accent); outline-offset: 1px; }
 .vam-map-chat-toggle.is-hidden, .vam-map-chat-body.is-hidden, .vam-map-chat-send.is-hidden, .vam-map-chat-stop.is-hidden { display: none; }
 .vam-map-chat-body { display: flex; flex-direction: column; gap: 6px; box-sizing: border-box; width: 360px; max-width: 100%; height: 360px; max-height: 100%; padding: 8px; border: 1px solid var(--background-modifier-border); border-radius: var(--radius-m); background: var(--background-primary); box-shadow: var(--shadow-l); }
 .vam-map-chat.is-drop .vam-map-chat-body, .vam-map-chat.is-drop .vam-map-chat-toggle { outline: 2px dashed var(--interactive-accent); outline-offset: 2px; background: var(--background-modifier-hover); }
@@ -428,6 +428,12 @@ button.vam-relevance-tag-button:disabled { cursor: default; opacity: .7; }
 .vam-map-chat-msg.is-error .vam-map-chat-text { color: var(--text-error); }
 .vam-map-chat-role { color: var(--text-muted); font-size: var(--font-ui-smaller); }
 .vam-map-chat-text { white-space: pre-wrap; overflow-wrap: anywhere; user-select: text; }
+.vam-map-chat-text.is-markdown { white-space: normal; }
+.vam-map-chat-text.is-markdown > :first-child { margin-top: 0; }
+.vam-map-chat-text.is-markdown > :last-child { margin-bottom: 0; }
+.vam-map-chat-text.is-markdown p, .vam-map-chat-text.is-markdown ul, .vam-map-chat-text.is-markdown ol, .vam-map-chat-text.is-markdown pre, .vam-map-chat-text.is-markdown blockquote, .vam-map-chat-text.is-markdown table { margin-block: 0 0.5em; }
+.vam-map-chat-text.is-markdown h1, .vam-map-chat-text.is-markdown h2, .vam-map-chat-text.is-markdown h3, .vam-map-chat-text.is-markdown h4 { margin-block: 0.5em 0.25em; font-size: var(--font-ui-medium); }
+.vam-map-chat-chip.is-note { border-style: solid; }
 .vam-map-chat-lines { display: flex; flex-direction: column; gap: 2px; margin-top: 4px; font-size: var(--font-ui-smaller); color: var(--text-muted); }
 .vam-map-chat-line.is-done::before { content: "✓ "; color: var(--text-success); }
 .vam-map-chat-line.is-skipped::before { content: "– "; }
@@ -438,7 +444,7 @@ button.vam-relevance-tag-button:disabled { cursor: default; opacity: .7; }
 .vam-map-chat-chip { display: inline-flex; align-items: center; gap: 2px; max-width: 100%; padding: 1px 4px 1px 8px; border: 1px solid var(--background-modifier-border); border-radius: 999px; background: var(--background-secondary); font-size: var(--font-ui-smaller); }
 .vam-map-chat-chip.is-auto { padding-right: 8px; border-style: dashed; }
 .vam-map-chat-chip-label { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.vam-map-chat-chip-remove { height: auto; padding: 0 4px; border: 0; background: transparent; box-shadow: none; }
+.vam-map-chat-chip-remove, .vam-map-chat-note-remove { height: auto; padding: 0 4px; border: 0; background: transparent; box-shadow: none; }
 .vam-map-chat-status { min-height: 1.2em; color: var(--text-muted); font-size: var(--font-ui-smaller); }
 .vam-map-chat-form { display: flex; align-items: flex-end; gap: 6px; }
 .vam-map-chat-input { flex: 1 1 auto; min-width: 0; resize: none; }

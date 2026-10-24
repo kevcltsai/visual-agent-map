@@ -1013,6 +1013,7 @@ export const en = {
   "ui.map_chat_remove_ref_0": "Remove reference: {0}",
   "ui.map_chat_ref_topic_0": "Topic: {0}",
   "ui.map_chat_ref_selected_0": "Selected: {0}",
+  "ui.map_chat_ref_note_0": "Current note: {0}",
   "ui.map_chat_ref_snippet_0": "Text from {0}",
   "ui.map_chat_ref_text": "Dropped text",
   "ui.map_chat_ref_file_0": "Note: {0}",

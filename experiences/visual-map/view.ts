@@ -711,6 +711,7 @@ export class VisualAgentMapView extends ItemView {
       this.registerEvent(
         workspace.on("active-leaf-change", leaf => {
           if (leaf?.view instanceof MarkdownView && leaf.view.file) this.lastMarkdownPath = leaf.view.file.path;
+          this.chat?.refreshNote();
         })
       );
     // Space-drag pans while selecting topics; typing a space in a field never arms it.
@@ -10044,6 +10045,8 @@ export class VisualAgentMapView extends ItemView {
         return file && file.extension === "md" ? file.path : null;
       },
       activeNotePath: () => this.activeMarkdownFile()?.path ?? null,
+      visibleNotePath: () => this.activeMarkdownFile()?.path ?? null,
+      renderMarkdown: (text, el, owner) => MarkdownRenderer.render(this.app, text, el, this.path, owner),
       activeElement: () => this.contentEl.ownerDocument?.activeElement ?? null,
       layoutChanged: open => this.chatWorkspaceEl?.toggleClass("has-map-chat-open", open)
     };
@@ -10068,17 +10071,26 @@ export class VisualAgentMapView extends ItemView {
     if (this.multiSelected.size) return [...this.multiSelected];
     return this.selected ? [this.selected] : [];
   }
-  /** The note the user most recently had open beside the map, if it is still open. */
+  /**
+   * The note a chat message goes with: only a note that is on screen beside the map right now (the shown tab of its tab group,
+   * in this map's window). Background tabs, other windows and closed notes never count. With several on screen: the one the
+   * user touched last, then one of this map's own topic notes, then the first.
+   */
   private activeMarkdownFile(): TFile | null {
-    const workspace = this.app.workspace;
-    const open = new Set<string>();
-    for (const leaf of workspace.getLeavesOfType?.("markdown") ?? [])
-      if (leaf.view instanceof MarkdownView && leaf.view.file) open.add(leaf.view.file.path);
-    const live = workspace.getActiveViewOfType?.(MarkdownView)?.file?.path;
+    const shown: string[] = [];
+    const doc = this.contentEl.ownerDocument;
+    for (const leaf of this.app.workspace.getLeavesOfType?.("markdown") ?? []) {
+      const view = leaf.view;
+      if (!(view instanceof MarkdownView) || !view.file) continue;
+      const el = view.containerEl;
+      if (!el || (doc && el.ownerDocument !== doc) || !el.isShown()) continue;
+      if (!shown.includes(view.file.path)) shown.push(view.file.path);
+    }
+    const topicPaths = new Set(this.map?.nodes.map(node => node.path) ?? []);
     const candidates = [
-      live,
-      this.lastMarkdownPath && open.has(this.lastMarkdownPath) ? this.lastMarkdownPath : null,
-      ...open
+      this.lastMarkdownPath && shown.includes(this.lastMarkdownPath) ? this.lastMarkdownPath : null,
+      shown.find(path => topicPaths.has(path)),
+      ...shown
     ];
     for (const path of candidates) {
       const file = path ? this.app.vault.getAbstractFileByPath(path) : null;
@@ -10223,8 +10235,9 @@ export class VisualAgentMapView extends ItemView {
         if (source) files.push({ path: source.file.path, content: source.text });
       }
     }
-    const active = this.activeMarkdownFile();
-    const activeSource = active ? await this.readChatFile(active.path) : null;
+    // Only the note the chip shows is sent; with the chip taken off nothing is, so no edit of it has a baseline.
+    const activePath = chat.currentNote();
+    const activeSource = activePath ? await this.readChatFile(activePath) : null;
     const context = buildMapChatContext({
       mapTitle: map.title,
       outline,

@@ -23,11 +23,15 @@ function page() {
   return { doc, root, attach };
 }
 function panelFixture(overrides = {}) {
-  const { MapChatPanel } = load('experiences/visual-map/map-chat.ts', { obsidian });
+  const owners = [];
+  class Component { constructor() { this.loaded = false; this.unloaded = false; owners.push(this); } load() { this.loaded = true; } unload() { this.unloaded = true; } }
+  const { MapChatPanel } = load('experiences/visual-map/map-chat.ts', { obsidian: { ...obsidian, Component } });
   const p = page(); const overlay = p.attach(p.root.createDiv('vam-canvas-overlay'));
   const calls = { send: 0, stop: 0, layout: [], more: [] };
   const topics = { a: 'Topic A', b: 'Topic B' };
   let selected = [];
+  let visibleNote = null;
+  const rendered = [];
   const prefs = { style: 'concise', model: '', saved: [], watchers: [] };
   const host = {
     style: () => prefs.style, setStyle: style => { prefs.style = style; prefs.saved.push(['style', style]); },
@@ -35,7 +39,8 @@ function panelFixture(overrides = {}) {
     watchModels: changed => { prefs.watchers.push(changed); return () => { prefs.watchers.splice(prefs.watchers.indexOf(changed), 1); }; },
     model: () => prefs.model, setModel: model => { prefs.model = model; prefs.saved.push(['model', model]); }, moreDetail: origin => { calls.more.push(origin); },
     topicTitle: id => topics[id] ?? null, selectedIds: () => selected, send: () => { calls.send++; }, stop: () => { calls.stop++; },
-    resolveLink: link => ({ Note: 'Notes/Note.md', Other: 'Notes/Other.md' })[link] ?? null, activeNotePath: () => 'Notes/Active.md',
+    resolveLink: link => ({ Note: 'Notes/Note.md', Other: 'Notes/Other.md' })[link] ?? null, activeNotePath: () => 'Notes/Active.md', visibleNotePath: () => visibleNote,
+    renderMarkdown: async (text, el, owner) => { rendered.push({ text, el, owner }); el.setText(text); },
     activeElement: () => p.doc.activeElement, layoutChanged: open => calls.layout.push(open), ...overrides
   };
   const panel = new MapChatPanel(host);
@@ -46,7 +51,7 @@ function panelFixture(overrides = {}) {
     send: () => byLabel(panel.el, 'Send'), stop: () => byLabel(panel.el, 'Stop'), close: () => byLabel(panel.bodyEl, 'Close AI chat'),
     chipTexts: () => findAll(panel.chipsEl, i => hasClass(i, 'vam-map-chat-chip-label')).map(i => i.text)
   };
-  return { panel, overlay, calls, prefs, page: p, parts, select: ids => { selected = ids; panel.refreshSelection(); } };
+  return { panel, overlay, calls, prefs, page: p, parts, rendered, owners, showNote: path => { visibleNote = path; panel.refreshNote(); }, select: ids => { selected = ids; panel.refreshSelection(); } };
 }
 const hasClass = (item, name) => dom.hasCls(item, name);
 const key = (input, event) => { let prevented = false; input.fire('keydown', { preventDefault() { prevented = true; }, shiftKey: false, isComposing: false, ...event }); return prevented; };
@@ -182,14 +187,14 @@ test('map chat: selected cards show as references that cannot be removed here, a
   eq(f.parts.chipTexts(), ['Topic: Topic A'], 'a selected card that is not on the map is not shown');
 });
 
-test('map chat: while the AI works Stop is shown with a visible status, the reply streams in place, and the turn ends with action lines', () => {
+test('map chat: while the AI works Stop is shown with a visible status, the reply streams in place, and the turn ends with action lines', async () => {
   const f = panelFixture(); f.panel.setOpen(true);
   f.parts.input().value = 'ask';
   f.panel.begin('ask');
   assert.equal(f.parts.input().value, '', 'the draft is cleared once the question is sent');
   assert.equal(f.parts.status().text, 'The AI is replying…'); assert.equal(f.parts.send().hidden, true); assert.equal(f.parts.stop().hidden, false);
   assert.equal(f.parts.stop().attrs['aria-label'], 'Stop'); assert.equal(f.parts.status().attrs.role, 'status'); assert.equal(f.parts.log().attrs.role, 'log');
-  f.panel.streamReply('partial'); f.panel.streamReply('partial answer');
+  f.panel.streamReply('partial'); f.panel.streamReply('partial answer'); await tick();
   assert.equal(find(f.parts.log(), i => hasClass(i, 'is-assistant')).children.find(c => hasClass(c, 'vam-map-chat-text')).text, 'partial answer');
   eq(f.panel.turns(), [], 'a turn that is still streaming is not history');
   f.panel.finish('final answer', [{ status: 'done', text: 'Done: A' }, { status: 'skipped', text: 'Skipped: B' }]);
@@ -236,7 +241,7 @@ async function harness({ aim = false, document = false } = {}) {
     await app.vault.create(file, text);
   }
   const notices = [], opened = [];
-  const control = { reply: async () => ({ reply: 'ok', actions: [], rejected: [] }), requests: [], models: [], claudeReady: true, listeners: [], refreshes: [], usageAsks: 0, decline: false, nested: 0, mutates: 0, depth: 0, calls: [] };
+  const control = { reply: async () => ({ reply: 'ok', actions: [], rejected: [] }), requests: [], models: [], claudeReady: true, listeners: [], refreshes: [], usageAsks: 0, decline: false, nested: 0, mutates: 0, depth: 0, calls: [], markdown: [] };
   let queue = Promise.resolve();
   const ctx = {};
   const plugin = withExpansionCoordinator({
@@ -262,7 +267,7 @@ async function harness({ aim = false, document = false } = {}) {
   const leaves = []; let activeMarkdown = null;
   app.workspace = { getLeavesOfType: type => type === 'markdown' ? leaves : [], getActiveViewOfType: () => activeMarkdown, on() {} };
   class Notice { constructor(message) { notices.push(message); } hide() {} }
-  const { VisualAgentMapView } = load('main.ts', { obsidian: { ...obsidian, MarkdownView, Notice } }, { ...(document ? { document: { documentElement: { style: {} }, get activeElement() { return ctx.page?.doc.activeElement ?? null; } } } : {}), CSS: { escape: value => String(value) }, createSvg: tag => ({ tag, attrs: {}, classes: [], setAttribute(name, value) { this.attrs[name] = value; }, addClass(name) { this.classes.push(name); } }), requestAnimationFrame: run => { run(); return 1; }, cancelAnimationFrame() {}, setTimeout: fn => { ctx.timers.push(fn); return ctx.timers.length; }, clearTimeout() {} });
+  const { VisualAgentMapView } = load('main.ts', { obsidian: { ...obsidian, MarkdownView, Notice, Component: class { load() {} unload() {} }, MarkdownRenderer: { render: async (_app, text, el, sourcePath, owner) => { control.markdown.push({ text, el, sourcePath, owner }); el.setText(text); } } } }, { ...(document ? { document: { documentElement: { style: {} }, get activeElement() { return ctx.page?.doc.activeElement ?? null; } } } : {}), CSS: { escape: value => String(value) }, createSvg: tag => ({ tag, attrs: {}, classes: [], setAttribute(name, value) { this.attrs[name] = value; }, addClass(name) { this.classes.push(name); } }), requestAnimationFrame: run => { run(); return 1; }, cancelAnimationFrame() {}, setTimeout: fn => { ctx.timers.push(fn); return ctx.timers.length; }, clearTimeout() {} });
   ctx.timers = [];
   const view = new VisualAgentMapView({ app }, plugin);
   ctx.view = view;
@@ -285,7 +290,10 @@ async function harness({ aim = false, document = false } = {}) {
   await reload();
   const h = {
     repo, app, contents, files, view, plugin, ids, control, notices, opened, leaves, page: p, rootEl, get timers() { return ctx.timers; }, repaint, renders: () => renders, workspace: () => workspaceEl,
-    setActive: (file, text, editor) => { const v = Object.assign(new MarkdownView(), { file: app.vault.getAbstractFileByPath(file), editor: editor ?? null }); activeMarkdown = v; leaves.splice(0, leaves.length, { view: v }); return v; },
+    setActive: (file, text, editor) => { const v = h.leaf(file, { editor }); activeMarkdown = v; leaves.splice(0, leaves.length, { view: v }); return v; },
+    // A markdown leaf; `shown` false is a background tab, `doc` another window. Not made active.
+    leaf: (file, { shown = true, doc = p.doc, editor = null } = {}) => Object.assign(new MarkdownView(), { file: app.vault.getAbstractFileByPath(file), editor, containerEl: { ownerDocument: doc, isShown: () => shown } }),
+    setLeaves: (...views) => { leaves.splice(0, leaves.length, ...views.map(view => ({ view }))); },
     hashes: (...paths) => Object.fromEntries(paths.map(p2 => [p2, contentHash(contents.get(p2))])),
     node: key => view.map.nodes.find(n => n.id === ids[key]),
     note: async key => repo.readNote(view.map.nodes.find(n => n.id === ids[key]).path),
@@ -1217,4 +1225,157 @@ test('map chat C1 F3: loading saved settings sanitises an invalid chat style and
   const good = settingsFromSaved({ mapChatStyle: 'detailed', mapChatModel: ' claude:haiku ' });
   assert.equal(good.mapChatStyle, 'detailed'); assert.equal(good.mapChatModel, 'claude:haiku');
   const none = settingsFromSaved(null); assert.equal(none.mapChatStyle, 'concise'); assert.equal(none.mapChatModel, '');
+});
+
+// ---- Packet D1: only the note on screen is sent; the reply is laid out as Markdown --------------------------------
+
+const noteLabel = chat => findAll(chat.chipsEl, i => hasClass(i, 'is-note')).flatMap(c => findAll(c, i => hasClass(i, 'vam-map-chat-chip-label'))).map(i => i.text);
+const noteRemove = chat => findAll(chat.chipsEl, i => hasClass(i, 'vam-map-chat-note-remove'))[0];
+const send = async (h, text = 'q') => { h.type(text); await h.view.sendMapChat(); return h.control.requests.at(-1); };
+const sentActive = request => JSON.parse(request.context.json).activeFile ?? null;
+
+integrationTest('map chat D1: a note open in a background tab is not sent and gets no chip', async () => {
+  const h = await harness(); await h.view.hydrate();
+  h.setLeaves(h.leaf('Notes/Other.md', { shown: false }));
+  const chat = h.open();
+  eq(noteLabel(chat), []); assert.equal(h.view.activeMarkdownFile(), null);
+  assert.equal(sentActive(await send(h)), null, 'a hidden tab is not context');
+});
+
+integrationTest('map chat D1: a note in another window is not sent and gets no chip', async () => {
+  const h = await harness(); await h.view.hydrate();
+  h.setLeaves(h.leaf('Notes/Other.md', { doc: { other: true } }));
+  const chat = h.open();
+  eq(noteLabel(chat), []); assert.equal(sentActive(await send(h)), null);
+});
+
+integrationTest('map chat D1: a note shown beside the map is sent, with a chip that names it and can be removed by name', async () => {
+  const h = await harness(); await h.view.hydrate();
+  h.setLeaves(h.leaf('Notes/Other.md'), h.leaf('Notes/Research.md', { shown: false }));
+  const chat = h.open();
+  eq(noteLabel(chat), ['Current note: Other']);
+  assert.equal(noteRemove(chat).attrs['aria-label'], 'Remove reference: Current note: Other');
+  assert.equal(sentActive(await send(h)).path, 'Notes/Other.md');
+});
+
+integrationTest('map chat D1: with several notes shown, the last one touched wins, then this map\'s own topic note, then the first', async () => {
+  const h = await harness(); await h.view.hydrate();
+  const topicPath = h.node('b').path;
+  h.setLeaves(h.leaf('Notes/Other.md'), h.leaf(topicPath), h.leaf('Notes/Research.md'));
+  assert.equal(h.view.activeMarkdownFile().path, topicPath, 'topic note beats the first shown');
+  h.view.lastMarkdownPath = 'Notes/Research.md';
+  assert.equal(h.view.activeMarkdownFile().path, 'Notes/Research.md', 'last touched, while still shown');
+  h.setLeaves(h.leaf('Notes/Other.md'), h.leaf('Notes/Research.md', { shown: false }));
+  assert.equal(h.view.activeMarkdownFile().path, 'Notes/Other.md', 'last touched is hidden now: the first shown');
+  h.setLeaves(h.leaf('Notes/Other.md'), h.leaf('Notes/Research.md'));
+  h.view.lastMarkdownPath = null;
+  assert.equal(h.view.activeMarkdownFile().path, 'Notes/Other.md', 'no topic note, no history: the first shown');
+});
+
+integrationTest('map chat D1: removing the chip sends no active note, and an edit of that note has no baseline and is skipped', async () => {
+  const h = await harness(); await h.view.hydrate();
+  h.setLeaves(h.leaf('Notes/Other.md'));
+  const chat = h.open();
+  h.control.reply = async () => ({ reply: 'r', actions: [{ kind: 'edit_md_file', path: 'Notes/Other.md', find: 'naps', replace: 'sleep' }], rejected: [] });
+  noteRemove(chat).click();
+  eq(noteLabel(chat), []);
+  const request = await send(h);
+  assert.equal(sentActive(request), null);
+  const lines = chat.transcript().at(-1).lines;
+  eq(lines.map(l => l.status).slice(0, 1), ['skipped'], JSON.stringify(lines));
+  assert.equal(h.contents.get('Notes/Other.md'), 'Other note about naps.\n');
+  // Control: with the chip on, the same edit goes through.
+  const h2 = await harness(); await h2.view.hydrate();
+  h2.setLeaves(h2.leaf('Notes/Other.md')); h2.open();
+  h2.control.reply = async () => ({ reply: 'r', actions: [{ kind: 'edit_md_file', path: 'Notes/Other.md', find: 'naps', replace: 'sleep' }], rejected: [] });
+  await send(h2);
+  assert.match(h2.contents.get('Notes/Other.md'), /about sleep/);
+});
+
+integrationTest('map chat D1: the chip follows the shown note, a removal holds only for that note, and goes with a new conversation', async () => {
+  const h = await harness(); await h.view.hydrate();
+  h.setLeaves(h.leaf('Notes/Other.md'));
+  const chat = h.open();
+  noteRemove(chat).click(); eq(noteLabel(chat), []);
+  h.view.lastMarkdownPath = null; chat.refreshNote(); eq(noteLabel(chat), [], 'still removed for the same note');
+  h.setLeaves(h.leaf('Notes/Research.md')); h.view.lastMarkdownPath = 'Notes/Research.md'; chat.refreshNote();
+  eq(noteLabel(chat), ['Current note: Research'], 'another note is shown: the chip is back, for that note');
+  assert.equal(sentActive(await send(h)).path, 'Notes/Research.md');
+});
+
+test('map chat D1: the panel chip refreshes on mount, on refreshNote, and a removal is remembered per note', () => {
+  const f = panelFixture(); f.panel.setOpen(true);
+  eq(f.parts.chipTexts(), []);
+  f.showNote('Notes/A.md'); eq(f.parts.chipTexts(), ['Current note: A']); assert.equal(f.panel.currentNote(), 'Notes/A.md');
+  findAll(f.panel.chipsEl, i => hasClass(i, 'vam-map-chat-note-remove'))[0].click();
+  assert.equal(f.panel.currentNote(), null); eq(f.parts.chipTexts(), []);
+  f.showNote('Notes/B.md'); assert.equal(f.panel.currentNote(), 'Notes/B.md');
+  f.showNote(null); assert.equal(f.panel.currentNote(), null);
+  f.showNote('Notes/A.md'); assert.equal(f.panel.currentNote(), 'Notes/A.md', 'a removal of A does not outlive A: after B, A is back');
+  findAll(f.panel.chipsEl, i => hasClass(i, 'vam-map-chat-note-remove'))[0].click(); assert.equal(f.panel.currentNote(), null);
+  f.panel.reset(); f.showNote('Notes/A.md'); assert.equal(f.panel.currentNote(), 'Notes/A.md', 'a new conversation starts with nothing removed');
+});
+
+test('map chat D1: dropped chips keep their remove behaviour with a note chip present', () => {
+  const f = panelFixture(); f.panel.setOpen(true); f.showNote('Notes/A.md');
+  for (const id of ['a', 'b']) f.panel.addTopicReference(id);
+  const removes = () => findAll(f.panel.chipsEl, i => hasClass(i, 'vam-map-chat-chip-remove'));
+  assert.equal(removes().length, 2); removes()[0].click();
+  assert.equal(f.page.doc.activeElement, removes()[0]); assert.equal(f.panel.currentNote(), 'Notes/A.md');
+});
+
+test('map chat D1: assistant replies are laid out by the Markdown renderer; the question, errors and result lines stay plain text', async () => {
+  const f = panelFixture(); f.panel.setOpen(true);
+  f.panel.begin('**not bold**');
+  f.panel.streamReply('Hi **bo'); f.panel.streamReply('Hi **bold** and <script>x</script> <img src=x onerror=y>'); await tick();
+  assert.equal(f.rendered.at(-1).text, 'Hi **bold** and <script>x</script> <img src=x onerror=y>', 'the newest streamed text is the one laid out');
+  f.panel.finish('Done **bold** [[Note]]', [{ status: 'done', text: '**line**' }]); await tick(); await tick();
+  assert.equal(f.rendered.at(-1).text, 'Done **bold** [[Note]]', 'the last layout is the complete answer');
+  assert.ok(f.rendered.every(r => r.text !== '**not bold**' && r.text !== '**line**'), 'only the reply goes through the renderer');
+  assert.ok(f.rendered.every(r => hasClass(r.el, 'is-markdown') || r.el.cls?.includes('vam-map-chat-text')));
+  f.panel.begin('two'); f.panel.fail('Broke **hard**'); await tick();
+  assert.ok(!f.rendered.some(r => r.text === 'Broke **hard**'), 'an error text is not laid out');
+  const user = findAll(f.parts.log(), i => hasClass(i, 'is-user'))[0];
+  assert.equal(user.children.find(c => hasClass(c, 'vam-map-chat-text')).text, '**not bold**');
+});
+
+test('map chat D1: each layout has its own owner that is unloaded when replaced, when the log repaints and on dispose', async () => {
+  const f = panelFixture(); f.panel.setOpen(true);
+  f.panel.begin('q'); f.panel.streamReply('one'); f.panel.streamReply('two'); await tick();
+  const used = f.rendered.map(r => r.owner);
+  assert.ok(used.length >= 2 && used.every(o => o.loaded), 'owners are loaded before use');
+  assert.ok(used.slice(0, -1).every(o => o.unloaded), 'a replaced layout\'s owner is unloaded'); assert.equal(used.at(-1).unloaded, false);
+  f.panel.finish('three', []); await tick();
+  assert.equal(used.at(-1).unloaded, true, 'repainting the log unloads the old owners');
+  f.panel.dispose(); assert.ok(f.owners.every(o => o.unloaded), 'dispose unloads every owner');
+});
+
+test('map chat D1: a layout that throws falls back to plain text', async () => {
+  const f = panelFixture({ renderMarkdown: async () => { throw new Error('boom'); } }); f.panel.setOpen(true);
+  f.panel.begin('q'); f.panel.finish('**x**', []); await tick();
+  assert.equal(find(f.parts.log(), i => hasClass(i, 'is-assistant')).children.find(c => hasClass(c, 'vam-map-chat-text')).text, '**x**');
+});
+
+integrationTest('map chat D1: the view lays a reply out with MarkdownRenderer using the map file as its source path', async () => {
+  const h = await harness(); await h.view.hydrate(); h.open();
+  h.control.reply = async () => ({ reply: 'Hello **there**', actions: [], rejected: [] });
+  await send(h); await tick(); await tick();
+  const last = h.control.markdown.at(-1);
+  assert.equal(last.text, 'Hello **there**'); assert.equal(last.sourcePath, MAP); assert.ok(last.owner);
+});
+
+test('map chat D1: model output is never put into the page with innerHTML, and no private API is used', () => {
+  const dir = path.join(root, 'experiences/visual-map');
+  for (const file of fs.readdirSync(dir).filter(name => name.endsWith('.ts'))) {
+    const text = fs.readFileSync(path.join(dir, file), 'utf8');
+    assert.doesNotMatch(text, /dragManager|\.internal\b/, file);
+    if (file === 'map-chat.ts') assert.doesNotMatch(text, /innerHTML|outerHTML|insertAdjacentHTML/, file);
+  }
+});
+
+test('map chat D1: the view refreshes the note chip when the active leaf changes', () => {
+  const source = fs.readFileSync(path.join(root, 'experiences/visual-map/view.ts'), 'utf8');
+  const at = source.indexOf('workspace.on("active-leaf-change"');
+  assert.ok(at > 0);
+  assert.match(source.slice(at, at + 400), /this\.chat\?\.refreshNote\(\)/);
 });

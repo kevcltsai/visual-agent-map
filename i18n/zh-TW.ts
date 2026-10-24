@@ -942,6 +942,7 @@ export const zhTW: Record<TranslationKey, string> = {
   "ui.map_chat_remove_ref_0": "移除引用：{0}",
   "ui.map_chat_ref_topic_0": "議題：{0}",
   "ui.map_chat_ref_selected_0": "已選取：{0}",
+  "ui.map_chat_ref_note_0": "目前筆記：{0}",
   "ui.map_chat_ref_snippet_0": "{0} 的文字",
   "ui.map_chat_ref_text": "拖入的文字",
   "ui.map_chat_ref_file_0": "筆記：{0}",

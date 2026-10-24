@@ -990,6 +990,7 @@ var en = {
   "ui.map_chat_remove_ref_0": "Remove reference: {0}",
   "ui.map_chat_ref_topic_0": "Topic: {0}",
   "ui.map_chat_ref_selected_0": "Selected: {0}",
+  "ui.map_chat_ref_note_0": "Current note: {0}",
   "ui.map_chat_ref_snippet_0": "Text from {0}",
   "ui.map_chat_ref_text": "Dropped text",
   "ui.map_chat_ref_file_0": "Note: {0}",
@@ -2829,6 +2830,7 @@ var zhCN = {
   "ui.map_chat_remove_ref_0": "\u79FB\u9664\u5F15\u7528\uFF1A{0}",
   "ui.map_chat_ref_topic_0": "\u8BAE\u9898\uFF1A{0}",
   "ui.map_chat_ref_selected_0": "\u5DF2\u9009\u53D6\uFF1A{0}",
+  "ui.map_chat_ref_note_0": "\u5F53\u524D\u7B14\u8BB0\uFF1A{0}",
   "ui.map_chat_ref_snippet_0": "{0} \u7684\u6587\u5B57",
   "ui.map_chat_ref_text": "\u62D6\u5165\u7684\u6587\u5B57",
   "ui.map_chat_ref_file_0": "\u7B14\u8BB0\uFF1A{0}",
@@ -4668,6 +4670,7 @@ var zhTW = {
   "ui.map_chat_remove_ref_0": "\u79FB\u9664\u5F15\u7528\uFF1A{0}",
   "ui.map_chat_ref_topic_0": "\u8B70\u984C\uFF1A{0}",
   "ui.map_chat_ref_selected_0": "\u5DF2\u9078\u53D6\uFF1A{0}",
+  "ui.map_chat_ref_note_0": "\u76EE\u524D\u7B46\u8A18\uFF1A{0}",
   "ui.map_chat_ref_snippet_0": "{0} \u7684\u6587\u5B57",
   "ui.map_chat_ref_text": "\u62D6\u5165\u7684\u6587\u5B57",
   "ui.map_chat_ref_file_0": "\u7B46\u8A18\uFF1A{0}",
@@ -20236,6 +20239,13 @@ var MapChatPanel = class {
     __publicField(this, "built", false);
     __publicField(this, "stopWatching", null);
     __publicField(this, "messageEls", []);
+    __publicField(this, "renderOwners", /* @__PURE__ */ new Map());
+    __publicField(this, "bodyEls", []);
+    __publicField(this, "markdownBodies", []);
+    __publicField(this, "paints", []);
+    /** The visible note the user took off the chip; it stays off until another note is visible. */
+    __publicField(this, "dismissedNote", null);
+    __publicField(this, "noteChip", null);
   }
   get isOpen() {
     return this.open;
@@ -20252,6 +20262,18 @@ var MapChatPanel = class {
   /** True when `element` is the message field. */
   isInput(element) {
     return this.built && element === this.inputEl;
+  }
+  /** Path of the visible note the next message goes with (the chip's note), or null. */
+  currentNote() {
+    this.refreshNote();
+    return this.noteChip;
+  }
+  /** The visible note may have changed: update which note the chip names and repaint the chips. */
+  refreshNote() {
+    const visible = this.host.visibleNotePath();
+    if (visible && visible !== this.dismissedNote) this.dismissedNote = null;
+    this.noteChip = visible && visible !== this.dismissedNote ? visible : null;
+    this.renderChips();
   }
   attachments() {
     return this.chips.map((chip) => ({ ...chip }));
@@ -20275,7 +20297,7 @@ var MapChatPanel = class {
     if (!this.built) this.build(parent);
     else parent.appendChild(this.el);
     this.applyOpen();
-    this.renderChips();
+    this.refreshNote();
     this.refreshControls();
   }
   /** The view is closing: stop listening for model changes. */
@@ -20283,6 +20305,11 @@ var MapChatPanel = class {
     var _a2;
     (_a2 = this.stopWatching) == null ? void 0 : _a2.call(this);
     this.stopWatching = null;
+    this.unloadOwners();
+  }
+  unloadOwners() {
+    for (const owner of this.renderOwners.values()) owner.unload();
+    this.renderOwners.clear();
   }
   /** Takes the panel out of the page; the next {@link mount} puts it back with all state intact. */
   detach() {
@@ -20367,9 +20394,10 @@ var MapChatPanel = class {
     const last = this.messages.at(-1);
     if (!last || !last.streaming) return;
     last.text = text11;
-    const target = this.messageEls.at(-1);
-    const body = target == null ? void 0 : target.querySelector(".vam-map-chat-text");
-    body == null ? void 0 : body.setText(text11);
+    const index = this.messageEls.length - 1;
+    const body = this.bodyEls[index];
+    if (body && this.markdownBodies[index]) this.paintMarkdown(index, text11);
+    else body == null ? void 0 : body.setText(text11);
     this.scrollToEnd();
   }
   /** The turn ended with an answer and the outcome of each action. */
@@ -20415,6 +20443,8 @@ var MapChatPanel = class {
   reset() {
     this.messages = [];
     this.chips = [];
+    this.dismissedNote = null;
+    this.noteChip = null;
     this.busy = false;
     if (this.built) this.inputEl.value = "";
     this.renderLog();
@@ -20588,6 +20618,22 @@ var MapChatPanel = class {
       const chip = this.chipsEl.createDiv({ cls: "vam-map-chat-chip is-auto" });
       chip.createSpan({ cls: "vam-map-chat-chip-label", text: t("ui.map_chat_ref_selected_0", clip(title)) });
     }
+    if (this.noteChip) {
+      const note = this.noteChip;
+      const label = t("ui.map_chat_ref_note_0", clip(baseName2(note)));
+      const chip = this.chipsEl.createDiv({ cls: "vam-map-chat-chip is-note" });
+      chip.createSpan({ cls: "vam-map-chat-chip-label", text: label });
+      const remove = chip.createEl("button", {
+        cls: "vam-map-chat-note-remove",
+        text: "\xD7",
+        attr: { "aria-label": t("ui.map_chat_remove_ref_0", label), type: "button" }
+      });
+      remove.addEventListener("click", () => {
+        this.dismissedNote = note;
+        this.refreshNote();
+        this.inputEl.focus();
+      });
+    }
     for (const entry of this.chips) {
       const label = this.chipLabel(entry);
       const chip = this.chipsEl.createDiv({ cls: `vam-map-chat-chip is-${entry.kind}` });
@@ -20604,6 +20650,10 @@ var MapChatPanel = class {
     if (!this.built) return;
     this.logEl.empty();
     this.messageEls = [];
+    this.bodyEls = [];
+    this.markdownBodies = [];
+    this.paints = [];
+    this.unloadOwners();
     for (const message of this.messages) {
       const row = this.logEl.createDiv({
         cls: `vam-map-chat-msg is-${message.role}${message.error ? " is-error" : ""}`
@@ -20612,7 +20662,14 @@ var MapChatPanel = class {
         cls: "vam-map-chat-role",
         text: t(message.role === "user" ? "ui.map_chat_role_you" : "ui.map_chat_role_ai")
       });
-      row.createDiv({ cls: "vam-map-chat-text", text: message.text });
+      const markdown = message.role === "assistant" && !message.error;
+      const body = row.createDiv({ cls: `vam-map-chat-text${markdown ? " is-markdown" : ""}` });
+      const index = this.messageEls.length;
+      this.bodyEls.push(body);
+      this.markdownBodies.push(markdown);
+      this.paints.push({ busy: false, pending: null });
+      if (markdown) this.paintMarkdown(index, message.text);
+      else body.setText(message.text);
       const asked = this.messages[this.messages.indexOf(message) - 1];
       if (message.role === "assistant" && !message.streaming && !message.error && message.text.trim() && (asked == null ? void 0 : asked.origin)) {
         const origin = asked.origin;
@@ -20634,6 +20691,37 @@ var MapChatPanel = class {
       this.messageEls.push(row);
     }
     this.scrollToEnd();
+  }
+  /** Lays message `index` out as Markdown. One layout runs at a time per message; the newest text always gets its turn. */
+  paintMarkdown(index, text11) {
+    const state = this.paints[index];
+    const body = this.bodyEls[index];
+    if (!state || !body) return;
+    if (state.busy) {
+      state.pending = text11;
+      return;
+    }
+    state.busy = true;
+    void (async () => {
+      var _a2;
+      let next = text11;
+      while (next !== null) {
+        const current = next;
+        state.pending = null;
+        const owner = new import_obsidian16.Component();
+        owner.load();
+        (_a2 = this.renderOwners.get(index)) == null ? void 0 : _a2.unload();
+        this.renderOwners.set(index, owner);
+        body.empty();
+        try {
+          await this.host.renderMarkdown(current, body, owner);
+        } catch (e) {
+          body.setText(current);
+        }
+        next = state.pending;
+      }
+      state.busy = false;
+    })();
   }
   renderBusy() {
     if (!this.built) return;
@@ -33589,7 +33677,9 @@ var VisualAgentMapView = class _VisualAgentMapView extends import_obsidian30.Ite
     if (typeof (workspace == null ? void 0 : workspace.on) === "function" && typeof this.registerEvent === "function")
       this.registerEvent(
         workspace.on("active-leaf-change", (leaf) => {
+          var _a3;
           if ((leaf == null ? void 0 : leaf.view) instanceof import_obsidian30.MarkdownView && leaf.view.file) this.lastMarkdownPath = leaf.view.file.path;
+          (_a3 = this.chat) == null ? void 0 : _a3.refreshNote();
         })
       );
     this.registerDomEvent((_j = this.contentEl.win) != null ? _j : window, "keydown", (event) => {
@@ -42246,6 +42336,11 @@ ${note.detail.trim()}` : "",
         var _a2, _b2;
         return (_b2 = (_a2 = this.activeMarkdownFile()) == null ? void 0 : _a2.path) != null ? _b2 : null;
       },
+      visibleNotePath: () => {
+        var _a2, _b2;
+        return (_b2 = (_a2 = this.activeMarkdownFile()) == null ? void 0 : _a2.path) != null ? _b2 : null;
+      },
+      renderMarkdown: (text11, el, owner) => import_obsidian30.MarkdownRenderer.render(this.app, text11, el, this.path, owner),
       activeElement: () => {
         var _a2, _b2;
         return (_b2 = (_a2 = this.contentEl.ownerDocument) == null ? void 0 : _a2.activeElement) != null ? _b2 : null;
@@ -42276,18 +42371,27 @@ ${note.detail.trim()}` : "",
     if (this.multiSelected.size) return [...this.multiSelected];
     return this.selected ? [this.selected] : [];
   }
-  /** The note the user most recently had open beside the map, if it is still open. */
+  /**
+   * The note a chat message goes with: only a note that is on screen beside the map right now (the shown tab of its tab group,
+   * in this map's window). Background tabs, other windows and closed notes never count. With several on screen: the one the
+   * user touched last, then one of this map's own topic notes, then the first.
+   */
   activeMarkdownFile() {
     var _a2, _b2, _c, _d, _e;
-    const workspace = this.app.workspace;
-    const open = /* @__PURE__ */ new Set();
-    for (const leaf of (_b2 = (_a2 = workspace.getLeavesOfType) == null ? void 0 : _a2.call(workspace, "markdown")) != null ? _b2 : [])
-      if (leaf.view instanceof import_obsidian30.MarkdownView && leaf.view.file) open.add(leaf.view.file.path);
-    const live = (_e = (_d = (_c = workspace.getActiveViewOfType) == null ? void 0 : _c.call(workspace, import_obsidian30.MarkdownView)) == null ? void 0 : _d.file) == null ? void 0 : _e.path;
+    const shown = [];
+    const doc = this.contentEl.ownerDocument;
+    for (const leaf of (_c = (_b2 = (_a2 = this.app.workspace).getLeavesOfType) == null ? void 0 : _b2.call(_a2, "markdown")) != null ? _c : []) {
+      const view = leaf.view;
+      if (!(view instanceof import_obsidian30.MarkdownView) || !view.file) continue;
+      const el = view.containerEl;
+      if (!el || doc && el.ownerDocument !== doc || !el.isShown()) continue;
+      if (!shown.includes(view.file.path)) shown.push(view.file.path);
+    }
+    const topicPaths = new Set((_e = (_d = this.map) == null ? void 0 : _d.nodes.map((node) => node.path)) != null ? _e : []);
     const candidates = [
-      live,
-      this.lastMarkdownPath && open.has(this.lastMarkdownPath) ? this.lastMarkdownPath : null,
-      ...open
+      this.lastMarkdownPath && shown.includes(this.lastMarkdownPath) ? this.lastMarkdownPath : null,
+      shown.find((path) => topicPaths.has(path)),
+      ...shown
     ];
     for (const path of candidates) {
       const file = path ? this.app.vault.getAbstractFileByPath(path) : null;
@@ -42423,8 +42527,8 @@ ${note.detail.trim()}` : "",
         if (source) files.push({ path: source.file.path, content: source.text });
       }
     }
-    const active = this.activeMarkdownFile();
-    const activeSource = active ? await this.readChatFile(active.path) : null;
+    const activePath = chat.currentNote();
+    const activeSource = activePath ? await this.readChatFile(activePath) : null;
     const context = buildMapChatContext({
       mapTitle: map.title,
       outline,

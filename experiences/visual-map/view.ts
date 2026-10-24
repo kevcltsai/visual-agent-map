@@ -22,8 +22,10 @@ import {
 import {
   MarkdownRenderer,
   ItemView,
+  type Editor,
   Menu,
   Modal,
+  MarkdownView,
   Notice,
   Scope,
   TFile,
@@ -119,6 +121,16 @@ import { RELEVANCE_LABEL, renderRelevanceTagButton } from "./relevance-tag";
 import { relevanceDisplayNodes } from "./relevance-order";
 import { fitViewport, focusViewport, initialViewport, insetFromRects } from "./viewport-inset";
 import { RelevanceSummaryModal } from "./relevance-summary-modal";
+import { MapChatPanel, type MapChatChip, type MapChatHost, type MapChatLine } from "./map-chat";
+import {
+  buildMapChatContext,
+  isMdStale,
+  type MapChatOutlineNode,
+  type MapChatTopicRef
+} from "../../core/map-chat-context";
+import { applyMdEdit, guardMapChatWrite, normalizeVaultPath, type MapChatGuardCode } from "../../core/map-chat-guard";
+import type { MapChatRequest, MapChatResult } from "../../core/map-chat-service";
+import type { MapChatAction } from "../../core/steps/map-chat/step";
 import { relevanceMode, relevanceModeAfterWrite, type RelevanceMode, type RelevancePin } from "./relevance-pins";
 import { PendingSuggestions } from "../../pending-suggestions";
 import { createAimMap } from "../aim/create-map";
@@ -418,6 +430,22 @@ function showDocumentReady(): void {
   documentReadyNotice = new Notice(t("ui.aim_document_ready"), 60_000);
 }
 
+/** What one chat action came to: written, skipped with a reason (shown in the chat), or failed. */
+type ChatOutcome = { status: "done" } | { status: "skipped" | "failed"; reason: string };
+const skipped = (key: TranslationKey): ChatOutcome => ({ status: "skipped", reason: t(key) });
+const GUARD_REASON: Record<MapChatGuardCode, TranslationKey> = {
+  outside_vault: "ui.map_chat_guard_outside_vault",
+  config_dir: "ui.map_chat_guard_config_dir",
+  not_markdown: "ui.map_chat_guard_not_markdown",
+  map_unparseable: "ui.map_chat_guard_map_unparseable",
+  topic_identity_changed: "ui.map_chat_guard_topic_identity_changed",
+  reserved_frontmatter: "ui.map_chat_guard_reserved_frontmatter",
+  exists: "ui.map_chat_guard_exists",
+  no_baseline: "ui.map_chat_guard_no_baseline"
+};
+const guardSkipped = (code: MapChatGuardCode): ChatOutcome => skipped(GUARD_REASON[code]);
+let mapChatTaskSequence = 0;
+
 export class VisualAgentMapView extends ItemView {
   private map: MapDocument | null = null;
   private path = "";
@@ -443,6 +471,15 @@ export class VisualAgentMapView extends ItemView {
   private relevancePanelGen = 0;
   private relevancePanelCleanup: (() => void) | null = null;
   private history = new History<Action>();
+  /** The AI chat window. It lives on the view, so a repaint keeps its messages, draft and chips. */
+  private chat: MapChatPanel | null = null;
+  /** The map the conversation belongs to; opening another map starts a new conversation. */
+  private chatMapId = "";
+  private chatController: AbortController | null = null;
+  private chatTaskKey: string | null = null;
+  private chatWorkspaceEl: HTMLElement | null = null;
+  /** The note the user last had open beside the map; dropped text is assumed to come from it. */
+  private lastMarkdownPath: string | null = null;
   private deletedMap: {
     path: string;
     content: string;
@@ -662,6 +699,13 @@ export class VisualAgentMapView extends ItemView {
     this.mapOpenEpoch++;
     this.contentEl.addClass("vam-view");
     this.contentEl.tabIndex = 0;
+    const workspace = this.app.workspace;
+    if (typeof workspace?.on === "function" && typeof this.registerEvent === "function")
+      this.registerEvent(
+        workspace.on("active-leaf-change", leaf => {
+          if (leaf?.view instanceof MarkdownView && leaf.view.file) this.lastMarkdownPath = leaf.view.file.path;
+        })
+      );
     // Space-drag pans while selecting topics; typing a space in a field never arms it.
     this.registerDomEvent(this.contentEl.win ?? window, "keydown", event => {
       if (
@@ -797,6 +841,7 @@ export class VisualAgentMapView extends ItemView {
     this.taskPreviewEls.clear();
     this.hoverResearch = null;
     this.plugin.releaseOutline(this);
+    this.abortMapChat();
     this.relevancePanelCleanup?.();
     this.relevancePanelCleanup = null;
     // An open panel pre-started the CLI for a grade that will never be sent.
@@ -3392,9 +3437,14 @@ export class VisualAgentMapView extends ItemView {
         this.changed(file);
         return;
       }
+      const active = this.contentEl.ownerDocument?.activeElement ?? null;
+      // The chat field is a text field too, but it is where the user waits for the map to change: only an IME
+      // composition in it holds the repaint back.
+      const inChat = !!this.chat?.isInput(active);
       if (
-        this.contentEl.contains(document.activeElement) &&
-        document.activeElement?.matches("input, textarea, select")
+        inChat
+          ? this.chat!.isComposing
+          : this.contentEl.contains(active) && !!active?.matches("input, textarea, select")
       ) {
         this.changed(file);
         return;
@@ -5840,6 +5890,7 @@ export class VisualAgentMapView extends ItemView {
     const focusedCard = activeDocument.activeElement?.closest<HTMLElement>(".vam-node");
     if (focusedCard && this.contentEl.contains(focusedCard)) this.focusNodeId ??= focusedCard.dataset.nodeId ?? null;
     const restoreRelevanceFocus = this.keepRelevanceBarFocus();
+    const restoreChatFocus = this.detachMapChat();
     // The repaint removes the focused panel field first; its late focusout must not close the panel that is redrawn below.
     this.relevancePanelGen++;
     this.relevancePanelCleanup?.();
@@ -6193,6 +6244,7 @@ export class VisualAgentMapView extends ItemView {
     const overlay = workspace.createDiv("vam-canvas-overlay");
     if (tools.childElementCount) overlay.appendChild(tools);
     else tools.remove();
+    this.mountMapChat(workspace, overlay);
     if (this.relevancePanelEl) this.placeRelevancePanel(this.relevancePanelEl);
     // The gesture hint goes away once the user has panned or zoomed; select mode keeps its gesture hint inside the selection bar, never over the canvas.
     // In select mode the selection bar (bottom-left) owns that space, so no hint is drawn there.
@@ -6277,6 +6329,7 @@ export class VisualAgentMapView extends ItemView {
       if (node) this.renderInspector(workspace, node);
     }
     restoreRelevanceFocus();
+    restoreChatFocus();
   }
   /** `shownNode` may be a display copy (sorted by relevance): it only supplies where the card is drawn. */
   private renderNode(shownNode: MapNode): void {
@@ -6972,6 +7025,7 @@ export class VisualAgentMapView extends ItemView {
       const check = this.cardChecks.get(id);
       if (check) check.checked = this.multiSelected.has(id);
     }
+    this.chat?.refreshSelection();
   }
   /**
    * Moves the selection without rebuilding the map: only the previous and next cards, the changed multi-select
@@ -9912,6 +9966,551 @@ export class VisualAgentMapView extends ItemView {
       viewport.addEventListener("pointercancel", up);
     });
   }
+  // ---- AI chat window -------------------------------------------------------------------------------------------
+  /** Before a repaint: takes the chat window out of the page and returns what gives its text field focus back after it. */
+  private detachMapChat(): () => void {
+    const restore = this.chat?.captureFocus() ?? ((): void => {});
+    this.chat?.detach();
+    return restore;
+  }
+  /** Puts the chat window into this repaint's overlay; the window itself (messages, draft, chips) lives on the view. */
+  private mountMapChat(workspace: HTMLElement, overlay: HTMLElement): void {
+    this.chatWorkspaceEl = workspace;
+    if (this.builtIn || !this.map) return;
+    if (!this.chat) this.chat = new MapChatPanel(this.chatHost());
+    if (this.chatMapId !== this.map.id) {
+      // Another map: the conversation belongs to the one it was about.
+      this.abortMapChat();
+      this.chat.reset();
+      this.chatMapId = this.map.id;
+    }
+    this.chat.mount(overlay);
+    workspace.toggleClass("has-map-chat-open", this.chat.isOpen);
+  }
+  private chatHost(): MapChatHost {
+    return {
+      topicTitle: id => {
+        const node = this.map?.nodes.find(item => item.id === id);
+        return node ? (this.notes.get(id)?.title ?? node.path) : null;
+      },
+      selectedIds: () => this.chatSelectionIds(),
+      send: () => {
+        void this.sendMapChat();
+      },
+      stop: () => this.stopMapChat(),
+      resolveLink: link => {
+        const file = this.app.metadataCache.getFirstLinkpathDest(link, this.activeMarkdownFile()?.path ?? "");
+        return file && file.extension === "md" ? file.path : null;
+      },
+      activeNotePath: () => this.activeMarkdownFile()?.path ?? null,
+      activeElement: () => this.contentEl.ownerDocument?.activeElement ?? null,
+      layoutChanged: open => this.chatWorkspaceEl?.toggleClass("has-map-chat-open", open)
+    };
+  }
+  /** The cards the user has selected: they count as chat references without being dragged in. */
+  private chatSelectionIds(): string[] {
+    if (this.multiSelected.size) return [...this.multiSelected];
+    return this.selected ? [this.selected] : [];
+  }
+  /** The note the user most recently had open beside the map, if it is still open. */
+  private activeMarkdownFile(): TFile | null {
+    const workspace = this.app.workspace;
+    const open = new Set<string>();
+    for (const leaf of workspace.getLeavesOfType?.("markdown") ?? [])
+      if (leaf.view instanceof MarkdownView && leaf.view.file) open.add(leaf.view.file.path);
+    const live = workspace.getActiveViewOfType?.(MarkdownView)?.file?.path;
+    const candidates = [
+      live,
+      this.lastMarkdownPath && open.has(this.lastMarkdownPath) ? this.lastMarkdownPath : null,
+      ...open
+    ];
+    for (const path of candidates) {
+      const file = path ? this.app.vault.getAbstractFileByPath(path) : null;
+      if (file instanceof TFile && file.extension === "md") return file;
+    }
+    return null;
+  }
+  private openMarkdownEditor(path: string): Editor | null {
+    for (const leaf of this.app.workspace.getLeavesOfType?.("markdown") ?? [])
+      if (leaf.view instanceof MarkdownView && leaf.view.file?.path === path) return leaf.view.editor;
+    return null;
+  }
+  /** A vault note's text as it is right now (an open note is read from its editor, which may hold unsaved typing). */
+  private async readChatFile(path: string): Promise<{ file: TFile; text: string; editor: Editor | null } | null> {
+    const key = normalizeVaultPath(path);
+    const file = key ? this.app.vault.getAbstractFileByPath(key) : null;
+    if (!(file instanceof TFile)) return null;
+    const editor = this.openMarkdownEditor(file.path);
+    return { file, editor, text: editor ? editor.getValue() : await this.app.vault.read(file) };
+  }
+  private async buildChatRequest(message: string, chat: MapChatPanel): Promise<MapChatRequest> {
+    const map = this.map!;
+    const settings = this.plugin.settings;
+    const byId = new Map(map.nodes.map(node => [node.id, node]));
+    const summaryOf = (id: string): string => {
+      const summary = this.notes.get(id)?.summary ?? "";
+      return isPlaceholder(summary) ? "" : summary;
+    };
+    const titleOf = (node: MapNode): string => this.notes.get(node.id)?.title ?? node.path;
+    const depthOf = (node: MapNode): number => {
+      const seen = new Set<string>([node.id]);
+      let depth = 0;
+      for (let at = node.parentId; at && !seen.has(at); at = byId.get(at)?.parentId ?? null) {
+        seen.add(at);
+        depth++;
+      }
+      return depth;
+    };
+    const outline: MapChatOutlineNode[] = map.nodes.map(node => ({
+      id: node.id,
+      title: titleOf(node),
+      summary: summaryOf(node.id),
+      parentId: node.parentId,
+      depth: depthOf(node)
+    }));
+    const ref = (id: string): MapChatTopicRef | null => {
+      const node = byId.get(id);
+      return node ? { id, title: titleOf(node), summary: summaryOf(id), path: node.path } : null;
+    };
+    const notNull = <T>(value: T | null): value is T => value !== null;
+    const selectedIds = this.chatSelectionIds();
+    const attached = chat.attachments();
+    const snippets: NonNullable<Parameters<typeof buildMapChatContext>[0]["snippets"]> = [];
+    const files: NonNullable<Parameters<typeof buildMapChatContext>[0]["files"]> = [];
+    for (const chip of attached) {
+      if (chip.kind === "snippet") {
+        const source = chip.path ? await this.readChatFile(chip.path) : null;
+        snippets.push({
+          path: chip.path,
+          text: chip.text,
+          pathGuessed: chip.pathGuessed,
+          ...(source ? { fileContent: source.text } : {})
+        });
+      } else if (chip.kind === "file") {
+        const source = await this.readChatFile(chip.path);
+        if (source) files.push({ path: source.file.path, content: source.text });
+      }
+    }
+    const active = this.activeMarkdownFile();
+    const activeSource = active ? await this.readChatFile(active.path) : null;
+    const context = buildMapChatContext({
+      mapTitle: map.title,
+      outline,
+      selected: selectedIds.map(ref).filter(notNull),
+      references: attached
+        .filter((chip): chip is Extract<MapChatChip, { kind: "topic" }> => chip.kind === "topic")
+        .map(chip => ref(chip.id))
+        .filter(notNull)
+        .filter(item => !selectedIds.includes(item.id)),
+      snippets,
+      files,
+      activeFile: activeSource ? { path: activeSource.file.path, content: activeSource.text } : null,
+      history: chat.turns()
+    });
+    return {
+      message,
+      context,
+      language: settings.language,
+      contentLanguage: outputLanguageForMap(map, settings.language, message),
+      model: settings.cliModel,
+      reasoning: normalizeReasoningLevel(settings.cliReasoning)
+    };
+  }
+  private chatErrorText(error: unknown): string {
+    const code =
+      (error as { name?: unknown; code?: unknown } | null)?.name === "MapChatError"
+        ? (error as { code?: unknown }).code
+        : null;
+    if (code === "over_budget") return t("ui.map_chat_error_over_budget");
+    if (code === "invalid") return t("ui.map_chat_error_invalid");
+    if (code === "stopped") return t("ui.map_chat_stopped");
+    return t("ui.map_chat_error_failed_0", errorMessage(error));
+  }
+  /** Sends the draft: usage notice, one request, a streamed answer, then every action it asked for, once. */
+  private async sendMapChat(): Promise<void> {
+    const chat = this.chat;
+    if (!chat || chat.isBusy || this.closed || !this.map || this.builtIn) return;
+    const message = chat.draft.trim();
+    if (!message) return;
+    const mapPath = this.path;
+    const mapId = this.map.id;
+    let request: MapChatRequest;
+    try {
+      request = await this.buildChatRequest(message, chat);
+    } catch (error) {
+      new Notice(errorMessage(error));
+      return;
+    }
+    await this.plugin.confirmAiUsage(request.model, async () => {
+      if (this.closed || chat.isBusy || this.path !== mapPath || this.map?.id !== mapId) return;
+      const controller = new AbortController();
+      const key = `map-chat-view:${++mapChatTaskSequence}`;
+      this.chatController = controller;
+      this.chatTaskKey = key;
+      this.plugin.activeTasks?.set(key, controller);
+      // A reply that arrives after Stop, closing the view or switching maps changes nothing.
+      const alive = (): boolean =>
+        !this.closed && !controller.signal.aborted && this.chatController === controller && this.path === mapPath;
+      chat.begin(message);
+      try {
+        const result = await this.plugin.mapChat.chat(request, controller.signal, text => {
+          if (alive()) chat.streamReply(text);
+        });
+        if (!alive()) return;
+        const lines = await this.applyMapChatActions(result, request.context.mdHashes, alive);
+        if (alive() && chat.isBusy) chat.finish(result.reply, lines);
+      } catch (error) {
+        if (alive()) chat.fail(this.chatErrorText(error));
+      } finally {
+        if (this.chatController === controller) this.releaseChatTask();
+      }
+    });
+  }
+  private releaseChatTask(): void {
+    if (this.chatTaskKey) this.plugin.activeTasks?.delete(this.chatTaskKey);
+    this.chatTaskKey = null;
+    this.chatController = null;
+  }
+  /** Stop button: the request is aborted and whatever came back is dropped. */
+  private stopMapChat(): void {
+    const controller = this.chatController;
+    if (!controller) return;
+    this.releaseChatTask();
+    controller.abort();
+    this.chat?.markStopped();
+    this.chat?.focusInput();
+  }
+  /** Closing the view or leaving the map: abort without touching the window. */
+  private abortMapChat(): void {
+    const controller = this.chatController;
+    this.releaseChatTask();
+    controller?.abort();
+  }
+  private chatActionLabel(action: MapChatAction): string {
+    const nodes = this.map?.nodes ?? [];
+    const title = (id: string): string => this.notes.get(id)?.title ?? nodes.find(node => node.id === id)?.path ?? id;
+    const targets = (ids: string[]): number => (ids.length ? ids.length : this.chatSelectionIds().length);
+    switch (action.kind) {
+      case "add_child":
+        return t("ui.map_chat_do_add_child_0", action.title);
+      case "rename_topic":
+        return t("ui.map_chat_do_rename_0", action.title);
+      case "update_summary":
+        return t("ui.map_chat_do_summary_0", title(action.nodeId));
+      case "edit_topic_note":
+        return t("ui.map_chat_do_note_0", title(action.nodeId));
+      case "move_topic":
+        return t("ui.map_chat_do_move_0_1", title(action.nodeId), title(action.newParentId));
+      case "delete_topic":
+        return t("ui.map_chat_do_delete_0", title(action.nodeId));
+      case "edit_md_file":
+        return t("ui.map_chat_do_edit_md_0", action.path);
+      case "create_md_file":
+        return t("ui.map_chat_do_create_md_0", action.path);
+      case "select_topics":
+        return t("ui.map_chat_do_select_0", action.all ? nodes.length : action.nodeIds.length);
+      case "run_map_action":
+        switch (action.action) {
+          case "research_standard":
+            return t("ui.map_chat_do_research");
+          case "expand":
+            return t("ui.map_chat_do_expand_0", targets(action.nodeIds));
+          case "synthesize":
+            return t("ui.map_chat_do_synthesize");
+          case "rate_by_goal":
+            return t("ui.map_chat_do_rate_0", action.goal);
+          case "merge":
+            return t("ui.map_chat_do_merge_0", action.title);
+        }
+    }
+  }
+  private chatLine(label: string, outcome: ChatOutcome): MapChatLine {
+    if (outcome.status === "done") return { status: "done", text: t("ui.map_chat_line_done_0", label) };
+    return {
+      status: outcome.status,
+      text: t(
+        outcome.status === "skipped" ? "ui.map_chat_line_skipped_0_1" : "ui.map_chat_line_failed_0_1",
+        label,
+        outcome.reason
+      )
+    };
+  }
+  /**
+   * Applies what a chat reply asked for, once, in order. Every write is its own `plugin.mutate` (the queue cannot be
+   * re-entered, and the task a run action starts uses it too), checked again for staleness inside it and, for Markdown
+   * files, by the write guard. None of it leaves an undo step. A stale or refused action is skipped; the rest go on.
+   * Selecting cards and the run actions come after every write, outside any mutate. Resolves with one line per action.
+   */
+  async applyMapChatActions(
+    result: Pick<MapChatResult, "actions" | "rejected">,
+    mdHashes: Readonly<Record<string, string>>,
+    alive: () => boolean = () => true
+  ): Promise<MapChatLine[]> {
+    const mapPath = this.path;
+    const mapId = this.map?.id;
+    const same = (): boolean => !this.closed && alive() && this.path === mapPath && this.map?.id === mapId;
+    const lines: MapChatLine[] = [];
+    const mark = this.history.mark();
+    const later: number[] = [];
+    try {
+      for (const [index, action] of result.actions.entries()) {
+        if (action.kind === "select_topics" || action.kind === "run_map_action") {
+          later.push(index);
+          continue;
+        }
+        const label = this.chatActionLabel(action);
+        if (!same()) {
+          lines[index] = this.chatLine(label, skipped("ui.map_chat_skip_map_changed"));
+          continue;
+        }
+        const box: { outcome: ChatOutcome } = { outcome: { status: "done" } };
+        try {
+          await this.plugin.mutate(async () => {
+            box.outcome = await this.applyChatWrite(action, mdHashes, same);
+          });
+        } catch (error) {
+          box.outcome = { status: "failed", reason: errorMessage(error) };
+        }
+        lines[index] = this.chatLine(label, box.outcome);
+      }
+    } finally {
+      // The chat's own writes are not undoable (the owner's choice): drop whatever they pushed.
+      this.history.discardSince(mark);
+      this.updateHistoryButtons();
+    }
+    for (const index of later) {
+      const action = result.actions[index];
+      const label = this.chatActionLabel(action);
+      let outcome: ChatOutcome;
+      if (!same()) outcome = skipped("ui.map_chat_skip_map_changed");
+      else {
+        try {
+          outcome = await this.runChatSelection(
+            action as Extract<MapChatAction, { kind: "select_topics" | "run_map_action" }>
+          );
+        } catch (error) {
+          outcome = { status: "failed", reason: errorMessage(error) };
+        }
+      }
+      lines[index] = this.chatLine(label, outcome);
+    }
+    const all = [...lines];
+    if (result.rejected.length)
+      all.push({ status: "skipped", text: t("ui.map_chat_rejected_0", result.rejected.length) });
+    return all;
+  }
+  /** One write action. Runs inside `plugin.mutate`: it must not queue another one. */
+  private async applyChatWrite(
+    action: Exclude<MapChatAction, { kind: "select_topics" | "run_map_action" }>,
+    hashes: Readonly<Record<string, string>>,
+    same: () => boolean
+  ): Promise<ChatOutcome> {
+    if (!same() || !this.map) return skipped("ui.map_chat_skip_map_changed");
+    const nodeOf = (id: string): MapNode | undefined => this.map?.nodes.find(item => item.id === id);
+    const gone = skipped("ui.map_chat_skip_topic_gone");
+    const done: ChatOutcome = { status: "done" };
+    const configDir = this.app.vault.configDir;
+    switch (action.kind) {
+      case "add_child": {
+        const parent = nodeOf(action.parentId);
+        if (!parent) return gone;
+        if (this.isMerging(parent.id)) return skipped("ui.map_chat_skip_merge_locked");
+        const before = new Set(this.map.nodes.map(item => item.id));
+        await this.addNode(parent, action.title, true, false);
+        const created = this.map?.nodes.find(item => !before.has(item.id));
+        if (!created) return skipped("ui.map_chat_skip_unavailable");
+        if (action.summary) await this.noteChange(created, { summary: action.summary });
+        return done;
+      }
+      case "rename_topic":
+      case "update_summary":
+      case "edit_topic_note": {
+        const node = nodeOf(action.nodeId);
+        if (!node) return gone;
+        if (this.isMerging(node.id)) return skipped("ui.map_chat_skip_merge_locked");
+        await this.noteChange(
+          node,
+          action.kind === "rename_topic"
+            ? { title: action.title }
+            : action.kind === "update_summary"
+              ? { summary: action.summary }
+              : { detail: action.detail }
+        );
+        return done;
+      }
+      case "move_topic": {
+        const node = nodeOf(action.nodeId);
+        const parent = nodeOf(action.newParentId);
+        if (!node || !parent) return gone;
+        if (this.isMerging(node.id) || this.isMerging(parent.id)) return skipped("ui.map_chat_skip_merge_locked");
+        if (!canParent(this.map.nodes, node.id, parent.id)) return skipped("ui.map_chat_skip_cycle");
+        await this.moveTopic(node, parent);
+        return done;
+      }
+      case "delete_topic": {
+        const node = nodeOf(action.nodeId);
+        if (!node) return gone;
+        if (this.isMerging(node.id)) return skipped("ui.map_chat_skip_merge_locked");
+        await this.removeToUnassigned(node, action.branch);
+        return done;
+      }
+      case "edit_md_file": {
+        // Path rules first, so a refused place is named as such rather than as a missing or stale file.
+        const early = guardMapChatWrite({
+          kind: "edit",
+          path: action.path,
+          newContent: "",
+          knownHashes: hashes,
+          configDir
+        });
+        if (!early.ok) return guardSkipped(early.code);
+        const source = await this.readChatFile(action.path);
+        if (!source) return skipped("ui.map_chat_skip_file_missing");
+        if (isMdStale(hashes, action.path, source.text)) return skipped("ui.map_chat_skip_stale");
+        const next = applyMdEdit(source.text, action.find, action.replace);
+        if (next === null) return skipped("ui.map_chat_skip_find_failed");
+        const verdict = guardMapChatWrite({
+          kind: "edit",
+          path: action.path,
+          oldContent: source.text,
+          newContent: next,
+          knownHashes: hashes,
+          configDir
+        });
+        if (!verdict.ok) return guardSkipped(verdict.code);
+        if (source.editor) {
+          const at = source.text.indexOf(action.find);
+          source.editor.replaceRange(
+            action.replace,
+            source.editor.offsetToPos(at),
+            source.editor.offsetToPos(at + action.find.length)
+          );
+          return done;
+        }
+        let raced = false;
+        await this.app.vault.process(source.file, current => {
+          // The file moved on between the check and the write: leave it as it is.
+          if (current !== source.text) {
+            raced = true;
+            return current;
+          }
+          return next;
+        });
+        return raced ? skipped("ui.map_chat_skip_stale") : done;
+      }
+      case "create_md_file": {
+        const key = normalizeVaultPath(action.path);
+        const exists = key ? !!this.app.vault.getAbstractFileByPath(key) : false;
+        const verdict = guardMapChatWrite({
+          kind: "create",
+          path: action.path,
+          newContent: action.content,
+          exists,
+          configDir
+        });
+        if (!verdict.ok || !key) return guardSkipped(verdict.ok ? "outside_vault" : verdict.code);
+        const folders = key.split("/").slice(0, -1);
+        for (let depth = 1; depth <= folders.length; depth++) {
+          const folder = folders.slice(0, depth).join("/");
+          if (!this.app.vault.getAbstractFileByPath(folder)) await this.app.vault.createFolder(folder);
+        }
+        await this.app.vault.create(key, action.content);
+        return done;
+      }
+    }
+  }
+  private chatSelect(ids: string[]): void {
+    this.multiSelected = new Set(ids);
+    this.selected = null;
+    this.integrationMode = true;
+    if (!this.closed) this.render();
+  }
+  /** Selecting cards, and the run actions that start the map's own tasks; both after every write, outside a mutate. */
+  private async runChatSelection(
+    action: Extract<MapChatAction, { kind: "select_topics" | "run_map_action" }>
+  ): Promise<ChatOutcome> {
+    const map = this.map;
+    if (!map) return skipped("ui.map_chat_skip_map_changed");
+    const launch = (work: unknown): void => {
+      void Promise.resolve(work).catch(error => new Notice(errorMessage(error)));
+    };
+    const known = (ids: string[]): string[] => ids.filter(id => this.map?.nodes.some(node => node.id === id));
+    if (action.kind === "select_topics") {
+      if (!this.canSelectTopics()) return skipped("ui.map_chat_skip_unavailable");
+      const ids = action.all ? map.nodes.map(node => node.id) : known(action.nodeIds);
+      if (!ids.length) return skipped("ui.map_chat_skip_topic_gone");
+      this.chatSelect(ids);
+      return { status: "done" };
+    }
+    if (!this.canSelectTopics()) return skipped("ui.map_chat_skip_unavailable");
+    const targets = known(action.nodeIds);
+    if (action.nodeIds.length && !targets.length) return skipped("ui.map_chat_skip_topic_gone");
+    switch (action.action) {
+      case "research_standard":
+        if (targets.length) this.chatSelect(targets);
+        if (!this.multiSelected.size) return skipped("ui.map_chat_skip_unavailable");
+        launch(
+          this.startMultiResearch({
+            researchMode: "research",
+            researchDepth: "normal",
+            requirements: "",
+            imageSearch: false
+          })
+        );
+        return { status: "done" };
+      case "expand": {
+        const ids = targets.length ? targets : this.chatSelectionIds();
+        const parents = known(ids)
+          .map(id => this.map?.nodes.find(node => node.id === id))
+          .filter((node): node is MapNode => !!node);
+        if (!parents.length) return skipped("ui.map_chat_skip_unavailable");
+        // The chat request is the confirmation: every suggestion is created, without the review dialog.
+        for (const parent of parents)
+          launch(
+            this.proposeChildren(
+              parent,
+              undefined,
+              action.direction,
+              (items, create) => launch(create(items)),
+              message => {
+                new Notice(message);
+              }
+            )
+          );
+        return { status: "done" };
+      }
+      case "synthesize":
+        if (targets.length) this.chatSelect(targets);
+        if (this.multiSelected.size < 2) return skipped("ui.map_chat_skip_unavailable");
+        if (this.integrationTask?.mapPath === this.path && this.integrationTask.state === "running")
+          return skipped("ui.map_chat_skip_unavailable");
+        this.openSelectionSynthesis(null);
+        return { status: "done" };
+      case "rate_by_goal": {
+        const goal = action.goal.trim();
+        if (!goal || !this.relevanceGradeable()) return skipped("ui.map_chat_skip_unavailable");
+        launch(this.submitRelevanceGoal(goal));
+        return { status: "done" };
+      }
+      case "merge": {
+        if (targets.length) this.chatSelect(targets);
+        const title = action.title.trim();
+        if (!title) return skipped("ui.map_chat_skip_unavailable");
+        if (this.mergeTasks.has(this.path)) return skipped("ui.map_chat_skip_merge_locked");
+        const check = this.mergeCheck();
+        if (!check.ok) return skipped("ui.map_chat_skip_unavailable");
+        const snapshot = {
+          path: this.path,
+          mapId: map.id,
+          parentId: check.parentId,
+          targetId: check.targetId,
+          sources: check.sources.map(source => ({ id: source.id, path: source.path }))
+        };
+        await this.plugin.mutate(() => this.mergeSelected(title, snapshot));
+        return { status: "done" };
+      }
+    }
+  }
   /** Topic selection (remove, move, copy, synthesize, merge) exists only on editable, non-AIM maps. */
   private canSelectTopics(): boolean {
     return !this.builtIn && !!this.map && !this.map.aim;
@@ -9954,7 +10553,12 @@ export class VisualAgentMapView extends ItemView {
       // A merging card stays where it is; the drop reports why.
       const locked = this.isMerging(node.id);
       let warned = false;
+      // Released over the AI chat window the card is a reference to add, not something to move.
+      let overChat = false;
       const move = (e: PointerEvent): void => {
+        overChat =
+          Math.hypot(e.clientX - start.x, e.clientY - start.y) > 3 && !!this.chat?.hitTest(e.clientX, e.clientY);
+        this.chat?.setDropHighlight(overChat);
         // While sorted the card sits at a display position; saving a drag would write that, so cards stay put.
         if (this.relevanceSortOn()) return;
         moved ||= Math.hypot(e.clientX - start.x, e.clientY - start.y) > 3;
@@ -9970,6 +10574,7 @@ export class VisualAgentMapView extends ItemView {
         this.dragFrame ??= window.requestAnimationFrame(paint);
       };
       const settle = (): void => {
+        this.chat?.setDropHighlight(false);
         this.dragging = false;
         if (this.dragFrame !== null) window.cancelAnimationFrame(this.dragFrame);
         this.dragFrame = null;
@@ -9987,6 +10592,14 @@ export class VisualAgentMapView extends ItemView {
           card.style.left = `${origin.x}px`;
           card.style.top = `${origin.y}px`;
           edges.update(origin.x, origin.y);
+          return;
+        }
+        if (overChat) {
+          // Dropped on the chat: the card goes back where it was, nothing is written to the map.
+          card.style.left = `${origin.x}px`;
+          card.style.top = `${origin.y}px`;
+          edges.update(origin.x, origin.y);
+          this.chat?.addTopicReference(node.id);
           return;
         }
         if (moved && locked) {

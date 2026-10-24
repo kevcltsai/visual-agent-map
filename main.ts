@@ -91,6 +91,7 @@ import { announceTestOverrides } from "./experiences/aim/flow-limits";
 import { ReframingService, providerReframeRunner } from "./core/reframing-service";
 import { OutlineGenerationService, providerOutlineRunner } from "./core/outline-generation-service";
 import { StructureReviewService, providerStructureReviewRunner } from "./core/structure-review-service";
+import { MapChatService, providerMapChatRunner } from "./core/map-chat-service";
 import {
   RelevanceGradeService,
   providerRelevanceGradeRunner,
@@ -210,6 +211,7 @@ export default class VisualAgentMapPlugin extends Plugin {
   readonly structureReview = new StructureReviewService(
     providerStructureReviewRunner(this.aiTaskOptions, this.activeTasks)
   );
+  readonly mapChat = new MapChatService(providerMapChatRunner(this.aiTaskOptions, this.activeTasks));
   readonly relevanceGrade = new RelevanceGradeService(
     providerRelevanceGradeRunner(this.aiTaskOptions, this.activeTasks)
   );

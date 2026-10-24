@@ -5556,10 +5556,18 @@ export class VisualAgentMapView extends ItemView {
     const before = JSON.stringify(Array.from(this.notes));
     await this.hydrate();
     if (structureChanged || before !== JSON.stringify(Array.from(this.notes))) {
-      const editing =
-        this.contentEl.contains(document.activeElement) && document.activeElement?.matches("input, textarea, select");
+      const active = this.contentEl.ownerDocument?.activeElement ?? null;
+      // The chat field is a text field too, but it is where the user waits for the map to change: only an IME
+      // composition in it counts as editing (same rule as changed()).
+      const editing = this.chat?.isInput(active)
+        ? this.chat.isComposing
+        : this.contentEl.contains(active) && !!active?.matches("input, textarea, select");
       if ((!editing || structureChanged) && !this.dragging) this.render();
-      else for (const node of this.map.nodes) this.refreshCard(node);
+      else {
+        // Cards are refreshed without redrawing the edges each time (a redraw reads every card's layout); once at the end.
+        for (const node of this.map.nodes) this.refreshCard(node, false);
+        this.drawEdges();
+      }
     }
   }
   private openMapActions(): void {
@@ -7214,7 +7222,7 @@ export class VisualAgentMapView extends ItemView {
     preview.style.left = `${Math.max(12, Math.min(left, Math.max(12, host.width - width - 12)))}px`;
     preview.style.top = `${Math.max(12, Math.min(rect.top - host.top, maxTop))}px`;
   }
-  private refreshCard(node: MapNode): void {
+  private refreshCard(node: MapNode, redrawEdges = true): void {
     const card = this.stageEl?.querySelector<HTMLElement>(`[data-node-id="${CSS.escape(node.id)}"]`),
       note = this.notes.get(node.id);
     if (!card || !note) return;
@@ -7262,7 +7270,7 @@ export class VisualAgentMapView extends ItemView {
         status.setText(label);
       } else header?.prepend(createSpan({ cls: `vam-status vam-status-${note.status}`, text: label }));
     }
-    this.drawEdges();
+    if (redrawEdges) this.drawEdges();
   }
   private taskSourceSettings(
     currentLabel: string,

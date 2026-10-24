@@ -262,7 +262,7 @@ async function harness({ aim = false } = {}) {
   const leaves = []; let activeMarkdown = null;
   app.workspace = { getLeavesOfType: type => type === 'markdown' ? leaves : [], getActiveViewOfType: () => activeMarkdown, on() {} };
   class Notice { constructor(message) { notices.push(message); } hide() {} }
-  const { VisualAgentMapView } = load('main.ts', { obsidian: { ...obsidian, MarkdownView, Notice } }, { requestAnimationFrame: run => { run(); return 1; }, cancelAnimationFrame() {}, setTimeout: fn => { ctx.timers.push(fn); return ctx.timers.length; }, clearTimeout() {} });
+  const { VisualAgentMapView } = load('main.ts', { obsidian: { ...obsidian, MarkdownView, Notice } }, { CSS: { escape: value => String(value) }, requestAnimationFrame: run => { run(); return 1; }, cancelAnimationFrame() {}, setTimeout: fn => { ctx.timers.push(fn); return ctx.timers.length; }, clearTimeout() {} });
   ctx.timers = [];
   const view = new VisualAgentMapView({ app }, plugin);
   ctx.view = view;
@@ -856,6 +856,44 @@ integrationTest('map chat: changed() refreshes at once while the chat field has 
   h.page.doc.activeElement = null; tick400(); assert.equal(runs.length, 3);
 });
 
+// C2: a sync with the chat field focused used to refresh every card and redraw every edge once per card (N x layout(N)).
+async function syncFixture() {
+  const h = await harness(); const chat = h.open(); const view = h.view;
+  const calls = { drawEdges: 0, refreshCard: 0 }; let renders = 0;
+  const realRefresh = view.refreshCard.bind(view);
+  view.drawEdges = () => { calls.drawEdges++; };
+  view.refreshCard = (...args) => { calls.refreshCard++; return realRefresh(...args); };
+  const baseRender = view.render; view.render = () => { renders++; baseRender(); };
+  const cards = new Map();
+  view.stageEl = { querySelector: selector => { const id = /data-node-id="(.+)"\]/.exec(selector)[1]; if (!cards.has(id)) { cards.set(id, { dataset: {}, querySelector: () => null, createSpan: () => ({ id: '', textContent: '' }), setAttr() {} }); } return cards.get(id); } };
+  const changeNote = async () => { await h.repo.updateNote(view.map.nodes[0].path, { summary: 'Changed ' + Math.random() }); };
+  const sync = async () => { calls.drawEdges = 0; calls.refreshCard = 0; renders = 0; await view.synchronize(); return { ...calls, renders }; };
+  return { h, chat, view, changeNote, sync };
+}
+integrationTest('map chat C2: a sync while the chat field has focus repaints normally (no per-card refresh, no per-card edge redraw)', async () => {
+  const { chat, changeNote, sync } = await syncFixture();
+  chat.inputEl.focus(); await changeNote();
+  const r = await sync();
+  assert.equal(r.renders, 1, 'chat focus is not editing: the map renders'); assert.equal(r.refreshCard, 0); assert.ok(r.drawEdges <= 1);
+});
+integrationTest('map chat C2: during IME composition in the chat field the sync still takes the editing branch (no render), edges drawn once', async () => {
+  const { h, chat, changeNote, sync } = await syncFixture();
+  chat.inputEl.focus(); chat.inputEl.fire('compositionstart'); await changeNote();
+  const r = await sync();
+  assert.equal(r.renders, 0); assert.equal(r.refreshCard, h.view.map.nodes.length); assert.equal(r.drawEdges, 1, 'one edge redraw for the whole batch, not one per card');
+});
+integrationTest('map chat C2: another text field with focus (card title, goal input) still takes the editing branch', async () => {
+  const { h, view, changeNote, sync } = await syncFixture();
+  const other = h.rootEl.createDiv(); other.matches = selector => /input/.test(selector); h.page.doc.activeElement = other; await changeNote();
+  const r = await sync();
+  assert.equal(r.renders, 0, 'not interrupted by a render'); assert.equal(r.refreshCard, view.map.nodes.length); assert.equal(r.drawEdges, 1);
+});
+integrationTest('map chat C2: a single refreshCard outside a batch still redraws the edges itself', async () => {
+  const { view } = await syncFixture();
+  let drawn = 0; view.drawEdges = () => { drawn++; };
+  view.refreshCard(view.map.nodes[0]); assert.equal(drawn, 1);
+  view.refreshCard(view.map.nodes[0], false); assert.equal(drawn, 1, 'a batched refresh leaves the redraw to its caller');
+});
 integrationTest('map chat: keys inside the chat field are not taken by the view scope', async () => {
   const h = await harness();
   const keys = h.view.scope.keys;

@@ -38074,7 +38074,7 @@ ${request.requirements}` : preset.text,
     }
   }
   async synchronize() {
-    var _a2;
+    var _a2, _b2, _c;
     if (this.builtIn) return;
     if (!this.path || !this.map || this.closed) return;
     if (!(this.app.vault.getAbstractFileByPath(this.path) instanceof import_obsidian30.TFile)) {
@@ -38094,9 +38094,13 @@ ${request.requirements}` : preset.text,
     const before = JSON.stringify(Array.from(this.notes));
     await this.hydrate();
     if (structureChanged || before !== JSON.stringify(Array.from(this.notes))) {
-      const editing = this.contentEl.contains(document.activeElement) && ((_a2 = document.activeElement) == null ? void 0 : _a2.matches("input, textarea, select"));
+      const active = (_b2 = (_a2 = this.contentEl.ownerDocument) == null ? void 0 : _a2.activeElement) != null ? _b2 : null;
+      const editing = ((_c = this.chat) == null ? void 0 : _c.isInput(active)) ? this.chat.isComposing : this.contentEl.contains(active) && !!(active == null ? void 0 : active.matches("input, textarea, select"));
       if ((!editing || structureChanged) && !this.dragging) this.render();
-      else for (const node of this.map.nodes) this.refreshCard(node);
+      else {
+        for (const node of this.map.nodes) this.refreshCard(node, false);
+        this.drawEdges();
+      }
     }
   }
   openMapActions() {
@@ -39637,7 +39641,7 @@ ${request.requirements}` : preset.text,
     preview.style.left = `${Math.max(12, Math.min(left, Math.max(12, host.width - width - 12)))}px`;
     preview.style.top = `${Math.max(12, Math.min(rect.top - host.top, maxTop))}px`;
   }
-  refreshCard(node) {
+  refreshCard(node, redrawEdges = true) {
     var _a2, _b2, _c;
     const card = (_a2 = this.stageEl) == null ? void 0 : _a2.querySelector(`[data-node-id="${CSS.escape(node.id)}"]`), note = this.notes.get(node.id);
     if (!card || !note) return;
@@ -39677,7 +39681,7 @@ ${request.requirements}` : preset.text,
         status.setText(label);
       } else header == null ? void 0 : header.prepend(createSpan({ cls: `vam-status vam-status-${note.status}`, text: label }));
     }
-    this.drawEdges();
+    if (redrawEdges) this.drawEdges();
   }
   taskSourceSettings(currentLabel, currentTopicId = ((_b2) => (_b2 = ((_a2) => (_a2 = this.map) == null ? void 0 : _a2.id)()) != null ? _b2 : "")(), synthesisLabel) {
     return {

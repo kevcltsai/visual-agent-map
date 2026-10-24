@@ -592,6 +592,8 @@ export class VisualAgentMapView extends ItemView {
   private renderAfterDrag = false;
   /** Ends the drag in progress (listeners, pending frame, flag); set only while a card is being dragged. */
   private dragCleanup: (() => void) | null = null;
+  /** The map a card drag started on; a drag that outlives it must not write to, or add a reference from, another map. */
+  private dragOrigin: { id: string; path: string } | null = null;
   private dragFrame: number | null = null;
   /** A viewport write is already waiting in the queue; it reads the viewport when it runs, so later saves join it. */
   private viewportQueued = false;
@@ -705,6 +707,8 @@ export class VisualAgentMapView extends ItemView {
     );
     // A tab can be shown or hidden, or moved to another window, without the active leaf changing.
     this.registerEvent(workspace.on("layout-change", () => this.chat?.refreshNote()));
+    // Collapsing or widening a side panel resizes the workspace, and it can hide the note that sat beside the map.
+    this.registerEvent(workspace.on("resize", () => this.chat?.refreshNote()));
   }
   async onOpen(): Promise<void> {
     this.closed = false;
@@ -5901,8 +5905,13 @@ export class VisualAgentMapView extends ItemView {
   private render(): void {
     // Repainting would replace the dragged card and drop its pointer capture, so wait for the drop (a closed view still ends the drag below).
     if (this.dragging && !this.closed) {
-      this.renderAfterDrag = true;
-      return;
+      if (!this.dragStale()) {
+        this.renderAfterDrag = true;
+        return;
+      }
+      // The map the drag started on is gone (another map opened, or it was deleted): end the drag and repaint now.
+      this.dragCleanup?.();
+      this.renderAfterDrag = false;
     }
     this.paintCount++;
     this.aimProgressEls.clear();
@@ -10063,7 +10072,6 @@ export class VisualAgentMapView extends ItemView {
       openLink: (href, newLeaf) => {
         void this.app.workspace.openLinkText(href, this.path, newLeaf);
       },
-      renderMarkdown: (text, el, owner) => MarkdownRenderer.render(this.app, text, el, this.path, owner),
       activeElement: () => this.contentEl.ownerDocument?.activeElement ?? null,
       layoutChanged: open => this.chatWorkspaceEl?.toggleClass("has-map-chat-open", open)
     };
@@ -10744,6 +10752,11 @@ export class VisualAgentMapView extends ItemView {
     this.integrationMode = true;
     if (!this.closed) this.render();
   }
+  /** True while a card drag is running on a map that is no longer the one shown here. */
+  private dragStale(): boolean {
+    const origin = this.dragOrigin;
+    return !!origin && (!this.map || this.map.id !== origin.id || this.path !== origin.path);
+  }
   private enableDrag(card: HTMLElement, node: MapNode): void {
     card.addEventListener("pointerdown", event => {
       if ((event.target as Element).closest("button") || event.button !== 0 || !this.map) return;
@@ -10757,6 +10770,7 @@ export class VisualAgentMapView extends ItemView {
       const currentNode = this.map.nodes.find(item => item.id === node.id);
       if (!currentNode) return;
       this.dragging = true;
+      this.dragOrigin = { id: this.map.id, path: this.path };
       const start = { x: event.clientX, y: event.clientY },
         origin = { x: currentNode.x, y: currentNode.y };
       let position = { ...origin },
@@ -10777,6 +10791,10 @@ export class VisualAgentMapView extends ItemView {
       // Released over the AI chat window the card is a reference to add, not something to move.
       let overChat = false;
       const move = (e: PointerEvent): void => {
+        if (this.dragStale()) {
+          this.endStaleDrag();
+          return;
+        }
         overChat =
           Math.hypot(e.clientX - start.x, e.clientY - start.y) > 3 && !!this.chat?.hitTest(e.clientX, e.clientY);
         this.chat?.setDropHighlight(overChat);
@@ -10801,6 +10819,7 @@ export class VisualAgentMapView extends ItemView {
       const settle = (): void => {
         this.chat?.setDropHighlight(false);
         this.dragging = false;
+        this.dragOrigin = null;
         if (this.dragFrame !== null) window.cancelAnimationFrame(this.dragFrame);
         this.dragFrame = null;
         card.removeEventListener("pointermove", move);
@@ -10811,9 +10830,10 @@ export class VisualAgentMapView extends ItemView {
       };
       // The drop's own work comes first; a repaint that was asked for during the drag then runs once.
       const finish = (e: PointerEvent): void => {
+        const stale = this.dragStale();
         settle();
         try {
-          drop(e);
+          if (!stale) drop(e);
         } finally {
           if (this.renderAfterDrag && !this.dragging) {
             this.renderAfterDrag = false;
@@ -10837,7 +10857,7 @@ export class VisualAgentMapView extends ItemView {
           card.style.left = `${origin.x}px`;
           card.style.top = `${origin.y}px`;
           edges.update(origin.x, origin.y);
-          this.chat?.addTopicReference(node.id);
+          if (this.map?.nodes.some(item => item.id === node.id)) this.chat?.addTopicReference(node.id);
           return;
         }
         if (selecting) return;
@@ -10885,6 +10905,14 @@ export class VisualAgentMapView extends ItemView {
       card.addEventListener("pointercancel", finish);
       card.addEventListener("lostpointercapture", finish);
     });
+  }
+  /** The map changed under a running drag: end it without writing anything, then run the repaint that waited for it. */
+  private endStaleDrag(): void {
+    this.dragCleanup?.();
+    if (this.renderAfterDrag) {
+      this.renderAfterDrag = false;
+      if (!this.closed) this.render();
+    }
   }
   /**
    * The edges touching one card, with the geometry they need already measured. `update` moves only those edges to

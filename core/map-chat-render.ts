@@ -1,0 +1,399 @@
+/**
+ * Lays a model reply out in the map chat. The reply is untrusted, so it is never handed to Obsidian's own Markdown engine
+ * (which would load remote images, embed notes and run code-block processors of other plugins). It is parsed here into a small
+ * set of blocks and inline pieces, and the page is built only from `createEl`/`createSpan` calls with plain text. No HTML
+ * string is ever parsed, and no `img`, `iframe` or `embed` is ever created. Everything outside the supported set (images, HTML, callouts,
+ * tables, math, indented code) stays visible as the text the model wrote; fences keep no language, so nothing runs them.
+ */
+
+export type ChatInline =
+  | { t: "text"; text: string }
+  | { t: "br" }
+  | { t: "code"; text: string }
+  | { t: "fmt"; tag: "strong" | "em" | "del"; c: ChatInline[] }
+  | { t: "wiki"; target: string; label: string }
+  | { t: "link"; href: string; c: ChatInline[] };
+
+export interface ChatListItem {
+  c: ChatInline[];
+  sub: Extract<ChatBlock, { t: "list" }> | null;
+}
+
+export type ChatBlock =
+  | { t: "p"; c: ChatInline[] }
+  | { t: "h"; level: number; c: ChatInline[] }
+  | { t: "hr" }
+  | { t: "code"; text: string }
+  | { t: "quote"; c: ChatBlock[] }
+  | { t: "list"; ordered: boolean; items: ChatListItem[] };
+
+const MAX_INLINE_DEPTH = 4;
+const MAX_QUOTE_DEPTH = 3;
+const ESCAPABLE = /[!-/:-@[-`{-~]/;
+const ALNUM = /[\p{L}\p{N}]/u;
+const HTTP_URL = /^https?:\/\/[^\s<>]+$/i;
+const BARE_URL = /https?:\/\/[^\s<>]+/iy;
+const WIKI = /\[\[([^[\]\n]+)\]\]/y;
+
+/** Index of the `]` that closes the `[` at `open` (nested pairs and `\]` are skipped), or -1. */
+function closingBracket(src: string, open: number): number {
+  let depth = 0;
+  for (let at = open; at < src.length; at++) {
+    const ch = src[at];
+    if (ch === "\\") at++;
+    else if (ch === "[") depth++;
+    else if (ch === "]" && --depth === 0) return at;
+  }
+  return -1;
+}
+
+/** `[label](destination "title")` at `open`: where it ends, the label text and the destination. Null when it is not that shape. */
+function bracketLink(src: string, open: number): { end: number; label: string; dest: string } | null {
+  if (src[open] !== "[") return null;
+  const close = closingBracket(src, open);
+  if (close < 0 || src[close + 1] !== "(") return null;
+  let depth = 0;
+  let at = close + 1;
+  for (; at < src.length; at++) {
+    const ch = src[at];
+    if (ch === "\\") at++;
+    else if (ch === "(") depth++;
+    else if (ch === ")" && --depth === 0) break;
+    else if (ch === "\n") return null;
+  }
+  if (at >= src.length) return null;
+  let dest = src.slice(close + 2, at).trim();
+  if (dest.startsWith("<")) {
+    const stop = dest.indexOf(">");
+    dest = stop > 0 ? dest.slice(1, stop) : dest;
+  } else dest = dest.split(/\s+/)[0] ?? "";
+  return { end: at + 1, label: src.slice(open + 1, close), dest };
+}
+
+function wikiAt(src: string, at: number): { end: number; target: string; label: string } | null {
+  WIKI.lastIndex = at;
+  const match = WIKI.exec(src);
+  if (!match) return null;
+  const [rawTarget, ...alias] = match[1].split("|");
+  const target = rawTarget.trim();
+  if (!target) return null;
+  return { end: at + match[0].length, target, label: alias.join("|").trim() || target };
+}
+
+const DELIMITERS = ["**", "__", "~~", "*", "_"] as const;
+
+function formatAt(src: string, at: number, depth: number): { end: number; node: ChatInline } | null {
+  const delimiter = DELIMITERS.find(item => src.startsWith(item, at));
+  if (!delimiter || depth >= MAX_INLINE_DEPTH) return null;
+  const underscore = delimiter[0] === "_";
+  if (underscore && at > 0 && ALNUM.test(src[at - 1])) return null;
+  const start = at + delimiter.length;
+  if (start >= src.length || /\s/.test(src[start])) return null;
+  for (let close: number = src.indexOf(delimiter, start + 1); close >= 0; close = src.indexOf(delimiter, close + 1)) {
+    if (/\s/.test(src[close - 1])) continue;
+    const after: string | undefined = src[close + delimiter.length];
+    if (delimiter.length === 1 && after === delimiter) continue;
+    if (underscore && after !== undefined && ALNUM.test(after)) continue;
+    const tag = delimiter === "~~" ? "del" : delimiter.length === 2 ? "strong" : "em";
+    return {
+      end: close + delimiter.length,
+      node: { t: "fmt", tag, c: parseInline(src.slice(start, close), depth + 1, true) }
+    };
+  }
+  return null;
+}
+
+function bareUrlAt(src: string, at: number): { end: number; url: string } | null {
+  if (at > 0 && ALNUM.test(src[at - 1])) return null;
+  BARE_URL.lastIndex = at;
+  const match = BARE_URL.exec(src);
+  if (!match) return null;
+  let url = match[0].replace(/[.,;:!?'"*_~\]]+$/, "");
+  while (url.endsWith(")") && !url.includes("(")) url = url.slice(0, -1).replace(/[.,;:!?'"*_~\]]+$/, "");
+  return /^https?:\/\/./i.test(url) ? { end: at + url.length, url } : null;
+}
+
+/** Parses inline Markdown. `links` is false inside a link label, where a nested link stays text. */
+export function parseInline(src: string, depth = 0, links = true): ChatInline[] {
+  const out: ChatInline[] = [];
+  let buf = "";
+  const flush = (): void => {
+    if (buf) out.push({ t: "text", text: buf });
+    buf = "";
+  };
+  for (let at = 0; at < src.length;) {
+    const ch = src[at];
+    if (ch === "\\" && at + 1 < src.length && ESCAPABLE.test(src[at + 1])) {
+      buf += src[at + 1];
+      at += 2;
+      continue;
+    }
+    if (ch === "\n") {
+      flush();
+      out.push({ t: "br" });
+      at++;
+      continue;
+    }
+    if (ch === "`") {
+      let end = at;
+      while (src[end] === "`") end++;
+      const run = src.slice(at, end);
+      let close = -1;
+      for (let search = end; search < src.length;) {
+        const next = src.indexOf("`", search);
+        if (next < 0) break;
+        let stop = next;
+        while (src[stop] === "`") stop++;
+        if (stop - next === run.length) {
+          close = next;
+          break;
+        }
+        search = stop;
+      }
+      if (close < 0) {
+        buf += run;
+        at = end;
+        continue;
+      }
+      flush();
+      out.push({ t: "code", text: src.slice(end, close).replace(/\n/g, " ") });
+      at = close + run.length;
+      continue;
+    }
+    if (ch === "!" && src[at + 1] === "[") {
+      // An image or embed is shown as written, never loaded and never turned into a link.
+      const wiki = src.startsWith("[[", at + 1) ? wikiAt(src, at + 1) : null;
+      const link = wiki ? null : bracketLink(src, at + 1);
+      const end = wiki?.end ?? link?.end;
+      if (end !== undefined) {
+        buf += src.slice(at, end);
+        at = end;
+      } else {
+        buf += ch;
+        at++;
+      }
+      continue;
+    }
+    if (ch === "[") {
+      const wiki = wikiAt(src, at);
+      if (wiki && links) {
+        flush();
+        out.push({ t: "wiki", target: wiki.target, label: wiki.label });
+        at = wiki.end;
+        continue;
+      }
+      if (wiki) {
+        buf += src.slice(at, wiki.end);
+        at = wiki.end;
+        continue;
+      }
+      const link = bracketLink(src, at);
+      if (link) {
+        if (links && HTTP_URL.test(link.dest)) {
+          flush();
+          // A link with no words in it shows its address, so it never turns into an invisible target.
+          const label = link.label.trim() ? parseInline(link.label, depth + 1, false) : [];
+          out.push({ t: "link", href: link.dest, c: label.length ? label : [{ t: "text", text: link.dest }] });
+        } else buf += src.slice(at, link.end);
+        at = link.end;
+        continue;
+      }
+    }
+    if (ch === "*" || ch === "_" || ch === "~") {
+      const format = formatAt(src, at, depth);
+      if (format) {
+        flush();
+        out.push(format.node);
+        at = format.end;
+        continue;
+      }
+    }
+    if ((ch === "h" || ch === "H") && links) {
+      const url = bareUrlAt(src, at);
+      if (url) {
+        flush();
+        out.push({ t: "link", href: url.url, c: [{ t: "text", text: url.url }] });
+        at = url.end;
+        continue;
+      }
+    }
+    buf += ch;
+    at++;
+  }
+  flush();
+  return out;
+}
+
+const FENCE_OPEN = /^ {0,3}(`{3,}|~{3,})(.*)$/;
+const FENCE_CLOSE = /^ {0,3}(`{3,}|~{3,})[ \t]*$/;
+const HEADING = /^ {0,3}(#{1,6})[ \t]+(.*?)(?:[ \t]+#+)?[ \t]*$/;
+const RULE = /^ {0,3}([-*_])(?:[ \t]*\1){2,}[ \t]*$/;
+const QUOTE = /^ {0,3}>/;
+const LIST = /^( *)([-*+]|\d{1,9}[.)])[ \t]+(.*)$/;
+
+const isFenceOpen = (line: string): RegExpExecArray | null => {
+  const open = FENCE_OPEN.exec(line);
+  // A backtick fence's info string cannot hold a backtick; otherwise the line is inline code.
+  return open && !(open[1][0] === "`" && open[2].includes("`")) ? open : null;
+};
+const startsBlock = (line: string): boolean =>
+  !!isFenceOpen(line) || HEADING.test(line) || RULE.test(line) || QUOTE.test(line) || LIST.test(line);
+
+export function parseBlocks(lines: string[], depth = 0): ChatBlock[] {
+  const blocks: ChatBlock[] = [];
+  for (let at = 0; at < lines.length;) {
+    const line = lines[at];
+    if (!line.trim()) {
+      at++;
+      continue;
+    }
+    const open = isFenceOpen(line);
+    if (open) {
+      const mark = open[1][0];
+      const length = open[1].length;
+      const body: string[] = [];
+      for (at++; at < lines.length; at++) {
+        const close = FENCE_CLOSE.exec(lines[at]);
+        if (close && close[1][0] === mark && close[1].length >= length) {
+          at++;
+          break;
+        }
+        body.push(lines[at]);
+      }
+      blocks.push({ t: "code", text: body.join("\n") });
+      continue;
+    }
+    const heading = HEADING.exec(line);
+    if (heading) {
+      blocks.push({ t: "h", level: heading[1].length, c: parseInline(heading[2]) });
+      at++;
+      continue;
+    }
+    if (RULE.test(line)) {
+      blocks.push({ t: "hr" });
+      at++;
+      continue;
+    }
+    if (QUOTE.test(line)) {
+      const inner: string[] = [];
+      for (; at < lines.length && QUOTE.test(lines[at]); at++) inner.push(lines[at].replace(/^ {0,3}> ?/, ""));
+      blocks.push({
+        t: "quote",
+        c: depth < MAX_QUOTE_DEPTH ? parseBlocks(inner, depth + 1) : [{ t: "p", c: parseInline(inner.join("\n")) }]
+      });
+      continue;
+    }
+    if (LIST.test(line)) {
+      const rows: { level: number; ordered: boolean; text: string }[] = [];
+      while (at < lines.length) {
+        const row = lines[at];
+        if (!row.trim()) {
+          let next = at + 1;
+          while (next < lines.length && !lines[next].trim()) next++;
+          if (next < lines.length && LIST.test(lines[next])) {
+            at = next;
+            continue;
+          }
+          break;
+        }
+        const item = LIST.exec(row);
+        if (item) {
+          const ordered = /\d/.test(item[2]);
+          const level = item[1].length >= 2 ? 1 : 0;
+          // Another kind of marker at the top level starts a new list.
+          if (level === 0 && rows.length && ordered !== rows[0].ordered) break;
+          rows.push({ level, ordered, text: item[3] });
+        } else if (/^\s{2,}\S/.test(row) && rows.length) rows[rows.length - 1].text += `\n${row.trim()}`;
+        else break;
+        at++;
+      }
+      const list: Extract<ChatBlock, { t: "list" }> = { t: "list", ordered: rows[0].ordered, items: [] };
+      for (const row of rows) {
+        const top = list.items.at(-1);
+        if (row.level === 1 && top) {
+          top.sub ??= { t: "list", ordered: row.ordered, items: [] };
+          top.sub.items.push({ c: parseInline(row.text), sub: null });
+        } else list.items.push({ c: parseInline(row.text), sub: null });
+      }
+      blocks.push(list);
+      continue;
+    }
+    const paragraph = [line];
+    for (at++; at < lines.length && lines[at].trim() && !startsBlock(lines[at]); at++) paragraph.push(lines[at]);
+    blocks.push({ t: "p", c: parseInline(paragraph.join("\n")) });
+  }
+  return blocks;
+}
+
+export function parseChatMarkdown(text: string): ChatBlock[] {
+  return parseBlocks(text.replace(/\r\n?/g, "\n").split("\n"));
+}
+
+function renderInline(parent: HTMLElement, nodes: ChatInline[]): void {
+  for (const node of nodes) {
+    switch (node.t) {
+      case "text":
+        parent.createSpan({ text: node.text });
+        break;
+      case "br":
+        parent.createEl("br");
+        break;
+      case "code":
+        parent.createEl("code", { text: node.text });
+        break;
+      case "fmt":
+        renderInline(parent.createEl(node.tag), node.c);
+        break;
+      case "wiki":
+        parent.createEl("a", {
+          cls: "internal-link",
+          text: node.label,
+          attr: { "data-href": node.target, href: node.target }
+        });
+        break;
+      case "link":
+        renderInline(
+          parent.createEl("a", { cls: "external-link", attr: { href: node.href, target: "_blank", rel: "noopener" } }),
+          node.c
+        );
+        break;
+    }
+  }
+}
+
+function renderBlocks(parent: HTMLElement, blocks: ChatBlock[]): void {
+  for (const block of blocks) {
+    switch (block.t) {
+      case "p":
+        renderInline(parent.createEl("p"), block.c);
+        break;
+      case "h":
+        renderInline(parent.createEl(`h${block.level}` as "h1", { cls: "vam-map-chat-heading" }), block.c);
+        break;
+      case "hr":
+        parent.createEl("hr");
+        break;
+      case "code":
+        parent.createEl("pre").createEl("code", { text: block.text });
+        break;
+      case "quote":
+        renderBlocks(parent.createEl("blockquote"), block.c);
+        break;
+      case "list": {
+        const list = parent.createEl(block.ordered ? "ol" : "ul");
+        for (const item of block.items) {
+          const row = list.createEl("li");
+          renderInline(row, item.c);
+          if (item.sub) renderBlocks(row, [item.sub]);
+        }
+        break;
+      }
+    }
+  }
+}
+
+/** Replaces the children of `parent` with the reply laid out as a safe subset of Markdown. */
+export function renderChatMarkdown(parent: HTMLElement, text: string): void {
+  parent.empty();
+  renderBlocks(parent, parseChatMarkdown(text));
+}

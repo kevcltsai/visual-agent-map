@@ -1,7 +1,7 @@
-import { Component, Keymap, setIcon } from "obsidian";
+import { Keymap, setIcon } from "obsidian";
 import { t } from "../../i18n";
 import type { MapChatTurn } from "../../core/map-chat-context";
-import { sanitizeChatMarkdown } from "../../core/map-chat-markdown";
+import { renderChatMarkdown } from "../../core/map-chat-render";
 
 /** What the user attached to the next message. Topic chips come from a dragged card; snippets and files from a drop. */
 export type MapChatChip =
@@ -49,8 +49,6 @@ export interface MapChatHost {
   activeNotePath(): string | null;
   /** The note that is visible beside the map right now (the one a message would be sent with), or null. */
   visibleNotePath(): string | null;
-  /** Lays `text` out as Markdown into `el`; `owner` carries whatever the layout registers and is unloaded by the panel. */
-  renderMarkdown(text: string, el: HTMLElement, owner: Component): Promise<void>;
   /** Opens the note a `[[link]]` in a reply names (`newLeaf`: in a new tab). */
   openLink(href: string, newLeaf: boolean | "tab" | "split" | "window"): void;
   /** The element that has keyboard focus right now. */
@@ -133,8 +131,6 @@ export class MapChatPanel {
   private stopWatching: (() => void) | null = null;
   private messageEls: HTMLElement[] = [];
   private bodyEls: HTMLElement[] = [];
-  private markdownBodies: boolean[] = [];
-  private paints: { busy: boolean; pending: string | null; owner: Component | null }[] = [];
   /** The visible note the user took off the chip; it stays off until another note is visible. */
   private dismissedNote: string | null = null;
   private noteChip: string | null = null;
@@ -200,13 +196,6 @@ export class MapChatPanel {
   dispose(): void {
     this.stopWatching?.();
     this.stopWatching = null;
-    this.unloadOwners();
-  }
-  private unloadOwners(): void {
-    for (const state of this.paints) {
-      state.owner?.unload();
-      state.owner = null;
-    }
   }
   /** Takes the panel out of the page; the next {@link mount} puts it back with all state intact. */
   detach(): void {
@@ -230,7 +219,10 @@ export class MapChatPanel {
     if (open === this.open && !focus) return;
     this.open = open;
     this.applyOpen();
-    if (open) this.refreshControls();
+    if (open) {
+      this.refreshControls();
+      this.refreshNote();
+    }
     this.host.layoutChanged(open);
     if (!this.built) return;
     if (open && focus) this.inputEl.focus();
@@ -292,7 +284,7 @@ export class MapChatPanel {
     this.messages.push({ role: "assistant", text: "", lines: [], streaming: true });
     this.busy = true;
     if (this.built && !keepDraft) this.inputEl.value = "";
-    this.renderLog();
+    this.renderLog(true);
     this.renderBusy();
   }
   /** The answer so far (the whole text, not a delta). */
@@ -300,11 +292,11 @@ export class MapChatPanel {
     const last = this.messages.at(-1);
     if (!last || !last.streaming) return;
     last.text = text;
-    const index = this.messageEls.length - 1;
-    const body = this.bodyEls[index];
-    if (body && this.markdownBodies[index]) this.paintMarkdown(index, text);
-    else body?.setText(text);
-    this.scrollToEnd();
+    const body = this.bodyEls[this.bodyEls.length - 1];
+    if (!body) return;
+    const stick = this.atEnd();
+    renderChatMarkdown(body, text);
+    if (stick) this.scrollToEnd();
   }
   /** The turn ended with an answer and the outcome of each action. */
   finish(reply: string, lines: MapChatLine[]): void {
@@ -452,6 +444,8 @@ export class MapChatPanel {
       this.composing = false;
     });
     this.inputEl.addEventListener("keydown", event => this.onKey(event));
+    // The visible note can change without any event the view hears (a collapsed sidebar, say); focusing the field is the last look before typing.
+    this.inputEl.addEventListener("focus", () => this.refreshNote());
     for (const name of ["dragenter", "dragover"] as const)
       this.el.addEventListener(name, event => this.onDragOver(event));
     this.el.addEventListener("dragleave", () => this.setDropHighlight(false));
@@ -572,14 +566,12 @@ export class MapChatPanel {
     }
   }
 
-  private renderLog(): void {
+  private renderLog(forceEnd = false): void {
     if (!this.built) return;
+    const stick = forceEnd || this.atEnd();
     this.logEl.empty();
     this.messageEls = [];
     this.bodyEls = [];
-    this.markdownBodies = [];
-    this.unloadOwners();
-    this.paints = [];
     for (const message of this.messages) {
       const row = this.logEl.createDiv({
         cls: `vam-map-chat-msg is-${message.role}${message.error ? " is-error" : ""}`
@@ -590,11 +582,8 @@ export class MapChatPanel {
       });
       const markdown = message.role === "assistant" && !message.error;
       const body = row.createDiv({ cls: `vam-map-chat-text${markdown ? " is-markdown" : ""}` });
-      const index = this.messageEls.length;
       this.bodyEls.push(body);
-      this.markdownBodies.push(markdown);
-      this.paints.push({ busy: false, pending: null, owner: null });
-      if (markdown) this.paintMarkdown(index, message.text);
+      if (markdown) renderChatMarkdown(body, message.text);
       else body.setText(message.text);
       const asked = this.messages[this.messages.indexOf(message) - 1];
       if (
@@ -622,40 +611,7 @@ export class MapChatPanel {
       }
       this.messageEls.push(row);
     }
-    this.scrollToEnd();
-  }
-
-  /** Lays message `index` out as Markdown. One layout runs at a time per message; the newest text always gets its turn. */
-  private paintMarkdown(index: number, text: string): void {
-    const state = this.paints[index];
-    const body = this.bodyEls[index];
-    if (!state || !body) return;
-    if (state.busy) {
-      state.pending = text;
-      return;
-    }
-    state.busy = true;
-    // The log may be repainted while a layout is in flight; then this paint is stale and must not touch anything current.
-    const current = () => this.paints[index] === state && this.bodyEls[index] === body;
-    void (async () => {
-      let next: string | null = text;
-      while (next !== null && current()) {
-        const raw = next;
-        state.pending = null;
-        const owner = new Component();
-        owner.load();
-        state.owner?.unload();
-        state.owner = owner;
-        body.empty();
-        try {
-          await this.host.renderMarkdown(sanitizeChatMarkdown(raw), body, owner);
-        } catch {
-          if (current()) body.setText(raw);
-        }
-        next = state.pending;
-      }
-      state.busy = false;
-    })();
+    if (stick) this.scrollToEnd();
   }
 
   private renderBusy(): void {
@@ -668,6 +624,12 @@ export class MapChatPanel {
     this.stopEl.toggleClass("is-hidden", !this.busy);
   }
 
+  /** True when the log is scrolled to its end (or cannot be measured), so a longer reply should keep the end in view. */
+  private atEnd(): boolean {
+    if (!this.built) return true;
+    const gap = this.logEl.scrollHeight - this.logEl.scrollTop - this.logEl.clientHeight;
+    return !Number.isFinite(gap) || gap <= 8;
+  }
   private scrollToEnd(): void {
     if (this.built) this.logEl.scrollTop = this.logEl.scrollHeight;
   }

@@ -1141,6 +1141,21 @@
       "language": "zh-CN",
       "schema": false
     },
+    "map-chat.en": {
+      "builder": "core/map-chat-service.ts buildMapChatPrompt",
+      "language": "en",
+      "schema": true
+    },
+    "map-chat.zh": {
+      "builder": "core/map-chat-service.ts buildMapChatPrompt",
+      "language": "zh-TW",
+      "schema": true
+    },
+    "map-chat.zh-CN": {
+      "builder": "core/map-chat-service.ts buildMapChatPrompt",
+      "language": "zh-CN",
+      "schema": true
+    },
     "markdown-context.plan-image": {
       "builder": "markdown-context/action-plan.ts planPrompt with image (not localized)",
       "language": "none",

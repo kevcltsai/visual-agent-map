@@ -897,6 +897,14 @@ export class History<T extends { undo: () => Promise<void>; redo: () => Promise<
     return { epoch: this.epoch, dropped: this.dropped, length: this.past.length };
   }
   /**
+   * Drops the entries pushed since `mark`, so work done in between leaves no undo step; entries from before the mark stay.
+   * When the history was cleared since the mark, every entry now in it was pushed after the mark and is dropped.
+   */
+  discardSince(mark: HistoryMark): void {
+    const start = mark.epoch === this.epoch ? Math.max(0, mark.length - (this.dropped - mark.dropped)) : 0;
+    if (start < this.past.length) this.past.splice(start);
+  }
+  /**
    * Folds the entries pushed since `mark` into one undo step: undo runs them newest first, redo oldest first. Does
    * nothing when the history was cleared since the mark, or when fewer than two entries were pushed. Each entry's
    * undo/redo is read when it runs, so later patches to an entry (parkOnUndo) still apply.

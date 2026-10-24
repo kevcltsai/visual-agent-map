@@ -205,8 +205,15 @@ export class MapChatPanel {
     this.renderChips();
   }
   removeChip(chip: MapChatChip): void {
+    const at = this.chips.indexOf(chip);
     this.chips = this.chips.filter(other => other !== chip);
     this.renderChips();
+    if (at < 0 || !this.built) return;
+    // The removed chip took the keyboard focus with it: hand it to the next chip, else the previous one, else the field.
+    const buttons = this.chipsEl.querySelectorAll<HTMLElement>(".vam-map-chat-chip-remove");
+    const target = buttons[at] ?? buttons[at - 1];
+    if (target) target.focus();
+    else this.inputEl.focus();
   }
   /** The selection changed: repaint the reference chips. */
   refreshSelection(): void {
@@ -394,6 +401,7 @@ export class MapChatPanel {
     this.toggleEl.hidden = this.open;
     this.toggleEl.toggleClass("is-hidden", this.open);
     this.toggleEl.setAttr("aria-expanded", String(this.open));
+    this.toggleEl.setAttr("aria-label", t(this.open ? "ui.map_chat_close" : "ui.map_chat_open"));
   }
 
   private chipLabel(chip: MapChatChip): string {

@@ -17,7 +17,7 @@ const outline = [
   { id: 'a1', title: 'A1', summary: '', parentId: 'a', depth: 2 },
   { id: 'b', title: 'B', summary: 'B summary', parentId: 'r', depth: 1 }
 ];
-const topic = (id, extra = {}) => ({ id, title: id.toUpperCase(), summary: `${id} summary`, path: `Maps/Notes/${id}.md`, ...extra });
+const topic = (id, extra = {}) => ({ id, title: id.toUpperCase(), summary: `${id} summary`, detail: `${id} detail`, path: `Maps/Notes/${id}.md`, ...extra });
 const input = (extra = {}) => ({ mapTitle: 'Steak', outline, selected: [], references: [], snippets: [], files: [], activeFile: null, history: [], ...extra });
 const context = (extra = {}) => buildMapChatContext(input(extra));
 const request = (extra = {}) => ({ message: 'What is missing?', context: context(), language: 'en', model: 'claude:sonnet', reasoning: 'low', ...extra });
@@ -118,9 +118,19 @@ test('context builder carries selection with parent and children, references, ou
   assert.deepEqual(data.selected[0].parent, { id: 'r', title: 'Root' });
   assert.deepEqual(data.selected[0].children, [{ id: 'a1', title: 'A1' }]);
   assert.equal(data.selected[0].path, 'Maps/Notes/a.md');
-  assert.deepEqual(data.references[0], { id: 'b', title: 'B', summary: 'b summary', path: 'Maps/Notes/b.md' });
+  assert.deepEqual(data.references[0], { id: 'b', title: 'B', summary: 'b summary', detail: 'b detail', path: 'Maps/Notes/b.md' });
   assert.deepEqual(data.earlierTurns.map(turn => turn.text), ['turn 16', 'turn 17', 'turn 18', 'turn 19']);
   assert.deepEqual(plain(built.nodeIds).sort(), ['a', 'a1', 'b', 'r']);
+});
+test('F2: topicHashes cover every outline card (title, parent) and, for cards sent in full, summary and the Detail hash', () => {
+  const built = context({ selected: [topic('a')], references: [topic('b', { detail: '' })] });
+  const data = JSON.parse(built.json);
+  assert.equal(data.selected[0].detail, 'a detail', 'the whole Detail goes to the model');
+  assert.deepEqual(plain(built.topicHashes.a), { title: 'A', parentId: 'r', summary: 'a summary', detailHash: contentHash('a detail') });
+  assert.equal(built.topicHashes.b.detailHash, contentHash(''), 'an empty Detail still has a baseline');
+  assert.deepEqual(plain(built.topicHashes.r), { title: 'Root', parentId: null }, 'outline-only: no summary or Detail baseline');
+  assert.equal(built.topicHashes.a1.detailHash, undefined);
+  assert.deepEqual(Object.keys(built.topicHashes).sort(), ['a', 'a1', 'b', 'r']);
 });
 test('context builder does not cut a long snippet, file or active file, and hashes every full file', () => {
   const long = 'Long sentence number. '.repeat(400);
@@ -188,7 +198,6 @@ test('guard passes a legal edit and a legal create', () => {
   assert.equal(code(edit('Notes/a.md', 'old', 'new')), 'ok');
   assert.equal(code(edit('Topics/n.md', NOTE_TEXT, NOTE_TEXT.replace('Body', 'Changed body'))), 'ok');
   assert.equal(code(edit('Topics/n.md', NOTE_TEXT, NOTE_TEXT.replace('title: N', 'title: Renamed'))), 'ok');
-  assert.equal(code(edit('Maps/M.md', MAP_TEXT, MAP_TEXT.replace('"x": 0', '"x": 5'))), 'ok');
   assert.equal(code(create('Notes/new.md')), 'ok');
 });
 test('guard refuses the configuration folder, including a custom one', () => {
@@ -214,7 +223,27 @@ test('guard refuses a map file that no longer parses, and allows a map that stil
   assert.equal(code(edit('Maps/M.md', MAP_TEXT, MAP_TEXT.replace('"version": 1', '"version": 2'))), 'map_unparseable');
   assert.equal(code(edit('Maps/M.md', MAP_TEXT, MAP_TEXT.replace('"nodes": [', '"nodes": [,'))), 'map_unparseable');
   assert.equal(code(edit('Maps/M.md', MAP_TEXT, MAP_TEXT.replace('```agent-map', '```json'))), 'map_unparseable');
-  assert.equal(code(edit('Maps/M.md', MAP_TEXT, MAP_TEXT.replace('"title": "M"', '"title": "M2"'))), 'ok');
+  assert.equal(code(edit('Maps/M.md', MAP_TEXT, MAP_TEXT.replace('"title": "M"', '"title": "M2"'))), 'map_file', 'a valid edit of a map file is refused too (F6a)');
+});
+test('F6a: a map file is never edited, even by a change that keeps it valid; a map-marker note by frontmatter is a map file too', () => {
+  assert.equal(code(edit('Maps/M.md', MAP_TEXT, MAP_TEXT.replace('"x": 0', '"x": 5'))), 'map_file');
+  const framed = '---\nvisual-agent-map: true\n---\nText\n';
+  assert.notEqual(code(edit('Maps/F.md', framed, framed.replace('Text', 'More'))), 'ok', 'refused (as a map file that does not parse)');
+  assert.equal(code(edit('Notes/plain.md', 'plain', 'plain more')), 'ok', 'a legal edit of an ordinary note still passes');
+});
+test('F6b: a front matter that repeats an identity key is refused, before or after the edit', () => {
+  const dup = NOTE_TEXT.replace('node-id: n\n', 'node-id: n\nnode-id: other\n');
+  assert.equal(code(edit('Topics/n.md', dup, dup.replace('Body', 'Changed'))), 'duplicate_identity_key');
+  assert.equal(code(edit('Topics/n.md', NOTE_TEXT, NOTE_TEXT.replace('topic-id: m\n', 'topic-id: m\ntopic-id: z\n'))), 'duplicate_identity_key');
+  assert.equal(code(edit('Topics/n.md', NOTE_TEXT, NOTE_TEXT.replace('Body', 'Changed'))), 'ok');
+});
+test('F6c: an edit cannot turn an ordinary note into a topic note (adding an identity key), but a topic note keeps its keys', () => {
+  const plain = '---\ntitle: P\n---\nText\n';
+  for (const key of ['agent-map-node: true', 'node-id: x', 'topic-id: y'])
+    assert.equal(code(edit('Notes/p.md', plain, plain.replace('title: P', `title: P\n${key}`))), 'reserved_frontmatter', key);
+  assert.equal(code(edit('Notes/p.md', 'no front matter\n', '---\nnode-id: x\n---\nno front matter\n')), 'reserved_frontmatter');
+  assert.equal(code(edit('Notes/p.md', plain, plain.replace('title: P', 'title: Q'))), 'ok');
+  assert.equal(code(edit('Topics/n.md', NOTE_TEXT, NOTE_TEXT.replace('Body', 'Changed body'))), 'ok');
 });
 test('guard refuses removing or changing agent-map-node, node-id or topic-id of a topic note', () => {
   for (const [from, to] of [['agent-map-node: true\n', ''], ['node-id: n\n', ''], ['topic-id: m\n', ''], ['node-id: n', 'node-id: other'], ['topic-id: m', 'topic-id: "z"'], ['agent-map-node: true', 'agent-map-node: false']])

@@ -21,6 +21,8 @@ export interface MapChatTopicRef {
   id: string;
   title: string;
   summary: string;
+  /** The whole Detail text; sent to the model, and hashed as the baseline `edit_topic_note` is checked against. */
+  detail: string;
   path: string;
 }
 export interface MapChatSnippet {
@@ -60,6 +62,18 @@ export interface MapChatContext {
   parents: Record<string, string | null>;
   /** Normalised path -> content hash of every Markdown file sent whole in this turn. */
   mdHashes: Record<string, string>;
+  /** Card id -> what the model saw of that card this turn; the baseline every card action is checked against. */
+  topicHashes: Record<string, MapChatTopicHash>;
+}
+/**
+ * What the model was shown of one card. `title` and `parentId` come from the outline, so every card has them. `summary` and
+ * `detailHash` exist only for cards sent in full (selected or referenced): the outline clips the summary and has no Detail.
+ */
+export interface MapChatTopicHash {
+  title: string;
+  parentId: string | null;
+  summary?: string;
+  detailHash?: string;
 }
 
 /** 53-bit string hash (cyrb53) as hex. Not cryptographic; it only detects that a file changed since it was sent. */
@@ -91,6 +105,7 @@ const clip = (value: string, limit: number): string => {
 
 export function buildMapChatContext(input: MapChatContextInput): MapChatContext {
   const hashes: Record<string, string> = {};
+  const topicHashes: Record<string, MapChatTopicHash> = {};
   const byId = new Map(input.outline.map(node => [node.id, node]));
   const ids = new Set<string>(byId.keys());
   const children = new Map<string, string[]>();
@@ -103,10 +118,17 @@ export function buildMapChatContext(input: MapChatContextInput): MapChatContext 
   const topic = (ref: MapChatTopicRef, withLinks: boolean): Record<string, unknown> => {
     ids.add(ref.id);
     const node = byId.get(ref.id);
+    topicHashes[ref.id] = {
+      title: ref.title,
+      parentId: node?.parentId ?? null,
+      summary: ref.summary,
+      detailHash: contentHash(ref.detail)
+    };
     return {
       id: ref.id,
       title: ref.title,
       summary: ref.summary,
+      detail: ref.detail,
       path: ref.path,
       ...(withLinks
         ? {
@@ -116,6 +138,7 @@ export function buildMapChatContext(input: MapChatContextInput): MapChatContext 
         : {})
     };
   };
+  for (const node of input.outline) topicHashes[node.id] = { title: node.title, parentId: node.parentId };
   const record = (path: string, content: string): string | null => {
     const key = normalizeVaultPath(path);
     if (key === null) return null;
@@ -171,6 +194,7 @@ export function buildMapChatContext(input: MapChatContextInput): MapChatContext 
     json,
     nodeIds: [...ids],
     parents: Object.fromEntries(input.outline.map(node => [node.id, node.parentId])),
-    mdHashes: hashes
+    mdHashes: hashes,
+    topicHashes
   };
 }

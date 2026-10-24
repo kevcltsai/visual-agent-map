@@ -10,7 +10,7 @@ const { element, find, findAll, byLabel, tick } = dom;
 
 const eq = (actual, expected, message) => assert.deepEqual(plain(actual), plain(expected), message);
 const MAP = 'Agent Workspace/Topics/map-a/Map.md';
-const { contentHash } = load('core/map-chat-context.ts');
+const { contentHash, buildMapChatContext } = load('core/map-chat-context.ts');
 
 // ---- panel on its own -------------------------------------------------------------------------------------------
 
@@ -38,7 +38,7 @@ function panelFixture(overrides = {}) {
   const parts = {
     toggle: () => find(panel.el, i => i.tag === 'button' && hasClass(i, 'vam-map-chat-toggle')),
     input: () => panel.inputEl, log: () => panel.logEl, chips: () => panel.chipsEl, status: () => panel.statusEl,
-    send: () => byLabel(panel.el, 'Send'), stop: () => byLabel(panel.el, 'Stop'), close: () => byLabel(panel.el, 'Close AI chat'),
+    send: () => byLabel(panel.el, 'Send'), stop: () => byLabel(panel.el, 'Stop'), close: () => byLabel(panel.bodyEl, 'Close AI chat'),
     chipTexts: () => findAll(panel.chipsEl, i => hasClass(i, 'vam-map-chat-chip-label')).map(i => i.text)
   };
   return { panel, overlay, calls, page: p, parts, select: ids => { selected = ids; panel.refreshSelection(); } };
@@ -72,6 +72,30 @@ test('map chat: starts collapsed at the bottom left with labelled controls; open
   f.parts.close().click();
   assert.equal(f.panel.isOpen, false); eq(f.calls.layout, [true, false]);
   assert.equal(f.page.doc.activeElement, toggle, 'closing returns the keyboard to the button that opens it');
+});
+
+test('map chat: the toggle button\'s label and aria-expanded follow the open state', () => {
+  const f = panelFixture(); const toggle = f.parts.toggle();
+  assert.equal(toggle.attrs['aria-label'], 'Open AI chat'); assert.equal(toggle.attrs['aria-expanded'], 'false');
+  f.panel.setOpen(true);
+  assert.equal(toggle.attrs['aria-label'], 'Close AI chat'); assert.equal(toggle.attrs['aria-expanded'], 'true');
+  f.panel.setOpen(false);
+  assert.equal(toggle.attrs['aria-label'], 'Open AI chat'); assert.equal(toggle.attrs['aria-expanded'], 'false');
+});
+
+test('map chat: removing a chip moves focus to the next chip\'s remove button, else the previous one, else the message field', () => {
+  const f = panelFixture(); f.panel.setOpen(true);
+  for (const id of ['a', 'b']) f.panel.addTopicReference(id);
+  f.panel.addSnippet('third', 'Notes/x.md', false);
+  const removes = () => findAll(f.panel.chipsEl, i => hasClass(i, 'vam-map-chat-chip-remove'));
+  const focused = () => f.page.doc.activeElement;
+  assert.equal(removes().length, 3);
+  removes()[1].click(); // middle: focus goes to what is now at its place (the third chip)
+  assert.equal(removes().length, 2); assert.equal(focused(), removes()[1]);
+  removes()[1].click(); // last: previous
+  assert.equal(removes().length, 1); assert.equal(focused(), removes()[0]);
+  removes()[0].click(); // only one: the message field
+  assert.equal(removes().length, 0); assert.equal(focused(), f.parts.input());
 });
 
 test('map chat: Enter sends, Shift+Enter and an IME confirmation do not, Escape collapses and keeps the draft', () => {
@@ -211,7 +235,7 @@ async function harness({ aim = false } = {}) {
   let queue = Promise.resolve();
   const ctx = {};
   const plugin = withExpansionCoordinator({
-    repo, settings, running: new Set(), logs: { appendLog() {} }, rebuildDerivedData: () => repo.rebuildDerivedData(), relevanceGrades: new Map(), releaseOutline() {}, syncOutline() {}, setOutlineActive() {},
+    repo, settings, running: new Set(), views: () => ctx.otherViews ?? [], logs: { appendLog() {} }, rebuildDerivedData: () => repo.rebuildDerivedData(), relevanceGrades: new Map(), releaseOutline() {}, syncOutline() {}, setOutlineActive() {},
     pendingSuggestions: new Map(), pendingResearchOptions: new Map(), detailsShown: () => false,
     // Like the real mutate: a promise queue that is not re-entrant. A call made from inside a running write waits for it, forever.
     mutate(work) {
@@ -264,12 +288,24 @@ async function harness({ aim = false } = {}) {
 }
 // Every wait on the view is bounded: a mutate made from inside a mutate never returns, and must fail the test, not hang it.
 const withTimeout = (promise, ms = 1500) => { let timer; return Promise.race([promise, new Promise((_, reject) => { timer = setTimeout(() => reject(new Error('timed out (deadlock?)')), ms); })]).finally(() => clearTimeout(timer)); };
-const apply = (h, actions, hashes = {}, alive) => withTimeout(h.view.applyMapChatActions({ actions, rejected: [] }, hashes, alive));
+// The default baseline is a context sent right now with every card in full (selected), so only a real change since then is stale.
+const topicBaseline = (h, { full = true } = {}) => {
+  const state = id => h.view.chatTopicState(id);
+  const outline = h.view.map.nodes.map(n => ({ id: n.id, title: state(n.id).title, summary: state(n.id).summary, parentId: n.parentId, depth: 0 }));
+  const selected = full ? h.view.map.nodes.map(n => ({ id: n.id, ...state(n.id), path: n.path })) : [];
+  return buildMapChatContext({ mapTitle: 'm', outline, selected, references: [], snippets: [], files: [], history: [] }).topicHashes;
+};
+const NOT_UNDOABLE = 'These changes cannot be undone; the undo history was cleared.';
+// Resolves with the action lines; the closing "cannot be undone" line is left out and reported as `.notice` (true when it was there).
+const apply = async (h, actions, hashes = {}, alive, topicHashes) => {
+  const all = await withTimeout(h.view.applyMapChatActions({ actions, rejected: [] }, { mdHashes: hashes, topicHashes: topicHashes ?? topicBaseline(h) }, alive));
+  const lines = all.filter(l => l.text !== NOT_UNDOABLE); lines.notice = lines.length !== all.length;
+  return lines;
+};
 
-integrationTest('map chat: one reply applies add_child, rename_topic, move_topic and edit_md_file in order, each in its own mutate, and leaves no undo step', async () => {
+integrationTest('map chat: one reply applies add_child, rename_topic, move_topic and edit_md_file in order, each in its own mutate, and clears the undo history', async () => {
   const h = await harness(); await h.view.hydrate();
   h.view.history.push({ undo: async () => {}, redo: async () => {}, label: 'earlier' });
-  const entry = h.view.history.undoEntry;
   h.control.mutates = 0;
   const lines = await withTimeout(apply(h, [
     { kind: 'add_child', parentId: h.ids.b, title: 'Dreams', summary: 'What we dream' },
@@ -283,27 +319,125 @@ integrationTest('map chat: one reply applies add_child, rename_topic, move_topic
   assert.ok(dreams, 'the new subtopic is under Mind'); assert.equal((await h.repo.readNote(dreams.path)).title, 'Dreams'); assert.equal((await h.repo.readNote(dreams.path)).summary, 'What we dream');
   assert.equal((await h.note('a')).title, 'Body clock'); assert.equal(nodes.find(n => n.id === h.ids.c).parentId, h.ids.b);
   assert.equal(h.contents.get('Notes/Research.md'), '# Research\n\nSleep needs total darkness.\nSleep needs quiet.\n');
-  assert.equal(h.view.history.undoEntry, entry, 'the undo history is what it was before the reply');
+  assert.equal(h.view.history.undoEntry, undefined, 'a chat write leaves nothing to undo'); assert.equal(lines.notice, true, 'the reply says so');
   eq(lines.map(l => l.text.split(':')[0]), ['Done', 'Done', 'Done', 'Done']);
 });
 
-integrationTest('map chat: control - without discarding, the same reply would leave undo steps (the undo test can fail)', async () => {
+// F1 (reviewer R1): an undo entry holds the map as it was before the chat wrote, so undoing it after the chat renamed files and moved cards
+// puts the map out of step with the notes (an orphan file, a parent that no longer exists, "File not found"). The history is cleared instead.
+integrationTest('map chat: F1 - a card drag, then a chat write, then Undo: nothing is left to undo, and the map and the files stay in step', async () => {
   const h = await harness(); await h.view.hydrate();
-  const entry = h.view.history.undoEntry;
-  h.view.history.discardSince = () => {};
-  await apply(h, [{ kind: 'rename_topic', nodeId: h.ids.a, title: 'Renamed' }]);
-  assert.notEqual(h.view.history.undoEntry, entry, 'the write pushed an entry; only discardSince removes it');
-  const clean = await harness(); await clean.view.hydrate(); const before = clean.view.history.undoEntry;
-  await apply(clean, [{ kind: 'rename_topic', nodeId: clean.ids.a, title: 'Renamed' }]);
-  assert.equal(clean.view.history.undoEntry, before);
+  const dragged = { snapshot: true, undo: async () => { throw new Error('File not found (a stale snapshot was restored)'); }, redo: async () => {}, label: 'drag card' };
+  h.view.history.push(dragged);
+  assert.equal(h.view.history.undoEntry, dragged);
+  const lines = await apply(h, [{ kind: 'add_child', parentId: h.ids.b, title: 'Dreams', summary: '' }, { kind: 'move_topic', nodeId: h.ids.c, newParentId: h.ids.b }]);
+  eq(lines.map(l => l.status), ['done', 'done']);
+  assert.equal(h.view.history.undoEntry, undefined, 'the earlier snapshot entry is gone');
+  assert.equal(h.view.history.undo(), undefined, 'Undo has nothing to run');
+  const nodes = await h.saved();
+  for (const n of nodes) assert.ok(h.files.has(n.path), `${n.path} exists`);
+  assert.ok(nodes.some(n => n.parentId === h.ids.b && n.id !== h.ids.c), 'the new card is on the saved map');
+  assert.equal(nodes.find(n => n.id === h.ids.c).parentId, h.ids.b);
 });
 
-integrationTest('map chat: discarding drops only the chat\'s own steps; earlier undo entries stay undoable', async () => {
+integrationTest('map chat: F1 - other views of the same map lose their undo history too; a view of another map keeps it; skipped writes clear nothing', async () => {
   const h = await harness(); await h.view.hydrate();
-  await h.view.noteChange(h.node('a'), { title: 'User rename' });
-  const mine = h.view.history.undoEntry; assert.ok(mine);
-  await apply(h, [{ kind: 'add_child', parentId: h.ids.a, title: 'X', summary: '' }, { kind: 'update_summary', nodeId: h.ids.b, summary: 'New' }]);
-  assert.equal(h.view.history.undoEntry, mine, 'the user\'s own earlier step is still the one Undo takes');
+  const other = { path: MAP, history: new (load('map-model.ts').History)() }; const elsewhere = { path: 'Other/Map.md', history: new (load('map-model.ts').History)() };
+  const entry = { undo: async () => {}, redo: async () => {}, label: 'x' };
+  other.history.push(entry); elsewhere.history.push(entry); h.view.history.push(entry);
+  h.view.ctxOther = [other, elsewhere]; h.plugin.views = () => [h.view, other, elsewhere];
+  const none = await apply(h, [{ kind: 'rename_topic', nodeId: 'zzz', title: 'Nope' }]);
+  eq(none.map(l => l.status), ['skipped']); assert.equal(none.notice, false);
+  assert.equal(h.view.history.undoEntry, entry, 'nothing was written, so nothing was cleared');
+  await apply(h, [{ kind: 'rename_topic', nodeId: h.ids.a, title: 'Renamed' }]);
+  assert.equal(h.view.history.undoEntry, undefined); assert.equal(other.history.undoEntry, undefined); assert.equal(elsewhere.history.undoEntry, entry);
+});
+
+integrationTest('map chat: F1 (reviewer probe) - a card moved by the user, then a chat reply that adds, moves and deletes cards: Undo cannot restore a map that points at missing files', async () => {
+  const h = await harness(); await h.view.hydrate();
+  await h.plugin.mutate(() => h.view.mapChange(map => { map.nodes.find(n => n.id === h.ids.b).x += 50; }));
+  assert.ok(h.view.history.undoEntry, 'the user\'s drag made a snapshot entry');
+  await apply(h, [
+    { kind: 'add_child', parentId: h.ids.b, title: 'Dreams', summary: '' },
+    { kind: 'move_topic', nodeId: h.ids.c, newParentId: h.ids.b },
+    { kind: 'delete_topic', nodeId: h.ids.a, branch: false }
+  ]);
+  assert.equal(h.view.history.undoEntry, undefined, 'there is no entry left to restore the pre-chat snapshot');
+  const after = await h.saved();
+  for (const n of after) assert.ok(h.app.vault.getAbstractFileByPath(n.path), `${n.path} exists`);
+  assert.ok(!after.some(n => n.id === h.ids.a), 'the deleted card stays off the map');
+});
+
+integrationTest('map chat: F2 - edit_topic_note needs the card\'s Detail baseline: a card seen only in the outline is never overwritten', async () => {
+  const h = await harness(); await h.view.hydrate();
+  await h.repo.updateNote(h.node('a').path, { detail: 'Original body' }); await h.view.hydrate();
+  const act = [{ kind: 'edit_topic_note', nodeId: h.ids.a, detail: 'Replaced by the AI' }];
+  const blind = await apply(h, act, {}, undefined, topicBaseline(h, { full: false }));
+  eq(blind.map(l => l.status), ['skipped']); assert.match(blind[0].text, /was not shown/);
+  assert.notEqual((await h.note('a')).detail.trim(), 'Replaced by the AI'); assert.equal(blind.notice, false);
+  const seen = await apply(h, act);
+  eq(seen.map(l => l.status), ['done']); assert.equal((await h.note('a')).detail.trim(), 'Replaced by the AI');
+});
+
+integrationTest('map chat: F2 - the Detail changed after the message was sent, so edit_topic_note is skipped and the new text stays', async () => {
+  const h = await harness(); await h.view.hydrate();
+  await h.repo.updateNote(h.node('a').path, { detail: 'Original body' }); await h.view.hydrate();
+  const baseline = topicBaseline(h);
+  await h.repo.updateNote(h.node('a').path, { detail: 'User typed this meanwhile' }); await h.view.hydrate();
+  const lines = await apply(h, [{ kind: 'edit_topic_note', nodeId: h.ids.a, detail: 'AI text' }], {}, undefined, baseline);
+  eq(lines.map(l => l.status), ['skipped']); assert.match(lines[0].text, /changed after you sent/);
+  assert.equal((await h.note('a')).detail.trim(), 'User typed this meanwhile');
+});
+
+integrationTest('map chat: F3 - the summary changed while the AI was replying: that action is skipped, the others still apply', async () => {
+  const h = await harness(); await h.view.hydrate();
+  const baseline = topicBaseline(h);
+  await h.repo.updateNote(h.node('a').path, { summary: 'User wrote this summary' }); await h.view.hydrate();
+  const lines = await apply(h, [
+    { kind: 'update_summary', nodeId: h.ids.a, summary: 'AI summary' },
+    { kind: 'rename_topic', nodeId: h.ids.b, title: 'Mind work' }
+  ], {}, undefined, baseline);
+  eq(lines.map(l => l.status), ['skipped', 'done']); assert.match(lines[0].text, /changed after you sent/);
+  assert.equal((await h.note('a')).summary, 'User wrote this summary'); assert.equal((await h.note('b')).title, 'Mind work');
+});
+
+integrationTest('map chat: F3 - a changed title or parent makes rename, move and delete stale; an outline-only card is judged by title and parent only', async () => {
+  const h = await harness(); await h.view.hydrate();
+  const baseline = topicBaseline(h, { full: false });
+  await h.repo.updateNote(h.node('a').path, { summary: 'Edited summary' }); await h.view.hydrate();
+  const ok = await apply(h, [{ kind: 'rename_topic', nodeId: h.ids.a, title: 'Body clock' }], {}, undefined, baseline);
+  eq(ok.map(l => l.status), ['done'], 'the summary was never shown in full, so it is not compared');
+  const base2 = topicBaseline(h);
+  await h.repo.updateNote(h.node('b').path, { title: 'Mind renamed by user' }); await h.view.hydrate();
+  await h.plugin.mutate(() => h.view.mapChange(map => { map.nodes.find(n => n.id === h.ids.c).parentId = h.ids.b; })); await h.view.hydrate();
+  const lines = await apply(h, [
+    { kind: 'rename_topic', nodeId: h.ids.b, title: 'X' },
+    { kind: 'move_topic', nodeId: h.ids.c, newParentId: h.ids.root },
+    { kind: 'delete_topic', nodeId: h.ids.c, branch: false }
+  ], {}, undefined, base2);
+  eq(lines.map(l => l.status), ['skipped', 'skipped', 'skipped'], JSON.stringify(lines));
+  assert.equal(h.node('c').parentId, h.ids.b);
+});
+
+integrationTest('map chat: F3 - two actions on the same card in one reply are not mistaken for a user edit', async () => {
+  const h = await harness(); await h.view.hydrate();
+  const lines = await apply(h, [{ kind: 'rename_topic', nodeId: h.ids.a, title: 'Body clock' }, { kind: 'update_summary', nodeId: h.ids.a, summary: 'Rhythm' }, { kind: 'edit_topic_note', nodeId: h.ids.a, detail: 'Fresh body' }]);
+  eq(lines.map(l => l.status), ['done', 'done', 'done'], JSON.stringify(lines));
+});
+
+integrationTest('map chat: F4 - a chat-started expand asks the confirmation of the card\'s own model first; when it is declined no AI call is made', async () => {
+  const h = await harness(); await h.view.hydrate();
+  const readNote = h.repo.readNote.bind(h.repo); h.repo.readNote = async (...args) => ({ ...(await readNote(...args)), model: 'claude:opus' }); // a card with its own model
+  const models = []; let proposed = 0;
+  h.plugin.confirmAiUsage = async (model, run) => { models.push(model); h.control.calls.push('confirm'); if (h.control.decline) return false; await run(); return true; };
+  h.view.proposeChildren = async () => { proposed++; };
+  const act = [{ kind: 'run_map_action', action: 'expand', nodeIds: [h.ids.a], title: '', goal: '', direction: '' }];
+  h.control.decline = true;
+  const declined = await apply(h, act); eq(declined.map(l => l.status), ['done']);
+  for (let i = 0; i < 10; i++) await tick();
+  eq(models, ['claude:opus'], 'asked once, for the card\'s own model, not the chat model'); assert.equal(proposed, 0, 'declined: askModel path never starts');
+  h.control.decline = false;
+  await apply(h, act); await withTimeout(until(() => proposed === 1));
 });
 
 integrationTest('map chat: a stale Markdown file is skipped with its reason, nothing is written to it, and the other actions still run', async () => {
@@ -514,7 +648,7 @@ integrationTest('map chat: sending asks for usage consent first, builds the cont
   assert.equal(context.activeFile.path, 'Notes/Other.md'); assert.equal(context.outline.length, 4);
   eq(seen, ['Thinking', 'Thinking harder'], 'the answer streams into the last message');
   const turn = chat.transcript(); assert.equal(turn.at(-1).text, 'Renamed it.');
-  eq(turn.at(-1).lines.map(l => l.status), ['done', 'done'], JSON.stringify(turn.at(-1).lines));
+  eq(turn.at(-1).lines.map(l => l.status), ['done', 'done', 'done'], JSON.stringify(turn.at(-1).lines)); assert.equal(turn.at(-1).lines.at(-1).text, NOT_UNDOABLE);
   assert.equal((await h.note('b')).title, 'Mind work'); assert.match(h.contents.get('Notes/Research.md'), /needs calm/);
   assert.equal(chat.isBusy, false); assert.equal(h.plugin.activeTasks.size, 0, 'the task key is released');
   assert.equal(chat.draft, '');

@@ -4,7 +4,7 @@ Action kinds (fill only the fields of the kind; every other field must be an emp
 - add_child: add a new child card. Fields: parentId (an existing card id), title (short plain text), summary (optional one-sentence summary).
 - rename_topic: nodeId, title (the new title).
 - update_summary: nodeId, summary (the full new summary).
-- edit_topic_note: nodeId, detail (the full new note body of that card, replacing the old body).
+- edit_topic_note: nodeId, detail (the full new note body of that card, replacing the old body). Only for a card listed under "selected" or "references", whose current "detail" you were given; never for a card that only appears in the outline. Start from the supplied detail and keep what the user did not ask to change.
 - move_topic: nodeId, newParentId. Never move a card under itself or its own descendant.
 - delete_topic: nodeId, branch (true to take the whole branch with it). The card is moved to Unassigned, not erased.
 - edit_md_file: path, find, replace. Replaces the one exact occurrence of "find" in the Markdown file at "path". "find" must appear exactly once in that file as supplied below, so copy enough surrounding text to make it unique. Only files listed under "files" or "snippets" with a content hash can be edited.

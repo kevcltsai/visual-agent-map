@@ -124,8 +124,11 @@ import { RelevanceSummaryModal } from "./relevance-summary-modal";
 import { MapChatPanel, type MapChatChip, type MapChatHost, type MapChatLine } from "./map-chat";
 import {
   buildMapChatContext,
+  contentHash,
   isMdStale,
+  type MapChatContext,
   type MapChatOutlineNode,
+  type MapChatTopicHash,
   type MapChatTopicRef
 } from "../../core/map-chat-context";
 import { applyMdEdit, guardMapChatWrite, normalizeVaultPath, type MapChatGuardCode } from "../../core/map-chat-guard";
@@ -438,6 +441,8 @@ const GUARD_REASON: Record<MapChatGuardCode, TranslationKey> = {
   config_dir: "ui.map_chat_guard_config_dir",
   not_markdown: "ui.map_chat_guard_not_markdown",
   map_unparseable: "ui.map_chat_guard_map_unparseable",
+  map_file: "ui.map_chat_guard_map_file",
+  duplicate_identity_key: "ui.map_chat_guard_duplicate_identity_key",
   topic_identity_changed: "ui.map_chat_guard_topic_identity_changed",
   reserved_frontmatter: "ui.map_chat_guard_reserved_frontmatter",
   exists: "ui.map_chat_guard_exists",
@@ -10043,15 +10048,62 @@ export class VisualAgentMapView extends ItemView {
     const editor = this.openMarkdownEditor(file.path);
     return { file, editor, text: editor ? editor.getValue() : await this.app.vault.read(file) };
   }
+  /** What a chat turn sees of a card right now: the values the turn's baseline hashes are compared with. */
+  private chatTopicState(
+    id: string
+  ): { title: string; summary: string; detail: string; parentId: string | null } | null {
+    const node = this.map?.nodes.find(item => item.id === id);
+    if (!node) return null;
+    const note = this.notes.get(id);
+    const summary = note?.summary ?? "";
+    return {
+      title: note?.title ?? node.path,
+      summary: isPlaceholder(summary) ? "" : summary,
+      detail: note?.detail ?? "",
+      parentId: node.parentId
+    };
+  }
+  /**
+   * The reason to skip a card action, or null when the card is as the model saw it. Title and parent are always compared;
+   * the summary and the Detail text only when the card was sent in full. `edit_topic_note` replaces the whole body, so it
+   * needs a Detail baseline: a card the model saw only in the outline is never overwritten.
+   */
+  private chatTopicStale(
+    id: string,
+    topicHashes: Readonly<Record<string, MapChatTopicHash>>,
+    needsDetail = false
+  ): ChatOutcome | null {
+    const seen = Object.prototype.hasOwnProperty.call(topicHashes, id) ? topicHashes[id] : undefined;
+    const now = this.chatTopicState(id);
+    if (!seen || !now) return skipped("ui.map_chat_skip_topic_changed");
+    if (needsDetail && seen.detailHash === undefined) return skipped("ui.map_chat_skip_topic_not_seen");
+    if (
+      seen.title !== now.title ||
+      seen.parentId !== now.parentId ||
+      (seen.summary !== undefined && seen.summary !== now.summary) ||
+      (seen.detailHash !== undefined && seen.detailHash !== contentHash(now.detail))
+    )
+      return skipped("ui.map_chat_skip_topic_changed");
+    return null;
+  }
+  /** After this reply's own write to a card, its baseline follows, so a second action in the same reply is not mistaken for a user edit. */
+  private chatTopicAccept(id: string, topicHashes: Record<string, MapChatTopicHash>): void {
+    const seen = topicHashes[id];
+    const now = this.chatTopicState(id);
+    if (!seen || !now) return;
+    topicHashes[id] = {
+      title: now.title,
+      parentId: now.parentId,
+      ...(seen.summary !== undefined ? { summary: now.summary } : {}),
+      ...(seen.detailHash !== undefined ? { detailHash: contentHash(now.detail) } : {})
+    };
+  }
   private async buildChatRequest(message: string, chat: MapChatPanel): Promise<MapChatRequest> {
     const map = this.map!;
     const settings = this.plugin.settings;
     const byId = new Map(map.nodes.map(node => [node.id, node]));
-    const summaryOf = (id: string): string => {
-      const summary = this.notes.get(id)?.summary ?? "";
-      return isPlaceholder(summary) ? "" : summary;
-    };
-    const titleOf = (node: MapNode): string => this.notes.get(node.id)?.title ?? node.path;
+    const summaryOf = (id: string): string => this.chatTopicState(id)?.summary ?? "";
+    const titleOf = (node: MapNode): string => this.chatTopicState(node.id)?.title ?? node.path;
     const depthOf = (node: MapNode): number => {
       const seen = new Set<string>([node.id]);
       let depth = 0;
@@ -10070,7 +10122,15 @@ export class VisualAgentMapView extends ItemView {
     }));
     const ref = (id: string): MapChatTopicRef | null => {
       const node = byId.get(id);
-      return node ? { id, title: titleOf(node), summary: summaryOf(id), path: node.path } : null;
+      return node
+        ? {
+            id,
+            title: titleOf(node),
+            summary: summaryOf(id),
+            detail: this.notes.get(id)?.detail ?? "",
+            path: node.path
+          }
+        : null;
     };
     const notNull = <T>(value: T | null): value is T => value !== null;
     const selectedIds = this.chatSelectionIds();
@@ -10157,7 +10217,7 @@ export class VisualAgentMapView extends ItemView {
           if (alive()) chat.streamReply(text);
         });
         if (!alive()) return;
-        const lines = await this.applyMapChatActions(result, request.context.mdHashes, alive);
+        const lines = await this.applyMapChatActions(result, request.context, alive);
         if (alive() && chat.isBusy) chat.finish(result.reply, lines);
       } catch (error) {
         if (alive()) chat.fail(this.chatErrorText(error));
@@ -10243,15 +10303,17 @@ export class VisualAgentMapView extends ItemView {
    */
   async applyMapChatActions(
     result: Pick<MapChatResult, "actions" | "rejected">,
-    mdHashes: Readonly<Record<string, string>>,
+    baseline: Pick<MapChatContext, "mdHashes" | "topicHashes">,
     alive: () => boolean = () => true
   ): Promise<MapChatLine[]> {
     const mapPath = this.path;
     const mapId = this.map?.id;
     const same = (): boolean => !this.closed && alive() && this.path === mapPath && this.map?.id === mapId;
     const lines: MapChatLine[] = [];
-    const mark = this.history.mark();
     const later: number[] = [];
+    let wrote = false;
+    // Copied: the turn's own writes move the baseline along, the request's context stays as it was sent.
+    const own = { mdHashes: baseline.mdHashes, topicHashes: { ...baseline.topicHashes } };
     try {
       for (const [index, action] of result.actions.entries()) {
         if (action.kind === "select_topics" || action.kind === "run_map_action") {
@@ -10266,17 +10328,23 @@ export class VisualAgentMapView extends ItemView {
         const box: { outcome: ChatOutcome } = { outcome: { status: "done" } };
         try {
           await this.plugin.mutate(async () => {
-            box.outcome = await this.applyChatWrite(action, mdHashes, same);
+            box.outcome = await this.applyChatWrite(action, own, same);
           });
         } catch (error) {
           box.outcome = { status: "failed", reason: errorMessage(error) };
         }
+        if (box.outcome.status !== "skipped") wrote = true;
         lines[index] = this.chatLine(label, box.outcome);
       }
     } finally {
-      // The chat's own writes are not undoable (the owner's choice): drop whatever they pushed.
-      this.history.discardSince(mark);
-      this.updateHistoryButtons();
+      // The chat's own writes are not undoable (the owner's choice). Undo entries hold snapshots of the map from before
+      // the write, so any entry that survived would put the map back out of step with the notes the chat wrote or moved.
+      // Drop the history here and in every other view of the same map, like any other change made outside the view.
+      if (wrote) {
+        this.history.clear();
+        for (const view of this.plugin.views()) if (view !== this && view.path === mapPath) view.history.clear();
+        this.updateHistoryButtons();
+      }
     }
     for (const index of later) {
       const action = result.actions[index];
@@ -10297,14 +10365,16 @@ export class VisualAgentMapView extends ItemView {
     const all = [...lines];
     if (result.rejected.length)
       all.push({ status: "skipped", text: t("ui.map_chat_rejected_0", result.rejected.length) });
+    if (wrote) all.push({ status: "done", text: t("ui.map_chat_not_undoable") });
     return all;
   }
   /** One write action. Runs inside `plugin.mutate`: it must not queue another one. */
   private async applyChatWrite(
     action: Exclude<MapChatAction, { kind: "select_topics" | "run_map_action" }>,
-    hashes: Readonly<Record<string, string>>,
+    baseline: Pick<MapChatContext, "mdHashes" | "topicHashes">,
     same: () => boolean
   ): Promise<ChatOutcome> {
+    const hashes = baseline.mdHashes;
     if (!same() || !this.map) return skipped("ui.map_chat_skip_map_changed");
     const nodeOf = (id: string): MapNode | undefined => this.map?.nodes.find(item => item.id === id);
     const gone = skipped("ui.map_chat_skip_topic_gone");
@@ -10328,6 +10398,8 @@ export class VisualAgentMapView extends ItemView {
         const node = nodeOf(action.nodeId);
         if (!node) return gone;
         if (this.isMerging(node.id)) return skipped("ui.map_chat_skip_merge_locked");
+        const changed = this.chatTopicStale(node.id, baseline.topicHashes, action.kind === "edit_topic_note");
+        if (changed) return changed;
         await this.noteChange(
           node,
           action.kind === "rename_topic"
@@ -10336,6 +10408,7 @@ export class VisualAgentMapView extends ItemView {
               ? { summary: action.summary }
               : { detail: action.detail }
         );
+        this.chatTopicAccept(node.id, baseline.topicHashes);
         return done;
       }
       case "move_topic": {
@@ -10343,14 +10416,19 @@ export class VisualAgentMapView extends ItemView {
         const parent = nodeOf(action.newParentId);
         if (!node || !parent) return gone;
         if (this.isMerging(node.id) || this.isMerging(parent.id)) return skipped("ui.map_chat_skip_merge_locked");
+        const changed = this.chatTopicStale(node.id, baseline.topicHashes);
+        if (changed) return changed;
         if (!canParent(this.map.nodes, node.id, parent.id)) return skipped("ui.map_chat_skip_cycle");
         await this.moveTopic(node, parent);
+        this.chatTopicAccept(node.id, baseline.topicHashes);
         return done;
       }
       case "delete_topic": {
         const node = nodeOf(action.nodeId);
         if (!node) return gone;
         if (this.isMerging(node.id)) return skipped("ui.map_chat_skip_merge_locked");
+        const changed = this.chatTopicStale(node.id, baseline.topicHashes);
+        if (changed) return changed;
         await this.removeToUnassigned(node, action.branch);
         return done;
       }
@@ -10464,17 +10542,22 @@ export class VisualAgentMapView extends ItemView {
           .map(id => this.map?.nodes.find(node => node.id === id))
           .filter((node): node is MapNode => !!node);
         if (!parents.length) return skipped("ui.map_chat_skip_unavailable");
-        // The chat request is the confirmation: every suggestion is created, without the review dialog.
+        // The chat request is the confirmation of the changes, not of the AI call: each parent asks for its own model's
+        // usage notice first, like the expand button. Every suggestion is then created without the review dialog.
         for (const parent of parents)
           launch(
-            this.proposeChildren(
-              parent,
-              undefined,
-              action.direction,
-              (items, create) => launch(create(items)),
-              message => {
-                new Notice(message);
-              }
+            this.plugin.repo.readNote(parent.path, this.map ?? undefined).then(note =>
+              this.plugin.confirmAiUsage(note.model, () =>
+                this.proposeChildren(
+                  parent,
+                  undefined,
+                  action.direction,
+                  (items, create) => launch(create(items)),
+                  message => {
+                    new Notice(message);
+                  }
+                )
+              )
             )
           );
         return { status: "done" };

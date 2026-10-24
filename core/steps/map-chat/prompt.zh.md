@@ -4,7 +4,7 @@
 - add_child：新增子議題。欄位：parentId（既有議題 id）、title（簡短純文字）、summary（選填，一句摘要）。
 - rename_topic：nodeId、title（新標題）。
 - update_summary：nodeId、summary（完整的新摘要）。
-- edit_topic_note：nodeId、detail（該議題完整的新筆記本文，取代舊本文）。
+- edit_topic_note：nodeId、detail（該議題完整的新筆記本文，取代舊本文）。只能用在 "selected" 或 "references" 裡、且已提供目前 "detail" 的議題；只出現在大綱裡的議題不可使用。以提供的 detail 為底，使用者沒要求改的部分要保留。
 - move_topic：nodeId、newParentId。不可把議題移到自己或自己的子孫底下。
 - delete_topic：nodeId、branch（true 表示整個分支一起處理）。議題是移到「未歸類」，不是真的刪除。
 - edit_md_file：path、find、replace。把 "path" 指向的 Markdown 檔中「恰好一處」的 "find" 換成 "replace"。"find" 在下方提供的檔案內容中必須剛好出現一次，請多複製一些前後文使它唯一。只有 "files" 或 "snippets" 裡帶有內容雜湊的檔案可以編輯。

@@ -9,6 +9,8 @@ export type MapChatGuardCode =
   | "config_dir"
   | "not_markdown"
   | "map_unparseable"
+  | "map_file"
+  | "duplicate_identity_key"
   | "topic_identity_changed"
   | "reserved_frontmatter"
   | "exists"
@@ -69,6 +71,19 @@ function topLevelValues(block: string | null, keys: readonly string[]): Map<stri
   return found;
 }
 
+/** True when a top-level identity key appears more than once: which value wins is parser-dependent, so such a file is not edited. */
+function hasDuplicateIdentityKey(block: string | null): boolean {
+  if (block === null) return false;
+  const seen = new Set<string>();
+  for (const line of block.split(/\r?\n/)) {
+    const match = line.match(/^([A-Za-z0-9_-]+)\s*:/);
+    if (!match || !TOPIC_IDENTITY_KEYS.includes(match[1])) continue;
+    if (seen.has(match[1])) return true;
+    seen.add(match[1]);
+  }
+  return false;
+}
+
 const hasMapMarker = (content: string): boolean =>
   /```agent-map\s*\n/.test(content) ||
   topLevelValues(frontmatterBlock(content), ["visual-agent-map"]).has("visual-agent-map");
@@ -95,17 +110,22 @@ export function guardMapChatWrite(check: MapChatWriteCheck): MapChatGuardResult 
   if (!Object.prototype.hasOwnProperty.call(baseline, path)) return { ok: false, code: "no_baseline" };
   const before = check.oldContent ?? "";
   if (hasMapMarker(before) || hasMapMarker(check.newContent)) {
+    // A map file is the plugin's own data: the chat never edits it (map changes go through the topic actions).
     try {
       parseMap(check.newContent);
     } catch {
       return { ok: false, code: "map_unparseable" };
     }
+    return { ok: false, code: "map_file" };
   }
+  if (hasDuplicateIdentityKey(frontmatterBlock(before)) || hasDuplicateIdentityKey(frontmatterBlock(check.newContent)))
+    return { ok: false, code: "duplicate_identity_key" };
   const was = topLevelValues(frontmatterBlock(before), TOPIC_IDENTITY_KEYS);
-  if (was.size > 0) {
-    const now = topLevelValues(frontmatterBlock(check.newContent), TOPIC_IDENTITY_KEYS);
-    for (const key of TOPIC_IDENTITY_KEYS)
-      if (was.get(key) !== now.get(key)) return { ok: false, code: "topic_identity_changed" };
+  const now = topLevelValues(frontmatterBlock(check.newContent), TOPIC_IDENTITY_KEYS);
+  for (const key of TOPIC_IDENTITY_KEYS) {
+    if (was.get(key) === now.get(key)) continue;
+    // A note that was not a topic must not become one.
+    return { ok: false, code: was.has(key) ? "topic_identity_changed" : "reserved_frontmatter" };
   }
   return { ok: true };
 }

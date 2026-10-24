@@ -3,6 +3,7 @@
 // the same methods render() calls (detachMapChat before the old content goes, mountMapChat once the overlay exists).
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
+const os = require('node:os');
 const path = require('node:path');
 const { test, integrationTest, root, load, core, plain, DEFAULT_SETTINGS, fixture, withExpansionCoordinator, until, deferred, obsidian } = require('../support.cjs');
 const dom = require('../support-dom.cjs');
@@ -25,8 +26,14 @@ function page() {
   attach(root);
   return { doc, root, attach };
 }
+/** The panel module together with the setter of the interface language that the same bundle reads (a bundle has its own copy of it). */
+function loadPanelModule(windowValues = {}) {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'vam-map-chat-entry-')); const file = path.join(dir, 'entry.ts');
+  fs.writeFileSync(file, `export { MapChatPanel } from ${JSON.stringify(path.join(root, 'experiences/visual-map/map-chat'))};\nexport { setUiLanguage } from ${JSON.stringify(path.join(root, 'i18n'))};\n`);
+  try { return load(path.relative(root, file), { obsidian: { ...obsidian, Keymap: { isModEvent: event => !!event.ctrlKey } } }, windowValues); } finally { fs.rmSync(dir, { recursive: true, force: true }); }
+}
 function panelFixture(overrides = {}, windowValues = {}) {
-  const { MapChatPanel } = load('experiences/visual-map/map-chat.ts', { obsidian: { ...obsidian, Keymap: { isModEvent: event => !!event.ctrlKey } } }, windowValues);
+  const { MapChatPanel, setUiLanguage } = loadPanelModule(windowValues);
   const p = page(); const overlay = p.attach(p.root.createDiv('vam-canvas-overlay'));
   const calls = { send: 0, stop: 0, layout: [], more: [], links: [] };
   const topics = { a: 'Topic A', b: 'Topic B' };
@@ -50,7 +57,7 @@ function panelFixture(overrides = {}, windowValues = {}) {
     send: () => byLabel(panel.el, 'Send'), stop: () => byLabel(panel.el, 'Stop'), close: () => byLabel(panel.bodyEl, 'Close AI chat'),
     chipTexts: () => findAll(panel.chipsEl, i => hasClass(i, 'vam-map-chat-chip-label')).map(i => i.text)
   };
-  return { panel, overlay, calls, prefs, page: p, parts, setVisible: path => { visibleNote = path; }, showNote: path => { visibleNote = path; panel.refreshNote(); }, select: ids => { selected = ids; panel.refreshSelection(); } };
+  return { panel, overlay, calls, prefs, page: p, parts, setLanguage: setUiLanguage, setVisible: path => { visibleNote = path; }, showNote: path => { visibleNote = path; panel.refreshNote(); }, select: ids => { selected = ids; panel.refreshSelection(); } };
 }
 const hasClass = (item, name) => dom.hasCls(item, name);
 const key = (input, event) => { let prevented = false; input.fire('keydown', { preventDefault() { prevented = true; }, shiftKey: false, isComposing: false, ...event }); return prevented; };
@@ -1920,5 +1927,102 @@ test('map chat E1: a long dense reply streamed in 10 chunks, then a short reply,
   const ms = Number(process.hrtime.bigint() - start) / 1e6; console.log(`E1 timing: ${ms.toFixed(0)} ms`);
   assert.ok(ms < LIMIT_MS, `${ms.toFixed(0)} ms`);
 });
-// Before the change the same run took about 630 ms in this fake DOM (and seconds in a real one, where layout dominates); the limit is loose on purpose.
-const LIMIT_MS = 350;
+// Before the change the same run took about 630 ms in this fake DOM (and seconds in a real one, where layout dominates); the limit is loose on purpose (the run now takes about 90 ms).
+const LIMIT_MS = 200;
+
+// ---- Packet E2: one parse for the cut, the view's own window, language, plain-text edges --------------------------------------------
+
+/** The render module with a count of the characters handed to a top-level inline parse, and `layoutReply` exposed for timing. */
+function spyRender() {
+  const source = fs.readFileSync(path.join(root, 'core/map-chat-render.ts'), 'utf8');
+  const signature = /export function parseInline\([^)]*\): ChatInline\[\] \{/;
+  assert.match(source, signature, 'parseInline is still the one inline parser');
+  const body = source.replace(signature, match => `export const __spy = { chars: 0 };\n${match}\n  if (depth === 0) __spy.chars += src.length;`) + '\nexport { layoutReply as __layoutReply };\n';
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'vam-render-spy-'));
+  try { fs.writeFileSync(path.join(dir, 'map-chat-render.ts'), body); return load(path.relative(root, path.join(dir, 'map-chat-render.ts'))); } finally { fs.rmSync(dir, { recursive: true, force: true }); }
+}
+// About 20 characters per element, so the cut falls late in the 50,000 characters (the worst case for a search that parses prefixes).
+const SPARSE = 'alpha beta gamma delta epsilon zeta eta theta iota kappa *e* ';
+const bestOf = (count, run) => { let best = Infinity; for (let i = 0; i < count; i++) { const start = process.hrtime.bigint(); run(); best = Math.min(best, Number(process.hrtime.bigint() - start) / 1e6); } return best; };
+const plainOf = el => find(el, i => hasClass(i, 'vam-map-chat-plain'));
+const laidParagraph = el => find(el, i => i.tag === 'p' && !hasClass(i, 'vam-map-chat-plain') && !hasClass(i, 'vam-map-chat-overflow-note'));
+
+test('map chat E2: the cut is found while parsing: a reply is parsed once, whatever the shape of the overflow', () => {
+  const lists = Array.from({ length: 5000 }, (_, i) => `- item *${i}* **x**`).join('\n');
+  for (const [name, text] of [['dense', DENSE.repeat(1850)], ['sparse', SPARSE.repeat(900)], ['list', lists], ['lines', 'a *b* c\n'.repeat(6000)], ['quote', '> ' + DENSE.repeat(1850)], ['blocks', 'para *x* **y**\n\n'.repeat(3000)]]) {
+    const spy = spyRender(); const el = element('div'); spy.renderChatMarkdown(el, text, 'NOTE');
+    assert.ok(plainOf(el), `${name}: the reply overflows`);
+    const limit = Math.min(text.length, 50000);
+    assert.ok(spy.__spy.chars <= limit, `${name}: ${spy.__spy.chars} characters parsed for a ${limit} character head`);
+  }
+});
+
+test('map chat E2: laying a dense single-line reply out costs about one parse of it, not a search that parses many prefixes', () => {
+  const spy = spyRender();
+  for (const text of [DENSE.repeat(1850), SPARSE.repeat(900)]) {
+    const one = bestOf(9, () => spy.parseInline(text.slice(0, 50000)));
+    const cut = bestOf(9, () => spy.__layoutReply(text));
+    assert.ok(cut <= one * 2, `layout ${cut.toFixed(1)} ms against ${one.toFixed(1)} ms for one parse`);
+  }
+});
+
+test('map chat E2: a reply streamed in a popped-out window asks that window for its frames, and cancels in it', () => {
+  const main = frames(); const popout = frames(); const f = panelFixture({}, main.window); f.panel.setOpen(true); const log = f.parts.log();
+  log.win = popout.window;
+  f.panel.begin('q'); f.panel.streamReply('one'); f.panel.streamReply('one two');
+  assert.equal(main.queue.length, 0, 'the main window was not asked'); assert.equal(popout.queue.filter(Boolean).length, 1);
+  assert.equal(popout.run(), 1); assert.equal(visibleText(replyBody2(log)), 'one two');
+  f.panel.streamReply('three'); f.panel.finish('final', []);
+  assert.equal(popout.queue.filter(Boolean).length, 0, 'the waiting frame was cancelled in the window that was asked'); assert.equal(main.queue.length, 0);
+  // Without `win`, the window of the document is the one asked.
+  const other = frames(); const g = panelFixture({}, main.window); g.panel.setOpen(true); g.parts.log().ownerDocument = { defaultView: other.window };
+  g.panel.begin('q'); g.panel.streamReply('x'); assert.equal(main.queue.length, 0); assert.equal(other.queue.length, 1);
+});
+
+test('map chat E2: changing the interface language rebuilds the "you" label and the overflow note of rows already shown', () => {
+  const f = panelFixture(); f.panel.setOpen(true); const log = f.parts.log();
+  f.setLanguage('en'); f.panel.begin('q'); f.panel.finish(DENSE.repeat(1850), []);
+  const roleOf = row => find(row, i => hasClass(i, 'vam-map-chat-role')).text; const noteOf = row => find(row, i => hasClass(i, 'vam-map-chat-overflow-note')).text;
+  const [userBefore, answerBefore] = [...log.children]; const roleBefore = roleOf(userBefore); const noteBefore = noteOf(answerBefore);
+  f.setLanguage('zh-TW'); f.panel.begin('q2'); f.panel.finish('ok', []);
+  const [userAfter, answerAfter] = [...log.children];
+  assert.notEqual(userAfter, userBefore, 'the user row was rebuilt'); assert.notEqual(roleOf(userAfter), roleBefore);
+  assert.notEqual(answerAfter, answerBefore, 'the answer row was rebuilt'); assert.notEqual(noteOf(answerAfter), noteBefore);
+  const kept = [...log.children]; f.panel.begin('q3'); f.panel.finish('three', []); assert.equal(log.children[0], kept[0], 'same language: rows are kept again');
+});
+
+test('map chat E2: the plain part keeps the indentation of its first line; only the blank lines at the cut go', () => {
+  const head = '```\n' + 'x'.repeat(49000) + '\n```\n';
+  const el = layoutWith(head + '    indented first ' + 'y'.repeat(1500) + '\n  second');
+  assert.ok(plainOf(el).text.startsWith('    indented first yyy'), JSON.stringify(plainOf(el).text.slice(0, 40))); assert.ok(plainOf(el).text.endsWith('\n  second'));
+  assert.ok(plainOf(layoutWith(head + '\n\n\n  two spaces ' + 'y'.repeat(2000))).text.startsWith('  two spaces '));
+  // A paragraph that overflows in the middle: the rest follows the last piece that fit, with no line break in front.
+  const text = 'a *b*\n'.repeat(5000).trimEnd(); const rest = plainOf(layoutWith(text)).text;
+  assert.ok(!rest.startsWith('\n') && text.endsWith(rest) && rest.length > 1000);
+});
+
+test('map chat E2: a long paragraph with no blank and no line break is cut between two of its pieces, never given up whole', () => {
+  const text = '中文，更多。*強*再來！'.repeat(1500); const el = layoutWith(text); const plain = plainOf(el); assert.ok(plain, 'the reply overflows');
+  assert.ok(nodes(el).length - 1 <= 2000 + FIXED);
+  const emphasised = nodes(el).filter(i => i.tag === 'em').length; assert.ok(emphasised > 300, `the start is laid out (${emphasised} emphasised pieces)`);
+  assert.ok(text.endsWith(plain.text), 'the rest is the end of the reply, as written');
+  assert.equal(visibleText(laidParagraph(el)), text.slice(0, text.length - plain.text.length).replace(/\*/g, ''), 'nothing is lost or repeated at the cut');
+});
+
+test('map chat E2: no cut falls inside an emoji, at a piece boundary or at the 50,000 character limit', () => {
+  const lone = /[\ud800-\udbff](?![\udc00-\udfff])|(?<![\ud800-\udbff])[\udc00-\udfff]/;
+  const marked = '😀*好*😀'.repeat(1200); const el = layoutWith(marked); const plain = plainOf(el); assert.ok(plain);
+  assert.ok(!lone.test(plain.text) && !lone.test(visibleText(el)), 'no half of an emoji in the output'); assert.ok(marked.endsWith(plain.text));
+  const odd = 'a' + '😀'.repeat(30000); const big = layoutWith(odd); const bigPlain = plainOf(big); assert.ok(bigPlain, 'past 50,000 characters');
+  assert.ok(!lone.test(visibleText(big)), 'the cut at the limit does not split a pair');
+  assert.equal(visibleText(laidParagraph(big)) + bigPlain.text, odd, 'all of it is still there, once');
+});
+
+test('map chat E2: a heading, a quote or a list that does not fit goes to the plain part whole or by items, and nothing is lost', () => {
+  const title = '# ' + '*a* '.repeat(2500); const h = layoutWith('first\n\n' + title);
+  assert.equal(findAll(h, i => /^h\d$/.test(i.tag)).length, 0); assert.equal(plainOf(h).text, title);
+  const quote = '> ' + '*q* '.repeat(2500); assert.equal(plainOf(layoutWith(quote)).text, quote);
+  const items = Array.from({ length: 1500 }, (_, i) => `- row **${i}** and more`); const l = layoutWith(items.join('\n') + '\n\nafter');
+  const lp = plainOf(l).text; const at = items.findIndex(row => lp.startsWith(row)); assert.ok(at > 100);
+  assert.equal(lp, items.slice(at).join('\n') + '\n\nafter'); assert.equal(findAll(l, i => i.tag === 'li').length, at);
+});

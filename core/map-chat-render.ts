@@ -161,13 +161,21 @@ function visibleLength(nodes: ChatInline[]): number {
   return total;
 }
 
-/** Parses inline Markdown. `links` is false inside a link label, where a nested link stays text. */
-export function parseInline(src: string, depth = 0, links = true): ChatInline[] {
+/**
+ * Parses inline Markdown. `links` is false inside a link label, where a nested link stays text. `ends`, when given, receives
+ * the offset in `src` at which each returned piece ends (one entry per piece), so a caller can cut the source after any piece.
+ */
+export function parseInline(src: string, depth = 0, links = true, ends?: number[]): ChatInline[] {
   const scan: InlineScan = { src, noClose: {} };
   const out: ChatInline[] = [];
   let buf = "";
-  const flush = (): void => {
-    if (buf) out.push({ t: "text", text: buf });
+  const push = (node: ChatInline, end: number): void => {
+    out.push(node);
+    ends?.push(end);
+  };
+  /** Ends the text gathered so far; `upto` is where the next piece begins. */
+  const flush = (upto: number): void => {
+    if (buf) push({ t: "text", text: buf }, upto);
     buf = "";
   };
   for (let at = 0; at < src.length;) {
@@ -178,8 +186,8 @@ export function parseInline(src: string, depth = 0, links = true): ChatInline[] 
       continue;
     }
     if (ch === "\n") {
-      flush();
-      out.push({ t: "br" });
+      flush(at);
+      push({ t: "br" }, at + 1);
       at++;
       continue;
     }
@@ -204,9 +212,9 @@ export function parseInline(src: string, depth = 0, links = true): ChatInline[] 
         at = end;
         continue;
       }
-      flush();
-      out.push({ t: "code", text: src.slice(end, close).replace(/\n/g, " ") });
+      flush(at);
       at = close + run.length;
+      push({ t: "code", text: src.slice(end, close).replace(/\n/g, " ") }, at);
       continue;
     }
     if (ch === "!" && src[at + 1] === "[") {
@@ -232,8 +240,8 @@ export function parseInline(src: string, depth = 0, links = true): ChatInline[] 
         continue;
       }
       if (wiki && links) {
-        flush();
-        out.push({ t: "wiki", target: wiki.target, label: wiki.label });
+        flush(at);
+        push({ t: "wiki", target: wiki.target, label: wiki.label }, wiki.end);
         at = wiki.end;
         continue;
       }
@@ -245,10 +253,13 @@ export function parseInline(src: string, depth = 0, links = true): ChatInline[] 
       const link = bracketLink(scan, at);
       if (link) {
         if (links && HTTP_URL.test(link.dest)) {
-          flush();
+          flush(at);
           // A link with no words in it shows its address, so it never turns into an invisible target.
           const label = parseInline(link.label, depth + 1, false);
-          out.push({ t: "link", href: link.dest, c: visibleLength(label) ? label : [{ t: "text", text: link.dest }] });
+          push(
+            { t: "link", href: link.dest, c: visibleLength(label) ? label : [{ t: "text", text: link.dest }] },
+            link.end
+          );
         } else buf += src.slice(at, link.end);
         at = link.end;
         continue;
@@ -257,8 +268,8 @@ export function parseInline(src: string, depth = 0, links = true): ChatInline[] 
     if (ch === "*" || ch === "_" || ch === "~") {
       const format = formatAt(scan, at, depth);
       if (format) {
-        flush();
-        out.push(format.node);
+        flush(at);
+        push(format.node, format.end);
         at = format.end;
         continue;
       }
@@ -266,8 +277,8 @@ export function parseInline(src: string, depth = 0, links = true): ChatInline[] 
     if ((ch === "h" || ch === "H") && links) {
       const url = bareUrlAt(src, at);
       if (url) {
-        flush();
-        out.push({ t: "link", href: url.url, c: [{ t: "text", text: url.url }] });
+        flush(at);
+        push({ t: "link", href: url.url, c: [{ t: "text", text: url.url }] }, url.end);
         at = url.end;
         continue;
       }
@@ -275,7 +286,7 @@ export function parseInline(src: string, depth = 0, links = true): ChatInline[] 
     buf += ch;
     at++;
   }
-  flush();
+  flush(src.length);
   return out;
 }
 
@@ -305,10 +316,34 @@ const isFenceOpen = (line: string): RegExpExecArray | null => {
 const startsBlock = (line: string): boolean =>
   !!isFenceOpen(line) || !!headingAt(line) || RULE.test(line) || QUOTE.test(line) || LIST.test(line);
 
-/** `starts`, when given, receives the line each top-level block begins at (one entry per block returned). */
-export function parseBlocks(lines: string[], depth = 0, starts?: number[]): ChatBlock[] {
+/** The element budget of one reply while it is parsed (see {@link layoutReply}); parsing stops at the first block that overruns it. */
+interface ReplyBudget {
+  room: number;
+  used: number;
+  over: boolean;
+  /** For an overrunning paragraph: the offset in its source at which each inline piece ends. */
+  ends?: number[];
+  /** For an overrunning list: the line at which each of its items begins. */
+  itemLines?: number[];
+}
+
+/**
+ * `starts`, when given, receives the line each top-level block begins at (one entry per block returned). `budget`, when given,
+ * makes the parse stop after the first top-level block that does not fit it; that block is the last one returned.
+ */
+export function parseBlocks(lines: string[], depth = 0, starts?: number[], budget?: ReplyBudget): ChatBlock[] {
   const blocks: ChatBlock[] = [];
+  /** Adds a finished block; returns false when it overran the budget. */
+  const emit = (block: ChatBlock): boolean => {
+    blocks.push(block);
+    if (!budget) return true;
+    const cost = blockCost(block);
+    if (budget.used + cost > budget.room) budget.over = true;
+    else budget.used += cost;
+    return !budget.over;
+  };
   for (let at = 0; at < lines.length;) {
+    if (budget?.over) break;
     const line = lines[at];
     if (!line.trim()) {
       at++;
@@ -328,31 +363,31 @@ export function parseBlocks(lines: string[], depth = 0, starts?: number[]): Chat
         }
         body.push(lines[at]);
       }
-      blocks.push({ t: "code", text: body.join("\n") });
+      emit({ t: "code", text: body.join("\n") });
       continue;
     }
     const heading = headingAt(line);
     if (heading) {
-      blocks.push({ t: "h", level: heading.level, c: parseInline(heading.text) });
+      emit({ t: "h", level: heading.level, c: parseInline(heading.text) });
       at++;
       continue;
     }
     if (RULE.test(line)) {
-      blocks.push({ t: "hr" });
+      emit({ t: "hr" });
       at++;
       continue;
     }
     if (QUOTE.test(line)) {
       const inner: string[] = [];
       for (; at < lines.length && QUOTE.test(lines[at]); at++) inner.push(lines[at].replace(/^ {0,3}> ?/, ""));
-      blocks.push({
+      emit({
         t: "quote",
         c: depth < MAX_QUOTE_DEPTH ? parseBlocks(inner, depth + 1) : [{ t: "p", c: parseInline(inner.join("\n")) }]
       });
       continue;
     }
     if (LIST.test(line)) {
-      const rows: { level: number; ordered: boolean; text: string }[] = [];
+      const rows: { level: number; ordered: boolean; text: string; line: number }[] = [];
       while (at < lines.length) {
         const row = lines[at];
         if (!row.trim()) {
@@ -370,41 +405,43 @@ export function parseBlocks(lines: string[], depth = 0, starts?: number[]): Chat
           const level = item[1].length >= 2 ? 1 : 0;
           // Another kind of marker at the top level starts a new list.
           if (level === 0 && rows.length && ordered !== rows[0].ordered) break;
-          rows.push({ level, ordered, text: item[3] });
+          rows.push({ level, ordered, text: item[3], line: at });
         } else if (/^\s{2,}\S/.test(row) && rows.length) rows[rows.length - 1].text += `\n${row.trim()}`;
         else break;
         at++;
       }
       const list: Extract<ChatBlock, { t: "list" }> = { t: "list", ordered: rows[0].ordered, items: [] };
+      const itemLines: number[] = [];
       for (const row of rows) {
         const top = list.items.at(-1);
         if (row.level === 1 && top) {
           top.sub ??= { t: "list", ordered: row.ordered, items: [] };
           top.sub.items.push({ c: parseInline(row.text), sub: null });
-        } else list.items.push({ c: parseInline(row.text), sub: null });
+        } else {
+          list.items.push({ c: parseInline(row.text), sub: null });
+          itemLines.push(row.line);
+        }
       }
-      blocks.push(list);
+      if (!emit(list) && budget) budget.itemLines = itemLines;
       continue;
     }
     const paragraph = [line];
     for (at++; at < lines.length && lines[at].trim() && !startsBlock(lines[at]); at++) paragraph.push(lines[at]);
-    blocks.push({ t: "p", c: parseInline(paragraph.join("\n")) });
+    const ends: number[] = [];
+    if (!emit({ t: "p", c: parseInline(paragraph.join("\n"), 0, true, budget ? ends : undefined) }) && budget)
+      budget.ends = ends;
   }
   return blocks;
-}
-
-export function parseChatMarkdown(text: string): ChatBlock[] {
-  return layoutReply(text).blocks;
 }
 
 /** How many elements {@link renderBlocks} creates for these pieces. */
 function inlineCost(nodes: ChatInline[]): number {
   let cost = 0;
-  for (const node of nodes) {
-    cost += 1;
-    if (node.t === "fmt" || node.t === "link") cost += inlineCost(node.c);
-  }
+  for (const node of nodes) cost += nodeCost(node);
   return cost;
+}
+function nodeCost(node: ChatInline): number {
+  return node.t === "fmt" || node.t === "link" ? 1 + inlineCost(node.c) : 1;
 }
 function blockCost(block: ChatBlock): number {
   switch (block.t) {
@@ -420,10 +457,13 @@ function blockCost(block: ChatBlock): number {
       return 1 + blocksCost(block.c);
     case "list": {
       let cost = 1;
-      for (const item of block.items) cost += 1 + inlineCost(item.c) + (item.sub ? blockCost(item.sub) : 0);
+      for (const item of block.items) cost += itemCost(item);
       return cost;
     }
   }
+}
+function itemCost(item: ChatListItem): number {
+  return 1 + inlineCost(item.c) + (item.sub ? blockCost(item.sub) : 0);
 }
 const blocksCost = (blocks: ChatBlock[]): number => blocks.reduce((sum, block) => sum + blockCost(block), 0);
 
@@ -436,6 +476,11 @@ interface ReplyLayout {
 /**
  * Parses a reply into blocks, but only as many as fit the limits: 50,000 characters (cut at a line end when there is one) and
  * `budget` elements. The part left over is returned as it was written.
+ *
+ * The reply is parsed once. The parse counts the elements it builds and stops at the first block that overruns the budget; that
+ * block is then cut where its own pieces (the inline pieces of a paragraph, the items of a list) stop fitting, so the cut falls
+ * between two pieces and never inside a character. A block that cannot be cut that way (a heading, a quote) goes whole to the
+ * plain part.
  */
 function layoutReply(text: string, budget = MAX_REPLY_NODES): ReplyLayout {
   const clean = text.replace(/\r\n?/g, "\n");
@@ -443,55 +488,45 @@ function layoutReply(text: string, budget = MAX_REPLY_NODES): ReplyLayout {
   let tail = "";
   if (clean.length > MAX_REPLY_CHARS) {
     const line = clean.lastIndexOf("\n", MAX_REPLY_CHARS);
-    const cut = line >= MAX_REPLY_CHARS / 2 ? line : MAX_REPLY_CHARS;
+    let cut = line >= MAX_REPLY_CHARS / 2 ? line : MAX_REPLY_CHARS;
+    // Never between the two halves of one character (an emoji is a surrogate pair).
+    if (isLowSurrogate(clean.charCodeAt(cut)) && isHighSurrogate(clean.charCodeAt(cut - 1))) cut--;
     head = clean.slice(0, cut);
     tail = clean.slice(cut);
   }
   const lines = head.split("\n");
   const starts: number[] = [];
-  const blocks = parseBlocks(lines, 0, starts);
-  let used = 0;
-  let fit = 0;
-  while (fit < blocks.length) {
-    const cost = blockCost(blocks[fit]);
-    if (used + cost > budget) break;
-    used += cost;
-    fit++;
-  }
-  if (fit === blocks.length) return { blocks, plain: tail };
-  // Block `fit` does not fit whole: keep the longest start of it that does (cut at a blank), and the rest stays plain.
-  const end = fit + 1 < blocks.length ? starts[fit + 1] : lines.length;
-  const source = lines.slice(starts[fit], end).join("\n");
-  const room = budget - used;
-  const cutAt = (limit: number): number => {
-    // At the end of a line when there is one, else at a blank, so the plain part starts at a word.
-    const line = source.lastIndexOf("\n", limit - 1);
-    if (line >= 0) return line + 1;
-    let at = limit;
-    while (at > 0 && !/\s/.test(source[at - 1])) at--;
-    return at;
-  };
-  const fits = (limit: number): boolean => blocksCost(parseBlocks(source.slice(0, cutAt(limit)).split("\n"))) <= room;
-  let low = 0;
-  let high = source.length;
-  // Grow the probe until it no longer fits (the answer is near the budget, far from the end), then narrow down.
-  for (let probe = Math.max(256, room * 2); probe < high; probe *= 2) {
-    if (fits(probe)) low = probe;
-    else {
-      high = probe - 1;
-      break;
+  const limit: ReplyBudget = { room: budget, used: 0, over: false };
+  const blocks = parseBlocks(lines, 0, starts, limit);
+  if (!limit.over) return { blocks, plain: tail };
+  // The last block is the one that did not fit whole: keep the longest start of it that fits, and the rest stays plain.
+  const over = blocks.pop() as ChatBlock;
+  const first = starts[blocks.length];
+  const room = limit.room - limit.used;
+  let line = first;
+  let offset = 0;
+  if (over.t === "p" && limit.ends) {
+    let used = 1;
+    let kept = 0;
+    while (kept < over.c.length && used + nodeCost(over.c[kept]) <= room) used += nodeCost(over.c[kept++]);
+    if (kept > 0) {
+      blocks.push({ t: "p", c: over.c.slice(0, kept) });
+      offset = limit.ends[kept - 1];
+    }
+  } else if (over.t === "list" && limit.itemLines) {
+    let used = 1;
+    let kept = 0;
+    while (kept < over.items.length && used + itemCost(over.items[kept]) <= room) used += itemCost(over.items[kept++]);
+    if (kept > 0) {
+      blocks.push({ t: "list", ordered: over.ordered, items: over.items.slice(0, kept) });
+      line = limit.itemLines[kept];
     }
   }
-  while (low < high) {
-    const mid = Math.ceil((low + high) / 2);
-    if (fits(mid)) low = mid;
-    else high = mid - 1;
-  }
-  low = cutAt(low);
-  const kept = parseBlocks(source.slice(0, low).split("\n"));
-  const rest = [source.slice(low), ...lines.slice(end)].join("\n") + (tail ? tail : "");
-  return { blocks: [...blocks.slice(0, fit), ...kept], plain: rest };
+  return { blocks, plain: lines.slice(line).join("\n").slice(offset) + tail };
 }
+
+const isHighSurrogate = (code: number): boolean => code >= 0xd800 && code <= 0xdbff;
+const isLowSurrogate = (code: number): boolean => code >= 0xdc00 && code <= 0xdfff;
 
 function renderInline(parent: HTMLElement, nodes: ChatInline[]): void {
   for (const node of nodes) {
@@ -565,8 +600,9 @@ export function renderChatMarkdown(parent: HTMLElement, text: string, overflowNo
   parent.empty();
   const { blocks, plain } = layoutReply(text);
   renderBlocks(parent, blocks);
-  const rest = plain.replace(/^\s+/, "");
-  if (!rest) return;
+  // The line break at the cut goes, and the blank lines after it, but not a space before it nor the indentation of the first line with text.
+  const rest = plain.replace(/^\n(?:[ \t]*\n)*/, "");
+  if (!rest.trim()) return;
   if (overflowNote) parent.createEl("p", { cls: "vam-map-chat-overflow-note", text: overflowNote });
   parent.createEl("p", { cls: "vam-map-chat-plain", text: rest });
 }

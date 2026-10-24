@@ -303,7 +303,9 @@ export class MapChatPanel {
     last.text = text;
     if (!this.built || this.frame) return;
     // Chunks that arrive within one frame are laid out once, with the newest text.
-    const win = typeof window !== "undefined" ? window : undefined;
+    // The window the log is shown in (a popped-out view has its own), because only that one paints its frames.
+    const win =
+      this.logEl.win ?? this.logEl.ownerDocument?.defaultView ?? (typeof window !== "undefined" ? window : undefined);
     if (typeof win?.requestAnimationFrame !== "function") {
       this.layoutStreaming();
       return;
@@ -612,7 +614,9 @@ export class MapChatPanel {
       message.error ? "e" : "",
       message.streaming ? "s" : "",
       more ? "m" : "",
+      t("ui.map_chat_role_you"),
       t("ui.map_chat_role_ai"),
+      t("ui.map_chat_overflow_note"),
       more ? t("ui.map_chat_more_detail") : "",
       message.lines.map(line => `${line.status}:${line.text}`).join("\n"),
       message.text

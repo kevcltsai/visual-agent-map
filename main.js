@@ -20304,13 +20304,17 @@ function visibleLength(nodes) {
   }
   return total2;
 }
-function parseInline(src, depth = 0, links = true) {
+function parseInline(src, depth = 0, links = true, ends) {
   var _a2;
   const scan2 = { src, noClose: {} };
   const out = [];
   let buf = "";
-  const flush = () => {
-    if (buf) out.push({ t: "text", text: buf });
+  const push = (node, end) => {
+    out.push(node);
+    ends == null ? void 0 : ends.push(end);
+  };
+  const flush = (upto) => {
+    if (buf) push({ t: "text", text: buf }, upto);
     buf = "";
   };
   for (let at = 0; at < src.length; ) {
@@ -20321,8 +20325,8 @@ function parseInline(src, depth = 0, links = true) {
       continue;
     }
     if (ch === "\n") {
-      flush();
-      out.push({ t: "br" });
+      flush(at);
+      push({ t: "br" }, at + 1);
       at++;
       continue;
     }
@@ -20347,9 +20351,9 @@ function parseInline(src, depth = 0, links = true) {
         at = end;
         continue;
       }
-      flush();
-      out.push({ t: "code", text: src.slice(end, close).replace(/\n/g, " ") });
+      flush(at);
       at = close + run.length;
+      push({ t: "code", text: src.slice(end, close).replace(/\n/g, " ") }, at);
       continue;
     }
     if (ch === "!" && src[at + 1] === "[") {
@@ -20373,8 +20377,8 @@ function parseInline(src, depth = 0, links = true) {
         continue;
       }
       if (wiki && links) {
-        flush();
-        out.push({ t: "wiki", target: wiki.target, label: wiki.label });
+        flush(at);
+        push({ t: "wiki", target: wiki.target, label: wiki.label }, wiki.end);
         at = wiki.end;
         continue;
       }
@@ -20386,9 +20390,12 @@ function parseInline(src, depth = 0, links = true) {
       const link = bracketLink(scan2, at);
       if (link) {
         if (links && HTTP_URL.test(link.dest)) {
-          flush();
+          flush(at);
           const label = parseInline(link.label, depth + 1, false);
-          out.push({ t: "link", href: link.dest, c: visibleLength(label) ? label : [{ t: "text", text: link.dest }] });
+          push(
+            { t: "link", href: link.dest, c: visibleLength(label) ? label : [{ t: "text", text: link.dest }] },
+            link.end
+          );
         } else buf += src.slice(at, link.end);
         at = link.end;
         continue;
@@ -20397,8 +20404,8 @@ function parseInline(src, depth = 0, links = true) {
     if (ch === "*" || ch === "_" || ch === "~") {
       const format = formatAt(scan2, at, depth);
       if (format) {
-        flush();
-        out.push(format.node);
+        flush(at);
+        push(format.node, format.end);
         at = format.end;
         continue;
       }
@@ -20406,8 +20413,8 @@ function parseInline(src, depth = 0, links = true) {
     if ((ch === "h" || ch === "H") && links) {
       const url = bareUrlAt(src, at);
       if (url) {
-        flush();
-        out.push({ t: "link", href: url.url, c: [{ t: "text", text: url.url }] });
+        flush(at);
+        push({ t: "link", href: url.url, c: [{ t: "text", text: url.url }] }, url.end);
         at = url.end;
         continue;
       }
@@ -20415,7 +20422,7 @@ function parseInline(src, depth = 0, links = true) {
     buf += ch;
     at++;
   }
-  flush();
+  flush(src.length);
   return out;
 }
 var FENCE_OPEN = /^ {0,3}(`{3,}|~{3,})(.*)$/;
@@ -20438,10 +20445,19 @@ var isFenceOpen = (line) => {
   return open && !(open[1][0] === "`" && open[2].includes("`")) ? open : null;
 };
 var startsBlock = (line) => !!isFenceOpen(line) || !!headingAt(line) || RULE.test(line) || QUOTE.test(line) || LIST.test(line);
-function parseBlocks(lines, depth = 0, starts) {
+function parseBlocks(lines, depth = 0, starts, budget) {
   var _a2;
   const blocks = [];
+  const emit = (block) => {
+    blocks.push(block);
+    if (!budget) return true;
+    const cost = blockCost(block);
+    if (budget.used + cost > budget.room) budget.over = true;
+    else budget.used += cost;
+    return !budget.over;
+  };
   for (let at = 0; at < lines.length; ) {
+    if (budget == null ? void 0 : budget.over) break;
     const line = lines[at];
     if (!line.trim()) {
       at++;
@@ -20461,24 +20477,24 @@ function parseBlocks(lines, depth = 0, starts) {
         }
         body.push(lines[at]);
       }
-      blocks.push({ t: "code", text: body.join("\n") });
+      emit({ t: "code", text: body.join("\n") });
       continue;
     }
     const heading = headingAt(line);
     if (heading) {
-      blocks.push({ t: "h", level: heading.level, c: parseInline(heading.text) });
+      emit({ t: "h", level: heading.level, c: parseInline(heading.text) });
       at++;
       continue;
     }
     if (RULE.test(line)) {
-      blocks.push({ t: "hr" });
+      emit({ t: "hr" });
       at++;
       continue;
     }
     if (QUOTE.test(line)) {
       const inner = [];
       for (; at < lines.length && QUOTE.test(lines[at]); at++) inner.push(lines[at].replace(/^ {0,3}> ?/, ""));
-      blocks.push({
+      emit({
         t: "quote",
         c: depth < MAX_QUOTE_DEPTH ? parseBlocks(inner, depth + 1) : [{ t: "p", c: parseInline(inner.join("\n")) }]
       });
@@ -20502,36 +20518,42 @@ function parseBlocks(lines, depth = 0, starts) {
           const ordered = /\d/.test(item[2]);
           const level = item[1].length >= 2 ? 1 : 0;
           if (level === 0 && rows.length && ordered !== rows[0].ordered) break;
-          rows.push({ level, ordered, text: item[3] });
+          rows.push({ level, ordered, text: item[3], line: at });
         } else if (/^\s{2,}\S/.test(row) && rows.length) rows[rows.length - 1].text += `
 ${row.trim()}`;
         else break;
         at++;
       }
       const list = { t: "list", ordered: rows[0].ordered, items: [] };
+      const itemLines2 = [];
       for (const row of rows) {
         const top = list.items.at(-1);
         if (row.level === 1 && top) {
           (_a2 = top.sub) != null ? _a2 : top.sub = { t: "list", ordered: row.ordered, items: [] };
           top.sub.items.push({ c: parseInline(row.text), sub: null });
-        } else list.items.push({ c: parseInline(row.text), sub: null });
+        } else {
+          list.items.push({ c: parseInline(row.text), sub: null });
+          itemLines2.push(row.line);
+        }
       }
-      blocks.push(list);
+      if (!emit(list) && budget) budget.itemLines = itemLines2;
       continue;
     }
     const paragraph = [line];
     for (at++; at < lines.length && lines[at].trim() && !startsBlock(lines[at]); at++) paragraph.push(lines[at]);
-    blocks.push({ t: "p", c: parseInline(paragraph.join("\n")) });
+    const ends = [];
+    if (!emit({ t: "p", c: parseInline(paragraph.join("\n"), 0, true, budget ? ends : void 0) }) && budget)
+      budget.ends = ends;
   }
   return blocks;
 }
 function inlineCost(nodes) {
   let cost = 0;
-  for (const node of nodes) {
-    cost += 1;
-    if (node.t === "fmt" || node.t === "link") cost += inlineCost(node.c);
-  }
+  for (const node of nodes) cost += nodeCost(node);
   return cost;
+}
+function nodeCost(node) {
+  return node.t === "fmt" || node.t === "link" ? 1 + inlineCost(node.c) : 1;
 }
 function blockCost(block) {
   switch (block.t) {
@@ -20547,10 +20569,13 @@ function blockCost(block) {
       return 1 + blocksCost(block.c);
     case "list": {
       let cost = 1;
-      for (const item of block.items) cost += 1 + inlineCost(item.c) + (item.sub ? blockCost(item.sub) : 0);
+      for (const item of block.items) cost += itemCost(item);
       return cost;
     }
   }
+}
+function itemCost(item) {
+  return 1 + inlineCost(item.c) + (item.sub ? blockCost(item.sub) : 0);
 }
 var blocksCost = (blocks) => blocks.reduce((sum, block) => sum + blockCost(block), 0);
 function layoutReply(text11, budget = MAX_REPLY_NODES) {
@@ -20558,53 +20583,43 @@ function layoutReply(text11, budget = MAX_REPLY_NODES) {
   let head = clean4;
   let tail = "";
   if (clean4.length > MAX_REPLY_CHARS) {
-    const line = clean4.lastIndexOf("\n", MAX_REPLY_CHARS);
-    const cut = line >= MAX_REPLY_CHARS / 2 ? line : MAX_REPLY_CHARS;
+    const line2 = clean4.lastIndexOf("\n", MAX_REPLY_CHARS);
+    let cut = line2 >= MAX_REPLY_CHARS / 2 ? line2 : MAX_REPLY_CHARS;
+    if (isLowSurrogate(clean4.charCodeAt(cut)) && isHighSurrogate(clean4.charCodeAt(cut - 1))) cut--;
     head = clean4.slice(0, cut);
     tail = clean4.slice(cut);
   }
   const lines = head.split("\n");
   const starts = [];
-  const blocks = parseBlocks(lines, 0, starts);
-  let used = 0;
-  let fit = 0;
-  while (fit < blocks.length) {
-    const cost = blockCost(blocks[fit]);
-    if (used + cost > budget) break;
-    used += cost;
-    fit++;
-  }
-  if (fit === blocks.length) return { blocks, plain: tail };
-  const end = fit + 1 < blocks.length ? starts[fit + 1] : lines.length;
-  const source = lines.slice(starts[fit], end).join("\n");
-  const room = budget - used;
-  const cutAt = (limit) => {
-    const line = source.lastIndexOf("\n", limit - 1);
-    if (line >= 0) return line + 1;
-    let at = limit;
-    while (at > 0 && !/\s/.test(source[at - 1])) at--;
-    return at;
-  };
-  const fits = (limit) => blocksCost(parseBlocks(source.slice(0, cutAt(limit)).split("\n"))) <= room;
-  let low = 0;
-  let high = source.length;
-  for (let probe = Math.max(256, room * 2); probe < high; probe *= 2) {
-    if (fits(probe)) low = probe;
-    else {
-      high = probe - 1;
-      break;
+  const limit = { room: budget, used: 0, over: false };
+  const blocks = parseBlocks(lines, 0, starts, limit);
+  if (!limit.over) return { blocks, plain: tail };
+  const over = blocks.pop();
+  const first = starts[blocks.length];
+  const room = limit.room - limit.used;
+  let line = first;
+  let offset = 0;
+  if (over.t === "p" && limit.ends) {
+    let used = 1;
+    let kept = 0;
+    while (kept < over.c.length && used + nodeCost(over.c[kept]) <= room) used += nodeCost(over.c[kept++]);
+    if (kept > 0) {
+      blocks.push({ t: "p", c: over.c.slice(0, kept) });
+      offset = limit.ends[kept - 1];
+    }
+  } else if (over.t === "list" && limit.itemLines) {
+    let used = 1;
+    let kept = 0;
+    while (kept < over.items.length && used + itemCost(over.items[kept]) <= room) used += itemCost(over.items[kept++]);
+    if (kept > 0) {
+      blocks.push({ t: "list", ordered: over.ordered, items: over.items.slice(0, kept) });
+      line = limit.itemLines[kept];
     }
   }
-  while (low < high) {
-    const mid = Math.ceil((low + high) / 2);
-    if (fits(mid)) low = mid;
-    else high = mid - 1;
-  }
-  low = cutAt(low);
-  const kept = parseBlocks(source.slice(0, low).split("\n"));
-  const rest = [source.slice(low), ...lines.slice(end)].join("\n") + (tail ? tail : "");
-  return { blocks: [...blocks.slice(0, fit), ...kept], plain: rest };
+  return { blocks, plain: lines.slice(line).join("\n").slice(offset) + tail };
 }
+var isHighSurrogate = (code) => code >= 55296 && code <= 56319;
+var isLowSurrogate = (code) => code >= 56320 && code <= 57343;
 function renderInline(parent, nodes) {
   for (const node of nodes) {
     switch (node.t) {
@@ -20670,8 +20685,8 @@ function renderChatMarkdown(parent, text11, overflowNote = "") {
   parent.empty();
   const { blocks, plain } = layoutReply(text11);
   renderBlocks(parent, blocks);
-  const rest = plain.replace(/^\s+/, "");
-  if (!rest) return;
+  const rest = plain.replace(/^\n(?:[ \t]*\n)*/, "");
+  if (!rest.trim()) return;
   if (overflowNote) parent.createEl("p", { cls: "vam-map-chat-overflow-note", text: overflowNote });
   parent.createEl("p", { cls: "vam-map-chat-plain", text: rest });
 }
@@ -20883,11 +20898,12 @@ var MapChatPanel = class {
   }
   /** The answer so far (the whole text, not a delta). */
   streamReply(text11) {
+    var _a2, _b2, _c;
     const last = this.messages.at(-1);
     if (!last || !last.streaming) return;
     last.text = text11;
     if (!this.built || this.frame) return;
-    const win = typeof window !== "undefined" ? window : void 0;
+    const win = (_c = (_b2 = this.logEl.win) != null ? _b2 : (_a2 = this.logEl.ownerDocument) == null ? void 0 : _a2.defaultView) != null ? _c : typeof window !== "undefined" ? window : void 0;
     if (typeof (win == null ? void 0 : win.requestAnimationFrame) !== "function") {
       this.layoutStreaming();
       return;
@@ -20897,8 +20913,8 @@ var MapChatPanel = class {
       this.layoutStreaming();
     });
     this.frame = { cancel: () => {
-      var _a2;
-      return (_a2 = win.cancelAnimationFrame) == null ? void 0 : _a2.call(win, id);
+      var _a3;
+      return (_a3 = win.cancelAnimationFrame) == null ? void 0 : _a3.call(win, id);
     } };
   }
   /** Lays the streaming message out with the text it has now; no other message is touched. */
@@ -21188,7 +21204,9 @@ var MapChatPanel = class {
       message.error ? "e" : "",
       message.streaming ? "s" : "",
       more ? "m" : "",
+      t("ui.map_chat_role_you"),
       t("ui.map_chat_role_ai"),
+      t("ui.map_chat_overflow_note"),
       more ? t("ui.map_chat_more_detail") : "",
       message.lines.map((line) => `${line.status}:${line.text}`).join("\n"),
       message.text

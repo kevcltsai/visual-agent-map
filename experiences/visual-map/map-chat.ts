@@ -387,14 +387,19 @@ export class MapChatPanel {
       attr: { role: "log", "aria-live": "polite", tabindex: "0" }
     });
     // A [[link]] in a reply is an internal link anchor; Obsidian's own handler is not attached to this panel, so open it here.
-    this.logEl.addEventListener("click", event => {
-      const target = event.target as { closest?: (selector: string) => Element | null } | null;
+    const openInternal = (event: MouseEvent | KeyboardEvent, from: unknown): void => {
+      const target = from as { closest?: (selector: string) => Element | null } | null;
       const anchor = target?.closest?.("a");
       if (!anchor?.classList.contains("internal-link")) return;
-      const href = anchor.getAttribute("data-href") ?? anchor.getAttribute("href");
+      const href = anchor.getAttribute("data-href");
       if (!href) return;
       event.preventDefault();
       this.host.openLink(href, Keymap.isModEvent(event));
+    };
+    this.logEl.addEventListener("click", event => openInternal(event, event.target));
+    // The link has no href, so it is reached with Tab and opened with Enter.
+    this.logEl.addEventListener("keydown", event => {
+      if (event.key === "Enter") openInternal(event, event.target);
     });
     this.chipsEl = this.bodyEl.createDiv({
       cls: "vam-map-chat-chips",

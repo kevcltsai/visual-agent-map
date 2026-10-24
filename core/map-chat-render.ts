@@ -33,35 +33,59 @@ const ESCAPABLE = /[!-/:-@[-`{-~]/;
 const ALNUM = /[\p{L}\p{N}]/u;
 const HTTP_URL = /^https?:\/\/[^\s<>]+$/i;
 const BARE_URL = /https?:\/\/[^\s<>]+/iy;
+const TRAILING = ".,;:!?'\"*_~]";
+const SCHEME = /^[a-z][a-z0-9+.-]*:/i;
+const INVISIBLE = /[\s\u200b-\u200d\u2060\ufeff\u00ad]/g;
+const MAX_REPLY_CHARS = 50000;
 const WIKI = /\[\[([^[\]\n]+)\]\]/y;
 
-/** Index of the `]` that closes the `[` at `open` (nested pairs and `\]` are skipped), or -1. */
-function closingBracket(src: string, open: number): number {
-  let depth = 0;
-  for (let at = open; at < src.length; at++) {
+/** Per-source lookup tables, built in one pass the first time they are needed, so no opener ever rescans the text. */
+interface InlineScan {
+  src: string;
+  brackets?: Int32Array;
+  parens?: Int32Array;
+  noClose: Record<string, number>;
+}
+
+/** For every `[` the index of the `]` that closes it (nested pairs and `\]` are skipped), or -1. */
+function bracketTable(scan: InlineScan): Int32Array {
+  if (scan.brackets) return scan.brackets;
+  const { src } = scan;
+  const table = new Int32Array(src.length).fill(-1);
+  const stack: number[] = [];
+  for (let at = 0; at < src.length; at++) {
     const ch = src[at];
     if (ch === "\\") at++;
-    else if (ch === "[") depth++;
-    else if (ch === "]" && --depth === 0) return at;
+    else if (ch === "[") stack.push(at);
+    else if (ch === "]" && stack.length) table[stack.pop() as number] = at;
   }
-  return -1;
+  return (scan.brackets = table);
+}
+
+/** For every `(` the index of the `)` that closes it on the same line (`\)` is skipped), or -1. */
+function parenTable(scan: InlineScan): Int32Array {
+  if (scan.parens) return scan.parens;
+  const { src } = scan;
+  const table = new Int32Array(src.length).fill(-1);
+  let stack: number[] = [];
+  for (let at = 0; at < src.length; at++) {
+    const ch = src[at];
+    if (ch === "\\") at++;
+    else if (ch === "(") stack.push(at);
+    else if (ch === ")" && stack.length) table[stack.pop() as number] = at;
+    else if (ch === "\n") stack = [];
+  }
+  return (scan.parens = table);
 }
 
 /** `[label](destination "title")` at `open`: where it ends, the label text and the destination. Null when it is not that shape. */
-function bracketLink(src: string, open: number): { end: number; label: string; dest: string } | null {
+function bracketLink(scan: InlineScan, open: number): { end: number; label: string; dest: string } | null {
+  const { src } = scan;
   if (src[open] !== "[") return null;
-  const close = closingBracket(src, open);
+  const close = bracketTable(scan)[open];
   if (close < 0 || src[close + 1] !== "(") return null;
-  let depth = 0;
-  let at = close + 1;
-  for (; at < src.length; at++) {
-    const ch = src[at];
-    if (ch === "\\") at++;
-    else if (ch === "(") depth++;
-    else if (ch === ")" && --depth === 0) break;
-    else if (ch === "\n") return null;
-  }
-  if (at >= src.length) return null;
+  const at = parenTable(scan)[close + 1];
+  if (at < 0) return null;
   let dest = src.slice(close + 2, at).trim();
   if (dest.startsWith("<")) {
     const stop = dest.indexOf(">");
@@ -82,13 +106,16 @@ function wikiAt(src: string, at: number): { end: number; target: string; label: 
 
 const DELIMITERS = ["**", "__", "~~", "*", "_"] as const;
 
-function formatAt(src: string, at: number, depth: number): { end: number; node: ChatInline } | null {
+function formatAt(scan: InlineScan, at: number, depth: number): { end: number; node: ChatInline } | null {
+  const { src } = scan;
   const delimiter = DELIMITERS.find(item => src.startsWith(item, at));
   if (!delimiter || depth >= MAX_INLINE_DEPTH) return null;
   const underscore = delimiter[0] === "_";
   if (underscore && at > 0 && ALNUM.test(src[at - 1])) return null;
   const start = at + delimiter.length;
   if (start >= src.length || /\s/.test(src[start])) return null;
+  // Whether a closer is valid does not depend on the opener, so one failed search rules out every later opener of the same kind.
+  if (start >= (scan.noClose[delimiter] ?? Infinity)) return null;
   for (let close: number = src.indexOf(delimiter, start + 1); close >= 0; close = src.indexOf(delimiter, close + 1)) {
     if (/\s/.test(src[close - 1])) continue;
     const after: string | undefined = src[close + delimiter.length];
@@ -100,6 +127,7 @@ function formatAt(src: string, at: number, depth: number): { end: number; node: 
       node: { t: "fmt", tag, c: parseInline(src.slice(start, close), depth + 1, true) }
     };
   }
+  scan.noClose[delimiter] = start;
   return null;
 }
 
@@ -108,13 +136,32 @@ function bareUrlAt(src: string, at: number): { end: number; url: string } | null
   BARE_URL.lastIndex = at;
   const match = BARE_URL.exec(src);
   if (!match) return null;
-  let url = match[0].replace(/[.,;:!?'"*_~\]]+$/, "");
-  while (url.endsWith(")") && !url.includes("(")) url = url.slice(0, -1).replace(/[.,;:!?'"*_~\]]+$/, "");
+  const raw = match[0];
+  const hasOpen = raw.includes("(");
+  let stop = raw.length;
+  for (;;) {
+    while (stop > 0 && TRAILING.includes(raw[stop - 1])) stop--;
+    if (stop > 0 && raw[stop - 1] === ")" && !hasOpen) stop--;
+    else break;
+  }
+  const url = raw.slice(0, stop);
   return /^https?:\/\/./i.test(url) ? { end: at + url.length, url } : null;
+}
+
+/** How many characters a reader can see in these pieces (blanks and zero-width characters do not count). */
+function visibleLength(nodes: ChatInline[]): number {
+  let total = 0;
+  for (const node of nodes) {
+    if (node.t === "text" || node.t === "code") total += node.text.replace(INVISIBLE, "").length;
+    else if (node.t === "fmt" || node.t === "link") total += visibleLength(node.c);
+    else if (node.t === "wiki") total += node.label.replace(INVISIBLE, "").length;
+  }
+  return total;
 }
 
 /** Parses inline Markdown. `links` is false inside a link label, where a nested link stays text. */
 export function parseInline(src: string, depth = 0, links = true): ChatInline[] {
+  const scan: InlineScan = { src, noClose: {} };
   const out: ChatInline[] = [];
   let buf = "";
   const flush = (): void => {
@@ -163,7 +210,7 @@ export function parseInline(src: string, depth = 0, links = true): ChatInline[] 
     if (ch === "!" && src[at + 1] === "[") {
       // An image or embed is shown as written, never loaded and never turned into a link.
       const wiki = src.startsWith("[[", at + 1) ? wikiAt(src, at + 1) : null;
-      const link = wiki ? null : bracketLink(src, at + 1);
+      const link = wiki ? null : bracketLink(scan, at + 1);
       const end = wiki?.end ?? link?.end;
       if (end !== undefined) {
         buf += src.slice(at, end);
@@ -176,6 +223,12 @@ export function parseInline(src: string, depth = 0, links = true): ChatInline[] 
     }
     if (ch === "[") {
       const wiki = wikiAt(src, at);
+      if (wiki && SCHEME.test(wiki.target)) {
+        // A target that names a scheme is never a note, so it stays the text the model wrote.
+        buf += src.slice(at, wiki.end);
+        at = wiki.end;
+        continue;
+      }
       if (wiki && links) {
         flush();
         out.push({ t: "wiki", target: wiki.target, label: wiki.label });
@@ -187,20 +240,20 @@ export function parseInline(src: string, depth = 0, links = true): ChatInline[] 
         at = wiki.end;
         continue;
       }
-      const link = bracketLink(src, at);
+      const link = bracketLink(scan, at);
       if (link) {
         if (links && HTTP_URL.test(link.dest)) {
           flush();
           // A link with no words in it shows its address, so it never turns into an invisible target.
-          const label = link.label.trim() ? parseInline(link.label, depth + 1, false) : [];
-          out.push({ t: "link", href: link.dest, c: label.length ? label : [{ t: "text", text: link.dest }] });
+          const label = parseInline(link.label, depth + 1, false);
+          out.push({ t: "link", href: link.dest, c: visibleLength(label) ? label : [{ t: "text", text: link.dest }] });
         } else buf += src.slice(at, link.end);
         at = link.end;
         continue;
       }
     }
     if (ch === "*" || ch === "_" || ch === "~") {
-      const format = formatAt(src, at, depth);
+      const format = formatAt(scan, at, depth);
       if (format) {
         flush();
         out.push(format.node);
@@ -226,7 +279,18 @@ export function parseInline(src: string, depth = 0, links = true): ChatInline[] 
 
 const FENCE_OPEN = /^ {0,3}(`{3,}|~{3,})(.*)$/;
 const FENCE_CLOSE = /^ {0,3}(`{3,}|~{3,})[ \t]*$/;
-const HEADING = /^ {0,3}(#{1,6})[ \t]+(.*?)(?:[ \t]+#+)?[ \t]*$/;
+const HEADING_OPEN = /^ {0,3}(#{1,6})(?:[ \t]+|$)/;
+
+/** An ATX heading's level and text, or null. The closing `#` run is stripped by hand, so no pattern can backtrack over spaces. */
+function headingAt(line: string): { level: number; text: string } | null {
+  const open = HEADING_OPEN.exec(line);
+  if (!open) return null;
+  let text = line.slice(open[0].length).trimEnd();
+  let at = text.length;
+  while (at > 0 && text[at - 1] === "#") at--;
+  if (at > 0 && at < text.length && (text[at - 1] === " " || text[at - 1] === "\t")) text = text.slice(0, at).trimEnd();
+  return { level: open[1].length, text };
+}
 const RULE = /^ {0,3}([-*_])(?:[ \t]*\1){2,}[ \t]*$/;
 const QUOTE = /^ {0,3}>/;
 const LIST = /^( *)([-*+]|\d{1,9}[.)])[ \t]+(.*)$/;
@@ -237,7 +301,7 @@ const isFenceOpen = (line: string): RegExpExecArray | null => {
   return open && !(open[1][0] === "`" && open[2].includes("`")) ? open : null;
 };
 const startsBlock = (line: string): boolean =>
-  !!isFenceOpen(line) || HEADING.test(line) || RULE.test(line) || QUOTE.test(line) || LIST.test(line);
+  !!isFenceOpen(line) || !!headingAt(line) || RULE.test(line) || QUOTE.test(line) || LIST.test(line);
 
 export function parseBlocks(lines: string[], depth = 0): ChatBlock[] {
   const blocks: ChatBlock[] = [];
@@ -263,9 +327,9 @@ export function parseBlocks(lines: string[], depth = 0): ChatBlock[] {
       blocks.push({ t: "code", text: body.join("\n") });
       continue;
     }
-    const heading = HEADING.exec(line);
+    const heading = headingAt(line);
     if (heading) {
-      blocks.push({ t: "h", level: heading[1].length, c: parseInline(heading[2]) });
+      blocks.push({ t: "h", level: heading.level, c: parseInline(heading.text) });
       at++;
       continue;
     }
@@ -326,7 +390,20 @@ export function parseBlocks(lines: string[], depth = 0): ChatBlock[] {
 }
 
 export function parseChatMarkdown(text: string): ChatBlock[] {
-  return parseBlocks(text.replace(/\r\n?/g, "\n").split("\n"));
+  const clean = text.replace(/\r\n?/g, "\n");
+  if (clean.length <= MAX_REPLY_CHARS) return parseBlocks(clean.split("\n"));
+  // A reply this long is laid out in full only up to the limit (cut at a line end when there is one); the rest stays plain text.
+  const line = clean.lastIndexOf("\n", MAX_REPLY_CHARS);
+  const cut = line >= MAX_REPLY_CHARS / 2 ? line : MAX_REPLY_CHARS;
+  const rest: ChatInline[] = [];
+  clean
+    .slice(cut)
+    .split("\n")
+    .forEach((part, index) => {
+      if (index) rest.push({ t: "br" });
+      if (part) rest.push({ t: "text", text: part });
+    });
+  return [...parseBlocks(clean.slice(0, cut).split("\n")), { t: "p", c: rest }];
 }
 
 function renderInline(parent: HTMLElement, nodes: ChatInline[]): void {
@@ -348,7 +425,7 @@ function renderInline(parent: HTMLElement, nodes: ChatInline[]): void {
         parent.createEl("a", {
           cls: "internal-link",
           text: node.label,
-          attr: { "data-href": node.target, href: node.target }
+          attr: { "data-href": node.target, tabindex: "0" }
         });
         break;
       case "link":

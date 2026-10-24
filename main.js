@@ -20194,32 +20194,46 @@ var ESCAPABLE = /[!-/:-@[-`{-~]/;
 var ALNUM = /[\p{L}\p{N}]/u;
 var HTTP_URL = /^https?:\/\/[^\s<>]+$/i;
 var BARE_URL = /https?:\/\/[^\s<>]+/iy;
+var TRAILING = `.,;:!?'"*_~]`;
+var SCHEME = /^[a-z][a-z0-9+.-]*:/i;
+var INVISIBLE = /[\s\u200b-\u200d\u2060\ufeff\u00ad]/g;
+var MAX_REPLY_CHARS = 5e4;
 var WIKI = /\[\[([^[\]\n]+)\]\]/y;
-function closingBracket(src, open) {
-  let depth = 0;
-  for (let at = open; at < src.length; at++) {
+function bracketTable(scan2) {
+  if (scan2.brackets) return scan2.brackets;
+  const { src } = scan2;
+  const table = new Int32Array(src.length).fill(-1);
+  const stack = [];
+  for (let at = 0; at < src.length; at++) {
     const ch = src[at];
     if (ch === "\\") at++;
-    else if (ch === "[") depth++;
-    else if (ch === "]" && --depth === 0) return at;
+    else if (ch === "[") stack.push(at);
+    else if (ch === "]" && stack.length) table[stack.pop()] = at;
   }
-  return -1;
+  return scan2.brackets = table;
 }
-function bracketLink(src, open) {
-  var _a2;
-  if (src[open] !== "[") return null;
-  const close = closingBracket(src, open);
-  if (close < 0 || src[close + 1] !== "(") return null;
-  let depth = 0;
-  let at = close + 1;
-  for (; at < src.length; at++) {
+function parenTable(scan2) {
+  if (scan2.parens) return scan2.parens;
+  const { src } = scan2;
+  const table = new Int32Array(src.length).fill(-1);
+  let stack = [];
+  for (let at = 0; at < src.length; at++) {
     const ch = src[at];
     if (ch === "\\") at++;
-    else if (ch === "(") depth++;
-    else if (ch === ")" && --depth === 0) break;
-    else if (ch === "\n") return null;
+    else if (ch === "(") stack.push(at);
+    else if (ch === ")" && stack.length) table[stack.pop()] = at;
+    else if (ch === "\n") stack = [];
   }
-  if (at >= src.length) return null;
+  return scan2.parens = table;
+}
+function bracketLink(scan2, open) {
+  var _a2;
+  const { src } = scan2;
+  if (src[open] !== "[") return null;
+  const close = bracketTable(scan2)[open];
+  if (close < 0 || src[close + 1] !== "(") return null;
+  const at = parenTable(scan2)[close + 1];
+  if (at < 0) return null;
   let dest = src.slice(close + 2, at).trim();
   if (dest.startsWith("<")) {
     const stop = dest.indexOf(">");
@@ -20237,13 +20251,16 @@ function wikiAt(src, at) {
   return { end: at + match[0].length, target, label: alias.join("|").trim() || target };
 }
 var DELIMITERS = ["**", "__", "~~", "*", "_"];
-function formatAt(src, at, depth) {
+function formatAt(scan2, at, depth) {
+  var _a2;
+  const { src } = scan2;
   const delimiter2 = DELIMITERS.find((item) => src.startsWith(item, at));
   if (!delimiter2 || depth >= MAX_INLINE_DEPTH) return null;
   const underscore = delimiter2[0] === "_";
   if (underscore && at > 0 && ALNUM.test(src[at - 1])) return null;
   const start = at + delimiter2.length;
   if (start >= src.length || /\s/.test(src[start])) return null;
+  if (start >= ((_a2 = scan2.noClose[delimiter2]) != null ? _a2 : Infinity)) return null;
   for (let close = src.indexOf(delimiter2, start + 1); close >= 0; close = src.indexOf(delimiter2, close + 1)) {
     if (/\s/.test(src[close - 1])) continue;
     const after = src[close + delimiter2.length];
@@ -20255,6 +20272,7 @@ function formatAt(src, at, depth) {
       node: { t: "fmt", tag, c: parseInline(src.slice(start, close), depth + 1, true) }
     };
   }
+  scan2.noClose[delimiter2] = start;
   return null;
 }
 function bareUrlAt(src, at) {
@@ -20262,12 +20280,29 @@ function bareUrlAt(src, at) {
   BARE_URL.lastIndex = at;
   const match = BARE_URL.exec(src);
   if (!match) return null;
-  let url = match[0].replace(/[.,;:!?'"*_~\]]+$/, "");
-  while (url.endsWith(")") && !url.includes("(")) url = url.slice(0, -1).replace(/[.,;:!?'"*_~\]]+$/, "");
+  const raw = match[0];
+  const hasOpen = raw.includes("(");
+  let stop = raw.length;
+  for (; ; ) {
+    while (stop > 0 && TRAILING.includes(raw[stop - 1])) stop--;
+    if (stop > 0 && raw[stop - 1] === ")" && !hasOpen) stop--;
+    else break;
+  }
+  const url = raw.slice(0, stop);
   return /^https?:\/\/./i.test(url) ? { end: at + url.length, url } : null;
+}
+function visibleLength(nodes) {
+  let total2 = 0;
+  for (const node of nodes) {
+    if (node.t === "text" || node.t === "code") total2 += node.text.replace(INVISIBLE, "").length;
+    else if (node.t === "fmt" || node.t === "link") total2 += visibleLength(node.c);
+    else if (node.t === "wiki") total2 += node.label.replace(INVISIBLE, "").length;
+  }
+  return total2;
 }
 function parseInline(src, depth = 0, links = true) {
   var _a2;
+  const scan2 = { src, noClose: {} };
   const out = [];
   let buf = "";
   const flush = () => {
@@ -20315,7 +20350,7 @@ function parseInline(src, depth = 0, links = true) {
     }
     if (ch === "!" && src[at + 1] === "[") {
       const wiki = src.startsWith("[[", at + 1) ? wikiAt(src, at + 1) : null;
-      const link = wiki ? null : bracketLink(src, at + 1);
+      const link = wiki ? null : bracketLink(scan2, at + 1);
       const end = (_a2 = wiki == null ? void 0 : wiki.end) != null ? _a2 : link == null ? void 0 : link.end;
       if (end !== void 0) {
         buf += src.slice(at, end);
@@ -20328,6 +20363,11 @@ function parseInline(src, depth = 0, links = true) {
     }
     if (ch === "[") {
       const wiki = wikiAt(src, at);
+      if (wiki && SCHEME.test(wiki.target)) {
+        buf += src.slice(at, wiki.end);
+        at = wiki.end;
+        continue;
+      }
       if (wiki && links) {
         flush();
         out.push({ t: "wiki", target: wiki.target, label: wiki.label });
@@ -20339,19 +20379,19 @@ function parseInline(src, depth = 0, links = true) {
         at = wiki.end;
         continue;
       }
-      const link = bracketLink(src, at);
+      const link = bracketLink(scan2, at);
       if (link) {
         if (links && HTTP_URL.test(link.dest)) {
           flush();
-          const label = link.label.trim() ? parseInline(link.label, depth + 1, false) : [];
-          out.push({ t: "link", href: link.dest, c: label.length ? label : [{ t: "text", text: link.dest }] });
+          const label = parseInline(link.label, depth + 1, false);
+          out.push({ t: "link", href: link.dest, c: visibleLength(label) ? label : [{ t: "text", text: link.dest }] });
         } else buf += src.slice(at, link.end);
         at = link.end;
         continue;
       }
     }
     if (ch === "*" || ch === "_" || ch === "~") {
-      const format = formatAt(src, at, depth);
+      const format = formatAt(scan2, at, depth);
       if (format) {
         flush();
         out.push(format.node);
@@ -20376,7 +20416,16 @@ function parseInline(src, depth = 0, links = true) {
 }
 var FENCE_OPEN = /^ {0,3}(`{3,}|~{3,})(.*)$/;
 var FENCE_CLOSE = /^ {0,3}(`{3,}|~{3,})[ \t]*$/;
-var HEADING2 = /^ {0,3}(#{1,6})[ \t]+(.*?)(?:[ \t]+#+)?[ \t]*$/;
+var HEADING_OPEN = /^ {0,3}(#{1,6})(?:[ \t]+|$)/;
+function headingAt(line) {
+  const open = HEADING_OPEN.exec(line);
+  if (!open) return null;
+  let text11 = line.slice(open[0].length).trimEnd();
+  let at = text11.length;
+  while (at > 0 && text11[at - 1] === "#") at--;
+  if (at > 0 && at < text11.length && (text11[at - 1] === " " || text11[at - 1] === "	")) text11 = text11.slice(0, at).trimEnd();
+  return { level: open[1].length, text: text11 };
+}
 var RULE = /^ {0,3}([-*_])(?:[ \t]*\1){2,}[ \t]*$/;
 var QUOTE = /^ {0,3}>/;
 var LIST = /^( *)([-*+]|\d{1,9}[.)])[ \t]+(.*)$/;
@@ -20384,7 +20433,7 @@ var isFenceOpen = (line) => {
   const open = FENCE_OPEN.exec(line);
   return open && !(open[1][0] === "`" && open[2].includes("`")) ? open : null;
 };
-var startsBlock = (line) => !!isFenceOpen(line) || HEADING2.test(line) || RULE.test(line) || QUOTE.test(line) || LIST.test(line);
+var startsBlock = (line) => !!isFenceOpen(line) || !!headingAt(line) || RULE.test(line) || QUOTE.test(line) || LIST.test(line);
 function parseBlocks(lines, depth = 0) {
   var _a2;
   const blocks = [];
@@ -20410,9 +20459,9 @@ function parseBlocks(lines, depth = 0) {
       blocks.push({ t: "code", text: body.join("\n") });
       continue;
     }
-    const heading = HEADING2.exec(line);
+    const heading = headingAt(line);
     if (heading) {
-      blocks.push({ t: "h", level: heading[1].length, c: parseInline(heading[2]) });
+      blocks.push({ t: "h", level: heading.level, c: parseInline(heading.text) });
       at++;
       continue;
     }
@@ -20472,7 +20521,16 @@ ${row.trim()}`;
   return blocks;
 }
 function parseChatMarkdown(text11) {
-  return parseBlocks(text11.replace(/\r\n?/g, "\n").split("\n"));
+  const clean4 = text11.replace(/\r\n?/g, "\n");
+  if (clean4.length <= MAX_REPLY_CHARS) return parseBlocks(clean4.split("\n"));
+  const line = clean4.lastIndexOf("\n", MAX_REPLY_CHARS);
+  const cut = line >= MAX_REPLY_CHARS / 2 ? line : MAX_REPLY_CHARS;
+  const rest = [];
+  clean4.slice(cut).split("\n").forEach((part, index) => {
+    if (index) rest.push({ t: "br" });
+    if (part) rest.push({ t: "text", text: part });
+  });
+  return [...parseBlocks(clean4.slice(0, cut).split("\n")), { t: "p", c: rest }];
 }
 function renderInline(parent, nodes) {
   for (const node of nodes) {
@@ -20493,7 +20551,7 @@ function renderInline(parent, nodes) {
         parent.createEl("a", {
           cls: "internal-link",
           text: node.label,
-          attr: { "data-href": node.target, href: node.target }
+          attr: { "data-href": node.target, tabindex: "0" }
         });
         break;
       case "link":
@@ -20836,15 +20894,19 @@ var MapChatPanel = class {
       cls: "vam-map-chat-log",
       attr: { role: "log", "aria-live": "polite", tabindex: "0" }
     });
-    this.logEl.addEventListener("click", (event) => {
-      var _a2, _b2;
-      const target = event.target;
+    const openInternal = (event, from) => {
+      var _a2;
+      const target = from;
       const anchor = (_a2 = target == null ? void 0 : target.closest) == null ? void 0 : _a2.call(target, "a");
       if (!(anchor == null ? void 0 : anchor.classList.contains("internal-link"))) return;
-      const href = (_b2 = anchor.getAttribute("data-href")) != null ? _b2 : anchor.getAttribute("href");
+      const href = anchor.getAttribute("data-href");
       if (!href) return;
       event.preventDefault();
       this.host.openLink(href, import_obsidian16.Keymap.isModEvent(event));
+    };
+    this.logEl.addEventListener("click", (event) => openInternal(event, event.target));
+    this.logEl.addEventListener("keydown", (event) => {
+      if (event.key === "Enter") openInternal(event, event.target);
     });
     this.chipsEl = this.bodyEl.createDiv({
       cls: "vam-map-chat-chips",
@@ -21638,7 +21700,7 @@ ${draft.context}` : "",
 // experiences/visual-map/outline-import.ts
 var OUTLINE_NODE_LIMIT = 100;
 var OUTLINE_TITLE_LIMIT = 200;
-var HEADING3 = /^ {0,3}(#{1,6})(?:[ \t]+(.*?))?[ \t]*$/;
+var HEADING2 = /^ {0,3}(#{1,6})(?:[ \t]+(.*?))?[ \t]*$/;
 var FENCE_OPEN2 = /^ {0,3}(`{3,}|~{3,})(.*)$/;
 var FENCE_CLOSE2 = /^ {0,3}(`{3,}|~{3,})[ \t]*$/;
 var MARKDOWN_FENCE = /^ {0,3}(`{3,}|~{3,})[ \t]*(markdown|md)?[ \t]*$/i;
@@ -21684,9 +21746,9 @@ function unwrapFencedOutline(lines) {
       continue;
     }
     const inner = lines.slice(index + 1, close);
-    if (!labelled[2] && inner.some((line) => line.trim() !== "" && !HEADING3.test(line))) return lines;
+    if (!labelled[2] && inner.some((line) => line.trim() !== "" && !HEADING2.test(line))) return lines;
     const outside = [...lines.slice(0, index), ...lines.slice(close + 1)];
-    if (!inner.some((line) => HEADING3.test(line)) || outside.some((line) => HEADING3.test(line))) return lines;
+    if (!inner.some((line) => HEADING2.test(line)) || outside.some((line) => HEADING2.test(line))) return lines;
     return lines.map((line, position) => position === index || position === close ? "" : line);
   }
   return lines;
@@ -21694,7 +21756,7 @@ function unwrapFencedOutline(lines) {
 function sanitizeOutlineDraft(markdown) {
   return markdown.split("\n").map((line) => {
     var _a2;
-    const heading = HEADING3.exec(line);
+    const heading = HEADING2.exec(line);
     if (!heading) return line;
     const title = outlineTitle(((_a2 = heading[2]) != null ? _a2 : "").replace(/(^|[ \t]+)#+[ \t]*$/, ""));
     if (!titleProblem(title)) return line;
@@ -21768,7 +21830,7 @@ function parseOutline(input) {
       blankLines++;
       continue;
     }
-    const heading = HEADING3.exec(line);
+    const heading = HEADING2.exec(line);
     if (!heading) {
       ignoredLines++;
       continue;

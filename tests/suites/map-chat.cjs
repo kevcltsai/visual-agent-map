@@ -1467,7 +1467,7 @@ function assertSafe(el, label) {
     assert.doesNotMatch(`${item.cls} ${JSON.stringify(item.attrs)}`, /language|lang-|dataview|mermaid/i, `${label}: a code language reached the tree`);
     if (item.tag === 'a') {
       if (hasClass(item, 'external-link')) { assert.match(item.attrs.href, /^https?:\/\//i, label); assert.equal(item.attrs.target, '_blank', label); assert.equal(item.attrs.rel, 'noopener', label); }
-      else assert.ok(hasClass(item, 'internal-link') && !/^[a-z][a-z0-9+.-]*:/i.test(item.attrs.href), `${label}: unexpected anchor ${JSON.stringify(item.attrs)}`);
+      else assert.ok(hasClass(item, 'internal-link') && !('href' in item.attrs) && !/^[a-z][a-z0-9+.-]*:/i.test(item.attrs['data-href']), `${label}: unexpected anchor ${JSON.stringify(item.attrs)}`);
     }
   }
 }
@@ -1503,6 +1503,10 @@ const BYPASSES = {
   escapedBrackets: { text: '\\[\\[Secret\\]\\] \\[x\\](https://evil/a)', links: ['https://evil/a'], shows: '[[Secret]] [x](https://evil/a)' },
   nestedLinkLabel: { text: '[a [b](https://evil/one)](https://evil/two)', links: ['https://evil/two'], shows: 'a [b](https://evil/one)' },
   mathAndTable: { text: '$$ x < y $$\n\n| a | b |\n|---|---|\n| <img src=x> | 1 |', links: [], shows: '| <img src=x> | 1 |' },
+  wikiJavascript: { text: '[[javascript:alert(1)]]', links: [], shows: '[[javascript:alert(1)]]' },
+  wikiHttps: { text: '[[https://evil]]', links: [], shows: '[[https://evil]]' },
+  wikiJavascriptCase: { text: '[[JavaScript:x]]', links: [], shows: '[[JavaScript:x]]' },
+  wikiSchemeAlias: { text: '[[javascript:x|Open]]', links: [], shows: '[[javascript:x|Open]]' },
   dataviewInline: { text: '`= this.file.name` and `$= dv.x()`', links: [], shows: '$= dv.x()' }
 };
 for (const [name, c] of Object.entries(BYPASSES)) {
@@ -1611,6 +1615,45 @@ test('map chat D4 Bug B: a link with no words shows its address, so it is never 
     assert.equal(visibleText(a), 'https://example.com/p', JSON.stringify(text)); assert.equal(a.attrs.href, 'https://example.com/p');
   }
   assert.equal(nodes(lay('![](https://example.com/p.png)')).filter(i => i.tag === 'img').length, 0, 'an image is never created, whatever its alt text');
+});
+
+test('map chat D5 F1: a [[link]] has no href, can be reached with Tab and opened with Enter', () => {
+  const el = lay('see [[Notes/Note#Part|the part]]'); const [a] = anchors(el);
+  assert.ok(!('href' in a.attrs), 'no href to carry a scheme'); eq([a.attrs['data-href'], a.attrs.tabindex], ['Notes/Note#Part', '0']);
+  const f = panelFixture(); f.panel.setOpen(true);
+  const anchor = (cls, href) => { const x = element('a', { cls }); x.attrs['data-href'] = href; x.getAttribute = name => x.attrs[name] ?? null; x.closest = () => x; return x; };
+  const press = (target, extra) => { let prevented = false; f.parts.log().fire('keydown', { target, key: 'Enter', preventDefault() { prevented = true; }, ...extra }); return prevented; };
+  assert.equal(press(anchor('internal-link', 'Notes/Note')), true); eq(f.calls.links, [['Notes/Note', false]]);
+  assert.equal(press(anchor('internal-link', 'Other'), { ctrlKey: true }), true); eq(f.calls.links.at(-1), ['Other', true]);
+  assert.equal(press(anchor('internal-link', 'Skip'), { key: 'a' }), false); assert.equal(press(anchor('external-link', 'https://e')), false);
+  assert.equal(f.calls.links.length, 2);
+});
+
+// Time limits (ms) for hostile input. Measured before the fix on the same machine: heading 5288, starsInline 1827, under 1130, wikiOpen 1199, brackets 1291.
+const timed = (text) => { const t = process.hrtime.bigint(); lay(text); return Number(process.hrtime.bigint() - t) / 1e6; };
+test('map chat D5 F2: a heading line with a long run of blanks parses in under 50 ms', () => {
+  for (const text of ['# a' + ' '.repeat(40000) + 'x', '# a' + ' \t'.repeat(20000) + 'x', '#' + ' '.repeat(40000) + 'x #']) {
+    const ms = timed(text); assert.ok(ms < 50, `${ms.toFixed(1)} ms for ${text.length} characters`);
+  }
+  eq(visibleText(lay('## Title ##  ')), 'Title'); eq(visibleText(lay('# C#')), 'C#'); eq(visibleText(lay('# a #b')), 'a #b');
+});
+
+test('map chat D5 F3: unmatched openers parse in under 100 ms, and a reply over 50,000 characters is laid out only up to that', () => {
+  for (const [name, unit] of [['star', 'a *'], ['bracket', '['], ['wiki', '[[a'], ['underscore', 'a _b'], ['link', '[a]('], ['image', '![a](']]) {
+    const text = unit.repeat(Math.ceil(40000 / unit.length)); const ms = timed(text);
+    assert.ok(ms < 100, `${name}: ${ms.toFixed(1)} ms`);
+  }
+  const long = 'x'.repeat(49990) + '\n*not bold*\n[[Late]]'; const el = lay(long);
+  eq(wikis(el), []); assert.equal(nodes(el).filter(i => i.tag === 'em').length, 0, 'the part past the limit is plain text');
+  assert.ok(visibleText(el).includes('*not bold*') && visibleText(el).includes('[[Late]]'));
+  eq(wikis(lay('*a* [[Early]] ' + 'y'.repeat(100))), ['Early']);
+});
+
+test('map chat D5 F4: a link whose text is only blanks or zero-width characters shows its address', () => {
+  for (const text of ['[\u200b](https://a)', '[\u200c\u200d\u2060](https://a)', '[\ufeff \u00ad](https://a)', '[**\u200b**](https://a)']) {
+    const [a] = anchors(lay(text)); assert.equal(visibleText(a), 'https://a', JSON.stringify(text));
+  }
+  assert.equal(visibleText(anchors(lay('[go\u200b](https://a)'))[0]), 'go\u200b');
 });
 
 test('map chat D4: line breaks are normalised (CRLF and CR) and kept inside a paragraph; blank lines separate paragraphs', () => {

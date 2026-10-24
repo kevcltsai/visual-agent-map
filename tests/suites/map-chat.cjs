@@ -25,8 +25,8 @@ function page() {
   attach(root);
   return { doc, root, attach };
 }
-function panelFixture(overrides = {}) {
-  const { MapChatPanel } = load('experiences/visual-map/map-chat.ts', { obsidian: { ...obsidian, Keymap: { isModEvent: event => !!event.ctrlKey } } });
+function panelFixture(overrides = {}, windowValues = {}) {
+  const { MapChatPanel } = load('experiences/visual-map/map-chat.ts', { obsidian: { ...obsidian, Keymap: { isModEvent: event => !!event.ctrlKey } } }, windowValues);
   const p = page(); const overlay = p.attach(p.root.createDiv('vam-canvas-overlay'));
   const calls = { send: 0, stop: 0, layout: [], more: [], links: [] };
   const topics = { a: 'Topic A', b: 'Topic B' };
@@ -1798,3 +1798,127 @@ integrationTest('map chat D4: a pending repaint also runs when the drop finds th
   removed.view.map = { ...removed.view.map, nodes: removed.view.map.nodes.filter(n => n.id !== removed.ids.a) }; removed.up();
   assert.equal(removed.chat.attachments().length, 0, 'the card is no longer on the map');
 });
+
+// ---- Packet E1: very long replies (finished messages keep their rows, one layout per frame, element budget) ----------------
+
+/** A window whose animation frames run only when the test says so. */
+const frames = () => {
+  const queue = [];
+  return { queue, window: { requestAnimationFrame: callback => queue.push(callback), cancelAnimationFrame: id => { queue[id - 1] = null; } }, run: () => { const due = queue.splice(0); due.forEach(callback => callback?.()); return due.filter(Boolean).length; } };
+};
+const spyRows = log => { const made = { rows: 0 }; const create = log.createDiv.bind(log); log.createDiv = value => { if (String(value?.cls ?? value).includes('vam-map-chat-msg')) made.rows++; return create(value); }; return made; };
+const DENSE = 'word *emph* **b** `c` [[x]] ';
+
+test('map chat E1: a finished message keeps its row on every later repaint; only the new messages are built', () => {
+  const f = panelFixture(); f.panel.setOpen(true); const log = f.parts.log(); const made = spyRows(log);
+  f.panel.begin('q1'); f.panel.finish(DENSE.repeat(200), [{ status: 'done', text: 'Done: A' }]);
+  const [user1, answer1] = [...log.children]; const body1 = answer1.children.find(c => hasClass(c, 'vam-map-chat-text'));
+  let reparsed = 0; const empty = body1.empty.bind(body1); body1.empty = () => { reparsed++; empty(); };
+  const inner = [...body1.children];
+  made.rows = 0;
+  f.panel.begin('q2'); f.panel.streamReply('second'); f.panel.finish('second answer', []);
+  assert.equal(made.rows, 2 + 1, 'two rows for the new question and answer, then the finished answer once more');
+  assert.equal(log.children.length, 4);
+  assert.equal(log.children[0], user1); assert.equal(log.children[1], answer1, 'the same row object, not a copy');
+  assert.equal(reparsed, 0, 'the finished message was not laid out again'); assert.deepEqual(body1.children, inner);
+  f.panel.fail('x'); // no streaming message: nothing to change, still the same rows
+  assert.equal(log.children[1], answer1);
+});
+
+test('map chat E1: a reset, and a new panel, start with no kept rows', () => {
+  const f = panelFixture(); f.panel.setOpen(true); const log = f.parts.log();
+  f.panel.begin('q1'); f.panel.finish('one', []); const old = [...log.children];
+  f.panel.reset(); assert.equal(log.children.length, 0);
+  f.panel.begin('q1'); f.panel.finish('one', []);
+  assert.equal(log.children.length, 2); assert.ok(old.every(row => !log.children.includes(row)), 'nothing of the old conversation is reused');
+});
+
+test('map chat E1: the "more detail" button of a kept row follows the busy state without rebuilding the row', () => {
+  const f = panelFixture(); f.panel.setOpen(true); const log = f.parts.log();
+  f.panel.begin('q1', { text: 'q1', chips: [], selectedIds: [] }); f.panel.finish('one', []);
+  const row = log.children[1]; const more = find(row, i => hasClass(i, 'vam-map-chat-more')); assert.equal(more.disabled, false);
+  f.panel.begin('q2'); assert.equal(log.children[1], row); assert.equal(more.disabled, true, 'disabled while the next turn runs');
+  f.panel.finish('two', []); assert.equal(log.children[1], row); assert.equal(more.disabled, false);
+});
+
+test('map chat E1: while streaming only the streaming message is laid out, once per frame, and the other rows stay the same objects', () => {
+  const clock = frames(); const f = panelFixture({}, clock.window); f.panel.setOpen(true); const log = f.parts.log();
+  f.panel.begin('q1'); f.panel.streamReply('first'); clock.run(); f.panel.finish('first answer', []);
+  const before = [...log.children];
+  f.panel.begin('q2'); const body = replyBody2(log); let layouts = 0; const empty = body.empty.bind(body); body.empty = () => { layouts++; empty(); };
+  for (let i = 1; i <= 10; i++) f.panel.streamReply(`chunk ${i} `.repeat(i));
+  assert.equal(layouts, 0, 'nothing is laid out until the frame'); assert.equal(clock.queue.filter(Boolean).length, 1, 'one frame is waiting');
+  assert.equal(clock.run(), 1); assert.equal(layouts, 1, 'ten chunks, one layout');
+  assert.equal(visibleText(body), 'chunk 10 '.repeat(10).replace(/chunk 10 $/, 'chunk 10 '));
+  assert.equal(log.children[0], before[0]); assert.equal(log.children[1], before[1]);
+  f.panel.streamReply('next'); assert.equal(clock.run(), 1); assert.equal(layouts, 2); assert.equal(visibleText(body), 'next');
+});
+const replyBody2 = log => { const rows = log.children.filter(r => hasClass(r, 'is-assistant')); return rows.at(-1).children.find(c => hasClass(c, 'vam-map-chat-text')); };
+
+test('map chat E1: finish shows the complete text even when the last chunks never got their frame, and a late frame changes nothing', () => {
+  const clock = frames(); const f = panelFixture({}, clock.window); f.panel.setOpen(true); const log = f.parts.log();
+  f.panel.begin('q'); f.panel.streamReply('par'); f.panel.streamReply('partial **tail**');
+  f.panel.finish('the **complete** answer', []);
+  assert.equal(visibleText(replyBody2(log)), 'the complete answer'); assert.equal(clock.queue.filter(Boolean).length, 0, 'the waiting frame was cancelled');
+  clock.queue.forEach(callback => callback?.()); assert.equal(visibleText(replyBody2(log)), 'the complete answer');
+  f.panel.begin('q2'); f.panel.streamReply('one'); f.panel.markStopped(); assert.equal(visibleText(replyBody2(log)), 'one');
+  f.panel.begin('q3'); f.panel.streamReply('x'); f.panel.reset(); clock.run(); assert.equal(log.children.length, 0, 'a frame after a reset adds nothing');
+});
+
+test('map chat E1: the end is looked at once per frame, and the follow-the-end rule is unchanged', () => {
+  const clock = frames(); const f = panelFixture({}, clock.window); f.panel.setOpen(true); const log = f.parts.log();
+  let reads = 0; let height = 1000; Object.defineProperty(log, 'scrollHeight', { get() { reads++; return height; }, configurable: true });
+  log.clientHeight = 200; log.scrollTop = 800; f.panel.begin('q'); log.scrollTop = 800; reads = 0;
+  for (let i = 0; i < 10; i++) f.panel.streamReply('a'.repeat(i + 1));
+  assert.equal(reads, 0, 'no layout is read per chunk'); clock.run(); assert.ok(reads <= 2, `one look before and one after the layout: ${reads}`);
+  assert.equal(log.scrollTop, 1000, 'at the end: follows');
+  log.scrollTop = 100; f.panel.streamReply('abc'); clock.run(); assert.equal(log.scrollTop, 100, 'scrolled up: left where it is');
+});
+
+const layoutWith = (text, note = 'NOTE') => { const el = element('div'); renderChatMarkdown(el, text, note); return el; };
+const FIXED = 6; // a plain block, its note and the paragraph around them
+test('map chat E1: a reply past the element budget builds at most the budget, then shows the rest as plain text with a note', () => {
+  const { MAX_REPLY_NODES } = load('core/map-chat-render.ts');
+  assert.ok(MAX_REPLY_NODES <= 2000);
+  const text = DENSE.repeat(1850) + 'THE END'; const el = layoutWith(text);
+  const count = nodes(el).length - 1;
+  assert.ok(count <= MAX_REPLY_NODES + FIXED, `${count} elements`);
+  const plain = find(el, i => hasClass(i, 'vam-map-chat-plain')); const note = find(el, i => hasClass(i, 'vam-map-chat-overflow-note'));
+  assert.ok(plain && note); assert.equal(note.text, 'NOTE'); assert.ok(plain.text.endsWith('THE END'), 'the end of the reply is there');
+  assert.ok(plain.text.includes('*emph* **b** `c` [[x]]'), 'the markup is shown as it was written');
+  assert.equal(findAll(plain, () => true).length, 1, 'one block, no children');
+  assert.ok(el.children.indexOf(note) < el.children.indexOf(plain));
+  assert.equal(nodes(el).filter(i => i.tag === 'a').length > 0, true, 'the start is still laid out');
+});
+test('map chat E1: past the budget, lines and list items keep their line breaks in the plain block, and nothing is lost', () => {
+  const lines = Array.from({ length: 5000 }, (_, i) => `- item *${i}* **x**`); const text = lines.join('\n');
+  const el = layoutWith(text); assert.ok(nodes(el).length - 1 <= 2000 + FIXED);
+  const plain = find(el, i => hasClass(i, 'vam-map-chat-plain')); assert.ok(plain.text.includes('\n'));
+  assert.ok(plain.text.endsWith('- item *4999* **x**')); assert.ok(plain.text.split('\n').length > 1000);
+  const shown = visibleText(el); assert.ok(shown.includes('item 0'), 'the start is laid out as a list'); assert.equal(find(el, i => i.tag === 'ul') !== undefined, true);
+  const first = plain.text.split('\n')[0]; const at = lines.indexOf(first); assert.ok(at > 0, 'the plain part begins at a line of the reply'); assert.equal(plain.text, lines.slice(at).join('\n'));
+  const para = layoutWith('a *b*\n'.repeat(5000).trimEnd()); const p = find(para, i => hasClass(i, 'vam-map-chat-plain')); assert.ok(p.text.includes('\n') && p.text.endsWith('a *b*'));
+});
+test('map chat E1: a reply under the budget has no plain block and no note; the 50,000 character limit still applies after it', () => {
+  const small = layoutWith(DENSE.repeat(50)); assert.equal(find(small, i => hasClass(i, 'vam-map-chat-plain')), undefined); assert.equal(find(small, i => hasClass(i, 'vam-map-chat-overflow-note')), undefined);
+  const code = layoutWith('```\n' + 'x'.repeat(40000) + '\n```'); assert.equal(find(code, i => hasClass(i, 'vam-map-chat-plain')), undefined, 'a code block is two elements, however long');
+  const huge = layoutWith('word '.repeat(30000)); const plain = find(huge, i => hasClass(i, 'vam-map-chat-plain')); assert.ok(plain); assert.ok(plain.text.length > 90000 || visibleText(huge).length >= 150000 - 5);
+  const noNote = element('div'); renderChatMarkdown(noNote, DENSE.repeat(1850)); assert.equal(find(noNote, i => hasClass(i, 'vam-map-chat-overflow-note')), undefined, 'no note is made without text for it');
+});
+test('map chat E1: the panel gives the note in the reader\'s language, and all three languages have it', () => {
+  const f = panelFixture(); f.panel.setOpen(true); f.panel.begin('q'); f.panel.finish(DENSE.repeat(1850), []);
+  const note = find(f.parts.log(), i => hasClass(i, 'vam-map-chat-overflow-note')); assert.ok(note); assert.match(note.text, /too long/i);
+  for (const lang of ['en', 'zh-TW', 'zh-CN']) assert.match(fs.readFileSync(path.join(root, 'i18n', `${lang}.ts`), 'utf8'), /"ui\.map_chat_overflow_note": "[^"]+"/, lang);
+});
+test('map chat E1: a long dense reply streamed in 10 chunks, then a short reply, lays out in a small fraction of the old time', () => {
+  const clock = frames(); const f = panelFixture({}, clock.window); f.panel.setOpen(true);
+  const dense = DENSE.repeat(1850); const short = 'word '.repeat(400); const start = process.hrtime.bigint();
+  for (const [q, text] of [['q1', dense], ['q2', short]]) {
+    f.panel.begin(q); for (let i = 1; i <= 10; i++) { f.panel.streamReply(text.slice(0, Math.ceil(text.length * i / 10))); clock.run(); }
+    f.panel.finish(text, []);
+  }
+  const ms = Number(process.hrtime.bigint() - start) / 1e6; console.log(`E1 timing: ${ms.toFixed(0)} ms`);
+  assert.ok(ms < LIMIT_MS, `${ms.toFixed(0)} ms`);
+});
+// Before the change the same run took about 630 ms in this fake DOM (and seconds in a real one, where layout dominates); the limit is loose on purpose.
+const LIMIT_MS = 350;

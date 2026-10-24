@@ -987,6 +987,7 @@ var en = {
   "ui.map_chat_redo_actions_ignored": "Actions are not applied again in a more-detail answer.",
   "ui.map_chat_replying": "The AI is replying\u2026",
   "ui.map_chat_stopped": "Stopped.",
+  "ui.map_chat_overflow_note": "Content too long; the rest is shown as plain text.",
   "ui.map_chat_remove_ref_0": "Remove reference: {0}",
   "ui.map_chat_ref_topic_0": "Topic: {0}",
   "ui.map_chat_ref_selected_0": "Selected: {0}",
@@ -2827,6 +2828,7 @@ var zhCN = {
   "ui.map_chat_redo_actions_ignored": "\u8BE6\u7EC6\u7248\u56DE\u7B54\u4E0D\u4F1A\u518D\u6B21\u5E94\u7528\u64CD\u4F5C\u3002",
   "ui.map_chat_replying": "AI \u6B63\u5728\u56DE\u590D\u2026",
   "ui.map_chat_stopped": "\u5DF2\u505C\u6B62\u3002",
+  "ui.map_chat_overflow_note": "\u5185\u5BB9\u8FC7\u957F\uFF0C\u4EE5\u4E0B\u4EE5\u7EAF\u6587\u672C\u663E\u793A",
   "ui.map_chat_remove_ref_0": "\u79FB\u9664\u5F15\u7528\uFF1A{0}",
   "ui.map_chat_ref_topic_0": "\u8BAE\u9898\uFF1A{0}",
   "ui.map_chat_ref_selected_0": "\u5DF2\u9009\u53D6\uFF1A{0}",
@@ -4667,6 +4669,7 @@ var zhTW = {
   "ui.map_chat_redo_actions_ignored": "\u8A73\u7D30\u7248\u56DE\u7B54\u4E0D\u6703\u518D\u6B21\u5957\u7528\u52D5\u4F5C\u3002",
   "ui.map_chat_replying": "AI \u6B63\u5728\u56DE\u8986\u2026",
   "ui.map_chat_stopped": "\u5DF2\u505C\u6B62\u3002",
+  "ui.map_chat_overflow_note": "\u5167\u5BB9\u904E\u9577\uFF0C\u4EE5\u4E0B\u4EE5\u7D14\u6587\u5B57\u986F\u793A",
   "ui.map_chat_remove_ref_0": "\u79FB\u9664\u5F15\u7528\uFF1A{0}",
   "ui.map_chat_ref_topic_0": "\u8B70\u984C\uFF1A{0}",
   "ui.map_chat_ref_selected_0": "\u5DF2\u9078\u53D6\uFF1A{0}",
@@ -20198,6 +20201,7 @@ var TRAILING = `.,;:!?'"*_~]`;
 var SCHEME = /^[a-z][a-z0-9+.-]*:/i;
 var INVISIBLE = /[\s\u200b-\u200d\u2060\ufeff\u00ad]/g;
 var MAX_REPLY_CHARS = 5e4;
+var MAX_REPLY_NODES = 2e3;
 var WIKI = /\[\[([^[\]\n]+)\]\]/y;
 function bracketTable(scan2) {
   if (scan2.brackets) return scan2.brackets;
@@ -20434,7 +20438,7 @@ var isFenceOpen = (line) => {
   return open && !(open[1][0] === "`" && open[2].includes("`")) ? open : null;
 };
 var startsBlock = (line) => !!isFenceOpen(line) || !!headingAt(line) || RULE.test(line) || QUOTE.test(line) || LIST.test(line);
-function parseBlocks(lines, depth = 0) {
+function parseBlocks(lines, depth = 0, starts) {
   var _a2;
   const blocks = [];
   for (let at = 0; at < lines.length; ) {
@@ -20443,6 +20447,7 @@ function parseBlocks(lines, depth = 0) {
       at++;
       continue;
     }
+    starts == null ? void 0 : starts.push(at);
     const open = isFenceOpen(line);
     if (open) {
       const mark = open[1][0];
@@ -20520,17 +20525,85 @@ ${row.trim()}`;
   }
   return blocks;
 }
-function parseChatMarkdown(text11) {
+function inlineCost(nodes) {
+  let cost = 0;
+  for (const node of nodes) {
+    cost += 1;
+    if (node.t === "fmt" || node.t === "link") cost += inlineCost(node.c);
+  }
+  return cost;
+}
+function blockCost(block) {
+  switch (block.t) {
+    case "p":
+      return 1 + inlineCost(block.c);
+    case "h":
+      return 1 + inlineCost(block.c);
+    case "hr":
+      return 1;
+    case "code":
+      return 2;
+    case "quote":
+      return 1 + blocksCost(block.c);
+    case "list": {
+      let cost = 1;
+      for (const item of block.items) cost += 1 + inlineCost(item.c) + (item.sub ? blockCost(item.sub) : 0);
+      return cost;
+    }
+  }
+}
+var blocksCost = (blocks) => blocks.reduce((sum, block) => sum + blockCost(block), 0);
+function layoutReply(text11, budget = MAX_REPLY_NODES) {
   const clean4 = text11.replace(/\r\n?/g, "\n");
-  if (clean4.length <= MAX_REPLY_CHARS) return parseBlocks(clean4.split("\n"));
-  const line = clean4.lastIndexOf("\n", MAX_REPLY_CHARS);
-  const cut = line >= MAX_REPLY_CHARS / 2 ? line : MAX_REPLY_CHARS;
-  const rest = [];
-  clean4.slice(cut).split("\n").forEach((part, index) => {
-    if (index) rest.push({ t: "br" });
-    if (part) rest.push({ t: "text", text: part });
-  });
-  return [...parseBlocks(clean4.slice(0, cut).split("\n")), { t: "p", c: rest }];
+  let head = clean4;
+  let tail = "";
+  if (clean4.length > MAX_REPLY_CHARS) {
+    const line = clean4.lastIndexOf("\n", MAX_REPLY_CHARS);
+    const cut = line >= MAX_REPLY_CHARS / 2 ? line : MAX_REPLY_CHARS;
+    head = clean4.slice(0, cut);
+    tail = clean4.slice(cut);
+  }
+  const lines = head.split("\n");
+  const starts = [];
+  const blocks = parseBlocks(lines, 0, starts);
+  let used = 0;
+  let fit = 0;
+  while (fit < blocks.length) {
+    const cost = blockCost(blocks[fit]);
+    if (used + cost > budget) break;
+    used += cost;
+    fit++;
+  }
+  if (fit === blocks.length) return { blocks, plain: tail };
+  const end = fit + 1 < blocks.length ? starts[fit + 1] : lines.length;
+  const source = lines.slice(starts[fit], end).join("\n");
+  const room = budget - used;
+  const cutAt = (limit) => {
+    const line = source.lastIndexOf("\n", limit - 1);
+    if (line >= 0) return line + 1;
+    let at = limit;
+    while (at > 0 && !/\s/.test(source[at - 1])) at--;
+    return at;
+  };
+  const fits = (limit) => blocksCost(parseBlocks(source.slice(0, cutAt(limit)).split("\n"))) <= room;
+  let low = 0;
+  let high = source.length;
+  for (let probe = Math.max(256, room * 2); probe < high; probe *= 2) {
+    if (fits(probe)) low = probe;
+    else {
+      high = probe - 1;
+      break;
+    }
+  }
+  while (low < high) {
+    const mid = Math.ceil((low + high) / 2);
+    if (fits(mid)) low = mid;
+    else high = mid - 1;
+  }
+  low = cutAt(low);
+  const kept = parseBlocks(source.slice(0, low).split("\n"));
+  const rest = [source.slice(low), ...lines.slice(end)].join("\n") + (tail ? tail : "");
+  return { blocks: [...blocks.slice(0, fit), ...kept], plain: rest };
 }
 function renderInline(parent, nodes) {
   for (const node of nodes) {
@@ -20593,9 +20666,14 @@ function renderBlocks(parent, blocks) {
     }
   }
 }
-function renderChatMarkdown(parent, text11) {
+function renderChatMarkdown(parent, text11, overflowNote = "") {
   parent.empty();
-  renderBlocks(parent, parseChatMarkdown(text11));
+  const { blocks, plain } = layoutReply(text11);
+  renderBlocks(parent, blocks);
+  const rest = plain.replace(/^\s+/, "");
+  if (!rest) return;
+  if (overflowNote) parent.createEl("p", { cls: "vam-map-chat-overflow-note", text: overflowNote });
+  parent.createEl("p", { cls: "vam-map-chat-plain", text: rest });
 }
 
 // experiences/visual-map/map-chat.ts
@@ -20653,6 +20731,10 @@ var MapChatPanel = class {
     __publicField(this, "stopWatching", null);
     __publicField(this, "messageEls", []);
     __publicField(this, "bodyEls", []);
+    /** The laid-out row of each message with the state it was built from; a message that has not changed keeps its row. */
+    __publicField(this, "rows", /* @__PURE__ */ new WeakMap());
+    /** The animation frame that will lay out the streaming message, if one is waiting. */
+    __publicField(this, "frame", null);
     /** The visible note the user took off the chip; it stays off until another note is visible. */
     __publicField(this, "dismissedNote", null);
     __publicField(this, "noteChip", null);
@@ -20715,6 +20797,8 @@ var MapChatPanel = class {
     var _a2;
     (_a2 = this.stopWatching) == null ? void 0 : _a2.call(this);
     this.stopWatching = null;
+    this.cancelFrame();
+    this.rows = /* @__PURE__ */ new WeakMap();
   }
   /** Takes the panel out of the page; the next {@link mount} puts it back with all state intact. */
   detach() {
@@ -20802,11 +20886,35 @@ var MapChatPanel = class {
     const last = this.messages.at(-1);
     if (!last || !last.streaming) return;
     last.text = text11;
-    const body = this.bodyEls[this.bodyEls.length - 1];
-    if (!body) return;
+    if (!this.built || this.frame) return;
+    const win = typeof window !== "undefined" ? window : void 0;
+    if (typeof (win == null ? void 0 : win.requestAnimationFrame) !== "function") {
+      this.layoutStreaming();
+      return;
+    }
+    const id = win.requestAnimationFrame(() => {
+      this.frame = null;
+      this.layoutStreaming();
+    });
+    this.frame = { cancel: () => {
+      var _a2;
+      return (_a2 = win.cancelAnimationFrame) == null ? void 0 : _a2.call(win, id);
+    } };
+  }
+  /** Lays the streaming message out with the text it has now; no other message is touched. */
+  layoutStreaming() {
+    const last = this.messages.at(-1);
+    const entry = last ? this.rows.get(last) : void 0;
+    if (!last || !last.streaming || !entry) return;
     const stick = this.atEnd();
-    renderChatMarkdown(body, text11);
+    renderChatMarkdown(entry.body, last.text, t("ui.map_chat_overflow_note"));
+    entry.key = this.rowKey(last);
     if (stick) this.scrollToEnd();
+  }
+  cancelFrame() {
+    var _a2;
+    (_a2 = this.frame) == null ? void 0 : _a2.cancel();
+    this.frame = null;
   }
   /** The turn ended with an answer and the outcome of each action. */
   finish(reply, lines) {
@@ -20849,6 +20957,8 @@ var MapChatPanel = class {
   }
   /** Back to an empty conversation (a different map was opened). */
   reset() {
+    this.cancelFrame();
+    this.rows = /* @__PURE__ */ new WeakMap();
     this.messages = [];
     this.chips = [];
     this.dismissedNote = null;
@@ -21069,46 +21179,82 @@ var MapChatPanel = class {
       remove.addEventListener("click", () => this.removeChip(entry));
     }
   }
+  /** Everything a message row shows; the row is rebuilt only when this changes. */
+  rowKey(message) {
+    const asked = this.messages[this.messages.indexOf(message) - 1];
+    const more = this.hasMore(message, asked);
+    return [
+      message.role,
+      message.error ? "e" : "",
+      message.streaming ? "s" : "",
+      more ? "m" : "",
+      t("ui.map_chat_role_ai"),
+      more ? t("ui.map_chat_more_detail") : "",
+      message.lines.map((line) => `${line.status}:${line.text}`).join("\n"),
+      message.text
+    ].join("");
+  }
+  hasMore(message, asked) {
+    return message.role === "assistant" && !message.streaming && !message.error && !!message.text.trim() && !!(asked == null ? void 0 : asked.origin);
+  }
   renderLog(forceEnd = false) {
     if (!this.built) return;
+    this.cancelFrame();
     const stick = forceEnd || this.atEnd();
-    this.logEl.empty();
+    const keys = this.messages.map((message) => this.rowKey(message));
+    const kept = /* @__PURE__ */ new Set();
+    this.messages.forEach((message, index) => {
+      const entry = this.rows.get(message);
+      if (entry && entry.key === keys[index]) kept.add(entry.row);
+    });
+    for (const child of Array.from(this.logEl.children)) if (!kept.has(child)) child.remove();
     this.messageEls = [];
     this.bodyEls = [];
-    for (const message of this.messages) {
-      const row = this.logEl.createDiv({
-        cls: `vam-map-chat-msg is-${message.role}${message.error ? " is-error" : ""}`
-      });
-      row.createSpan({
-        cls: "vam-map-chat-role",
-        text: t(message.role === "user" ? "ui.map_chat_role_you" : "ui.map_chat_role_ai")
-      });
-      const markdown = message.role === "assistant" && !message.error;
-      const body = row.createDiv({ cls: `vam-map-chat-text${markdown ? " is-markdown" : ""}` });
-      this.bodyEls.push(body);
-      if (markdown) renderChatMarkdown(body, message.text);
-      else body.setText(message.text);
-      const asked = this.messages[this.messages.indexOf(message) - 1];
-      if (message.role === "assistant" && !message.streaming && !message.error && message.text.trim() && (asked == null ? void 0 : asked.origin)) {
-        const origin = asked.origin;
-        const more = row.createEl("button", {
-          cls: "vam-map-chat-more",
-          text: t("ui.map_chat_more_detail"),
-          attr: { type: "button" }
-        });
-        more.disabled = this.busy;
-        more.addEventListener("click", () => {
-          if (!this.busy) this.host.moreDetail(origin);
-        });
+    this.messages.forEach((message, index) => {
+      let entry = this.rows.get(message);
+      if (!entry || entry.key !== keys[index]) {
+        entry = { ...this.buildRow(message), key: keys[index] };
+        this.rows.set(message, entry);
       }
-      if (message.lines.length) {
-        const list = row.createDiv({ cls: "vam-map-chat-lines" });
-        for (const line of message.lines)
-          list.createDiv({ cls: `vam-map-chat-line is-${line.status}`, text: line.text });
-      }
-      this.messageEls.push(row);
-    }
+      const at = this.logEl.children[index];
+      if (at !== entry.row) this.logEl.insertBefore(entry.row, at != null ? at : null);
+      if (entry.more) entry.more.disabled = this.busy;
+      this.messageEls.push(entry.row);
+      this.bodyEls.push(entry.body);
+    });
     if (stick) this.scrollToEnd();
+  }
+  buildRow(message) {
+    const row = this.logEl.createDiv({
+      cls: `vam-map-chat-msg is-${message.role}${message.error ? " is-error" : ""}`
+    });
+    row.createSpan({
+      cls: "vam-map-chat-role",
+      text: t(message.role === "user" ? "ui.map_chat_role_you" : "ui.map_chat_role_ai")
+    });
+    const markdown = message.role === "assistant" && !message.error;
+    const body = row.createDiv({ cls: `vam-map-chat-text${markdown ? " is-markdown" : ""}` });
+    if (markdown) renderChatMarkdown(body, message.text, t("ui.map_chat_overflow_note"));
+    else body.setText(message.text);
+    const asked = this.messages[this.messages.indexOf(message) - 1];
+    let more = null;
+    if (this.hasMore(message, asked) && (asked == null ? void 0 : asked.origin)) {
+      const origin = asked.origin;
+      more = row.createEl("button", {
+        cls: "vam-map-chat-more",
+        text: t("ui.map_chat_more_detail"),
+        attr: { type: "button" }
+      });
+      more.disabled = this.busy;
+      more.addEventListener("click", () => {
+        if (!this.busy) this.host.moreDetail(origin);
+      });
+    }
+    if (message.lines.length) {
+      const list = row.createDiv({ cls: "vam-map-chat-lines" });
+      for (const line of message.lines) list.createDiv({ cls: `vam-map-chat-line is-${line.status}`, text: line.text });
+    }
+    return { row, body, more };
   }
   renderBusy() {
     if (!this.built) return;

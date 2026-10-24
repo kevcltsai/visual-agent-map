@@ -131,6 +131,13 @@ export class MapChatPanel {
   private stopWatching: (() => void) | null = null;
   private messageEls: HTMLElement[] = [];
   private bodyEls: HTMLElement[] = [];
+  /** The laid-out row of each message with the state it was built from; a message that has not changed keeps its row. */
+  private rows = new WeakMap<
+    MapChatMessage,
+    { key: string; row: HTMLElement; body: HTMLElement; more: HTMLButtonElement | null }
+  >();
+  /** The animation frame that will lay out the streaming message, if one is waiting. */
+  private frame: { cancel: () => void } | null = null;
   /** The visible note the user took off the chip; it stays off until another note is visible. */
   private dismissedNote: string | null = null;
   private noteChip: string | null = null;
@@ -196,6 +203,8 @@ export class MapChatPanel {
   dispose(): void {
     this.stopWatching?.();
     this.stopWatching = null;
+    this.cancelFrame();
+    this.rows = new WeakMap();
   }
   /** Takes the panel out of the page; the next {@link mount} puts it back with all state intact. */
   detach(): void {
@@ -292,11 +301,32 @@ export class MapChatPanel {
     const last = this.messages.at(-1);
     if (!last || !last.streaming) return;
     last.text = text;
-    const body = this.bodyEls[this.bodyEls.length - 1];
-    if (!body) return;
+    if (!this.built || this.frame) return;
+    // Chunks that arrive within one frame are laid out once, with the newest text.
+    const win = typeof window !== "undefined" ? window : undefined;
+    if (typeof win?.requestAnimationFrame !== "function") {
+      this.layoutStreaming();
+      return;
+    }
+    const id = win.requestAnimationFrame(() => {
+      this.frame = null;
+      this.layoutStreaming();
+    });
+    this.frame = { cancel: () => win.cancelAnimationFrame?.(id) };
+  }
+  /** Lays the streaming message out with the text it has now; no other message is touched. */
+  private layoutStreaming(): void {
+    const last = this.messages.at(-1);
+    const entry = last ? this.rows.get(last) : undefined;
+    if (!last || !last.streaming || !entry) return;
     const stick = this.atEnd();
-    renderChatMarkdown(body, text);
+    renderChatMarkdown(entry.body, last.text, t("ui.map_chat_overflow_note"));
+    entry.key = this.rowKey(last);
     if (stick) this.scrollToEnd();
+  }
+  private cancelFrame(): void {
+    this.frame?.cancel();
+    this.frame = null;
   }
   /** The turn ended with an answer and the outcome of each action. */
   finish(reply: string, lines: MapChatLine[]): void {
@@ -339,6 +369,8 @@ export class MapChatPanel {
   }
   /** Back to an empty conversation (a different map was opened). */
   reset(): void {
+    this.cancelFrame();
+    this.rows = new WeakMap();
     this.messages = [];
     this.chips = [];
     this.dismissedNote = null;
@@ -571,52 +603,91 @@ export class MapChatPanel {
     }
   }
 
+  /** Everything a message row shows; the row is rebuilt only when this changes. */
+  private rowKey(message: MapChatMessage): string {
+    const asked = this.messages[this.messages.indexOf(message) - 1];
+    const more = this.hasMore(message, asked);
+    return [
+      message.role,
+      message.error ? "e" : "",
+      message.streaming ? "s" : "",
+      more ? "m" : "",
+      t("ui.map_chat_role_ai"),
+      more ? t("ui.map_chat_more_detail") : "",
+      message.lines.map(line => `${line.status}:${line.text}`).join("\n"),
+      message.text
+    ].join("\u0001");
+  }
+  private hasMore(message: MapChatMessage, asked: MapChatMessage | undefined): boolean {
+    return (
+      message.role === "assistant" && !message.streaming && !message.error && !!message.text.trim() && !!asked?.origin
+    );
+  }
+
   private renderLog(forceEnd = false): void {
     if (!this.built) return;
+    this.cancelFrame();
     const stick = forceEnd || this.atEnd();
-    this.logEl.empty();
+    // Rows of messages that have not changed are kept as they are (no parsing, no new elements); only the rest is built.
+    const keys = this.messages.map(message => this.rowKey(message));
+    const kept = new Set<HTMLElement>();
+    this.messages.forEach((message, index) => {
+      const entry = this.rows.get(message);
+      if (entry && entry.key === keys[index]) kept.add(entry.row);
+    });
+    for (const child of Array.from(this.logEl.children)) if (!kept.has(child as HTMLElement)) child.remove();
     this.messageEls = [];
     this.bodyEls = [];
-    for (const message of this.messages) {
-      const row = this.logEl.createDiv({
-        cls: `vam-map-chat-msg is-${message.role}${message.error ? " is-error" : ""}`
-      });
-      row.createSpan({
-        cls: "vam-map-chat-role",
-        text: t(message.role === "user" ? "ui.map_chat_role_you" : "ui.map_chat_role_ai")
-      });
-      const markdown = message.role === "assistant" && !message.error;
-      const body = row.createDiv({ cls: `vam-map-chat-text${markdown ? " is-markdown" : ""}` });
-      this.bodyEls.push(body);
-      if (markdown) renderChatMarkdown(body, message.text);
-      else body.setText(message.text);
-      const asked = this.messages[this.messages.indexOf(message) - 1];
-      if (
-        message.role === "assistant" &&
-        !message.streaming &&
-        !message.error &&
-        message.text.trim() &&
-        asked?.origin
-      ) {
-        const origin = asked.origin;
-        const more = row.createEl("button", {
-          cls: "vam-map-chat-more",
-          text: t("ui.map_chat_more_detail"),
-          attr: { type: "button" }
-        });
-        more.disabled = this.busy;
-        more.addEventListener("click", () => {
-          if (!this.busy) this.host.moreDetail(origin);
-        });
+    this.messages.forEach((message, index) => {
+      let entry = this.rows.get(message);
+      if (!entry || entry.key !== keys[index]) {
+        entry = { ...this.buildRow(message), key: keys[index] };
+        this.rows.set(message, entry);
       }
-      if (message.lines.length) {
-        const list = row.createDiv({ cls: "vam-map-chat-lines" });
-        for (const line of message.lines)
-          list.createDiv({ cls: `vam-map-chat-line is-${line.status}`, text: line.text });
-      }
-      this.messageEls.push(row);
-    }
+      const at = this.logEl.children[index];
+      if (at !== entry.row) this.logEl.insertBefore(entry.row, at ?? null);
+      if (entry.more) entry.more.disabled = this.busy;
+      this.messageEls.push(entry.row);
+      this.bodyEls.push(entry.body);
+    });
     if (stick) this.scrollToEnd();
+  }
+
+  private buildRow(message: MapChatMessage): {
+    row: HTMLElement;
+    body: HTMLElement;
+    more: HTMLButtonElement | null;
+  } {
+    const row = this.logEl.createDiv({
+      cls: `vam-map-chat-msg is-${message.role}${message.error ? " is-error" : ""}`
+    });
+    row.createSpan({
+      cls: "vam-map-chat-role",
+      text: t(message.role === "user" ? "ui.map_chat_role_you" : "ui.map_chat_role_ai")
+    });
+    const markdown = message.role === "assistant" && !message.error;
+    const body = row.createDiv({ cls: `vam-map-chat-text${markdown ? " is-markdown" : ""}` });
+    if (markdown) renderChatMarkdown(body, message.text, t("ui.map_chat_overflow_note"));
+    else body.setText(message.text);
+    const asked = this.messages[this.messages.indexOf(message) - 1];
+    let more: HTMLButtonElement | null = null;
+    if (this.hasMore(message, asked) && asked?.origin) {
+      const origin = asked.origin;
+      more = row.createEl("button", {
+        cls: "vam-map-chat-more",
+        text: t("ui.map_chat_more_detail"),
+        attr: { type: "button" }
+      });
+      more.disabled = this.busy;
+      more.addEventListener("click", () => {
+        if (!this.busy) this.host.moreDetail(origin);
+      });
+    }
+    if (message.lines.length) {
+      const list = row.createDiv({ cls: "vam-map-chat-lines" });
+      for (const line of message.lines) list.createDiv({ cls: `vam-map-chat-line is-${line.status}`, text: line.text });
+    }
+    return { row, body, more };
   }
 
   private renderBusy(): void {

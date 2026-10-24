@@ -437,6 +437,8 @@ button.vam-relevance-tag-button:disabled { cursor: default; opacity: .7; }
 .vam-map-chat-text.is-markdown blockquote { padding-inline-start: 0.75em; border-inline-start: 2px solid var(--background-modifier-border); color: var(--text-muted); }
 .vam-map-chat-text.is-markdown pre { overflow-x: auto; padding: 4px 6px; border-radius: var(--radius-s); background: var(--background-primary); white-space: pre; }
 .vam-map-chat-text.is-markdown hr { margin-block: 0.5em; }
+.vam-map-chat-text.is-markdown .vam-map-chat-plain { white-space: pre-wrap; }
+.vam-map-chat-text.is-markdown .vam-map-chat-overflow-note { color: var(--text-muted); font-size: var(--font-ui-smaller); }
 .vam-map-chat-chip.is-note { border-style: solid; }
 .vam-map-chat-lines { display: flex; flex-direction: column; gap: 2px; margin-top: 4px; font-size: var(--font-ui-smaller); color: var(--text-muted); }
 .vam-map-chat-line.is-done::before { content: "✓ "; color: var(--text-success); }

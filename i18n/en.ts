@@ -1010,6 +1010,7 @@ export const en = {
   "ui.map_chat_redo_actions_ignored": "Actions are not applied again in a more-detail answer.",
   "ui.map_chat_replying": "The AI is replying…",
   "ui.map_chat_stopped": "Stopped.",
+  "ui.map_chat_overflow_note": "Content too long; the rest is shown as plain text.",
   "ui.map_chat_remove_ref_0": "Remove reference: {0}",
   "ui.map_chat_ref_topic_0": "Topic: {0}",
   "ui.map_chat_ref_selected_0": "Selected: {0}",

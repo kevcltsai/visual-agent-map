@@ -37,6 +37,8 @@ const TRAILING = ".,;:!?'\"*_~]";
 const SCHEME = /^[a-z][a-z0-9+.-]*:/i;
 const INVISIBLE = /[\s\u200b-\u200d\u2060\ufeff\u00ad]/g;
 const MAX_REPLY_CHARS = 50000;
+/** Most elements one reply may build; the rest of it is shown as one plain text block (see {@link renderChatMarkdown}). */
+export const MAX_REPLY_NODES = 2000;
 const WIKI = /\[\[([^[\]\n]+)\]\]/y;
 
 /** Per-source lookup tables, built in one pass the first time they are needed, so no opener ever rescans the text. */
@@ -303,7 +305,8 @@ const isFenceOpen = (line: string): RegExpExecArray | null => {
 const startsBlock = (line: string): boolean =>
   !!isFenceOpen(line) || !!headingAt(line) || RULE.test(line) || QUOTE.test(line) || LIST.test(line);
 
-export function parseBlocks(lines: string[], depth = 0): ChatBlock[] {
+/** `starts`, when given, receives the line each top-level block begins at (one entry per block returned). */
+export function parseBlocks(lines: string[], depth = 0, starts?: number[]): ChatBlock[] {
   const blocks: ChatBlock[] = [];
   for (let at = 0; at < lines.length;) {
     const line = lines[at];
@@ -311,6 +314,7 @@ export function parseBlocks(lines: string[], depth = 0): ChatBlock[] {
       at++;
       continue;
     }
+    starts?.push(at);
     const open = isFenceOpen(line);
     if (open) {
       const mark = open[1][0];
@@ -390,20 +394,103 @@ export function parseBlocks(lines: string[], depth = 0): ChatBlock[] {
 }
 
 export function parseChatMarkdown(text: string): ChatBlock[] {
+  return layoutReply(text).blocks;
+}
+
+/** How many elements {@link renderBlocks} creates for these pieces. */
+function inlineCost(nodes: ChatInline[]): number {
+  let cost = 0;
+  for (const node of nodes) {
+    cost += 1;
+    if (node.t === "fmt" || node.t === "link") cost += inlineCost(node.c);
+  }
+  return cost;
+}
+function blockCost(block: ChatBlock): number {
+  switch (block.t) {
+    case "p":
+      return 1 + inlineCost(block.c);
+    case "h":
+      return 1 + inlineCost(block.c);
+    case "hr":
+      return 1;
+    case "code":
+      return 2;
+    case "quote":
+      return 1 + blocksCost(block.c);
+    case "list": {
+      let cost = 1;
+      for (const item of block.items) cost += 1 + inlineCost(item.c) + (item.sub ? blockCost(item.sub) : 0);
+      return cost;
+    }
+  }
+}
+const blocksCost = (blocks: ChatBlock[]): number => blocks.reduce((sum, block) => sum + blockCost(block), 0);
+
+interface ReplyLayout {
+  blocks: ChatBlock[];
+  /** What is not laid out (past the character limit or the element budget), exactly as written. */
+  plain: string;
+}
+
+/**
+ * Parses a reply into blocks, but only as many as fit the limits: 50,000 characters (cut at a line end when there is one) and
+ * `budget` elements. The part left over is returned as it was written.
+ */
+function layoutReply(text: string, budget = MAX_REPLY_NODES): ReplyLayout {
   const clean = text.replace(/\r\n?/g, "\n");
-  if (clean.length <= MAX_REPLY_CHARS) return parseBlocks(clean.split("\n"));
-  // A reply this long is laid out in full only up to the limit (cut at a line end when there is one); the rest stays plain text.
-  const line = clean.lastIndexOf("\n", MAX_REPLY_CHARS);
-  const cut = line >= MAX_REPLY_CHARS / 2 ? line : MAX_REPLY_CHARS;
-  const rest: ChatInline[] = [];
-  clean
-    .slice(cut)
-    .split("\n")
-    .forEach((part, index) => {
-      if (index) rest.push({ t: "br" });
-      if (part) rest.push({ t: "text", text: part });
-    });
-  return [...parseBlocks(clean.slice(0, cut).split("\n")), { t: "p", c: rest }];
+  let head = clean;
+  let tail = "";
+  if (clean.length > MAX_REPLY_CHARS) {
+    const line = clean.lastIndexOf("\n", MAX_REPLY_CHARS);
+    const cut = line >= MAX_REPLY_CHARS / 2 ? line : MAX_REPLY_CHARS;
+    head = clean.slice(0, cut);
+    tail = clean.slice(cut);
+  }
+  const lines = head.split("\n");
+  const starts: number[] = [];
+  const blocks = parseBlocks(lines, 0, starts);
+  let used = 0;
+  let fit = 0;
+  while (fit < blocks.length) {
+    const cost = blockCost(blocks[fit]);
+    if (used + cost > budget) break;
+    used += cost;
+    fit++;
+  }
+  if (fit === blocks.length) return { blocks, plain: tail };
+  // Block `fit` does not fit whole: keep the longest start of it that does (cut at a blank), and the rest stays plain.
+  const end = fit + 1 < blocks.length ? starts[fit + 1] : lines.length;
+  const source = lines.slice(starts[fit], end).join("\n");
+  const room = budget - used;
+  const cutAt = (limit: number): number => {
+    // At the end of a line when there is one, else at a blank, so the plain part starts at a word.
+    const line = source.lastIndexOf("\n", limit - 1);
+    if (line >= 0) return line + 1;
+    let at = limit;
+    while (at > 0 && !/\s/.test(source[at - 1])) at--;
+    return at;
+  };
+  const fits = (limit: number): boolean => blocksCost(parseBlocks(source.slice(0, cutAt(limit)).split("\n"))) <= room;
+  let low = 0;
+  let high = source.length;
+  // Grow the probe until it no longer fits (the answer is near the budget, far from the end), then narrow down.
+  for (let probe = Math.max(256, room * 2); probe < high; probe *= 2) {
+    if (fits(probe)) low = probe;
+    else {
+      high = probe - 1;
+      break;
+    }
+  }
+  while (low < high) {
+    const mid = Math.ceil((low + high) / 2);
+    if (fits(mid)) low = mid;
+    else high = mid - 1;
+  }
+  low = cutAt(low);
+  const kept = parseBlocks(source.slice(0, low).split("\n"));
+  const rest = [source.slice(low), ...lines.slice(end)].join("\n") + (tail ? tail : "");
+  return { blocks: [...blocks.slice(0, fit), ...kept], plain: rest };
 }
 
 function renderInline(parent: HTMLElement, nodes: ChatInline[]): void {
@@ -469,8 +556,17 @@ function renderBlocks(parent: HTMLElement, blocks: ChatBlock[]): void {
   }
 }
 
-/** Replaces the children of `parent` with the reply laid out as a safe subset of Markdown. */
-export function renderChatMarkdown(parent: HTMLElement, text: string): void {
+/**
+ * Replaces the children of `parent` with the reply laid out as a safe subset of Markdown. A reply is laid out only up to
+ * {@link MAX_REPLY_NODES} elements (and 50,000 characters); what is left stays visible as one plain text block that keeps its
+ * line breaks, introduced by `overflowNote` (a line of small text, given by the caller because this file has no translations).
+ */
+export function renderChatMarkdown(parent: HTMLElement, text: string, overflowNote = ""): void {
   parent.empty();
-  renderBlocks(parent, parseChatMarkdown(text));
+  const { blocks, plain } = layoutReply(text);
+  renderBlocks(parent, blocks);
+  const rest = plain.replace(/^\s+/, "");
+  if (!rest) return;
+  if (overflowNote) parent.createEl("p", { cls: "vam-map-chat-overflow-note", text: overflowNote });
+  parent.createEl("p", { cls: "vam-map-chat-plain", text: rest });
 }

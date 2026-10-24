@@ -938,6 +938,7 @@ export const zhCN: Record<TranslationKey, string> = {
   "ui.map_chat_redo_actions_ignored": "详细版回答不会再次应用操作。",
   "ui.map_chat_replying": "AI 正在回复…",
   "ui.map_chat_stopped": "已停止。",
+  "ui.map_chat_overflow_note": "内容过长，以下以纯文本显示",
   "ui.map_chat_remove_ref_0": "移除引用：{0}",
   "ui.map_chat_ref_topic_0": "议题：{0}",
   "ui.map_chat_ref_selected_0": "已选取：{0}",

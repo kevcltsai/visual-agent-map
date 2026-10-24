@@ -588,6 +588,8 @@ export class VisualAgentMapView extends ItemView {
   private taskPreviewEls = new Map<string, HTMLElement>();
   private integrationMode = false;
   private dragging = false;
+  // A repaint asked for mid-drag waits here; the drag's settle runs it once.
+  private renderAfterDrag = false;
   /** Ends the drag in progress (listeners, pending frame, flag); set only while a card is being dragged. */
   private dragCleanup: (() => void) | null = null;
   private dragFrame: number | null = null;
@@ -836,6 +838,7 @@ export class VisualAgentMapView extends ItemView {
   }
   async onClose(): Promise<void> {
     this.closed = true;
+    this.renderAfterDrag = false;
     this.announcer?.remove();
     this.announcer = null;
     this.announcedStages.clear();
@@ -5890,6 +5893,11 @@ export class VisualAgentMapView extends ItemView {
     ]).open();
   }
   private render(): void {
+    // Repainting would replace the dragged card and drop its pointer capture, so wait for the drop (a closed view still ends the drag below).
+    if (this.dragging && !this.closed) {
+      this.renderAfterDrag = true;
+      return;
+    }
     this.paintCount++;
     this.aimProgressEls.clear();
     // The dragged card is about to be replaced, so its pointer events would never arrive and the drag would stay "on".
@@ -10708,8 +10716,9 @@ export class VisualAgentMapView extends ItemView {
   }
   private enableDrag(card: HTMLElement, node: MapNode): void {
     card.addEventListener("pointerdown", event => {
-      if (this.integrationMode || (event.target as Element).closest("button") || event.button !== 0 || !this.map)
-        return;
+      if ((event.target as Element).closest("button") || event.button !== 0 || !this.map) return;
+      // In selection mode a card cannot be moved and a plain click still toggles it, but it can be dragged onto the chat.
+      const selecting = this.integrationMode;
       this.clearHoverTimer();
       this.hoverCard?.remove();
       this.hoverCard = null;
@@ -10721,7 +10730,8 @@ export class VisualAgentMapView extends ItemView {
       const start = { x: event.clientX, y: event.clientY },
         origin = { x: currentNode.x, y: currentNode.y };
       let position = { ...origin },
-        moved = false;
+        moved = false,
+        travelled = false;
       // Sizes and the far end of each touching edge are read once; a move then only writes.
       const edges = this.dragEdges(node.id, card);
       card.setPointerCapture(event.pointerId);
@@ -10740,6 +10750,10 @@ export class VisualAgentMapView extends ItemView {
         overChat =
           Math.hypot(e.clientX - start.x, e.clientY - start.y) > 3 && !!this.chat?.hitTest(e.clientX, e.clientY);
         this.chat?.setDropHighlight(overChat);
+        if (selecting) {
+          travelled ||= Math.hypot(e.clientX - start.x, e.clientY - start.y) > 3;
+          return;
+        }
         // While sorted the card sits at a display position; saving a drag would write that, so cards stay put.
         if (this.relevanceSortOn()) return;
         moved ||= Math.hypot(e.clientX - start.x, e.clientY - start.y) > 3;
@@ -10765,8 +10779,21 @@ export class VisualAgentMapView extends ItemView {
         card.removeEventListener("lostpointercapture", finish);
         this.dragCleanup = null;
       };
+      // The drop's own work comes first; a repaint that was asked for during the drag then runs once.
       const finish = (e: PointerEvent): void => {
         settle();
+        try {
+          drop(e);
+        } finally {
+          if (this.renderAfterDrag && !this.dragging) {
+            this.renderAfterDrag = false;
+            if (!this.closed) this.render();
+          }
+        }
+      };
+      const drop = (e: PointerEvent): void => {
+        // A plain click in selection mode is left to the click handler; a drag there must not toggle the card.
+        if (selecting && !travelled) return;
         this.suppressClickUntil = Date.now() + 250;
         // The browser lost the pointer (or it was cancelled) without a release: put the card back.
         if (e.type === "pointercancel" || e.type === "lostpointercapture") {
@@ -10783,6 +10810,7 @@ export class VisualAgentMapView extends ItemView {
           this.chat?.addTopicReference(node.id);
           return;
         }
+        if (selecting) return;
         if (moved && locked) {
           // The Notice already showed when the drag started.
         } else if (moved) {

@@ -33567,6 +33567,8 @@ var VisualAgentMapView = class _VisualAgentMapView extends import_obsidian30.Ite
     __publicField(this, "taskPreviewEls", /* @__PURE__ */ new Map());
     __publicField(this, "integrationMode", false);
     __publicField(this, "dragging", false);
+    // A repaint asked for mid-drag waits here; the drag's settle runs it once.
+    __publicField(this, "renderAfterDrag", false);
     /** Ends the drag in progress (listeners, pending frame, flag); set only while a card is being dragged. */
     __publicField(this, "dragCleanup", null);
     __publicField(this, "dragFrame", null);
@@ -33790,6 +33792,7 @@ var VisualAgentMapView = class _VisualAgentMapView extends import_obsidian30.Ite
   async onClose() {
     var _a2, _b2, _c, _d, _e, _f, _g, _h;
     this.closed = true;
+    this.renderAfterDrag = false;
     (_a2 = this.announcer) == null ? void 0 : _a2.remove();
     this.announcer = null;
     this.announcedStages.clear();
@@ -38515,6 +38518,10 @@ ${request.requirements}` : preset.text,
   }
   render() {
     var _a2, _b2, _c, _d, _e, _f, _g, _h, _i, _j, _k, _l, _m, _n, _o, _p, _q, _r, _s, _t, _u, _v, _w, _x;
+    if (this.dragging && !this.closed) {
+      this.renderAfterDrag = true;
+      return;
+    }
     this.paintCount++;
     this.aimProgressEls.clear();
     (_a2 = this.dragCleanup) == null ? void 0 : _a2.call(this);
@@ -42984,8 +42991,8 @@ ${note.detail.trim()}` : "",
   enableDrag(card, node) {
     card.addEventListener("pointerdown", (event) => {
       var _a2, _b2;
-      if (this.integrationMode || event.target.closest("button") || event.button !== 0 || !this.map)
-        return;
+      if (event.target.closest("button") || event.button !== 0 || !this.map) return;
+      const selecting = this.integrationMode;
       this.clearHoverTimer();
       (_a2 = this.hoverCard) == null ? void 0 : _a2.remove();
       this.hoverCard = null;
@@ -42994,7 +43001,7 @@ ${note.detail.trim()}` : "",
       if (!currentNode) return;
       this.dragging = true;
       const start = { x: event.clientX, y: event.clientY }, origin = { x: currentNode.x, y: currentNode.y };
-      let position = { ...origin }, moved = false;
+      let position = { ...origin }, moved = false, travelled = false;
       const edges = this.dragEdges(node.id, card);
       card.setPointerCapture(event.pointerId);
       const paint = () => {
@@ -43010,6 +43017,10 @@ ${note.detail.trim()}` : "",
         var _a3, _b3, _c;
         overChat = Math.hypot(e.clientX - start.x, e.clientY - start.y) > 3 && !!((_a3 = this.chat) == null ? void 0 : _a3.hitTest(e.clientX, e.clientY));
         (_b3 = this.chat) == null ? void 0 : _b3.setDropHighlight(overChat);
+        if (selecting) {
+          travelled || (travelled = Math.hypot(e.clientX - start.x, e.clientY - start.y) > 3);
+          return;
+        }
         if (this.relevanceSortOn()) return;
         moved || (moved = Math.hypot(e.clientX - start.x, e.clientY - start.y) > 3);
         if (moved && locked) {
@@ -43036,8 +43047,19 @@ ${note.detail.trim()}` : "",
         this.dragCleanup = null;
       };
       const finish = (e) => {
-        var _a3;
         settle();
+        try {
+          drop(e);
+        } finally {
+          if (this.renderAfterDrag && !this.dragging) {
+            this.renderAfterDrag = false;
+            if (!this.closed) this.render();
+          }
+        }
+      };
+      const drop = (e) => {
+        var _a3;
+        if (selecting && !travelled) return;
         this.suppressClickUntil = Date.now() + 250;
         if (e.type === "pointercancel" || e.type === "lostpointercapture") {
           card.style.left = `${origin.x}px`;
@@ -43052,6 +43074,7 @@ ${note.detail.trim()}` : "",
           (_a3 = this.chat) == null ? void 0 : _a3.addTopicReference(node.id);
           return;
         }
+        if (selecting) return;
         if (moved && locked) {
         } else if (moved) {
           paint();

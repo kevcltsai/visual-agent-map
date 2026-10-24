@@ -1379,3 +1379,61 @@ test('map chat D1: the view refreshes the note chip when the active leaf changes
   assert.ok(at > 0);
   assert.match(source.slice(at, at + 400), /this\.chat\?\.refreshNote\(\)/);
 });
+
+// ---- dragging in selection mode and repaints during a drag ----------------------------------------------------------
+
+integrationTest('map chat: in selection mode a card dragged onto the panel adds a topic chip, writes nothing and keeps the selection', async () => {
+  const d = await dragHarness();
+  d.view.integrationMode = true; d.view.multiSelected = new Set([d.ids.b, d.ids.c]);
+  d.down(); d.move(100, 400);
+  assert.ok(hasClass(d.chat.el, 'is-drop'), 'the panel lights up in selection mode too');
+  d.up();
+  eq(d.chat.attachments().filter(a => a.kind === 'topic'), [{ kind: 'topic', id: d.ids.a }]);
+  assert.equal(d.changes.length, 0, 'no mapChange'); eq([...d.view.multiSelected], [d.ids.b, d.ids.c]); assert.equal(d.view.integrationMode, true);
+  assert.ok(d.view.suppressClickUntil > Date.now(), 'the release is not read as a click that toggles the card');
+  assert.equal(d.view.dragging, false);
+});
+
+integrationTest('map chat: in selection mode a drag onto the canvas moves nothing and does not toggle; a plain click is left to the click handler', async () => {
+  const d = await dragHarness();
+  d.view.integrationMode = true; d.view.multiSelected = new Set([d.ids.b]); d.view.selected = d.ids.b;
+  d.down(); d.move(520, 150); d.move(560, 160); d.up();
+  await new Promise(r => setTimeout(r, 0));
+  assert.equal(d.changes.length, 0, 'mapChange not called'); eq([d.card.style.left, d.card.style.top], [`${d.node('a').x}px`, `${d.node('a').y}px`]);
+  eq([...d.view.multiSelected], [d.ids.b]); assert.equal(d.view.selected, d.ids.b); assert.equal(d.chat.attachments().filter(a => a.kind === 'topic').length, 0);
+  assert.ok(d.view.suppressClickUntil > Date.now(), 'the click after a drag is suppressed');
+  d.view.suppressClickUntil = 0;
+  d.down(); d.up();
+  eq([...d.view.multiSelected], [d.ids.b]); assert.equal(d.view.selected, d.ids.b, 'pointer handling leaves a plain click to the click handler');
+  assert.equal(d.view.suppressClickUntil, 0, 'a plain click is not suppressed, so it still toggles');
+});
+
+// The real render() needs more DOM than the fake offers, so it is counted where it first touches the plugin (syncOutline) and stopped there.
+const realRenderProbe = d => {
+  const stop = new Error('render reached syncOutline'); const probe = { count: 0 };
+  d.view.render = Object.getPrototypeOf(d.view).render;
+  d.view.plugin.syncOutline = () => { probe.count++; throw stop; };
+  probe.run = work => { try { work(); } catch (error) { if (error !== stop) throw error; } };
+  return probe;
+};
+
+integrationTest('map chat: a repaint requested mid-drag waits for the drop and then happens exactly once', async () => {
+  const d = await dragHarness(); const probe = realRenderProbe(d);
+  d.down(); d.move(100, 400);
+  probe.run(() => { d.view.render(); d.view.render(); });
+  assert.equal(probe.count, 0, 'nothing was rebuilt while the card was held'); assert.equal(d.view.dragging, true);
+  assert.ok(d.events.has('pointermove'), 'the card keeps its drag listeners'); assert.equal(d.view.renderAfterDrag, true);
+  probe.run(() => d.up());
+  assert.equal(probe.count, 1, 'exactly one repaint after the drop'); assert.equal(d.view.renderAfterDrag, false);
+  eq(d.chat.attachments().filter(a => a.kind === 'topic'), [{ kind: 'topic', id: d.ids.a }]);
+});
+
+integrationTest('map chat: closing the view mid-drag with a pending repaint neither repaints nor throws', async () => {
+  const d = await dragHarness(); const probe = realRenderProbe(d);
+  d.down(); d.move(100, 400); d.view.render();
+  assert.equal(d.view.renderAfterDrag, true);
+  await d.view.onClose();
+  assert.equal(d.view.renderAfterDrag, false); assert.equal(d.view.dragging, false);
+  d.view.render();
+  assert.equal(probe.count, 0, 'a closed view is never repainted');
+});

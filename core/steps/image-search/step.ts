@@ -1,5 +1,5 @@
-import { renderTemplate, type StepDefinition } from "../../../../core/step-runner";
-import type { ImageCandidate } from "../../action-plan";
+import { renderTemplate, type StepDefinition } from "../../step-runner";
+import type { ImageCandidate } from "../../image-candidates";
 import template from "./prompt.md";
 
 export interface ImageSearchInput {

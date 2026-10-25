@@ -79,7 +79,7 @@ test('the markdown call site in main.ts uses the Step Runner and the shared runt
 });
 
 test('web image search keeps https image and source links, drops invented or unsafe ones, dedupes and caps at six', () => {
-  const { parseImageCandidates, imageSearchStep } = load('experiences/markdown-context/steps/image-search/step.ts', {}, { URL });
+  const { parseImageCandidates, imageSearchStep } = load('core/steps/image-search/step.ts', {}, { URL });
   const images = [
     { title: 'Fried egg', imageUrl: 'https://example.org/egg.jpg', sourceUrl: 'https://example.org/eggs' },
     { title: 'Dup', imageUrl: 'https://example.org/egg.jpg', sourceUrl: 'https://example.org/other' },

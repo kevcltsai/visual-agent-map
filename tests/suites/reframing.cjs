@@ -1,14 +1,14 @@
 const assert = require('node:assert/strict');
 const { test, integrationTest, load, core, map, withExpansionCoordinator, obsidian, DEFAULT_SETTINGS, fixture, topicNote, coffeeSession, deferred, until, coffeeFind, reframingModalFixture } = require('../support.cjs');
 test('Reframing validates structured output and rejects whole-request over-budget without truncation', async () => {
-  const { ReframingService, buildReframePrompt, REFRAME_SCHEMA } = load('core/reframing-service.ts');
+  const { ReframingService, buildReframePrompt, REFRAME_SCHEMA, REFRAME_TOKEN_BUDGET } = load('core/reframing-service.ts');
   const calls = [];
   const service = new ReframingService(async (request) => { calls.push(request); return JSON.stringify({ question: 'What evidence distinguishes these explanations?', context: 'Simulated analogy; alternatives and uncertainty remain.', rationale: 'Test the key tension.' }); });
   const request = { targetCore: 'understand', source: 'Candidate insight, not evidence', question: 'Explore this', context: '', language: 'en', model: 'model-a', reasoning: 'low' };
   const result = await service.reframe(request, new AbortController().signal);
   assert.match(result.context, /uncertainty/); assert.equal(calls.length, 1);
   assert.match(buildReframePrompt(request), /Candidate insight/); assert.equal(REFRAME_SCHEMA.additionalProperties, false);
-  await assert.rejects(service.reframe({ ...request, source: 'x'.repeat(128001) }, new AbortController().signal), /budget|large/i); assert.equal(calls.length, 1);
+  await assert.rejects(service.reframe({ ...request, source: 'x'.repeat(REFRAME_TOKEN_BUDGET * 4 + 1) }, new AbortController().signal), /budget|large/i); assert.equal(calls.length, 1);
   const invalid = new ReframingService(async () => '{"question":"q","context":"c","rationale":"r","path":"invented"}');
   await assert.rejects(invalid.reframe(request, new AbortController().signal), /invalid/i);
 });
@@ -209,7 +209,7 @@ integrationTest('Reframing runner uses structured output and disabled tools on b
 });
 integrationTest('Oversized Thinking Origin is rejected before provider work without trimming', async () => {
   const {default:Plugin}=load('main.ts',{obsidian});const plugin=new Plugin();let calls=0;plugin.runtime=()=>{calls++;throw Error('must not run');};
-  await assert.rejects(plugin.askModel({title:'Q',summary:'',detail:'',task:'Research',rules:'',ancestors:'',sourceContext:'x'.repeat(128001)},'m'),/budget|預算/i);assert.equal(calls,0);
+  await assert.rejects(plugin.askModel({title:'Q',summary:'',detail:'',task:'Research',rules:'',ancestors:'',sourceContext:'x'.repeat(128001 /* 32_000 tokens * 4 chars + 1: the hardcoded limit in core/ai-task-service.ts:124 */)},'m'),/budget|預算/i);assert.equal(calls,0);
 });
 integrationTest('Coffee becoming busy during the final snapshot read blocks handoff writes', async () => {
   const data=await reframingModalFixture();let checks=0;const read=data.store.assertHandoffSnapshot.bind(data.store);

@@ -3,7 +3,7 @@ const { test } = require('node:test');
 const assert = require('node:assert/strict');
 const { load } = require('./support-replay.cjs');
 const { estimateTokens } = load('ai/context-builder.ts');
-const { mapChatStep, parseMapChat, MAP_CHAT_SCHEMA, MAP_CHAT_ACTION_KINDS, MAP_RUN_ACTIONS, MapChatError } = load('core/steps/map-chat/step.ts');
+const { MAP_CHAT_TOKEN_BUDGET, mapChatStep, parseMapChat, MAP_CHAT_SCHEMA, MAP_CHAT_ACTION_KINDS, MAP_RUN_ACTIONS, MapChatError } = load('core/steps/map-chat/step.ts');
 const { buildMapChatContext, contentHash, isMdStale, MAP_CHAT_MAP_TITLE_LIMIT } = load('core/map-chat-context.ts');
 const { planFor, matchMapTitle, allNewTargets, chatResearchRequest, MAP_CHAT_PLAN_ACTION_LIMIT, MAP_CHAT_PLAN_RESEARCH_LIMIT } = load('core/map-chat-plan.ts');
 const { guardMapChatWrite, normalizeVaultPath, applyMdEdit } = load('core/map-chat-guard.ts');
@@ -183,7 +183,7 @@ test('context text is data: markdown with prompt-like text stays inside the JSON
 test('step policy refuses an empty message and an over-budget context', () => {
   const { prepareStep } = load('core/step-runner.ts');
   assert.throws(() => prepareStep(mapChatStep, request({ message: '  ' })), error => error.code === 'empty');
-  const huge = context({ files: [{ path: 'n.md', content: 'x'.repeat(700_000) }] });
+  const huge = context({ files: [{ path: 'n.md', content: 'x'.repeat(MAP_CHAT_TOKEN_BUDGET * 4) /* 4 chars per estimated token (ai/context-builder.ts:3); the JSON wrapper pushes it over */ }] });
   assert.ok(estimateTokens(huge.json) > 150_000);
   assert.throws(() => prepareStep(mapChatStep, request({ context: huge })), error => error.code === 'over_budget');
 });

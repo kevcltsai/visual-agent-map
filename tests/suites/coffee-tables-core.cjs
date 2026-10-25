@@ -215,7 +215,7 @@ test('Coffee Tables prompt keeps the owner’s role topology and conversational 
   assert.match(coffeePrompts.tablePrompt('Topic', 'zh-TW', snapshot.guests), /先多問問題，再整理分歧/); assert.match(coffeePrompts.tablePrompt('Topic', 'zh-TW', snapshot.guests), /背景.md[\s\S]*<!-- coffee-tables-complete -->/);
   assert.match(coffeePrompts.questionPrompt(snapshot, '追問'), /先多問問題，再整理分歧/); assert.match(coffeePrompts.questionPrompt(snapshot, '追問'), /背景.md/);
   assert.match(coffeePrompts.observerOnlyPrompt(snapshot), /先多問問題，再整理分歧/); assert.match(coffeePrompts.observerOnlyPrompt(snapshot), /背景.md/); assert.match(coffeePrompts.observerOnlyPrompt(snapshot), /source: 對談中的原句/);
-  assert.throws(() => coffeePrompts.questionPrompt(snapshot, 'x'.repeat(180000)), /太長|too long/);
+  assert.throws(() => coffeePrompts.questionPrompt(snapshot, 'x'.repeat(load('experiences/coffee-tables/prompt-parts.ts').MAX_COFFEE_CONTEXT_CHARS)), /太長|too long/);
 });
 test('Coffee Tables custom style replaces editable built-in behavior guidance in every generation mode', () => {
   const session = coffeeSession();

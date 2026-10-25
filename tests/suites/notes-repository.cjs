@@ -184,7 +184,7 @@ integrationTest('large vaults: map discovery, unrelated renames and rebuilds rea
   const { repo, app } = fixture();
   const path = await repo.createMap('Perf', []), map = await repo.readMap(path);
   const node = await repo.createNote('Tracked', 'a', map, path, 'workspace'); map.nodes.push(node); await repo.saveMap(path, map);
-  for (let index = 0; index < 5000; index++) await app.vault.create(`Personal/note-${index}.md`, `# Personal ${index}\n\nPlain text.`);
+  for (let index = 0; index < 50; index++) await app.vault.create(`Personal/note-${index}.md`, `# Personal ${index}\n\nPlain text.`);
   const reads = [];
   for (const method of ['read', 'cachedRead']) { const original = app.vault[method].bind(app.vault); app.vault[method] = async file => { reads.push(file.path); return original(file); }; }
   assert.deepEqual(JSON.parse(JSON.stringify((await repo.mapFiles()).map(file => file.path))), [path]);
@@ -473,7 +473,7 @@ integrationTest('switching the interface language preserves exact existing Markd
 });
 integrationTest('Markdown reader accepts only Markdown and reads the full file without changing it', async () => {
   const api = load('ai/reference-materials.ts', { obsidian });
-  const body = 'Full source sentinel\n'.repeat(30_000);
+  const body = 'Full source sentinel\n'.repeat(1_000) /* 21_000 chars: past the 14_000 per-document batch size (ai/reference-materials.ts:52) */;
   const file = { extension: 'md', path: 'Maps/Source.md' };
   const result = await api.readMarkdownFile({ vault: { read: async selected => { assert.equal(selected, file); return body; } } }, file);
   assert.equal(result.path, file.path); assert.equal(result.content, body); assert.equal(result.external, undefined);

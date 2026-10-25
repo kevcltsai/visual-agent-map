@@ -7,7 +7,7 @@ const os = require('node:os');
 const path = require('node:path');
 const { load, root } = require('./support-replay.cjs');
 
-const { reframeStep, REFRAME_SCHEMA } = load('core/steps/reframe/step.ts');
+const { reframeStep, REFRAME_SCHEMA, REFRAME_TOKEN_BUDGET } = load('core/steps/reframe/step.ts');
 const { ReframingService, providerReframeRunner, buildReframePrompt } = load('core/reframing-service.ts');
 const { prepareStep } = load('core/step-runner.ts');
 const { searchBudgetExhaustedMessage } = load('ai/runtime/messages/index.ts');
@@ -26,7 +26,7 @@ test('the reframe step renders the same prompt in both languages, carries the sc
 });
 
 test('over-budget is a policy: refused before render output reaches any provider, with the localized message', () => {
-  const big = request({ source: 'x'.repeat(128001) });
+  const big = request({ source: 'x'.repeat(REFRAME_TOKEN_BUDGET * 4 + 1) });
   assert.throws(() => prepareStep(reframeStep, big), error => error.message === translate('en', 'error.reframing_over_budget'));
   assert.throws(() => prepareStep(reframeStep, { ...big, language: 'zh-TW' }), error => error.message === translate('zh-TW', 'error.reframing_over_budget'));
 });
@@ -88,7 +88,7 @@ test('provider path: an unsupported Claude model is refused inside the logged ex
 
 test('over-budget is refused before any provider work or exchange entry', async () => {
   const fx = runnerFixture();
-  await assert.rejects(fx.service.reframe(request({ source: 'x'.repeat(128001) }), new AbortController().signal), /budget|預算/i);
+  await assert.rejects(fx.service.reframe(request({ source: 'x'.repeat(REFRAME_TOKEN_BUDGET * 4 + 1) }), new AbortController().signal), /budget|預算/i);
   assert.equal(fx.calls.length, 0); assert.equal(fx.log.getEntries().length, 0);
 });
 

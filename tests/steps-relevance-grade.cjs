@@ -393,7 +393,8 @@ test('service repair: Stop between rounds sends no further repair; the budget is
   // Budget on round two: the round-one reply has a single violation, the round-two reply has one per child (each with its
   // ancestor chain), so the round-one repair still fits and the round-two request is refused and never sent.
   const wide = [{ id: 'r', title: 'R', summary: '', status: 'idea', parentId: null, depth: 0 }, { id: 'g', title: 'G', summary: '', status: 'idea', parentId: 'r', depth: 1 }, { id: 'p', title: 'P', summary: '', status: 'idea', parentId: 'g', depth: 2 }];
-  for (let i = 0; i < 1000; i++) wide.push({ id: `k${i}`, title: `Kid ${i}`, summary: '', status: 'idea', parentId: 'p', depth: 3 });
+  // 500 kids: round two (one violation per child, each with its chain) first exceeds RELEVANCE_GRADE_TOKEN_BUDGET at 453 kids with today's prompt; 500 leaves ~10% margin. Fewer, and the budget is not reached.
+  for (let i = 0; i < 500; i++) wide.push({ id: `k${i}`, title: `Kid ${i}`, summary: '', status: 'idea', parentId: 'p', depth: 3 });
   const kids = tier => wide.slice(3).map((_, i) => entry(`c${i + 4}`, { tier: i === 0 ? 'core' : tier }));
   const sent = [];
   const budget = new grade.RelevanceGradeService(async (req, signal, prepared) => {

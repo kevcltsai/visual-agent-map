@@ -46,7 +46,7 @@ export type MapRunAction = (typeof MAP_RUN_ACTIONS)[number];
 /** Research modes a reply may name; "" (not named) is read as the map's remembered mode by the view. */
 export const MAP_CHAT_RESEARCH_MODES = ["quick", "standard"] as const;
 export type MapChatResearchMode = (typeof MAP_CHAT_RESEARCH_MODES)[number];
-/** The depths of reply version 4 and earlier: still accepted, and read as Standard (D-2026-10-231). */
+/** The depths of reply version 5 and earlier: still accepted, and read as Standard (D-2026-10-231). */
 const LEGACY_RESEARCH_DEPTHS = ["fast", "normal", "deep"] as const;
 export const MAP_CHAT_MAX_ACTIONS = 100;
 /** Prefix of a temporary id a reply gives to a card it creates itself; `ref: "n1"` is named `new:n1` by later actions. */
@@ -364,7 +364,7 @@ export function parseMapChat(
           if (action === "rate_by_goal" && !goal) throw new Dropped("missing_field");
           // find_images puts pictures on exactly one card: an existing card or a `new:<ref>`; empty means the single selected card (the view checks).
           if (action === "find_images" && nodeIds.length > 1) throw new Dropped("bad_value");
-          // mode and images only mean something to a research; every other action ignores them. A reply of version 4 or earlier
+          // mode and images only mean something to a research; every other action ignores them. A reply of version 5 or earlier
           // has `depth` instead of `mode`: a named depth reads as Standard, an empty one as not named.
           const research = action === "research_standard";
           let given = research ? text("mode", false) : "";

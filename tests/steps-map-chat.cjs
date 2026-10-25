@@ -719,7 +719,7 @@ test('B3 find_images: depth and images are ignored, not a reason to drop', () =>
   assert.equal(result.actions[0].mode, '');
   assert.equal(result.actions[0].images, false);
 });
-test('B3 compat: a step version 4 reply (research depth and images, no find_images) parses exactly as before', () => {
+test('B3 compat: a step version 4 reply (research depth and images, no find_images) parses, its depth read as Standard', () => {
   const v4 = JSON.stringify({ reply: 'ok', actions: [item('run_map_action', { action: 'research_standard', nodeIds: ['a'], mode: undefined, depth: 'deep', images: true }), item('run_map_action', { action: 'merge', title: 'M', nodeIds: ['a', 'b'] })] });
   const result = parse(v4);
   assert.deepEqual(result.rejected, []);
@@ -728,12 +728,12 @@ test('B3 compat: a step version 4 reply (research depth and images, no find_imag
 });
 test('B3 plan: each find_images is one call, at most MAP_CHAT_FIND_IMAGES_LIMIT per reply', () => {
   assert.equal(MAP_CHAT_FIND_IMAGES_LIMIT, 3);
-  const run = (extra = {}) => ({ kind: 'run_map_action', action: 'find_images', nodeIds: ['x'], title: '', goal: '', direction: '', depth: '', images: false, ...extra });
+  const run = (extra = {}) => ({ kind: 'run_map_action', action: 'find_images', nodeIds: ['x'], title: '', goal: '', direction: '', mode: '', images: false, ...extra });
   const estimate = actions => planFor([{ kind: 'create_map', title: 'Q' }, ...actions], { parents: {}, selectedCount: 0 }).estimatedCalls;
   assert.equal(estimate([run()]), 1);
   assert.equal(estimate([run(), run(), run()]), 3);
   assert.equal(estimate([run(), run(), run(), run()]), 3, 'the fourth is skipped, so the plan counts three');
-  assert.equal(estimate([run(), { kind: 'run_map_action', action: 'rate_by_goal', nodeIds: [], title: '', goal: 'g', direction: '', depth: '', images: false }]), 2);
+  assert.equal(estimate([run(), { kind: 'run_map_action', action: 'rate_by_goal', nodeIds: [], title: '', goal: 'g', direction: '', mode: '', images: false }]), 2);
 });
 test('B3 prompt: find_images guidance is in both languages and the chat itself still does not search the web', () => {
   const en = mapChatStep.render(request({ language: 'en' }));

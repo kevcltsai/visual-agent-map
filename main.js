@@ -1055,6 +1055,7 @@ var en = {
   "ui.map_chat_skip_map_choose": "several maps match; choose one in the list below",
   "ui.map_chat_skip_not_first": "a new map can only be created by the first action",
   "ui.map_chat_skip_map_not_created": "the new map was not created",
+  "ui.map_chat_skip_map_not_opened": "the new map was created but could not be opened here",
   "ui.map_chat_plan_title": "Plan to review",
   "ui.map_chat_plan_intro": "Nothing changes until you choose Apply.",
   "ui.map_chat_plan_reason_many_actions_0": "{0} actions",
@@ -1076,8 +1077,8 @@ var en = {
   "ui.map_chat_example_learn": "Plan a three-month route to learn basic Japanese",
   "ui.map_chat_example_decide": "Compare renting and buying a home: costs, risks, timing",
   "ui.map_chat_suggestions_label": "Suggested messages",
-  "ui.map_chat_suggest_empty_build": "Build a three-level topic tree about\u2026",
-  "ui.map_chat_suggest_empty_new_map": "Create a new map about\u2026",
+  "ui.map_chat_suggest_empty_build": "Build a three-level topic tree about",
+  "ui.map_chat_suggest_empty_new_map": "Create a new map about",
   "ui.map_chat_suggest_empty_from_note": "Build a map from the open note",
   "ui.map_chat_suggest_all_missing": "What is missing from this map?",
   "ui.map_chat_suggest_all_layout": "Arrange the whole map",
@@ -1107,6 +1108,19 @@ var en = {
   "ui.map_chat_plan_group_delete_0": "Delete ({0})",
   "ui.map_chat_plan_group_research_0": "Research and AI work ({0})",
   "ui.map_chat_plan_group_view_0": "Map and view ({0})",
+  "ui.map_chat_hero_placeholder": "Say what you want to research or organize. One sentence is enough.",
+  "ui.map_chat_empty_log": "No messages yet. Type below, or pick a suggestion.",
+  "ui.map_chat_canvas_building": "Building the map\u2026",
+  "ui.map_chat_canvas_plan": "Once you confirm the plan, the map appears here.",
+  "ui.map_chat_plan_replace_hint": "Sending a new message cancels this plan.",
+  "ui.map_chat_plan_irreversible": "Cannot be undone once applied.",
+  "ui.map_chat_plan_mark_delete": "Removes",
+  "ui.map_chat_plan_title_applied": "Applied plan",
+  "ui.map_chat_plan_title_cancelled": "Cancelled plan",
+  "ui.map_chat_applying": "Applying the plan\u2026",
+  "ui.map_chat_skip_stopped": "you stopped it",
+  "ui.map_chat_live_plan_0": "A plan is waiting for you: {0}",
+  "ui.map_chat_model_follow_short_0": "Default: {0}",
   "ui.map_chat_toggle_command": "Toggle the map AI chat",
   "ui.structure_review_entry_label": "AI structure suggestions:",
   "ui.structure_review_entry_map": "What to strengthen or cut? (whole map)",
@@ -2962,6 +2976,7 @@ var zhCN = {
   "ui.map_chat_skip_map_choose": "\u6709\u591A\u5F20\u5730\u56FE\u7B26\u5408\uFF0C\u8BF7\u5728\u4E0B\u65B9\u6E05\u5355\u9009\u4E00\u5F20",
   "ui.map_chat_skip_not_first": "\u65B0\u5730\u56FE\u53EA\u80FD\u7531\u7B2C\u4E00\u4E2A\u52A8\u4F5C\u5EFA\u7ACB",
   "ui.map_chat_skip_map_not_created": "\u6CA1\u6709\u5EFA\u7ACB\u65B0\u5730\u56FE",
+  "ui.map_chat_skip_map_not_opened": "\u5DF2\u5EFA\u7ACB\u65B0\u5730\u56FE\uFF0C\u4F46\u6CA1\u80FD\u5728\u8FD9\u91CC\u6253\u5F00",
   "ui.map_chat_plan_title": "\u5F85\u786E\u8BA4\u7684\u8BA1\u5212",
   "ui.map_chat_plan_intro": "\u6309\u201C\u5957\u7528\u201D\u4E4B\u524D\uFF0C\u4E0D\u4F1A\u6709\u4EFB\u4F55\u6539\u53D8\u3002",
   "ui.map_chat_plan_reason_many_actions_0": "\u5171 {0} \u4E2A\u52A8\u4F5C",
@@ -2983,8 +2998,8 @@ var zhCN = {
   "ui.map_chat_example_learn": "\u89C4\u5212\u4E09\u4E2A\u6708\u5B66\u4F1A\u57FA\u7840\u65E5\u6587\u7684\u5B66\u4E60\u8DEF\u7EBF",
   "ui.map_chat_example_decide": "\u6BD4\u8F83\u79DF\u623F\u548C\u4E70\u623F\uFF1A\u6210\u672C\u3001\u98CE\u9669\u4E0E\u65F6\u673A",
   "ui.map_chat_suggestions_label": "\u5EFA\u8BAE\u6307\u4EE4",
-  "ui.map_chat_suggest_empty_build": "\u5EFA\u7ACB\u4E00\u68F5\u4E09\u5C42\u7684\u8BAE\u9898\u6811\uFF0C\u4E3B\u9898\u662F\u2026",
-  "ui.map_chat_suggest_empty_new_map": "\u65B0\u5EFA\u4E00\u5F20\u5730\u56FE\uFF0C\u4E3B\u9898\u662F\u2026",
+  "ui.map_chat_suggest_empty_build": "\u5EFA\u7ACB\u4E00\u68F5\u4E09\u5C42\u7684\u8BAE\u9898\u6811\uFF0C\u4E3B\u9898\u662F",
+  "ui.map_chat_suggest_empty_new_map": "\u65B0\u5EFA\u4E00\u5F20\u5730\u56FE\uFF0C\u4E3B\u9898\u662F",
   "ui.map_chat_suggest_empty_from_note": "\u7528\u5F53\u524D\u6253\u5F00\u7684\u7B14\u8BB0\u5EFA\u7ACB\u5730\u56FE",
   "ui.map_chat_suggest_all_missing": "\u8FD9\u5F20\u56FE\u8FD8\u7F3A\u4EC0\u4E48\uFF1F",
   "ui.map_chat_suggest_all_layout": "\u6574\u7406\u5E76\u91CD\u65B0\u6392\u7248\u6574\u5F20\u56FE",
@@ -3014,6 +3029,19 @@ var zhCN = {
   "ui.map_chat_plan_group_delete_0": "\u5220\u9664\uFF08{0}\uFF09",
   "ui.map_chat_plan_group_research_0": "\u7814\u7A76\u4E0E AI \u4F5C\u4E1A\uFF08{0}\uFF09",
   "ui.map_chat_plan_group_view_0": "\u5730\u56FE\u4E0E\u753B\u9762\uFF08{0}\uFF09",
+  "ui.map_chat_hero_placeholder": "\u7528\u4E00\u53E5\u8BDD\u8BF4\u8BF4\u4F60\u60F3\u7814\u7A76\u6216\u6574\u7406\u4EC0\u4E48",
+  "ui.map_chat_empty_log": "\u8FD8\u6CA1\u6709\u5BF9\u8BDD\u3002\u5728\u4E0B\u9762\u8F93\u5165\uFF0C\u6216\u70B9\u4E00\u6761\u5EFA\u8BAE\u3002",
+  "ui.map_chat_canvas_building": "\u6B63\u5728\u5EFA\u7ACB\u5730\u56FE\u2026",
+  "ui.map_chat_canvas_plan": "\u786E\u8BA4\u8BA1\u5212\u540E\uFF0C\u5730\u56FE\u4F1A\u51FA\u73B0\u5728\u8FD9\u91CC",
+  "ui.map_chat_plan_replace_hint": "\u53D1\u9001\u65B0\u6D88\u606F\u4F1A\u53D6\u6D88\u8FD9\u4EFD\u8BA1\u5212",
+  "ui.map_chat_plan_irreversible": "\u5E94\u7528\u540E\u4E0D\u53EF\u64A4\u9500",
+  "ui.map_chat_plan_mark_delete": "\u4F1A\u79FB\u9664",
+  "ui.map_chat_plan_title_applied": "\u5DF2\u5E94\u7528\u7684\u8BA1\u5212",
+  "ui.map_chat_plan_title_cancelled": "\u5DF2\u53D6\u6D88\u7684\u8BA1\u5212",
+  "ui.map_chat_applying": "\u6B63\u5728\u5E94\u7528\u8BA1\u5212\u2026",
+  "ui.map_chat_skip_stopped": "\u4F60\u5DF2\u505C\u6B62",
+  "ui.map_chat_live_plan_0": "\u6709\u4E00\u4EFD\u8BA1\u5212\u7B49\u4F60\u786E\u8BA4\uFF1A{0}",
+  "ui.map_chat_model_follow_short_0": "\u9ED8\u8BA4\uFF1A{0}",
   "ui.map_chat_toggle_command": "\u5F00\u5173\u5730\u56FE AI \u5BF9\u8BDD",
   "ui.structure_review_entry_label": "AI \u7ED3\u6784\u5EFA\u8BAE\uFF1A",
   "ui.structure_review_entry_map": "\u54EA\u91CC\u8BE5\u52A0\u5F3A\u6216\u5220\u51CF\uFF1F\uFF08\u6574\u5F20\u56FE\uFF09",
@@ -4869,6 +4897,7 @@ var zhTW = {
   "ui.map_chat_skip_map_choose": "\u6709\u591A\u5F35\u5FC3\u667A\u5716\u7B26\u5408\uFF0C\u8ACB\u5728\u4E0B\u65B9\u6E05\u55AE\u9078\u4E00\u5F35",
   "ui.map_chat_skip_not_first": "\u65B0\u5FC3\u667A\u5716\u53EA\u80FD\u7531\u7B2C\u4E00\u500B\u52D5\u4F5C\u5EFA\u7ACB",
   "ui.map_chat_skip_map_not_created": "\u6C92\u6709\u5EFA\u7ACB\u65B0\u5FC3\u667A\u5716",
+  "ui.map_chat_skip_map_not_opened": "\u5DF2\u5EFA\u7ACB\u65B0\u5FC3\u667A\u5716\uFF0C\u4F46\u6C92\u80FD\u5728\u9019\u88E1\u958B\u555F",
   "ui.map_chat_plan_title": "\u5F85\u78BA\u8A8D\u7684\u8A08\u756B",
   "ui.map_chat_plan_intro": "\u6309\u300C\u5957\u7528\u300D\u4E4B\u524D\uFF0C\u4E0D\u6703\u6709\u4EFB\u4F55\u6539\u8B8A\u3002",
   "ui.map_chat_plan_reason_many_actions_0": "\u5171 {0} \u500B\u52D5\u4F5C",
@@ -4890,8 +4919,8 @@ var zhTW = {
   "ui.map_chat_example_learn": "\u898F\u5283\u4E09\u500B\u6708\u5B78\u6703\u57FA\u790E\u65E5\u6587\u7684\u5B78\u7FD2\u8DEF\u7DDA",
   "ui.map_chat_example_decide": "\u6BD4\u8F03\u79DF\u623F\u548C\u8CB7\u623F\uFF1A\u6210\u672C\u3001\u98A8\u96AA\u8207\u6642\u6A5F",
   "ui.map_chat_suggestions_label": "\u5EFA\u8B70\u6307\u4EE4",
-  "ui.map_chat_suggest_empty_build": "\u5EFA\u7ACB\u4E00\u68F5\u4E09\u5C64\u7684\u8B70\u984C\u6A39\uFF0C\u4E3B\u984C\u662F\u2026",
-  "ui.map_chat_suggest_empty_new_map": "\u65B0\u5EFA\u4E00\u5F35\u5FC3\u667A\u5716\uFF0C\u4E3B\u984C\u662F\u2026",
+  "ui.map_chat_suggest_empty_build": "\u5EFA\u7ACB\u4E00\u68F5\u4E09\u5C64\u7684\u8B70\u984C\u6A39\uFF0C\u4E3B\u984C\u662F",
+  "ui.map_chat_suggest_empty_new_map": "\u65B0\u5EFA\u4E00\u5F35\u5FC3\u667A\u5716\uFF0C\u4E3B\u984C\u662F",
   "ui.map_chat_suggest_empty_from_note": "\u7528\u76EE\u524D\u958B\u8457\u7684\u7B46\u8A18\u5EFA\u7ACB\u5FC3\u667A\u5716",
   "ui.map_chat_suggest_all_missing": "\u9019\u5F35\u5716\u9084\u7F3A\u4EC0\u9EBC\uFF1F",
   "ui.map_chat_suggest_all_layout": "\u6574\u7406\u4E26\u91CD\u65B0\u6392\u7248\u6574\u5F35\u5716",
@@ -4921,6 +4950,19 @@ var zhTW = {
   "ui.map_chat_plan_group_delete_0": "\u522A\u9664\uFF08{0}\uFF09",
   "ui.map_chat_plan_group_research_0": "\u7814\u7A76\u8207 AI \u4F5C\u696D\uFF08{0}\uFF09",
   "ui.map_chat_plan_group_view_0": "\u5FC3\u667A\u5716\u8207\u756B\u9762\uFF08{0}\uFF09",
+  "ui.map_chat_hero_placeholder": "\u7528\u4E00\u53E5\u8A71\u8AAA\u8AAA\u4F60\u60F3\u7814\u7A76\u6216\u6574\u7406\u4EC0\u9EBC",
+  "ui.map_chat_empty_log": "\u9084\u6C92\u6709\u5C0D\u8A71\u3002\u5728\u4E0B\u9762\u8F38\u5165\uFF0C\u6216\u9EDE\u4E00\u5247\u5EFA\u8B70\u3002",
+  "ui.map_chat_canvas_building": "\u6B63\u5728\u5EFA\u7ACB\u5FC3\u667A\u5716\u2026",
+  "ui.map_chat_canvas_plan": "\u78BA\u8A8D\u8A08\u756B\u5F8C\uFF0C\u5FC3\u667A\u5716\u6703\u51FA\u73FE\u5728\u9019\u88E1",
+  "ui.map_chat_plan_replace_hint": "\u9001\u51FA\u65B0\u8A0A\u606F\u6703\u53D6\u6D88\u9019\u4EFD\u8A08\u756B",
+  "ui.map_chat_plan_irreversible": "\u5957\u7528\u5F8C\u4E0D\u53EF\u5FA9\u539F",
+  "ui.map_chat_plan_mark_delete": "\u6703\u79FB\u9664",
+  "ui.map_chat_plan_title_applied": "\u5DF2\u5957\u7528\u7684\u8A08\u756B",
+  "ui.map_chat_plan_title_cancelled": "\u5DF2\u53D6\u6D88\u7684\u8A08\u756B",
+  "ui.map_chat_applying": "\u6B63\u5728\u5957\u7528\u8A08\u756B\u2026",
+  "ui.map_chat_skip_stopped": "\u4F60\u5DF2\u505C\u6B62",
+  "ui.map_chat_live_plan_0": "\u6709\u4E00\u4EFD\u8A08\u756B\u7B49\u4F60\u78BA\u8A8D\uFF1A{0}",
+  "ui.map_chat_model_follow_short_0": "\u9810\u8A2D\uFF1A{0}",
   "ui.map_chat_toggle_command": "\u958B\u95DC\u5FC3\u667A\u5716 AI \u5C0D\u8A71",
   "ui.structure_review_entry_label": "AI \u7D50\u69CB\u5EFA\u8B70\uFF1A",
   "ui.structure_review_entry_map": "\u54EA\u88E1\u8A72\u52A0\u5F37\u6216\u522A\u6E1B\uFF1F\uFF08\u6574\u5F35\u5716\uFF09",
@@ -17963,14 +18005,23 @@ var MAP_CHAT_WIDTH_DEFAULT = 340;
 var MAP_CHAT_WIDTH_MIN = 280;
 var MAP_CHAT_WIDTH_MAX = 560;
 var MAP_CHAT_WIDTH_STEP = 16;
-var MAP_CHAT_MIN_CANVAS = 700;
+var MAP_CHAT_MIN_CANVAS = 360;
+var MAP_CHAT_NARROW_HYSTERESIS = 24;
+var MAP_CHAT_OVERLAY_MARGIN = 160;
 var MAP_CHAT_LINES_FOLD_ABOVE = 5;
 function clampMapChatWidth(value) {
   if (typeof value !== "number" || !Number.isFinite(value)) return MAP_CHAT_WIDTH_DEFAULT;
   return Math.min(MAP_CHAT_WIDTH_MAX, Math.max(MAP_CHAT_WIDTH_MIN, Math.round(value)));
 }
-function isChatNarrow(paneWidth, sidebarWidth) {
-  return paneWidth - sidebarWidth < MAP_CHAT_MIN_CANVAS;
+function isChatNarrow(paneWidth, inspector = 0, wasNarrow = false) {
+  const limit = MAP_CHAT_WIDTH_MIN + MAP_CHAT_MIN_CANVAS + (wasNarrow ? MAP_CHAT_NARROW_HYSTERESIS : 0);
+  return paneWidth - inspector < limit;
+}
+function chatDockedWidth(paneWidth, setWidth, inspector = 0) {
+  return Math.max(MAP_CHAT_WIDTH_MIN, Math.min(setWidth, paneWidth - inspector - MAP_CHAT_MIN_CANVAS));
+}
+function chatOverlayWidth(paneWidth, setWidth) {
+  return Math.max(MAP_CHAT_WIDTH_MIN, Math.min(setWidth, paneWidth - MAP_CHAT_OVERLAY_MARGIN));
 }
 function chatSuggestionKeys(context) {
   const keys = !context.hasTopics ? ["ui.map_chat_suggest_empty_build", "ui.map_chat_suggest_empty_new_map"] : context.selected > 1 ? ["ui.map_chat_suggest_many_compare", "ui.map_chat_suggest_many_integrate", "ui.map_chat_suggest_many_group"] : context.selected === 1 ? ["ui.map_chat_suggest_one_expand", "ui.map_chat_suggest_one_research", "ui.map_chat_suggest_one_summary"] : ["ui.map_chat_suggest_all_missing", "ui.map_chat_suggest_all_layout", "ui.map_chat_suggest_all_collapse"];
@@ -20997,13 +21048,22 @@ var MapChatPanel = class {
     __publicField(this, "unread", false);
     __publicField(this, "width", MAP_CHAT_WIDTH_DEFAULT);
     __publicField(this, "busy", false);
+    /** A confirmed plan is being applied: the window shows it is working and can stop it. */
+    __publicField(this, "applying", false);
     __publicField(this, "composing", false);
+    /** The widths the pane leaves for the docked window and for the one laid over a narrow pane (the set width when unknown). */
+    __publicField(this, "dockedPx", null);
+    __publicField(this, "overlayPx", null);
+    /** Where the log was scrolled when the panel was taken out for a repaint. */
+    __publicField(this, "keptScroll", null);
     __publicField(this, "el");
     __publicField(this, "toggleEl");
     __publicField(this, "badgeEl");
     __publicField(this, "bodyEl");
     __publicField(this, "headEl");
     __publicField(this, "heroTitleEl");
+    __publicField(this, "guideEl");
+    __publicField(this, "hintEl");
     __publicField(this, "logEl");
     __publicField(this, "suggestEl");
     __publicField(this, "suggestKey", "");
@@ -21056,8 +21116,21 @@ var MapChatPanel = class {
   get shown() {
     return this.hero || this.docked || this.floating;
   }
+  /** A turn is running (a request or its actions). */
   get isBusy() {
     return this.busy;
+  }
+  /** The window is laid over the canvas of a narrow pane. */
+  get isOverlay() {
+    return this.floating;
+  }
+  /** Width of the window laid over the canvas, 0 when it is not. */
+  get overlayWidth() {
+    return this.floating ? this.shownWidth() : 0;
+  }
+  /** A turn or a plan being applied is running: no new message can be sent, and Stop is offered. */
+  get working() {
+    return this.busy || this.applying;
   }
   get isComposing() {
     return this.composing;
@@ -21113,6 +21186,15 @@ var MapChatPanel = class {
     this.applyOpen();
     this.refreshNote();
     this.refreshControls();
+    this.restoreScroll();
+  }
+  /** After a repaint the log is scrolled where it was: at the end it stays at the end (a new element starts at the top). */
+  restoreScroll() {
+    const kept = this.keptScroll;
+    this.keptScroll = null;
+    if (!kept || !this.built) return;
+    if (kept.atEnd) this.scrollToEnd();
+    else this.logEl.scrollTop = kept.top;
   }
   /** Moves the panel to `parent`, before `before` (the end when null). */
   place(parent, before) {
@@ -21131,7 +21213,9 @@ var MapChatPanel = class {
   }
   /** Takes the panel out of the page; the next {@link mount} puts it back with all state intact. */
   detach() {
-    if (this.built) this.el.remove();
+    if (!this.built) return;
+    this.keptScroll = { atEnd: this.atEnd(), top: this.logEl.scrollTop };
+    this.el.remove();
   }
   /**
    * Call before a repaint: when the message field has focus, the returned function (call it after the repaint) gives it
@@ -21168,7 +21252,12 @@ var MapChatPanel = class {
     this.applyOpen();
   }
   /** The pane became too narrow to dock the window (or wide enough again). The window folds to its edge, or docks back. */
-  setNarrow(narrow) {
+  setNarrow(narrow, widths) {
+    if (widths && (widths.docked !== this.dockedPx || widths.overlay !== this.overlayPx)) {
+      this.dockedPx = widths.docked;
+      this.overlayPx = widths.overlay;
+      this.applyWidth();
+    }
     if (narrow === this.narrow) return;
     const hadFocus = this.hasFocus();
     this.narrow = narrow;
@@ -21245,11 +21334,24 @@ var MapChatPanel = class {
   }
   /** A turn starts: the user's text, an empty answer, and the busy state. */
   begin(userText, origin, keepDraft = false) {
+    this.retireChoices();
     this.messages.push({ role: "user", text: userText, lines: [], ...origin ? { origin } : {} });
     this.messages.push({ role: "assistant", text: "", lines: [], streaming: true });
     this.busy = true;
     if (this.built && !keepDraft) this.inputEl.value = "";
     this.renderLog(true);
+    this.renderBusy();
+  }
+  /** Every list of choices already shown stops working (a pick was made, or a newer message came). */
+  retireChoices(except) {
+    for (const message of this.messages)
+      if (message.choices && message.choices !== except) message.choices.picked = true;
+  }
+  /** A confirmed plan is being applied (true) or is done (false). */
+  setApplying(on) {
+    if (this.applying === on) return;
+    this.applying = on;
+    this.renderLog();
     this.renderBusy();
   }
   /** The answer so far (the whole text, not a delta). */
@@ -21303,7 +21405,7 @@ var MapChatPanel = class {
     this.markUnread();
   }
   /** The turn ended without an answer. */
-  fail(text11) {
+  fail(text11, announce) {
     const last = this.messages.at(-1);
     if (last == null ? void 0 : last.streaming) {
       last.text = text11;
@@ -21313,7 +21415,7 @@ var MapChatPanel = class {
     this.busy = false;
     this.renderLog();
     this.renderBusy();
-    this.announce(t("ui.map_chat_live_failed_0", clip(text11, 160)));
+    this.announce(announce !== void 0 ? clip(announce, 160) : t("ui.map_chat_live_failed_0", clip(text11, 160)));
     this.markUnread();
   }
   /** The user stopped the turn: whatever text arrived stays, marked as stopped. */
@@ -21334,10 +21436,19 @@ var MapChatPanel = class {
   }
   /** The reply just finished needs the user's yes: shows the plan card on its message. */
   showPlan(plan) {
+    var _a2, _b2, _c;
     const last = this.messages.at(-1);
     if (!last || last.role !== "assistant") return;
     last.plan = plan;
     this.renderLog();
+    this.renderHint();
+    this.announce(
+      `${t("ui.map_chat_live_done_0", clip(last.text, 160))} ${t(
+        "ui.map_chat_live_plan_0",
+        clip((_a2 = plan.summary) != null ? _a2 : t("ui.map_chat_plan_summary_0", plan.reasons.join(t("ui.map_chat_count_separator"))), 160)
+      )}`
+    );
+    (_c = (_b2 = this.host).stateChanged) == null ? void 0 : _c.call(_b2);
   }
   /** The plan card still waiting for an answer, if any. */
   pendingPlan() {
@@ -21349,11 +21460,14 @@ var MapChatPanel = class {
   }
   /** A plan was applied or cancelled: its buttons stop working; `lines` (the result of applying) join its message. */
   settlePlan(plan, state, lines) {
+    var _a2, _b2;
     const message = this.messages.find((item) => item.plan === plan);
     if (!message) return;
     plan.state = state;
     if (lines) message.lines = lines;
     this.renderLog();
+    this.renderHint();
+    (_b2 = (_a2 = this.host).stateChanged) == null ? void 0 : _b2.call(_a2);
     if (lines == null ? void 0 : lines.length)
       this.announce(
         t("ui.map_chat_live_results_0", this.countsText(countChatLines(lines, t("ui.map_chat_not_undoable"))))
@@ -21363,6 +21477,7 @@ var MapChatPanel = class {
   showChoices(choices) {
     const last = this.messages.at(-1);
     if (!last || last.role !== "assistant") return;
+    this.retireChoices();
     last.choices = choices;
     this.renderLog();
   }
@@ -21375,6 +21490,7 @@ var MapChatPanel = class {
   }
   /** Back to an empty conversation (a different map was opened). */
   reset() {
+    var _a2, _b2;
     this.cancelFrame();
     this.rows = /* @__PURE__ */ new WeakMap();
     this.messages = [];
@@ -21382,12 +21498,15 @@ var MapChatPanel = class {
     this.dismissedNote = null;
     this.noteChip = null;
     this.busy = false;
+    this.applying = false;
     this.unread = false;
     if (this.built) this.inputEl.value = "";
     this.renderLog();
     this.renderChips();
     this.renderBusy();
+    this.renderHint();
     this.applyOpen();
+    (_b2 = (_a2 = this.host).stateChanged) == null ? void 0 : _b2.call(_a2);
   }
   focusInput() {
     if (this.built) this.inputEl.focus();
@@ -21414,7 +21533,10 @@ var MapChatPanel = class {
       cls: "vam-map-chat-model dropdown",
       attr: { "aria-label": t("ui.map_chat_model_label") }
     });
-    this.modelEl.addEventListener("change", () => this.host.setModel(this.modelEl.value));
+    this.modelEl.addEventListener("change", () => {
+      this.host.setModel(this.modelEl.value);
+      this.refreshControls();
+    });
     const close = this.headEl.createEl("button", {
       cls: "vam-map-chat-close clickable-icon",
       attr: { "aria-label": t("ui.map_chat_close") }
@@ -21426,6 +21548,7 @@ var MapChatPanel = class {
       text: t("ui.map_chat_hero_title"),
       attr: { role: "heading", "aria-level": "2" }
     });
+    this.guideEl = this.bodyEl.createDiv({ cls: "vam-map-chat-guide", text: t("ui.map_chat_empty_log") });
     this.logEl = this.bodyEl.createDiv({
       cls: "vam-map-chat-log",
       attr: { role: "group", "aria-label": t("ui.map_chat_log_label"), tabindex: "0" }
@@ -21449,6 +21572,8 @@ var MapChatPanel = class {
       cls: "vam-map-chat-chips",
       attr: { role: "group", "aria-label": t("ui.map_chat_references") }
     });
+    this.hintEl = this.bodyEl.createDiv({ cls: "vam-map-chat-plan-hint" });
+    this.hintEl.hidden = true;
     this.statusEl = this.bodyEl.createDiv({ cls: "vam-map-chat-status", attr: { role: "status" } });
     const form = this.bodyEl.createDiv("vam-map-chat-form");
     this.inputEl = form.createEl("textarea", {
@@ -21539,18 +21664,29 @@ var MapChatPanel = class {
   }
   // ---- width ----------------------------------------------------------------------------------------------------
   resizeTo(width, commit) {
-    var _a2, _b2;
+    var _a2, _b2, _c, _d;
     this.width = clampMapChatWidth(width);
+    const widths = (_b2 = (_a2 = this.host).widths) == null ? void 0 : _b2.call(_a2, this.width);
+    if (widths) {
+      this.dockedPx = widths.docked;
+      this.overlayPx = widths.overlay;
+    }
     this.applyWidth();
-    (_b2 = (_a2 = this.host).setWidth) == null ? void 0 : _b2.call(_a2, this.width, commit);
+    (_d = (_c = this.host).setWidth) == null ? void 0 : _d.call(_c, this.width, commit);
+  }
+  /** The width the window has on the page now: the set width, given way to when the pane has no room for it. */
+  shownWidth() {
+    var _a2, _b2;
+    if (this.floating) return (_a2 = this.overlayPx) != null ? _a2 : this.width;
+    return (_b2 = this.dockedPx) != null ? _b2 : this.width;
   }
   applyWidth() {
     if (!this.built) return;
-    this.el.style.width = this.docked || this.floating ? `${this.width}px` : "";
-    this.resizerEl.setAttr("aria-valuenow", String(this.width));
+    this.el.style.width = this.docked || this.floating ? `${this.shownWidth()}px` : "";
+    this.resizerEl.setAttr("aria-valuenow", String(this.shownWidth()));
   }
   onResizerKey(event) {
-    const to = event.key === "ArrowLeft" ? this.width - MAP_CHAT_WIDTH_STEP : event.key === "ArrowRight" ? this.width + MAP_CHAT_WIDTH_STEP : event.key === "Home" ? MAP_CHAT_WIDTH_MIN : event.key === "End" ? MAP_CHAT_WIDTH_MAX : null;
+    const to = event.key === "ArrowLeft" ? this.shownWidth() - MAP_CHAT_WIDTH_STEP : event.key === "ArrowRight" ? this.shownWidth() + MAP_CHAT_WIDTH_STEP : event.key === "Home" ? MAP_CHAT_WIDTH_MIN : event.key === "End" ? MAP_CHAT_WIDTH_MAX : null;
     if (to === null) return;
     event.preventDefault();
     this.resizeTo(to, true);
@@ -21568,7 +21704,7 @@ var MapChatPanel = class {
     if (!(doc == null ? void 0 : doc.addEventListener)) return;
     event.preventDefault();
     const startX = event.clientX;
-    const startWidth = this.width;
+    const startWidth = this.shownWidth();
     const handle = this.resizerEl;
     const move = (next) => {
       if (next.buttons === 0) end();
@@ -21609,6 +21745,16 @@ var MapChatPanel = class {
     if (counts.skipped) parts.push(t("ui.map_chat_count_skipped_0", counts.skipped));
     if (counts.failed) parts.push(t("ui.map_chat_count_failed_0", counts.failed));
     return parts.join(t("ui.map_chat_count_separator"));
+  }
+  /** The counts as one sentence; a failed count is set apart in the error colour, and its word says it as well. */
+  buildCounts(parent, counts) {
+    if (!counts.failed) {
+      parent.setText(this.countsText(counts));
+      return;
+    }
+    const rest = this.countsText({ ...counts, failed: 0 });
+    if (rest) parent.createSpan({ text: `${rest}${t("ui.map_chat_count_separator")}` });
+    parent.createSpan({ cls: "vam-map-chat-count-failed", text: t("ui.map_chat_count_failed_0", counts.failed) });
   }
   spokenTurn(reply, lines) {
     const said = t("ui.map_chat_live_done_0", clip(reply, 160));
@@ -21689,6 +21835,7 @@ ${text11}` : text11;
       floating: this.floating,
       shown: this.shown
     };
+    const hadUnread = this.unread;
     if (shown) this.unread = false;
     this.el.toggleClass("is-open", shown && !hero);
     this.el.toggleClass("is-hero", hero);
@@ -21711,11 +21858,24 @@ ${text11}` : text11;
     this.headEl.toggleClass("is-hero", hero);
     this.heroTitleEl.hidden = !hero;
     this.heroTitleEl.toggleClass("is-hidden", !hero);
+    this.inputEl.setAttr("placeholder", t(hero ? "ui.map_chat_hero_placeholder" : "ui.map_chat_input_placeholder"));
     this.applyWidth();
     this.renderSuggestions();
+    this.renderGuide();
+    if (shown && hadUnread) this.scrollToEnd();
+  }
+  /** An empty conversation in the side window shows one line of guidance in place of the log. */
+  renderGuide() {
+    if (!this.built) return;
+    const empty = this.messages.length === 0 && !this.hero;
+    this.guideEl.hidden = !empty;
+    this.guideEl.toggleClass("is-hidden", !empty);
+    this.logEl.hidden = empty;
+    this.logEl.toggleClass("is-hidden", empty);
   }
   /** Puts the answer-length buttons and the model list back in step with what the view remembers. */
   refreshControls() {
+    var _a2, _b2, _c;
     if (!this.built || !this.styleEls) return;
     const style = this.host.style();
     for (const choice2 of ["concise", "detailed"]) {
@@ -21724,8 +21884,14 @@ ${text11}` : text11;
     }
     const choices = this.host.modelChoices();
     this.modelEl.empty();
-    for (const choice2 of choices) this.modelEl.createEl("option", { text: choice2.label, value: choice2.value });
+    for (const choice2 of choices)
+      this.modelEl.createEl("option", {
+        text: (_a2 = choice2.short) != null ? _a2 : choice2.label,
+        value: choice2.value,
+        attr: { title: choice2.label }
+      });
     this.modelEl.value = this.host.model();
+    this.modelEl.setAttr("title", (_c = (_b2 = choices.find((choice2) => choice2.value === this.modelEl.value)) == null ? void 0 : _b2.label) != null ? _c : "");
   }
   chipLabel(chip) {
     if (chip.kind === "topic") {
@@ -21789,12 +21955,16 @@ ${text11}` : text11;
       t("ui.map_chat_retry"),
       t("ui.map_chat_lines_hide"),
       t("ui.map_chat_plan_summary_0", ""),
+      t("ui.map_chat_plan_title"),
+      t("ui.map_chat_plan_title_applied"),
+      t("ui.map_chat_plan_title_cancelled"),
+      this.working ? "w" : "",
       t("ui.map_chat_role_you"),
       t("ui.map_chat_role_ai"),
       t("ui.map_chat_overflow_note"),
       more ? t("ui.map_chat_more_detail") : "",
       message.lines.map((line) => `${line.status}:${line.text}`).join("\n"),
-      message.plan ? `plan:${message.plan.state}:${message.plan.items.length}:${message.plan.estimate}:${(_b2 = (_a2 = message.plan.groups) == null ? void 0 : _a2.map((group) => group.label).join("|")) != null ? _b2 : ""}` : "",
+      message.plan ? `plan:${message.plan.state}:${message.plan.items.length}:${message.plan.estimate}:${(_b2 = (_a2 = message.plan.groups) == null ? void 0 : _a2.map((group) => `${group.label}${group.danger ? "!" : ""}`).join("|")) != null ? _b2 : ""}` : "",
       message.choices ? `choices:${message.choices.picked}:${message.choices.options.map((o) => o.label).join("|")}` : "",
       message.text
     ].join("");
@@ -21803,7 +21973,9 @@ ${text11}` : text11;
     return message.role === "assistant" && !!message.error && !message.streaming && !!(asked == null ? void 0 : asked.origin) && !!this.host.retry;
   }
   hasMore(message, asked) {
-    return message.role === "assistant" && !message.streaming && !message.error && !!message.text.trim() && !!(asked == null ? void 0 : asked.origin);
+    var _a2;
+    return message.role === "assistant" && !message.streaming && !message.error && !!message.text.trim() && !!(asked == null ? void 0 : asked.origin) && // Saying it again would replace the plan that waits for its answer.
+    ((_a2 = message.plan) == null ? void 0 : _a2.state) !== "pending";
   }
   renderLog(forceEnd = false) {
     if (!this.built) return;
@@ -21826,10 +21998,11 @@ ${text11}` : text11;
       }
       const at = this.logEl.children[index];
       if (at !== entry.row) this.logEl.insertBefore(entry.row, at != null ? at : null);
-      if (entry.more) entry.more.disabled = this.busy;
+      if (entry.more) entry.more.disabled = this.working;
       this.messageEls.push(entry.row);
       this.bodyEls.push(entry.body);
     });
+    this.renderGuide();
     if (stick) this.scrollToEnd();
   }
   buildRow(message) {
@@ -21844,6 +22017,9 @@ ${text11}` : text11;
     const body = row.createDiv({ cls: `vam-map-chat-text${markdown ? " is-markdown" : ""}` });
     if (markdown) renderChatMarkdown(body, message.text, t("ui.map_chat_overflow_note"));
     else body.setText(message.text);
+    if (message.plan) this.buildPlan(row, message.plan);
+    if (message.choices) this.buildChoices(row, message.choices);
+    if (message.lines.length) this.buildLines(row, message);
     const asked = this.messages[this.messages.indexOf(message) - 1];
     let more = null;
     if (this.hasMore(message, asked) && (asked == null ? void 0 : asked.origin)) {
@@ -21853,9 +22029,9 @@ ${text11}` : text11;
         text: t("ui.map_chat_more_detail"),
         attr: { type: "button" }
       });
-      more.disabled = this.busy;
+      more.disabled = this.working;
       more.addEventListener("click", () => {
-        if (!this.busy) this.host.moreDetail(origin);
+        if (!this.working) this.host.moreDetail(origin);
       });
     }
     if (this.canRetry(message, asked) && (asked == null ? void 0 : asked.origin)) {
@@ -21865,15 +22041,12 @@ ${text11}` : text11;
         text: t("ui.map_chat_retry"),
         attr: { type: "button" }
       });
-      more.disabled = this.busy;
+      more.disabled = this.working;
       more.addEventListener("click", () => {
         var _a2, _b2;
-        if (!this.busy) (_b2 = (_a2 = this.host).retry) == null ? void 0 : _b2.call(_a2, origin);
+        if (!this.working) (_b2 = (_a2 = this.host).retry) == null ? void 0 : _b2.call(_a2, origin);
       });
     }
-    if (message.plan) this.buildPlan(row, message.plan);
-    if (message.choices) this.buildChoices(row, message.choices);
-    if (message.lines.length) this.buildLines(row, message);
     return { row, body, more };
   }
   /**
@@ -21888,7 +22061,7 @@ ${text11}` : text11;
     const fold2 = results.length > MAP_CHAT_LINES_FOLD_ABOVE;
     const shown = !fold2 || message.linesOpen === true;
     if (fold2) {
-      list.createDiv({ cls: "vam-map-chat-lines-summary", text: this.countsText(countChatLines(results)) });
+      this.buildCounts(list.createDiv("vam-map-chat-lines-summary"), countChatLines(results));
       const toggle = list.createEl("button", {
         cls: "vam-map-chat-lines-toggle",
         text: shown ? t("ui.map_chat_lines_hide") : t("ui.map_chat_lines_show_0", results.length),
@@ -21912,17 +22085,24 @@ ${text11}` : text11;
   buildPlan(row, plan) {
     var _a2, _b2;
     const card = row.createDiv({ cls: `vam-map-chat-plan is-${plan.state}` });
+    const title = t(
+      plan.state === "applied" ? "ui.map_chat_plan_title_applied" : plan.state === "cancelled" ? "ui.map_chat_plan_title_cancelled" : "ui.map_chat_plan_title"
+    );
     card.setAttr("role", "group");
-    card.setAttr("aria-label", t("ui.map_chat_plan_title"));
-    card.createDiv({ cls: "vam-map-chat-plan-title", text: t("ui.map_chat_plan_title") });
+    card.setAttr("aria-label", title);
+    card.createDiv({ cls: "vam-map-chat-plan-title", text: title });
     card.createDiv({
       cls: "vam-map-chat-plan-sentence",
       text: (_a2 = plan.summary) != null ? _a2 : t("ui.map_chat_plan_summary_0", plan.reasons.join(t("ui.map_chat_count_separator")))
     });
     const groups = (_b2 = plan.groups) != null ? _b2 : plan.items.length ? [{ label: "", items: plan.items }] : [];
     for (const group of groups) {
-      const list = group.label ? card.createEl("details", { cls: "vam-map-chat-plan-group" }) : card.createDiv("vam-map-chat-plan-group");
-      if (group.label) list.createEl("summary", { cls: "vam-map-chat-plan-group-title", text: group.label });
+      const danger = "danger" in group ? group.danger : void 0;
+      const list = group.label ? card.createEl("details", { cls: `vam-map-chat-plan-group${danger ? " is-danger" : ""}` }) : card.createDiv("vam-map-chat-plan-group");
+      if (group.label) {
+        const summary = list.createEl("summary", { cls: "vam-map-chat-plan-group-title", text: group.label });
+        if (danger) summary.createSpan({ cls: "vam-map-chat-plan-mark", text: danger.mark });
+      }
       const items = list.createEl("ol", { cls: "vam-map-chat-plan-items" });
       for (const item of group.items) items.createEl("li", { text: item });
     }
@@ -21946,6 +22126,7 @@ ${text11}` : text11;
       text: t("ui.map_chat_plan_cancel"),
       attr: { type: "button" }
     });
+    buttons.createSpan({ cls: "vam-map-chat-plan-warning", text: t("ui.map_chat_plan_irreversible") });
     apply.addEventListener("click", () => {
       if (plan.state !== "pending") return;
       apply.disabled = cancel.disabled = true;
@@ -21977,19 +22158,31 @@ ${text11}` : text11;
         if (choices.picked) return;
         choices.picked = true;
         for (const other of buttons) other.disabled = true;
+        this.retireChoices(choices);
         option2.pick();
         this.focusInput();
       });
     }
   }
   renderBusy() {
+    var _a2, _b2;
     if (!this.built) return;
-    this.statusEl.setText(this.busy ? t("ui.map_chat_replying") : "");
-    this.el.toggleClass("is-busy", this.busy);
-    this.sendEl.hidden = this.busy;
-    this.sendEl.toggleClass("is-hidden", this.busy);
-    this.stopEl.hidden = !this.busy;
-    this.stopEl.toggleClass("is-hidden", !this.busy);
+    this.statusEl.setText(this.busy ? t("ui.map_chat_replying") : this.applying ? t("ui.map_chat_applying") : "");
+    this.el.toggleClass("is-busy", this.working);
+    this.sendEl.hidden = this.working;
+    this.sendEl.toggleClass("is-hidden", this.working);
+    this.stopEl.hidden = !this.working;
+    this.stopEl.toggleClass("is-hidden", !this.working);
+    this.renderHint();
+    (_b2 = (_a2 = this.host).stateChanged) == null ? void 0 : _b2.call(_a2);
+  }
+  /** While a plan waits for its answer a line above the message field says what sending a new message does to it. */
+  renderHint() {
+    if (!this.built) return;
+    const waiting = !this.working && this.pendingPlan() !== null;
+    this.hintEl.setText(waiting ? t("ui.map_chat_plan_replace_hint") : "");
+    this.hintEl.hidden = !waiting;
+    this.hintEl.toggleClass("is-hidden", !waiting);
   }
   /** True when the log is scrolled to its end (or cannot be measured), so a longer reply should keep the end in view. */
   atEnd() {
@@ -22659,6 +22852,18 @@ var MAP_CHAT_PLAN_RESEARCH_LIMIT = 10;
 var MAP_CHAT_AUTO_LAYOUT_MIN_NEW = 5;
 function targetCount(nodeIds, selection) {
   return nodeIds.length ? nodeIds.length : selection;
+}
+function researchTargetsOf(actions, selectedCount) {
+  let research = 0;
+  let selection = selectedCount;
+  for (const action of actions) {
+    if (action.kind === "select_topics") selection = action.nodeIds.length;
+    else if (action.kind === "run_map_action") {
+      if (action.nodeIds.length) selection = action.nodeIds.length;
+      if (action.action === "research_standard") research += targetCount(action.nodeIds, selection);
+    }
+  }
+  return research;
 }
 function planFor(actions, context) {
   const reasons = [];
@@ -35178,6 +35383,8 @@ function showDocumentReady() {
   documentReadyNotice == null ? void 0 : documentReadyNotice.hide();
   documentReadyNotice = new import_obsidian30.Notice(t("ui.aim_document_ready"), 6e4);
 }
+var CHAT_RAIL_WIDTH = 44;
+var CHAT_TOOLS_GAP = 12;
 var skipped = (key2) => ({ status: "skipped", reason: t(key2) });
 var GUARD_REASON = {
   outside_vault: "ui.map_chat_guard_outside_vault",
@@ -35233,6 +35440,14 @@ var VisualAgentMapView = class _VisualAgentMapView extends import_obsidian30.Ite
     __publicField(this, "chatCarryOver", false);
     /** True while a confirmed plan is being applied; no new message is sent meanwhile. */
     __publicField(this, "chatApplying", false);
+    /** While a reply's actions are applied, repaints and the views' re-reads wait and happen once at the end (see holdChatBatch). */
+    __publicField(this, "renderHold", 0);
+    __publicField(this, "renderPending", false);
+    __publicField(this, "syncHold", 0);
+    __publicField(this, "syncPending", false);
+    __publicField(this, "heldViews", []);
+    /** The hint on an empty canvas, which follows the chat while it builds a map. */
+    __publicField(this, "emptyMapEl", null);
     __publicField(this, "chatWorkspaceEl", null);
     __publicField(this, "chatOverlayEl", null);
     /** The map whose opening screen has already taken the keyboard once. */
@@ -35427,7 +35642,7 @@ var VisualAgentMapView = class _VisualAgentMapView extends import_obsidian30.Ite
       this.spaceHeld = false;
     });
     this.registerDomEvent(this.contentEl, "keydown", (event) => {
-      if (event.target instanceof HTMLElement && event.target.closest(["input", "textarea", "select", "[contenteditable=true]", ".vam-map-chat"].join(", ")))
+      if (event.target instanceof HTMLElement && event.target.closest("input, textarea, select, [contenteditable=true], .vam-map-chat"))
         return;
       if (event.key === "Escape") {
         const previous = this.selected, touched = [...this.multiSelected];
@@ -39905,6 +40120,10 @@ ${request.requirements}` : preset.text,
   async synchronize() {
     var _a2, _b2, _c;
     if (this.builtIn) return;
+    if (this.syncHold > 0) {
+      this.syncPending = true;
+      return;
+    }
     if (!this.path || !this.map || this.closed) return;
     if (!(this.app.vault.getAbstractFileByPath(this.path) instanceof import_obsidian30.TFile)) {
       this.map = null;
@@ -40249,6 +40468,13 @@ ${request.requirements}` : preset.text,
     ]).open();
   }
   render() {
+    if (this.renderHold > 0 && !this.closed) {
+      this.renderPending = true;
+      return;
+    }
+    this.paint();
+  }
+  paint() {
     var _a2, _b2, _c, _d, _e, _f, _g, _h, _i, _j, _k, _l, _m, _n, _o, _p, _q, _r, _s, _t, _u, _v, _w, _x, _y;
     if (this.dragging && !this.closed) {
       if (!this.dragStale()) {
@@ -40259,6 +40485,7 @@ ${request.requirements}` : preset.text,
       this.renderAfterDrag = false;
     }
     this.paintCount++;
+    this.emptyMapEl = null;
     this.aimProgressEls.clear();
     (_b2 = this.dragCleanup) == null ? void 0 : _b2.call(this);
     if (this.closed) return;
@@ -40680,13 +40907,8 @@ ${request.requirements}` : preset.text,
       this.focusNodeId = null;
     }
     if (!this.map.nodes.length) {
-      const emptyMap = this.viewportEl.createDiv("vam-empty");
-      emptyMap.createSpan({
-        text: t(
-          this.map.aim ? "ui.aim_empty_map_hint" : "ui.this_mind_map_has_no_topics_click_topic_to_create_the_first"
-        )
-      });
-      if (!this.map.aim) this.button(emptyMap, t("ui.topic"), () => this.enqueue(() => this.addNode(null)));
+      this.emptyMapEl = this.viewportEl.createDiv("vam-empty");
+      this.fillEmptyMap(this.emptyMapEl);
     }
     this.setupPan();
     this.applyInitialViewport();
@@ -40694,10 +40916,48 @@ ${request.requirements}` : preset.text,
     this.drawEdges();
     if (this.builtIn && this.selected) {
       const node = this.map.nodes.find((n) => n.id === this.selected);
-      if (node) this.renderInspector(workspace, node);
+      if (node) {
+        this.renderInspector(workspace, node);
+        this.syncChatNarrow();
+      }
     }
     restoreRelevanceFocus();
     restoreChatFocus();
+  }
+  /** What the empty canvas says: the usual hint, or (while the chat builds the map, or waits for a plan) what is happening. */
+  emptyCanvasState() {
+    var _a2;
+    const chat = this.chat;
+    if (!chat || this.builtIn || ((_a2 = this.map) == null ? void 0 : _a2.aim)) return "idle";
+    if (chat.isBusy || this.chatApplying) return "building";
+    return chat.pendingPlan() ? "plan" : "idle";
+  }
+  fillEmptyMap(box) {
+    if (!this.map) return;
+    const state = this.emptyCanvasState();
+    box.toggleClass("is-building", state === "building");
+    box.toggleClass("is-waiting", state === "plan");
+    if (state === "building") {
+      box.createSpan({ text: t("ui.map_chat_canvas_building") });
+      const skeleton = box.createDiv({ cls: "vam-chat-skeleton", attr: { "aria-hidden": "true" } });
+      for (let card = 0; card < 3; card++) skeleton.createDiv("vam-chat-skeleton-card");
+      return;
+    }
+    if (state === "plan") {
+      box.createSpan({ text: t("ui.map_chat_canvas_plan") });
+      return;
+    }
+    box.createSpan({
+      text: t(this.map.aim ? "ui.aim_empty_map_hint" : "ui.this_mind_map_has_no_topics_click_topic_to_create_the_first")
+    });
+    if (!this.map.aim) this.button(box, t("ui.topic"), () => this.enqueue(() => this.addNode(null)));
+  }
+  /** The chat started or ended something: an empty canvas follows it. */
+  refreshEmptyMap() {
+    const box = this.emptyMapEl;
+    if (!box || this.closed || !this.map || this.map.nodes.length) return;
+    box.empty();
+    this.fillEmptyMap(box);
   }
   /** `shownNode` may be a display copy (sorted by relevance): it only supplies where the card is drawn. */
   renderNode(shownNode) {
@@ -44089,8 +44349,10 @@ ${note.detail.trim()}` : "",
     this.contentEl.querySelectorAll(".vam-chat-hero-slot").forEach((slot) => slot.remove());
     (_a2 = this.viewportEl) == null ? void 0 : _a2.removeClass("has-chat-hero");
     this.placeChatPanel();
+    if (!chat.isOpen) chat.setOpen(true, true);
     (_b2 = this.chatWorkspaceEl) == null ? void 0 : _b2.toggleClass("has-map-chat-open", chat.isOpen);
     restore();
+    this.placeMapTools();
   }
   /** Opening screen: the keyboard starts in the message field, once per map, unless it is in another pane. */
   focusChatHeroOnce() {
@@ -44101,11 +44363,45 @@ ${note.detail.trim()}` : "",
     const active = (_b2 = (_a2 = this.contentEl.ownerDocument) == null ? void 0 : _a2.activeElement) != null ? _b2 : null;
     if (!active || active === ((_c = this.contentEl.ownerDocument) == null ? void 0 : _c.body) || this.contentEl.contains(active)) chat.focusInput();
   }
-  /** The window folds to a narrow edge when the pane would keep less than 700px for the canvas beside it. */
+  /** The pane's width and what the sample's inspector takes of it; null while the pane has no size yet (not shown, or a test). */
+  chatPaneWidths() {
+    var _a2, _b2;
+    const pane = (_a2 = this.contentEl) == null ? void 0 : _a2.clientWidth;
+    if (!pane) return null;
+    const inspector = this.contentEl.querySelector(".vam-inspector");
+    return { pane, inspector: (_b2 = inspector == null ? void 0 : inspector.offsetWidth) != null ? _b2 : 0 };
+  }
+  /** What the pane gives the window for a set width: docked beside the canvas, or laid over a narrow pane. */
+  chatWidths(setWidth) {
+    const measured = this.chatPaneWidths();
+    if (!measured) return null;
+    return {
+      docked: chatDockedWidth(measured.pane, setWidth, measured.inspector),
+      overlay: chatOverlayWidth(measured.pane, setWidth)
+    };
+  }
+  /**
+   * The window folds to a narrow edge only when even its narrowest form would leave the canvas under 360px; wider than that it
+   * docks and gives way in width (see chatDockedWidth). A pane on the limit keeps its state until it is a little wider.
+   */
   syncChatNarrow() {
-    var _a2;
-    const width = (_a2 = this.contentEl) == null ? void 0 : _a2.clientWidth;
-    if (this.chat && width) this.chat.setNarrow(isChatNarrow(width, this.chatWidth()));
+    const measured = this.chatPaneWidths();
+    if (!this.chat || !measured) return;
+    const widths = this.chatWidths(this.chatWidth());
+    if (!widths) return;
+    this.chat.setNarrow(isChatNarrow(measured.pane, measured.inspector, this.chat.isNarrow), widths);
+    this.placeMapTools();
+  }
+  /**
+   * The tool group sits at the top left of the canvas. While the window is laid over a narrow pane it would be under the window,
+   * so it moves to the window's right edge, as it sits beside a docked window.
+   */
+  placeMapTools() {
+    var _a2, _b2;
+    const tools = (_a2 = this.contentEl) == null ? void 0 : _a2.querySelector(".vam-map-tools");
+    if (!tools) return;
+    const left = ((_b2 = this.chat) == null ? void 0 : _b2.isOverlay) ? this.chat.overlayWidth - CHAT_RAIL_WIDTH + CHAT_TOOLS_GAP : 0;
+    tools.style.left = left > 0 ? `${left}px` : "";
   }
   /** Obsidian calls this when the pane's size changes. */
   onResize() {
@@ -44181,12 +44477,15 @@ ${note.detail.trim()}` : "",
         var _a2;
         const chat = this.chat;
         (_a2 = this.chatWorkspaceEl) == null ? void 0 : _a2.toggleClass("has-map-chat-open", !!(chat == null ? void 0 : chat.isOpen));
+        this.placeMapTools();
         if (chat && !chat.isHero && this.plugin.settings.mapChatOpen !== chat.wantsOpen) {
           this.plugin.settings.mapChatOpen = chat.wantsOpen;
           void this.plugin.saveSettings();
         }
       },
       width: () => this.chatWidth(),
+      widths: (setWidth) => this.chatWidths(setWidth),
+      stateChanged: () => this.refreshEmptyMap(),
       setWidth: (width, commit) => {
         if (!commit) return;
         this.plugin.settings.mapChatWidth = clampMapChatWidth(width);
@@ -44206,7 +44505,11 @@ ${note.detail.trim()}` : "",
   chatModelChoices() {
     const settings = this.plugin.settings;
     const choices = [
-      { value: "", label: t("ui.map_chat_model_follow_0", this.plugin.modelLabel(settings.cliModel)) },
+      {
+        value: "",
+        label: t("ui.map_chat_model_follow_0", this.plugin.modelLabel(settings.cliModel)),
+        short: t("ui.map_chat_model_follow_short_0", this.plugin.modelLabel(settings.cliModel))
+      },
       ...this.plugin.availableModels().map((id) => ({ value: id, label: this.plugin.modelLabel(id) }))
     ];
     const saved = settings.mapChatModel;
@@ -44426,12 +44729,13 @@ ${note.detail.trim()}` : "",
       reasoning: normalizeReasoningLevel(settings.cliReasoning)
     };
   }
+  /** The text of a failed turn; `wrapped` when it already says that the chat failed (so a reader is not told twice). */
   chatErrorText(error) {
     const code = (error == null ? void 0 : error.name) === "MapChatError" ? error.code : null;
-    if (code === "over_budget") return t("ui.map_chat_error_over_budget");
-    if (code === "invalid") return t("ui.map_chat_error_invalid");
-    if (code === "stopped") return t("ui.map_chat_stopped");
-    return t("ui.map_chat_error_failed_0", errorMessage(error));
+    if (code === "over_budget") return { text: t("ui.map_chat_error_over_budget"), wrapped: false };
+    if (code === "invalid") return { text: t("ui.map_chat_error_invalid"), wrapped: false };
+    if (code === "stopped") return { text: t("ui.map_chat_stopped"), wrapped: false };
+    return { text: t("ui.map_chat_error_failed_0", errorMessage(error)), wrapped: true };
   }
   /** Sends the draft: usage notice, one request, a streamed answer, then every action it asked for, once (or a plan to confirm first). */
   async sendMapChat(again, retry = false) {
@@ -44487,7 +44791,10 @@ ${note.detail.trim()}` : "",
         const lines = await this.applyMapChatActions(result, request.context, alive, anchor);
         if (alive() && chat.isBusy) chat.finish(result.reply, lines);
       } catch (error) {
-        if (alive()) chat.fail(this.chatErrorText(error));
+        if (alive()) {
+          const failure = this.chatErrorText(error);
+          chat.fail(failure.text, failure.wrapped ? failure.text : void 0);
+        }
       } finally {
         if (this.chatController === controller) this.releaseChatTask();
       }
@@ -44500,20 +44807,14 @@ ${note.detail.trim()}` : "",
     this.chatPlanToken++;
     if (pending) (_c = this.chat) == null ? void 0 : _c.settlePlan(pending, "cancelled");
   }
-  planReasonText(reason, result) {
+  planReasonText(reason, result, selectedCount) {
     switch (reason) {
       case "many_actions":
         return t("ui.map_chat_plan_reason_many_actions_0", result.actions.length);
       case "delete_branch":
         return t("ui.map_chat_plan_reason_delete_branch");
       case "many_research":
-        return t(
-          "ui.map_chat_plan_reason_many_research_0",
-          result.actions.reduce(
-            (sum, action) => action.kind === "run_map_action" && action.action === "research_standard" ? sum + (action.nodeIds.length || this.chatSelectionIds().length) : sum,
-            0
-          )
-        );
+        return t("ui.map_chat_plan_reason_many_research_0", researchTargetsOf(result.actions, selectedCount));
       case "new_map":
         return t("ui.map_chat_plan_reason_new_map");
     }
@@ -44527,10 +44828,17 @@ ${note.detail.trim()}` : "",
     const items = result.actions.map((action) => this.chatActionLabel(action, refTitles));
     const groups = CHAT_PLAN_GROUP_ORDER.flatMap((group) => {
       const own = items.filter((_, index) => chatPlanGroupOf(result.actions[index].kind) === group);
-      return own.length ? [{ label: t(`ui.map_chat_plan_group_${group}_0`, own.length), items: own }] : [];
+      return own.length ? [
+        {
+          label: t(`ui.map_chat_plan_group_${group}_0`, own.length),
+          items: own,
+          // Removing cards is said in words as well as in the warning colour.
+          ...group === "delete" ? { danger: { mark: t("ui.map_chat_plan_mark_delete") } } : {}
+        }
+      ] : [];
     });
     const card = {
-      reasons: plan.reasons.map((reason) => this.planReasonText(reason, result)),
+      reasons: plan.reasons.map((reason) => this.planReasonText(reason, result, baseline.selectedCount)),
       items,
       groups,
       estimate: plan.estimatedCalls ? t("ui.map_chat_plan_calls_0", plan.estimatedCalls) : t("ui.map_chat_plan_calls_none"),
@@ -44555,6 +44863,7 @@ ${note.detail.trim()}` : "",
     }
     this.chatApplying = true;
     chat.settlePlan(card, "applied");
+    chat.setApplying(true);
     let lines;
     try {
       lines = await this.applyMapChatActions(result, baseline, () => token === this.chatPlanToken, {
@@ -44565,6 +44874,7 @@ ${note.detail.trim()}` : "",
       lines = [{ status: "failed", text: errorMessage(error) }];
     } finally {
       this.chatApplying = false;
+      chat.setApplying(false);
     }
     if (!this.closed) chat.settlePlan(card, "applied", lines);
   }
@@ -44576,13 +44886,18 @@ ${note.detail.trim()}` : "",
   }
   /** Stop button: the request is aborted and whatever came back is dropped. */
   stopMapChat() {
-    var _a2, _b2;
+    var _a2, _b2, _c;
+    if (this.chatApplying && !this.chatController) {
+      this.chatPlanToken++;
+      (_a2 = this.chat) == null ? void 0 : _a2.focusInput();
+      return;
+    }
     const controller = this.chatController;
     if (!controller) return;
     this.releaseChatTask();
     controller.abort();
-    (_a2 = this.chat) == null ? void 0 : _a2.markStopped();
-    (_b2 = this.chat) == null ? void 0 : _b2.focusInput();
+    (_b2 = this.chat) == null ? void 0 : _b2.markStopped();
+    (_c = this.chat) == null ? void 0 : _c.focusInput();
   }
   /** Closing the view or leaving the map: abort without touching the window. */
   abortMapChat() {
@@ -44664,6 +44979,41 @@ ${note.detail.trim()}` : "",
     };
   }
   /**
+   * Holds back every repaint of this view and every re-read of the plugin's views while a long reply is applied: each write
+   * would otherwise repaint twice and re-read the whole map, which costs seconds for a hundred cards. {@link releaseChatBatch}
+   * lets them happen once.
+   */
+  holdChatBatch() {
+    if (this.heldViews.length) return;
+    this.heldViews = [this, ...this.plugin.views().filter((view) => view !== this)];
+    this.renderHold++;
+    for (const view of this.heldViews) view.syncHold++;
+  }
+  async releaseChatBatch() {
+    const held = this.heldViews;
+    if (!held.length) return;
+    this.heldViews = [];
+    this.renderHold = Math.max(0, this.renderHold - 1);
+    for (const view of held) view.syncHold = Math.max(0, view.syncHold - 1);
+    if (this.renderHold === 0 && this.renderPending) {
+      this.renderPending = false;
+      this.render();
+    }
+    if (!held.some((view) => view.syncPending)) return;
+    for (const view of held) view.syncPending = false;
+    try {
+      await this.plugin.mutate(async () => {
+      });
+    } catch (e) {
+    }
+  }
+  /** A repaint a batch is holding back happens now, for the step that needs the cards measured (layout). */
+  flushChatRender() {
+    if (!this.renderPending || this.closed) return;
+    this.renderPending = false;
+    this.paint();
+  }
+  /**
    * Applies what a chat reply asked for, once, in order. Every write is its own `plugin.mutate` (the queue cannot be
    * re-entered, and the task a run action starts uses it too), checked again for staleness inside it and, for Markdown
    * files, by the write guard. None of it leaves an undo step. A stale or refused action is skipped; the rest go on.
@@ -44681,14 +45031,19 @@ ${note.detail.trim()}` : "",
       var _a2;
       return !this.closed && alive() && this.path === anchor.path && ((_a2 = this.map) == null ? void 0 : _a2.id) === anchor.id;
     };
+    const lost = () => skipped(!this.closed && !alive() ? "ui.map_chat_skip_stopped" : "ui.map_chat_skip_map_changed");
     const lines = [];
     const later = [];
     const run = { refs: /* @__PURE__ */ new Map(), created: [] };
     const refTitles = this.chatRefTitles(result.actions);
     let wrote = false;
     let noNewMap = false;
+    let noNewMapReason = "ui.map_chat_skip_map_not_created";
     const own = { mdHashes: baseline.mdHashes, topicHashes: { ...baseline.topicHashes } };
+    const adds = result.actions.filter((action) => action.kind === "add_child").length;
+    const batched = adds === 0 || adds >= MAP_CHAT_AUTO_LAYOUT_MIN_NEW;
     try {
+      if (batched) this.holdChatBatch();
       for (const [index, action] of result.actions.entries()) {
         if (action.kind === "select_topics" || action.kind === "run_map_action" || action.kind === "open_map") {
           later.push(index);
@@ -44696,20 +45051,25 @@ ${note.detail.trim()}` : "",
         }
         const label = this.chatActionLabel(action, refTitles);
         if (!same2()) {
-          lines[index] = this.chatLine(label, skipped("ui.map_chat_skip_map_changed"));
+          lines[index] = this.chatLine(label, lost());
           continue;
         }
         if (noNewMap) {
-          lines[index] = this.chatLine(label, skipped("ui.map_chat_skip_map_not_created"));
+          lines[index] = this.chatLine(label, skipped(noNewMapReason));
           continue;
         }
         if (action.kind === "create_map") {
+          await this.releaseChatBatch();
           const outcome = await this.chatCreateMap(action.title, anchor, same2);
+          if (batched) this.holdChatBatch();
           if (outcome.status === "done") {
             wrote = true;
             touched.add(anchor.path);
             own.topicHashes = {};
-          } else noNewMap = true;
+          } else {
+            noNewMap = true;
+            if ("created" in outcome && outcome.created) noNewMapReason = "ui.map_chat_skip_map_not_opened";
+          }
           lines[index] = this.chatLine(label, outcome);
           continue;
         }
@@ -44730,13 +45090,14 @@ ${note.detail.trim()}` : "",
           await this.plugin.mutate(async () => {
             var _a2, _b2, _c2;
             if (!same2() || !this.map) return;
+            this.flushChatRender();
             await this.mapChange((map) => {
               map.nodes = arrangeMap(map.nodes, supersededAimNodeIds(map), this.cardHeightOf);
             }, false);
             const nodes = (_b2 = (_a2 = this.map) == null ? void 0 : _a2.nodes) != null ? _b2 : [];
             const fresh = run.created.map((id) => nodes.find((node) => node.id === id)).filter((n) => !!n);
             const target = (_c2 = fresh.find((node) => !node.parentId)) != null ? _c2 : fresh[0];
-            if (target) this.focusNode(target);
+            if (target && !result.actions.some((action) => action.kind === "focus_topic")) this.focusNode(target);
             arranged = true;
           });
         } catch (e) {
@@ -44749,13 +45110,14 @@ ${note.detail.trim()}` : "",
         for (const view of this.plugin.views()) if (view !== this && touched.has(view.path)) view.history.clear();
         this.updateHistoryButtons();
       }
+      await this.releaseChatBatch();
     }
     for (const index of later) {
       const action = result.actions[index];
       const label = this.chatActionLabel(action, refTitles);
       let outcome;
-      if (!same2()) outcome = skipped("ui.map_chat_skip_map_changed");
-      else if (noNewMap) outcome = skipped("ui.map_chat_skip_map_not_created");
+      if (!same2()) outcome = lost();
+      else if (noNewMap) outcome = skipped(noNewMapReason);
       else {
         try {
           if (action.kind === "open_map") {
@@ -44792,16 +45154,19 @@ ${note.detail.trim()}` : "",
     const name = sanitizeGeneratedTitle(title).trim();
     if (!name) return skipped("ui.map_chat_skip_unavailable");
     let opened = "";
+    const made = { created: false };
     try {
       await this.plugin.mutate(async () => {
         if (!same2()) return;
         const mapPath = await this.plugin.repo.createMap(name);
+        made.created = true;
         opened = await this.chatSwitchTo(mapPath, anchor);
       });
     } catch (error) {
-      return { status: "failed", reason: errorMessage(error) };
+      return { status: "failed", reason: errorMessage(error), created: made.created };
     }
-    return opened ? { status: "done" } : skipped("ui.map_chat_skip_map_changed");
+    if (opened) return { status: "done" };
+    return made.created ? { status: "skipped", reason: t("ui.map_chat_skip_map_not_opened"), created: true } : skipped("ui.map_chat_skip_map_changed");
   }
   /** open_map: the view names the map, not the model. One match opens it; several are listed to pick from; none is a skip. */
   async chatOpenMap(title, anchor, same2) {
@@ -44900,6 +45265,7 @@ ${note.detail.trim()}` : "",
       }
       case "collapse_topic":
       case "expand_topic": {
+        this.flushChatRender();
         const id = real(action.nodeId);
         if (id === null) return skipped("ui.map_chat_skip_parent_missing");
         const node = nodeOf(id);
@@ -44914,11 +45280,13 @@ ${note.detail.trim()}` : "",
         return done;
       }
       case "auto_layout":
+        this.flushChatRender();
         await this.mapChange((map) => {
           map.nodes = arrangeMap(map.nodes, supersededAimNodeIds(map), this.cardHeightOf);
         }, false);
         return done;
       case "focus_topic": {
+        this.flushChatRender();
         const id = real(action.nodeId);
         if (id === null) return skipped("ui.map_chat_skip_parent_missing");
         const node = nodeOf(id);
@@ -47833,7 +48201,7 @@ function shareViewerUiExtras(languages) {
 
 // experiences/sharing/viewer-bundle.generated.ts
 var SHARE_VIEWER_JS = '(()=>{function ct(t){var n;let r=t.aimKind==="question"?[]:(n=t.aimConvergesFromNodeIds)!=null?n:[];return[...t.parentId?[t.parentId]:[],...r.filter(a=>a!==t.parentId)]}function dt(t,r){let n=new Set,a=[r];for(;a.length;){let i=a.pop();for(let d of t)d.parentId===i&&d.id!==r&&!n.has(d.id)&&(n.add(d.id),a.push(d.id))}return n}function Fe(t,r){let n=new Map(t.map(d=>[d.id,d])),a=d=>{let p=0,c=new Set([d.id]);for(let g=d.parentId;g&&n.has(g)&&!c.has(g);g=n.get(g).parentId)c.add(g),p++;return p},i=new Set(t.map(d=>d.parentId).filter(d=>!!d&&n.has(d)));for(let d of t)i.has(d.id)&&(d.collapsed=r===null?!1:a(d)>=r)}var Zt=360;var Ke=24,Jt=180;var Qt=(t,r)=>{let n=t==null?void 0:t(r);return n!==void 0&&Number.isFinite(n)&&n>0?n:Jt};function en(t,r,n,a,i=!1,d){var Ae,ce;let p=new Map(t.map(u=>[u.id,u])),c=new Map,g=new Map,h=(u,A,N)=>{var S;return u.set(A,[...(S=u.get(A))!=null?S:[],N])};for(let u of t){if(!u.parentId)continue;let A=u.aimKind!=="question"&&((Ae=u.aimConvergesFromNodeIds)!=null&&Ae.length)?ct(u).map(S=>p.get(S)):[],N=(ce=A[0])==null?void 0:ce.parentId;N&&p.has(N)&&A.every(S=>S&&S.parentId===N)?h(g,N,u):h(c,u.parentId,u)}let m=new Map,y=u=>{var A;return i&&u.collapsed?[]:(A=c.get(u.id))!=null?A:[]},b=u=>{var A;return i&&u.collapsed?[]:((A=g.get(u.id))!=null?A:[]).filter(N=>{var S;return!(i&&((S=p.get(N.parentId))!=null&&S.collapsed))})},M=u=>Qt(d,u.id),H=new Map,C=new Map,ne=u=>u.reduce((A,N)=>A+H.get(N.id),0)+Math.max(0,u.length-1)*Ke,re=u=>{let A=y(u),N=b(u);for(let S of[...A,...N])re(S);H.set(u.id,Math.max(M(u),ne(A),ne(N))),C.set(u.id,1+Math.max(0,...A.map(S=>C.get(S.id))))},oe=(u,A,N)=>{let S=y(u),Te=b(u),de=H.get(u.id),Z=($,U)=>{let T=N+(de-ne($))/2;return $.map(j=>{let Q=oe(j,U,T);return T+=H.get(j.id)+Ke,Q})},ae=Z(S,A+1),we=Z(Te,A+C.get(u.id)),J=ae.length?S:Te,O=ae.length?ae:we,ue=M(u),K=N+(de-ue)/2;if(O.length){let $=O[0]+M(J[0])/2,U=O[O.length-1]+M(J[J.length-1])/2;K=($+U)/2-ue/2}return m.set(u.id,{x:n+A*Zt,y:a+K}),K},ie=0;for(let u of r)re(u),oe(u,0,ie),ie+=H.get(u.id)+Ke;return m}function ut(t,r,n){let a=r!=null&&r.size?t.filter(p=>!r.has(p.id)):t,i=a.filter(p=>!p.parentId),d=en(a,i,80,80,!0,n);return t.map(p=>({...p,...d.get(p.id)}))}function pt(t,r){return!r||!(r.bottom>r.top)?0:Math.max(0,Math.ceil(r.bottom-t))+8}function mt(t,r,n,a){let i=t.zoom;return{zoom:i,x:n.width/2-r.x*i,y:a+(n.height-a)/2-r.y*i}}function ft(t,r,n,a=1.2){let i=Math.max(1,r.height-n),d=t.maxX-t.minX,p=t.maxY-t.minY,c=Math.max(.25,Math.min(a,(r.width-80)/d,(i-80)/p));return{zoom:c,x:(r.width-d*c)/2-t.minX*c,y:n+(i-p*c)/2-t.minY*c}}var gt={lang:"en",readOnly:"Shared map \\xB7 read-only",madeWithVam:"Made with VAM",install:"Install VAM",goal:"Goal: {0}",hint:"Drag empty space to pan \\xB7 Scroll to zoom \\xB7 Click a topic to read it",layout:"Layout",collapseAll:"Collapse all",expandAll:"Expand all",expandToLevel:"Expand to level {0}",autoLayout:"Auto layout",zoomIn:"Zoom in",zoomOut:"Zoom out",zoomReset:"Zoom {0}, reset to 100%",showAll:"Show all",toResearch:"To research",tierCore:"Must learn",tierSupport:"Learn when needed",tierSide:"Skippable",manualReason:"You set this",topicDetails:"Topic details",detailsButton:"Details",close:"Close",collapse:"Collapse",expandCount:"Expand {0}",subtopics:"Subtopics",noContent:"This topic has no notes in the shared file.",imageOmitted:"[image not included]",imageSource:"Source: {0}",resizePanel:"Resize the side panel",untitledMap:"Untitled map",language:"Language",aiTranslated:"Translated by AI from {0}.",aiTranslatedUnknown:"Translated by AI.",originalText:"Original",imageTextUntranslated:"Text inside images is not translated."};function je(t){let r=3735928559,n=1103547991;for(let a=0;a<t.length;a++){let i=t.charCodeAt(a);r=Math.imul(r^i,2654435761),n=Math.imul(n^i,1597334677)}return r=Math.imul(r^r>>>16,2246822507)^Math.imul(n^n>>>13,3266489909),n=Math.imul(n^n>>>16,2246822507)^Math.imul(r^r>>>13,3266489909),(4294967296*(2097151&n)+(r>>>0)).toString(36)}var ee="\\u27E6",te="\\u27E7",ve=/\u27E6(\\/?)(\\d+)(\\/?)\u27E7/g,bt=new Set(["address","article","aside","blockquote","body","caption","colgroup","dd","details","dialog","div","dl","dt","fieldset","figcaption","figure","footer","h1","h2","h3","h4","h5","h6","header","hgroup","hr","legend","li","main","nav","ol","p","section","summary","table","tbody","td","tfoot","th","thead","tr","ul"]),Xe=new Set(["pre","script","style","textarea","template","noscript"]),tn=new Set(["code","kbd","samp","var","tt","svg","math","img","br","wbr","input","canvas","video","audio","iframe","object","embed","select","button"]),nn=new Set(["math","katex","katex-display","mjx-container","tag","notranslate","vam-image-omitted","vam-mermaid-note","vam-mermaid-slot"]),rn=/(?:https?:\\/\\/|www\\.)[^\\s<>"\'\uFF0C\u3002\u3001\uFF1B\uFF1A\uFF09\u300D\u300F\u3011\u300B]+/gi,on=/\\p{L}/u,xe=t=>t.localName.toLowerCase(),xt=t=>{var r;return((r=t.getAttribute("class"))!=null?r:"").split(/\\s+/).filter(Boolean)},Re=t=>Array.from(t.childNodes).filter(r=>r.nodeType===1);function vt(t){for(let r of Re(t))if(bt.has(xe(r))||Xe.has(xe(r))||vt(r))return!0;return!1}function Et(t){let r=xe(t);return Xe.has(r)?"skip":tn.has(r)||t.getAttribute("translate")==="no"||xt(t).some(n=>nn.has(n))?"atom":bt.has(r)||vt(t)?"block":"inline"}function an(t,r){return t.replace(rn,n=>(r.push({literal:n,atom:!0}),`${ee}${r.length}/${te}`))}function sn(t,r){let n="",a=i=>{var p;if(i.nodeType===3){n+=an((p=i.nodeValue)!=null?p:"",r);return}if(i.nodeType!==1){r.push({node:i,atom:!0}),n+=`${ee}${r.length}/${te}`;return}let d=i;if(Et(d)==="inline"){r.push({node:d,atom:!1});let c=r.length;n+=`${ee}${c}${te}`;for(let g of Array.from(d.childNodes))a(g);n+=`${ee}/${c}${te}`;return}r.push({node:d,atom:!0}),n+=`${ee}${r.length}/${te}`};for(let i of t)a(i);return n}function ht(t){return on.test(t.replace(ve,""))}function At(t){let r=[],n=p=>{let c=p.getAttribute("alt");c&&ht(c)&&r.push({index:r.length,kind:"attribute",text:c.trim(),nodes:[],lead:"",trail:"",parts:[],element:p,attribute:"alt"})},a=p=>{for(let c of Re(p)){let g=xe(c);Xe.has(g)||g==="svg"||(g==="img"?n(c):a(c))}},i=p=>{if(!p.length)return;let c=[],g=sn(p,c),h=g.trim();if(!h||!ht(h)||g.includes("\\u27E6\\u27E6"))return;let m=g.replace(ve,"");if(m.includes(ee)||m.includes(te))return;let y=g.slice(0,g.length-g.trimStart().length),b=g.slice(g.trimEnd().length);r.push({index:r.length,kind:"run",text:h,nodes:p,lead:y,trail:b,parts:c})},d=p=>{let c=[];for(let g of Array.from(p.childNodes)){if(g.nodeType===3){c.push(g);continue}if(g.nodeType!==1){i(c),c=[];continue}let h=g,m=Et(h);m==="atom"||m==="inline"?c.push(h):(i(c),c=[],m==="block"&&d(h))}i(c)};return a(t),d(t),{units:r}}var yt=t=>[...t.matchAll(ve)].map(r=>r[0]);function ln(t,r){if(!r.trim())return!1;let n=yt(t),a=yt(r);if(n.length!==a.length||n.some((d,p)=>d!==a[p]))return!1;let i=r.replace(ve,"");return!i.includes(ee)&&!i.includes(te)}function cn(t,r,n){var g;let a=[],i=[],d=h=>{let m=i[i.length-1];m?m.appendChild(h):a.push(h)},p=h=>{h&&d(n.createTextNode(h))};p(t.lead);let c=0;for(let h of r.matchAll(ve)){p(r.slice(c,h.index)),c=((g=h.index)!=null?g:0)+h[0].length;let m=t.parts[Number(h[2])-1];if(h[1]==="/")i.pop();else if(h[3]==="/")m.literal!==void 0?p(m.literal):m.node&&d(m.node.cloneNode(!0));else if(m.node){let y=m.node.cloneNode(!1);d(y),i.push(y)}}return p(r.slice(c)),p(t.trail),a}function Tt(t,r){var i,d,p;let n={applied:0,kept:0},a=[...t.units.filter(c=>c.kind==="attribute"),...t.units.filter(c=>c.kind==="run")];for(let c of a){let g=r(c);if(g===void 0||!ln(c.text,g)){n.kept++;continue}if(c.kind==="attribute"){(d=c.element)==null||d.setAttribute((i=c.attribute)!=null?i:"alt",g.trim()),n.applied++;continue}let h=c.nodes[0],m=h==null?void 0:h.parentNode,y=h==null?void 0:h.ownerDocument;if(!h||!m||!y){n.kept++;continue}for(let b of cn(c,g,y))m.insertBefore(b,h);for(let b of c.nodes)(p=b.parentNode)==null||p.removeChild(b);n.applied++}return n}function wt(t){let r=[],n=a=>{for(let i of Re(a))xe(i)==="svg"?r.push(i):n(i)};return n(t),r}function Mt(t,r){let n=[],a=i=>{for(let d of Re(i))xt(d).includes(r)&&n.push(d),a(d)};return a(t),n}var Nt="vam-mermaid-slot",Ie=1,St=3,Lt=t=>{let r=t;return!!r&&(Array.isArray(r.detailSegments)||Array.isArray(r.detailDiagrams))},dn=t=>t.replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;"),un=t=>t.replace(/&/g,"&amp;").replace(/"/g,"&quot;");function pn(t){var r,n;return t.nodeType===St?dn((r=t.nodeValue)!=null?r:""):t.nodeType!==Ie?`\\0${t.nodeType}:${(n=t.nodeValue)!=null?n:""}\\0`:kt(t)}function kt(t){let r=t.localName.toLowerCase(),n=t.getAttributeNames().sort().map(a=>{var i;return` ${a}="${un((i=t.getAttribute(a))!=null?i:"")}"`}).join("");return`<${r}${n}>${mn(t)}</${r}>`}function mn(t){return Array.from(t.childNodes).map(pn).join("")}function fn(t){let r=[],n=a=>{if(r.push(a),a.nodeType===Ie)for(let i of Array.from(a.childNodes))n(i)};return n(t),r}function gn(t,r){var a;let n=wt(t);for(let i of n){let d=r();d.setAttribute("class",Nt),(a=i.parentNode)==null||a.replaceChild(d,i)}return{root:t,svgs:n,extraction:At(t)}}function hn(t){let r=t.units.map(n=>`${n.kind}\\0${n.text}`).join("");return`${t.units.length}.${je(r)}`}var yn=t=>je(kt(t));function bn(t,r){if(!Array.isArray(r))return!1;let n=fn(t);for(let a of r){if(!Array.isArray(a)||a.length!==2)return!1;let[i,d]=a;if(typeof i!="number"||!Number.isInteger(i)||i<0||i>=n.length)return!1;let p=n[i];if(typeof d=="string"){if(p.nodeType!==St)return!1;p.nodeValue=d}else if(d&&typeof d=="object"&&!Array.isArray(d)){if(p.nodeType!==Ie)return!1;for(let[c,g]of Object.entries(d))if(g===null)p.removeAttribute(c);else if(typeof g=="string")p.setAttribute(c,g);else return!1}else return!1}return!0}function xn(t,r,n){if(!t||typeof t!="object")return null;let a=t;if(typeof a.svg=="string"){let i=n(a.svg),d=Array.from(i.childNodes).filter(p=>p.nodeType===Ie);return d.length===1&&d[0].localName.toLowerCase()==="svg"?d[0]:null}if(typeof a.check=="string"&&a.check===yn(r)){let i=r.cloneNode(!0);return bn(i,a.patch)?i:null}return null}function Ct(t,r,n){var g,h;let a={applied:0,kept:0,fallback:!1,diagramsKept:0},{svgs:i,extraction:d}=gn(t,n.createSlot),p=r.detailSegments;if(p!==void 0||r.detailCheck!==void 0)if(Array.isArray(p)&&p.length===d.units.length&&r.detailCheck===hn(d)){let m=Tt(d,b=>{let M=p[b.index];return typeof M=="string"?M:void 0}),y=p.filter(b=>typeof b!="string").length;if(a.applied=m.applied,a.kept=Math.max(0,m.kept-y),n.afterText&&!n.afterText(t))return a.fallback=!0,a}else a.fallback=!0;let c=Mt(t,Nt);c.length!==i.length&&(a.fallback=!0);for(let[m,y]of c.entries()){let b=i[m];if(!b)break;let M=(g=r.detailDiagrams)==null?void 0:g[m],H=b;if(M){let C=null;try{C=xn(M,b,n.parse)}catch{C=null}C?H=C:a.diagramsKept++}(h=y.parentNode)==null||h.replaceChild(H,y)}return a}function q(t,r,n){let a=t.createElement(r);return n&&(a.className=n),a}function vn(t,r){var p;let n=/^https?:\\/\\/(?:[^/?#@]*@)?([^/?#:]+)/i.exec(t),a=(p=n==null?void 0:n[1])!=null?p:t,[i,d=""]=r.imageSource.split("{0}");return[i,a,d]}function En(t,r,n){let[a,i,d]=vn(r,n),p=q(t,"span");p.className="vam-image-source";let c=q(t,"a");return c.setAttribute("href",r),c.setAttribute("target","_blank"),c.setAttribute("rel","noopener noreferrer"),c.textContent=i,p.append(t.createTextNode(a),c,t.createTextNode(d)),p}function Ye(t,r,n,a,i){Rt(t,r,new DOMParser().parseFromString(n,"text/html").body,a,i)}function Rt(t,r,n,a,i){var p,c,g,h;for(let m of Array.from(n.querySelectorAll("script, iframe, frame, object, embed, applet, link, meta, base")))m.remove();for(let m of Array.from(n.querySelectorAll("*")))for(let y of m.getAttributeNames()){let b=(p=m.getAttribute(y))!=null?p:"",M=y.toLowerCase();(M.startsWith("on")||/^(href|src|xlink:href|action|formaction)$/.test(M)&&/^\\s*(javascript|vbscript):/i.test(b))&&m.removeAttribute(y)}let d=()=>{let m=q(t,"span");return m.className="vam-image-omitted",m.textContent=i.imageOmitted,m};for(let m of Array.from(n.querySelectorAll("img"))){let y=(c=m.getAttribute("src"))!=null?c:"";if(y.startsWith("vam-asset:")){let b=a[y.slice(10)];typeof b=="string"&&b.startsWith("data:image/")?m.setAttribute("src",b):m.replaceWith(d())}else if(/^https?:\\/\\//i.test(y)){m.setAttribute("referrerpolicy","no-referrer"),m.setAttribute("loading","lazy");let b=m.closest("a");(b!=null?b:m).after(En(t,y,i))}else/^data:image\\//i.test(y)||m.replaceWith(d())}for(let m of Array.from(n.querySelectorAll("a"))){let y=(g=m.getAttribute("href"))!=null?g:"";/^(https?:|mailto:)/i.test(y)?(m.setAttribute("target","_blank"),m.setAttribute("rel","noopener noreferrer")):y.startsWith("#")||m.removeAttribute("href")}for(let m of Array.from(n.querySelectorAll("table"))){if((h=m.parentElement)!=null&&h.classList.contains("vam-table-scroll"))continue;let y=q(t,"div");y.className="vam-table-scroll",m.replaceWith(y),y.append(m)}r.append(...Array.from(n.childNodes).map(m=>t.importNode(m,!0)))}function It(t,r,n,a,i,d){let p=c=>new DOMParser().parseFromString(c,"text/html").body;try{let c=p(n);Ct(c,a,{parse:p,createSlot:()=>q(t,"div")}),Rt(t,r,c,i,d)}catch{r.replaceChildren(),Ye(t,r,n,i,d)}}function Ht(t,r,n,a){let i=Math.max(60,Math.abs(n-t)/2);return`M ${t} ${r} C ${t+i} ${r}, ${n-i} ${a}, ${n} ${a}`}var An=(t,r)=>t.toLowerCase()===r.toLowerCase(),He=(t,r)=>t.find(n=>An(n,r));function Tn(t,r){if(typeof t!="string"||!t.trim())return;let n=He(r,t.trim());if(n)return n;let a=t.trim().toLowerCase().split(/[-_]/),i=a[0];if(i==="zh"){let p=a.slice(1).some(c=>c==="hant"||c==="tw"||c==="hk"||c==="mo")?"TW":"CN";return He(r,`${i}-${p}`)}return r.find(d=>d.toLowerCase().split(/[-_]/)[0]===i)}function _t(t){let{languages:r}=t,n=r[0];if(typeof t.stored=="string"){let a=He(r,t.stored);if(a)return a}if(typeof t.defaultLanguage=="string"){let a=He(r,t.defaultLanguage);if(a)return a}for(let a of t.browser){let i=Tn(a,r);if(i)return i}return n}function Dt(t){return typeof t=="string"&&t.trim()!==""?`vam-share-language:${t}`:void 0}var wn="https://github.com/kevcltsai/visual-agent-map?ref=share",Mn="und",_e="http://www.w3.org/2000/svg",Ot="vam-share-panel-width",Nn=300,Ge=240,Sn=.25,Ln=2,kn=280,Cn=4,Rn={target:["circle|cx=12|cy=12|r=10","circle|cx=12|cy=12|r=6","circle|cx=12|cy=12|r=2"],library:["path|d=m16 6 4 14","path|d=M12 6v14","path|d=M8 8v12","path|d=M4 4v16"],skip:["polygon|points=5 4 15 12 5 20 5 4","line|x1=19|x2=19|y1=5|y2=19"],minus:["path|d=M5 12h14"],plus:["path|d=M5 12h14","path|d=M12 5v14"],max:["path|d=M8 3H5a2 2 0 0 0-2 2v3","path|d=M21 8V5a2 2 0 0 0-2-2h-3","path|d=M3 16v3a2 2 0 0 0 2 2h3","path|d=M16 21h3a2 2 0 0 0 2-2v-3"]},In={core:"target",support:"library",side:"skip"},Pt=t=>t==="core"||t==="support"||t==="side",Ee=(t,r)=>t.replace("{0}",String(r));function qe(t,r){var a;let n=(a=t.getElementById(r))==null?void 0:a.textContent;if(n)try{return JSON.parse(n)}catch{return}}function $t(t){let r={...gt};if(t&&typeof t=="object")for(let n of Object.keys(r)){let a=t[n];typeof a=="string"&&(r[n]=a)}return r}function Hn(t){let r=qe(t,"vam-ui"),n=new Map,a={};if(r&&typeof r=="object"){if(r.uiByLanguage&&typeof r.uiByLanguage=="object")for(let[i,d]of Object.entries(r.uiByLanguage))n.set(i,$t(d));if(r.languageNames&&typeof r.languageNames=="object")for(let[i,d]of Object.entries(r.languageNames))typeof d=="string"&&d&&(a[i]=d)}return{sets:n,names:a}}var F=t=>typeof t=="string"&&t.trim()!=="";function zt(t){try{return window.localStorage.getItem(t)}catch{return null}}function Vt(t,r){try{window.localStorage.setItem(t,r)}catch{}}function Ut(t){var it,at,st,lt;let r=$t(qe(t,"vam-ui")),n=r;t.documentElement.lang=n.lang;let a=t.getElementById("vam-app"),i=qe(t,"vam-map");if(!a)return;if(!i||i.format!=="vam-share"||i.version!==1||!Array.isArray(i.nodes)){a.replaceChildren(t.createTextNode("This is not a Visual Agent Map share file."));return}let d=i.assets&&typeof i.assets=="object"?i.assets:{},p=new Map,c=[];for(let e of i.nodes)!e||typeof e.id!="string"||p.has(e.id)||(p.set(e.id,e),c.push({id:e.id,path:e.id,parentId:typeof e.parentId=="string"?e.parentId:null,x:Number.isFinite(e.x)?e.x:0,y:Number.isFinite(e.y)?e.y:0,collapsed:!!e.collapsed}));let g=new Map(c.map(e=>[e.id,e]));for(let e of c)e.parentId&&(!g.has(e.parentId)||e.parentId===e.id)&&(e.parentId=null);let h=new Map;for(let e of c)e.parentId&&h.set(e.parentId,[...(it=h.get(e.parentId))!=null?it:[],e]);let m=Hn(t),y=Array.isArray(i.languages)?Array.from(new Set(i.languages.filter(F))):[],b=Dt((at=i.source)==null?void 0:at.mapId),M=y.length>=2,H=M?y[0]:"",C=H;if(M){let e=[];try{e=Array.from((st=window.navigator.languages)!=null?st:[window.navigator.language]).filter(F)}catch{}C=_t({languages:y,stored:b?zt(b):null,defaultLanguage:F(i.defaultLanguage)?i.defaultLanguage:void 0,browser:e})}let ne=e=>{var o;return(o=m.sets.get(e))!=null?o:r},re=M&&H===Mn,oe=()=>M&&C!==H;M&&(n=ne(C),t.documentElement.lang=C);let ie=e=>{var s;let o=oe()?(s=e.translations)==null?void 0:s[C]:void 0;return!o||typeof o!="object"?e:{title:F(o.title)?o.title:e.title,summary:F(o.summary)?o.summary:e.summary,reason:F(o.reason)?o.reason:e.reason,detailHtml:F(o.detailHtml)?o.detailHtml:e.detailHtml,...Lt(o)&&F(e.detailHtml)?{compact:o,detailHtml:e.detailHtml}:{}}},Ae=()=>{var l;let e=oe()?(l=i.translations)==null?void 0:l[C]:void 0,o=F(e==null?void 0:e.title)?e.title:i.title,s=F(e==null?void 0:e.goal)?e.goal:i.goal;return{title:typeof o=="string"&&o.trim()||n.untitledMap,goal:typeof s=="string"?s.trim():""}},ce=(e,o)=>{var s;try{let l=new Intl.DisplayNames([o!=null?o:e],{type:"language"}).of(e);if(l&&l!==e)return l}catch{}return(s=m.names[e])!=null?s:e};try{let e=window.matchMedia("(prefers-color-scheme: dark)"),o=()=>{t.documentElement.classList.toggle("theme-dark",e.matches)};o(),e.addEventListener("change",o)}catch{}let u=(e,o,s)=>{let l=q(t,e);return o&&(l.className=o),s!==void 0&&(l.textContent=s),l},A=e=>{let o=t.createElementNS(_e,"svg");o.setAttribute("class","svg-icon"),o.setAttribute("viewBox","0 0 24 24"),o.setAttribute("aria-hidden","true");for(let s of Rn[e]){let[l,...f]=s.split("|"),x=t.createElementNS(_e,l);for(let R of f)x.setAttribute(R.slice(0,R.indexOf("=")),R.slice(R.indexOf("=")+1));o.append(x)}return o},N=(e,o,s,l)=>{let f=u("button",s,o);return f.type="button",f.addEventListener("click",x=>{x.stopPropagation(),l()}),e.append(f),f},S=(e,o,s,l)=>{let f=u("button");return f.type="button",f.setAttribute("aria-label",s),f.title=s,f.append(A(o)),f.addEventListener("click",x=>{x.stopPropagation(),l()}),e.append(f),f},Te=e=>e==="core"?n.tierCore:e==="support"?n.tierSupport:n.tierSide,de=(e,o)=>{let s=u("span","vam-relevance-tag");s.dataset.tier=e,o&&(s.title=o);let l=u("span","vam-relevance-icon");return l.append(A(In[e])),s.append(l,u("span",void 0,Te(e))),s};a.className="vam-app";let Z=u("div","vam-toolbar"),ae=u("h1","vam-map-switcher"),we=u("span","vam-shared");Z.append(ae,we);let J=u("div","vam-toolbar-actions"),O=u("select","vam-language");if(M){for(let e of y){let o=u("option",void 0,(lt=m.names[e])!=null?lt:ce(e));o.value=e,re&&e===H&&(o.dataset.original="1"),O.append(o)}O.value=C,J.append(O)}let ue=u("span","vam-made-with"),K=u("a","vam-install");K.href=wn,K.target="_blank",K.rel="noopener noreferrer",J.append(ue,K),Z.append(J);let $=u("div","vam-translate-note");$.hidden=!0;let U=u("div","vam-workspace"),T=u("div","vam-viewport"),j=u("div","vam-stage");j.setAttribute("role","tree");let Q=t.createElementNS(_e,"svg");Q.setAttribute("class","vam-edges"),Q.setAttribute("aria-hidden","true"),j.append(Q),T.append(j);let Me=u("div","vam-canvas-overlay"),se=u("div","vam-map-tools"),pe=u("span","vam-goal"),Ze=u("span","vam-goal-text");pe.append(A("target"),Ze);let Je=u("span","vam-canvas-hint"),Y=u("div","vam-zoom-controls"),Bt=S(Y,"minus","",()=>fe(1/1.2)),me=u("button","vam-zoom","100%");me.type="button",me.addEventListener("click",e=>{e.stopPropagation(),fe(1/v.zoom)}),Y.append(me);let Wt=S(Y,"plus","",()=>fe(1.2)),Ft=S(Y,"max","",()=>ge()),X=u("button","vam-layout-button");X.type="button",X.setAttribute("aria-haspopup","menu"),X.setAttribute("aria-expanded","false"),Y.append(X);let _=u("div","vam-layout-menu");_.setAttribute("role","menu"),_.hidden=!0,Y.append(_),Me.append(se,Je,Y);let w=u("aside","vam-inspector");w.hidden=!0,U.append(T,Me,w),a.replaceChildren(...M?[Z,$,U]:[Z,U]);let v={x:0,y:0,zoom:1},B=null,De=!1,Ne=Number(zt(Ot))||Nn,I=new Map,Kt=()=>{let e=new Set,o=(s,l)=>{var f;for(let x of(f=h.get(s.id))!=null?f:[])l&&e.add(x.id),o(x,l||x.collapsed)};for(let s of c)s.parentId||o(s,s.collapsed);return e},jt=e=>{var s,l;let o=0;for(let f=e.parentId;f&&!(++o>c.length);f=(l=(s=g.get(f))==null?void 0:s.parentId)!=null?l:null);return o},Qe=()=>pt(T.getBoundingClientRect().top,se.hidden?void 0:se.getBoundingClientRect());function G(){j.style.transform=`translate(${v.x}px, ${v.y}px) scale(${v.zoom})`;let e=`${Math.round(v.zoom*100)}%`;me.textContent=e,me.setAttribute("aria-label",Ee(n.zoomReset,e))}function fe(e,o){let s=o!=null?o:{x:T.clientWidth/2,y:T.clientHeight/2},l=Math.min(Ln,Math.max(Sn,v.zoom*e)),f=l/v.zoom;v={x:s.x-(s.x-v.x)*f,y:s.y-(s.y-v.y)*f,zoom:l},G()}let Oe=!1;function ge(){if(!I.size)return;if(!T.clientWidth||!T.clientHeight){Oe=!0;return}let e=1/0,o=1/0,s=-1/0,l=-1/0;for(let f of I.values())e=Math.min(e,f.offsetLeft),o=Math.min(o,f.offsetTop),s=Math.max(s,f.offsetLeft+(f.offsetWidth||kn)),l=Math.max(l,f.offsetTop+f.offsetHeight);v=ft({minX:e,minY:o,maxX:s,maxY:l},{width:T.clientWidth,height:T.clientHeight},Qe()),G()}function Xt(e){let o=I.get(e);o&&(v=mt(v,{x:o.offsetLeft+o.offsetWidth/2,y:o.offsetTop+o.offsetHeight/2},{width:T.clientWidth,height:T.clientHeight},Qe()),G())}function le(){var e;Q.replaceChildren();for(let o of c){let s=o.parentId?I.get(o.parentId):void 0,l=I.get(o.id);if(!s||!l)continue;let f=t.createElementNS(_e,"path");f.setAttribute("d",Ht(s.offsetLeft+s.offsetWidth,s.offsetTop+s.offsetHeight/2,l.offsetLeft,l.offsetTop+l.offsetHeight/2)),f.setAttribute("class",((e=p.get(o.id))==null?void 0:e.tier)==="side"?"vam-edge vam-edge-side":"vam-edge"),Q.append(f)}}let Pe=0,et=()=>{Pe||(Pe=window.requestAnimationFrame(()=>{Pe=0,le()}))},ze=e=>{let o=I.get(e),s=g.get(e);!o||!s||(o.style.left=`${s.x}px`,o.style.top=`${s.y}px`)};function Ve(){var o,s;for(let l of I.values())l.remove();I.clear();let e=Kt();for(let l of c){if(e.has(l.id))continue;let f=p.get(l.id),x=ie(f),R=dt(c,l.id).size,D=Pt(f.tier)?f.tier:void 0,E=u("div",`vam-node${l.id===B?" is-selected":""}`);E.dataset.nodeId=l.id,E.dataset.status=f.status==="completed"?"completed":"idea",D&&(E.dataset.relevance=D),E.tabIndex=0,E.setAttribute("role","treeitem"),E.setAttribute("aria-level",String(jt(l)+1)),E.setAttribute("aria-selected",String(l.id===B)),E.setAttribute("aria-label",String((o=x.title)!=null?o:"")),R&&E.setAttribute("aria-expanded",String(!l.collapsed));let z=u("div","vam-node-header");E.append(z),f.status!=="completed"&&z.append(u("span","vam-status vam-status-idea",n.toResearch)),D&&z.append(de(D,typeof x.reason=="string"?x.reason:void 0));let W=u("div","vam-node-tools");E.append(W),R&&N(l.collapsed?z:W,l.collapsed?Ee(n.expandCount,R):n.collapse,"vam-collapse-button",()=>{l.collapsed=!l.collapsed,$e(l.id)}).setAttribute("aria-expanded",String(!l.collapsed)),N(W,n.detailsButton,void 0,()=>he(l.id)),E.append(u("h3","vam-card-title",String((s=x.title)!=null?s:""))),typeof x.summary=="string"&&x.summary.trim()&&E.append(u("p","vam-card-summary",x.summary)),E.addEventListener("click",()=>{De||he(l.id)}),E.addEventListener("keydown",L=>{L.target===E&&(L.key==="Enter"||L.key===" ")&&(L.preventDefault(),he(l.id))}),E.addEventListener("pointerdown",L=>Yt(L,l,E)),j.append(E),I.set(l.id,E),ze(l.id)}}function Se(){ut(c,void 0,o=>{var s;return(s=I.get(o))==null?void 0:s.offsetHeight}).forEach((o,s)=>{c[s].x=o.x,c[s].y=o.y});for(let o of I.keys())ze(o)}function $e(e){var l;let o=e?(l=I.get(e))==null?void 0:l.getBoundingClientRect():void 0;Ve(),Se(),le();let s=e?I.get(e):void 0;if(s){if(o){let f=s.getBoundingClientRect();v={...v,x:v.x+o.left-f.left,y:v.y+o.top-f.top},G()}s.focus({preventScroll:!0})}}function Yt(e,o,s){if(e.button!==0||!e.isPrimary||e.target.closest("button"))return;let l=e.clientX,f=e.clientY,x=o.x,R=o.y,D=!1,E=W=>{let L=W.clientX-l,V=W.clientY-f;if(!D){if(Math.hypot(L,V)<=Cn)return;D=!0,s.classList.add("is-dragging"),s.setPointerCapture(W.pointerId)}o.x=x+L/v.zoom,o.y=R+V/v.zoom,ze(o.id),et()},z=()=>{s.removeEventListener("pointermove",E),s.removeEventListener("pointerup",z),s.removeEventListener("pointercancel",z),s.classList.remove("is-dragging"),D&&(De=!0,window.setTimeout(()=>De=!1,0))};s.addEventListener("pointermove",E),s.addEventListener("pointerup",z),s.addEventListener("pointercancel",z)}let Ue=e=>Math.round(Math.min(Math.max(Ge,e),Math.max(Ge,U.clientWidth*.7)));function Le(){let e=window.matchMedia("(max-width: 600px)").matches;if(w.hidden||e){w.style.removeProperty("width"),Me.style.removeProperty("right");return}let o=Ue(Ne);w.style.width=`${o}px`,Me.style.right=`${o}px`,k.setAttribute("aria-valuenow",String(o)),k.setAttribute("aria-valuemax",String(Ue(1/0)))}let k=u("div","vam-inspector-resizer");k.setAttribute("role","separator"),k.setAttribute("aria-orientation","vertical"),k.setAttribute("aria-label",n.resizePanel),k.setAttribute("aria-valuemin",String(Ge)),k.tabIndex=0;let ke=(e,o)=>{Ne=Ue(e),Le(),o&&Vt(Ot,String(Ne))};k.addEventListener("pointerdown",e=>{e.preventDefault();let o=e.clientX,s=w.offsetWidth;k.setPointerCapture(e.pointerId),k.classList.add("is-resizing"),t.body.classList.add("vam-resizing");let l=x=>ke(s+o-x.clientX,!1),f=()=>{k.removeEventListener("pointermove",l),k.removeEventListener("pointerup",f),k.removeEventListener("pointercancel",f),k.classList.remove("is-resizing"),t.body.classList.remove("vam-resizing"),ke(Ne,!0)};k.addEventListener("pointermove",l),k.addEventListener("pointerup",f),k.addEventListener("pointercancel",f)}),k.addEventListener("keydown",e=>{let o=e.shiftKey?48:16;if(e.key==="ArrowLeft")ke(w.offsetWidth+o,!0);else if(e.key==="ArrowRight")ke(w.offsetWidth-o,!0);else return;e.preventDefault()}),window.addEventListener("resize",()=>{Le(),G()});function Be(){B=null;for(let e of I.values())e.classList.remove("is-selected"),e.setAttribute("aria-selected","false");w.hidden=!0,U.classList.remove("has-inspector"),w.replaceChildren(),Le()}function he(e){var E,z,W;let o=g.get(e),s=p.get(e);if(!o||!s)return;let l={...s,...ie(s)};B=e;for(let[L,V]of I)V.classList.toggle("is-selected",L===e),V.setAttribute("aria-selected",String(L===e));w.replaceChildren(k);let f=u("div","vam-inspector-heading");f.append(u("strong",void 0,n.topicDetails)),N(f,n.close,void 0,Be),w.append(f,u("h3",void 0,String((E=l.title)!=null?E:"")));let x=Pt(l.tier)?l.tier:void 0;if(x){let L=u("div","vam-inspector-why");L.append(de(x));let V=typeof l.reason=="string"&&l.reason.trim()?l.reason:l.manual?n.manualReason:"";V&&L.append(u("span",void 0,V)),w.append(L)}typeof l.summary=="string"&&l.summary.trim()&&w.append(u("p","vam-sample-summary",l.summary));let R=u("div","vam-sample-detail");typeof l.detailHtml=="string"&&l.detailHtml.trim()?l.compact?It(t,R,l.detailHtml,l.compact,d,n):Ye(t,R,l.detailHtml,d,n):R.append(u("p","vam-inspector-empty",n.noContent)),w.append(R);let D=(z=h.get(e))!=null?z:[];if(D.length){let L=u("div","vam-subtopics");L.append(u("strong",void 0,n.subtopics));for(let V of D)N(L,String((W=ie(p.get(V.id)).title)!=null?W:""),void 0,()=>{o.collapsed&&(o.collapsed=!1,$e(o.id)),he(V.id),Xt(V.id)});w.append(L)}w.hidden=!1,U.classList.add("has-inspector"),Le(),w.scrollTop=0}let We=e=>{Fe(c,e),$e(),ge()},ye=e=>{_.hidden||(_.hidden=!0,X.setAttribute("aria-expanded","false"),e&&X.focus())};function Gt(){_.replaceChildren();let e=[{label:n.collapseAll,run:()=>We(0)},{label:n.expandAll,run:()=>We(null)},...[1,2,3].map(o=>({label:Ee(n.expandToLevel,o),run:()=>We(o)})),null,{label:n.autoLayout,run:()=>{Se(),le()}}];for(let o of e){if(!o){_.append(u("hr"));continue}let s=u("button",void 0,o.label);s.type="button",s.setAttribute("role","menuitem"),s.addEventListener("click",l=>{l.stopPropagation(),ye(!0),o.run()}),_.append(s)}}let tt=()=>Array.from(_.querySelectorAll("button"));X.addEventListener("click",e=>{var o;if(e.stopPropagation(),!_.hidden)return ye(!0);_.hidden=!1,X.setAttribute("aria-expanded","true"),(o=tt()[0])==null||o.focus()}),_.addEventListener("keydown",e=>{let o=tt(),s=o.indexOf(t.activeElement);if(e.key==="ArrowDown")o[(s+1)%o.length].focus();else if(e.key==="ArrowUp")o[(s-1+o.length)%o.length].focus();else if(e.key==="Home")o[0].focus();else if(e.key==="End")o[o.length-1].focus();else return e.key==="Tab"?ye(!1):void 0;e.preventDefault()}),t.addEventListener("pointerdown",e=>{!_.hidden&&!Y.contains(e.target)&&ye(!1)}),t.addEventListener("keydown",e=>{if(e.key==="Escape"){if(!_.hidden)ye(!0);else if(!w.hidden){let o=B?I.get(B):void 0;Be(),o==null||o.focus({preventScroll:!0})}}});function nt(){let e=Ae();if(t.title=e.title,ae.textContent=e.title,j.setAttribute("aria-label",e.title),we.textContent=n.readOnly,ue.textContent=n.madeWithVam,K.textContent=n.install,O.setAttribute("aria-label",n.language),O.title=n.language,re)for(let s of Array.from(O.options))s.dataset.original&&(s.textContent=n.originalText);e.goal?(Ze.textContent=Ee(n.goal,e.goal),pe.title=e.goal,pe.parentElement||se.append(pe),se.hidden=!1):(pe.remove(),se.hidden=!0),Je.textContent=n.hint;let o=(s,l)=>{s.setAttribute("aria-label",l),s.title=l};if(o(Bt,n.zoomOut),o(Wt,n.zoomIn),o(Ft,n.showAll),X.textContent=n.layout,w.setAttribute("aria-label",n.topicDetails),k.setAttribute("aria-label",n.resizePanel),Gt(),oe()){let s=re?n.aiTranslatedUnknown:Ee(n.aiTranslated,ce(H,C));$.textContent=`${s} ${n.imageTextUntranslated}`,$.hidden=!1}else $.hidden=!0;G()}function qt(e){if(e===C||!y.includes(e))return;C=e,n=ne(e),b&&Vt(b,e),t.documentElement.lang=e;let o=w.scrollTop;nt(),Ve(),le(),B!==null&&g.has(B)&&(he(B),w.scrollTop=o),et()}O.addEventListener("change",()=>qt(O.value));let P=new Map,be=0,Ce=!1;T.addEventListener("pointerdown",e=>{if(!(e.target.closest(".vam-node")||e.pointerType==="mouse"&&e.button!==0)&&(T.setPointerCapture(e.pointerId),P.set(e.pointerId,{x:e.clientX,y:e.clientY}),T.classList.add("is-panning"),P.size===1&&(Ce=!1),P.size===2)){let[o,s]=Array.from(P.values());be=Math.hypot(o.x-s.x,o.y-s.y)}}),T.addEventListener("pointermove",e=>{let o=P.get(e.pointerId);if(!o)return;if(P.set(e.pointerId,{x:e.clientX,y:e.clientY}),P.size===2&&be){let[f,x]=Array.from(P.values()),R=Math.hypot(f.x-x.x,f.y-x.y),D=T.getBoundingClientRect();fe(R/be,{x:(f.x+x.x)/2-D.left,y:(f.y+x.y)/2-D.top}),be=R,Ce=!0;return}let s=e.clientX-o.x,l=e.clientY-o.y;Ce||(Ce=Math.abs(s)+Math.abs(l)>0),v={...v,x:v.x+s,y:v.y+l},G()});let rt=e=>{P.delete(e.pointerId)&&(P.size<2&&(be=0),P.size||(T.classList.remove("is-panning"),!Ce&&e.type==="pointerup"&&!w.hidden&&Be()))};T.addEventListener("pointerup",rt),T.addEventListener("pointercancel",rt),T.addEventListener("wheel",e=>{e.preventDefault();let o=T.getBoundingClientRect();e.ctrlKey||e.metaKey||e.deltaMode===1||!e.deltaX&&Math.abs(e.deltaY)>=50?fe(Math.exp(-e.deltaY*(e.deltaMode===0?.0015:.04)),{x:e.clientX-o.left,y:e.clientY-o.top}):(v={...v,x:v.x-e.deltaX,y:v.y-e.deltaY},G())},{passive:!1}),typeof ResizeObserver!="undefined"&&new ResizeObserver(()=>{Oe&&(Oe=!1,ge())}).observe(T),nt(),Fe(c,1),Ve(),Se(),le(),ge();let ot=t.fonts;ot&&ot.ready.then(()=>{B!==null||P.size||(Se(),le(),ge())})}Ut(document);})();';
-var SHARE_VIEWER_CSS = '/* Share viewer styles. Order: tokens and base (this part), the card, canvas and inspector rules extracted from styles.css, then the viewer-only parts below the marker. */\n:root {\n  color-scheme: light;\n  --background-primary: #ffffff;\n  --background-secondary: #f6f6f6;\n  --background-modifier-border: #e0e0e0;\n  --background-modifier-border-hover: #cfcfcf;\n  --background-modifier-border-focus: #8a5cf5;\n  --background-modifier-hover: rgba(0, 0, 0, 0.05);\n  --background-modifier-active-hover: rgba(138, 92, 245, 0.15);\n  --text-normal: #222222;\n  --text-muted: #5c5c5c;\n  --text-faint: #8a8a8a;\n  --text-on-accent: #ffffff;\n  --text-error: #d1243c;\n  --interactive-accent: #8a5cf5;\n  --text-accent: #6f42e0;\n  --color-red: #e93147;\n  --color-red-rgb: 233, 49, 71;\n  --color-orange: #e9973f;\n  --shadow-s: 0 1px 2px rgba(0, 0, 0, 0.06), 0 2px 8px rgba(0, 0, 0, 0.05);\n  --shadow-l: 0 8px 28px rgba(0, 0, 0, 0.16);\n  --radius-s: 4px;\n  --radius-m: 8px;\n  --font-ui-smaller: 12px;\n  --font-ui-small: 13px;\n  --font-ui-medium: 15px;\n  --input-height: 30px;\n  --size-4-3: 12px;\n  --font-interface: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang TC", "PingFang SC", "Noto Sans TC", "Noto Sans SC", "Microsoft JhengHei", Roboto, sans-serif;\n  --font-monospace: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;\n}\n@media (prefers-color-scheme: dark) {\n  :root {\n    color-scheme: dark;\n    --background-primary: #1e1e1e;\n    --background-secondary: #262626;\n    --background-modifier-border: #363636;\n    --background-modifier-border-hover: #4a4a4a;\n    --background-modifier-border-focus: #a88bfa;\n    --background-modifier-hover: rgba(255, 255, 255, 0.06);\n    --background-modifier-active-hover: rgba(168, 139, 250, 0.2);\n    --text-normal: #dadada;\n    --text-muted: #b3b3b3;\n    --text-faint: #8c8c8c;\n    --text-error: #fb464c;\n    --text-accent: #a88bfa;\n    --color-red: #fb464c;\n    --color-red-rgb: 251, 70, 76;\n    --shadow-s: 0 1px 2px rgba(0, 0, 0, 0.3), 0 2px 8px rgba(0, 0, 0, 0.25);\n    --shadow-l: 0 8px 28px rgba(0, 0, 0, 0.5);\n  }\n}\n*, *::before, *::after { box-sizing: border-box; }\nhtml, body { height: 100%; margin: 0; }\nbody { background: var(--background-primary); color: var(--text-normal); font-family: var(--font-interface); font-size: var(--font-ui-small); overflow: hidden; -webkit-text-size-adjust: 100%; }\nbutton { font: inherit; font-size: var(--font-ui-small); color: var(--text-normal); background: var(--background-primary); border: 1px solid var(--background-modifier-border); border-radius: var(--radius-s); padding: 4px 10px; height: 30px; cursor: pointer; display: inline-flex; align-items: center; gap: 4px; white-space: nowrap; }\nbutton:hover { background: var(--background-modifier-hover); }\nbutton:focus-visible, a:focus-visible, [tabindex]:focus-visible { outline: 2px solid var(--interactive-accent); outline-offset: 1px; }\n.svg-icon { width: 16px; height: 16px; stroke: currentColor; fill: none; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; flex: none; }\n.vam-app { display: flex; flex-direction: column; height: 100%; }\n/* From styles.css, unchanged. */\n.vam-toolbar { display: flex; align-items: center; flex-wrap: wrap; gap: 6px 14px; min-height: 48px; padding: 6px 10px 6px 6px; border-bottom: 1px solid var(--background-modifier-border); background: var(--background-primary); flex-shrink: 0; }\n.vam-toolbar button, .vam-map-tools button, .vam-actions button { font-size: var(--font-ui-small); }\n.vam-toolbar .vam-map-switcher { display: inline-flex; align-items: center; gap: 6px; font-size: var(--font-ui-medium); min-width: 0; max-width: min(460px, 45%); height: auto; padding: 6px 8px; border: 0; border-radius: var(--radius-m); background: transparent; box-shadow: none; color: var(--text-normal); cursor: pointer; }\n.vam-toolbar .vam-map-switcher:hover { background: var(--background-modifier-hover); }\n.vam-map-switcher:focus-visible { outline: 2px solid var(--interactive-accent); outline-offset: 1px; }\n.vam-map-switcher-icon { display: inline-flex; flex-shrink: 0; color: var(--text-faint); }\n.vam-map-switcher-icon svg { width: 14px; height: 14px; }\n.vam-toolbar-actions { display: flex; align-items: center; gap: 2px; margin-left: auto; }\n.vam-canvas-overlay { position: absolute; z-index: 4; inset: 0; pointer-events: none; }\n.vam-workspace.has-inspector > .vam-canvas-overlay { right: 300px; }\n.vam-canvas-overlay > * { pointer-events: auto; }\n.vam-map-tools, .vam-zoom-controls { position: absolute; display: flex; align-items: center; gap: 2px; padding: 4px; border: 1px solid var(--background-modifier-border); border-radius: var(--radius-m); background: var(--background-primary); box-shadow: var(--shadow-s); }\n.vam-map-tools { top: 12px; left: 12px; flex-wrap: wrap; max-width: calc(100% - 24px); }\n.vam-map-tools button:not(.mod-cta), .vam-zoom-controls button { background: transparent; box-shadow: none; }\n.vam-map-tools button:focus-visible, .vam-zoom-controls button:focus-visible, .vam-node-tools button:focus-visible { outline: 2px solid var(--interactive-accent); outline-offset: 1px; }\n.vam-map-tools button:not(.mod-cta):hover, .vam-zoom-controls button:hover { background: var(--background-modifier-hover); }\n.vam-map-tools button.is-active { background: var(--background-modifier-active-hover); box-shadow: inset 0 0 0 1px var(--interactive-accent); color: var(--text-accent); }\n.vam-zoom-controls { right: 12px; bottom: 12px; }\n.vam-zoom-controls > .vam-layout-button { padding: 0 8px; font-size: var(--font-ui-small); }\n.vam-layout-button::after { content: "\u25BE" / ""; margin-left: 4px; color: var(--text-muted); }\n.vam-zoom { min-width: 52px; padding: 0 6px; text-align: center; font-variant-numeric: tabular-nums; color: var(--text-muted); }\n.vam-canvas-overlay > .vam-canvas-hint { position: absolute; left: 12px; bottom: 12px; max-width: 50%; padding: 6px 10px; border: 1px solid var(--background-modifier-border); border-radius: var(--radius-m); background: var(--background-primary); box-shadow: var(--shadow-s); color: var(--text-muted); pointer-events: none; }\n.vam-workspace { display: flex; flex: 1; min-height: 0; min-width: 0; position: relative; }\n.vam-viewport { position: relative; flex: 1; min-width: 0; overflow: hidden; cursor: grab; touch-action: none; background-color: var(--background-secondary); background-image: radial-gradient(var(--background-modifier-border) 1px, transparent 1px); background-size: 24px 24px; }\n.vam-viewport.is-panning { cursor: grabbing; }\n.vam-stage { position: absolute; left: 0; top: 0; width: 1px; height: 1px; transform-origin: 0 0; }\n.vam-edges { position: absolute; left: 0; top: 0; width: 1px; height: 1px; overflow: visible; pointer-events: none; }\n.vam-edge { fill: none; stroke: var(--interactive-accent); stroke-width: 2; opacity: 0.55; }\n.vam-node { --vam-card-bg: var(--background-primary); position: absolute; box-sizing: border-box; width: 280px; padding: 12px 14px 14px; border: 1px solid var(--background-modifier-border); border-radius: 12px; background: var(--vam-card-bg); box-shadow: var(--shadow-s); cursor: grab; user-select: none; transition: border-color 160ms ease-out, box-shadow 160ms ease-out; }\n.vam-node:hover { border-color: var(--background-modifier-border-hover); }\n.vam-node > .vam-card-label { position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0; overflow: hidden; white-space: nowrap; border: 0; }\n.vam-edge-convergence { stroke: var(--interactive-accent); stroke-dasharray: 5 5; opacity: .8; }\n.vam-node:active { cursor: grabbing; }\n.vam-node.is-selected { border-color: var(--interactive-accent); outline: 2px solid var(--interactive-accent); outline-offset: 2px; }\n.vam-node:focus-visible { outline: 2px dashed var(--interactive-accent); outline-offset: 5px; }\n.vam-node-header { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 6px; }\n.vam-node-header button { font-size: var(--font-ui-smaller); height: 24px; padding: 2px 8px; }\n.vam-node-header > .vam-collapse-button { margin-left: auto; font-variant-numeric: tabular-nums; }\n.vam-node > .vam-node-tools { position: absolute; right: 10px; bottom: calc(100% - 6px); z-index: 3; display: flex; align-items: center; gap: 2px; padding: 3px; border: 1px solid var(--background-modifier-border); border-radius: 8px; background: var(--background-primary); box-shadow: var(--shadow-s); opacity: 0; pointer-events: none; transform: translateY(4px); transition: opacity 120ms ease-out, transform 120ms ease-out; width: max-content; }\n.vam-node-tools button { font-size: var(--font-ui-smaller); height: 26px; padding: 2px 8px; }\n.vam-node-tools > .vam-collapse-button { order: -1; }\n.vam-status { display: inline-block; max-width: 100%; overflow: hidden; text-overflow: ellipsis; padding: 0; font-size: var(--font-ui-smaller); color: var(--text-muted); white-space: nowrap; }\n.vam-status::before { content: ""; display: inline-block; margin-right: 6px; vertical-align: 1px; width: 7px; height: 7px; box-sizing: border-box; border-radius: 50%; background: var(--text-faint); }\n.vam-status-idea::before { border: 1.5px solid var(--text-faint); background: transparent; }\n.vam-status-running { color: var(--text-accent); }\n.vam-status-running::before { background: var(--interactive-accent); animation: vam-pulse 1.4s ease-in-out infinite; }\n.vam-status-completed::before { background: var(--interactive-accent); }\n.vam-status-queued { color: var(--text-accent); }\n.vam-status-queued::before { border: 1.5px solid var(--interactive-accent); background: transparent; }\n.vam-status-error { color: var(--color-red); }\n.vam-status-error::before { background: var(--color-red); }\n.vam-node-header button.vam-badge-new { border: 0; cursor: pointer; }\n.vam-card-title { color: var(--text-normal); font-size: var(--font-ui-medium); font-weight: 650; line-height: 1.4; margin: 8px 0 4px; overflow-wrap: anywhere; }\n.vam-card-summary { margin: 0; color: var(--text-muted); font-size: var(--font-ui-small); line-height: 1.55; overflow-wrap: anywhere; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 3; overflow: hidden; }\n.vam-card-error { margin: 6px 0 0; color: var(--color-red); font-size: var(--font-ui-smaller); line-height: 1.45; overflow-wrap: anywhere; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow: hidden; }\n.vam-node:not([data-aim-kind])[data-status="idea"] { border-style: dashed; border-color: var(--background-modifier-border-hover); box-shadow: none; }\n.vam-card-summary.is-preview { font-style: italic; color: var(--text-faint); }\n.vam-card-preview-label { font-style: normal; font-weight: 600; margin-right: 6px; }\n.vam-node:not([data-aim-kind])[data-status="idea"] .vam-card-summary { color: var(--text-faint); }\n.vam-node:not([data-aim-kind])[data-status="running"] { border-color: var(--interactive-accent); }\n.vam-node:not([data-aim-kind])[data-status="queued"] { --vam-card-bg: color-mix(in srgb, var(--interactive-accent) 7%, var(--background-primary)); border-style: dashed; border-color: color-mix(in srgb, var(--interactive-accent) 60%, transparent); }\n.vam-node:not([data-aim-kind])[data-status="running"]::after { content: ""; position: absolute; left: 14px; right: 14px; top: -1px; height: 2px; border-radius: 2px; background: linear-gradient(90deg, transparent, var(--interactive-accent), transparent); background-size: 50% 100%; background-repeat: no-repeat; animation: vam-scan 1.6s ease-in-out infinite; }\n.vam-node:not([data-aim-kind])[data-status="error"] { border-color: rgba(var(--color-red-rgb), 0.55); }\n.vam-relevance-tag { display: inline-flex; align-items: center; gap: 4px; max-width: 100%; font-size: var(--font-ui-smaller); line-height: 1.4; white-space: nowrap; }\n.vam-relevance-tag-name { position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0; overflow: hidden; white-space: nowrap; }\n.vam-relevance-tag > .vam-relevance-icon { display: inline-flex; flex: none; }\n.vam-relevance-tag .svg-icon { width: 14px; height: 14px; }\n.vam-relevance-tag[data-tier="core"] { color: var(--text-accent); }\n.vam-relevance-tag[data-tier="support"] { color: var(--text-muted); }\n.vam-relevance-tag[data-tier="side"] { color: var(--text-faint); }\n.vam-node[data-relevance="side"] { opacity: .5; transition: border-color 160ms ease-out, box-shadow 160ms ease-out, opacity 160ms ease-out; }\n.vam-node[data-relevance="side"]:hover, .vam-node[data-relevance="side"]:focus-within, .vam-node[data-relevance="side"].is-selected { opacity: 1; }\n.vam-edge.vam-edge-side { opacity: .2; }\n.theme-dark .vam-viewport { background-color: var(--background-primary); }\n.theme-dark .vam-node { --vam-card-bg: var(--background-secondary); }\n.vam-inspector { width: 300px; flex-shrink: 0; padding: 16px; overflow-y: auto; border-left: 1px solid var(--background-modifier-border); background: var(--background-primary); }\n.vam-inspector-heading { display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px; }\n.vam-inspector-heading strong { font-size: var(--font-ui-medium); }\n.vam-node.is-readonly, .vam-node.is-readonly:active { cursor: pointer; }\n.vam-sample-summary { color: var(--text-muted); line-height: 1.6; }\n.vam-sample-detail { line-height: 1.6; }\n@media (max-width: 900px) {\n  .vam-inspector { width: 260px; }\n  .vam-workspace.has-inspector > .vam-canvas-overlay { right: 260px; }\n}\n@media (max-width: 600px) {\n  .vam-inspector { position: absolute; right: 0; top: 0; bottom: 0; width: min(300px, 85%); z-index: 5; box-shadow: var(--shadow-l); }\n}\n@keyframes vam-pulse { 50% { opacity: 0.35; } }\n@keyframes vam-scan { from { background-position: -100% 0; } to { background-position: 200% 0; } }\n/* Viewer-only parts: the pieces Obsidian would otherwise provide. */\n.vam-toolbar { padding-left: max(10px, env(safe-area-inset-left, 0px)); padding-right: max(10px, env(safe-area-inset-right, 0px)); }\n.vam-toolbar .vam-map-switcher { cursor: default; margin: 0; font-weight: 600; font-family: inherit; line-height: 1.3; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; display: block; }\n.vam-toolbar .vam-map-switcher:hover { background: transparent; }\n.vam-shared { font-size: var(--font-ui-smaller); color: var(--text-faint); }\n.vam-toolbar-actions { gap: 10px; flex-wrap: wrap; justify-content: flex-end; }\n.vam-made-with { font-size: var(--font-ui-smaller); color: var(--text-faint); }\n.vam-install { display: inline-flex; align-items: center; height: 30px; padding: 4px 12px; border-radius: var(--radius-s); background: var(--interactive-accent); color: var(--text-on-accent); font-size: var(--font-ui-small); text-decoration: none; white-space: nowrap; }\n.vam-install:hover { filter: brightness(1.08); }\n.vam-language { font: inherit; font-size: var(--font-ui-small); height: 30px; max-width: 11em; padding: 0 8px; color: var(--text-normal); background: var(--background-primary); border: 1px solid var(--background-modifier-border); border-radius: var(--radius-s); cursor: pointer; }\n.vam-language:hover { background: var(--background-modifier-hover); }\n.vam-translate-note { flex-shrink: 0; padding: 5px max(10px, env(safe-area-inset-left, 0px)); font-size: var(--font-ui-smaller); line-height: 1.4; color: var(--text-muted); background: var(--background-secondary); border-bottom: 1px solid var(--background-modifier-border); }\n.vam-translate-note[hidden] { display: none; }\n.vam-goal { display: inline-flex; align-items: center; gap: 6px; min-width: 0; max-width: 22em; padding: 0 6px; line-height: var(--input-height); font-size: var(--font-ui-small); color: var(--text-normal); }\n.vam-goal-text { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }\n.vam-goal .svg-icon { color: var(--text-accent); }\n.vam-map-tools[hidden] { display: none; }\n.vam-zoom-controls { right: max(12px, env(safe-area-inset-right, 0px)); bottom: max(12px, env(safe-area-inset-bottom, 0px)); }\n.vam-zoom-controls button { background: transparent; }\n.vam-node { touch-action: none; }\n.vam-node.is-dragging { cursor: grabbing; z-index: 2; }\n.vam-node .vam-node-tools button, .vam-node-header button { background: transparent; border: 0; }\n.vam-node-header > .vam-collapse-button { border: 1px solid var(--background-modifier-border); background: var(--background-primary); }\n.vam-layout-menu { position: absolute; right: 0; bottom: calc(100% + 6px); z-index: 6; display: flex; flex-direction: column; min-width: 190px; padding: 4px; border: 1px solid var(--background-modifier-border); border-radius: var(--radius-m); background: var(--background-primary); box-shadow: var(--shadow-l); }\n.vam-layout-menu[hidden] { display: none; }\n.vam-layout-menu button { justify-content: flex-start; width: 100%; border: 0; background: transparent; height: 30px; }\n.vam-layout-menu hr { width: 100%; margin: 4px 0; border: 0; border-top: 1px solid var(--background-modifier-border); }\n.vam-zoom-controls { overflow: visible; }\n.vam-inspector { font-size: 14px; line-height: 1.6; color: var(--text-normal); }\n@media (min-width: 601px) { .vam-inspector { position: relative; } }\n.vam-inspector[hidden] { display: none; }\n.vam-inspector-heading button { height: 26px; }\n.vam-inspector h3 { font-size: 18px; line-height: 1.35; margin: 0 0 8px; overflow-wrap: anywhere; }\n.vam-inspector-why { display: flex; flex-direction: column; gap: 4px; padding: 8px 10px; margin: 0 0 12px; border: 1px solid var(--background-modifier-border); border-radius: var(--radius-m); color: var(--text-muted); font-size: var(--font-ui-small); }\n.vam-inspector-resizer { position: absolute; left: -4px; top: 0; bottom: 0; width: 8px; cursor: col-resize; touch-action: none; z-index: 2; }\n.vam-inspector-resizer:hover, .vam-inspector-resizer.is-resizing { background: var(--background-modifier-active-hover); }\n.vam-inspector-empty { color: var(--text-muted); }\n.vam-subtopics { display: flex; flex-direction: column; gap: 4px; margin-top: 16px; padding-top: 10px; border-top: 1px solid var(--background-modifier-border); }\n.vam-subtopics strong { font-size: var(--font-ui-small); color: var(--text-muted); font-weight: 500; }\n.vam-subtopics button { justify-content: flex-start; height: auto; min-height: 30px; white-space: normal; text-align: left; }\n/* Reading styles for the note HTML that Obsidian rendered at export time. */\n.vam-sample-detail { overflow-wrap: anywhere; }\n.vam-sample-detail h1, .vam-sample-detail h2, .vam-sample-detail h3, .vam-sample-detail h4, .vam-sample-detail h5, .vam-sample-detail h6 { margin: 18px 0 6px; line-height: 1.35; }\n.vam-sample-detail h1 { font-size: 18px; }\n.vam-sample-detail h2 { font-size: 16px; }\n.vam-sample-detail h3, .vam-sample-detail h4, .vam-sample-detail h5, .vam-sample-detail h6 { font-size: 15px; }\n.vam-sample-detail p { margin: 8px 0; }\n.vam-sample-detail ul, .vam-sample-detail ol { padding-left: 22px; margin: 8px 0; }\n.vam-sample-detail a { color: var(--text-accent); }\n.vam-sample-detail blockquote { margin: 10px 0; padding: 2px 12px; border-left: 3px solid var(--background-modifier-border-hover); color: var(--text-muted); }\n.vam-sample-detail hr { border: 0; border-top: 1px solid var(--background-modifier-border); margin: 14px 0; }\n.vam-sample-detail code { font-family: var(--font-monospace); font-size: 12px; background: var(--background-secondary); padding: 1px 4px; border-radius: 3px; }\n.vam-sample-detail pre { overflow-x: auto; background: var(--background-secondary); padding: 8px; border-radius: 6px; }\n.vam-sample-detail pre code { background: transparent; padding: 0; }\n.vam-sample-detail img { max-width: 100%; height: auto; }\n.vam-sample-detail svg { max-width: 100%; height: auto; }\n.vam-sample-detail .mermaid, .vam-sample-detail .vam-table-scroll { overflow-x: auto; margin: 10px 0; }\n.vam-sample-detail table { border-collapse: collapse; font-size: 12.5px; min-width: 100%; }\n.vam-sample-detail th, .vam-sample-detail td { border: 1px solid var(--background-modifier-border); padding: 4px 6px; text-align: left; vertical-align: top; min-width: 5em; overflow-wrap: normal; word-break: normal; }\n.vam-sample-detail .callout { margin: 10px 0; padding: 8px 12px; border-radius: var(--radius-m); background: color-mix(in srgb, var(--interactive-accent) 9%, transparent); border-left: 3px solid var(--interactive-accent); }\n.vam-sample-detail .callout-title { display: flex; align-items: center; gap: 6px; font-weight: 600; color: var(--text-accent); }\n.vam-sample-detail .callout-icon { display: inline-flex; flex: none; }\n.vam-sample-detail .callout-icon svg { width: 16px; height: 16px; }\n.vam-sample-detail .callout-content p:first-child { margin-top: 4px; }\n.vam-sample-detail .vam-image-source { display: block; margin: 2px 0 8px; color: var(--text-faint); font-size: var(--font-ui-smaller); overflow-wrap: anywhere; }\n.vam-sample-detail .vam-image-omitted { color: var(--text-faint); font-size: var(--font-ui-smaller); }\n.vam-sample-detail .internal-link { color: inherit; text-decoration: none; }\n/* Repeating the class raises specificity above the extracted per-card cursor rules (up to 0,3,0), so no !important is needed. */\n.vam-resizing.vam-resizing.vam-resizing.vam-resizing, .vam-resizing.vam-resizing.vam-resizing.vam-resizing * { cursor: col-resize; user-select: none; }\n@media (max-width: 700px) { .vam-canvas-overlay > .vam-canvas-hint { display: none; } }\n@media (max-width: 600px) { .vam-workspace.has-inspector > .vam-canvas-overlay { right: 0; } .vam-inspector { width: 100%; box-shadow: none; } }\n@media (max-width: 600px) { .vam-inspector-heading { position: sticky; top: 0; z-index: 3; background: var(--background-primary); padding: 8px 0; margin-bottom: 6px; } }\n@media (max-width: 600px) { .vam-inspector-resizer { display: none; } .vam-toolbar .vam-map-switcher { max-width: 100%; } .vam-made-with { display: none; } }\n/* Four :root pseudo-classes (0,4,0) outrank every extracted transition rule without !important. */\n@media (prefers-reduced-motion: reduce) { :root:root:root:root * { transition: none; } }\n';
+var SHARE_VIEWER_CSS = '/* Share viewer styles. Order: tokens and base (this part), the card, canvas and inspector rules extracted from styles.css, then the viewer-only parts below the marker. */\n:root {\n  color-scheme: light;\n  --background-primary: #ffffff;\n  --background-secondary: #f6f6f6;\n  --background-modifier-border: #e0e0e0;\n  --background-modifier-border-hover: #cfcfcf;\n  --background-modifier-border-focus: #8a5cf5;\n  --background-modifier-hover: rgba(0, 0, 0, 0.05);\n  --background-modifier-active-hover: rgba(138, 92, 245, 0.15);\n  --text-normal: #222222;\n  --text-muted: #5c5c5c;\n  --text-faint: #8a8a8a;\n  --text-on-accent: #ffffff;\n  --text-error: #d1243c;\n  --interactive-accent: #8a5cf5;\n  --text-accent: #6f42e0;\n  --color-red: #e93147;\n  --color-red-rgb: 233, 49, 71;\n  --color-orange: #e9973f;\n  --shadow-s: 0 1px 2px rgba(0, 0, 0, 0.06), 0 2px 8px rgba(0, 0, 0, 0.05);\n  --shadow-l: 0 8px 28px rgba(0, 0, 0, 0.16);\n  --radius-s: 4px;\n  --radius-m: 8px;\n  --font-ui-smaller: 12px;\n  --font-ui-small: 13px;\n  --font-ui-medium: 15px;\n  --input-height: 30px;\n  --size-4-3: 12px;\n  --font-interface: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang TC", "PingFang SC", "Noto Sans TC", "Noto Sans SC", "Microsoft JhengHei", Roboto, sans-serif;\n  --font-monospace: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;\n}\n@media (prefers-color-scheme: dark) {\n  :root {\n    color-scheme: dark;\n    --background-primary: #1e1e1e;\n    --background-secondary: #262626;\n    --background-modifier-border: #363636;\n    --background-modifier-border-hover: #4a4a4a;\n    --background-modifier-border-focus: #a88bfa;\n    --background-modifier-hover: rgba(255, 255, 255, 0.06);\n    --background-modifier-active-hover: rgba(168, 139, 250, 0.2);\n    --text-normal: #dadada;\n    --text-muted: #b3b3b3;\n    --text-faint: #8c8c8c;\n    --text-error: #fb464c;\n    --text-accent: #a88bfa;\n    --color-red: #fb464c;\n    --color-red-rgb: 251, 70, 76;\n    --shadow-s: 0 1px 2px rgba(0, 0, 0, 0.3), 0 2px 8px rgba(0, 0, 0, 0.25);\n    --shadow-l: 0 8px 28px rgba(0, 0, 0, 0.5);\n  }\n}\n*, *::before, *::after { box-sizing: border-box; }\nhtml, body { height: 100%; margin: 0; }\nbody { background: var(--background-primary); color: var(--text-normal); font-family: var(--font-interface); font-size: var(--font-ui-small); overflow: hidden; -webkit-text-size-adjust: 100%; }\nbutton { font: inherit; font-size: var(--font-ui-small); color: var(--text-normal); background: var(--background-primary); border: 1px solid var(--background-modifier-border); border-radius: var(--radius-s); padding: 4px 10px; height: 30px; cursor: pointer; display: inline-flex; align-items: center; gap: 4px; white-space: nowrap; }\nbutton:hover { background: var(--background-modifier-hover); }\nbutton:focus-visible, a:focus-visible, [tabindex]:focus-visible { outline: 2px solid var(--interactive-accent); outline-offset: 1px; }\n.svg-icon { width: 16px; height: 16px; stroke: currentColor; fill: none; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; flex: none; }\n.vam-app { display: flex; flex-direction: column; height: 100%; }\n/* From styles.css, unchanged. */\n.vam-toolbar { display: flex; align-items: center; flex-wrap: wrap; gap: 6px 14px; min-height: 48px; padding: 6px 10px 6px 6px; border-bottom: 1px solid var(--background-modifier-border); background: var(--background-primary); flex-shrink: 0; }\n.vam-toolbar button, .vam-map-tools button, .vam-actions button { font-size: var(--font-ui-small); }\n.vam-toolbar .vam-map-switcher { display: inline-flex; align-items: center; gap: 6px; font-size: var(--font-ui-medium); min-width: 0; max-width: min(460px, 45%); height: auto; padding: 6px 8px; border: 0; border-radius: var(--radius-m); background: transparent; box-shadow: none; color: var(--text-normal); cursor: pointer; }\n.vam-toolbar .vam-map-switcher:hover { background: var(--background-modifier-hover); }\n.vam-map-switcher:focus-visible { outline: 2px solid var(--interactive-accent); outline-offset: 1px; }\n.vam-map-switcher-icon { display: inline-flex; flex-shrink: 0; color: var(--text-faint); }\n.vam-map-switcher-icon svg { width: 14px; height: 14px; }\n.vam-toolbar-actions { display: flex; align-items: center; gap: 2px; margin-left: auto; }\n.vam-canvas-overlay { position: absolute; z-index: 4; inset: 0; pointer-events: none; }\n.vam-canvas-overlay > * { pointer-events: auto; }\n.vam-map-tools, .vam-zoom-controls { position: absolute; display: flex; align-items: center; gap: 2px; padding: 4px; border: 1px solid var(--background-modifier-border); border-radius: var(--radius-m); background: var(--background-primary); box-shadow: var(--shadow-s); }\n.vam-map-tools { top: 12px; left: 12px; flex-wrap: wrap; max-width: calc(100% - 24px); }\n.vam-map-tools button:not(.mod-cta), .vam-zoom-controls button { background: transparent; box-shadow: none; }\n.vam-map-tools button:focus-visible, .vam-zoom-controls button:focus-visible, .vam-node-tools button:focus-visible { outline: 2px solid var(--interactive-accent); outline-offset: 1px; }\n.vam-map-tools button:not(.mod-cta):hover, .vam-zoom-controls button:hover { background: var(--background-modifier-hover); }\n.vam-map-tools button.is-active { background: var(--background-modifier-active-hover); box-shadow: inset 0 0 0 1px var(--interactive-accent); color: var(--text-accent); }\n.vam-zoom-controls { right: 12px; bottom: 12px; }\n.vam-zoom-controls > .vam-layout-button { padding: 0 8px; font-size: var(--font-ui-small); }\n.vam-layout-button::after { content: "\u25BE" / ""; margin-left: 4px; color: var(--text-muted); }\n.vam-zoom { min-width: 52px; padding: 0 6px; text-align: center; font-variant-numeric: tabular-nums; color: var(--text-muted); }\n.vam-canvas-overlay > .vam-canvas-hint { position: absolute; left: 12px; bottom: 12px; max-width: 50%; padding: 6px 10px; border: 1px solid var(--background-modifier-border); border-radius: var(--radius-m); background: var(--background-primary); box-shadow: var(--shadow-s); color: var(--text-muted); pointer-events: none; }\n.vam-workspace { display: flex; flex: 1; min-height: 0; min-width: 0; position: relative; }\n.vam-viewport { position: relative; flex: 1; min-width: 0; overflow: hidden; cursor: grab; touch-action: none; background-color: var(--background-secondary); background-image: radial-gradient(var(--background-modifier-border) 1px, transparent 1px); background-size: 24px 24px; }\n.vam-viewport.is-panning { cursor: grabbing; }\n.vam-stage { position: absolute; left: 0; top: 0; width: 1px; height: 1px; transform-origin: 0 0; }\n.vam-edges { position: absolute; left: 0; top: 0; width: 1px; height: 1px; overflow: visible; pointer-events: none; }\n.vam-edge { fill: none; stroke: var(--interactive-accent); stroke-width: 2; opacity: 0.55; }\n.vam-node { --vam-card-bg: var(--background-primary); position: absolute; box-sizing: border-box; width: 280px; padding: 12px 14px 14px; border: 1px solid var(--background-modifier-border); border-radius: 12px; background: var(--vam-card-bg); box-shadow: var(--shadow-s); cursor: grab; user-select: none; transition: border-color 160ms ease-out, box-shadow 160ms ease-out; }\n.vam-node:hover { border-color: var(--background-modifier-border-hover); }\n.vam-node > .vam-card-label { position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0; overflow: hidden; white-space: nowrap; border: 0; }\n.vam-edge-convergence { stroke: var(--interactive-accent); stroke-dasharray: 5 5; opacity: .8; }\n.vam-node:active { cursor: grabbing; }\n.vam-node.is-selected { border-color: var(--interactive-accent); outline: 2px solid var(--interactive-accent); outline-offset: 2px; }\n.vam-node:focus-visible { outline: 2px dashed var(--interactive-accent); outline-offset: 5px; }\n.vam-node-header { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 6px; }\n.vam-node-header button { font-size: var(--font-ui-smaller); height: 24px; padding: 2px 8px; }\n.vam-node-header > .vam-collapse-button { margin-left: auto; font-variant-numeric: tabular-nums; }\n.vam-node > .vam-node-tools { position: absolute; right: 10px; bottom: calc(100% - 6px); z-index: 3; display: flex; align-items: center; gap: 2px; padding: 3px; border: 1px solid var(--background-modifier-border); border-radius: 8px; background: var(--background-primary); box-shadow: var(--shadow-s); opacity: 0; pointer-events: none; transform: translateY(4px); transition: opacity 120ms ease-out, transform 120ms ease-out; width: max-content; }\n.vam-node-tools button { font-size: var(--font-ui-smaller); height: 26px; padding: 2px 8px; }\n.vam-node-tools > .vam-collapse-button { order: -1; }\n.vam-status { display: inline-block; max-width: 100%; overflow: hidden; text-overflow: ellipsis; padding: 0; font-size: var(--font-ui-smaller); color: var(--text-muted); white-space: nowrap; }\n.vam-status::before { content: ""; display: inline-block; margin-right: 6px; vertical-align: 1px; width: 7px; height: 7px; box-sizing: border-box; border-radius: 50%; background: var(--text-faint); }\n.vam-status-idea::before { border: 1.5px solid var(--text-faint); background: transparent; }\n.vam-status-running { color: var(--text-accent); }\n.vam-status-running::before { background: var(--interactive-accent); animation: vam-pulse 1.4s ease-in-out infinite; }\n.vam-status-completed::before { background: var(--interactive-accent); }\n.vam-status-queued { color: var(--text-accent); }\n.vam-status-queued::before { border: 1.5px solid var(--interactive-accent); background: transparent; }\n.vam-status-error { color: var(--color-red); }\n.vam-status-error::before { background: var(--color-red); }\n.vam-node-header button.vam-badge-new { border: 0; cursor: pointer; }\n.vam-card-title { color: var(--text-normal); font-size: var(--font-ui-medium); font-weight: 650; line-height: 1.4; margin: 8px 0 4px; overflow-wrap: anywhere; }\n.vam-card-summary { margin: 0; color: var(--text-muted); font-size: var(--font-ui-small); line-height: 1.55; overflow-wrap: anywhere; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 3; overflow: hidden; }\n.vam-card-error { margin: 6px 0 0; color: var(--color-red); font-size: var(--font-ui-smaller); line-height: 1.45; overflow-wrap: anywhere; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow: hidden; }\n.vam-node:not([data-aim-kind])[data-status="idea"] { border-style: dashed; border-color: var(--background-modifier-border-hover); box-shadow: none; }\n.vam-card-summary.is-preview { font-style: italic; color: var(--text-faint); }\n.vam-card-preview-label { font-style: normal; font-weight: 600; margin-right: 6px; }\n.vam-node:not([data-aim-kind])[data-status="idea"] .vam-card-summary { color: var(--text-faint); }\n.vam-node:not([data-aim-kind])[data-status="running"] { border-color: var(--interactive-accent); }\n.vam-node:not([data-aim-kind])[data-status="queued"] { --vam-card-bg: color-mix(in srgb, var(--interactive-accent) 7%, var(--background-primary)); border-style: dashed; border-color: color-mix(in srgb, var(--interactive-accent) 60%, transparent); }\n.vam-node:not([data-aim-kind])[data-status="running"]::after { content: ""; position: absolute; left: 14px; right: 14px; top: -1px; height: 2px; border-radius: 2px; background: linear-gradient(90deg, transparent, var(--interactive-accent), transparent); background-size: 50% 100%; background-repeat: no-repeat; animation: vam-scan 1.6s ease-in-out infinite; }\n.vam-node:not([data-aim-kind])[data-status="error"] { border-color: rgba(var(--color-red-rgb), 0.55); }\n.vam-relevance-tag { display: inline-flex; align-items: center; gap: 4px; max-width: 100%; font-size: var(--font-ui-smaller); line-height: 1.4; white-space: nowrap; }\n.vam-relevance-tag-name { position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0; overflow: hidden; white-space: nowrap; }\n.vam-relevance-tag > .vam-relevance-icon { display: inline-flex; flex: none; }\n.vam-relevance-tag .svg-icon { width: 14px; height: 14px; }\n.vam-relevance-tag[data-tier="core"] { color: var(--text-accent); }\n.vam-relevance-tag[data-tier="support"] { color: var(--text-muted); }\n.vam-relevance-tag[data-tier="side"] { color: var(--text-faint); }\n.vam-node[data-relevance="side"] { opacity: .5; transition: border-color 160ms ease-out, box-shadow 160ms ease-out, opacity 160ms ease-out; }\n.vam-node[data-relevance="side"]:hover, .vam-node[data-relevance="side"]:focus-within, .vam-node[data-relevance="side"].is-selected { opacity: 1; }\n.vam-edge.vam-edge-side { opacity: .2; }\n.theme-dark .vam-viewport { background-color: var(--background-primary); }\n.theme-dark .vam-node { --vam-card-bg: var(--background-secondary); }\n.vam-inspector { width: 300px; flex-shrink: 0; padding: 16px; overflow-y: auto; border-left: 1px solid var(--background-modifier-border); background: var(--background-primary); }\n.vam-inspector-heading { display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px; }\n.vam-inspector-heading strong { font-size: var(--font-ui-medium); }\n.vam-node.is-readonly, .vam-node.is-readonly:active { cursor: pointer; }\n.vam-sample-summary { color: var(--text-muted); line-height: 1.6; }\n.vam-sample-detail { line-height: 1.6; }\n@media (max-width: 900px) {\n  .vam-inspector { width: 260px; }\n}\n@media (max-width: 600px) {\n  .vam-inspector { position: absolute; right: 0; top: 0; bottom: 0; width: min(300px, 85%); z-index: 5; box-shadow: var(--shadow-l); }\n  .vam-workspace.has-inspector .vam-zoom-controls { right: auto; left: 12px; }\n}\n@keyframes vam-pulse { 50% { opacity: 0.35; } }\n@keyframes vam-scan { from { background-position: -100% 0; } to { background-position: 200% 0; } }\n/* Viewer-only parts: the pieces Obsidian would otherwise provide. */\n.vam-toolbar { padding-left: max(10px, env(safe-area-inset-left, 0px)); padding-right: max(10px, env(safe-area-inset-right, 0px)); }\n.vam-toolbar .vam-map-switcher { cursor: default; margin: 0; font-weight: 600; font-family: inherit; line-height: 1.3; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; display: block; }\n.vam-toolbar .vam-map-switcher:hover { background: transparent; }\n.vam-shared { font-size: var(--font-ui-smaller); color: var(--text-faint); }\n.vam-toolbar-actions { gap: 10px; flex-wrap: wrap; justify-content: flex-end; }\n.vam-made-with { font-size: var(--font-ui-smaller); color: var(--text-faint); }\n.vam-install { display: inline-flex; align-items: center; height: 30px; padding: 4px 12px; border-radius: var(--radius-s); background: var(--interactive-accent); color: var(--text-on-accent); font-size: var(--font-ui-small); text-decoration: none; white-space: nowrap; }\n.vam-install:hover { filter: brightness(1.08); }\n.vam-language { font: inherit; font-size: var(--font-ui-small); height: 30px; max-width: 11em; padding: 0 8px; color: var(--text-normal); background: var(--background-primary); border: 1px solid var(--background-modifier-border); border-radius: var(--radius-s); cursor: pointer; }\n.vam-language:hover { background: var(--background-modifier-hover); }\n.vam-translate-note { flex-shrink: 0; padding: 5px max(10px, env(safe-area-inset-left, 0px)); font-size: var(--font-ui-smaller); line-height: 1.4; color: var(--text-muted); background: var(--background-secondary); border-bottom: 1px solid var(--background-modifier-border); }\n.vam-translate-note[hidden] { display: none; }\n.vam-goal { display: inline-flex; align-items: center; gap: 6px; min-width: 0; max-width: 22em; padding: 0 6px; line-height: var(--input-height); font-size: var(--font-ui-small); color: var(--text-normal); }\n.vam-goal-text { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }\n.vam-goal .svg-icon { color: var(--text-accent); }\n.vam-map-tools[hidden] { display: none; }\n.vam-zoom-controls { right: max(12px, env(safe-area-inset-right, 0px)); bottom: max(12px, env(safe-area-inset-bottom, 0px)); }\n.vam-zoom-controls button { background: transparent; }\n.vam-node { touch-action: none; }\n.vam-node.is-dragging { cursor: grabbing; z-index: 2; }\n.vam-node .vam-node-tools button, .vam-node-header button { background: transparent; border: 0; }\n.vam-node-header > .vam-collapse-button { border: 1px solid var(--background-modifier-border); background: var(--background-primary); }\n.vam-layout-menu { position: absolute; right: 0; bottom: calc(100% + 6px); z-index: 6; display: flex; flex-direction: column; min-width: 190px; padding: 4px; border: 1px solid var(--background-modifier-border); border-radius: var(--radius-m); background: var(--background-primary); box-shadow: var(--shadow-l); }\n.vam-layout-menu[hidden] { display: none; }\n.vam-layout-menu button { justify-content: flex-start; width: 100%; border: 0; background: transparent; height: 30px; }\n.vam-layout-menu hr { width: 100%; margin: 4px 0; border: 0; border-top: 1px solid var(--background-modifier-border); }\n.vam-zoom-controls { overflow: visible; }\n.vam-inspector { font-size: 14px; line-height: 1.6; color: var(--text-normal); }\n@media (min-width: 601px) { .vam-inspector { position: relative; } }\n.vam-inspector[hidden] { display: none; }\n.vam-inspector-heading button { height: 26px; }\n.vam-inspector h3 { font-size: 18px; line-height: 1.35; margin: 0 0 8px; overflow-wrap: anywhere; }\n.vam-inspector-why { display: flex; flex-direction: column; gap: 4px; padding: 8px 10px; margin: 0 0 12px; border: 1px solid var(--background-modifier-border); border-radius: var(--radius-m); color: var(--text-muted); font-size: var(--font-ui-small); }\n.vam-inspector-resizer { position: absolute; left: -4px; top: 0; bottom: 0; width: 8px; cursor: col-resize; touch-action: none; z-index: 2; }\n.vam-inspector-resizer:hover, .vam-inspector-resizer.is-resizing { background: var(--background-modifier-active-hover); }\n.vam-inspector-empty { color: var(--text-muted); }\n.vam-subtopics { display: flex; flex-direction: column; gap: 4px; margin-top: 16px; padding-top: 10px; border-top: 1px solid var(--background-modifier-border); }\n.vam-subtopics strong { font-size: var(--font-ui-small); color: var(--text-muted); font-weight: 500; }\n.vam-subtopics button { justify-content: flex-start; height: auto; min-height: 30px; white-space: normal; text-align: left; }\n/* Reading styles for the note HTML that Obsidian rendered at export time. */\n.vam-sample-detail { overflow-wrap: anywhere; }\n.vam-sample-detail h1, .vam-sample-detail h2, .vam-sample-detail h3, .vam-sample-detail h4, .vam-sample-detail h5, .vam-sample-detail h6 { margin: 18px 0 6px; line-height: 1.35; }\n.vam-sample-detail h1 { font-size: 18px; }\n.vam-sample-detail h2 { font-size: 16px; }\n.vam-sample-detail h3, .vam-sample-detail h4, .vam-sample-detail h5, .vam-sample-detail h6 { font-size: 15px; }\n.vam-sample-detail p { margin: 8px 0; }\n.vam-sample-detail ul, .vam-sample-detail ol { padding-left: 22px; margin: 8px 0; }\n.vam-sample-detail a { color: var(--text-accent); }\n.vam-sample-detail blockquote { margin: 10px 0; padding: 2px 12px; border-left: 3px solid var(--background-modifier-border-hover); color: var(--text-muted); }\n.vam-sample-detail hr { border: 0; border-top: 1px solid var(--background-modifier-border); margin: 14px 0; }\n.vam-sample-detail code { font-family: var(--font-monospace); font-size: 12px; background: var(--background-secondary); padding: 1px 4px; border-radius: 3px; }\n.vam-sample-detail pre { overflow-x: auto; background: var(--background-secondary); padding: 8px; border-radius: 6px; }\n.vam-sample-detail pre code { background: transparent; padding: 0; }\n.vam-sample-detail img { max-width: 100%; height: auto; }\n.vam-sample-detail svg { max-width: 100%; height: auto; }\n.vam-sample-detail .mermaid, .vam-sample-detail .vam-table-scroll { overflow-x: auto; margin: 10px 0; }\n.vam-sample-detail table { border-collapse: collapse; font-size: 12.5px; min-width: 100%; }\n.vam-sample-detail th, .vam-sample-detail td { border: 1px solid var(--background-modifier-border); padding: 4px 6px; text-align: left; vertical-align: top; min-width: 5em; overflow-wrap: normal; word-break: normal; }\n.vam-sample-detail .callout { margin: 10px 0; padding: 8px 12px; border-radius: var(--radius-m); background: color-mix(in srgb, var(--interactive-accent) 9%, transparent); border-left: 3px solid var(--interactive-accent); }\n.vam-sample-detail .callout-title { display: flex; align-items: center; gap: 6px; font-weight: 600; color: var(--text-accent); }\n.vam-sample-detail .callout-icon { display: inline-flex; flex: none; }\n.vam-sample-detail .callout-icon svg { width: 16px; height: 16px; }\n.vam-sample-detail .callout-content p:first-child { margin-top: 4px; }\n.vam-sample-detail .vam-image-source { display: block; margin: 2px 0 8px; color: var(--text-faint); font-size: var(--font-ui-smaller); overflow-wrap: anywhere; }\n.vam-sample-detail .vam-image-omitted { color: var(--text-faint); font-size: var(--font-ui-smaller); }\n.vam-sample-detail .internal-link { color: inherit; text-decoration: none; }\n/* Repeating the class raises specificity above the extracted per-card cursor rules (up to 0,3,0), so no !important is needed. */\n.vam-resizing.vam-resizing.vam-resizing.vam-resizing, .vam-resizing.vam-resizing.vam-resizing.vam-resizing * { cursor: col-resize; user-select: none; }\n@media (max-width: 700px) { .vam-canvas-overlay > .vam-canvas-hint { display: none; } }\n@media (max-width: 600px) { .vam-workspace.has-inspector > .vam-canvas-overlay { right: 0; } .vam-inspector { width: 100%; box-shadow: none; } }\n@media (max-width: 600px) { .vam-inspector-heading { position: sticky; top: 0; z-index: 3; background: var(--background-primary); padding: 8px 0; margin-bottom: 6px; } }\n@media (max-width: 600px) { .vam-inspector-resizer { display: none; } .vam-toolbar .vam-map-switcher { max-width: 100%; } .vam-made-with { display: none; } }\n/* Four :root pseudo-classes (0,4,0) outrank every extracted transition rule without !important. */\n@media (prefers-reduced-motion: reduce) { :root:root:root:root * { transition: none; } }\n';
 
 // experiences/sharing/share-html.ts
 var CONTENT_SECURITY_POLICY = "default-src 'none'; img-src data: https:; style-src 'unsafe-inline'; script-src 'unsafe-inline'; base-uri 'none'; form-action 'none'";

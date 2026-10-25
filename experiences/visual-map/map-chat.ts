@@ -46,7 +46,7 @@ export interface MapChatPlanCard {
   /** The one-sentence description; built from `reasons` when absent. */
   summary?: string;
   /** The same actions by kind of work, each folded on the card; `items` is shown flat when absent. */
-  groups?: { label: string; items: string[] }[];
+  groups?: { label: string; items: string[]; danger?: { mark: string } }[];
   state: "pending" | "applied" | "cancelled";
   apply(): void;
   cancel(): void;
@@ -98,7 +98,7 @@ export interface MapChatHost {
   /** The user picked an answer length; the view remembers it. */
   setStyle(style: MapChatStyleChoice): void;
   /** Models the chat can use; `value` "" follows the default model and its label names that model. */
-  modelChoices(): { value: string; label: string }[];
+  modelChoices(): { value: string; label: string; short?: string }[];
   /** Remembered chat model ("" follows the default). */
   model(): string;
   /** The user picked a chat model; the view remembers it. */
@@ -111,12 +111,16 @@ export interface MapChatHost {
   layoutChanged(open: boolean): void;
   /** Width in pixels of the side window (the view remembers it). */
   width?(): number;
+  /** The widths the pane gives the window for a set width (docked, and laid over a narrow pane); null when the pane is unknown. */
+  widths?(setWidth: number): { docked: number; overlay: number } | null;
   /** The user is resizing the side window; `commit` is false while the handle is still being dragged. */
   setWidth?(width: number, commit: boolean): void;
   /** What the map looks like now, to pick the suggested messages. */
   suggestions?(): Pick<ChatSuggestionContext, "selected" | "hasTopics">;
   /** "Retry" on a failed turn: send the same question again. */
   retry?(origin: MapChatOrigin): void;
+  /** The conversation's state changed (a turn started or ended, a plan appeared or was settled); the canvas may say so. */
+  stateChanged?(): void;
 }
 
 const LABEL_LIMIT = 40;
@@ -171,13 +175,22 @@ export class MapChatPanel {
   private unread = false;
   private width = MAP_CHAT_WIDTH_DEFAULT;
   private busy = false;
+  /** A confirmed plan is being applied: the window shows it is working and can stop it. */
+  private applying = false;
   private composing = false;
+  /** The widths the pane leaves for the docked window and for the one laid over a narrow pane (the set width when unknown). */
+  private dockedPx: number | null = null;
+  private overlayPx: number | null = null;
+  /** Where the log was scrolled when the panel was taken out for a repaint. */
+  private keptScroll: { atEnd: boolean; top: number } | null = null;
   private el!: HTMLElement;
   private toggleEl!: HTMLButtonElement;
   private badgeEl!: HTMLElement;
   private bodyEl!: HTMLElement;
   private headEl!: HTMLElement;
   private heroTitleEl!: HTMLElement;
+  private guideEl!: HTMLElement;
+  private hintEl!: HTMLElement;
   private logEl!: HTMLElement;
   private suggestEl!: HTMLElement;
   private suggestKey = "";
@@ -235,8 +248,21 @@ export class MapChatPanel {
   private get shown(): boolean {
     return this.hero || this.docked || this.floating;
   }
+  /** A turn is running (a request or its actions). */
   get isBusy(): boolean {
     return this.busy;
+  }
+  /** The window is laid over the canvas of a narrow pane. */
+  get isOverlay(): boolean {
+    return this.floating;
+  }
+  /** Width of the window laid over the canvas, 0 when it is not. */
+  get overlayWidth(): number {
+    return this.floating ? this.shownWidth() : 0;
+  }
+  /** A turn or a plan being applied is running: no new message can be sent, and Stop is offered. */
+  private get working(): boolean {
+    return this.busy || this.applying;
   }
   get isComposing(): boolean {
     return this.composing;
@@ -293,6 +319,15 @@ export class MapChatPanel {
     this.applyOpen();
     this.refreshNote();
     this.refreshControls();
+    this.restoreScroll();
+  }
+  /** After a repaint the log is scrolled where it was: at the end it stays at the end (a new element starts at the top). */
+  private restoreScroll(): void {
+    const kept = this.keptScroll;
+    this.keptScroll = null;
+    if (!kept || !this.built) return;
+    if (kept.atEnd) this.scrollToEnd();
+    else this.logEl.scrollTop = kept.top;
   }
   /** Moves the panel to `parent`, before `before` (the end when null). */
   private place(parent: HTMLElement, before: ChildNode | null): void {
@@ -311,7 +346,9 @@ export class MapChatPanel {
   }
   /** Takes the panel out of the page; the next {@link mount} puts it back with all state intact. */
   detach(): void {
-    if (this.built) this.el.remove();
+    if (!this.built) return;
+    this.keptScroll = { atEnd: this.atEnd(), top: this.logEl.scrollTop };
+    this.el.remove();
   }
   /**
    * Call before a repaint: when the message field has focus, the returned function (call it after the repaint) gives it
@@ -348,7 +385,12 @@ export class MapChatPanel {
     this.applyOpen();
   }
   /** The pane became too narrow to dock the window (or wide enough again). The window folds to its edge, or docks back. */
-  setNarrow(narrow: boolean): void {
+  setNarrow(narrow: boolean, widths?: { docked: number; overlay: number }): void {
+    if (widths && (widths.docked !== this.dockedPx || widths.overlay !== this.overlayPx)) {
+      this.dockedPx = widths.docked;
+      this.overlayPx = widths.overlay;
+      this.applyWidth();
+    }
     if (narrow === this.narrow) return;
     const hadFocus = this.hasFocus();
     this.narrow = narrow;
@@ -434,11 +476,25 @@ export class MapChatPanel {
 
   /** A turn starts: the user's text, an empty answer, and the busy state. */
   begin(userText: string, origin?: MapChatOrigin, keepDraft = false): void {
+    // A list of maps to pick from belongs to the message before; a new message ends its choices.
+    this.retireChoices();
     this.messages.push({ role: "user", text: userText, lines: [], ...(origin ? { origin } : {}) });
     this.messages.push({ role: "assistant", text: "", lines: [], streaming: true });
     this.busy = true;
     if (this.built && !keepDraft) this.inputEl.value = "";
     this.renderLog(true);
+    this.renderBusy();
+  }
+  /** Every list of choices already shown stops working (a pick was made, or a newer message came). */
+  private retireChoices(except?: MapChatChoices): void {
+    for (const message of this.messages)
+      if (message.choices && message.choices !== except) message.choices.picked = true;
+  }
+  /** A confirmed plan is being applied (true) or is done (false). */
+  setApplying(on: boolean): void {
+    if (this.applying === on) return;
+    this.applying = on;
+    this.renderLog();
     this.renderBusy();
   }
   /** The answer so far (the whole text, not a delta). */
@@ -491,7 +547,7 @@ export class MapChatPanel {
     this.markUnread();
   }
   /** The turn ended without an answer. */
-  fail(text: string): void {
+  fail(text: string, announce?: string): void {
     const last = this.messages.at(-1);
     if (last?.streaming) {
       last.text = text;
@@ -501,7 +557,8 @@ export class MapChatPanel {
     this.busy = false;
     this.renderLog();
     this.renderBusy();
-    this.announce(t("ui.map_chat_live_failed_0", clip(text, 160)));
+    // `announce` is the whole sentence when `text` already says that the chat failed; it is never prefixed twice.
+    this.announce(announce !== undefined ? clip(announce, 160) : t("ui.map_chat_live_failed_0", clip(text, 160)));
     this.markUnread();
   }
   /** The user stopped the turn: whatever text arrived stays, marked as stopped. */
@@ -526,6 +583,15 @@ export class MapChatPanel {
     if (!last || last.role !== "assistant") return;
     last.plan = plan;
     this.renderLog();
+    this.renderHint();
+    // A plan waits for an answer and nothing else tells a screen reader so: say the reply and the plan once.
+    this.announce(
+      `${t("ui.map_chat_live_done_0", clip(last.text, 160))} ${t(
+        "ui.map_chat_live_plan_0",
+        clip(plan.summary ?? t("ui.map_chat_plan_summary_0", plan.reasons.join(t("ui.map_chat_count_separator"))), 160)
+      )}`
+    );
+    this.host.stateChanged?.();
   }
   /** The plan card still waiting for an answer, if any. */
   pendingPlan(): MapChatPlanCard | null {
@@ -538,6 +604,8 @@ export class MapChatPanel {
     plan.state = state;
     if (lines) message.lines = lines;
     this.renderLog();
+    this.renderHint();
+    this.host.stateChanged?.();
     // The results of an applied plan arrive well after the reply: say them once, like the results of a reply.
     if (lines?.length)
       this.announce(
@@ -548,6 +616,7 @@ export class MapChatPanel {
   showChoices(choices: MapChatChoices): void {
     const last = this.messages.at(-1);
     if (!last || last.role !== "assistant") return;
+    this.retireChoices();
     last.choices = choices;
     this.renderLog();
   }
@@ -567,12 +636,15 @@ export class MapChatPanel {
     this.dismissedNote = null;
     this.noteChip = null;
     this.busy = false;
+    this.applying = false;
     this.unread = false;
     if (this.built) this.inputEl.value = "";
     this.renderLog();
     this.renderChips();
     this.renderBusy();
+    this.renderHint();
     this.applyOpen();
+    this.host.stateChanged?.();
   }
   focusInput(): void {
     if (this.built) this.inputEl.focus();
@@ -602,7 +674,10 @@ export class MapChatPanel {
       cls: "vam-map-chat-model dropdown",
       attr: { "aria-label": t("ui.map_chat_model_label") }
     });
-    this.modelEl.addEventListener("change", () => this.host.setModel(this.modelEl.value));
+    this.modelEl.addEventListener("change", () => {
+      this.host.setModel(this.modelEl.value);
+      this.refreshControls();
+    });
     const close = this.headEl.createEl("button", {
       cls: "vam-map-chat-close clickable-icon",
       attr: { "aria-label": t("ui.map_chat_close") }
@@ -614,6 +689,8 @@ export class MapChatPanel {
       text: t("ui.map_chat_hero_title"),
       attr: { role: "heading", "aria-level": "2" }
     });
+    // A map that has content opens the window onto an empty log: one line says what it is for.
+    this.guideEl = this.bodyEl.createDiv({ cls: "vam-map-chat-guide", text: t("ui.map_chat_empty_log") });
     // The log is not a live region: a streaming reply would be read out word by word. `liveEl` says it once, when it ends.
     this.logEl = this.bodyEl.createDiv({
       cls: "vam-map-chat-log",
@@ -640,6 +717,8 @@ export class MapChatPanel {
       cls: "vam-map-chat-chips",
       attr: { role: "group", "aria-label": t("ui.map_chat_references") }
     });
+    this.hintEl = this.bodyEl.createDiv({ cls: "vam-map-chat-plan-hint" });
+    this.hintEl.hidden = true;
     this.statusEl = this.bodyEl.createDiv({ cls: "vam-map-chat-status", attr: { role: "status" } });
     const form = this.bodyEl.createDiv("vam-map-chat-form");
     this.inputEl = form.createEl("textarea", {
@@ -738,20 +817,30 @@ export class MapChatPanel {
 
   private resizeTo(width: number, commit: boolean): void {
     this.width = clampMapChatWidth(width);
+    const widths = this.host.widths?.(this.width);
+    if (widths) {
+      this.dockedPx = widths.docked;
+      this.overlayPx = widths.overlay;
+    }
     this.applyWidth();
     this.host.setWidth?.(this.width, commit);
   }
+  /** The width the window has on the page now: the set width, given way to when the pane has no room for it. */
+  private shownWidth(): number {
+    if (this.floating) return this.overlayPx ?? this.width;
+    return this.dockedPx ?? this.width;
+  }
   private applyWidth(): void {
     if (!this.built) return;
-    this.el.style.width = this.docked || this.floating ? `${this.width}px` : "";
-    this.resizerEl.setAttr("aria-valuenow", String(this.width));
+    this.el.style.width = this.docked || this.floating ? `${this.shownWidth()}px` : "";
+    this.resizerEl.setAttr("aria-valuenow", String(this.shownWidth()));
   }
   private onResizerKey(event: KeyboardEvent): void {
     const to =
       event.key === "ArrowLeft"
-        ? this.width - MAP_CHAT_WIDTH_STEP
+        ? this.shownWidth() - MAP_CHAT_WIDTH_STEP
         : event.key === "ArrowRight"
-          ? this.width + MAP_CHAT_WIDTH_STEP
+          ? this.shownWidth() + MAP_CHAT_WIDTH_STEP
           : event.key === "Home"
             ? MAP_CHAT_WIDTH_MIN
             : event.key === "End"
@@ -773,7 +862,7 @@ export class MapChatPanel {
     if (!doc?.addEventListener) return;
     event.preventDefault();
     const startX = event.clientX;
-    const startWidth = this.width;
+    const startWidth = this.shownWidth();
     const handle = this.resizerEl;
     const move = (next: PointerEvent): void => {
       if (next.buttons === 0) end();
@@ -816,6 +905,16 @@ export class MapChatPanel {
     if (counts.skipped) parts.push(t("ui.map_chat_count_skipped_0", counts.skipped));
     if (counts.failed) parts.push(t("ui.map_chat_count_failed_0", counts.failed));
     return parts.join(t("ui.map_chat_count_separator"));
+  }
+  /** The counts as one sentence; a failed count is set apart in the error colour, and its word says it as well. */
+  private buildCounts(parent: HTMLElement, counts: ChatLineCounts): void {
+    if (!counts.failed) {
+      parent.setText(this.countsText(counts));
+      return;
+    }
+    const rest = this.countsText({ ...counts, failed: 0 });
+    if (rest) parent.createSpan({ text: `${rest}${t("ui.map_chat_count_separator")}` });
+    parent.createSpan({ cls: "vam-map-chat-count-failed", text: t("ui.map_chat_count_failed_0", counts.failed) });
   }
   private spokenTurn(reply: string, lines: MapChatLine[]): string {
     const said = t("ui.map_chat_live_done_0", clip(reply, 160));
@@ -905,6 +1004,7 @@ export class MapChatPanel {
       floating: this.floating,
       shown: this.shown
     };
+    const hadUnread = this.unread;
     if (shown) this.unread = false;
     this.el.toggleClass("is-open", shown && !hero);
     this.el.toggleClass("is-hero", hero);
@@ -927,8 +1027,22 @@ export class MapChatPanel {
     this.headEl.toggleClass("is-hero", hero);
     this.heroTitleEl.hidden = !hero;
     this.heroTitleEl.toggleClass("is-hidden", !hero);
+    // The opening screen asks for a topic; the side window talks about the map in front of it.
+    this.inputEl.setAttr("placeholder", t(hero ? "ui.map_chat_hero_placeholder" : "ui.map_chat_input_placeholder"));
     this.applyWidth();
     this.renderSuggestions();
+    this.renderGuide();
+    // Someone opens the window because a reply came in while it was folded: they land on the newest message.
+    if (shown && hadUnread) this.scrollToEnd();
+  }
+  /** An empty conversation in the side window shows one line of guidance in place of the log. */
+  private renderGuide(): void {
+    if (!this.built) return;
+    const empty = this.messages.length === 0 && !this.hero;
+    this.guideEl.hidden = !empty;
+    this.guideEl.toggleClass("is-hidden", !empty);
+    this.logEl.hidden = empty;
+    this.logEl.toggleClass("is-hidden", empty);
   }
 
   /** Puts the answer-length buttons and the model list back in step with what the view remembers. */
@@ -941,8 +1055,15 @@ export class MapChatPanel {
     }
     const choices = this.host.modelChoices();
     this.modelEl.empty();
-    for (const choice of choices) this.modelEl.createEl("option", { text: choice.label, value: choice.value });
+    // A long label (the follow-default entry names the model) is shortened in the list; the full one is its tooltip.
+    for (const choice of choices)
+      this.modelEl.createEl("option", {
+        text: choice.short ?? choice.label,
+        value: choice.value,
+        attr: { title: choice.label }
+      });
     this.modelEl.value = this.host.model();
+    this.modelEl.setAttr("title", choices.find(choice => choice.value === this.modelEl.value)?.label ?? "");
   }
 
   private chipLabel(chip: MapChatChip): string {
@@ -1008,13 +1129,17 @@ export class MapChatPanel {
       t("ui.map_chat_retry"),
       t("ui.map_chat_lines_hide"),
       t("ui.map_chat_plan_summary_0", ""),
+      t("ui.map_chat_plan_title"),
+      t("ui.map_chat_plan_title_applied"),
+      t("ui.map_chat_plan_title_cancelled"),
+      this.working ? "w" : "",
       t("ui.map_chat_role_you"),
       t("ui.map_chat_role_ai"),
       t("ui.map_chat_overflow_note"),
       more ? t("ui.map_chat_more_detail") : "",
       message.lines.map(line => `${line.status}:${line.text}`).join("\n"),
       message.plan
-        ? `plan:${message.plan.state}:${message.plan.items.length}:${message.plan.estimate}:${message.plan.groups?.map(group => group.label).join("|") ?? ""}`
+        ? `plan:${message.plan.state}:${message.plan.items.length}:${message.plan.estimate}:${message.plan.groups?.map(group => `${group.label}${group.danger ? "!" : ""}`).join("|") ?? ""}`
         : "",
       message.choices ? `choices:${message.choices.picked}:${message.choices.options.map(o => o.label).join("|")}` : "",
       message.text
@@ -1027,7 +1152,13 @@ export class MapChatPanel {
   }
   private hasMore(message: MapChatMessage, asked: MapChatMessage | undefined): boolean {
     return (
-      message.role === "assistant" && !message.streaming && !message.error && !!message.text.trim() && !!asked?.origin
+      message.role === "assistant" &&
+      !message.streaming &&
+      !message.error &&
+      !!message.text.trim() &&
+      !!asked?.origin &&
+      // Saying it again would replace the plan that waits for its answer.
+      message.plan?.state !== "pending"
     );
   }
 
@@ -1053,10 +1184,11 @@ export class MapChatPanel {
       }
       const at = this.logEl.children[index];
       if (at !== entry.row) this.logEl.insertBefore(entry.row, at ?? null);
-      if (entry.more) entry.more.disabled = this.busy;
+      if (entry.more) entry.more.disabled = this.working;
       this.messageEls.push(entry.row);
       this.bodyEls.push(entry.body);
     });
+    this.renderGuide();
     if (stick) this.scrollToEnd();
   }
 
@@ -1076,6 +1208,10 @@ export class MapChatPanel {
     const body = row.createDiv({ cls: `vam-map-chat-text${markdown ? " is-markdown" : ""}` });
     if (markdown) renderChatMarkdown(body, message.text, t("ui.map_chat_overflow_note"));
     else body.setText(message.text);
+    if (message.plan) this.buildPlan(row, message.plan);
+    if (message.choices) this.buildChoices(row, message.choices);
+    if (message.lines.length) this.buildLines(row, message);
+    // What the AI actually did comes straight after what it said; the buttons that act on the answer come last.
     const asked = this.messages[this.messages.indexOf(message) - 1];
     let more: HTMLButtonElement | null = null;
     if (this.hasMore(message, asked) && asked?.origin) {
@@ -1085,9 +1221,9 @@ export class MapChatPanel {
         text: t("ui.map_chat_more_detail"),
         attr: { type: "button" }
       });
-      more.disabled = this.busy;
+      more.disabled = this.working;
       more.addEventListener("click", () => {
-        if (!this.busy) this.host.moreDetail(origin);
+        if (!this.working) this.host.moreDetail(origin);
       });
     }
     if (this.canRetry(message, asked) && asked?.origin) {
@@ -1097,14 +1233,11 @@ export class MapChatPanel {
         text: t("ui.map_chat_retry"),
         attr: { type: "button" }
       });
-      more.disabled = this.busy;
+      more.disabled = this.working;
       more.addEventListener("click", () => {
-        if (!this.busy) this.host.retry?.(origin);
+        if (!this.working) this.host.retry?.(origin);
       });
     }
-    if (message.plan) this.buildPlan(row, message.plan);
-    if (message.choices) this.buildChoices(row, message.choices);
-    if (message.lines.length) this.buildLines(row, message);
     return { row, body, more };
   }
 
@@ -1120,7 +1253,7 @@ export class MapChatPanel {
     const fold = results.length > MAP_CHAT_LINES_FOLD_ABOVE;
     const shown = !fold || message.linesOpen === true;
     if (fold) {
-      list.createDiv({ cls: "vam-map-chat-lines-summary", text: this.countsText(countChatLines(results)) });
+      this.buildCounts(list.createDiv("vam-map-chat-lines-summary"), countChatLines(results));
       const toggle = list.createEl("button", {
         cls: "vam-map-chat-lines-toggle",
         text: shown ? t("ui.map_chat_lines_hide") : t("ui.map_chat_lines_show_0", results.length),
@@ -1144,19 +1277,32 @@ export class MapChatPanel {
    */
   private buildPlan(row: HTMLElement, plan: MapChatPlanCard): void {
     const card = row.createDiv({ cls: `vam-map-chat-plan is-${plan.state}` });
+    // The title follows what became of the plan, so a card read again later does not look as if it still waits.
+    const title = t(
+      plan.state === "applied"
+        ? "ui.map_chat_plan_title_applied"
+        : plan.state === "cancelled"
+          ? "ui.map_chat_plan_title_cancelled"
+          : "ui.map_chat_plan_title"
+    );
     card.setAttr("role", "group");
-    card.setAttr("aria-label", t("ui.map_chat_plan_title"));
-    card.createDiv({ cls: "vam-map-chat-plan-title", text: t("ui.map_chat_plan_title") });
+    card.setAttr("aria-label", title);
+    card.createDiv({ cls: "vam-map-chat-plan-title", text: title });
     card.createDiv({
       cls: "vam-map-chat-plan-sentence",
       text: plan.summary ?? t("ui.map_chat_plan_summary_0", plan.reasons.join(t("ui.map_chat_count_separator")))
     });
     const groups = plan.groups ?? (plan.items.length ? [{ label: "", items: plan.items }] : []);
     for (const group of groups) {
+      const danger = "danger" in group ? group.danger : undefined;
       const list = group.label
-        ? card.createEl("details", { cls: "vam-map-chat-plan-group" })
+        ? card.createEl("details", { cls: `vam-map-chat-plan-group${danger ? " is-danger" : ""}` })
         : card.createDiv("vam-map-chat-plan-group");
-      if (group.label) list.createEl("summary", { cls: "vam-map-chat-plan-group-title", text: group.label });
+      if (group.label) {
+        const summary = list.createEl("summary", { cls: "vam-map-chat-plan-group-title", text: group.label });
+        // Text as well as colour: a group that removes cards says so in words.
+        if (danger) summary.createSpan({ cls: "vam-map-chat-plan-mark", text: danger.mark });
+      }
       const items = list.createEl("ol", { cls: "vam-map-chat-plan-items" });
       for (const item of group.items) items.createEl("li", { text: item });
     }
@@ -1180,6 +1326,8 @@ export class MapChatPanel {
       text: t("ui.map_chat_plan_cancel"),
       attr: { type: "button" }
     });
+    // Said before the button is pressed, not after: applying clears the undo history.
+    buttons.createSpan({ cls: "vam-map-chat-plan-warning", text: t("ui.map_chat_plan_irreversible") });
     // A second press does nothing: the buttons stop working as soon as one is used. They disappear with the repaint, so the
     // keyboard goes back to the message field instead of falling to the page.
     apply.addEventListener("click", () => {
@@ -1213,6 +1361,8 @@ export class MapChatPanel {
         if (choices.picked) return;
         choices.picked = true;
         for (const other of buttons) other.disabled = true;
+        // One pick ends every list of maps shown so far.
+        this.retireChoices(choices);
         option.pick();
         this.focusInput();
       });
@@ -1221,12 +1371,22 @@ export class MapChatPanel {
 
   private renderBusy(): void {
     if (!this.built) return;
-    this.statusEl.setText(this.busy ? t("ui.map_chat_replying") : "");
-    this.el.toggleClass("is-busy", this.busy);
-    this.sendEl.hidden = this.busy;
-    this.sendEl.toggleClass("is-hidden", this.busy);
-    this.stopEl.hidden = !this.busy;
-    this.stopEl.toggleClass("is-hidden", !this.busy);
+    this.statusEl.setText(this.busy ? t("ui.map_chat_replying") : this.applying ? t("ui.map_chat_applying") : "");
+    this.el.toggleClass("is-busy", this.working);
+    this.sendEl.hidden = this.working;
+    this.sendEl.toggleClass("is-hidden", this.working);
+    this.stopEl.hidden = !this.working;
+    this.stopEl.toggleClass("is-hidden", !this.working);
+    this.renderHint();
+    this.host.stateChanged?.();
+  }
+  /** While a plan waits for its answer a line above the message field says what sending a new message does to it. */
+  private renderHint(): void {
+    if (!this.built) return;
+    const waiting = !this.working && this.pendingPlan() !== null;
+    this.hintEl.setText(waiting ? t("ui.map_chat_plan_replace_hint") : "");
+    this.hintEl.hidden = !waiting;
+    this.hintEl.toggleClass("is-hidden", !waiting);
   }
 
   /** True when the log is scrolled to its end (or cannot be measured), so a longer reply should keep the end in view. */

@@ -11,8 +11,12 @@ export const MAP_CHAT_WIDTH_MIN = 280;
 export const MAP_CHAT_WIDTH_MAX = 560;
 /** One arrow-key press on the width handle. */
 export const MAP_CHAT_WIDTH_STEP = 16;
-/** The map pane must keep at least this much width beside the side window, or the window folds to a narrow edge. */
-export const MAP_CHAT_MIN_CANVAS = 700;
+/** The canvas keeps at least this much width beside the docked window. */
+export const MAP_CHAT_MIN_CANVAS = 360;
+/** A folded window docks again only when the pane is this much wider than the fold limit, so a pane on the limit does not flicker. */
+export const MAP_CHAT_NARROW_HYSTERESIS = 24;
+/** The laid-over window leaves at least this much of the pane visible beside it. */
+export const MAP_CHAT_OVERLAY_MARGIN = 160;
 /** More result lines than this fold into a count. */
 export const MAP_CHAT_LINES_FOLD_ABOVE = 5;
 
@@ -23,11 +27,24 @@ export function clampMapChatWidth(value: unknown): number {
 }
 
 /**
- * Whether the side window folds to a narrow edge. It judges the pane against the width the window is set to, never the width
- * the canvas has right now: folding widens the canvas, and judging by that would unfold the window again at once.
+ * Whether the side window folds to a narrow edge: only when even the narrowest window (280px) would leave the canvas less than
+ * 360px. The set width does not matter (a docked window gives way down to 280), and neither does the width the canvas has right
+ * now (folding widens it, and judging by that would unfold the window again at once). `inspector` is the width of the sample's
+ * inspector beside the canvas. A window that is folded stays folded until the pane is a little wider than the limit.
  */
-export function isChatNarrow(paneWidth: number, sidebarWidth: number): boolean {
-  return paneWidth - sidebarWidth < MAP_CHAT_MIN_CANVAS;
+export function isChatNarrow(paneWidth: number, inspector = 0, wasNarrow = false): boolean {
+  const limit = MAP_CHAT_WIDTH_MIN + MAP_CHAT_MIN_CANVAS + (wasNarrow ? MAP_CHAT_NARROW_HYSTERESIS : 0);
+  return paneWidth - inspector < limit;
+}
+
+/** The width of the docked window: the set width, but never so wide that the canvas gets under 360px (280px at the least). */
+export function chatDockedWidth(paneWidth: number, setWidth: number, inspector = 0): number {
+  return Math.max(MAP_CHAT_WIDTH_MIN, Math.min(setWidth, paneWidth - inspector - MAP_CHAT_MIN_CANVAS));
+}
+
+/** The width of the window laid over a narrow pane: the set width, leaving 160px of the pane visible (280px at the least). */
+export function chatOverlayWidth(paneWidth: number, setWidth: number): number {
+  return Math.max(MAP_CHAT_WIDTH_MIN, Math.min(setWidth, paneWidth - MAP_CHAT_OVERLAY_MARGIN));
 }
 
 export interface ChatSuggestionContext {

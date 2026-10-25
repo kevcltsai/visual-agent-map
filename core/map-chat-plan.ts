@@ -35,6 +35,23 @@ function targetCount(nodeIds: string[], selection: number): number {
   return nodeIds.length ? nodeIds.length : selection;
 }
 
+/**
+ * Cards a reply starts research on, counted the way a plan is judged: the targets of each research action, or the selection at
+ * that point of the reply (an earlier `select_topics` or run action changes it).
+ */
+export function researchTargetsOf(actions: readonly MapChatAction[], selectedCount: number): number {
+  let research = 0;
+  let selection = selectedCount;
+  for (const action of actions) {
+    if (action.kind === "select_topics") selection = action.nodeIds.length;
+    else if (action.kind === "run_map_action") {
+      if (action.nodeIds.length) selection = action.nodeIds.length;
+      if (action.action === "research_standard") research += targetCount(action.nodeIds, selection);
+    }
+  }
+  return research;
+}
+
 /** The plan a reply needs, or null when it can be applied at once. */
 export function planFor(actions: readonly MapChatAction[], context: PlanContext): MapChatPlan | null {
   const reasons: MapChatPlanReason[] = [];

@@ -34,7 +34,14 @@ export const MAP_CHAT_ACTION_KINDS = [
   "focus_topic"
 ] as const;
 export type MapChatActionKind = (typeof MAP_CHAT_ACTION_KINDS)[number];
-export const MAP_RUN_ACTIONS = ["research_standard", "expand", "synthesize", "rate_by_goal", "merge"] as const;
+export const MAP_RUN_ACTIONS = [
+  "research_standard",
+  "expand",
+  "synthesize",
+  "rate_by_goal",
+  "merge",
+  "find_images"
+] as const;
 export type MapRunAction = (typeof MAP_RUN_ACTIONS)[number];
 /** Research modes a reply may name; "" (not named) is read as the map's remembered mode by the view. */
 export const MAP_CHAT_RESEARCH_MODES = ["quick", "standard"] as const;
@@ -68,7 +75,7 @@ export type MapChatAction =
       title: string;
       /** rate_by_goal: the learner goal. */
       goal: string;
-      /** expand: optional direction. research_standard: extra requirements for the research. */
+      /** expand: optional direction. research_standard: extra requirements for the research. find_images: the search words ("" = the target card's title, decided by the view). */
       direction: string;
       /** research_standard: the mode the user asked for; "" = not named (the view uses the map's remembered mode). Ignored by every other action. */
       mode: MapChatResearchMode | "";
@@ -355,6 +362,8 @@ export function parseMapChat(
             goal = text("goal", false);
           if (action === "merge" && !title) throw new Dropped("missing_field");
           if (action === "rate_by_goal" && !goal) throw new Dropped("missing_field");
+          // find_images puts pictures on exactly one card: an existing card or a `new:<ref>`; empty means the single selected card (the view checks).
+          if (action === "find_images" && nodeIds.length > 1) throw new Dropped("bad_value");
           // mode and images only mean something to a research; every other action ignores them. A reply of version 4 or earlier
           // has `depth` instead of `mode`: a named depth reads as Standard, an empty one as not named.
           const research = action === "research_standard";
@@ -414,7 +423,7 @@ export function parseMapChat(
 /** One conversation turn: the user's message plus the context the panel gathered. The reply is JSON; actions are applied by the view. */
 export const mapChatStep: StepDefinition<MapChatRequest, MapChatResult> = {
   id: "map-chat",
-  version: 5,
+  version: 6,
   render: request => {
     const language = request.contentLanguage ?? request.language;
     const zh = instructionLanguageOf(language) === "zh";

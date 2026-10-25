@@ -134,10 +134,22 @@ import {
   MapChatPanel,
   type MapChatChip,
   type MapChatHost,
+  type MapChatImageItem,
+  type MapChatImages,
+  type MapChatInsertResult,
   type MapChatLine,
   type MapChatOrigin,
-  type MapChatPlanCard
+  type MapChatPlanCard,
+  type MapChatSavedTurn
 } from "./map-chat";
+import { imageMarkdown, type ImageCandidate } from "../../core/image-candidates";
+import {
+  chatNoteName,
+  transcriptMarkdown,
+  type TranscriptRef,
+  type TranscriptTurn
+} from "../../core/map-chat-transcript";
+import { loadableImages } from "../../ui/image-candidates";
 import {
   buildMapChatContext,
   contentHash,
@@ -153,6 +165,7 @@ import { MAP_CHAT_NEW_PREFIX, type MapChatAction } from "../../core/steps/map-ch
 import {
   MAP_CHAT_AUTO_LAYOUT_MIN_NEW,
   chatResearchMode,
+  MAP_CHAT_FIND_IMAGES_LIMIT,
   chatResearchRequest,
   mapChoiceParts,
   matchMapTitle,
@@ -573,6 +586,9 @@ export class VisualAgentMapView extends ItemView {
   private chatCarryOver = false;
   /** True while a confirmed plan is being applied; no new message is sent meanwhile. */
   private chatApplying = false;
+  /** Picture searches the chat started and that have not ended; the view owns them, so closing it or leaving the map stops them. */
+  private chatImageSearches = new Map<number, AbortController>();
+  private chatImageSequence = 0;
   /** While a reply's actions are applied, repaints and the views' re-reads wait and happen once at the end (see holdChatBatch). */
   private renderHold = 0;
   private renderPending = false;
@@ -10463,7 +10479,11 @@ export class VisualAgentMapView extends ItemView {
       suggestions: () => ({
         selected: this.chatSelectionIds().length,
         hasTopics: (this.map?.nodes.length ?? 0) > 0
-      })
+      }),
+      insertImage: (images, item) => this.chatInsertImage(images, item),
+      canSave: () =>
+        this.builtIn || !this.map ? { ok: false, reason: t("ui.map_chat_save_unavailable") } : { ok: true },
+      saveTranscript: turns => this.saveChatTranscript(turns)
     };
   }
   /** The chat's model list: the follow-default entry first, then the settings page's list (and a saved model that has gone). */
@@ -10935,6 +10955,13 @@ export class VisualAgentMapView extends ItemView {
     const controller = this.chatController;
     this.releaseChatTask();
     controller?.abort();
+    this.abortChatImageSearches();
+  }
+  /** Every picture search the chat started stops; a result that still arrives is neither shown nor written. */
+  private abortChatImageSearches(): void {
+    const searches = [...this.chatImageSearches.values()];
+    this.chatImageSearches.clear();
+    for (const controller of searches) controller.abort();
   }
   /** Titles the reply gave to the cards it creates, by `new:<ref>` id, so a later action can name them before they exist. */
   private chatRefTitles(actions: readonly MapChatAction[]): Map<string, string> {
@@ -10995,6 +11022,10 @@ export class VisualAgentMapView extends ItemView {
             return t("ui.map_chat_do_rate_0", action.goal);
           case "merge":
             return t("ui.map_chat_do_merge_0", action.title);
+          case "find_images": {
+            const ids = action.nodeIds.length ? action.nodeIds : this.chatSelectionIds();
+            return t("ui.map_chat_do_find_images_0", ids.length === 1 ? title(ids[0]) : action.direction || "…");
+          }
         }
     }
   }
@@ -11089,6 +11120,8 @@ export class VisualAgentMapView extends ItemView {
     const lines: MapChatLine[] = [];
     const later: number[] = [];
     const run: ChatRun = { refs: new Map(), created: [] };
+    // How many find_images this reply has asked for so far (the first MAP_CHAT_FIND_IMAGES_LIMIT start, the rest are skipped).
+    const laterBatch = { imageSearches: 0 };
     // How many cards existed when the last auto_layout of the reply ran: the ones made after it are only roughly placed.
     let laidOutCount = 0;
     let layoutDone = false;
@@ -11231,7 +11264,7 @@ export class VisualAgentMapView extends ItemView {
               run
             );
             outcome = resolved
-              ? await this.runChatSelection(resolved.action, result.message ?? "")
+              ? await this.runChatSelection(resolved.action, result.message ?? "", laterBatch)
               : skipped("ui.map_chat_skip_parent_missing");
           }
         } catch (error) {
@@ -11581,7 +11614,9 @@ export class VisualAgentMapView extends ItemView {
   private async runChatSelection(
     action: Extract<MapChatAction, { kind: "select_topics" | "run_map_action" }>,
     /** The user's message: the direction of an integration. */
-    message = ""
+    message = "",
+    /** What the later actions of this reply have started so far. */
+    batch: { imageSearches: number } = { imageSearches: 0 }
   ): Promise<ChatOutcome> {
     const map = this.map;
     if (!map) return skipped("ui.map_chat_skip_map_changed");
@@ -11663,7 +11698,257 @@ export class VisualAgentMapView extends ItemView {
         await this.plugin.mutate(() => this.mergeSelected(title, snapshot));
         return { status: "done" };
       }
+      case "find_images":
+        return this.chatFindImages(action.direction, targets, batch);
     }
+  }
+  /**
+   * find_images: the chat only picked the card and the search words. The search itself is the Markdown quick action's: the
+   * `markdown.image-search` step through the card's own model (after its usage notice), then only the candidates whose thumbnail
+   * loads. The outcome is "done" once the search started; its candidates join the reply's row later, and nothing is written to
+   * any note until the user picks one (see {@link chatInsertImage}).
+   */
+  private async chatFindImages(
+    direction: string,
+    targets: string[],
+    batch: { imageSearches: number }
+  ): Promise<ChatOutcome> {
+    batch.imageSearches += 1;
+    if (batch.imageSearches > MAP_CHAT_FIND_IMAGES_LIMIT)
+      return { status: "skipped", reason: t("ui.map_chat_skip_images_limit_0", MAP_CHAT_FIND_IMAGES_LIMIT) };
+    const map = this.map;
+    const chat = this.chat;
+    if (!map || !chat) return skipped("ui.map_chat_skip_map_changed");
+    const ids = targets.length ? targets : this.chatSelectionIds();
+    if (ids.length !== 1) return skipped("ui.map_chat_skip_images_one_card");
+    const node = map.nodes.find(item => item.id === ids[0]);
+    if (!node) return skipped("ui.map_chat_skip_topic_gone");
+    const note = await this.plugin.repo.readNote(node.path, map);
+    const query = direction.trim() || note.title.trim();
+    if (!query) return skipped("ui.map_chat_skip_unavailable");
+    const anchor = { path: this.path, id: map.id };
+    return new Promise<ChatOutcome>(resolve => {
+      let settled = false;
+      const settle = (outcome: ChatOutcome): void => {
+        if (settled) return;
+        settled = true;
+        resolve(outcome);
+      };
+      void this.plugin
+        .confirmAiUsage(note.model, async () => {
+          if (this.closed || this.chat !== chat || this.path !== anchor.path || this.map?.id !== anchor.id) {
+            settle(skipped("ui.map_chat_skip_map_changed"));
+            return;
+          }
+          const controller = new AbortController();
+          const key = ++this.chatImageSequence;
+          this.chatImageSearches.set(key, controller);
+          const block: MapChatImages = {
+            query,
+            nodeId: node.id,
+            nodeTitle: note.title,
+            mapPath: anchor.path,
+            mapId: anchor.id,
+            state: "searching",
+            items: [],
+            stop: () => {
+              if (this.chatImageSearches.get(key) !== controller) return;
+              this.chatImageSearches.delete(key);
+              controller.abort();
+              chat.settleImages(block, { state: "stopped" });
+            }
+          };
+          chat.addImages(block);
+          settle({ status: "done" });
+          try {
+            await this.runImageSearch(block, controller, chat, note.model);
+          } finally {
+            if (this.chatImageSearches.get(key) === controller) this.chatImageSearches.delete(key);
+          }
+        })
+        .then(
+          () => settle(skipped("ui.map_chat_skip_not_started")),
+          error => settle({ status: "failed", reason: errorMessage(error) })
+        );
+    });
+  }
+  /** The thumbnail check of a search (a seam: it loads images, which only a real page can). */
+  private chatProbeImages(found: ImageCandidate[], signal: AbortSignal): Promise<ImageCandidate[]> {
+    return loadableImages(found, signal);
+  }
+  /** Runs one picture search to its end and shows what came of it, unless the view, the panel or the map is not the same any more. */
+  private async runImageSearch(
+    block: MapChatImages,
+    controller: AbortController,
+    chat: MapChatPanel,
+    model: string
+  ): Promise<void> {
+    const sameMap = (): boolean => this.path === block.mapPath && this.map?.id === block.mapId;
+    /** Still the place the search was started for: shown only then. */
+    const current = (): boolean => !this.closed && !controller.signal.aborted && this.chat === chat && sameMap();
+    /** The conversation moved on to another map (or a stop was not the cause): say it, but only when the panel is still here. */
+    const dropped = (): void => {
+      if (this.closed || controller.signal.aborted || this.chat !== chat) return;
+      chat.settleImages(block, { state: "failed", reason: t("ui.map_chat_images_stale_map") });
+    };
+    try {
+      const found = await this.plugin.searchImages(block.query, model, controller.signal);
+      if (!current()) return dropped();
+      // Web results can be stale or block hotlinking: offer only images that actually load.
+      const loadable = (await this.chatProbeImages(found, controller.signal)).slice(0, 6);
+      if (!current()) return dropped();
+      if (!loadable.length) chat.settleImages(block, { state: "empty" });
+      else chat.settleImages(block, { state: "ready", items: loadable.map(candidate => ({ candidate })) });
+    } catch (error) {
+      if (!current()) return dropped();
+      chat.settleImages(block, { state: "failed", reason: errorMessage(error) });
+    }
+  }
+  /**
+   * The user picked a picture candidate: it goes to the end of the card's Detail (a blank line before it), as one undoable edit.
+   * Refused, with the reason in words and nothing written, when the map in view is not the one the candidate came from, the card
+   * is gone, being merged or being worked on by an AI task, or the map cannot be edited. The same checks run again inside the
+   * write, where nothing else can change the map.
+   */
+  private async chatInsertImage(block: MapChatImages, item: MapChatImageItem): Promise<MapChatInsertResult> {
+    const fence = (): { reason: TranslationKey } | { node: MapNode } => {
+      if (this.closed || !this.map || this.path !== block.mapPath || this.map.id !== block.mapId)
+        return { reason: "ui.map_chat_images_stale_map" };
+      if (this.builtIn || this.map.aim) return { reason: "ui.map_chat_images_stale_locked" };
+      const node = this.map.nodes.find(candidate => candidate.id === block.nodeId);
+      if (!node) return { reason: "ui.map_chat_images_stale_gone" };
+      if (this.isMerging(node.id)) return { reason: "ui.map_chat_images_stale_merging" };
+      if (this.plugin.running?.has(node.path) || this.plugin.activeTasks?.has(node.path))
+        return { reason: "ui.map_chat_images_stale_running" };
+      return { node };
+    };
+    const first = fence();
+    if ("reason" in first) return { ok: false, reason: t(first.reason) };
+    const outcome: { result: MapChatInsertResult } = {
+      result: { ok: false, reason: t("ui.map_chat_images_stale_map") }
+    };
+    try {
+      await this.plugin.mutate(async () => {
+        const again = fence();
+        if ("reason" in again) {
+          outcome.result = { ok: false, reason: t(again.reason) };
+          return;
+        }
+        // A failure is carried out as a result, not thrown: mutate() would show its own Notice for a throw, and this is the second.
+        try {
+          const note = await this.plugin.repo.readNote(again.node.path, this.map ?? undefined);
+          const before = note.detail.replace(/\s+$/, "");
+          const addition = imageMarkdown(item.candidate);
+          await this.noteChange(again.node, { detail: before ? `${before}\n\n${addition}` : addition });
+          outcome.result = { ok: true };
+        } catch (error) {
+          outcome.result = { ok: false, reason: t("ui.map_chat_images_insert_failed_0", errorMessage(error)) };
+        }
+      });
+    } catch (error) {
+      return { ok: false, reason: t("ui.map_chat_images_insert_failed_0", errorMessage(error)) };
+    }
+    return outcome.result;
+  }
+  /** What the chat window gets of a saved turn: the vault paths of the cards and notes it named, and the picture candidates. */
+  private chatTranscriptTurn(turn: MapChatSavedTurn): TranscriptTurn {
+    const { question, answer } = turn;
+    const refs: TranscriptRef[] = [];
+    const seen = new Set<string>();
+    const topic = (id: string): void => {
+      if (seen.has(id)) return;
+      seen.add(id);
+      const node = this.map?.nodes.find(item => item.id === id);
+      if (node) refs.push({ kind: "topic", path: node.path, title: this.notes.get(id)?.title ?? node.path });
+    };
+    for (const chip of question.origin?.chips ?? []) {
+      if (chip.kind === "topic") topic(chip.id);
+      else if (chip.kind === "file") refs.push({ kind: "file", path: chip.path, title: "" });
+      else refs.push({ kind: "snippet", path: chip.path, title: "", text: chip.text });
+    }
+    for (const id of question.origin?.selectedIds ?? []) topic(id);
+    return {
+      question: question.text,
+      refs,
+      answer: answer.text,
+      lines: answer.lines.map(line => line.text),
+      ...(answer.plan ? { plan: answer.plan.state } : {}),
+      images: (answer.images ?? []).map(block => ({
+        nodeTitle: block.nodeTitle,
+        query: block.query,
+        state: block.state,
+        ...(block.reason ? { reason: block.reason } : {}),
+        items: block.items.map(entry => ({
+          title: entry.candidate.title,
+          source: entry.candidate.source,
+          ...(entry.inserted ? { inserted: entry.inserted } : {})
+        }))
+      }))
+    };
+  }
+  /**
+   * "Save as a note": writes the finished turns to `<map folder>/Chats/<date> <first sentence>.md`, a new file every time
+   * (the repository's unique name adds " 2", " 3"; `vault.create` never overwrites). The folder is the one of the map in view
+   * when the button is pressed. The note is built by {@link transcriptMarkdown} from a whitelist, never from the raw text.
+   */
+  private async saveChatTranscript(
+    turns: MapChatSavedTurn[]
+  ): Promise<{ ok: true; path: string } | { ok: false; reason: string }> {
+    const map = this.map;
+    if (this.closed || !map || this.builtIn || !turns.length)
+      return { ok: false, reason: t("ui.map_chat_save_unavailable") };
+    const mapPath = this.path;
+    const savedAt = new Date();
+    const first = turns[0].question;
+    const name = chatNoteName(first.origin?.text ?? first.text, savedAt, t("ui.map_chat_save_default_name"));
+    const markdown = transcriptMarkdown({
+      mapTitle: map.title,
+      mapPath,
+      savedAt,
+      labels: {
+        title: t("ui.map_chat_note_title"),
+        map: t("ui.map_chat_note_map"),
+        saved: t("ui.map_chat_note_saved"),
+        you: t("ui.map_chat_role_you"),
+        ai: t("ui.map_chat_role_ai"),
+        references: t("ui.map_chat_note_references"),
+        results: t("ui.map_chat_note_results"),
+        planPending: t("ui.map_chat_note_plan_pending"),
+        planApplied: t("ui.map_chat_note_plan_applied"),
+        planCancelled: t("ui.map_chat_note_plan_cancelled"),
+        images: t("ui.map_chat_note_images_0", "{0}"),
+        imagesSearching: t("ui.map_chat_note_images_searching_0", "{0}"),
+        imagesNone: t("ui.map_chat_note_images_none"),
+        imagesFailed: t("ui.map_chat_note_images_failed_0", "{0}"),
+        imagesStopped: t("ui.map_chat_note_images_stopped"),
+        inserted: t("ui.map_chat_note_inserted_0", "{0}")
+      },
+      turns: turns.map(turn => this.chatTranscriptTurn(turn))
+    });
+    const written: { path: string; error?: unknown } = { path: "" };
+    try {
+      await this.plugin.mutate(async () => {
+        // A failure is carried out as a result, not thrown: mutate() would show its own Notice for a throw, and this is the second.
+        try {
+          const folder = `${this.plugin.repo.topicRoot(mapPath)}/Chats`;
+          await this.plugin.repo.folder(folder);
+          const path = this.plugin.repo.unique(folder, name);
+          await this.app.vault.create(path, markdown);
+          written.path = path;
+        } catch (error) {
+          written.error = error;
+        }
+      });
+    } catch (error) {
+      written.error = error;
+    }
+    if (written.error !== undefined) {
+      const reason = t("ui.map_chat_save_failed_0", errorMessage(written.error));
+      new Notice(reason);
+      return { ok: false, reason };
+    }
+    new Notice(t("ui.map_chat_saved_0", written.path));
+    return { ok: true, path: written.path };
   }
   /**
    * Expand from the chat: the multi-level outline expansion of the Next Step dialog (the same generator and the same writer),

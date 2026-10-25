@@ -6,9 +6,9 @@ const { estimateTokens } = load('ai/context-builder.ts');
 const { MAP_CHAT_TOKEN_BUDGET, mapChatStep, parseMapChat, MAP_CHAT_SCHEMA, MAP_CHAT_ACTION_KINDS, MAP_RUN_ACTIONS, MapChatError } = load('core/steps/map-chat/step.ts');
 const { buildMapChatContext, contentHash, isMdStale, MAP_CHAT_MAP_TITLE_LIMIT } = load('core/map-chat-context.ts');
 const { aiModeOptions } = load('experiences/visual-map/ai-mode.ts');
-const { planFor, matchMapTitle, chatResearchRequest, MAP_CHAT_PLAN_ACTION_LIMIT, MAP_CHAT_PLAN_RESEARCH_LIMIT } = load('core/map-chat-plan.ts');
+const { planFor, matchMapTitle, chatResearchRequest, MAP_CHAT_PLAN_ACTION_LIMIT, MAP_CHAT_PLAN_RESEARCH_LIMIT, MAP_CHAT_FIND_IMAGES_LIMIT } = load('core/map-chat-plan.ts');
 const { guardMapChatWrite, normalizeVaultPath, applyMdEdit } = load('core/map-chat-guard.ts');
-const { partialReply, MapChatService } = load('core/map-chat-service.ts');
+const { partialReply, MapChatService, providerMapChatRunner } = load('core/map-chat-service.ts');
 const { History, serializeMap } = load('map-model.ts');
 
 const CONFIG = '.obsidian';
@@ -399,8 +399,8 @@ test('C1: a redo prompt says actions must be empty; a normal prompt does not', (
   assert.ok(!/actions" must be an empty list/.test(mapChatStep.render(request({ style: 'detailed' }))));
   assert.match(mapChatStep.render(request({ language: 'zh-TW', style: 'detailed', redo: true })), /"actions" 必須是空清單/);
 });
-test('C1: the style is not part of the action schema, and the step version is 5 (D-2026-10-231: mode replaces depth)', () => {
-  assert.equal(mapChatStep.version, 5);
+test('C1: the style is not part of the action schema, and the step version is 6 (D-2026-10-231: mode replaces depth; B3 find_images was 5)', () => {
+  assert.equal(mapChatStep.version, 6);
   assert.equal(JSON.stringify(MAP_CHAT_SCHEMA).includes('style'), false);
 });
 
@@ -692,5 +692,93 @@ test('B2 prompt: research options, "research only when asked", headless integrat
 });
 test('B2 structure tidy: no action kind or run action opens the structure-review window', () => {
   for (const name of [...MAP_CHAT_ACTION_KINDS, ...MAP_RUN_ACTIONS]) assert.doesNotMatch(name, /structure|review|suggest/i, name);
-  assert.deepEqual(plain(MAP_RUN_ACTIONS), ['research_standard', 'expand', 'synthesize', 'rate_by_goal', 'merge']);
+  assert.deepEqual(plain(MAP_RUN_ACTIONS), ['research_standard', 'expand', 'synthesize', 'rate_by_goal', 'merge', 'find_images']);
+});
+
+
+// ---- B3-feat: find_images ----
+const findImages = (fields = {}) => item('run_map_action', { action: 'find_images', nodeIds: ['a'], direction: 'espresso beans', ...fields });
+test('B3 find_images: the strict schema lists it and the parser keeps one target with the search words in direction', () => {
+  assert.ok(plain(MAP_CHAT_SCHEMA.properties.actions.items.properties.action.enum).includes('find_images'));
+  const result = parse(reply(findImages()));
+  assert.deepEqual(result.rejected, []);
+  assert.deepEqual(result.actions[0], { kind: 'run_map_action', action: 'find_images', nodeIds: ['a'], title: '', goal: '', direction: 'espresso beans', mode: '', images: false });
+});
+test('B3 find_images: more than one target is dropped as bad_value; an empty list (the selection) and a new: ref are kept', () => {
+  assert.deepEqual(codes(parse(reply(findImages({ nodeIds: ['a', 'b'] })))), ['0:bad_value']);
+  assert.deepEqual(parse(reply(findImages({ nodeIds: [] }))).rejected, []);
+  const withNew = parse(reply(item('add_child', { ref: 'n1', title: 'N' }), findImages({ nodeIds: ['new:n1'] })));
+  assert.deepEqual(withNew.rejected, []);
+  assert.deepEqual(withNew.actions[1].nodeIds, ['new:n1']);
+  assert.deepEqual(codes(parse(reply(findImages({ nodeIds: ['new:ghost'] })))), ['0:bad_ref']);
+  assert.deepEqual(codes(parse(reply(findImages({ nodeIds: ['ghost'] })))), ['0:unknown_node']);
+});
+test('B3 find_images: depth and images are ignored, not a reason to drop', () => {
+  const result = parse(reply(findImages({ depth: 'deep', images: true })));
+  assert.deepEqual(result.rejected, []);
+  assert.equal(result.actions[0].mode, '');
+  assert.equal(result.actions[0].images, false);
+});
+test('B3 compat: a step version 4 reply (research depth and images, no find_images) parses exactly as before', () => {
+  const v4 = JSON.stringify({ reply: 'ok', actions: [item('run_map_action', { action: 'research_standard', nodeIds: ['a'], mode: undefined, depth: 'deep', images: true }), item('run_map_action', { action: 'merge', title: 'M', nodeIds: ['a', 'b'] })] });
+  const result = parse(v4);
+  assert.deepEqual(result.rejected, []);
+  assert.deepEqual(result.actions[0], { kind: 'run_map_action', action: 'research_standard', nodeIds: ['a'], title: '', goal: '', direction: '', mode: 'standard', images: true }); // step v6: a v4/v5 depth reads as Standard (D-2026-10-231)
+  assert.equal(result.actions[1].action, 'merge');
+});
+test('B3 plan: each find_images is one call, at most MAP_CHAT_FIND_IMAGES_LIMIT per reply', () => {
+  assert.equal(MAP_CHAT_FIND_IMAGES_LIMIT, 3);
+  const run = (extra = {}) => ({ kind: 'run_map_action', action: 'find_images', nodeIds: ['x'], title: '', goal: '', direction: '', depth: '', images: false, ...extra });
+  const estimate = actions => planFor([{ kind: 'create_map', title: 'Q' }, ...actions], { parents: {}, selectedCount: 0 }).estimatedCalls;
+  assert.equal(estimate([run()]), 1);
+  assert.equal(estimate([run(), run(), run()]), 3);
+  assert.equal(estimate([run(), run(), run(), run()]), 3, 'the fourth is skipped, so the plan counts three');
+  assert.equal(estimate([run(), { kind: 'run_map_action', action: 'rate_by_goal', nodeIds: [], title: '', goal: 'g', direction: '', depth: '', images: false }]), 2);
+});
+test('B3 prompt: find_images guidance is in both languages and the chat itself still does not search the web', () => {
+  const en = mapChatStep.render(request({ language: 'en' }));
+  for (const pattern of [/find_images \(look for candidate pictures for ONE card/, /find_images: short search words/, /use find_images only when the user asks for pictures/i, /You cannot see any picture/, /never that a picture was found or inserted/, /research_standard with images=true; do not combine it with find_images/, /do not inspect files, use tools or search the web/]) assert.match(en, pattern, String(pattern));
+  const zh = mapChatStep.render(request({ language: 'zh-TW' }));
+  for (const pattern of [/find_images（為「一張」議題找候選圖片/, /find_images：簡短的搜尋詞/, /只有使用者要求圖片時才用 find_images/, /你看不到任何圖片/, /不說已找到或已插入/, /research_standard 並設 images=true，不要與 find_images 混用/, /不要檢視檔案、使用工具或搜尋網路/]) assert.match(zh, pattern, String(pattern));
+});
+
+// B3: the chat does not go on the web; only the picture search does, and its probe cleans up after itself.
+test('B3 web flags: the chat request is text only with no search budget; the picture search through main.ts asks for web search', async () => {
+  const calls = [];
+  const runtime = { runTask: async (...args) => { calls.push(args); return JSON.stringify({ reply: 'ok', actions: [] }); } };
+  const options = { pluginDirectory: () => '/plugin', exchangeLoggingEnabled: () => false, exchanges: () => null, codexRuntime: () => runtime, claudeRuntime: () => runtime };
+  const service = new MapChatService(providerMapChatRunner(options, new Map()));
+  await service.chat(request({ model: 'gpt-6-luna' }), new AbortController().signal);
+  const controls = calls[0][4];
+  assert.equal(controls.textOnly, true, 'the chat itself reads only what it is given'); assert.equal(controls.searchBudget, 0); assert.ok(!controls.webSearch && !controls.webSearchOnly);
+  const rendered = mapChatStep.render(request());
+  assert.match(rendered, /do not inspect files, use tools or search the web/);
+  const main = require('node:fs').readFileSync(require('node:path').join(__dirname, '..', 'main.ts'), 'utf8');
+  const start = main.indexOf('async searchImages('); const body = main.slice(start, main.indexOf('private async runConfirmedMarkdownContextAi', start));
+  assert.ok(start > 0 && /prepareStep\(imageSearchStep, \{ query \}\)/.test(body));
+  assert.ok(/this\.runMarkdownContextAi\(prepared, model, signal, undefined, true\)/.test(body), 'web search on; the usage notice was asked by the caller, so not twice');
+  assert.ok(!/runConfirmedMarkdownContextAi/.test(body));
+  const markdownStart = main.indexOf('private async runMarkdownContextAi'); const markdown = main.slice(markdownStart, markdownStart + 4000);
+  assert.ok(/textOnly: !webSearch && !generateImage/.test(markdown) && /webSearchOnly: webSearch/.test(markdown), 'webSearch=true turns web search on for that call only');
+});
+test('B3 loadableImages: timers and listeners are cleared when a probe finishes and when the search is aborted', async () => {
+  const timers = new Map(); let nextTimer = 1;
+  const win = { setTimeout: (fn, ms) => { const id = nextTimer++; timers.set(id, { fn, ms }); return id; }, clearTimeout: id => { timers.delete(id); } };
+  const probes = [];
+  const createEl = tag => { const img = { tag, naturalWidth: 100, referrerPolicy: '', _src: '' }; Object.defineProperty(img, 'src', { get() { return this._src; }, set(value) { this._src = value; } }); probes.push(img); return img; };
+  const { loadableImages } = load('ui/image-candidates.ts', {}, { window: win, createEl });
+  const listeners = new Set();
+  const signal = { aborted: false, addEventListener: (_name, fn) => listeners.add(fn), removeEventListener: (_name, fn) => listeners.delete(fn) };
+  const candidates = [1, 2, 3].map(n => ({ title: `T${n}`, url: `https://img.example/${n}.jpg`, source: `https://page.example/${n}` }));
+  const finished = loadableImages(candidates, signal);
+  assert.equal(probes.length, 3); assert.equal(timers.size, 3); assert.equal(listeners.size, 3); assert.ok([...timers.values()].every(t => t.ms === 8000), 'eight seconds each');
+  assert.ok(probes.every(p => p.referrerPolicy === 'no-referrer'));
+  probes[0].onload(); probes[1].onerror(); probes[2].naturalWidth = 0; probes[2].onload();
+  assert.deepEqual(plain((await finished).map(c => c.title)), ['T1'], 'only the one that loaded, in order');
+  assert.equal(timers.size, 0, 'no timer is left'); assert.equal(listeners.size, 0, 'no listener is left'); assert.ok(probes.every(p => p.onload === null && p.onerror === null));
+  // Aborted halfway: every probe ends, nothing is left behind.
+  probes.length = 0;
+  const aborted = loadableImages(candidates, signal);
+  probes[0].onload(); for (const fn of [...listeners]) fn();
+  const kept = await aborted; assert.deepEqual(plain(kept.map(c => c.title)), ['T1'], 'a probe that finished before the abort keeps its result; the rest are dropped'); assert.equal(timers.size, 0); assert.equal(listeners.size, 0);
 });

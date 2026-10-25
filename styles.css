@@ -425,7 +425,7 @@ button.vam-relevance-tag-button:disabled { cursor: default; opacity: .7; }
 .vam-map-chat.is-drop { outline: 2px dashed var(--interactive-accent); outline-offset: -2px; background: var(--background-modifier-hover); }
 .vam-map-chat-head { display: flex; align-items: center; gap: 8px; }
 .vam-map-chat-title { flex: 0 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: var(--font-semibold); }
-.vam-map-chat-model { flex: 1 1 140px; min-width: 120px; margin-left: auto; font-size: var(--font-ui-smaller); text-overflow: ellipsis; }
+.vam-map-chat-model { flex: 1 1 0; min-width: 0; margin-left: auto; font-size: var(--font-ui-smaller); text-overflow: ellipsis; }
 .vam-map-chat-close { display: inline-flex; flex: 0 0 auto; align-items: center; justify-content: center; }
 .vam-map-chat-head.is-hero { justify-content: flex-end; }
 .vam-map-chat-head.is-hero .vam-map-chat-title, .vam-map-chat-head.is-hero .vam-map-chat-close { display: none; }

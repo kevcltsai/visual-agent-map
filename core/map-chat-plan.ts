@@ -21,9 +21,12 @@ export interface MapChatPlan {
   /** Every condition that holds, in a fixed order. */
   reasons: MapChatPlanReason[];
   /**
-   * AI calls the actions start, counted at least: one per research target, one per card an expand is asked for, one for rating
-   * by a goal, one for a merge. Synthesis is 0 because it only opens the dialog, and the AI call starts when the user confirms
-   * there. Writes to cards and notes, create_map, open_map and the view operations are 0. The chat reply itself is not counted.
+   * AI calls the actions start, counted at least (B2): each research target is its main call plus the diagram call that follows
+   * the write (`options.diagrams`, on by default); the depth does not change the count (a normal or deep research that found
+   * nothing on the web is sent once more, which is a retry and is not counted). Each synthesize is one integration call plus the
+   * same diagram call: B2 starts it without a dialog and without the directions step. One call per card an expand is asked for,
+   * one for rating by a goal, one for a merge. Writes to cards and notes, create_map, open_map and the view operations are 0.
+   * The chat reply itself is not counted.
    */
   estimatedCalls: number;
 }
@@ -52,8 +55,16 @@ export function researchTargetsOf(actions: readonly MapChatAction[], selectedCou
   return research;
 }
 
-/** The plan a reply needs, or null when it can be applied at once. */
-export function planFor(actions: readonly MapChatAction[], context: PlanContext): MapChatPlan | null {
+/** Calls one research or synthesis makes on its own: the main call, then (when diagrams are on) the diagram call. */
+export const mapChatCallsPerTask = (diagrams: boolean): number => (diagrams ? 2 : 1);
+
+/** The plan a reply needs, or null when it can be applied at once. `diagrams` is the "Add diagrams after research" setting. */
+export function planFor(
+  actions: readonly MapChatAction[],
+  context: PlanContext,
+  options: { diagrams?: boolean } = {}
+): MapChatPlan | null {
+  const perTask = mapChatCallsPerTask(options.diagrams !== false);
   const reasons: MapChatPlanReason[] = [];
   if (actions.length > MAP_CHAT_PLAN_ACTION_LIMIT) reasons.push("many_actions");
   // Cards that have a child: in the map as it was sent, or created by this very reply.
@@ -83,7 +94,7 @@ export function planFor(actions: readonly MapChatAction[], context: PlanContext)
           case "research_standard": {
             const targets = targetCount(action.nodeIds, selection);
             research += targets;
-            calls += targets;
+            calls += targets * perTask;
             break;
           }
           case "expand":
@@ -94,6 +105,7 @@ export function planFor(actions: readonly MapChatAction[], context: PlanContext)
             calls += 1;
             break;
           case "synthesize":
+            calls += perTask;
             break;
         }
         break;
@@ -126,5 +138,59 @@ export function matchMapTitle<T extends { title: string }>(query: string, maps: 
   return hits.length === 1 ? { kind: "one", map: hits[0].map } : { kind: "many", maps: hits.map(entry => entry.map) };
 }
 
+/** What tells apart the maps of a list that share a title: their folder, and a number when even the folder is the same. */
+export interface MapChoicePart {
+  title: string;
+  folder?: string;
+  seq?: number;
+}
+/**
+ * The parts of the labels for a list of maps to pick from. A title that is alone in the list stays as it is; maps that share
+ * one (compared as shown, after trimming) also get the folder their Map.md is in, and a number when the folder is shared too.
+ */
+export function mapChoiceParts(maps: readonly { title: string; mapPath: string }[]): MapChoicePart[] {
+  const shown = (map: { title: string }): string => map.title.trim();
+  const folder = (map: { mapPath: string }): string => map.mapPath.split("/").slice(0, -1).join("/");
+  const same = (a: { title: string }, b: { title: string }): boolean => shown(a) === shown(b);
+  const seen = new Map<string, number>();
+  return maps.map(map => {
+    if (maps.filter(other => same(other, map)).length < 2) return { title: map.title };
+    const key = `${shown(map)}\u0000${folder(map)}`;
+    const alike = maps.filter(other => same(other, map) && folder(other) === folder(map));
+    if (alike.length < 2) return { title: map.title, folder: folder(map) };
+    const seq = (seen.get(key) ?? 0) + 1;
+    seen.set(key, seq);
+    return { title: map.title, folder: folder(map), seq };
+  });
+}
+
 /** True for an id a reply gave to a card it creates itself. */
 export const isNewRef = (id: string): boolean => id.startsWith(MAP_CHAT_NEW_PREFIX);
+
+/** True when a target list names cards of this very reply and nothing else (an empty list means the selection, which is not new). */
+export const allNewTargets = (nodeIds: readonly string[]): boolean => nodeIds.length > 0 && nodeIds.every(isNewRef);
+
+/** What the chat hands to the multi-research for a research_standard action (the shape `startMultiResearch` takes). */
+export interface ChatResearchRequest {
+  researchMode: "research";
+  researchDepth: "fast" | "normal" | "deep";
+  requirements: string;
+  imageSearch: boolean;
+}
+/**
+ * The research a reply asks for. A depth the reply named wins; unnamed, a reply that researches only cards it created itself
+ * is a first look at a new tree (fast), and anything that touches an existing card is the standard depth (normal). Images are
+ * off unless asked for. `direction` is the extra requirement. A reply of the earlier step version has no depth and no images,
+ * which reads as "not named" and "off". Decided here, not by the model.
+ */
+export function chatResearchRequest(
+  action: Extract<MapChatAction, { kind: "run_map_action" }>,
+  allNew: boolean
+): ChatResearchRequest {
+  return {
+    researchMode: "research",
+    researchDepth: action.depth || (allNew ? "fast" : "normal"),
+    requirements: action.direction,
+    imageSearch: action.images === true
+  };
+}

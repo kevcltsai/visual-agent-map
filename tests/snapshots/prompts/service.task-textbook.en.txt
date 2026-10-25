@@ -51,7 +51,7 @@ Rules:
 9. Use math only for real formulas: inline math as `$…$` with no spaces just inside the dollars, display math with `$$` on its own lines; never use `\(`, `\)`, `\[` or `\]`.
 10. A chart with numbers (pie, xychart-beta, sankey-beta, radar-beta and similar) uses only numbers found in the sources and names its source on a line below the chart, cited the same way as the text; with no source data, draw no data chart. A conceptual quadrantChart says "Illustrative" in its title.
 
-Normal research: provide the main evidence, limitations, and open questions needed to support the conclusion. Search when external facts are needed. There is no fixed query or source count. Continue while a likely useful search can resolve a decision-relevant uncertainty; stop when the answer is sufficiently supported or further searches have low expected value. Identify unresolved gaps.
+Normal research: provide the main evidence, limitations, and open questions needed to support the conclusion. Search when external facts are needed. There is no fixed query or source count. Continue while a likely useful search can resolve a decision-relevant uncertainty; stop when the answer is sufficiently supported or further searches have low expected value. Identify unresolved gaps. This research must use the web. If the topic's current Detail cites no source, or says it is not verified yet, search before you stop and cite what you found. Do not finish with a note such as "no external search was done": either search, or say plainly that the web could not be reached.
 
 Search for image references when they materially aid understanding or the user explicitly asks for images.
 

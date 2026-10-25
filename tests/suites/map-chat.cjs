@@ -1684,19 +1684,25 @@ test('map chat D5 F1: a [[link]] has no href, can be reached with Tab and opened
   assert.equal(f.calls.links.length, 2);
 });
 
-// Time limits (ms) for hostile input. Measured before the fix on the same machine: heading 5288, starsInline 1827, under 1130, wikiOpen 1199, brackets 1291.
+// Time limits for hostile input are relative: the hostile text is laid out and compared with benign text of the same length, measured in the same process, so a slow machine moves both sides.
+// Measured before the fix on the same machine: heading 5288 ms, starsInline 1827, under 1130, wikiOpen 1199, brackets 1291 (benign text of that length: about 1 to 5 ms).
+// Measured now: the ratio is 0 to 16 for every case below (benign time floored at 1 ms); before the fix it was above 1000. 60 sits between.
 const timed = (text) => { const t = process.hrtime.bigint(); lay(text); return Number(process.hrtime.bigint() - t) / 1e6; };
-test('map chat D5 F2: a heading line with a long run of blanks parses in under 50 ms', () => {
+const bestTime = (text, count = 5) => { let min = Infinity; for (let i = 0; i < count; i++) min = Math.min(min, timed(text)); return min; };
+const benignOf = (text) => 'word '.repeat(Math.ceil(text.length / 5)).slice(0, text.length);
+const HOSTILE_RATIO_LIMIT = 60;
+const hostileRatio = (text) => { bestTime(benignOf(text), 2); const base = Math.max(bestTime(benignOf(text)), 1); const ms = bestTime(text); return { ms, base, ratio: ms / base }; };
+test('map chat D5 F2: a heading line with a long run of blanks parses in a small multiple of benign text of the same length', () => {
   for (const text of ['# a' + ' '.repeat(40000) + 'x', '# a' + ' \t'.repeat(20000) + 'x', '#' + ' '.repeat(40000) + 'x #']) {
-    const ms = timed(text); assert.ok(ms < 50, `${ms.toFixed(1)} ms for ${text.length} characters`);
+    const r = hostileRatio(text); console.log(`F2 ratio ${r.ratio.toFixed(1)} (${r.ms.toFixed(1)} vs ${r.base.toFixed(1)} ms)`); assert.ok(r.ratio <= HOSTILE_RATIO_LIMIT, `${r.ms.toFixed(1)} ms is ${r.ratio.toFixed(1)} times benign text (${r.base.toFixed(1)} ms) for ${text.length} characters`);
   }
   eq(visibleText(lay('## Title ##  ')), 'Title'); eq(visibleText(lay('# C#')), 'C#'); eq(visibleText(lay('# a #b')), 'a #b');
 });
 
-test('map chat D5 F3: unmatched openers parse in under 100 ms, and a reply over 50,000 characters is laid out only up to that', () => {
+test('map chat D5 F3: unmatched openers parse in a small multiple of benign text of the same length, and a reply over 50,000 characters is laid out only up to that', () => {
   for (const [name, unit] of [['star', 'a *'], ['bracket', '['], ['wiki', '[[a'], ['underscore', 'a _b'], ['link', '[a]('], ['image', '![a](']]) {
-    const text = unit.repeat(Math.ceil(40000 / unit.length)); const ms = timed(text);
-    assert.ok(ms < 100, `${name}: ${ms.toFixed(1)} ms`);
+    const text = unit.repeat(Math.ceil(40000 / unit.length)); const r = hostileRatio(text);
+    console.log(`F3 ${name} ratio ${r.ratio.toFixed(1)} (${r.ms.toFixed(1)} vs ${r.base.toFixed(1)} ms)`); assert.ok(r.ratio <= HOSTILE_RATIO_LIMIT, `${name}: ${r.ms.toFixed(1)} ms is ${r.ratio.toFixed(1)} times benign text (${r.base.toFixed(1)} ms)`);
   }
   const long = 'x'.repeat(49990) + '\n*not bold*\n[[Late]]'; const el = lay(long);
   eq(wikis(el), []); assert.equal(nodes(el).filter(i => i.tag === 'em').length, 0, 'the part past the limit is plain text');

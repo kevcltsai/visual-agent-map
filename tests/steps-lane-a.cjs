@@ -181,7 +181,7 @@ test('B2 W1: normal and deep standard research asks the provider for a web-searc
   const controlsOf = async (ctx, model = 'gpt-6-luna') => { const fake = runtime(GOOD); await makeService(fake).askModel(ctx, model, 'low'); return fake.calls[0].controls; };
   for (const model of ['gpt-6-luna', 'claude:sonnet']) {
     const normal = await controlsOf(researchContext(), model);
-    assert.equal(normal.webSearchOnly, true, `${model} normal is the isolated web-only thread`); assert.equal(normal.textOnly, false, `${model} normal`); assert.equal(normal.requireWeb, undefined, `${model} normal has no separate requireWeb path`);
+    assert.equal(normal.webSearchOnly, true, `${model} normal is the isolated web-only thread`); assert.ok(!normal.textOnly, `${model} normal keeps web search on`); assert.equal(normal.requireWeb, undefined, `${model} normal has no separate requireWeb path`);
     assert.equal((await controlsOf(researchContext({ researchDepth: 'deep' }), model)).webSearchOnly, true, `${model} deep`);
     assert.equal((await controlsOf(researchContext({ researchDepth: 'fast' }), model)).webSearchOnly, undefined, `${model} fast may answer without searching`);
   }

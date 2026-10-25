@@ -8,7 +8,7 @@ export function isMapAiMode(value: unknown): value is MapAiMode {
   return value === "quick" || value === "standard";
 }
 
-/** The mode a topic note was last researched with: `research-mode: local` is Quick; anything else (including a missing value) is Standard. */
+/** The mode a topic note was last researched with: `local` is Quick, `research` is Standard; a missing or unknown value was already read as `local`. */
 export function noteAiMode(researchMode: ResearchMode): MapAiMode {
   return researchMode === "local" ? "quick" : "standard";
 }

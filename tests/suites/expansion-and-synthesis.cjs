@@ -2479,7 +2479,7 @@ integrationTest('Re-run with Standard: a note edited while the run is out is not
   const note = await h.repo.readNote(h.topic.path);
   assert.deepEqual(plain([note.summary, note.researchMode, note.detail.includes(GAP_DETAIL)]), ['Edited by the user', 'local', true], 'nothing of the late answer was written');
 });
-integrationTest('multi research without overrides runs each topic in its own note\'s mode: Quick notes local, no images, no charts; a missing or research mode as Standard with the web, images and charts', async () => {
+integrationTest('multi research without overrides runs each topic in its own note\'s mode: Quick notes local, no images, no charts; a research mode as Standard with the web, images and charts; a missing mode as Quick', async () => {
   const h = await multiResearchHarness(['Quick note', 'Old note', 'Standard note']);
   await h.repo.updateNote(h.nodes[0].path, { researchMode: 'local' });
   await h.repo.updateNote(h.nodes[2].path, { researchMode: 'research' });

@@ -89,7 +89,7 @@ test('research depth remains qualitative and imposes no fixed query or source co
 });
 test('explicit source context survives long existing Markdown', () => {
   const { buildPreparedTaskContext } = load('ai/context-builder.ts');
-  const context = { title: 'Topic', summary: '', rules: '', detail: 'old '.repeat(8_000), task: 'Review selected note', ancestors: '', workingFindings: '', sourceContext: '來源：selected.md\nverified evidence', mode: 'task', researchMode: 'local', researchDepth: 'normal', visualMode: 'off' };
+  const context = { title: 'Topic', summary: '', rules: '', detail: 'old '.repeat(1_100), task: 'Review selected note', ancestors: '', workingFindings: '', sourceContext: '來源：selected.md\nverified evidence', mode: 'task', researchMode: 'local', researchDepth: 'normal', visualMode: 'off' };
   const prepared = buildPreparedTaskContext(context, 'test-model', 1_000);
   assert.match(prepared.context.sourceContext, /verified evidence/);
   assert.ok(prepared.context.detail.length < context.detail.length);

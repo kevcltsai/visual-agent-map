@@ -1815,6 +1815,8 @@ const frames = () => {
 };
 const spyRows = log => { const made = { rows: 0 }; const create = log.createDiv.bind(log); log.createDiv = value => { if (String(value?.cls ?? value).includes('vam-map-chat-msg')) made.rows++; return create(value); }; return made; };
 const DENSE = 'word *emph* **b** `c` [[x]] ';
+// A reply just over the element budget (core/map-chat-render.ts:41 MAX_REPLY_NODES): DENSE builds 4 elements per copy, plus 100 copies of margin.
+const DENSE_OVER_BUDGET = DENSE.repeat(Math.ceil(load('core/map-chat-render.ts').MAX_REPLY_NODES / 4) + 100);
 
 test('map chat E1: a finished message keeps its row on every later repaint; only the new messages are built', () => {
   const f = panelFixture(); f.panel.setOpen(true); const log = f.parts.log(); const made = spyRows(log);
@@ -1887,7 +1889,7 @@ const FIXED = 6; // a plain block, its note and the paragraph around them
 test('map chat E1: a reply past the element budget builds at most the budget, then shows the rest as plain text with a note', () => {
   const { MAX_REPLY_NODES } = load('core/map-chat-render.ts');
   assert.ok(MAX_REPLY_NODES <= 2000);
-  const text = DENSE.repeat(1850) + 'THE END'; const el = layoutWith(text);
+  const text = DENSE_OVER_BUDGET + 'THE END'; const el = layoutWith(text);
   const count = nodes(el).length - 1;
   assert.ok(count <= MAX_REPLY_NODES + FIXED, `${count} elements`);
   const plain = find(el, i => hasClass(i, 'vam-map-chat-plain')); const note = find(el, i => hasClass(i, 'vam-map-chat-overflow-note'));
@@ -1910,10 +1912,10 @@ test('map chat E1: a reply under the budget has no plain block and no note; the 
   const small = layoutWith(DENSE.repeat(50)); assert.equal(find(small, i => hasClass(i, 'vam-map-chat-plain')), undefined); assert.equal(find(small, i => hasClass(i, 'vam-map-chat-overflow-note')), undefined);
   const code = layoutWith('```\n' + 'x'.repeat(40000) + '\n```'); assert.equal(find(code, i => hasClass(i, 'vam-map-chat-plain')), undefined, 'a code block is two elements, however long');
   const huge = layoutWith('word '.repeat(30000)); const plain = find(huge, i => hasClass(i, 'vam-map-chat-plain')); assert.ok(plain); assert.ok(plain.text.length > 90000 || visibleText(huge).length >= 150000 - 5);
-  const noNote = element('div'); renderChatMarkdown(noNote, DENSE.repeat(1850)); assert.equal(find(noNote, i => hasClass(i, 'vam-map-chat-overflow-note')), undefined, 'no note is made without text for it');
+  const noNote = element('div'); renderChatMarkdown(noNote, DENSE_OVER_BUDGET); assert.equal(find(noNote, i => hasClass(i, 'vam-map-chat-overflow-note')), undefined, 'no note is made without text for it');
 });
 test('map chat E1: the panel gives the note in the reader\'s language, and all three languages have it', () => {
-  const f = panelFixture(); f.panel.setOpen(true); f.panel.begin('q'); f.panel.finish(DENSE.repeat(1850), []);
+  const f = panelFixture(); f.panel.setOpen(true); f.panel.begin('q'); f.panel.finish(DENSE_OVER_BUDGET, []);
   const note = find(f.parts.log(), i => hasClass(i, 'vam-map-chat-overflow-note')); assert.ok(note); assert.match(note.text, /too long/i);
   for (const lang of ['en', 'zh-TW', 'zh-CN']) assert.match(fs.readFileSync(path.join(root, 'i18n', `${lang}.ts`), 'utf8'), /"ui\.map_chat_overflow_note": "[^"]+"/, lang);
 });
@@ -1992,7 +1994,7 @@ test('map chat E2: a reply streamed in a popped-out window asks that window for 
 
 test('map chat E2: changing the interface language rebuilds the "you" label and the overflow note of rows already shown', () => {
   const f = panelFixture(); f.panel.setOpen(true); const log = f.parts.log();
-  f.setLanguage('en'); f.panel.begin('q'); f.panel.finish(DENSE.repeat(1850), []);
+  f.setLanguage('en'); f.panel.begin('q'); f.panel.finish(DENSE_OVER_BUDGET, []);
   const roleOf = row => find(row, i => hasClass(i, 'vam-map-chat-role')).text; const noteOf = row => find(row, i => hasClass(i, 'vam-map-chat-overflow-note')).text;
   const [userBefore, answerBefore] = [...log.children]; const roleBefore = roleOf(userBefore); const noteBefore = noteOf(answerBefore);
   f.setLanguage('zh-TW'); f.panel.begin('q2'); f.panel.finish('ok', []);

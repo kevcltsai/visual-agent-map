@@ -572,7 +572,7 @@ test('W2: synthesize and merge are observed on the main request only; reference 
   for (const mode of ['synthesize', 'merge']) {
     const direct = await run(mode, 'direct', 'short');
     assert.equal(direct.calls.length, 1, `${mode}: one request`); assert.equal(direct.calls[0].stream, true, `${mode}: the one request streams`); assert.equal(direct.attempts.length, 1);
-    const extracted = await run(mode, 'direct', 'x'.repeat(20_000));
+    const extracted = await run(mode, 'direct', 'x'.repeat(18_001));
     assert.ok(extracted.calls.length >= 2, `${mode}: over-budget sources are extracted first`);
     assert.deepEqual(extracted.calls.slice(0, -1).map(call => call.stream), extracted.calls.slice(0, -1).map(() => undefined), `${mode}: extraction is not observed`);
     assert.equal(extracted.calls.at(-1).stream, true, `${mode}: the main request streams`); assert.equal(extracted.attempts.length, 1);

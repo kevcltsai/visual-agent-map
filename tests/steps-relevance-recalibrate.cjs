@@ -410,7 +410,8 @@ test('recalibrate service: nothing to ask (every gradable card pinned) sends no 
   const result = await service.recalibrate(recalRequest({ pins: all, previous: [] }), new AbortController().signal);
   assert.deepEqual(plain(result.items), []);
   await assert.rejects(service.recalibrate(recalRequest({ nodes: [tree[0]] }), new AbortController().signal), error => error.code === 'empty');
-  const huge = Array.from({ length: 700 }, (_, i) => node(`h${i}`, i === 0 ? null : 'h0', 1)).map(n => ({ ...n, summary: 'x'.repeat(240), title: 'T'.repeat(200) }));
+  // 270 cards: the recalibrate request first exceeds RELEVANCE_GRADE_TOKEN_BUDGET (core/steps/relevance-grade/step.ts:37) at 242 cards with today's prompt; ~10% margin.
+  const huge = Array.from({ length: 270 }, (_, i) => node(`h${i}`, i === 0 ? null : 'h0', 1)).map(n => ({ ...n, summary: 'x'.repeat(240), title: 'T'.repeat(200) }));
   await assert.rejects(service.recalibrate(recalRequest({ nodes: huge, previous: [] }), new AbortController().signal), error => error.code === 'over_budget');
 });
 

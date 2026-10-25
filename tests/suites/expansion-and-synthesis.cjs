@@ -738,7 +738,7 @@ integrationTest('synthesis content is explicit for one, three and four children,
     const children = [];
     for (let index = 0; index < count; index++) {
       const child = await topicNote(repo, `Child ${index}`, 'model-a'); child.parentId = parent.id;
-      await repo.updateNote(child.path, { summary: `Summary ${index}`, detail: `DETAIL_START_${index}\n${'body '.repeat(3500)}\nBODY_ONLY_CONDITION_${index}\n${'rest '.repeat(3500)}\nDETAIL_END_${index}`, newFindings: `Finding ${index}`, rules: `LEGACY_CHILD_${index}` });
+      await repo.updateNote(child.path, { summary: `Summary ${index}`, detail: `DETAIL_START_${index}\n${'body '.repeat(1500)}\nBODY_ONLY_CONDITION_${index}\n${'rest '.repeat(1500)}\nDETAIL_END_${index}`, newFindings: `Finding ${index}`, rules: `LEGACY_CHILD_${index}` });
       children.push(child);
     }
     const grandchild = await topicNote(repo, 'Grandchild', 'model-a'); grandchild.parentId = children[0].id;
@@ -2311,7 +2311,7 @@ integrationTest('synthesis carry-forward: nothing missing leaves the detail as t
   assert.ok(first.includes('Sources from earlier research'));
 });
 integrationTest('synthesis carry-forward with a large (over one batch) child note keeps the earlier links', async () => {
-  const f = await keepSourcesFixture(Array.from({ length: 700 }, (_, i) => `Line ${i} of a long child note with enough words to pass the batch size.`).join('\n'));
+  const f = await keepSourcesFixture(Array.from({ length: 300 }, (_, i) => `Line ${i} of a long child note with enough words to pass the batch size.`).join('\n'));
   await synthesize(f);
   const file = await f.repo.app.vault.adapter.read(f.parent.path);
   for (const url of earlierSources) assert.ok(file.includes(url), url);
@@ -2389,10 +2389,11 @@ integrationTest('B8: empty Working Findings add no label to the prompt and the s
   assert.equal((await f.repo.readNote(f.parent.path)).newFindings, '');
 });
 integrationTest('B8: Working Findings the context budget cut off are kept on save', async () => {
-  const f = await findingsFixture('KEPT_FINDING_START ' + 'x'.repeat(140000));
+  // 128001 = the 32_000-token budget (core/ai-task-service.ts buildPreparedTaskContext(..., 32_000)) * 4 chars per token + 1; the budget is a literal there, not exported.
+  const f = await findingsFixture('KEPT_FINDING_START ' + 'x'.repeat(128001));
   await synthesize(f);
   assert.equal(f.runtime.calls.length, 2);
-  assert.ok(!f.runtime.calls[1].prompt.includes('x'.repeat(140000)), 'the findings were cut');
+  assert.ok(!f.runtime.calls[1].prompt.includes('x'.repeat(128001)), 'the findings were cut');
   const saved = await f.repo.readNote(f.parent.path);
   assert.equal(saved.summary, 'Draft summary');
   assert.match(saved.newFindings, /^KEPT_FINDING_START x+$/);

@@ -185,7 +185,7 @@ test('share translate plan: batches, hash, estimate and the three-map session ca
   const items = Array.from({ length: 10 }, (_, i) => ({ id: String(i + 1), text: 'x'.repeat(2500) }));
   const batches = planModule.planBatches(items, planModule.TRANSLATE_BATCH_CHARS);
   assert.deepEqual(plain(batches.map(batch => batch.length)), [2, 2, 2, 2, 2]);
-  assert.deepEqual(plain(planModule.planBatches([{ id: '1', text: 'y'.repeat(9000) }, { id: '2', text: 'a' }], 6000).map(batch => batch.length)), [1, 1], 'an oversize item goes alone');
+  assert.deepEqual(plain(planModule.planBatches([{ id: '1', text: 'y'.repeat(planModule.TRANSLATE_BATCH_CHARS + 1) }, { id: '2', text: 'a' }], planModule.TRANSLATE_BATCH_CHARS).map(batch => batch.length)), [1, 1], 'an oversize item goes alone');
   assert.deepEqual(plain(planModule.planBatches([], 6000)), []);
   assert.equal(planModule.segmentHash('abc'), planModule.segmentHash('abc'));
   assert.notEqual(planModule.segmentHash('abc'), planModule.segmentHash('abd'));

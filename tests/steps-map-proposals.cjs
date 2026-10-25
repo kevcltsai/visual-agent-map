@@ -11,8 +11,8 @@ const { obsidian } = require('./support.cjs');
 const outline = load('core/outline-generation-service.ts', { obsidian });
 const review = load('core/structure-review-service.ts');
 const { prepareStep } = load('core/step-runner.ts');
-const { outlineGenerateStep } = load('core/steps/outline-generate/step.ts', { obsidian });
-const { structureReviewStep } = load('core/steps/structure-review/step.ts');
+const { outlineGenerateStep, OUTLINE_GENERATE_TOKEN_BUDGET } = load('core/steps/outline-generate/step.ts', { obsidian });
+const { structureReviewStep, STRUCTURE_REVIEW_TOKEN_BUDGET } = load('core/steps/structure-review/step.ts');
 const { AiExchangeLog } = load('ai-exchange-log.ts');
 const { translate } = load('i18n.ts');
 
@@ -39,7 +39,7 @@ test('outline prompt carries the preset with the topic as quoted data and the un
 test('empty topic and an over-budget request are refused before any provider call, with localized typed errors', () => {
   for (const [language, topic] of [['en', '  '], ['zh-TW', '']])
     assert.throws(() => prepareStep(outlineGenerateStep, outlineRequest({ language, topic })), error => error.name === 'OutlineGenerateError' && error.code === 'empty_topic' && error.message === translate(language, 'error.outline_generate_empty_topic'));
-  assert.throws(() => prepareStep(outlineGenerateStep, outlineRequest({ presetText: 'x'.repeat(130000) })), error => error.code === 'over_budget');
+  assert.throws(() => prepareStep(outlineGenerateStep, outlineRequest({ presetText: 'x'.repeat(OUTLINE_GENERATE_TOKEN_BUDGET * 4 + 1) })), error => error.code === 'over_budget');
 });
 
 test('outline reply: headings accepted, a wrapping fence is stripped, parseOutline nodes returned', () => {
@@ -238,7 +238,7 @@ test('structure service: strict JSON path with schema, step label, rejected list
   await assert.rejects(new review.StructureReviewService(review.providerStructureReviewRunner(bad.options, bad.active)).review(reviewRequest(), new AbortController().signal), error => error.code === 'invalid');
   assert.equal(bad.log.getEntries()[0].status, 'failed');
   await assert.rejects(service.review(reviewRequest({ nodes: [] }), new AbortController().signal), error => error.code === 'empty');
-  await assert.rejects(service.review(reviewRequest({ rootQuestion: 'x'.repeat(130000) }), new AbortController().signal), error => error.code === 'over_budget');
+  await assert.rejects(service.review(reviewRequest({ rootQuestion: 'x'.repeat(STRUCTURE_REVIEW_TOKEN_BUDGET * 4 + 1) }), new AbortController().signal), error => error.code === 'over_budget');
   const stop = new AbortController(); stop.abort();
   await assert.rejects(service.review(reviewRequest(), stop.signal), error => error.code === 'stopped');
   assert.equal(fx.calls.length, 1);

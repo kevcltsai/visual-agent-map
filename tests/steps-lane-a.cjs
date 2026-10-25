@@ -97,9 +97,10 @@ test('an AIM request is the step aim.<phase>@1 and its prompt is exactly buildAi
 
 test('the reference extract and reduce rounds are their own steps, followed by the task.run step', async () => {
   const log = spyLog();
-  const big = JSON.stringify({ summary: 'S', detail: 'e'.repeat(10_000), suggestions: [], visualReferences: [] });
+  // 9_001 = half of the 18_000 batch limit (ai/reference-materials.ts:52 batchLimit, :38 packReferenceChunks default; not exported) + 1: two documents or two findings never share a batch.
+  const big = JSON.stringify({ summary: 'S', detail: 'e'.repeat(9_001), suggestions: [], visualReferences: [] });
   const fake = runtime(prompt => (prompt.includes('Extract relevant facts') ? big : GOOD));
-  const documents = [1, 2, 3, 4].map(n => ({ path: `n${n}.md`, content: 'x'.repeat(14_000) }));
+  const documents = [1, 2, 3, 4].map(n => ({ path: `n${n}.md`, content: 'x'.repeat(9_001) })); // 4 batches, as above
   const progress = [];
   await makeService(fake, { logging: true, exchanges: log }).askModel(context({ referenceGroups: [{ id: 'g', name: 'g', location: 'l', documents }], onProgress: text => progress.push(text) }), 'gpt-6-luna', 'low');
   const steps = log.events.filter(event => event[0] === 'begin').map(event => event[1].step);

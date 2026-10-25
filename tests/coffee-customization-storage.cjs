@@ -71,7 +71,7 @@ test('Coffee customization and convergence metadata round trip; undo survives sa
   const customization = { observerPrompt: longPrompt, convergencePrompt: longPrompt, mergeLevel: 'balanced', detailLevel: 'standard', preserve: ['disagreements', 'sources'] };
   const currentNotes = insights.serializeInsightNotes(insights.baselineFromVersions(['# Observer’s notes\n\n## Unexpected connections\n- Accepted new insight. <!-- coffee-insight:v1:id=insight-current -->'], 'en'), 'en');
   const priorNotes = insights.serializeInsightNotes(insights.baselineFromVersions(['# Observer’s notes\n\n## Core disagreements\n- Original insight. <!-- coffee-insight:v1:id=insight-original -->'], 'en'), 'en');
-  const raw = `${'x'.repeat(18_000)}\n\n## Observer notes\nThis stays in the sidecar.`;
+  const raw = `${'x'.repeat(200)}\n\n## Observer notes\nThis stays in the sidecar.`;
   session.status = 'completed';
   session.guests.customization = customization;
   session.observerNotes = [currentNotes];

@@ -451,7 +451,7 @@ test('merge request: sources that fit one batch go in as written in a single tas
   assert.match(runtime.calls[0].prompt, /first source facts: 42 degrees/); assert.match(runtime.calls[0].prompt, /second source/);
 });
 test('merge request: sources over the batch budget are still extracted first, and a normal synthesis always is', async () => {
-  const big = 'x'.repeat(20_000);
+  const big = 'x'.repeat(18_001);
   const runtime = replayRuntime([{ response: JSON.stringify({ summary: '', detail: 'finding', suggestions: [], visualReferences: [] }) }, { response: JSON.stringify({ summary: '', detail: 'finding', suggestions: [], visualReferences: [] }) }, { response: JSON.stringify({ summary: '', detail: 'finding', suggestions: [], visualReferences: [] }) }, { response: mergeReply }]);
   await makeService(runtime, { language: 'en' }).askModel(mergeContext(big), 'claude:sonnet', 'low');
   assert.ok(runtime.calls.length >= 2, 'extraction then the task');
@@ -474,7 +474,7 @@ test('synthesis request (direct): more than one batch is still extracted first, 
   const finding = { response: JSON.stringify({ summary: '', detail: 'finding', suggestions: [], visualReferences: [] }) };
   const main = JSON.stringify({ summary: 'Sum [S1]', detail: '### Core conclusions\n\nA claim [S1] and another [S2].', suggestions: [], visualReferences: [] });
   const runtime = { calls: [], runTask: async prompt => { runtime.calls.push({ prompt }); return /SYNTH-TASK/.test(prompt) && !/Reference extraction|reference-extract/i.test(prompt) && /Source registry/i.test(prompt) ? main : finding.response; } };
-  const result = await makeService(runtime, { language: 'en' }).askModel(synthContext('x'.repeat(20_000)), 'claude:sonnet', 'low');
+  const result = await makeService(runtime, { language: 'en' }).askModel(synthContext('x'.repeat(18_001)), 'claude:sonnet', 'low');
   assert.ok(runtime.calls.length >= 2, 'extraction then the task');
   assert.match(result.detail, /\[\^1\]: \[\[Notes\/A\.md\|A\]\]/); assert.match(result.detail, /\[\^2\]: \[\[Notes\/B\.md\|B\]\]/);
 });

@@ -12,6 +12,7 @@ import { canonicalDetail, normalizeOutputScriptHeadings } from "../ai/result-uti
 import { normalizeDetailHeadings, normalizeMathDelimiters } from "../ai/markdown-blocks";
 import { checkCounts, countIssueText } from "../ai/detail-templates";
 import type { AiResult, ReasoningLevel, TaskContext } from "../ai/types";
+import { isSearchNotPerformed } from "../ai/search-not-performed";
 import { noteLanguageOf, translate, t, type ContentLanguage, type UiLanguage } from "../i18n";
 import { CLAUDE_MODEL_CHOICES, providerForModel } from "../ai/providers/provider";
 import type { CodexAppServerRuntime, CodexWebSearchEvent } from "../ai/runtime/codex-app-server";
@@ -173,6 +174,22 @@ export class AiTaskService {
     });
 
     console.debug("Visual Agent Map AI metrics", prepared.metrics);
+    // A standard research (Research mode of a plain task, not AIM and not a helper request): its web retrievals are counted for
+    // the result, and at normal or deep depth it must make at least one. A quick overview may answer without the web.
+    const countsWeb =
+      !context.aimIsolatedResearch &&
+      (context.mode ?? "task") === "task" &&
+      context.researchMode === "research" &&
+      role === undefined &&
+      !input.countRepair;
+    const requiresWeb = countsWeb && context.researchDepth !== "fast";
+    let retrievals = 0;
+    const webHook: ((event: CodexWebSearchEvent) => void) | undefined = countsWeb
+      ? event => {
+          if (event.method === "item/completed") retrievals++;
+          onWebSearchEvent?.(event);
+        }
+      : onWebSearchEvent;
     const providerStarted = Date.now();
     const effort = effectiveReasoningLevel(
       context,
@@ -202,7 +219,9 @@ export class AiTaskService {
           : {}),
         ...(context.aimIsolatedResearch
           ? { webSearchOnly: context.researchMode !== "local", textOnly: context.researchMode === "local" }
-          : {}),
+          : requiresWeb
+            ? { webSearchOnly: true }
+            : {}),
         onAccepted: accepted,
         // Search depth guides investigation; it does not impose a per-task query cap.
         // Codex uses 0 as no steering budget; Claude receives webSearch separately.
@@ -227,7 +246,7 @@ export class AiTaskService {
           effort,
           topic: context.title,
           mode: context.mode ?? "task",
-          task: { ...controls, onWebSearchEvent, ...(setup ? { ...setup.hooks, signal: setup.signal } : {}) },
+          task: { ...controls, onWebSearchEvent: webHook, ...(setup ? { ...setup.hooks, signal: setup.signal } : {}) },
           finish: "caller",
           requestLog: "request",
           ...(setup
@@ -240,12 +259,25 @@ export class AiTaskService {
           }
         });
       // Only the main call of a research request is observed (not reference extraction, a count repair or the chart step).
-      const { raw } =
-        observer && role === undefined && !input.countRepair
-          ? await this.sendObserved(observer, signal, accepted, sendOnce)
-          : await sendOnce();
+      let raw = "";
+      for (let attempt = 1; ; attempt++) {
+        retrievals = 0;
+        try {
+          ({ raw } =
+            observer && role === undefined && !input.countRepair
+              ? await this.sendObserved(observer, signal, accepted, sendOnce)
+              : await sendOnce());
+          break;
+        } catch (error) {
+          // No retrieval at all: asked once more; a second time is a failure and nothing is written from it.
+          if (!requiresWeb || attempt >= 2 || signal?.aborted || !isSearchNotPerformed(error)) throw error;
+          if (this.options.exchangeLoggingEnabled())
+            exchanges?.failed(exchangeId, error instanceof Error ? error.message : String(error));
+        }
+      }
       stage = t("log.stage_parsing_reply");
       let result = step.parse(raw);
+      if (countsWeb) result.retrievals = retrievals;
       if (readerFacingDetail(input)) {
         result.detail = normalizeMathDelimiters(normalizeDetailHeadings(result.detail));
         result.detail = normalizeOutputScriptHeadings(result.detail, outputLanguage, input.detailTemplate, input);

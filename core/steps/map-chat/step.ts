@@ -36,6 +36,9 @@ export const MAP_CHAT_ACTION_KINDS = [
 export type MapChatActionKind = (typeof MAP_CHAT_ACTION_KINDS)[number];
 export const MAP_RUN_ACTIONS = ["research_standard", "expand", "synthesize", "rate_by_goal", "merge"] as const;
 export type MapRunAction = (typeof MAP_RUN_ACTIONS)[number];
+/** Research depths a reply may name; "" (not named) is read as the default by the view. */
+export const MAP_CHAT_RESEARCH_DEPTHS = ["fast", "normal", "deep"] as const;
+export type MapChatResearchDepth = (typeof MAP_CHAT_RESEARCH_DEPTHS)[number];
 export const MAP_CHAT_MAX_ACTIONS = 100;
 /** Prefix of a temporary id a reply gives to a card it creates itself; `ref: "n1"` is named `new:n1` by later actions. */
 export const MAP_CHAT_NEW_PREFIX = "new:";
@@ -63,8 +66,12 @@ export type MapChatAction =
       title: string;
       /** rate_by_goal: the learner goal. */
       goal: string;
-      /** expand: optional direction. */
+      /** expand: optional direction. research_standard: extra requirements for the research. */
       direction: string;
+      /** research_standard: the depth the user asked for; "" = not named (the view decides). Ignored by every other action. */
+      depth: MapChatResearchDepth | "";
+      /** research_standard: true = also search for images. Ignored by every other action. */
+      images: boolean;
     }
   /** Always the first action: a new map, opened for the rest of the reply. */
   | { kind: "create_map"; title: string }
@@ -151,7 +158,9 @@ export const MAP_CHAT_SCHEMA = {
           branch: { type: "boolean" },
           action: { type: "string", enum: [...MAP_RUN_ACTIONS, ""] },
           goal: STRING,
-          direction: STRING
+          direction: STRING,
+          depth: { type: "string", enum: [...MAP_CHAT_RESEARCH_DEPTHS, ""] },
+          images: { type: "boolean" }
         },
         required: [
           "kind",
@@ -171,7 +180,9 @@ export const MAP_CHAT_SCHEMA = {
           "branch",
           "action",
           "goal",
-          "direction"
+          "direction",
+          "depth",
+          "images"
         ]
       }
     }
@@ -342,13 +353,19 @@ export function parseMapChat(
             goal = text("goal", false);
           if (action === "merge" && !title) throw new Dropped("missing_field");
           if (action === "rate_by_goal" && !goal) throw new Dropped("missing_field");
+          // depth and images only mean something to a research; every other action ignores them (an old v3 reply has neither).
+          const research = action === "research_standard";
+          const given = research ? text("depth", false) : "";
+          if (given && !(MAP_CHAT_RESEARCH_DEPTHS as readonly string[]).includes(given)) throw new Dropped("bad_value");
           actions.push({
             kind: "run_map_action",
             action: action as MapRunAction,
             nodeIds,
             title,
             goal,
-            direction: text("direction", false)
+            direction: text("direction", false),
+            depth: given as MapChatResearchDepth | "",
+            images: research && flag("images")
           });
           break;
         }
@@ -387,7 +404,7 @@ export function parseMapChat(
 /** One conversation turn: the user's message plus the context the panel gathered. The reply is JSON; actions are applied by the view. */
 export const mapChatStep: StepDefinition<MapChatRequest, MapChatResult> = {
   id: "map-chat",
-  version: 3,
+  version: 4,
   render: request => {
     const language = request.contentLanguage ?? request.language;
     const zh = instructionLanguageOf(language) === "zh";

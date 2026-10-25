@@ -1,5 +1,6 @@
 import { spawn as nodeSpawn } from "node:child_process";
 import { t } from "../../i18n";
+import { searchNotPerformedError } from "../search-not-performed";
 import { createUtf8StreamDecoder } from "./utf8-stream";
 import type { AiMilestones } from "../../ai-exchange-log";
 import type { PartialFields } from "../partial-structured";
@@ -47,7 +48,7 @@ export interface ClaudeTaskControls {
   onSteer?: (steer: (text: string) => Promise<void>) => void;
   timeoutMs?: number;
   timeoutMessage?: string;
-  /** Isolated research: fail the task unless at least one web search or page fetch actually returned. */
+  /** Isolated research, and standard research of normal or deep depth: fail the task unless at least one web search or page fetch actually returned. */
   webSearchOnly?: boolean;
   /** Receives WebSearch/WebFetch activity in the same shape as Codex App Server web-search items. */
   onWebSearchEvent?: (event: WebSearchEvent) => void;
@@ -569,7 +570,7 @@ export class ClaudeCodeCliRuntime {
             if (Array.isArray(transcript)) for (const record of transcript) activity.read(record);
           }
           const result = claudeStructuredOutput(streaming ? finalResult : stdout, !outputSchema);
-          if (controls.webSearchOnly && !activity.retrievals) throw new Error(t("ui.context_ai_search_not_performed"));
+          if (controls.webSearchOnly && !activity.retrievals) throw searchNotPerformedError();
           const streamed = [streamText, currentText].filter(Boolean).join("\n\n");
           finish(undefined, !outputSchema && streaming && result.length < streamed.length ? streamed : result);
         } catch (error) {

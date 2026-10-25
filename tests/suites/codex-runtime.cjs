@@ -540,3 +540,41 @@ integrationTest('L2: turn/started is not the first model event; the first item o
   assert.match(await run, /"summary":"S"/);
   runtime.stop();
 });
+
+// B2-feat (W1): a standard research of normal or deep depth reaches Codex as a web-search-only turn. Args and config only; no live run.
+integrationTest('B2 W1 Codex: a web-search-only turn starts its thread with web_search live; a plain turn adds no web override; the local runtime starts with web search disabled', async () => {
+  const run = async controls => {
+    const { EventEmitter } = require('node:events'); const sent = [];
+    const child = new EventEmitter(); child.stdout = new EventEmitter(); child.stderr = new EventEmitter(); child.kill = () => {};
+    const emit = message => process.nextTick(() => child.stdout.emit('data', Buffer.from(`${JSON.stringify(message)}\n`)));
+    child.stdin = { write: line => {
+      const message = JSON.parse(line.trim()); sent.push(message);
+      if (message.method === 'initialize') emit({ id: message.id, result: {} });
+      else if (message.method === 'config/read') emit({ id: message.id, result: { config: { mcp_servers: { 'user.mcp': { command: 'x' } } } } });
+      else if (message.method === 'thread/start') emit({ id: message.id, result: { thread: { id: 'thread-1' } } });
+      else if (message.method === 'turn/start') {
+        emit({ id: message.id, result: { turn: { id: 'turn-1' } } });
+        emit({ method: 'item/completed', params: { threadId: 'thread-1', item: { id: 'w1', type: 'webSearch', action: { type: 'search' } } } });
+        emit({ method: 'item/completed', params: { threadId: 'thread-1', item: { type: 'agentMessage', text: 'answer' } } });
+        emit({ method: 'turn/completed', params: { threadId: 'thread-1', turn: { status: 'completed' } } });
+      } else if (message.method === 'thread/unsubscribe') emit({ id: message.id, result: {} });
+    } };
+    let spawnArgs;
+    const { CodexAppServerRuntime } = load('ai/runtime/codex-app-server.ts', { 'node:child_process': { spawn: (_exe, args) => { spawnArgs = args; return child; } } });
+    const runtime = new CodexAppServerRuntime({ executable: 'codex', cwd: '/plugin', env: {}, clientVersion: 'test', webSearchDisabled: controls.local === true });
+    try { await runtime.runTask('research', 'model', 'low', {}, controls.local ? {} : controls); } finally { runtime.stop(); }
+    return { thread: sent.find(m => m.method === 'thread/start').params, spawnArgs, configReads: sent.filter(m => m.method === 'config/read').length };
+  };
+  const web = await run({ webSearchOnly: true });
+  assert.equal(web.thread.config.web_search, 'live'); assert.match(web.thread.baseInstructions, /web search only/);
+  // Standard research and AIM share this isolated thread: features off, user MCP servers disabled, web-only instructions, config read once.
+  assert.equal(web.thread.config['features.shell_tool'], false, 'features are off'); assert.equal(web.thread.config['features.apps'], false);
+  assert.deepEqual(JSON.parse(JSON.stringify(web.thread.config.mcp_servers)), { 'user.mcp': { enabled: false } }, 'user MCP servers are disabled');
+  assert.equal(web.configReads, 1, 'the effective config is read to disable MCP servers');
+  assert.equal(typeof web.thread.baseInstructions, 'string');
+  const plainTurn = await run({});
+  assert.equal(plainTurn.thread.config, undefined, 'an ordinary turn sends no config override');
+  const local = await run({ local: true });
+  assert.deepEqual(JSON.parse(JSON.stringify(local.spawnArgs)), ['--config', 'web_search="disabled"', 'app-server'], 'local mode: web search disabled at launch');
+  assert.equal(local.thread.config, undefined);
+});

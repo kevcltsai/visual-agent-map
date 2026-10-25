@@ -1070,3 +1070,83 @@ integrationTest('S6 dialog: a plugin without the pre-start methods (older test d
   const h = nextStepHarness({});
   assert.doesNotThrow(() => h.modal.close());
 });
+
+// ---- B2-feat: integration from the chat (no dialog, the user's message is the direction) ---------------------------------
+const NOT_UNDOABLE_TEXT = 'These changes cannot be undone; the undo history was cleared.';
+const chatApply = async (h, actions, message, baseline = {}) => (await h.view.applyMapChatActions({ actions, rejected: [], message }, { mdHashes: {}, topicHashes: baseline })).filter(l => l.text !== NOT_UNDOABLE_TEXT);
+const synth = (nodeIds, extra = {}) => ({ kind: 'run_map_action', action: 'synthesize', nodeIds, title: '', goal: '', direction: 'model words', depth: '', images: false, ...extra });
+const spyOptions = h => { const seen = []; for (const name of ['startSynthesis', 'startSelectionSynthesis']) { const original = h.view[name].bind(h.view); h.view[name] = (target, options, ...rest) => { const { signal, onProgress, ...kept } = options; seen.push({ name, options: JSON.parse(JSON.stringify(kept)), direction: rest[0], hadSignal: !!signal }); return original(target, options, ...rest); }; } return seen; };
+
+integrationTest('B2 synthesize (chat): one card with subtopics is integrated into itself with no dialog; the message is the direction; the parent note is written', async () => {
+  const h = await synthesisHarness();
+  const lines = await chatApply(h, [synth([h.parent.id])], 'Integrate around sleep debt');
+  assert.deepEqual(plain(lines.map(l => l.status)), ['done'], JSON.stringify(lines));
+  await untilAsync(async () => (await h.note()).summary === 'Draft summary');
+  assert.equal(h.modals.length, 0, 'no dialog of any kind opened');
+  assert.equal(h.calls.length, 1); assert.equal(h.calls[0].directions, false, 'the directions step is skipped');
+  assert.equal(h.calls[0].context.task, 'Integrate around sleep debt', 'the request task is the message, not the model\'s direction');
+  assert.match((await h.note()).detail, /Draft detail/); assert.equal(h.view.synthesisTasks.size, 0);
+  assert.equal(actionNotices(h).filter(n => n.actions[0].text === 'Undo').length, 1, 'the usual done Notice with Undo');
+});
+integrationTest('B2 synthesize (chat): the selection is the target when the reply names none', async () => {
+  const h = await synthesisHarness();
+  h.view.selected = h.parent.id;
+  const lines = await chatApply(h, [synth([])], 'Go');
+  assert.deepEqual(plain(lines.map(l => l.status)), ['done']); await untilAsync(async () => (await h.note()).summary === 'Draft summary');
+  assert.equal(h.modals.length, 0);
+});
+integrationTest('B2 synthesize (chat) counterexample: a card without subtopics is skipped with the reason, no dialog, no request', async () => {
+  const h = await synthesisHarness();
+  const lines = await chatApply(h, [synth([h.kids[0].id])], 'Integrate');
+  assert.deepEqual(plain(lines.map(l => l.status)), ['skipped']); assert.match(lines[0].text, /no subtopics/);
+  assert.equal(h.modals.length, 0); assert.equal(h.calls.length, 0);
+});
+integrationTest('B2 synthesize (chat) counterexample: an integration already running on the card is skipped; the first one still finishes', async () => {
+  const h = await synthesisHarness();
+  const gate = h.hold();
+  const first = chatApply(h, [synth([h.parent.id])], 'First');
+  await until(() => h.calls.length === 1);
+  const second = await chatApply(h, [synth([h.parent.id])], 'Second');
+  assert.deepEqual(plain(second.map(l => l.status)), ['skipped']); assert.match(second[0].text, /already running or waiting/); assert.equal(h.calls.length, 1);
+  gate.resolve(); assert.deepEqual(plain((await first).map(l => l.status)), ['done']);
+  await untilAsync(async () => (await h.note()).summary === 'Draft summary'); assert.equal(h.modals.length, 0);
+});
+integrationTest('B2 synthesize (chat): several cards go to the selection integration with no dialog and make one new integrated topic', async () => {
+  const h = await synthesisHarness();
+  const before = h.view.map.nodes.length;
+  const lines = await chatApply(h, [synth(h.kids.map(k => k.id))], 'Compare the two');
+  assert.deepEqual(plain(lines.map(l => l.status)), ['done'], JSON.stringify(lines));
+  await untilAsync(async () => h.view.map.nodes.length === before + 1 || (await h.repo.readMap(h.mapPath)).nodes.length === before + 1);
+  assert.equal(h.modals.length, 0); assert.equal(h.calls.length, 1); assert.equal(h.calls[0].directions, false);
+  assert.match(h.calls[0].context.task, /Compare the two/);
+});
+integrationTest('B2 synthesize (chat): a declined usage notice starts nothing and says so', async () => {
+  const h = await synthesisHarness(); h.plugin.confirmAiUsage = async () => false;
+  const lines = await chatApply(h, [synth([h.parent.id])], 'x');
+  assert.deepEqual(plain(lines.map(l => l.status)), ['skipped']); assert.match(lines[0].text, /did not start/); assert.equal(h.calls.length, 0);
+});
+integrationTest('B2 synthesize (chat): a start that fails before the provider accepts is a failed line; a map that is read-only or switched is skipped', async () => {
+  const h = await synthesisHarness();
+  h.plugin.askModel = async () => { throw new Error('provider down'); };
+  const failed = await chatApply(h, [synth([h.parent.id])], 'x');
+  assert.deepEqual(plain(failed.map(l => l.status)), ['failed']); assert.match(failed[0].text, /provider down/); assert.equal(h.modals.length, 0);
+  const ro = await synthesisHarness(); ro.view.builtIn = true;
+  const skippedRo = await chatApply(ro, [synth([ro.parent.id])], 'x'); assert.deepEqual(plain(skippedRo.map(l => l.status)), ['skipped']); assert.equal(ro.calls.length, 0);
+});
+integrationTest('B2 synthesize (chat): the options equal what the integration dialog hands over when its fields are left alone (single card and selection)', async () => {
+  const dialog = await synthesisHarness(); const dialogSeen = spyOptions(dialog);
+  const modal = await dialog.openSingle(); visibleBar(modal, 'Skip suggestions and synthesize now').click();
+  await untilAsync(async () => (await dialog.note()).summary === 'Draft summary');
+  const chat = await synthesisHarness(); const chatSeen = spyOptions(chat);
+  await chatApply(chat, [synth([chat.parent.id])], 'x'); await untilAsync(async () => (await chat.note()).summary === 'Draft summary');
+  assert.equal(dialogSeen.length, 1); assert.equal(chatSeen.length, 1);
+  assert.deepEqual(chatSeen[0].options, dialogSeen[0].options, 'single card: same TaskOptions');
+  console.log('B2 integration default options (single):', JSON.stringify(chatSeen[0].options));
+  const selDialog = await synthesisHarness(); const selDialogSeen = spyOptions(selDialog);
+  const selModal = await selDialog.openSelection(); visibleBar(selModal, 'Skip suggestions and synthesize now').click();
+  await until(() => selDialogSeen.length === 1);
+  const selChat = await synthesisHarness(); const selChatSeen = spyOptions(selChat);
+  await chatApply(selChat, [synth(selChat.kids.map(k => k.id))], 'x'); await until(() => selChatSeen.length === 1);
+  assert.deepEqual(selChatSeen[0].options, selDialogSeen[0].options, 'selection: same TaskOptions, including the new topic\'s default name');
+  console.log('B2 integration default options (selection):', JSON.stringify(selChatSeen[0].options));
+});

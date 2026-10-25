@@ -172,3 +172,65 @@ test('a rerun without note sources keeps a source footnote linked by restoring i
   assert.ok(result.detail.includes('Kept[^1]'));
   assert.ok(result.detail.includes('[^1]: [[Maps/A/one.md|one]]'));
 });
+
+// ---- B2-feat (W1): standard research must really use the web ----
+const { searchNotPerformedError } = load('ai/search-not-performed.ts');
+const webEvent = { method: 'item/completed', params: { item: { type: 'webSearch', action: { type: 'search' } } } };
+const researchContext = (extra = {}) => context({ researchMode: 'research', researchDepth: 'normal', ...extra });
+
+test('B2 W1: normal and deep standard research asks the provider for a web-search-only turn; fast, local and AIM do not change', async () => {
+  const controlsOf = async (ctx, model = 'gpt-6-luna') => { const fake = runtime(GOOD); await makeService(fake).askModel(ctx, model, 'low'); return fake.calls[0].controls; };
+  for (const model of ['gpt-6-luna', 'claude:sonnet']) {
+    const normal = await controlsOf(researchContext(), model);
+    assert.equal(normal.webSearchOnly, true, `${model} normal is the isolated web-only thread`); assert.ok(!normal.textOnly, `${model} normal keeps web search on`); assert.equal(normal.requireWeb, undefined, `${model} normal has no separate requireWeb path`);
+    assert.equal((await controlsOf(researchContext({ researchDepth: 'deep' }), model)).webSearchOnly, true, `${model} deep`);
+    assert.equal((await controlsOf(researchContext({ researchDepth: 'fast' }), model)).webSearchOnly, undefined, `${model} fast may answer without searching`);
+  }
+  const local = await controlsOf(context({ researchMode: 'local', researchDepth: 'normal' }));
+  assert.equal(local.webSearchOnly, undefined); assert.equal(local.requireWeb, undefined); assert.equal(local.webSearch, false, 'local mode carries no web parameter');
+  assert.equal((await controlsOf(researchContext({ mode: 'synthesize' }))).webSearchOnly, undefined, 'a synthesis is not a standard research');
+  const aim = await controlsOf(researchContext({ aimIsolatedResearch: true }));
+  assert.equal(aim.webSearchOnly, true); assert.equal(aim.textOnly, false); assert.equal(aim.requireWeb, undefined);
+});
+
+test('B2 W1: a research with no retrieval is sent once more; the second attempt\'s answer is kept and carries its search count', async () => {
+  const log = spyLog(); let attempts = 0;
+  const fake = runtime((_prompt, n) => { attempts = n; return GOOD; });
+  const original = fake.runTask;
+  fake.runTask = async (...args) => { const controls = args[4]; if (fake.calls.length === 0) { fake.calls.push({ controls }); controls.onRequest?.({}); throw searchNotPerformedError(); } controls.onWebSearchEvent?.(webEvent); return original(...args); };
+  const result = await makeService(fake, { logging: true, exchanges: log }).askModel(researchContext(), 'gpt-6-luna', 'low');
+  assert.equal(fake.calls.length, 2, 'asked exactly twice'); assert.equal(result.summary, 'S'); assert.equal(result.retrievals, 1);
+  assert.ok(log.events.some(event => event[0] === 'failed'), 'the first attempt\'s entry is closed as failed');
+  void attempts;
+});
+
+test('B2 W1: still no retrieval on the second attempt fails the research; nothing is returned to be written', async () => {
+  const fake = { calls: [], runTask: async (_p, _m, _e, _s, controls) => { fake.calls.push(controls); controls.onRequest?.({}); throw searchNotPerformedError(); } };
+  await assert.rejects(makeService(fake).askModel(researchContext(), 'gpt-6-luna', 'low'), error => error.name === 'SearchNotPerformedError');
+  assert.equal(fake.calls.length, 2, 'one retry, not more');
+  const other = { calls: 0, runTask: async () => { other.calls++; throw new Error('provider down'); } };
+  await assert.rejects(makeService(other).askModel(researchContext(), 'gpt-6-luna', 'low'), /provider down/);
+  assert.equal(other.calls, 1, 'only the no-search failure is retried');
+});
+
+test('B2 W1: a fast research with no retrieval completes as usual and reports 0 searches; local research reports none', async () => {
+  const fast = await makeService(runtime(GOOD)).askModel(researchContext({ researchDepth: 'fast' }), 'gpt-6-luna', 'low');
+  assert.equal(fast.summary, 'S'); assert.equal(fast.retrievals, 0);
+  const local = await makeService(runtime(GOOD)).askModel(context(), 'gpt-6-luna', 'low');
+  assert.equal('retrievals' in local, false);
+  const fake = runtime(GOOD); const seen = [];
+  const original = fake.runTask; fake.runTask = async (...args) => { args[4].onWebSearchEvent?.(webEvent); args[4].onWebSearchEvent?.({ method: 'item/started', params: {} }); return original(...args); };
+  const counted = await makeService(fake).askModel(researchContext(), 'gpt-6-luna', 'low', undefined, undefined, undefined, event => seen.push(event));
+  assert.equal(counted.retrievals, 1, 'only completed retrievals count'); assert.equal(seen.length, 2, 'the caller\'s own listener still hears every event');
+});
+
+test('B2 W2: the research prompt says to search when Detail has no source (normal and deep, all languages); fast, local and AIM keep the old text', () => {
+  for (const language of ['en', 'zh-TW', 'zh-CN']) {
+    const required = translate(language, 'research.web_required');
+    for (const depth of ['normal', 'deep']) assert.ok(taskPrompt(researchContext({ researchDepth: depth }), language).includes(required), `${language} ${depth}`);
+    assert.ok(!taskPrompt(researchContext({ researchDepth: 'fast' }), language).includes(required), `${language} fast`);
+    assert.ok(!taskPrompt(context({ researchMode: 'local', researchDepth: 'normal' }), language).includes(required), `${language} local`);
+    assert.ok(!taskPrompt(researchContext({ aimIsolatedResearch: true }), language).includes(required), `${language} AIM`);
+  }
+  assert.match(translate('en', 'research.web_required'), /search before you stop/); assert.match(translate('zh-TW', 'research.web_required'), /尚未查證/);
+});

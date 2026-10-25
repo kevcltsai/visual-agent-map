@@ -274,7 +274,7 @@ async function harness({ aim = false, document = false, empty = false, realRende
   const handlers = []; const linkOpens = [];
   app.workspace = { getLeavesOfType: type => type === 'markdown' ? leaves : [], getActiveViewOfType: () => activeMarkdown, requestSaveLayout() {}, on(name, fn) { const ref = { name, fn }; handlers.push(ref); return ref; }, openLinkText(link, source, newLeaf) { linkOpens.push([link, source, newLeaf]); } };
   class Notice { constructor(message) { notices.push(message); } hide() {} }
-  const { VisualAgentMapView } = load('main.ts', { obsidian: { ...obsidian, MarkdownView, Notice, Component: class { load() {} unload() {} }, MarkdownRenderer: { render: async (_app, text, el, sourcePath, owner) => { control.markdown.push({ text, el, sourcePath, owner }); el.setText(text); } } } }, { ...(document ? { document: { documentElement: { style: {} }, get activeElement() { return ctx.page?.doc.activeElement ?? null; } } } : {}), CSS: { escape: value => String(value) }, createSvg: tag => ({ tag, attrs: {}, classes: [], setAttribute(name, value) { this.attrs[name] = value; }, addClass(name) { this.classes.push(name); } }), requestAnimationFrame: run => { run(); return 1; }, cancelAnimationFrame() {}, setTimeout: fn => { ctx.timers.push(fn); return ctx.timers.length; }, clearTimeout() {} });
+  const { VisualAgentMapView } = load('main.ts', { obsidian: { ...obsidian, MarkdownView, Notice, Modal: class { constructor(app) { this.app = app; } open() { (control.modals ??= []).push(this); if (typeof this.resolve === 'function' && this.local) this.resolve(this.local); } close() {} }, Component: class { load() {} unload() {} }, MarkdownRenderer: { render: async (_app, text, el, sourcePath, owner) => { control.markdown.push({ text, el, sourcePath, owner }); el.setText(text); } } } }, { ...(document ? { document: { documentElement: { style: {} }, get activeElement() { return ctx.page?.doc.activeElement ?? null; } } } : {}), CSS: { escape: value => String(value) }, createSvg: tag => ({ tag, attrs: {}, classes: [], setAttribute(name, value) { this.attrs[name] = value; }, addClass(name) { this.classes.push(name); } }), requestAnimationFrame: run => { run(); return 1; }, cancelAnimationFrame() {}, setTimeout: fn => { ctx.timers.push(fn); return ctx.timers.length; }, clearTimeout() {} });
   ctx.timers = [];
   const view = new VisualAgentMapView({ app }, plugin);
   ctx.view = view;
@@ -614,18 +614,20 @@ integrationTest('map chat: control - the same nested mutate really does hang whe
   assert.equal(h.control.nested, 1, 'the harness counts the nested call, so a nested write would also fail the other tests');
 });
 
-integrationTest('map chat: synthesize opens the integration dialog for the selection; rate_by_goal and merge start their own task', async () => {
+integrationTest('map chat: synthesize of several cards starts the selection integration without a dialog; rate_by_goal and merge start their own task', async () => {
   const h = await harness(); await h.view.hydrate();
   const opened = []; h.view.openSelectionSynthesis = pending => opened.push(pending);
+  const starts = []; h.view.startSelectionSynthesis = async (nodes, options, direction, failed, accepted) => { starts.push({ ids: nodes.map(n => n.id).sort(), options, direction, failed: typeof failed, depth: h.control.depth }); accepted(); };
   const goals = []; h.view.relevanceGradeable = () => true; h.view.submitRelevanceGoal = async goal => { goals.push(goal); };
   const merges = []; h.view.mergeSelected = async (title, snapshot) => { merges.push([title, snapshot.sources.map(s => s.id).sort(), h.control.depth]); };
-  const lines = await apply(h, [
+  const lines = await withTimeout(h.view.applyMapChatActions({ message: 'Compare them', rejected: [], actions: [
     { kind: 'run_map_action', action: 'synthesize', nodeIds: [h.ids.a, h.ids.b], title: '', goal: '', direction: '' },
     { kind: 'run_map_action', action: 'rate_by_goal', nodeIds: [], title: '', goal: ' Sleep better ', direction: '' },
     { kind: 'run_map_action', action: 'merge', nodeIds: [h.ids.a, h.ids.b], title: 'Body and mind', goal: '', direction: '' }
-  ]);
-  eq(lines.map(l => l.status), ['done', 'done', 'done'], JSON.stringify(lines)); await tick();
-  eq(opened, [null]); eq(goals, ['Sleep better']);
+  ] }, { mdHashes: {}, topicHashes: topicBaseline(h) }));
+  eq(lines.filter(l => l.text !== NOT_UNDOABLE).map(l => l.status), ['done', 'done', 'done'], JSON.stringify(lines)); await tick();
+  eq(opened, [], 'B2: no dialog opens'); eq(goals, ['Sleep better']);
+  assert.equal(starts.length, 1); eq(starts[0].ids, [h.ids.a, h.ids.b].sort()); assert.equal(starts[0].direction, 'Compare them', 'the user\'s message is the direction'); assert.equal(starts[0].depth, 0, 'not inside a mutate');
   eq(merges, [['Body and mind', [h.ids.a, h.ids.b].sort(), 1]], 'merge runs in its own mutate, after every write');
 });
 
@@ -639,7 +641,7 @@ integrationTest('map chat: run actions are skipped, not guessed, when the map ca
   const plain = await harness(); await plain.view.hydrate();
   plain.view.relevanceGradeable = () => false; plain.view.openSelectionSynthesis = () => { throw new Error('must not open'); };
   const result = await apply(plain, [
-    { kind: 'run_map_action', action: 'synthesize', nodeIds: [plain.ids.a], title: '', goal: '', direction: '' },
+    { kind: 'run_map_action', action: 'synthesize', nodeIds: [plain.ids.b], title: '', goal: '', direction: '' },
     { kind: 'run_map_action', action: 'rate_by_goal', nodeIds: [], title: '', goal: 'x', direction: '' },
     { kind: 'run_map_action', action: 'merge', nodeIds: [], title: '', goal: '', direction: '' },
     { kind: 'run_map_action', action: 'research_standard', nodeIds: ['nope'], title: '', goal: '', direction: '' }
@@ -2397,6 +2399,18 @@ integrationTest('B1 ui: sending the first message moves the same panel (same mes
   assert.equal(chat.transcript().length, 2);
 });
 
+integrationTest('B2-fix F2: sending the first message from the opening screen does not change the remembered mapChatOpen', async () => {
+  for (const remembered of [false, true]) {
+    const h = await harness({ empty: true }); h.plugin.settings.mapChatOpen = remembered; await h.view.hydrate(); h.repaint(); const chat = h.view.chat;
+    assert.equal(chat.isHero, true);
+    h.control.reply = async () => ({ reply: 'ok', actions: [], rejected: [] });
+    h.type('Coffee'); await h.view.sendMapChat();
+    assert.equal(chat.isHero, false); assert.equal(chat.isOpen, true, 'the panel is shown');
+    assert.equal(h.plugin.settings.mapChatOpen, remembered, 'right after the send');
+    h.repaint(); assert.equal(h.plugin.settings.mapChatOpen, remembered, `mapChatOpen stays ${remembered}`);
+  }
+});
+
 integrationTest('B1 ui: an AIM map with no cards does NOT get the opening screen', async () => {
   const h = await harness({ aim: true, empty: true }); await h.view.hydrate(); h.repaint();
   assert.equal(h.view.map.nodes.length, 0); assert.ok(h.view.map.aim); assert.equal(h.view.chat.isHero, false); assert.equal(find(h.rootEl, i => hasClass(i, 'vam-chat-hero-slot')), undefined);
@@ -2871,4 +2885,268 @@ test('B1 fix 9 and 10: no dead overlay rule; the Escape selector is a plain lite
   const source = fs.readFileSync(path.join(root, 'experiences/visual-map/view.ts'), 'utf8'); assert.equal(/closest\(\[/.test(source), false, 'no selector built from parts');
   const allow = JSON.parse(fs.readFileSync(path.join(root, 'tests/literal-scan/visual-map.json'), 'utf8')).allow.find(entry => entry.text === 'input, textarea, select, [contenteditable=true], .vam-map-chat');
   assert.ok(allow && allow.reason.length > 10);
+});
+
+// ---- B2-0 L3: a squeezed window does not write a smaller width back ----------------------------------------------------
+const squeezed = async () => {
+  const h = await harness(); await h.view.hydrate(); h.plugin.settings.mapChatWidth = 500; const chat = h.open();
+  h.rootEl.clientWidth = 700; h.view.onResize(); // the pane leaves 340 of the 500 the user set
+  assert.equal(chat.el.style.width, '340px'); h.control.saves = 0;
+  return { h, chat };
+};
+integrationTest('B2-0 L3: squeezed window - ArrowRight (widening) keeps the set width; ArrowLeft (narrowing) still writes the smaller value', async () => {
+  const { h, chat } = await squeezed();
+  press(chat.resizerEl, { key: 'ArrowRight' });
+  assert.equal(h.plugin.settings.mapChatWidth, 500, 'a widening inside the squeezed range does not shrink the set width'); assert.equal(h.control.saves, 0);
+  press(chat.resizerEl, { key: 'ArrowLeft' });
+  assert.equal(h.plugin.settings.mapChatWidth, 324, 'narrowing from what is shown writes the smaller value'); assert.ok(h.control.saves > 0);
+});
+integrationTest('B2-0 L3: squeezed window - a drag that only widens keeps the set width; a drag that narrows writes it; End still writes the larger value', async () => {
+  const { h, chat } = await squeezed(); const doc = counting(); chat.el.ownerDocument = doc;
+  chat.resizerEl.fire('pointerdown', { button: 0, clientX: 340, pointerId: 1 }); doc.fire('pointermove', { clientX: 440 }); doc.fire('pointerup', {});
+  assert.equal(h.plugin.settings.mapChatWidth, 500, 'dragged wider than shown but under the set width: unchanged');
+  chat.resizerEl.fire('pointerdown', { button: 0, clientX: 340, pointerId: 1 }); doc.fire('pointermove', { clientX: 300 }); doc.fire('pointerup', {});
+  assert.equal(h.plugin.settings.mapChatWidth, 300, 'dragged narrower: written');
+  press(chat.resizerEl, { key: 'End' }); assert.equal(h.plugin.settings.mapChatWidth, 560, 'wider than the set width: written');
+});
+integrationTest('B2-0 L3: a window that is not squeezed writes both directions as before', async () => {
+  const h = await harness(); await h.view.hydrate(); h.plugin.settings.mapChatWidth = 500; const chat = h.open(); h.rootEl.clientWidth = 1400; h.view.onResize();
+  press(chat.resizerEl, { key: 'ArrowLeft' }); assert.equal(h.plugin.settings.mapChatWidth, 484);
+  press(chat.resizerEl, { key: 'ArrowRight' }); press(chat.resizerEl, { key: 'ArrowRight' }); assert.equal(h.plugin.settings.mapChatWidth, 516);
+  const doc = counting(); chat.el.ownerDocument = doc; chat.resizerEl.fire('pointerdown', { button: 0, clientX: 500, pointerId: 1 }); doc.fire('pointermove', { clientX: 450 }); doc.fire('pointerup', {});
+  assert.equal(h.plugin.settings.mapChatWidth, 466);
+});
+
+// ---- B2-0 F1: opening the overlay scrolls once its height is final -----------------------------------------------------
+test('B2-0 F1: opening the folded overlay scrolls to the end after the next frame (when the overlay height is final), not before', () => {
+  const f = panelFixture(); f.panel.setOpen(true); const log = f.parts.log(); f.panel.setNarrow(true);
+  f.panel.begin('q'); f.panel.finish('a reply', []); f.panel.collapseOverlay(); assert.equal(f.panel.isOpen, false);
+  const frames = []; log.win = { requestAnimationFrame: fn => { frames.push(fn); return frames.length; }, cancelAnimationFrame() {} };
+  Object.assign(log, { scrollHeight: 0, clientHeight: 0, scrollTop: 0 }); // a folded log measures as empty, so as at its end
+  f.parts.toggle().click(); assert.equal(f.panel.isOpen, true); assert.ok(frames.length >= 1, 'the scroll waits for a frame');
+  assert.equal(log.scrollTop, 0, 'not scrolled against the height from before the overlay was laid out');
+  // The overlay settles at its final height; the scroll must use it.
+  Object.assign(log, { scrollHeight: 1030, clientHeight: 300 }); frames.splice(0).forEach(run => run());
+  assert.equal(log.scrollTop, 1030, 'at the very end once the height is final');
+});
+test('B2-0 F1: the deferred scroll is dropped when the window is folded again before the frame', () => {
+  const f = panelFixture(); f.panel.setOpen(true); const log = f.parts.log(); f.panel.setNarrow(true); f.panel.begin('q'); f.panel.finish('a reply', []); f.panel.collapseOverlay();
+  const frames = []; log.win = { requestAnimationFrame: fn => { frames.push(fn); return frames.length; }, cancelAnimationFrame() {} };
+  Object.assign(log, { scrollHeight: 0, clientHeight: 0, scrollTop: 0 });
+  f.parts.toggle().click(); f.panel.collapseOverlay(); Object.assign(log, { scrollHeight: 1000, clientHeight: 300 }); frames.splice(0).forEach(run => run()); assert.equal(log.scrollTop, 0, 'folded again: nothing to scroll');
+});
+
+// ---- B2-0 F3: the model menu keeps its width at 340px --------------------------------------------------------------------
+integrationTest('B2-0 F3: the model select takes the header\'s remaining width (flex 1 1 0, min-width 0), and the default entry shows the model without its provider prefix, the tooltip keeps the full name', async () => {
+  const css = fs.readFileSync(path.join(root, 'styles.css'), 'utf8');
+  const rule = css.split('\n').find(line => line.startsWith('.vam-map-chat-model {')); assert.ok(rule);
+  assert.match(rule, /flex: 1 1 0;/); assert.match(rule, /min-width: 0;/); assert.doesNotMatch(rule, /min-width: 120px/);
+  const h = await harness(); await h.view.hydrate(); h.plugin.settings.cliModel = 'gpt-6-luna'; h.plugin.modelLabel = id => id.startsWith('claude:') ? 'Claude Sonnet' : `OpenAI Codex · ${id}`;
+  const first = h.view.chatModelChoices()[0];
+  assert.equal(first.label, 'Follow default (now: OpenAI Codex · gpt-6-luna)', 'the full name stays in the tooltip'); assert.equal(first.short, 'Default: gpt-6-luna');
+  h.plugin.settings.cliModel = 'claude:sonnet'; assert.equal(h.view.chatModelChoices()[0].short, 'Default: Claude Sonnet', 'a label without a provider prefix is unchanged');
+});
+
+// ---- B2-0 F5: maps with the same name can be told apart in the list --------------------------------------------------------
+test('B2-0 F5: mapChoiceParts leaves different titles alone, adds the folder to a shared title, and a number when the folder is shared too', () => {
+  const { mapChoiceParts } = load('core/map-chat-plan.ts');
+  eq(mapChoiceParts([{ title: 'Sleep', mapPath: 'A/x/Map.md' }, { title: 'Diet', mapPath: 'A/y/Map.md' }]), [{ title: 'Sleep' }, { title: 'Diet' }], 'different names: no path');
+  eq(mapChoiceParts([{ title: 'Sleep', mapPath: 'A/x/Map.md' }, { title: 'Sleep', mapPath: 'A/y/Map.md' }, { title: 'Diet', mapPath: 'A/z/Map.md' }]),
+    [{ title: 'Sleep', folder: 'A/x' }, { title: 'Sleep', folder: 'A/y' }, { title: 'Diet' }], 'only the maps that share a name get a path');
+  eq(mapChoiceParts([{ title: 'Sleep', mapPath: 'A/x/Map.md' }, { title: ' Sleep ', mapPath: 'A/x/Map.md' }, { title: 'Sleep', mapPath: 'A/y/Map.md' }]),
+    [{ title: 'Sleep', folder: 'A/x', seq: 1 }, { title: ' Sleep ', folder: 'A/x', seq: 2 }, { title: 'Sleep', folder: 'A/y' }], 'the same path too: a number');
+  eq(mapChoiceParts([]), []);
+});
+integrationTest('B2-0 F5: open_map with two maps of the same name lists them with their folders; different names show no path', async () => {
+  const h = await harness(); await h.view.hydrate(); h.open();
+  h.plugin.repo.topics = async () => [{ id: '1', title: 'Sleep', mapPath: 'Agent Workspace/Topics/a/Map.md' }, { id: '2', title: 'Sleep', mapPath: 'Agent Workspace/Topics/b/Map.md' }, { id: '3', title: 'Sleep log', mapPath: 'Agent Workspace/Topics/c/Map.md' }];
+  const shown = []; h.view.chat.showChoices = choices => { shown.push(choices); };
+  const outcome = await h.view.chatOpenMap('Sleep', { path: MAP, id: h.view.map.id }, () => true);
+  eq(outcome.status, 'skipped'); eq(shown[0].options.map(o => o.label), ['Sleep (Agent Workspace/Topics/a)', 'Sleep (Agent Workspace/Topics/b)']);
+  h.plugin.repo.topics = async () => [{ id: '3', title: 'Sleep log', mapPath: 'X/c/Map.md' }, { id: '4', title: 'Sleeping', mapPath: 'X/d/Map.md' }];
+  await h.view.chatOpenMap('Sleep', { path: MAP, id: h.view.map.id }, () => true); eq(shown[1].options.map(o => o.label), ['Sleep log', 'Sleeping'], 'different names: no path');
+});
+
+// ---- B2-0 F4: a batch of add_child rebuilds the derived data once ------------------------------------------------------
+const countCalls = (h) => {
+  const counts = { readMap: 0, scanMaps: 0, rebuild: 0 };
+  for (const [owner, name, key] of [[h.repo, 'readMap', 'readMap'], [h.repo, 'scanMaps', 'scanMaps'], [h.plugin, 'rebuildDerivedData', 'rebuild']]) {
+    const original = owner[name].bind(owner); owner[name] = async (...args) => { counts[key]++; return original(...args); };
+  }
+  return counts;
+};
+integrationTest('B2-0 F4: 100 add_child into a 150-card map rebuild the derived data once, not 100 times (counts logged)', async () => {
+  const h = await harness({ empty: true, realRender: true, viaSync: true }); await h.view.hydrate();
+  await apply(h, [addRoot('r', 'Root'), ...Array.from({ length: 149 }, (_, i) => addRoot(`s${i}`, `Seed ${i}`, 'new:r'))]);
+  assert.equal(h.view.map.nodes.length, 150);
+  const counts = countCalls(h);
+  const lines = await apply(h, [addRoot('q', 'Root 2'), ...Array.from({ length: 99 }, (_, i) => addRoot(`n${i}`, `New ${i}`, 'new:q'))]);
+  console.log(`B2-0 F4 counts: ${JSON.stringify(counts)}`);
+  assert.ok(lines.filter(l => l.status === 'done').length >= 100);
+  assert.equal(h.view.map.nodes.length, 250);
+  assert.equal(counts.rebuild, 1, `rebuildDerivedData ${counts.rebuild}`); assert.ok(counts.scanMaps <= 1, `scanMaps ${counts.scanMaps}`);
+});
+integrationTest('B2-0 F4: a card that fails to be added still has the derived data rebuilt (once), and the other cards are made', async () => {
+  const h = await harness({ empty: true, realRender: true, viaSync: true }); await h.view.hydrate(); const counts = countCalls(h);
+  const createNote = h.repo.createNote.bind(h.repo); h.repo.createNote = async (title, ...rest) => { const made = await createNote(title, ...rest); if (title === 'Boom') throw new Error('disk full'); return made; };
+  const actions = [addRoot('r', 'Root'), addRoot('a', 'A', 'new:r'), addRoot('b', 'Boom', 'new:r'), ...Array.from({ length: 4 }, (_, i) => addRoot(`c${i}`, `C${i}`, 'new:r'))];
+  const lines = await apply(h, actions);
+  eq(lines.filter(l => l.status === 'failed').length, 1); assert.ok(lines.filter(l => l.status === 'done').length >= 6);
+  assert.equal(counts.rebuild, 1, `rebuilt once: ${counts.rebuild}`);
+});
+integrationTest('B2-0 F4: nothing added, nothing rebuilt; a reply that stops half way still rebuilds once for what it made', async () => {
+  const h = await harness({ empty: true, realRender: true, viaSync: true }); await h.view.hydrate(); let counts = countCalls(h);
+  await apply(h, [{ kind: 'auto_layout' }]); assert.equal(counts.rebuild, 0);
+  let asked = 0; const lines = await apply(h, [addRoot('r', 'Root'), ...Array.from({ length: 8 }, (_, i) => addRoot(`c${i}`, `C${i}`, 'new:r'))], {}, () => ++asked < 6);
+  assert.ok(lines.some(l => l.status === 'skipped')); assert.equal(counts.rebuild, 1);
+});
+integrationTest('B2-0 F4: an outside change to Map.md in the middle of a batch still raises the conflict window, once, and the batch goes on', async () => {
+  const h = await harness({ empty: true, realRender: true, viaSync: true }); await h.view.hydrate(); let created = 0;
+  const createNote = h.repo.createNote.bind(h.repo);
+  h.repo.createNote = async (...args) => { const made = await createNote(...args); if (++created === 4) await h.repo.saveMap(MAP, { ...(await h.repo.readMap(MAP)), title: 'Edited outside' }); return made; };
+  const lines = await apply(h, [addRoot('r', 'Root'), ...Array.from({ length: 7 }, (_, i) => addRoot(`c${i}`, `C${i}`, 'new:r'))]);
+  assert.equal((h.control.modals ?? []).length, 1, 'the conflict window was asked once'); assert.ok(lines.filter(l => l.status === 'done').length >= 8);
+});
+
+
+// ---- B2-0 L4: new cards do not overlap after a stop or an auto_layout that came first ------------------------------------
+// A card's height is only known once it was painted: the held repaint is flushed at a layout, so cards made after it are unmeasured.
+const measuredHeights = (h, height = 500) => {
+  let measured = new Set(); const flush = h.view.flushChatRender.bind(h.view);
+  h.view.flushChatRender = () => { measured = new Set(h.view.map.nodes.map(n => n.id)); return flush(); };
+  h.view.cardHeightOf = id => (measured.has(id) ? height : undefined);
+};
+const overlaps = (nodes, height = 500) => {
+  const found = [];
+  for (const a of nodes) for (const b of nodes) if (a.id < b.id && Math.abs(a.x - b.x) < 300 && a.y < b.y + height && b.y < a.y + height) found.push([a.id, b.id]);
+  return found;
+};
+const spread = () => [addRoot('r', 'Root'), ...Array.from({ length: 9 }, (_, i) => addRoot(`c${i}`, `Kid ${i}`, 'new:r'))];
+integrationTest('B2-0 L4: stopping a batch places the new cards that exist so far without overlap, skips what is left, and re-lays nothing else', async () => {
+  const h = await harness({ empty: true, realRender: true, viaSync: true }); await h.view.hydrate(); measuredHeights(h);
+  let asked = 0; const alive = () => ++asked < 7;
+  const lines = await apply(h, [...spread(), { kind: 'rename_topic', nodeId: 'zzz', title: 'late' }], {}, alive);
+  const created = h.view.map.nodes.length; assert.ok(created >= 3 && created < 10, `part was created: ${created}`);
+  assert.ok(lines.some(l => l.status === 'skipped'), 'the rest is skipped'); assert.equal(lines.some(l => /Arranged/.test(l.text)), false, 'no automatic layout line');
+  eq(overlaps(h.view.map.nodes), [], 'no two cards overlap');
+  eq(overlaps(await h.saved()), [], 'and the saved map is the same');
+  assert.equal(h.view.renderHold, 0);
+});
+integrationTest('B2-fix L4: a Stop that lands right after the last add_child still places the new cards locally, no overlap', async () => {
+  const h = await harness({ empty: true, realRender: true, viaSync: true }); await h.view.hydrate(); measuredHeights(h);
+  let stopped = false, writes = 0; const original = h.view.applyChatWrite.bind(h.view);
+  h.view.applyChatWrite = async (...args) => { const outcome = await original(...args); if (++writes === 10) stopped = true; return outcome; };
+  const lines = await apply(h, spread(), {}, () => !stopped);
+  assert.equal(writes, 10); assert.equal(h.view.map.nodes.length, 10, 'every card was written');
+  assert.equal(lines.some(l => /Arranged/.test(l.text)), false, 'a stopped reply gets no automatic layout line');
+  eq(overlaps(h.view.map.nodes), [], 'no two cards overlap'); eq(overlaps(await h.saved()), [], 'and the saved map is the same');
+  assert.equal(h.view.renderHold, 0);
+});
+integrationTest('B2-0 L4: an auto_layout that comes before the add_child actions does not leave the later cards overlapping', async () => {
+  const h = await harness({ empty: true, realRender: true, viaSync: true }); await h.view.hydrate(); measuredHeights(h);
+  const all = spread(); const lines = await apply(h, [...all.slice(0, 4), { kind: 'auto_layout' }, ...all.slice(4)]);
+  assert.equal(lines.filter(l => l.status === 'done').length, 11); assert.equal(h.view.map.nodes.length, 10);
+  eq(overlaps(h.view.map.nodes), [], 'no two cards overlap');
+});
+integrationTest('B2-0 L4: a reply with one automatic layout at the end is laid out as before (the whole map, once)', async () => {
+  const h = await harness({ empty: true, realRender: true, viaSync: true }); await h.view.hydrate(); measuredHeights(h);
+  let layouts = 0; const original = h.view.mapChange.bind(h.view); h.view.mapChange = async (change, rebuild) => { if (rebuild === false) layouts++; return original(change, rebuild); };
+  const lines = await apply(h, spread()); assert.ok(lines.some(l => /Arranged/.test(l.text))); assert.equal(layouts, 1, 'one layout, no extra local step'); eq(overlaps(h.view.map.nodes), []);
+});
+
+// ---- B2-feat: research options, shallow research, headless integration, two merges ---------------------------------------
+const researchAct = (fields = {}) => ({ kind: 'run_map_action', action: 'research_standard', nodeIds: [], title: '', goal: '', direction: '', depth: '', images: false, ...fields });
+const startedResearch = h => { const started = []; h.view.startMultiResearch = async (request, key, onSettled) => { started.push({ request, key, onSettled, selected: [...h.view.multiSelected], depth: h.control.depth }); }; return started; };
+const newCard = ref => ({ kind: 'add_child', parentId: '', title: `Card ${ref}`, summary: '', ref });
+
+integrationTest('B2 research: a named depth, images and the extra requirement reach startMultiResearch; unnamed is normal, no images, no requirements', async () => {
+  const h = await harness(); await h.view.hydrate(); const started = startedResearch(h);
+  const lines = await apply(h, [
+    researchAct({ nodeIds: [h.ids.a] }),
+    researchAct({ nodeIds: [h.ids.b], depth: 'deep', images: true, direction: 'only peer-reviewed' }),
+    researchAct({ nodeIds: [h.ids.c], depth: 'fast' })
+  ]);
+  eq(lines.map(l => l.status), ['done', 'done', 'done'], JSON.stringify(lines)); await tick();
+  eq(started.map(s => s.request), [
+    { researchMode: 'research', researchDepth: 'normal', requirements: '', imageSearch: false },
+    { researchMode: 'research', researchDepth: 'deep', requirements: 'only peer-reviewed', imageSearch: true },
+    { researchMode: 'research', researchDepth: 'fast', requirements: '', imageSearch: false }
+  ]);
+  eq(started.map(s => s.selected), [[h.ids.a], [h.ids.b], [h.ids.c]]); assert.ok(started.every(s => s.depth === 0), 'outside any mutate');
+});
+integrationTest('B2 shallow research: researching only cards this reply created is fast unless a depth is named; one existing card makes it normal', async () => {
+  const h = await harness(); await h.view.hydrate(); const started = startedResearch(h);
+  await apply(h, [newCard('n1'), newCard('n2'), researchAct({ nodeIds: ['new:n1', 'new:n2'] })]); await tick();
+  assert.equal(started.length, 1); assert.equal(started[0].request.researchDepth, 'fast'); assert.equal(started[0].selected.length, 2);
+  await apply(h, [newCard('n3'), researchAct({ nodeIds: ['new:n3'], depth: 'deep' })]); await tick();
+  assert.equal(started[1].request.researchDepth, 'deep', 'a named depth beats the new-card default');
+  await apply(h, [newCard('n4'), researchAct({ nodeIds: ['new:n4', h.ids.a] })]); await tick();
+  assert.equal(started[2].request.researchDepth, 'normal', 'an existing card in the list: normal'); assert.equal(started[2].selected.length, 2);
+  await apply(h, [newCard('n5'), researchAct({ nodeIds: [] })]); await tick();
+  assert.equal(started[3].request.researchDepth, 'normal', 'an empty target list (the current selection) is never counted as new');
+});
+integrationTest('B2 shallow research: researching 12 new cards waits as a plan; after Apply all 12 are in one research batch at the fast depth', async () => {
+  const h = await harness(); await h.view.hydrate(); const chat = h.open(); const started = startedResearch(h);
+  const refs = Array.from({ length: 12 }, (_, i) => `r${i}`);
+  h.control.reply = async () => ({ reply: 'I will build and research.', actions: [...refs.map(newCard), researchAct({ nodeIds: refs.map(r => `new:${r}`) })], rejected: [] });
+  h.type('build and research'); await h.view.sendMapChat();
+  assert.equal(started.length, 0, 'nothing runs before Apply'); assert.equal(h.view.map.nodes.length, 4);
+  assert.match(visibleText(planCard(h)[0]), /Starts research on 12 topics/); assert.match(visibleText(planCard(h)[0]), /At least 24 AI calls/, '12 research calls and 12 diagram calls');
+  planButton(h, 'apply').click(); await until(() => chat.pendingPlan() === null && !h.view.chatApplying); await tick();
+  assert.equal(started.length, 1); assert.equal(started[0].selected.length, 12); assert.equal(started[0].request.researchDepth, 'fast'); assert.equal(h.view.map.nodes.length, 16);
+});
+integrationTest('B2 shallow research: 9 new cards researched are applied at once with no plan card', async () => {
+  const h = await harness(); await h.view.hydrate(); const chat = h.open(); const started = startedResearch(h);
+  const refs = Array.from({ length: 9 }, (_, i) => `r${i}`);
+  h.control.reply = async () => ({ reply: 'ok', actions: [...refs.map(newCard), researchAct({ nodeIds: refs.map(r => `new:${r}`) })], rejected: [] });
+  h.type('go'); await h.view.sendMapChat(); await tick();
+  assert.equal(planCard(h).length, 0); assert.equal(chat.pendingPlan(), null); assert.equal(started.length, 1); assert.equal(started[0].selected.length, 9);
+});
+integrationTest('B2 research: a research batch already running is skipped with a reason in the result, and nothing is started', async () => {
+  const h = await harness(); await h.view.hydrate(); const started = startedResearch(h);
+  h.plugin.expansionCoordinator.isRunning = () => true;
+  const lines = await apply(h, [researchAct({ nodeIds: [h.ids.a] })]);
+  eq(lines.map(l => l.status), ['skipped']); assert.match(lines[0].text, /research is already running/); assert.equal(started.length, 0);
+});
+integrationTest('B2 research: the finished batch adds its search count to the answer; a topic with no search is warned about; a newer turn is not touched', async () => {
+  const h = await harness(); await h.view.hydrate(); const chat = h.open(); const started = startedResearch(h);
+  h.control.reply = async () => ({ reply: 'Researching.', actions: [researchAct({ nodeIds: [h.ids.a, h.ids.b] })], rejected: [] });
+  h.type('research a and b'); await h.view.sendMapChat(); await tick();
+  assert.equal(started.length, 1); assert.equal(typeof started[0].onSettled, 'function');
+  started[0].onSettled({ searches: 5, counted: 2, withoutSearch: 1 });
+  const texts = chat.transcript().at(-1).lines.map(l => [l.status, l.text]);
+  eq(texts.slice(-2), [['done', 'Web searches made: 5.'], ['skipped', 'Warning: topics that finished without any web search: 1.']]);
+  started[0].onSettled({ searches: 0, counted: 0, withoutSearch: 0 });
+  assert.equal(chat.transcript().at(-1).lines.length, texts.length, 'nothing to report adds nothing');
+  h.control.reply = async () => ({ reply: 'Next.', actions: [], rejected: [] });
+  h.type('something else'); await h.view.sendMapChat();
+  const before = chat.transcript().at(-1).lines.length; started[0].onSettled({ searches: 9, counted: 1, withoutSearch: 0 });
+  assert.equal(chat.transcript().at(-1).lines.length, before, 'a later turn does not get the old batch\'s lines');
+});
+integrationTest('B2 merge: two merges in one reply are both completed; the second is not skipped as locked', async () => {
+  const h = await harness({ viaSync: false }); await h.view.hydrate();
+  const refs = ['p1', 'p2', 'p3', 'p4'].map(ref => ({ kind: 'add_child', parentId: h.ids.root, title: `Merge ${ref}`, summary: '', ref }));
+  const merge = (a, b, title) => ({ kind: 'run_map_action', action: 'merge', nodeIds: [a, b], title, goal: '', direction: '', depth: '', images: false });
+  const lines = await apply(h, [...refs, merge('new:p1', 'new:p2', 'First merged'), merge('new:p3', 'new:p4', 'Second merged')]);
+  eq(lines.slice(0, 6).map(l => l.status), ['done', 'done', 'done', 'done', 'done', 'done'], JSON.stringify(lines));
+  const titles = []; for (const n of await h.saved()) titles.push((await h.repo.readNote(n.path)).title);
+  assert.ok(titles.includes('First merged') && titles.includes('Second merged'), titles.join('|'));
+  assert.ok(!titles.some(t2 => /^Merge p\d$/.test(t2)), 'the four sources are gone from the map');
+  assert.equal(h.view.mergeTasks.size, 0); assert.equal(h.control.nested, 0);
+});
+integrationTest('B2 merge: a merge still locked by an AI merge is skipped with the locked reason', async () => {
+  const h = await harness(); await h.view.hydrate();
+  h.view.mergeTasks.set(h.view.path, { mapPath: h.view.path, sources: [{ id: h.ids.a, path: h.node('a').path }], controller: new AbortController(), state: 'running' });
+  const lines = await apply(h, [{ kind: 'run_map_action', action: 'merge', nodeIds: [h.ids.a, h.ids.b], title: 'X', goal: '', direction: '', depth: '', images: false }]);
+  eq(lines.map(l => l.status), ['skipped']); assert.match(lines[0].text, /being merged/);
+});
+integrationTest('B2 synthesize: the plan card keeps the user\'s message as the integration direction', async () => {
+  const h = await harness(); await h.view.hydrate(); const chat = h.open();
+  const calls = []; h.view.startSynthesis = async (node, options, direction, failed, accepted) => { calls.push({ id: node.id, direction, options }); accepted(); };
+  h.control.reply = async () => ({ reply: 'plan', actions: [...Array.from({ length: 15 }, (_, i) => ({ kind: 'add_child', parentId: h.ids.root, title: `Card ${i}`, summary: '' })), { kind: 'run_map_action', action: 'synthesize', nodeIds: [h.ids.a], title: '', goal: '', direction: 'ignored model words', depth: '', images: false }], rejected: [] });
+  h.type('Integrate Body around sleep debt'); await h.view.sendMapChat();
+  assert.equal(chat.pendingPlan().state, 'pending'); assert.equal(calls.length, 0);
+  assert.match(visibleText(planCard(h)[0]), /At least 2 AI calls/);
+  planButton(h, 'apply').click(); await until(() => chat.pendingPlan() === null && !h.view.chatApplying);
+  assert.equal(calls.length, 1); assert.equal(calls[0].id, h.ids.a); assert.equal(calls[0].direction, 'Integrate Body around sleep debt', 'the message, not the model\'s direction');
 });

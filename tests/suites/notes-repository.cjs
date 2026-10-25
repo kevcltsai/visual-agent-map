@@ -16,10 +16,15 @@ integrationTest('editing note fields preserves latest AI detail and unrelated fr
   assert.match(contents.get(n.path), /## Working Findings\n\nFresh research/);
   assert.match(contents.get(n.path), /custom: retain me/);
 });
-integrationTest('local research mode persists without changing older notes; a stored research-depth line is ignored on read and left as it is on write', async () => {
+integrationTest('local research mode persists; a missing or unrecognised research-mode reads as Quick, an explicit research stays Standard; a stored research-depth line is ignored on read and left as it is on write', async () => {
   const { repo, contents } = fixture(); const n = await topicNote(repo);
   const original = await repo.readNote(n.path);
-  assert.equal(original.researchMode, 'research', 'a missing research-mode reads as Standard');
+  assert.equal(original.researchMode, 'local', 'a missing research-mode reads as Quick');
+  contents.set(n.path, contents.get(n.path).replace('---\n', '---\nresearch-mode: deep\n'));
+  assert.equal((await repo.readNote(n.path)).researchMode, 'local', 'an unrecognised research-mode reads as Quick');
+  contents.set(n.path, contents.get(n.path).replace('research-mode: deep\n', 'research-mode: research\n'));
+  assert.equal((await repo.readNote(n.path)).researchMode, 'research', 'an explicit research stays Standard');
+  contents.set(n.path, contents.get(n.path).replace('research-mode: research\n', ''));
   assert.equal('researchDepth' in original, false, 'the note has no depth any more');
   assert.equal(original.visualMode, 'auto');
   contents.set(n.path, contents.get(n.path).replace('---\n', '---\nresearch-depth: deep\n'));
@@ -43,7 +48,7 @@ integrationTest('a new topic note stores research-mode only when its creator ask
   assert.match(contents.get(quick.path), /research-mode: local/);
   assert.doesNotMatch(contents.get(plain_.path), /research-mode/, 'integration, merge and sample notes write nothing');
   assert.equal((await repo.readNote(quick.path, map)).researchMode, 'local');
-  assert.equal((await repo.readNote(plain_.path, map)).researchMode, 'research', 'missing = Standard, as for every older note');
+  assert.equal((await repo.readNote(plain_.path, map)).researchMode, 'local', 'missing = Quick (D-2026-10-273)');
   for (const key of ['research-depth']) assert.doesNotMatch(contents.get(quick.path) + contents.get(plain_.path), new RegExp(key));
 });
 integrationTest('current summary is editable in the Markdown body', async () => {

@@ -19170,7 +19170,7 @@ var Repository = class {
       model,
       modelSource,
       reasoning: normalizeReasoningLevel((_a2 = fm["reasoning-level"]) != null ? _a2 : this.settings.cliReasoning),
-      researchMode: fm["research-mode"] === "local" ? "local" : "research",
+      researchMode: fm["research-mode"] === "research" ? "research" : "local",
       visualMode: fm["visual-mode"] === "on" || fm["visual-mode"] === "off" ? fm["visual-mode"] : "auto",
       ...typeof fm["detail-template"] === "string" && fm["detail-template"] ? { detailTemplateId: fm["detail-template"] } : {},
       ...typeof fm.tone === "string" && fm.tone ? { toneId: fm.tone } : {},

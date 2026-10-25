@@ -204,6 +204,8 @@ integrationTest('AiTaskService forwards native Codex webSearch events unchanged 
   child.stdin = { write: line => {
     const message = JSON.parse(line.trim());
     if (message.method === 'initialize') emit({ id: message.id, result: {} });
+    // A Research-mode task is the isolated web-only thread at every depth (D-2026-10-248): it reads the effective config once.
+    else if (message.method === 'config/read') emit({ id: message.id, result: { config: {} } });
     else if (message.method === 'thread/start') emit({ id: message.id, result: { thread: { id: 'thread-1' } } });
     else if (message.method === 'turn/start') {
       emit({ id: message.id, result: { turn: { id: 'turn-1' } } });
@@ -493,6 +495,8 @@ integrationTest('S4: Codex events map to waiting/searching/reading/writing for t
   child.stdin = { write: line => {
     const message = JSON.parse(line.trim());
     if (message.method === 'initialize') emit({ id: message.id, result: {} });
+    // A Research-mode task is the isolated web-only thread at every depth (D-2026-10-248): it reads the effective config once.
+    else if (message.method === 'config/read') emit({ id: message.id, result: { config: {} } });
     else if (message.method === 'thread/start') emit({ id: message.id, result: { thread: { id: 'thread-1' } } });
     else if (message.method === 'turn/start') {
       emit({ id: message.id, result: { turn: { id: 'turn-1' } } });

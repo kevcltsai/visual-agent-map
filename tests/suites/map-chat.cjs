@@ -274,7 +274,7 @@ async function harness({ aim = false, document = false, empty = false, realRende
   const handlers = []; const linkOpens = [];
   app.workspace = { getLeavesOfType: type => type === 'markdown' ? leaves : [], getActiveViewOfType: () => activeMarkdown, requestSaveLayout() {}, on(name, fn) { const ref = { name, fn }; handlers.push(ref); return ref; }, openLinkText(link, source, newLeaf) { linkOpens.push([link, source, newLeaf]); } };
   class Notice { constructor(message) { notices.push(message); } hide() {} }
-  const { VisualAgentMapView } = load('main.ts', { obsidian: { ...obsidian, MarkdownView, Notice, Component: class { load() {} unload() {} }, MarkdownRenderer: { render: async (_app, text, el, sourcePath, owner) => { control.markdown.push({ text, el, sourcePath, owner }); el.setText(text); } } } }, { ...(document ? { document: { documentElement: { style: {} }, get activeElement() { return ctx.page?.doc.activeElement ?? null; } } } : {}), CSS: { escape: value => String(value) }, createSvg: tag => ({ tag, attrs: {}, classes: [], setAttribute(name, value) { this.attrs[name] = value; }, addClass(name) { this.classes.push(name); } }), requestAnimationFrame: run => { run(); return 1; }, cancelAnimationFrame() {}, setTimeout: fn => { ctx.timers.push(fn); return ctx.timers.length; }, clearTimeout() {} });
+  const { VisualAgentMapView } = load('main.ts', { obsidian: { ...obsidian, MarkdownView, Notice, Modal: class { constructor(app) { this.app = app; } open() { (control.modals ??= []).push(this); if (typeof this.resolve === 'function' && this.local) this.resolve(this.local); } close() {} }, Component: class { load() {} unload() {} }, MarkdownRenderer: { render: async (_app, text, el, sourcePath, owner) => { control.markdown.push({ text, el, sourcePath, owner }); el.setText(text); } } } }, { ...(document ? { document: { documentElement: { style: {} }, get activeElement() { return ctx.page?.doc.activeElement ?? null; } } } : {}), CSS: { escape: value => String(value) }, createSvg: tag => ({ tag, attrs: {}, classes: [], setAttribute(name, value) { this.attrs[name] = value; }, addClass(name) { this.classes.push(name); } }), requestAnimationFrame: run => { run(); return 1; }, cancelAnimationFrame() {}, setTimeout: fn => { ctx.timers.push(fn); return ctx.timers.length; }, clearTimeout() {} });
   ctx.timers = [];
   const view = new VisualAgentMapView({ app }, plugin);
   ctx.view = view;
@@ -2949,4 +2949,81 @@ integrationTest('B2-0 F5: open_map with two maps of the same name lists them wit
   eq(outcome.status, 'skipped'); eq(shown[0].options.map(o => o.label), ['Sleep (Agent Workspace/Topics/a)', 'Sleep (Agent Workspace/Topics/b)']);
   h.plugin.repo.topics = async () => [{ id: '3', title: 'Sleep log', mapPath: 'X/c/Map.md' }, { id: '4', title: 'Sleeping', mapPath: 'X/d/Map.md' }];
   await h.view.chatOpenMap('Sleep', { path: MAP, id: h.view.map.id }, () => true); eq(shown[1].options.map(o => o.label), ['Sleep log', 'Sleeping'], 'different names: no path');
+});
+
+// ---- B2-0 F4: a batch of add_child rebuilds the derived data once ------------------------------------------------------
+const countCalls = (h) => {
+  const counts = { readMap: 0, scanMaps: 0, rebuild: 0 };
+  for (const [owner, name, key] of [[h.repo, 'readMap', 'readMap'], [h.repo, 'scanMaps', 'scanMaps'], [h.plugin, 'rebuildDerivedData', 'rebuild']]) {
+    const original = owner[name].bind(owner); owner[name] = async (...args) => { counts[key]++; return original(...args); };
+  }
+  return counts;
+};
+integrationTest('B2-0 F4: 100 add_child into a 150-card map rebuild the derived data once, not 100 times (counts logged)', async () => {
+  const h = await harness({ empty: true, realRender: true, viaSync: true }); await h.view.hydrate();
+  await apply(h, [addRoot('r', 'Root'), ...Array.from({ length: 149 }, (_, i) => addRoot(`s${i}`, `Seed ${i}`, 'new:r'))]);
+  assert.equal(h.view.map.nodes.length, 150);
+  const counts = countCalls(h);
+  const lines = await apply(h, [addRoot('q', 'Root 2'), ...Array.from({ length: 99 }, (_, i) => addRoot(`n${i}`, `New ${i}`, 'new:q'))]);
+  console.log(`B2-0 F4 counts: ${JSON.stringify(counts)}`);
+  assert.ok(lines.filter(l => l.status === 'done').length >= 100);
+  assert.equal(h.view.map.nodes.length, 250);
+  assert.equal(counts.rebuild, 1, `rebuildDerivedData ${counts.rebuild}`); assert.ok(counts.scanMaps <= 1, `scanMaps ${counts.scanMaps}`);
+});
+integrationTest('B2-0 F4: a card that fails to be added still has the derived data rebuilt (once), and the other cards are made', async () => {
+  const h = await harness({ empty: true, realRender: true, viaSync: true }); await h.view.hydrate(); const counts = countCalls(h);
+  const createNote = h.repo.createNote.bind(h.repo); h.repo.createNote = async (title, ...rest) => { const made = await createNote(title, ...rest); if (title === 'Boom') throw new Error('disk full'); return made; };
+  const actions = [addRoot('r', 'Root'), addRoot('a', 'A', 'new:r'), addRoot('b', 'Boom', 'new:r'), ...Array.from({ length: 4 }, (_, i) => addRoot(`c${i}`, `C${i}`, 'new:r'))];
+  const lines = await apply(h, actions);
+  eq(lines.filter(l => l.status === 'failed').length, 1); assert.ok(lines.filter(l => l.status === 'done').length >= 6);
+  assert.equal(counts.rebuild, 1, `rebuilt once: ${counts.rebuild}`);
+});
+integrationTest('B2-0 F4: nothing added, nothing rebuilt; a reply that stops half way still rebuilds once for what it made', async () => {
+  const h = await harness({ empty: true, realRender: true, viaSync: true }); await h.view.hydrate(); let counts = countCalls(h);
+  await apply(h, [{ kind: 'auto_layout' }]); assert.equal(counts.rebuild, 0);
+  let asked = 0; const lines = await apply(h, [addRoot('r', 'Root'), ...Array.from({ length: 8 }, (_, i) => addRoot(`c${i}`, `C${i}`, 'new:r'))], {}, () => ++asked < 6);
+  assert.ok(lines.some(l => l.status === 'skipped')); assert.equal(counts.rebuild, 1);
+});
+integrationTest('B2-0 F4: an outside change to Map.md in the middle of a batch still raises the conflict window, once, and the batch goes on', async () => {
+  const h = await harness({ empty: true, realRender: true, viaSync: true }); await h.view.hydrate(); let created = 0;
+  const createNote = h.repo.createNote.bind(h.repo);
+  h.repo.createNote = async (...args) => { const made = await createNote(...args); if (++created === 4) await h.repo.saveMap(MAP, { ...(await h.repo.readMap(MAP)), title: 'Edited outside' }); return made; };
+  const lines = await apply(h, [addRoot('r', 'Root'), ...Array.from({ length: 7 }, (_, i) => addRoot(`c${i}`, `C${i}`, 'new:r'))]);
+  assert.equal((h.control.modals ?? []).length, 1, 'the conflict window was asked once'); assert.ok(lines.filter(l => l.status === 'done').length >= 8);
+});
+
+
+// ---- B2-0 L4: new cards do not overlap after a stop or an auto_layout that came first ------------------------------------
+// A card's height is only known once it was painted: the held repaint is flushed at a layout, so cards made after it are unmeasured.
+const measuredHeights = (h, height = 500) => {
+  let measured = new Set(); const flush = h.view.flushChatRender.bind(h.view);
+  h.view.flushChatRender = () => { measured = new Set(h.view.map.nodes.map(n => n.id)); return flush(); };
+  h.view.cardHeightOf = id => (measured.has(id) ? height : undefined);
+};
+const overlaps = (nodes, height = 500) => {
+  const found = [];
+  for (const a of nodes) for (const b of nodes) if (a.id < b.id && Math.abs(a.x - b.x) < 300 && a.y < b.y + height && b.y < a.y + height) found.push([a.id, b.id]);
+  return found;
+};
+const spread = () => [addRoot('r', 'Root'), ...Array.from({ length: 9 }, (_, i) => addRoot(`c${i}`, `Kid ${i}`, 'new:r'))];
+integrationTest('B2-0 L4: stopping a batch places the new cards that exist so far without overlap, skips what is left, and re-lays nothing else', async () => {
+  const h = await harness({ empty: true, realRender: true, viaSync: true }); await h.view.hydrate(); measuredHeights(h);
+  let asked = 0; const alive = () => ++asked < 7;
+  const lines = await apply(h, [...spread(), { kind: 'rename_topic', nodeId: 'zzz', title: 'late' }], {}, alive);
+  const created = h.view.map.nodes.length; assert.ok(created >= 3 && created < 10, `part was created: ${created}`);
+  assert.ok(lines.some(l => l.status === 'skipped'), 'the rest is skipped'); assert.equal(lines.some(l => /Arranged/.test(l.text)), false, 'no automatic layout line');
+  eq(overlaps(h.view.map.nodes), [], 'no two cards overlap');
+  eq(overlaps(await h.saved()), [], 'and the saved map is the same');
+  assert.equal(h.view.renderHold, 0);
+});
+integrationTest('B2-0 L4: an auto_layout that comes before the add_child actions does not leave the later cards overlapping', async () => {
+  const h = await harness({ empty: true, realRender: true, viaSync: true }); await h.view.hydrate(); measuredHeights(h);
+  const all = spread(); const lines = await apply(h, [...all.slice(0, 4), { kind: 'auto_layout' }, ...all.slice(4)]);
+  assert.equal(lines.filter(l => l.status === 'done').length, 11); assert.equal(h.view.map.nodes.length, 10);
+  eq(overlaps(h.view.map.nodes), [], 'no two cards overlap');
+});
+integrationTest('B2-0 L4: a reply with one automatic layout at the end is laid out as before (the whole map, once)', async () => {
+  const h = await harness({ empty: true, realRender: true, viaSync: true }); await h.view.hydrate(); measuredHeights(h);
+  let layouts = 0; const original = h.view.mapChange.bind(h.view); h.view.mapChange = async (change, rebuild) => { if (rebuild === false) layouts++; return original(change, rebuild); };
+  const lines = await apply(h, spread()); assert.ok(lines.some(l => /Arranged/.test(l.text))); assert.equal(layouts, 1, 'one layout, no extra local step'); eq(overlaps(h.view.map.nodes), []);
 });

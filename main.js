@@ -45074,6 +45074,19 @@ ${note.detail.trim()}` : "",
     } catch (e) {
     }
   }
+  /** Rebuilds the derived data once for the cards a reply added, then lets the held repaint and re-read happen. */
+  async settleChatBatch(run) {
+    if (run.ownershipDirty) {
+      run.ownershipDirty = false;
+      try {
+        await this.plugin.mutate(async () => {
+          await this.plugin.rebuildDerivedData();
+        });
+      } catch (e) {
+      }
+    }
+    await this.releaseChatBatch();
+  }
   /** A repaint a batch is holding back happens now, for the step that needs the cards measured (layout). */
   flushChatRender() {
     if (!this.renderPending || this.closed) return;
@@ -45093,15 +45106,17 @@ ${note.detail.trim()}` : "",
    * automatic layout and a move of the view to the new cards.
    */
   async applyMapChatActions(result, baseline, alive = () => true, anchor = { path: this.path, id: ((_c) => (_c = this.map) == null ? void 0 : _c.id)() }) {
+    var _a2;
     const touched = /* @__PURE__ */ new Set([anchor.path]);
     const same2 = () => {
-      var _a2;
-      return !this.closed && alive() && this.path === anchor.path && ((_a2 = this.map) == null ? void 0 : _a2.id) === anchor.id;
+      var _a3;
+      return !this.closed && alive() && this.path === anchor.path && ((_a3 = this.map) == null ? void 0 : _a3.id) === anchor.id;
     };
     const lost = () => skipped(!this.closed && !alive() ? "ui.map_chat_skip_stopped" : "ui.map_chat_skip_map_changed");
     const lines = [];
     const later = [];
     const run = { refs: /* @__PURE__ */ new Map(), created: [] };
+    let laidOutCount = 0;
     const refTitles = this.chatRefTitles(result.actions);
     let wrote = false;
     let noNewMap = false;
@@ -45126,7 +45141,7 @@ ${note.detail.trim()}` : "",
           continue;
         }
         if (action.kind === "create_map") {
-          await this.releaseChatBatch();
+          await this.settleChatBatch(run);
           const outcome = await this.chatCreateMap(action.title, anchor, same2);
           if (batched) this.holdChatBatch();
           if (outcome.status === "done") {
@@ -45149,19 +45164,20 @@ ${note.detail.trim()}` : "",
           box.outcome = { status: "failed", reason: errorMessage(error) };
         }
         if (box.outcome.status !== "skipped" && action.kind !== "focus_topic") wrote = true;
+        if (action.kind === "auto_layout" && box.outcome.status === "done") laidOutCount = run.created.length;
         lines[index] = this.chatLine(label, box.outcome);
       }
       let arranged = false;
       if (run.created.length >= MAP_CHAT_AUTO_LAYOUT_MIN_NEW && !noNewMap && same2() && !result.actions.some((action) => action.kind === "auto_layout")) {
         try {
           await this.plugin.mutate(async () => {
-            var _a2, _b2, _c2;
+            var _a3, _b2, _c2;
             if (!same2() || !this.map) return;
             this.flushChatRender();
             await this.mapChange((map) => {
               map.nodes = arrangeMap(map.nodes, supersededAimNodeIds(map), this.cardHeightOf);
             }, false);
-            const nodes = (_b2 = (_a2 = this.map) == null ? void 0 : _a2.nodes) != null ? _b2 : [];
+            const nodes = (_b2 = (_a3 = this.map) == null ? void 0 : _a3.nodes) != null ? _b2 : [];
             const fresh = run.created.map((id) => nodes.find((node) => node.id === id)).filter((n) => !!n);
             const target = (_c2 = fresh.find((node) => !node.parentId)) != null ? _c2 : fresh[0];
             if (target && !result.actions.some((action) => action.kind === "focus_topic")) this.focusNode(target);
@@ -45171,13 +45187,27 @@ ${note.detail.trim()}` : "",
         }
       }
       if (arranged) lines.push({ status: "done", text: t("ui.map_chat_auto_layout_added") });
+      const rough = batched && !arranged ? run.created.slice(laidOutCount) : [];
+      if (rough.length && !this.closed && this.path === anchor.path && ((_a2 = this.map) == null ? void 0 : _a2.id) === anchor.id) {
+        try {
+          await this.plugin.mutate(async () => {
+            var _a3;
+            if (this.closed || this.path !== anchor.path || ((_a3 = this.map) == null ? void 0 : _a3.id) !== anchor.id) return;
+            this.flushChatRender();
+            await this.mapChange((map) => {
+              map.nodes = this.placeChatCards(map.nodes, new Set(rough));
+            }, false);
+          });
+        } catch (e) {
+        }
+      }
     } finally {
       if (wrote) {
         this.history.clear();
         for (const view of this.plugin.views()) if (view !== this && touched.has(view.path)) view.history.clear();
         this.updateHistoryButtons();
       }
-      await this.releaseChatBatch();
+      await this.settleChatBatch(run);
     }
     for (const index of later) {
       const action = result.actions[index];
@@ -45208,6 +45238,39 @@ ${note.detail.trim()}` : "",
       all.push({ status: "skipped", text: t("ui.map_chat_rejected_0", result.rejected.length) });
     if (wrote) all.push({ status: "done", text: t("ui.map_chat_not_undoable") });
     return all;
+  }
+  /** Places the cards a reply made (and only those): each new branch beside its parent, a new tree below the others. */
+  placeChatCards(nodes, fresh) {
+    const subtree = (rootId) => {
+      const ids = /* @__PURE__ */ new Set([rootId]);
+      for (let grew = true; grew; ) {
+        grew = false;
+        for (const node of nodes)
+          if (fresh.has(node.id) && node.parentId && ids.has(node.parentId) && !ids.has(node.id)) {
+            ids.add(node.id);
+            grew = true;
+          }
+      }
+      return ids;
+    };
+    let placed = nodes;
+    const tops = nodes.filter((node) => fresh.has(node.id) && !(node.parentId && fresh.has(node.parentId)));
+    const done = /* @__PURE__ */ new Set();
+    for (const top of tops) {
+      if (done.has(top.id)) continue;
+      if (!top.parentId) {
+        const ids2 = subtree(top.id);
+        placed = arrangeNewTree(placed, top.id, ids2, this.cardHeightOf);
+        for (const id of ids2) done.add(id);
+        continue;
+      }
+      const siblings = tops.filter((other) => other.parentId === top.parentId);
+      const ids = /* @__PURE__ */ new Set();
+      for (const sibling of siblings) for (const id of subtree(sibling.id)) ids.add(id);
+      placed = arrangeNewBranch(placed, top.parentId, ids, this.cardHeightOf);
+      for (const id of ids) done.add(id);
+    }
+    return placed;
   }
   /** Swaps `new:<ref>` target ids for the cards they became; null when every target was a card that was never created. */
   chatResolveTargets(action, run) {
@@ -45328,7 +45391,8 @@ ${note.detail.trim()}` : "",
           if (this.isMerging(parent.id)) return skipped("ui.map_chat_skip_merge_locked");
         }
         const before = new Set(this.map.nodes.map((item) => item.id));
-        await this.addNode(parent, action.title, true, false);
+        run.ownershipDirty = true;
+        await this.addNode(parent, action.title, false, false);
         const created = (_b2 = this.map) == null ? void 0 : _b2.nodes.find((item) => !before.has(item.id));
         if (!created) return skipped("ui.map_chat_skip_unavailable");
         run.created.push(created.id);

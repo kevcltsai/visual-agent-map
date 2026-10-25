@@ -465,6 +465,8 @@ type ChatOutcome = { status: "done" } | { status: "skipped" | "failed"; reason: 
 interface ChatRun {
   refs: Map<string, string>;
   created: string[];
+  /** A card was (or may have been) written without rebuilding the derived data; one rebuild at the end of the reply does it. */
+  ownershipDirty?: boolean;
 }
 /** The narrow edge the laid-over chat window leaves in place, and the gap the tool group keeps from the window. */
 const CHAT_RAIL_WIDTH = 44;
@@ -10877,6 +10879,21 @@ export class VisualAgentMapView extends ItemView {
       // mutate() has logged it; the views catch up at their next write.
     }
   }
+  /** Rebuilds the derived data once for the cards a reply added, then lets the held repaint and re-read happen. */
+  private async settleChatBatch(run: ChatRun): Promise<void> {
+    if (run.ownershipDirty) {
+      run.ownershipDirty = false;
+      try {
+        // plugin.rebuildDerivedData reports its own failure; the queue only keeps it from running between two writes.
+        await this.plugin.mutate(async () => {
+          await this.plugin.rebuildDerivedData();
+        });
+      } catch {
+        // mutate() has logged it.
+      }
+    }
+    await this.releaseChatBatch();
+  }
   /** A repaint a batch is holding back happens now, for the step that needs the cards measured (layout). */
   private flushChatRender(): void {
     if (!this.renderPending || this.closed) return;
@@ -10909,6 +10926,8 @@ export class VisualAgentMapView extends ItemView {
     const lines: MapChatLine[] = [];
     const later: number[] = [];
     const run: ChatRun = { refs: new Map(), created: [] };
+    // How many cards existed when the last auto_layout of the reply ran: the ones made after it are only roughly placed.
+    let laidOutCount = 0;
     const refTitles = this.chatRefTitles(result.actions);
     let wrote = false;
     // True once a create_map failed: the rest would land in the map the user is looking at, which is not what was asked.
@@ -10939,7 +10958,7 @@ export class VisualAgentMapView extends ItemView {
         }
         if (action.kind === "create_map") {
           // The map switch repaints on its own.
-          await this.releaseChatBatch();
+          await this.settleChatBatch(run);
           const outcome = await this.chatCreateMap(action.title, anchor, same);
           if (batched) this.holdChatBatch();
           if (outcome.status === "done") {
@@ -10963,6 +10982,7 @@ export class VisualAgentMapView extends ItemView {
           box.outcome = { status: "failed", reason: errorMessage(error) };
         }
         if (box.outcome.status !== "skipped" && action.kind !== "focus_topic") wrote = true;
+        if (action.kind === "auto_layout" && box.outcome.status === "done") laidOutCount = run.created.length;
         lines[index] = this.chatLine(label, box.outcome);
       }
       // Many cards at once land in a rough spot: one layout for the lot, then the view goes to the new branch.
@@ -10993,6 +11013,22 @@ export class VisualAgentMapView extends ItemView {
         }
       }
       if (arranged) lines.push({ status: "done", text: t("ui.map_chat_auto_layout_added") });
+      // A stop, or an auto_layout that came before the cards, leaves them at the rough spot of a held batch (unmeasured heights).
+      // Only those cards are placed, each branch beside its parent; nothing else moves, and no other action of the reply runs.
+      const rough = batched && !arranged ? run.created.slice(laidOutCount) : [];
+      if (rough.length && !this.closed && this.path === anchor.path && this.map?.id === anchor.id) {
+        try {
+          await this.plugin.mutate(async () => {
+            if (this.closed || this.path !== anchor.path || this.map?.id !== anchor.id) return;
+            this.flushChatRender();
+            await this.mapChange(map => {
+              map.nodes = this.placeChatCards(map.nodes, new Set(rough));
+            }, false);
+          });
+        } catch {
+          // The cards are written already; only the tidy-up failed, and the user can lay the map out by hand.
+        }
+      }
     } finally {
       // The chat's own writes are not undoable (the owner's choice). Undo entries hold snapshots of the map from before
       // the write, so any entry that survived would put the map back out of step with the notes the chat wrote or moved.
@@ -11002,8 +11038,8 @@ export class VisualAgentMapView extends ItemView {
         for (const view of this.plugin.views()) if (view !== this && touched.has(view.path)) view.history.clear();
         this.updateHistoryButtons();
       }
-      // Whatever ended the loop (done, stopped, closed, thrown), the held repaint and re-read happen once.
-      await this.releaseChatBatch();
+      // Whatever ended the loop (done, stopped, closed, thrown), the derived data, the held repaint and the re-read happen once.
+      await this.settleChatBatch(run);
     }
     for (const index of later) {
       const action = result.actions[index];
@@ -11034,6 +11070,40 @@ export class VisualAgentMapView extends ItemView {
       all.push({ status: "skipped", text: t("ui.map_chat_rejected_0", result.rejected.length) });
     if (wrote) all.push({ status: "done", text: t("ui.map_chat_not_undoable") });
     return all;
+  }
+  /** Places the cards a reply made (and only those): each new branch beside its parent, a new tree below the others. */
+  private placeChatCards(nodes: MapNode[], fresh: Set<string>): MapNode[] {
+    const subtree = (rootId: string): Set<string> => {
+      const ids = new Set([rootId]);
+      for (let grew = true; grew;) {
+        grew = false;
+        for (const node of nodes)
+          if (fresh.has(node.id) && node.parentId && ids.has(node.parentId) && !ids.has(node.id)) {
+            ids.add(node.id);
+            grew = true;
+          }
+      }
+      return ids;
+    };
+    let placed = nodes;
+    const tops = nodes.filter(node => fresh.has(node.id) && !(node.parentId && fresh.has(node.parentId)));
+    const done = new Set<string>();
+    for (const top of tops) {
+      if (done.has(top.id)) continue;
+      if (!top.parentId) {
+        const ids = subtree(top.id);
+        placed = arrangeNewTree(placed, top.id, ids, this.cardHeightOf);
+        for (const id of ids) done.add(id);
+        continue;
+      }
+      // Every new card under the same parent is placed together.
+      const siblings = tops.filter(other => other.parentId === top.parentId);
+      const ids = new Set<string>();
+      for (const sibling of siblings) for (const id of subtree(sibling.id)) ids.add(id);
+      placed = arrangeNewBranch(placed, top.parentId, ids, this.cardHeightOf);
+      for (const id of ids) done.add(id);
+    }
+    return placed;
   }
   /** Swaps `new:<ref>` target ids for the cards they became; null when every target was a card that was never created. */
   private chatResolveTargets(
@@ -11174,7 +11244,10 @@ export class VisualAgentMapView extends ItemView {
           if (this.isMerging(parent.id)) return skipped("ui.map_chat_skip_merge_locked");
         }
         const before = new Set(this.map.nodes.map(item => item.id));
-        await this.addNode(parent, action.title, true, false);
+        // The derived data (every map is read for it) is rebuilt once, when the reply ends, not after each card; marked first so
+        // a card that was written before the action failed is covered too.
+        run.ownershipDirty = true;
+        await this.addNode(parent, action.title, false, false);
         const created = this.map?.nodes.find(item => !before.has(item.id));
         if (!created) return skipped("ui.map_chat_skip_unavailable");
         run.created.push(created.id);

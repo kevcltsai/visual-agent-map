@@ -104,9 +104,15 @@ import {
   type CountIssue,
   type DetailTemplate
 } from "../../ai/detail-templates";
-import { DEFAULT_TONE_ID, listPresets, resolvePreset, resolveToneText } from "../../ai/prompt-presets";
+import {
+  DEFAULT_OUTLINE_PRESET_ID,
+  DEFAULT_TONE_ID,
+  listPresets,
+  resolvePreset,
+  resolveToneText
+} from "../../ai/prompt-presets";
 import { matchPreset, NOTE_STYLE_PRESETS, styleLabel } from "./note-style";
-import type { AiResult, ResearchDepth, Suggestion, TaskContext } from "../../ai/types";
+import type { AiResult, Suggestion, TaskContext } from "../../ai/types";
 import { previewMetrics } from "../../ui/preview-utils";
 import { BUILTIN_SAMPLE_ID, builtInSample, SAMPLE_TOUR_VERSION } from "../../builtin-sample";
 import {
@@ -146,7 +152,6 @@ import type { MapChatRequest, MapChatResult } from "../../core/map-chat-service"
 import { MAP_CHAT_NEW_PREFIX, type MapChatAction } from "../../core/steps/map-chat/step";
 import {
   MAP_CHAT_AUTO_LAYOUT_MIN_NEW,
-  allNewTargets,
   chatResearchRequest,
   mapChoiceParts,
   matchMapTitle,
@@ -166,7 +171,7 @@ import {
 import { relevanceMode, relevanceModeAfterWrite, type RelevanceMode, type RelevancePin } from "./relevance-pins";
 import { PendingSuggestions } from "../../pending-suggestions";
 import { createAimMap } from "../aim/create-map";
-import { addOutlineToMap, createOutlineMap, type OutlineNode } from "./outline-import";
+import { addOutlineToMap, createOutlineMap, limitOutline, type OutlineNode } from "./outline-import";
 import {
   OutlineImportModal,
   type OutlineDraftInputs,
@@ -242,6 +247,7 @@ import {
   type BackgroundHooks,
   type PendingOutline,
   outlineProposals,
+  proposalOutline,
   type QuickOutline,
   type SynthesisObserver,
   armDiscard,
@@ -467,21 +473,17 @@ function showDocumentReady(): void {
 /**
  * The options a chat integration runs with: what the integration dialog hands over when its fields are left as they come up
  * (no sources picked, no web search or images, the full content of the subtopics, no template or tone chosen, no extra
- * requirements). `depth` is the topic's own research depth (a multi-select integration has none: "normal"); `synthesisTitle`
- * is the new topic's name and only a multi-select integration has one. Pure, so a test can hold it against the real dialog.
+ * requirements). An integration is always Quick (no web search; D-2026-10-229). `synthesisTitle` is the new topic's name and
+ * only a multi-select integration has one. Pure, so a test can hold it against the real dialog.
  */
-export function chatSynthesisOptions(input: {
-  depth: ResearchDepth;
-  outputLanguage: ContentLanguage;
-  synthesisTitle?: string;
-}): TaskOptions {
+export function chatSynthesisOptions(input: { outputLanguage: ContentLanguage; synthesisTitle?: string }): TaskOptions {
   return {
     synthesisContent: "full",
     referenceGroups: [],
     outputLanguage: input.outputLanguage,
     requirements: "",
     researchMode: "local",
-    researchDepth: input.depth,
+    researchDepth: "normal",
     visualMode: "off",
     ...(input.synthesisTitle !== undefined ? { synthesisTitle: input.synthesisTitle } : {})
   };
@@ -513,6 +515,9 @@ interface ChatRun {
 /** The narrow edge the laid-over chat window leaves in place, and the gap the tool group keeps from the window. */
 const CHAT_RAIL_WIDTH = 44;
 const CHAT_TOOLS_GAP = 12;
+/** The size of a chat expand: the Next Step dialog's defaults (levels below the topic, topics in total). */
+const CHAT_EXPAND_LEVELS = 2;
+const CHAT_EXPAND_MAX_TOPICS = 15;
 const skipped = (key: TranslationKey): ChatOutcome => ({ status: "skipped", reason: t(key) });
 const GUARD_REASON: Record<MapChatGuardCode, TranslationKey> = {
   outside_vault: "ui.map_chat_guard_outside_vault",
@@ -8631,6 +8636,8 @@ export class VisualAgentMapView extends ItemView {
         const choicesFor = (note: Note): TaskOptions =>
           request.researchMode !== undefined
             ? {
+                // The mode follows the override (local = Quick), so a Quick run gets the Quick prompt and no charts.
+                ...aiModeOptions(noteAiMode(request.researchMode), "research"),
                 researchMode: request.researchMode,
                 researchDepth: request.researchDepth ?? "normal",
                 visualMode: request.imageSearch ? "auto" : "off",
@@ -10763,7 +10770,10 @@ export class VisualAgentMapView extends ItemView {
           return;
         }
         const plan = result.actions.length
-          ? planFor(result.actions, request.context, { diagrams: this.plugin.settings.addDiagramsAfterResearch })
+          ? planFor(result.actions, request.context, {
+              diagrams: this.plugin.settings.addDiagramsAfterResearch,
+              mapAiMode: this.map?.aiMode
+            })
           : null;
         if (plan) {
           // Nothing is touched until the user applies the plan.
@@ -11209,7 +11219,7 @@ export class VisualAgentMapView extends ItemView {
               run
             );
             outcome = resolved
-              ? await this.runChatSelection(resolved.action, resolved.allNew, result.message ?? "")
+              ? await this.runChatSelection(resolved.action, result.message ?? "")
               : skipped("ui.map_chat_skip_parent_missing");
           }
         } catch (error) {
@@ -11260,20 +11270,18 @@ export class VisualAgentMapView extends ItemView {
   }
   /**
    * Swaps `new:<ref>` target ids for the cards they became; null when every target was a card that was never created.
-   * `allNew` says every target the reply named is a card the same reply created (decided before the swap).
    */
   private chatResolveTargets(
     action: Extract<MapChatAction, { kind: "select_topics" | "run_map_action" }>,
     run: ChatRun
-  ): { action: Extract<MapChatAction, { kind: "select_topics" | "run_map_action" }>; allNew: boolean } | null {
-    if (action.kind === "select_topics" && action.all) return { action, allNew: false };
-    const allNew = allNewTargets(action.nodeIds);
+  ): { action: Extract<MapChatAction, { kind: "select_topics" | "run_map_action" }> } | null {
+    if (action.kind === "select_topics" && action.all) return { action };
     const ids = action.nodeIds
       .map(id => (id.startsWith(MAP_CHAT_NEW_PREFIX) ? run.refs.get(id.slice(MAP_CHAT_NEW_PREFIX.length)) : id))
       .filter((id): id is string => !!id);
     // A target list that lost all its entries must not turn into "the current selection".
     if (action.nodeIds.length && !ids.length) return null;
-    return { action: { ...action, nodeIds: ids }, allNew };
+    return { action: { ...action, nodeIds: ids } };
   }
   /** create_map: makes the map, opens it (the conversation goes along) and moves the anchor to it. */
   private async chatCreateMap(
@@ -11560,8 +11568,6 @@ export class VisualAgentMapView extends ItemView {
   /** Selecting cards, and the run actions that start the map's own tasks; both after every write, outside a mutate. */
   private async runChatSelection(
     action: Extract<MapChatAction, { kind: "select_topics" | "run_map_action" }>,
-    /** Every target of this action is a card the same reply created. */
-    allNew = false,
     /** The user's message: the direction of an integration. */
     message = ""
   ): Promise<ChatOutcome> {
@@ -11592,11 +11598,15 @@ export class VisualAgentMapView extends ItemView {
         const chat = this.chat;
         const turns = chat?.transcript().length ?? 0;
         launch(
-          this.startMultiResearch(chatResearchRequest(action, allNew), undefined, web => {
-            const lines = researchWebLines(web);
-            if (lines.length && chat && this.chat === chat && !this.closed && chat.transcript().length === turns)
-              chat.appendLines(lines);
-          })
+          this.startMultiResearch(
+            chatResearchRequest(action, this.map?.aiMode, mode => aiModeOptions(mode, "research")),
+            undefined,
+            web => {
+              const lines = researchWebLines(web);
+              if (lines.length && chat && this.chat === chat && !this.closed && chat.transcript().length === turns)
+                chat.appendLines(lines);
+            }
+          )
         );
         return { status: "done" };
       }
@@ -11607,22 +11617,12 @@ export class VisualAgentMapView extends ItemView {
           .filter((node): node is MapNode => !!node);
         if (!parents.length) return skipped("ui.map_chat_skip_unavailable");
         // The chat request is the confirmation of the changes, not of the AI call: each parent asks for its own model's
-        // usage notice first, like the expand button. Every suggestion is then created without the review dialog.
+        // usage notice first, like the expand button. The subtopics are then added without the review window.
         for (const parent of parents)
           launch(
-            this.plugin.repo.readNote(parent.path, this.map ?? undefined).then(note =>
-              this.plugin.confirmAiUsage(note.model, () =>
-                this.proposeChildren(
-                  parent,
-                  undefined,
-                  action.direction,
-                  (items, create) => launch(create(items)),
-                  message => {
-                    new Notice(message);
-                  }
-                )
-              )
-            )
+            this.plugin.repo
+              .readNote(parent.path, this.map ?? undefined)
+              .then(note => this.plugin.confirmAiUsage(note.model, () => this.chatExpand(parent, action.direction)))
           );
         return { status: "done" };
       }
@@ -11651,6 +11651,68 @@ export class VisualAgentMapView extends ItemView {
         await this.plugin.mutate(() => this.mergeSelected(title, snapshot));
         return { status: "done" };
       }
+    }
+  }
+  /**
+   * Expand from the chat: the multi-level outline expansion of the Next Step dialog (the same generator and the same writer),
+   * with the map's default size (2 levels, at most 15 topics), every topic accepted and no review window. The new topics are
+   * written without a research (`research-mode: local`, no task text). Like the dialog's run, the card shows running and Stop
+   * while the outline is generated.
+   */
+  private async chatExpand(parent: MapNode, direction: string): Promise<void> {
+    if (this.plugin.expansionCoordinator.isRunning(parent.path) || this.plugin.running.has(parent.path)) {
+      new Notice(t("ui.ai_running_ai"));
+      return;
+    }
+    const controller = new AbortController();
+    this.plugin.running.add(parent.path);
+    this.plugin.quickExpandPending.add(parent.path);
+    this.plugin.activeTasks.set(parent.path, controller);
+    this.render();
+    try {
+      const note = await this.plugin.repo.readNote(parent.path, this.map ?? undefined);
+      const outline = this.quickOutline(parent);
+      const limits = { levels: CHAT_EXPAND_LEVELS, maxTopics: CHAT_EXPAND_MAX_TOPICS };
+      const generated = await outline.generate(
+        {
+          presetId: DEFAULT_OUTLINE_PRESET_ID,
+          requirements: direction,
+          language: defaultOutputLanguage(
+            this.plugin.settings.language,
+            note.title,
+            existingNoteLanguage(note),
+            this.outputLanguageMemory().outputLanguage
+          ),
+          limits
+        },
+        controller.signal
+      );
+      if (controller.signal.aborted || this.closed) return;
+      const { nodes } = limitOutline(generated, limits);
+      const items = outlineProposals(nodes);
+      if (!items.length) {
+        new Notice(t("ui.ai_does_not_recommend_decomposition_or_did_not_propose_3_to"));
+        return;
+      }
+      // The parent may have been removed while the AI worked; the writer then refuses and says so.
+      await outline.create(proposalOutline(items), {
+        researchMode: "local",
+        researchDepth: "normal",
+        visualMode: "off",
+        outputLanguage: defaultOutputLanguage(
+          this.plugin.settings.language,
+          note.title,
+          existingNoteLanguage(note),
+          this.outputLanguageMemory().outputLanguage
+        )
+      });
+    } catch (error) {
+      if (!controller.signal.aborted) new Notice(this.plugin.recordFailure(t("log.ai_split_failed"), error));
+    } finally {
+      if (this.plugin.activeTasks.get(parent.path) === controller) this.plugin.activeTasks.delete(parent.path);
+      this.plugin.running.delete(parent.path);
+      this.plugin.quickExpandPending.delete(parent.path);
+      if (!this.closed) this.render();
     }
   }
   /**
@@ -11683,7 +11745,6 @@ export class VisualAgentMapView extends ItemView {
         return skipped("ui.map_chat_skip_synthesis_busy");
       const note = await this.plugin.repo.readNote(node.path, map);
       const options = chatSynthesisOptions({
-        depth: "normal",
         outputLanguage: defaultOutputLanguage(settings.language, note.title, existingNoteLanguage(note), remembered)
       });
       return this.launchChatTask(note.model, (failed, accepted) =>
@@ -11695,7 +11756,6 @@ export class VisualAgentMapView extends ItemView {
       return skipped("ui.map_chat_skip_synthesis_busy");
     const names = nodes.map(node => this.notes.get(node.id)?.title ?? node.path);
     const options = chatSynthesisOptions({
-      depth: "normal",
       outputLanguage: defaultOutputLanguage(settings.language, "", undefined, remembered),
       synthesisTitle: synthesisDefaultName(resolveMapTextLanguage(map, settings.language), names)
     });

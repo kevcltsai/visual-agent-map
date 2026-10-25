@@ -5,7 +5,8 @@ const { load } = require('./support-replay.cjs');
 const { estimateTokens } = load('ai/context-builder.ts');
 const { MAP_CHAT_TOKEN_BUDGET, mapChatStep, parseMapChat, MAP_CHAT_SCHEMA, MAP_CHAT_ACTION_KINDS, MAP_RUN_ACTIONS, MapChatError } = load('core/steps/map-chat/step.ts');
 const { buildMapChatContext, contentHash, isMdStale, MAP_CHAT_MAP_TITLE_LIMIT } = load('core/map-chat-context.ts');
-const { planFor, matchMapTitle, allNewTargets, chatResearchRequest, MAP_CHAT_PLAN_ACTION_LIMIT, MAP_CHAT_PLAN_RESEARCH_LIMIT } = load('core/map-chat-plan.ts');
+const { aiModeOptions } = load('experiences/visual-map/ai-mode.ts');
+const { planFor, matchMapTitle, chatResearchRequest, MAP_CHAT_PLAN_ACTION_LIMIT, MAP_CHAT_PLAN_RESEARCH_LIMIT } = load('core/map-chat-plan.ts');
 const { guardMapChatWrite, normalizeVaultPath, applyMdEdit } = load('core/map-chat-guard.ts');
 const { partialReply, MapChatService } = load('core/map-chat-service.ts');
 const { History, serializeMap } = load('map-model.ts');
@@ -22,7 +23,7 @@ const topic = (id, extra = {}) => ({ id, title: id.toUpperCase(), summary: `${id
 const input = (extra = {}) => ({ mapTitle: 'Steak', outline, selected: [], references: [], snippets: [], files: [], activeFile: null, history: [], ...extra });
 const context = (extra = {}) => buildMapChatContext(input(extra));
 const request = (extra = {}) => ({ message: 'What is missing?', context: context(), language: 'en', model: 'claude:sonnet', reasoning: 'low', ...extra });
-const item = (kind, fields = {}) => ({ kind, nodeId: '', ref: '', parentId: '', newParentId: '', title: '', summary: '', detail: '', path: '', find: '', replace: '', content: '', nodeIds: [], all: false, branch: false, action: '', goal: '', direction: '', depth: '', images: false, ...fields });
+const item = (kind, fields = {}) => ({ kind, nodeId: '', ref: '', parentId: '', newParentId: '', title: '', summary: '', detail: '', path: '', find: '', replace: '', content: '', nodeIds: [], all: false, branch: false, action: '', goal: '', direction: '', mode: '', images: false, ...fields });
 const reply = (...actions) => JSON.stringify({ reply: 'ok', actions });
 const parse = (raw, ctx = context()) => plain(parseMapChat(raw, ctx));
 
@@ -398,8 +399,8 @@ test('C1: a redo prompt says actions must be empty; a normal prompt does not', (
   assert.ok(!/actions" must be an empty list/.test(mapChatStep.render(request({ style: 'detailed' }))));
   assert.match(mapChatStep.render(request({ language: 'zh-TW', style: 'detailed', redo: true })), /"actions" 必須是空清單/);
 });
-test('C1: the style is not part of the action schema, and the step version is 4 (B2: research depth and images)', () => {
-  assert.equal(mapChatStep.version, 4);
+test('C1: the style is not part of the action schema, and the step version is 5 (D-2026-10-231: mode replaces depth)', () => {
+  assert.equal(mapChatStep.version, 5);
   assert.equal(JSON.stringify(MAP_CHAT_SCHEMA).includes('style'), false);
 });
 
@@ -550,9 +551,9 @@ test('B1 prompt: it tells the model to say what it will do (not what it did), ex
 });
 
 // ---- plan conditions ----
-const plan = (actions, extra = {}) => planFor(actions, { parents: { a: 'r', a1: 'a', b: 'r', r: null }, selectedCount: 0, ...extra });
+const plan = (actions, extra = {}, options) => planFor(actions, { parents: { a: 'r', a1: 'a', b: 'r', r: null }, selectedCount: 0, ...extra }, options);
 const renameRows = count => Array.from({ length: count }, () => ({ kind: 'rename_topic', nodeId: 'a', title: 'T' }));
-const researchOn = ids => ({ kind: 'run_map_action', action: 'research_standard', nodeIds: ids, title: '', goal: '', direction: '', depth: '', images: false });
+const researchOn = ids => ({ kind: 'run_map_action', action: 'research_standard', nodeIds: ids, title: '', goal: '', direction: '', mode: '', images: false });
 const ids = count => Array.from({ length: count }, (_, i) => `n${i}`);
 test('B1 plan: 16 actions need a plan, 15 do not', () => {
   assert.equal(MAP_CHAT_PLAN_ACTION_LIMIT, 15);
@@ -568,7 +569,8 @@ test('B1 plan: delete_topic with branch:true needs a plan only when the card has
 test('B1 plan: 10 research targets need a plan, 9 do not; no targets means the selection at that point', () => {
   assert.equal(MAP_CHAT_PLAN_RESEARCH_LIMIT, 10);
   assert.equal(plan([researchOn(ids(9))]), null);
-  assert.deepEqual(plain(plan([researchOn(ids(10))])), { reasons: ['many_research'], estimatedCalls: 20 }, 'B2: each research is its main call plus the diagram call');
+  assert.deepEqual(plain(plan([researchOn(ids(10))], {}, { mapAiMode: 'standard' })), { reasons: ['many_research'], estimatedCalls: 20 }, 'Standard: each research is its main call plus the diagram call');
+  assert.deepEqual(plain(plan([researchOn(ids(10))])), { reasons: ['many_research'], estimatedCalls: 10 }, 'no map mode = Quick: one call each, no diagram');
   assert.deepEqual(plain(plan([researchOn([])], { selectedCount: 10 }).reasons), ['many_research']);
   assert.equal(plan([researchOn([])], { selectedCount: 9 }), null);
   assert.deepEqual(plain(plan([{ kind: 'select_topics', nodeIds: ids(12), all: false }, researchOn([])]).reasons), ['many_research'], 'a select_topics before it sets the selection');
@@ -580,13 +582,16 @@ test('B1 plan: create_map needs a plan', () => {
   assert.deepEqual(plain(plan([{ kind: 'create_map', title: 'Q' }, ...renameRows(15)]).reasons), ['many_actions', 'new_map']);
 });
 test('B1/B2 plan: the estimate counts research and synthesis (main call plus diagram call), expanded cards, one rating, one merge, and nothing for writes or view operations', () => {
-  const run = (action, extra = {}) => ({ kind: 'run_map_action', action, nodeIds: [], title: 'm', goal: 'g', direction: '', depth: '', images: false, ...extra });
+  const run = (action, extra = {}) => ({ kind: 'run_map_action', action, nodeIds: [], title: 'm', goal: 'g', direction: '', mode: '', images: false, ...extra });
   const estimate = (actions, selectedCount = 0, options) => planFor([{ kind: 'create_map', title: 'Q' }, ...actions], { parents: {}, selectedCount }, options).estimatedCalls;
   assert.equal(estimate([]), 0);
-  assert.equal(estimate([run('research_standard', { nodeIds: ['x', 'y', 'z'] })]), 6, 'three topics: three research calls and three diagram calls');
-  assert.equal(estimate([run('research_standard', { nodeIds: ['x', 'y', 'z'] })], 0, { diagrams: false }), 3, 'with "Add diagrams after research" off there is no diagram call');
-  for (const depth of ['fast', 'normal', 'deep']) assert.equal(estimate([run('research_standard', { nodeIds: ['x'], depth })]), 2, `${depth}: the depth does not change the number of calls`);
-  assert.equal(estimate([run('expand', { nodeIds: ['x', 'y'] })]), 2);
+  const standard = { mapAiMode: 'standard' };
+  assert.equal(estimate([run('research_standard', { nodeIds: ['x', 'y', 'z'] })], 0, standard), 6, 'Standard, three topics: three research calls and three diagram calls');
+  assert.equal(estimate([run('research_standard', { nodeIds: ['x', 'y', 'z'] })], 0, { ...standard, diagrams: false }), 3, 'with "Add diagrams after research" off there is no diagram call');
+  assert.equal(estimate([run('research_standard', { nodeIds: ['x', 'y', 'z'] })]), 3, 'no map mode = Quick: one call each, no diagram call');
+  assert.equal(estimate([run('research_standard', { nodeIds: ['x'], mode: 'quick' })], 0, standard), 1, 'a named Quick beats the map Standard');
+  assert.equal(estimate([run('research_standard', { nodeIds: ['x'], mode: 'standard' })], 0, { mapAiMode: 'quick' }), 2, 'a named Standard beats the map Quick');
+  assert.equal(estimate([run('expand', { nodeIds: ['x', 'y'] })]), 2, 'expand: one outline call per card');
   assert.equal(estimate([run('expand')], 4), 4, 'no targets = the selection');
   assert.equal(estimate([run('rate_by_goal')]), 1);
   assert.equal(estimate([run('merge')]), 1);
@@ -594,7 +599,7 @@ test('B1/B2 plan: the estimate counts research and synthesis (main call plus dia
   assert.equal(estimate([run('synthesize', { nodeIds: ['x', 'y'] })]), 2, 'several cards are still one integration');
   assert.equal(estimate([run('synthesize')], 0, { diagrams: false }), 1);
   assert.equal(estimate([{ kind: 'collapse_topic', nodeId: 'x' }, { kind: 'auto_layout' }, { kind: 'focus_topic', nodeId: 'x' }, { kind: 'rename_topic', nodeId: 'x', title: 'T' }]), 0);
-  assert.equal(estimate([run('research_standard', { nodeIds: ['x', 'y'] }), run('expand', { nodeIds: ['x'] }), run('rate_by_goal'), run('merge')]), 7);
+  assert.equal(estimate([run('research_standard', { nodeIds: ['x', 'y'] }), run('expand', { nodeIds: ['x'] }), run('rate_by_goal'), run('merge')], 0, standard), 7);
 });
 test('B1 open_map matching: exact first, then contains; case, spacing and Traditional/Simplified are ignored; none, one and many are told apart', () => {
   const maps = [{ title: 'Coffee industry' }, { title: '咖啡產業' }, { title: 'Coffee' }, { title: 'Tea' }];
@@ -609,57 +614,68 @@ test('B1 open_map matching: exact first, then contains; case, spacing and Tradit
 
 // ---- B2-feat: research options, shallow research, integration, structure tidy ----
 const researchItem = (fields = {}) => item('run_map_action', { action: 'research_standard', nodeIds: ['a'], ...fields });
-test('B2 schema: depth (fast|normal|deep|"") and images (boolean) are in the strict schema and required', () => {
+test('B2 schema: mode (quick|standard|"") and images (boolean) are in the strict schema and required; depth is gone', () => {
   const entry = MAP_CHAT_SCHEMA.properties.actions.items;
-  assert.deepEqual(plain(entry.properties.depth), { type: 'string', enum: ['fast', 'normal', 'deep', ''] });
+  assert.deepEqual(plain(entry.properties.mode), { type: 'string', enum: ['quick', 'standard', ''] });
   assert.deepEqual(plain(entry.properties.images), { type: 'boolean' });
-  assert.ok(entry.required.includes('depth') && entry.required.includes('images'));
+  assert.ok(entry.required.includes('mode') && entry.required.includes('images'));
+  assert.equal('depth' in entry.properties, false); assert.equal(entry.required.includes('depth'), false);
   assert.equal(entry.additionalProperties, false);
   for (const key of Object.keys(entry.properties)) assert.ok(entry.required.includes(key), `${key} is required (strict schema)`);
 });
-test('B2 parser: a research keeps depth, images and the extra requirement (direction)', () => {
-  const [kept] = parse(reply(researchItem({ depth: 'deep', images: true, direction: ' only after 2020 ' }))).actions;
-  assert.equal(kept.depth, 'deep'); assert.equal(kept.images, true); assert.equal(kept.direction, 'only after 2020');
-  for (const depth of ['fast', 'normal', 'deep', '']) assert.equal(parse(reply(researchItem({ depth }))).actions[0].depth, depth);
+test('B2 parser: a research keeps mode, images and the extra requirement (direction); Quick never keeps images', () => {
+  const [kept] = parse(reply(researchItem({ mode: 'standard', images: true, direction: ' only after 2020 ' }))).actions;
+  assert.equal(kept.mode, 'standard'); assert.equal(kept.images, true); assert.equal(kept.direction, 'only after 2020'); assert.equal('depth' in kept, false);
+  for (const mode of ['quick', 'standard', '']) assert.equal(parse(reply(researchItem({ mode }))).actions[0].mode, mode);
+  const quick = parse(reply(researchItem({ mode: 'quick', images: true }))).actions[0];
+  assert.equal(quick.images, false, 'a Quick research never looks for images');
 });
-test('B2 parser counterexample: depth "ultra" drops the research as bad_value', () => {
-  const result = parse(reply(researchItem({ depth: 'ultra' }), researchItem({ depth: 'fast' })));
+test('B2 parser counterexample: mode "ultra" drops the research as bad_value', () => {
+  const result = parse(reply(researchItem({ mode: 'ultra' }), researchItem({ mode: 'quick' })));
   assert.deepEqual(result.rejected, [{ index: 0, code: 'bad_value' }]);
-  assert.deepEqual(result.actions.map(action => action.depth), ['fast']);
-  assert.equal(parse(reply(researchItem({ depth: 5 }))).rejected[0].code, 'bad_value', 'a non-string depth is a bad value too');
+  assert.deepEqual(result.actions.map(action => action.mode), ['quick']);
+  assert.equal(parse(reply(researchItem({ mode: 5 }))).rejected[0].code, 'bad_value', 'a non-string mode is a bad value too');
 });
-test('B2 parser counterexample: depth and images on any other action are ignored, even a depth that would be invalid', () => {
+test('B2 parser counterexample: mode and images on any other action are ignored, even a mode that would be invalid', () => {
   const result = parse(reply(
-    item('run_map_action', { action: 'expand', nodeIds: ['a'], depth: 'deep', images: true, direction: 'sleep' }),
-    item('run_map_action', { action: 'synthesize', nodeIds: ['a'], depth: 'ultra', images: true }),
-    item('run_map_action', { action: 'merge', title: 'M', depth: 'deep', images: true })
+    item('run_map_action', { action: 'expand', nodeIds: ['a'], mode: 'standard', images: true, direction: 'sleep' }),
+    item('run_map_action', { action: 'synthesize', nodeIds: ['a'], mode: 'ultra', images: true }),
+    item('run_map_action', { action: 'merge', title: 'M', mode: 'quick', images: true })
   ));
   assert.deepEqual(result.rejected, []);
-  for (const action of result.actions) { assert.equal(action.depth, ''); assert.equal(action.images, false); }
+  for (const action of result.actions) { assert.equal(action.mode, ''); assert.equal(action.images, false); }
   assert.equal(result.actions[0].direction, 'sleep');
 });
-test('B2 parser compatibility: a step-v3 reply without depth and images still parses, and reads as the defaults', () => {
-  const v3 = JSON.stringify({ reply: 'ok', actions: [{ kind: 'run_map_action', nodeId: '', ref: '', parentId: '', newParentId: '', title: '', summary: '', detail: '', path: '', find: '', replace: '', content: '', nodeIds: ['a'], all: false, branch: false, action: 'research_standard', goal: '', direction: '' }] });
-  const result = parse(v3);
+const legacyReply = fields => JSON.stringify({ reply: 'ok', actions: [{ kind: 'run_map_action', nodeId: '', ref: '', parentId: '', newParentId: '', title: '', summary: '', detail: '', path: '', find: '', replace: '', content: '', nodeIds: ['a'], all: false, branch: false, action: 'research_standard', goal: '', direction: '', ...fields }] });
+test('B2 parser compatibility: a step-v3 reply without depth and images still parses, and reads as not named, images off', () => {
+  const result = parse(legacyReply({}));
   assert.deepEqual(result.rejected, []);
-  assert.deepEqual(result.actions[0], { kind: 'run_map_action', action: 'research_standard', nodeIds: ['a'], title: '', goal: '', direction: '', depth: '', images: false });
-  const request = chatResearchRequest(result.actions[0], false);
-  assert.deepEqual(plain(request), { researchMode: 'research', researchDepth: 'normal', requirements: '', imageSearch: false });
+  assert.deepEqual(result.actions[0], { kind: 'run_map_action', action: 'research_standard', nodeIds: ['a'], title: '', goal: '', direction: '', mode: '', images: false });
 });
-test('B2 research request: a named depth wins; unnamed is fast for cards the reply created and normal otherwise; images and direction pass through', () => {
+test('D-231 counterexample (old data): a step-v4 reply with depth "deep", "normal", "fast" reads as Standard, depth "" as not named', () => {
+  for (const depth of ['deep', 'normal', 'fast']) {
+    const result = parse(legacyReply({ depth, images: true }));
+    assert.deepEqual(result.rejected, [], depth);
+    assert.equal(result.actions[0].mode, 'standard', `${depth} -> standard`); assert.equal(result.actions[0].images, true, 'a named depth keeps its images flag (Standard)');
+    assert.equal('depth' in result.actions[0], false);
+  }
+  assert.equal(parse(legacyReply({ depth: '', images: false })).actions[0].mode, '');
+  const bad = parse(legacyReply({ depth: 'ultra' }));
+  assert.deepEqual(bad.rejected, [{ index: 0, code: 'bad_value' }], 'an invalid old depth is still dropped');
+  assert.equal(parse(legacyReply({ depth: 'deep', mode: 'quick' })).actions[0].mode, 'quick', 'when mode is present, mode wins');
+});
+test('D-231 mode resolution: a named mode > the map mode > Quick; the all-new-cards rule is gone', () => {
   const action = (fields = {}) => parse(reply(researchItem(fields))).actions[0];
-  assert.deepEqual(plain(chatResearchRequest(action(), false)), { researchMode: 'research', researchDepth: 'normal', requirements: '', imageSearch: false });
-  assert.equal(chatResearchRequest(action(), true).researchDepth, 'fast', 'new cards only: a first look');
-  assert.equal(chatResearchRequest(action({ depth: 'deep' }), true).researchDepth, 'deep', 'a named depth beats the new-card default');
-  assert.equal(chatResearchRequest(action({ depth: 'fast' }), false).researchDepth, 'fast');
-  assert.equal(chatResearchRequest(action({ images: true, direction: 'recent only' }), false).imageSearch, true);
-  assert.equal(chatResearchRequest(action({ direction: 'recent only' }), false).requirements, 'recent only');
-});
-test('B2 allNewTargets: only a non-empty list of new: ids counts; a mix, an existing card and the selection (empty) do not', () => {
-  assert.equal(allNewTargets(['new:a', 'new:b']), true);
-  assert.equal(allNewTargets(['new:a', 'x']), false);
-  assert.equal(allNewTargets(['x']), false);
-  assert.equal(allNewTargets([]), false);
+  const ask = (fields, mapMode) => chatResearchRequest(action(fields), mapMode, mode => aiModeOptions(mode, 'research'));
+  assert.equal(ask({ mode: 'quick' }, 'standard').mapAiMode, 'quick', 'named Quick + map Standard = Quick');
+  assert.equal(ask({}, 'standard').mapAiMode, 'standard', 'only "research" + map Standard = Standard');
+  assert.equal(ask({}, undefined).mapAiMode, 'quick', 'only "research" + map without a mode = Quick');
+  assert.equal(ask({ mode: 'standard' }, 'quick').mapAiMode, 'standard', 'named Standard + map Quick = Standard');
+  assert.deepEqual(plain(ask({}, undefined)), { mapAiMode: 'quick', researchMode: 'local', researchDepth: 'normal', requirements: '', imageSearch: false });
+  assert.deepEqual(plain(ask({ mode: 'standard' }, undefined)), { mapAiMode: 'standard', researchMode: 'research', researchDepth: 'normal', requirements: '', imageSearch: false });
+  assert.equal(ask({ mode: 'standard', images: true, direction: 'recent only' }).imageSearch, true, 'Standard: images when asked');
+  assert.equal(ask({ mode: 'standard', images: true, direction: 'recent only' }).requirements, 'recent only');
+  assert.equal(ask({ images: true }, 'quick').imageSearch, false, 'Quick: never images');
 });
 test('B2 plan counterexample: researching 9 cards the reply created needs no plan, 10 do (the research limit counts new: targets too)', () => {
   const news = count => researchOn(Array.from({ length: count }, (_, i) => `new:n${i}`));
@@ -669,9 +685,9 @@ test('B2 plan counterexample: researching 9 cards the reply created needs no pla
 });
 test('B2 prompt: research options, "research only when asked", headless integration and the structure-tidy rules are in both languages', () => {
   const en = mapChatStep.render(request({ language: 'en' }));
-  for (const pattern of [/depth \(research_standard only/, /images \(research_standard only/, /extra requirements for the research/, /add research_standard only when the user asked for research/, /"new:<ref>" in the nodeIds of research_standard/, /no dialog opens/, /use only move_topic, run_map_action with merge, rename_topic and delete_topic/, /Prefer merging and moving/, /"depth":"","images":false/]) assert.match(en, pattern, String(pattern));
+  for (const pattern of [/mode \(research_standard only/, /images \(research_standard only/, /extra requirements for the research/, /add research_standard only when the user asked for research/, /"new:<ref>" in the nodeIds of research_standard/, /no dialog opens/, /multi-level outline expansion/, /quick research/, /standard research/, /use only move_topic, run_map_action with merge, rename_topic and delete_topic/, /Prefer merging and moving/, /"mode":"","images":false/]) assert.match(en, pattern, String(pattern));
   const zh = mapChatStep.render(request({ language: 'zh-TW' }));
-  for (const pattern of [/depth（只用於 research_standard/, /images（只用於 research_standard/, /只有使用者要求研究或查資料時才加 research_standard/, /不會開對話框/, /只用 move_topic、run_map_action 的 merge、rename_topic 與 delete_topic/, /優先用合併與移動/, /"depth":"","images":false/]) assert.match(zh, pattern, String(pattern));
+  for (const pattern of [/mode（只用於 research_standard/, /images（只用於 research_standard/, /只有使用者要求研究或查資料時才加 research_standard/, /不會開對話框/, /多層大綱展開/, /快速研究/, /標準研究/, /只用 move_topic、run_map_action 的 merge、rename_topic 與 delete_topic/, /優先用合併與移動/, /"mode":"","images":false/]) assert.match(zh, pattern, String(pattern));
   for (const text of [en, zh]) assert.doesNotMatch(text, /open the synthesis dialog|開啟選取議題的整合|開啟整合對話框/i);
 });
 test('B2 structure tidy: no action kind or run action opens the structure-review window', () => {

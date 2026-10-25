@@ -175,14 +175,15 @@ export class AiTaskService {
 
     console.debug("Visual Agent Map AI metrics", prepared.metrics);
     // A standard research (Research mode of a plain task, not AIM and not a helper request): its web retrievals are counted for
-    // the result, and at normal or deep depth it must make at least one. A quick overview may answer without the web.
+    // the result, and it must make at least one, whatever its answer length (the short overview of a Standard subtopic research
+    // included). A Quick run is not in Research mode, so it neither searches nor is checked.
     const countsWeb =
       !context.aimIsolatedResearch &&
       (context.mode ?? "task") === "task" &&
       context.researchMode === "research" &&
       role === undefined &&
       !input.countRepair;
-    const requiresWeb = countsWeb && context.researchDepth !== "fast";
+    const requiresWeb = countsWeb;
     let retrievals = 0;
     const webHook: ((event: CodexWebSearchEvent) => void) | undefined = countsWeb
       ? event => {

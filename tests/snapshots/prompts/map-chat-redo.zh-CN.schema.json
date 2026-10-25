@@ -94,12 +94,11 @@
           "direction": {
             "type": "string"
           },
-          "depth": {
+          "mode": {
             "type": "string",
             "enum": [
-              "fast",
-              "normal",
-              "deep",
+              "quick",
+              "standard",
               ""
             ]
           },
@@ -126,7 +125,7 @@
           "action",
           "goal",
           "direction",
-          "depth",
+          "mode",
           "images"
         ]
       }

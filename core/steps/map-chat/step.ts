@@ -36,9 +36,11 @@ export const MAP_CHAT_ACTION_KINDS = [
 export type MapChatActionKind = (typeof MAP_CHAT_ACTION_KINDS)[number];
 export const MAP_RUN_ACTIONS = ["research_standard", "expand", "synthesize", "rate_by_goal", "merge"] as const;
 export type MapRunAction = (typeof MAP_RUN_ACTIONS)[number];
-/** Research depths a reply may name; "" (not named) is read as the default by the view. */
-export const MAP_CHAT_RESEARCH_DEPTHS = ["fast", "normal", "deep"] as const;
-export type MapChatResearchDepth = (typeof MAP_CHAT_RESEARCH_DEPTHS)[number];
+/** Research modes a reply may name; "" (not named) is read as the map's remembered mode by the view. */
+export const MAP_CHAT_RESEARCH_MODES = ["quick", "standard"] as const;
+export type MapChatResearchMode = (typeof MAP_CHAT_RESEARCH_MODES)[number];
+/** The depths of reply version 4 and earlier: still accepted, and read as Standard (D-2026-10-231). */
+const LEGACY_RESEARCH_DEPTHS = ["fast", "normal", "deep"] as const;
 export const MAP_CHAT_MAX_ACTIONS = 100;
 /** Prefix of a temporary id a reply gives to a card it creates itself; `ref: "n1"` is named `new:n1` by later actions. */
 export const MAP_CHAT_NEW_PREFIX = "new:";
@@ -68,9 +70,9 @@ export type MapChatAction =
       goal: string;
       /** expand: optional direction. research_standard: extra requirements for the research. */
       direction: string;
-      /** research_standard: the depth the user asked for; "" = not named (the view decides). Ignored by every other action. */
-      depth: MapChatResearchDepth | "";
-      /** research_standard: true = also search for images. Ignored by every other action. */
+      /** research_standard: the mode the user asked for; "" = not named (the view uses the map's remembered mode). Ignored by every other action. */
+      mode: MapChatResearchMode | "";
+      /** research_standard: true = also search for images (Standard only; a Quick research never does). Ignored by every other action. */
       images: boolean;
     }
   /** Always the first action: a new map, opened for the rest of the reply. */
@@ -159,7 +161,7 @@ export const MAP_CHAT_SCHEMA = {
           action: { type: "string", enum: [...MAP_RUN_ACTIONS, ""] },
           goal: STRING,
           direction: STRING,
-          depth: { type: "string", enum: [...MAP_CHAT_RESEARCH_DEPTHS, ""] },
+          mode: { type: "string", enum: [...MAP_CHAT_RESEARCH_MODES, ""] },
           images: { type: "boolean" }
         },
         required: [
@@ -181,7 +183,7 @@ export const MAP_CHAT_SCHEMA = {
           "action",
           "goal",
           "direction",
-          "depth",
+          "mode",
           "images"
         ]
       }
@@ -353,10 +355,18 @@ export function parseMapChat(
             goal = text("goal", false);
           if (action === "merge" && !title) throw new Dropped("missing_field");
           if (action === "rate_by_goal" && !goal) throw new Dropped("missing_field");
-          // depth and images only mean something to a research; every other action ignores them (an old v3 reply has neither).
+          // mode and images only mean something to a research; every other action ignores them. A reply of version 4 or earlier
+          // has `depth` instead of `mode`: a named depth reads as Standard, an empty one as not named.
           const research = action === "research_standard";
-          const given = research ? text("depth", false) : "";
-          if (given && !(MAP_CHAT_RESEARCH_DEPTHS as readonly string[]).includes(given)) throw new Dropped("bad_value");
+          let given = research ? text("mode", false) : "";
+          if (given && !(MAP_CHAT_RESEARCH_MODES as readonly string[]).includes(given)) throw new Dropped("bad_value");
+          if (research && !given && item.mode === undefined) {
+            const legacy = text("depth", false);
+            if (legacy && !(LEGACY_RESEARCH_DEPTHS as readonly string[]).includes(legacy))
+              throw new Dropped("bad_value");
+            if (legacy) given = "standard";
+          }
+          const mode = given as MapChatResearchMode | "";
           actions.push({
             kind: "run_map_action",
             action: action as MapRunAction,
@@ -364,8 +374,8 @@ export function parseMapChat(
             title,
             goal,
             direction: text("direction", false),
-            depth: given as MapChatResearchDepth | "",
-            images: research && flag("images")
+            mode,
+            images: research && mode !== "quick" && flag("images")
           });
           break;
         }
@@ -404,7 +414,7 @@ export function parseMapChat(
 /** One conversation turn: the user's message plus the context the panel gathered. The reply is JSON; actions are applied by the view. */
 export const mapChatStep: StepDefinition<MapChatRequest, MapChatResult> = {
   id: "map-chat",
-  version: 4,
+  version: 5,
   render: request => {
     const language = request.contentLanguage ?? request.language;
     const zh = instructionLanguageOf(language) === "zh";

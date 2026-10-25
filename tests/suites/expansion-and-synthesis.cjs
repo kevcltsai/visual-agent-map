@@ -2494,13 +2494,18 @@ integrationTest('multi research without overrides runs each topic in its own not
   for (const run of h.runs) assert.match(run.options.task, /Be brief$/);
   for (const name of h.finish.keys()) h.finish.get(name)();
   await until(() => h.plugin.expansionBatches.get(h.key).status === 'completed');
-  // With the map chat's overrides the batch behaves as before: no mode on the context.
+  // With the map chat's overrides the batch follows the override's mode (D-2026-10-231): research = Standard, local = Quick (no charts, the Quick prompt).
   const chat = await multiResearchHarness(['Chat topic']);
   chat.view.multiSelected = new Set(chat.nodes.map(n => n.id));
   await chat.view.startMultiResearch({ researchMode: 'research', researchDepth: 'deep', requirements: '', imageSearch: true });
   await until(() => chat.runs.length === 1);
   assert.deepEqual(plain([chat.runs[0].options.researchMode, chat.runs[0].options.researchDepth, chat.runs[0].options.visualMode, chat.runs[0].options.addCharts]), ['research', 'deep', 'auto', true]);
-  assert.equal(chat.runs[0].options.mapAiMode, undefined, 'the chat\'s overrides leave the mode empty');
+  assert.equal(chat.runs[0].options.mapAiMode, 'standard', 'a chat research override carries its mode so the right prompt is used');
+  const quick = await multiResearchHarness(['Chat quick topic']);
+  quick.view.multiSelected = new Set(quick.nodes.map(n => n.id));
+  await quick.view.startMultiResearch({ researchMode: 'local', researchDepth: 'normal', requirements: '', imageSearch: false });
+  await until(() => quick.runs.length === 1);
+  assert.deepEqual(plain([quick.runs[0].options.researchMode, quick.runs[0].options.researchDepth, quick.runs[0].options.visualMode, quick.runs[0].options.mapAiMode, quick.runs[0].options.addCharts]), ['local', 'normal', 'off', 'quick', false]);
 });
 integrationTest('AI mode memory on the map: remembering writes aiMode once; the same value again writes nothing; unknown stored values are dropped on read', async () => {
   const h = await templateHarness({ language: 'en' });

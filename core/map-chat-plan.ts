@@ -1,6 +1,7 @@
 import { toSimplifiedFold } from "../i18n/han-fold";
+import type { MapAiMode, ResearchDepth, ResearchMode } from "../ai/types";
 import type { MapChatContext } from "./map-chat-context";
-import { MAP_CHAT_NEW_PREFIX, type MapChatAction } from "./steps/map-chat/step";
+import type { MapChatAction } from "./steps/map-chat/step";
 
 /**
  * Plan confirmation. Most replies are applied at once; a reply that can do a lot of damage or cost a lot is shown as a plan
@@ -21,11 +22,12 @@ export interface MapChatPlan {
   /** Every condition that holds, in a fixed order. */
   reasons: MapChatPlanReason[];
   /**
-   * AI calls the actions start, counted at least (B2): each research target is its main call plus the diagram call that follows
-   * the write (`options.diagrams`, on by default); the depth does not change the count (a normal or deep research that found
-   * nothing on the web is sent once more, which is a retry and is not counted). Each synthesize is one integration call plus the
-   * same diagram call: B2 starts it without a dialog and without the directions step. One call per card an expand is asked for,
-   * one for rating by a goal, one for a merge. Writes to cards and notes, create_map, open_map and the view operations are 0.
+   * AI calls the actions start, counted at least (B2): each Standard research target is its main call plus the diagram call that
+   * follows the write (`options.diagrams`, on by default); a Quick research target is one call (it adds no diagram). The mode is the
+   * one the action names, then `options.mapAiMode`, then Quick (a standard research that found nothing on the web is sent once
+   * more, which is a retry and is not counted). Each synthesize is one integration call plus the
+   * same diagram call: B2 starts it without a dialog and without the directions step. An expand is one outline call per
+   * card it is asked for (its subtopics are added without further AI calls), one for rating by a goal, one for a merge. Writes to cards and notes, create_map, open_map and the view operations are 0.
    * The chat reply itself is not counted.
    */
   estimatedCalls: number;
@@ -62,7 +64,7 @@ export const mapChatCallsPerTask = (diagrams: boolean): number => (diagrams ? 2 
 export function planFor(
   actions: readonly MapChatAction[],
   context: PlanContext,
-  options: { diagrams?: boolean } = {}
+  options: { diagrams?: boolean; mapAiMode?: MapAiMode } = {}
 ): MapChatPlan | null {
   const perTask = mapChatCallsPerTask(options.diagrams !== false);
   const reasons: MapChatPlanReason[] = [];
@@ -94,7 +96,8 @@ export function planFor(
           case "research_standard": {
             const targets = targetCount(action.nodeIds, selection);
             research += targets;
-            calls += targets * perTask;
+            // Quick: the research call alone (no images or charts). Standard: the research call plus the diagram call.
+            calls += targets * (chatResearchMode(action, options.mapAiMode) === "quick" ? 1 : perTask);
             break;
           }
           case "expand":
@@ -164,33 +167,44 @@ export function mapChoiceParts(maps: readonly { title: string; mapPath: string }
   });
 }
 
-/** True for an id a reply gave to a card it creates itself. */
-export const isNewRef = (id: string): boolean => id.startsWith(MAP_CHAT_NEW_PREFIX);
-
-/** True when a target list names cards of this very reply and nothing else (an empty list means the selection, which is not new). */
-export const allNewTargets = (nodeIds: readonly string[]): boolean => nodeIds.length > 0 && nodeIds.every(isNewRef);
-
 /** What the chat hands to the multi-research for a research_standard action (the shape `startMultiResearch` takes). */
 export interface ChatResearchRequest {
-  researchMode: "research";
-  researchDepth: "fast" | "normal" | "deep";
+  /** The mode this research runs in (Quick or Standard); it also tells the task which prompt to use. */
+  mapAiMode: MapAiMode;
+  researchMode: ResearchMode;
+  researchDepth: ResearchDepth;
   requirements: string;
   imageSearch: boolean;
 }
 /**
- * The research a reply asks for. A depth the reply named wins; unnamed, a reply that researches only cards it created itself
- * is a first look at a new tree (fast), and anything that touches an existing card is the standard depth (normal). Images are
- * off unless asked for. `direction` is the extra requirement. A reply of the earlier step version has no depth and no images,
- * which reads as "not named" and "off". Decided here, not by the model.
+ * The mode a research runs in: the mode the user named, then the mode the map remembers, then Quick (D-2026-10-228, 231).
+ * Whether the targets are all new cards no longer matters. Decided here, not by the model.
+ */
+export function chatResearchMode(
+  action: Extract<MapChatAction, { kind: "run_map_action" }>,
+  mapAiMode: MapAiMode | undefined
+): MapAiMode {
+  return action.mode || mapAiMode || "quick";
+}
+/** The research options of a mode (the view hands in `aiModeOptions(mode, "research")`; core does not import an experience). */
+export type ChatModeOptions = (mode: MapAiMode) => { researchMode: ResearchMode; researchDepth: ResearchDepth };
+/**
+ * The research a reply asks for: the options of its mode (`optionsOf`). Quick never looks for images; Standard does only when
+ * the user asked for them. `direction` is the extra requirement. A reply of the earlier step version reads as "not named" (no
+ * depth) or Standard (a named depth) and "images off".
  */
 export function chatResearchRequest(
   action: Extract<MapChatAction, { kind: "run_map_action" }>,
-  allNew: boolean
+  mapAiMode: MapAiMode | undefined,
+  optionsOf: ChatModeOptions
 ): ChatResearchRequest {
+  const mode = chatResearchMode(action, mapAiMode);
+  const options = optionsOf(mode);
   return {
-    researchMode: "research",
-    researchDepth: action.depth || (allNew ? "fast" : "normal"),
+    mapAiMode: mode,
+    researchMode: options.researchMode,
+    researchDepth: options.researchDepth,
     requirements: action.direction,
-    imageSearch: action.images === true
+    imageSearch: mode === "standard" && action.images === true
   };
 }

@@ -757,7 +757,11 @@ integrationTest('Quick research reaches the providers without any web tool; a St
     assert.equal(s.calls[0].options.webSearchOnly, true, `${model}: Standard research of normal depth must search (B2 gate)`);
     assert.ok(s.calls[0].prompt.includes(load('i18n.ts').translate('en', 'research.web_required')) || s.calls[0].prompt.includes(load('i18n.ts').translate('zh-TW', 'research.web_required')));
   }
-  // Known gap, deferred to Packet B (D-2026-10-248): a Standard subtopic research (short overview) has the web but is not forced to use it.
-  const sub = make(); await sub.plugin.askModel(research('standard', 'subtopic'), 'claude:sonnet', 'low');
-  assert.equal(sub.calls[0].options.webSearch, true); assert.equal('webSearchOnly' in sub.calls[0].options, false);
+  // D-2026-10-248: a Standard subtopic research (the short overview) is forced to use the web too; its Quick counterpart is not.
+  for (const model of ['claude:sonnet', 'gpt-test']) {
+    const sub = make(); await sub.plugin.askModel(research('standard', 'subtopic'), model, 'low');
+    assert.equal(sub.calls[0].options.webSearch, true, `${model}: Standard subtopic keeps the web`); assert.equal(sub.calls[0].options.webSearchOnly, true, `${model}: Standard subtopic research must search`);
+    const quickSub = make(); await quickSub.plugin.askModel(research('quick', 'subtopic'), model, 'low');
+    assert.equal(quickSub.calls[0].options.webSearch, false, `${model}: Quick subtopic has no web`); assert.equal('webSearchOnly' in quickSub.calls[0].options, false, `${model}: Quick subtopic is not forced to search`);
+  }
 });

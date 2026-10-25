@@ -178,13 +178,16 @@ const { searchNotPerformedError } = load('ai/search-not-performed.ts');
 const webEvent = { method: 'item/completed', params: { item: { type: 'webSearch', action: { type: 'search' } } } };
 const researchContext = (extra = {}) => context({ researchMode: 'research', researchDepth: 'normal', ...extra });
 
-test('B2 W1: normal and deep standard research asks the provider for a web-search-only turn; fast, local and AIM do not change', async () => {
+test('B2 W1 / D-2026-10-248: every standard research (normal, deep and the short fast overview of a subtopic) asks the provider for a web-search-only turn; local (Quick) and AIM do not change', async () => {
   const controlsOf = async (ctx, model = 'gpt-6-luna') => { const fake = runtime(GOOD); await makeService(fake).askModel(ctx, model, 'low'); return fake.calls[0].controls; };
   for (const model of ['gpt-6-luna', 'claude:sonnet']) {
     const normal = await controlsOf(researchContext(), model);
     assert.equal(normal.webSearchOnly, true, `${model} normal is the isolated web-only thread`); assert.ok(!normal.textOnly, `${model} normal keeps web search on`); assert.equal(normal.requireWeb, undefined, `${model} normal has no separate requireWeb path`);
     assert.equal((await controlsOf(researchContext({ researchDepth: 'deep' }), model)).webSearchOnly, true, `${model} deep`);
-    assert.equal((await controlsOf(researchContext({ researchDepth: 'fast' }), model)).webSearchOnly, undefined, `${model} fast may answer without searching`);
+    const fast = await controlsOf(researchContext({ researchDepth: 'fast' }), model);
+    assert.equal(fast.webSearchOnly, true, `${model} fast (a standard subtopic research) must search too`); assert.ok(!fast.textOnly, `${model} fast keeps web search on`);
+    const quick = await controlsOf(context({ researchMode: 'local', researchDepth: 'fast', mapAiMode: 'quick' }), model);
+    assert.equal(quick.webSearchOnly, undefined, `${model} Quick does not require the web`); assert.equal(quick.webSearch, false, `${model} Quick carries no web parameter`);
   }
   const local = await controlsOf(context({ researchMode: 'local', researchDepth: 'normal' }));
   assert.equal(local.webSearchOnly, undefined); assert.equal(local.requireWeb, undefined); assert.equal(local.webSearch, false, 'local mode carries no web parameter');
@@ -213,7 +216,7 @@ test('B2 W1: still no retrieval on the second attempt fails the research; nothin
   assert.equal(other.calls, 1, 'only the no-search failure is retried');
 });
 
-test('B2 W1: a fast research with no retrieval completes as usual and reports 0 searches; local research reports none', async () => {
+test('B2 W1: a research whose provider counted no retrieval reports 0 searches (the provider, not the service, rejects it); local research reports none', async () => {
   const fast = await makeService(runtime(GOOD)).askModel(researchContext({ researchDepth: 'fast' }), 'gpt-6-luna', 'low');
   assert.equal(fast.summary, 'S'); assert.equal(fast.retrievals, 0);
   const local = await makeService(runtime(GOOD)).askModel(context(), 'gpt-6-luna', 'low');
@@ -224,11 +227,11 @@ test('B2 W1: a fast research with no retrieval completes as usual and reports 0 
   assert.equal(counted.retrievals, 1, 'only completed retrievals count'); assert.equal(seen.length, 2, 'the caller\'s own listener still hears every event');
 });
 
-test('B2 W2: the research prompt says to search when Detail has no source (normal and deep, all languages); fast, local and AIM keep the old text', () => {
+test('B2 W2 / D-2026-10-248: the research prompt says to search when Detail has no source (every depth in research mode, all languages); local and AIM keep the old text', () => {
   for (const language of ['en', 'zh-TW', 'zh-CN']) {
     const required = translate(language, 'research.web_required');
     for (const depth of ['normal', 'deep']) assert.ok(taskPrompt(researchContext({ researchDepth: depth }), language).includes(required), `${language} ${depth}`);
-    assert.ok(!taskPrompt(researchContext({ researchDepth: 'fast' }), language).includes(required), `${language} fast`);
+    assert.ok(taskPrompt(researchContext({ researchDepth: 'fast' }), language).includes(required), `${language} fast (a standard subtopic research)`);
     assert.ok(!taskPrompt(context({ researchMode: 'local', researchDepth: 'normal' }), language).includes(required), `${language} local`);
     assert.ok(!taskPrompt(researchContext({ aimIsolatedResearch: true }), language).includes(required), `${language} AIM`);
   }

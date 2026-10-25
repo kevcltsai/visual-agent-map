@@ -15,6 +15,9 @@ const visibleText = el => (el.text ?? '') + el.children.map(visibleText).join(''
 const replyBody = f => find(f.parts.log(), i => hasClass(i, 'is-assistant')).children.find(c => hasClass(c, 'vam-map-chat-text'));
 const MAP = 'Agent Workspace/Topics/map-a/Map.md';
 const { contentHash, buildMapChatContext } = load('core/map-chat-context.ts');
+const outlineApi = load('experiences/visual-map/outline-import.ts', { obsidian });
+const { aiModeOptions } = load('experiences/visual-map/ai-mode.ts');
+const { chatResearchRequest } = load('core/map-chat-plan.ts');
 
 // ---- panel on its own -------------------------------------------------------------------------------------------
 
@@ -252,7 +255,7 @@ async function harness({ aim = false, document = false, empty = false, realRende
   const ctx = {};
   const plugin = withExpansionCoordinator({
     repo, settings, running: new Set(), views: () => ctx.otherViews ?? [], logs: { appendLog() {} }, rebuildDerivedData: () => repo.rebuildDerivedData(), relevanceGrades: new Map(), closeStaleDetails() {}, releaseOutline() {}, syncOutline() {}, setOutlineActive() {},
-    pendingSuggestions: new Map(), pendingResearchOptions: new Map(), detailsShown: () => false,
+    pendingSuggestions: new Map(), pendingResearchOptions: new Map(), detailsShown: () => false, activeTasks: new Map(), quickExpandPending: new Set(), recordFailure: error => String(error?.message ?? error),
     // Like the real mutate: a promise queue that is not re-entrant. A call made from inside a running write waits for it, forever.
     mutate(work) {
       control.mutates++; if (control.depth > 0) control.nested++;
@@ -457,12 +460,12 @@ integrationTest('map chat: F4 - a chat-started expand asks the confirmation of t
   const readNote = h.repo.readNote.bind(h.repo); h.repo.readNote = async (...args) => ({ ...(await readNote(...args)), model: 'claude:opus' }); // a card with its own model
   const models = []; let proposed = 0;
   h.plugin.confirmAiUsage = async (model, run) => { models.push(model); h.control.calls.push('confirm'); if (h.control.decline) return false; await run(); return true; };
-  h.view.proposeChildren = async () => { proposed++; };
+  h.view.chatExpand = async () => { proposed++; };
   const act = [{ kind: 'run_map_action', action: 'expand', nodeIds: [h.ids.a], title: '', goal: '', direction: '' }];
   h.control.decline = true;
   const declined = await apply(h, act); eq(declined.map(l => l.status), ['done']);
   for (let i = 0; i < 10; i++) await tick();
-  eq(models, ['claude:opus'], 'asked once, for the card\'s own model, not the chat model'); assert.equal(proposed, 0, 'declined: askModel path never starts');
+  eq(models, ['claude:opus'], 'asked once, for the card\'s own model, not the chat model'); assert.equal(proposed, 0, 'declined: the outline call never starts');
   h.control.decline = false;
   await apply(h, act); await withTimeout(until(() => proposed === 1));
 });
@@ -569,7 +572,7 @@ integrationTest('map chat: a failing write is reported and the next action still
   assert.equal((await h.note('b')).title, 'Two');
 });
 
-integrationTest('map chat: select_topics(all) then research_standard starts the standard research once on every topic, outside any mutate', async () => {
+integrationTest('map chat: select_topics(all) then research_standard starts the research once on every topic (Quick when nothing names a mode), outside any mutate', async () => {
   const h = await harness(); await h.view.hydrate();
   const started = [];
   h.view.startMultiResearch = async request => { started.push({ request, selected: [...h.view.multiSelected], mutating: h.control.depth }); };
@@ -579,7 +582,7 @@ integrationTest('map chat: select_topics(all) then research_standard starts the 
     { kind: 'run_map_action', action: 'research_standard', nodeIds: [], title: '', goal: '', direction: '' }
   ]);
   eq(lines.map(l => l.status), ['done', 'done']); await tick();
-  assert.equal(started.length, 1); eq(started[0].request, { researchMode: 'research', researchDepth: 'normal', requirements: '', imageSearch: false });
+  assert.equal(started.length, 1); eq(started[0].request, quickRequest, 'no mode named and the map remembers none: Quick (D-2026-10-228)');
   eq(started[0].selected.sort(), Object.values(h.ids).sort()); assert.equal(started[0].mutating, 0, 'not inside a mutate');
   assert.equal(h.view.integrationMode, true); assert.equal(h.control.mutates, 0, 'selecting and starting research write nothing through the queue');
 });
@@ -591,20 +594,41 @@ integrationTest('map chat: research on named topics selects exactly those first'
   eq(seen, [[h.ids.a, h.ids.b]]);
 });
 
-integrationTest('map chat: expand suggests subtopics for each target and creates them without the review dialog; a nested mutate inside it does not deadlock', async () => {
+integrationTest('map chat: expand is the multi-level outline expansion (2 levels, at most 15 topics), every topic is added without a review window, the new topics are Quick (research-mode local), and a nested mutate inside it does not deadlock', async () => {
   const h = await harness(); await h.view.hydrate();
-  const calls = []; let reviewOpened = 0; let created = 0;
-  h.view.openChildSuggestions = () => { reviewOpened++; };
-  h.view.proposeChildren = async (parent, options, direction, found, failed) => {
-    calls.push({ parent: parent.id, options, direction, found: typeof found, failed: typeof failed });
-    await h.plugin.mutate(async () => {}); // what the real task does when it writes: its own mutate
-    found([{ title: 'S' }], async items => { created += items.length; await h.plugin.mutate(async () => {}); });
-  };
-  const lines = await withTimeout(apply(h, [{ kind: 'run_map_action', action: 'expand', nodeIds: [h.ids.a, h.ids.b], title: '', goal: '', direction: 'sleep hygiene' }]));
+  const outline = ['# Body', ...Array.from({ length: 10 }, (_, i) => `## Part ${i}\n### Detail ${i}\n#### Too deep ${i}`)].join('\n');
+  const requests = [];
+  const modalsBefore = (h.control.modals ?? []).length;
+  h.plugin.outlineGeneration = { generate: async (request, signal) => { requests.push({ request, aborted: signal.aborted }); await h.plugin.mutate(async () => {}); return { markdown: outline, nodes: outlineApi.parseOutline(outline).nodes }; } };
+  h.view.openChildSuggestions = () => assert.fail('the review window must not open'); h.view.proposeChildren = () => assert.fail('the guided proposal path is not used');
+  const before = (await h.saved()).length;
+  const lines = await withTimeout(apply(h, [{ kind: 'run_map_action', action: 'expand', nodeIds: [h.ids.a], title: '', goal: '', direction: 'sleep hygiene' }]));
   eq(lines.map(l => l.status), ['done']);
-  await withTimeout(until(() => created === 2));
-  eq(calls.map(c => [c.parent, c.options, c.direction, c.found, c.failed]), [[h.ids.a, undefined, 'sleep hygiene', 'function', 'function'], [h.ids.b, undefined, 'sleep hygiene', 'function', 'function']]);
-  assert.equal(reviewOpened, 0, 'the review dialog never opens'); assert.equal(h.control.nested, 0);
+  await withTimeout(until(() => h.plugin.running.size === 0 && requests.length === 1 && h.plugin.activeTasks.size === 0), 4000);
+  eq(requests.map(r => [r.request.limits, r.request.topic, r.request.presetText.endsWith('\n\nsleep hygiene'), r.aborted]), [[{ levels: 2, maxTopics: 15 }, 'Body', true, false]]);
+  const created = (await h.saved()).filter(n => ![h.ids.root, h.ids.a, h.ids.b, h.ids.c].includes(n.id));
+  assert.equal(before + created.length, (await h.saved()).length);
+  assert.equal(created.length, 15, 'the outline has 30 headings: the first 2 levels are 20 topics, kept up to the 15-topic limit');
+  const titles = await Promise.all(created.map(async n => (await h.repo.readNote(n.path)).title));
+  assert.ok(!titles.some(t => t.startsWith('Too deep')), 'a third level is dropped');
+  assert.equal(created.filter(n => n.parentId === h.ids.a).length, 10, 'the first level sits under the card');
+  for (const node of created) assert.equal((await h.repo.readNote(node.path)).researchMode, 'local', 'new topics are Quick');
+  assert.equal(h.control.nested, 0); assert.equal(h.plugin.running.size, 0, 'the card is released'); assert.equal((h.control.modals ?? []).length, modalsBefore, 'no review dialog');
+});
+integrationTest('map chat: expand with an outline that has nothing below the root writes nothing and says so; Stop before the answer writes nothing', async () => {
+  const h = await harness(); await h.view.hydrate();
+  h.plugin.outlineGeneration = { generate: async () => ({ markdown: '# Body', nodes: outlineApi.parseOutline('# Body').nodes }) };
+  const before = (await h.saved()).length;
+  await apply(h, [{ kind: 'run_map_action', action: 'expand', nodeIds: [h.ids.a], title: '', goal: '', direction: '' }]);
+  await withTimeout(until(() => h.plugin.running.size === 0 && h.notices.length > 0), 4000);
+  assert.equal((await h.saved()).length, before); assert.match(h.notices.at(-1), /does not recommend/i);
+  const gate = deferred(); let signal;
+  h.plugin.outlineGeneration = { generate: async (_r, s2) => { signal = s2; await gate.promise; return { markdown: '# Body\n## X', nodes: outlineApi.parseOutline('# Body\n## X').nodes }; } };
+  await apply(h, [{ kind: 'run_map_action', action: 'expand', nodeIds: [h.ids.a], title: '', goal: '', direction: '' }]);
+  await withTimeout(until(() => h.plugin.activeTasks.has(h.view.map.nodes.find(n => n.id === h.ids.a).path)), 2000);
+  h.plugin.activeTasks.get(h.view.map.nodes.find(n => n.id === h.ids.a).path).abort(); gate.resolve();
+  await withTimeout(until(() => h.plugin.running.size === 0), 4000);
+  assert.equal(signal.aborted, true); assert.equal((await h.saved()).length, before, 'a stopped expand adds nothing');
 });
 
 integrationTest('map chat: control - the same nested mutate really does hang when it is made from inside a write', async () => {
@@ -3055,45 +3079,67 @@ integrationTest('B2-0 L4: a reply with one automatic layout at the end is laid o
 });
 
 // ---- B2-feat: research options, shallow research, headless integration, two merges ---------------------------------------
-const researchAct = (fields = {}) => ({ kind: 'run_map_action', action: 'research_standard', nodeIds: [], title: '', goal: '', direction: '', depth: '', images: false, ...fields });
+const researchAct = (fields = {}) => ({ kind: 'run_map_action', action: 'research_standard', nodeIds: [], title: '', goal: '', direction: '', mode: '', images: false, ...fields });
 const startedResearch = h => { const started = []; h.view.startMultiResearch = async (request, key, onSettled) => { started.push({ request, key, onSettled, selected: [...h.view.multiSelected], depth: h.control.depth }); }; return started; };
 const newCard = ref => ({ kind: 'add_child', parentId: '', title: `Card ${ref}`, summary: '', ref });
 
-integrationTest('B2 research: a named depth, images and the extra requirement reach startMultiResearch; unnamed is normal, no images, no requirements', async () => {
+const quickRequest = { mapAiMode: 'quick', researchMode: 'local', researchDepth: 'normal', requirements: '', imageSearch: false };
+const standardRequest = { mapAiMode: 'standard', researchMode: 'research', researchDepth: 'normal', requirements: '', imageSearch: false };
+integrationTest('B2/D-231 research: a named mode, images and the extra requirement reach startMultiResearch; unnamed uses the map mode (none = Quick); Quick never gets images', async () => {
   const h = await harness(); await h.view.hydrate(); const started = startedResearch(h);
   const lines = await apply(h, [
     researchAct({ nodeIds: [h.ids.a] }),
-    researchAct({ nodeIds: [h.ids.b], depth: 'deep', images: true, direction: 'only peer-reviewed' }),
-    researchAct({ nodeIds: [h.ids.c], depth: 'fast' })
+    researchAct({ nodeIds: [h.ids.b], mode: 'standard', images: true, direction: 'only peer-reviewed' }),
+    researchAct({ nodeIds: [h.ids.c], mode: 'quick', images: true })
   ]);
   eq(lines.map(l => l.status), ['done', 'done', 'done'], JSON.stringify(lines)); await tick();
-  eq(started.map(s => s.request), [
-    { researchMode: 'research', researchDepth: 'normal', requirements: '', imageSearch: false },
-    { researchMode: 'research', researchDepth: 'deep', requirements: 'only peer-reviewed', imageSearch: true },
-    { researchMode: 'research', researchDepth: 'fast', requirements: '', imageSearch: false }
-  ]);
+  eq(started.map(s => s.request), [quickRequest, { ...standardRequest, requirements: 'only peer-reviewed', imageSearch: true }, quickRequest]);
   eq(started.map(s => s.selected), [[h.ids.a], [h.ids.b], [h.ids.c]]); assert.ok(started.every(s => s.depth === 0), 'outside any mutate');
 });
-integrationTest('B2 shallow research: researching only cards this reply created is fast unless a depth is named; one existing card makes it normal', async () => {
+integrationTest('D-231 counterexample (mode resolution): named Quick + map Standard = Quick; only "research" + map Standard = Standard; only "research" + no map mode = Quick; a chat research never changes the map mode', async () => {
+  const h = await harness(); await h.view.hydrate(); const started = startedResearch(h);
+  h.view.map.aiMode = 'standard';
+  await apply(h, [researchAct({ nodeIds: [h.ids.a], mode: 'quick' }), researchAct({ nodeIds: [h.ids.b] })]); await tick();
+  eq(started.map(s => s.request.mapAiMode), ['quick', 'standard']); eq(started.map(s => s.request.researchMode), ['local', 'research']);
+  delete h.view.map.aiMode;
+  await apply(h, [researchAct({ nodeIds: [h.ids.a] })]); await tick();
+  assert.equal(started[2].request.mapAiMode, 'quick');
+  h.view.map.aiMode = 'quick'; await apply(h, [researchAct({ nodeIds: [h.ids.a], mode: 'standard' })]); await tick();
+  assert.equal(started[3].request.mapAiMode, 'standard'); assert.equal(h.view.map.aiMode, 'quick', 'the map mode is remembered only by the dialog');
+  assert.equal((await h.repo.readMap(MAP)).aiMode, undefined, 'nothing was written for it');
+});
+integrationTest('D-231: the real startMultiResearch override path runs the batch in the mode the chat asked for (Quick: local, no charts, Quick prompt context; Standard: research)', async () => {
+  const h = await harness(); await h.view.hydrate();
+  const runs = [];
+  h.view.researchChild = async (child, _signal, accepted, choices, charts, done) => { runs.push({ id: child.id, mode: choices.researchMode, depth: choices.researchDepth, visual: choices.visualMode, mapAiMode: choices.mapAiMode, charts }); accepted(); done?.({ retrievals: 2 }); };
+  for (const [mode, expected] of [['quick', { mode: 'local', depth: 'normal', visual: 'off', mapAiMode: 'quick', charts: false }], ['standard', { mode: 'research', depth: 'normal', visual: 'off', mapAiMode: 'standard', charts: true }]]) {
+    runs.length = 0; h.view.chatSelect([h.ids.a]);
+    const request = chatResearchRequest({ ...researchAct({ nodeIds: [h.ids.a] }), mode }, undefined, m => aiModeOptions(m, 'research'));
+    await h.view.startMultiResearch(request); await withTimeout(until(() => runs.length === 1), 3000);
+    eq(runs, [{ id: h.ids.a, ...expected }]);
+  }
+});
+integrationTest('D-231: researching cards the reply created no longer means a fast first look: the mode comes from the user\'s words, the map mode, then Quick', async () => {
   const h = await harness(); await h.view.hydrate(); const started = startedResearch(h);
   await apply(h, [newCard('n1'), newCard('n2'), researchAct({ nodeIds: ['new:n1', 'new:n2'] })]); await tick();
-  assert.equal(started.length, 1); assert.equal(started[0].request.researchDepth, 'fast'); assert.equal(started[0].selected.length, 2);
-  await apply(h, [newCard('n3'), researchAct({ nodeIds: ['new:n3'], depth: 'deep' })]); await tick();
-  assert.equal(started[1].request.researchDepth, 'deep', 'a named depth beats the new-card default');
-  await apply(h, [newCard('n4'), researchAct({ nodeIds: ['new:n4', h.ids.a] })]); await tick();
-  assert.equal(started[2].request.researchDepth, 'normal', 'an existing card in the list: normal'); assert.equal(started[2].selected.length, 2);
+  assert.equal(started.length, 1); eq(started[0].request, quickRequest); assert.equal(started[0].selected.length, 2);
+  h.view.map.aiMode = 'standard';
+  await apply(h, [newCard('n3'), researchAct({ nodeIds: ['new:n3'] })]); await tick();
+  eq(started[1].request, standardRequest, 'new cards only + map Standard: Standard, not fast');
+  await apply(h, [newCard('n4'), researchAct({ nodeIds: ['new:n4', h.ids.a], mode: 'quick' })]); await tick();
+  eq(started[2].request, quickRequest); assert.equal(started[2].selected.length, 2);
   await apply(h, [newCard('n5'), researchAct({ nodeIds: [] })]); await tick();
-  assert.equal(started[3].request.researchDepth, 'normal', 'an empty target list (the current selection) is never counted as new');
+  eq(started[3].request, standardRequest, 'an empty target list (the current selection) follows the map mode');
 });
-integrationTest('B2 shallow research: researching 12 new cards waits as a plan; after Apply all 12 are in one research batch at the fast depth', async () => {
+integrationTest('B2 shallow research: researching 12 new cards waits as a plan; after Apply all 12 are in one Quick research batch', async () => {
   const h = await harness(); await h.view.hydrate(); const chat = h.open(); const started = startedResearch(h);
   const refs = Array.from({ length: 12 }, (_, i) => `r${i}`);
   h.control.reply = async () => ({ reply: 'I will build and research.', actions: [...refs.map(newCard), researchAct({ nodeIds: refs.map(r => `new:${r}`) })], rejected: [] });
   h.type('build and research'); await h.view.sendMapChat();
   assert.equal(started.length, 0, 'nothing runs before Apply'); assert.equal(h.view.map.nodes.length, 4);
-  assert.match(visibleText(planCard(h)[0]), /Starts research on 12 topics/); assert.match(visibleText(planCard(h)[0]), /At least 24 AI calls/, '12 research calls and 12 diagram calls');
+  assert.match(visibleText(planCard(h)[0]), /Starts research on 12 topics/); assert.match(visibleText(planCard(h)[0]), /At least 12 AI calls/, 'Quick (no map mode): 12 research calls, no diagram call');
   planButton(h, 'apply').click(); await until(() => chat.pendingPlan() === null && !h.view.chatApplying); await tick();
-  assert.equal(started.length, 1); assert.equal(started[0].selected.length, 12); assert.equal(started[0].request.researchDepth, 'fast'); assert.equal(h.view.map.nodes.length, 16);
+  assert.equal(started.length, 1); assert.equal(started[0].selected.length, 12); eq(started[0].request, quickRequest); assert.equal(h.view.map.nodes.length, 16);
 });
 integrationTest('B2 shallow research: 9 new cards researched are applied at once with no plan card', async () => {
   const h = await harness(); await h.view.hydrate(); const chat = h.open(); const started = startedResearch(h);
@@ -3126,7 +3172,7 @@ integrationTest('B2 research: the finished batch adds its search count to the an
 integrationTest('B2 merge: two merges in one reply are both completed; the second is not skipped as locked', async () => {
   const h = await harness({ viaSync: false }); await h.view.hydrate();
   const refs = ['p1', 'p2', 'p3', 'p4'].map(ref => ({ kind: 'add_child', parentId: h.ids.root, title: `Merge ${ref}`, summary: '', ref }));
-  const merge = (a, b, title) => ({ kind: 'run_map_action', action: 'merge', nodeIds: [a, b], title, goal: '', direction: '', depth: '', images: false });
+  const merge = (a, b, title) => ({ kind: 'run_map_action', action: 'merge', nodeIds: [a, b], title, goal: '', direction: '', mode: '', images: false });
   const lines = await apply(h, [...refs, merge('new:p1', 'new:p2', 'First merged'), merge('new:p3', 'new:p4', 'Second merged')]);
   eq(lines.slice(0, 6).map(l => l.status), ['done', 'done', 'done', 'done', 'done', 'done'], JSON.stringify(lines));
   const titles = []; for (const n of await h.saved()) titles.push((await h.repo.readNote(n.path)).title);
@@ -3137,16 +3183,17 @@ integrationTest('B2 merge: two merges in one reply are both completed; the secon
 integrationTest('B2 merge: a merge still locked by an AI merge is skipped with the locked reason', async () => {
   const h = await harness(); await h.view.hydrate();
   h.view.mergeTasks.set(h.view.path, { mapPath: h.view.path, sources: [{ id: h.ids.a, path: h.node('a').path }], controller: new AbortController(), state: 'running' });
-  const lines = await apply(h, [{ kind: 'run_map_action', action: 'merge', nodeIds: [h.ids.a, h.ids.b], title: 'X', goal: '', direction: '', depth: '', images: false }]);
+  const lines = await apply(h, [{ kind: 'run_map_action', action: 'merge', nodeIds: [h.ids.a, h.ids.b], title: 'X', goal: '', direction: '', mode: '', images: false }]);
   eq(lines.map(l => l.status), ['skipped']); assert.match(lines[0].text, /being merged/);
 });
 integrationTest('B2 synthesize: the plan card keeps the user\'s message as the integration direction', async () => {
   const h = await harness(); await h.view.hydrate(); const chat = h.open();
   const calls = []; h.view.startSynthesis = async (node, options, direction, failed, accepted) => { calls.push({ id: node.id, direction, options }); accepted(); };
-  h.control.reply = async () => ({ reply: 'plan', actions: [...Array.from({ length: 15 }, (_, i) => ({ kind: 'add_child', parentId: h.ids.root, title: `Card ${i}`, summary: '' })), { kind: 'run_map_action', action: 'synthesize', nodeIds: [h.ids.a], title: '', goal: '', direction: 'ignored model words', depth: '', images: false }], rejected: [] });
+  h.control.reply = async () => ({ reply: 'plan', actions: [...Array.from({ length: 15 }, (_, i) => ({ kind: 'add_child', parentId: h.ids.root, title: `Card ${i}`, summary: '' })), { kind: 'run_map_action', action: 'synthesize', nodeIds: [h.ids.a], title: '', goal: '', direction: 'ignored model words', mode: '', images: false }], rejected: [] });
   h.type('Integrate Body around sleep debt'); await h.view.sendMapChat();
   assert.equal(chat.pendingPlan().state, 'pending'); assert.equal(calls.length, 0);
   assert.match(visibleText(planCard(h)[0]), /At least 2 AI calls/);
   planButton(h, 'apply').click(); await until(() => chat.pendingPlan() === null && !h.view.chatApplying);
   assert.equal(calls.length, 1); assert.equal(calls[0].id, h.ids.a); assert.equal(calls[0].direction, 'Integrate Body around sleep debt', 'the message, not the model\'s direction');
+  const o = calls[0].options; eq([o.researchMode, o.visualMode, o.synthesisContent, 'depth' in o && o.depth !== undefined], ['local', 'off', 'full', false], 'an integration from the chat is always Quick (D-2026-10-229)');
 });

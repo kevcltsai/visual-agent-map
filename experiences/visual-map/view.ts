@@ -511,6 +511,12 @@ export class VisualAgentMapView extends ItemView {
   private chatCarryOver = false;
   /** True while a confirmed plan is being applied; no new message is sent meanwhile. */
   private chatApplying = false;
+  /** While a reply's actions are applied, repaints and the views' re-reads wait and happen once at the end (see holdChatBatch). */
+  private renderHold = 0;
+  private renderPending = false;
+  private syncHold = 0;
+  private syncPending = false;
+  private heldViews: VisualAgentMapView[] = [];
   private chatWorkspaceEl: HTMLElement | null = null;
   private chatOverlayEl: HTMLElement | null = null;
   /** The map whose opening screen has already taken the keyboard once. */
@@ -5587,6 +5593,11 @@ export class VisualAgentMapView extends ItemView {
   }
   async synchronize(): Promise<void> {
     if (this.builtIn) return;
+    // A batch of chat writes reads the map back once, when it is done.
+    if (this.syncHold > 0) {
+      this.syncPending = true;
+      return;
+    }
     if (!this.path || !this.map || this.closed) return;
     if (!(this.app.vault.getAbstractFileByPath(this.path) instanceof TFile)) {
       this.map = null;
@@ -5934,6 +5945,14 @@ export class VisualAgentMapView extends ItemView {
     ]).open();
   }
   private render(): void {
+    // A batch of chat writes repaints once, when it is done.
+    if (this.renderHold > 0 && !this.closed) {
+      this.renderPending = true;
+      return;
+    }
+    this.paint();
+  }
+  private paint(): void {
     // Repainting would replace the dragged card and drop its pointer capture, so wait for the drop (a closed view still ends the drag below).
     if (this.dragging && !this.closed) {
       if (!this.dragStale()) {
@@ -10714,6 +10733,42 @@ export class VisualAgentMapView extends ItemView {
     };
   }
   /**
+   * Holds back every repaint of this view and every re-read of the plugin's views while a long reply is applied: each write
+   * would otherwise repaint twice and re-read the whole map, which costs seconds for a hundred cards. {@link releaseChatBatch}
+   * lets them happen once.
+   */
+  private holdChatBatch(): void {
+    if (this.heldViews.length) return;
+    this.heldViews = [this, ...this.plugin.views().filter(view => view !== this)];
+    this.renderHold++;
+    for (const view of this.heldViews) view.syncHold++;
+  }
+  private async releaseChatBatch(): Promise<void> {
+    const held = this.heldViews;
+    if (!held.length) return;
+    this.heldViews = [];
+    this.renderHold = Math.max(0, this.renderHold - 1);
+    for (const view of held) view.syncHold = Math.max(0, view.syncHold - 1);
+    if (this.renderHold === 0 && this.renderPending) {
+      this.renderPending = false;
+      this.render();
+    }
+    if (!held.some(view => view.syncPending)) return;
+    for (const view of held) view.syncPending = false;
+    try {
+      // An empty write: its tail re-reads every view once.
+      await this.plugin.mutate(async () => {});
+    } catch {
+      // mutate() has logged it; the views catch up at their next write.
+    }
+  }
+  /** A repaint a batch is holding back happens now, for the step that needs the cards measured (layout). */
+  private flushChatRender(): void {
+    if (!this.renderPending || this.closed) return;
+    this.renderPending = false;
+    this.paint();
+  }
+  /**
    * Applies what a chat reply asked for, once, in order. Every write is its own `plugin.mutate` (the queue cannot be
    * re-entered, and the task a run action starts uses it too), checked again for staleness inside it and, for Markdown
    * files, by the write guard. None of it leaves an undo step. A stale or refused action is skipped; the rest go on.
@@ -10742,7 +10797,12 @@ export class VisualAgentMapView extends ItemView {
     let noNewMap = false;
     // Copied: the turn's own writes move the baseline along, the request's context stays as it was sent.
     const own = { mdHashes: baseline.mdHashes, topicHashes: { ...baseline.topicHashes } };
+    // A reply that adds many cards is laid out as a whole afterwards, so its writes repaint once at the end. One that adds a
+    // few cards places each against the cards painted so far, so it keeps repainting after every write.
+    const adds = result.actions.filter(action => action.kind === "add_child").length;
+    const batched = adds === 0 || adds >= MAP_CHAT_AUTO_LAYOUT_MIN_NEW;
     try {
+      if (batched) this.holdChatBatch();
       for (const [index, action] of result.actions.entries()) {
         if (action.kind === "select_topics" || action.kind === "run_map_action" || action.kind === "open_map") {
           later.push(index);
@@ -10758,7 +10818,10 @@ export class VisualAgentMapView extends ItemView {
           continue;
         }
         if (action.kind === "create_map") {
+          // The map switch repaints on its own.
+          await this.releaseChatBatch();
           const outcome = await this.chatCreateMap(action.title, anchor, same);
+          if (batched) this.holdChatBatch();
           if (outcome.status === "done") {
             wrote = true;
             touched.add(anchor.path);
@@ -10790,6 +10853,8 @@ export class VisualAgentMapView extends ItemView {
         try {
           await this.plugin.mutate(async () => {
             if (!same() || !this.map) return;
+            // The layout measures the cards, so the held repaint comes first.
+            this.flushChatRender();
             await this.mapChange(map => {
               map.nodes = arrangeMap(map.nodes, supersededAimNodeIds(map), this.cardHeightOf);
             }, false);
@@ -10813,6 +10878,8 @@ export class VisualAgentMapView extends ItemView {
         for (const view of this.plugin.views()) if (view !== this && touched.has(view.path)) view.history.clear();
         this.updateHistoryButtons();
       }
+      // Whatever ended the loop (done, stopped, closed, thrown), the held repaint and re-read happen once.
+      await this.releaseChatBatch();
     }
     for (const index of later) {
       const action = result.actions[index];
@@ -10978,6 +11045,7 @@ export class VisualAgentMapView extends ItemView {
       }
       case "collapse_topic":
       case "expand_topic": {
+        this.flushChatRender();
         const id = real(action.nodeId);
         if (id === null) return skipped("ui.map_chat_skip_parent_missing");
         const node = nodeOf(id);
@@ -10992,11 +11060,14 @@ export class VisualAgentMapView extends ItemView {
         return done;
       }
       case "auto_layout":
+        // The layout measures the cards, so a held repaint comes first.
+        this.flushChatRender();
         await this.mapChange(map => {
           map.nodes = arrangeMap(map.nodes, supersededAimNodeIds(map), this.cardHeightOf);
         }, false);
         return done;
       case "focus_topic": {
+        this.flushChatRender();
         const id = real(action.nodeId);
         if (id === null) return skipped("ui.map_chat_skip_parent_missing");
         const node = nodeOf(id);

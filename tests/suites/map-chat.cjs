@@ -224,7 +224,7 @@ test('map chat: a failed or stopped turn shows its own text and does not become 
 
 class MarkdownView {}
 
-async function harness({ aim = false, document = false, empty = false } = {}) {
+async function harness({ aim = false, document = false, empty = false, realRender = false, viaSync = false } = {}) {
   const { repo, app, contents, files } = fixture('en');
   app.vault.configDir = '.obsidian';
   const settings = { ...DEFAULT_SETTINGS, language: 'en', cliModel: 'claude:sonnet' };
@@ -258,7 +258,7 @@ async function harness({ aim = false, document = false, empty = false } = {}) {
       control.mutates++; if (control.depth > 0) control.nested++;
       const result = queue.then(async () => {
         control.depth++;
-        try { await work(); const view = ctx.view; if (view) await view.hydrate(); } finally { control.depth--; }
+        try { await work(); const view = ctx.view; if (view) await (viaSync ? view.synchronize() : view.hydrate()); } finally { control.depth--; }
       });
       queue = result.catch(() => {});
       return result;
@@ -287,7 +287,9 @@ async function harness({ aim = false, document = false, empty = false } = {}) {
   const reload = async () => { view.notes = new Map(await Promise.all(view.map.nodes.map(async n => [n.id, await repo.readNote(n.path)]))); };
   view.hydrate = reload;
   let renders = 0;
-  view.render = () => { renders++; view.paintCount++; repaint(); };
+  // `realRender` keeps the view's own render() (which can hold a repaint back) and counts the repaints it really makes.
+  if (realRender) view.paint = () => { renders++; view.paintCount++; repaint(); };
+  else view.render = () => { renders++; view.paintCount++; repaint(); };
   // What render() does around the chat: detach first, mount into the new overlay last, then give focus back.
   let workspaceEl = null;
   const repaint = () => {
@@ -2603,4 +2605,33 @@ test('B1 ui: render() builds the workspace as the chat window, the canvas (viewp
   const source = fs.readFileSync(path.join(root, 'experiences/visual-map/view.ts'), 'utf8'); const render = source.slice(source.indexOf('  private render(): void {'), source.indexOf('  /** `shownNode` may be a display copy'));
   assert.match(render, /const canvas = workspace\.createDiv\("vam-canvas"\)/); assert.match(render, /this\.viewportEl = canvas\.createDiv\("vam-viewport"\)/); assert.match(render, /const overlay = canvas\.createDiv\("vam-canvas-overlay"\)/);
   assert.match(render, /this\.renderSelectionBar\(canvas\)/); assert.match(render, /this\.renderInspector\(workspace, node\)/, 'the sample inspector is still a sibling of the canvas');
+});
+
+// ---- B1-fix 1: the batch repaints once ----------------------------------------------------------------------------------
+const hundred = () => [addRoot('r', 'Root'), ...Array.from({ length: 99 }, (_, i) => addRoot(`c${i}`, `Kid ${i}`, 'new:r'))];
+integrationTest('B1 fix 1: 100 add_child repaint at most 3 times and read the notes back at most 3 times, not 200 and 100', async () => {
+  const h = await harness({ empty: true, realRender: true, viaSync: true }); await h.view.hydrate();
+  let hydrates = 0; const hydrate = h.view.hydrate; h.view.hydrate = async (...args) => { hydrates++; return hydrate(...args); };
+  const before = h.renders(); const lines = await apply(h, hundred());
+  assert.equal(lines.filter(l => l.status === 'done').length >= 100, true, JSON.stringify(lines.slice(0, 3)));
+  assert.equal(h.view.map.nodes.length, 100); assert.equal((await h.saved()).length, 100);
+  const repaints = h.renders() - before; console.log(`B1 fix 1: ${repaints} repaints, ${hydrates} syncs for 100 add_child`);
+  assert.ok(repaints >= 1 && repaints <= 3, `repaints: ${repaints}`);
+  assert.ok(hydrates <= 3, `syncs: ${hydrates}`);
+});
+integrationTest('B1 fix 1: stopping in the middle of a batch still repaints once, and the rest is skipped', async () => {
+  const h = await harness({ empty: true, realRender: true, viaSync: true }); await h.view.hydrate();
+  let asked = 0; const alive = () => ++asked < 40; // the 40th check says "stopped"
+  const before = h.renders(); const lines = await apply(h, hundred(), {}, alive);
+  assert.ok(lines.some(l => l.status === 'done') && lines.some(l => l.status === 'skipped'), 'part done, part skipped');
+  assert.ok(h.view.map.nodes.length > 0 && h.view.map.nodes.length < 100);
+  assert.ok(h.renders() - before >= 1 && h.renders() - before <= 3, `repaints: ${h.renders() - before}`);
+  assert.equal(h.view.renderHold, 0); assert.equal(h.view.syncHold, 0);
+});
+integrationTest('B1 fix 1: the layout after a held batch is made after the cards were painted (it measures them)', async () => {
+  const h = await harness({ empty: true, realRender: true, viaSync: true }); await h.view.hydrate();
+  let paintedAtLayout = -1; const original = h.view.mapChange.bind(h.view);
+  h.view.mapChange = async (change, rebuild) => { if (rebuild === false && paintedAtLayout < 0) paintedAtLayout = h.renders(); return original(change, rebuild); };
+  const before = h.renders(); await apply(h, [...hundred().slice(0, 6), { kind: 'auto_layout' }]);
+  assert.ok(paintedAtLayout - before >= 1, `painted before the layout: ${paintedAtLayout - before}`);
 });

@@ -45117,6 +45117,8 @@ ${note.detail.trim()}` : "",
     const later = [];
     const run = { refs: /* @__PURE__ */ new Map(), created: [] };
     let laidOutCount = 0;
+    let layoutDone = false;
+    let stopped = false;
     const refTitles = this.chatRefTitles(result.actions);
     let wrote = false;
     let noNewMap = false;
@@ -45126,6 +45128,7 @@ ${note.detail.trim()}` : "",
     const batched = adds === 0 || adds >= MAP_CHAT_AUTO_LAYOUT_MIN_NEW;
     try {
       if (batched) this.holdChatBatch();
+      run.deferRebuild = batched;
       for (const [index, action] of result.actions.entries()) {
         if (action.kind === "select_topics" || action.kind === "run_map_action" || action.kind === "open_map") {
           later.push(index);
@@ -45133,6 +45136,7 @@ ${note.detail.trim()}` : "",
         }
         const label = this.chatActionLabel(action, refTitles);
         if (!same2()) {
+          stopped = true;
           lines[index] = this.chatLine(label, lost());
           continue;
         }
@@ -45164,7 +45168,10 @@ ${note.detail.trim()}` : "",
           box.outcome = { status: "failed", reason: errorMessage(error) };
         }
         if (box.outcome.status !== "skipped" && action.kind !== "focus_topic") wrote = true;
-        if (action.kind === "auto_layout" && box.outcome.status === "done") laidOutCount = run.created.length;
+        if (action.kind === "auto_layout" && box.outcome.status === "done") {
+          laidOutCount = run.created.length;
+          layoutDone = true;
+        }
         lines[index] = this.chatLine(label, box.outcome);
       }
       let arranged = false;
@@ -45187,7 +45194,7 @@ ${note.detail.trim()}` : "",
         }
       }
       if (arranged) lines.push({ status: "done", text: t("ui.map_chat_auto_layout_added") });
-      const rough = batched && !arranged ? run.created.slice(laidOutCount) : [];
+      const rough = batched && !arranged && (stopped || layoutDone) ? run.created.slice(laidOutCount) : [];
       if (rough.length && !this.closed && this.path === anchor.path && ((_a2 = this.map) == null ? void 0 : _a2.id) === anchor.id) {
         try {
           await this.plugin.mutate(async () => {
@@ -45391,8 +45398,8 @@ ${note.detail.trim()}` : "",
           if (this.isMerging(parent.id)) return skipped("ui.map_chat_skip_merge_locked");
         }
         const before = new Set(this.map.nodes.map((item) => item.id));
-        run.ownershipDirty = true;
-        await this.addNode(parent, action.title, false, false);
+        if (run.deferRebuild) run.ownershipDirty = true;
+        await this.addNode(parent, action.title, !run.deferRebuild, false);
         const created = (_b2 = this.map) == null ? void 0 : _b2.nodes.find((item) => !before.has(item.id));
         if (!created) return skipped("ui.map_chat_skip_unavailable");
         run.created.push(created.id);

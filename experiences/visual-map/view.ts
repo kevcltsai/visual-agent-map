@@ -467,6 +467,8 @@ interface ChatRun {
   created: string[];
   /** A card was (or may have been) written without rebuilding the derived data; one rebuild at the end of the reply does it. */
   ownershipDirty?: boolean;
+  /** True for a held batch (five cards or more): its cards leave the derived data to the one rebuild at the end. */
+  deferRebuild?: boolean;
 }
 /** The narrow edge the laid-over chat window leaves in place, and the gap the tool group keeps from the window. */
 const CHAT_RAIL_WIDTH = 44;
@@ -10928,6 +10930,9 @@ export class VisualAgentMapView extends ItemView {
     const run: ChatRun = { refs: new Map(), created: [] };
     // How many cards existed when the last auto_layout of the reply ran: the ones made after it are only roughly placed.
     let laidOutCount = 0;
+    let layoutDone = false;
+    // True once the reply stopped before its end (the user's Stop, or the view going away).
+    let stopped = false;
     const refTitles = this.chatRefTitles(result.actions);
     let wrote = false;
     // True once a create_map failed: the rest would land in the map the user is looking at, which is not what was asked.
@@ -10942,6 +10947,7 @@ export class VisualAgentMapView extends ItemView {
     const batched = adds === 0 || adds >= MAP_CHAT_AUTO_LAYOUT_MIN_NEW;
     try {
       if (batched) this.holdChatBatch();
+      run.deferRebuild = batched;
       for (const [index, action] of result.actions.entries()) {
         if (action.kind === "select_topics" || action.kind === "run_map_action" || action.kind === "open_map") {
           later.push(index);
@@ -10949,6 +10955,7 @@ export class VisualAgentMapView extends ItemView {
         }
         const label = this.chatActionLabel(action, refTitles);
         if (!same()) {
+          stopped = true;
           lines[index] = this.chatLine(label, lost());
           continue;
         }
@@ -10982,7 +10989,10 @@ export class VisualAgentMapView extends ItemView {
           box.outcome = { status: "failed", reason: errorMessage(error) };
         }
         if (box.outcome.status !== "skipped" && action.kind !== "focus_topic") wrote = true;
-        if (action.kind === "auto_layout" && box.outcome.status === "done") laidOutCount = run.created.length;
+        if (action.kind === "auto_layout" && box.outcome.status === "done") {
+          laidOutCount = run.created.length;
+          layoutDone = true;
+        }
         lines[index] = this.chatLine(label, box.outcome);
       }
       // Many cards at once land in a rough spot: one layout for the lot, then the view goes to the new branch.
@@ -11015,7 +11025,7 @@ export class VisualAgentMapView extends ItemView {
       if (arranged) lines.push({ status: "done", text: t("ui.map_chat_auto_layout_added") });
       // A stop, or an auto_layout that came before the cards, leaves them at the rough spot of a held batch (unmeasured heights).
       // Only those cards are placed, each branch beside its parent; nothing else moves, and no other action of the reply runs.
-      const rough = batched && !arranged ? run.created.slice(laidOutCount) : [];
+      const rough = batched && !arranged && (stopped || layoutDone) ? run.created.slice(laidOutCount) : [];
       if (rough.length && !this.closed && this.path === anchor.path && this.map?.id === anchor.id) {
         try {
           await this.plugin.mutate(async () => {
@@ -11246,8 +11256,8 @@ export class VisualAgentMapView extends ItemView {
         const before = new Set(this.map.nodes.map(item => item.id));
         // The derived data (every map is read for it) is rebuilt once, when the reply ends, not after each card; marked first so
         // a card that was written before the action failed is covered too.
-        run.ownershipDirty = true;
-        await this.addNode(parent, action.title, false, false);
+        if (run.deferRebuild) run.ownershipDirty = true;
+        await this.addNode(parent, action.title, !run.deferRebuild, false);
         const created = this.map?.nodes.find(item => !before.has(item.id));
         if (!created) return skipped("ui.map_chat_skip_unavailable");
         run.created.push(created.id);

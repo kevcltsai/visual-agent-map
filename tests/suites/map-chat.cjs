@@ -587,6 +587,19 @@ integrationTest('map chat: select_topics(all) then research_standard starts the 
   assert.equal(h.view.integrationMode, true); assert.equal(h.control.mutates, 0, 'selecting and starting research write nothing through the queue');
 });
 
+integrationTest('map chat: the result rows name the mode the research really runs in, and the expand row says the subtopics are created directly', async () => {
+  const h = await harness(); await h.view.hydrate();
+  const research = mode => ({ kind: 'run_map_action', action: 'research_standard', nodeIds: [h.ids.a], title: '', goal: '', direction: '', mode });
+  delete h.view.map.aiMode;
+  assert.equal(h.view.chatActionLabel(research('')), 'Start quick research on the selected topics', 'no mode named, none remembered: Quick');
+  assert.equal(h.view.chatActionLabel(research('standard')), 'Start standard research on the selected topics');
+  h.view.map.aiMode = 'standard';
+  assert.equal(h.view.chatActionLabel(research('')), 'Start standard research on the selected topics', 'the remembered mode');
+  assert.equal(h.view.chatActionLabel(research('quick')), 'Start quick research on the selected topics', 'the named mode wins');
+  const expand = h.view.chatActionLabel({ kind: 'run_map_action', action: 'expand', nodeIds: [h.ids.a, h.ids.b], title: '', goal: '', direction: '' });
+  assert.equal(expand, 'Expand subtopics for 2 topics'); assert.equal(/suggest/i.test(expand), false);
+});
+
 integrationTest('map chat: research on named topics selects exactly those first', async () => {
   const h = await harness(); await h.view.hydrate(); const seen = [];
   h.view.startMultiResearch = async () => { seen.push([...h.view.multiSelected]); };

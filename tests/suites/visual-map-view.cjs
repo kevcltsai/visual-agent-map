@@ -248,7 +248,7 @@ integrationTest('Next Step reviews first expansion proposals in place and keeps 
   const [researchAdjust, expandAdjust, synthAdjust] = all(adjust, item => item.cls === 'vam-next-adjust-section');
   assert.equal(all(modal.contentEl, item => item.tag === 'fieldset').length, 0, 'the research-depth fieldset is gone; the AI mode switch replaces it');
   const summaryLine = find(modal.contentEl, item => item.cls === 'vam-next-summary');
-  assert.equal(summaryLine.text, 'Quick · Same language as my text');
+  assert.equal(summaryLine.text, 'Quick mode · Same language as my text');
   const sourceDisclosures = all(modal.contentEl, item => item.cls.includes('vam-next-source-details'));
   assert.equal(sourceDisclosures.length, 1, 'one data-source picker serves every step');
   const [sources] = sourceDisclosures;
@@ -1544,13 +1544,13 @@ integrationTest('the more-actions menu holds Organize notes and folders; toolbar
   assert.equal(translate('zh-TW', 'ui.organize'), '整理筆記與資料夾'); assert.equal(translate('zh-TW', 'ui.rename_topic'), '重新命名'); assert.equal(translate('zh-TW', 'ui.ai_explore'), 'AI 探索');
   assert.equal(translate('zh-TW', 'ui.new_map'), '＋ 新增心智圖');
 });
-integrationTest('UI wording: quick research, not shallow research; the synthesis draft is reviewed (檢閱) everywhere', () => {
+integrationTest('UI wording: short research (subtopic research), not shallow research; the synthesis draft is reviewed (檢閱) everywhere', () => {
   const { translate } = load('i18n.ts');
   const source = require('../support.cjs').i18nSource();
   const values = [...source.matchAll(/^  "((?:ui|notice|modal|settings)\.[^"]+)": "((?:[^"\\]|\\.)*)"/gm)];
   assert.deepEqual(values.filter(([, , text]) => /淺研究|shallow research|檢查整合草稿/i.test(text)).map(([, key]) => key), []);
   assert.equal(translate('zh-TW', 'ui.review_synthesis_draft'), '檢閱整合草稿'); assert.equal(translate('zh-TW', 'ui.review_the_synthesis_draft'), '請檢閱整合草稿。');
-  assert.equal(translate('zh-TW', 'ui.shallow_research_counts', 1, 3), '快速研究：完成 1／3'); assert.equal(translate('en', 'ui.shallow_research_counts', 1, 3), 'Quick research: 1 of 3 done');
+  assert.equal(translate('zh-TW', 'ui.shallow_research_counts', 1, 3), '簡短研究：完成 1／3'); assert.equal(translate('en', 'ui.shallow_research_counts', 1, 3), 'Short research: 1 of 3 done');
 });
 integrationTest('map UI terms in zh-TW say 議題 and 心智圖, not 節點 or 地圖, and keep 工作區 consistent', () => {
   const { translate } = load('i18n.ts');

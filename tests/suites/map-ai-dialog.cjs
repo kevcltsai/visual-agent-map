@@ -249,7 +249,7 @@ const cardsOf = h => find(h.modal.contentEl, i => i.cls === 'vam-next-cards');
 
 integrationTest('one-click dialog: research is open then one confirm; the summary line states the mode, language and tone, and every option sits under Adjust', async () => {
   const h = nextStepHarness({ modelSettings: { tones, currentTone: 'Magazine column', topicStatus: 'idea' } });
-  assert.equal(summaryOf(h), 'Quick · Same language as my text · Magazine column');
+  assert.equal(summaryOf(h), 'Quick mode · Same language as my text · Magazine column');
   // Everything adjustable is inside the one disclosure, which starts closed.
   const adjust = adjustOf(h);
   assert.equal(adjust.open, false); assert.equal(adjust.children[0].text, 'Adjust');
@@ -261,9 +261,9 @@ integrationTest('one-click dialog: research is open then one confirm; the summar
   const modeGroup = byLabel(h.modal.contentEl, 'AI mode');
   assert.ok(modeGroup && modeGroup.attrs.role === 'radiogroup' && !findAll(adjust, x => x === modeGroup).length, 'the switch is a radiogroup outside Adjust');
   button(modeGroup, 'Standard').click();
-  assert.equal(summaryOf(h), 'Standard · Same language as my text · Magazine column');
+  assert.equal(summaryOf(h), 'Standard mode · Same language as my text · Magazine column');
   byLabel(h.modal.contentEl, 'Note style').value = 'preset:plain'; byLabel(h.modal.contentEl, 'Note style').fire('change');
-  assert.equal(summaryOf(h), 'Standard · Same language as my text · Plain language');
+  assert.equal(summaryOf(h), 'Standard mode · Same language as my text · Plain language');
   byLabel(h.modal.contentEl, 'Answer language for this task').value = 'zh-TW'; byLabel(h.modal.contentEl, 'Answer language for this task').fire('change');
   assert.match(summaryOf(h), /繁體中文/);
   // One click on the primary action runs it and closes: with the opening click that is two clicks in all.
@@ -283,7 +283,7 @@ integrationTest('one-click dialog: each step shows only its own section under Ad
   assert.equal(summaryOf(h), 'Full content · Same language as my text · Academic rigor', 'a synthesis has no mode or web choice');
   cardsOf(h).children[0].click();
   assert.deepEqual(sections.map(s => s.hidden), [false, true, true]);
-  assert.equal(summaryOf(h), 'Quick · Same language as my text · Academic rigor');
+  assert.equal(summaryOf(h), 'Quick mode · Same language as my text · Academic rigor');
 });
 const outlineStub = (calls = []) => ({ presets: [{ id: 'knowledge-tree', name: 'Knowledge tree' }], generate: async request => { calls.push(request); return []; }, create: async () => {} });
 integrationTest('one-click dialog: levels and size sit on the Expand panel (2 and 15); there is no guided or quick-explore control and the button is Expand', () => {
@@ -298,9 +298,9 @@ integrationTest('one-click dialog: levels and size sit on the Expand panel (2 an
   assert.equal(summaryOf(h), '2 levels · up to 15 · Same language as my text', 'the summary names the chosen levels and size; no web part');
   const shallow = findAll(adjustOf(h), i => i.tag === 'input' && i.type === 'checkbox')[0];
   shallow.checked = true; shallow.change();
-  assert.equal(summaryOf(h), '2 levels · up to 15 · Quick · Same language as my text', 'subtopic research adds the mode');
+  assert.equal(summaryOf(h), '2 levels · up to 15 · Quick mode · Same language as my text', 'subtopic research adds the mode');
   button(byLabel(h.modal.contentEl, 'AI mode'), 'Standard').click();
-  assert.equal(summaryOf(h), '2 levels · up to 15 · Standard · Same language as my text');
+  assert.equal(summaryOf(h), '2 levels · up to 15 · Standard mode · Same language as my text');
   const withoutOutline = nextStepHarness({ modelSettings: { topicStatus: 'completed' }, children: 0 });
   assert.equal(button(withoutOutline.actions(), 'Expand').disabled, true, 'no outline generator, nothing to run');
 });
@@ -743,6 +743,23 @@ integrationTest('research Notice: a Quick answer with the knowledge-gap marker o
   assert.deepEqual(reruns, [h.parent.id]); assert.equal(notice.hidden, true, 'pressing a button closes the Notice');
   assert.deepEqual(opened, [], 'only the pressed action ran');
   const second = h.Notice.all.at(-1); second.actions[0].click(); assert.deepEqual(opened, [h.parent.id], 'View opens the details');
+});
+integrationTest('research Notice: Re-run with Standard pressed after the view moved to another map does not run and asks to go back', async () => {
+  const h = await synthesisHarness();
+  const reruns = [];
+  h.view.openDetails = () => {}; h.view.rerunStandard = node => reruns.push(node.id);
+  const hooks = h.view.backgroundHooks(h.parent.path, h.parent);
+  hooks.completed('research', { summary: 'S', detail: 'Model knowledge is insufficient.', suggestions: [], visualReferences: [] });
+  const notice = actionNotices(h).at(-1);
+  const before = h.notices.length, original = h.view.path;
+  h.view.path = 'Maps/Other/Other.vam.json';
+  notice.actions[1].click();
+  assert.deepEqual(reruns, [], 'no run on the other map');
+  assert.equal(h.notices.length, before + 1); assert.match(h.notices.at(-1), /Go back to the map this research ran on/);
+  h.view.path = original;
+  hooks.completed('research', { summary: 'S', detail: 'Model knowledge is insufficient.', suggestions: [], visualReferences: [] });
+  actionNotices(h).at(-1).actions[1].click();
+  assert.deepEqual(reruns, [h.parent.id], 'back on the original map the button runs');
 });
 test('background notice: a single action, several actions, or none', () => {
   const dom = require('../support-dom.cjs');

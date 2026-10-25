@@ -19,6 +19,7 @@ import {
   REFERENCE_CITATIONS,
   quickKnowledge,
   ROLE,
+  ROLE_QUICK,
   SOURCE_SAFETY,
   SOURCE_SAFETY_QUICK,
   toneBlock,
@@ -94,7 +95,7 @@ export function generalTaskPrompt(
   const topicAnchor: FollowAnchor = { kind: "topic", text: context.title };
   return [
     outputLanguage(language, topicAnchor),
-    inLanguage(ROLE, language),
+    inLanguage(quick ? ROLE_QUICK : ROLE, language),
     inLanguage(quick ? SOURCE_SAFETY_QUICK : SOURCE_SAFETY, language),
     context.sourceContext ? inLanguage(REFERENCE_CITATIONS, language) : "",
     context.sourceContext && context.researchMode !== "local" ? inLanguage(LOCAL_FIRST, language) : "",

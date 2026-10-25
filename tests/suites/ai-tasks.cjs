@@ -720,6 +720,23 @@ integrationTest('Quick prompt guards: a helper request, an AIM prompt, a count r
     assert.equal(promptOf({ ...context, mapAiMode: 'quick' }, language), promptOf(context, language), `${name}/${language}: unchanged by mapAiMode`);
     assert.equal(promptOf({ ...context, mapAiMode: 'quick' }, language).includes(QUICK_MARKERS[language]), false, `${name}/${language}: no Quick text`);
   }
+  // F2: the ROLE text is the original byte for byte whenever the prompt is not Quick; only a Quick task gets ROLE_QUICK.
+  {
+    const fr = load('core/steps/_shared/fragments.ts');
+    for (const language of ['en', 'zh-TW', 'zh-CN']) {
+      const role = fr.inLanguage(fr.ROLE, language), roleQuick = fr.inLanguage(fr.ROLE_QUICK, language);
+      assert.notEqual(role, roleQuick);
+      for (const [name, patch] of Object.entries(cases)) {
+        const text = promptOf({ ...quickBase, ...patch, mapAiMode: 'quick' }, language);
+        assert.ok(text.includes(role), `${name}/${language}: original ROLE`); assert.equal(text.includes(roleQuick), false, `${name}/${language}: no ROLE_QUICK`);
+      }
+      const researchStd = promptOf({ ...quickBase, researchMode: 'research', mapAiMode: 'quick' }, language);
+      assert.ok(researchStd.includes(role) && !researchStd.includes(roleQuick), `${language}: standard research keeps ROLE`);
+      const quick = promptOf({ ...quickBase, mapAiMode: 'quick' }, language);
+      assert.ok(quick.includes(roleQuick) && !quick.includes(role), `${language}: Quick uses ROLE_QUICK`);
+      assert.equal(/web search|網路搜尋|网络搜索/.test(roleQuick), false, `${language}: no permission to search the web`);
+    }
+  }
   // AIM goes through its own shell, which never reads mapAiMode.
   const { taskPrompt } = load('core/steps/task/render.ts', { obsidian });
   const aim = { ...quickBase, promptProfile: 'aim', task: 'Research the subtopic', researchMode: 'research' };

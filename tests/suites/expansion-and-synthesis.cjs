@@ -1652,26 +1652,26 @@ async function nodeBadgeHarness(language, outcome) {
 }
 integrationTest('shallow research badge: failure badge, stopped marker and retry after stop; zh-TW strings', async () => {
   const { translate } = load('i18n.ts'); const z = (key, ...v) => translate('zh-TW', key, ...v);
-  assert.equal([z('ui.shallow_research_counts', 0, 3), z('ui.batch_failed_count', 1), z('ui.shallow_research_current', 'B')].join(' · '), '快速研究：完成 0／3 · 失敗 1 · 研究中：B');
-  assert.equal([z('ui.shallow_research_counts', 2, 3), z('ui.batch_failed_count', 1), z('ui.shallow_research_stopped')].join(' · '), '快速研究：完成 2／3 · 失敗 1 · 已停止');
+  assert.equal([z('ui.shallow_research_counts', 0, 3), z('ui.batch_failed_count', 1), z('ui.shallow_research_current', 'B')].join(' · '), '簡短研究：完成 0／3 · 失敗 1 · 研究中：B');
+  assert.equal([z('ui.shallow_research_counts', 2, 3), z('ui.batch_failed_count', 1), z('ui.shallow_research_stopped')].join(' · '), '簡短研究：完成 2／3 · 失敗 1 · 已停止');
   assert.equal(z('ui.multi_research_progress', 1, 5), '研究中：完成 1／5'); assert.equal(z('ui.retry_failed_topics', 2), '重試失敗的議題（2）'); assert.equal(z('ui.dismiss'), '關閉');
   const x = await nodeBadgeHarness('en', 'fail');
   x.release.get(x.b.id)(); await until(() => x.h.plugin.expansionBatches.get(x.parent.path).failedPaths.length === 1);
   x.paint(); assert.ok(x.spans.some(s => s.text === '1 failed'), x.text());
   x.h.plugin.expansionCoordinator.stop(x.parent.path); x.release.get(x.a.id)(); x.release.get(x.c.id)();
   await until(() => x.h.plugin.expansionBatches.get(x.parent.path).status === 'stopped');
-  x.paint(); assert.ok(x.spans.some(s => s.text === 'Quick research: 0 of 3 done · 1 failed · stopped'), x.text());
+  x.paint(); assert.ok(x.spans.some(s => s.text === 'Short research: 0 of 3 done · 1 failed · stopped'), x.text());
   assert.ok(x.buttons.some(b => b.text === 'Retry failed topics (1)'));
 });
 integrationTest('shallow research badge in English: running, finished with a failure, and retry only when not running', async () => {
   const x = await nodeBadgeHarness('en', 'fail');
-  x.paint(); assert.ok(x.spans.some(s => s.text === 'Quick research: 0 of 3 done · researching: A'), x.text());
+  x.paint(); assert.ok(x.spans.some(s => s.text === 'Short research: 0 of 3 done · researching: A'), x.text());
   assert.equal(x.buttons.some(b => /^Retry failed topics/.test(b.text)), false);
   x.release.get(x.b.id)(); await until(() => x.h.plugin.expansionBatches.get(x.parent.path).failedPaths.length === 1);
-  x.paint(); assert.ok(x.spans.some(s => s.text === 'Quick research: 0 of 3 done · 1 failed · researching: A'), x.text());
+  x.paint(); assert.ok(x.spans.some(s => s.text === 'Short research: 0 of 3 done · 1 failed · researching: A'), x.text());
   assert.equal(x.buttons.some(b => /^Retry failed topics/.test(b.text)), false, 'no retry while running');
   x.release.get(x.a.id)(); x.release.get(x.c.id)(); await until(() => x.h.plugin.expansionBatches.get(x.parent.path).status === 'completed');
-  x.paint(); assert.ok(x.spans.some(s => s.text === 'Quick research: 2 of 3 done · 1 failed'), x.text());
+  x.paint(); assert.ok(x.spans.some(s => s.text === 'Short research: 2 of 3 done · 1 failed'), x.text());
   assert.ok(x.buttons.some(b => b.text === 'Retry failed topics (1)'));
   x.h.view.map.nodes = x.h.view.map.nodes.filter(n => n.id !== x.b.id); x.paint();
   assert.equal(x.buttons.some(b => /^Retry failed topics/.test(b.text)), false, 'failed topic removed from the map');

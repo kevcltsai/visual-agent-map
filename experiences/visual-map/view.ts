@@ -152,6 +152,7 @@ import type { MapChatRequest, MapChatResult } from "../../core/map-chat-service"
 import { MAP_CHAT_NEW_PREFIX, type MapChatAction } from "../../core/steps/map-chat/step";
 import {
   MAP_CHAT_AUTO_LAYOUT_MIN_NEW,
+  chatResearchMode,
   chatResearchRequest,
   mapChoiceParts,
   matchMapTitle,
@@ -7582,7 +7583,14 @@ export class VisualAgentMapView extends ItemView {
           if (result && hasKnowledgeGapMarker(result.detail))
             backgroundResultNotice(t("ui.background_research_gap_0", title), [
               view,
-              { label: t("ui.rerun_standard"), open: () => this.rerunStandard(node) }
+              {
+                label: t("ui.rerun_standard"),
+                open: () => {
+                  // The notice outlives a map switch: the re-run belongs to the map the research ran on.
+                  if (this.path !== mapPath) new Notice(t("ui.rerun_standard_other_map"));
+                  else this.rerunStandard(node);
+                }
+              }
             ]);
           else backgroundResultNotice(t("ui.background_research_done_0", title), view);
         } else {
@@ -10974,7 +10982,11 @@ export class VisualAgentMapView extends ItemView {
       case "run_map_action":
         switch (action.action) {
           case "research_standard":
-            return t("ui.map_chat_do_research");
+            return t(
+              chatResearchMode(action, this.map?.aiMode) === "quick"
+                ? "ui.map_chat_do_research_quick"
+                : "ui.map_chat_do_research_standard"
+            );
           case "expand":
             return t("ui.map_chat_do_expand_0", targets(action.nodeIds));
           case "synthesize":

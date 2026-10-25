@@ -1526,7 +1526,8 @@ export class NextStepModal extends Modal {
     const describeOutput = (): void => {
       outputValue.setText([supportedLanguageLabel(languageSelect.value), style.label()].filter(Boolean).join(" · "));
     };
-    const modeName = (): string => t(aiMode.value() === "standard" ? "ui.standard" : "ui.quick");
+    const modeName = (): string =>
+      t("ui.ai_mode_value_0", t(aiMode.value() === "standard" ? "ui.standard" : "ui.quick"));
     const refreshSummary = (): void => {
       describeOutput();
       if (currentMode === "synthesize" && stage === "directions") {

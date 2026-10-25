@@ -36,6 +36,8 @@ import RoleZH from "./role.zh.md";
 import RoleEN from "./role.en.md";
 import SourceSafetyZH from "./source-safety.zh.md";
 import SourceSafetyEN from "./source-safety.en.md";
+import RoleQuickZH from "./role-quick.zh.md";
+import RoleQuickEN from "./role-quick.en.md";
 import SourceSafetyQuickZH from "./source-safety-quick.zh.md";
 import SourceSafetyQuickEN from "./source-safety-quick.en.md";
 import QuickKnowledgeZH from "./quick-knowledge.zh.md";
@@ -125,6 +127,8 @@ export const NONE: FragmentPair = pair(NoneZH, NoneEN);
 export const OBSIDIAN_FORMAT: FragmentPair = pair(ObsidianFormatZH, ObsidianFormatEN);
 export const REFERENCE_CITATIONS: FragmentPair = pair(ReferenceCitationsZH, ReferenceCitationsEN);
 export const ROLE: FragmentPair = pair(RoleZH, RoleEN);
+/** The Quick AI mode's role text: same as ROLE except the sources half, which allows the model's own knowledge and no web search. */
+export const ROLE_QUICK: FragmentPair = pair(RoleQuickZH, RoleQuickEN);
 export const SOURCE_SAFETY: FragmentPair = pair(SourceSafetyZH, SourceSafetyEN);
 /** The Quick AI mode's source-safety text: only the "insufficient evidence" sentence differs, so the model may use its own knowledge. */
 export const SOURCE_SAFETY_QUICK: FragmentPair = pair(SourceSafetyQuickZH, SourceSafetyQuickEN);

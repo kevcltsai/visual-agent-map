@@ -313,7 +313,7 @@ integrationTest('opening a web page does not consume the search query budget', a
   } finally { runtime.stop(); }
 });
 integrationTest('a web-search-only turn accepts a directly opened page but rejects a turn with no web retrieval', async () => {
-  const run = async items => {
+  const run = async (items, controls = { webSearchOnly: true }) => {
     const { EventEmitter } = require('node:events');
     const child = new EventEmitter(); child.stdout = new EventEmitter(); child.stderr = new EventEmitter(); child.kill = () => {};
     const emit = message => process.nextTick(() => child.stdout.emit('data', Buffer.from(`${JSON.stringify(message)}\n`)));
@@ -331,10 +331,11 @@ integrationTest('a web-search-only turn accepts a directly opened page but rejec
     } };
     const { CodexAppServerRuntime } = load('ai/runtime/codex-app-server.ts', { 'node:child_process': { spawn: () => child } });
     const runtime = new CodexAppServerRuntime({ executable: 'codex', cwd: '/plugin', env: {}, clientVersion: 'test' });
-    try { return await runtime.runTask('research', 'model', 'low', {}, { webSearchOnly: true }); } finally { runtime.stop(); }
+    try { return await runtime.runTask('research', 'model', 'low', {}, controls); } finally { runtime.stop(); }
   };
   assert.equal(await run([{ id: 'open-1', type: 'webSearch', action: { type: 'openPage', url: 'https://obsidian.md/changelog/' } }]), 'answer');
   await assert.rejects(run([]), /did not perform web search|沒有實際執行網路搜尋/);
+  await assert.rejects(run([], { requireWeb: true }), /did not perform web search|沒有實際執行網路搜尋/, 'requireWeb also needs a retrieval');
 });
 integrationTest('an image generation turn enables only the image tool and resolves to the generated image as a data URL', async () => {
   const run = async items => {
@@ -563,10 +564,16 @@ integrationTest('B2 W1 Codex: a web-search-only turn starts its thread with web_
     const { CodexAppServerRuntime } = load('ai/runtime/codex-app-server.ts', { 'node:child_process': { spawn: (_exe, args) => { spawnArgs = args; return child; } } });
     const runtime = new CodexAppServerRuntime({ executable: 'codex', cwd: '/plugin', env: {}, clientVersion: 'test', webSearchDisabled: controls.local === true });
     try { await runtime.runTask('research', 'model', 'low', {}, controls.local ? {} : controls); } finally { runtime.stop(); }
-    return { thread: sent.find(m => m.method === 'thread/start').params, spawnArgs };
+    return { thread: sent.find(m => m.method === 'thread/start').params, spawnArgs, configReads: sent.filter(m => m.method === 'config/read').length };
   };
   const web = await run({ webSearchOnly: true });
   assert.equal(web.thread.config.web_search, 'live'); assert.match(web.thread.baseInstructions, /web search only/);
+  assert.ok(web.thread.config['features.shell_tool'] === false && web.thread.baseInstructions, 'AIM isolation keeps features off and its own instructions');
+  // Standard research: live web and a retrieval requirement only. Nothing leaks from the isolated AIM thread.
+  const std = await run({ requireWeb: true });
+  assert.deepEqual(JSON.parse(JSON.stringify(std.thread.config)), { web_search: 'live' }, 'standard research changes only web_search');
+  assert.equal(std.thread.baseInstructions, undefined, 'standard research keeps the default instructions');
+  assert.equal(std.configReads, 0, 'no MCP or feature overlay is computed for standard research');
   const plainTurn = await run({});
   assert.equal(plainTurn.thread.config, undefined, 'an ordinary turn sends no config override');
   const local = await run({ local: true });

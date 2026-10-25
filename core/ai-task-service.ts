@@ -220,7 +220,7 @@ export class AiTaskService {
         ...(context.aimIsolatedResearch
           ? { webSearchOnly: context.researchMode !== "local", textOnly: context.researchMode === "local" }
           : requiresWeb
-            ? { webSearchOnly: true }
+            ? { requireWeb: true }
             : {}),
         onAccepted: accepted,
         // Search depth guides investigation; it does not impose a per-task query cap.

@@ -28,6 +28,7 @@ test('Claude isolated research reports web activity in the Codex event shape and
   await assert.rejects(runWith([subagent, { ...done('s2'), parent_tool_use_id: 'task-1' }]), /did not perform web search|沒有實際執行網路搜尋/, 'only the main agent counts');
   assert.equal(JSON.parse(await runWith([use('s3', 'WebSearch'), done('s3')], { onWebSearchEvent: () => { throw new Error('UI failure'); } })).summary, 'S', 'a telemetry consumer error does not fail the task');
   assert.equal(JSON.parse(await runWith([], { webSearchOnly: false })).summary, 'S', 'ordinary tasks do not require search');
+  await assert.rejects(runWith([], { webSearchOnly: false, requireWeb: true }), /did not perform web search|沒有實際執行網路搜尋/, 'standard research requires a retrieval');
 });
 test('Claude stream mode skips plain-text warning lines between JSON records', async () => {
   const { EventEmitter } = require('node:events');

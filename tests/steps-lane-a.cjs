@@ -180,15 +180,16 @@ const researchContext = (extra = {}) => context({ researchMode: 'research', rese
 test('B2 W1: normal and deep standard research asks the provider for a web-search-only turn; fast, local and AIM do not change', async () => {
   const controlsOf = async (ctx, model = 'gpt-6-luna') => { const fake = runtime(GOOD); await makeService(fake).askModel(ctx, model, 'low'); return fake.calls[0].controls; };
   for (const model of ['gpt-6-luna', 'claude:sonnet']) {
-    assert.equal((await controlsOf(researchContext(), model)).webSearchOnly, true, `${model} normal`);
-    assert.equal((await controlsOf(researchContext({ researchDepth: 'deep' }), model)).webSearchOnly, true, `${model} deep`);
-    assert.equal((await controlsOf(researchContext({ researchDepth: 'fast' }), model)).webSearchOnly, undefined, `${model} fast may answer without searching`);
+    assert.equal((await controlsOf(researchContext(), model)).requireWeb, true, `${model} normal`);
+    assert.equal((await controlsOf(researchContext(), model)).webSearchOnly, undefined, `${model} normal research is not an isolated AIM thread`);
+    assert.equal((await controlsOf(researchContext({ researchDepth: 'deep' }), model)).requireWeb, true, `${model} deep`);
+    assert.equal((await controlsOf(researchContext({ researchDepth: 'fast' }), model)).requireWeb, undefined, `${model} fast may answer without searching`);
   }
   const local = await controlsOf(context({ researchMode: 'local', researchDepth: 'normal' }));
-  assert.equal(local.webSearchOnly, undefined); assert.equal(local.webSearch, false, 'local mode carries no web parameter');
-  assert.equal((await controlsOf(researchContext({ mode: 'synthesize' }))).webSearchOnly, undefined, 'a synthesis is not a standard research');
+  assert.equal(local.webSearchOnly, undefined); assert.equal(local.requireWeb, undefined); assert.equal(local.webSearch, false, 'local mode carries no web parameter');
+  assert.equal((await controlsOf(researchContext({ mode: 'synthesize' }))).requireWeb, undefined, 'a synthesis is not a standard research');
   const aim = await controlsOf(researchContext({ aimIsolatedResearch: true }));
-  assert.equal(aim.webSearchOnly, true); assert.equal(aim.textOnly, false);
+  assert.equal(aim.webSearchOnly, true); assert.equal(aim.textOnly, false); assert.equal(aim.requireWeb, undefined);
 });
 
 test('B2 W1: a research with no retrieval is sent once more; the second attempt\'s answer is kept and carries its search count', async () => {

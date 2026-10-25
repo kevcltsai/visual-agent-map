@@ -2397,6 +2397,18 @@ integrationTest('B1 ui: sending the first message moves the same panel (same mes
   assert.equal(chat.transcript().length, 2);
 });
 
+integrationTest('B2-fix F2: sending the first message from the opening screen does not change the remembered mapChatOpen', async () => {
+  for (const remembered of [false, true]) {
+    const h = await harness({ empty: true }); h.plugin.settings.mapChatOpen = remembered; await h.view.hydrate(); h.repaint(); const chat = h.view.chat;
+    assert.equal(chat.isHero, true);
+    h.control.reply = async () => ({ reply: 'ok', actions: [], rejected: [] });
+    h.type('Coffee'); await h.view.sendMapChat();
+    assert.equal(chat.isHero, false); assert.equal(chat.isOpen, true, 'the panel is shown');
+    assert.equal(h.plugin.settings.mapChatOpen, remembered, 'right after the send');
+    h.repaint(); assert.equal(h.plugin.settings.mapChatOpen, remembered, `mapChatOpen stays ${remembered}`);
+  }
+});
+
 integrationTest('B1 ui: an AIM map with no cards does NOT get the opening screen', async () => {
   const h = await harness({ aim: true, empty: true }); await h.view.hydrate(); h.repaint();
   assert.equal(h.view.map.nodes.length, 0); assert.ok(h.view.map.aim); assert.equal(h.view.chat.isHero, false); assert.equal(find(h.rootEl, i => hasClass(i, 'vam-chat-hero-slot')), undefined);
@@ -3016,6 +3028,16 @@ integrationTest('B2-0 L4: stopping a batch places the new cards that exist so fa
   assert.ok(lines.some(l => l.status === 'skipped'), 'the rest is skipped'); assert.equal(lines.some(l => /Arranged/.test(l.text)), false, 'no automatic layout line');
   eq(overlaps(h.view.map.nodes), [], 'no two cards overlap');
   eq(overlaps(await h.saved()), [], 'and the saved map is the same');
+  assert.equal(h.view.renderHold, 0);
+});
+integrationTest('B2-fix L4: a Stop that lands right after the last add_child still places the new cards locally, no overlap', async () => {
+  const h = await harness({ empty: true, realRender: true, viaSync: true }); await h.view.hydrate(); measuredHeights(h);
+  let stopped = false, writes = 0; const original = h.view.applyChatWrite.bind(h.view);
+  h.view.applyChatWrite = async (...args) => { const outcome = await original(...args); if (++writes === 10) stopped = true; return outcome; };
+  const lines = await apply(h, spread(), {}, () => !stopped);
+  assert.equal(writes, 10); assert.equal(h.view.map.nodes.length, 10, 'every card was written');
+  assert.equal(lines.some(l => /Arranged/.test(l.text)), false, 'a stopped reply gets no automatic layout line');
+  eq(overlaps(h.view.map.nodes), [], 'no two cards overlap'); eq(overlaps(await h.saved()), [], 'and the saved map is the same');
   assert.equal(h.view.renderHold, 0);
 });
 integrationTest('B2-0 L4: an auto_layout that comes before the add_child actions does not leave the later cards overlapping', async () => {

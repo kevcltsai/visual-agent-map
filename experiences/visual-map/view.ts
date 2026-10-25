@@ -10238,6 +10238,8 @@ export class VisualAgentMapView extends ItemView {
     this.viewportEl?.toggleClass("has-chat-hero", !startCard);
   }
   /** The first message was sent (or a conversation ended): the panel moves between the opening screen and the window. */
+  /** True while the first message forces the window open: that is not the user's choice, so it is not saved. */
+  private chatForcedOpen = false;
   private relocateMapChat(): void {
     const chat = this.chat;
     if (!chat || this.closed) return;
@@ -10248,7 +10250,13 @@ export class VisualAgentMapView extends ItemView {
     this.viewportEl?.removeClass("has-chat-hero");
     this.placeChatPanel();
     // The window the first message moves into is shown even when it was folded or closed: the conversation just began in it.
-    if (!chat.isOpen) chat.setOpen(true, true);
+    // This is not the user's choice, so it is not remembered (see layoutChanged).
+    this.chatForcedOpen = true;
+    try {
+      if (!chat.isOpen) chat.setOpen(true, true);
+    } finally {
+      this.chatForcedOpen = false;
+    }
     this.chatWorkspaceEl?.toggleClass("has-map-chat-open", chat.isOpen);
     restore();
     this.placeMapTools();
@@ -10361,7 +10369,7 @@ export class VisualAgentMapView extends ItemView {
         this.chatWorkspaceEl?.toggleClass("has-map-chat-open", !!chat?.isOpen);
         this.placeMapTools();
         // Only what the user chose is remembered, not the fold a narrow pane forces on the window.
-        if (chat && !chat.isHero && this.plugin.settings.mapChatOpen !== chat.wantsOpen) {
+        if (chat && !chat.isHero && !this.chatForcedOpen && this.plugin.settings.mapChatOpen !== chat.wantsOpen) {
           this.plugin.settings.mapChatOpen = chat.wantsOpen;
           void this.plugin.saveSettings();
         }
@@ -11093,6 +11101,8 @@ export class VisualAgentMapView extends ItemView {
         }
       }
       if (arranged) lines.push({ status: "done", text: t("ui.map_chat_auto_layout_added") });
+      // A stop that lands after the last action is a stop too.
+      if (!same()) stopped = true;
       // A stop, or an auto_layout that came before the cards, leaves them at the rough spot of a held batch (unmeasured heights).
       // Only those cards are placed, each branch beside its parent; nothing else moves, and no other action of the reply runs.
       const rough = batched && !arranged && (stopped || layoutDone) ? run.created.slice(laidOutCount) : [];

@@ -17,6 +17,11 @@
       "file": "experiences/visual-map/view.ts",
       "text": "25,0.5 75,0.5",
       "reason": "SVG polygon points, not natural language"
+    },
+    {
+      "file": "experiences/visual-map/view.ts",
+      "text": "input, textarea, select, [contenteditable=true], .vam-map-chat",
+      "reason": "CSS selector for fields and the chat window, not natural language"
     }
   ]
 }

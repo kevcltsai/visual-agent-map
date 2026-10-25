@@ -51,6 +51,8 @@ import {
   normalizeReasoningLevel,
   normalizeMapChatStyle,
   normalizeMapChatModel,
+  normalizeMapChatWidth,
+  normalizeMapChatOpen,
   rebaseMapNotePaths,
   resolveMapFolders,
   type Note,
@@ -178,6 +180,8 @@ export function settingsFromSaved(saved: Partial<Settings> | null): Settings {
     cliModel: saved?.cliModel || DEFAULT_SETTINGS.cliModel,
     mapChatStyle: normalizeMapChatStyle(saved?.mapChatStyle),
     mapChatModel: normalizeMapChatModel(saved?.mapChatModel),
+    mapChatWidth: normalizeMapChatWidth(saved?.mapChatWidth),
+    mapChatOpen: normalizeMapChatOpen(saved?.mapChatOpen),
     cliReasoning: normalizeReasoningLevel(saved?.cliReasoning),
     previewScale:
       saved?.previewScale !== undefined
@@ -596,6 +600,21 @@ export default class VisualAgentMapPlugin extends Plugin {
     });
     const mapRibbonIcon = this.ribbonIcon;
     this.app.workspace.onLayoutReady(() => this.register(groupRibbonIcons(mapRibbonIcon, coffeeRibbonIcon)));
+    // Opens or closes the map's AI chat and leaves the keyboard in its message field. No default hotkey: the user picks one in
+    // Obsidian's hotkey settings, so it can never collide with a built-in one.
+    this.localizedCommands.push({
+      command: this.addCommand({
+        id: "toggle-map-chat",
+        name: t("ui.map_chat_toggle_command"),
+        checkCallback: checking => {
+          const view = this.app.workspace.getActiveViewOfType(VisualAgentMapView);
+          if (!view) return false;
+          if (!checking) view.toggleMapChat();
+          return true;
+        }
+      }),
+      key: "ui.map_chat_toggle_command"
+    });
     this.addLocalizedCommand("open-map", "ui.open_map", () => {
       void this.activateView().catch(error => new Notice(String(error)));
     });

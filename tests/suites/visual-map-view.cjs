@@ -1692,7 +1692,8 @@ integrationTest('map stylesheet: no :has() on the map surface, reduced motion be
   const rules = css.split('\n');
   const surface = /\.vam-(workspace|canvas-overlay|node|map-tools|zoom-controls|toolbar|outline-option|inspector)/;
   assert.deepEqual(rules.filter(rule => rule.includes(':has(') && surface.test(rule)), [], 'no :has() on the map surface');
-  assert.match(css, /\.vam-workspace\.has-inspector > \.vam-canvas-overlay \{ right: 300px; \}/); assert.match(css, /\.vam-workspace\.has-inspector > \.vam-canvas-overlay \{ right: 260px; \}/);
+  // The overlay lives inside the canvas now, which already leaves the inspector's width out: shifting it was dead. Narrow panes move the zoom cluster aside instead.
+  assert.equal(css.includes('.vam-workspace.has-inspector > .vam-canvas-overlay'), false, 'the dead overlay shift is gone'); assert.match(css, /\.vam-workspace\.has-inspector \.vam-zoom-controls \{ right: auto; left: 12px; \}/, 'the zoom cluster gives way to the inspector on a narrow pane');
   const scan = '.vam-node:not([data-aim-kind])[data-status="running"]::after';
   const reduced = css.slice(css.indexOf('@media (prefers-reduced-motion: reduce)'), css.indexOf('.theme-dark .vam-viewport'));
   assert.ok(css.includes(`${scan} { content:`), 'the scan animation rule exists');

@@ -35681,7 +35681,6 @@ var VisualAgentMapView = class _VisualAgentMapView extends import_obsidian30.Ite
     __publicField(this, "aimProgressRenderTimer", null);
     __publicField(this, "aimFailedReports", /* @__PURE__ */ new Map());
     __publicField(this, "aimAnswerRequestIds", /* @__PURE__ */ new Map());
-    /** The first message was sent (or a conversation ended): the panel moves between the opening screen and the window. */
     /** True while the first message forces the window open: that is not the user's choice, so it is not saved. */
     __publicField(this, "chatForcedOpen", false);
     this.installUndoScope();
@@ -44483,6 +44482,7 @@ ${note.detail.trim()}` : "",
     chat.mount(slot, "hero");
     (_a2 = this.viewportEl) == null ? void 0 : _a2.toggleClass("has-chat-hero", !startCard);
   }
+  /** The first message was sent (or a conversation ended): the panel moves between the opening screen and the window. */
   relocateMapChat() {
     var _a2, _b2;
     const chat = this.chat;

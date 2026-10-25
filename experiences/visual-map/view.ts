@@ -10237,9 +10237,9 @@ export class VisualAgentMapView extends ItemView {
     chat.mount(slot, "hero");
     this.viewportEl?.toggleClass("has-chat-hero", !startCard);
   }
-  /** The first message was sent (or a conversation ended): the panel moves between the opening screen and the window. */
   /** True while the first message forces the window open: that is not the user's choice, so it is not saved. */
   private chatForcedOpen = false;
+  /** The first message was sent (or a conversation ended): the panel moves between the opening screen and the window. */
   private relocateMapChat(): void {
     const chat = this.chat;
     if (!chat || this.closed) return;

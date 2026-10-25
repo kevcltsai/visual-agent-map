@@ -19,9 +19,17 @@ const lastSegment = (operand) => operand.replace(/\[[^\]]*\]/g, "").split(".").p
 const isLimit = (operand) => /^\d[\d_]*(?:\.\d+)?$/.test(operand) || /^[A-Z][A-Z0-9_]*$/.test(lastSegment(operand));
 const COMPARE = /([\w$.[\]]+)\s*(?<![=!<>-])(<=?|>=?)\s*([\w$.[\]]+)/g;
 
+// An elapsed time written inline: a subtraction involving a clock read, compared with a number or an all-caps constant, in either order.
+const CLOCK = String.raw`(?:Date\.now\(\)|performance\.now\(\)|(?:process\.)?hrtime(?:\.bigint)?\(\))`;
+const LIMIT = String.raw`(?:\d[\d_]*(?:\.\d+)?|[A-Z][A-Z0-9_]*)(?![\w$.(\[])`;
+const OP = String.raw`(?<![=!<>-])(?:<=?|>=?)`;
+const CLOCK_LEFT = new RegExp(String.raw`(?=[^<>;]*${CLOCK})[^<>;]*-[^<>;]*${OP}\s*${LIMIT}`);
+const CLOCK_RIGHT = new RegExp(String.raw`${LIMIT}\s*${OP}\s*(?=[^<>;]*${CLOCK})[^<>;]*-`);
+
 /** True when the line is an assert call comparing a timing value with a number or an all-caps constant. */
 export function isAbsoluteTimingLine(line) {
   if (!/\bassert(?:\.\w+)?\s*\(/.test(line)) return false;
+  if (CLOCK_LEFT.test(line) || CLOCK_RIGHT.test(line)) return true;
   for (const match of line.matchAll(COMPARE)) {
     const [, left, , right] = match;
     if ((isTimingName(lastSegment(left)) && isLimit(right)) || (isTimingName(lastSegment(right)) && isLimit(left))) return true;

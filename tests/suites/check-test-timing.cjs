@@ -11,14 +11,15 @@ test('timing scanner: reports an assert that compares a timing value with a numb
   const { isAbsoluteTimingLine } = await scanner();
   for (const body of [
     'ms < 50', 'ms < 100, `${name}`', 'elapsed <= 200', 'durationMs < 5', 'ms < LIMIT_MS', 'r.ms < 50', 't.elapsedMs < 200', '50 > ms', 'LIMIT_MS >= ms',
-    'startMS < 10', 'wait_ms < 10', 'timers[0].ms <= 200', 'totalDuration < 1_000', 'ms < 0.5'
+    'startMS < 10', 'wait_ms < 10', 'timers[0].ms <= 200', 'totalDuration < 1_000', 'ms < 0.5',
+    'Date.now() - started < 200', 'performance.now() - t0 <= 50', 'Number(process.hrtime.bigint() - start) / 1e6 < 100', 'LIMIT_MS > Date.now() - started', '200 > Date.now() - started', 'end - Date.now() < 5'
   ]) assert.equal(isAbsoluteTimingLine(call(body)), true, body);
   const timer = 'assert.equal' + '(timers[0].ms <= 200, true);';
   assert.equal(isAbsoluteTimingLine(timer), true);
 });
 test('timing scanner: leaves other comparisons alone, including names that merely contain ms', async () => {
   const { isAbsoluteTimingLine } = await scanner();
-  for (const body of ['count < 5', 'numItems < 10', 'terms < 5', 'msgCount <= 3', 'items.length >= 2', 'ratio <= STREAM_RATIO_LIMIT', 'ms <= other', 'items.map(i => i.ms)', 'a => b']) {
+  for (const body of ['count < 5', 'numItems < 10', 'terms < 5', 'msgCount <= 3', 'items.length >= 2', 'ratio <= STREAM_RATIO_LIMIT', 'ms <= other', 'items.map(i => i.ms)', 'a => b', 'a - b < 5', 'Date.now() - started', 'Date.now() > started', 'Date.now() - started < elapsedLimit', 'items.length - 1 < 5']) {
     assert.equal(isAbsoluteTimingLine(call(body)), false, body);
   }
   assert.equal(isAbsoluteTimingLine('const ms = 5 < 6;'), false, 'not inside an assert');

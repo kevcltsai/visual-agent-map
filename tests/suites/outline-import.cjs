@@ -94,12 +94,17 @@ test('outline: every line is accounted for exactly once; text around headings is
   assert.deepEqual(keys(parse.warnings), ['ui.outline_warning_ignored_lines:0']);
 });
 
-test('outline: a 5,000-line note parses quickly', () => {
-  const big = ['# R', ...Array.from({ length: 4999 }, (_, i) => (i % 50 === 0 ? `## H${i}` : `text ${i}`))].join('\n');
-  const started = Date.now();
-  const parse = api.parseOutline(big);
-  assert.ok(Date.now() - started < 200);
-  assert.equal(parse.nodes.length, 101);
+test('outline: a 5,000-line note parses in time linear in its size', () => {
+  const note = lines => ['# R', ...Array.from({ length: lines - 1 }, (_, i) => (i % 50 === 0 ? `## H${i}` : `text ${i}`))].join('\n');
+  const big = note(5000); const small = note(500);
+  // No absolute limit: a slow machine moves both sides. The 5,000-line parse (REPEATS times) is compared with ten times as many parses of a note a tenth the size, measured here, in the same process.
+  // Linear work gives a ratio near 1; quadratic work gives about 10. Both totals are tens of ms, so timer noise does not matter and no floor is used.
+  const REPEATS = 20; const LIMIT = 4;
+  const block = (text, times) => { let min = Infinity; for (let k = 0; k < 3; k++) { const t = process.hrtime.bigint(); for (let i = 0; i < times; i++) api.parseOutline(text); min = Math.min(min, Number(process.hrtime.bigint() - t) / 1e6); } return min; };
+  const bigMs = block(big, REPEATS); const smallMs = block(small, REPEATS * 10); const ratio = bigMs / smallMs;
+  process.stdout.write(`outline timing: ${bigMs.toFixed(1)} ms for ${REPEATS} large parses, ${smallMs.toFixed(1)} ms for ${REPEATS * 10} small ones, ratio ${ratio.toFixed(2)}\n`);
+  assert.ok(ratio <= LIMIT, `${bigMs.toFixed(0)} ms is ${ratio.toFixed(1)} times ten parses of a tenth-size note (${smallMs.toFixed(0)} ms)`);
+  assert.equal(api.parseOutline(big).nodes.length, 101);
 });
 
 test('outline: every Markdown file in the repository parses without throwing and accounts for every line', () => {

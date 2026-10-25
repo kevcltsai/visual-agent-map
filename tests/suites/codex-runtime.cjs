@@ -313,7 +313,7 @@ integrationTest('opening a web page does not consume the search query budget', a
   } finally { runtime.stop(); }
 });
 integrationTest('a web-search-only turn accepts a directly opened page but rejects a turn with no web retrieval', async () => {
-  const run = async (items, controls = { webSearchOnly: true }) => {
+  const run = async items => {
     const { EventEmitter } = require('node:events');
     const child = new EventEmitter(); child.stdout = new EventEmitter(); child.stderr = new EventEmitter(); child.kill = () => {};
     const emit = message => process.nextTick(() => child.stdout.emit('data', Buffer.from(`${JSON.stringify(message)}\n`)));
@@ -331,11 +331,10 @@ integrationTest('a web-search-only turn accepts a directly opened page but rejec
     } };
     const { CodexAppServerRuntime } = load('ai/runtime/codex-app-server.ts', { 'node:child_process': { spawn: () => child } });
     const runtime = new CodexAppServerRuntime({ executable: 'codex', cwd: '/plugin', env: {}, clientVersion: 'test' });
-    try { return await runtime.runTask('research', 'model', 'low', {}, controls); } finally { runtime.stop(); }
+    try { return await runtime.runTask('research', 'model', 'low', {}, { webSearchOnly: true }); } finally { runtime.stop(); }
   };
   assert.equal(await run([{ id: 'open-1', type: 'webSearch', action: { type: 'openPage', url: 'https://obsidian.md/changelog/' } }]), 'answer');
   await assert.rejects(run([]), /did not perform web search|沒有實際執行網路搜尋/);
-  await assert.rejects(run([], { requireWeb: true }), /did not perform web search|沒有實際執行網路搜尋/, 'requireWeb also needs a retrieval');
 });
 integrationTest('an image generation turn enables only the image tool and resolves to the generated image as a data URL', async () => {
   const run = async items => {
@@ -551,7 +550,7 @@ integrationTest('B2 W1 Codex: a web-search-only turn starts its thread with web_
     child.stdin = { write: line => {
       const message = JSON.parse(line.trim()); sent.push(message);
       if (message.method === 'initialize') emit({ id: message.id, result: {} });
-      else if (message.method === 'config/read') emit({ id: message.id, result: { config: {} } });
+      else if (message.method === 'config/read') emit({ id: message.id, result: { config: { mcp_servers: { 'user.mcp': { command: 'x' } } } } });
       else if (message.method === 'thread/start') emit({ id: message.id, result: { thread: { id: 'thread-1' } } });
       else if (message.method === 'turn/start') {
         emit({ id: message.id, result: { turn: { id: 'turn-1' } } });
@@ -568,12 +567,11 @@ integrationTest('B2 W1 Codex: a web-search-only turn starts its thread with web_
   };
   const web = await run({ webSearchOnly: true });
   assert.equal(web.thread.config.web_search, 'live'); assert.match(web.thread.baseInstructions, /web search only/);
-  assert.ok(web.thread.config['features.shell_tool'] === false && web.thread.baseInstructions, 'AIM isolation keeps features off and its own instructions');
-  // Standard research: live web and a retrieval requirement only. Nothing leaks from the isolated AIM thread.
-  const std = await run({ requireWeb: true });
-  assert.deepEqual(JSON.parse(JSON.stringify(std.thread.config)), { web_search: 'live' }, 'standard research changes only web_search');
-  assert.equal(std.thread.baseInstructions, undefined, 'standard research keeps the default instructions');
-  assert.equal(std.configReads, 0, 'no MCP or feature overlay is computed for standard research');
+  // Standard research and AIM share this isolated thread: features off, user MCP servers disabled, web-only instructions, config read once.
+  assert.equal(web.thread.config['features.shell_tool'], false, 'features are off'); assert.equal(web.thread.config['features.apps'], false);
+  assert.deepEqual(JSON.parse(JSON.stringify(web.thread.config.mcp_servers)), { 'user.mcp': { enabled: false } }, 'user MCP servers are disabled');
+  assert.equal(web.configReads, 1, 'the effective config is read to disable MCP servers');
+  assert.equal(typeof web.thread.baseInstructions, 'string');
   const plainTurn = await run({});
   assert.equal(plainTurn.thread.config, undefined, 'an ordinary turn sends no config override');
   const local = await run({ local: true });

@@ -50,8 +50,6 @@ export interface ClaudeTaskControls {
   timeoutMessage?: string;
   /** Isolated research, and standard research of normal or deep depth: fail the task unless at least one web search or page fetch actually returned. */
   webSearchOnly?: boolean;
-  /** Standard research: the same retrieval requirement, without any isolation. */
-  requireWeb?: boolean;
   /** Receives WebSearch/WebFetch activity in the same shape as Codex App Server web-search items. */
   onWebSearchEvent?: (event: WebSearchEvent) => void;
   /** A base64 PNG, JPEG, GIF or WebP data URL sent with the prompt as an image block. */
@@ -572,7 +570,7 @@ export class ClaudeCodeCliRuntime {
             if (Array.isArray(transcript)) for (const record of transcript) activity.read(record);
           }
           const result = claudeStructuredOutput(streaming ? finalResult : stdout, !outputSchema);
-          if ((controls.webSearchOnly || controls.requireWeb) && !activity.retrievals) throw searchNotPerformedError();
+          if (controls.webSearchOnly && !activity.retrievals) throw searchNotPerformedError();
           const streamed = [streamText, currentText].filter(Boolean).join("\n\n");
           finish(undefined, !outputSchema && streaming && result.length < streamed.length ? streamed : result);
         } catch (error) {

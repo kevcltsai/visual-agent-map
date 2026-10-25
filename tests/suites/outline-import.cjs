@@ -213,12 +213,12 @@ test('outline modal: preview, errors block creation, shallow option and single s
   assert.equal(requests.length, 1); assert.equal(create.disabled, true);
   assert.deepEqual(plain(requests[0].nodes.map(node => node.title)), ['Trip', 'Food', 'Breakfast']);
   assert.equal(requests[0].source, null); assert.equal(requests[0].shallowResearch, true);
-  assert.equal(requests[0].researchDepth, 'fast'); assert.equal(requests[0].model, undefined);
+  assert.equal(requests[0].aiMode, 'quick', 'the shallow research starts on Quick'); assert.equal('researchDepth' in requests[0], false); assert.equal(requests[0].model, undefined);
   release(); await new Promise(resolve => setTimeout(resolve, 0));
   assert.equal(modal.closed, true);
 });
 
-test('outline modal: research depth and model show only with shallow research and are sent with the request', async () => {
+test('outline modal: AI mode and model show only with shallow research and are sent with the request', async () => {
   const h = modalHarness(); const requests = []; let changed = null, unwatched = 0; let models = [];
   const choices = { list: () => models, watch: fn => { changed = fn; return () => { unwatched++; }; } };
   const modal = new h.mod.OutlineImportModal({ vault: { getMarkdownFiles: () => [] } }, async request => { requests.push(request); }, choices);
@@ -227,18 +227,19 @@ test('outline modal: research depth and model show only with shallow research an
   const shallow = h.find(modal.contentEl, item => item.tag === 'input' && item.type === 'checkbox');
   assert.equal(options.toggled['is-hidden'], true);
   shallow.checked = true; shallow.listeners.change(); assert.equal(options.toggled['is-hidden'], false);
-  // The shared depth widget: Quick / Standard / Deep radios, Quick checked here (shallow research is deliberately a first look).
-  const depthRadios = h.all(modal.contentEl, item => item.tag === 'input' && item.type === 'radio' && ['fast', 'normal', 'deep'].includes(item.value));
-  assert.equal(depthRadios.length, 3);
+  // The shared mode switch: Quick / Standard, Quick checked here (a first look at many topics); it is not remembered on the map.
+  const modeRadios = h.all(modal.contentEl, item => item.tag === 'button' && item.role === 'radio');
+  assert.deepEqual(modeRadios.map(radio => [radio.text, radio['aria-checked']]), [['Quick', 'true'], ['Standard', 'false']]);
+  assert.equal(h.all(modal.contentEl, item => item.tag === 'fieldset').length, 0, 'the research-depth fieldset is gone');
   const model = () => h.find(modal.contentEl, item => item.tag === 'select' && item['aria-label'] === 'Model');
-  assert.deepEqual(depthRadios.map(radio => radio.checked), [true, false, false]); assert.deepEqual(plain(model().children.map(c => c.value)), ['']);
+  assert.deepEqual(plain(model().children.map(c => c.value)), ['']);
   models = [{ id: 'm1', label: 'Model One' }]; changed();
   assert.deepEqual(plain(model().children.map(c => c.value)), ['', 'm1']);
-  depthRadios[2].checked = true; depthRadios[2].listeners.change(); model().value = 'm1';
+  modeRadios[1].listeners.click(); model().value = 'm1';
   const textarea = h.find(modal.contentEl, item => item.tag === 'textarea'); textarea.value = '# R\n## A'; textarea.listeners.input();
   h.find(modal.modalEl, item => item.tag === 'button' && item.text === 'Add to mind map').listeners.click();
   await new Promise(resolve => setTimeout(resolve, 0));
-  assert.equal(requests[0].researchDepth, 'deep'); assert.equal(requests[0].model, 'm1');
+  assert.equal(requests[0].aiMode, 'standard'); assert.equal(requests[0].model, 'm1');
   modal.onClose(); assert.equal(unwatched, 1);
 });
 
@@ -298,10 +299,10 @@ integrationTest('importOutline creates the map, opens it, and starts shallow res
   await view.importOutline({ nodes, source: null, shallowResearch: true });
   assert.equal(opened.length, 2); assert.equal(researched.length, 1);
   assert.equal(researched[0].children, 2);
-  assert.equal(researched[0].options.researchMode, 'research'); assert.equal(researched[0].options.researchDepth, 'fast');
+  assert.deepEqual(plain([researched[0].options.researchMode, researched[0].options.researchDepth, researched[0].options.visualMode, researched[0].options.mapAiMode]), ['local', 'fast', 'off', 'quick'], 'the default import research is the short Quick overview');
   const confirms = []; plugin.confirmAiUsage = async (model, run) => { confirms.push(model); await run(); return true; };
-  await view.importOutline({ nodes, source: null, shallowResearch: true, researchDepth: 'normal', model: 'model-x' });
-  assert.deepEqual(confirms, ['model-x']); assert.equal(researched[1].options.researchDepth, 'normal');
+  await view.importOutline({ nodes, source: null, shallowResearch: true, aiMode: 'standard', model: 'model-x' });
+  assert.deepEqual(confirms, ['model-x']); assert.deepEqual(plain([researched[1].options.researchMode, researched[1].options.researchDepth, researched[1].options.visualMode, researched[1].options.mapAiMode]), ['research', 'fast', 'auto', 'standard']);
   const map = await repo.readMap(opened[2]);
   for (const node of map.nodes) assert.equal((await repo.readNote(node.path)).model, 'model-x');
 });
@@ -646,19 +647,19 @@ integrationTest('importOutline under the selected topic: the outline root become
 
 integrationTest('importOutline under the selected topic with shallow research: researches only the outline root descendants with the chosen model', async () => {
   const h = await placementHarness();
-  await h.view.importOutline({ nodes: api.parseOutline('# Sub\n## S1\n## S2').nodes, source: null, shallowResearch: true, researchDepth: 'normal', model: 'model-x', placement: { kind: 'under', parentId: h.oldRoot.id } });
+  await h.view.importOutline({ nodes: api.parseOutline('# Sub\n## S1\n## S2').nodes, source: null, shallowResearch: true, aiMode: 'standard', model: 'model-x', placement: { kind: 'under', parentId: h.oldRoot.id } });
   const saved = await h.repo.readMap(h.mapPath);
   const sub = saved.nodes.find(item => item.parentId === h.oldRoot.id && item.id !== h.oldChild.id);
   assert.equal(h.researched.length, 1);
   assert.equal(h.researched[0].parent, sub.id);
   const expected = saved.nodes.filter(item => item.parentId === sub.id).map(item => item.id);
   assert.deepEqual(plain(h.researched[0].children), plain(expected));
-  assert.equal(h.researched[0].options.researchDepth, 'normal'); assert.equal(h.researched[0].options.researchMode, 'research');
+  assert.equal(h.researched[0].options.researchDepth, 'fast'); assert.equal(h.researched[0].options.researchMode, 'research'); assert.equal(h.researched[0].options.mapAiMode, 'standard');
   assert.deepEqual(h.confirms, ['model-x']);
   for (const item of [sub, ...saved.nodes.filter(node => node.parentId === sub.id)]) assert.equal((await h.repo.readNote(item.path)).model, 'model-x');
 });
 
-integrationTest('quick explore: the real create path researches every created subtopic with the dialog research choices, at Quick depth', async () => {
+integrationTest('quick explore: the real create path researches every created subtopic with the dialog\'s AI mode, as the short overview', async () => {
   const template = { id: 't1', name: 'Template one', sections: [{ id: 's1', name: 'Findings', description: '', role: 'none', aliases: [] }] };
   const h = await placementHarness({ detailTemplates: [template] });
   // The reviewed outline as the Next Step dialog hands it over: the topic's own root is already dropped.
@@ -666,7 +667,7 @@ integrationTest('quick explore: the real create path researches every created su
   const group = { id: 'group-1', label: 'Sources', documents: [{ path: 'Inbox/source.md', content: 'x' }] };
   const signal = new AbortController().signal;
   await h.view.quickOutline(h.oldRoot).create(nodes, {
-    researchMode: 'research', researchDepth: 'normal', visualMode: 'auto', referenceGroups: [group], outputLanguage: 'zh-TW',
+    researchMode: 'local', researchDepth: 'fast', visualMode: 'off', mapAiMode: 'quick', referenceGroups: [group], outputLanguage: 'zh-TW',
     toneId: 'tone-1', requirements: 'Keep it short', detailTemplateId: 't1', shallowResearch: true, signal, onProgress: () => {}
   });
   const saved = await h.repo.readMap(h.mapPath);
@@ -677,17 +678,21 @@ integrationTest('quick explore: the real create path researches every created su
   assert.equal(h.researched[0].parent, h.oldRoot.id, 'researched under the topic quick explore ran on');
   assert.deepEqual(plain(h.researched[0].children.slice().sort()), plain([food.id, breakfast.id].sort()), 'the single top heading is researched too');
   const options = h.researched[0].options;
-  // S7: the dialog allowed the web (and images), but the quick pass reads local context only unless "also search the web" is on.
-  assert.equal(options.researchMode, 'local'); assert.equal(options.researchDepth, 'fast', 'shallow research stays Quick');
-  assert.equal(options.visualMode, 'off'); assert.equal(options.outputLanguage, 'zh-TW'); assert.equal(options.toneId, 'tone-1');
+  // Quick: local context and model knowledge only, the short overview, no images, and the Quick prompt.
+  assert.equal(options.researchMode, 'local'); assert.equal(options.researchDepth, 'fast', 'subtopic research is the short overview');
+  assert.equal(options.mapAiMode, 'quick'); assert.equal(options.visualMode, 'off'); assert.equal(options.outputLanguage, 'zh-TW'); assert.equal(options.toneId, 'tone-1');
   assert.equal(options.requirements, 'Keep it short'); assert.equal(JSON.stringify(options.referenceGroups), JSON.stringify([group]));
   assert.equal(options.signal, undefined); assert.equal(options.onProgress, undefined);
   assert.equal(options.detailTemplateId, 't1');
   for (const item of [food, breakfast]) assert.equal((await h.repo.readNote(item.path)).detailTemplateId, 't1', 'the chosen template is recorded on each subtopic');
-  // S7: with the checkbox on, the dialog's web and image choices reach the quick research.
+  // Standard: the web and images, still the short overview.
   const web = await placementHarness();
-  await web.view.quickOutline(web.oldRoot).create(nodes, { researchMode: 'research', researchDepth: 'normal', visualMode: 'auto', referenceGroups: [], shallowResearch: true, shallowWebSearch: true });
-  assert.equal(web.researched[0].options.researchMode, 'research'); assert.equal(web.researched[0].options.visualMode, 'auto');
+  await web.view.quickOutline(web.oldRoot).create(nodes, { researchMode: 'research', researchDepth: 'fast', visualMode: 'auto', mapAiMode: 'standard', referenceGroups: [], shallowResearch: true });
+  assert.deepEqual(plain([web.researched[0].options.researchMode, web.researched[0].options.researchDepth, web.researched[0].options.visualMode, web.researched[0].options.mapAiMode]), ['research', 'fast', 'auto', 'standard']);
+  // No mode given (an older stored outline): Quick.
+  const bare = await placementHarness();
+  await bare.view.quickOutline(bare.oldRoot).create(nodes, { researchMode: 'research', researchDepth: 'normal', visualMode: 'auto', referenceGroups: [], shallowResearch: true });
+  assert.deepEqual(plain([bare.researched[0].options.researchMode, bare.researched[0].options.mapAiMode]), ['local', 'quick']);
   // Without shallow research nothing is researched.
   const g = await placementHarness();
   await g.view.quickOutline(g.oldRoot).create(nodes, { researchMode: 'local', researchDepth: 'fast', visualMode: 'off', shallowResearch: false });
@@ -801,7 +806,7 @@ integrationTest('quick explore from the view: the generator gets the topic, pres
   assert.equal(h.view.history.canUndo, true);
 });
 
-const draftInputs = (over = {}) => ({ topic: 'T', presetId: 'knowledge-tree', presetText: 'p', placement: 'tree', target: { map: 'editable' }, shallow: false, depth: 'fast', ...over });
+const draftInputs = (over = {}) => ({ topic: 'T', presetId: 'knowledge-tree', presetText: 'p', placement: 'tree', target: { map: 'editable' }, shallow: false, mode: 'quick', ...over });
 integrationTest('the import window generator asks about AI usage first, hides the window only once AI starts, and says so when it does not start', async () => {
   const h = await placementHarness();
   const calls = [], order = [];
@@ -889,7 +894,7 @@ integrationTest('outline AI in the background: completion is one Notice with a R
 });
 integrationTest('outline AI in the background: Review reopens the window with every earlier input and the AI result in the outline box (e)', async () => {
   const h = await draftHarness();
-  const inputs = draftInputs({ topic: 'Balcony herbs', presetId: 'knowledge-tree', presetText: 'Unsaved preset edit', placement: 'under', target: { map: 'editable', selected: { id: h.oldRoot.id, title: 'Old root' } }, shallow: true, depth: 'deep' });
+  const inputs = draftInputs({ topic: 'Balcony herbs', presetId: 'knowledge-tree', presetText: 'Unsaved preset edit', placement: 'under', target: { map: 'editable', selected: { id: h.oldRoot.id, title: 'Old root' } }, shallow: true, mode: 'standard' });
   const { run } = await h.start(inputs);
   h.gates[0].resolve('# T\n## A\n### A1\n'); await run;
   h.press('Review');
@@ -902,7 +907,7 @@ integrationTest('outline AI in the background: Review reopens the window with ev
   const radios = dom.findAll(modal.contentEl, i => i.type === 'radio');
   assert.equal(radios.find(r => r.checked && r.value === 'under') !== undefined, true, 'placement under the topic is back');
   assert.equal(dom.find(modal.contentEl, i => i.type === 'checkbox' && dom.hasCls(i.parent ?? {}, 'vam-outline-check')).checked, true, 'shallow research is back');
-  assert.equal(dom.find(modal.contentEl, i => i.type === 'radio' && i.value === 'deep').checked, true, 'research depth is back');
+  assert.deepEqual(plain(dom.findAll(modal.contentEl, i => i.tag === 'button' && i.attrs?.role === 'radio').map(r => [r.text, r.attrs['aria-checked']])), [['Quick', 'false'], ['Standard', 'true']], 'the AI mode is back');
   assert.ok(dom.find(modal.contentEl, i => i.text === '3 topics, 3 levels'), 'previewed like pasted text');
 });
 integrationTest('outline AI in the background: a failure is a Notice plus a failed status entry; Review reopens with the inputs and the reason', async () => {
@@ -972,7 +977,7 @@ test('the outline prompt states the chosen levels and size after the preset only
 
 integrationTest('importOutline under a manual parent: a shallow-research model equal to the workspace model but different from the parent is kept as a manual choice', async () => {
   const h = await placementHarness({ cliModel: 'claude:sonnet' });
-  await h.view.importOutline({ nodes: api.parseOutline('# Sub\n## S1').nodes, source: null, shallowResearch: true, researchDepth: 'normal', model: 'claude:sonnet', placement: { kind: 'under', parentId: h.oldRoot.id } });
+  await h.view.importOutline({ nodes: api.parseOutline('# Sub\n## S1').nodes, source: null, shallowResearch: true, aiMode: 'quick', model: 'claude:sonnet', placement: { kind: 'under', parentId: h.oldRoot.id } });
   const saved = await h.repo.readMap(h.mapPath);
   const fresh = saved.nodes.filter(item => item.parentId !== null && item.id !== h.oldChild.id);
   assert.equal(fresh.length, 2);
@@ -981,7 +986,7 @@ integrationTest('importOutline under a manual parent: a shallow-research model e
 });
 integrationTest('importOutline under a manual parent: no chosen model, or the parent model itself, stays inherited', async () => {
   const h = await placementHarness({ cliModel: 'claude:sonnet' });
-  await h.view.importOutline({ nodes: api.parseOutline('# Sub\n## S1').nodes, source: null, shallowResearch: true, researchDepth: 'normal', model: 'parent-model', placement: { kind: 'under', parentId: h.oldRoot.id } });
+  await h.view.importOutline({ nodes: api.parseOutline('# Sub\n## S1').nodes, source: null, shallowResearch: true, aiMode: 'quick', model: 'parent-model', placement: { kind: 'under', parentId: h.oldRoot.id } });
   const saved = await h.repo.readMap(h.mapPath);
   for (const item of saved.nodes.filter(item => item.parentId !== null && item.id !== h.oldChild.id)) { const note = await h.repo.readNote(item.path, saved); assert.equal(note.modelSource, 'inherited'); assert.equal(note.model, 'parent-model'); }
 });
@@ -1027,4 +1032,16 @@ integrationTest('importOutline into the open map: the chosen template and tone a
   assert.equal(second.researched[0].options.toneId, 'magazine');
   const created = (await second.repo.readMap(second.mapPath)).nodes.filter(item => item.id !== second.oldRoot.id && item.id !== second.oldChild.id);
   for (const item of created) assert.equal((await second.repo.readNote(item.path)).toneId, undefined);
+});
+
+integrationTest('topics created by an outline import start in Quick mode, the root and the children alike (D-2026-10-244)', async () => {
+  const h = await placementHarness();
+  await h.view.importOutline({ nodes: api.parseOutline('# Sub\n## S1\n## S2').nodes, source: null, shallowResearch: false, placement: { kind: 'under', parentId: h.oldRoot.id } });
+  const saved = await h.repo.readMap(h.mapPath);
+  const created = saved.nodes.filter(item => item.id !== h.oldRoot.id && item.id !== h.oldChild.id);
+  assert.equal(created.length, 3);
+  for (const item of created) assert.equal((await h.repo.readNote(item.path, saved)).researchMode, 'local', 'created as Quick');
+  assert.equal((await h.repo.readNote(h.oldChild.path, saved)).researchMode, 'research', 'an older topic is not touched');
+  const text = await h.app.vault.cachedRead(h.app.vault.getAbstractFileByPath(created[0].path));
+  assert.match(text, /research-mode: local/); assert.doesNotMatch(text, /research-depth/);
 });

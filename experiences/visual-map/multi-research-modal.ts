@@ -1,22 +1,20 @@
 import { App, Modal } from "obsidian";
 import { t } from "../../i18n";
 import type { ResearchDepth, ResearchMode } from "../../ai/types";
-import {
-  modelField,
-  noteStyleField,
-  researchDepthField,
-  type FieldLinks,
-  type ManageTones,
-  type ModelChoices
-} from "./research-fields";
+import type { MapAiMode } from "./ai-mode";
+import { modelField, noteStyleField, type FieldLinks, type ManageTones, type ModelChoices } from "./research-fields";
 import { modalActions } from "../../ui/modals/action-bar";
 
 export interface MultiResearchRequest {
-  researchMode: ResearchMode;
-  researchDepth: ResearchDepth;
+  /**
+   * Overrides for every started topic; only the map AI chat sets them. The dialog leaves them out, so each topic runs in the
+   * mode its own note stores (Quick or Standard) with the matching depth and image setting.
+   */
+  researchMode?: ResearchMode;
+  researchDepth?: ResearchDepth;
+  /** Search for image references (an override; only meaningful with web search). */
+  imageSearch?: boolean;
   requirements: string;
-  /** Search for image references; only meaningful with web search. */
-  imageSearch: boolean;
   /** Model for every started topic (saved on the topic, as single-topic research does); undefined keeps each topic's model. */
   model?: string;
   /** Content template for every started topic (saved on the topic); undefined keeps each topic's template. */
@@ -37,7 +35,9 @@ export class MultiResearchModal extends Modal {
     private submit: (request: MultiResearchRequest) => void,
     private tones: { id: string; name: string }[] = [],
     private manageTones?: ManageTones,
-    private links: FieldLinks = {}
+    private links: FieldLinks = {},
+    /** The mode each listed topic will run in (parallel to `names`), shown beside its name. */
+    private modes: MapAiMode[] = []
   ) {
     super(app);
   }
@@ -47,8 +47,16 @@ export class MultiResearchModal extends Modal {
     this.contentEl.createEl("p", { text: t("ui.multi_research_intro", this.names.length), cls: "vam-modal-intro" });
     const topics = this.contentEl.createDiv("vam-integration-sources");
     topics.createEl("strong", { text: t("ui.multi_research_topics") });
-    for (const name of this.names) topics.createDiv({ text: name });
-    const depth = researchDepthField(this.contentEl);
+    this.names.forEach((name, index) => {
+      const row = topics.createDiv({ cls: "vam-multi-research-topic" });
+      row.createSpan({ text: name });
+      const mode = this.modes[index];
+      if (mode)
+        row.createSpan({
+          cls: "vam-multi-research-mode",
+          text: t(mode === "quick" ? "ui.quick" : "ui.standard")
+        });
+    });
     const model = modelField(this.contentEl, this.models, t("ui.multi_research_keep_topic_models"), this.links.repair);
     this.unwatch = model.dispose;
     const style = noteStyleField(this.contentEl, {
@@ -59,18 +67,6 @@ export class MultiResearchModal extends Modal {
       toneDefault: t("ui.tone_keep_each"),
       manageTemplates: this.links.manageTemplates,
       manageTones: this.manageTones
-    });
-    const webLabel = this.contentEl.createEl("label", { cls: "vam-field vam-next-toggle" });
-    const web = webLabel.createEl("input", { type: "checkbox" });
-    web.checked = true;
-    webLabel.createSpan({ text: t("ui.allow_web_search") });
-    const imageLabel = this.contentEl.createEl("label", { cls: "vam-field vam-next-toggle" });
-    const images = imageLabel.createEl("input", { type: "checkbox" });
-    images.checked = true;
-    imageLabel.createSpan({ text: t("ui.search_for_image_references") });
-    web.addEventListener("change", () => {
-      images.disabled = !web.checked;
-      if (!web.checked) images.checked = false;
     });
     const requirementsLabel = this.contentEl.createEl("label", { cls: "vam-field" });
     requirementsLabel.createSpan({ text: t("ui.additional_requirements") });
@@ -88,10 +84,7 @@ export class MultiResearchModal extends Modal {
       if (this.submitted) return;
       this.submitted = true;
       const request: MultiResearchRequest = {
-        researchMode: web.checked ? "research" : "local",
-        researchDepth: depth.value(),
         requirements: requirements.value.trim(),
-        imageSearch: web.checked && images.checked,
         ...(model.value() ? { model: model.value() } : {}),
         ...(style.templateId() ? { detailTemplateId: style.templateId() } : {}),
         ...(style.toneId() ? { toneId: style.toneId() } : {})

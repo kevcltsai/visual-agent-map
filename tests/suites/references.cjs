@@ -68,21 +68,19 @@ test('reference picker keeps source groups compact, collapsible and task-local',
   const { ReferencePicker } = load('ui/reference-picker.ts', { obsidian: { ...obsidian, Modal, setIcon: (parent, name) => { const icon = element('svg'); icon.iconName = name; parent.children.push(icon); } } });
   const root = element('root');
   const picker = new ReferencePicker({ vault: { adapter: {} } }, root, async () => [], async () => [], 'current', 'Current topic and parent are included');
-  const offline = new ReferencePicker({ vault: { adapter: {} } }, element('root'), async () => [], async () => [], 'current', 'Current topic and parent are included', false, true);
-  assert.deepEqual(plain(offline.selection()), { webSearch: false, imageSearch: false });
+  // The picker no longer carries a web or image choice: that belongs to the AI mode.
+  assert.equal(picker.selection, undefined); assert.equal(picker.setNetworkDefault, undefined);
   const area = root.children[0];
   assert.ok(find(area, child => child.cls.includes('vam-reference-cancel')).cls.includes('is-hidden'));
   assert.ok(find(area, child => child.cls.includes('vam-reference-error-acknowledge')).cls.includes('is-hidden'));
   assert.deepEqual(area.children.filter(child => child.cls.includes('vam-reference-section')).map(child => child.cls), [
-    'vam-reference-section vam-reference-network-section', 'vam-reference-section vam-reference-local-section'
+    'vam-reference-section vam-reference-local-section'
   ]);
-  const web = find(area, child => child.tag === 'input' && child.type === 'checkbox');
-  const image = find(area, child => child.tag === 'input' && child !== web && child.type === 'checkbox');
+  assert.equal(find(area, child => child.tag === 'input' && child.type === 'checkbox'), undefined, 'no web or image checkbox');
   assert.ok(find(area, child => child.tag === 'strong' && !!child.text));
   const actionRow = find(area, child => child.cls === 'vam-reference-actions');
   assert.equal(actionRow.children.filter(child => child.tag === 'button').length, 3);
   assert.deepEqual(actionRow.children.filter(child => child.tag === 'button').map(button => button.children[0].children[0].iconName), ['brain-circuit', 'folder-open', 'file-text']);
-  web.checked = false; web.listeners.change(); assert.equal(image.disabled, true); assert.equal(image.checked, false);
   picker.groups = [{ id: 'map', name: 'Travel map', location: 'Maps/Travel/Map.md', documents: [{ path: 'Maps/Travel/Notes/Train.md', content: 'rail' }] }];
   picker.refresh();
   const details = find(area, child => child.tag === 'details');
@@ -95,6 +93,7 @@ test('reference picker keeps source groups compact, collapsible and task-local',
   details.open = true; details.listeners.toggle();
   assert.equal(find(details, child => child.tag === 'li').text, 'Maps/Travel/Notes/Train.md');
   remove.listeners.click({ preventDefault() {} });
+  assert.deepEqual(Object.keys(await picker.ready()), ['groups'], 'ready() hands over the source groups only');
   assert.equal((await picker.ready()).groups.length, 0);
   assert.ok(find(area, child => child.cls.includes('vam-reference-cancel')).cls.includes('is-hidden'));
   const input = (path, content) => ({name: path.split('/').at(-1), webkitRelativePath: path, text: async () => content});

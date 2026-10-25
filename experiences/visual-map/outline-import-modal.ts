@@ -1,9 +1,9 @@
 import { App, Modal, Notice } from "obsidian";
 import { t } from "../../i18n";
 import { parseOutline, sanitizeOutlineDraft, type OutlineIssue, type OutlineNode } from "./outline-import";
-import type { ResearchDepth } from "../../ai/types";
+import type { MapAiMode } from "./ai-mode";
 import type { TaskOptions } from "./modals";
-import { modelField, noteStyleField, researchDepthField, type FieldLinks, type ModelChoices } from "./research-fields";
+import { aiModeField, modelField, noteStyleField, type FieldLinks, type ModelChoices } from "./research-fields";
 import { actionStatus, armDiscard, modalActions } from "../../ui/modals/action-bar";
 import type { PromptPresetsHost } from "../../ui/modals/prompt-presets-modal";
 import {
@@ -36,16 +36,13 @@ export interface OutlineImportRequest {
   placement?: OutlinePlacement;
   source: string | null;
   shallowResearch: boolean;
-  /** Shallow research depth (fast when omitted). */
-  researchDepth?: ResearchDepth;
+  /** AI mode of the shallow research (Quick when omitted). */
+  aiMode?: MapAiMode;
   /**
    * The research choices for the shallow research (quick explore passes its dialog's); without them it searches the
    * web with no reference groups, no images, the workspace language and tone, and no extra requirements.
    */
-  researchOptions?: Pick<
-    TaskOptions,
-    "researchMode" | "referenceGroups" | "visualMode" | "outputLanguage" | "toneId" | "requirements"
-  >;
+  researchOptions?: Pick<TaskOptions, "referenceGroups" | "outputLanguage" | "toneId" | "requirements">;
   /**
    * The outline has no root of its own (quick explore drops the topic it was generated for): every created topic is
    * researched under the "under" parent, even when the outline has a single top heading.
@@ -71,7 +68,7 @@ export interface OutlineDraftInputs {
   placement: OutlinePlacement["kind"];
   target: OutlineImportTarget;
   shallow: boolean;
-  depth: ResearchDepth;
+  mode: MapAiMode;
   model?: string;
   template?: string;
   tone?: string;
@@ -113,13 +110,13 @@ export class OutlineImportModal extends Modal {
   private shallow!: HTMLInputElement;
   private nodes: OutlineNode[] = [];
   private submitting = false;
-  private depth: () => ResearchDepth = () => "fast";
+  private mode: () => MapAiMode = () => "quick";
   private model: () => string | undefined = () => undefined;
   private template: () => string | undefined = () => undefined;
   private tone: () => string | undefined = () => undefined;
   private setModel: (id: string | undefined) => void = () => {};
   private setStyle: (template: string | undefined, tone: string | undefined) => void = () => {};
-  private setDepth: (depth: ResearchDepth) => void = () => {};
+  private setMode: (mode: MapAiMode) => void = () => {};
   private syncResearchOptions: () => void = () => {};
   private restoreResult: () => void = () => {};
   /** AI generation started and this window hid itself; closing no longer stops it (the status bar has Stop). */
@@ -174,9 +171,10 @@ export class OutlineImportModal extends Modal {
     this.shallow = shallowLabel.createEl("input", { type: "checkbox" });
     shallowLabel.createSpan({ text: t("ui.outline_import_shallow") });
     const researchOptions = research.createDiv("vam-outline-research-options");
-    const depth = researchDepthField(researchOptions, { initial: "fast" });
-    this.depth = depth.value;
-    this.setDepth = depth.set;
+    // The mode is a per-import choice (Quick first); unlike the research dialogs it is not remembered on the map.
+    const mode = aiModeField(researchOptions, { initial: "quick" });
+    this.mode = mode.value;
+    this.setMode = mode.set;
     const model = modelField(researchOptions, this.models, t("ui.workspace_default"), this.links.repair);
     this.model = model.value;
     this.setModel = model.set;
@@ -212,7 +210,7 @@ export class OutlineImportModal extends Modal {
   private restoreChoices(inputs: OutlineDraftInputs): void {
     this.shallow.checked = inputs.shallow;
     this.syncResearchOptions();
-    this.setDepth(inputs.depth);
+    this.setMode(inputs.mode);
     this.setModel(inputs.model);
     this.setStyle(inputs.template, inputs.tone);
   }
@@ -398,7 +396,7 @@ export class OutlineImportModal extends Modal {
           placement: this.placement,
           target: this.target,
           shallow: this.shallow.checked,
-          depth: this.depth(),
+          mode: this.mode(),
           ...(model ? { model } : {}),
           ...(template ? { template } : {}),
           ...(tone ? { tone } : {})
@@ -496,7 +494,7 @@ export class OutlineImportModal extends Modal {
         placement: this.placementRequest(),
         source: null,
         shallowResearch,
-        ...(shallowResearch ? { researchDepth: this.depth() } : {}),
+        ...(shallowResearch ? { aiMode: this.mode() } : {}),
         ...(model ? { model } : {}),
         ...(detailTemplateId ? { detailTemplateId } : {}),
         ...(toneId ? { toneId } : {})

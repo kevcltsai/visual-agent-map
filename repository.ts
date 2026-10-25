@@ -15,7 +15,7 @@ import {
 } from "./i18n";
 import { MapDocument, MapNode, serializeMap, parseMap, type AimReuseRecord } from "./map-model";
 import type { CoffeeStyle } from "./experiences/coffee-tables/types";
-import type { ReasoningLevel, ResearchDepth, ResearchMode, VisualMode } from "./ai/types";
+import type { ReasoningLevel, ResearchMode, VisualMode } from "./ai/types";
 import { normalizeReasoningLevel } from "./ai/task-policy";
 import type { PromptPreset } from "./ai/prompt-presets";
 import { sourcesHeadingKeys, standardTemplate, type DetailTemplate } from "./ai/detail-templates";
@@ -78,7 +78,6 @@ export interface Note {
   modelSource: ModelSource;
   reasoning?: ReasoningLevel;
   researchMode: ResearchMode;
-  researchDepth: ResearchDepth;
   visualMode: VisualMode;
   detailTemplateId?: string;
   /** Per-topic tone preset id (frontmatter `tone`); absent = use the map default. */
@@ -1143,8 +1142,6 @@ export class Repository {
       modelSource,
       reasoning: normalizeReasoningLevel(fm["reasoning-level"] ?? this.settings.cliReasoning),
       researchMode: fm["research-mode"] === "local" ? "local" : "research",
-      researchDepth:
-        fm["research-depth"] === "fast" || fm["research-depth"] === "deep" ? fm["research-depth"] : "normal",
       visualMode: fm["visual-mode"] === "on" || fm["visual-mode"] === "off" ? fm["visual-mode"] : "auto",
       ...(typeof fm["detail-template"] === "string" && fm["detail-template"]
         ? { detailTemplateId: fm["detail-template"] }
@@ -1191,7 +1188,6 @@ export class Repository {
       if (patch.modelSource !== undefined) fm["model-source"] = patch.modelSource;
       if (patch.reasoning !== undefined) fm["reasoning-level"] = normalizeReasoningLevel(patch.reasoning);
       if (patch.researchMode !== undefined) fm["research-mode"] = patch.researchMode;
-      if (patch.researchDepth !== undefined) fm["research-depth"] = patch.researchDepth;
       if (patch.visualMode !== undefined) fm["visual-mode"] = patch.visualMode;
       if (patch.detailTemplateId !== undefined)
         patch.detailTemplateId ? (fm["detail-template"] = patch.detailTemplateId) : delete fm["detail-template"];
@@ -1282,7 +1278,7 @@ export class Repository {
     map: MapDocument,
     mapPath: string,
     modelSource: ModelSource,
-    initial: Pick<NotePatch, "detail" | "thinkingOrigin" | "summary" | "reasoning"> = {},
+    initial: Pick<NotePatch, "detail" | "thinkingOrigin" | "summary" | "reasoning" | "researchMode"> = {},
     onCreate?: (path: string) => void
   ): Promise<MapNode> {
     const folder = this.topicFolder(mapPath, "Notes");
@@ -1300,6 +1296,7 @@ export class Repository {
       model,
       "model-source": modelSource,
       "reasoning-level": initial.reasoning ?? this.settings.cliReasoning,
+      ...(initial.researchMode ? { "research-mode": initial.researchMode } : {}),
       status: "idea",
       cssclasses: [NOTE_CSS_CLASS]
     };

@@ -37,6 +37,10 @@ test('collect snapshots: AiTaskService general task prompt', async () => {
     await recordContext(`service.task-web.${tag}`, 'AiTaskService instructions: mode task, web research, visual auto', language, ctx);
     await recordContext(`service.task-web-visual-on.${tag}`, 'AiTaskService instructions: mode task, visual on', language, { ...ctx, visualMode: 'on' });
     await recordContext(`service.task-local-fast.${tag}`, 'AiTaskService instructions: mode task, local research, fast', language, { ...ctx, researchMode: 'local', researchDepth: 'fast' });
+    // AI mode Quick (D-2026-10-228, 240): the Quick source-safety and knowledge texts replace the local research text; Standard prompts above are untouched.
+    const quick = { ...ctx, researchMode: 'local', researchDepth: 'normal', visualMode: 'off', mapAiMode: 'quick' };
+    await recordContext(`service.task-quick.${tag}`, 'AiTaskService instructions: Quick AI mode research (knowledge text, Quick source safety, no web, no images)', language, quick);
+    await recordContext(`service.task-quick-subtopic.${tag}`, 'AiTaskService instructions: Quick AI mode subtopic research (short overview depth)', language, { ...quick, researchDepth: 'fast' });
     await recordContext(`service.decompose-deep.${tag}`, 'AiTaskService instructions: mode decompose, deep research', language, { ...ctx, mode: 'decompose', researchDepth: 'deep' });
     await recordContext(`service.synthesize-local.${tag}`, 'AiTaskService instructions: mode synthesize, local, visual off', language, { ...ctx, mode: 'synthesize', researchMode: 'local', visualMode: 'off' });
     await recordContext(`service.task-tone.${tag}`, 'AiTaskService instructions: mode task with a resolved tone text (B1)', language, { ...ctx, toneText: language === 'en' ? 'Tone: example voice. Write warmly.' : '寫作語氣：範例語氣。請溫暖地寫作。' });
@@ -244,6 +248,7 @@ test('collect snapshots: Claude structured-output instruction (task, AIM phase, 
   for (const [language, tag] of LANGUAGES) {
     const ctx = { ...base, outputLanguage: language };
     await recordContext(`claude.task-general.${tag}`, 'AiTaskService instructions for Claude: mode task, web research (StructuredOutput-first sentence)', language, ctx, claude);
+    await recordContext(`claude.task-quick.${tag}`, 'AiTaskService instructions for Claude: Quick AI mode research (StructuredOutput-first sentence, no tools)', language, { ...ctx, researchMode: 'local', researchDepth: 'normal', visualMode: 'off', mapAiMode: 'quick' }, claude);
     await recordContext(`claude.task-decompose.${tag}`, 'AiTaskService instructions for Claude: mode decompose', language, { ...ctx, mode: 'decompose', researchDepth: 'deep' }, claude);
     await recordContext(`claude.task-synthesize.${tag}`, 'AiTaskService instructions for Claude: mode synthesize, local', language, { ...ctx, mode: 'synthesize', researchMode: 'local', visualMode: 'off' }, claude);
     const aim = { title: 'Goal G', summary: 'Summary S', rules: 'Rule R', detail: 'Reports D', ancestors: 'Known conditions C', workingFindings: 'Prior findings F', sourceContext: 'Source [S1]: fact', mode: 'task', promptProfile: 'aim', researchMode: 'research', researchDepth: 'normal', visualMode: 'off', task: '<!-- aim-phase: subtopic-research -->\nPhase task text.', outputLanguage: language };

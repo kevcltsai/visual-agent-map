@@ -7,6 +7,8 @@ export type ReasoningLevel = "auto" | "low" | "medium" | "high";
 export type ResearchMode = "local" | "research";
 export type ResearchDepth = "fast" | "normal" | "deep";
 export type VisualMode = "auto" | "on" | "off";
+/** The map's two AI modes: Quick (no web, the model's own knowledge) and Standard (web, images). The helpers live next to the map view's dialogs. */
+export type MapAiMode = "quick" | "standard";
 export interface VisualReference {
   title: string;
   imageUrl: string;
@@ -73,6 +75,8 @@ export interface TaskContext {
   timeoutMs?: number;
   researchMode?: ResearchMode;
   researchDepth?: ResearchDepth;
+  /** Trusted: the map's AI mode for a research or expansion request. Quick (with local research) swaps in the Quick prompt text; never serialized. */
+  mapAiMode?: MapAiMode;
   visualMode?: VisualMode;
 }
 /** Provider-neutral web activity event; Claude events are translated into the Codex App Server shape. */

@@ -6,8 +6,6 @@ export const en = {
   "ui.select_proposal_0": "Select proposal: {0}",
   "ui.proposal_name": "Proposal name",
   "ui.proposal_task": "Proposal task",
-  "ui.on": "on",
-  "ui.off": "off",
   "ui.no_map_open": "No mind map is open",
   "ui.sample_outline_hint": "The read-only sample has no editable outline. Duplicate it from the map to begin.",
   "ui.empty_outline_hint": "This map has no topics yet. Add the first topic from the map.",
@@ -160,13 +158,24 @@ export const en = {
   "ui.quick_outline_hint":
     "AI writes an outline for this topic with the chosen preset. You review it here before any subtopic is created.",
   "ui.quick_outline_mode_hint":
-    "AI drafts a whole tree of subtopics at once, as many levels as you choose under Adjust; review and edit it here before creating.",
+    "AI drafts a whole tree of subtopics at once; set the levels and size below. Review and edit it here before anything is created.",
   "ui.quick_outline_review": "AI outline",
   "ui.number_of_levels": "Levels",
   "ui.quick_outline_max_topics": "Most subtopics",
-  "ui.quick_outline_summary_0_1": "Quick explore · {0} levels · up to {1}",
   "ui.quick_outline_trimmed_0": "Left out beyond the chosen levels or size: {0} heading(s).",
   "ui.quick_outline_review_hint": "Uncheck what you don't need and edit names, then create the subtopics.",
+  "ui.ai_mode": "AI mode",
+  "ui.ai_mode_hint":
+    "Quick answers from the model's own knowledge without the web. Use Standard once the structure is settled, or when the topic is new or obscure.",
+  "ui.ai_mode_quick_desc": "a short overview from the model's knowledge and your sources, without the web",
+  "ui.ai_mode_standard_desc": "a short overview that searches the web and may add images",
+  "ui.expand_summary_0_1": "{0} levels · up to {1}",
+  "ui.review_ai_subtopic_suggestions_0": "Review AI subtopic suggestions ({0})",
+  "ui.synthesis_standard_first_hint": "If information is thin, run a Standard research on the topic first.",
+  "ui.rerun_standard": "Re-run with Standard",
+  "ui.rerun_standard_0": "Re-run with Standard: {0}",
+  "ui.background_research_gap_0": "Research finished, but the model's knowledge was not enough: {0}",
+  "research.knowledge_gap_marker": "Model knowledge is insufficient",
   "ui.quick_outline_empty": "The AI outline has no headings under the topic.",
   "ui.outline_ai_not_started": "Outline generation did not start.",
   "ui.aim_create_map": "New AIM",
@@ -647,8 +656,6 @@ export const en = {
   "ui.relevance_conflicts_title": "Your settings disagree",
   "ui.relevance_conflict_0_1_2_3": "You set “{0}” to {1}, but “{2}” under it to {3}. Both were kept as you set them.",
   "ui.suggested": "Suggested",
-  "ui.synthesis_web_default_hint":
-    "Synthesis works from existing findings, so web search is off by default. You can turn it on under Data sources.",
   "ui.output_settings": "Output",
   "ui.topic_card_label_0_1": "{0}, {1}",
   "ui.researching_0": "Researching {0}",
@@ -723,8 +730,6 @@ export const en = {
   "ui.select_at_least_one_subtopic": "Select at least one subtopic.",
   "ui.some_subtopics_were_created_reopen_this_window_and_check_the":
     "Some subtopics were created. Reopen this window and check the map before continuing.",
-  "ui.you_have_pending_proposals_review_them_here": "You have pending proposals; review them here.",
-  "ui.review_ai_subtopic_suggestions": "Review AI subtopic suggestions",
   "ui.review_the_synthesis_draft": "Review the synthesis draft.",
   "ui.choose_or_edit_a_synthesis_direction_then_get_a_draft":
     "Choose or edit a synthesis direction, then start the synthesis.",
@@ -735,23 +740,16 @@ export const en = {
   "ui.ai_suggests_synthesis_angles_first_the_parent_topic_changes":
     "AI suggests synthesis angles first. The parent topic is updated directly once the synthesis finishes, and you can undo it.",
   "ui.ai_did_not_suggest_a_synthesis_direction_please_retry": "AI did not suggest a synthesis direction. Please retry.",
-  "ui.choose_directions_together": "Choose directions together",
-  "ui.quickly_explore_a_map": "Quickly explore a map",
-  "ui.run_shallow_research_on_each_created_subtopic":
-    "Run quick research on each created subtopic (does not search the web)",
-  "ui.shallow_research_web_search": "Also search the web for subtopic research",
-  "ui.get_expansion_directions": "Get expansion directions",
+  "ui.run_shallow_research_on_each_created_subtopic": "Run a short research on each created subtopic",
   "ui.subtopic_names_must_be_unique": "Subtopic names must be unique.",
   "ui.create_subtopics_without_research": "Create subtopics without research",
   "ui.research_each_subtopic_after_creation_and_use_codex_quota":
-    "Each new subtopic gets a quick research pass, using AI quota",
+    "Each new subtopic gets a short research pass, using AI quota",
   "ui.auto_layout": "Auto layout",
   "ui.layout": "Layout",
   "ui.expansion_failed": "Expansion failed",
   "ui.the_map_or_parent_topic_changed_while_ai_was_running_no_subt":
     "The map or parent topic changed while AI was running. No subtopics were created.",
-  "ui.ai_suggests_one_level_of_subtopics_review_or_edit_them_befor":
-    "AI suggests only the next level of subtopics; review or edit them before creation. To go deeper, explore a subtopic later.",
   "ui.create_subtopics_after_confirmation_without_running_research":
     "Create subtopics after confirmation without running research",
   "ui.creating_subtopics": "Creating subtopics…",
@@ -766,7 +764,6 @@ export const en = {
   "ui.start_from_this_node_s_question_update_only_this_node": "Results update only this topic.",
   "ui.quick": "Quick",
   "ui.standard": "Standard",
-  "ui.deep": "Deep",
   "ui.this_mind_map_has_no_topics_click_topic_to_create_the_first":
     "This mind map has no topics. Click “＋ Topic” to create the first node.",
   "ui.note_missing": "Note missing",
@@ -1255,20 +1252,7 @@ export const en = {
   "ui.research_stopped_existing_content_was_preserved": "Research stopped. Existing content was preserved.",
   "ui.the_topic_changed_so_the_outdated_ai_result_was_not_saved":
     "The topic changed, so the outdated AI result was not saved.",
-  "ui.allow_web_search": "Allow web search",
-  "ui.research_depth": "Research depth",
-  "ui.quick_aim_for_up_to_1_web_search_and_2_main_sources_answer_t":
-    "Quick: answer the core question first, then briefly note relevant evidence and gaps. Continue research when it could resolve an important uncertainty.",
-  "ui.standard_aim_for_up_to_3_web_searches_and_5_main_sources_sum":
-    "Standard: provide the main evidence, limits, and open questions needed to support the conclusion.",
-  "ui.deep_aim_for_up_to_6_web_searches_and_10_main_sources_compar":
-    "Deep: compare evidence for agreement and disagreement, and explain important support, limits, and unresolved questions.",
-  "ui.web_and_image_searches_share_the_search_limit_search_counts":
-    "There is no fixed query or source count. Continue while a useful search could resolve a decision-relevant uncertainty; stop when evidence is sufficient or further searches have low expected value.",
-  "ui.search_for_image_references": "Search for image references",
   "ui.shallow_research_for_expanded_subtopics_0": "Subtopic research: {0}",
-  "ui.shallow_research_local_description":
-    "Answers from the topic and the sources you provide, without searching the web. Tick the box below to search.",
   "ui.select_the_parent_topic_before_its_child": "Select the parent topic before its child.",
   "ui.first_level_topic_names_must_be_unique": "First-level topic names must be unique.",
   "ui.ai_proposed_duplicate_first_level_names_generate_the_proposa":
@@ -1328,11 +1312,8 @@ export const en = {
   "ui.detail_templates_setting_desc": 'Used when you pick "Custom…" in Note style. Changes apply to future AI updates.',
   "ui.tone_presets_setting_desc": 'Used when you pick "Custom…" in Note style.',
   "ui.adjust": "Adjust",
-  "ui.next_summary_depth_0": "{0} research",
   "ui.next_summary_synth_full": "Full content",
   "ui.next_summary_synth_summary": "Summary only",
-  "ui.next_summary_web_on": "Web search",
-  "ui.next_summary_web_off": "No web search",
   "ui.synthesis_skip_suggestions": "Skip suggestions and synthesize now",
   "ui.synthesis_stage_two_fixed":
     "Sources, content, language and template were fixed when the directions were requested; only the extra requirements can still change.",

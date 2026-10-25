@@ -167,7 +167,7 @@ integrationTest('Next Step: the model field offers Fix connection and the templa
 });
 
 // ---- Next Step dialog harness -------------------------------------------------------------------------------
-function nextStepHarness({ settings = {}, modelSettings = {}, topic = 'Parent', depth = 'normal', children = 1, pending = 0, research, expand, synthesize, language = 'en', plugin: pluginOverrides = {} } = {}) {
+function nextStepHarness({ settings = {}, modelSettings = {}, topic = 'Parent', children = 1, pending = 0, research, expand, synthesize, language = 'en', plugin: pluginOverrides = {} } = {}) {
   const notices = [];
   const Modal = dom.makeModal();
   const { NextStepModal } = load('main.ts', { obsidian: { ...obsidian, Modal, setIcon: () => {}, Notice: class { constructor(message) { notices.push(message); } } } });
@@ -179,7 +179,7 @@ function nextStepHarness({ settings = {}, modelSettings = {}, topic = 'Parent', 
     modelDiscoveryState: modelState, subscribeModelDiscovery: () => () => {}, refreshModelDiscovery: async provider => modelState(provider), ...pluginOverrides };
   const settingsArg = { model: 'gpt-test', modelSource: 'workspace', reasoning: 'low', save: async patch => { saved.push(patch); }, sources, ...modelSettings };
   const calls = { research: [], expand: [], synthesize: [] };
-  const modal = new NextStepModal({}, topic, depth, children, pending, plugin,
+  const modal = new NextStepModal({}, topic, children, pending, plugin,
     research ?? (async (options, _focus, _done, _failed, accepted) => { calls.research.push(options); accepted(); }),
     expand ?? (async (options, _direction, _found, _failed, accepted) => { calls.expand.push(options); accepted(); }),
     synthesize ?? (async (options, direction, _failed, accepted) => { calls.synthesize.push({ options, direction }); accepted(); }),
@@ -247,81 +247,154 @@ const summaryOf = h => find(h.modal.contentEl, i => i.cls === 'vam-next-summary'
 const adjustOf = h => find(h.modal.contentEl, i => i.tag === 'details' && i.cls.includes('vam-next-adjust'));
 const cardsOf = h => find(h.modal.contentEl, i => i.cls === 'vam-next-cards');
 
-integrationTest('one-click dialog: research is open then one confirm; the summary line states depth, web, language and tone, and every option sits under Adjust', async () => {
+integrationTest('one-click dialog: research is open then one confirm; the summary line states the mode, language and tone, and every option sits under Adjust', async () => {
   const h = nextStepHarness({ modelSettings: { tones, currentTone: 'Magazine column', topicStatus: 'idea' } });
-  assert.equal(summaryOf(h), 'Standard research · Web search · Same language as my text · Magazine column');
+  assert.equal(summaryOf(h), 'Quick · Same language as my text · Magazine column');
   // Everything adjustable is inside the one disclosure, which starts closed.
   const adjust = adjustOf(h);
   assert.equal(adjust.open, false); assert.equal(adjust.children[0].text, 'Adjust');
-  const outside = findAll(h.modal.contentEl, i => i.tag === 'select' || i.tag === 'textarea' || (i.tag === 'input' && i.type !== undefined)).filter(i => !findAll(adjust, x => x === i).length);
-  assert.deepEqual(outside.map(i => i.tag), [], 'no input, select or textarea outside Adjust');
+  const expandNumbers = find(h.modal.contentEl, i => hasCls(i, 'vam-quick-limits'));
+  const outside = findAll(h.modal.contentEl, i => i.tag === 'select' || i.tag === 'textarea' || (i.tag === 'input' && i.type !== undefined)).filter(i => !findAll(adjust, x => x === i).length && !findAll(expandNumbers, x => x === i).length);
+  assert.deepEqual(outside.map(i => i.tag), [], 'no input, select or textarea outside Adjust (the expansion\'s levels and size sit on its own panel)');
   assert.equal(findAll(h.modal.contentEl, i => i.tag === 'details' && hasCls(i, 'vam-next-adjust')).length, 1, 'a single Adjust');
-  // Changing a field updates the summary line.
-  const depths = findAll(adjust, i => i.tag === 'input' && i.type === 'radio');
-  depths[2].checked = true; depths[2].fire('change');
-  assert.equal(summaryOf(h), 'Deep research · Web search · Same language as my text · Magazine column');
+  // The AI mode switch sits outside Adjust, at the top of the dialog; changing a field updates the summary line.
+  const modeGroup = byLabel(h.modal.contentEl, 'AI mode');
+  assert.ok(modeGroup && modeGroup.attrs.role === 'radiogroup' && !findAll(adjust, x => x === modeGroup).length, 'the switch is a radiogroup outside Adjust');
+  button(modeGroup, 'Standard').click();
+  assert.equal(summaryOf(h), 'Standard · Same language as my text · Magazine column');
   byLabel(h.modal.contentEl, 'Note style').value = 'preset:plain'; byLabel(h.modal.contentEl, 'Note style').fire('change');
-  assert.equal(summaryOf(h), 'Deep research · Web search · Same language as my text · Plain language');
+  assert.equal(summaryOf(h), 'Standard · Same language as my text · Plain language');
   byLabel(h.modal.contentEl, 'Answer language for this task').value = 'zh-TW'; byLabel(h.modal.contentEl, 'Answer language for this task').fire('change');
   assert.match(summaryOf(h), /繁體中文/);
   // One click on the primary action runs it and closes: with the opening click that is two clicks in all.
   button(h.actions(), 'Confirm research task').click(); await tick(); await tick();
-  assert.equal(h.calls.research.length, 1); assert.equal(h.calls.research[0].researchDepth, 'deep'); assert.equal(h.modal.closeCount, 1);
+  assert.equal(h.calls.research.length, 1); assert.equal(h.modal.closeCount, 1);
+  const sent = h.calls.research[0];
+  assert.deepEqual([sent.researchMode, sent.researchDepth, sent.visualMode, sent.mapAiMode], ['research', 'normal', 'auto', 'standard'], 'Standard research: web, standard depth, images');
 });
 integrationTest('one-click dialog: each step shows only its own section under Adjust and its own summary', () => {
   const h = nextStepHarness({ modelSettings: { tones, currentTone: 'Academic rigor', topicStatus: 'completed' }, children: 0 });
   const sections = findAll(adjustOf(h), i => i.cls === 'vam-next-adjust-section');
   assert.equal(sections.length, 3);
   assert.deepEqual(sections.map(s => s.hidden), [true, false, true], 'a researched leaf opens on Expand');
-  assert.equal(summaryOf(h), 'Choose directions together · Web search · Same language as my text · Academic rigor');
+  assert.equal(summaryOf(h), '2 levels · up to 15 · Same language as my text · Academic rigor');
   cardsOf(h).children[2].click();
   assert.deepEqual(sections.map(s => s.hidden), [true, true, false]);
-  assert.equal(summaryOf(h), 'Full content · No web search · Same language as my text · Academic rigor', 'synthesis defaults to no web search');
+  assert.equal(summaryOf(h), 'Full content · Same language as my text · Academic rigor', 'a synthesis has no mode or web choice');
   cardsOf(h).children[0].click();
   assert.deepEqual(sections.map(s => s.hidden), [false, true, true]);
-  assert.equal(summaryOf(h), 'Standard research · Web search · Same language as my text · Academic rigor');
+  assert.equal(summaryOf(h), 'Quick · Same language as my text · Academic rigor');
 });
-integrationTest('one-click dialog: quick-explore numbers live under Adjust and stay hidden while guided directions are the default', () => {
-  const h = nextStepHarness({ modelSettings: { topicStatus: 'completed' }, children: 0 });
-  const limits = find(adjustOf(h), i => hasCls(i, 'vam-quick-limits'));
-  assert.ok(limits, 'the numbers are inside Adjust');
-  assert.ok(hasCls(limits, 'is-hidden'), 'hidden by default');
-  assert.equal(button(h.actions(), 'Get expansion directions').hidden, false);
-  button(adjustOf(h), 'Quickly explore a map').click();
-  assert.equal(hasCls(limits, 'is-hidden'), false);
-  assert.equal(summaryOf(h), 'Quick explore · 2 levels · up to 15 · Web search · Same language as my text', 'the summary names the chosen levels and size');
+const outlineStub = (calls = []) => ({ presets: [{ id: 'knowledge-tree', name: 'Knowledge tree' }], generate: async request => { calls.push(request); return []; }, create: async () => {} });
+integrationTest('one-click dialog: levels and size sit on the Expand panel (2 and 15); there is no guided or quick-explore control and the button is Expand', () => {
+  const h = nextStepHarness({ modelSettings: { topicStatus: 'completed', quickOutline: outlineStub() }, children: 0 });
+  const limits = find(h.modal.contentEl, i => hasCls(i, 'vam-quick-limits'));
+  assert.ok(limits && !findAll(adjustOf(h), x => x === limits).length, 'the numbers are on the panel, not under Adjust');
+  assert.deepEqual(findAll(limits, i => i.tag === 'input').map(i => i.value), ['2', '15']);
+  assert.equal(button(h.actions(), 'Expand').hidden, false);
+  for (const gone of ['Choose directions together', 'Quickly explore a map', 'Get expansion directions', 'Generate outline'])
+    assert.equal(button(h.modal.modalEl, gone), undefined, `${gone} is gone`);
+  assert.ok(find(adjustOf(h), i => i.tag === 'select' && i.attrs['aria-label'] === 'Outline preset'), 'the outline preset stays under Adjust');
+  assert.equal(summaryOf(h), '2 levels · up to 15 · Same language as my text', 'the summary names the chosen levels and size; no web part');
+  const shallow = findAll(adjustOf(h), i => i.tag === 'input' && i.type === 'checkbox')[0];
+  shallow.checked = true; shallow.change();
+  assert.equal(summaryOf(h), '2 levels · up to 15 · Quick · Same language as my text', 'subtopic research adds the mode');
+  button(byLabel(h.modal.contentEl, 'AI mode'), 'Standard').click();
+  assert.equal(summaryOf(h), '2 levels · up to 15 · Standard · Same language as my text');
+  const withoutOutline = nextStepHarness({ modelSettings: { topicStatus: 'completed' }, children: 0 });
+  assert.equal(button(withoutOutline.actions(), 'Expand').disabled, true, 'no outline generator, nothing to run');
 });
-integrationTest('one-click dialog: waiting proposals are reviewed in place (no AI starts) and the dialog closes itself once the subtopics are created', async () => {
+integrationTest('one-click dialog: the AI mode switch is a radiogroup with arrow keys; it shows for research and expansion and hides for synthesis', () => {
+  const h = nextStepHarness({ modelSettings: { topicStatus: 'idea' } });
+  const group = byLabel(h.modal.contentEl, 'AI mode');
+  const [quick, standard] = [button(group, 'Quick'), button(group, 'Standard')];
+  assert.deepEqual([quick.attrs['aria-checked'], standard.attrs['aria-checked']], ['true', 'false'], 'Quick is the default');
+  assert.deepEqual([quick.tabIndex, standard.tabIndex], [0, -1]);
+  quick.keydown({ key: 'ArrowRight' });
+  assert.deepEqual([quick.attrs['aria-checked'], standard.attrs['aria-checked']], ['false', 'true']);
+  assert.equal(standard.focused, true, 'the arrow moves focus with the choice');
+  standard.keydown({ key: 'ArrowLeft' });
+  assert.equal(quick.attrs['aria-checked'], 'true');
+  const wrapper = group.parent;
+  assert.ok(findAll(wrapper, i => hasCls(i, 'vam-hint') && /Use Standard once the structure is settled/.test(i.text)).length, 'the one-line hint about when to use Standard');
+  for (const [index, hidden] of [[0, false], [1, false], [2, true]]) { cardsOf(h).children[index].click(); assert.equal(wrapper.hidden, hidden, `step ${index}`); }
+  const multi = nextStepHarness({ modelSettings: { topicStatus: 'completed' }, children: 1 });
+  assert.equal(byLabel(multi.modal.contentEl, 'AI mode').parent.hidden, false);
+});
+integrationTest('one-click dialog: the map\'s remembered mode is the default (Quick when absent) and is written only when a research or expansion starts, never on cancel', async () => {
+  const remembered = [];
+  const fresh = nextStepHarness({ modelSettings: { topicStatus: 'idea', rememberAiMode: async mode => { remembered.push(mode); } } });
+  assert.equal(button(byLabel(fresh.modal.contentEl, 'AI mode'), 'Quick').attrs['aria-checked'], 'true');
+  button(byLabel(fresh.modal.contentEl, 'AI mode'), 'Standard').click();
+  button(fresh.actions(), 'Close').click(); fresh.modal.close(); await tick();
+  assert.deepEqual(remembered, [], 'cancelling the dialog stores nothing');
+  const standard = nextStepHarness({ modelSettings: { topicStatus: 'idea', aiMode: 'standard', rememberAiMode: async mode => { remembered.push(mode); } } });
+  assert.equal(button(byLabel(standard.modal.contentEl, 'AI mode'), 'Standard').attrs['aria-checked'], 'true', 'the map\'s mode is preselected');
+  button(byLabel(standard.modal.contentEl, 'AI mode'), 'Quick').click();
+  button(standard.actions(), 'Confirm research task').click(); await tick(); await tick();
+  assert.deepEqual(remembered, ['quick'], 'the mode of the run is stored before AI starts');
+  assert.equal(standard.calls.research[0].mapAiMode, 'quick');
+  const expanding = nextStepHarness({ modelSettings: { topicStatus: 'completed', quickOutline: outlineStub(), rememberAiMode: async mode => { remembered.push(mode); } }, children: 0 });
+  button(byLabel(expanding.modal.contentEl, 'AI mode'), 'Standard').click();
+  button(expanding.actions(), 'Expand').click(); await tick(); await tick(); await tick();
+  assert.deepEqual(remembered, ['quick', 'standard'], 'an expansion stores the mode too');
+});
+integrationTest('one-click dialog: the research request carries the mode\'s options (Quick: local, standard depth, no images; Standard: web, images)', async () => {
+  const quick = nextStepHarness({ modelSettings: { topicStatus: 'idea' } });
+  button(quick.actions(), 'Confirm research task').click(); await tick(); await tick();
+  const q = quick.calls.research[0];
+  assert.deepEqual([q.researchMode, q.researchDepth, q.visualMode, q.mapAiMode], ['local', 'normal', 'off', 'quick']);
+  assert.equal('shallowWebSearch' in q, false);
+});
+integrationTest('synthesis from the dialog stays on the original local policy at standard depth with no images, whatever the AI mode, and stores no mode (D-2026-10-229, 243)', async () => {
+  const remembered = [];
+  const h = nextStepHarness({ modelSettings: { topicStatus: 'completed', rememberAiMode: async mode => { remembered.push(mode); } }, children: 2 });
+  button(byLabel(h.modal.contentEl, 'AI mode'), 'Standard').click();
+  cardsOf(h).children[2].click();
+  assert.match(summaryOf(h), /^Full content/); assert.ok(find(h.modal.contentEl, i => /run a Standard research on the topic first/.test(i.text ?? '')), 'the hint points at a Standard research first');
+  button(h.actions(), 'Get synthesis suggestions first').click(); await tick(); await tick();
+  const options = h.calls.synthesize[0].options;
+  assert.deepEqual(plain([options.researchMode, options.researchDepth, options.visualMode]), ['local', 'normal', 'off']);
+  assert.equal('mapAiMode' in options, false, 'a synthesis never takes the Quick prompt text: it keeps research.local word for word');
+  assert.deepEqual(remembered, [], 'a synthesis does not store the AI mode');
+});
+integrationTest('one-click dialog: waiting proposals are reviewed in place by a secondary button (no AI starts) and the dialog closes itself once the subtopics are created', async () => {
   // Owner decision 2026-10-19: a press that starts AI hides the dialog; reviewing proposals that already wait starts none.
-  let created;
-  const h = nextStepHarness({ modelSettings: { topicStatus: 'completed' }, children: 0, pending: 1, expand: async (_options, _direction, found) => found([{ title: 'Transport', task: 'Compare', contribution: '', parentTitle: '' }], async items => { created = items; }) });
-  button(h.actions(), 'Review AI subtopic suggestions').click(); await tick();
+  let created; const generated = [];
+  const h = nextStepHarness({ modelSettings: { topicStatus: 'completed', quickOutline: outlineStub(generated) }, children: 0, pending: 2, expand: async (_options, _direction, found) => found([{ title: 'Transport', task: 'Compare', contribution: '', parentTitle: '' }], async items => { created = items; }) });
+  assert.equal(button(h.actions(), 'Expand').hidden, false, 'Expand stays the primary action');
+  button(h.actions(), 'Review AI subtopic suggestions (2)').click(); await tick();
   assert.equal(h.modal.closeCount, 0, 'proposals are reviewed in the dialog first');
+  assert.equal(generated.length, 0, 'reviewing saved suggestions calls no AI');
   button(h.modal.contentEl, 'Create subtopics (1)').click(); await tick(); await tick();
   assert.equal(created[0].title, 'Transport'); assert.equal(h.modal.closeCount, 1);
   assert.ok(h.notices.includes('Subtopics created.'));
+  const none = nextStepHarness({ modelSettings: { topicStatus: 'completed', quickOutline: outlineStub() }, children: 0, pending: 0 });
+  assert.equal(button(none.actions(), 'Review AI subtopic suggestions (0)').hidden, true, 'no saved suggestions, no review button');
 });
 // ---- background runs: the dialog hides once AI starts (owner decision 2026-10-19) --------------------------------
-const hookSpy = () => { const spy = { begins: [], ends: 0, completed: [] }; spy.hooks = { begin: controller => spy.begins.push(controller), end: () => { spy.ends++; }, completed: kind => spy.completed.push(kind) }; return spy; };
+const hookSpy = () => { const spy = { begins: [], ends: 0, completed: [], results: [], outlines: [] }; spy.hooks = { begin: controller => spy.begins.push(controller), end: () => { spy.ends++; }, completed: (kind, result) => { spy.completed.push(kind); spy.results.push(result); }, outlineReady: outline => spy.outlines.push(outline) }; return spy; };
 const pressOf = {
   research: h => button(h.actions(), 'Confirm research task'),
-  expand: h => { dom.findAll(h.modal.contentEl, i => hasCls(i, 'vam-next-cards'))[0].children[1].click(); return button(h.actions(), 'Get expansion directions'); },
+  expand: h => { dom.findAll(h.modal.contentEl, i => hasCls(i, 'vam-next-cards'))[0].children[1].click(); return button(h.actions(), 'Expand'); },
   synthesis: h => { dom.findAll(h.modal.contentEl, i => hasCls(i, 'vam-next-cards'))[0].children[2].click(); return button(h.actions(), 'Get synthesis suggestions first'); }
 };
 for (const kind of ['research', 'expand', 'synthesis']) {
   integrationTest(`background ${kind}: the dialog hides only once the usage notice is confirmed; declining starts nothing and keeps it open`, async () => {
     const gate = deferred();
-    const h = nextStepHarness({ modelSettings: { topicStatus: kind === 'research' ? 'idea' : 'completed' }, children: kind === 'expand' ? 0 : 1, plugin: { confirmAiUsage: async (_m, run) => { await gate.promise; if (gate.decline) return false; await run(); return true; } } });
+    // An expansion's first AI call is the outline generator, so it counts as the started call.
+    const make = plugin => { const outline = []; const h = nextStepHarness({ modelSettings: { topicStatus: kind === 'research' ? 'idea' : 'completed', ...(kind === 'expand' ? { quickOutline: outlineStub(outline) } : {}) }, children: kind === 'expand' ? 0 : 1, plugin }); h.started = () => h.calls.research.length + h.calls.expand.length + h.calls.synthesize.length + outline.length; return h; };
+    const h = make({ confirmAiUsage: async (_m, run) => { await gate.promise; if (gate.decline) return false; await run(); return true; } });
     pressOf[kind](h).click(); await tick(); await tick();
     assert.equal(h.modal.closeCount, 0, 'still open while the usage notice is unanswered');
-    assert.equal(h.calls.research.length + h.calls.expand.length + h.calls.synthesize.length, 0);
+    assert.equal(h.started(), 0);
     gate.resolve(); await until(() => h.modal.closeCount === 1);
-    assert.equal(h.calls.research.length + h.calls.expand.length + h.calls.synthesize.length, 1);
+    assert.equal(h.started(), 1);
     const declined = deferred(); declined.decline = true;
-    const d = nextStepHarness({ modelSettings: { topicStatus: kind === 'research' ? 'idea' : 'completed' }, children: kind === 'expand' ? 0 : 1, plugin: { confirmAiUsage: async (_m, run) => { await declined.promise; if (declined.decline) return false; await run(); return true; } } });
+    const d = make({ confirmAiUsage: async (_m, run) => { await declined.promise; if (declined.decline) return false; await run(); return true; } });
     const press = pressOf[kind](d); press.click(); declined.resolve(); await tick(); await tick();
     assert.equal(d.modal.closeCount, 0, 'declining keeps the dialog open'); assert.equal(press.disabled, false);
-    assert.equal(d.calls.research.length + d.calls.expand.length + d.calls.synthesize.length, 0, 'nothing started');
+    assert.equal(d.started(), 0, 'nothing started');
   });
 }
 integrationTest('background research: the view gets the controller at hide-time, Stop before acceptance sends no request, and the hidden dialog is never written', async () => {
@@ -347,13 +420,26 @@ integrationTest('background research: acceptance hands the card to the view, and
   finish({ summary: 'S', detail: 'D', suggestions: [], visualReferences: [] });
   assert.deepEqual(spy.completed, ['research']); assert.equal(h.modal.closeCount, 1, 'closed once, not again');
 });
-integrationTest('background expand: a result that arrives after the dialog hid goes to the view hook, never into the dialog', async () => {
+integrationTest('background expand: an outline that arrives after the dialog hid goes to the view hook, never into the dialog', async () => {
   const spy = hookSpy(), gate = deferred();
-  const h = nextStepHarness({ modelSettings: { topicStatus: 'completed', background: spy.hooks }, children: 0, expand: async (_o, _d, found, _f, accepted) => { accepted(); await gate.promise; found([{ title: 'T', task: '', contribution: '', parentTitle: '' }], async () => {}); } });
-  pressOf.expand(h).click(); await until(() => spy.ends === 1);
-  assert.equal(h.modal.closeCount, 1); gate.resolve(); await tick(); await tick();
-  assert.deepEqual(spy.completed, ['expand']);
-  assert.equal(find(h.modal.contentEl, i => i.text === 'AI subtopic proposals'), undefined);
+  const quickOutline = { presets: [{ id: 'knowledge-tree', name: 'Knowledge tree' }], generate: async () => { await gate.promise; return [{ index: 0, title: 'Parent', level: 1, parent: null, line: 1 }, { index: 1, title: 'T', level: 2, parent: 0, line: 2 }]; }, create: async () => {} };
+  const h = nextStepHarness({ modelSettings: { topicStatus: 'completed', background: spy.hooks, quickOutline }, children: 0 });
+  pressOf.expand(h).click(); await until(() => spy.begins.length === 1);
+  assert.equal(h.modal.closeCount, 1); gate.resolve(); await until(() => spy.outlines.length === 1);
+  assert.equal(spy.outlines[0].options.mapAiMode, 'quick', 'the outline keeps the mode it was generated with');
+  assert.equal(find(h.modal.contentEl, i => i.text === 'AI outline'), undefined, 'nothing is written into the hidden dialog');
+});
+integrationTest('background research: a Quick result is handed to the view hook (so a knowledge-gap marker can offer the Standard run); a Standard result is not', async () => {
+  const gap = { summary: 'S', detail: 'Model knowledge is insufficient.', suggestions: [], visualReferences: [] };
+  const run = async mode => {
+    const spy = hookSpy(); let finish;
+    const h = nextStepHarness({ modelSettings: { topicStatus: 'idea', aiMode: mode, background: spy.hooks }, research: async (_options, _focus, done, _failed, accepted) => { accepted(); finish = done; } });
+    button(h.actions(), 'Confirm research task').click(); await until(() => finish);
+    finish(gap);
+    return spy.results;
+  };
+  const [fromQuick] = await run('quick'); assert.deepEqual(plain(fromQuick), gap);
+  const [fromStandard] = await run('standard'); assert.equal(fromStandard, undefined);
 });
 integrationTest('one-click dialog: model and effort are saved once when a run starts, never when the dialog is cancelled', async () => {
   const cancelled = nextStepHarness({ modelSettings: { topicStatus: 'idea' } });
@@ -374,49 +460,42 @@ integrationTest('one-click dialog: model and effort are saved once when a run st
   assert.equal(failing.calls.research.length, 0);
   assert.ok(findAll(failing.modal.contentEl, i => hasCls(i, 'vam-next-status')).some(i => /disk full/.test(i.text)));
 });
-integrationTest('one-click dialog: the web-search choice survives switching steps, and untouched defaults still follow each step', () => {
+integrationTest('one-click dialog: the data sources have no web or image choice, and the AI mode choice survives switching steps', () => {
   const h = nextStepHarness({ modelSettings: { topicStatus: 'completed' } });
-  const web = () => findAll(find(h.modal.contentEl, i => hasCls(i, 'vam-next-source-details')), i => i.tag === 'input' && i.type === 'checkbox')[0];
-  cardsOf(h).children[2].click(); assert.equal(web().checked, false, 'synthesis starts without web search');
-  cardsOf(h).children[0].click(); assert.equal(web().checked, true);
-  web().checked = false; web().fire('change');
-  assert.equal(summaryOf(h).includes('No web search'), true);
-  cardsOf(h).children[1].click(); assert.equal(web().checked, false, 'the choice is kept in Expand');
-  cardsOf(h).children[2].click(); assert.equal(web().checked, false);
-  web().checked = true; web().fire('change');
-  cardsOf(h).children[0].click(); assert.equal(web().checked, true, 'and a later choice is kept too');
-  assert.equal(summaryOf(h).includes('No web search'), false);
+  const sources = find(h.modal.contentEl, i => hasCls(i, 'vam-next-source-details'));
+  assert.deepEqual(findAll(sources, i => i.tag === 'input' && i.type === 'checkbox').map(i => i.text), [], 'no checkbox for web search or images');
+  assert.equal(findAll(sources, i => /web search|image references/i.test(i.text)).length, 0, 'no web or image wording in the sources');
+  assert.match(sources.children[0].text + findAll(sources, i => hasCls(i, 'vam-next-source-summary')).map(i => i.text).join(''), /0 Markdown files$/);
+  const group = byLabel(h.modal.contentEl, 'AI mode');
+  button(group, 'Standard').click();
+  for (const index of [2, 1, 0]) { cardsOf(h).children[index].click(); assert.equal(button(group, 'Standard').attrs['aria-checked'], 'true', 'the choice is kept'); }
 });
-integrationTest('one research-depth widget with one default: the Next Step, task and multi-research dialogs share it', () => {
+integrationTest('one AI-mode widget with one default: the Next Step dialog and the outline import window share it', () => {
   const Modal = dom.makeModal();
   const fields = load('experiences/visual-map/research-fields.ts', { obsidian });
-  assert.equal(fields.DEFAULT_RESEARCH_DEPTH, 'normal');
-  const parent = element('div');
-  const widget = fields.researchDepthField(parent);
-  const radios = findAll(parent, i => i.tag === 'input' && i.type === 'radio');
-  assert.deepEqual(radios.map(r => [r.value, r.checked]), [['fast', false], ['normal', true], ['deep', false]]);
-  assert.equal(widget.value(), 'normal');
-  const labels = findAll(parent, i => i.tag === 'label');
-  assert.ok(hasCls(labels[1], 'is-checked') && !hasCls(labels[0], 'is-checked'), 'the checked state is a JS-toggled class');
-  radios[2].checked = true; radios[2].fire('change');
-  assert.equal(widget.value(), 'deep');
-  assert.ok(hasCls(labels[2], 'is-checked') && !hasCls(labels[1], 'is-checked'));
-  assert.deepEqual(radios.map(r => r.checked), [false, false, true], 'the group is exclusive');
-  radios[2].fire('focus'); assert.ok(hasCls(labels[2], 'is-focused')); radios[2].fire('blur'); assert.equal(hasCls(labels[2], 'is-focused'), false);
-  assert.ok(findAll(parent, i => i.tag === 'p').some(p => /3 web searches/.test(p.text) === false && /Deep/.test(p.text) === false) || true);
-  const { MultiResearchModal } = load('experiences/visual-map/multi-research-modal.ts', { obsidian: { ...obsidian, Modal } });
-  const multi = new MultiResearchModal({}, ['A'], { list: () => [], watch: () => () => {} }, [], () => {}, []); multi.open();
-  assert.deepEqual(findAll(multi.contentEl, i => i.type === 'radio').map(r => r.checked), [false, true, false], 'multi-research starts at the same default');
-  const h = nextStepHarness({ depth: 'normal' });
-  assert.deepEqual(findAll(adjustOf(h), i => i.type === 'radio').map(r => r.checked), [false, true, false]);
-  const deepTopic = nextStepHarness({ depth: 'deep' });
-  assert.deepEqual(findAll(adjustOf(deepTopic), i => i.type === 'radio').map(r => r.checked), [false, false, true], 'a topic that saved a depth keeps it');
+  assert.equal('researchDepthField' in fields, false); assert.equal('DEFAULT_RESEARCH_DEPTH' in fields, false);
+  const parent = element('div'); const seen = [];
+  const widget = fields.aiModeField(parent, { onChange: mode => seen.push(mode) });
+  const radios = findAll(parent, i => i.tag === 'button' && i.attrs.role === 'radio');
+  assert.deepEqual(radios.map(r => [r.text, r.attrs['aria-checked']]), [['Quick', 'true'], ['Standard', 'false']]);
+  assert.equal(widget.value(), 'quick');
+  radios[1].click(); assert.equal(widget.value(), 'standard'); assert.deepEqual(seen, ['standard']);
+  radios[1].click(); assert.deepEqual(seen, ['standard'], 'choosing the same mode again is no change');
+  assert.ok(hasCls(radios[1], 'is-active') && !hasCls(radios[0], 'is-active'), 'the checked state is a JS-toggled class');
+  widget.set('quick'); assert.equal(radios[0].attrs['aria-checked'], 'true'); assert.deepEqual(seen, ['standard'], 'set() is silent');
+  const outline = load('experiences/visual-map/outline-import-modal.ts', { obsidian: { ...obsidian, Modal } });
+  const modal = new outline.OutlineImportModal({}, async () => {}); modal.open();
+  assert.deepEqual(findAll(modal.contentEl, i => i.tag === 'button' && i.attrs.role === 'radio').map(r => [r.text, r.attrs['aria-checked']]), [['Quick', 'true'], ['Standard', 'false']], 'the outline window starts on Quick');
+  const multi = load('experiences/visual-map/multi-research-modal.ts', { obsidian: { ...obsidian, Modal } });
+  const dialog = new multi.MultiResearchModal({}, ['A'], { list: () => [], watch: () => () => {} }, [], () => {}, []); dialog.open();
+  assert.equal(findAll(dialog.contentEl, i => i.type === 'radio' || i.attrs?.role === 'radio').length, 0, 'multi-research has no mode choice of its own');
 });
-integrationTest('map stylesheet: the depth choice uses JS-toggled classes, so no :has() is left on the map or the AI dialog', () => {
+integrationTest('map stylesheet: the AI-mode choice uses JS-toggled classes, so no :has() is left on the map or the AI dialog', () => {
   const css = require('node:fs').readFileSync(require('node:path').join(__dirname, '..', '..', 'styles.css'), 'utf8');
   const withHas = css.split('\n').filter(rule => rule.includes(':has('));
   assert.deepEqual(withHas.filter(rule => /\.vam-next|\.vam-depth|\.vam-workspace|\.vam-node|\.vam-canvas/.test(rule)), []);
-  assert.match(css, /\.vam-next-depths label\.is-checked \{/); assert.match(css, /\.vam-next-depths label\.is-focused/);
+  assert.match(css, /\.vam-ai-mode > button\.is-active \{/); assert.match(css, /\.vam-ai-mode > button:focus-visible/);
+  assert.doesNotMatch(css, /vam-next-depth|vam-reference-network|vam-next-segmented/, 'the styles of the removed depth, network and guided-expansion controls are gone');
 });
 integrationTest('localized labels: reasoning levels and model names are never shown as raw ids', () => {
   const modals = load('experiences/visual-map/modals.ts', { obsidian });
@@ -648,6 +727,35 @@ integrationTest('synthesis: a research or expansion result reported by the view 
   assert.equal(actionNotices(h).length, 2); pressNotice(h, 'View 2 expansion suggestions');
   assert.deepEqual(opened, [['details', h.parent.id], ['proposals', h.parent.id]]);
 });
+integrationTest('research Notice: a Quick answer with the knowledge-gap marker offers View and Re-run with Standard; any other result keeps the single View button', async () => {
+  const h = await synthesisHarness();
+  const opened = [], reruns = [];
+  h.view.openDetails = node => opened.push(node.id); h.view.rerunStandard = node => reruns.push(node.id);
+  const hooks = h.view.backgroundHooks(h.parent.path, h.parent);
+  hooks.completed('research', { summary: 'S', detail: 'A complete answer.', suggestions: [], visualReferences: [] });
+  hooks.completed('research');
+  assert.deepEqual(plain(actionNotices(h).map(n => n.actions.map(b => b.text))), [['View'], ['View']], 'no marker, or no result handed over: one button');
+  hooks.completed('research', { summary: 'S', detail: 'Model knowledge is insufficient.', suggestions: [], visualReferences: [] });
+  const notice = actionNotices(h).at(-1);
+  assert.deepEqual(plain(notice.actions.map(b => b.text)), ['View', 'Re-run with Standard']);
+  assert.match(h.notices.at(-1), /Research finished, but the model's knowledge was not enough: Parent/);
+  notice.actions[1].click();
+  assert.deepEqual(reruns, [h.parent.id]); assert.equal(notice.hidden, true, 'pressing a button closes the Notice');
+  assert.deepEqual(opened, [], 'only the pressed action ran');
+  const second = h.Notice.all.at(-1); second.actions[0].click(); assert.deepEqual(opened, [h.parent.id], 'View opens the details');
+});
+test('background notice: a single action, several actions, or none', () => {
+  const dom = require('../support-dom.cjs');
+  const log = []; const Notice = dom.makeNotice(log);
+  const { backgroundResultNotice } = load('ui/background-run.ts', { obsidian: { ...obsidian, Notice } }, { createFragment: dom.createFragment, window: { createFragment: dom.createFragment } });
+  const pressed = [];
+  const one = backgroundResultNotice('One', { label: 'Open', open: () => pressed.push('open') });
+  assert.deepEqual(plain(one.actions.map(b => b.text)), ['Open']); one.actions[0].click(); assert.deepEqual(pressed, ['open']); assert.equal(one.hidden, true);
+  const many = backgroundResultNotice('Many', [{ label: 'View', open: () => pressed.push('view') }, { label: 'Again', open: () => pressed.push('again') }]);
+  assert.deepEqual(plain(many.actions.map(b => b.text)), ['View', 'Again']); many.actions[1].click(); assert.deepEqual(pressed, ['open', 'again']); assert.equal(many.hidden, true);
+  assert.equal(backgroundResultNotice('Plain').actions.length, 0); assert.equal(backgroundResultNotice('Empty list', []).actions.length, 0);
+  assert.equal(log.at(-1), 'Empty list');
+});
 integrationTest('quick outline: Generate hides the dialog, the card runs with Stop, completion is one Notice plus a badge entry, and reopening goes straight to the review (a, d, e)', async () => {
   const h = await synthesisHarness();
   const outline = load('experiences/visual-map/outline-import.ts', { obsidian }).parseOutline('# Parent\n## Food\n### Breakfast').nodes;
@@ -657,8 +765,7 @@ integrationTest('quick outline: Generate hides the dialog, the card runs with St
   h.view.openNextStep(h.parent); await until(() => h.modals.length === before + 1);
   const modal = h.modals.at(-1);
   findAll(modal.contentEl, i => hasCls(i, 'vam-next-cards'))[0].children[1].click();
-  button(findAll(modal.contentEl, i => i.tag === 'details' && hasCls(i, 'vam-next-adjust'))[0], 'Quickly explore a map').click();
-  button(modal.modalEl, 'Generate outline').click();
+  button(modal.modalEl, 'Expand').click();
   await until(() => h.view.startingTasks.has(h.parent.path));
   assert.equal(modal.closeCount, 1, 'the dialog hid itself once the outline started');
   assert.equal(providerSignal === undefined || providerSignal.aborted === false, true);
@@ -688,8 +795,7 @@ integrationTest('quick outline: Stop on the card before the provider answers dro
     h.view.openNextStep(h.parent); await until(() => h.modals.length === before + 1);
     const modal = h.modals.at(-1);
     findAll(modal.contentEl, i => hasCls(i, 'vam-next-cards'))[0].children[1].click();
-    button(findAll(modal.contentEl, i => i.tag === 'details' && hasCls(i, 'vam-next-adjust'))[0], 'Quickly explore a map').click();
-    button(modal.modalEl, 'Generate outline').click();
+      button(modal.modalEl, 'Expand').click();
     await until(() => h.view.startingTasks.has(h.parent.path));
     return modal;
   };
@@ -702,8 +808,7 @@ integrationTest('quick outline: Stop on the card before the provider answers dro
   second.view.openNextStep(second.parent); await until(() => second.modals.length === before + 1);
   const dialog = second.modals.at(-1);
   findAll(dialog.contentEl, i => hasCls(i, 'vam-next-cards'))[0].children[1].click();
-  button(findAll(dialog.contentEl, i => i.tag === 'details' && hasCls(i, 'vam-next-adjust'))[0], 'Quickly explore a map').click();
-  button(dialog.modalEl, 'Generate outline').click();
+  button(dialog.modalEl, 'Expand').click();
   await until(() => providerSignal && second.view.startingTasks.has(second.parent.path));
   await second.view.onClose();
   assert.equal(providerSignal.aborted, true, 'closing the view stops the hidden outline');
@@ -1024,45 +1129,42 @@ integrationTest('S6 dialog: switching to another step releases the process, and 
   cards[1].click();
   assert.equal(spy.releases, before + 1, 'leaving the research step releases the process');
 });
-integrationTest('S6 dialog: the pre-start follows the web-search setting (local research pre-starts the local command) and expansion pre-starts it only for local quick child research', () => {
+integrationTest('S6 dialog: the pre-start follows the AI mode (Quick pre-starts without web tools, Standard with them); an expansion pre-starts only when its subtopics are researched', () => {
   const spy = { prewarms: [], releases: 0 };
   spy.plugin = { prewarmClaude: (model, reasoning, webSearch) => spy.prewarms.push(webSearch), releaseWarmClaude: () => { spy.releases++; } };
   const h = nextStepHarness({ plugin: spy.plugin, modelSettings: { topicStatus: 'idea' } });
-  assert.deepEqual(spy.prewarms, [true], 'web search is on by default');
+  assert.deepEqual(spy.prewarms, [false], 'Quick is the default: pre-started without web tools');
+  const group = byLabel(h.modal.contentEl, 'AI mode');
+  button(group, 'Standard').click();
+  assert.deepEqual(spy.prewarms, [false, true], 'switching to Standard pre-starts again with web tools');
+  button(group, 'Quick').click();
+  assert.deepEqual(spy.prewarms, [false, true, false]);
+  // expansion: nothing unless the new subtopics are researched afterwards
   const checkbox = text => find(find(h.modal.contentEl, i => i.tag === 'label' && findAll(i, c => c.text === text).length > 0), i => i.tag === 'input');
-  const web = checkbox('Allow web search'); web.checked = false; web.change();
-  assert.deepEqual(spy.prewarms, [true, false], 'local research pre-starts without web tools');
-  web.checked = true; web.change();
-  assert.deepEqual(spy.prewarms, [true, false, true]);
-  // expansion: nothing unless quick child research is on with the web option off
   const cards = findAll(cardsOf(h), i => i.tag === 'button' && i.attrs && i.attrs.role === 'radio');
   const releases = spy.releases;
   cards[1].click();
   assert.equal(spy.releases, releases + 1, 'plain expansion pre-starts nothing');
-  const shallow = checkbox('Run quick research on each created subtopic (does not search the web)');
+  const shallow = checkbox('Run a short research on each created subtopic');
   shallow.checked = true; shallow.change();
-  assert.deepEqual(spy.prewarms.at(-1), false, 'quick child research without the web pre-starts the local command');
-  const count = spy.prewarms.length;
-  const childWeb = checkbox('Also search the web for subtopic research');
-  childWeb.checked = true; childWeb.change();
-  assert.equal(spy.prewarms.length, count, 'with web search the child research is not served by the local process');
-  assert.equal(spy.releases, releases + 2);
+  assert.deepEqual(spy.prewarms.at(-1), false, 'Quick subtopic research pre-starts without web tools');
+  button(group, 'Standard').click();
+  assert.deepEqual(spy.prewarms.at(-1), true, 'Standard subtopic research pre-starts with web tools');
+  shallow.checked = false; shallow.change();
+  assert.equal(spy.releases, releases + 2, 'unticking the subtopic research releases it again');
 });
-integrationTest('W2c dialog: the synthesis step pre-starts a synthesis command with the picker\'s web setting, again after the directions arrive, and releases it when leaving the step', () => {
+integrationTest('W2c dialog: the synthesis step pre-starts a web-less synthesis command whatever the AI mode, and releases it when leaving the step', () => {
   const spy = { prewarms: [], releases: 0 };
   spy.plugin = { prewarmClaude: (model, reasoning, webSearch, mode) => spy.prewarms.push([webSearch, mode]), releaseWarmClaude: () => { spy.releases++; } };
   const h = nextStepHarness({ plugin: spy.plugin, modelSettings: { topicStatus: 'idea' } });
   const cards = findAll(cardsOf(h), i => i.tag === 'button' && i.attrs && i.attrs.role === 'radio');
+  button(byLabel(h.modal.contentEl, 'AI mode'), 'Standard').click();
   cards[2].click();
-  assert.deepEqual(spy.prewarms.at(-1), [false, 'synthesize'], 'synthesis is local by default and uses the synthesis effort');
-  const before = spy.prewarms.length;
-  const checkbox = text => find(find(h.modal.contentEl, i => i.tag === 'label' && findAll(i, c => c.text === text).length > 0), i => i.tag === 'input');
-  const web = checkbox('Allow web search'); web.checked = true; web.change();
-  assert.deepEqual(spy.prewarms.at(-1), [true, 'synthesize'], 'the picker\'s web setting is followed');
-  assert.ok(spy.prewarms.length > before);
+  assert.deepEqual(spy.prewarms.at(-1), [false, 'synthesize'], 'synthesis never uses the web and uses the synthesis effort');
   const releases = spy.releases;
   cards[0].click();
-  assert.equal(spy.prewarms.at(-1)[1], undefined, 'the research step pre-starts a plain research command'); assert.equal(spy.releases, releases);
+  assert.equal(spy.prewarms.at(-1)[1], undefined, 'the research step pre-starts a plain research command'); assert.equal(spy.prewarms.at(-1)[0], true, 'in the chosen mode');
+  assert.equal(spy.releases, releases);
   cards[1].click();
   assert.equal(spy.releases, releases + 1, 'plain expansion releases it');
 });

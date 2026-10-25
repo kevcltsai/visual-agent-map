@@ -40,18 +40,11 @@ import {
   type OutlineNode
 } from "./outline-import";
 import { FOLLOW_DEFAULT_MODEL, syncModelSelect } from "../../core/model-discovery";
-import {
-  fieldLink,
-  linkedField,
-  researchDepthDescription,
-  researchDepthField,
-  noteStyleField
-} from "./research-fields";
+import { aiModeField, fieldLink, linkedField, noteStyleField } from "./research-fields";
+import { aiModeOptions, DEFAULT_MAP_AI_MODE, type MapAiMode } from "./ai-mode";
 import { DetailTemplatesModal } from "../../ui/modals/detail-templates-modal";
 import { builtinTemplates } from "../../ai/detail-templates";
 import { titleProblemText } from "../../ui/modals/title-check";
-
-export { researchDepthDescription };
 
 export type SynthesisContent = "full" | "summary";
 export interface TaskOptions {
@@ -66,10 +59,10 @@ export interface TaskOptions {
   visualMode: VisualMode;
   shallowResearch?: boolean;
   /**
-   * Shallow research of the new subtopics also searches the web (and images when chosen). Absent or false: those quick
-   * runs use local context only; the parent's decomposition keeps the dialog's own web choice.
+   * The AI mode the run was started in (Quick or Standard); the research task context carries it so a Quick run uses the
+   * Quick prompt. Absent for a run that has no mode (a synthesis, the map chat).
    */
-  shallowWebSearch?: boolean;
+  mapAiMode?: MapAiMode;
   /** This run's explicit content template choice; recorded on the topic when given. */
   detailTemplateId?: string;
   /** This run's explicit writing tone choice; recorded on the topic when given. */
@@ -100,8 +93,11 @@ export interface SynthesisObserver {
 export interface BackgroundHooks {
   begin: (controller: AbortController) => void;
   end: () => void;
-  /** A result finished while the dialog is closed and has no task state of its own to announce it. */
-  completed?: (kind: "research" | "expand") => void;
+  /**
+   * A result finished while the dialog is closed and has no task state of its own to announce it. A Quick research passes
+   * its result so the notice can offer "Re-run with Standard" when the answer says the model's knowledge was not enough.
+   */
+  completed?: (kind: "research" | "expand", result?: AiResult) => void;
   /** A quick outline finished while the dialog is closed: the view keeps it for review and announces it. */
   outlineReady?: (outline: Omit<PendingOutline, "discard">) => void;
 }
@@ -121,8 +117,15 @@ export interface OutputLanguageMemory {
   /** Records the language picked by hand in this dialog; called once, when a run starts. */
   rememberOutputLanguage?: (language: ContentLanguage) => Promise<void>;
 }
+/** The map's remembered AI mode and how to record the one a research or expansion starts with. */
+export interface AiModeMemory {
+  /** What the map remembers today; unknown stored values are already dropped. Absent: Quick. */
+  aiMode?: MapAiMode;
+  /** Records the mode when a research or expansion starts (never when the dialog is cancelled). */
+  rememberAiMode?: (mode: MapAiMode) => Promise<void>;
+}
 export { FOLLOW_DEFAULT_MODEL };
-export interface NextStepSettings extends OutputLanguageMemory {
+export interface NextStepSettings extends OutputLanguageMemory, AiModeMemory {
   /**
    * The note language the topic note already uses: its stored `content-language`, or the language of its standard Detail
    * headings when it has none (D-2026-10-84). A detected output language with another note language is not preselected.
@@ -303,7 +306,6 @@ export class NextStepModal extends Modal {
   constructor(
     app: App,
     private topic: string,
-    private depth: ResearchDepth,
     private childrenCount: number,
     private pendingCount: number,
     private plugin: VisualAgentMapPlugin,
@@ -390,11 +392,9 @@ export class NextStepModal extends Modal {
     const updateSelection = (): void => selection.setText(picker.describe());
     pickerContent.addEventListener("change", updateSelection);
     updateSelection();
-    // Synthesis works from existing findings, so it defaults to no web search until the user chooses otherwise.
     const forMode = (mode: "research" | "expand" | "synthesize"): void => {
       const synthesize = mode === "synthesize";
       picker.setCurrentLabel(synthesize ? (sources.synthesisLabel ?? sources.currentLabel) : sources.currentLabel);
-      picker.setNetworkDefault(!synthesize, !synthesize);
       updateSelection();
     };
     return { picker, disclosure, forMode };
@@ -462,6 +462,10 @@ export class NextStepModal extends Modal {
     // starting is stopped.
     if (!this.detached) this.taskController?.abort();
     this.unsubscribeModels?.();
+  }
+  /** Records the AI mode on the map when a research or expansion starts (before AI runs; a cancelled dialog never gets here). */
+  private async rememberMode(mode: MapAiMode): Promise<void> {
+    await this.modelSettings?.rememberAiMode?.(mode);
   }
   /** Saves the model and effort chosen in this dialog, once, at the moment a run actually starts. */
   private async flushSettings(): Promise<void> {
@@ -992,6 +996,17 @@ export class NextStepModal extends Modal {
       "synthesize"
     );
     const cardFor = { research: researchCard, expand: expandCard, synthesize: synthesizeCard };
+    // The AI mode switch sits at the top level of the dialog: Quick (no web, the model's own knowledge) or Standard (web,
+    // images). It applies to a research and to an expansion, and the map remembers the last one that was run.
+    const aiMode = aiModeField(this.contentEl, {
+      initial: this.modelSettings?.aiMode ?? DEFAULT_MAP_AI_MODE,
+      onChange: () => {
+        shallowHint.setText(shallowHintText());
+        // A different mode changes the command: pre-start again (the old process is killed).
+        warmForMode();
+        refreshSummary();
+      }
+    });
     const structureReview = selection ? undefined : this.modelSettings?.structureReview;
     if (structureReview) {
       const row = this.contentEl.createDiv("vam-next-structure");
@@ -1032,24 +1047,19 @@ export class NextStepModal extends Modal {
       expand: adjustBody.createDiv("vam-next-adjust-section"),
       synthesize: adjustBody.createDiv("vam-next-adjust-section")
     };
-    // --- Research: one confirm; the depth is under Adjust.
+    // --- Research: one confirm; the AI mode is the switch above (Quick or Standard).
     research.createEl("p", { text: t("ui.start_from_this_node_s_question_update_only_this_node") });
-    const depthField = researchDepthField(adjustFor.research, {
-      initial: this.depth,
-      onChange: () => refreshSummary()
-    });
     research.createEl("p", { cls: "vam-next-status", attr: { "aria-live": "polite" } });
     confirm.addEventListener("click", () => {
       void this.run(research, confirm, async () => {
         const controller = this.taskController;
         const selected = await sharedSources?.picker.ready();
         if (!controller || this.dead(controller)) return;
+        const mode = aiMode.value();
         const options: TaskOptions = {
           referenceGroups: selected?.groups ?? [],
           outputLanguage: languageSelect.value as ContentLanguage,
-          researchMode: selected?.webSearch ? "research" : "local",
-          researchDepth: depthField.value(),
-          visualMode: selected?.imageSearch ? "auto" : "off",
+          ...aiModeOptions(mode, "research"),
           requirements: this.requirements(),
           ...(templateId() ? { detailTemplateId: templateId() } : {}),
           ...(toneId() ? { toneId: toneId() } : {}),
@@ -1059,6 +1069,8 @@ export class NextStepModal extends Modal {
               research.querySelector<HTMLElement>(".vam-next-status")?.setText(message);
           }
         };
+        await this.rememberMode(mode);
+        if (this.dead(controller)) return;
         this.detach(controller);
         let launchAccepted = false;
         let launchFailed = false;
@@ -1087,9 +1099,9 @@ export class NextStepModal extends Modal {
         await this.research(
           options,
           "",
-          () => {
+          result => {
             if (this.closed) {
-              this.background?.completed?.("research");
+              this.background?.completed?.("research", options.mapAiMode === "quick" ? result : undefined);
               return;
             }
             release();
@@ -1112,79 +1124,14 @@ export class NextStepModal extends Modal {
         }
       });
     });
-    // --- Expand: guided directions by default; the quick-explore numbers are under Adjust.
-    const modes = adjustFor.expand.createDiv("vam-next-depths vam-next-segmented");
-    modes.setAttr("role", "radiogroup");
-    modes.setAttr("aria-label", t("ui.expand_the_map"));
-    const guided = modes.createEl("button", { text: t("ui.choose_directions_together"), cls: "is-active" });
-    const quick = modes.createEl("button", { text: t("ui.quickly_explore_a_map") });
-    for (const [option, checked] of [
-      [guided, true],
-      [quick, false]
-    ] as const) {
-      option.setAttr("role", "radio");
-      option.setAttr("aria-checked", String(checked));
-      option.tabIndex = checked ? 0 : -1;
-      option.addEventListener("keydown", event => {
-        if (!["ArrowRight", "ArrowDown", "ArrowLeft", "ArrowUp"].includes(event.key)) return;
-        event.preventDefault();
-        const other = option === guided ? quick : guided;
-        setExpandMode(other === quick);
-        other.focus();
-      });
-    }
-    let multiLayer = false;
-    const setExpandMode = (value: boolean): void => {
-      multiLayer = value;
-      guided.classList.toggle("is-active", !value);
-      quick.classList.toggle("is-active", value);
-      guided.setAttr("aria-checked", String(!value));
-      quick.setAttr("aria-checked", String(value));
-      guided.tabIndex = value ? -1 : 0;
-      quick.tabIndex = value ? 0 : -1;
-      modeHint.setText(
-        value
-          ? t("ui.quick_outline_mode_hint")
-          : this.pendingCount
-            ? t("ui.you_have_pending_proposals_review_them_here")
-            : t("ui.ai_suggests_one_level_of_subtopics_review_or_edit_them_befor")
-      );
-      quickLimits.classList.toggle("is-hidden", !value);
-      expandFooterText.setText(
-        shallow.checked
-          ? t("ui.research_each_subtopic_after_creation_and_use_codex_quota")
-          : t("ui.create_subtopics_without_research")
-      );
-      expandButton.setText(
-        value
-          ? t("ui.outline_ai_run")
-          : this.pendingCount
-            ? t("ui.review_ai_subtopic_suggestions")
-            : t("ui.get_expansion_directions")
-      );
-      expandButton.dataset.topicRun = expandButton.textContent ?? "";
-      expandButton.disabled = !!this.modelSettings?.running || (value && !quickOutline);
-      refreshSummary();
-    };
-    guided.addEventListener("click", () => setExpandMode(false));
-    quick.addEventListener("click", () => setExpandMode(true));
-    const modeHint = expandPanel.createEl("p", {
-      text: this.pendingCount
-        ? t("ui.you_have_pending_proposals_review_them_here")
-        : t("ui.ai_suggests_one_level_of_subtopics_review_or_edit_them_befor")
-    });
-    // Quick explore generates an outline from a preset; it is reviewed here before anything is created.
+    // --- Expand: one path. The AI writes a multi-level outline (levels and size are on this panel), reviewed here
+    // before any subtopic is created. Saved suggestions that still wait for review open through their own button.
     const quickOutline = this.modelSettings?.quickOutline;
-    const quickLimits = adjustFor.expand.createDiv("vam-quick-limits is-hidden");
-    const presetLabel = quickLimits.createEl("label", { cls: "vam-field" });
-    presetLabel.createSpan({ text: t("ui.outline_ai_preset") });
-    const presetSelect = presetLabel.createEl("select");
-    presetSelect.setAttr("aria-label", t("ui.outline_ai_preset"));
-    for (const preset of quickOutline?.presets ?? [])
-      presetSelect.createEl("option", { value: preset.id, text: preset.name });
+    expandPanel.createEl("p", { text: t("ui.quick_outline_mode_hint") });
+    const limits = expandPanel.createDiv("vam-quick-limits");
     // How deep and how big the tree may grow: told to the AI, then enforced on its reply before the review.
     const numberField = (label: string, initial: number, max: number): (() => number) => {
-      const field = quickLimits.createEl("label", { cls: "vam-field" });
+      const field = limits.createEl("label", { cls: "vam-field" });
       field.createSpan({ text: label });
       const input = field.createEl("input", { type: "number", attr: { min: "1", max: String(max), step: "1" } });
       input.value = String(initial);
@@ -1198,106 +1145,81 @@ export class NextStepModal extends Modal {
     };
     const quickLevels = numberField(t("ui.number_of_levels"), 2, QUICK_OUTLINE_MAX_LEVELS);
     const quickTopics = numberField(t("ui.quick_outline_max_topics"), 15, QUICK_OUTLINE_MAX_TOPICS);
-    quickLimits.createEl("p", { text: t("ui.quick_outline_hint"), cls: "vam-hint" });
+    limits.createEl("p", { text: t("ui.quick_outline_hint"), cls: "vam-hint" });
+    // The outline preset stays under Adjust.
+    const presetLabel = adjustFor.expand.createEl("label", { cls: "vam-field" });
+    presetLabel.createSpan({ text: t("ui.outline_ai_preset") });
+    const presetSelect = presetLabel.createEl("select");
+    presetSelect.setAttr("aria-label", t("ui.outline_ai_preset"));
+    for (const preset of quickOutline?.presets ?? [])
+      presetSelect.createEl("option", { value: preset.id, text: preset.name });
     const shallowLabel = adjustFor.expand.createEl("label", { cls: "vam-field vam-next-toggle" });
     const shallow = shallowLabel.createEl("input", { type: "checkbox" });
     shallow.checked = false;
     shallowLabel.createSpan({ text: t("ui.run_shallow_research_on_each_created_subtopic") });
-    // Shallow research on new subtopics is deliberately Quick: it is a first look at many topics, not a full study.
-    // Subtopic research does not search the web unless the box below is ticked, and the hint says which applies.
+    // The research of the new subtopics is always the short overview; the AI mode only decides where it gets its facts.
     const shallowHintText = (): string =>
       t(
         "ui.shallow_research_for_expanded_subtopics_0",
-        shallowWeb.checked ? researchDepthDescription("fast") : t("ui.shallow_research_local_description")
+        t(aiMode.value() === "standard" ? "ui.ai_mode_standard_desc" : "ui.ai_mode_quick_desc")
       );
     const shallowHint = adjustFor.expand.createEl("p", { cls: "vam-hint" });
     shallowHint.hidden = true;
-    const shallowWebLabel = adjustFor.expand.createEl("label", { cls: "vam-field vam-next-toggle" });
-    const shallowWeb = shallowWebLabel.createEl("input", { type: "checkbox" });
-    shallowWeb.checked = false;
-    shallowWebLabel.createSpan({ text: t("ui.shallow_research_web_search") });
-    shallowWebLabel.hidden = true;
     shallowHint.setText(shallowHintText());
-    shallowWeb.addEventListener("change", () => shallowHint.setText(shallowHintText()));
     const expandFooterText = actions.createSpan({
       text: t("ui.create_subtopics_after_confirmation_without_running_research"),
       cls: "vam-next-actions-note"
     });
-    const expandButton = actions.createEl("button", {
-      text: this.pendingCount ? t("ui.review_ai_subtopic_suggestions") : t("ui.get_expansion_directions"),
-      cls: "mod-cta"
-    });
+    // Saved suggestions (a research's, or an older guided expansion's): reviewed through the existing path, no AI call.
+    const reviewButton = actions.createEl("button", { text: "" });
+    const expandButton = actions.createEl("button", { text: t("ui.expand"), cls: "mod-cta" });
     expandButton.dataset.topicRun = expandButton.textContent ?? "";
-    expandButton.disabled = !!this.modelSettings?.running;
+    expandButton.disabled = !!this.modelSettings?.running || !quickOutline;
     expandPanel.createEl("p", { cls: "vam-next-status", attr: { "aria-live": "polite" } });
     expandPanel.createDiv("vam-next-result");
+    const syncExpand = (): void => {
+      expandFooterText.setText(
+        shallow.checked
+          ? t("ui.research_each_subtopic_after_creation_and_use_codex_quota")
+          : t("ui.create_subtopics_without_research")
+      );
+      reviewButton.setText(t("ui.review_ai_subtopic_suggestions_0", this.pendingCount));
+      reviewButton.dataset.pendingReview = String(this.pendingCount);
+      reviewButton.hidden = currentMode !== "expand" || !this.pendingCount;
+      refreshSummary();
+    };
     const consumed = (): void => {
       this.pendingCount = 0;
-      setExpandMode(multiLayer);
+      syncExpand();
     };
     shallow.addEventListener("change", () => {
       shallowHint.hidden = !shallow.checked;
-      shallowWebLabel.hidden = !shallow.checked;
-      setExpandMode(multiLayer);
+      syncExpand();
     });
-    expandButton.addEventListener("click", () => {
+    const expandOptions = (signal: AbortSignal | undefined): TaskOptions => ({
+      referenceGroups: [],
+      outputLanguage: languageSelect.value as ContentLanguage,
+      requirements: this.requirements(),
+      ...aiModeOptions(aiMode.value(), "subtopic"),
+      shallowResearch: shallow.checked,
+      ...(templateId() ? { detailTemplateId: templateId() } : {}),
+      ...(toneId() ? { toneId: toneId() } : {}),
+      signal,
+      onProgress: message => {
+        if (!this.closed) expandPanel.querySelector<HTMLElement>(".vam-next-status")?.setText(message);
+      }
+    });
+    reviewButton.addEventListener("click", () => {
       void this.run(
         expandPanel,
-        expandButton,
+        reviewButton,
         async () => {
           const selected = await sharedSources?.picker.ready();
-          const options: TaskOptions = {
-            referenceGroups: selected?.groups ?? [],
-            outputLanguage: languageSelect.value as ContentLanguage,
-            requirements: this.requirements(),
-            researchMode: selected?.webSearch ? "research" : "local",
-            shallowResearch: shallow.checked,
-            ...(shallow.checked && shallowWeb.checked ? { shallowWebSearch: true } : {}),
-            researchDepth: "fast",
-            visualMode: shallow.checked && selected?.imageSearch ? "auto" : "off",
-            ...(templateId() ? { detailTemplateId: templateId() } : {}),
-            ...(toneId() ? { toneId: toneId() } : {}),
-            signal: this.taskSignal,
-            onProgress: message => {
-              if (!this.closed) expandPanel.querySelector<HTMLElement>(".vam-next-status")?.setText(message);
-            }
-          };
-          if (multiLayer) {
-            if (!quickOutline) return;
-            const signal = this.taskSignal;
-            const controller = this.taskController;
-            if (!signal || !controller) return;
-            const limits = { levels: quickLevels(), maxTopics: quickTopics() };
-            const request = {
-              presetId: presetSelect.value,
-              requirements: this.requirements(),
-              language: options.outputLanguage ?? this.plugin.settings.language,
-              limits
-            };
-            // Usage confirmed, settings saved and sources ready: hide the dialog; the card shows running and Stop.
-            this.detach(controller);
-            const generated = await quickOutline.generate(request, signal);
-            if (signal.aborted || (this.closed && !this.detached)) return;
-            const { nodes, dropped } = limitOutline(generated, limits);
-            if (this.closed) {
-              // Hidden while it ran: the card badge keeps the outline for review and a Notice says it is ready.
-              // The closed dialog's signal and progress callback must not outlive it in the stored options.
-              this.background?.outlineReady?.({
-                nodes,
-                dropped,
-                options: { ...options, signal: undefined, onProgress: undefined }
-              });
-              return;
-            }
-            this.outlineReview(expandPanel, nodes, expandButton, quickOutline.create, options, dropped);
-            return;
-          }
-          if (!this.pendingCount && this.taskController) this.detach(this.taskController);
+          const options: TaskOptions = { ...expandOptions(this.taskSignal), referenceGroups: selected?.groups ?? [] };
           await this.expand(
             options,
             "",
             (items, create) => {
-              // Hidden while it ran: the card badge holds the suggestions and a Notice says they are ready.
               if (this.closed) this.background?.completed?.("expand");
               else this.proposals(expandPanel, items, create, expandButton, consumed, options);
             },
@@ -1311,16 +1233,47 @@ export class NextStepModal extends Modal {
               else this.failedAi(expandPanel, expandButton, message);
               if (retryable === false) expandButton.disabled = true;
             },
-            () => {
-              this.taskSignal = undefined;
-              this.taskController = undefined;
-              this.endBackground();
-              if (!this.closed) this.startedInBackground();
-            }
+            () => {}
           );
         },
-        multiLayer || !this.pendingCount
+        false
       );
+    });
+    expandButton.addEventListener("click", () => {
+      void this.run(expandPanel, expandButton, async () => {
+        if (!quickOutline) return;
+        const selected = await sharedSources?.picker.ready();
+        const signal = this.taskSignal;
+        const controller = this.taskController;
+        if (!signal || !controller) return;
+        const mode = aiMode.value();
+        const options: TaskOptions = { ...expandOptions(signal), referenceGroups: selected?.groups ?? [] };
+        const bounds = { levels: quickLevels(), maxTopics: quickTopics() };
+        const request = {
+          presetId: presetSelect.value,
+          requirements: this.requirements(),
+          language: options.outputLanguage ?? this.plugin.settings.language,
+          limits: bounds
+        };
+        await this.rememberMode(mode);
+        if (this.dead(controller)) return;
+        // Usage confirmed, settings saved and sources ready: hide the dialog; the card shows running and Stop.
+        this.detach(controller);
+        const generated = await quickOutline.generate(request, signal);
+        if (signal.aborted || (this.closed && !this.detached)) return;
+        const { nodes, dropped } = limitOutline(generated, bounds);
+        if (this.closed) {
+          // Hidden while it ran: the card badge keeps the outline for review and a Notice says it is ready.
+          // The closed dialog's signal and progress callback must not outlive it in the stored options.
+          this.background?.outlineReady?.({
+            nodes,
+            dropped,
+            options: { ...options, signal: undefined, onProgress: undefined }
+          });
+          return;
+        }
+        this.outlineReview(expandPanel, nodes, expandButton, quickOutline.create, options, dropped);
+      });
     });
     // --- Synthesize: setup, directions, draft and review all happen in this one dialog.
     const pendingDirections = selection ? selection.pending : this.modelSettings?.synthesisPending;
@@ -1349,7 +1302,7 @@ export class NextStepModal extends Modal {
       text: t("ui.synthesis_stage_two_fixed")
     });
     stageTwoHint.hidden = true;
-    synthesizePanel.createEl("p", { cls: "vam-hint", text: t("ui.synthesis_web_default_hint") });
+    synthesizePanel.createEl("p", { cls: "vam-hint", text: t("ui.synthesis_standard_first_hint") });
     const synthStatus = synthesizePanel.createEl("p", { cls: "vam-next-status", attr: { "aria-live": "polite" } });
     const synthResult = synthesizePanel.createDiv("vam-next-result");
     const suggestButton = actions.createEl("button", { text: t("ui.get_synthesis_suggestions_first"), cls: "mod-cta" });
@@ -1422,9 +1375,10 @@ export class NextStepModal extends Modal {
         referenceGroups: selected?.groups ?? [],
         outputLanguage: languageSelect.value as ContentLanguage,
         requirements: this.requirements(),
-        researchMode: selected?.webSearch ? "research" : "local",
-        researchDepth: this.depth,
-        visualMode: selected?.imageSearch ? "auto" : "off",
+        // A synthesis arranges what the topics already hold: Quick policy text, no web (D-2026-10-229).
+        researchMode: "local",
+        researchDepth: "normal",
+        visualMode: "off",
         ...(templateId() ? { detailTemplateId: templateId() } : {}),
         ...(toneId() ? { toneId: toneId() } : {}),
         ...(titleInput ? { synthesisTitle: titleInput.value.trim() } : {}),
@@ -1443,7 +1397,7 @@ export class NextStepModal extends Modal {
       outputLanguage: languageSelect.value as ContentLanguage,
       requirements: this.requirements(),
       researchMode: "local",
-      researchDepth: this.depth,
+      researchDepth: "normal",
       visualMode: "off",
       ...(titleInput ? { synthesisTitle: titleInput.value.trim() } : {}),
       signal,
@@ -1480,14 +1434,13 @@ export class NextStepModal extends Modal {
     );
     // --- Shared options, all under Adjust.
     const sharedSources = this.addReferencePicker(adjustBody);
-    // The research step runs with the web setting of the source picker. Expansion pre-starts one process only for local
-    // (no web search) Quick child research; children run in parallel, so only the first one finds it waiting.
+    // The research step runs with the web tools of the chosen AI mode (Standard searches, Quick does not). Expansion
+    // pre-starts one process only when subtopics are researched afterwards; children run in parallel, so only the first
+    // one finds it waiting. A synthesis never uses the web.
     const warmForMode = (): void => {
-      if (currentMode === "research") this.prewarmAi(sharedSources?.picker.selection().webSearch ?? true);
-      else if (currentMode === "expand" && shallow.checked && !shallowWeb.checked) this.prewarmAi(false);
-      // Synthesis of this topic's children (suggestions or the draft): both are mode synthesize with the picker's web setting.
-      else if (currentMode === "synthesize")
-        this.prewarmAi(sharedSources?.picker.selection().webSearch ?? false, "synthesize");
+      if (currentMode === "research") this.prewarmAi(aiMode.value() === "standard");
+      else if (currentMode === "expand" && shallow.checked) this.prewarmAi(aiMode.value() === "standard");
+      else if (currentMode === "synthesize") this.prewarmAi(false, "synthesize");
       else if (!this.detached) this.plugin.releaseWarmClaude?.();
     };
     show = mode => {
@@ -1508,6 +1461,9 @@ export class NextStepModal extends Modal {
       confirm.hidden = mode !== "research";
       expandButton.hidden = mode !== "expand";
       expandFooterText.hidden = mode !== "expand";
+      reviewButton.hidden = mode !== "expand" || !this.pendingCount;
+      // The AI mode applies to a research and to an expansion; a synthesis has no choice to make.
+      aiMode.element.hidden = mode === "synthesize";
       // Once directions are requested, the synthesis step has no sources, language or template left to choose.
       syncSynthesisStage();
       refreshSummary();
@@ -1570,8 +1526,7 @@ export class NextStepModal extends Modal {
     const describeOutput = (): void => {
       outputValue.setText([supportedLanguageLabel(languageSelect.value), style.label()].filter(Boolean).join(" · "));
     };
-    const depthName = (depth: ResearchDepth): string =>
-      t(depth === "fast" ? "ui.quick" : depth === "deep" ? "ui.deep" : "ui.standard");
+    const modeName = (): string => t(aiMode.value() === "standard" ? "ui.standard" : "ui.quick");
     const refreshSummary = (): void => {
       describeOutput();
       if (currentMode === "synthesize" && stage === "directions") {
@@ -1579,21 +1534,16 @@ export class NextStepModal extends Modal {
         return;
       }
       const parts: string[] = [];
-      if (currentMode === "research") parts.push(t("ui.next_summary_depth_0", depthName(depthField.value())));
-      else if (currentMode === "expand")
-        parts.push(
-          multiLayer
-            ? t("ui.quick_outline_summary_0_1", quickLevels(), quickTopics())
-            : t("ui.choose_directions_together")
-        );
-      else
+      if (currentMode === "research") parts.push(modeName());
+      else if (currentMode === "expand") {
+        parts.push(t("ui.expand_summary_0_1", quickLevels(), quickTopics()));
+        if (shallow.checked) parts.push(modeName());
+      } else
         parts.push(
           t(
             synthesisContentSelect?.value === "summary" ? "ui.next_summary_synth_summary" : "ui.next_summary_synth_full"
           )
         );
-      const network = sharedSources?.picker.selection();
-      if (network) parts.push(t(network.webSearch ? "ui.next_summary_web_on" : "ui.next_summary_web_off"));
       parts.push(supportedLanguageLabel(languageSelect.value));
       const styleName = style.name();
       if (styleName) parts.push(styleName);
@@ -1607,15 +1557,17 @@ export class NextStepModal extends Modal {
     });
     if (pendingDirections) showDirections(pendingDirections.directions);
     else checkName();
+    syncExpand();
     show(initialMode);
     const waitingOutline = this.modelSettings?.pendingOutline;
     if (waitingOutline && quickOutline) {
       // Reopened from the card badge or the Notice: straight into the review of the outline generated in the background.
       shallow.checked = !!waitingOutline.options.shallowResearch;
-      shallowWeb.checked = !!waitingOutline.options.shallowWebSearch;
+      // The review shows the switch the outline was generated with.
+      if (waitingOutline.options.mapAiMode) aiMode.set(waitingOutline.options.mapAiMode);
       shallowHint.hidden = !shallow.checked;
-      shallowWebLabel.hidden = !shallow.checked;
-      setExpandMode(true);
+      shallowHint.setText(shallowHintText());
+      syncExpand();
       const reviewOptions: TaskOptions = {
         ...waitingOutline.options,
         onProgress: message => expandPanel.querySelector<HTMLElement>(".vam-next-status")?.setText(message)

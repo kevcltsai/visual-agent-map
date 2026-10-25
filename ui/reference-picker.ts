@@ -18,31 +18,13 @@ export class ReferencePicker {
   private acknowledgeErrorButton!: HTMLButtonElement;
   private report: (message: string) => void;
   private refresh: () => void;
-  private webSearch: boolean;
-  private imageSearch: boolean;
-  private webInput!: HTMLInputElement;
-  private imageInput!: HTMLInputElement;
   private currentLabelEl!: HTMLElement;
-  /** Once the user sets the network options, a caller's per-task defaults no longer override them. */
-  private networkTouched = false;
   /** Retitles the "current topic included" note when one picker serves several tasks. */
   setCurrentLabel(label: string): void {
     this.currentLabelEl.setText(label);
   }
-  /** Applies a task's default network options unless the user already chose them. */
-  setNetworkDefault(web: boolean, images: boolean): void {
-    if (this.networkTouched) return;
-    this.webSearch = web;
-    this.imageSearch = web && images;
-    this.webInput.checked = web;
-    this.imageInput.checked = web && images;
-    this.imageInput.disabled = !web;
-  }
   describe(): string {
-    return `${this.groups.flatMap(group => group.documents).length} ${t("ui.markdown_files")} · ${t("ui.allow_web_search")} ${t(this.webSearch ? "ui.on" : "ui.off")} · ${t("ui.search_for_image_references")} ${t(this.imageSearch && this.webSearch ? "ui.on" : "ui.off")}`;
-  }
-  selection(): { webSearch: boolean; imageSearch: boolean } {
-    return { webSearch: this.webSearch, imageSearch: this.imageSearch && this.webSearch };
+    return `${this.groups.flatMap(group => group.documents).length} ${t("ui.markdown_files")}`;
   }
 
   constructor(
@@ -55,45 +37,14 @@ export class ReferencePicker {
       progress: (message: string) => void
     ) => Promise<ReferenceDocument[]>,
     private currentTopicId: string,
-    currentLabel: string,
-    initialWeb = true,
-    initialImages = true
+    currentLabel: string
   ) {
-    this.webSearch = initialWeb;
-    this.imageSearch = initialWeb && initialImages;
     const area = parent.createDiv("vam-reference-picker");
     const heading = area.createDiv("vam-reference-heading");
     heading.createEl("h3", { text: t("ui.data_sources") });
     const intro = heading.createDiv("vam-reference-intro");
     this.currentLabelEl = intro.createEl("p", { text: currentLabel, cls: "vam-hint" });
     intro.createEl("p", { text: t("ui.reference_task_only_hint"), cls: "vam-hint" });
-
-    const networkSection = area.createDiv("vam-reference-section vam-reference-network-section");
-    const network = networkSection.createDiv("vam-reference-network");
-    const webLabel = network.createEl("label", { cls: "vam-field vam-next-toggle" });
-    const web = webLabel.createEl("input", { type: "checkbox" });
-    web.checked = initialWeb;
-    webLabel.createSpan({ text: t("ui.allow_web_search") });
-    const imageLabel = network.createEl("label", { cls: "vam-field vam-next-toggle vam-reference-image-option" });
-    const images = imageLabel.createEl("input", { type: "checkbox" });
-    images.checked = initialWeb && initialImages;
-    images.disabled = !web.checked;
-    imageLabel.createSpan({ text: t("ui.search_for_image_references") });
-    this.webInput = web;
-    this.imageInput = images;
-    web.addEventListener("change", () => {
-      this.networkTouched = true;
-      this.webSearch = web.checked;
-      images.disabled = !web.checked;
-      if (!web.checked) {
-        images.checked = false;
-        this.imageSearch = false;
-      }
-    });
-    images.addEventListener("change", () => {
-      this.networkTouched = true;
-      this.imageSearch = images.checked;
-    });
 
     const local = area.createDiv("vam-reference-section vam-reference-local-section");
     local.createEl("strong", { text: t("ui.local_data") });
@@ -343,13 +294,11 @@ export class ReferencePicker {
     };
   }
 
-  async ready(): Promise<{ groups: ReferenceGroup[]; webSearch: boolean; imageSearch: boolean }> {
+  async ready(): Promise<{ groups: ReferenceGroup[] }> {
     await this.pending;
     if (this.pendingError) throw new Error(t("ui.reference_source_error_must_be_acknowledged"));
     return {
-      groups: dedupeReferenceGroups(this.groups),
-      webSearch: this.webSearch,
-      imageSearch: this.webSearch && this.imageSearch
+      groups: dedupeReferenceGroups(this.groups)
     };
   }
 }

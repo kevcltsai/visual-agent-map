@@ -19,20 +19,26 @@ export interface BackgroundAction {
 }
 
 /**
- * One Notice that reports a finished background run. With an action it carries a single button; pressing it runs
+ * One Notice that reports a finished background run. With actions it carries one button each; pressing one runs its
  * `open()` and hides the Notice. Without the host's fragment helper (tests, non-Obsidian hosts) it is a plain message.
  */
-export function backgroundResultNotice(message: string, action?: BackgroundAction, timeout?: number): Notice {
+export function backgroundResultNotice(
+  message: string,
+  action?: BackgroundAction | readonly BackgroundAction[],
+  timeout?: number
+): Notice {
+  const actions: readonly BackgroundAction[] = action === undefined ? [] : "label" in action ? [action] : action;
   // The fragment helper is a host global; a host without it (tests) gets the plain message.
   const make = (window as { createFragment?: typeof createFragment }).createFragment;
-  if (!action || typeof make !== "function") return new Notice(message, timeout);
+  if (!actions.length || typeof make !== "function") return new Notice(message, timeout);
   let notice: Notice | undefined;
   const fragment = make(el => {
     el.createSpan({ text: message });
-    el.createEl("button", { text: action.label, cls: "vam-background-notice-action" }).addEventListener("click", () => {
-      notice?.hide();
-      action.open();
-    });
+    for (const item of actions)
+      el.createEl("button", { text: item.label, cls: "vam-background-notice-action" }).addEventListener("click", () => {
+        notice?.hide();
+        item.open();
+      });
   });
   notice = new Notice(fragment, timeout);
   return notice;

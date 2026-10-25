@@ -71,7 +71,6 @@ export function builtInSample(language: NoteLanguage, useEmbeddedAssets = true):
       model: "",
       modelSource: "workspace",
       researchMode: "research",
-      researchDepth: "normal",
       visualMode: "auto",
       detailFormatIssues: [],
       mapId: map.id,

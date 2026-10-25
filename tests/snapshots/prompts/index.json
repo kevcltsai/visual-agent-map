@@ -1006,6 +1006,21 @@
       "language": "zh-CN",
       "schema": true
     },
+    "claude.task-quick.en": {
+      "builder": "AiTaskService instructions for Claude: Quick AI mode research (StructuredOutput-first sentence, no tools)",
+      "language": "en",
+      "schema": true
+    },
+    "claude.task-quick.zh": {
+      "builder": "AiTaskService instructions for Claude: Quick AI mode research (StructuredOutput-first sentence, no tools)",
+      "language": "zh-TW",
+      "schema": true
+    },
+    "claude.task-quick.zh-CN": {
+      "builder": "AiTaskService instructions for Claude: Quick AI mode research (StructuredOutput-first sentence, no tools)",
+      "language": "zh-CN",
+      "schema": true
+    },
     "claude.task-synthesize.en": {
       "builder": "AiTaskService instructions for Claude: mode synthesize, local",
       "language": "en",
@@ -1438,6 +1453,36 @@
     },
     "service.task-local-fast.zh-CN": {
       "builder": "AiTaskService instructions: mode task, local research, fast",
+      "language": "zh-CN",
+      "schema": true
+    },
+    "service.task-quick-subtopic.en": {
+      "builder": "AiTaskService instructions: Quick AI mode subtopic research (short overview depth)",
+      "language": "en",
+      "schema": true
+    },
+    "service.task-quick-subtopic.zh": {
+      "builder": "AiTaskService instructions: Quick AI mode subtopic research (short overview depth)",
+      "language": "zh-TW",
+      "schema": true
+    },
+    "service.task-quick-subtopic.zh-CN": {
+      "builder": "AiTaskService instructions: Quick AI mode subtopic research (short overview depth)",
+      "language": "zh-CN",
+      "schema": true
+    },
+    "service.task-quick.en": {
+      "builder": "AiTaskService instructions: Quick AI mode research (knowledge text, Quick source safety, no web, no images)",
+      "language": "en",
+      "schema": true
+    },
+    "service.task-quick.zh": {
+      "builder": "AiTaskService instructions: Quick AI mode research (knowledge text, Quick source safety, no web, no images)",
+      "language": "zh-TW",
+      "schema": true
+    },
+    "service.task-quick.zh-CN": {
+      "builder": "AiTaskService instructions: Quick AI mode research (knowledge text, Quick source safety, no web, no images)",
       "language": "zh-CN",
       "schema": true
     },

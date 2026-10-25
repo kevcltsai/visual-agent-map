@@ -197,6 +197,7 @@ import { RELEVANCE_GRADE_SCHEMA, RELEVANCE_RECALIBRATE_SCHEMA } from "../../core
 import { renderTopicTree } from "../../ui/topic-tree";
 import { TopicTreeModal } from "../../ui/modals/topic-tree-modal";
 import type { FieldLinks, ModelChoices } from "./research-fields";
+import { aiModeOptions, hasKnowledgeGapMarker, noteAiMode, type MapAiMode } from "./ai-mode";
 import type { ResearchObserver } from "../../ai/research-observer";
 import type { ResearchProgress } from "./research-progress";
 import { DetailTemplatesModal } from "../../ui/modals/detail-templates-modal";
@@ -237,6 +238,7 @@ import {
   TaskSourceSettings,
   NextStepModal,
   type OutputLanguageMemory,
+  type AiModeMemory,
   type BackgroundHooks,
   type PendingOutline,
   outlineProposals,
@@ -1057,6 +1059,43 @@ export class VisualAgentMapView extends ItemView {
         )
     };
   }
+  /** What the research and expansion dialog needs to preselect and record this map's AI mode (D-2026-10-228). */
+  private aiModeMemory(): AiModeMemory {
+    return {
+      ...(this.map?.aiMode ? { aiMode: this.map.aiMode } : {}),
+      rememberAiMode: (mode: MapAiMode) =>
+        this.plugin.mutate(async () => {
+          // Unchanged: nothing to write (and no history entry).
+          if (this.map?.aiMode === mode) return;
+          await this.mapChange(map => {
+            map.aiMode = mode;
+          }, false);
+        })
+    };
+  }
+  /**
+   * "Re-run with Standard": researches the topic again in Standard mode (web search, images), replacing the Quick result.
+   * It goes through the usual usage notice and writes with the usual undo step, so the Quick result can be restored.
+   */
+  private rerunStandard(node: MapNode): void {
+    void (async () => {
+      const note = await this.plugin.repo.readNote(node.path, this.map ?? undefined);
+      if (this.plugin.running.has(node.path)) {
+        new Notice(t("ui.ai_running_ai"));
+        return;
+      }
+      await this.plugin.confirmAiUsage(note.model, async () => {
+        const outputLanguage = outputLanguageForMap(this.map, this.plugin.settings.language, note.title);
+        await this.runAgent(node, undefined, message => new Notice(message), {
+          task: researchTopicTask(outputLanguage, note.title),
+          referenceGroups: [],
+          outputLanguage,
+          rules: "",
+          ...aiModeOptions("standard", "research")
+        });
+      });
+    })().catch(error => new Notice(errorMessage(error)));
+  }
   private async persist(): Promise<void> {
     if (!this.builtIn && this.map && this.path) await this.plugin.repo.saveMap(this.path, this.map);
   }
@@ -1555,15 +1594,12 @@ export class VisualAgentMapView extends ItemView {
           source: null,
           shallowResearch: !!options.shallowResearch,
           researchEveryTopic: true,
-          // Shallow research stays Quick (see the dialog); every other research choice is the dialog's.
+          // The research of the new topics is the short overview in the dialog's AI mode (Quick when it has none).
           ...(options.shallowResearch
             ? {
-                researchDepth: "fast" as const,
+                aiMode: options.mapAiMode ?? ("quick" as const),
                 researchOptions: {
-                  // Quick research of the new topics reads local context only unless the dialog asks for the web.
-                  researchMode: options.shallowWebSearch ? options.researchMode : ("local" as const),
                   referenceGroups: options.referenceGroups ?? [],
-                  visualMode: options.shallowWebSearch ? options.visualMode : ("off" as const),
                   ...(options.outputLanguage ? { outputLanguage: options.outputLanguage } : {}),
                   ...(options.toneId ? { toneId: options.toneId } : {}),
                   ...(options.requirements ? { requirements: options.requirements } : {})
@@ -2758,10 +2794,8 @@ export class VisualAgentMapView extends ItemView {
     void this.plugin
       .confirmAiUsage(model, () =>
         this.startShallowResearch(root, children, {
-          researchMode: "research",
-          researchDepth: request.researchDepth ?? "fast",
-          referenceGroups: [],
-          visualMode: "off"
+          ...aiModeOptions(request.aiMode ?? "quick", "subtopic"),
+          referenceGroups: []
         })
       )
       .catch(error => new Notice(errorMessage(error)));
@@ -2898,11 +2932,9 @@ export class VisualAgentMapView extends ItemView {
     void this.plugin
       .confirmAiUsage(model, () =>
         this.startShallowResearch(top, children, {
-          researchMode: "research",
+          ...aiModeOptions(request.aiMode ?? "quick", "subtopic"),
           referenceGroups: [],
-          visualMode: "off",
           ...request.researchOptions,
-          researchDepth: request.researchDepth ?? "fast",
           ...(request.detailTemplateId ? { detailTemplateId: request.detailTemplateId } : {}),
           ...(request.toneId ? { toneId: request.toneId } : {})
         })
@@ -5535,7 +5567,6 @@ export class VisualAgentMapView extends ItemView {
       note.model,
       note.reasoning,
       note.researchMode,
-      note.researchDepth,
       note.visualMode,
       note.status,
       note.sourcePaths,
@@ -6733,6 +6764,24 @@ export class VisualAgentMapView extends ItemView {
       this.button(header, t("ui.view_0_expansion_suggestions", pendingCount), () =>
         this.openNodePanel(node, "proposals")
       ).addClass("vam-badge-new");
+    // A Quick answer that says the model's knowledge was not enough offers the Standard run (never while AI works on it).
+    if (
+      note &&
+      note.researchMode === "local" &&
+      !this.builtIn &&
+      !this.integrationMode &&
+      !this.map?.aim &&
+      !node.aimKind &&
+      !active &&
+      !queued &&
+      !research &&
+      !merging &&
+      hasKnowledgeGapMarker(note.detail)
+    )
+      this.button(header, t("ui.rerun_standard"), () => this.rerunStandard(node)).setAttr(
+        "aria-label",
+        t("ui.rerun_standard_0", note.title)
+      );
     const waitingOutline = this.quickOutlines.get(node.path);
     if (
       waitingOutline &&
@@ -7519,15 +7568,19 @@ export class VisualAgentMapView extends ItemView {
         });
         this.render();
       },
-      completed: kind => {
+      completed: (kind, result) => {
         if (!node || this.closed || this.path !== mapPath) return;
         const title = this.notes.get(node.id)?.title ?? node.path;
-        if (kind === "research")
-          backgroundResultNotice(t("ui.background_research_done_0", title), {
-            label: t("ui.background_view"),
-            open: () => this.openDetails(node)
-          });
-        else {
+        if (kind === "research") {
+          const view = { label: t("ui.background_view"), open: () => this.openDetails(node) };
+          // A Quick answer that says the model's knowledge was not enough also offers the Standard run.
+          if (result && hasKnowledgeGapMarker(result.detail))
+            backgroundResultNotice(t("ui.background_research_gap_0", title), [
+              view,
+              { label: t("ui.rerun_standard"), open: () => this.rerunStandard(node) }
+            ]);
+          else backgroundResultNotice(t("ui.background_research_done_0", title), view);
+        } else {
           const count = this.plugin.pendingSuggestions.get(node.path)?.length ?? 0;
           backgroundResultNotice(t("ui.background_expand_ready_0", title), {
             label: t("ui.view_0_expansion_suggestions", count),
@@ -7553,7 +7606,6 @@ export class VisualAgentMapView extends ItemView {
       new NextStepModal(
         this.app,
         note.title,
-        note.researchDepth,
         this.map?.nodes.filter(item => item.parentId === node.id).length ?? 0,
         this.plugin.pendingSuggestions.get(node.path)?.length ?? 0,
         this.plugin,
@@ -7577,7 +7629,9 @@ export class VisualAgentMapView extends ItemView {
               rules: "",
               researchMode: options.researchMode,
               researchDepth: options.researchDepth,
-              visualMode: options.visualMode
+              visualMode: options.visualMode,
+              mapAiMode: options.mapAiMode,
+              addCharts: options.mapAiMode !== "quick"
             },
             accepted
           );
@@ -7626,6 +7680,7 @@ export class VisualAgentMapView extends ItemView {
           currentSummary: note.summary,
           ...(existingNoteLanguage(note) ? { contentLanguage: existingNoteLanguage(note) } : {}),
           ...this.outputLanguageMemory(),
+          ...this.aiModeMemory(),
           // Only a label: a missing topic template is reported at the next AI update, not when the dialog opens.
           currentTemplate: templateInLanguage(this.resolveTopicTemplate(note).template, this.plugin.settings.language)
             .name,
@@ -7849,10 +7904,8 @@ export class VisualAgentMapView extends ItemView {
           const researchOptions: TaskOptions | undefined = shallow.checked
             ? {
                 ...(this.plugin.pendingResearchOptions.get(node.path) ?? {
-                  researchMode: "research" as const,
-                  researchDepth: "fast" as const,
-                  referenceGroups: [],
-                  visualMode: "off" as const
+                  ...aiModeOptions("quick", "subtopic"),
+                  referenceGroups: []
                 }),
                 shallowResearch: true
               }
@@ -7874,7 +7927,7 @@ export class VisualAgentMapView extends ItemView {
             await (this.plugin.pendingSuggestions as PendingSuggestions).flush?.();
           });
           if (researchOptions && createdNodes.length)
-            await this.startShallowResearch(node, createdNodes, this.shallowChildOptions(researchOptions));
+            await this.startShallowResearch(node, createdNodes, researchOptions);
           close?.();
           this.render();
         } catch (error) {
@@ -8020,7 +8073,9 @@ export class VisualAgentMapView extends ItemView {
       model,
       this.map,
       this.path,
-      parent ? "inherited" : "workspace"
+      parent ? "inherited" : "workspace",
+      // A new topic starts in Quick mode (a research of it may still be run in Standard).
+      { researchMode: "local" }
     );
     if (parent) {
       const parentNote = await this.plugin.repo.readNote(parent.path, this.map ?? undefined);
@@ -8116,7 +8171,7 @@ export class VisualAgentMapView extends ItemView {
           this.render();
         });
         if (researchOptions?.shallowResearch && createdNodes.length)
-          await this.startShallowResearch(parent, createdNodes, this.shallowChildOptions(researchOptions));
+          await this.startShallowResearch(parent, createdNodes, researchOptions);
       });
     };
     if (pending?.length) {
@@ -8180,7 +8235,7 @@ export class VisualAgentMapView extends ItemView {
             ...this.toneField(note, options),
             mode: "decompose",
             researchMode: options?.researchMode ?? "research",
-            researchDepth: options?.researchDepth ?? note.researchDepth,
+            researchDepth: options?.researchDepth ?? "normal",
             visualMode: "off"
           },
           note
@@ -8281,7 +8336,7 @@ export class VisualAgentMapView extends ItemView {
           this.render();
         });
         if (researchOptions?.shallowResearch && createdNodes.length)
-          await this.startShallowResearch(parent, createdNodes, this.shallowChildOptions(researchOptions));
+          await this.startShallowResearch(parent, createdNodes, researchOptions);
       })().catch(error => {
         new Notice(error instanceof Error ? error.message : String(error));
       });
@@ -8334,8 +8389,7 @@ export class VisualAgentMapView extends ItemView {
               : "",
           ...(researchOptions
             ? {
-                researchMode: "research" as const,
-                researchDepth: "fast" as const,
+                researchMode: "local" as const,
                 visualMode: researchOptions.visualMode
               }
             : {}),
@@ -8421,13 +8475,6 @@ export class VisualAgentMapView extends ItemView {
       { sync: false }
     );
   }
-  /**
-   * The options of the quick research that follows AI expansion: no web or image search unless the dialog's checkbox
-   * is on. The decomposition itself and the notes' stored research settings are not affected.
-   */
-  private shallowChildOptions(options: TaskOptions): TaskOptions {
-    return options.shallowWebSearch ? options : { ...options, researchMode: "local", visualMode: "off" };
-  }
   private startShallowResearch(parent: MapNode, children: MapNode[], options: TaskOptions): Promise<void> {
     const signal = options.signal;
     const pendingOptions = this.researchChoices(options);
@@ -8491,6 +8538,7 @@ export class VisualAgentMapView extends ItemView {
         researchMode: choices.researchMode,
         researchDepth: choices.researchDepth,
         visualMode: choices.visualMode,
+        mapAiMode: choices.mapAiMode,
         addCharts: charts,
         task: [note.prompt || researchTopicTask(outputLanguage, note.title), choices.requirements]
           .filter(Boolean)
@@ -8510,7 +8558,11 @@ export class VisualAgentMapView extends ItemView {
   }
   private openMultiResearch(retryBatchKey?: string): void {
     if (!this.map || this.map.aim || !this.multiSelected.size) return;
-    const names = [...this.multiSelected].map(id => this.notes.get(id)?.title).filter((name): name is string => !!name);
+    const shown = [...this.multiSelected].flatMap(id => {
+      const note = this.notes.get(id);
+      return note ? [{ name: note.title, mode: noteAiMode(note.researchMode) }] : [];
+    });
+    const names = shown.map(item => item.name);
     new MultiResearchModal(
       this.app,
       names,
@@ -8520,7 +8572,8 @@ export class VisualAgentMapView extends ItemView {
       this.toneChoices(),
       (selected, refreshed) =>
         new PromptPresetsModal(this.app, this.plugin, "tone", () => refreshed(this.toneChoices()), selected).open(),
-      this.fieldLinks()
+      this.fieldLinks(),
+      shown.map(item => item.mode)
     ).open();
   }
   stopMultiResearch(): void {
@@ -8567,15 +8620,23 @@ export class VisualAgentMapView extends ItemView {
         this.integrationMode = false;
         this.multiSelected.clear();
         if (!this.closed) this.render();
-        const choices: TaskOptions = {
-          researchMode: request.researchMode,
-          researchDepth: request.researchDepth,
-          visualMode: request.imageSearch ? "auto" : "off",
+        const shared = {
           referenceGroups: [],
           requirements: request.requirements,
           ...(request.detailTemplateId ? { detailTemplateId: request.detailTemplateId } : {}),
           ...(request.toneId ? { toneId: request.toneId } : {})
         };
+        // The map chat may set the research choices for the whole batch (as before); the dialog never does, so each topic then
+        // runs in the mode its own note stores: Quick without the web and without charts, Standard with both.
+        const choicesFor = (note: Note): TaskOptions =>
+          request.researchMode !== undefined
+            ? {
+                researchMode: request.researchMode,
+                researchDepth: request.researchDepth ?? "normal",
+                visualMode: request.imageSearch ? "auto" : "off",
+                ...shared
+              }
+            : { ...aiModeOptions(noteAiMode(note.researchMode), "research"), ...shared };
         // A retry replaces the failure state of the batch it came from (a running batch is never touched).
         if (retryBatchKey && this.plugin.expansionBatches.get(retryBatchKey)?.status !== "running")
           this.plugin.expansionBatches.delete(retryBatchKey);
@@ -8593,7 +8654,8 @@ export class VisualAgentMapView extends ItemView {
                 accepted();
                 return "skipped";
               }
-              await this.researchChild(child, batchSignal, accepted, choices, true, result => {
+              const choices = choicesFor(await this.plugin.repo.readNote(child.path, this.map ?? undefined));
+              await this.researchChild(child, batchSignal, accepted, choices, choices.mapAiMode !== "quick", result => {
                 if (choices.researchMode !== "research" || result.retrievals === undefined) return;
                 web.counted++;
                 web.searches += result.retrievals;
@@ -8998,7 +9060,7 @@ export class VisualAgentMapView extends ItemView {
           ...this.toneField(note, options),
           mode: "synthesize",
           researchMode: options?.researchMode ?? "local",
-          researchDepth: options?.researchDepth ?? note.researchDepth,
+          researchDepth: options?.researchDepth ?? "normal",
           visualMode: options?.visualMode ?? note.visualMode,
           detailTemplate,
           addCharts: true
@@ -9362,7 +9424,6 @@ export class VisualAgentMapView extends ItemView {
     new NextStepModal(
       this.app,
       "",
-      "normal",
       0,
       0,
       this.plugin,
@@ -11622,7 +11683,7 @@ export class VisualAgentMapView extends ItemView {
         return skipped("ui.map_chat_skip_synthesis_busy");
       const note = await this.plugin.repo.readNote(node.path, map);
       const options = chatSynthesisOptions({
-        depth: note.researchDepth,
+        depth: "normal",
         outputLanguage: defaultOutputLanguage(settings.language, note.title, existingNoteLanguage(note), remembered)
       });
       return this.launchChatTask(note.model, (failed, accepted) =>
@@ -11996,7 +12057,7 @@ export class VisualAgentMapView extends ItemView {
         sourceContext: "",
         mode: "task",
         researchMode: note.researchMode,
-        researchDepth: note.researchDepth,
+        researchDepth: "normal",
         visualMode: note.visualMode,
         ...this.toneField(note, overrides),
         ...overrides,
@@ -12099,7 +12160,6 @@ export class VisualAgentMapView extends ItemView {
             latest.model !== note.model ||
             latest.reasoning !== note.reasoning ||
             latest.researchMode !== note.researchMode ||
-            latest.researchDepth !== note.researchDepth ||
             latest.visualMode !== note.visualMode ||
             latest.sourcePaths.join("\n") !== note.sourcePaths.join("\n") ||
             JSON.stringify(latest.referencePaths) !== JSON.stringify(note.referencePaths);
@@ -12128,6 +12188,8 @@ export class VisualAgentMapView extends ItemView {
               visualReferences: visualReferencesMarkdown(result.visualReferences, noteLanguageOf(language)),
               newFindings: "",
               status: "completed",
+              // The topic remembers the mode of its latest research (Quick is stored as local).
+              ...(context.researchMode ? { researchMode: context.researchMode } : {}),
               ...formatIssuesPatch(result.formatIssues, language)
             },
             { detailTemplate: context.detailTemplate }
@@ -12137,7 +12199,16 @@ export class VisualAgentMapView extends ItemView {
             node.path,
             { ...latest, status: note.status },
             saved,
-            ["summary", "detail", "visualReferences", "newFindings", "previewSection", "previewInitialized", "status"],
+            [
+              "summary",
+              "detail",
+              "visualReferences",
+              "newFindings",
+              "previewSection",
+              "previewInitialized",
+              "status",
+              "researchMode"
+            ],
             t("ui.research_task")
           );
           if (exchangeId && this.plugin.settings.aiExchangeLoggingEnabled) this.plugin.exchanges?.completed(exchangeId);

@@ -330,7 +330,8 @@ async function createOutlineNotes(
         map,
         mapPath,
         manualModel ? "manual" : top && parentId === null ? "workspace" : "inherited",
-        top ? { detail: rootDetail } : {}
+        // A topic created from an outline starts in Quick mode (its first research, if any, is the short one).
+        top ? { detail: rootDetail, researchMode: "local" } : { researchMode: "local" }
       );
       note.parentId = top ? parentId : created[node.parent!].id;
       created.push(note);

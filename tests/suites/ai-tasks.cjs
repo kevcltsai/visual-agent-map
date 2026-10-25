@@ -685,3 +685,79 @@ test('S3: there is no automatic re-send and only the main call is observed', asy
   await plain.askModel({ title: 'T', summary: '', rules: '', detail: '', task: 'Research', ancestors: '', mode: 'task', researchMode: 'local', researchDepth: 'fast', visualMode: 'off' }, 'claude:sonnet', 'low');
   assert.equal(controls.stream, undefined);
 });
+
+// ---- AI mode Quick / Standard (D-2026-10-228..233, 239..248) --------------------------------------------------------
+const quickBase = { title: 'Topic T', summary: 'Summary S', rules: '', detail: 'Detail D', task: 'Research the topic', ancestors: '', sourceContext: 'Source [S1]: a fact', mode: 'task', researchMode: 'local', researchDepth: 'normal', visualMode: 'off' };
+const QUICK_MARKERS = { en: 'Model knowledge is insufficient', 'zh-TW': '模型知識不足', 'zh-CN': '模型知识不足' };
+const promptOf = (context, language) => load('core/steps/task/render.ts', { obsidian }).generalTaskPrompt({ ...context, outputLanguage: language }, language, 'codex');
+integrationTest('Quick prompt: the Quick source-safety and knowledge texts replace the local-research text; no web policy and no LOCAL_FIRST; the marker sentence is quoted in each language', () => {
+  for (const language of ['en', 'zh-TW', 'zh-CN']) {
+    const standard = promptOf({ ...quickBase, researchMode: 'research' }, language);
+    const local = promptOf(quickBase, language);
+    const quick = promptOf({ ...quickBase, mapAiMode: 'quick' }, language);
+    assert.notEqual(quick, local); assert.notEqual(quick, standard);
+    assert.ok(quick.includes(QUICK_MARKERS[language]), `${language}: the fixed marker sentence is in the Quick prompt`);
+    assert.equal(local.includes(QUICK_MARKERS[language]), false, 'the old local text does not carry it');
+    const t = load('i18n.ts').translate;
+    assert.ok(local.includes(t(language, 'research.local')) && !quick.includes(t(language, 'research.local')), 'research.local is replaced');
+    assert.equal(quick.includes(t(language, 'research.web')), false, 'no web policy');
+    assert.equal(quick.includes(load('core/steps/_shared/fragments.ts').inLanguage(load('core/steps/_shared/fragments.ts').LOCAL_FIRST, language)), false, 'no LOCAL_FIRST');
+    assert.ok(quick.includes('[S#]') || quick.includes('[S'), 'provided sources keep their [S#] markers');
+  }
+  // Standard is the current research text, byte for byte, whether or not the context says so.
+  assert.equal(promptOf({ ...quickBase, researchMode: 'research', mapAiMode: 'standard' }, 'en'), promptOf({ ...quickBase, researchMode: 'research' }, 'en'));
+  // Quick with a fast depth keeps the depth sentence and swaps only the knowledge text.
+  const fast = promptOf({ ...quickBase, mapAiMode: 'quick', researchDepth: 'fast' }, 'en');
+  assert.ok(fast.includes(load('i18n.ts').translate('en', 'research.fast'))); assert.equal(fast.includes(load('i18n.ts').translate('en', 'research.normal')), false);
+});
+integrationTest('Quick prompt guards: a helper request, an AIM prompt, a count repair or an intermediate extraction keeps the original source-safety and local-research text even with mapAiMode quick', () => {
+  const cases = {
+    synthesize: { mode: 'synthesize' }, merge: { mode: 'merge' }, decompose: { mode: 'decompose' },
+    countRepair: { countRepair: true }, intermediateDetail: { intermediateDetail: true }
+  };
+  for (const [name, patch] of Object.entries(cases)) for (const language of ['en', 'zh-TW']) {
+    const context = { ...quickBase, ...patch };
+    assert.equal(promptOf({ ...context, mapAiMode: 'quick' }, language), promptOf(context, language), `${name}/${language}: unchanged by mapAiMode`);
+    assert.equal(promptOf({ ...context, mapAiMode: 'quick' }, language).includes(QUICK_MARKERS[language]), false, `${name}/${language}: no Quick text`);
+  }
+  // AIM goes through its own shell, which never reads mapAiMode.
+  const { taskPrompt } = load('core/steps/task/render.ts', { obsidian });
+  const aim = { ...quickBase, promptProfile: 'aim', task: 'Research the subtopic', researchMode: 'research' };
+  assert.equal(taskPrompt({ ...aim, mapAiMode: 'quick' }, 'en', 'codex'), taskPrompt(aim, 'en', 'codex'));
+  // The only requests a Quick map research is allowed to change: a plain task, and it must be local.
+  assert.equal(promptOf({ ...quickBase, researchMode: 'research', mapAiMode: 'quick' }, 'en'), promptOf({ ...quickBase, researchMode: 'research' }, 'en'), 'a web request with a stray quick flag is not Quick');
+  const gate = load('core/steps/task/render.ts', { obsidian }).isQuickTask;
+  assert.equal(gate({ ...quickBase, mapAiMode: 'quick' }), true);
+  assert.equal(gate({ ...quickBase, mode: undefined, mapAiMode: 'quick' }), true, 'no mode means a task');
+  for (const patch of [{ mapAiMode: 'standard' }, { mapAiMode: undefined }, { researchMode: 'research' }, { mode: 'synthesize' }, { promptProfile: 'aim' }, { countRepair: true }, { intermediateDetail: true }])
+    assert.equal(gate({ ...quickBase, mapAiMode: 'quick', ...patch }), false, JSON.stringify(patch));
+});
+integrationTest('Quick research reaches the providers without any web tool; a Standard research from the dialog still hits the forced-web gate', async () => {
+  const { aiModeOptions } = load('experiences/visual-map/ai-mode.ts');
+  const make = () => {
+    const { default: Plugin } = load('main.ts', { obsidian });
+    const plugin = new Plugin(); plugin.app = { vault: { adapter: new obsidian.FileSystemAdapter() } }; plugin.manifest = { dir: '.obsidian/plugins/visual-agent-map' };
+    const calls = [];
+    const reply = JSON.stringify({ summary: 'S', detail: 'D', suggestions: [], visualReferences: [], searchStatus: 'completed' });
+    plugin.claudeCli = () => ({ runTask: async (...args) => { calls.push({ provider: 'claude', prompt: args[0], options: args[4] }); return reply; } });
+    plugin.runtime = (_directory, local) => ({ runTask: async (prompt, _model, _effort, _schema, options) => { calls.push({ provider: 'codex', local, prompt, options }); return reply; } });
+    return { plugin, calls };
+  };
+  const research = (mode, kind = 'research') => ({ ...quickBase, sourceContext: undefined, ...aiModeOptions(mode, kind) });
+  for (const model of ['claude:sonnet', 'gpt-test']) {
+    const q = make(); await q.plugin.askModel(research('quick'), model, 'low');
+    assert.equal(q.calls.length, 1, `${model}: one request`);
+    assert.equal(q.calls[0].options.webSearch, false, `${model}: Quick has no web tools`);
+    assert.equal('webSearchOnly' in q.calls[0].options, false, `${model}: Quick never takes the web-only thread`);
+    if (model.startsWith('gpt')) assert.equal(q.calls[0].local, true, 'Codex runs the local (no network) runtime');
+    assert.equal(q.calls[0].prompt.includes('Model knowledge is insufficient'), true);
+    assert.equal(q.calls[0].prompt.includes('Use only the provided topic and source context'), false);
+    const s = make(); await s.plugin.askModel(research('standard'), model, 'low');
+    assert.equal(s.calls[0].options.webSearch, true, `${model}: Standard keeps the web`);
+    assert.equal(s.calls[0].options.webSearchOnly, true, `${model}: Standard research of normal depth must search (B2 gate)`);
+    assert.ok(s.calls[0].prompt.includes(load('i18n.ts').translate('en', 'research.web_required')) || s.calls[0].prompt.includes(load('i18n.ts').translate('zh-TW', 'research.web_required')));
+  }
+  // Known gap, deferred to Packet B (D-2026-10-248): a Standard subtopic research (short overview) has the web but is not forced to use it.
+  const sub = make(); await sub.plugin.askModel(research('standard', 'subtopic'), 'claude:sonnet', 'low');
+  assert.equal(sub.calls[0].options.webSearch, true); assert.equal('webSearchOnly' in sub.calls[0].options, false);
+});

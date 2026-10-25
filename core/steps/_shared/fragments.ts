@@ -1,6 +1,7 @@
 import { renderTemplate } from "../../step-runner";
 import {
   instructionLanguageOf,
+  translate,
   isFollowInputLanguage,
   languagePromptName,
   verbatimHeadingLanguage,
@@ -35,6 +36,10 @@ import RoleZH from "./role.zh.md";
 import RoleEN from "./role.en.md";
 import SourceSafetyZH from "./source-safety.zh.md";
 import SourceSafetyEN from "./source-safety.en.md";
+import SourceSafetyQuickZH from "./source-safety-quick.zh.md";
+import SourceSafetyQuickEN from "./source-safety-quick.en.md";
+import QuickKnowledgeZH from "./quick-knowledge.zh.md";
+import QuickKnowledgeEN from "./quick-knowledge.en.md";
 import HeadingsVerbatimZH from "./headings-verbatim.zh.md";
 import HeadingsVerbatimEN from "./headings-verbatim.en.md";
 import HeadingsVerbatimFollowZH from "./headings-verbatim-follow.zh.md";
@@ -121,6 +126,19 @@ export const OBSIDIAN_FORMAT: FragmentPair = pair(ObsidianFormatZH, ObsidianForm
 export const REFERENCE_CITATIONS: FragmentPair = pair(ReferenceCitationsZH, ReferenceCitationsEN);
 export const ROLE: FragmentPair = pair(RoleZH, RoleEN);
 export const SOURCE_SAFETY: FragmentPair = pair(SourceSafetyZH, SourceSafetyEN);
+/** The Quick AI mode's source-safety text: only the "insufficient evidence" sentence differs, so the model may use its own knowledge. */
+export const SOURCE_SAFETY_QUICK: FragmentPair = pair(SourceSafetyQuickZH, SourceSafetyQuickEN);
+
+/** The fixed sentence a Quick answer writes in its Detail when sources and model knowledge are both insufficient (matched by `hasKnowledgeGapMarker`). */
+export function knowledgeGapMarker(language: ContentLanguage): string {
+  return translate(language, "research.knowledge_gap_marker");
+}
+/** The Quick AI mode's knowledge rule; it replaces the `research.local` text for a Quick map research or expansion. */
+export function quickKnowledge(language: ContentLanguage): string {
+  return renderTemplate(inLanguage({ zh: QuickKnowledgeZH, en: QuickKnowledgeEN }, language), {
+    marker: knowledgeGapMarker(language)
+  });
+}
 
 /**
  * The tone rule plus the resolved tone text. Callers add it only when a tone text exists (academic or absent adds

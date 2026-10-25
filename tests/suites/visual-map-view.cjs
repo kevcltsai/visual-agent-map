@@ -208,7 +208,7 @@ integrationTest('Next Step reviews first expansion proposals in place and keeps 
   const modelState = provider => ({ provider, status: 'ready', models: provider === 'codex' ? ['gpt-test'] : [] });
   const plugin = { settings: { codexUsageNoticeSeen: true, claudeUsageNoticeSeen: true, models: 'gpt-test', cliReasoning: 'low', language: 'en' }, aiReadyForModel: async model => { checkedModels.push(model); return true; }, confirmAiUsage: async (model, run) => { checkedModels.push(model); await run(); return true; }, saveSettings: async () => {}, activeTasks: new Map(), availableModels: () => ['gpt-test'], modelLabel: model => model, modelDiscoveryState: modelState, subscribeModelDiscovery: () => () => {}, refreshModelDiscovery: async provider => modelState(provider), sources: { currentTopicId: 'current', currentLabel: 'Current topic included', synthesisLabel: 'Current topic and child topics included', synthesisTopics: ['Child A', 'Child B'], topics: async () => [], readTopic: async () => [] } };
   const modelSettings = { model: 'gpt-test', modelSource: 'workspace', reasoning: 'low', save: async () => {}, sources: plugin.sources };
-  const modal = new NextStepModal({}, 'Parent', 'normal', 1, 1, plugin,
+  const modal = new NextStepModal({}, 'Parent', 1, 1, plugin,
     async (options, _focus, _done, _failed, accepted) => { researchOptions = options; accepted(); },
     async (options, _direction, found) => { expandOptions = options; expandCalls++; found([{ title: 'Transport', task: 'Compare', contribution: '', parentTitle: '' }], async items => { created = items; }); },
     async (options, direction) => { synthCalls++; synthOptions = options; assert.equal(direction, null); }, modelSettings);
@@ -246,11 +246,9 @@ integrationTest('Next Step reviews first expansion proposals in place and keeps 
   assert.equal(adjust.open, false); assert.equal(adjust.children[0].text, 'Adjust');
   assert.equal(find(research, item => item.tag === 'fieldset'), undefined);
   const [researchAdjust, expandAdjust, synthAdjust] = all(adjust, item => item.cls === 'vam-next-adjust-section');
-  const depthSet = find(researchAdjust, item => item.tag === 'fieldset');
-  assert.equal(depthSet.children[0].tag, 'legend');
-  assert.equal(all(modal.contentEl, item => item.tag === 'fieldset').length, 1, 'one research-depth widget');
+  assert.equal(all(modal.contentEl, item => item.tag === 'fieldset').length, 0, 'the research-depth fieldset is gone; the AI mode switch replaces it');
   const summaryLine = find(modal.contentEl, item => item.cls === 'vam-next-summary');
-  assert.equal(summaryLine.text, 'Standard research · Web search · Same language as my text');
+  assert.equal(summaryLine.text, 'Quick · Same language as my text');
   const sourceDisclosures = all(modal.contentEl, item => item.cls.includes('vam-next-source-details'));
   assert.equal(sourceDisclosures.length, 1, 'one data-source picker serves every step');
   const [sources] = sourceDisclosures;
@@ -265,37 +263,31 @@ integrationTest('Next Step reviews first expansion proposals in place and keeps 
   assert.equal(all(modal.contentEl, item => item.tag === 'textarea').length, 1);
   assert.equal(button(modal.contentEl, 'Save instructions'), undefined);
   requirements.value = 'Only this run';
-  const sourceChecks = all(sources, item => item.tag === 'input' && item.type === 'checkbox');
-  assert.equal(sourceChecks.length, 2); assert.ok(sourceChecks[0].checked); assert.ok(sourceChecks[1].checked);
-  assert.ok(find(sources, item => item.text === 'Search for image references'));
-  assert.ok(find(researchAdjust, item => /Standard: provide the main evidence, limits, and open questions/.test(item.text ?? '')));
-  // S7: the shallow-research option plus its own "also search the web" option, both off by default; the second shows only with the first.
+  // The data sources keep only local files: no web or image choice (the AI mode decides both).
+  assert.equal(all(sources, item => item.tag === 'input' && item.type === 'checkbox').length, 0);
+  assert.equal(find(sources, item => item.text === 'Search for image references'), undefined);
+  assert.equal(find(sources, item => item.text === 'Allow web search'), undefined);
+  assert.ok(find(modal.contentEl, item => /Use Standard once the structure is settled, or when the topic is new or obscure/.test(item.text ?? '')), 'one line says when to use Standard');
+  // The expansion's subtopic research is one option; its hint follows the AI mode and never claims the web for Quick.
   const expandChecks = all(expandAdjust, item => item.tag === 'input' && item.type === 'checkbox');
-  assert.equal(expandChecks.length, 2, 'expand keeps its shallow-research option and the web-search option for it');
-  assert.equal(expandChecks[0].checked, false); assert.equal(expandChecks[1].checked, false);
-  assert.ok(find(expandAdjust, item => item.text === 'Run quick research on each created subtopic (does not search the web)'));
-  assert.ok(find(expandAdjust, item => item.text === 'Also search the web for subtopic research'));
-  // R1: the hint never claims a web search while the web option is off, and describes it once the option is on.
+  assert.equal(expandChecks.length, 1, 'expand keeps only its subtopic-research option');
+  assert.equal(expandChecks[0].checked, false);
+  assert.ok(find(expandAdjust, item => item.text === 'Run a short research on each created subtopic'));
+  assert.equal(find(expandAdjust, item => item.text === 'Also search the web for subtopic research'), undefined);
   const shallowHint = () => find(expandAdjust, item => /^Subtopic research: /.test(item.text ?? ''));
-  assert.match(shallowHint().text, /without searching the web/); assert.doesNotMatch(shallowHint().text, /web search\b(?! is)/i);
-  expandChecks[1].checked = true; expandChecks[1].change();
-  assert.match(shallowHint().text, /Quick: answer the core question first/); assert.doesNotMatch(shallowHint().text, /without searching the web/);
-  assert.doesNotMatch(shallowHint().text, /Quick research: Quick/, 'the depth label is not repeated');
-  assert.equal(load('i18n.ts').translate('zh-TW', 'ui.shallow_research_for_expanded_subtopics_0', load('i18n.ts').translate('zh-TW', 'ui.quick_aim_for_up_to_1_web_search_and_2_main_sources_answer_t')).match(/快速/g).length, 1, 'zh hint does not repeat 快速');
-  expandChecks[1].checked = false; expandChecks[1].change();
-  assert.match(shallowHint().text, /without searching the web/);
-  assert.equal(load('i18n.ts').translate('zh-TW', 'ui.shallow_research_local_description'), '依主題與你提供的來源回答，不搜尋網路。勾選下方選項才會搜尋。');
+  assert.match(shallowHint().text, /without the web/); assert.doesNotMatch(shallowHint().text, /searches the web/);
+  button(find(modal.contentEl, item => item['aria-label'] === 'AI mode'), 'Standard').click();
+  assert.match(shallowHint().text, /searches the web/); assert.doesNotMatch(shallowHint().text, /without the web/);
+  button(find(modal.contentEl, item => item['aria-label'] === 'AI mode'), 'Quick').click();
+  assert.match(shallowHint().text, /without the web/);
+  assert.equal(load('i18n.ts').translate('zh-TW', 'ui.shallow_research_for_expanded_subtopics_0', load('i18n.ts').translate('zh-TW', 'ui.ai_mode_quick_desc')).includes('快速'), false, 'the zh hint does not repeat the mode name');
   assert.equal(all(sources, item => item.tag === 'input' && item.type === 'file').length, 2);
-  assert.ok(find(sources, item => item.text === 'Allow web search'));
-  assert.ok(find(synthesize, item => /web search is off by default/.test(item.text ?? '')));
+  assert.ok(find(synthesize, item => /run a Standard research on the topic first/.test(item.text ?? '')));
   assert.equal(find(synthesize, item => item.text === 'Does not copy full subtopic notes'), undefined);
   cards.children[1].click();
   assert.equal(activeCard(), 1); assert.equal(researchAction.hidden, true);
   assert.equal(research.style.display, 'none'); assert.equal(expand.style.display, '');
-  sourceChecks[0].checked = false; sourceChecks[0].change();
-  assert.equal(sourceChecks[1].disabled, true); assert.equal(sourceChecks[1].checked, false);
-  sourceChecks[0].checked = true; sourceChecks[0].change();
-  button(modal.modalEl, 'Review AI subtopic suggestions').click(); await tick();
+  button(modal.modalEl, 'Review AI subtopic suggestions (1)').click(); await tick();
   assert.equal(expandCalls, 1); assert.equal(closed, 0);
   const proposalCheck = find(expand.querySelector('.vam-next-result'), item => item.tag === 'input' && item.type === 'checkbox');
   proposalCheck.checked = false; button(expand, 'Create subtopics (1)').click(); await tick();
@@ -304,44 +296,23 @@ integrationTest('Next Step reviews first expansion proposals in place and keeps 
   button(expand, 'Create subtopics (1)').click(); await tick();
   assert.equal(created[0].title, 'Transport'); assert.equal(expandOptions.outputLanguage, 'zh-TW');
   assert.equal(closed, 1, 'guided expansion closes after the subtopics are created'); closed = 0; // later absolute close counts stay as before
-  // Owner decision 2026-10-19: pressing an AI action hides the dialog once AI starts. A first expansion (nothing waiting)
-  // therefore closes at the press; a failure is a Notice, and the proposals come back through the card badge, never
-  // into the closed dialog. Reviewing proposals in place still holds for proposals already waiting (pending count > 0).
+  // The guided first expansion ("Get expansion directions") is gone: Expand writes an outline, and only proposals that already
+  // wait are reviewed here, through the secondary button. The background hook is still handed to the dialog.
   const spy = { begins: 0, ends: 0, completed: [], controllers: [] };
   const background = { begin: controller => { spy.begins++; spy.controllers.push(controller); }, end: () => { spy.ends++; }, completed: kind => spy.completed.push(kind) };
-  let firstAttempts = 0, firstOptions;
-  const firstExpand = async (options, _direction, found, failed) => {
-    firstOptions = options; firstAttempts++;
-    if (firstAttempts === 1) { failed('No useful proposals'); return; }
-    found([{ title: 'First idea', task: 'Explore it', contribution: '', parentTitle: '' }], async () => {});
-  };
-  const openFirst = () => {
-    const flow = new NextStepModal({}, 'Parent', 'normal', 0, 0, plugin, async () => {}, firstExpand, async () => {}, { ...modelSettings, background });
-    flow.onOpen(); find(flow.contentEl, item => item.cls === 'vam-next-cards').children[1].click();
-    return flow;
-  };
-  const firstFlow = openFirst();
-  const firstPanel = all(firstFlow.contentEl, item => item.cls.includes('vam-next-research'))[1];
-  find(firstFlow.contentEl, item => item.tag === 'textarea').value = 'Keep this while retrying';
-  button(firstFlow.modalEl, 'Get expansion directions').click(); await tick();
-  assert.equal(closed, 1, 'the dialog hid itself once AI started'); closed = 0;
-  assert.ok(notices.includes('No useful proposals'), 'a failure after hiding is a Notice');
-  assert.notEqual(firstPanel.querySelector('.vam-next-status').text, 'No useful proposals', 'the failure is not written into the closed dialog');
-  assert.equal(spy.begins, 1); assert.equal(spy.ends, 1, 'the card hand-over is released when the run ends'); assert.equal(firstOptions.signal.aborted, false);
-  const secondFlow = openFirst();
-  button(secondFlow.modalEl, 'Get expansion directions').click(); await tick();
-  assert.equal(closed, 1); closed = 0;
-  assert.deepEqual(spy.completed, ['expand'], 'the view is told once that the proposals wait on the card');
-  assert.equal(find(all(secondFlow.contentEl, item => item.cls.includes('vam-next-research'))[1].querySelector('.vam-next-result'), item => item.text === 'AI subtopic proposals'), undefined, 'proposals are not rendered into the closed dialog');
+  const noPending = new NextStepModal({}, 'Parent', 0, 0, plugin, async () => {}, async () => assert.fail('no AI call for an empty review'), async () => {}, { ...modelSettings, background });
+  noPending.onOpen();
+  assert.equal(button(noPending.modalEl, 'Get expansion directions'), undefined, 'no guided first expansion');
+  assert.equal(button(noPending.modalEl, 'Review AI subtopic suggestions (0)').hidden, true, 'nothing waits, so the review button is hidden');
   // Proposals already waiting are reviewed in place: no AI starts, so the dialog stays open until they are created.
   let firstCreated;
-  const reviewFlow = new NextStepModal({}, 'Parent', 'normal', 0, 1, plugin, async () => {}, async (_options, _direction, found) => {
+  const reviewFlow = new NextStepModal({}, 'Parent', 0, 1, plugin, async () => {}, async (_options, _direction, found) => {
     found([{ title: 'First idea', task: 'Explore it', contribution: '', parentTitle: '' }], async items => { firstCreated = items; });
   }, async () => {}, { ...modelSettings, background });
   reviewFlow.onOpen(); find(reviewFlow.contentEl, item => item.cls === 'vam-next-cards').children[1].click();
   const reviewPanel = all(reviewFlow.contentEl, item => item.cls.includes('vam-next-research'))[1];
-  button(reviewFlow.modalEl, 'Review AI subtopic suggestions').click(); await tick();
-  assert.equal(closed, 0, 'reviewing waiting proposals starts no AI and keeps the dialog open'); assert.equal(spy.begins, 2, 'no further hand-over');
+  button(reviewFlow.modalEl, 'Review AI subtopic suggestions (1)').click(); await tick();
+  assert.equal(closed, 0, 'reviewing waiting proposals starts no AI and keeps the dialog open'); assert.equal(spy.begins, 0, 'no hand-over: no AI started');
   assert.ok(find(reviewPanel.querySelector('.vam-next-result'), item => item.text === 'AI subtopic proposals'));
   const firstCheckbox = find(reviewPanel.querySelector('.vam-next-result'), item => item.tag === 'input' && item.type === 'checkbox');
   firstCheckbox.checked = false;
@@ -357,11 +328,11 @@ integrationTest('Next Step reviews first expansion proposals in place and keeps 
   assert.ok(find(synthAdjust, item => item.tag === 'li' && item.text === 'Child B'));
   contentChoice.value = 'summary'; contentChoice.change();
   assert.ok(find(synthAdjust, item => /Important conditions in the body may be omitted/.test(item.text ?? '')));
-  assert.equal(find(modal.contentEl, item => item.cls === 'vam-next-summary').text, 'Choose directions together · Web search · 繁體中文', 'expand summary names the mode');
+  assert.equal(find(modal.contentEl, item => item.cls === 'vam-next-summary').text, '2 levels · up to 15 · 繁體中文', 'expand summary names the chosen levels and size');
   cards.children[2].click(); assert.equal(activeCard(), 2); assert.equal(researchAction.hidden, true);
-  assert.equal(find(modal.contentEl, item => item.cls === 'vam-next-summary').text, 'Summary only · Web search · 繁體中文', 'the summary line follows the synthesis content choice');
+  assert.equal(find(modal.contentEl, item => item.cls === 'vam-next-summary').text, 'Summary only · 繁體中文', 'the summary line follows the synthesis content choice');
   // Starting synthesis closes its window at once, so it runs on its own modal and this one stays open for research.
-  const synthModal = new NextStepModal({}, 'Parent', 'normal', 1, 1, plugin, async () => {}, async () => {}, modal.synthesize, modelSettings);
+  const synthModal = new NextStepModal({}, 'Parent', 1, 1, plugin, async () => {}, async () => {}, modal.synthesize, modelSettings);
   synthModal.onOpen(); find(synthModal.contentEl, item => item.cls === 'vam-next-cards').children[2].click();
   find(synthModal.contentEl, item => item['aria-label'] === 'Answer language for this task').value = 'zh-TW';
   const synthPanel = all(synthModal.contentEl, item => item.cls.includes('vam-next-research'))[2];
@@ -375,32 +346,31 @@ integrationTest('Next Step reviews first expansion proposals in place and keeps 
   assert.equal(synthCalls, 1); assert.equal(closed, closedBeforeSynthStart + 1); assert.equal(synthModal.closed, true);
   assert.equal(find(synthModal.contentEl, item => item.cls.includes('vam-next-status') && /cancelled/i.test(item.text ?? '')), undefined);
   assert.equal(synthOptions.researchMode, 'local');
-  // Untouched network options follow each step's default; a choice the user makes is kept across steps.
-  const defaultsModal = new NextStepModal({}, 'Parent', 'normal', 1, 1, plugin, async () => {}, async () => {}, async () => {}, modelSettings);
+  // The AI mode choice is kept across steps; a synthesis hides the switch and never sends a mode.
+  const defaultsModal = new NextStepModal({}, 'Parent', 1, 1, plugin, async () => {}, async () => {}, async () => {}, modelSettings);
   defaultsModal.onOpen();
   const defaultCards = find(defaultsModal.contentEl, item => item.cls === 'vam-next-cards');
-  const webOf = () => all(find(defaultsModal.contentEl, item => item.cls.includes('vam-next-source-details')), item => item.tag === 'input' && item.type === 'checkbox')[0];
-  defaultCards.children[2].click(); assert.equal(webOf().checked, false);
-  defaultCards.children[0].click(); assert.equal(webOf().checked, true);
-  webOf().checked = false; webOf().change();
-  defaultCards.children[1].click(); assert.equal(webOf().checked, false);
+  const modeSwitch = find(defaultsModal.contentEl, item => item['aria-label'] === 'AI mode');
+  button(modeSwitch, 'Standard').click();
+  defaultCards.children[2].click(); assert.equal(modeSwitch.parent.hidden, true);
+  defaultCards.children[1].click(); assert.equal(modeSwitch.parent.hidden, false); assert.equal(button(modeSwitch, 'Standard')['aria-checked'], 'true');
   assert.equal(synthOptions.outputLanguage, 'zh-TW');
   assert.equal(button(synthPanel, 'Choose this direction'), undefined);
   closed = closedBeforeSynthStart;
   cards.children[0].click(); assert.equal(activeCard(), 0); assert.equal(researchAction.hidden, false);
   // The first modal closed itself after creating subtopics, so a research run needs a fresh dialog: one confirm click starts it.
-  const researchModal = new NextStepModal({}, 'Parent', 'normal', 1, 0, plugin,
+  const researchModal = new NextStepModal({}, 'Parent', 1, 0, plugin,
     async (options, _focus, _done, _failed, accepted) => { researchOptions = options; accepted(); }, async () => {}, async () => {}, modelSettings);
   researchModal.onOpen();
   find(researchModal.contentEl, item => item.tag === 'textarea').value = 'Only this run';
   find(researchModal.contentEl, item => item['aria-label'] === 'Answer language for this task').value = 'zh-TW';
   button(researchModal.modalEl, 'Confirm research task').click(); await tick();
-  assert.equal(researchOptions.requirements, 'Only this run'); assert.equal(researchOptions.researchMode, 'research'); assert.equal(researchOptions.referenceGroups.length, 0);
+  assert.equal(researchOptions.requirements, 'Only this run'); assert.equal(researchOptions.researchMode, 'local', 'Quick is the default mode'); assert.equal(researchOptions.mapAiMode, 'quick'); assert.equal(researchOptions.referenceGroups.length, 0);
   assert.equal(researchOptions.outputLanguage, 'zh-TW'); assert.equal(researchOptions.researchDepth, 'normal');
   assert.equal(closed, 1, 'research is two clicks in all: open, then confirm'); assert.equal(researchModal.closed, true);
   // The suggested step follows the topic's research state.
   const suggested = (childrenCount, topicStatus, childrenCompleted) => {
-    const suggestModal = new NextStepModal({}, 'Parent', 'normal', childrenCount, 0, plugin, async () => {}, async () => {}, async () => {}, { ...modelSettings, topicStatus, childrenCompleted });
+    const suggestModal = new NextStepModal({}, 'Parent', childrenCount, 0, plugin, async () => {}, async () => {}, async () => {}, { ...modelSettings, topicStatus, childrenCompleted });
     suggestModal.onOpen();
     return find(suggestModal.contentEl, item => item.cls === 'vam-next-cards').children.findIndex(item => item['aria-checked'] === 'true');
   };
@@ -420,16 +390,16 @@ integrationTest('Next Step reviews first expansion proposals in place and keeps 
   // dialog reopens straight at its review (with the generated nodes and the dialog's options).
   let readyOutline; const outlineHooks = { begins: 0, ends: 0 };
   const quickBackground = { begin: () => { outlineHooks.begins++; }, end: () => { outlineHooks.ends++; }, outlineReady: outline => { readyOutline = outline; } };
-  const quickModal = new NextStepModal({}, 'Parent', 'normal', 1, 0, plugin, async () => {}, modal.expand, async () => {}, { ...modelSettings, sources: undefined, quickOutline: quickOutline(), background: quickBackground });
-  quickModal.onOpen(); find(quickModal.contentEl, item => item.cls === 'vam-next-cards').children[1].click(); button(quickModal.contentEl, 'Quickly explore a map').click();
+  const quickModal = new NextStepModal({}, 'Parent', 1, 0, plugin, async () => {}, modal.expand, async () => {}, { ...modelSettings, sources: undefined, quickOutline: quickOutline(), background: quickBackground });
+  quickModal.onOpen(); find(quickModal.contentEl, item => item.cls === 'vam-next-cards').children[1].click();
   find(quickModal.contentEl, item => item['aria-label'] === 'Answer language for this task').value = 'zh-TW';
   find(quickModal.contentEl, item => item.tag === 'textarea').value = 'Keep it short';
-  assert.equal(button(quickModal.modalEl, 'Review AI subtopic suggestions'), undefined);
+  assert.equal(button(quickModal.modalEl, 'Review AI subtopic suggestions (0)').hidden, true);
   assert.equal(all(quickModal.contentEl, item => item.tag === 'input' && item.type === 'number').length, 2, 'levels and size fields');
   assert.ok(find(quickModal.contentEl, item => item['aria-label'] === 'Outline preset'));
   const expandCallsBeforeQuick = expandCalls;
   const closedBeforeQuick = closed;
-  button(quickModal.modalEl, 'Generate outline').click(); await tick(); await tick();
+  button(quickModal.modalEl, 'Expand').click(); await tick(); await tick();
   assert.equal(quickRequest.language, 'zh-TW'); assert.equal(quickRequest.requirements, 'Keep it short'); assert.equal(quickRequest.presetId, 'knowledge-tree');
   assert.equal(expandCalls, expandCallsBeforeQuick, 'the old multi-layer expansion is not called'); assert.equal(quickCreated, undefined);
   assert.equal(closed, closedBeforeQuick + 1, 'the dialog hid itself once the outline started');
@@ -437,7 +407,7 @@ integrationTest('Next Step reviews first expansion proposals in place and keeps 
   assert.ok(readyOutline, 'the finished outline is handed to the view'); assert.equal(readyOutline.nodes.length, 3);
   assert.equal(find(quickModal.contentEl, item => /^Create subtopics/.test(item.text ?? '')), undefined, 'nothing is written into the hidden dialog');
   let outlineDiscarded = 0;
-  const reopenedQuick = new NextStepModal({}, 'Parent', 'normal', 1, 0, plugin, async () => {}, modal.expand, async () => {}, { ...modelSettings, sources: undefined, quickOutline: quickOutline(), pendingOutline: { ...readyOutline, discard: () => { outlineDiscarded++; } } });
+  const reopenedQuick = new NextStepModal({}, 'Parent', 1, 0, plugin, async () => {}, modal.expand, async () => {}, { ...modelSettings, sources: undefined, quickOutline: quickOutline(), pendingOutline: { ...readyOutline, discard: () => { outlineDiscarded++; } } });
   reopenedQuick.onOpen();
   assert.deepEqual(all(reopenedQuick.contentEl, item => item.cls?.includes('vam-proposal-title')).map(item => item.value), ['Food', 'Breakfast'], 'reopening goes straight to the review');
   button(reopenedQuick.contentEl, 'Create subtopics (2)').click(); await tick(); await tick();
@@ -447,11 +417,11 @@ integrationTest('Next Step reviews first expansion proposals in place and keeps 
   // A failure while creating keeps the dialog open with the reason, and the review can be confirmed again.
   // The same hidden-then-reopened path for the create step: generate in one dialog, review and create in the next.
   const generateThenReopen = async (create, prepare = () => {}) => {
-    let ready; const first = new NextStepModal({}, 'Parent', 'normal', 1, 0, plugin, async () => {}, async () => {}, async () => {}, { ...modelSettings, quickOutline: quickOutline(create), background: { begin() {}, end() {}, outlineReady: outline => { ready = outline; } } });
-    first.onOpen(); find(first.contentEl, item => item.cls === 'vam-next-cards').children[1].click(); button(first.contentEl, 'Quickly explore a map').click();
+    let ready; const first = new NextStepModal({}, 'Parent', 1, 0, plugin, async () => {}, async () => {}, async () => {}, { ...modelSettings, quickOutline: quickOutline(create), background: { begin() {}, end() {}, outlineReady: outline => { ready = outline; } } });
+    first.onOpen(); find(first.contentEl, item => item.cls === 'vam-next-cards').children[1].click();
     prepare(first);
-    button(first.modalEl, 'Generate outline').click(); await tick(); await tick();
-    const reopened = new NextStepModal({}, 'Parent', 'normal', 1, 0, plugin, async () => {}, async () => {}, async () => {}, { ...modelSettings, quickOutline: quickOutline(create), pendingOutline: { ...ready, discard() {} } });
+    button(first.modalEl, 'Expand').click(); await tick(); await tick();
+    const reopened = new NextStepModal({}, 'Parent', 1, 0, plugin, async () => {}, async () => {}, async () => {}, { ...modelSettings, quickOutline: quickOutline(create), pendingOutline: { ...ready, discard() {} } });
     reopened.onOpen();
     return reopened;
   };
@@ -475,7 +445,7 @@ integrationTest('Next Step reviews first expansion proposals in place and keeps 
   // and a result that arrives afterwards is never written into the closed dialog.
   let directionSignal, directionCalls = [], lateDirections = 0; const handOver = { begins: [], ends: 0 };
   let continueBackground2; const background2 = new Promise(resolve => { continueBackground2 = resolve; });
-  const directionsModal = new NextStepModal({}, 'Parent', 'normal', 1, 0, plugin, async () => {}, async () => {}, async (options, direction, _failed, accepted, observer) => {
+  const directionsModal = new NextStepModal({}, 'Parent', 1, 0, plugin, async () => {}, async () => {}, async (options, direction, _failed, accepted, observer) => {
     directionSignal = options.signal; directionCalls.push(direction); accepted(); observer.accepted(() => { cancelRun = true; });
     await background2;
     if (observer.isOpen()) observer.directions([{ title: 'Late', task: 'Late', contribution: '' }]); else lateDirections++;
@@ -497,7 +467,7 @@ integrationTest('Next Step reviews first expansion proposals in place and keeps 
   assert.equal(find(directionsModal.contentEl, item => item.cls === 'vam-next-angle'), undefined, 'nothing is written into the closed dialog');
   // Reopening from the node badge shows the pending directions; choosing one drafts and reviews it in the same dialog.
   let discarded = 0, draftSignal, confirmed; const draftCalls = []; let draftStageOptions;
-  const pendingModal2 = new NextStepModal({}, 'Parent', 'normal', 1, 0, plugin, async () => {}, async () => {}, async (options, direction, _failed, accepted, observer) => { draftSignal = options.signal; draftStageOptions = options; draftCalls.push(direction); accepted();
+  const pendingModal2 = new NextStepModal({}, 'Parent', 1, 0, plugin, async () => {}, async () => {}, async (options, direction, _failed, accepted, observer) => { draftSignal = options.signal; draftStageOptions = options; draftCalls.push(direction); accepted();
       if (observer.isOpen()) observer.drafted({ result: { summary: 'Draft S', detail: 'Draft D', suggestions: [], visualReferences: [] }, confirm: async (summary, detail) => { confirmed = [summary, detail]; }, discard: () => { discarded++; } }); },
     { ...modelSettings, currentSummary: 'Old summary', synthesisPending: { directions: [{ title: 'Shared constraints', task: 'Find tradeoffs', contribution: 'Across children' }, { title: 'Open questions', task: 'List gaps', contribution: '' }], discard: () => { discarded++; } } });
   pendingModal2.onOpen();
@@ -514,29 +484,29 @@ integrationTest('Next Step reviews first expansion proposals in place and keeps 
   assert.equal(pendingModal2.closed, true, 'pressing the draft button hides the dialog');
   assert.equal(button(pendingModal2.modalEl, 'Confirm update to parent topic'), undefined, 'the review is not opened inside the hidden dialog');
   assert.equal(confirmed, undefined); assert.equal(draftSignal.aborted, false);
-  const discardModal = new NextStepModal({}, 'Parent', 'normal', 1, 0, plugin, async () => {}, async () => {}, async () => {}, { ...modelSettings, synthesisPending: { directions: [{ title: 'A', task: 'B', contribution: '' }], discard: () => { discarded++; } } });
+  const discardModal = new NextStepModal({}, 'Parent', 1, 0, plugin, async () => {}, async () => {}, async () => {}, { ...modelSettings, synthesisPending: { directions: [{ title: 'A', task: 'B', contribution: '' }], discard: () => { discarded++; } } });
   discardModal.onOpen(); button(discardModal.contentEl, 'Discard').click();
   assert.equal(discarded, 1); assert.equal(discardModal.closed, true);
   closed = closedBeforeSynth; // keep later absolute close counts independent of the background-synthesis modals above
   let emptyOptions;
-  const empty = new NextStepModal({}, 'No children', 'normal', 0, 0, plugin, async () => {}, async () => {}, async options => { synthCalls++; emptyOptions = options; });
+  const empty = new NextStepModal({}, 'No children', 0, 0, plugin, async () => {}, async () => {}, async options => { synthCalls++; emptyOptions = options; });
   empty.onOpen(); find(empty.contentEl, item => item.cls === 'vam-next-cards').children[2].click();
   const emptyPanel = all(empty.contentEl, item => item.cls.includes('vam-next-research'))[2];
   assert.match(emptyPanel.children[0].text, /no direct subtopics/i);
   button(empty.modalEl, 'Get synthesis suggestions first').click(); await tick();
   assert.equal(synthCalls, 1); assert.equal(emptyOptions, undefined);
   const closedBeforeFailing = closed;
-  const failing = new NextStepModal({}, 'Parent', 'normal', 1, 1, plugin, async () => {}, async (_options, _direction, _found, failed) => failed('Provider failed'), async () => {});
+  const failing = new NextStepModal({}, 'Parent', 1, 1, plugin, async () => {}, async (_options, _direction, _found, failed) => failed('Provider failed'), async () => {});
   failing.onOpen(); find(failing.contentEl, item => item.cls === 'vam-next-cards').children[1].click();
-  button(failing.modalEl, 'Review AI subtopic suggestions').click(); await tick();
+  button(failing.modalEl, 'Review AI subtopic suggestions (1)').click(); await tick();
   assert.equal(all(failing.contentEl, item => item.cls.includes('vam-next-research'))[1].querySelector('.vam-next-status').text, 'Provider failed'); assert.equal(closed, closedBeforeFailing); closed = 3; // the absolute counts below start again from the original 3
   const startedBeforeFailures = startedNotices();
-  const failedResearch = new NextStepModal({}, 'Parent', 'normal', 1, 0, plugin, async (_options, _focus, _done, failed) => failed('Cannot start'), async () => {}, async () => {});
+  const failedResearch = new NextStepModal({}, 'Parent', 1, 0, plugin, async (_options, _focus, _done, failed) => failed('Cannot start'), async () => {}, async () => {});
   failedResearch.onOpen(); button(failedResearch.modalEl, 'Confirm research task').click(); await tick();
   // Owner decision 2026-10-19: the dialog hid when AI started, so the launch failure is a Notice, not dialog text.
   assert.equal(closed, 4); closed = 3; assert.ok(notices.includes('Cannot start'));
   assert.notEqual(all(failedResearch.contentEl, item => item.cls.includes('vam-next-research'))[0].querySelector('.vam-next-status').text, 'Cannot start');
-  const unacceptedResearch = new NextStepModal({}, 'Parent', 'normal', 1, 0, plugin, async () => {}, async () => {}, async () => {});
+  const unacceptedResearch = new NextStepModal({}, 'Parent', 1, 0, plugin, async () => {}, async () => {}, async () => {});
   unacceptedResearch.onOpen(); button(unacceptedResearch.modalEl, 'Confirm research task').click(); await tick();
   assert.equal(closed, 4); closed = 3; assert.equal(unacceptedResearch.closed, true);
   // Launch failures and unaccepted launches never claim the task started.
@@ -544,7 +514,7 @@ integrationTest('Next Step reviews first expansion proposals in place and keeps 
   let acknowledged = 0, began = 0;
   let firstUseConfirmed = false;
   const firstUsePlugin = { settings: { codexUsageNoticeSeen: false }, aiReadyForModel: async () => true, confirmAiUsage: async (_model, run) => { if (!firstUseConfirmed) { firstUseConfirmed = true; return false; } acknowledged++; await run(); return true; }, saveSettings: async () => { acknowledged++; } };
-  const firstUse = new NextStepModal({}, 'Parent', 'normal', 1, 0, firstUsePlugin, async (_options, _focus, _done, _failed, accepted) => { began++; accepted(); }, async () => {}, async () => {});
+  const firstUse = new NextStepModal({}, 'Parent', 1, 0, firstUsePlugin, async (_options, _focus, _done, _failed, accepted) => { began++; accepted(); }, async () => {}, async () => {});
   firstUse.onOpen(); button(firstUse.modalEl, 'Confirm research task').click(); await tick();
   assert.equal(began, 0); assert.equal(button(firstUse.contentEl, 'Understand and run'), undefined); assert.equal(closed, 3);
   button(firstUse.modalEl, 'Confirm research task').click(); await tick();
@@ -552,9 +522,9 @@ integrationTest('Next Step reviews first expansion proposals in place and keeps 
   let pendingCalls = 0;
   let pendingConfirmed = false;
   const pendingPlugin = { settings: { codexUsageNoticeSeen: false }, aiReadyForModel: async () => true, confirmAiUsage: async (_model, run) => { if (!pendingConfirmed) { pendingConfirmed = true; return false; } await run(); return true; }, saveSettings: async () => {} };
-  const pendingModal = new NextStepModal({}, 'Parent', 'normal', 1, 1, pendingPlugin, async () => {}, async (_options, _direction, found) => { pendingCalls++; found([{ title: 'Existing', task: 'Research', contribution: '', parentTitle: '' }], async () => {}); }, async () => {});
+  const pendingModal = new NextStepModal({}, 'Parent', 1, 1, pendingPlugin, async () => {}, async (_options, _direction, found) => { pendingCalls++; found([{ title: 'Existing', task: 'Research', contribution: '', parentTitle: '' }], async () => {}); }, async () => {});
   pendingModal.onOpen(); find(pendingModal.contentEl, item => item.cls === 'vam-next-cards').children[1].click();
-  button(pendingModal.modalEl, 'Review AI subtopic suggestions').click(); await tick();
+  button(pendingModal.modalEl, 'Review AI subtopic suggestions (1)').click(); await tick();
   assert.equal(pendingCalls, 1); assert.equal(button(pendingModal.contentEl, 'Understand and run'), undefined);
   button(pendingModal.contentEl, 'Create subtopics (1)').click(); await tick();
   assert.equal(pendingModal.closed, true, 'creating the reviewed subtopics ends the guided expansion'); closed -= 1;
@@ -565,42 +535,31 @@ integrationTest('Next Step reviews first expansion proposals in place and keeps 
   const delayedOutline = { presets: [{ id: 'knowledge-tree', name: 'Knowledge tree generator' }],
     generate: () => new Promise(resolve => { finishQuick = () => resolve(outlineOf('# Parent\n## A\n### A1\n## B')); }),
     create: async (nodes, options) => { delayedNodes = nodes; delayedOptions = options; } };
-  const delayed = new NextStepModal({}, 'Parent', 'normal', 1, 0, plugin, async () => {}, async () => assert.fail('old quick expansion'), async () => {}, { ...modelSettings, quickOutline: delayedOutline, background: { begin: () => { delayedStops++; }, end: () => { delayedStops--; }, outlineReady: outline => { delayedReady = outline; } } });
-  delayed.onOpen(); find(delayed.contentEl, item => item.cls === 'vam-next-cards').children[1].click(); button(delayed.contentEl, 'Quickly explore a map').click();
+  const delayed = new NextStepModal({}, 'Parent', 1, 0, plugin, async () => {}, async () => assert.fail('old quick expansion'), async () => {}, { ...modelSettings, quickOutline: delayedOutline, background: { begin: () => { delayedStops++; }, end: () => { delayedStops--; }, outlineReady: outline => { delayedReady = outline; } } });
+  delayed.onOpen(); find(delayed.contentEl, item => item.cls === 'vam-next-cards').children[1].click();
   const shallow = find(all(delayed.contentEl, item => item.cls === 'vam-next-adjust-section')[1], item => item.tag === 'input' && item.type === 'checkbox');
   shallow.checked = true;
-  button(delayed.modalEl, 'Generate outline').click(); await tick();
+  button(delayed.modalEl, 'Expand').click(); await tick();
   assert.equal(closed, 5, 'the dialog hides as soon as the outline starts'); assert.equal(delayedNodes, undefined); assert.equal(delayedStops, 1, 'the card shows it running until the outline arrives');
   finishQuick(); await tick(); await tick();
   assert.equal(closed, 5); assert.equal(delayedStops, 0); assert.equal(delayedNodes, undefined, 'the outline is reviewed before anything is created');
-  const delayedReview = new NextStepModal({}, 'Parent', 'normal', 1, 0, plugin, async () => {}, async () => assert.fail('old quick expansion'), async () => {}, { ...modelSettings, quickOutline: delayedOutline, pendingOutline: { ...delayedReady, discard() {} } });
+  const delayedReview = new NextStepModal({}, 'Parent', 1, 0, plugin, async () => {}, async () => assert.fail('old quick expansion'), async () => {}, { ...modelSettings, quickOutline: delayedOutline, pendingOutline: { ...delayedReady, discard() {} } });
   delayedReview.onOpen();
   button(delayedReview.contentEl, 'Create subtopics (3)').click(); await until(() => delayedReview.closed);
   assert.equal(closed, 6); assert.equal(delayedNodes.length, 3); assert.equal(delayedOptions.shallowResearch, true);
   // A failed outline (for example over the heading limit) after the dialog hid becomes a Notice and creates nothing.
-  const invalid = new NextStepModal({}, 'Parent', 'normal', 1, 0, plugin, async () => {}, async () => assert.fail('over-limit task started'), async () => {}, { ...modelSettings, background: { begin() {}, end() {}, outlineReady: () => assert.fail('no outline') }, quickOutline: {
+  const invalid = new NextStepModal({}, 'Parent', 1, 0, plugin, async () => {}, async () => assert.fail('over-limit task started'), async () => {}, { ...modelSettings, background: { begin() {}, end() {}, outlineReady: () => assert.fail('no outline') }, quickOutline: {
     presets: [{ id: 'knowledge-tree', name: 'Knowledge tree generator' }],
     generate: async () => { throw new Error('The AI outline has 101 headings; the limit is 100.'); },
     create: async () => assert.fail('nothing to create')
   } });
-  invalid.onOpen(); find(invalid.contentEl, item => item.cls === 'vam-next-cards').children[1].click(); button(invalid.contentEl, 'Quickly explore a map').click();
-  button(invalid.modalEl, 'Generate outline').click(); await tick(); await tick();
+  invalid.onOpen(); find(invalid.contentEl, item => item.cls === 'vam-next-cards').children[1].click();
+  button(invalid.modalEl, 'Expand').click(); await tick(); await tick();
   await until(() => notices.some(message => /101 headings/.test(message)));
   assert.equal(closed, 7); closed = 5;
-  let finishGuided, guidedFinished = false;
-  const guidedModal = new NextStepModal({}, 'Parent', 'normal', 1, 0, plugin, async () => {}, async (_options, _direction, found) => {
-    await new Promise(resolve => { finishGuided = resolve; });
-    found([{ title: 'Later', task: 'Explore', contribution: '' }], async () => {});
-    guidedFinished = true;
-  }, async () => {});
-  guidedModal.onOpen(); find(guidedModal.contentEl, item => item.cls === 'vam-next-cards').children[1].click();
-  button(guidedModal.modalEl, 'Get expansion directions').click(); await tick();
-  // Owner decision 2026-10-19: the guided default hides the dialog at the press and the run continues in the background.
-  assert.equal(closed, 6); closed = 5; assert.equal(guidedFinished, false);
-  finishGuided(); await tick();
-  assert.equal(guidedFinished, true); assert.equal(button(guidedModal.contentEl, 'Create subtopics (1)'), undefined, 'the proposals are not rendered into the closed dialog');
+  // (The guided first expansion that used to hide the dialog at the press is gone with its button; see the pending-review cases above.)
   const settingsWrites = []; let researchAfterSave = false;
-  const settingsModal = new NextStepModal({}, 'Parent', 'normal', 0, 0,
+  const settingsModal = new NextStepModal({}, 'Parent', 0, 0,
     { settings: { codexUsageNoticeSeen: true, models: 'model-a,model-b' }, availableModels: () => ['model-a', 'model-b'], modelLabel: model => model, modelDiscoveryState: provider => ({ provider, status: 'ready', models: ['model-a', 'model-b'] }), subscribeModelDiscovery: () => () => {}, refreshModelDiscovery: async provider => ({ provider, status: 'ready', models: ['model-a', 'model-b'] }), aiReadyForModel: async model => { checkedModels.push(model); return true; }, confirmAiUsage: async (model, run) => { checkedModels.push(model); await run(); return true; }, saveSettings: async () => {} },
     async (_options, _focus, _done, _failed, accepted) => { researchAfterSave = settingsWrites.length === 1; accepted(); }, async () => {}, async () => {},
     { model: 'model-a', modelSource: 'workspace', reasoning: 'low', save: async patch => { settingsWrites.push(patch); } });
@@ -618,13 +577,13 @@ integrationTest('Next Step reviews first expansion proposals in place and keeps 
   const closedBeforeCancel = closed;
   // C2 (owner decision 2026-10-19): Stop moves to the card; stopping the hidden outline aborts it and creates nothing.
   let cardStop, cancelSignal, cancelReady = 0;
-  const cancelModal = new NextStepModal({}, 'Parent', 'normal', 1, 0, plugin, async () => {}, async () => assert.fail('old quick expansion'), async () => {}, { ...modelSettings, background: { begin: controller => { cardStop = controller; }, end() {}, outlineReady: () => { cancelReady++; } }, quickOutline: {
+  const cancelModal = new NextStepModal({}, 'Parent', 1, 0, plugin, async () => {}, async () => assert.fail('old quick expansion'), async () => {}, { ...modelSettings, background: { begin: controller => { cardStop = controller; }, end() {}, outlineReady: () => { cancelReady++; } }, quickOutline: {
     presets: [{ id: 'knowledge-tree', name: 'Knowledge tree generator' }],
     generate: (_request, signal) => new Promise((_resolve, reject) => { cancelSignal = signal; signal.addEventListener('abort', () => { const error = new Error('aborted'); error.name = 'AbortError'; reject(error); }, { once: true }); }),
     create: async () => assert.fail('cancel creates nothing')
   } });
   cancelModal.onOpen(); find(cancelModal.contentEl, item => item.cls === 'vam-next-cards').children[1].click();
-  button(cancelModal.contentEl, 'Quickly explore a map').click(); button(cancelModal.modalEl, 'Generate outline').click(); await tick();
+  button(cancelModal.modalEl, 'Expand').click(); await tick();
   assert.equal(closed, closedBeforeCancel + 1, 'the dialog hid itself'); assert.equal(cancelSignal.aborted, false, 'hiding the dialog does not stop the AI');
   cardStop.abort(); await tick(); await tick();
   assert.equal(cancelSignal.aborted, true); assert.equal(cancelReady, 0, 'a stopped outline is never handed to the view');
@@ -661,7 +620,7 @@ test('preview renderer receives Markdown in original order with no extra Preview
   view.showHoverCard({...element(),dataset:{nodeId:'a'}},{title:'Topic',preview:markdown});
   assert.equal(rendered.markdown,markdown);assert.equal(rendered.path,'a.md');assert.deepEqual(created,[['strong','Topic']]);
 });
-test('multi research modal: defaults, options and immediate close on start', () => {
+test('multi research modal: no mode, network, image or depth fields; each row shows its mode; the request carries no mode; immediate close on start', () => {
   const element = (tag, options = {}) => ({
     tag, text: options.text ?? '', cls: options.cls ?? '', type: options.type, value: options.value ?? '', checked: false, disabled: false, children: [], listeners: {},
     createDiv(value) { const c = element('div', typeof value === 'string' ? { cls: value } : value); this.children.push(c); return c; },
@@ -676,34 +635,33 @@ test('multi research modal: defaults, options and immediate close on start', () 
   const requests = []; const templates = [{ id: 'standard', name: 'Standard' }, { id: 'A', name: 'Alpha template' }];
   let models = [], changed = null, unwatched = 0;
   const live = { list: () => models, watch: fn => { changed = fn; return () => { unwatched++; }; } };
-  const modal = new mod.MultiResearchModal({}, ['Alpha', 'Beta'], live, templates, request => requests.push(request)); modal.open();
+  const modal = new mod.MultiResearchModal({}, ['Alpha', 'Beta'], live, templates, request => requests.push(request), [], undefined, {}, ['quick', 'standard']); modal.open();
   assert.ok(find(modal.contentEl, i => i.text === 'Alpha')); assert.ok(find(modal.contentEl, i => i.text === 'Beta'));
-  const web = find(modal.contentEl, i => i.tag === 'input' && i.type === 'checkbox'); assert.equal(web.checked, true);
-  assert.ok(find(modal.contentEl, i => i.text === 'Search for image references'));
-  // The shared depth widget, with the same default as every other research dialog.
-  const radios = (root) => { const out = []; const visit = n => { if (n.type === 'radio') out.push(n); n.children.forEach(visit); }; visit(root); return out; };
-  const depthRadios = radios(modal.contentEl); assert.deepEqual(depthRadios.map(r => r.checked), [false, true, false]);
+  // D-2026-10-233 / D-2026-10-247: no web, image or depth choice; the list says which mode each topic runs in.
+  assert.equal(find(modal.contentEl, i => i.tag === 'input' && i.type === 'checkbox'), undefined);
+  assert.equal(find(modal.contentEl, i => i.text === 'Search for image references' || i.text === 'Allow web search'), undefined);
+  const radios = (root) => { const out = []; const visit = n => { if (n.type === 'radio' || (n.attrs && n.attrs.role === 'radio')) out.push(n); n.children.forEach(visit); }; visit(root); return out; };
+  assert.equal(radios(modal.contentEl).length, 0, 'no depth or mode radio');
+  const rows = dom.findAll(modal.contentEl, i => i.cls === 'vam-multi-research-topic').map(row => row.children.map(c => c.text));
+  assert.deepEqual(rows, [['Alpha', 'Quick'], ['Beta', 'Standard']]);
   const model = () => find(modal.contentEl, i => i.tag === 'select' && i['aria-label'] === 'Model'); assert.equal(model().value, '');
   assert.deepEqual(plain(model().children.map(c => c.value)), ['']);
   models = [{ id: 'm1', label: 'Model One' }, { id: 'm2', label: 'Model Two' }]; changed();
   assert.deepEqual(plain(model().children.map(c => [c.value, c.text])), [['', "Each topic's current model"], ['m1', 'Model One'], ['m2', 'Model Two']]);
-  assert.equal(depthRadios.length, 3);
   const templateSelect = find(modal.contentEl, i => i.tag === 'select' && i['aria-label'] === 'Content template');
   assert.deepEqual(plain(templateSelect.children.map(c => [c.value, c.text])), [['', "Each topic's current template"], ['standard', 'Standard'], ['A', 'Alpha template']]);
   const start = find(modal.modalEl, i => i.tag === 'button' && i.text === 'Start research (2)');
   start.listeners.click(); start.listeners.click();
   assert.equal(modal.closed, 1); assert.equal(requests.length, 1); modal.onClose(); assert.equal(unwatched, 1);
-  assert.deepEqual(plain(requests[0]), { researchMode: 'research', researchDepth: 'normal', requirements: '', imageSearch: true });
+  assert.deepEqual(plain(requests[0]), { requirements: '' }, 'the request carries no mode: each topic runs in its own note\'s mode');
   const second = []; const m2 = new mod.MultiResearchModal({}, ['A'], { list: () => [{ id: 'm1', label: 'Model One' }], watch: () => () => {} }, templates, r => second.push(r)); m2.open();
-  find(m2.contentEl, i => i.tag === 'input' && i.type === 'checkbox').checked = false;
-  const second3 = radios(m2.contentEl)[2]; second3.checked = true; second3.listeners.change();
   find(m2.contentEl, i => i.tag === 'select' && i['aria-label'] === 'Model').value = 'm1';
   // The template select lives under "Custom…" of the Note style select.
   const style2 = find(m2.contentEl, i => i.tag === 'select' && i['aria-label'] === 'Note style'); style2.value = 'custom'; style2.listeners.change();
   find(m2.contentEl, i => i.tag === 'select' && i['aria-label'] === 'Content template').value = 'A';
   find(m2.contentEl, i => i.tag === 'textarea').value = '  only 2025  ';
   find(m2.modalEl, i => i.tag === 'button' && i.text === 'Start research (1)').listeners.click();
-  assert.deepEqual(plain(second[0]), { researchMode: 'local', researchDepth: 'deep', requirements: 'only 2025', imageSearch: false, model: 'm1', detailTemplateId: 'A' });
+  assert.deepEqual(plain(second[0]), { requirements: 'only 2025', model: 'm1', detailTemplateId: 'A' });
 });
 test('card shows a Format not met badge with the issues as tooltip', () => {
   const { VisualAgentMapView } = load('main.ts', { obsidian });
@@ -741,7 +699,7 @@ integrationTest('Next Step modal: the content template choice goes into research
   const settings = { model: 'gpt-test', modelSource: 'workspace', reasoning: 'low', save: async () => {}, sources: plugin.sources, templates, currentTemplate: 'Standard' };
   const seen = {};
   const open = (name, withSettings) => {
-    const modal = new NextStepModal({}, 'Parent', 'normal', 1, 0, plugin,
+    const modal = new NextStepModal({}, 'Parent', 1, 0, plugin,
       async options => { seen.research = options; },
       async options => { seen.expand = options; },
       async options => { seen.synth = options; }, withSettings);
@@ -768,8 +726,8 @@ integrationTest('Next Step modal: the content template choice goes into research
   const quickModal = open('quick', { ...settings, quickOutline, background: { begin() {}, end() {}, outlineReady: outline => { ready = outline; } } });
   customStyle(quickModal); templateSelect(quickModal).value = 'A';
   cardsOf(quickModal).children[1].click();
-  button(quickModal.contentEl, 'Quickly explore a map').click();
-  button(quickModal.modalEl, 'Generate outline').click(); await tick(); await tick();
+ 
+  button(quickModal.modalEl, 'Expand').click(); await tick(); await tick();
   const reviewModal = open('review', { ...settings, quickOutline, pendingOutline: { ...ready, discard() {} } });
   button(reviewModal.contentEl, 'Create subtopics (1)').click(); await tick(); await tick();
   assert.equal(seen.expand.detailTemplateId, 'A');
@@ -932,7 +890,7 @@ integrationTest('merge dialog (the shared synthesis dialog) names the topic afte
   const plugin = { settings: { language: 'en', cliModel: 'gpt-test', codexUsageNoticeSeen: true }, aiReadyForModel: async () => true, confirmAiUsage: async (_model, run) => { await run(); return true; }, activeTasks: new Map() };
   const sources = { currentTopicId: 'map', currentLabel: 'Selected topics included', topics: async () => [], readTopic: async () => [] };
   const open = (names, title, calls) => {
-    const modal = new NextStepModal({}, '', 'normal', 0, 0, plugin, async () => {}, async () => {}, async (options, direction, _failed, accepted) => { calls.push({ options, direction }); accepted(); },
+    const modal = new NextStepModal({}, '', 0, 0, plugin, async () => {}, async () => {}, async (options, direction, _failed, accepted) => { calls.push({ options, direction }); accepted(); },
       undefined, { names, initialTitle: title, defaultDirection: 'Find shared conclusions', fields: { sources, templates: [], tones: [] } });
     modal.onOpen();
     return modal;
@@ -2015,4 +1973,58 @@ integrationTest('the read-only sample and AIM maps never enter selection mode fr
     viewport.handlers.get('pointermove')({ clientX: 350, clientY: 200 }); viewport.handlers.get('pointerup')({});
     assert.equal(view.integrationMode, false);
   }
+});
+
+// ---- AI mode Quick / Standard ----------------------------------------------------------------------------------------
+test('ai-mode helpers: modes map to note values and task options; the knowledge-gap marker is found in three languages only', () => {
+  const mode = load('experiences/visual-map/ai-mode.ts');
+  assert.equal(mode.isMapAiMode('quick'), true); assert.equal(mode.isMapAiMode('standard'), true);
+  for (const bad of ['deep', 'Quick', '', 123, null, undefined, {}]) assert.equal(mode.isMapAiMode(bad), false, String(bad));
+  assert.equal(mode.noteAiMode('local'), 'quick'); assert.equal(mode.noteAiMode('research'), 'standard');
+  assert.equal(mode.researchModeOf('quick'), 'local'); assert.equal(mode.researchModeOf('standard'), 'research');
+  assert.deepEqual(plain(mode.aiModeOptions('quick', 'research')), { researchMode: 'local', researchDepth: 'normal', visualMode: 'off', mapAiMode: 'quick' });
+  assert.deepEqual(plain(mode.aiModeOptions('quick', 'subtopic')), { researchMode: 'local', researchDepth: 'fast', visualMode: 'off', mapAiMode: 'quick' });
+  assert.deepEqual(plain(mode.aiModeOptions('standard', 'research')), { researchMode: 'research', researchDepth: 'normal', visualMode: 'auto', mapAiMode: 'standard' });
+  assert.deepEqual(plain(mode.aiModeOptions('standard', 'subtopic')), { researchMode: 'research', researchDepth: 'fast', visualMode: 'auto', mapAiMode: 'standard' });
+  assert.equal(mode.DEFAULT_MAP_AI_MODE, 'quick');
+  for (const text of ['模型知識不足', '模型知识不足', 'Model knowledge is insufficient', 'model KNOWLEDGE is insufficient', '### Core\n\n模型知識不足。需要更多資料。']) assert.equal(mode.hasKnowledgeGapMarker(text), true, text);
+  for (const text of ['', '現有資料不足', 'Insufficient information', '模型知識很充足', 'knowledge is insufficient']) assert.equal(mode.hasKnowledgeGapMarker(text), false, text);
+  // The sentence the Quick prompt asks for is the one the detector looks for, in each dictionary.
+  const { translate } = load('i18n.ts');
+  for (const language of ['en', 'zh-TW', 'zh-CN']) assert.equal(mode.hasKnowledgeGapMarker(translate(language, 'research.knowledge_gap_marker')), true, language);
+  assert.equal(translate('en', 'research.knowledge_gap_marker'), 'Model knowledge is insufficient');
+});
+integrationTest('Re-run with Standard on the card: only for an idle Quick topic whose Detail carries the marker, on an ordinary map; named for screen readers', () => {
+  const { VisualAgentMapView } = load('main.ts', { obsidian });
+  const makeElement = (tag, buttons) => ({ tag, children: [], dataset: {}, style: {},
+    createDiv(options) { const child = makeElement('div', buttons); child.cls = options?.cls ?? options; this.children.push(child); return child; },
+    createEl(name, options) { const child = makeElement(name, buttons); child.text = options?.text; this.children.push(child); if (name === 'button') buttons.push(child); return child; },
+    createSpan(options) { const child = makeElement('span', buttons); child.text = options?.text; this.children.push(child); return child; },
+    setAttr(name, value) { this[name] = value; }, addClass(name) { this.cls = name; }, setPointerCapture() {}, addEventListener(name, handler) { if (name === 'click') this.click = handler; }, removeEventListener() {}
+  });
+  const topic = node('topic');
+  const render = ({ note = {}, doc = map([topic]), integrationMode = false, plugin = {} } = {}) => {
+    const buttons = [];
+    const view = new VisualAgentMapView({ app: {} }, { pendingSuggestions: new Map(), expansionBatches: new Map(), running: new Set(), activeTasks: new Map(), quickExpandPending: new Set(), expansionCoordinator: { isQueued: () => false, isRunning: () => false }, ...plugin });
+    view.stageEl = makeElement('stage', buttons); view.map = doc; view.integrationMode = integrationMode;
+    view.notes = new Map([[topic.id, { title: 'Topic', summary: 'S', status: 'completed', researchMode: 'local', detail: 'Model knowledge is insufficient.', ...note }]]);
+    const rerun = []; view.rerunStandard = target => rerun.push(target.id);
+    view.renderNode(topic);
+    return { button: buttons.find(item => item.text === 'Re-run with Standard'), rerun };
+  };
+  const shown = render();
+  assert.ok(shown.button, 'a Quick topic with the marker offers the Standard run');
+  assert.equal(shown.button.tag, 'button', 'a real button: keyboard reachable');
+  assert.equal(shown.button['aria-label'], 'Re-run with Standard: Topic', 'it names the topic it acts on');
+  shown.button.click({ stopPropagation() {} });
+  assert.deepEqual(plain(shown.rerun), [topic.id], 'pressing it re-runs this topic');
+  for (const detail of ['模型知識不足', '模型知识不足']) assert.ok(render({ note: { detail: `### 核心結論\n\n${detail}` } }).button, detail);
+  const none = [
+    ['a Standard note', { note: { researchMode: 'research' } }],
+    ['no marker', { note: { detail: 'A complete answer.' } }],
+    ['topic is running', { plugin: { running: new Set(['topic.md']) } }],
+    ['an AIM map', { doc: Object.assign(map([topic]), { aim: { version: 1, branches: [], runs: [], pendingCommits: [] } }) }],
+    ['topic selection mode', { integrationMode: true }]
+  ];
+  for (const [name, options] of none) assert.equal(render(options).button, undefined, `no button: ${name}`);
 });

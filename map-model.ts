@@ -1,6 +1,7 @@
 import { validateAimResearchPlan } from "./experiences/aim/research-plan";
 import { upgradeLegacyAimData } from "./experiences/aim/legacy-names";
 import type { AiResult } from "./ai/types";
+import { isMapAiMode, type MapAiMode } from "./experiences/visual-map/ai-mode";
 import type { FinalDeliveryCheckpoint } from "./experiences/aim/final-delivery";
 import { isContentLanguage, isNoteLanguage, t, translate, type ContentLanguage, type NoteLanguage } from "./i18n";
 import {
@@ -26,6 +27,8 @@ export interface MapDocument {
    * language. Any content language, including the follow-the-input row. Unknown values are ignored (dropped on read).
    */
   outputLanguage?: ContentLanguage;
+  /** The AI mode (Quick or Standard) last used to run a research or expansion in this map; the dialogs' default. Unknown values are ignored (dropped on read). */
+  aiMode?: MapAiMode;
   detailTemplateId?: string;
   /** Default tone preset id for the map; absent = academic. */
   toneId?: string;
@@ -369,6 +372,7 @@ export function parseMap(content: string): MapDocument {
   if (map.detailTemplateId !== undefined && typeof map.detailTemplateId !== "string") delete map.detailTemplateId;
   if (map.toneId !== undefined && typeof map.toneId !== "string") delete map.toneId;
   if (map.outputLanguage !== undefined && !isContentLanguage(map.outputLanguage)) delete map.outputLanguage;
+  if (map.aiMode !== undefined && !isMapAiMode(map.aiMode)) delete map.aiMode;
   const ids = new Set<string>(),
     aimQuestionRequests = new Set<string>();
   for (const n of map.nodes) {

@@ -296,7 +296,7 @@ integrationTest('structural two-level child creation stores shallow-research set
   assert.deepEqual(researched, []);
   for (const node of saved.nodes.slice(1)) {
     const note = await repo.readNote(node.path);
-    assert.equal(note.researchDepth, 'fast'); assert.equal(note.researchMode, 'research'); assert.equal(note.visualMode, 'auto');
+    assert.equal('researchDepth' in note, false); assert.equal(note.researchMode, 'local', 'a new subtopic starts as Quick (D-2026-10-244)'); assert.equal(note.visualMode, 'auto');
   }
 });
 integrationTest('guided child creation stores shallow-research settings without dispatching', async () => {
@@ -310,7 +310,7 @@ integrationTest('guided child creation stores shallow-research settings without 
   const researched = []; view.runAgent = async child => { researched.push(child.id); await repo.updateNote(child.path, { status: 'running' }); };
   await view.createChildBatch(parent, [{ title: 'Research me', task: 'Find evidence', contribution: '', parentTitle: '' }], { researchMode: 'local', researchDepth: 'fast', visualMode: 'off', referenceGroups: [], shallowResearch: true });
   assert.deepEqual(researched, []);
-  assert.equal((await repo.readNote(view.map.nodes.at(-1).path)).researchMode, 'research');
+  assert.equal((await repo.readNote(view.map.nodes.at(-1).path)).researchMode, 'local');
 });
 integrationTest('one shallow-research startup failure marks that child and does not strand later children', async () => {
   const { repo, app } = fixture(), parent = await topicNote(repo, 'Parent', 'model-a');
@@ -1310,7 +1310,7 @@ const testTemplate = (id, names) => ({ id, name: `Template ${id}`, sections: nam
 const sampleTemplates = () => [testTemplate('A', ['Alpha']), testTemplate('B', ['Beta']), testTemplate('C', ['Gamma'])];
 // Runs the real runAgent / synthesis save paths; only plugin.askModel is a double (L-001).
 async function templateHarness({ language = 'zh-TW', settings = {}, mapTemplate, reply } = {}) {
-  const { repo, app } = fixture(language), notices = [], contexts = [], chartJobs = [], chartAborts = [];
+  const { repo, app, contents } = fixture(language), notices = [], contexts = [], chartJobs = [], chartAborts = [];
   const mapPath = 'Agent Workspace/Topics/map-a/Map.md', doc = { id: 'map-a', title: 'map-a', version: 1, nodes: [], viewport: { x: 0, y: 0, zoom: 1 } };
   if (mapTemplate) doc.detailTemplateId = mapTemplate;
   await repo.ensureTopicFolders('Agent Workspace/Topics/map-a'); await app.vault.create(mapPath, core.serializeMap(doc));
@@ -1322,7 +1322,7 @@ async function templateHarness({ language = 'zh-TW', settings = {}, mapTemplate,
   const { VisualAgentMapView } = load('main.ts', { obsidian: { ...obsidian, Notice: class { constructor(message) { notices.push(message); } } } });
   view = new VisualAgentMapView({ app }, plugin); view.path = mapPath; view.map = doc; view.contentEl = { querySelector: () => null }; view.render = () => {}; view.hydrate = async () => {}; view.ancestorContext = async () => '';
   const run = async (target = topic) => { const handle = await view.runAgent(target); await handle?.finished; await until(() => !plugin.running.size); };
-  return { repo, app, view, plugin, doc, mapPath, topic, notices, contexts, run, chartJobs, chartAborts };
+  return { repo, app, contents, view, plugin, doc, mapPath, topic, notices, contexts, run, chartJobs, chartAborts };
 }
 integrationTest('runAgent: context carries the resolved template (topic > map > workspace > Standard)', async () => {
   const h = await templateHarness({ settings: { detailTemplates: sampleTemplates(), defaultDetailTemplateId: 'C' } });
@@ -1863,8 +1863,8 @@ integrationTest('S2: child synthesis and multi-topic synthesis queue the chart s
   assert.match((await h.repo.readNote(integrated.path)).detail, /```mermaid/);
 });
 
-// ---- S7: quick research of AI-expanded subtopics reads local context only unless the dialog's checkbox is on.
-integrationTest('S7: expansion shallow research defaults to local and no images; the checkbox restores the dialog choices; stored mode stays research', async () => {
+// ---- S7: the research of AI-expanded subtopics follows the dialog's AI mode (Quick: local, no images; Standard: web, images).
+integrationTest('S7: expansion subtopic research follows the AI mode: Quick = local, no images, no charts; Standard = web, images, charts; the new child notes start as Quick', async () => {
   const { repo, app } = fixture('en'), parent = await topicNote(repo, 'Parent', 'model-a');
   const mapPath = 'Agent Workspace/Topics/map-s7/Map.md', mapDoc = map([parent]); mapDoc.id = 'map-s7';
   await app.vault.create(mapPath, core.serializeMap(mapDoc));
@@ -1872,22 +1872,24 @@ integrationTest('S7: expansion shallow research defaults to local and no images;
   const plugin = withExpansionCoordinator({ repo, settings: { ...DEFAULT_SETTINGS, language: 'en' }, running: new Set(), abortChartJobs: () => {}, addChartsAfterWrite: () => {}, pendingSuggestions: new Map(), pendingResearchOptions: new Map(), rebuildDerivedData: async () => {}, mutate: async work => work(), recordFailure: (_context, error) => error.message });
   const { VisualAgentMapView } = load('main.ts', { obsidian });
   const view = new VisualAgentMapView({ app }, plugin); view.path = mapPath; view.map = mapDoc; view.contentEl = { querySelector: () => null }; view.render = () => {}; view.hydrate = async () => {};
-  view.runAgent = async (_child, _done, _failed, overrides, accepted) => { runs.push({ researchMode: overrides.researchMode, visualMode: overrides.visualMode }); accepted?.(); return { finished: Promise.resolve() }; };
-  const dialog = { researchMode: 'research', researchDepth: 'fast', visualMode: 'auto', referenceGroups: [], shallowResearch: true, outputLanguage: 'en' };
-  const children = await view.createChildBatch(parent, [{ title: 'One', task: 'Why one?', contribution: '' }], dialog);
+  view.runAgent = async (_child, _done, _failed, overrides, accepted) => { runs.push({ researchMode: overrides.researchMode, researchDepth: overrides.researchDepth, visualMode: overrides.visualMode, mapAiMode: overrides.mapAiMode, addCharts: overrides.addCharts }); accepted?.(); return { finished: Promise.resolve() }; };
+  const { aiModeOptions } = load('experiences/visual-map/ai-mode.ts');
+  const dialog = mode => ({ ...aiModeOptions(mode, 'subtopic'), referenceGroups: [], shallowResearch: true, outputLanguage: 'en' });
+  const quick = dialog('quick');
+  const children = await view.createChildBatch(parent, [{ title: 'One', task: 'Why one?', contribution: '' }], quick);
   const stored = await repo.readNote(children[0].path);
-  assert.equal(stored.researchMode, 'research', 'the child note keeps research as its own mode'); assert.equal(stored.visualMode, 'auto');
-  await view.startShallowResearch(parent, children, view.shallowChildOptions(dialog));
+  assert.equal(stored.researchMode, 'local', 'the child note starts as Quick'); assert.equal('researchDepth' in stored, false);
+  await view.startShallowResearch(parent, children, quick);
   await until(() => plugin.expansionBatches.get(parent.path).status !== 'running');
-  assert.deepEqual(plain(runs), [{ researchMode: 'local', visualMode: 'off' }]);
-  assert.equal(view.shallowChildOptions({ ...dialog, shallowWebSearch: true }).researchMode, 'research');
-  assert.equal(view.shallowChildOptions({ ...dialog, shallowWebSearch: true }).visualMode, 'auto');
-  // Outline import (not AI expansion) keeps passing the options through startShallowResearch unchanged.
+  assert.deepEqual(plain(runs), [{ researchMode: 'local', researchDepth: 'fast', visualMode: 'off', mapAiMode: 'quick', addCharts: false }]);
   runs.length = 0;
-  const second = await view.createChildBatch(parent, [{ title: 'Two', task: 'Why two?', contribution: '' }], dialog);
-  await view.startShallowResearch(parent, second, dialog);
+  const standard = dialog('standard');
+  const second = await view.createChildBatch(parent, [{ title: 'Two', task: 'Why two?', contribution: '' }], standard);
+  assert.equal((await repo.readNote(second[0].path)).researchMode, 'local', 'the research, once it writes, stores the mode it ran in');
+  await view.startShallowResearch(parent, second, standard);
   await until(() => plugin.expansionBatches.get(parent.path).status !== 'running');
-  assert.deepEqual(plain(runs), [{ researchMode: 'research', visualMode: 'auto' }]);
+  assert.deepEqual(plain(runs), [{ researchMode: 'research', researchDepth: 'fast', visualMode: 'auto', mapAiMode: 'standard', addCharts: true }]);
+  assert.equal(view.shallowChildOptions, undefined, 'the web checkbox helper for subtopic research is gone');
 });
 
 // ---- Segment B: research progress on the card, the unsaved preview and its clearing ----
@@ -2043,17 +2045,17 @@ test('S5: the card preview is not a live region and the throttle keeps updates t
   assert.equal(walk(card).some(e => e.live || e.role), false, 'the preview adds no aria-live or role attributes');
 });
 
-integrationTest('L4: startShallowResearch wires the chart decision: a local shallow child gets no chart job, a web-enabled one does', async () => {
-  for (const [shallowWebSearch, expected] of [[false, false], [true, true]]) {
+integrationTest('L4: startShallowResearch wires the chart decision: a Quick shallow child gets no chart job, a Standard one does', async () => {
+  for (const [mode, expected] of [['quick', false], ['standard', true]]) {
     const h = await templateHarness({ language: 'en', reply: () => ({ summary: 'Sum', detail: 'Body paragraph.', visualReferences: [], suggestions: [] }) });
     const child = await h.repo.createNote('Child', 'model-a', h.doc, h.mapPath, 'workspace', h.topic.id);
     await h.repo.updateNote(child.path, { prompt: 'Research the child' });
     h.doc.nodes.push(child);
-    const dialog = { researchMode: 'research', researchDepth: 'fast', visualMode: 'auto', referenceGroups: [], shallowResearch: true, outputLanguage: 'en', shallowWebSearch };
-    await h.view.startShallowResearch(h.topic, [child], h.view.shallowChildOptions(dialog));
+    const dialog = { ...load('experiences/visual-map/ai-mode.ts').aiModeOptions(mode, 'subtopic'), referenceGroups: [], shallowResearch: true, outputLanguage: 'en' };
+    await h.view.startShallowResearch(h.topic, [child], dialog);
     await until(() => h.plugin.expansionBatches.get(h.topic.path).status !== 'running');
-    assert.equal(h.contexts.at(-1).researchMode, shallowWebSearch ? 'research' : 'local');
-    assert.equal(h.contexts.at(-1).addCharts === true, expected, `web search ${shallowWebSearch}`);
+    assert.equal(h.contexts.at(-1).researchMode, expected ? 'research' : 'local'); assert.equal(h.contexts.at(-1).mapAiMode, mode, 'the context carries the mode');
+    assert.equal(h.contexts.at(-1).addCharts === true, expected, `mode ${mode}`);
     // The plugin starts a chart step only for a context that asked for charts (chartEligible), so the job's context decides.
     assert.ok(h.chartJobs.length >= 1 && h.chartJobs.every(job => (job.context.addCharts === true) === expected), `chart request carries addCharts=${expected}`);
     const { AiTaskService } = load('core/ai-task-service.ts');
@@ -2408,4 +2410,132 @@ integrationTest('B8: Working Findings edited while the synthesis runs make the s
   const saved = await f.repo.readNote(f.parent.path);
   assert.equal(saved.newFindings, 'Edited by the user meanwhile');
   assert.notEqual(saved.summary, 'S');
+});
+
+// ---- AI mode Quick / Standard: what a research writes, the re-run, and the modes of a batch ---------------------------
+const GAP_DETAIL = 'Model knowledge is insufficient.';
+integrationTest('AI mode: a research stores the mode it ran in on the topic (Quick = local, Standard = research) and one undo restores the earlier summary, detail and mode', async () => {
+  const { aiModeOptions } = load('experiences/visual-map/ai-mode.ts');
+  const h = await templateHarness({ language: 'en', reply: (_context, call) => ({ summary: `Summary ${call}`, detail: `Detail ${call}`, visualReferences: [], suggestions: [] }) });
+  await h.repo.updateNote(h.topic.path, { researchMode: 'local', summary: 'Old summary', detail: 'Old detail', status: 'completed' });
+  const before = await h.repo.readNote(h.topic.path);
+  const handle = await h.view.runAgent(h.topic, undefined, undefined, { ...aiModeOptions('standard', 'research'), referenceGroups: [], rules: '' });
+  await handle.finished; await until(() => !h.plugin.running.size);
+  let note = await h.repo.readNote(h.topic.path);
+  assert.equal(note.researchMode, 'research'); assert.equal(note.summary, 'Summary 1'); assert.equal('researchDepth' in note, false);
+  const context = h.contexts.at(-1);
+  assert.deepEqual(plain([context.researchMode, context.researchDepth, context.visualMode, context.mapAiMode]), ['research', 'normal', 'auto', 'standard']);
+  const action = h.view.history.undo(); await action.undo();
+  note = await h.repo.readNote(h.topic.path);
+  assert.deepEqual(plain([note.researchMode, note.summary]), ['local', 'Old summary'], 'undo brings back the Quick mode with the old result');
+  assert.equal(note.detail, before.detail);
+  await h.view.runAgent(h.topic, undefined, undefined, { ...aiModeOptions('quick', 'research'), referenceGroups: [], rules: '', addCharts: false }).then(x => x.finished); await until(() => !h.plugin.running.size);
+  assert.equal((await h.repo.readNote(h.topic.path)).researchMode, 'local');
+  assert.equal(h.contexts.at(-1).mapAiMode, 'quick');
+  assert.equal(h.chartJobs.filter(job => job.context.mapAiMode === 'quick').every(job => job.context.addCharts === false), true, 'a Quick research asks for no charts');
+});
+integrationTest('AI mode: a note with research-depth deep keeps that line after a research, and a note with no research-mode runs as Standard in a batch', async () => {
+  const h = await templateHarness({ language: 'en' });
+  const text = async () => h.contents.get(h.topic.path);
+  h.contents.set(h.topic.path, h.contents.get(h.topic.path).replace('---\n', '---\nresearch-depth: deep\n'));
+  assert.equal((await h.repo.readNote(h.topic.path)).researchMode, 'research', 'missing research-mode reads as Standard');
+  await h.run();
+  assert.match(await text(), /research-depth: deep/, 'the old line survives a research');
+  assert.match(await text(), /research-mode: research/);
+  assert.equal(h.contexts.at(-1).researchDepth, 'normal', 'the depth no longer comes from the note');
+});
+integrationTest('Re-run with Standard: one usage confirmation, Standard options, the plain research task without sources or extra requirements, and the Quick result is restored by one undo', async () => {
+  const h = await templateHarness({ language: 'en', reply: () => ({ summary: 'Standard summary', detail: 'Standard detail with sources', visualReferences: [], suggestions: [] }) });
+  await h.repo.updateNote(h.topic.path, { researchMode: 'local', summary: 'Quick summary', detail: GAP_DETAIL, status: 'completed', prompt: 'A stored custom prompt' });
+  const confirms = [];
+  h.plugin.confirmAiUsage = async (model, run) => { confirms.push(model); await run(); return true; };
+  h.view.rerunStandard(h.topic);
+  await until(() => h.contexts.length === 1); await until(() => !h.plugin.running.size);
+  assert.deepEqual(plain(confirms), [(await h.repo.readNote(h.topic.path)).model], 'the usual usage confirmation, for the topic\'s model');
+  const context = h.contexts[0];
+  const { researchTopicTask } = load('experiences/visual-map/steps/fragments.ts');
+  assert.equal(context.task, researchTopicTask('en', 'Topic'), 'the plain research task: no stored prompt text, no extra requirements');
+  assert.deepEqual(plain([context.researchMode, context.researchDepth, context.visualMode, context.mapAiMode, context.referenceGroups]), ['research', 'normal', 'auto', 'standard', []]);
+  let note = await h.repo.readNote(h.topic.path);
+  assert.deepEqual(plain([note.researchMode, note.summary]), ['research', 'Standard summary']);
+  const action = h.view.history.undo(); await action.undo();
+  note = await h.repo.readNote(h.topic.path);
+  assert.deepEqual(plain([note.researchMode, note.summary, note.detail.includes(GAP_DETAIL)]), ['local', 'Quick summary', true], 'one undo restores summary, detail and the Quick mode');
+});
+integrationTest('Re-run with Standard: a note edited while the run is out is not overwritten (the existing stale fence), and the run does not start while the topic is busy', async () => {
+  const h = await templateHarness({ language: 'en' });
+  await h.repo.updateNote(h.topic.path, { researchMode: 'local', summary: 'Quick summary', detail: GAP_DETAIL, status: 'completed' });
+  const gate = deferred();
+  h.plugin.confirmAiUsage = async (_model, run) => { await run(); return true; };
+  h.plugin.askModel = async (context, _model, _reasoning, _signal, _exchange, onAccepted) => { h.contexts.push(context); onAccepted?.(); await gate.promise; return { summary: 'Standard summary', detail: 'Standard detail', visualReferences: [], suggestions: [] }; };
+  h.view.rerunStandard(h.topic);
+  await until(() => h.contexts.length === 1);
+  h.view.rerunStandard(h.topic);
+  await new Promise(resolve => setTimeout(resolve, 20));
+  assert.equal(h.contexts.length, 1, 'a second press while the topic runs starts nothing');
+  assert.ok(h.notices.some(message => /running/i.test(message)), 'and says why');
+  await h.repo.updateNote(h.topic.path, { summary: 'Edited by the user' });
+  gate.resolve(); await until(() => !h.plugin.running.size);
+  const note = await h.repo.readNote(h.topic.path);
+  assert.deepEqual(plain([note.summary, note.researchMode, note.detail.includes(GAP_DETAIL)]), ['Edited by the user', 'local', true], 'nothing of the late answer was written');
+});
+integrationTest('multi research without overrides runs each topic in its own note\'s mode: Quick notes local, no images, no charts; a missing or research mode as Standard with the web, images and charts', async () => {
+  const h = await multiResearchHarness(['Quick note', 'Old note', 'Standard note']);
+  await h.repo.updateNote(h.nodes[0].path, { researchMode: 'local' });
+  await h.repo.updateNote(h.nodes[2].path, { researchMode: 'research' });
+  h.view.multiSelected = new Set(h.nodes.map(n => n.id));
+  await h.view.startMultiResearch({ requirements: 'Be brief' });
+  await until(() => h.runs.length === 3);
+  const byTitle = Object.fromEntries(h.runs.map(run => [run.title, run.options]));
+  const shape = options => plain([options.researchMode, options.researchDepth, options.visualMode, options.mapAiMode, options.addCharts]);
+  assert.deepEqual(shape(byTitle['Quick note']), ['local', 'normal', 'off', 'quick', false]);
+  assert.deepEqual(shape(byTitle['Old note']), ['research', 'normal', 'auto', 'standard', true], 'an older note without research-mode is Standard');
+  assert.deepEqual(shape(byTitle['Standard note']), ['research', 'normal', 'auto', 'standard', true]);
+  for (const run of h.runs) assert.match(run.options.task, /Be brief$/);
+  for (const name of h.finish.keys()) h.finish.get(name)();
+  await until(() => h.plugin.expansionBatches.get(h.key).status === 'completed');
+  // With the map chat's overrides the batch behaves as before: no mode on the context.
+  const chat = await multiResearchHarness(['Chat topic']);
+  chat.view.multiSelected = new Set(chat.nodes.map(n => n.id));
+  await chat.view.startMultiResearch({ researchMode: 'research', researchDepth: 'deep', requirements: '', imageSearch: true });
+  await until(() => chat.runs.length === 1);
+  assert.deepEqual(plain([chat.runs[0].options.researchMode, chat.runs[0].options.researchDepth, chat.runs[0].options.visualMode, chat.runs[0].options.addCharts]), ['research', 'deep', 'auto', true]);
+  assert.equal(chat.runs[0].options.mapAiMode, undefined, 'the chat\'s overrides leave the mode empty');
+});
+integrationTest('AI mode memory on the map: remembering writes aiMode once; the same value again writes nothing; unknown stored values are dropped on read', async () => {
+  const h = await templateHarness({ language: 'en' });
+  h.plugin.mutate = async work => work();
+  h.view.mapChange = async (change, rebuild) => { await h.plugin.repo.updateMap(h.mapPath, change); change(h.view.map); h.mapChanges = (h.mapChanges ?? 0) + 1; assert.equal(rebuild, false, 'a mode change needs no derived-data rebuild'); };
+  const memory = h.view.aiModeMemory();
+  assert.equal(memory.aiMode, undefined, 'a map that never ran one remembers nothing (the dialog then starts on Quick)');
+  await memory.rememberAiMode('standard');
+  assert.equal((await h.repo.readMap(h.mapPath)).aiMode, 'standard'); assert.equal(h.mapChanges, 1);
+  assert.equal(h.view.aiModeMemory().aiMode, 'standard');
+  await h.view.aiModeMemory().rememberAiMode('standard');
+  assert.equal(h.mapChanges, 1, 'the same mode again writes nothing');
+  await h.view.aiModeMemory().rememberAiMode('quick');
+  assert.equal((await h.repo.readMap(h.mapPath)).aiMode, 'quick');
+  for (const bad of ['"deep"', '123', 'null', '{"a":1}']) {
+    const text = h.contents.get(h.mapPath);
+    assert.match(text, /"aiMode": "quick"/);
+    h.contents.set(h.mapPath, text.replace('"aiMode": "quick"', `"aiMode": ${bad}`));
+    const loaded = await h.repo.readMap(h.mapPath);
+    assert.equal('aiMode' in loaded, false, `aiMode ${bad} is dropped; the map still loads`);
+    assert.equal(loaded.nodes.length, 1);
+    await h.repo.updateMap(h.mapPath, map => { map.aiMode = 'quick'; });
+  }
+  assert.equal((await h.repo.readMap(h.mapPath)).aiMode, 'quick', 'a valid value round-trips');
+});
+integrationTest('a topic added by hand or by an expansion without subtopic research starts in Quick mode too (addNode, D-2026-10-244)', async () => {
+  const { repo, app } = fixture(), parent = await topicNote(repo, 'Parent', 'model-a');
+  const mapPath = 'Agent Workspace/Topics/map-a/Map.md', mapDoc = map([parent]); mapDoc.id = 'map-a';
+  await app.vault.create(mapPath, core.serializeMap(mapDoc));
+  const { VisualAgentMapView } = load('main.ts', { obsidian });
+  const plugin = withExpansionCoordinator({ repo, settings: { ...DEFAULT_SETTINGS }, rebuildDerivedData: async () => {} });
+  const view = new VisualAgentMapView({ app }, plugin); view.path = mapPath; view.map = mapDoc; view.contentEl = { querySelector: () => null }; view.render = () => {}; view.hydrate = async () => {}; view.focusNode = () => {};
+  await view.createChildBatch(parent, [{ title: 'Plain child', task: 'Look', contribution: '', parentTitle: '' }]);
+  const child = view.map.nodes.at(-1);
+  assert.equal((await repo.readNote(child.path)).researchMode, 'local');
+  assert.match(await app.vault.cachedRead(app.vault.getAbstractFileByPath(child.path)), /research-mode: local/);
+  assert.equal((await repo.readNote(parent.path)).researchMode, 'research', 'the parent keeps its own mode');
 });

@@ -1,5 +1,5 @@
 import { t } from "../../i18n";
-import type { ResearchDepth } from "../../ai/types";
+import { DEFAULT_MAP_AI_MODE, type MapAiMode } from "./ai-mode";
 import { matchPreset, NOTE_STYLE_PRESETS } from "./note-style";
 
 /** Live model choices: the list fills in as model discovery finishes. */
@@ -9,64 +9,60 @@ export interface ModelChoices {
   watch(changed: () => void): () => void;
 }
 
-/** Today's standard depth for every research dialog; a dialog passes `initial` only for a deliberate exception. */
-export const DEFAULT_RESEARCH_DEPTH: ResearchDepth = "normal";
-
-/** What each depth searches and how it answers, shown under the depth choice. */
-export function researchDepthDescription(depth: ResearchDepth): string {
-  const description =
-    depth === "fast"
-      ? t("ui.quick_aim_for_up_to_1_web_search_and_2_main_sources_answer_t")
-      : depth === "deep"
-        ? t("ui.deep_aim_for_up_to_6_web_searches_and_10_main_sources_compar")
-        : t("ui.standard_aim_for_up_to_3_web_searches_and_5_main_sources_sum");
-  return `${description} ${t("ui.web_and_image_searches_share_the_search_limit_search_counts")}`;
-}
-
-let depthGroup = 0;
+/** The two AI modes in the order shown. */
+const AI_MODES: readonly MapAiMode[] = ["quick", "standard"];
 
 /**
- * The one research-depth choice: Quick / Standard / Deep as a radio group with the chosen depth's description below.
- * Checked and focused state are JS-toggled classes (`is-checked`, `is-focused`), so the stylesheet needs no :has().
+ * The one AI-mode choice (Quick / Standard): a two-button radio group with arrow-key movement, and a one-line hint beside
+ * it about when to use Standard. The checked state is `aria-checked` plus the `is-active` class.
  */
-export function researchDepthField(
+export function aiModeField(
   parent: HTMLElement,
-  options: { initial?: ResearchDepth; onChange?: (depth: ResearchDepth) => void } = {}
-): { value: () => ResearchDepth; set: (depth: ResearchDepth) => void } {
-  const fieldset = parent.createEl("fieldset", { cls: "vam-next-depth-set" });
-  fieldset.createEl("legend", { text: t("ui.research_depth") });
-  const group = `vam-depth-${++depthGroup}`;
-  const row = fieldset.createDiv("vam-next-depths");
-  const hint = fieldset.createEl("p", { cls: "vam-hint", attr: { "aria-live": "polite" } });
-  const radios = new Map<ResearchDepth, { input: HTMLInputElement; label: HTMLElement }>();
+  options: { initial?: MapAiMode; onChange?: (mode: MapAiMode) => void } = {}
+): { element: HTMLElement; value: () => MapAiMode; set: (mode: MapAiMode) => void } {
+  const element = parent.createDiv("vam-ai-mode-set");
+  const group = element.createDiv("vam-ai-mode");
+  group.setAttr("role", "radiogroup");
+  group.setAttr("aria-label", t("ui.ai_mode"));
+  element.createEl("p", { cls: "vam-hint", text: t("ui.ai_mode_hint") });
+  const buttons = new Map<MapAiMode, HTMLButtonElement>();
+  let current: MapAiMode = options.initial ?? DEFAULT_MAP_AI_MODE;
   const paint = (): void => {
-    for (const { input, label } of radios.values()) label.toggleClass("is-checked", input.checked);
+    for (const [mode, button] of buttons) {
+      button.setAttr("aria-checked", String(mode === current));
+      button.tabIndex = mode === current ? 0 : -1;
+      button.toggleClass("is-active", mode === current);
+    }
   };
-  const value = (): ResearchDepth => [...radios].find(([, item]) => item.input.checked)?.[0] ?? DEFAULT_RESEARCH_DEPTH;
-  const set = (depth: ResearchDepth): void => {
-    for (const [key, item] of radios) item.input.checked = key === depth;
-    hint.setText(researchDepthDescription(depth));
+  const set = (mode: MapAiMode): void => {
+    current = mode;
     paint();
   };
-  for (const [depth, key] of [
-    ["fast", "ui.quick"],
-    ["normal", "ui.standard"],
-    ["deep", "ui.deep"]
-  ] as const) {
-    const label = row.createEl("label");
-    const input = label.createEl("input", { type: "radio", value: depth, attr: { name: group } });
-    label.createSpan({ text: t(key) });
-    radios.set(depth, { input, label });
-    input.addEventListener("change", () => {
-      if (!input.checked) return;
-      set(depth);
-      options.onChange?.(depth);
+  const choose = (mode: MapAiMode): void => {
+    if (mode === current) return;
+    set(mode);
+    options.onChange?.(mode);
+  };
+  for (const mode of AI_MODES) {
+    const button = group.createEl("button", { text: t(mode === "quick" ? "ui.quick" : "ui.standard") });
+    button.setAttr("role", "radio");
+    button.addEventListener("click", () => choose(mode));
+    button.addEventListener("keydown", event => {
+      const step = ["ArrowRight", "ArrowDown"].includes(event.key)
+        ? 1
+        : ["ArrowLeft", "ArrowUp"].includes(event.key)
+          ? -1
+          : 0;
+      if (!step) return;
+      event.preventDefault();
+      const next = AI_MODES[(AI_MODES.indexOf(mode) + step + AI_MODES.length) % AI_MODES.length];
+      choose(next);
+      buttons.get(next)?.focus();
     });
-    input.addEventListener("focus", () => label.addClass("is-focused"));
-    input.addEventListener("blur", () => label.removeClass("is-focused"));
+    buttons.set(mode, button);
   }
-  set(options.initial ?? DEFAULT_RESEARCH_DEPTH);
-  return { value, set };
+  paint();
+  return { element, value: () => current, set };
 }
 
 /**

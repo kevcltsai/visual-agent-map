@@ -21958,7 +21958,6 @@ ${text11}` : text11;
       t("ui.map_chat_plan_title"),
       t("ui.map_chat_plan_title_applied"),
       t("ui.map_chat_plan_title_cancelled"),
-      this.working ? "w" : "",
       t("ui.map_chat_role_you"),
       t("ui.map_chat_role_ai"),
       t("ui.map_chat_overflow_note"),

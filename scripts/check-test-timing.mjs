@@ -1,13 +1,43 @@
-// Fails when a test asserts a timing variable against a numeric constant (absolute milliseconds).
+// Fails when a test asserts a timing value against a fixed number or constant (absolute milliseconds).
 // Machines differ in speed; compare against a baseline measured in the same run instead.
 import fs from "node:fs";
 import path from "node:path";
+import { fileURLToPath } from "node:url";
 
-const root = path.resolve(path.dirname(new URL(import.meta.url).pathname), "..");
-const testsDir = path.join(root, "tests");
 const exts = new Set([".cjs", ".js", ".mjs", ".ts"]);
-const timingName = "[A-Za-z_$][\\w$]*(?:ms|Ms|MS|elapsed|Elapsed|duration|Duration)[\\w$]*|(?:ms|elapsed|duration)[\\w$]*";
-const bad = new RegExp(`\\bassert(?:\\.\\w+)?\\s*\\(.*(?<![.\\w$])(?:${timingName})\\s*<=?\\s*\\d`);
+// Lines that look like a timing limit but are not a measurement. Matched by file and exact text, not by line number.
+const ALLOWED = [
+  // A fake timer's configured delay, not an elapsed time.
+  { file: "tests/suites/expansion-and-synthesis.cjs", text: "assert.equal(timers[0].ms <= 200, true);" },
+];
+
+// A timing name is `ms`, a name ending in `Ms`, `MS` or `_ms`, or a name containing elapsed or duration. `terms`, `numItems` and `msgCount` are not.
+export function isTimingName(name) {
+  return name === "ms" || /(?:Ms|MS|_ms)$/.test(name) || /elapsed|duration/i.test(name);
+}
+const lastSegment = (operand) => operand.replace(/\[[^\]]*\]/g, "").split(".").pop();
+const isLimit = (operand) => /^\d[\d_]*(?:\.\d+)?$/.test(operand) || /^[A-Z][A-Z0-9_]*$/.test(lastSegment(operand));
+const COMPARE = /([\w$.[\]]+)\s*(?<![=!<>-])(<=?|>=?)\s*([\w$.[\]]+)/g;
+
+/** True when the line is an assert call comparing a timing value with a number or an all-caps constant. */
+export function isAbsoluteTimingLine(line) {
+  if (!/\bassert(?:\.\w+)?\s*\(/.test(line)) return false;
+  for (const match of line.matchAll(COMPARE)) {
+    const [, left, , right] = match;
+    if ((isTimingName(lastSegment(left)) && isLimit(right)) || (isTimingName(lastSegment(right)) && isLimit(left))) return true;
+  }
+  return false;
+}
+
+export function findAbsoluteTiming(text, file = "") {
+  const hits = [];
+  text.split("\n").forEach((line, index) => {
+    if (!isAbsoluteTimingLine(line)) return;
+    if (ALLOWED.some((entry) => entry.file === file && line.trim() === entry.text)) return;
+    hits.push({ line: index + 1, text: line.trim() });
+  });
+  return hits;
+}
 
 function* walk(dir) {
   for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
@@ -18,15 +48,16 @@ function* walk(dir) {
   }
 }
 
-const hits = [];
-for (const file of walk(testsDir)) {
-  fs.readFileSync(file, "utf8").split("\n").forEach((line, i) => {
-    if (bad.test(line)) hits.push(`${path.relative(root, file)}:${i + 1}: ${line.trim()}`);
-  });
+if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
+  const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
+  const lines = [];
+  for (const file of walk(path.join(root, "tests"))) {
+    const rel = path.relative(root, file).split(path.sep).join("/");
+    for (const hit of findAbsoluteTiming(fs.readFileSync(file, "utf8"), rel)) lines.push(`  ${rel}:${hit.line}: ${hit.text}`);
+  }
+  if (lines.length) {
+    process.stderr.write("Absolute timing limits in tests (compare against a baseline measured in the same run instead):\n" + lines.join("\n") + "\n");
+    process.exit(1);
+  }
+  process.stdout.write("check-test-timing: ok\n");
 }
-if (hits.length) {
-  process.stderr.write("Absolute timing limits in tests (compare against a baseline measured in the same run instead):\n");
-  for (const h of hits) process.stderr.write(`  ${h}\n`);
-  process.exit(1);
-}
-process.stdout.write("check-test-timing: ok\n");

@@ -1,0 +1,35 @@
+// The absolute-millisecond scanner (scripts/check-test-timing.mjs): what it reports and what it leaves alone.
+// Sample lines are built from their comparison alone so that the scanner does not report this file.
+const assert = require('node:assert/strict');
+const path = require('node:path');
+const { pathToFileURL } = require('node:url');
+const { test, root } = require('../support.cjs');
+const scanner = () => import(pathToFileURL(path.join(root, 'scripts', 'check-test-timing.mjs')).href);
+const call = body => 'assert.ok(' + body + ');';
+
+test('timing scanner: reports an assert that compares a timing value with a number or an all-caps constant', async () => {
+  const { isAbsoluteTimingLine } = await scanner();
+  for (const body of [
+    'ms < 50', 'ms < 100, `${name}`', 'elapsed <= 200', 'durationMs < 5', 'ms < LIMIT_MS', 'r.ms < 50', 't.elapsedMs < 200', '50 > ms', 'LIMIT_MS >= ms',
+    'startMS < 10', 'wait_ms < 10', 'timers[0].ms <= 200', 'totalDuration < 1_000', 'ms < 0.5'
+  ]) assert.equal(isAbsoluteTimingLine(call(body)), true, body);
+  const timer = 'assert.equal' + '(timers[0].ms <= 200, true);';
+  assert.equal(isAbsoluteTimingLine(timer), true);
+});
+test('timing scanner: leaves other comparisons alone, including names that merely contain ms', async () => {
+  const { isAbsoluteTimingLine } = await scanner();
+  for (const body of ['count < 5', 'numItems < 10', 'terms < 5', 'msgCount <= 3', 'items.length >= 2', 'ratio <= STREAM_RATIO_LIMIT', 'ms <= other', 'items.map(i => i.ms)', 'a => b']) {
+    assert.equal(isAbsoluteTimingLine(call(body)), false, body);
+  }
+  assert.equal(isAbsoluteTimingLine('const ms = 5 < 6;'), false, 'not inside an assert');
+});
+test('timing scanner: only the fake-timer delay line in expansion-and-synthesis is allowed, by file and exact text', async () => {
+  const { findAbsoluteTiming } = await scanner();
+  const fake = '  assert.equal' + '(timers[0].ms <= 200, true);';
+  const file = 'tests/suites/expansion-and-synthesis.cjs';
+  assert.deepEqual(findAbsoluteTiming(fake, file), []);
+  assert.equal(findAbsoluteTiming(fake, 'tests/suites/other.cjs').length, 1);
+  const slow = call('ms < 50');
+  assert.equal(findAbsoluteTiming('  ' + slow, file).length, 1);
+  assert.deepEqual(findAbsoluteTiming('x\n' + slow + '\n', 'a.cjs'), [{ line: 2, text: slow }]);
+});

@@ -1684,17 +1684,19 @@ test('map chat D5 F1: a [[link]] has no href, can be reached with Tab and opened
   assert.equal(f.calls.links.length, 2);
 });
 
-// Time limits for hostile input are relative: the hostile text is laid out and compared with benign text of the same length, measured in the same process, so a slow machine moves both sides.
-// Measured before the fix on the same machine: heading 5288 ms, starsInline 1827, under 1130, wikiOpen 1199, brackets 1291 (benign text of that length: about 1 to 5 ms).
-// Measured now: the ratio is 0 to 16 for every case below (benign time floored at 1 ms); before the fix it was above 1000. 60 sits between.
-const timed = (text) => { const t = process.hrtime.bigint(); lay(text); return Number(process.hrtime.bigint() - t) / 1e6; };
-const bestTime = (text, count = 5) => { let min = Infinity; for (let i = 0; i < count; i++) min = Math.min(min, timed(text)); return min; };
+// Time limits for hostile input are relative: the hostile text is laid out HOSTILE_REPEATS times and so is benign text of the same length, in the same process, and the two totals are compared. A slow machine moves both sides.
+// The repeats make the benign total large enough (tens of ms) that timer resolution and scheduling noise do not move the ratio; no floor is needed.
+// Before the fix the hostile layouts took 1100 to 5300 ms each against about 0.4 ms for benign text: a ratio above 2000. Measured now (best of 3 per side): ratios up to about 65 (5 runs, loaded machine).
+// The limit is about 3 times the largest measured ratio and far below the old one; it catches a return to quadratic work, not a small slowdown.
+const HOSTILE_REPEATS = 80; const HOSTILE_RATIO_LIMIT = 200;
+const blockTime = (text) => { const t = process.hrtime.bigint(); for (let i = 0; i < HOSTILE_REPEATS; i++) lay(text); return Number(process.hrtime.bigint() - t) / 1e6; };
+const bestBlock = (text, count = 3) => { let min = Infinity; for (let i = 0; i < count; i++) min = Math.min(min, blockTime(text)); return min; };
 const benignOf = (text) => 'word '.repeat(Math.ceil(text.length / 5)).slice(0, text.length);
-const HOSTILE_RATIO_LIMIT = 60;
-const hostileRatio = (text) => { bestTime(benignOf(text), 2); const base = Math.max(bestTime(benignOf(text)), 1); const ms = bestTime(text); return { ms, base, ratio: ms / base }; };
+const hostileRatio = (text) => { const base = bestBlock(benignOf(text)); const ms = bestBlock(text, 2); return { ms, base, ratio: ms / base }; };
+const ratioNote = (r) => `${r.ms.toFixed(0)} ms is ${r.ratio.toFixed(1)} times benign text (${r.base.toFixed(0)} ms) for ${HOSTILE_REPEATS} layouts`;
 test('map chat D5 F2: a heading line with a long run of blanks parses in a small multiple of benign text of the same length', () => {
   for (const text of ['# a' + ' '.repeat(40000) + 'x', '# a' + ' \t'.repeat(20000) + 'x', '#' + ' '.repeat(40000) + 'x #']) {
-    const r = hostileRatio(text); console.log(`F2 ratio ${r.ratio.toFixed(1)} (${r.ms.toFixed(1)} vs ${r.base.toFixed(1)} ms)`); assert.ok(r.ratio <= HOSTILE_RATIO_LIMIT, `${r.ms.toFixed(1)} ms is ${r.ratio.toFixed(1)} times benign text (${r.base.toFixed(1)} ms) for ${text.length} characters`);
+    const r = hostileRatio(text); console.log(`F2 ratio ${r.ratio.toFixed(1)}, benign total ${r.base.toFixed(1)} ms`); assert.ok(r.ratio <= HOSTILE_RATIO_LIMIT, `${ratioNote(r)} for ${text.length} characters`);
   }
   eq(visibleText(lay('## Title ##  ')), 'Title'); eq(visibleText(lay('# C#')), 'C#'); eq(visibleText(lay('# a #b')), 'a #b');
 });
@@ -1702,7 +1704,7 @@ test('map chat D5 F2: a heading line with a long run of blanks parses in a small
 test('map chat D5 F3: unmatched openers parse in a small multiple of benign text of the same length, and a reply over 50,000 characters is laid out only up to that', () => {
   for (const [name, unit] of [['star', 'a *'], ['bracket', '['], ['wiki', '[[a'], ['underscore', 'a _b'], ['link', '[a]('], ['image', '![a](']]) {
     const text = unit.repeat(Math.ceil(40000 / unit.length)); const r = hostileRatio(text);
-    console.log(`F3 ${name} ratio ${r.ratio.toFixed(1)} (${r.ms.toFixed(1)} vs ${r.base.toFixed(1)} ms)`); assert.ok(r.ratio <= HOSTILE_RATIO_LIMIT, `${name}: ${r.ms.toFixed(1)} ms is ${r.ratio.toFixed(1)} times benign text (${r.base.toFixed(1)} ms)`);
+    console.log(`F3 ${name} ratio ${r.ratio.toFixed(1)}, benign total ${r.base.toFixed(1)} ms`); assert.ok(r.ratio <= HOSTILE_RATIO_LIMIT, `${name}: ${ratioNote(r)}`);
   }
   const long = 'x'.repeat(49990) + '\n*not bold*\n[[Late]]'; const el = lay(long);
   eq(wikis(el), []); assert.equal(nodes(el).filter(i => i.tag === 'em').length, 0, 'the part past the limit is plain text');

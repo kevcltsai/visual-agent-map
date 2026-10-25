@@ -1021,6 +1021,8 @@ export const zhCN: Record<TranslationKey, string> = {
   "ui.map_chat_plan_cancelled": "计划已取消，没有任何改变。",
   "ui.map_chat_choose_map": "你指的是哪一张地图？",
   "ui.map_chat_choose_opened_0": "已切换到“{0}”。",
+  "ui.map_chat_choose_label_0_1": "{0}（{1}）",
+  "ui.map_chat_choose_label_0_1_2": "{0}（{1}）#{2}",
   "ui.map_chat_log_label": "对话记录",
   "ui.map_chat_hero_title": "你想研究或整理什么？",
   "ui.map_chat_examples_label": "可以从这些开始",

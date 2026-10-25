@@ -126,5 +126,31 @@ export function matchMapTitle<T extends { title: string }>(query: string, maps: 
   return hits.length === 1 ? { kind: "one", map: hits[0].map } : { kind: "many", maps: hits.map(entry => entry.map) };
 }
 
+/** What tells apart the maps of a list that share a title: their folder, and a number when even the folder is the same. */
+export interface MapChoicePart {
+  title: string;
+  folder?: string;
+  seq?: number;
+}
+/**
+ * The parts of the labels for a list of maps to pick from. A title that is alone in the list stays as it is; maps that share
+ * one (compared as shown, after trimming) also get the folder their Map.md is in, and a number when the folder is shared too.
+ */
+export function mapChoiceParts(maps: readonly { title: string; mapPath: string }[]): MapChoicePart[] {
+  const shown = (map: { title: string }): string => map.title.trim();
+  const folder = (map: { mapPath: string }): string => map.mapPath.split("/").slice(0, -1).join("/");
+  const same = (a: { title: string }, b: { title: string }): boolean => shown(a) === shown(b);
+  const seen = new Map<string, number>();
+  return maps.map(map => {
+    if (maps.filter(other => same(other, map)).length < 2) return { title: map.title };
+    const key = `${shown(map)}\u0000${folder(map)}`;
+    const alike = maps.filter(other => same(other, map) && folder(other) === folder(map));
+    if (alike.length < 2) return { title: map.title, folder: folder(map) };
+    const seq = (seen.get(key) ?? 0) + 1;
+    seen.set(key, seq);
+    return { title: map.title, folder: folder(map), seq };
+  });
+}
+
 /** True for an id a reply gave to a card it creates itself. */
 export const isNewRef = (id: string): boolean => id.startsWith(MAP_CHAT_NEW_PREFIX);

@@ -1070,6 +1070,8 @@ var en = {
   "ui.map_chat_plan_cancelled": "Plan cancelled. Nothing was changed.",
   "ui.map_chat_choose_map": "Which map do you mean?",
   "ui.map_chat_choose_opened_0": "Opened \u201C{0}\u201D.",
+  "ui.map_chat_choose_label_0_1": "{0} ({1})",
+  "ui.map_chat_choose_label_0_1_2": "{0} ({1}) #{2}",
   "ui.map_chat_log_label": "Conversation",
   "ui.map_chat_hero_title": "What do you want to research or organize?",
   "ui.map_chat_examples_label": "Examples to start from",
@@ -2991,6 +2993,8 @@ var zhCN = {
   "ui.map_chat_plan_cancelled": "\u8BA1\u5212\u5DF2\u53D6\u6D88\uFF0C\u6CA1\u6709\u4EFB\u4F55\u6539\u53D8\u3002",
   "ui.map_chat_choose_map": "\u4F60\u6307\u7684\u662F\u54EA\u4E00\u5F20\u5730\u56FE\uFF1F",
   "ui.map_chat_choose_opened_0": "\u5DF2\u5207\u6362\u5230\u201C{0}\u201D\u3002",
+  "ui.map_chat_choose_label_0_1": "{0}\uFF08{1}\uFF09",
+  "ui.map_chat_choose_label_0_1_2": "{0}\uFF08{1}\uFF09#{2}",
   "ui.map_chat_log_label": "\u5BF9\u8BDD\u8BB0\u5F55",
   "ui.map_chat_hero_title": "\u4F60\u60F3\u7814\u7A76\u6216\u6574\u7406\u4EC0\u4E48\uFF1F",
   "ui.map_chat_examples_label": "\u53EF\u4EE5\u4ECE\u8FD9\u4E9B\u5F00\u59CB",
@@ -4912,6 +4916,8 @@ var zhTW = {
   "ui.map_chat_plan_cancelled": "\u8A08\u756B\u5DF2\u53D6\u6D88\uFF0C\u6C92\u6709\u4EFB\u4F55\u6539\u8B8A\u3002",
   "ui.map_chat_choose_map": "\u4F60\u6307\u7684\u662F\u54EA\u4E00\u5F35\u5FC3\u667A\u5716\uFF1F",
   "ui.map_chat_choose_opened_0": "\u5DF2\u5207\u63DB\u5230\u300C{0}\u300D\u3002",
+  "ui.map_chat_choose_label_0_1": "{0}\uFF08{1}\uFF09",
+  "ui.map_chat_choose_label_0_1_2": "{0}\uFF08{1}\uFF09#{2}",
   "ui.map_chat_log_label": "\u5C0D\u8A71\u7D00\u9304",
   "ui.map_chat_hero_title": "\u4F60\u60F3\u7814\u7A76\u6216\u6574\u7406\u4EC0\u9EBC\uFF1F",
   "ui.map_chat_examples_label": "\u53EF\u4EE5\u5F9E\u9019\u4E9B\u958B\u59CB",
@@ -21086,6 +21092,10 @@ var MapChatPanel = class {
     __publicField(this, "rows", /* @__PURE__ */ new WeakMap());
     /** The animation frame that will lay out the streaming message, if one is waiting. */
     __publicField(this, "frame", null);
+    /** Whether the body was showing at the last applyOpen, to tell the moment it opens. */
+    __publicField(this, "wasShown", false);
+    /** The scroll to the end that waits for the overlay's height to be final. */
+    __publicField(this, "openFrame", null);
     /** The visible note the user took off the chip; it stays off until another note is visible. */
     __publicField(this, "dismissedNote", null);
     __publicField(this, "noteChip", null);
@@ -21663,16 +21673,23 @@ var MapChatPanel = class {
     this.host.send();
   }
   // ---- width ----------------------------------------------------------------------------------------------------
-  resizeTo(width, commit) {
+  /**
+   * `from` is the set width and the shown width before this adjustment. A window the pane squeezed shows less than was set; a
+   * widening that stays under the set width must not shrink the set width, so a width is written only when it is larger than
+   * the set width or narrower than what was shown.
+   */
+  resizeTo(width, commit, from = { set: this.width, shown: this.shownWidth() }) {
     var _a2, _b2, _c, _d;
-    this.width = clampMapChatWidth(width);
-    const widths = (_b2 = (_a2 = this.host).widths) == null ? void 0 : _b2.call(_a2, this.width);
+    const next = clampMapChatWidth(width);
+    const writes = next > from.set || next < from.shown;
+    const widths = (_b2 = (_a2 = this.host).widths) == null ? void 0 : _b2.call(_a2, next);
     if (widths) {
       this.dockedPx = widths.docked;
       this.overlayPx = widths.overlay;
     }
+    if (writes) this.width = next;
     this.applyWidth();
-    (_d = (_c = this.host).setWidth) == null ? void 0 : _d.call(_c, this.width, commit);
+    if (writes) (_d = (_c = this.host).setWidth) == null ? void 0 : _d.call(_c, this.width, commit);
   }
   /** The width the window has on the page now: the set width, given way to when the pane has no room for it. */
   shownWidth() {
@@ -21705,10 +21722,11 @@ var MapChatPanel = class {
     event.preventDefault();
     const startX = event.clientX;
     const startWidth = this.shownWidth();
+    const from = { set: this.width, shown: startWidth };
     const handle = this.resizerEl;
     const move = (next) => {
       if (next.buttons === 0) end();
-      else this.resizeTo(startWidth + (next.clientX - startX), false);
+      else this.resizeTo(startWidth + (next.clientX - startX), false, from);
     };
     const end = () => {
       var _a3, _b2;
@@ -21837,6 +21855,10 @@ ${text11}` : text11;
     };
     const hadUnread = this.unread;
     if (shown) this.unread = false;
+    const opening = shown && !this.wasShown && floating && !hero;
+    const stick = opening && this.atEnd();
+    this.wasShown = shown;
+    if (!shown) this.cancelOpenFrame();
     this.el.toggleClass("is-open", shown && !hero);
     this.el.toggleClass("is-hero", hero);
     this.el.toggleClass("is-docked", docked);
@@ -21863,6 +21885,30 @@ ${text11}` : text11;
     this.renderSuggestions();
     this.renderGuide();
     if (shown && hadUnread) this.scrollToEnd();
+    if (stick) this.scrollToEndWhenSettled();
+  }
+  cancelOpenFrame() {
+    var _a2;
+    (_a2 = this.openFrame) == null ? void 0 : _a2.cancel();
+    this.openFrame = null;
+  }
+  /** The overlay's height is final only after the classes are laid out, so the scroll to the end waits for the next frame. */
+  scrollToEndWhenSettled() {
+    var _a2, _b2, _c;
+    this.cancelOpenFrame();
+    const win = (_c = (_b2 = this.logEl.win) != null ? _b2 : (_a2 = this.logEl.ownerDocument) == null ? void 0 : _a2.defaultView) != null ? _c : typeof window !== "undefined" ? window : void 0;
+    if (typeof (win == null ? void 0 : win.requestAnimationFrame) !== "function") {
+      this.scrollToEnd();
+      return;
+    }
+    const id = win.requestAnimationFrame(() => {
+      this.openFrame = null;
+      if (this.shown) this.scrollToEnd();
+    });
+    this.openFrame = { cancel: () => {
+      var _a3;
+      return (_a3 = win.cancelAnimationFrame) == null ? void 0 : _a3.call(win, id);
+    } };
   }
   /** An empty conversation in the side window shows one line of guidance in place of the log. */
   renderGuide() {
@@ -22926,6 +22972,22 @@ function matchMapTitle(query, maps) {
   if (!hits.length) hits = keyed.filter((entry) => entry.key.includes(wanted));
   if (!hits.length) return { kind: "none" };
   return hits.length === 1 ? { kind: "one", map: hits[0].map } : { kind: "many", maps: hits.map((entry) => entry.map) };
+}
+function mapChoiceParts(maps) {
+  const shown = (map) => map.title.trim();
+  const folder = (map) => map.mapPath.split("/").slice(0, -1).join("/");
+  const same2 = (a, b) => shown(a) === shown(b);
+  const seen = /* @__PURE__ */ new Map();
+  return maps.map((map) => {
+    var _a2;
+    if (maps.filter((other) => same2(other, map)).length < 2) return { title: map.title };
+    const key2 = `${shown(map)}\0${folder(map)}`;
+    const alike = maps.filter((other) => same2(other, map) && folder(other) === folder(map));
+    if (alike.length < 2) return { title: map.title, folder: folder(map) };
+    const seq = ((_a2 = seen.get(key2)) != null ? _a2 : 0) + 1;
+    seen.set(key2, seq);
+    return { title: map.title, folder: folder(map), seq };
+  });
 }
 
 // experiences/visual-map/relevance-pins.ts
@@ -44503,12 +44565,17 @@ ${note.detail.trim()}` : "",
   }
   /** The chat's model list: the follow-default entry first, then the settings page's list (and a saved model that has gone). */
   chatModelChoices() {
+    var _a2;
     const settings = this.plugin.settings;
     const choices = [
       {
         value: "",
         label: t("ui.map_chat_model_follow_0", this.plugin.modelLabel(settings.cliModel)),
-        short: t("ui.map_chat_model_follow_short_0", this.plugin.modelLabel(settings.cliModel))
+        // The list shows the model's own name; the provider prefix ("Codex · ") is in the tooltip with the full label.
+        short: t(
+          "ui.map_chat_model_follow_short_0",
+          (_a2 = this.plugin.modelLabel(settings.cliModel).split(" \xB7 ").at(-1)) != null ? _a2 : ""
+        )
       },
       ...this.plugin.availableModels().map((id) => ({ value: id, label: this.plugin.modelLabel(id) }))
     ];
@@ -45175,9 +45242,15 @@ ${note.detail.trim()}` : "",
     const match = matchMapTitle(title, topics);
     if (match.kind === "none") return skipped("ui.map_chat_skip_map_not_found");
     if (match.kind === "many") {
+      const parts = mapChoiceParts(match.maps);
       (_a2 = this.chat) == null ? void 0 : _a2.showChoices({
         prompt: t("ui.map_chat_choose_map"),
-        options: match.maps.map((topic) => ({ label: topic.title, pick: () => void this.chatPickMap(topic) })),
+        options: match.maps.map((topic, index) => {
+          var _a3;
+          const part = parts[index];
+          const label = part.seq ? t("ui.map_chat_choose_label_0_1_2", part.title, (_a3 = part.folder) != null ? _a3 : "", part.seq) : part.folder ? t("ui.map_chat_choose_label_0_1", part.title, part.folder) : part.title;
+          return { label, pick: () => void this.chatPickMap(topic) };
+        }),
         picked: false
       });
       return skipped("ui.map_chat_skip_map_choose");

@@ -1093,6 +1093,8 @@ export const en = {
   "ui.map_chat_plan_cancelled": "Plan cancelled. Nothing was changed.",
   "ui.map_chat_choose_map": "Which map do you mean?",
   "ui.map_chat_choose_opened_0": "Opened “{0}”.",
+  "ui.map_chat_choose_label_0_1": "{0} ({1})",
+  "ui.map_chat_choose_label_0_1_2": "{0} ({1}) #{2}",
   "ui.map_chat_log_label": "Conversation",
   "ui.map_chat_hero_title": "What do you want to research or organize?",
   "ui.map_chat_examples_label": "Examples to start from",

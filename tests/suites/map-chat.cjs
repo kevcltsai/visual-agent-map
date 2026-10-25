@@ -2870,3 +2870,83 @@ test('B1 fix 9 and 10: no dead overlay rule; the Escape selector is a plain lite
   const allow = JSON.parse(fs.readFileSync(path.join(root, 'tests/literal-scan/visual-map.json'), 'utf8')).allow.find(entry => entry.text === 'input, textarea, select, [contenteditable=true], .vam-map-chat');
   assert.ok(allow && allow.reason.length > 10);
 });
+
+// ---- B2-0 L3: a squeezed window does not write a smaller width back ----------------------------------------------------
+const squeezed = async () => {
+  const h = await harness(); await h.view.hydrate(); h.plugin.settings.mapChatWidth = 500; const chat = h.open();
+  h.rootEl.clientWidth = 700; h.view.onResize(); // the pane leaves 340 of the 500 the user set
+  assert.equal(chat.el.style.width, '340px'); h.control.saves = 0;
+  return { h, chat };
+};
+integrationTest('B2-0 L3: squeezed window - ArrowRight (widening) keeps the set width; ArrowLeft (narrowing) still writes the smaller value', async () => {
+  const { h, chat } = await squeezed();
+  press(chat.resizerEl, { key: 'ArrowRight' });
+  assert.equal(h.plugin.settings.mapChatWidth, 500, 'a widening inside the squeezed range does not shrink the set width'); assert.equal(h.control.saves, 0);
+  press(chat.resizerEl, { key: 'ArrowLeft' });
+  assert.equal(h.plugin.settings.mapChatWidth, 324, 'narrowing from what is shown writes the smaller value'); assert.ok(h.control.saves > 0);
+});
+integrationTest('B2-0 L3: squeezed window - a drag that only widens keeps the set width; a drag that narrows writes it; End still writes the larger value', async () => {
+  const { h, chat } = await squeezed(); const doc = counting(); chat.el.ownerDocument = doc;
+  chat.resizerEl.fire('pointerdown', { button: 0, clientX: 340, pointerId: 1 }); doc.fire('pointermove', { clientX: 440 }); doc.fire('pointerup', {});
+  assert.equal(h.plugin.settings.mapChatWidth, 500, 'dragged wider than shown but under the set width: unchanged');
+  chat.resizerEl.fire('pointerdown', { button: 0, clientX: 340, pointerId: 1 }); doc.fire('pointermove', { clientX: 300 }); doc.fire('pointerup', {});
+  assert.equal(h.plugin.settings.mapChatWidth, 300, 'dragged narrower: written');
+  press(chat.resizerEl, { key: 'End' }); assert.equal(h.plugin.settings.mapChatWidth, 560, 'wider than the set width: written');
+});
+integrationTest('B2-0 L3: a window that is not squeezed writes both directions as before', async () => {
+  const h = await harness(); await h.view.hydrate(); h.plugin.settings.mapChatWidth = 500; const chat = h.open(); h.rootEl.clientWidth = 1400; h.view.onResize();
+  press(chat.resizerEl, { key: 'ArrowLeft' }); assert.equal(h.plugin.settings.mapChatWidth, 484);
+  press(chat.resizerEl, { key: 'ArrowRight' }); press(chat.resizerEl, { key: 'ArrowRight' }); assert.equal(h.plugin.settings.mapChatWidth, 516);
+  const doc = counting(); chat.el.ownerDocument = doc; chat.resizerEl.fire('pointerdown', { button: 0, clientX: 500, pointerId: 1 }); doc.fire('pointermove', { clientX: 450 }); doc.fire('pointerup', {});
+  assert.equal(h.plugin.settings.mapChatWidth, 466);
+});
+
+// ---- B2-0 F1: opening the overlay scrolls once its height is final -----------------------------------------------------
+test('B2-0 F1: opening the folded overlay scrolls to the end after the next frame (when the overlay height is final), not before', () => {
+  const f = panelFixture(); f.panel.setOpen(true); const log = f.parts.log(); f.panel.setNarrow(true);
+  f.panel.begin('q'); f.panel.finish('a reply', []); f.panel.collapseOverlay(); assert.equal(f.panel.isOpen, false);
+  const frames = []; log.win = { requestAnimationFrame: fn => { frames.push(fn); return frames.length; }, cancelAnimationFrame() {} };
+  Object.assign(log, { scrollHeight: 0, clientHeight: 0, scrollTop: 0 }); // a folded log measures as empty, so as at its end
+  f.parts.toggle().click(); assert.equal(f.panel.isOpen, true); assert.ok(frames.length >= 1, 'the scroll waits for a frame');
+  assert.equal(log.scrollTop, 0, 'not scrolled against the height from before the overlay was laid out');
+  // The overlay settles at its final height; the scroll must use it.
+  Object.assign(log, { scrollHeight: 1030, clientHeight: 300 }); frames.splice(0).forEach(run => run());
+  assert.equal(log.scrollTop, 1030, 'at the very end once the height is final');
+});
+test('B2-0 F1: the deferred scroll is dropped when the window is folded again before the frame', () => {
+  const f = panelFixture(); f.panel.setOpen(true); const log = f.parts.log(); f.panel.setNarrow(true); f.panel.begin('q'); f.panel.finish('a reply', []); f.panel.collapseOverlay();
+  const frames = []; log.win = { requestAnimationFrame: fn => { frames.push(fn); return frames.length; }, cancelAnimationFrame() {} };
+  Object.assign(log, { scrollHeight: 0, clientHeight: 0, scrollTop: 0 });
+  f.parts.toggle().click(); f.panel.collapseOverlay(); Object.assign(log, { scrollHeight: 1000, clientHeight: 300 }); frames.splice(0).forEach(run => run()); assert.equal(log.scrollTop, 0, 'folded again: nothing to scroll');
+});
+
+// ---- B2-0 F3: the model menu keeps its width at 340px --------------------------------------------------------------------
+integrationTest('B2-0 F3: the model select takes the header\'s remaining width (flex 1 1 0, min-width 0), and the default entry shows the model without its provider prefix, the tooltip keeps the full name', async () => {
+  const css = fs.readFileSync(path.join(root, 'styles.css'), 'utf8');
+  const rule = css.split('\n').find(line => line.startsWith('.vam-map-chat-model {')); assert.ok(rule);
+  assert.match(rule, /flex: 1 1 0;/); assert.match(rule, /min-width: 0;/); assert.doesNotMatch(rule, /min-width: 120px/);
+  const h = await harness(); await h.view.hydrate(); h.plugin.settings.cliModel = 'gpt-6-luna'; h.plugin.modelLabel = id => id.startsWith('claude:') ? 'Claude Sonnet' : `OpenAI Codex · ${id}`;
+  const first = h.view.chatModelChoices()[0];
+  assert.equal(first.label, 'Follow default (now: OpenAI Codex · gpt-6-luna)', 'the full name stays in the tooltip'); assert.equal(first.short, 'Default: gpt-6-luna');
+  h.plugin.settings.cliModel = 'claude:sonnet'; assert.equal(h.view.chatModelChoices()[0].short, 'Default: Claude Sonnet', 'a label without a provider prefix is unchanged');
+});
+
+// ---- B2-0 F5: maps with the same name can be told apart in the list --------------------------------------------------------
+test('B2-0 F5: mapChoiceParts leaves different titles alone, adds the folder to a shared title, and a number when the folder is shared too', () => {
+  const { mapChoiceParts } = load('core/map-chat-plan.ts');
+  eq(mapChoiceParts([{ title: 'Sleep', mapPath: 'A/x/Map.md' }, { title: 'Diet', mapPath: 'A/y/Map.md' }]), [{ title: 'Sleep' }, { title: 'Diet' }], 'different names: no path');
+  eq(mapChoiceParts([{ title: 'Sleep', mapPath: 'A/x/Map.md' }, { title: 'Sleep', mapPath: 'A/y/Map.md' }, { title: 'Diet', mapPath: 'A/z/Map.md' }]),
+    [{ title: 'Sleep', folder: 'A/x' }, { title: 'Sleep', folder: 'A/y' }, { title: 'Diet' }], 'only the maps that share a name get a path');
+  eq(mapChoiceParts([{ title: 'Sleep', mapPath: 'A/x/Map.md' }, { title: ' Sleep ', mapPath: 'A/x/Map.md' }, { title: 'Sleep', mapPath: 'A/y/Map.md' }]),
+    [{ title: 'Sleep', folder: 'A/x', seq: 1 }, { title: ' Sleep ', folder: 'A/x', seq: 2 }, { title: 'Sleep', folder: 'A/y' }], 'the same path too: a number');
+  eq(mapChoiceParts([]), []);
+});
+integrationTest('B2-0 F5: open_map with two maps of the same name lists them with their folders; different names show no path', async () => {
+  const h = await harness(); await h.view.hydrate(); h.open();
+  h.plugin.repo.topics = async () => [{ id: '1', title: 'Sleep', mapPath: 'Agent Workspace/Topics/a/Map.md' }, { id: '2', title: 'Sleep', mapPath: 'Agent Workspace/Topics/b/Map.md' }, { id: '3', title: 'Sleep log', mapPath: 'Agent Workspace/Topics/c/Map.md' }];
+  const shown = []; h.view.chat.showChoices = choices => { shown.push(choices); };
+  const outcome = await h.view.chatOpenMap('Sleep', { path: MAP, id: h.view.map.id }, () => true);
+  eq(outcome.status, 'skipped'); eq(shown[0].options.map(o => o.label), ['Sleep (Agent Workspace/Topics/a)', 'Sleep (Agent Workspace/Topics/b)']);
+  h.plugin.repo.topics = async () => [{ id: '3', title: 'Sleep log', mapPath: 'X/c/Map.md' }, { id: '4', title: 'Sleeping', mapPath: 'X/d/Map.md' }];
+  await h.view.chatOpenMap('Sleep', { path: MAP, id: h.view.map.id }, () => true); eq(shown[1].options.map(o => o.label), ['Sleep log', 'Sleeping'], 'different names: no path');
+});

@@ -145,6 +145,7 @@ import type { MapChatRequest, MapChatResult } from "../../core/map-chat-service"
 import { MAP_CHAT_NEW_PREFIX, type MapChatAction } from "../../core/steps/map-chat/step";
 import {
   MAP_CHAT_AUTO_LAYOUT_MIN_NEW,
+  mapChoiceParts,
   matchMapTitle,
   planFor,
   researchTargetsOf,
@@ -10326,7 +10327,11 @@ export class VisualAgentMapView extends ItemView {
       {
         value: "",
         label: t("ui.map_chat_model_follow_0", this.plugin.modelLabel(settings.cliModel)),
-        short: t("ui.map_chat_model_follow_short_0", this.plugin.modelLabel(settings.cliModel))
+        // The list shows the model's own name; the provider prefix ("Codex · ") is in the tooltip with the full label.
+        short: t(
+          "ui.map_chat_model_follow_short_0",
+          this.plugin.modelLabel(settings.cliModel).split(" · ").at(-1) ?? ""
+        )
       },
       ...this.plugin.availableModels().map(id => ({ value: id, label: this.plugin.modelLabel(id) }))
     ];
@@ -11079,9 +11084,18 @@ export class VisualAgentMapView extends ItemView {
     const match = matchMapTitle(title, topics);
     if (match.kind === "none") return skipped("ui.map_chat_skip_map_not_found");
     if (match.kind === "many") {
+      const parts = mapChoiceParts(match.maps);
       this.chat?.showChoices({
         prompt: t("ui.map_chat_choose_map"),
-        options: match.maps.map(topic => ({ label: topic.title, pick: () => void this.chatPickMap(topic) })),
+        options: match.maps.map((topic, index) => {
+          const part = parts[index];
+          const label = part.seq
+            ? t("ui.map_chat_choose_label_0_1_2", part.title, part.folder ?? "", part.seq)
+            : part.folder
+              ? t("ui.map_chat_choose_label_0_1", part.title, part.folder)
+              : part.title;
+          return { label, pick: () => void this.chatPickMap(topic) };
+        }),
         picked: false
       });
       return skipped("ui.map_chat_skip_map_choose");

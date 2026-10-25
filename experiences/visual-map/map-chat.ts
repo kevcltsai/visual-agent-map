@@ -216,6 +216,10 @@ export class MapChatPanel {
   >();
   /** The animation frame that will lay out the streaming message, if one is waiting. */
   private frame: { cancel: () => void } | null = null;
+  /** Whether the body was showing at the last applyOpen, to tell the moment it opens. */
+  private wasShown = false;
+  /** The scroll to the end that waits for the overlay's height to be final. */
+  private openFrame: { cancel: () => void } | null = null;
   /** The visible note the user took off the chip; it stays off until another note is visible. */
   private dismissedNote: string | null = null;
   private noteChip: string | null = null;
@@ -815,15 +819,26 @@ export class MapChatPanel {
 
   // ---- width ----------------------------------------------------------------------------------------------------
 
-  private resizeTo(width: number, commit: boolean): void {
-    this.width = clampMapChatWidth(width);
-    const widths = this.host.widths?.(this.width);
+  /**
+   * `from` is the set width and the shown width before this adjustment. A window the pane squeezed shows less than was set; a
+   * widening that stays under the set width must not shrink the set width, so a width is written only when it is larger than
+   * the set width or narrower than what was shown.
+   */
+  private resizeTo(
+    width: number,
+    commit: boolean,
+    from: { set: number; shown: number } = { set: this.width, shown: this.shownWidth() }
+  ): void {
+    const next = clampMapChatWidth(width);
+    const writes = next > from.set || next < from.shown;
+    const widths = this.host.widths?.(next);
     if (widths) {
       this.dockedPx = widths.docked;
       this.overlayPx = widths.overlay;
     }
+    if (writes) this.width = next;
     this.applyWidth();
-    this.host.setWidth?.(this.width, commit);
+    if (writes) this.host.setWidth?.(this.width, commit);
   }
   /** The width the window has on the page now: the set width, given way to when the pane has no room for it. */
   private shownWidth(): number {
@@ -863,10 +878,11 @@ export class MapChatPanel {
     event.preventDefault();
     const startX = event.clientX;
     const startWidth = this.shownWidth();
+    const from = { set: this.width, shown: startWidth };
     const handle = this.resizerEl;
     const move = (next: PointerEvent): void => {
       if (next.buttons === 0) end();
-      else this.resizeTo(startWidth + (next.clientX - startX), false);
+      else this.resizeTo(startWidth + (next.clientX - startX), false, from);
     };
     const end = (): void => {
       const stop = this.stopResizing;
@@ -1006,6 +1022,11 @@ export class MapChatPanel {
     };
     const hadUnread = this.unread;
     if (shown) this.unread = false;
+    // Measured before the classes change: a folded log measures as at its end.
+    const opening = shown && !this.wasShown && floating && !hero;
+    const stick = opening && this.atEnd();
+    this.wasShown = shown;
+    if (!shown) this.cancelOpenFrame();
     this.el.toggleClass("is-open", shown && !hero);
     this.el.toggleClass("is-hero", hero);
     this.el.toggleClass("is-docked", docked);
@@ -1034,6 +1055,26 @@ export class MapChatPanel {
     this.renderGuide();
     // Someone opens the window because a reply came in while it was folded: they land on the newest message.
     if (shown && hadUnread) this.scrollToEnd();
+    if (stick) this.scrollToEndWhenSettled();
+  }
+  private cancelOpenFrame(): void {
+    this.openFrame?.cancel();
+    this.openFrame = null;
+  }
+  /** The overlay's height is final only after the classes are laid out, so the scroll to the end waits for the next frame. */
+  private scrollToEndWhenSettled(): void {
+    this.cancelOpenFrame();
+    const win =
+      this.logEl.win ?? this.logEl.ownerDocument?.defaultView ?? (typeof window !== "undefined" ? window : undefined);
+    if (typeof win?.requestAnimationFrame !== "function") {
+      this.scrollToEnd();
+      return;
+    }
+    const id = win.requestAnimationFrame(() => {
+      this.openFrame = null;
+      if (this.shown) this.scrollToEnd();
+    });
+    this.openFrame = { cancel: () => win.cancelAnimationFrame?.(id) };
   }
   /** An empty conversation in the side window shows one line of guidance in place of the log. */
   private renderGuide(): void {

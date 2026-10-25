@@ -198,7 +198,7 @@ class Dropped extends Error {
  * malformed, forward or undefined ref (also one whose defining item was dropped) drops the item as `bad_ref`. A `new:` id has no
  * baseline, so rename, summary, note and delete actions refuse it. `parentId: ""` on `add_child` is a new root card.
  * `create_map` is only valid as the first item and `open_map` only as the last; after `create_map` the cards of the old map are
- * out of reach. With `noEditableMap` the reply must start with `create_map`: any other first item (and everything before the
+ * out of reach. With `noEditableMap` the reply must start with `create_map` (a lone `open_map` is also fine): any other first item (and everything before the
  * create) is dropped.
  */
 export function parseMapChat(
@@ -271,7 +271,7 @@ export function parseMapChat(
       const kind = item.kind;
       if (typeof kind !== "string" || !(MAP_CHAT_ACTION_KINDS as readonly string[]).includes(kind))
         throw new Dropped("unknown_kind");
-      if (context.noEditableMap && !created && kind !== "create_map") throw new Dropped("bad_value");
+      if (context.noEditableMap && !created && kind !== "create_map" && kind !== "open_map") throw new Dropped("bad_value");
       switch (kind as MapChatActionKind) {
         case "add_child": {
           const given = text("parentId", false);

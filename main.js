@@ -22704,7 +22704,7 @@ function parseMapChat(raw, context) {
       const kind = item.kind;
       if (typeof kind !== "string" || !MAP_CHAT_ACTION_KINDS.includes(kind))
         throw new Dropped("unknown_kind");
-      if (context.noEditableMap && !created && kind !== "create_map") throw new Dropped("bad_value");
+      if (context.noEditableMap && !created && kind !== "create_map" && kind !== "open_map") throw new Dropped("bad_value");
       switch (kind) {
         case "add_child": {
           const given = text11("parentId", false);

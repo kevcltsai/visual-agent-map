@@ -506,6 +506,13 @@ test('B1 noEditableMap: the reply has to start with create_map; anything else be
   assert.equal(wrongOrder.actions.length, 0, 'create_map is only valid as the first action, so the whole reply is dropped');
   assert.equal(parse(reply(child('r', '')), context()).actions.length, 1, 'without the flag a root card is fine');
 });
+test('B1 fix 7: with no editable map a lone open_map is kept (it needs no card), and cards still need create_map', () => {
+  const none = { ...context(), noEditableMap: true };
+  const lone = parse(reply(item('open_map', { title: 'Coffee' })), none);
+  assert.deepEqual(lone.rejected, []); assert.deepEqual(plain(lone.actions), [{ kind: 'open_map', title: 'Coffee' }]);
+  const withCard = parse(reply(child('r', ''), item('open_map', { title: 'Coffee' })), none);
+  assert.deepEqual(plain(withCard.actions.map(a => a.kind)), ['open_map'], 'the card before it is still dropped'); assert.deepEqual(withCard.rejected.map(entry => entry.code), ['bad_value']);
+});
 test('B1 view operations: collapse_topic, expand_topic and focus_topic need a card; auto_layout needs nothing', () => {
   const result = parse(reply(item('collapse_topic', { nodeId: 'a' }), item('expand_topic', { nodeId: 'a' }), item('auto_layout'), item('focus_topic', { nodeId: 'b' })));
   assert.deepEqual(result.rejected, []);

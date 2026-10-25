@@ -1,3 +1,4 @@
+export { imageMarkdown, type ImageCandidate } from "../../core/image-candidates";
 export type ContextAction = "transform" | "research" | "image_search" | "diagram" | "image_generate" | "clarify";
 export interface ContextPlan {
   action: ContextAction;
@@ -5,11 +6,6 @@ export interface ContextPlan {
   instruction: string;
   placement: "after" | "replace";
   captionInstruction: string;
-}
-export interface ImageCandidate {
-  title: string;
-  url: string;
-  source: string;
 }
 
 export function parsePlan(raw: string): ContextPlan {
@@ -30,10 +26,4 @@ export function parsePlan(raw: string): ContextPlan {
   )
     throw new Error("Invalid AI action plan");
   return plan as ContextPlan;
-}
-
-/** Markdown for a chosen image and a link to the page it came from. */
-export function imageMarkdown(candidate: ImageCandidate): string {
-  const title = candidate.title.replace(/[\]\\\r\n[]/g, " ");
-  return `![${title}](<${candidate.url}>)\n\n[${title}](<${candidate.source}>)`;
 }

@@ -3,8 +3,9 @@ import { getUiLanguage, t } from "../../i18n";
 import type { PreparedStep } from "../../core/step-runner";
 import { unsafeMermaid } from "../../ai/mermaid-safety";
 import { prepareStep } from "../../core/step-runner";
-import { imageMarkdown, type ImageCandidate } from "./action-plan";
-import { imageSearchStep } from "./steps/image-search/step";
+import { imageMarkdown, type ImageCandidate } from "../../core/image-candidates";
+import { imageSearchStep } from "../../core/steps/image-search/step";
+import { loadableImages } from "../../ui/image-candidates";
 import { ImageTranslateAction, type ImageToken } from "./image-translate-action";
 import { planStep } from "./steps/plan/step";
 import { transformStep } from "./steps/transform/step";
@@ -56,34 +57,6 @@ function positionAt(source: string, offset: number): { line: number; ch: number 
   const before = source.slice(0, offset);
   const line = before.split("\n").length - 1;
   return { line, ch: before.length - (before.lastIndexOf("\n") + 1) };
-}
-
-/** Keeps the candidates whose image loads within a few seconds, in order; the rest are dead or blocked links. */
-async function loadableImages(candidates: ImageCandidate[], signal: AbortSignal): Promise<ImageCandidate[]> {
-  const loads = await Promise.all(
-    candidates.map(
-      candidate =>
-        new Promise<boolean>(resolve => {
-          const probe = createEl("img");
-          probe.referrerPolicy = "no-referrer";
-          const abort = (): void => done(false);
-          const timer = window.setTimeout(abort, 8_000);
-          const done = (ok: boolean): void => {
-            window.clearTimeout(timer);
-            signal.removeEventListener("abort", abort);
-            const loaded = ok && probe.naturalWidth > 0;
-            probe.onload = probe.onerror = null;
-            if (!loaded) probe.src = "";
-            resolve(loaded);
-          };
-          probe.onload = () => done(true);
-          probe.onerror = () => done(false);
-          signal.addEventListener("abort", abort, { once: true });
-          probe.src = candidate.url;
-        })
-    )
-  );
-  return candidates.filter((_, index) => loads[index]);
 }
 
 /**

@@ -85,6 +85,7 @@
               "synthesize",
               "rate_by_goal",
               "merge",
+              "find_images",
               ""
             ]
           },

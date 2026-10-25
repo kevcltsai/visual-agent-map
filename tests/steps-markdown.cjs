@@ -78,8 +78,15 @@ test('the markdown call site in main.ts uses the Step Runner and the shared runt
   assert.ok(!/\.runTask\(/.test(body), 'the call site does not call runTask itself');
 });
 
+test('imageMarkdown removes angle brackets as well as square ones from the title (no HTML in the alt text)', () => {
+  const { imageMarkdown } = load('core/image-candidates.ts');
+  const md = imageMarkdown({ title: '<img src=x onerror=alert(1)> [a]', url: 'https://i.example/a.png', source: 'https://p.example/a' });
+  assert.doesNotMatch(md.replace(/\(<https:[^>]*>\)/g, ''), /[<>]/);
+  assert.ok(md.startsWith('![ img src=x onerror=alert(1)   a ]('));
+});
+
 test('web image search keeps https image and source links, drops invented or unsafe ones, dedupes and caps at six', () => {
-  const { parseImageCandidates, imageSearchStep } = load('experiences/markdown-context/steps/image-search/step.ts', {}, { URL });
+  const { parseImageCandidates, imageSearchStep } = load('core/steps/image-search/step.ts', {}, { URL });
   const images = [
     { title: 'Fried egg', imageUrl: 'https://example.org/egg.jpg', sourceUrl: 'https://example.org/eggs' },
     { title: 'Dup', imageUrl: 'https://example.org/egg.jpg', sourceUrl: 'https://example.org/other' },

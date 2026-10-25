@@ -9,6 +9,8 @@ import { MAP_CHAT_NEW_PREFIX, type MapChatAction } from "./steps/map-chat/step";
 
 /** More actions than this need a plan (so exactly this many do not). */
 export const MAP_CHAT_PLAN_ACTION_LIMIT = 15;
+/** A reply starts at most this many find_images; each is a web call the user did not confirm one by one, so later ones are skipped (B3). */
+export const MAP_CHAT_FIND_IMAGES_LIMIT = 3;
 /** This many research targets or more need a plan. */
 export const MAP_CHAT_PLAN_RESEARCH_LIMIT = 10;
 
@@ -25,7 +27,7 @@ export interface MapChatPlan {
    * the write (`options.diagrams`, on by default); the depth does not change the count (a normal or deep research that found
    * nothing on the web is sent once more, which is a retry and is not counted). Each synthesize is one integration call plus the
    * same diagram call: B2 starts it without a dialog and without the directions step. One call per card an expand is asked for,
-   * one for rating by a goal, one for a merge. Writes to cards and notes, create_map, open_map and the view operations are 0.
+   * one for rating by a goal, one for a merge, one for each find_images up to {@link MAP_CHAT_FIND_IMAGES_LIMIT} per reply (the view skips the rest; the loadable-image check is not an AI call). Writes to cards and notes, create_map, open_map and the view operations are 0.
    * The chat reply itself is not counted.
    */
   estimatedCalls: number;
@@ -74,6 +76,7 @@ export function planFor(
     if (action.kind === "add_child" && action.parentId) parentsWithChildren.add(action.parentId);
   let research = 0;
   let calls = 0;
+  let imageSearches = 0;
   let selection = context.selectedCount;
   let deletesBranch = false;
   let createsMap = false;
@@ -106,6 +109,12 @@ export function planFor(
             break;
           case "synthesize":
             calls += perTask;
+            break;
+          case "find_images":
+            if (imageSearches < MAP_CHAT_FIND_IMAGES_LIMIT) {
+              imageSearches += 1;
+              calls += 1;
+            }
             break;
         }
         break;

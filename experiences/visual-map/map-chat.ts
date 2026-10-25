@@ -1,5 +1,6 @@
 import { Keymap, setIcon } from "obsidian";
 import { t } from "../../i18n";
+import type { ImageCandidate } from "../../core/image-candidates";
 import type { MapChatTurn } from "../../core/map-chat-context";
 import { renderChatMarkdown } from "../../core/map-chat-render";
 import {
@@ -58,6 +59,45 @@ export interface MapChatChoices {
   picked: boolean;
 }
 
+/** One picture candidate of a search, and what became of it. */
+export interface MapChatImageItem {
+  candidate: ImageCandidate;
+  /** Title of the card the picture was inserted into; set once it was. */
+  inserted?: string;
+  /** The thumbnail could not be loaded: the candidate cannot be picked. */
+  broken?: boolean;
+  /** An insertion is running; a second click does nothing. */
+  busy?: boolean;
+}
+/**
+ * The picture candidates of one `find_images`, shown under the reply that asked for them. They belong to that reply for good: a
+ * later message does not drop them (they are a result that was already paid for).
+ */
+export interface MapChatImages {
+  /** The search words. */
+  query: string;
+  /** The card the picture is for, with the map it was found on. */
+  nodeId: string;
+  nodeTitle: string;
+  mapPath: string;
+  mapId: string;
+  state: "searching" | "ready" | "empty" | "failed" | "stopped";
+  /** Why the search failed. */
+  reason?: string;
+  /** Why the last insertion was refused, in words. */
+  notice?: string;
+  items: MapChatImageItem[];
+  /** Stops the search (only while it is running). */
+  stop?(): void;
+}
+/** The outcome of inserting a candidate. */
+export type MapChatInsertResult = { ok: true } | { ok: false; reason: string };
+/** A finished question and answer, as the host saves them. */
+export interface MapChatSavedTurn {
+  question: MapChatMessage;
+  answer: MapChatMessage;
+}
+
 export interface MapChatMessage {
   role: "user" | "assistant";
   /** On a user message: the question and references it was sent with. */
@@ -71,6 +111,8 @@ export interface MapChatMessage {
   choices?: MapChatChoices;
   /** More result lines than fit are folded into a count; true while they are all shown. */
   linesOpen?: boolean;
+  /** Picture candidates the reply asked for (`find_images`), oldest first. */
+  images?: MapChatImages[];
 }
 
 /** What the panel needs from the view that owns it. */
@@ -121,6 +163,12 @@ export interface MapChatHost {
   retry?(origin: MapChatOrigin): void;
   /** The conversation's state changed (a turn started or ended, a plan appeared or was settled); the canvas may say so. */
   stateChanged?(): void;
+  /** Inserts a picture candidate into the card it was found for; resolves with why it was refused, if it was. */
+  insertImage?(images: MapChatImages, item: MapChatImageItem): Promise<MapChatInsertResult>;
+  /** Whether the conversation can be saved next to this map; `reason` says why not. */
+  canSave?(): { ok: true } | { ok: false; reason: string };
+  /** Saves the finished turns as a note; resolves with the new note's path, or why it could not be saved. */
+  saveTranscript?(turns: MapChatSavedTurn[]): Promise<{ ok: true; path: string } | { ok: false; reason: string }>;
 }
 
 const LABEL_LIMIT = 40;
@@ -205,6 +253,15 @@ export class MapChatPanel {
   private modelEl!: HTMLSelectElement;
   private styleEls: Record<MapChatStyleChoice, HTMLButtonElement> | null = null;
   private stopEl!: HTMLButtonElement;
+  private saveEl!: HTMLButtonElement;
+  /** The note is being written; a second press does nothing. */
+  private saving = false;
+  /** The save button reads as disabled (it stays reachable by keyboard, so its title can be read). */
+  private saveDisabled = true;
+  /** What the reader is told once the reply that is streaming now has ended (a picture search can end in the middle of it). */
+  private spokenLater: string[] = [];
+  /** The pick button of each picture candidate, to give the keyboard back after a repaint. */
+  private pickEls = new WeakMap<MapChatImageItem, HTMLElement>();
   private built = false;
   private stopWatching: (() => void) | null = null;
   private messageEls: HTMLElement[] = [];
@@ -303,6 +360,17 @@ export class MapChatPanel {
       const answer = this.messages[at + 1];
       if (answer.streaming || answer.error || !answer.text.trim()) continue;
       turns.push({ role: "user", text: question.text }, { role: "assistant", text: answer.text });
+    }
+    return turns;
+  }
+  /** Finished question and answer pairs, oldest first: what "save as a note" writes (a streaming or failed answer is left out). */
+  completedTurns(): MapChatSavedTurn[] {
+    const turns: MapChatSavedTurn[] = [];
+    for (let at = 0; at + 1 < this.messages.length; at += 2) {
+      const question = this.messages[at];
+      const answer = this.messages[at + 1];
+      if (answer.streaming || answer.error || !answer.text.trim()) continue;
+      turns.push({ question, answer });
     }
     return turns;
   }
@@ -631,11 +699,35 @@ export class MapChatPanel {
     last.lines = [...last.lines, ...lines];
     this.renderLog();
   }
+  /** A picture search starts under the last answer. The block is shown at once and changes with {@link settleImages}. */
+  addImages(block: MapChatImages): void {
+    const last = this.messages.at(-1);
+    if (!last || last.role !== "assistant") return;
+    last.images = [...(last.images ?? []), block];
+    this.renderLog();
+  }
+  /**
+   * A picture search ended (or was stopped): the block takes `patch` and its row is laid out again. The keyboard stays where it
+   * is, and the reader hears one sentence (after the reply that is streaming now, if one is).
+   */
+  settleImages(block: MapChatImages, patch: Partial<Pick<MapChatImages, "state" | "reason" | "items">>): void {
+    if (!this.messages.some(message => message.images?.includes(block))) return;
+    Object.assign(block, patch);
+    block.stop = undefined;
+    this.renderLog();
+    if (block.state === "ready")
+      this.announceImages(t("ui.map_chat_images_ready_0_1", block.items.length, clip(block.nodeTitle)));
+    else if (block.state === "empty") this.announceImages(t("ui.map_chat_images_none"));
+    else if (block.state === "failed")
+      this.announceImages(t("ui.map_chat_images_failed_0", clip(block.reason ?? "", 160)));
+    else if (block.state === "stopped") this.announceImages(t("ui.map_chat_images_stopped"));
+  }
   /** Back to an empty conversation (a different map was opened). */
   reset(): void {
     this.cancelFrame();
     this.rows = new WeakMap();
     this.messages = [];
+    this.spokenLater = [];
     this.chips = [];
     this.dismissedNote = null;
     this.noteChip = null;
@@ -682,6 +774,12 @@ export class MapChatPanel {
       this.host.setModel(this.modelEl.value);
       this.refreshControls();
     });
+    this.saveEl = this.headEl.createEl("button", {
+      cls: "vam-map-chat-save clickable-icon",
+      attr: { type: "button", "aria-label": t("ui.map_chat_save"), title: t("ui.map_chat_save") }
+    });
+    setIcon(this.saveEl, "file-down");
+    this.saveEl.addEventListener("click", () => void this.saveNote());
     const close = this.headEl.createEl("button", {
       cls: "vam-map-chat-close clickable-icon",
       attr: { "aria-label": t("ui.map_chat_close") }
@@ -802,6 +900,43 @@ export class MapChatPanel {
     this.stopWatching = this.host.watchModels(() => this.refreshControls());
   }
 
+  /**
+   * The save button: hidden on the opening screen, and "disabled" (still reachable by keyboard, so its title can be read) while
+   * there is no finished turn or the map has no folder to save into.
+   */
+  private refreshSave(): void {
+    if (!this.built || !this.saveEl) return;
+    this.saveEl.hidden = this.hero;
+    this.saveEl.toggleClass("is-hidden", this.hero);
+    let why = "";
+    if (!this.completedTurns().length) why = t("ui.map_chat_save_empty");
+    else if (!this.host.saveTranscript) why = t("ui.map_chat_save_unavailable");
+    else {
+      const can = this.host.canSave?.();
+      if (can && !can.ok) why = can.reason;
+    }
+    const disabled = !!why || this.saving;
+    this.saveDisabled = disabled;
+    this.saveEl.setAttr("aria-disabled", String(disabled));
+    this.saveEl.toggleClass("is-disabled", disabled);
+    this.saveEl.setAttr("title", why || t("ui.map_chat_save"));
+  }
+  private async saveNote(): Promise<void> {
+    if (!this.built || this.saving || this.saveDisabled) return;
+    const turns = this.completedTurns();
+    if (!turns.length || !this.host.saveTranscript) return;
+    this.saving = true;
+    this.refreshSave();
+    try {
+      const result = await this.host.saveTranscript(turns);
+      // The keyboard stays on the button; the reader is told once.
+      this.announceImages(result.ok ? t("ui.map_chat_saved_0", result.path) : result.reason);
+    } finally {
+      this.saving = false;
+      this.refreshSave();
+    }
+  }
+
   private onKey(event: KeyboardEvent): void {
     if (event.key === "Escape" && !event.isComposing && !this.composing) {
       // On the opening screen there is no window to fold.
@@ -913,7 +1048,13 @@ export class MapChatPanel {
   // ---- messages the reader hears and the dot on the narrow edge ----------------------------------------------------
 
   private announce(text: string): void {
-    if (this.built) this.liveEl.setText(text);
+    if (!this.built) return;
+    // Sentences held back while a reply streamed are read right after the one that ends it.
+    this.liveEl.setText([text, ...this.spokenLater.splice(0)].filter(Boolean).join(" "));
+  }
+  private announceImages(text: string): void {
+    if (this.busy) this.spokenLater.push(text);
+    else this.announce(text);
   }
   private countsText(counts: ChatLineCounts): string {
     const parts: string[] = [];
@@ -1053,6 +1194,7 @@ export class MapChatPanel {
     this.applyWidth();
     this.renderSuggestions();
     this.renderGuide();
+    this.refreshSave();
     // Someone opens the window because a reply came in while it was folded: they land on the newest message.
     if (shown && hadUnread) this.scrollToEnd();
     if (stick) this.scrollToEndWhenSettled();
@@ -1176,12 +1318,21 @@ export class MapChatPanel {
       t("ui.map_chat_role_you"),
       t("ui.map_chat_role_ai"),
       t("ui.map_chat_overflow_note"),
+      t("ui.map_chat_images_source"),
       more ? t("ui.map_chat_more_detail") : "",
       message.lines.map(line => `${line.status}:${line.text}`).join("\n"),
       message.plan
         ? `plan:${message.plan.state}:${message.plan.items.length}:${message.plan.estimate}:${message.plan.groups?.map(group => `${group.label}${group.danger ? "!" : ""}`).join("|") ?? ""}`
         : "",
       message.choices ? `choices:${message.choices.picked}:${message.choices.options.map(o => o.label).join("|")}` : "",
+      (message.images ?? [])
+        .map(
+          block =>
+            `images:${block.state}:${block.reason ?? ""}:${block.notice ?? ""}:${block.items
+              .map(item => [item.candidate.url, item.inserted ?? "", item.broken ? 1 : 0, item.busy ? 1 : 0].join("~"))
+              .join(",")}`
+        )
+        .join(";"),
       message.text
     ].join("\u0001");
   }
@@ -1229,6 +1380,7 @@ export class MapChatPanel {
       this.bodyEls.push(entry.body);
     });
     this.renderGuide();
+    this.refreshSave();
     if (stick) this.scrollToEnd();
   }
 
@@ -1251,6 +1403,7 @@ export class MapChatPanel {
     if (message.plan) this.buildPlan(row, message.plan);
     if (message.choices) this.buildChoices(row, message.choices);
     if (message.lines.length) this.buildLines(row, message);
+    for (const block of message.images ?? []) this.buildImages(row, block);
     // What the AI actually did comes straight after what it said; the buttons that act on the answer come last.
     const asked = this.messages[this.messages.indexOf(message) - 1];
     let more: HTMLButtonElement | null = null;
@@ -1382,6 +1535,113 @@ export class MapChatPanel {
       plan.cancel();
       this.focusInput();
     });
+  }
+  /**
+   * The picture candidates of one search. Every state says itself in words. A candidate is one button (insert it) and one link
+   * (the page it came from); nothing here is run or fetched except the thumbnails, which are https images shown without a
+   * referrer. All text goes in as text.
+   */
+  private buildImages(row: HTMLElement, block: MapChatImages): void {
+    const box = row.createDiv({
+      cls: `vam-map-chat-images is-${block.state}`,
+      attr: { role: "group", "aria-label": t("ui.map_chat_images_label_0", clip(block.nodeTitle)) }
+    });
+    const text =
+      block.state === "searching"
+        ? t("ui.map_chat_images_searching_0", clip(block.query, 80))
+        : block.state === "ready"
+          ? t("ui.map_chat_images_ready_0_1", block.items.length, clip(block.nodeTitle))
+          : block.state === "empty"
+            ? t("ui.map_chat_images_none")
+            : block.state === "failed"
+              ? t("ui.map_chat_images_failed_0", clip(block.reason ?? "", 160))
+              : t("ui.map_chat_images_stopped");
+    box.createDiv({ cls: "vam-map-chat-images-status", text });
+    if (block.state === "searching" && block.stop) {
+      const stop = box.createEl("button", {
+        cls: "vam-map-chat-images-stop",
+        text: t("ui.map_chat_images_stop"),
+        attr: { type: "button" }
+      });
+      stop.addEventListener("click", () => block.stop?.());
+    }
+    if (block.state === "ready") {
+      const list = box.createDiv({ cls: "vam-map-chat-images-list", attr: { role: "list" } });
+      block.items.forEach(item => this.buildImageItem(list, block, item));
+    }
+    if (block.notice)
+      box.createDiv({ cls: "vam-map-chat-images-notice", text: block.notice, attr: { role: "status" } });
+  }
+  private buildImageItem(list: HTMLElement, block: MapChatImages, item: MapChatImageItem): void {
+    const { candidate } = item;
+    const cell = list.createDiv({ cls: "vam-map-chat-images-item", attr: { role: "listitem" } });
+    const pick = cell.createEl("button", {
+      cls: "vam-map-chat-images-pick",
+      attr: {
+        type: "button",
+        "aria-label": item.inserted
+          ? t("ui.map_chat_images_inserted_0", clip(item.inserted))
+          : t("ui.map_chat_images_insert_0_1", clip(candidate.title), clip(block.nodeTitle)),
+        "aria-disabled": String(!!item.inserted || !!item.broken || !!item.busy)
+      }
+    });
+    this.pickEls.set(item, pick);
+    // Only the https address the parser kept; no referrer is sent, and nothing runs.
+    const thumb = item.broken
+      ? null
+      : pick.createEl("img", {
+          cls: "vam-map-chat-images-thumb",
+          attr: { src: candidate.url, alt: "", loading: "lazy", referrerpolicy: "no-referrer" }
+        });
+    pick.createSpan({ cls: "vam-map-chat-images-title", text: clip(candidate.title, 80) });
+    if (item.inserted)
+      pick.createSpan({
+        cls: "vam-map-chat-images-state",
+        text: t("ui.map_chat_images_inserted_0", clip(item.inserted))
+      });
+    if (item.broken) pick.createSpan({ cls: "vam-map-chat-images-state", text: t("ui.map_chat_images_broken") });
+    thumb?.addEventListener("error", () => {
+      item.broken = true;
+      pick.setAttr("aria-disabled", "true");
+      thumb.remove();
+      pick.createSpan({ cls: "vam-map-chat-images-state", text: t("ui.map_chat_images_broken") });
+    });
+    pick.addEventListener("click", () => this.pickImage(block, item));
+    cell.createEl("a", {
+      cls: "vam-map-chat-images-source",
+      text: t("ui.map_chat_images_source"),
+      attr: {
+        href: candidate.source,
+        target: "_blank",
+        rel: "noopener noreferrer",
+        "aria-label": t("ui.map_chat_images_source_0", clip(candidate.title))
+      }
+    });
+  }
+  /** A candidate was chosen: the host inserts it into the card; the button is inert while that runs and afterwards. */
+  private pickImage(block: MapChatImages, item: MapChatImageItem): void {
+    if (item.inserted || item.broken || item.busy || !this.host.insertImage) return;
+    const hadFocus = this.hasFocus();
+    item.busy = true;
+    block.notice = undefined;
+    this.renderLog();
+    if (hadFocus) this.pickEls.get(item)?.focus();
+    void this.host.insertImage(block, item).then(
+      result => {
+        item.busy = false;
+        if (result.ok) item.inserted = block.nodeTitle;
+        block.notice = result.ok ? undefined : result.reason;
+        this.renderLog();
+        if (hadFocus) this.pickEls.get(item)?.focus();
+        this.announceImages(result.ok ? t("ui.map_chat_images_inserted_0", clip(block.nodeTitle)) : result.reason);
+      },
+      (error: unknown) => {
+        item.busy = false;
+        block.notice = t("ui.map_chat_images_insert_failed_0", error instanceof Error ? error.message : String(error));
+        this.renderLog();
+        if (hadFocus) this.pickEls.get(item)?.focus();
+      }
+    );
   }
   private buildChoices(row: HTMLElement, choices: MapChatChoices): void {
     const box = row.createDiv({ cls: "vam-map-chat-choices" });

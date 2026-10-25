@@ -83,7 +83,9 @@ import { CodexAppServerRuntime, type CodexWebSearchEvent } from "./ai/runtime/co
 import { ClaudeCodeCliRuntime } from "./ai/runtime/claude-code-cli";
 import { CLAUDE_MODEL_CHOICES, providerForModel, providerModelId } from "./ai/providers/provider";
 import { ThinkingCore } from "./core/thinking-core";
-import { StepRunner, type PreparedStep } from "./core/step-runner";
+import { StepRunner, prepareStep, type PreparedStep } from "./core/step-runner";
+import type { ImageCandidate } from "./core/image-candidates";
+import { imageSearchStep } from "./core/steps/image-search/step";
 import { runtimeStepProvider } from "./core/runtime-step-provider";
 import { AiRuntimeService } from "./core/ai-runtime-service";
 import { ModelDiscovery, type ModelDiscoveryState } from "./core/model-discovery";
@@ -1556,6 +1558,15 @@ export default class VisualAgentMapPlugin extends Plugin {
     const bytes = Buffer.from(match[2], "base64");
     await this.app.vault.createBinary(path, bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength));
     return path;
+  }
+  /**
+   * Web image search for the map chat: the Markdown quick action's `markdown.image-search` step through the model's web search,
+   * parsed to https candidates (at most six). The caller has already asked for the usage notice of `model`, so this does not
+   * ask again; the thumbnail check is the caller's too.
+   */
+  async searchImages(query: string, model: string, signal: AbortSignal): Promise<ImageCandidate[]> {
+    const prepared = prepareStep(imageSearchStep, { query });
+    return prepared.parse(await this.runMarkdownContextAi(prepared, model, signal, undefined, true));
   }
   private async runConfirmedMarkdownContextAi<Input, Output>(
     prepared: PreparedStep<Input, Output>,

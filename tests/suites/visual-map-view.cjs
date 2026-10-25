@@ -272,7 +272,7 @@ integrationTest('Next Step reviews first expansion proposals in place and keeps 
   const expandChecks = all(expandAdjust, item => item.tag === 'input' && item.type === 'checkbox');
   assert.equal(expandChecks.length, 1, 'expand keeps only its subtopic-research option');
   assert.equal(expandChecks[0].checked, false);
-  assert.ok(find(expandAdjust, item => item.text === 'Run a short research on each created subtopic'));
+  assert.ok(find(expandAdjust, item => item.text === 'Run short research on each created subtopic'));
   assert.equal(find(expandAdjust, item => item.text === 'Also search the web for subtopic research'), undefined);
   const shallowHint = () => find(expandAdjust, item => /^Subtopic research: /.test(item.text ?? ''));
   assert.match(shallowHint().text, /without the web/); assert.doesNotMatch(shallowHint().text, /searches the web/);

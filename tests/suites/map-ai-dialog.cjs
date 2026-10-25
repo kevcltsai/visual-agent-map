@@ -1162,7 +1162,7 @@ integrationTest('S6 dialog: the pre-start follows the AI mode (Quick pre-starts 
   const releases = spy.releases;
   cards[1].click();
   assert.equal(spy.releases, releases + 1, 'plain expansion pre-starts nothing');
-  const shallow = checkbox('Run a short research on each created subtopic');
+  const shallow = checkbox('Run short research on each created subtopic');
   shallow.checked = true; shallow.change();
   assert.deepEqual(spy.prewarms.at(-1), false, 'Quick subtopic research pre-starts without web tools');
   button(group, 'Standard').click();

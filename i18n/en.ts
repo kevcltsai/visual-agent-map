@@ -108,7 +108,7 @@ export const en = {
     "Write the outline as Markdown headings only, with no other text.\n- Use exactly one # heading for the main topic.\n- Use ## for first-level subtopics, ### for the next level, and so on.\n- Do not use bold text or bullet lists instead of headings.\n- Use at most 100 headings in total.\nOutput only the outline.",
   "ui.outline_import_preview_count": "{0} topics, {1} levels",
   "ui.outline_import_preview_empty": "Paste or generate an outline to see the preview.",
-  "ui.outline_import_shallow": "Run a short research on each topic after creation (uses AI quota)",
+  "ui.outline_import_shallow": "Run short research on each topic after creation (uses AI quota)",
   "ui.outline_import_add": "Add to mind map",
   "ui.outline_import_placement": "Put it in",
   "ui.outline_import_placement_tree": "This mind map, as a new tree",
@@ -742,7 +742,7 @@ export const en = {
   "ui.ai_suggests_synthesis_angles_first_the_parent_topic_changes":
     "AI suggests synthesis angles first. The parent topic is updated directly once the synthesis finishes, and you can undo it.",
   "ui.ai_did_not_suggest_a_synthesis_direction_please_retry": "AI did not suggest a synthesis direction. Please retry.",
-  "ui.run_shallow_research_on_each_created_subtopic": "Run a short research on each created subtopic",
+  "ui.run_shallow_research_on_each_created_subtopic": "Run short research on each created subtopic",
   "ui.subtopic_names_must_be_unique": "Subtopic names must be unique.",
   "ui.create_subtopics_without_research": "Create subtopics without research",
   "ui.research_each_subtopic_after_creation_and_use_codex_quota":

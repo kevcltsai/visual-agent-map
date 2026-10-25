@@ -199,7 +199,7 @@ test('map chat: while the AI works Stop is shown with a visible status, the repl
   f.panel.begin('ask');
   assert.equal(f.parts.input().value, '', 'the draft is cleared once the question is sent');
   assert.equal(f.parts.status().text, 'The AI is replying…'); assert.equal(f.parts.send().hidden, true); assert.equal(f.parts.stop().hidden, false);
-  assert.equal(f.parts.stop().attrs['aria-label'], 'Stop'); assert.equal(f.parts.status().attrs.role, 'status'); assert.equal(f.parts.log().attrs.role, 'log');
+  assert.equal(f.parts.stop().attrs['aria-label'], 'Stop'); assert.equal(f.parts.status().attrs.role, 'status'); assert.equal(f.parts.log().attrs.role, 'group', 'B1-ui: the log is a plain group, not role=log (which is live by itself)'); assert.equal(f.parts.log().attrs['aria-live'], undefined, 'B1-ui: no aria-live on the log while a reply streams');
   f.panel.streamReply('partial'); f.panel.streamReply('partial answer'); await tick();
   assert.equal(visibleText(replyBody(f)), 'partial answer');
   eq(f.panel.turns(), [], 'a turn that is still streaming is not history');
@@ -224,7 +224,7 @@ test('map chat: a failed or stopped turn shows its own text and does not become 
 
 class MarkdownView {}
 
-async function harness({ aim = false, document = false } = {}) {
+async function harness({ aim = false, document = false, empty = false, realRender = false, viaSync = false } = {}) {
   const { repo, app, contents, files } = fixture('en');
   app.vault.configDir = '.obsidian';
   const settings = { ...DEFAULT_SETTINGS, language: 'en', cliModel: 'claude:sonnet' };
@@ -238,7 +238,7 @@ async function harness({ aim = false, document = false } = {}) {
     mapDoc.nodes.push(created); ids[key] = created.id;
     return created;
   };
-  await add('root', 'Sleep'); await add('a', 'Body', 'root'); await add('b', 'Mind', 'root'); await add('c', 'REM', 'a');
+  if (!empty) { await add('root', 'Sleep'); await add('a', 'Body', 'root'); await add('b', 'Mind', 'root'); await add('c', 'REM', 'a'); }
   await app.vault.create(MAP, core.serializeMap(mapDoc));
   await repo.rebuildDerivedData();
   for (const [file, text] of Object.entries({ 'Notes/Research.md': '# Research\n\nSleep needs darkness.\nSleep needs quiet.\n', 'Notes/Other.md': 'Other note about naps.\n', '.obsidian/plugins/x.md': 'config text\n' })) {
@@ -251,14 +251,14 @@ async function harness({ aim = false, document = false } = {}) {
   let queue = Promise.resolve();
   const ctx = {};
   const plugin = withExpansionCoordinator({
-    repo, settings, running: new Set(), views: () => ctx.otherViews ?? [], logs: { appendLog() {} }, rebuildDerivedData: () => repo.rebuildDerivedData(), relevanceGrades: new Map(), releaseOutline() {}, syncOutline() {}, setOutlineActive() {},
+    repo, settings, running: new Set(), views: () => ctx.otherViews ?? [], logs: { appendLog() {} }, rebuildDerivedData: () => repo.rebuildDerivedData(), relevanceGrades: new Map(), closeStaleDetails() {}, releaseOutline() {}, syncOutline() {}, setOutlineActive() {},
     pendingSuggestions: new Map(), pendingResearchOptions: new Map(), detailsShown: () => false,
     // Like the real mutate: a promise queue that is not re-entrant. A call made from inside a running write waits for it, forever.
     mutate(work) {
       control.mutates++; if (control.depth > 0) control.nested++;
       const result = queue.then(async () => {
         control.depth++;
-        try { await work(); const view = ctx.view; if (view) await view.hydrate(); } finally { control.depth--; }
+        try { await work(); const view = ctx.view; if (view) await (viaSync ? view.synchronize() : view.hydrate()); } finally { control.depth--; }
       });
       queue = result.catch(() => {});
       return result;
@@ -272,21 +272,24 @@ async function harness({ aim = false, document = false } = {}) {
   });
   const leaves = []; let activeMarkdown = null;
   const handlers = []; const linkOpens = [];
-  app.workspace = { getLeavesOfType: type => type === 'markdown' ? leaves : [], getActiveViewOfType: () => activeMarkdown, on(name, fn) { const ref = { name, fn }; handlers.push(ref); return ref; }, openLinkText(link, source, newLeaf) { linkOpens.push([link, source, newLeaf]); } };
+  app.workspace = { getLeavesOfType: type => type === 'markdown' ? leaves : [], getActiveViewOfType: () => activeMarkdown, requestSaveLayout() {}, on(name, fn) { const ref = { name, fn }; handlers.push(ref); return ref; }, openLinkText(link, source, newLeaf) { linkOpens.push([link, source, newLeaf]); } };
   class Notice { constructor(message) { notices.push(message); } hide() {} }
   const { VisualAgentMapView } = load('main.ts', { obsidian: { ...obsidian, MarkdownView, Notice, Component: class { load() {} unload() {} }, MarkdownRenderer: { render: async (_app, text, el, sourcePath, owner) => { control.markdown.push({ text, el, sourcePath, owner }); el.setText(text); } } } }, { ...(document ? { document: { documentElement: { style: {} }, get activeElement() { return ctx.page?.doc.activeElement ?? null; } } } : {}), CSS: { escape: value => String(value) }, createSvg: tag => ({ tag, attrs: {}, classes: [], setAttribute(name, value) { this.attrs[name] = value; }, addClass(name) { this.classes.push(name); } }), requestAnimationFrame: run => { run(); return 1; }, cancelAnimationFrame() {}, setTimeout: fn => { ctx.timers.push(fn); return ctx.timers.length; }, clearTimeout() {} });
   ctx.timers = [];
   const view = new VisualAgentMapView({ app }, plugin);
   ctx.view = view;
   const p = page(); const rootEl = p.root; ctx.page = p;
-  Object.assign(view, { path: MAP, contentEl: rootEl, focusNode() {}, closed: false });
+  const focused = [];
+  Object.assign(view, { path: MAP, contentEl: rootEl, focusNode(node) { focused.push(node.id); }, closed: false });
   view.map = await repo.readMap(MAP);
   if (aim) view.map.aim = { version: 1, branches: [], runs: [], pendingCommits: [] };
   const rawSend = view.sendMapChat.bind(view); view.sendMapChat = (...args) => withTimeout(rawSend(...args));
   const reload = async () => { view.notes = new Map(await Promise.all(view.map.nodes.map(async n => [n.id, await repo.readNote(n.path)]))); };
   view.hydrate = reload;
   let renders = 0;
-  view.render = () => { renders++; view.paintCount++; repaint(); };
+  // `realRender` keeps the view's own render() (which can hold a repaint back) and counts the repaints it really makes.
+  if (realRender) view.paint = () => { renders++; view.paintCount++; repaint(); };
+  else view.render = () => { renders++; view.paintCount++; repaint(); };
   // What render() does around the chat: detach first, mount into the new overlay last, then give focus back.
   let workspaceEl = null;
   const repaint = () => {
@@ -296,7 +299,7 @@ async function harness({ aim = false, document = false } = {}) {
   };
   await reload();
   const h = {
-    repo, app, contents, files, view, plugin, ids, control, notices, opened, leaves, handlers, linkOpens, page: p, rootEl, get timers() { return ctx.timers; }, repaint, renders: () => renders, workspace: () => workspaceEl,
+    repo, app, contents, files, view, plugin, ids, control, notices, focused, opened, leaves, handlers, linkOpens, page: p, rootEl, get timers() { return ctx.timers; }, repaint, renders: () => renders, workspace: () => workspaceEl,
     setActive: (file, text, editor) => { const v = h.leaf(file, { editor }); activeMarkdown = v; leaves.splice(0, leaves.length, { view: v }); return v; },
     // A markdown leaf; `shown` false is a background tab, `doc` another window. Not made active.
     leaf: (file, { shown = true, doc = p.doc, editor = null } = {}) => Object.assign(new MarkdownView(), { file: app.vault.getAbstractFileByPath(file), editor, containerEl: { ownerDocument: doc, isShown: () => shown } }),
@@ -691,7 +694,9 @@ integrationTest('map chat: an empty draft, a second send while busy and a send o
   h.type('one'); const first = h.view.sendMapChat(); await until(() => chat.isBusy);
   h.type('two'); await h.view.sendMapChat(); assert.equal(h.control.requests.length, 1, 'only one request at a time');
   gate.resolve(); await first;
-  h.view.builtIn = true; h.type('three'); await h.view.sendMapChat(); assert.equal(h.control.requests.length, 1);
+  h.view.builtIn = true; h.type('three'); await h.view.sendMapChat();
+  // B1-ui: the read-only sample is the opening screen now; a message from it is sent, and tells the model there is no map to edit.
+  assert.equal(h.control.requests.length, 2); assert.equal(h.control.requests[1].context.noEditableMap, true);
 });
 
 integrationTest('map chat: Stop aborts the request, releases the task, and a reply that still arrives applies nothing', async () => {
@@ -757,10 +762,10 @@ integrationTest('map chat: a repaint keeps messages, draft and chips, restores f
   const el = chat.el; h.repaint();
   assert.equal(h.view.chat.el, el); assert.equal(chat.draft, 'typing…'); assert.equal(chat.transcript().length, 2); assert.equal(chat.attachments().length, 1);
   assert.equal(h.page.doc.activeElement, chat.inputEl, 'focus is back in the field'); assert.equal(chat.inputEl.selectionStart, 3);
-  assert.ok(find(h.rootEl, i => i === el), 'the panel is in the new overlay'); assert.ok(h.workspace().classes.includes('has-map-chat-open'));
+  assert.ok(find(h.rootEl, i => i === el), 'the panel is back in the page'); assert.equal(h.workspace().children[0], el, 'B1-ui: it is the first child of the workspace, left of the canvas'); assert.ok(h.workspace().classes.includes('has-map-chat-open'));
   chat.setOpen(false); assert.ok(!h.workspace().classes.includes('has-map-chat-open'), 'the selection bar and hint get their room back');
   h.repaint(); assert.ok(!h.workspace().classes.includes('has-map-chat-open'));
-  assert.ok(find(find(h.rootEl, i => hasClass(i, 'vam-canvas-overlay')), i => i === el));
+  assert.equal(find(find(h.rootEl, i => hasClass(i, 'vam-canvas-overlay')), i => i === el), undefined, 'B1-ui: the overlay covers the canvas only; the window is not in it');
 });
 
 integrationTest('map chat: repaints caused by the chat\'s own writes keep the conversation going', async () => {
@@ -771,13 +776,13 @@ integrationTest('map chat: repaints caused by the chat\'s own writes keep the co
   assert.equal(chat.transcript().at(-1).text, 'done'); assert.ok(find(h.rootEl, i => i === chat.el));
 });
 
-integrationTest('map chat: a different map starts a new conversation, the sample map gets no panel', async () => {
+integrationTest('map chat: a different map starts a new conversation, and the sample map has the panel too (B1-ui)', async () => {
   const h = await harness(); await h.view.hydrate(); const chat = h.open();
   chat.begin('old'); chat.finish('old answer', []); chat.addTopicReference(h.ids.a);
   h.view.map.id = 'another-map'; h.repaint();
   assert.equal(chat.transcript().length, 0); assert.equal(chat.attachments().length, 0);
   chat.begin('x'); chat.finish('y', []);
-  h.view.builtIn = true; h.repaint(); assert.equal(find(h.rootEl, i => i === chat.el), undefined, 'not mounted on the read-only sample');
+  h.view.builtIn = true; h.repaint(); assert.ok(find(h.rootEl, i => i === chat.el) && chat.isHero === false, 'B1-ui: the read-only sample keeps the conversation it had (side window); a fresh one shows the opening screen');
   h.view.builtIn = false; h.repaint(); assert.ok(find(h.rootEl, i => i === chat.el)); assert.equal(chat.transcript().length, 2, 'and it comes back as it was');
 });
 
@@ -1221,7 +1226,8 @@ integrationTest('map chat C1 F2: model discovery going from idle to ready makes 
   h.control.claudeReady = true; for (const listener of [...h.control.listeners]) listener();
   eq(chat.modelEl.children.map(o => o.optionValue), ['', 'gpt-6-luna', 'claude:sonnet', 'claude:haiku']);
   h.plugin.settings.cliModel = 'gpt-6-luna'; chat.setOpen(false); chat.setOpen(true);
-  assert.equal(chat.modelEl.children[0].text, 'Follow default (now: label(gpt-6-luna))', 'the label follows cliModel when the window is opened');
+  assert.equal(chat.modelEl.children[0].text, 'Default: label(gpt-6-luna)', 'the shown label (shortened so it fits 340px) follows cliModel when the window is opened');
+  assert.equal(chat.modelEl.children[0].attrs.title, 'Follow default (now: label(gpt-6-luna))', 'the full wording is its tooltip'); assert.equal(chat.modelEl.attrs.title, 'Follow default (now: label(gpt-6-luna))', 'and the select names it too');
   await h.view.onClose(); assert.equal(h.control.listeners.length, 0);
 });
 
@@ -2038,4 +2044,831 @@ test('map chat E2: a heading, a quote or a list that does not fit goes to the pl
   const items = Array.from({ length: 1500 }, (_, i) => `- row **${i}** and more`); const l = layoutWith(items.join('\n') + '\n\nafter');
   const lp = plainOf(l).text; const at = items.findIndex(row => lp.startsWith(row)); assert.ok(at > 100);
   assert.equal(lp, items.slice(at).join('\n') + '\n\nafter'); assert.equal(findAll(l, i => i.tag === 'li').length, at);
+});
+
+// ---- first window, core (B1-core) -----------------------------------------------------------------------------------
+// The panel's plan card is clicked through its real buttons. A snapshot of every file in the vault proves "nothing changed".
+const vaultState = h => JSON.stringify([...h.contents.entries()].sort(([a], [b]) => a < b ? -1 : 1));
+const planCard = h => findAll(h.view.chat.logEl, i => hasClass(i, 'vam-map-chat-plan'));
+const planButton = (h, which) => find(h.view.chat.logEl, i => i.tag === 'button' && hasClass(i, `vam-map-chat-plan-${which}`));
+const addRoot = (ref, title, parentId = '') => ({ kind: 'add_child', parentId, title, summary: '', ref });
+const children = (h, id) => h.view.map.nodes.filter(n => n.parentId === id);
+const titleOf = async (h, node) => (await h.repo.readNote(node.path)).title;
+
+integrationTest('B1 core: a root card plus three levels, tied together with new:<ref>, are built on an empty map with the same parent/child shape as the reply', async () => {
+  const h = await harness({ empty: true }); await h.view.hydrate(); assert.equal(h.view.map.nodes.length, 0);
+  const lines = await apply(h, [addRoot('r', 'Coffee'), addRoot('o', 'Origins', 'new:r'), addRoot('p', 'Processing', 'new:r'), addRoot('e', 'Ethiopia', 'new:o'), addRoot('w', 'Washed', 'new:p'), addRoot('x', 'Anaerobic', 'new:p')]);
+  eq(lines.slice(0, 6).map(l => l.status), Array(6).fill('done'), JSON.stringify(lines)); assert.equal(lines.length, 7, 'six cards: the sixth line is the automatic layout');
+  const saved = await h.saved(); assert.equal(saved.length, 6);
+  const byTitle = {}; for (const n of saved) byTitle[await titleOf(h, n)] = n;
+  assert.equal(byTitle.Coffee.parentId, null); assert.equal(byTitle.Origins.parentId, byTitle.Coffee.id); assert.equal(byTitle.Processing.parentId, byTitle.Coffee.id);
+  assert.equal(byTitle.Ethiopia.parentId, byTitle.Origins.id); assert.equal(byTitle.Washed.parentId, byTitle.Processing.id); assert.equal(byTitle.Anaerobic.parentId, byTitle.Processing.id);
+  assert.equal(h.control.nested, 0, 'never a mutate inside a mutate');
+});
+integrationTest('B1 core: a card whose parent was not created is skipped with a reason, its own children too, and the other cards still build', async () => {
+  const h = await harness(); await h.view.hydrate();
+  const lines = await apply(h, [{ kind: 'add_child', parentId: 'ghost-id', title: 'Orphan', summary: '', ref: 'o' }, addRoot('k', 'Kid', 'new:o'), addRoot('kk', 'Grandkid', 'new:k'), { kind: 'add_child', parentId: h.ids.a, title: 'Fine', summary: '' }]);
+  eq(lines.map(l => l.status), ['skipped', 'skipped', 'skipped', 'done'], JSON.stringify(lines));
+  assert.match(lines[0].text, /no longer on the map/); assert.match(lines[1].text, /parent topic was not created/); assert.match(lines[2].text, /parent topic was not created/);
+  assert.equal((await h.saved()).length, 5);
+});
+integrationTest('B1 core: a new root card on a map that has cards goes in beside the others; no parent card is needed', async () => {
+  const h = await harness(); await h.view.hydrate();
+  const lines = await apply(h, [addRoot('r', 'Second root'), addRoot('k', 'Its child', 'new:r')]);
+  eq(lines.map(l => l.status), ['done', 'done']);
+  const roots = (await h.saved()).filter(n => !n.parentId); assert.equal(roots.length, 2);
+});
+
+integrationTest('B1 plan: 16 actions wait for Apply; until then the map, the notes and Map.md are untouched', async () => {
+  const h = await harness(); await h.view.hydrate(); const chat = h.open();
+  const before = vaultState(h); h.control.mutates = 0;
+  h.control.reply = async () => ({ reply: 'I will add sixteen cards.', actions: Array.from({ length: 16 }, (_, i) => ({ kind: 'add_child', parentId: h.ids.root, title: `Card ${i}`, summary: '' })), rejected: [] });
+  h.type('add many'); await h.view.sendMapChat();
+  assert.equal(planCard(h).length, 1, 'the plan card is in the conversation'); assert.equal(chat.pendingPlan().state, 'pending');
+  assert.equal(chat.isBusy, false); assert.equal(h.control.mutates, 0, 'no write was queued'); assert.equal(vaultState(h), before, 'the vault is byte for byte as it was');
+  assert.match(visibleText(planCard(h)[0]), /16 actions/); assert.match(visibleText(planCard(h)[0]), /No extra AI calls/);
+  assert.equal(findAll(planCard(h)[0], i => i.tag === 'li' && /Add subtopic/.test(visibleText(i))).length, 16, 'every action is listed');
+  assert.equal(planButton(h, 'apply').attrs.type, 'button'); assert.equal(planButton(h, 'cancel').attrs.type, 'button');
+  planButton(h, 'apply').click(); await until(() => chat.pendingPlan() === null && !h.view.chatApplying);
+  assert.equal(children(h, h.ids.root).length, 18); assert.notEqual(vaultState(h), before);
+  const lines = chat.transcript().at(-1).lines; assert.equal(lines.filter(l => l.status === 'done').length >= 16, true);
+});
+integrationTest('B1 plan: Cancel leaves the vault exactly as it was and the buttons stop working', async () => {
+  const h = await harness(); await h.view.hydrate(); const chat = h.open(); const before = vaultState(h);
+  h.control.reply = async () => ({ reply: 'plan', actions: Array.from({ length: 20 }, (_, i) => ({ kind: 'add_child', parentId: h.ids.root, title: `Card ${i}`, summary: '' })), rejected: [] });
+  h.type('add many'); await h.view.sendMapChat(); const card = chat.pendingPlan();
+  planButton(h, 'cancel').click();
+  assert.equal(card.state, 'cancelled'); assert.equal(h.control.mutates, 0); assert.equal(vaultState(h), before);
+  assert.match(visibleText(planCard(h)[0]), /Plan cancelled\. Nothing was changed\./); assert.equal(planButton(h, 'apply'), undefined, 'no buttons on a settled plan');
+  card.apply(); await tick(); assert.equal(h.control.mutates, 0, 'a settled card cannot be applied'); assert.equal(vaultState(h), before);
+});
+integrationTest('B1 plan: sending a new message while a plan waits cancels it; the old Apply no longer writes', async () => {
+  const h = await harness(); await h.view.hydrate(); const chat = h.open(); const before = vaultState(h);
+  h.control.reply = async () => ({ reply: 'plan', actions: Array.from({ length: 16 }, (_, i) => ({ kind: 'add_child', parentId: h.ids.root, title: `Card ${i}`, summary: '' })), rejected: [] });
+  h.type('add many'); await h.view.sendMapChat(); const old = chat.pendingPlan();
+  h.control.reply = async () => ({ reply: 'just talking', actions: [], rejected: [] });
+  h.type('never mind'); await h.view.sendMapChat();
+  assert.equal(old.state, 'cancelled'); assert.equal(chat.pendingPlan(), null);
+  old.apply(); await tick(); assert.equal(vaultState(h), before, 'the old plan wrote nothing'); assert.equal(h.control.mutates, 0);
+  assert.equal(old.state, 'cancelled', 'a superseded card is not marked applied by a late Apply');
+});
+integrationTest('B1 plan: switching to another map by hand ends the plan; closing the view does too', async () => {
+  const h = await harness(); await h.view.hydrate(); const chat = h.open(); const before = vaultState(h);
+  h.control.reply = async () => ({ reply: 'plan', actions: Array.from({ length: 16 }, (_, i) => ({ kind: 'add_child', parentId: h.ids.root, title: `Card ${i}`, summary: '' })), rejected: [] });
+  h.type('add many'); await h.view.sendMapChat(); const card = chat.pendingPlan();
+  h.view.map.id = 'another-map'; h.repaint();
+  card.apply(); await tick(); assert.equal(h.control.mutates, 0); assert.equal(vaultState(h), before);
+  h.view.map.id = 'map-a'; h.repaint();
+  h.type('again'); await h.view.sendMapChat(); const second = chat.pendingPlan(); assert.ok(second);
+  await h.view.onClose(); second.apply(); await tick(); assert.equal(h.control.mutates, 0);
+});
+integrationTest('B1 plan: Apply on a plan whose map is no longer the open one writes nothing and says so', async () => {
+  const h = await harness(); await h.view.hydrate(); const chat = h.open(); const before = vaultState(h);
+  h.control.reply = async () => ({ reply: 'plan', actions: Array.from({ length: 16 }, (_, i) => ({ kind: 'add_child', parentId: h.ids.root, title: `Card ${i}`, summary: '' })), rejected: [] });
+  h.type('add many'); await h.view.sendMapChat(); const card = chat.pendingPlan();
+  h.view.path = 'Agent Workspace/Topics/elsewhere/Map.md'; // the view moved on without the conversation being reset
+  planButton(h, 'apply').click(); await tick();
+  assert.equal(card.state, 'cancelled'); assert.equal(h.control.mutates, 0); assert.equal(vaultState(h), before);
+  assert.match(chat.transcript().at(-1).lines[0].text, /map was changed or closed/);
+});
+integrationTest('B1 plan: exactly 15 actions are applied at once, with no plan card', async () => {
+  const h = await harness(); await h.view.hydrate(); const chat = h.open();
+  h.control.reply = async () => ({ reply: 'adding', actions: Array.from({ length: 15 }, (_, i) => ({ kind: 'add_child', parentId: h.ids.root, title: `Card ${i}`, summary: '' })), rejected: [] });
+  h.type('add 15'); await h.view.sendMapChat();
+  assert.equal(planCard(h).length, 0); assert.equal(chat.pendingPlan(), null); assert.equal(children(h, h.ids.root).length, 17);
+});
+integrationTest('B1 plan: delete with branch:true needs a plan when the card has subtopics, and not when it is a leaf', async () => {
+  const h = await harness(); await h.view.hydrate(); const chat = h.open(); const before = vaultState(h);
+  h.control.reply = async () => ({ reply: 'removing', actions: [{ kind: 'delete_topic', nodeId: h.ids.a, branch: true }], rejected: [] });
+  h.type('remove Body'); await h.view.sendMapChat();
+  assert.equal(planCard(h).length, 1); assert.match(visibleText(planCard(h)[0]), /whole branch/); assert.equal(vaultState(h), before);
+  planButton(h, 'cancel').click();
+  h.control.reply = async () => ({ reply: 'removing', actions: [{ kind: 'delete_topic', nodeId: h.ids.c, branch: true }], rejected: [] });
+  h.type('remove REM'); await h.view.sendMapChat();
+  assert.equal(chat.pendingPlan(), null, 'a leaf has no branch to take with it');
+  assert.equal(h.view.map.nodes.some(n => n.id === h.ids.c), false, 'REM was moved out at once');
+});
+integrationTest('B1 plan: a plan that waited while the card changed skips that action as stale, like any other', async () => {
+  const h = await harness(); await h.view.hydrate(); const chat = h.open();
+  h.control.reply = async () => ({ reply: 'plan', actions: [...Array.from({ length: 15 }, (_, i) => ({ kind: 'add_child', parentId: h.ids.b, title: `Card ${i}`, summary: '' })), { kind: 'rename_topic', nodeId: h.ids.a, title: 'Renamed' }], rejected: [] });
+  h.type('go'); await h.view.sendMapChat();
+  await h.view.noteChange(h.node('a'), { title: 'Edited by the user meanwhile' });
+  planButton(h, 'apply').click(); await until(() => !h.view.chatApplying && chat.transcript().at(-1).lines.length > 0);
+  assert.equal((await h.note('a')).title, 'Edited by the user meanwhile', 'the user\'s edit stays');
+  assert.ok(chat.transcript().at(-1).lines.some(l => l.status === 'skipped' && /changed after you sent/.test(l.text)), JSON.stringify(chat.transcript().at(-1).lines));
+});
+
+integrationTest('B1 map: create_map waits for Apply, then opens the new map, builds the tree in it, and the conversation goes along', async () => {
+  const h = await harness(); await h.view.hydrate(); const chat = h.open(); const oldPath = h.view.path; const oldNodes = JSON.stringify(await h.saved());
+  chat.begin('earlier'); chat.finish('earlier answer', []);
+  h.control.reply = async () => ({ reply: 'I will create a map.', actions: [{ kind: 'create_map', title: 'Quantum computing' }, addRoot('r', 'Quantum'), addRoot('q', 'Qubits', 'new:r'), addRoot('g', 'Gates', 'new:r')], rejected: [] });
+  const topicsBefore = (await h.repo.topics()).length;
+  h.type('new map on quantum'); await h.view.sendMapChat();
+  assert.equal((await h.repo.topics()).length, topicsBefore, 'no map was made before Apply'); assert.equal(h.view.path, oldPath);
+  assert.match(visibleText(planCard(h)[0]), /new map/);
+  planButton(h, 'apply').click(); await until(() => !h.view.chatApplying && chat.pendingPlan() === null && chat.transcript().at(-1).lines.length > 0);
+  assert.notEqual(h.view.path, oldPath); assert.equal(h.view.map.title, 'Quantum computing'); assert.equal((await h.repo.topics()).length, topicsBefore + 1);
+  assert.equal(h.view.map.nodes.length, 3); const root = h.view.map.nodes.find(n => !n.parentId); assert.equal(children(h, root.id).length, 2);
+  assert.equal(JSON.stringify((await h.repo.readMap(oldPath)).nodes), oldNodes, 'the old map is unchanged');
+  assert.equal(chat.transcript().length, 4, 'the conversation was kept: earlier turn + this turn'); assert.equal(chat.transcript()[0].text, 'earlier');
+  assert.equal(h.view.chatMapId, h.view.map.id); assert.equal(chat.isBusy, false);
+  eq(chat.transcript().at(-1).lines.slice(0, 4).map(l => l.status), ['done', 'done', 'done', 'done'], JSON.stringify(chat.transcript().at(-1).lines));
+  // A later manual switch still starts a new conversation.
+  h.view.map.id = 'another-map'; h.repaint(); assert.equal(chat.transcript().length, 0);
+});
+integrationTest('B1 map: if the new map cannot be made nothing else is written to the map the user is looking at', async () => {
+  const h = await harness(); await h.view.hydrate(); const chat = h.open();
+  const original = h.repo.createMap.bind(h.repo); h.repo.createMap = async () => { throw new Error('disk full'); };
+  h.control.reply = async () => ({ reply: 'plan', actions: [{ kind: 'create_map', title: 'Quantum' }, addRoot('r', 'Quantum'), addRoot('q', 'Qubits', 'new:r')], rejected: [] });
+  const nodes = JSON.stringify(await h.saved());
+  h.type('new map'); await h.view.sendMapChat(); planButton(h, 'apply').click(); await until(() => !h.view.chatApplying && chat.transcript().at(-1).lines.length > 0);
+  h.repo.createMap = original;
+  const lines = chat.transcript().at(-1).lines;
+  assert.equal(lines[0].status, 'failed'); assert.match(lines[0].text, /disk full/); eq(lines.slice(1, 3).map(l => l.status), ['skipped', 'skipped']); assert.match(lines[1].text, /new map was not created/);
+  assert.equal(JSON.stringify(await h.saved()), nodes, 'the current map was not touched'); assert.equal(h.view.path, MAP);
+});
+integrationTest('B1 map: open_map switches at once when exactly one map matches, the conversation goes along, and the turn still finishes', async () => {
+  const h = await harness(); await h.view.hydrate(); const chat = h.open();
+  const coffee = await h.repo.createMap('Coffee industry'); await h.repo.createMap('Tea');
+  chat.begin('hi'); chat.finish('hello', []);
+  h.control.reply = async () => ({ reply: 'Switching.', actions: [{ kind: 'open_map', title: 'coffee' }], rejected: [] });
+  h.type('go to the coffee one'); await h.view.sendMapChat();
+  assert.equal(h.view.path, coffee); assert.equal(planCard(h).length, 0, 'open_map needs no plan');
+  assert.equal(chat.isBusy, false, 'the turn finished although the map changed under it'); assert.equal(chat.transcript().length, 4);
+  assert.equal(chat.transcript().at(-1).text, 'Switching.'); assert.equal(chat.transcript().at(-1).lines[0].status, 'done');
+  assert.equal(h.view.chatMapId, h.view.map.id); assert.equal(h.plugin.activeTasks.size, 0);
+});
+integrationTest('B1 map: open_map with several matches lists them and opens nothing until one is picked; none writes the reason', async () => {
+  const h = await harness(); await h.view.hydrate(); const chat = h.open();
+  const a = await h.repo.createMap('Coffee industry'); const b = await h.repo.createMap('Coffee brewing');
+  h.control.reply = async () => ({ reply: 'Which one?', actions: [{ kind: 'open_map', title: 'Coffee' }], rejected: [] });
+  h.type('open coffee'); await h.view.sendMapChat();
+  assert.equal(h.view.path, MAP, 'nothing opened yet'); const buttons = findAll(chat.logEl, i => i.tag === 'button' && hasClass(i, 'vam-map-chat-choice'));
+  eq(buttons.map(i => i.text).sort(), ['Coffee brewing', 'Coffee industry']);
+  assert.equal(chat.transcript().at(-1).lines[0].status, 'skipped'); assert.match(chat.transcript().at(-1).lines[0].text, /several maps match/);
+  buttons.find(i => i.text === 'Coffee brewing').click(); await until(() => h.view.path !== MAP && !h.view.chatApplying);
+  assert.equal(h.view.path, b); assert.notEqual(h.view.path, a); assert.equal(chat.transcript().at(0).text, 'open coffee', 'the conversation went along');
+  assert.ok(chat.transcript().at(-1).lines.some(l => l.status === 'done' && /Opened/.test(l.text)));
+  h.control.reply = async () => ({ reply: 'None', actions: [{ kind: 'open_map', title: 'Wine cellar' }], rejected: [] });
+  h.type('open wine'); await h.view.sendMapChat();
+  assert.equal(h.view.path, b); assert.match(chat.transcript().at(-1).lines[0].text, /no map has that name/);
+});
+
+integrationTest('B1 view operations: collapse, expand, auto layout and focus each write one result line; collapse and expand are saved in Map.md', async () => {
+  const h = await harness(); await h.view.hydrate(); const chat = h.open();
+  h.view.history.push({ undo: async () => {}, redo: async () => {}, label: 'earlier' });
+  const lines = await apply(h, [{ kind: 'collapse_topic', nodeId: h.ids.a }, { kind: 'auto_layout' }, { kind: 'focus_topic', nodeId: h.ids.b }, { kind: 'expand_topic', nodeId: h.ids.a }, { kind: 'collapse_topic', nodeId: h.ids.c }]);
+  eq(lines.map(l => l.status), ['done', 'done', 'done', 'done', 'skipped'], JSON.stringify(lines));
+  assert.match(lines[0].text, /Collapse “Body”/); assert.match(lines[1].text, /Arrange the whole map/); assert.match(lines[2].text, /Move the view to “Mind”/); assert.match(lines[3].text, /Expand “Body”/); assert.match(lines[4].text, /no subtopics/);
+  eq(h.focused, [h.ids.b]);
+  assert.equal(h.control.nested, 0); assert.equal(h.view.history.undoEntry, undefined, 'the undo history was cleared');
+  await apply(h, [{ kind: 'collapse_topic', nodeId: h.ids.a }]);
+  assert.equal((await h.saved()).find(n => n.id === h.ids.a).collapsed, true, 'saved'); assert.equal(chat.isBusy, false);
+  await apply(h, [{ kind: 'expand_topic', nodeId: h.ids.a }]); assert.equal(!!(await h.saved()).find(n => n.id === h.ids.a).collapsed, false);
+});
+integrationTest('B1 view operations: a reply that adds five cards is arranged once and the view goes to the new root; four cards are not; an explicit auto_layout is not doubled', async () => {
+  const counted = async () => { const h = await harness({ empty: true }); await h.view.hydrate(); h.layouts = 0; const original = h.view.mapChange.bind(h.view); h.view.mapChange = async (change, rebuild) => { h.layouts++; return original(change, rebuild); }; return h; };
+  const tree = count => [addRoot('r', 'Root'), ...Array.from({ length: count - 1 }, (_, i) => addRoot(`c${i}`, `Kid ${i}`, 'new:r'))];
+  const four = await counted(); const fourLines = await apply(four, tree(4));
+  assert.equal(four.layouts, 0, 'four cards: no layout'); eq(four.focused, []); assert.ok(!fourLines.some(l => /Arranged the map automatically/.test(l.text)));
+  const five = await counted(); const fiveLines = await apply(five, tree(5)); const root = five.view.map.nodes.find(n => !n.parentId);
+  assert.equal(five.layouts, 1, 'five cards: exactly one layout'); eq(five.focused, [root.id]); assert.ok(fiveLines.some(l => l.status === 'done' && /Arranged the map automatically/.test(l.text)), JSON.stringify(fiveLines));
+  assert.equal(fiveLines.at(-1).text, 'Arranged the map automatically after adding many topics', 'it comes after every card line');
+  const explicit = await counted(); const explicitLines = await apply(explicit, [...tree(5), { kind: 'auto_layout' }]);
+  assert.equal(explicit.layouts, 1, 'the reply\'s own auto_layout is the only one'); assert.equal(explicitLines.filter(l => /Arrange/.test(l.text)).length, 1);
+  const skipped = await counted(); const skippedLines = await apply(skipped, [...tree(5).slice(0, 4), { kind: 'add_child', parentId: 'ghost', title: 'Lost', summary: '', ref: '' }, { kind: 'add_child', parentId: 'ghost', title: 'Lost 2', summary: '', ref: '' }]);
+  assert.equal(skipped.layouts, 0, 'only cards that were really added count'); assert.ok(skippedLines.length >= 6);
+});
+
+// ---- first window, UI (B1-ui) ---------------------------------------------------------------------------------------
+// The DOM here is the small stand-in of support-dom: structure, state and events are real, geometry and pixels are not
+// (those are the tester's, in Obsidian). A document stand-in counts listeners so a leak shows as a number.
+const counting = () => {
+  const listeners = {}; const doc = { activeElement: null, body: null };
+  doc.addEventListener = (name, fn) => { (listeners[name] ??= []).push(fn); };
+  doc.removeEventListener = (name, fn) => { listeners[name] = (listeners[name] ?? []).filter(f => f !== fn); };
+  doc.count = () => Object.values(listeners).reduce((sum, list) => sum + list.length, 0);
+  doc.fire = (name, event) => { for (const fn of [...(listeners[name] ?? [])]) fn({ preventDefault() {}, buttons: 1, ...event }); };
+  return doc;
+};
+const press = (el, event) => { let prevented = false; el.fire('keydown', { preventDefault() { prevented = true; }, shiftKey: false, isComposing: false, ...event }); return prevented; };
+const resizerOf = chat => chat.resizerEl;
+const suggestionTexts = chat => findAll(chat.suggestEl, i => i.tag === 'button').map(i => i.text);
+const layoutModule = () => load('core/map-chat-layout.ts');
+
+test('B1 ui: the width is 340 by default, 280 to 560 at most, whole numbers, and anything unreadable is the default', () => {
+  const { clampMapChatWidth, MAP_CHAT_WIDTH_DEFAULT } = layoutModule();
+  assert.equal(MAP_CHAT_WIDTH_DEFAULT, 340); assert.equal(clampMapChatWidth(undefined), 340); assert.equal(clampMapChatWidth('300'), 340); assert.equal(clampMapChatWidth(NaN), 340);
+  assert.equal(clampMapChatWidth(279), 280); assert.equal(clampMapChatWidth(280), 280); assert.equal(clampMapChatWidth(560), 560); assert.equal(clampMapChatWidth(561), 560); assert.equal(clampMapChatWidth(300.6), 301);
+});
+
+test('B1 ui: saved width and open state are sanitised on load; an old data.json without them gets the defaults', () => {
+  const { settingsFromSaved } = load('main.ts', { obsidian: { ...obsidian, MarkdownView } });
+  const none = settingsFromSaved(null); assert.equal(none.mapChatWidth, 340); assert.equal(none.mapChatOpen, true);
+  const old = settingsFromSaved({ mapChatStyle: 'concise' }); assert.equal(old.mapChatWidth, 340); assert.equal(old.mapChatOpen, true);
+  const bad = settingsFromSaved({ mapChatWidth: 9000, mapChatOpen: 'no' }); assert.equal(bad.mapChatWidth, 560); assert.equal(bad.mapChatOpen, true);
+  const low = settingsFromSaved({ mapChatWidth: -4, mapChatOpen: false }); assert.equal(low.mapChatWidth, 280); assert.equal(low.mapChatOpen, false);
+  const text = settingsFromSaved({ mapChatWidth: 'wide' }); assert.equal(text.mapChatWidth, 340);
+});
+
+test('B1 fix 13: the window folds to a narrow edge only when even 280px would leave the canvas under 360px (pane under 640); the set width and the current canvas do not matter', () => {
+  const { isChatNarrow, chatDockedWidth, chatOverlayWidth } = layoutModule();
+  assert.equal(isChatNarrow(640), false, '280 + 360 fits'); assert.equal(isChatNarrow(639), true, 'one pixel less does not');
+  // The old rule folded at 1039 with the default width; panes between 640 and 1039 now dock.
+  for (const pane of [640, 700, 796, 1039, 1100, 1440]) assert.equal(isChatNarrow(pane), false, `${pane} docks`);
+  // The sample's inspector takes its width from the canvas.
+  assert.equal(isChatNarrow(940, 300), false); assert.equal(isChatNarrow(939, 300), true);
+  // A folded window stays folded until the pane is a little wider than the limit; an unfolded one stays unfolded down to the limit.
+  assert.equal(isChatNarrow(645, 0, true), true, 'inside the margin a folded window stays folded'); assert.equal(isChatNarrow(664, 0, true), false);
+  assert.equal(isChatNarrow(645, 0, false), false, 'a docked window does not fold inside the margin');
+  const walk = []; let state = false; for (let pane = 700; pane >= 600; pane--) { state = isChatNarrow(pane, 0, state); walk.push(state); } for (let pane = 600; pane <= 700; pane++) { state = isChatNarrow(pane, 0, state); walk.push(state); }
+  const flips = walk.filter((value, index) => index && value !== walk[index - 1]).length; assert.equal(flips, 2, 'down once, up once: no flicker on the limit');
+  // The docked width gives way down to 280; the width laid over a narrow pane leaves 160px of the pane.
+  assert.equal(chatDockedWidth(1100, 340), 340); assert.equal(chatDockedWidth(640, 340), 280); assert.equal(chatDockedWidth(700, 560), 340, 'the set width is never written back, only given way to'); assert.equal(chatDockedWidth(800, 340, 300), 280);
+  assert.equal(chatOverlayWidth(600, 340), 340); assert.equal(chatOverlayWidth(456, 340), 296); assert.equal(chatOverlayWidth(380, 340), 280, 'never under 280');
+});
+
+integrationTest('B1 fix 13: a pane of 640 or more docks the window (at the width the pane allows); a pane under 640 folds it; the set width stays as the user set it', async () => {
+  const h = await harness(); await h.view.hydrate(); const chat = h.open(); h.plugin.settings.mapChatWidth = 340;
+  h.rootEl.clientWidth = 700; h.view.onResize(); assert.equal(chat.isNarrow, false); assert.equal(chat.el.style.width, '340px', 'the canvas keeps 360');
+  h.rootEl.clientWidth = 640; h.view.onResize(); assert.equal(chat.isNarrow, false); assert.equal(chat.el.style.width, '280px', 'the window gave way to keep 360 for the canvas'); assert.equal(h.plugin.settings.mapChatWidth, 340, 'the set width is untouched');
+  h.rootEl.clientWidth = 639; h.view.onResize(); assert.equal(chat.isNarrow, true);
+  h.rootEl.clientWidth = 650; h.view.onResize(); assert.equal(chat.isNarrow, true, 'folded stays folded inside the margin');
+  h.rootEl.clientWidth = 700; h.view.onResize(); assert.equal(chat.isNarrow, false);
+  h.rootEl.clientWidth = 1100; h.view.onResize(); assert.equal(chat.el.style.width, '340px', 'wide again: the set width');
+  const states = []; for (let i = 0; i < 4; i++) { h.rootEl.clientWidth = 639; h.view.onResize(); states.push(chat.isNarrow); h.repaint(); states.push(chat.isNarrow); }
+  eq(states, Array(8).fill(true), 'folded and stays folded however often it is looked at, though the canvas got wider when it folded');
+  // Dragging the width: the keys move the SET width from what the window shows.
+  h.rootEl.clientWidth = 1100; h.view.onResize(); chat.resizerEl.fire('keydown', { key: 'ArrowRight' }); assert.equal(h.plugin.settings.mapChatWidth, 356); assert.equal(chat.isNarrow, false);
+});
+
+integrationTest('B1 ui: a narrow pane shows only the edge button with an unread dot; a click opens the window over the canvas; Escape and a press on the canvas fold it back; nothing is forgotten', async () => {
+  const h = await harness(); await h.view.hydrate(); const chat = h.open(); h.rootEl.clientWidth = 600; h.view.onResize();
+  assert.equal(chat.isNarrow, true); assert.equal(chat.isOpen, false); assert.ok(chat.el.hasClass('is-rail')); assert.equal(chat.bodyEl.hidden, true); assert.equal(chat.toggleEl.hidden, false);
+  chat.begin('q'); chat.finish('a reply while folded', []);
+  assert.equal(chat.toggleEl.hasClass('has-unread'), true, 'the edge says there is something new'); assert.equal(chat.toggleEl.attrs['aria-label'], 'Open AI chat (new reply)');
+  chat.toggleEl.click();
+  assert.equal(chat.isOpen, true); assert.ok(chat.el.hasClass('is-overlay')); assert.equal(chat.toggleEl.hasClass('has-unread'), false, 'seen'); assert.equal(h.page.doc.activeElement, chat.inputEl);
+  assert.equal(chat.wantsOpen, true, 'the user still wants it open');
+  press(chat.inputEl, { key: 'Escape' }); assert.equal(chat.isOpen, false); assert.equal(chat.wantsOpen, true, 'folding the overlay is not closing the window'); assert.equal(h.page.doc.activeElement, chat.toggleEl);
+  chat.toggleEl.click(); chat.collapseOverlay(); assert.equal(chat.isOpen, false, 'a press on the canvas folds it');
+  h.rootEl.clientWidth = 1400; h.view.onResize(); assert.equal(chat.isOpen, true, 'wide again: docked as the user left it'); assert.ok(chat.el.hasClass('is-docked'));
+  assert.equal(chat.transcript().length, 2, 'the conversation is untouched');
+});
+
+integrationTest('B1 ui: the window is the first child of the workspace, before the canvas, and the width, open state and a drag survive a repaint', async () => {
+  const h = await harness(); await h.view.hydrate(); const chat = h.open();
+  assert.equal(h.workspace().children[0], chat.el, 'first child'); assert.ok(hasClass(h.workspace().children[1], 'vam-canvas-overlay') || h.workspace().children.length >= 2);
+  assert.equal(chat.el.style.width, '340px', 'default width');
+  chat.resizerEl.fire('keydown', { key: 'ArrowRight' }); assert.equal(chat.el.style.width, '356px'); assert.equal(chat.resizerEl.attrs['aria-valuenow'], '356');
+  assert.equal(h.plugin.settings.mapChatWidth, 356, 'remembered'); assert.ok(h.control.saves > 0, 'and saved');
+  h.repaint(); assert.equal(chat.el.style.width, '356px', 'a repaint keeps it'); assert.equal(h.workspace().children[0], chat.el);
+});
+
+integrationTest('B1 ui: the width handle is a labelled separator that moves 16px per arrow key, stops at 280 and 560, and Home/End jump to them', async () => {
+  const h = await harness(); await h.view.hydrate(); const chat = h.open(); const bar = resizerOf(chat);
+  assert.equal(bar.attrs.role, 'separator'); assert.equal(bar.attrs['aria-orientation'], 'vertical'); assert.equal(bar.attrs['aria-valuemin'], '280'); assert.equal(bar.attrs['aria-valuemax'], '560'); assert.equal(bar.attrs['aria-valuenow'], '340'); assert.equal(bar.attrs.tabindex, '0'); assert.ok(bar.attrs['aria-label']);
+  assert.equal(press(bar, { key: 'ArrowLeft' }), true); assert.equal(bar.attrs['aria-valuenow'], '324'); press(bar, { key: 'ArrowRight' }); press(bar, { key: 'ArrowRight' }); assert.equal(bar.attrs['aria-valuenow'], '356');
+  press(bar, { key: 'End' }); assert.equal(bar.attrs['aria-valuenow'], '560'); press(bar, { key: 'ArrowRight' }); assert.equal(bar.attrs['aria-valuenow'], '560', 'not past the maximum');
+  press(bar, { key: 'Home' }); assert.equal(bar.attrs['aria-valuenow'], '280'); press(bar, { key: 'ArrowLeft' }); assert.equal(bar.attrs['aria-valuenow'], '280', 'not under the minimum');
+  assert.equal(press(bar, { key: 'a' }), false, 'other keys are left alone');
+});
+
+integrationTest('B1 ui: dragging the handle follows the pointer, is saved when the button is let go, and leaves no listener on the document; a repaint in the middle does not break it', async () => {
+  const h = await harness(); await h.view.hydrate(); const chat = h.open(); const doc = counting(); chat.el.ownerDocument = doc;
+  const before = doc.count(); const saves = h.control.saves ?? 0;
+  chat.resizerEl.fire('pointerdown', { button: 0, clientX: 340, pointerId: 1 });
+  assert.ok(doc.count() > before, 'listeners are on the document while dragging');
+  doc.fire('pointermove', { clientX: 400 }); assert.equal(chat.el.style.width, '400px');
+  assert.equal(h.control.saves ?? 0, saves, 'nothing is saved mid-drag');
+  h.repaint(); chat.el.ownerDocument = doc; // the panel is lifted out and put back
+  doc.fire('pointermove', { clientX: 450 }); assert.equal(chat.el.style.width, '450px', 'the drag survives the repaint');
+  doc.fire('pointermove', { clientX: 900 }); assert.equal(chat.el.style.width, '560px', 'clamped');
+  doc.fire('pointerup', {}); assert.equal(doc.count(), before, 'let go: back to the listeners it began with'); assert.equal(h.plugin.settings.mapChatWidth, 560);
+  doc.fire('pointermove', { clientX: 100 }); assert.equal(chat.el.style.width, '560px', 'and the pointer no longer drags');
+});
+
+integrationTest('B1 ui: closing the view in the middle of a drag, a lost pointer capture, and a move with no button all end the drag; the document listener count returns to the value it had', async () => {
+  const h = await harness(); await h.view.hydrate(); const chat = h.open(); const doc = counting(); chat.el.ownerDocument = doc; const before = doc.count();
+  chat.resizerEl.fire('pointerdown', { button: 0, clientX: 340, pointerId: 1 }); chat.dispose(); assert.equal(doc.count(), before, 'view closed');
+  chat.resizerEl.fire('pointerdown', { button: 0, clientX: 340, pointerId: 1 }); chat.resizerEl.fire('lostpointercapture', {}); assert.equal(doc.count(), before, 'capture lost');
+  chat.resizerEl.fire('pointerdown', { button: 0, clientX: 340, pointerId: 1 }); doc.fire('pointermove', { clientX: 380, buttons: 0 }); assert.equal(doc.count(), before, 'the button was let go outside the page');
+  chat.resizerEl.fire('pointerdown', { button: 2, clientX: 340, pointerId: 1 }); assert.equal(doc.count(), before, 'only the primary button drags');
+  for (let i = 0; i < 5; i++) { chat.resizerEl.fire('pointerdown', { button: 0, clientX: 340, pointerId: 1 }); doc.fire('pointerup', {}); } assert.equal(doc.count(), before, 'repeated drags leak nothing');
+});
+
+integrationTest('B1 ui: the real view close path disposes the panel (the drag listeners go with it)', async () => {
+  const source = fs.readFileSync(path.join(root, 'experiences/visual-map/view.ts'), 'utf8');
+  const close = source.slice(source.indexOf('  async onClose(): Promise<void> {'), source.indexOf('  async onClose(): Promise<void> {') + 2500);
+  assert.match(close, /this\.chat\?\.dispose\(\)/);
+});
+
+// ---- opening screen ----------------------------------------------------------------------------------------------
+
+integrationTest('B1 ui: an empty map shows the opening screen: the question, the message field and exactly three examples; the window is not docked', async () => {
+  const h = await harness({ empty: true }); await h.view.hydrate(); h.repaint(); const chat = h.view.chat;
+  assert.equal(chat.isHero, true); assert.ok(chat.el.hasClass('is-hero')); assert.equal(chat.isOpen, true);
+  assert.equal(chat.heroTitleEl.text, 'What do you want to research or organize?'); assert.equal(chat.heroTitleEl.hidden, false); assert.equal(chat.heroTitleEl.attrs.role, 'heading');
+  const slot = find(h.rootEl, i => hasClass(i, 'vam-chat-hero-slot')); assert.ok(slot && find(slot, i => i === chat.el), 'in the middle of the canvas overlay');
+  assert.equal(find(h.workspace(), i => i === chat.el) !== undefined, true);
+  assert.equal(findAll(chat.suggestEl, i => i.tag === 'button').length, 3, 'three examples'); assert.ok(chat.suggestEl.hasClass('is-examples'));
+  eq(suggestionTexts(chat), ['Research the coffee industry: players, supply chain, trends', 'Plan a three-month route to learn basic Japanese', 'Compare renting and buying a home: costs, risks, timing']);
+  assert.equal(chat.resizerEl.hidden, true, 'no width handle on the opening screen'); assert.equal(h.page.doc.activeElement, chat.inputEl, 'the keyboard starts in the message field');
+  assert.equal(chat.logEl.attrs.role, 'group');
+  // DOM order = reading order: heading, message field, then the examples.
+  const order = findAll(chat.bodyEl, i => i === chat.heroTitleEl || i === chat.inputEl || i === chat.suggestEl); eq(order.map(i => i === chat.heroTitleEl ? 'title' : i === chat.inputEl ? 'input' : 'examples'), ['title', 'input', 'examples']);
+});
+
+integrationTest('B1 ui: clicking an example fills the message field and sends nothing', async () => {
+  const h = await harness({ empty: true }); await h.view.hydrate(); h.repaint(); const chat = h.view.chat;
+  const sends = h.control.requests.length; findAll(chat.suggestEl, i => i.tag === 'button')[1].click();
+  assert.equal(chat.inputEl.value, 'Plan a three-month route to learn basic Japanese'); assert.equal(h.page.doc.activeElement, chat.inputEl);
+  await tick(); assert.equal(h.control.requests.length, sends, 'not sent'); assert.equal(chat.hasMessages, false); assert.equal(chat.isHero, true);
+});
+
+integrationTest('B1 ui: sending the first message moves the same panel (same message field) into the side window and the keyboard stays in the field', async () => {
+  const h = await harness({ empty: true }); await h.view.hydrate(); h.repaint(); const chat = h.view.chat; const el = chat.el; const input = chat.inputEl;
+  h.control.reply = async () => ({ reply: 'ok', actions: [], rejected: [] });
+  h.type('Coffee'); input.focus(); await h.view.sendMapChat();
+  assert.equal(chat.isHero, false); assert.equal(chat.el, el, 'one panel'); assert.equal(chat.inputEl, input, 'one message field'); assert.equal(h.workspace().children[0], el, 'now the first child of the workspace');
+  assert.equal(find(h.rootEl, i => hasClass(i, 'vam-chat-hero-slot')) , undefined, 'the opening slot is gone'); assert.equal(h.page.doc.activeElement, input, 'focus still in the field');
+  assert.equal(chat.suggestEl.hasClass('is-examples'), false, 'suggestions, not examples'); assert.equal(chat.heroTitleEl.hidden, true); assert.equal(chat.resizerEl.hidden, false);
+  h.repaint(); assert.equal(chat.isHero, false, 'a repaint keeps it in the side window');
+  assert.equal(chat.transcript().length, 2);
+});
+
+integrationTest('B1 ui: an AIM map with no cards does NOT get the opening screen', async () => {
+  const h = await harness({ aim: true, empty: true }); await h.view.hydrate(); h.repaint();
+  assert.equal(h.view.map.nodes.length, 0); assert.ok(h.view.map.aim); assert.equal(h.view.chat.isHero, false); assert.equal(find(h.rootEl, i => hasClass(i, 'vam-chat-hero-slot')), undefined);
+  assert.equal(h.workspace().children[0], h.view.chat.el);
+});
+
+integrationTest('B1 ui: a map with cards does not get the opening screen either', async () => {
+  const h = await harness(); await h.view.hydrate(); h.repaint(); assert.equal(h.view.chat.isHero, false);
+});
+
+integrationTest('B1 ui: the read-only sample shows the opening screen in its start card, and a message from it is sent as noEditableMap', async () => {
+  const h = await harness(); await h.view.hydrate(); h.view.builtIn = true;
+  // render() makes the start card before it mounts the chat; the stand-in does the same.
+  const repaint = () => { const restore = h.view.detachMapChat(); h.page.doc.activeElement = null; h.rootEl.empty(); const start = h.rootEl.createDiv('vam-sample-start'); start.createDiv('vam-sample-start-chat'); h.page.attach(start); const ws = h.rootEl.createDiv('vam-workspace'); const overlay = h.page.attach(ws.createDiv('vam-canvas-overlay')); h.view.mountMapChat(ws, overlay); restore(); return ws; };
+  repaint(); const chat = h.view.chat;
+  assert.equal(chat.isHero, true); const card = find(h.rootEl, i => hasClass(i, 'vam-sample-start-chat')); assert.ok(find(card, i => i === chat.el), 'in the sample\'s start card');
+  h.type('Coffee map'); await h.view.sendMapChat();
+  assert.equal(h.control.requests.length, 1); assert.equal(h.control.requests[0].context.noEditableMap, true); assert.equal(JSON.parse(h.control.requests[0].context.json).noEditableMap ?? true, true);
+  assert.equal(chat.hasMessages, true); assert.equal(chat.isHero, false, 'after the message it is the side window');
+});
+
+// ---- suggestions -------------------------------------------------------------------------------------------------
+
+test('B1 ui: there are two to four suggestions in every situation, and they change with the selection and with a note beside the map', () => {
+  const { chatSuggestionKeys } = layoutModule(); const cases = [];
+  for (const selected of [0, 1, 2, 5]) for (const hasNote of [false, true]) for (const hasTopics of [false, true]) cases.push({ selected, hasNote, hasTopics, keys: chatSuggestionKeys({ selected, hasNote, hasTopics }) });
+  for (const c of cases) assert.ok(c.keys.length >= 2 && c.keys.length <= 4, JSON.stringify(c));
+  const key = (selected, hasNote = false, hasTopics = true) => chatSuggestionKeys({ selected, hasNote, hasTopics }).join();
+  assert.notEqual(key(0), key(1)); assert.notEqual(key(1), key(2)); assert.notEqual(key(0, false, false), key(0)); assert.notEqual(key(1), key(1, true));
+  assert.equal(key(2), key(7), 'many is many'); assert.ok(chatSuggestionKeys({ selected: 0, hasNote: true, hasTopics: false }).includes('ui.map_chat_suggest_empty_from_note'));
+});
+
+test('B1 ui: every suggestion and example exists in all three languages and is a non-empty sentence', () => {
+  const { chatSuggestionKeys, MAP_CHAT_EXAMPLE_KEYS } = layoutModule(); const dictionaries = ['en', 'zh-TW', 'zh-CN'].map(name => load(`i18n/${name}.ts`)[name === 'en' ? 'en' : name === 'zh-TW' ? 'zhTW' : 'zhCN'] ?? Object.values(load(`i18n/${name}.ts`))[0]);
+  const keys = new Set([...MAP_CHAT_EXAMPLE_KEYS]); for (const selected of [0, 1, 2]) for (const hasNote of [false, true]) for (const hasTopics of [false, true]) chatSuggestionKeys({ selected, hasNote, hasTopics }).forEach(k => keys.add(k));
+  for (const dictionary of dictionaries) for (const k of keys) assert.ok(typeof dictionary[k] === 'string' && dictionary[k].trim().length > 4, `${k}`);
+});
+
+integrationTest('B1 ui: a suggestion only fills the message field (nothing is sent, nothing else changes), keeps what was typed, and the row follows the selection and the open note', async () => {
+  const h = await harness(); await h.view.hydrate(); const chat = h.open();
+  eq(suggestionTexts(chat), ['What is missing from this map?', 'Arrange the whole map', 'Collapse every branch below the first level']);
+  const requests = h.control.requests.length, mutates = h.control.mutates;
+  findAll(chat.suggestEl, i => i.tag === 'button')[0].click();
+  assert.equal(chat.inputEl.value, 'What is missing from this map?'); assert.equal(h.page.doc.activeElement, chat.inputEl);
+  await tick(); assert.equal(h.control.requests.length, requests, 'nothing sent'); assert.equal(h.control.mutates, mutates, 'nothing written'); assert.equal(chat.hasMessages, false);
+  chat.inputEl.value = 'first line'; findAll(chat.suggestEl, i => i.tag === 'button')[1].click(); assert.equal(chat.inputEl.value, 'first line\nArrange the whole map', 'an existing draft is kept');
+  h.view.selected = h.ids.a; chat.refreshSelection(); assert.match(suggestionTexts(chat)[0], /subtopics under the selected topic/);
+  h.view.multiSelected = new Set([h.ids.a, h.ids.b]); chat.refreshSelection(); assert.match(suggestionTexts(chat)[0], /Compare the selected topics/);
+  h.view.selected = null; h.view.multiSelected = new Set(); h.setActive('Notes/Research.md', ''); chat.refreshNote(); assert.ok(suggestionTexts(chat).includes('Add what the open note says to the map'));
+  assert.ok(suggestionTexts(chat).length <= 4);
+});
+
+integrationTest('B1 ui: a suggestion button that has the keyboard is not rebuilt by a refresh that changes nothing', async () => {
+  const h = await harness(); await h.view.hydrate(); const chat = h.open(); const button = findAll(chat.suggestEl, i => i.tag === 'button')[0]; button.focus();
+  chat.refreshSelection(); chat.refreshNote(); chat.refreshSelection();
+  assert.equal(findAll(chat.suggestEl, i => i.tag === 'button')[0], button, 'same element'); assert.equal(h.page.doc.activeElement, button);
+});
+
+// ---- keyboard ------------------------------------------------------------------------------------------------------
+
+integrationTest('B1 ui: Enter sends, Shift+Enter does not, and IME composition keeps Enter from sending, on the opening screen too', async () => {
+  const h = await harness({ empty: true }); await h.view.hydrate(); h.repaint(); const chat = h.view.chat; const input = chat.inputEl; let sends = 0; h.view.sendMapChat = async () => { sends++; };
+  h.type('x'); input.fire('compositionstart'); assert.equal(press(input, { key: 'Enter' }), false); assert.equal(sends, 0, 'composing: Enter only confirms the candidate');
+  assert.equal(press(input, { key: 'Enter', isComposing: true }), false); assert.equal(sends, 0);
+  input.fire('compositionend'); assert.equal(press(input, { key: 'Enter', shiftKey: true }), false); assert.equal(sends, 0);
+  assert.equal(press(input, { key: 'Enter' }), true); assert.equal(sends, 1);
+  // Escape in the opening screen does not fold anything: there is no window yet.
+  assert.equal(press(input, { key: 'Escape' }), false); assert.equal(chat.isOpen, true);
+});
+
+integrationTest('B1 ui: a repaint and a map change during IME composition leave the field, its text and its composing state alone', async () => {
+  const h = await harness({ empty: true }); await h.view.hydrate(); h.repaint(); const chat = h.view.chat; const input = chat.inputEl; input.focus(); input.value = 'ㄅㄆ'; input.fire('compositionstart');
+  h.repaint(); assert.equal(chat.isComposing, true); assert.equal(chat.draft, 'ㄅㄆ'); assert.equal(h.page.doc.activeElement, input);
+  assert.equal(h.view.typingInField(), true, 'the view treats it as typing: the sync waits');
+  input.fire('compositionend'); assert.equal(h.view.typingInField(), false);
+});
+
+integrationTest('B1 ui: Escape on any control of the window folds it; the view\'s own Escape (clear the selection) ignores anything inside the window', async () => {
+  const h = await harness(); await h.view.hydrate(); const chat = h.open(); const suggestion = findAll(chat.suggestEl, i => i.tag === 'button')[0]; suggestion.focus();
+  assert.equal(press(chat.el, { key: 'Escape', target: suggestion }), true); assert.equal(chat.isOpen, false); assert.equal(h.page.doc.activeElement, chat.toggleEl);
+  const source = fs.readFileSync(path.join(root, 'experiences/visual-map/view.ts'), 'utf8'); const at = source.indexOf('Escape inside the chat window');
+  assert.ok(at > 0 && /closest\("input, textarea, select, \[contenteditable=true\], \.vam-map-chat"\)/.test(source.slice(at, at + 400)), 'the contentEl Escape skips input fields and the chat window (a plain literal, allowlisted in tests/literal-scan/visual-map.json)');
+});
+
+integrationTest('B1 ui: Tab order follows the document: suggestions, then the reference chips, then the message field, then the answer length and Send', async () => {
+  const h = await harness(); await h.view.hydrate(); const chat = h.open(); chat.addTopicReference(h.ids.a);
+  const focusable = findAll(chat.bodyEl, i => (i.tag === 'button' || i.tag === 'textarea' || i.tag === 'select') && !i.hidden && i.attrs.tabindex !== '-1');
+  const names = focusable.map(i => hasClass(i, 'vam-map-chat-suggestion') ? 'suggestion' : hasClass(i, 'vam-map-chat-chip-remove') ? 'chip' : i === chat.inputEl ? 'input' : hasClass(i, 'vam-map-chat-style-option') ? 'style' : hasClass(i, 'vam-map-chat-send') ? 'send' : hasClass(i, 'vam-map-chat-stop') ? 'stop' : i.tag === 'select' ? 'model' : 'other');
+  const tail = names.slice(names.indexOf('suggestion')).filter(n => n !== 'stop'); eq(tail, ['suggestion', 'suggestion', 'suggestion', 'chip', 'input', 'style', 'style', 'send']);
+  assert.ok(!focusable.some(i => i.attrs.tabindex && Number(i.attrs.tabindex) > 0), 'no positive tabindex');
+});
+
+test('B1 ui: the command to toggle the chat exists in the source, has no default hotkey, and is named in all three languages', () => {
+  const main = fs.readFileSync(path.join(root, 'main.ts'), 'utf8'); const at = main.indexOf('id: "toggle-map-chat"');
+  assert.ok(at > 0); const block = main.slice(at - 200, at + 500); assert.doesNotMatch(block, /hotkeys/); assert.match(block, /ui\.map_chat_toggle_command/);
+  for (const name of ['en', 'zh-TW', 'zh-CN']) assert.match(fs.readFileSync(path.join(root, 'i18n', `${name}.ts`), 'utf8'), /"ui\.map_chat_toggle_command":/);
+});
+
+integrationTest('B1 ui: the toggle command opens the window and leaves the keyboard in the message field; with the keyboard there it closes it; elsewhere it moves the keyboard in', async () => {
+  const h = await harness(); await h.view.hydrate(); const chat = h.open(); chat.setOpen(false); h.view.toggleMapChat();
+  assert.equal(chat.isOpen, true); assert.equal(h.page.doc.activeElement, chat.inputEl, 'the keyboard is in the field');
+  h.page.doc.activeElement = null; h.view.toggleMapChat(); assert.equal(chat.isOpen, true, 'open but the keyboard was elsewhere: it just comes to the field'); assert.equal(h.page.doc.activeElement, chat.inputEl);
+  h.view.toggleMapChat(); assert.equal(chat.isOpen, false, 'with the keyboard in the field it closes');
+  const wide = await harness({ empty: true }); await wide.view.hydrate(); wide.repaint(); wide.page.doc.activeElement = null; wide.view.toggleMapChat(); assert.equal(wide.page.doc.activeElement, wide.view.chat.inputEl); assert.equal(wide.view.chat.isHero, true, 'on the opening screen it only focuses');
+});
+
+integrationTest('B1 ui: opening and closing the window is remembered in the settings; a fold forced by a narrow pane is not', async () => {
+  const h = await harness(); await h.view.hydrate(); const chat = h.open(); chat.setOpen(false); assert.equal(h.plugin.settings.mapChatOpen, false); chat.setOpen(true); assert.equal(h.plugin.settings.mapChatOpen, true);
+  h.rootEl.clientWidth = 600; h.view.onResize(); assert.equal(chat.isOpen, false); assert.equal(h.plugin.settings.mapChatOpen, true, 'the user did not close it');
+});
+
+integrationTest('B1 ui: a saved closed state starts the window closed', async () => {
+  const h = await harness(); h.plugin.settings.mapChatOpen = false; await h.view.hydrate(); h.repaint(); assert.equal(h.view.chat.isOpen, false); assert.ok(h.view.chat.el.hasClass('is-rail'));
+});
+
+// ---- plan card and results -----------------------------------------------------------------------------------------
+
+integrationTest('B1 ui: the plan card has a one-sentence description, actions grouped by kind and folded, the call estimate, and Apply / Cancel as real buttons', async () => {
+  const h = await harness(); await h.view.hydrate(); const chat = h.open();
+  h.control.reply = async () => ({ reply: 'plan', actions: [...Array.from({ length: 14 }, (_, i) => ({ kind: 'add_child', parentId: h.ids.root, title: `Card ${i}`, summary: '' })), { kind: 'rename_topic', nodeId: h.ids.a, title: 'Body!' }, { kind: 'delete_topic', nodeId: h.ids.b, branch: false }, { kind: 'collapse_topic', nodeId: h.ids.root }], rejected: [] });
+  h.type('many'); await h.view.sendMapChat(); const card = planCard(h)[0];
+  assert.match(visibleText(find(card, i => hasClass(i, 'vam-map-chat-plan-sentence'))), /^This plan needs your confirmation: 17 actions\.$/);
+  const groups = findAll(card, i => i.tag === 'details'); eq(groups.map(g => find(g, i => i.tag === 'summary').text), ['Add or create (14)', 'Edit or move (1)', 'Delete (1)', 'Map and view (1)']);
+  assert.ok(groups.every(g => g.open === false && g.attrs.open === undefined), 'every group starts folded'); assert.equal(findAll(card, i => i.tag === 'li').length, 17);
+  assert.match(visibleText(find(card, i => hasClass(i, 'vam-map-chat-plan-estimate'))), /No extra AI calls/);
+  assert.equal(planButton(h, 'apply').tag, 'button'); assert.equal(planButton(h, 'cancel').tag, 'button'); assert.equal(planButton(h, 'apply').disabled, false);
+  // Apply is a plain button click, so Enter and Space (the browser turns both into click) work; the keyboard returns to the field.
+  h.page.doc.activeElement = planButton(h, 'apply'); planButton(h, 'apply').click(); assert.equal(h.page.doc.activeElement, chat.inputEl, 'focus back in the field, not lost with the button');
+  await until(() => chat.pendingPlan() === null && !h.view.chatApplying);
+});
+
+integrationTest('B1 ui: a cancelled plan keeps the focus in the field and the card says nothing changed', async () => {
+  const h = await harness(); await h.view.hydrate(); const chat = h.open();
+  h.control.reply = async () => ({ reply: 'plan', actions: Array.from({ length: 16 }, (_, i) => ({ kind: 'add_child', parentId: h.ids.root, title: `Card ${i}`, summary: '' })), rejected: [] });
+  h.type('many'); await h.view.sendMapChat(); h.page.doc.activeElement = planButton(h, 'cancel'); planButton(h, 'cancel').click();
+  assert.equal(h.page.doc.activeElement, chat.inputEl); assert.match(visibleText(planCard(h)[0]), /Nothing was changed/);
+});
+
+integrationTest('B1 ui: result lines name their status in words; five or fewer are all shown; the closing "cannot be undone" line is always last', async () => {
+  const h = await harness(); await h.view.hydrate(); const chat = h.open(); chat.begin('q');
+  chat.finish('r', [{ status: 'done', text: 'Done: A' }, { status: 'skipped', text: 'Skipped: B (the topic is no longer on the map)' }, { status: 'failed', text: 'Failed: C (boom)' }, { status: 'done', text: 'These changes cannot be undone; the undo history was cleared.' }]);
+  const lines = findAll(chat.logEl, i => hasClass(i, 'vam-map-chat-line')); eq(lines.map(l => l.text.split(':')[0].split(' ')[0]), ['Done:', 'Skipped:', 'Failed:', 'These'].map(s => s.replace(':', ''))); assert.ok(hasClass(lines.at(-1), 'is-note'));
+  assert.equal(findAll(chat.logEl, i => hasClass(i, 'vam-map-chat-lines-toggle')).length, 0);
+});
+
+integrationTest('B1 ui: more than five result lines fold into a count; the toggle shows them all and back; the closing line stays last; focus stays on the toggle', async () => {
+  const h = await harness(); await h.view.hydrate(); const chat = h.open(); chat.begin('q');
+  const lines = [...Array.from({ length: 18 }, (_, i) => ({ status: 'done', text: `Done: card ${i}` })), { status: 'skipped', text: 'Skipped: x (y)' }, { status: 'skipped', text: 'Skipped: z (w)' }, { status: 'failed', text: 'Failed: q (r)' }, { status: 'done', text: 'These changes cannot be undone; the undo history was cleared.' }];
+  chat.finish('r', lines);
+  const text = () => visibleText(find(chat.logEl, i => hasClass(i, 'vam-map-chat-lines'))); const shown = () => findAll(chat.logEl, i => hasClass(i, 'vam-map-chat-line'));
+  assert.match(text(), /18 done, 2 skipped, 1 failed/); eq(shown().map(l => l.text), ['These changes cannot be undone; the undo history was cleared.'], 'folded: only the closing line');
+  let toggle = find(chat.logEl, i => hasClass(i, 'vam-map-chat-lines-toggle')); assert.equal(toggle.text, 'Show all 21 results'); assert.equal(toggle.attrs['aria-expanded'], 'false'); toggle.click();
+  assert.equal(shown().length, 22); assert.ok(hasClass(shown().at(-1), 'is-note'), 'still last'); toggle = find(chat.logEl, i => hasClass(i, 'vam-map-chat-lines-toggle')); assert.equal(toggle.attrs['aria-expanded'], 'true'); assert.equal(h.page.doc.activeElement, toggle);
+  toggle.click(); assert.equal(shown().length, 1);
+  // Exactly five results do not fold; six do.
+  const five = await harness(); await five.view.hydrate(); const c5 = five.open(); c5.begin('q'); c5.finish('r', Array.from({ length: 5 }, (_, i) => ({ status: 'done', text: `Done: ${i}` }))); assert.equal(findAll(c5.logEl, i => hasClass(i, 'vam-map-chat-line')).length, 5);
+  c5.begin('q2'); c5.finish('r', Array.from({ length: 6 }, (_, i) => ({ status: 'done', text: `Done: ${i}` }))); assert.equal(findAll(c5.logEl, i => hasClass(i, 'vam-map-chat-line')).length, 5, 'the second message is folded: only the first one\'s five remain');
+});
+
+integrationTest('B1 ui: a failed turn stays in the conversation with a Retry button, no Notice is shown, and Retry sends the same question again and applies its actions', async () => {
+  const h = await harness(); await h.view.hydrate(); const chat = h.open(); const notices = h.notices.length;
+  h.control.reply = async () => { throw new Error('network is down'); };
+  h.type('add a card'); await h.view.sendMapChat();
+  const errorRow = find(chat.logEl, i => hasClass(i, 'is-error')); assert.ok(errorRow); assert.match(visibleText(errorRow), /network is down/); assert.equal(h.notices.length, notices, 'no pop-up');
+  const retry = find(errorRow, i => i.tag === 'button' && hasClass(i, 'vam-map-chat-retry')); assert.equal(retry.text, 'Retry'); assert.equal(retry.disabled, false);
+  h.control.reply = async () => ({ reply: 'added', actions: [{ kind: 'add_child', parentId: h.ids.a, title: 'Retried', summary: '' }], rejected: [] });
+  const before = h.view.map.nodes.length; retry.click(); await until(() => chat.transcript().at(-1)?.text === 'added' && !chat.isBusy);
+  assert.equal(h.control.requests.at(-1).message, 'add a card', 'the same question'); assert.equal(h.view.map.nodes.length, before + 1, 'and its actions were applied this time');
+  assert.equal(chat.draft, '', 'the draft is not touched');
+});
+
+integrationTest('B1 ui: Retry is disabled while a request runs, and an answer that is not an error has no Retry', async () => {
+  const h = await harness(); await h.view.hydrate(); const chat = h.open(); const origin = { text: 'q', chips: [], selectedIds: [] }; chat.begin('q', origin); chat.fail('boom'); chat.begin('q2', { ...origin, text: 'q2' });
+  const buttons = findAll(chat.logEl, i => hasClass(i, 'vam-map-chat-retry')); assert.equal(buttons.length, 1); assert.equal(buttons[0].disabled, true);
+  chat.finish('fine', []); assert.equal(findAll(chat.logEl, i => hasClass(i, 'vam-map-chat-retry')).length, 1, 'only the failed one'); assert.equal(findAll(chat.logEl, i => hasClass(i, 'vam-map-chat-retry'))[0].disabled, false);
+});
+
+// ---- screen reader --------------------------------------------------------------------------------------------------
+
+integrationTest('B1 ui: the window is a labelled region; the log has no aria-live and no role=log; one live region says the summary once, when the turn ends', async () => {
+  const h = await harness(); await h.view.hydrate(); const chat = h.open();
+  assert.equal(chat.bodyEl.attrs.role, 'region'); assert.equal(chat.bodyEl.attrs['aria-label'], 'Ask AI about this map');
+  assert.equal(chat.logEl.attrs['aria-live'], undefined); assert.notEqual(chat.logEl.attrs.role, 'log'); assert.equal(findAll(chat.bodyEl, i => i.attrs['aria-live'] !== undefined).length, 0, 'nothing in the body is live');
+  const writes = []; const live = chat.liveEl; const setText = live.setText.bind(live); live.setText = value => { writes.push(value); setText(value); };
+  assert.equal(live.attrs['aria-live'], 'polite'); assert.equal(live.attrs['aria-atomic'], 'true');
+  chat.begin('ask'); for (const part of ['He', 'Hello', 'Hello wor', 'Hello world']) { chat.streamReply(part); await tick(); } eq(writes, [], 'silence while it streams');
+  chat.finish('Hello world', [{ status: 'done', text: 'Done: A' }, { status: 'done', text: 'Done: B' }, { status: 'skipped', text: 'Skipped: C (x)' }]);
+  eq(writes, ['AI replied: Hello world Results: 2 done, 1 skipped'], 'once, with the counts'); assert.equal(live.text, writes[0]);
+  chat.begin('again'); chat.fail('boom'); eq(writes.length, 2); assert.match(writes[1], /AI chat failed: boom/);
+});
+
+integrationTest('B1 ui: stopping a turn and applying a plan each say one thing; the long reply in the summary is clipped', async () => {
+  const h = await harness(); await h.view.hydrate(); const chat = h.open(); const writes = []; const setText = chat.liveEl.setText.bind(chat.liveEl); chat.liveEl.setText = value => { writes.push(value); setText(value); };
+  chat.begin('q'); chat.streamReply('partial'); chat.markStopped(); eq(writes, ['Stopped.']);
+  chat.begin('q2'); chat.finish('x'.repeat(500), []); assert.ok(writes.at(-1).length < 200, 'clipped');
+});
+
+// ---- what must not change --------------------------------------------------------------------------------------------
+
+test('B1 ui: single sources stay single: one typingInField (3 mentions), the same 5 renderChatMarkdown mentions in code, one definition each of the focus capture and the detach', () => {
+  const walk = dir => fs.readdirSync(path.join(root, dir), { withFileTypes: true }).flatMap(entry => entry.isDirectory() ? (['node_modules', 'tests', 'samples', 'scripts'].includes(entry.name) ? [] : walk(path.join(dir, entry.name))) : entry.name.endsWith('.ts') ? [path.join(dir, entry.name)] : []);
+  const sources = walk('.').map(file => fs.readFileSync(path.join(root, file), 'utf8'));
+  const total = pattern => sources.reduce((sum, text) => sum + (text.match(new RegExp(pattern, 'g')) ?? []).length, 0);
+  assert.equal(total('typingInField'), 3, 'typingInField'); assert.equal(total('renderChatMarkdown'), 5, 'renderChatMarkdown');
+  assert.equal(total('captureFocus\\(\\): \\(\\) => void \\{'), 1, 'one capture'); assert.equal(total('private detachMapChat\\(\\)'), 1, 'one detach');
+});
+
+test('B1 ui: the stylesheet takes colours and sizes from Obsidian variables only, has no floating-window rules left, and keeps the toolbar and zoom rules', () => {
+  const css = fs.readFileSync(path.join(root, 'styles.css'), 'utf8'); const chatRules = css.split('\n').filter(line => /^\.(vam-map-chat|vam-chat-hero|vam-sr-only|vam-canvas \{)/.test(line)).join('\n');
+  assert.ok(chatRules.length > 3000); assert.doesNotMatch(chatRules, /#[0-9a-fA-F]{3,8}\b|rgb\(|rgba\(|hsl\(/, 'no literal colours'); assert.doesNotMatch(css, /has-map-chat-open/, 'the floating-window make-room rules are gone');
+  assert.doesNotMatch(css, /\.vam-map-chat ~ \.vam-canvas-hint/); assert.doesNotMatch(css, /bottom: 392px/); assert.doesNotMatch(chatRules, /border-left|border-right: [2-9]|linear-gradient|background-clip: text/, 'none of the banned surface habits');
+  assert.match(css, /^\.vam-map-tools \{ top: 12px; left: 12px;/m); assert.match(css, /^\.vam-zoom-controls \{ right: 12px; bottom: 12px; \}/m);
+  assert.match(css, /^\.vam-workspace \{ display: flex;[^}]*position: relative;/m); assert.match(css, /^\.vam-canvas \{ position: relative; display: flex; flex: 1;/m);
+  assert.match(css, /\.vam-map-chat\.is-overlay \+ \.vam-canvas \{ margin-left: 44px; \}/);
+});
+
+test('B1 ui: render() builds the workspace as the chat window, the canvas (viewport + overlay) and the inspector, and the selection bar lives in the canvas', () => {
+  const source = fs.readFileSync(path.join(root, 'experiences/visual-map/view.ts'), 'utf8'); const render = source.slice(source.indexOf('  private render(): void {'), source.indexOf('  /** `shownNode` may be a display copy'));
+  assert.match(render, /const canvas = workspace\.createDiv\("vam-canvas"\)/); assert.match(render, /this\.viewportEl = canvas\.createDiv\("vam-viewport"\)/); assert.match(render, /const overlay = canvas\.createDiv\("vam-canvas-overlay"\)/);
+  assert.match(render, /this\.renderSelectionBar\(canvas\)/); assert.match(render, /this\.renderInspector\(workspace, node\)/, 'the sample inspector is still a sibling of the canvas');
+});
+
+// ---- B1-fix 1: the batch repaints once ----------------------------------------------------------------------------------
+const hundred = () => [addRoot('r', 'Root'), ...Array.from({ length: 99 }, (_, i) => addRoot(`c${i}`, `Kid ${i}`, 'new:r'))];
+integrationTest('B1 fix 1: 100 add_child repaint at most 3 times and read the notes back at most 3 times, not 200 and 100', async () => {
+  const h = await harness({ empty: true, realRender: true, viaSync: true }); await h.view.hydrate();
+  let hydrates = 0; const hydrate = h.view.hydrate; h.view.hydrate = async (...args) => { hydrates++; return hydrate(...args); };
+  const before = h.renders(); const lines = await apply(h, hundred());
+  assert.equal(lines.filter(l => l.status === 'done').length >= 100, true, JSON.stringify(lines.slice(0, 3)));
+  assert.equal(h.view.map.nodes.length, 100); assert.equal((await h.saved()).length, 100);
+  const repaints = h.renders() - before; console.log(`B1 fix 1: ${repaints} repaints, ${hydrates} syncs for 100 add_child`);
+  assert.ok(repaints >= 1 && repaints <= 3, `repaints: ${repaints}`);
+  assert.ok(hydrates <= 3, `syncs: ${hydrates}`);
+});
+integrationTest('B1 fix 1: stopping in the middle of a batch still repaints once, and the rest is skipped', async () => {
+  const h = await harness({ empty: true, realRender: true, viaSync: true }); await h.view.hydrate();
+  let asked = 0; const alive = () => ++asked < 40; // the 40th check says "stopped"
+  const before = h.renders(); const lines = await apply(h, hundred(), {}, alive);
+  assert.ok(lines.some(l => l.status === 'done') && lines.some(l => l.status === 'skipped'), 'part done, part skipped');
+  assert.ok(h.view.map.nodes.length > 0 && h.view.map.nodes.length < 100);
+  assert.ok(h.renders() - before >= 1 && h.renders() - before <= 3, `repaints: ${h.renders() - before}`);
+  assert.equal(h.view.renderHold, 0); assert.equal(h.view.syncHold, 0);
+});
+integrationTest('B1 fix 1: the layout after a held batch is made after the cards were painted (it measures them)', async () => {
+  const h = await harness({ empty: true, realRender: true, viaSync: true }); await h.view.hydrate();
+  let paintedAtLayout = -1; const original = h.view.mapChange.bind(h.view);
+  h.view.mapChange = async (change, rebuild) => { if (rebuild === false && paintedAtLayout < 0) paintedAtLayout = h.renders(); return original(change, rebuild); };
+  const before = h.renders(); await apply(h, [...hundred().slice(0, 6), { kind: 'auto_layout' }]);
+  assert.ok(paintedAtLayout - before >= 1, `painted before the layout: ${paintedAtLayout - before}`);
+});
+
+// ---- B1-fix: first window, plan card, canvas, panel ------------------------------------------------------------------
+const planActions = (h, n = 16) => Array.from({ length: n }, (_, i) => ({ kind: 'add_child', parentId: h.ids.root, title: `Card ${i}`, summary: '' }));
+const lineTexts = chat => chat.transcript().at(-1).lines.map(l => l.text);
+
+integrationTest('B1 fix 2: the first message of an opening screen opens the window even when it was closed or the pane is narrow, and the keyboard stays in the message field', async () => {
+  for (const [closed, width] of [[true, 0], [false, 600], [true, 600]]) {
+    const h = await harness({ empty: true }); await h.view.hydrate(); h.plugin.settings.mapChatOpen = !closed; h.repaint(); const chat = h.view.chat;
+    if (closed) chat.restoreOpen(false); if (width) { h.rootEl.clientWidth = width; h.view.onResize(); }
+    assert.equal(chat.isHero, true); h.type('Coffee'); chat.inputEl.focus(); await h.view.sendMapChat();
+    assert.equal(chat.isHero, false, 'now the side window'); assert.equal(chat.isOpen, true, `shown (closed ${closed}, pane ${width})`); assert.equal(h.page.doc.activeElement, chat.inputEl, 'the keyboard did not leave the field');
+    if (width) assert.equal(chat.isOverlay, true, 'a narrow pane lays the window over the canvas');
+  }
+});
+
+integrationTest('B1 fix 3: while a plan is applied the window says so and offers Stop; Stop keeps what is done and skips the rest with its reason; a send is not taken', async () => {
+  const h = await harness(); await h.view.hydrate(); const chat = h.open();
+  h.control.reply = async () => ({ reply: 'plan', actions: planActions(h), rejected: [] });
+  h.type('many'); await h.view.sendMapChat();
+  const gate = deferred(); let calls = 0; const original = h.view.applyChatWrite.bind(h.view);
+  h.view.applyChatWrite = async (...args) => { if (++calls === 3) await gate.promise; return original(...args); };
+  planButton(h, 'apply').click(); await until(() => calls === 3);
+  assert.equal(chat.stopEl.hidden, false, 'Stop is offered'); assert.equal(chat.sendEl.hidden, true); assert.equal(chat.statusEl.text, 'Applying the plan…'); assert.ok(chat.el.hasClass('is-busy'));
+  const requests = h.control.requests.length; h.type('another'); await h.view.sendMapChat(); assert.equal(h.control.requests.length, requests, 'no second request while the plan is applied');
+  chat.stopEl.click(); gate.resolve(); await until(() => !h.view.chatApplying);
+  const lines = chat.transcript().at(-1).lines; assert.equal(lines.filter(l => l.status === 'done').length >= 3, true, JSON.stringify(lines.slice(0, 4)));
+  assert.ok(lines.some(l => l.status === 'skipped' && /you stopped it/.test(l.text)), JSON.stringify(lines.slice(-3)));
+  assert.equal(chat.stopEl.hidden, true); assert.equal(chat.sendEl.hidden, false); assert.equal(chat.statusEl.text, '');
+  assert.equal(h.view.map.nodes.length, 4 + lines.filter(l => l.status === 'done' && /Add subtopic/.test(l.text)).length, 'what was done is kept');
+});
+
+integrationTest('B1 fix 4: a plan that waits has no "say it in more detail" button (it would replace the plan); once settled the button is back and comes after the results', async () => {
+  const h = await harness(); await h.view.hydrate(); const chat = h.open();
+  h.control.reply = async () => ({ reply: 'a plan for you', actions: planActions(h), rejected: [] });
+  h.type('many'); await h.view.sendMapChat();
+  assert.equal(findAll(chat.logEl, i => hasClass(i, 'vam-map-chat-more')).length, 0, 'not while the plan waits');
+  planButton(h, 'cancel').click(); await tick();
+  const more = findAll(chat.logEl, i => hasClass(i, 'vam-map-chat-more')); assert.equal(more.length, 1, 'back after the plan was settled');
+  const row = more[0].parent; const order = row.children.map(c => c.cls.split(' ')[0]);
+  assert.ok(order.indexOf('vam-map-chat-more') > order.indexOf('vam-map-chat-plan'), JSON.stringify(order));
+});
+
+integrationTest('B1 fix 25: "say it in more detail" comes after the result lines, not between the reply and them', async () => {
+  const h = await harness(); await h.view.hydrate(); const chat = h.open();
+  h.control.reply = async () => ({ reply: 'done', actions: [{ kind: 'rename_topic', nodeId: h.ids.a, title: 'Renamed' }], rejected: [] });
+  h.type('rename'); await h.view.sendMapChat(); const row = findAll(chat.logEl, i => hasClass(i, 'vam-map-chat-more'))[0].parent; const order = row.children.map(c => c.cls.split(' ')[0]);
+  assert.ok(order.indexOf('vam-map-chat-lines') >= 0 && order.indexOf('vam-map-chat-more') > order.indexOf('vam-map-chat-lines'), JSON.stringify(order));
+});
+
+test('B1 fix 5: a new message, and a pick in any list, end every list of maps shown so far', () => {
+  const f = panelFixture(); f.panel.setOpen(true); const picks = [];
+  const list = name => ({ prompt: 'Which?', options: [{ label: name, pick: () => picks.push(name) }], picked: false });
+  const enabled = () => findAll(f.parts.log(), i => hasClass(i, 'vam-map-chat-choice')).map(b => !b.disabled);
+  f.panel.begin('one'); f.panel.finish('a', []); f.panel.showChoices(list('A')); f.panel.begin('two'); f.panel.finish('b', []); f.panel.showChoices(list('B'));
+  eq(enabled(), [false, true], 'the older list stopped working when the next one appeared');
+  f.panel.begin('three'); eq(enabled(), [false, false], 'a new message ends the rest');
+  const g = panelFixture(); g.panel.setOpen(true); g.panel.begin('one'); g.panel.finish('a', []); g.panel.showChoices({ prompt: 'p', options: [{ label: 'A', pick: () => {} }], picked: false });
+  g.panel.messageEls; const first = g.panel.transcript(); assert.equal(first.length, 2);
+  const other = { prompt: 'q', options: [{ label: 'B', pick: () => {} }], picked: false }; g.panel.begin('two'); g.panel.finish('b', []); g.panel.showChoices(other);
+  findAll(g.parts.log(), i => hasClass(i, 'vam-map-chat-choice')).at(-1).click(); eq(findAll(g.parts.log(), i => hasClass(i, 'vam-map-chat-choice')).map(b => !b.disabled), [false, false], 'a pick ends every list');
+});
+
+integrationTest('B1 fix 6: a reply that asks to look at a card keeps that view; the automatic move to the new branch is only the default', async () => {
+  const h = await harness({ empty: true }); await h.view.hydrate();
+  const tree = [addRoot('r', 'Root'), ...Array.from({ length: 5 }, (_, i) => addRoot(`c${i}`, `Kid ${i}`, 'new:r'))];
+  await apply(h, [...tree, { kind: 'focus_topic', nodeId: 'new:c2' }]);
+  const kid = h.view.map.nodes.filter(n => n.parentId)[2]; eq(h.focused, [kid.id], 'only the card the reply named');
+  const plain = await harness({ empty: true }); await plain.view.hydrate(); await apply(plain, tree); eq(plain.focused, [plain.view.map.nodes.find(n => !n.parentId).id], 'without focus_topic the new root, as before');
+});
+
+test('B1 fix 8: the count a plan names is the one it was judged by (a selection made earlier in the reply counts)', () => {
+  const { researchTargetsOf, planFor } = load('core/map-chat-plan.ts'); const ids = Array.from({ length: 12 }, (_, i) => `x${i}`);
+  const actions = [{ kind: 'select_topics', nodeIds: ids, all: false }, { kind: 'run_map_action', action: 'research_standard', nodeIds: [] }];
+  assert.equal(researchTargetsOf(actions, 0), 12); assert.ok(planFor(actions, { parents: {}, selectedCount: 0 }).reasons.includes('many_research'));
+  assert.equal(researchTargetsOf([{ kind: 'run_map_action', action: 'research_standard', nodeIds: [] }], 3), 3, 'the selection sent with the message');
+  assert.equal(researchTargetsOf([{ kind: 'run_map_action', action: 'research_standard', nodeIds: ['a', 'b'] }, { kind: 'run_map_action', action: 'research_standard', nodeIds: [] }], 0), 4, 'a named list becomes the selection');
+});
+integrationTest('B1 fix 8: the plan card names the same research count as the plan, and a plan card is announced once to a screen reader', async () => {
+  const h = await harness(); await h.view.hydrate(); const chat = h.open(); const ids = Array.from({ length: 12 }, (_, i) => `x${i}`);
+  h.control.reply = async () => ({ reply: 'I will research.', actions: [{ kind: 'select_topics', nodeIds: ids, all: false }, { kind: 'run_map_action', action: 'research_standard', nodeIds: [] }], rejected: [] });
+  h.type('research'); await h.view.sendMapChat();
+  assert.match(visibleText(planCard(h)[0]), /Starts research on 12 topics/);
+  const live = findAll(chat.el, i => hasClass(i, 'vam-sr-only'))[0].text; assert.match(live, /I will research\./); assert.match(live, /A plan is waiting for you: This plan needs your confirmation/);
+});
+
+integrationTest('B1 fix 11: a map that was made but could not be opened says so, and the rest of the reply says the same', async () => {
+  const h = await harness(); await h.view.hydrate(); const original = h.view.chatSwitchTo.bind(h.view); h.view.chatSwitchTo = async () => '';
+  const lines = await apply(h, [{ kind: 'create_map', title: 'Lost map' }, addRoot('r', 'Root')]);
+  assert.match(lines[0].text, /created but could not be opened here/); assert.doesNotMatch(lines[0].text, /changed or closed/); assert.match(lines[1].text, /created but could not be opened here/);
+  const none = await harness(); await none.view.hydrate(); none.view.plugin.repo.createMap = async () => { throw new Error('disk full'); };
+  const failed = await apply(none, [{ kind: 'create_map', title: 'X' }, addRoot('r', 'Root')]); assert.equal(failed[0].status, 'failed'); assert.match(failed[1].text, /was not created/);
+  void original;
+});
+
+integrationTest('B1 fix 12: the read-only sample, from the opening screen to a map of the user\'s own: message, plan card, Apply, the new map with its cards, the conversation kept', async () => {
+  const h = await harness(); await h.view.hydrate(); h.view.builtIn = true;
+  const repaint = () => { const restore = h.view.detachMapChat(); h.page.doc.activeElement = null; h.rootEl.empty(); const start = h.rootEl.createDiv('vam-sample-start'); start.createDiv('vam-sample-start-chat'); h.page.attach(start); const ws = h.rootEl.createDiv('vam-workspace'); const overlay = h.page.attach(ws.createDiv('vam-canvas-overlay')); h.view.mountMapChat(ws, overlay); restore(); };
+  repaint(); const chat = h.view.chat; assert.equal(chat.isHero, true);
+  const actions = [{ kind: 'create_map', title: 'Coffee study' }, addRoot('r', 'Coffee'), ...Array.from({ length: 4 }, (_, i) => addRoot(`c${i}`, `Part ${i}`, 'new:r'))];
+  h.control.reply = async () => ({ reply: 'I will make a map.', actions, rejected: [] });
+  const topicsBefore = (await h.repo.topics()).length; h.type('Coffee map'); await h.view.sendMapChat();
+  assert.equal(h.control.requests[0].context.noEditableMap, true); assert.equal(planCard(h).length, 1, 'a new map waits for the yes'); assert.equal((await h.repo.topics()).length, topicsBefore);
+  planButton(h, 'apply').click(); await until(() => !h.view.chatApplying && chat.pendingPlan() === null && chat.transcript().at(-1).lines.length > 0);
+  assert.equal(h.view.builtIn, false, 'a map of the user\'s own'); assert.equal(h.view.map.title, 'Coffee study'); assert.equal(h.view.map.nodes.length, 5); assert.equal((await h.repo.topics()).length, topicsBefore + 1);
+  assert.equal(chat.transcript().length, 2, 'the conversation went along'); eq(lineTexts(chat).slice(0, 6).every(t => /^Done/.test(t)), true);
+});
+
+integrationTest('B1 fix 15: the empty canvas follows the chat: building while it works, a line while a plan waits, the usual hint again when it ends or is cancelled', async () => {
+  const h = await harness({ empty: true }); await h.view.hydrate(); h.repaint(); const chat = h.view.chat; const box = element('div'); h.view.emptyMapEl = box; h.view.fillEmptyMap(box);
+  const shown = () => visibleText(box); assert.match(shown(), /no topics/); assert.ok(findAll(box, i => i.tag === 'button').length === 1, 'the topic button of the usual hint');
+  const gate = deferred(); h.control.reply = async () => { await gate.promise; return { reply: 'plan', actions: planActions(h, 16).map(a => ({ ...a, parentId: '' })), rejected: [] }; };
+  h.type('Coffee'); const sent = h.view.sendMapChat(); await until(() => chat.isBusy);
+  assert.match(shown(), /Building the map…/); assert.equal(findAll(box, i => hasClass(i, 'vam-chat-skeleton-card')).length, 3); assert.equal(findAll(box, i => i.tag === 'button').length, 0, 'no manual-create button meanwhile');
+  assert.equal(findAll(box, i => hasClass(i, 'vam-chat-skeleton'))[0].attrs['aria-hidden'], 'true');
+  gate.resolve(); await sent; assert.match(shown(), /Once you confirm the plan, the map appears here\./); assert.equal(findAll(box, i => hasClass(i, 'vam-chat-skeleton-card')).length, 0);
+  planButton(h, 'cancel').click(); await tick(); assert.match(shown(), /no topics/, 'cancelled: the usual hint is back');
+  h.control.reply = async () => ({ reply: 'just text', actions: [], rejected: [] }); h.type('hello'); await h.view.sendMapChat(); assert.match(shown(), /no topics/, 'a reply that builds nothing leaves the usual hint');
+  h.control.reply = async () => { throw new Error('boom'); }; h.type('again'); await h.view.sendMapChat(); assert.match(shown(), /no topics/, 'failed: the usual hint');
+});
+
+integrationTest('B1 fix 16: the plan card says before Apply that it cannot be undone, marks the group that removes cards in words, and its title follows what became of it', async () => {
+  const h = await harness(); await h.view.hydrate(); const chat = h.open();
+  h.control.reply = async () => ({ reply: 'plan', actions: [...planActions(h, 15), { kind: 'delete_topic', nodeId: h.ids.a, branch: true }], rejected: [] });
+  h.type('many'); await h.view.sendMapChat(); const title = () => find(planCard(h)[0], i => hasClass(i, 'vam-map-chat-plan-title')).text;
+  assert.equal(title(), 'Plan to review'); const buttons = find(planCard(h)[0], i => hasClass(i, 'vam-map-chat-plan-buttons'));
+  assert.ok(findAll(buttons, i => hasClass(i, 'vam-map-chat-plan-warning') && i.text === 'Cannot be undone once applied.').length === 1, 'next to the buttons, before they are pressed');
+  const danger = findAll(planCard(h)[0], i => i.tag === 'details' && hasClass(i, 'is-danger')); assert.equal(danger.length, 1, 'only the delete group');
+  assert.match(visibleText(danger[0]), /Delete \(1\)/); assert.equal(findAll(danger[0], i => hasClass(i, 'vam-map-chat-plan-mark'))[0].text, 'Removes');
+  assert.equal(findAll(planCard(h)[0], i => i.tag === 'details' && !hasClass(i, 'is-danger')).length >= 1, true);
+  planButton(h, 'apply').click(); await until(() => chat.pendingPlan() === null && !h.view.chatApplying); assert.equal(title(), 'Applied plan'); assert.equal(planCard(h)[0].attrs['aria-label'], 'Applied plan');
+  const again = await harness(); await again.view.hydrate(); again.open(); again.control.reply = async () => ({ reply: 'plan', actions: planActions(again, 16), rejected: [] });
+  again.type('many'); await again.view.sendMapChat(); planButton(again, 'cancel').click(); await tick(); assert.equal(find(planCard(again)[0], i => hasClass(i, 'vam-map-chat-plan-title')).text, 'Cancelled plan');
+});
+
+integrationTest('B1 fix 3 (Primary 3): while a plan waits the field is not locked and a line says that a new message cancels it; sending cancels the plan and the line goes', async () => {
+  const h = await harness(); await h.view.hydrate(); const chat = h.open();
+  h.control.reply = async () => ({ reply: 'plan', actions: planActions(h), rejected: [] }); h.type('many'); await h.view.sendMapChat();
+  assert.equal(chat.hintEl.hidden, false); assert.equal(chat.hintEl.text, 'Sending a new message cancels this plan.'); assert.equal(chat.inputEl.disabled, false, 'the field is not locked');
+  h.control.reply = async () => ({ reply: 'ok', actions: [], rejected: [] }); h.type('something else'); await h.view.sendMapChat();
+  assert.equal(chat.hintEl.hidden, true); assert.equal(chat.hintEl.text, ''); assert.equal(chat.transcript().find(m => m.plan).plan.state, 'cancelled');
+  assert.equal(find(planCard(h)[0], i => hasClass(i, 'vam-map-chat-plan-title')).text, 'Cancelled plan');
+});
+
+test('B1 fix 18: a failure is announced once: a text that already says the chat failed is not prefixed again', () => {
+  const f = panelFixture(); f.panel.setOpen(true); const live = () => findAll(f.panel.el, i => hasClass(i, 'vam-sr-only'))[0].text;
+  f.panel.begin('a'); f.panel.fail('The AI chat failed: boom', 'The AI chat failed: boom'); assert.equal(live(), 'The AI chat failed: boom');
+  f.panel.begin('b'); f.panel.fail('The references are too large to send.'); assert.equal(live(), 'AI chat failed: The references are too large to send.', 'a plain reason still gets its prefix, once');
+});
+integrationTest('B1 fix 18: the view announces a service failure once', async () => {
+  const h = await harness(); await h.view.hydrate(); const chat = h.open(); h.control.reply = async () => { throw new Error('boom'); };
+  h.type('hi'); await h.view.sendMapChat(); const live = findAll(chat.el, i => hasClass(i, 'vam-sr-only'))[0].text; assert.equal(live, 'The AI chat failed: boom'); assert.equal((live.match(/AI chat failed/g) ?? []).length, 1);
+});
+
+integrationTest('B1 fix 20 and 24: the opening screen asks for a topic and hides the old empty hint; a map with content opens the window onto one line of guidance, not a blank log', async () => {
+  const hero = await harness({ empty: true }); await hero.view.hydrate(); hero.repaint(); const chat = hero.view.chat;
+  assert.equal(chat.inputEl.attrs.placeholder, 'Say what you want to research or organize. One sentence is enough.'); assert.equal(chat.guideEl.hidden, true, 'no guidance on the opening screen');
+  const css = fs.readFileSync(path.join(root, 'styles.css'), 'utf8'); assert.match(css, /\.has-chat-hero \.vam-empty \{ display: none; \}/);
+  hero.control.reply = async () => ({ reply: 'ok', actions: [], rejected: [] }); hero.type('Coffee'); await hero.view.sendMapChat(); assert.match(chat.inputEl.attrs.placeholder, /^Ask a question, or ask the AI to change the map/);
+  const h = await harness(); await h.view.hydrate(); const side = h.open();
+  assert.equal(side.guideEl.hidden, false); assert.equal(side.guideEl.text, 'No messages yet. Type below, or pick a suggestion.'); assert.equal(side.logEl.hidden, true);
+  side.begin('q'); assert.equal(side.guideEl.hidden, true); assert.equal(side.logEl.hidden, false);
+});
+
+integrationTest('B1 fix 22: the failed count in a folded summary is set apart in its own element, with its word', async () => {
+  const h = await harness(); await h.view.hydrate(); const chat = h.open(); chat.begin('q');
+  chat.finish('done', [...Array.from({ length: 6 }, (_, i) => ({ status: 'done', text: `Done ${i}` })), { status: 'skipped', text: 'Skipped x' }, { status: 'failed', text: 'Failed y' }]);
+  const summary = find(chat.logEl, i => hasClass(i, 'vam-map-chat-lines-summary')); const failed = find(summary, i => hasClass(i, 'vam-map-chat-count-failed'));
+  assert.equal(failed.text, '1 failed'); assert.equal(visibleText(summary), '6 done, 1 skipped, 1 failed');
+  chat.begin('r'); chat.finish('done', Array.from({ length: 6 }, (_, i) => ({ status: 'done', text: `D${i}` })));
+  assert.equal(findAll(chat.logEl, i => hasClass(i, 'vam-map-chat-count-failed')).length, 1, 'no failed element when nothing failed');
+});
+
+test('B1 fix 23 and 28: no suggestion ends in an ellipsis in any language, and without a selected card none speaks of a selection', () => {
+  const { chatSuggestionKeys, MAP_CHAT_EXAMPLE_KEYS } = layoutModule(); const dictionaries = Object.fromEntries(['en', 'zh-TW', 'zh-CN'].map(name => [name, load(`i18n/${name}.ts`)[name === 'en' ? 'en' : name === 'zh-TW' ? 'zhTW' : 'zhCN'] ?? Object.values(load(`i18n/${name}.ts`))[0]]));
+  const none = [...chatSuggestionKeys({ selected: 0, hasNote: true, hasTopics: true }), ...chatSuggestionKeys({ selected: 0, hasNote: true, hasTopics: false }), ...chatSuggestionKeys({ selected: 0, hasNote: false, hasTopics: true }), ...MAP_CHAT_EXAMPLE_KEYS];
+  const some = [...chatSuggestionKeys({ selected: 1, hasNote: false, hasTopics: true }), ...chatSuggestionKeys({ selected: 3, hasNote: false, hasTopics: true })];
+  for (const [name, dictionary] of Object.entries(dictionaries)) {
+    for (const key of [...none, ...some]) assert.doesNotMatch(dictionary[key], /(…|\.\.\.)$/, `${name} ${key}`);
+    for (const key of none) assert.doesNotMatch(dictionary[key], name === 'en' ? /selected/i : /選取|选取|选中|選中/, `${name} ${key}: nothing is selected`);
+    assert.ok(some.some(key => (name === 'en' ? /selected/i : /選取|选取/).test(dictionary[key])), `${name}: with a selection the suggestions say so`);
+  }
+});
+
+test('B1 fix 14 and 26: opening the window onto an unread reply lands on the newest message; a repaint keeps the log where it was (at the end stays at the end)', () => {
+  const f = panelFixture(); f.panel.setOpen(true); const log = f.parts.log(); f.panel.setNarrow(true);
+  f.panel.begin('q'); f.panel.finish('a reply while folded', []); assert.equal(f.parts.toggle().hasClass('has-unread'), true);
+  Object.assign(log, { scrollHeight: 1000, clientHeight: 300, scrollTop: 0 }); f.parts.toggle().click(); assert.equal(log.scrollTop, 1000, 'newest message, not the top');
+  // A repaint lifts the panel out of the page (a real element forgets its scroll position there).
+  log.scrollTop = 700; f.panel.detach(); log.scrollTop = 0; f.panel.mount(f.overlay); assert.equal(log.scrollTop, 1000, 'at the end before: at the end after');
+  log.scrollTop = 100; f.panel.detach(); log.scrollTop = 0; f.panel.mount(f.overlay); assert.equal(log.scrollTop, 100, 'somewhere in the middle: the same place');
+});
+integrationTest('B1 fix 26: after create_map re-mounts the conversation in the new map\'s page, the log is at its end and the results are in view', async () => {
+  const h = await harness(); await h.view.hydrate(); const chat = h.open(); const log = chat.logEl; Object.assign(log, { scrollHeight: 1000, clientHeight: 300, scrollTop: 700 });
+  const remove = chat.el.remove.bind(chat.el); chat.el.remove = () => { remove(); log.scrollTop = 0; };
+  h.control.reply = async () => ({ reply: 'new map', actions: [{ kind: 'create_map', title: 'Fresh' }, addRoot('r', 'Root')], rejected: [] });
+  h.type('new map'); await h.view.sendMapChat(); planButton(h, 'apply')?.click(); await until(() => !h.view.chatApplying && chat.pendingPlan() === null);
+  assert.equal(log.scrollTop, 1000, 'at the end');
+});
+
+integrationTest('B1 fix 21 and 27: a window laid over a narrow pane leaves 160px of it; the tool group moves to the window\'s right edge and comes back; the hover preview is under the window', async () => {
+  const h = await harness(); await h.view.hydrate(); const chat = h.open(); const tools = h.rootEl.createDiv('vam-map-tools'); h.plugin.settings.mapChatWidth = 340;
+  h.rootEl.clientWidth = 600; h.view.onResize(); assert.equal(chat.isNarrow, true); assert.equal(tools.style.left ?? '', '', 'folded: the group stays at the canvas corner');
+  chat.toggleEl.click(); assert.equal(chat.isOverlay, true); assert.equal(chat.el.style.width, '340px'); assert.equal(tools.style.left, `${340 - 44 + 12}px`, 'beside the window, like a docked one');
+  h.rootEl.clientWidth = 400; h.view.onResize(); assert.equal(chat.el.style.width, '280px', 'under the 160px margin the window shrinks to its minimum'); assert.equal(tools.style.left, `${280 - 44 + 12}px`);
+  h.rootEl.clientWidth = 500; h.view.onResize(); assert.equal(chat.el.style.width, '340px');
+  chat.collapseOverlay(); assert.equal(tools.style.left, '', 'folded again: the group goes back');
+  const css = fs.readFileSync(path.join(root, 'styles.css'), 'utf8'); const z = selector => Number(css.match(new RegExp(`${selector.replace(/[.]/g, '\\.')} \\{[^}]*z-index: (\\d+)`))[1]);
+  assert.ok(z('.vam-map-chat.is-overlay') > z('.vam-hover-card'), 'the preview is under the laid-over window');
+});
+
+test('B1 fix 17: the suggestions, examples, retry, "more detail" and "show all" each get their own look, with enough weight to beat the base button style', () => {
+  const css = fs.readFileSync(path.join(root, 'styles.css'), 'utf8'); const rule = selector => css.split('\n').find(line => line.startsWith(`${selector} {`)) ?? '';
+  for (const name of ['suggestion', 'example']) assert.match(rule(`.vam-map-chat button.vam-map-chat-${name}`), /background: transparent/, `${name}: ghost text`);
+  assert.match(rule('.vam-map-chat button.vam-map-chat-retry'), /border: 1px solid/, 'retry: a clear secondary button'); assert.match(rule('.vam-map-chat button.vam-map-chat-retry'), /background: var\(--background-primary\)/);
+  assert.match(css, /\.vam-map-chat button\.vam-map-chat-lines-toggle, \.vam-map-chat button\.vam-map-chat-more \{[^}]*background: transparent/);
+  assert.match(rule('.vam-map-chat-chip'), /border: 1px solid[^;]*; border-radius: 999px/, 'chips: an outlined pill');
+  for (const bare of ['.vam-map-chat-suggestion', '.vam-map-chat-example', '.vam-map-chat-retry', '.vam-map-chat-more']) assert.equal(css.split('\n').some(line => line.startsWith(`${bare} {`)), false, `${bare} is no longer a bare class that the base style beats`);
+});
+
+test('B1 fix 9 and 10: no dead overlay rule; the Escape selector is a plain literal that the literal scan allows with a reason', () => {
+  const css = fs.readFileSync(path.join(root, 'styles.css'), 'utf8'); assert.equal(css.includes('.vam-workspace.has-inspector > .vam-canvas-overlay'), false);
+  const source = fs.readFileSync(path.join(root, 'experiences/visual-map/view.ts'), 'utf8'); assert.equal(/closest\(\[/.test(source), false, 'no selector built from parts');
+  const allow = JSON.parse(fs.readFileSync(path.join(root, 'tests/literal-scan/visual-map.json'), 'utf8')).allow.find(entry => entry.text === 'input, textarea, select, [contenteditable=true], .vam-map-chat');
+  assert.ok(allow && allow.reason.length > 10);
 });

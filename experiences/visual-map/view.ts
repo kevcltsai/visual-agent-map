@@ -84,6 +84,7 @@ import {
   moveNotePath,
   normalizeReasoningLevel,
   normalizeMapChatStyle,
+  normalizeMapChatOpen,
   rebaseMapNotePaths,
   type Note,
   type NotePatch,
@@ -122,7 +123,14 @@ import { RELEVANCE_LABEL, renderRelevanceTagButton } from "./relevance-tag";
 import { relevanceDisplayNodes } from "./relevance-order";
 import { fitViewport, focusViewport, initialViewport, insetFromRects } from "./viewport-inset";
 import { RelevanceSummaryModal } from "./relevance-summary-modal";
-import { MapChatPanel, type MapChatChip, type MapChatHost, type MapChatLine, type MapChatOrigin } from "./map-chat";
+import {
+  MapChatPanel,
+  type MapChatChip,
+  type MapChatHost,
+  type MapChatLine,
+  type MapChatOrigin,
+  type MapChatPlanCard
+} from "./map-chat";
 import {
   buildMapChatContext,
   contentHash,
@@ -134,7 +142,23 @@ import {
 } from "../../core/map-chat-context";
 import { applyMdEdit, guardMapChatWrite, normalizeVaultPath, type MapChatGuardCode } from "../../core/map-chat-guard";
 import type { MapChatRequest, MapChatResult } from "../../core/map-chat-service";
-import type { MapChatAction } from "../../core/steps/map-chat/step";
+import { MAP_CHAT_NEW_PREFIX, type MapChatAction } from "../../core/steps/map-chat/step";
+import {
+  MAP_CHAT_AUTO_LAYOUT_MIN_NEW,
+  matchMapTitle,
+  planFor,
+  researchTargetsOf,
+  type MapChatPlan,
+  type MapChatPlanReason
+} from "../../core/map-chat-plan";
+import {
+  CHAT_PLAN_GROUP_ORDER,
+  chatDockedWidth,
+  chatOverlayWidth,
+  chatPlanGroupOf,
+  clampMapChatWidth,
+  isChatNarrow
+} from "../../core/map-chat-layout";
 import { relevanceMode, relevanceModeAfterWrite, type RelevanceMode, type RelevancePin } from "./relevance-pins";
 import { PendingSuggestions } from "../../pending-suggestions";
 import { createAimMap } from "../aim/create-map";
@@ -435,7 +459,15 @@ function showDocumentReady(): void {
 }
 
 /** What one chat action came to: written, skipped with a reason (shown in the chat), or failed. */
-type ChatOutcome = { status: "done" } | { status: "skipped" | "failed"; reason: string };
+type ChatOutcome = { status: "done" } | { status: "skipped" | "failed"; reason: string; created?: boolean };
+/** What the writes of one reply have made so far: the real id behind each `ref`, and the cards created, in order. */
+interface ChatRun {
+  refs: Map<string, string>;
+  created: string[];
+}
+/** The narrow edge the laid-over chat window leaves in place, and the gap the tool group keeps from the window. */
+const CHAT_RAIL_WIDTH = 44;
+const CHAT_TOOLS_GAP = 12;
 const skipped = (key: TranslationKey): ChatOutcome => ({ status: "skipped", reason: t(key) });
 const GUARD_REASON: Record<MapChatGuardCode, TranslationKey> = {
   outside_vault: "ui.map_chat_guard_outside_vault",
@@ -484,7 +516,24 @@ export class VisualAgentMapView extends ItemView {
   private chatMapId = "";
   private chatController: AbortController | null = null;
   private chatTaskKey: string | null = null;
+  /** Counts plans: a plan card only works while its number is the current one (a new message, another map or closing ends it). */
+  private chatPlanToken = 0;
+  /** True while the conversation itself switches maps (create_map, open_map): the conversation goes along instead of restarting. */
+  private chatCarryOver = false;
+  /** True while a confirmed plan is being applied; no new message is sent meanwhile. */
+  private chatApplying = false;
+  /** While a reply's actions are applied, repaints and the views' re-reads wait and happen once at the end (see holdChatBatch). */
+  private renderHold = 0;
+  private renderPending = false;
+  private syncHold = 0;
+  private syncPending = false;
+  private heldViews: VisualAgentMapView[] = [];
+  /** The hint on an empty canvas, which follows the chat while it builds a map. */
+  private emptyMapEl: HTMLElement | null = null;
   private chatWorkspaceEl: HTMLElement | null = null;
+  private chatOverlayEl: HTMLElement | null = null;
+  /** The map whose opening screen has already taken the keyboard once. */
+  private chatHeroFocusedFor: string | null = null;
   /** The note the user last had open beside the map; dropped text is assumed to come from it. */
   private lastMarkdownPath: string | null = null;
   private deletedMap: {
@@ -743,9 +792,10 @@ export class VisualAgentMapView extends ItemView {
       this.spaceHeld = false;
     });
     this.registerDomEvent(this.contentEl, "keydown", event => {
+      // Escape inside the chat window folds the window (the panel handles it); it never clears the map's selection.
       if (
         event.target instanceof HTMLElement &&
-        event.target.closest("input, textarea, select, [contenteditable=true]")
+        event.target.closest("input, textarea, select, [contenteditable=true], .vam-map-chat")
       )
         return;
       if (event.key === "Escape") {
@@ -5556,6 +5606,11 @@ export class VisualAgentMapView extends ItemView {
   }
   async synchronize(): Promise<void> {
     if (this.builtIn) return;
+    // A batch of chat writes reads the map back once, when it is done.
+    if (this.syncHold > 0) {
+      this.syncPending = true;
+      return;
+    }
     if (!this.path || !this.map || this.closed) return;
     if (!(this.app.vault.getAbstractFileByPath(this.path) instanceof TFile)) {
       this.map = null;
@@ -5903,6 +5958,14 @@ export class VisualAgentMapView extends ItemView {
     ]).open();
   }
   private render(): void {
+    // A batch of chat writes repaints once, when it is done.
+    if (this.renderHold > 0 && !this.closed) {
+      this.renderPending = true;
+      return;
+    }
+    this.paint();
+  }
+  private paint(): void {
     // Repainting would replace the dragged card and drop its pointer capture, so wait for the drop (a closed view still ends the drag below).
     if (this.dragging && !this.closed) {
       if (!this.dragStale()) {
@@ -5914,6 +5977,7 @@ export class VisualAgentMapView extends ItemView {
       this.renderAfterDrag = false;
     }
     this.paintCount++;
+    this.emptyMapEl = null;
     this.aimProgressEls.clear();
     // The dragged card is about to be replaced, so its pointer events would never arrive and the drag would stay "on".
     this.dragCleanup?.();
@@ -6248,6 +6312,8 @@ export class VisualAgentMapView extends ItemView {
         ).open()
       );
       if (!this.plugin.settings.models.trim()) this.renderConnectionCheck(actions);
+      // The opening screen of the chat: one sentence builds a new map of the user's own, which the sample cannot be.
+      start.createDiv("vam-sample-start-chat");
     }
     if (!this.builtIn && !this.map.aim) this.renderMultiResearchStatus(this.contentEl);
     if (!this.builtIn && !this.map.aim) this.renderRelevanceStatus(this.contentEl);
@@ -6283,10 +6349,12 @@ export class VisualAgentMapView extends ItemView {
       }
     }
     const workspace = this.contentEl.createDiv("vam-workspace");
-    this.viewportEl = workspace.createDiv("vam-viewport");
+    // The workspace is a row: the chat window (put in first by mountMapChat), the canvas, the sample's inspector.
+    const canvas = workspace.createDiv("vam-canvas");
+    this.viewportEl = canvas.createDiv("vam-viewport");
     if (this.integrationMode) this.viewportEl.addClass("is-selecting");
-    // Canvas controls float over the map instead of stacking a second toolbar above it.
-    const overlay = workspace.createDiv("vam-canvas-overlay");
+    // Canvas controls float over the map instead of stacking a second toolbar above it; the overlay covers the canvas only.
+    const overlay = canvas.createDiv("vam-canvas-overlay");
     if (tools.childElementCount) overlay.appendChild(tools);
     else tools.remove();
     this.mountMapChat(workspace, overlay);
@@ -6336,7 +6404,7 @@ export class VisualAgentMapView extends ItemView {
     const shown = this.canvasNodes();
     if (this.selected && !shown.some(node => node.id === this.selected)) this.selected = null;
     this.multiSelected = new Set([...this.multiSelected].filter(id => shown.some(node => node.id === id)));
-    if (this.integrationMode) this.selectionBarEl = this.renderSelectionBar(workspace);
+    if (this.integrationMode) this.selectionBarEl = this.renderSelectionBar(canvas);
     this.tabStopId = this.defaultTabStop(shown);
     this.renderingCard = true;
     try {
@@ -6357,13 +6425,8 @@ export class VisualAgentMapView extends ItemView {
       this.focusNodeId = null;
     }
     if (!this.map.nodes.length) {
-      const emptyMap = this.viewportEl.createDiv("vam-empty");
-      emptyMap.createSpan({
-        text: t(
-          this.map.aim ? "ui.aim_empty_map_hint" : "ui.this_mind_map_has_no_topics_click_topic_to_create_the_first"
-        )
-      });
-      if (!this.map.aim) this.button(emptyMap, t("ui.topic"), () => this.enqueue(() => this.addNode(null)));
+      this.emptyMapEl = this.viewportEl.createDiv("vam-empty");
+      this.fillEmptyMap(this.emptyMapEl);
     }
     this.setupPan();
     this.applyInitialViewport();
@@ -6371,10 +6434,49 @@ export class VisualAgentMapView extends ItemView {
     this.drawEdges();
     if (this.builtIn && this.selected) {
       const node = this.map.nodes.find(n => n.id === this.selected);
-      if (node) this.renderInspector(workspace, node);
+      if (node) {
+        this.renderInspector(workspace, node);
+        // The inspector takes width from the canvas, which the window's fold limit counts.
+        this.syncChatNarrow();
+      }
     }
     restoreRelevanceFocus();
     restoreChatFocus();
+  }
+  /** What the empty canvas says: the usual hint, or (while the chat builds the map, or waits for a plan) what is happening. */
+  private emptyCanvasState(): "idle" | "building" | "plan" {
+    const chat = this.chat;
+    if (!chat || this.builtIn || this.map?.aim) return "idle";
+    if (chat.isBusy || this.chatApplying) return "building";
+    return chat.pendingPlan() ? "plan" : "idle";
+  }
+  private fillEmptyMap(box: HTMLElement): void {
+    if (!this.map) return;
+    const state = this.emptyCanvasState();
+    box.toggleClass("is-building", state === "building");
+    box.toggleClass("is-waiting", state === "plan");
+    if (state === "building") {
+      // Three faint card outlines, no motion: the map is on its way.
+      box.createSpan({ text: t("ui.map_chat_canvas_building") });
+      const skeleton = box.createDiv({ cls: "vam-chat-skeleton", attr: { "aria-hidden": "true" } });
+      for (let card = 0; card < 3; card++) skeleton.createDiv("vam-chat-skeleton-card");
+      return;
+    }
+    if (state === "plan") {
+      box.createSpan({ text: t("ui.map_chat_canvas_plan") });
+      return;
+    }
+    box.createSpan({
+      text: t(this.map.aim ? "ui.aim_empty_map_hint" : "ui.this_mind_map_has_no_topics_click_topic_to_create_the_first")
+    });
+    if (!this.map.aim) this.button(box, t("ui.topic"), () => this.enqueue(() => this.addNode(null)));
+  }
+  /** The chat started or ended something: an empty canvas follows it. */
+  private refreshEmptyMap(): void {
+    const box = this.emptyMapEl;
+    if (!box || this.closed || !this.map || this.map.nodes.length) return;
+    box.empty();
+    this.fillEmptyMap(box);
   }
   /** `shownNode` may be a display copy (sorted by relevance): it only supplies where the card is drawn. */
   private renderNode(shownNode: MapNode): void {
@@ -7206,7 +7308,8 @@ export class VisualAgentMapView extends ItemView {
     }, 220);
   }
   private showHoverCard(card: HTMLElement, note: Note): void {
-    const workspace = this.contentEl.querySelector<HTMLElement>(".vam-workspace");
+    // The card is placed against the canvas, not the whole row: the chat window beside it is not part of the map.
+    const workspace = this.contentEl.querySelector<HTMLElement>(".vam-canvas");
     if (!workspace) return;
     this.hoverCard?.remove();
     const preview = workspace.createDiv("vam-hover-card");
@@ -10018,19 +10121,133 @@ export class VisualAgentMapView extends ItemView {
     this.chat?.detach();
     return restore;
   }
-  /** Puts the chat window into this repaint's overlay; the window itself (messages, draft, chips) lives on the view. */
+  /**
+   * Puts the chat window into this repaint. Normally it is the first child of `workspace`, the window left of the canvas. On an
+   * empty map (and on the read-only sample) with no conversation yet it is the opening screen instead, in the middle of the
+   * canvas (or in the sample's start card). The window itself (messages, draft, chips) lives on the view.
+   */
   private mountMapChat(workspace: HTMLElement, overlay: HTMLElement): void {
     this.chatWorkspaceEl = workspace;
-    if (this.builtIn || !this.map) return;
-    if (!this.chat) this.chat = new MapChatPanel(this.chatHost());
-    if (this.chatMapId !== this.map.id) {
-      // Another map: the conversation belongs to the one it was about.
-      this.abortMapChat();
-      this.chat.reset();
-      this.chatMapId = this.map.id;
+    this.chatOverlayEl = overlay;
+    if (!this.map) return;
+    if (!this.chat) {
+      this.chat = new MapChatPanel(this.chatHost());
+      this.chat.restoreOpen(normalizeMapChatOpen(this.plugin.settings.mapChatOpen));
     }
-    this.chat.mount(overlay);
+    if (this.chatMapId !== this.map.id) {
+      if (this.chatCarryOver) {
+        // The conversation opened this map itself (create_map, open_map): it goes along and its running turn goes on.
+        this.chatMapId = this.map.id;
+      } else {
+        // Another map opened some other way: the conversation belongs to the one it was about.
+        this.abortMapChat();
+        this.chatPlanToken++;
+        this.chat.reset();
+        this.chatMapId = this.map.id;
+      }
+    }
+    this.syncChatNarrow();
+    this.placeChatPanel();
+    // A press on the canvas puts a window that was laid over it back to the edge.
+    this.viewportEl?.addEventListener("pointerdown", () => this.chat?.collapseOverlay());
     workspace.toggleClass("has-map-chat-open", this.chat.isOpen);
+    this.focusChatHeroOnce();
+  }
+  /** Whether the opening screen is showing: nothing said yet, and an empty map (not an AIM one) or the read-only sample. */
+  private chatHero(): boolean {
+    if (!this.chat || this.chat.hasMessages || !this.map) return false;
+    return this.builtIn || (!this.map.aim && this.map.nodes.length === 0);
+  }
+  /** Mounts the panel where it belongs now: the opening screen's place, or the first child of the workspace. */
+  private placeChatPanel(): void {
+    const chat = this.chat;
+    const workspace = this.chatWorkspaceEl;
+    const overlay = this.chatOverlayEl;
+    if (!chat || !workspace || !overlay) return;
+    if (!this.chatHero()) {
+      chat.mount(workspace, "side");
+      return;
+    }
+    // The sample keeps its map in view: the opening screen sits in the sample's own start card. An empty map has the whole canvas.
+    const startCard = this.builtIn ? this.contentEl.querySelector<HTMLElement>(".vam-sample-start-chat") : null;
+    const slot = startCard ?? overlay.createDiv("vam-chat-hero-slot");
+    chat.mount(slot, "hero");
+    this.viewportEl?.toggleClass("has-chat-hero", !startCard);
+  }
+  /** The first message was sent (or a conversation ended): the panel moves between the opening screen and the window. */
+  private relocateMapChat(): void {
+    const chat = this.chat;
+    if (!chat || this.closed) return;
+    const hero = chat.isHero;
+    if (hero === this.chatHero()) return;
+    const restore = this.detachMapChat();
+    this.contentEl.querySelectorAll<HTMLElement>(".vam-chat-hero-slot").forEach(slot => slot.remove());
+    this.viewportEl?.removeClass("has-chat-hero");
+    this.placeChatPanel();
+    // The window the first message moves into is shown even when it was folded or closed: the conversation just began in it.
+    if (!chat.isOpen) chat.setOpen(true, true);
+    this.chatWorkspaceEl?.toggleClass("has-map-chat-open", chat.isOpen);
+    restore();
+    this.placeMapTools();
+  }
+  /** Opening screen: the keyboard starts in the message field, once per map, unless it is in another pane. */
+  private focusChatHeroOnce(): void {
+    const chat = this.chat;
+    if (!chat?.isHero || !this.map || this.chatHeroFocusedFor === this.map.id) return;
+    this.chatHeroFocusedFor = this.map.id;
+    const active = this.contentEl.ownerDocument?.activeElement ?? null;
+    if (!active || active === this.contentEl.ownerDocument?.body || this.contentEl.contains(active)) chat.focusInput();
+  }
+  /** The pane's width and what the sample's inspector takes of it; null while the pane has no size yet (not shown, or a test). */
+  private chatPaneWidths(): { pane: number; inspector: number } | null {
+    const pane = this.contentEl?.clientWidth;
+    if (!pane) return null;
+    const inspector = this.contentEl.querySelector<HTMLElement>(".vam-inspector");
+    return { pane, inspector: inspector?.offsetWidth ?? 0 };
+  }
+  /** What the pane gives the window for a set width: docked beside the canvas, or laid over a narrow pane. */
+  private chatWidths(setWidth: number): { docked: number; overlay: number } | null {
+    const measured = this.chatPaneWidths();
+    if (!measured) return null;
+    return {
+      docked: chatDockedWidth(measured.pane, setWidth, measured.inspector),
+      overlay: chatOverlayWidth(measured.pane, setWidth)
+    };
+  }
+  /**
+   * The window folds to a narrow edge only when even its narrowest form would leave the canvas under 360px; wider than that it
+   * docks and gives way in width (see chatDockedWidth). A pane on the limit keeps its state until it is a little wider.
+   */
+  private syncChatNarrow(): void {
+    const measured = this.chatPaneWidths();
+    if (!this.chat || !measured) return;
+    const widths = this.chatWidths(this.chatWidth());
+    if (!widths) return;
+    this.chat.setNarrow(isChatNarrow(measured.pane, measured.inspector, this.chat.isNarrow), widths);
+    this.placeMapTools();
+  }
+  /**
+   * The tool group sits at the top left of the canvas. While the window is laid over a narrow pane it would be under the window,
+   * so it moves to the window's right edge, as it sits beside a docked window.
+   */
+  private placeMapTools(): void {
+    const tools = this.contentEl?.querySelector<HTMLElement>(".vam-map-tools");
+    if (!tools) return;
+    // The canvas starts after the 44px edge the laid-over window leaves in place.
+    const left = this.chat?.isOverlay ? this.chat.overlayWidth - CHAT_RAIL_WIDTH + CHAT_TOOLS_GAP : 0;
+    tools.style.left = left > 0 ? `${left}px` : "";
+  }
+  /** Obsidian calls this when the pane's size changes. */
+  onResize(): void {
+    this.syncChatNarrow();
+  }
+  private chatWidth(): number {
+    return clampMapChatWidth(this.plugin.settings.mapChatWidth);
+  }
+  /** The command that opens or closes the chat window and leaves the keyboard in its message field. */
+  toggleMapChat(): void {
+    if (!this.chat) return;
+    this.chat.toggleFromCommand();
   }
   private chatHost(): MapChatHost {
     return {
@@ -10063,6 +10280,9 @@ export class VisualAgentMapView extends ItemView {
       moreDetail: origin => {
         void this.sendMapChat(origin);
       },
+      retry: origin => {
+        void this.sendMapChat(origin, true);
+      },
       resolveLink: link => {
         const file = this.app.metadataCache.getFirstLinkpathDest(link, this.sourceMarkdownFile()?.path ?? "");
         return file && file.extension === "md" ? file.path : null;
@@ -10073,14 +10293,41 @@ export class VisualAgentMapView extends ItemView {
         void this.app.workspace.openLinkText(href, this.path, newLeaf);
       },
       activeElement: () => this.contentEl.ownerDocument?.activeElement ?? null,
-      layoutChanged: open => this.chatWorkspaceEl?.toggleClass("has-map-chat-open", open)
+      layoutChanged: () => {
+        const chat = this.chat;
+        this.chatWorkspaceEl?.toggleClass("has-map-chat-open", !!chat?.isOpen);
+        this.placeMapTools();
+        // Only what the user chose is remembered, not the fold a narrow pane forces on the window.
+        if (chat && !chat.isHero && this.plugin.settings.mapChatOpen !== chat.wantsOpen) {
+          this.plugin.settings.mapChatOpen = chat.wantsOpen;
+          void this.plugin.saveSettings();
+        }
+      },
+      width: () => this.chatWidth(),
+      widths: setWidth => this.chatWidths(setWidth),
+      stateChanged: () => this.refreshEmptyMap(),
+      setWidth: (width, commit) => {
+        if (!commit) return;
+        this.plugin.settings.mapChatWidth = clampMapChatWidth(width);
+        void this.plugin.saveSettings();
+        // The width decides whether the pane has room for the window beside the canvas.
+        this.syncChatNarrow();
+      },
+      suggestions: () => ({
+        selected: this.chatSelectionIds().length,
+        hasTopics: (this.map?.nodes.length ?? 0) > 0
+      })
     };
   }
   /** The chat's model list: the follow-default entry first, then the settings page's list (and a saved model that has gone). */
-  private chatModelChoices(): { value: string; label: string }[] {
+  private chatModelChoices(): { value: string; label: string; short?: string }[] {
     const settings = this.plugin.settings;
     const choices = [
-      { value: "", label: t("ui.map_chat_model_follow_0", this.plugin.modelLabel(settings.cliModel)) },
+      {
+        value: "",
+        label: t("ui.map_chat_model_follow_0", this.plugin.modelLabel(settings.cliModel)),
+        short: t("ui.map_chat_model_follow_short_0", this.plugin.modelLabel(settings.cliModel))
+      },
       ...this.plugin.availableModels().map(id => ({ value: id, label: this.plugin.modelLabel(id) }))
     ];
     const saved = settings.mapChatModel;
@@ -10284,8 +10531,15 @@ export class VisualAgentMapView extends ItemView {
     // Only the note the chip shows is sent; with the chip taken off nothing is, so no edit of it has a baseline.
     const activePath = chat.currentNote();
     const activeSource = activePath ? await this.readChatFile(activePath) : null;
+    // Titles let the model tell "make a new map" from "go to that one"; a failure to list them only leaves the list empty.
+    const mapTitles = await Promise.resolve()
+      .then(() => this.plugin.repo.topics())
+      .then(topics => topics.map(topic => topic.title))
+      .catch(() => [] as string[]);
     const context = buildMapChatContext({
       mapTitle: map.title,
+      mapTitles,
+      noEditableMap: this.builtIn || !isManagedMapPath(settings, this.path),
       outline,
       selected: selectedIds.map(ref).filter(notNull),
       references: attached
@@ -10309,21 +10563,24 @@ export class VisualAgentMapView extends ItemView {
       reasoning: normalizeReasoningLevel(settings.cliReasoning)
     };
   }
-  private chatErrorText(error: unknown): string {
+  /** The text of a failed turn; `wrapped` when it already says that the chat failed (so a reader is not told twice). */
+  private chatErrorText(error: unknown): { text: string; wrapped: boolean } {
     const code =
       (error as { name?: unknown; code?: unknown } | null)?.name === "MapChatError"
         ? (error as { code?: unknown }).code
         : null;
-    if (code === "over_budget") return t("ui.map_chat_error_over_budget");
-    if (code === "invalid") return t("ui.map_chat_error_invalid");
-    if (code === "stopped") return t("ui.map_chat_stopped");
-    return t("ui.map_chat_error_failed_0", errorMessage(error));
+    if (code === "over_budget") return { text: t("ui.map_chat_error_over_budget"), wrapped: false };
+    if (code === "invalid") return { text: t("ui.map_chat_error_invalid"), wrapped: false };
+    if (code === "stopped") return { text: t("ui.map_chat_stopped"), wrapped: false };
+    return { text: t("ui.map_chat_error_failed_0", errorMessage(error)), wrapped: true };
   }
-  /** Sends the draft: usage notice, one request, a streamed answer, then every action it asked for, once. */
-  private async sendMapChat(again?: MapChatOrigin): Promise<void> {
+  /** Sends the draft: usage notice, one request, a streamed answer, then every action it asked for, once (or a plan to confirm first). */
+  private async sendMapChat(again?: MapChatOrigin, retry = false): Promise<void> {
     const chat = this.chat;
-    if (!chat || chat.isBusy || this.closed || !this.map || this.builtIn) return;
-    // "Say it in more detail" sends the same question with the same references again; a normal send reads the draft.
+    if (!chat || chat.isBusy || this.chatApplying || this.closed || !this.map) return;
+    // "Say it in more detail" sends the same question with the same references again; a normal send reads the draft. A retry
+    // sends the same question as it was (concise, with its actions applied), after a failure.
+    const redo = Boolean(again) && !retry;
     const message = again ? again.text : chat.draft.trim();
     if (!message) return;
     const origin: MapChatOrigin = again ?? {
@@ -10331,17 +10588,18 @@ export class VisualAgentMapView extends ItemView {
       chips: chat.attachments(),
       selectedIds: this.chatSelectionIds()
     };
-    const mapPath = this.path;
-    const mapId = this.map.id;
+    // Where this turn is anchored. A create_map / open_map of the turn itself moves it (see applyMapChatActions).
+    const anchor = { path: this.path, id: this.map.id as string | undefined };
     let request: MapChatRequest;
     try {
-      request = await this.buildChatRequest(message, chat, origin, Boolean(again));
+      request = await this.buildChatRequest(message, chat, origin, redo);
     } catch (error) {
       new Notice(errorMessage(error));
       return;
     }
     await this.plugin.confirmAiUsage(request.model, async () => {
-      if (this.closed || chat.isBusy || this.path !== mapPath || this.map?.id !== mapId) return;
+      if (this.closed || chat.isBusy || this.chatApplying || this.path !== anchor.path || this.map?.id !== anchor.id)
+        return;
       const controller = new AbortController();
       const key = `map-chat-view:${++mapChatTaskSequence}`;
       this.chatController = controller;
@@ -10349,26 +10607,144 @@ export class VisualAgentMapView extends ItemView {
       this.plugin.activeTasks?.set(key, controller);
       // A reply that arrives after Stop, closing the view or switching maps changes nothing.
       const alive = (): boolean =>
-        !this.closed && !controller.signal.aborted && this.chatController === controller && this.path === mapPath;
-      chat.begin(again ? t("ui.map_chat_more_detail_asked") : message, origin, Boolean(again));
+        !this.closed && !controller.signal.aborted && this.chatController === controller && this.path === anchor.path;
+      // A plan still waiting for its yes belongs to the question before this one.
+      this.supersedeChatPlan();
+      chat.begin(redo ? t("ui.map_chat_more_detail_asked") : message, origin, Boolean(again));
+      // The first message of a conversation moves the opening screen's panel into the side window.
+      this.relocateMapChat();
       try {
         const result = await this.plugin.mapChat.chat(request, controller.signal, text => {
           if (alive()) chat.streamReply(text);
         });
         if (!alive()) return;
         // A detail re-send only explains: the actions of the first answer were applied already, so whatever it lists is dropped.
-        const lines = again
-          ? result.actions.length
+        if (redo) {
+          const lines = result.actions.length
             ? [{ status: "skipped" as const, text: t("ui.map_chat_redo_actions_ignored") }]
-            : []
-          : await this.applyMapChatActions(result, request.context, alive);
+            : [];
+          if (alive() && chat.isBusy) chat.finish(result.reply, lines);
+          return;
+        }
+        const plan = result.actions.length ? planFor(result.actions, request.context) : null;
+        if (plan) {
+          // Nothing is touched until the user applies the plan.
+          if (chat.isBusy) {
+            chat.finish(result.reply, []);
+            this.offerChatPlan(result, plan, request.context, { path: anchor.path, id: anchor.id });
+          }
+          return;
+        }
+        const lines = await this.applyMapChatActions(result, request.context, alive, anchor);
         if (alive() && chat.isBusy) chat.finish(result.reply, lines);
       } catch (error) {
-        if (alive()) chat.fail(this.chatErrorText(error));
+        if (alive()) {
+          const failure = this.chatErrorText(error);
+          chat.fail(failure.text, failure.wrapped ? failure.text : undefined);
+        }
       } finally {
         if (this.chatController === controller) this.releaseChatTask();
       }
     });
+  }
+  /** Ends the plan waiting for an answer, if any: its buttons stop working and it reads as cancelled. */
+  private supersedeChatPlan(): void {
+    const pending = this.chat?.pendingPlan() ?? null;
+    this.chatPlanToken++;
+    if (pending) this.chat?.settlePlan(pending, "cancelled");
+  }
+  private planReasonText(
+    reason: MapChatPlanReason,
+    result: Pick<MapChatResult, "actions">,
+    selectedCount: number
+  ): string {
+    switch (reason) {
+      case "many_actions":
+        return t("ui.map_chat_plan_reason_many_actions_0", result.actions.length);
+      case "delete_branch":
+        return t("ui.map_chat_plan_reason_delete_branch");
+      case "many_research":
+        // The same count the plan was judged by (a selection made earlier in the reply counts).
+        return t("ui.map_chat_plan_reason_many_research_0", researchTargetsOf(result.actions, selectedCount));
+      case "new_map":
+        return t("ui.map_chat_plan_reason_new_map");
+    }
+  }
+  /** Shows the plan card under the answer; only its Apply button ever writes anything. */
+  private offerChatPlan(
+    result: MapChatResult,
+    plan: MapChatPlan,
+    baseline: Pick<MapChatContext, "mdHashes" | "topicHashes" | "selectedCount">,
+    anchor: { path: string; id: string | undefined }
+  ): void {
+    const chat = this.chat;
+    if (!chat) return;
+    const token = ++this.chatPlanToken;
+    const refTitles = this.chatRefTitles(result.actions);
+    const items = result.actions.map(action => this.chatActionLabel(action, refTitles));
+    // The same lines by kind of work, so a 100-action plan reads as five folded lists.
+    const groups = CHAT_PLAN_GROUP_ORDER.flatMap(group => {
+      const own = items.filter((_, index) => chatPlanGroupOf(result.actions[index].kind) === group);
+      return own.length
+        ? [
+            {
+              label: t(`ui.map_chat_plan_group_${group}_0`, own.length),
+              items: own,
+              // Removing cards is said in words as well as in the warning colour.
+              ...(group === "delete" ? { danger: { mark: t("ui.map_chat_plan_mark_delete") } } : {})
+            }
+          ]
+        : [];
+    });
+    const card: MapChatPlanCard = {
+      reasons: plan.reasons.map(reason => this.planReasonText(reason, result, baseline.selectedCount)),
+      items,
+      groups,
+      estimate: plan.estimatedCalls
+        ? t("ui.map_chat_plan_calls_0", plan.estimatedCalls)
+        : t("ui.map_chat_plan_calls_none"),
+      state: "pending",
+      apply: () => void this.applyChatPlan(card, token, result, baseline, anchor),
+      cancel: () => {
+        if (token !== this.chatPlanToken) return;
+        this.chatPlanToken++;
+        this.chat?.settlePlan(card, "cancelled");
+      }
+    };
+    chat.showPlan(card);
+  }
+  private async applyChatPlan(
+    card: MapChatPlanCard,
+    token: number,
+    result: MapChatResult,
+    baseline: Pick<MapChatContext, "mdHashes" | "topicHashes">,
+    anchor: { path: string; id: string | undefined }
+  ): Promise<void> {
+    const chat = this.chat;
+    if (!chat || this.closed || token !== this.chatPlanToken || chat.isBusy || this.chatApplying) return;
+    // The map the plan was made for is not the one open any more: nothing is written.
+    if (!this.map || this.path !== anchor.path || this.map.id !== anchor.id) {
+      this.chatPlanToken++;
+      chat.settlePlan(card, "cancelled", [{ status: "skipped", text: t("ui.map_chat_skip_map_changed") }]);
+      return;
+    }
+    this.chatApplying = true;
+    chat.settlePlan(card, "applied");
+    // The window shows that it is working, and Stop ends the rest of the plan.
+    chat.setApplying(true);
+    let lines: MapChatLine[];
+    try {
+      lines = await this.applyMapChatActions(result, baseline, () => token === this.chatPlanToken, {
+        path: anchor.path,
+        id: anchor.id
+      });
+    } catch (error) {
+      lines = [{ status: "failed", text: errorMessage(error) }];
+    } finally {
+      this.chatApplying = false;
+      chat.setApplying(false);
+    }
+    if (!this.closed) chat.settlePlan(card, "applied", lines);
   }
   private releaseChatTask(): void {
     if (this.chatTaskKey) this.plugin.activeTasks?.delete(this.chatTaskKey);
@@ -10377,6 +10753,12 @@ export class VisualAgentMapView extends ItemView {
   }
   /** Stop button: the request is aborted and whatever came back is dropped. */
   private stopMapChat(): void {
+    // A plan being applied has no request to abort: the plan's number moves on, what is done stays and the rest is skipped.
+    if (this.chatApplying && !this.chatController) {
+      this.chatPlanToken++;
+      this.chat?.focusInput();
+      return;
+    }
     const controller = this.chatController;
     if (!controller) return;
     this.releaseChatTask();
@@ -10386,13 +10768,22 @@ export class VisualAgentMapView extends ItemView {
   }
   /** Closing the view or leaving the map: abort without touching the window. */
   private abortMapChat(): void {
+    this.chatPlanToken++;
     const controller = this.chatController;
     this.releaseChatTask();
     controller?.abort();
   }
-  private chatActionLabel(action: MapChatAction): string {
+  /** Titles the reply gave to the cards it creates, by `new:<ref>` id, so a later action can name them before they exist. */
+  private chatRefTitles(actions: readonly MapChatAction[]): Map<string, string> {
+    const titles = new Map<string, string>();
+    for (const action of actions)
+      if (action.kind === "add_child" && action.ref) titles.set(`${MAP_CHAT_NEW_PREFIX}${action.ref}`, action.title);
+    return titles;
+  }
+  private chatActionLabel(action: MapChatAction, refTitles?: ReadonlyMap<string, string>): string {
     const nodes = this.map?.nodes ?? [];
-    const title = (id: string): string => this.notes.get(id)?.title ?? nodes.find(node => node.id === id)?.path ?? id;
+    const title = (id: string): string =>
+      refTitles?.get(id) ?? this.notes.get(id)?.title ?? nodes.find(node => node.id === id)?.path ?? id;
     const targets = (ids: string[]): number => (ids.length ? ids.length : this.chatSelectionIds().length);
     switch (action.kind) {
       case "add_child":
@@ -10413,6 +10804,18 @@ export class VisualAgentMapView extends ItemView {
         return t("ui.map_chat_do_create_md_0", action.path);
       case "select_topics":
         return t("ui.map_chat_do_select_0", action.all ? nodes.length : action.nodeIds.length);
+      case "create_map":
+        return t("ui.map_chat_do_create_map_0", action.title);
+      case "open_map":
+        return t("ui.map_chat_do_open_map_0", action.title);
+      case "collapse_topic":
+        return t("ui.map_chat_do_collapse_0", title(action.nodeId));
+      case "expand_topic":
+        return t("ui.map_chat_do_expand_topic_0", title(action.nodeId));
+      case "auto_layout":
+        return t("ui.map_chat_do_auto_layout");
+      case "focus_topic":
+        return t("ui.map_chat_do_focus_0", title(action.nodeId));
       case "run_map_action":
         switch (action.action) {
           case "research_standard":
@@ -10440,66 +10843,181 @@ export class VisualAgentMapView extends ItemView {
     };
   }
   /**
+   * Holds back every repaint of this view and every re-read of the plugin's views while a long reply is applied: each write
+   * would otherwise repaint twice and re-read the whole map, which costs seconds for a hundred cards. {@link releaseChatBatch}
+   * lets them happen once.
+   */
+  private holdChatBatch(): void {
+    if (this.heldViews.length) return;
+    this.heldViews = [this, ...this.plugin.views().filter(view => view !== this)];
+    this.renderHold++;
+    for (const view of this.heldViews) view.syncHold++;
+  }
+  private async releaseChatBatch(): Promise<void> {
+    const held = this.heldViews;
+    if (!held.length) return;
+    this.heldViews = [];
+    this.renderHold = Math.max(0, this.renderHold - 1);
+    for (const view of held) view.syncHold = Math.max(0, view.syncHold - 1);
+    if (this.renderHold === 0 && this.renderPending) {
+      this.renderPending = false;
+      this.render();
+    }
+    if (!held.some(view => view.syncPending)) return;
+    for (const view of held) view.syncPending = false;
+    try {
+      // An empty write: its tail re-reads every view once.
+      await this.plugin.mutate(async () => {});
+    } catch {
+      // mutate() has logged it; the views catch up at their next write.
+    }
+  }
+  /** A repaint a batch is holding back happens now, for the step that needs the cards measured (layout). */
+  private flushChatRender(): void {
+    if (!this.renderPending || this.closed) return;
+    this.renderPending = false;
+    this.paint();
+  }
+  /**
    * Applies what a chat reply asked for, once, in order. Every write is its own `plugin.mutate` (the queue cannot be
    * re-entered, and the task a run action starts uses it too), checked again for staleness inside it and, for Markdown
    * files, by the write guard. None of it leaves an undo step. A stale or refused action is skipped; the rest go on.
-   * Selecting cards and the run actions come after every write, outside any mutate. Resolves with one line per action.
+   * Selecting cards, the run actions and `open_map` come after every write, outside any mutate. Resolves with one line per action.
+   *
+   * `new:<ref>` ids are swapped for the real card ids as the cards are created; a card whose parent was not created is skipped.
+   * `create_map` (always first) opens a new map and the rest of the reply builds in it; if it fails nothing else is written.
+   * `anchor` is the map this reply belongs to; a create or open the reply performs moves it, so the rest of the reply and the
+   * caller's liveness check follow the conversation to the new map. A reply that adds five cards or more is followed by one
+   * automatic layout and a move of the view to the new cards.
    */
   async applyMapChatActions(
     result: Pick<MapChatResult, "actions" | "rejected">,
     baseline: Pick<MapChatContext, "mdHashes" | "topicHashes">,
-    alive: () => boolean = () => true
+    alive: () => boolean = () => true,
+    anchor: { path: string; id: string | undefined } = { path: this.path, id: this.map?.id }
   ): Promise<MapChatLine[]> {
-    const mapPath = this.path;
-    const mapId = this.map?.id;
-    const same = (): boolean => !this.closed && alive() && this.path === mapPath && this.map?.id === mapId;
+    const touched = new Set<string>([anchor.path]);
+    const same = (): boolean => !this.closed && alive() && this.path === anchor.path && this.map?.id === anchor.id;
+    /** Why the rest is skipped: the user stopped it, or the map is not the one the reply was about. */
+    const lost = (): ChatOutcome =>
+      skipped(!this.closed && !alive() ? "ui.map_chat_skip_stopped" : "ui.map_chat_skip_map_changed");
     const lines: MapChatLine[] = [];
     const later: number[] = [];
+    const run: ChatRun = { refs: new Map(), created: [] };
+    const refTitles = this.chatRefTitles(result.actions);
     let wrote = false;
+    // True once a create_map failed: the rest would land in the map the user is looking at, which is not what was asked.
+    let noNewMap = false;
+    // ... and why: the map was never made, or it was made but could not be opened here.
+    let noNewMapReason: TranslationKey = "ui.map_chat_skip_map_not_created";
     // Copied: the turn's own writes move the baseline along, the request's context stays as it was sent.
     const own = { mdHashes: baseline.mdHashes, topicHashes: { ...baseline.topicHashes } };
+    // A reply that adds many cards is laid out as a whole afterwards, so its writes repaint once at the end. One that adds a
+    // few cards places each against the cards painted so far, so it keeps repainting after every write.
+    const adds = result.actions.filter(action => action.kind === "add_child").length;
+    const batched = adds === 0 || adds >= MAP_CHAT_AUTO_LAYOUT_MIN_NEW;
     try {
+      if (batched) this.holdChatBatch();
       for (const [index, action] of result.actions.entries()) {
-        if (action.kind === "select_topics" || action.kind === "run_map_action") {
+        if (action.kind === "select_topics" || action.kind === "run_map_action" || action.kind === "open_map") {
           later.push(index);
           continue;
         }
-        const label = this.chatActionLabel(action);
+        const label = this.chatActionLabel(action, refTitles);
         if (!same()) {
-          lines[index] = this.chatLine(label, skipped("ui.map_chat_skip_map_changed"));
+          lines[index] = this.chatLine(label, lost());
+          continue;
+        }
+        if (noNewMap) {
+          lines[index] = this.chatLine(label, skipped(noNewMapReason));
+          continue;
+        }
+        if (action.kind === "create_map") {
+          // The map switch repaints on its own.
+          await this.releaseChatBatch();
+          const outcome = await this.chatCreateMap(action.title, anchor, same);
+          if (batched) this.holdChatBatch();
+          if (outcome.status === "done") {
+            wrote = true;
+            touched.add(anchor.path);
+            // The old map's baseline means nothing in the new one.
+            own.topicHashes = {};
+          } else {
+            noNewMap = true;
+            if ("created" in outcome && outcome.created) noNewMapReason = "ui.map_chat_skip_map_not_opened";
+          }
+          lines[index] = this.chatLine(label, outcome);
           continue;
         }
         const box: { outcome: ChatOutcome } = { outcome: { status: "done" } };
         try {
           await this.plugin.mutate(async () => {
-            box.outcome = await this.applyChatWrite(action, own, same);
+            box.outcome = await this.applyChatWrite(action, own, same, run);
           });
         } catch (error) {
           box.outcome = { status: "failed", reason: errorMessage(error) };
         }
-        if (box.outcome.status !== "skipped") wrote = true;
+        if (box.outcome.status !== "skipped" && action.kind !== "focus_topic") wrote = true;
         lines[index] = this.chatLine(label, box.outcome);
       }
+      // Many cards at once land in a rough spot: one layout for the lot, then the view goes to the new branch.
+      let arranged = false;
+      if (
+        run.created.length >= MAP_CHAT_AUTO_LAYOUT_MIN_NEW &&
+        !noNewMap &&
+        same() &&
+        !result.actions.some(action => action.kind === "auto_layout")
+      ) {
+        try {
+          await this.plugin.mutate(async () => {
+            if (!same() || !this.map) return;
+            // The layout measures the cards, so the held repaint comes first.
+            this.flushChatRender();
+            await this.mapChange(map => {
+              map.nodes = arrangeMap(map.nodes, supersededAimNodeIds(map), this.cardHeightOf);
+            }, false);
+            const nodes = this.map?.nodes ?? [];
+            const fresh = run.created.map(id => nodes.find(node => node.id === id)).filter((n): n is MapNode => !!n);
+            const target = fresh.find(node => !node.parentId) ?? fresh[0];
+            // A card the reply asked to look at is where the view goes; this move to the new branch is only the default.
+            if (target && !result.actions.some(action => action.kind === "focus_topic")) this.focusNode(target);
+            arranged = true;
+          });
+        } catch {
+          // The cards are written already; only the tidy-up failed, and the user can lay the map out by hand.
+        }
+      }
+      if (arranged) lines.push({ status: "done", text: t("ui.map_chat_auto_layout_added") });
     } finally {
       // The chat's own writes are not undoable (the owner's choice). Undo entries hold snapshots of the map from before
       // the write, so any entry that survived would put the map back out of step with the notes the chat wrote or moved.
       // Drop the history here and in every other view of the same map, like any other change made outside the view.
       if (wrote) {
         this.history.clear();
-        for (const view of this.plugin.views()) if (view !== this && view.path === mapPath) view.history.clear();
+        for (const view of this.plugin.views()) if (view !== this && touched.has(view.path)) view.history.clear();
         this.updateHistoryButtons();
       }
+      // Whatever ended the loop (done, stopped, closed, thrown), the held repaint and re-read happen once.
+      await this.releaseChatBatch();
     }
     for (const index of later) {
       const action = result.actions[index];
-      const label = this.chatActionLabel(action);
+      const label = this.chatActionLabel(action, refTitles);
       let outcome: ChatOutcome;
-      if (!same()) outcome = skipped("ui.map_chat_skip_map_changed");
+      if (!same()) outcome = lost();
+      else if (noNewMap) outcome = skipped(noNewMapReason);
       else {
         try {
-          outcome = await this.runChatSelection(
-            action as Extract<MapChatAction, { kind: "select_topics" | "run_map_action" }>
-          );
+          if (action.kind === "open_map") {
+            outcome = await this.chatOpenMap(action.title, anchor, same);
+            if (outcome.status === "done") touched.add(anchor.path);
+          } else {
+            const resolved = this.chatResolveTargets(
+              action as Extract<MapChatAction, { kind: "select_topics" | "run_map_action" }>,
+              run
+            );
+            outcome = resolved ? await this.runChatSelection(resolved) : skipped("ui.map_chat_skip_parent_missing");
+          }
         } catch (error) {
           outcome = { status: "failed", reason: errorMessage(error) };
         }
@@ -10512,11 +11030,114 @@ export class VisualAgentMapView extends ItemView {
     if (wrote) all.push({ status: "done", text: t("ui.map_chat_not_undoable") });
     return all;
   }
+  /** Swaps `new:<ref>` target ids for the cards they became; null when every target was a card that was never created. */
+  private chatResolveTargets(
+    action: Extract<MapChatAction, { kind: "select_topics" | "run_map_action" }>,
+    run: ChatRun
+  ): Extract<MapChatAction, { kind: "select_topics" | "run_map_action" }> | null {
+    if (action.kind === "select_topics" && action.all) return action;
+    const ids = action.nodeIds
+      .map(id => (id.startsWith(MAP_CHAT_NEW_PREFIX) ? run.refs.get(id.slice(MAP_CHAT_NEW_PREFIX.length)) : id))
+      .filter((id): id is string => !!id);
+    // A target list that lost all its entries must not turn into "the current selection".
+    if (action.nodeIds.length && !ids.length) return null;
+    return { ...action, nodeIds: ids };
+  }
+  /** create_map: makes the map, opens it (the conversation goes along) and moves the anchor to it. */
+  private async chatCreateMap(
+    title: string,
+    anchor: { path: string; id: string | undefined },
+    same: () => boolean
+  ): Promise<ChatOutcome> {
+    const name = sanitizeGeneratedTitle(title).trim();
+    if (!name) return skipped("ui.map_chat_skip_unavailable");
+    let opened = "";
+    const made = { created: false };
+    try {
+      await this.plugin.mutate(async () => {
+        if (!same()) return;
+        const mapPath = await this.plugin.repo.createMap(name);
+        made.created = true;
+        opened = await this.chatSwitchTo(mapPath, anchor);
+      });
+    } catch (error) {
+      return { status: "failed", reason: errorMessage(error), created: made.created };
+    }
+    if (opened) return { status: "done" };
+    // A map that was made but is not open is not "the map was changed": say what happened.
+    return made.created
+      ? { status: "skipped", reason: t("ui.map_chat_skip_map_not_opened"), created: true }
+      : skipped("ui.map_chat_skip_map_changed");
+  }
+  /** open_map: the view names the map, not the model. One match opens it; several are listed to pick from; none is a skip. */
+  private async chatOpenMap(
+    title: string,
+    anchor: { path: string; id: string | undefined },
+    same: () => boolean
+  ): Promise<ChatOutcome> {
+    const topics = await this.plugin.repo.topics();
+    const match = matchMapTitle(title, topics);
+    if (match.kind === "none") return skipped("ui.map_chat_skip_map_not_found");
+    if (match.kind === "many") {
+      this.chat?.showChoices({
+        prompt: t("ui.map_chat_choose_map"),
+        options: match.maps.map(topic => ({ label: topic.title, pick: () => void this.chatPickMap(topic) })),
+        picked: false
+      });
+      return skipped("ui.map_chat_skip_map_choose");
+    }
+    let opened = "";
+    await this.plugin.mutate(async () => {
+      if (!same()) return;
+      opened = await this.chatSwitchTo(match.map.mapPath, anchor);
+    });
+    return opened ? { status: "done" } : skipped("ui.map_chat_skip_map_changed");
+  }
+  /** The user picked one of several maps the reply named. */
+  private async chatPickMap(topic: { title: string; mapPath: string }): Promise<void> {
+    const chat = this.chat;
+    if (!chat || this.closed || chat.isBusy || this.chatApplying) return;
+    this.chatApplying = true;
+    try {
+      let opened = "";
+      await this.plugin.mutate(async () => {
+        if (!this.closed) opened = await this.chatSwitchTo(topic.mapPath, { path: this.path, id: this.map?.id });
+      });
+      this.chat?.appendLines([
+        opened
+          ? { status: "done", text: t("ui.map_chat_choose_opened_0", topic.title) }
+          : { status: "skipped", text: t("ui.map_chat_skip_map_changed") }
+      ]);
+    } catch (error) {
+      this.chat?.appendLines([{ status: "failed", text: errorMessage(error) }]);
+    } finally {
+      this.chatApplying = false;
+    }
+  }
+  /**
+   * Opens a map for the conversation (inside a mutate) and moves `anchor`, the map the turn belongs to, along with it; returns
+   * the path, or "" when the map did not end up open. The anchor moves even when the open fails late, once the view is on it.
+   */
+  private async chatSwitchTo(mapPath: string, anchor: { path: string; id: string | undefined }): Promise<string> {
+    this.chatCarryOver = true;
+    try {
+      await this.openMapInMutation(mapPath);
+    } finally {
+      this.chatCarryOver = false;
+      if (!this.closed && this.path === mapPath && this.map) {
+        anchor.path = mapPath;
+        anchor.id = this.map.id;
+        this.chatMapId = this.map.id;
+      }
+    }
+    return !this.closed && this.path === mapPath && this.map ? mapPath : "";
+  }
   /** One write action. Runs inside `plugin.mutate`: it must not queue another one. */
   private async applyChatWrite(
-    action: Exclude<MapChatAction, { kind: "select_topics" | "run_map_action" }>,
+    action: Exclude<MapChatAction, { kind: "select_topics" | "run_map_action" | "create_map" | "open_map" }>,
     baseline: Pick<MapChatContext, "mdHashes" | "topicHashes">,
-    same: () => boolean
+    same: () => boolean,
+    run: ChatRun = { refs: new Map(), created: [] }
   ): Promise<ChatOutcome> {
     const hashes = baseline.mdHashes;
     if (!same() || !this.map) return skipped("ui.map_chat_skip_map_changed");
@@ -10524,16 +11145,59 @@ export class VisualAgentMapView extends ItemView {
     const gone = skipped("ui.map_chat_skip_topic_gone");
     const done: ChatOutcome = { status: "done" };
     const configDir = this.app.vault.configDir;
+    /** The real id behind an id of the reply; null when it names a card of this reply that was never created. */
+    const real = (id: string): string | null =>
+      id.startsWith(MAP_CHAT_NEW_PREFIX) ? (run.refs.get(id.slice(MAP_CHAT_NEW_PREFIX.length)) ?? null) : id;
     switch (action.kind) {
       case "add_child": {
-        const parent = nodeOf(action.parentId);
-        if (!parent) return gone;
-        if (this.isMerging(parent.id)) return skipped("ui.map_chat_skip_merge_locked");
+        // An empty parent is a new root card.
+        let parent: MapNode | null = null;
+        if (action.parentId) {
+          const parentId = real(action.parentId);
+          if (parentId === null) return skipped("ui.map_chat_skip_parent_missing");
+          parent = nodeOf(parentId) ?? null;
+          if (!parent) return gone;
+          if (this.isMerging(parent.id)) return skipped("ui.map_chat_skip_merge_locked");
+        }
         const before = new Set(this.map.nodes.map(item => item.id));
         await this.addNode(parent, action.title, true, false);
         const created = this.map?.nodes.find(item => !before.has(item.id));
         if (!created) return skipped("ui.map_chat_skip_unavailable");
+        run.created.push(created.id);
+        if (action.ref) run.refs.set(action.ref, created.id);
         if (action.summary) await this.noteChange(created, { summary: action.summary });
+        return done;
+      }
+      case "collapse_topic":
+      case "expand_topic": {
+        this.flushChatRender();
+        const id = real(action.nodeId);
+        if (id === null) return skipped("ui.map_chat_skip_parent_missing");
+        const node = nodeOf(id);
+        if (!node) return gone;
+        if (!this.map.nodes.some(item => item.parentId === node.id)) return skipped("ui.map_chat_skip_no_children");
+        const collapsed = action.kind === "collapse_topic";
+        await this.mapChange(map => {
+          const target = map.nodes.find(item => item.id === node.id);
+          if (target) target.collapsed = collapsed;
+          map.nodes = arrangeMap(map.nodes, supersededAimNodeIds(map), this.cardHeightOf);
+        });
+        return done;
+      }
+      case "auto_layout":
+        // The layout measures the cards, so a held repaint comes first.
+        this.flushChatRender();
+        await this.mapChange(map => {
+          map.nodes = arrangeMap(map.nodes, supersededAimNodeIds(map), this.cardHeightOf);
+        }, false);
+        return done;
+      case "focus_topic": {
+        this.flushChatRender();
+        const id = real(action.nodeId);
+        if (id === null) return skipped("ui.map_chat_skip_parent_missing");
+        const node = nodeOf(id);
+        if (!node) return gone;
+        this.focusNode(node);
         return done;
       }
       case "rename_topic":
@@ -10557,7 +11221,9 @@ export class VisualAgentMapView extends ItemView {
       }
       case "move_topic": {
         const node = nodeOf(action.nodeId);
-        const parent = nodeOf(action.newParentId);
+        const parentId = real(action.newParentId);
+        if (parentId === null) return skipped("ui.map_chat_skip_parent_missing");
+        const parent = nodeOf(parentId);
         if (!node || !parent) return gone;
         if (this.isMerging(node.id) || this.isMerging(parent.id)) return skipped("ui.map_chat_skip_merge_locked");
         const changed = await this.chatTopicStale(node.id, baseline.topicHashes);

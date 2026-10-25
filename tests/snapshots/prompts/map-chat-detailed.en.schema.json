@@ -23,10 +23,19 @@
               "edit_md_file",
               "create_md_file",
               "select_topics",
-              "run_map_action"
+              "run_map_action",
+              "create_map",
+              "open_map",
+              "collapse_topic",
+              "expand_topic",
+              "auto_layout",
+              "focus_topic"
             ]
           },
           "nodeId": {
+            "type": "string"
+          },
+          "ref": {
             "type": "string"
           },
           "parentId": {
@@ -89,6 +98,7 @@
         "required": [
           "kind",
           "nodeId",
+          "ref",
           "parentId",
           "newParentId",
           "title",

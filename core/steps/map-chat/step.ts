@@ -25,16 +25,26 @@ export const MAP_CHAT_ACTION_KINDS = [
   "edit_md_file",
   "create_md_file",
   "select_topics",
-  "run_map_action"
+  "run_map_action",
+  "create_map",
+  "open_map",
+  "collapse_topic",
+  "expand_topic",
+  "auto_layout",
+  "focus_topic"
 ] as const;
 export type MapChatActionKind = (typeof MAP_CHAT_ACTION_KINDS)[number];
 export const MAP_RUN_ACTIONS = ["research_standard", "expand", "synthesize", "rate_by_goal", "merge"] as const;
 export type MapRunAction = (typeof MAP_RUN_ACTIONS)[number];
-export const MAP_CHAT_MAX_ACTIONS = 40;
+export const MAP_CHAT_MAX_ACTIONS = 100;
+/** Prefix of a temporary id a reply gives to a card it creates itself; `ref: "n1"` is named `new:n1` by later actions. */
+export const MAP_CHAT_NEW_PREFIX = "new:";
+const REF_FORMAT = /^[A-Za-z0-9_-]{1,40}$/;
 export const MAP_CHAT_TOKEN_BUDGET = 150_000;
 
 export type MapChatAction =
-  | { kind: "add_child"; parentId: string; title: string; summary: string }
+  /** `parentId` "" = a new root card; `new:<ref>` = a card created earlier in this reply. `ref` names this card for later actions (absent = none). */
+  | { kind: "add_child"; parentId: string; title: string; summary: string; ref?: string }
   | { kind: "rename_topic"; nodeId: string; title: string }
   | { kind: "update_summary"; nodeId: string; summary: string }
   | { kind: "edit_topic_note"; nodeId: string; detail: string }
@@ -55,10 +65,26 @@ export type MapChatAction =
       goal: string;
       /** expand: optional direction. */
       direction: string;
-    };
+    }
+  /** Always the first action: a new map, opened for the rest of the reply. */
+  | { kind: "create_map"; title: string }
+  /** Always the last action: switch to the map the title names (matched by the view, not the model). */
+  | { kind: "open_map"; title: string }
+  | { kind: "collapse_topic"; nodeId: string }
+  | { kind: "expand_topic"; nodeId: string }
+  | { kind: "auto_layout" }
+  | { kind: "focus_topic"; nodeId: string };
 
 export type MapChatRejectCode =
-  "bad_item" | "unknown_kind" | "unknown_node" | "missing_field" | "bad_value" | "cycle" | "too_many";
+  | "bad_item"
+  | "unknown_kind"
+  | "unknown_node"
+  | "missing_field"
+  | "bad_value"
+  | "cycle"
+  | "too_many"
+  /** A `ref` that is malformed or repeated, or a `new:` id that no earlier kept action defines (or one used where it cannot be). */
+  | "bad_ref";
 export interface MapChatRejection {
   index: number;
   code: MapChatRejectCode;
@@ -110,6 +136,7 @@ export const MAP_CHAT_SCHEMA = {
         properties: {
           kind: { type: "string", enum: [...MAP_CHAT_ACTION_KINDS] },
           nodeId: STRING,
+          ref: STRING,
           parentId: STRING,
           newParentId: STRING,
           title: STRING,
@@ -129,6 +156,7 @@ export const MAP_CHAT_SCHEMA = {
         required: [
           "kind",
           "nodeId",
+          "ref",
           "parentId",
           "newParentId",
           "title",
@@ -164,8 +192,19 @@ class Dropped extends Error {
  * {@link MapChatError}. Inside `actions` each item is judged alone: one that is not an object, has an unknown kind, names a
  * card that is not in the supplied context, misses a field its kind needs, or would put a card under itself is dropped and
  * counted in `rejected`. Nothing dropped is applied; strings are trimmed, and unused fields are ignored.
+ *
+ * A reply may build a tree in one go: an `add_child` with `ref: "n1"` can be named `new:n1` by `parentId`, `newParentId`,
+ * `nodeIds` and the view operations that follow it. Only a ref defined by an earlier item that was kept counts; a repeated,
+ * malformed, forward or undefined ref (also one whose defining item was dropped) drops the item as `bad_ref`. A `new:` id has no
+ * baseline, so rename, summary, note and delete actions refuse it. `parentId: ""` on `add_child` is a new root card.
+ * `create_map` is only valid as the first item and `open_map` only as the last; after `create_map` the cards of the old map are
+ * out of reach. With `noEditableMap` the reply must start with `create_map` (a lone `open_map` is also fine): any other first item (and everything before the
+ * create) is dropped.
  */
-export function parseMapChat(raw: string, context: Pick<MapChatContext, "nodeIds" | "parents">): MapChatResult {
+export function parseMapChat(
+  raw: string,
+  context: Pick<MapChatContext, "nodeIds" | "parents"> & { noEditableMap?: boolean }
+): MapChatResult {
   let value: unknown;
   try {
     value = JSON.parse(raw);
@@ -177,12 +216,16 @@ export function parseMapChat(raw: string, context: Pick<MapChatContext, "nodeIds
   if (typeof body.reply !== "string") throw invalid("reply");
   if (!Array.isArray(body.actions)) throw invalid("actions");
   const known = new Set(context.nodeIds);
-  const parents = context.parents;
+  // Parent links of the supplied cards, plus those of the cards this reply creates (for the cycle check).
+  const parents: Record<string, string | null | undefined> = { ...context.parents };
+  const refs = new Set<string>();
+  let created = false;
   const underOrSame = (id: string, ancestor: string): boolean => {
     for (let at: string | null | undefined = id, hops = 0; at && hops < 10_000; at = parents[at], hops++)
       if (at === ancestor) return true;
     return false;
   };
+  const total = body.actions.length;
   const actions: MapChatAction[] = [];
   const rejected: MapChatRejection[] = [];
   body.actions.forEach((entry: unknown, index: number) => {
@@ -208,31 +251,48 @@ export function parseMapChat(raw: string, context: Pick<MapChatContext, "nodeIds
         return field;
       };
       const flag = (key: string): boolean => item[key] === true;
-      const node = (key: string): string => {
-        const id = text(key);
-        if (!known.has(id)) throw new Dropped("unknown_node");
+      /** One card id: a supplied card, or (when `allowNew`) a `new:` ref an earlier kept item defined. */
+      const resolve = (id: string, allowNew: boolean): string => {
+        if (id.startsWith(MAP_CHAT_NEW_PREFIX)) {
+          if (!allowNew || !refs.has(id.slice(MAP_CHAT_NEW_PREFIX.length))) throw new Dropped("bad_ref");
+          return id;
+        }
+        if (created || !known.has(id)) throw new Dropped("unknown_node");
         return id;
       };
+      const node = (key: string, allowNew = false): string => resolve(text(key), allowNew);
       const list = (key: string): string[] => {
         const field = item[key];
         if (field === undefined || field === null) return [];
         if (!Array.isArray(field) || field.some(id => typeof id !== "string")) throw new Dropped("bad_value");
         const ids = [...new Set((field as string[]).map(id => id.trim()).filter(Boolean))];
-        if (ids.some(id => !known.has(id))) throw new Dropped("unknown_node");
-        return ids;
+        return ids.map(id => resolve(id, true));
       };
       const kind = item.kind;
       if (typeof kind !== "string" || !(MAP_CHAT_ACTION_KINDS as readonly string[]).includes(kind))
         throw new Dropped("unknown_kind");
+      if (context.noEditableMap && !created && kind !== "create_map" && kind !== "open_map")
+        throw new Dropped("bad_value");
       switch (kind as MapChatActionKind) {
-        case "add_child":
+        case "add_child": {
+          const given = text("parentId", false);
+          const parentId = given ? resolve(given, true) : "";
+          const title = text("title");
+          const ref = text("ref", false);
+          if (ref && (!REF_FORMAT.test(ref) || refs.has(ref))) throw new Dropped("bad_ref");
           actions.push({
             kind: "add_child",
-            parentId: node("parentId"),
-            title: text("title"),
-            summary: text("summary", false)
+            parentId,
+            title,
+            summary: text("summary", false),
+            ...(ref ? { ref } : {})
           });
+          if (ref) {
+            refs.add(ref);
+            parents[`${MAP_CHAT_NEW_PREFIX}${ref}`] = parentId || null;
+          }
           break;
+        }
         case "rename_topic":
           actions.push({ kind: "rename_topic", nodeId: node("nodeId"), title: text("title") });
           break;
@@ -244,7 +304,7 @@ export function parseMapChat(raw: string, context: Pick<MapChatContext, "nodeIds
           break;
         case "move_topic": {
           const nodeId = node("nodeId"),
-            newParentId = node("newParentId");
+            newParentId = node("newParentId", true);
           if (underOrSame(newParentId, nodeId)) throw new Dropped("cycle");
           actions.push({ kind: "move_topic", nodeId, newParentId });
           break;
@@ -268,6 +328,7 @@ export function parseMapChat(raw: string, context: Pick<MapChatContext, "nodeIds
         }
         case "select_topics": {
           const all = flag("all");
+          if (all && created) throw new Dropped("bad_value");
           const nodeIds = all ? [...known] : list("nodeIds");
           if (!nodeIds.length) throw new Dropped("missing_field");
           actions.push({ kind: "select_topics", nodeIds, all });
@@ -291,6 +352,29 @@ export function parseMapChat(raw: string, context: Pick<MapChatContext, "nodeIds
           });
           break;
         }
+        case "create_map": {
+          if (index !== 0) throw new Dropped("bad_value");
+          actions.push({ kind: "create_map", title: text("title") });
+          created = true;
+          break;
+        }
+        case "open_map": {
+          if (index !== total - 1 || created) throw new Dropped("bad_value");
+          actions.push({ kind: "open_map", title: text("title") });
+          break;
+        }
+        case "collapse_topic":
+          actions.push({ kind: "collapse_topic", nodeId: node("nodeId", true) });
+          break;
+        case "expand_topic":
+          actions.push({ kind: "expand_topic", nodeId: node("nodeId", true) });
+          break;
+        case "auto_layout":
+          actions.push({ kind: "auto_layout" });
+          break;
+        case "focus_topic":
+          actions.push({ kind: "focus_topic", nodeId: node("nodeId", true) });
+          break;
       }
     } catch (error) {
       if (!(error instanceof Dropped)) throw error;
@@ -303,7 +387,7 @@ export function parseMapChat(raw: string, context: Pick<MapChatContext, "nodeIds
 /** One conversation turn: the user's message plus the context the panel gathered. The reply is JSON; actions are applied by the view. */
 export const mapChatStep: StepDefinition<MapChatRequest, MapChatResult> = {
   id: "map-chat",
-  version: 2,
+  version: 3,
   render: request => {
     const language = request.contentLanguage ?? request.language;
     const zh = instructionLanguageOf(language) === "zh";

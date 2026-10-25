@@ -776,7 +776,7 @@ export class VisualAgentMapView extends ItemView {
       // Escape inside the chat window folds the window (the panel handles it); it never clears the map's selection.
       if (
         event.target instanceof HTMLElement &&
-        event.target.closest("input, textarea, select, [contenteditable=true], .vam-map-chat")
+        event.target.closest(["input", "textarea", "select", "[contenteditable=true]", ".vam-map-chat"].join(", "))
       )
         return;
       if (event.key === "Escape") {

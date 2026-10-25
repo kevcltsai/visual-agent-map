@@ -2464,7 +2464,7 @@ integrationTest('B1 ui: Escape on any control of the window folds it; the view\'
   const h = await harness(); await h.view.hydrate(); const chat = h.open(); const suggestion = findAll(chat.suggestEl, i => i.tag === 'button')[0]; suggestion.focus();
   assert.equal(press(chat.el, { key: 'Escape', target: suggestion }), true); assert.equal(chat.isOpen, false); assert.equal(h.page.doc.activeElement, chat.toggleEl);
   const source = fs.readFileSync(path.join(root, 'experiences/visual-map/view.ts'), 'utf8'); const at = source.indexOf('Escape inside the chat window');
-  assert.ok(at > 0 && /closest\("input, textarea, select, \[contenteditable=true\], \.vam-map-chat"\)/.test(source.slice(at, at + 400)), 'the contentEl Escape skips input fields and the chat window');
+  assert.ok(at > 0 && /closest\(\["input", "textarea", "select", "\[contenteditable=true\]", "\.vam-map-chat"\]\.join/.test(source.slice(at, at + 400)), 'the contentEl Escape skips input fields and the chat window');
 });
 
 integrationTest('B1 ui: Tab order follows the document: suggestions, then the reference chips, then the message field, then the answer length and Send', async () => {

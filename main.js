@@ -35427,7 +35427,7 @@ var VisualAgentMapView = class _VisualAgentMapView extends import_obsidian30.Ite
       this.spaceHeld = false;
     });
     this.registerDomEvent(this.contentEl, "keydown", (event) => {
-      if (event.target instanceof HTMLElement && event.target.closest("input, textarea, select, [contenteditable=true], .vam-map-chat"))
+      if (event.target instanceof HTMLElement && event.target.closest(["input", "textarea", "select", "[contenteditable=true]", ".vam-map-chat"].join(", ")))
         return;
       if (event.key === "Escape") {
         const previous = this.selected, touched = [...this.multiSelected];

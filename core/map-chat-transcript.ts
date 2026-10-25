@@ -10,7 +10,8 @@ import { parseBlocks, type ChatBlock, type ChatInline, type ChatListItem } from 
  */
 
 const CHAT_NAME_LIMIT = 40;
-const SENTENCE_END = /[。！？.!?\n\r]/;
+/** A sentence ends at 。！？!? or a line break, or at a "." that is followed by a blank or the end (so "v1.5" stays whole). */
+const SENTENCE_END = /[。！？!?\n\r]|\.(?=\s|$)/;
 /** U+200B, written by code so no invisible character sits in this file. */
 const ZERO_WIDTH = String.fromCharCode(0x200b);
 
@@ -148,7 +149,9 @@ function codeSpan(text: string): string {
   const body = defuseCode(text.replace(/\r?\n|\r/g, " "));
   const longest = Math.max(0, ...(body.match(/`+/g) ?? []).map(run => run.length));
   const fence = "`".repeat(longest + 1);
-  const padded = /^[`\s]|[`\s]$/.test(body) ? ` ${body} ` : body;
+  // Dataview runs an inline code that starts with "=" or "$" (after blanks): a zero-width space in front keeps it plain code.
+  const guarded = /^\s*[=$]/.test(body) ? `${ZERO_WIDTH}${body}` : body;
+  const padded = /^[`\s]|[`\s]$/.test(guarded) ? ` ${guarded} ` : guarded;
   return `${fence}${padded}${fence}`;
 }
 
@@ -368,6 +371,11 @@ export function transcriptMarkdown(input: TranscriptInput): string {
       .join("\n\n")
       // Defence in depth: nothing written can open an image, and no key the plugin reads can appear in the note.
       .replace(/!(?=\[)/g, `!${ZERO_WIDTH}`)
-      .replace(FRONT_MATTER_KEYS, match => `${match[0]}${ZERO_WIDTH}${match.slice(1)}`) + "\n"
+      // The three keys are split everywhere except inside a wikilink, whose target must stay a working path.
+      .split(/(\[\[[^\]\n]*\]\])/)
+      .map((part, at) =>
+        at % 2 ? part : part.replace(FRONT_MATTER_KEYS, match => `${match[0]}${ZERO_WIDTH}${match.slice(1)}`)
+      )
+      .join("") + "\n"
   );
 }

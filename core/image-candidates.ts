@@ -7,6 +7,6 @@ export interface ImageCandidate {
 
 /** Markdown for a chosen image and a link to the page it came from. */
 export function imageMarkdown(candidate: ImageCandidate): string {
-  const title = candidate.title.replace(/[\]\\\r\n[]/g, " ");
+  const title = candidate.title.replace(/[\]\\\r\n[<>]/g, " ");
   return `![${title}](<${candidate.url}>)\n\n[${title}](<${candidate.source}>)`;
 }

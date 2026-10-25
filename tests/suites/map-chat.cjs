@@ -2943,7 +2943,9 @@ test('B2-0 F1: the deferred scroll is dropped when the window is folded again be
 integrationTest('B2-0 F3: the model select takes the header\'s remaining width (flex 1 1 0, min-width 0), and the default entry shows the model without its provider prefix, the tooltip keeps the full name', async () => {
   const css = fs.readFileSync(path.join(root, 'styles.css'), 'utf8');
   const rule = css.split('\n').find(line => line.startsWith('.vam-map-chat-model {')); assert.ok(rule);
-  assert.match(rule, /flex: 1 1 0;/); assert.match(rule, /min-width: 0;/); assert.doesNotMatch(rule, /min-width: 120px/);
+  // B3-fix rule change: with the save button in the header the model asks for 146px (basis) and the title gives way first (flex-shrink 100, min 64px).
+  assert.match(rule, /flex: 1 1 146px;/); assert.match(rule, /min-width: 0;/);
+  const title = css.split('\n').find(line => line.startsWith('.vam-map-chat-title {')); assert.match(title, /flex: 0 100 auto;/); assert.match(title, /min-width: 64px;/); assert.doesNotMatch(rule, /min-width: 120px/);
   const h = await harness(); await h.view.hydrate(); h.plugin.settings.cliModel = 'gpt-6-luna'; h.plugin.modelLabel = id => id.startsWith('claude:') ? 'Claude Sonnet' : `OpenAI Codex · ${id}`;
   const first = h.view.chatModelChoices()[0];
   assert.equal(first.label, 'Follow default (now: OpenAI Codex · gpt-6-luna)', 'the full name stays in the tooltip'); assert.equal(first.short, 'Default: gpt-6-luna');
@@ -3359,6 +3361,7 @@ integrationTest('B3 insert: a failing write is reported on the candidate and doe
   h.view.noteChange = async () => { throw new Error('disk full'); };
   pickButtons(h)[0].click(); await withTimeout(until(() => block.notice));
   assert.match(block.notice, /Could not insert the picture: disk full/); assert.equal(block.items[0].inserted, undefined);
+  assert.equal(h.notices.filter(n => /disk full/.test(n)).length, 0, 'the reason is in the candidate block; no Notice on top');
 });
 integrationTest('B3 find_images: nothing is inserted unless a candidate is clicked; a hostile reply with an image becomes neither a candidate nor an insertion', async () => {
   const { h, chat } = await imageHarness(); const file = noteFile(h, 'a'); const before = h.contents.get(file);
@@ -3474,6 +3477,7 @@ integrationTest('B3 save: a failing write says why and leaves no file', async ()
   h.app.vault.create = async () => { throw new Error('read-only disk'); };
   saveButton(h).click(); await withTimeout(until(() => h.notices.some(n => /Could not save the chat/.test(n))));
   assert.ok(h.notices.includes('Could not save the chat: read-only disk')); eq(savedPaths(h), []);
+  assert.equal(h.notices.filter(n => /read-only disk/.test(n)).length, 1, 'one Notice for one failure');
   await withTimeout(until(() => saveButton(h).attrs['aria-disabled'] === 'false'));
 });
 integrationTest('B3 save: the note is saved into the folder of the map in view when the button is pressed', async () => {
@@ -3496,4 +3500,18 @@ integrationTest('B3 save: a saved Chats note is not a topic - rebuilding the der
 test('B3 transcript: view labels are the interface language (the note follows the language of the window)', () => {
   const out = transcriptMarkdown({ mapTitle: 'T', mapPath: 'M/Map.md', savedAt: new Date(2026, 0, 2, 3, 4), labels: { title: 'Titel', map: 'Karte', saved: 'Gespeichert', you: 'Du', ai: 'KI', references: 'Bezüge', results: 'Ergebnisse', planPending: 'a', planApplied: 'b', planCancelled: 'c', images: '{0}', imagesSearching: '{0}', imagesNone: 'n', imagesFailed: '{0}', imagesStopped: 's', inserted: '{0}' }, turns: [{ question: 'Hallo', refs: [], answer: 'Hi', lines: [], images: [] }] });
   assert.ok(out.startsWith('# Titel\n\nKarte: [[M/Map|T]]\\\nGespeichert: 2026-01-02 03:04'));
+});
+
+integrationTest('B3-fix save: Dataview inline code in a reply is written as plain code', async () => {
+  const { h, chat } = await imageHarness(); chat.finish('Try `=this.file.name` and `$=dv.el("b","x")` and ` = x`.', []);
+  saveButton(h).click(); await withTimeout(until(() => savedPaths(h).length === 1));
+  const text = h.contents.get(savedPaths(h)[0]);
+  assert.doesNotMatch(text, /`\s*[=$]/);
+});
+integrationTest('B3-fix insert: a candidate title with HTML adds no extra picture to the card', async () => {
+  const { h } = await imageHarness(); h.control.search = async () => [{ title: '<img src=x onerror=alert(1)>', url: 'https://img.example/p.jpg', source: 'https://page.example/p' }];
+  await apply(h, [findAct(h, 'a')]); await withTimeout(until(() => lastImages(h)?.state === 'ready'));
+  pickButtons(h)[0].click(); await withTimeout(until(() => lastImages(h).items[0].inserted));
+  const detail = (await h.note('a')).detail;
+  assert.equal((detail.match(/<img/gi) ?? []).length, 0); assert.equal((detail.match(/!\[/g) ?? []).length, 1, 'exactly one picture embed');
 });

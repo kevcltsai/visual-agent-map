@@ -11761,11 +11761,16 @@ export class VisualAgentMapView extends ItemView {
           outcome.result = { ok: false, reason: t(again.reason) };
           return;
         }
-        const note = await this.plugin.repo.readNote(again.node.path, this.map ?? undefined);
-        const before = note.detail.replace(/\s+$/, "");
-        const addition = imageMarkdown(item.candidate);
-        await this.noteChange(again.node, { detail: before ? `${before}\n\n${addition}` : addition });
-        outcome.result = { ok: true };
+        // A failure is carried out as a result, not thrown: mutate() would show its own Notice for a throw, and this is the second.
+        try {
+          const note = await this.plugin.repo.readNote(again.node.path, this.map ?? undefined);
+          const before = note.detail.replace(/\s+$/, "");
+          const addition = imageMarkdown(item.candidate);
+          await this.noteChange(again.node, { detail: before ? `${before}\n\n${addition}` : addition });
+          outcome.result = { ok: true };
+        } catch (error) {
+          outcome.result = { ok: false, reason: t("ui.map_chat_images_insert_failed_0", errorMessage(error)) };
+        }
       });
     } catch (error) {
       return { ok: false, reason: t("ui.map_chat_images_insert_failed_0", errorMessage(error)) };
@@ -11847,17 +11852,25 @@ export class VisualAgentMapView extends ItemView {
       },
       turns: turns.map(turn => this.chatTranscriptTurn(turn))
     });
-    const written: { path: string } = { path: "" };
+    const written: { path: string; error?: unknown } = { path: "" };
     try {
       await this.plugin.mutate(async () => {
-        const folder = `${this.plugin.repo.topicRoot(mapPath)}/Chats`;
-        await this.plugin.repo.folder(folder);
-        const path = this.plugin.repo.unique(folder, name);
-        await this.app.vault.create(path, markdown);
-        written.path = path;
+        // A failure is carried out as a result, not thrown: mutate() would show its own Notice for a throw, and this is the second.
+        try {
+          const folder = `${this.plugin.repo.topicRoot(mapPath)}/Chats`;
+          await this.plugin.repo.folder(folder);
+          const path = this.plugin.repo.unique(folder, name);
+          await this.app.vault.create(path, markdown);
+          written.path = path;
+        } catch (error) {
+          written.error = error;
+        }
       });
     } catch (error) {
-      const reason = t("ui.map_chat_save_failed_0", errorMessage(error));
+      written.error = error;
+    }
+    if (written.error !== undefined) {
+      const reason = t("ui.map_chat_save_failed_0", errorMessage(written.error));
       new Notice(reason);
       return { ok: false, reason };
     }

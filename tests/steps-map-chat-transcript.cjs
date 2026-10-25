@@ -20,7 +20,7 @@ test('B3 file name: local date, first sentence up to 。！？.!? or a line brea
 test('B3 file name: characters a file or link name cannot hold become blanks; leading dots and blanks go', () => {
   assert.equal(name('a/b\\c:d*e"f<g>h|i#j^k[l]m'), '2026-10-26 a b c d e f g h i j k l m');
   assert.equal(name('/ #hidden file'), '2026-10-26 hidden file');
-  assert.equal(name('..hidden file'), `2026-10-26 ${FALLBACK}`, 'a period ends the sentence before anything is left');
+  assert.equal(name('..hidden file'), '2026-10-26 hidden file', 'D-267: a period inside a word run is not a sentence end');
   assert.equal(name('trailing dots...'), '2026-10-26 trailing dots');
   assert.equal(name('x \u0000 y'), '2026-10-26 x y');
 });
@@ -210,4 +210,28 @@ test('B3 transcript: control and bidirectional override characters are dropped',
   const rlo = String.fromCharCode(0x202e), lri = String.fromCharCode(0x2066), lre = String.fromCharCode(0x202a);
   const out = render([turn({ question: `a\u0000b${rlo}c${lri}d`, answer: `x\u0007y${lre}z` })]);
   assert.doesNotMatch(out, new RegExp(`[${rlo}${lri}${lre}\\u0000\\u0007]`));
+});
+
+test('B3-fix first sentence (D-2026-10-267): "." ends a sentence only before a blank or the end', () => {
+  assert.equal(name('v1.5 release'), '2026-10-26 v1.5 release');
+  assert.equal(name('Hi. there'), '2026-10-26 Hi');
+  assert.equal(name('end.'), '2026-10-26 end');
+  assert.equal(name('3.14 is pi? yes'), '2026-10-26 3.14 is pi');
+});
+test('B3-fix inline code that Dataview would run stays plain code', () => {
+  const zw = String.fromCharCode(0x200b);
+  for (const code of ['=this.file.name', '$=dv.el("b","x")', ' = x', '  $= 1']) {
+    const out = replyMarkdown('see `' + code + '` now');
+    const span = out.match(/`+([^`]*)`+/)[1];
+    assert.ok(!/^\s*[=$]/.test(span), `${JSON.stringify(code)} -> ${JSON.stringify(span)}`);
+    assert.ok(span.startsWith(zw) || span.startsWith(' ' + zw) || /^\s+\u200b/.test(span) || span.includes(zw), 'a zero-width space is in front');
+  }
+  assert.equal(replyMarkdown('`plain code`'), '`plain code`', 'ordinary code is unchanged');
+  assert.equal(replyMarkdown('`a = b`'), '`a = b`');
+});
+test('B3-fix the key splitter leaves wikilink targets alone', () => {
+  const out = render([turn({ refs: [{ kind: 'topic', path: 'Maps/node-id/Notes/A.md', title: 'node-id card' }], answer: 'See [[topic-id notes]] and node-id here' })]);
+  assert.ok(out.includes('[[Maps/node-id/Notes/A|node-id card'.replace('node-id card', 'node-id card')) || out.includes('[[Maps/node-id/Notes/A|'), 'the target path is intact');
+  assert.ok(out.includes('[[topic-id notes]]'));
+  assert.doesNotMatch(out.replace(/\[\[[^\]]*\]\]/g, ''), /agent-map-node|node-id|topic-id/, 'outside links the keys are split');
 });

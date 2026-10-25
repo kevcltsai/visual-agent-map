@@ -22596,7 +22596,7 @@ ${text11}` : text11;
 
 // core/image-candidates.ts
 function imageMarkdown(candidate) {
-  const title = candidate.title.replace(/[\]\\\r\n[]/g, " ");
+  const title = candidate.title.replace(/[\]\\\r\n[<>]/g, " ");
   return `![${title}](<${candidate.url}>)
 
 [${title}](<${candidate.source}>)`;
@@ -22604,7 +22604,7 @@ function imageMarkdown(candidate) {
 
 // core/map-chat-transcript.ts
 var CHAT_NAME_LIMIT = 40;
-var SENTENCE_END2 = /[。！？.!?\n\r]/;
+var SENTENCE_END2 = /[。！？!?\n\r]|\.(?=\s|$)/;
 var ZERO_WIDTH = String.fromCharCode(8203);
 function graphemesOf(value) {
   const Segmenter = Intl.Segmenter;
@@ -22676,7 +22676,8 @@ function codeSpan(text11) {
   const body = defuseCode(text11.replace(/\r?\n|\r/g, " "));
   const longest = Math.max(0, ...((_a2 = body.match(/`+/g)) != null ? _a2 : []).map((run) => run.length));
   const fence = "`".repeat(longest + 1);
-  const padded = /^[`\s]|[`\s]$/.test(body) ? ` ${body} ` : body;
+  const guarded = /^\s*[=$]/.test(body) ? `${ZERO_WIDTH}${body}` : body;
+  const padded = /^[`\s]|[`\s]$/.test(guarded) ? ` ${guarded} ` : guarded;
   return `${fence}${padded}${fence}`;
 }
 function defuseCode(text11) {
@@ -22811,7 +22812,9 @@ ${escapeLine(labels.saved)}: ${localStamp(input.savedAt)}`
       );
     for (const block of turn.images) parts.push(imagesMarkdown(block, labels));
   });
-  return parts.join("\n\n").replace(/!(?=\[)/g, `!${ZERO_WIDTH}`).replace(FRONT_MATTER_KEYS, (match) => `${match[0]}${ZERO_WIDTH}${match.slice(1)}`) + "\n";
+  return parts.join("\n\n").replace(/!(?=\[)/g, `!${ZERO_WIDTH}`).split(/(\[\[[^\]\n]*\]\])/).map(
+    (part, at) => at % 2 ? part : part.replace(FRONT_MATTER_KEYS, (match) => `${match[0]}${ZERO_WIDTH}${match.slice(1)}`)
+  ).join("") + "\n";
 }
 
 // ui/image-candidates.ts
@@ -46476,13 +46479,17 @@ ${note.detail.trim()}` : "",
           outcome.result = { ok: false, reason: t(again.reason) };
           return;
         }
-        const note = await this.plugin.repo.readNote(again.node.path, (_a2 = this.map) != null ? _a2 : void 0);
-        const before = note.detail.replace(/\s+$/, "");
-        const addition = imageMarkdown(item.candidate);
-        await this.noteChange(again.node, { detail: before ? `${before}
+        try {
+          const note = await this.plugin.repo.readNote(again.node.path, (_a2 = this.map) != null ? _a2 : void 0);
+          const before = note.detail.replace(/\s+$/, "");
+          const addition = imageMarkdown(item.candidate);
+          await this.noteChange(again.node, { detail: before ? `${before}
 
 ${addition}` : addition });
-        outcome.result = { ok: true };
+          outcome.result = { ok: true };
+        } catch (error) {
+          outcome.result = { ok: false, reason: t("ui.map_chat_images_insert_failed_0", errorMessage(error)) };
+        }
       });
     } catch (error) {
       return { ok: false, reason: t("ui.map_chat_images_insert_failed_0", errorMessage(error)) };
@@ -46568,14 +46575,21 @@ ${addition}` : addition });
     const written = { path: "" };
     try {
       await this.plugin.mutate(async () => {
-        const folder = `${this.plugin.repo.topicRoot(mapPath)}/Chats`;
-        await this.plugin.repo.folder(folder);
-        const path = this.plugin.repo.unique(folder, name);
-        await this.app.vault.create(path, markdown);
-        written.path = path;
+        try {
+          const folder = `${this.plugin.repo.topicRoot(mapPath)}/Chats`;
+          await this.plugin.repo.folder(folder);
+          const path = this.plugin.repo.unique(folder, name);
+          await this.app.vault.create(path, markdown);
+          written.path = path;
+        } catch (error) {
+          written.error = error;
+        }
       });
     } catch (error) {
-      const reason = t("ui.map_chat_save_failed_0", errorMessage(error));
+      written.error = error;
+    }
+    if (written.error !== void 0) {
+      const reason = t("ui.map_chat_save_failed_0", errorMessage(written.error));
       new import_obsidian30.Notice(reason);
       return { ok: false, reason };
     }

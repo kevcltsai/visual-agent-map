@@ -1041,7 +1041,7 @@ integrationTest('topics created by an outline import start in Quick mode, the ro
   const created = saved.nodes.filter(item => item.id !== h.oldRoot.id && item.id !== h.oldChild.id);
   assert.equal(created.length, 3);
   for (const item of created) assert.equal((await h.repo.readNote(item.path, saved)).researchMode, 'local', 'created as Quick');
-  assert.equal((await h.repo.readNote(h.oldChild.path, saved)).researchMode, 'research', 'an older topic is not touched');
+  assert.equal((await h.repo.readNote(h.oldChild.path, saved)).researchMode, 'local', 'an older topic (no research-mode) reads as Quick and is not touched');
   const text = await h.app.vault.cachedRead(h.app.vault.getAbstractFileByPath(created[0].path));
   assert.match(text, /research-mode: local/); assert.doesNotMatch(text, /research-depth/);
 });

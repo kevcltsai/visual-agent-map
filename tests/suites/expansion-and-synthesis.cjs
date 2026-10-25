@@ -2434,14 +2434,14 @@ integrationTest('AI mode: a research stores the mode it ran in on the topic (Qui
   assert.equal(h.contexts.at(-1).mapAiMode, 'quick');
   assert.equal(h.chartJobs.filter(job => job.context.mapAiMode === 'quick').every(job => job.context.addCharts === false), true, 'a Quick research asks for no charts');
 });
-integrationTest('AI mode: a note with research-depth deep keeps that line after a research, and a note with no research-mode runs as Standard in a batch', async () => {
+integrationTest('AI mode: a note with research-depth deep keeps that line after a research, and a note with no research-mode reads as Quick', async () => {
   const h = await templateHarness({ language: 'en' });
   const text = async () => h.contents.get(h.topic.path);
   h.contents.set(h.topic.path, h.contents.get(h.topic.path).replace('---\n', '---\nresearch-depth: deep\n'));
-  assert.equal((await h.repo.readNote(h.topic.path)).researchMode, 'research', 'missing research-mode reads as Standard');
+  assert.equal((await h.repo.readNote(h.topic.path)).researchMode, 'local', 'missing research-mode reads as Quick');
   await h.run();
   assert.match(await text(), /research-depth: deep/, 'the old line survives a research');
-  assert.match(await text(), /research-mode: research/);
+  assert.match(await text(), /research-mode: local/, 'a Quick run writes the mode it used');
   assert.equal(h.contexts.at(-1).researchDepth, 'normal', 'the depth no longer comes from the note');
 });
 integrationTest('Re-run with Standard: one usage confirmation, Standard options, the plain research task without sources or extra requirements, and the Quick result is restored by one undo', async () => {
@@ -2489,7 +2489,7 @@ integrationTest('multi research without overrides runs each topic in its own not
   const byTitle = Object.fromEntries(h.runs.map(run => [run.title, run.options]));
   const shape = options => plain([options.researchMode, options.researchDepth, options.visualMode, options.mapAiMode, options.addCharts]);
   assert.deepEqual(shape(byTitle['Quick note']), ['local', 'normal', 'off', 'quick', false]);
-  assert.deepEqual(shape(byTitle['Old note']), ['research', 'normal', 'auto', 'standard', true], 'an older note without research-mode is Standard');
+  assert.deepEqual(shape(byTitle['Old note']), ['local', 'normal', 'off', 'quick', false], 'an older note without research-mode is Quick');
   assert.deepEqual(shape(byTitle['Standard note']), ['research', 'normal', 'auto', 'standard', true]);
   for (const run of h.runs) assert.match(run.options.task, /Be brief$/);
   for (const name of h.finish.keys()) h.finish.get(name)();
@@ -2542,5 +2542,5 @@ integrationTest('a topic added by hand or by an expansion without subtopic resea
   const child = view.map.nodes.at(-1);
   assert.equal((await repo.readNote(child.path)).researchMode, 'local');
   assert.match(await app.vault.cachedRead(app.vault.getAbstractFileByPath(child.path)), /research-mode: local/);
-  assert.equal((await repo.readNote(parent.path)).researchMode, 'research', 'the parent keeps its own mode');
+  assert.equal((await repo.readNote(parent.path)).researchMode, 'local', 'the parent (no research-mode) reads as Quick and is not touched');
 });

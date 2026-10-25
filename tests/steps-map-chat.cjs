@@ -4,7 +4,8 @@ const assert = require('node:assert/strict');
 const { load } = require('./support-replay.cjs');
 const { estimateTokens } = load('ai/context-builder.ts');
 const { mapChatStep, parseMapChat, MAP_CHAT_SCHEMA, MAP_CHAT_ACTION_KINDS, MAP_RUN_ACTIONS, MapChatError } = load('core/steps/map-chat/step.ts');
-const { buildMapChatContext, contentHash, isMdStale } = load('core/map-chat-context.ts');
+const { buildMapChatContext, contentHash, isMdStale, MAP_CHAT_MAP_TITLE_LIMIT } = load('core/map-chat-context.ts');
+const { planFor, matchMapTitle, MAP_CHAT_PLAN_ACTION_LIMIT, MAP_CHAT_PLAN_RESEARCH_LIMIT } = load('core/map-chat-plan.ts');
 const { guardMapChatWrite, normalizeVaultPath, applyMdEdit } = load('core/map-chat-guard.ts');
 const { partialReply, MapChatService } = load('core/map-chat-service.ts');
 const { History, serializeMap } = load('map-model.ts');
@@ -21,7 +22,7 @@ const topic = (id, extra = {}) => ({ id, title: id.toUpperCase(), summary: `${id
 const input = (extra = {}) => ({ mapTitle: 'Steak', outline, selected: [], references: [], snippets: [], files: [], activeFile: null, history: [], ...extra });
 const context = (extra = {}) => buildMapChatContext(input(extra));
 const request = (extra = {}) => ({ message: 'What is missing?', context: context(), language: 'en', model: 'claude:sonnet', reasoning: 'low', ...extra });
-const item = (kind, fields = {}) => ({ kind, nodeId: '', parentId: '', newParentId: '', title: '', summary: '', detail: '', path: '', find: '', replace: '', content: '', nodeIds: [], all: false, branch: false, action: '', goal: '', direction: '', ...fields });
+const item = (kind, fields = {}) => ({ kind, nodeId: '', ref: '', parentId: '', newParentId: '', title: '', summary: '', detail: '', path: '', find: '', replace: '', content: '', nodeIds: [], all: false, branch: false, action: '', goal: '', direction: '', ...fields });
 const reply = (...actions) => JSON.stringify({ reply: 'ok', actions });
 const parse = (raw, ctx = context()) => plain(parseMapChat(raw, ctx));
 
@@ -40,7 +41,8 @@ test('parser keeps well-formed actions of every kind with trimmed fields', () =>
     item('run_map_action', { action: 'merge', title: 'Merged' })
   ));
   assert.equal(result.rejected.length, 0);
-  assert.deepEqual(result.actions.map(action => action.kind), plain(MAP_CHAT_ACTION_KINDS));
+  // The ten kinds of step version 2; the six added in version 3 (create_map, open_map and the view operations) have their own tests below.
+  assert.deepEqual(result.actions.map(action => action.kind), plain(MAP_CHAT_ACTION_KINDS).slice(0, 10));
   assert.deepEqual(result.actions[0], { kind: 'add_child', parentId: 'a', title: 'New', summary: 'S' });
   assert.equal(result.reply, 'ok');
 });
@@ -96,16 +98,16 @@ test('parser select_topics all=true selects every card and run_map_action accept
 test('parser rejects a malformed whole reply and caps the number of actions', () => {
   for (const raw of ['not json', '[]', '{"reply":"x"}', '{"actions":[]}', '{"reply":3,"actions":[]}', '{"reply":"x","actions":{}}'])
     assert.throws(() => parseMapChat(raw, context()), error => error instanceof MapChatError && error.code === 'invalid', raw);
-  const many = Array.from({ length: 45 }, () => item('rename_topic', { nodeId: 'a', title: 'T' }));
+  const many = Array.from({ length: 105 }, () => item('rename_topic', { nodeId: 'a', title: 'T' }));
   const result = parse(reply(...many));
-  assert.equal(result.actions.length, 40);
+  assert.equal(result.actions.length, 100);
   assert.equal(result.rejected.length, 5);
   assert.ok(result.rejected.every(entry => entry.code === 'too_many'));
 });
 test('schema lists exactly the kinds and run actions, and every property is required', () => {
   const properties = MAP_CHAT_SCHEMA.properties.actions.items.properties;
   assert.deepEqual(plain(properties.kind.enum), plain(MAP_CHAT_ACTION_KINDS));
-  assert.equal(MAP_CHAT_ACTION_KINDS.length, 10);
+  assert.equal(MAP_CHAT_ACTION_KINDS.length, 16);
   assert.deepEqual(plain(properties.action.enum), [...plain(MAP_RUN_ACTIONS), '']);
   assert.deepEqual(plain(MAP_CHAT_SCHEMA.properties.actions.items.required).sort(), Object.keys(properties).sort());
 });
@@ -396,7 +398,199 @@ test('C1: a redo prompt says actions must be empty; a normal prompt does not', (
   assert.ok(!/actions" must be an empty list/.test(mapChatStep.render(request({ style: 'detailed' }))));
   assert.match(mapChatStep.render(request({ language: 'zh-TW', style: 'detailed', redo: true })), /"actions" 必須是空清單/);
 });
-test('C1: the action schema is unchanged and the step version moved to 2', () => {
-  assert.equal(mapChatStep.version, 2);
+test('C1: the style is not part of the action schema, and the step version is 3 (ref and the six new kinds)', () => {
+  assert.equal(mapChatStep.version, 3);
   assert.equal(JSON.stringify(MAP_CHAT_SCHEMA).includes('style'), false);
+});
+
+
+// ---- first window, core (B1-core): ref, root cards, 100 actions, create/open map, view operations ----
+const codes = result => result.rejected.map(entry => `${entry.index}:${entry.code}`);
+const child = (ref, parent, title = ref) => item('add_child', { ref, parentId: parent, title });
+
+test('B1 ref: a root card (empty parentId) and three levels refer to each other with new:<ref>', () => {
+  const result = parse(reply(
+    child('r1', ''), child('l1', 'new:r1'), child('l2', 'new:l1'), child('l3', 'new:l2'),
+    item('add_child', { parentId: 'a', title: 'Under existing' })
+  ));
+  assert.deepEqual(result.rejected, []);
+  assert.deepEqual(result.actions.map(action => [action.ref, action.parentId]), [['r1', ''], ['l1', 'new:r1'], ['l2', 'new:l1'], ['l3', 'new:l2'], [undefined, 'a']]);
+  assert.equal('ref' in result.actions[4], false, 'a card without a ref carries no ref key (the version 2 shape)');
+});
+test('B1 ref counterexample: a forward reference is dropped, the rest stay', () => {
+  const result = parse(reply(child('b', 'new:a'), child('a', ''), child('c', 'new:a')));
+  assert.deepEqual(codes(result), ['0:bad_ref']);
+  assert.deepEqual(result.actions.map(action => action.ref), ['a', 'c']);
+});
+test('B1 ref counterexample: a repeated ref and a malformed ref are dropped as bad_ref', () => {
+  const result = parse(reply(child('a', ''), child('a', 'new:a', 'again'), child('has space', ''), child('x'.repeat(41), ''), child('ok', 'new:a')));
+  assert.deepEqual(codes(result), ['1:bad_ref', '2:bad_ref', '3:bad_ref']);
+  assert.deepEqual(result.actions.map(action => action.ref), ['a', 'ok']);
+});
+test('B1 ref counterexample: a new: id nobody defined is dropped, wherever it is used', () => {
+  const result = parse(reply(
+    child('a', 'new:ghost'),
+    item('move_topic', { nodeId: 'a', newParentId: 'new:ghost' }),
+    item('select_topics', { nodeIds: ['new:ghost'] }),
+    item('collapse_topic', { nodeId: 'new:ghost' }),
+    item('focus_topic', { nodeId: 'new:ghost' })
+  ));
+  assert.equal(result.actions.length, 0);
+  assert.deepEqual(result.rejected.map(entry => entry.code), Array(5).fill('bad_ref'));
+});
+test('B1 ref counterexample: new: that points at an item which was dropped is dropped, and so is everything below it', () => {
+  const result = parse(reply(
+    item('add_child', { ref: 'p', parentId: 'a', title: '   ' }), // dropped: no title, so p is never defined
+    child('c1', 'new:p'), child('c2', 'new:c1'), child('ok', 'a')
+  ));
+  assert.deepEqual(codes(result), ['0:missing_field', '1:bad_ref', '2:bad_ref']);
+  assert.deepEqual(result.actions.map(action => action.ref), ['ok']);
+});
+test('B1 ref: new: ids may name cards in move_topic, select_topics, run_map_action and the view operations, but not in rename, summary, note or delete', () => {
+  const ok = parse(reply(
+    child('n', 'a'),
+    item('move_topic', { nodeId: 'b', newParentId: 'new:n' }),
+    item('select_topics', { nodeIds: ['new:n', 'a'] }),
+    item('run_map_action', { action: 'expand', nodeIds: ['new:n'] }),
+    item('collapse_topic', { nodeId: 'new:n' }), item('expand_topic', { nodeId: 'new:n' }), item('focus_topic', { nodeId: 'new:n' })
+  ));
+  assert.deepEqual(ok.rejected, []);
+  const refused = parse(reply(
+    child('n', 'a'),
+    item('rename_topic', { nodeId: 'new:n', title: 'T' }), item('update_summary', { nodeId: 'new:n', summary: 'S' }),
+    item('edit_topic_note', { nodeId: 'new:n', detail: 'D' }), item('delete_topic', { nodeId: 'new:n' })
+  ));
+  assert.deepEqual(refused.rejected.map(entry => entry.code), Array(4).fill('bad_ref'));
+});
+test('B1 ref: moving an existing card under a new card whose parent is inside it is a cycle', () => {
+  const result = parse(reply(child('x', 'a1'), item('move_topic', { nodeId: 'a', newParentId: 'new:x' })));
+  assert.deepEqual(codes(result), ['1:cycle']);
+});
+test('B1 limit: the 100th action is kept and the 101st is dropped as too_many', () => {
+  const rows = count => Array.from({ length: count }, (_, i) => child(`n${i}`, ''));
+  const hundred = parse(reply(...rows(100)));
+  assert.equal(hundred.actions.length, 100); assert.deepEqual(hundred.rejected, []);
+  const more = parse(reply(...rows(101)));
+  assert.equal(more.actions.length, 100); assert.deepEqual(more.rejected, [{ index: 100, code: 'too_many' }]);
+  assert.equal(MAP_CHAT_ACTION_KINDS.at(-1), 'focus_topic');
+});
+test('B1 compat: a step version 2 reply (no ref key anywhere) still parses', () => {
+  const old = key => ({ kind: key, nodeId: '', parentId: '', newParentId: '', title: '', summary: '', detail: '', path: '', find: '', replace: '', content: '', nodeIds: [], all: false, branch: false, action: '', goal: '', direction: '' });
+  const result = parse(JSON.stringify({ reply: 'ok', actions: [{ ...old('add_child'), parentId: 'a', title: 'T' }, { ...old('rename_topic'), nodeId: 'b', title: 'N' }] }));
+  assert.deepEqual(result.rejected, []); assert.deepEqual(result.actions, [{ kind: 'add_child', parentId: 'a', title: 'T', summary: '' }, { kind: 'rename_topic', nodeId: 'b', title: 'N' }]);
+});
+test('B1 create_map: only as the very first action; afterwards the old map\'s cards are out of reach', () => {
+  const ok = parse(reply(item('create_map', { title: ' Quantum ' }), child('r', ''), child('k', 'new:r')));
+  assert.deepEqual(ok.rejected, []); assert.deepEqual(ok.actions[0], { kind: 'create_map', title: 'Quantum' });
+  const late = parse(reply(child('r', ''), item('create_map', { title: 'Quantum' })));
+  assert.deepEqual(codes(late), ['1:bad_value']); assert.deepEqual(late.actions.map(action => action.kind), ['add_child']);
+  const after = parse(reply(item('create_map', { title: 'Q' }), child('r', 'a'), item('rename_topic', { nodeId: 'a', title: 'x' }), item('select_topics', { all: true }), item('create_map', { title: 'again' })));
+  assert.deepEqual(after.rejected.map(entry => entry.code), ['unknown_node', 'unknown_node', 'bad_value', 'bad_value']);
+  assert.equal(parse(reply(item('create_map'))).actions.length, 0, 'a title is required');
+});
+test('B1 open_map: only as the very last action, with a title, and not after a create_map', () => {
+  const ok = parse(reply(item('rename_topic', { nodeId: 'a', title: 'T' }), item('open_map', { title: 'Coffee' })));
+  assert.deepEqual(ok.rejected, []); assert.deepEqual(ok.actions.at(-1), { kind: 'open_map', title: 'Coffee' });
+  const early = parse(reply(item('open_map', { title: 'Coffee' }), item('rename_topic', { nodeId: 'a', title: 'T' })));
+  assert.deepEqual(codes(early), ['0:bad_value']);
+  assert.deepEqual(codes(parse(reply(item('create_map', { title: 'Q' }), item('open_map', { title: 'Coffee' })))), ['1:bad_value']);
+  assert.deepEqual(codes(parse(reply(item('open_map')))), ['0:missing_field']);
+});
+test('B1 noEditableMap: the reply has to start with create_map; anything else before it is dropped', () => {
+  const none = { ...context(), noEditableMap: true };
+  const start = parse(reply(item('create_map', { title: 'First' }), child('r', ''), child('k', 'new:r')), none);
+  assert.deepEqual(start.rejected, []); assert.equal(start.actions.length, 3);
+  const noCreate = parse(reply(child('r', ''), child('k', 'new:r')), none);
+  assert.equal(noCreate.actions.length, 0); assert.deepEqual(noCreate.rejected.map(entry => entry.code), ['bad_value', 'bad_value']);
+  const wrongOrder = parse(reply(child('r', ''), item('create_map', { title: 'First' }), child('k', 'new:r')), none);
+  assert.equal(wrongOrder.actions.length, 0, 'create_map is only valid as the first action, so the whole reply is dropped');
+  assert.equal(parse(reply(child('r', '')), context()).actions.length, 1, 'without the flag a root card is fine');
+});
+test('B1 view operations: collapse_topic, expand_topic and focus_topic need a card; auto_layout needs nothing', () => {
+  const result = parse(reply(item('collapse_topic', { nodeId: 'a' }), item('expand_topic', { nodeId: 'a' }), item('auto_layout'), item('focus_topic', { nodeId: 'b' })));
+  assert.deepEqual(result.rejected, []);
+  assert.deepEqual(result.actions, [{ kind: 'collapse_topic', nodeId: 'a' }, { kind: 'expand_topic', nodeId: 'a' }, { kind: 'auto_layout' }, { kind: 'focus_topic', nodeId: 'b' }]);
+  const bad = parse(reply(item('collapse_topic'), item('focus_topic', { nodeId: 'ghost' })));
+  assert.deepEqual(bad.rejected.map(entry => entry.code), ['missing_field', 'unknown_node']);
+});
+test('B1 schema: ref is a required string property and the kinds list ends with the view operations', () => {
+  const properties = MAP_CHAT_SCHEMA.properties.actions.items.properties;
+  assert.deepEqual(plain(properties.ref), { type: 'string' });
+  assert.ok(MAP_CHAT_SCHEMA.properties.actions.items.required.includes('ref'));
+  assert.deepEqual(plain(properties.kind.enum).slice(10), ['create_map', 'open_map', 'collapse_topic', 'expand_topic', 'auto_layout', 'focus_topic']);
+});
+test('B1 context: map titles (cleaned, at most 200) and the noEditableMap flag reach the model; the selection size is kept', () => {
+  const titles = Array.from({ length: 260 }, (_, i) => `Map ${i}`);
+  const built = context({ mapTitles: ['  Coffee \n map ', ...titles], noEditableMap: true, selected: [topic('a'), topic('b')] });
+  const data = JSON.parse(built.json);
+  assert.equal(data.mapTitles.length, MAP_CHAT_MAP_TITLE_LIMIT); assert.equal(MAP_CHAT_MAP_TITLE_LIMIT, 200);
+  assert.equal(data.mapTitles[0], 'Coffee map'); assert.equal(data.noEditableMap, true);
+  assert.equal(built.noEditableMap, true); assert.equal(built.selectedCount, 2);
+  const plainContext = context(); assert.equal('noEditableMap' in JSON.parse(plainContext.json), false); assert.equal(plainContext.noEditableMap, false);
+  assert.deepEqual(JSON.parse(plainContext.json).mapTitles, []);
+});
+test('B1 prompt: it tells the model to say what it will do (not what it did), explains ref / empty parentId / the new kinds, in both languages', () => {
+  for (const [language, patterns] of [
+    ['en', [/Never say a change has already been made/, /new:<ref>/, /empty string for a new root topic/, /create_map: title/, /open_map: title/, /At most 100 actions/, /future or intention wording/]],
+    ['zh-TW', [/不可說已經改好了/, /new:<ref>/, /空字串，表示新的根議題/, /create_map：title/, /open_map：title/, /最多 100 個動作/]]
+  ]) {
+    const text = mapChatStep.render(request({ language }));
+    for (const pattern of patterns) assert.match(text, pattern, `${language} ${pattern}`);
+    assert.match(text, /"ref":""/, 'the JSON template names ref');
+  }
+  assert.match(mapChatStep.render(request({ style: 'concise' })), /never claim it is already done/);
+  assert.match(mapChatStep.render(request({ language: 'zh-TW', style: 'concise' })), /不可說已經完成/);
+});
+
+// ---- plan conditions ----
+const plan = (actions, extra = {}) => planFor(actions, { parents: { a: 'r', a1: 'a', b: 'r', r: null }, selectedCount: 0, ...extra });
+const renameRows = count => Array.from({ length: count }, () => ({ kind: 'rename_topic', nodeId: 'a', title: 'T' }));
+const researchOn = ids => ({ kind: 'run_map_action', action: 'research_standard', nodeIds: ids, title: '', goal: '', direction: '' });
+const ids = count => Array.from({ length: count }, (_, i) => `n${i}`);
+test('B1 plan: 16 actions need a plan, 15 do not', () => {
+  assert.equal(MAP_CHAT_PLAN_ACTION_LIMIT, 15);
+  assert.equal(plan(renameRows(15)), null);
+  assert.deepEqual(plain(plan(renameRows(16))), { reasons: ['many_actions'], estimatedCalls: 0 });
+});
+test('B1 plan: delete_topic with branch:true needs a plan only when the card has subtopics', () => {
+  assert.deepEqual(plain(plan([{ kind: 'delete_topic', nodeId: 'a', branch: true }]).reasons), ['delete_branch']);
+  assert.equal(plan([{ kind: 'delete_topic', nodeId: 'a1', branch: true }]), null, 'a leaf has no branch to take');
+  assert.equal(plan([{ kind: 'delete_topic', nodeId: 'a', branch: false }]), null, 'the card alone is moved');
+  assert.deepEqual(plain(plan([{ kind: 'add_child', parentId: 'a1', title: 'T', summary: '' }, { kind: 'delete_topic', nodeId: 'a1', branch: true }]).reasons), ['delete_branch'], 'a child added by the same reply counts');
+});
+test('B1 plan: 10 research targets need a plan, 9 do not; no targets means the selection at that point', () => {
+  assert.equal(MAP_CHAT_PLAN_RESEARCH_LIMIT, 10);
+  assert.equal(plan([researchOn(ids(9))]), null);
+  assert.deepEqual(plain(plan([researchOn(ids(10))])), { reasons: ['many_research'], estimatedCalls: 10 });
+  assert.deepEqual(plain(plan([researchOn([])], { selectedCount: 10 }).reasons), ['many_research']);
+  assert.equal(plan([researchOn([])], { selectedCount: 9 }), null);
+  assert.deepEqual(plain(plan([{ kind: 'select_topics', nodeIds: ids(12), all: false }, researchOn([])]).reasons), ['many_research'], 'a select_topics before it sets the selection');
+  assert.deepEqual(plain(plan([researchOn(ids(6)), researchOn(ids(5))]).reasons), ['many_research'], 'research actions add up');
+});
+test('B1 plan: create_map needs a plan', () => {
+  assert.deepEqual(plain(plan([{ kind: 'create_map', title: 'Q' }]).reasons), ['new_map']);
+  assert.equal(plan([{ kind: 'open_map', title: 'Q' }]), null);
+  assert.deepEqual(plain(plan([{ kind: 'create_map', title: 'Q' }, ...renameRows(15)]).reasons), ['many_actions', 'new_map']);
+});
+test('B1 plan: the estimate counts research targets, expanded cards, one rating, one merge, and nothing for writes, synthesis or view operations', () => {
+  const run = (action, extra = {}) => ({ kind: 'run_map_action', action, nodeIds: [], title: 'm', goal: 'g', direction: '', ...extra });
+  const estimate = (actions, selectedCount = 0) => planFor([{ kind: 'create_map', title: 'Q' }, ...actions], { parents: {}, selectedCount }).estimatedCalls;
+  assert.equal(estimate([]), 0);
+  assert.equal(estimate([run('research_standard', { nodeIds: ['x', 'y', 'z'] })]), 3);
+  assert.equal(estimate([run('expand', { nodeIds: ['x', 'y'] })]), 2);
+  assert.equal(estimate([run('expand')], 4), 4, 'no targets = the selection');
+  assert.equal(estimate([run('rate_by_goal')]), 1);
+  assert.equal(estimate([run('merge')]), 1);
+  assert.equal(estimate([run('synthesize')]), 0);
+  assert.equal(estimate([{ kind: 'collapse_topic', nodeId: 'x' }, { kind: 'auto_layout' }, { kind: 'focus_topic', nodeId: 'x' }, { kind: 'rename_topic', nodeId: 'x', title: 'T' }]), 0);
+  assert.equal(estimate([run('research_standard', { nodeIds: ['x', 'y'] }), run('expand', { nodeIds: ['x'] }), run('rate_by_goal'), run('merge')]), 5);
+});
+test('B1 open_map matching: exact first, then contains; case, spacing and Traditional/Simplified are ignored; none, one and many are told apart', () => {
+  const maps = [{ title: 'Coffee industry' }, { title: '咖啡產業' }, { title: 'Coffee' }, { title: 'Tea' }];
+  assert.deepEqual(plain(matchMapTitle('  coffee ', maps)), { kind: 'one', map: maps[2] }, 'an exact match beats the longer title that contains it');
+  assert.deepEqual(plain(matchMapTitle('咖啡产业', maps)), { kind: 'one', map: maps[1] }, 'Simplified finds Traditional');
+  assert.deepEqual(plain(matchMapTitle('cof', maps)), { kind: 'many', maps: [maps[0], maps[2]] });
+  assert.deepEqual(plain(matchMapTitle('Wine', maps)), { kind: 'none' });
+  assert.deepEqual(plain(matchMapTitle('   ', maps)), { kind: 'none' });
+  assert.deepEqual(plain(matchMapTitle('Tea', [{ title: 'Tea' }, { title: 'tea' }])), { kind: 'many', maps: [{ title: 'Tea' }, { title: 'tea' }] }, 'two exact matches stay two');
 });

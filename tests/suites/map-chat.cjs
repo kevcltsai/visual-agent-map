@@ -224,7 +224,7 @@ test('map chat: a failed or stopped turn shows its own text and does not become 
 
 class MarkdownView {}
 
-async function harness({ aim = false, document = false } = {}) {
+async function harness({ aim = false, document = false, empty = false } = {}) {
   const { repo, app, contents, files } = fixture('en');
   app.vault.configDir = '.obsidian';
   const settings = { ...DEFAULT_SETTINGS, language: 'en', cliModel: 'claude:sonnet' };
@@ -238,7 +238,7 @@ async function harness({ aim = false, document = false } = {}) {
     mapDoc.nodes.push(created); ids[key] = created.id;
     return created;
   };
-  await add('root', 'Sleep'); await add('a', 'Body', 'root'); await add('b', 'Mind', 'root'); await add('c', 'REM', 'a');
+  if (!empty) { await add('root', 'Sleep'); await add('a', 'Body', 'root'); await add('b', 'Mind', 'root'); await add('c', 'REM', 'a'); }
   await app.vault.create(MAP, core.serializeMap(mapDoc));
   await repo.rebuildDerivedData();
   for (const [file, text] of Object.entries({ 'Notes/Research.md': '# Research\n\nSleep needs darkness.\nSleep needs quiet.\n', 'Notes/Other.md': 'Other note about naps.\n', '.obsidian/plugins/x.md': 'config text\n' })) {
@@ -251,7 +251,7 @@ async function harness({ aim = false, document = false } = {}) {
   let queue = Promise.resolve();
   const ctx = {};
   const plugin = withExpansionCoordinator({
-    repo, settings, running: new Set(), views: () => ctx.otherViews ?? [], logs: { appendLog() {} }, rebuildDerivedData: () => repo.rebuildDerivedData(), relevanceGrades: new Map(), releaseOutline() {}, syncOutline() {}, setOutlineActive() {},
+    repo, settings, running: new Set(), views: () => ctx.otherViews ?? [], logs: { appendLog() {} }, rebuildDerivedData: () => repo.rebuildDerivedData(), relevanceGrades: new Map(), closeStaleDetails() {}, releaseOutline() {}, syncOutline() {}, setOutlineActive() {},
     pendingSuggestions: new Map(), pendingResearchOptions: new Map(), detailsShown: () => false,
     // Like the real mutate: a promise queue that is not re-entrant. A call made from inside a running write waits for it, forever.
     mutate(work) {
@@ -272,14 +272,15 @@ async function harness({ aim = false, document = false } = {}) {
   });
   const leaves = []; let activeMarkdown = null;
   const handlers = []; const linkOpens = [];
-  app.workspace = { getLeavesOfType: type => type === 'markdown' ? leaves : [], getActiveViewOfType: () => activeMarkdown, on(name, fn) { const ref = { name, fn }; handlers.push(ref); return ref; }, openLinkText(link, source, newLeaf) { linkOpens.push([link, source, newLeaf]); } };
+  app.workspace = { getLeavesOfType: type => type === 'markdown' ? leaves : [], getActiveViewOfType: () => activeMarkdown, requestSaveLayout() {}, on(name, fn) { const ref = { name, fn }; handlers.push(ref); return ref; }, openLinkText(link, source, newLeaf) { linkOpens.push([link, source, newLeaf]); } };
   class Notice { constructor(message) { notices.push(message); } hide() {} }
   const { VisualAgentMapView } = load('main.ts', { obsidian: { ...obsidian, MarkdownView, Notice, Component: class { load() {} unload() {} }, MarkdownRenderer: { render: async (_app, text, el, sourcePath, owner) => { control.markdown.push({ text, el, sourcePath, owner }); el.setText(text); } } } }, { ...(document ? { document: { documentElement: { style: {} }, get activeElement() { return ctx.page?.doc.activeElement ?? null; } } } : {}), CSS: { escape: value => String(value) }, createSvg: tag => ({ tag, attrs: {}, classes: [], setAttribute(name, value) { this.attrs[name] = value; }, addClass(name) { this.classes.push(name); } }), requestAnimationFrame: run => { run(); return 1; }, cancelAnimationFrame() {}, setTimeout: fn => { ctx.timers.push(fn); return ctx.timers.length; }, clearTimeout() {} });
   ctx.timers = [];
   const view = new VisualAgentMapView({ app }, plugin);
   ctx.view = view;
   const p = page(); const rootEl = p.root; ctx.page = p;
-  Object.assign(view, { path: MAP, contentEl: rootEl, focusNode() {}, closed: false });
+  const focused = [];
+  Object.assign(view, { path: MAP, contentEl: rootEl, focusNode(node) { focused.push(node.id); }, closed: false });
   view.map = await repo.readMap(MAP);
   if (aim) view.map.aim = { version: 1, branches: [], runs: [], pendingCommits: [] };
   const rawSend = view.sendMapChat.bind(view); view.sendMapChat = (...args) => withTimeout(rawSend(...args));
@@ -296,7 +297,7 @@ async function harness({ aim = false, document = false } = {}) {
   };
   await reload();
   const h = {
-    repo, app, contents, files, view, plugin, ids, control, notices, opened, leaves, handlers, linkOpens, page: p, rootEl, get timers() { return ctx.timers; }, repaint, renders: () => renders, workspace: () => workspaceEl,
+    repo, app, contents, files, view, plugin, ids, control, notices, focused, opened, leaves, handlers, linkOpens, page: p, rootEl, get timers() { return ctx.timers; }, repaint, renders: () => renders, workspace: () => workspaceEl,
     setActive: (file, text, editor) => { const v = h.leaf(file, { editor }); activeMarkdown = v; leaves.splice(0, leaves.length, { view: v }); return v; },
     // A markdown leaf; `shown` false is a background tab, `doc` another window. Not made active.
     leaf: (file, { shown = true, doc = p.doc, editor = null } = {}) => Object.assign(new MarkdownView(), { file: app.vault.getAbstractFileByPath(file), editor, containerEl: { ownerDocument: doc, isShown: () => shown } }),
@@ -2036,4 +2037,198 @@ test('map chat E2: a heading, a quote or a list that does not fit goes to the pl
   const items = Array.from({ length: 1500 }, (_, i) => `- row **${i}** and more`); const l = layoutWith(items.join('\n') + '\n\nafter');
   const lp = plainOf(l).text; const at = items.findIndex(row => lp.startsWith(row)); assert.ok(at > 100);
   assert.equal(lp, items.slice(at).join('\n') + '\n\nafter'); assert.equal(findAll(l, i => i.tag === 'li').length, at);
+});
+
+// ---- first window, core (B1-core) -----------------------------------------------------------------------------------
+// The panel's plan card is clicked through its real buttons. A snapshot of every file in the vault proves "nothing changed".
+const vaultState = h => JSON.stringify([...h.contents.entries()].sort(([a], [b]) => a < b ? -1 : 1));
+const planCard = h => findAll(h.view.chat.logEl, i => hasClass(i, 'vam-map-chat-plan'));
+const planButton = (h, which) => find(h.view.chat.logEl, i => i.tag === 'button' && hasClass(i, `vam-map-chat-plan-${which}`));
+const addRoot = (ref, title, parentId = '') => ({ kind: 'add_child', parentId, title, summary: '', ref });
+const children = (h, id) => h.view.map.nodes.filter(n => n.parentId === id);
+const titleOf = async (h, node) => (await h.repo.readNote(node.path)).title;
+
+integrationTest('B1 core: a root card plus three levels, tied together with new:<ref>, are built on an empty map with the same parent/child shape as the reply', async () => {
+  const h = await harness({ empty: true }); await h.view.hydrate(); assert.equal(h.view.map.nodes.length, 0);
+  const lines = await apply(h, [addRoot('r', 'Coffee'), addRoot('o', 'Origins', 'new:r'), addRoot('p', 'Processing', 'new:r'), addRoot('e', 'Ethiopia', 'new:o'), addRoot('w', 'Washed', 'new:p'), addRoot('x', 'Anaerobic', 'new:p')]);
+  eq(lines.slice(0, 6).map(l => l.status), Array(6).fill('done'), JSON.stringify(lines)); assert.equal(lines.length, 7, 'six cards: the sixth line is the automatic layout');
+  const saved = await h.saved(); assert.equal(saved.length, 6);
+  const byTitle = {}; for (const n of saved) byTitle[await titleOf(h, n)] = n;
+  assert.equal(byTitle.Coffee.parentId, null); assert.equal(byTitle.Origins.parentId, byTitle.Coffee.id); assert.equal(byTitle.Processing.parentId, byTitle.Coffee.id);
+  assert.equal(byTitle.Ethiopia.parentId, byTitle.Origins.id); assert.equal(byTitle.Washed.parentId, byTitle.Processing.id); assert.equal(byTitle.Anaerobic.parentId, byTitle.Processing.id);
+  assert.equal(h.control.nested, 0, 'never a mutate inside a mutate');
+});
+integrationTest('B1 core: a card whose parent was not created is skipped with a reason, its own children too, and the other cards still build', async () => {
+  const h = await harness(); await h.view.hydrate();
+  const lines = await apply(h, [{ kind: 'add_child', parentId: 'ghost-id', title: 'Orphan', summary: '', ref: 'o' }, addRoot('k', 'Kid', 'new:o'), addRoot('kk', 'Grandkid', 'new:k'), { kind: 'add_child', parentId: h.ids.a, title: 'Fine', summary: '' }]);
+  eq(lines.map(l => l.status), ['skipped', 'skipped', 'skipped', 'done'], JSON.stringify(lines));
+  assert.match(lines[0].text, /no longer on the map/); assert.match(lines[1].text, /parent topic was not created/); assert.match(lines[2].text, /parent topic was not created/);
+  assert.equal((await h.saved()).length, 5);
+});
+integrationTest('B1 core: a new root card on a map that has cards goes in beside the others; no parent card is needed', async () => {
+  const h = await harness(); await h.view.hydrate();
+  const lines = await apply(h, [addRoot('r', 'Second root'), addRoot('k', 'Its child', 'new:r')]);
+  eq(lines.map(l => l.status), ['done', 'done']);
+  const roots = (await h.saved()).filter(n => !n.parentId); assert.equal(roots.length, 2);
+});
+
+integrationTest('B1 plan: 16 actions wait for Apply; until then the map, the notes and Map.md are untouched', async () => {
+  const h = await harness(); await h.view.hydrate(); const chat = h.open();
+  const before = vaultState(h); h.control.mutates = 0;
+  h.control.reply = async () => ({ reply: 'I will add sixteen cards.', actions: Array.from({ length: 16 }, (_, i) => ({ kind: 'add_child', parentId: h.ids.root, title: `Card ${i}`, summary: '' })), rejected: [] });
+  h.type('add many'); await h.view.sendMapChat();
+  assert.equal(planCard(h).length, 1, 'the plan card is in the conversation'); assert.equal(chat.pendingPlan().state, 'pending');
+  assert.equal(chat.isBusy, false); assert.equal(h.control.mutates, 0, 'no write was queued'); assert.equal(vaultState(h), before, 'the vault is byte for byte as it was');
+  assert.match(visibleText(planCard(h)[0]), /16 actions/); assert.match(visibleText(planCard(h)[0]), /No extra AI calls/);
+  assert.equal(findAll(planCard(h)[0], i => i.tag === 'li' && /Add subtopic/.test(visibleText(i))).length, 16, 'every action is listed');
+  assert.equal(planButton(h, 'apply').attrs.type, 'button'); assert.equal(planButton(h, 'cancel').attrs.type, 'button');
+  planButton(h, 'apply').click(); await until(() => chat.pendingPlan() === null && !h.view.chatApplying);
+  assert.equal(children(h, h.ids.root).length, 18); assert.notEqual(vaultState(h), before);
+  const lines = chat.transcript().at(-1).lines; assert.equal(lines.filter(l => l.status === 'done').length >= 16, true);
+});
+integrationTest('B1 plan: Cancel leaves the vault exactly as it was and the buttons stop working', async () => {
+  const h = await harness(); await h.view.hydrate(); const chat = h.open(); const before = vaultState(h);
+  h.control.reply = async () => ({ reply: 'plan', actions: Array.from({ length: 20 }, (_, i) => ({ kind: 'add_child', parentId: h.ids.root, title: `Card ${i}`, summary: '' })), rejected: [] });
+  h.type('add many'); await h.view.sendMapChat(); const card = chat.pendingPlan();
+  planButton(h, 'cancel').click();
+  assert.equal(card.state, 'cancelled'); assert.equal(h.control.mutates, 0); assert.equal(vaultState(h), before);
+  assert.match(visibleText(planCard(h)[0]), /Plan cancelled\. Nothing was changed\./); assert.equal(planButton(h, 'apply'), undefined, 'no buttons on a settled plan');
+  card.apply(); await tick(); assert.equal(h.control.mutates, 0, 'a settled card cannot be applied'); assert.equal(vaultState(h), before);
+});
+integrationTest('B1 plan: sending a new message while a plan waits cancels it; the old Apply no longer writes', async () => {
+  const h = await harness(); await h.view.hydrate(); const chat = h.open(); const before = vaultState(h);
+  h.control.reply = async () => ({ reply: 'plan', actions: Array.from({ length: 16 }, (_, i) => ({ kind: 'add_child', parentId: h.ids.root, title: `Card ${i}`, summary: '' })), rejected: [] });
+  h.type('add many'); await h.view.sendMapChat(); const old = chat.pendingPlan();
+  h.control.reply = async () => ({ reply: 'just talking', actions: [], rejected: [] });
+  h.type('never mind'); await h.view.sendMapChat();
+  assert.equal(old.state, 'cancelled'); assert.equal(chat.pendingPlan(), null);
+  old.apply(); await tick(); assert.equal(vaultState(h), before, 'the old plan wrote nothing'); assert.equal(h.control.mutates, 0);
+  assert.equal(old.state, 'cancelled', 'a superseded card is not marked applied by a late Apply');
+});
+integrationTest('B1 plan: switching to another map by hand ends the plan; closing the view does too', async () => {
+  const h = await harness(); await h.view.hydrate(); const chat = h.open(); const before = vaultState(h);
+  h.control.reply = async () => ({ reply: 'plan', actions: Array.from({ length: 16 }, (_, i) => ({ kind: 'add_child', parentId: h.ids.root, title: `Card ${i}`, summary: '' })), rejected: [] });
+  h.type('add many'); await h.view.sendMapChat(); const card = chat.pendingPlan();
+  h.view.map.id = 'another-map'; h.repaint();
+  card.apply(); await tick(); assert.equal(h.control.mutates, 0); assert.equal(vaultState(h), before);
+  h.view.map.id = 'map-a'; h.repaint();
+  h.type('again'); await h.view.sendMapChat(); const second = chat.pendingPlan(); assert.ok(second);
+  await h.view.onClose(); second.apply(); await tick(); assert.equal(h.control.mutates, 0);
+});
+integrationTest('B1 plan: Apply on a plan whose map is no longer the open one writes nothing and says so', async () => {
+  const h = await harness(); await h.view.hydrate(); const chat = h.open(); const before = vaultState(h);
+  h.control.reply = async () => ({ reply: 'plan', actions: Array.from({ length: 16 }, (_, i) => ({ kind: 'add_child', parentId: h.ids.root, title: `Card ${i}`, summary: '' })), rejected: [] });
+  h.type('add many'); await h.view.sendMapChat(); const card = chat.pendingPlan();
+  h.view.path = 'Agent Workspace/Topics/elsewhere/Map.md'; // the view moved on without the conversation being reset
+  planButton(h, 'apply').click(); await tick();
+  assert.equal(card.state, 'cancelled'); assert.equal(h.control.mutates, 0); assert.equal(vaultState(h), before);
+  assert.match(chat.transcript().at(-1).lines[0].text, /map was changed or closed/);
+});
+integrationTest('B1 plan: exactly 15 actions are applied at once, with no plan card', async () => {
+  const h = await harness(); await h.view.hydrate(); const chat = h.open();
+  h.control.reply = async () => ({ reply: 'adding', actions: Array.from({ length: 15 }, (_, i) => ({ kind: 'add_child', parentId: h.ids.root, title: `Card ${i}`, summary: '' })), rejected: [] });
+  h.type('add 15'); await h.view.sendMapChat();
+  assert.equal(planCard(h).length, 0); assert.equal(chat.pendingPlan(), null); assert.equal(children(h, h.ids.root).length, 17);
+});
+integrationTest('B1 plan: delete with branch:true needs a plan when the card has subtopics, and not when it is a leaf', async () => {
+  const h = await harness(); await h.view.hydrate(); const chat = h.open(); const before = vaultState(h);
+  h.control.reply = async () => ({ reply: 'removing', actions: [{ kind: 'delete_topic', nodeId: h.ids.a, branch: true }], rejected: [] });
+  h.type('remove Body'); await h.view.sendMapChat();
+  assert.equal(planCard(h).length, 1); assert.match(visibleText(planCard(h)[0]), /whole branch/); assert.equal(vaultState(h), before);
+  planButton(h, 'cancel').click();
+  h.control.reply = async () => ({ reply: 'removing', actions: [{ kind: 'delete_topic', nodeId: h.ids.c, branch: true }], rejected: [] });
+  h.type('remove REM'); await h.view.sendMapChat();
+  assert.equal(chat.pendingPlan(), null, 'a leaf has no branch to take with it');
+  assert.equal(h.view.map.nodes.some(n => n.id === h.ids.c), false, 'REM was moved out at once');
+});
+integrationTest('B1 plan: a plan that waited while the card changed skips that action as stale, like any other', async () => {
+  const h = await harness(); await h.view.hydrate(); const chat = h.open();
+  h.control.reply = async () => ({ reply: 'plan', actions: [...Array.from({ length: 15 }, (_, i) => ({ kind: 'add_child', parentId: h.ids.b, title: `Card ${i}`, summary: '' })), { kind: 'rename_topic', nodeId: h.ids.a, title: 'Renamed' }], rejected: [] });
+  h.type('go'); await h.view.sendMapChat();
+  await h.view.noteChange(h.node('a'), { title: 'Edited by the user meanwhile' });
+  planButton(h, 'apply').click(); await until(() => !h.view.chatApplying && chat.transcript().at(-1).lines.length > 0);
+  assert.equal((await h.note('a')).title, 'Edited by the user meanwhile', 'the user\'s edit stays');
+  assert.ok(chat.transcript().at(-1).lines.some(l => l.status === 'skipped' && /changed after you sent/.test(l.text)), JSON.stringify(chat.transcript().at(-1).lines));
+});
+
+integrationTest('B1 map: create_map waits for Apply, then opens the new map, builds the tree in it, and the conversation goes along', async () => {
+  const h = await harness(); await h.view.hydrate(); const chat = h.open(); const oldPath = h.view.path; const oldNodes = JSON.stringify(await h.saved());
+  chat.begin('earlier'); chat.finish('earlier answer', []);
+  h.control.reply = async () => ({ reply: 'I will create a map.', actions: [{ kind: 'create_map', title: 'Quantum computing' }, addRoot('r', 'Quantum'), addRoot('q', 'Qubits', 'new:r'), addRoot('g', 'Gates', 'new:r')], rejected: [] });
+  const topicsBefore = (await h.repo.topics()).length;
+  h.type('new map on quantum'); await h.view.sendMapChat();
+  assert.equal((await h.repo.topics()).length, topicsBefore, 'no map was made before Apply'); assert.equal(h.view.path, oldPath);
+  assert.match(visibleText(planCard(h)[0]), /new map/);
+  planButton(h, 'apply').click(); await until(() => !h.view.chatApplying && chat.pendingPlan() === null && chat.transcript().at(-1).lines.length > 0);
+  assert.notEqual(h.view.path, oldPath); assert.equal(h.view.map.title, 'Quantum computing'); assert.equal((await h.repo.topics()).length, topicsBefore + 1);
+  assert.equal(h.view.map.nodes.length, 3); const root = h.view.map.nodes.find(n => !n.parentId); assert.equal(children(h, root.id).length, 2);
+  assert.equal(JSON.stringify((await h.repo.readMap(oldPath)).nodes), oldNodes, 'the old map is unchanged');
+  assert.equal(chat.transcript().length, 4, 'the conversation was kept: earlier turn + this turn'); assert.equal(chat.transcript()[0].text, 'earlier');
+  assert.equal(h.view.chatMapId, h.view.map.id); assert.equal(chat.isBusy, false);
+  eq(chat.transcript().at(-1).lines.slice(0, 4).map(l => l.status), ['done', 'done', 'done', 'done'], JSON.stringify(chat.transcript().at(-1).lines));
+  // A later manual switch still starts a new conversation.
+  h.view.map.id = 'another-map'; h.repaint(); assert.equal(chat.transcript().length, 0);
+});
+integrationTest('B1 map: if the new map cannot be made nothing else is written to the map the user is looking at', async () => {
+  const h = await harness(); await h.view.hydrate(); const chat = h.open();
+  const original = h.repo.createMap.bind(h.repo); h.repo.createMap = async () => { throw new Error('disk full'); };
+  h.control.reply = async () => ({ reply: 'plan', actions: [{ kind: 'create_map', title: 'Quantum' }, addRoot('r', 'Quantum'), addRoot('q', 'Qubits', 'new:r')], rejected: [] });
+  const nodes = JSON.stringify(await h.saved());
+  h.type('new map'); await h.view.sendMapChat(); planButton(h, 'apply').click(); await until(() => !h.view.chatApplying && chat.transcript().at(-1).lines.length > 0);
+  h.repo.createMap = original;
+  const lines = chat.transcript().at(-1).lines;
+  assert.equal(lines[0].status, 'failed'); assert.match(lines[0].text, /disk full/); eq(lines.slice(1, 3).map(l => l.status), ['skipped', 'skipped']); assert.match(lines[1].text, /new map was not created/);
+  assert.equal(JSON.stringify(await h.saved()), nodes, 'the current map was not touched'); assert.equal(h.view.path, MAP);
+});
+integrationTest('B1 map: open_map switches at once when exactly one map matches, the conversation goes along, and the turn still finishes', async () => {
+  const h = await harness(); await h.view.hydrate(); const chat = h.open();
+  const coffee = await h.repo.createMap('Coffee industry'); await h.repo.createMap('Tea');
+  chat.begin('hi'); chat.finish('hello', []);
+  h.control.reply = async () => ({ reply: 'Switching.', actions: [{ kind: 'open_map', title: 'coffee' }], rejected: [] });
+  h.type('go to the coffee one'); await h.view.sendMapChat();
+  assert.equal(h.view.path, coffee); assert.equal(planCard(h).length, 0, 'open_map needs no plan');
+  assert.equal(chat.isBusy, false, 'the turn finished although the map changed under it'); assert.equal(chat.transcript().length, 4);
+  assert.equal(chat.transcript().at(-1).text, 'Switching.'); assert.equal(chat.transcript().at(-1).lines[0].status, 'done');
+  assert.equal(h.view.chatMapId, h.view.map.id); assert.equal(h.plugin.activeTasks.size, 0);
+});
+integrationTest('B1 map: open_map with several matches lists them and opens nothing until one is picked; none writes the reason', async () => {
+  const h = await harness(); await h.view.hydrate(); const chat = h.open();
+  const a = await h.repo.createMap('Coffee industry'); const b = await h.repo.createMap('Coffee brewing');
+  h.control.reply = async () => ({ reply: 'Which one?', actions: [{ kind: 'open_map', title: 'Coffee' }], rejected: [] });
+  h.type('open coffee'); await h.view.sendMapChat();
+  assert.equal(h.view.path, MAP, 'nothing opened yet'); const buttons = findAll(chat.logEl, i => i.tag === 'button' && hasClass(i, 'vam-map-chat-choice'));
+  eq(buttons.map(i => i.text).sort(), ['Coffee brewing', 'Coffee industry']);
+  assert.equal(chat.transcript().at(-1).lines[0].status, 'skipped'); assert.match(chat.transcript().at(-1).lines[0].text, /several maps match/);
+  buttons.find(i => i.text === 'Coffee brewing').click(); await until(() => h.view.path !== MAP && !h.view.chatApplying);
+  assert.equal(h.view.path, b); assert.notEqual(h.view.path, a); assert.equal(chat.transcript().at(0).text, 'open coffee', 'the conversation went along');
+  assert.ok(chat.transcript().at(-1).lines.some(l => l.status === 'done' && /Opened/.test(l.text)));
+  h.control.reply = async () => ({ reply: 'None', actions: [{ kind: 'open_map', title: 'Wine cellar' }], rejected: [] });
+  h.type('open wine'); await h.view.sendMapChat();
+  assert.equal(h.view.path, b); assert.match(chat.transcript().at(-1).lines[0].text, /no map has that name/);
+});
+
+integrationTest('B1 view operations: collapse, expand, auto layout and focus each write one result line; collapse and expand are saved in Map.md', async () => {
+  const h = await harness(); await h.view.hydrate(); const chat = h.open();
+  h.view.history.push({ undo: async () => {}, redo: async () => {}, label: 'earlier' });
+  const lines = await apply(h, [{ kind: 'collapse_topic', nodeId: h.ids.a }, { kind: 'auto_layout' }, { kind: 'focus_topic', nodeId: h.ids.b }, { kind: 'expand_topic', nodeId: h.ids.a }, { kind: 'collapse_topic', nodeId: h.ids.c }]);
+  eq(lines.map(l => l.status), ['done', 'done', 'done', 'done', 'skipped'], JSON.stringify(lines));
+  assert.match(lines[0].text, /Collapse “Body”/); assert.match(lines[1].text, /Arrange the whole map/); assert.match(lines[2].text, /Move the view to “Mind”/); assert.match(lines[3].text, /Expand “Body”/); assert.match(lines[4].text, /no subtopics/);
+  eq(h.focused, [h.ids.b]);
+  assert.equal(h.control.nested, 0); assert.equal(h.view.history.undoEntry, undefined, 'the undo history was cleared');
+  await apply(h, [{ kind: 'collapse_topic', nodeId: h.ids.a }]);
+  assert.equal((await h.saved()).find(n => n.id === h.ids.a).collapsed, true, 'saved'); assert.equal(chat.isBusy, false);
+  await apply(h, [{ kind: 'expand_topic', nodeId: h.ids.a }]); assert.equal(!!(await h.saved()).find(n => n.id === h.ids.a).collapsed, false);
+});
+integrationTest('B1 view operations: a reply that adds five cards is arranged once and the view goes to the new root; four cards are not; an explicit auto_layout is not doubled', async () => {
+  const counted = async () => { const h = await harness({ empty: true }); await h.view.hydrate(); h.layouts = 0; const original = h.view.mapChange.bind(h.view); h.view.mapChange = async (change, rebuild) => { h.layouts++; return original(change, rebuild); }; return h; };
+  const tree = count => [addRoot('r', 'Root'), ...Array.from({ length: count - 1 }, (_, i) => addRoot(`c${i}`, `Kid ${i}`, 'new:r'))];
+  const four = await counted(); const fourLines = await apply(four, tree(4));
+  assert.equal(four.layouts, 0, 'four cards: no layout'); eq(four.focused, []); assert.ok(!fourLines.some(l => /Arranged the map automatically/.test(l.text)));
+  const five = await counted(); const fiveLines = await apply(five, tree(5)); const root = five.view.map.nodes.find(n => !n.parentId);
+  assert.equal(five.layouts, 1, 'five cards: exactly one layout'); eq(five.focused, [root.id]); assert.ok(fiveLines.some(l => l.status === 'done' && /Arranged the map automatically/.test(l.text)), JSON.stringify(fiveLines));
+  assert.equal(fiveLines.at(-1).text, 'Arranged the map automatically after adding many topics', 'it comes after every card line');
+  const explicit = await counted(); const explicitLines = await apply(explicit, [...tree(5), { kind: 'auto_layout' }]);
+  assert.equal(explicit.layouts, 1, 'the reply\'s own auto_layout is the only one'); assert.equal(explicitLines.filter(l => /Arrange/.test(l.text)).length, 1);
+  const skipped = await counted(); const skippedLines = await apply(skipped, [...tree(5).slice(0, 4), { kind: 'add_child', parentId: 'ghost', title: 'Lost', summary: '', ref: '' }, { kind: 'add_child', parentId: 'ghost', title: 'Lost 2', summary: '', ref: '' }]);
+  assert.equal(skipped.layouts, 0, 'only cards that were really added count'); assert.ok(skippedLines.length >= 6);
 });

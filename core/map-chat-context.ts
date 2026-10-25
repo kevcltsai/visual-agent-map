@@ -9,6 +9,8 @@ import { normalizeVaultPath } from "./map-chat-guard";
 export const MAP_CHAT_DEFAULT_TURNS = 6;
 /** Total characters of card Detail sent in one turn; cards past it go without Detail (and without a Detail baseline). */
 export const MAP_CHAT_DETAIL_BUDGET = 60000;
+/** Titles of the user's other maps sent so the model can tell "make a new map" from "go to that map"; the rest are left out. */
+export const MAP_CHAT_MAP_TITLE_LIMIT = 200;
 const TITLE_LIMIT = 200;
 const SUMMARY_LIMIT = 240;
 
@@ -56,12 +58,20 @@ export interface MapChatContextInput {
   maxTurns?: number;
   /** Total characters of card Detail to send; default {@link MAP_CHAT_DETAIL_BUDGET}. */
   detailBudget?: number;
+  /** Titles of the maps the user has (untrusted text); at most {@link MAP_CHAT_MAP_TITLE_LIMIT} are sent. */
+  mapTitles?: string[];
+  /** There is no map the reply could edit (the read-only sample, a map that cannot be changed): it has to start with `create_map`. */
+  noEditableMap?: boolean;
 }
 export interface MapChatContext {
   /** The context as the JSON text put in the prompt. */
   json: string;
   /** Every card id the reply may name. */
   nodeIds: string[];
+  /** How many cards were selected when the message was sent (an action with no targets means these). */
+  selectedCount: number;
+  /** The reply must start with `create_map` (see {@link MapChatContextInput.noEditableMap}). */
+  noEditableMap: boolean;
   /** Parent links of the outline, for the parser's cycle check. */
   parents: Record<string, string | null>;
   /** Normalised path -> content hash of every Markdown file sent whole in this turn. */
@@ -179,10 +189,16 @@ export function buildMapChatContext(input: MapChatContextInput): MapChatContext 
       text: snippet.text
     };
   });
+  const mapTitles = [...new Set((input.mapTitles ?? []).map(title => clip(title, TITLE_LIMIT)).filter(Boolean))].slice(
+    0,
+    MAP_CHAT_MAP_TITLE_LIMIT
+  );
   const turns = Math.max(0, input.maxTurns ?? MAP_CHAT_DEFAULT_TURNS) * 2;
   const history = turns ? input.history.slice(-turns) : [];
   const json = JSON.stringify({
     mapTitle: input.mapTitle,
+    ...(input.noEditableMap ? { noEditableMap: true } : {}),
+    mapTitles,
     outline: input.outline.map(node => ({
       id: node.id,
       title: clip(node.title, TITLE_LIMIT),
@@ -200,6 +216,8 @@ export function buildMapChatContext(input: MapChatContextInput): MapChatContext 
   return {
     json,
     nodeIds: [...ids],
+    selectedCount: input.selected.length,
+    noEditableMap: !!input.noEditableMap,
     parents: Object.fromEntries(input.outline.map(node => [node.id, node.parentId])),
     mdHashes: hashes,
     topicHashes

@@ -22,6 +22,25 @@ export interface MapChatOrigin {
 }
 export type MapChatStyleChoice = "concise" | "detailed";
 
+/** A reply that waits for the user's yes: what it would do, what it costs, and the two buttons. */
+export interface MapChatPlanCard {
+  /** One line per reason the reply needs confirming. */
+  reasons: string[];
+  /** One line per action, in order. */
+  items: string[];
+  /** The estimated AI calls, as a sentence. */
+  estimate: string;
+  state: "pending" | "applied" | "cancelled";
+  apply(): void;
+  cancel(): void;
+}
+/** Maps (or anything else) the user has to pick from; picking runs `pick` once. */
+export interface MapChatChoices {
+  prompt: string;
+  options: { label: string; pick(): void }[];
+  picked: boolean;
+}
+
 export interface MapChatMessage {
   role: "user" | "assistant";
   /** On a user message: the question and references it was sent with. */
@@ -31,6 +50,8 @@ export interface MapChatMessage {
   lines: MapChatLine[];
   error?: boolean;
   streaming?: boolean;
+  plan?: MapChatPlanCard;
+  choices?: MapChatChoices;
 }
 
 /** What the panel needs from the view that owns it. */
@@ -369,6 +390,39 @@ export class MapChatPanel {
     this.renderLog();
     this.renderBusy();
   }
+  /** The reply just finished needs the user's yes: shows the plan card on its message. */
+  showPlan(plan: MapChatPlanCard): void {
+    const last = this.messages.at(-1);
+    if (!last || last.role !== "assistant") return;
+    last.plan = plan;
+    this.renderLog();
+  }
+  /** The plan card still waiting for an answer, if any. */
+  pendingPlan(): MapChatPlanCard | null {
+    return this.messages.find(message => message.plan?.state === "pending")?.plan ?? null;
+  }
+  /** A plan was applied or cancelled: its buttons stop working; `lines` (the result of applying) join its message. */
+  settlePlan(plan: MapChatPlanCard, state: "applied" | "cancelled", lines?: MapChatLine[]): void {
+    const message = this.messages.find(item => item.plan === plan);
+    if (!message) return;
+    plan.state = state;
+    if (lines) message.lines = lines;
+    this.renderLog();
+  }
+  /** Offers a short list to pick from under the last answer. */
+  showChoices(choices: MapChatChoices): void {
+    const last = this.messages.at(-1);
+    if (!last || last.role !== "assistant") return;
+    last.choices = choices;
+    this.renderLog();
+  }
+  /** Adds result lines to the last answer (after something that happened later, such as a picked map). */
+  appendLines(lines: MapChatLine[]): void {
+    const last = this.messages.at(-1);
+    if (!last || last.role !== "assistant") return;
+    last.lines = [...last.lines, ...lines];
+    this.renderLog();
+  }
   /** Back to an empty conversation (a different map was opened). */
   reset(): void {
     this.cancelFrame();
@@ -619,6 +673,8 @@ export class MapChatPanel {
       t("ui.map_chat_overflow_note"),
       more ? t("ui.map_chat_more_detail") : "",
       message.lines.map(line => `${line.status}:${line.text}`).join("\n"),
+      message.plan ? `plan:${message.plan.state}:${message.plan.items.length}:${message.plan.estimate}` : "",
+      message.choices ? `choices:${message.choices.picked}:${message.choices.options.map(o => o.label).join("|")}` : "",
       message.text
     ].join("\u0001");
   }
@@ -687,11 +743,78 @@ export class MapChatPanel {
         if (!this.busy) this.host.moreDetail(origin);
       });
     }
+    if (message.plan) this.buildPlan(row, message.plan);
+    if (message.choices) this.buildChoices(row, message.choices);
     if (message.lines.length) {
       const list = row.createDiv({ cls: "vam-map-chat-lines" });
       for (const line of message.lines) list.createDiv({ cls: `vam-map-chat-line is-${line.status}`, text: line.text });
     }
     return { row, body, more };
+  }
+
+  /** The plan card: reasons, every action, the estimate, and Apply / Cancel (plain buttons, so Tab, Enter and Space work). */
+  private buildPlan(row: HTMLElement, plan: MapChatPlanCard): void {
+    const card = row.createDiv({ cls: `vam-map-chat-plan is-${plan.state}` });
+    card.setAttr("role", "group");
+    card.setAttr("aria-label", t("ui.map_chat_plan_title"));
+    card.createDiv({ cls: "vam-map-chat-plan-title", text: t("ui.map_chat_plan_title") });
+    if (plan.state === "pending") card.createDiv({ cls: "vam-map-chat-plan-note", text: t("ui.map_chat_plan_intro") });
+    const reasons = card.createEl("ul", { cls: "vam-map-chat-plan-reasons" });
+    for (const reason of plan.reasons) reasons.createEl("li", { text: reason });
+    const items = card.createEl("ol", { cls: "vam-map-chat-plan-items" });
+    for (const item of plan.items) items.createEl("li", { text: item });
+    card.createDiv({ cls: "vam-map-chat-plan-estimate", text: plan.estimate });
+    if (plan.state !== "pending") {
+      card.createDiv({
+        cls: "vam-map-chat-plan-state",
+        text: t(plan.state === "applied" ? "ui.map_chat_plan_applied" : "ui.map_chat_plan_cancelled")
+      });
+      return;
+    }
+    const buttons = card.createDiv({ cls: "vam-map-chat-plan-buttons" });
+    const apply = buttons.createEl("button", {
+      cls: "mod-cta vam-map-chat-plan-apply",
+      text: t("ui.map_chat_plan_apply"),
+      attr: { type: "button" }
+    });
+    const cancel = buttons.createEl("button", {
+      cls: "vam-map-chat-plan-cancel",
+      text: t("ui.map_chat_plan_cancel"),
+      attr: { type: "button" }
+    });
+    // A second press does nothing: the buttons stop working as soon as one is used.
+    apply.addEventListener("click", () => {
+      if (plan.state !== "pending") return;
+      apply.disabled = cancel.disabled = true;
+      plan.apply();
+    });
+    cancel.addEventListener("click", () => {
+      if (plan.state !== "pending") return;
+      apply.disabled = cancel.disabled = true;
+      plan.cancel();
+    });
+  }
+  private buildChoices(row: HTMLElement, choices: MapChatChoices): void {
+    const box = row.createDiv({ cls: "vam-map-chat-choices" });
+    box.setAttr("role", "group");
+    box.setAttr("aria-label", choices.prompt);
+    box.createDiv({ cls: "vam-map-chat-choices-prompt", text: choices.prompt });
+    const buttons: HTMLButtonElement[] = [];
+    for (const option of choices.options) {
+      const button = box.createEl("button", {
+        cls: "vam-map-chat-choice",
+        text: option.label,
+        attr: { type: "button" }
+      });
+      button.disabled = choices.picked;
+      buttons.push(button);
+      button.addEventListener("click", () => {
+        if (choices.picked) return;
+        choices.picked = true;
+        for (const other of buttons) other.disabled = true;
+        option.pick();
+      });
+    }
   }
 
   private renderBusy(): void {

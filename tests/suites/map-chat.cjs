@@ -199,7 +199,7 @@ test('map chat: while the AI works Stop is shown with a visible status, the repl
   f.panel.begin('ask');
   assert.equal(f.parts.input().value, '', 'the draft is cleared once the question is sent');
   assert.equal(f.parts.status().text, 'The AI is replying…'); assert.equal(f.parts.send().hidden, true); assert.equal(f.parts.stop().hidden, false);
-  assert.equal(f.parts.stop().attrs['aria-label'], 'Stop'); assert.equal(f.parts.status().attrs.role, 'status'); assert.equal(f.parts.log().attrs.role, 'log');
+  assert.equal(f.parts.stop().attrs['aria-label'], 'Stop'); assert.equal(f.parts.status().attrs.role, 'status'); assert.equal(f.parts.log().attrs.role, 'group', 'B1-ui: the log is a plain group, not role=log (which is live by itself)'); assert.equal(f.parts.log().attrs['aria-live'], undefined, 'B1-ui: no aria-live on the log while a reply streams');
   f.panel.streamReply('partial'); f.panel.streamReply('partial answer'); await tick();
   assert.equal(visibleText(replyBody(f)), 'partial answer');
   eq(f.panel.turns(), [], 'a turn that is still streaming is not history');
@@ -692,7 +692,9 @@ integrationTest('map chat: an empty draft, a second send while busy and a send o
   h.type('one'); const first = h.view.sendMapChat(); await until(() => chat.isBusy);
   h.type('two'); await h.view.sendMapChat(); assert.equal(h.control.requests.length, 1, 'only one request at a time');
   gate.resolve(); await first;
-  h.view.builtIn = true; h.type('three'); await h.view.sendMapChat(); assert.equal(h.control.requests.length, 1);
+  h.view.builtIn = true; h.type('three'); await h.view.sendMapChat();
+  // B1-ui: the read-only sample is the opening screen now; a message from it is sent, and tells the model there is no map to edit.
+  assert.equal(h.control.requests.length, 2); assert.equal(h.control.requests[1].context.noEditableMap, true);
 });
 
 integrationTest('map chat: Stop aborts the request, releases the task, and a reply that still arrives applies nothing', async () => {
@@ -758,10 +760,10 @@ integrationTest('map chat: a repaint keeps messages, draft and chips, restores f
   const el = chat.el; h.repaint();
   assert.equal(h.view.chat.el, el); assert.equal(chat.draft, 'typing…'); assert.equal(chat.transcript().length, 2); assert.equal(chat.attachments().length, 1);
   assert.equal(h.page.doc.activeElement, chat.inputEl, 'focus is back in the field'); assert.equal(chat.inputEl.selectionStart, 3);
-  assert.ok(find(h.rootEl, i => i === el), 'the panel is in the new overlay'); assert.ok(h.workspace().classes.includes('has-map-chat-open'));
+  assert.ok(find(h.rootEl, i => i === el), 'the panel is back in the page'); assert.equal(h.workspace().children[0], el, 'B1-ui: it is the first child of the workspace, left of the canvas'); assert.ok(h.workspace().classes.includes('has-map-chat-open'));
   chat.setOpen(false); assert.ok(!h.workspace().classes.includes('has-map-chat-open'), 'the selection bar and hint get their room back');
   h.repaint(); assert.ok(!h.workspace().classes.includes('has-map-chat-open'));
-  assert.ok(find(find(h.rootEl, i => hasClass(i, 'vam-canvas-overlay')), i => i === el));
+  assert.equal(find(find(h.rootEl, i => hasClass(i, 'vam-canvas-overlay')), i => i === el), undefined, 'B1-ui: the overlay covers the canvas only; the window is not in it');
 });
 
 integrationTest('map chat: repaints caused by the chat\'s own writes keep the conversation going', async () => {
@@ -772,13 +774,13 @@ integrationTest('map chat: repaints caused by the chat\'s own writes keep the co
   assert.equal(chat.transcript().at(-1).text, 'done'); assert.ok(find(h.rootEl, i => i === chat.el));
 });
 
-integrationTest('map chat: a different map starts a new conversation, the sample map gets no panel', async () => {
+integrationTest('map chat: a different map starts a new conversation, and the sample map has the panel too (B1-ui)', async () => {
   const h = await harness(); await h.view.hydrate(); const chat = h.open();
   chat.begin('old'); chat.finish('old answer', []); chat.addTopicReference(h.ids.a);
   h.view.map.id = 'another-map'; h.repaint();
   assert.equal(chat.transcript().length, 0); assert.equal(chat.attachments().length, 0);
   chat.begin('x'); chat.finish('y', []);
-  h.view.builtIn = true; h.repaint(); assert.equal(find(h.rootEl, i => i === chat.el), undefined, 'not mounted on the read-only sample');
+  h.view.builtIn = true; h.repaint(); assert.ok(find(h.rootEl, i => i === chat.el) && chat.isHero === false, 'B1-ui: the read-only sample keeps the conversation it had (side window); a fresh one shows the opening screen');
   h.view.builtIn = false; h.repaint(); assert.ok(find(h.rootEl, i => i === chat.el)); assert.equal(chat.transcript().length, 2, 'and it comes back as it was');
 });
 
@@ -2231,4 +2233,374 @@ integrationTest('B1 view operations: a reply that adds five cards is arranged on
   assert.equal(explicit.layouts, 1, 'the reply\'s own auto_layout is the only one'); assert.equal(explicitLines.filter(l => /Arrange/.test(l.text)).length, 1);
   const skipped = await counted(); const skippedLines = await apply(skipped, [...tree(5).slice(0, 4), { kind: 'add_child', parentId: 'ghost', title: 'Lost', summary: '', ref: '' }, { kind: 'add_child', parentId: 'ghost', title: 'Lost 2', summary: '', ref: '' }]);
   assert.equal(skipped.layouts, 0, 'only cards that were really added count'); assert.ok(skippedLines.length >= 6);
+});
+
+// ---- first window, UI (B1-ui) ---------------------------------------------------------------------------------------
+// The DOM here is the small stand-in of support-dom: structure, state and events are real, geometry and pixels are not
+// (those are the tester's, in Obsidian). A document stand-in counts listeners so a leak shows as a number.
+const counting = () => {
+  const listeners = {}; const doc = { activeElement: null, body: null };
+  doc.addEventListener = (name, fn) => { (listeners[name] ??= []).push(fn); };
+  doc.removeEventListener = (name, fn) => { listeners[name] = (listeners[name] ?? []).filter(f => f !== fn); };
+  doc.count = () => Object.values(listeners).reduce((sum, list) => sum + list.length, 0);
+  doc.fire = (name, event) => { for (const fn of [...(listeners[name] ?? [])]) fn({ preventDefault() {}, buttons: 1, ...event }); };
+  return doc;
+};
+const press = (el, event) => { let prevented = false; el.fire('keydown', { preventDefault() { prevented = true; }, shiftKey: false, isComposing: false, ...event }); return prevented; };
+const resizerOf = chat => chat.resizerEl;
+const suggestionTexts = chat => findAll(chat.suggestEl, i => i.tag === 'button').map(i => i.text);
+const layoutModule = () => load('core/map-chat-layout.ts');
+
+test('B1 ui: the width is 340 by default, 280 to 560 at most, whole numbers, and anything unreadable is the default', () => {
+  const { clampMapChatWidth, MAP_CHAT_WIDTH_DEFAULT } = layoutModule();
+  assert.equal(MAP_CHAT_WIDTH_DEFAULT, 340); assert.equal(clampMapChatWidth(undefined), 340); assert.equal(clampMapChatWidth('300'), 340); assert.equal(clampMapChatWidth(NaN), 340);
+  assert.equal(clampMapChatWidth(279), 280); assert.equal(clampMapChatWidth(280), 280); assert.equal(clampMapChatWidth(560), 560); assert.equal(clampMapChatWidth(561), 560); assert.equal(clampMapChatWidth(300.6), 301);
+});
+
+test('B1 ui: saved width and open state are sanitised on load; an old data.json without them gets the defaults', () => {
+  const { settingsFromSaved } = load('main.ts', { obsidian: { ...obsidian, MarkdownView } });
+  const none = settingsFromSaved(null); assert.equal(none.mapChatWidth, 340); assert.equal(none.mapChatOpen, true);
+  const old = settingsFromSaved({ mapChatStyle: 'concise' }); assert.equal(old.mapChatWidth, 340); assert.equal(old.mapChatOpen, true);
+  const bad = settingsFromSaved({ mapChatWidth: 9000, mapChatOpen: 'no' }); assert.equal(bad.mapChatWidth, 560); assert.equal(bad.mapChatOpen, true);
+  const low = settingsFromSaved({ mapChatWidth: -4, mapChatOpen: false }); assert.equal(low.mapChatWidth, 280); assert.equal(low.mapChatOpen, false);
+  const text = settingsFromSaved({ mapChatWidth: 'wide' }); assert.equal(text.mapChatWidth, 340);
+});
+
+test('B1 ui: the window is folded to a narrow edge when the pane minus the SET width is under 700, and the verdict never depends on the current canvas', () => {
+  const { isChatNarrow } = layoutModule();
+  assert.equal(isChatNarrow(1040, 340), false, '700 left is enough'); assert.equal(isChatNarrow(1039, 340), true, '699 is not');
+  // The pane widths of the three review sizes, at the default width and at the limits.
+  for (const [pane, width, narrow] of [[1024, 340, true], [1280, 340, false], [1440, 340, false], [1024, 280, false], [1280, 560, false], [1180, 560, true], [1440, 560, false]]) assert.equal(isChatNarrow(pane, width), narrow, `${pane} with ${width}`);
+  // Walking the width across the threshold flips once; the same inputs always give the same answer (no memory, no feedback).
+  const walk = []; for (let width = 330; width <= 350; width++) walk.push(isChatNarrow(1040, width));
+  eq(walk, [...Array(11).fill(false), ...Array(10).fill(true)]);
+  for (let round = 0; round < 3; round++) { assert.equal(isChatNarrow(1040, 340), false); assert.equal(isChatNarrow(1040, 341), true); }
+});
+
+integrationTest('B1 ui: folding to the narrow edge does not unfold it again: the same pane and width give the same state however often it is looked at', async () => {
+  const h = await harness(); await h.view.hydrate(); const chat = h.open(); h.plugin.settings.mapChatWidth = 340; h.rootEl.clientWidth = 1039;
+  const states = [];
+  for (let i = 0; i < 4; i++) { h.view.onResize(); states.push(chat.isNarrow); h.repaint(); states.push(chat.isNarrow); }
+  eq(states, Array(8).fill(true), 'narrow and stays narrow, even though the canvas got wider when it folded');
+  h.rootEl.clientWidth = 1040; h.view.onResize(); assert.equal(chat.isNarrow, false); h.view.onResize(); h.repaint(); assert.equal(chat.isNarrow, false);
+  // Dragging the width across the threshold: 340 fits, 341 does not, 340 again fits.
+  chat.resizerEl.fire('keydown', { key: 'ArrowRight' }); assert.equal(h.plugin.settings.mapChatWidth, 356); assert.equal(chat.isNarrow, true);
+  chat.resizerEl.fire('keydown', { key: 'ArrowLeft' }); assert.equal(h.plugin.settings.mapChatWidth, 340); assert.equal(chat.isNarrow, false);
+});
+
+integrationTest('B1 ui: a narrow pane shows only the edge button with an unread dot; a click opens the window over the canvas; Escape and a press on the canvas fold it back; nothing is forgotten', async () => {
+  const h = await harness(); await h.view.hydrate(); const chat = h.open(); h.rootEl.clientWidth = 900; h.view.onResize();
+  assert.equal(chat.isNarrow, true); assert.equal(chat.isOpen, false); assert.ok(chat.el.hasClass('is-rail')); assert.equal(chat.bodyEl.hidden, true); assert.equal(chat.toggleEl.hidden, false);
+  chat.begin('q'); chat.finish('a reply while folded', []);
+  assert.equal(chat.toggleEl.hasClass('has-unread'), true, 'the edge says there is something new'); assert.equal(chat.toggleEl.attrs['aria-label'], 'Open AI chat (new reply)');
+  chat.toggleEl.click();
+  assert.equal(chat.isOpen, true); assert.ok(chat.el.hasClass('is-overlay')); assert.equal(chat.toggleEl.hasClass('has-unread'), false, 'seen'); assert.equal(h.page.doc.activeElement, chat.inputEl);
+  assert.equal(chat.wantsOpen, true, 'the user still wants it open');
+  press(chat.inputEl, { key: 'Escape' }); assert.equal(chat.isOpen, false); assert.equal(chat.wantsOpen, true, 'folding the overlay is not closing the window'); assert.equal(h.page.doc.activeElement, chat.toggleEl);
+  chat.toggleEl.click(); chat.collapseOverlay(); assert.equal(chat.isOpen, false, 'a press on the canvas folds it');
+  h.rootEl.clientWidth = 1400; h.view.onResize(); assert.equal(chat.isOpen, true, 'wide again: docked as the user left it'); assert.ok(chat.el.hasClass('is-docked'));
+  assert.equal(chat.transcript().length, 2, 'the conversation is untouched');
+});
+
+integrationTest('B1 ui: the window is the first child of the workspace, before the canvas, and the width, open state and a drag survive a repaint', async () => {
+  const h = await harness(); await h.view.hydrate(); const chat = h.open();
+  assert.equal(h.workspace().children[0], chat.el, 'first child'); assert.ok(hasClass(h.workspace().children[1], 'vam-canvas-overlay') || h.workspace().children.length >= 2);
+  assert.equal(chat.el.style.width, '340px', 'default width');
+  chat.resizerEl.fire('keydown', { key: 'ArrowRight' }); assert.equal(chat.el.style.width, '356px'); assert.equal(chat.resizerEl.attrs['aria-valuenow'], '356');
+  assert.equal(h.plugin.settings.mapChatWidth, 356, 'remembered'); assert.ok(h.control.saves > 0, 'and saved');
+  h.repaint(); assert.equal(chat.el.style.width, '356px', 'a repaint keeps it'); assert.equal(h.workspace().children[0], chat.el);
+});
+
+integrationTest('B1 ui: the width handle is a labelled separator that moves 16px per arrow key, stops at 280 and 560, and Home/End jump to them', async () => {
+  const h = await harness(); await h.view.hydrate(); const chat = h.open(); const bar = resizerOf(chat);
+  assert.equal(bar.attrs.role, 'separator'); assert.equal(bar.attrs['aria-orientation'], 'vertical'); assert.equal(bar.attrs['aria-valuemin'], '280'); assert.equal(bar.attrs['aria-valuemax'], '560'); assert.equal(bar.attrs['aria-valuenow'], '340'); assert.equal(bar.attrs.tabindex, '0'); assert.ok(bar.attrs['aria-label']);
+  assert.equal(press(bar, { key: 'ArrowLeft' }), true); assert.equal(bar.attrs['aria-valuenow'], '324'); press(bar, { key: 'ArrowRight' }); press(bar, { key: 'ArrowRight' }); assert.equal(bar.attrs['aria-valuenow'], '356');
+  press(bar, { key: 'End' }); assert.equal(bar.attrs['aria-valuenow'], '560'); press(bar, { key: 'ArrowRight' }); assert.equal(bar.attrs['aria-valuenow'], '560', 'not past the maximum');
+  press(bar, { key: 'Home' }); assert.equal(bar.attrs['aria-valuenow'], '280'); press(bar, { key: 'ArrowLeft' }); assert.equal(bar.attrs['aria-valuenow'], '280', 'not under the minimum');
+  assert.equal(press(bar, { key: 'a' }), false, 'other keys are left alone');
+});
+
+integrationTest('B1 ui: dragging the handle follows the pointer, is saved when the button is let go, and leaves no listener on the document; a repaint in the middle does not break it', async () => {
+  const h = await harness(); await h.view.hydrate(); const chat = h.open(); const doc = counting(); chat.el.ownerDocument = doc;
+  const before = doc.count(); const saves = h.control.saves ?? 0;
+  chat.resizerEl.fire('pointerdown', { button: 0, clientX: 340, pointerId: 1 });
+  assert.ok(doc.count() > before, 'listeners are on the document while dragging');
+  doc.fire('pointermove', { clientX: 400 }); assert.equal(chat.el.style.width, '400px');
+  assert.equal(h.control.saves ?? 0, saves, 'nothing is saved mid-drag');
+  h.repaint(); chat.el.ownerDocument = doc; // the panel is lifted out and put back
+  doc.fire('pointermove', { clientX: 450 }); assert.equal(chat.el.style.width, '450px', 'the drag survives the repaint');
+  doc.fire('pointermove', { clientX: 900 }); assert.equal(chat.el.style.width, '560px', 'clamped');
+  doc.fire('pointerup', {}); assert.equal(doc.count(), before, 'let go: back to the listeners it began with'); assert.equal(h.plugin.settings.mapChatWidth, 560);
+  doc.fire('pointermove', { clientX: 100 }); assert.equal(chat.el.style.width, '560px', 'and the pointer no longer drags');
+});
+
+integrationTest('B1 ui: closing the view in the middle of a drag, a lost pointer capture, and a move with no button all end the drag; the document listener count returns to the value it had', async () => {
+  const h = await harness(); await h.view.hydrate(); const chat = h.open(); const doc = counting(); chat.el.ownerDocument = doc; const before = doc.count();
+  chat.resizerEl.fire('pointerdown', { button: 0, clientX: 340, pointerId: 1 }); chat.dispose(); assert.equal(doc.count(), before, 'view closed');
+  chat.resizerEl.fire('pointerdown', { button: 0, clientX: 340, pointerId: 1 }); chat.resizerEl.fire('lostpointercapture', {}); assert.equal(doc.count(), before, 'capture lost');
+  chat.resizerEl.fire('pointerdown', { button: 0, clientX: 340, pointerId: 1 }); doc.fire('pointermove', { clientX: 380, buttons: 0 }); assert.equal(doc.count(), before, 'the button was let go outside the page');
+  chat.resizerEl.fire('pointerdown', { button: 2, clientX: 340, pointerId: 1 }); assert.equal(doc.count(), before, 'only the primary button drags');
+  for (let i = 0; i < 5; i++) { chat.resizerEl.fire('pointerdown', { button: 0, clientX: 340, pointerId: 1 }); doc.fire('pointerup', {}); } assert.equal(doc.count(), before, 'repeated drags leak nothing');
+});
+
+integrationTest('B1 ui: the real view close path disposes the panel (the drag listeners go with it)', async () => {
+  const source = fs.readFileSync(path.join(root, 'experiences/visual-map/view.ts'), 'utf8');
+  const close = source.slice(source.indexOf('  async onClose(): Promise<void> {'), source.indexOf('  async onClose(): Promise<void> {') + 2500);
+  assert.match(close, /this\.chat\?\.dispose\(\)/);
+});
+
+// ---- opening screen ----------------------------------------------------------------------------------------------
+
+integrationTest('B1 ui: an empty map shows the opening screen: the question, the message field and exactly three examples; the window is not docked', async () => {
+  const h = await harness({ empty: true }); await h.view.hydrate(); h.repaint(); const chat = h.view.chat;
+  assert.equal(chat.isHero, true); assert.ok(chat.el.hasClass('is-hero')); assert.equal(chat.isOpen, true);
+  assert.equal(chat.heroTitleEl.text, 'What do you want to research or organize?'); assert.equal(chat.heroTitleEl.hidden, false); assert.equal(chat.heroTitleEl.attrs.role, 'heading');
+  const slot = find(h.rootEl, i => hasClass(i, 'vam-chat-hero-slot')); assert.ok(slot && find(slot, i => i === chat.el), 'in the middle of the canvas overlay');
+  assert.equal(find(h.workspace(), i => i === chat.el) !== undefined, true);
+  assert.equal(findAll(chat.suggestEl, i => i.tag === 'button').length, 3, 'three examples'); assert.ok(chat.suggestEl.hasClass('is-examples'));
+  eq(suggestionTexts(chat), ['Research the coffee industry: players, supply chain, trends', 'Plan a three-month route to learn basic Japanese', 'Compare renting and buying a home: costs, risks, timing']);
+  assert.equal(chat.resizerEl.hidden, true, 'no width handle on the opening screen'); assert.equal(h.page.doc.activeElement, chat.inputEl, 'the keyboard starts in the message field');
+  assert.equal(chat.logEl.attrs.role, 'group');
+  // DOM order = reading order: heading, message field, then the examples.
+  const order = findAll(chat.bodyEl, i => i === chat.heroTitleEl || i === chat.inputEl || i === chat.suggestEl); eq(order.map(i => i === chat.heroTitleEl ? 'title' : i === chat.inputEl ? 'input' : 'examples'), ['title', 'input', 'examples']);
+});
+
+integrationTest('B1 ui: clicking an example fills the message field and sends nothing', async () => {
+  const h = await harness({ empty: true }); await h.view.hydrate(); h.repaint(); const chat = h.view.chat;
+  const sends = h.control.requests.length; findAll(chat.suggestEl, i => i.tag === 'button')[1].click();
+  assert.equal(chat.inputEl.value, 'Plan a three-month route to learn basic Japanese'); assert.equal(h.page.doc.activeElement, chat.inputEl);
+  await tick(); assert.equal(h.control.requests.length, sends, 'not sent'); assert.equal(chat.hasMessages, false); assert.equal(chat.isHero, true);
+});
+
+integrationTest('B1 ui: sending the first message moves the same panel (same message field) into the side window and the keyboard stays in the field', async () => {
+  const h = await harness({ empty: true }); await h.view.hydrate(); h.repaint(); const chat = h.view.chat; const el = chat.el; const input = chat.inputEl;
+  h.control.reply = async () => ({ reply: 'ok', actions: [], rejected: [] });
+  h.type('Coffee'); input.focus(); await h.view.sendMapChat();
+  assert.equal(chat.isHero, false); assert.equal(chat.el, el, 'one panel'); assert.equal(chat.inputEl, input, 'one message field'); assert.equal(h.workspace().children[0], el, 'now the first child of the workspace');
+  assert.equal(find(h.rootEl, i => hasClass(i, 'vam-chat-hero-slot')) , undefined, 'the opening slot is gone'); assert.equal(h.page.doc.activeElement, input, 'focus still in the field');
+  assert.equal(chat.suggestEl.hasClass('is-examples'), false, 'suggestions, not examples'); assert.equal(chat.heroTitleEl.hidden, true); assert.equal(chat.resizerEl.hidden, false);
+  h.repaint(); assert.equal(chat.isHero, false, 'a repaint keeps it in the side window');
+  assert.equal(chat.transcript().length, 2);
+});
+
+integrationTest('B1 ui: an AIM map with no cards does NOT get the opening screen', async () => {
+  const h = await harness({ aim: true, empty: true }); await h.view.hydrate(); h.repaint();
+  assert.equal(h.view.map.nodes.length, 0); assert.ok(h.view.map.aim); assert.equal(h.view.chat.isHero, false); assert.equal(find(h.rootEl, i => hasClass(i, 'vam-chat-hero-slot')), undefined);
+  assert.equal(h.workspace().children[0], h.view.chat.el);
+});
+
+integrationTest('B1 ui: a map with cards does not get the opening screen either', async () => {
+  const h = await harness(); await h.view.hydrate(); h.repaint(); assert.equal(h.view.chat.isHero, false);
+});
+
+integrationTest('B1 ui: the read-only sample shows the opening screen in its start card, and a message from it is sent as noEditableMap', async () => {
+  const h = await harness(); await h.view.hydrate(); h.view.builtIn = true;
+  // render() makes the start card before it mounts the chat; the stand-in does the same.
+  const repaint = () => { const restore = h.view.detachMapChat(); h.page.doc.activeElement = null; h.rootEl.empty(); const start = h.rootEl.createDiv('vam-sample-start'); start.createDiv('vam-sample-start-chat'); h.page.attach(start); const ws = h.rootEl.createDiv('vam-workspace'); const overlay = h.page.attach(ws.createDiv('vam-canvas-overlay')); h.view.mountMapChat(ws, overlay); restore(); return ws; };
+  repaint(); const chat = h.view.chat;
+  assert.equal(chat.isHero, true); const card = find(h.rootEl, i => hasClass(i, 'vam-sample-start-chat')); assert.ok(find(card, i => i === chat.el), 'in the sample\'s start card');
+  h.type('Coffee map'); await h.view.sendMapChat();
+  assert.equal(h.control.requests.length, 1); assert.equal(h.control.requests[0].context.noEditableMap, true); assert.equal(JSON.parse(h.control.requests[0].context.json).noEditableMap ?? true, true);
+  assert.equal(chat.hasMessages, true); assert.equal(chat.isHero, false, 'after the message it is the side window');
+});
+
+// ---- suggestions -------------------------------------------------------------------------------------------------
+
+test('B1 ui: there are two to four suggestions in every situation, and they change with the selection and with a note beside the map', () => {
+  const { chatSuggestionKeys } = layoutModule(); const cases = [];
+  for (const selected of [0, 1, 2, 5]) for (const hasNote of [false, true]) for (const hasTopics of [false, true]) cases.push({ selected, hasNote, hasTopics, keys: chatSuggestionKeys({ selected, hasNote, hasTopics }) });
+  for (const c of cases) assert.ok(c.keys.length >= 2 && c.keys.length <= 4, JSON.stringify(c));
+  const key = (selected, hasNote = false, hasTopics = true) => chatSuggestionKeys({ selected, hasNote, hasTopics }).join();
+  assert.notEqual(key(0), key(1)); assert.notEqual(key(1), key(2)); assert.notEqual(key(0, false, false), key(0)); assert.notEqual(key(1), key(1, true));
+  assert.equal(key(2), key(7), 'many is many'); assert.ok(chatSuggestionKeys({ selected: 0, hasNote: true, hasTopics: false }).includes('ui.map_chat_suggest_empty_from_note'));
+});
+
+test('B1 ui: every suggestion and example exists in all three languages and is a non-empty sentence', () => {
+  const { chatSuggestionKeys, MAP_CHAT_EXAMPLE_KEYS } = layoutModule(); const dictionaries = ['en', 'zh-TW', 'zh-CN'].map(name => load(`i18n/${name}.ts`)[name === 'en' ? 'en' : name === 'zh-TW' ? 'zhTW' : 'zhCN'] ?? Object.values(load(`i18n/${name}.ts`))[0]);
+  const keys = new Set([...MAP_CHAT_EXAMPLE_KEYS]); for (const selected of [0, 1, 2]) for (const hasNote of [false, true]) for (const hasTopics of [false, true]) chatSuggestionKeys({ selected, hasNote, hasTopics }).forEach(k => keys.add(k));
+  for (const dictionary of dictionaries) for (const k of keys) assert.ok(typeof dictionary[k] === 'string' && dictionary[k].trim().length > 4, `${k}`);
+});
+
+integrationTest('B1 ui: a suggestion only fills the message field (nothing is sent, nothing else changes), keeps what was typed, and the row follows the selection and the open note', async () => {
+  const h = await harness(); await h.view.hydrate(); const chat = h.open();
+  eq(suggestionTexts(chat), ['What is missing from this map?', 'Arrange the whole map', 'Collapse every branch below the first level']);
+  const requests = h.control.requests.length, mutates = h.control.mutates;
+  findAll(chat.suggestEl, i => i.tag === 'button')[0].click();
+  assert.equal(chat.inputEl.value, 'What is missing from this map?'); assert.equal(h.page.doc.activeElement, chat.inputEl);
+  await tick(); assert.equal(h.control.requests.length, requests, 'nothing sent'); assert.equal(h.control.mutates, mutates, 'nothing written'); assert.equal(chat.hasMessages, false);
+  chat.inputEl.value = 'first line'; findAll(chat.suggestEl, i => i.tag === 'button')[1].click(); assert.equal(chat.inputEl.value, 'first line\nArrange the whole map', 'an existing draft is kept');
+  h.view.selected = h.ids.a; chat.refreshSelection(); assert.match(suggestionTexts(chat)[0], /subtopics under the selected topic/);
+  h.view.multiSelected = new Set([h.ids.a, h.ids.b]); chat.refreshSelection(); assert.match(suggestionTexts(chat)[0], /Compare the selected topics/);
+  h.view.selected = null; h.view.multiSelected = new Set(); h.setActive('Notes/Research.md', ''); chat.refreshNote(); assert.ok(suggestionTexts(chat).includes('Add what the open note says to the map'));
+  assert.ok(suggestionTexts(chat).length <= 4);
+});
+
+integrationTest('B1 ui: a suggestion button that has the keyboard is not rebuilt by a refresh that changes nothing', async () => {
+  const h = await harness(); await h.view.hydrate(); const chat = h.open(); const button = findAll(chat.suggestEl, i => i.tag === 'button')[0]; button.focus();
+  chat.refreshSelection(); chat.refreshNote(); chat.refreshSelection();
+  assert.equal(findAll(chat.suggestEl, i => i.tag === 'button')[0], button, 'same element'); assert.equal(h.page.doc.activeElement, button);
+});
+
+// ---- keyboard ------------------------------------------------------------------------------------------------------
+
+integrationTest('B1 ui: Enter sends, Shift+Enter does not, and IME composition keeps Enter from sending, on the opening screen too', async () => {
+  const h = await harness({ empty: true }); await h.view.hydrate(); h.repaint(); const chat = h.view.chat; const input = chat.inputEl; let sends = 0; h.view.sendMapChat = async () => { sends++; };
+  h.type('x'); input.fire('compositionstart'); assert.equal(press(input, { key: 'Enter' }), false); assert.equal(sends, 0, 'composing: Enter only confirms the candidate');
+  assert.equal(press(input, { key: 'Enter', isComposing: true }), false); assert.equal(sends, 0);
+  input.fire('compositionend'); assert.equal(press(input, { key: 'Enter', shiftKey: true }), false); assert.equal(sends, 0);
+  assert.equal(press(input, { key: 'Enter' }), true); assert.equal(sends, 1);
+  // Escape in the opening screen does not fold anything: there is no window yet.
+  assert.equal(press(input, { key: 'Escape' }), false); assert.equal(chat.isOpen, true);
+});
+
+integrationTest('B1 ui: a repaint and a map change during IME composition leave the field, its text and its composing state alone', async () => {
+  const h = await harness({ empty: true }); await h.view.hydrate(); h.repaint(); const chat = h.view.chat; const input = chat.inputEl; input.focus(); input.value = 'ㄅㄆ'; input.fire('compositionstart');
+  h.repaint(); assert.equal(chat.isComposing, true); assert.equal(chat.draft, 'ㄅㄆ'); assert.equal(h.page.doc.activeElement, input);
+  assert.equal(h.view.typingInField(), true, 'the view treats it as typing: the sync waits');
+  input.fire('compositionend'); assert.equal(h.view.typingInField(), false);
+});
+
+integrationTest('B1 ui: Escape on any control of the window folds it; the view\'s own Escape (clear the selection) ignores anything inside the window', async () => {
+  const h = await harness(); await h.view.hydrate(); const chat = h.open(); const suggestion = findAll(chat.suggestEl, i => i.tag === 'button')[0]; suggestion.focus();
+  assert.equal(press(chat.el, { key: 'Escape', target: suggestion }), true); assert.equal(chat.isOpen, false); assert.equal(h.page.doc.activeElement, chat.toggleEl);
+  const source = fs.readFileSync(path.join(root, 'experiences/visual-map/view.ts'), 'utf8'); const at = source.indexOf('Escape inside the chat window');
+  assert.ok(at > 0 && /closest\("input, textarea, select, \[contenteditable=true\], \.vam-map-chat"\)/.test(source.slice(at, at + 400)), 'the contentEl Escape skips input fields and the chat window');
+});
+
+integrationTest('B1 ui: Tab order follows the document: suggestions, then the reference chips, then the message field, then the answer length and Send', async () => {
+  const h = await harness(); await h.view.hydrate(); const chat = h.open(); chat.addTopicReference(h.ids.a);
+  const focusable = findAll(chat.bodyEl, i => (i.tag === 'button' || i.tag === 'textarea' || i.tag === 'select') && !i.hidden && i.attrs.tabindex !== '-1');
+  const names = focusable.map(i => hasClass(i, 'vam-map-chat-suggestion') ? 'suggestion' : hasClass(i, 'vam-map-chat-chip-remove') ? 'chip' : i === chat.inputEl ? 'input' : hasClass(i, 'vam-map-chat-style-option') ? 'style' : hasClass(i, 'vam-map-chat-send') ? 'send' : hasClass(i, 'vam-map-chat-stop') ? 'stop' : i.tag === 'select' ? 'model' : 'other');
+  const tail = names.slice(names.indexOf('suggestion')).filter(n => n !== 'stop'); eq(tail, ['suggestion', 'suggestion', 'suggestion', 'chip', 'input', 'style', 'style', 'send']);
+  assert.ok(!focusable.some(i => i.attrs.tabindex && Number(i.attrs.tabindex) > 0), 'no positive tabindex');
+});
+
+test('B1 ui: the command to toggle the chat exists in the source, has no default hotkey, and is named in all three languages', () => {
+  const main = fs.readFileSync(path.join(root, 'main.ts'), 'utf8'); const at = main.indexOf('id: "toggle-map-chat"');
+  assert.ok(at > 0); const block = main.slice(at - 200, at + 500); assert.doesNotMatch(block, /hotkeys/); assert.match(block, /ui\.map_chat_toggle_command/);
+  for (const name of ['en', 'zh-TW', 'zh-CN']) assert.match(fs.readFileSync(path.join(root, 'i18n', `${name}.ts`), 'utf8'), /"ui\.map_chat_toggle_command":/);
+});
+
+integrationTest('B1 ui: the toggle command opens the window and leaves the keyboard in the message field; with the keyboard there it closes it; elsewhere it moves the keyboard in', async () => {
+  const h = await harness(); await h.view.hydrate(); const chat = h.open(); chat.setOpen(false); h.view.toggleMapChat();
+  assert.equal(chat.isOpen, true); assert.equal(h.page.doc.activeElement, chat.inputEl, 'the keyboard is in the field');
+  h.page.doc.activeElement = null; h.view.toggleMapChat(); assert.equal(chat.isOpen, true, 'open but the keyboard was elsewhere: it just comes to the field'); assert.equal(h.page.doc.activeElement, chat.inputEl);
+  h.view.toggleMapChat(); assert.equal(chat.isOpen, false, 'with the keyboard in the field it closes');
+  const wide = await harness({ empty: true }); await wide.view.hydrate(); wide.repaint(); wide.page.doc.activeElement = null; wide.view.toggleMapChat(); assert.equal(wide.page.doc.activeElement, wide.view.chat.inputEl); assert.equal(wide.view.chat.isHero, true, 'on the opening screen it only focuses');
+});
+
+integrationTest('B1 ui: opening and closing the window is remembered in the settings; a fold forced by a narrow pane is not', async () => {
+  const h = await harness(); await h.view.hydrate(); const chat = h.open(); chat.setOpen(false); assert.equal(h.plugin.settings.mapChatOpen, false); chat.setOpen(true); assert.equal(h.plugin.settings.mapChatOpen, true);
+  h.rootEl.clientWidth = 900; h.view.onResize(); assert.equal(chat.isOpen, false); assert.equal(h.plugin.settings.mapChatOpen, true, 'the user did not close it');
+});
+
+integrationTest('B1 ui: a saved closed state starts the window closed', async () => {
+  const h = await harness(); h.plugin.settings.mapChatOpen = false; await h.view.hydrate(); h.repaint(); assert.equal(h.view.chat.isOpen, false); assert.ok(h.view.chat.el.hasClass('is-rail'));
+});
+
+// ---- plan card and results -----------------------------------------------------------------------------------------
+
+integrationTest('B1 ui: the plan card has a one-sentence description, actions grouped by kind and folded, the call estimate, and Apply / Cancel as real buttons', async () => {
+  const h = await harness(); await h.view.hydrate(); const chat = h.open();
+  h.control.reply = async () => ({ reply: 'plan', actions: [...Array.from({ length: 14 }, (_, i) => ({ kind: 'add_child', parentId: h.ids.root, title: `Card ${i}`, summary: '' })), { kind: 'rename_topic', nodeId: h.ids.a, title: 'Body!' }, { kind: 'delete_topic', nodeId: h.ids.b, branch: false }, { kind: 'collapse_topic', nodeId: h.ids.root }], rejected: [] });
+  h.type('many'); await h.view.sendMapChat(); const card = planCard(h)[0];
+  assert.match(visibleText(find(card, i => hasClass(i, 'vam-map-chat-plan-sentence'))), /^This plan needs your confirmation: 17 actions\.$/);
+  const groups = findAll(card, i => i.tag === 'details'); eq(groups.map(g => find(g, i => i.tag === 'summary').text), ['Add or create (14)', 'Edit or move (1)', 'Delete (1)', 'Map and view (1)']);
+  assert.ok(groups.every(g => g.open === false && g.attrs.open === undefined), 'every group starts folded'); assert.equal(findAll(card, i => i.tag === 'li').length, 17);
+  assert.match(visibleText(find(card, i => hasClass(i, 'vam-map-chat-plan-estimate'))), /No extra AI calls/);
+  assert.equal(planButton(h, 'apply').tag, 'button'); assert.equal(planButton(h, 'cancel').tag, 'button'); assert.equal(planButton(h, 'apply').disabled, false);
+  // Apply is a plain button click, so Enter and Space (the browser turns both into click) work; the keyboard returns to the field.
+  h.page.doc.activeElement = planButton(h, 'apply'); planButton(h, 'apply').click(); assert.equal(h.page.doc.activeElement, chat.inputEl, 'focus back in the field, not lost with the button');
+  await until(() => chat.pendingPlan() === null && !h.view.chatApplying);
+});
+
+integrationTest('B1 ui: a cancelled plan keeps the focus in the field and the card says nothing changed', async () => {
+  const h = await harness(); await h.view.hydrate(); const chat = h.open();
+  h.control.reply = async () => ({ reply: 'plan', actions: Array.from({ length: 16 }, (_, i) => ({ kind: 'add_child', parentId: h.ids.root, title: `Card ${i}`, summary: '' })), rejected: [] });
+  h.type('many'); await h.view.sendMapChat(); h.page.doc.activeElement = planButton(h, 'cancel'); planButton(h, 'cancel').click();
+  assert.equal(h.page.doc.activeElement, chat.inputEl); assert.match(visibleText(planCard(h)[0]), /Nothing was changed/);
+});
+
+integrationTest('B1 ui: result lines name their status in words; five or fewer are all shown; the closing "cannot be undone" line is always last', async () => {
+  const h = await harness(); await h.view.hydrate(); const chat = h.open(); chat.begin('q');
+  chat.finish('r', [{ status: 'done', text: 'Done: A' }, { status: 'skipped', text: 'Skipped: B (the topic is no longer on the map)' }, { status: 'failed', text: 'Failed: C (boom)' }, { status: 'done', text: 'These changes cannot be undone; the undo history was cleared.' }]);
+  const lines = findAll(chat.logEl, i => hasClass(i, 'vam-map-chat-line')); eq(lines.map(l => l.text.split(':')[0].split(' ')[0]), ['Done:', 'Skipped:', 'Failed:', 'These'].map(s => s.replace(':', ''))); assert.ok(hasClass(lines.at(-1), 'is-note'));
+  assert.equal(findAll(chat.logEl, i => hasClass(i, 'vam-map-chat-lines-toggle')).length, 0);
+});
+
+integrationTest('B1 ui: more than five result lines fold into a count; the toggle shows them all and back; the closing line stays last; focus stays on the toggle', async () => {
+  const h = await harness(); await h.view.hydrate(); const chat = h.open(); chat.begin('q');
+  const lines = [...Array.from({ length: 18 }, (_, i) => ({ status: 'done', text: `Done: card ${i}` })), { status: 'skipped', text: 'Skipped: x (y)' }, { status: 'skipped', text: 'Skipped: z (w)' }, { status: 'failed', text: 'Failed: q (r)' }, { status: 'done', text: 'These changes cannot be undone; the undo history was cleared.' }];
+  chat.finish('r', lines);
+  const text = () => visibleText(find(chat.logEl, i => hasClass(i, 'vam-map-chat-lines'))); const shown = () => findAll(chat.logEl, i => hasClass(i, 'vam-map-chat-line'));
+  assert.match(text(), /18 done, 2 skipped, 1 failed/); eq(shown().map(l => l.text), ['These changes cannot be undone; the undo history was cleared.'], 'folded: only the closing line');
+  let toggle = find(chat.logEl, i => hasClass(i, 'vam-map-chat-lines-toggle')); assert.equal(toggle.text, 'Show all 21 results'); assert.equal(toggle.attrs['aria-expanded'], 'false'); toggle.click();
+  assert.equal(shown().length, 22); assert.ok(hasClass(shown().at(-1), 'is-note'), 'still last'); toggle = find(chat.logEl, i => hasClass(i, 'vam-map-chat-lines-toggle')); assert.equal(toggle.attrs['aria-expanded'], 'true'); assert.equal(h.page.doc.activeElement, toggle);
+  toggle.click(); assert.equal(shown().length, 1);
+  // Exactly five results do not fold; six do.
+  const five = await harness(); await five.view.hydrate(); const c5 = five.open(); c5.begin('q'); c5.finish('r', Array.from({ length: 5 }, (_, i) => ({ status: 'done', text: `Done: ${i}` }))); assert.equal(findAll(c5.logEl, i => hasClass(i, 'vam-map-chat-line')).length, 5);
+  c5.begin('q2'); c5.finish('r', Array.from({ length: 6 }, (_, i) => ({ status: 'done', text: `Done: ${i}` }))); assert.equal(findAll(c5.logEl, i => hasClass(i, 'vam-map-chat-line')).length, 5, 'the second message is folded: only the first one\'s five remain');
+});
+
+integrationTest('B1 ui: a failed turn stays in the conversation with a Retry button, no Notice is shown, and Retry sends the same question again and applies its actions', async () => {
+  const h = await harness(); await h.view.hydrate(); const chat = h.open(); const notices = h.notices.length;
+  h.control.reply = async () => { throw new Error('network is down'); };
+  h.type('add a card'); await h.view.sendMapChat();
+  const errorRow = find(chat.logEl, i => hasClass(i, 'is-error')); assert.ok(errorRow); assert.match(visibleText(errorRow), /network is down/); assert.equal(h.notices.length, notices, 'no pop-up');
+  const retry = find(errorRow, i => i.tag === 'button' && hasClass(i, 'vam-map-chat-retry')); assert.equal(retry.text, 'Retry'); assert.equal(retry.disabled, false);
+  h.control.reply = async () => ({ reply: 'added', actions: [{ kind: 'add_child', parentId: h.ids.a, title: 'Retried', summary: '' }], rejected: [] });
+  const before = h.view.map.nodes.length; retry.click(); await until(() => chat.transcript().at(-1)?.text === 'added' && !chat.isBusy);
+  assert.equal(h.control.requests.at(-1).message, 'add a card', 'the same question'); assert.equal(h.view.map.nodes.length, before + 1, 'and its actions were applied this time');
+  assert.equal(chat.draft, '', 'the draft is not touched');
+});
+
+integrationTest('B1 ui: Retry is disabled while a request runs, and an answer that is not an error has no Retry', async () => {
+  const h = await harness(); await h.view.hydrate(); const chat = h.open(); const origin = { text: 'q', chips: [], selectedIds: [] }; chat.begin('q', origin); chat.fail('boom'); chat.begin('q2', { ...origin, text: 'q2' });
+  const buttons = findAll(chat.logEl, i => hasClass(i, 'vam-map-chat-retry')); assert.equal(buttons.length, 1); assert.equal(buttons[0].disabled, true);
+  chat.finish('fine', []); assert.equal(findAll(chat.logEl, i => hasClass(i, 'vam-map-chat-retry')).length, 1, 'only the failed one'); assert.equal(findAll(chat.logEl, i => hasClass(i, 'vam-map-chat-retry'))[0].disabled, false);
+});
+
+// ---- screen reader --------------------------------------------------------------------------------------------------
+
+integrationTest('B1 ui: the window is a labelled region; the log has no aria-live and no role=log; one live region says the summary once, when the turn ends', async () => {
+  const h = await harness(); await h.view.hydrate(); const chat = h.open();
+  assert.equal(chat.bodyEl.attrs.role, 'region'); assert.equal(chat.bodyEl.attrs['aria-label'], 'Ask AI about this map');
+  assert.equal(chat.logEl.attrs['aria-live'], undefined); assert.notEqual(chat.logEl.attrs.role, 'log'); assert.equal(findAll(chat.bodyEl, i => i.attrs['aria-live'] !== undefined).length, 0, 'nothing in the body is live');
+  const writes = []; const live = chat.liveEl; const setText = live.setText.bind(live); live.setText = value => { writes.push(value); setText(value); };
+  assert.equal(live.attrs['aria-live'], 'polite'); assert.equal(live.attrs['aria-atomic'], 'true');
+  chat.begin('ask'); for (const part of ['He', 'Hello', 'Hello wor', 'Hello world']) { chat.streamReply(part); await tick(); } eq(writes, [], 'silence while it streams');
+  chat.finish('Hello world', [{ status: 'done', text: 'Done: A' }, { status: 'done', text: 'Done: B' }, { status: 'skipped', text: 'Skipped: C (x)' }]);
+  eq(writes, ['AI replied: Hello world Results: 2 done, 1 skipped'], 'once, with the counts'); assert.equal(live.text, writes[0]);
+  chat.begin('again'); chat.fail('boom'); eq(writes.length, 2); assert.match(writes[1], /AI chat failed: boom/);
+});
+
+integrationTest('B1 ui: stopping a turn and applying a plan each say one thing; the long reply in the summary is clipped', async () => {
+  const h = await harness(); await h.view.hydrate(); const chat = h.open(); const writes = []; const setText = chat.liveEl.setText.bind(chat.liveEl); chat.liveEl.setText = value => { writes.push(value); setText(value); };
+  chat.begin('q'); chat.streamReply('partial'); chat.markStopped(); eq(writes, ['Stopped.']);
+  chat.begin('q2'); chat.finish('x'.repeat(500), []); assert.ok(writes.at(-1).length < 200, 'clipped');
+});
+
+// ---- what must not change --------------------------------------------------------------------------------------------
+
+test('B1 ui: single sources stay single: one typingInField (3 mentions), the same 5 renderChatMarkdown mentions in code, one definition each of the focus capture and the detach', () => {
+  const walk = dir => fs.readdirSync(path.join(root, dir), { withFileTypes: true }).flatMap(entry => entry.isDirectory() ? (['node_modules', 'tests', 'samples', 'scripts'].includes(entry.name) ? [] : walk(path.join(dir, entry.name))) : entry.name.endsWith('.ts') ? [path.join(dir, entry.name)] : []);
+  const sources = walk('.').map(file => fs.readFileSync(path.join(root, file), 'utf8'));
+  const total = pattern => sources.reduce((sum, text) => sum + (text.match(new RegExp(pattern, 'g')) ?? []).length, 0);
+  assert.equal(total('typingInField'), 3, 'typingInField'); assert.equal(total('renderChatMarkdown'), 5, 'renderChatMarkdown');
+  assert.equal(total('captureFocus\\(\\): \\(\\) => void \\{'), 1, 'one capture'); assert.equal(total('private detachMapChat\\(\\)'), 1, 'one detach');
+});
+
+test('B1 ui: the stylesheet takes colours and sizes from Obsidian variables only, has no floating-window rules left, and keeps the toolbar and zoom rules', () => {
+  const css = fs.readFileSync(path.join(root, 'styles.css'), 'utf8'); const chatRules = css.split('\n').filter(line => /^\.(vam-map-chat|vam-chat-hero|vam-sr-only|vam-canvas \{)/.test(line)).join('\n');
+  assert.ok(chatRules.length > 3000); assert.doesNotMatch(chatRules, /#[0-9a-fA-F]{3,8}\b|rgb\(|rgba\(|hsl\(/, 'no literal colours'); assert.doesNotMatch(css, /has-map-chat-open/, 'the floating-window make-room rules are gone');
+  assert.doesNotMatch(css, /\.vam-map-chat ~ \.vam-canvas-hint/); assert.doesNotMatch(css, /bottom: 392px/); assert.doesNotMatch(chatRules, /border-left|border-right: [2-9]|linear-gradient|background-clip: text/, 'none of the banned surface habits');
+  assert.match(css, /^\.vam-map-tools \{ top: 12px; left: 12px;/m); assert.match(css, /^\.vam-zoom-controls \{ right: 12px; bottom: 12px; \}/m);
+  assert.match(css, /^\.vam-workspace \{ display: flex;[^}]*position: relative;/m); assert.match(css, /^\.vam-canvas \{ position: relative; display: flex; flex: 1;/m);
+  assert.match(css, /\.vam-map-chat\.is-overlay \+ \.vam-canvas \{ margin-left: 44px; \}/);
+});
+
+test('B1 ui: render() builds the workspace as the chat window, the canvas (viewport + overlay) and the inspector, and the selection bar lives in the canvas', () => {
+  const source = fs.readFileSync(path.join(root, 'experiences/visual-map/view.ts'), 'utf8'); const render = source.slice(source.indexOf('  private render(): void {'), source.indexOf('  /** `shownNode` may be a display copy'));
+  assert.match(render, /const canvas = workspace\.createDiv\("vam-canvas"\)/); assert.match(render, /this\.viewportEl = canvas\.createDiv\("vam-viewport"\)/); assert.match(render, /const overlay = canvas\.createDiv\("vam-canvas-overlay"\)/);
+  assert.match(render, /this\.renderSelectionBar\(canvas\)/); assert.match(render, /this\.renderInspector\(workspace, node\)/, 'the sample inspector is still a sibling of the canvas');
 });

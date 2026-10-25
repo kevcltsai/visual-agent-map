@@ -20,6 +20,7 @@ import { normalizeReasoningLevel } from "./ai/task-policy";
 import type { PromptPreset } from "./ai/prompt-presets";
 import { sourcesHeadingKeys, standardTemplate, type DetailTemplate } from "./ai/detail-templates";
 import { fencedLines } from "./ai/markdown-blocks";
+import { clampMapChatWidth, MAP_CHAT_WIDTH_DEFAULT } from "./core/map-chat-layout";
 import { findWikilinks, linkPathOf, rewriteLinkTargets, splitFrontmatter } from "./core/link-rewrite";
 import {
   managedHeadingValue,
@@ -44,6 +45,15 @@ export function normalizeMapChatStyle(value: unknown): "concise" | "detailed" {
 /** Saved map-chat model: a trimmed string; empty (also for any non-string) follows the workspace default model. */
 export function normalizeMapChatModel(value: unknown): string {
   return typeof value === "string" ? value.trim() : "";
+}
+
+/** Saved width of the map chat's side window: a whole number from 280 to 560; anything else is the default. */
+export function normalizeMapChatWidth(value: unknown): number {
+  return clampMapChatWidth(value);
+}
+/** Saved open state of the map chat's side window; open unless it was saved as closed. */
+export function normalizeMapChatOpen(value: unknown): boolean {
+  return value !== false;
 }
 
 export type Status = "idea" | "running" | "completed" | "error";
@@ -107,6 +117,10 @@ export interface Settings {
   mapChatStyle: "concise" | "detailed";
   /** Model of the map AI chat; empty follows cliModel. */
   mapChatModel: string;
+  /** Width in pixels of the map AI chat's side window (280 to 560); remembered between sessions. */
+  mapChatWidth: number;
+  /** Whether the side window was open when the map was last used; remembered between sessions. */
+  mapChatOpen: boolean;
   cliReasoning: ReasoningLevel;
   previewSize?: "small" | "medium" | "large";
   previewScale: number;
@@ -207,6 +221,8 @@ export const DEFAULT_SETTINGS: Settings = {
   cliModel: "gpt-5.6-luna",
   mapChatStyle: "concise",
   mapChatModel: "",
+  mapChatWidth: MAP_CHAT_WIDTH_DEFAULT,
+  mapChatOpen: true,
   cliReasoning: "low",
   previewScale: 120,
   models: "",

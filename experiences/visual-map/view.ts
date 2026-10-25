@@ -84,6 +84,7 @@ import {
   moveNotePath,
   normalizeReasoningLevel,
   normalizeMapChatStyle,
+  normalizeMapChatOpen,
   rebaseMapNotePaths,
   type Note,
   type NotePatch,
@@ -149,6 +150,7 @@ import {
   type MapChatPlan,
   type MapChatPlanReason
 } from "../../core/map-chat-plan";
+import { CHAT_PLAN_GROUP_ORDER, chatPlanGroupOf, clampMapChatWidth, isChatNarrow } from "../../core/map-chat-layout";
 import { relevanceMode, relevanceModeAfterWrite, type RelevanceMode, type RelevancePin } from "./relevance-pins";
 import { PendingSuggestions } from "../../pending-suggestions";
 import { createAimMap } from "../aim/create-map";
@@ -510,6 +512,9 @@ export class VisualAgentMapView extends ItemView {
   /** True while a confirmed plan is being applied; no new message is sent meanwhile. */
   private chatApplying = false;
   private chatWorkspaceEl: HTMLElement | null = null;
+  private chatOverlayEl: HTMLElement | null = null;
+  /** The map whose opening screen has already taken the keyboard once. */
+  private chatHeroFocusedFor: string | null = null;
   /** The note the user last had open beside the map; dropped text is assumed to come from it. */
   private lastMarkdownPath: string | null = null;
   private deletedMap: {
@@ -768,9 +773,10 @@ export class VisualAgentMapView extends ItemView {
       this.spaceHeld = false;
     });
     this.registerDomEvent(this.contentEl, "keydown", event => {
+      // Escape inside the chat window folds the window (the panel handles it); it never clears the map's selection.
       if (
         event.target instanceof HTMLElement &&
-        event.target.closest("input, textarea, select, [contenteditable=true]")
+        event.target.closest("input, textarea, select, [contenteditable=true], .vam-map-chat")
       )
         return;
       if (event.key === "Escape") {
@@ -6273,6 +6279,8 @@ export class VisualAgentMapView extends ItemView {
         ).open()
       );
       if (!this.plugin.settings.models.trim()) this.renderConnectionCheck(actions);
+      // The opening screen of the chat: one sentence builds a new map of the user's own, which the sample cannot be.
+      start.createDiv("vam-sample-start-chat");
     }
     if (!this.builtIn && !this.map.aim) this.renderMultiResearchStatus(this.contentEl);
     if (!this.builtIn && !this.map.aim) this.renderRelevanceStatus(this.contentEl);
@@ -6308,10 +6316,12 @@ export class VisualAgentMapView extends ItemView {
       }
     }
     const workspace = this.contentEl.createDiv("vam-workspace");
-    this.viewportEl = workspace.createDiv("vam-viewport");
+    // The workspace is a row: the chat window (put in first by mountMapChat), the canvas, the sample's inspector.
+    const canvas = workspace.createDiv("vam-canvas");
+    this.viewportEl = canvas.createDiv("vam-viewport");
     if (this.integrationMode) this.viewportEl.addClass("is-selecting");
-    // Canvas controls float over the map instead of stacking a second toolbar above it.
-    const overlay = workspace.createDiv("vam-canvas-overlay");
+    // Canvas controls float over the map instead of stacking a second toolbar above it; the overlay covers the canvas only.
+    const overlay = canvas.createDiv("vam-canvas-overlay");
     if (tools.childElementCount) overlay.appendChild(tools);
     else tools.remove();
     this.mountMapChat(workspace, overlay);
@@ -6361,7 +6371,7 @@ export class VisualAgentMapView extends ItemView {
     const shown = this.canvasNodes();
     if (this.selected && !shown.some(node => node.id === this.selected)) this.selected = null;
     this.multiSelected = new Set([...this.multiSelected].filter(id => shown.some(node => node.id === id)));
-    if (this.integrationMode) this.selectionBarEl = this.renderSelectionBar(workspace);
+    if (this.integrationMode) this.selectionBarEl = this.renderSelectionBar(canvas);
     this.tabStopId = this.defaultTabStop(shown);
     this.renderingCard = true;
     try {
@@ -7231,7 +7241,8 @@ export class VisualAgentMapView extends ItemView {
     }, 220);
   }
   private showHoverCard(card: HTMLElement, note: Note): void {
-    const workspace = this.contentEl.querySelector<HTMLElement>(".vam-workspace");
+    // The card is placed against the canvas, not the whole row: the chat window beside it is not part of the map.
+    const workspace = this.contentEl.querySelector<HTMLElement>(".vam-canvas");
     if (!workspace) return;
     this.hoverCard?.remove();
     const preview = workspace.createDiv("vam-hover-card");
@@ -10043,11 +10054,19 @@ export class VisualAgentMapView extends ItemView {
     this.chat?.detach();
     return restore;
   }
-  /** Puts the chat window into this repaint's overlay; the window itself (messages, draft, chips) lives on the view. */
+  /**
+   * Puts the chat window into this repaint. Normally it is the first child of `workspace`, the window left of the canvas. On an
+   * empty map (and on the read-only sample) with no conversation yet it is the opening screen instead, in the middle of the
+   * canvas (or in the sample's start card). The window itself (messages, draft, chips) lives on the view.
+   */
   private mountMapChat(workspace: HTMLElement, overlay: HTMLElement): void {
     this.chatWorkspaceEl = workspace;
-    if (this.builtIn || !this.map) return;
-    if (!this.chat) this.chat = new MapChatPanel(this.chatHost());
+    this.chatOverlayEl = overlay;
+    if (!this.map) return;
+    if (!this.chat) {
+      this.chat = new MapChatPanel(this.chatHost());
+      this.chat.restoreOpen(normalizeMapChatOpen(this.plugin.settings.mapChatOpen));
+    }
     if (this.chatMapId !== this.map.id) {
       if (this.chatCarryOver) {
         // The conversation opened this map itself (create_map, open_map): it goes along and its running turn goes on.
@@ -10060,8 +10079,71 @@ export class VisualAgentMapView extends ItemView {
         this.chatMapId = this.map.id;
       }
     }
-    this.chat.mount(overlay);
+    this.syncChatNarrow();
+    this.placeChatPanel();
+    // A press on the canvas puts a window that was laid over it back to the edge.
+    this.viewportEl?.addEventListener("pointerdown", () => this.chat?.collapseOverlay());
     workspace.toggleClass("has-map-chat-open", this.chat.isOpen);
+    this.focusChatHeroOnce();
+  }
+  /** Whether the opening screen is showing: nothing said yet, and an empty map (not an AIM one) or the read-only sample. */
+  private chatHero(): boolean {
+    if (!this.chat || this.chat.hasMessages || !this.map) return false;
+    return this.builtIn || (!this.map.aim && this.map.nodes.length === 0);
+  }
+  /** Mounts the panel where it belongs now: the opening screen's place, or the first child of the workspace. */
+  private placeChatPanel(): void {
+    const chat = this.chat;
+    const workspace = this.chatWorkspaceEl;
+    const overlay = this.chatOverlayEl;
+    if (!chat || !workspace || !overlay) return;
+    if (!this.chatHero()) {
+      chat.mount(workspace, "side");
+      return;
+    }
+    // The sample keeps its map in view: the opening screen sits in the sample's own start card. An empty map has the whole canvas.
+    const startCard = this.builtIn ? this.contentEl.querySelector<HTMLElement>(".vam-sample-start-chat") : null;
+    const slot = startCard ?? overlay.createDiv("vam-chat-hero-slot");
+    chat.mount(slot, "hero");
+    this.viewportEl?.toggleClass("has-chat-hero", !startCard);
+  }
+  /** The first message was sent (or a conversation ended): the panel moves between the opening screen and the window. */
+  private relocateMapChat(): void {
+    const chat = this.chat;
+    if (!chat || this.closed) return;
+    const hero = chat.isHero;
+    if (hero === this.chatHero()) return;
+    const restore = this.detachMapChat();
+    this.contentEl.querySelectorAll<HTMLElement>(".vam-chat-hero-slot").forEach(slot => slot.remove());
+    this.viewportEl?.removeClass("has-chat-hero");
+    this.placeChatPanel();
+    this.chatWorkspaceEl?.toggleClass("has-map-chat-open", chat.isOpen);
+    restore();
+  }
+  /** Opening screen: the keyboard starts in the message field, once per map, unless it is in another pane. */
+  private focusChatHeroOnce(): void {
+    const chat = this.chat;
+    if (!chat?.isHero || !this.map || this.chatHeroFocusedFor === this.map.id) return;
+    this.chatHeroFocusedFor = this.map.id;
+    const active = this.contentEl.ownerDocument?.activeElement ?? null;
+    if (!active || active === this.contentEl.ownerDocument?.body || this.contentEl.contains(active)) chat.focusInput();
+  }
+  /** The window folds to a narrow edge when the pane would keep less than 700px for the canvas beside it. */
+  private syncChatNarrow(): void {
+    const width = this.contentEl?.clientWidth;
+    if (this.chat && width) this.chat.setNarrow(isChatNarrow(width, this.chatWidth()));
+  }
+  /** Obsidian calls this when the pane's size changes. */
+  onResize(): void {
+    this.syncChatNarrow();
+  }
+  private chatWidth(): number {
+    return clampMapChatWidth(this.plugin.settings.mapChatWidth);
+  }
+  /** The command that opens or closes the chat window and leaves the keyboard in its message field. */
+  toggleMapChat(): void {
+    if (!this.chat) return;
+    this.chat.toggleFromCommand();
   }
   private chatHost(): MapChatHost {
     return {
@@ -10094,6 +10176,9 @@ export class VisualAgentMapView extends ItemView {
       moreDetail: origin => {
         void this.sendMapChat(origin);
       },
+      retry: origin => {
+        void this.sendMapChat(origin, true);
+      },
       resolveLink: link => {
         const file = this.app.metadataCache.getFirstLinkpathDest(link, this.sourceMarkdownFile()?.path ?? "");
         return file && file.extension === "md" ? file.path : null;
@@ -10104,7 +10189,27 @@ export class VisualAgentMapView extends ItemView {
         void this.app.workspace.openLinkText(href, this.path, newLeaf);
       },
       activeElement: () => this.contentEl.ownerDocument?.activeElement ?? null,
-      layoutChanged: open => this.chatWorkspaceEl?.toggleClass("has-map-chat-open", open)
+      layoutChanged: () => {
+        const chat = this.chat;
+        this.chatWorkspaceEl?.toggleClass("has-map-chat-open", !!chat?.isOpen);
+        // Only what the user chose is remembered, not the fold a narrow pane forces on the window.
+        if (chat && !chat.isHero && this.plugin.settings.mapChatOpen !== chat.wantsOpen) {
+          this.plugin.settings.mapChatOpen = chat.wantsOpen;
+          void this.plugin.saveSettings();
+        }
+      },
+      width: () => this.chatWidth(),
+      setWidth: (width, commit) => {
+        if (!commit) return;
+        this.plugin.settings.mapChatWidth = clampMapChatWidth(width);
+        void this.plugin.saveSettings();
+        // The width decides whether the pane has room for the window beside the canvas.
+        this.syncChatNarrow();
+      },
+      suggestions: () => ({
+        selected: this.chatSelectionIds().length,
+        hasTopics: (this.map?.nodes.length ?? 0) > 0
+      })
     };
   }
   /** The chat's model list: the follow-default entry first, then the settings page's list (and a saved model that has gone). */
@@ -10358,10 +10463,12 @@ export class VisualAgentMapView extends ItemView {
     return t("ui.map_chat_error_failed_0", errorMessage(error));
   }
   /** Sends the draft: usage notice, one request, a streamed answer, then every action it asked for, once (or a plan to confirm first). */
-  private async sendMapChat(again?: MapChatOrigin): Promise<void> {
+  private async sendMapChat(again?: MapChatOrigin, retry = false): Promise<void> {
     const chat = this.chat;
-    if (!chat || chat.isBusy || this.chatApplying || this.closed || !this.map || this.builtIn) return;
-    // "Say it in more detail" sends the same question with the same references again; a normal send reads the draft.
+    if (!chat || chat.isBusy || this.chatApplying || this.closed || !this.map) return;
+    // "Say it in more detail" sends the same question with the same references again; a normal send reads the draft. A retry
+    // sends the same question as it was (concise, with its actions applied), after a failure.
+    const redo = Boolean(again) && !retry;
     const message = again ? again.text : chat.draft.trim();
     if (!message) return;
     const origin: MapChatOrigin = again ?? {
@@ -10373,7 +10480,7 @@ export class VisualAgentMapView extends ItemView {
     const anchor = { path: this.path, id: this.map.id as string | undefined };
     let request: MapChatRequest;
     try {
-      request = await this.buildChatRequest(message, chat, origin, Boolean(again));
+      request = await this.buildChatRequest(message, chat, origin, redo);
     } catch (error) {
       new Notice(errorMessage(error));
       return;
@@ -10391,14 +10498,16 @@ export class VisualAgentMapView extends ItemView {
         !this.closed && !controller.signal.aborted && this.chatController === controller && this.path === anchor.path;
       // A plan still waiting for its yes belongs to the question before this one.
       this.supersedeChatPlan();
-      chat.begin(again ? t("ui.map_chat_more_detail_asked") : message, origin, Boolean(again));
+      chat.begin(redo ? t("ui.map_chat_more_detail_asked") : message, origin, Boolean(again));
+      // The first message of a conversation moves the opening screen's panel into the side window.
+      this.relocateMapChat();
       try {
         const result = await this.plugin.mapChat.chat(request, controller.signal, text => {
           if (alive()) chat.streamReply(text);
         });
         if (!alive()) return;
         // A detail re-send only explains: the actions of the first answer were applied already, so whatever it lists is dropped.
-        if (again) {
+        if (redo) {
           const lines = result.actions.length
             ? [{ status: "skipped" as const, text: t("ui.map_chat_redo_actions_ignored") }]
             : [];
@@ -10461,9 +10570,16 @@ export class VisualAgentMapView extends ItemView {
     if (!chat) return;
     const token = ++this.chatPlanToken;
     const refTitles = this.chatRefTitles(result.actions);
+    const items = result.actions.map(action => this.chatActionLabel(action, refTitles));
+    // The same lines by kind of work, so a 100-action plan reads as five folded lists.
+    const groups = CHAT_PLAN_GROUP_ORDER.flatMap(group => {
+      const own = items.filter((_, index) => chatPlanGroupOf(result.actions[index].kind) === group);
+      return own.length ? [{ label: t(`ui.map_chat_plan_group_${group}_0`, own.length), items: own }] : [];
+    });
     const card: MapChatPlanCard = {
       reasons: plan.reasons.map(reason => this.planReasonText(reason, result)),
-      items: result.actions.map(action => this.chatActionLabel(action, refTitles)),
+      items,
+      groups,
       estimate: plan.estimatedCalls
         ? t("ui.map_chat_plan_calls_0", plan.estimatedCalls)
         : t("ui.map_chat_plan_calls_none"),

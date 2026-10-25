@@ -1069,6 +1069,45 @@ var en = {
   "ui.map_chat_plan_cancelled": "Plan cancelled. Nothing was changed.",
   "ui.map_chat_choose_map": "Which map do you mean?",
   "ui.map_chat_choose_opened_0": "Opened \u201C{0}\u201D.",
+  "ui.map_chat_log_label": "Conversation",
+  "ui.map_chat_hero_title": "What do you want to research or organize?",
+  "ui.map_chat_examples_label": "Examples to start from",
+  "ui.map_chat_example_research": "Research the coffee industry: players, supply chain, trends",
+  "ui.map_chat_example_learn": "Plan a three-month route to learn basic Japanese",
+  "ui.map_chat_example_decide": "Compare renting and buying a home: costs, risks, timing",
+  "ui.map_chat_suggestions_label": "Suggested messages",
+  "ui.map_chat_suggest_empty_build": "Build a three-level topic tree about\u2026",
+  "ui.map_chat_suggest_empty_new_map": "Create a new map about\u2026",
+  "ui.map_chat_suggest_empty_from_note": "Build a map from the open note",
+  "ui.map_chat_suggest_all_missing": "What is missing from this map?",
+  "ui.map_chat_suggest_all_layout": "Arrange the whole map",
+  "ui.map_chat_suggest_all_collapse": "Collapse every branch below the first level",
+  "ui.map_chat_suggest_one_expand": "Add three subtopics under the selected topic",
+  "ui.map_chat_suggest_one_research": "Research the selected topic",
+  "ui.map_chat_suggest_one_summary": "Rewrite the summary of the selected topic",
+  "ui.map_chat_suggest_many_compare": "Compare the selected topics",
+  "ui.map_chat_suggest_many_integrate": "Integrate the selected topics into one",
+  "ui.map_chat_suggest_many_group": "Group the selected topics under a new topic",
+  "ui.map_chat_suggest_note_add": "Add what the open note says to the map",
+  "ui.map_chat_width_label": "AI chat width (arrow keys change it)",
+  "ui.map_chat_open_unread": "Open AI chat (new reply)",
+  "ui.map_chat_live_done_0": "AI replied: {0}",
+  "ui.map_chat_live_failed_0": "AI chat failed: {0}",
+  "ui.map_chat_live_results_0": "Results: {0}",
+  "ui.map_chat_count_done_0": "{0} done",
+  "ui.map_chat_count_skipped_0": "{0} skipped",
+  "ui.map_chat_count_failed_0": "{0} failed",
+  "ui.map_chat_count_separator": ", ",
+  "ui.map_chat_lines_show_0": "Show all {0} results",
+  "ui.map_chat_lines_hide": "Show the summary only",
+  "ui.map_chat_retry": "Retry",
+  "ui.map_chat_plan_summary_0": "This plan needs your confirmation: {0}.",
+  "ui.map_chat_plan_group_create_0": "Add or create ({0})",
+  "ui.map_chat_plan_group_change_0": "Edit or move ({0})",
+  "ui.map_chat_plan_group_delete_0": "Delete ({0})",
+  "ui.map_chat_plan_group_research_0": "Research and AI work ({0})",
+  "ui.map_chat_plan_group_view_0": "Map and view ({0})",
+  "ui.map_chat_toggle_command": "Toggle the map AI chat",
   "ui.structure_review_entry_label": "AI structure suggestions:",
   "ui.structure_review_entry_map": "What to strengthen or cut? (whole map)",
   "ui.structure_review_entry_branch": "What to strengthen or cut? (this branch)",
@@ -2937,6 +2976,45 @@ var zhCN = {
   "ui.map_chat_plan_cancelled": "\u8BA1\u5212\u5DF2\u53D6\u6D88\uFF0C\u6CA1\u6709\u4EFB\u4F55\u6539\u53D8\u3002",
   "ui.map_chat_choose_map": "\u4F60\u6307\u7684\u662F\u54EA\u4E00\u5F20\u5730\u56FE\uFF1F",
   "ui.map_chat_choose_opened_0": "\u5DF2\u5207\u6362\u5230\u201C{0}\u201D\u3002",
+  "ui.map_chat_log_label": "\u5BF9\u8BDD\u8BB0\u5F55",
+  "ui.map_chat_hero_title": "\u4F60\u60F3\u7814\u7A76\u6216\u6574\u7406\u4EC0\u4E48\uFF1F",
+  "ui.map_chat_examples_label": "\u53EF\u4EE5\u4ECE\u8FD9\u4E9B\u5F00\u59CB",
+  "ui.map_chat_example_research": "\u7814\u7A76\u5496\u5561\u4EA7\u4E1A\uFF1A\u4E3B\u8981\u53C2\u4E0E\u8005\u3001\u4F9B\u5E94\u94FE\u4E0E\u8D8B\u52BF",
+  "ui.map_chat_example_learn": "\u89C4\u5212\u4E09\u4E2A\u6708\u5B66\u4F1A\u57FA\u7840\u65E5\u6587\u7684\u5B66\u4E60\u8DEF\u7EBF",
+  "ui.map_chat_example_decide": "\u6BD4\u8F83\u79DF\u623F\u548C\u4E70\u623F\uFF1A\u6210\u672C\u3001\u98CE\u9669\u4E0E\u65F6\u673A",
+  "ui.map_chat_suggestions_label": "\u5EFA\u8BAE\u6307\u4EE4",
+  "ui.map_chat_suggest_empty_build": "\u5EFA\u7ACB\u4E00\u68F5\u4E09\u5C42\u7684\u8BAE\u9898\u6811\uFF0C\u4E3B\u9898\u662F\u2026",
+  "ui.map_chat_suggest_empty_new_map": "\u65B0\u5EFA\u4E00\u5F20\u5730\u56FE\uFF0C\u4E3B\u9898\u662F\u2026",
+  "ui.map_chat_suggest_empty_from_note": "\u7528\u5F53\u524D\u6253\u5F00\u7684\u7B14\u8BB0\u5EFA\u7ACB\u5730\u56FE",
+  "ui.map_chat_suggest_all_missing": "\u8FD9\u5F20\u56FE\u8FD8\u7F3A\u4EC0\u4E48\uFF1F",
+  "ui.map_chat_suggest_all_layout": "\u6574\u7406\u5E76\u91CD\u65B0\u6392\u7248\u6574\u5F20\u56FE",
+  "ui.map_chat_suggest_all_collapse": "\u628A\u7B2C\u4E00\u5C42\u4EE5\u4E0B\u7684\u5206\u652F\u90FD\u6536\u8D77\u6765",
+  "ui.map_chat_suggest_one_expand": "\u5728\u9009\u53D6\u7684\u8BAE\u9898\u5E95\u4E0B\u52A0\u4E09\u4E2A\u5B50\u8BAE\u9898",
+  "ui.map_chat_suggest_one_research": "\u7814\u7A76\u9009\u53D6\u7684\u8BAE\u9898",
+  "ui.map_chat_suggest_one_summary": "\u6539\u5199\u9009\u53D6\u8BAE\u9898\u7684\u6458\u8981",
+  "ui.map_chat_suggest_many_compare": "\u6BD4\u8F83\u9009\u53D6\u7684\u8FD9\u51E0\u4E2A\u8BAE\u9898",
+  "ui.map_chat_suggest_many_integrate": "\u628A\u9009\u53D6\u7684\u8BAE\u9898\u6574\u5408\u6210\u4E00\u4E2A",
+  "ui.map_chat_suggest_many_group": "\u628A\u9009\u53D6\u7684\u8BAE\u9898\u5F52\u5230\u4E00\u4E2A\u65B0\u8BAE\u9898\u5E95\u4E0B",
+  "ui.map_chat_suggest_note_add": "\u628A\u5F53\u524D\u6253\u5F00\u7684\u7B14\u8BB0\u5185\u5BB9\u8865\u8FDB\u5730\u56FE",
+  "ui.map_chat_width_label": "AI \u5BF9\u8BDD\u5BBD\u5EA6\uFF08\u65B9\u5411\u952E\u53EF\u8C03\u6574\uFF09",
+  "ui.map_chat_open_unread": "\u6253\u5F00 AI \u5BF9\u8BDD\uFF08\u6709\u65B0\u56DE\u590D\uFF09",
+  "ui.map_chat_live_done_0": "AI \u5DF2\u56DE\u590D\uFF1A{0}",
+  "ui.map_chat_live_failed_0": "AI \u5BF9\u8BDD\u5931\u8D25\uFF1A{0}",
+  "ui.map_chat_live_results_0": "\u7ED3\u679C\uFF1A{0}",
+  "ui.map_chat_count_done_0": "\u5B8C\u6210 {0}",
+  "ui.map_chat_count_skipped_0": "\u7565\u8FC7 {0}",
+  "ui.map_chat_count_failed_0": "\u5931\u8D25 {0}",
+  "ui.map_chat_count_separator": "\u3001",
+  "ui.map_chat_lines_show_0": "\u663E\u793A\u5168\u90E8 {0} \u6761\u7ED3\u679C",
+  "ui.map_chat_lines_hide": "\u53EA\u663E\u793A\u6458\u8981",
+  "ui.map_chat_retry": "\u91CD\u8BD5",
+  "ui.map_chat_plan_summary_0": "\u8FD9\u4EFD\u8BA1\u5212\u9700\u8981\u4F60\u786E\u8BA4\uFF1A{0}\u3002",
+  "ui.map_chat_plan_group_create_0": "\u65B0\u589E\u6216\u5EFA\u7ACB\uFF08{0}\uFF09",
+  "ui.map_chat_plan_group_change_0": "\u4FEE\u6539\u6216\u79FB\u52A8\uFF08{0}\uFF09",
+  "ui.map_chat_plan_group_delete_0": "\u5220\u9664\uFF08{0}\uFF09",
+  "ui.map_chat_plan_group_research_0": "\u7814\u7A76\u4E0E AI \u4F5C\u4E1A\uFF08{0}\uFF09",
+  "ui.map_chat_plan_group_view_0": "\u5730\u56FE\u4E0E\u753B\u9762\uFF08{0}\uFF09",
+  "ui.map_chat_toggle_command": "\u5F00\u5173\u5730\u56FE AI \u5BF9\u8BDD",
   "ui.structure_review_entry_label": "AI \u7ED3\u6784\u5EFA\u8BAE\uFF1A",
   "ui.structure_review_entry_map": "\u54EA\u91CC\u8BE5\u52A0\u5F3A\u6216\u5220\u51CF\uFF1F\uFF08\u6574\u5F20\u56FE\uFF09",
   "ui.structure_review_entry_branch": "\u54EA\u91CC\u8BE5\u52A0\u5F3A\u6216\u5220\u51CF\uFF1F\uFF08\u8FD9\u4E2A\u5206\u652F\uFF09",
@@ -4805,6 +4883,45 @@ var zhTW = {
   "ui.map_chat_plan_cancelled": "\u8A08\u756B\u5DF2\u53D6\u6D88\uFF0C\u6C92\u6709\u4EFB\u4F55\u6539\u8B8A\u3002",
   "ui.map_chat_choose_map": "\u4F60\u6307\u7684\u662F\u54EA\u4E00\u5F35\u5FC3\u667A\u5716\uFF1F",
   "ui.map_chat_choose_opened_0": "\u5DF2\u5207\u63DB\u5230\u300C{0}\u300D\u3002",
+  "ui.map_chat_log_label": "\u5C0D\u8A71\u7D00\u9304",
+  "ui.map_chat_hero_title": "\u4F60\u60F3\u7814\u7A76\u6216\u6574\u7406\u4EC0\u9EBC\uFF1F",
+  "ui.map_chat_examples_label": "\u53EF\u4EE5\u5F9E\u9019\u4E9B\u958B\u59CB",
+  "ui.map_chat_example_research": "\u7814\u7A76\u5496\u5561\u7522\u696D\uFF1A\u4E3B\u8981\u53C3\u8207\u8005\u3001\u4F9B\u61C9\u93C8\u8207\u8DA8\u52E2",
+  "ui.map_chat_example_learn": "\u898F\u5283\u4E09\u500B\u6708\u5B78\u6703\u57FA\u790E\u65E5\u6587\u7684\u5B78\u7FD2\u8DEF\u7DDA",
+  "ui.map_chat_example_decide": "\u6BD4\u8F03\u79DF\u623F\u548C\u8CB7\u623F\uFF1A\u6210\u672C\u3001\u98A8\u96AA\u8207\u6642\u6A5F",
+  "ui.map_chat_suggestions_label": "\u5EFA\u8B70\u6307\u4EE4",
+  "ui.map_chat_suggest_empty_build": "\u5EFA\u7ACB\u4E00\u68F5\u4E09\u5C64\u7684\u8B70\u984C\u6A39\uFF0C\u4E3B\u984C\u662F\u2026",
+  "ui.map_chat_suggest_empty_new_map": "\u65B0\u5EFA\u4E00\u5F35\u5730\u5716\uFF0C\u4E3B\u984C\u662F\u2026",
+  "ui.map_chat_suggest_empty_from_note": "\u7528\u76EE\u524D\u958B\u8457\u7684\u7B46\u8A18\u5EFA\u7ACB\u5730\u5716",
+  "ui.map_chat_suggest_all_missing": "\u9019\u5F35\u5716\u9084\u7F3A\u4EC0\u9EBC\uFF1F",
+  "ui.map_chat_suggest_all_layout": "\u6574\u7406\u4E26\u91CD\u65B0\u6392\u7248\u6574\u5F35\u5716",
+  "ui.map_chat_suggest_all_collapse": "\u628A\u7B2C\u4E00\u5C64\u4EE5\u4E0B\u7684\u5206\u652F\u90FD\u6536\u8D77\u4F86",
+  "ui.map_chat_suggest_one_expand": "\u5728\u9078\u53D6\u7684\u8B70\u984C\u5E95\u4E0B\u52A0\u4E09\u500B\u5B50\u8B70\u984C",
+  "ui.map_chat_suggest_one_research": "\u7814\u7A76\u9078\u53D6\u7684\u8B70\u984C",
+  "ui.map_chat_suggest_one_summary": "\u6539\u5BEB\u9078\u53D6\u8B70\u984C\u7684\u6458\u8981",
+  "ui.map_chat_suggest_many_compare": "\u6BD4\u8F03\u9078\u53D6\u7684\u9019\u5E7E\u500B\u8B70\u984C",
+  "ui.map_chat_suggest_many_integrate": "\u628A\u9078\u53D6\u7684\u8B70\u984C\u6574\u5408\u6210\u4E00\u500B",
+  "ui.map_chat_suggest_many_group": "\u628A\u9078\u53D6\u7684\u8B70\u984C\u6B78\u5230\u4E00\u500B\u65B0\u8B70\u984C\u5E95\u4E0B",
+  "ui.map_chat_suggest_note_add": "\u628A\u76EE\u524D\u958B\u8457\u7684\u7B46\u8A18\u5167\u5BB9\u88DC\u9032\u5730\u5716",
+  "ui.map_chat_width_label": "AI \u5C0D\u8A71\u5BEC\u5EA6\uFF08\u65B9\u5411\u9375\u53EF\u8ABF\u6574\uFF09",
+  "ui.map_chat_open_unread": "\u958B\u555F AI \u5C0D\u8A71\uFF08\u6709\u65B0\u56DE\u8986\uFF09",
+  "ui.map_chat_live_done_0": "AI \u5DF2\u56DE\u8986\uFF1A{0}",
+  "ui.map_chat_live_failed_0": "AI \u5C0D\u8A71\u5931\u6557\uFF1A{0}",
+  "ui.map_chat_live_results_0": "\u7D50\u679C\uFF1A{0}",
+  "ui.map_chat_count_done_0": "\u5B8C\u6210 {0}",
+  "ui.map_chat_count_skipped_0": "\u7565\u904E {0}",
+  "ui.map_chat_count_failed_0": "\u5931\u6557 {0}",
+  "ui.map_chat_count_separator": "\u3001",
+  "ui.map_chat_lines_show_0": "\u986F\u793A\u5168\u90E8 {0} \u7B46\u7D50\u679C",
+  "ui.map_chat_lines_hide": "\u53EA\u986F\u793A\u6458\u8981",
+  "ui.map_chat_retry": "\u91CD\u8A66",
+  "ui.map_chat_plan_summary_0": "\u9019\u4EFD\u8A08\u756B\u9700\u8981\u4F60\u78BA\u8A8D\uFF1A{0}\u3002",
+  "ui.map_chat_plan_group_create_0": "\u65B0\u589E\u6216\u5EFA\u7ACB\uFF08{0}\uFF09",
+  "ui.map_chat_plan_group_change_0": "\u4FEE\u6539\u6216\u79FB\u52D5\uFF08{0}\uFF09",
+  "ui.map_chat_plan_group_delete_0": "\u522A\u9664\uFF08{0}\uFF09",
+  "ui.map_chat_plan_group_research_0": "\u7814\u7A76\u8207 AI \u4F5C\u696D\uFF08{0}\uFF09",
+  "ui.map_chat_plan_group_view_0": "\u5730\u5716\u8207\u756B\u9762\uFF08{0}\uFF09",
+  "ui.map_chat_toggle_command": "\u958B\u95DC\u5730\u5716 AI \u5C0D\u8A71",
   "ui.structure_review_entry_label": "AI \u7D50\u69CB\u5EFA\u8B70\uFF1A",
   "ui.structure_review_entry_map": "\u54EA\u88E1\u8A72\u52A0\u5F37\u6216\u522A\u6E1B\uFF1F\uFF08\u6574\u5F35\u5716\uFF09",
   "ui.structure_review_entry_branch": "\u54EA\u88E1\u8A72\u52A0\u5F37\u6216\u522A\u6E1B\uFF1F\uFF08\u9019\u500B\u5206\u652F\uFF09",
@@ -17841,6 +17958,59 @@ function insertAfterBlock(lines, code, start, add, stop, separate = false) {
 var import_obsidian13 = require("obsidian");
 var import_node_crypto4 = require("node:crypto");
 
+// core/map-chat-layout.ts
+var MAP_CHAT_WIDTH_DEFAULT = 340;
+var MAP_CHAT_WIDTH_MIN = 280;
+var MAP_CHAT_WIDTH_MAX = 560;
+var MAP_CHAT_WIDTH_STEP = 16;
+var MAP_CHAT_MIN_CANVAS = 700;
+var MAP_CHAT_LINES_FOLD_ABOVE = 5;
+function clampMapChatWidth(value) {
+  if (typeof value !== "number" || !Number.isFinite(value)) return MAP_CHAT_WIDTH_DEFAULT;
+  return Math.min(MAP_CHAT_WIDTH_MAX, Math.max(MAP_CHAT_WIDTH_MIN, Math.round(value)));
+}
+function isChatNarrow(paneWidth, sidebarWidth) {
+  return paneWidth - sidebarWidth < MAP_CHAT_MIN_CANVAS;
+}
+function chatSuggestionKeys(context) {
+  const keys = !context.hasTopics ? ["ui.map_chat_suggest_empty_build", "ui.map_chat_suggest_empty_new_map"] : context.selected > 1 ? ["ui.map_chat_suggest_many_compare", "ui.map_chat_suggest_many_integrate", "ui.map_chat_suggest_many_group"] : context.selected === 1 ? ["ui.map_chat_suggest_one_expand", "ui.map_chat_suggest_one_research", "ui.map_chat_suggest_one_summary"] : ["ui.map_chat_suggest_all_missing", "ui.map_chat_suggest_all_layout", "ui.map_chat_suggest_all_collapse"];
+  if (context.hasNote)
+    keys.push(context.hasTopics ? "ui.map_chat_suggest_note_add" : "ui.map_chat_suggest_empty_from_note");
+  return keys;
+}
+var MAP_CHAT_EXAMPLE_KEYS = [
+  "ui.map_chat_example_research",
+  "ui.map_chat_example_learn",
+  "ui.map_chat_example_decide"
+];
+function countChatLines(lines, ignore) {
+  const counts = { done: 0, skipped: 0, failed: 0 };
+  for (const line of lines) if (line.text !== ignore) counts[line.status]++;
+  return counts;
+}
+var CHAT_PLAN_GROUP_ORDER = ["create", "change", "delete", "research", "view"];
+function chatPlanGroupOf(kind) {
+  switch (kind) {
+    case "add_child":
+    case "create_md_file":
+    case "create_map":
+      return "create";
+    case "rename_topic":
+    case "update_summary":
+    case "edit_topic_note":
+    case "move_topic":
+    case "edit_md_file":
+      return "change";
+    case "delete_topic":
+      return "delete";
+    case "select_topics":
+    case "run_map_action":
+      return "research";
+    default:
+      return "view";
+  }
+}
+
 // core/link-rewrite.ts
 function linkPathOf(target) {
   const hash = target.indexOf("#");
@@ -17977,6 +18147,12 @@ function normalizeMapChatStyle(value) {
 function normalizeMapChatModel(value) {
   return typeof value === "string" ? value.trim() : "";
 }
+function normalizeMapChatWidth(value) {
+  return clampMapChatWidth(value);
+}
+function normalizeMapChatOpen(value) {
+  return value !== false;
+}
 function resolveMapFolders(saved) {
   const workspace = (saved == null ? void 0 : saved.workspaceFolder) || DEFAULT_SETTINGS.workspaceFolder;
   return {
@@ -18010,6 +18186,8 @@ var DEFAULT_SETTINGS = {
   cliModel: "gpt-5.6-luna",
   mapChatStyle: "concise",
   mapChatModel: "",
+  mapChatWidth: MAP_CHAT_WIDTH_DEFAULT,
+  mapChatOpen: true,
   cliReasoning: "low",
   previewScale: 120,
   models: "",
@@ -20809,13 +20987,30 @@ var MapChatPanel = class {
     __publicField(this, "id", `vam-map-chat-${++panelSequence}`);
     __publicField(this, "messages", []);
     __publicField(this, "chips", []);
+    /** The user's wish: the side window is open (remembered). Whether it shows also depends on `narrow`. */
     __publicField(this, "open", false);
+    /** The pane is too narrow to dock the window: it is a narrow edge, and `overlayOpen` lays it over the canvas. */
+    __publicField(this, "narrow", false);
+    __publicField(this, "overlayOpen", false);
+    /** The opening screen: no side window yet, the same elements stand in the middle of the canvas. */
+    __publicField(this, "hero", false);
+    __publicField(this, "unread", false);
+    __publicField(this, "width", MAP_CHAT_WIDTH_DEFAULT);
     __publicField(this, "busy", false);
     __publicField(this, "composing", false);
     __publicField(this, "el");
     __publicField(this, "toggleEl");
+    __publicField(this, "badgeEl");
     __publicField(this, "bodyEl");
+    __publicField(this, "headEl");
+    __publicField(this, "heroTitleEl");
     __publicField(this, "logEl");
+    __publicField(this, "suggestEl");
+    __publicField(this, "suggestKey", "");
+    __publicField(this, "suggestInHero", false);
+    __publicField(this, "resizerEl");
+    __publicField(this, "liveEl");
+    __publicField(this, "stopResizing", null);
     __publicField(this, "chipsEl");
     __publicField(this, "statusEl");
     __publicField(this, "inputEl");
@@ -20835,8 +21030,31 @@ var MapChatPanel = class {
     __publicField(this, "dismissedNote", null);
     __publicField(this, "noteChip", null);
   }
+  /** The window is showing (docked, laid over the canvas, or as the opening screen). */
   get isOpen() {
+    return this.shown;
+  }
+  /** The user's choice to keep it open, which is what is remembered; it can differ from what shows on a narrow pane. */
+  get wantsOpen() {
     return this.open;
+  }
+  get isHero() {
+    return this.hero;
+  }
+  get isNarrow() {
+    return this.narrow;
+  }
+  get hasMessages() {
+    return this.messages.length > 0;
+  }
+  get docked() {
+    return !this.hero && this.open && !this.narrow;
+  }
+  get floating() {
+    return !this.hero && this.narrow && this.overlayOpen;
+  }
+  get shown() {
+    return this.hero || this.docked || this.floating;
   }
   get isBusy() {
     return this.busy;
@@ -20862,6 +21080,7 @@ var MapChatPanel = class {
     if (visible && visible !== this.dismissedNote) this.dismissedNote = null;
     this.noteChip = visible && visible !== this.dismissedNote ? visible : null;
     this.renderChips();
+    this.renderSuggestions();
   }
   attachments() {
     return this.chips.map((chip) => ({ ...chip }));
@@ -20880,19 +21099,33 @@ var MapChatPanel = class {
   transcript() {
     return this.messages.map((message) => ({ ...message, lines: [...message.lines] }));
   }
-  /** Puts the panel into `parent` (built there the first time, moved there afterwards). */
-  mount(parent) {
+  /**
+   * Puts the panel into `parent` (built there the first time, moved there afterwards). "side" makes it the first child of
+   * `parent`, the window left of the canvas; "hero" is the opening screen, which goes wherever `parent` is.
+   */
+  mount(parent, mode = "side") {
+    var _a2, _b2, _c;
+    this.hero = mode === "hero";
     if (!this.built) this.build(parent);
-    else parent.appendChild(this.el);
+    else if (mode === "hero") this.place(parent, null);
+    if (mode === "side") this.place(parent, parent.firstChild);
+    this.width = clampMapChatWidth((_c = (_b2 = (_a2 = this.host).width) == null ? void 0 : _b2.call(_a2)) != null ? _c : this.width);
     this.applyOpen();
     this.refreshNote();
     this.refreshControls();
   }
-  /** The view is closing: stop listening for model changes. */
+  /** Moves the panel to `parent`, before `before` (the end when null). */
+  place(parent, before) {
+    const ref = before === this.el ? this.el.nextSibling : before;
+    this.el.remove();
+    parent.insertBefore(this.el, ref);
+  }
+  /** The view is closing: stop listening for model changes and let go of a resize in progress. */
   dispose() {
-    var _a2;
+    var _a2, _b2;
     (_a2 = this.stopWatching) == null ? void 0 : _a2.call(this);
     this.stopWatching = null;
+    (_b2 = this.stopResizing) == null ? void 0 : _b2.call(this);
     this.cancelFrame();
     this.rows = /* @__PURE__ */ new WeakMap();
   }
@@ -20915,17 +21148,58 @@ var MapChatPanel = class {
     };
   }
   setOpen(open, focus = false) {
-    if (open === this.open && !focus) return;
+    if (open === this.open && (!this.narrow || open === this.overlayOpen) && !focus) return;
     this.open = open;
+    this.overlayOpen = open;
     this.applyOpen();
     if (open) {
       this.refreshControls();
       this.refreshNote();
     }
-    this.host.layoutChanged(open);
+    this.host.layoutChanged(this.shown);
     if (!this.built) return;
     if (open && focus) this.inputEl.focus();
     if (!open && focus) this.toggleEl.focus();
+  }
+  /** The saved open state is applied without telling the view (it asked for it). */
+  restoreOpen(open) {
+    this.open = open;
+    this.overlayOpen = false;
+    this.applyOpen();
+  }
+  /** The pane became too narrow to dock the window (or wide enough again). The window folds to its edge, or docks back. */
+  setNarrow(narrow) {
+    if (narrow === this.narrow) return;
+    const hadFocus = this.hasFocus();
+    this.narrow = narrow;
+    this.overlayOpen = false;
+    this.applyOpen();
+    this.host.layoutChanged(this.shown);
+    if (hadFocus && !this.shown && this.built) this.toggleEl.focus();
+  }
+  /** Lays the folded window back to its edge without forgetting that the user wants it open (Escape, a click on the canvas). */
+  collapseOverlay(focus = false) {
+    if (!this.floating) return;
+    const hadFocus = this.hasFocus();
+    this.overlayOpen = false;
+    this.applyOpen();
+    this.host.layoutChanged(this.shown);
+    if ((focus || hadFocus) && this.built) this.toggleEl.focus();
+  }
+  /** The command that opens or closes the window: it ends with the keyboard in the message field when it opens. */
+  toggleFromCommand() {
+    if (this.hero) {
+      this.focusInput();
+      return;
+    }
+    if (!this.shown) this.setOpen(true, true);
+    else if (this.built && this.host.activeElement() !== this.inputEl) this.inputEl.focus();
+    else if (this.narrow) this.collapseOverlay(true);
+    else this.setOpen(false, true);
+  }
+  hasFocus() {
+    const active = this.host.activeElement();
+    return this.built && !!active && this.el.contains(active);
   }
   /** Whether the point is over the panel (or over its button while it is collapsed). */
   hitTest(clientX, clientY) {
@@ -20964,9 +21238,10 @@ var MapChatPanel = class {
     if (target) target.focus();
     else this.inputEl.focus();
   }
-  /** The selection changed: repaint the reference chips. */
+  /** The selection changed: repaint the reference chips and the suggestions. */
   refreshSelection() {
     this.renderChips();
+    this.renderSuggestions();
   }
   /** A turn starts: the user's text, an empty answer, and the busy state. */
   begin(userText, origin, keepDraft = false) {
@@ -21024,6 +21299,8 @@ var MapChatPanel = class {
     this.busy = false;
     this.renderLog();
     this.renderBusy();
+    this.announce(this.spokenTurn(reply, lines));
+    this.markUnread();
   }
   /** The turn ended without an answer. */
   fail(text11) {
@@ -21036,6 +21313,8 @@ var MapChatPanel = class {
     this.busy = false;
     this.renderLog();
     this.renderBusy();
+    this.announce(t("ui.map_chat_live_failed_0", clip(text11, 160)));
+    this.markUnread();
   }
   /** The user stopped the turn: whatever text arrived stays, marked as stopped. */
   markStopped() {
@@ -21051,6 +21330,7 @@ var MapChatPanel = class {
     this.busy = false;
     this.renderLog();
     this.renderBusy();
+    this.announce(t("ui.map_chat_stopped"));
   }
   /** The reply just finished needs the user's yes: shows the plan card on its message. */
   showPlan(plan) {
@@ -21074,6 +21354,10 @@ var MapChatPanel = class {
     plan.state = state;
     if (lines) message.lines = lines;
     this.renderLog();
+    if (lines == null ? void 0 : lines.length)
+      this.announce(
+        t("ui.map_chat_live_results_0", this.countsText(countChatLines(lines, t("ui.map_chat_not_undoable"))))
+      );
   }
   /** Offers a short list to pick from under the last answer. */
   showChoices(choices) {
@@ -21098,10 +21382,12 @@ var MapChatPanel = class {
     this.dismissedNote = null;
     this.noteChip = null;
     this.busy = false;
+    this.unread = false;
     if (this.built) this.inputEl.value = "";
     this.renderLog();
     this.renderChips();
     this.renderBusy();
+    this.applyOpen();
   }
   focusInput() {
     if (this.built) this.inputEl.focus();
@@ -21115,28 +21401,34 @@ var MapChatPanel = class {
       attr: { "aria-label": t("ui.map_chat_open"), "aria-expanded": "false", "aria-controls": this.id }
     });
     (0, import_obsidian16.setIcon)(this.toggleEl.createSpan("vam-map-chat-toggle-icon"), "message-square");
+    this.badgeEl = this.toggleEl.createSpan({ cls: "vam-map-chat-unread", attr: { "aria-hidden": "true" } });
+    this.badgeEl.hidden = true;
     this.toggleEl.addEventListener("click", () => this.setOpen(true, true));
     this.bodyEl = this.el.createDiv({
       cls: "vam-map-chat-body",
       attr: { id: this.id, role: "region", "aria-label": t("ui.map_chat_title") }
     });
-    const head = this.bodyEl.createDiv("vam-map-chat-head");
-    head.createSpan({ cls: "vam-map-chat-title", text: t("ui.map_chat_title") });
-    const close = head.createEl("button", {
+    this.headEl = this.bodyEl.createDiv("vam-map-chat-head");
+    this.headEl.createSpan({ cls: "vam-map-chat-title", text: t("ui.map_chat_title") });
+    this.modelEl = this.headEl.createEl("select", {
+      cls: "vam-map-chat-model dropdown",
+      attr: { "aria-label": t("ui.map_chat_model_label") }
+    });
+    this.modelEl.addEventListener("change", () => this.host.setModel(this.modelEl.value));
+    const close = this.headEl.createEl("button", {
       cls: "vam-map-chat-close clickable-icon",
       attr: { "aria-label": t("ui.map_chat_close") }
     });
     (0, import_obsidian16.setIcon)(close, "x");
     close.addEventListener("click", () => this.setOpen(false, true));
-    const modelRow = this.bodyEl.createDiv("vam-map-chat-model-row");
-    this.modelEl = modelRow.createEl("select", {
-      cls: "vam-map-chat-model dropdown",
-      attr: { "aria-label": t("ui.map_chat_model_label") }
+    this.heroTitleEl = this.bodyEl.createDiv({
+      cls: "vam-map-chat-hero-title",
+      text: t("ui.map_chat_hero_title"),
+      attr: { role: "heading", "aria-level": "2" }
     });
-    this.modelEl.addEventListener("change", () => this.host.setModel(this.modelEl.value));
     this.logEl = this.bodyEl.createDiv({
       cls: "vam-map-chat-log",
-      attr: { role: "log", "aria-live": "polite", tabindex: "0" }
+      attr: { role: "group", "aria-label": t("ui.map_chat_log_label"), tabindex: "0" }
     });
     const openInternal = (event, from) => {
       var _a2;
@@ -21152,6 +21444,7 @@ var MapChatPanel = class {
     this.logEl.addEventListener("keydown", (event) => {
       if (event.key === "Enter") openInternal(event, event.target);
     });
+    this.suggestEl = this.bodyEl.createDiv({ cls: "vam-map-chat-suggest", attr: { role: "group" } });
     this.chipsEl = this.bodyEl.createDiv({
       cls: "vam-map-chat-chips",
       attr: { role: "group", "aria-label": t("ui.map_chat_references") }
@@ -21201,6 +21494,29 @@ var MapChatPanel = class {
     });
     this.inputEl.addEventListener("keydown", (event) => this.onKey(event));
     this.inputEl.addEventListener("focus", () => this.refreshNote());
+    this.el.addEventListener("keydown", (event) => {
+      const target = event.target;
+      if (event.key !== "Escape" || event.target === this.inputEl || (target == null ? void 0 : target.tagName) === "SELECT") return;
+      if (this.hero || event.isComposing) return;
+      event.preventDefault();
+      if (this.narrow) this.collapseOverlay(true);
+      else this.setOpen(false, true);
+    });
+    this.resizerEl = this.el.createDiv({
+      cls: "vam-map-chat-resizer",
+      attr: {
+        role: "separator",
+        "aria-orientation": "vertical",
+        "aria-label": t("ui.map_chat_width_label"),
+        "aria-valuemin": String(MAP_CHAT_WIDTH_MIN),
+        "aria-valuemax": String(MAP_CHAT_WIDTH_MAX),
+        "aria-valuenow": String(this.width),
+        tabindex: "0"
+      }
+    });
+    this.resizerEl.addEventListener("keydown", (event) => this.onResizerKey(event));
+    this.resizerEl.addEventListener("pointerdown", (event) => this.startResize(event));
+    this.liveEl = this.el.createDiv({ cls: "vam-sr-only", attr: { "aria-live": "polite", "aria-atomic": "true" } });
     for (const name of ["dragenter", "dragover"])
       this.el.addEventListener(name, (event) => this.onDragOver(event));
     this.el.addEventListener("dragleave", () => this.setDropHighlight(false));
@@ -21211,13 +21527,135 @@ var MapChatPanel = class {
   }
   onKey(event) {
     if (event.key === "Escape" && !event.isComposing && !this.composing) {
+      if (this.hero) return;
       event.preventDefault();
-      this.setOpen(false, true);
+      if (this.narrow) this.collapseOverlay(true);
+      else this.setOpen(false, true);
       return;
     }
     if (event.key !== "Enter" || event.shiftKey || event.isComposing || this.composing) return;
     event.preventDefault();
     this.host.send();
+  }
+  // ---- width ----------------------------------------------------------------------------------------------------
+  resizeTo(width, commit) {
+    var _a2, _b2;
+    this.width = clampMapChatWidth(width);
+    this.applyWidth();
+    (_b2 = (_a2 = this.host).setWidth) == null ? void 0 : _b2.call(_a2, this.width, commit);
+  }
+  applyWidth() {
+    if (!this.built) return;
+    this.el.style.width = this.docked || this.floating ? `${this.width}px` : "";
+    this.resizerEl.setAttr("aria-valuenow", String(this.width));
+  }
+  onResizerKey(event) {
+    const to = event.key === "ArrowLeft" ? this.width - MAP_CHAT_WIDTH_STEP : event.key === "ArrowRight" ? this.width + MAP_CHAT_WIDTH_STEP : event.key === "Home" ? MAP_CHAT_WIDTH_MIN : event.key === "End" ? MAP_CHAT_WIDTH_MAX : null;
+    if (to === null) return;
+    event.preventDefault();
+    this.resizeTo(to, true);
+  }
+  /**
+   * Dragging the handle. The listeners sit on the page's document, not on the handle, so a repaint of the map in the middle
+   * (which lifts the panel out and puts it back) does not break the drag. They are removed when the button is let go, when
+   * the pointer capture is lost, and when the view closes.
+   */
+  startResize(event) {
+    var _a2;
+    if (event.button) return;
+    (_a2 = this.stopResizing) == null ? void 0 : _a2.call(this);
+    const doc = this.el.ownerDocument;
+    if (!(doc == null ? void 0 : doc.addEventListener)) return;
+    event.preventDefault();
+    const startX = event.clientX;
+    const startWidth = this.width;
+    const handle = this.resizerEl;
+    const move = (next) => {
+      if (next.buttons === 0) end();
+      else this.resizeTo(startWidth + (next.clientX - startX), false);
+    };
+    const end = () => {
+      var _a3, _b2;
+      const stop = this.stopResizing;
+      this.stopResizing = null;
+      stop == null ? void 0 : stop();
+      (_b2 = (_a3 = this.host).setWidth) == null ? void 0 : _b2.call(_a3, this.width, true);
+    };
+    doc.addEventListener("pointermove", move);
+    doc.addEventListener("pointerup", end);
+    doc.addEventListener("pointercancel", end);
+    handle.addEventListener("lostpointercapture", end);
+    try {
+      handle.setPointerCapture(event.pointerId);
+    } catch (e) {
+    }
+    this.el.addClass("is-resizing");
+    this.stopResizing = () => {
+      doc.removeEventListener("pointermove", move);
+      doc.removeEventListener("pointerup", end);
+      doc.removeEventListener("pointercancel", end);
+      handle.removeEventListener("lostpointercapture", end);
+      this.el.removeClass("is-resizing");
+      this.stopResizing = null;
+    };
+  }
+  // ---- messages the reader hears and the dot on the narrow edge ----------------------------------------------------
+  announce(text11) {
+    if (this.built) this.liveEl.setText(text11);
+  }
+  countsText(counts) {
+    const parts = [];
+    if (counts.done) parts.push(t("ui.map_chat_count_done_0", counts.done));
+    if (counts.skipped) parts.push(t("ui.map_chat_count_skipped_0", counts.skipped));
+    if (counts.failed) parts.push(t("ui.map_chat_count_failed_0", counts.failed));
+    return parts.join(t("ui.map_chat_count_separator"));
+  }
+  spokenTurn(reply, lines) {
+    const said = t("ui.map_chat_live_done_0", clip(reply, 160));
+    const counts = this.countsText(countChatLines(lines, t("ui.map_chat_not_undoable")));
+    return counts ? `${said} ${t("ui.map_chat_live_results_0", counts)}` : said;
+  }
+  /** A reply came in while the window is folded to its edge: the edge shows a dot. */
+  markUnread() {
+    if (this.shown || !this.built) return;
+    this.unread = true;
+    this.applyOpen();
+  }
+  // ---- suggested messages -----------------------------------------------------------------------------------------
+  /** Puts `text` into the message field and gives it the keyboard. Sending is always the user's own act. */
+  fill(text11) {
+    const draft = this.inputEl.value;
+    this.inputEl.value = draft.trim() ? `${draft.replace(/\s+$/, "")}
+${text11}` : text11;
+    this.inputEl.focus();
+    const end = this.inputEl.value.length;
+    this.inputEl.setSelectionRange(end, end);
+  }
+  renderSuggestions() {
+    if (!this.built) return;
+    const hero = this.hero;
+    const keys = hero ? [...MAP_CHAT_EXAMPLE_KEYS] : this.host.suggestions ? chatSuggestionKeys({ ...this.host.suggestions(), hasNote: !!this.noteChip }) : [];
+    const signature = [hero ? "hero" : "side", ...keys.map((key2) => t(key2))].join("");
+    if (signature === this.suggestKey && hero === this.suggestInHero) return;
+    this.suggestKey = signature;
+    if (hero !== this.suggestInHero) {
+      this.suggestInHero = hero;
+      this.suggestEl.remove();
+      this.bodyEl.insertBefore(this.suggestEl, hero ? null : this.chipsEl);
+    }
+    this.suggestEl.empty();
+    this.suggestEl.setAttr("aria-label", t(hero ? "ui.map_chat_examples_label" : "ui.map_chat_suggestions_label"));
+    this.suggestEl.toggleClass("is-examples", hero);
+    this.suggestEl.hidden = keys.length === 0;
+    for (const key2 of keys) {
+      const text11 = t(key2);
+      const button = this.suggestEl.createEl("button", {
+        cls: hero ? "vam-map-chat-example" : "vam-map-chat-suggestion",
+        text: text11,
+        attr: { type: "button" }
+      });
+      button.addEventListener("click", () => this.fill(text11));
+    }
   }
   onDragOver(event) {
     if (!event.dataTransfer) return;
@@ -21245,13 +21683,36 @@ var MapChatPanel = class {
   }
   applyOpen() {
     if (!this.built) return;
-    this.el.toggleClass("is-open", this.open);
-    this.bodyEl.hidden = !this.open;
-    this.bodyEl.toggleClass("is-hidden", !this.open);
-    this.toggleEl.hidden = this.open;
-    this.toggleEl.toggleClass("is-hidden", this.open);
-    this.toggleEl.setAttr("aria-expanded", String(this.open));
-    this.toggleEl.setAttr("aria-label", t(this.open ? "ui.map_chat_close" : "ui.map_chat_open"));
+    const { hero, docked, floating, shown } = {
+      hero: this.hero,
+      docked: this.docked,
+      floating: this.floating,
+      shown: this.shown
+    };
+    if (shown) this.unread = false;
+    this.el.toggleClass("is-open", shown && !hero);
+    this.el.toggleClass("is-hero", hero);
+    this.el.toggleClass("is-docked", docked);
+    this.el.toggleClass("is-overlay", floating);
+    this.el.toggleClass("is-rail", !shown);
+    this.bodyEl.hidden = !shown;
+    this.bodyEl.toggleClass("is-hidden", !shown);
+    this.toggleEl.hidden = shown;
+    this.toggleEl.toggleClass("is-hidden", shown);
+    this.toggleEl.toggleClass("has-unread", this.unread);
+    this.badgeEl.hidden = !this.unread;
+    this.toggleEl.setAttr("aria-expanded", String(shown));
+    this.toggleEl.setAttr(
+      "aria-label",
+      t(shown ? "ui.map_chat_close" : this.unread ? "ui.map_chat_open_unread" : "ui.map_chat_open")
+    );
+    this.resizerEl.hidden = !docked;
+    this.resizerEl.toggleClass("is-hidden", !docked);
+    this.headEl.toggleClass("is-hero", hero);
+    this.heroTitleEl.hidden = !hero;
+    this.heroTitleEl.toggleClass("is-hidden", !hero);
+    this.applyWidth();
+    this.renderSuggestions();
   }
   /** Puts the answer-length buttons and the model list back in step with what the view remembers. */
   refreshControls() {
@@ -21315,6 +21776,7 @@ var MapChatPanel = class {
   }
   /** Everything a message row shows; the row is rebuilt only when this changes. */
   rowKey(message) {
+    var _a2, _b2;
     const asked = this.messages[this.messages.indexOf(message) - 1];
     const more = this.hasMore(message, asked);
     return [
@@ -21322,15 +21784,23 @@ var MapChatPanel = class {
       message.error ? "e" : "",
       message.streaming ? "s" : "",
       more ? "m" : "",
+      this.canRetry(message, asked) ? "r" : "",
+      message.linesOpen ? "o" : "",
+      t("ui.map_chat_retry"),
+      t("ui.map_chat_lines_hide"),
+      t("ui.map_chat_plan_summary_0", ""),
       t("ui.map_chat_role_you"),
       t("ui.map_chat_role_ai"),
       t("ui.map_chat_overflow_note"),
       more ? t("ui.map_chat_more_detail") : "",
       message.lines.map((line) => `${line.status}:${line.text}`).join("\n"),
-      message.plan ? `plan:${message.plan.state}:${message.plan.items.length}:${message.plan.estimate}` : "",
+      message.plan ? `plan:${message.plan.state}:${message.plan.items.length}:${message.plan.estimate}:${(_b2 = (_a2 = message.plan.groups) == null ? void 0 : _a2.map((group) => group.label).join("|")) != null ? _b2 : ""}` : "",
       message.choices ? `choices:${message.choices.picked}:${message.choices.options.map((o) => o.label).join("|")}` : "",
       message.text
     ].join("");
+  }
+  canRetry(message, asked) {
+    return message.role === "assistant" && !!message.error && !message.streaming && !!(asked == null ? void 0 : asked.origin) && !!this.host.retry;
   }
   hasMore(message, asked) {
     return message.role === "assistant" && !message.streaming && !message.error && !!message.text.trim() && !!(asked == null ? void 0 : asked.origin);
@@ -21388,25 +21858,74 @@ var MapChatPanel = class {
         if (!this.busy) this.host.moreDetail(origin);
       });
     }
+    if (this.canRetry(message, asked) && (asked == null ? void 0 : asked.origin)) {
+      const origin = asked.origin;
+      more = row.createEl("button", {
+        cls: "vam-map-chat-retry",
+        text: t("ui.map_chat_retry"),
+        attr: { type: "button" }
+      });
+      more.disabled = this.busy;
+      more.addEventListener("click", () => {
+        var _a2, _b2;
+        if (!this.busy) (_b2 = (_a2 = this.host).retry) == null ? void 0 : _b2.call(_a2, origin);
+      });
+    }
     if (message.plan) this.buildPlan(row, message.plan);
     if (message.choices) this.buildChoices(row, message.choices);
-    if (message.lines.length) {
-      const list = row.createDiv({ cls: "vam-map-chat-lines" });
-      for (const line of message.lines) list.createDiv({ cls: `vam-map-chat-line is-${line.status}`, text: line.text });
-    }
+    if (message.lines.length) this.buildLines(row, message);
     return { row, body, more };
   }
-  /** The plan card: reasons, every action, the estimate, and Apply / Cancel (plain buttons, so Tab, Enter and Space work). */
+  /**
+   * One line per action. More than five fold into a count (the closing "cannot be undone" note stays); each line says what
+   * happened in words, so the colour is never the only sign.
+   */
+  buildLines(row, message) {
+    const closing = t("ui.map_chat_not_undoable");
+    const results = message.lines.filter((line) => line.text !== closing);
+    const notes = message.lines.filter((line) => line.text === closing);
+    const list = row.createDiv({ cls: "vam-map-chat-lines" });
+    const fold2 = results.length > MAP_CHAT_LINES_FOLD_ABOVE;
+    const shown = !fold2 || message.linesOpen === true;
+    if (fold2) {
+      list.createDiv({ cls: "vam-map-chat-lines-summary", text: this.countsText(countChatLines(results)) });
+      const toggle = list.createEl("button", {
+        cls: "vam-map-chat-lines-toggle",
+        text: shown ? t("ui.map_chat_lines_hide") : t("ui.map_chat_lines_show_0", results.length),
+        attr: { type: "button", "aria-expanded": String(shown) }
+      });
+      toggle.addEventListener("click", () => {
+        var _a2, _b2;
+        message.linesOpen = !shown;
+        this.renderLog();
+        (_b2 = (_a2 = this.rows.get(message)) == null ? void 0 : _a2.row.querySelector(".vam-map-chat-lines-toggle")) == null ? void 0 : _b2.focus();
+      });
+    }
+    if (shown)
+      for (const line of results) list.createDiv({ cls: `vam-map-chat-line is-${line.status}`, text: line.text });
+    for (const note of notes) list.createDiv({ cls: "vam-map-chat-line is-note", text: note.text });
+  }
+  /**
+   * The plan card: one sentence, the actions folded by kind of work, the estimate, and Apply / Cancel. All plain elements
+   * (buttons, details), so Tab, Enter and Space work without any script.
+   */
   buildPlan(row, plan) {
+    var _a2, _b2;
     const card = row.createDiv({ cls: `vam-map-chat-plan is-${plan.state}` });
     card.setAttr("role", "group");
     card.setAttr("aria-label", t("ui.map_chat_plan_title"));
     card.createDiv({ cls: "vam-map-chat-plan-title", text: t("ui.map_chat_plan_title") });
-    if (plan.state === "pending") card.createDiv({ cls: "vam-map-chat-plan-note", text: t("ui.map_chat_plan_intro") });
-    const reasons = card.createEl("ul", { cls: "vam-map-chat-plan-reasons" });
-    for (const reason of plan.reasons) reasons.createEl("li", { text: reason });
-    const items = card.createEl("ol", { cls: "vam-map-chat-plan-items" });
-    for (const item of plan.items) items.createEl("li", { text: item });
+    card.createDiv({
+      cls: "vam-map-chat-plan-sentence",
+      text: (_a2 = plan.summary) != null ? _a2 : t("ui.map_chat_plan_summary_0", plan.reasons.join(t("ui.map_chat_count_separator")))
+    });
+    const groups = (_b2 = plan.groups) != null ? _b2 : plan.items.length ? [{ label: "", items: plan.items }] : [];
+    for (const group of groups) {
+      const list = group.label ? card.createEl("details", { cls: "vam-map-chat-plan-group" }) : card.createDiv("vam-map-chat-plan-group");
+      if (group.label) list.createEl("summary", { cls: "vam-map-chat-plan-group-title", text: group.label });
+      const items = list.createEl("ol", { cls: "vam-map-chat-plan-items" });
+      for (const item of group.items) items.createEl("li", { text: item });
+    }
     card.createDiv({ cls: "vam-map-chat-plan-estimate", text: plan.estimate });
     if (plan.state !== "pending") {
       card.createDiv({
@@ -21415,6 +21934,7 @@ var MapChatPanel = class {
       });
       return;
     }
+    card.createDiv({ cls: "vam-map-chat-plan-note", text: t("ui.map_chat_plan_intro") });
     const buttons = card.createDiv({ cls: "vam-map-chat-plan-buttons" });
     const apply = buttons.createEl("button", {
       cls: "mod-cta vam-map-chat-plan-apply",
@@ -21430,11 +21950,13 @@ var MapChatPanel = class {
       if (plan.state !== "pending") return;
       apply.disabled = cancel.disabled = true;
       plan.apply();
+      this.focusInput();
     });
     cancel.addEventListener("click", () => {
       if (plan.state !== "pending") return;
       apply.disabled = cancel.disabled = true;
       plan.cancel();
+      this.focusInput();
     });
   }
   buildChoices(row, choices) {
@@ -21456,6 +21978,7 @@ var MapChatPanel = class {
         choices.picked = true;
         for (const other of buttons) other.disabled = true;
         option2.pick();
+        this.focusInput();
       });
     }
   }
@@ -34711,6 +35234,9 @@ var VisualAgentMapView = class _VisualAgentMapView extends import_obsidian30.Ite
     /** True while a confirmed plan is being applied; no new message is sent meanwhile. */
     __publicField(this, "chatApplying", false);
     __publicField(this, "chatWorkspaceEl", null);
+    __publicField(this, "chatOverlayEl", null);
+    /** The map whose opening screen has already taken the keyboard once. */
+    __publicField(this, "chatHeroFocusedFor", null);
     /** The note the user last had open beside the map; dropped text is assumed to come from it. */
     __publicField(this, "lastMarkdownPath", null);
     __publicField(this, "deletedMap", null);
@@ -34901,7 +35427,7 @@ var VisualAgentMapView = class _VisualAgentMapView extends import_obsidian30.Ite
       this.spaceHeld = false;
     });
     this.registerDomEvent(this.contentEl, "keydown", (event) => {
-      if (event.target instanceof HTMLElement && event.target.closest("input, textarea, select, [contenteditable=true]"))
+      if (event.target instanceof HTMLElement && event.target.closest("input, textarea, select, [contenteditable=true], .vam-map-chat"))
         return;
       if (event.key === "Escape") {
         const previous = this.selected, touched = [...this.multiSelected];
@@ -40052,6 +40578,7 @@ ${request.requirements}` : preset.text,
         ).open()
       );
       if (!this.plugin.settings.models.trim()) this.renderConnectionCheck(actions);
+      start.createDiv("vam-sample-start-chat");
     }
     if (!this.builtIn && !this.map.aim) this.renderMultiResearchStatus(this.contentEl);
     if (!this.builtIn && !this.map.aim) this.renderRelevanceStatus(this.contentEl);
@@ -40086,9 +40613,10 @@ ${request.requirements}` : preset.text,
       }
     }
     const workspace = this.contentEl.createDiv("vam-workspace");
-    this.viewportEl = workspace.createDiv("vam-viewport");
+    const canvas = workspace.createDiv("vam-canvas");
+    this.viewportEl = canvas.createDiv("vam-viewport");
     if (this.integrationMode) this.viewportEl.addClass("is-selecting");
-    const overlay = workspace.createDiv("vam-canvas-overlay");
+    const overlay = canvas.createDiv("vam-canvas-overlay");
     if (tools.childElementCount) overlay.appendChild(tools);
     else tools.remove();
     this.mountMapChat(workspace, overlay);
@@ -40133,7 +40661,7 @@ ${request.requirements}` : preset.text,
     const shown = this.canvasNodes();
     if (this.selected && !shown.some((node) => node.id === this.selected)) this.selected = null;
     this.multiSelected = new Set([...this.multiSelected].filter((id) => shown.some((node) => node.id === id)));
-    if (this.integrationMode) this.selectionBarEl = this.renderSelectionBar(workspace);
+    if (this.integrationMode) this.selectionBarEl = this.renderSelectionBar(canvas);
     this.tabStopId = this.defaultTabStop(shown);
     this.renderingCard = true;
     try {
@@ -40909,7 +41437,7 @@ ${request.requirements}` : preset.text,
   }
   showHoverCard(card, note) {
     var _a2, _b2, _c, _d, _e;
-    const workspace = this.contentEl.querySelector(".vam-workspace");
+    const workspace = this.contentEl.querySelector(".vam-canvas");
     if (!workspace) return;
     (_a2 = this.hoverCard) == null ? void 0 : _a2.remove();
     const preview = workspace.createDiv("vam-hover-card");
@@ -43496,11 +44024,20 @@ ${note.detail.trim()}` : "",
     (_c = this.chat) == null ? void 0 : _c.detach();
     return restore;
   }
-  /** Puts the chat window into this repaint's overlay; the window itself (messages, draft, chips) lives on the view. */
+  /**
+   * Puts the chat window into this repaint. Normally it is the first child of `workspace`, the window left of the canvas. On an
+   * empty map (and on the read-only sample) with no conversation yet it is the opening screen instead, in the middle of the
+   * canvas (or in the sample's start card). The window itself (messages, draft, chips) lives on the view.
+   */
   mountMapChat(workspace, overlay) {
+    var _a2;
     this.chatWorkspaceEl = workspace;
-    if (this.builtIn || !this.map) return;
-    if (!this.chat) this.chat = new MapChatPanel(this.chatHost());
+    this.chatOverlayEl = overlay;
+    if (!this.map) return;
+    if (!this.chat) {
+      this.chat = new MapChatPanel(this.chatHost());
+      this.chat.restoreOpen(normalizeMapChatOpen(this.plugin.settings.mapChatOpen));
+    }
     if (this.chatMapId !== this.map.id) {
       if (this.chatCarryOver) {
         this.chatMapId = this.map.id;
@@ -43511,8 +44048,76 @@ ${note.detail.trim()}` : "",
         this.chatMapId = this.map.id;
       }
     }
-    this.chat.mount(overlay);
+    this.syncChatNarrow();
+    this.placeChatPanel();
+    (_a2 = this.viewportEl) == null ? void 0 : _a2.addEventListener("pointerdown", () => {
+      var _a3;
+      return (_a3 = this.chat) == null ? void 0 : _a3.collapseOverlay();
+    });
     workspace.toggleClass("has-map-chat-open", this.chat.isOpen);
+    this.focusChatHeroOnce();
+  }
+  /** Whether the opening screen is showing: nothing said yet, and an empty map (not an AIM one) or the read-only sample. */
+  chatHero() {
+    if (!this.chat || this.chat.hasMessages || !this.map) return false;
+    return this.builtIn || !this.map.aim && this.map.nodes.length === 0;
+  }
+  /** Mounts the panel where it belongs now: the opening screen's place, or the first child of the workspace. */
+  placeChatPanel() {
+    var _a2;
+    const chat = this.chat;
+    const workspace = this.chatWorkspaceEl;
+    const overlay = this.chatOverlayEl;
+    if (!chat || !workspace || !overlay) return;
+    if (!this.chatHero()) {
+      chat.mount(workspace, "side");
+      return;
+    }
+    const startCard = this.builtIn ? this.contentEl.querySelector(".vam-sample-start-chat") : null;
+    const slot = startCard != null ? startCard : overlay.createDiv("vam-chat-hero-slot");
+    chat.mount(slot, "hero");
+    (_a2 = this.viewportEl) == null ? void 0 : _a2.toggleClass("has-chat-hero", !startCard);
+  }
+  /** The first message was sent (or a conversation ended): the panel moves between the opening screen and the window. */
+  relocateMapChat() {
+    var _a2, _b2;
+    const chat = this.chat;
+    if (!chat || this.closed) return;
+    const hero = chat.isHero;
+    if (hero === this.chatHero()) return;
+    const restore = this.detachMapChat();
+    this.contentEl.querySelectorAll(".vam-chat-hero-slot").forEach((slot) => slot.remove());
+    (_a2 = this.viewportEl) == null ? void 0 : _a2.removeClass("has-chat-hero");
+    this.placeChatPanel();
+    (_b2 = this.chatWorkspaceEl) == null ? void 0 : _b2.toggleClass("has-map-chat-open", chat.isOpen);
+    restore();
+  }
+  /** Opening screen: the keyboard starts in the message field, once per map, unless it is in another pane. */
+  focusChatHeroOnce() {
+    var _a2, _b2, _c;
+    const chat = this.chat;
+    if (!(chat == null ? void 0 : chat.isHero) || !this.map || this.chatHeroFocusedFor === this.map.id) return;
+    this.chatHeroFocusedFor = this.map.id;
+    const active = (_b2 = (_a2 = this.contentEl.ownerDocument) == null ? void 0 : _a2.activeElement) != null ? _b2 : null;
+    if (!active || active === ((_c = this.contentEl.ownerDocument) == null ? void 0 : _c.body) || this.contentEl.contains(active)) chat.focusInput();
+  }
+  /** The window folds to a narrow edge when the pane would keep less than 700px for the canvas beside it. */
+  syncChatNarrow() {
+    var _a2;
+    const width = (_a2 = this.contentEl) == null ? void 0 : _a2.clientWidth;
+    if (this.chat && width) this.chat.setNarrow(isChatNarrow(width, this.chatWidth()));
+  }
+  /** Obsidian calls this when the pane's size changes. */
+  onResize() {
+    this.syncChatNarrow();
+  }
+  chatWidth() {
+    return clampMapChatWidth(this.plugin.settings.mapChatWidth);
+  }
+  /** The command that opens or closes the chat window and leaves the keyboard in its message field. */
+  toggleMapChat() {
+    if (!this.chat) return;
+    this.chat.toggleFromCommand();
   }
   chatHost() {
     return {
@@ -43549,6 +44154,9 @@ ${note.detail.trim()}` : "",
       moreDetail: (origin) => {
         void this.sendMapChat(origin);
       },
+      retry: (origin) => {
+        void this.sendMapChat(origin, true);
+      },
       resolveLink: (link) => {
         var _a2, _b2;
         const file = this.app.metadataCache.getFirstLinkpathDest(link, (_b2 = (_a2 = this.sourceMarkdownFile()) == null ? void 0 : _a2.path) != null ? _b2 : "");
@@ -43569,9 +44177,28 @@ ${note.detail.trim()}` : "",
         var _a2, _b2;
         return (_b2 = (_a2 = this.contentEl.ownerDocument) == null ? void 0 : _a2.activeElement) != null ? _b2 : null;
       },
-      layoutChanged: (open) => {
+      layoutChanged: () => {
         var _a2;
-        return (_a2 = this.chatWorkspaceEl) == null ? void 0 : _a2.toggleClass("has-map-chat-open", open);
+        const chat = this.chat;
+        (_a2 = this.chatWorkspaceEl) == null ? void 0 : _a2.toggleClass("has-map-chat-open", !!(chat == null ? void 0 : chat.isOpen));
+        if (chat && !chat.isHero && this.plugin.settings.mapChatOpen !== chat.wantsOpen) {
+          this.plugin.settings.mapChatOpen = chat.wantsOpen;
+          void this.plugin.saveSettings();
+        }
+      },
+      width: () => this.chatWidth(),
+      setWidth: (width, commit) => {
+        if (!commit) return;
+        this.plugin.settings.mapChatWidth = clampMapChatWidth(width);
+        void this.plugin.saveSettings();
+        this.syncChatNarrow();
+      },
+      suggestions: () => {
+        var _a2, _b2;
+        return {
+          selected: this.chatSelectionIds().length,
+          hasTopics: ((_b2 = (_a2 = this.map) == null ? void 0 : _a2.nodes.length) != null ? _b2 : 0) > 0
+        };
       }
     };
   }
@@ -43807,9 +44434,10 @@ ${note.detail.trim()}` : "",
     return t("ui.map_chat_error_failed_0", errorMessage(error));
   }
   /** Sends the draft: usage notice, one request, a streamed answer, then every action it asked for, once (or a plan to confirm first). */
-  async sendMapChat(again) {
+  async sendMapChat(again, retry = false) {
     const chat = this.chat;
-    if (!chat || chat.isBusy || this.chatApplying || this.closed || !this.map || this.builtIn) return;
+    if (!chat || chat.isBusy || this.chatApplying || this.closed || !this.map) return;
+    const redo = Boolean(again) && !retry;
     const message = again ? again.text : chat.draft.trim();
     if (!message) return;
     const origin = again != null ? again : {
@@ -43820,7 +44448,7 @@ ${note.detail.trim()}` : "",
     const anchor = { path: this.path, id: this.map.id };
     let request;
     try {
-      request = await this.buildChatRequest(message, chat, origin, Boolean(again));
+      request = await this.buildChatRequest(message, chat, origin, redo);
     } catch (error) {
       new import_obsidian30.Notice(errorMessage(error));
       return;
@@ -43836,13 +44464,14 @@ ${note.detail.trim()}` : "",
       (_b2 = this.plugin.activeTasks) == null ? void 0 : _b2.set(key2, controller);
       const alive = () => !this.closed && !controller.signal.aborted && this.chatController === controller && this.path === anchor.path;
       this.supersedeChatPlan();
-      chat.begin(again ? t("ui.map_chat_more_detail_asked") : message, origin, Boolean(again));
+      chat.begin(redo ? t("ui.map_chat_more_detail_asked") : message, origin, Boolean(again));
+      this.relocateMapChat();
       try {
         const result = await this.plugin.mapChat.chat(request, controller.signal, (text11) => {
           if (alive()) chat.streamReply(text11);
         });
         if (!alive()) return;
-        if (again) {
+        if (redo) {
           const lines2 = result.actions.length ? [{ status: "skipped", text: t("ui.map_chat_redo_actions_ignored") }] : [];
           if (alive() && chat.isBusy) chat.finish(result.reply, lines2);
           return;
@@ -43895,9 +44524,15 @@ ${note.detail.trim()}` : "",
     if (!chat) return;
     const token = ++this.chatPlanToken;
     const refTitles = this.chatRefTitles(result.actions);
+    const items = result.actions.map((action) => this.chatActionLabel(action, refTitles));
+    const groups = CHAT_PLAN_GROUP_ORDER.flatMap((group) => {
+      const own = items.filter((_, index) => chatPlanGroupOf(result.actions[index].kind) === group);
+      return own.length ? [{ label: t(`ui.map_chat_plan_group_${group}_0`, own.length), items: own }] : [];
+    });
     const card = {
       reasons: plan.reasons.map((reason) => this.planReasonText(reason, result)),
-      items: result.actions.map((action) => this.chatActionLabel(action, refTitles)),
+      items,
+      groups,
       estimate: plan.estimatedCalls ? t("ui.map_chat_plan_calls_0", plan.estimatedCalls) : t("ui.map_chat_plan_calls_none"),
       state: "pending",
       apply: () => void this.applyChatPlan(card, token, result, baseline, anchor),
@@ -53814,6 +54449,8 @@ function settingsFromSaved(saved) {
     cliModel: (saved == null ? void 0 : saved.cliModel) || DEFAULT_SETTINGS.cliModel,
     mapChatStyle: normalizeMapChatStyle(saved == null ? void 0 : saved.mapChatStyle),
     mapChatModel: normalizeMapChatModel(saved == null ? void 0 : saved.mapChatModel),
+    mapChatWidth: normalizeMapChatWidth(saved == null ? void 0 : saved.mapChatWidth),
+    mapChatOpen: normalizeMapChatOpen(saved == null ? void 0 : saved.mapChatOpen),
     cliReasoning: normalizeReasoningLevel(saved == null ? void 0 : saved.cliReasoning),
     previewScale: (saved == null ? void 0 : saved.previewScale) !== void 0 ? clampPreviewScale(saved.previewScale) : legacyPreviewScale(saved == null ? void 0 : saved.previewSize),
     models: "",
@@ -54222,6 +54859,19 @@ var VisualAgentMapPlugin = class extends import_obsidian38.Plugin {
     });
     const mapRibbonIcon = this.ribbonIcon;
     this.app.workspace.onLayoutReady(() => this.register(groupRibbonIcons(mapRibbonIcon, coffeeRibbonIcon)));
+    this.localizedCommands.push({
+      command: this.addCommand({
+        id: "toggle-map-chat",
+        name: t("ui.map_chat_toggle_command"),
+        checkCallback: (checking) => {
+          const view = this.app.workspace.getActiveViewOfType(VisualAgentMapView);
+          if (!view) return false;
+          if (!checking) view.toggleMapChat();
+          return true;
+        }
+      }),
+      key: "ui.map_chat_toggle_command"
+    });
     this.addLocalizedCommand("open-map", "ui.open_map", () => {
       void this.activateView().catch((error) => new import_obsidian38.Notice(String(error)));
     });

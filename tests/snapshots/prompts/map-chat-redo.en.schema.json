@@ -93,6 +93,18 @@
           },
           "direction": {
             "type": "string"
+          },
+          "depth": {
+            "type": "string",
+            "enum": [
+              "fast",
+              "normal",
+              "deep",
+              ""
+            ]
+          },
+          "images": {
+            "type": "boolean"
           }
         },
         "required": [
@@ -113,7 +125,9 @@
           "branch",
           "action",
           "goal",
-          "direction"
+          "direction",
+          "depth",
+          "images"
         ]
       }
     }

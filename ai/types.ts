@@ -89,6 +89,11 @@ export interface AiResult {
   suggestions: Suggestion[];
   visualReferences: VisualReference[];
   searchStatus?: SearchStatus;
+  /**
+   * Web searches and page fetches the provider made for this answer. Set only on a standard research (Research mode, not AIM);
+   * 0 means it answered without the web. Absent on every other result.
+   */
+  retrievals?: number;
   /** Sections still off their template count after the repair request; present only when the context had counts. */
   formatIssues?: CountIssue[];
 }

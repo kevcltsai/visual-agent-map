@@ -2,6 +2,7 @@ import type { WebSearchEvent } from "../types";
 import { spawn as nodeSpawn } from "node:child_process";
 import { createUtf8StreamDecoder } from "./utf8-stream";
 import { t } from "../../i18n";
+import { searchNotPerformedError } from "../search-not-performed";
 import { searchBudgetExhaustedMessage } from "./messages";
 
 type ProcessEnvironment = Record<string, string | undefined>;
@@ -565,7 +566,7 @@ export class CodexAppServerRuntime {
       window.clearTimeout(state.timeout);
       this.turns.delete(threadId);
       if (turn?.status === "completed" && state.requireSearch && !state.webRetrievals.size)
-        state.reject(new Error(t("ui.context_ai_search_not_performed")));
+        state.reject(searchNotPerformedError());
       else if (turn?.status === "completed" && state.generateImage) {
         const generated = state.generatedImage;
         if (!generated || (!generated.result && !generated.savedPath))

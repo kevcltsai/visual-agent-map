@@ -135,6 +135,8 @@ export const en = {
   "ui.multi_research_all_skipped": "All selected topics are already running AI.",
   "ui.multi_research_already_running": "A multi-topic research is already running on this map.",
   "ui.multi_research_finished": "Research finished: {0} of {1} succeeded, {2} failed, {3} skipped.",
+  "ui.multi_research_searches_0": "Web searches made: {0}.",
+  "ui.multi_research_no_search_0": "Warning: topics that finished without any web search: {0}.",
   "ui.multi_research_stopped": "Research stopped: {0} of {1} succeeded, {2} failed, {3} skipped.",
   "ui.outline_import_partial": "Created {0} of {1} topics: {2}",
   "ui.outline_ai_generate": "Generate an outline with AI",
@@ -1062,7 +1064,7 @@ export const en = {
   "ui.map_chat_do_select_0": "Select {0} topics",
   "ui.map_chat_do_research": "Start standard research on the selected topics",
   "ui.map_chat_do_expand_0": "Suggest subtopics for {0} topics",
-  "ui.map_chat_do_synthesize": "Open the integration dialog for the selected topics",
+  "ui.map_chat_do_synthesize": "Integrate the selected topics (your message is the direction; no dialog opens)",
   "ui.map_chat_do_rate_0": "Prioritize topics by the goal “{0}”",
   "ui.map_chat_do_merge_0": "Merge the selected topics into “{0}”",
   "ui.map_chat_do_create_map_0": "Create the map “{0}”",
@@ -1074,6 +1076,9 @@ export const en = {
   "ui.map_chat_auto_layout_added": "Arranged the map automatically after adding many topics",
   "ui.map_chat_skip_parent_missing": "the parent topic was not created",
   "ui.map_chat_skip_no_children": "the topic has no subtopics",
+  "ui.map_chat_skip_research_running": "research is already running on this map",
+  "ui.map_chat_skip_synthesis_busy": "an integration is already running or waiting for this topic",
+  "ui.map_chat_skip_not_started": "the AI task did not start",
   "ui.map_chat_skip_map_not_found": "no map has that name",
   "ui.map_chat_skip_map_choose": "several maps match; choose one in the list below",
   "ui.map_chat_skip_not_first": "a new map can only be created by the first action",
@@ -1444,6 +1449,8 @@ export const en = {
     'Use only the provided topic and source context. Do not search the web or read other files. If the available evidence cannot support an answer, explicitly write "Insufficient information" and identify what is missing; do not present model memory or invented sources as verified facts.',
   "research.web":
     "Search when external facts are needed. There is no fixed query or source count. Continue while a likely useful search can resolve a decision-relevant uncertainty; stop when the answer is sufficiently supported or further searches have low expected value. Identify unresolved gaps.",
+  "research.web_required":
+    'This research must use the web. If the topic\'s current Detail cites no source, or says it is not verified yet, search before you stop and cite what you found. Do not finish with a note such as "no external search was done": either search, or say plainly that the web could not be reached.',
   "ui.source_context_exceeds_budget":
     "Source context exceeds the task budget. Choose less source content; nothing was omitted.",
   "error.file_not_found": "File not found",

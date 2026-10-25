@@ -24,5 +24,9 @@ export function researchGuidance(context: TaskContext, language: ContentLanguage
         : "research.normal"
   );
   if (context.researchMode === "local") return `${depth} ${translate(language, "research.local")}`;
-  return `${depth} ${translate(language, "research.web")}`;
+  const web = `${depth} ${translate(language, "research.web")}`;
+  // A quick overview may answer without the web; a standard research of normal or deep depth must search (the service also
+  // checks it did). AIM's isolated research and every helper request (synthesis, merge, decompose) keep the text above.
+  const standard = !context.aimIsolatedResearch && (context.mode ?? "task") === "task";
+  return standard && context.researchDepth !== "fast" ? `${web} ${translate(language, "research.web_required")}` : web;
 }

@@ -614,18 +614,20 @@ integrationTest('map chat: control - the same nested mutate really does hang whe
   assert.equal(h.control.nested, 1, 'the harness counts the nested call, so a nested write would also fail the other tests');
 });
 
-integrationTest('map chat: synthesize opens the integration dialog for the selection; rate_by_goal and merge start their own task', async () => {
+integrationTest('map chat: synthesize of several cards starts the selection integration without a dialog; rate_by_goal and merge start their own task', async () => {
   const h = await harness(); await h.view.hydrate();
   const opened = []; h.view.openSelectionSynthesis = pending => opened.push(pending);
+  const starts = []; h.view.startSelectionSynthesis = async (nodes, options, direction, failed, accepted) => { starts.push({ ids: nodes.map(n => n.id).sort(), options, direction, failed: typeof failed, depth: h.control.depth }); accepted(); };
   const goals = []; h.view.relevanceGradeable = () => true; h.view.submitRelevanceGoal = async goal => { goals.push(goal); };
   const merges = []; h.view.mergeSelected = async (title, snapshot) => { merges.push([title, snapshot.sources.map(s => s.id).sort(), h.control.depth]); };
-  const lines = await apply(h, [
+  const lines = await withTimeout(h.view.applyMapChatActions({ message: 'Compare them', rejected: [], actions: [
     { kind: 'run_map_action', action: 'synthesize', nodeIds: [h.ids.a, h.ids.b], title: '', goal: '', direction: '' },
     { kind: 'run_map_action', action: 'rate_by_goal', nodeIds: [], title: '', goal: ' Sleep better ', direction: '' },
     { kind: 'run_map_action', action: 'merge', nodeIds: [h.ids.a, h.ids.b], title: 'Body and mind', goal: '', direction: '' }
-  ]);
-  eq(lines.map(l => l.status), ['done', 'done', 'done'], JSON.stringify(lines)); await tick();
-  eq(opened, [null]); eq(goals, ['Sleep better']);
+  ] }, { mdHashes: {}, topicHashes: topicBaseline(h) }));
+  eq(lines.filter(l => l.text !== NOT_UNDOABLE).map(l => l.status), ['done', 'done', 'done'], JSON.stringify(lines)); await tick();
+  eq(opened, [], 'B2: no dialog opens'); eq(goals, ['Sleep better']);
+  assert.equal(starts.length, 1); eq(starts[0].ids, [h.ids.a, h.ids.b].sort()); assert.equal(starts[0].direction, 'Compare them', 'the user\'s message is the direction'); assert.equal(starts[0].depth, 0, 'not inside a mutate');
   eq(merges, [['Body and mind', [h.ids.a, h.ids.b].sort(), 1]], 'merge runs in its own mutate, after every write');
 });
 
@@ -639,7 +641,7 @@ integrationTest('map chat: run actions are skipped, not guessed, when the map ca
   const plain = await harness(); await plain.view.hydrate();
   plain.view.relevanceGradeable = () => false; plain.view.openSelectionSynthesis = () => { throw new Error('must not open'); };
   const result = await apply(plain, [
-    { kind: 'run_map_action', action: 'synthesize', nodeIds: [plain.ids.a], title: '', goal: '', direction: '' },
+    { kind: 'run_map_action', action: 'synthesize', nodeIds: [plain.ids.b], title: '', goal: '', direction: '' },
     { kind: 'run_map_action', action: 'rate_by_goal', nodeIds: [], title: '', goal: 'x', direction: '' },
     { kind: 'run_map_action', action: 'merge', nodeIds: [], title: '', goal: '', direction: '' },
     { kind: 'run_map_action', action: 'research_standard', nodeIds: ['nope'], title: '', goal: '', direction: '' }
@@ -3026,4 +3028,101 @@ integrationTest('B2-0 L4: a reply with one automatic layout at the end is laid o
   const h = await harness({ empty: true, realRender: true, viaSync: true }); await h.view.hydrate(); measuredHeights(h);
   let layouts = 0; const original = h.view.mapChange.bind(h.view); h.view.mapChange = async (change, rebuild) => { if (rebuild === false) layouts++; return original(change, rebuild); };
   const lines = await apply(h, spread()); assert.ok(lines.some(l => /Arranged/.test(l.text))); assert.equal(layouts, 1, 'one layout, no extra local step'); eq(overlaps(h.view.map.nodes), []);
+});
+
+// ---- B2-feat: research options, shallow research, headless integration, two merges ---------------------------------------
+const researchAct = (fields = {}) => ({ kind: 'run_map_action', action: 'research_standard', nodeIds: [], title: '', goal: '', direction: '', depth: '', images: false, ...fields });
+const startedResearch = h => { const started = []; h.view.startMultiResearch = async (request, key, onSettled) => { started.push({ request, key, onSettled, selected: [...h.view.multiSelected], depth: h.control.depth }); }; return started; };
+const newCard = ref => ({ kind: 'add_child', parentId: '', title: `Card ${ref}`, summary: '', ref });
+
+integrationTest('B2 research: a named depth, images and the extra requirement reach startMultiResearch; unnamed is normal, no images, no requirements', async () => {
+  const h = await harness(); await h.view.hydrate(); const started = startedResearch(h);
+  const lines = await apply(h, [
+    researchAct({ nodeIds: [h.ids.a] }),
+    researchAct({ nodeIds: [h.ids.b], depth: 'deep', images: true, direction: 'only peer-reviewed' }),
+    researchAct({ nodeIds: [h.ids.c], depth: 'fast' })
+  ]);
+  eq(lines.map(l => l.status), ['done', 'done', 'done'], JSON.stringify(lines)); await tick();
+  eq(started.map(s => s.request), [
+    { researchMode: 'research', researchDepth: 'normal', requirements: '', imageSearch: false },
+    { researchMode: 'research', researchDepth: 'deep', requirements: 'only peer-reviewed', imageSearch: true },
+    { researchMode: 'research', researchDepth: 'fast', requirements: '', imageSearch: false }
+  ]);
+  eq(started.map(s => s.selected), [[h.ids.a], [h.ids.b], [h.ids.c]]); assert.ok(started.every(s => s.depth === 0), 'outside any mutate');
+});
+integrationTest('B2 shallow research: researching only cards this reply created is fast unless a depth is named; one existing card makes it normal', async () => {
+  const h = await harness(); await h.view.hydrate(); const started = startedResearch(h);
+  await apply(h, [newCard('n1'), newCard('n2'), researchAct({ nodeIds: ['new:n1', 'new:n2'] })]); await tick();
+  assert.equal(started.length, 1); assert.equal(started[0].request.researchDepth, 'fast'); assert.equal(started[0].selected.length, 2);
+  await apply(h, [newCard('n3'), researchAct({ nodeIds: ['new:n3'], depth: 'deep' })]); await tick();
+  assert.equal(started[1].request.researchDepth, 'deep', 'a named depth beats the new-card default');
+  await apply(h, [newCard('n4'), researchAct({ nodeIds: ['new:n4', h.ids.a] })]); await tick();
+  assert.equal(started[2].request.researchDepth, 'normal', 'an existing card in the list: normal'); assert.equal(started[2].selected.length, 2);
+  await apply(h, [newCard('n5'), researchAct({ nodeIds: [] })]); await tick();
+  assert.equal(started[3].request.researchDepth, 'normal', 'an empty target list (the current selection) is never counted as new');
+});
+integrationTest('B2 shallow research: researching 12 new cards waits as a plan; after Apply all 12 are in one research batch at the fast depth', async () => {
+  const h = await harness(); await h.view.hydrate(); const chat = h.open(); const started = startedResearch(h);
+  const refs = Array.from({ length: 12 }, (_, i) => `r${i}`);
+  h.control.reply = async () => ({ reply: 'I will build and research.', actions: [...refs.map(newCard), researchAct({ nodeIds: refs.map(r => `new:${r}`) })], rejected: [] });
+  h.type('build and research'); await h.view.sendMapChat();
+  assert.equal(started.length, 0, 'nothing runs before Apply'); assert.equal(h.view.map.nodes.length, 4);
+  assert.match(visibleText(planCard(h)[0]), /Starts research on 12 topics/); assert.match(visibleText(planCard(h)[0]), /At least 24 AI calls/, '12 research calls and 12 diagram calls');
+  planButton(h, 'apply').click(); await until(() => chat.pendingPlan() === null && !h.view.chatApplying); await tick();
+  assert.equal(started.length, 1); assert.equal(started[0].selected.length, 12); assert.equal(started[0].request.researchDepth, 'fast'); assert.equal(h.view.map.nodes.length, 16);
+});
+integrationTest('B2 shallow research: 9 new cards researched are applied at once with no plan card', async () => {
+  const h = await harness(); await h.view.hydrate(); const chat = h.open(); const started = startedResearch(h);
+  const refs = Array.from({ length: 9 }, (_, i) => `r${i}`);
+  h.control.reply = async () => ({ reply: 'ok', actions: [...refs.map(newCard), researchAct({ nodeIds: refs.map(r => `new:${r}`) })], rejected: [] });
+  h.type('go'); await h.view.sendMapChat(); await tick();
+  assert.equal(planCard(h).length, 0); assert.equal(chat.pendingPlan(), null); assert.equal(started.length, 1); assert.equal(started[0].selected.length, 9);
+});
+integrationTest('B2 research: a research batch already running is skipped with a reason in the result, and nothing is started', async () => {
+  const h = await harness(); await h.view.hydrate(); const started = startedResearch(h);
+  h.plugin.expansionCoordinator.isRunning = () => true;
+  const lines = await apply(h, [researchAct({ nodeIds: [h.ids.a] })]);
+  eq(lines.map(l => l.status), ['skipped']); assert.match(lines[0].text, /research is already running/); assert.equal(started.length, 0);
+});
+integrationTest('B2 research: the finished batch adds its search count to the answer; a topic with no search is warned about; a newer turn is not touched', async () => {
+  const h = await harness(); await h.view.hydrate(); const chat = h.open(); const started = startedResearch(h);
+  h.control.reply = async () => ({ reply: 'Researching.', actions: [researchAct({ nodeIds: [h.ids.a, h.ids.b] })], rejected: [] });
+  h.type('research a and b'); await h.view.sendMapChat(); await tick();
+  assert.equal(started.length, 1); assert.equal(typeof started[0].onSettled, 'function');
+  started[0].onSettled({ searches: 5, counted: 2, withoutSearch: 1 });
+  const texts = chat.transcript().at(-1).lines.map(l => [l.status, l.text]);
+  eq(texts.slice(-2), [['done', 'Web searches made: 5.'], ['skipped', 'Warning: topics that finished without any web search: 1.']]);
+  started[0].onSettled({ searches: 0, counted: 0, withoutSearch: 0 });
+  assert.equal(chat.transcript().at(-1).lines.length, texts.length, 'nothing to report adds nothing');
+  h.control.reply = async () => ({ reply: 'Next.', actions: [], rejected: [] });
+  h.type('something else'); await h.view.sendMapChat();
+  const before = chat.transcript().at(-1).lines.length; started[0].onSettled({ searches: 9, counted: 1, withoutSearch: 0 });
+  assert.equal(chat.transcript().at(-1).lines.length, before, 'a later turn does not get the old batch\'s lines');
+});
+integrationTest('B2 merge: two merges in one reply are both completed; the second is not skipped as locked', async () => {
+  const h = await harness({ viaSync: false }); await h.view.hydrate();
+  const refs = ['p1', 'p2', 'p3', 'p4'].map(ref => ({ kind: 'add_child', parentId: h.ids.root, title: `Merge ${ref}`, summary: '', ref }));
+  const merge = (a, b, title) => ({ kind: 'run_map_action', action: 'merge', nodeIds: [a, b], title, goal: '', direction: '', depth: '', images: false });
+  const lines = await apply(h, [...refs, merge('new:p1', 'new:p2', 'First merged'), merge('new:p3', 'new:p4', 'Second merged')]);
+  eq(lines.slice(0, 6).map(l => l.status), ['done', 'done', 'done', 'done', 'done', 'done'], JSON.stringify(lines));
+  const titles = []; for (const n of await h.saved()) titles.push((await h.repo.readNote(n.path)).title);
+  assert.ok(titles.includes('First merged') && titles.includes('Second merged'), titles.join('|'));
+  assert.ok(!titles.some(t2 => /^Merge p\d$/.test(t2)), 'the four sources are gone from the map');
+  assert.equal(h.view.mergeTasks.size, 0); assert.equal(h.control.nested, 0);
+});
+integrationTest('B2 merge: a merge still locked by an AI merge is skipped with the locked reason', async () => {
+  const h = await harness(); await h.view.hydrate();
+  h.view.mergeTasks.set(h.view.path, { mapPath: h.view.path, sources: [{ id: h.ids.a, path: h.node('a').path }], controller: new AbortController(), state: 'running' });
+  const lines = await apply(h, [{ kind: 'run_map_action', action: 'merge', nodeIds: [h.ids.a, h.ids.b], title: 'X', goal: '', direction: '', depth: '', images: false }]);
+  eq(lines.map(l => l.status), ['skipped']); assert.match(lines[0].text, /being merged/);
+});
+integrationTest('B2 synthesize: the plan card keeps the user\'s message as the integration direction', async () => {
+  const h = await harness(); await h.view.hydrate(); const chat = h.open();
+  const calls = []; h.view.startSynthesis = async (node, options, direction, failed, accepted) => { calls.push({ id: node.id, direction, options }); accepted(); };
+  h.control.reply = async () => ({ reply: 'plan', actions: [...Array.from({ length: 15 }, (_, i) => ({ kind: 'add_child', parentId: h.ids.root, title: `Card ${i}`, summary: '' })), { kind: 'run_map_action', action: 'synthesize', nodeIds: [h.ids.a], title: '', goal: '', direction: 'ignored model words', depth: '', images: false }], rejected: [] });
+  h.type('Integrate Body around sleep debt'); await h.view.sendMapChat();
+  assert.equal(chat.pendingPlan().state, 'pending'); assert.equal(calls.length, 0);
+  assert.match(visibleText(planCard(h)[0]), /At least 2 AI calls/);
+  planButton(h, 'apply').click(); await until(() => chat.pendingPlan() === null && !h.view.chatApplying);
+  assert.equal(calls.length, 1); assert.equal(calls[0].id, h.ids.a); assert.equal(calls[0].direction, 'Integrate Body around sleep debt', 'the message, not the model\'s direction');
 });

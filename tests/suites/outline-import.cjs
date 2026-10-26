@@ -704,18 +704,22 @@ integrationTest('quick explore: the real create path researches every created su
   assert.equal(g.researched.length, 0);
 });
 
-integrationTest('importOutline into the open map: a partial failure keeps every created note in the map and skips research', async () => {
+// Fixture trashFile is a no-op; a real one moves the file out of the vault, as Obsidian's trash does.
+function realTrash(h) { h.app.fileManager.trashFile = async file => { await h.app.vault.rename(file, `.trash/${file.path}`); }; }
+
+integrationTest('importOutline into the open map: a failure while creating notes rolls the whole import back and skips research', async () => {
   for (const kind of ['tree', 'under']) {
     const h = await placementHarness();
+    realTrash(h);
+    const files = h.notesInFolder();
     const create = h.repo.createNote.bind(h.repo); let calls = 0;
     h.repo.createNote = async (...args) => { calls++; if (calls === 3) throw new Error('disk full'); return create(...args); };
     const placement = kind === 'tree' ? { kind } : { kind, parentId: h.oldRoot.id };
-    await h.view.importOutline({ nodes: api.parseOutline('# R\n## A\n## B\n## C').nodes, source: null, shallowResearch: true, placement });
-    assert.deepEqual(h.notices, ['Created 2 of 4 topics: disk full'], kind);
-    const saved = await h.repo.readMap(h.mapPath);
-    assert.equal(saved.nodes.length, 4, kind);
-    assert.deepEqual(h.notesInFolder(), plain(saved.nodes.map(item => item.path).sort()), `${kind}: no orphan notes`);
+    await assert.rejects(h.view.importOutline({ nodes: api.parseOutline('# R\n## A\n## B\n## C').nodes, source: null, shallowResearch: true, placement }), /disk full/, kind);
+    assert.deepEqual(h.notesInFolder(), files, `${kind}: the Vault is as before`);
+    assert.equal((await h.repo.readMap(h.mapPath)).nodes.length, 2, kind);
     assert.equal(h.researched.length, 0, kind);
+    assert.deepEqual(h.notices, [], kind);
   }
 });
 
@@ -762,16 +766,26 @@ integrationTest('importOutline under a topic removed from Map.md meanwhile: choo
   assert.equal(h.view.selected, sub.id);
 });
 
-integrationTest('importOutline into the open map: a Map.md save failure lists the created notes, keeps the selection and skips research', async () => {
+integrationTest('importOutline into the open map: a Map.md save failure rolls the import back, keeps the selection and skips research', async () => {
   const h = await placementHarness();
+  realTrash(h);
+  const files = h.notesInFolder();
   h.view.selected = h.oldRoot.id;
   h.repo.saveMap = async () => { throw new Error('locked'); };
-  await h.view.importOutline({ nodes: api.parseOutline('# Sub\n## S1').nodes, source: null, shallowResearch: true, placement: { kind: 'under', parentId: h.oldRoot.id } });
-  assert.equal(h.notices.length, 1, h.notices.join(' | '));
-  assert.match(h.notices[0], /could not be saved: locked \(.*Sub\.md, .*S1\.md\)/);
+  await assert.rejects(h.view.importOutline({ nodes: api.parseOutline('# Sub\n## S1').nodes, source: null, shallowResearch: true, placement: { kind: 'under', parentId: h.oldRoot.id } }), /locked/);
+  assert.deepEqual(h.notesInFolder(), files, 'the Vault is as before');
   assert.equal(h.view.selected, h.oldRoot.id, 'selection unchanged');
   assert.equal(h.researched.length, 0);
   assert.deepEqual(plain(h.view.map.nodes.map(item => item.id)), plain([h.oldRoot.id, h.oldChild.id]));
+});
+integrationTest('quick outline create from the expansion panel: a Map.md save failure rejects (the panel shows the reason) and creates nothing', async () => {
+  const h = await placementHarness();
+  realTrash(h);
+  const files = h.notesInFolder();
+  h.repo.saveMap = async () => { throw new Error('locked'); };
+  const nodes = api.parseOutline('# Old root\n## A\n## B').nodes;
+  await assert.rejects(h.view.quickOutline(h.oldRoot).create(nodes, { researchMode: 'local', researchDepth: 'fast', visualMode: 'off', shallowResearch: false }), /locked/);
+  assert.deepEqual(h.notesInFolder(), files);
 });
 test('outline modal: a create failure keeps the dialog open with the reason beside the button', async () => {
   const h = modalHarness();

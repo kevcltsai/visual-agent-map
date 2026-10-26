@@ -306,7 +306,7 @@ function outlineRootDetail(
 /**
  * Creates one note per outline heading in `mapPath`'s topic folder, in outline order with parents by index; the
  * outline root hangs under `parentId` (null for a top-level topic). The first failure stops creation; every note
- * created so far is returned so the caller can write it into the map (no orphans). Does not save the map.
+ * created so far is returned, with the failure, for the caller to keep or discard. Does not save the map.
  */
 async function createOutlineNotes(
   repository: Repository,

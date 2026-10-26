@@ -118,23 +118,6 @@ test('C6: one conflict-free mapChange makes this many saveMap calls (recorded, n
   assert.equal(h.view.map.nodes[0].collapsed, true);
 });
 
-test('R1-F1: an outline import whose rebuild fails still leaves an entry that parks the notes on undo', async () => {
-  const h = await harness();
-  h.view.plugin.mutate = async work => { await work(); };
-  h.view.outlineImportTarget = () => ({ map: 'editable' });
-  h.view.plugin.rebuildDerivedData = async () => { throw new Error('injected rebuild'); };
-  const nodes = ['Topic', 'Two', 'Three'].map((title, index) => ({ index, title, level: 1, parent: null, line: index }));
-  await h.view.importOutlineIntoMap({ nodes, source: null, shallowResearch: false }, { kind: 'tree' }).catch(() => {});
-  assert.equal(h.view.map.nodes.length, 4, 'the import is saved and in memory');
-  assert.equal(h.view.history.canUndo, true, 'the entry is in history');
-  const created = h.view.map.nodes.filter(n => n.id !== h.root.id).map(n => n.path);
-  h.view.plugin.rebuildDerivedData = () => h.repo.rebuildDerivedData();
-  await h.view.travel(false);
-  assert.equal(h.view.map.nodes.length, 1, 'the nodes are gone from the map');
-  assert.equal(h.notesIn('Unassigned').length, 3, 'the notes are parked in Unassigned');
-  for (const path of created) assert.equal(h.contents.has(path), false, `${path} is no longer in Notes`);
-});
-
 test('R1-F4: a viewport panned while the commit is running is kept', async () => {
   const h = await harness();
   const pan = { x: 77, y: 88, zoom: 1.5 };

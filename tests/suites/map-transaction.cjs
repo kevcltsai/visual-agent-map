@@ -493,3 +493,12 @@ integrationTest('map transaction: a Map.md save that always fails throws the ori
   assert.deepEqual(h.snapshot(), before);
   assert.equal(h.counts.applied.length, 0);
 });
+
+integrationTest('map transaction: R1-F3 a coordinate-only write that landed before a later failure is put back', async () => {
+  const h = await harness();
+  h.deps.onApplied = () => { throw new Error('injected onApplied'); };
+  const before = (await h.repo.readMap(MAP)).nodes.map(n => [n.id, n.x, n.y]);
+  const error = await rejected(begin(h.deps).editMap(MAP, map => { map.nodes[0].x += 123; map.nodes[0].y += 45; }).commit());
+  assert.equal(error.message, 'injected onApplied');
+  assert.deepEqual((await h.repo.readMap(MAP)).nodes.map(n => [n.id, n.x, n.y]), before, 'coordinates are back as before');
+});

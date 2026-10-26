@@ -6926,16 +6926,16 @@ function outputScriptObserverHeadings() {
     if (!verbatimHeadingLanguage(locale)) continue;
     const note = noteLanguageOf(locale);
     for (const [key2, category] of entries) {
-      const written = translate(locale, key2);
+      const written2 = translate(locale, key2);
       const heading = translate(note, key2);
-      if (written !== heading) forms.set(written, { heading, category });
+      if (written2 !== heading) forms.set(written2, { heading, category });
     }
   }
   return forms;
 }
 var _a, _b;
-for (const [written, { category }] of outputScriptObserverHeadings())
-  if (category) (_b = CATEGORY_ALIASES[_a = written.toLocaleLowerCase()]) != null ? _b : CATEGORY_ALIASES[_a] = category;
+for (const [written2, { category }] of outputScriptObserverHeadings())
+  if (category) (_b = CATEGORY_ALIASES[_a = written2.toLocaleLowerCase()]) != null ? _b : CATEGORY_ALIASES[_a] = category;
 var MARKER = /<!--\s*coffee-insight:(v1:([^\s>]+)|(keep|update|merge):([^\s>]+))\s*-->/i;
 var ALL_MARKERS = /<!--\s*coffee-insight:(v1:([^\s>]+)|(keep|update|merge):([^\s>]+))\s*-->/gi;
 var SOURCE_MARKER = /<!--\s*source:\s*([\s\S]*?)\s*-->/gi;
@@ -15982,6 +15982,7 @@ var History = class {
 
 // experiences/visual-map/map-transaction.ts
 var structure = (map) => JSON.stringify({ ...map, viewport: null, nodes: map.nodes.map((node) => ({ ...node, x: null, y: null })) });
+var written = (map) => JSON.stringify({ ...map, viewport: null });
 var ownership = (map) => JSON.stringify(map.nodes.map((node) => [node.id, node.path, node.parentId]));
 var baseNameOf = (path) => path.slice(path.lastIndexOf("/") + 1).replace(/\.md$/, "");
 var tagged = (error, kind) => Object.assign(error, { kind });
@@ -16027,7 +16028,7 @@ function begin(deps) {
       if (!item.written) continue;
       try {
         const current = await repo.readMap(item.mapPath);
-        if (structure(current) === structure(item.restore)) continue;
+        if (written(current) === written(item.restore)) continue;
         const next = clone(item.restore);
         next.viewport = current.viewport;
         await repo.saveMap(item.mapPath, next);
@@ -17419,8 +17420,8 @@ function normalizeOutputScriptHeadings(detail, output, template, context = {}) {
   const forms = /* @__PURE__ */ new Map();
   for (const [, key2] of STANDARD) {
     const canonical = translate(note, key2);
-    const written = translate(output, key2);
-    if (written !== canonical) forms.set(written, canonical);
+    const written2 = translate(output, key2);
+    if (written2 !== canonical) forms.set(written2, canonical);
   }
   const lines = detail.split("\n");
   const code = fencedLines(lines);
@@ -18806,14 +18807,14 @@ function setFrontmatterKeys(content, values) {
     return lines.length ? `---${eol}${lines.join(eol)}${eol}---${eol}${content}` : content;
   }
   const kept = [];
-  const written = /* @__PURE__ */ new Set();
+  const written2 = /* @__PURE__ */ new Set();
   let skipping = false;
   for (const line of match[1].split(/\r?\n/)) {
     const key2 = (_a2 = /^([A-Za-z][\w-]*):/.exec(line)) == null ? void 0 : _a2[1];
     if (key2) {
       skipping = Object.keys(values).includes(key2);
-      if (skipping && !written.has(key2)) {
-        written.add(key2);
+      if (skipping && !written2.has(key2)) {
+        written2.add(key2);
         const value = values[key2];
         if (value !== null) kept.push(...render(key2, value));
       }
@@ -18821,7 +18822,7 @@ function setFrontmatterKeys(content, values) {
     if (!skipping) kept.push(line);
   }
   for (const [key2, value] of Object.entries(values))
-    if (!written.has(key2) && value !== null) kept.push(...render(key2, value));
+    if (!written2.has(key2) && value !== null) kept.push(...render(key2, value));
   return `---${eol}${kept.join(eol)}${eol}---${content.slice(match[0].length)}`;
 }
 var localDate = (date = /* @__PURE__ */ new Date()) => `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
@@ -19972,7 +19973,7 @@ ${body}`);
     const origin = item.path;
     await this.app.vault.rename(item, target);
     if (!this.app.vault.getAbstractFileByPath(target)) throw new Error(this.message("error.move_not_applied"));
-    const written = [];
+    const written2 = [];
     try {
       for (const edit of plan.edits) {
         const path = (_a2 = moves.get(edit.path)) != null ? _a2 : edit.path, file = this.app.vault.getAbstractFileByPath(path);
@@ -19982,11 +19983,11 @@ ${body}`);
             throw new Error(translate(this.settings.language, "error.move_links_note_changed_0", path));
           return edit.after;
         });
-        written.push({ path, before: edit.before, after: edit.after });
+        written2.push({ path, before: edit.before, after: edit.after });
       }
     } catch (error) {
       try {
-        for (const entry of written.reverse()) {
+        for (const entry of written2.reverse()) {
           const file = this.app.vault.getAbstractFileByPath(entry.path);
           if (file instanceof import_obsidian13.TFile)
             await this.app.vault.process(file, (current) => current === entry.after ? entry.before : current);
@@ -30398,16 +30399,16 @@ ${research.detail}`;
   } else {
     reuseRemaining = false;
     const saved = (_j = savedCheckpoint == null ? void 0 : savedCheckpoint.sections) == null ? void 0 : _j[DOCUMENT_KEY];
-    let written;
+    let written2;
     if ((saved == null ? void 0 : saved.fingerprint) === draftFingerprint) {
       try {
         validateContent(saved.result);
-        written = saved.result;
+        written2 = saved.result;
       } catch (e) {
       }
     }
-    if (!written) {
-      written = await run(
+    if (!written2) {
+      written2 = await run(
         "delivery-writing",
         renderWritingTask({
           outline,
@@ -30422,14 +30423,14 @@ ${research.detail}`;
       [DOCUMENT_KEY]: {
         fingerprint: draftFingerprint,
         evidenceIds: documentSources.map((source) => source.id),
-        result: written
+        result: written2
       }
     };
     draft = {
-      summary: written.summary,
-      detail: written.detail,
+      summary: written2.summary,
+      detail: written2.detail,
       suggestions: [],
-      visualReferences: (_m = written.visualReferences) != null ? _m : []
+      visualReferences: (_m = written2.visualReferences) != null ? _m : []
     };
     validateContent(draft);
     checkpoint.draftFingerprint = draftFingerprint;
@@ -31903,17 +31904,17 @@ ${openItemsMarker(review.openItems.map((item) => item.title))}` : body;
    * reviewer's rationale stays in the run records; it can name internal IDs and critiques the draft, not the topic.
    */
   publishRejectedDelivery(review, language2) {
-    const written = this.deliveryRejections.get(review);
-    if (!written) return this.withOpenItems(review, language2);
+    const written2 = this.deliveryRejections.get(review);
+    if (!written2) return this.withOpenItems(review, language2);
     const warning = rejectedDeliveryWarning(review.researchTarget ? [review.researchTarget.title] : [], language2);
     return this.withOpenItems(
       {
         ...review,
-        summary: written.summary,
+        summary: written2.summary,
         detail: warning ? `${warning}
 
-${written.detail}` : written.detail,
-        openItems: written.openItems
+${written2.detail}` : written2.detail,
+        openItems: written2.openItems
       },
       language2
     );
@@ -32227,8 +32228,8 @@ ${note.detail}`;
     if (!(pastLimit && asksUser) && !(reviewed.decision === "research_more" && reviewed.gapKind === "not_decisive"))
       return reviewed;
     throwIfAborted(signal);
-    const written = (_b2 = (_a2 = this.deliveryRejections.get(reviewed)) == null ? void 0 : _a2.openItems) != null ? _b2 : [];
-    const carried = written.length ? { ...reviewed, openItems: [...written, ...(_c = reviewed.openItems) != null ? _c : []] } : reviewed;
+    const written2 = (_b2 = (_a2 = this.deliveryRejections.get(reviewed)) == null ? void 0 : _a2.openItems) != null ? _b2 : [];
+    const carried = written2.length ? { ...reviewed, openItems: [...written2, ...(_c = reviewed.openItems) != null ? _c : []] } : reviewed;
     return this.reviewDecisionOnce(this.limitToOpenItems(carried, context), context, model, reasoning, signal);
   }
   /** A question or a user-only/not-decisive gap becomes a conclusion that lists it for the user to confirm. */
@@ -38438,7 +38439,7 @@ ${request.requirements}` : preset.text,
     target();
     const state = {};
     let model = settings.cliModel;
-    let written = true;
+    let written2 = true;
     try {
       await this.plugin.mutate(async () => {
         var _a3, _b3;
@@ -38478,8 +38479,8 @@ ${request.requirements}` : preset.text,
         }
         const top2 = created[0];
         const ids2 = new Set(created.map((node) => node.id));
+        const previousEntry = this.history.undoEntry;
         try {
-          const previousEntry = this.history.undoEntry;
           const done = await this.mapChangeSnapshots((next) => {
             next.nodes.push(...created);
             const owner2 = parent ? next.nodes.find((node) => node.id === parent.id && !ids2.has(node.id)) : void 0;
@@ -38494,6 +38495,8 @@ ${request.requirements}` : preset.text,
           });
           if (done) this.parkOnUndo([...ids2], done.before, done.after, previousEntry);
         } catch (error) {
+          const pushed = error == null ? void 0 : error.pushedEntry;
+          if (pushed) this.parkOnUndo([...ids2], pushed.before, pushed.after, previousEntry);
           state.saveFailed = true;
           new import_obsidian30.Notice(
             t(
@@ -38511,14 +38514,14 @@ ${request.requirements}` : preset.text,
         }
       });
     } catch (e) {
-      written = false;
+      written2 = false;
     }
     if (state.rejection) throw state.rejection;
     const outcome = state.result;
     if (!outcome) return;
     if (outcome.failure)
       new import_obsidian30.Notice(t("ui.outline_import_partial", outcome.created.length, outcome.total, outcome.failure));
-    if (outcome.failure || state.saveFailed || !written || !request.shallowResearch || !outcome.created.length) return;
+    if (outcome.failure || state.saveFailed || !written2 || !request.shallowResearch || !outcome.created.length) return;
     const owner = placement.kind === "under" ? placement.parentId : null;
     const several = owner !== null && (!!request.researchEveryTopic || request.nodes.filter((node) => node.parent === null).length > 1);
     const top = (_a2 = this.map) == null ? void 0 : _a2.nodes.find((node) => node.id === (several ? owner : outcome.created[0].id));
@@ -39637,7 +39640,8 @@ ${request.requirements}` : preset.text,
         after = clone(map);
       }).commit({ deferRebuild: true });
       this.history.push(entry);
-      if (this.map) this.map.viewport = clone(after.viewport);
+      if (this.map && JSON.stringify(after.viewport) !== JSON.stringify(viewport))
+        this.map.viewport = clone(after.viewport);
     } catch (error) {
       this.render();
       throw error;
@@ -39648,6 +39652,7 @@ ${request.requirements}` : preset.text,
         await this.plugin.rebuildDerivedData();
     } catch (error) {
       this.render();
+      if (error !== null && typeof error === "object") Object.assign(error, { pushedEntry: { before, after } });
       throw error;
     }
     this.render();
@@ -44863,15 +44868,19 @@ ${note.detail.trim()}` : "",
       integrated.parentId = null;
       integrated.x = Math.max(...sources2.map((node) => node.x)) + 340;
       integrated.y = sources2.reduce((sum, node) => sum + node.y, 0) / sources2.length;
-      await this.mapChangeSnapshots(
-        (map) => {
-          map.nodes.push(integrated);
-        },
-        true,
-        [integrated.path]
-      );
-      const entry = this.history.undoEntry;
-      if (entry) entry.label = t("ui.confirm_new_synthesis_topic");
+      const previousEntry = this.history.undoEntry;
+      try {
+        await this.mapChangeSnapshots(
+          (map) => {
+            map.nodes.push(integrated);
+          },
+          true,
+          [integrated.path]
+        );
+      } finally {
+        const pushed = this.history.undoEntry;
+        if (pushed && pushed !== previousEntry) pushed.label = t("ui.confirm_new_synthesis_topic");
+      }
       this.integrationTask = null;
       this.selected = integrated.id;
       this.multiSelected.clear();
@@ -44957,13 +44966,13 @@ ${note.detail.trim()}` : "",
     var _a2, _b2;
     if (this.builtIn || !this.map || !this.path) return;
     const viewport = { ...this.map.viewport };
-    const written = await this.plugin.repo.updateMap(this.path, (map) => {
+    const written2 = await this.plugin.repo.updateMap(this.path, (map) => {
       map.viewport = viewport;
     });
-    const stamped = (_a2 = written == null ? void 0 : written.aim) == null ? void 0 : _a2.contentLanguage;
+    const stamped = (_a2 = written2 == null ? void 0 : written2.aim) == null ? void 0 : _a2.contentLanguage;
     if (stamped !== void 0 && ((_b2 = this.map) == null ? void 0 : _b2.aim) && this.map.aim.contentLanguage === void 0)
       this.map.aim.contentLanguage = stamped;
-    const stampedOutput = written == null ? void 0 : written.outputLanguage;
+    const stampedOutput = written2 == null ? void 0 : written2.outputLanguage;
     if (stampedOutput !== void 0 && this.map && this.map.outputLanguage === void 0)
       this.map.outputLanguage = stampedOutput;
   }
@@ -46707,7 +46716,7 @@ ${addition}` : addition });
       },
       turns: turns.map((turn) => this.chatTranscriptTurn(turn))
     });
-    const written = { path: "" };
+    const written2 = { path: "" };
     try {
       await this.plugin.mutate(async () => {
         try {
@@ -46715,21 +46724,21 @@ ${addition}` : addition });
           await this.plugin.repo.folder(folder);
           const path = this.plugin.repo.unique(folder, name);
           await this.app.vault.create(path, markdown);
-          written.path = path;
+          written2.path = path;
         } catch (error) {
-          written.error = error;
+          written2.error = error;
         }
       });
     } catch (error) {
-      written.error = error;
+      written2.error = error;
     }
-    if (written.error !== void 0) {
-      const reason = t("ui.map_chat_save_failed_0", errorMessage(written.error));
+    if (written2.error !== void 0) {
+      const reason = t("ui.map_chat_save_failed_0", errorMessage(written2.error));
       new import_obsidian30.Notice(reason);
       return { ok: false, reason };
     }
-    new import_obsidian30.Notice(t("ui.map_chat_saved_0", written.path));
-    return { ok: true, path: written.path };
+    new import_obsidian30.Notice(t("ui.map_chat_saved_0", written2.path));
+    return { ok: true, path: written2.path };
   }
   /**
    * Expand from the chat: the multi-level outline expansion of the Next Step dialog (the same generator and the same writer),

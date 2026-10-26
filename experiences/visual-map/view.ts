@@ -2895,8 +2895,8 @@ export class VisualAgentMapView extends ItemView {
         const top = created[0];
         const ids = new Set(created.map(node => node.id));
         // The view's normal mutation path: conflict check, Map.md save, undo history and Reference Links.
+        const previousEntry = this.history.undoEntry;
         try {
-          const previousEntry = this.history.undoEntry;
           const done = await this.mapChangeSnapshots(next => {
             next.nodes.push(...created);
             // The map may have been swapped for the file version by the conflict window: without the parent there,
@@ -2914,6 +2914,9 @@ export class VisualAgentMapView extends ItemView {
           // One Undo takes the whole import's notes out of Notes (parked in Unassigned); Redo puts them back.
           if (done) this.parkOnUndo([...ids], done.before, done.after, previousEntry);
         } catch (error) {
+          // A failing rebuild leaves the entry in history: Undo must still park the notes.
+          const pushed = (error as { pushedEntry?: { before: MapDocument; after: MapDocument } } | null)?.pushedEntry;
+          if (pushed) this.parkOnUndo([...ids], pushed.before, pushed.after, previousEntry);
           // The notes exist but the map does not hold them: list them, like a new map whose Map.md cannot be saved.
           state.saveFailed = true;
           new Notice(
@@ -4119,7 +4122,9 @@ export class VisualAgentMapView extends ItemView {
         })
         .commit({ deferRebuild: true });
       this.history.push(entry);
-      if (this.map) this.map.viewport = clone(after.viewport);
+      // Commit is asynchronous: the user may have panned meanwhile, so only a viewport the change itself set is applied.
+      if (this.map && JSON.stringify(after.viewport) !== JSON.stringify(viewport))
+        this.map.viewport = clone(after.viewport);
     } catch (error) {
       this.render();
       throw error;
@@ -4132,6 +4137,8 @@ export class VisualAgentMapView extends ItemView {
         await this.plugin.rebuildDerivedData();
     } catch (error) {
       this.render();
+      // The entry is already in history: hand the snapshots to the caller so it can finish the entry (e.g. parkOnUndo).
+      if (error !== null && typeof error === "object") Object.assign(error, { pushedEntry: { before, after } });
       throw error;
     }
     this.render();
@@ -9861,15 +9868,20 @@ export class VisualAgentMapView extends ItemView {
       integrated.parentId = null;
       integrated.x = Math.max(...sources.map(node => node.x)) + 340;
       integrated.y = sources.reduce((sum, node) => sum + node.y, 0) / sources.length;
-      await this.mapChangeSnapshots(
-        map => {
-          map.nodes.push(integrated);
-        },
-        true,
-        [integrated.path]
-      );
-      const entry = this.history.undoEntry;
-      if (entry) entry.label = t("ui.confirm_new_synthesis_topic");
+      const previousEntry = this.history.undoEntry;
+      try {
+        await this.mapChangeSnapshots(
+          map => {
+            map.nodes.push(integrated);
+          },
+          true,
+          [integrated.path]
+        );
+      } finally {
+        // Also when the rebuild failed after the entry was pushed: the entry keeps its label.
+        const pushed = this.history.undoEntry;
+        if (pushed && pushed !== previousEntry) pushed.label = t("ui.confirm_new_synthesis_topic");
+      }
       this.integrationTask = null;
       this.selected = integrated.id;
       this.multiSelected.clear();

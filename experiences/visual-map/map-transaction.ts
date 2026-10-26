@@ -88,6 +88,7 @@ interface Journal {
 // Viewport and node positions are layout, not content: undo writes the stored positions back and does not treat a change as stale.
 const structure = (map: MapDocument): string =>
   JSON.stringify({ ...map, viewport: null, nodes: map.nodes.map(node => ({ ...node, x: null, y: null })) });
+const written = (map: MapDocument): string => JSON.stringify({ ...map, viewport: null });
 const ownership = (map: MapDocument): string =>
   JSON.stringify(map.nodes.map(node => [node.id, node.path, node.parentId]));
 const baseNameOf = (path: string): string => path.slice(path.lastIndexOf("/") + 1).replace(/\.md$/, "");
@@ -145,7 +146,8 @@ export function begin(deps: TransactionDeps): Transaction {
       try {
         const current = await repo.readMap(item.mapPath);
         // The write may never have happened (the save itself threw before changing the file): nothing to put back.
-        if (structure(current) === structure(item.restore)) continue;
+        // Compared with positions: a coordinate-only write that did land must still be put back.
+        if (written(current) === written(item.restore)) continue;
         const next = clone(item.restore);
         next.viewport = current.viewport;
         await repo.saveMap(item.mapPath, next);

@@ -363,7 +363,7 @@ test('flow case: converter keeps AiExchange step and order, and the ordered raw 
 });
 
 
-/** Build a synthetic live ai-exchanges.json through the real AiExchangeLog + runtimeStepProvider + AiTaskService, with a fake runtime that logs a Codex-shaped (or Claude-shaped) request. */
+/** Build a synthetic live ai-exchanges.json through the real AiExchangeLog + AiCalls + AiTaskService, with a fake runtime that logs a Codex-shaped (or Claude-shaped) request. */
 async function recordSyntheticExchanges(directory) {
   const { AiExchangeLog } = load('ai-exchange-log.ts');
   const logFile = path.join(directory, 'ai-exchanges.json');

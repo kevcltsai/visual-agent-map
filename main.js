@@ -54022,7 +54022,7 @@ var AiTaskService = class {
     var _a2, _b2, _c, _d, _e;
     if (input.timeoutMs !== void 0 && (!Number.isInteger(input.timeoutMs) || input.timeoutMs < 18e4 || input.timeoutMs > 6e5))
       throw new Error("Invalid AI task timeout.");
-    const provider = providerForModel(model);
+    const provider = this.runtimeIdFor(model);
     if (provider === "claude" && !CLAUDE_MODEL_CHOICES.some((choice2) => choice2.id === model)) {
       throw new Error(t("ui.claude_model_is_not_supported_0", model));
     }
@@ -54391,7 +54391,7 @@ var AiTaskService = class {
       request.detail,
       request.countIssues,
       (_b2 = request.input.outputLanguage) != null ? _b2 : this.options.language(),
-      providerForModel(request.model),
+      this.runtimeIdFor(request.model),
       request.model,
       request.signal,
       this.options.exchangeLoggingEnabled() ? this.options.exchanges() : null,
@@ -54402,6 +54402,13 @@ var AiTaskService = class {
   failExchange(id, reason) {
     var _a2;
     if (id && this.options.exchangeLoggingEnabled()) (_a2 = this.options.exchanges()) == null ? void 0 : _a2.failed(id, reason);
+  }
+  /** The runtime serving `model` (the prompt wording differs per runtime), without starting it or reading the plugin directory. */
+  runtimeIdFor(model) {
+    return aiRuntimeForModel(model, {
+      claude: () => this.options.claudeRuntime(this.options.pluginDirectory()),
+      codex: (local) => this.options.codexRuntime(this.options.pluginDirectory(), local)
+    }).capabilities.id;
   }
   /** AiCalls over this service's runtimes in `pluginDirectory`, logging to `exchanges` (taken when the request started) while logging stays on. */
   callsIn(pluginDirectory, exchanges) {
@@ -54442,7 +54449,7 @@ var AiTaskService = class {
       request.detail,
       void 0,
       request.language,
-      providerForModel(request.model),
+      this.runtimeIdFor(request.model),
       request.model,
       request.signal,
       this.options.exchangeLoggingEnabled() ? this.options.exchanges() : null

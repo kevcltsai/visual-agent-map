@@ -47,7 +47,8 @@ const suites = [
   'sharing-translate.cjs',
   'sharing-translate-dialog.cjs',
   'sharing-mermaid-capture.cjs',
-  'check-test-timing.cjs'
+  'check-test-timing.cjs',
+  'check-test-wiring.cjs'
 ];
 const directory = path.join(__dirname, 'suites');
 assert.deepEqual(fs.readdirSync(directory).filter(file => file.endsWith('.cjs')).sort(), suites.slice().sort(), 'tests/run.cjs must list every file in tests/suites');

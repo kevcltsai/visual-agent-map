@@ -1,6 +1,6 @@
 # Install Visual Agent Map
 
-This guide takes you from installation to your first editable VAM map. VAM is requires **Obsidian Desktop 1.13.7 or later**; the tested environment is **macOS with Obsidian 1.13.7**.
+This guide takes you from installation to your first editable VAM map. VAM requires **Obsidian Desktop 1.13.7 or later**; the tested environment is **macOS with Obsidian 1.13.7**.
 
 ## What you need
 

@@ -38332,18 +38332,59 @@ ${request.requirements}` : preset.text,
         );
         state.result = result;
         const created = result.created;
-        if (!created.length) return;
+        if (!created.length && !result.failure) return;
         for (const node of created) {
           try {
             this.notes.set(node.id, await repo.readNote(node.path, { ...map, nodes: [...map.nodes, ...created] }));
           } catch (e) {
           }
         }
+        const rollBack = async (error) => {
+          const cause = error instanceof Error ? error : new Error(String(error));
+          let referenced = null;
+          if (created.length) {
+            try {
+              referenced = new Set((await repo.readMap(path)).nodes.map((node) => node.id));
+            } catch (e) {
+            }
+          }
+          const kept = [];
+          for (const node of [...created].reverse()) {
+            const file = repo.app.vault.getAbstractFileByPath(node.path);
+            if (!referenced || referenced.has(node.id)) {
+              kept.unshift(node.path);
+              continue;
+            }
+            if (!(file instanceof import_obsidian30.TFile)) {
+              this.notes.delete(node.id);
+              continue;
+            }
+            try {
+              await repo.app.fileManager.trashFile(file);
+              this.notes.delete(node.id);
+            } catch (e) {
+              kept.unshift(node.path);
+            }
+          }
+          this.render();
+          if (!kept.length) {
+            state.rejection = cause;
+            return;
+          }
+          state.saveFailed = true;
+          new import_obsidian30.Notice(t("ui.outline_import_map_save_failed", `${errorMessage(cause)} (${kept.join(", ")})`));
+        };
+        if (result.failure) return rollBack(new Error(result.failure));
         const top2 = created[0];
         const ids2 = new Set(created.map((node) => node.id));
-        const previousEntry = this.history.undoEntry;
+        const tx = this.beginMapTransaction();
+        for (const node of created) tx.create(node.path, repo.topicFolder(path, "Unassigned"), map.id);
+        const viewport = clone(map.viewport);
+        const opened = this.map;
+        let after;
         try {
-          const done = await this.mapChangeSnapshots((next) => {
+          const entry = await tx.editMap(path, (next) => {
+            next.viewport = clone(viewport);
             next.nodes.push(...created);
             const owner2 = parent ? next.nodes.find((node) => node.id === parent.id && !ids2.has(node.id)) : void 0;
             const outlineTop = next.nodes.find((node) => node.id === top2.id);
@@ -38354,18 +38395,13 @@ ${request.requirements}` : preset.text,
               outlineTop.parentId = null;
               next.nodes = arrangeNewTree(next.nodes, top2.id, ids2, this.cardHeightOf);
             }
-          });
-          if (done) this.parkOnUndo([...ids2], done.before, done.after, previousEntry);
+            after = clone(next);
+          }).commit();
+          this.history.push(entry);
+          if (this.map && (this.map !== opened || JSON.stringify(after.viewport) !== JSON.stringify(viewport)))
+            this.map.viewport = clone(after.viewport);
         } catch (error) {
-          const pushed = error == null ? void 0 : error.pushedEntry;
-          if (pushed) this.parkOnUndo([...ids2], pushed.before, pushed.after, previousEntry);
-          state.saveFailed = true;
-          new import_obsidian30.Notice(
-            t(
-              "ui.outline_import_map_save_failed",
-              `${errorMessage(error)} (${created.map((node) => node.path).join(", ")})`
-            )
-          );
+          await rollBack(error);
           return;
         }
         const placed = (_b3 = this.map) == null ? void 0 : _b3.nodes.find((node) => node.id === top2.id);
@@ -38381,9 +38417,7 @@ ${request.requirements}` : preset.text,
     if (state.rejection) throw state.rejection;
     const outcome = state.result;
     if (!outcome) return;
-    if (outcome.failure)
-      new import_obsidian30.Notice(t("ui.outline_import_partial", outcome.created.length, outcome.total, outcome.failure));
-    if (outcome.failure || state.saveFailed || !written2 || !request.shallowResearch || !outcome.created.length) return;
+    if (state.saveFailed || !written2 || !request.shallowResearch || !outcome.created.length) return;
     const owner = placement.kind === "under" ? placement.parentId : null;
     const several = owner !== null && (!!request.researchEveryTopic || request.nodes.filter((node) => node.parent === null).length > 1);
     const top = (_a2 = this.map) == null ? void 0 : _a2.nodes.find((node) => node.id === (several ? owner : outcome.created[0].id));
@@ -39515,7 +39549,6 @@ ${request.requirements}` : preset.text,
         await this.plugin.rebuildDerivedData();
     } catch (error) {
       this.render();
-      if (error !== null && typeof error === "object") Object.assign(error, { pushedEntry: { before, after } });
       throw error;
     }
     this.render();
@@ -43009,39 +43042,6 @@ ${request.requirements}` : preset.text,
         }
       }))
     ).open();
-  }
-  /**
-   * The undo of a created topic must take its note away with it: the history entry mapChange just pushed only
-   * rewrites Map.md, which would leave the new note behind in Notes. Replace it with the remove lifecycle: undo parks
-   * the note in Unassigned, redo moves it back to the exact path it had.
-   */
-  parkOnUndo(nodeIds, before, after, previousEntry) {
-    const entry = this.history.undoEntry;
-    if (!entry || entry === previousEntry) return;
-    const ids = new Set(typeof nodeIds === "string" ? [nodeIds] : nodeIds);
-    let moves = [];
-    entry.undo = async () => {
-      var _a2, _b2;
-      const repo = this.plugin.repo, folder = repo.topicFolder(this.path, "Unassigned"), taken = /* @__PURE__ */ new Set();
-      moves = [];
-      for (const current of (_b2 = (_a2 = this.map) == null ? void 0 : _a2.nodes.filter((item) => ids.has(item.id))) != null ? _b2 : []) {
-        const base = current.path.slice(current.path.lastIndexOf("/") + 1).replace(/\.md$/, "");
-        const parkedPath = repo.unique(folder, base, taken);
-        taken.add(parkedPath);
-        moves.push({ activePath: current.path, parkedPath, topicId: before.id, parkedState: "unassigned" });
-      }
-      if (!moves.length) return;
-      await this.restoreLifecycle(this.withCurrentViewport(before), moves, true);
-    };
-    entry.redo = async () => {
-      if (!moves.length) return;
-      await this.restoreLifecycle(this.withCurrentViewport(after), moves, false);
-    };
-  }
-  withCurrentViewport(snapshot) {
-    const next = clone(snapshot);
-    if (this.map) next.viewport = clone(this.map.viewport);
-    return next;
   }
   /** `focus` false leaves the camera to the caller (a batch frames the whole branch once it is laid out). */
   async addNode(parentNode, suggestedTitle, rebuildDerivedData = true, focus = true) {

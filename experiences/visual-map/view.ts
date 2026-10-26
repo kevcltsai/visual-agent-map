@@ -2884,7 +2884,7 @@ export class VisualAgentMapView extends ItemView {
         );
         state.result = result;
         const created = result.created;
-        if (!created.length) return;
+        if (!created.length && !result.failure) return;
         for (const node of created) {
           try {
             this.notes.set(node.id, await repo.readNote(node.path, { ...map, nodes: [...map.nodes, ...created] }));
@@ -2892,39 +2892,80 @@ export class VisualAgentMapView extends ItemView {
             // The note exists; the view reloads it on the next hydrate.
           }
         }
+        // The notes were made outside the transaction (D-2026-10-319, D-2026-10-320): any failure puts the vault back as it was.
+        // A note the saved Map.md still holds is kept (the map must not point at a missing file); the rest go to the trash.
+        const rollBack = async (error: unknown): Promise<void> => {
+          const cause = error instanceof Error ? error : new Error(String(error));
+          let referenced: Set<string> | null = null;
+          if (created.length) {
+            try {
+              referenced = new Set((await repo.readMap(path)).nodes.map(node => node.id));
+            } catch {
+              // Map.md cannot be read: nothing is trashed.
+            }
+          }
+          const kept: string[] = [];
+          for (const node of [...created].reverse()) {
+            const file = repo.app.vault.getAbstractFileByPath(node.path);
+            if (!referenced || referenced.has(node.id)) {
+              kept.unshift(node.path);
+              continue;
+            }
+            if (!(file instanceof TFile)) {
+              this.notes.delete(node.id);
+              continue;
+            }
+            try {
+              await repo.app.fileManager.trashFile(file);
+              this.notes.delete(node.id);
+            } catch {
+              kept.unshift(node.path);
+            }
+          }
+          this.render();
+          if (!kept.length) {
+            state.rejection = cause;
+            return;
+          }
+          // Notes remain: the window closes so a retry cannot create a second set.
+          state.saveFailed = true;
+          new Notice(t("ui.outline_import_map_save_failed", `${errorMessage(cause)} (${kept.join(", ")})`));
+        };
+        if (result.failure) return rollBack(new Error(result.failure));
         const top = created[0];
         const ids = new Set(created.map(node => node.id));
-        // The view's normal mutation path: conflict check, Map.md save, undo history and Reference Links.
-        const previousEntry = this.history.undoEntry;
+        // Created notes, the Map.md edit and the derived data are one transaction; undo parks the notes in Unassigned.
+        const tx = this.beginMapTransaction();
+        for (const node of created) tx.create(node.path, repo.topicFolder(path, "Unassigned"), map.id);
+        const viewport = clone(map.viewport);
+        const opened = this.map;
+        let after!: MapDocument;
         try {
-          const done = await this.mapChangeSnapshots(next => {
-            next.nodes.push(...created);
-            // The map may have been swapped for the file version by the conflict window: without the parent there,
-            // the outline becomes a new tree rather than a node pointing at a missing parent.
-            const owner = parent ? next.nodes.find(node => node.id === parent.id && !ids.has(node.id)) : undefined;
-            const outlineTop = next.nodes.find(node => node.id === top.id)!;
-            if (owner) {
-              owner.collapsed = false;
-              next.nodes = arrangeNewBranch(next.nodes, owner.id, ids, this.cardHeightOf);
-            } else {
-              outlineTop.parentId = null;
-              next.nodes = arrangeNewTree(next.nodes, top.id, ids, this.cardHeightOf);
-            }
-          });
-          // One Undo takes the whole import's notes out of Notes (parked in Unassigned); Redo puts them back.
-          if (done) this.parkOnUndo([...ids], done.before, done.after, previousEntry);
+          const entry = await tx
+            .editMap(path, next => {
+              // Map.md on disk may hold an older viewport: the edit starts from the one on screen.
+              next.viewport = clone(viewport);
+              next.nodes.push(...created);
+              // The map may have been swapped for the file version by the conflict window: without the parent there,
+              // the outline becomes a new tree rather than a node pointing at a missing parent.
+              const owner = parent ? next.nodes.find(node => node.id === parent.id && !ids.has(node.id)) : undefined;
+              const outlineTop = next.nodes.find(node => node.id === top.id)!;
+              if (owner) {
+                owner.collapsed = false;
+                next.nodes = arrangeNewBranch(next.nodes, owner.id, ids, this.cardHeightOf);
+              } else {
+                outlineTop.parentId = null;
+                next.nodes = arrangeNewTree(next.nodes, top.id, ids, this.cardHeightOf);
+              }
+              after = clone(next);
+            })
+            .commit();
+          this.history.push(entry);
+          // A conflict window replaces this.map: the viewport on screen wins over the one in the file version.
+          if (this.map && (this.map !== opened || JSON.stringify(after.viewport) !== JSON.stringify(viewport)))
+            this.map.viewport = clone(after.viewport);
         } catch (error) {
-          // A failing rebuild leaves the entry in history: Undo must still park the notes.
-          const pushed = (error as { pushedEntry?: { before: MapDocument; after: MapDocument } } | null)?.pushedEntry;
-          if (pushed) this.parkOnUndo([...ids], pushed.before, pushed.after, previousEntry);
-          // The notes exist but the map does not hold them: list them, like a new map whose Map.md cannot be saved.
-          state.saveFailed = true;
-          new Notice(
-            t(
-              "ui.outline_import_map_save_failed",
-              `${errorMessage(error)} (${created.map(node => node.path).join(", ")})`
-            )
-          );
+          await rollBack(error);
           return;
         }
         const placed = this.map?.nodes.find(node => node.id === top.id);
@@ -2940,9 +2981,7 @@ export class VisualAgentMapView extends ItemView {
     if (state.rejection) throw state.rejection;
     const outcome = state.result;
     if (!outcome) return;
-    if (outcome.failure)
-      new Notice(t("ui.outline_import_partial", outcome.created.length, outcome.total, outcome.failure));
-    if (outcome.failure || state.saveFailed || !written || !request.shallowResearch || !outcome.created.length) return;
+    if (state.saveFailed || !written || !request.shallowResearch || !outcome.created.length) return;
     // An outline with several top headings, or one without a root of its own (quick explore drops the topic's root),
     // is researched under the parent.
     const owner = placement.kind === "under" ? placement.parentId : null;
@@ -4139,8 +4178,6 @@ export class VisualAgentMapView extends ItemView {
         await this.plugin.rebuildDerivedData();
     } catch (error) {
       this.render();
-      // The entry is already in history: hand the snapshots to the caller so it can finish the entry (e.g. parkOnUndo).
-      if (error !== null && typeof error === "object") Object.assign(error, { pushedEntry: { before, after } });
       throw error;
     }
     this.render();
@@ -7973,47 +8010,6 @@ export class VisualAgentMapView extends ItemView {
         }
       }))
     ).open();
-  }
-  /**
-   * The undo of a created topic must take its note away with it: the history entry mapChange just pushed only
-   * rewrites Map.md, which would leave the new note behind in Notes. Replace it with the remove lifecycle: undo parks
-   * the note in Unassigned, redo moves it back to the exact path it had.
-   */
-  private parkOnUndo(
-    nodeIds: string | string[],
-    before: MapDocument,
-    after: MapDocument,
-    previousEntry: Action | undefined
-  ): void {
-    const entry = this.history.undoEntry;
-    if (!entry || entry === previousEntry) return;
-    const ids = new Set(typeof nodeIds === "string" ? [nodeIds] : nodeIds);
-    let moves: FileMove[] = [];
-    entry.undo = async () => {
-      const repo = this.plugin.repo,
-        folder = repo.topicFolder(this.path, "Unassigned"),
-        taken = new Set<string>();
-      moves = [];
-      for (const current of this.map?.nodes.filter(item => ids.has(item.id)) ?? []) {
-        const base = current.path.slice(current.path.lastIndexOf("/") + 1).replace(/\.md$/, "");
-        // The moves have not run yet, so the names claimed in this call are passed as the avoid set; unique also
-        // folds case and Unicode form against what Unassigned already holds.
-        const parkedPath = repo.unique(folder, base, taken);
-        taken.add(parkedPath);
-        moves.push({ activePath: current.path, parkedPath, topicId: before.id, parkedState: "unassigned" });
-      }
-      if (!moves.length) return;
-      await this.restoreLifecycle(this.withCurrentViewport(before), moves, true);
-    };
-    entry.redo = async () => {
-      if (!moves.length) return;
-      await this.restoreLifecycle(this.withCurrentViewport(after), moves, false);
-    };
-  }
-  private withCurrentViewport(snapshot: MapDocument): MapDocument {
-    const next = clone(snapshot);
-    if (this.map) next.viewport = clone(this.map.viewport);
-    return next;
   }
   /** `focus` false leaves the camera to the caller (a batch frames the whole branch once it is laid out). */
   private async addNode(

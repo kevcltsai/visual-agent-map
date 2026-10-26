@@ -17,13 +17,18 @@ export function deduplicateAimRequest<T extends TaskContext>(context: T): T {
   // buildPreparedTaskContext later cuts detail, workingFindings and ancestors down from the end when a request is over
   // budget. A reference must never outlive its copy, so a copy that sits in one of those fields is referenced only from
   // the same field (the cut keeps the start of a field, so a reference after its copy survives with it).
-  const passages = new Map<string, { id: number; key: string }>();
+  // Every field that carries a complete copy of a passage. A repeat may reference any copy that survives the cut: one
+  // outside the trimmed fields, or one earlier in the same field. A copy in a trimmed field never hides the other
+  // copies, so a later repeat can still point at a copy that is certain to be sent.
+  const passages = new Map<string, Set<string>>();
   const copyFor = (text: string, key: string): boolean => {
-    const copy = passages.get(text);
-    return copy !== undefined && (!TRIMMED_FIELDS.has(copy.key) || copy.key === key);
+    const copies = passages.get(text);
+    return copies !== undefined && [...copies].some(copyKey => !TRIMMED_FIELDS.has(copyKey) || copyKey === key);
   };
   const remember = (text: string, key: string): void => {
-    if (!passages.has(text)) passages.set(text, { id: passages.size + 1, key });
+    const copies = passages.get(text);
+    if (copies) copies.add(key);
+    else passages.set(text, new Set([key]));
   };
   for (const key of ["task", "detail", "ancestors", "workingFindings", "summary", "rules", "title"] as const) {
     const value = prepared[key];

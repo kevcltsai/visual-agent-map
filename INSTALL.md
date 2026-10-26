@@ -46,6 +46,12 @@ You are ready when an available model appears in the topic task dialog and can c
 
 CLI detection alone does not verify authentication, organization access or structured task completion. See [Known limitations](#known-limitations).
 
+## Talk to your map
+
+A map has an AI chat window on its left side (open or close it from the map view, or run **Toggle the map AI chat**; assign a shortcut in Obsidian's hotkey settings if you want one). Use it to ask about the map or to change it in plain language: build a map from one sentence, edit and move topics, run Quick or Standard research, expand, integrate, find pictures for a topic, or edit notes you point it to. Large requests (more than 15 actions, deleting a branch, research on 10 or more topics, a new map) appear as a plan that does nothing until you choose **Apply**. Changes the chat applies from a reply cannot be undone. **Save the chat as a note** writes the conversation to `Chats/` in the map's folder.
+
+Research and expansion have two AI modes. **Quick** answers from the model's knowledge and your sources without the web. **Standard** searches the web and may add images. Use Standard once the structure is settled or when the topic is new or obscure.
+
 ## Share a map
 
 Open a mind map and choose **Share this map** (command or button). VAM saves one HTML file that opens in any browser, even offline (images that link to the web need a connection); you choose where it is saved. The dialog lets you leave out full notes or images, and AI can add translated versions (needs Codex or Claude Code). Before saving, VAM checks the file for private information such as your vault's location or `[[note links]]`, and saves nothing if it finds any. **Copy the GitHub publishing instructions** only copies text for you to paste into your own Claude Code or Codex. See [Known limitations](#known-limitations) for what is not shared.
@@ -61,9 +67,9 @@ Open a mind map and choose **Share this map** (command or button). VAM saves one
 
 AI actions for selected Markdown text produce editable drafts. You explicitly accept a draft before it changes a note. **Translate image** writes a translated copy into the note once you choose **Replace image** or **Add new image**; it requires Codex, sends the image data when you run it, and keeps the original image file. To stop the automatic selection button and image button, turn off **Show “Use AI on selection” automatically** in settings; the **Use AI on selection** command still works.
 
-VAM has no telemetry and does not store API keys. AI tasks send relevant content, including research context, selected background files, or guest profiles, through your local CLI to OpenAI or Anthropic. Your provider allowance or charges may apply. AI request/reply logging is off by default; enabled logs may contain private note content.
+VAM has no telemetry and does not store API keys. AI tasks send relevant content, including research context, selected background files, or guest profiles, through your local CLI to OpenAI or Anthropic. The map AI chat also sends the map outline, the titles of your other maps, the cards you select or reference, the note open beside the map in full (shown as a chip you can remove), notes and text you drop in, and the last few messages; the chat can edit those notes and create new Markdown notes in your vault, but not inside the Obsidian settings folder. Your provider allowance or charges may apply. AI request/reply logging is off by default; enabled logs may contain private note content.
 
-The CLI inherits Obsidian's OS permissions; read-only or tool restrictions are not an OS sandbox. VAM runs the CLI program you installed, and when you use AIM or AI research that program searches the web for you. VAM may read vault Markdown paths to find its workspace and probe CLI paths outside the vault. Share files are written only where you choose in the save window; VAM never uploads them. Optional AI exchange logs and temporary files are stored in plugin data. Copy actions write requested text to the clipboard; VAM does not read clipboard contents or install/update your CLI.
+The CLI inherits Obsidian's OS permissions; read-only or tool restrictions are not an OS sandbox. VAM runs the CLI program you installed, and when you use AIM, Standard research or picture search that program searches the web for you (Quick mode does not). Thumbnails of picture candidates are loaded from their websites. VAM may read vault Markdown paths to find its workspace and probe CLI paths outside the vault. Share files are written only where you choose in the save window; VAM never uploads them. Optional AI exchange logs and temporary files are stored in plugin data. Copy actions write requested text to the clipboard; VAM does not read clipboard contents or install/update your CLI.
 
 ## Known limitations
 
@@ -76,6 +82,8 @@ Researching several topics at once uses more of your provider allowance, and a b
 Images found by AI web search may not be free to reuse; check each source page. Outline search covers titles in the current map, not full text. Map undo/redo is temporary and clears when you switch maps or close the view.
 
 New mind maps are created in `Mind Maps/` and new AIM maps in `AIM/` inside your workspace folder (both names can be changed in settings, which renames the existing folder and closes the Settings window while it runs; Obsidian may ask about links for each map). Existing maps in `Topics/` keep working where they are; VAM never moves them on its own. To move them, run the command "Organize workspace folders", which shows a preview first and restores everything if a step fails. The Inbox is no longer managed: notes in an existing `Inbox/` folder are left untouched. When "Organize workspace folders" leaves the legacy `Topics/` folder or the `Inbox/` folder completely empty, it moves that empty folder to the trash (following your Obsidian trash setting); a folder that still contains anything is never touched. Maps saved with the pre-0.4 structure (outside these folders) can still be opened and viewed, but cannot be renamed, edited structurally, or organized. If Obsidian is closed or VAM is disabled while a move is running, some maps may be left in their new folder with outdated links inside VAM; run "Refresh VAM data" (it repairs those paths first) or start "Organize workspace folders" again.
+
+Map AI chat: tested live with Claude only; Codex was not tested live in the chat. A picture you inserted and one that could not load look alike, and the result line for a picture search says it started even if the search later finds nothing. Changes the chat applies from a reply cannot be undone. English and Simplified Chinese chat screens, pop-out windows and Windows or Linux were not checked.
 
 Share files: AIM research maps and the built-in sample cannot be shared yet, and web images are not embedded: they keep their original address and are shown only when the reader is online. Translations are made by AI and their quality is not checked by a native speaker. iOS cannot open a local HTML file, so view a shared file on a phone through a web address such as GitHub Pages. Opening a share file from a local file on desktop Safari was not tested.
 
@@ -131,6 +139,12 @@ VAM 不會自行安裝或更新任一 CLI；至少需要一個服務，另一個
 
 偵測到 CLI 不代表登入、組織權限或結構化任務已通過。請參閱 [已知限制](#已知限制)。
 
+## 對地圖說話
+
+地圖左側有 AI 對話視窗（可在地圖視圖開關，或執行「開關心智圖 AI 對話」指令；想用快捷鍵請到 Obsidian 的快捷鍵設定自行指定）。可以用一般的話提問或修改地圖：一句話建出整張地圖、編輯與移動議題、執行快速或標準研究、展開、整合、為議題找圖，或修改你指定的筆記。較大的要求（超過 15 個動作、刪除整個分支、對 10 個以上議題研究、新建地圖）會先列成計畫，按「套用」前不會有任何改變。對話依回覆套用的變更無法復原。「把對話存成筆記」會把對話寫到地圖資料夾下的 `Chats/`。
+
+研究與展開有兩種 AI 模式。**快速**只用模型的知識與你提供的資料來源、不上網；**標準**會上網搜尋，並可配圖。架構穩定後、或題目較新較冷門時，用標準。
+
 ## 分享地圖
 
 開啟心智圖後，選擇 **Share this map**（分享這張地圖，指令或按鈕皆可）。VAM 會存成一個 HTML 檔，可在任何瀏覽器開啟（也能離線；連到網路的圖片需要連線），存放位置由你選擇。對話框可選擇不含完整筆記或圖片，也可用 AI 加上翻譯版本（需要 Codex 或 Claude Code）。存檔前 VAM 會檢查檔案是否含有私人資訊，例如 vault 的位置或 `[[筆記連結]]`；若有就不會存檔。**複製發佈到 GitHub 的指令**只會複製文字，讓你貼到自己的 Claude Code 或 Codex。哪些內容不會分享，請見 [已知限制](#已知限制)。
@@ -146,9 +160,9 @@ VAM 不會自行安裝或更新任一 CLI；至少需要一個服務，另一個
 
 選取 Markdown 文字的 AI 操作會產生可編輯草稿，你必須明確接受草稿，才會改動筆記。「生成翻譯圖片」在你選擇「取代原圖」或「新增一張」後，會把翻譯版圖片寫入筆記；它需要 Codex，執行時才傳送圖片資料，原始圖片檔保持不變。若不想在選取文字或點選圖片時自動出現 AI 按鈕，可在設定關閉「自動顯示『用 AI 處理選取文字』」；「用 AI 處理選取文字」命令仍可使用。
 
-VAM 不含遙測，也不儲存 API key。AI 任務會透過本機 CLI 將相關內容，包括研究脈絡、選取的背景檔或來賓設定，傳送至 OpenAI 或 Anthropic，可能使用帳號額度或產生費用。AI 請求／回覆紀錄預設關閉；啟用後的紀錄可能包含私人筆記。
+VAM 不含遙測，也不儲存 API key。AI 任務會透過本機 CLI 將相關內容，包括研究脈絡、選取的背景檔或來賓設定，傳送至 OpenAI 或 Anthropic，可能使用帳號額度或產生費用。地圖 AI 對話另外會送出地圖大綱、你其他地圖的標題、你選取或加入參考的議題、地圖旁開著的整篇筆記（以可移除的標籤顯示）、你拖入的筆記與文字，以及最近幾則訊息；對話可以修改這些筆記，也能在 vault 新增 Markdown 筆記，但不會寫進 Obsidian 設定資料夾。AI 請求／回覆紀錄預設關閉；啟用後的紀錄可能包含私人筆記。
 
-CLI 繼承 Obsidian 的作業系統權限；唯讀或工具限制不等於 OS sandbox。VAM 會執行你安裝的 CLI 程式；使用 AIM 或 AI 研究時，該程式會代你上網搜尋。分享檔只會寫到你在存檔視窗選的位置，VAM 不會上傳。VAM 可能讀取 Vault 的 Markdown 路徑來尋找工作區，也會探測 Vault 外的 CLI 路徑。選用的 AI 往返紀錄與暫存檔會保存在外掛資料中。複製操作只將指定文字寫入剪貼簿；VAM 不讀取剪貼簿內容，也不會自行安裝或更新 CLI。
+CLI 繼承 Obsidian 的作業系統權限；唯讀或工具限制不等於 OS sandbox。VAM 會執行你安裝的 CLI 程式；使用 AIM、標準研究或找圖時，該程式會代你上網搜尋（快速模式不會）。找圖候選的縮圖會直接從各網站載入。分享檔只會寫到你在存檔視窗選的位置，VAM 不會上傳。VAM 可能讀取 Vault 的 Markdown 路徑來尋找工作區，也會探測 Vault 外的 CLI 路徑。選用的 AI 往返紀錄與暫存檔會保存在外掛資料中。複製操作只將指定文字寫入剪貼簿；VAM 不讀取剪貼簿內容，也不會自行安裝或更新 CLI。
 
 ## 已知限制
 
@@ -161,6 +175,8 @@ AIM 會搜尋網路並提供來源連結，但找到來源不代表內容已證�
 AI 從網路找到的圖片不一定能自由使用，請查看各自的來源頁。大綱只搜尋目前地圖的議題名稱，不搜尋全文。地圖的復原／重做是暫存紀錄，切換地圖或關閉視圖後會清除。
 
 新的心智圖會建立在工作區資料夾內的 `Mind Maps/`，新的 AIM 會建立在 `AIM/`（資料夾名稱可在設定中修改，會一併重新命名既有資料夾，執行時設定視窗會關閉，Obsidian 可能會逐份詢問連結處理方式）。`Topics/` 內既有的地圖維持原位、照常可用；VAM 不會自行搬動它們。要搬移請執行「整理工作區資料夾」指令，它會先顯示預覽，任一步失敗會還原全部。收件匣（Inbox）不再由 VAM 管理：既有 `Inbox/` 內的筆記原封不動。當「整理工作區資料夾」讓舊的 `Topics/` 或 `Inbox/` 資料夾完全清空時，會把該空資料夾移到垃圾桶（依你的 Obsidian 垃圾桶設定）；仍有任何內容的資料夾絕不會被動到。以 0.4 前舊結構儲存的地圖（不在上述資料夾內）仍可開啟與檢視，但不能改名、不能修改結構，也不會被整理。若搬移進行中關閉了 Obsidian 或停用了 VAM，部分地圖可能已在新資料夾但 VAM 內的路徑尚未更新；請執行「重新整理 VAM 資料」（會先修復這些路徑），或再次執行「整理工作區資料夾」。
+
+地圖 AI 對話：只用 Claude 做過實機測試，Codex 未在對話中實機測試。已插入的圖與無法載入的圖看起來一樣，找圖的結果列即使之後找不到圖也會寫「已開始」。對話依回覆套用的變更無法復原。對話在英文與簡體中文畫面、彈出視窗、Windows 與 Linux 未檢查。
 
 分享檔：AIM 研究地圖與內建範例目前不能分享，網路圖片不會內嵌，保留原網址，讀者連線時才顯示；翻譯由 AI 產生，品質未經母語者檢查。iOS 無法開啟本機 HTML 檔，手機請透過網址（例如 GitHub Pages）檢視；桌面 Safari 開啟本機分享檔尚未測試。
 

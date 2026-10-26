@@ -13,7 +13,7 @@ const { translate } = load('i18n.ts');
 const ORIGINAL = 'data:image/png;base64,ORIGINAL';
 const image = { complete: true, naturalWidth: 10, naturalHeight: 10 };
 
-// A fake DOM for fitImageForClaude: an img whose natural size depends on its src, and a canvas that records its use.
+// A fake DOM for fitImageForInput: an img whose natural size depends on its src, and a canvas that records its use.
 function fakeDom(sizes) {
   const canvases = [];
   const createEl = tag => {

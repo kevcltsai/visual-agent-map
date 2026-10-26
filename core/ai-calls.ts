@@ -154,16 +154,16 @@ export class AiCalls {
         log()?.failed(id, message);
       }
     };
-    started?.begin({
-      id,
-      startedAt: new Date().toISOString(),
-      topic: options.topic,
-      mode,
-      model: options.model,
-      effort: options.effort,
-      step: stepLabel({ id: call.stepId, version: call.version })
-    });
     try {
+      started?.begin({
+        id,
+        startedAt: new Date().toISOString(),
+        topic: options.topic,
+        mode,
+        model: options.model,
+        effort: options.effort,
+        step: stepLabel({ id: call.stepId, version: call.version })
+      });
       const runtime = this.options.runtimeFor(options.model);
       options.validate?.(runtime);
       const task = options.task ?? {};

@@ -3,6 +3,9 @@
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
 const S = require('./support.cjs');
+const { load } = require('./support-replay.cjs');
+
+const { translate } = load('i18n.ts');
 
 const { default: Plugin } = S.load('main.ts', { obsidian: S.obsidian });
 
@@ -45,7 +48,7 @@ test('wiring: an outline call is registered under outline-generate: and resetCod
   fake.pending.resolve('# Root\n## A');
   const result = await settled;
   assert.ok(result.error, 'a reply that arrives after the stop is refused');
-  assert.match(result.error.message, /^Outline generation stopped/);
+  assert.equal(result.error.message, translate('en', 'error.outline_generate_stopped'));
   assert.equal(plugin.activeTasks.size, 0);
 });
 
@@ -64,6 +67,6 @@ test('wiring: a reframe call through core.reframing is registered under reframe:
   fake.pending.resolve(JSON.stringify({ question: 'What distinguishes these?', context: 'Open tensions remain.', rationale: 'Test it.' }));
   const result = await settled;
   assert.ok(result.error, 'a reply that arrives after the stop is refused');
-  assert.match(result.error.message, /^Reframing stopped/);
+  assert.equal(result.error.message, 'Reframing stopped');
   assert.equal(plugin.activeTasks.size, 0);
 });

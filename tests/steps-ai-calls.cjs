@@ -243,3 +243,22 @@ test('capabilities: Claude has no image generation, takes 1568px / 5 MiB images 
   assert.deepEqual(plain(mod.CODEX_CAPABILITIES), { id: 'codex', imageGeneration: true, webSearch: true, prewarm: false });
   assert.equal(mod.aiRuntimeForModel('claude:opus', { claude: () => ({ runTask: async () => '' }), codex: () => ({ runTask: async () => '' }) }).capabilities, mod.CLAUDE_CAPABILITIES);
 });
+
+test('a sink whose begin throws: the original error rejects, nothing stays registered or listening, and the runtime never runs', async () => {
+  const boom = mod.makeError('begin exploded');
+  const controller = new AbortController();
+  let added = 0, removed = 0;
+  const add = controller.signal.addEventListener.bind(controller.signal), remove = controller.signal.removeEventListener.bind(controller.signal);
+  controller.signal.addEventListener = (type, ...rest) => { if (type === 'abort') added++; return add(type, ...rest); };
+  controller.signal.removeEventListener = (type, ...rest) => { if (type === 'abort') removed++; return remove(type, ...rest); };
+  const runtimeCalls = [];
+  const runtime = { capabilities: mod.CODEX_CAPABILITIES, run: async request => { runtimeCalls.push(request); return 'reply'; } };
+  const sink = { begin: () => { throw boom; }, sent() {}, received() {}, milestones() {}, parsed() {}, completed() {}, failed() {} };
+  const active = new RecordingMap();
+  const calls = new mod.AiCalls({ runtimeFor: () => runtime, exchanges: () => sink, activeTasks: active });
+  await assert.rejects(calls.run(prepared(), options({ signal: controller.signal }), raw => raw), error => error === boom);
+  assert.equal(active.size, 0);
+  assert.equal(added - removed, 0, 'the caller signal keeps no abort listener');
+  assert.ok(added >= 1, 'the listener was added, so the removal is what is checked');
+  assert.equal(runtimeCalls.length, 0);
+});

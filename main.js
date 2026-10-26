@@ -51579,16 +51579,16 @@ var AiCalls = class {
         (_a3 = log()) == null ? void 0 : _a3.failed(id, message);
       }
     };
-    started == null ? void 0 : started.begin({
-      id,
-      startedAt: (/* @__PURE__ */ new Date()).toISOString(),
-      topic: options.topic,
-      mode,
-      model: options.model,
-      effort: options.effort,
-      step: stepLabel({ id: call.stepId, version: call.version })
-    });
     try {
+      started == null ? void 0 : started.begin({
+        id,
+        startedAt: (/* @__PURE__ */ new Date()).toISOString(),
+        topic: options.topic,
+        mode,
+        model: options.model,
+        effort: options.effort,
+        step: stepLabel({ id: call.stepId, version: call.version })
+      });
       const runtime = this.options.runtimeFor(options.model);
       (_b2 = options.validate) == null ? void 0 : _b2.call(options, runtime);
       const task = (_c = options.task) != null ? _c : {};

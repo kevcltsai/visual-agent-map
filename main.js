@@ -29866,6 +29866,7 @@ function evidenceCard(id, summary, detail) {
 }
 
 // experiences/aim/request-context.ts
+var AIM_PASSAGE_MIN_CHARS = 200;
 function deduplicateAimRequest(context) {
   const prepared = { ...context };
   const passages = /* @__PURE__ */ new Map();
@@ -29874,12 +29875,12 @@ function deduplicateAimRequest(context) {
     if (typeof value !== "string") continue;
     const chunks = value.split(/(\n\n)/);
     prepared[key2] = chunks.map((chunk) => {
-      if (chunk.length < 512) return chunk;
+      if (chunk.length < AIM_PASSAGE_MIN_CHARS) return chunk;
       const previous = passages.get(chunk);
       if (previous !== void 0) return PASSAGE_REFERENCE;
       passages.set(chunk, passages.size + 1);
       return chunk.split("\n").map((line) => {
-        if (line.length < 512 || line === chunk) return line;
+        if (line.length < AIM_PASSAGE_MIN_CHARS || line === chunk) return line;
         const earlier = passages.get(line);
         if (earlier !== void 0) return PASSAGE_REFERENCE;
         passages.set(line, passages.size + 1);

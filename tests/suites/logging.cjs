@@ -111,7 +111,7 @@ integrationTest('a Markdown selection reply that arrives after Stop is logged as
     plugin.settings.aiExchangeLoggingEnabled = true;
     plugin.exchanges = new AiExchangeLog(nodeFsAdapter, path.join(directory, 'exchanges.json'), error => assert.fail(String(error)));
     const stop = new AbortController();
-    plugin.runtime = () => ({ runTask: async (_prompt, _model, _effort, _schema, controls) => { controls.onRequest({ input: 'sent prompt' }); stop.abort(); return 'late reply'; } });
+    plugin.aiRuntime.codex = () => ({ runTask: async (_prompt, _model, _effort, _schema, controls) => { controls.onRequest({ input: 'sent prompt' }); stop.abort(); return 'late reply'; } });
     const prepared = prepareStep(planStep, { instruction: 'Condense', selected: 'Selected text', context: '', hasImage: false });
     await assert.rejects(plugin.runMarkdownContextAi(prepared, 'test-model', stop.signal));
     await plugin.exchanges.flush();

@@ -301,3 +301,96 @@ test('run with task.generateImage on a runtime without image generation: refused
   // The same options on a runtime that can draw go through.
   assert.equal(await h.calls.run(prepared(), options({ task: { generateImage: true } }), raw => raw), 'reply');
 });
+
+// ---- onBegin, failMessage, entryEnd ----
+/** A caller signal that counts its abort listeners. */
+function listenerCountingSignal() {
+  const controller = new AbortController();
+  const counts = { added: 0, removed: 0 };
+  const add = controller.signal.addEventListener.bind(controller.signal), remove = controller.signal.removeEventListener.bind(controller.signal);
+  controller.signal.addEventListener = (type, ...rest) => { if (type === 'abort') counts.added++; return add(type, ...rest); };
+  controller.signal.removeEventListener = (type, ...rest) => { if (type === 'abort') counts.removed++; return remove(type, ...rest); };
+  return { controller, counts };
+}
+
+test('onBegin: called once right after begin with the entry id; a preset exchangeId is what it receives; not called when logging was off', async () => {
+  const h = harness();
+  await h.calls.run(prepared(), options({ onBegin: id => h.events.push(['onBegin', id]) }), () => 1);
+  assert.deepEqual(h.names(), ['begin', 'onBegin', 'sent', 'received', 'milestones', 'completed']);
+  assert.equal(h.events[1][1], h.events[0][1].id);
+  const preset = harness();
+  await preset.calls.run(prepared(), options({ exchangeId: 'promised-id', onBegin: id => preset.events.push(['onBegin', id]) }), () => 1);
+  assert.deepEqual(preset.events[1], ['onBegin', 'promised-id']); assert.equal(preset.events[0][1].id, 'promised-id');
+  const off = harness({ logging: false });
+  let called = 0;
+  await off.calls.run(prepared(), options({ onBegin: () => { called++; } }), () => 1);
+  assert.equal(called, 0);
+  const late = harness({ logging: false, run: (_request, state) => { state.logging = true; return 'x'; } });
+  await late.calls.run(prepared(), options({ onBegin: () => { called++; } }), () => 1);
+  assert.equal(called, 0, 'logging switched on mid-call does not start a notification');
+});
+
+test('failMessage: a runtime reject and a finish throw write failMessage(error) with the original error object', async () => {
+  const boom = mod.makeError('runtime boom'), seen = [];
+  const failMessage = error => { seen.push(error); return 'custom message'; };
+  const h = harness({ run: () => { throw boom; } });
+  await assert.rejects(h.calls.run(prepared(), options({ failMessage }), () => 1), error => error === boom);
+  assert.deepEqual(h.events.filter(event => event[0] === 'failed').map(event => event[2]), ['custom message']);
+  assert.equal(seen[0], boom);
+  const finishBoom = mod.makeError('finish boom');
+  const g = harness();
+  await assert.rejects(g.calls.run(prepared(), options({ failMessage }), () => { throw finishBoom; }), error => error === finishBoom);
+  assert.deepEqual(g.events.filter(event => event[0] === 'failed').map(event => event[2]), ['custom message']);
+  assert.equal(seen[1], finishBoom);
+});
+
+test('failMessage is not called after exchange.fail: one failed with the finish callback\'s message', async () => {
+  let called = 0;
+  const h = harness();
+  await assert.rejects(h.calls.run(prepared(), options({ failMessage: () => { called++; return 'never'; } }), (_raw, exchange) => { exchange.fail('first'); throw mod.makeError('second'); }), /second/);
+  assert.deepEqual(h.events.filter(event => event[0] === 'failed').map(event => event[2]), ['first']);
+  assert.equal(called, 0);
+});
+
+test('without failMessage the failed entry keeps the error message', async () => {
+  const h = harness({ run: () => { throw mod.makeError('plain message'); } });
+  await assert.rejects(h.calls.run(prepared(), options(), () => 1), /plain message/);
+  assert.deepEqual(h.events.filter(event => event[0] === 'failed').map(event => event[2]), ['plain message']);
+});
+
+test('entryEnd "caller", success: begin, sent, received, milestones and no completed; parsed and fail written through exchange still work', async () => {
+  const { controller, counts } = listenerCountingSignal();
+  const h = harness();
+  await h.calls.run(prepared(), options({ entryEnd: 'caller', signal: controller.signal }), () => 1);
+  assert.deepEqual(h.names(), ['begin', 'sent', 'received', 'milestones']);
+  assert.equal(h.active.size, 0); assert.equal(counts.added - counts.removed, 0);
+  const g = harness();
+  await g.calls.run(prepared(), options({ entryEnd: 'caller' }), (_raw, exchange) => { exchange.parsed(); });
+  assert.deepEqual(g.names(), ['begin', 'sent', 'received', 'milestones', 'parsed']);
+  const f = harness();
+  await f.calls.run(prepared(), options({ entryEnd: 'caller' }), (_raw, exchange) => { exchange.fail('by the caller'); });
+  assert.deepEqual(f.events.filter(event => event[0] === 'failed').map(event => event[2]), ['by the caller']);
+  assert.equal(f.names().includes('completed'), false);
+});
+
+test('entryEnd "caller", runtime reject: milestones written, no failed, the original error rejects; failMessage is unused', async () => {
+  const { controller, counts } = listenerCountingSignal();
+  const boom = mod.makeError('runtime boom');
+  let called = 0;
+  const h = harness({ run: () => { throw boom; } });
+  await assert.rejects(h.calls.run(prepared(), options({ entryEnd: 'caller', signal: controller.signal, extraMilestones: () => ({ slow: true }), failMessage: () => { called++; return 'x'; } }), () => 1), error => error === boom);
+  assert.deepEqual(h.names(), ['begin', 'sent', 'milestones']);
+  assert.deepEqual(h.events[2][2], { slow: true });
+  assert.equal(called, 0); assert.equal(h.active.size, 0); assert.equal(counts.added - counts.removed, 0);
+});
+
+test('entryEnd "caller", reply after a stop: stopped() rejects, no received, no failed, nothing left registered or listening', async () => {
+  const { controller, counts } = listenerCountingSignal();
+  const stopped = mod.makeError('stopped here');
+  let finished = 0;
+  const h = harness({ run: () => { controller.abort(); return 'late'; } });
+  await assert.rejects(h.calls.run(prepared(), options({ entryEnd: 'caller', signal: controller.signal, stopped: () => stopped }), () => { finished++; }), error => error === stopped);
+  assert.equal(finished, 0);
+  assert.deepEqual(h.names(), ['begin', 'sent']);
+  assert.equal(h.active.size, 0); assert.equal(counts.added - counts.removed, 0);
+});

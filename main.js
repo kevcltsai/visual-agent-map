@@ -51478,7 +51478,7 @@ var AiCalls = class {
     return result.value;
   }
   async runCall(call, options, finish) {
-    var _a2, _b2, _c, _d, _e, _f, _g;
+    var _a2, _b2, _c, _d, _e, _f, _g, _h;
     if ((_a2 = options.task) == null ? void 0 : _a2.generateImage) this.capabilitiesFor(options.model, { imageGeneration: true });
     const {
       mode = "task",
@@ -51534,9 +51534,10 @@ var AiCalls = class {
         effort: options.effort,
         step: stepLabel({ id: call.stepId, version: call.version })
       });
+      if (started) (_c = options.onBegin) == null ? void 0 : _c.call(options, id);
       const runtime = this.options.runtimeFor(options.model);
-      (_c = options.validate) == null ? void 0 : _c.call(options, runtime);
-      const task = (_d = options.task) != null ? _d : {};
+      (_d = options.validate) == null ? void 0 : _d.call(options, runtime);
+      const task = (_e = options.task) != null ? _e : {};
       const controls = {
         ...task,
         signal: controller.signal,
@@ -51564,19 +51565,22 @@ var AiCalls = class {
         localCodex: options.localCodex
       });
       if (controller.signal.aborted) throw stopped();
-      (_e = options.afterReply) == null ? void 0 : _e.call(options);
+      (_f = options.afterReply) == null ? void 0 : _f.call(options);
       milestones.receivedAt = (/* @__PURE__ */ new Date()).toISOString();
-      (_f = log()) == null ? void 0 : _f.received(id, raw);
+      (_g = log()) == null ? void 0 : _g.received(id, raw);
       writeMilestones();
       const value = await finish(raw, exchange);
       if (!finished) {
         finished = true;
-        (_g = log()) == null ? void 0 : _g.completed(id);
+        if (options.entryEnd !== "caller") (_h = log()) == null ? void 0 : _h.completed(id);
       }
       return value;
     } catch (error) {
       writeMilestones();
-      exchange.fail(error instanceof Error ? error.message : String(error));
+      if (options.entryEnd !== "caller" && !finished)
+        exchange.fail(
+          options.failMessage ? options.failMessage(error) : error instanceof Error ? error.message : String(error)
+        );
       throw error;
     } finally {
       options.signal.removeEventListener("abort", abort);

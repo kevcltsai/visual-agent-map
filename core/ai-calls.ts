@@ -47,6 +47,12 @@ export interface AiCallOptions {
   extraMilestones?: () => AiMilestones;
   /** Controls forwarded to the runtime; `onMilestones` and `onRequest` are chained, not replaced. */
   task?: Omit<RuntimeTaskControls, "signal">;
+  /** Receives the entry id right after `begin`; not called when logging was off at the start. */
+  onBegin?: (id: string) => void;
+  /** The failed entry's message when the call throws; the error's own message when absent. Unused with `entryEnd: "caller"`. */
+  failMessage?: (error: unknown) => string;
+  /** "caller": AiCalls writes neither `completed` nor `failed`; the caller ends the entry by id after later work. */
+  entryEnd?: "calls" | "caller";
 }
 
 /** What the finishing callback may use to end the call's exchange log entry. */
@@ -175,6 +181,7 @@ export class AiCalls {
         effort: options.effort,
         step: stepLabel({ id: call.stepId, version: call.version })
       });
+      if (started) options.onBegin?.(id);
       const runtime = this.options.runtimeFor(options.model);
       options.validate?.(runtime);
       const task = options.task ?? {};
@@ -210,12 +217,15 @@ export class AiCalls {
       const value = await finish(raw, exchange);
       if (!finished) {
         finished = true;
-        log()?.completed(id);
+        if (options.entryEnd !== "caller") log()?.completed(id);
       }
       return value;
     } catch (error) {
       writeMilestones();
-      exchange.fail(error instanceof Error ? error.message : String(error));
+      if (options.entryEnd !== "caller" && !finished)
+        exchange.fail(
+          options.failMessage ? options.failMessage(error) : error instanceof Error ? error.message : String(error)
+        );
       throw error;
     } finally {
       options.signal.removeEventListener("abort", abort);

@@ -87,6 +87,7 @@ import { StepRunner, prepareStep, type PreparedStep } from "./core/step-runner";
 import type { ImageCandidate } from "./core/image-candidates";
 import { imageSearchStep } from "./core/steps/image-search/step";
 import { runtimeStepProvider } from "./core/runtime-step-provider";
+import { AiCalls } from "./core/ai-calls";
 import { AiRuntimeService } from "./core/ai-runtime-service";
 import { ModelDiscovery, type ModelDiscoveryState } from "./core/model-discovery";
 import { ShallowExpansionCoordinator, type ExpansionBatchState } from "./experiences/visual-map/expansion-batch";
@@ -215,7 +216,11 @@ export default class VisualAgentMapPlugin extends Plugin {
   ready: Promise<void> = Promise.resolve();
   readonly running = new Set<string>();
   readonly quickExpandPending = new Set<string>();
-  readonly activeTasks = new Map<string, AbortController>();
+  readonly aiCalls = new AiCalls({
+    runtimeFor: model => this.aiRuntime.runtimeFor(model),
+    exchanges: () => (this.settings.aiExchangeLoggingEnabled ? this.exchanges : null)
+  });
+  readonly activeTasks = this.aiCalls.activeTasks;
   /** Background chart steps (running and queued), keyed by note path: one per path, at most {@link CHART_JOB_LIMIT} run at a time. */
   readonly chartJobs = new Map<string, AbortController>();
   /** Set by onunload; a late dialog event must not start a pre-warmed process after it. */
@@ -237,6 +242,7 @@ export default class VisualAgentMapPlugin extends Plugin {
     codexPath: () => this.settings.codexPath,
     claudePath: () => this.settings.claudePath,
     clientVersion: () => this.manifest.version || "0.0.0",
+    pluginDirectory: () => this.pluginDirectory(),
     readLocalFile: path => FileSystemAdapter.readLocalFile(path),
     onLog: (level, message) => this.logs.appendLog(level, message)
   });
@@ -266,21 +272,13 @@ export default class VisualAgentMapPlugin extends Plugin {
     this.aiTasks,
     new ReframingService(providerReframeRunner(this.aiTaskOptions, this.activeTasks))
   );
-  readonly outlineGeneration = new OutlineGenerationService(
-    providerOutlineRunner(this.aiTaskOptions, this.activeTasks)
-  );
-  readonly structureReview = new StructureReviewService(
-    providerStructureReviewRunner(this.aiTaskOptions, this.activeTasks)
-  );
-  readonly mapChat = new MapChatService(providerMapChatRunner(this.aiTaskOptions, this.activeTasks));
-  readonly relevanceGrade = new RelevanceGradeService(
-    providerRelevanceGradeRunner(this.aiTaskOptions, this.activeTasks)
-  );
+  readonly outlineGeneration = new OutlineGenerationService(providerOutlineRunner(this.aiCalls));
+  readonly structureReview = new StructureReviewService(providerStructureReviewRunner(this.aiCalls));
+  readonly mapChat = new MapChatService(providerMapChatRunner(this.aiCalls));
+  readonly relevanceGrade = new RelevanceGradeService(providerRelevanceGradeRunner(this.aiCalls));
   /** Translated share text kept for this Obsidian session only (never written to disk); emptied on unload. */
   readonly shareTranslationCache = new ShareTranslationCache();
-  readonly shareTranslate = new ShareTranslateService(
-    providerShareTranslateRunner(this.aiTaskOptions, this.activeTasks)
-  );
+  readonly shareTranslate = new ShareTranslateService(providerShareTranslateRunner(this.aiCalls));
   /** The relevance grading run of each map, by map path. A view shows it; only one run per map. */
   readonly relevanceGrades = new Map<string, RelevanceGradeRun>();
   exchanges: AiExchangeLog | null = null;

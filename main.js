@@ -15984,7 +15984,7 @@ function withThinkingOrigin(context, note) {
 }
 
 // experiences/visual-map/view.ts
-var import_node_crypto13 = require("node:crypto");
+var import_node_crypto11 = require("node:crypto");
 var import_obsidian30 = require("obsidian");
 
 // ai/markdown-blocks.ts
@@ -28001,174 +28001,36 @@ var StructureReviewModal = class extends import_obsidian23.Modal {
 };
 
 // core/provider-step-runner.ts
-var import_node_crypto7 = require("node:crypto");
-
-// core/runtime-step-provider.ts
-var import_node_crypto6 = require("node:crypto");
-function runtimeStepProvider(options) {
-  return {
-    async complete(call) {
-      const {
-        model,
-        effort,
-        topic,
-        mode = "task",
-        task = {},
-        onExchange,
-        finish = "completed",
-        requestLog = "request-and-prompt",
-        afterReply,
-        exchangeId,
-        extraMilestones
-      } = call.controls;
-      const started = options.exchanges();
-      const exchanges = {
-        sent: (...args) => {
-          var _a2;
-          return started ? (_a2 = options.exchanges()) == null ? void 0 : _a2.sent(...args) : void 0;
-        },
-        received: (...args) => {
-          var _a2;
-          return started ? (_a2 = options.exchanges()) == null ? void 0 : _a2.received(...args) : void 0;
-        },
-        completed: (...args) => {
-          var _a2;
-          return started ? (_a2 = options.exchanges()) == null ? void 0 : _a2.completed(...args) : void 0;
-        },
-        failed: (...args) => {
-          var _a2;
-          return started ? (_a2 = options.exchanges()) == null ? void 0 : _a2.failed(...args) : void 0;
-        },
-        milestones: (...args) => {
-          var _a2;
-          return started ? (_a2 = options.exchanges()) == null ? void 0 : _a2.milestones(...args) : void 0;
-        }
-      };
-      const milestones = {};
-      let milestonesWritten = false;
-      const writeMilestones = () => {
-        if (milestonesWritten) return;
-        milestonesWritten = true;
-        try {
-          Object.assign(milestones, { ...extraMilestones == null ? void 0 : extraMilestones(), ...milestones });
-        } catch (e) {
-        }
-        if (Object.keys(milestones).length) exchanges.milestones(id, milestones);
-      };
-      const id = exchangeId != null ? exchangeId : (0, import_node_crypto6.randomUUID)();
-      started == null ? void 0 : started.begin({
-        id,
-        startedAt: (/* @__PURE__ */ new Date()).toISOString(),
-        topic,
-        mode,
-        model,
-        effort,
-        step: stepLabel({ id: call.stepId, version: call.version })
-      });
-      if (started) onExchange == null ? void 0 : onExchange(id);
-      try {
-        const controls = {
-          ...task,
-          onMilestones: (data) => {
-            var _a2;
-            (_a2 = task.onMilestones) == null ? void 0 : _a2.call(task, data);
-            Object.assign(milestones, data);
-          },
-          onRequest: (data) => {
-            var _a2;
-            (_a2 = task.onRequest) == null ? void 0 : _a2.call(task, data);
-            exchanges.sent(
-              id,
-              JSON.stringify(requestLog === "request" ? data : { request: data, prompt: call.prompt }, null, 2),
-              call.prompt
-            );
-          }
-        };
-        const raw = providerForModel(model) === "claude" ? await options.claude().runTask(call.prompt, providerModelId(model), effort, call.schema, controls) : await options.codex(options.localCodex === true).runTask(call.prompt, model, effort, call.schema, controls);
-        afterReply == null ? void 0 : afterReply();
-        milestones.receivedAt = (/* @__PURE__ */ new Date()).toISOString();
-        exchanges.received(id, raw);
-        writeMilestones();
-        if (finish === "completed") exchanges.completed(id);
-        return raw;
-      } catch (error) {
-        writeMilestones();
-        if (finish === "completed") exchanges.failed(id, error instanceof Error ? error.message : String(error));
-        throw error;
-      }
-    }
-  };
-}
-
-// core/provider-step-runner.ts
 var stepEffort = (reasoning) => reasoning === "auto" ? "low" : reasoning;
-function providerStepRunner(options, activeTasks, config) {
-  return async (request, signal, prepared, onStructuredJson) => {
-    var _a2, _b2, _c;
-    const key2 = `${config.name}:${(0, import_node_crypto7.randomUUID)()}`, controller = new AbortController();
-    const abort = () => controller.abort();
-    signal.addEventListener("abort", abort, { once: true });
-    if (signal.aborted) controller.abort();
-    activeTasks.set(key2, controller);
-    const effort = stepEffort(request.reasoning);
-    const refuseIfStopped = () => {
-      if (controller.signal.aborted) throw config.stopped();
-    };
-    const log = () => options.exchangeLoggingEnabled() ? options.exchanges() : null;
-    const provider = runtimeStepProvider({
-      claude: () => ({
-        runTask: async (prompt, model, level, schema, controls2) => {
-          if (!CLAUDE_MODEL_CHOICES.some((choice2) => choice2.id === request.model))
-            throw new Error("Unsupported Claude model");
-          const raw = await options.claudeRuntime(options.pluginDirectory()).runTask(prompt, model, level, schema, controls2);
-          refuseIfStopped();
-          return raw;
-        }
-      }),
-      codex: (local) => ({
-        runTask: async (prompt, model, level, schema, controls2) => {
-          const raw = await options.codexRuntime(options.pluginDirectory(), local).runTask(prompt, model, level, schema, controls2);
-          refuseIfStopped();
-          return raw;
-        }
-      }),
-      exchanges: log,
-      localCodex: true
-    });
-    let id;
-    const controls = {
+function providerStepRunner(aiCalls, config) {
+  return (request, signal, prepared, onStructuredJson) => aiCalls.run(
+    prepared,
+    {
       model: request.model,
-      effort,
+      effort: stepEffort(request.reasoning),
       topic: config.topic(request),
-      finish: "caller",
-      onExchange: (exchangeId) => {
-        id = exchangeId;
+      taskName: config.name,
+      signal,
+      localCodex: true,
+      stopped: config.stopped,
+      validate: (runtime) => {
+        if (runtime.capabilities.id === "claude" && !CLAUDE_MODEL_CHOICES.some((choice2) => choice2.id === request.model))
+          throw new Error("Unsupported Claude model");
       },
       task: {
         textOnly: true,
         searchBudget: 0,
-        signal: controller.signal,
         ...config.stream ? { stream: true } : {},
         ...config.stream && onStructuredJson ? { onStructuredJson } : {}
       }
-    };
-    try {
-      const { raw } = await new StepRunner(provider).send(prepared, controls);
-      refuseIfStopped();
+    },
+    (raw, exchange) => {
+      if (exchange.signal.aborted) throw config.stopped();
       prepared.parse(raw);
-      if (id) {
-        (_a2 = log()) == null ? void 0 : _a2.parsed(id);
-        (_b2 = log()) == null ? void 0 : _b2.completed(id);
-      }
+      exchange.parsed();
       return raw;
-    } catch (error) {
-      if (id) (_c = log()) == null ? void 0 : _c.failed(id, error instanceof Error ? error.message : String(error));
-      throw error;
-    } finally {
-      signal.removeEventListener("abort", abort);
-      activeTasks.delete(key2);
     }
-  };
+  );
 }
 
 // core/steps/structure-review/language.en.md
@@ -28414,8 +28276,8 @@ var structureReviewStep = {
 };
 
 // core/structure-review-service.ts
-function providerStructureReviewRunner(options, activeTasks) {
-  return providerStepRunner(options, activeTasks, {
+function providerStructureReviewRunner(aiCalls) {
+  return providerStepRunner(aiCalls, {
     name: "structure-review",
     topic: (request) => `Structure review \xB7 ${request.rootQuestion.trim().slice(0, 80)}`,
     stopped: () => new StructureReviewError("stopped", "Structure review stopped")
@@ -29118,8 +28980,8 @@ var relevanceRecalibrateRepairStep = {
 // core/relevance-grade-service.ts
 var TIER_FIELD = /"tier"\s*:\s*"(?:core|support|side)"/g;
 var PROGRESS_INTERVAL_MS = 200;
-function providerRelevanceGradeRunner(options, activeTasks) {
-  return providerStepRunner(options, activeTasks, {
+function providerRelevanceGradeRunner(aiCalls) {
+  return providerStepRunner(aiCalls, {
     name: "relevance-grade",
     topic: (request) => `Relevance ${"previous" in request ? "recalibrate" : "grade"} \xB7 ${request.goal.trim().slice(0, 80)}`,
     stopped: () => new RelevanceGradeError("stopped", "Relevance grading stopped"),
@@ -29352,7 +29214,7 @@ var TopicTreeModal = class extends import_obsidian24.Modal {
 
 // ui/modals/aim-start-modal.ts
 var import_obsidian25 = require("obsidian");
-var import_node_crypto8 = require("node:crypto");
+var import_node_crypto6 = require("node:crypto");
 var AimStartModal = class extends import_obsidian25.Modal {
   constructor(app, submit, models = [], defaultModel = "gpt-6-luna", defaultReasoning = "low", refreshModels) {
     super(app);
@@ -29361,7 +29223,7 @@ var AimStartModal = class extends import_obsidian25.Modal {
     this.defaultModel = defaultModel;
     this.defaultReasoning = defaultReasoning;
     this.refreshModels = refreshModels;
-    __publicField(this, "requestId", (0, import_node_crypto8.randomUUID)());
+    __publicField(this, "requestId", (0, import_node_crypto6.randomUUID)());
   }
   onOpen() {
     this.titleEl.setText(t("ui.aim_start_title"));
@@ -29516,7 +29378,7 @@ var AimStartModal = class extends import_obsidian25.Modal {
     answerCount.setAttr("aria-label", t("ui.aim_minimum_answers"));
     answerCountLabel.createEl("p", { cls: "vam-hint", text: t("ui.aim_answer_target_hint") });
     const newRequest = () => {
-      this.requestId = (0, import_node_crypto8.randomUUID)();
+      this.requestId = (0, import_node_crypto6.randomUUID)();
     };
     topic.addEventListener("input", newRequest);
     context.addEventListener("input", newRequest);
@@ -29635,9 +29497,9 @@ var AimStartModal = class extends import_obsidian25.Modal {
 
 // ui/modals/aim-answer-modal.ts
 var import_obsidian26 = require("obsidian");
-var import_node_crypto9 = require("node:crypto");
+var import_node_crypto7 = require("node:crypto");
 var AimAnswerModal = class extends import_obsidian26.Modal {
-  constructor(app, question, options, submit, requestId = (0, import_node_crypto9.randomUUID)()) {
+  constructor(app, question, options, submit, requestId = (0, import_node_crypto7.randomUUID)()) {
     super(app);
     this.question = question;
     this.options = options;
@@ -29660,7 +29522,7 @@ var AimAnswerModal = class extends import_obsidian26.Modal {
       label.createSpan({ text: option2.label });
       boxes.set(option2.id, input);
       input.addEventListener("change", () => {
-        this.requestId = (0, import_node_crypto9.randomUUID)();
+        this.requestId = (0, import_node_crypto7.randomUUID)();
         if (input.checked && option2.id === "__aim_unknown__") {
           for (const [id, peer] of boxes) if (id !== option2.id) peer.checked = false;
         } else if (input.checked) {
@@ -29674,7 +29536,7 @@ var AimAnswerModal = class extends import_obsidian26.Modal {
     const freeText = freeTextLabel.createEl("textarea", { attr: { rows: "3" } });
     freeText.setAttr("aria-label", t("ui.aim_free_text"));
     freeText.addEventListener("input", () => {
-      this.requestId = (0, import_node_crypto9.randomUUID)();
+      this.requestId = (0, import_node_crypto7.randomUUID)();
     });
     const status = this.contentEl.createEl("p", { cls: "vam-hint", attr: { "aria-live": "polite" } });
     let pending = false, submitButton;
@@ -29900,7 +29762,7 @@ function deduplicateAimRequest(context) {
 }
 
 // experiences/aim/final-delivery.ts
-var import_node_crypto10 = require("node:crypto");
+var import_node_crypto8 = require("node:crypto");
 
 // experiences/aim/steps/delivery-outline/task.md
 var task_default = "You are the final-delivery Synthesizer. Design the actual document needed to answer the original user goal with all supplied conditions and outcome preferences. Previous research informs the outline; do not merely concatenate reports or reuse their headings. Return the outline in aim.sections: each section has heading, purpose (what the reader can do or understand after it), searchTask (specific web search needed, or empty if already supported), evidenceIds and dependencies (supplied source IDs). Choose a suitable structure, not a fixed template. Open with a section that gives the direct answer or recommendation. Give every section a distinct purpose so no two sections cover the same advice or caveats; gather the items the user must still confirm in at most one section; use no more sections than the answer needs (usually 3 to 5). Include concrete examples, resources, execution details or comparisons when required by this user. Map each section to the minimal supplied evidenceIds it needs. Dependencies also name supplied source IDs. Leave searchTask empty when mapped supplied reports already support the section; do not request a full search merely to repeat them. Identify exact source gaps for the deliverable. Earlier rounds are part of this answer: the user's earlier answers and their saved results (earlier documents and research) carry into this document, integrated with the current research. Update what the current research changes, and drop an earlier finding only when a later answer replaces it. Do not ask the user or deliver the document yet.\nSupplied evidence IDs and reports:\n{{sourceCatalog}}\n";
@@ -29952,7 +29814,7 @@ ${renderTemplate(open_items_default, { openItems })}` : task;
 
 // experiences/aim/final-delivery.ts
 var DOCUMENT_KEY = "document";
-var fingerprint = (value) => (0, import_node_crypto10.createHash)("sha256").update(JSON.stringify(value)).digest("hex");
+var fingerprint = (value) => (0, import_node_crypto8.createHash)("sha256").update(JSON.stringify(value)).digest("hex");
 function parseDeliveryOutline(detail) {
   const marker5 = detail.match(/<!--\s*aim-delivery-outline\s+([\s\S]*?)\s*-->/);
   if (!marker5) throw new Error("Final delivery outline is missing; no conclusion was saved.");
@@ -30242,7 +30104,7 @@ ${draft.detail}`
 }
 
 // experiences/aim/manual-flow.ts
-var import_node_crypto11 = require("node:crypto");
+var import_node_crypto9 = require("node:crypto");
 
 // experiences/aim/search-diagnostic.ts
 function createSearchDiagnostic(researchTurn) {
@@ -31556,7 +31418,7 @@ var OTHER_ROUTE_REUSE_LIMIT = 6;
 var SEARCH_NOT_PERFORMED = /did not perform web search|沒有實際執行網路搜尋/;
 var CHECKLIST_QUESTION_LIMIT = 5;
 var _AimManualFlow = class _AimManualFlow {
-  constructor(repository, runs, askModel, id = import_node_crypto11.randomUUID, persist = (operation) => operation(), limits = ACTIVE_AIM_FLOW_LIMITS) {
+  constructor(repository, runs, askModel, id = import_node_crypto9.randomUUID, persist = (operation) => operation(), limits = ACTIVE_AIM_FLOW_LIMITS) {
     this.repository = repository;
     this.runs = runs;
     this.askModel = askModel;
@@ -31796,7 +31658,7 @@ ${(_d = context.task) != null ? _d : ""}`
       readable.map(async (id) => {
         const ref = this.evidenceReports.get(id);
         const note = await this.repository.readNote(ref.path);
-        if ((0, import_node_crypto11.createHash)("sha256").update(note.detail).digest("hex") !== ref.hash)
+        if ((0, import_node_crypto9.createHash)("sha256").update(note.detail).digest("hex") !== ref.hash)
           throw new Error("AIM evidence changed after indexing; retry with the updated report.");
         return `Evidence ID: ${id}
 Full report:
@@ -33848,7 +33710,7 @@ ${note.detail}`
         });
         this.evidenceReports.set(`${result.nodeId}-v${result.version}`, {
           path: result.notePath,
-          hash: (0, import_node_crypto11.createHash)("sha256").update(note.detail).digest("hex")
+          hash: (0, import_node_crypto9.createHash)("sha256").update(note.detail).digest("hex")
         });
         if (this.evidenceReports.size > 512) {
           const oldest = [...this.evidenceReports.keys()][0];
@@ -34368,7 +34230,7 @@ ${dependencyReports}` : "")
     try {
       await this.persist(() => this.runs.recordResearchTurn(mapPath, synthesisHandle));
       const supplementalReports = [];
-      const sourceFingerprint = (0, import_node_crypto11.createHash)("sha256").update(
+      const sourceFingerprint = (0, import_node_crypto9.createHash)("sha256").update(
         JSON.stringify({
           detail: contextBase.detail,
           ancestors: contextBase.ancestors,
@@ -34408,7 +34270,7 @@ ${report.detail}`
         return [
           ...(_a3 = resumeDelivery == null ? void 0 : resumeDelivery.evidence) != null ? _a3 : initialDeliveryEvidence,
           ...supplementalReports.map((item) => ({
-            id: `followup-${(0, import_node_crypto11.createHash)("sha256").update(JSON.stringify(item.target)).digest("hex")}`,
+            id: `followup-${(0, import_node_crypto9.createHash)("sha256").update(JSON.stringify(item.target)).digest("hex")}`,
             hash: researchContentHash(item),
             detail: `## ${item.target.title}
 
@@ -34910,7 +34772,7 @@ ${beforeSearch.detail}`,
         const evidenceId = `${result.nodeId}-v${result.version}`;
         this.evidenceReports.set(evidenceId, {
           path: result.notePath,
-          hash: (0, import_node_crypto11.createHash)("sha256").update(note.detail).digest("hex")
+          hash: (0, import_node_crypto9.createHash)("sha256").update(note.detail).digest("hex")
         });
         if (this.evidenceReports.size > 512) {
           const oldest = [...this.evidenceReports.keys()][0];
@@ -34923,7 +34785,7 @@ ${evidenceCard(evidenceId, note.summary, note.detail)}`
         evidence.push(note);
         sources2.push({
           id: evidenceId,
-          hash: (0, import_node_crypto11.createHash)("sha256").update(note.detail).digest("hex"),
+          hash: (0, import_node_crypto9.createHash)("sha256").update(note.detail).digest("hex"),
           detail: `## ${note.title}
 
 ${note.summary}
@@ -34958,12 +34820,12 @@ __publicField(_AimManualFlow, "continuationRuns", /* @__PURE__ */ new Map());
 var AimManualFlow = _AimManualFlow;
 
 // experiences/aim/research-run-store.ts
-var import_node_crypto12 = require("node:crypto");
+var import_node_crypto10 = require("node:crypto");
 function isRunningAttempt(run, attempt, handle) {
   return run.currentAttemptId === handle.attemptId && attempt.status === "running" && attempt.inputSnapshotHash === handle.inputSnapshotHash;
 }
 var _AimRunStore = class _AimRunStore {
-  constructor(repository, id = import_node_crypto12.randomUUID, now = () => (/* @__PURE__ */ new Date()).toISOString()) {
+  constructor(repository, id = import_node_crypto10.randomUUID, now = () => (/* @__PURE__ */ new Date()).toISOString()) {
     this.repository = repository;
     this.id = id;
     this.now = now;
@@ -35750,7 +35612,7 @@ var _AimRunStore = class _AimRunStore {
     return state;
   }
   snapshotHash(value) {
-    return (0, import_node_crypto12.createHash)("sha256").update(JSON.stringify(value)).digest("hex");
+    return (0, import_node_crypto10.createHash)("sha256").update(JSON.stringify(value)).digest("hex");
   }
   liveKey(mapPath, runId, attemptId) {
     return `${mapPath}
@@ -35985,7 +35847,7 @@ function templateInLanguage(template, language2) {
 function formatIssuesPatch(issues, language2) {
   return { detailFormatIssues: (issues != null ? issues : []).map((issue) => countIssueText(issue, noteLanguageOf(language2))) };
 }
-var originBaseline = (origin) => (0, import_node_crypto13.createHash)("sha256").update(origin != null ? origin : "").digest("hex");
+var originBaseline = (origin) => (0, import_node_crypto11.createHash)("sha256").update(origin != null ? origin : "").digest("hex");
 function aimQuestionStatus(map, questionNodeId, activeQuestionNodeId) {
   var _a2, _b2;
   if (activeQuestionNodeId === questionNodeId) return "running";
@@ -38648,7 +38510,7 @@ ${request.requirements}` : preset.text,
       }
       this.aimActivityKind = "planning";
       this.render();
-      const result = await this.planAimQuestion(node.id, (0, import_node_crypto13.randomUUID)(), parentBranchId, controller.signal);
+      const result = await this.planAimQuestion(node.id, (0, import_node_crypto11.randomUUID)(), parentBranchId, controller.signal);
       this.noticeDocumentReadyElsewhere(
         result.status === "question" ? void 0 : (_e = result.outcome) == null ? void 0 : _e.status,
         epoch,
@@ -38869,7 +38731,7 @@ ${request.requirements}` : preset.text,
           }
         }
       },
-      (_d = this.aimAnswerRequestIds.get(node.id)) != null ? _d : (0, import_node_crypto13.randomUUID)()
+      (_d = this.aimAnswerRequestIds.get(node.id)) != null ? _d : (0, import_node_crypto11.randomUUID)()
     ).open();
   }
   async openBuiltInSample(forceTour = false) {
@@ -51037,8 +50899,8 @@ var ShareTranslateError = class extends Error {
     this.name = "ShareTranslateError";
   }
 };
-function providerShareTranslateRunner(options, activeTasks) {
-  return providerStepRunner(options, activeTasks, {
+function providerShareTranslateRunner(aiCalls) {
+  return providerStepRunner(aiCalls, {
     name: "share-translate",
     topic: (request) => `Share translation \xB7 ${request.targetLanguage}`,
     stopped: () => new ShareTranslateError("stopped", "Share translation stopped")
@@ -51397,6 +51259,239 @@ function parseImageCandidates(raw) {
   }
   return found;
 }
+
+// core/runtime-step-provider.ts
+var import_node_crypto12 = require("node:crypto");
+function runtimeStepProvider(options) {
+  return {
+    async complete(call) {
+      const {
+        model,
+        effort,
+        topic,
+        mode = "task",
+        task = {},
+        onExchange,
+        finish = "completed",
+        requestLog = "request-and-prompt",
+        afterReply,
+        exchangeId,
+        extraMilestones
+      } = call.controls;
+      const started = options.exchanges();
+      const exchanges = {
+        sent: (...args) => {
+          var _a2;
+          return started ? (_a2 = options.exchanges()) == null ? void 0 : _a2.sent(...args) : void 0;
+        },
+        received: (...args) => {
+          var _a2;
+          return started ? (_a2 = options.exchanges()) == null ? void 0 : _a2.received(...args) : void 0;
+        },
+        completed: (...args) => {
+          var _a2;
+          return started ? (_a2 = options.exchanges()) == null ? void 0 : _a2.completed(...args) : void 0;
+        },
+        failed: (...args) => {
+          var _a2;
+          return started ? (_a2 = options.exchanges()) == null ? void 0 : _a2.failed(...args) : void 0;
+        },
+        milestones: (...args) => {
+          var _a2;
+          return started ? (_a2 = options.exchanges()) == null ? void 0 : _a2.milestones(...args) : void 0;
+        }
+      };
+      const milestones = {};
+      let milestonesWritten = false;
+      const writeMilestones = () => {
+        if (milestonesWritten) return;
+        milestonesWritten = true;
+        try {
+          Object.assign(milestones, { ...extraMilestones == null ? void 0 : extraMilestones(), ...milestones });
+        } catch (e) {
+        }
+        if (Object.keys(milestones).length) exchanges.milestones(id, milestones);
+      };
+      const id = exchangeId != null ? exchangeId : (0, import_node_crypto12.randomUUID)();
+      started == null ? void 0 : started.begin({
+        id,
+        startedAt: (/* @__PURE__ */ new Date()).toISOString(),
+        topic,
+        mode,
+        model,
+        effort,
+        step: stepLabel({ id: call.stepId, version: call.version })
+      });
+      if (started) onExchange == null ? void 0 : onExchange(id);
+      try {
+        const controls = {
+          ...task,
+          onMilestones: (data) => {
+            var _a2;
+            (_a2 = task.onMilestones) == null ? void 0 : _a2.call(task, data);
+            Object.assign(milestones, data);
+          },
+          onRequest: (data) => {
+            var _a2;
+            (_a2 = task.onRequest) == null ? void 0 : _a2.call(task, data);
+            exchanges.sent(
+              id,
+              JSON.stringify(requestLog === "request" ? data : { request: data, prompt: call.prompt }, null, 2),
+              call.prompt
+            );
+          }
+        };
+        const raw = providerForModel(model) === "claude" ? await options.claude().runTask(call.prompt, providerModelId(model), effort, call.schema, controls) : await options.codex(options.localCodex === true).runTask(call.prompt, model, effort, call.schema, controls);
+        afterReply == null ? void 0 : afterReply();
+        milestones.receivedAt = (/* @__PURE__ */ new Date()).toISOString();
+        exchanges.received(id, raw);
+        writeMilestones();
+        if (finish === "completed") exchanges.completed(id);
+        return raw;
+      } catch (error) {
+        writeMilestones();
+        if (finish === "completed") exchanges.failed(id, error instanceof Error ? error.message : String(error));
+        throw error;
+      }
+    }
+  };
+}
+
+// core/ai-calls.ts
+var import_node_crypto13 = require("node:crypto");
+var AiCalls = class {
+  constructor(options) {
+    this.options = options;
+    __publicField(this, "activeTasks");
+    var _a2;
+    this.activeTasks = (_a2 = options.activeTasks) != null ? _a2 : /* @__PURE__ */ new Map();
+  }
+  /** Aborts every running call, including keys other code registered. Entries stay until their owner removes them. */
+  stopAll() {
+    for (const controller of this.activeTasks.values()) controller.abort();
+  }
+  /**
+   * Sends a prepared step. A value that is not a `PreparedStep` throws before anything is registered or logged.
+   * `finish` gets the raw reply and ends the entry (parse, `exchange.parsed()`); returning writes `completed`.
+   */
+  async run(prepared, options, finish) {
+    let result;
+    const provider = {
+      complete: async (call) => {
+        result = { value: await this.runCall(call, options, finish) };
+        return "";
+      }
+    };
+    await new StepRunner(provider).send(prepared, null);
+    if (!result) throw new Error("AiCalls.run finished without a result");
+    return result.value;
+  }
+  async runCall(call, options, finish) {
+    var _a2, _b2, _c, _d, _e, _f;
+    const {
+      mode = "task",
+      requestLog = "request-and-prompt",
+      stopped = () => new Error(t("ui.ai_task_cancelled"))
+    } = options;
+    const key2 = `${options.taskName}:${(0, import_node_crypto13.randomUUID)()}`;
+    const controller = new AbortController();
+    const abort = () => controller.abort();
+    options.signal.addEventListener("abort", abort, { once: true });
+    if (options.signal.aborted) controller.abort();
+    this.activeTasks.set(key2, controller);
+    const started = this.options.exchanges();
+    const log = () => started ? this.options.exchanges() : void 0;
+    const id = (_a2 = options.exchangeId) != null ? _a2 : (0, import_node_crypto13.randomUUID)();
+    const milestones = {};
+    let milestonesWritten = false;
+    const writeMilestones = () => {
+      var _a3, _b3;
+      if (milestonesWritten) return;
+      milestonesWritten = true;
+      try {
+        Object.assign(milestones, { ...(_a3 = options.extraMilestones) == null ? void 0 : _a3.call(options), ...milestones });
+      } catch (e) {
+      }
+      if (Object.keys(milestones).length) (_b3 = log()) == null ? void 0 : _b3.milestones(id, milestones);
+    };
+    let finished = false;
+    let parsedWritten = false;
+    const exchange = {
+      id: started ? id : void 0,
+      signal: controller.signal,
+      parsed: () => {
+        var _a3;
+        if (finished || parsedWritten) return;
+        parsedWritten = true;
+        (_a3 = log()) == null ? void 0 : _a3.parsed(id);
+      },
+      fail: (message) => {
+        var _a3;
+        if (finished) return;
+        finished = true;
+        (_a3 = log()) == null ? void 0 : _a3.failed(id, message);
+      }
+    };
+    started == null ? void 0 : started.begin({
+      id,
+      startedAt: (/* @__PURE__ */ new Date()).toISOString(),
+      topic: options.topic,
+      mode,
+      model: options.model,
+      effort: options.effort,
+      step: stepLabel({ id: call.stepId, version: call.version })
+    });
+    try {
+      const runtime = this.options.runtimeFor(options.model);
+      (_b2 = options.validate) == null ? void 0 : _b2.call(options, runtime);
+      const task = (_c = options.task) != null ? _c : {};
+      const controls = {
+        ...task,
+        signal: controller.signal,
+        onMilestones: (data) => {
+          var _a3;
+          (_a3 = task.onMilestones) == null ? void 0 : _a3.call(task, data);
+          Object.assign(milestones, data);
+        },
+        onRequest: (data) => {
+          var _a3, _b3;
+          (_a3 = task.onRequest) == null ? void 0 : _a3.call(task, data);
+          (_b3 = log()) == null ? void 0 : _b3.sent(
+            id,
+            JSON.stringify(requestLog === "request" ? data : { request: data, prompt: call.prompt }, null, 2),
+            call.prompt
+          );
+        }
+      };
+      const raw = await runtime.run({
+        prompt: call.prompt,
+        model: options.model,
+        effort: options.effort,
+        ...call.schema === void 0 ? {} : { schema: call.schema },
+        controls,
+        localCodex: options.localCodex
+      });
+      if (controller.signal.aborted) throw stopped();
+      (_d = options.afterReply) == null ? void 0 : _d.call(options);
+      milestones.receivedAt = (/* @__PURE__ */ new Date()).toISOString();
+      (_e = log()) == null ? void 0 : _e.received(id, raw);
+      writeMilestones();
+      const value = await finish(raw, exchange);
+      if (!finished) {
+        finished = true;
+        (_f = log()) == null ? void 0 : _f.completed(id);
+      }
+      return value;
+    } catch (error) {
+      writeMilestones();
+      exchange.fail(error instanceof Error ? error.message : String(error));
+      throw error;
+    } finally {
+      options.signal.removeEventListener("abort", abort);
+      if (this.activeTasks.get(key2) === controller) this.activeTasks.delete(key2);
+    }
+  }
+};
 
 // core/ai-runtime-service.ts
 var import_node_child_process3 = require("node:child_process");
@@ -54744,8 +54839,8 @@ ${renderTemplate(
 };
 
 // core/outline-generation-service.ts
-function providerOutlineRunner(options, activeTasks) {
-  return providerStepRunner(options, activeTasks, {
+function providerOutlineRunner(aiCalls) {
+  return providerStepRunner(aiCalls, {
     name: "outline-generate",
     topic: (request) => `Outline \xB7 ${request.topic.trim().slice(0, 80)}`,
     stopped: () => new OutlineGenerateError("stopped", "Outline generation stopped")
@@ -54869,8 +54964,8 @@ function partialReply(buffer) {
   }
   return none;
 }
-function providerMapChatRunner(options, activeTasks) {
-  return providerStepRunner(options, activeTasks, {
+function providerMapChatRunner(aiCalls) {
+  return providerStepRunner(aiCalls, {
     name: "map-chat",
     topic: (request) => `Map chat \xB7 ${request.message.trim().slice(0, 80)}`,
     stopped: () => new MapChatError("stopped", "Map chat stopped"),
@@ -56147,7 +56242,11 @@ var VisualAgentMapPlugin = class extends import_obsidian38.Plugin {
     __publicField(this, "ready", Promise.resolve());
     __publicField(this, "running", /* @__PURE__ */ new Set());
     __publicField(this, "quickExpandPending", /* @__PURE__ */ new Set());
-    __publicField(this, "activeTasks", /* @__PURE__ */ new Map());
+    __publicField(this, "aiCalls", new AiCalls({
+      runtimeFor: (model) => this.aiRuntime.runtimeFor(model),
+      exchanges: () => this.settings.aiExchangeLoggingEnabled ? this.exchanges : null
+    }));
+    __publicField(this, "activeTasks", this.aiCalls.activeTasks);
     /** Background chart steps (running and queued), keyed by note path: one per path, at most {@link CHART_JOB_LIMIT} run at a time. */
     __publicField(this, "chartJobs", /* @__PURE__ */ new Map());
     /** Set by onunload; a late dialog event must not start a pre-warmed process after it. */
@@ -56169,6 +56268,7 @@ var VisualAgentMapPlugin = class extends import_obsidian38.Plugin {
       codexPath: () => this.settings.codexPath,
       claudePath: () => this.settings.claudePath,
       clientVersion: () => this.manifest.version || "0.0.0",
+      pluginDirectory: () => this.pluginDirectory(),
       readLocalFile: (path) => import_obsidian38.FileSystemAdapter.readLocalFile(path),
       onLog: (level, message) => this.logs.appendLog(level, message)
     }));
@@ -56197,21 +56297,13 @@ var VisualAgentMapPlugin = class extends import_obsidian38.Plugin {
       this.aiTasks,
       new ReframingService(providerReframeRunner(this.aiTaskOptions, this.activeTasks))
     ));
-    __publicField(this, "outlineGeneration", new OutlineGenerationService(
-      providerOutlineRunner(this.aiTaskOptions, this.activeTasks)
-    ));
-    __publicField(this, "structureReview", new StructureReviewService(
-      providerStructureReviewRunner(this.aiTaskOptions, this.activeTasks)
-    ));
-    __publicField(this, "mapChat", new MapChatService(providerMapChatRunner(this.aiTaskOptions, this.activeTasks)));
-    __publicField(this, "relevanceGrade", new RelevanceGradeService(
-      providerRelevanceGradeRunner(this.aiTaskOptions, this.activeTasks)
-    ));
+    __publicField(this, "outlineGeneration", new OutlineGenerationService(providerOutlineRunner(this.aiCalls)));
+    __publicField(this, "structureReview", new StructureReviewService(providerStructureReviewRunner(this.aiCalls)));
+    __publicField(this, "mapChat", new MapChatService(providerMapChatRunner(this.aiCalls)));
+    __publicField(this, "relevanceGrade", new RelevanceGradeService(providerRelevanceGradeRunner(this.aiCalls)));
     /** Translated share text kept for this Obsidian session only (never written to disk); emptied on unload. */
     __publicField(this, "shareTranslationCache", new ShareTranslationCache());
-    __publicField(this, "shareTranslate", new ShareTranslateService(
-      providerShareTranslateRunner(this.aiTaskOptions, this.activeTasks)
-    ));
+    __publicField(this, "shareTranslate", new ShareTranslateService(providerShareTranslateRunner(this.aiCalls)));
     /** The relevance grading run of each map, by map path. A view shows it; only one run per map. */
     __publicField(this, "relevanceGrades", /* @__PURE__ */ new Map());
     __publicField(this, "exchanges", null);

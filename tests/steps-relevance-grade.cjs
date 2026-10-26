@@ -6,8 +6,9 @@ const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
 const { load } = require('./support-replay.cjs');
+const { loadWithAiCalls, aiCallsFor } = require('./support-ai-calls.cjs');
 const { estimateTokens } = load('ai/context-builder.ts');
-const grade = load('core/relevance-grade-service.ts');
+const grade = loadWithAiCalls('core/relevance-grade-service.ts');
 const { relevanceGradeStep } = load('core/steps/relevance-grade/step.ts');
 const { AiExchangeLog } = load('ai-exchange-log.ts');
 const { translate } = load('i18n.ts');
@@ -191,7 +192,7 @@ function serviceFixture(reply) {
 
 test('service: strict JSON path with schema and step label; malformed replies fail typed and are logged as failed', async () => {
   const fx = serviceFixture(full());
-  const service = new grade.RelevanceGradeService(grade.providerRelevanceGradeRunner(fx.options, fx.active));
+  const service = new grade.RelevanceGradeService(grade.providerRelevanceGradeRunner(aiCallsFor(grade, fx.options, fx.active)));
   const result = await service.grade(request(), new AbortController().signal);
   assert.equal(result.items.length, 3); assert.equal(fx.active.size, 0);
   const [prompt, model, effort, schema, controls] = fx.calls[0];
@@ -200,20 +201,20 @@ test('service: strict JSON path with schema and step label; malformed replies fa
   assert.equal(controls.textOnly, true); assert.equal(controls.searchBudget, 0);
   assert.equal(fx.log.getEntries()[0].step, 'relevance-grade@11'); assert.equal(fx.log.getEntries()[0].status, 'completed');
   const bad = serviceFixture(reply(entry('a'), entry('b')));
-  await assert.rejects(new grade.RelevanceGradeService(grade.providerRelevanceGradeRunner(bad.options, bad.active)).grade(request(), new AbortController().signal), error => error.code === 'invalid');
+  await assert.rejects(new grade.RelevanceGradeService(grade.providerRelevanceGradeRunner(aiCallsFor(grade, bad.options, bad.active))).grade(request(), new AbortController().signal), error => error.code === 'invalid');
   assert.equal(bad.log.getEntries()[0].status, 'failed'); assert.equal(bad.active.size, 0);
 });
 
 test('service: stopping before the call, during it and after it returns all fail as stopped and return nothing', async () => {
   const before = serviceFixture(full());
-  const service = new grade.RelevanceGradeService(grade.providerRelevanceGradeRunner(before.options, before.active));
+  const service = new grade.RelevanceGradeService(grade.providerRelevanceGradeRunner(aiCallsFor(grade, before.options, before.active)));
   const early = new AbortController(); early.abort();
   await assert.rejects(service.grade(request(), early.signal), error => error.code === 'stopped');
   assert.equal(before.calls.length, 0, 'a stop before the call never reaches the provider');
   const stopMessage = translate('en', 'error.relevance_grade_stopped');
   const during = new AbortController();
   const mid = serviceFixture(() => { during.abort(); return full(); });
-  await assert.rejects(new grade.RelevanceGradeService(grade.providerRelevanceGradeRunner(mid.options, mid.active)).grade(request(), during.signal), error => error.code === 'stopped' && error.message === stopMessage);
+  await assert.rejects(new grade.RelevanceGradeService(grade.providerRelevanceGradeRunner(aiCallsFor(grade, mid.options, mid.active))).grade(request(), during.signal), error => error.code === 'stopped' && error.message === stopMessage);
   assert.equal(mid.active.size, 0, 'the active task is cleaned up');
   const after = new AbortController();
   const late = new grade.RelevanceGradeService(async () => { after.abort(); return full(); });
@@ -448,7 +449,7 @@ test('service repair: the token budget applies to the repair request; an over-bu
 test('service repair: through the real provider runner both exchanges are logged under their own step label', async () => {
   const replies = [badDeep(), goodDeep()];
   const fx = serviceFixture(() => replies.shift());
-  const service = new grade.RelevanceGradeService(grade.providerRelevanceGradeRunner(fx.options, fx.active));
+  const service = new grade.RelevanceGradeService(grade.providerRelevanceGradeRunner(aiCallsFor(grade, fx.options, fx.active)));
   const result = await service.grade(repairRequest(), new AbortController().signal);
   assert.equal(result.items.length, 4); assert.equal(fx.active.size, 0);
   assert.equal(fx.calls.length, 2);
@@ -456,7 +457,7 @@ test('service repair: through the real provider runner both exchanges are logged
   assert.equal(fx.calls[1][1], 'gpt-6-luna'); assert.equal(fx.calls[1][2], 'low', 'same model and reasoning');
 });
 
-const realRunnerService = fx => new grade.RelevanceGradeService(grade.providerRelevanceGradeRunner(fx.options, fx.active));
+const realRunnerService = fx => new grade.RelevanceGradeService(grade.providerRelevanceGradeRunner(aiCallsFor(grade, fx.options, fx.active)));
 
 test('service repair through the real runner: two bad replies then a good one succeed; all three exchanges are logged', async () => {
   const replies = [badDeep(), badDeep(), goodDeep()];

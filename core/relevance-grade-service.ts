@@ -1,5 +1,5 @@
 import { translate, uiLocale } from "../i18n";
-import type { AiTaskServiceOptions } from "./ai-task-service";
+import type { AiCalls } from "./ai-calls";
 import { providerStepRunner, type ProviderStepRunner } from "./provider-step-runner";
 import { prepareStep, type PreparedStep, type StepDefinition } from "./step-runner";
 import {
@@ -145,11 +145,8 @@ export interface RelevanceGradeHooks {
 export function buildRelevanceGradePrompt(request: RelevanceGradeRequest): string {
   return relevanceGradeStep.render(request);
 }
-export function providerRelevanceGradeRunner(
-  options: AiTaskServiceOptions,
-  activeTasks: Map<string, AbortController>
-): RelevanceGradeRunner {
-  return providerStepRunner<RelevanceGradeRequest, RelevanceGradeResult>(options, activeTasks, {
+export function providerRelevanceGradeRunner(aiCalls: AiCalls): RelevanceGradeRunner {
+  return providerStepRunner<RelevanceGradeRequest, RelevanceGradeResult>(aiCalls, {
     name: "relevance-grade",
     topic: request =>
       `Relevance ${"previous" in request ? "recalibrate" : "grade"} · ${request.goal.trim().slice(0, 80)}`,

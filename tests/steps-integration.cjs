@@ -20,7 +20,6 @@ const RUN_TASK_CALLERS = [
   { file: 'core/ai-runtime-service.ts', method: 'export function codexAppServerAiRuntime(', count: 1, reason: 'AiRuntime adapter over the Codex app server runtime' },
   { file: 'core/runtime-step-provider.ts', method: 'export function runtimeStepProvider(', count: 2, reason: 'shared StepProvider over the Claude and Codex runtimes' },
   { file: 'core/reframing-service.ts', method: 'export function providerReframeRunner(', count: 2, reason: 'stop-checking runtime wrappers passed into runtimeStepProvider' },
-  { file: 'core/provider-step-runner.ts', method: 'export function providerStepRunner<', count: 2, reason: 'stop-checking runtime wrappers passed into runtimeStepProvider (outline-generate, structure-review)' },
   { file: 'main.ts', method: 'async runCoffeeRequest(', count: 2, reason: 'the runtime behind experiences/coffee-tables/step-provider.ts' }
 ];
 // The function containing `index`: the nearest preceding top-level function or two-space class member.

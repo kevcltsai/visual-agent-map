@@ -1,5 +1,5 @@
 import { translate, uiLocale } from "../i18n";
-import type { AiTaskServiceOptions } from "./ai-task-service";
+import type { AiCalls } from "./ai-calls";
 import { providerStepRunner, type ProviderStepRunner } from "./provider-step-runner";
 import { prepareStep, type PreparedStep } from "./step-runner";
 import {
@@ -20,11 +20,8 @@ export type OutlineGenerateRunner = ProviderStepRunner<OutlineGenerateRequest, O
 export function buildOutlineGeneratePrompt(request: OutlineGenerateRequest): string {
   return outlineGenerateStep.render(request);
 }
-export function providerOutlineRunner(
-  options: AiTaskServiceOptions,
-  activeTasks: Map<string, AbortController>
-): OutlineGenerateRunner {
-  return providerStepRunner<OutlineGenerateRequest, OutlineGenerateResult>(options, activeTasks, {
+export function providerOutlineRunner(aiCalls: AiCalls): OutlineGenerateRunner {
+  return providerStepRunner<OutlineGenerateRequest, OutlineGenerateResult>(aiCalls, {
     name: "outline-generate",
     topic: request => `Outline · ${request.topic.trim().slice(0, 80)}`,
     stopped: () => new OutlineGenerateError("stopped", "Outline generation stopped")

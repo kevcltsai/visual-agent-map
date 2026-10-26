@@ -5,6 +5,7 @@ const { test } = require('node:test');
 const assert = require('node:assert/strict');
 const { loadSource, load } = require('./support-replay.cjs');
 const S = require('./support.cjs');
+const { aiCallsFor } = require('./support-ai-calls.cjs');
 
 // One bundle, so the runners and `prepareStep` share the step brand registry (see tests/support-ai-calls.cjs).
 const bundle = loadSource(`
@@ -12,6 +13,8 @@ export { providerOutlineRunner } from "./core/outline-generation-service";
 export { providerMapChatRunner } from "./core/map-chat-service";
 export { providerReframeRunner } from "./core/reframing-service";
 export { prepareStep } from "./core/step-runner";
+export { AiCalls } from "./core/ai-calls";
+export { aiRuntimeForModel } from "./core/ai-runtime-service";
 export { outlineGenerateStep } from "./core/steps/outline-generate/step";
 export { mapChatStep, MAP_CHAT_SCHEMA } from "./core/steps/map-chat/step";
 export { reframeStep, REFRAME_SCHEMA } from "./core/steps/reframe/step";
@@ -24,11 +27,11 @@ const { buildMapChatContext } = load('core/map-chat-context.ts');
 function makeRunner(kind, options, active) {
   const prepare = (step, request) => bundle.prepareStep(step, request);
   if (kind === 'outline') {
-    const runner = bundle.providerOutlineRunner(options, active);
+    const runner = bundle.providerOutlineRunner(aiCallsFor(bundle, options, active));
     return (request, signal, onJson) => runner(request, signal, prepare(bundle.outlineGenerateStep, request), onJson);
   }
   if (kind === 'map-chat') {
-    const runner = bundle.providerMapChatRunner(options, active);
+    const runner = bundle.providerMapChatRunner(aiCallsFor(bundle, options, active));
     return (request, signal, onJson) => runner(request, signal, prepare(bundle.mapChatStep, request), onJson);
   }
   const runner = bundle.providerReframeRunner(options, active);

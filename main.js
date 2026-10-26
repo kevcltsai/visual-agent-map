@@ -39987,7 +39987,7 @@ ${request.requirements}` : preset.text,
    * notes go to Unassigned, their subtopics move under the new topic. One history step; a failure puts everything back.
    */
   async mergeSelected(title, snapshot, content) {
-    var _a2, _b2, _c, _d;
+    var _a2, _b2, _c, _d, _e;
     const stale = () => {
       throw new Error(t("ui.merge_draft_stale"));
     };
@@ -40089,7 +40089,10 @@ ${request.requirements}` : preset.text,
           await this.plugin.rebuildDerivedData();
         }
       } catch (parkError) {
-        throw new AggregateError([error, parkError], t("error.merge_rollback_failed"));
+        const earlier = isTransactionError(error, "rollback-failed") ? (_e = error.errors) != null ? _e : [error] : [error];
+        throw Object.assign(new AggregateError([...earlier, parkError], t("error.merge_rollback_failed")), {
+          kind: "rollback-failed"
+        });
       }
       throw this.mergeError(error);
     }

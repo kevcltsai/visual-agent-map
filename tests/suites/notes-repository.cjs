@@ -1125,6 +1125,51 @@ integrationTest('V5: a failed merge that cannot restore itself throws the rollba
   assert.match(String(error.errors[0]), /disk full/);
   assert.equal(h.view.history.canUndo, false);
 });
+integrationTest('V5b: a synthesis merge whose new note cannot be parked throws rollback-failed with the original error first', async () => {
+  const h = await mergeHarness();
+  const rebuild = h.plugin.rebuildDerivedData; let rebuilds = 0;
+  h.plugin.rebuildDerivedData = async () => { if (++rebuilds === 1) throw new Error('rebuild broke'); return rebuild(); };
+  const moveUnique = h.repo.moveUnique.bind(h.repo);
+  h.repo.moveUnique = async (path, ...rest) => { if (path.includes('/Merged')) throw new Error('park blocked'); return moveUnique(path, ...rest); };
+  const error = await h.merge('Merged').then(() => assert.fail('expected a rejection'), e => e);
+  h.repo.moveUnique = moveUnique;
+  assert.equal(error.name, 'AggregateError'); assert.equal(error.message, ROLLBACK_FAILED); assert.equal(error.kind, 'rollback-failed');
+  assert.deepEqual(plain(error.errors.map(e => e.message)), ['rebuild broke', 'park blocked']);
+  assert.equal(h.view.history.canUndo, false);
+});
+integrationTest('V5c: a merge whose rollback and parking both fail keeps one flat error list, the original error first', async () => {
+  const h = await mergeHarness();
+  const moveUnique = h.repo.moveUnique.bind(h.repo), moveExact = h.repo.moveExact.bind(h.repo); let calls = 0;
+  h.repo.moveUnique = async (path, ...rest) => {
+    if (path.includes('/Merged')) throw new Error('park blocked');
+    if (++calls === 2) throw new Error('disk full');
+    return moveUnique(path, ...rest);
+  };
+  h.repo.moveExact = async () => { throw new Error('restore blocked'); };
+  const error = await h.merge('Merged').then(() => assert.fail('expected a rejection'), e => e);
+  h.repo.moveUnique = moveUnique; h.repo.moveExact = moveExact;
+  assert.equal(error.name, 'AggregateError'); assert.equal(error.message, ROLLBACK_FAILED); assert.equal(error.kind, 'rollback-failed');
+  assert.match(String(error.errors[0]), /disk full/);
+  assert.equal(error.errors.every(e => !(e instanceof AggregateError)), true, 'no nested AggregateError');
+  assert.equal(error.errors.at(-1).message, 'park blocked');
+});
+integrationTest('V5d: undo and redo that cannot restore themselves are rewrapped as the rollback-failed AggregateError', async () => {
+  const check = async (h, direction, label) => {
+    const error = await h.view.travel(direction).then(() => assert.fail(`expected a rejection (${label})`), e => e);
+    assert.equal(error.name, 'AggregateError'); assert.equal(error.message, ROLLBACK_FAILED); assert.equal(error.kind, 'rollback-failed');
+    assert.match(error.errors[0].message, new RegExp(`${label} blocked`));
+  };
+  // Undo moves the sources back with moveExact: the 1st works, the 2nd fails, and putting the 1st back fails too.
+  const undoing = await mergeHarness(); await undoing.merge('Merged');
+  const moveExact = undoing.repo.moveExact.bind(undoing.repo); let exact = 0;
+  undoing.repo.moveExact = async (...args) => { if (++exact >= 2) throw new Error(`undo blocked ${exact}`); return moveExact(...args); };
+  await check(undoing, false, 'undo');
+  // Redo moves the sources to their parking paths with moveExact too: same shape, in a merge that was undone first.
+  const redoing = await mergeHarness(); await redoing.merge('Merged'); await redoing.view.travel(false);
+  const redoMove = redoing.repo.moveExact.bind(redoing.repo); let again = 0;
+  redoing.repo.moveExact = async (...args) => { if (++again >= 2) throw new Error(`redo blocked ${again}`); return redoMove(...args); };
+  await check(redoing, true, 'redo');
+});
 integrationTest('V6: parent merge undo whose Map.md write fails puts the merged note and files back and keeps the entry undoable', async () => {
   const h = await mergeHarness(); await parentOf(h); const text = h.contents.get(h.parent.path); const original = await h.shape();
   await parentMerge(h, 'Renamed parent'); const merged = await h.shape(); const mergedText = h.contents.get(h.parent.path);

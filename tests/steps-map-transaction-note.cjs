@@ -167,8 +167,13 @@ test('N7: a rebuild failing during commit restores everything, including the not
 
 test('N8: a parent whose body links to the moved children is back to its exact text after commit and undo', async () => {
   const h = await harness();
+  // A full-path link to where a child will be parked: when undo writes the note before the moves, the move back
+  // (parked -> original) finds that link in the note and rewrites it, so the text no longer equals the original.
+  await h.repo.updateNote(h.parent, { detail: `Parent detail\n\nSee [[Child A]], [[Child B]] and [[${UNASSIGNED}/Child A]].` });
+  await h.repo.rebuildDerivedData();
   const original = h.contents.get(h.parent);
   assert.match(original, /\[\[Child A\]\]/);
+  assert.equal(original.includes(`[[${UNASSIGNED}/Child A]]`), true);
   const entry = await h.merge().commit();
   await entry.undo();
   assert.equal(h.contents.get(h.parent), original);

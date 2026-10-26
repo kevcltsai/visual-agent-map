@@ -4681,7 +4681,12 @@ export class VisualAgentMapView extends ItemView {
           await this.plugin.rebuildDerivedData();
         }
       } catch (parkError) {
-        throw new AggregateError([error, parkError], t("error.merge_rollback_failed"));
+        const earlier: unknown[] = isTransactionError(error, "rollback-failed")
+          ? ((error as Partial<AggregateError>).errors ?? [error])
+          : [error];
+        throw Object.assign(new AggregateError([...earlier, parkError], t("error.merge_rollback_failed")), {
+          kind: "rollback-failed" as const
+        });
       }
       throw this.mergeError(error);
     }

@@ -30,7 +30,7 @@ async function harness() {
   // Failures are injected on the repo the view uses; the view itself is untouched.
   const fail = {}, calls = [];
   const spy = Object.create(repo);
-  for (const name of ['setLifecycle', 'saveMap', 'moveExact']) {
+  for (const name of ['setLifecycle', 'saveMap', 'moveExact', 'moveUnique', 'duplicateNote']) {
     let n = 0;
     spy[name] = async (...args) => {
       n++; calls.push(name);
@@ -257,4 +257,183 @@ test('removeToUnassigned V2: undo keeps the viewport the user has panned to', as
   assert.equal(h.view.map.nodes.length, 4);
   await h.view.travel(true);
   assert.equal(JSON.stringify(h.view.map.viewport), JSON.stringify({ x: 123, y: -45, zoom: 1.5 }));
+});
+
+// removeSelected and copySelected (MapTransaction 05): one history step through the transaction, no private rollback code.
+const UNASSIGNED = `${TOPICS}/map-u/Unassigned/`;
+const REFRESH_NOTICE = 'The change was saved, but the view could not refresh. Reopen the map to see it.';
+const parkedPaths = h => [...h.contents.keys()].filter(p => p.startsWith(UNASSIGNED));
+const removeBranch = async (h, id) => { h.view.multiSelected.clear(); h.view.multiSelected.add(id); await h.view.removeSelected(); };
+const copyBranch = async (h, id, targetId) => { h.view.multiSelected.clear(); h.view.multiSelected.add(id); await h.view.copySelected(h.node(targetId)); };
+
+test('X1: removeSelected then a parked note moved away: undo is stale, nothing is written, the pointer is back', async () => {
+  const h = await branchHarness();
+  await removeBranch(h, h.ids.child);
+  const parked = parkedPaths(h);
+  assert.equal(parked.length, 2);
+  await h.app.vault.rename(h.file(parked[1]), `${TOPICS}/map-u/Moved by hand.md`);
+  const before = h.snapshot();
+  const error = await h.rejected(h.view.travel(false));
+  assert.equal(error.kind, 'stale');
+  assert.equal(h.view.history.canUndo, true);
+  assert.deepEqual(h.snapshot(), before);
+});
+
+test('X2: removeSelected then an unrecorded structural write to Map.md: undo is stale and keeps that write', async () => {
+  const h = await branchHarness();
+  await removeBranch(h, h.ids.sibling);
+  const outside = await h.repo.readMap(MAP);
+  outside.title = 'Written elsewhere';
+  await h.repo.saveMap(MAP, outside);
+  h.view.map = await h.repo.readMap(MAP);
+  const before = h.snapshot();
+  const error = await h.rejected(h.view.travel(false));
+  assert.equal(error.kind, 'stale');
+  assert.deepEqual(h.snapshot(), before);
+  assert.equal((await h.repo.readMap(MAP)).title, 'Written elsewhere');
+});
+
+test('X3: removeSelected, pan, undo, redo: the viewport stays where the user panned', async () => {
+  const h = await branchHarness();
+  await removeBranch(h, h.ids.sibling);
+  const panned = { x: 123, y: -45, zoom: 1.5 };
+  h.view.map.viewport = { ...panned };
+  await h.view.travel(false);
+  assert.deepEqual(JSON.parse(JSON.stringify(h.view.map.viewport)), panned);
+  assert.equal(h.view.map.nodes.length, 4);
+  await h.view.travel(true);
+  assert.deepEqual(JSON.parse(JSON.stringify(h.view.map.viewport)), panned);
+  assert.equal(h.view.map.nodes.length, 3);
+});
+
+test('X4: removeSelected checks Map.md for outside edits once before writing', async () => {
+  const h = await branchHarness();
+  const outside = await h.repo.readMap(MAP);
+  outside.title = 'Edited elsewhere';
+  await h.repo.saveMap(MAP, outside);
+  let asked = 0;
+  h.view.resolveMapConflict = async () => { asked++; return false; };
+  await removeBranch(h, h.ids.sibling);
+  assert.equal(asked, 1);
+  assert.equal((await h.repo.readMap(MAP)).title, 'Edited elsewhere');
+});
+
+test('X5: removeSelected whose reload fails keeps the change and its entry and tells the user', async () => {
+  const h = await branchHarness();
+  h.view.hydrate = async () => { throw new Error('reload failed'); };
+  await removeBranch(h, h.ids.sibling);
+  assert.deepEqual(h.notices, [REFRESH_NOTICE]);
+  assert.equal((await h.repo.readMap(MAP)).nodes.some(n => n.id === h.ids.sibling), false);
+  assert.equal(h.view.history.canUndo, true);
+});
+
+test('X6: removeSelected whose second setLifecycle and whose restore both fail reports rollback-failed and leaves no entry', async () => {
+  const h = await branchHarness();
+  const entries = h.view.history.past.length;
+  h.fail.setLifecycle = n => n === 2;
+  h.fail.moveExact = () => true;
+  const error = await h.rejected(removeBranch(h, h.ids.child));
+  assert.ok(Array.isArray(error.errors), 'an AggregateError');
+  assert.equal(error.message, 'Batch removal failed and could not be fully undone');
+  assert.equal(error.kind, 'rollback-failed');
+  assert.equal(h.view.history.past.length, entries);
+});
+
+test('X7: copySelected, undo, a parked copy moved away, redo: stale and nothing is written', async () => {
+  const h = await branchHarness();
+  await copyBranch(h, h.ids.child, h.ids.sibling);
+  assert.equal(h.view.map.nodes.length, 6);
+  await h.view.travel(false);
+  const parked = parkedPaths(h);
+  assert.equal(parked.length, 2);
+  await h.app.vault.rename(h.file(parked[0]), `${TOPICS}/map-u/Moved by hand.md`);
+  const before = h.snapshot();
+  const error = await h.rejected(h.view.travel(true));
+  assert.equal(error.kind, 'stale');
+  assert.deepEqual(h.snapshot(), before);
+});
+
+test('X8: copySelected, undo, redo, the fixed parking path taken by another file: undo is stale', async () => {
+  const h = await branchHarness();
+  await copyBranch(h, h.ids.child, h.ids.sibling);
+  await h.view.travel(false);
+  const parked = parkedPaths(h);
+  await h.view.travel(true);
+  assert.equal(parkedPaths(h).length, 0);
+  await h.app.vault.create(parked[0], 'taken');
+  const before = h.snapshot();
+  const error = await h.rejected(h.view.travel(false));
+  assert.equal(error.kind, 'stale');
+  assert.deepEqual(h.snapshot(), before);
+});
+
+test('X9: copySelected whose reload fails keeps the change and its entry and tells the user', async () => {
+  const h = await branchHarness();
+  h.view.hydrate = async () => { throw new Error('reload failed'); };
+  await copyBranch(h, h.ids.child, h.ids.sibling);
+  assert.deepEqual(h.notices, [REFRESH_NOTICE]);
+  assert.equal((await h.repo.readMap(MAP)).nodes.length, 6);
+  assert.equal(h.view.history.canUndo, true);
+});
+
+test('X10: copySelected whose saveMap and parking both fail reports rollback-failed and keeps the copies', async () => {
+  const h = await branchHarness();
+  const entries = h.view.history.past.length;
+  let armed = false;
+  h.fail.saveMap = (n, [path]) => path === MAP && (armed = true);
+  h.fail.moveUnique = () => armed;
+  const error = await h.rejected(copyBranch(h, h.ids.child, h.ids.sibling));
+  assert.ok(Array.isArray(error.errors), 'an AggregateError');
+  assert.equal(error.message, 'Batch copy failed and could not be fully undone');
+  assert.equal(error.kind, 'rollback-failed');
+  assert.equal(h.view.history.past.length, entries);
+  assert.equal([...h.contents.keys()].filter(p => /copy/i.test(p)).length, 2, 'the copies are still there');
+});
+
+test('X11: undo of a copy whose Map.md write and restore both fail reports rollback-failed; a write failure alone puts the copies back', async () => {
+  const both = await branchHarness();
+  await copyBranch(both, both.ids.child, both.ids.sibling);
+  let armed = false;
+  both.fail.saveMap = (n, [path]) => path === MAP && (armed = true);
+  both.fail.moveExact = () => armed;
+  const error = await both.rejected(both.view.travel(false));
+  assert.ok(Array.isArray(error.errors), 'an AggregateError');
+  assert.equal(error.message, 'Undoing the copy failed and could not be fully restored');
+  assert.equal(error.kind, 'rollback-failed');
+
+  const h = await branchHarness();
+  await copyBranch(h, h.ids.child, h.ids.sibling);
+  const copyNodes = h.view.map.nodes.filter(n => ![h.ids.root, h.ids.child, h.ids.grand, h.ids.sibling].includes(n.id));
+  assert.equal(copyNodes.length, 2);
+  const after = h.contents.get(MAP);
+  h.fail.saveMap = (n, [path]) => path === MAP;
+  const failure = await h.rejected(h.view.travel(false));
+  assert.match(failure.message, /injected saveMap/);
+  for (const node of copyNodes) {
+    assert.equal(h.exists(node.path), true, 'the copy is back at its path');
+    assert.deepEqual((await h.lifecycleOf(node.path)).slice(2), ['active']);
+  }
+  assert.equal(h.contents.get(MAP), after, 'Map.md is the state after the copy');
+  assert.equal(h.view.history.canUndo, true, 'pointer restored');
+});
+
+test('X12: AIM removeSelected of a removable question branch: undo brings the branch back', async () => {
+  const h = await branchHarness();
+  const doc = await h.repo.readMap(MAP);
+  doc.nodes.find(n => n.id === h.ids.child).aimKind = 'question';
+  doc.aim = {
+    version: 1,
+    branches: [{ id: 'b1', questionNodeId: h.ids.child, parentBranchId: null, answerSnapshot: { selections: [], freeText: '' }, inputSnapshot: { topic: 't', conditions: {}, upstreamResults: [] }, createdAt: '2026-01-01T00:00:00.000Z', results: [] }],
+    runs: [],
+    pendingCommits: []
+  };
+  await h.repo.saveMap(MAP, doc);
+  h.view.map = await h.repo.readMap(MAP);
+  await h.view.hydrate();
+  const original = JSON.stringify(h.view.map.aim);
+  await removeBranch(h, h.ids.child);
+  assert.equal(h.view.map.aim.branches.length, 0);
+  await h.view.travel(false);
+  assert.equal(JSON.stringify(h.view.map.aim), original);
+  assert.equal(h.view.map.nodes.length, 4);
 });

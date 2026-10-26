@@ -911,7 +911,7 @@ export class History<T extends { undo: () => Promise<void>; redo: () => Promise<
   /**
    * Folds the entries pushed since `mark` into one undo step: undo runs them newest first, redo oldest first. Does
    * nothing when the history was cleared since the mark, or when fewer than two entries were pushed. Each entry's
-   * undo/redo is read when it runs, so later patches to an entry (parkOnUndo) still apply.
+   * undo/redo is read when it runs, so later patches to an entry (a wrapper replaced after push) still apply.
    */
   collapseSince(mark: HistoryMark, label?: string): void {
     if (mark.epoch !== this.epoch) return;

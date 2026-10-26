@@ -29,6 +29,7 @@ Quick and Standard
 - The optional research after an outline import or expansion is called "short research", and it follows the mode you chose.
 - Integrate no longer has a web-search option and always works from existing findings; the dialog suggests running Standard research on the topic first when information is thin.
 - Standard research must use the web: if the AI finishes without any web search or page fetch, VAM asks once more, and if it still did not search, the research fails and nothing is written. With Codex, Standard research now runs with web search only (your Codex MCP servers and other tools are off for it), as it already did with Claude Code.
+- AIM requests carry a paragraph that repeats in a saved report only once, so requests that include a saved report are smaller.
 - Translated share files store only the translated text and are rebuilt from the original note when opened, so they are smaller (in one test map with two translations, 1.1 MB became 0.67 MB). Old share files still open.
 
 ### Limitations

@@ -19,8 +19,10 @@ import type { CodexAppServerRuntime, CodexWebSearchEvent } from "../ai/runtime/c
 import type { ClaudeCodeCliRuntime } from "../ai/runtime/claude-code-cli";
 import type { AiExchangeLog, AiMilestones } from "../ai-exchange-log";
 import type { ResearchObserver, ResearchStageName } from "../ai/research-observer";
-import { runtimeStepProvider, type ExchangeSink, type RuntimeTaskControls } from "./runtime-step-provider";
-import { prepareStep, StepRunner } from "./step-runner";
+import type { RuntimeTaskControls } from "./runtime-step-provider";
+import { prepareStep } from "./step-runner";
+import { AiCalls, type AiCallExchange } from "./ai-calls";
+import { aiRuntimeForModel } from "./ai-runtime-service";
 import { referenceTask } from "./steps/reference/step";
 import { taskResponseShape } from "./steps/task/schemas";
 import { repairCounts, sourceRegistry } from "./steps/task/fragments";
@@ -198,15 +200,12 @@ export class AiTaskService {
     );
     const exchanges = this.options.exchangeLoggingEnabled() ? this.options.exchanges() : null;
     let exchangeId = "";
-    // Turning exchange logging off while a task runs stops recording from then on, so every write re-checks the setting.
-    const sink = this.exchangeSink();
 
     // Set once the first request's entry is closed because the repair request replaced it; the catch must not reopen it.
     let supersededClosed = false;
     let stage = t("log.stage_starting_ai");
     try {
       const controls = {
-        signal,
         ...(input.timeoutMs !== undefined
           ? {
               timeoutMs: Math.min(600_000, Math.max(180_000, input.timeoutMs)),
@@ -232,33 +231,35 @@ export class AiTaskService {
           stage = t("log.stage_waiting_reply");
         }
       };
-      // The provider logs begin, sent and received; this method ends the entry with parsed or its own failed message.
-      const runner = new StepRunner(
-        runtimeStepProvider({
-          claude: () => this.options.claudeRuntime(pluginDirectory),
-          codex: local => this.options.codexRuntime(pluginDirectory, local),
-          exchanges: () => sink,
-          localCodex: context.researchMode === "local"
-        })
-      );
-      const sendOnce = (setup?: AttemptSetup) =>
-        runner.send(step, {
-          model,
-          effort,
-          topic: context.title,
-          mode: context.mode ?? "task",
-          task: { ...controls, onWebSearchEvent: webHook, ...(setup ? { ...setup.hooks, signal: setup.signal } : {}) },
-          finish: "caller",
-          requestLog: "request",
-          ...(setup
-            ? { exchangeId: setup.exchangeId, extraMilestones: setup.extraMilestones, afterReply: setup.afterReply }
-            : {}),
-          onExchange: id => {
-            exchangeId = id;
-            setup?.onExchange(id);
-            onExchange?.(id);
-          }
-        });
+      const calls = this.callsIn(pluginDirectory, exchanges);
+      const sendOnce = async (setup?: AttemptSetup): Promise<{ raw: string }> => ({
+        raw: await calls.run(
+          step,
+          {
+            model,
+            effort,
+            topic: context.title,
+            mode: context.mode ?? "task",
+            taskName: "ai-task",
+            signal: setup?.signal ?? signal ?? new AbortController().signal,
+            localCodex: context.researchMode === "local",
+            requestLog: "request",
+            // The service ends the entry: parsed, a stage failure, a re-ask, a re-send or a superseded first reply.
+            entryEnd: "caller",
+            stopped: cancelled,
+            task: { ...controls, onWebSearchEvent: webHook, ...(setup ? setup.hooks : {}) },
+            ...(setup
+              ? { exchangeId: setup.exchangeId, extraMilestones: setup.extraMilestones, afterReply: setup.afterReply }
+              : {}),
+            onBegin: id => {
+              exchangeId = id;
+              setup?.onExchange(id);
+              onExchange?.(id);
+            }
+          },
+          raw => raw
+        )
+      });
       // Only the main call of a research request is observed (not reference extraction, a count repair or the chart step).
       let raw = "";
       for (let attempt = 1; ; attempt++) {
@@ -543,7 +544,7 @@ export class AiTaskService {
       providerForModel(request.model),
       request.model,
       request.signal,
-      this.exchangeSink(),
+      this.options.exchangeLoggingEnabled() ? this.options.exchanges() : null,
       request.onExchange
     );
   }
@@ -553,24 +554,16 @@ export class AiTaskService {
     if (id && this.options.exchangeLoggingEnabled()) this.options.exchanges()?.failed(id, reason);
   }
 
-  /** A guarded view of the exchange log: every write re-checks the logging setting. Null when logging is off. */
-  private exchangeSink(): ExchangeSink | null {
-    const exchanges = this.options.exchangeLoggingEnabled() ? this.options.exchanges() : null;
-    const record =
-      <Args extends unknown[]>(write: (...args: Args) => void) =>
-      (...args: Args): void => {
-        if (this.options.exchangeLoggingEnabled()) write(...args);
-      };
-    return (
-      exchanges && {
-        begin: entry => exchanges.begin(entry),
-        sent: record((id: string, body: string, prompt?: string) => exchanges.sent(id, body, prompt)),
-        received: record((id: string, body: string) => exchanges.received(id, body)),
-        completed: record((id: string) => exchanges.completed(id)),
-        failed: record((id: string, error: string) => exchanges.failed(id, error)),
-        milestones: record((id: string, data: AiMilestones) => exchanges.milestones(id, data))
-      }
-    );
+  /** AiCalls over this service's runtimes in `pluginDirectory`, logging to `exchanges` (taken when the request started) while logging stays on. */
+  private callsIn(pluginDirectory: string, exchanges: AiExchangeLog | null): AiCalls {
+    return new AiCalls({
+      runtimeFor: model =>
+        aiRuntimeForModel(model, {
+          claude: () => this.options.claudeRuntime(pluginDirectory),
+          codex: local => this.options.codexRuntime(pluginDirectory, local)
+        }),
+      exchanges: () => (exchanges && this.options.exchangeLoggingEnabled() ? exchanges : null)
+    });
   }
 
   private diagramsOn(): boolean {
@@ -612,7 +605,7 @@ export class AiTaskService {
       providerForModel(request.model),
       request.model,
       request.signal,
-      this.exchangeSink()
+      this.options.exchangeLoggingEnabled() ? this.options.exchanges() : null
     );
   }
 
@@ -628,7 +621,7 @@ export class AiTaskService {
     provider: "claude" | "codex",
     model: string,
     signal: AbortSignal | undefined,
-    sink: ExchangeSink | null,
+    exchanges: AiExchangeLog | null,
     onExchange?: (id: string) => void
   ): Promise<string> {
     const existing = existingDiagrams(detail);
@@ -644,63 +637,59 @@ export class AiTaskService {
       remaining,
       provider
     });
-    let exchangeId = "";
-    const runner = new StepRunner(
-      runtimeStepProvider({
-        claude: () => this.options.claudeRuntime(pluginDirectory),
-        codex: local => this.options.codexRuntime(pluginDirectory, local),
-        exchanges: () => sink,
-        localCodex: true
-      })
-    );
-    const refuse = (code: ChartCode): string => {
-      console.warn("Visual Agent Map chart step", code);
-      if (exchangeId && this.options.exchangeLoggingEnabled())
-        this.options.exchanges()?.failed(exchangeId, translate(this.options.language(), "log.chart_not_added_0", code));
+    const aborted = (error: unknown): boolean =>
+      !!signal?.aborted || (error instanceof Error && error.name === "AbortError");
+    const codeOf = (error: unknown): ChartCode => (error instanceof ChartRejected ? error.code : "runtime_error");
+    const notAdded = (code: ChartCode): string => translate(this.options.language(), "log.chart_not_added_0", code);
+    const warn = (code: ChartCode): void => console.warn("Visual Agent Map chart step", code);
+    const refuse = (code: ChartCode, exchange: AiCallExchange): string => {
+      warn(code);
+      exchange.fail(notAdded(code));
       return detail;
     };
+    const calls = this.callsIn(pluginDirectory, exchanges);
     try {
-      const { raw } = await runner.send(step, {
-        model,
-        effort: "low",
-        topic: input.title,
-        mode: input.mode ?? "task",
-        task: {
-          signal,
-          timeoutMs: 180_000,
-          timeoutMessage: translate(this.options.language(), "ui.ai_task_exceeded_0_minutes", 3),
-          webSearch: false,
-          textOnly: true,
-          searchBudget: 0
+      return await calls.run(
+        step,
+        {
+          model,
+          effort: "low",
+          topic: input.title,
+          mode: input.mode ?? "task",
+          taskName: "chart",
+          signal: signal ?? new AbortController().signal,
+          localCodex: true,
+          requestLog: "request",
+          stopped: () => new DOMException("Aborted", "AbortError"),
+          failMessage: error =>
+            aborted(error) ? (error instanceof Error ? error.message : String(error)) : notAdded(codeOf(error)),
+          onBegin: onExchange,
+          task: {
+            timeoutMs: 180_000,
+            timeoutMessage: translate(this.options.language(), "ui.ai_task_exceeded_0_minutes", 3),
+            webSearch: false,
+            textOnly: true,
+            searchBudget: 0
+          }
         },
-        finish: "caller",
-        requestLog: "request",
-        onExchange: id => {
-          exchangeId = id;
-          onExchange?.(id);
+        async (raw, exchange) => {
+          if (signal?.aborted) throw new DOMException("Aborted", "AbortError");
+          const charts = step.parse(raw);
+          const applied = await applyCharts(detail, charts, { remaining, parses: this.options.mermaidParses });
+          if (!applied.ok) return refuse(applied.code, exchange);
+          const template = input.detailTemplate;
+          if (countIssues && template && input.detailFormat !== "adaptive") {
+            const after = checkCounts(canonicalDetail(applied.detail, noteLanguageOf(language), template), template);
+            if (JSON.stringify(after) !== JSON.stringify(countIssues)) return refuse("counts_changed", exchange);
+          }
+          exchange.parsed();
+          return applied.detail;
         }
-      });
-      if (signal?.aborted) throw new DOMException("Aborted", "AbortError");
-      const charts = step.parse(raw);
-      const applied = await applyCharts(detail, charts, { remaining, parses: this.options.mermaidParses });
-      if (!applied.ok) return refuse(applied.code);
-      const template = input.detailTemplate;
-      if (countIssues && template && input.detailFormat !== "adaptive") {
-        const after = checkCounts(canonicalDetail(applied.detail, noteLanguageOf(language), template), template);
-        if (JSON.stringify(after) !== JSON.stringify(countIssues)) return refuse("counts_changed");
-      }
-      if (this.options.exchangeLoggingEnabled() && exchangeId) {
-        this.options.exchanges()?.parsed(exchangeId);
-        this.options.exchanges()?.completed(exchangeId);
-      }
-      return applied.detail;
+      );
     } catch (error) {
-      if (signal?.aborted || (error instanceof Error && error.name === "AbortError")) {
-        if (exchangeId && this.options.exchangeLoggingEnabled())
-          this.options.exchanges()?.failed(exchangeId, error instanceof Error ? error.message : String(error));
-        throw error;
-      }
-      return refuse(error instanceof ChartRejected ? error.code : "runtime_error");
+      if (aborted(error)) throw error;
+      warn(codeOf(error));
+      return detail;
     }
   }
 

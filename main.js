@@ -51387,7 +51387,7 @@ function groupRibbonIcons(map, coffee) {
 }
 
 // main.ts
-var import_node_crypto15 = require("node:crypto");
+var import_node_crypto14 = require("node:crypto");
 
 // core/thinking-core.ts
 var ThinkingCore = class {
@@ -53573,104 +53573,7 @@ var ResearchProgressStore = class {
 };
 
 // core/ai-task-service.ts
-var import_node_crypto14 = require("node:crypto");
-
-// core/runtime-step-provider.ts
 var import_node_crypto13 = require("node:crypto");
-function runtimeStepProvider(options) {
-  return {
-    async complete(call) {
-      const {
-        model,
-        effort,
-        topic,
-        mode = "task",
-        task = {},
-        onExchange,
-        finish = "completed",
-        requestLog = "request-and-prompt",
-        afterReply,
-        exchangeId,
-        extraMilestones
-      } = call.controls;
-      const started = options.exchanges();
-      const exchanges = {
-        sent: (...args) => {
-          var _a2;
-          return started ? (_a2 = options.exchanges()) == null ? void 0 : _a2.sent(...args) : void 0;
-        },
-        received: (...args) => {
-          var _a2;
-          return started ? (_a2 = options.exchanges()) == null ? void 0 : _a2.received(...args) : void 0;
-        },
-        completed: (...args) => {
-          var _a2;
-          return started ? (_a2 = options.exchanges()) == null ? void 0 : _a2.completed(...args) : void 0;
-        },
-        failed: (...args) => {
-          var _a2;
-          return started ? (_a2 = options.exchanges()) == null ? void 0 : _a2.failed(...args) : void 0;
-        },
-        milestones: (...args) => {
-          var _a2;
-          return started ? (_a2 = options.exchanges()) == null ? void 0 : _a2.milestones(...args) : void 0;
-        }
-      };
-      const milestones = {};
-      let milestonesWritten = false;
-      const writeMilestones = () => {
-        if (milestonesWritten) return;
-        milestonesWritten = true;
-        try {
-          Object.assign(milestones, { ...extraMilestones == null ? void 0 : extraMilestones(), ...milestones });
-        } catch (e) {
-        }
-        if (Object.keys(milestones).length) exchanges.milestones(id, milestones);
-      };
-      const id = exchangeId != null ? exchangeId : (0, import_node_crypto13.randomUUID)();
-      started == null ? void 0 : started.begin({
-        id,
-        startedAt: (/* @__PURE__ */ new Date()).toISOString(),
-        topic,
-        mode,
-        model,
-        effort,
-        step: stepLabel({ id: call.stepId, version: call.version })
-      });
-      if (started) onExchange == null ? void 0 : onExchange(id);
-      try {
-        const controls = {
-          ...task,
-          onMilestones: (data) => {
-            var _a2;
-            (_a2 = task.onMilestones) == null ? void 0 : _a2.call(task, data);
-            Object.assign(milestones, data);
-          },
-          onRequest: (data) => {
-            var _a2;
-            (_a2 = task.onRequest) == null ? void 0 : _a2.call(task, data);
-            exchanges.sent(
-              id,
-              JSON.stringify(requestLog === "request" ? data : { request: data, prompt: call.prompt }, null, 2),
-              call.prompt
-            );
-          }
-        };
-        const raw = providerForModel(model) === "claude" ? await options.claude().runTask(call.prompt, providerModelId(model), effort, call.schema, controls) : await options.codex(options.localCodex === true).runTask(call.prompt, model, effort, call.schema, controls);
-        afterReply == null ? void 0 : afterReply();
-        milestones.receivedAt = (/* @__PURE__ */ new Date()).toISOString();
-        exchanges.received(id, raw);
-        writeMilestones();
-        if (finish === "completed") exchanges.completed(id);
-        return raw;
-      } catch (error) {
-        writeMilestones();
-        if (finish === "completed") exchanges.failed(id, error instanceof Error ? error.message : String(error));
-        throw error;
-      }
-    }
-  };
-}
 
 // core/steps/reference/extract.zh.md
 var extract_zh_default = "\u5F9E\u6BCF\u500B\u63D0\u4F9B\u7684\u4F86\u6E90\u6BB5\u843D\u64F7\u53D6\u76F8\u95DC\u4E8B\u5BE6\u3001\u8B49\u64DA\u3001\u5206\u6B67\u8207\u9650\u5236\u3002\u4E0D\u53EF\u56E0\u4F86\u6E90\u770B\u4F3C\u4E0D\u76F8\u95DC\u5C31\u7565\u904E\u3002\u6BCF\u9805\u64F7\u53D6\u5167\u5BB9\u90FD\u8981\u5728\u4E3B\u5F35\u65C1\u4FDD\u7559\u539F\u59CB [S#]\uFF0C\u4E26\u9644\u4E0A\u672C\u6279\u6240\u6709 [S#] \u5C0D\u61C9\u539F\u59CB\u5B8C\u6574\u8DEF\u5F91\u7684\u4F86\u6E90\u5C0D\u7167\u8868\u3002\u4FDD\u7559\u6709\u52A9\u8FA8\u8B58\u7AE0\u7BC0\u7684\u6A19\u984C\uFF1B\u6700\u7D42\u7B54\u6848\u9700\u8981\u9019\u4EFD\u5C0D\u7167\u8868\u624D\u80FD\u5F15\u7528\u539F\u6A94\u3002\u4E0D\u53EF\u8D85\u51FA\u539F\u6587\u63A8\u8AD6\u3002\n";
@@ -54291,12 +54194,10 @@ var AiTaskService = class {
     );
     const exchanges = this.options.exchangeLoggingEnabled() ? this.options.exchanges() : null;
     let exchangeId = "";
-    const sink = this.exchangeSink();
     let supersededClosed = false;
     let stage = t("log.stage_starting_ai");
     try {
       const controls = {
-        signal,
         ...input.timeoutMs !== void 0 ? {
           timeoutMs: Math.min(6e5, Math.max(18e4, input.timeoutMs)),
           // The timeout is an interface message: it follows the interface language, not the content language.
@@ -54316,31 +54217,35 @@ var AiTaskService = class {
           stage = t("log.stage_waiting_reply");
         }
       };
-      const runner = new StepRunner(
-        runtimeStepProvider({
-          claude: () => this.options.claudeRuntime(pluginDirectory),
-          codex: (local) => this.options.codexRuntime(pluginDirectory, local),
-          exchanges: () => sink,
-          localCodex: context.researchMode === "local"
-        })
-      );
-      const sendOnce = (setup) => {
-        var _a3;
-        return runner.send(step, {
-          model,
-          effort,
-          topic: context.title,
-          mode: (_a3 = context.mode) != null ? _a3 : "task",
-          task: { ...controls, onWebSearchEvent: webHook, ...setup ? { ...setup.hooks, signal: setup.signal } : {} },
-          finish: "caller",
-          requestLog: "request",
-          ...setup ? { exchangeId: setup.exchangeId, extraMilestones: setup.extraMilestones, afterReply: setup.afterReply } : {},
-          onExchange: (id) => {
-            exchangeId = id;
-            setup == null ? void 0 : setup.onExchange(id);
-            onExchange == null ? void 0 : onExchange(id);
-          }
-        });
+      const calls = this.callsIn(pluginDirectory, exchanges);
+      const sendOnce = async (setup) => {
+        var _a3, _b3, _c2;
+        return {
+          raw: await calls.run(
+            step,
+            {
+              model,
+              effort,
+              topic: context.title,
+              mode: (_a3 = context.mode) != null ? _a3 : "task",
+              taskName: "ai-task",
+              signal: (_c2 = (_b3 = setup == null ? void 0 : setup.signal) != null ? _b3 : signal) != null ? _c2 : new AbortController().signal,
+              localCodex: context.researchMode === "local",
+              requestLog: "request",
+              // The service ends the entry: parsed, a stage failure, a re-ask, a re-send or a superseded first reply.
+              entryEnd: "caller",
+              stopped: cancelled,
+              task: { ...controls, onWebSearchEvent: webHook, ...setup ? setup.hooks : {} },
+              ...setup ? { exchangeId: setup.exchangeId, extraMilestones: setup.extraMilestones, afterReply: setup.afterReply } : {},
+              onBegin: (id) => {
+                exchangeId = id;
+                setup == null ? void 0 : setup.onExchange(id);
+                onExchange == null ? void 0 : onExchange(id);
+              }
+            },
+            (raw2) => raw2
+          )
+        };
       };
       let raw = "";
       for (let attempt = 1; ; attempt++) {
@@ -54445,7 +54350,7 @@ var AiTaskService = class {
     for (; ; ) {
       if (taskSignal == null ? void 0 : taskSignal.aborted) throw cancelled();
       attemptNumber++;
-      const attemptId = (0, import_node_crypto14.randomUUID)();
+      const attemptId = (0, import_node_crypto13.randomUUID)();
       const controller = new AbortController();
       const onTaskAbort = () => controller.abort();
       taskSignal == null ? void 0 : taskSignal.addEventListener("abort", onTaskAbort, { once: true });
@@ -54464,7 +54369,7 @@ var AiTaskService = class {
         if ((taskSignal == null ? void 0 : taskSignal.aborted) || !live() || firstEvent) return;
         resendRequested = true;
         disarm();
-        promisedId = (0, import_node_crypto14.randomUUID)();
+        promisedId = (0, import_node_crypto13.randomUUID)();
         extra.resentAs = promisedId;
         controller.abort();
       };
@@ -54604,7 +54509,7 @@ var AiTaskService = class {
       providerForModel(request.model),
       request.model,
       request.signal,
-      this.exchangeSink(),
+      this.options.exchangeLoggingEnabled() ? this.options.exchanges() : null,
       request.onExchange
     );
   }
@@ -54613,20 +54518,15 @@ var AiTaskService = class {
     var _a2;
     if (id && this.options.exchangeLoggingEnabled()) (_a2 = this.options.exchanges()) == null ? void 0 : _a2.failed(id, reason);
   }
-  /** A guarded view of the exchange log: every write re-checks the logging setting. Null when logging is off. */
-  exchangeSink() {
-    const exchanges = this.options.exchangeLoggingEnabled() ? this.options.exchanges() : null;
-    const record = (write) => (...args) => {
-      if (this.options.exchangeLoggingEnabled()) write(...args);
-    };
-    return exchanges && {
-      begin: (entry) => exchanges.begin(entry),
-      sent: record((id, body, prompt) => exchanges.sent(id, body, prompt)),
-      received: record((id, body) => exchanges.received(id, body)),
-      completed: record((id) => exchanges.completed(id)),
-      failed: record((id, error) => exchanges.failed(id, error)),
-      milestones: record((id, data) => exchanges.milestones(id, data))
-    };
+  /** AiCalls over this service's runtimes in `pluginDirectory`, logging to `exchanges` (taken when the request started) while logging stays on. */
+  callsIn(pluginDirectory, exchanges) {
+    return new AiCalls({
+      runtimeFor: (model) => aiRuntimeForModel(model, {
+        claude: () => this.options.claudeRuntime(pluginDirectory),
+        codex: (local) => this.options.codexRuntime(pluginDirectory, local)
+      }),
+      exchanges: () => exchanges && this.options.exchangeLoggingEnabled() ? exchanges : null
+    });
   }
   diagramsOn() {
     var _a2, _b2;
@@ -54660,15 +54560,15 @@ var AiTaskService = class {
       providerForModel(request.model),
       request.model,
       request.signal,
-      this.exchangeSink()
+      this.options.exchangeLoggingEnabled() ? this.options.exchanges() : null
     );
   }
   /**
    * The chart step: one local, tool-free model call that proposes diagrams for the finished note. Any failure other than
    * a stop leaves the detail unchanged, so a note is never worse for having been offered diagrams.
    */
-  async addCharts(input, detail, countIssues, language2, provider, model, signal, sink, onExchange) {
-    var _a2, _b2, _c, _d;
+  async addCharts(input, detail, countIssues, language2, provider, model, signal, exchanges, onExchange) {
+    var _a2;
     const existing = existingDiagrams(detail);
     const remaining = 3 - existing.count;
     if (remaining <= 0 || !detail.trim()) return detail;
@@ -54682,64 +54582,57 @@ var AiTaskService = class {
       remaining,
       provider
     });
-    let exchangeId = "";
-    const runner = new StepRunner(
-      runtimeStepProvider({
-        claude: () => this.options.claudeRuntime(pluginDirectory),
-        codex: (local) => this.options.codexRuntime(pluginDirectory, local),
-        exchanges: () => sink,
-        localCodex: true
-      })
-    );
-    const refuse = (code) => {
-      var _a3;
-      console.warn("Visual Agent Map chart step", code);
-      if (exchangeId && this.options.exchangeLoggingEnabled())
-        (_a3 = this.options.exchanges()) == null ? void 0 : _a3.failed(exchangeId, translate(this.options.language(), "log.chart_not_added_0", code));
+    const aborted = (error) => !!(signal == null ? void 0 : signal.aborted) || error instanceof Error && error.name === "AbortError";
+    const codeOf = (error) => error instanceof ChartRejected ? error.code : "runtime_error";
+    const notAdded = (code) => translate(this.options.language(), "log.chart_not_added_0", code);
+    const warn = (code) => console.warn("Visual Agent Map chart step", code);
+    const refuse = (code, exchange) => {
+      warn(code);
+      exchange.fail(notAdded(code));
       return detail;
     };
+    const calls = this.callsIn(pluginDirectory, exchanges);
     try {
-      const { raw } = await runner.send(step, {
-        model,
-        effort: "low",
-        topic: input.title,
-        mode: (_a2 = input.mode) != null ? _a2 : "task",
-        task: {
-          signal,
-          timeoutMs: 18e4,
-          timeoutMessage: translate(this.options.language(), "ui.ai_task_exceeded_0_minutes", 3),
-          webSearch: false,
-          textOnly: true,
-          searchBudget: 0
+      return await calls.run(
+        step,
+        {
+          model,
+          effort: "low",
+          topic: input.title,
+          mode: (_a2 = input.mode) != null ? _a2 : "task",
+          taskName: "chart",
+          signal: signal != null ? signal : new AbortController().signal,
+          localCodex: true,
+          requestLog: "request",
+          stopped: () => new DOMException("Aborted", "AbortError"),
+          failMessage: (error) => aborted(error) ? error instanceof Error ? error.message : String(error) : notAdded(codeOf(error)),
+          onBegin: onExchange,
+          task: {
+            timeoutMs: 18e4,
+            timeoutMessage: translate(this.options.language(), "ui.ai_task_exceeded_0_minutes", 3),
+            webSearch: false,
+            textOnly: true,
+            searchBudget: 0
+          }
         },
-        finish: "caller",
-        requestLog: "request",
-        onExchange: (id) => {
-          exchangeId = id;
-          onExchange == null ? void 0 : onExchange(id);
+        async (raw, exchange) => {
+          if (signal == null ? void 0 : signal.aborted) throw new DOMException("Aborted", "AbortError");
+          const charts = step.parse(raw);
+          const applied = await applyCharts(detail, charts, { remaining, parses: this.options.mermaidParses });
+          if (!applied.ok) return refuse(applied.code, exchange);
+          const template = input.detailTemplate;
+          if (countIssues && template && input.detailFormat !== "adaptive") {
+            const after = checkCounts(canonicalDetail(applied.detail, noteLanguageOf(language2), template), template);
+            if (JSON.stringify(after) !== JSON.stringify(countIssues)) return refuse("counts_changed", exchange);
+          }
+          exchange.parsed();
+          return applied.detail;
         }
-      });
-      if (signal == null ? void 0 : signal.aborted) throw new DOMException("Aborted", "AbortError");
-      const charts = step.parse(raw);
-      const applied = await applyCharts(detail, charts, { remaining, parses: this.options.mermaidParses });
-      if (!applied.ok) return refuse(applied.code);
-      const template = input.detailTemplate;
-      if (countIssues && template && input.detailFormat !== "adaptive") {
-        const after = checkCounts(canonicalDetail(applied.detail, noteLanguageOf(language2), template), template);
-        if (JSON.stringify(after) !== JSON.stringify(countIssues)) return refuse("counts_changed");
-      }
-      if (this.options.exchangeLoggingEnabled() && exchangeId) {
-        (_b2 = this.options.exchanges()) == null ? void 0 : _b2.parsed(exchangeId);
-        (_c = this.options.exchanges()) == null ? void 0 : _c.completed(exchangeId);
-      }
-      return applied.detail;
+      );
     } catch (error) {
-      if ((signal == null ? void 0 : signal.aborted) || error instanceof Error && error.name === "AbortError") {
-        if (exchangeId && this.options.exchangeLoggingEnabled())
-          (_d = this.options.exchanges()) == null ? void 0 : _d.failed(exchangeId, error instanceof Error ? error.message : String(error));
-        throw error;
-      }
-      return refuse(error instanceof ChartRejected ? error.code : "runtime_error");
+      if (aborted(error)) throw error;
+      warn(codeOf(error));
+      return detail;
     }
   }
   async extractReferenceFindings(context, model, reasoning, signal, onRequestAccepted) {
@@ -57534,7 +57427,7 @@ ${t("ui.organize_link_wait_hint")}`;
       normalizeReasoningLevel(session.reasoning)
     );
     const exchanges = this.settings.aiExchangeLoggingEnabled ? this.exchanges : null;
-    const id = (0, import_node_crypto15.randomUUID)();
+    const id = (0, import_node_crypto14.randomUUID)();
     const key2 = `coffee:${id}`;
     const controller = new AbortController();
     const abort = () => controller.abort();

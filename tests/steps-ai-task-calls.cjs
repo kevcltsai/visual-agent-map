@@ -98,8 +98,12 @@ test('main task controls: signal reaches the runtime and aborts with the caller,
   assert.equal(controls.webSearch, true); assert.equal(controls.searchBudget, 0); assert.equal(controls.webSearchOnly, true); assert.equal(controls.textOnly, false);
   assert.ok(controls.signal instanceof AbortSignal);
   assert.equal(controls.signal.aborted, false);
-  controller.abort();
-  assert.equal(controls.signal.aborted, true, 'the caller\'s abort reaches the runtime signal');
+  // D-2026-10-318: the runtime signal belongs to AiCalls and follows the caller's only while the call runs.
+  assert.notEqual(controls.signal, controller.signal);
+  const midCall = new AbortController(); let seen;
+  const m = rig({ handler: call => { seen = call.controls.signal; assert.equal(seen.aborted, false); midCall.abort(); assert.equal(seen.aborted, true, 'the caller\'s abort reaches the runtime signal'); return answer(call); } });
+  await assert.rejects(m.service.askModel(context(), 'gpt-6-luna', 'low', midCall.signal), error => error.name === 'AbortError');
+  assert.notEqual(seen, midCall.signal);
 });
 
 // ---- 2. failures ----
@@ -334,8 +338,12 @@ test('chart success: begin(chart.add@1), ox, sent(request only), received, miles
   assert.equal(controls.webSearch, false); assert.equal(controls.textOnly, true); assert.equal(controls.searchBudget, 0);
   assert.deepEqual(h.state.routes, [['codex', '/plugin', true]]);
   assert.equal(controls.signal.aborted, false);
-  controller.abort();
-  assert.equal(controls.signal.aborted, true, 'the caller\'s abort reaches the runtime signal');
+  // D-2026-10-318: the runtime signal belongs to AiCalls and follows the caller's only while the call runs.
+  assert.notEqual(controls.signal, controller.signal);
+  const midCall = new AbortController(); let seen;
+  const m = chartRig(call => { seen = call.controls.signal; assert.equal(seen.aborted, false); midCall.abort(); assert.equal(seen.aborted, true, 'the caller\'s abort reaches the runtime signal'); return answer(call, chartReply()); });
+  await assert.rejects(withWarn(() => m.service.chartDetail({ input: chartBase(), detail: NOTE, model: 'gpt-6-luna', signal: midCall.signal })), error => error.name === 'AbortError');
+  assert.notEqual(seen, midCall.signal);
 });
 
 test('chart refused by the rules (number, counts, invalid reply): one failed with chart_not_added_0, no completed, one warn, detail unchanged', async () => {

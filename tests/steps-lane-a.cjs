@@ -70,7 +70,15 @@ test('controls reach the runtime unchanged: abort signal, timeout, search flags,
   const fake = runtime(GOOD), controller = new AbortController(), accepted = () => {}, web = () => {};
   await makeService(fake).askModel(context({ researchMode: 'research', timeoutMs: 240_000, aimIsolatedResearch: true }), 'gpt-6-luna', 'low', controller.signal, undefined, accepted, web);
   const controls = fake.calls[0].controls;
-  assert.equal(controls.signal, controller.signal); assert.equal(controls.onAccepted, accepted); assert.equal(controls.onWebSearchEvent, web);
+  // The runtime gets AiCalls' own signal, linked to the caller's: a caller stop reaches it and a reply that arrives later is refused.
+  assert.notEqual(controls.signal, controller.signal);
+  {
+    const stopper = new AbortController(); let seen;
+    const stopping = { runTask: async (_prompt, _model, _effort, _schema, runControls) => { seen = runControls.signal; assert.equal(seen.aborted, false); stopper.abort(); assert.equal(seen.aborted, true, 'the caller stop reaches the runtime signal'); return GOOD; } };
+    await assert.rejects(makeService(stopping).askModel(context(), 'gpt-6-luna', 'low', stopper.signal), error => error.name === 'AbortError');
+    assert.notEqual(seen, stopper.signal);
+  }
+  assert.equal(controls.onAccepted, accepted); assert.equal(controls.onWebSearchEvent, web);
   assert.equal(controls.timeoutMs, 240_000); assert.ok(controls.timeoutMessage);
   assert.equal(controls.webSearch, true); assert.equal(controls.searchBudget, 0); assert.equal(controls.webSearchOnly, true); assert.equal(controls.textOnly, false);
   assert.ok(fake.calls[0].schema.required.includes('searchStatus'), 'isolated web research selects the web research schema');
@@ -136,10 +144,11 @@ test('the lane keys are gone from i18n.ts and every fragment has a zh and an en 
   }
 });
 
-test('architecture: ai-task-service sends model calls only through the Step Runner provider, and no lane file reads a removed key', () => {
+test('architecture: ai-task-service sends model calls only through AiCalls, and no lane file reads a removed key', () => {
   const service = fs.readFileSync(path.join(root, 'core', 'ai-task-service.ts'), 'utf8');
   assert.doesNotMatch(service, /\.runTask\(/, 'AiTaskService must not call a runtime directly');
-  assert.match(service, /runtimeStepProvider\(/);
+  assert.equal((service.match(/calls\.run\(\s*step,/g) ?? []).length, 2);
+  assert.doesNotMatch(service, /runtimeStepProvider\(|new StepRunner\(|finish: "caller"/);
   for (const file of ['core/ai-task-service.ts', 'core/steps/task/render.ts', 'ai/aim-prompt.ts', 'ai/visual-guidance.ts', 'experiences/visual-map/view.ts', 'experiences/visual-map/thinking-origin.ts'])
     assert.doesNotMatch(fs.readFileSync(path.join(root, file), 'utf8'), /["`]prompt\.[a-z_]+["`]/, `${file} must not read a prompt.* i18n key`);
 });

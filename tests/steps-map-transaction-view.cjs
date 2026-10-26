@@ -152,3 +152,109 @@ test('a failing reload after a saved change keeps the change and its history ent
   assert.equal(h.exists(h.loose), false, 'the note stays moved');
   assert.deepEqual(h.notices, ['The change was saved, but the view could not refresh. Reopen the map to see it.']);
 });
+
+// removeToUnassigned (MapTransaction 02): a root with a child and a grandchild, plus a sibling to adopt the children.
+async function branchHarness() {
+  const h = await harness();
+  const doc = await h.repo.readMap(MAP);
+  const make = async (title, parentId, x, y) => {
+    const note = await h.repo.createNote(title, 'gpt-6-luna', doc, MAP, 'workspace');
+    return { ...note, parentId, x, y, collapsed: true };
+  };
+  const child = await make('Child', h.rootNode.id, 300, 0), grand = await make('Grand', child.id, 600, 0), sibling = await make('Sibling', null, 80, 400);
+  doc.nodes = [doc.nodes.find(n => n.id === h.rootNode.id), child, grand, sibling];
+  await h.repo.saveMap(MAP, doc);
+  await h.repo.rebuildDerivedData();
+  h.view.map = await h.repo.readMap(MAP);
+  await h.view.hydrate();
+  h.doc = h.view.map;
+  h.node = id => h.view.map.nodes.find(n => n.id === id);
+  h.ids = { root: h.rootNode.id, child: child.id, grand: grand.id, sibling: sibling.id };
+  return h;
+}
+
+test('removeToUnassigned R1: a second setLifecycle that fails puts every note, lifecycle and Map.md back and leaves no entry', async () => {
+  const h = await branchHarness();
+  const before = h.snapshot(), paths = h.view.map.nodes.map(n => n.path);
+  const lifecycles = await Promise.all(paths.map(h.lifecycleOf));
+  const root = h.node(h.ids.root);
+  h.fail.setLifecycle = n => n === 2;
+  const error = await h.rejected(h.view.removeToUnassigned(root, true));
+  assert.match(error.message, /injected setLifecycle/);
+  assert.deepEqual(h.snapshot(), before, 'Vault equals the state before');
+  for (const [i, p] of paths.entries()) assert.deepEqual(await h.lifecycleOf(p), lifecycles[i]);
+  assert.equal(h.view.history.canUndo, false);
+});
+
+test('removeToUnassigned R2: a rebuild that fails after Map.md is saved restores files, lifecycle and Map.md, with no entry', async () => {
+  const h = await branchHarness();
+  const before = h.snapshot(), paths = h.view.map.nodes.map(n => n.path);
+  const lifecycles = await Promise.all(paths.map(h.lifecycleOf));
+  let failed = false;
+  h.view.plugin.rebuildDerivedData = async () => { if (!failed) { failed = true; throw new Error('injected rebuild'); } return h.repo.rebuildDerivedData(); };
+  const error = await h.rejected(h.view.removeToUnassigned(h.node(h.ids.root), true));
+  assert.match(error.message, /injected rebuild/);
+  assert.deepEqual(h.snapshot(), before);
+  for (const [i, p] of paths.entries()) assert.deepEqual(await h.lifecycleOf(p), lifecycles[i]);
+  assert.equal(h.view.history.canUndo, false);
+  assert.equal(h.view.map.nodes.length, 4, 'view map is back too');
+});
+
+test('removeToUnassigned R3: undo after a parked note was moved away outside refuses with stale and changes nothing', async () => {
+  const h = await branchHarness();
+  const grandPath = h.node(h.ids.grand).path;
+  await h.view.removeToUnassigned(h.node(h.ids.root), true);
+  const parked = [...h.contents.keys()].filter(p => p.startsWith(`${TOPICS}/map-u/Unassigned/`));
+  assert.equal(parked.length, 3);
+  await h.app.vault.rename(h.file(parked[1]), `${TOPICS}/map-u/Moved by hand.md`);
+  const before = h.snapshot();
+  const error = await h.rejected(h.view.travel(false));
+  assert.equal(error.kind, 'stale');
+  assert.equal(h.view.history.canUndo, true, 'pointer restored');
+  assert.deepEqual(h.snapshot(), before);
+  assert.equal(h.exists(grandPath), false);
+});
+
+test('removeToUnassigned R4: undo after an unrecorded structural write to Map.md refuses and keeps that write', async () => {
+  const h = await branchHarness();
+  await h.view.removeToUnassigned(h.node(h.ids.child), false);
+  const outside = await h.repo.readMap(MAP);
+  outside.title = 'Written by AIM';
+  await h.repo.saveMap(MAP, outside);
+  h.view.map = await h.repo.readMap(MAP);
+  const before = h.snapshot();
+  const error = await h.rejected(h.view.travel(false));
+  assert.equal(error.kind, 'stale');
+  assert.deepEqual(h.snapshot(), before);
+  assert.equal((await h.repo.readMap(MAP)).title, 'Written by AIM');
+});
+
+test('removeToUnassigned V1: adopter takes the children and expands; undo restores everything and redo returns the removed state', async () => {
+  const h = await branchHarness();
+  const before = h.snapshot(), original = JSON.stringify(h.view.map);
+  const { child, grand, sibling } = h.ids;
+  await h.view.removeToUnassigned(h.node(h.ids.root), false, sibling);
+  const after = h.snapshot(), afterMap = JSON.stringify(h.view.map);
+  assert.equal(h.node(child).parentId, sibling);
+  assert.equal(h.node(grand).parentId, child);
+  assert.equal(h.node(sibling).collapsed, false);
+  assert.equal(h.node(h.ids.root), undefined);
+  assert.equal(h.view.selected, null);
+  await h.view.travel(false);
+  assert.deepEqual(h.snapshot(), before);
+  assert.equal(JSON.stringify(h.view.map), original);
+  await h.view.travel(true);
+  assert.deepEqual(h.snapshot(), after);
+  assert.equal(JSON.stringify(h.view.map), afterMap);
+});
+
+test('removeToUnassigned V2: undo keeps the viewport the user has panned to', async () => {
+  const h = await branchHarness();
+  await h.view.removeToUnassigned(h.node(h.ids.sibling), false);
+  h.view.map.viewport = { x: 123, y: -45, zoom: 1.5 };
+  await h.view.travel(false);
+  assert.equal(JSON.stringify(h.view.map.viewport), JSON.stringify({ x: 123, y: -45, zoom: 1.5 }));
+  assert.equal(h.view.map.nodes.length, 4);
+  await h.view.travel(true);
+  assert.equal(JSON.stringify(h.view.map.viewport), JSON.stringify({ x: 123, y: -45, zoom: 1.5 }));
+});

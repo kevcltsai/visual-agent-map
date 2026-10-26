@@ -4193,52 +4193,33 @@ export class VisualAgentMapView extends ItemView {
     );
     this.assertAimReferencesRemain(before, ids, false, removableQuestions);
     const removed = before.nodes.filter(item => ids.has(item.id)),
-      moves: FileMove[] = [];
-    try {
-      for (const item of removed) {
-        const target = await this.plugin.repo.moveUnique(
-          item.path,
-          this.plugin.repo.topicFolder(this.path, "Unassigned")
-        );
-        moves.push({ activePath: item.path, parkedPath: target, topicId: before.id, parkedState: "unassigned" });
-        await this.plugin.repo.setLifecycle(target, before.id, "", "unassigned");
-      }
-      const after = clone(before);
-      const adopted = new Set<string>();
-      if (adopterId)
-        for (const item of after.nodes)
-          if (item.parentId === node.id) {
-            item.parentId = adopterId;
-            adopted.add(item.id);
-            for (const id of descendants(after.nodes, item.id)) adopted.add(id);
-          }
-      after.nodes = removeNodes(after.nodes, node.id, branch);
-      if (adopterId && adopted.size) {
-        const adopter = after.nodes.find(item => item.id === adopterId);
-        if (adopter) adopter.collapsed = false;
-        after.nodes = arrangeNewBranch(after.nodes, adopterId, adopted, this.cardHeightOf);
-      }
-      this.removeAimReferences(after, ids, before.nodes);
-      await this.plugin.repo.saveMap(this.path, after);
-      this.map = after;
-      this.selected = null;
-      this.multiSelected.clear();
-      await this.plugin.rebuildDerivedData();
-      await this.hydrate();
-      this.history.push({
-        undo: () => this.restoreLifecycle(before, moves, false),
-        redo: () => this.restoreLifecycle(after, moves, true)
-      });
-      this.render();
-    } catch (error) {
-      for (const move of [...moves].reverse())
-        if (
-          this.app.vault.getAbstractFileByPath(move.parkedPath) &&
-          !this.app.vault.getAbstractFileByPath(move.activePath)
-        )
-          await this.plugin.repo.moveExact(move.parkedPath, move.activePath);
-      throw error;
-    }
+      parkFolder = this.plugin.repo.topicFolder(this.path, "Unassigned");
+    const tx = this.beginMapTransaction();
+    for (const item of removed) tx.park(item.path, parkFolder, before.id, "unassigned");
+    const entry = await tx
+      .editMap(this.path, map => {
+        const prior = clone(map);
+        const adopted = new Set<string>();
+        if (adopterId)
+          for (const item of map.nodes)
+            if (item.parentId === node.id) {
+              item.parentId = adopterId;
+              adopted.add(item.id);
+              for (const id of descendants(map.nodes, item.id)) adopted.add(id);
+            }
+        map.nodes = removeNodes(map.nodes, node.id, branch);
+        if (adopterId && adopted.size) {
+          const adopter = map.nodes.find(item => item.id === adopterId);
+          if (adopter) adopter.collapsed = false;
+          map.nodes = arrangeNewBranch(map.nodes, adopterId, adopted, this.cardHeightOf);
+        }
+        this.removeAimReferences(map, ids, prior.nodes);
+      })
+      .commit();
+    this.selected = null;
+    this.multiSelected.clear();
+    this.history.push(entry);
+    await this.refreshAfterSavedChange();
   }
   private mergeBusy(node: MapNode, except?: MergeTask): boolean {
     const batch = this.plugin.expansionBatches?.get(this.multiResearchKey()),

@@ -168,7 +168,7 @@ test('Fix connection checks the chosen model service and quietly refreshes the o
   const { default: Plugin } = load('main.ts', { obsidian });
   const run = (model, claudeInstalled = true) => {
     const calls = [], plugin = Object.create(Plugin.prototype);
-    Object.assign(plugin, { settings: { cliModel: 'gpt-test' },
+    Object.assign(plugin, { aiRuntime: new Plugin().aiRuntime, settings: { cliModel: 'gpt-test' },
       recheckCodex: async guide => { calls.push(['recheckCodex', guide]); }, recheckClaude: async () => { calls.push(['recheckClaude']); },
       openClaudeSetupGuide: () => calls.push(['claudeGuide']), claudeDiagnostic: () => ({ installed: claudeInstalled }),
       refreshModelDiscovery: async provider => { calls.push(['refresh', provider]); } });

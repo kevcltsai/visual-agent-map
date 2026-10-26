@@ -26,14 +26,14 @@ const newPlugin = () => {
 test('plugin: prewarmClaudeStep starts the step\'s own command (model id, effort rule, its schema, no web tools); a Codex model releases; after unload nothing starts', () => {
   const plugin = newPlugin();
   const calls = [];
-  plugin.claudeCli = directory => ({ prewarm: (...args) => { calls.push([directory, ...args]); return true; } });
+  plugin.aiRuntime.claude = directory => ({ prewarm: (...args) => { calls.push([directory, ...args]); return true; } });
   plugin.prewarmClaudeStep('claude:sonnet', 'auto', grade.RELEVANCE_GRADE_SCHEMA);
   plugin.prewarmClaudeStep('claude:opus', 'high', grade.RELEVANCE_RECALIBRATE_SCHEMA);
   assert.deepEqual(calls.map(call => [call[0], call[1], call[2], call[3] === grade.RELEVANCE_GRADE_SCHEMA, call[4]]), [['/plugin', 'sonnet', 'low', true, false], ['/plugin', 'opus', 'high', false, false]], 'auto is low, like the run');
   assert.equal(calls[1][3], grade.RELEVANCE_RECALIBRATE_SCHEMA);
   assert.equal(stepEffort('auto'), 'low'); assert.equal(stepEffort('medium'), 'medium');
   let released = 0;
-  plugin.aiRuntime = { releaseWarm: () => { released++; }, reset: () => { released += 10; }, dispose: () => { released += 100; } };
+  Object.assign(plugin.aiRuntime, { releaseWarm: () => { released++; }, reset: () => { released += 10; }, dispose: () => { released += 100; } });
   plugin.prewarmClaudeStep('gpt-test', 'low', grade.RELEVANCE_GRADE_SCHEMA);
   assert.equal(released, 1, 'Codex starts nothing and drops a waiting process'); assert.equal(calls.length, 2);
   plugin.pluginDirectory = () => { throw new Error('no folder'); };

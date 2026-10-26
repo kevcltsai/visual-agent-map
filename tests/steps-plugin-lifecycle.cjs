@@ -104,7 +104,7 @@ test('W2c plugin: prewarmClaude for a synthesis resolves auto to medium like the
   const plugin = newPlugin();
   const calls = [];
   plugin.pluginDirectory = () => '/plugin';
-  plugin.claudeCli = () => ({ prewarm: (...args) => { calls.push([args[0], args[1], args[3]]); return true; } });
+  plugin.aiRuntime.claude = () => ({ prewarm: (...args) => { calls.push([args[0], args[1], args[3]]); return true; } });
   plugin.settings.cliReasoning = 'auto';
   plugin.prewarmClaude('claude:sonnet', undefined, false, 'synthesize');
   plugin.prewarmClaude('claude:sonnet', 'auto', true, 'merge');
@@ -123,7 +123,7 @@ test('S6 plugin: prewarmClaude pre-starts a Claude command (model id, effort, re
   const plugin = newPlugin();
   const calls = [];
   plugin.pluginDirectory = () => '/plugin';
-  plugin.claudeCli = directory => ({ prewarm: (...args) => { calls.push([directory, args[0], args[1], args[2] && args[2].type, args[3]]); return true; } });
+  plugin.aiRuntime.claude = directory => ({ prewarm: (...args) => { calls.push([directory, args[0], args[1], args[2] && args[2].type, args[3]]); return true; } });
   plugin.settings.cliReasoning = 'auto';
   plugin.prewarmClaude('claude:sonnet', undefined);
   plugin.prewarmClaude('claude:opus', 'high');
@@ -132,7 +132,7 @@ test('S6 plugin: prewarmClaude pre-starts a Claude command (model id, effort, re
   assert.equal(calls.at(-1)[4], false, 'a local run pre-starts the command without web tools');
   calls.pop();
   let released = 0;
-  plugin.aiRuntime = { releaseWarm: () => { released++; }, reset: () => { released += 10; }, dispose: () => { released += 100; } };
+  Object.assign(plugin.aiRuntime, { releaseWarm: () => { released++; }, reset: () => { released += 10; }, dispose: () => { released += 100; } });
   plugin.prewarmClaude('gpt-test');
   assert.equal(released, 1, 'a Codex model has nothing to pre-start and drops a waiting process');
   plugin.releaseWarmClaude();

@@ -5,23 +5,26 @@ import { fileURLToPath } from "node:url";
 
 const root = fileURLToPath(new URL("..", import.meta.url));
 const shards = Math.max(1, Number(process.env.VAM_TEST_SHARDS) || 3);
-const parts = [
+export const parts = [
   ...Array.from({ length: shards }, (_, i) => ({ name: `run.cjs shard ${i + 1}/${shards}`, args: ["tests/run.cjs", "--layer=integration", `--shard=${i + 1}/${shards}`] })),
   { name: "test-vault.mjs", args: ["--test", "tests/test-vault.mjs"] },
 ];
 
 const run = part => new Promise(resolve => {
   const child = spawn(process.execPath, part.args, { cwd: root, stdio: ["ignore", "pipe", "pipe"] });
-  let output = "";
-  child.stdout.on("data", chunk => { output += chunk; });
-  child.stderr.on("data", chunk => { output += chunk; });
-  child.on("close", code => resolve({ ...part, code, output }));
+  const chunks = [];
+  child.stdout.on("data", chunk => chunks.push(chunk));
+  child.stderr.on("data", chunk => chunks.push(chunk));
+  child.on("close", code => resolve({ ...part, code, output: Buffer.concat(chunks).toString("utf8") }));
   child.on("error", error => resolve({ ...part, code: 1, output: String(error) }));
 });
 
-let failed = false;
-await Promise.all(parts.map(part => run(part).then(result => {
-  process.stdout.write(`\n=== ${result.name} (exit ${result.code}) ===\n${result.output}`);
-  if (result.code !== 0) failed = true;
-})));
-process.exit(failed ? 1 : 0);
+async function main() {
+  let failed = false;
+  await Promise.all(parts.map(part => run(part).then(result => {
+    process.stdout.write(`\n=== ${result.name} (exit ${result.code}) ===\n${result.output}`);
+    if (result.code !== 0) failed = true;
+  })));
+  process.exit(failed ? 1 : 0);
+}
+if (process.argv[1] && fileURLToPath(import.meta.url) === process.argv[1]) await main();

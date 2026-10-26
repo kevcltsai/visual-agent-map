@@ -1,4 +1,4 @@
-import type { AiTaskServiceOptions } from "../../core/ai-task-service";
+import type { AiCalls } from "../../core/ai-calls";
 import { providerStepRunner, type ProviderStepRunner } from "../../core/provider-step-runner";
 import { prepareStep, type StepDefinition } from "../../core/step-runner";
 import {
@@ -69,11 +69,8 @@ export function buildShareTranslatePrompt(request: ShareTranslateRequest): strin
 export function buildShareTranslateLabelsPrompt(request: ShareTranslateRequest): string {
   return shareTranslateLabelsStep.render(request);
 }
-export function providerShareTranslateRunner(
-  options: AiTaskServiceOptions,
-  activeTasks: Map<string, AbortController>
-): ShareTranslateRunner {
-  return providerStepRunner<ShareTranslateRequest, ShareTranslateOutput>(options, activeTasks, {
+export function providerShareTranslateRunner(aiCalls: AiCalls): ShareTranslateRunner {
+  return providerStepRunner<ShareTranslateRequest, ShareTranslateOutput>(aiCalls, {
     name: "share-translate",
     topic: request => `Share translation · ${request.targetLanguage}`,
     stopped: () => new ShareTranslateError("stopped", "Share translation stopped")

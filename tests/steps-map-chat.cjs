@@ -2,13 +2,15 @@
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
 const { load } = require('./support-replay.cjs');
+const { loadWithAiCalls, aiCallsFor } = require('./support-ai-calls.cjs');
 const { estimateTokens } = load('ai/context-builder.ts');
 const { MAP_CHAT_TOKEN_BUDGET, mapChatStep, parseMapChat, MAP_CHAT_SCHEMA, MAP_CHAT_ACTION_KINDS, MAP_RUN_ACTIONS, MapChatError } = load('core/steps/map-chat/step.ts');
 const { buildMapChatContext, contentHash, isMdStale, MAP_CHAT_MAP_TITLE_LIMIT } = load('core/map-chat-context.ts');
 const { aiModeOptions } = load('experiences/visual-map/ai-mode.ts');
 const { planFor, matchMapTitle, chatResearchRequest, MAP_CHAT_PLAN_ACTION_LIMIT, MAP_CHAT_PLAN_RESEARCH_LIMIT, MAP_CHAT_FIND_IMAGES_LIMIT } = load('core/map-chat-plan.ts');
 const { guardMapChatWrite, normalizeVaultPath, applyMdEdit } = load('core/map-chat-guard.ts');
-const { partialReply, MapChatService, providerMapChatRunner } = load('core/map-chat-service.ts');
+const mapChatService = loadWithAiCalls('core/map-chat-service.ts');
+const { partialReply, MapChatService, providerMapChatRunner } = mapChatService;
 const { History, serializeMap } = load('map-model.ts');
 
 const CONFIG = '.obsidian';
@@ -747,7 +749,7 @@ test('B3 web flags: the chat request is text only with no search budget; the pic
   const calls = [];
   const runtime = { runTask: async (...args) => { calls.push(args); return JSON.stringify({ reply: 'ok', actions: [] }); } };
   const options = { pluginDirectory: () => '/plugin', exchangeLoggingEnabled: () => false, exchanges: () => null, codexRuntime: () => runtime, claudeRuntime: () => runtime };
-  const service = new MapChatService(providerMapChatRunner(options, new Map()));
+  const service = new MapChatService(providerMapChatRunner(aiCallsFor(mapChatService, options, new Map())));
   await service.chat(request({ model: 'gpt-6-luna' }), new AbortController().signal);
   const controls = calls[0][4];
   assert.equal(controls.textOnly, true, 'the chat itself reads only what it is given'); assert.equal(controls.searchBudget, 0); assert.ok(!controls.webSearch && !controls.webSearchOnly);

@@ -6,10 +6,11 @@ const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
 const { load } = require('./support-replay.cjs');
+const { loadWithAiCalls, aiCallsFor } = require('./support-ai-calls.cjs');
 const { obsidian } = require('./support.cjs');
 
-const outline = load('core/outline-generation-service.ts', { obsidian });
-const review = load('core/structure-review-service.ts');
+const outline = loadWithAiCalls('core/outline-generation-service.ts', { obsidian });
+const review = loadWithAiCalls('core/structure-review-service.ts');
 const { prepareStep } = load('core/step-runner.ts');
 const { outlineGenerateStep, OUTLINE_GENERATE_TOKEN_BUDGET } = load('core/steps/outline-generate/step.ts', { obsidian });
 const { structureReviewStep, STRUCTURE_REVIEW_TOKEN_BUDGET } = load('core/steps/structure-review/step.ts');
@@ -94,7 +95,7 @@ function serviceFixture(reply, model = 'gpt-6-luna') {
 
 test('outline service: provider path sends the prompt with no schema, logs the step label, returns parsed nodes', async () => {
   const fx = serviceFixture('```markdown\n# Root\n## A\n```');
-  const service = new outline.OutlineGenerationService(outline.providerOutlineRunner(fx.options, fx.active));
+  const service = new outline.OutlineGenerationService(outline.providerOutlineRunner(aiCallsFor(outline, fx.options, fx.active)));
   const result = await service.generate(outlineRequest(), new AbortController().signal);
   assert.equal(result.nodes.length, 2); assert.equal(fx.active.size, 0);
   const [prompt, model, effort, schema, controls] = fx.calls[0];
@@ -106,7 +107,7 @@ test('outline service: provider path sends the prompt with no schema, logs the s
 
 test('outline service: invalid reply rejects with the typed error and nothing is returned; empty topic never reaches the provider', async () => {
   const fx = serviceFixture('Sorry, I cannot do that.');
-  const service = new outline.OutlineGenerationService(outline.providerOutlineRunner(fx.options, fx.active));
+  const service = new outline.OutlineGenerationService(outline.providerOutlineRunner(aiCallsFor(outline, fx.options, fx.active)));
   await assert.rejects(service.generate(outlineRequest(), new AbortController().signal), error => error.code === 'no_headings');
   assert.equal(fx.active.size, 0);
   await assert.rejects(service.generate(outlineRequest({ topic: ' ' }), new AbortController().signal), error => error.code === 'empty_topic');
@@ -115,13 +116,13 @@ test('outline service: invalid reply rejects with the typed error and nothing is
 
 test('outline service: a stop before or during the call surfaces as the stopped error and a late reply is dropped', async () => {
   const fx = serviceFixture('# Root');
-  const service = new outline.OutlineGenerationService(outline.providerOutlineRunner(fx.options, fx.active));
+  const service = new outline.OutlineGenerationService(outline.providerOutlineRunner(aiCallsFor(outline, fx.options, fx.active)));
   const early = new AbortController(); early.abort();
   await assert.rejects(service.generate(outlineRequest(), early.signal), error => error.code === 'stopped' && /stopped/.test(error.message));
   assert.equal(fx.calls.length, 0);
   const controller = new AbortController();
   const late = serviceFixture(() => { controller.abort(); return '# Root\n## A'; });
-  const lateService = new outline.OutlineGenerationService(outline.providerOutlineRunner(late.options, late.active));
+  const lateService = new outline.OutlineGenerationService(outline.providerOutlineRunner(aiCallsFor(outline, late.options, late.active)));
   await assert.rejects(lateService.generate(outlineRequest(), controller.signal), error => error.code === 'stopped');
   assert.equal(late.active.size, 0);
 });
@@ -228,14 +229,14 @@ test('staleness: a suggestion is stale when the map moved on and fresh when it s
 
 test('structure service: strict JSON path with schema, step label, rejected list; stop and malformed reply fail typed', async () => {
   const fx = serviceFixture(reply(item(), item({ targetId: 'ghost' })));
-  const service = new review.StructureReviewService(review.providerStructureReviewRunner(fx.options, fx.active));
+  const service = new review.StructureReviewService(review.providerStructureReviewRunner(aiCallsFor(review, fx.options, fx.active)));
   const result = await service.review(reviewRequest(), new AbortController().signal);
   assert.equal(result.suggestions.length, 1); assert.equal(result.rejected.length, 1); assert.equal(fx.active.size, 0);
   const [prompt, , , schema] = fx.calls[0];
   assert.equal(prompt, review.buildStructureReviewPrompt(reviewRequest())); assert.equal(JSON.stringify(schema), JSON.stringify(review.STRUCTURE_REVIEW_SCHEMA));
   assert.equal(fx.log.getEntries()[0].step, 'structure-review@1'); assert.equal(fx.log.getEntries()[0].status, 'completed');
   const bad = serviceFixture('{"suggestions":[{"kind":"zap"}]}');
-  await assert.rejects(new review.StructureReviewService(review.providerStructureReviewRunner(bad.options, bad.active)).review(reviewRequest(), new AbortController().signal), error => error.code === 'invalid');
+  await assert.rejects(new review.StructureReviewService(review.providerStructureReviewRunner(aiCallsFor(review, bad.options, bad.active))).review(reviewRequest(), new AbortController().signal), error => error.code === 'invalid');
   assert.equal(bad.log.getEntries()[0].status, 'failed');
   await assert.rejects(service.review(reviewRequest({ nodes: [] }), new AbortController().signal), error => error.code === 'empty');
   await assert.rejects(service.review(reviewRequest({ rootQuestion: 'x'.repeat(STRUCTURE_REVIEW_TOKEN_BUDGET * 4 + 1) }), new AbortController().signal), error => error.code === 'over_budget');

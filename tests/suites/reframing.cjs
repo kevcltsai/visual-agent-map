@@ -217,10 +217,10 @@ integrationTest('Coffee becoming busy during the final snapshot read blocks hand
   coffeeFind(data.modal.contentEl,e=>e.text==='Create research map').onclick();await until(()=>!data.modal.creating);assert.equal((await data.repo.mapFiles()).length,0);assert.match(data.modal.status.text,/generating/);
 });
 integrationTest('Reframing exchange logs record validation failure and clean active controllers', async () => {
-  const {providerReframeRunner,ReframingService}=load('core/reframing-service.ts');const states=[];const active=new Map();
+  const {loadWithAiCalls,aiCallsFor}=require('../support-ai-calls.cjs');const reframing=loadWithAiCalls('core/reframing-service.ts');const {providerReframeRunner,ReframingService}=reframing;const states=[];const active=new Map();
   const log={milestones:()=>{},begin:()=>states.push('begin'),sent:()=>{},received:()=>states.push('received'),parsed:()=>states.push('parsed'),completed:()=>states.push('completed'),failed:()=>states.push('failed')};
   const options={pluginDirectory:()=>'/plugin',exchangeLoggingEnabled:()=>true,exchanges:()=>log,codexRuntime:()=>({runTask:async()=>'{"question":"Q?","context":"","rationale":"r"}'})};
-  const service=new ReframingService(providerReframeRunner(options,active));
+  const service=new ReframingService(providerReframeRunner(aiCallsFor(reframing,options,active)));
   await assert.rejects(service.reframe({targetCore:'understand',source:'idea',question:'Q?',context:'',language:'en',model:'m',reasoning:'low'},new AbortController().signal),/Invalid/);assert.deepEqual(states,['begin','received','failed']);assert.equal(active.size,0);
 });
 integrationTest('Guided proposals fence Thinking Origin at publication and after persisted reload', async () => {

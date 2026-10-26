@@ -1,4 +1,4 @@
-import type { AiTaskServiceOptions } from "./ai-task-service";
+import type { AiCalls } from "./ai-calls";
 import { providerStepRunner, type ProviderStepRunner } from "./provider-step-runner";
 import { prepareStep } from "./step-runner";
 import {
@@ -122,11 +122,8 @@ export function partialReply(buffer: string): { text: string; complete: boolean 
   return none;
 }
 
-export function providerMapChatRunner(
-  options: AiTaskServiceOptions,
-  activeTasks: Map<string, AbortController>
-): MapChatRunner {
-  return providerStepRunner<MapChatRequest, MapChatResult>(options, activeTasks, {
+export function providerMapChatRunner(aiCalls: AiCalls): MapChatRunner {
+  return providerStepRunner<MapChatRequest, MapChatResult>(aiCalls, {
     name: "map-chat",
     topic: request => `Map chat · ${request.message.trim().slice(0, 80)}`,
     stopped: () => new MapChatError("stopped", "Map chat stopped"),

@@ -6,9 +6,12 @@ const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
 const { load, root } = require('./support-replay.cjs');
+const { loadWithAiCalls, aiCallsFor } = require('./support-ai-calls.cjs');
 
 const { reframeStep, REFRAME_SCHEMA, REFRAME_TOKEN_BUDGET } = load('core/steps/reframe/step.ts');
-const { ReframingService, providerReframeRunner, buildReframePrompt } = load('core/reframing-service.ts');
+// One bundle: the runner, prepareStep's brand registry and AiCalls must come from the same module graph.
+const reframing = loadWithAiCalls('core/reframing-service.ts');
+const { ReframingService, providerReframeRunner, buildReframePrompt } = reframing;
 const { prepareStep } = load('core/step-runner.ts');
 const { searchBudgetExhaustedMessage } = load('ai/runtime/messages/index.ts');
 const { translate } = load('i18n.ts');
@@ -44,7 +47,7 @@ function runnerFixture({ reply = goodReply, runTask, model = 'gpt-6-luna' } = {}
   const runtime = { runTask: runTask ?? (async (...args) => { calls.push(args); args[4].onRequest?.({ via: 'runtime' }); return reply; }) };
   const options = { pluginDirectory: () => '/plugin', exchangeLoggingEnabled: () => true, exchanges: () => log, codexRuntime: (_dir, local) => { calls.localCodex = local; return runtime; }, claudeRuntime: () => runtime };
   const active = new Map();
-  return { log, calls, active, service: new ReframingService(providerReframeRunner(options, active)), model };
+  return { log, calls, active, service: new ReframingService(providerReframeRunner(aiCallsFor(reframing, options, active))), model };
 }
 
 test('provider path: step label on the exchange, sent payload unchanged, log sequence received -> parsed -> completed', async () => {
@@ -100,8 +103,9 @@ test('the search-budget steer text comes from runtime message files in both lang
   assert.match(fs.readFileSync(path.join(root, 'ai', 'runtime', 'codex-app-server.ts'), 'utf8'), /searchBudgetExhaustedMessage\(\)/);
 });
 
-test('reframing no longer builds its prompt or calls runTask outside the shared provider', () => {
+test('reframing no longer builds its prompt or calls runTask; it sends the prepared step through AiCalls', () => {
   const source = fs.readFileSync(path.join(root, 'core', 'reframing-service.ts'), 'utf8');
-  assert.doesNotMatch(source, /\.runTask\(prompt, providerModelId|Reframe the supplied/);
-  assert.match(source, /runtimeStepProvider\(/); assert.match(source, /\.send\(prepared/);
+  assert.doesNotMatch(source, /\.runTask\(|providerModelId|Reframe the supplied/);
+  assert.match(source, /\.run\(prepared,/);
+  assert.match(fs.readFileSync(path.join(root, 'core', 'ai-calls.ts'), 'utf8'), /\.send\(prepared/);
 });

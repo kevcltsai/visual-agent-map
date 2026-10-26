@@ -7,10 +7,11 @@ const os = require('node:os');
 const path = require('node:path');
 const { EventEmitter } = require('node:events');
 const S = require('./support.cjs');
+const { loadWithAiCalls, aiCallsFor } = require('./support-ai-calls.cjs');
 const { nodeFsAdapter } = require('./support-fs-adapter.cjs');
 
 const { default: Plugin } = S.load('main.ts', { obsidian: S.obsidian });
-const grade = S.load('core/relevance-grade-service.ts');
+const grade = loadWithAiCalls('core/relevance-grade-service.ts');
 const { AiExchangeLog } = S.load('ai-exchange-log.ts');
 const { stepEffort } = S.load('core/provider-step-runner.ts');
 
@@ -69,7 +70,7 @@ function fixture() {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'vam-relevance-warm-'));
   const log = new AiExchangeLog(nodeFsAdapter, path.join(dir, 'ai-exchanges.json'), error => { throw error; });
   const options = { pluginDirectory: () => '/plugin', exchangeLoggingEnabled: () => true, exchanges: () => log, codexRuntime: () => { throw new Error('unexpected provider'); }, claudeRuntime: () => runtime };
-  const service = new grade.RelevanceGradeService(grade.providerRelevanceGradeRunner(options, new Map()));
+  const service = new grade.RelevanceGradeService(grade.providerRelevanceGradeRunner(aiCallsFor(grade, options, new Map())));
   // Answers whichever process received the prompt with a valid grade of the two cards.
   const answer = async child => {
     for (let i = 0; i < 50 && !child.writes.length; i++) await new Promise(resolve => setImmediate(resolve));

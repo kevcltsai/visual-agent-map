@@ -1,5 +1,5 @@
 import { translate, uiLocale } from "../i18n";
-import type { AiTaskServiceOptions } from "./ai-task-service";
+import type { AiCalls } from "./ai-calls";
 import { providerStepRunner, type ProviderStepRunner } from "./provider-step-runner";
 import { prepareStep } from "./step-runner";
 import {
@@ -39,11 +39,8 @@ export type StructureReviewRunner = ProviderStepRunner<StructureReviewRequest, S
 export function buildStructureReviewPrompt(request: StructureReviewRequest): string {
   return structureReviewStep.render(request);
 }
-export function providerStructureReviewRunner(
-  options: AiTaskServiceOptions,
-  activeTasks: Map<string, AbortController>
-): StructureReviewRunner {
-  return providerStepRunner<StructureReviewRequest, StructureReviewResult>(options, activeTasks, {
+export function providerStructureReviewRunner(aiCalls: AiCalls): StructureReviewRunner {
+  return providerStepRunner<StructureReviewRequest, StructureReviewResult>(aiCalls, {
     name: "structure-review",
     topic: request => `Structure review · ${request.rootQuestion.trim().slice(0, 80)}`,
     stopped: () => new StructureReviewError("stopped", "Structure review stopped")

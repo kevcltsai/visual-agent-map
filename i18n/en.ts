@@ -552,6 +552,7 @@ export const en = {
   "ui.close": "Close",
   "ui.no_other_topics": "No other topics.",
   "ui.the_node_to_relink_was_not_found": "The node to relink was not found.",
+  "ui.change_saved_refresh_failed": "The change was saved, but the view could not refresh. Reopen the map to see it.",
   "ui.rename_current_mind_map": "Rename current mind map",
   "ui.update_the_topic_folder_and_mind_map_name_together": "Update the topic folder and mind map name together.",
   "ui.repair_missing_mind_map": "Repair missing mind map",
@@ -2067,6 +2068,8 @@ export const en = {
   "log.stopped_result_not_written": "Research stopped; the result was not written.",
   "log.topic_write_failed_0": "Writing the topic failed: {0}",
   "error.topic_state_change_rollback_failed": "Changing the topic state failed and could not be fully undone",
+  "error.map_transaction_stale":
+    "This change can no longer be undone or redone because the notes or the map were changed elsewhere.",
   "error.batch_remove_rollback_failed": "Batch removal failed and could not be fully undone",
   "error.copy_rollback_restore_failed": "Undoing the copy failed and could not be fully restored",
   "error.batch_copy_rollback_failed": "Batch copy failed and could not be fully undone",

@@ -25,6 +25,7 @@ const suites = [
   'prompt-presets.cjs',
   'map-ai-dialog.cjs',
   'map-structure.cjs',
+  'map-transaction.cjs',
   'relevance-grade.cjs',
   'shell-entrances.cjs',
   'coffee-tables-core.cjs',

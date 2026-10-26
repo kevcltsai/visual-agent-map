@@ -6,6 +6,7 @@ import {
   resolveAimContentLanguage
 } from "../aim/content-language";
 import { resolveMapTextLanguage, synthesisDefaultName } from "./map-text-language";
+import { begin as beginTransaction, type Transaction } from "./map-transaction";
 import { backgroundResultNotice, renderBackgroundStatus } from "../../ui/background-run";
 import { PromptPresetsModal } from "../../ui/modals/prompt-presets-modal";
 import { AimClarificationModal } from "../../ui/modals/aim-clarification-modal";
@@ -5380,85 +5381,70 @@ export class VisualAgentMapView extends ItemView {
       throw error;
     }
   }
+  /** Builds the transaction the five file-moving methods share: Map.md of the open map is checked for outside edits first and adopted after each apply. */
+  private beginMapTransaction(): Transaction {
+    return beginTransaction({
+      repo: this.plugin.repo,
+      rebuildDerivedData: () => this.plugin.rebuildDerivedData(),
+      onApplied: (mapPath, map) => {
+        if (mapPath !== this.path) return;
+        const viewport = this.map?.viewport;
+        this.map = clone(map);
+        if (viewport) this.map.viewport = clone(viewport);
+      },
+      checkConflict: async mapPath => {
+        if (mapPath !== this.path) return;
+        await this.resolveMapConflict();
+        await this.persist();
+      }
+    });
+  }
+  /** The change is already saved and in history; a failing reload must not look like the change failed. */
+  private async refreshAfterSavedChange(): Promise<void> {
+    try {
+      await this.hydrate();
+      this.render();
+    } catch {
+      this.render();
+      new Notice(t("ui.change_saved_refresh_failed"));
+    }
+  }
   private async claimToCurrent(file: TFile): Promise<void> {
     if (!this.map) return;
-    const before = clone(this.map),
-      previous = await this.plugin.repo.readNote(file.path, this.map ?? undefined),
+    const id = crypto.randomUUID(),
       original = file.path;
-    const target = await this.plugin.repo.moveUnique(original, this.plugin.repo.topicFolder(this.path, "Notes"));
-    await this.plugin.repo.setLifecycle(target, this.map.id, this.map.id, "active");
-    const node: MapNode = {
-      id: crypto.randomUUID(),
-      path: target,
-      parentId: null,
-      x: 80,
-      y: Math.max(-100, ...this.map.nodes.map(item => item.y)) + 240,
-      collapsed: false
-    };
-    const after = clone(before);
-    after.nodes.push(node);
-    await this.plugin.repo.saveMap(this.path, after);
-    this.map = after;
-    this.selected = node.id;
-    await this.plugin.rebuildDerivedData();
-    await this.hydrate();
-    const undo = async (): Promise<void> => {
-      await this.plugin.repo.moveExact(target, original);
-      await this.plugin.repo.setLifecycle(original, previous.topicId, previous.mapId, previous.topicState);
-      await this.plugin.repo.saveMap(this.path, before);
-      this.map = clone(before);
-      await this.plugin.rebuildDerivedData();
-      await this.hydrate();
-      this.render();
-    };
-    const redo = async (): Promise<void> => {
-      await this.plugin.repo.moveExact(original, target);
-      await this.plugin.repo.setLifecycle(target, after.id, after.id, "active");
-      await this.plugin.repo.saveMap(this.path, after);
-      this.map = clone(after);
-      await this.plugin.rebuildDerivedData();
-      await this.hydrate();
-      this.render();
-    };
-    this.history.push({ undo, redo });
-    this.render();
-    this.focusNode(node);
+    const entry = await this.beginMapTransaction()
+      .unpark(original, this.plugin.repo.topicFolder(this.path, "Notes"), this.map.id, this.map.id)
+      .editMap(this.path, (map, resolve) => {
+        map.nodes.push({
+          id,
+          path: resolve(original),
+          parentId: null,
+          x: 80,
+          y: Math.max(-100, ...map.nodes.map(item => item.y)) + 240,
+          collapsed: false
+        });
+      })
+      .commit();
+    this.selected = id;
+    this.history.push(entry);
+    await this.refreshAfterSavedChange();
+    const node = this.map?.nodes.find(item => item.id === id);
+    if (node) this.focusNode(node);
   }
   private async relinkMissingNode(node: MapNode, file: TFile): Promise<void> {
     if (!this.map) return;
-    const before = clone(this.map),
-      previous = await this.plugin.repo.readNote(file.path, this.map ?? undefined),
-      original = file.path;
-    const target = await this.plugin.repo.moveUnique(original, this.plugin.repo.topicFolder(this.path, "Notes"));
-    await this.plugin.repo.setLifecycle(target, this.map.id, this.map.id, "active");
-    const after = clone(before),
-      replacement = after.nodes.find(item => item.id === node.id);
-    if (!replacement) throw new Error(t("ui.the_node_to_relink_was_not_found"));
-    rebaseMapNotePaths(after, moveNotePath(replacement.path, target));
-    await this.plugin.repo.saveMap(this.path, after);
-    this.map = after;
-    await this.plugin.rebuildDerivedData();
-    await this.hydrate();
-    const undo = async (): Promise<void> => {
-      await this.plugin.repo.moveExact(target, original);
-      await this.plugin.repo.setLifecycle(original, previous.topicId, previous.mapId, previous.topicState);
-      await this.plugin.repo.saveMap(this.path, before);
-      this.map = clone(before);
-      await this.plugin.rebuildDerivedData();
-      await this.hydrate();
-      this.render();
-    };
-    const redo = async (): Promise<void> => {
-      await this.plugin.repo.moveExact(original, target);
-      await this.plugin.repo.setLifecycle(target, after.id, after.id, "active");
-      await this.plugin.repo.saveMap(this.path, after);
-      this.map = clone(after);
-      await this.plugin.rebuildDerivedData();
-      await this.hydrate();
-      this.render();
-    };
-    this.history.push({ undo, redo });
-    this.render();
+    const original = file.path;
+    const entry = await this.beginMapTransaction()
+      .unpark(original, this.plugin.repo.topicFolder(this.path, "Notes"), this.map.id, this.map.id)
+      .editMap(this.path, (map, resolve) => {
+        const replacement = map.nodes.find(item => item.id === node.id);
+        if (!replacement) throw new Error(t("ui.the_node_to_relink_was_not_found"));
+        rebaseMapNotePaths(map, moveNotePath(replacement.path, resolve(original)));
+      })
+      .commit();
+    this.history.push(entry);
+    await this.refreshAfterSavedChange();
   }
   private async parkFile(
     file: TFile,
@@ -5466,82 +5452,34 @@ export class VisualAgentMapView extends ItemView {
     state: "unassigned" | "archived"
   ): Promise<void> {
     if (!this.map) return;
-    const before = await this.plugin.repo.readNote(file.path, this.map ?? undefined),
-      original = file.path;
-    const target = await this.plugin.repo.moveUnique(original, this.plugin.repo.topicFolder(this.path, collection));
-    await this.plugin.repo.setLifecycle(target, this.map.id, "", state);
-    await this.plugin.rebuildDerivedData();
-    const undo = async (): Promise<void> => {
-      await this.plugin.repo.moveExact(target, original);
-      await this.plugin.repo.setLifecycle(original, before.topicId, before.mapId, before.topicState);
-      await this.plugin.rebuildDerivedData();
-      this.render();
-    };
-    const redo = async (): Promise<void> => {
-      await this.plugin.repo.moveExact(original, target);
-      await this.plugin.repo.setLifecycle(target, this.map!.id, "", state);
-      await this.plugin.rebuildDerivedData();
-      this.render();
-    };
-    this.history.push({ undo, redo });
-    this.render();
+    const entry = await this.beginMapTransaction()
+      .park(file.path, this.plugin.repo.topicFolder(this.path, collection), this.map.id, state)
+      .commit();
+    this.history.push(entry);
+    await this.refreshAfterSavedChange();
   }
   private async transferToTopic(file: TFile, topic: TopicInfo): Promise<void> {
-    const before = await this.plugin.repo.readNote(file.path, this.map ?? undefined),
-      original = file.path,
-      folder = `${topic.root}/Unassigned`;
-    const target = await this.plugin.repo.moveUnique(original, folder);
-    await this.plugin.repo.setLifecycle(target, topic.id, "", "unassigned");
-    await this.plugin.rebuildDerivedData();
-    const undo = async (): Promise<void> => {
-      await this.plugin.repo.moveExact(target, original);
-      await this.plugin.repo.setLifecycle(original, before.topicId, before.mapId, before.topicState);
-      await this.plugin.rebuildDerivedData();
-      this.render();
-    };
-    const redo = async (): Promise<void> => {
-      await this.plugin.repo.moveExact(original, target);
-      await this.plugin.repo.setLifecycle(target, topic.id, "", "unassigned");
-      await this.plugin.rebuildDerivedData();
-      this.render();
-    };
-    this.history.push({ undo, redo });
-    this.render();
+    const entry = await this.beginMapTransaction().transfer(file.path, topic, "unassigned").commit();
+    this.history.push(entry);
+    await this.refreshAfterSavedChange();
   }
   private async transferAndAdd(file: TFile, topic: TopicInfo): Promise<void> {
-    const previous = await this.plugin.repo.readNote(file.path, this.map ?? undefined),
-      original = file.path,
-      before = await this.plugin.repo.readMap(topic.mapPath);
-    const target = await this.plugin.repo.moveUnique(original, `${topic.root}/Notes`);
-    await this.plugin.repo.setLifecycle(target, topic.id, topic.id, "active");
-    const node: MapNode = {
-      id: crypto.randomUUID(),
-      path: target,
-      parentId: null,
-      x: 80,
-      y: Math.max(-100, ...before.nodes.map(item => item.y)) + 240,
-      collapsed: false
-    };
-    const after = clone(before);
-    after.nodes.push(node);
-    await this.plugin.repo.saveMap(topic.mapPath, after);
-    await this.plugin.rebuildDerivedData();
-    const undo = async (): Promise<void> => {
-      await this.plugin.repo.moveExact(target, original);
-      await this.plugin.repo.setLifecycle(original, previous.topicId, previous.mapId, previous.topicState);
-      await this.plugin.repo.saveMap(topic.mapPath, before);
-      await this.plugin.rebuildDerivedData();
-      this.render();
-    };
-    const redo = async (): Promise<void> => {
-      await this.plugin.repo.moveExact(original, target);
-      await this.plugin.repo.setLifecycle(target, topic.id, topic.id, "active");
-      await this.plugin.repo.saveMap(topic.mapPath, after);
-      await this.plugin.rebuildDerivedData();
-      this.render();
-    };
-    this.history.push({ undo, redo });
-    this.render();
+    const original = file.path;
+    const entry = await this.beginMapTransaction()
+      .transfer(original, topic, "add")
+      .editMap(topic.mapPath, (map, resolve) => {
+        map.nodes.push({
+          id: crypto.randomUUID(),
+          path: resolve(original),
+          parentId: null,
+          x: 80,
+          y: Math.max(-100, ...map.nodes.map(item => item.y)) + 240,
+          collapsed: false
+        });
+      })
+      .commit();
+    this.history.push(entry);
+    await this.refreshAfterSavedChange();
   }
   private async noteChange(node: MapNode, patch: NotePatch): Promise<void> {
     const current = await this.plugin.repo.readNote(node.path, this.map ?? undefined),

@@ -2,5 +2,16 @@
 # Git exports GIT_DIR (and friends) to hooks. Tests that create throwaway repos would otherwise act on this
 # repository: `git init` there rewrote the shared config to core.bare=true. Let every nested git find its repo from cwd.
 unset GIT_DIR GIT_WORK_TREE GIT_INDEX_FILE GIT_COMMON_DIR GIT_PREFIX GIT_OBJECT_DIRECTORY GIT_ALTERNATE_OBJECT_DIRECTORIES
-echo "pre-push: npm run verify"
-exec npm run verify
+# Pushes to main or a tag run the full `npm run verify` (same set as CI). Feature branches run `verify:fast`
+# (everything except the integration layer); CI runs the full verify on every branch push, and agents-spec
+# WORKFLOW requires a green CI run before merging to main.
+full=0
+while read -r _local_ref _local_sha remote_ref _remote_sha; do
+  case "$remote_ref" in refs/heads/main|refs/tags/*) full=1 ;; esac
+done
+if [ "$full" = 1 ]; then
+  echo "pre-push: npm run verify"
+  exec npm run verify
+fi
+echo "pre-push: npm run verify:fast (feature branch; full suite runs in CI)"
+exec npm run verify:fast

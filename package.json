@@ -26,7 +26,8 @@
     "test:ui:update": "node scripts/test-harness.mjs --update-current",
     "format": "prettier --write \"**/*.ts\"",
     "format:check": "prettier --check \"**/*.ts\"",
-    "verify": "npm run lint && npm run format:check && npm run check:i18n && npm test && git diff --exit-code -- main.js samples/taiwan-travel/compiled.json experiences/sharing/viewer-bundle.generated.ts && npm run check:artifacts"
+    "verify": "npm run lint && npm run format:check && npm run check:i18n && npm test && git diff --exit-code -- main.js samples/taiwan-travel/compiled.json experiences/sharing/viewer-bundle.generated.ts && npm run check:artifacts",
+    "verify:fast": "npm run lint && npm run format:check && npm run check:i18n && npm run test:unit && git diff --exit-code -- main.js samples/taiwan-travel/compiled.json experiences/sharing/viewer-bundle.generated.ts && npm run check:artifacts"
   },
   "devDependencies": {
     "@codemirror/state": "6.5.0",

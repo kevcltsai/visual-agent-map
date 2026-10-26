@@ -15986,15 +15986,33 @@ var written = (map) => JSON.stringify({ ...map, viewport: null });
 var ownership = (map) => JSON.stringify(map.nodes.map((node) => [node.id, node.path, node.parentId]));
 var baseNameOf = (path) => path.slice(path.lastIndexOf("/") + 1).replace(/\.md$/, "");
 var tagged = (error, kind) => Object.assign(error, { kind });
+var GUARD_FIELDS = ["title", "summary", "detail", "status"];
+var guardOf = (note) => ({
+  title: note.title,
+  summary: note.summary,
+  detail: note.detail,
+  status: note.status
+});
+var sameGuard = (a, b) => GUARD_FIELDS.every((field) => JSON.stringify(a[field]) === JSON.stringify(b[field]));
+var readText = (repo, path) => repo.app.vault.read(repo.file(path));
+var writeText = async (repo, path, text11) => {
+  await repo.app.vault.process(repo.file(path), () => text11);
+};
 function begin(deps) {
   const { repo } = deps;
   const moves = [];
   const edits = [];
+  const noteOps = [];
   let committed = false;
   const exists = (path) => !!repo.app.vault.getAbstractFileByPath(path);
-  async function run(files, maps, rebuild2) {
-    const journal = { files: [], maps: [] };
+  async function run(files, maps, rebuild2, notes = { before: [], after: [] }) {
+    const journal = { files: [], maps: [], notes: [] };
+    const rewrite = async (step) => {
+      journal.notes.push({ path: step.path, restore: step.restore, written: true });
+      await step.apply();
+    };
     try {
+      for (const step of notes.before) await rewrite(step);
       for (const step of files) {
         const entry = { ...step, moved: false, lifecycleSet: false };
         journal.files.push(entry);
@@ -16008,6 +16026,7 @@ function begin(deps) {
         entry.lifecycleSet = true;
         await repo.setLifecycle(step.to, step.lifecycle.topicId, step.lifecycle.mapId, step.lifecycle.state);
       }
+      for (const step of notes.after) await rewrite(step);
       for (const item of maps) {
         const next = clone(item.write);
         if (item.preserveViewport) next.viewport = clone((await repo.readMap(item.mapPath)).viewport);
@@ -16056,6 +16075,14 @@ function begin(deps) {
         }
       }
     }
+    for (const item of [...journal.notes].reverse()) {
+      if (!item.written) continue;
+      try {
+        if (await readText(repo, item.path) !== item.restore) await writeText(repo, item.path, item.restore);
+      } catch (problem) {
+        problems.push(problem);
+      }
+    }
     if (rebuild2 && (journal.files.length > 0 || journal.maps.length > 0)) {
       try {
         await deps.rebuildDerivedData();
@@ -16070,7 +16097,7 @@ function begin(deps) {
       "rollback-failed"
     );
   }
-  function entryFor(ops, records, rebuild2, label) {
+  function entryFor(ops, records, rebuild2, label, noteRecords = []) {
     const toward = (op, direction) => op.kind === "create" === (direction === "undo");
     const sequence = (direction) => {
       const moved = ops.filter((op) => op.kind === "move"), created = ops.filter((op) => op.kind === "create");
@@ -16082,6 +16109,14 @@ function begin(deps) {
         if (op.kind !== "create") continue;
         if (!op.target) op.target = repo.unique(op.folder, baseNameOf(op.original), taken);
         taken.add(op.target);
+      }
+    };
+    const guarded = async (direction) => {
+      for (const note of noteRecords) {
+        if (!exists(note.path)) throw tagged(new Error(t("error.map_transaction_stale")), "stale");
+        const expected = direction === "undo" ? note.guardAfter : note.guardBefore;
+        if (!sameGuard(guardOf(await repo.readNote(note.path)), expected))
+          throw tagged(new Error(t("error.map_transaction_stale")), "guard");
       }
     };
     const stale = async (direction) => {
@@ -16100,6 +16135,7 @@ function begin(deps) {
     };
     const apply = async (direction) => {
       if (direction === "undo") choosePark();
+      await guarded(direction);
       await stale(direction);
       const files = sequence(direction).map(
         (op) => toward(op, direction) ? { from: op.original, to: op.target, lifecycle: op.lifecycle, restore: op.previous } : { from: op.target, to: op.original, lifecycle: op.previous, restore: op.lifecycle }
@@ -16111,7 +16147,14 @@ function begin(deps) {
         restore: undoing ? record.after : record.before,
         preserveViewport: true
       }));
-      await run(files, maps, rebuild2);
+      const notes = { before: [], after: [] };
+      for (const note of noteRecords) {
+        const restore = await readText(repo, note.path);
+        if (undoing)
+          notes.after.push({ path: note.path, restore, apply: () => writeText(repo, note.path, note.beforeText) });
+        else notes.before.push({ path: note.path, restore, apply: () => note.write(note.path) });
+      }
+      await run(files, maps, rebuild2, notes);
     };
     return { undo: () => apply("undo"), redo: () => apply("redo"), ...label === void 0 ? {} : { label } };
   }
@@ -16137,9 +16180,16 @@ function begin(deps) {
       edits.push({ mapPath, edit });
       return transaction;
     },
+    rewriteNote(path, write) {
+      noteOps.push({ path, write });
+      return transaction;
+    },
     async commit(options = {}) {
       if (committed) throw new Error("A transaction can only be committed once.");
       committed = true;
+      for (const note of noteOps)
+        if (moves.some((move) => move.path === note.path))
+          throw new Error(`A note cannot be rewritten and moved in one step: ${note.path}`);
       const mapPaths = [...new Set(edits.map((item) => item.mapPath))];
       for (const mapPath of mapPaths) await deps.checkConflict(mapPath);
       const ops = [];
@@ -16157,10 +16207,24 @@ function begin(deps) {
       const befores = /* @__PURE__ */ new Map();
       for (const mapPath of mapPaths) befores.set(mapPath, await repo.readMap(mapPath));
       const rebuildRequested = !options.deferRebuild;
-      const journal = { files: [], maps: [] };
+      const noteRecords = [];
+      for (const note of noteOps) {
+        const before = guardOf(await repo.readNote(note.path));
+        noteRecords.push({
+          ...note,
+          guardBefore: before,
+          guardAfter: before,
+          beforeText: await readText(repo, note.path)
+        });
+      }
+      const journal = { files: [], maps: [], notes: [] };
       let rebuildNeeded = ops.length > 0;
       const records = [];
       try {
+        for (const note of noteRecords) {
+          journal.notes.push({ path: note.path, restore: note.beforeText, written: true });
+          await note.write(note.path);
+        }
         for (const op of ops) {
           if (op.kind === "create") continue;
           const entry = {
@@ -16184,6 +16248,7 @@ function begin(deps) {
           entry.lifecycleSet = true;
           await repo.setLifecycle(op.target, op.lifecycle.topicId, op.lifecycle.mapId, op.lifecycle.state);
         }
+        for (const note of noteRecords) note.guardAfter = guardOf(await repo.readNote(note.path));
         const resolve = (originalPath) => {
           const found = ops.find((op) => op.kind === "move" && op.original === originalPath);
           if (!found) throw new Error(`Not a moved note: ${originalPath}`);
@@ -16203,7 +16268,7 @@ function begin(deps) {
       } catch (error) {
         return revert(journal, rebuildRequested && rebuildNeeded, error);
       }
-      return entryFor(ops, records, rebuildNeeded, options.label);
+      return entryFor(ops, records, rebuildNeeded, options.label, noteRecords);
     }
   };
   return transaction;

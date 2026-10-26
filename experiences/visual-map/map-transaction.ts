@@ -1,6 +1,6 @@
 import { t } from "../../i18n";
 import { clone, type MapDocument } from "../../map-model";
-import type { Repository, TopicState } from "../../repository";
+import type { Note, Repository, TopicState } from "../../repository";
 
 /**
  * One undoable step that moves note files and edits Map.md files together.
@@ -15,7 +15,7 @@ export interface Lifecycle {
 export interface TransactionDeps {
   repo: Pick<
     Repository,
-    "readNote" | "readMap" | "saveMap" | "moveUnique" | "moveExact" | "setLifecycle" | "unique" | "app"
+    "readNote" | "readMap" | "saveMap" | "moveUnique" | "moveExact" | "setLifecycle" | "unique" | "app" | "file"
   >;
   rebuildDerivedData: () => Promise<void>;
   /** Called once per edited map after commit, undo and redo, with the map as now stored. */
@@ -33,7 +33,7 @@ export interface CommitOptions {
   deferRebuild?: boolean;
   label?: string;
 }
-export type TransactionErrorKind = "stale" | "rollback-failed";
+export type TransactionErrorKind = "stale" | "rollback-failed" | "guard";
 export type TransactionError = Error & { kind: TransactionErrorKind };
 export interface Transaction {
   /** Moves a note into `folder` (a free name is chosen) and sets its lifecycle; returns nothing until commit. */
@@ -49,12 +49,20 @@ export interface Transaction {
   transfer(path: string, topic: { id: string; root: string }, mode: "unassigned" | "add"): Transaction;
   /** `resolve(originalPath)` gives the path a moved note will have; moves run before map edits. */
   editMap(mapPath: string, edit: (map: MapDocument, resolve: (originalPath: string) => string) => void): Transaction;
+  /**
+   * Rewrites the note at `path` through `write(path)` (which must write that file and nothing else). Commit runs it
+   * before any move; undo writes the original text back after the moves; redo runs `write` again before the moves.
+   * Undo and redo refuse (`guard`) when title, summary, detail or status differ from what this step left or found.
+   */
+  rewriteNote(path: string, write: (path: string) => Promise<void>): Transaction;
   commit(options?: CommitOptions): Promise<TransactionEntry>;
 }
 
 export const isTransactionError = (error: unknown, kind?: TransactionErrorKind): error is TransactionError => {
   const found = (error as { kind?: unknown } | null | undefined)?.kind;
-  return (found === "stale" || found === "rollback-failed") && (kind === undefined || found === kind);
+  return (
+    (found === "stale" || found === "rollback-failed" || found === "guard") && (kind === undefined || found === kind)
+  );
 };
 export const isStaleError = (error: unknown): boolean => isTransactionError(error, "stale");
 
@@ -83,6 +91,8 @@ interface Journal {
   /** `lost`: the file left `from` but its new path is unknown, so it cannot be put back. */
   files: Array<FileStep & { moved: boolean; lifecycleSet: boolean; lost?: boolean }>;
   maps: Array<{ mapPath: string; restore: MapDocument; written: boolean }>;
+  /** `restore`: the whole note text read before the write in that direction. */
+  notes: Array<{ path: string; restore: string; written: boolean }>;
 }
 
 // Viewport and node positions are layout, not content: undo writes the stored positions back and does not treat a change as stale.
@@ -94,11 +104,44 @@ const ownership = (map: MapDocument): string =>
 const baseNameOf = (path: string): string => path.slice(path.lastIndexOf("/") + 1).replace(/\.md$/, "");
 const tagged = (error: Error, kind: TransactionErrorKind): TransactionError => Object.assign(error, { kind });
 
+// Note rewrite (ticket 04)
+const GUARD_FIELDS = ["title", "summary", "detail", "status"] as const;
+type NoteGuard = Pick<Note, (typeof GUARD_FIELDS)[number]>;
+interface NoteOp {
+  path: string;
+  write: (path: string) => Promise<void>;
+}
+interface NoteRecord extends NoteOp {
+  guardBefore: NoteGuard;
+  guardAfter: NoteGuard;
+  beforeText: string;
+}
+/** One note write inside `run`: `apply` does it, `restore` is the text to put back if the step fails. */
+interface NoteStep {
+  path: string;
+  restore: string;
+  apply: () => Promise<void>;
+}
+const guardOf = (note: Note): NoteGuard => ({
+  title: note.title,
+  summary: note.summary,
+  detail: note.detail,
+  status: note.status
+});
+const sameGuard = (a: NoteGuard, b: NoteGuard): boolean =>
+  GUARD_FIELDS.every(field => JSON.stringify(a[field]) === JSON.stringify(b[field]));
+const readText = (repo: Pick<Repository, "app" | "file">, path: string): Promise<string> =>
+  repo.app.vault.read(repo.file(path));
+const writeText = async (repo: Pick<Repository, "app" | "file">, path: string, text: string): Promise<void> => {
+  await repo.app.vault.process(repo.file(path), () => text);
+};
+
 export function begin(deps: TransactionDeps): Transaction {
   const { repo } = deps;
   const moves: Array<{ kind: "move" | "create"; path: string; folder: string; lifecycle: Lifecycle }> = [];
   const edits: Array<{ mapPath: string; edit: (map: MapDocument, resolve: (originalPath: string) => string) => void }> =
     [];
+  const noteOps: NoteOp[] = [];
   let committed = false;
   const exists = (path: string): boolean => !!repo.app.vault.getAbstractFileByPath(path);
 
@@ -106,10 +149,16 @@ export function begin(deps: TransactionDeps): Transaction {
   async function run(
     files: FileStep[],
     maps: Array<{ mapPath: string; write: MapDocument; restore: MapDocument; preserveViewport: boolean }>,
-    rebuild: boolean
+    rebuild: boolean,
+    notes: { before: NoteStep[]; after: NoteStep[] } = { before: [], after: [] }
   ): Promise<void> {
-    const journal: Journal = { files: [], maps: [] };
+    const journal: Journal = { files: [], maps: [], notes: [] };
+    const rewrite = async (step: NoteStep): Promise<void> => {
+      journal.notes.push({ path: step.path, restore: step.restore, written: true });
+      await step.apply();
+    };
     try {
+      for (const step of notes.before) await rewrite(step);
       for (const step of files) {
         const entry = { ...step, moved: false, lifecycleSet: false };
         journal.files.push(entry);
@@ -124,6 +173,7 @@ export function begin(deps: TransactionDeps): Transaction {
         entry.lifecycleSet = true;
         await repo.setLifecycle(step.to, step.lifecycle.topicId, step.lifecycle.mapId, step.lifecycle.state);
       }
+      for (const step of notes.after) await rewrite(step);
       for (const item of maps) {
         const next = clone(item.write);
         if (item.preserveViewport) next.viewport = clone((await repo.readMap(item.mapPath)).viewport);
@@ -175,6 +225,14 @@ export function begin(deps: TransactionDeps): Transaction {
         }
       }
     }
+    for (const item of [...journal.notes].reverse()) {
+      if (!item.written) continue;
+      try {
+        if ((await readText(repo, item.path)) !== item.restore) await writeText(repo, item.path, item.restore);
+      } catch (problem) {
+        problems.push(problem);
+      }
+    }
     if (rebuild && (journal.files.length > 0 || journal.maps.length > 0)) {
       try {
         await deps.rebuildDerivedData();
@@ -191,7 +249,13 @@ export function begin(deps: TransactionDeps): Transaction {
     );
   }
 
-  function entryFor(ops: FileOp[], records: MapRecord[], rebuild: boolean, label?: string): TransactionEntry {
+  function entryFor(
+    ops: FileOp[],
+    records: MapRecord[],
+    rebuild: boolean,
+    label?: string,
+    noteRecords: NoteRecord[] = []
+  ): TransactionEntry {
     // `toward`: the step moves the note from its original path to its target path.
     const toward = (op: FileOp, direction: "undo" | "redo"): boolean =>
       (op.kind === "create") === (direction === "undo");
@@ -207,6 +271,15 @@ export function begin(deps: TransactionDeps): Transaction {
         if (op.kind !== "create") continue;
         if (!op.target) op.target = repo.unique(op.folder, baseNameOf(op.original), taken);
         taken.add(op.target);
+      }
+    };
+    // Checked before `stale`: a note edited outside is a `guard` refusal even when files also moved.
+    const guarded = async (direction: "undo" | "redo"): Promise<void> => {
+      for (const note of noteRecords) {
+        if (!exists(note.path)) throw tagged(new Error(t("error.map_transaction_stale")), "stale");
+        const expected = direction === "undo" ? note.guardAfter : note.guardBefore;
+        if (!sameGuard(guardOf(await repo.readNote(note.path)), expected))
+          throw tagged(new Error(t("error.map_transaction_stale")), "guard");
       }
     };
     const stale = async (direction: "undo" | "redo"): Promise<void> => {
@@ -226,6 +299,7 @@ export function begin(deps: TransactionDeps): Transaction {
     };
     const apply = async (direction: "undo" | "redo"): Promise<void> => {
       if (direction === "undo") choosePark();
+      await guarded(direction);
       await stale(direction);
       const files: FileStep[] = sequence(direction).map(op =>
         toward(op, direction)
@@ -239,7 +313,15 @@ export function begin(deps: TransactionDeps): Transaction {
         restore: undoing ? record.after : record.before,
         preserveViewport: true
       }));
-      await run(files, maps, rebuild);
+      const notes: { before: NoteStep[]; after: NoteStep[] } = { before: [], after: [] };
+      for (const note of noteRecords) {
+        const restore = await readText(repo, note.path);
+        // Undo writes the original text after the moves (a move rewrites links in other notes); redo writes before them.
+        if (undoing)
+          notes.after.push({ path: note.path, restore, apply: () => writeText(repo, note.path, note.beforeText) });
+        else notes.before.push({ path: note.path, restore, apply: () => note.write(note.path) });
+      }
+      await run(files, maps, rebuild, notes);
     };
     return { undo: () => apply("undo"), redo: () => apply("redo"), ...(label === undefined ? {} : { label }) };
   }
@@ -268,9 +350,16 @@ export function begin(deps: TransactionDeps): Transaction {
       edits.push({ mapPath, edit });
       return transaction;
     },
+    rewriteNote(path, write) {
+      noteOps.push({ path, write });
+      return transaction;
+    },
     async commit(options = {}) {
       if (committed) throw new Error("A transaction can only be committed once.");
       committed = true;
+      for (const note of noteOps)
+        if (moves.some(move => move.path === note.path))
+          throw new Error(`A note cannot be rewritten and moved in one step: ${note.path}`);
       const mapPaths = [...new Set(edits.map(item => item.mapPath))];
       for (const mapPath of mapPaths) await deps.checkConflict(mapPath);
       const ops: FileOp[] = [];
@@ -288,10 +377,24 @@ export function begin(deps: TransactionDeps): Transaction {
       const befores = new Map<string, MapDocument>();
       for (const mapPath of mapPaths) befores.set(mapPath, await repo.readMap(mapPath));
       const rebuildRequested = !options.deferRebuild;
-      const journal: Journal = { files: [], maps: [] };
+      const noteRecords: NoteRecord[] = [];
+      for (const note of noteOps) {
+        const before = guardOf(await repo.readNote(note.path));
+        noteRecords.push({
+          ...note,
+          guardBefore: before,
+          guardAfter: before,
+          beforeText: await readText(repo, note.path)
+        });
+      }
+      const journal: Journal = { files: [], maps: [], notes: [] };
       let rebuildNeeded = ops.length > 0;
       const records: MapRecord[] = [];
       try {
+        for (const note of noteRecords) {
+          journal.notes.push({ path: note.path, restore: note.beforeText, written: true });
+          await note.write(note.path);
+        }
         for (const op of ops) {
           if (op.kind === "create") continue;
           const entry = {
@@ -316,6 +419,7 @@ export function begin(deps: TransactionDeps): Transaction {
           entry.lifecycleSet = true;
           await repo.setLifecycle(op.target, op.lifecycle.topicId, op.lifecycle.mapId, op.lifecycle.state);
         }
+        for (const note of noteRecords) note.guardAfter = guardOf(await repo.readNote(note.path));
         const resolve = (originalPath: string): string => {
           const found = ops.find(op => op.kind === "move" && op.original === originalPath);
           if (!found) throw new Error(`Not a moved note: ${originalPath}`);
@@ -335,7 +439,7 @@ export function begin(deps: TransactionDeps): Transaction {
       } catch (error) {
         return revert(journal, rebuildRequested && rebuildNeeded, error);
       }
-      return entryFor(ops, records, rebuildNeeded, options.label);
+      return entryFor(ops, records, rebuildNeeded, options.label, noteRecords);
     }
   };
   return transaction;

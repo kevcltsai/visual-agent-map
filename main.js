@@ -56205,7 +56205,8 @@ var VisualAgentMapPlugin = class extends import_obsidian38.Plugin {
     __publicField(this, "quickExpandPending", /* @__PURE__ */ new Set());
     __publicField(this, "aiCalls", new AiCalls({
       runtimeFor: (model) => this.aiRuntime.runtimeFor(model),
-      exchanges: () => this.settings.aiExchangeLoggingEnabled ? this.exchanges : null
+      exchanges: () => this.settings.aiExchangeLoggingEnabled ? this.exchanges : null,
+      releaseWarm: () => this.aiRuntime.releaseWarm()
     }));
     __publicField(this, "activeTasks", this.aiCalls.activeTasks);
     /** Background chart steps (running and queued), keyed by note path: one per path, at most {@link CHART_JOB_LIMIT} run at a time. */
@@ -56231,7 +56232,11 @@ var VisualAgentMapPlugin = class extends import_obsidian38.Plugin {
       clientVersion: () => this.manifest.version || "0.0.0",
       pluginDirectory: () => this.pluginDirectory(),
       readLocalFile: (path) => import_obsidian38.FileSystemAdapter.readLocalFile(path),
-      onLog: (level, message) => this.logs.appendLog(level, message)
+      onLog: (level, message) => this.logs.appendLog(level, message),
+      checks: {
+        refresh: (id) => this.refreshModelDiscovery(id),
+        codexInstalled: () => this.codexDiagnostic().installed
+      }
     }));
     __publicField(this, "aiTaskOptions", {
       pluginDirectory: () => this.pluginDirectory(),
@@ -57001,9 +57006,14 @@ ${t("ui.organize_link_wait_hint")}`;
         this.logs.appendLog("warn", `${state.provider} model discovery failed: ${(_a2 = state.error) != null ? _a2 : "unknown error"}`);
     return this.availableModels();
   }
+  /** Which runtime serves `model`, without starting it. */
+  runtimeIdFor(model) {
+    return this.aiRuntime.runtimeFor(model).capabilities.id;
+  }
   coffeeReasoningEfforts(model) {
     var _a2, _b2;
-    if (providerForModel(model) === "claude") return ["low", "medium", "high"];
+    const fixed = this.aiRuntime.runtimeFor(model).capabilities.fixedReasoningEfforts;
+    if (fixed) return [...fixed];
     return (_b2 = (_a2 = this.modelDiscovery.state("codex").reasoningEfforts) == null ? void 0 : _a2[model]) != null ? _b2 : [];
   }
   modelLabel(model) {
@@ -57015,10 +57025,10 @@ ${t("ui.organize_link_wait_hint")}`;
     return !this.usageNoticeSeen(model);
   }
   usageNoticeSeen(model) {
-    return providerForModel(model) === "claude" ? this.settings.claudeUsageNoticeSeen : this.settings.codexUsageNoticeSeen;
+    return this.runtimeIdFor(model) === "claude" ? this.settings.claudeUsageNoticeSeen : this.settings.codexUsageNoticeSeen;
   }
   async setUsageNoticeSeen(model) {
-    if (providerForModel(model) === "claude") this.settings.claudeUsageNoticeSeen = true;
+    if (this.runtimeIdFor(model) === "claude") this.settings.claudeUsageNoticeSeen = true;
     else this.settings.codexUsageNoticeSeen = true;
     await this.saveSettings();
   }
@@ -57212,29 +57222,14 @@ ${t("ui.organize_link_wait_hint")}`;
     return this.app.workspace.getLeavesOfType(COFFEE_TABLES_VIEW_TYPE).map((leaf) => leaf.view).filter((view) => view instanceof CoffeeTablesView);
   }
   async aiReadyForModel(model) {
-    if (providerForModel(model) === "claude") {
-      const state = await this.refreshModelDiscovery("claude");
-      if (state.status === "missing") {
-        this.openClaudeSetupGuide();
-        return false;
-      }
-      return state.status === "ready" && state.models.includes(model);
-    }
-    if (!this.codexDiagnostic().installed) {
-      this.openCodexSetupGuide();
-      return false;
-    }
-    try {
-      const state = await this.refreshModelDiscovery("codex");
-      if (state.status === "ready" && state.models.includes(model)) return true;
-      if (state.status === "missing") {
-        this.openCodexSetupGuide();
-        return false;
-      }
-      new import_obsidian38.Notice(t("ui.current_model_is_unavailable"));
-    } catch (error) {
-      this.logs.appendLog("warn", t("log.codex_not_ready_0", error instanceof Error ? error.message : String(error)));
-    }
+    const runtime = this.aiRuntime.runtimeFor(model);
+    const readiness = await runtime.readiness(model);
+    if (readiness.status === "ready") return true;
+    if (readiness.status === "missing") {
+      if (runtime.capabilities.id === "claude") this.openClaudeSetupGuide();
+      else this.openCodexSetupGuide();
+    } else if (readiness.status === "model-unavailable") new import_obsidian38.Notice(t("ui.current_model_is_unavailable"));
+    else if (readiness.error !== void 0) this.logs.appendLog("warn", t("log.codex_not_ready_0", readiness.error));
     return false;
   }
   async codexReadyForAi() {
@@ -57242,7 +57237,7 @@ ${t("ui.organize_link_wait_hint")}`;
   }
   /** The dialogs' "Fix connection…" link: the setup guide when the model's CLI is missing, otherwise a fresh check. */
   repairConnection(model) {
-    if (providerForModel(model || this.settings.cliModel) === "claude") {
+    if (this.runtimeIdFor(model || this.settings.cliModel) === "claude") {
       if (this.claudeDiagnostic().installed) void this.recheckClaude();
       else this.openClaudeSetupGuide();
       void this.refreshModelDiscovery("codex");
@@ -57269,7 +57264,7 @@ ${t("ui.organize_link_wait_hint")}`;
   async confirmAiUsage(model, run) {
     if (!await this.aiReadyForModel(model)) return false;
     if (!this.usageNoticeSeen(model)) {
-      const provider = providerForModel(model);
+      const provider = this.runtimeIdFor(model);
       const confirmed = await new Promise((resolve) => new AiUsageModal(this.app, provider, resolve).open());
       if (!confirmed) return false;
       await this.setUsageNoticeSeen(model);
@@ -57561,22 +57556,18 @@ ${t("ui.organize_link_wait_hint")}`;
   }
   /**
    * Starts an idle Claude CLI while the research dialog is open, so confirming only has to write the prompt. No model
-   * call happens until then; a run with different settings starts cold and leaves it for the dialog.
+   * call happens until then; a run with different settings starts cold and leaves it for the dialog. A runtime that
+   * cannot pre-start drops a waiting process instead (AiCalls).
    */
   prewarmClaude(model, reasoning, webSearch = true, mode) {
     if (this.unloaded) return;
-    if (providerForModel(model) !== "claude") {
-      this.aiRuntime.releaseWarm();
-      return;
-    }
     try {
       const selected = normalizeReasoningLevel(reasoning != null ? reasoning : this.settings.cliReasoning);
-      this.claudeCli(this.pluginDirectory()).prewarm(
-        providerModelId(model),
-        effectiveReasoningLevel({ mode }, selected),
-        response_schema_default,
+      this.aiCalls.prewarm(model, {
+        effort: effectiveReasoningLevel({ mode }, selected),
+        schema: response_schema_default,
         webSearch
-      );
+      });
     } catch (e) {
     }
   }
@@ -57586,12 +57577,8 @@ ${t("ui.organize_link_wait_hint")}`;
    */
   prewarmClaudeStep(model, reasoning, schema) {
     if (this.unloaded) return;
-    if (providerForModel(model) !== "claude") {
-      this.aiRuntime.releaseWarm();
-      return;
-    }
     try {
-      this.claudeCli(this.pluginDirectory()).prewarm(providerModelId(model), stepEffort(reasoning), schema, false);
+      this.aiCalls.prewarm(model, { effort: stepEffort(reasoning), schema, webSearch: false });
     } catch (e) {
     }
   }

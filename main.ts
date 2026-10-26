@@ -81,12 +81,13 @@ import { providerShareTranslateRunner, ShareTranslateService } from "./experienc
 import { groupRibbonIcons } from "./ui/ribbon-group";
 import { CodexAppServerRuntime, type CodexWebSearchEvent } from "./ai/runtime/codex-app-server";
 import { ClaudeCodeCliRuntime } from "./ai/runtime/claude-code-cli";
-import { CLAUDE_MODEL_CHOICES, providerForModel, providerModelId } from "./ai/providers/provider";
+import { CLAUDE_MODEL_CHOICES } from "./ai/providers/provider";
 import { ThinkingCore } from "./core/thinking-core";
 import { prepareStep, type PreparedStep } from "./core/step-runner";
 import type { ImageCandidate } from "./core/image-candidates";
 import { imageSearchStep } from "./core/steps/image-search/step";
 import { AiCalls } from "./core/ai-calls";
+import type { AiRuntimeId } from "./core/ai-runtime";
 import { AiRuntimeService } from "./core/ai-runtime-service";
 import { ModelDiscovery, type ModelDiscoveryState } from "./core/model-discovery";
 import { ShallowExpansionCoordinator, type ExpansionBatchState } from "./experiences/visual-map/expansion-batch";
@@ -186,7 +187,8 @@ export default class VisualAgentMapPlugin extends Plugin {
   readonly quickExpandPending = new Set<string>();
   readonly aiCalls = new AiCalls({
     runtimeFor: model => this.aiRuntime.runtimeFor(model),
-    exchanges: () => (this.settings.aiExchangeLoggingEnabled ? this.exchanges : null)
+    exchanges: () => (this.settings.aiExchangeLoggingEnabled ? this.exchanges : null),
+    releaseWarm: () => this.aiRuntime.releaseWarm()
   });
   readonly activeTasks = this.aiCalls.activeTasks;
   /** Background chart steps (running and queued), keyed by note path: one per path, at most {@link CHART_JOB_LIMIT} run at a time. */
@@ -212,7 +214,11 @@ export default class VisualAgentMapPlugin extends Plugin {
     clientVersion: () => this.manifest.version || "0.0.0",
     pluginDirectory: () => this.pluginDirectory(),
     readLocalFile: path => FileSystemAdapter.readLocalFile(path),
-    onLog: (level, message) => this.logs.appendLog(level, message)
+    onLog: (level, message) => this.logs.appendLog(level, message),
+    checks: {
+      refresh: id => this.refreshModelDiscovery(id),
+      codexInstalled: () => this.codexDiagnostic().installed
+    }
   });
   private readonly aiTaskOptions = {
     pluginDirectory: () => this.pluginDirectory(),
@@ -1009,8 +1015,14 @@ export default class VisualAgentMapPlugin extends Plugin {
         this.logs.appendLog("warn", `${state.provider} model discovery failed: ${state.error ?? "unknown error"}`);
     return this.availableModels();
   }
+  /** Which runtime serves `model`, without starting it. */
+  private runtimeIdFor(model: string): AiRuntimeId {
+    return this.aiRuntime.runtimeFor(model).capabilities.id;
+  }
   coffeeReasoningEfforts(model: string): string[] {
-    if (providerForModel(model) === "claude") return ["low", "medium", "high"];
+    const fixed = this.aiRuntime.runtimeFor(model).capabilities.fixedReasoningEfforts;
+    // A copy: the list belongs to the runtime's shared capabilities.
+    if (fixed) return [...fixed];
     return this.modelDiscovery.state("codex").reasoningEfforts?.[model] ?? [];
   }
   modelLabel(model: string): string {
@@ -1023,12 +1035,12 @@ export default class VisualAgentMapPlugin extends Plugin {
     return !this.usageNoticeSeen(model);
   }
   private usageNoticeSeen(model: string): boolean {
-    return providerForModel(model) === "claude"
+    return this.runtimeIdFor(model) === "claude"
       ? this.settings.claudeUsageNoticeSeen
       : this.settings.codexUsageNoticeSeen;
   }
   private async setUsageNoticeSeen(model: string): Promise<void> {
-    if (providerForModel(model) === "claude") this.settings.claudeUsageNoticeSeen = true;
+    if (this.runtimeIdFor(model) === "claude") this.settings.claudeUsageNoticeSeen = true;
     else this.settings.codexUsageNoticeSeen = true;
     await this.saveSettings();
   }
@@ -1238,29 +1250,14 @@ export default class VisualAgentMapPlugin extends Plugin {
       .filter((view): view is CoffeeTablesView => view instanceof CoffeeTablesView);
   }
   async aiReadyForModel(model: string): Promise<boolean> {
-    if (providerForModel(model) === "claude") {
-      const state = await this.refreshModelDiscovery("claude");
-      if (state.status === "missing") {
-        this.openClaudeSetupGuide();
-        return false;
-      }
-      return state.status === "ready" && state.models.includes(model);
-    }
-    if (!this.codexDiagnostic().installed) {
-      this.openCodexSetupGuide();
-      return false;
-    }
-    try {
-      const state = await this.refreshModelDiscovery("codex");
-      if (state.status === "ready" && state.models.includes(model)) return true;
-      if (state.status === "missing") {
-        this.openCodexSetupGuide();
-        return false;
-      }
-      new Notice(t("ui.current_model_is_unavailable"));
-    } catch (error) {
-      this.logs.appendLog("warn", t("log.codex_not_ready_0", error instanceof Error ? error.message : String(error)));
-    }
+    const runtime = this.aiRuntime.runtimeFor(model);
+    const readiness = await runtime.readiness(model);
+    if (readiness.status === "ready") return true;
+    if (readiness.status === "missing") {
+      if (runtime.capabilities.id === "claude") this.openClaudeSetupGuide();
+      else this.openCodexSetupGuide();
+    } else if (readiness.status === "model-unavailable") new Notice(t("ui.current_model_is_unavailable"));
+    else if (readiness.error !== undefined) this.logs.appendLog("warn", t("log.codex_not_ready_0", readiness.error));
     return false;
   }
   async codexReadyForAi(): Promise<boolean> {
@@ -1269,7 +1266,7 @@ export default class VisualAgentMapPlugin extends Plugin {
   /** The dialogs' "Fix connection…" link: the setup guide when the model's CLI is missing, otherwise a fresh check. */
   repairConnection(model?: string): void {
     // The other service is refreshed quietly too, so a CLI fixed meanwhile brings its models back to the picker.
-    if (providerForModel(model || this.settings.cliModel) === "claude") {
+    if (this.runtimeIdFor(model || this.settings.cliModel) === "claude") {
       if (this.claudeDiagnostic().installed) void this.recheckClaude();
       else this.openClaudeSetupGuide();
       void this.refreshModelDiscovery("codex");
@@ -1296,7 +1293,7 @@ export default class VisualAgentMapPlugin extends Plugin {
   async confirmAiUsage(model: string, run: () => Promise<void>): Promise<boolean> {
     if (!(await this.aiReadyForModel(model))) return false;
     if (!this.usageNoticeSeen(model)) {
-      const provider = providerForModel(model);
+      const provider = this.runtimeIdFor(model);
       const confirmed = await new Promise<boolean>(resolve => new AiUsageModal(this.app, provider, resolve).open());
       if (!confirmed) return false;
       await this.setUsageNoticeSeen(model);
@@ -1637,24 +1634,20 @@ export default class VisualAgentMapPlugin extends Plugin {
   }
   /**
    * Starts an idle Claude CLI while the research dialog is open, so confirming only has to write the prompt. No model
-   * call happens until then; a run with different settings starts cold and leaves it for the dialog.
+   * call happens until then; a run with different settings starts cold and leaves it for the dialog. A runtime that
+   * cannot pre-start drops a waiting process instead (AiCalls).
    */
   prewarmClaude(model: string, reasoning?: unknown, webSearch = true, mode?: AiTaskKind): void {
     if (this.unloaded) return;
-    if (providerForModel(model) !== "claude") {
-      this.aiRuntime.releaseWarm();
-      return;
-    }
     try {
       const selected = normalizeReasoningLevel(reasoning ?? this.settings.cliReasoning);
       // Same rule as the run itself (effectiveReasoningLevel): auto is low for a short-source task but medium for a
       // synthesis. A long-source task resolves differently and starts cold.
-      this.claudeCli(this.pluginDirectory()).prewarm(
-        providerModelId(model),
-        effectiveReasoningLevel({ mode } as TaskContext, selected),
-        responseSchema,
+      this.aiCalls.prewarm(model, {
+        effort: effectiveReasoningLevel({ mode } as TaskContext, selected),
+        schema: responseSchema,
         webSearch
-      );
+      });
     } catch {
       /* Pre-starting is an optimisation: the run starts the process itself. */
     }
@@ -1665,12 +1658,8 @@ export default class VisualAgentMapPlugin extends Plugin {
    */
   prewarmClaudeStep(model: string, reasoning: ReasoningLevel, schema: unknown): void {
     if (this.unloaded) return;
-    if (providerForModel(model) !== "claude") {
-      this.aiRuntime.releaseWarm();
-      return;
-    }
     try {
-      this.claudeCli(this.pluginDirectory()).prewarm(providerModelId(model), stepEffort(reasoning), schema, false);
+      this.aiCalls.prewarm(model, { effort: stepEffort(reasoning), schema, webSearch: false });
     } catch {
       /* Pre-starting is an optimisation: the run starts the process itself. */
     }

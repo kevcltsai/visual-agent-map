@@ -1062,6 +1062,121 @@ integrationTest('parent merge: busy on the parent or a subtopic is refused and w
   await h.view.mergeSelected('Parent', { path: h.path, mapId: h.mapDoc.id, targetId: h.parent.id, sources: [h.parent, h.sources[0]].map(n => ({ id: n.id, path: n.path })) });
   assert.deepEqual(await h.shape(), original); assert.equal(h.contents.get(h.parent.path), text); assert.equal(h.view.history.canUndo, false);
 });
+// MapTransaction 04, Packet 2: both merge modes run through the transaction (undo/redo refuse stale, restore rebuild failures, keep the viewport).
+const STALE = /can no longer be undone or redone/;
+const ROLLBACK_FAILED = 'Merge failed and could not be fully undone. Check the Unassigned folder.';
+const REFRESH_FAILED = 'Merged, but the view failed to refresh. Reopen the map.';
+// A structure write that is not in history (the view's map is kept in step, so no conflict window opens).
+const outsideWrite = async h => {
+  const disk = await h.repo.readMap(h.path); disk.nodes.find(n => n.id === h.parent.id).collapsed = true;
+  await h.repo.saveMap(h.path, disk); h.view.map = await h.repo.readMap(h.path);
+};
+integrationTest('V1: synthesis merge, then an unrelated structure write, then undo is refused (stale) and keeps that write', async () => {
+  const h = await mergeHarness(); await h.merge('Merged'); await outsideWrite(h);
+  const files = new Map(h.contents), mapText = h.contents.get(h.path);
+  await assert.rejects(() => h.view.travel(false), STALE);
+  assert.deepEqual(new Map(h.contents), files, 'no file changed'); assert.equal(h.contents.get(h.path), mapText);
+  assert.equal((await h.repo.readMap(h.path)).nodes.find(n => n.id === h.parent.id).collapsed, true, 'the outside write survives');
+  assert.equal(h.view.history.canUndo, true); assert.equal(h.view.history.canRedo, false, 'the history pointer is back');
+});
+integrationTest('V2: parent merge, then an unrelated structure write, then undo is refused (stale) and leaves the parent note as merged', async () => {
+  const h = await mergeHarness(); await parentOf(h); await parentMerge(h, 'Renamed parent');
+  const mergedText = h.contents.get(h.parent.path); await outsideWrite(h);
+  const files = new Map(h.contents);
+  await assert.rejects(() => h.view.travel(false), STALE);
+  assert.equal(h.contents.get(h.parent.path), mergedText, 'the parent note is not rewritten'); assert.deepEqual(new Map(h.contents), files);
+  assert.equal((await h.repo.readMap(h.path)).nodes.find(n => n.id === h.parent.id).collapsed, true);
+  assert.equal(h.view.history.canUndo, true); assert.equal(h.view.history.canRedo, false);
+});
+integrationTest('V3: synthesis merge whose rebuild fails inside the commit is rolled back as a whole (new note parked, no history entry)', async () => {
+  const h = await mergeHarness(); const original = await h.shape(); const mapText = h.contents.get(h.path);
+  const rebuild = h.plugin.rebuildDerivedData; let calls = 0;
+  h.plugin.rebuildDerivedData = async () => { if (++calls === 1) throw new Error('rebuild broke'); return rebuild(); };
+  await assert.rejects(() => h.merge('Merged'), /rebuild broke/);
+  const after = await h.shape();
+  assert.deepEqual(after.nodes, original.nodes); assert.equal(h.contents.get(h.path), mapText);
+  for (const source of h.sources) assert.equal(h.fm(source.path).state, 'active');
+  assert.equal(after.unassigned.length, 1, 'the new note waits in Unassigned'); assert.equal(h.fm(after.unassigned[0]).state, 'unassigned');
+  assert.equal(h.view.history.canUndo, false, 'no history entry');
+});
+integrationTest('V4a: synthesis merge whose view refresh (hydrate) fails keeps the merge and its history entry and shows the refresh Notice', async () => {
+  const h = await aiMergeHarness(); h.view.hydrate = async () => { throw new Error('hydrate broke'); };
+  await h.merge('Merged');
+  assert.deepEqual(h.notices.filter(m => m === REFRESH_FAILED), [REFRESH_FAILED]);
+  assert.equal(h.view.history.canUndo, true); assert.equal(h.view.history.undoEntry.label, 'Merge topics');
+  const m = await h.repo.readMap(h.path); assert.equal(m.nodes.some(n => h.sources.some(s => s.id === n.id)), false, 'Map.md is the merged one');
+});
+integrationTest('V4b: parent merge whose view refresh (hydrate) fails keeps the merge and its history entry and shows the refresh Notice', async () => {
+  const h = await aiMergeHarness(); await parentOf(h); h.view.hydrate = async () => { throw new Error('hydrate broke'); };
+  await parentMerge(h, 'Parent');
+  assert.deepEqual(h.notices.filter(m => m === REFRESH_FAILED), [REFRESH_FAILED]);
+  assert.equal(h.view.history.canUndo, true);
+  const m = await h.repo.readMap(h.path); assert.equal(m.nodes.some(n => n.id === h.sources[0].id), false, 'Map.md is the merged one');
+  assert.match((await h.repo.readNote(h.parent.path)).detail, /Alpha detail/);
+});
+integrationTest('V5: a failed merge that cannot restore itself throws the rollback-failed AggregateError', async () => {
+  const h = await mergeHarness();
+  const moveUnique = h.repo.moveUnique.bind(h.repo), moveExact = h.repo.moveExact.bind(h.repo); let calls = 0;
+  h.repo.moveUnique = async (...args) => { if (++calls === 2) throw new Error('disk full'); return moveUnique(...args); };
+  h.repo.moveExact = async () => { throw new Error('restore blocked'); };
+  const error = await h.merge('Merged').then(() => assert.fail('expected a rejection'), e => e);
+  h.repo.moveUnique = moveUnique; h.repo.moveExact = moveExact;
+  assert.equal(error.name, 'AggregateError'); assert.equal(error.message, ROLLBACK_FAILED); assert.equal(error.kind, 'rollback-failed');
+  assert.match(String(error.errors[0]), /disk full/);
+  assert.equal(h.view.history.canUndo, false);
+});
+integrationTest('V6: parent merge undo whose Map.md write fails puts the merged note and files back and keeps the entry undoable', async () => {
+  const h = await mergeHarness(); await parentOf(h); const text = h.contents.get(h.parent.path); const original = await h.shape();
+  await parentMerge(h, 'Renamed parent'); const merged = await h.shape(); const mergedText = h.contents.get(h.parent.path);
+  const save = h.repo.saveMap.bind(h.repo);
+  h.repo.saveMap = async () => { throw new Error('map locked'); };
+  await assert.rejects(() => h.view.travel(false), /map locked/);
+  h.repo.saveMap = save;
+  assert.equal(h.contents.get(h.parent.path), mergedText, 'the parent note is the merged text again'); assert.deepEqual(await h.shape(), merged, 'subtopics wait in Unassigned');
+  assert.equal(h.view.history.canUndo, true, 'the history pointer is back');
+  await h.view.travel(false); assert.equal(h.contents.get(h.parent.path), text); assert.deepEqual(await h.shape(), original);
+});
+integrationTest('V7: synthesis merge, undo, the parked new note moved away outside, redo is refused (stale) and writes nothing', async () => {
+  const h = await mergeHarness(); await h.merge('Merged'); await h.view.travel(false);
+  const [parked] = (await h.shape()).unassigned;
+  await h.repo.moveExact(parked, `${h.path.replace(/\/Map\.md$/, '')}/Notes/Elsewhere.md`);
+  const files = new Map(h.contents);
+  await assert.rejects(() => h.view.travel(true), STALE);
+  assert.deepEqual(new Map(h.contents), files); assert.equal(h.view.history.canRedo, true, 'redo is still pending');
+});
+integrationTest('V8: undoing a merge clears the selection when the merged card leaves the map', async () => {
+  const h = await mergeHarness(); await h.merge('Merged');
+  const merged = (await h.repo.readMap(h.path)).nodes.find(n => n.path.includes('Merged')); assert.equal(h.view.selected, merged.id);
+  await h.view.travel(false); assert.equal(h.view.selected, null);
+});
+integrationTest('V9: a viewport panned before undo (and redo) stays as panned', async () => {
+  const h = await mergeHarness(); await h.merge('Merged');
+  h.view.map.viewport = { x: 321, y: -45, zoom: 1.5 };
+  await h.view.travel(false); assert.deepEqual(plain(h.view.map.viewport), { x: 321, y: -45, zoom: 1.5 });
+  h.view.map.viewport = { x: 7, y: 8, zoom: 0.5 };
+  await h.view.travel(true); assert.deepEqual(plain(h.view.map.viewport), { x: 7, y: 8, zoom: 0.5 });
+});
+integrationTest('V10: the conflict window keeps a file version that lacks the sources: nothing is merged, the new note is parked, no history', async () => {
+  const h = await mergeHarness();
+  const disk = await h.repo.readMap(h.path); disk.nodes = disk.nodes.filter(n => n.id !== h.sources[1].id); disk.title = 'Edited elsewhere';
+  await h.repo.saveMap(h.path, disk);
+  h.view.resolveMapConflict = async function () { this.map = await h.repo.readMap(h.path); this.history.clear(); return true; };
+  await assert.rejects(() => h.merge('Merged'), /note is missing/);
+  const after = await h.shape(); assert.deepEqual(after.nodes, disk.nodes.map(n => [n.id, n.path, n.parentId]));
+  for (const source of h.sources) { assert.ok(h.app.vault.getAbstractFileByPath(source.path)); assert.equal(h.fm(source.path).state, 'active'); }
+  assert.equal((await h.repo.readMap(h.path)).title, 'Edited elsewhere');
+  assert.equal(after.unassigned.length, 1, 'the new note is parked'); assert.equal(h.view.history.canUndo, false);
+});
+integrationTest('V11: a guard refusal carries kind "guard" and the merged-topic message, on undo and on redo', async () => {
+  const h = await mergeHarness(); await parentOf(h); await parentMerge(h, 'Parent');
+  await h.repo.updateNote(h.parent.path, { summary: 'Edited later' });
+  const refused = await h.view.travel(false).then(() => assert.fail('expected a rejection'), e => e);
+  assert.equal(refused.kind, 'guard'); assert.match(refused.message, /merged topic was edited/); assert.equal(h.view.history.canUndo, true);
+  await h.repo.updateNote(h.parent.path, { summary: 'Parent summary' });
+  await h.view.travel(false); await h.repo.updateNote(h.parent.path, { summary: 'Edited after undo' });
+  const redo = await h.view.travel(true).then(() => assert.fail('expected a rejection'), e => e);
+  assert.equal(redo.kind, 'guard'); assert.match(redo.message, /merged topic was edited/); assert.equal(h.view.history.canRedo, true);
+});
 const parentBegin = async (h, title) => {
   const snapshot = parentSnapshot(h);
   const began = await h.view.startMergeDraft(title, snapshot, () => { h.started++; }, new AbortController().signal);

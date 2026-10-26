@@ -15981,6 +15981,10 @@ var History = class {
 };
 
 // experiences/visual-map/map-transaction.ts
+var isTransactionError = (error, kind) => {
+  const found = error == null ? void 0 : error.kind;
+  return (found === "stale" || found === "rollback-failed" || found === "guard") && (kind === void 0 || found === kind);
+};
 var structure = (map) => JSON.stringify({ ...map, viewport: null, nodes: map.nodes.map((node) => ({ ...node, x: null, y: null })) });
 var written = (map) => JSON.stringify({ ...map, viewport: null });
 var ownership = (map) => JSON.stringify(map.nodes.map((node) => [node.id, node.path, node.parentId]));
@@ -36182,7 +36186,6 @@ function aimQuestionStatus(map, questionNodeId, activeQuestionNodeId) {
   if (statuses.includes("cancelled")) return "cancelled";
   return "not_started";
 }
-var MERGE_GUARD_FIELDS = ["title", "summary", "detail", "status"];
 var TASK_PROGRESS_PREFIX = "vam-task:";
 var MERGE_DONE_NOTICE_MS = 15e3;
 var cardLabelSequence = 0;
@@ -39979,20 +39982,12 @@ ${request.requirements}` : preset.text,
       )
     );
   }
-  /** Puts moved notes back where they were and restores their lifecycle, newest move first. */
-  async revertMergeMoves(moves) {
-    for (const move of [...moves].reverse()) {
-      if (this.app.vault.getAbstractFileByPath(move.to) && !this.app.vault.getAbstractFileByPath(move.from))
-        await this.plugin.repo.moveExact(move.to, move.from);
-      await this.plugin.repo.setLifecycle(move.from, move.topicId, move.restoreMapId, move.restoreState);
-    }
-  }
   /**
    * Replaces the selected sibling topics with one new topic: their Details become sections of the new Detail, their
    * notes go to Unassigned, their subtopics move under the new topic. One history step; a failure puts everything back.
    */
   async mergeSelected(title, snapshot, content) {
-    var _a2, _b2, _c;
+    var _a2, _b2, _c, _d;
     const stale = () => {
       throw new Error(t("ui.merge_draft_stale"));
     };
@@ -40045,8 +40040,8 @@ ${request.requirements}` : preset.text,
       check.parentId ? "inherited" : "workspace",
       content ? void 0 : { detail }
     );
-    const done = [], moves = [];
-    const after = clone(before);
+    const parkFolder = repo.topicFolder(mapPath, "Unassigned"), viewport = clone((_d = (_c = this.map) == null ? void 0 : _c.viewport) != null ? _d : before.viewport);
+    let entry;
     try {
       if (content) {
         const detailTemplate = this.mapDetailTemplate(language2);
@@ -40068,84 +40063,42 @@ ${request.requirements}` : preset.text,
           sourcePaths: sources2.map((source) => source.path),
           status: mergedStatus(detail)
         });
-      for (const source of sources2) {
-        const target = await repo.moveUnique(source.path, repo.topicFolder(mapPath, "Unassigned"));
-        done.push({
-          from: source.path,
-          to: target,
-          topicId: before.id,
-          restoreMapId: before.id,
-          restoreState: "active"
-        });
-        moves.push({ activePath: source.path, parkedPath: target, topicId: before.id, parkedState: "unassigned" });
-        await repo.setLifecycle(target, before.id, "", "unassigned");
-      }
-      const ids = new Set(sources2.map((source) => source.id)), first = sources2[0], merged = { ...created, parentId: check.parentId, x: first.x, y: first.y, collapsed: false }, adopted = /* @__PURE__ */ new Set();
-      for (const item of after.nodes)
-        if (item.parentId !== null && ids.has(item.parentId)) {
-          item.parentId = merged.id;
-          adopted.add(item.id);
-          for (const id of descendants(after.nodes, item.id)) adopted.add(id);
-        }
-      after.nodes = after.nodes.flatMap((item) => item.id === first.id ? [merged] : ids.has(item.id) ? [] : [item]);
-      if (adopted.size) after.nodes = arrangeNewBranch(after.nodes, merged.id, adopted, this.cardHeightOf);
-      await repo.saveMap(mapPath, after);
+      const tx = this.beginMapTransaction().create(created.path, parkFolder, before.id);
+      for (const source of sources2) tx.park(source.path, parkFolder, before.id, "unassigned");
+      entry = await tx.editMap(mapPath, (map) => {
+        map.viewport = clone(viewport);
+        const ids = new Set(sources2.map((source) => source.id)), first = map.nodes.find((item) => item.id === sources2[0].id);
+        if (!first || sources2.some((source) => !map.nodes.some((item) => item.id === source.id)))
+          throw new Error(t("ui.merge_missing_note"));
+        const merged = { ...created, parentId: check.parentId, x: first.x, y: first.y, collapsed: false }, adopted = /* @__PURE__ */ new Set();
+        for (const item of map.nodes)
+          if (item.parentId !== null && ids.has(item.parentId)) {
+            item.parentId = merged.id;
+            adopted.add(item.id);
+            for (const id of descendants(map.nodes, item.id)) adopted.add(id);
+          }
+        map.nodes = map.nodes.flatMap((item) => item.id === first.id ? [merged] : ids.has(item.id) ? [] : [item]);
+        if (adopted.size) map.nodes = arrangeNewBranch(map.nodes, merged.id, adopted, this.cardHeightOf);
+      }).commit({ label: t("ui.merge_topics_history") });
     } catch (error) {
+      this.render();
       try {
-        await this.revertMergeMoves(done);
-        await repo.saveMap(mapPath, before);
-        const parked = await repo.moveUnique(created.path, repo.topicFolder(mapPath, "Unassigned"));
-        await repo.setLifecycle(parked, before.id, "", "unassigned");
-        this.map = before;
-        await this.plugin.rebuildDerivedData();
-        await this.hydrate();
-        this.render();
-      } catch (rollbackError) {
-        throw new AggregateError([error, rollbackError], t("error.merge_rollback_failed"));
+        if (this.app.vault.getAbstractFileByPath(created.path)) {
+          const parked = await repo.moveUnique(created.path, parkFolder);
+          await repo.setLifecycle(parked, before.id, "", "unassigned");
+          await this.plugin.rebuildDerivedData();
+        }
+      } catch (parkError) {
+        throw new AggregateError([error, parkError], t("error.merge_rollback_failed"));
       }
-      throw error;
+      throw this.mergeError(error);
     }
-    const state = {
-      before,
-      after,
-      newId: created.id,
-      newActive: created.path,
-      newParked: null,
-      sources: moves
-    };
-    this.map = after;
     if (content && this.mergeTasks.get(mapPath) === content.task) this.mergeTasks.delete(mapPath);
-    this.history.push({
-      label: t("ui.merge_topics_history"),
-      undo: () => this.applyMerge(state, false),
-      redo: () => this.applyMerge(state, true)
-    });
+    this.history.push(this.mergeEntry(entry));
     this.integrationMode = false;
     this.selected = created.id;
     this.multiSelected.clear();
-    try {
-      await this.plugin.rebuildDerivedData();
-      await this.hydrate();
-      this.render();
-      const merged = (_c = this.map) == null ? void 0 : _c.nodes.find((item) => item.id === created.id);
-      if (merged) this.focusNode(merged);
-    } catch (e) {
-      this.render();
-      new import_obsidian30.Notice(t("ui.merge_saved_refresh_failed"));
-    }
-  }
-  /** The note's exact text, and a verbatim write of it (undo of a merge into a parent restores the original this way). */
-  async readNoteText(path) {
-    return this.app.vault.read(this.plugin.repo.file(path));
-  }
-  async writeNoteText(path, text11) {
-    await this.app.vault.process(this.plugin.repo.file(path), () => text11);
-  }
-  mergeGuardOf(note) {
-    return { title: note.title, summary: note.summary, detail: note.detail, status: note.status };
-  }
-  sameMergeGuard(a, b) {
-    return MERGE_GUARD_FIELDS.every((field) => JSON.stringify(a[field]) === JSON.stringify(b[field]));
+    await this.finishMerge(created.id);
   }
   /**
    * Merge into a parent topic (`sources[0]`): the parent keeps its card, id, path, place and other properties; its
@@ -40154,11 +40107,11 @@ ${request.requirements}` : preset.text,
    * the parent's exact text.
    */
   async mergeIntoParent(title, sources2, content, before) {
-    var _a2;
+    var _a2, _b2;
     const [target, ...children] = sources2, mapPath = this.path, repo = this.plugin.repo, language2 = this.plugin.settings.language, detailTemplate = this.mapDetailTemplate(language2);
-    const beforeText = await this.readNoteText(target.path), sourceNotes = [];
+    const sourceNotes = [];
     for (const source of sources2) sourceNotes.push(await repo.readNote(source.path, before));
-    const guardBefore = this.mergeGuardOf(sourceNotes[0]), name = title.trim(), sourcePaths = [.../* @__PURE__ */ new Set([...sourceNotes[0].sourcePaths, ...children.map((child) => child.path)])];
+    const name = title.trim(), sourcePaths = [.../* @__PURE__ */ new Set([...sourceNotes[0].sourcePaths, ...children.map((child) => child.path)])];
     let patch;
     if (content) {
       const references2 = visualReferencesMarkdown(content.visualReferences, noteLanguageOf(language2));
@@ -40175,194 +40128,76 @@ ${request.requirements}` : preset.text,
       patch = { detail, status: mergedStatus(detail), sourcePaths };
     }
     if (name && name !== sourceNotes[0].title) patch.title = name;
-    const done = [], moves = [], after = clone(before);
+    const parkFolder = repo.topicFolder(mapPath, "Unassigned"), viewport = clone((_b2 = (_a2 = this.map) == null ? void 0 : _a2.viewport) != null ? _b2 : before.viewport);
+    let entry;
     try {
-      await repo.updateNote(target.path, patch, { detailTemplate });
-      for (const child of children) {
-        const parked = await repo.moveUnique(child.path, repo.topicFolder(mapPath, "Unassigned"));
-        done.push({
-          from: child.path,
-          to: parked,
-          topicId: before.id,
-          restoreMapId: before.id,
-          restoreState: "active"
-        });
-        moves.push({ activePath: child.path, parkedPath: parked, topicId: before.id, parkedState: "unassigned" });
-        await repo.setLifecycle(parked, before.id, "", "unassigned");
-      }
-      const ids = new Set(children.map((child) => child.id)), adopted = /* @__PURE__ */ new Set();
-      for (const item of after.nodes)
-        if (item.parentId !== null && ids.has(item.parentId)) {
-          item.parentId = target.id;
-          adopted.add(item.id);
-          for (const id of descendants(after.nodes, item.id)) adopted.add(id);
-        }
-      after.nodes = after.nodes.filter((item) => !ids.has(item.id));
-      if (adopted.size) after.nodes = arrangeNewBranch(after.nodes, target.id, adopted, this.cardHeightOf);
-      await repo.saveMap(mapPath, after);
+      const tx = this.beginMapTransaction().rewriteNote(target.path, async (path) => {
+        await repo.updateNote(path, patch, { detailTemplate });
+      });
+      for (const child of children) tx.park(child.path, parkFolder, before.id, "unassigned");
+      entry = await tx.editMap(mapPath, (map) => {
+        map.viewport = clone(viewport);
+        const ids = new Set(children.map((child) => child.id));
+        if (!map.nodes.some((item) => item.id === target.id) || children.some((child) => !map.nodes.some((item) => item.id === child.id)))
+          throw new Error(t("ui.merge_missing_note"));
+        const adopted = /* @__PURE__ */ new Set();
+        for (const item of map.nodes)
+          if (item.parentId !== null && ids.has(item.parentId)) {
+            item.parentId = target.id;
+            adopted.add(item.id);
+            for (const id of descendants(map.nodes, item.id)) adopted.add(id);
+          }
+        map.nodes = map.nodes.filter((item) => !ids.has(item.id));
+        if (adopted.size) map.nodes = arrangeNewBranch(map.nodes, target.id, adopted, this.cardHeightOf);
+      }).commit({ label: t("ui.merge_topics_history") });
     } catch (error) {
-      try {
-        await this.revertMergeMoves(done);
-        await this.writeNoteText(target.path, beforeText);
-        await repo.saveMap(mapPath, before);
-        this.map = before;
-        await this.plugin.rebuildDerivedData();
-        await this.hydrate();
-        this.render();
-      } catch (rollbackError) {
-        throw new AggregateError([error, rollbackError], t("error.merge_rollback_failed"));
-      }
-      throw error;
+      this.render();
+      throw this.mergeError(error);
     }
-    const state = {
-      before,
-      after,
-      targetPath: target.path,
-      beforeText,
-      patch,
-      detailTemplate,
-      guardBefore,
-      guardAfter: this.mergeGuardOf(await repo.readNote(target.path)),
-      sources: moves
-    };
-    this.map = after;
     if (content && this.mergeTasks.get(mapPath) === content.task) this.mergeTasks.delete(mapPath);
-    this.history.push({
-      label: t("ui.merge_topics_history"),
-      undo: () => this.applyParentMerge(state, false),
-      redo: () => this.applyParentMerge(state, true)
-    });
+    this.history.push(this.mergeEntry(entry));
     this.integrationMode = false;
     this.selected = target.id;
     this.multiSelected.clear();
+    await this.finishMerge(target.id);
+  }
+  /** The merge is saved and in history; a failing reload must not look like the merge failed. */
+  async finishMerge(id) {
+    var _a2;
     try {
-      await this.plugin.rebuildDerivedData();
       await this.hydrate();
       this.render();
-      const merged = (_a2 = this.map) == null ? void 0 : _a2.nodes.find((item) => item.id === target.id);
+      const merged = (_a2 = this.map) == null ? void 0 : _a2.nodes.find((item) => item.id === id);
       if (merged) this.focusNode(merged);
     } catch (e) {
       this.render();
       new import_obsidian30.Notice(t("ui.merge_saved_refresh_failed"));
     }
   }
-  /**
-   * Undo (`merged` false) or redo (`merged` true) of a merge into a parent. The parent's visible content must still be
-   * what the merge left (or what it replaced) before any file moves; undo writes the original text back verbatim.
-   */
-  async applyParentMerge(state, merged) {
-    const repo = this.plugin.repo, previous = clone(this.map), mapPath = this.path, topicId = state.before.id, done = [];
-    const latest = this.mergeGuardOf(await repo.readNote(state.targetPath));
-    if (!this.sameMergeGuard(latest, merged ? state.guardBefore : state.guardAfter))
-      throw new Error(t("ui.merge_target_changed"));
-    const priorText = await this.readNoteText(state.targetPath);
-    try {
-      if (merged) await repo.updateNote(state.targetPath, state.patch, { detailTemplate: state.detailTemplate });
-      for (const move of state.sources) {
-        const from = merged ? move.activePath : move.parkedPath, to = merged ? move.parkedPath : move.activePath;
-        await repo.moveExact(from, to);
-        done.push({
-          from,
-          to,
-          topicId,
-          restoreMapId: merged ? topicId : "",
-          restoreState: merged ? "active" : "unassigned"
-        });
-        await repo.setLifecycle(to, topicId, merged ? "" : topicId, merged ? "unassigned" : "active");
-      }
-      if (!merged) await this.writeNoteText(state.targetPath, state.beforeText);
-      const next = clone(merged ? state.after : state.before);
-      next.viewport = clone(previous.viewport);
-      await repo.saveMap(mapPath, next);
-      this.map = next;
-      if (this.selected && !next.nodes.some((item) => item.id === this.selected)) this.selected = null;
-      await this.plugin.rebuildDerivedData();
-      await this.hydrate();
-      this.render();
-    } catch (error) {
-      try {
-        await this.revertMergeMoves(done);
-        await this.writeNoteText(state.targetPath, priorText);
-        await repo.saveMap(mapPath, previous);
-        this.map = previous;
-        await this.plugin.rebuildDerivedData();
-        await this.hydrate();
-        this.render();
-      } catch (rollbackError) {
-        throw new AggregateError([error, rollbackError], t("error.merge_rollback_failed"));
-      }
-      throw error;
-    }
+  /** What the user is told when the transaction refuses or cannot restore; other errors pass through unchanged. */
+  mergeError(error) {
+    var _a2;
+    if (isTransactionError(error, "guard"))
+      return Object.assign(new Error(t("ui.merge_target_changed")), { kind: "guard" });
+    if (isTransactionError(error, "rollback-failed"))
+      return Object.assign(
+        new AggregateError((_a2 = error.errors) != null ? _a2 : [error], t("error.merge_rollback_failed")),
+        { kind: "rollback-failed" }
+      );
+    return error;
   }
-  /** Undo (`merged` false) or redo (`merged` true) of a merge: the same notes move between the same two paths. */
-  async applyMerge(state, merged) {
-    const previous = clone(this.map), repo = this.plugin.repo, mapPath = this.path, topicId = state.before.id, done = [];
-    const parkNew = async () => {
-      const target = state.newParked ? (await repo.moveExact(state.newActive, state.newParked), state.newParked) : await repo.moveUnique(state.newActive, repo.topicFolder(mapPath, "Unassigned"));
-      state.newParked = target;
-      done.push({ from: state.newActive, to: target, topicId, restoreMapId: topicId, restoreState: "active" });
-      await repo.setLifecycle(target, topicId, "", "unassigned");
-    };
-    const unparkNew = async () => {
-      await repo.moveExact(state.newParked, state.newActive);
-      done.push({ from: state.newParked, to: state.newActive, topicId, restoreMapId: "", restoreState: "unassigned" });
-      await repo.setLifecycle(state.newActive, topicId, topicId, "active");
-    };
-    const parkSources = async () => {
-      for (const move of state.sources) {
-        await repo.moveExact(move.activePath, move.parkedPath);
-        done.push({
-          from: move.activePath,
-          to: move.parkedPath,
-          topicId,
-          restoreMapId: topicId,
-          restoreState: "active"
-        });
-        await repo.setLifecycle(move.parkedPath, topicId, "", "unassigned");
-      }
-    };
-    const unparkSources = async () => {
-      for (const move of state.sources) {
-        await repo.moveExact(move.parkedPath, move.activePath);
-        done.push({
-          from: move.parkedPath,
-          to: move.activePath,
-          topicId,
-          restoreMapId: "",
-          restoreState: "unassigned"
-        });
-        await repo.setLifecycle(move.activePath, topicId, topicId, "active");
-      }
-    };
-    try {
-      if (merged) {
-        await parkSources();
-        await unparkNew();
-      } else {
-        await parkNew();
-        await unparkSources();
-      }
-      const next = clone(merged ? state.after : state.before);
-      next.viewport = clone(previous.viewport);
-      await repo.saveMap(mapPath, next);
-      this.map = next;
-      if (this.selected && !next.nodes.some((item) => item.id === this.selected)) this.selected = null;
-      await this.plugin.rebuildDerivedData();
-      await this.hydrate();
-      this.render();
-    } catch (error) {
+  /** One history step for a merge: the commit's entry, plus the selection clean-up and the merge's own error messages. */
+  mergeEntry(entry) {
+    const travel = (work) => async () => {
+      var _a2;
       try {
-        await this.revertMergeMoves(done);
-        await repo.saveMap(mapPath, previous);
-        this.map = previous;
-        await this.plugin.rebuildDerivedData();
-        await this.hydrate();
-        this.render();
-      } catch (rollbackError) {
-        throw new AggregateError([error, rollbackError], t("error.merge_rollback_failed"));
+        await work();
+      } catch (error) {
+        throw this.mergeError(error);
       }
-      throw error;
-    }
+      if (this.selected && !((_a2 = this.map) == null ? void 0 : _a2.nodes.some((item) => item.id === this.selected))) this.selected = null;
+    };
+    return { ...entry, undo: travel(entry.undo), redo: travel(entry.redo) };
   }
   selectedRoots() {
     if (!this.map) return [];

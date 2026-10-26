@@ -301,3 +301,183 @@ integrationTest('map transaction: commit whose moveUnique relocates and then thr
   assert.equal(h.exists(h.notes[0]), false, 'the new path is unknown, so the file is not guessed back');
   assert.equal(h.counts.applied.length, 0);
 });
+
+// ---- ticket 02: node positions are layout; create(path, parkFolder, topicId) ----
+const UNASSIGNED = `${TOPICS}/map-u/Unassigned`;
+const create = (h, paths) => paths.reduce((tx, path) => tx.create(path, UNASSIGNED, 'map-u'), begin(h.deps));
+const unassignedFiles = h => [...h.contents.keys()].filter(p => p.startsWith(`${UNASSIGNED}/`));
+
+integrationTest('map transaction: M1 a position-only change on a node (x/y) does not make undo stale, and undo writes the stored positions back', async () => {
+  const h = await harness();
+  const positions = plain((await h.repo.readMap(MAP)).nodes.map(n => [n.x, n.y]));
+  const entry = await begin(h.deps).editMap(MAP, map => { map.nodes[0].collapsed = true; map.nodes[0].x += 100; }).commit();
+  const committed = await h.repo.readMap(MAP);
+  committed.nodes[0].x = 777; committed.nodes[1].y = -5; // e.g. respaceBatch
+  await h.repo.saveMap(MAP, committed);
+  await entry.undo();
+  const restored = await h.repo.readMap(MAP);
+  assert.equal(restored.nodes[0].collapsed, false);
+  assert.deepEqual(plain(restored.nodes.map(n => [n.x, n.y])), positions, 'the positions stored before the step are written back');
+});
+
+integrationTest('map transaction: M2 every non-position change to Map.md still makes undo stale and writes nothing', async () => {
+  const outside = {
+    parentId: map => { map.nodes[1].parentId = map.nodes[0].id; },
+    path: map => { map.nodes[0].path = `${TOPICS}/map-u/Notes/other.md`; },
+    collapsed: map => { map.nodes[0].collapsed = true; },
+    'node added': map => { map.nodes.push({ id: 'extra', path: 'x.md', parentId: null, x: 0, y: 0, collapsed: false }); },
+    'node removed': map => { map.nodes.pop(); },
+    'node order': map => { map.nodes.reverse(); },
+    title: map => { map.title = 'changed outside'; },
+    'map setting': map => { map.toneId = 'outside-tone'; },
+    aim: map => { map.aim = { version: 1, branches: [], runs: [], pendingCommits: [], minimumAnswersBeforeConclusion: 3 }; }
+  };
+  for (const [label, change] of Object.entries(outside)) {
+    const h = await harness();
+    const entry = await begin(h.deps).editMap(MAP, map => { map.nodes[0].x += 10; }).commit();
+    const map = await h.repo.readMap(MAP);
+    change(map);
+    await h.repo.saveMap(MAP, map);
+    const before = h.snapshot(), calls = h.calls.length;
+    const error = await rejected(entry.undo());
+    assert.equal(error.kind, 'stale', `${label}: ${error.message}`);
+    assert.deepEqual(h.snapshot(), before, `${label}: vault unchanged`);
+    assert.equal(h.calls.length, calls, `${label}: nothing written`);
+  }
+});
+
+integrationTest('map transaction: M3 create undo, redo, undo parks at the same path both times and the lifecycle follows', async () => {
+  const h = await harness();
+  const note = h.notes[0];
+  const entry = await create(h, [note]).editMap(MAP, map => { map.title = 'renamed'; }).commit();
+  assert.deepEqual(await h.lifecycleOf(note), ['map-u', 'map-u', 'active'], 'commit writes no file');
+  assert.equal(h.calls.filter(c => c !== 'saveMap').length, 0);
+  await entry.undo();
+  const parked = unassignedFiles(h);
+  assert.equal(parked.length, 1);
+  assert.equal(h.exists(note), false);
+  assert.deepEqual(await h.lifecycleOf(parked[0]), ['map-u', '', 'unassigned']);
+  assert.equal((await h.repo.readMap(MAP)).title, 'map-u');
+  await entry.redo();
+  assert.equal(h.exists(note), true);
+  assert.deepEqual(await h.lifecycleOf(note), ['map-u', 'map-u', 'active']);
+  assert.equal((await h.repo.readMap(MAP)).title, 'renamed');
+  await entry.undo();
+  assert.deepEqual(unassignedFiles(h), parked, 'the second undo parks at the path chosen by the first');
+  assert.deepEqual(await h.lifecycleOf(parked[0]), ['map-u', '', 'unassigned']);
+});
+
+integrationTest('map transaction: M4 create parks under a free name, and two creates with the same name in one undo get different names', async () => {
+  let h = await harness();
+  const name = h.notes[0].split('/').at(-1);
+  await h.repo.folder(UNASSIGNED);
+  await h.app.vault.create(`${UNASSIGNED}/${name}`, 'occupied');
+  const entry = await create(h, [h.notes[0]]).commit();
+  await entry.undo();
+  const parked = unassignedFiles(h).filter(p => p !== `${UNASSIGNED}/${name}`);
+  assert.equal(parked.length, 1);
+  assert.notEqual(parked[0], `${UNASSIGNED}/${name}`);
+  assert.equal(h.contents.get(`${UNASSIGNED}/${name}`), 'occupied', 'the existing file is untouched');
+
+  h = await harness();
+  const twin = `${TOPICS}/map-u/Notes/sub/${h.notes[0].split('/').at(-1)}`;
+  await h.repo.folder(`${TOPICS}/map-u/Notes/sub`);
+  await h.app.vault.rename(h.app.vault.getAbstractFileByPath(h.notes[1]), twin);
+  const both = await create(h, [h.notes[0], twin]).commit();
+  await both.undo();
+  const names = unassignedFiles(h);
+  assert.equal(names.length, 2);
+  assert.equal(new Set(names).size, 2, 'distinct parking paths');
+  assert.equal(h.exists(h.notes[0]) || h.exists(twin), false);
+});
+
+integrationTest('map transaction: M5 a file placed on the fixed parking path makes undo stale; no new name is chosen', async () => {
+  const h = await harness();
+  const entry = await create(h, [h.notes[0]]).commit();
+  await entry.undo();
+  const parked = unassignedFiles(h)[0];
+  await entry.redo();
+  await h.app.vault.create(parked, 'external');
+  const before = h.snapshot(), calls = h.calls.length;
+  const error = await rejected(entry.undo());
+  assert.equal(error.kind, 'stale');
+  assert.deepEqual(h.snapshot(), before);
+  assert.equal(h.calls.length, calls, 'nothing written');
+  assert.deepEqual(unassignedFiles(h), [parked], 'no second parking path appeared');
+});
+
+integrationTest('map transaction: M6 create redo is stale when the active path is taken or the parked note is gone', async () => {
+  const cases = [
+    ['active path taken', async (h, parked) => h.app.vault.create(h.notes[0], 'taken')],
+    ['parked note moved away', async (h, parked) => h.app.vault.rename(h.app.vault.getAbstractFileByPath(parked), `${TOPICS}/elsewhere.md`)]
+  ];
+  for (const [label, disturb] of cases) {
+    const h = await harness();
+    const entry = await create(h, [h.notes[0]]).editMap(MAP, map => { map.title = 'renamed'; }).commit();
+    await entry.undo();
+    await disturb(h, unassignedFiles(h)[0]);
+    const before = h.snapshot(), calls = h.calls.length;
+    const error = await rejected(entry.redo());
+    assert.equal(error.kind, 'stale', label);
+    assert.deepEqual(h.snapshot(), before, label);
+    assert.equal(h.calls.length, calls, label);
+  }
+});
+
+integrationTest('map transaction: M7 a create undo whose Map.md write fails puts the note and lifecycle back; a failing restore is rollback-failed', async () => {
+  let h = await harness();
+  const entry = await create(h, [h.notes[0]]).editMap(MAP, map => { map.title = 'renamed'; }).commit();
+  let before = h.snapshot();
+  h.fail.saveMap = (n, args) => args[0] === MAP && !h.fail.done && (h.fail.done = true);
+  const error = await rejected(entry.undo());
+  assert.match(error.message, /^injected saveMap/);
+  assert.equal(isTransactionError(error), false, 'the rollback worked, so the original error is thrown');
+  assert.deepEqual(h.snapshot(), before, 'Map.md and the note are as before the undo');
+  assert.deepEqual(await h.lifecycleOf(h.notes[0]), ['map-u', 'map-u', 'active']);
+  h.fail.saveMap = null;
+  await entry.undo(); // the parking path chosen by the rejected attempt is reused
+  assert.equal(unassignedFiles(h).length, 1);
+
+  h = await harness();
+  const second = await create(h, [h.notes[0]]).editMap(MAP, map => { map.title = 'renamed'; }).commit();
+  h.fail.saveMap = (n, args) => args[0] === MAP && !h.fail.done && (h.fail.done = true);
+  h.fail.moveExact = n => n === 2; // call 1 is the undo's move, call 2 its restore
+  const both = await rejected(second.undo());
+  assert.equal(both.name, 'AggregateError');
+  assert.equal(both.kind, 'rollback-failed');
+  assert.match(both.errors[0].message, /^injected saveMap/);
+  assert.match(both.errors[1].message, /^injected moveExact 2/);
+});
+
+integrationTest('map transaction: M8 History keeps working with transaction entries: discardSince drops them, collapseSince runs newest first then oldest first', async () => {
+  const { History } = load('map-model.ts');
+  let h = await harness();
+  const history = new History();
+  history.push(await park(h, [h.notes[2]]).commit());
+  const mark = history.mark();
+  history.push(await park(h, [h.notes[0]]).commit());
+  history.push(await create(h, [h.notes[1]]).commit());
+  const committed = h.snapshot();
+  history.discardSince(mark);
+  assert.deepEqual(h.snapshot(), committed, 'discarding leaves the vault alone');
+  assert.equal(history.canUndo, true);
+  await history.undo().undo();
+  assert.equal(h.exists(h.notes[2]), true, 'the entry from before the mark still undoes');
+  assert.equal(history.canUndo, false);
+
+  h = await harness();
+  const batch = new History(), order = [];
+  const wrap = (name, entry) => ({ undo: () => { order.push(`undo ${name}`); return entry.undo(); }, redo: () => { order.push(`redo ${name}`); return entry.redo(); } });
+  const bMark = batch.mark();
+  batch.push(wrap('one', await park(h, [h.notes[0]]).commit()));
+  batch.push(wrap('two', await create(h, [h.notes[1]]).commit()));
+  batch.collapseSince(bMark);
+  await batch.undo().undo();
+  assert.deepEqual(order, ['undo two', 'undo one']);
+  assert.equal(h.exists(h.notes[0]), true);
+  assert.equal(h.exists(h.notes[1]), false, 'the created note is parked');
+  await batch.redo().redo();
+  assert.deepEqual(order.slice(2), ['redo one', 'redo two']);
+  assert.equal(h.exists(h.notes[0]), false);
+  assert.equal(h.exists(h.notes[1]), true);
+});

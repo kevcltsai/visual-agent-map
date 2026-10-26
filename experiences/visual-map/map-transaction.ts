@@ -13,7 +13,10 @@ export interface Lifecycle {
   state: TopicState;
 }
 export interface TransactionDeps {
-  repo: Pick<Repository, "readNote" | "readMap" | "saveMap" | "moveUnique" | "moveExact" | "setLifecycle" | "app">;
+  repo: Pick<
+    Repository,
+    "readNote" | "readMap" | "saveMap" | "moveUnique" | "moveExact" | "setLifecycle" | "unique" | "app"
+  >;
   rebuildDerivedData: () => Promise<void>;
   /** Called once per edited map after commit, undo and redo, with the map as now stored. */
   onApplied: (mapPath: string, map: MapDocument) => void | Promise<void>;
@@ -36,6 +39,12 @@ export interface Transaction {
   /** Moves a note into `folder` (a free name is chosen) and sets its lifecycle; returns nothing until commit. */
   move(path: string, folder: string, lifecycle: Lifecycle): Transaction;
   park(path: string, folder: string, topicId: string, state: "unassigned" | "archived"): Transaction;
+  /**
+   * Registers a note that already exists at `path` and is part of this step. Commit writes nothing for it; undo parks it
+   * in `parkFolder` as unassigned (the path is chosen on the first undo and kept), redo puts it back with the lifecycle
+   * it had at commit.
+   */
+  create(path: string, parkFolder: string, topicId: string): Transaction;
   unpark(path: string, folder: string, topicId: string, mapId: string): Transaction;
   transfer(path: string, topic: { id: string; root: string }, mode: "unassigned" | "add"): Transaction;
   /** `resolve(originalPath)` gives the path a moved note will have; moves run before map edits. */
@@ -50,6 +59,8 @@ export const isTransactionError = (error: unknown, kind?: TransactionErrorKind):
 export const isStaleError = (error: unknown): boolean => isTransactionError(error, "stale");
 
 interface FileOp {
+  /** `create`: the note is at `original` after commit; `target` is its parking path, chosen on the first undo. */
+  kind: "move" | "create";
   original: string;
   folder: string;
   lifecycle: Lifecycle;
@@ -74,14 +85,17 @@ interface Journal {
   maps: Array<{ mapPath: string; restore: MapDocument; written: boolean }>;
 }
 
-const structure = (map: MapDocument): string => JSON.stringify({ ...map, viewport: null });
+// Viewport and node positions are layout, not content: undo writes the stored positions back and does not treat a change as stale.
+const structure = (map: MapDocument): string =>
+  JSON.stringify({ ...map, viewport: null, nodes: map.nodes.map(node => ({ ...node, x: null, y: null })) });
 const ownership = (map: MapDocument): string =>
   JSON.stringify(map.nodes.map(node => [node.id, node.path, node.parentId]));
+const baseNameOf = (path: string): string => path.slice(path.lastIndexOf("/") + 1).replace(/\.md$/, "");
 const tagged = (error: Error, kind: TransactionErrorKind): TransactionError => Object.assign(error, { kind });
 
 export function begin(deps: TransactionDeps): Transaction {
   const { repo } = deps;
-  const moves: Array<{ path: string; folder: string; lifecycle: Lifecycle }> = [];
+  const moves: Array<{ kind: "move" | "create"; path: string; folder: string; lifecycle: Lifecycle }> = [];
   const edits: Array<{ mapPath: string; edit: (map: MapDocument, resolve: (originalPath: string) => string) => void }> =
     [];
   let committed = false;
@@ -174,13 +188,31 @@ export function begin(deps: TransactionDeps): Transaction {
   }
 
   function entryFor(ops: FileOp[], records: MapRecord[], rebuild: boolean, label?: string): TransactionEntry {
+    // `toward`: the step moves the note from its original path to its target path.
+    const toward = (op: FileOp, direction: "undo" | "redo"): boolean =>
+      (op.kind === "create") === (direction === "undo");
+    const sequence = (direction: "undo" | "redo"): FileOp[] => {
+      const moved = ops.filter(op => op.kind === "move"),
+        created = ops.filter(op => op.kind === "create");
+      return direction === "undo" ? [...moved.reverse(), ...created.reverse()] : [...created, ...moved];
+    };
+    /** Picks (once) the parking path of every create that has none; later undo and redo reuse it. */
+    const choosePark = (): void => {
+      const taken = new Set<string>();
+      for (const op of ops) {
+        if (op.kind !== "create") continue;
+        if (!op.target) op.target = repo.unique(op.folder, baseNameOf(op.original), taken);
+        taken.add(op.target);
+      }
+    };
     const stale = async (direction: "undo" | "redo"): Promise<void> => {
       const fail = (): never => {
         throw tagged(new Error(t("error.map_transaction_stale")), "stale");
       };
       for (const op of ops) {
-        const here = direction === "undo" ? op.target : op.original,
-          there = direction === "undo" ? op.original : op.target;
+        if (!op.target) fail();
+        const here = toward(op, direction) ? op.original : op.target,
+          there = toward(op, direction) ? op.target : op.original;
         if (!exists(here) || exists(there)) fail();
       }
       for (const record of records) {
@@ -189,14 +221,14 @@ export function begin(deps: TransactionDeps): Transaction {
       }
     };
     const apply = async (direction: "undo" | "redo"): Promise<void> => {
+      if (direction === "undo") choosePark();
       await stale(direction);
+      const files: FileStep[] = sequence(direction).map(op =>
+        toward(op, direction)
+          ? { from: op.original, to: op.target, lifecycle: op.lifecycle, restore: op.previous }
+          : { from: op.target, to: op.original, lifecycle: op.previous, restore: op.lifecycle }
+      );
       const undoing = direction === "undo";
-      const files: FileStep[] = (undoing ? [...ops].reverse() : ops).map(op => ({
-        from: undoing ? op.target : op.original,
-        to: undoing ? op.original : op.target,
-        lifecycle: undoing ? op.previous : op.lifecycle,
-        restore: undoing ? op.lifecycle : op.previous
-      }));
       const maps = records.map(record => ({
         mapPath: record.mapPath,
         write: undoing ? record.before : record.after,
@@ -210,7 +242,11 @@ export function begin(deps: TransactionDeps): Transaction {
 
   const transaction: Transaction = {
     move(path, folder, lifecycle) {
-      moves.push({ path, folder, lifecycle });
+      moves.push({ kind: "move", path, folder, lifecycle });
+      return transaction;
+    },
+    create(path, parkFolder, topicId) {
+      moves.push({ kind: "create", path, folder: parkFolder, lifecycle: { topicId, mapId: "", state: "unassigned" } });
       return transaction;
     },
     park(path, folder, topicId, state) {
@@ -237,6 +273,7 @@ export function begin(deps: TransactionDeps): Transaction {
       for (const move of moves) {
         const note = await repo.readNote(move.path);
         ops.push({
+          kind: move.kind,
           original: move.path,
           folder: move.folder,
           lifecycle: move.lifecycle,
@@ -252,6 +289,7 @@ export function begin(deps: TransactionDeps): Transaction {
       const records: MapRecord[] = [];
       try {
         for (const op of ops) {
+          if (op.kind === "create") continue;
           const entry = {
             from: op.original,
             to: "",
@@ -275,7 +313,7 @@ export function begin(deps: TransactionDeps): Transaction {
           await repo.setLifecycle(op.target, op.lifecycle.topicId, op.lifecycle.mapId, op.lifecycle.state);
         }
         const resolve = (originalPath: string): string => {
-          const found = ops.find(op => op.original === originalPath);
+          const found = ops.find(op => op.kind === "move" && op.original === originalPath);
           if (!found) throw new Error(`Not a moved note: ${originalPath}`);
           return found.target;
         };

@@ -15981,8 +15981,9 @@ var History = class {
 };
 
 // experiences/visual-map/map-transaction.ts
-var structure = (map) => JSON.stringify({ ...map, viewport: null });
+var structure = (map) => JSON.stringify({ ...map, viewport: null, nodes: map.nodes.map((node) => ({ ...node, x: null, y: null })) });
 var ownership = (map) => JSON.stringify(map.nodes.map((node) => [node.id, node.path, node.parentId]));
+var baseNameOf = (path) => path.slice(path.lastIndexOf("/") + 1).replace(/\.md$/, "");
 var tagged = (error, kind) => Object.assign(error, { kind });
 function begin(deps) {
   const { repo } = deps;
@@ -16068,12 +16069,26 @@ function begin(deps) {
     );
   }
   function entryFor(ops, records, rebuild2, label) {
+    const toward = (op, direction) => op.kind === "create" === (direction === "undo");
+    const sequence = (direction) => {
+      const moved = ops.filter((op) => op.kind === "move"), created = ops.filter((op) => op.kind === "create");
+      return direction === "undo" ? [...moved.reverse(), ...created.reverse()] : [...created, ...moved];
+    };
+    const choosePark = () => {
+      const taken = /* @__PURE__ */ new Set();
+      for (const op of ops) {
+        if (op.kind !== "create") continue;
+        if (!op.target) op.target = repo.unique(op.folder, baseNameOf(op.original), taken);
+        taken.add(op.target);
+      }
+    };
     const stale = async (direction) => {
       const fail = () => {
         throw tagged(new Error(t("error.map_transaction_stale")), "stale");
       };
       for (const op of ops) {
-        const here = direction === "undo" ? op.target : op.original, there = direction === "undo" ? op.original : op.target;
+        if (!op.target) fail();
+        const here = toward(op, direction) ? op.original : op.target, there = toward(op, direction) ? op.target : op.original;
         if (!exists(here) || exists(there)) fail();
       }
       for (const record of records) {
@@ -16082,14 +16097,12 @@ function begin(deps) {
       }
     };
     const apply = async (direction) => {
+      if (direction === "undo") choosePark();
       await stale(direction);
+      const files = sequence(direction).map(
+        (op) => toward(op, direction) ? { from: op.original, to: op.target, lifecycle: op.lifecycle, restore: op.previous } : { from: op.target, to: op.original, lifecycle: op.previous, restore: op.lifecycle }
+      );
       const undoing = direction === "undo";
-      const files = (undoing ? [...ops].reverse() : ops).map((op) => ({
-        from: undoing ? op.target : op.original,
-        to: undoing ? op.original : op.target,
-        lifecycle: undoing ? op.previous : op.lifecycle,
-        restore: undoing ? op.lifecycle : op.previous
-      }));
       const maps = records.map((record) => ({
         mapPath: record.mapPath,
         write: undoing ? record.before : record.after,
@@ -16102,7 +16115,11 @@ function begin(deps) {
   }
   const transaction = {
     move(path, folder, lifecycle) {
-      moves.push({ path, folder, lifecycle });
+      moves.push({ kind: "move", path, folder, lifecycle });
+      return transaction;
+    },
+    create(path, parkFolder, topicId) {
+      moves.push({ kind: "create", path, folder: parkFolder, lifecycle: { topicId, mapId: "", state: "unassigned" } });
       return transaction;
     },
     park(path, folder, topicId, state) {
@@ -16127,6 +16144,7 @@ function begin(deps) {
       for (const move of moves) {
         const note = await repo.readNote(move.path);
         ops.push({
+          kind: move.kind,
           original: move.path,
           folder: move.folder,
           lifecycle: move.lifecycle,
@@ -16142,6 +16160,7 @@ function begin(deps) {
       const records = [];
       try {
         for (const op of ops) {
+          if (op.kind === "create") continue;
           const entry = {
             from: op.original,
             to: "",
@@ -16164,7 +16183,7 @@ function begin(deps) {
           await repo.setLifecycle(op.target, op.lifecycle.topicId, op.lifecycle.mapId, op.lifecycle.state);
         }
         const resolve = (originalPath) => {
-          const found = ops.find((op) => op.original === originalPath);
+          const found = ops.find((op) => op.kind === "move" && op.original === originalPath);
           if (!found) throw new Error(`Not a moved note: ${originalPath}`);
           return found.target;
         };

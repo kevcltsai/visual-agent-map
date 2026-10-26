@@ -27,5 +27,5 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
     console.error(`Test files run by no verify script (wire them into test:unit or scripts/test-integration.mjs, or list a helper in scripts/check-test-wiring.mjs):\n${unwired.map(name => `  tests/${name}`).join("\n")}`);
     process.exit(1);
   }
-  console.log("check-test-wiring: every test file under tests/ is run by verify.");
+  process.stdout.write("check-test-wiring: every test file under tests/ is run by verify.\n");
 }

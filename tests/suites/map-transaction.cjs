@@ -263,3 +263,41 @@ integrationTest('map transaction: a taken name gets a unique target, resolve rep
   await entry.undo();
   assert.equal(h.exists(h.notes[0]) && h.exists(h.notes[1]), true);
 });
+
+// repository.moveExact/moveUnique relocate the file first and then rewrite source paths; make that second step throw once.
+const failAfterRelocate = (h, times = 1) => {
+  const original = h.repo.replaceSourcePath;
+  let left = times;
+  h.repo.replaceSourcePath = async (...args) => {
+    if (left-- > 0) throw new Error('injected after relocate');
+    return original.apply(h.repo, args);
+  };
+  return () => { h.repo.replaceSourcePath = original; };
+};
+
+integrationTest('map transaction: undo/redo whose moveExact relocates and then throws moves the file back and keeps the plain error', async () => {
+  for (const redo of [false, true]) {
+    const h = await harness();
+    const entry = await park(h, [h.notes[0]]).commit();
+    if (redo) await entry.undo();
+    const before = h.snapshot();
+    const restore = failAfterRelocate(h);
+    const error = await rejected(redo ? entry.redo() : entry.undo());
+    restore();
+    assert.equal(error.message, 'injected after relocate', `redo=${redo}`);
+    assert.equal(isTransactionError(error, 'rollback-failed'), false, 'rollback succeeded, so the original error is thrown');
+    assert.deepEqual(h.snapshot(), before, `redo=${redo}: the file is back where it was before the step`);
+  }
+});
+
+integrationTest('map transaction: commit whose moveUnique relocates and then throws reports rollback-failed with the original error first', async () => {
+  const h = await harness();
+  const restore = failAfterRelocate(h);
+  const error = await rejected(park(h, [h.notes[0]]).commit());
+  restore();
+  assert.equal(isTransactionError(error, 'rollback-failed'), true);
+  assert.equal(error.name, 'AggregateError');
+  assert.equal(error.errors[0].message, 'injected after relocate');
+  assert.equal(h.exists(h.notes[0]), false, 'the new path is unknown, so the file is not guessed back');
+  assert.equal(h.counts.applied.length, 0);
+});

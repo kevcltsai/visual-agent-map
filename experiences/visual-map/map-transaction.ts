@@ -69,7 +69,8 @@ interface FileStep {
   restore: Lifecycle;
 }
 interface Journal {
-  files: Array<FileStep & { moved: boolean; lifecycleSet: boolean }>;
+  /** `lost`: the file left `from` but its new path is unknown, so it cannot be put back. */
+  files: Array<FileStep & { moved: boolean; lifecycleSet: boolean; lost?: boolean }>;
   maps: Array<{ mapPath: string; restore: MapDocument; written: boolean }>;
 }
 
@@ -97,7 +98,13 @@ export function begin(deps: TransactionDeps): Transaction {
       for (const step of files) {
         const entry = { ...step, moved: false, lifecycleSet: false };
         journal.files.push(entry);
-        await repo.moveExact(step.from, step.to);
+        try {
+          await repo.moveExact(step.from, step.to);
+        } catch (problem) {
+          // The move relocates first and rewrites links after; a throw in between leaves the file at `to` (known empty before).
+          if (!exists(step.from) && exists(step.to)) entry.moved = true;
+          throw problem;
+        }
         entry.moved = true;
         entry.lifecycleSet = true;
         await repo.setLifecycle(step.to, step.lifecycle.topicId, step.lifecycle.mapId, step.lifecycle.state);
@@ -132,6 +139,7 @@ export function begin(deps: TransactionDeps): Transaction {
     }
     for (const step of [...journal.files].reverse()) {
       let at = step.from;
+      if (step.lost) problems.push(new Error(`Moved note could not be located to restore: ${step.from}`));
       if (step.moved) {
         at = step.to;
         try {
@@ -250,10 +258,17 @@ export function begin(deps: TransactionDeps): Transaction {
             lifecycle: op.lifecycle,
             restore: op.previous,
             moved: false,
-            lifecycleSet: false
+            lifecycleSet: false,
+            lost: false
           };
           journal.files.push(entry);
-          op.target = await repo.moveUnique(op.original, op.folder);
+          try {
+            op.target = await repo.moveUnique(op.original, op.folder);
+          } catch (problem) {
+            // The new path is unknown (not guessed), so a file that already left its origin is a rollback problem.
+            if (!exists(op.original)) entry.lost = true;
+            throw problem;
+          }
           entry.to = op.target;
           entry.moved = true;
           entry.lifecycleSet = true;

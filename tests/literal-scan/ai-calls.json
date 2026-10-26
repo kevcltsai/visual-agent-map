@@ -1,0 +1,4 @@
+{
+  "dirs": ["core/ai-calls.ts", "core/ai-runtime.ts"],
+  "allow": []
+}

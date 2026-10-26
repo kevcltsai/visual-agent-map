@@ -16,6 +16,8 @@ function sourceFiles(directory) {
 // Every runtime.runTask call outside ai/runtime/ is a provider adapter (or the runtime behind one), pinned by
 // file, enclosing function and count so a new direct call anywhere fails this test.
 const RUN_TASK_CALLERS = [
+  { file: 'core/ai-runtime-service.ts', method: 'export function claudeCodeAiRuntime(', count: 1, reason: 'AiRuntime adapter over the Claude Code CLI runtime' },
+  { file: 'core/ai-runtime-service.ts', method: 'export function codexAppServerAiRuntime(', count: 1, reason: 'AiRuntime adapter over the Codex app server runtime' },
   { file: 'core/runtime-step-provider.ts', method: 'export function runtimeStepProvider(', count: 2, reason: 'shared StepProvider over the Claude and Codex runtimes' },
   { file: 'core/reframing-service.ts', method: 'export function providerReframeRunner(', count: 2, reason: 'stop-checking runtime wrappers passed into runtimeStepProvider' },
   { file: 'core/provider-step-runner.ts', method: 'export function providerStepRunner<', count: 2, reason: 'stop-checking runtime wrappers passed into runtimeStepProvider (outline-generate, structure-review)' },

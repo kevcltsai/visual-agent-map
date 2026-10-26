@@ -52952,6 +52952,22 @@ var ClaudeWarmPool = class {
   }
 };
 
+// core/ai-runtime.ts
+var CLAUDE_CAPABILITIES = {
+  id: "claude",
+  imageGeneration: false,
+  imageInput: { maxEdgePx: 1568, maxBytes: 5 * 1024 * 1024 },
+  webSearch: true,
+  prewarm: true,
+  fixedReasoningEfforts: ["low", "medium", "high"]
+};
+var CODEX_CAPABILITIES = {
+  id: "codex",
+  imageGeneration: true,
+  webSearch: true,
+  prewarm: false
+};
+
 // core/ai-runtime-service.ts
 function currentProcessEnvironment() {
   var _a2, _b2;
@@ -53004,6 +53020,21 @@ var shellExecutableProbe = {
     return ((_a2 = runShell(LIST_DIRECTORY_SCRIPT, [directory])) != null ? _a2 : "").split("\n").filter(Boolean);
   }
 };
+function claudeCodeAiRuntime(get) {
+  return {
+    capabilities: CLAUDE_CAPABILITIES,
+    run: async ({ prompt, model, effort, schema, controls }) => get().runTask(prompt, providerModelId(model), effort, schema, controls)
+  };
+}
+function codexAppServerAiRuntime(get) {
+  return {
+    capabilities: CODEX_CAPABILITIES,
+    run: async ({ prompt, model, effort, schema, controls, localCodex }) => get(localCodex).runTask(prompt, model, effort, schema, controls)
+  };
+}
+function aiRuntimeForModel(model, sources2) {
+  return providerForModel(model) === "claude" ? claudeCodeAiRuntime(sources2.claude) : codexAppServerAiRuntime(sources2.codex);
+}
 var AiRuntimeService = class {
   constructor(options) {
     this.options = options;
@@ -53078,6 +53109,18 @@ var AiRuntimeService = class {
     });
     this.claudeRuntime = { key: key2, runtime };
     return runtime;
+  }
+  /** The runtime that serves `model`, started lazily in the plugin folder when a call runs. */
+  runtimeFor(model) {
+    const directory = () => {
+      const read = this.options.pluginDirectory;
+      if (!read) throw new Error("AiRuntimeService needs a pluginDirectory option for runtimeFor");
+      return read();
+    };
+    return aiRuntimeForModel(model, {
+      claude: () => this.claude(directory()),
+      codex: (local) => this.codex(directory(), local)
+    });
   }
   resolveExecutable(configured) {
     const environment = currentProcessEnvironment();

@@ -4,6 +4,8 @@ import { CodexAppServerRuntime, type ReadLocalFile } from "../ai/runtime/codex-a
 import { ClaudeCodeCliRuntime, type ClaudeProcess, type ClaudeSpawn } from "../ai/runtime/claude-code-cli";
 import { ClaudeWarmPool, type WarmClock } from "../ai/runtime/claude-warm-pool";
 import type { LogLevel } from "../log-manager";
+import { providerForModel, providerModelId } from "../ai/providers/provider";
+import { CLAUDE_CAPABILITIES, CODEX_CAPABILITIES, type AiRuntime } from "./ai-runtime";
 
 export type ProcessEnvironment = Record<string, string | undefined>;
 
@@ -79,6 +81,37 @@ export const shellExecutableProbe: ExecutableProbe = {
   }
 };
 
+/** The Claude Code CLI as an {@link AiRuntime}; `get` is read when a call runs, so nothing starts before then. */
+export function claudeCodeAiRuntime(get: () => Pick<ClaudeCodeCliRuntime, "runTask">): AiRuntime {
+  return {
+    capabilities: CLAUDE_CAPABILITIES,
+    run: async ({ prompt, model, effort, schema, controls }) =>
+      get().runTask(prompt, providerModelId(model), effort, schema, controls)
+  };
+}
+
+/** The Codex app server as an {@link AiRuntime}; `get` receives `localCodex` (the runtime without web search). */
+export function codexAppServerAiRuntime(get: (local: boolean) => Pick<CodexAppServerRuntime, "runTask">): AiRuntime {
+  return {
+    capabilities: CODEX_CAPABILITIES,
+    run: async ({ prompt, model, effort, schema, controls, localCodex }) =>
+      get(localCodex).runTask(prompt, model, effort, schema, controls)
+  };
+}
+
+/** The runtime that serves `model`: `claude:` ids go to Claude Code, anything else to Codex. */
+export function aiRuntimeForModel(
+  model: string,
+  sources: {
+    claude: () => Pick<ClaudeCodeCliRuntime, "runTask">;
+    codex: (local: boolean) => Pick<CodexAppServerRuntime, "runTask">;
+  }
+): AiRuntime {
+  return providerForModel(model) === "claude"
+    ? claudeCodeAiRuntime(sources.claude)
+    : codexAppServerAiRuntime(sources.codex);
+}
+
 export interface AiRuntimeServiceOptions {
   codexPath: () => string;
   claudePath: () => string;
@@ -92,6 +125,8 @@ export interface AiRuntimeServiceOptions {
   probe?: ExecutableProbe;
   /** Obsidian's FileSystemAdapter.readLocalFile, for Codex images saved to disk. */
   readLocalFile?: ReadLocalFile;
+  /** The plugin folder the runtimes start in; read when a call runs. Needed only by `runtimeFor`. */
+  pluginDirectory?: () => string;
 }
 
 export class AiRuntimeService {
@@ -175,6 +210,19 @@ export class AiRuntimeService {
     });
     this.claudeRuntime = { key, runtime };
     return runtime;
+  }
+
+  /** The runtime that serves `model`, started lazily in the plugin folder when a call runs. */
+  runtimeFor(model: string): AiRuntime {
+    const directory = (): string => {
+      const read = this.options.pluginDirectory;
+      if (!read) throw new Error("AiRuntimeService needs a pluginDirectory option for runtimeFor");
+      return read();
+    };
+    return aiRuntimeForModel(model, {
+      claude: () => this.claude(directory()),
+      codex: local => this.codex(directory(), local)
+    });
   }
 
   resolveExecutable(configured: string): string {

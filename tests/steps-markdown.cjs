@@ -72,8 +72,9 @@ test('the five context_ai prompt keys are gone from i18n and nothing in the plug
 
 test('the markdown call site in main.ts goes through AiCalls only', () => {
   const main = fs.readFileSync(path.join(root, 'main.ts'), 'utf8');
-  const start = main.indexOf('private async runMarkdownContextAi'), end = main.indexOf('private async markdownContextImage');
-  const body = main.slice(start, end > start ? end : start + 4000);
+  const start = main.indexOf('private async runMarkdownContextAi'), end = main.indexOf('async openCoffeeHandoff', start);
+  assert.ok(end > start, 'the end anchor follows the start anchor');
+  const body = main.slice(start, end);
   assert.ok(start >= 0 && /this\.aiCalls\.run\(\s*prepared,/.test(body));
   for (const text of ['runtimeStepProvider(', 'new StepRunner(', '.runTask(', 'activeTasks', 'new AbortController', 'finish:', 'onExchange', 'providerForModel('])
     assert.doesNotMatch(body, new RegExp(text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')), `the call site does not use ${text}`);

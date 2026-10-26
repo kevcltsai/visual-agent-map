@@ -501,6 +501,7 @@ export const zhTW: Record<TranslationKey, string> = {
   "ui.close": "關閉",
   "ui.no_other_topics": "沒有其他主題。",
   "ui.the_node_to_relink_was_not_found": "找不到要重新連結的議題。",
+  "ui.change_saved_refresh_failed": "變更已儲存，但畫面無法重新整理。請重新開啟心智圖查看。",
   "ui.rename_current_mind_map": "重新命名目前心智圖",
   "ui.update_the_topic_folder_and_mind_map_name_together": "同時更新主題資料夾與心智圖名稱。",
   "ui.repair_missing_mind_map": "修復遺失的心智圖",

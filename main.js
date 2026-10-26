@@ -583,6 +583,7 @@ var en = {
   "ui.close": "Close",
   "ui.no_other_topics": "No other topics.",
   "ui.the_node_to_relink_was_not_found": "The node to relink was not found.",
+  "ui.change_saved_refresh_failed": "The change was saved, but the view could not refresh. Reopen the map to see it.",
   "ui.rename_current_mind_map": "Rename current mind map",
   "ui.update_the_topic_folder_and_mind_map_name_together": "Update the topic folder and mind map name together.",
   "ui.repair_missing_mind_map": "Repair missing mind map",
@@ -2545,6 +2546,7 @@ var zhCN = {
   "ui.close": "\u5173\u95ED",
   "ui.no_other_topics": "\u6CA1\u6709\u5176\u4ED6\u4E3B\u9898\u3002",
   "ui.the_node_to_relink_was_not_found": "\u627E\u4E0D\u5230\u8981\u91CD\u65B0\u94FE\u63A5\u7684\u8BAE\u9898\u3002",
+  "ui.change_saved_refresh_failed": "\u66F4\u6539\u5DF2\u4FDD\u5B58\uFF0C\u4F46\u754C\u9762\u65E0\u6CD5\u5237\u65B0\u3002\u8BF7\u91CD\u65B0\u6253\u5F00\u5730\u56FE\u67E5\u770B\u3002",
   "ui.rename_current_mind_map": "\u91CD\u547D\u540D\u5F53\u524D\u5FC3\u667A\u56FE",
   "ui.update_the_topic_folder_and_mind_map_name_together": "\u540C\u65F6\u66F4\u65B0\u4E3B\u9898\u6587\u4EF6\u5939\u4E0E\u5FC3\u667A\u56FE\u540D\u79F0\u3002",
   "ui.repair_missing_mind_map": "\u4FEE\u590D\u9057\u5931\u7684\u5FC3\u667A\u56FE",
@@ -4507,6 +4509,7 @@ var zhTW = {
   "ui.close": "\u95DC\u9589",
   "ui.no_other_topics": "\u6C92\u6709\u5176\u4ED6\u4E3B\u984C\u3002",
   "ui.the_node_to_relink_was_not_found": "\u627E\u4E0D\u5230\u8981\u91CD\u65B0\u9023\u7D50\u7684\u8B70\u984C\u3002",
+  "ui.change_saved_refresh_failed": "\u8B8A\u66F4\u5DF2\u5132\u5B58\uFF0C\u4F46\u756B\u9762\u7121\u6CD5\u91CD\u65B0\u6574\u7406\u3002\u8ACB\u91CD\u65B0\u958B\u555F\u5FC3\u667A\u5716\u67E5\u770B\u3002",
   "ui.rename_current_mind_map": "\u91CD\u65B0\u547D\u540D\u76EE\u524D\u5FC3\u667A\u5716",
   "ui.update_the_topic_folder_and_mind_map_name_together": "\u540C\u6642\u66F4\u65B0\u4E3B\u984C\u8CC7\u6599\u593E\u8207\u5FC3\u667A\u5716\u540D\u7A31\u3002",
   "ui.repair_missing_mind_map": "\u4FEE\u5FA9\u907A\u5931\u7684\u5FC3\u667A\u5716",
@@ -15448,6 +15451,731 @@ function synthesisDefaultName(language2, names3) {
   return names3.length > 2 ? translate(language2, "ui.synthesis_of_0_and_1_more", names3[0], names3.length) : translate(language2, "ui.synthesis_of_0", names3.join(translate(language2, "ui.list_separator")));
 }
 
+// experiences/aim/research-plan.ts
+var import_node_crypto3 = require("node:crypto");
+function researchContentHash(report) {
+  return (0, import_node_crypto3.createHash)("sha256").update(JSON.stringify({ summary: report.summary, detail: report.detail })).digest("hex");
+}
+function hoistNestedValidity(item) {
+  var _a2;
+  const nested = (_a2 = item.source) == null ? void 0 : _a2.validity;
+  if (item.validity !== void 0 || !nested || typeof nested !== "object") return item;
+  const { validity: _validity, ...source } = item.source;
+  return { ...item, source, validity: nested };
+}
+function hasProvenSource(item) {
+  var _a2, _b2, _c;
+  const source = item.source;
+  return !(!source || [source.branchId, source.resultId, source.notePath, source.contentHash].some(
+    (value) => typeof value !== "string" || !value.trim()
+  ) || !Number.isInteger(source.version) || source.version < 1 || !/^[a-f0-9]{64}$/i.test(source.contentHash) || !((_a2 = item.rationale) == null ? void 0 : _a2.trim()) || !((_c = (_b2 = item.validity) == null ? void 0 : _b2.reason) == null ? void 0 : _c.trim()) || !Array.isArray(item.validity.conditionKeys) || item.validity.conditionKeys.some((key2) => typeof key2 !== "string" || !key2.trim()));
+}
+function researchUnprovenReuse(subtopics) {
+  if (!Array.isArray(subtopics)) return subtopics;
+  return subtopics.map((item) => {
+    if (!item || typeof item !== "object") return item;
+    const target = hoistNestedValidity(item);
+    if (target.action !== "reuse" && target.action !== "update" || hasProvenSource(target)) return item;
+    const { source: _source, validity: _validity, ...rest } = target;
+    return { ...rest, action: "research" };
+  });
+}
+function validateAimResearchPlan(subtopics) {
+  if (!Array.isArray(subtopics) || subtopics.length > 5 || subtopics.some((item) => {
+    if (!item || typeof item !== "object") return true;
+    const fields = item;
+    return ["id", "title", "task", "expectedValue"].some(
+      (key2) => typeof fields[key2] !== "string" || !fields[key2].trim()
+    );
+  }))
+    throw new Error("Planner must return 0\u20135 valid research subtopics before the answer can proceed.");
+  const plan = subtopics.map(hoistNestedValidity);
+  const ids = new Set(plan.map((item) => item.id));
+  if (ids.size !== plan.length || new Set(plan.map((item) => item.title.trim().toLowerCase())).size !== plan.length)
+    throw new Error("Planner research subtopics must have unique ids and titles.");
+  for (const item of plan) {
+    if (item.action !== void 0 && !["reuse", "update", "research"].includes(item.action))
+      throw new Error("Invalid AIM research action.");
+    if (item.dependsOn !== void 0 && (!Array.isArray(item.dependsOn) || new Set(item.dependsOn).size !== item.dependsOn.length || item.dependsOn.some((id) => typeof id !== "string" || !ids.has(id) || id === item.id)))
+      throw new Error("Research dependencies must name distinct existing targets other than themselves.");
+    if ((item.action === "reuse" || item.action === "update") && !hasProvenSource(item))
+      throw new Error("Reuse and update targets need an exact source, rationale and condition validity assessment.");
+  }
+  const visiting = /* @__PURE__ */ new Set(), visited = /* @__PURE__ */ new Set();
+  const visit = (id) => {
+    var _a2, _b2;
+    if (visiting.has(id)) throw new Error("Research dependencies cannot contain a cycle.");
+    if (visited.has(id)) return;
+    visiting.add(id);
+    for (const dependency of (_b2 = (_a2 = plan.find((item) => item.id === id)) == null ? void 0 : _a2.dependsOn) != null ? _b2 : []) visit(dependency);
+    visiting.delete(id);
+    visited.add(id);
+  };
+  for (const id of ids) visit(id);
+  return plan;
+}
+
+// experiences/aim/legacy-names.ts
+var LEGACY_KEY_PREFIX = "mindSearch";
+var LEGACY_MARKER_PREFIX = "mindsearch-";
+var AIM_CREATE_MAP_COMMAND_ID = "create-mindsearch-map";
+var LEGACY_VALUES = [
+  ["__MINDSEARCH_NO_QUESTION__", "__AIM_NO_QUESTION__"],
+  ["__mindsearch_unknown__", "__aim_unknown__"]
+];
+var LEGACY_MARKER = new RegExp(`<!--(\\s*)${LEGACY_MARKER_PREFIX}`, "g");
+var upgradeKey = (key2) => key2.startsWith(LEGACY_KEY_PREFIX) ? `aim${key2.slice(LEGACY_KEY_PREFIX.length)}` : key2;
+function upgradeLegacyAimText(text11) {
+  let upgraded = text11.replace(LEGACY_MARKER, "<!--$1aim-");
+  for (const [legacy, current] of LEGACY_VALUES) upgraded = upgraded.split(legacy).join(current);
+  return upgraded;
+}
+function upgradeLegacyAimData(value) {
+  if (typeof value === "string") return upgradeLegacyAimText(value);
+  if (Array.isArray(value)) return value.map((item) => upgradeLegacyAimData(item));
+  if (!value || typeof value !== "object") return value;
+  const upgraded = {};
+  for (const [key2, item] of Object.entries(value)) {
+    const target = upgradeKey(key2);
+    if (target !== key2 && Object.prototype.hasOwnProperty.call(value, target)) continue;
+    upgraded[target] = upgradeLegacyAimData(item);
+  }
+  return upgraded;
+}
+
+// experiences/visual-map/ai-mode.ts
+var DEFAULT_MAP_AI_MODE = "quick";
+function isMapAiMode(value) {
+  return value === "quick" || value === "standard";
+}
+function noteAiMode(researchMode) {
+  return researchMode === "local" ? "quick" : "standard";
+}
+function researchModeOf(mode) {
+  return mode === "quick" ? "local" : "research";
+}
+function aiModeOptions(mode, kind) {
+  return {
+    researchMode: researchModeOf(mode),
+    researchDepth: kind === "research" ? "normal" : "fast",
+    visualMode: mode === "standard" ? "auto" : "off",
+    mapAiMode: mode
+  };
+}
+var KNOWLEDGE_GAP_MARKERS = ["\u6A21\u578B\u77E5\u8B58\u4E0D\u8DB3", "\u6A21\u578B\u77E5\u8BC6\u4E0D\u8DB3"];
+var KNOWLEDGE_GAP_MARKER_EN = "model knowledge is insufficient";
+function hasKnowledgeGapMarker(text11) {
+  return KNOWLEDGE_GAP_MARKERS.some((marker5) => text11.includes(marker5)) || text11.toLowerCase().includes(KNOWLEDGE_GAP_MARKER_EN);
+}
+
+// map-graph.ts
+function parentIdsForNode(node) {
+  var _a2;
+  const convergenceParents = node.aimKind === "question" ? [] : (_a2 = node.aimConvergesFromNodeIds) != null ? _a2 : [];
+  return [...node.parentId ? [node.parentId] : [], ...convergenceParents.filter((id) => id !== node.parentId)];
+}
+function descendants(nodes, id) {
+  const found = /* @__PURE__ */ new Set();
+  const pending = [id];
+  while (pending.length) {
+    const parent = pending.pop();
+    for (const node of nodes) {
+      if (node.parentId === parent && node.id !== id && !found.has(node.id)) {
+        found.add(node.id);
+        pending.push(node.id);
+      }
+    }
+  }
+  return found;
+}
+function visibleNodes(nodes) {
+  const hidden = /* @__PURE__ */ new Set();
+  for (const node of nodes) if (node.collapsed) for (const id of descendants(nodes, node.id)) hidden.add(id);
+  return nodes.filter((node) => !hidden.has(node.id));
+}
+function applyCollapseLevel(nodes, shownLevels) {
+  const byId = new Map(nodes.map((node) => [node.id, node]));
+  const depthOf = (node) => {
+    let depth = 0;
+    const seen = /* @__PURE__ */ new Set([node.id]);
+    for (let parent = node.parentId; parent && byId.has(parent) && !seen.has(parent); parent = byId.get(parent).parentId) {
+      seen.add(parent);
+      depth++;
+    }
+    return depth;
+  };
+  const parents = new Set(nodes.map((node) => node.parentId).filter((id) => !!id && byId.has(id)));
+  for (const node of nodes) {
+    if (!parents.has(node.id)) continue;
+    node.collapsed = shownLevels === null ? false : depthOf(node) >= shownLevels;
+  }
+}
+
+// map-model.ts
+function clearQuestionConvergenceEdges(map) {
+  let changed = false;
+  for (const node of map.nodes) {
+    if (node.aimKind !== "question" || node.aimConvergesFromNodeIds === void 0) continue;
+    delete node.aimConvergesFromNodeIds;
+    changed = true;
+  }
+  return changed;
+}
+function repairAimResultConvergence(map) {
+  var _a2, _b2, _c;
+  let changed = false;
+  for (const branch of (_b2 = (_a2 = map.aim) == null ? void 0 : _a2.branches) != null ? _b2 : []) {
+    for (const [index, result] of branch.results.entries()) {
+      const node = map.nodes.find((item) => item.id === result.nodeId);
+      if (!node || node.aimKind !== "synthesis" && node.aimKind !== "conclusion" || node.parentId !== branch.questionNodeId || ((_c = node.aimConvergesFromNodeIds) == null ? void 0 : _c.length))
+        continue;
+      const sources2 = [
+        ...new Set(
+          branch.results.slice(0, index).filter(
+            (source) => source.kind === "research" && source.subtopicId && map.nodes.some(
+              (item) => item.id === source.nodeId && item.aimKind === "research" && item.parentId === branch.questionNodeId
+            )
+          ).map((source) => source.nodeId)
+        )
+      ];
+      if (!sources2.length) continue;
+      node.parentId = sources2[sources2.length - 1];
+      node.aimConvergesFromNodeIds = [...sources2];
+      changed = true;
+    }
+  }
+  return changed;
+}
+function validReuse(record) {
+  return record === void 0 || !!record && [
+    record.sourceBranchId,
+    record.sourceResultId,
+    record.sourceNotePath,
+    record.checkedAt,
+    record.rationale,
+    record.validityReason
+  ].every((value) => typeof value === "string" && !!value.trim()) && Number.isInteger(record.sourceVersion) && record.sourceVersion > 0 && typeof record.sourceContentHash === "string" && /^[a-f0-9]{64}$/i.test(record.sourceContentHash) && !!record.applicableConditions && typeof record.applicableConditions === "object" && !Array.isArray(record.applicableConditions) && Object.values(record.applicableConditions).every((value) => typeof value === "string");
+}
+function validDeliveryCheckpoint(checkpoint) {
+  const resultValid = (result) => !!result && typeof result.summary === "string" && typeof result.detail === "string" && Array.isArray(result.suggestions) && Array.isArray(result.visualReferences);
+  const hashValid = (value) => value === void 0 || typeof value === "string" && /^[a-f0-9]{64}$/i.test(value);
+  return !!checkpoint && typeof checkpoint === "object" && !Array.isArray(checkpoint) && [checkpoint.outline, checkpoint.research, checkpoint.draft, checkpoint.acceptance].every(
+    (result) => result === void 0 || resultValid(result)
+  ) && hashValid(checkpoint.baseFingerprint) && hashValid(checkpoint.researchFingerprint) && hashValid(checkpoint.draftFingerprint) && (checkpoint.sections === void 0 || !!checkpoint.sections && typeof checkpoint.sections === "object" && !Array.isArray(checkpoint.sections) && Object.entries(checkpoint.sections).every(
+    ([key2, section3]) => !!key2.trim() && !!section3 && hashValid(section3.fingerprint) && typeof section3.fingerprint === "string" && Array.isArray(section3.evidenceIds) && section3.evidenceIds.every((id) => typeof id === "string" && !!id.trim()) && resultValid(section3.result)
+  ));
+}
+var clone = (value) => JSON.parse(JSON.stringify(value));
+function canParent(nodes, id, parentId) {
+  return parentId === null || parentId !== id && nodes.some((n) => n.id === parentId) && !descendants(nodes, id).has(parentId);
+}
+function supersededAimNodeIds(map) {
+  var _a2, _b2;
+  const hidden = /* @__PURE__ */ new Set();
+  const parents = new Set(map.nodes.map((node) => node.parentId).filter((id) => !!id));
+  for (const branch of (_b2 = (_a2 = map.aim) == null ? void 0 : _a2.branches) != null ? _b2 : []) {
+    branch.results.forEach((result, index) => {
+      if (result.kind !== "synthesis" || parents.has(result.nodeId)) return;
+      if (branch.results.some(
+        (later, laterIndex) => laterIndex > index && later.runId === result.runId && later.kind === "conclusion"
+      ))
+        hidden.add(result.nodeId);
+    });
+  }
+  return hidden;
+}
+function removeNodes(nodes, id, branch) {
+  const removed = branch ? descendants(nodes, id) : /* @__PURE__ */ new Set();
+  removed.add(id);
+  return nodes.filter((node) => !removed.has(node.id)).map((node) => ({ ...node, parentId: node.parentId && removed.has(node.parentId) ? null : node.parentId }));
+}
+function validRetainedReports(reports) {
+  if (!Array.isArray(reports) || reports.length === 0) return false;
+  return reports.every((item) => {
+    if (!item || typeof item !== "object") return false;
+    const { summary, detail } = item;
+    return typeof summary === "string" && summary.trim() !== "" && typeof detail === "string" && detail.trim() !== "";
+  });
+}
+function parseMap(content) {
+  const block = content.match(/```agent-map\s*\n([\s\S]*?)\n```/);
+  if (!block) throw new Error(t("ui.mind_map_data_was_not_found_keep_the_agent_map_block"));
+  const map = upgradeLegacyAimData(JSON.parse(block[1]));
+  if (map.version !== 1 || typeof map.id !== "string" || typeof map.title !== "string" || !Array.isArray(map.nodes))
+    throw new Error(t("ui.invalid_mind_map_format"));
+  if (map.detailTemplateId !== void 0 && typeof map.detailTemplateId !== "string") delete map.detailTemplateId;
+  if (map.toneId !== void 0 && typeof map.toneId !== "string") delete map.toneId;
+  if (map.outputLanguage !== void 0 && !isContentLanguage(map.outputLanguage)) delete map.outputLanguage;
+  if (map.aiMode !== void 0 && !isMapAiMode(map.aiMode)) delete map.aiMode;
+  const ids = /* @__PURE__ */ new Set(), aimQuestionRequests = /* @__PURE__ */ new Set();
+  for (const n of map.nodes) {
+    if (!n || typeof n.id !== "string" || typeof n.path !== "string" || !n.path.endsWith(".md") || !Number.isFinite(n.x) || !Number.isFinite(n.y) || n.parentId !== null && typeof n.parentId !== "string" || ids.has(n.id))
+      throw new Error(t("ui.invalid_node_data_or_duplicate_id"));
+    if (n.aimDismissedQuestionRequestIds !== void 0 && (!Array.isArray(n.aimDismissedQuestionRequestIds) || new Set(n.aimDismissedQuestionRequestIds).size !== n.aimDismissedQuestionRequestIds.length || n.aimDismissedQuestionRequestIds.some((id) => typeof id !== "string" || !id.trim())))
+      throw new Error("Invalid dismissed AIM question identities.");
+    ids.add(n.id);
+    n.collapsed = n.collapsed === true;
+    if (n.aimKind !== void 0 && !["topic", "question", "answer", "research", "synthesis", "conclusion"].includes(n.aimKind))
+      throw new Error("Invalid AIM node kind.");
+    if (n.aimConvergesFromNodeIds !== void 0 && (!Array.isArray(n.aimConvergesFromNodeIds) || new Set(n.aimConvergesFromNodeIds).size !== n.aimConvergesFromNodeIds.length || n.aimConvergesFromNodeIds.some(
+      (id) => typeof id !== "string" || id === n.id || !map.nodes.some((candidate) => candidate.id === id)
+    )))
+      throw new Error("Invalid AIM convergence references.");
+    if (n.aimQuestion !== void 0) {
+      const question = n.aimQuestion;
+      if (n.aimKind !== "question" || !question || typeof question.requestId !== "string" || !question.requestId.trim() || !(question.parentBranchId === void 0 || question.parentBranchId === null || typeof question.parentBranchId === "string") || !Array.isArray(question.options) || question.options.length < 2 || question.options.some(
+        (option2) => !option2 || typeof option2.id !== "string" || !option2.id.trim() || typeof option2.label !== "string" || !option2.label.trim()
+      ) || new Set(question.options.map((option2) => option2.id)).size !== question.options.length || typeof question.allowMultiple !== "boolean" || typeof question.allowFreeText !== "boolean")
+        throw new Error("Invalid AIM question controls.");
+      if (aimQuestionRequests.has(question.requestId)) throw new Error("Duplicate AIM question request identity.");
+      aimQuestionRequests.add(question.requestId);
+    }
+  }
+  for (const n of map.nodes)
+    if (!canParent(map.nodes, n.id, n.parentId))
+      throw new Error(t("ui.a_link_contains_a_cycle_or_points_to_a_missing_parent_topic"));
+  if (map.aim !== void 0) validateAimMap(map);
+  if (!map.viewport || !Number.isFinite(map.viewport.x) || !Number.isFinite(map.viewport.y) || !Number.isFinite(map.viewport.zoom))
+    map.viewport = { x: 40, y: 40, zoom: 1 };
+  map.viewport.zoom = Math.min(2, Math.max(0.25, map.viewport.zoom));
+  return map;
+}
+function validateAimMap(map) {
+  var _a2, _b2, _c, _d, _e, _f, _g;
+  const data = map.aim;
+  if (!data || data.version !== 1 || !Array.isArray(data.branches) || !Array.isArray(data.runs) || !Array.isArray(data.pendingCommits) || data.resultDrafts !== void 0 && !Array.isArray(data.resultDrafts))
+    throw new Error("Invalid AIM map extension.");
+  if (data.creationId !== void 0 && (typeof data.creationId !== "string" || !data.creationId.trim()))
+    throw new Error("Invalid AIM creation identity.");
+  if (data.contentLanguage !== void 0 && !isNoteLanguage(data.contentLanguage))
+    throw new Error("Invalid AIM content language.");
+  if (data.minimumAnswersBeforeConclusion !== void 0 && (!Number.isInteger(data.minimumAnswersBeforeConclusion) || data.minimumAnswersBeforeConclusion < 1 || data.minimumAnswersBeforeConclusion > 10))
+    throw new Error("Invalid AIM exploration question target.");
+  if (data.interaction !== void 0 && data.interaction !== "unattended")
+    throw new Error("Invalid AIM interaction mode.");
+  if (data.rootDraft !== void 0 && (!data.rootDraft || typeof data.rootDraft.nodeId !== "string" || typeof data.rootDraft.notePath !== "string" || !data.rootDraft.notePath.endsWith(".md") || typeof data.rootDraft.title !== "string" || typeof data.rootDraft.context !== "string" || data.rootDraft.model !== void 0 && (typeof data.rootDraft.model !== "string" || !data.rootDraft.model.trim()) || data.rootDraft.reasoning !== void 0 && !["low", "medium", "high"].includes(data.rootDraft.reasoning) || map.nodes.some((node) => node.id === data.rootDraft.nodeId)))
+    throw new Error("Invalid AIM root draft.");
+  if (data.questionDraft !== void 0) {
+    const draft = data.questionDraft;
+    if (!draft || typeof draft.requestId !== "string" || !draft.requestId.trim() || map.nodes.some((node) => {
+      var _a3;
+      return ((_a3 = node.aimQuestion) == null ? void 0 : _a3.requestId) === draft.requestId;
+    }) || typeof draft.nodeId !== "string" || map.nodes.some((node) => node.id === draft.nodeId) || typeof draft.parentId !== "string" || !map.nodes.some((node) => node.id === draft.parentId) || !(draft.parentBranchId === void 0 || draft.parentBranchId === null || typeof draft.parentBranchId === "string") || typeof draft.notePath !== "string" || !draft.notePath.endsWith(".md") || typeof draft.title !== "string" || typeof draft.summary !== "string" || !draft.summary.trim() || typeof draft.detail !== "string" || typeof draft.prompt !== "string" || typeof draft.model !== "string" || draft.reasoning !== void 0 && !["low", "medium", "high"].includes(draft.reasoning) || !Array.isArray(draft.options) || draft.options.length < 2 || draft.options.some(
+      (option2) => !option2 || typeof option2.id !== "string" || !option2.id.trim() || typeof option2.label !== "string" || !option2.label.trim()
+    ) || new Set(draft.options.map((option2) => option2.id)).size !== draft.options.length || draft.convergesFromNodeIds !== void 0 && (!Array.isArray(draft.convergesFromNodeIds) || new Set(draft.convergesFromNodeIds).size !== draft.convergesFromNodeIds.length || draft.convergesFromNodeIds.some((id) => !map.nodes.some((node) => node.id === id))))
+      throw new Error("Invalid AIM question draft.");
+  }
+  const branchIds = /* @__PURE__ */ new Set(), submissionIds = /* @__PURE__ */ new Set();
+  for (const branch of data.branches) {
+    if (!branch || typeof branch.id !== "string" || branchIds.has(branch.id) || branch.submissionId !== void 0 && (typeof branch.submissionId !== "string" || !branch.submissionId.trim() || submissionIds.has(branch.submissionId)) || branch.sourceQuestionNodeId !== void 0 && (typeof branch.sourceQuestionNodeId !== "string" || !branch.sourceQuestionNodeId.trim()) || typeof branch.questionNodeId !== "string" || !map.nodes.some((node) => node.id === branch.questionNodeId) || branch.answerNodeId !== void 0 && (typeof branch.answerNodeId !== "string" || !map.nodes.some(
+      (node) => node.id === branch.answerNodeId && node.aimKind === "answer" && node.parentId === branch.questionNodeId
+    )) || !(branch.parentBranchId === null || typeof branch.parentBranchId === "string") || !branch.answerSnapshot || !Array.isArray(branch.answerSnapshot.selections) || branch.answerSnapshot.selections.some((item) => typeof item !== "string") || typeof branch.answerSnapshot.freeText !== "string" || !branch.inputSnapshot || typeof branch.inputSnapshot.topic !== "string" || !branch.inputSnapshot.conditions || typeof branch.inputSnapshot.conditions !== "object" || Array.isArray(branch.inputSnapshot.conditions) || !Array.isArray(branch.inputSnapshot.upstreamResults) || !Array.isArray(branch.results) || branch.researchPlanError !== void 0 && (typeof branch.researchPlanError !== "string" || !branch.researchPlanError.trim() || branch.researchPlanError.length > 500) || branch.researchPlan !== void 0 && (!Array.isArray(branch.researchPlan) || branch.researchPlan.length > 5 || branch.researchPlan.some(
+      (item) => !item || typeof item.id !== "string" || !item.id.trim() || typeof item.title !== "string" || !item.title.trim() || typeof item.task !== "string" || !item.task.trim() || typeof item.expectedValue !== "string" || !item.expectedValue.trim()
+    ) || new Set(branch.researchPlan.map((item) => item.id)).size !== branch.researchPlan.length || new Set(branch.researchPlan.map((item) => item.title.trim().toLowerCase())).size !== branch.researchPlan.length))
+      throw new Error("Invalid AIM branch snapshot.");
+    if (branch.researchPlan !== void 0) validateAimResearchPlan(branch.researchPlan);
+    if (branch.retryTimeoutMs !== void 0 && (!Number.isInteger(branch.retryTimeoutMs) || branch.retryTimeoutMs < 18e4 || branch.retryTimeoutMs > 6e5))
+      throw new Error("Invalid AIM retry timeout.");
+    if (branch.deliveryRecovery && (typeof branch.deliveryRecovery.fingerprint !== "string" || !branch.deliveryRecovery.planner || typeof branch.deliveryRecovery.planner.detail !== "string" || !validDeliveryCheckpoint(branch.deliveryRecovery.checkpoint)))
+      throw new Error("Invalid AIM delivery checkpoint.");
+    if (((_a2 = branch.deliveryRecovery) == null ? void 0 : _a2.evidence) !== void 0) {
+      const evidence = branch.deliveryRecovery.evidence;
+      if (!Array.isArray(evidence) || evidence.some(
+        (source) => !source || typeof source.id !== "string" || !source.id.trim() || typeof source.hash !== "string" || !/^[a-f0-9]{64}$/i.test(source.hash) || typeof source.detail !== "string" || !source.detail.trim()
+      ) || new Set(evidence.map((source) => source.id)).size !== evidence.length)
+        throw new Error("Invalid AIM delivery evidence.");
+    }
+    branchIds.add(branch.id);
+    if (branch.submissionId) submissionIds.add(branch.submissionId);
+    const questionNode = map.nodes.find((node) => node.id === branch.questionNodeId);
+    if (questionNode.aimQuestion && questionNode.aimQuestion.parentBranchId !== branch.parentBranchId)
+      throw new Error("AIM answer branch does not match its question's parent branch.");
+  }
+  for (const branch of data.branches) {
+    if (branch.parentBranchId && !branchIds.has(branch.parentBranchId))
+      throw new Error("AIM branch points to a missing parent.");
+    const seen = /* @__PURE__ */ new Set([branch.id]);
+    let parent = branch.parentBranchId;
+    while (parent) {
+      if (seen.has(parent)) throw new Error("AIM answer branches cannot contain cycles.");
+      seen.add(parent);
+      parent = (_c = (_b2 = data.branches.find((item) => item.id === parent)) == null ? void 0 : _b2.parentBranchId) != null ? _c : null;
+    }
+  }
+  const runIds = /* @__PURE__ */ new Set();
+  const validAttempt = (attempt) => {
+    var _a3;
+    if (!attempt || typeof attempt.id !== "string" || typeof attempt.inputSnapshotHash !== "string") return false;
+    if (!["running", "saving", "completed", "partial", "failed", "cancelled", "superseded"].includes(attempt.status))
+      return false;
+    if (attempt.subtopicId !== void 0 && (typeof attempt.subtopicId !== "string" || !attempt.subtopicId.trim()))
+      return false;
+    if (attempt.phase !== void 0 && (typeof attempt.phase !== "string" || !attempt.phase.trim())) return false;
+    if (attempt.model !== void 0 && (typeof attempt.model !== "string" || !attempt.model.trim())) return false;
+    if (attempt.reasoningLevel !== void 0 && !["low", "medium", "high"].includes(attempt.reasoningLevel))
+      return false;
+    if (attempt.maxResearchTurns !== void 0 && (!Number.isInteger(attempt.maxResearchTurns) || attempt.maxResearchTurns < 1 || attempt.maxResearchTurns > 3))
+      return false;
+    if (attempt.researchTurns !== void 0 && (!Number.isInteger(attempt.researchTurns) || attempt.researchTurns < 0 || attempt.researchTurns > ((_a3 = attempt.maxResearchTurns) != null ? _a3 : 3)))
+      return false;
+    if (attempt.plannerReviews !== void 0 && (!Array.isArray(attempt.plannerReviews) || attempt.plannerReviews.some(
+      (review) => !review || !["research_more", "ask_user", "conclude"].includes(review.decision) || typeof review.rationale !== "string" || !review.rationale.trim() || !Number.isInteger(review.researchTurn) || review.researchTurn < 1 || review.researchTurn > 3 || review.question !== void 0 && (typeof review.question !== "string" || !review.question.trim()) || review.answerOptions !== void 0 && (!Array.isArray(review.answerOptions) || review.answerOptions.some(
+        (option2) => typeof option2 === "string" ? !option2.trim() : !option2 || typeof option2.axisId !== "string" || !option2.axisId.trim() || typeof option2.value !== "string" || !option2.value.trim()
+      )) || review.answerAxis !== void 0 && (!review.answerAxis || typeof review.answerAxis.id !== "string" || !review.answerAxis.id.trim() || typeof review.answerAxis.label !== "string" || !review.answerAxis.label.trim()) || review.researchTarget !== void 0 && (!review.researchTarget || typeof review.researchTarget.title !== "string" || !review.researchTarget.title.trim() || typeof review.researchTarget.task !== "string" || !review.researchTarget.task.trim() || typeof review.researchTarget.expectedValue !== "string" || !review.researchTarget.expectedValue.trim())
+    )))
+      return false;
+    if (attempt.retainedReports !== void 0 && (!attempt.retainedReports || typeof attempt.retainedReports.notePath !== "string" || !attempt.retainedReports.notePath.endsWith(".md") || !validRetainedReports(attempt.retainedReports.reports)))
+      return false;
+    if (attempt.searchDiagnostics !== void 0 && (!Array.isArray(attempt.searchDiagnostics) || attempt.searchDiagnostics.some(
+      (item) => !item || !Number.isInteger(item.researchTurn) || item.researchTurn < 1 || !Number.isInteger(item.startedEvents) || item.startedEvents < 0 || !Number.isInteger(item.completedEvents) || item.completedEvents < 0 || !Number.isInteger(item.completedSearchActions) || item.completedSearchActions < 0 || !Number.isInteger(item.otherCompletedActions) || item.otherCompletedActions < 0
+    )))
+      return false;
+    return true;
+  };
+  for (const run of data.runs) {
+    if (!run || typeof run.id !== "string" || runIds.has(run.id) || !branchIds.has(run.branchId) || typeof run.currentAttemptId !== "string" || !Array.isArray(run.attempts) || !run.attempts.some((attempt) => attempt.id === run.currentAttemptId) || run.attempts.some((attempt) => !validAttempt(attempt)))
+      throw new Error("Invalid AIM run record.");
+    runIds.add(run.id);
+  }
+  const resultIds = /* @__PURE__ */ new Set();
+  for (const branch of data.branches)
+    for (const result of branch.results) {
+      const run = data.runs.find((item) => item.id === (result == null ? void 0 : result.runId)), attempt = run == null ? void 0 : run.attempts.find((item) => item.id === (result == null ? void 0 : result.attemptId));
+      if (!result || !validReuse(result.reuse) || typeof result.resultId !== "string" || resultIds.has(result.resultId) || !run || run.branchId !== branch.id || !["completed", "partial"].includes((_d = attempt == null ? void 0 : attempt.status) != null ? _d : "") || typeof result.nodeId !== "string" || typeof result.notePath !== "string" || !Number.isInteger(result.version) || result.version < 1 || result.kind !== void 0 && !["research", "synthesis", "conclusion"].includes(result.kind) || result.subtopicId !== void 0 && (!((_e = branch.researchPlan) == null ? void 0 : _e.some((item) => item.id === result.subtopicId)) || typeof result.subtopicId !== "string") || !map.nodes.some(
+        (node) => {
+          var _a3;
+          return node.id === result.nodeId && node.path === result.notePath && (node.parentId === ((_a3 = branch.answerNodeId) != null ? _a3 : branch.questionNodeId) || branch.results.some((parent) => parent.nodeId === node.parentId));
+        }
+      ))
+        throw new Error("Invalid AIM branch result reference.");
+      resultIds.add(result.resultId);
+    }
+  const drafts = (_f = data.resultDrafts) != null ? _f : [];
+  const draftIds = /* @__PURE__ */ new Set();
+  for (const draft of drafts) {
+    const branch = draft && data.branches.find((item) => item.id === draft.branchId);
+    const run = draft && data.runs.find((item) => item.id === draft.runId), attempt = run == null ? void 0 : run.attempts.find((item) => item.id === draft.attemptId);
+    if (!draft || !validReuse(draft.reuse) || draft.retainedReports !== void 0 && !validRetainedReports(draft.retainedReports) || typeof draft.id !== "string" || draftIds.has(draft.id) || !branch || typeof draft.nodeId !== "string" || typeof draft.notePath !== "string" || !draft.notePath.endsWith(".md") || typeof draft.title !== "string" || draft.status !== "creating" && draft.status !== "ready" || draft.model !== void 0 && (typeof draft.model !== "string" || !draft.model.trim()) || draft.reasoning !== void 0 && !["low", "medium", "high"].includes(draft.reasoning) || draft.kind !== void 0 && !["research", "synthesis", "conclusion"].includes(draft.kind) || draft.subtopicId !== void 0 && !((_g = branch.researchPlan) == null ? void 0 : _g.some((item) => item.id === draft.subtopicId)) || (run == null ? void 0 : run.branchId) !== branch.id || !attempt || attempt.inputSnapshotHash !== draft.inputSnapshotHash || !map.nodes.some(
+      (node) => {
+        var _a3, _b3;
+        return node.id === draft.nodeId && node.path === draft.notePath && node.parentId === ((_b3 = (_a3 = draft.parentNodeId) != null ? _a3 : branch.answerNodeId) != null ? _b3 : branch.questionNodeId);
+      }
+    ))
+      throw new Error("Invalid AIM result draft.");
+    draftIds.add(draft.id);
+  }
+  for (const pending of data.pendingCommits) {
+    const run = data.runs.find((item) => item.id === (pending == null ? void 0 : pending.runId)), attempt = run == null ? void 0 : run.attempts.find((item) => item.id === (pending == null ? void 0 : pending.attemptId));
+    const branch = data.branches.find((item) => item.id === (pending == null ? void 0 : pending.branchId)), draft = drafts.find((item) => item.id === (pending == null ? void 0 : pending.resultDraftId));
+    if (!pending || pending.resultStatus !== void 0 && !["completed", "partial"].includes(pending.resultStatus) || !run || run.branchId !== pending.branchId || run.currentAttemptId !== pending.attemptId || (attempt == null ? void 0 : attempt.status) !== "saving" || !branch || !draft || draft.status !== "ready" || draft.branchId !== branch.id || draft.runId !== run.id || draft.attemptId !== attempt.id || draft.nodeId !== pending.nodeId || draft.notePath !== pending.notePath || typeof pending.notePath !== "string" || !pending.notePath.endsWith(".md"))
+      throw new Error("Invalid AIM pending commit.");
+  }
+}
+function serializeMap(map, language2 = "zh-TW") {
+  const description = translate(language2, "ui.map_file_description");
+  return `---
+visual-agent-map: true
+---
+
+# ${map.title.replace(/\n/g, " ")}
+
+${description}
+
+\`\`\`agent-map
+${JSON.stringify(map, null, 2)}
+\`\`\`
+`;
+}
+function inheritModel(parentModel, defaultModel) {
+  return parentModel != null ? parentModel : defaultModel;
+}
+var History = class {
+  constructor() {
+    __publicField(this, "past", []);
+    __publicField(this, "future", []);
+    /** Bumped by clear(), so a mark taken before it can tell the entries it covered are gone. */
+    __publicField(this, "epoch", 0);
+    /** Entries pushed out of the front by the 80-entry cap, so a mark's position survives the cap. */
+    __publicField(this, "dropped", 0);
+  }
+  get canUndo() {
+    return this.past.length > 0;
+  }
+  get canRedo() {
+    return this.future.length > 0;
+  }
+  get undoEntry() {
+    return this.past[this.past.length - 1];
+  }
+  get redoEntry() {
+    return this.future[this.future.length - 1];
+  }
+  push(entry) {
+    this.past.push(entry);
+    if (this.past.length > 80) {
+      this.past.shift();
+      this.dropped++;
+    }
+    this.future = [];
+  }
+  undo() {
+    const entry = this.past.pop();
+    if (entry) this.future.push(entry);
+    return entry;
+  }
+  redo() {
+    const entry = this.future.pop();
+    if (entry) this.past.push(entry);
+    return entry;
+  }
+  clear() {
+    this.past = [];
+    this.future = [];
+    this.epoch++;
+  }
+  /** Marks the present end of the history; collapseSince folds everything pushed after it into one entry. */
+  mark() {
+    return { epoch: this.epoch, dropped: this.dropped, length: this.past.length };
+  }
+  /**
+   * Drops the entries pushed since `mark`, so work done in between leaves no undo step; entries from before the mark stay.
+   * When the history was cleared since the mark, every entry now in it was pushed after the mark and is dropped.
+   */
+  discardSince(mark) {
+    const start = mark.epoch === this.epoch ? Math.max(0, mark.length - (this.dropped - mark.dropped)) : 0;
+    if (start < this.past.length) this.past.splice(start);
+  }
+  /**
+   * Folds the entries pushed since `mark` into one undo step: undo runs them newest first, redo oldest first. Does
+   * nothing when the history was cleared since the mark, or when fewer than two entries were pushed. Each entry's
+   * undo/redo is read when it runs, so later patches to an entry (parkOnUndo) still apply.
+   */
+  collapseSince(mark, label) {
+    if (mark.epoch !== this.epoch) return;
+    const start = Math.max(0, mark.length - (this.dropped - mark.dropped));
+    if (this.past.length - start < 2) return;
+    const entries = this.past.splice(start);
+    const run = async (list, redo) => {
+      const done = [];
+      try {
+        for (const entry of list) {
+          await (redo ? entry.redo() : entry.undo());
+          done.push(entry);
+        }
+      } catch (error) {
+        try {
+          for (const entry of done.reverse()) await (redo ? entry.undo() : entry.redo());
+        } catch (e) {
+        }
+        throw error;
+      }
+    };
+    const combined = {
+      undo: () => run([...entries].reverse(), false),
+      redo: () => run(entries, true),
+      ...label ? { label } : {}
+    };
+    this.past.push(combined);
+    this.future = [];
+  }
+};
+
+// experiences/visual-map/map-transaction.ts
+var structure = (map) => JSON.stringify({ ...map, viewport: null });
+var ownership = (map) => JSON.stringify(map.nodes.map((node) => [node.id, node.path, node.parentId]));
+var tagged = (error, kind) => Object.assign(error, { kind });
+function begin(deps) {
+  const { repo } = deps;
+  const moves = [];
+  const edits = [];
+  let committed = false;
+  const exists = (path) => !!repo.app.vault.getAbstractFileByPath(path);
+  async function run(files, maps, rebuild2) {
+    const journal = { files: [], maps: [] };
+    try {
+      for (const step of files) {
+        const entry = { ...step, moved: false, lifecycleSet: false };
+        journal.files.push(entry);
+        await repo.moveExact(step.from, step.to);
+        entry.moved = true;
+        entry.lifecycleSet = true;
+        await repo.setLifecycle(step.to, step.lifecycle.topicId, step.lifecycle.mapId, step.lifecycle.state);
+      }
+      for (const item of maps) {
+        const next = clone(item.write);
+        if (item.preserveViewport) next.viewport = clone((await repo.readMap(item.mapPath)).viewport);
+        const entry = { mapPath: item.mapPath, restore: item.restore, written: false };
+        journal.maps.push(entry);
+        entry.written = true;
+        await repo.saveMap(item.mapPath, next);
+      }
+      if (rebuild2) await deps.rebuildDerivedData();
+      for (const item of maps) await deps.onApplied(item.mapPath, clone(item.write));
+    } catch (error) {
+      await revert(journal, rebuild2, error);
+    }
+  }
+  async function revert(journal, rebuild2, error) {
+    const problems = [];
+    for (const item of [...journal.maps].reverse()) {
+      if (!item.written) continue;
+      try {
+        const current = await repo.readMap(item.mapPath);
+        const next = clone(item.restore);
+        next.viewport = current.viewport;
+        await repo.saveMap(item.mapPath, next);
+      } catch (problem) {
+        problems.push(problem);
+      }
+    }
+    for (const step of [...journal.files].reverse()) {
+      let at = step.from;
+      if (step.moved) {
+        at = step.to;
+        try {
+          await repo.moveExact(step.to, step.from);
+          at = step.from;
+        } catch (problem) {
+          problems.push(problem);
+        }
+      }
+      if (step.lifecycleSet) {
+        try {
+          await repo.setLifecycle(at, step.restore.topicId, step.restore.mapId, step.restore.state);
+        } catch (problem) {
+          problems.push(problem);
+        }
+      }
+    }
+    if (rebuild2 && (journal.files.length > 0 || journal.maps.length > 0)) {
+      try {
+        await deps.rebuildDerivedData();
+      } catch (problem) {
+        problems.push(problem);
+      }
+    }
+    if (problems.length === 0) throw error;
+    const rollbackError = problems.length === 1 ? problems[0] : new AggregateError(problems, t("error.topic_state_change_rollback_failed"));
+    throw tagged(
+      new AggregateError([error, rollbackError], t("error.topic_state_change_rollback_failed")),
+      "rollback-failed"
+    );
+  }
+  function entryFor(ops, records, rebuild2, label) {
+    const stale = async (direction) => {
+      const fail = () => {
+        throw tagged(new Error(t("error.map_transaction_stale")), "stale");
+      };
+      for (const op of ops) {
+        const here = direction === "undo" ? op.target : op.original, there = direction === "undo" ? op.original : op.target;
+        if (!exists(here) || exists(there)) fail();
+      }
+      for (const record of records) {
+        const expected = direction === "undo" ? record.after : record.before;
+        if (structure(await repo.readMap(record.mapPath)) !== structure(expected)) fail();
+      }
+    };
+    const apply = async (direction) => {
+      await stale(direction);
+      const undoing = direction === "undo";
+      const files = (undoing ? [...ops].reverse() : ops).map((op) => ({
+        from: undoing ? op.target : op.original,
+        to: undoing ? op.original : op.target,
+        lifecycle: undoing ? op.previous : op.lifecycle,
+        restore: undoing ? op.lifecycle : op.previous
+      }));
+      const maps = records.map((record) => ({
+        mapPath: record.mapPath,
+        write: undoing ? record.before : record.after,
+        restore: undoing ? record.after : record.before,
+        preserveViewport: true
+      }));
+      await run(files, maps, rebuild2);
+    };
+    return { undo: () => apply("undo"), redo: () => apply("redo"), ...label === void 0 ? {} : { label } };
+  }
+  const transaction = {
+    move(path, folder, lifecycle) {
+      moves.push({ path, folder, lifecycle });
+      return transaction;
+    },
+    park(path, folder, topicId, state) {
+      return transaction.move(path, folder, { topicId, mapId: "", state });
+    },
+    unpark(path, folder, topicId, mapId) {
+      return transaction.move(path, folder, { topicId, mapId, state: "active" });
+    },
+    transfer(path, topic, mode) {
+      return mode === "add" ? transaction.move(path, `${topic.root}/Notes`, { topicId: topic.id, mapId: topic.id, state: "active" }) : transaction.move(path, `${topic.root}/Unassigned`, { topicId: topic.id, mapId: "", state: "unassigned" });
+    },
+    editMap(mapPath, edit) {
+      edits.push({ mapPath, edit });
+      return transaction;
+    },
+    async commit(options = {}) {
+      if (committed) throw new Error("A transaction can only be committed once.");
+      committed = true;
+      const mapPaths = [...new Set(edits.map((item) => item.mapPath))];
+      for (const mapPath of mapPaths) await deps.checkConflict(mapPath);
+      const ops = [];
+      for (const move of moves) {
+        const note = await repo.readNote(move.path);
+        ops.push({
+          original: move.path,
+          folder: move.folder,
+          lifecycle: move.lifecycle,
+          previous: { topicId: note.topicId, mapId: note.mapId, state: note.topicState },
+          target: ""
+        });
+      }
+      const befores = /* @__PURE__ */ new Map();
+      for (const mapPath of mapPaths) befores.set(mapPath, await repo.readMap(mapPath));
+      const rebuildRequested = !options.deferRebuild;
+      const journal = { files: [], maps: [] };
+      let rebuildNeeded = ops.length > 0;
+      const records = [];
+      try {
+        for (const op of ops) {
+          const entry = {
+            from: op.original,
+            to: "",
+            lifecycle: op.lifecycle,
+            restore: op.previous,
+            moved: false,
+            lifecycleSet: false
+          };
+          journal.files.push(entry);
+          op.target = await repo.moveUnique(op.original, op.folder);
+          entry.to = op.target;
+          entry.moved = true;
+          entry.lifecycleSet = true;
+          await repo.setLifecycle(op.target, op.lifecycle.topicId, op.lifecycle.mapId, op.lifecycle.state);
+        }
+        const resolve = (originalPath) => {
+          const found = ops.find((op) => op.original === originalPath);
+          if (!found) throw new Error(`Not a moved note: ${originalPath}`);
+          return found.target;
+        };
+        for (const mapPath of mapPaths) {
+          const before = befores.get(mapPath);
+          const after = clone(before);
+          for (const item of edits) if (item.mapPath === mapPath) item.edit(after, resolve);
+          records.push({ mapPath, before, after });
+          if (ownership(before) !== ownership(after)) rebuildNeeded = true;
+          journal.maps.push({ mapPath, restore: before, written: true });
+          await repo.saveMap(mapPath, after);
+        }
+        if (rebuildRequested && rebuildNeeded) await deps.rebuildDerivedData();
+        for (const record of records) await deps.onApplied(record.mapPath, clone(record.after));
+      } catch (error) {
+        return revert(journal, rebuildRequested && rebuildNeeded, error);
+      }
+      return entryFor(ops, records, rebuildNeeded, options.label);
+    }
+  };
+  return transaction;
+}
+
 // ui/modals/prompt-presets-modal.ts
 var import_obsidian9 = require("obsidian");
 
@@ -17085,535 +17813,6 @@ var ChoiceModal = class extends import_obsidian12.Modal {
     cancel.addEventListener("click", () => this.close());
     cancel.focus();
     window.setTimeout(() => cancel.focus(), 0);
-  }
-};
-
-// experiences/aim/research-plan.ts
-var import_node_crypto3 = require("node:crypto");
-function researchContentHash(report) {
-  return (0, import_node_crypto3.createHash)("sha256").update(JSON.stringify({ summary: report.summary, detail: report.detail })).digest("hex");
-}
-function hoistNestedValidity(item) {
-  var _a2;
-  const nested = (_a2 = item.source) == null ? void 0 : _a2.validity;
-  if (item.validity !== void 0 || !nested || typeof nested !== "object") return item;
-  const { validity: _validity, ...source } = item.source;
-  return { ...item, source, validity: nested };
-}
-function hasProvenSource(item) {
-  var _a2, _b2, _c;
-  const source = item.source;
-  return !(!source || [source.branchId, source.resultId, source.notePath, source.contentHash].some(
-    (value) => typeof value !== "string" || !value.trim()
-  ) || !Number.isInteger(source.version) || source.version < 1 || !/^[a-f0-9]{64}$/i.test(source.contentHash) || !((_a2 = item.rationale) == null ? void 0 : _a2.trim()) || !((_c = (_b2 = item.validity) == null ? void 0 : _b2.reason) == null ? void 0 : _c.trim()) || !Array.isArray(item.validity.conditionKeys) || item.validity.conditionKeys.some((key2) => typeof key2 !== "string" || !key2.trim()));
-}
-function researchUnprovenReuse(subtopics) {
-  if (!Array.isArray(subtopics)) return subtopics;
-  return subtopics.map((item) => {
-    if (!item || typeof item !== "object") return item;
-    const target = hoistNestedValidity(item);
-    if (target.action !== "reuse" && target.action !== "update" || hasProvenSource(target)) return item;
-    const { source: _source, validity: _validity, ...rest } = target;
-    return { ...rest, action: "research" };
-  });
-}
-function validateAimResearchPlan(subtopics) {
-  if (!Array.isArray(subtopics) || subtopics.length > 5 || subtopics.some((item) => {
-    if (!item || typeof item !== "object") return true;
-    const fields = item;
-    return ["id", "title", "task", "expectedValue"].some(
-      (key2) => typeof fields[key2] !== "string" || !fields[key2].trim()
-    );
-  }))
-    throw new Error("Planner must return 0\u20135 valid research subtopics before the answer can proceed.");
-  const plan = subtopics.map(hoistNestedValidity);
-  const ids = new Set(plan.map((item) => item.id));
-  if (ids.size !== plan.length || new Set(plan.map((item) => item.title.trim().toLowerCase())).size !== plan.length)
-    throw new Error("Planner research subtopics must have unique ids and titles.");
-  for (const item of plan) {
-    if (item.action !== void 0 && !["reuse", "update", "research"].includes(item.action))
-      throw new Error("Invalid AIM research action.");
-    if (item.dependsOn !== void 0 && (!Array.isArray(item.dependsOn) || new Set(item.dependsOn).size !== item.dependsOn.length || item.dependsOn.some((id) => typeof id !== "string" || !ids.has(id) || id === item.id)))
-      throw new Error("Research dependencies must name distinct existing targets other than themselves.");
-    if ((item.action === "reuse" || item.action === "update") && !hasProvenSource(item))
-      throw new Error("Reuse and update targets need an exact source, rationale and condition validity assessment.");
-  }
-  const visiting = /* @__PURE__ */ new Set(), visited = /* @__PURE__ */ new Set();
-  const visit = (id) => {
-    var _a2, _b2;
-    if (visiting.has(id)) throw new Error("Research dependencies cannot contain a cycle.");
-    if (visited.has(id)) return;
-    visiting.add(id);
-    for (const dependency of (_b2 = (_a2 = plan.find((item) => item.id === id)) == null ? void 0 : _a2.dependsOn) != null ? _b2 : []) visit(dependency);
-    visiting.delete(id);
-    visited.add(id);
-  };
-  for (const id of ids) visit(id);
-  return plan;
-}
-
-// experiences/aim/legacy-names.ts
-var LEGACY_KEY_PREFIX = "mindSearch";
-var LEGACY_MARKER_PREFIX = "mindsearch-";
-var AIM_CREATE_MAP_COMMAND_ID = "create-mindsearch-map";
-var LEGACY_VALUES = [
-  ["__MINDSEARCH_NO_QUESTION__", "__AIM_NO_QUESTION__"],
-  ["__mindsearch_unknown__", "__aim_unknown__"]
-];
-var LEGACY_MARKER = new RegExp(`<!--(\\s*)${LEGACY_MARKER_PREFIX}`, "g");
-var upgradeKey = (key2) => key2.startsWith(LEGACY_KEY_PREFIX) ? `aim${key2.slice(LEGACY_KEY_PREFIX.length)}` : key2;
-function upgradeLegacyAimText(text11) {
-  let upgraded = text11.replace(LEGACY_MARKER, "<!--$1aim-");
-  for (const [legacy, current] of LEGACY_VALUES) upgraded = upgraded.split(legacy).join(current);
-  return upgraded;
-}
-function upgradeLegacyAimData(value) {
-  if (typeof value === "string") return upgradeLegacyAimText(value);
-  if (Array.isArray(value)) return value.map((item) => upgradeLegacyAimData(item));
-  if (!value || typeof value !== "object") return value;
-  const upgraded = {};
-  for (const [key2, item] of Object.entries(value)) {
-    const target = upgradeKey(key2);
-    if (target !== key2 && Object.prototype.hasOwnProperty.call(value, target)) continue;
-    upgraded[target] = upgradeLegacyAimData(item);
-  }
-  return upgraded;
-}
-
-// experiences/visual-map/ai-mode.ts
-var DEFAULT_MAP_AI_MODE = "quick";
-function isMapAiMode(value) {
-  return value === "quick" || value === "standard";
-}
-function noteAiMode(researchMode) {
-  return researchMode === "local" ? "quick" : "standard";
-}
-function researchModeOf(mode) {
-  return mode === "quick" ? "local" : "research";
-}
-function aiModeOptions(mode, kind) {
-  return {
-    researchMode: researchModeOf(mode),
-    researchDepth: kind === "research" ? "normal" : "fast",
-    visualMode: mode === "standard" ? "auto" : "off",
-    mapAiMode: mode
-  };
-}
-var KNOWLEDGE_GAP_MARKERS = ["\u6A21\u578B\u77E5\u8B58\u4E0D\u8DB3", "\u6A21\u578B\u77E5\u8BC6\u4E0D\u8DB3"];
-var KNOWLEDGE_GAP_MARKER_EN = "model knowledge is insufficient";
-function hasKnowledgeGapMarker(text11) {
-  return KNOWLEDGE_GAP_MARKERS.some((marker5) => text11.includes(marker5)) || text11.toLowerCase().includes(KNOWLEDGE_GAP_MARKER_EN);
-}
-
-// map-graph.ts
-function parentIdsForNode(node) {
-  var _a2;
-  const convergenceParents = node.aimKind === "question" ? [] : (_a2 = node.aimConvergesFromNodeIds) != null ? _a2 : [];
-  return [...node.parentId ? [node.parentId] : [], ...convergenceParents.filter((id) => id !== node.parentId)];
-}
-function descendants(nodes, id) {
-  const found = /* @__PURE__ */ new Set();
-  const pending = [id];
-  while (pending.length) {
-    const parent = pending.pop();
-    for (const node of nodes) {
-      if (node.parentId === parent && node.id !== id && !found.has(node.id)) {
-        found.add(node.id);
-        pending.push(node.id);
-      }
-    }
-  }
-  return found;
-}
-function visibleNodes(nodes) {
-  const hidden = /* @__PURE__ */ new Set();
-  for (const node of nodes) if (node.collapsed) for (const id of descendants(nodes, node.id)) hidden.add(id);
-  return nodes.filter((node) => !hidden.has(node.id));
-}
-function applyCollapseLevel(nodes, shownLevels) {
-  const byId = new Map(nodes.map((node) => [node.id, node]));
-  const depthOf = (node) => {
-    let depth = 0;
-    const seen = /* @__PURE__ */ new Set([node.id]);
-    for (let parent = node.parentId; parent && byId.has(parent) && !seen.has(parent); parent = byId.get(parent).parentId) {
-      seen.add(parent);
-      depth++;
-    }
-    return depth;
-  };
-  const parents = new Set(nodes.map((node) => node.parentId).filter((id) => !!id && byId.has(id)));
-  for (const node of nodes) {
-    if (!parents.has(node.id)) continue;
-    node.collapsed = shownLevels === null ? false : depthOf(node) >= shownLevels;
-  }
-}
-
-// map-model.ts
-function clearQuestionConvergenceEdges(map) {
-  let changed = false;
-  for (const node of map.nodes) {
-    if (node.aimKind !== "question" || node.aimConvergesFromNodeIds === void 0) continue;
-    delete node.aimConvergesFromNodeIds;
-    changed = true;
-  }
-  return changed;
-}
-function repairAimResultConvergence(map) {
-  var _a2, _b2, _c;
-  let changed = false;
-  for (const branch of (_b2 = (_a2 = map.aim) == null ? void 0 : _a2.branches) != null ? _b2 : []) {
-    for (const [index, result] of branch.results.entries()) {
-      const node = map.nodes.find((item) => item.id === result.nodeId);
-      if (!node || node.aimKind !== "synthesis" && node.aimKind !== "conclusion" || node.parentId !== branch.questionNodeId || ((_c = node.aimConvergesFromNodeIds) == null ? void 0 : _c.length))
-        continue;
-      const sources2 = [
-        ...new Set(
-          branch.results.slice(0, index).filter(
-            (source) => source.kind === "research" && source.subtopicId && map.nodes.some(
-              (item) => item.id === source.nodeId && item.aimKind === "research" && item.parentId === branch.questionNodeId
-            )
-          ).map((source) => source.nodeId)
-        )
-      ];
-      if (!sources2.length) continue;
-      node.parentId = sources2[sources2.length - 1];
-      node.aimConvergesFromNodeIds = [...sources2];
-      changed = true;
-    }
-  }
-  return changed;
-}
-function validReuse(record) {
-  return record === void 0 || !!record && [
-    record.sourceBranchId,
-    record.sourceResultId,
-    record.sourceNotePath,
-    record.checkedAt,
-    record.rationale,
-    record.validityReason
-  ].every((value) => typeof value === "string" && !!value.trim()) && Number.isInteger(record.sourceVersion) && record.sourceVersion > 0 && typeof record.sourceContentHash === "string" && /^[a-f0-9]{64}$/i.test(record.sourceContentHash) && !!record.applicableConditions && typeof record.applicableConditions === "object" && !Array.isArray(record.applicableConditions) && Object.values(record.applicableConditions).every((value) => typeof value === "string");
-}
-function validDeliveryCheckpoint(checkpoint) {
-  const resultValid = (result) => !!result && typeof result.summary === "string" && typeof result.detail === "string" && Array.isArray(result.suggestions) && Array.isArray(result.visualReferences);
-  const hashValid = (value) => value === void 0 || typeof value === "string" && /^[a-f0-9]{64}$/i.test(value);
-  return !!checkpoint && typeof checkpoint === "object" && !Array.isArray(checkpoint) && [checkpoint.outline, checkpoint.research, checkpoint.draft, checkpoint.acceptance].every(
-    (result) => result === void 0 || resultValid(result)
-  ) && hashValid(checkpoint.baseFingerprint) && hashValid(checkpoint.researchFingerprint) && hashValid(checkpoint.draftFingerprint) && (checkpoint.sections === void 0 || !!checkpoint.sections && typeof checkpoint.sections === "object" && !Array.isArray(checkpoint.sections) && Object.entries(checkpoint.sections).every(
-    ([key2, section3]) => !!key2.trim() && !!section3 && hashValid(section3.fingerprint) && typeof section3.fingerprint === "string" && Array.isArray(section3.evidenceIds) && section3.evidenceIds.every((id) => typeof id === "string" && !!id.trim()) && resultValid(section3.result)
-  ));
-}
-var clone = (value) => JSON.parse(JSON.stringify(value));
-function canParent(nodes, id, parentId) {
-  return parentId === null || parentId !== id && nodes.some((n) => n.id === parentId) && !descendants(nodes, id).has(parentId);
-}
-function supersededAimNodeIds(map) {
-  var _a2, _b2;
-  const hidden = /* @__PURE__ */ new Set();
-  const parents = new Set(map.nodes.map((node) => node.parentId).filter((id) => !!id));
-  for (const branch of (_b2 = (_a2 = map.aim) == null ? void 0 : _a2.branches) != null ? _b2 : []) {
-    branch.results.forEach((result, index) => {
-      if (result.kind !== "synthesis" || parents.has(result.nodeId)) return;
-      if (branch.results.some(
-        (later, laterIndex) => laterIndex > index && later.runId === result.runId && later.kind === "conclusion"
-      ))
-        hidden.add(result.nodeId);
-    });
-  }
-  return hidden;
-}
-function removeNodes(nodes, id, branch) {
-  const removed = branch ? descendants(nodes, id) : /* @__PURE__ */ new Set();
-  removed.add(id);
-  return nodes.filter((node) => !removed.has(node.id)).map((node) => ({ ...node, parentId: node.parentId && removed.has(node.parentId) ? null : node.parentId }));
-}
-function validRetainedReports(reports) {
-  if (!Array.isArray(reports) || reports.length === 0) return false;
-  return reports.every((item) => {
-    if (!item || typeof item !== "object") return false;
-    const { summary, detail } = item;
-    return typeof summary === "string" && summary.trim() !== "" && typeof detail === "string" && detail.trim() !== "";
-  });
-}
-function parseMap(content) {
-  const block = content.match(/```agent-map\s*\n([\s\S]*?)\n```/);
-  if (!block) throw new Error(t("ui.mind_map_data_was_not_found_keep_the_agent_map_block"));
-  const map = upgradeLegacyAimData(JSON.parse(block[1]));
-  if (map.version !== 1 || typeof map.id !== "string" || typeof map.title !== "string" || !Array.isArray(map.nodes))
-    throw new Error(t("ui.invalid_mind_map_format"));
-  if (map.detailTemplateId !== void 0 && typeof map.detailTemplateId !== "string") delete map.detailTemplateId;
-  if (map.toneId !== void 0 && typeof map.toneId !== "string") delete map.toneId;
-  if (map.outputLanguage !== void 0 && !isContentLanguage(map.outputLanguage)) delete map.outputLanguage;
-  if (map.aiMode !== void 0 && !isMapAiMode(map.aiMode)) delete map.aiMode;
-  const ids = /* @__PURE__ */ new Set(), aimQuestionRequests = /* @__PURE__ */ new Set();
-  for (const n of map.nodes) {
-    if (!n || typeof n.id !== "string" || typeof n.path !== "string" || !n.path.endsWith(".md") || !Number.isFinite(n.x) || !Number.isFinite(n.y) || n.parentId !== null && typeof n.parentId !== "string" || ids.has(n.id))
-      throw new Error(t("ui.invalid_node_data_or_duplicate_id"));
-    if (n.aimDismissedQuestionRequestIds !== void 0 && (!Array.isArray(n.aimDismissedQuestionRequestIds) || new Set(n.aimDismissedQuestionRequestIds).size !== n.aimDismissedQuestionRequestIds.length || n.aimDismissedQuestionRequestIds.some((id) => typeof id !== "string" || !id.trim())))
-      throw new Error("Invalid dismissed AIM question identities.");
-    ids.add(n.id);
-    n.collapsed = n.collapsed === true;
-    if (n.aimKind !== void 0 && !["topic", "question", "answer", "research", "synthesis", "conclusion"].includes(n.aimKind))
-      throw new Error("Invalid AIM node kind.");
-    if (n.aimConvergesFromNodeIds !== void 0 && (!Array.isArray(n.aimConvergesFromNodeIds) || new Set(n.aimConvergesFromNodeIds).size !== n.aimConvergesFromNodeIds.length || n.aimConvergesFromNodeIds.some(
-      (id) => typeof id !== "string" || id === n.id || !map.nodes.some((candidate) => candidate.id === id)
-    )))
-      throw new Error("Invalid AIM convergence references.");
-    if (n.aimQuestion !== void 0) {
-      const question = n.aimQuestion;
-      if (n.aimKind !== "question" || !question || typeof question.requestId !== "string" || !question.requestId.trim() || !(question.parentBranchId === void 0 || question.parentBranchId === null || typeof question.parentBranchId === "string") || !Array.isArray(question.options) || question.options.length < 2 || question.options.some(
-        (option2) => !option2 || typeof option2.id !== "string" || !option2.id.trim() || typeof option2.label !== "string" || !option2.label.trim()
-      ) || new Set(question.options.map((option2) => option2.id)).size !== question.options.length || typeof question.allowMultiple !== "boolean" || typeof question.allowFreeText !== "boolean")
-        throw new Error("Invalid AIM question controls.");
-      if (aimQuestionRequests.has(question.requestId)) throw new Error("Duplicate AIM question request identity.");
-      aimQuestionRequests.add(question.requestId);
-    }
-  }
-  for (const n of map.nodes)
-    if (!canParent(map.nodes, n.id, n.parentId))
-      throw new Error(t("ui.a_link_contains_a_cycle_or_points_to_a_missing_parent_topic"));
-  if (map.aim !== void 0) validateAimMap(map);
-  if (!map.viewport || !Number.isFinite(map.viewport.x) || !Number.isFinite(map.viewport.y) || !Number.isFinite(map.viewport.zoom))
-    map.viewport = { x: 40, y: 40, zoom: 1 };
-  map.viewport.zoom = Math.min(2, Math.max(0.25, map.viewport.zoom));
-  return map;
-}
-function validateAimMap(map) {
-  var _a2, _b2, _c, _d, _e, _f, _g;
-  const data = map.aim;
-  if (!data || data.version !== 1 || !Array.isArray(data.branches) || !Array.isArray(data.runs) || !Array.isArray(data.pendingCommits) || data.resultDrafts !== void 0 && !Array.isArray(data.resultDrafts))
-    throw new Error("Invalid AIM map extension.");
-  if (data.creationId !== void 0 && (typeof data.creationId !== "string" || !data.creationId.trim()))
-    throw new Error("Invalid AIM creation identity.");
-  if (data.contentLanguage !== void 0 && !isNoteLanguage(data.contentLanguage))
-    throw new Error("Invalid AIM content language.");
-  if (data.minimumAnswersBeforeConclusion !== void 0 && (!Number.isInteger(data.minimumAnswersBeforeConclusion) || data.minimumAnswersBeforeConclusion < 1 || data.minimumAnswersBeforeConclusion > 10))
-    throw new Error("Invalid AIM exploration question target.");
-  if (data.interaction !== void 0 && data.interaction !== "unattended")
-    throw new Error("Invalid AIM interaction mode.");
-  if (data.rootDraft !== void 0 && (!data.rootDraft || typeof data.rootDraft.nodeId !== "string" || typeof data.rootDraft.notePath !== "string" || !data.rootDraft.notePath.endsWith(".md") || typeof data.rootDraft.title !== "string" || typeof data.rootDraft.context !== "string" || data.rootDraft.model !== void 0 && (typeof data.rootDraft.model !== "string" || !data.rootDraft.model.trim()) || data.rootDraft.reasoning !== void 0 && !["low", "medium", "high"].includes(data.rootDraft.reasoning) || map.nodes.some((node) => node.id === data.rootDraft.nodeId)))
-    throw new Error("Invalid AIM root draft.");
-  if (data.questionDraft !== void 0) {
-    const draft = data.questionDraft;
-    if (!draft || typeof draft.requestId !== "string" || !draft.requestId.trim() || map.nodes.some((node) => {
-      var _a3;
-      return ((_a3 = node.aimQuestion) == null ? void 0 : _a3.requestId) === draft.requestId;
-    }) || typeof draft.nodeId !== "string" || map.nodes.some((node) => node.id === draft.nodeId) || typeof draft.parentId !== "string" || !map.nodes.some((node) => node.id === draft.parentId) || !(draft.parentBranchId === void 0 || draft.parentBranchId === null || typeof draft.parentBranchId === "string") || typeof draft.notePath !== "string" || !draft.notePath.endsWith(".md") || typeof draft.title !== "string" || typeof draft.summary !== "string" || !draft.summary.trim() || typeof draft.detail !== "string" || typeof draft.prompt !== "string" || typeof draft.model !== "string" || draft.reasoning !== void 0 && !["low", "medium", "high"].includes(draft.reasoning) || !Array.isArray(draft.options) || draft.options.length < 2 || draft.options.some(
-      (option2) => !option2 || typeof option2.id !== "string" || !option2.id.trim() || typeof option2.label !== "string" || !option2.label.trim()
-    ) || new Set(draft.options.map((option2) => option2.id)).size !== draft.options.length || draft.convergesFromNodeIds !== void 0 && (!Array.isArray(draft.convergesFromNodeIds) || new Set(draft.convergesFromNodeIds).size !== draft.convergesFromNodeIds.length || draft.convergesFromNodeIds.some((id) => !map.nodes.some((node) => node.id === id))))
-      throw new Error("Invalid AIM question draft.");
-  }
-  const branchIds = /* @__PURE__ */ new Set(), submissionIds = /* @__PURE__ */ new Set();
-  for (const branch of data.branches) {
-    if (!branch || typeof branch.id !== "string" || branchIds.has(branch.id) || branch.submissionId !== void 0 && (typeof branch.submissionId !== "string" || !branch.submissionId.trim() || submissionIds.has(branch.submissionId)) || branch.sourceQuestionNodeId !== void 0 && (typeof branch.sourceQuestionNodeId !== "string" || !branch.sourceQuestionNodeId.trim()) || typeof branch.questionNodeId !== "string" || !map.nodes.some((node) => node.id === branch.questionNodeId) || branch.answerNodeId !== void 0 && (typeof branch.answerNodeId !== "string" || !map.nodes.some(
-      (node) => node.id === branch.answerNodeId && node.aimKind === "answer" && node.parentId === branch.questionNodeId
-    )) || !(branch.parentBranchId === null || typeof branch.parentBranchId === "string") || !branch.answerSnapshot || !Array.isArray(branch.answerSnapshot.selections) || branch.answerSnapshot.selections.some((item) => typeof item !== "string") || typeof branch.answerSnapshot.freeText !== "string" || !branch.inputSnapshot || typeof branch.inputSnapshot.topic !== "string" || !branch.inputSnapshot.conditions || typeof branch.inputSnapshot.conditions !== "object" || Array.isArray(branch.inputSnapshot.conditions) || !Array.isArray(branch.inputSnapshot.upstreamResults) || !Array.isArray(branch.results) || branch.researchPlanError !== void 0 && (typeof branch.researchPlanError !== "string" || !branch.researchPlanError.trim() || branch.researchPlanError.length > 500) || branch.researchPlan !== void 0 && (!Array.isArray(branch.researchPlan) || branch.researchPlan.length > 5 || branch.researchPlan.some(
-      (item) => !item || typeof item.id !== "string" || !item.id.trim() || typeof item.title !== "string" || !item.title.trim() || typeof item.task !== "string" || !item.task.trim() || typeof item.expectedValue !== "string" || !item.expectedValue.trim()
-    ) || new Set(branch.researchPlan.map((item) => item.id)).size !== branch.researchPlan.length || new Set(branch.researchPlan.map((item) => item.title.trim().toLowerCase())).size !== branch.researchPlan.length))
-      throw new Error("Invalid AIM branch snapshot.");
-    if (branch.researchPlan !== void 0) validateAimResearchPlan(branch.researchPlan);
-    if (branch.retryTimeoutMs !== void 0 && (!Number.isInteger(branch.retryTimeoutMs) || branch.retryTimeoutMs < 18e4 || branch.retryTimeoutMs > 6e5))
-      throw new Error("Invalid AIM retry timeout.");
-    if (branch.deliveryRecovery && (typeof branch.deliveryRecovery.fingerprint !== "string" || !branch.deliveryRecovery.planner || typeof branch.deliveryRecovery.planner.detail !== "string" || !validDeliveryCheckpoint(branch.deliveryRecovery.checkpoint)))
-      throw new Error("Invalid AIM delivery checkpoint.");
-    if (((_a2 = branch.deliveryRecovery) == null ? void 0 : _a2.evidence) !== void 0) {
-      const evidence = branch.deliveryRecovery.evidence;
-      if (!Array.isArray(evidence) || evidence.some(
-        (source) => !source || typeof source.id !== "string" || !source.id.trim() || typeof source.hash !== "string" || !/^[a-f0-9]{64}$/i.test(source.hash) || typeof source.detail !== "string" || !source.detail.trim()
-      ) || new Set(evidence.map((source) => source.id)).size !== evidence.length)
-        throw new Error("Invalid AIM delivery evidence.");
-    }
-    branchIds.add(branch.id);
-    if (branch.submissionId) submissionIds.add(branch.submissionId);
-    const questionNode = map.nodes.find((node) => node.id === branch.questionNodeId);
-    if (questionNode.aimQuestion && questionNode.aimQuestion.parentBranchId !== branch.parentBranchId)
-      throw new Error("AIM answer branch does not match its question's parent branch.");
-  }
-  for (const branch of data.branches) {
-    if (branch.parentBranchId && !branchIds.has(branch.parentBranchId))
-      throw new Error("AIM branch points to a missing parent.");
-    const seen = /* @__PURE__ */ new Set([branch.id]);
-    let parent = branch.parentBranchId;
-    while (parent) {
-      if (seen.has(parent)) throw new Error("AIM answer branches cannot contain cycles.");
-      seen.add(parent);
-      parent = (_c = (_b2 = data.branches.find((item) => item.id === parent)) == null ? void 0 : _b2.parentBranchId) != null ? _c : null;
-    }
-  }
-  const runIds = /* @__PURE__ */ new Set();
-  const validAttempt = (attempt) => {
-    var _a3;
-    if (!attempt || typeof attempt.id !== "string" || typeof attempt.inputSnapshotHash !== "string") return false;
-    if (!["running", "saving", "completed", "partial", "failed", "cancelled", "superseded"].includes(attempt.status))
-      return false;
-    if (attempt.subtopicId !== void 0 && (typeof attempt.subtopicId !== "string" || !attempt.subtopicId.trim()))
-      return false;
-    if (attempt.phase !== void 0 && (typeof attempt.phase !== "string" || !attempt.phase.trim())) return false;
-    if (attempt.model !== void 0 && (typeof attempt.model !== "string" || !attempt.model.trim())) return false;
-    if (attempt.reasoningLevel !== void 0 && !["low", "medium", "high"].includes(attempt.reasoningLevel))
-      return false;
-    if (attempt.maxResearchTurns !== void 0 && (!Number.isInteger(attempt.maxResearchTurns) || attempt.maxResearchTurns < 1 || attempt.maxResearchTurns > 3))
-      return false;
-    if (attempt.researchTurns !== void 0 && (!Number.isInteger(attempt.researchTurns) || attempt.researchTurns < 0 || attempt.researchTurns > ((_a3 = attempt.maxResearchTurns) != null ? _a3 : 3)))
-      return false;
-    if (attempt.plannerReviews !== void 0 && (!Array.isArray(attempt.plannerReviews) || attempt.plannerReviews.some(
-      (review) => !review || !["research_more", "ask_user", "conclude"].includes(review.decision) || typeof review.rationale !== "string" || !review.rationale.trim() || !Number.isInteger(review.researchTurn) || review.researchTurn < 1 || review.researchTurn > 3 || review.question !== void 0 && (typeof review.question !== "string" || !review.question.trim()) || review.answerOptions !== void 0 && (!Array.isArray(review.answerOptions) || review.answerOptions.some(
-        (option2) => typeof option2 === "string" ? !option2.trim() : !option2 || typeof option2.axisId !== "string" || !option2.axisId.trim() || typeof option2.value !== "string" || !option2.value.trim()
-      )) || review.answerAxis !== void 0 && (!review.answerAxis || typeof review.answerAxis.id !== "string" || !review.answerAxis.id.trim() || typeof review.answerAxis.label !== "string" || !review.answerAxis.label.trim()) || review.researchTarget !== void 0 && (!review.researchTarget || typeof review.researchTarget.title !== "string" || !review.researchTarget.title.trim() || typeof review.researchTarget.task !== "string" || !review.researchTarget.task.trim() || typeof review.researchTarget.expectedValue !== "string" || !review.researchTarget.expectedValue.trim())
-    )))
-      return false;
-    if (attempt.retainedReports !== void 0 && (!attempt.retainedReports || typeof attempt.retainedReports.notePath !== "string" || !attempt.retainedReports.notePath.endsWith(".md") || !validRetainedReports(attempt.retainedReports.reports)))
-      return false;
-    if (attempt.searchDiagnostics !== void 0 && (!Array.isArray(attempt.searchDiagnostics) || attempt.searchDiagnostics.some(
-      (item) => !item || !Number.isInteger(item.researchTurn) || item.researchTurn < 1 || !Number.isInteger(item.startedEvents) || item.startedEvents < 0 || !Number.isInteger(item.completedEvents) || item.completedEvents < 0 || !Number.isInteger(item.completedSearchActions) || item.completedSearchActions < 0 || !Number.isInteger(item.otherCompletedActions) || item.otherCompletedActions < 0
-    )))
-      return false;
-    return true;
-  };
-  for (const run of data.runs) {
-    if (!run || typeof run.id !== "string" || runIds.has(run.id) || !branchIds.has(run.branchId) || typeof run.currentAttemptId !== "string" || !Array.isArray(run.attempts) || !run.attempts.some((attempt) => attempt.id === run.currentAttemptId) || run.attempts.some((attempt) => !validAttempt(attempt)))
-      throw new Error("Invalid AIM run record.");
-    runIds.add(run.id);
-  }
-  const resultIds = /* @__PURE__ */ new Set();
-  for (const branch of data.branches)
-    for (const result of branch.results) {
-      const run = data.runs.find((item) => item.id === (result == null ? void 0 : result.runId)), attempt = run == null ? void 0 : run.attempts.find((item) => item.id === (result == null ? void 0 : result.attemptId));
-      if (!result || !validReuse(result.reuse) || typeof result.resultId !== "string" || resultIds.has(result.resultId) || !run || run.branchId !== branch.id || !["completed", "partial"].includes((_d = attempt == null ? void 0 : attempt.status) != null ? _d : "") || typeof result.nodeId !== "string" || typeof result.notePath !== "string" || !Number.isInteger(result.version) || result.version < 1 || result.kind !== void 0 && !["research", "synthesis", "conclusion"].includes(result.kind) || result.subtopicId !== void 0 && (!((_e = branch.researchPlan) == null ? void 0 : _e.some((item) => item.id === result.subtopicId)) || typeof result.subtopicId !== "string") || !map.nodes.some(
-        (node) => {
-          var _a3;
-          return node.id === result.nodeId && node.path === result.notePath && (node.parentId === ((_a3 = branch.answerNodeId) != null ? _a3 : branch.questionNodeId) || branch.results.some((parent) => parent.nodeId === node.parentId));
-        }
-      ))
-        throw new Error("Invalid AIM branch result reference.");
-      resultIds.add(result.resultId);
-    }
-  const drafts = (_f = data.resultDrafts) != null ? _f : [];
-  const draftIds = /* @__PURE__ */ new Set();
-  for (const draft of drafts) {
-    const branch = draft && data.branches.find((item) => item.id === draft.branchId);
-    const run = draft && data.runs.find((item) => item.id === draft.runId), attempt = run == null ? void 0 : run.attempts.find((item) => item.id === draft.attemptId);
-    if (!draft || !validReuse(draft.reuse) || draft.retainedReports !== void 0 && !validRetainedReports(draft.retainedReports) || typeof draft.id !== "string" || draftIds.has(draft.id) || !branch || typeof draft.nodeId !== "string" || typeof draft.notePath !== "string" || !draft.notePath.endsWith(".md") || typeof draft.title !== "string" || draft.status !== "creating" && draft.status !== "ready" || draft.model !== void 0 && (typeof draft.model !== "string" || !draft.model.trim()) || draft.reasoning !== void 0 && !["low", "medium", "high"].includes(draft.reasoning) || draft.kind !== void 0 && !["research", "synthesis", "conclusion"].includes(draft.kind) || draft.subtopicId !== void 0 && !((_g = branch.researchPlan) == null ? void 0 : _g.some((item) => item.id === draft.subtopicId)) || (run == null ? void 0 : run.branchId) !== branch.id || !attempt || attempt.inputSnapshotHash !== draft.inputSnapshotHash || !map.nodes.some(
-      (node) => {
-        var _a3, _b3;
-        return node.id === draft.nodeId && node.path === draft.notePath && node.parentId === ((_b3 = (_a3 = draft.parentNodeId) != null ? _a3 : branch.answerNodeId) != null ? _b3 : branch.questionNodeId);
-      }
-    ))
-      throw new Error("Invalid AIM result draft.");
-    draftIds.add(draft.id);
-  }
-  for (const pending of data.pendingCommits) {
-    const run = data.runs.find((item) => item.id === (pending == null ? void 0 : pending.runId)), attempt = run == null ? void 0 : run.attempts.find((item) => item.id === (pending == null ? void 0 : pending.attemptId));
-    const branch = data.branches.find((item) => item.id === (pending == null ? void 0 : pending.branchId)), draft = drafts.find((item) => item.id === (pending == null ? void 0 : pending.resultDraftId));
-    if (!pending || pending.resultStatus !== void 0 && !["completed", "partial"].includes(pending.resultStatus) || !run || run.branchId !== pending.branchId || run.currentAttemptId !== pending.attemptId || (attempt == null ? void 0 : attempt.status) !== "saving" || !branch || !draft || draft.status !== "ready" || draft.branchId !== branch.id || draft.runId !== run.id || draft.attemptId !== attempt.id || draft.nodeId !== pending.nodeId || draft.notePath !== pending.notePath || typeof pending.notePath !== "string" || !pending.notePath.endsWith(".md"))
-      throw new Error("Invalid AIM pending commit.");
-  }
-}
-function serializeMap(map, language2 = "zh-TW") {
-  const description = translate(language2, "ui.map_file_description");
-  return `---
-visual-agent-map: true
----
-
-# ${map.title.replace(/\n/g, " ")}
-
-${description}
-
-\`\`\`agent-map
-${JSON.stringify(map, null, 2)}
-\`\`\`
-`;
-}
-function inheritModel(parentModel, defaultModel) {
-  return parentModel != null ? parentModel : defaultModel;
-}
-var History = class {
-  constructor() {
-    __publicField(this, "past", []);
-    __publicField(this, "future", []);
-    /** Bumped by clear(), so a mark taken before it can tell the entries it covered are gone. */
-    __publicField(this, "epoch", 0);
-    /** Entries pushed out of the front by the 80-entry cap, so a mark's position survives the cap. */
-    __publicField(this, "dropped", 0);
-  }
-  get canUndo() {
-    return this.past.length > 0;
-  }
-  get canRedo() {
-    return this.future.length > 0;
-  }
-  get undoEntry() {
-    return this.past[this.past.length - 1];
-  }
-  get redoEntry() {
-    return this.future[this.future.length - 1];
-  }
-  push(entry) {
-    this.past.push(entry);
-    if (this.past.length > 80) {
-      this.past.shift();
-      this.dropped++;
-    }
-    this.future = [];
-  }
-  undo() {
-    const entry = this.past.pop();
-    if (entry) this.future.push(entry);
-    return entry;
-  }
-  redo() {
-    const entry = this.future.pop();
-    if (entry) this.past.push(entry);
-    return entry;
-  }
-  clear() {
-    this.past = [];
-    this.future = [];
-    this.epoch++;
-  }
-  /** Marks the present end of the history; collapseSince folds everything pushed after it into one entry. */
-  mark() {
-    return { epoch: this.epoch, dropped: this.dropped, length: this.past.length };
-  }
-  /**
-   * Drops the entries pushed since `mark`, so work done in between leaves no undo step; entries from before the mark stay.
-   * When the history was cleared since the mark, every entry now in it was pushed after the mark and is dropped.
-   */
-  discardSince(mark) {
-    const start = mark.epoch === this.epoch ? Math.max(0, mark.length - (this.dropped - mark.dropped)) : 0;
-    if (start < this.past.length) this.past.splice(start);
-  }
-  /**
-   * Folds the entries pushed since `mark` into one undo step: undo runs them newest first, redo oldest first. Does
-   * nothing when the history was cleared since the mark, or when fewer than two entries were pushed. Each entry's
-   * undo/redo is read when it runs, so later patches to an entry (parkOnUndo) still apply.
-   */
-  collapseSince(mark, label) {
-    if (mark.epoch !== this.epoch) return;
-    const start = Math.max(0, mark.length - (this.dropped - mark.dropped));
-    if (this.past.length - start < 2) return;
-    const entries = this.past.splice(start);
-    const run = async (list, redo) => {
-      const done = [];
-      try {
-        for (const entry of list) {
-          await (redo ? entry.redo() : entry.undo());
-          done.push(entry);
-        }
-      } catch (error) {
-        try {
-          for (const entry of done.reverse()) await (redo ? entry.undo() : entry.redo());
-        } catch (e) {
-        }
-        throw error;
-      }
-    };
-    const combined = {
-      undo: () => run([...entries].reverse(), false),
-      redo: () => run(entries, true),
-      ...label ? { label } : {}
-    };
-    this.past.push(combined);
-    this.future = [];
   }
 };
 
@@ -19890,46 +20089,46 @@ ${body}`);
     var _a2, _b2;
     const roots = typeof scope === "string" ? [scope] : (_a2 = scope == null ? void 0 : scope.roots) != null ? _a2 : [], extra = new Set(typeof scope === "string" ? [] : (_b2 = scope == null ? void 0 : scope.paths) != null ? _b2 : []);
     const inScope = (path) => !scope || extra.has(path) || roots.some((root) => path.startsWith(`${root}/`));
-    const ownership = /* @__PURE__ */ new Map();
+    const ownership2 = /* @__PURE__ */ new Map();
     const topics = /* @__PURE__ */ new Map();
     const scan2 = await this.scanMaps();
     for (const { file: mapFile, map } of scan2.readable) {
       topics.set(map.id, { map, mapPath: mapFile.path });
       for (const node of map.nodes) {
-        const existing = ownership.get(node.path);
+        const existing = ownership2.get(node.path);
         if (existing && existing.map.id !== map.id)
           throw new Error(`${this.message("error.note_in_multiple_maps")}: ${node.path}`);
-        ownership.set(node.path, { map, mapPath: mapFile.path, node });
+        ownership2.set(node.path, { map, mapPath: mapFile.path, node });
       }
     }
     const nodeFiles = new Map((await this.markedFiles("agent-map-node")).map((file) => [file.path, file]));
-    for (const path of ownership.keys()) {
+    for (const path of ownership2.keys()) {
       const file = this.app.vault.getAbstractFileByPath(path);
       if (file instanceof import_obsidian13.TFile) nodeFiles.set(path, file);
     }
     for (const file of nodeFiles.values()) {
       if (!inScope(file.path)) continue;
-      if (scan2.skippedRoots.some((root) => file.path.startsWith(`${root}/`) && !ownership.has(file.path))) continue;
-      const cached = await this.app.vault.cachedRead(file), derived = this.derivedNoteContent(file, cached, ownership, topics);
+      if (scan2.skippedRoots.some((root) => file.path.startsWith(`${root}/`) && !ownership2.has(file.path))) continue;
+      const cached = await this.app.vault.cachedRead(file), derived = this.derivedNoteContent(file, cached, ownership2, topics);
       if (derived === null || derived === cached) continue;
       await this.app.vault.process(
         file,
         (content) => {
           var _a3;
-          return (_a3 = this.derivedNoteContent(file, content, ownership, topics)) != null ? _a3 : content;
+          return (_a3 = this.derivedNoteContent(file, content, ownership2, topics)) != null ? _a3 : content;
         }
       );
     }
   }
   /** The node note with derived lifecycle fields and references applied, or null when it is not a VAM node note. */
-  derivedNoteContent(file, content, ownership, topics) {
+  derivedNoteContent(file, content, ownership2, topics) {
     var _a2;
     const fm = frontmatter(content);
     if (!marker2(fm["agent-map-node"])) return null;
     const language2 = this.scaffoldLanguage(content, fm);
     ensureNoteCssClass(fm);
     fm.title = noteTitle(content, fm, file.basename);
-    const owner = ownership.get(file.path);
+    const owner = ownership2.get(file.path);
     let state = file.path.includes("/Archive/") ? "archived" : file.path.includes("/Unassigned/") ? "unassigned" : owner ? "active" : text5(fm["topic-state"], "unassigned");
     if (owner) {
       fm["agent-map-id"] = owner.map.id;
@@ -39384,8 +39583,8 @@ ${request.requirements}` : preset.text,
   async resolveMapConflict() {
     if (!this.map) return false;
     const disk = await this.plugin.repo.readMap(this.path);
-    const structure = (map) => JSON.stringify({ ...map, viewport: null });
-    if (structure(disk) === structure(this.map)) return false;
+    const structure2 = (map) => JSON.stringify({ ...map, viewport: null });
+    if (structure2(disk) === structure2(this.map)) return false;
     const local = clone(this.map);
     this.map = await new Promise((resolve) => new MapConflictModal(this.app, local, disk, resolve).open());
     this.history.clear();
@@ -39410,15 +39609,15 @@ ${request.requirements}` : preset.text,
       this.render();
       throw error;
     }
-    const ownership = (map) => JSON.stringify(map.nodes.map((node) => [node.id, node.path, node.parentId]));
-    if (rebuildDerivedData && ownership(before) !== ownership(after)) await this.plugin.rebuildDerivedData();
+    const ownership2 = (map) => JSON.stringify(map.nodes.map((node) => [node.id, node.path, node.parentId]));
+    if (rebuildDerivedData && ownership2(before) !== ownership2(after)) await this.plugin.rebuildDerivedData();
     const restore = async (snapshot) => {
       const previous = clone(this.map);
       const next = clone(snapshot);
       if (this.map) next.viewport = clone(this.map.viewport);
       await this.plugin.repo.saveMap(path, next);
       this.map = next;
-      if (ownership(previous) !== ownership(next)) await this.plugin.rebuildDerivedData();
+      if (ownership2(previous) !== ownership2(next)) await this.plugin.rebuildDerivedData();
       await this.hydrate();
     };
     this.history.push({ undo: () => restore(before), redo: () => restore(after) });
@@ -40548,159 +40747,91 @@ ${request.requirements}` : preset.text,
       throw error;
     }
   }
+  /** Builds the transaction the five file-moving methods share: Map.md of the open map is checked for outside edits first and adopted after each apply. */
+  beginMapTransaction() {
+    return begin({
+      repo: this.plugin.repo,
+      rebuildDerivedData: () => this.plugin.rebuildDerivedData(),
+      onApplied: (mapPath, map) => {
+        var _a2;
+        if (mapPath !== this.path) return;
+        const viewport = (_a2 = this.map) == null ? void 0 : _a2.viewport;
+        this.map = clone(map);
+        if (viewport) this.map.viewport = clone(viewport);
+      },
+      checkConflict: async (mapPath) => {
+        if (mapPath !== this.path) return;
+        await this.resolveMapConflict();
+        await this.persist();
+      }
+    });
+  }
+  /** The change is already saved and in history; a failing reload must not look like the change failed. */
+  async refreshAfterSavedChange() {
+    try {
+      await this.hydrate();
+      this.render();
+    } catch (e) {
+      this.render();
+      new import_obsidian30.Notice(t("ui.change_saved_refresh_failed"));
+    }
+  }
   async claimToCurrent(file) {
     var _a2;
     if (!this.map) return;
-    const before = clone(this.map), previous = await this.plugin.repo.readNote(file.path, (_a2 = this.map) != null ? _a2 : void 0), original = file.path;
-    const target = await this.plugin.repo.moveUnique(original, this.plugin.repo.topicFolder(this.path, "Notes"));
-    await this.plugin.repo.setLifecycle(target, this.map.id, this.map.id, "active");
-    const node = {
-      id: crypto.randomUUID(),
-      path: target,
-      parentId: null,
-      x: 80,
-      y: Math.max(-100, ...this.map.nodes.map((item) => item.y)) + 240,
-      collapsed: false
-    };
-    const after = clone(before);
-    after.nodes.push(node);
-    await this.plugin.repo.saveMap(this.path, after);
-    this.map = after;
-    this.selected = node.id;
-    await this.plugin.rebuildDerivedData();
-    await this.hydrate();
-    const undo = async () => {
-      await this.plugin.repo.moveExact(target, original);
-      await this.plugin.repo.setLifecycle(original, previous.topicId, previous.mapId, previous.topicState);
-      await this.plugin.repo.saveMap(this.path, before);
-      this.map = clone(before);
-      await this.plugin.rebuildDerivedData();
-      await this.hydrate();
-      this.render();
-    };
-    const redo = async () => {
-      await this.plugin.repo.moveExact(original, target);
-      await this.plugin.repo.setLifecycle(target, after.id, after.id, "active");
-      await this.plugin.repo.saveMap(this.path, after);
-      this.map = clone(after);
-      await this.plugin.rebuildDerivedData();
-      await this.hydrate();
-      this.render();
-    };
-    this.history.push({ undo, redo });
-    this.render();
-    this.focusNode(node);
+    const id = crypto.randomUUID(), original = file.path;
+    const entry = await this.beginMapTransaction().unpark(original, this.plugin.repo.topicFolder(this.path, "Notes"), this.map.id, this.map.id).editMap(this.path, (map, resolve) => {
+      map.nodes.push({
+        id,
+        path: resolve(original),
+        parentId: null,
+        x: 80,
+        y: Math.max(-100, ...map.nodes.map((item) => item.y)) + 240,
+        collapsed: false
+      });
+    }).commit();
+    this.selected = id;
+    this.history.push(entry);
+    await this.refreshAfterSavedChange();
+    const node = (_a2 = this.map) == null ? void 0 : _a2.nodes.find((item) => item.id === id);
+    if (node) this.focusNode(node);
   }
   async relinkMissingNode(node, file) {
-    var _a2;
     if (!this.map) return;
-    const before = clone(this.map), previous = await this.plugin.repo.readNote(file.path, (_a2 = this.map) != null ? _a2 : void 0), original = file.path;
-    const target = await this.plugin.repo.moveUnique(original, this.plugin.repo.topicFolder(this.path, "Notes"));
-    await this.plugin.repo.setLifecycle(target, this.map.id, this.map.id, "active");
-    const after = clone(before), replacement = after.nodes.find((item) => item.id === node.id);
-    if (!replacement) throw new Error(t("ui.the_node_to_relink_was_not_found"));
-    rebaseMapNotePaths(after, moveNotePath(replacement.path, target));
-    await this.plugin.repo.saveMap(this.path, after);
-    this.map = after;
-    await this.plugin.rebuildDerivedData();
-    await this.hydrate();
-    const undo = async () => {
-      await this.plugin.repo.moveExact(target, original);
-      await this.plugin.repo.setLifecycle(original, previous.topicId, previous.mapId, previous.topicState);
-      await this.plugin.repo.saveMap(this.path, before);
-      this.map = clone(before);
-      await this.plugin.rebuildDerivedData();
-      await this.hydrate();
-      this.render();
-    };
-    const redo = async () => {
-      await this.plugin.repo.moveExact(original, target);
-      await this.plugin.repo.setLifecycle(target, after.id, after.id, "active");
-      await this.plugin.repo.saveMap(this.path, after);
-      this.map = clone(after);
-      await this.plugin.rebuildDerivedData();
-      await this.hydrate();
-      this.render();
-    };
-    this.history.push({ undo, redo });
-    this.render();
+    const original = file.path;
+    const entry = await this.beginMapTransaction().unpark(original, this.plugin.repo.topicFolder(this.path, "Notes"), this.map.id, this.map.id).editMap(this.path, (map, resolve) => {
+      const replacement = map.nodes.find((item) => item.id === node.id);
+      if (!replacement) throw new Error(t("ui.the_node_to_relink_was_not_found"));
+      rebaseMapNotePaths(map, moveNotePath(replacement.path, resolve(original)));
+    }).commit();
+    this.history.push(entry);
+    await this.refreshAfterSavedChange();
   }
   async parkFile(file, collection, state) {
-    var _a2;
     if (!this.map) return;
-    const before = await this.plugin.repo.readNote(file.path, (_a2 = this.map) != null ? _a2 : void 0), original = file.path;
-    const target = await this.plugin.repo.moveUnique(original, this.plugin.repo.topicFolder(this.path, collection));
-    await this.plugin.repo.setLifecycle(target, this.map.id, "", state);
-    await this.plugin.rebuildDerivedData();
-    const undo = async () => {
-      await this.plugin.repo.moveExact(target, original);
-      await this.plugin.repo.setLifecycle(original, before.topicId, before.mapId, before.topicState);
-      await this.plugin.rebuildDerivedData();
-      this.render();
-    };
-    const redo = async () => {
-      await this.plugin.repo.moveExact(original, target);
-      await this.plugin.repo.setLifecycle(target, this.map.id, "", state);
-      await this.plugin.rebuildDerivedData();
-      this.render();
-    };
-    this.history.push({ undo, redo });
-    this.render();
+    const entry = await this.beginMapTransaction().park(file.path, this.plugin.repo.topicFolder(this.path, collection), this.map.id, state).commit();
+    this.history.push(entry);
+    await this.refreshAfterSavedChange();
   }
   async transferToTopic(file, topic) {
-    var _a2;
-    const before = await this.plugin.repo.readNote(file.path, (_a2 = this.map) != null ? _a2 : void 0), original = file.path, folder = `${topic.root}/Unassigned`;
-    const target = await this.plugin.repo.moveUnique(original, folder);
-    await this.plugin.repo.setLifecycle(target, topic.id, "", "unassigned");
-    await this.plugin.rebuildDerivedData();
-    const undo = async () => {
-      await this.plugin.repo.moveExact(target, original);
-      await this.plugin.repo.setLifecycle(original, before.topicId, before.mapId, before.topicState);
-      await this.plugin.rebuildDerivedData();
-      this.render();
-    };
-    const redo = async () => {
-      await this.plugin.repo.moveExact(original, target);
-      await this.plugin.repo.setLifecycle(target, topic.id, "", "unassigned");
-      await this.plugin.rebuildDerivedData();
-      this.render();
-    };
-    this.history.push({ undo, redo });
-    this.render();
+    const entry = await this.beginMapTransaction().transfer(file.path, topic, "unassigned").commit();
+    this.history.push(entry);
+    await this.refreshAfterSavedChange();
   }
   async transferAndAdd(file, topic) {
-    var _a2;
-    const previous = await this.plugin.repo.readNote(file.path, (_a2 = this.map) != null ? _a2 : void 0), original = file.path, before = await this.plugin.repo.readMap(topic.mapPath);
-    const target = await this.plugin.repo.moveUnique(original, `${topic.root}/Notes`);
-    await this.plugin.repo.setLifecycle(target, topic.id, topic.id, "active");
-    const node = {
-      id: crypto.randomUUID(),
-      path: target,
-      parentId: null,
-      x: 80,
-      y: Math.max(-100, ...before.nodes.map((item) => item.y)) + 240,
-      collapsed: false
-    };
-    const after = clone(before);
-    after.nodes.push(node);
-    await this.plugin.repo.saveMap(topic.mapPath, after);
-    await this.plugin.rebuildDerivedData();
-    const undo = async () => {
-      await this.plugin.repo.moveExact(target, original);
-      await this.plugin.repo.setLifecycle(original, previous.topicId, previous.mapId, previous.topicState);
-      await this.plugin.repo.saveMap(topic.mapPath, before);
-      await this.plugin.rebuildDerivedData();
-      this.render();
-    };
-    const redo = async () => {
-      await this.plugin.repo.moveExact(original, target);
-      await this.plugin.repo.setLifecycle(target, topic.id, topic.id, "active");
-      await this.plugin.repo.saveMap(topic.mapPath, after);
-      await this.plugin.rebuildDerivedData();
-      this.render();
-    };
-    this.history.push({ undo, redo });
-    this.render();
+    const original = file.path;
+    const entry = await this.beginMapTransaction().transfer(original, topic, "add").editMap(topic.mapPath, (map, resolve) => {
+      map.nodes.push({
+        id: crypto.randomUUID(),
+        path: resolve(original),
+        parentId: null,
+        x: 80,
+        y: Math.max(-100, ...map.nodes.map((item) => item.y)) + 240,
+        collapsed: false
+      });
+    }).commit();
+    this.history.push(entry);
+    await this.refreshAfterSavedChange();
   }
   async noteChange(node, patch) {
     var _a2, _b2, _c, _d;
@@ -41902,9 +42033,9 @@ ${request.requirements}` : preset.text,
     }
     if (!this.builtIn && !this.integrationMode) {
       if (!((_B = this.map) == null ? void 0 : _B.aim)) {
-        const structure = this.button(tools, t("ui.node_tool_links"), () => this.openNodePanel(node, "structure"));
-        structure.addClass("vam-node-tool", "vam-structure-tool");
-        structure.setAttr("aria-label", t("ui.structure_and_links"));
+        const structure2 = this.button(tools, t("ui.node_tool_links"), () => this.openNodePanel(node, "structure"));
+        structure2.addClass("vam-node-tool", "vam-structure-tool");
+        structure2.setAttr("aria-label", t("ui.structure_and_links"));
         if (note)
           this.button(
             tools,

@@ -501,6 +501,7 @@ export const zhCN: Record<TranslationKey, string> = {
   "ui.close": "关闭",
   "ui.no_other_topics": "没有其他主题。",
   "ui.the_node_to_relink_was_not_found": "找不到要重新链接的议题。",
+  "ui.change_saved_refresh_failed": "更改已保存，但界面无法刷新。请重新打开地图查看。",
   "ui.rename_current_mind_map": "重命名当前心智图",
   "ui.update_the_topic_folder_and_mind_map_name_together": "同时更新主题文件夹与心智图名称。",
   "ui.repair_missing_mind_map": "修复遗失的心智图",

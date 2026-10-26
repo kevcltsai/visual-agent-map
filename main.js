@@ -15948,7 +15948,7 @@ var History = class {
   /**
    * Folds the entries pushed since `mark` into one undo step: undo runs them newest first, redo oldest first. Does
    * nothing when the history was cleared since the mark, or when fewer than two entries were pushed. Each entry's
-   * undo/redo is read when it runs, so later patches to an entry (parkOnUndo) still apply.
+   * undo/redo is read when it runs, so later patches to an entry (a wrapper replaced after push) still apply.
    */
   collapseSince(mark, label) {
     if (mark.epoch !== this.epoch) return;
@@ -39622,48 +39622,6 @@ ${request.requirements}` : preset.text,
     this.render();
     return { before, after };
   }
-  async restoreLifecycle(snapshot, moves, parked) {
-    const previous = clone(this.map), transitioned = [];
-    try {
-      for (const move of moves) {
-        const from = parked ? move.activePath : move.parkedPath, to = parked ? move.parkedPath : move.activePath;
-        await this.plugin.repo.moveExact(from, to);
-        transitioned.push(move);
-        await this.plugin.repo.setLifecycle(
-          to,
-          move.topicId,
-          parked ? "" : snapshot.id,
-          parked ? move.parkedState : "active"
-        );
-      }
-      await this.plugin.repo.saveMap(this.path, clone(snapshot));
-      this.map = clone(snapshot);
-      await this.plugin.rebuildDerivedData();
-      await this.hydrate();
-      this.render();
-    } catch (error) {
-      try {
-        for (const move of transitioned.reverse()) {
-          const from = parked ? move.activePath : move.parkedPath, to = parked ? move.parkedPath : move.activePath;
-          if (this.app.vault.getAbstractFileByPath(to)) await this.plugin.repo.moveExact(to, from);
-          await this.plugin.repo.setLifecycle(
-            from,
-            move.topicId,
-            parked ? previous.id : "",
-            parked ? "active" : move.parkedState
-          );
-        }
-        await this.plugin.repo.saveMap(this.path, previous);
-        this.map = previous;
-        await this.plugin.rebuildDerivedData();
-        await this.hydrate();
-        this.render();
-      } catch (rollbackError) {
-        throw new AggregateError([error, rollbackError], t("error.topic_state_change_rollback_failed"));
-      }
-      throw error;
-    }
-  }
   /** Removes a topic (or its branch) to Unassigned in one undo step; `adopterId` first takes over its children (merge). */
   async removeToUnassigned(node, branch, adopterId) {
     if (!this.map) return;
@@ -40314,6 +40272,7 @@ ${request.requirements}` : preset.text,
     ).open();
   }
   async removeSelected() {
+    var _a2;
     if (!this.map) return;
     const before = clone(this.map), ids = /* @__PURE__ */ new Set();
     const roots = this.selectedRoots(), removableQuestions = /* @__PURE__ */ new Set();
@@ -40327,48 +40286,33 @@ ${request.requirements}` : preset.text,
     }
     if (!this.mergeUnlocked(ids)) return;
     this.assertAimReferencesRemain(before, ids, false, removableQuestions);
-    const removed = before.nodes.filter((node) => ids.has(node.id)), moves = [];
+    const removed = before.nodes.filter((node) => ids.has(node.id)), parkFolder = this.plugin.repo.topicFolder(this.path, "Unassigned"), viewport = clone(this.map.viewport);
+    const tx = this.beginMapTransaction();
+    for (const node of removed) tx.park(node.path, parkFolder, before.id, "unassigned");
+    let entry;
     try {
-      for (const node of removed) {
-        const target = await this.plugin.repo.moveUnique(
-          node.path,
-          this.plugin.repo.topicFolder(this.path, "Unassigned")
-        );
-        moves.push({ activePath: node.path, parkedPath: target, topicId: before.id, parkedState: "unassigned" });
-        await this.plugin.repo.setLifecycle(target, before.id, "", "unassigned");
-      }
-      const after = clone(before);
-      after.nodes = after.nodes.filter((node) => !ids.has(node.id));
-      this.removeAimReferences(after, ids, before.nodes);
-      await this.plugin.repo.saveMap(this.path, after);
-      this.map = after;
-      this.selected = null;
-      this.multiSelected.clear();
-      await this.plugin.rebuildDerivedData();
-      await this.hydrate();
-      this.history.push({
-        undo: () => this.restoreLifecycle(before, moves, false),
-        redo: () => this.restoreLifecycle(after, moves, true)
-      });
-      this.render();
+      entry = await tx.editMap(this.path, (map) => {
+        map.viewport = clone(viewport);
+        const prior = clone(map);
+        map.nodes = map.nodes.filter((node) => !ids.has(node.id));
+        this.removeAimReferences(map, ids, prior.nodes);
+      }).commit();
     } catch (error) {
-      try {
-        for (const move of [...moves].reverse()) {
-          if (this.app.vault.getAbstractFileByPath(move.parkedPath) && !this.app.vault.getAbstractFileByPath(move.activePath))
-            await this.plugin.repo.moveExact(move.parkedPath, move.activePath);
-          if (this.app.vault.getAbstractFileByPath(move.activePath))
-            await this.plugin.repo.setLifecycle(move.activePath, move.topicId, before.id, "active");
-        }
-        await this.plugin.repo.saveMap(this.path, before);
-        this.map = before;
-        await this.plugin.rebuildDerivedData();
-        await this.hydrate();
-        this.render();
-      } catch (rollbackError) {
-        throw new AggregateError([error, rollbackError], t("error.batch_remove_rollback_failed"));
-      }
+      this.render();
+      if (isTransactionError(error, "rollback-failed"))
+        throw Object.assign(
+          new AggregateError(
+            (_a2 = error.errors) != null ? _a2 : [error],
+            t("error.batch_remove_rollback_failed")
+          ),
+          { kind: "rollback-failed" }
+        );
       throw error;
     }
+    this.selected = null;
+    this.multiSelected.clear();
+    this.history.push(entry);
+    await this.refreshAfterSavedChange();
   }
   chooseSelectedParent(copyNodes) {
     if (!this.map) return;
@@ -40470,12 +40414,13 @@ ${request.requirements}` : preset.text,
     }
   }
   async copySelected(target) {
-    var _a2;
+    var _a2, _b2;
     if (!this.map) return;
-    const roots = this.selectedRoots(), before = clone(this.map);
+    const roots = this.selectedRoots(), before = clone(this.map), viewport = clone(this.map.viewport);
     if (!this.mergeUnlocked([target.id, ...roots.flatMap((root) => [root.id, ...descendants(before.nodes, root.id)])]))
       return;
-    const copies = [], replacement = /* @__PURE__ */ new Map();
+    const copies = [], replacement = /* @__PURE__ */ new Map(), repo = this.plugin.repo, parkFolder = repo.topicFolder(this.path, "Unassigned");
+    let entry;
     try {
       for (const root of roots) {
         const branch = [];
@@ -40485,7 +40430,7 @@ ${request.requirements}` : preset.text,
         };
         append(root);
         for (const original of branch) {
-          const copy = await this.plugin.repo.duplicateNote(original.path, before, this.path);
+          const copy = await repo.duplicateNote(original.path, before, this.path);
           replacement.set(original.id, copy.id);
           copy.parentId = original.id === root.id ? target.id : (_a2 = replacement.get(original.parentId)) != null ? _a2 : target.id;
           copy.x = target.x + 340 + (original.x - root.x);
@@ -40493,76 +40438,70 @@ ${request.requirements}` : preset.text,
           copies.push(copy);
         }
       }
-      const after = clone(before);
-      after.nodes.push(...copies);
-      after.nodes.find((node) => node.id === target.id).collapsed = false;
-      after.nodes = arrangeNewBranch(after.nodes, target.id, new Set(copies.map((copy) => copy.id)), this.cardHeightOf);
-      await this.plugin.repo.saveMap(this.path, after);
-      this.map = after;
-      await this.plugin.rebuildDerivedData();
-      await this.hydrate();
-      const moves = [];
-      this.history.push({
-        undo: async () => {
-          moves.length = 0;
-          try {
-            for (const copy of copies) {
-              const parkedPath = await this.plugin.repo.moveUnique(
-                copy.path,
-                this.plugin.repo.topicFolder(this.path, "Unassigned")
-              );
-              moves.push({ activePath: copy.path, parkedPath, topicId: before.id, parkedState: "unassigned" });
-              await this.plugin.repo.setLifecycle(parkedPath, before.id, "", "unassigned");
-            }
-            await this.plugin.repo.saveMap(this.path, before);
-            this.map = clone(before);
-            await this.plugin.rebuildDerivedData();
-            await this.hydrate();
-            this.render();
-          } catch (error) {
-            try {
-              for (const move of [...moves].reverse()) {
-                if (this.app.vault.getAbstractFileByPath(move.parkedPath))
-                  await this.plugin.repo.moveExact(move.parkedPath, move.activePath);
-                await this.plugin.repo.setLifecycle(move.activePath, before.id, before.id, "active");
-              }
-              await this.plugin.repo.saveMap(this.path, after);
-              this.map = clone(after);
-              await this.plugin.rebuildDerivedData();
-              await this.hydrate();
-              this.render();
-            } catch (rollbackError) {
-              throw new AggregateError([error, rollbackError], t("error.copy_rollback_restore_failed"));
-            }
-            throw error;
-          }
-        },
-        redo: () => this.restoreLifecycle(after, moves, false)
-      });
-      this.multiSelected.clear();
-      this.render();
+      const tx = this.beginMapTransaction();
+      for (const copy of copies) tx.create(copy.path, parkFolder, before.id);
+      entry = await tx.editMap(this.path, (map) => {
+        map.viewport = clone(viewport);
+        const found = map.nodes.find((node) => node.id === target.id);
+        if (!found) throw new Error(t("ui.outline_import_selected_missing"));
+        map.nodes.push(...copies);
+        found.collapsed = false;
+        map.nodes = arrangeNewBranch(map.nodes, target.id, new Set(copies.map((copy) => copy.id)), this.cardHeightOf);
+      }).commit();
     } catch (error) {
+      this.render();
+      let parkFailure;
       try {
-        await this.plugin.repo.saveMap(this.path, before);
-        this.map = before;
+        let parkedAny = false;
         for (const copy of copies) {
           if (!this.app.vault.getAbstractFileByPath(copy.path)) continue;
-          const parkedPath = await this.plugin.repo.moveUnique(
-            copy.path,
-            this.plugin.repo.topicFolder(this.path, "Unassigned")
-          );
-          await this.plugin.repo.setLifecycle(parkedPath, before.id, "", "unassigned");
+          const parked = await repo.moveUnique(copy.path, parkFolder);
+          parkedAny = true;
+          await repo.setLifecycle(parked, before.id, "", "unassigned");
         }
-        await this.plugin.rebuildDerivedData();
-        await this.hydrate();
-        this.render();
-      } catch (rollbackError) {
-        throw new AggregateError([error, rollbackError], t("error.batch_copy_rollback_failed"));
+        if (parkedAny) await this.plugin.rebuildDerivedData();
+      } catch (parkError) {
+        parkFailure = { error: parkError };
+      }
+      if (parkFailure || isTransactionError(error, "rollback-failed")) {
+        const earlier = isTransactionError(error, "rollback-failed") ? (_b2 = error.errors) != null ? _b2 : [error] : [error];
+        throw Object.assign(
+          new AggregateError(
+            parkFailure ? [...earlier, parkFailure.error] : earlier,
+            t("error.batch_copy_rollback_failed")
+          ),
+          { kind: "rollback-failed" }
+        );
       }
       throw error;
     }
+    this.history.push(this.copyEntry(entry));
+    this.multiSelected.clear();
+    await this.refreshAfterSavedChange();
   }
-  /** Builds the transaction the five file-moving methods share: Map.md of the open map is checked for outside edits first and adopted after each apply. */
+  /** One history step for a copy: the commit's entry, with its own message when undo cannot be fully restored. */
+  copyEntry(entry) {
+    return {
+      ...entry,
+      undo: async () => {
+        var _a2;
+        try {
+          await entry.undo();
+        } catch (error) {
+          if (isTransactionError(error, "rollback-failed"))
+            throw Object.assign(
+              new AggregateError(
+                (_a2 = error.errors) != null ? _a2 : [error],
+                t("error.copy_rollback_restore_failed")
+              ),
+              { kind: "rollback-failed" }
+            );
+          throw error;
+        }
+      }
+    };
+  }
+  /** Builds the transaction file-moving methods share: Map.md of the open map is checked for outside edits first and adopted after each apply. */
   beginMapTransaction() {
     return begin({
       repo: this.plugin.repo,

@@ -34,6 +34,15 @@ test('artifact gate rejects invalid manifests, version drift and missing distrib
       writeFileSync(join(directory, 'manifest.json'), JSON.stringify(manifest));
       const result = run(); assert.notEqual(result.status, 0); assert.ok(result.stderr.includes(message), result.stderr);
     }
+    const edit = (file, change) => { const path = join(directory, file); const data = JSON.parse(readFileSync(path, 'utf8')); change(data); writeFileSync(path, JSON.stringify(data)); };
+    for (const [file, change, message] of [
+      ['package-lock.json', lock => { lock.packages[''].version = '0.0.1'; }, 'package-lock.json and manifest.json versions must match'],
+      ['package-lock.json', lock => { lock.version = '0.0.1'; }, 'package-lock.json and manifest.json versions must match'],
+      ['versions.json', versions => { const manifest = JSON.parse(readFileSync(join(directory, 'manifest.json'), 'utf8')); versions[manifest.version] = '0.0.1'; }, 'versions.json must map the current release to manifest.minAppVersion'],
+      ['manifest.json', manifest => { manifest.minAppVersion = '0.0.1'; }, 'versions.json must map the current release to manifest.minAppVersion']
+    ]) {
+      reset(); edit(file, change); const result = run(); assert.notEqual(result.status, 0, message); assert.ok(result.stderr.includes(message), result.stderr);
+    }
     for (const file of ['main.js', 'styles.css', 'manifest.json', 'LICENSE', 'README.md', 'README.zh-TW.md', 'INSTALL.md']) {
       reset(); rmSync(join(directory, file)); const result = run(); assert.notEqual(result.status, 0); assert.ok(result.stderr.includes(file));
     }

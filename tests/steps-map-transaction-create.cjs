@@ -143,3 +143,42 @@ test('R1-F4: a viewport panned while the commit is running is kept', async () =>
   await h.view.mapChange(map => { map.nodes[0].collapsed = true; });
   assert.equal(JSON.stringify(h.view.map.viewport), JSON.stringify(pan));
 });
+
+test('R2-N3: after the conflict window keeps the file version, the viewport on screen is applied, not the older one from disk', async () => {
+  const h = await harness();
+  const screen = { x: 50, y: 60, zoom: 2 };
+  const outside = await h.repo.readMap(MAP);
+  outside.title = 'Written by AIM';
+  outside.viewport = { x: 1, y: 2, zoom: 1 };
+  await h.repo.saveMap(MAP, outside);
+  h.view.map.viewport = screen;
+  // The same outcome as choosing "use file contents": this.map becomes a clone of the map on disk.
+  h.view.resolveMapConflict = async function () {
+    this.map = await h.repo.readMap(MAP);
+    this.history.clear();
+    return true;
+  };
+  await h.view.mapChange(map => { map.nodes[0].collapsed = true; });
+  assert.equal(h.view.map.title, 'Written by AIM', 'the file version was kept');
+  assert.equal(JSON.stringify(h.view.map.viewport), JSON.stringify(screen), 'the viewport on screen survives');
+});
+
+test('R2-N4: a synthesis topic whose rebuild fails keeps the synthesis label on its history entry', async () => {
+  const h = await harness();
+  const view = h.view;
+  view.plugin.rebuildDerivedData = async () => { throw new Error('injected rebuild'); };
+  const sources = [h.root];
+  const task = {
+    state: 'applying', controller: new AbortController(), mapPath: MAP, mapId: view.map.id,
+    options: { synthesisContent: 'strong' }, directions: [], sourceContent: ''
+  };
+  view.integrationTask = task;
+  task.sourceContent = JSON.stringify((await view.topicReferenceGroup(sources, 'strong', {})).documents);
+  const result = { summary: 's', detail: 'd', visualReferences: [], formatIssues: [] };
+  // The note is saved and on disk, so a failing rebuild is reported but does not fail the save.
+  await view.saveIntegratedNode('Synth', sources, 'goal', '', 'gpt-6-luna', result, 'en', task, {});
+  assert.equal(view.map.nodes.length, 2, 'the synthesis topic is saved');
+  const entry = view.history.undoEntry;
+  assert.ok(entry, 'the entry is in history');
+  assert.equal(entry.label, 'Create synthesis topic');
+});

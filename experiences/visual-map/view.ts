@@ -4111,6 +4111,7 @@ export class VisualAgentMapView extends ItemView {
     for (const path of created) tx.create(path, this.plugin.repo.topicFolder(this.path, "Unassigned"), this.map.id);
     let before!: MapDocument, after!: MapDocument;
     const viewport = clone(this.map.viewport);
+    const opened = this.map;
     try {
       const entry = await tx
         .editMap(this.path, map => {
@@ -4123,7 +4124,8 @@ export class VisualAgentMapView extends ItemView {
         .commit({ deferRebuild: true });
       this.history.push(entry);
       // Commit is asynchronous: the user may have panned meanwhile, so only a viewport the change itself set is applied.
-      if (this.map && JSON.stringify(after.viewport) !== JSON.stringify(viewport))
+      // A conflict window replaces this.map with another object (possibly the older file version): the viewport on screen wins then.
+      if (this.map && (this.map !== opened || JSON.stringify(after.viewport) !== JSON.stringify(viewport)))
         this.map.viewport = clone(after.viewport);
     } catch (error) {
       this.render();

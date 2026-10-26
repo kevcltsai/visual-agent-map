@@ -39632,6 +39632,7 @@ ${request.requirements}` : preset.text,
     for (const path of created) tx.create(path, this.plugin.repo.topicFolder(this.path, "Unassigned"), this.map.id);
     let before, after;
     const viewport = clone(this.map.viewport);
+    const opened = this.map;
     try {
       const entry = await tx.editMap(this.path, (map) => {
         map.viewport = clone(viewport);
@@ -39640,7 +39641,7 @@ ${request.requirements}` : preset.text,
         after = clone(map);
       }).commit({ deferRebuild: true });
       this.history.push(entry);
-      if (this.map && JSON.stringify(after.viewport) !== JSON.stringify(viewport))
+      if (this.map && (this.map !== opened || JSON.stringify(after.viewport) !== JSON.stringify(viewport)))
         this.map.viewport = clone(after.viewport);
     } catch (error) {
       this.render();

@@ -51386,9 +51386,6 @@ function groupRibbonIcons(map, coffee) {
   };
 }
 
-// main.ts
-var import_node_crypto15 = require("node:crypto");
-
 // core/thinking-core.ts
 var ThinkingCore = class {
   constructor(ai, tasks, calls, reframing) {
@@ -51469,7 +51466,17 @@ var AiCalls = class {
     let result;
     const provider = {
       complete: async (call) => {
-        result = { value: await this.runCall(call, options, finish) };
+        result = {
+          value: await this.runCall(
+            {
+              prompt: call.prompt,
+              ...call.schema === void 0 ? {} : { schema: call.schema },
+              step: stepLabel({ id: call.stepId, version: call.version })
+            },
+            options,
+            finish
+          )
+        };
         return "";
       }
     };
@@ -51477,6 +51484,7 @@ var AiCalls = class {
     if (!result) throw new Error("AiCalls.run finished without a result");
     return result.value;
   }
+  /** A raw call without a PreparedStep (Coffee Tables). Same registration, runtime routing and logging as `run`. */
   async runCall(call, options, finish) {
     var _a2, _b2, _c, _d, _e, _f, _g;
     if ((_a2 = options.task) == null ? void 0 : _a2.generateImage) this.capabilitiesFor(options.model, { imageGeneration: true });
@@ -51498,7 +51506,7 @@ var AiCalls = class {
     let milestonesWritten = false;
     const writeMilestones = () => {
       var _a3, _b3;
-      if (milestonesWritten) return;
+      if (milestonesWritten || options.milestones === false) return;
       milestonesWritten = true;
       try {
         Object.assign(milestones, { ...(_a3 = options.extraMilestones) == null ? void 0 : _a3.call(options), ...milestones });
@@ -51532,7 +51540,7 @@ var AiCalls = class {
         mode,
         model: options.model,
         effort: options.effort,
-        step: stepLabel({ id: call.stepId, version: call.version })
+        ...call.step ? { step: call.step } : {}
       });
       const runtime = this.options.runtimeFor(options.model);
       (_c = options.validate) == null ? void 0 : _c.call(options, runtime);
@@ -51540,10 +51548,12 @@ var AiCalls = class {
       const controls = {
         ...task,
         signal: controller.signal,
-        onMilestones: (data) => {
-          var _a3;
-          (_a3 = task.onMilestones) == null ? void 0 : _a3.call(task, data);
-          Object.assign(milestones, data);
+        ...options.milestones === false ? {} : {
+          onMilestones: (data) => {
+            var _a3;
+            (_a3 = task.onMilestones) == null ? void 0 : _a3.call(task, data);
+            Object.assign(milestones, data);
+          }
         },
         onRequest: (data) => {
           var _a3, _b3;
@@ -57524,63 +57534,38 @@ ${t("ui.organize_link_wait_hint")}`;
     if (!(this.app.vault.adapter instanceof import_obsidian38.FileSystemAdapter) || !this.manifest.dir)
       throw new Error("Coffee Tables requires the desktop runtime");
     const { session, signal, prompt } = request;
-    const directory = (0, import_node_path2.join)(this.app.vault.adapter.getBasePath(), this.manifest.dir);
     const effort = effectiveReasoningLevel(
       { title: session.topic, summary: "", detail: "", rules: "", task: "", ancestors: "" },
       normalizeReasoningLevel(session.reasoning)
     );
-    const exchanges = this.settings.aiExchangeLoggingEnabled ? this.exchanges : null;
-    const id = (0, import_node_crypto15.randomUUID)();
-    const key2 = `coffee:${id}`;
-    const controller = new AbortController();
-    const abort = () => controller.abort();
-    signal.addEventListener("abort", abort, { once: true });
-    if (signal.aborted) controller.abort();
-    this.activeTasks.set(key2, controller);
-    exchanges == null ? void 0 : exchanges.begin({
-      id,
-      startedAt: (/* @__PURE__ */ new Date()).toISOString(),
-      topic: `Coffee Tables \xB7 ${session.topic}`,
-      mode: "task",
-      model: session.model,
-      effort,
-      ...request.step ? { step: request.step } : {}
-    });
-    try {
-      const controls = {
-        textOnly: true,
-        signal: controller.signal,
-        searchBudget: 0,
-        timeoutMs: 15 * 60 * 1e3,
-        timeoutMessage: t("ui.coffee_generation_timed_out"),
-        onText: (text11) => {
-          var _a2;
-          return (_a2 = request.onText) == null ? void 0 : _a2.call(request, text11);
-        },
-        onSteer: (handler) => {
-          var _a2;
-          return (_a2 = request.registerIntervention) == null ? void 0 : _a2.call(request, handler);
-        },
-        onRequest: (data) => {
-          if (this.settings.aiExchangeLoggingEnabled)
-            exchanges == null ? void 0 : exchanges.sent(id, JSON.stringify({ request: data, prompt }, null, 2), prompt);
+    return this.aiCalls.runCall(
+      { prompt, step: request.step },
+      {
+        model: session.model,
+        effort,
+        topic: `Coffee Tables \xB7 ${session.topic}`,
+        taskName: "coffee",
+        signal,
+        localCodex: true,
+        milestones: false,
+        stopped: () => new Error("Coffee Tables request cancelled"),
+        task: {
+          textOnly: true,
+          searchBudget: 0,
+          timeoutMs: 15 * 60 * 1e3,
+          timeoutMessage: t("ui.coffee_generation_timed_out"),
+          onText: (text11) => {
+            var _a2;
+            return (_a2 = request.onText) == null ? void 0 : _a2.call(request, text11);
+          },
+          onSteer: (handler) => {
+            var _a2;
+            return (_a2 = request.registerIntervention) == null ? void 0 : _a2.call(request, handler);
+          }
         }
-      };
-      const raw = providerForModel(session.model) === "claude" ? await this.claudeCli(directory).runTask(prompt, providerModelId(session.model), effort, void 0, controls) : await this.runtime(directory, true).runTask(prompt, session.model, effort, void 0, controls);
-      if (controller.signal.aborted) throw new Error("Coffee Tables request cancelled");
-      if (this.settings.aiExchangeLoggingEnabled) {
-        exchanges == null ? void 0 : exchanges.received(id, raw);
-        exchanges == null ? void 0 : exchanges.completed(id);
-      }
-      return raw;
-    } catch (error) {
-      if (this.settings.aiExchangeLoggingEnabled)
-        exchanges == null ? void 0 : exchanges.failed(id, error instanceof Error ? error.message : String(error));
-      throw error;
-    } finally {
-      signal.removeEventListener("abort", abort);
-      this.activeTasks.delete(key2);
-    }
+      },
+      (raw) => raw
+    );
   }
   async markdownContextImage(image, signal) {
     var _a2, _b2, _c, _d;

@@ -45,6 +45,11 @@ export interface AiCallOptions {
   exchangeId?: string;
   /** Facts the caller knows about this call; the runtime's own measurements win. */
   extraMilestones?: () => AiMilestones;
+  /**
+   * Default true. False: AiCalls injects no `onMilestones` (a caller's own one is still forwarded) and writes no
+   * milestones event.
+   */
+  milestones?: boolean;
   /** Controls forwarded to the runtime; `onMilestones` and `onRequest` are chained, not replaced. */
   task?: Omit<RuntimeTaskControls, "signal">;
 }
@@ -61,11 +66,12 @@ export interface AiCallExchange {
   fail(message: string): void;
 }
 
-export interface AiCallInput {
-  stepId: string;
-  version: number;
+/** A call without a PreparedStep. */
+export interface AiCallRequest {
   prompt: string;
   schema?: unknown;
+  /** `stepId@version` for the exchange log; the entry has no step field when absent. */
+  step?: string;
 }
 
 /**
@@ -106,7 +112,17 @@ export class AiCalls {
     let result: { value: Result } | undefined;
     const provider: StepProvider<null> = {
       complete: async call => {
-        result = { value: await this.runCall(call, options, finish) };
+        result = {
+          value: await this.runCall(
+            {
+              prompt: call.prompt,
+              ...(call.schema === undefined ? {} : { schema: call.schema }),
+              step: stepLabel({ id: call.stepId, version: call.version })
+            },
+            options,
+            finish
+          )
+        };
         return "";
       }
     };
@@ -115,8 +131,9 @@ export class AiCalls {
     return result.value;
   }
 
-  private async runCall<Result>(
-    call: AiCallInput,
+  /** A raw call without a PreparedStep (Coffee Tables). Same registration, runtime routing and logging as `run`. */
+  async runCall<Result>(
+    call: AiCallRequest,
     options: AiCallOptions,
     finish: (raw: string, exchange: AiCallExchange) => Result | Promise<Result>
   ): Promise<Result> {
@@ -139,7 +156,7 @@ export class AiCalls {
     const milestones: AiMilestones = {};
     let milestonesWritten = false;
     const writeMilestones = (): void => {
-      if (milestonesWritten) return;
+      if (milestonesWritten || options.milestones === false) return;
       milestonesWritten = true;
       try {
         // The runtime's own measurements win over the caller's.
@@ -173,7 +190,7 @@ export class AiCalls {
         mode,
         model: options.model,
         effort: options.effort,
-        step: stepLabel({ id: call.stepId, version: call.version })
+        ...(call.step ? { step: call.step } : {})
       });
       const runtime = this.options.runtimeFor(options.model);
       options.validate?.(runtime);
@@ -181,10 +198,14 @@ export class AiCalls {
       const controls: RuntimeTaskControls = {
         ...task,
         signal: controller.signal,
-        onMilestones: (data: AiMilestones): void => {
-          task.onMilestones?.(data);
-          Object.assign(milestones, data);
-        },
+        ...(options.milestones === false
+          ? {}
+          : {
+              onMilestones: (data: AiMilestones): void => {
+                task.onMilestones?.(data);
+                Object.assign(milestones, data);
+              }
+            }),
         onRequest: (data: unknown): void => {
           task.onRequest?.(data);
           log()?.sent(

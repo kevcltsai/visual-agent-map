@@ -79,7 +79,6 @@ import { ShareTranslationCache } from "./experiences/sharing/share-translate-pla
 import { obsidianTranslateDom } from "./experiences/sharing/share-translate-dom";
 import { providerShareTranslateRunner, ShareTranslateService } from "./experiences/sharing/share-translate-service";
 import { groupRibbonIcons } from "./ui/ribbon-group";
-import { randomUUID } from "node:crypto";
 import { CodexAppServerRuntime, type CodexWebSearchEvent } from "./ai/runtime/codex-app-server";
 import { ClaudeCodeCliRuntime } from "./ai/runtime/claude-code-cli";
 import { CLAUDE_MODEL_CHOICES, providerForModel, providerModelId } from "./ai/providers/provider";
@@ -1408,60 +1407,32 @@ export default class VisualAgentMapPlugin extends Plugin {
     if (!(this.app.vault.adapter instanceof FileSystemAdapter) || !this.manifest.dir)
       throw new Error("Coffee Tables requires the desktop runtime");
     const { session, signal, prompt } = request;
-    const directory = join(this.app.vault.adapter.getBasePath(), this.manifest.dir);
     const effort = effectiveReasoningLevel(
       { title: session.topic, summary: "", detail: "", rules: "", task: "", ancestors: "" },
       normalizeReasoningLevel(session.reasoning)
     );
-    const exchanges = this.settings.aiExchangeLoggingEnabled ? this.exchanges : null;
-    const id = randomUUID();
-    const key = `coffee:${id}`;
-    const controller = new AbortController();
-    const abort = (): void => controller.abort();
-    signal.addEventListener("abort", abort, { once: true });
-    if (signal.aborted) controller.abort();
-    this.activeTasks.set(key, controller);
-    exchanges?.begin({
-      id,
-      startedAt: new Date().toISOString(),
-      topic: `Coffee Tables · ${session.topic}`,
-      mode: "task",
-      model: session.model,
-      effort,
-      ...(request.step ? { step: request.step } : {})
-    });
-    try {
-      const controls = {
-        textOnly: true,
-        signal: controller.signal,
-        searchBudget: 0,
-        timeoutMs: 15 * 60 * 1000,
-        timeoutMessage: t("ui.coffee_generation_timed_out"),
-        onText: (text: string): void => request.onText?.(text),
-        onSteer: (handler: (text: string) => Promise<void>): void => request.registerIntervention?.(handler),
-        onRequest: (data: unknown): void => {
-          if (this.settings.aiExchangeLoggingEnabled)
-            exchanges?.sent(id, JSON.stringify({ request: data, prompt }, null, 2), prompt);
+    return this.aiCalls.runCall(
+      { prompt, step: request.step },
+      {
+        model: session.model,
+        effort,
+        topic: `Coffee Tables · ${session.topic}`,
+        taskName: "coffee",
+        signal,
+        localCodex: true,
+        milestones: false,
+        stopped: () => new Error("Coffee Tables request cancelled"),
+        task: {
+          textOnly: true,
+          searchBudget: 0,
+          timeoutMs: 15 * 60 * 1000,
+          timeoutMessage: t("ui.coffee_generation_timed_out"),
+          onText: (text: string): void => request.onText?.(text),
+          onSteer: (handler: (text: string) => Promise<void>): void => request.registerIntervention?.(handler)
         }
-      };
-      const raw =
-        providerForModel(session.model) === "claude"
-          ? await this.claudeCli(directory).runTask(prompt, providerModelId(session.model), effort, undefined, controls)
-          : await this.runtime(directory, true).runTask(prompt, session.model, effort, undefined, controls);
-      if (controller.signal.aborted) throw new Error("Coffee Tables request cancelled");
-      if (this.settings.aiExchangeLoggingEnabled) {
-        exchanges?.received(id, raw);
-        exchanges?.completed(id);
-      }
-      return raw;
-    } catch (error) {
-      if (this.settings.aiExchangeLoggingEnabled)
-        exchanges?.failed(id, error instanceof Error ? error.message : String(error));
-      throw error;
-    } finally {
-      signal.removeEventListener("abort", abort);
-      this.activeTasks.delete(key);
-    }
+      },
+      raw => raw
+    );
   }
   private async markdownContextImage(image: HTMLImageElement, signal: AbortSignal): Promise<string> {
     if (signal.aborted || !image.complete || !image.naturalWidth) throw new Error(t("ui.context_ai_image_unavailable"));

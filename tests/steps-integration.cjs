@@ -18,8 +18,7 @@ function sourceFiles(directory) {
 const RUN_TASK_CALLERS = [
   { file: 'core/ai-runtime-service.ts', method: 'export function claudeCodeAiRuntime(', count: 1, reason: 'AiRuntime adapter over the Claude Code CLI runtime' },
   { file: 'core/ai-runtime-service.ts', method: 'export function codexAppServerAiRuntime(', count: 1, reason: 'AiRuntime adapter over the Codex app server runtime' },
-  { file: 'core/runtime-step-provider.ts', method: 'export function runtimeStepProvider(', count: 2, reason: 'shared StepProvider over the Claude and Codex runtimes' },
-  { file: 'main.ts', method: 'async runCoffeeRequest(', count: 2, reason: 'the runtime behind experiences/coffee-tables/step-provider.ts' }
+  { file: 'core/runtime-step-provider.ts', method: 'export function runtimeStepProvider(', count: 2, reason: 'shared StepProvider over the Claude and Codex runtimes' }
 ];
 // The function containing `index`: the nearest preceding top-level function or two-space class member.
 function enclosingMethod(source, index) {
@@ -51,6 +50,17 @@ test('runCoffeeRequest, which takes a raw prompt, is only wired into the Coffee 
   });
   // The definition, the plugin's own Coffee view factory and the view's engine wiring.
   assert.deepEqual(uses.sort(), ['experiences/coffee-tables/view.ts', 'main.ts', 'main.ts']);
+});
+
+test('runCoffeeRequest is a thin wiring over AiCalls.runCall', () => {
+  const main = fs.readFileSync(path.join(root, 'main.ts'), 'utf8');
+  const start = main.indexOf('async runCoffeeRequest(');
+  const end = main.indexOf('private async markdownContextImage', start);
+  assert.ok(start >= 0 && end > start);
+  const body = main.slice(start, end);
+  for (const forbidden of ['providerForModel(', '.runTask(', 'new AbortController', 'activeTasks', 'exchanges', 'randomUUID'])
+    assert.equal(body.split(forbidden).length - 1, 0, `${forbidden} must not appear in runCoffeeRequest`);
+  assert.equal(body.split('this.aiCalls.runCall(').length - 1, 1);
 });
 
 test('i18n.ts holds no prompt.* keys', () => {

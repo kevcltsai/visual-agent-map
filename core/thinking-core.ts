@@ -1,5 +1,6 @@
 import { ExperienceRouter } from "./experience-router";
 import type { AiRuntimeService } from "./ai-runtime-service";
+import type { AiCalls } from "./ai-calls";
 import type { AiTaskService } from "./ai-task-service";
 
 import type { ReframingService } from "./reframing-service";
@@ -9,6 +10,7 @@ export class ThinkingCore {
   constructor(
     readonly ai: AiRuntimeService,
     readonly tasks: AiTaskService,
+    readonly calls: AiCalls,
     readonly reframing?: ReframingService
   ) {}
 }

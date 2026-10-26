@@ -270,7 +270,8 @@ export default class VisualAgentMapPlugin extends Plugin {
   readonly core = new ThinkingCore(
     this.aiRuntime,
     this.aiTasks,
-    new ReframingService(providerReframeRunner(this.aiTaskOptions, this.activeTasks))
+    this.aiCalls,
+    new ReframingService(providerReframeRunner(this.aiCalls))
   );
   readonly outlineGeneration = new OutlineGenerationService(providerOutlineRunner(this.aiCalls));
   readonly structureReview = new StructureReviewService(providerStructureReviewRunner(this.aiCalls));
@@ -1065,7 +1066,7 @@ export default class VisualAgentMapPlugin extends Plugin {
   }
   resetCodexRuntime(): void {
     this.expansionCoordinator.stopAll();
-    for (const controller of this.activeTasks.values()) controller.abort();
+    this.aiCalls.stopAll();
     this.abortChartJobs();
     this.modelDiscovery.invalidate("codex");
     this.aiRuntime.reset();

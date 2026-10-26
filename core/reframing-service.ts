@@ -1,9 +1,7 @@
 import { translate, uiLocale } from "../i18n";
-import { randomUUID } from "node:crypto";
 import { CLAUDE_MODEL_CHOICES } from "../ai/providers/provider";
-import type { AiTaskServiceOptions } from "./ai-task-service";
-import { runtimeStepProvider, type RuntimeStepControls } from "./runtime-step-provider";
-import { prepareStep, StepRunner, type PreparedStep } from "./step-runner";
+import type { AiCallOptions, AiCalls } from "./ai-calls";
+import { prepareStep, type PreparedStep } from "./step-runner";
 import {
   parseReframeDraft,
   REFRAME_SCHEMA,
@@ -30,74 +28,28 @@ export type ReframeRunner = (
 export function buildReframePrompt(request: ReframeRequest): string {
   return reframeStep.render(request);
 }
-export function providerReframeRunner(
-  options: AiTaskServiceOptions,
-  activeTasks: Map<string, AbortController>
-): ReframeRunner {
-  return async (request, _prompt, _schema, signal, prepared) => {
-    const key = `reframe:${randomUUID()}`,
-      controller = new AbortController();
-    const abort = (): void => controller.abort();
-    signal.addEventListener("abort", abort, { once: true });
-    if (signal.aborted) controller.abort();
-    activeTasks.set(key, controller);
-    const effort = request.reasoning === "auto" ? "low" : request.reasoning;
-    // A reply that arrives after the stop is refused before the provider logs it as received.
-    const refuseIfStopped = (): void => {
-      if (controller.signal.aborted) throw new Error("Reframing stopped");
-    };
-    const log = (): ReturnType<AiTaskServiceOptions["exchanges"]> =>
-      options.exchangeLoggingEnabled() ? options.exchanges() : null;
-    const provider = runtimeStepProvider({
-      claude: () => ({
-        runTask: async (prompt, model, level, schema, controls) => {
-          if (!CLAUDE_MODEL_CHOICES.some(choice => choice.id === request.model))
-            throw new Error("Unsupported Claude model");
-          const raw = await options
-            .claudeRuntime(options.pluginDirectory())
-            .runTask(prompt, model, level, schema, controls);
-          refuseIfStopped();
-          return raw;
-        }
-      }),
-      codex: local => ({
-        runTask: async (prompt, model, level, schema, controls) => {
-          const raw = await options
-            .codexRuntime(options.pluginDirectory(), local)
-            .runTask(prompt, model, level, schema, controls);
-          refuseIfStopped();
-          return raw;
-        }
-      }),
-      exchanges: log,
-      localCodex: true
-    });
-    let id: string | undefined;
-    const controls: RuntimeStepControls = {
+export function providerReframeRunner(aiCalls: AiCalls): ReframeRunner {
+  return (request, _prompt, _schema, signal, prepared) => {
+    const options: AiCallOptions = {
       model: request.model,
-      effort,
+      effort: request.reasoning === "auto" ? "low" : request.reasoning,
       topic: `Reframing · ${request.question}`,
-      finish: "caller",
-      onExchange: exchangeId => {
-        id = exchangeId;
+      taskName: "reframe",
+      signal,
+      localCodex: true,
+      stopped: () => new Error("Reframing stopped"),
+      validate: runtime => {
+        if (runtime.capabilities.id === "claude" && !CLAUDE_MODEL_CHOICES.some(choice => choice.id === request.model))
+          throw new Error("Unsupported Claude model");
       },
-      task: { textOnly: true, searchBudget: 0, signal: controller.signal }
+      task: { textOnly: true, searchBudget: 0 }
     };
-    try {
-      const { raw } = await new StepRunner(provider).send(prepared, controls);
+    // Unlike providerStepRunner, finish has no stop check of its own (a stop before the reply is refused inside AiCalls).
+    return aiCalls.run(prepared, options, (raw, exchange) => {
       prepared.parse(raw);
-      if (id) {
-        log()?.parsed(id);
-        log()?.completed(id);
-      }
+      exchange.parsed();
       return raw;
-    } catch (error) {
-      if (id) log()?.failed(id, error instanceof Error ? error.message : String(error));
-      throw error;
-    } finally {
-      signal.removeEventListener("abort", abort);
-      activeTasks.delete(key);
-    }
+    });
   };
 }
 export class ReframingService {

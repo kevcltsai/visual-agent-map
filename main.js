@@ -51209,13 +51209,14 @@ function groupRibbonIcons(map, coffee) {
 }
 
 // main.ts
-var import_node_crypto16 = require("node:crypto");
+var import_node_crypto15 = require("node:crypto");
 
 // core/thinking-core.ts
 var ThinkingCore = class {
-  constructor(ai, tasks, reframing) {
+  constructor(ai, tasks, calls, reframing) {
     this.ai = ai;
     this.tasks = tasks;
+    this.calls = calls;
     this.reframing = reframing;
     __publicField(this, "experiences", new ExperienceRouter());
   }
@@ -54601,9 +54602,6 @@ ${value}`).join("\n\n");
   }
 };
 
-// core/reframing-service.ts
-var import_node_crypto15 = require("node:crypto");
-
 // core/steps/reframe/language.en.md
 var language_en_default4 = "Write in {{language}}.\n";
 
@@ -54656,65 +54654,27 @@ var reframeStep = {
 };
 
 // core/reframing-service.ts
-function providerReframeRunner(options, activeTasks) {
-  return async (request, _prompt, _schema, signal, prepared) => {
-    var _a2, _b2, _c;
-    const key2 = `reframe:${(0, import_node_crypto15.randomUUID)()}`, controller = new AbortController();
-    const abort = () => controller.abort();
-    signal.addEventListener("abort", abort, { once: true });
-    if (signal.aborted) controller.abort();
-    activeTasks.set(key2, controller);
-    const effort = request.reasoning === "auto" ? "low" : request.reasoning;
-    const refuseIfStopped = () => {
-      if (controller.signal.aborted) throw new Error("Reframing stopped");
-    };
-    const log = () => options.exchangeLoggingEnabled() ? options.exchanges() : null;
-    const provider = runtimeStepProvider({
-      claude: () => ({
-        runTask: async (prompt, model, level, schema, controls2) => {
-          if (!CLAUDE_MODEL_CHOICES.some((choice2) => choice2.id === request.model))
-            throw new Error("Unsupported Claude model");
-          const raw = await options.claudeRuntime(options.pluginDirectory()).runTask(prompt, model, level, schema, controls2);
-          refuseIfStopped();
-          return raw;
-        }
-      }),
-      codex: (local) => ({
-        runTask: async (prompt, model, level, schema, controls2) => {
-          const raw = await options.codexRuntime(options.pluginDirectory(), local).runTask(prompt, model, level, schema, controls2);
-          refuseIfStopped();
-          return raw;
-        }
-      }),
-      exchanges: log,
-      localCodex: true
-    });
-    let id;
-    const controls = {
+function providerReframeRunner(aiCalls) {
+  return (request, _prompt, _schema, signal, prepared) => {
+    const options = {
       model: request.model,
-      effort,
+      effort: request.reasoning === "auto" ? "low" : request.reasoning,
       topic: `Reframing \xB7 ${request.question}`,
-      finish: "caller",
-      onExchange: (exchangeId) => {
-        id = exchangeId;
+      taskName: "reframe",
+      signal,
+      localCodex: true,
+      stopped: () => new Error("Reframing stopped"),
+      validate: (runtime) => {
+        if (runtime.capabilities.id === "claude" && !CLAUDE_MODEL_CHOICES.some((choice2) => choice2.id === request.model))
+          throw new Error("Unsupported Claude model");
       },
-      task: { textOnly: true, searchBudget: 0, signal: controller.signal }
+      task: { textOnly: true, searchBudget: 0 }
     };
-    try {
-      const { raw } = await new StepRunner(provider).send(prepared, controls);
+    return aiCalls.run(prepared, options, (raw, exchange) => {
       prepared.parse(raw);
-      if (id) {
-        (_a2 = log()) == null ? void 0 : _a2.parsed(id);
-        (_b2 = log()) == null ? void 0 : _b2.completed(id);
-      }
+      exchange.parsed();
       return raw;
-    } catch (error) {
-      if (id) (_c = log()) == null ? void 0 : _c.failed(id, error instanceof Error ? error.message : String(error));
-      throw error;
-    } finally {
-      signal.removeEventListener("abort", abort);
-      activeTasks.delete(key2);
-    }
+    });
   };
 }
 var ReframingService = class {
@@ -56295,7 +56255,8 @@ var VisualAgentMapPlugin = class extends import_obsidian38.Plugin {
     __publicField(this, "core", new ThinkingCore(
       this.aiRuntime,
       this.aiTasks,
-      new ReframingService(providerReframeRunner(this.aiTaskOptions, this.activeTasks))
+      this.aiCalls,
+      new ReframingService(providerReframeRunner(this.aiCalls))
     ));
     __publicField(this, "outlineGeneration", new OutlineGenerationService(providerOutlineRunner(this.aiCalls)));
     __publicField(this, "structureReview", new StructureReviewService(providerStructureReviewRunner(this.aiCalls)));
@@ -57062,7 +57023,7 @@ ${t("ui.organize_link_wait_hint")}`;
   }
   resetCodexRuntime() {
     this.expansionCoordinator.stopAll();
-    for (const controller of this.activeTasks.values()) controller.abort();
+    this.aiCalls.stopAll();
     this.abortChartJobs();
     this.modelDiscovery.invalidate("codex");
     this.aiRuntime.reset();
@@ -57411,7 +57372,7 @@ ${t("ui.organize_link_wait_hint")}`;
       normalizeReasoningLevel(session.reasoning)
     );
     const exchanges = this.settings.aiExchangeLoggingEnabled ? this.exchanges : null;
-    const id = (0, import_node_crypto16.randomUUID)();
+    const id = (0, import_node_crypto15.randomUUID)();
     const key2 = `coffee:${id}`;
     const controller = new AbortController();
     const abort = () => controller.abort();
@@ -57540,7 +57501,7 @@ ${t("ui.organize_link_wait_hint")}`;
       normalizeReasoningLevel(this.settings.cliReasoning)
     );
     const exchanges = this.settings.aiExchangeLoggingEnabled ? this.exchanges : null;
-    const key2 = `markdown-context:${(0, import_node_crypto16.randomUUID)()}`;
+    const key2 = `markdown-context:${(0, import_node_crypto15.randomUUID)()}`;
     const controller = new AbortController();
     const abort = () => controller.abort();
     signal.addEventListener("abort", abort, { once: true });

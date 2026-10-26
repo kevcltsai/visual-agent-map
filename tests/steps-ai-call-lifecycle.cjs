@@ -34,7 +34,7 @@ function makeRunner(kind, options, active) {
     const runner = bundle.providerMapChatRunner(aiCallsFor(bundle, options, active));
     return (request, signal, onJson) => runner(request, signal, prepare(bundle.mapChatStep, request), onJson);
   }
-  const runner = bundle.providerReframeRunner(options, active);
+  const runner = bundle.providerReframeRunner(aiCallsFor(bundle, options, active));
   return (request, signal) => {
     const prepared = prepare(bundle.reframeStep, request);
     return runner(request, prepared.prompt, bundle.REFRAME_SCHEMA, signal, prepared);

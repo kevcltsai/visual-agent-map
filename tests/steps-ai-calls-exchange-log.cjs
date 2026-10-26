@@ -53,9 +53,10 @@ test('a Codex model runs through the Codex runtime with the step schema, and the
   assert.deepEqual(JSON.parse(entry.request), { request: { provider: 'codex' }, prompt: 'the prompt' });
   assert.match(formatAiExchange(entry), /step: test\.step@4/);
   // D2(a): the caller's abort during the call reaches the runtime signal.
-  const midCall = new AbortController(); let seen;
-  const aborting = fixture({ onRun: args => { seen = args[4].signal; assert.equal(seen.aborted, false); midCall.abort(); assert.equal(seen.aborted, true, 'the caller abort reaches the runtime signal'); } });
-  await assert.rejects(run(aborting.calls, { signal: midCall.signal }));
+  const midCall = new AbortController(); let seen, abortedBefore, abortedAfter;
+  const aborting = fixture({ onRun: args => { seen = args[4].signal; abortedBefore = seen.aborted; midCall.abort(); abortedAfter = seen.aborted; } });
+  await assert.rejects(run(aborting.calls, { signal: midCall.signal }), error => error.message === 'AI task cancelled');
+  assert.equal(abortedBefore, false); assert.equal(abortedAfter, true, 'the caller abort reaches the runtime signal');
   assert.notEqual(seen, midCall.signal);
 });
 

@@ -1992,13 +1992,29 @@ test('map chat E1: long dense replies streamed in bursts of chunks, then a short
   // Each round times the unit as the mean of ten parses right before the streamed run, so both sides see the same machine load; a best-of-N unit would find a quiet 4 ms slice that a 1 s run never gets under load.
   const { parseInline } = load('core/map-chat-render.ts');
   const round = () => { const unit = once(() => { for (let i = 0; i < 10; i++) parseInline(dense.slice(0, 50000)); }) / 10; const ms = once(streamed); return { ms, unit, ratio: ms / unit }; };
-  const { ms, unit, ratio } = Array.from({ length: 5 }, round).reduce((a, b) => (b.ratio < a.ratio ? b : a));
+  const { ms, unit, ratio } = Array.from({ length: 5 }, round).sort((a, b) => a.ratio - b.ratio)[2]; // the median round
   console.log(`E1 timing: ${ms.toFixed(0)} ms for the streamed run, ${unit.toFixed(1)} ms for one parse, ratio ${ratio.toFixed(1)}`);
   assert.ok(ratio <= STREAM_RATIO_LIMIT, `${ms.toFixed(0)} ms is ${ratio.toFixed(1)} times one parse (${unit.toFixed(1)} ms)`);
 });
-// Ratio of the streamed run to one inline parse. Measured here: 160 to 185 with the row cache, the frame coalescing and the element budget; 330 to 500 without the row cache,
-// 410 to 460 with a layout for every chunk, 770 to 850 with a 2,000,000 element budget. 260 sits between; a slower machine moves both sides of the ratio.
-const STREAM_RATIO_LIMIT = 260;
+test('map chat E1: chunks that arrive within one frame are laid out once, with the newest text (counted layouts, not time)', () => {
+  const clock = frames(); const f = panelFixture({}, clock.window); f.panel.setOpen(true); const log = f.parts.log();
+  f.panel.begin('q');
+  const body = find(log.children.at(-1), i => hasClass(i, 'vam-map-chat-text')); assert.ok(body, 'the streaming answer has its text element');
+  let layouts = 0; const empty = body.empty.bind(body); body.empty = () => { layouts++; empty(); };
+  const text = DENSE.repeat(200);
+  for (let i = 1; i <= 30; i++) f.panel.streamReply(text.slice(0, Math.ceil(text.length * i / 30)));
+  assert.equal(layouts, 0, '30 chunks inside one frame lay nothing out before the frame');
+  assert.equal(clock.run(), 1, 'one frame was asked for, not one per chunk');
+  assert.equal(layouts, 1, 'the frame lays the message out once');
+  for (let round = 0; round < 4; round++) { f.panel.streamReply(text); f.panel.streamReply(text + ' more'); clock.run(); }
+  assert.equal(layouts, 5, 'one layout per frame');
+});
+// Ratio of the streamed run to one inline parse (unit = mean of ten parses, median of five paired rounds). Measured here, five runs each:
+// unmodified 190 to 200 on a quiet machine and 105 to 125 with three busy loops per core; a 2,000,000 element budget 580 to 665 quiet and 440 to 580 loaded. 300 sits between.
+// This is the coarse gate for gross cost. Finer regressions are counted instead of timed, because they move the ratio too little to separate from load noise:
+// frame coalescing by 'chunks that arrive within one frame are laid out once' (layout for every chunk: 30 layouts instead of 1, fails 5 of 5 quiet and loaded)
+// and the row cache by 'a finished message keeps its row on every later repaint'.
+const STREAM_RATIO_LIMIT = 300;
 
 // ---- Packet E2: one parse for the cut, the view's own window, language, plain-text edges --------------------------------------------
 

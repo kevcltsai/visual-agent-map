@@ -77,6 +77,9 @@ function sharedTexts() {
   };
 }
 
+// The shared.dedup pin changed on 2026-10-26 (ticket 08): a passage whose only copy is in detail, workingFindings or ancestors
+// (fields the budget trim may cut) is no longer replaced by a reference in another field; the 600-character 'b' in ancestors
+// now stays in full instead of pointing at detail. Passages whose copy is in the task are still referenced.
 // The delivery-writing pins changed once on 2026-10-15: section headings moved from ## to ### (note layout P1-b).
 const PINS = {
   "repair": {
@@ -123,7 +126,7 @@ const PINS = {
     "EVIDENCE_LOOKUP_FIELD_RULE": "5a4b8bda93af1f26191fbc01455690a262fb3f17cf3bfec096d4d30f1781e49b",
     "evidenceCard-urls": "826c4a33636868fe1b00f550f8f73630880ae20004fcd987e078b2595d1d55e0",
     "evidenceCard-empty": "ed2fefb198c0b6fe4f125d6f0bf414168c4b2d0314b0bc63b25140da4a36ab9c",
-    "dedup": "3f791d3e8de8cc6c8d8a847a08efc6d2ee3e2b5aff4d3c31425fc88951454852"
+    "dedup": "b0c42714a567b2981da42744090ecfc12f31e3a568ef01a622406bf2b61ca4df"
   }
 };
 

@@ -394,3 +394,35 @@ test('entryEnd "caller", reply after a stop: stopped() rejects, no received, no 
   assert.deepEqual(h.names(), ['begin', 'sent']);
   assert.equal(h.active.size, 0); assert.equal(counts.added - counts.removed, 0);
 });
+
+// ---- runCall: a raw call without a PreparedStep ----
+test('runCall with a step label writes it in begin; without one, begin has no step key', async () => {
+  const h = harness();
+  assert.equal(await h.calls.runCall({ prompt: 'p', step: 'x.y@3' }, options(), raw => raw), 'reply');
+  assert.equal(h.events[0][1].step, 'x.y@3');
+  assert.deepEqual(h.events[1].slice(2), [{ request: { via: 'runtime' }, prompt: 'p' }, 'p']);
+  const bare = harness();
+  await bare.calls.runCall({ prompt: 'p' }, options(), raw => raw);
+  assert.equal('step' in bare.events[0][1], false);
+});
+
+test('milestones:false on success: no onMilestones to the runtime, no milestones event', async () => {
+  const h = harness();
+  await h.calls.runCall({ prompt: 'p' }, options({ milestones: false, extraMilestones: () => ({ sentAt: 'x' }) }), raw => raw);
+  assert.deepEqual(h.names(), ['begin', 'sent', 'received', 'completed']);
+  assert.equal('onMilestones' in h.state.runtimeCalls[0].controls, false);
+});
+
+test('milestones:false forwards the caller\'s own onMilestones as is, and still writes no milestones event', async () => {
+  const h = harness();
+  const own = () => {};
+  await h.calls.runCall({ prompt: 'p' }, options({ milestones: false, task: { onMilestones: own } }), raw => raw);
+  assert.equal(h.state.runtimeCalls[0].controls.onMilestones, own);
+  assert.deepEqual(h.names(), ['begin', 'sent', 'received', 'completed']);
+});
+
+test('milestones:false on failure writes no milestones event either', async () => {
+  const h = harness({ run: () => { throw mod.makeError('runtime boom'); } });
+  await assert.rejects(h.calls.runCall({ prompt: 'p' }, options({ milestones: false }), raw => raw), error => error.message === 'runtime boom');
+  assert.deepEqual(h.names(), ['begin', 'sent', 'failed']);
+});

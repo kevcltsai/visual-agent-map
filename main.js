@@ -38332,18 +38332,59 @@ ${request.requirements}` : preset.text,
         );
         state.result = result;
         const created = result.created;
-        if (!created.length) return;
+        if (!created.length && !result.failure) return;
         for (const node of created) {
           try {
             this.notes.set(node.id, await repo.readNote(node.path, { ...map, nodes: [...map.nodes, ...created] }));
           } catch (e) {
           }
         }
+        const rollBack = async (error) => {
+          const cause = error instanceof Error ? error : new Error(String(error));
+          let referenced = null;
+          if (created.length) {
+            try {
+              referenced = new Set((await repo.readMap(path)).nodes.map((node) => node.id));
+            } catch (e) {
+            }
+          }
+          const kept = [];
+          for (const node of [...created].reverse()) {
+            const file = repo.app.vault.getAbstractFileByPath(node.path);
+            if (!referenced || referenced.has(node.id)) {
+              kept.unshift(node.path);
+              continue;
+            }
+            if (!(file instanceof import_obsidian30.TFile)) {
+              this.notes.delete(node.id);
+              continue;
+            }
+            try {
+              await repo.app.fileManager.trashFile(file);
+              this.notes.delete(node.id);
+            } catch (e) {
+              kept.unshift(node.path);
+            }
+          }
+          this.render();
+          if (!kept.length) {
+            state.rejection = cause;
+            return;
+          }
+          state.saveFailed = true;
+          new import_obsidian30.Notice(t("ui.outline_import_map_save_failed", `${errorMessage(cause)} (${kept.join(", ")})`));
+        };
+        if (result.failure) return rollBack(new Error(result.failure));
         const top2 = created[0];
         const ids2 = new Set(created.map((node) => node.id));
-        const previousEntry = this.history.undoEntry;
+        const tx = this.beginMapTransaction();
+        for (const node of created) tx.create(node.path, repo.topicFolder(path, "Unassigned"), map.id);
+        const viewport = clone(map.viewport);
+        const opened = this.map;
+        let after;
         try {
-          const done = await this.mapChangeSnapshots((next) => {
+          const entry = await tx.editMap(path, (next) => {
+            next.viewport = clone(viewport);
             next.nodes.push(...created);
             const owner2 = parent ? next.nodes.find((node) => node.id === parent.id && !ids2.has(node.id)) : void 0;
             const outlineTop = next.nodes.find((node) => node.id === top2.id);
@@ -38354,18 +38395,13 @@ ${request.requirements}` : preset.text,
               outlineTop.parentId = null;
               next.nodes = arrangeNewTree(next.nodes, top2.id, ids2, this.cardHeightOf);
             }
-          });
-          if (done) this.parkOnUndo([...ids2], done.before, done.after, previousEntry);
+            after = clone(next);
+          }).commit();
+          this.history.push(entry);
+          if (this.map && (this.map !== opened || JSON.stringify(after.viewport) !== JSON.stringify(viewport)))
+            this.map.viewport = clone(after.viewport);
         } catch (error) {
-          const pushed = error == null ? void 0 : error.pushedEntry;
-          if (pushed) this.parkOnUndo([...ids2], pushed.before, pushed.after, previousEntry);
-          state.saveFailed = true;
-          new import_obsidian30.Notice(
-            t(
-              "ui.outline_import_map_save_failed",
-              `${errorMessage(error)} (${created.map((node) => node.path).join(", ")})`
-            )
-          );
+          await rollBack(error);
           return;
         }
         const placed = (_b3 = this.map) == null ? void 0 : _b3.nodes.find((node) => node.id === top2.id);
@@ -38381,9 +38417,7 @@ ${request.requirements}` : preset.text,
     if (state.rejection) throw state.rejection;
     const outcome = state.result;
     if (!outcome) return;
-    if (outcome.failure)
-      new import_obsidian30.Notice(t("ui.outline_import_partial", outcome.created.length, outcome.total, outcome.failure));
-    if (outcome.failure || state.saveFailed || !written2 || !request.shallowResearch || !outcome.created.length) return;
+    if (state.saveFailed || !written2 || !request.shallowResearch || !outcome.created.length) return;
     const owner = placement.kind === "under" ? placement.parentId : null;
     const several = owner !== null && (!!request.researchEveryTopic || request.nodes.filter((node) => node.parent === null).length > 1);
     const top = (_a2 = this.map) == null ? void 0 : _a2.nodes.find((node) => node.id === (several ? owner : outcome.created[0].id));
@@ -39515,7 +39549,6 @@ ${request.requirements}` : preset.text,
         await this.plugin.rebuildDerivedData();
     } catch (error) {
       this.render();
-      if (error !== null && typeof error === "object") Object.assign(error, { pushedEntry: { before, after } });
       throw error;
     }
     this.render();
@@ -43009,39 +43042,6 @@ ${request.requirements}` : preset.text,
         }
       }))
     ).open();
-  }
-  /**
-   * The undo of a created topic must take its note away with it: the history entry mapChange just pushed only
-   * rewrites Map.md, which would leave the new note behind in Notes. Replace it with the remove lifecycle: undo parks
-   * the note in Unassigned, redo moves it back to the exact path it had.
-   */
-  parkOnUndo(nodeIds, before, after, previousEntry) {
-    const entry = this.history.undoEntry;
-    if (!entry || entry === previousEntry) return;
-    const ids = new Set(typeof nodeIds === "string" ? [nodeIds] : nodeIds);
-    let moves = [];
-    entry.undo = async () => {
-      var _a2, _b2;
-      const repo = this.plugin.repo, folder = repo.topicFolder(this.path, "Unassigned"), taken = /* @__PURE__ */ new Set();
-      moves = [];
-      for (const current of (_b2 = (_a2 = this.map) == null ? void 0 : _a2.nodes.filter((item) => ids.has(item.id))) != null ? _b2 : []) {
-        const base = current.path.slice(current.path.lastIndexOf("/") + 1).replace(/\.md$/, "");
-        const parkedPath = repo.unique(folder, base, taken);
-        taken.add(parkedPath);
-        moves.push({ activePath: current.path, parkedPath, topicId: before.id, parkedState: "unassigned" });
-      }
-      if (!moves.length) return;
-      await this.restoreLifecycle(this.withCurrentViewport(before), moves, true);
-    };
-    entry.redo = async () => {
-      if (!moves.length) return;
-      await this.restoreLifecycle(this.withCurrentViewport(after), moves, false);
-    };
-  }
-  withCurrentViewport(snapshot) {
-    const next = clone(snapshot);
-    if (this.map) next.viewport = clone(this.map.viewport);
-    return next;
   }
   /** `focus` false leaves the camera to the caller (a batch frames the whole branch once it is laid out). */
   async addNode(parentNode, suggestedTitle, rebuildDerivedData = true, focus = true) {
@@ -51386,9 +51386,6 @@ function groupRibbonIcons(map, coffee) {
   };
 }
 
-// main.ts
-var import_node_crypto14 = require("node:crypto");
-
 // core/thinking-core.ts
 var ThinkingCore = class {
   constructor(ai, tasks, calls, reframing) {
@@ -51469,7 +51466,17 @@ var AiCalls = class {
     let result;
     const provider = {
       complete: async (call) => {
-        result = { value: await this.runCall(call, options, finish) };
+        result = {
+          value: await this.runCall(
+            {
+              prompt: call.prompt,
+              ...call.schema === void 0 ? {} : { schema: call.schema },
+              step: stepLabel({ id: call.stepId, version: call.version })
+            },
+            options,
+            finish
+          )
+        };
         return "";
       }
     };
@@ -51477,6 +51484,7 @@ var AiCalls = class {
     if (!result) throw new Error("AiCalls.run finished without a result");
     return result.value;
   }
+  /** A raw call without a PreparedStep (Coffee Tables). Same registration, runtime routing and logging as `run`. */
   async runCall(call, options, finish) {
     var _a2, _b2, _c, _d, _e, _f, _g, _h;
     if ((_a2 = options.task) == null ? void 0 : _a2.generateImage) this.capabilitiesFor(options.model, { imageGeneration: true });
@@ -51498,7 +51506,7 @@ var AiCalls = class {
     let milestonesWritten = false;
     const writeMilestones = () => {
       var _a3, _b3;
-      if (milestonesWritten) return;
+      if (milestonesWritten || options.milestones === false) return;
       milestonesWritten = true;
       try {
         Object.assign(milestones, { ...(_a3 = options.extraMilestones) == null ? void 0 : _a3.call(options), ...milestones });
@@ -51532,7 +51540,7 @@ var AiCalls = class {
         mode,
         model: options.model,
         effort: options.effort,
-        step: stepLabel({ id: call.stepId, version: call.version })
+        ...call.step ? { step: call.step } : {}
       });
       if (started) (_c = options.onBegin) == null ? void 0 : _c.call(options, id);
       const runtime = this.options.runtimeFor(options.model);
@@ -51541,10 +51549,12 @@ var AiCalls = class {
       const controls = {
         ...task,
         signal: controller.signal,
-        onMilestones: (data) => {
-          var _a3;
-          (_a3 = task.onMilestones) == null ? void 0 : _a3.call(task, data);
-          Object.assign(milestones, data);
+        ...options.milestones === false ? {} : {
+          onMilestones: (data) => {
+            var _a3;
+            (_a3 = task.onMilestones) == null ? void 0 : _a3.call(task, data);
+            Object.assign(milestones, data);
+          }
         },
         onRequest: (data) => {
           var _a3, _b3;
@@ -57421,63 +57431,38 @@ ${t("ui.organize_link_wait_hint")}`;
     if (!(this.app.vault.adapter instanceof import_obsidian38.FileSystemAdapter) || !this.manifest.dir)
       throw new Error("Coffee Tables requires the desktop runtime");
     const { session, signal, prompt } = request;
-    const directory = (0, import_node_path2.join)(this.app.vault.adapter.getBasePath(), this.manifest.dir);
     const effort = effectiveReasoningLevel(
       { title: session.topic, summary: "", detail: "", rules: "", task: "", ancestors: "" },
       normalizeReasoningLevel(session.reasoning)
     );
-    const exchanges = this.settings.aiExchangeLoggingEnabled ? this.exchanges : null;
-    const id = (0, import_node_crypto14.randomUUID)();
-    const key2 = `coffee:${id}`;
-    const controller = new AbortController();
-    const abort = () => controller.abort();
-    signal.addEventListener("abort", abort, { once: true });
-    if (signal.aborted) controller.abort();
-    this.activeTasks.set(key2, controller);
-    exchanges == null ? void 0 : exchanges.begin({
-      id,
-      startedAt: (/* @__PURE__ */ new Date()).toISOString(),
-      topic: `Coffee Tables \xB7 ${session.topic}`,
-      mode: "task",
-      model: session.model,
-      effort,
-      ...request.step ? { step: request.step } : {}
-    });
-    try {
-      const controls = {
-        textOnly: true,
-        signal: controller.signal,
-        searchBudget: 0,
-        timeoutMs: 15 * 60 * 1e3,
-        timeoutMessage: t("ui.coffee_generation_timed_out"),
-        onText: (text11) => {
-          var _a2;
-          return (_a2 = request.onText) == null ? void 0 : _a2.call(request, text11);
-        },
-        onSteer: (handler) => {
-          var _a2;
-          return (_a2 = request.registerIntervention) == null ? void 0 : _a2.call(request, handler);
-        },
-        onRequest: (data) => {
-          if (this.settings.aiExchangeLoggingEnabled)
-            exchanges == null ? void 0 : exchanges.sent(id, JSON.stringify({ request: data, prompt }, null, 2), prompt);
+    return this.aiCalls.runCall(
+      { prompt, step: request.step },
+      {
+        model: session.model,
+        effort,
+        topic: `Coffee Tables \xB7 ${session.topic}`,
+        taskName: "coffee",
+        signal,
+        localCodex: true,
+        milestones: false,
+        stopped: () => new Error("Coffee Tables request cancelled"),
+        task: {
+          textOnly: true,
+          searchBudget: 0,
+          timeoutMs: 15 * 60 * 1e3,
+          timeoutMessage: t("ui.coffee_generation_timed_out"),
+          onText: (text11) => {
+            var _a2;
+            return (_a2 = request.onText) == null ? void 0 : _a2.call(request, text11);
+          },
+          onSteer: (handler) => {
+            var _a2;
+            return (_a2 = request.registerIntervention) == null ? void 0 : _a2.call(request, handler);
+          }
         }
-      };
-      const raw = providerForModel(session.model) === "claude" ? await this.claudeCli(directory).runTask(prompt, providerModelId(session.model), effort, void 0, controls) : await this.runtime(directory, true).runTask(prompt, session.model, effort, void 0, controls);
-      if (controller.signal.aborted) throw new Error("Coffee Tables request cancelled");
-      if (this.settings.aiExchangeLoggingEnabled) {
-        exchanges == null ? void 0 : exchanges.received(id, raw);
-        exchanges == null ? void 0 : exchanges.completed(id);
-      }
-      return raw;
-    } catch (error) {
-      if (this.settings.aiExchangeLoggingEnabled)
-        exchanges == null ? void 0 : exchanges.failed(id, error instanceof Error ? error.message : String(error));
-      throw error;
-    } finally {
-      signal.removeEventListener("abort", abort);
-      this.activeTasks.delete(key2);
-    }
+      },
+      (raw) => raw
+    );
   }
   async markdownContextImage(image, signal) {
     var _a2, _b2, _c, _d;

@@ -380,9 +380,9 @@ integrationTest('Coffee Tables provider adapter uses plain text while preserving
   const { default: Plugin } = load('main.ts', { obsidian });
   for (const model of ['test-codex', 'claude:sonnet']) {
     const plugin = new Plugin(); plugin.app = { vault: { adapter: new obsidian.FileSystemAdapter() } }; plugin.manifest = { dir: 'plugin' }; plugin.settings.aiExchangeLoggingEnabled = true;
-    const events = []; plugin.exchanges = Object.fromEntries(['begin', 'sent', 'received', 'completed', 'failed'].map(key => [key, (...args) => events.push([key, ...args])]));
+    const events = []; plugin.exchanges = Object.fromEntries(['begin', 'sent', 'received', 'milestones', 'completed', 'failed'].map(key => [key, (...args) => events.push([key, ...args])]));
     const runTask = async (_prompt, actualModel, effort, schema, controls) => { assert.equal(effort, 'high'); assert.equal(schema, undefined); assert.equal(controls.searchBudget, 0); assert.equal(actualModel, model === 'claude:sonnet' ? 'sonnet' : model); controls.onRequest({ prompt: 'plain text' }); return '完整 Markdown'; };
-    plugin.runtime = (_directory, local) => { assert.equal(local, true); return { runTask }; }; plugin.claudeCli = () => ({ runTask });
+    plugin.aiRuntime.codex = (_directory, local) => { assert.equal(local, true); return { runTask }; }; plugin.aiRuntime.claude = () => ({ runTask });
     const request = { session: { ...coffeeSession(), model, reasoning: 'high' }, prompt: 'coffee prompt', signal: new AbortController().signal };
     assert.equal(await plugin.runCoffeeRequest(request), '完整 Markdown'); assert.deepEqual(events.map(event => event[0]), ['begin', 'sent', 'received', 'completed']); assert.equal(plugin.activeTasks.size, 0);
     const abort = new AbortController(); abort.abort(); await assert.rejects(plugin.runCoffeeRequest({ ...request, signal: abort.signal }), /cancelled/);

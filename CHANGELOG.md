@@ -1,5 +1,46 @@
 # Changelog
 
+## [0.27.0] - 2026-10-26
+
+### Added
+
+Map AI chat
+- A chat window beside the map: ask a question about the map, or ask the AI to change it in plain language. It opens as a side window on the left (open or close it from the map view, or with the "Toggle the map AI chat" command; no shortcut is set by default, so pick one in Obsidian's hotkey settings). Drag its edge, or use the arrow keys on it, to set the width (280 to 560 px; the width and open state are remembered). In a very narrow pane it folds to a thin edge that you can open over the map. On an empty map it opens with a prompt, three examples and a message box.
+- The AI can add, rename, move and delete topics (a deleted topic goes to Unassigned), change a topic's summary or note, select topics, fold or unfold branches, move the view to a topic, arrange the whole map, create a new map or switch to another one by name, and build a whole tree of topics from one sentence. It can also start the map's own features for you: research (Quick or Standard), expand, integrate, merge, and prioritize by goal. At most 100 actions per reply.
+- A long or risky request is shown as a plan first and does nothing until you choose Apply: more than 15 actions, deleting a whole branch, research on 10 or more topics, or creating a new map. The plan lists the actions in groups and the least number of AI calls it will use. Sending a new message cancels a waiting plan.
+- After a reply, every action gets a result line (done, skipped or failed, with the reason). The line is the record of what changed; the AI's own text only says what it intends. Changes the chat makes to the map or to notes cannot be undone, and the map's undo history is cleared when they are applied (the result lines say so).
+- References: cards you select, topic cards or notes you drag onto the chat, text you drag in from a note, and the note open beside the map (shown as a "Current note" chip you can remove) are sent with your message. The AI can edit such a Markdown note or create a new note in the vault, but only a note it was shown in full this turn, only if the note has not changed since, and never inside the Obsidian settings folder or outside the vault.
+- Replies are short by default; switch to Detailed next to the message box, or press "Say it in more detail" under a reply (the actions are not applied a second time). The chat has its own model menu ("Follow default" or a specific model), and the choice is remembered.
+- Pictures: ask for pictures for one topic. The AI searches the web through your installed CLI, VAM keeps up to six candidates whose thumbnails load, with a link to each source page, and nothing is written until you pick one. A picked picture is added to the end of the topic's note as a web link with its source link (it is not downloaded).
+- "Save the chat as a note" writes the finished conversation (questions, answers, result lines, references and picture candidates) to a new Markdown file at `Chats/<date> <first words>.md` in the map's folder.
+- Replies are shown with simple Markdown formatting (no pictures, embeds or HTML from the model), `[[note links]]` open the note, and very long replies are cut into plain text after a point so the chat stays responsive.
+- Suggested messages (two to four, depending on whether the map is empty, topics are selected or a note is open) only fill the message box; nothing is sent until you press Send.
+
+Quick and Standard
+- Research and expansion now have two AI modes. Quick answers from the model's own knowledge and the sources you attach, without the web, and marks what it is unsure about. Standard searches the web and may add images. A switch at the top of the research and expand dialogs sets it, Quick is the default, and each map remembers the last mode you ran.
+- When a Quick answer says the model's knowledge was not enough, a "Re-run with Standard" button appears; it replaces that topic's result, and Undo restores it.
+- Researching several topics shows how many web searches were made and warns about topics that finished without any.
+- The chat uses the same two modes: ask for "quick research" or "standard research"; saying only "research" uses the mode the map remembers.
+
+### Changed
+
+- Research depth (Quick, Standard, Deep) is gone, along with the web-search tick box in Data sources, the image-search tick box and the "also search the web for subtopic research" option. The mode switch replaces them, and Deep is no longer offered. Notes keep working: `research-mode: local` is read as Quick and `research` as Standard.
+- Expand is now one path: the AI writes a multi-level outline (Levels and "Most subtopics" are on the panel, default 2 levels and up to 15) that you review before anything is created. "Choose directions together" and "Quickly explore" are removed. New topics from an outline or an AI expansion are saved as Quick.
+- The optional research after an outline import or expansion is called "short research", and it follows the mode you chose.
+- Integrate no longer has a web-search option and always works from existing findings; the dialog suggests running Standard research on the topic first when information is thin.
+- Standard research is told that it must use the web.
+- Translated share files store only the translated text and are rebuilt from the original note when opened, so they are smaller (in one test map with two translations, 1.1 MB became 0.67 MB). Old share files still open.
+
+### Limitations
+
+- Live testing used Claude only. Standard research with a GPT (Codex) model searching the web was checked once, on one real vault; the chat with Codex was not tested live. Asking the chat to tidy the structure by merging duplicate topics was run live once, but that the merged topic keeps all the content was not confirmed.
+- Picture search: a picture you inserted and a picture that could not load look the same (both grey and disabled). The result line says "Done: started looking for pictures" even when the search later finds nothing, fails or is stopped; the box below it says what happened. "Also search for images" on a research does not guarantee a picture.
+- Chat results: a failed action cannot be retried by itself (send the message again). The toolbar can cover the first card. After a retry the attempt number shown restarts at 1, a single-topic research shows no search count, and integrating several topics can write into their shared parent topic.
+- Chat display: a reply of about 140,000 characters can still lag for a moment, and a quote or nested list past the display limit is shown as plain text. At the narrowest width the model menu cuts the model name (the full name shows on hover). Typing and dragging were checked with synthetic events, not a real IME, a real file drag from the desktop, or a real Tab key walk.
+- Not checked: the chat and Quick/Standard screens in English and Simplified Chinese, pop-out windows, reduced-motion, Windows and Linux, the one-time usage notice window in the new dialogs, and a 100-action reply on a large map (a 150-topic map took about 23 seconds in a test).
+- After a Standard re-run, the "Preview" callout in the note can still show the old summary (the current summary is updated). Reopening a saved outline for review shows the default levels and size in the panel.
+- Translated share files: the quality of Japanese, Korean and Spanish translations, opening a share file in Safari, Firefox and on a phone, and redrawing Mermaid diagrams in a live AI translation were not tested here.
+
 ## [0.26.0] - 2026-10-23
 
 ### Added

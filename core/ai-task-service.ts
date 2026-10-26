@@ -14,12 +14,12 @@ import { checkCounts, countIssueText } from "../ai/detail-templates";
 import type { AiResult, ReasoningLevel, TaskContext } from "../ai/types";
 import { isSearchNotPerformed } from "../ai/search-not-performed";
 import { noteLanguageOf, translate, t, type ContentLanguage, type UiLanguage } from "../i18n";
-import { CLAUDE_MODEL_CHOICES, providerForModel } from "../ai/providers/provider";
+import { CLAUDE_MODEL_CHOICES } from "../ai/providers/provider";
 import type { CodexAppServerRuntime, CodexWebSearchEvent } from "../ai/runtime/codex-app-server";
 import type { ClaudeCodeCliRuntime } from "../ai/runtime/claude-code-cli";
 import type { AiExchangeLog, AiMilestones } from "../ai-exchange-log";
 import type { ResearchObserver, ResearchStageName } from "../ai/research-observer";
-import type { RuntimeTaskControls } from "./runtime-step-provider";
+import type { AiRuntimeId, RuntimeTaskControls } from "./ai-runtime";
 import { prepareStep } from "./step-runner";
 import { AiCalls, type AiCallExchange } from "./ai-calls";
 import { aiRuntimeForModel } from "./ai-runtime-service";
@@ -119,7 +119,7 @@ export class AiTaskService {
       (!Number.isInteger(input.timeoutMs) || input.timeoutMs < 180_000 || input.timeoutMs > 600_000)
     )
       throw new Error("Invalid AI task timeout.");
-    const provider = providerForModel(model);
+    const provider = this.runtimeIdFor(model);
     if (provider === "claude" && !CLAUDE_MODEL_CHOICES.some(choice => choice.id === model)) {
       throw new Error(t("ui.claude_model_is_not_supported_0", model));
     }
@@ -541,7 +541,7 @@ export class AiTaskService {
       request.detail,
       request.countIssues,
       request.input.outputLanguage ?? this.options.language(),
-      providerForModel(request.model),
+      this.runtimeIdFor(request.model),
       request.model,
       request.signal,
       this.options.exchangeLoggingEnabled() ? this.options.exchanges() : null,
@@ -552,6 +552,14 @@ export class AiTaskService {
   /** Marks an exchange failed with the caller's reason (for example a stale chart that was not applied). */
   failExchange(id: string, reason: string): void {
     if (id && this.options.exchangeLoggingEnabled()) this.options.exchanges()?.failed(id, reason);
+  }
+
+  /** The runtime serving `model` (the prompt wording differs per runtime), without starting it or reading the plugin directory. */
+  private runtimeIdFor(model: string): AiRuntimeId {
+    return aiRuntimeForModel(model, {
+      claude: () => this.options.claudeRuntime(this.options.pluginDirectory()),
+      codex: local => this.options.codexRuntime(this.options.pluginDirectory(), local)
+    }).capabilities.id;
   }
 
   /** AiCalls over this service's runtimes in `pluginDirectory`, logging to `exchanges` (taken when the request started) while logging stays on. */
@@ -602,7 +610,7 @@ export class AiTaskService {
       request.detail,
       undefined,
       request.language,
-      providerForModel(request.model),
+      this.runtimeIdFor(request.model),
       request.model,
       request.signal,
       this.options.exchangeLoggingEnabled() ? this.options.exchanges() : null

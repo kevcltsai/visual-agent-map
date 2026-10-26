@@ -1,5 +1,9 @@
 import type { AiProviderId } from "../ai/providers/provider";
-import type { RuntimeTaskControls } from "./runtime-step-provider";
+import type { ClaudeTaskControls } from "../ai/runtime/claude-code-cli";
+import type { CodexAppServerRuntime } from "../ai/runtime/codex-app-server";
+
+/** Everything the Claude and Codex runtimes accept as per-call controls (abort, streaming, steering, timeouts). */
+export type RuntimeTaskControls = ClaudeTaskControls & NonNullable<Parameters<CodexAppServerRuntime["runTask"]>[4]>;
 
 /** Which model runtime a call goes to: the Claude Code CLI or the Codex app server. */
 export type AiRuntimeId = AiProviderId;

@@ -17,8 +17,7 @@ function sourceFiles(directory) {
 // file, enclosing function and count so a new direct call anywhere fails this test.
 const RUN_TASK_CALLERS = [
   { file: 'core/ai-runtime-service.ts', method: 'export function claudeCodeAiRuntime(', count: 1, reason: 'AiRuntime adapter over the Claude Code CLI runtime' },
-  { file: 'core/ai-runtime-service.ts', method: 'export function codexAppServerAiRuntime(', count: 1, reason: 'AiRuntime adapter over the Codex app server runtime' },
-  { file: 'core/runtime-step-provider.ts', method: 'export function runtimeStepProvider(', count: 2, reason: 'shared StepProvider over the Claude and Codex runtimes' }
+  { file: 'core/ai-runtime-service.ts', method: 'export function codexAppServerAiRuntime(', count: 1, reason: 'AiRuntime adapter over the Codex app server runtime' }
 ];
 // The function containing `index`: the nearest preceding top-level function or two-space class member.
 function enclosingMethod(source, index) {

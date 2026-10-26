@@ -47,14 +47,36 @@ test('short or unique content is returned byte for byte', () => {
   assert.equal(JSON.stringify(deduplicateAimRequest({ ...base })), JSON.stringify(base), 'an empty note changes nothing');
 });
 
-test('the repair still carries the failing fragment: the first copy of a repeated passage is never the one removed', () => {
-  // A format repair names the validation error and quotes the original response; the quoted response is later in the
-  // request than the task, so when both hold the same passage the model still reads the passage in full.
-  const failing = passage('FAILING-RESPONSE', 350);
-  const out = deduplicateAimRequest({ ...base, task: `Repair this.\nFormat validation error: missing field\n\nOriginal response to repair:\n${failing}`, detail: `Original response to repair:\n${failing}` });
-  assert.equal(out.task.includes(failing), true);
-  assert.equal(occurrences(joined(out), failing), 1);
-  assert.match(out.task, /Format validation error: missing field/);
+const { buildPreparedTaskContext } = load('ai/context-builder.ts');
+const all = ctx => FIELDS.concat(['sourceContext']).map(key => ctx[key] ?? '').join('\n');
+
+test('a reference is only sent when its complete copy is sent too (after the real budget trim)', () => {
+  const passageText = passage('KEY-PASSAGE', 300);
+  const big = 'filler sentence. '.repeat(9000);
+  for (const [copyField, repeatField] of [['detail', 'ancestors'], ['detail', 'summary'], ['detail', 'rules'], ['ancestors', 'rules'], ['workingFindings', 'summary'], ['task', 'detail']]) {
+    const request = { ...base, task: 'Do X', [copyField]: `${big}\n\n${passageText}` };
+    request[repeatField] = `${request[repeatField] && repeatField !== copyField ? request[repeatField] + '\n\n' : ''}${passageText}`;
+    const sent = buildPreparedTaskContext(deduplicateAimRequest(request), 'model').context;
+    const text = all(sent);
+    const references = occurrences(text, PASSAGE_REFERENCE);
+    const copies = occurrences(text, passageText);
+    assert.ok(references === 0 || copies >= 1, `${copyField}->${repeatField}: ${references} reference(s) but ${copies} complete copies`);
+  }
+});
+
+test('the repair request keeps the failing fragment and the validation error through dedup and the real trim', async () => {
+  const { parseAimPlannerReviewWithRecovery } = load('experiences/aim/planner-review.ts');
+  const failingBody = passage('FAILING-RESPONSE', 350);
+  const original = { summary: 'Original summary', detail: `<!-- aim-review ${JSON.stringify({ decision: 'ask_user', rationale: 'Because.' })} -->\n${failingBody}`, suggestions: [{ title: 'Only one', task: '', contribution: '' }], visualReferences: [] };
+  let task;
+  await parseAimPlannerReviewWithRecovery(original, { question: 'Which option?', answerSnapshot: '{}', reportSummary: 'S', reportDetail: failingBody, requiredDecision: 'ask_user', requiredDecisionRationale: 'Fixed rationale.' }, async repairTask => { task = repairTask; throw new Error('stop'); }).catch(() => undefined);
+  assert.ok(task && task.includes(failingBody), 'the real repair task was built and quotes the failing response');
+  // The same fragment also reaches the request as supplied report detail.
+  const sent = buildPreparedTaskContext(deduplicateAimRequest({ ...base, task, detail: `Prior research:\n\n${failingBody}` }), 'model').context;
+  const text = all(sent);
+  assert.ok(text.includes(failingBody), 'the failing fragment is still sent in full');
+  assert.match(text, /State the one clarification question/, 'the repair instruction is kept');
+  assert.equal(occurrences(text, failingBody), 1, 'the repeat of the failing fragment is a reference to the complete copy');
 });
 
 test('every report paragraph of a three-answer AIM branch reaches every delivery request once, at typical report size', async () => {

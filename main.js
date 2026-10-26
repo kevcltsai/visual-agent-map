@@ -29867,23 +29867,29 @@ function evidenceCard(id, summary, detail) {
 
 // experiences/aim/request-context.ts
 var AIM_PASSAGE_MIN_CHARS = 200;
+var TRIMMED_FIELDS = /* @__PURE__ */ new Set(["detail", "workingFindings", "ancestors"]);
 function deduplicateAimRequest(context) {
   const prepared = { ...context };
   const passages = /* @__PURE__ */ new Map();
+  const copyFor = (text11, key2) => {
+    const copy = passages.get(text11);
+    return copy !== void 0 && (!TRIMMED_FIELDS.has(copy.key) || copy.key === key2);
+  };
+  const remember = (text11, key2) => {
+    if (!passages.has(text11)) passages.set(text11, { id: passages.size + 1, key: key2 });
+  };
   for (const key2 of ["task", "detail", "ancestors", "workingFindings", "summary", "rules", "title"]) {
     const value = prepared[key2];
     if (typeof value !== "string") continue;
     const chunks = value.split(/(\n\n)/);
     prepared[key2] = chunks.map((chunk) => {
       if (chunk.length < AIM_PASSAGE_MIN_CHARS) return chunk;
-      const previous = passages.get(chunk);
-      if (previous !== void 0) return PASSAGE_REFERENCE;
-      passages.set(chunk, passages.size + 1);
+      if (copyFor(chunk, key2)) return PASSAGE_REFERENCE;
+      remember(chunk, key2);
       return chunk.split("\n").map((line) => {
         if (line.length < AIM_PASSAGE_MIN_CHARS || line === chunk) return line;
-        const earlier = passages.get(line);
-        if (earlier !== void 0) return PASSAGE_REFERENCE;
-        passages.set(line, passages.size + 1);
+        if (copyFor(line, key2)) return PASSAGE_REFERENCE;
+        remember(line, key2);
         return line;
       }).join("\n");
     }).join("");

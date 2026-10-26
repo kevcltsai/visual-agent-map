@@ -21,6 +21,8 @@ const commandWords = command => {
 
 export async function findUnwired(root = defaultRoot) {
   const unit = commandWords(JSON.parse(readFileSync(join(root, "package.json"), "utf8")).scripts["test:unit"]);
+  // The path is the repository root plus a fixed file name (tests pass a temporary root), never input.
+  // eslint-disable-next-line no-unsanitized/method -- fixed repository path, not user input
   const { parts } = await import(pathToFileURL(join(root, "scripts/test-integration.mjs")).href);
   const words = [...unit, ...parts.flatMap(part => part.args)];
   const named = words.filter(word => /^tests\/[\w*.-]+\.(?:cjs|mjs)$/.test(word)).map(word => toRegExp(word.slice("tests/".length)));

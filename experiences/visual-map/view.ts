@@ -4097,41 +4097,43 @@ export class VisualAgentMapView extends ItemView {
     this.history.clear();
     return true;
   }
+  /** Runs `change` on Map.md through MapTransaction; `created` are notes that already exist and are parked by Undo. */
   private async mapChangeSnapshots(
     change: (map: MapDocument) => void,
-    rebuildDerivedData = true
+    rebuildDerivedData = true,
+    created: string[] = []
   ): Promise<{ before: MapDocument; after: MapDocument } | null> {
     if (!this.map) return null;
-    const path = this.path;
-    await this.resolveMapConflict();
-    const before = clone(this.map);
+    const tx = this.beginMapTransaction();
+    for (const path of created) tx.create(path, this.plugin.repo.topicFolder(this.path, "Unassigned"), this.map.id);
+    let before!: MapDocument, after!: MapDocument;
+    const viewport = clone(this.map.viewport);
     try {
-      change(this.map);
+      const entry = await tx
+        .editMap(this.path, map => {
+          // Map.md on disk may hold an older viewport: the edit starts from the one on screen, as the in-memory edit did.
+          map.viewport = clone(viewport);
+          before = clone(map);
+          change(map);
+          after = clone(map);
+        })
+        .commit({ deferRebuild: true });
+      this.history.push(entry);
+      if (this.map) this.map.viewport = clone(after.viewport);
     } catch (error) {
-      this.map = before;
-      throw error;
-    }
-    const after = clone(this.map);
-    try {
-      await this.persist();
-    } catch (error) {
-      this.map = before;
       this.render();
       throw error;
     }
+    // The change is saved and in history; a failing rebuild is reported but leaves it there (Undo stays available).
     const ownership = (map: MapDocument): string =>
       JSON.stringify(map.nodes.map(node => [node.id, node.path, node.parentId]));
-    if (rebuildDerivedData && ownership(before) !== ownership(after)) await this.plugin.rebuildDerivedData();
-    const restore = async (snapshot: MapDocument): Promise<void> => {
-      const previous = clone(this.map!);
-      const next = clone(snapshot);
-      if (this.map) next.viewport = clone(this.map.viewport);
-      await this.plugin.repo.saveMap(path, next);
-      this.map = next;
-      if (ownership(previous) !== ownership(next)) await this.plugin.rebuildDerivedData();
-      await this.hydrate();
-    };
-    this.history.push({ undo: () => restore(before), redo: () => restore(after) });
+    try {
+      if (rebuildDerivedData && (ownership(before) !== ownership(after) || created.length > 0))
+        await this.plugin.rebuildDerivedData();
+    } catch (error) {
+      this.render();
+      throw error;
+    }
     this.render();
     return { before, after };
   }
@@ -5369,14 +5371,27 @@ export class VisualAgentMapView extends ItemView {
       rebuildDerivedData: () => this.plugin.rebuildDerivedData(),
       onApplied: (mapPath, map) => {
         if (mapPath !== this.path) return;
-        const viewport = this.map?.viewport;
-        this.map = clone(map);
-        if (viewport) this.map.viewport = clone(viewport);
+        const next = clone(map);
+        if (!this.map) {
+          this.map = next;
+          return;
+        }
+        // In place: callers and tests hold references to the open map.
+        const viewport = this.map.viewport;
+        const target = this.map as unknown as Record<string, unknown>;
+        for (const key of Object.keys(target)) if (!(key in next)) delete target[key];
+        for (const [key, value] of Object.entries(next)) {
+          const current = target[key];
+          // Arrays keep their identity too (the node list is held by cards and tests).
+          if (Array.isArray(current) && Array.isArray(value))
+            current.splice(0, current.length, ...(value as unknown[]));
+          else target[key] = value;
+        }
+        this.map.viewport = clone(viewport);
       },
       checkConflict: async mapPath => {
         if (mapPath !== this.path) return;
-        await this.resolveMapConflict();
-        await this.persist();
+        if (await this.resolveMapConflict()) await this.persist();
       }
     });
   }
@@ -8038,25 +8053,27 @@ export class VisualAgentMapView extends ItemView {
       await this.plugin.repo.readNote(node.path, { ...this.map, nodes: [...this.map.nodes, node] })
     );
     this.selected = node.id;
-    const previousEntry = this.history.undoEntry;
-    const done = await this.mapChangeSnapshots(map => {
-      map.nodes.push(node);
-      const owner = parent ? map.nodes.find(n => n.id === parent.id) : undefined;
-      if (owner) {
-        owner.collapsed = false;
-        // A new sibling goes after the existing ones (not into a gap above them); collisions are then resolved from there.
-        const siblings = map.nodes.filter(n => n.parentId === owner.id && n.id !== node.id);
-        const minTop = siblings.length
-          ? Math.max(...siblings.map(n => n.y + (this.cardHeightOf(n.id) ?? DEFAULT_CARD_HEIGHT))) + LAYOUT_GAP
-          : undefined;
-        map.nodes = arrangeNewBranch(map.nodes, owner.id, new Set([node.id]), this.cardHeightOf, minTop);
-      } else if (!parent) {
-        const roots = map.nodes.filter(n => n.id !== node.id && !n.parentId);
-        if (roots.length)
-          node.y = Math.max(...roots.map(n => n.y + (this.cardHeightOf(n.id) ?? DEFAULT_CARD_HEIGHT))) + LAYOUT_GAP;
-      }
-    }, rebuildDerivedData);
-    if (done) this.parkOnUndo(node.id, done.before, done.after, previousEntry);
+    await this.mapChangeSnapshots(
+      map => {
+        map.nodes.push(node);
+        const owner = parent ? map.nodes.find(n => n.id === parent.id) : undefined;
+        if (owner) {
+          owner.collapsed = false;
+          // A new sibling goes after the existing ones (not into a gap above them); collisions are then resolved from there.
+          const siblings = map.nodes.filter(n => n.parentId === owner.id && n.id !== node.id);
+          const minTop = siblings.length
+            ? Math.max(...siblings.map(n => n.y + (this.cardHeightOf(n.id) ?? DEFAULT_CARD_HEIGHT))) + LAYOUT_GAP
+            : undefined;
+          map.nodes = arrangeNewBranch(map.nodes, owner.id, new Set([node.id]), this.cardHeightOf, minTop);
+        } else if (!parent) {
+          const roots = map.nodes.filter(n => n.id !== node.id && !n.parentId);
+          if (roots.length)
+            node.y = Math.max(...roots.map(n => n.y + (this.cardHeightOf(n.id) ?? DEFAULT_CARD_HEIGHT))) + LAYOUT_GAP;
+        }
+      },
+      rebuildDerivedData,
+      [node.path]
+    );
     if (!focus) return;
     if (this.map) this.map.viewport.zoom = Math.max(this.map.viewport.zoom, 0.7);
     this.focusNode(this.map?.nodes.find(n => n.id === node.id) ?? node);
@@ -9844,38 +9861,15 @@ export class VisualAgentMapView extends ItemView {
       integrated.parentId = null;
       integrated.x = Math.max(...sources.map(node => node.x)) + 340;
       integrated.y = sources.reduce((sum, node) => sum + node.y, 0) / sources.length;
-      await this.mapChange(map => {
-        map.nodes.push(integrated);
-      });
+      await this.mapChangeSnapshots(
+        map => {
+          map.nodes.push(integrated);
+        },
+        true,
+        [integrated.path]
+      );
       const entry = this.history.undoEntry;
-      if (entry) {
-        entry.label = t("ui.confirm_new_synthesis_topic");
-        // Undo takes the new topic off the map and parks its note in Unassigned; Redo brings both back.
-        const mapUndo = entry.undo,
-          mapRedo = entry.redo;
-        let parked = "";
-        entry.undo = async () => {
-          parked = await this.plugin.repo.moveUnique(
-            integrated.path,
-            this.plugin.repo.topicFolder(this.path, "Unassigned")
-          );
-          await this.plugin.repo.setLifecycle(parked, this.map!.id, "", "unassigned");
-          try {
-            await mapUndo();
-          } catch (error) {
-            await this.plugin.repo.moveExact(parked, integrated.path);
-            await this.plugin.repo.setLifecycle(integrated.path, this.map!.id, this.map!.id, "active");
-            throw error;
-          }
-        };
-        entry.redo = async () => {
-          if (parked) {
-            await this.plugin.repo.moveExact(parked, integrated.path);
-            await this.plugin.repo.setLifecycle(integrated.path, this.map!.id, this.map!.id, "active");
-          }
-          await mapRedo();
-        };
-      }
+      if (entry) entry.label = t("ui.confirm_new_synthesis_topic");
       this.integrationTask = null;
       this.selected = integrated.id;
       this.multiSelected.clear();

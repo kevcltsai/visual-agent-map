@@ -16027,6 +16027,7 @@ function begin(deps) {
       if (!item.written) continue;
       try {
         const current = await repo.readMap(item.mapPath);
+        if (structure(current) === structure(item.restore)) continue;
         const next = clone(item.restore);
         next.viewport = current.viewport;
         await repo.saveMap(item.mapPath, next);
@@ -39621,37 +39622,34 @@ ${request.requirements}` : preset.text,
     this.history.clear();
     return true;
   }
-  async mapChangeSnapshots(change, rebuildDerivedData = true) {
+  /** Runs `change` on Map.md through MapTransaction; `created` are notes that already exist and are parked by Undo. */
+  async mapChangeSnapshots(change, rebuildDerivedData = true, created = []) {
     if (!this.map) return null;
-    const path = this.path;
-    await this.resolveMapConflict();
-    const before = clone(this.map);
+    const tx = this.beginMapTransaction();
+    for (const path of created) tx.create(path, this.plugin.repo.topicFolder(this.path, "Unassigned"), this.map.id);
+    let before, after;
+    const viewport = clone(this.map.viewport);
     try {
-      change(this.map);
+      const entry = await tx.editMap(this.path, (map) => {
+        map.viewport = clone(viewport);
+        before = clone(map);
+        change(map);
+        after = clone(map);
+      }).commit({ deferRebuild: true });
+      this.history.push(entry);
+      if (this.map) this.map.viewport = clone(after.viewport);
     } catch (error) {
-      this.map = before;
-      throw error;
-    }
-    const after = clone(this.map);
-    try {
-      await this.persist();
-    } catch (error) {
-      this.map = before;
       this.render();
       throw error;
     }
     const ownership2 = (map) => JSON.stringify(map.nodes.map((node) => [node.id, node.path, node.parentId]));
-    if (rebuildDerivedData && ownership2(before) !== ownership2(after)) await this.plugin.rebuildDerivedData();
-    const restore = async (snapshot) => {
-      const previous = clone(this.map);
-      const next = clone(snapshot);
-      if (this.map) next.viewport = clone(this.map.viewport);
-      await this.plugin.repo.saveMap(path, next);
-      this.map = next;
-      if (ownership2(previous) !== ownership2(next)) await this.plugin.rebuildDerivedData();
-      await this.hydrate();
-    };
-    this.history.push({ undo: () => restore(before), redo: () => restore(after) });
+    try {
+      if (rebuildDerivedData && (ownership2(before) !== ownership2(after) || created.length > 0))
+        await this.plugin.rebuildDerivedData();
+    } catch (error) {
+      this.render();
+      throw error;
+    }
     this.render();
     return { before, after };
   }
@@ -40766,16 +40764,26 @@ ${request.requirements}` : preset.text,
       repo: this.plugin.repo,
       rebuildDerivedData: () => this.plugin.rebuildDerivedData(),
       onApplied: (mapPath, map) => {
-        var _a2;
         if (mapPath !== this.path) return;
-        const viewport = (_a2 = this.map) == null ? void 0 : _a2.viewport;
-        this.map = clone(map);
-        if (viewport) this.map.viewport = clone(viewport);
+        const next = clone(map);
+        if (!this.map) {
+          this.map = next;
+          return;
+        }
+        const viewport = this.map.viewport;
+        const target = this.map;
+        for (const key2 of Object.keys(target)) if (!(key2 in next)) delete target[key2];
+        for (const [key2, value] of Object.entries(next)) {
+          const current = target[key2];
+          if (Array.isArray(current) && Array.isArray(value))
+            current.splice(0, current.length, ...value);
+          else target[key2] = value;
+        }
+        this.map.viewport = clone(viewport);
       },
       checkConflict: async (mapPath) => {
         if (mapPath !== this.path) return;
-        await this.resolveMapConflict();
-        await this.persist();
+        if (await this.resolveMapConflict()) await this.persist();
       }
     });
   }
@@ -43210,28 +43218,30 @@ ${request.requirements}` : preset.text,
       await this.plugin.repo.readNote(node.path, { ...this.map, nodes: [...this.map.nodes, node] })
     );
     this.selected = node.id;
-    const previousEntry = this.history.undoEntry;
-    const done = await this.mapChangeSnapshots((map) => {
-      map.nodes.push(node);
-      const owner = parent ? map.nodes.find((n) => n.id === parent.id) : void 0;
-      if (owner) {
-        owner.collapsed = false;
-        const siblings = map.nodes.filter((n) => n.parentId === owner.id && n.id !== node.id);
-        const minTop = siblings.length ? Math.max(...siblings.map((n) => {
-          var _a3;
-          return n.y + ((_a3 = this.cardHeightOf(n.id)) != null ? _a3 : DEFAULT_CARD_HEIGHT);
-        })) + LAYOUT_GAP : void 0;
-        map.nodes = arrangeNewBranch(map.nodes, owner.id, /* @__PURE__ */ new Set([node.id]), this.cardHeightOf, minTop);
-      } else if (!parent) {
-        const roots = map.nodes.filter((n) => n.id !== node.id && !n.parentId);
-        if (roots.length)
-          node.y = Math.max(...roots.map((n) => {
+    await this.mapChangeSnapshots(
+      (map) => {
+        map.nodes.push(node);
+        const owner = parent ? map.nodes.find((n) => n.id === parent.id) : void 0;
+        if (owner) {
+          owner.collapsed = false;
+          const siblings = map.nodes.filter((n) => n.parentId === owner.id && n.id !== node.id);
+          const minTop = siblings.length ? Math.max(...siblings.map((n) => {
             var _a3;
             return n.y + ((_a3 = this.cardHeightOf(n.id)) != null ? _a3 : DEFAULT_CARD_HEIGHT);
-          })) + LAYOUT_GAP;
-      }
-    }, rebuildDerivedData);
-    if (done) this.parkOnUndo(node.id, done.before, done.after, previousEntry);
+          })) + LAYOUT_GAP : void 0;
+          map.nodes = arrangeNewBranch(map.nodes, owner.id, /* @__PURE__ */ new Set([node.id]), this.cardHeightOf, minTop);
+        } else if (!parent) {
+          const roots = map.nodes.filter((n) => n.id !== node.id && !n.parentId);
+          if (roots.length)
+            node.y = Math.max(...roots.map((n) => {
+              var _a3;
+              return n.y + ((_a3 = this.cardHeightOf(n.id)) != null ? _a3 : DEFAULT_CARD_HEIGHT);
+            })) + LAYOUT_GAP;
+        }
+      },
+      rebuildDerivedData,
+      [node.path]
+    );
     if (!focus) return;
     if (this.map) this.map.viewport.zoom = Math.max(this.map.viewport.zoom, 0.7);
     this.focusNode((_g = (_f = this.map) == null ? void 0 : _f.nodes.find((n) => n.id === node.id)) != null ? _g : node);
@@ -44853,36 +44863,15 @@ ${note.detail.trim()}` : "",
       integrated.parentId = null;
       integrated.x = Math.max(...sources2.map((node) => node.x)) + 340;
       integrated.y = sources2.reduce((sum, node) => sum + node.y, 0) / sources2.length;
-      await this.mapChange((map) => {
-        map.nodes.push(integrated);
-      });
+      await this.mapChangeSnapshots(
+        (map) => {
+          map.nodes.push(integrated);
+        },
+        true,
+        [integrated.path]
+      );
       const entry = this.history.undoEntry;
-      if (entry) {
-        entry.label = t("ui.confirm_new_synthesis_topic");
-        const mapUndo = entry.undo, mapRedo = entry.redo;
-        let parked = "";
-        entry.undo = async () => {
-          parked = await this.plugin.repo.moveUnique(
-            integrated.path,
-            this.plugin.repo.topicFolder(this.path, "Unassigned")
-          );
-          await this.plugin.repo.setLifecycle(parked, this.map.id, "", "unassigned");
-          try {
-            await mapUndo();
-          } catch (error) {
-            await this.plugin.repo.moveExact(parked, integrated.path);
-            await this.plugin.repo.setLifecycle(integrated.path, this.map.id, this.map.id, "active");
-            throw error;
-          }
-        };
-        entry.redo = async () => {
-          if (parked) {
-            await this.plugin.repo.moveExact(parked, integrated.path);
-            await this.plugin.repo.setLifecycle(integrated.path, this.map.id, this.map.id, "active");
-          }
-          await mapRedo();
-        };
-      }
+      if (entry) entry.label = t("ui.confirm_new_synthesis_topic");
       this.integrationTask = null;
       this.selected = integrated.id;
       this.multiSelected.clear();

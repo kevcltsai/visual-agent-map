@@ -144,6 +144,8 @@ export function begin(deps: TransactionDeps): Transaction {
       if (!item.written) continue;
       try {
         const current = await repo.readMap(item.mapPath);
+        // The write may never have happened (the save itself threw before changing the file): nothing to put back.
+        if (structure(current) === structure(item.restore)) continue;
         const next = clone(item.restore);
         next.viewport = current.viewport;
         await repo.saveMap(item.mapPath, next);

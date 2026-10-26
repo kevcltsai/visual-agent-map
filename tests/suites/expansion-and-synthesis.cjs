@@ -2544,3 +2544,28 @@ integrationTest('a topic added by hand or by an expansion without subtopic resea
   assert.match(await app.vault.cachedRead(app.vault.getAbstractFileByPath(child.path)), /research-mode: local/);
   assert.equal((await repo.readNote(parent.path)).researchMode, 'local', 'the parent (no research-mode) reads as Quick and is not touched');
 });
+// MapTransaction 02 C5: confirming a synthesis topic is one transaction entry; redo refuses (stale) after an unrecorded write.
+integrationTest('map transaction C5: synthesis topic undo parks the note, and redo after an unrecorded Map.md write refuses and keeps it', async () => {
+  const h = await templateHarness({ language: 'en' });
+  const other = await h.repo.createNote('Other', 'model-a', h.doc, h.mapPath, 'workspace'); h.doc.nodes.push(other); await h.repo.saveMap(h.mapPath, h.doc);
+  await h.view.createIntegratedNode('Combined', [h.topic, other], 'Compare', '');
+  const integrated = h.view.map.nodes.at(-1);
+  assert.equal((await h.repo.readNote(integrated.path)).title, 'Combined');
+  assert.equal(h.view.history.undoEntry.label, 'Create synthesis topic');
+  await h.view.travel(false);
+  assert.equal(h.view.map.nodes.some(n => n.id === integrated.id), false);
+  const parked = [...h.contents.keys()].find(p => p.startsWith('Agent Workspace/Topics/map-a/Unassigned/'));
+  assert.ok(parked, 'the note is parked in Unassigned');
+  assert.equal(h.contents.has(integrated.path), false);
+  const outside = await h.repo.readMap(h.mapPath);
+  outside.title = 'Written by AIM';
+  await h.repo.saveMap(h.mapPath, outside);
+  h.view.map = await h.repo.readMap(h.mapPath);
+  const before = new Map(h.contents);
+  const error = await h.view.travel(true).then(() => null, e => e);
+  assert.equal(error?.kind, 'stale');
+  assert.deepEqual([...h.contents], [...before], 'nothing was written');
+  assert.equal(h.contents.has(parked), true, 'the note stays parked');
+  assert.equal((await h.repo.readMap(h.mapPath)).title, 'Written by AIM');
+  assert.equal(h.view.history.canRedo, true, 'the pointer is back');
+});

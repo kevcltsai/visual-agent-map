@@ -481,3 +481,15 @@ integrationTest('map transaction: M8 History keeps working with transaction entr
   assert.equal(h.exists(h.notes[0]), false);
   assert.equal(h.exists(h.notes[1]), true);
 });
+
+integrationTest('map transaction: a Map.md save that always fails throws the original error, not a rollback failure', async () => {
+  const h = await harness();
+  const before = h.snapshot();
+  h.fail.saveMap = () => true;
+  const error = await rejected(begin(h.deps).editMap(MAP, map => { map.title = 'renamed'; }).commit());
+  assert.equal(error.message, 'injected saveMap 1');
+  assert.equal(isTransactionError(error), false);
+  assert.equal(error.kind, undefined);
+  assert.deepEqual(h.snapshot(), before);
+  assert.equal(h.counts.applied.length, 0);
+});

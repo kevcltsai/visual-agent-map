@@ -1722,6 +1722,7 @@ integrationTest('legacy AIM map: a viewport write that stamps the content langua
   view.map = clone(disk);
   view.plugin.repo.updateMap = async (_path, change) => { change(disk); disk.aim.contentLanguage ??= 'en'; return clone(disk); };
   view.plugin.repo.readMap = async () => clone(disk);
+  view.plugin.repo.saveMap = async (_path, map) => { Object.assign(disk, clone(map)); };
   view.plugin.rebuildDerivedData = async () => {};
   view.persist = async () => {};
   let cleared = 0; const history = view.history; const original = history.clear.bind(history); history.clear = () => { cleared++; original(); };

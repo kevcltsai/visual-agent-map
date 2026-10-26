@@ -70,12 +70,13 @@ test('the five context_ai prompt keys are gone from i18n and nothing in the plug
   }
 });
 
-test('the markdown call site in main.ts uses the Step Runner and the shared runtime provider only', () => {
+test('the markdown call site in main.ts goes through AiCalls only', () => {
   const main = fs.readFileSync(path.join(root, 'main.ts'), 'utf8');
   const start = main.indexOf('private async runMarkdownContextAi'), end = main.indexOf('private async markdownContextImage');
   const body = main.slice(start, end > start ? end : start + 4000);
-  assert.ok(start >= 0 && body.includes('runtimeStepProvider(') && body.includes('.send(prepared'));
-  assert.ok(!/\.runTask\(/.test(body), 'the call site does not call runTask itself');
+  assert.ok(start >= 0 && /this\.aiCalls\.run\(\s*prepared,/.test(body));
+  for (const text of ['runtimeStepProvider(', 'new StepRunner(', '.runTask(', 'activeTasks', 'new AbortController', 'finish:', 'onExchange', 'providerForModel('])
+    assert.doesNotMatch(body, new RegExp(text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')), `the call site does not use ${text}`);
 });
 
 test('imageMarkdown removes angle brackets as well as square ones from the title (no HTML in the alt text)', () => {

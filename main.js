@@ -47714,6 +47714,38 @@ var response_schema_default = {
   additionalProperties: false
 };
 
+// ui/fit-image-input.ts
+async function fitImageForInput(dataUrl, limits, signal) {
+  if (!limits) return dataUrl;
+  const image = createEl("img");
+  await new Promise((resolve, reject) => {
+    image.onload = () => resolve();
+    image.onerror = () => reject(new Error(t("ui.context_ai_image_unavailable")));
+    image.src = dataUrl;
+  });
+  if (signal.aborted) throw new Error(t("ui.ai_task_cancelled"));
+  const longest = Math.max(image.naturalWidth, image.naturalHeight);
+  if (dataUrl.length <= limits.maxBytes && longest <= limits.maxEdgePx) return dataUrl;
+  const canvas = createEl("canvas");
+  const context = canvas.getContext("2d");
+  if (!context) throw new Error(t("ui.context_ai_image_unavailable"));
+  for (const [edge, quality] of [
+    [1568, 0.9],
+    [1280, 0.85],
+    [1024, 0.8]
+  ]) {
+    const scale = Math.min(1, edge / longest);
+    canvas.width = Math.max(1, Math.round(image.naturalWidth * scale));
+    canvas.height = Math.max(1, Math.round(image.naturalHeight * scale));
+    context.fillStyle = "#fff";
+    context.fillRect(0, 0, canvas.width, canvas.height);
+    context.drawImage(image, 0, 0, canvas.width, canvas.height);
+    const fitted = canvas.toDataURL("image/jpeg", quality);
+    if (fitted.length <= limits.maxBytes) return fitted;
+  }
+  throw new Error(t("ui.context_ai_image_unavailable"));
+}
+
 // ui/outline-view.ts
 var import_obsidian32 = require("obsidian");
 var OUTLINE_VIEW_TYPE = "visual-agent-map-outline";
@@ -51407,105 +51439,8 @@ function parseImageCandidates(raw) {
   return found;
 }
 
-// core/runtime-step-provider.ts
-var import_node_crypto12 = require("node:crypto");
-function runtimeStepProvider(options) {
-  return {
-    async complete(call) {
-      const {
-        model,
-        effort,
-        topic,
-        mode = "task",
-        task = {},
-        onExchange,
-        finish = "completed",
-        requestLog = "request-and-prompt",
-        afterReply,
-        exchangeId,
-        extraMilestones
-      } = call.controls;
-      const started = options.exchanges();
-      const exchanges = {
-        sent: (...args) => {
-          var _a2;
-          return started ? (_a2 = options.exchanges()) == null ? void 0 : _a2.sent(...args) : void 0;
-        },
-        received: (...args) => {
-          var _a2;
-          return started ? (_a2 = options.exchanges()) == null ? void 0 : _a2.received(...args) : void 0;
-        },
-        completed: (...args) => {
-          var _a2;
-          return started ? (_a2 = options.exchanges()) == null ? void 0 : _a2.completed(...args) : void 0;
-        },
-        failed: (...args) => {
-          var _a2;
-          return started ? (_a2 = options.exchanges()) == null ? void 0 : _a2.failed(...args) : void 0;
-        },
-        milestones: (...args) => {
-          var _a2;
-          return started ? (_a2 = options.exchanges()) == null ? void 0 : _a2.milestones(...args) : void 0;
-        }
-      };
-      const milestones = {};
-      let milestonesWritten = false;
-      const writeMilestones = () => {
-        if (milestonesWritten) return;
-        milestonesWritten = true;
-        try {
-          Object.assign(milestones, { ...extraMilestones == null ? void 0 : extraMilestones(), ...milestones });
-        } catch (e) {
-        }
-        if (Object.keys(milestones).length) exchanges.milestones(id, milestones);
-      };
-      const id = exchangeId != null ? exchangeId : (0, import_node_crypto12.randomUUID)();
-      started == null ? void 0 : started.begin({
-        id,
-        startedAt: (/* @__PURE__ */ new Date()).toISOString(),
-        topic,
-        mode,
-        model,
-        effort,
-        step: stepLabel({ id: call.stepId, version: call.version })
-      });
-      if (started) onExchange == null ? void 0 : onExchange(id);
-      try {
-        const controls = {
-          ...task,
-          onMilestones: (data) => {
-            var _a2;
-            (_a2 = task.onMilestones) == null ? void 0 : _a2.call(task, data);
-            Object.assign(milestones, data);
-          },
-          onRequest: (data) => {
-            var _a2;
-            (_a2 = task.onRequest) == null ? void 0 : _a2.call(task, data);
-            exchanges.sent(
-              id,
-              JSON.stringify(requestLog === "request" ? data : { request: data, prompt: call.prompt }, null, 2),
-              call.prompt
-            );
-          }
-        };
-        const raw = providerForModel(model) === "claude" ? await options.claude().runTask(call.prompt, providerModelId(model), effort, call.schema, controls) : await options.codex(options.localCodex === true).runTask(call.prompt, model, effort, call.schema, controls);
-        afterReply == null ? void 0 : afterReply();
-        milestones.receivedAt = (/* @__PURE__ */ new Date()).toISOString();
-        exchanges.received(id, raw);
-        writeMilestones();
-        if (finish === "completed") exchanges.completed(id);
-        return raw;
-      } catch (error) {
-        writeMilestones();
-        if (finish === "completed") exchanges.failed(id, error instanceof Error ? error.message : String(error));
-        throw error;
-      }
-    }
-  };
-}
-
 // core/ai-calls.ts
-var import_node_crypto13 = require("node:crypto");
+var import_node_crypto12 = require("node:crypto");
 var AiCalls = class {
   constructor(options) {
     this.options = options;
@@ -51550,7 +51485,7 @@ var AiCalls = class {
       requestLog = "request-and-prompt",
       stopped = () => new Error(t("ui.ai_task_cancelled"))
     } = options;
-    const key2 = `${options.taskName}:${(0, import_node_crypto13.randomUUID)()}`;
+    const key2 = `${options.taskName}:${(0, import_node_crypto12.randomUUID)()}`;
     const controller = new AbortController();
     const abort = () => controller.abort();
     options.signal.addEventListener("abort", abort, { once: true });
@@ -51558,7 +51493,7 @@ var AiCalls = class {
     this.activeTasks.set(key2, controller);
     const started = this.options.exchanges();
     const log = () => started ? this.options.exchanges() : void 0;
-    const id = (_b2 = options.exchangeId) != null ? _b2 : (0, import_node_crypto13.randomUUID)();
+    const id = (_b2 = options.exchangeId) != null ? _b2 : (0, import_node_crypto12.randomUUID)();
     const milestones = {};
     let milestonesWritten = false;
     const writeMilestones = () => {
@@ -53635,6 +53570,103 @@ var ResearchProgressStore = class {
 
 // core/ai-task-service.ts
 var import_node_crypto14 = require("node:crypto");
+
+// core/runtime-step-provider.ts
+var import_node_crypto13 = require("node:crypto");
+function runtimeStepProvider(options) {
+  return {
+    async complete(call) {
+      const {
+        model,
+        effort,
+        topic,
+        mode = "task",
+        task = {},
+        onExchange,
+        finish = "completed",
+        requestLog = "request-and-prompt",
+        afterReply,
+        exchangeId,
+        extraMilestones
+      } = call.controls;
+      const started = options.exchanges();
+      const exchanges = {
+        sent: (...args) => {
+          var _a2;
+          return started ? (_a2 = options.exchanges()) == null ? void 0 : _a2.sent(...args) : void 0;
+        },
+        received: (...args) => {
+          var _a2;
+          return started ? (_a2 = options.exchanges()) == null ? void 0 : _a2.received(...args) : void 0;
+        },
+        completed: (...args) => {
+          var _a2;
+          return started ? (_a2 = options.exchanges()) == null ? void 0 : _a2.completed(...args) : void 0;
+        },
+        failed: (...args) => {
+          var _a2;
+          return started ? (_a2 = options.exchanges()) == null ? void 0 : _a2.failed(...args) : void 0;
+        },
+        milestones: (...args) => {
+          var _a2;
+          return started ? (_a2 = options.exchanges()) == null ? void 0 : _a2.milestones(...args) : void 0;
+        }
+      };
+      const milestones = {};
+      let milestonesWritten = false;
+      const writeMilestones = () => {
+        if (milestonesWritten) return;
+        milestonesWritten = true;
+        try {
+          Object.assign(milestones, { ...extraMilestones == null ? void 0 : extraMilestones(), ...milestones });
+        } catch (e) {
+        }
+        if (Object.keys(milestones).length) exchanges.milestones(id, milestones);
+      };
+      const id = exchangeId != null ? exchangeId : (0, import_node_crypto13.randomUUID)();
+      started == null ? void 0 : started.begin({
+        id,
+        startedAt: (/* @__PURE__ */ new Date()).toISOString(),
+        topic,
+        mode,
+        model,
+        effort,
+        step: stepLabel({ id: call.stepId, version: call.version })
+      });
+      if (started) onExchange == null ? void 0 : onExchange(id);
+      try {
+        const controls = {
+          ...task,
+          onMilestones: (data) => {
+            var _a2;
+            (_a2 = task.onMilestones) == null ? void 0 : _a2.call(task, data);
+            Object.assign(milestones, data);
+          },
+          onRequest: (data) => {
+            var _a2;
+            (_a2 = task.onRequest) == null ? void 0 : _a2.call(task, data);
+            exchanges.sent(
+              id,
+              JSON.stringify(requestLog === "request" ? data : { request: data, prompt: call.prompt }, null, 2),
+              call.prompt
+            );
+          }
+        };
+        const raw = providerForModel(model) === "claude" ? await options.claude().runTask(call.prompt, providerModelId(model), effort, call.schema, controls) : await options.codex(options.localCodex === true).runTask(call.prompt, model, effort, call.schema, controls);
+        afterReply == null ? void 0 : afterReply();
+        milestones.receivedAt = (/* @__PURE__ */ new Date()).toISOString();
+        exchanges.received(id, raw);
+        writeMilestones();
+        if (finish === "completed") exchanges.completed(id);
+        return raw;
+      } catch (error) {
+        writeMilestones();
+        if (finish === "completed") exchanges.failed(id, error instanceof Error ? error.message : String(error));
+        throw error;
+      }
+    }
+  };
+}
 
 // core/steps/reference/extract.zh.md
 var extract_zh_default = "\u5F9E\u6BCF\u500B\u63D0\u4F9B\u7684\u4F86\u6E90\u6BB5\u843D\u64F7\u53D6\u76F8\u95DC\u4E8B\u5BE6\u3001\u8B49\u64DA\u3001\u5206\u6B67\u8207\u9650\u5236\u3002\u4E0D\u53EF\u56E0\u4F86\u6E90\u770B\u4F3C\u4E0D\u76F8\u95DC\u5C31\u7565\u904E\u3002\u6BCF\u9805\u64F7\u53D6\u5167\u5BB9\u90FD\u8981\u5728\u4E3B\u5F35\u65C1\u4FDD\u7559\u539F\u59CB [S#]\uFF0C\u4E26\u9644\u4E0A\u672C\u6279\u6240\u6709 [S#] \u5C0D\u61C9\u539F\u59CB\u5B8C\u6574\u8DEF\u5F91\u7684\u4F86\u6E90\u5C0D\u7167\u8868\u3002\u4FDD\u7559\u6709\u52A9\u8FA8\u8B58\u7AE0\u7BC0\u7684\u6A19\u984C\uFF1B\u6700\u7D42\u7B54\u6848\u9700\u8981\u9019\u4EFD\u5C0D\u7167\u8868\u624D\u80FD\u5F15\u7528\u539F\u6A94\u3002\u4E0D\u53EF\u8D85\u51FA\u539F\u6587\u63A8\u8AD6\u3002\n";
@@ -56274,36 +56306,6 @@ ${value}
 };
 
 // main.ts
-async function fitImageForClaude(dataUrl, signal) {
-  const limit = 5 * 1024 * 1024;
-  const image = createEl("img");
-  await new Promise((resolve, reject) => {
-    image.onload = () => resolve();
-    image.onerror = () => reject(new Error(t("ui.context_ai_image_unavailable")));
-    image.src = dataUrl;
-  });
-  if (signal.aborted) throw new Error(t("ui.ai_task_cancelled"));
-  const longest = Math.max(image.naturalWidth, image.naturalHeight);
-  if (dataUrl.length <= limit && longest <= 1568) return dataUrl;
-  const canvas = createEl("canvas");
-  const context = canvas.getContext("2d");
-  if (!context) throw new Error(t("ui.context_ai_image_unavailable"));
-  for (const [edge, quality] of [
-    [1568, 0.9],
-    [1280, 0.85],
-    [1024, 0.8]
-  ]) {
-    const scale = Math.min(1, edge / longest);
-    canvas.width = Math.max(1, Math.round(image.naturalWidth * scale));
-    canvas.height = Math.max(1, Math.round(image.naturalHeight * scale));
-    context.fillStyle = "#fff";
-    context.fillRect(0, 0, canvas.width, canvas.height);
-    context.drawImage(image, 0, 0, canvas.width, canvas.height);
-    const fitted = canvas.toDataURL("image/jpeg", quality);
-    if (fitted.length <= limit) return fitted;
-  }
-  throw new Error(t("ui.context_ai_image_unavailable"));
-}
 function settingsFromSaved(saved) {
   var _a2, _b2;
   const legacy = saved;
@@ -57646,65 +57648,39 @@ ${t("ui.organize_link_wait_hint")}`;
     return result;
   }
   async runMarkdownContextAi(prepared, model, signal, image, webSearch = false, generateImage = false) {
-    if (generateImage && providerForModel(model) === "claude")
-      throw new Error(t("ui.context_ai_image_generation_codex"));
+    const capabilities = this.aiCalls.capabilitiesFor(model, { imageGeneration: generateImage });
     const loaded = image ? await this.markdownContextImage(image, signal) : void 0;
-    const imageDataUrl = loaded && providerForModel(model) === "claude" ? await fitImageForClaude(loaded, signal) : loaded;
+    const imageDataUrl = loaded ? await fitImageForInput(loaded, capabilities.imageInput, signal) : void 0;
     if (signal.aborted) throw new Error(t("ui.ai_task_cancelled"));
-    const directory = this.pluginDirectory();
+    this.pluginDirectory();
     const effort = effectiveReasoningLevel(
       { title: "Selected Markdown text", summary: "", detail: "", rules: "", task: prepared.prompt, ancestors: "" },
       normalizeReasoningLevel(this.settings.cliReasoning)
     );
-    const exchanges = this.settings.aiExchangeLoggingEnabled ? this.exchanges : null;
-    const key2 = `markdown-context:${(0, import_node_crypto15.randomUUID)()}`;
-    const controller = new AbortController();
-    const abort = () => controller.abort();
-    signal.addEventListener("abort", abort, { once: true });
-    if (signal.aborted) controller.abort();
-    this.activeTasks.set(key2, controller);
-    let exchangeId;
-    try {
-      const provider = runtimeStepProvider({
-        claude: () => this.claudeCli(directory),
-        codex: (local) => this.runtime(directory, local),
-        exchanges: () => this.settings.aiExchangeLoggingEnabled ? this.exchanges : null,
-        localCodex: !webSearch
-      });
-      const { raw } = await new StepRunner(provider).send(prepared, {
+    return this.aiCalls.run(
+      prepared,
+      {
         model,
         effort,
         topic: "Markdown selection",
-        finish: "caller",
-        // A reply that arrives after the stop is refused before the provider logs it as received.
-        afterReply: () => {
-          if (controller.signal.aborted) throw new Error(t("ui.ai_task_cancelled"));
-        },
-        onExchange: (id) => {
-          exchangeId = id;
-        },
+        taskName: "markdown-context",
+        signal,
+        localCodex: !webSearch,
         task: {
           textOnly: !webSearch && !generateImage,
           webSearchOnly: webSearch,
           generateImage,
           imageDataUrl,
-          signal: controller.signal,
           searchBudget: webSearch ? 4 : 0,
           // Drawing takes longer than a text reply.
           ...generateImage ? { timeoutMs: 6 * 60 * 1e3 } : {}
         }
-      });
-      if (controller.signal.aborted) throw new Error(t("ui.ai_task_cancelled"));
-      if (this.settings.aiExchangeLoggingEnabled && exchangeId) exchanges == null ? void 0 : exchanges.completed(exchangeId);
-      return raw;
-    } catch (error) {
-      if (this.settings.aiExchangeLoggingEnabled && exchangeId)
-        exchanges == null ? void 0 : exchanges.failed(exchangeId, error instanceof Error ? error.message : String(error));
-      throw error;
-    } finally {
-      signal.removeEventListener("abort", abort);
-      this.activeTasks.delete(key2);
-    }
+      },
+      (raw, exchange) => {
+        if (exchange.signal.aborted) throw new Error(t("ui.ai_task_cancelled"));
+        return raw;
+      }
+    );
   }
   async openCoffeeHandoff(session, sourcePath, insightId) {
     try {

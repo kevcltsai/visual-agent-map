@@ -67,6 +67,7 @@ import type { ReasoningLevel } from "./ai/types";
 import responseSchema from "./response-schema.json";
 import type { AiResult, AiTaskKind, Suggestion, TaskContext } from "./ai/types";
 import { clampPreviewScale, legacyPreviewScale } from "./ui/preview-utils";
+import { fitImageForInput } from "./ui/fit-image-input";
 import { BUILTIN_SAMPLE_ID, builtInSample } from "./builtin-sample";
 import { debugLog, LogManager } from "./log-manager";
 import { AiExchangeLog } from "./ai-exchange-log";
@@ -83,10 +84,9 @@ import { CodexAppServerRuntime, type CodexWebSearchEvent } from "./ai/runtime/co
 import { ClaudeCodeCliRuntime } from "./ai/runtime/claude-code-cli";
 import { CLAUDE_MODEL_CHOICES, providerForModel, providerModelId } from "./ai/providers/provider";
 import { ThinkingCore } from "./core/thinking-core";
-import { StepRunner, prepareStep, type PreparedStep } from "./core/step-runner";
+import { prepareStep, type PreparedStep } from "./core/step-runner";
 import type { ImageCandidate } from "./core/image-candidates";
 import { imageSearchStep } from "./core/steps/image-search/step";
-import { runtimeStepProvider } from "./core/runtime-step-provider";
 import { AiCalls } from "./core/ai-calls";
 import { AiRuntimeService } from "./core/ai-runtime-service";
 import { ModelDiscovery, type ModelDiscoveryState } from "./core/model-discovery";
@@ -118,37 +118,6 @@ export { ChildProposalModal, DraftReviewModal, NextStepModal } from "./experienc
 export { VisualAgentMapSettingTab } from "./ui/settings-tab";
 export { firstMarkdownImage, firstMarkdownTable, markdownImages } from "./ui/preview-utils";
 export type { AiRunMetrics, PreparedTaskContext } from "./ai/types";
-/** Claude takes images up to 5 MB and works best within 1568 px; larger ones are re-encoded as JPEG. */
-async function fitImageForClaude(dataUrl: string, signal: AbortSignal): Promise<string> {
-  const limit = 5 * 1024 * 1024;
-  const image = createEl("img");
-  await new Promise<void>((resolve, reject) => {
-    image.onload = () => resolve();
-    image.onerror = () => reject(new Error(t("ui.context_ai_image_unavailable")));
-    image.src = dataUrl;
-  });
-  if (signal.aborted) throw new Error(t("ui.ai_task_cancelled"));
-  const longest = Math.max(image.naturalWidth, image.naturalHeight);
-  if (dataUrl.length <= limit && longest <= 1568) return dataUrl;
-  const canvas = createEl("canvas");
-  const context = canvas.getContext("2d");
-  if (!context) throw new Error(t("ui.context_ai_image_unavailable"));
-  for (const [edge, quality] of [
-    [1568, 0.9],
-    [1280, 0.85],
-    [1024, 0.8]
-  ] as const) {
-    const scale = Math.min(1, edge / longest);
-    canvas.width = Math.max(1, Math.round(image.naturalWidth * scale));
-    canvas.height = Math.max(1, Math.round(image.naturalHeight * scale));
-    context.fillStyle = "#fff";
-    context.fillRect(0, 0, canvas.width, canvas.height);
-    context.drawImage(image, 0, 0, canvas.width, canvas.height);
-    const fitted = canvas.toDataURL("image/jpeg", quality);
-    if (fitted.length <= limit) return fitted;
-  }
-  throw new Error(t("ui.context_ai_image_unavailable"));
-}
 
 /** The settings in effect for what was saved: every field is checked, and a missing or invalid one takes its default. */
 export function settingsFromSaved(saved: Partial<Settings> | null): Settings {
@@ -1590,68 +1559,40 @@ export default class VisualAgentMapPlugin extends Plugin {
     webSearch = false,
     generateImage = false
   ): Promise<string> {
-    // Only Codex can draw; Claude Code has no image generation tool.
-    if (generateImage && providerForModel(model) === "claude")
-      throw new Error(t("ui.context_ai_image_generation_codex"));
+    const capabilities = this.aiCalls.capabilitiesFor(model, { imageGeneration: generateImage });
     const loaded = image ? await this.markdownContextImage(image, signal) : undefined;
-    const imageDataUrl =
-      loaded && providerForModel(model) === "claude" ? await fitImageForClaude(loaded, signal) : loaded;
+    const imageDataUrl = loaded ? await fitImageForInput(loaded, capabilities.imageInput, signal) : undefined;
     if (signal.aborted) throw new Error(t("ui.ai_task_cancelled"));
-    const directory = this.pluginDirectory();
+    // Fail before anything is registered or logged when there is no plugin directory (not desktop Obsidian).
+    this.pluginDirectory();
     const effort = effectiveReasoningLevel(
       { title: "Selected Markdown text", summary: "", detail: "", rules: "", task: prepared.prompt, ancestors: "" },
       normalizeReasoningLevel(this.settings.cliReasoning)
     );
-    const exchanges = this.settings.aiExchangeLoggingEnabled ? this.exchanges : null;
-    const key = `markdown-context:${randomUUID()}`;
-    const controller = new AbortController();
-    const abort = (): void => controller.abort();
-    signal.addEventListener("abort", abort, { once: true });
-    if (signal.aborted) controller.abort();
-    this.activeTasks.set(key, controller);
-    // "caller" keeps the exchange entry open after `received`, so the abort check below can still end it as failed.
-    let exchangeId: string | undefined;
-    try {
-      const provider = runtimeStepProvider({
-        claude: () => this.claudeCli(directory),
-        codex: local => this.runtime(directory, local),
-        exchanges: () => (this.settings.aiExchangeLoggingEnabled ? this.exchanges : null),
-        localCodex: !webSearch
-      });
-      const { raw } = await new StepRunner(provider).send(prepared, {
+    return this.aiCalls.run(
+      prepared,
+      {
         model,
         effort,
         topic: "Markdown selection",
-        finish: "caller",
-        // A reply that arrives after the stop is refused before the provider logs it as received.
-        afterReply: () => {
-          if (controller.signal.aborted) throw new Error(t("ui.ai_task_cancelled"));
-        },
-        onExchange: id => {
-          exchangeId = id;
-        },
+        taskName: "markdown-context",
+        signal,
+        localCodex: !webSearch,
         task: {
           textOnly: !webSearch && !generateImage,
           webSearchOnly: webSearch,
           generateImage,
           imageDataUrl,
-          signal: controller.signal,
           searchBudget: webSearch ? 4 : 0,
           // Drawing takes longer than a text reply.
           ...(generateImage ? { timeoutMs: 6 * 60 * 1000 } : {})
         }
-      });
-      if (controller.signal.aborted) throw new Error(t("ui.ai_task_cancelled"));
-      if (this.settings.aiExchangeLoggingEnabled && exchangeId) exchanges?.completed(exchangeId);
-      return raw;
-    } catch (error) {
-      if (this.settings.aiExchangeLoggingEnabled && exchangeId)
-        exchanges?.failed(exchangeId, error instanceof Error ? error.message : String(error));
-      throw error;
-    } finally {
-      signal.removeEventListener("abort", abort);
-      this.activeTasks.delete(key);
-    }
+      },
+      (raw, exchange) => {
+        if (exchange.signal.aborted) throw new Error(t("ui.ai_task_cancelled"));
+        return raw;
+      }
+    );
   }
   async openCoffeeHandoff(session: CoffeeSession, sourcePath: string, insightId?: string): Promise<void> {
     try {

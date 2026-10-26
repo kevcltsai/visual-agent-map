@@ -1978,7 +1978,6 @@ test('map chat E1: the panel gives the note in the reader\'s language, and all t
 test('map chat E1: long dense replies streamed in bursts of chunks, then a short reply, lay out in a small multiple of one parse', () => {
   const dense = DENSE.repeat(1850); const short = 'word '.repeat(400);
   const once = run => { const start = process.hrtime.bigint(); run(); return Number(process.hrtime.bigint() - start) / 1e6; };
-  const best = (count, run) => { let min = Infinity; for (let i = 0; i < count; i++) min = Math.min(min, once(run)); return min; };
   // Six dense turns kept in the log, each streamed as 30 chunks with a frame after every third chunk, then a short turn.
   const streamed = () => {
     const clock = frames(); const f = panelFixture({}, clock.window); f.panel.setOpen(true);
@@ -1989,9 +1988,11 @@ test('map chat E1: long dense replies streamed in bursts of chunks, then a short
     }
   };
   streamed(); // warm up
-  // The bound is relative, measured in this process: one inline parse of the head of the same dense reply is the unit (it does not depend on the element budget), so a slow machine moves both sides.
-  const { parseInline } = load('core/map-chat-render.ts'); const unit = best(5, () => parseInline(dense.slice(0, 50000)));
-  const ms = best(5, streamed); const ratio = ms / unit;
+  // The bound is relative, measured in this process: one inline parse of the head of the same dense reply is the unit (it does not depend on the element budget).
+  // Each round times the unit as the mean of ten parses right before the streamed run, so both sides see the same machine load; a best-of-N unit would find a quiet 4 ms slice that a 1 s run never gets under load.
+  const { parseInline } = load('core/map-chat-render.ts');
+  const round = () => { const unit = once(() => { for (let i = 0; i < 10; i++) parseInline(dense.slice(0, 50000)); }) / 10; const ms = once(streamed); return { ms, unit, ratio: ms / unit }; };
+  const { ms, unit, ratio } = Array.from({ length: 5 }, round).reduce((a, b) => (b.ratio < a.ratio ? b : a));
   console.log(`E1 timing: ${ms.toFixed(0)} ms for the streamed run, ${unit.toFixed(1)} ms for one parse, ratio ${ratio.toFixed(1)}`);
   assert.ok(ratio <= STREAM_RATIO_LIMIT, `${ms.toFixed(0)} ms is ${ratio.toFixed(1)} times one parse (${unit.toFixed(1)} ms)`);
 });

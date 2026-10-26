@@ -114,3 +114,36 @@ test('the measurement tool gives sane numbers for an empty note and a very long 
   assert.ok(sizes.empty < sizes.typical && sizes.typical < sizes.long);
   assert.ok(filler('t', 0, 1) === '');
 });
+
+// Ticket 09 (08 R2 low): a first copy in a field the budget trim may cut must not hide the later copies. A repeat in a
+// field the trim never cuts is itself a complete copy that survives, so the repeats after it can point at it.
+test('a first copy in a trimmable field still lets a later copy in a safe field be referenced by the repeats after it', () => {
+  const text = passage('CHAIN-PASSAGE', 300);
+  const out = deduplicateAimRequest({ ...base, detail: `Prior:\n\n${text}`, ancestors: `Lineage:\n\n${text}`, summary: text, rules: text, title: text });
+  assert.equal(out.detail.includes(text), true, 'the first copy is kept');
+  assert.equal(out.ancestors.includes(text), true, 'a trimmable field never references another trimmable field');
+  assert.equal(out.summary, text, 'the first copy outside the trimmable fields is kept in full');
+  assert.equal(out.rules, PASSAGE_REFERENCE, 'the repeat after it is a reference');
+  assert.equal(out.title, PASSAGE_REFERENCE);
+  const sent = buildPreparedTaskContext(out, 'model').context;
+  assert.ok(occurrences(all(sent), text) >= 1, 'a complete copy is still sent');
+});
+
+test('the chained reference survives the real budget trim of the trimmable copies', () => {
+  const text = passage('CHAIN-TRIM', 300);
+  const big = 'filler sentence. '.repeat(9000);
+  const request = { ...base, task: 'Do X', detail: `${big}\n\n${text}`, ancestors: `${big}\n\n${text}`, summary: text, rules: text };
+  const sent = buildPreparedTaskContext(deduplicateAimRequest(request), 'model').context;
+  const textAfter = all(sent);
+  assert.ok(occurrences(textAfter, PASSAGE_REFERENCE) === 0 || occurrences(textAfter, text) >= 1, 'a reference never outlives every complete copy');
+  assert.equal(sent.rules, PASSAGE_REFERENCE);
+  assert.equal(sent.summary, text);
+});
+
+test('a repeat that differs by one character is not referenced (a changed input is never treated as the same passage)', () => {
+  const text = passage('CHANGE', 300);
+  const changed = text.slice(0, -1) + 'y';
+  const out = deduplicateAimRequest({ ...base, detail: `Prior:\n\n${text}`, summary: text, rules: changed });
+  assert.equal(out.rules, changed, 'the changed passage stays in full');
+  assert.equal(out.summary, text);
+});

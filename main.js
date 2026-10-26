@@ -29872,11 +29872,13 @@ function deduplicateAimRequest(context) {
   const prepared = { ...context };
   const passages = /* @__PURE__ */ new Map();
   const copyFor = (text11, key2) => {
-    const copy = passages.get(text11);
-    return copy !== void 0 && (!TRIMMED_FIELDS.has(copy.key) || copy.key === key2);
+    const copies = passages.get(text11);
+    return copies !== void 0 && [...copies].some((copyKey) => !TRIMMED_FIELDS.has(copyKey) || copyKey === key2);
   };
   const remember = (text11, key2) => {
-    if (!passages.has(text11)) passages.set(text11, { id: passages.size + 1, key: key2 });
+    const copies = passages.get(text11);
+    if (copies) copies.add(key2);
+    else passages.set(text11, /* @__PURE__ */ new Set([key2]));
   };
   for (const key2 of ["task", "detail", "ancestors", "workingFindings", "summary", "rules", "title"]) {
     const value = prepared[key2];

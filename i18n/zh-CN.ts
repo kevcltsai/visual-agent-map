@@ -1913,6 +1913,7 @@ export const zhCN: Record<TranslationKey, string> = {
   "log.stopped_result_not_written": "研究已停止，结果未写入。",
   "log.topic_write_failed_0": "写入议题失败：{0}",
   "error.topic_state_change_rollback_failed": "议题状态转换失败，且无法完整恢复",
+  "error.map_transaction_stale": "笔记或地图已在其他地方被更改，无法再撤销或重做此更改。",
   "error.batch_remove_rollback_failed": "批量移除失败，且无法完整恢复",
   "error.copy_rollback_restore_failed": "复原复制失败，且无法完整回复",
   "error.batch_copy_rollback_failed": "批量复制失败，且无法完整恢复",

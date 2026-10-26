@@ -2067,6 +2067,8 @@ export const en = {
   "log.stopped_result_not_written": "Research stopped; the result was not written.",
   "log.topic_write_failed_0": "Writing the topic failed: {0}",
   "error.topic_state_change_rollback_failed": "Changing the topic state failed and could not be fully undone",
+  "error.map_transaction_stale":
+    "This change can no longer be undone or redone because the notes or the map were changed elsewhere.",
   "error.batch_remove_rollback_failed": "Batch removal failed and could not be fully undone",
   "error.copy_rollback_restore_failed": "Undoing the copy failed and could not be fully restored",
   "error.batch_copy_rollback_failed": "Batch copy failed and could not be fully undone",

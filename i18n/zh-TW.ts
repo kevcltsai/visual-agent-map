@@ -1914,6 +1914,7 @@ export const zhTW: Record<TranslationKey, string> = {
   "log.stopped_result_not_written": "研究已停止，結果未寫入。",
   "log.topic_write_failed_0": "寫入議題失敗：{0}",
   "error.topic_state_change_rollback_failed": "議題狀態轉換失敗，且無法完整復原",
+  "error.map_transaction_stale": "筆記或地圖已在其他地方被更動，無法再復原或重做這個變更。",
   "error.batch_remove_rollback_failed": "批次移除失敗，且無法完整復原",
   "error.copy_rollback_restore_failed": "復原複製失敗，且無法完整回復",
   "error.batch_copy_rollback_failed": "批次複製失敗，且無法完整復原",

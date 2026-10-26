@@ -5,7 +5,14 @@ import { ClaudeCodeCliRuntime, type ClaudeProcess, type ClaudeSpawn } from "../a
 import { ClaudeWarmPool, type WarmClock } from "../ai/runtime/claude-warm-pool";
 import type { LogLevel } from "../log-manager";
 import { providerForModel, providerModelId } from "../ai/providers/provider";
-import { CLAUDE_CAPABILITIES, CODEX_CAPABILITIES, type AiRuntime } from "./ai-runtime";
+import {
+  CLAUDE_CAPABILITIES,
+  CODEX_CAPABILITIES,
+  type AiRuntime,
+  type AiRuntimeId,
+  type AiRuntimeReadinessResult
+} from "./ai-runtime";
+import type { ModelDiscoveryState } from "./model-discovery";
 
 export type ProcessEnvironment = Record<string, string | undefined>;
 
@@ -81,21 +88,62 @@ export const shellExecutableProbe: ExecutableProbe = {
   }
 };
 
+/** What the runtimes' readiness checks read from the plugin. */
+export interface AiRuntimeChecks {
+  /** Must be the plugin's `refreshModelDiscovery`: it also saves the Codex model list to settings. */
+  refresh(id: AiRuntimeId): Promise<Pick<ModelDiscoveryState, "status" | "models">>;
+  codexInstalled(): boolean;
+}
+
+function checksOf(checks: AiRuntimeChecks | undefined): AiRuntimeChecks {
+  if (!checks) throw new Error("AiRuntimeService needs a checks option for readiness");
+  return checks;
+}
+
 /** The Claude Code CLI as an {@link AiRuntime}; `get` is read when a call runs, so nothing starts before then. */
-export function claudeCodeAiRuntime(get: () => Pick<ClaudeCodeCliRuntime, "runTask">): AiRuntime {
+export function claudeCodeAiRuntime(
+  get: () => Pick<ClaudeCodeCliRuntime, "runTask" | "prewarm">,
+  checks?: AiRuntimeChecks
+): AiRuntime {
   return {
     capabilities: CLAUDE_CAPABILITIES,
     run: async ({ prompt, model, effort, schema, controls }) =>
-      get().runTask(prompt, providerModelId(model), effort, schema, controls)
+      get().runTask(prompt, providerModelId(model), effort, schema, controls),
+    readiness: async model => {
+      const state = await checksOf(checks).refresh("claude");
+      if (state.status === "missing") return { status: "missing" };
+      // Not on the list, or any other state: it cannot run, and there is nothing to report.
+      return state.status === "ready" && state.models.includes(model) ? { status: "ready" } : { status: "error" };
+    },
+    prewarm: (model, { effort, schema, webSearch }) => {
+      get().prewarm(providerModelId(model), effort, schema, webSearch);
+    }
   };
 }
 
 /** The Codex app server as an {@link AiRuntime}; `get` receives `localCodex` (the runtime without web search). */
-export function codexAppServerAiRuntime(get: (local: boolean) => Pick<CodexAppServerRuntime, "runTask">): AiRuntime {
+export function codexAppServerAiRuntime(
+  get: (local: boolean) => Pick<CodexAppServerRuntime, "runTask">,
+  checks?: AiRuntimeChecks
+): AiRuntime {
   return {
     capabilities: CODEX_CAPABILITIES,
     run: async ({ prompt, model, effort, schema, controls, localCodex }) =>
-      get(localCodex).runTask(prompt, model, effort, schema, controls)
+      get(localCodex).runTask(prompt, model, effort, schema, controls),
+    readiness: async (model): Promise<AiRuntimeReadinessResult> => {
+      const c = checksOf(checks);
+      if (!c.codexInstalled()) return { status: "missing" };
+      try {
+        const state = await c.refresh("codex");
+        if (state.status === "ready" && state.models.includes(model)) return { status: "ready" };
+        return state.status === "missing" ? { status: "missing" } : { status: "model-unavailable" };
+      } catch (error) {
+        return { status: "error", error: error instanceof Error ? error.message : String(error) };
+      }
+    },
+    prewarm: () => {
+      // capabilities.prewarm is false: AiCalls never calls this.
+    }
   };
 }
 
@@ -103,13 +151,14 @@ export function codexAppServerAiRuntime(get: (local: boolean) => Pick<CodexAppSe
 export function aiRuntimeForModel(
   model: string,
   sources: {
-    claude: () => Pick<ClaudeCodeCliRuntime, "runTask">;
+    claude: () => Pick<ClaudeCodeCliRuntime, "runTask" | "prewarm">;
     codex: (local: boolean) => Pick<CodexAppServerRuntime, "runTask">;
+    checks?: AiRuntimeChecks;
   }
 ): AiRuntime {
   return providerForModel(model) === "claude"
-    ? claudeCodeAiRuntime(sources.claude)
-    : codexAppServerAiRuntime(sources.codex);
+    ? claudeCodeAiRuntime(sources.claude, sources.checks)
+    : codexAppServerAiRuntime(sources.codex, sources.checks);
 }
 
 export interface AiRuntimeServiceOptions {
@@ -127,6 +176,8 @@ export interface AiRuntimeServiceOptions {
   readLocalFile?: ReadLocalFile;
   /** The plugin folder the runtimes start in; read when a call runs. Needed only by `runtimeFor`. */
   pluginDirectory?: () => string;
+  /** What readiness reads from the plugin. Needed only by `runtimeFor(...).readiness`. */
+  checks?: AiRuntimeChecks;
 }
 
 export class AiRuntimeService {
@@ -221,7 +272,8 @@ export class AiRuntimeService {
     };
     return aiRuntimeForModel(model, {
       claude: () => this.claude(directory()),
-      codex: local => this.codex(directory(), local)
+      codex: local => this.codex(directory(), local),
+      checks: this.options.checks
     });
   }
 

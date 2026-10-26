@@ -51361,6 +51361,13 @@ var AiCalls = class {
       throw new Error(t("ui.context_ai_image_generation_codex"));
     return capabilities;
   }
+  /** Pre-starts the runtime serving `model` for a call with these settings (no model call); a runtime that cannot pre-start drops any waiting process instead. */
+  prewarm(model, options) {
+    var _a2, _b2;
+    const runtime = this.options.runtimeFor(model);
+    if (runtime.capabilities.prewarm) runtime.prewarm(model, options);
+    else (_b2 = (_a2 = this.options).releaseWarm) == null ? void 0 : _b2.call(_a2);
+  }
   /**
    * Sends a prepared step. A value that is not a `PreparedStep` throws before anything is registered or logged.
    * `finish` gets the raw reply and ends the entry (parse, `exchange.parsed()`); returning writes `completed`.
@@ -53124,20 +53131,45 @@ var shellExecutableProbe = {
     return ((_a2 = runShell(LIST_DIRECTORY_SCRIPT, [directory])) != null ? _a2 : "").split("\n").filter(Boolean);
   }
 };
-function claudeCodeAiRuntime(get) {
+function checksOf(checks) {
+  if (!checks) throw new Error("AiRuntimeService needs a checks option for readiness");
+  return checks;
+}
+function claudeCodeAiRuntime(get, checks) {
   return {
     capabilities: CLAUDE_CAPABILITIES,
-    run: async ({ prompt, model, effort, schema, controls }) => get().runTask(prompt, providerModelId(model), effort, schema, controls)
+    run: async ({ prompt, model, effort, schema, controls }) => get().runTask(prompt, providerModelId(model), effort, schema, controls),
+    readiness: async (model) => {
+      const state = await checksOf(checks).refresh("claude");
+      if (state.status === "missing") return { status: "missing" };
+      return state.status === "ready" && state.models.includes(model) ? { status: "ready" } : { status: "error" };
+    },
+    prewarm: (model, { effort, schema, webSearch }) => {
+      get().prewarm(providerModelId(model), effort, schema, webSearch);
+    }
   };
 }
-function codexAppServerAiRuntime(get) {
+function codexAppServerAiRuntime(get, checks) {
   return {
     capabilities: CODEX_CAPABILITIES,
-    run: async ({ prompt, model, effort, schema, controls, localCodex }) => get(localCodex).runTask(prompt, model, effort, schema, controls)
+    run: async ({ prompt, model, effort, schema, controls, localCodex }) => get(localCodex).runTask(prompt, model, effort, schema, controls),
+    readiness: async (model) => {
+      const c = checksOf(checks);
+      if (!c.codexInstalled()) return { status: "missing" };
+      try {
+        const state = await c.refresh("codex");
+        if (state.status === "ready" && state.models.includes(model)) return { status: "ready" };
+        return state.status === "missing" ? { status: "missing" } : { status: "model-unavailable" };
+      } catch (error) {
+        return { status: "error", error: error instanceof Error ? error.message : String(error) };
+      }
+    },
+    prewarm: () => {
+    }
   };
 }
 function aiRuntimeForModel(model, sources2) {
-  return providerForModel(model) === "claude" ? claudeCodeAiRuntime(sources2.claude) : codexAppServerAiRuntime(sources2.codex);
+  return providerForModel(model) === "claude" ? claudeCodeAiRuntime(sources2.claude, sources2.checks) : codexAppServerAiRuntime(sources2.codex, sources2.checks);
 }
 var AiRuntimeService = class {
   constructor(options) {
@@ -53223,7 +53255,8 @@ var AiRuntimeService = class {
     };
     return aiRuntimeForModel(model, {
       claude: () => this.claude(directory()),
-      codex: (local) => this.codex(directory(), local)
+      codex: (local) => this.codex(directory(), local),
+      checks: this.options.checks
     });
   }
   resolveExecutable(configured) {

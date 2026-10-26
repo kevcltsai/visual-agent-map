@@ -48,10 +48,23 @@ export interface AiRuntimeRequest {
 export interface AiRuntime {
   readonly capabilities: AiRuntimeCapabilities;
   run(request: AiRuntimeRequest): Promise<string>;
+  /** Whether `model` can run now. Refreshes model discovery (its cache, pickers and saved list); the caller shows any guide, notice or log. */
+  readiness(model: string): Promise<AiRuntimeReadinessResult>;
+  /** Starts an idle process for a call with these settings; makes no model call. Called only when `capabilities.prewarm`. */
+  prewarm(model: string, options: AiRuntimePrewarmOptions): void;
 }
 
-/** Defined for the readiness and prewarm work that follows; nothing uses them yet. */
+/**
+ * Whether a model can run: `ready`; `missing` (the CLI is not installed); `model-unavailable` (installed, but the
+ * model is not on its list); `error` (the check itself failed).
+ */
 export type AiRuntimeReadiness = "ready" | "missing" | "model-unavailable" | "error";
+
+/** What {@link AiRuntime.readiness} found. `error` is the check's own failure, for the debug log; an "error" without it has nothing to report. */
+export interface AiRuntimeReadinessResult {
+  status: AiRuntimeReadiness;
+  error?: string;
+}
 
 export interface AiRuntimePrewarmOptions {
   effort: string;

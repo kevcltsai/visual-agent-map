@@ -1,7 +1,7 @@
 import { randomUUID } from "node:crypto";
 import type { AiExchangeLog, AiMilestones } from "../ai-exchange-log";
 import { t } from "../i18n";
-import type { AiRuntime, AiRuntimeCapabilities } from "./ai-runtime";
+import type { AiRuntime, AiRuntimeCapabilities, AiRuntimePrewarmOptions } from "./ai-runtime";
 import type { RuntimeTaskControls } from "./runtime-step-provider";
 import { StepRunner, stepLabel, type PreparedStep, type StepProvider } from "./step-runner";
 
@@ -18,6 +18,8 @@ export interface AiCallsOptions {
   exchanges(): AiCallExchangeSink | null;
   /** The shared registry of running calls; a Stop button aborts what it holds. A new Map when absent. */
   activeTasks?: Map<string, AbortController>;
+  /** Drops a pre-started process; {@link AiCalls.prewarm} calls it for a runtime that cannot pre-start. Nothing to drop when absent. */
+  releaseWarm?(): void;
 }
 
 export interface AiCallOptions {
@@ -104,6 +106,13 @@ export class AiCalls {
     if (needs.imageGeneration && !capabilities.imageGeneration)
       throw new Error(t("ui.context_ai_image_generation_codex"));
     return capabilities;
+  }
+
+  /** Pre-starts the runtime serving `model` for a call with these settings (no model call); a runtime that cannot pre-start drops any waiting process instead. */
+  prewarm(model: string, options: AiRuntimePrewarmOptions): void {
+    const runtime = this.options.runtimeFor(model);
+    if (runtime.capabilities.prewarm) runtime.prewarm(model, options);
+    else this.options.releaseWarm?.();
   }
 
   /**

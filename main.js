@@ -51518,6 +51518,15 @@ var AiCalls = class {
     for (const controller of this.activeTasks.values()) controller.abort();
   }
   /**
+   * What the runtime serving `model` can do, without starting it. Throws when `needs` asks for something it cannot do.
+   */
+  capabilitiesFor(model, needs = {}) {
+    const { capabilities } = this.options.runtimeFor(model);
+    if (needs.imageGeneration && !capabilities.imageGeneration)
+      throw new Error(t("ui.context_ai_image_generation_codex"));
+    return capabilities;
+  }
+  /**
    * Sends a prepared step. A value that is not a `PreparedStep` throws before anything is registered or logged.
    * `finish` gets the raw reply and ends the entry (parse, `exchange.parsed()`); returning writes `completed`.
    */
@@ -51534,7 +51543,8 @@ var AiCalls = class {
     return result.value;
   }
   async runCall(call, options, finish) {
-    var _a2, _b2, _c, _d, _e, _f;
+    var _a2, _b2, _c, _d, _e, _f, _g;
+    if ((_a2 = options.task) == null ? void 0 : _a2.generateImage) this.capabilitiesFor(options.model, { imageGeneration: true });
     const {
       mode = "task",
       requestLog = "request-and-prompt",
@@ -51548,7 +51558,7 @@ var AiCalls = class {
     this.activeTasks.set(key2, controller);
     const started = this.options.exchanges();
     const log = () => started ? this.options.exchanges() : void 0;
-    const id = (_a2 = options.exchangeId) != null ? _a2 : (0, import_node_crypto13.randomUUID)();
+    const id = (_b2 = options.exchangeId) != null ? _b2 : (0, import_node_crypto13.randomUUID)();
     const milestones = {};
     let milestonesWritten = false;
     const writeMilestones = () => {
@@ -51590,8 +51600,8 @@ var AiCalls = class {
         step: stepLabel({ id: call.stepId, version: call.version })
       });
       const runtime = this.options.runtimeFor(options.model);
-      (_b2 = options.validate) == null ? void 0 : _b2.call(options, runtime);
-      const task = (_c = options.task) != null ? _c : {};
+      (_c = options.validate) == null ? void 0 : _c.call(options, runtime);
+      const task = (_d = options.task) != null ? _d : {};
       const controls = {
         ...task,
         signal: controller.signal,
@@ -51619,14 +51629,14 @@ var AiCalls = class {
         localCodex: options.localCodex
       });
       if (controller.signal.aborted) throw stopped();
-      (_d = options.afterReply) == null ? void 0 : _d.call(options);
+      (_e = options.afterReply) == null ? void 0 : _e.call(options);
       milestones.receivedAt = (/* @__PURE__ */ new Date()).toISOString();
-      (_e = log()) == null ? void 0 : _e.received(id, raw);
+      (_f = log()) == null ? void 0 : _f.received(id, raw);
       writeMilestones();
       const value = await finish(raw, exchange);
       if (!finished) {
         finished = true;
-        (_f = log()) == null ? void 0 : _f.completed(id);
+        (_g = log()) == null ? void 0 : _g.completed(id);
       }
       return value;
     } catch (error) {

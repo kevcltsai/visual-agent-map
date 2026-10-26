@@ -262,3 +262,42 @@ test('a sink whose begin throws: the original error rejects, nothing stays regis
   assert.ok(added >= 1, 'the listener was added, so the removal is what is checked');
   assert.equal(runtimeCalls.length, 0);
 });
+
+test('capabilitiesFor returns the constants without calling any adapter get(); needs.imageGeneration refuses Claude only', () => {
+  let claudeGets = 0, codexGets = 0;
+  const sources = {
+    claude: () => { claudeGets++; return { runTask: async () => '' }; },
+    codex: () => { codexGets++; return { runTask: async () => '' }; }
+  };
+  const calls = new mod.AiCalls({ runtimeFor: model => mod.aiRuntimeForModel(model, sources), exchanges: () => null });
+  assert.equal(calls.capabilitiesFor('claude:sonnet'), mod.CLAUDE_CAPABILITIES);
+  assert.equal(calls.capabilitiesFor('gpt-6-luna'), mod.CODEX_CAPABILITIES);
+  assert.equal(calls.capabilitiesFor('claude:sonnet', {}), mod.CLAUDE_CAPABILITIES);
+  assert.equal(calls.capabilitiesFor('claude:sonnet', { imageGeneration: false }), mod.CLAUDE_CAPABILITIES);
+  assert.equal(calls.capabilitiesFor('gpt-6-luna', { imageGeneration: true }), mod.CODEX_CAPABILITIES);
+  assert.throws(() => calls.capabilitiesFor('claude:sonnet', { imageGeneration: true }), error => error.message === translate('en', 'ui.context_ai_image_generation_codex'));
+  assert.equal(claudeGets, 0);
+  assert.equal(codexGets, 0);
+});
+
+test('run with task.generateImage on a runtime without image generation: refused with 0 events, 0 registrations, 0 listeners, 0 runtime calls', async () => {
+  const controller = new AbortController();
+  let added = 0;
+  const add = controller.signal.addEventListener.bind(controller.signal);
+  controller.signal.addEventListener = (type, ...rest) => { if (type === 'abort') added++; return add(type, ...rest); };
+  const h = harness();
+  const runtimeCalls = h.state.runtimeCalls;
+  const noImage = { capabilities: mod.CLAUDE_CAPABILITIES, run: async request => { runtimeCalls.push(request); return 'reply'; } };
+  const active = new RecordingMap();
+  const events = [];
+  const sink = { begin: e => events.push(e), sent: e => events.push(e), received: e => events.push(e), milestones: e => events.push(e), parsed: e => events.push(e), completed: e => events.push(e), failed: e => events.push(e) };
+  const calls = new mod.AiCalls({ runtimeFor: () => noImage, exchanges: () => sink, activeTasks: active });
+  await assert.rejects(calls.run(prepared(), options({ model: 'claude:sonnet', signal: controller.signal, task: { generateImage: true } }), raw => raw), error => error.message === translate('en', 'ui.context_ai_image_generation_codex'));
+  assert.equal(events.length, 0);
+  assert.equal(active.keysSet.length, 0);
+  assert.equal(active.size, 0);
+  assert.equal(added, 0);
+  assert.equal(runtimeCalls.length, 0);
+  // The same options on a runtime that can draw go through.
+  assert.equal(await h.calls.run(prepared(), options({ task: { generateImage: true } }), raw => raw), 'reply');
+});

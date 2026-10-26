@@ -1,7 +1,7 @@
 import { randomUUID } from "node:crypto";
 import type { AiExchangeLog, AiMilestones } from "../ai-exchange-log";
 import { t } from "../i18n";
-import type { AiRuntime } from "./ai-runtime";
+import type { AiRuntime, AiRuntimeCapabilities } from "./ai-runtime";
 import type { RuntimeTaskControls } from "./runtime-step-provider";
 import { StepRunner, stepLabel, type PreparedStep, type StepProvider } from "./step-runner";
 
@@ -85,6 +85,16 @@ export class AiCalls {
   }
 
   /**
+   * What the runtime serving `model` can do, without starting it. Throws when `needs` asks for something it cannot do.
+   */
+  capabilitiesFor(model: string, needs: { imageGeneration?: boolean } = {}): AiRuntimeCapabilities {
+    const { capabilities } = this.options.runtimeFor(model);
+    if (needs.imageGeneration && !capabilities.imageGeneration)
+      throw new Error(t("ui.context_ai_image_generation_codex"));
+    return capabilities;
+  }
+
+  /**
    * Sends a prepared step. A value that is not a `PreparedStep` throws before anything is registered or logged.
    * `finish` gets the raw reply and ends the entry (parse, `exchange.parsed()`); returning writes `completed`.
    */
@@ -110,6 +120,7 @@ export class AiCalls {
     options: AiCallOptions,
     finish: (raw: string, exchange: AiCallExchange) => Result | Promise<Result>
   ): Promise<Result> {
+    if (options.task?.generateImage) this.capabilitiesFor(options.model, { imageGeneration: true });
     const {
       mode = "task",
       requestLog = "request-and-prompt",

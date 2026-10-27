@@ -81,12 +81,6 @@ export type MapChatAction =
       mode: MapChatResearchMode | "";
       /** research_standard: true = also search for images (Standard only; a Quick research never does). Ignored by every other action. */
       images: boolean;
-      /**
-       * research_standard with mode "quick": the model's own images flag, which `images` hides because a Quick research never
-       * looks for images. Present (as true) only in that case, so every other action keeps its exact shape. The seamless
-       * research reads it as "the user asked for images".
-       */
-      imagesAsked?: true;
     }
   /** Always the first action: a new map, opened for the rest of the reply. */
   | { kind: "create_map"; title: string }
@@ -390,8 +384,7 @@ export function parseMapChat(
             goal,
             direction: text("direction", false),
             mode,
-            images: research && mode !== "quick" && flag("images"),
-            ...(research && mode === "quick" && flag("images") ? { imagesAsked: true as const } : {})
+            images: research && mode !== "quick" && flag("images")
           });
           break;
         }

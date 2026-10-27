@@ -1366,66 +1366,6 @@
       "language": "zh-CN",
       "schema": true
     },
-    "seamless.research-images.en": {
-      "builder": "core/steps/research-verify/images.ts researchImagesStep (seamless research images: separate web call, opens pages, license as stated; not localized)",
-      "language": "en",
-      "schema": true
-    },
-    "seamless.research-images.zh": {
-      "builder": "core/steps/research-verify/images.ts researchImagesStep (seamless research images: separate web call, opens pages, license as stated; not localized)",
-      "language": "zh-TW",
-      "schema": true
-    },
-    "seamless.research-images.zh-CN": {
-      "builder": "core/steps/research-verify/images.ts researchImagesStep (seamless research images: separate web call, opens pages, license as stated; not localized)",
-      "language": "zh-CN",
-      "schema": true
-    },
-    "seamless.research-verify-choices.en": {
-      "builder": "core/steps/research-verify/step.ts researchVerifyStep with requirements, tone and a content-template outline (R1-M3)",
-      "language": "en",
-      "schema": true
-    },
-    "seamless.research-verify-choices.zh": {
-      "builder": "core/steps/research-verify/step.ts researchVerifyStep with requirements, tone and a content-template outline (R1-M3)",
-      "language": "zh-TW",
-      "schema": true
-    },
-    "seamless.research-verify-choices.zh-CN": {
-      "builder": "core/steps/research-verify/step.ts researchVerifyStep with requirements, tone and a content-template outline (R1-M3)",
-      "language": "zh-CN",
-      "schema": true
-    },
-    "seamless.research-verify.en": {
-      "builder": "core/steps/research-verify/step.ts researchVerifyStep (seamless research phase 2: web search, sourced detail, verdicts, images)",
-      "language": "en",
-      "schema": true
-    },
-    "seamless.research-verify.zh": {
-      "builder": "core/steps/research-verify/step.ts researchVerifyStep (seamless research phase 2: web search, sourced detail, verdicts, images)",
-      "language": "zh-TW",
-      "schema": true
-    },
-    "seamless.research-verify.zh-CN": {
-      "builder": "core/steps/research-verify/step.ts researchVerifyStep (seamless research phase 2: web search, sourced detail, verdicts, images)",
-      "language": "zh-CN",
-      "schema": true
-    },
-    "seamless.skeleton-task.en": {
-      "builder": "core/steps/research-verify/step.ts skeletonInstruction (seamless research phase 1 task text; sent as the task of a Quick AI mode fast research call)",
-      "language": "en",
-      "schema": false
-    },
-    "seamless.skeleton-task.zh": {
-      "builder": "core/steps/research-verify/step.ts skeletonInstruction (seamless research phase 1 task text; sent as the task of a Quick AI mode fast research call)",
-      "language": "zh-TW",
-      "schema": false
-    },
-    "seamless.skeleton-task.zh-CN": {
-      "builder": "core/steps/research-verify/step.ts skeletonInstruction (seamless research phase 1 task text; sent as the task of a Quick AI mode fast research call)",
-      "language": "zh-CN",
-      "schema": false
-    },
     "service.decompose-deep.en": {
       "builder": "AiTaskService instructions: mode decompose, deep research",
       "language": "en",

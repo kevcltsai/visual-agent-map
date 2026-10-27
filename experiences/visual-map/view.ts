@@ -172,7 +172,6 @@ import {
   chatResearchMode,
   MAP_CHAT_FIND_IMAGES_LIMIT,
   chatResearchRequest,
-  seamlessChatResearchRequest,
   mapChoiceParts,
   matchMapTitle,
   planFor,
@@ -202,13 +201,6 @@ import {
   type OutlinePlacement
 } from "./outline-import-modal";
 import { MultiResearchModal, type MultiResearchRequest } from "./multi-research-modal";
-import {
-  problemActionKey,
-  problemMessageKey,
-  type SeamlessEvent,
-  type SeamlessProblem,
-  type SeamlessResearch
-} from "./seamless-research";
 import { StructureReviewModal } from "./structure-review-modal";
 import {
   buildStructureReviewNodes,
@@ -663,9 +655,6 @@ export class VisualAgentMapView extends ItemView {
   /** The unsaved-answer block of the open hover card, repainted as the preview grows. */
   private hoverResearch: { path: string; block: HTMLElement; summary: HTMLElement; detail: HTMLElement } | null = null;
   private unsubscribeResearch: (() => void) | null = null;
-  /** Seamless research (experimental setting): the listener on its service, and the topics this view started (for undo history). */
-  private unsubscribeSeamless: (() => void) | null = null;
-  private readonly seamlessOwned = new Set<string>();
   /** What each card last showed of its research progress; a different signature means the card must be redrawn. */
   private researchSigs = new Map<string, string>();
   private researchElapsed = new Map<HTMLElement, number>();
@@ -813,7 +802,6 @@ export class VisualAgentMapView extends ItemView {
     this.announcedStages.clear();
     this.unsubscribeResearch?.();
     this.unsubscribeResearch = this.plugin.researchProgress?.subscribe(path => this.onResearchProgress(path)) ?? null;
-    if (this.plugin.settings?.seamlessResearch) this.watchSeamless();
     const epoch = ++this.aimViewEpoch;
     this.mapOpenEpoch++;
     this.contentEl.addClass("vam-view");
@@ -948,9 +936,6 @@ export class VisualAgentMapView extends ItemView {
     this.announcedStages.clear();
     this.unsubscribeResearch?.();
     this.unsubscribeResearch = null;
-    this.unsubscribeSeamless?.();
-    this.unsubscribeSeamless = null;
-    this.seamlessOwned.clear();
     if (this.researchTick !== null) window.clearInterval(this.researchTick);
     if (this.researchRenderTimer !== null) window.clearTimeout(this.researchRenderTimer);
     this.researchTick = this.researchRenderTimer = null;
@@ -6345,8 +6330,6 @@ export class VisualAgentMapView extends ItemView {
         : queued
           ? "queued"
           : (note?.status ?? "error");
-    // Seamless research: a topic that is still growing (or whose result waits for its open note) breathes; stopping means done.
-    if (this.seamlessGrowing(node.path)) card.addClass("vam-seamless-growing");
     card.style.left = `${shownNode.x}px`;
     card.style.top = `${shownNode.y}px`;
     card.tabIndex = node.id === this.tabStopId ? 0 : -1;
@@ -7375,14 +7358,6 @@ export class VisualAgentMapView extends ItemView {
           const taskLanguage =
             options.outputLanguage ?? outputLanguageForMap(this.map, this.plugin.settings.language, latest.title);
           const task = researchTopicTask(taskLanguage, latest.title);
-          if (this.plugin.settings?.seamlessResearch) {
-            await this.researchSeamless(node, latest, taskLanguage, options.signal, failed, accepted, {
-              requirements: options.requirements,
-              toneId: options.toneId,
-              detailTemplateId: options.detailTemplateId
-            });
-            return;
-          }
           const detailTemplate = await this.detailTemplateFor(node, options.detailTemplateId, options.toneId);
           await this.runAgent(
             node,
@@ -8303,8 +8278,7 @@ export class VisualAgentMapView extends ItemView {
       (selected, refreshed) =>
         new PromptPresetsModal(this.app, this.plugin, "tone", () => refreshed(this.toneChoices()), selected).open(),
       this.fieldLinks(),
-      // One-button research has no mode to show next to a name.
-      this.plugin.settings?.seamlessResearch ? [] : shown.map(item => item.mode)
+      shown.map(item => item.mode)
     ).open();
   }
   stopMultiResearch(): void {
@@ -8373,11 +8347,6 @@ export class VisualAgentMapView extends ItemView {
         // A retry replaces the failure state of the batch it came from (a running batch is never touched).
         if (retryBatchKey && this.plugin.expansionBatches.get(retryBatchKey)?.status !== "running")
           this.plugin.expansionBatches.delete(retryBatchKey);
-        // The experimental one-button research: no mode, no web tally, no "finished" summary; see seamless-research.ts.
-        if (this.plugin.settings?.seamlessResearch) {
-          await this.startSeamlessBatch(key, nodes, request, busy, onSettled);
-          return;
-        }
         let reported = false;
         let skipped = 0;
         // Web activity of the topics that finished: Research mode only (a local run searches nothing, so it has nothing to report).
@@ -8430,197 +8399,6 @@ export class VisualAgentMapView extends ItemView {
       new Notice(errorMessage(error));
     }
   }
-  // ---------- seamless research (experimental setting; every caller checks `settings.seamlessResearch` first) ----------
-  /** The service while the setting is on; `undefined` otherwise, so with the setting off nothing of it is ever created. */
-  private seamless(): SeamlessResearch | undefined {
-    return this.plugin.settings?.seamlessResearch ? this.plugin.seamlessResearchService() : undefined;
-  }
-  /** The card breathes while its topic is researched, or its result waits for an open note. */
-  private seamlessGrowing(path: string): boolean {
-    return this.seamless()?.isGrowing(path) ?? false;
-  }
-  /** One listener per view: repaint when a topic starts or stops growing or a problem appears; record a write for undo. */
-  private watchSeamless(): void {
-    if (this.unsubscribeSeamless) return;
-    this.unsubscribeSeamless =
-      this.seamless()?.subscribe(event => {
-        if (this.closed) return;
-        if (event.type === "written") this.recordSeamlessWrite(event);
-        else if (this.map) this.render();
-      }) ?? null;
-  }
-  private recordSeamlessWrite(event: Extract<SeamlessEvent, { type: "written" }>): void {
-    if (!this.seamlessOwned.has(event.path)) return;
-    const { before, after } = event;
-    const fields = (["summary", "detail"] as const).filter(field => before[field] !== after[field]);
-    if (!fields.length) return;
-    // The view's note shape has more fields; the history only restores the ones the write changed.
-    this.recordNoteWrite(
-      event.path,
-      before as unknown as Note,
-      after as unknown as Note,
-      fields,
-      t("ui.seamless_research")
-    );
-  }
-  /** The titles of the topic's ancestors: the phase-1 check keeps them (they are not new facts). */
-  private ancestorTitles(node: MapNode): string[] {
-    const titles: string[] = [];
-    const seen = new Set([node.id]);
-    let parent = node.parentId;
-    while (parent && !seen.has(parent)) {
-      seen.add(parent);
-      const title = this.notes.get(parent)?.title;
-      if (title) titles.push(title);
-      parent = this.map?.nodes.find(item => item.id === parent)?.parentId ?? null;
-    }
-    return titles;
-  }
-  private async seamlessRequest(
-    sr: SeamlessResearch,
-    node: MapNode,
-    note: Note,
-    language: ContentLanguage,
-    signal: AbortSignal | undefined,
-    accepted: (() => void) | undefined,
-    choices: { imagesRequested?: boolean; requirements?: string; toneId?: string; detailTemplateId?: string } = {}
-  ): Promise<void> {
-    this.watchSeamless();
-    this.seamlessOwned.add(node.path);
-    // The dialog's or card's choices are saved on the topic, like the other research paths do.
-    if (choices.toneId) await this.plugin.repo.updateNote(node.path, { toneId: choices.toneId });
-    if (choices.detailTemplateId)
-      await this.plugin.repo.updateNote(node.path, { detailTemplateId: choices.detailTemplateId });
-    const toneText = this.toneTextFor(note, choices.toneId, language);
-    const chosenTemplate = choices.detailTemplateId || note.detailTemplateId;
-    const structure = chosenTemplate
-      ? templateInLanguage(this.resolveTopicTemplate(note, choices.detailTemplateId).template, language)
-          .sections.filter(section => section.role !== "log")
-          .map(section => `- ${section.name}${section.description.trim() ? `: ${section.description.trim()}` : ""}`)
-          .join("\n")
-      : "";
-    await sr.research({
-      path: node.path,
-      title: note.title,
-      context: await this.ancestorContext(node, language),
-      language,
-      allow: this.ancestorTitles(node),
-      model: note.model,
-      ...(choices.imagesRequested ? { imagesRequested: true } : {}),
-      ...(choices.requirements?.trim() ? { requirements: choices.requirements.trim() } : {}),
-      ...(toneText ? { toneText } : {}),
-      ...(structure ? { structure } : {}),
-      ...(signal ? { signal } : {}),
-      ...(accepted ? { accepted } : {})
-    });
-  }
-  /** The single-topic research card with the setting on: no mode, the same two phases. */
-  private async researchSeamless(
-    node: MapNode,
-    note: Note,
-    language: ContentLanguage,
-    signal: AbortSignal | undefined,
-    failed: (message: string) => void,
-    accepted: () => void,
-    choices: { requirements?: string; toneId?: string; detailTemplateId?: string } = {}
-  ): Promise<void> {
-    const sr = this.seamless();
-    if (!sr) return;
-    try {
-      await this.seamlessRequest(sr, node, note, language, signal, accepted, choices);
-    } catch (error) {
-      failed(errorMessage(error));
-    } finally {
-      if (!this.closed) this.render();
-    }
-  }
-  /** The batch of the multi-research dialog and the chat with the setting on. Same busy rules and coordinator, up to 8 topics at once. */
-  private async startSeamlessBatch(
-    key: string,
-    nodes: MapNode[],
-    request: MultiResearchRequest,
-    busy: (node: MapNode) => boolean,
-    onSettled?: (web: ResearchWebTally) => void
-  ): Promise<void> {
-    const sr = this.seamless();
-    if (!sr) return;
-    let reported = false;
-    try {
-      await this.plugin.expansionCoordinator.start(
-        key,
-        nodes,
-        async (child, batchSignal, accepted) => {
-          if (busy(child)) {
-            accepted();
-            return "skipped";
-          }
-          const note = await this.plugin.repo.readNote(child.path, this.map ?? undefined);
-          const language = outputLanguageForMap(this.map, this.plugin.settings.language, note.title);
-          await this.seamlessRequest(sr, child, note, language, batchSignal, accepted, {
-            imagesRequested: request.imagesRequested,
-            requirements: request.requirements,
-            toneId: request.toneId,
-            detailTemplateId: request.detailTemplateId
-          });
-          return undefined;
-        },
-        () => {
-          const state = this.plugin.expansionBatches.get(key);
-          if (state && state.status !== "running" && !reported) {
-            reported = true;
-            // No "finished" Notice and no search counts: the cards stop breathing, and only problems are said.
-            onSettled?.({ searches: 0, counted: 0, withoutSearch: 0 });
-          }
-          if (!this.closed) this.render();
-        },
-        undefined,
-        Math.min(nodes.length, 8)
-      );
-    } catch {
-      // Launch rejection from the coordinator (stopped or all failed) is shown by the batch's own status bar.
-    }
-  }
-  /** One chat line per problem of the given topics (the same sentence the status bar shows). */
-  private seamlessProblemLines(paths: readonly string[]): MapChatLine[] {
-    const sr = this.seamless();
-    if (!sr) return [];
-    return paths.flatMap(path => {
-      const problem = sr.problemFor(path);
-      return problem ? [{ status: "skipped" as const, text: this.seamlessProblemText(problem) }] : [];
-    });
-  }
-  private seamlessProblemText(problem: SeamlessProblem): string {
-    return t(problemMessageKey(problem.reason), problem.title);
-  }
-  /** One sentence plus at most one button for each problem; a polite live region, reachable with the keyboard. */
-  private renderSeamlessProblems(parent: HTMLElement): void {
-    const sr = this.seamless();
-    const problems = sr?.problems() ?? [];
-    if (!sr || !problems.length) return;
-    const list = parent.createDiv("vam-aim-statusbar vam-seamless-problems");
-    list.setAttr("role", "status");
-    list.setAttr("aria-live", "polite");
-    for (const problem of problems) {
-      const row = list.createDiv("vam-seamless-problem");
-      row.dataset.reason = problem.reason;
-      row.dataset.path = problem.path;
-      row.createSpan({ cls: "vam-seamless-problem-text", text: this.seamlessProblemText(problem) });
-      if (!problem.action) continue;
-      const button = this.button(row, t(problemActionKey(problem.action)), () => this.runSeamlessAction(sr, problem));
-      button.addClass("vam-seamless-problem-action");
-      // The sentence of a non-image problem names no topic: the button's name does.
-      button.setAttr("aria-label", `${t(problemActionKey(problem.action))}: ${problem.title}`);
-    }
-  }
-  private runSeamlessAction(sr: SeamlessResearch, problem: SeamlessProblem): void {
-    if (problem.action === "dismiss") {
-      sr.dismiss(problem.path);
-      return;
-    }
-    this.seamlessOwned.add(problem.path);
-    const work = problem.action === "switch-model" ? sr.switchModelAndRetry(problem.path) : sr.retry(problem.path);
-    void work.catch(error => new Notice(errorMessage(error)));
-  }
   /** Counts that cannot be misread: succeeded of total, failures, optional current topic and stopped marker. */
   private batchProgressLabel(counts: string, batch: ExpansionBatchState, current?: string): string {
     return [
@@ -8657,7 +8435,6 @@ export class VisualAgentMapView extends ItemView {
   }
   /** Status bar under the toolbar (same place and look as the AIM status bar) with progress, Stop, and Retry/Dismiss after failures. */
   private renderMultiResearchStatus(parent: HTMLElement): void {
-    this.renderSeamlessProblems(parent);
     const key = this.multiResearchKey();
     const state = this.plugin.expansionBatches.get(key);
     if (!state) return;
@@ -10681,8 +10458,7 @@ export class VisualAgentMapView extends ItemView {
         const plan = result.actions.length
           ? planFor(result.actions, request.context, {
               diagrams: this.plugin.settings.addDiagramsAfterResearch,
-              mapAiMode: this.map?.aiMode,
-              ...(this.plugin.settings.seamlessResearch ? { seamless: true } : {})
+              mapAiMode: this.map?.aiMode
             })
           : null;
         if (plan) {
@@ -10891,8 +10667,6 @@ export class VisualAgentMapView extends ItemView {
       case "run_map_action":
         switch (action.action) {
           case "research_standard":
-            // With the one-button research there is no Quick or Standard to name.
-            if (this.plugin.settings?.seamlessResearch) return t("ui.map_chat_do_research_seamless");
             return t(
               chatResearchMode(action, this.map?.aiMode) === "quick"
                 ? "ui.map_chat_do_research_quick"
@@ -11528,19 +11302,12 @@ export class VisualAgentMapView extends ItemView {
         // The search count comes when the batch ends, long after this turn: it joins this answer's lines if no newer turn began.
         const chat = this.chat;
         const turns = chat?.transcript().length ?? 0;
-        const seamless = this.plugin.settings?.seamlessResearch === true;
-        const batchPaths = this.chatSelectionIds().flatMap(
-          id => this.map?.nodes.find(node => node.id === id)?.path ?? []
-        );
         launch(
           this.startMultiResearch(
-            seamless
-              ? seamlessChatResearchRequest(action)
-              : chatResearchRequest(action, this.map?.aiMode, mode => aiModeOptions(mode, "research")),
+            chatResearchRequest(action, this.map?.aiMode, mode => aiModeOptions(mode, "research")),
             undefined,
             web => {
-              // Seamless: no search counts; the only lines are the problems of this batch's topics.
-              const lines = seamless ? this.seamlessProblemLines(batchPaths) : researchWebLines(web);
+              const lines = researchWebLines(web);
               if (lines.length && chat && this.chat === chat && !this.closed && chat.transcript().length === turns)
                 chat.appendLines(lines);
             }

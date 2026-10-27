@@ -62,14 +62,11 @@ export function researchTargetsOf(actions: readonly MapChatAction[], selectedCou
 /** Calls one research or synthesis makes on its own: the main call, then (when diagrams are on) the diagram call. */
 export const mapChatCallsPerTask = (diagrams: boolean): number => (diagrams ? 2 : 1);
 
-/** Calls one topic costs in seamless research: phase 1 draft, then phase 2 verify and phase 2 images (side by side). */
-export const SEAMLESS_CALLS_PER_TOPIC = 3;
-
 /** The plan a reply needs, or null when it can be applied at once. `diagrams` is the "Add diagrams after research" setting. */
 export function planFor(
   actions: readonly MapChatAction[],
   context: PlanContext,
-  options: { diagrams?: boolean; mapAiMode?: MapAiMode; seamless?: boolean } = {}
+  options: { diagrams?: boolean; mapAiMode?: MapAiMode } = {}
 ): MapChatPlan | null {
   const perTask = mapChatCallsPerTask(options.diagrams !== false);
   const reasons: MapChatPlanReason[] = [];
@@ -103,9 +100,7 @@ export function planFor(
             const targets = targetCount(action.nodeIds, selection);
             research += targets;
             // Quick: the research call alone (no images or charts). Standard: the research call plus the diagram call.
-            // Seamless research (experimental setting): the draft call, then the verify call and the images call (no mode to pick).
-            if (options.seamless === true) calls += targets * SEAMLESS_CALLS_PER_TOPIC;
-            else calls += targets * (chatResearchMode(action, options.mapAiMode) === "quick" ? 1 : perTask);
+            calls += targets * (chatResearchMode(action, options.mapAiMode) === "quick" ? 1 : perTask);
             break;
           }
           case "expand":
@@ -221,16 +216,4 @@ export function chatResearchRequest(
     requirements: action.direction,
     imageSearch: mode === "standard" && action.images === true
   };
-}
-
-/** What the chat hands to the multi-research when `settings.seamlessResearch` is on: no mode, depth or image-search override. */
-export interface SeamlessChatResearchRequest {
-  requirements: string;
-  /** The user asked for images; only then is "no image found" a problem. */
-  imagesRequested: boolean;
-}
-export function seamlessChatResearchRequest(
-  action: Extract<MapChatAction, { kind: "run_map_action" }>
-): SeamlessChatResearchRequest {
-  return { requirements: action.direction, imagesRequested: action.images === true || action.imagesAsked === true };
 }

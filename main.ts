@@ -42,14 +42,11 @@ import {
   VisualAgentMapSettingTab,
   CLAUDE_INSTALL_URL
 } from "./ui/settings-tab";
-import * as dns from "node:dns/promises";
-import * as https from "node:https";
 import { join } from "node:path";
 import { type MapDocument, type MapNode } from "./map-model";
 import {
   DEFAULT_SETTINGS,
   isManagedMapPath,
-  isPlaceholder,
   moveNotePath,
   normalizeReasoningLevel,
   normalizeMapChatStyle,
@@ -94,19 +91,6 @@ import type { AiRuntimeId } from "./core/ai-runtime";
 import { AiRuntimeService } from "./core/ai-runtime-service";
 import { ModelDiscovery, type ModelDiscoveryState } from "./core/model-discovery";
 import { ShallowExpansionCoordinator, type ExpansionBatchState } from "./experiences/visual-map/expansion-batch";
-import {
-  SeamlessResearch,
-  type SeamlessPhase1Input,
-  type SeamlessVerifyInput,
-  type SeamlessImagesInput
-} from "./experiences/visual-map/seamless-research";
-import { aiModeOptions } from "./experiences/visual-map/ai-mode";
-import { researchTopicTask } from "./experiences/visual-map/steps/fragments";
-import { researchVerifyStep, skeletonInstruction, type ResearchVerifyResult } from "./core/steps/research-verify/step";
-import { researchImagesStep, type ResearchImagesResult } from "./core/steps/research-verify/images";
-import { checkImageBytes, MAX_IMAGE_BYTES, normalizeHttpsUrl } from "./core/seamless-research/apply";
-import { fetchPublicImage, pinnedLookup, type ImageFetchDeps } from "./core/seamless-research/image-fetch";
-import { isSearchNotPerformed } from "./ai/search-not-performed";
 import { ResearchProgressStore } from "./experiences/visual-map/research-progress";
 import type { ResearchObserver } from "./ai/research-observer";
 import { AiTaskService } from "./core/ai-task-service";
@@ -184,7 +168,6 @@ export function settingsFromSaved(saved: Partial<Settings> | null): Settings {
     aiExchangeLoggingEnabled: saved?.aiExchangeLoggingEnabled === true,
     markdownSelectionAiAutoOpen: saved?.markdownSelectionAiAutoOpen !== false,
     addDiagramsAfterResearch: saved?.addDiagramsAfterResearch !== false,
-    seamlessResearch: saved?.seamlessResearch === true,
     workspaceInitialized: saved ? saved.workspaceInitialized !== false : false,
     sampleTourVersionSeen: saved?.sampleTourVersionSeen ?? 0,
     canvasHintSeen: saved?.canvasHintSeen === true
@@ -222,8 +205,6 @@ export default class VisualAgentMapPlugin extends Plugin {
   private chartRunning = 0;
   readonly expansionBatches = new Map<string, ExpansionBatchState>();
   readonly expansionCoordinator = new ShallowExpansionCoordinator(this.activeTasks, this.expansionBatches);
-  /** The one-button research flow; created on first use, so with `settings.seamlessResearch` off nothing of it exists. */
-  private seamless: SeamlessResearch | null = null;
   pendingSuggestions: Map<string, Suggestion[]> = new Map();
   readonly pendingResearchOptions = new Map<string, TaskOptions>();
   readonly logs: LogManager = debugLog;
@@ -691,11 +672,6 @@ export default class VisualAgentMapPlugin extends Plugin {
       })
     );
     this.registerEvent(this.app.workspace.on("active-leaf-change", leaf => this.onActiveLeafChange(leaf)));
-    // A seamless-research result held for an open note is applied once the note is no longer shown (nothing exists with the setting off).
-    this.registerEvent(this.app.workspace.on("layout-change", () => void this.seamless?.flushHeld().catch(() => {})));
-    this.registerEvent(
-      this.app.workspace.on("active-leaf-change", () => void this.seamless?.flushHeld().catch(() => {}))
-    );
     this.registerEvent(
       this.app.workspace.on("file-open", file => {
         for (const leaf of this.app.workspace.getLeavesOfType("markdown")) this.styleNodeLeaf(leaf);
@@ -1070,7 +1046,6 @@ export default class VisualAgentMapPlugin extends Plugin {
   }
   resetCodexRuntime(): void {
     this.expansionCoordinator.stopAll();
-    this.seamless?.abortAll();
     this.aiCalls.stopAll();
     this.abortChartJobs();
     this.modelDiscovery.invalidate("codex");
@@ -1190,9 +1165,6 @@ export default class VisualAgentMapPlugin extends Plugin {
     leaf.view.containerEl.toggleClass("vam-topic-markdown", !!leaf.view.file && this.isNode(leaf.view.file));
   }
   onunload(): void {
-    // Seamless research: abort every topic and forget held results before the repository goes away.
-    this.seamless?.dispose();
-    this.seamless = null;
     // Background diagram jobs stop before the repository does, so none can apply a result after the vault is released.
     this.abortChartJobs();
     // In-flight work (a long Obsidian rename, a queued mutation) must not write into the vault after this point.
@@ -1532,161 +1504,6 @@ export default class VisualAgentMapPlugin extends Plugin {
     const prepared = prepareStep(imageSearchStep, { query });
     return prepared.parse(await this.runMarkdownContextAi(prepared, model, signal, undefined, true));
   }
-  /** The seamless research flow (see experiences/visual-map/seamless-research.ts). Callers check `settings.seamlessResearch` first; `research()` refuses when it is off. */
-  seamlessResearchService(): SeamlessResearch {
-    this.seamless ??= new SeamlessResearch({
-      enabled: () => this.settings.seamlessResearch,
-      repo: {
-        readNote: path => this.repo.readNote(path),
-        updateNote: (path, patch) => this.repo.updateNote(path, patch)
-      },
-      mutate: work => this.mutate(work),
-      askModel: input => this.runSeamlessPhase1(input),
-      runVerify: input => this.runResearchVerify(input),
-      runImages: input => this.runResearchImages(input),
-      saveImage: (image, notePath, signal, name) => this.saveResearchImage(image.imageUrl, notePath, signal, name),
-      removeImage: path => this.removeResearchImage(path),
-      isShown: path => this.isNoteShown(path),
-      capabilitiesFor: model => this.aiCalls.capabilitiesFor(model),
-      defaultModel: () => this.settings.cliModel,
-      running: this.running,
-      busyElsewhere: path => this.quickExpandPending.has(path) || this.activeTasks.has(path),
-      skeletonInstruction: language => skeletonInstruction(language),
-      log: message => this.logs.appendLog("info", message),
-      isPlaceholderSummary: summary => !summary.trim() || isPlaceholder(summary)
-    });
-    return this.seamless;
-  }
-  /** The note is open in a Markdown leaf that is visible right now. */
-  isNoteShown(path: string): boolean {
-    return this.app.workspace
-      .getLeavesOfType("markdown")
-      .some(
-        leaf => leaf.view instanceof MarkdownView && leaf.view.file?.path === path && leaf.view.containerEl.isShown()
-      );
-  }
-  /**
-   * Seamless phase 1: one short Quick call without the web, fast depth, low effort, no images. The page template is not used:
-   * the task text asks for a few short sections and a length cap, so the first write lands quickly (phase 2 writes the full
-   * page). The caller filters the text before it is written; that filter, not the prompt, is the guarantee.
-   */
-  private async runSeamlessPhase1(input: SeamlessPhase1Input): Promise<{ summary: string; detail: string }> {
-    const note = await this.repo.readNote(input.path);
-    const context: TaskContext = {
-      title: input.title,
-      summary: isPlaceholder(note.summary) ? "" : note.summary,
-      rules: "",
-      detail: "",
-      task: [
-        note.prompt || researchTopicTask(input.language, input.title),
-        input.instruction,
-        ...(input.requirements ? [input.requirements] : [])
-      ].join("\n\n"),
-      ancestors: input.context,
-      mode: "task",
-      ...aiModeOptions("quick", "research"),
-      researchDepth: "fast",
-      visualMode: "off",
-      outputLanguage: input.language,
-      // No fixed page layout: the skeleton task text carries the short format.
-      detailFormat: "adaptive",
-      ...(input.toneText ? { toneText: input.toneText } : {}),
-      addCharts: false
-    };
-    const result = await this.askModel(context, input.model, "low", input.signal);
-    return { summary: result.summary, detail: result.detail };
-  }
-  /** Seamless phase 2, text and footnotes: web search only. One more try when the model finished without any web retrieval. */
-  async runResearchVerify(input: SeamlessVerifyInput): Promise<ResearchVerifyResult> {
-    const prepared = prepareStep(researchVerifyStep, {
-      topic: input.title,
-      context: input.context,
-      skeleton: input.skeleton,
-      language: input.language,
-      ...(input.requirements ? { requirements: input.requirements } : {}),
-      ...(input.toneText ? { toneText: input.toneText } : {}),
-      ...(input.structure ? { structure: input.structure } : {})
-    });
-    return this.runSeamlessWebCall(prepared, input, "research-verify", 8, true);
-  }
-  /** Seamless phase 2, images: a separate web call beside runResearchVerify. No retry; the caller decides what a failure means. */
-  async runResearchImages(input: SeamlessImagesInput): Promise<ResearchImagesResult> {
-    const prepared = prepareStep(researchImagesStep, { topic: input.title, context: input.context });
-    return this.runSeamlessWebCall(prepared, input, "research-images", 6, false);
-  }
-  private async runSeamlessWebCall<Input, Output>(
-    prepared: PreparedStep<Input, Output>,
-    input: { title: string; model: string; reasoning?: unknown; signal: AbortSignal },
-    taskName: string,
-    searchBudget: number,
-    retryWithoutSearch: boolean
-  ): Promise<Output> {
-    const cancelled = (): Error => Object.assign(new Error(t("ui.ai_task_cancelled")), { name: "AbortError" });
-    for (let attempt = 1; ; attempt++) {
-      try {
-        this.aiCalls.capabilitiesFor(input.model);
-        // Fail before anything is registered or logged when there is no plugin directory (not desktop Obsidian).
-        this.pluginDirectory();
-        const effort = effectiveReasoningLevel(
-          { title: input.title, summary: "", detail: "", rules: "", task: prepared.prompt, ancestors: "" },
-          normalizeReasoningLevel(input.reasoning ?? this.settings.cliReasoning)
-        );
-        return await this.aiCalls.run(
-          prepared,
-          {
-            model: input.model,
-            effort,
-            topic: input.title,
-            taskName,
-            signal: input.signal,
-            localCodex: false,
-            stopped: cancelled,
-            task: { textOnly: false, webSearchOnly: true, generateImage: false, searchBudget }
-          },
-          (raw, exchange) => {
-            if (exchange.signal.aborted) throw cancelled();
-            const value = prepared.parse(raw);
-            exchange.parsed();
-            return value;
-          }
-        );
-      } catch (error) {
-        if (!retryWithoutSearch || attempt >= 2 || input.signal.aborted || !isSearchNotPerformed(error)) throw error;
-      }
-    }
-  }
-  /**
-   * Saves one researched image as a local copy next to `notePath`'s attachments. https only; the bytes must be png, jpeg, gif or
-   * webp (checked by magic bytes, not by name or content type) and at most 10 MB. Every hop (the address and each redirect) must
-   * be a public host: all DNS answers are checked and the connection is pinned to the checked address. Returns the Vault path,
-   * or undefined when the run was stopped; anything else that is wrong throws, and the caller drops that one image.
-   */
-  async saveResearchImage(
-    url: string,
-    notePath: string,
-    signal: AbortSignal,
-    name = "research-image"
-  ): Promise<string | undefined> {
-    const safeUrl = normalizeHttpsUrl(url);
-    if (!safeUrl) throw new Error("image address is not allowed");
-    if (signal.aborted) return undefined;
-    const bytes = await fetchPublicImage(safeUrl, await nodeImageFetchDeps(signal));
-    if (!bytes || signal.aborted) return undefined;
-    const checked = checkImageBytes(bytes);
-    if ("rejected" in checked) throw new Error(`image rejected: ${checked.rejected}`);
-    const extension = checked.kind === "jpeg" ? "jpg" : checked.kind;
-    const path = await this.app.fileManager.getAvailablePathForAttachment(`${name}.${extension}`, notePath);
-    await this.app.vault.createBinary(
-      path,
-      bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength) as ArrayBuffer
-    );
-    return path;
-  }
-  /** Deletes a copy saved by saveResearchImage when its result was discarded. Only a file in the Vault is touched; a missing file is fine. */
-  async removeResearchImage(path: string): Promise<void> {
-    const file = this.app.vault.getAbstractFileByPath(path);
-    if (file instanceof TFile) await this.app.fileManager.trashFile(file);
-  }
   private async runConfirmedMarkdownContextAi<Input, Output>(
     prepared: PreparedStep<Input, Output>,
     model: string,
@@ -1965,87 +1782,4 @@ export default class VisualAgentMapPlugin extends Plugin {
   private claudeCli(pluginDirectory: string): ClaudeCodeCliRuntime {
     return this.aiRuntime.claude(pluginDirectory);
   }
-}
-
-/** Node-backed deps for fetchPublicImage (desktop only). Fails closed when Node networking is missing; never falls back to requestUrl, which follows redirects unseen. */
-function imageFetchUserAgent(): string {
-  const ua = (window as { navigator?: { userAgent?: unknown } }).navigator?.userAgent;
-  return typeof ua === "string" && ua.length > 0 ? ua : "Mozilla/5.0 (Obsidian)";
-}
-
-async function nodeImageFetchDeps(signal: AbortSignal): Promise<ImageFetchDeps> {
-  if (typeof dns?.lookup !== "function" || typeof https?.request !== "function")
-    throw new Error("image download unavailable");
-  return {
-    signal,
-    lookup: async hostname => {
-      const answers = await dns.lookup(hostname, { all: true, verbatim: true });
-      return answers.map(answer => ({ address: answer.address, family: answer.family === 6 ? 6 : 4 }));
-    },
-    get: (request, requestSignal) =>
-      new Promise((resolve, reject) => {
-        const isIp = request.hostname.startsWith("[") || /^\d+\.\d+\.\d+\.\d+$/.test(request.hostname);
-        const host = request.hostname.replace(/^\[|\]$/g, "");
-        let settled = false;
-        const chunks: Uint8Array[] = [];
-        let total = 0;
-        const req = https.request({
-          protocol: "https:",
-          host,
-          servername: isIp ? undefined : host,
-          port: new URL(request.url).port || 443,
-          path: new URL(request.url).pathname + new URL(request.url).search,
-          method: "GET",
-          timeout: 30000,
-          lookup: pinnedLookup(request.address, request.family),
-          headers: { "User-Agent": imageFetchUserAgent(), Accept: "image/*" }
-        });
-        const finish = (error: Error | undefined, value?: { status: number; location?: string; body?: Uint8Array }) => {
-          if (settled) return;
-          settled = true;
-          requestSignal.removeEventListener("abort", onAbort);
-          if (error) {
-            req.destroy();
-            reject(error);
-          } else resolve(value as { status: number });
-        };
-        const onAbort = () => finish(new Error("image download stopped"));
-        requestSignal.addEventListener("abort", onAbort, { once: true });
-        if (requestSignal.aborted) return onAbort();
-        req.on("timeout", () => finish(new Error("image download timed out")));
-        req.on("error", () => finish(new Error("image download failed")));
-        req.on("response", res => {
-          const status = res.statusCode ?? 0;
-          const location = typeof res.headers.location === "string" ? res.headers.location : undefined;
-          if (status < 200 || status >= 300) {
-            res.resume();
-            finish(undefined, { status, location });
-            req.destroy();
-            return;
-          }
-          res.on("data", (chunk: Uint8Array) => {
-            total += chunk.length;
-            if (total > MAX_IMAGE_BYTES) {
-              res.destroy();
-              finish(new Error("image rejected: too-large"));
-              return;
-            }
-            chunks.push(chunk);
-          });
-          res.on("error", () => finish(new Error("image download failed")));
-          res.on("aborted", () => finish(new Error("image download failed")));
-          res.on("close", () => finish(new Error("image download failed")));
-          res.on("end", () => {
-            const body = new Uint8Array(total);
-            let offset = 0;
-            for (const chunk of chunks) {
-              body.set(chunk, offset);
-              offset += chunk.length;
-            }
-            finish(undefined, { status, body });
-          });
-        });
-        req.end();
-      })
-  };
 }

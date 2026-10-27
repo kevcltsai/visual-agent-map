@@ -57,10 +57,13 @@ export async function fetchPublicImage(url: string, deps: ImageFetchDeps): Promi
         throw new Error("image host resolves to a private address");
       target = answers[0];
     }
-    const response = await deps.get(
-      { url: safe, hostname, address: target.address, family: target.family },
-      deps.signal
-    );
+    let response: ImageResponse;
+    try {
+      response = await deps.get({ url: safe, hostname, address: target.address, family: target.family }, deps.signal);
+    } catch (error) {
+      if (deps.signal.aborted) return undefined;
+      throw error;
+    }
     if (deps.signal.aborted) return undefined;
     if (REDIRECT_STATUSES.has(response.status)) {
       if (!response.location) throw new Error("image redirect has no location");

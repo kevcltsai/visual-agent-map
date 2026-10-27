@@ -887,6 +887,24 @@ test('image fetch: a stop after the DNS lookup returns undefined and sends no re
   assert.equal(h.gets.length, 0);
 });
 
+test('image fetch: a download that rejects because the run was stopped returns undefined', async () => {
+  const controller = new AbortController();
+  const h = imageHarness({ signal: controller.signal });
+  h.deps.get = async () => {
+    controller.abort();
+    throw new Error('image download stopped');
+  };
+  assert.equal(await imageFetch.fetchPublicImage('https://a.example/x.png', h.deps), undefined);
+});
+
+test('image fetch: a download that rejects while not stopped still throws', async () => {
+  const h = imageHarness();
+  h.deps.get = async () => {
+    throw new Error('image download failed');
+  };
+  await assert.rejects(imageFetch.fetchPublicImage('https://a.example/x.png', h.deps), /image download failed/);
+});
+
 test('image fetch: errors do not carry the full URL', async () => {
   const h = imageHarness({ pages: { 'https://a.example/secret-token.png': redirectTo('https://127.0.0.1/secret-token2') } });
   await assert.rejects(imageFetch.fetchPublicImage('https://a.example/secret-token.png', h.deps), error => !/secret-token/.test(error.message));

@@ -42,6 +42,8 @@ import {
   VisualAgentMapSettingTab,
   CLAUDE_INSTALL_URL
 } from "./ui/settings-tab";
+import * as dns from "node:dns/promises";
+import * as https from "node:https";
 import { join } from "node:path";
 import { type MapDocument, type MapNode } from "./map-model";
 import {
@@ -1967,14 +1969,6 @@ export default class VisualAgentMapPlugin extends Plugin {
 
 /** Node-backed deps for fetchPublicImage (desktop only). Fails closed when Node networking is missing; never falls back to requestUrl, which follows redirects unseen. */
 async function nodeImageFetchDeps(signal: AbortSignal): Promise<ImageFetchDeps> {
-  let dns: typeof import("node:dns/promises");
-  let https: typeof import("node:https");
-  try {
-    dns = await import("node:dns/promises");
-    https = await import("node:https");
-  } catch {
-    throw new Error("image download unavailable");
-  }
   if (typeof dns?.lookup !== "function" || typeof https?.request !== "function")
     throw new Error("image download unavailable");
   return {
@@ -1994,6 +1988,7 @@ async function nodeImageFetchDeps(signal: AbortSignal): Promise<ImageFetchDeps> 
           protocol: "https:",
           host,
           servername: isIp ? undefined : host,
+          port: new URL(request.url).port || 443,
           path: new URL(request.url).pathname + new URL(request.url).search,
           method: "GET",
           timeout: 30000,
@@ -2033,6 +2028,7 @@ async function nodeImageFetchDeps(signal: AbortSignal): Promise<ImageFetchDeps> 
           });
           res.on("error", () => finish(new Error("image download failed")));
           res.on("aborted", () => finish(new Error("image download failed")));
+          res.on("close", () => finish(new Error("image download failed")));
           res.on("end", () => {
             const body = new Uint8Array(total);
             let offset = 0;

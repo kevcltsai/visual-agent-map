@@ -7227,11 +7227,11 @@ function mergeInsightUpdates(current, generated, language2) {
   const proposed = parsed.length ? parsed : baselineFromVersions([generated], language2);
   if (!proposed.length) throw new Error("Observer insights are missing readable items");
   const active = [...baseline];
-  const lookup = /* @__PURE__ */ new Map();
+  const lookup2 = /* @__PURE__ */ new Map();
   for (const insight of active)
     for (const id of [insight.id, ...insight.mergedIds]) {
-      if (lookup.has(id) && lookup.get(id) !== insight) throw new Error("Duplicate observer insight reference");
-      lookup.set(id, insight);
+      if (lookup2.has(id) && lookup2.get(id) !== insight) throw new Error("Duplicate observer insight reference");
+      lookup2.set(id, insight);
     }
   const seenTargets = /* @__PURE__ */ new Set();
   for (const item of proposed) {
@@ -7243,10 +7243,10 @@ function mergeInsightUpdates(current, generated, language2) {
         continue;
       item.persistedId = true;
       active.push(item);
-      lookup.set(item.id, item);
+      lookup2.set(item.id, item);
       continue;
     }
-    const targets = item.mergedIds.map((id) => lookup.get(id));
+    const targets = item.mergedIds.map((id) => lookup2.get(id));
     if (targets.some((target) => !target)) throw new Error("Observer insight references an unknown item");
     if (item.mergedIds.some((id) => seenTargets.has(id)))
       throw new Error("Observer insight reference is used more than once");
@@ -7287,7 +7287,7 @@ function mergeInsightUpdates(current, generated, language2) {
     const index = active.indexOf(first);
     if (index < 0) throw new Error("Observer insight target is no longer active");
     active[index] = revised;
-    for (const id of [revised.id, ...revised.mergedIds]) lookup.set(id, revised);
+    for (const id of [revised.id, ...revised.mergedIds]) lookup2.set(id, revised);
   }
   return active;
 }
@@ -9048,7 +9048,7 @@ var ModelDiscovery = class {
       models: this.states[provider].models,
       reasoningEfforts: this.states[provider].reasoningEfforts
     });
-    const request = this.loadCodex().then((catalog) => {
+    const request2 = this.loadCodex().then((catalog) => {
       const models = Array.isArray(catalog) ? catalog : catalog.models;
       const state = {
         provider,
@@ -9071,10 +9071,10 @@ var ModelDiscovery = class {
       this.publish(provider, state);
       return this.state(provider);
     }).finally(() => {
-      if (this.inFlight.get(provider) === request) this.inFlight.delete(provider);
+      if (this.inFlight.get(provider) === request2) this.inFlight.delete(provider);
     });
-    this.inFlight.set(provider, request);
-    return request;
+    this.inFlight.set(provider, request2);
+    return request2;
   }
   publish(provider, state) {
     this.states[provider] = { ...state, models: [...state.models] };
@@ -9375,7 +9375,7 @@ var CoffeeHandoffModal = class extends import_obsidian6.Modal {
     this.plugin.activeTasks.set(`reframe-modal:${this.operationId}`, controller);
     this.refresh();
     const language2 = isNoteLanguage(this.language.value) ? this.language.value : "en";
-    const request = {
+    const request2 = {
       targetCore: "understand",
       source: this.source.content,
       question: this.question.value,
@@ -9388,18 +9388,18 @@ var CoffeeHandoffModal = class extends import_obsidian6.Modal {
     this.status.setText(this.t("coffee.organizing_a_research_question"));
     try {
       await this.assertSource();
-      const confirmed = await this.plugin.confirmAiUsage(request.model, async () => {
+      const confirmed = await this.plugin.confirmAiUsage(request2.model, async () => {
         if (controller.signal.aborted || this.closed || epoch !== this.epoch) return;
         const task = this.startBackground(controller, {
-          question: request.question,
-          context: request.context,
-          model: request.model,
-          reasoning: request.reasoning,
+          question: request2.question,
+          context: request2.context,
+          model: request2.model,
+          reasoning: request2.reasoning,
           language: language2
         });
         this.detached = true;
         this.close();
-        await this.runBackground(task, request);
+        await this.runBackground(task, request2);
       });
       if (!confirmed && !this.detached && epoch === this.epoch && !this.closed)
         this.status.setText(this.t("coffee.ai_did_not_run_edit_the_draft_manually_or_retry"));
@@ -9431,7 +9431,7 @@ var CoffeeHandoffModal = class extends import_obsidian6.Modal {
     return task;
   }
   /** Runs after the dialog hid itself: never touches the dialog; results land in the task and a Notice. */
-  async runBackground(task, request) {
+  async runBackground(task, request2) {
     const epoch = task.epoch;
     const stale = () => {
       if (task.epoch !== epoch || !this.isCurrent(task)) return true;
@@ -9441,7 +9441,7 @@ var CoffeeHandoffModal = class extends import_obsidian6.Modal {
       return true;
     };
     try {
-      const draft = await this.plugin.core.reframing.reframe(request, task.controller.signal);
+      const draft = await this.plugin.core.reframing.reframe(request2, task.controller.signal);
       if (stale()) return;
       await this.assertTaskSource();
       if (stale()) return;
@@ -14460,7 +14460,7 @@ ${timestamp.toLocaleString()}${item.model ? ` \xB7 ${item.model}` : ""}`
     this.followUpGuests = [];
     this.engine = (_c = (_b2 = this.plugin.coffeeManager) == null ? void 0 : _b2.open(session)) != null ? _c : new CoffeeEngine(
       session,
-      (request) => this.plugin.runCoffeeRequest(request),
+      (request2) => this.plugin.runCoffeeRequest(request2),
       (value, summariesOnly) => this.store.save(value, summariesOnly)
     );
     this.unsubscribe = this.engine.subscribe(() => this.refresh());
@@ -17289,15 +17289,15 @@ function copyTemplate(source, name, id) {
 }
 var headingKey = (value) => value.trim().toLocaleLowerCase();
 function sectionLookup(template) {
-  const lookup = /* @__PURE__ */ new Map();
+  const lookup2 = /* @__PURE__ */ new Map();
   template.sections.forEach(
-    (section3, index) => section3.aliases.map(headingKey).forEach((key2) => key2 && lookup.set(key2, index))
+    (section3, index) => section3.aliases.map(headingKey).forEach((key2) => key2 && lookup2.set(key2, index))
   );
   template.sections.forEach((section3, index) => {
     const key2 = headingKey(section3.name);
-    if (key2) lookup.set(key2, index);
+    if (key2) lookup2.set(key2, index);
   });
-  return lookup;
+  return lookup2;
 }
 function sourcesHeadingKeys(template) {
   const index = template.sections.findIndex((section3) => section3.role === "sources");
@@ -17413,14 +17413,14 @@ function countItems(body) {
   return outside.filter((line) => /^(?:[-*+]|\d+[.)])\s+\S/.test(line)).length;
 }
 function sectionBodies(detail, template) {
-  const lookup = sectionLookup(template);
+  const lookup2 = sectionLookup(template);
   const lines = detail.split("\n");
   const code = fencedLines(lines);
   const bodies = /* @__PURE__ */ new Map();
   let current;
   lines.forEach((line, index) => {
     const heading = code[index] ? null : /^###\s+(.+?)\s*$/.exec(line);
-    const match = heading ? lookup.get(heading[1].toLocaleLowerCase()) : void 0;
+    const match = heading ? lookup2.get(heading[1].toLocaleLowerCase()) : void 0;
     if (match !== void 0) {
       current = match;
       if (!bodies.has(match)) bodies.set(match, []);
@@ -23896,33 +23896,33 @@ function parseMapChat(raw, context) {
 var mapChatStep = {
   id: "map-chat",
   version: 6,
-  render: (request) => {
+  render: (request2) => {
     var _a2;
-    const language2 = (_a2 = request.contentLanguage) != null ? _a2 : request.language;
+    const language2 = (_a2 = request2.contentLanguage) != null ? _a2 : request2.language;
     const zh = instructionLanguageOf(language2) === "zh";
-    const detailed = request.style === "detailed";
+    const detailed = request2.style === "detailed";
     const styleText = detailed ? zh ? style_detailed_zh_default : style_detailed_en_default : zh ? style_concise_zh_default : style_concise_en_default;
     return renderTemplate(zh ? prompt_zh_default6 : prompt_en_default6, {
-      styleInstruction: request.redo ? `${styleText}
+      styleInstruction: request2.redo ? `${styleText}
 ${zh ? redo_zh_default : redo_en_default}` : styleText,
       languageInstruction: renderTemplate(
         zh ? language_zh_default : language_en_default,
         languageVariables(language2, { language: "region" }, language2, void 0, {
           kind: "question",
-          text: request.message
+          text: request2.message
         })
       ),
-      context: request.context.json,
-      message: JSON.stringify(request.message)
+      context: request2.context.json,
+      message: JSON.stringify(request2.message)
     });
   },
   schema: MAP_CHAT_SCHEMA,
-  policy: (prompt, request) => {
-    if (!request.message.trim()) throw new MapChatError("empty", "Map chat message is empty");
+  policy: (prompt, request2) => {
+    if (!request2.message.trim()) throw new MapChatError("empty", "Map chat message is empty");
     if (estimateTokens(prompt + JSON.stringify(MAP_CHAT_SCHEMA)) > MAP_CHAT_TOKEN_BUDGET)
       throw new MapChatError("over_budget", "Map chat context is too large");
   },
-  parse: (raw, request) => parseMapChat(raw, request.context)
+  parse: (raw, request2) => parseMapChat(raw, request2.context)
 };
 
 // core/map-chat-plan.ts
@@ -25421,14 +25421,14 @@ var MultiResearchModal = class extends import_obsidian18.Modal {
     start.addEventListener("click", () => {
       if (this.submitted) return;
       this.submitted = true;
-      const request = {
+      const request2 = {
         requirements: requirements.value.trim(),
         ...model.value() ? { model: model.value() } : {},
         ...style.templateId() ? { detailTemplateId: style.templateId() } : {},
         ...style.toneId() ? { toneId: style.toneId() } : {}
       };
       this.close();
-      this.submit(request);
+      this.submit(request2);
     });
   }
   onClose() {
@@ -26172,25 +26172,25 @@ var SeamlessResearch = class {
    * into a problem, or stopped. Throws only when the topic cannot start (flag off, busy) or phase 1 fails; the caller's batch
    * counts that as a failed topic. The caller has already asked for the AI usage notice.
    */
-  async research(request) {
+  async research(request2) {
     var _a2, _b2, _c, _d, _e, _f, _g;
     this.requireEnabled();
     const topic = {
-      path: request.path,
-      title: request.title,
-      context: request.context,
-      language: request.language,
-      allow: [request.title, ...(_a2 = request.allow) != null ? _a2 : []],
-      imagesRequested: request.imagesRequested === true,
-      requirements: (_c = (_b2 = request.requirements) == null ? void 0 : _b2.trim()) != null ? _c : "",
-      toneText: (_e = (_d = request.toneText) == null ? void 0 : _d.trim()) != null ? _e : "",
-      structure: (_g = (_f = request.structure) == null ? void 0 : _f.trim()) != null ? _g : "",
-      ...request.model ? { model: request.model } : {},
+      path: request2.path,
+      title: request2.title,
+      context: request2.context,
+      language: request2.language,
+      allow: [request2.title, ...(_a2 = request2.allow) != null ? _a2 : []],
+      imagesRequested: request2.imagesRequested === true,
+      requirements: (_c = (_b2 = request2.requirements) == null ? void 0 : _b2.trim()) != null ? _c : "",
+      toneText: (_e = (_d = request2.toneText) == null ? void 0 : _d.trim()) != null ? _e : "",
+      structure: (_g = (_f = request2.structure) == null ? void 0 : _f.trim()) != null ? _g : "",
+      ...request2.model ? { model: request2.model } : {},
       status0: "idea",
       phase1Written: false,
       skeleton: ""
     };
-    await this.run(topic, request.signal, request.accepted, false);
+    await this.run(topic, request2.signal, request2.accepted, false);
   }
   /** "Try again": phase 2 only, with the skeleton of the last run. */
   async retry(path, signal) {
@@ -26986,10 +26986,10 @@ function promptMetrics(entry) {
       const parsed = JSON.parse(entry.request);
       const parsedRecord = isRecord(parsed) ? parsed : void 0;
       const requestValue = (_a2 = parsedRecord == null ? void 0 : parsedRecord.request) != null ? _a2 : parsed;
-      const request = isRecord(requestValue) ? requestValue : void 0;
-      if (typeof (request == null ? void 0 : request.prompt) === "string") prompt = request.prompt;
-      else if (request && isUnknownArray(request.input)) {
-        prompt = request.input.map((item) => isRecord(item) && item.type === "text" && typeof item.text === "string" ? item.text : "").filter(Boolean).join("\n");
+      const request2 = isRecord(requestValue) ? requestValue : void 0;
+      if (typeof (request2 == null ? void 0 : request2.prompt) === "string") prompt = request2.prompt;
+      else if (request2 && isUnknownArray(request2.input)) {
+        prompt = request2.input.map((item) => isRecord(item) && item.type === "text" && typeof item.text === "string" ? item.text : "").filter(Boolean).join("\n");
       }
     } catch (e) {
     }
@@ -27078,7 +27078,7 @@ var AiExchangeLog = class {
     this.entries = this.entries.slice(-this.limit);
     this.changed();
   }
-  sent(id, request, prompt) {
+  sent(id, request2, prompt) {
     const entry = this.entries.find((item) => item.id === id);
     if (entry == null ? void 0 : entry.request) {
       const sentAt = (/* @__PURE__ */ new Date()).toISOString();
@@ -27090,7 +27090,7 @@ var AiExchangeLog = class {
         mode: "steer",
         model: entry.model,
         effort: entry.effort,
-        request,
+        request: request2,
         sentAt,
         response: "",
         status: "sent",
@@ -27101,7 +27101,7 @@ var AiExchangeLog = class {
       return;
     }
     this.update(id, {
-      request,
+      request: request2,
       ...prompt !== void 0 ? { prompt } : {},
       sentAt: (/* @__PURE__ */ new Date()).toISOString(),
       status: "sent"
@@ -28654,7 +28654,7 @@ var NextStepModal = class extends import_obsidian22.Modal {
         const mode = aiMode.value();
         const options = { ...expandOptions(signal), referenceGroups: (_a3 = selected == null ? void 0 : selected.groups) != null ? _a3 : [] };
         const bounds = { levels: quickLevels(), maxTopics: quickTopics() };
-        const request = {
+        const request2 = {
           presetId: presetSelect.value,
           requirements: this.requirements(),
           language: (_b3 = options.outputLanguage) != null ? _b3 : this.plugin.settings.language,
@@ -28663,7 +28663,7 @@ var NextStepModal = class extends import_obsidian22.Modal {
         await this.rememberMode(mode);
         if (this.dead(controller)) return;
         this.detach(controller);
-        const generated = await quickOutline.generate(request, signal);
+        const generated = await quickOutline.generate(request2, signal);
         if (signal.aborted || this.closed && !this.detached) return;
         const { nodes, dropped } = limitOutline(generated, bounds);
         if (this.closed) {
@@ -29592,18 +29592,18 @@ var StructureReviewModal = class extends import_obsidian23.Modal {
 // core/provider-step-runner.ts
 var stepEffort = (reasoning) => reasoning === "auto" ? "low" : reasoning;
 function providerStepRunner(aiCalls, config) {
-  return (request, signal, prepared, onStructuredJson) => aiCalls.run(
+  return (request2, signal, prepared, onStructuredJson) => aiCalls.run(
     prepared,
     {
-      model: request.model,
-      effort: stepEffort(request.reasoning),
-      topic: config.topic(request),
+      model: request2.model,
+      effort: stepEffort(request2.reasoning),
+      topic: config.topic(request2),
       taskName: config.name,
       signal,
       localCodex: true,
       stopped: config.stopped,
       validate: (runtime) => {
-        if (runtime.capabilities.id === "claude" && !CLAUDE_MODEL_CHOICES.some((choice2) => choice2.id === request.model))
+        if (runtime.capabilities.id === "claude" && !CLAUDE_MODEL_CHOICES.some((choice2) => choice2.id === request2.model))
           throw new Error("Unsupported Claude model");
       },
       task: {
@@ -29829,20 +29829,20 @@ function isSuggestionStale(suggestion, currentTree) {
 var structureReviewStep = {
   id: "structure-review",
   version: 1,
-  render: (request) => {
+  render: (request2) => {
     var _a2;
     return renderTemplate(prompt_default, {
       languageInstruction: inLanguageNaming(
         { zh: language_zh_default2, en: language_en_default2 },
-        (_a2 = request.contentLanguage) != null ? _a2 : request.language,
+        (_a2 = request2.contentLanguage) != null ? _a2 : request2.language,
         { language: "region" },
         "en",
-        { kind: "question", text: request.rootQuestion }
+        { kind: "question", text: request2.rootQuestion }
       ),
       limit: String(STRUCTURE_REVIEW_MAX_SUGGESTIONS),
-      question: JSON.stringify(request.rootQuestion),
+      question: JSON.stringify(request2.rootQuestion),
       tree: JSON.stringify(
-        request.nodes.map((node) => ({
+        request2.nodes.map((node) => ({
           id: node.id,
           title: node.title,
           summary: node.summary,
@@ -29854,21 +29854,21 @@ var structureReviewStep = {
     });
   },
   schema: STRUCTURE_REVIEW_SCHEMA,
-  policy: (prompt, request) => {
-    const locale = uiLocale(request.language);
-    if (!request.nodes.length)
+  policy: (prompt, request2) => {
+    const locale = uiLocale(request2.language);
+    if (!request2.nodes.length)
       throw new StructureReviewError("empty", translate(locale, "error.structure_review_empty"));
     if (estimateTokens(prompt + JSON.stringify(STRUCTURE_REVIEW_SCHEMA)) > STRUCTURE_REVIEW_TOKEN_BUDGET)
       throw new StructureReviewError("over_budget", translate(locale, "error.structure_review_over_budget"));
   },
-  parse: (raw, request) => parseStructureReview(raw, request.nodes, request.language)
+  parse: (raw, request2) => parseStructureReview(raw, request2.nodes, request2.language)
 };
 
 // core/structure-review-service.ts
 function providerStructureReviewRunner(aiCalls) {
   return providerStepRunner(aiCalls, {
     name: "structure-review",
-    topic: (request) => `Structure review \xB7 ${request.rootQuestion.trim().slice(0, 80)}`,
+    topic: (request2) => `Structure review \xB7 ${request2.rootQuestion.trim().slice(0, 80)}`,
     stopped: () => new StructureReviewError("stopped", "Structure review stopped")
   });
 }
@@ -29880,13 +29880,13 @@ var StructureReviewService = class {
    * Review a map or branch. Throws {@link StructureReviewError} (localized message, `code` for the reason) for an
    * empty or over-budget tree, a stop, or a malformed reply. Individually unusable suggestions come back in `rejected`.
    */
-  async review(request, signal) {
-    const stopped = () => new StructureReviewError("stopped", translate(uiLocale(request.language), "error.structure_review_stopped"));
+  async review(request2, signal) {
+    const stopped = () => new StructureReviewError("stopped", translate(uiLocale(request2.language), "error.structure_review_stopped"));
     if (signal.aborted) throw stopped();
-    const prepared = prepareStep(structureReviewStep, request);
+    const prepared = prepareStep(structureReviewStep, request2);
     let raw;
     try {
-      raw = await this.run(request, signal, prepared);
+      raw = await this.run(request2, signal, prepared);
     } catch (error) {
       if (signal.aborted && !(error instanceof StructureReviewError)) throw stopped();
       if (error instanceof StructureReviewError && error.code === "stopped") throw stopped();
@@ -30184,41 +30184,41 @@ var promptCards = (nodes, pinned) => {
     ...pinned.has(node.id) ? { pinned: pinned.get(node.id) } : {}
   }));
 };
-var gradePrompt = (request) => {
+var gradePrompt = (request2) => {
   var _a2, _b2, _c;
-  const parts = promptPinParts(request.nodes, request.pins);
-  const text13 = gradeProviderText(request.model);
+  const parts = promptPinParts(request2.nodes, request2.pins);
+  const text13 = gradeProviderText(request2.model);
   return renderTemplate(prompt_default2, {
     toolLine: text13.tools,
     outputLine: text13.output,
     pinsSection: parts ? `${renderTemplate(pins_default, { pins: parts.pins, bounds: parts.bounds, mustInclude: parts.mustInclude })}
 
 ` : "",
-    goal: JSON.stringify(request.goal),
-    level: JSON.stringify((_a2 = request.level) != null ? _a2 : null),
-    context: JSON.stringify((_b2 = request.context) != null ? _b2 : null),
-    nodes: JSON.stringify(promptCards(request.nodes, (_c = parts == null ? void 0 : parts.pinned) != null ? _c : /* @__PURE__ */ new Map()))
+    goal: JSON.stringify(request2.goal),
+    level: JSON.stringify((_a2 = request2.level) != null ? _a2 : null),
+    context: JSON.stringify((_b2 = request2.context) != null ? _b2 : null),
+    nodes: JSON.stringify(promptCards(request2.nodes, (_c = parts == null ? void 0 : parts.pinned) != null ? _c : /* @__PURE__ */ new Map()))
   });
 };
-var refuseIfTooBig = (prompt, request, schema) => {
-  const locale = uiLocale(request.language);
-  if (!gradableNodes(request.nodes).length)
+var refuseIfTooBig = (prompt, request2, schema) => {
+  const locale = uiLocale(request2.language);
+  if (!gradableNodes(request2.nodes).length)
     throw new RelevanceGradeError("empty", translate(locale, "error.relevance_grade_empty"));
   if (estimateTokens(prompt + JSON.stringify(schema)) > RELEVANCE_GRADE_TOKEN_BUDGET)
     throw new RelevanceGradeError("over_budget", translate(locale, "error.relevance_grade_over_budget"));
 };
-var pinConflicts = (request) => relevancePinBounds(request.nodes, effectivePins(request.nodes, request.pins)).conflicts;
-var cardsToGrade = (request) => {
-  const pinned = new Set(effectivePins(request.nodes, request.pins).map((pin) => pin.id));
-  return gradableNodes(request.nodes).filter((node) => !pinned.has(node.id));
+var pinConflicts = (request2) => relevancePinBounds(request2.nodes, effectivePins(request2.nodes, request2.pins)).conflicts;
+var cardsToGrade = (request2) => {
+  const pinned = new Set(effectivePins(request2.nodes, request2.pins).map((pin) => pin.id));
+  return gradableNodes(request2.nodes).filter((node) => !pinned.has(node.id));
 };
 var relevanceGradeStep = {
   id: "relevance-grade",
   version: 11,
   render: gradePrompt,
   schema: RELEVANCE_GRADE_SCHEMA,
-  policy: (prompt, request) => refuseIfTooBig(prompt, request, RELEVANCE_GRADE_SCHEMA),
-  parse: (raw, request) => parseRelevanceGrade(raw, request.nodes, request.language, request.pins)
+  policy: (prompt, request2) => refuseIfTooBig(prompt, request2, RELEVANCE_GRADE_SCHEMA),
+  parse: (raw, request2) => parseRelevanceGrade(raw, request2.nodes, request2.language, request2.pins)
 };
 var RELEVANCE_REPAIR_MAX_ROUNDS = 2;
 var ancestorChain = (nodes, tiers, parentId) => {
@@ -30259,14 +30259,14 @@ var promptItem = (nodes, item) => {
   const { anchor, ...rest } = item;
   return { ...rest, id: label2(item.id), ...anchor ? { anchor: label2(anchor) } : {} };
 };
-var repairPrompt = (request) => {
-  const pins = effectivePins(request.nodes, request.pins);
-  const tiers = mergeRelevanceTiers({ items: request.previousReply.items, pins });
-  const text13 = relevanceProviderText(request.model, { claude: output_repair_claude_default, codex: output_repair_codex_default });
+var repairPrompt = (request2) => {
+  const pins = effectivePins(request2.nodes, request2.pins);
+  const tiers = mergeRelevanceTiers({ items: request2.previousReply.items, pins });
+  const text13 = relevanceProviderText(request2.model, { claude: output_repair_claude_default, codex: output_repair_codex_default });
   return renderTemplate(repair_default, {
-    originalPrompt: gradePrompt(request),
-    previousReply: JSON.stringify({ items: request.previousReply.items.map((item) => promptItem(request.nodes, item)) }),
-    violations: JSON.stringify(promptViolations(request.nodes, tiers, request.violations)),
+    originalPrompt: gradePrompt(request2),
+    previousReply: JSON.stringify({ items: request2.previousReply.items.map((item) => promptItem(request2.nodes, item)) }),
+    violations: JSON.stringify(promptViolations(request2.nodes, tiers, request2.violations)),
     pinsNote: pins.length ? `${renderTemplate(repair_pins_default, {})}
 ` : "",
     toolLine: text13.tools,
@@ -30278,29 +30278,29 @@ var relevanceGradeRepairStep = {
   version: 5,
   render: repairPrompt,
   schema: RELEVANCE_GRADE_SCHEMA,
-  policy: (prompt, request) => refuseIfTooBig(prompt, request, RELEVANCE_GRADE_SCHEMA),
+  policy: (prompt, request2) => refuseIfTooBig(prompt, request2, RELEVANCE_GRADE_SCHEMA),
   // The same strict parser; a repair that breaks anything but hierarchy fails the grade, and one that still violates
   // hierarchy gets another round until RELEVANCE_REPAIR_MAX_ROUNDS is used up.
-  parse: (raw, request) => parseRelevanceGrade(raw, request.nodes, request.language, request.pins)
+  parse: (raw, request2) => parseRelevanceGrade(raw, request2.nodes, request2.language, request2.pins)
 };
-var repairMissingPrompt = (request) => {
+var repairMissingPrompt = (request2) => {
   var _a2;
-  const ids = positionIds(request.nodes.map((node) => node.id));
+  const ids = positionIds(request2.nodes.map((node) => node.id));
   const label2 = (id) => {
     var _a3;
     return (_a3 = ids.short(id)) != null ? _a3 : id;
   };
-  const bounds = relevancePinBounds(request.nodes, effectivePins(request.nodes, request.pins)).bounds;
-  const titleOf = new Map(request.nodes.map((node) => [node.id, node.title]));
-  const text13 = relevanceProviderText(request.model, {
+  const bounds = relevancePinBounds(request2.nodes, effectivePins(request2.nodes, request2.pins)).bounds;
+  const titleOf = new Map(request2.nodes.map((node) => [node.id, node.title]));
+  const text13 = relevanceProviderText(request2.model, {
     claude: output_repair_missing_claude_default,
     codex: output_repair_missing_codex_default
   });
   return renderTemplate(repair_missing_default, {
-    originalPrompt: gradePrompt(request),
-    previousReply: JSON.stringify({ items: request.previousReply.items.map((item) => promptItem(request.nodes, item)) }),
+    originalPrompt: gradePrompt(request2),
+    previousReply: JSON.stringify({ items: request2.previousReply.items.map((item) => promptItem(request2.nodes, item)) }),
     missing: JSON.stringify(
-      ((_a2 = request.missing) != null ? _a2 : []).map((id) => {
+      ((_a2 = request2.missing) != null ? _a2 : []).map((id) => {
         var _a3, _b2, _c, _d, _e;
         return {
           id: label2(id),
@@ -30310,7 +30310,7 @@ var repairMissingPrompt = (request) => {
         };
       })
     ),
-    askLine: trimmed(providerForModel(request.model) === "claude" ? ask_repair_missing_claude_default : ask_repair_missing_codex_default),
+    askLine: trimmed(providerForModel(request2.model) === "claude" ? ask_repair_missing_claude_default : ask_repair_missing_codex_default),
     toolLine: text13.tools,
     outputLine: text13.output
   });
@@ -30320,8 +30320,8 @@ var relevanceGradeMissingRepairStep = {
   version: 3,
   render: repairMissingPrompt,
   schema: RELEVANCE_GRADE_SCHEMA,
-  policy: (prompt, request) => refuseIfTooBig(prompt, request, RELEVANCE_GRADE_SCHEMA),
-  parse: (raw, request) => parseRelevanceGrade(raw, request.nodes, request.language, request.pins)
+  policy: (prompt, request2) => refuseIfTooBig(prompt, request2, RELEVANCE_GRADE_SCHEMA),
+  parse: (raw, request2) => parseRelevanceGrade(raw, request2.nodes, request2.language, request2.pins)
 };
 
 // core/steps/relevance-recalibrate/prompt.md
@@ -30419,14 +30419,14 @@ var RELEVANCE_RECALIBRATE_SCHEMA = {
   },
   required: ["changes"]
 };
-var currentTiers = (request) => {
-  const pinned = new Set(effectivePins(request.nodes, request.pins).map((pin) => pin.id));
-  const gradable = new Set(gradableNodes(request.nodes).map((node) => node.id));
-  return request.previous.filter((entry) => gradable.has(entry.id) && !pinned.has(entry.id));
+var currentTiers = (request2) => {
+  const pinned = new Set(effectivePins(request2.nodes, request2.pins).map((pin) => pin.id));
+  const gradable = new Set(gradableNodes(request2.nodes).map((node) => node.id));
+  return request2.previous.filter((entry) => gradable.has(entry.id) && !pinned.has(entry.id));
 };
-function parseRelevanceRecalibrate(raw, request) {
-  const tree = request.nodes;
-  const locale = uiLocale(request.language);
+function parseRelevanceRecalibrate(raw, request2) {
+  const tree = request2.nodes;
+  const locale = uiLocale(request2.language);
   let value;
   try {
     value = JSON.parse(raw);
@@ -30438,9 +30438,9 @@ function parseRelevanceRecalibrate(raw, request) {
   if (Object.keys(body).length !== 1 || !Array.isArray(body.changes)) throw invalid3(locale, "changes");
   const ids = positionIds(tree.map((node) => node.id));
   const gradable = new Map(gradableNodes(tree).map((node) => [node.id, node]));
-  const pins = effectivePins(tree, request.pins);
+  const pins = effectivePins(tree, request2.pins);
   const pinned = new Set(pins.map((pin) => pin.id));
-  const previous = currentTiers(request);
+  const previous = currentTiers(request2);
   const previousTier = new Map(previous.map((entry) => [entry.id, entry.tier]));
   const seen = /* @__PURE__ */ new Set();
   const items = [];
@@ -30495,16 +30495,16 @@ function parseRelevanceRecalibrate(raw, request) {
   if (violations.length) throw hierarchyError(locale, violations, result);
   return result;
 }
-var cardsToRecalibrate = (request) => cardsToGrade(request);
-var promptCards2 = (request) => {
-  const ids = positionIds(request.nodes.map((node) => node.id));
+var cardsToRecalibrate = (request2) => cardsToGrade(request2);
+var promptCards2 = (request2) => {
+  const ids = positionIds(request2.nodes.map((node) => node.id));
   const label2 = (id) => {
     var _a2;
     return (_a2 = ids.short(id)) != null ? _a2 : id;
   };
-  const pins = new Map(effectivePins(request.nodes, request.pins).map((pin) => [pin.id, pin.tier]));
-  const tiers = new Map(currentTiers(request).map((entry) => [entry.id, entry.tier]));
-  return request.nodes.map((node) => {
+  const pins = new Map(effectivePins(request2.nodes, request2.pins).map((pin) => [pin.id, pin.tier]));
+  const tiers = new Map(currentTiers(request2).map((entry) => [entry.id, entry.tier]));
+  return request2.nodes.map((node) => {
     var _a2, _b2;
     return {
       id: label2(node.id),
@@ -30517,19 +30517,19 @@ var promptCards2 = (request) => {
     };
   });
 };
-var recalibratePrompt = (request) => {
+var recalibratePrompt = (request2) => {
   var _a2, _b2, _c, _d;
-  const parts = promptPinParts(request.nodes, request.pins);
-  const text13 = relevanceProviderText(request.model, { claude: output_recalibrate_claude_default, codex: output_recalibrate_codex_default });
+  const parts = promptPinParts(request2.nodes, request2.pins);
+  const text13 = relevanceProviderText(request2.model, { claude: output_recalibrate_claude_default, codex: output_recalibrate_codex_default });
   return renderTemplate(prompt_default3, {
     toolLine: text13.tools,
     outputLine: text13.output,
-    goal: JSON.stringify(request.goal),
-    level: JSON.stringify((_a2 = request.level) != null ? _a2 : null),
-    context: JSON.stringify((_b2 = request.context) != null ? _b2 : null),
+    goal: JSON.stringify(request2.goal),
+    level: JSON.stringify((_a2 = request2.level) != null ? _a2 : null),
+    context: JSON.stringify((_b2 = request2.context) != null ? _b2 : null),
     pins: (_c = parts == null ? void 0 : parts.pins) != null ? _c : "[]",
     bounds: (_d = parts == null ? void 0 : parts.bounds) != null ? _d : "[]",
-    nodes: JSON.stringify(promptCards2(request))
+    nodes: JSON.stringify(promptCards2(request2))
   });
 };
 var relevanceRecalibrateStep = {
@@ -30537,22 +30537,22 @@ var relevanceRecalibrateStep = {
   version: 2,
   render: recalibratePrompt,
   schema: RELEVANCE_RECALIBRATE_SCHEMA,
-  policy: (prompt, request) => refuseIfTooBig(prompt, request, RELEVANCE_RECALIBRATE_SCHEMA),
-  parse: (raw, request) => parseRelevanceRecalibrate(raw, request)
+  policy: (prompt, request2) => refuseIfTooBig(prompt, request2, RELEVANCE_RECALIBRATE_SCHEMA),
+  parse: (raw, request2) => parseRelevanceRecalibrate(raw, request2)
 };
-var repairPrompt2 = (request) => {
-  const pins = effectivePins(request.nodes, request.pins);
-  const tiers = mergeRelevanceTiers({ previous: currentTiers(request), items: request.previousReply.items, pins });
-  const text13 = relevanceProviderText(request.model, { claude: output_repair_claude_default2, codex: output_repair_codex_default2 });
+var repairPrompt2 = (request2) => {
+  const pins = effectivePins(request2.nodes, request2.pins);
+  const tiers = mergeRelevanceTiers({ previous: currentTiers(request2), items: request2.previousReply.items, pins });
+  const text13 = relevanceProviderText(request2.model, { claude: output_repair_claude_default2, codex: output_repair_codex_default2 });
   return renderTemplate(repair_default2, {
-    originalPrompt: recalibratePrompt(request),
+    originalPrompt: recalibratePrompt(request2),
     previousReply: JSON.stringify({
-      changes: request.previousReply.items.map((item) => {
-        const { anchor, ...rest } = promptItem(request.nodes, item);
+      changes: request2.previousReply.items.map((item) => {
+        const { anchor, ...rest } = promptItem(request2.nodes, item);
         return { ...rest, anchor: anchor != null ? anchor : null };
       })
     }),
-    violations: JSON.stringify(promptViolations(request.nodes, tiers, request.violations)),
+    violations: JSON.stringify(promptViolations(request2.nodes, tiers, request2.violations)),
     toolLine: text13.tools,
     outputLine: text13.output
   });
@@ -30562,8 +30562,8 @@ var relevanceRecalibrateRepairStep = {
   version: 2,
   render: repairPrompt2,
   schema: RELEVANCE_RECALIBRATE_SCHEMA,
-  policy: (prompt, request) => refuseIfTooBig(prompt, request, RELEVANCE_RECALIBRATE_SCHEMA),
-  parse: (raw, request) => parseRelevanceRecalibrate(raw, request)
+  policy: (prompt, request2) => refuseIfTooBig(prompt, request2, RELEVANCE_RECALIBRATE_SCHEMA),
+  parse: (raw, request2) => parseRelevanceRecalibrate(raw, request2)
 };
 
 // core/relevance-grade-service.ts
@@ -30572,7 +30572,7 @@ var PROGRESS_INTERVAL_MS = 200;
 function providerRelevanceGradeRunner(aiCalls) {
   return providerStepRunner(aiCalls, {
     name: "relevance-grade",
-    topic: (request) => `Relevance ${"previous" in request ? "recalibrate" : "grade"} \xB7 ${request.goal.trim().slice(0, 80)}`,
+    topic: (request2) => `Relevance ${"previous" in request2 ? "recalibrate" : "grade"} \xB7 ${request2.goal.trim().slice(0, 80)}`,
     stopped: () => new RelevanceGradeError("stopped", "Relevance grading stopped"),
     stream: true
   });
@@ -30593,21 +30593,21 @@ var RelevanceGradeService = class {
    * reply. Any other failure, or a hierarchy failure after the last round, fails the whole grade with a plain message
    * (ids only in `detail`).
    */
-  async grade(request, signal, hooks = {}) {
+  async grade(request2, signal, hooks = {}) {
     return this.drive(
-      request,
+      request2,
       signal,
       hooks,
       relevanceGradeStep,
       (failure) => failure.missing ? relevanceGradeMissingRepairStep : relevanceGradeRepairStep,
       (failure) => ({
-        ...request,
+        ...request2,
         previousReply: failure.reply,
         violations: failure.violations,
         ...failure.missing ? { missing: failure.missing } : {}
       }),
-      cardsToGrade(request).length === 0,
-      cardsToGrade(request).length
+      cardsToGrade(request2).length === 0,
+      cardsToGrade(request2).length
     );
   }
   /**
@@ -30616,19 +30616,19 @@ var RelevanceGradeService = class {
    * as {@link grade}; an empty `items` is a valid answer ("nothing to adjust"). Nothing to ask (every gradable card is
    * pinned) sends no request.
    */
-  async recalibrate(request, signal, hooks = {}) {
+  async recalibrate(request2, signal, hooks = {}) {
     return this.drive(
-      request,
+      request2,
       signal,
       hooks,
       relevanceRecalibrateStep,
       () => relevanceRecalibrateRepairStep,
       (failure) => ({
-        ...request,
+        ...request2,
         previousReply: failure.reply,
         violations: failure.violations
       }),
-      cardsToRecalibrate(request).length === 0
+      cardsToRecalibrate(request2).length === 0
     );
   }
   /** Turns the stream of StructuredOutput JSON into a throttled "tiers received" count. */
@@ -30662,15 +30662,15 @@ var RelevanceGradeService = class {
       emit((_b2 = (_a2 = buffer.match(TIER_FIELD)) == null ? void 0 : _a2.length) != null ? _b2 : 0);
     };
   }
-  async drive(request, signal, hooks, step, repairStep, repairRequest, nothingToAsk, total2) {
-    const stopped = () => new RelevanceGradeError("stopped", translate(uiLocale(request.language), "error.relevance_grade_stopped"));
+  async drive(request2, signal, hooks, step, repairStep, repairRequest, nothingToAsk, total2) {
+    const stopped = () => new RelevanceGradeError("stopped", translate(uiLocale(request2.language), "error.relevance_grade_stopped"));
     if (signal.aborted) throw stopped();
-    const prepared = prepareStep(step, request);
+    const prepared = prepareStep(step, request2);
     if (nothingToAsk) {
-      const conflicts = pinConflicts(request);
+      const conflicts = pinConflicts(request2);
       return { items: [], ...conflicts.length ? { conflicts } : {} };
     }
-    const send = (made) => this.run(request, signal, made, this.progressListener(hooks, total2));
+    const send = (made) => this.run(request2, signal, made, this.progressListener(hooks, total2));
     let raw;
     try {
       raw = await send(prepared);
@@ -30678,7 +30678,7 @@ var RelevanceGradeService = class {
       if (signal.aborted && !(error instanceof RelevanceGradeError)) throw stopped();
       if (error instanceof RelevanceGradeError && error.code === "stopped") throw stopped();
       if (error instanceof RelevanceGradeError && error.hierarchy && !signal.aborted)
-        return this.repair(request, signal, hooks, error.hierarchy, stopped, repairStep, repairRequest, send);
+        return this.repair(request2, signal, hooks, error.hierarchy, stopped, repairStep, repairRequest, send);
       throw error;
     }
     if (signal.aborted) throw stopped();
@@ -30686,11 +30686,11 @@ var RelevanceGradeService = class {
       return prepared.parse(raw);
     } catch (error) {
       if (error instanceof RelevanceGradeError && error.hierarchy)
-        return this.repair(request, signal, hooks, error.hierarchy, stopped, repairStep, repairRequest, send);
+        return this.repair(request2, signal, hooks, error.hierarchy, stopped, repairStep, repairRequest, send);
       throw error;
     }
   }
-  async repair(request, signal, hooks, first, stopped, repairStep, repairRequest, send) {
+  async repair(request2, signal, hooks, first, stopped, repairStep, repairRequest, send) {
     var _a2, _b2;
     let failure = first;
     for (let round = 1; ; round++) {
@@ -30715,7 +30715,7 @@ var RelevanceGradeService = class {
         if (round >= RELEVANCE_REPAIR_MAX_ROUNDS)
           throw error.hierarchy.missing ? new RelevanceGradeError("invalid", error.message, void 0, (_b2 = error.detail) != null ? _b2 : error.message) : new RelevanceGradeError(
             "invalid",
-            translate(uiLocale(request.language), "error.relevance_grade_hierarchy"),
+            translate(uiLocale(request2.language), "error.relevance_grade_hierarchy"),
             void 0,
             error.message
           );
@@ -33103,9 +33103,9 @@ var _AimManualFlow = class _AimManualFlow {
   /** A conclusion note keeps its open items in a hidden marker, so the user can correct them later. */
   async concludedDetail(review, charts) {
     var _a2;
-    const { mapPath, branchId, ...request } = charts;
+    const { mapPath, branchId, ...request2 } = charts;
     const body = this.addDiagrams ? await this.addDiagrams({
-      ...request,
+      ...request2,
       detail: review.detail,
       // Called only when the step really runs (the setting is on), so the UI never shows a stage that is skipped.
       onStart: () => this.emitProgress({ kind: "stage", mapPath, branchId, stage: "add-diagrams" })
@@ -33228,9 +33228,9 @@ ${(_d = context.task) != null ? _d : ""}`
       );
     const result = await this.askModel(deduplicated, model, reasoning, signal, onWebSearchEvent);
     throwIfAborted(signal);
-    const lookup = result.detail.match(/^\s*<!--\s*aim-evidence-request\s+(\{[^\n]*\})\s*-->/);
-    if (!lookup) return result;
-    const payload = JSON.parse(lookup[1]);
+    const lookup2 = result.detail.match(/^\s*<!--\s*aim-evidence-request\s+(\{[^\n]*\})\s*-->/);
+    if (!lookup2) return result;
+    const payload = JSON.parse(lookup2[1]);
     const ids = payload && typeof payload === "object" && "ids" in payload ? payload.ids : void 0;
     const visibleIds = new Set(
       (_f = (_e = [deduplicated.task, deduplicated.detail, deduplicated.ancestors].join("\n").match(/Evidence ID: ([^\s]+)/g)) == null ? void 0 : _e.map((line) => line.slice(13))) != null ? _f : []
@@ -37711,13 +37711,13 @@ var VisualAgentMapView = class _VisualAgentMapView extends import_obsidian30.Ite
       }
     );
     this.aimManual.onProgress = (event) => this.onAimProgress(event);
-    this.aimManual.addDiagrams = (request) => plugin.addAimDiagrams(request);
+    this.aimManual.addDiagrams = (request2) => plugin.addAimDiagrams(request2);
     this.aimRecovery = new AimManualFlow(
       plugin.repo,
       this.aimRuns,
       (context, model, reasoning, signal, onWebSearchEvent) => plugin.askModel(context, model, reasoning, signal, void 0, void 0, onWebSearchEvent)
     );
-    this.aimRecovery.addDiagrams = (request) => plugin.addAimDiagrams(request);
+    this.aimRecovery.addDiagrams = (request2) => plugin.addAimDiagrams(request2);
   }
   getViewType() {
     return VIEW_TYPE;
@@ -38322,7 +38322,7 @@ var VisualAgentMapView = class _VisualAgentMapView extends import_obsidian30.Ite
     const placement = prefill ? prefill.inputs.placement : target.selected ? "under" : "tree";
     new OutlineImportModal(
       this.app,
-      (request) => this.importOutline(request),
+      (request2) => this.importOutline(request2),
       this.modelChoices(),
       this.templateChoices(),
       target,
@@ -38351,7 +38351,7 @@ var VisualAgentMapView = class _VisualAgentMapView extends import_obsidian30.Ite
       presets: this.plugin,
       initialTopic,
       ...prefill ? { prefill } : {},
-      generate: async (request, signal, started) => {
+      generate: async (request2, signal, started) => {
         var _a2, _b2;
         if (((_a2 = this.outlineDraftTask) == null ? void 0 : _a2.state) === "running") throw new Error(t("ui.ai_running_ai"));
         const settings = this.plugin.settings;
@@ -38376,9 +38376,9 @@ var VisualAgentMapView = class _VisualAgentMapView extends import_obsidian30.Ite
           try {
             const result = await this.plugin.outlineGeneration.generate(
               {
-                ...request,
+                ...request2,
                 language: settings.language,
-                contentLanguage: outputLanguageForMap(this.map, settings.language, request.topic),
+                contentLanguage: outputLanguageForMap(this.map, settings.language, request2.topic),
                 model,
                 reasoning: normalizeReasoningLevel(settings.cliReasoning)
               },
@@ -38483,20 +38483,20 @@ var VisualAgentMapView = class _VisualAgentMapView extends import_obsidian30.Ite
     const settings = this.plugin.settings;
     return {
       presets: listPresets(settings.promptPresets, "outline", settings.language).map(({ id, name }) => ({ id, name })),
-      generate: async (request, signal) => {
+      generate: async (request2, signal) => {
         var _a2, _b2;
         const note = await this.plugin.repo.readNote(node.path, (_a2 = this.map) != null ? _a2 : void 0);
-        const { preset } = resolvePreset(settings.promptPresets, "outline", request.presetId, request.language);
+        const { preset } = resolvePreset(settings.promptPresets, "outline", request2.presetId, request2.language);
         const result = await this.plugin.outlineGeneration.generate(
           {
             topic: note.title,
-            presetText: request.requirements ? `${preset.text}
+            presetText: request2.requirements ? `${preset.text}
 
-${request.requirements}` : preset.text,
-            language: request.language,
+${request2.requirements}` : preset.text,
+            language: request2.language,
             model: note.model,
             reasoning: normalizeReasoningLevel((_b2 = note.reasoning) != null ? _b2 : settings.cliReasoning),
-            limits: request.limits
+            limits: request2.limits
           },
           signal
         );
@@ -39088,7 +39088,7 @@ ${request.requirements}` : preset.text,
         }
         basis = buildStructureReviewNodes(this.map.nodes, (id) => this.describeForReview(id));
         pins = this.relevancePinList();
-        const request = {
+        const request2 = {
           goal,
           ...level ? { level } : {},
           ...context ? { context } : {},
@@ -39114,10 +39114,10 @@ ${request.requirements}` : preset.text,
           }
         };
         result = mode === "recalibrate" ? await this.plugin.relevanceGrade.recalibrate(
-          { ...request, previous: this.relevanceAiGrades() },
+          { ...request2, previous: this.relevanceAiGrades() },
           run.controller.signal,
           hooks
-        ) : await this.plugin.relevanceGrade.grade(request, run.controller.signal, hooks);
+        ) : await this.plugin.relevanceGrade.grade(request2, run.controller.signal, hooks);
       });
       if (!this.relevanceRunIsCurrent(run, mapPath)) return;
       if (!started) return this.finishRelevance(run, mapPath, "declined", t("ui.relevance_not_started"));
@@ -39582,15 +39582,15 @@ ${request.requirements}` : preset.text,
     if (!node) return { map: "editable" };
     return { map: "editable", selected: { id: node.id, title: (_b2 = (_a2 = this.notes.get(node.id)) == null ? void 0 : _a2.title) != null ? _b2 : node.path } };
   }
-  async importOutline(request) {
+  async importOutline(request2) {
     var _a2;
-    const placement = (_a2 = request.placement) != null ? _a2 : { kind: "new" };
-    if (placement.kind !== "new") return this.importOutlineIntoMap(request, placement);
-    const model = request.shallowResearch && request.model || this.plugin.settings.cliModel;
+    const placement = (_a2 = request2.placement) != null ? _a2 : { kind: "new" };
+    if (placement.kind !== "new") return this.importOutlineIntoMap(request2, placement);
+    const model = request2.shallowResearch && request2.model || this.plugin.settings.cliModel;
     const settings = this.plugin.settings;
     const { template } = resolveTemplate(
       settings.detailTemplates,
-      [request.detailTemplateId, settings.defaultDetailTemplateId],
+      [request2.detailTemplateId, settings.defaultDetailTemplateId],
       noteLanguageOf(settings.language)
     );
     let result;
@@ -39598,11 +39598,11 @@ ${request.requirements}` : preset.text,
       result = await createOutlineMap(
         this.plugin.repo,
         model,
-        request.nodes,
-        request.source,
+        request2.nodes,
+        request2.source,
         void 0,
         template,
-        Boolean(request.shallowResearch && request.model && request.model !== settings.cliModel)
+        Boolean(request2.shallowResearch && request2.model && request2.model !== settings.cliModel)
       );
     } catch (error) {
       if (!(error == null ? void 0 : error.mapCreated)) throw error;
@@ -39612,8 +39612,8 @@ ${request.requirements}` : preset.text,
     let opened = true;
     try {
       await this.plugin.mutate(async () => {
-        const chosenTemplate = request.detailTemplateId;
-        const chosenTone = request.toneId;
+        const chosenTemplate = request2.detailTemplateId;
+        const chosenTone = request2.toneId;
         if (chosenTemplate || chosenTone)
           await this.plugin.repo.updateMap(result.mapPath, (map) => {
             if (chosenTemplate) map.detailTemplateId = chosenTemplate;
@@ -39627,7 +39627,7 @@ ${request.requirements}` : preset.text,
       opened = false;
     }
     if (result.failure) new import_obsidian30.Notice(t("ui.outline_import_partial", result.created, result.total, result.failure));
-    if (result.failure || !opened || !request.shallowResearch || result.nodes.length < 2) return;
+    if (result.failure || !opened || !request2.shallowResearch || result.nodes.length < 2) return;
     const root = result.nodes.find((node) => node.parentId === null);
     if (!root) return;
     const children = result.nodes.filter((node) => node.parentId !== null);
@@ -39636,14 +39636,14 @@ ${request.requirements}` : preset.text,
       () => {
         var _a3;
         return this.startShallowResearch(root, children, {
-          ...aiModeOptions((_a3 = request.aiMode) != null ? _a3 : "quick", "subtopic"),
+          ...aiModeOptions((_a3 = request2.aiMode) != null ? _a3 : "quick", "subtopic"),
           referenceGroups: []
         });
       }
     ).catch((error) => new import_obsidian30.Notice(errorMessage(error)));
   }
   /** Adds the outline to the open map, as a new top-level tree or under the selected topic; existing nodes stay put. */
-  async importOutlineIntoMap(request, placement) {
+  async importOutlineIntoMap(request2, placement) {
     var _a2, _b2, _c;
     const settings = this.plugin.settings;
     const repo = this.plugin.repo;
@@ -39674,21 +39674,21 @@ ${request.requirements}` : preset.text,
         }
         const { map, path, parent } = current;
         const baseModel = parent ? inheritModel((await repo.readNote(parent.path, map)).model, settings.cliModel) : settings.cliModel;
-        model = request.shallowResearch && request.model || baseModel;
-        const template = this.mapDetailTemplate(settings.language, request.detailTemplateId);
+        model = request2.shallowResearch && request2.model || baseModel;
+        const template = this.mapDetailTemplate(settings.language, request2.detailTemplateId);
         const result = await addOutlineToMap(
           repo,
           map,
           path,
           model,
-          request.nodes,
-          request.source,
+          request2.nodes,
+          request2.source,
           (_a3 = parent == null ? void 0 : parent.id) != null ? _a3 : null,
           template,
-          request.detailTemplateId,
+          request2.detailTemplateId,
           void 0,
-          Boolean(request.shallowResearch && request.model && request.model !== baseModel),
-          request.toneId
+          Boolean(request2.shallowResearch && request2.model && request2.model !== baseModel),
+          request2.toneId
         );
         state.result = result;
         const created = result.created;
@@ -39777,9 +39777,9 @@ ${request.requirements}` : preset.text,
     if (state.rejection) throw state.rejection;
     const outcome = state.result;
     if (!outcome) return;
-    if (state.saveFailed || !written2 || !request.shallowResearch || !outcome.created.length) return;
+    if (state.saveFailed || !written2 || !request2.shallowResearch || !outcome.created.length) return;
     const owner = placement.kind === "under" ? placement.parentId : null;
-    const several = owner !== null && (!!request.researchEveryTopic || request.nodes.filter((node) => node.parent === null).length > 1);
+    const several = owner !== null && (!!request2.researchEveryTopic || request2.nodes.filter((node) => node.parent === null).length > 1);
     const top = (_a2 = this.map) == null ? void 0 : _a2.nodes.find((node) => node.id === (several ? owner : outcome.created[0].id));
     if (!top) return;
     const ids = new Set((several ? outcome.created : outcome.created.slice(1)).map((node) => node.id));
@@ -39790,11 +39790,11 @@ ${request.requirements}` : preset.text,
       () => {
         var _a3;
         return this.startShallowResearch(top, children, {
-          ...aiModeOptions((_a3 = request.aiMode) != null ? _a3 : "quick", "subtopic"),
+          ...aiModeOptions((_a3 = request2.aiMode) != null ? _a3 : "quick", "subtopic"),
           referenceGroups: [],
-          ...request.researchOptions,
-          ...request.detailTemplateId ? { detailTemplateId: request.detailTemplateId } : {},
-          ...request.toneId ? { toneId: request.toneId } : {}
+          ...request2.researchOptions,
+          ...request2.detailTemplateId ? { detailTemplateId: request2.detailTemplateId } : {},
+          ...request2.toneId ? { toneId: request2.toneId } : {}
         });
       }
     ).catch((error) => new import_obsidian30.Notice(errorMessage(error)));
@@ -41095,7 +41095,7 @@ ${request.requirements}` : preset.text,
       const sourceGroup = await this.topicReferenceGroup(task.sources, "strong", { origin: false });
       if (!this.isLiveMergeTask(task)) return;
       task.sourceContent = JSON.stringify(sourceGroup.documents);
-      const request = {
+      const request2 = {
         title: t("ui.merge_ai_untitled"),
         summary: noSummaryYet(language2),
         rules: "",
@@ -41137,14 +41137,14 @@ ${request.requirements}` : preset.text,
         if (JSON.stringify(latest.documents) !== task.sourceContent) throw new Error(t("ui.merge_draft_stale"));
         return true;
       };
-      let result = await ask(request);
+      let result = await ask(request2);
       if (!await sourcesUnchanged()) return;
       task.title = mergeTitleFromResult(result, task.title);
       let check = await this.checkMergeResult(task, result);
       if (!check.ok) {
         try {
           const repaired = await ask({
-            ...request,
+            ...request2,
             summary: result.summary,
             detail: result.detail,
             task: mergeRepair(
@@ -44678,7 +44678,7 @@ ${request.requirements}` : preset.text,
       names3,
       this.modelChoices(),
       this.templateChoices(),
-      (request) => void this.startMultiResearch(request, retryBatchKey),
+      (request2) => void this.startMultiResearch(request2, retryBatchKey),
       this.toneChoices(),
       (selected, refreshed) => new PromptPresetsModal(this.app, this.plugin, "tone", () => refreshed(this.toneChoices()), selected).open(),
       this.fieldLinks(),
@@ -44693,7 +44693,7 @@ ${request.requirements}` : preset.text,
    * `onSettled` (the chat's research) hears once how the batch's web activity came out, when the batch has ended: searches made,
    * topics that were counted, and how many of those made none.
    */
-  async startMultiResearch(request, retryBatchKey, onSettled) {
+  async startMultiResearch(request2, retryBatchKey, onSettled) {
     var _a2;
     if (!this.map || this.map.aim || this.builtIn || !this.multiSelected.size) return;
     const key2 = this.multiResearchKey();
@@ -44703,7 +44703,7 @@ ${request.requirements}` : preset.text,
     }
     const selected = [...this.multiSelected].map((id) => this.map.nodes.find((node) => node.id === id)).filter((node) => !!node);
     try {
-      await this.plugin.confirmAiUsage((_a2 = request.model) != null ? _a2 : this.plugin.settings.cliModel, async () => {
+      await this.plugin.confirmAiUsage((_a2 = request2.model) != null ? _a2 : this.plugin.settings.cliModel, async () => {
         var _a3, _b2;
         if (this.plugin.expansionCoordinator.isRunning(key2)) {
           new import_obsidian30.Notice(t("ui.multi_research_already_running"));
@@ -44716,33 +44716,33 @@ ${request.requirements}` : preset.text,
           return;
         }
         if (nodes.length < selected.length) new import_obsidian30.Notice(t("ui.multi_research_skipped", selected.length - nodes.length));
-        if (request.model)
+        if (request2.model)
           for (const node of nodes)
-            await this.plugin.repo.updateNote(node.path, { model: request.model, modelSource: "manual" });
+            await this.plugin.repo.updateNote(node.path, { model: request2.model, modelSource: "manual" });
         this.integrationMode = false;
         this.multiSelected.clear();
         if (!this.closed) this.render();
         const shared2 = {
           referenceGroups: [],
-          requirements: request.requirements,
-          ...request.detailTemplateId ? { detailTemplateId: request.detailTemplateId } : {},
-          ...request.toneId ? { toneId: request.toneId } : {}
+          requirements: request2.requirements,
+          ...request2.detailTemplateId ? { detailTemplateId: request2.detailTemplateId } : {},
+          ...request2.toneId ? { toneId: request2.toneId } : {}
         };
         const choicesFor = (note) => {
           var _a4;
-          return request.researchMode !== void 0 ? {
+          return request2.researchMode !== void 0 ? {
             // The mode follows the override (local = Quick), so a Quick run gets the Quick prompt and no charts.
-            ...aiModeOptions(noteAiMode(request.researchMode), "research"),
-            researchMode: request.researchMode,
-            researchDepth: (_a4 = request.researchDepth) != null ? _a4 : "normal",
-            visualMode: request.imageSearch ? "auto" : "off",
+            ...aiModeOptions(noteAiMode(request2.researchMode), "research"),
+            researchMode: request2.researchMode,
+            researchDepth: (_a4 = request2.researchDepth) != null ? _a4 : "normal",
+            visualMode: request2.imageSearch ? "auto" : "off",
             ...shared2
           } : { ...aiModeOptions(noteAiMode(note.researchMode), "research"), ...shared2 };
         };
         if (retryBatchKey && ((_a3 = this.plugin.expansionBatches.get(retryBatchKey)) == null ? void 0 : _a3.status) !== "running")
           this.plugin.expansionBatches.delete(retryBatchKey);
         if ((_b2 = this.plugin.settings) == null ? void 0 : _b2.seamlessResearch) {
-          await this.startSeamlessBatch(key2, nodes, request, busy, onSettled);
+          await this.startSeamlessBatch(key2, nodes, request2, busy, onSettled);
           return;
         }
         let reported = false;
@@ -44882,7 +44882,7 @@ ${request.requirements}` : preset.text,
     }
   }
   /** The batch of the multi-research dialog and the chat with the setting on. Same busy rules and coordinator, up to 8 topics at once. */
-  async startSeamlessBatch(key2, nodes, request, busy, onSettled) {
+  async startSeamlessBatch(key2, nodes, request2, busy, onSettled) {
     const sr = this.seamless();
     if (!sr) return;
     let reported = false;
@@ -44899,10 +44899,10 @@ ${request.requirements}` : preset.text,
           const note = await this.plugin.repo.readNote(child.path, (_a2 = this.map) != null ? _a2 : void 0);
           const language2 = outputLanguageForMap(this.map, this.plugin.settings.language, note.title);
           await this.seamlessRequest(sr, child, note, language2, batchSignal, accepted, {
-            imagesRequested: request.imagesRequested,
-            requirements: request.requirements,
-            toneId: request.toneId,
-            detailTemplateId: request.detailTemplateId
+            imagesRequested: request2.imagesRequested,
+            requirements: request2.requirements,
+            toneId: request2.toneId,
+            detailTemplateId: request2.detailTemplateId
           });
           return void 0;
         },
@@ -46839,14 +46839,14 @@ ${note.detail.trim()}` : "",
       selectedIds: this.chatSelectionIds()
     };
     const anchor = { path: this.path, id: this.map.id };
-    let request;
+    let request2;
     try {
-      request = await this.buildChatRequest(message, chat, origin, redo);
+      request2 = await this.buildChatRequest(message, chat, origin, redo);
     } catch (error) {
       new import_obsidian30.Notice(errorMessage(error));
       return;
     }
-    await this.plugin.confirmAiUsage(request.model, async () => {
+    await this.plugin.confirmAiUsage(request2.model, async () => {
       var _a2, _b2, _c;
       if (this.closed || chat.isBusy || this.chatApplying || this.path !== anchor.path || ((_a2 = this.map) == null ? void 0 : _a2.id) !== anchor.id)
         return;
@@ -46860,7 +46860,7 @@ ${note.detail.trim()}` : "",
       chat.begin(redo ? t("ui.map_chat_more_detail_asked") : message, origin, Boolean(again));
       this.relocateMapChat();
       try {
-        const result = await this.plugin.mapChat.chat(request, controller.signal, (text13) => {
+        const result = await this.plugin.mapChat.chat(request2, controller.signal, (text13) => {
           if (alive()) chat.streamReply(text13);
         });
         if (!alive()) return;
@@ -46869,7 +46869,7 @@ ${note.detail.trim()}` : "",
           if (alive() && chat.isBusy) chat.finish(result.reply, lines2);
           return;
         }
-        const plan = result.actions.length ? planFor(result.actions, request.context, {
+        const plan = result.actions.length ? planFor(result.actions, request2.context, {
           diagrams: this.plugin.settings.addDiagramsAfterResearch,
           mapAiMode: (_c = this.map) == null ? void 0 : _c.aiMode,
           ...this.plugin.settings.seamlessResearch ? { seamless: true } : {}
@@ -46877,13 +46877,13 @@ ${note.detail.trim()}` : "",
         if (plan) {
           if (chat.isBusy) {
             chat.finish(result.reply, []);
-            this.offerChatPlan(result, plan, request.context, { path: anchor.path, id: anchor.id }, request.message);
+            this.offerChatPlan(result, plan, request2.context, { path: anchor.path, id: anchor.id }, request2.message);
           }
           return;
         }
         const lines = await this.applyMapChatActions(
-          { ...result, message: request.message },
-          request.context,
+          { ...result, message: request2.message },
+          request2.context,
           alive,
           anchor
         );
@@ -49009,6 +49009,8 @@ var VisualAgentMapSettingTab = class extends import_obsidian31.PluginSettingTab 
 };
 
 // main.ts
+var dns = __toESM(require("node:dns/promises"));
+var https2 = __toESM(require("node:https"));
 var import_node_path2 = require("node:path");
 
 // response-schema.json
@@ -52193,7 +52195,7 @@ var unfence = (raw) => {
   const match = /^\s*```(?:json)?\s*\n([\s\S]*?)\n```\s*$/i.exec(raw);
   return match ? match[1] : raw;
 };
-function parseShareTranslation(raw, request) {
+function parseShareTranslation(raw, request2) {
   let value;
   try {
     value = JSON.parse(unfence(raw));
@@ -52205,7 +52207,7 @@ function parseShareTranslation(raw, request) {
   const body = value;
   if (!Array.isArray(body.segments))
     throw new ShareTranslateParseError("bad-shape", "The translation reply has no segments list");
-  const asked = new Set(request.items.map((item) => item.id));
+  const asked = new Set(request2.items.map((item) => item.id));
   const seen = /* @__PURE__ */ new Set();
   const segments = [];
   for (const entry of body.segments) {
@@ -52220,10 +52222,10 @@ function parseShareTranslation(raw, request) {
   }
   return { segments };
 }
-var variables4 = (request) => ({
-  sourceLanguage: request.sourceLanguage === UNKNOWN_SOURCE_LANGUAGE ? unknown_source_default.trim() : languagePromptName(request.sourceLanguage, "en", "region"),
-  targetLanguage: languagePromptName(request.targetLanguage, "en", "region"),
-  segments: JSON.stringify(request.items.map((item) => ({ id: item.id, text: item.text })))
+var variables4 = (request2) => ({
+  sourceLanguage: request2.sourceLanguage === UNKNOWN_SOURCE_LANGUAGE ? unknown_source_default.trim() : languagePromptName(request2.sourceLanguage, "en", "region"),
+  targetLanguage: languagePromptName(request2.targetLanguage, "en", "region"),
+  segments: JSON.stringify(request2.items.map((item) => ({ id: item.id, text: item.text })))
 });
 var policy = (prompt) => {
   if (estimateTokens(prompt + JSON.stringify(SHARE_TRANSLATE_SCHEMA)) > SHARE_TRANSLATE_TOKEN_BUDGET)
@@ -52232,18 +52234,18 @@ var policy = (prompt) => {
 var shareTranslateStep = {
   id: "share-translate",
   version: 1,
-  render: (request) => renderTemplate(prompt_default4, variables4(request)),
+  render: (request2) => renderTemplate(prompt_default4, variables4(request2)),
   schema: SHARE_TRANSLATE_SCHEMA,
   policy,
-  parse: (raw, request) => parseShareTranslation(raw, request)
+  parse: (raw, request2) => parseShareTranslation(raw, request2)
 };
 var shareTranslateLabelsStep = {
   id: "share-translate.labels",
   version: 1,
-  render: (request) => renderTemplate(mermaid_prompt_default, variables4(request)),
+  render: (request2) => renderTemplate(mermaid_prompt_default, variables4(request2)),
   schema: SHARE_TRANSLATE_SCHEMA,
   policy,
-  parse: (raw, request) => parseShareTranslation(raw, request)
+  parse: (raw, request2) => parseShareTranslation(raw, request2)
 };
 
 // experiences/sharing/share-translate-mermaid.ts
@@ -52415,7 +52417,7 @@ var ShareTranslateError = class extends Error {
 function providerShareTranslateRunner(aiCalls) {
   return providerStepRunner(aiCalls, {
     name: "share-translate",
-    topic: (request) => `Share translation \xB7 ${request.targetLanguage}`,
+    topic: (request2) => `Share translation \xB7 ${request2.targetLanguage}`,
     stopped: () => new ShareTranslateError("stopped", "Share translation stopped")
   });
 }
@@ -52527,16 +52529,16 @@ var ShareTranslateService = class {
     };
     progress("translate");
     const send = async (group, items) => {
-      const request = {
+      const request2 = {
         items: items.map((item) => ({ id: item.id, text: item.text })),
         sourceLanguage: source.sourceLanguage,
         targetLanguage: language2,
         model,
         reasoning: options.reasoning
       };
-      const preparedStep = prepareStep(group.step, request);
+      const preparedStep = prepareStep(group.step, request2);
       languageCalls++;
-      const raw = await this.run(request, signal, preparedStep);
+      const raw = await this.run(request2, signal, preparedStep);
       return preparedStep.parse(raw);
     };
     const batchTask = (group, batch) => async () => {
@@ -55070,10 +55072,13 @@ async function fetchPublicImage(url, deps) {
         throw new Error("image host resolves to a private address");
       target = answers[0];
     }
-    const response = await deps.get(
-      { url: safe, hostname, address: target.address, family: target.family },
-      deps.signal
-    );
+    let response;
+    try {
+      response = await deps.get({ url: safe, hostname, address: target.address, family: target.family }, deps.signal);
+    } catch (error) {
+      if (deps.signal.aborted) return void 0;
+      throw error;
+    }
     if (deps.signal.aborted) return void 0;
     if (REDIRECT_STATUSES.has(response.status)) {
       if (!response.location) throw new Error("image redirect has no location");
@@ -55750,14 +55755,14 @@ var chartStep = {
   id: "chart.add",
   version: 1,
   schema: CHART_SCHEMA,
-  render: (request) => renderTemplate(inLanguage({ zh: chart_zh_default, en: chart_en_default }, request.language), {
-    existingCount: String(request.existingCount),
-    existingTypes: request.existingTypes.length ? request.existingTypes.join(inLanguage({ zh: "\u3001", en: ", " }, request.language)) : inLanguage({ zh: "\u7121", en: "none" }, request.language),
-    remaining: String(request.remaining),
-    claudeOutput: request.provider === "claude" ? `
-${inLanguage(CLAUDE_STRUCTURED_OUTPUT, request.language)}` : "",
-    title: request.title,
-    detail: request.detail
+  render: (request2) => renderTemplate(inLanguage({ zh: chart_zh_default, en: chart_en_default }, request2.language), {
+    existingCount: String(request2.existingCount),
+    existingTypes: request2.existingTypes.length ? request2.existingTypes.join(inLanguage({ zh: "\u3001", en: ", " }, request2.language)) : inLanguage({ zh: "\u7121", en: "none" }, request2.language),
+    remaining: String(request2.remaining),
+    claudeOutput: request2.provider === "claude" ? `
+${inLanguage(CLAUDE_STRUCTURED_OUTPUT, request2.language)}` : "",
+    title: request2.title,
+    detail: request2.detail
   }),
   parse: (raw) => parseChartReply(raw)
 };
@@ -56147,19 +56152,19 @@ var AiTaskService = class {
    * detail with the diagrams added, or unchanged when the step finds none or fails; only a stop throws. `onExchange`
    * receives the chart entry's id so the caller can mark it failed when it decides not to apply the result.
    */
-  async chartDetail(request) {
+  async chartDetail(request2) {
     var _a2, _b2;
-    if ((_a2 = request.signal) == null ? void 0 : _a2.aborted) throw new DOMException("Aborted", "AbortError");
+    if ((_a2 = request2.signal) == null ? void 0 : _a2.aborted) throw new DOMException("Aborted", "AbortError");
     return this.addCharts(
-      request.input,
-      request.detail,
-      request.countIssues,
-      (_b2 = request.input.outputLanguage) != null ? _b2 : this.options.language(),
-      this.runtimeIdFor(request.model),
-      request.model,
-      request.signal,
+      request2.input,
+      request2.detail,
+      request2.countIssues,
+      (_b2 = request2.input.outputLanguage) != null ? _b2 : this.options.language(),
+      this.runtimeIdFor(request2.model),
+      request2.model,
+      request2.signal,
       this.options.exchangeLoggingEnabled() ? this.options.exchanges() : null,
-      request.onExchange
+      request2.onExchange
     );
   }
   /** Marks an exchange failed with the caller's reason (for example a stale chart that was not applied). */
@@ -56192,30 +56197,30 @@ var AiTaskService = class {
    * The chart step for a finished AIM conclusion (its final detail only, never interim or gap-audit text). Returns the
    * detail unchanged when diagrams are off or the step fails; only a stop throws.
    */
-  async addDiagramsToDetail(request) {
+  async addDiagramsToDetail(request2) {
     var _a2, _b2;
-    if (!this.diagramsOn()) return request.detail;
-    if ((_a2 = request.signal) == null ? void 0 : _a2.aborted) throw new DOMException("Aborted", "AbortError");
-    (_b2 = request.onStart) == null ? void 0 : _b2.call(request);
+    if (!this.diagramsOn()) return request2.detail;
+    if ((_a2 = request2.signal) == null ? void 0 : _a2.aborted) throw new DOMException("Aborted", "AbortError");
+    (_b2 = request2.onStart) == null ? void 0 : _b2.call(request2);
     const input = {
-      title: request.title,
+      title: request2.title,
       summary: "",
       rules: "",
-      detail: request.detail,
+      detail: request2.detail,
       task: "",
       ancestors: "",
       mode: "task",
       detailFormat: "adaptive",
-      outputLanguage: request.language
+      outputLanguage: request2.language
     };
     return this.addCharts(
       input,
-      request.detail,
+      request2.detail,
       void 0,
-      request.language,
-      this.runtimeIdFor(request.model),
-      request.model,
-      request.signal,
+      request2.language,
+      this.runtimeIdFor(request2.model),
+      request2.model,
+      request2.signal,
       this.options.exchangeLoggingEnabled() ? this.options.exchanges() : null
     );
   }
@@ -56375,38 +56380,38 @@ function parseReframeDraft(raw) {
 var reframeStep = {
   id: "reframe",
   version: 1,
-  render: (request) => renderTemplate(prompt_default6, {
+  render: (request2) => renderTemplate(prompt_default6, {
     languageInstruction: inLanguageNaming(
       { zh: language_zh_default4, en: language_en_default4 },
-      request.language,
+      request2.language,
       { language: "region" },
       "en",
-      { kind: "question", text: request.question }
+      { kind: "question", text: request2.question }
     ),
-    direction: JSON.stringify({ question: request.question, context: request.context }),
-    source: JSON.stringify(request.source)
+    direction: JSON.stringify({ question: request2.question, context: request2.context }),
+    source: JSON.stringify(request2.source)
   }),
   schema: REFRAME_SCHEMA,
-  policy: (prompt, request) => {
+  policy: (prompt, request2) => {
     if (estimateTokens(prompt + JSON.stringify(REFRAME_SCHEMA)) > REFRAME_TOKEN_BUDGET)
-      throw new Error(translate(uiLocale(request.language), "error.reframing_over_budget"));
+      throw new Error(translate(uiLocale(request2.language), "error.reframing_over_budget"));
   },
   parse: (raw) => parseReframeDraft(raw)
 };
 
 // core/reframing-service.ts
 function providerReframeRunner(aiCalls) {
-  return (request, _prompt, _schema, signal, prepared) => {
+  return (request2, _prompt, _schema, signal, prepared) => {
     const options = {
-      model: request.model,
-      effort: request.reasoning === "auto" ? "low" : request.reasoning,
-      topic: `Reframing \xB7 ${request.question}`,
+      model: request2.model,
+      effort: request2.reasoning === "auto" ? "low" : request2.reasoning,
+      topic: `Reframing \xB7 ${request2.question}`,
       taskName: "reframe",
       signal,
       localCodex: true,
       stopped: () => new Error("Reframing stopped"),
       validate: (runtime) => {
-        if (runtime.capabilities.id === "claude" && !CLAUDE_MODEL_CHOICES.some((choice2) => choice2.id === request.model))
+        if (runtime.capabilities.id === "claude" && !CLAUDE_MODEL_CHOICES.some((choice2) => choice2.id === request2.model))
           throw new Error("Unsupported Claude model");
       },
       task: { textOnly: true, searchBudget: 0 }
@@ -56422,14 +56427,14 @@ var ReframingService = class {
   constructor(run) {
     this.run = run;
   }
-  async reframe(request, signal) {
+  async reframe(request2, signal) {
     const checkCancelled = () => {
-      if (signal.aborted) throw new Error(translate(uiLocale(request.language), "error.reframing_stopped"));
+      if (signal.aborted) throw new Error(translate(uiLocale(request2.language), "error.reframing_stopped"));
     };
     checkCancelled();
-    if (request.targetCore !== "understand") throw new Error("Unsupported reframing target");
-    const prepared = prepareStep(reframeStep, request);
-    const raw = await this.run(request, prepared.prompt, REFRAME_SCHEMA, signal, prepared);
+    if (request2.targetCore !== "understand") throw new Error("Unsupported reframing target");
+    const prepared = prepareStep(reframeStep, request2);
+    const raw = await this.run(request2, prepared.prompt, REFRAME_SCHEMA, signal, prepared);
     checkCancelled();
     return prepared.parse(raw);
   }
@@ -56513,37 +56518,37 @@ function parseOutlineReply(raw, language2) {
 var outlineGenerateStep = {
   id: "outline-generate",
   version: 1,
-  render: (request) => {
+  render: (request2) => {
     var _a2;
-    const content = (_a2 = request.contentLanguage) != null ? _a2 : request.language;
+    const content = (_a2 = request2.contentLanguage) != null ? _a2 : request2.language;
     return renderTemplate(prompt_default7, {
       languageInstruction: inLanguageNaming({ zh: language_zh_default5, en: language_en_default5 }, content, { language: "region" }, "en", {
         kind: "topic",
-        text: request.topic
+        text: request2.topic
       }),
-      preset: request.limits ? `${applyTopicToPreset(request.presetText, request.topic, content)}
+      preset: request2.limits ? `${applyTopicToPreset(request2.presetText, request2.topic, content)}
 
 ${renderTemplate(
         inLanguage({ zh: limits_zh_default, en: limits_en_default }, content),
-        { levels: String(request.limits.levels), maxTopics: String(request.limits.maxTopics) }
-      )}` : applyTopicToPreset(request.presetText, request.topic, content)
+        { levels: String(request2.limits.levels), maxTopics: String(request2.limits.maxTopics) }
+      )}` : applyTopicToPreset(request2.presetText, request2.topic, content)
     });
   },
-  policy: (prompt, request) => {
-    const locale = uiLocale(request.language);
-    if (!request.topic.trim())
+  policy: (prompt, request2) => {
+    const locale = uiLocale(request2.language);
+    if (!request2.topic.trim())
       throw new OutlineGenerateError("empty_topic", translate(locale, "error.outline_generate_empty_topic"));
     if (estimateTokens(prompt) > OUTLINE_GENERATE_TOKEN_BUDGET)
       throw new OutlineGenerateError("over_budget", translate(locale, "error.outline_generate_over_budget"));
   },
-  parse: (raw, request) => parseOutlineReply(raw, request.language)
+  parse: (raw, request2) => parseOutlineReply(raw, request2.language)
 };
 
 // core/outline-generation-service.ts
 function providerOutlineRunner(aiCalls) {
   return providerStepRunner(aiCalls, {
     name: "outline-generate",
-    topic: (request) => `Outline \xB7 ${request.topic.trim().slice(0, 80)}`,
+    topic: (request2) => `Outline \xB7 ${request2.topic.trim().slice(0, 80)}`,
     stopped: () => new OutlineGenerateError("stopped", "Outline generation stopped")
   });
 }
@@ -56555,16 +56560,16 @@ var OutlineGenerationService = class {
    * Generate a heading-only outline for `request.topic`. Throws {@link OutlineGenerateError} (localized message,
    * `code` for the reason) for an empty topic, an over-budget request, a stop, or a reply that is not a valid outline.
    */
-  async generate(request, signal) {
-    const stopped = () => new OutlineGenerateError("stopped", translate(uiLocale(request.language), "error.outline_generate_stopped"));
+  async generate(request2, signal) {
+    const stopped = () => new OutlineGenerateError("stopped", translate(uiLocale(request2.language), "error.outline_generate_stopped"));
     if (signal.aborted) throw stopped();
     const prepared = prepareStep(
       outlineGenerateStep,
-      request
+      request2
     );
     let raw;
     try {
-      raw = await this.run(request, signal, prepared);
+      raw = await this.run(request2, signal, prepared);
     } catch (error) {
       if (signal.aborted && !(error instanceof OutlineGenerateError)) throw stopped();
       if (error instanceof OutlineGenerateError && error.code === "stopped") throw stopped();
@@ -56668,7 +56673,7 @@ function partialReply(buffer) {
 function providerMapChatRunner(aiCalls) {
   return providerStepRunner(aiCalls, {
     name: "map-chat",
-    topic: (request) => `Map chat \xB7 ${request.message.trim().slice(0, 80)}`,
+    topic: (request2) => `Map chat \xB7 ${request2.message.trim().slice(0, 80)}`,
     stopped: () => new MapChatError("stopped", "Map chat stopped"),
     stream: true
   });
@@ -56683,10 +56688,10 @@ var MapChatService = class {
    * empty message, an over-budget context, a stop or a malformed reply. Actions that name nothing valid come back in
    * `rejected`. Only Claude streams; for other providers `onReply` is never called and the reply arrives with the result.
    */
-  async chat(request, signal, onReply) {
+  async chat(request2, signal, onReply) {
     const stopped = () => new MapChatError("stopped", "Map chat stopped");
     if (signal.aborted) throw stopped();
-    const prepared = prepareStep(mapChatStep, request);
+    const prepared = prepareStep(mapChatStep, request2);
     let shown = "";
     const onStructuredJson = onReply ? (buffer) => {
       if (signal.aborted) return;
@@ -56697,7 +56702,7 @@ var MapChatService = class {
     } : void 0;
     let raw;
     try {
-      raw = await this.run(request, signal, prepared, onStructuredJson);
+      raw = await this.run(request2, signal, prepared, onStructuredJson);
     } catch (error) {
       if (signal.aborted && !(error instanceof MapChatError)) throw stopped();
       if (error instanceof MapChatError && error.code === "stopped") throw stopped();
@@ -57738,14 +57743,14 @@ var SelectionAiPanel = class extends import_obsidian37.Component {
         if (controller.signal.aborted || !this.isOpen) return;
       } else {
         status.setText(t("ui.context_ai_running_0", label2));
-        const request = prepareStep(transformStep, {
+        const request2 = prepareStep(transformStep, {
           instruction: plan.instruction || prompt,
           selected: this.snapshot.text,
           context,
           action: plan.action,
           hasImage: false
         });
-        result = await this.run(request, this.model, controller.signal, void 0, plan.action === "research");
+        result = await this.run(request2, this.model, controller.signal, void 0, plan.action === "research");
         insertAfter = plan.action === "research" || plan.action === "diagram";
         if (plan.action === "diagram") {
           result = result.replace(/\r\n?/g, "\n");
@@ -58642,7 +58647,7 @@ ${t("ui.organize_link_wait_hint")}`;
     );
     this.coffeeStorage = storage;
     this.coffeeManager = new CoffeeManager(
-      (request) => this.runCoffeeRequest(request),
+      (request2) => this.runCoffeeRequest(request2),
       (session, summariesOnly) => storage.save(session, summariesOnly)
     );
   }
@@ -59087,16 +59092,16 @@ ${t("ui.organize_link_wait_hint")}`;
     await this.app.workspace.revealLeaf(leaf);
     if (leaf.view instanceof CoffeeTablesView) this.syncCoffeeOutline(leaf.view);
   }
-  async runCoffeeRequest(request) {
+  async runCoffeeRequest(request2) {
     if (!(this.app.vault.adapter instanceof import_obsidian38.FileSystemAdapter) || !this.manifest.dir)
       throw new Error("Coffee Tables requires the desktop runtime");
-    const { session, signal, prompt } = request;
+    const { session, signal, prompt } = request2;
     const effort = effectiveReasoningLevel(
       { title: session.topic, summary: "", detail: "", rules: "", task: "", ancestors: "" },
       normalizeReasoningLevel(session.reasoning)
     );
     return this.aiCalls.runCall(
-      { prompt, step: request.step },
+      { prompt, step: request2.step },
       {
         model: session.model,
         effort,
@@ -59113,11 +59118,11 @@ ${t("ui.organize_link_wait_hint")}`;
           timeoutMessage: t("ui.coffee_generation_timed_out"),
           onText: (text13) => {
             var _a2;
-            return (_a2 = request.onText) == null ? void 0 : _a2.call(request, text13);
+            return (_a2 = request2.onText) == null ? void 0 : _a2.call(request2, text13);
           },
           onSteer: (handler) => {
             var _a2;
-            return (_a2 = request.registerIntervention) == null ? void 0 : _a2.call(request, handler);
+            return (_a2 = request2.registerIntervention) == null ? void 0 : _a2.call(request2, handler);
           }
         }
       },
@@ -59544,8 +59549,8 @@ ${t("ui.organize_link_wait_hint")}`;
     this.pumpChartQueue();
   }
   /** The chart step for a finished AIM conclusion; the setting is checked inside, so off returns the detail untouched. */
-  async addAimDiagrams(request) {
-    return this.aiTasks.addDiagramsToDetail(request);
+  async addAimDiagrams(request2) {
+    return this.aiTasks.addDiagramsToDetail(request2);
   }
   pluginDirectory() {
     const adapter = this.app.vault.adapter;
@@ -59561,14 +59566,6 @@ ${t("ui.organize_link_wait_hint")}`;
   }
 };
 async function nodeImageFetchDeps(signal) {
-  let dns;
-  let https2;
-  try {
-    dns = await import("node:dns/promises");
-    https2 = await import("node:https");
-  } catch (e) {
-    throw new Error("image download unavailable");
-  }
   if (typeof (dns == null ? void 0 : dns.lookup) !== "function" || typeof (https2 == null ? void 0 : https2.request) !== "function")
     throw new Error("image download unavailable");
   return {
@@ -59577,9 +59574,9 @@ async function nodeImageFetchDeps(signal) {
       const answers = await dns.lookup(hostname, { all: true, verbatim: true });
       return answers.map((answer) => ({ address: answer.address, family: answer.family === 6 ? 6 : 4 }));
     },
-    get: (request, requestSignal) => new Promise((resolve, reject) => {
-      const isIp = request.hostname.startsWith("[") || /^\d+\.\d+\.\d+\.\d+$/.test(request.hostname);
-      const host = request.hostname.replace(/^\[|\]$/g, "");
+    get: (request2, requestSignal) => new Promise((resolve, reject) => {
+      const isIp = request2.hostname.startsWith("[") || /^\d+\.\d+\.\d+\.\d+$/.test(request2.hostname);
+      const host = request2.hostname.replace(/^\[|\]$/g, "");
       let settled = false;
       const chunks = [];
       let total2 = 0;
@@ -59587,10 +59584,11 @@ async function nodeImageFetchDeps(signal) {
         protocol: "https:",
         host,
         servername: isIp ? void 0 : host,
-        path: new URL(request.url).pathname + new URL(request.url).search,
+        port: new URL(request2.url).port || 443,
+        path: new URL(request2.url).pathname + new URL(request2.url).search,
         method: "GET",
         timeout: 3e4,
-        lookup: pinnedLookup(request.address, request.family)
+        lookup: pinnedLookup(request2.address, request2.family)
       });
       const finish = (error, value) => {
         if (settled) return;
@@ -59627,6 +59625,7 @@ async function nodeImageFetchDeps(signal) {
         });
         res.on("error", () => finish(new Error("image download failed")));
         res.on("aborted", () => finish(new Error("image download failed")));
+        res.on("close", () => finish(new Error("image download failed")));
         res.on("end", () => {
           const body = new Uint8Array(total2);
           let offset = 0;

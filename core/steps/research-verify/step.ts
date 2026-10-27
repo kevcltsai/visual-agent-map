@@ -1,5 +1,5 @@
 import { instructionLanguageOf, type ContentLanguage } from "../../../i18n";
-import { MAX_IMAGES, isHttpsUrl } from "../../seamless-research/apply";
+import { MAX_IMAGES, normalizeHttpsUrl } from "../../seamless-research/apply";
 import type { Phase2Footnote, Phase2Image, Phase2Verdict } from "../../seamless-research/apply";
 import { renderTemplate, type StepDefinition } from "../../step-runner";
 import { languageVariables, type FragmentPair } from "../_shared/fragments";
@@ -100,10 +100,11 @@ function text(row: Row, key: string, reason: ResearchVerifyParseReason, required
     throw new ResearchVerifyParseError(reason, `${key} must be ${required ? "a non-empty " : "a "}string`);
   return value;
 }
-function https(row: Row, key: string, reason: ResearchVerifyParseReason): string {
+/** The shape needs an https address (a different scheme is a parse error); an address that fails the URL gate returns undefined and the caller drops that one item. */
+function https(row: Row, key: string, reason: ResearchVerifyParseReason): string | undefined {
   const value = text(row, key, reason).trim();
-  if (!isHttpsUrl(value)) throw new ResearchVerifyParseError(reason, `${key} must be an https address`);
-  return value;
+  if (!/^https:\/\//i.test(value)) throw new ResearchVerifyParseError(reason, `${key} must be an https address`);
+  return normalizeHttpsUrl(value);
 }
 
 /** Strict parse of an `images` array: exact fields, https addresses only, at most six. */
@@ -111,12 +112,13 @@ export function parseImageRows(value: unknown): Phase2Image[] {
   const imageRows = rows(value, "images", ["imageUrl", "sourceUrl", "title", "license"]);
   if (imageRows.length > MAX_IMAGES)
     throw new ResearchVerifyParseError("too-many-images", `${imageRows.length} images`);
-  return imageRows.map(row => ({
-    imageUrl: https(row, "imageUrl", "images"),
-    sourceUrl: https(row, "sourceUrl", "images"),
-    title: text(row, "title", "images", false).trim(),
-    license: text(row, "license", "images", false).trim()
-  }));
+  return imageRows.flatMap(row => {
+    const imageUrl = https(row, "imageUrl", "images");
+    const sourceUrl = https(row, "sourceUrl", "images");
+    const title = text(row, "title", "images", false).trim();
+    const license = text(row, "license", "images", false).trim();
+    return imageUrl && sourceUrl ? [{ imageUrl, sourceUrl, title, license }] : [];
+  });
 }
 
 /** Strict parse of the phase-2 reply: exact fields, https addresses only, at most six images. Any mismatch throws ResearchVerifyParseError. */
@@ -131,10 +133,12 @@ export function parseResearchVerify(raw: string): ResearchVerifyResult {
   if (!onlyKeys(value, ["detail", "footnotes", "verdicts", "images"]))
     throw new ResearchVerifyParseError("unexpected-field", Object.keys(value).join(","));
   const detail = text(value, "detail", "detail").trim();
-  const footnotes = rows(value.footnotes, "footnotes", ["id", "url", "title"]).map(row => {
+  const footnotes = rows(value.footnotes, "footnotes", ["id", "url", "title"]).flatMap(row => {
     const id = text(row, "id", "footnotes").trim();
     if (!/^[\w-]+$/.test(id)) throw new ResearchVerifyParseError("footnotes", "id has unsupported characters");
-    return { id, url: https(row, "url", "footnotes"), title: text(row, "title", "footnotes", false).trim() };
+    const url = https(row, "url", "footnotes");
+    const title = text(row, "title", "footnotes", false).trim();
+    return url ? [{ id, url, title }] : [];
   });
   const verdicts = rows(value.verdicts, "verdicts", ["sentence", "verdict", "correction", "sourceUrl"]).map(row => {
     const verdict = row.verdict;
@@ -142,7 +146,10 @@ export function parseResearchVerify(raw: string): ResearchVerifyResult {
       throw new ResearchVerifyParseError("verdicts", "verdict must be supported or unsupported");
     const item: Phase2Verdict = { sentence: text(row, "sentence", "verdicts").trim(), verdict };
     if (row.correction !== undefined) item.correction = text(row, "correction", "verdicts", false).trim();
-    if (row.sourceUrl !== undefined) item.sourceUrl = https(row, "sourceUrl", "verdicts");
+    if (row.sourceUrl !== undefined) {
+      const sourceUrl = https(row, "sourceUrl", "verdicts");
+      if (sourceUrl) item.sourceUrl = sourceUrl;
+    }
     return item;
   });
   const images = parseImageRows(value.images);

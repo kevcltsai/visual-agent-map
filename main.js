@@ -16944,7 +16944,7 @@ function normalizeMathDelimiters(markdown) {
   });
   const edits = [];
   let display = null;
-  let inline = null;
+  let inline2 = null;
   let current = -1;
   const blankBetween = (from, to) => {
     for (let n = from + 1; n <= to; n++) if (code[n] || !lines[n].trim()) return true;
@@ -16953,7 +16953,7 @@ function normalizeMathDelimiters(markdown) {
   for (const token of tokens2) {
     if (token.line !== current) {
       current = token.line;
-      inline = null;
+      inline2 = null;
     }
     if (display && (token.line - display.line > MATH_LOOKAHEAD_LINES || blankBetween(display.line, token.line - 1)))
       display = null;
@@ -16974,12 +16974,12 @@ function normalizeMathDelimiters(markdown) {
       }
       display = null;
     } else if (!display) {
-      if (token.kind === "(") inline = token;
-      else if (inline) {
-        const inner = lines[token.line].slice(inline.start + 2, token.start).trim();
+      if (token.kind === "(") inline2 = token;
+      else if (inline2) {
+        const inner = lines[token.line].slice(inline2.start + 2, token.start).trim();
         if (inner && !inner.includes("$"))
-          edits.push({ line: token.line, start: inline.start, end: token.start + 2, text: `$${inner}$` });
-        inline = null;
+          edits.push({ line: token.line, start: inline2.start, end: token.start + 2, text: `$${inner}$` });
+        inline2 = null;
       }
     }
   }
@@ -25440,14 +25440,63 @@ function detailHash(text13) {
   }
   return hash.toString(16).padStart(8, "0");
 }
-var HTTPS_URL = /^https:\/\/[^\s<>"'`()]+$/i;
-function isHttpsUrl(value) {
-  if (!HTTPS_URL.test(value)) return false;
-  try {
-    return new URL(value).protocol === "https:";
-  } catch (e) {
-    return false;
+var UNSAFE_URL_CHARS = /[\s<>"'`\\]/;
+function hasHiddenCharacter(text13) {
+  return stripUnsafeCharacters(text13) !== text13 || /[\u0080-\u009f\u2028\u2029]/.test(text13);
+}
+function privateIpv4(a, b, c) {
+  return a === 0 || a === 10 || a === 127 || a >= 224 || a === 100 && b >= 64 && b <= 127 || a === 169 && b === 254 || a === 172 && b >= 16 && b <= 31 || a === 192 && b === 168 || a === 192 && b === 0 && c === 0;
+}
+function ipv6Groups(address) {
+  let text13 = address;
+  const dotted = /(\d+)\.(\d+)\.(\d+)\.(\d+)$/.exec(text13);
+  if (dotted) {
+    const octets = dotted.slice(1).map(Number);
+    if (octets.some((octet) => octet > 255)) return void 0;
+    text13 = `${text13.slice(0, dotted.index)}${(octets[0] << 8 | octets[1]).toString(16)}:${(octets[2] << 8 | octets[3]).toString(16)}`;
   }
+  const halves = text13.split("::");
+  if (halves.length > 2) return void 0;
+  const read = (part) => part ? part.split(":").map((group) => /^[0-9a-f]{1,4}$/.test(group) ? parseInt(group, 16) : NaN) : [];
+  const head = read(halves[0]);
+  const groups = halves.length === 1 ? head : [
+    ...head,
+    ...new Array(Math.max(0, 8 - head.length - read(halves[1]).length)).fill(0),
+    ...read(halves[1])
+  ];
+  return groups.length === 8 && groups.every((group) => group >= 0) ? groups : void 0;
+}
+function isPrivateHost(hostname) {
+  const host = hostname.toLowerCase().replace(/^\[|\]$/g, "").replace(/\.$/, "");
+  if (!host) return true;
+  if (host.includes(":")) {
+    const g = ipv6Groups(host);
+    if (!g) return true;
+    const embedded = (hi, lo) => privateIpv4(hi >> 8, hi & 255, lo >> 8);
+    const zeros = (count) => g.slice(0, count).every((group) => group === 0);
+    return zeros(6) || zeros(5) && g[5] === 65535 && embedded(g[6], g[7]) || g[0] === 100 && g[1] === 65435 && g.slice(2, 6).every((group) => group === 0) && embedded(g[6], g[7]) || g[0] === 8194 && embedded(g[1], g[2]) || (g[0] & 65024) === 64512 || (g[0] & 65472) === 65152 || (g[0] & 65472) === 65216 || g[0] >> 8 === 255;
+  }
+  const v4 = /^(\d+)\.(\d+)\.(\d+)\.(\d+)$/.exec(host);
+  if (v4) return privateIpv4(Number(v4[1]), Number(v4[2]), Number(v4[3]));
+  return host === "localhost" || host.endsWith(".localhost") || host.endsWith(".local") || host.endsWith(".internal") || host.endsWith(".home.arpa");
+}
+function normalizeHttpsUrl(value) {
+  const raw = value.trim();
+  if (!raw || UNSAFE_URL_CHARS.test(raw) || hasHiddenCharacter(raw) || !/^https:\/\//i.test(raw)) return void 0;
+  let url;
+  try {
+    url = new URL(raw);
+  } catch (e) {
+    return void 0;
+  }
+  if (url.protocol !== "https:" || url.username || url.password || isPrivateHost(url.hostname)) return void 0;
+  if (!/^(?:[a-z0-9.-]+|\[[0-9a-f:.]+\])$/i.test(url.hostname)) return void 0;
+  const afterScheme = raw.slice(8);
+  const authorityLength = afterScheme.search(/[/?#]/);
+  const cut = authorityLength < 0 ? raw.length : 8 + authorityLength;
+  const authority = raw.slice(8, cut);
+  if (!authority || authority.includes("@")) return void 0;
+  return raw.slice(0, cut) + raw.slice(cut).replace(/[()[\]!]/g, (char) => `%${char.charCodeAt(0).toString(16).toUpperCase().padStart(2, "0")}`);
 }
 function stripUnsafeCharacters(text13) {
   let out = "";
@@ -25459,25 +25508,175 @@ function stripUnsafeCharacters(text13) {
   }
   return out;
 }
-function sanitizePhase2Markdown(markdown) {
-  const dropped = [];
-  const drop = (kind, what) => {
-    dropped.push(`${kind}: ${what.slice(0, 80)}`);
+var MAX_LABEL = 2e3;
+function findClose(text13, open) {
+  let depth = 0;
+  const end = Math.min(text13.length, open + MAX_LABEL);
+  for (let k = open; k < end; k++) {
+    const char = text13[k];
+    if (char === "\\") k++;
+    else if (char === "[") depth++;
+    else if (char === "]" && --depth === 0) return k;
+  }
+  return -1;
+}
+function parseDestination(text13, from) {
+  var _a2, _b2;
+  let j = from + 1;
+  while (j < text13.length && /[ \t]/.test(text13[j])) j++;
+  let raw;
+  if (text13[j] === "<") {
+    const close = text13.indexOf(">", j);
+    if (close < 0) return void 0;
+    raw = text13.slice(j + 1, close);
+    j = close + 1;
+  } else {
+    const start = j;
+    let depth = 0;
+    while (j < text13.length) {
+      const char = text13[j];
+      if (char === "\\") {
+        j += 2;
+        continue;
+      }
+      if (/\s/.test(char)) break;
+      if (char === "(") depth++;
+      else if (char === ")") {
+        if (depth === 0) break;
+        depth--;
+      }
+      j++;
+    }
+    raw = text13.slice(start, j);
+  }
+  const spaced = /[ \t]/.test((_a2 = text13[j]) != null ? _a2 : "");
+  while (j < text13.length && /[ \t]/.test(text13[j])) j++;
+  if (spaced && /["'(]/.test((_b2 = text13[j]) != null ? _b2 : "")) {
+    const closer = text13[j] === "(" ? ")" : text13[j];
+    let k = j + 1;
+    while (k < text13.length && text13[k] !== closer) k += text13[k] === "\\" ? 2 : 1;
+    if (k >= text13.length) return void 0;
+    j = k + 1;
+    while (j < text13.length && /[ \t]/.test(text13[j])) j++;
+  }
+  return text13[j] === ")" ? { raw, end: j + 1 } : void 0;
+}
+function scrubSchemes(text13, drop) {
+  return text13.replace(/\b(?:javascript|vbscript|data|file):[^\s)\]]*/gi, (match) => {
+    drop("scheme", match);
+    return "";
+  });
+}
+function inline(text13, mode, options, drop) {
+  var _a2;
+  let out = "";
+  let pending = "";
+  const emit = (value) => {
+    out += scrubSchemes(pending, drop) + value;
+    pending = "";
   };
+  const bracket = (char) => mode === "plain" ? char : `\\${char}`;
+  let i = 0;
+  while (i < text13.length) {
+    const char = text13[i];
+    if (char === "\\") {
+      const next = text13[i + 1];
+      if (next !== void 0 && /[!-/:-@[-`{-~]/.test(next)) {
+        pending += char + next;
+        i += 2;
+      } else {
+        pending += char;
+        i++;
+      }
+      continue;
+    }
+    if (char === "<") {
+      pending += "&lt;";
+      i++;
+      continue;
+    }
+    if (char === "!" && text13[i + 1] === "[") {
+      if (text13[i + 2] === "[") {
+        const end = text13.indexOf("]]", i + 3);
+        if (end < 0) {
+          drop("embed", text13.slice(i));
+          i++;
+          continue;
+        }
+        const name = text13.slice(i + 3, end);
+        if (mode === "text" && ((_a2 = options.embeds) == null ? void 0 : _a2.has(name))) emit(`![[${name}]]`);
+        else drop("embed", text13.slice(i, end + 2));
+        i = end + 2;
+        continue;
+      }
+      const close = findClose(text13, i + 1);
+      if (close < 0) {
+        drop("image", text13.slice(i));
+        i++;
+        continue;
+      }
+      let j = close + 1;
+      if (text13[j] === "(") {
+        const destination = parseDestination(text13, j);
+        j = destination ? destination.end : text13.length;
+      } else if (text13[j] === "[") {
+        const second = findClose(text13, j);
+        if (second >= 0) j = second + 1;
+      }
+      drop("image", text13.slice(i, j));
+      i = j;
+      continue;
+    }
+    if (char === "[") {
+      const note = /\[\^([\w-]+)\]/y;
+      note.lastIndex = i;
+      const found = note.exec(text13);
+      if (found && text13[i + found[0].length] !== "(") {
+        const id = found[1];
+        if (mode === "plain") pending += found[0];
+        else if (mode === "text" && (!options.footnoteIds || options.footnoteIds.has(id))) emit(found[0]);
+        else pending += `\\[^${id}\\]`;
+        i += found[0].length;
+        continue;
+      }
+      const close = findClose(text13, i);
+      if (close >= 0 && text13[close + 1] === "(") {
+        const destination = parseDestination(text13, close + 1);
+        if (destination) {
+          const href = normalizeHttpsUrl(destination.raw);
+          const label2 = inline(text13.slice(i + 1, close), mode === "plain" ? "plain" : "label", options, drop);
+          if (href && mode === "text") emit(`[${label2.trim() || href.replace(/[[\]]/g, "")}](${href})`);
+          else {
+            if (!href) drop("link", text13.slice(i, destination.end));
+            emit(label2);
+          }
+          i = destination.end;
+          continue;
+        }
+      }
+      pending += bracket("[");
+      i++;
+      continue;
+    }
+    if (char === "]") {
+      pending += bracket("]");
+      i++;
+      continue;
+    }
+    pending += char;
+    i++;
+  }
+  emit("");
+  return out;
+}
+function removeMarkup(markdown, drop) {
   let text13 = stripUnsafeCharacters(markdown.replace(/\r\n?/g, "\n"));
-  text13 = text13.replace(/!\[[^\]]*\]\([^)]*\)/g, (match) => {
-    drop("image", match);
+  text13 = text13.replace(/<(https:\/\/[^\s<>]+)>/gi, (match, url) => {
+    const href = normalizeHttpsUrl(url);
+    if (href) return href;
+    drop("link", match);
     return "";
   });
-  text13 = text13.replace(/!\[\[[^\]]*\]\]/g, (match) => {
-    drop("embed", match);
-    return "";
-  });
-  text13 = text13.replace(/!\[[^\]]*\]\[[^\]]*\]/g, (match) => {
-    drop("image", match);
-    return "";
-  });
-  text13 = text13.replace(/<(https:\/\/[^\s<>]+)>/gi, "$1");
   text13 = text13.replace(/<!--[\s\S]*?-->/g, (match) => {
     drop("html", match);
     return "";
@@ -25486,34 +25685,46 @@ function sanitizePhase2Markdown(markdown) {
     drop("html", match);
     return "";
   });
-  text13 = text13.replace(/<\/?[A-Za-z][^>]*>/g, (match) => {
+  return text13.replace(/<\/?[A-Za-z][^>]*>/g, (match) => {
     drop("html", match);
     return "";
   });
-  text13 = text13.replace(
-    /\[([^\]]*)\]\(\s*<?((?:[^()\s>]|\([^()]*\))*)>?(?:\s+(?:"[^"]*"|'[^']*'))?\s*\)/g,
-    (match, label2, target) => {
-      if (isHttpsUrl(target)) return match;
-      drop("link", match);
-      return label2;
-    }
-  );
-  text13 = text13.split("\n").filter((line) => {
-    const definition = /^\s*\[(?!\^)[^\]]+\]:\s*(\S+)/.exec(line);
-    if (definition && !isHttpsUrl(definition[1].replace(/^<|>$/g, ""))) {
+}
+function buildLine(line, options, drop) {
+  var _a2, _b2;
+  const note = /^\[\^([\w-]+)\]:\s*(.*)$/.exec(line);
+  if (note && (!options.footnoteIds || options.footnoteIds.has(note[1])))
+    return `[^${note[1]}]: ${inline(note[2], "text", options, drop)}`;
+  const definition = /^\s*\[(?!\^)([^\]]+)\]:\s*(\S+)/.exec(line);
+  if (definition) {
+    if (options.referenceDefinitions === false) {
       drop("definition", line);
-      return false;
+      return void 0;
     }
-    return true;
-  }).join("\n");
-  text13 = text13.replace(/\b(?:javascript|vbscript|data|file):[^\s)\]]*/gi, (match) => {
-    drop("scheme", match);
-    return "";
-  });
+    const href = normalizeHttpsUrl(definition[2].replace(/^<|>$/g, ""));
+    if (!href) {
+      drop("definition", line);
+      return void 0;
+    }
+    return `[${definition[1].replace(/[[\]\\]/g, " ").trim() || "link"}]: ${href}`;
+  }
+  const keep = (_b2 = (_a2 = /^(?:\s*(?:[-*+]|\d+[.)])\s+\[[ xX]\](?=\s)|\s*>+\s*\[![\w-]+\][+-]?)/.exec(line)) == null ? void 0 : _a2[0]) != null ? _b2 : "";
+  return keep + inline(line.slice(keep.length), "text", options, drop);
+}
+function sanitizePhase2Markdown(markdown, options = {}) {
+  const dropped = [];
+  const drop = (kind, what) => {
+    dropped.push(`${kind}: ${what.slice(0, 80)}`);
+  };
+  const lines = removeMarkup(markdown, drop).split("\n").map((line) => buildLine(line, options, drop)).filter((line) => line !== void 0);
   return {
-    markdown: text13.replace(/[ \t]+\n/g, "\n").replace(/\n{3,}/g, "\n\n").trim(),
+    markdown: lines.join("\n").replace(/[ \t]+\n/g, "\n").replace(/\n{3,}/g, "\n\n").trim(),
     dropped
   };
+}
+function cleanFragment(text13, mode, options = {}) {
+  const drop = () => void 0;
+  return inline(removeMarkup(text13, drop).replace(/\n+/g, " "), mode, options, drop).trim();
 }
 function imageKind(bytes) {
   const at = (offset, values) => values.every((value, index) => bytes[offset + index] === value);
@@ -25531,23 +25742,8 @@ function checkImageBytes(bytes) {
   return kind ? { kind } : { rejected: "not-an-image" };
 }
 var NO_LICENSE = /^(?:|n\/?a|none|unknown|unspecified|not specified|no license|無|未知|不明|未標示|未註明|未說明)$/i;
-function privateHost(hostname) {
-  const host = hostname.toLowerCase().replace(/^\[|\]$/g, "");
-  if (host === "localhost" || host.endsWith(".localhost") || host.endsWith(".local") || host.endsWith(".internal"))
-    return true;
-  if (/^(?:127|10|0)\./.test(host) || /^192\.168\./.test(host) || /^169\.254\./.test(host) || /^172\.(?:1[6-9]|2\d|3[01])\./.test(host))
-    return true;
-  return host === "::1" || host.startsWith("fc") && host.includes(":") || host.startsWith("fd") && host.includes(":") || host.startsWith("fe80:");
-}
 function usableHttps(value) {
-  if (!isHttpsUrl(value)) return void 0;
-  try {
-    const url = new URL(value);
-    if (url.username || url.password || privateHost(url.hostname)) return void 0;
-    return url;
-  } catch (e) {
-    return void 0;
-  }
+  return normalizeHttpsUrl(value) !== void 0;
 }
 function eligibleImages(images, limit = MAX_IMAGES) {
   var _a2, _b2, _c;
@@ -25564,12 +25760,23 @@ function eligibleImages(images, limit = MAX_IMAGES) {
   }
   return { eligible, rejected };
 }
+function footnoteLabel(title) {
+  return cleanFragment(title, "plain").replace(/[[\]\\]/g, " ").trim();
+}
 function renderFootnoteDefinitions(footnotes) {
-  return footnotes.filter((note) => /^[\w-]+$/.test(note.id) && isHttpsUrl(note.url)).map((note) => `[^${note.id}]: [${(note.title || note.url).replace(/[[\]\n]/g, " ").trim()}](${note.url})`).join("\n");
+  const lines = [];
+  for (const note of footnotes) {
+    const href = /^[\w-]+$/.test(note.id) ? normalizeHttpsUrl(note.url) : void 0;
+    if (href) lines.push(`[^${note.id}]: [${footnoteLabel(note.title) || href.replace(/[[\]]/g, "")}](${href})`);
+  }
+  return lines.join("\n");
 }
 function originalFootnote(original, sourceUrl) {
-  const text13 = original.replace(/\[\^[^\]]+\]/g, "").replace(/\s+/g, " ").trim();
-  return `${ORIGINAL_PREFIX}${text13}${sourceUrl && isHttpsUrl(sourceUrl) ? `\uFF08\u4F86\u6E90\uFF1A${sourceUrl}\uFF09` : ""}`;
+  const text13 = cleanFragment(original.replace(/\[\^[^\]]+\]/g, "").replace(/\s+/g, " "), "text", {
+    footnoteIds: /* @__PURE__ */ new Set()
+  });
+  const href = sourceUrl ? normalizeHttpsUrl(sourceUrl) : void 0;
+  return `${ORIGINAL_PREFIX}${text13}${href ? `\uFF08\u4F86\u6E90\uFF1A${href}\uFF09` : ""}`;
 }
 function highestFootnote(text13) {
   let highest = 0;
@@ -25593,13 +25800,13 @@ function locate(detail, sentence) {
 function escape(text13) {
   return text13.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
-function applyCorrections(detail, verdicts) {
-  var _a2;
+function applyCorrections(detail, verdicts, options = {}) {
   let text13 = detail.replace(/\r\n?/g, "\n");
   const corrected = [];
   const removed = [];
   const unmatched = [];
   const definitions = [];
+  const addedFootnoteIds = [];
   let next = highestFootnote(text13) + 1;
   for (const verdict of verdicts) {
     if (verdict.verdict !== "unsupported") continue;
@@ -25608,7 +25815,7 @@ function applyCorrections(detail, verdicts) {
       unmatched.push(verdict.sentence);
       continue;
     }
-    const correction = (_a2 = verdict.correction) == null ? void 0 : _a2.trim();
+    const correction = verdict.correction ? cleanFragment(verdict.correction, "text", options) : "";
     if (!correction) {
       const start = found.start;
       let end = found.end;
@@ -25630,6 +25837,7 @@ function applyCorrections(detail, verdicts) {
     let replacement = correction;
     if (!alreadyNoted) {
       definitions.push(`[^${next}]: ${originalFootnote(verdict.sentence, verdict.sourceUrl)}`);
+      addedFootnoteIds.push(String(next));
       replacement = `${correction}[^${next}]`;
       next++;
     }
@@ -25640,7 +25848,7 @@ function applyCorrections(detail, verdicts) {
 
 ${definitions.join("\n")}
 `;
-  return { detail: text13, corrected, removed, unmatched };
+  return { detail: text13, addedFootnoteIds, corrected, removed, unmatched };
 }
 function planPhase2Write(input) {
   const { currentDetail } = input;
@@ -25837,17 +26045,28 @@ function label(value, limit) {
 function renderImageBlock(saved) {
   return saved.map(({ path, image }) => {
     const title = label(image.title, 120) || image.sourceUrl;
-    const link = `[${title}](${image.sourceUrl})`;
+    const href = normalizeHttpsUrl(image.sourceUrl);
+    const link = href ? `[${title.replace(/[[\]]/g, " ")}](${href})` : title;
     return `![[${path}]]
 ${t("ui.seamless_image_source_0_1", link, label(image.license, 80))}`;
   }).join("\n\n");
 }
 function composePhase2Detail(verify, saved) {
-  const clean4 = sanitizePhase2Markdown(verify.detail).markdown;
+  const footnoteIds = new Set(
+    verify.footnotes.filter((note) => /^[\w-]+$/.test(note.id) && normalizeHttpsUrl(note.url)).map((note) => note.id)
+  );
+  const clean4 = sanitizePhase2Markdown(verify.detail, { footnoteIds, referenceDefinitions: false }).markdown;
   if (!clean4.trim()) throw new Error(t("ui.seamless_phase2_empty"));
-  const corrected = applyCorrections(clean4, verify.verdicts).detail.trimEnd();
-  const parts = [corrected, renderFootnoteDefinitions(verify.footnotes), renderImageBlock(saved)].filter(Boolean);
-  return { detail: `${parts.join("\n\n")}
+  const applied = applyCorrections(clean4, verify.verdicts, { footnoteIds });
+  const parts = [applied.detail.trimEnd(), renderFootnoteDefinitions(verify.footnotes), renderImageBlock(saved)].filter(
+    Boolean
+  );
+  const final = sanitizePhase2Markdown(parts.join("\n\n"), {
+    footnoteIds: /* @__PURE__ */ new Set([...footnoteIds, ...applied.addedFootnoteIds]),
+    embeds: new Set(saved.map((item) => item.path)),
+    referenceDefinitions: false
+  }).markdown;
+  return { detail: `${final}
 ` };
 }
 var Semaphore = class {
@@ -52684,9 +52903,9 @@ function bytesToBase64(bytes) {
 }
 async function generatedImageDataUrl(image, readLocalFile) {
   var _a2, _b2;
-  const inline = (_b2 = (_a2 = image.result) == null ? void 0 : _a2.trim()) != null ? _b2 : "";
-  if (/^data:image\/(?:png|jpeg|webp);base64,/.test(inline)) return inline;
-  if (/^[A-Za-z0-9+/=\s]{64,}$/.test(inline)) return `data:image/png;base64,${inline.replace(/\s/g, "")}`;
+  const inline2 = (_b2 = (_a2 = image.result) == null ? void 0 : _a2.trim()) != null ? _b2 : "";
+  if (/^data:image\/(?:png|jpeg|webp);base64,/.test(inline2)) return inline2;
+  if (/^[A-Za-z0-9+/=\s]{64,}$/.test(inline2)) return `data:image/png;base64,${inline2.replace(/\s/g, "")}`;
   if (!image.savedPath) throw new Error(t("ui.context_ai_image_not_generated"));
   if (!readLocalFile) throw new Error(t("ui.context_ai_image_not_generated"));
   const bytes = new Uint8Array(await readLocalFile(image.savedPath));
@@ -54595,19 +54814,20 @@ function text9(row, key2, reason, required = true) {
 }
 function https(row, key2, reason) {
   const value = text9(row, key2, reason).trim();
-  if (!isHttpsUrl(value)) throw new ResearchVerifyParseError(reason, `${key2} must be an https address`);
-  return value;
+  if (!/^https:\/\//i.test(value)) throw new ResearchVerifyParseError(reason, `${key2} must be an https address`);
+  return normalizeHttpsUrl(value);
 }
 function parseImageRows(value) {
   const imageRows = rows(value, "images", ["imageUrl", "sourceUrl", "title", "license"]);
   if (imageRows.length > MAX_IMAGES)
     throw new ResearchVerifyParseError("too-many-images", `${imageRows.length} images`);
-  return imageRows.map((row) => ({
-    imageUrl: https(row, "imageUrl", "images"),
-    sourceUrl: https(row, "sourceUrl", "images"),
-    title: text9(row, "title", "images", false).trim(),
-    license: text9(row, "license", "images", false).trim()
-  }));
+  return imageRows.flatMap((row) => {
+    const imageUrl = https(row, "imageUrl", "images");
+    const sourceUrl = https(row, "sourceUrl", "images");
+    const title = text9(row, "title", "images", false).trim();
+    const license = text9(row, "license", "images", false).trim();
+    return imageUrl && sourceUrl ? [{ imageUrl, sourceUrl, title, license }] : [];
+  });
 }
 function parseResearchVerify(raw) {
   let value;
@@ -54620,10 +54840,12 @@ function parseResearchVerify(raw) {
   if (!onlyKeys(value, ["detail", "footnotes", "verdicts", "images"]))
     throw new ResearchVerifyParseError("unexpected-field", Object.keys(value).join(","));
   const detail = text9(value, "detail", "detail").trim();
-  const footnotes = rows(value.footnotes, "footnotes", ["id", "url", "title"]).map((row) => {
+  const footnotes = rows(value.footnotes, "footnotes", ["id", "url", "title"]).flatMap((row) => {
     const id = text9(row, "id", "footnotes").trim();
     if (!/^[\w-]+$/.test(id)) throw new ResearchVerifyParseError("footnotes", "id has unsupported characters");
-    return { id, url: https(row, "url", "footnotes"), title: text9(row, "title", "footnotes", false).trim() };
+    const url = https(row, "url", "footnotes");
+    const title = text9(row, "title", "footnotes", false).trim();
+    return url ? [{ id, url, title }] : [];
   });
   const verdicts = rows(value.verdicts, "verdicts", ["sentence", "verdict", "correction", "sourceUrl"]).map((row) => {
     const verdict = row.verdict;
@@ -54631,7 +54853,10 @@ function parseResearchVerify(raw) {
       throw new ResearchVerifyParseError("verdicts", "verdict must be supported or unsupported");
     const item = { sentence: text9(row, "sentence", "verdicts").trim(), verdict };
     if (row.correction !== void 0) item.correction = text9(row, "correction", "verdicts", false).trim();
-    if (row.sourceUrl !== void 0) item.sourceUrl = https(row, "sourceUrl", "verdicts");
+    if (row.sourceUrl !== void 0) {
+      const sourceUrl = https(row, "sourceUrl", "verdicts");
+      if (sourceUrl) item.sourceUrl = sourceUrl;
+    }
     return item;
   });
   const images = parseImageRows(value.images);
@@ -58888,9 +59113,10 @@ ${t("ui.organize_link_wait_hint")}`;
    * run was stopped; anything else that is wrong throws, and the caller drops that one image.
    */
   async saveResearchImage(url, notePath, signal) {
-    if (!isHttpsUrl(url)) throw new Error("image address is not https");
+    const safeUrl = normalizeHttpsUrl(url);
+    if (!safeUrl) throw new Error("image address is not allowed");
     if (signal.aborted) return void 0;
-    const response = await (0, import_obsidian38.requestUrl)({ url, method: "GET", throw: true });
+    const response = await (0, import_obsidian38.requestUrl)({ url: safeUrl, method: "GET", throw: true });
     if (signal.aborted) return void 0;
     const checked = checkImageBytes(new Uint8Array(response.arrayBuffer));
     if ("rejected" in checked) throw new Error(`image rejected: ${checked.rejected}`);

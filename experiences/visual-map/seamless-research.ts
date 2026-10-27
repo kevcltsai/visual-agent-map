@@ -9,6 +9,7 @@ import {
   applyCorrections,
   detailHash,
   eligibleImages,
+  normalizeHttpsUrl,
   planPhase2Write,
   renderFootnoteDefinitions,
   sanitizePhase2Markdown,
@@ -180,7 +181,8 @@ export function renderImageBlock(saved: readonly { path: string; image: Phase2Im
   return saved
     .map(({ path, image }) => {
       const title = label(image.title, 120) || image.sourceUrl;
-      const link = `[${title}](${image.sourceUrl})`;
+      const href = normalizeHttpsUrl(image.sourceUrl);
+      const link = href ? `[${title.replace(/[[\]]/g, " ")}](${href})` : title;
       return `![[${path}]]\n${t("ui.seamless_image_source_0_1", link, label(image.license, 80))}`;
     })
     .join("\n\n");
@@ -189,16 +191,29 @@ export function renderImageBlock(saved: readonly { path: string; image: Phase2Im
 export interface Phase2Composition {
   detail: string;
 }
-/** Phase-2 markdown ready for the write plan: cleaned, corrected in place, footnote definitions and saved images added. */
+/**
+ * Phase-2 markdown ready for the write plan. Every piece (detail, corrections, footnote definitions, image and license lines) is joined first,
+ * then the whole text goes through the allowlist builder once more as the last step; the only embeds it lets through are the saved copies.
+ */
 export function composePhase2Detail(
   verify: ResearchVerifyResult,
   saved: readonly { path: string; image: Phase2Image }[]
 ): Phase2Composition {
-  const clean = sanitizePhase2Markdown(verify.detail).markdown;
+  const footnoteIds = new Set(
+    verify.footnotes.filter(note => /^[\w-]+$/.test(note.id) && normalizeHttpsUrl(note.url)).map(note => note.id)
+  );
+  const clean = sanitizePhase2Markdown(verify.detail, { footnoteIds, referenceDefinitions: false }).markdown;
   if (!clean.trim()) throw new Error(t("ui.seamless_phase2_empty"));
-  const corrected = applyCorrections(clean, verify.verdicts).detail.trimEnd();
-  const parts = [corrected, renderFootnoteDefinitions(verify.footnotes), renderImageBlock(saved)].filter(Boolean);
-  return { detail: `${parts.join("\n\n")}\n` };
+  const applied = applyCorrections(clean, verify.verdicts, { footnoteIds });
+  const parts = [applied.detail.trimEnd(), renderFootnoteDefinitions(verify.footnotes), renderImageBlock(saved)].filter(
+    Boolean
+  );
+  const final = sanitizePhase2Markdown(parts.join("\n\n"), {
+    footnoteIds: new Set([...footnoteIds, ...applied.addedFootnoteIds]),
+    embeds: new Set(saved.map(item => item.path)),
+    referenceDefinitions: false
+  }).markdown;
+  return { detail: `${final}\n` };
 }
 
 class Semaphore {

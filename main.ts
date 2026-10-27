@@ -102,7 +102,7 @@ import { aiModeOptions } from "./experiences/visual-map/ai-mode";
 import { researchTopicTask } from "./experiences/visual-map/steps/fragments";
 import { researchVerifyStep, skeletonInstruction, type ResearchVerifyResult } from "./core/steps/research-verify/step";
 import { researchImagesStep, type ResearchImagesResult } from "./core/steps/research-verify/images";
-import { checkImageBytes, isHttpsUrl } from "./core/seamless-research/apply";
+import { checkImageBytes, normalizeHttpsUrl } from "./core/seamless-research/apply";
 import { isSearchNotPerformed } from "./ai/search-not-performed";
 import { ResearchProgressStore } from "./experiences/visual-map/research-progress";
 import type { ResearchObserver } from "./ai/research-observer";
@@ -1648,9 +1648,11 @@ export default class VisualAgentMapPlugin extends Plugin {
    * run was stopped; anything else that is wrong throws, and the caller drops that one image.
    */
   async saveResearchImage(url: string, notePath: string, signal: AbortSignal): Promise<string | undefined> {
-    if (!isHttpsUrl(url)) throw new Error("image address is not https");
+    // Same gate as the parser (https, public host, no credentials). requestUrl does not report the final address after a redirect, so that host is not re-checked here.
+    const safeUrl = normalizeHttpsUrl(url);
+    if (!safeUrl) throw new Error("image address is not allowed");
     if (signal.aborted) return undefined;
-    const response = await requestUrl({ url, method: "GET", throw: true });
+    const response = await requestUrl({ url: safeUrl, method: "GET", throw: true });
     if (signal.aborted) return undefined;
     const checked = checkImageBytes(new Uint8Array(response.arrayBuffer));
     if ("rejected" in checked) throw new Error(`image rejected: ${checked.rejected}`);

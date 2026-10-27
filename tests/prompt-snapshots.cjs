@@ -285,6 +285,16 @@ test('collect snapshots: preset instruction strings composed directly from i18n'
   }
 });
 
+test('collect snapshots: seamless research (skeleton task and research-verify step)', async () => {
+  const { researchVerifyStep, skeletonInstruction } = loadModule('core/steps/research-verify/step.ts');
+  for (const [language, tag] of LANGUAGES) {
+    const quick = { ...base, outputLanguage: language, researchMode: 'local', researchDepth: 'fast', visualMode: 'off', mapAiMode: 'quick', detail: '', task: skeletonInstruction(language) };
+    await recordContext(`seamless.skeleton-task.${tag}`, 'AiTaskService instructions: seamless research phase 1, skeleton task text (core/steps/research-verify/skeleton.*.md) in Quick AI mode', language, quick);
+    const input = { topic: language === 'en' ? 'Layering a jacket' : '外套怎麼疊穿', context: language === 'en' ? 'Outfit basics' : '穿搭基礎', skeleton: language === 'en' ? '## Idea\nLayers trap warm air.' : '## 概念\n疊穿是用多層衣物鎖住空氣。', language };
+    record(`seamless.research-verify.${tag}`, 'core/steps/research-verify/step.ts researchVerifyStep (seamless research phase 2: web search, sourced detail, verdicts, images)', language, researchVerifyStep.render(input), researchVerifyStep.schema);
+  }
+});
+
 function promptKeyCoverage() {
   const { translate, t } = loadModule('i18n.ts');
   void t;

@@ -391,3 +391,137 @@ test('the gate stays as before: SearchNotPerformed is classified, never converte
   assert.equal(error.name, 'SearchNotPerformedError');
   assert.notEqual(seamlessOutcome({ failure: classifyFailure(error), phase1Written: true, phase2: 'none', imagesRequested: false, imagesSaved: 0 }).status, 'completed');
 });
+
+// ---------- research-verify step (P2): strict phase-2 parse, prompts ----------
+const verify = load('core/steps/research-verify/step.ts', {}, { URL });
+const { parseResearchVerify, researchVerifyStep, skeletonInstruction, RESEARCH_VERIFY_SCHEMA } = verify;
+const validReply = (overrides = {}) => ({
+  detail: '## 概念\n外套有分厚薄。[^1]',
+  footnotes: [{ id: '1', url: 'https://example.org/a', title: 'A' }],
+  verdicts: [{ sentence: '外套有分厚薄。', verdict: 'supported' }],
+  images: [{ imageUrl: 'https://upload.example.org/a.jpg', sourceUrl: 'https://example.org/a', title: 'A', license: 'CC BY 4.0' }],
+  ...overrides
+});
+const parseOf = value => parseResearchVerify(typeof value === 'string' ? value : JSON.stringify(value));
+const parseReason = value => {
+  try { parseOf(value); } catch (error) { assert.equal(error.name, 'ResearchVerifyParseError'); return error.reason; }
+  assert.fail(`expected a parse error for ${JSON.stringify(value).slice(0, 120)}`);
+};
+
+test('research-verify parse: a valid reply keeps detail, footnotes, verdicts and images', () => {
+  const result = plain(parseOf(validReply()));
+  assert.equal(result.detail, '## 概念\n外套有分厚薄。[^1]');
+  assert.deepEqual(result.footnotes, [{ id: '1', url: 'https://example.org/a', title: 'A' }]);
+  assert.deepEqual(result.verdicts, [{ sentence: '外套有分厚薄。', verdict: 'supported' }]);
+  assert.equal(result.images.length, 1);
+});
+
+test('research-verify parse: unsupported verdict keeps correction and sourceUrl; output feeds applyCorrections', () => {
+  const result = plain(parseOf(validReply({
+    detail: '外套都防水。',
+    verdicts: [{ sentence: '外套都防水。', verdict: 'unsupported', correction: '多數外套不防水。', sourceUrl: 'https://example.org/b' }]
+  })));
+  assert.deepEqual(result.verdicts[0], { sentence: '外套都防水。', verdict: 'unsupported', correction: '多數外套不防水。', sourceUrl: 'https://example.org/b' });
+  const applied = plain(apply.applyCorrections(result.detail, result.verdicts));
+  assert.match(applied.detail, /多數外套不防水。\[\^1\]/);
+  assert.match(applied.detail, /\[\^1\]: 原本寫：外套都防水。（來源：https:\/\/example\.org\/b）/);
+});
+
+test('research-verify parse: malformed replies are typed parse errors, never silent success', () => {
+  const cases = [
+    ['not JSON', 'here is your answer', 'not-json'],
+    ['empty string', '', 'not-json'],
+    ['array root', '[]', 'not-object'],
+    ['null root', 'null', 'not-object'],
+    ['markdown fence around JSON', '```json\n' + JSON.stringify(validReply()) + '\n```', 'not-json'],
+    ['extra top-level field', { ...validReply(), notes: 'x' }, 'unexpected-field'],
+    ['missing detail', (({ detail, ...rest }) => rest)(validReply()), 'detail'],
+    ['blank detail', validReply({ detail: '  \n ' }), 'detail'],
+    ['non-string detail', validReply({ detail: 3 }), 'detail'],
+    ['missing footnotes', (({ footnotes, ...rest }) => rest)(validReply()), 'footnotes'],
+    ['footnotes not an array', validReply({ footnotes: {} }), 'footnotes'],
+    ['footnote with http url', validReply({ footnotes: [{ id: '1', url: 'http://example.org', title: 'A' }] }), 'footnotes'],
+    ['footnote with javascript url', validReply({ footnotes: [{ id: '1', url: 'javascript:alert(1)', title: 'A' }] }), 'footnotes'],
+    ['footnote id with bracket', validReply({ footnotes: [{ id: '1]', url: 'https://example.org', title: 'A' }] }), 'footnotes'],
+    ['footnote missing title', validReply({ footnotes: [{ id: '1', url: 'https://example.org' }] }), 'footnotes'],
+    ['footnote extra field', validReply({ footnotes: [{ id: '1', url: 'https://example.org', title: 'A', note: 'x' }] }), 'footnotes'],
+    ['verdict outside the enum', validReply({ verdicts: [{ sentence: 'x', verdict: 'maybe' }] }), 'verdicts'],
+    ['verdict with blank sentence', validReply({ verdicts: [{ sentence: ' ', verdict: 'supported' }] }), 'verdicts'],
+    ['verdict correction not a string', validReply({ verdicts: [{ sentence: 'x', verdict: 'unsupported', correction: 4 }] }), 'verdicts'],
+    ['verdict sourceUrl http', validReply({ verdicts: [{ sentence: 'x', verdict: 'unsupported', sourceUrl: 'http://example.org' }] }), 'verdicts'],
+    ['verdict extra field', validReply({ verdicts: [{ sentence: 'x', verdict: 'supported', why: 'y' }] }), 'verdicts'],
+    ['image http', validReply({ images: [{ imageUrl: 'http://x.org/a.png', sourceUrl: 'https://x.org', title: 'A', license: 'CC0' }] }), 'images'],
+    ['image data url', validReply({ images: [{ imageUrl: 'data:image/png;base64,AAAA', sourceUrl: 'https://x.org', title: 'A', license: 'CC0' }] }), 'images'],
+    ['image source page http', validReply({ images: [{ imageUrl: 'https://x.org/a.png', sourceUrl: 'http://x.org', title: 'A', license: 'CC0' }] }), 'images'],
+    ['image missing license', validReply({ images: [{ imageUrl: 'https://x.org/a.png', sourceUrl: 'https://x.org', title: 'A' }] }), 'images'],
+    ['image extra field', validReply({ images: [{ imageUrl: 'https://x.org/a.png', sourceUrl: 'https://x.org', title: 'A', license: 'CC0', alt: 'x' }] }), 'images'],
+    ['images not an array', validReply({ images: 'none' }), 'images']
+  ];
+  for (const [name, input, reason] of cases) assert.equal(parseReason(input), reason, name);
+});
+
+test('research-verify parse: at most six images; seven is an error, six passes', () => {
+  const image = index => ({ imageUrl: `https://x.org/${index}.png`, sourceUrl: 'https://x.org/p', title: `T${index}`, license: 'CC0' });
+  assert.equal(parseOf(validReply({ images: [1, 2, 3, 4, 5, 6].map(image) })).images.length, 6);
+  assert.equal(parseReason(validReply({ images: [1, 2, 3, 4, 5, 6, 7].map(image) })), 'too-many-images');
+  assert.equal(RESEARCH_VERIFY_SCHEMA.properties.images.maxItems, 6);
+});
+
+test('research-verify parse: empty arrays are valid (no footnotes, verdicts or images found)', () => {
+  const result = plain(parseOf(validReply({ footnotes: [], verdicts: [], images: [] })));
+  assert.deepEqual([result.footnotes, result.verdicts, result.images], [[], [], []]);
+});
+
+test('research-verify parse: an image with a blank license still parses; eligibleImages is what refuses it', () => {
+  const result = plain(parseOf(validReply({ images: [{ imageUrl: 'https://x.org/a.png', sourceUrl: 'https://x.org/p', title: 'A', license: 'unknown' }] })));
+  assert.equal(plain(apply.eligibleImages(result.images)).eligible.length, 0);
+});
+
+test('research-verify schema: strict objects, https patterns, required fields', () => {
+  const schema = plain(RESEARCH_VERIFY_SCHEMA);
+  assert.equal(schema.additionalProperties, false);
+  assert.deepEqual(schema.required, ['detail', 'footnotes', 'verdicts', 'images']);
+  assert.deepEqual(schema.properties.verdicts.items.properties.verdict.enum, ['supported', 'unsupported']);
+  assert.deepEqual(schema.properties.verdicts.items.required, ['sentence', 'verdict']);
+  for (const key of ['footnotes', 'verdicts', 'images']) assert.equal(schema.properties[key].items.additionalProperties, false);
+  assert.equal(schema.properties.images.items.properties.imageUrl.pattern, '^https://');
+  assert.equal(researchVerifyStep.version, 1);
+  assert.equal(researchVerifyStep.id, 'research-verify');
+});
+
+test('research-verify render: both instruction languages carry the same obligations and the inputs as JSON strings', () => {
+  const input = language => ({ topic: '外套 "疊穿"', context: '', skeleton: '## 概念\n疊穿。', language });
+  for (const language of ['zh-TW', 'zh-CN', 'en']) {
+    const prompt = researchVerifyStep.render(input(language));
+    assert.ok(!/\{\{|\}\}/.test(prompt), `${language}: unfilled placeholder`);
+    assert.ok(prompt.includes(JSON.stringify('外套 "疊穿"')), `${language}: topic as JSON string`);
+    assert.ok(prompt.includes(JSON.stringify('## 概念\n疊穿。')), `${language}: skeleton as JSON string`);
+    for (const word of ['supported', 'unsupported', 'correction', 'sourceUrl', 'imageUrl', 'license', '[^1]', 'https', 'JSON']) assert.ok(prompt.includes(word), `${language}: ${word}`);
+  }
+  assert.match(researchVerifyStep.render(input('en')), /web search/i);
+  assert.match(researchVerifyStep.render(input('zh-TW')), /網路搜尋/);
+});
+
+test('research-verify render: conflicting sources, untrusted pages and image rules are stated', () => {
+  const en = researchVerifyStep.render({ topic: 't', context: '', skeleton: 's', language: 'en' });
+  assert.match(en, /sources conflict[\s\S]*era, region or definition/);
+  assert.match(en, /untrusted data/);
+  assert.match(en, /at most 6/);
+  assert.match(en, /Do not put images or image links inside `detail`/);
+  const zh = researchVerifyStep.render({ topic: 't', context: '', skeleton: 's', language: 'zh-TW' });
+  assert.match(zh, /來源互相矛盾[\s\S]*年代、地區或定義/);
+  assert.match(zh, /不可信的資料/);
+  assert.match(zh, /最多 6 張/);
+});
+
+test('skeleton instruction: conservative, forbids numbers, dates, proper nouns, quotes and prices', () => {
+  for (const language of ['zh-TW', 'zh-CN', 'en']) {
+    const text = skeletonInstruction(language);
+    assert.ok(text.length > 100 && !/\{\{/.test(text), language);
+  }
+  const zh = skeletonInstruction('zh-TW');
+  for (const word of ['數字', '日期', '價格', '專有名詞', '引文', '架構', '概念']) assert.ok(zh.includes(word), word);
+  const en = skeletonInstruction('en');
+  for (const word of ['numbers', 'dates', 'prices', 'proper nouns', 'quotations', 'architecture', 'concepts']) assert.ok(en.includes(word), word);
+  assert.equal(skeletonInstruction('zh-TW'), skeletonInstruction('zh-CN'));
+});

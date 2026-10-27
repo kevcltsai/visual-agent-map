@@ -1366,6 +1366,36 @@
       "language": "zh-CN",
       "schema": true
     },
+    "seamless.research-verify.en": {
+      "builder": "core/steps/research-verify/step.ts researchVerifyStep (seamless research phase 2: web search, sourced detail, verdicts, images)",
+      "language": "en",
+      "schema": true
+    },
+    "seamless.research-verify.zh": {
+      "builder": "core/steps/research-verify/step.ts researchVerifyStep (seamless research phase 2: web search, sourced detail, verdicts, images)",
+      "language": "zh-TW",
+      "schema": true
+    },
+    "seamless.research-verify.zh-CN": {
+      "builder": "core/steps/research-verify/step.ts researchVerifyStep (seamless research phase 2: web search, sourced detail, verdicts, images)",
+      "language": "zh-CN",
+      "schema": true
+    },
+    "seamless.skeleton-task.en": {
+      "builder": "AiTaskService instructions: seamless research phase 1, skeleton task text (core/steps/research-verify/skeleton.*.md) in Quick AI mode",
+      "language": "en",
+      "schema": true
+    },
+    "seamless.skeleton-task.zh": {
+      "builder": "AiTaskService instructions: seamless research phase 1, skeleton task text (core/steps/research-verify/skeleton.*.md) in Quick AI mode",
+      "language": "zh-TW",
+      "schema": true
+    },
+    "seamless.skeleton-task.zh-CN": {
+      "builder": "AiTaskService instructions: seamless research phase 1, skeleton task text (core/steps/research-verify/skeleton.*.md) in Quick AI mode",
+      "language": "zh-CN",
+      "schema": true
+    },
     "service.decompose-deep.en": {
       "builder": "AiTaskService instructions: mode decompose, deep research",
       "language": "en",

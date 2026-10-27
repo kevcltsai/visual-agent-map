@@ -25686,7 +25686,18 @@ function removeMarkup(markdown, drop) {
     return "";
   });
 }
+function escapeFenceOpener(line) {
+  const match = /^((?:[ \t]*(?:>|[-*+][ \t]|\d+[.)][ \t]|\[[ xX]\][ \t]|\[\^[\w-]+\]:[ \t]|\[![\w-]+\][+-]?))*[ \t]*)([~`])\2{2,}/.exec(
+    line
+  );
+  if (!match) return line;
+  return `${match[1]}\\${line.slice(match[1].length)}`;
+}
 function buildLine(line, options, drop) {
+  const built = buildLineRaw(line, options, drop);
+  return built === void 0 ? void 0 : escapeFenceOpener(built);
+}
+function buildLineRaw(line, options, drop) {
   var _a2, _b2;
   const note = /^\[\^([\w-]+)\]:\s*(.*)$/.exec(line);
   if (note && (!options.footnoteIds || options.footnoteIds.has(note[1])))

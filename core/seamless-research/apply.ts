@@ -369,7 +369,22 @@ function removeMarkup(markdown: string, drop: Drop): string {
   });
 }
 
+/** Block level: a run of 3+ `~` or backticks at line start (after quote, list, task, footnote or indent prefixes) could open a fence; its first character is escaped. */
+function escapeFenceOpener(line: string): string {
+  const match =
+    /^((?:[ \t]*(?:>|[-*+][ \t]|\d+[.)][ \t]|\[[ xX]\][ \t]|\[\^[\w-]+\]:[ \t]|\[![\w-]+\][+-]?))*[ \t]*)([~`])\2{2,}/.exec(
+      line
+    );
+  if (!match) return line;
+  return `${match[1]}\\${line.slice(match[1].length)}`;
+}
+
 function buildLine(line: string, options: BuildOptions, drop: Drop): string | undefined {
+  const built = buildLineRaw(line, options, drop);
+  return built === undefined ? undefined : escapeFenceOpener(built);
+}
+
+function buildLineRaw(line: string, options: BuildOptions, drop: Drop): string | undefined {
   const note = /^\[\^([\w-]+)\]:\s*(.*)$/.exec(line);
   if (note && (!options.footnoteIds || options.footnoteIds.has(note[1])))
     return `[^${note[1]}]: ${inline(note[2], "text", options, drop)}`;
@@ -392,7 +407,8 @@ function buildLine(line: string, options: BuildOptions, drop: Drop): string | un
 }
 
 /**
- * Builds the note text from model markdown. Only these nodes are written: plain text (with list, heading, emphasis and table characters passed through),
+ * Builds the note text from model markdown. Only these nodes are written: plain text (with list, heading, emphasis and table characters passed through;
+ * a `~~~`/backtick run that could open a fence is escaped at line start),
  * https links made from validated URLs, `[^id]` references, and `![[name]]` embeds the caller lists. Images, raw HTML, wiki links, reference-style
  * links and every other bracket form come out as dropped text or backslash-escaped plain text, never as a node.
  */

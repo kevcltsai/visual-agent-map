@@ -1968,6 +1968,11 @@ export default class VisualAgentMapPlugin extends Plugin {
 }
 
 /** Node-backed deps for fetchPublicImage (desktop only). Fails closed when Node networking is missing; never falls back to requestUrl, which follows redirects unseen. */
+function imageFetchUserAgent(): string {
+  const ua = (window as { navigator?: { userAgent?: unknown } }).navigator?.userAgent;
+  return typeof ua === "string" && ua.length > 0 ? ua : "Mozilla/5.0 (Obsidian)";
+}
+
 async function nodeImageFetchDeps(signal: AbortSignal): Promise<ImageFetchDeps> {
   if (typeof dns?.lookup !== "function" || typeof https?.request !== "function")
     throw new Error("image download unavailable");
@@ -1992,7 +1997,8 @@ async function nodeImageFetchDeps(signal: AbortSignal): Promise<ImageFetchDeps> 
           path: new URL(request.url).pathname + new URL(request.url).search,
           method: "GET",
           timeout: 30000,
-          lookup: pinnedLookup(request.address, request.family)
+          lookup: pinnedLookup(request.address, request.family),
+          headers: { "User-Agent": imageFetchUserAgent(), Accept: "image/*" }
         });
         const finish = (error: Error | undefined, value?: { status: number; location?: string; body?: Uint8Array }) => {
           if (settled) return;

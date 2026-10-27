@@ -59565,6 +59565,11 @@ ${t("ui.organize_link_wait_hint")}`;
     return this.aiRuntime.claude(pluginDirectory);
   }
 };
+function imageFetchUserAgent() {
+  var _a2;
+  const ua = (_a2 = window.navigator) == null ? void 0 : _a2.userAgent;
+  return typeof ua === "string" && ua.length > 0 ? ua : "Mozilla/5.0 (Obsidian)";
+}
 async function nodeImageFetchDeps(signal) {
   if (typeof (dns == null ? void 0 : dns.lookup) !== "function" || typeof (https2 == null ? void 0 : https2.request) !== "function")
     throw new Error("image download unavailable");
@@ -59588,7 +59593,8 @@ async function nodeImageFetchDeps(signal) {
         path: new URL(request2.url).pathname + new URL(request2.url).search,
         method: "GET",
         timeout: 3e4,
-        lookup: pinnedLookup(request2.address, request2.family)
+        lookup: pinnedLookup(request2.address, request2.family),
+        headers: { "User-Agent": imageFetchUserAgent(), Accept: "image/*" }
       });
       const finish = (error, value) => {
         if (settled) return;

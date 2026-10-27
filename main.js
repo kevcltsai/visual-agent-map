@@ -1,6 +1,8 @@
+var __create = Object.create;
 var __defProp = Object.defineProperty;
 var __getOwnPropDesc = Object.getOwnPropertyDescriptor;
 var __getOwnPropNames = Object.getOwnPropertyNames;
+var __getProtoOf = Object.getPrototypeOf;
 var __hasOwnProp = Object.prototype.hasOwnProperty;
 var __defNormalProp = (obj, key2, value) => key2 in obj ? __defProp(obj, key2, { enumerable: true, configurable: true, writable: true, value }) : obj[key2] = value;
 var __export = (target, all) => {
@@ -15,6 +17,14 @@ var __copyProps = (to, from, except, desc) => {
   }
   return to;
 };
+var __toESM = (mod, isNodeMode, target) => (target = mod != null ? __create(__getProtoOf(mod)) : {}, __copyProps(
+  // If the importer is in node compatibility mode or this is not an ESM
+  // file that has been converted to a CommonJS file using a Babel-
+  // compatible transform (i.e. "__esModule" has not been set), then set
+  // "default" to the CommonJS "module.exports" for node compatibility.
+  isNodeMode || !mod || !mod.__esModule ? __defProp(target, "default", { value: mod, enumerable: true }) : target,
+  mod
+));
 var __toCommonJS = (mod) => __copyProps(__defProp({}, "__esModule", { value: true }), mod);
 var __publicField = (obj, key2, value) => __defNormalProp(obj, typeof key2 !== "symbol" ? key2 + "" : key2, value);
 
@@ -55031,6 +55041,62 @@ var researchImagesStep = {
   parse: (raw) => parseResearchImages(raw)
 };
 
+// core/seamless-research/image-fetch.ts
+var REDIRECT_STATUSES = /* @__PURE__ */ new Set([301, 302, 303, 307, 308]);
+function ipLiteral(hostname) {
+  if (hostname.startsWith("[") && hostname.endsWith("]")) return { address: hostname.slice(1, -1), family: 6 };
+  if (/^\d+\.\d+\.\d+\.\d+$/.test(hostname)) return { address: hostname, family: 4 };
+  return void 0;
+}
+async function fetchPublicImage(url, deps) {
+  var _a2, _b2;
+  const maxRedirects = (_a2 = deps.maxRedirects) != null ? _a2 : 3;
+  let current = url;
+  for (let redirects = 0; ; redirects++) {
+    if (deps.signal.aborted) return void 0;
+    const safe = normalizeHttpsUrl(current);
+    if (!safe) throw new Error("image address is not allowed");
+    const hostname = new URL(safe).hostname;
+    let target;
+    const literal = ipLiteral(hostname);
+    if (literal) {
+      if (isPrivateHost(literal.address)) throw new Error("image host resolves to a private address");
+      target = literal;
+    } else {
+      const answers = await deps.lookup(hostname);
+      if (deps.signal.aborted) return void 0;
+      if (answers.length === 0) throw new Error("image host did not resolve");
+      if (answers.some((answer) => isPrivateHost(answer.address)))
+        throw new Error("image host resolves to a private address");
+      target = answers[0];
+    }
+    const response = await deps.get(
+      { url: safe, hostname, address: target.address, family: target.family },
+      deps.signal
+    );
+    if (deps.signal.aborted) return void 0;
+    if (REDIRECT_STATUSES.has(response.status)) {
+      if (!response.location) throw new Error("image redirect has no location");
+      if (redirects >= maxRedirects) throw new Error("image redirect limit exceeded");
+      try {
+        current = new URL(response.location, safe).href;
+      } catch (e) {
+        throw new Error("image redirect location is invalid");
+      }
+      continue;
+    }
+    if (response.status < 200 || response.status >= 300)
+      throw new Error(`image download failed: HTTP ${response.status}`);
+    return (_b2 = response.body) != null ? _b2 : new Uint8Array(0);
+  }
+}
+function pinnedLookup(address, family) {
+  return (_hostname, options, callback) => {
+    if (options && options.all === true) callback(null, [{ address, family }]);
+    else callback(null, address, family);
+  };
+}
+
 // experiences/visual-map/research-progress.ts
 var PREVIEW_THROTTLE_MS = 200;
 var DETAIL_TAIL_CHARS = 600;
@@ -59236,20 +59302,24 @@ ${t("ui.organize_link_wait_hint")}`;
   }
   /**
    * Saves one researched image as a local copy next to `notePath`'s attachments. https only; the bytes must be png, jpeg, gif or
-   * webp (checked by magic bytes, not by name or content type) and at most 10 MB. Returns the Vault path, or undefined when the
-   * run was stopped; anything else that is wrong throws, and the caller drops that one image.
+   * webp (checked by magic bytes, not by name or content type) and at most 10 MB. Every hop (the address and each redirect) must
+   * be a public host: all DNS answers are checked and the connection is pinned to the checked address. Returns the Vault path,
+   * or undefined when the run was stopped; anything else that is wrong throws, and the caller drops that one image.
    */
   async saveResearchImage(url, notePath, signal, name = "research-image") {
     const safeUrl = normalizeHttpsUrl(url);
     if (!safeUrl) throw new Error("image address is not allowed");
     if (signal.aborted) return void 0;
-    const response = await (0, import_obsidian38.requestUrl)({ url: safeUrl, method: "GET", throw: true });
-    if (signal.aborted) return void 0;
-    const checked = checkImageBytes(new Uint8Array(response.arrayBuffer));
+    const bytes = await fetchPublicImage(safeUrl, await nodeImageFetchDeps(signal));
+    if (!bytes || signal.aborted) return void 0;
+    const checked = checkImageBytes(bytes);
     if ("rejected" in checked) throw new Error(`image rejected: ${checked.rejected}`);
     const extension = checked.kind === "jpeg" ? "jpg" : checked.kind;
     const path = await this.app.fileManager.getAvailablePathForAttachment(`${name}.${extension}`, notePath);
-    await this.app.vault.createBinary(path, response.arrayBuffer);
+    await this.app.vault.createBinary(
+      path,
+      bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength)
+    );
     return path;
   }
   /** Deletes a copy saved by saveResearchImage when its result was discarded. Only a file in the Vault is touched; a missing file is fine. */
@@ -59490,3 +59560,84 @@ ${t("ui.organize_link_wait_hint")}`;
     return this.aiRuntime.claude(pluginDirectory);
   }
 };
+async function nodeImageFetchDeps(signal) {
+  let dns;
+  let https2;
+  try {
+    dns = await import("node:dns/promises");
+    https2 = await import("node:https");
+  } catch (e) {
+    throw new Error("image download unavailable");
+  }
+  if (typeof (dns == null ? void 0 : dns.lookup) !== "function" || typeof (https2 == null ? void 0 : https2.request) !== "function")
+    throw new Error("image download unavailable");
+  return {
+    signal,
+    lookup: async (hostname) => {
+      const answers = await dns.lookup(hostname, { all: true, verbatim: true });
+      return answers.map((answer) => ({ address: answer.address, family: answer.family === 6 ? 6 : 4 }));
+    },
+    get: (request, requestSignal) => new Promise((resolve, reject) => {
+      const isIp = request.hostname.startsWith("[") || /^\d+\.\d+\.\d+\.\d+$/.test(request.hostname);
+      const host = request.hostname.replace(/^\[|\]$/g, "");
+      let settled = false;
+      const chunks = [];
+      let total2 = 0;
+      const req = https2.request({
+        protocol: "https:",
+        host,
+        servername: isIp ? void 0 : host,
+        path: new URL(request.url).pathname + new URL(request.url).search,
+        method: "GET",
+        timeout: 3e4,
+        lookup: pinnedLookup(request.address, request.family)
+      });
+      const finish = (error, value) => {
+        if (settled) return;
+        settled = true;
+        requestSignal.removeEventListener("abort", onAbort);
+        if (error) {
+          req.destroy();
+          reject(error);
+        } else resolve(value);
+      };
+      const onAbort = () => finish(new Error("image download stopped"));
+      requestSignal.addEventListener("abort", onAbort, { once: true });
+      if (requestSignal.aborted) return onAbort();
+      req.on("timeout", () => finish(new Error("image download timed out")));
+      req.on("error", () => finish(new Error("image download failed")));
+      req.on("response", (res) => {
+        var _a2;
+        const status = (_a2 = res.statusCode) != null ? _a2 : 0;
+        const location = typeof res.headers.location === "string" ? res.headers.location : void 0;
+        if (status < 200 || status >= 300) {
+          res.resume();
+          finish(void 0, { status, location });
+          req.destroy();
+          return;
+        }
+        res.on("data", (chunk) => {
+          total2 += chunk.length;
+          if (total2 > MAX_IMAGE_BYTES) {
+            res.destroy();
+            finish(new Error("image rejected: too-large"));
+            return;
+          }
+          chunks.push(chunk);
+        });
+        res.on("error", () => finish(new Error("image download failed")));
+        res.on("aborted", () => finish(new Error("image download failed")));
+        res.on("end", () => {
+          const body = new Uint8Array(total2);
+          let offset = 0;
+          for (const chunk of chunks) {
+            body.set(chunk, offset);
+            offset += chunk.length;
+          }
+          finish(void 0, { status, body });
+        });
+      });
+      req.end();
+    })
+  };
+}

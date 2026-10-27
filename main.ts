@@ -102,7 +102,8 @@ import { aiModeOptions } from "./experiences/visual-map/ai-mode";
 import { researchTopicTask } from "./experiences/visual-map/steps/fragments";
 import { researchVerifyStep, skeletonInstruction, type ResearchVerifyResult } from "./core/steps/research-verify/step";
 import { researchImagesStep, type ResearchImagesResult } from "./core/steps/research-verify/images";
-import { checkImageBytes, normalizeHttpsUrl } from "./core/seamless-research/apply";
+import { checkImageBytes, MAX_IMAGE_BYTES, normalizeHttpsUrl } from "./core/seamless-research/apply";
+import { fetchPublicImage, pinnedLookup, type ImageFetchDeps } from "./core/seamless-research/image-fetch";
 import { isSearchNotPerformed } from "./ai/search-not-performed";
 import { ResearchProgressStore } from "./experiences/visual-map/research-progress";
 import type { ResearchObserver } from "./ai/research-observer";
@@ -1654,8 +1655,9 @@ export default class VisualAgentMapPlugin extends Plugin {
   }
   /**
    * Saves one researched image as a local copy next to `notePath`'s attachments. https only; the bytes must be png, jpeg, gif or
-   * webp (checked by magic bytes, not by name or content type) and at most 10 MB. Returns the Vault path, or undefined when the
-   * run was stopped; anything else that is wrong throws, and the caller drops that one image.
+   * webp (checked by magic bytes, not by name or content type) and at most 10 MB. Every hop (the address and each redirect) must
+   * be a public host: all DNS answers are checked and the connection is pinned to the checked address. Returns the Vault path,
+   * or undefined when the run was stopped; anything else that is wrong throws, and the caller drops that one image.
    */
   async saveResearchImage(
     url: string,
@@ -1663,17 +1665,19 @@ export default class VisualAgentMapPlugin extends Plugin {
     signal: AbortSignal,
     name = "research-image"
   ): Promise<string | undefined> {
-    // Same gate as the parser (https, public host, no credentials). requestUrl does not report the final address after a redirect, so that host is not re-checked here.
     const safeUrl = normalizeHttpsUrl(url);
     if (!safeUrl) throw new Error("image address is not allowed");
     if (signal.aborted) return undefined;
-    const response = await requestUrl({ url: safeUrl, method: "GET", throw: true });
-    if (signal.aborted) return undefined;
-    const checked = checkImageBytes(new Uint8Array(response.arrayBuffer));
+    const bytes = await fetchPublicImage(safeUrl, await nodeImageFetchDeps(signal));
+    if (!bytes || signal.aborted) return undefined;
+    const checked = checkImageBytes(bytes);
     if ("rejected" in checked) throw new Error(`image rejected: ${checked.rejected}`);
     const extension = checked.kind === "jpeg" ? "jpg" : checked.kind;
     const path = await this.app.fileManager.getAvailablePathForAttachment(`${name}.${extension}`, notePath);
-    await this.app.vault.createBinary(path, response.arrayBuffer);
+    await this.app.vault.createBinary(
+      path,
+      bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength) as ArrayBuffer
+    );
     return path;
   }
   /** Deletes a copy saved by saveResearchImage when its result was discarded. Only a file in the Vault is touched; a missing file is fine. */
@@ -1959,4 +1963,87 @@ export default class VisualAgentMapPlugin extends Plugin {
   private claudeCli(pluginDirectory: string): ClaudeCodeCliRuntime {
     return this.aiRuntime.claude(pluginDirectory);
   }
+}
+
+/** Node-backed deps for fetchPublicImage (desktop only). Fails closed when Node networking is missing; never falls back to requestUrl, which follows redirects unseen. */
+async function nodeImageFetchDeps(signal: AbortSignal): Promise<ImageFetchDeps> {
+  let dns: typeof import("node:dns/promises");
+  let https: typeof import("node:https");
+  try {
+    dns = await import("node:dns/promises");
+    https = await import("node:https");
+  } catch {
+    throw new Error("image download unavailable");
+  }
+  if (typeof dns?.lookup !== "function" || typeof https?.request !== "function")
+    throw new Error("image download unavailable");
+  return {
+    signal,
+    lookup: async hostname => {
+      const answers = await dns.lookup(hostname, { all: true, verbatim: true });
+      return answers.map(answer => ({ address: answer.address, family: answer.family === 6 ? 6 : 4 }));
+    },
+    get: (request, requestSignal) =>
+      new Promise((resolve, reject) => {
+        const isIp = request.hostname.startsWith("[") || /^\d+\.\d+\.\d+\.\d+$/.test(request.hostname);
+        const host = request.hostname.replace(/^\[|\]$/g, "");
+        let settled = false;
+        const chunks: Uint8Array[] = [];
+        let total = 0;
+        const req = https.request({
+          protocol: "https:",
+          host,
+          servername: isIp ? undefined : host,
+          path: new URL(request.url).pathname + new URL(request.url).search,
+          method: "GET",
+          timeout: 30000,
+          lookup: pinnedLookup(request.address, request.family)
+        });
+        const finish = (error: Error | undefined, value?: { status: number; location?: string; body?: Uint8Array }) => {
+          if (settled) return;
+          settled = true;
+          requestSignal.removeEventListener("abort", onAbort);
+          if (error) {
+            req.destroy();
+            reject(error);
+          } else resolve(value as { status: number });
+        };
+        const onAbort = () => finish(new Error("image download stopped"));
+        requestSignal.addEventListener("abort", onAbort, { once: true });
+        if (requestSignal.aborted) return onAbort();
+        req.on("timeout", () => finish(new Error("image download timed out")));
+        req.on("error", () => finish(new Error("image download failed")));
+        req.on("response", res => {
+          const status = res.statusCode ?? 0;
+          const location = typeof res.headers.location === "string" ? res.headers.location : undefined;
+          if (status < 200 || status >= 300) {
+            res.resume();
+            finish(undefined, { status, location });
+            req.destroy();
+            return;
+          }
+          res.on("data", (chunk: Uint8Array) => {
+            total += chunk.length;
+            if (total > MAX_IMAGE_BYTES) {
+              res.destroy();
+              finish(new Error("image rejected: too-large"));
+              return;
+            }
+            chunks.push(chunk);
+          });
+          res.on("error", () => finish(new Error("image download failed")));
+          res.on("aborted", () => finish(new Error("image download failed")));
+          res.on("end", () => {
+            const body = new Uint8Array(total);
+            let offset = 0;
+            for (const chunk of chunks) {
+              body.set(chunk, offset);
+              offset += chunk.length;
+            }
+            finish(undefined, { status, body });
+          });
+        });
+        req.end();
+      })
+  };
 }

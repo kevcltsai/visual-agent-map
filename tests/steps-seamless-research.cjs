@@ -753,3 +753,152 @@ test('R2-N1 builder: the scheme text is kept and escaped, nothing is deleted fro
   assert.equal(apply.sanitizePhase2Markdown('a (b) `c` d > e!').markdown, 'a \\(b\\) \\`c\\` d \\> e\\!');
   assert.equal(apply.sanitizePhase2Markdown('> quote\n> [!note] x').markdown, '> quote\n> [!note] x');
 });
+
+// Image download SSRF guard: fetchPublicImage re-checks every hop and pins the connection (fake lookup/get, no network).
+const imageFetch = load('core/seamless-research/image-fetch.ts', {}, { URL });
+const PNG = new Uint8Array([0x89, 0x50, 0x4e, 0x47, 1, 2, 3]);
+function imageHarness({ dns = {}, pages = {}, signal = new AbortController().signal } = {}) {
+  const gets = [];
+  const lookups = [];
+  const deps = {
+    signal,
+    lookup: async host => {
+      lookups.push(host);
+      return dns[host] ?? [{ address: '93.184.216.34', family: 4 }];
+    },
+    get: async request => {
+      gets.push(request);
+      const page = pages[request.url];
+      if (!page) throw new Error('unexpected request');
+      return page;
+    }
+  };
+  return { deps, gets, lookups };
+}
+const redirectTo = location => ({ status: 302, location });
+
+test('image fetch: redirect to a private IPv4 literal throws after one request', async () => {
+  const h = imageHarness({ pages: { 'https://a.example/x.png': redirectTo('https://127.0.0.1/x.png') } });
+  await assert.rejects(imageFetch.fetchPublicImage('https://a.example/x.png', h.deps));
+  assert.equal(h.gets.length, 1);
+});
+
+test('image fetch: redirect to http throws', async () => {
+  const h = imageHarness({ pages: { 'https://a.example/x.png': redirectTo('http://example.com/x.png') } });
+  await assert.rejects(imageFetch.fetchPublicImage('https://a.example/x.png', h.deps));
+  assert.equal(h.gets.length, 1);
+});
+
+test('image fetch: redirect to localhost, mapped IPv6 loopback and metadata address each throw', async () => {
+  for (const target of ['https://localhost/', 'https://[::ffff:127.0.0.1]/', 'https://169.254.169.254/']) {
+    const h = imageHarness({ pages: { 'https://a.example/x.png': redirectTo(target) } });
+    await assert.rejects(imageFetch.fetchPublicImage('https://a.example/x.png', h.deps), undefined, target);
+    assert.equal(h.gets.length, 1, target);
+  }
+});
+
+test('image fetch: one private DNS answer among public ones throws before any request', async () => {
+  const h = imageHarness({ dns: { 'a.example': [{ address: '93.184.216.34', family: 4 }, { address: '10.0.0.1', family: 4 }] } });
+  await assert.rejects(imageFetch.fetchPublicImage('https://a.example/x.png', h.deps), /private address/);
+  assert.equal(h.gets.length, 0);
+});
+
+test('image fetch: loopback, CGNAT, ::1 and mapped private DNS answers each throw', async () => {
+  const answers = [
+    { address: '127.0.0.1', family: 4 },
+    { address: '100.64.0.1', family: 4 },
+    { address: '::1', family: 6 },
+    { address: '::ffff:192.168.1.1', family: 6 }
+  ];
+  for (const answer of answers) {
+    const h = imageHarness({ dns: { 'a.example': [answer] } });
+    await assert.rejects(imageFetch.fetchPublicImage('https://a.example/x.png', h.deps), undefined, answer.address);
+    assert.equal(h.gets.length, 0, answer.address);
+  }
+});
+
+test('image fetch: an empty DNS answer throws', async () => {
+  const h = imageHarness({ dns: { 'a.example': [] } });
+  await assert.rejects(imageFetch.fetchPublicImage('https://a.example/x.png', h.deps));
+  assert.equal(h.gets.length, 0);
+});
+
+test('image fetch: rebinding on a redirect target (public first hop, private second) throws without a second request', async () => {
+  const h = imageHarness({
+    dns: { 'b.example': [{ address: '192.168.0.5', family: 4 }] },
+    pages: { 'https://a.example/x.png': redirectTo('https://b.example/y.png') }
+  });
+  await assert.rejects(imageFetch.fetchPublicImage('https://a.example/x.png', h.deps), /private address/);
+  assert.equal(h.gets.length, 1);
+  assert.deepEqual(h.lookups, ['a.example', 'b.example']);
+});
+
+test('image fetch: 3 redirects succeed, 4 throw', async () => {
+  const chain = count => {
+    const pages = {};
+    for (let i = 0; i < count; i++) pages[`https://h${i}.example/p`] = redirectTo(`https://h${i + 1}.example/p`);
+    pages[`https://h${count}.example/p`] = { status: 200, body: PNG };
+    return pages;
+  };
+  const ok = imageHarness({ pages: chain(3) });
+  assert.deepEqual(Array.from(await imageFetch.fetchPublicImage('https://h0.example/p', ok.deps)), Array.from(PNG));
+  const bad = imageHarness({ pages: chain(4) });
+  await assert.rejects(imageFetch.fetchPublicImage('https://h0.example/p', bad.deps), /redirect limit/);
+});
+
+test('image fetch: a redirect without Location throws; a relative Location resolves against the current URL', async () => {
+  const missing = imageHarness({ pages: { 'https://a.example/x.png': { status: 301 } } });
+  await assert.rejects(imageFetch.fetchPublicImage('https://a.example/x.png', missing.deps));
+  const h = imageHarness({
+    pages: { 'https://a.example/dir/x.png': redirectTo('/b.png'), 'https://a.example/b.png': { status: 200, body: PNG } }
+  });
+  await imageFetch.fetchPublicImage('https://a.example/dir/x.png', h.deps);
+  assert.equal(h.gets[1].url, 'https://a.example/b.png');
+  assert.equal(h.gets[1].hostname, 'a.example');
+});
+
+test('image fetch: the request is pinned to the validated address', async () => {
+  const h = imageHarness({
+    dns: { 'a.example': [{ address: '2606:2800:220:1::1', family: 6 }, { address: '93.184.216.34', family: 4 }] },
+    pages: { 'https://a.example/x.png': { status: 200, body: PNG } }
+  });
+  await imageFetch.fetchPublicImage('https://a.example/x.png', h.deps);
+  assert.equal(h.gets[0].address, '2606:2800:220:1::1');
+  assert.equal(h.gets[0].family, 6);
+});
+
+test('image fetch: 404 and 500 throw', async () => {
+  for (const status of [404, 500]) {
+    const h = imageHarness({ pages: { 'https://a.example/x.png': { status } } });
+    await assert.rejects(imageFetch.fetchPublicImage('https://a.example/x.png', h.deps), undefined, String(status));
+  }
+});
+
+test('image fetch: a stop after the DNS lookup returns undefined and sends no request', async () => {
+  const controller = new AbortController();
+  const h = imageHarness({ signal: controller.signal });
+  const lookup = h.deps.lookup;
+  h.deps.lookup = async host => {
+    const answers = await lookup(host);
+    controller.abort();
+    return answers;
+  };
+  assert.equal(await imageFetch.fetchPublicImage('https://a.example/x.png', h.deps), undefined);
+  assert.equal(h.gets.length, 0);
+});
+
+test('image fetch: errors do not carry the full URL', async () => {
+  const h = imageHarness({ pages: { 'https://a.example/secret-token.png': redirectTo('https://127.0.0.1/secret-token2') } });
+  await assert.rejects(imageFetch.fetchPublicImage('https://a.example/secret-token.png', h.deps), error => !/secret-token/.test(error.message));
+});
+
+test('pinnedLookup answers with the given address in both callback shapes', () => {
+  const lookup = imageFetch.pinnedLookup('93.184.216.34', 4);
+  let all;
+  lookup('x.example', { all: true }, (error, list) => (all = { error, list }));
+  assert.equal(all.error, null);
+  assert.deepEqual(JSON.parse(JSON.stringify(all.list)), [{ address: '93.184.216.34', family: 4 }]);
+  let one;
+  lookup('x.example', {}, (error, address, family) => (one = { error, address, family }));
+  assert.deepEqual(one, { error: null, address: '93.184.216.34', family: 4 });
+});

@@ -712,3 +712,28 @@ test('R1-M2 private hosts: IPv4-mapped and compatible IPv6, CGNAT, and other for
   const bad = ['https://[::ffff:127.0.0.1]/a.png', 'https://100.64.0.1/a.png'].map(imageUrl => img({ imageUrl }));
   assert.equal(eligibleImages(bad).eligible.length, 0);
 });
+
+// ---------- F2: short skeleton task, user choices in the phase-2 prompt (R1-B2, R1-M3) ----------
+
+test('R1-B2 skeleton task: a short format with a length cap, no page layout, in every instruction language', () => {
+  for (const language of ['zh-TW', 'zh-CN', 'en']) {
+    const text = skeletonInstruction(language);
+    assert.match(text, /600|300/, `${language}: length cap`);
+    assert.match(text, /##/, `${language}: short sections`);
+    assert.ok(text.length < 1500, `${language}: the task text itself stays short`);
+  }
+});
+
+test('R1-M3 research-verify render: no choices adds nothing; each choice adds its block after the base prompt', () => {
+  const base = { topic: '外套', context: '穿搭', skeleton: '## 概念\n疊穿。', language: 'zh-TW' };
+  const plainPrompt = researchVerifyStep.render(base);
+  assert.equal(researchVerifyStep.render({ ...base, requirements: '  ', toneText: '', structure: '\n' }), plainPrompt);
+  const withAll = researchVerifyStep.render({ ...base, requirements: '只談休閒穿搭"', toneText: '平實語氣', structure: '- 核心：結論' });
+  assert.ok(withAll.startsWith(plainPrompt.trimEnd()));
+  assert.match(withAll, /只談休閒穿搭\\"/, 'requirements are a JSON string, so a quote cannot end it');
+  assert.match(withAll, /平實語氣/);
+  assert.match(withAll, /- 核心：結論/);
+  const english = researchVerifyStep.render({ ...base, language: 'en', requirements: 'casual only' });
+  assert.match(english, /The user's extra requirements/);
+  assert.doesNotMatch(researchVerifyStep.render({ ...base, requirements: 'x' }), /內容範本|文字語氣/, 'only the chosen blocks appear');
+});

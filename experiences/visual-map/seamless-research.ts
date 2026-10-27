@@ -50,6 +50,10 @@ export interface SeamlessPhase1Input {
   reasoning?: ReasoningLevel;
   /** The conservative-skeleton task text for the model. */
   instruction: string;
+  /** The user's extra requirements for the topic; appended to the task. */
+  requirements?: string;
+  /** Writing tone text (never set for the academic default). */
+  toneText?: string;
   signal: AbortSignal;
 }
 export interface SeamlessVerifyInput {
@@ -60,6 +64,10 @@ export interface SeamlessVerifyInput {
   language: ContentLanguage;
   model: string;
   reasoning?: ReasoningLevel;
+  requirements?: string;
+  toneText?: string;
+  /** Section outline of the content template the user chose; shapes the phase-2 page. */
+  structure?: string;
   signal: AbortSignal;
 }
 export interface SeamlessImagesInput {
@@ -86,8 +94,10 @@ export interface SeamlessDeps {
   runVerify(input: SeamlessVerifyInput): Promise<ResearchVerifyResult>;
   /** Phase 2 images: a separate web call run beside runVerify. */
   runImages(input: SeamlessImagesInput): Promise<ResearchImagesResult>;
-  /** Downloads one eligible image into the Vault; returns its Vault path, or throws / returns undefined to drop it. */
-  saveImage(image: Phase2Image, notePath: string, signal: AbortSignal): Promise<string | undefined>;
+  /** Downloads one eligible image into the Vault; returns its Vault path, or throws / returns undefined to drop it. `name` is the file name without extension (the topic title and a number). */
+  saveImage(image: Phase2Image, notePath: string, signal: AbortSignal, name?: string): Promise<string | undefined>;
+  /** Deletes a copy this attempt downloaded when its result is discarded. Failures are logged, never thrown. */
+  removeImage?(path: string): Promise<void>;
   /** The note is open in a visible Markdown leaf. */
   isShown(path: string): boolean;
   capabilitiesFor(model: string): { webSearch: boolean };
@@ -117,6 +127,12 @@ export interface SeamlessRequest {
   allow?: readonly string[];
   /** The chat asked for images. Only then is "no image found" a problem. */
   imagesRequested?: boolean;
+  /** The user's extra requirements (dialog, chat direction, research card). Phase 1 and phase 2 both see them. */
+  requirements?: string;
+  /** Writing tone text of the chosen tone; undefined for the academic default. */
+  toneText?: string;
+  /** Section outline of the content template the user chose; shapes the phase-2 page only. */
+  structure?: string;
   /** The model the topic resolves to (a topic that follows its parent has no model of its own). A model chosen by hand on the note still wins. */
   model?: string;
   /** The batch's stop signal. */
@@ -165,6 +181,18 @@ export function problemActionKey(
 
 /** Model used by "switch to a model that can go online": the default model when it can, else `claude:sonnet`. */
 export const FALLBACK_WEB_MODEL = "claude:sonnet";
+
+/** File name (no extension) of a downloaded copy: the topic title, made safe for a file name, and the picture's number. */
+export function imageFileBase(title: string, number: number): string {
+  const safe = title
+    .replace(/[\p{Cc}\\/:*?"<>|#^[\]]/gu, " ")
+    .replace(/\s+/g, " ")
+    .trim()
+    .replace(/^\.+/, "")
+    .slice(0, 60)
+    .trim();
+  return `${safe || "research-image"} ${number}`;
+}
 
 const LABEL_UNSAFE = /[[\]()<>|`*_~\n\r]/g;
 function label(value: string, limit: number): string {
@@ -264,6 +292,9 @@ interface Topic {
   language: ContentLanguage;
   allow: readonly string[];
   imagesRequested: boolean;
+  requirements: string;
+  toneText: string;
+  structure: string;
   /** The resolved model of a topic that follows its parent; see `SeamlessRequest.model`. */
   model?: string;
   /** Status the note had before the first attempt; restored when a stop comes before anything was written. */
@@ -345,6 +376,9 @@ export class SeamlessResearch {
       language: request.language,
       allow: [request.title, ...(request.allow ?? [])],
       imagesRequested: request.imagesRequested === true,
+      requirements: request.requirements?.trim() ?? "",
+      toneText: request.toneText?.trim() ?? "",
+      structure: request.structure?.trim() ?? "",
       ...(request.model ? { model: request.model } : {}),
       status0: "idea",
       phase1Written: false,
@@ -407,6 +441,7 @@ export class SeamlessResearch {
       attempt.detach();
     }
     this.current.clear();
+    for (const entry of this.held.values()) void this.discardSaved(entry);
     this.held.clear();
     this.problemMap.clear();
     this.applying.clear();
@@ -547,9 +582,25 @@ export class SeamlessResearch {
     if (!this.disposed) await this.setStatus(attempt, outcome.status === "restore" ? topic.status0 : outcome.status);
   }
 
+  /** Deletes the copies an attempt downloaded for a result that is not going to be written. */
+  private async discardSaved(entry: { saved?: { path: string }[] }): Promise<void> {
+    const saved = entry.saved ?? [];
+    entry.saved = [];
+    if (!this.deps.removeImage) return;
+    for (const item of saved) {
+      try {
+        await this.deps.removeImage(item.path);
+      } catch (error) {
+        this.log(t("log.seamless_image_skipped_0", error instanceof Error ? error.message : "remove"));
+      }
+    }
+  }
+
   private async discardHeld(path: string, attempt: Attempt): Promise<void> {
-    if (this.held.get(path)?.attempt !== attempt) return;
+    const entry = this.held.get(path);
+    if (entry?.attempt !== attempt) return;
     try {
+      await this.discardSaved(entry);
       await this.stopped(attempt);
     } finally {
       this.release(attempt);
@@ -574,6 +625,8 @@ export class SeamlessResearch {
       model: this.modelFor(topic, note),
       reasoning: note.reasoning,
       instruction: this.deps.skeletonInstruction(topic.language),
+      ...(topic.requirements ? { requirements: topic.requirements } : {}),
+      ...(topic.toneText ? { toneText: topic.toneText } : {}),
       signal: attempt.controller.signal
     });
     if (!this.isCurrent(attempt)) return false;
@@ -631,7 +684,14 @@ export class SeamlessResearch {
         signal
       };
       // Two independent web calls; each outcome is judged on its own.
-      const verifyCall = this.deps.runVerify({ ...base, skeleton: topic.skeleton, language: topic.language });
+      const verifyCall = this.deps.runVerify({
+        ...base,
+        skeleton: topic.skeleton,
+        language: topic.language,
+        ...(topic.requirements ? { requirements: topic.requirements } : {}),
+        ...(topic.toneText ? { toneText: topic.toneText } : {}),
+        ...(topic.structure ? { structure: topic.structure } : {})
+      });
       const imagesCall = this.deps.runImages(base);
       const [verify, images] = await Promise.allSettled([verifyCall, imagesCall]);
       if (signal.aborted) return await this.dropStale(attempt);
@@ -710,6 +770,7 @@ export class SeamlessResearch {
     if (!(await this.fenceOk(attempt))) {
       this.held.delete(path);
       try {
+        await this.discardSaved(entry);
         await this.dropStale(attempt);
       } finally {
         this.release(attempt);
@@ -729,7 +790,12 @@ export class SeamlessResearch {
     for (const image of eligibleImages(images).eligible) {
       if (!this.isCurrent(attempt)) break;
       try {
-        const path = await this.deps.saveImage(image, attempt.topic.path, attempt.controller.signal);
+        const path = await this.deps.saveImage(
+          image,
+          attempt.topic.path,
+          attempt.controller.signal,
+          imageFileBase(attempt.topic.title, saved.length + 1)
+        );
         if (path) saved.push({ path, image });
       } catch (error) {
         this.log(t("log.seamless_image_skipped_0", error instanceof Error ? error.message : "download"));
@@ -744,7 +810,10 @@ export class SeamlessResearch {
     const path = topic.path;
     entry.saved ??= await this.saveImages(attempt, entry.result.images);
     const saved = entry.saved;
-    if (!this.isCurrent(attempt)) return await this.dropStale(attempt);
+    if (!this.isCurrent(attempt)) {
+      await this.discardSaved(entry);
+      return await this.dropStale(attempt);
+    }
     const box: {
       problem?: SeamlessProblemReason;
       reheld?: boolean;
@@ -803,8 +872,14 @@ export class SeamlessResearch {
       this.changed();
       return;
     }
-    if (box.stale) return await this.dropStale(attempt);
-    if (box.failure !== undefined) return await this.fail(attempt, "other", box.failure);
+    if (box.stale) {
+      await this.discardSaved(entry);
+      return await this.dropStale(attempt);
+    }
+    if (box.failure !== undefined) {
+      await this.discardSaved(entry);
+      return await this.fail(attempt, "other", box.failure);
+    }
     if (box.written) for (const listener of [...this.listeners]) listener({ type: "written", path, ...box.written });
     if (box.problem) {
       this.problemMap.set(path, { path, title: topic.title, reason: box.problem, action: "dismiss" });

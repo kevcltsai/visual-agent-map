@@ -5,6 +5,12 @@ import { renderTemplate, type StepDefinition } from "../../step-runner";
 import { languageVariables, type FragmentPair } from "../_shared/fragments";
 import promptEn from "./prompt.en.md";
 import promptZh from "./prompt.zh.md";
+import extraRequirementsEn from "./extra-requirements.en.md";
+import extraRequirementsZh from "./extra-requirements.zh.md";
+import extraStructureEn from "./extra-structure.en.md";
+import extraStructureZh from "./extra-structure.zh.md";
+import extraToneEn from "./extra-tone.en.md";
+import extraToneZh from "./extra-tone.zh.md";
 import skeletonEn from "./skeleton.en.md";
 import skeletonZh from "./skeleton.zh.md";
 
@@ -15,6 +21,12 @@ export interface ResearchVerifyInput {
   /** The filtered phase-1 text. */
   skeleton: string;
   language: ContentLanguage;
+  /** The user's extra requirements for this topic (dialog, chat direction or research card). Empty adds nothing to the prompt. */
+  requirements?: string;
+  /** Writing tone text of the chosen tone. Empty adds nothing. */
+  toneText?: string;
+  /** Section outline of a content template the user chose (one line per section). Empty adds nothing. */
+  structure?: string;
 }
 export interface ResearchVerifyResult {
   detail: string;
@@ -158,6 +170,23 @@ export function parseResearchVerify(raw: string): ResearchVerifyResult {
 
 const PROMPT: FragmentPair = { zh: promptZh, en: promptEn };
 const SKELETON: FragmentPair = { zh: skeletonZh, en: skeletonEn };
+const EXTRA_REQUIREMENTS: FragmentPair = { zh: extraRequirementsZh, en: extraRequirementsEn };
+const EXTRA_TONE: FragmentPair = { zh: extraToneZh, en: extraToneEn };
+const EXTRA_STRUCTURE: FragmentPair = { zh: extraStructureZh, en: extraStructureEn };
+
+/** The optional blocks that carry the user's choices into phase 2. Nothing is added when a choice is empty. */
+function extraBlocks(input: ResearchVerifyInput): string {
+  const side = instructionLanguageOf(input.language);
+  const blocks: string[] = [];
+  const requirements = input.requirements?.trim();
+  const tone = input.toneText?.trim();
+  const structure = input.structure?.trim();
+  if (requirements)
+    blocks.push(renderTemplate(EXTRA_REQUIREMENTS[side], { requirements: JSON.stringify(requirements) }).trimEnd());
+  if (tone) blocks.push(renderTemplate(EXTRA_TONE[side], { tone }).trimEnd());
+  if (structure) blocks.push(renderTemplate(EXTRA_STRUCTURE[side], { structure }).trimEnd());
+  return blocks.join("\n\n");
+}
 
 /** Task text for phase 1: the conservative skeleton instruction in the language's instruction language. */
 export function skeletonInstruction(language: ContentLanguage): string {
@@ -171,8 +200,8 @@ export function skeletonInstruction(language: ContentLanguage): string {
 export const researchVerifyStep: StepDefinition<ResearchVerifyInput, ResearchVerifyResult> = {
   id: "research-verify",
   version: 1,
-  render: input =>
-    renderTemplate(PROMPT[instructionLanguageOf(input.language)], {
+  render: input => {
+    const prompt = renderTemplate(PROMPT[instructionLanguageOf(input.language)], {
       ...languageVariables(input.language, { language: "region" }, undefined, undefined, {
         kind: "question",
         text: input.topic
@@ -180,7 +209,10 @@ export const researchVerifyStep: StepDefinition<ResearchVerifyInput, ResearchVer
       topic: JSON.stringify(input.topic),
       context: JSON.stringify(input.context),
       skeleton: JSON.stringify(input.skeleton)
-    }),
+    });
+    const extra = extraBlocks(input);
+    return extra ? `${prompt.trimEnd()}\n\n${extra}\n` : prompt;
+  },
   schema: RESEARCH_VERIFY_SCHEMA,
   parse: raw => parseResearchVerify(raw)
 };

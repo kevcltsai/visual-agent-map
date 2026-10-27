@@ -1229,3 +1229,184 @@ test('R1-B1 composePhase2Detail: reference definitions are not written, so they 
   assert.doesNotMatch(out, /evil\.example|^\[x\]:/m);
   assert.match(out, /句子。/);
 });
+
+// ---------- R1-B3: the map-chat parser keeps the model's own images flag for a Quick research ----------
+
+const { parseMapChat } = load('core/steps/map-chat/step.ts');
+const { buildMapChatContext } = load('core/map-chat-context.ts');
+const { aiModeOptions } = load('experiences/visual-map/ai-mode.ts');
+const chatContext = buildMapChatContext({
+  mapTitle: 'Steak', outline: [{ id: 'r', title: 'Root', summary: '', parentId: null, depth: 0 }, { id: 'a', title: 'A', summary: '', parentId: 'r', depth: 1 }],
+  selected: [], references: [], snippets: [], files: [], activeFile: null, history: []
+});
+const chatItem = (fields = {}) => ({ kind: 'run_map_action', nodeId: '', ref: '', parentId: '', newParentId: '', title: '', summary: '', detail: '', path: '', find: '', replace: '', content: '', nodeIds: ['a'], all: false, branch: false, action: 'research_standard', goal: '', direction: '', mode: '', images: false, ...fields });
+const parseChat = (...items) => plain(parseMapChat(JSON.stringify({ reply: 'ok', actions: items }), chatContext));
+
+test('R1-B3 parser: a Quick research keeps images false and adds imagesAsked; other shapes are unchanged', () => {
+  const quick = parseChat(chatItem({ mode: 'quick', images: true })).actions[0];
+  assert.equal(quick.images, false, 'the existing field still says a Quick research never looks for images');
+  assert.equal(quick.imagesAsked, true);
+  assert.deepEqual(parseChat(chatItem({ mode: 'quick', images: false })).actions[0], { kind: 'run_map_action', action: 'research_standard', nodeIds: ['a'], title: '', goal: '', direction: '', mode: 'quick', images: false });
+  assert.deepEqual(parseChat(chatItem({ mode: 'standard', images: true })).actions[0], { kind: 'run_map_action', action: 'research_standard', nodeIds: ['a'], title: '', goal: '', direction: '', mode: 'standard', images: true });
+  assert.equal('imagesAsked' in parseChat(chatItem({ action: 'expand', mode: 'quick', images: true })).actions[0], false, 'only a research carries it');
+});
+
+test('R1-B3 chat request, flag on: quick plus images means imagesRequested true; no images means false', () => {
+  const asked = parseChat(chatItem({ mode: 'quick', images: true, direction: 'casual' })).actions[0];
+  assert.deepEqual(plain(seamlessChatResearchRequest(asked)), { requirements: 'casual', imagesRequested: true });
+  assert.equal(seamlessChatResearchRequest(parseChat(chatItem({ mode: 'quick' })).actions[0]).imagesRequested, false);
+  assert.equal(seamlessChatResearchRequest(parseChat(chatItem({ mode: 'standard', images: true })).actions[0]).imagesRequested, true);
+});
+
+test('R1-B3 chat request, flag off: chatResearchRequest for a Quick reply with images is what it was (no images)', () => {
+  const asked = parseChat(chatItem({ mode: 'quick', images: true, direction: 'casual' })).actions[0];
+  const request = chatResearchRequest(asked, undefined, mode => aiModeOptions(mode, 'research'));
+  assert.deepEqual(plain(request), { mapAiMode: 'quick', researchMode: 'local', researchDepth: 'normal', requirements: 'casual', imageSearch: false });
+});
+
+// ---------- R1-M3: requirements, tone and content template reach both phases ----------
+
+test('R1-M3 orchestrator: requirements and tone reach phase 1; requirements, tone and structure reach verify, never images; retry keeps them', async () => {
+  const h = harness({ runVerify: () => { throw new Error('socket hang up ECONNRESET'); } });
+  await h.sr.research(h.request({ requirements: ' only gear ', toneText: 'Plain voice', structure: '- Core: the main point' }));
+  assert.equal(h.calls.ask[0].requirements, 'only gear');
+  assert.equal(h.calls.ask[0].toneText, 'Plain voice');
+  assert.equal('structure' in h.calls.ask[0], false, 'the template shapes phase 2, not the short skeleton');
+  assert.deepEqual([h.calls.verify[0].requirements, h.calls.verify[0].toneText, h.calls.verify[0].structure], ['only gear', 'Plain voice', '- Core: the main point']);
+  for (const key of ['requirements', 'toneText', 'structure']) assert.equal(key in h.calls.images[0], false, key);
+  h.deps.runVerify = async input => { h.calls.verify.push(input); return verifyResult(); };
+  await h.sr.retry(PATH);
+  const again = h.calls.verify.at(-1);
+  assert.deepEqual([again.requirements, again.toneText, again.structure], ['only gear', 'Plain voice', '- Core: the main point']);
+});
+
+test('R1-M3 orchestrator: nothing chosen adds no keys to either call', async () => {
+  const h = harness();
+  await h.sr.research(h.request());
+  for (const key of ['requirements', 'toneText', 'structure']) {
+    assert.equal(key in h.calls.ask[0], false, `ask ${key}`);
+    assert.equal(key in h.calls.verify[0], false, `verify ${key}`);
+  }
+});
+
+test('R1-M3 view: the dialog\'s requirements, tone and content template reach the service request; the choices are saved on the topic', async () => {
+  const h = viewHarness(true);
+  const saved = [];
+  h.plugin.repo.updateNote = async (path, patch) => { saved.push([path, plain(patch)]); };
+  h.view.multiSelected = new Set(['b']);
+  await h.view.startMultiResearch({ requirements: 'only gear', toneId: 'plain', detailTemplateId: 'textbook' });
+  const [, nodes, work] = h.state.starts[0];
+  await work(nodes[0], new AbortController().signal, () => {});
+  const request = h.sr.calls.find(call => call[0] === 'research')[1];
+  assert.equal(request.requirements, 'only gear');
+  assert.ok(request.toneText && request.toneText.length > 5, 'the plain tone text');
+  assert.match(request.structure, /^- /m, 'one line per section of the textbook template');
+  assert.ok(saved.some(([, patch]) => patch.toneId === 'plain') && saved.some(([, patch]) => patch.detailTemplateId === 'textbook'));
+});
+
+test('R1-M3 view: nothing chosen sends no tone or structure; the single-topic research card sends its supplementary requirements', async () => {
+  const h = viewHarness(true);
+  h.view.multiSelected = new Set(['b']);
+  await h.view.startMultiResearch({ requirements: '' });
+  const [, nodes, work] = h.state.starts[0];
+  await work(nodes[0], new AbortController().signal, () => {});
+  const request = h.sr.calls.find(call => call[0] === 'research')[1];
+  for (const key of ['requirements', 'toneText', 'structure']) assert.equal(key in request, false, key);
+  const card = viewHarness(true);
+  const note = await card.plugin.repo.readNote('a.md');
+  await card.view.researchSeamless(card.a, note, 'en', undefined, () => {}, () => {}, { requirements: 'use sources from 2020', toneId: 'plain' });
+  const single = card.sr.calls.find(call => call[0] === 'research')[1];
+  assert.equal(single.requirements, 'use sources from 2020');
+  assert.ok(single.toneText);
+});
+
+// ---------- R1-M4: the chat result line does not say Quick with the setting on ----------
+
+test('R1-M4 chat result line: flag on is mode-neutral in every language; flag off still names the mode', () => {
+  const quick = researchAction({ mode: 'quick' });
+  const on = viewHarness(true);
+  const off = viewHarness(false);
+  off.view.chatSelectionIds = on.view.chatSelectionIds = () => [];
+  assert.equal(on.view.chatActionLabel(quick), 'Start researching the selected topics');
+  assert.match(off.view.chatActionLabel(quick), /quick research/i);
+  const { zhTW } = load('i18n/zh-TW.ts');
+  const { zhCN } = load('i18n/zh-CN.ts');
+  assert.equal(zhTW['ui.map_chat_do_research_seamless'], '對選取的議題開始研究');
+  assert.equal(zhCN['ui.map_chat_do_research_seamless'], '对选取的议题开始研究');
+  for (const text of [on.view.chatActionLabel(researchAction({ mode: 'standard' })), zhTW['ui.map_chat_do_research_seamless'], zhCN['ui.map_chat_do_research_seamless']])
+    assert.doesNotMatch(text, /快速|快速|quick|標準|标准|standard/i);
+});
+
+// ---------- R1-M5: a discarded result deletes the copies its attempt downloaded ----------
+
+const { imageFileBase } = seamlessModule;
+
+function removalHarness(saveImage) {
+  const h = harness({ runImages: () => ({ images: [IMAGE(1), IMAGE(2)] }) });
+  const removed = [];
+  h.deps.removeImage = async path => { removed.push(path); };
+  h.deps.saveImage = async (image, notePath, signal, name) => {
+    h.calls.save.push({ url: image.imageUrl, name });
+    return saveImage(image, h, name);
+  };
+  return { h, removed };
+}
+
+test('R1-M5 stop after the download and before the write: both copies are deleted and the phase-1 text stays', async () => {
+  const { h, removed } = removalHarness(async (image, hh, name) => {
+    hh.sr.abort(PATH);
+    return `Attachments/${name}.png`;
+  });
+  await h.sr.research(h.request({ imagesRequested: true }));
+  assert.deepEqual(removed, ['Attachments/Outfit 1.png']);
+  assert.equal(h.note().status, 'idea');
+  assert.doesNotMatch(h.note().detail, /Attachments/);
+});
+
+test('R1-M5 the topic was renamed while images downloaded: the copies are deleted, nothing is written', async () => {
+  const { h, removed } = removalHarness(async (image, hh, name) => {
+    hh.notes.get(PATH).title = 'Renamed';
+    return `Attachments/${name}.png`;
+  });
+  await h.sr.research(h.request({ imagesRequested: true }));
+  assert.deepEqual(removed.sort(), ['Attachments/Outfit 1.png', 'Attachments/Outfit 2.png']);
+  assert.doesNotMatch(h.note().detail, /Attachments/);
+});
+
+test('R1-M5 held again after the download, then stopped: the held copies are deleted', async () => {
+  const { h, removed } = removalHarness(async (image, hh, name) => {
+    hh.state.shown = true;
+    return `Attachments/${name}.png`;
+  });
+  await h.sr.research(h.request({ imagesRequested: true }));
+  assert.equal(h.sr.isHeld(PATH), true);
+  assert.deepEqual(removed, []);
+  h.sr.abort(PATH);
+  await settle();
+  assert.deepEqual(removed.sort(), ['Attachments/Outfit 1.png', 'Attachments/Outfit 2.png']);
+  assert.equal(h.sr.isHeld(PATH), false);
+});
+
+test('R1-M5 a result that is written keeps its copies, and the file names carry the topic title and a number', async () => {
+  const { h, removed } = removalHarness(async (image, hh, name) => `Attachments/${name}.png`);
+  await h.sr.research(h.request({ imagesRequested: true }));
+  assert.deepEqual(removed, []);
+  assert.deepEqual(h.calls.save.map(call => call.name), ['Outfit 1', 'Outfit 2']);
+  assert.match(h.note().detail, /!\[\[Attachments\/Outfit 1\.png\]\]/);
+});
+
+test('R1-M5 a removal that fails is logged and does not hide the stop', async () => {
+  const { h } = removalHarness(async (image, hh, name) => { hh.sr.abort(PATH); return `Attachments/${name}.png`; });
+  h.deps.removeImage = async () => { throw new Error('locked'); };
+  await h.sr.research(h.request({ imagesRequested: true }));
+  assert.equal(h.note().status, 'idea');
+  assert.ok(h.logs.some(line => /skipped one image: remove/.test(line)), JSON.stringify(h.logs));
+});
+
+test('R1-M5 imageFileBase: the title is made safe for a file name and the number is appended', () => {
+  assert.equal(imageFileBase('外套怎麼疊穿', 1), '外套怎麼疊穿 1');
+  assert.equal(imageFileBase('A/B: C? [x] #y ^z', 2), 'A B C x y z 2');
+  assert.equal(imageFileBase('  ..hidden  ', 3), 'hidden 3');
+  assert.equal(imageFileBase('///', 1), 'research-image 1');
+  assert.ok(imageFileBase('長'.repeat(200), 1).length <= 62);
+});

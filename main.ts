@@ -60,7 +60,7 @@ import {
   Repository,
   type Settings
 } from "./repository";
-import { normalizeTemplates, resolveTemplate } from "./ai/detail-templates";
+import { normalizeTemplates } from "./ai/detail-templates";
 import { normalizePresets } from "./ai/prompt-presets";
 import { effectiveReasoningLevel } from "./ai/task-policy";
 import { stepEffort } from "./core/provider-step-runner";
@@ -1541,7 +1541,8 @@ export default class VisualAgentMapPlugin extends Plugin {
       askModel: input => this.runSeamlessPhase1(input),
       runVerify: input => this.runResearchVerify(input),
       runImages: input => this.runResearchImages(input),
-      saveImage: (image, notePath, signal) => this.saveResearchImage(image.imageUrl, notePath, signal),
+      saveImage: (image, notePath, signal, name) => this.saveResearchImage(image.imageUrl, notePath, signal, name),
+      removeImage: path => this.removeResearchImage(path),
       isShown: path => this.isNoteShown(path),
       capabilitiesFor: model => this.aiCalls.capabilitiesFor(model),
       defaultModel: () => this.settings.cliModel,
@@ -1561,7 +1562,11 @@ export default class VisualAgentMapPlugin extends Plugin {
         leaf => leaf.view instanceof MarkdownView && leaf.view.file?.path === path && leaf.view.containerEl.isShown()
       );
   }
-  /** Seamless phase 1: one Quick call without the web, fast depth, no images. The caller filters the text before it is written. */
+  /**
+   * Seamless phase 1: one short Quick call without the web, fast depth, low effort, no images. The page template is not used:
+   * the task text asks for a few short sections and a length cap, so the first write lands quickly (phase 2 writes the full
+   * page). The caller filters the text before it is written; that filter, not the prompt, is the guarantee.
+   */
   private async runSeamlessPhase1(input: SeamlessPhase1Input): Promise<{ summary: string; detail: string }> {
     const note = await this.repo.readNote(input.path);
     const context: TaskContext = {
@@ -1569,21 +1574,23 @@ export default class VisualAgentMapPlugin extends Plugin {
       summary: isPlaceholder(note.summary) ? "" : note.summary,
       rules: "",
       detail: "",
-      task: [note.prompt || researchTopicTask(input.language, input.title), input.instruction].join("\n\n"),
+      task: [
+        note.prompt || researchTopicTask(input.language, input.title),
+        input.instruction,
+        ...(input.requirements ? [input.requirements] : [])
+      ].join("\n\n"),
       ancestors: input.context,
       mode: "task",
       ...aiModeOptions("quick", "research"),
       researchDepth: "fast",
       visualMode: "off",
       outputLanguage: input.language,
-      detailTemplate: resolveTemplate(
-        this.settings.detailTemplates,
-        [note.detailTemplateId, this.settings.defaultDetailTemplateId],
-        noteLanguageOf(input.language)
-      ).template,
+      // No fixed page layout: the skeleton task text carries the short format.
+      detailFormat: "adaptive",
+      ...(input.toneText ? { toneText: input.toneText } : {}),
       addCharts: false
     };
-    const result = await this.askModel(context, input.model, input.reasoning, input.signal);
+    const result = await this.askModel(context, input.model, "low", input.signal);
     return { summary: result.summary, detail: result.detail };
   }
   /** Seamless phase 2, text and footnotes: web search only. One more try when the model finished without any web retrieval. */
@@ -1592,7 +1599,10 @@ export default class VisualAgentMapPlugin extends Plugin {
       topic: input.title,
       context: input.context,
       skeleton: input.skeleton,
-      language: input.language
+      language: input.language,
+      ...(input.requirements ? { requirements: input.requirements } : {}),
+      ...(input.toneText ? { toneText: input.toneText } : {}),
+      ...(input.structure ? { structure: input.structure } : {})
     });
     return this.runSeamlessWebCall(prepared, input, "research-verify", 8, true);
   }
@@ -1647,7 +1657,12 @@ export default class VisualAgentMapPlugin extends Plugin {
    * webp (checked by magic bytes, not by name or content type) and at most 10 MB. Returns the Vault path, or undefined when the
    * run was stopped; anything else that is wrong throws, and the caller drops that one image.
    */
-  async saveResearchImage(url: string, notePath: string, signal: AbortSignal): Promise<string | undefined> {
+  async saveResearchImage(
+    url: string,
+    notePath: string,
+    signal: AbortSignal,
+    name = "research-image"
+  ): Promise<string | undefined> {
     // Same gate as the parser (https, public host, no credentials). requestUrl does not report the final address after a redirect, so that host is not re-checked here.
     const safeUrl = normalizeHttpsUrl(url);
     if (!safeUrl) throw new Error("image address is not allowed");
@@ -1657,9 +1672,14 @@ export default class VisualAgentMapPlugin extends Plugin {
     const checked = checkImageBytes(new Uint8Array(response.arrayBuffer));
     if ("rejected" in checked) throw new Error(`image rejected: ${checked.rejected}`);
     const extension = checked.kind === "jpeg" ? "jpg" : checked.kind;
-    const path = await this.app.fileManager.getAvailablePathForAttachment(`research-image.${extension}`, notePath);
+    const path = await this.app.fileManager.getAvailablePathForAttachment(`${name}.${extension}`, notePath);
     await this.app.vault.createBinary(path, response.arrayBuffer);
     return path;
+  }
+  /** Deletes a copy saved by saveResearchImage when its result was discarded. Only a file in the Vault is touched; a missing file is fine. */
+  async removeResearchImage(path: string): Promise<void> {
+    const file = this.app.vault.getAbstractFileByPath(path);
+    if (file instanceof TFile) await this.app.fileManager.trashFile(file);
   }
   private async runConfirmedMarkdownContextAi<Input, Output>(
     prepared: PreparedStep<Input, Output>,

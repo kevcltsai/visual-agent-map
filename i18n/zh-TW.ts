@@ -1011,6 +1011,7 @@ export const zhTW: Record<TranslationKey, string> = {
   "ui.map_chat_do_select_0": "選取 {0} 個議題",
   "ui.map_chat_do_research_quick": "對選取的議題開始快速研究",
   "ui.map_chat_do_research_standard": "對選取的議題開始標準研究",
+  "ui.map_chat_do_research_seamless": "對選取的議題開始研究",
   "ui.map_chat_do_expand_0": "為 {0} 個議題展開子議題",
   "ui.map_chat_do_synthesize": "整合選取的議題（以你的訊息為方向，不開視窗）",
   "ui.map_chat_do_rate_0": "依目標「{0}」分級議題",

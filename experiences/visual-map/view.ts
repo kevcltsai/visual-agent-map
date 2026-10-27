@@ -7376,7 +7376,11 @@ export class VisualAgentMapView extends ItemView {
             options.outputLanguage ?? outputLanguageForMap(this.map, this.plugin.settings.language, latest.title);
           const task = researchTopicTask(taskLanguage, latest.title);
           if (this.plugin.settings?.seamlessResearch) {
-            await this.researchSeamless(node, latest, taskLanguage, options.signal, failed, accepted);
+            await this.researchSeamless(node, latest, taskLanguage, options.signal, failed, accepted, {
+              requirements: options.requirements,
+              toneId: options.toneId,
+              detailTemplateId: options.detailTemplateId
+            });
             return;
           }
           const detailTemplate = await this.detailTemplateFor(node, options.detailTemplateId, options.toneId);
@@ -8479,10 +8483,22 @@ export class VisualAgentMapView extends ItemView {
     language: ContentLanguage,
     signal: AbortSignal | undefined,
     accepted: (() => void) | undefined,
-    imagesRequested?: boolean
+    choices: { imagesRequested?: boolean; requirements?: string; toneId?: string; detailTemplateId?: string } = {}
   ): Promise<void> {
     this.watchSeamless();
     this.seamlessOwned.add(node.path);
+    // The dialog's or card's choices are saved on the topic, like the other research paths do.
+    if (choices.toneId) await this.plugin.repo.updateNote(node.path, { toneId: choices.toneId });
+    if (choices.detailTemplateId)
+      await this.plugin.repo.updateNote(node.path, { detailTemplateId: choices.detailTemplateId });
+    const toneText = this.toneTextFor(note, choices.toneId, language);
+    const chosenTemplate = choices.detailTemplateId || note.detailTemplateId;
+    const structure = chosenTemplate
+      ? templateInLanguage(this.resolveTopicTemplate(note, choices.detailTemplateId).template, language)
+          .sections.filter(section => section.role !== "log")
+          .map(section => `- ${section.name}${section.description.trim() ? `: ${section.description.trim()}` : ""}`)
+          .join("\n")
+      : "";
     await sr.research({
       path: node.path,
       title: note.title,
@@ -8490,7 +8506,10 @@ export class VisualAgentMapView extends ItemView {
       language,
       allow: this.ancestorTitles(node),
       model: note.model,
-      ...(imagesRequested ? { imagesRequested: true } : {}),
+      ...(choices.imagesRequested ? { imagesRequested: true } : {}),
+      ...(choices.requirements?.trim() ? { requirements: choices.requirements.trim() } : {}),
+      ...(toneText ? { toneText } : {}),
+      ...(structure ? { structure } : {}),
       ...(signal ? { signal } : {}),
       ...(accepted ? { accepted } : {})
     });
@@ -8502,12 +8521,13 @@ export class VisualAgentMapView extends ItemView {
     language: ContentLanguage,
     signal: AbortSignal | undefined,
     failed: (message: string) => void,
-    accepted: () => void
+    accepted: () => void,
+    choices: { requirements?: string; toneId?: string; detailTemplateId?: string } = {}
   ): Promise<void> {
     const sr = this.seamless();
     if (!sr) return;
     try {
-      await this.seamlessRequest(sr, node, note, language, signal, accepted);
+      await this.seamlessRequest(sr, node, note, language, signal, accepted, choices);
     } catch (error) {
       failed(errorMessage(error));
     } finally {
@@ -8536,7 +8556,12 @@ export class VisualAgentMapView extends ItemView {
           }
           const note = await this.plugin.repo.readNote(child.path, this.map ?? undefined);
           const language = outputLanguageForMap(this.map, this.plugin.settings.language, note.title);
-          await this.seamlessRequest(sr, child, note, language, batchSignal, accepted, request.imagesRequested);
+          await this.seamlessRequest(sr, child, note, language, batchSignal, accepted, {
+            imagesRequested: request.imagesRequested,
+            requirements: request.requirements,
+            toneId: request.toneId,
+            detailTemplateId: request.detailTemplateId
+          });
           return undefined;
         },
         () => {
@@ -10866,6 +10891,8 @@ export class VisualAgentMapView extends ItemView {
       case "run_map_action":
         switch (action.action) {
           case "research_standard":
+            // With the one-button research there is no Quick or Standard to name.
+            if (this.plugin.settings?.seamlessResearch) return t("ui.map_chat_do_research_seamless");
             return t(
               chatResearchMode(action, this.map?.aiMode) === "quick"
                 ? "ui.map_chat_do_research_quick"

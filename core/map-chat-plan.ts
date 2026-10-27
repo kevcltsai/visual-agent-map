@@ -232,5 +232,5 @@ export interface SeamlessChatResearchRequest {
 export function seamlessChatResearchRequest(
   action: Extract<MapChatAction, { kind: "run_map_action" }>
 ): SeamlessChatResearchRequest {
-  return { requirements: action.direction, imagesRequested: action.images === true };
+  return { requirements: action.direction, imagesRequested: action.images === true || action.imagesAsked === true };
 }

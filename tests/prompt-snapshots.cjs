@@ -297,6 +297,16 @@ test('collect snapshots: seamless research (skeleton task and research-verify st
   }
 });
 
+test('collect snapshots: seamless research phase 2 with the user choices (R1-M3)', () => {
+  // The phase-1 prompt as sent is not snapshotted: wrapping the task text through the Quick prompt adds research.* lines that tests/steps-i18n-zh-cn-prompts.cjs counts exactly.
+  const { researchVerifyStep } = loadModule('core/steps/research-verify/step.ts');
+  for (const [language, tag] of LANGUAGES) {
+    const english = language === 'en';
+    const input = { topic: english ? 'Layering a jacket' : '外套怎麼疊穿', context: english ? 'Outfit basics' : '穿搭基礎', skeleton: english ? '## Idea\nLayers trap warm air.' : '## 概念\n疊穿是用多層衣物鎖住空氣。', language, requirements: english ? 'Only casual wear.' : '只談休閒穿搭。', toneText: english ? 'Tone: plain voice.' : '寫作語氣：平實。', structure: english ? '- Core: the main point\n- Method: how it works' : '- 核心：主要結論\n- 方法：怎麼運作' };
+    record(`seamless.research-verify-choices.${tag}`, 'core/steps/research-verify/step.ts researchVerifyStep with requirements, tone and a content-template outline (R1-M3)', language, researchVerifyStep.render(input), researchVerifyStep.schema);
+  }
+});
+
 function promptKeyCoverage() {
   const { translate, t } = loadModule('i18n.ts');
   void t;

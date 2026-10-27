@@ -502,16 +502,76 @@ test('research-verify render: both instruction languages carry the same obligati
   assert.match(researchVerifyStep.render(input('zh-TW')), /網路搜尋/);
 });
 
-test('research-verify render: conflicting sources, untrusted pages and image rules are stated', () => {
+test('research-verify render: conflicting sources and untrusted pages are stated; images are not requested here', () => {
   const en = researchVerifyStep.render({ topic: 't', context: '', skeleton: 's', language: 'en' });
   assert.match(en, /sources conflict[\s\S]*era, region or definition/);
   assert.match(en, /untrusted data/);
-  assert.match(en, /at most 6/);
-  assert.match(en, /Do not put images or image links inside `detail`/);
+  assert.match(en, /always return `images` as an empty array/);
+  assert.match(en, /do not put images or image links inside `detail`/);
+  assert.doesNotMatch(en, /at most 6/);
   const zh = researchVerifyStep.render({ topic: 't', context: '', skeleton: 's', language: 'zh-TW' });
   assert.match(zh, /來源互相矛盾[\s\S]*年代、地區或定義/);
   assert.match(zh, /不可信的資料/);
-  assert.match(zh, /最多 6 張/);
+  assert.match(zh, /`images` 一律回傳空陣列/);
+  assert.doesNotMatch(zh, /最多 6 張/);
+});
+
+test('research-verify render: unsupported is limited to contradicted or checkable unsourced claims; hedge before delete; no dated log', () => {
+  const en = researchVerifyStep.render({ topic: 't', context: '', skeleton: 's', language: 'en' });
+  assert.match(en, /contradicts the sentence, or the sentence is a specific, checkable factual claim/);
+  assert.match(en, /General advice and explanations[\s\S]*are not listed as unsupported/);
+  assert.match(en, /prefer a `correction` that downgrades it to a hedged qualifier[\s\S]*instead of deleting it/);
+  assert.match(en, /Only when the sentence is wrong/);
+  assert.match(en, /Do not add a dated update-log entry/);
+  const zh = researchVerifyStep.render({ topic: 't', context: '', skeleton: 's', language: 'zh-TW' });
+  assert.match(zh, /來源與它相反；或它是具體、可查核的事實主張/);
+  assert.match(zh, /一般性的建議與解釋[\s\S]*不要列入/);
+  assert.match(zh, /優先在 `correction` 寫一句降級為限定語的句子[\s\S]*不要刪除/);
+  assert.match(zh, /只有句子本身是錯的/);
+  assert.match(zh, /不要新增帶日期的「更新紀錄」條目/);
+  assert.deepEqual(plain(parseOf(validReply({ images: [] }))).images, []);
+});
+
+// ---------- research images step (P2b) ----------
+const imagesMod = load('core/steps/research-verify/images.ts', {}, { URL });
+const { researchImagesStep, parseResearchImages, RESEARCH_IMAGES_SCHEMA } = imagesMod;
+const imagesReply = images => JSON.stringify({ images });
+const oneImage = (overrides = {}) => ({ imageUrl: 'https://upload.example.org/a.jpg', sourceUrl: 'https://example.org/a', title: 'A', license: 'CC BY-SA 4.0', ...overrides });
+const imagesReason = raw => {
+  try { parseResearchImages(raw); } catch (error) { assert.equal(error.name, 'ResearchVerifyParseError'); return error.reason; }
+  assert.fail('expected a parse error');
+};
+
+test('research images step: id, schema, render carries inputs as JSON strings and the fetch-and-license rules', () => {
+  assert.equal(researchImagesStep.id, 'research.images');
+  assert.deepEqual(plain(RESEARCH_IMAGES_SCHEMA).required, ['images']);
+  assert.equal(plain(RESEARCH_IMAGES_SCHEMA).properties.images.maxItems, 6);
+  const prompt = researchImagesStep.render({ topic: '外套 "疊穿"', context: '穿搭' });
+  assert.ok(!/\{\{|\}\}/.test(prompt));
+  assert.ok(prompt.includes(JSON.stringify('外套 "疊穿"')) && prompt.includes(JSON.stringify('穿搭')));
+  assert.match(prompt, /Open \(fetch\) the candidate pages/);
+  assert.match(prompt, /actually saw in a fetched page/);
+  assert.match(prompt, /license or credit exactly as stated on that page/);
+  assert.match(prompt, /\{"images":\[\]\}/);
+  assert.match(prompt, /untrusted data/);
+});
+
+test('research images step: parse keeps a valid list, accepts empty, rejects bad shapes and counts', () => {
+  assert.equal(plain(parseResearchImages(imagesReply([oneImage()]))).images.length, 1);
+  assert.deepEqual(plain(parseResearchImages(imagesReply([]))).images, []);
+  assert.equal(imagesReason('nope'), 'not-json');
+  assert.equal(imagesReason('[]'), 'not-object');
+  assert.equal(imagesReason(JSON.stringify({ images: [], extra: 1 })), 'unexpected-field');
+  assert.equal(imagesReason(JSON.stringify({})), 'images');
+  assert.equal(imagesReason(imagesReply([oneImage({ imageUrl: 'http://x.org/a.png' })])), 'images');
+  assert.equal(imagesReason(imagesReply([1, 2, 3, 4, 5, 6, 7].map(n => oneImage({ imageUrl: `https://x.org/${n}.png` })))), 'too-many-images');
+});
+
+test('research images step: a blank or unknown license parses but eligibleImages refuses it', () => {
+  const { images } = plain(parseResearchImages(imagesReply([oneImage(), oneImage({ imageUrl: 'https://x.org/b.png', license: 'unknown' }), oneImage({ imageUrl: 'https://x.org/c.png', license: '' })])));
+  const result = plain(apply.eligibleImages(images));
+  assert.equal(result.eligible.length, 1);
+  assert.deepEqual(result.rejected.map(r => r.reason), ['license', 'license']);
 });
 
 test('skeleton instruction: conservative, forbids numbers, dates, proper nouns, quotes and prices', () => {

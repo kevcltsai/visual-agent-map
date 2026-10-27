@@ -287,11 +287,13 @@ test('collect snapshots: preset instruction strings composed directly from i18n'
 
 test('collect snapshots: seamless research (skeleton task and research-verify step)', () => {
   const { researchVerifyStep, skeletonInstruction } = loadModule('core/steps/research-verify/step.ts');
+  const { researchImagesStep } = loadModule('core/steps/research-verify/images.ts');
   for (const [language, tag] of LANGUAGES) {
     // The task text only: wrapping it through AiTaskService would add the Quick research.* lines that tests/steps-i18n-zh-cn-prompts.cjs counts exactly; that wrapping is already covered by service.task-quick-subtopic.
     record(`seamless.skeleton-task.${tag}`, 'core/steps/research-verify/step.ts skeletonInstruction (seamless research phase 1 task text; sent as the task of a Quick AI mode fast research call)', language, skeletonInstruction(language));
     const input = { topic: language === 'en' ? 'Layering a jacket' : '外套怎麼疊穿', context: language === 'en' ? 'Outfit basics' : '穿搭基礎', skeleton: language === 'en' ? '## Idea\nLayers trap warm air.' : '## 概念\n疊穿是用多層衣物鎖住空氣。', language };
     record(`seamless.research-verify.${tag}`, 'core/steps/research-verify/step.ts researchVerifyStep (seamless research phase 2: web search, sourced detail, verdicts, images)', language, researchVerifyStep.render(input), researchVerifyStep.schema);
+    record(`seamless.research-images.${tag}`, 'core/steps/research-verify/images.ts researchImagesStep (seamless research images: separate web call, opens pages, license as stated; not localized)', language, researchImagesStep.render({ topic: input.topic, context: input.context }), researchImagesStep.schema);
   }
 });
 

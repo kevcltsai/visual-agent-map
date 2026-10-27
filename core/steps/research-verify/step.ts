@@ -38,6 +38,16 @@ export class ResearchVerifyParseError extends Error {
 
 const stringField = { type: "string" };
 const httpsField = { type: "string", pattern: "^https://" };
+export const IMAGES_ARRAY_SCHEMA = {
+  type: "array",
+  maxItems: MAX_IMAGES,
+  items: {
+    type: "object",
+    additionalProperties: false,
+    properties: { imageUrl: httpsField, sourceUrl: httpsField, title: stringField, license: stringField },
+    required: ["imageUrl", "sourceUrl", "title", "license"]
+  }
+};
 export const RESEARCH_VERIFY_SCHEMA = {
   type: "object",
   additionalProperties: false,
@@ -66,16 +76,7 @@ export const RESEARCH_VERIFY_SCHEMA = {
         required: ["sentence", "verdict"]
       }
     },
-    images: {
-      type: "array",
-      maxItems: MAX_IMAGES,
-      items: {
-        type: "object",
-        additionalProperties: false,
-        properties: { imageUrl: httpsField, sourceUrl: httpsField, title: stringField, license: stringField },
-        required: ["imageUrl", "sourceUrl", "title", "license"]
-      }
-    }
+    images: IMAGES_ARRAY_SCHEMA
   },
   required: ["detail", "footnotes", "verdicts", "images"]
 };
@@ -105,6 +106,19 @@ function https(row: Row, key: string, reason: ResearchVerifyParseReason): string
   return value;
 }
 
+/** Strict parse of an `images` array: exact fields, https addresses only, at most six. */
+export function parseImageRows(value: unknown): Phase2Image[] {
+  const imageRows = rows(value, "images", ["imageUrl", "sourceUrl", "title", "license"]);
+  if (imageRows.length > MAX_IMAGES)
+    throw new ResearchVerifyParseError("too-many-images", `${imageRows.length} images`);
+  return imageRows.map(row => ({
+    imageUrl: https(row, "imageUrl", "images"),
+    sourceUrl: https(row, "sourceUrl", "images"),
+    title: text(row, "title", "images", false).trim(),
+    license: text(row, "license", "images", false).trim()
+  }));
+}
+
 /** Strict parse of the phase-2 reply: exact fields, https addresses only, at most six images. Any mismatch throws ResearchVerifyParseError. */
 export function parseResearchVerify(raw: string): ResearchVerifyResult {
   let value: unknown;
@@ -131,15 +145,7 @@ export function parseResearchVerify(raw: string): ResearchVerifyResult {
     if (row.sourceUrl !== undefined) item.sourceUrl = https(row, "sourceUrl", "verdicts");
     return item;
   });
-  const imageRows = rows(value.images, "images", ["imageUrl", "sourceUrl", "title", "license"]);
-  if (imageRows.length > MAX_IMAGES)
-    throw new ResearchVerifyParseError("too-many-images", `${imageRows.length} images`);
-  const images = imageRows.map(row => ({
-    imageUrl: https(row, "imageUrl", "images"),
-    sourceUrl: https(row, "sourceUrl", "images"),
-    title: text(row, "title", "images", false).trim(),
-    license: text(row, "license", "images", false).trim()
-  }));
+  const images = parseImageRows(value.images);
   return { detail, footnotes, verdicts, images };
 }
 
@@ -152,7 +158,7 @@ export function skeletonInstruction(language: ContentLanguage): string {
 }
 
 /**
- * Phase 2: search the web, add sourced detail to the skeleton, judge each skeleton sentence, and find licensed images.
+ * Phase 2: search the web, add sourced detail to the skeleton, and judge each skeleton sentence. Images come from the separate researchImagesStep; the `images` field is kept in the schema and is always empty here.
  * Run it with web search only. A reply that does not match the schema is a ResearchVerifyParseError.
  */
 export const researchVerifyStep: StepDefinition<ResearchVerifyInput, ResearchVerifyResult> = {

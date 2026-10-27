@@ -6,14 +6,21 @@ export type SeamlessStatus = "idea" | "running" | "completed" | "error";
 export type SeamlessAction = "retry" | "switch-model" | "dismiss";
 
 const NETWORK_CODE = /\b(?:ENOTFOUND|ECONN[A-Z]*|ETIMEDOUT|EAI_AGAIN|ENETUNREACH|EHOSTUNREACH|EPIPE)\b/;
-const NETWORK_MESSAGE = /fetch failed|network (?:error|request failed|is unreachable)|socket hang up|failed to fetch|getaddrinfo|ERR_INTERNET_DISCONNECTED|ERR_NETWORK|unable to connect|connection (?:refused|reset|timed out)|offline/i;
+const NETWORK_MESSAGE =
+  /fetch failed|network (?:error|request failed|is unreachable)|socket hang up|failed to fetch|getaddrinfo|ERR_INTERNET_DISCONNECTED|ERR_NETWORK|unable to connect|connection (?:refused|reset|timed out)|offline/i;
 
 function text(error: unknown): string {
   if (typeof error === "string") return error;
   if (typeof error !== "object" || error === null) return "";
   const record = error as { message?: unknown; code?: unknown; cause?: unknown };
   const cause = record.cause && record.cause !== error ? text(record.cause) : "";
-  return [typeof record.code === "string" ? record.code : "", typeof record.message === "string" ? record.message : "", cause].filter(Boolean).join(" ");
+  return [
+    typeof record.code === "string" ? record.code : "",
+    typeof record.message === "string" ? record.message : "",
+    cause
+  ]
+    .filter(Boolean)
+    .join(" ");
 }
 
 /**
@@ -21,7 +28,8 @@ function text(error: unknown): string {
  * network errors are "network"; anything else is "other" and is never shown as success either.
  */
 export function classifyFailure(error: unknown): FailureClass {
-  if (typeof error === "object" && error !== null && ((error as { name?: unknown }).name === "AbortError")) return "stopped";
+  if (typeof error === "object" && error !== null && (error as { name?: unknown }).name === "AbortError")
+    return "stopped";
   if (isSearchNotPerformed(error)) return "network";
   const message = text(error);
   if (NETWORK_CODE.test(message) || NETWORK_MESSAGE.test(message)) return "network";
@@ -47,12 +55,14 @@ export interface Outcome {
 }
 
 export function seamlessOutcome(input: OutcomeInput): Outcome {
-  if (input.stopped || input.failure === "stopped") return input.phase1Written ? { status: "idea", reason: "stopped" } : { status: "restore", reason: "stopped" };
+  if (input.stopped || input.failure === "stopped")
+    return input.phase1Written ? { status: "idea", reason: "stopped" } : { status: "restore", reason: "stopped" };
   if (input.failure === "network") return { status: "error", reason: "network", action: "retry" };
   if (input.failure === "no-web-model") return { status: "error", reason: "no-web-model", action: "switch-model" };
   if (input.failure === "no-images") return { status: "error", reason: "no-images", action: "dismiss" };
   if (input.failure) return { status: "error", reason: "other", action: "retry" };
   if (input.phase2 !== "applied") return { status: "running" };
-  if (input.imagesRequested && input.imagesSaved <= 0) return { status: "error", reason: "no-images", action: "dismiss" };
+  if (input.imagesRequested && input.imagesSaved <= 0)
+    return { status: "error", reason: "no-images", action: "dismiss" };
   return { status: "completed" };
 }

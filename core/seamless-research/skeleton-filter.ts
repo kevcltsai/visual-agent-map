@@ -15,7 +15,8 @@ export const DEFAULT_SKELETON_PLACEHOLDER = "（這一節等查證後補上。�
 
 // Chinese numerals: 一 alone is not a number in 一般 / 一些 / 一種; it counts only in 一百, 十二 and before a measure such as 年 or 公斤.
 const NUMERAL = "(?:[〇零二兩三四五六七八九十百千萬億]|一(?=[〇零一二兩三四五六七八九十百千萬億]))";
-const UNIT = "(?:個|種|次|位|項|條|張|名|人|年|月|日|號|天|週|周|小時|分鐘|秒|度|倍|成|元|塊|公斤|公里|公分|公尺|毫米|公克|克|歲|世紀|季|間|家|筆|件|萬|億)";
+const UNIT =
+  "(?:個|種|次|位|項|條|張|名|人|年|月|日|號|天|週|周|小時|分鐘|秒|度|倍|成|元|塊|公斤|公里|公分|公尺|毫米|公克|克|歲|世紀|季|間|家|筆|件|萬|億)";
 const ONE_UNIT = "一(?:年|月|日|天|週|周|小時|分鐘|秒|度|倍|成|元|塊|公斤|公里|公分|公尺|毫米|公克|世紀|百|千|萬|億)";
 
 const PATTERNS: readonly RegExp[] = [
@@ -39,7 +40,8 @@ function escapeRegExp(text: string): string {
 /** True when the sentence states something the filter must not let through before a web search. */
 export function sentenceHasSourceNeed(sentence: string, allow: readonly string[] = []): boolean {
   let text = sentence;
-  for (const word of [...allow].filter(item => item.trim()).sort((a, b) => b.length - a.length)) text = text.replace(new RegExp(escapeRegExp(word.trim()), "gi"), " ");
+  for (const word of [...allow].filter(item => item.trim()).sort((a, b) => b.length - a.length))
+    text = text.replace(new RegExp(escapeRegExp(word.trim()), "gi"), " ");
   return PATTERNS.some(pattern => pattern.test(text));
 }
 
@@ -82,7 +84,9 @@ function dropOrphanMarkers(lines: readonly string[]): string[] {
 
 /** The text of a section counts only when it is more than blank lines, callout markers and comments. */
 function hasText(lines: readonly string[]): boolean {
-  return lines.some(line => line.trim() && !CALLOUT_MARKER.test(line) && !COMMENT.test(line) && !/^\s*(?:>\s*)*$/.test(line));
+  return lines.some(
+    line => line.trim() && !CALLOUT_MARKER.test(line) && !COMMENT.test(line) && !/^\s*(?:>\s*)*$/.test(line)
+  );
 }
 
 export function skeletonFilter(markdown: string, options: SkeletonFilterOptions = {}): string {
@@ -101,8 +105,15 @@ export function skeletonFilter(markdown: string, options: SkeletonFilterOptions 
       continue;
     }
     const open = FENCE.exec(line);
-    if (open) { fence = open[1]; section.original.push(line); continue; }
-    if (HEADING.test(line)) { sections.push({ heading: line, original: [], kept: [] }); continue; }
+    if (open) {
+      fence = open[1];
+      section.original.push(line);
+      continue;
+    }
+    if (HEADING.test(line)) {
+      sections.push({ heading: line, original: [], kept: [] });
+      continue;
+    }
     section.original.push(line);
     if (FOOTNOTE_DEFINITION.test(line)) continue;
     if (/^\s*\|/.test(line)) {
@@ -112,7 +123,10 @@ export function skeletonFilter(markdown: string, options: SkeletonFilterOptions 
       section.kept.push(...filterTable(block, allow));
       continue;
     }
-    if (COMMENT.test(line) || CALLOUT_MARKER.test(line)) { section.kept.push(line); continue; }
+    if (COMMENT.test(line) || CALLOUT_MARKER.test(line)) {
+      section.kept.push(line);
+      continue;
+    }
     const filtered = filterLine(line, allow);
     if (filtered !== undefined) section.kept.push(filtered);
   }
@@ -125,5 +139,11 @@ export function skeletonFilter(markdown: string, options: SkeletonFilterOptions 
     if (section.heading !== undefined && hasText(section.original) && !hasText(kept)) out.push("", placeholder);
     out.push("");
   }
-  return out.join("\n").replace(/\n{3,}/g, "\n\n").replace(/^\n+/, "").trimEnd() + (out.some(line => line.trim()) ? "\n" : "");
+  return (
+    out
+      .join("\n")
+      .replace(/\n{3,}/g, "\n\n")
+      .replace(/^\n+/, "")
+      .trimEnd() + (out.some(line => line.trim()) ? "\n" : "")
+  );
 }

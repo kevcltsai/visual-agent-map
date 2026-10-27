@@ -8,9 +8,23 @@ export const ORIGINAL_PREFIX = "原本寫：";
 export const MAX_IMAGES = 6;
 export const MAX_IMAGE_BYTES = 10 * 1024 * 1024;
 
-export interface Phase2Footnote { id: string; url: string; title: string }
-export interface Phase2Verdict { sentence: string; verdict: "supported" | "unsupported"; correction?: string; sourceUrl?: string }
-export interface Phase2Image { imageUrl: string; sourceUrl: string; title: string; license: string }
+export interface Phase2Footnote {
+  id: string;
+  url: string;
+  title: string;
+}
+export interface Phase2Verdict {
+  sentence: string;
+  verdict: "supported" | "unsupported";
+  correction?: string;
+  sourceUrl?: string;
+}
+export interface Phase2Image {
+  imageUrl: string;
+  sourceUrl: string;
+  title: string;
+  license: string;
+}
 
 /** Detail text compared by ownership hash: line endings and outer blank space do not count as a user edit. */
 function normalize(text: string): string {
@@ -33,7 +47,11 @@ const HTTPS_URL = /^https:\/\/[^\s<>"'`()]+$/i;
 
 export function isHttpsUrl(value: string): boolean {
   if (!HTTPS_URL.test(value)) return false;
-  try { return new URL(value).protocol === "https:"; } catch { return false; }
+  try {
+    return new URL(value).protocol === "https:";
+  } catch {
+    return false;
+  }
 }
 
 /** Removes control characters (except tab and newline), zero-width marks and bidirectional overrides. */
@@ -41,14 +59,21 @@ function stripUnsafeCharacters(text: string): string {
   let out = "";
   for (const char of text) {
     const code = char.codePointAt(0)!;
-    const control = code < 0x20 && code !== 0x09 && code !== 0x0a || code === 0x7f;
-    const invisible = code >= 0x200b && code <= 0x200f || code >= 0x202a && code <= 0x202e || code >= 0x2066 && code <= 0x2069 || code === 0xfeff;
+    const control = (code < 0x20 && code !== 0x09 && code !== 0x0a) || code === 0x7f;
+    const invisible =
+      (code >= 0x200b && code <= 0x200f) ||
+      (code >= 0x202a && code <= 0x202e) ||
+      (code >= 0x2066 && code <= 0x2069) ||
+      code === 0xfeff;
     if (!control && !invisible) out += char;
   }
   return out;
 }
 
-export interface SanitizeResult { markdown: string; dropped: string[] }
+export interface SanitizeResult {
+  markdown: string;
+  dropped: string[];
+}
 
 /**
  * Keeps model markdown to an allowlist: https links only, no images (images arrive only as saved local copies), no raw HTML,
@@ -56,32 +81,70 @@ export interface SanitizeResult { markdown: string; dropped: string[] }
  */
 export function sanitizePhase2Markdown(markdown: string): SanitizeResult {
   const dropped: string[] = [];
-  const drop = (kind: string, what: string): void => { dropped.push(`${kind}: ${what.slice(0, 80)}`); };
+  const drop = (kind: string, what: string): void => {
+    dropped.push(`${kind}: ${what.slice(0, 80)}`);
+  };
   let text = stripUnsafeCharacters(markdown.replace(/\r\n?/g, "\n"));
   // Images first, so a remote image never turns into a plain link: ![alt](url) and ![[embed]].
-  text = text.replace(/!\[[^\]]*\]\([^)]*\)/g, match => { drop("image", match); return ""; });
-  text = text.replace(/!\[\[[^\]]*\]\]/g, match => { drop("embed", match); return ""; });
-  text = text.replace(/!\[[^\]]*\]\[[^\]]*\]/g, match => { drop("image", match); return ""; });
+  text = text.replace(/!\[[^\]]*\]\([^)]*\)/g, match => {
+    drop("image", match);
+    return "";
+  });
+  text = text.replace(/!\[\[[^\]]*\]\]/g, match => {
+    drop("embed", match);
+    return "";
+  });
+  text = text.replace(/!\[[^\]]*\]\[[^\]]*\]/g, match => {
+    drop("image", match);
+    return "";
+  });
   // Autolinks <https://x> keep the address; any other <...> is raw HTML.
   text = text.replace(/<(https:\/\/[^\s<>]+)>/gi, "$1");
-  text = text.replace(/<!--[\s\S]*?-->/g, match => { drop("html", match); return ""; });
-  text = text.replace(/<(script|style|iframe|object|embed)\b[\s\S]*?(?:<\/\1\s*>|$)/gi, match => { drop("html", match); return ""; });
-  text = text.replace(/<\/?[A-Za-z][^>]*>/g, match => { drop("html", match); return ""; });
-  // Inline links: keep the link only when the target is https, else keep the label.
-  text = text.replace(/\[([^\]]*)\]\(\s*<?((?:[^()\s>]|\([^()]*\))*)>?(?:\s+(?:"[^"]*"|'[^']*'))?\s*\)/g, (match, label: string, target: string) => {
-    if (isHttpsUrl(target)) return match;
-    drop("link", match);
-    return label;
+  text = text.replace(/<!--[\s\S]*?-->/g, match => {
+    drop("html", match);
+    return "";
   });
+  text = text.replace(/<(script|style|iframe|object|embed)\b[\s\S]*?(?:<\/\1\s*>|$)/gi, match => {
+    drop("html", match);
+    return "";
+  });
+  text = text.replace(/<\/?[A-Za-z][^>]*>/g, match => {
+    drop("html", match);
+    return "";
+  });
+  // Inline links: keep the link only when the target is https, else keep the label.
+  text = text.replace(
+    /\[([^\]]*)\]\(\s*<?((?:[^()\s>]|\([^()]*\))*)>?(?:\s+(?:"[^"]*"|'[^']*'))?\s*\)/g,
+    (match, label: string, target: string) => {
+      if (isHttpsUrl(target)) return match;
+      drop("link", match);
+      return label;
+    }
+  );
   // Reference definitions: [id]: url (not footnote definitions, whose body is text).
-  text = text.split("\n").filter(line => {
-    const definition = /^\s*\[(?!\^)[^\]]+\]:\s*(\S+)/.exec(line);
-    if (definition && !isHttpsUrl(definition[1].replace(/^<|>$/g, ""))) { drop("definition", line); return false; }
-    return true;
-  }).join("\n");
+  text = text
+    .split("\n")
+    .filter(line => {
+      const definition = /^\s*\[(?!\^)[^\]]+\]:\s*(\S+)/.exec(line);
+      if (definition && !isHttpsUrl(definition[1].replace(/^<|>$/g, ""))) {
+        drop("definition", line);
+        return false;
+      }
+      return true;
+    })
+    .join("\n");
   // Bare dangerous schemes left in text (not inside a kept https link).
-  text = text.replace(/\b(?:javascript|vbscript|data|file):[^\s)\]]*/gi, match => { drop("scheme", match); return ""; });
-  return { markdown: text.replace(/[ \t]+\n/g, "\n").replace(/\n{3,}/g, "\n\n").trim(), dropped };
+  text = text.replace(/\b(?:javascript|vbscript|data|file):[^\s)\]]*/gi, match => {
+    drop("scheme", match);
+    return "";
+  });
+  return {
+    markdown: text
+      .replace(/[ \t]+\n/g, "\n")
+      .replace(/\n{3,}/g, "\n\n")
+      .trim(),
+    dropped
+  };
 }
 
 // ---------- images ----------
@@ -90,10 +153,12 @@ export type ImageKind = "png" | "jpeg" | "gif" | "webp";
 
 /** Looks at the first bytes, never at the extension or content type. */
 export function imageKind(bytes: Uint8Array): ImageKind | undefined {
-  const at = (offset: number, values: number[]): boolean => values.every((value, index) => bytes[offset + index] === value);
+  const at = (offset: number, values: number[]): boolean =>
+    values.every((value, index) => bytes[offset + index] === value);
   if (bytes.length >= 8 && at(0, [0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a])) return "png";
   if (bytes.length >= 3 && at(0, [0xff, 0xd8, 0xff])) return "jpeg";
-  if (bytes.length >= 6 && (at(0, [0x47, 0x49, 0x46, 0x38, 0x37, 0x61]) || at(0, [0x47, 0x49, 0x46, 0x38, 0x39, 0x61]))) return "gif";
+  if (bytes.length >= 6 && (at(0, [0x47, 0x49, 0x46, 0x38, 0x37, 0x61]) || at(0, [0x47, 0x49, 0x46, 0x38, 0x39, 0x61])))
+    return "gif";
   if (bytes.length >= 12 && at(0, [0x52, 0x49, 0x46, 0x46]) && at(8, [0x57, 0x45, 0x42, 0x50])) return "webp";
   return undefined;
 }
@@ -112,9 +177,21 @@ const NO_LICENSE = /^(?:|n\/?a|none|unknown|unspecified|not specified|no license
 
 function privateHost(hostname: string): boolean {
   const host = hostname.toLowerCase().replace(/^\[|\]$/g, "");
-  if (host === "localhost" || host.endsWith(".localhost") || host.endsWith(".local") || host.endsWith(".internal")) return true;
-  if (/^(?:127|10|0)\./.test(host) || /^192\.168\./.test(host) || /^169\.254\./.test(host) || /^172\.(?:1[6-9]|2\d|3[01])\./.test(host)) return true;
-  return host === "::1" || host.startsWith("fc") && host.includes(":") || host.startsWith("fd") && host.includes(":") || host.startsWith("fe80:");
+  if (host === "localhost" || host.endsWith(".localhost") || host.endsWith(".local") || host.endsWith(".internal"))
+    return true;
+  if (
+    /^(?:127|10|0)\./.test(host) ||
+    /^192\.168\./.test(host) ||
+    /^169\.254\./.test(host) ||
+    /^172\.(?:1[6-9]|2\d|3[01])\./.test(host)
+  )
+    return true;
+  return (
+    host === "::1" ||
+    (host.startsWith("fc") && host.includes(":")) ||
+    (host.startsWith("fd") && host.includes(":")) ||
+    host.startsWith("fe80:")
+  );
 }
 
 function usableHttps(value: string): URL | undefined {
@@ -123,10 +200,15 @@ function usableHttps(value: string): URL | undefined {
     const url = new URL(value);
     if (url.username || url.password || privateHost(url.hostname)) return undefined;
     return url;
-  } catch { return undefined; }
+  } catch {
+    return undefined;
+  }
 }
 
-export interface EligibleImages { eligible: Phase2Image[]; rejected: { image: Phase2Image; reason: string }[] }
+export interface EligibleImages {
+  eligible: Phase2Image[];
+  rejected: { image: Phase2Image; reason: string }[];
+}
 
 /** Candidates that may be downloaded: https image and source page on public hosts, a stated license or credit, no duplicates, at most MAX_IMAGES. */
 export function eligibleImages(images: readonly Phase2Image[], limit = MAX_IMAGES): EligibleImages {
@@ -134,13 +216,22 @@ export function eligibleImages(images: readonly Phase2Image[], limit = MAX_IMAGE
   const rejected: { image: Phase2Image; reason: string }[] = [];
   const seen = new Set<string>();
   for (const image of images) {
-    const reason = !usableHttps(String(image?.imageUrl ?? "")) ? "image-url"
-      : !usableHttps(String(image?.sourceUrl ?? "")) ? "source-url"
-      : NO_LICENSE.test(String(image?.license ?? "").trim()) ? "license"
-      : seen.has(image.imageUrl) ? "duplicate"
-      : eligible.length >= limit ? "over-limit" : undefined;
+    const reason = !usableHttps(String(image?.imageUrl ?? ""))
+      ? "image-url"
+      : !usableHttps(String(image?.sourceUrl ?? ""))
+        ? "source-url"
+        : NO_LICENSE.test(String(image?.license ?? "").trim())
+          ? "license"
+          : seen.has(image.imageUrl)
+            ? "duplicate"
+            : eligible.length >= limit
+              ? "over-limit"
+              : undefined;
     if (reason) rejected.push({ image, reason });
-    else { seen.add(image.imageUrl); eligible.push(image); }
+    else {
+      seen.add(image.imageUrl);
+      eligible.push(image);
+    }
   }
   return { eligible, rejected };
 }
@@ -157,7 +248,10 @@ export function renderFootnoteDefinitions(footnotes: readonly Phase2Footnote[]):
 
 /** Body of the footnote that keeps a corrected sentence: "原本寫：…" plus the source when known. One line. */
 export function originalFootnote(original: string, sourceUrl?: string): string {
-  const text = original.replace(/\[\^[^\]]+\]/g, "").replace(/\s+/g, " ").trim();
+  const text = original
+    .replace(/\[\^[^\]]+\]/g, "")
+    .replace(/\s+/g, " ")
+    .trim();
   return `${ORIGINAL_PREFIX}${text}${sourceUrl && isHttpsUrl(sourceUrl) ? `（來源：${sourceUrl}）` : ""}`;
 }
 
@@ -172,7 +266,12 @@ export function offsetFootnotes(markdown: string, offset: number): string {
   return offset ? markdown.replace(/\[\^(\d+)\]/g, (_m, id: string) => `[^${Number(id) + offset}]`) : markdown;
 }
 
-export interface CorrectionResult { detail: string; corrected: string[]; removed: string[]; unmatched: string[] }
+export interface CorrectionResult {
+  detail: string;
+  corrected: string[];
+  removed: string[];
+  unmatched: string[];
+}
 
 /** First place the sentence stands in the body; footnote definitions (where an earlier 原本寫 note lives) are not searched. */
 function locate(detail: string, sentence: string): { start: number; end: number } | undefined {
@@ -181,7 +280,8 @@ function locate(detail: string, sentence: string): { start: number; end: number 
   const pattern = new RegExp(wanted.split(/\s+/).map(escape).join("\\s+"), "g");
   for (const found of detail.matchAll(pattern)) {
     const lineStart = detail.lastIndexOf("\n", found.index - 1) + 1;
-    if (!/^\s*\[\^[^\]]+\]:/.test(detail.slice(lineStart, found.index + 1))) return { start: found.index, end: found.index + found[0].length };
+    if (!/^\s*\[\^[^\]]+\]:/.test(detail.slice(lineStart, found.index + 1)))
+      return { start: found.index, end: found.index + found[0].length };
   }
   return undefined;
 }
@@ -205,7 +305,10 @@ export function applyCorrections(detail: string, verdicts: readonly Phase2Verdic
   for (const verdict of verdicts) {
     if (verdict.verdict !== "unsupported") continue;
     const found = locate(text, verdict.sentence);
-    if (!found) { unmatched.push(verdict.sentence); continue; }
+    if (!found) {
+      unmatched.push(verdict.sentence);
+      continue;
+    }
     const correction = verdict.correction?.trim();
     if (!correction) {
       const start = found.start;
@@ -221,7 +324,15 @@ export function applyCorrections(detail: string, verdicts: readonly Phase2Verdic
       removed.push(verdict.sentence);
       continue;
     }
-    const alreadyNoted = new RegExp(`\\[\\^[^\\]]+\\]:\\s*${escape(ORIGINAL_PREFIX)}\\s*${escape(verdict.sentence.trim().replace(/\[\^[^\]]+\]/g, "").replace(/\s+/g, " ").slice(0, 24))}`).test(text);
+    const alreadyNoted = new RegExp(
+      `\\[\\^[^\\]]+\\]:\\s*${escape(ORIGINAL_PREFIX)}\\s*${escape(
+        verdict.sentence
+          .trim()
+          .replace(/\[\^[^\]]+\]/g, "")
+          .replace(/\s+/g, " ")
+          .slice(0, 24)
+      )}`
+    ).test(text);
     let replacement = correction;
     if (!alreadyNoted) {
       definitions.push(`[^${next}]: ${originalFootnote(verdict.sentence, verdict.sourceUrl)}`);

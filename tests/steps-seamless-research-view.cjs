@@ -756,3 +756,422 @@ test('abortAll (the plugin-wide stop) stops a running topic and a held one', asy
   assert.equal(held.sr.isHeld(PATH), false);
   assert.equal(held.note().status, 'idea');
 });
+
+// ---------- P4: the view, the chat request, the dialogs (fake DOM, fake plugin, no Obsidian, no provider) ----------
+
+const S = require('./support.cjs');
+const dom = require('./support-dom.cjs');
+const { planFor, chatResearchRequest, seamlessChatResearchRequest, SEAMLESS_CALLS_PER_TOPIC } = load('core/map-chat-plan.ts');
+
+const notices = [];
+const ViewObsidian = {
+  ...S.obsidian,
+  Modal: dom.makeModal(),
+  Notice: class {
+    constructor(message) {
+      notices.push(message);
+    }
+  }
+};
+const { VisualAgentMapView, NextStepModal } = S.load('main.ts', { obsidian: ViewObsidian }, { requestAnimationFrame: run => { run(); return 1; }, cancelAnimationFrame() {} });
+
+const researchAction = (overrides = {}) => ({ kind: 'run_map_action', action: 'research_standard', nodeIds: ['a', 'b', 'c', 'd'], title: '', goal: '', direction: '', mode: '', images: false, ...overrides });
+
+/** A fake of the seamless service: records what the view asks of it. */
+function fakeService(overrides = {}) {
+  const calls = [];
+  let listener = null;
+  const sr = {
+    calls,
+    growing: new Set(),
+    problemList: [],
+    research: async request => {
+      calls.push(['research', request]);
+      request.accepted?.();
+    },
+    retry: async path => { calls.push(['retry', path]); },
+    switchModelAndRetry: async path => { calls.push(['switchModelAndRetry', path]); },
+    dismiss: path => { calls.push(['dismiss', path]); },
+    abort: path => { calls.push(['abort', path]); },
+    isGrowing: path => sr.growing.has(path),
+    isHeld: () => false,
+    growingPaths: () => [...sr.growing],
+    problems: () => sr.problemList,
+    problemFor: path => sr.problemList.find(item => item.path === path),
+    subscribe: fn => { listener = fn; return () => { listener = null; }; },
+    emit: event => listener?.(event),
+    hasListener: () => listener !== null,
+    ...overrides
+  };
+  return sr;
+}
+
+/** A view over a fake plugin. `flag` is `settings.seamlessResearch`; `serviceCalls` counts how often the plugin was asked for the service. */
+function viewHarness(flag, srOverrides = {}) {
+  const sr = fakeService(srOverrides);
+  const state = { serviceCalls: 0, starts: [], confirmed: [] };
+  const a = S.node('a'), b = S.node('b', 'a'), c = S.node('c', 'b');
+  const doc = S.map([a, b, c]);
+  const titles = { a: 'Root topic', b: 'Middle topic', c: 'Leaf topic' };
+  const plugin = {
+    settings: { ...DEFAULT_SETTINGS, seamlessResearch: flag, language: 'en' },
+    seamlessResearchService: () => { state.serviceCalls++; return sr; },
+    repo: {
+      readNote: async path => ({ title: titles[path.replace('.md', '')], summary: '', detail: '', model: 'claude:haiku', modelSource: 'inherited', status: 'idea' }),
+      updateNote: async () => {}
+    },
+    confirmAiUsage: async (model, run) => { state.confirmed.push(model); await run(); return true; },
+    running: new Set(),
+    quickExpandPending: new Set(),
+    activeTasks: new Map(),
+    releaseOutline: () => {},
+    pendingSuggestions: new Map(),
+    researchProgress: new Map(),
+    expansionBatches: new Map(),
+    expansionCoordinator: {
+      isRunning: () => false,
+      isQueued: () => false,
+      start: async (...args) => { state.starts.push(args); }
+    }
+  };
+  const view = new VisualAgentMapView({ app: {} }, plugin);
+  view.map = doc;
+  view.notes = new Map(Object.entries(titles).map(([id, title]) => [id, { title, summary: '', status: 'idea' }]));
+  view.render = () => { state.renders = (state.renders ?? 0) + 1; };
+  view.ancestorContext = async () => 'ANCESTORS';
+  return { view, plugin, sr, state, doc, a, b, c };
+}
+
+// --- the dialog ---
+
+function openDialog(flag) {
+  const made = [];
+  const Base = dom.makeModal();
+  class Modal extends Base {
+    constructor(app) {
+      super(app);
+      made.push(this);
+    }
+  }
+  const { VisualAgentMapView: View } = S.load('main.ts', { obsidian: { ...ViewObsidian, Modal } });
+  const h = viewHarness(flag);
+  const view = new View({ app: {} }, h.plugin);
+  view.map = h.doc;
+  view.notes = new Map([['a', { title: 'Root topic', researchMode: 'local' }], ['b', { title: 'Middle topic', researchMode: 'research' }]]);
+  view.multiSelected = new Set(['a', 'b']);
+  view.modelChoices = () => ({ list: () => [], watch: () => () => {} });
+  view.templateChoices = () => [];
+  view.toneChoices = () => [];
+  view.fieldLinks = () => ({});
+  view.openMultiResearch();
+  const modal = made.find(item => item.contentEl.children.length);
+  return { modal, rows: dom.findAll(modal.contentEl, item => item.cls === 'vam-multi-research-topic'), modes: dom.findAll(modal.contentEl, item => item.cls === 'vam-multi-research-mode'), service: h.state };
+}
+
+test('dialog, flag on: no .vam-multi-research-mode label on any topic row', () => {
+  const { rows, modes } = openDialog(true);
+  assert.equal(rows.length, 2);
+  assert.equal(modes.length, 0);
+  assert.deepEqual(plain(rows.map(row => row.children.map(child => child.text))), [['Root topic'], ['Middle topic']]);
+});
+
+test('dialog, flag off: each row still shows its mode (unchanged)', () => {
+  const { rows, modes, service } = openDialog(false);
+  assert.deepEqual(plain(rows.map(row => row.children.map(child => child.text))), [['Root topic', 'Quick'], ['Middle topic', 'Standard']]);
+  assert.equal(modes.length, 2);
+  assert.equal(service.serviceCalls, 0);
+});
+
+test('the single-topic research card hides the mode switch with the flag on; expand keeps it; flag off shows it on research', () => {
+  const build = flag => {
+    const modelState = provider => ({ provider, status: 'ready', models: [] });
+    const plugin = {
+      settings: { ...DEFAULT_SETTINGS, seamlessResearch: flag, codexUsageNoticeSeen: true, claudeUsageNoticeSeen: true, models: 'gpt-test', cliReasoning: 'low', language: 'en' },
+      aiReadyForModel: async () => true, confirmAiUsage: async (_m, run) => { await run(); return true; }, saveSettings: async () => {}, activeTasks: new Map(),
+      availableModels: () => ['gpt-test'], modelLabel: model => model, modelDiscoveryState: modelState, subscribeModelDiscovery: () => () => {}, refreshModelDiscovery: async provider => modelState(provider),
+      sources: { currentTopicId: 'current', currentLabel: 'Current', synthesisLabel: 'Current and children', synthesisTopics: ['Child'], topics: async () => [], readTopic: async () => [] }
+    };
+    const modelSettings = { model: 'gpt-test', modelSource: 'workspace', reasoning: 'low', save: async () => {}, sources: plugin.sources };
+    const modal = new NextStepModal({}, 'Parent', 1, 0, plugin, async () => {}, async () => {}, async () => {}, modelSettings);
+    modal.onOpen();
+    const cards = dom.find(modal.contentEl, item => item.cls === 'vam-next-cards');
+    const modeSwitch = dom.find(modal.contentEl, item => item.attrs['aria-label'] === 'AI mode');
+    return { cards, hidden: () => modeSwitch.parent.hidden };
+  };
+  const on = build(true);
+  assert.equal(on.cards.children[0].attrs['aria-checked'], 'true', 'research is the first card');
+  assert.equal(on.hidden(), true, 'flag on: research shows no mode switch');
+  on.cards.children[1].click();
+  assert.equal(on.hidden(), false, 'expand keeps the switch');
+  on.cards.children[0].click();
+  assert.equal(on.hidden(), true);
+  const off = build(false);
+  assert.equal(off.hidden(), false, 'flag off: unchanged');
+});
+
+// --- the chat request and the estimate ---
+
+test('chat request, flag on: no mode, depth or imageSearch; carries imagesRequested', () => {
+  const withImages = seamlessChatResearchRequest(researchAction({ direction: 'casual', images: true, mode: 'quick' }));
+  assert.deepEqual(plain(withImages), { requirements: 'casual', imagesRequested: true });
+  for (const key of ['mapAiMode', 'researchMode', 'researchDepth', 'imageSearch']) assert.equal(key in withImages, false, key);
+  assert.deepEqual(plain(seamlessChatResearchRequest(researchAction())), { requirements: '', imagesRequested: false });
+});
+
+test('chat request, flag off: the existing request is unchanged', () => {
+  const request = chatResearchRequest(researchAction({ mode: 'standard', images: true }), undefined, mode => ({ researchMode: mode === 'standard' ? 'research' : 'local', researchDepth: 'normal' }));
+  assert.deepEqual(plain(request), { mapAiMode: 'standard', researchMode: 'research', researchDepth: 'normal', requirements: '', imageSearch: true });
+});
+
+test('call estimate: 3 per topic with the flag on, unchanged with it off', () => {
+  const action = researchAction();
+  const context = { parents: {}, selectedCount: 0 };
+  const calls = options => planFor([action, researchAction({ nodeIds: ['e', 'f', 'g', 'h', 'i', 'j', 'k'] })], context, options)?.estimatedCalls;
+  assert.equal(SEAMLESS_CALLS_PER_TOPIC, 3);
+  assert.equal(calls({ seamless: true }), 11 * 3);
+  assert.equal(calls({ seamless: true, mapAiMode: 'standard', diagrams: false }), 11 * 3, 'the map mode and the diagram setting do not matter');
+  assert.equal(calls({}), 11, 'off: Quick, one call each');
+  assert.equal(calls({ mapAiMode: 'standard' }), 22, 'off: Standard, main call plus diagram call');
+  assert.equal(calls({ seamless: false, mapAiMode: 'standard' }), 22);
+});
+
+// --- the batch ---
+
+test('flag on, multi-research: busy topics are skipped, the coordinator limit is min(n, 8), each topic goes to the service with ancestors in allow', async () => {
+  const h = viewHarness(true);
+  h.view.multiSelected = new Set(['a', 'b', 'c']);
+  h.plugin.running.add('a.md');
+  const settled = [];
+  await h.view.startMultiResearch({ requirements: '', imagesRequested: true, model: 'claude:sonnet' }, undefined, web => settled.push(web));
+  assert.deepEqual(h.state.confirmed, ['claude:sonnet'], 'the usage notice comes first');
+  assert.equal(h.state.starts.length, 1);
+  const [key, nodes, work, , , limit] = h.state.starts[0];
+  assert.equal(key, 'multi-research:' + (h.view.path ?? undefined));
+  assert.deepEqual(plain(nodes.map(node => node.id)), ['b', 'c'], 'the running topic is filtered out before the coordinator');
+  assert.equal(limit, 2);
+  const outcomes = [];
+  for (const node of nodes) outcomes.push(await work(node, new AbortController().signal, () => {}));
+  assert.ok(outcomes.length === 2 && outcomes.every(outcome => outcome === undefined));
+  const requests = h.sr.calls.filter(call => call[0] === 'research').map(call => call[1]);
+  assert.deepEqual(requests.map(request => request.path), ['b.md', 'c.md']);
+  assert.equal(requests[0].title, 'Middle topic');
+  assert.equal(requests[0].context, 'ANCESTORS');
+  assert.deepEqual(plain(requests[1].allow), ['Middle topic', 'Root topic'], 'ancestor titles, nearest first');
+  assert.equal(requests[0].imagesRequested, true);
+  assert.equal(requests[0].model, 'claude:haiku', 'the topic\'s resolved model is passed along');
+  assert.equal(requests[0].language, 'same-as-input', 'the language follows the map, like the other research flows');
+  assert.ok(requests[0].signal instanceof AbortSignal);
+  assert.equal(h.view.multiSelected.size, 0);
+});
+
+test('flag on: the batch end says no "finished" Notice and passes an empty search tally', async () => {
+  const h = viewHarness(true);
+  h.view.multiSelected = new Set(['a']);
+  const settled = [];
+  const before = notices.length;
+  await h.view.startMultiResearch({ requirements: '' }, undefined, web => settled.push(web));
+  const changed = h.state.starts[0][3];
+  h.plugin.expansionBatches.set(h.state.starts[0][0], { status: 'completed', succeeded: 1, total: 1, failures: [], failedPaths: [] });
+  changed();
+  changed();
+  assert.deepEqual(plain(settled), [{ searches: 0, counted: 0, withoutSearch: 0 }], 'called once');
+  assert.equal(notices.length, before, 'no summary Notice');
+});
+
+test('flag on: a topic that became busy after the filter is skipped, not researched', async () => {
+  const h = viewHarness(true);
+  h.view.multiSelected = new Set(['a']);
+  await h.view.startMultiResearch({ requirements: '' });
+  const [, nodes, work] = h.state.starts[0];
+  h.plugin.quickExpandPending.add('a.md');
+  let accepted = 0;
+  assert.equal(await work(nodes[0], new AbortController().signal, () => { accepted++; }), 'skipped');
+  assert.equal(accepted, 1);
+  assert.equal(h.sr.calls.length, 0);
+});
+
+test('flag off: the batch never asks the plugin for the seamless service and starts the coordinator as before (no limit argument)', async () => {
+  const h = viewHarness(false);
+  h.view.multiSelected = new Set(['a', 'b']);
+  await h.view.startMultiResearch({ requirements: 'x' });
+  assert.equal(h.state.starts.length, 1);
+  assert.equal(h.state.starts[0].length, 4, 'start(key, nodes, work, changed) as on main: no signal and no limit argument');
+  assert.equal(h.state.serviceCalls, 0);
+  assert.equal(h.sr.calls.length, 0);
+});
+
+test('flag off: rendering a card, watching, the problem rows and the history hook never touch the service', () => {
+  const h = viewHarness(false);
+  h.view.stageEl = cardElement('stage');
+  h.view.renderNode(h.a);
+  h.view.renderNode({ ...h.b, x: 5, y: 5 });
+  h.view.renderMultiResearchStatus(dom.element('parent'));
+  assert.equal(h.state.serviceCalls, 0);
+  assert.ok(h.view.stageEl.children.every(card => !card.hasClass('vam-seamless-growing')));
+  assert.equal(h.view.unsubscribeSeamless, null);
+});
+
+// --- breathing card ---
+
+/** The card renderer needs a plain element whose text can be set (the shared DOM double only reads `textContent`). */
+function cardElement(tag) {
+  const el = {
+    tag, children: [], dataset: {}, style: {}, classNames: new Set(),
+    createDiv(options) { const child = cardElement('div'); for (const name of String(options?.cls ?? options ?? '').split(/\s+/).filter(Boolean)) child.classNames.add(name); this.children.push(child); return child; },
+    createEl(name, options) { const child = cardElement(name); child.text = options?.text; this.children.push(child); return child; },
+    createSpan(options) { const child = cardElement('span'); child.text = options?.text; this.children.push(child); return child; },
+    setAttr(name, value) { this[name] = value; }, addClass(name) { this.classNames.add(name); }, removeClass(name) { this.classNames.delete(name); },
+    toggleClass(name, on) { on ? this.classNames.add(name) : this.classNames.delete(name); }, hasClass(name) { return this.classNames.has(name); },
+    addEventListener() {}, removeEventListener() {}, setPointerCapture() {}, appendChild() {}
+  };
+  return el;
+}
+
+test('the growing class is on a card while its topic grows and off once it stops', () => {
+  const h = viewHarness(true);
+  const paint = () => {
+    h.view.stageEl = cardElement('stage');
+    h.view.renderNode(h.a);
+    h.view.renderNode(h.b);
+    return h.view.stageEl.children;
+  };
+  h.sr.growing.add('b.md');
+  let [cardA, cardB] = paint();
+  assert.equal(cardA.hasClass('vam-seamless-growing'), false);
+  assert.equal(cardB.hasClass('vam-seamless-growing'), true);
+  h.sr.growing.clear();
+  [cardA, cardB] = paint();
+  assert.equal(cardB.hasClass('vam-seamless-growing'), false, 'removed when the topic stops growing');
+});
+
+test('the stylesheet breathes the border slowly and stops the motion under prefers-reduced-motion', () => {
+  const css = require('node:fs').readFileSync(require('node:path').join(__dirname, '..', 'styles.css'), 'utf8');
+  assert.match(css, /\.vam-node\.vam-seamless-growing \{[^}]*animation: vam-seamless-breathe [\d.]+s[^}]*infinite/);
+  assert.match(css, /@keyframes vam-seamless-breathe/);
+  assert.match(css, /@media \(prefers-reduced-motion: reduce\) \{ \.vam-node\.vam-seamless-growing \{ animation: none; \} \}/);
+});
+
+// --- problem rows ---
+
+const PROBLEMS = [
+  { path: 'a.md', title: 'Root topic', reason: 'network', action: 'retry' },
+  { path: 'b.md', title: 'Middle topic', reason: 'no-web-model', action: 'switch-model' },
+  { path: 'c.md', title: 'Leaf topic', reason: 'no-images', action: 'dismiss' }
+];
+
+test('status rows: one sentence and one button per problem, in a polite live region', () => {
+  const h = viewHarness(true);
+  h.sr.problemList = PROBLEMS;
+  const parent = dom.element('parent');
+  h.view.renderSeamlessProblems(parent);
+  const region = dom.find(parent, item => item.hasClass('vam-seamless-problems'));
+  assert.equal(region.attrs['aria-live'], 'polite');
+  assert.equal(region.attrs.role, 'status');
+  const rows = dom.findAll(region, item => item.hasClass('vam-seamless-problem'));
+  assert.equal(rows.length, 3);
+  assert.deepEqual(rows.map(row => row.children.map(child => child.text)), [
+    ['Couldn\'t go online this time, so the content is brief', 'Try again'],
+    ['This model can\'t go online, so the content is brief', 'Switch to a model that can go online'],
+    ['No suitable image found for “Leaf topic”', 'Dismiss']
+  ]);
+  for (const row of rows) assert.equal(dom.findAll(row, item => item.tag === 'button').length, 1, 'exactly one button');
+  const buttons = dom.findAll(region, item => item.tag === 'button');
+  assert.ok(buttons.every(item => item.tabIndex !== -1), 'keyboard reachable: not taken out of the tab order');
+  assert.ok(buttons[0].attrs['aria-label'].includes('Root topic'), 'the button names its topic');
+});
+
+test('status rows: nothing is rendered when there is no problem', () => {
+  const h = viewHarness(true);
+  const parent = dom.element('parent');
+  h.view.renderSeamlessProblems(parent);
+  assert.equal(parent.children.length, 0);
+});
+
+test('status rows: each button calls the matching service method for its topic', async () => {
+  const h = viewHarness(true);
+  h.sr.problemList = PROBLEMS;
+  const parent = dom.element('parent');
+  h.view.renderSeamlessProblems(parent);
+  const [retry, switchModel, dismiss] = dom.findAll(parent, item => item.tag === 'button');
+  retry.click();
+  switchModel.click();
+  dismiss.click();
+  await settle();
+  assert.deepEqual(plain(h.sr.calls), [['retry', 'a.md'], ['switchModelAndRetry', 'b.md'], ['dismiss', 'c.md']]);
+});
+
+test('status rows: a failing retry is told in a Notice, not swallowed', async () => {
+  const h = viewHarness(true, { retry: async () => { throw new Error('busy now'); } });
+  h.sr.problemList = [PROBLEMS[0]];
+  const parent = dom.element('parent');
+  h.view.renderSeamlessProblems(parent);
+  const before = notices.length;
+  dom.find(parent, item => item.tag === 'button').click();
+  await settle();
+  assert.deepEqual(notices.slice(before), ['busy now']);
+});
+
+test('chat lines for problems use the same sentences as the rows', () => {
+  const h = viewHarness(true);
+  h.sr.problemList = PROBLEMS;
+  assert.deepEqual(plain(h.view.seamlessProblemLines(['a.md', 'c.md', 'x.md'])), [
+    { status: 'skipped', text: 'Couldn\'t go online this time, so the content is brief' },
+    { status: 'skipped', text: 'No suitable image found for “Leaf topic”' }
+  ]);
+  assert.deepEqual(plain(viewHarness(false).view.seamlessProblemLines(['a.md'])), []);
+});
+
+// --- change events, undo history, single-topic research ---
+
+test('service events: a change repaints, a write of a topic this view started is recorded for undo, a stranger\'s write is not', async () => {
+  const h = viewHarness(true);
+  h.view.updateHistoryButtons = () => {};
+  h.view.watchSeamless();
+  h.view.watchSeamless();
+  assert.ok(h.sr.hasListener());
+  h.sr.emit({ type: 'change' });
+  assert.equal(h.state.renders, 1);
+  const written = path => ({ type: 'written', path, before: { summary: '', detail: 'draft', title: 'T' }, after: { summary: '', detail: 'web text', title: 'T' } });
+  h.sr.emit(written('b.md'));
+  assert.equal(h.view.history.canUndo, false, 'not started by this view');
+  h.view.seamlessOwned.add('b.md');
+  h.sr.emit(written('b.md'));
+  assert.equal(h.view.history.canUndo, true);
+  await h.view.onClose();
+  assert.equal(h.sr.hasListener(), false, 'closing the view removes the listener');
+});
+
+test('single-topic research with the flag on goes to the service without a mode and reports a failure through `failed`', async () => {
+  const h = viewHarness(true);
+  let accepted = 0;
+  const failures = [];
+  const note = await h.plugin.repo.readNote('b.md');
+  await h.view.researchSeamless(h.b, note, 'en', undefined, message => failures.push(message), () => accepted++);
+  assert.equal(accepted, 1);
+  const [, request] = h.sr.calls[0];
+  assert.equal(request.path, 'b.md');
+  assert.equal(request.imagesRequested, undefined);
+  assert.deepEqual(failures, []);
+  const broken = viewHarness(true, { research: async () => { throw new Error('first draft failed'); } });
+  await broken.view.researchSeamless(broken.b, note, 'en', undefined, message => failures.push(message), () => {});
+  assert.deepEqual(failures, ['first draft failed']);
+});
+
+test('the shared stop signal and flag-off retry do not exist as new entry points: no seamless call without the setting', () => {
+  const h = viewHarness(false);
+  assert.equal(h.view.seamless(), undefined);
+  assert.equal(h.view.seamlessGrowing('a.md'), false);
+  assert.equal(h.state.serviceCalls, 0);
+});
+
+test('the topic\'s resolved model: a topic that follows its parent uses the model the view passed, a manual choice still wins', async () => {
+  const run = async (modelSource, passed) => {
+    const h = harness({}, { model: 'claude:haiku', modelSource });
+    await h.sr.research({ ...h.request(), model: passed });
+    return h.calls.ask[0].model;
+  };
+  assert.equal(await run('inherited', 'claude:sonnet'), 'claude:sonnet');
+  assert.equal(await run('workspace', 'claude:sonnet'), 'claude:sonnet');
+  assert.equal(await run('manual', 'claude:sonnet'), 'claude:haiku');
+  assert.equal(await run('inherited', undefined), 'claude:haiku');
+});

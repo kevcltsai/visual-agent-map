@@ -23932,6 +23932,7 @@ function researchTargetsOf(actions, selectedCount) {
   return research;
 }
 var mapChatCallsPerTask = (diagrams) => diagrams ? 2 : 1;
+var SEAMLESS_CALLS_PER_TOPIC = 3;
 function planFor(actions, context, options = {}) {
   const perTask = mapChatCallsPerTask(options.diagrams !== false);
   const reasons = [];
@@ -23963,7 +23964,8 @@ function planFor(actions, context, options = {}) {
           case "research_standard": {
             const targets = targetCount(action.nodeIds, selection);
             research += targets;
-            calls += targets * (chatResearchMode(action, options.mapAiMode) === "quick" ? 1 : perTask);
+            if (options.seamless === true) calls += targets * SEAMLESS_CALLS_PER_TOPIC;
+            else calls += targets * (chatResearchMode(action, options.mapAiMode) === "quick" ? 1 : perTask);
             break;
           }
           case "expand":
@@ -24032,6 +24034,9 @@ function chatResearchRequest(action, mapAiMode, optionsOf) {
     requirements: action.direction,
     imageSearch: mode === "standard" && action.images === true
   };
+}
+function seamlessChatResearchRequest(action) {
+  return { requirements: action.direction, imagesRequested: action.images === true };
 }
 
 // experiences/visual-map/relevance-pins.ts
@@ -25416,6 +25421,949 @@ var MultiResearchModal = class extends import_obsidian18.Modal {
     var _a2;
     (_a2 = this.unwatch) == null ? void 0 : _a2.call(this);
     this.unwatch = void 0;
+  }
+};
+
+// core/seamless-research/apply.ts
+var WEB_SUPPLEMENT_HEADING = "### \u7DB2\u8DEF\u88DC\u5145";
+var ORIGINAL_PREFIX = "\u539F\u672C\u5BEB\uFF1A";
+var MAX_IMAGES = 6;
+var MAX_IMAGE_BYTES = 10 * 1024 * 1024;
+function normalize3(text13) {
+  return text13.replace(/\r\n?/g, "\n").trim();
+}
+function detailHash(text13) {
+  let hash = 2166136261;
+  for (const char of normalize3(text13)) {
+    hash ^= char.codePointAt(0);
+    hash = Math.imul(hash, 16777619) >>> 0;
+  }
+  return hash.toString(16).padStart(8, "0");
+}
+var HTTPS_URL = /^https:\/\/[^\s<>"'`()]+$/i;
+function isHttpsUrl(value) {
+  if (!HTTPS_URL.test(value)) return false;
+  try {
+    return new URL(value).protocol === "https:";
+  } catch (e) {
+    return false;
+  }
+}
+function stripUnsafeCharacters(text13) {
+  let out = "";
+  for (const char of text13) {
+    const code = char.codePointAt(0);
+    const control = code < 32 && code !== 9 && code !== 10 || code === 127;
+    const invisible = code >= 8203 && code <= 8207 || code >= 8234 && code <= 8238 || code >= 8294 && code <= 8297 || code === 65279;
+    if (!control && !invisible) out += char;
+  }
+  return out;
+}
+function sanitizePhase2Markdown(markdown) {
+  const dropped = [];
+  const drop = (kind, what) => {
+    dropped.push(`${kind}: ${what.slice(0, 80)}`);
+  };
+  let text13 = stripUnsafeCharacters(markdown.replace(/\r\n?/g, "\n"));
+  text13 = text13.replace(/!\[[^\]]*\]\([^)]*\)/g, (match) => {
+    drop("image", match);
+    return "";
+  });
+  text13 = text13.replace(/!\[\[[^\]]*\]\]/g, (match) => {
+    drop("embed", match);
+    return "";
+  });
+  text13 = text13.replace(/!\[[^\]]*\]\[[^\]]*\]/g, (match) => {
+    drop("image", match);
+    return "";
+  });
+  text13 = text13.replace(/<(https:\/\/[^\s<>]+)>/gi, "$1");
+  text13 = text13.replace(/<!--[\s\S]*?-->/g, (match) => {
+    drop("html", match);
+    return "";
+  });
+  text13 = text13.replace(/<(script|style|iframe|object|embed)\b[\s\S]*?(?:<\/\1\s*>|$)/gi, (match) => {
+    drop("html", match);
+    return "";
+  });
+  text13 = text13.replace(/<\/?[A-Za-z][^>]*>/g, (match) => {
+    drop("html", match);
+    return "";
+  });
+  text13 = text13.replace(
+    /\[([^\]]*)\]\(\s*<?((?:[^()\s>]|\([^()]*\))*)>?(?:\s+(?:"[^"]*"|'[^']*'))?\s*\)/g,
+    (match, label2, target) => {
+      if (isHttpsUrl(target)) return match;
+      drop("link", match);
+      return label2;
+    }
+  );
+  text13 = text13.split("\n").filter((line) => {
+    const definition = /^\s*\[(?!\^)[^\]]+\]:\s*(\S+)/.exec(line);
+    if (definition && !isHttpsUrl(definition[1].replace(/^<|>$/g, ""))) {
+      drop("definition", line);
+      return false;
+    }
+    return true;
+  }).join("\n");
+  text13 = text13.replace(/\b(?:javascript|vbscript|data|file):[^\s)\]]*/gi, (match) => {
+    drop("scheme", match);
+    return "";
+  });
+  return {
+    markdown: text13.replace(/[ \t]+\n/g, "\n").replace(/\n{3,}/g, "\n\n").trim(),
+    dropped
+  };
+}
+function imageKind(bytes) {
+  const at = (offset, values) => values.every((value, index) => bytes[offset + index] === value);
+  if (bytes.length >= 8 && at(0, [137, 80, 78, 71, 13, 10, 26, 10])) return "png";
+  if (bytes.length >= 3 && at(0, [255, 216, 255])) return "jpeg";
+  if (bytes.length >= 6 && (at(0, [71, 73, 70, 56, 55, 97]) || at(0, [71, 73, 70, 56, 57, 97])))
+    return "gif";
+  if (bytes.length >= 12 && at(0, [82, 73, 70, 70]) && at(8, [87, 69, 66, 80])) return "webp";
+  return void 0;
+}
+function checkImageBytes(bytes) {
+  if (bytes.length === 0) return { rejected: "empty" };
+  if (bytes.length > MAX_IMAGE_BYTES) return { rejected: "too-large" };
+  const kind = imageKind(bytes);
+  return kind ? { kind } : { rejected: "not-an-image" };
+}
+var NO_LICENSE = /^(?:|n\/?a|none|unknown|unspecified|not specified|no license|無|未知|不明|未標示|未註明|未說明)$/i;
+function privateHost(hostname) {
+  const host = hostname.toLowerCase().replace(/^\[|\]$/g, "");
+  if (host === "localhost" || host.endsWith(".localhost") || host.endsWith(".local") || host.endsWith(".internal"))
+    return true;
+  if (/^(?:127|10|0)\./.test(host) || /^192\.168\./.test(host) || /^169\.254\./.test(host) || /^172\.(?:1[6-9]|2\d|3[01])\./.test(host))
+    return true;
+  return host === "::1" || host.startsWith("fc") && host.includes(":") || host.startsWith("fd") && host.includes(":") || host.startsWith("fe80:");
+}
+function usableHttps(value) {
+  if (!isHttpsUrl(value)) return void 0;
+  try {
+    const url = new URL(value);
+    if (url.username || url.password || privateHost(url.hostname)) return void 0;
+    return url;
+  } catch (e) {
+    return void 0;
+  }
+}
+function eligibleImages(images, limit = MAX_IMAGES) {
+  var _a2, _b2, _c;
+  const eligible = [];
+  const rejected = [];
+  const seen = /* @__PURE__ */ new Set();
+  for (const image of images) {
+    const reason = !usableHttps(String((_a2 = image == null ? void 0 : image.imageUrl) != null ? _a2 : "")) ? "image-url" : !usableHttps(String((_b2 = image == null ? void 0 : image.sourceUrl) != null ? _b2 : "")) ? "source-url" : NO_LICENSE.test(String((_c = image == null ? void 0 : image.license) != null ? _c : "").trim()) ? "license" : seen.has(image.imageUrl) ? "duplicate" : eligible.length >= limit ? "over-limit" : void 0;
+    if (reason) rejected.push({ image, reason });
+    else {
+      seen.add(image.imageUrl);
+      eligible.push(image);
+    }
+  }
+  return { eligible, rejected };
+}
+function renderFootnoteDefinitions(footnotes) {
+  return footnotes.filter((note) => /^[\w-]+$/.test(note.id) && isHttpsUrl(note.url)).map((note) => `[^${note.id}]: [${(note.title || note.url).replace(/[[\]\n]/g, " ").trim()}](${note.url})`).join("\n");
+}
+function originalFootnote(original, sourceUrl) {
+  const text13 = original.replace(/\[\^[^\]]+\]/g, "").replace(/\s+/g, " ").trim();
+  return `${ORIGINAL_PREFIX}${text13}${sourceUrl && isHttpsUrl(sourceUrl) ? `\uFF08\u4F86\u6E90\uFF1A${sourceUrl}\uFF09` : ""}`;
+}
+function highestFootnote(text13) {
+  let highest = 0;
+  for (const match of text13.matchAll(/\[\^(\d+)\]/g)) highest = Math.max(highest, Number(match[1]));
+  return highest;
+}
+function offsetFootnotes(markdown, offset) {
+  return offset ? markdown.replace(/\[\^(\d+)\]/g, (_m, id) => `[^${Number(id) + offset}]`) : markdown;
+}
+function locate(detail, sentence) {
+  const wanted = sentence.trim();
+  if (!wanted) return void 0;
+  const pattern = new RegExp(wanted.split(/\s+/).map(escape).join("\\s+"), "g");
+  for (const found of detail.matchAll(pattern)) {
+    const lineStart = detail.lastIndexOf("\n", found.index - 1) + 1;
+    if (!/^\s*\[\^[^\]]+\]:/.test(detail.slice(lineStart, found.index + 1)))
+      return { start: found.index, end: found.index + found[0].length };
+  }
+  return void 0;
+}
+function escape(text13) {
+  return text13.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+function applyCorrections(detail, verdicts) {
+  var _a2;
+  let text13 = detail.replace(/\r\n?/g, "\n");
+  const corrected = [];
+  const removed = [];
+  const unmatched = [];
+  const definitions = [];
+  let next = highestFootnote(text13) + 1;
+  for (const verdict of verdicts) {
+    if (verdict.verdict !== "unsupported") continue;
+    const found = locate(text13, verdict.sentence);
+    if (!found) {
+      unmatched.push(verdict.sentence);
+      continue;
+    }
+    const correction = (_a2 = verdict.correction) == null ? void 0 : _a2.trim();
+    if (!correction) {
+      const start = found.start;
+      let end = found.end;
+      while (end < text13.length && /[ \t]/.test(text13[end])) end++;
+      text13 = text13.slice(0, start) + text13.slice(end);
+      const lineStart = text13.lastIndexOf("\n", start - 1) + 1;
+      const lineEnd = text13.indexOf("\n", start) < 0 ? text13.length : text13.indexOf("\n", start);
+      if (/^\s*(?:>\s*)*(?:[-*+]\s*|\d+[.)]\s*)?$/.test(text13.slice(lineStart, lineEnd))) {
+        text13 = text13.slice(0, lineStart) + text13.slice(Math.min(lineEnd + 1, text13.length));
+      }
+      removed.push(verdict.sentence);
+      continue;
+    }
+    const alreadyNoted = new RegExp(
+      `\\[\\^[^\\]]+\\]:\\s*${escape(ORIGINAL_PREFIX)}\\s*${escape(
+        verdict.sentence.trim().replace(/\[\^[^\]]+\]/g, "").replace(/\s+/g, " ").slice(0, 24)
+      )}`
+    ).test(text13);
+    let replacement = correction;
+    if (!alreadyNoted) {
+      definitions.push(`[^${next}]: ${originalFootnote(verdict.sentence, verdict.sourceUrl)}`);
+      replacement = `${correction}[^${next}]`;
+      next++;
+    }
+    text13 = text13.slice(0, found.start) + replacement + text13.slice(found.end);
+    corrected.push(verdict.sentence);
+  }
+  if (definitions.length) text13 = `${text13.trimEnd()}
+
+${definitions.join("\n")}
+`;
+  return { detail: text13, corrected, removed, unmatched };
+}
+function planPhase2Write(input) {
+  const { currentDetail } = input;
+  const phase2 = input.phase2Detail.replace(/\r\n?/g, "\n").trim();
+  if (!phase2) return { mode: "noop", detail: currentDetail, writtenHash: input.writtenHash };
+  const empty = normalize3(currentDetail) === "";
+  if (empty || input.writtenHash !== void 0 && input.writtenHash === detailHash(currentDetail)) {
+    return { mode: "replace", detail: phase2, writtenHash: detailHash(phase2) };
+  }
+  const shifted = offsetFootnotes(phase2, highestFootnote(currentDetail));
+  if (currentDetail.includes(shifted) || currentDetail.includes(phase2)) return { mode: "noop", detail: currentDetail };
+  const separator = currentDetail.endsWith("\n\n") ? "" : currentDetail.endsWith("\n") ? "\n" : "\n\n";
+  return { mode: "append", detail: `${currentDetail}${separator}${WEB_SUPPLEMENT_HEADING}
+
+${shifted}
+` };
+}
+
+// ai/search-not-performed.ts
+var SEARCH_NOT_PERFORMED = "SearchNotPerformedError";
+function searchNotPerformedError() {
+  const error = new Error(t("ui.context_ai_search_not_performed"));
+  error.name = SEARCH_NOT_PERFORMED;
+  return error;
+}
+function isSearchNotPerformed(error) {
+  return typeof error === "object" && error !== null && error.name === SEARCH_NOT_PERFORMED;
+}
+
+// core/seamless-research/outcome.ts
+var NETWORK_CODE = /\b(?:ENOTFOUND|ECONN[A-Z]*|ETIMEDOUT|EAI_AGAIN|ENETUNREACH|EHOSTUNREACH|EPIPE)\b/;
+var NETWORK_MESSAGE = /fetch failed|network (?:error|request failed|is unreachable)|socket hang up|failed to fetch|getaddrinfo|ERR_INTERNET_DISCONNECTED|ERR_NETWORK|unable to connect|connection (?:refused|reset|timed out)|offline/i;
+function text6(error) {
+  if (typeof error === "string") return error;
+  if (typeof error !== "object" || error === null) return "";
+  const record = error;
+  const cause = record.cause && record.cause !== error ? text6(record.cause) : "";
+  return [
+    typeof record.code === "string" ? record.code : "",
+    typeof record.message === "string" ? record.message : "",
+    cause
+  ].filter(Boolean).join(" ");
+}
+function classifyFailure(error) {
+  if (typeof error === "object" && error !== null && error.name === "AbortError")
+    return "stopped";
+  if (isSearchNotPerformed(error)) return "network";
+  const message = text6(error);
+  if (NETWORK_CODE.test(message) || NETWORK_MESSAGE.test(message)) return "network";
+  return "other";
+}
+function seamlessOutcome(input) {
+  if (input.stopped || input.failure === "stopped")
+    return input.phase1Written ? { status: "idea", reason: "stopped" } : { status: "restore", reason: "stopped" };
+  if (input.failure === "network") return { status: "error", reason: "network", action: "retry" };
+  if (input.failure === "no-web-model") return { status: "error", reason: "no-web-model", action: "switch-model" };
+  if (input.failure === "no-images") return { status: "error", reason: "no-images", action: "dismiss" };
+  if (input.failure) return { status: "error", reason: "other", action: "retry" };
+  if (input.phase2 !== "applied") return { status: "running" };
+  if (input.imagesRequested && input.imagesSaved <= 0)
+    return { status: "error", reason: "no-images", action: "dismiss" };
+  return { status: "completed" };
+}
+
+// core/seamless-research/skeleton-filter.ts
+var DEFAULT_SKELETON_PLACEHOLDER = "\uFF08\u9019\u4E00\u7BC0\u7B49\u67E5\u8B49\u5F8C\u88DC\u4E0A\u3002\uFF09";
+var NUMERAL = "(?:[\u3007\u96F6\u4E8C\u5169\u4E09\u56DB\u4E94\u516D\u4E03\u516B\u4E5D\u5341\u767E\u5343\u842C\u5104]|\u4E00(?=[\u3007\u96F6\u4E00\u4E8C\u5169\u4E09\u56DB\u4E94\u516D\u4E03\u516B\u4E5D\u5341\u767E\u5343\u842C\u5104]))";
+var UNIT = "(?:\u500B|\u7A2E|\u6B21|\u4F4D|\u9805|\u689D|\u5F35|\u540D|\u4EBA|\u5E74|\u6708|\u65E5|\u865F|\u5929|\u9031|\u5468|\u5C0F\u6642|\u5206\u9418|\u79D2|\u5EA6|\u500D|\u6210|\u5143|\u584A|\u516C\u65A4|\u516C\u91CC|\u516C\u5206|\u516C\u5C3A|\u6BEB\u7C73|\u516C\u514B|\u514B|\u6B72|\u4E16\u7D00|\u5B63|\u9593|\u5BB6|\u7B46|\u4EF6|\u842C|\u5104)";
+var ONE_UNIT = "\u4E00(?:\u5E74|\u6708|\u65E5|\u5929|\u9031|\u5468|\u5C0F\u6642|\u5206\u9418|\u79D2|\u5EA6|\u500D|\u6210|\u5143|\u584A|\u516C\u65A4|\u516C\u91CC|\u516C\u5206|\u516C\u5C3A|\u6BEB\u7C73|\u516C\u514B|\u4E16\u7D00|\u767E|\u5343|\u842C|\u5104)";
+var PATTERNS = [
+  /[0-9０-９]/u,
+  new RegExp(`${NUMERAL}+${UNIT}`, "u"),
+  new RegExp(ONE_UNIT, "u"),
+  /[$€£¥￥₩]/u,
+  /[「」『』“”"＂]/u,
+  /[《》〈〉]/u,
+  /\b[A-Z][A-Za-z]*/u,
+  /\b[a-z]{1,2}[A-Z][a-z]+/u,
+  /https?:\/\/|www\./iu,
+  /\[\^[^\]]+\]/u,
+  /!\[[^\]]*\]\(|!\[\[/u
+];
+function escapeRegExp(text13) {
+  return text13.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+function sentenceHasSourceNeed(sentence, allow = []) {
+  let text13 = sentence;
+  for (const word of [...allow].filter((item) => item.trim()).sort((a, b) => b.length - a.length))
+    text13 = text13.replace(new RegExp(escapeRegExp(word.trim()), "gi"), " ");
+  return PATTERNS.some((pattern) => pattern.test(text13));
+}
+var LINE_PREFIX = /^(\s*(?:>\s*)*(?:[-*+]\s+|\d+[.)]\s+)?(?:\[[ xX]\]\s+)?)/u;
+var CALLOUT_MARKER = /^\s*(?:>\s*)+\[![^\]]+\][+-]?.*$/u;
+var FENCE2 = /^\s*(?:>\s*)*(```|~~~)/u;
+var HEADING3 = /^\s{0,3}#{1,6}\s/u;
+var COMMENT = /^\s*<!--.*-->\s*$/u;
+var FOOTNOTE_DEFINITION = /^\s*\[\^[^\]]+\]:/u;
+function splitSentences(text13) {
+  return text13.split(/(?<=[。！？；])|(?<=[.!?;])(?=\s)/u).filter((part) => part.length > 0);
+}
+function filterLine(line, allow) {
+  var _a2, _b2;
+  const prefix = (_b2 = (_a2 = LINE_PREFIX.exec(line)) == null ? void 0 : _a2[1]) != null ? _b2 : "";
+  const body = line.slice(prefix.length);
+  if (!body.trim()) return line;
+  const kept = splitSentences(body).filter((sentence) => !sentenceHasSourceNeed(sentence, allow));
+  const text13 = kept.join("").trim();
+  return text13 ? prefix + text13 : void 0;
+}
+function filterTable(block, allow) {
+  if (block.length < 2 || sentenceHasSourceNeed(block[0], allow)) return [];
+  const rows2 = block.slice(2).filter((row) => !sentenceHasSourceNeed(row, allow));
+  return rows2.length ? [block[0], block[1], ...rows2] : [];
+}
+function dropOrphanMarkers(lines) {
+  return lines.filter((line, index) => {
+    if (!CALLOUT_MARKER.test(line)) return true;
+    for (let next = index + 1; next < lines.length && /^\s*>/.test(lines[next]); next++) {
+      if (!CALLOUT_MARKER.test(lines[next]) && lines[next].replace(/^[\s>]+/, "")) return true;
+    }
+    return false;
+  });
+}
+function hasText(lines) {
+  return lines.some(
+    (line) => line.trim() && !CALLOUT_MARKER.test(line) && !COMMENT.test(line) && !/^\s*(?:>\s*)*$/.test(line)
+  );
+}
+function skeletonFilter(markdown, options = {}) {
+  var _a2, _b2;
+  const allow = (_a2 = options.allow) != null ? _a2 : [];
+  const placeholder2 = (_b2 = options.placeholder) != null ? _b2 : DEFAULT_SKELETON_PLACEHOLDER;
+  const lines = markdown.replace(/\r\n?/g, "\n").split("\n");
+  const sections = [{ original: [], kept: [] }];
+  let fence;
+  for (let index = 0; index < lines.length; index++) {
+    const line = lines[index];
+    const section3 = sections[sections.length - 1];
+    if (fence) {
+      section3.original.push(line);
+      if (line.trimStart().startsWith(fence)) fence = void 0;
+      continue;
+    }
+    const open = FENCE2.exec(line);
+    if (open) {
+      fence = open[1];
+      section3.original.push(line);
+      continue;
+    }
+    if (HEADING3.test(line)) {
+      sections.push({ heading: line, original: [], kept: [] });
+      continue;
+    }
+    section3.original.push(line);
+    if (FOOTNOTE_DEFINITION.test(line)) continue;
+    if (/^\s*\|/.test(line)) {
+      const block = [line];
+      while (index + 1 < lines.length && /^\s*\|/.test(lines[index + 1])) block.push(lines[++index]);
+      section3.original.push(...block.slice(1));
+      section3.kept.push(...filterTable(block, allow));
+      continue;
+    }
+    if (COMMENT.test(line) || CALLOUT_MARKER.test(line)) {
+      section3.kept.push(line);
+      continue;
+    }
+    const filtered = filterLine(line, allow);
+    if (filtered !== void 0) section3.kept.push(filtered);
+  }
+  const out = [];
+  for (const section3 of sections) {
+    if (section3.heading !== void 0) out.push(section3.heading);
+    const cleaned = dropOrphanMarkers(section3.kept);
+    const kept = hasText(cleaned) ? cleaned : section3.kept.filter((line) => COMMENT.test(line));
+    out.push(...kept);
+    if (section3.heading !== void 0 && hasText(section3.original) && !hasText(kept)) out.push("", placeholder2);
+    out.push("");
+  }
+  return out.join("\n").replace(/\n{3,}/g, "\n\n").replace(/^\n+/, "").trimEnd() + (out.some((line) => line.trim()) ? "\n" : "");
+}
+
+// experiences/visual-map/seamless-research.ts
+function problemMessageKey(reason) {
+  return reason === "no-images" ? "ui.seamless_problem_no_images_0" : reason === "network" ? "ui.seamless_problem_network" : reason === "no-web-model" ? "ui.seamless_problem_no_web_model" : "ui.seamless_problem_other";
+}
+function problemActionKey(action) {
+  return action === "retry" ? "ui.seamless_action_retry" : action === "switch-model" ? "ui.seamless_action_switch_model" : "ui.seamless_action_dismiss";
+}
+var FALLBACK_WEB_MODEL = "claude:sonnet";
+var LABEL_UNSAFE = /[[\]()<>|`*_~\n\r]/g;
+function label(value, limit) {
+  return value.replace(/\b(?:javascript|vbscript|data|file):\S*/gi, " ").replace(LABEL_UNSAFE, " ").replace(/\s+/g, " ").trim().slice(0, limit);
+}
+function renderImageBlock(saved) {
+  return saved.map(({ path, image }) => {
+    const title = label(image.title, 120) || image.sourceUrl;
+    const link = `[${title}](${image.sourceUrl})`;
+    return `![[${path}]]
+${t("ui.seamless_image_source_0_1", link, label(image.license, 80))}`;
+  }).join("\n\n");
+}
+function composePhase2Detail(verify, saved) {
+  const clean4 = sanitizePhase2Markdown(verify.detail).markdown;
+  if (!clean4.trim()) throw new Error(t("ui.seamless_phase2_empty"));
+  const corrected = applyCorrections(clean4, verify.verdicts).detail.trimEnd();
+  const parts = [corrected, renderFootnoteDefinitions(verify.footnotes), renderImageBlock(saved)].filter(Boolean);
+  return { detail: `${parts.join("\n\n")}
+` };
+}
+var Semaphore = class {
+  constructor(size) {
+    __publicField(this, "waiting", []);
+    __publicField(this, "free");
+    this.free = Math.max(1, size);
+  }
+  acquire(signal) {
+    if (signal.aborted) return Promise.reject(abortError());
+    if (this.free > 0) {
+      this.free--;
+      return Promise.resolve();
+    }
+    return new Promise((resolve, reject) => {
+      const entry = {
+        grant: () => {
+          signal.removeEventListener("abort", onAbort);
+          resolve();
+        },
+        reject
+      };
+      const onAbort = () => {
+        this.waiting = this.waiting.filter((item) => item !== entry);
+        reject(abortError());
+      };
+      signal.addEventListener("abort", onAbort, { once: true });
+      this.waiting.push(entry);
+    });
+  }
+  release() {
+    const next = this.waiting.shift();
+    if (next) next.grant();
+    else this.free++;
+  }
+};
+function abortError() {
+  const error = new Error("aborted");
+  error.name = "AbortError";
+  return error;
+}
+var SeamlessResearch = class {
+  constructor(deps) {
+    this.deps = deps;
+    __publicField(this, "current", /* @__PURE__ */ new Map());
+    __publicField(this, "topics", /* @__PURE__ */ new Map());
+    __publicField(this, "held", /* @__PURE__ */ new Map());
+    __publicField(this, "problemMap", /* @__PURE__ */ new Map());
+    __publicField(this, "applying", /* @__PURE__ */ new Set());
+    __publicField(this, "listeners", /* @__PURE__ */ new Set());
+    __publicField(this, "phase2Slots");
+    __publicField(this, "disposed", false);
+    var _a2;
+    this.phase2Slots = new Semaphore((_a2 = deps.phase2Concurrency) != null ? _a2 : 3);
+  }
+  // ---------- what the view reads ----------
+  /** The topic is being researched or its result is held: show the slow "growing" signal, never "done". */
+  isGrowing(path) {
+    return this.current.has(path) || this.held.has(path);
+  }
+  isHeld(path) {
+    return this.held.has(path);
+  }
+  growingPaths() {
+    return [.../* @__PURE__ */ new Set([...this.current.keys(), ...this.held.keys()])];
+  }
+  problems() {
+    return [...this.problemMap.values()];
+  }
+  problemFor(path) {
+    return this.problemMap.get(path);
+  }
+  subscribe(listener) {
+    this.listeners.add(listener);
+    return () => this.listeners.delete(listener);
+  }
+  // ---------- actions ----------
+  /**
+   * Researches one topic: phase 1, then phase 2. Resolves when phase 2 has been written, held for a note that is open, failed
+   * into a problem, or stopped. Throws only when the topic cannot start (flag off, busy) or phase 1 fails; the caller's batch
+   * counts that as a failed topic. The caller has already asked for the AI usage notice.
+   */
+  async research(request) {
+    var _a2;
+    this.requireEnabled();
+    const topic = {
+      path: request.path,
+      title: request.title,
+      context: request.context,
+      language: request.language,
+      allow: [request.title, ...(_a2 = request.allow) != null ? _a2 : []],
+      imagesRequested: request.imagesRequested === true,
+      ...request.model ? { model: request.model } : {},
+      status0: "idea",
+      phase1Written: false,
+      skeleton: ""
+    };
+    await this.run(topic, request.signal, request.accepted, false);
+  }
+  /** "Try again": phase 2 only, with the skeleton of the last run. */
+  async retry(path, signal) {
+    this.requireEnabled();
+    const topic = this.topics.get(path);
+    const problem = this.problemMap.get(path);
+    if (!topic || !problem || problem.action !== "retry") throw new Error(t("ui.seamless_nothing_to_retry"));
+    await this.run(topic, signal, void 0, true);
+  }
+  /** "Switch to a model that can go online": changes only this topic's model, then runs phase 2 again. */
+  async switchModelAndRetry(path, signal) {
+    this.requireEnabled();
+    const topic = this.topics.get(path);
+    const problem = this.problemMap.get(path);
+    if (!topic || !problem || problem.action !== "switch-model") throw new Error(t("ui.seamless_nothing_to_retry"));
+    this.requireIdle(path);
+    const preferred = this.deps.defaultModel();
+    let model = FALLBACK_WEB_MODEL;
+    try {
+      if (preferred && this.deps.capabilitiesFor(preferred).webSearch) model = preferred;
+    } catch (e) {
+    }
+    await this.deps.mutate(async () => {
+      await this.deps.repo.updateNote(path, { model, modelSource: "manual" });
+    });
+    await this.run(topic, signal, void 0, true);
+  }
+  /** The image problem has a single button: dismiss. */
+  dismiss(path) {
+    if (this.problemMap.delete(path)) this.changed();
+  }
+  /** Stop one topic (running or held). Phase-1 text stays; the status is never `completed`. */
+  abort(path) {
+    const attempt = this.current.get(path);
+    if (!attempt) return;
+    attempt.controller.abort();
+  }
+  /** Stop every topic that is running or held (the plugin-wide stop). */
+  abortAll() {
+    for (const attempt of [...this.current.values()]) attempt.controller.abort();
+  }
+  /** The plugin is unloading: abort everything, forget held results, write nothing more. */
+  dispose() {
+    this.disposed = true;
+    for (const attempt of this.current.values()) {
+      attempt.controller.abort();
+      attempt.detach();
+    }
+    this.current.clear();
+    this.held.clear();
+    this.problemMap.clear();
+    this.applying.clear();
+    this.listeners.clear();
+  }
+  /** Applies every held result whose note is no longer shown. Called on `layout-change` and `active-leaf-change`. */
+  async flushHeld() {
+    if (this.disposed || !this.held.size) return;
+    for (const [path, entry] of [...this.held]) {
+      if (this.applying.has(path) || this.deps.isShown(path)) continue;
+      this.applying.add(path);
+      try {
+        await this.applyHeld(path, entry);
+      } finally {
+        this.applying.delete(path);
+      }
+    }
+  }
+  // ---------- pipeline ----------
+  requireEnabled() {
+    if (!this.deps.enabled()) throw new Error(t("ui.seamless_off"));
+  }
+  requireIdle(path) {
+    const busy = this.current.has(path) || this.held.has(path) || this.deps.running.has(path) || this.deps.busyElsewhere(path);
+    if (busy) throw new Error(t("ui.ai_running_ai"));
+  }
+  changed() {
+    for (const listener of [...this.listeners]) listener({ type: "change" });
+  }
+  log(message) {
+    var _a2, _b2;
+    (_b2 = (_a2 = this.deps).log) == null ? void 0 : _b2.call(_a2, message);
+  }
+  isCurrent(attempt) {
+    return !this.disposed && !attempt.controller.signal.aborted && this.current.get(attempt.topic.path) === attempt;
+  }
+  begin(topic, batchSignal) {
+    var _a2, _b2, _c;
+    const controller = new AbortController();
+    const onBatchAbort = () => controller.abort();
+    const attempt = {
+      id: (_c = (_b2 = (_a2 = this.deps).uuid) == null ? void 0 : _b2.call(_a2)) != null ? _c : `${Date.now().toString(36)}-${Math.random().toString(36).slice(2)}`,
+      controller,
+      topic,
+      handedOff: false,
+      detach: () => batchSignal == null ? void 0 : batchSignal.removeEventListener("abort", onBatchAbort)
+    };
+    controller.signal.addEventListener(
+      "abort",
+      () => {
+        var _a3;
+        if (((_a3 = this.held.get(topic.path)) == null ? void 0 : _a3.attempt) === attempt) void this.discardHeld(topic.path, attempt);
+      },
+      { once: true }
+    );
+    if (batchSignal == null ? void 0 : batchSignal.aborted) controller.abort();
+    else batchSignal == null ? void 0 : batchSignal.addEventListener("abort", onBatchAbort, { once: true });
+    this.current.set(topic.path, attempt);
+    this.deps.running.add(topic.path);
+    this.topics.set(topic.path, topic);
+    this.problemMap.delete(topic.path);
+    this.changed();
+    return attempt;
+  }
+  /** Removes the attempt's registrations (only those it owns). */
+  release(attempt) {
+    const path = attempt.topic.path;
+    attempt.detach();
+    if (this.current.get(path) === attempt) this.current.delete(path);
+    if (!this.current.has(path)) this.deps.running.delete(path);
+    this.changed();
+  }
+  async run(topic, batchSignal, accepted, phase2Only) {
+    this.requireIdle(topic.path);
+    const attempt = this.begin(topic, batchSignal);
+    const signal = attempt.controller.signal;
+    try {
+      const note = await this.deps.repo.readNote(topic.path);
+      if (!phase2Only) topic.status0 = note.status;
+      topic.title = phase2Only ? topic.title : note.title || topic.title;
+      if (signal.aborted) return await this.stopped(attempt);
+      await this.setStatus(attempt, "running");
+      if (signal.aborted) return await this.stopped(attempt);
+      accepted == null ? void 0 : accepted();
+      if (!phase2Only) {
+        const emptyDetail = !note.detail.trim();
+        if (emptyDetail) {
+          if (!await this.phase1(attempt, note)) return await this.dropStale(attempt);
+        } else topic.skeleton = skeletonFilter(note.detail, { allow: topic.allow });
+        if (!this.isCurrent(attempt)) return await this.dropStale(attempt);
+      }
+      await this.phase2(attempt);
+    } catch (error) {
+      if (this.disposed) return;
+      if (signal.aborted || classifyFailure(error) === "stopped") return await this.stopped(attempt);
+      await this.setStatus(attempt, "error");
+      throw error;
+    } finally {
+      if (!attempt.handedOff) this.release(attempt);
+    }
+  }
+  async setStatus(attempt, status) {
+    if (this.disposed) return;
+    const path = attempt.topic.path;
+    await this.deps.mutate(async () => {
+      const owner = this.current.get(path);
+      if (owner && owner !== attempt) return;
+      await this.deps.repo.updateNote(path, { status });
+    });
+  }
+  /** Stop: phase-1 text stays, status goes back (nothing written) or to `idea` (never `completed`), held result is dropped. */
+  async stopped(attempt) {
+    var _a2;
+    const topic = attempt.topic;
+    if (((_a2 = this.held.get(topic.path)) == null ? void 0 : _a2.attempt) === attempt) this.held.delete(topic.path);
+    const outcome = seamlessOutcome({
+      stopped: true,
+      phase1Written: topic.phase1Written,
+      phase2: "none",
+      imagesRequested: topic.imagesRequested,
+      imagesSaved: 0
+    });
+    this.log(t("log.seamless_ended_0_1", topic.title, "stopped"));
+    if (!this.disposed) await this.setStatus(attempt, outcome.status === "restore" ? topic.status0 : outcome.status);
+  }
+  async discardHeld(path, attempt) {
+    var _a2;
+    if (((_a2 = this.held.get(path)) == null ? void 0 : _a2.attempt) !== attempt) return;
+    try {
+      await this.stopped(attempt);
+    } finally {
+      this.release(attempt);
+    }
+  }
+  /** A model chosen by hand wins; a topic that follows its parent uses the model the view resolved for it. */
+  modelFor(topic, note) {
+    return note.modelSource === "manual" || !topic.model ? note.model : topic.model;
+  }
+  // ---------- phase 1 ----------
+  /** Returns false when nothing was written because the attempt is no longer the topic's (stopped, retitled, or the detail is no longer empty). */
+  async phase1(attempt, note) {
+    const topic = attempt.topic;
+    const reply = await this.deps.askModel({
+      path: topic.path,
+      title: topic.title,
+      context: topic.context,
+      language: topic.language,
+      model: this.modelFor(topic, note),
+      reasoning: note.reasoning,
+      instruction: this.deps.skeletonInstruction(topic.language),
+      signal: attempt.controller.signal
+    });
+    if (!this.isCurrent(attempt)) return false;
+    const skeleton = skeletonFilter(reply.detail, { allow: topic.allow });
+    if (!skeleton.trim()) throw new Error(t("ui.seamless_phase1_empty"));
+    const summary = skeletonFilter(reply.summary, { allow: topic.allow }).trim();
+    let written2 = false;
+    await this.deps.mutate(async () => {
+      if (!this.isCurrent(attempt)) return;
+      const latest = await this.deps.repo.readNote(topic.path);
+      if (latest.title !== topic.title || latest.detail.trim()) return;
+      const placeholder2 = (value) => this.deps.isPlaceholderSummary ? this.deps.isPlaceholderSummary(value) : !value.trim();
+      await this.deps.repo.updateNote(topic.path, {
+        detail: skeleton,
+        researchWrittenHash: detailHash(skeleton),
+        ...summary && placeholder2(latest.summary) ? { summary } : {}
+      });
+      written2 = true;
+    });
+    if (!written2) return false;
+    topic.phase1Written = true;
+    topic.skeleton = skeleton;
+    return true;
+  }
+  // ---------- phase 2 ----------
+  async phase2(attempt) {
+    const topic = attempt.topic;
+    const signal = attempt.controller.signal;
+    const note = await this.deps.repo.readNote(topic.path);
+    if (signal.aborted) return await this.stopped(attempt);
+    let webSearch = true;
+    try {
+      webSearch = this.deps.capabilitiesFor(this.modelFor(topic, note)).webSearch !== false;
+    } catch (e) {
+      webSearch = true;
+    }
+    if (!webSearch) return await this.fail(attempt, "no-web-model");
+    let result;
+    try {
+      await this.phase2Slots.acquire(signal);
+    } catch (e) {
+      return await this.stopped(attempt);
+    }
+    try {
+      const base = {
+        path: topic.path,
+        title: topic.title,
+        context: topic.context,
+        model: this.modelFor(topic, note),
+        reasoning: note.reasoning,
+        signal
+      };
+      const verifyCall = this.deps.runVerify({ ...base, skeleton: topic.skeleton, language: topic.language });
+      const imagesCall = this.deps.runImages(base);
+      const [verify, images] = await Promise.allSettled([verifyCall, imagesCall]);
+      if (signal.aborted) return await this.dropStale(attempt);
+      if (verify.status === "rejected") return await this.fail(attempt, classifyFailure(verify.reason), verify.reason);
+      result = {
+        verify: verify.value,
+        images: [...verify.value.images, ...images.status === "fulfilled" ? images.value.images : []],
+        imagesFailed: images.status === "rejected"
+      };
+    } finally {
+      this.phase2Slots.release();
+    }
+    await this.deliver(attempt, result);
+  }
+  async fail(attempt, failure, cause) {
+    var _a2;
+    const topic = attempt.topic;
+    if (failure === "stopped") return await this.stopped(attempt);
+    const outcome = seamlessOutcome({
+      failure,
+      phase1Written: topic.phase1Written,
+      phase2: "none",
+      imagesRequested: topic.imagesRequested,
+      imagesSaved: 0
+    });
+    this.log(
+      t(
+        "log.seamless_ended_0_1",
+        topic.title,
+        cause instanceof Error && failure === "other" ? `${failure}: ${cause.name}` : failure
+      )
+    );
+    if (this.disposed) return;
+    this.problemMap.set(topic.path, {
+      path: topic.path,
+      title: topic.title,
+      reason: (_a2 = outcome.reason) != null ? _a2 : "other",
+      ...outcome.action ? { action: outcome.action } : {}
+    });
+    await this.setStatus(attempt, outcome.status === "restore" ? "error" : outcome.status);
+    this.changed();
+  }
+  /** Phase-2 result arrived: fence, then hold (note open) or apply. */
+  async deliver(attempt, result) {
+    const topic = attempt.topic;
+    if (!await this.fenceOk(attempt)) return await this.dropStale(attempt);
+    if (this.deps.isShown(topic.path)) {
+      this.held.set(topic.path, { attempt, result });
+      attempt.handedOff = true;
+      this.changed();
+      return;
+    }
+    await this.apply(attempt, { attempt, result });
+  }
+  async fenceOk(attempt) {
+    if (!this.isCurrent(attempt)) return false;
+    try {
+      const note = await this.deps.repo.readNote(attempt.topic.path);
+      return note.title === attempt.topic.title && this.isCurrent(attempt);
+    } catch (e) {
+      return false;
+    }
+  }
+  async dropStale(attempt) {
+    this.log(t("log.stale_result_not_written"));
+    await this.stopped(attempt);
+  }
+  async applyHeld(path, entry) {
+    const attempt = entry.attempt;
+    if (this.held.get(path) !== entry) return;
+    if (!await this.fenceOk(attempt)) {
+      this.held.delete(path);
+      try {
+        await this.dropStale(attempt);
+      } finally {
+        this.release(attempt);
+      }
+      return;
+    }
+    this.held.delete(path);
+    try {
+      await this.apply(attempt, entry);
+    } finally {
+      if (!this.held.has(path)) this.release(attempt);
+    }
+  }
+  async saveImages(attempt, images) {
+    const saved = [];
+    for (const image of eligibleImages(images).eligible) {
+      if (!this.isCurrent(attempt)) break;
+      try {
+        const path = await this.deps.saveImage(image, attempt.topic.path, attempt.controller.signal);
+        if (path) saved.push({ path, image });
+      } catch (error) {
+        this.log(t("log.seamless_image_skipped_0", error instanceof Error ? error.message : "download"));
+      }
+    }
+    return saved;
+  }
+  /** Redo the fence, save images, then write inside the mutation queue: replace when the AI still owns the detail, else append. */
+  async apply(attempt, entry) {
+    var _a2;
+    const topic = attempt.topic;
+    const path = topic.path;
+    (_a2 = entry.saved) != null ? _a2 : entry.saved = await this.saveImages(attempt, entry.result.images);
+    const saved = entry.saved;
+    if (!this.isCurrent(attempt)) return await this.dropStale(attempt);
+    const box = {};
+    await this.deps.mutate(async () => {
+      var _a3, _b2;
+      if (!this.isCurrent(attempt)) {
+        box.stale = true;
+        return;
+      }
+      if (this.deps.isShown(path)) {
+        this.held.set(path, entry);
+        attempt.handedOff = true;
+        box.reheld = true;
+        return;
+      }
+      const latest = await this.deps.repo.readNote(path);
+      if (latest.title !== topic.title) {
+        box.stale = true;
+        return;
+      }
+      let composition;
+      try {
+        composition = composePhase2Detail(entry.result.verify, saved);
+      } catch (error) {
+        box.failure = error;
+        return;
+      }
+      const plan = planPhase2Write({
+        currentDetail: latest.detail,
+        writtenHash: latest.researchWrittenHash,
+        phase2Detail: composition.detail
+      });
+      const outcome = seamlessOutcome({
+        phase1Written: topic.phase1Written,
+        phase2: "applied",
+        imagesRequested: topic.imagesRequested,
+        imagesSaved: saved.length
+      });
+      if (outcome.reason === "no-images") box.problem = "no-images";
+      await this.deps.repo.updateNote(path, {
+        ...plan.mode === "noop" ? {} : { detail: plan.detail },
+        researchWrittenHash: plan.mode === "append" ? "" : (_b2 = (_a3 = plan.writtenHash) != null ? _a3 : latest.researchWrittenHash) != null ? _b2 : "",
+        status: outcome.status
+      });
+      const after = await this.deps.repo.readNote(path);
+      if (plan.mode === "replace" && detailHash(after.detail) !== plan.writtenHash)
+        await this.deps.repo.updateNote(path, { researchWrittenHash: detailHash(after.detail) });
+      box.written = { before: latest, after };
+    });
+    if (box.reheld) {
+      this.changed();
+      return;
+    }
+    if (box.stale) return await this.dropStale(attempt);
+    if (box.failure !== void 0) return await this.fail(attempt, "other", box.failure);
+    if (box.written) for (const listener of [...this.listeners]) listener({ type: "written", path, ...box.written });
+    if (box.problem) {
+      this.problemMap.set(path, { path, title: topic.title, reason: box.problem, action: "dismiss" });
+      this.log(t("log.seamless_ended_0_1", topic.title, box.problem));
+    }
+    this.changed();
   }
 };
 
@@ -27245,7 +28193,7 @@ var NextStepModal = class extends import_obsidian22.Modal {
               (_a4 = research.querySelector(".vam-next-status")) == null ? void 0 : _a4.setText(message);
           }
         };
-        await this.rememberMode(mode);
+        if (!this.plugin.settings.seamlessResearch) await this.rememberMode(mode);
         if (this.dead(controller)) return;
         this.detach(controller);
         let launchAccepted = false;
@@ -27627,7 +28575,7 @@ var NextStepModal = class extends import_obsidian22.Modal {
       expandButton.hidden = mode !== "expand";
       expandFooterText.hidden = mode !== "expand";
       reviewButton.hidden = mode !== "expand" || !this.pendingCount;
-      aiMode.element.hidden = mode === "synthesize";
+      aiMode.element.hidden = mode === "synthesize" || this.plugin.settings.seamlessResearch === true && mode === "research";
       syncSynthesisStage();
       refreshSummary();
     };
@@ -30053,19 +31001,19 @@ var reuse_target_expected_value_default = "Retain adequate existing evidence wit
 var reuse_target_validity_reason_default = "Full report must pass the current-goal applicability and freshness audit\n";
 
 // experiences/aim/steps/_shared/rules.ts
-var text6 = (template) => renderTemplate(template, {});
-var PLANNER_COVERAGE_RULE = text6(planner_coverage_rule_default);
-var SEARCHER_TARGET_RULE = text6(searcher_target_rule_default);
-var USER_QUESTION_RULE = text6(user_question_rule_default);
-var FLOOR_ASK_RULE = text6(floor_ask_rule_default);
-var OUTCOME_EXPECTATION_RULE = text6(outcome_expectation_rule_default);
-var EVIDENCE_LOOKUP_RULE = text6(evidence_lookup_rule_default);
-var EVIDENCE_LOOKUP_FIELD_RULE = text6(evidence_lookup_field_rule_default);
-var TOPIC_ROOT_ANSWER = text6(topic_root_answer_default);
-var REUSE_TARGET_EXPECTED_VALUE = text6(reuse_target_expected_value_default);
-var REUSE_TARGET_VALIDITY_REASON = text6(reuse_target_validity_reason_default);
-var PASSAGE_REFERENCE = text6(passage_reference_default);
-var EVIDENCE_LOOKUP_UNAVAILABLE = text6(evidence_lookup_unavailable_default);
+var text7 = (template) => renderTemplate(template, {});
+var PLANNER_COVERAGE_RULE = text7(planner_coverage_rule_default);
+var SEARCHER_TARGET_RULE = text7(searcher_target_rule_default);
+var USER_QUESTION_RULE = text7(user_question_rule_default);
+var FLOOR_ASK_RULE = text7(floor_ask_rule_default);
+var OUTCOME_EXPECTATION_RULE = text7(outcome_expectation_rule_default);
+var EVIDENCE_LOOKUP_RULE = text7(evidence_lookup_rule_default);
+var EVIDENCE_LOOKUP_FIELD_RULE = text7(evidence_lookup_field_rule_default);
+var TOPIC_ROOT_ANSWER = text7(topic_root_answer_default);
+var REUSE_TARGET_EXPECTED_VALUE = text7(reuse_target_expected_value_default);
+var REUSE_TARGET_VALIDITY_REASON = text7(reuse_target_validity_reason_default);
+var PASSAGE_REFERENCE = text7(passage_reference_default);
+var EVIDENCE_LOOKUP_UNAVAILABLE = text7(evidence_lookup_unavailable_default);
 var renderOpenItemsContext = (openItems) => renderTemplate(open_items_context_default, { openItems });
 var renderEvidenceLookupFollowup = (task, evidence) => renderTemplate(evidence_lookup_followup_default, { task, evidence });
 
@@ -30515,8 +31463,8 @@ var announceTestOverrides = (_notify) => {
 // ai/aim-contracts.ts
 var AIM_NO_QUESTION = "__AIM_NO_QUESTION__";
 var QUESTION_SCOPE = "Ask about the user's goal, preferences, constraints or situation, never about this tool's workflow, counts, nodes or branches.";
-var text7 = { type: "string" };
-var texts = { type: "array", items: text7 };
+var text8 = { type: "string" };
+var texts = { type: "array", items: text8 };
 var nullable = (schema) => ({ anyOf: [schema, { type: "null" }] });
 var object = (properties) => ({
   type: "object",
@@ -30537,7 +31485,7 @@ function payloadSchema(contract) {
       return object({
         decision: { type: "string", enum: contract.requireQuestion ? ["ask_user"] : ["ask_user", "no_question"] },
         question: {
-          ...text7,
+          ...text8,
           description: `The one direct question for the user, written as a question. ${QUESTION_SCOPE} Empty only for no_question.`
         },
         answerOptions: {
@@ -30551,27 +31499,27 @@ function payloadSchema(contract) {
           type: "array",
           description: "0\u20133 distinct evidence tasks.",
           items: object({
-            id: text7,
-            title: text7,
-            task: text7,
-            expectedValue: text7,
+            id: text8,
+            title: text8,
+            task: text8,
+            expectedValue: text8,
             action: { type: "string", enum: ["research", "update", "reuse"] },
             dependsOn: { ...texts, description: "Ids of prerequisite targets in this plan; empty when independent." },
-            rationale: text7,
+            rationale: text8,
             source: {
               ...nullable(
                 object({
-                  branchId: text7,
-                  resultId: text7,
-                  notePath: text7,
+                  branchId: text8,
+                  resultId: text8,
+                  notePath: text8,
                   version: { type: "integer" },
-                  contentHash: text7
+                  contentHash: text8
                 })
               ),
               description: "For reuse/update: the exact source copied from the supplied ancestor report. Null for research."
             },
             validity: {
-              ...nullable(object({ conditionKeys: texts, reason: text7 })),
+              ...nullable(object({ conditionKeys: texts, reason: text8 })),
               description: "For reuse/update: which supplied condition keys the source depends on and why it still applies. Null for research."
             }
           })
@@ -30580,9 +31528,9 @@ function payloadSchema(contract) {
     case "reuse":
       return object({
         usable: { type: "boolean" },
-        rationale: text7,
+        rationale: text8,
         conditionKeys: texts,
-        validity: { ...text7, description: "Freshness and applicability assessment." }
+        validity: { ...text8, description: "Freshness and applicability assessment." }
       });
     case "review":
       return object({
@@ -30591,19 +31539,19 @@ function payloadSchema(contract) {
           description: "true when the supplied reports already answer the original goal under the known conditions; false when a material evidence gap in the goal itself remains."
         },
         decision: { type: "string", enum: [...contract.decisions] },
-        rationale: { ...text7, description: "Evidence-based reason for the decision." },
-        stopReason: { ...text7, description: "For conclude: why research can stop. Otherwise empty." },
+        rationale: { ...text8, description: "Evidence-based reason for the decision." },
+        stopReason: { ...text8, description: "For conclude: why research can stop. Otherwise empty." },
         question: {
-          ...text7,
+          ...text8,
           description: `For ask_user: the one direct question for the user, written as a question. ${QUESTION_SCOPE} Otherwise empty.`
         },
         answerOptions: { ...texts, description: "For ask_user: 2\u20135 distinct answer choices. Otherwise empty." },
         researchTarget: {
           ...nullable(
             object({
-              title: text7,
-              task: { ...text7, description: "Search instruction." },
-              expectedValue: { ...text7, description: "Uncertainty the search should reduce." }
+              title: text8,
+              task: { ...text8, description: "Search instruction." },
+              expectedValue: { ...text8, description: "Uncertainty the search should reduce." }
             })
           ),
           description: "For research_more: the one targeted evidence gap. Otherwise null."
@@ -30622,10 +31570,10 @@ function payloadSchema(contract) {
         sections: {
           type: "array",
           items: object({
-            heading: text7,
-            purpose: text7,
+            heading: text8,
+            purpose: text8,
             searchTask: {
-              ...text7,
+              ...text8,
               description: "Specific web search needed for this section, or empty if already supported."
             },
             evidenceIds: {
@@ -31208,7 +32156,7 @@ function matchAimFailedReportTargets(map, candidates) {
 }
 
 // experiences/aim/research-scheduler.ts
-function abortError() {
+function abortError2() {
   const error = new Error("The operation was aborted.");
   error.name = "AbortError";
   return error;
@@ -31226,7 +32174,7 @@ async function scheduleAimResearch(plan, execute, signal, options = {}) {
   const active = /* @__PURE__ */ new Map();
   try {
     while (pending.length || active.size) {
-      if (controller.signal.aborted) throw abortError();
+      if (controller.signal.aborted) throw abortError2();
       while (active.size < limit) {
         const index = pending.findIndex((target2) => {
           var _a3;
@@ -31236,7 +32184,7 @@ async function scheduleAimResearch(plan, execute, signal, options = {}) {
         const target = pending.splice(index, 1)[0];
         const predecessors = new Map(((_b2 = target.dependsOn) != null ? _b2 : []).map((id) => [id, completed.get(id)]));
         const task = Promise.resolve().then(() => {
-          if (controller.signal.aborted) throw abortError();
+          if (controller.signal.aborted) throw abortError2();
           return execute(target, predecessors, controller.signal);
         }).then(
           (value) => ({ id: target.id, ok: true, value }),
@@ -31250,7 +32198,7 @@ async function scheduleAimResearch(plan, execute, signal, options = {}) {
       if (!next.ok) throw next.error;
       completed.set(next.id, next.value);
     }
-    if (controller.signal.aborted) throw abortError();
+    if (controller.signal.aborted) throw abortError2();
     return completed;
   } finally {
     await Promise.all(active.values());
@@ -31771,7 +32719,7 @@ function readOpenItems(detail) {
 var AIM_INTAKE_COMPLETE = "<!-- aim-intake-complete -->";
 var CHECKLIST_FLOOR = 1;
 var OTHER_ROUTE_REUSE_LIMIT = 6;
-var SEARCH_NOT_PERFORMED = /did not perform web search|沒有實際執行網路搜尋/;
+var SEARCH_NOT_PERFORMED2 = /did not perform web search|沒有實際執行網路搜尋/;
 var CHECKLIST_QUESTION_LIMIT = 5;
 var _AimManualFlow = class _AimManualFlow {
   constructor(repository, runs, askModel, id = import_node_crypto9.randomUUID, persist = (operation) => operation(), limits = ACTIVE_AIM_FLOW_LIMITS) {
@@ -34530,7 +35478,7 @@ ${dependencyReports}` : "")
             }
             const searchSkipped = error instanceof SubtopicSearchUnavailable || // Read the message without instanceof: the runtime's error may come from another realm. A subtopic
             // that ran past its time limit is skipped the same way, so one slow search cannot end the run.
-            SEARCH_NOT_PERFORMED.test(String((_c2 = error == null ? void 0 : error.message) != null ? _c2 : error)) || aimTimedOut(String((_d2 = error == null ? void 0 : error.message) != null ? _d2 : error));
+            SEARCH_NOT_PERFORMED2.test(String((_c2 = error == null ? void 0 : error.message) != null ? _c2 : error)) || aimTimedOut(String((_d2 = error == null ? void 0 : error.message) != null ? _d2 : error));
             if (searchSkipped && !taskSignal.aborted) {
               this.emitProgress({ kind: "subtopic", mapPath, branchId, subtopicId: target.id, state: "skipped" });
               searchFailure = error;
@@ -34862,7 +35810,7 @@ ${beforeSearch.detail}`,
         } catch (error) {
           await this.persist(() => this.runs.recordSearchDiagnostic(mapPath, synthesisHandle, diagnostic));
           const message = String((_j = error == null ? void 0 : error.message) != null ? _j : error);
-          if ((signal == null ? void 0 : signal.aborted) || !(SEARCH_NOT_PERFORMED.test(message) || aimTimedOut(message))) throw error;
+          if ((signal == null ? void 0 : signal.aborted) || !(SEARCH_NOT_PERFORMED2.test(message) || aimTimedOut(message))) throw error;
         }
         await this.persist(() => this.runs.recordSearchDiagnostic(mapPath, synthesisHandle, diagnostic));
         throwIfAborted(signal);
@@ -36390,6 +37338,9 @@ var VisualAgentMapView = class _VisualAgentMapView extends import_obsidian30.Ite
     /** The unsaved-answer block of the open hover card, repainted as the preview grows. */
     __publicField(this, "hoverResearch", null);
     __publicField(this, "unsubscribeResearch", null);
+    /** Seamless research (experimental setting): the listener on its service, and the topics this view started (for undo history). */
+    __publicField(this, "unsubscribeSeamless", null);
+    __publicField(this, "seamlessOwned", /* @__PURE__ */ new Set());
     /** What each card last showed of its research progress; a different signature means the card must be redrawn. */
     __publicField(this, "researchSigs", /* @__PURE__ */ new Map());
     __publicField(this, "researchElapsed", /* @__PURE__ */ new Map());
@@ -36522,7 +37473,7 @@ var VisualAgentMapView = class _VisualAgentMapView extends import_obsidian30.Ite
     }));
   }
   async onOpen() {
-    var _a2, _b2, _c, _d, _e, _f, _g, _h, _i, _j, _k, _l;
+    var _a2, _b2, _c, _d, _e, _f, _g, _h, _i, _j, _k, _l, _m;
     this.closed = false;
     (_a2 = this.announcer) == null ? void 0 : _a2.remove();
     this.announcer = (_c = (_b2 = this.containerEl) == null ? void 0 : _b2.createDiv({ cls: "vam-sr-only" })) != null ? _c : null;
@@ -36532,19 +37483,20 @@ var VisualAgentMapView = class _VisualAgentMapView extends import_obsidian30.Ite
     this.announcedStages.clear();
     (_g = this.unsubscribeResearch) == null ? void 0 : _g.call(this);
     this.unsubscribeResearch = (_i = (_h = this.plugin.researchProgress) == null ? void 0 : _h.subscribe((path) => this.onResearchProgress(path))) != null ? _i : null;
+    if ((_j = this.plugin.settings) == null ? void 0 : _j.seamlessResearch) this.watchSeamless();
     const epoch = ++this.aimViewEpoch;
     this.mapOpenEpoch++;
     this.contentEl.addClass("vam-view");
     this.contentEl.tabIndex = 0;
     this.registerWorkspaceEvents();
-    this.registerDomEvent((_j = this.contentEl.win) != null ? _j : window, "keydown", (event) => {
+    this.registerDomEvent((_k = this.contentEl.win) != null ? _k : window, "keydown", (event) => {
       if (event.code === "Space" && !(event.target instanceof HTMLElement && event.target.closest("input, textarea, select, [contenteditable=true]")))
         this.spaceHeld = true;
     });
-    this.registerDomEvent((_k = this.contentEl.win) != null ? _k : window, "keyup", (event) => {
+    this.registerDomEvent((_l = this.contentEl.win) != null ? _l : window, "keyup", (event) => {
       if (event.code === "Space") this.spaceHeld = false;
     });
-    this.registerDomEvent((_l = this.contentEl.win) != null ? _l : window, "blur", () => {
+    this.registerDomEvent((_m = this.contentEl.win) != null ? _m : window, "blur", () => {
       this.spaceHeld = false;
     });
     this.registerDomEvent(this.contentEl, "keydown", (event) => {
@@ -36643,7 +37595,7 @@ var VisualAgentMapView = class _VisualAgentMapView extends import_obsidian30.Ite
     ).open();
   }
   async onClose() {
-    var _a2, _b2, _c, _d, _e, _f, _g, _h;
+    var _a2, _b2, _c, _d, _e, _f, _g, _h, _i;
     this.closed = true;
     this.renderAfterDrag = false;
     (_a2 = this.announcer) == null ? void 0 : _a2.remove();
@@ -36651,6 +37603,9 @@ var VisualAgentMapView = class _VisualAgentMapView extends import_obsidian30.Ite
     this.announcedStages.clear();
     (_b2 = this.unsubscribeResearch) == null ? void 0 : _b2.call(this);
     this.unsubscribeResearch = null;
+    (_c = this.unsubscribeSeamless) == null ? void 0 : _c.call(this);
+    this.unsubscribeSeamless = null;
+    this.seamlessOwned.clear();
     if (this.researchTick !== null) window.clearInterval(this.researchTick);
     if (this.researchRenderTimer !== null) window.clearTimeout(this.researchRenderTimer);
     this.researchTick = this.researchRenderTimer = null;
@@ -36660,10 +37615,10 @@ var VisualAgentMapView = class _VisualAgentMapView extends import_obsidian30.Ite
     this.hoverResearch = null;
     this.plugin.releaseOutline(this);
     this.abortMapChat();
-    (_c = this.chat) == null ? void 0 : _c.dispose();
-    (_d = this.relevancePanelCleanup) == null ? void 0 : _d.call(this);
+    (_d = this.chat) == null ? void 0 : _d.dispose();
+    (_e = this.relevancePanelCleanup) == null ? void 0 : _e.call(this);
     this.relevancePanelCleanup = null;
-    if (this.relevancePanelOpen) (_f = (_e = this.plugin).releaseWarmClaude) == null ? void 0 : _f.call(_e);
+    if (this.relevancePanelOpen) (_g = (_f = this.plugin).releaseWarmClaude) == null ? void 0 : _g.call(_f);
     this.abortRelevanceGrade();
     for (const task of this.synthesisTasks.values()) if (task.state === "running") task.controller.abort();
     this.synthesisTasks.clear();
@@ -36683,8 +37638,8 @@ var VisualAgentMapView = class _VisualAgentMapView extends import_obsidian30.Ite
     this.stopAimProgress();
     if (this.refreshTimer !== null) window.clearTimeout(this.refreshTimer);
     if (this.hoverTimer !== null) window.clearTimeout(this.hoverTimer);
-    (_g = this.hoverCard) == null ? void 0 : _g.remove();
-    (_h = this.dragCleanup) == null ? void 0 : _h.call(this);
+    (_h = this.hoverCard) == null ? void 0 : _h.remove();
+    (_i = this.dragCleanup) == null ? void 0 : _i.call(this);
     if (this.viewportTimer !== null) {
       window.clearTimeout(this.viewportTimer);
       this.viewportTimer = null;
@@ -41659,6 +42614,7 @@ ${request.requirements}` : preset.text,
     const queued = this.isResearchQueued(node);
     const merging = this.isMerging(node.id);
     card.dataset.status = merging || ((_c = this.plugin.running) == null ? void 0 : _c.has(node.path)) || ((_d = this.plugin.quickExpandPending) == null ? void 0 : _d.has(node.path)) || this.startingTasks.has(node.path) ? "running" : queued ? "queued" : (_e = note == null ? void 0 : note.status) != null ? _e : "error";
+    if (this.seamlessGrowing(node.path)) card.addClass("vam-seamless-growing");
     card.style.left = `${shownNode.x}px`;
     card.style.top = `${shownNode.y}px`;
     card.tabIndex = node.id === this.tabStopId ? 0 : -1;
@@ -42572,10 +43528,14 @@ ${request.requirements}` : preset.text,
         (_h = (_g = this.plugin.pendingSuggestions.get(node.path)) == null ? void 0 : _g.length) != null ? _h : 0,
         this.plugin,
         async (options, focus, done, failed, accepted) => {
-          var _a3, _b3;
+          var _a3, _b3, _c2;
           const latest = await this.plugin.repo.readNote(node.path, (_a3 = this.map) != null ? _a3 : void 0);
           const taskLanguage = (_b3 = options.outputLanguage) != null ? _b3 : outputLanguageForMap(this.map, this.plugin.settings.language, latest.title);
           const task = researchTopicTask(taskLanguage, latest.title);
+          if ((_c2 = this.plugin.settings) == null ? void 0 : _c2.seamlessResearch) {
+            await this.researchSeamless(node, latest, taskLanguage, options.signal, failed, accepted);
+            return;
+          }
           const detailTemplate = await this.detailTemplateFor(node, options.detailTemplateId, options.toneId);
           await this.runAgent(
             node,
@@ -43417,6 +44377,7 @@ ${request.requirements}` : preset.text,
     return `multi-research:${this.path}`;
   }
   openMultiResearch(retryBatchKey) {
+    var _a2;
     if (!this.map || this.map.aim || !this.multiSelected.size) return;
     const shown = [...this.multiSelected].flatMap((id) => {
       const note = this.notes.get(id);
@@ -43432,7 +44393,8 @@ ${request.requirements}` : preset.text,
       this.toneChoices(),
       (selected, refreshed) => new PromptPresetsModal(this.app, this.plugin, "tone", () => refreshed(this.toneChoices()), selected).open(),
       this.fieldLinks(),
-      shown.map((item) => item.mode)
+      // One-button research has no mode to show next to a name.
+      ((_a2 = this.plugin.settings) == null ? void 0 : _a2.seamlessResearch) ? [] : shown.map((item) => item.mode)
     ).open();
   }
   stopMultiResearch() {
@@ -43453,7 +44415,7 @@ ${request.requirements}` : preset.text,
     const selected = [...this.multiSelected].map((id) => this.map.nodes.find((node) => node.id === id)).filter((node) => !!node);
     try {
       await this.plugin.confirmAiUsage((_a2 = request.model) != null ? _a2 : this.plugin.settings.cliModel, async () => {
-        var _a3;
+        var _a3, _b2;
         if (this.plugin.expansionCoordinator.isRunning(key2)) {
           new import_obsidian30.Notice(t("ui.multi_research_already_running"));
           return;
@@ -43490,6 +44452,10 @@ ${request.requirements}` : preset.text,
         };
         if (retryBatchKey && ((_a3 = this.plugin.expansionBatches.get(retryBatchKey)) == null ? void 0 : _a3.status) !== "running")
           this.plugin.expansionBatches.delete(retryBatchKey);
+        if ((_b2 = this.plugin.settings) == null ? void 0 : _b2.seamlessResearch) {
+          await this.startSeamlessBatch(key2, nodes, request, busy, onSettled);
+          return;
+        }
         let reported = false;
         let skipped2 = 0;
         const web = { searches: 0, counted: 0, withoutSearch: 0 };
@@ -43541,6 +44507,156 @@ ${request.requirements}` : preset.text,
       new import_obsidian30.Notice(errorMessage(error));
     }
   }
+  // ---------- seamless research (experimental setting; every caller checks `settings.seamlessResearch` first) ----------
+  /** The service while the setting is on; `undefined` otherwise, so with the setting off nothing of it is ever created. */
+  seamless() {
+    var _a2;
+    return ((_a2 = this.plugin.settings) == null ? void 0 : _a2.seamlessResearch) ? this.plugin.seamlessResearchService() : void 0;
+  }
+  /** The card breathes while its topic is researched, or its result waits for an open note. */
+  seamlessGrowing(path) {
+    var _a2, _b2;
+    return (_b2 = (_a2 = this.seamless()) == null ? void 0 : _a2.isGrowing(path)) != null ? _b2 : false;
+  }
+  /** One listener per view: repaint when a topic starts or stops growing or a problem appears; record a write for undo. */
+  watchSeamless() {
+    var _a2, _b2;
+    if (this.unsubscribeSeamless) return;
+    this.unsubscribeSeamless = (_b2 = (_a2 = this.seamless()) == null ? void 0 : _a2.subscribe((event) => {
+      if (this.closed) return;
+      if (event.type === "written") this.recordSeamlessWrite(event);
+      else if (this.map) this.render();
+    })) != null ? _b2 : null;
+  }
+  recordSeamlessWrite(event) {
+    if (!this.seamlessOwned.has(event.path)) return;
+    const { before, after } = event;
+    const fields = ["summary", "detail"].filter((field) => before[field] !== after[field]);
+    if (!fields.length) return;
+    this.recordNoteWrite(
+      event.path,
+      before,
+      after,
+      fields,
+      t("ui.seamless_research")
+    );
+  }
+  /** The titles of the topic's ancestors: the phase-1 check keeps them (they are not new facts). */
+  ancestorTitles(node) {
+    var _a2, _b2, _c, _d;
+    const titles = [];
+    const seen = /* @__PURE__ */ new Set([node.id]);
+    let parent = node.parentId;
+    while (parent && !seen.has(parent)) {
+      seen.add(parent);
+      const title = (_a2 = this.notes.get(parent)) == null ? void 0 : _a2.title;
+      if (title) titles.push(title);
+      parent = (_d = (_c = (_b2 = this.map) == null ? void 0 : _b2.nodes.find((item) => item.id === parent)) == null ? void 0 : _c.parentId) != null ? _d : null;
+    }
+    return titles;
+  }
+  async seamlessRequest(sr, node, note, language2, signal, accepted, imagesRequested) {
+    this.watchSeamless();
+    this.seamlessOwned.add(node.path);
+    await sr.research({
+      path: node.path,
+      title: note.title,
+      context: await this.ancestorContext(node, language2),
+      language: language2,
+      allow: this.ancestorTitles(node),
+      model: note.model,
+      ...imagesRequested ? { imagesRequested: true } : {},
+      ...signal ? { signal } : {},
+      ...accepted ? { accepted } : {}
+    });
+  }
+  /** The single-topic research card with the setting on: no mode, the same two phases. */
+  async researchSeamless(node, note, language2, signal, failed, accepted) {
+    const sr = this.seamless();
+    if (!sr) return;
+    try {
+      await this.seamlessRequest(sr, node, note, language2, signal, accepted);
+    } catch (error) {
+      failed(errorMessage(error));
+    } finally {
+      if (!this.closed) this.render();
+    }
+  }
+  /** The batch of the multi-research dialog and the chat with the setting on. Same busy rules and coordinator, up to 8 topics at once. */
+  async startSeamlessBatch(key2, nodes, request, busy, onSettled) {
+    const sr = this.seamless();
+    if (!sr) return;
+    let reported = false;
+    try {
+      await this.plugin.expansionCoordinator.start(
+        key2,
+        nodes,
+        async (child, batchSignal, accepted) => {
+          var _a2;
+          if (busy(child)) {
+            accepted();
+            return "skipped";
+          }
+          const note = await this.plugin.repo.readNote(child.path, (_a2 = this.map) != null ? _a2 : void 0);
+          const language2 = outputLanguageForMap(this.map, this.plugin.settings.language, note.title);
+          await this.seamlessRequest(sr, child, note, language2, batchSignal, accepted, request.imagesRequested);
+          return void 0;
+        },
+        () => {
+          const state = this.plugin.expansionBatches.get(key2);
+          if (state && state.status !== "running" && !reported) {
+            reported = true;
+            onSettled == null ? void 0 : onSettled({ searches: 0, counted: 0, withoutSearch: 0 });
+          }
+          if (!this.closed) this.render();
+        },
+        void 0,
+        Math.min(nodes.length, 8)
+      );
+    } catch (e) {
+    }
+  }
+  /** One chat line per problem of the given topics (the same sentence the status bar shows). */
+  seamlessProblemLines(paths) {
+    const sr = this.seamless();
+    if (!sr) return [];
+    return paths.flatMap((path) => {
+      const problem = sr.problemFor(path);
+      return problem ? [{ status: "skipped", text: this.seamlessProblemText(problem) }] : [];
+    });
+  }
+  seamlessProblemText(problem) {
+    return t(problemMessageKey(problem.reason), problem.title);
+  }
+  /** One sentence plus at most one button for each problem; a polite live region, reachable with the keyboard. */
+  renderSeamlessProblems(parent) {
+    var _a2;
+    const sr = this.seamless();
+    const problems = (_a2 = sr == null ? void 0 : sr.problems()) != null ? _a2 : [];
+    if (!sr || !problems.length) return;
+    const list = parent.createDiv("vam-aim-statusbar vam-seamless-problems");
+    list.setAttr("role", "status");
+    list.setAttr("aria-live", "polite");
+    for (const problem of problems) {
+      const row = list.createDiv("vam-seamless-problem");
+      row.dataset.reason = problem.reason;
+      row.dataset.path = problem.path;
+      row.createSpan({ cls: "vam-seamless-problem-text", text: this.seamlessProblemText(problem) });
+      if (!problem.action) continue;
+      const button = this.button(row, t(problemActionKey(problem.action)), () => this.runSeamlessAction(sr, problem));
+      button.addClass("vam-seamless-problem-action");
+      button.setAttr("aria-label", `${t(problemActionKey(problem.action))}: ${problem.title}`);
+    }
+  }
+  runSeamlessAction(sr, problem) {
+    if (problem.action === "dismiss") {
+      sr.dismiss(problem.path);
+      return;
+    }
+    this.seamlessOwned.add(problem.path);
+    const work = problem.action === "switch-model" ? sr.switchModelAndRetry(problem.path) : sr.retry(problem.path);
+    void work.catch((error) => new import_obsidian30.Notice(errorMessage(error)));
+  }
   /** Counts that cannot be misread: succeeded of total, failures, optional current topic and stopped marker. */
   batchProgressLabel(counts, batch, current) {
     return [
@@ -43574,6 +44690,7 @@ ${request.requirements}` : preset.text,
   /** Status bar under the toolbar (same place and look as the AIM status bar) with progress, Stop, and Retry/Dismiss after failures. */
   renderMultiResearchStatus(parent) {
     var _a2, _b2;
+    this.renderSeamlessProblems(parent);
     const key2 = this.multiResearchKey();
     const state = this.plugin.expansionBatches.get(key2);
     if (!state) return;
@@ -45450,7 +46567,8 @@ ${note.detail.trim()}` : "",
         }
         const plan = result.actions.length ? planFor(result.actions, request.context, {
           diagrams: this.plugin.settings.addDiagramsAfterResearch,
-          mapAiMode: (_c = this.map) == null ? void 0 : _c.aiMode
+          mapAiMode: (_c = this.map) == null ? void 0 : _c.aiMode,
+          ...this.plugin.settings.seamlessResearch ? { seamless: true } : {}
         }) : null;
         if (plan) {
           if (chat.isBusy) {
@@ -46173,7 +47291,7 @@ ${note.detail.trim()}` : "",
   }
   /** Selecting cards, and the run actions that start the map's own tasks; both after every write, outside a mutate. */
   async runChatSelection(action, message = "", batch = { imageSearches: 0 }) {
-    var _a2, _b2, _c;
+    var _a2, _b2, _c, _d;
     const map = this.map;
     if (!map) return skipped("ui.map_chat_skip_map_changed");
     const launch = (work) => {
@@ -46201,12 +47319,19 @@ ${note.detail.trim()}` : "",
           return skipped("ui.map_chat_skip_research_running");
         const chat = this.chat;
         const turns = (_a2 = chat == null ? void 0 : chat.transcript().length) != null ? _a2 : 0;
+        const seamless = ((_b2 = this.plugin.settings) == null ? void 0 : _b2.seamlessResearch) === true;
+        const batchPaths = this.chatSelectionIds().flatMap(
+          (id) => {
+            var _a3, _b3, _c2;
+            return (_c2 = (_b3 = (_a3 = this.map) == null ? void 0 : _a3.nodes.find((node) => node.id === id)) == null ? void 0 : _b3.path) != null ? _c2 : [];
+          }
+        );
         launch(
           this.startMultiResearch(
-            chatResearchRequest(action, (_b2 = this.map) == null ? void 0 : _b2.aiMode, (mode) => aiModeOptions(mode, "research")),
+            seamless ? seamlessChatResearchRequest(action) : chatResearchRequest(action, (_c = this.map) == null ? void 0 : _c.aiMode, (mode) => aiModeOptions(mode, "research")),
             void 0,
             (web) => {
-              const lines = researchWebLines(web);
+              const lines = seamless ? this.seamlessProblemLines(batchPaths) : researchWebLines(web);
               if (lines.length && chat && this.chat === chat && !this.closed && chat.transcript().length === turns)
                 chat.appendLines(lines);
             }
@@ -46223,7 +47348,7 @@ ${note.detail.trim()}` : "",
         if (!parents.length) return skipped("ui.map_chat_skip_unavailable");
         for (const parent of parents)
           launch(
-            this.plugin.repo.readNote(parent.path, (_c = this.map) != null ? _c : void 0).then((note) => this.plugin.confirmAiUsage(note.model, () => this.chatExpand(parent, action.direction)))
+            this.plugin.repo.readNote(parent.path, (_d = this.map) != null ? _d : void 0).then((note) => this.plugin.confirmAiUsage(note.model, () => this.chatExpand(parent, action.direction)))
           );
         return { status: "done" };
       }
@@ -49393,7 +50518,7 @@ function shareViewerUiExtras(languages) {
 
 // experiences/sharing/viewer-bundle.generated.ts
 var SHARE_VIEWER_JS = '(()=>{function ct(t){var n;let r=t.aimKind==="question"?[]:(n=t.aimConvergesFromNodeIds)!=null?n:[];return[...t.parentId?[t.parentId]:[],...r.filter(a=>a!==t.parentId)]}function dt(t,r){let n=new Set,a=[r];for(;a.length;){let i=a.pop();for(let d of t)d.parentId===i&&d.id!==r&&!n.has(d.id)&&(n.add(d.id),a.push(d.id))}return n}function Fe(t,r){let n=new Map(t.map(d=>[d.id,d])),a=d=>{let p=0,c=new Set([d.id]);for(let g=d.parentId;g&&n.has(g)&&!c.has(g);g=n.get(g).parentId)c.add(g),p++;return p},i=new Set(t.map(d=>d.parentId).filter(d=>!!d&&n.has(d)));for(let d of t)i.has(d.id)&&(d.collapsed=r===null?!1:a(d)>=r)}var Zt=360;var Ke=24,Jt=180;var Qt=(t,r)=>{let n=t==null?void 0:t(r);return n!==void 0&&Number.isFinite(n)&&n>0?n:Jt};function en(t,r,n,a,i=!1,d){var Ae,ce;let p=new Map(t.map(u=>[u.id,u])),c=new Map,g=new Map,h=(u,A,N)=>{var S;return u.set(A,[...(S=u.get(A))!=null?S:[],N])};for(let u of t){if(!u.parentId)continue;let A=u.aimKind!=="question"&&((Ae=u.aimConvergesFromNodeIds)!=null&&Ae.length)?ct(u).map(S=>p.get(S)):[],N=(ce=A[0])==null?void 0:ce.parentId;N&&p.has(N)&&A.every(S=>S&&S.parentId===N)?h(g,N,u):h(c,u.parentId,u)}let m=new Map,y=u=>{var A;return i&&u.collapsed?[]:(A=c.get(u.id))!=null?A:[]},b=u=>{var A;return i&&u.collapsed?[]:((A=g.get(u.id))!=null?A:[]).filter(N=>{var S;return!(i&&((S=p.get(N.parentId))!=null&&S.collapsed))})},M=u=>Qt(d,u.id),H=new Map,C=new Map,ne=u=>u.reduce((A,N)=>A+H.get(N.id),0)+Math.max(0,u.length-1)*Ke,re=u=>{let A=y(u),N=b(u);for(let S of[...A,...N])re(S);H.set(u.id,Math.max(M(u),ne(A),ne(N))),C.set(u.id,1+Math.max(0,...A.map(S=>C.get(S.id))))},oe=(u,A,N)=>{let S=y(u),Te=b(u),de=H.get(u.id),Z=($,U)=>{let T=N+(de-ne($))/2;return $.map(j=>{let Q=oe(j,U,T);return T+=H.get(j.id)+Ke,Q})},ae=Z(S,A+1),we=Z(Te,A+C.get(u.id)),J=ae.length?S:Te,O=ae.length?ae:we,ue=M(u),K=N+(de-ue)/2;if(O.length){let $=O[0]+M(J[0])/2,U=O[O.length-1]+M(J[J.length-1])/2;K=($+U)/2-ue/2}return m.set(u.id,{x:n+A*Zt,y:a+K}),K},ie=0;for(let u of r)re(u),oe(u,0,ie),ie+=H.get(u.id)+Ke;return m}function ut(t,r,n){let a=r!=null&&r.size?t.filter(p=>!r.has(p.id)):t,i=a.filter(p=>!p.parentId),d=en(a,i,80,80,!0,n);return t.map(p=>({...p,...d.get(p.id)}))}function pt(t,r){return!r||!(r.bottom>r.top)?0:Math.max(0,Math.ceil(r.bottom-t))+8}function mt(t,r,n,a){let i=t.zoom;return{zoom:i,x:n.width/2-r.x*i,y:a+(n.height-a)/2-r.y*i}}function ft(t,r,n,a=1.2){let i=Math.max(1,r.height-n),d=t.maxX-t.minX,p=t.maxY-t.minY,c=Math.max(.25,Math.min(a,(r.width-80)/d,(i-80)/p));return{zoom:c,x:(r.width-d*c)/2-t.minX*c,y:n+(i-p*c)/2-t.minY*c}}var gt={lang:"en",readOnly:"Shared map \\xB7 read-only",madeWithVam:"Made with VAM",install:"Install VAM",goal:"Goal: {0}",hint:"Drag empty space to pan \\xB7 Scroll to zoom \\xB7 Click a topic to read it",layout:"Layout",collapseAll:"Collapse all",expandAll:"Expand all",expandToLevel:"Expand to level {0}",autoLayout:"Auto layout",zoomIn:"Zoom in",zoomOut:"Zoom out",zoomReset:"Zoom {0}, reset to 100%",showAll:"Show all",toResearch:"To research",tierCore:"Must learn",tierSupport:"Learn when needed",tierSide:"Skippable",manualReason:"You set this",topicDetails:"Topic details",detailsButton:"Details",close:"Close",collapse:"Collapse",expandCount:"Expand {0}",subtopics:"Subtopics",noContent:"This topic has no notes in the shared file.",imageOmitted:"[image not included]",imageSource:"Source: {0}",resizePanel:"Resize the side panel",untitledMap:"Untitled map",language:"Language",aiTranslated:"Translated by AI from {0}.",aiTranslatedUnknown:"Translated by AI.",originalText:"Original",imageTextUntranslated:"Text inside images is not translated."};function je(t){let r=3735928559,n=1103547991;for(let a=0;a<t.length;a++){let i=t.charCodeAt(a);r=Math.imul(r^i,2654435761),n=Math.imul(n^i,1597334677)}return r=Math.imul(r^r>>>16,2246822507)^Math.imul(n^n>>>13,3266489909),n=Math.imul(n^n>>>16,2246822507)^Math.imul(r^r>>>13,3266489909),(4294967296*(2097151&n)+(r>>>0)).toString(36)}var ee="\\u27E6",te="\\u27E7",ve=/\u27E6(\\/?)(\\d+)(\\/?)\u27E7/g,bt=new Set(["address","article","aside","blockquote","body","caption","colgroup","dd","details","dialog","div","dl","dt","fieldset","figcaption","figure","footer","h1","h2","h3","h4","h5","h6","header","hgroup","hr","legend","li","main","nav","ol","p","section","summary","table","tbody","td","tfoot","th","thead","tr","ul"]),Xe=new Set(["pre","script","style","textarea","template","noscript"]),tn=new Set(["code","kbd","samp","var","tt","svg","math","img","br","wbr","input","canvas","video","audio","iframe","object","embed","select","button"]),nn=new Set(["math","katex","katex-display","mjx-container","tag","notranslate","vam-image-omitted","vam-mermaid-note","vam-mermaid-slot"]),rn=/(?:https?:\\/\\/|www\\.)[^\\s<>"\'\uFF0C\u3002\u3001\uFF1B\uFF1A\uFF09\u300D\u300F\u3011\u300B]+/gi,on=/\\p{L}/u,xe=t=>t.localName.toLowerCase(),xt=t=>{var r;return((r=t.getAttribute("class"))!=null?r:"").split(/\\s+/).filter(Boolean)},Re=t=>Array.from(t.childNodes).filter(r=>r.nodeType===1);function vt(t){for(let r of Re(t))if(bt.has(xe(r))||Xe.has(xe(r))||vt(r))return!0;return!1}function Et(t){let r=xe(t);return Xe.has(r)?"skip":tn.has(r)||t.getAttribute("translate")==="no"||xt(t).some(n=>nn.has(n))?"atom":bt.has(r)||vt(t)?"block":"inline"}function an(t,r){return t.replace(rn,n=>(r.push({literal:n,atom:!0}),`${ee}${r.length}/${te}`))}function sn(t,r){let n="",a=i=>{var p;if(i.nodeType===3){n+=an((p=i.nodeValue)!=null?p:"",r);return}if(i.nodeType!==1){r.push({node:i,atom:!0}),n+=`${ee}${r.length}/${te}`;return}let d=i;if(Et(d)==="inline"){r.push({node:d,atom:!1});let c=r.length;n+=`${ee}${c}${te}`;for(let g of Array.from(d.childNodes))a(g);n+=`${ee}/${c}${te}`;return}r.push({node:d,atom:!0}),n+=`${ee}${r.length}/${te}`};for(let i of t)a(i);return n}function ht(t){return on.test(t.replace(ve,""))}function At(t){let r=[],n=p=>{let c=p.getAttribute("alt");c&&ht(c)&&r.push({index:r.length,kind:"attribute",text:c.trim(),nodes:[],lead:"",trail:"",parts:[],element:p,attribute:"alt"})},a=p=>{for(let c of Re(p)){let g=xe(c);Xe.has(g)||g==="svg"||(g==="img"?n(c):a(c))}},i=p=>{if(!p.length)return;let c=[],g=sn(p,c),h=g.trim();if(!h||!ht(h)||g.includes("\\u27E6\\u27E6"))return;let m=g.replace(ve,"");if(m.includes(ee)||m.includes(te))return;let y=g.slice(0,g.length-g.trimStart().length),b=g.slice(g.trimEnd().length);r.push({index:r.length,kind:"run",text:h,nodes:p,lead:y,trail:b,parts:c})},d=p=>{let c=[];for(let g of Array.from(p.childNodes)){if(g.nodeType===3){c.push(g);continue}if(g.nodeType!==1){i(c),c=[];continue}let h=g,m=Et(h);m==="atom"||m==="inline"?c.push(h):(i(c),c=[],m==="block"&&d(h))}i(c)};return a(t),d(t),{units:r}}var yt=t=>[...t.matchAll(ve)].map(r=>r[0]);function ln(t,r){if(!r.trim())return!1;let n=yt(t),a=yt(r);if(n.length!==a.length||n.some((d,p)=>d!==a[p]))return!1;let i=r.replace(ve,"");return!i.includes(ee)&&!i.includes(te)}function cn(t,r,n){var g;let a=[],i=[],d=h=>{let m=i[i.length-1];m?m.appendChild(h):a.push(h)},p=h=>{h&&d(n.createTextNode(h))};p(t.lead);let c=0;for(let h of r.matchAll(ve)){p(r.slice(c,h.index)),c=((g=h.index)!=null?g:0)+h[0].length;let m=t.parts[Number(h[2])-1];if(h[1]==="/")i.pop();else if(h[3]==="/")m.literal!==void 0?p(m.literal):m.node&&d(m.node.cloneNode(!0));else if(m.node){let y=m.node.cloneNode(!1);d(y),i.push(y)}}return p(r.slice(c)),p(t.trail),a}function Tt(t,r){var i,d,p;let n={applied:0,kept:0},a=[...t.units.filter(c=>c.kind==="attribute"),...t.units.filter(c=>c.kind==="run")];for(let c of a){let g=r(c);if(g===void 0||!ln(c.text,g)){n.kept++;continue}if(c.kind==="attribute"){(d=c.element)==null||d.setAttribute((i=c.attribute)!=null?i:"alt",g.trim()),n.applied++;continue}let h=c.nodes[0],m=h==null?void 0:h.parentNode,y=h==null?void 0:h.ownerDocument;if(!h||!m||!y){n.kept++;continue}for(let b of cn(c,g,y))m.insertBefore(b,h);for(let b of c.nodes)(p=b.parentNode)==null||p.removeChild(b);n.applied++}return n}function wt(t){let r=[],n=a=>{for(let i of Re(a))xe(i)==="svg"?r.push(i):n(i)};return n(t),r}function Mt(t,r){let n=[],a=i=>{for(let d of Re(i))xt(d).includes(r)&&n.push(d),a(d)};return a(t),n}var Nt="vam-mermaid-slot",Ie=1,St=3,Lt=t=>{let r=t;return!!r&&(Array.isArray(r.detailSegments)||Array.isArray(r.detailDiagrams))},dn=t=>t.replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;"),un=t=>t.replace(/&/g,"&amp;").replace(/"/g,"&quot;");function pn(t){var r,n;return t.nodeType===St?dn((r=t.nodeValue)!=null?r:""):t.nodeType!==Ie?`\\0${t.nodeType}:${(n=t.nodeValue)!=null?n:""}\\0`:kt(t)}function kt(t){let r=t.localName.toLowerCase(),n=t.getAttributeNames().sort().map(a=>{var i;return` ${a}="${un((i=t.getAttribute(a))!=null?i:"")}"`}).join("");return`<${r}${n}>${mn(t)}</${r}>`}function mn(t){return Array.from(t.childNodes).map(pn).join("")}function fn(t){let r=[],n=a=>{if(r.push(a),a.nodeType===Ie)for(let i of Array.from(a.childNodes))n(i)};return n(t),r}function gn(t,r){var a;let n=wt(t);for(let i of n){let d=r();d.setAttribute("class",Nt),(a=i.parentNode)==null||a.replaceChild(d,i)}return{root:t,svgs:n,extraction:At(t)}}function hn(t){let r=t.units.map(n=>`${n.kind}\\0${n.text}`).join("");return`${t.units.length}.${je(r)}`}var yn=t=>je(kt(t));function bn(t,r){if(!Array.isArray(r))return!1;let n=fn(t);for(let a of r){if(!Array.isArray(a)||a.length!==2)return!1;let[i,d]=a;if(typeof i!="number"||!Number.isInteger(i)||i<0||i>=n.length)return!1;let p=n[i];if(typeof d=="string"){if(p.nodeType!==St)return!1;p.nodeValue=d}else if(d&&typeof d=="object"&&!Array.isArray(d)){if(p.nodeType!==Ie)return!1;for(let[c,g]of Object.entries(d))if(g===null)p.removeAttribute(c);else if(typeof g=="string")p.setAttribute(c,g);else return!1}else return!1}return!0}function xn(t,r,n){if(!t||typeof t!="object")return null;let a=t;if(typeof a.svg=="string"){let i=n(a.svg),d=Array.from(i.childNodes).filter(p=>p.nodeType===Ie);return d.length===1&&d[0].localName.toLowerCase()==="svg"?d[0]:null}if(typeof a.check=="string"&&a.check===yn(r)){let i=r.cloneNode(!0);return bn(i,a.patch)?i:null}return null}function Ct(t,r,n){var g,h;let a={applied:0,kept:0,fallback:!1,diagramsKept:0},{svgs:i,extraction:d}=gn(t,n.createSlot),p=r.detailSegments;if(p!==void 0||r.detailCheck!==void 0)if(Array.isArray(p)&&p.length===d.units.length&&r.detailCheck===hn(d)){let m=Tt(d,b=>{let M=p[b.index];return typeof M=="string"?M:void 0}),y=p.filter(b=>typeof b!="string").length;if(a.applied=m.applied,a.kept=Math.max(0,m.kept-y),n.afterText&&!n.afterText(t))return a.fallback=!0,a}else a.fallback=!0;let c=Mt(t,Nt);c.length!==i.length&&(a.fallback=!0);for(let[m,y]of c.entries()){let b=i[m];if(!b)break;let M=(g=r.detailDiagrams)==null?void 0:g[m],H=b;if(M){let C=null;try{C=xn(M,b,n.parse)}catch{C=null}C?H=C:a.diagramsKept++}(h=y.parentNode)==null||h.replaceChild(H,y)}return a}function q(t,r,n){let a=t.createElement(r);return n&&(a.className=n),a}function vn(t,r){var p;let n=/^https?:\\/\\/(?:[^/?#@]*@)?([^/?#:]+)/i.exec(t),a=(p=n==null?void 0:n[1])!=null?p:t,[i,d=""]=r.imageSource.split("{0}");return[i,a,d]}function En(t,r,n){let[a,i,d]=vn(r,n),p=q(t,"span");p.className="vam-image-source";let c=q(t,"a");return c.setAttribute("href",r),c.setAttribute("target","_blank"),c.setAttribute("rel","noopener noreferrer"),c.textContent=i,p.append(t.createTextNode(a),c,t.createTextNode(d)),p}function Ye(t,r,n,a,i){Rt(t,r,new DOMParser().parseFromString(n,"text/html").body,a,i)}function Rt(t,r,n,a,i){var p,c,g,h;for(let m of Array.from(n.querySelectorAll("script, iframe, frame, object, embed, applet, link, meta, base")))m.remove();for(let m of Array.from(n.querySelectorAll("*")))for(let y of m.getAttributeNames()){let b=(p=m.getAttribute(y))!=null?p:"",M=y.toLowerCase();(M.startsWith("on")||/^(href|src|xlink:href|action|formaction)$/.test(M)&&/^\\s*(javascript|vbscript):/i.test(b))&&m.removeAttribute(y)}let d=()=>{let m=q(t,"span");return m.className="vam-image-omitted",m.textContent=i.imageOmitted,m};for(let m of Array.from(n.querySelectorAll("img"))){let y=(c=m.getAttribute("src"))!=null?c:"";if(y.startsWith("vam-asset:")){let b=a[y.slice(10)];typeof b=="string"&&b.startsWith("data:image/")?m.setAttribute("src",b):m.replaceWith(d())}else if(/^https?:\\/\\//i.test(y)){m.setAttribute("referrerpolicy","no-referrer"),m.setAttribute("loading","lazy");let b=m.closest("a");(b!=null?b:m).after(En(t,y,i))}else/^data:image\\//i.test(y)||m.replaceWith(d())}for(let m of Array.from(n.querySelectorAll("a"))){let y=(g=m.getAttribute("href"))!=null?g:"";/^(https?:|mailto:)/i.test(y)?(m.setAttribute("target","_blank"),m.setAttribute("rel","noopener noreferrer")):y.startsWith("#")||m.removeAttribute("href")}for(let m of Array.from(n.querySelectorAll("table"))){if((h=m.parentElement)!=null&&h.classList.contains("vam-table-scroll"))continue;let y=q(t,"div");y.className="vam-table-scroll",m.replaceWith(y),y.append(m)}r.append(...Array.from(n.childNodes).map(m=>t.importNode(m,!0)))}function It(t,r,n,a,i,d){let p=c=>new DOMParser().parseFromString(c,"text/html").body;try{let c=p(n);Ct(c,a,{parse:p,createSlot:()=>q(t,"div")}),Rt(t,r,c,i,d)}catch{r.replaceChildren(),Ye(t,r,n,i,d)}}function Ht(t,r,n,a){let i=Math.max(60,Math.abs(n-t)/2);return`M ${t} ${r} C ${t+i} ${r}, ${n-i} ${a}, ${n} ${a}`}var An=(t,r)=>t.toLowerCase()===r.toLowerCase(),He=(t,r)=>t.find(n=>An(n,r));function Tn(t,r){if(typeof t!="string"||!t.trim())return;let n=He(r,t.trim());if(n)return n;let a=t.trim().toLowerCase().split(/[-_]/),i=a[0];if(i==="zh"){let p=a.slice(1).some(c=>c==="hant"||c==="tw"||c==="hk"||c==="mo")?"TW":"CN";return He(r,`${i}-${p}`)}return r.find(d=>d.toLowerCase().split(/[-_]/)[0]===i)}function _t(t){let{languages:r}=t,n=r[0];if(typeof t.stored=="string"){let a=He(r,t.stored);if(a)return a}if(typeof t.defaultLanguage=="string"){let a=He(r,t.defaultLanguage);if(a)return a}for(let a of t.browser){let i=Tn(a,r);if(i)return i}return n}function Dt(t){return typeof t=="string"&&t.trim()!==""?`vam-share-language:${t}`:void 0}var wn="https://github.com/kevcltsai/visual-agent-map?ref=share",Mn="und",_e="http://www.w3.org/2000/svg",Ot="vam-share-panel-width",Nn=300,Ge=240,Sn=.25,Ln=2,kn=280,Cn=4,Rn={target:["circle|cx=12|cy=12|r=10","circle|cx=12|cy=12|r=6","circle|cx=12|cy=12|r=2"],library:["path|d=m16 6 4 14","path|d=M12 6v14","path|d=M8 8v12","path|d=M4 4v16"],skip:["polygon|points=5 4 15 12 5 20 5 4","line|x1=19|x2=19|y1=5|y2=19"],minus:["path|d=M5 12h14"],plus:["path|d=M5 12h14","path|d=M12 5v14"],max:["path|d=M8 3H5a2 2 0 0 0-2 2v3","path|d=M21 8V5a2 2 0 0 0-2-2h-3","path|d=M3 16v3a2 2 0 0 0 2 2h3","path|d=M16 21h3a2 2 0 0 0 2-2v-3"]},In={core:"target",support:"library",side:"skip"},Pt=t=>t==="core"||t==="support"||t==="side",Ee=(t,r)=>t.replace("{0}",String(r));function qe(t,r){var a;let n=(a=t.getElementById(r))==null?void 0:a.textContent;if(n)try{return JSON.parse(n)}catch{return}}function $t(t){let r={...gt};if(t&&typeof t=="object")for(let n of Object.keys(r)){let a=t[n];typeof a=="string"&&(r[n]=a)}return r}function Hn(t){let r=qe(t,"vam-ui"),n=new Map,a={};if(r&&typeof r=="object"){if(r.uiByLanguage&&typeof r.uiByLanguage=="object")for(let[i,d]of Object.entries(r.uiByLanguage))n.set(i,$t(d));if(r.languageNames&&typeof r.languageNames=="object")for(let[i,d]of Object.entries(r.languageNames))typeof d=="string"&&d&&(a[i]=d)}return{sets:n,names:a}}var F=t=>typeof t=="string"&&t.trim()!=="";function zt(t){try{return window.localStorage.getItem(t)}catch{return null}}function Vt(t,r){try{window.localStorage.setItem(t,r)}catch{}}function Ut(t){var it,at,st,lt;let r=$t(qe(t,"vam-ui")),n=r;t.documentElement.lang=n.lang;let a=t.getElementById("vam-app"),i=qe(t,"vam-map");if(!a)return;if(!i||i.format!=="vam-share"||i.version!==1||!Array.isArray(i.nodes)){a.replaceChildren(t.createTextNode("This is not a Visual Agent Map share file."));return}let d=i.assets&&typeof i.assets=="object"?i.assets:{},p=new Map,c=[];for(let e of i.nodes)!e||typeof e.id!="string"||p.has(e.id)||(p.set(e.id,e),c.push({id:e.id,path:e.id,parentId:typeof e.parentId=="string"?e.parentId:null,x:Number.isFinite(e.x)?e.x:0,y:Number.isFinite(e.y)?e.y:0,collapsed:!!e.collapsed}));let g=new Map(c.map(e=>[e.id,e]));for(let e of c)e.parentId&&(!g.has(e.parentId)||e.parentId===e.id)&&(e.parentId=null);let h=new Map;for(let e of c)e.parentId&&h.set(e.parentId,[...(it=h.get(e.parentId))!=null?it:[],e]);let m=Hn(t),y=Array.isArray(i.languages)?Array.from(new Set(i.languages.filter(F))):[],b=Dt((at=i.source)==null?void 0:at.mapId),M=y.length>=2,H=M?y[0]:"",C=H;if(M){let e=[];try{e=Array.from((st=window.navigator.languages)!=null?st:[window.navigator.language]).filter(F)}catch{}C=_t({languages:y,stored:b?zt(b):null,defaultLanguage:F(i.defaultLanguage)?i.defaultLanguage:void 0,browser:e})}let ne=e=>{var o;return(o=m.sets.get(e))!=null?o:r},re=M&&H===Mn,oe=()=>M&&C!==H;M&&(n=ne(C),t.documentElement.lang=C);let ie=e=>{var s;let o=oe()?(s=e.translations)==null?void 0:s[C]:void 0;return!o||typeof o!="object"?e:{title:F(o.title)?o.title:e.title,summary:F(o.summary)?o.summary:e.summary,reason:F(o.reason)?o.reason:e.reason,detailHtml:F(o.detailHtml)?o.detailHtml:e.detailHtml,...Lt(o)&&F(e.detailHtml)?{compact:o,detailHtml:e.detailHtml}:{}}},Ae=()=>{var l;let e=oe()?(l=i.translations)==null?void 0:l[C]:void 0,o=F(e==null?void 0:e.title)?e.title:i.title,s=F(e==null?void 0:e.goal)?e.goal:i.goal;return{title:typeof o=="string"&&o.trim()||n.untitledMap,goal:typeof s=="string"?s.trim():""}},ce=(e,o)=>{var s;try{let l=new Intl.DisplayNames([o!=null?o:e],{type:"language"}).of(e);if(l&&l!==e)return l}catch{}return(s=m.names[e])!=null?s:e};try{let e=window.matchMedia("(prefers-color-scheme: dark)"),o=()=>{t.documentElement.classList.toggle("theme-dark",e.matches)};o(),e.addEventListener("change",o)}catch{}let u=(e,o,s)=>{let l=q(t,e);return o&&(l.className=o),s!==void 0&&(l.textContent=s),l},A=e=>{let o=t.createElementNS(_e,"svg");o.setAttribute("class","svg-icon"),o.setAttribute("viewBox","0 0 24 24"),o.setAttribute("aria-hidden","true");for(let s of Rn[e]){let[l,...f]=s.split("|"),x=t.createElementNS(_e,l);for(let R of f)x.setAttribute(R.slice(0,R.indexOf("=")),R.slice(R.indexOf("=")+1));o.append(x)}return o},N=(e,o,s,l)=>{let f=u("button",s,o);return f.type="button",f.addEventListener("click",x=>{x.stopPropagation(),l()}),e.append(f),f},S=(e,o,s,l)=>{let f=u("button");return f.type="button",f.setAttribute("aria-label",s),f.title=s,f.append(A(o)),f.addEventListener("click",x=>{x.stopPropagation(),l()}),e.append(f),f},Te=e=>e==="core"?n.tierCore:e==="support"?n.tierSupport:n.tierSide,de=(e,o)=>{let s=u("span","vam-relevance-tag");s.dataset.tier=e,o&&(s.title=o);let l=u("span","vam-relevance-icon");return l.append(A(In[e])),s.append(l,u("span",void 0,Te(e))),s};a.className="vam-app";let Z=u("div","vam-toolbar"),ae=u("h1","vam-map-switcher"),we=u("span","vam-shared");Z.append(ae,we);let J=u("div","vam-toolbar-actions"),O=u("select","vam-language");if(M){for(let e of y){let o=u("option",void 0,(lt=m.names[e])!=null?lt:ce(e));o.value=e,re&&e===H&&(o.dataset.original="1"),O.append(o)}O.value=C,J.append(O)}let ue=u("span","vam-made-with"),K=u("a","vam-install");K.href=wn,K.target="_blank",K.rel="noopener noreferrer",J.append(ue,K),Z.append(J);let $=u("div","vam-translate-note");$.hidden=!0;let U=u("div","vam-workspace"),T=u("div","vam-viewport"),j=u("div","vam-stage");j.setAttribute("role","tree");let Q=t.createElementNS(_e,"svg");Q.setAttribute("class","vam-edges"),Q.setAttribute("aria-hidden","true"),j.append(Q),T.append(j);let Me=u("div","vam-canvas-overlay"),se=u("div","vam-map-tools"),pe=u("span","vam-goal"),Ze=u("span","vam-goal-text");pe.append(A("target"),Ze);let Je=u("span","vam-canvas-hint"),Y=u("div","vam-zoom-controls"),Bt=S(Y,"minus","",()=>fe(1/1.2)),me=u("button","vam-zoom","100%");me.type="button",me.addEventListener("click",e=>{e.stopPropagation(),fe(1/v.zoom)}),Y.append(me);let Wt=S(Y,"plus","",()=>fe(1.2)),Ft=S(Y,"max","",()=>ge()),X=u("button","vam-layout-button");X.type="button",X.setAttribute("aria-haspopup","menu"),X.setAttribute("aria-expanded","false"),Y.append(X);let _=u("div","vam-layout-menu");_.setAttribute("role","menu"),_.hidden=!0,Y.append(_),Me.append(se,Je,Y);let w=u("aside","vam-inspector");w.hidden=!0,U.append(T,Me,w),a.replaceChildren(...M?[Z,$,U]:[Z,U]);let v={x:0,y:0,zoom:1},B=null,De=!1,Ne=Number(zt(Ot))||Nn,I=new Map,Kt=()=>{let e=new Set,o=(s,l)=>{var f;for(let x of(f=h.get(s.id))!=null?f:[])l&&e.add(x.id),o(x,l||x.collapsed)};for(let s of c)s.parentId||o(s,s.collapsed);return e},jt=e=>{var s,l;let o=0;for(let f=e.parentId;f&&!(++o>c.length);f=(l=(s=g.get(f))==null?void 0:s.parentId)!=null?l:null);return o},Qe=()=>pt(T.getBoundingClientRect().top,se.hidden?void 0:se.getBoundingClientRect());function G(){j.style.transform=`translate(${v.x}px, ${v.y}px) scale(${v.zoom})`;let e=`${Math.round(v.zoom*100)}%`;me.textContent=e,me.setAttribute("aria-label",Ee(n.zoomReset,e))}function fe(e,o){let s=o!=null?o:{x:T.clientWidth/2,y:T.clientHeight/2},l=Math.min(Ln,Math.max(Sn,v.zoom*e)),f=l/v.zoom;v={x:s.x-(s.x-v.x)*f,y:s.y-(s.y-v.y)*f,zoom:l},G()}let Oe=!1;function ge(){if(!I.size)return;if(!T.clientWidth||!T.clientHeight){Oe=!0;return}let e=1/0,o=1/0,s=-1/0,l=-1/0;for(let f of I.values())e=Math.min(e,f.offsetLeft),o=Math.min(o,f.offsetTop),s=Math.max(s,f.offsetLeft+(f.offsetWidth||kn)),l=Math.max(l,f.offsetTop+f.offsetHeight);v=ft({minX:e,minY:o,maxX:s,maxY:l},{width:T.clientWidth,height:T.clientHeight},Qe()),G()}function Xt(e){let o=I.get(e);o&&(v=mt(v,{x:o.offsetLeft+o.offsetWidth/2,y:o.offsetTop+o.offsetHeight/2},{width:T.clientWidth,height:T.clientHeight},Qe()),G())}function le(){var e;Q.replaceChildren();for(let o of c){let s=o.parentId?I.get(o.parentId):void 0,l=I.get(o.id);if(!s||!l)continue;let f=t.createElementNS(_e,"path");f.setAttribute("d",Ht(s.offsetLeft+s.offsetWidth,s.offsetTop+s.offsetHeight/2,l.offsetLeft,l.offsetTop+l.offsetHeight/2)),f.setAttribute("class",((e=p.get(o.id))==null?void 0:e.tier)==="side"?"vam-edge vam-edge-side":"vam-edge"),Q.append(f)}}let Pe=0,et=()=>{Pe||(Pe=window.requestAnimationFrame(()=>{Pe=0,le()}))},ze=e=>{let o=I.get(e),s=g.get(e);!o||!s||(o.style.left=`${s.x}px`,o.style.top=`${s.y}px`)};function Ve(){var o,s;for(let l of I.values())l.remove();I.clear();let e=Kt();for(let l of c){if(e.has(l.id))continue;let f=p.get(l.id),x=ie(f),R=dt(c,l.id).size,D=Pt(f.tier)?f.tier:void 0,E=u("div",`vam-node${l.id===B?" is-selected":""}`);E.dataset.nodeId=l.id,E.dataset.status=f.status==="completed"?"completed":"idea",D&&(E.dataset.relevance=D),E.tabIndex=0,E.setAttribute("role","treeitem"),E.setAttribute("aria-level",String(jt(l)+1)),E.setAttribute("aria-selected",String(l.id===B)),E.setAttribute("aria-label",String((o=x.title)!=null?o:"")),R&&E.setAttribute("aria-expanded",String(!l.collapsed));let z=u("div","vam-node-header");E.append(z),f.status!=="completed"&&z.append(u("span","vam-status vam-status-idea",n.toResearch)),D&&z.append(de(D,typeof x.reason=="string"?x.reason:void 0));let W=u("div","vam-node-tools");E.append(W),R&&N(l.collapsed?z:W,l.collapsed?Ee(n.expandCount,R):n.collapse,"vam-collapse-button",()=>{l.collapsed=!l.collapsed,$e(l.id)}).setAttribute("aria-expanded",String(!l.collapsed)),N(W,n.detailsButton,void 0,()=>he(l.id)),E.append(u("h3","vam-card-title",String((s=x.title)!=null?s:""))),typeof x.summary=="string"&&x.summary.trim()&&E.append(u("p","vam-card-summary",x.summary)),E.addEventListener("click",()=>{De||he(l.id)}),E.addEventListener("keydown",L=>{L.target===E&&(L.key==="Enter"||L.key===" ")&&(L.preventDefault(),he(l.id))}),E.addEventListener("pointerdown",L=>Yt(L,l,E)),j.append(E),I.set(l.id,E),ze(l.id)}}function Se(){ut(c,void 0,o=>{var s;return(s=I.get(o))==null?void 0:s.offsetHeight}).forEach((o,s)=>{c[s].x=o.x,c[s].y=o.y});for(let o of I.keys())ze(o)}function $e(e){var l;let o=e?(l=I.get(e))==null?void 0:l.getBoundingClientRect():void 0;Ve(),Se(),le();let s=e?I.get(e):void 0;if(s){if(o){let f=s.getBoundingClientRect();v={...v,x:v.x+o.left-f.left,y:v.y+o.top-f.top},G()}s.focus({preventScroll:!0})}}function Yt(e,o,s){if(e.button!==0||!e.isPrimary||e.target.closest("button"))return;let l=e.clientX,f=e.clientY,x=o.x,R=o.y,D=!1,E=W=>{let L=W.clientX-l,V=W.clientY-f;if(!D){if(Math.hypot(L,V)<=Cn)return;D=!0,s.classList.add("is-dragging"),s.setPointerCapture(W.pointerId)}o.x=x+L/v.zoom,o.y=R+V/v.zoom,ze(o.id),et()},z=()=>{s.removeEventListener("pointermove",E),s.removeEventListener("pointerup",z),s.removeEventListener("pointercancel",z),s.classList.remove("is-dragging"),D&&(De=!0,window.setTimeout(()=>De=!1,0))};s.addEventListener("pointermove",E),s.addEventListener("pointerup",z),s.addEventListener("pointercancel",z)}let Ue=e=>Math.round(Math.min(Math.max(Ge,e),Math.max(Ge,U.clientWidth*.7)));function Le(){let e=window.matchMedia("(max-width: 600px)").matches;if(w.hidden||e){w.style.removeProperty("width"),Me.style.removeProperty("right");return}let o=Ue(Ne);w.style.width=`${o}px`,Me.style.right=`${o}px`,k.setAttribute("aria-valuenow",String(o)),k.setAttribute("aria-valuemax",String(Ue(1/0)))}let k=u("div","vam-inspector-resizer");k.setAttribute("role","separator"),k.setAttribute("aria-orientation","vertical"),k.setAttribute("aria-label",n.resizePanel),k.setAttribute("aria-valuemin",String(Ge)),k.tabIndex=0;let ke=(e,o)=>{Ne=Ue(e),Le(),o&&Vt(Ot,String(Ne))};k.addEventListener("pointerdown",e=>{e.preventDefault();let o=e.clientX,s=w.offsetWidth;k.setPointerCapture(e.pointerId),k.classList.add("is-resizing"),t.body.classList.add("vam-resizing");let l=x=>ke(s+o-x.clientX,!1),f=()=>{k.removeEventListener("pointermove",l),k.removeEventListener("pointerup",f),k.removeEventListener("pointercancel",f),k.classList.remove("is-resizing"),t.body.classList.remove("vam-resizing"),ke(Ne,!0)};k.addEventListener("pointermove",l),k.addEventListener("pointerup",f),k.addEventListener("pointercancel",f)}),k.addEventListener("keydown",e=>{let o=e.shiftKey?48:16;if(e.key==="ArrowLeft")ke(w.offsetWidth+o,!0);else if(e.key==="ArrowRight")ke(w.offsetWidth-o,!0);else return;e.preventDefault()}),window.addEventListener("resize",()=>{Le(),G()});function Be(){B=null;for(let e of I.values())e.classList.remove("is-selected"),e.setAttribute("aria-selected","false");w.hidden=!0,U.classList.remove("has-inspector"),w.replaceChildren(),Le()}function he(e){var E,z,W;let o=g.get(e),s=p.get(e);if(!o||!s)return;let l={...s,...ie(s)};B=e;for(let[L,V]of I)V.classList.toggle("is-selected",L===e),V.setAttribute("aria-selected",String(L===e));w.replaceChildren(k);let f=u("div","vam-inspector-heading");f.append(u("strong",void 0,n.topicDetails)),N(f,n.close,void 0,Be),w.append(f,u("h3",void 0,String((E=l.title)!=null?E:"")));let x=Pt(l.tier)?l.tier:void 0;if(x){let L=u("div","vam-inspector-why");L.append(de(x));let V=typeof l.reason=="string"&&l.reason.trim()?l.reason:l.manual?n.manualReason:"";V&&L.append(u("span",void 0,V)),w.append(L)}typeof l.summary=="string"&&l.summary.trim()&&w.append(u("p","vam-sample-summary",l.summary));let R=u("div","vam-sample-detail");typeof l.detailHtml=="string"&&l.detailHtml.trim()?l.compact?It(t,R,l.detailHtml,l.compact,d,n):Ye(t,R,l.detailHtml,d,n):R.append(u("p","vam-inspector-empty",n.noContent)),w.append(R);let D=(z=h.get(e))!=null?z:[];if(D.length){let L=u("div","vam-subtopics");L.append(u("strong",void 0,n.subtopics));for(let V of D)N(L,String((W=ie(p.get(V.id)).title)!=null?W:""),void 0,()=>{o.collapsed&&(o.collapsed=!1,$e(o.id)),he(V.id),Xt(V.id)});w.append(L)}w.hidden=!1,U.classList.add("has-inspector"),Le(),w.scrollTop=0}let We=e=>{Fe(c,e),$e(),ge()},ye=e=>{_.hidden||(_.hidden=!0,X.setAttribute("aria-expanded","false"),e&&X.focus())};function Gt(){_.replaceChildren();let e=[{label:n.collapseAll,run:()=>We(0)},{label:n.expandAll,run:()=>We(null)},...[1,2,3].map(o=>({label:Ee(n.expandToLevel,o),run:()=>We(o)})),null,{label:n.autoLayout,run:()=>{Se(),le()}}];for(let o of e){if(!o){_.append(u("hr"));continue}let s=u("button",void 0,o.label);s.type="button",s.setAttribute("role","menuitem"),s.addEventListener("click",l=>{l.stopPropagation(),ye(!0),o.run()}),_.append(s)}}let tt=()=>Array.from(_.querySelectorAll("button"));X.addEventListener("click",e=>{var o;if(e.stopPropagation(),!_.hidden)return ye(!0);_.hidden=!1,X.setAttribute("aria-expanded","true"),(o=tt()[0])==null||o.focus()}),_.addEventListener("keydown",e=>{let o=tt(),s=o.indexOf(t.activeElement);if(e.key==="ArrowDown")o[(s+1)%o.length].focus();else if(e.key==="ArrowUp")o[(s-1+o.length)%o.length].focus();else if(e.key==="Home")o[0].focus();else if(e.key==="End")o[o.length-1].focus();else return e.key==="Tab"?ye(!1):void 0;e.preventDefault()}),t.addEventListener("pointerdown",e=>{!_.hidden&&!Y.contains(e.target)&&ye(!1)}),t.addEventListener("keydown",e=>{if(e.key==="Escape"){if(!_.hidden)ye(!0);else if(!w.hidden){let o=B?I.get(B):void 0;Be(),o==null||o.focus({preventScroll:!0})}}});function nt(){let e=Ae();if(t.title=e.title,ae.textContent=e.title,j.setAttribute("aria-label",e.title),we.textContent=n.readOnly,ue.textContent=n.madeWithVam,K.textContent=n.install,O.setAttribute("aria-label",n.language),O.title=n.language,re)for(let s of Array.from(O.options))s.dataset.original&&(s.textContent=n.originalText);e.goal?(Ze.textContent=Ee(n.goal,e.goal),pe.title=e.goal,pe.parentElement||se.append(pe),se.hidden=!1):(pe.remove(),se.hidden=!0),Je.textContent=n.hint;let o=(s,l)=>{s.setAttribute("aria-label",l),s.title=l};if(o(Bt,n.zoomOut),o(Wt,n.zoomIn),o(Ft,n.showAll),X.textContent=n.layout,w.setAttribute("aria-label",n.topicDetails),k.setAttribute("aria-label",n.resizePanel),Gt(),oe()){let s=re?n.aiTranslatedUnknown:Ee(n.aiTranslated,ce(H,C));$.textContent=`${s} ${n.imageTextUntranslated}`,$.hidden=!1}else $.hidden=!0;G()}function qt(e){if(e===C||!y.includes(e))return;C=e,n=ne(e),b&&Vt(b,e),t.documentElement.lang=e;let o=w.scrollTop;nt(),Ve(),le(),B!==null&&g.has(B)&&(he(B),w.scrollTop=o),et()}O.addEventListener("change",()=>qt(O.value));let P=new Map,be=0,Ce=!1;T.addEventListener("pointerdown",e=>{if(!(e.target.closest(".vam-node")||e.pointerType==="mouse"&&e.button!==0)&&(T.setPointerCapture(e.pointerId),P.set(e.pointerId,{x:e.clientX,y:e.clientY}),T.classList.add("is-panning"),P.size===1&&(Ce=!1),P.size===2)){let[o,s]=Array.from(P.values());be=Math.hypot(o.x-s.x,o.y-s.y)}}),T.addEventListener("pointermove",e=>{let o=P.get(e.pointerId);if(!o)return;if(P.set(e.pointerId,{x:e.clientX,y:e.clientY}),P.size===2&&be){let[f,x]=Array.from(P.values()),R=Math.hypot(f.x-x.x,f.y-x.y),D=T.getBoundingClientRect();fe(R/be,{x:(f.x+x.x)/2-D.left,y:(f.y+x.y)/2-D.top}),be=R,Ce=!0;return}let s=e.clientX-o.x,l=e.clientY-o.y;Ce||(Ce=Math.abs(s)+Math.abs(l)>0),v={...v,x:v.x+s,y:v.y+l},G()});let rt=e=>{P.delete(e.pointerId)&&(P.size<2&&(be=0),P.size||(T.classList.remove("is-panning"),!Ce&&e.type==="pointerup"&&!w.hidden&&Be()))};T.addEventListener("pointerup",rt),T.addEventListener("pointercancel",rt),T.addEventListener("wheel",e=>{e.preventDefault();let o=T.getBoundingClientRect();e.ctrlKey||e.metaKey||e.deltaMode===1||!e.deltaX&&Math.abs(e.deltaY)>=50?fe(Math.exp(-e.deltaY*(e.deltaMode===0?.0015:.04)),{x:e.clientX-o.left,y:e.clientY-o.top}):(v={...v,x:v.x-e.deltaX,y:v.y-e.deltaY},G())},{passive:!1}),typeof ResizeObserver!="undefined"&&new ResizeObserver(()=>{Oe&&(Oe=!1,ge())}).observe(T),nt(),Fe(c,1),Ve(),Se(),le(),ge();let ot=t.fonts;ot&&ot.ready.then(()=>{B!==null||P.size||(Se(),le(),ge())})}Ut(document);})();';
-var SHARE_VIEWER_CSS = '/* Share viewer styles. Order: tokens and base (this part), the card, canvas and inspector rules extracted from styles.css, then the viewer-only parts below the marker. */\n:root {\n  color-scheme: light;\n  --background-primary: #ffffff;\n  --background-secondary: #f6f6f6;\n  --background-modifier-border: #e0e0e0;\n  --background-modifier-border-hover: #cfcfcf;\n  --background-modifier-border-focus: #8a5cf5;\n  --background-modifier-hover: rgba(0, 0, 0, 0.05);\n  --background-modifier-active-hover: rgba(138, 92, 245, 0.15);\n  --text-normal: #222222;\n  --text-muted: #5c5c5c;\n  --text-faint: #8a8a8a;\n  --text-on-accent: #ffffff;\n  --text-error: #d1243c;\n  --interactive-accent: #8a5cf5;\n  --text-accent: #6f42e0;\n  --color-red: #e93147;\n  --color-red-rgb: 233, 49, 71;\n  --color-orange: #e9973f;\n  --shadow-s: 0 1px 2px rgba(0, 0, 0, 0.06), 0 2px 8px rgba(0, 0, 0, 0.05);\n  --shadow-l: 0 8px 28px rgba(0, 0, 0, 0.16);\n  --radius-s: 4px;\n  --radius-m: 8px;\n  --font-ui-smaller: 12px;\n  --font-ui-small: 13px;\n  --font-ui-medium: 15px;\n  --input-height: 30px;\n  --size-4-3: 12px;\n  --font-interface: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang TC", "PingFang SC", "Noto Sans TC", "Noto Sans SC", "Microsoft JhengHei", Roboto, sans-serif;\n  --font-monospace: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;\n}\n@media (prefers-color-scheme: dark) {\n  :root {\n    color-scheme: dark;\n    --background-primary: #1e1e1e;\n    --background-secondary: #262626;\n    --background-modifier-border: #363636;\n    --background-modifier-border-hover: #4a4a4a;\n    --background-modifier-border-focus: #a88bfa;\n    --background-modifier-hover: rgba(255, 255, 255, 0.06);\n    --background-modifier-active-hover: rgba(168, 139, 250, 0.2);\n    --text-normal: #dadada;\n    --text-muted: #b3b3b3;\n    --text-faint: #8c8c8c;\n    --text-error: #fb464c;\n    --text-accent: #a88bfa;\n    --color-red: #fb464c;\n    --color-red-rgb: 251, 70, 76;\n    --shadow-s: 0 1px 2px rgba(0, 0, 0, 0.3), 0 2px 8px rgba(0, 0, 0, 0.25);\n    --shadow-l: 0 8px 28px rgba(0, 0, 0, 0.5);\n  }\n}\n*, *::before, *::after { box-sizing: border-box; }\nhtml, body { height: 100%; margin: 0; }\nbody { background: var(--background-primary); color: var(--text-normal); font-family: var(--font-interface); font-size: var(--font-ui-small); overflow: hidden; -webkit-text-size-adjust: 100%; }\nbutton { font: inherit; font-size: var(--font-ui-small); color: var(--text-normal); background: var(--background-primary); border: 1px solid var(--background-modifier-border); border-radius: var(--radius-s); padding: 4px 10px; height: 30px; cursor: pointer; display: inline-flex; align-items: center; gap: 4px; white-space: nowrap; }\nbutton:hover { background: var(--background-modifier-hover); }\nbutton:focus-visible, a:focus-visible, [tabindex]:focus-visible { outline: 2px solid var(--interactive-accent); outline-offset: 1px; }\n.svg-icon { width: 16px; height: 16px; stroke: currentColor; fill: none; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; flex: none; }\n.vam-app { display: flex; flex-direction: column; height: 100%; }\n/* From styles.css, unchanged. */\n.vam-toolbar { display: flex; align-items: center; flex-wrap: wrap; gap: 6px 14px; min-height: 48px; padding: 6px 10px 6px 6px; border-bottom: 1px solid var(--background-modifier-border); background: var(--background-primary); flex-shrink: 0; }\n.vam-toolbar button, .vam-map-tools button, .vam-actions button { font-size: var(--font-ui-small); }\n.vam-toolbar .vam-map-switcher { display: inline-flex; align-items: center; gap: 6px; font-size: var(--font-ui-medium); min-width: 0; max-width: min(460px, 45%); height: auto; padding: 6px 8px; border: 0; border-radius: var(--radius-m); background: transparent; box-shadow: none; color: var(--text-normal); cursor: pointer; }\n.vam-toolbar .vam-map-switcher:hover { background: var(--background-modifier-hover); }\n.vam-map-switcher:focus-visible { outline: 2px solid var(--interactive-accent); outline-offset: 1px; }\n.vam-map-switcher-icon { display: inline-flex; flex-shrink: 0; color: var(--text-faint); }\n.vam-map-switcher-icon svg { width: 14px; height: 14px; }\n.vam-toolbar-actions { display: flex; align-items: center; gap: 2px; margin-left: auto; }\n.vam-canvas-overlay { position: absolute; z-index: 4; inset: 0; pointer-events: none; }\n.vam-canvas-overlay > * { pointer-events: auto; }\n.vam-map-tools, .vam-zoom-controls { position: absolute; display: flex; align-items: center; gap: 2px; padding: 4px; border: 1px solid var(--background-modifier-border); border-radius: var(--radius-m); background: var(--background-primary); box-shadow: var(--shadow-s); }\n.vam-map-tools { top: 12px; left: 12px; flex-wrap: wrap; max-width: calc(100% - 24px); }\n.vam-map-tools button:not(.mod-cta), .vam-zoom-controls button { background: transparent; box-shadow: none; }\n.vam-map-tools button:focus-visible, .vam-zoom-controls button:focus-visible, .vam-node-tools button:focus-visible { outline: 2px solid var(--interactive-accent); outline-offset: 1px; }\n.vam-map-tools button:not(.mod-cta):hover, .vam-zoom-controls button:hover { background: var(--background-modifier-hover); }\n.vam-map-tools button.is-active { background: var(--background-modifier-active-hover); box-shadow: inset 0 0 0 1px var(--interactive-accent); color: var(--text-accent); }\n.vam-zoom-controls { right: 12px; bottom: 12px; }\n.vam-zoom-controls > .vam-layout-button { padding: 0 8px; font-size: var(--font-ui-small); }\n.vam-layout-button::after { content: "\u25BE" / ""; margin-left: 4px; color: var(--text-muted); }\n.vam-zoom { min-width: 52px; padding: 0 6px; text-align: center; font-variant-numeric: tabular-nums; color: var(--text-muted); }\n.vam-canvas-overlay > .vam-canvas-hint { position: absolute; left: 12px; bottom: 12px; max-width: 50%; padding: 6px 10px; border: 1px solid var(--background-modifier-border); border-radius: var(--radius-m); background: var(--background-primary); box-shadow: var(--shadow-s); color: var(--text-muted); pointer-events: none; }\n.vam-workspace { display: flex; flex: 1; min-height: 0; min-width: 0; position: relative; }\n.vam-viewport { position: relative; flex: 1; min-width: 0; overflow: hidden; cursor: grab; touch-action: none; background-color: var(--background-secondary); background-image: radial-gradient(var(--background-modifier-border) 1px, transparent 1px); background-size: 24px 24px; }\n.vam-viewport.is-panning { cursor: grabbing; }\n.vam-stage { position: absolute; left: 0; top: 0; width: 1px; height: 1px; transform-origin: 0 0; }\n.vam-edges { position: absolute; left: 0; top: 0; width: 1px; height: 1px; overflow: visible; pointer-events: none; }\n.vam-edge { fill: none; stroke: var(--interactive-accent); stroke-width: 2; opacity: 0.55; }\n.vam-node { --vam-card-bg: var(--background-primary); position: absolute; box-sizing: border-box; width: 280px; padding: 12px 14px 14px; border: 1px solid var(--background-modifier-border); border-radius: 12px; background: var(--vam-card-bg); box-shadow: var(--shadow-s); cursor: grab; user-select: none; transition: border-color 160ms ease-out, box-shadow 160ms ease-out; }\n.vam-node:hover { border-color: var(--background-modifier-border-hover); }\n.vam-node > .vam-card-label { position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0; overflow: hidden; white-space: nowrap; border: 0; }\n.vam-edge-convergence { stroke: var(--interactive-accent); stroke-dasharray: 5 5; opacity: .8; }\n.vam-node:active { cursor: grabbing; }\n.vam-node.is-selected { border-color: var(--interactive-accent); outline: 2px solid var(--interactive-accent); outline-offset: 2px; }\n.vam-node:focus-visible { outline: 2px dashed var(--interactive-accent); outline-offset: 5px; }\n.vam-node-header { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 6px; }\n.vam-node-header button { font-size: var(--font-ui-smaller); height: 24px; padding: 2px 8px; }\n.vam-node-header > .vam-collapse-button { margin-left: auto; font-variant-numeric: tabular-nums; }\n.vam-node > .vam-node-tools { position: absolute; right: 10px; bottom: calc(100% - 6px); z-index: 3; display: flex; align-items: center; gap: 2px; padding: 3px; border: 1px solid var(--background-modifier-border); border-radius: 8px; background: var(--background-primary); box-shadow: var(--shadow-s); opacity: 0; pointer-events: none; transform: translateY(4px); transition: opacity 120ms ease-out, transform 120ms ease-out; width: max-content; }\n.vam-node-tools button { font-size: var(--font-ui-smaller); height: 26px; padding: 2px 8px; }\n.vam-node-tools > .vam-collapse-button { order: -1; }\n.vam-status { display: inline-block; max-width: 100%; overflow: hidden; text-overflow: ellipsis; padding: 0; font-size: var(--font-ui-smaller); color: var(--text-muted); white-space: nowrap; }\n.vam-status::before { content: ""; display: inline-block; margin-right: 6px; vertical-align: 1px; width: 7px; height: 7px; box-sizing: border-box; border-radius: 50%; background: var(--text-faint); }\n.vam-status-idea::before { border: 1.5px solid var(--text-faint); background: transparent; }\n.vam-status-running { color: var(--text-accent); }\n.vam-status-running::before { background: var(--interactive-accent); animation: vam-pulse 1.4s ease-in-out infinite; }\n.vam-status-completed::before { background: var(--interactive-accent); }\n.vam-status-queued { color: var(--text-accent); }\n.vam-status-queued::before { border: 1.5px solid var(--interactive-accent); background: transparent; }\n.vam-status-error { color: var(--color-red); }\n.vam-status-error::before { background: var(--color-red); }\n.vam-node-header button.vam-badge-new { border: 0; cursor: pointer; }\n.vam-card-title { color: var(--text-normal); font-size: var(--font-ui-medium); font-weight: 650; line-height: 1.4; margin: 8px 0 4px; overflow-wrap: anywhere; }\n.vam-card-summary { margin: 0; color: var(--text-muted); font-size: var(--font-ui-small); line-height: 1.55; overflow-wrap: anywhere; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 3; overflow: hidden; }\n.vam-card-error { margin: 6px 0 0; color: var(--color-red); font-size: var(--font-ui-smaller); line-height: 1.45; overflow-wrap: anywhere; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow: hidden; }\n.vam-node:not([data-aim-kind])[data-status="idea"] { border-style: dashed; border-color: var(--background-modifier-border-hover); box-shadow: none; }\n.vam-card-summary.is-preview { font-style: italic; color: var(--text-faint); }\n.vam-card-preview-label { font-style: normal; font-weight: 600; margin-right: 6px; }\n.vam-node:not([data-aim-kind])[data-status="idea"] .vam-card-summary { color: var(--text-faint); }\n.vam-node:not([data-aim-kind])[data-status="running"] { border-color: var(--interactive-accent); }\n.vam-node:not([data-aim-kind])[data-status="queued"] { --vam-card-bg: color-mix(in srgb, var(--interactive-accent) 7%, var(--background-primary)); border-style: dashed; border-color: color-mix(in srgb, var(--interactive-accent) 60%, transparent); }\n.vam-node:not([data-aim-kind])[data-status="running"]::after { content: ""; position: absolute; left: 14px; right: 14px; top: -1px; height: 2px; border-radius: 2px; background: linear-gradient(90deg, transparent, var(--interactive-accent), transparent); background-size: 50% 100%; background-repeat: no-repeat; animation: vam-scan 1.6s ease-in-out infinite; }\n.vam-node:not([data-aim-kind])[data-status="error"] { border-color: rgba(var(--color-red-rgb), 0.55); }\n.vam-relevance-tag { display: inline-flex; align-items: center; gap: 4px; max-width: 100%; font-size: var(--font-ui-smaller); line-height: 1.4; white-space: nowrap; }\n.vam-relevance-tag-name { position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0; overflow: hidden; white-space: nowrap; }\n.vam-relevance-tag > .vam-relevance-icon { display: inline-flex; flex: none; }\n.vam-relevance-tag .svg-icon { width: 14px; height: 14px; }\n.vam-relevance-tag[data-tier="core"] { color: var(--text-accent); }\n.vam-relevance-tag[data-tier="support"] { color: var(--text-muted); }\n.vam-relevance-tag[data-tier="side"] { color: var(--text-faint); }\n.vam-node[data-relevance="side"] { opacity: .5; transition: border-color 160ms ease-out, box-shadow 160ms ease-out, opacity 160ms ease-out; }\n.vam-node[data-relevance="side"]:hover, .vam-node[data-relevance="side"]:focus-within, .vam-node[data-relevance="side"].is-selected { opacity: 1; }\n.vam-edge.vam-edge-side { opacity: .2; }\n.theme-dark .vam-viewport { background-color: var(--background-primary); }\n.theme-dark .vam-node { --vam-card-bg: var(--background-secondary); }\n.vam-inspector { width: 300px; flex-shrink: 0; padding: 16px; overflow-y: auto; border-left: 1px solid var(--background-modifier-border); background: var(--background-primary); }\n.vam-inspector-heading { display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px; }\n.vam-inspector-heading strong { font-size: var(--font-ui-medium); }\n.vam-node.is-readonly, .vam-node.is-readonly:active { cursor: pointer; }\n.vam-sample-summary { color: var(--text-muted); line-height: 1.6; }\n.vam-sample-detail { line-height: 1.6; }\n@media (max-width: 900px) {\n  .vam-inspector { width: 260px; }\n}\n@media (max-width: 600px) {\n  .vam-inspector { position: absolute; right: 0; top: 0; bottom: 0; width: min(300px, 85%); z-index: 5; box-shadow: var(--shadow-l); }\n  .vam-workspace.has-inspector .vam-zoom-controls { right: auto; left: 12px; }\n}\n@keyframes vam-pulse { 50% { opacity: 0.35; } }\n@keyframes vam-scan { from { background-position: -100% 0; } to { background-position: 200% 0; } }\n/* Viewer-only parts: the pieces Obsidian would otherwise provide. */\n.vam-toolbar { padding-left: max(10px, env(safe-area-inset-left, 0px)); padding-right: max(10px, env(safe-area-inset-right, 0px)); }\n.vam-toolbar .vam-map-switcher { cursor: default; margin: 0; font-weight: 600; font-family: inherit; line-height: 1.3; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; display: block; }\n.vam-toolbar .vam-map-switcher:hover { background: transparent; }\n.vam-shared { font-size: var(--font-ui-smaller); color: var(--text-faint); }\n.vam-toolbar-actions { gap: 10px; flex-wrap: wrap; justify-content: flex-end; }\n.vam-made-with { font-size: var(--font-ui-smaller); color: var(--text-faint); }\n.vam-install { display: inline-flex; align-items: center; height: 30px; padding: 4px 12px; border-radius: var(--radius-s); background: var(--interactive-accent); color: var(--text-on-accent); font-size: var(--font-ui-small); text-decoration: none; white-space: nowrap; }\n.vam-install:hover { filter: brightness(1.08); }\n.vam-language { font: inherit; font-size: var(--font-ui-small); height: 30px; max-width: 11em; padding: 0 8px; color: var(--text-normal); background: var(--background-primary); border: 1px solid var(--background-modifier-border); border-radius: var(--radius-s); cursor: pointer; }\n.vam-language:hover { background: var(--background-modifier-hover); }\n.vam-translate-note { flex-shrink: 0; padding: 5px max(10px, env(safe-area-inset-left, 0px)); font-size: var(--font-ui-smaller); line-height: 1.4; color: var(--text-muted); background: var(--background-secondary); border-bottom: 1px solid var(--background-modifier-border); }\n.vam-translate-note[hidden] { display: none; }\n.vam-goal { display: inline-flex; align-items: center; gap: 6px; min-width: 0; max-width: 22em; padding: 0 6px; line-height: var(--input-height); font-size: var(--font-ui-small); color: var(--text-normal); }\n.vam-goal-text { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }\n.vam-goal .svg-icon { color: var(--text-accent); }\n.vam-map-tools[hidden] { display: none; }\n.vam-zoom-controls { right: max(12px, env(safe-area-inset-right, 0px)); bottom: max(12px, env(safe-area-inset-bottom, 0px)); }\n.vam-zoom-controls button { background: transparent; }\n.vam-node { touch-action: none; }\n.vam-node.is-dragging { cursor: grabbing; z-index: 2; }\n.vam-node .vam-node-tools button, .vam-node-header button { background: transparent; border: 0; }\n.vam-node-header > .vam-collapse-button { border: 1px solid var(--background-modifier-border); background: var(--background-primary); }\n.vam-layout-menu { position: absolute; right: 0; bottom: calc(100% + 6px); z-index: 6; display: flex; flex-direction: column; min-width: 190px; padding: 4px; border: 1px solid var(--background-modifier-border); border-radius: var(--radius-m); background: var(--background-primary); box-shadow: var(--shadow-l); }\n.vam-layout-menu[hidden] { display: none; }\n.vam-layout-menu button { justify-content: flex-start; width: 100%; border: 0; background: transparent; height: 30px; }\n.vam-layout-menu hr { width: 100%; margin: 4px 0; border: 0; border-top: 1px solid var(--background-modifier-border); }\n.vam-zoom-controls { overflow: visible; }\n.vam-inspector { font-size: 14px; line-height: 1.6; color: var(--text-normal); }\n@media (min-width: 601px) { .vam-inspector { position: relative; } }\n.vam-inspector[hidden] { display: none; }\n.vam-inspector-heading button { height: 26px; }\n.vam-inspector h3 { font-size: 18px; line-height: 1.35; margin: 0 0 8px; overflow-wrap: anywhere; }\n.vam-inspector-why { display: flex; flex-direction: column; gap: 4px; padding: 8px 10px; margin: 0 0 12px; border: 1px solid var(--background-modifier-border); border-radius: var(--radius-m); color: var(--text-muted); font-size: var(--font-ui-small); }\n.vam-inspector-resizer { position: absolute; left: -4px; top: 0; bottom: 0; width: 8px; cursor: col-resize; touch-action: none; z-index: 2; }\n.vam-inspector-resizer:hover, .vam-inspector-resizer.is-resizing { background: var(--background-modifier-active-hover); }\n.vam-inspector-empty { color: var(--text-muted); }\n.vam-subtopics { display: flex; flex-direction: column; gap: 4px; margin-top: 16px; padding-top: 10px; border-top: 1px solid var(--background-modifier-border); }\n.vam-subtopics strong { font-size: var(--font-ui-small); color: var(--text-muted); font-weight: 500; }\n.vam-subtopics button { justify-content: flex-start; height: auto; min-height: 30px; white-space: normal; text-align: left; }\n/* Reading styles for the note HTML that Obsidian rendered at export time. */\n.vam-sample-detail { overflow-wrap: anywhere; }\n.vam-sample-detail h1, .vam-sample-detail h2, .vam-sample-detail h3, .vam-sample-detail h4, .vam-sample-detail h5, .vam-sample-detail h6 { margin: 18px 0 6px; line-height: 1.35; }\n.vam-sample-detail h1 { font-size: 18px; }\n.vam-sample-detail h2 { font-size: 16px; }\n.vam-sample-detail h3, .vam-sample-detail h4, .vam-sample-detail h5, .vam-sample-detail h6 { font-size: 15px; }\n.vam-sample-detail p { margin: 8px 0; }\n.vam-sample-detail ul, .vam-sample-detail ol { padding-left: 22px; margin: 8px 0; }\n.vam-sample-detail a { color: var(--text-accent); }\n.vam-sample-detail blockquote { margin: 10px 0; padding: 2px 12px; border-left: 3px solid var(--background-modifier-border-hover); color: var(--text-muted); }\n.vam-sample-detail hr { border: 0; border-top: 1px solid var(--background-modifier-border); margin: 14px 0; }\n.vam-sample-detail code { font-family: var(--font-monospace); font-size: 12px; background: var(--background-secondary); padding: 1px 4px; border-radius: 3px; }\n.vam-sample-detail pre { overflow-x: auto; background: var(--background-secondary); padding: 8px; border-radius: 6px; }\n.vam-sample-detail pre code { background: transparent; padding: 0; }\n.vam-sample-detail img { max-width: 100%; height: auto; }\n.vam-sample-detail svg { max-width: 100%; height: auto; }\n.vam-sample-detail .mermaid, .vam-sample-detail .vam-table-scroll { overflow-x: auto; margin: 10px 0; }\n.vam-sample-detail table { border-collapse: collapse; font-size: 12.5px; min-width: 100%; }\n.vam-sample-detail th, .vam-sample-detail td { border: 1px solid var(--background-modifier-border); padding: 4px 6px; text-align: left; vertical-align: top; min-width: 5em; overflow-wrap: normal; word-break: normal; }\n.vam-sample-detail .callout { margin: 10px 0; padding: 8px 12px; border-radius: var(--radius-m); background: color-mix(in srgb, var(--interactive-accent) 9%, transparent); border-left: 3px solid var(--interactive-accent); }\n.vam-sample-detail .callout-title { display: flex; align-items: center; gap: 6px; font-weight: 600; color: var(--text-accent); }\n.vam-sample-detail .callout-icon { display: inline-flex; flex: none; }\n.vam-sample-detail .callout-icon svg { width: 16px; height: 16px; }\n.vam-sample-detail .callout-content p:first-child { margin-top: 4px; }\n.vam-sample-detail .vam-image-source { display: block; margin: 2px 0 8px; color: var(--text-faint); font-size: var(--font-ui-smaller); overflow-wrap: anywhere; }\n.vam-sample-detail .vam-image-omitted { color: var(--text-faint); font-size: var(--font-ui-smaller); }\n.vam-sample-detail .internal-link { color: inherit; text-decoration: none; }\n/* Repeating the class raises specificity above the extracted per-card cursor rules (up to 0,3,0), so no !important is needed. */\n.vam-resizing.vam-resizing.vam-resizing.vam-resizing, .vam-resizing.vam-resizing.vam-resizing.vam-resizing * { cursor: col-resize; user-select: none; }\n@media (max-width: 700px) { .vam-canvas-overlay > .vam-canvas-hint { display: none; } }\n@media (max-width: 600px) { .vam-workspace.has-inspector > .vam-canvas-overlay { right: 0; } .vam-inspector { width: 100%; box-shadow: none; } }\n@media (max-width: 600px) { .vam-inspector-heading { position: sticky; top: 0; z-index: 3; background: var(--background-primary); padding: 8px 0; margin-bottom: 6px; } }\n@media (max-width: 600px) { .vam-inspector-resizer { display: none; } .vam-toolbar .vam-map-switcher { max-width: 100%; } .vam-made-with { display: none; } }\n/* Four :root pseudo-classes (0,4,0) outrank every extracted transition rule without !important. */\n@media (prefers-reduced-motion: reduce) { :root:root:root:root * { transition: none; } }\n';
+var SHARE_VIEWER_CSS = '/* Share viewer styles. Order: tokens and base (this part), the card, canvas and inspector rules extracted from styles.css, then the viewer-only parts below the marker. */\n:root {\n  color-scheme: light;\n  --background-primary: #ffffff;\n  --background-secondary: #f6f6f6;\n  --background-modifier-border: #e0e0e0;\n  --background-modifier-border-hover: #cfcfcf;\n  --background-modifier-border-focus: #8a5cf5;\n  --background-modifier-hover: rgba(0, 0, 0, 0.05);\n  --background-modifier-active-hover: rgba(138, 92, 245, 0.15);\n  --text-normal: #222222;\n  --text-muted: #5c5c5c;\n  --text-faint: #8a8a8a;\n  --text-on-accent: #ffffff;\n  --text-error: #d1243c;\n  --interactive-accent: #8a5cf5;\n  --text-accent: #6f42e0;\n  --color-red: #e93147;\n  --color-red-rgb: 233, 49, 71;\n  --color-orange: #e9973f;\n  --shadow-s: 0 1px 2px rgba(0, 0, 0, 0.06), 0 2px 8px rgba(0, 0, 0, 0.05);\n  --shadow-l: 0 8px 28px rgba(0, 0, 0, 0.16);\n  --radius-s: 4px;\n  --radius-m: 8px;\n  --font-ui-smaller: 12px;\n  --font-ui-small: 13px;\n  --font-ui-medium: 15px;\n  --input-height: 30px;\n  --size-4-3: 12px;\n  --font-interface: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang TC", "PingFang SC", "Noto Sans TC", "Noto Sans SC", "Microsoft JhengHei", Roboto, sans-serif;\n  --font-monospace: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;\n}\n@media (prefers-color-scheme: dark) {\n  :root {\n    color-scheme: dark;\n    --background-primary: #1e1e1e;\n    --background-secondary: #262626;\n    --background-modifier-border: #363636;\n    --background-modifier-border-hover: #4a4a4a;\n    --background-modifier-border-focus: #a88bfa;\n    --background-modifier-hover: rgba(255, 255, 255, 0.06);\n    --background-modifier-active-hover: rgba(168, 139, 250, 0.2);\n    --text-normal: #dadada;\n    --text-muted: #b3b3b3;\n    --text-faint: #8c8c8c;\n    --text-error: #fb464c;\n    --text-accent: #a88bfa;\n    --color-red: #fb464c;\n    --color-red-rgb: 251, 70, 76;\n    --shadow-s: 0 1px 2px rgba(0, 0, 0, 0.3), 0 2px 8px rgba(0, 0, 0, 0.25);\n    --shadow-l: 0 8px 28px rgba(0, 0, 0, 0.5);\n  }\n}\n*, *::before, *::after { box-sizing: border-box; }\nhtml, body { height: 100%; margin: 0; }\nbody { background: var(--background-primary); color: var(--text-normal); font-family: var(--font-interface); font-size: var(--font-ui-small); overflow: hidden; -webkit-text-size-adjust: 100%; }\nbutton { font: inherit; font-size: var(--font-ui-small); color: var(--text-normal); background: var(--background-primary); border: 1px solid var(--background-modifier-border); border-radius: var(--radius-s); padding: 4px 10px; height: 30px; cursor: pointer; display: inline-flex; align-items: center; gap: 4px; white-space: nowrap; }\nbutton:hover { background: var(--background-modifier-hover); }\nbutton:focus-visible, a:focus-visible, [tabindex]:focus-visible { outline: 2px solid var(--interactive-accent); outline-offset: 1px; }\n.svg-icon { width: 16px; height: 16px; stroke: currentColor; fill: none; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; flex: none; }\n.vam-app { display: flex; flex-direction: column; height: 100%; }\n/* From styles.css, unchanged. */\n.vam-toolbar { display: flex; align-items: center; flex-wrap: wrap; gap: 6px 14px; min-height: 48px; padding: 6px 10px 6px 6px; border-bottom: 1px solid var(--background-modifier-border); background: var(--background-primary); flex-shrink: 0; }\n.vam-toolbar button, .vam-map-tools button, .vam-actions button { font-size: var(--font-ui-small); }\n.vam-toolbar .vam-map-switcher { display: inline-flex; align-items: center; gap: 6px; font-size: var(--font-ui-medium); min-width: 0; max-width: min(460px, 45%); height: auto; padding: 6px 8px; border: 0; border-radius: var(--radius-m); background: transparent; box-shadow: none; color: var(--text-normal); cursor: pointer; }\n.vam-toolbar .vam-map-switcher:hover { background: var(--background-modifier-hover); }\n.vam-map-switcher:focus-visible { outline: 2px solid var(--interactive-accent); outline-offset: 1px; }\n.vam-map-switcher-icon { display: inline-flex; flex-shrink: 0; color: var(--text-faint); }\n.vam-map-switcher-icon svg { width: 14px; height: 14px; }\n.vam-toolbar-actions { display: flex; align-items: center; gap: 2px; margin-left: auto; }\n.vam-canvas-overlay { position: absolute; z-index: 4; inset: 0; pointer-events: none; }\n.vam-canvas-overlay > * { pointer-events: auto; }\n.vam-map-tools, .vam-zoom-controls { position: absolute; display: flex; align-items: center; gap: 2px; padding: 4px; border: 1px solid var(--background-modifier-border); border-radius: var(--radius-m); background: var(--background-primary); box-shadow: var(--shadow-s); }\n.vam-map-tools { top: 12px; left: 12px; flex-wrap: wrap; max-width: calc(100% - 24px); }\n.vam-map-tools button:not(.mod-cta), .vam-zoom-controls button { background: transparent; box-shadow: none; }\n.vam-map-tools button:focus-visible, .vam-zoom-controls button:focus-visible, .vam-node-tools button:focus-visible { outline: 2px solid var(--interactive-accent); outline-offset: 1px; }\n.vam-map-tools button:not(.mod-cta):hover, .vam-zoom-controls button:hover { background: var(--background-modifier-hover); }\n.vam-map-tools button.is-active { background: var(--background-modifier-active-hover); box-shadow: inset 0 0 0 1px var(--interactive-accent); color: var(--text-accent); }\n.vam-zoom-controls { right: 12px; bottom: 12px; }\n.vam-zoom-controls > .vam-layout-button { padding: 0 8px; font-size: var(--font-ui-small); }\n.vam-layout-button::after { content: "\u25BE" / ""; margin-left: 4px; color: var(--text-muted); }\n.vam-zoom { min-width: 52px; padding: 0 6px; text-align: center; font-variant-numeric: tabular-nums; color: var(--text-muted); }\n.vam-canvas-overlay > .vam-canvas-hint { position: absolute; left: 12px; bottom: 12px; max-width: 50%; padding: 6px 10px; border: 1px solid var(--background-modifier-border); border-radius: var(--radius-m); background: var(--background-primary); box-shadow: var(--shadow-s); color: var(--text-muted); pointer-events: none; }\n.vam-workspace { display: flex; flex: 1; min-height: 0; min-width: 0; position: relative; }\n.vam-viewport { position: relative; flex: 1; min-width: 0; overflow: hidden; cursor: grab; touch-action: none; background-color: var(--background-secondary); background-image: radial-gradient(var(--background-modifier-border) 1px, transparent 1px); background-size: 24px 24px; }\n.vam-viewport.is-panning { cursor: grabbing; }\n.vam-stage { position: absolute; left: 0; top: 0; width: 1px; height: 1px; transform-origin: 0 0; }\n.vam-edges { position: absolute; left: 0; top: 0; width: 1px; height: 1px; overflow: visible; pointer-events: none; }\n.vam-edge { fill: none; stroke: var(--interactive-accent); stroke-width: 2; opacity: 0.55; }\n.vam-node { --vam-card-bg: var(--background-primary); position: absolute; box-sizing: border-box; width: 280px; padding: 12px 14px 14px; border: 1px solid var(--background-modifier-border); border-radius: 12px; background: var(--vam-card-bg); box-shadow: var(--shadow-s); cursor: grab; user-select: none; transition: border-color 160ms ease-out, box-shadow 160ms ease-out; }\n.vam-node:hover { border-color: var(--background-modifier-border-hover); }\n.vam-node.vam-seamless-growing { border-color: var(--interactive-accent); animation: vam-seamless-breathe 3.6s ease-in-out infinite; }\n.vam-node > .vam-card-label { position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0; overflow: hidden; white-space: nowrap; border: 0; }\n.vam-edge-convergence { stroke: var(--interactive-accent); stroke-dasharray: 5 5; opacity: .8; }\n.vam-node:active { cursor: grabbing; }\n.vam-node.is-selected { border-color: var(--interactive-accent); outline: 2px solid var(--interactive-accent); outline-offset: 2px; }\n.vam-node:focus-visible { outline: 2px dashed var(--interactive-accent); outline-offset: 5px; }\n.vam-node-header { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 6px; }\n.vam-node-header button { font-size: var(--font-ui-smaller); height: 24px; padding: 2px 8px; }\n.vam-node-header > .vam-collapse-button { margin-left: auto; font-variant-numeric: tabular-nums; }\n.vam-node > .vam-node-tools { position: absolute; right: 10px; bottom: calc(100% - 6px); z-index: 3; display: flex; align-items: center; gap: 2px; padding: 3px; border: 1px solid var(--background-modifier-border); border-radius: 8px; background: var(--background-primary); box-shadow: var(--shadow-s); opacity: 0; pointer-events: none; transform: translateY(4px); transition: opacity 120ms ease-out, transform 120ms ease-out; width: max-content; }\n.vam-node-tools button { font-size: var(--font-ui-smaller); height: 26px; padding: 2px 8px; }\n.vam-node-tools > .vam-collapse-button { order: -1; }\n.vam-status { display: inline-block; max-width: 100%; overflow: hidden; text-overflow: ellipsis; padding: 0; font-size: var(--font-ui-smaller); color: var(--text-muted); white-space: nowrap; }\n.vam-status::before { content: ""; display: inline-block; margin-right: 6px; vertical-align: 1px; width: 7px; height: 7px; box-sizing: border-box; border-radius: 50%; background: var(--text-faint); }\n.vam-status-idea::before { border: 1.5px solid var(--text-faint); background: transparent; }\n.vam-status-running { color: var(--text-accent); }\n.vam-status-running::before { background: var(--interactive-accent); animation: vam-pulse 1.4s ease-in-out infinite; }\n.vam-status-completed::before { background: var(--interactive-accent); }\n.vam-status-queued { color: var(--text-accent); }\n.vam-status-queued::before { border: 1.5px solid var(--interactive-accent); background: transparent; }\n.vam-status-error { color: var(--color-red); }\n.vam-status-error::before { background: var(--color-red); }\n.vam-node-header button.vam-badge-new { border: 0; cursor: pointer; }\n.vam-card-title { color: var(--text-normal); font-size: var(--font-ui-medium); font-weight: 650; line-height: 1.4; margin: 8px 0 4px; overflow-wrap: anywhere; }\n.vam-card-summary { margin: 0; color: var(--text-muted); font-size: var(--font-ui-small); line-height: 1.55; overflow-wrap: anywhere; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 3; overflow: hidden; }\n.vam-card-error { margin: 6px 0 0; color: var(--color-red); font-size: var(--font-ui-smaller); line-height: 1.45; overflow-wrap: anywhere; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow: hidden; }\n.vam-node:not([data-aim-kind])[data-status="idea"] { border-style: dashed; border-color: var(--background-modifier-border-hover); box-shadow: none; }\n.vam-card-summary.is-preview { font-style: italic; color: var(--text-faint); }\n.vam-card-preview-label { font-style: normal; font-weight: 600; margin-right: 6px; }\n.vam-node:not([data-aim-kind])[data-status="idea"] .vam-card-summary { color: var(--text-faint); }\n.vam-node:not([data-aim-kind])[data-status="running"] { border-color: var(--interactive-accent); }\n.vam-node:not([data-aim-kind])[data-status="queued"] { --vam-card-bg: color-mix(in srgb, var(--interactive-accent) 7%, var(--background-primary)); border-style: dashed; border-color: color-mix(in srgb, var(--interactive-accent) 60%, transparent); }\n.vam-node:not([data-aim-kind])[data-status="running"]::after { content: ""; position: absolute; left: 14px; right: 14px; top: -1px; height: 2px; border-radius: 2px; background: linear-gradient(90deg, transparent, var(--interactive-accent), transparent); background-size: 50% 100%; background-repeat: no-repeat; animation: vam-scan 1.6s ease-in-out infinite; }\n.vam-node:not([data-aim-kind])[data-status="error"] { border-color: rgba(var(--color-red-rgb), 0.55); }\n.vam-relevance-tag { display: inline-flex; align-items: center; gap: 4px; max-width: 100%; font-size: var(--font-ui-smaller); line-height: 1.4; white-space: nowrap; }\n.vam-relevance-tag-name { position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0; overflow: hidden; white-space: nowrap; }\n.vam-relevance-tag > .vam-relevance-icon { display: inline-flex; flex: none; }\n.vam-relevance-tag .svg-icon { width: 14px; height: 14px; }\n.vam-relevance-tag[data-tier="core"] { color: var(--text-accent); }\n.vam-relevance-tag[data-tier="support"] { color: var(--text-muted); }\n.vam-relevance-tag[data-tier="side"] { color: var(--text-faint); }\n.vam-node[data-relevance="side"] { opacity: .5; transition: border-color 160ms ease-out, box-shadow 160ms ease-out, opacity 160ms ease-out; }\n.vam-node[data-relevance="side"]:hover, .vam-node[data-relevance="side"]:focus-within, .vam-node[data-relevance="side"].is-selected { opacity: 1; }\n.vam-edge.vam-edge-side { opacity: .2; }\n.theme-dark .vam-viewport { background-color: var(--background-primary); }\n.theme-dark .vam-node { --vam-card-bg: var(--background-secondary); }\n.vam-inspector { width: 300px; flex-shrink: 0; padding: 16px; overflow-y: auto; border-left: 1px solid var(--background-modifier-border); background: var(--background-primary); }\n.vam-inspector-heading { display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px; }\n.vam-inspector-heading strong { font-size: var(--font-ui-medium); }\n.vam-node.is-readonly, .vam-node.is-readonly:active { cursor: pointer; }\n.vam-sample-summary { color: var(--text-muted); line-height: 1.6; }\n.vam-sample-detail { line-height: 1.6; }\n@media (max-width: 900px) {\n  .vam-inspector { width: 260px; }\n}\n@media (max-width: 600px) {\n  .vam-inspector { position: absolute; right: 0; top: 0; bottom: 0; width: min(300px, 85%); z-index: 5; box-shadow: var(--shadow-l); }\n  .vam-workspace.has-inspector .vam-zoom-controls { right: auto; left: 12px; }\n}\n@keyframes vam-seamless-breathe { 0%, 100% { border-color: var(--background-modifier-border); box-shadow: var(--shadow-s); } 50% { border-color: var(--interactive-accent); box-shadow: 0 0 0 3px color-mix(in srgb, var(--interactive-accent) 22%, transparent), var(--shadow-s); } }\n@keyframes vam-pulse { 50% { opacity: 0.35; } }\n@keyframes vam-scan { from { background-position: -100% 0; } to { background-position: 200% 0; } }\n/* Viewer-only parts: the pieces Obsidian would otherwise provide. */\n.vam-toolbar { padding-left: max(10px, env(safe-area-inset-left, 0px)); padding-right: max(10px, env(safe-area-inset-right, 0px)); }\n.vam-toolbar .vam-map-switcher { cursor: default; margin: 0; font-weight: 600; font-family: inherit; line-height: 1.3; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; display: block; }\n.vam-toolbar .vam-map-switcher:hover { background: transparent; }\n.vam-shared { font-size: var(--font-ui-smaller); color: var(--text-faint); }\n.vam-toolbar-actions { gap: 10px; flex-wrap: wrap; justify-content: flex-end; }\n.vam-made-with { font-size: var(--font-ui-smaller); color: var(--text-faint); }\n.vam-install { display: inline-flex; align-items: center; height: 30px; padding: 4px 12px; border-radius: var(--radius-s); background: var(--interactive-accent); color: var(--text-on-accent); font-size: var(--font-ui-small); text-decoration: none; white-space: nowrap; }\n.vam-install:hover { filter: brightness(1.08); }\n.vam-language { font: inherit; font-size: var(--font-ui-small); height: 30px; max-width: 11em; padding: 0 8px; color: var(--text-normal); background: var(--background-primary); border: 1px solid var(--background-modifier-border); border-radius: var(--radius-s); cursor: pointer; }\n.vam-language:hover { background: var(--background-modifier-hover); }\n.vam-translate-note { flex-shrink: 0; padding: 5px max(10px, env(safe-area-inset-left, 0px)); font-size: var(--font-ui-smaller); line-height: 1.4; color: var(--text-muted); background: var(--background-secondary); border-bottom: 1px solid var(--background-modifier-border); }\n.vam-translate-note[hidden] { display: none; }\n.vam-goal { display: inline-flex; align-items: center; gap: 6px; min-width: 0; max-width: 22em; padding: 0 6px; line-height: var(--input-height); font-size: var(--font-ui-small); color: var(--text-normal); }\n.vam-goal-text { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }\n.vam-goal .svg-icon { color: var(--text-accent); }\n.vam-map-tools[hidden] { display: none; }\n.vam-zoom-controls { right: max(12px, env(safe-area-inset-right, 0px)); bottom: max(12px, env(safe-area-inset-bottom, 0px)); }\n.vam-zoom-controls button { background: transparent; }\n.vam-node { touch-action: none; }\n.vam-node.is-dragging { cursor: grabbing; z-index: 2; }\n.vam-node .vam-node-tools button, .vam-node-header button { background: transparent; border: 0; }\n.vam-node-header > .vam-collapse-button { border: 1px solid var(--background-modifier-border); background: var(--background-primary); }\n.vam-layout-menu { position: absolute; right: 0; bottom: calc(100% + 6px); z-index: 6; display: flex; flex-direction: column; min-width: 190px; padding: 4px; border: 1px solid var(--background-modifier-border); border-radius: var(--radius-m); background: var(--background-primary); box-shadow: var(--shadow-l); }\n.vam-layout-menu[hidden] { display: none; }\n.vam-layout-menu button { justify-content: flex-start; width: 100%; border: 0; background: transparent; height: 30px; }\n.vam-layout-menu hr { width: 100%; margin: 4px 0; border: 0; border-top: 1px solid var(--background-modifier-border); }\n.vam-zoom-controls { overflow: visible; }\n.vam-inspector { font-size: 14px; line-height: 1.6; color: var(--text-normal); }\n@media (min-width: 601px) { .vam-inspector { position: relative; } }\n.vam-inspector[hidden] { display: none; }\n.vam-inspector-heading button { height: 26px; }\n.vam-inspector h3 { font-size: 18px; line-height: 1.35; margin: 0 0 8px; overflow-wrap: anywhere; }\n.vam-inspector-why { display: flex; flex-direction: column; gap: 4px; padding: 8px 10px; margin: 0 0 12px; border: 1px solid var(--background-modifier-border); border-radius: var(--radius-m); color: var(--text-muted); font-size: var(--font-ui-small); }\n.vam-inspector-resizer { position: absolute; left: -4px; top: 0; bottom: 0; width: 8px; cursor: col-resize; touch-action: none; z-index: 2; }\n.vam-inspector-resizer:hover, .vam-inspector-resizer.is-resizing { background: var(--background-modifier-active-hover); }\n.vam-inspector-empty { color: var(--text-muted); }\n.vam-subtopics { display: flex; flex-direction: column; gap: 4px; margin-top: 16px; padding-top: 10px; border-top: 1px solid var(--background-modifier-border); }\n.vam-subtopics strong { font-size: var(--font-ui-small); color: var(--text-muted); font-weight: 500; }\n.vam-subtopics button { justify-content: flex-start; height: auto; min-height: 30px; white-space: normal; text-align: left; }\n/* Reading styles for the note HTML that Obsidian rendered at export time. */\n.vam-sample-detail { overflow-wrap: anywhere; }\n.vam-sample-detail h1, .vam-sample-detail h2, .vam-sample-detail h3, .vam-sample-detail h4, .vam-sample-detail h5, .vam-sample-detail h6 { margin: 18px 0 6px; line-height: 1.35; }\n.vam-sample-detail h1 { font-size: 18px; }\n.vam-sample-detail h2 { font-size: 16px; }\n.vam-sample-detail h3, .vam-sample-detail h4, .vam-sample-detail h5, .vam-sample-detail h6 { font-size: 15px; }\n.vam-sample-detail p { margin: 8px 0; }\n.vam-sample-detail ul, .vam-sample-detail ol { padding-left: 22px; margin: 8px 0; }\n.vam-sample-detail a { color: var(--text-accent); }\n.vam-sample-detail blockquote { margin: 10px 0; padding: 2px 12px; border-left: 3px solid var(--background-modifier-border-hover); color: var(--text-muted); }\n.vam-sample-detail hr { border: 0; border-top: 1px solid var(--background-modifier-border); margin: 14px 0; }\n.vam-sample-detail code { font-family: var(--font-monospace); font-size: 12px; background: var(--background-secondary); padding: 1px 4px; border-radius: 3px; }\n.vam-sample-detail pre { overflow-x: auto; background: var(--background-secondary); padding: 8px; border-radius: 6px; }\n.vam-sample-detail pre code { background: transparent; padding: 0; }\n.vam-sample-detail img { max-width: 100%; height: auto; }\n.vam-sample-detail svg { max-width: 100%; height: auto; }\n.vam-sample-detail .mermaid, .vam-sample-detail .vam-table-scroll { overflow-x: auto; margin: 10px 0; }\n.vam-sample-detail table { border-collapse: collapse; font-size: 12.5px; min-width: 100%; }\n.vam-sample-detail th, .vam-sample-detail td { border: 1px solid var(--background-modifier-border); padding: 4px 6px; text-align: left; vertical-align: top; min-width: 5em; overflow-wrap: normal; word-break: normal; }\n.vam-sample-detail .callout { margin: 10px 0; padding: 8px 12px; border-radius: var(--radius-m); background: color-mix(in srgb, var(--interactive-accent) 9%, transparent); border-left: 3px solid var(--interactive-accent); }\n.vam-sample-detail .callout-title { display: flex; align-items: center; gap: 6px; font-weight: 600; color: var(--text-accent); }\n.vam-sample-detail .callout-icon { display: inline-flex; flex: none; }\n.vam-sample-detail .callout-icon svg { width: 16px; height: 16px; }\n.vam-sample-detail .callout-content p:first-child { margin-top: 4px; }\n.vam-sample-detail .vam-image-source { display: block; margin: 2px 0 8px; color: var(--text-faint); font-size: var(--font-ui-smaller); overflow-wrap: anywhere; }\n.vam-sample-detail .vam-image-omitted { color: var(--text-faint); font-size: var(--font-ui-smaller); }\n.vam-sample-detail .internal-link { color: inherit; text-decoration: none; }\n/* Repeating the class raises specificity above the extracted per-card cursor rules (up to 0,3,0), so no !important is needed. */\n.vam-resizing.vam-resizing.vam-resizing.vam-resizing, .vam-resizing.vam-resizing.vam-resizing.vam-resizing * { cursor: col-resize; user-select: none; }\n@media (max-width: 700px) { .vam-canvas-overlay > .vam-canvas-hint { display: none; } }\n@media (max-width: 600px) { .vam-workspace.has-inspector > .vam-canvas-overlay { right: 0; } .vam-inspector { width: 100%; box-shadow: none; } }\n@media (max-width: 600px) { .vam-inspector-heading { position: sticky; top: 0; z-index: 3; background: var(--background-primary); padding: 8px 0; margin-bottom: 6px; } }\n@media (max-width: 600px) { .vam-inspector-resizer { display: none; } .vam-toolbar .vam-map-switcher { max-width: 100%; } .vam-made-with { display: none; } }\n/* Four :root pseudo-classes (0,4,0) outrank every extracted transition rule without !important. */\n@media (prefers-reduced-motion: reduce) { :root:root:root:root * { transition: none; } }\n';
 
 // experiences/sharing/share-html.ts
 var CONTENT_SECURITY_POLICY = "default-src 'none'; img-src data: https:; style-src 'unsafe-inline'; script-src 'unsafe-inline'; base-uri 'none'; form-action 'none'";
@@ -51528,17 +52653,6 @@ function createUtf8StreamDecoder() {
   };
 }
 
-// ai/search-not-performed.ts
-var SEARCH_NOT_PERFORMED2 = "SearchNotPerformedError";
-function searchNotPerformedError() {
-  const error = new Error(t("ui.context_ai_search_not_performed"));
-  error.name = SEARCH_NOT_PERFORMED2;
-  return error;
-}
-function isSearchNotPerformed(error) {
-  return typeof error === "object" && error !== null && error.name === SEARCH_NOT_PERFORMED2;
-}
-
 // ai/runtime/messages/search-budget-exhausted.en.md
 var search_budget_exhausted_en_default = "The web search budget is used up. Stop searching and finish the answer from the information already gathered; list anything missing as unconfirmed.\n";
 
@@ -52613,7 +53727,7 @@ var ClaudeWebActivity = class {
     }
   }
 };
-function abortError2() {
+function abortError3() {
   const error = new Error(t("ui.ai_task_cancelled"));
   error.name = "AbortError";
   return error;
@@ -52660,7 +53774,7 @@ var ClaudeCodeCliRuntime = class {
     var _a2, _b2, _c, _d, _e, _f, _g, _h, _i;
     if ((_a2 = controls.signal) == null ? void 0 : _a2.aborted) {
       (_b2 = this.options.warmPool) == null ? void 0 : _b2.release();
-      throw abortError2();
+      throw abortError3();
     }
     const webSearch = (_d = controls.webSearch) != null ? _d : ((_c = controls.searchBudget) != null ? _c : 0) > 0;
     let args = claudeTaskArgs(model, effort, outputSchema, webSearch);
@@ -52820,7 +53934,7 @@ var ClaudeCodeCliRuntime = class {
       };
       const onAbort = () => {
         stop();
-        finish(abortError2());
+        finish(abortError3());
       };
       const timeout = window.setTimeout(
         () => {
@@ -53395,927 +54509,6 @@ var ShallowExpansionCoordinator = class {
         state.queuedPaths = [];
         state.controller.abort();
       }
-  }
-};
-
-// core/seamless-research/apply.ts
-var WEB_SUPPLEMENT_HEADING = "### \u7DB2\u8DEF\u88DC\u5145";
-var ORIGINAL_PREFIX = "\u539F\u672C\u5BEB\uFF1A";
-var MAX_IMAGES = 6;
-var MAX_IMAGE_BYTES = 10 * 1024 * 1024;
-function normalize3(text13) {
-  return text13.replace(/\r\n?/g, "\n").trim();
-}
-function detailHash(text13) {
-  let hash = 2166136261;
-  for (const char of normalize3(text13)) {
-    hash ^= char.codePointAt(0);
-    hash = Math.imul(hash, 16777619) >>> 0;
-  }
-  return hash.toString(16).padStart(8, "0");
-}
-var HTTPS_URL = /^https:\/\/[^\s<>"'`()]+$/i;
-function isHttpsUrl(value) {
-  if (!HTTPS_URL.test(value)) return false;
-  try {
-    return new URL(value).protocol === "https:";
-  } catch (e) {
-    return false;
-  }
-}
-function stripUnsafeCharacters(text13) {
-  let out = "";
-  for (const char of text13) {
-    const code = char.codePointAt(0);
-    const control = code < 32 && code !== 9 && code !== 10 || code === 127;
-    const invisible = code >= 8203 && code <= 8207 || code >= 8234 && code <= 8238 || code >= 8294 && code <= 8297 || code === 65279;
-    if (!control && !invisible) out += char;
-  }
-  return out;
-}
-function sanitizePhase2Markdown(markdown) {
-  const dropped = [];
-  const drop = (kind, what) => {
-    dropped.push(`${kind}: ${what.slice(0, 80)}`);
-  };
-  let text13 = stripUnsafeCharacters(markdown.replace(/\r\n?/g, "\n"));
-  text13 = text13.replace(/!\[[^\]]*\]\([^)]*\)/g, (match) => {
-    drop("image", match);
-    return "";
-  });
-  text13 = text13.replace(/!\[\[[^\]]*\]\]/g, (match) => {
-    drop("embed", match);
-    return "";
-  });
-  text13 = text13.replace(/!\[[^\]]*\]\[[^\]]*\]/g, (match) => {
-    drop("image", match);
-    return "";
-  });
-  text13 = text13.replace(/<(https:\/\/[^\s<>]+)>/gi, "$1");
-  text13 = text13.replace(/<!--[\s\S]*?-->/g, (match) => {
-    drop("html", match);
-    return "";
-  });
-  text13 = text13.replace(/<(script|style|iframe|object|embed)\b[\s\S]*?(?:<\/\1\s*>|$)/gi, (match) => {
-    drop("html", match);
-    return "";
-  });
-  text13 = text13.replace(/<\/?[A-Za-z][^>]*>/g, (match) => {
-    drop("html", match);
-    return "";
-  });
-  text13 = text13.replace(
-    /\[([^\]]*)\]\(\s*<?((?:[^()\s>]|\([^()]*\))*)>?(?:\s+(?:"[^"]*"|'[^']*'))?\s*\)/g,
-    (match, label2, target) => {
-      if (isHttpsUrl(target)) return match;
-      drop("link", match);
-      return label2;
-    }
-  );
-  text13 = text13.split("\n").filter((line) => {
-    const definition = /^\s*\[(?!\^)[^\]]+\]:\s*(\S+)/.exec(line);
-    if (definition && !isHttpsUrl(definition[1].replace(/^<|>$/g, ""))) {
-      drop("definition", line);
-      return false;
-    }
-    return true;
-  }).join("\n");
-  text13 = text13.replace(/\b(?:javascript|vbscript|data|file):[^\s)\]]*/gi, (match) => {
-    drop("scheme", match);
-    return "";
-  });
-  return {
-    markdown: text13.replace(/[ \t]+\n/g, "\n").replace(/\n{3,}/g, "\n\n").trim(),
-    dropped
-  };
-}
-function imageKind(bytes) {
-  const at = (offset, values) => values.every((value, index) => bytes[offset + index] === value);
-  if (bytes.length >= 8 && at(0, [137, 80, 78, 71, 13, 10, 26, 10])) return "png";
-  if (bytes.length >= 3 && at(0, [255, 216, 255])) return "jpeg";
-  if (bytes.length >= 6 && (at(0, [71, 73, 70, 56, 55, 97]) || at(0, [71, 73, 70, 56, 57, 97])))
-    return "gif";
-  if (bytes.length >= 12 && at(0, [82, 73, 70, 70]) && at(8, [87, 69, 66, 80])) return "webp";
-  return void 0;
-}
-function checkImageBytes(bytes) {
-  if (bytes.length === 0) return { rejected: "empty" };
-  if (bytes.length > MAX_IMAGE_BYTES) return { rejected: "too-large" };
-  const kind = imageKind(bytes);
-  return kind ? { kind } : { rejected: "not-an-image" };
-}
-var NO_LICENSE = /^(?:|n\/?a|none|unknown|unspecified|not specified|no license|無|未知|不明|未標示|未註明|未說明)$/i;
-function privateHost(hostname) {
-  const host = hostname.toLowerCase().replace(/^\[|\]$/g, "");
-  if (host === "localhost" || host.endsWith(".localhost") || host.endsWith(".local") || host.endsWith(".internal"))
-    return true;
-  if (/^(?:127|10|0)\./.test(host) || /^192\.168\./.test(host) || /^169\.254\./.test(host) || /^172\.(?:1[6-9]|2\d|3[01])\./.test(host))
-    return true;
-  return host === "::1" || host.startsWith("fc") && host.includes(":") || host.startsWith("fd") && host.includes(":") || host.startsWith("fe80:");
-}
-function usableHttps(value) {
-  if (!isHttpsUrl(value)) return void 0;
-  try {
-    const url = new URL(value);
-    if (url.username || url.password || privateHost(url.hostname)) return void 0;
-    return url;
-  } catch (e) {
-    return void 0;
-  }
-}
-function eligibleImages(images, limit = MAX_IMAGES) {
-  var _a2, _b2, _c;
-  const eligible = [];
-  const rejected = [];
-  const seen = /* @__PURE__ */ new Set();
-  for (const image of images) {
-    const reason = !usableHttps(String((_a2 = image == null ? void 0 : image.imageUrl) != null ? _a2 : "")) ? "image-url" : !usableHttps(String((_b2 = image == null ? void 0 : image.sourceUrl) != null ? _b2 : "")) ? "source-url" : NO_LICENSE.test(String((_c = image == null ? void 0 : image.license) != null ? _c : "").trim()) ? "license" : seen.has(image.imageUrl) ? "duplicate" : eligible.length >= limit ? "over-limit" : void 0;
-    if (reason) rejected.push({ image, reason });
-    else {
-      seen.add(image.imageUrl);
-      eligible.push(image);
-    }
-  }
-  return { eligible, rejected };
-}
-function renderFootnoteDefinitions(footnotes) {
-  return footnotes.filter((note) => /^[\w-]+$/.test(note.id) && isHttpsUrl(note.url)).map((note) => `[^${note.id}]: [${(note.title || note.url).replace(/[[\]\n]/g, " ").trim()}](${note.url})`).join("\n");
-}
-function originalFootnote(original, sourceUrl) {
-  const text13 = original.replace(/\[\^[^\]]+\]/g, "").replace(/\s+/g, " ").trim();
-  return `${ORIGINAL_PREFIX}${text13}${sourceUrl && isHttpsUrl(sourceUrl) ? `\uFF08\u4F86\u6E90\uFF1A${sourceUrl}\uFF09` : ""}`;
-}
-function highestFootnote(text13) {
-  let highest = 0;
-  for (const match of text13.matchAll(/\[\^(\d+)\]/g)) highest = Math.max(highest, Number(match[1]));
-  return highest;
-}
-function offsetFootnotes(markdown, offset) {
-  return offset ? markdown.replace(/\[\^(\d+)\]/g, (_m, id) => `[^${Number(id) + offset}]`) : markdown;
-}
-function locate(detail, sentence) {
-  const wanted = sentence.trim();
-  if (!wanted) return void 0;
-  const pattern = new RegExp(wanted.split(/\s+/).map(escape).join("\\s+"), "g");
-  for (const found of detail.matchAll(pattern)) {
-    const lineStart = detail.lastIndexOf("\n", found.index - 1) + 1;
-    if (!/^\s*\[\^[^\]]+\]:/.test(detail.slice(lineStart, found.index + 1)))
-      return { start: found.index, end: found.index + found[0].length };
-  }
-  return void 0;
-}
-function escape(text13) {
-  return text13.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-}
-function applyCorrections(detail, verdicts) {
-  var _a2;
-  let text13 = detail.replace(/\r\n?/g, "\n");
-  const corrected = [];
-  const removed = [];
-  const unmatched = [];
-  const definitions = [];
-  let next = highestFootnote(text13) + 1;
-  for (const verdict of verdicts) {
-    if (verdict.verdict !== "unsupported") continue;
-    const found = locate(text13, verdict.sentence);
-    if (!found) {
-      unmatched.push(verdict.sentence);
-      continue;
-    }
-    const correction = (_a2 = verdict.correction) == null ? void 0 : _a2.trim();
-    if (!correction) {
-      const start = found.start;
-      let end = found.end;
-      while (end < text13.length && /[ \t]/.test(text13[end])) end++;
-      text13 = text13.slice(0, start) + text13.slice(end);
-      const lineStart = text13.lastIndexOf("\n", start - 1) + 1;
-      const lineEnd = text13.indexOf("\n", start) < 0 ? text13.length : text13.indexOf("\n", start);
-      if (/^\s*(?:>\s*)*(?:[-*+]\s*|\d+[.)]\s*)?$/.test(text13.slice(lineStart, lineEnd))) {
-        text13 = text13.slice(0, lineStart) + text13.slice(Math.min(lineEnd + 1, text13.length));
-      }
-      removed.push(verdict.sentence);
-      continue;
-    }
-    const alreadyNoted = new RegExp(
-      `\\[\\^[^\\]]+\\]:\\s*${escape(ORIGINAL_PREFIX)}\\s*${escape(
-        verdict.sentence.trim().replace(/\[\^[^\]]+\]/g, "").replace(/\s+/g, " ").slice(0, 24)
-      )}`
-    ).test(text13);
-    let replacement = correction;
-    if (!alreadyNoted) {
-      definitions.push(`[^${next}]: ${originalFootnote(verdict.sentence, verdict.sourceUrl)}`);
-      replacement = `${correction}[^${next}]`;
-      next++;
-    }
-    text13 = text13.slice(0, found.start) + replacement + text13.slice(found.end);
-    corrected.push(verdict.sentence);
-  }
-  if (definitions.length) text13 = `${text13.trimEnd()}
-
-${definitions.join("\n")}
-`;
-  return { detail: text13, corrected, removed, unmatched };
-}
-function planPhase2Write(input) {
-  const { currentDetail } = input;
-  const phase2 = input.phase2Detail.replace(/\r\n?/g, "\n").trim();
-  if (!phase2) return { mode: "noop", detail: currentDetail, writtenHash: input.writtenHash };
-  const empty = normalize3(currentDetail) === "";
-  if (empty || input.writtenHash !== void 0 && input.writtenHash === detailHash(currentDetail)) {
-    return { mode: "replace", detail: phase2, writtenHash: detailHash(phase2) };
-  }
-  const shifted = offsetFootnotes(phase2, highestFootnote(currentDetail));
-  if (currentDetail.includes(shifted) || currentDetail.includes(phase2)) return { mode: "noop", detail: currentDetail };
-  const separator = currentDetail.endsWith("\n\n") ? "" : currentDetail.endsWith("\n") ? "\n" : "\n\n";
-  return { mode: "append", detail: `${currentDetail}${separator}${WEB_SUPPLEMENT_HEADING}
-
-${shifted}
-` };
-}
-
-// core/seamless-research/outcome.ts
-var NETWORK_CODE = /\b(?:ENOTFOUND|ECONN[A-Z]*|ETIMEDOUT|EAI_AGAIN|ENETUNREACH|EHOSTUNREACH|EPIPE)\b/;
-var NETWORK_MESSAGE = /fetch failed|network (?:error|request failed|is unreachable)|socket hang up|failed to fetch|getaddrinfo|ERR_INTERNET_DISCONNECTED|ERR_NETWORK|unable to connect|connection (?:refused|reset|timed out)|offline/i;
-function text8(error) {
-  if (typeof error === "string") return error;
-  if (typeof error !== "object" || error === null) return "";
-  const record = error;
-  const cause = record.cause && record.cause !== error ? text8(record.cause) : "";
-  return [
-    typeof record.code === "string" ? record.code : "",
-    typeof record.message === "string" ? record.message : "",
-    cause
-  ].filter(Boolean).join(" ");
-}
-function classifyFailure(error) {
-  if (typeof error === "object" && error !== null && error.name === "AbortError")
-    return "stopped";
-  if (isSearchNotPerformed(error)) return "network";
-  const message = text8(error);
-  if (NETWORK_CODE.test(message) || NETWORK_MESSAGE.test(message)) return "network";
-  return "other";
-}
-function seamlessOutcome(input) {
-  if (input.stopped || input.failure === "stopped")
-    return input.phase1Written ? { status: "idea", reason: "stopped" } : { status: "restore", reason: "stopped" };
-  if (input.failure === "network") return { status: "error", reason: "network", action: "retry" };
-  if (input.failure === "no-web-model") return { status: "error", reason: "no-web-model", action: "switch-model" };
-  if (input.failure === "no-images") return { status: "error", reason: "no-images", action: "dismiss" };
-  if (input.failure) return { status: "error", reason: "other", action: "retry" };
-  if (input.phase2 !== "applied") return { status: "running" };
-  if (input.imagesRequested && input.imagesSaved <= 0)
-    return { status: "error", reason: "no-images", action: "dismiss" };
-  return { status: "completed" };
-}
-
-// core/seamless-research/skeleton-filter.ts
-var DEFAULT_SKELETON_PLACEHOLDER = "\uFF08\u9019\u4E00\u7BC0\u7B49\u67E5\u8B49\u5F8C\u88DC\u4E0A\u3002\uFF09";
-var NUMERAL = "(?:[\u3007\u96F6\u4E8C\u5169\u4E09\u56DB\u4E94\u516D\u4E03\u516B\u4E5D\u5341\u767E\u5343\u842C\u5104]|\u4E00(?=[\u3007\u96F6\u4E00\u4E8C\u5169\u4E09\u56DB\u4E94\u516D\u4E03\u516B\u4E5D\u5341\u767E\u5343\u842C\u5104]))";
-var UNIT = "(?:\u500B|\u7A2E|\u6B21|\u4F4D|\u9805|\u689D|\u5F35|\u540D|\u4EBA|\u5E74|\u6708|\u65E5|\u865F|\u5929|\u9031|\u5468|\u5C0F\u6642|\u5206\u9418|\u79D2|\u5EA6|\u500D|\u6210|\u5143|\u584A|\u516C\u65A4|\u516C\u91CC|\u516C\u5206|\u516C\u5C3A|\u6BEB\u7C73|\u516C\u514B|\u514B|\u6B72|\u4E16\u7D00|\u5B63|\u9593|\u5BB6|\u7B46|\u4EF6|\u842C|\u5104)";
-var ONE_UNIT = "\u4E00(?:\u5E74|\u6708|\u65E5|\u5929|\u9031|\u5468|\u5C0F\u6642|\u5206\u9418|\u79D2|\u5EA6|\u500D|\u6210|\u5143|\u584A|\u516C\u65A4|\u516C\u91CC|\u516C\u5206|\u516C\u5C3A|\u6BEB\u7C73|\u516C\u514B|\u4E16\u7D00|\u767E|\u5343|\u842C|\u5104)";
-var PATTERNS = [
-  /[0-9０-９]/u,
-  new RegExp(`${NUMERAL}+${UNIT}`, "u"),
-  new RegExp(ONE_UNIT, "u"),
-  /[$€£¥￥₩]/u,
-  /[「」『』“”"＂]/u,
-  /[《》〈〉]/u,
-  /\b[A-Z][A-Za-z]*/u,
-  /\b[a-z]{1,2}[A-Z][a-z]+/u,
-  /https?:\/\/|www\./iu,
-  /\[\^[^\]]+\]/u,
-  /!\[[^\]]*\]\(|!\[\[/u
-];
-function escapeRegExp(text13) {
-  return text13.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-}
-function sentenceHasSourceNeed(sentence, allow = []) {
-  let text13 = sentence;
-  for (const word of [...allow].filter((item) => item.trim()).sort((a, b) => b.length - a.length))
-    text13 = text13.replace(new RegExp(escapeRegExp(word.trim()), "gi"), " ");
-  return PATTERNS.some((pattern) => pattern.test(text13));
-}
-var LINE_PREFIX = /^(\s*(?:>\s*)*(?:[-*+]\s+|\d+[.)]\s+)?(?:\[[ xX]\]\s+)?)/u;
-var CALLOUT_MARKER = /^\s*(?:>\s*)+\[![^\]]+\][+-]?.*$/u;
-var FENCE2 = /^\s*(?:>\s*)*(```|~~~)/u;
-var HEADING3 = /^\s{0,3}#{1,6}\s/u;
-var COMMENT = /^\s*<!--.*-->\s*$/u;
-var FOOTNOTE_DEFINITION = /^\s*\[\^[^\]]+\]:/u;
-function splitSentences(text13) {
-  return text13.split(/(?<=[。！？；])|(?<=[.!?;])(?=\s)/u).filter((part) => part.length > 0);
-}
-function filterLine(line, allow) {
-  var _a2, _b2;
-  const prefix = (_b2 = (_a2 = LINE_PREFIX.exec(line)) == null ? void 0 : _a2[1]) != null ? _b2 : "";
-  const body = line.slice(prefix.length);
-  if (!body.trim()) return line;
-  const kept = splitSentences(body).filter((sentence) => !sentenceHasSourceNeed(sentence, allow));
-  const text13 = kept.join("").trim();
-  return text13 ? prefix + text13 : void 0;
-}
-function filterTable(block, allow) {
-  if (block.length < 2 || sentenceHasSourceNeed(block[0], allow)) return [];
-  const rows2 = block.slice(2).filter((row) => !sentenceHasSourceNeed(row, allow));
-  return rows2.length ? [block[0], block[1], ...rows2] : [];
-}
-function dropOrphanMarkers(lines) {
-  return lines.filter((line, index) => {
-    if (!CALLOUT_MARKER.test(line)) return true;
-    for (let next = index + 1; next < lines.length && /^\s*>/.test(lines[next]); next++) {
-      if (!CALLOUT_MARKER.test(lines[next]) && lines[next].replace(/^[\s>]+/, "")) return true;
-    }
-    return false;
-  });
-}
-function hasText(lines) {
-  return lines.some(
-    (line) => line.trim() && !CALLOUT_MARKER.test(line) && !COMMENT.test(line) && !/^\s*(?:>\s*)*$/.test(line)
-  );
-}
-function skeletonFilter(markdown, options = {}) {
-  var _a2, _b2;
-  const allow = (_a2 = options.allow) != null ? _a2 : [];
-  const placeholder2 = (_b2 = options.placeholder) != null ? _b2 : DEFAULT_SKELETON_PLACEHOLDER;
-  const lines = markdown.replace(/\r\n?/g, "\n").split("\n");
-  const sections = [{ original: [], kept: [] }];
-  let fence;
-  for (let index = 0; index < lines.length; index++) {
-    const line = lines[index];
-    const section3 = sections[sections.length - 1];
-    if (fence) {
-      section3.original.push(line);
-      if (line.trimStart().startsWith(fence)) fence = void 0;
-      continue;
-    }
-    const open = FENCE2.exec(line);
-    if (open) {
-      fence = open[1];
-      section3.original.push(line);
-      continue;
-    }
-    if (HEADING3.test(line)) {
-      sections.push({ heading: line, original: [], kept: [] });
-      continue;
-    }
-    section3.original.push(line);
-    if (FOOTNOTE_DEFINITION.test(line)) continue;
-    if (/^\s*\|/.test(line)) {
-      const block = [line];
-      while (index + 1 < lines.length && /^\s*\|/.test(lines[index + 1])) block.push(lines[++index]);
-      section3.original.push(...block.slice(1));
-      section3.kept.push(...filterTable(block, allow));
-      continue;
-    }
-    if (COMMENT.test(line) || CALLOUT_MARKER.test(line)) {
-      section3.kept.push(line);
-      continue;
-    }
-    const filtered = filterLine(line, allow);
-    if (filtered !== void 0) section3.kept.push(filtered);
-  }
-  const out = [];
-  for (const section3 of sections) {
-    if (section3.heading !== void 0) out.push(section3.heading);
-    const cleaned = dropOrphanMarkers(section3.kept);
-    const kept = hasText(cleaned) ? cleaned : section3.kept.filter((line) => COMMENT.test(line));
-    out.push(...kept);
-    if (section3.heading !== void 0 && hasText(section3.original) && !hasText(kept)) out.push("", placeholder2);
-    out.push("");
-  }
-  return out.join("\n").replace(/\n{3,}/g, "\n\n").replace(/^\n+/, "").trimEnd() + (out.some((line) => line.trim()) ? "\n" : "");
-}
-
-// experiences/visual-map/seamless-research.ts
-var FALLBACK_WEB_MODEL = "claude:sonnet";
-var LABEL_UNSAFE = /[[\]()<>|`*_~\n\r]/g;
-function label(value, limit) {
-  return value.replace(/\b(?:javascript|vbscript|data|file):\S*/gi, " ").replace(LABEL_UNSAFE, " ").replace(/\s+/g, " ").trim().slice(0, limit);
-}
-function renderImageBlock(saved) {
-  return saved.map(({ path, image }) => {
-    const title = label(image.title, 120) || image.sourceUrl;
-    const link = `[${title}](${image.sourceUrl})`;
-    return `![[${path}]]
-${t("ui.seamless_image_source_0_1", link, label(image.license, 80))}`;
-  }).join("\n\n");
-}
-function composePhase2Detail(verify, saved) {
-  const clean4 = sanitizePhase2Markdown(verify.detail).markdown;
-  if (!clean4.trim()) throw new Error(t("ui.seamless_phase2_empty"));
-  const corrected = applyCorrections(clean4, verify.verdicts).detail.trimEnd();
-  const parts = [corrected, renderFootnoteDefinitions(verify.footnotes), renderImageBlock(saved)].filter(Boolean);
-  return { detail: `${parts.join("\n\n")}
-` };
-}
-var Semaphore = class {
-  constructor(size) {
-    __publicField(this, "waiting", []);
-    __publicField(this, "free");
-    this.free = Math.max(1, size);
-  }
-  acquire(signal) {
-    if (signal.aborted) return Promise.reject(abortError3());
-    if (this.free > 0) {
-      this.free--;
-      return Promise.resolve();
-    }
-    return new Promise((resolve, reject) => {
-      const entry = {
-        grant: () => {
-          signal.removeEventListener("abort", onAbort);
-          resolve();
-        },
-        reject
-      };
-      const onAbort = () => {
-        this.waiting = this.waiting.filter((item) => item !== entry);
-        reject(abortError3());
-      };
-      signal.addEventListener("abort", onAbort, { once: true });
-      this.waiting.push(entry);
-    });
-  }
-  release() {
-    const next = this.waiting.shift();
-    if (next) next.grant();
-    else this.free++;
-  }
-};
-function abortError3() {
-  const error = new Error("aborted");
-  error.name = "AbortError";
-  return error;
-}
-var SeamlessResearch = class {
-  constructor(deps) {
-    this.deps = deps;
-    __publicField(this, "current", /* @__PURE__ */ new Map());
-    __publicField(this, "topics", /* @__PURE__ */ new Map());
-    __publicField(this, "held", /* @__PURE__ */ new Map());
-    __publicField(this, "problemMap", /* @__PURE__ */ new Map());
-    __publicField(this, "applying", /* @__PURE__ */ new Set());
-    __publicField(this, "listeners", /* @__PURE__ */ new Set());
-    __publicField(this, "phase2Slots");
-    __publicField(this, "disposed", false);
-    var _a2;
-    this.phase2Slots = new Semaphore((_a2 = deps.phase2Concurrency) != null ? _a2 : 3);
-  }
-  // ---------- what the view reads ----------
-  /** The topic is being researched or its result is held: show the slow "growing" signal, never "done". */
-  isGrowing(path) {
-    return this.current.has(path) || this.held.has(path);
-  }
-  isHeld(path) {
-    return this.held.has(path);
-  }
-  growingPaths() {
-    return [.../* @__PURE__ */ new Set([...this.current.keys(), ...this.held.keys()])];
-  }
-  problems() {
-    return [...this.problemMap.values()];
-  }
-  problemFor(path) {
-    return this.problemMap.get(path);
-  }
-  subscribe(listener) {
-    this.listeners.add(listener);
-    return () => this.listeners.delete(listener);
-  }
-  // ---------- actions ----------
-  /**
-   * Researches one topic: phase 1, then phase 2. Resolves when phase 2 has been written, held for a note that is open, failed
-   * into a problem, or stopped. Throws only when the topic cannot start (flag off, busy) or phase 1 fails; the caller's batch
-   * counts that as a failed topic. The caller has already asked for the AI usage notice.
-   */
-  async research(request) {
-    var _a2;
-    this.requireEnabled();
-    const topic = {
-      path: request.path,
-      title: request.title,
-      context: request.context,
-      language: request.language,
-      allow: [request.title, ...(_a2 = request.allow) != null ? _a2 : []],
-      imagesRequested: request.imagesRequested === true,
-      status0: "idea",
-      phase1Written: false,
-      skeleton: ""
-    };
-    await this.run(topic, request.signal, request.accepted, false);
-  }
-  /** "Try again": phase 2 only, with the skeleton of the last run. */
-  async retry(path, signal) {
-    this.requireEnabled();
-    const topic = this.topics.get(path);
-    const problem = this.problemMap.get(path);
-    if (!topic || !problem || problem.action !== "retry") throw new Error(t("ui.seamless_nothing_to_retry"));
-    await this.run(topic, signal, void 0, true);
-  }
-  /** "Switch to a model that can go online": changes only this topic's model, then runs phase 2 again. */
-  async switchModelAndRetry(path, signal) {
-    this.requireEnabled();
-    const topic = this.topics.get(path);
-    const problem = this.problemMap.get(path);
-    if (!topic || !problem || problem.action !== "switch-model") throw new Error(t("ui.seamless_nothing_to_retry"));
-    this.requireIdle(path);
-    const preferred = this.deps.defaultModel();
-    let model = FALLBACK_WEB_MODEL;
-    try {
-      if (preferred && this.deps.capabilitiesFor(preferred).webSearch) model = preferred;
-    } catch (e) {
-    }
-    await this.deps.mutate(async () => {
-      await this.deps.repo.updateNote(path, { model, modelSource: "manual" });
-    });
-    await this.run(topic, signal, void 0, true);
-  }
-  /** The image problem has a single button: dismiss. */
-  dismiss(path) {
-    if (this.problemMap.delete(path)) this.changed();
-  }
-  /** Stop one topic (running or held). Phase-1 text stays; the status is never `completed`. */
-  abort(path) {
-    const attempt = this.current.get(path);
-    if (!attempt) return;
-    attempt.controller.abort();
-  }
-  /** Stop every topic that is running or held (the plugin-wide stop). */
-  abortAll() {
-    for (const attempt of [...this.current.values()]) attempt.controller.abort();
-  }
-  /** The plugin is unloading: abort everything, forget held results, write nothing more. */
-  dispose() {
-    this.disposed = true;
-    for (const attempt of this.current.values()) {
-      attempt.controller.abort();
-      attempt.detach();
-    }
-    this.current.clear();
-    this.held.clear();
-    this.problemMap.clear();
-    this.applying.clear();
-    this.listeners.clear();
-  }
-  /** Applies every held result whose note is no longer shown. Called on `layout-change` and `active-leaf-change`. */
-  async flushHeld() {
-    if (this.disposed || !this.held.size) return;
-    for (const [path, entry] of [...this.held]) {
-      if (this.applying.has(path) || this.deps.isShown(path)) continue;
-      this.applying.add(path);
-      try {
-        await this.applyHeld(path, entry);
-      } finally {
-        this.applying.delete(path);
-      }
-    }
-  }
-  // ---------- pipeline ----------
-  requireEnabled() {
-    if (!this.deps.enabled()) throw new Error(t("ui.seamless_off"));
-  }
-  requireIdle(path) {
-    const busy = this.current.has(path) || this.held.has(path) || this.deps.running.has(path) || this.deps.busyElsewhere(path);
-    if (busy) throw new Error(t("ui.ai_running_ai"));
-  }
-  changed() {
-    for (const listener of [...this.listeners]) listener({ type: "change" });
-  }
-  log(message) {
-    var _a2, _b2;
-    (_b2 = (_a2 = this.deps).log) == null ? void 0 : _b2.call(_a2, message);
-  }
-  isCurrent(attempt) {
-    return !this.disposed && !attempt.controller.signal.aborted && this.current.get(attempt.topic.path) === attempt;
-  }
-  begin(topic, batchSignal) {
-    var _a2, _b2, _c;
-    const controller = new AbortController();
-    const onBatchAbort = () => controller.abort();
-    const attempt = {
-      id: (_c = (_b2 = (_a2 = this.deps).uuid) == null ? void 0 : _b2.call(_a2)) != null ? _c : `${Date.now().toString(36)}-${Math.random().toString(36).slice(2)}`,
-      controller,
-      topic,
-      handedOff: false,
-      detach: () => batchSignal == null ? void 0 : batchSignal.removeEventListener("abort", onBatchAbort)
-    };
-    controller.signal.addEventListener(
-      "abort",
-      () => {
-        var _a3;
-        if (((_a3 = this.held.get(topic.path)) == null ? void 0 : _a3.attempt) === attempt) void this.discardHeld(topic.path, attempt);
-      },
-      { once: true }
-    );
-    if (batchSignal == null ? void 0 : batchSignal.aborted) controller.abort();
-    else batchSignal == null ? void 0 : batchSignal.addEventListener("abort", onBatchAbort, { once: true });
-    this.current.set(topic.path, attempt);
-    this.deps.running.add(topic.path);
-    this.topics.set(topic.path, topic);
-    this.problemMap.delete(topic.path);
-    this.changed();
-    return attempt;
-  }
-  /** Removes the attempt's registrations (only those it owns). */
-  release(attempt) {
-    const path = attempt.topic.path;
-    attempt.detach();
-    if (this.current.get(path) === attempt) this.current.delete(path);
-    if (!this.current.has(path)) this.deps.running.delete(path);
-    this.changed();
-  }
-  async run(topic, batchSignal, accepted, phase2Only) {
-    this.requireIdle(topic.path);
-    const attempt = this.begin(topic, batchSignal);
-    const signal = attempt.controller.signal;
-    try {
-      const note = await this.deps.repo.readNote(topic.path);
-      if (!phase2Only) topic.status0 = note.status;
-      topic.title = phase2Only ? topic.title : note.title || topic.title;
-      if (signal.aborted) return await this.stopped(attempt);
-      await this.setStatus(attempt, "running");
-      if (signal.aborted) return await this.stopped(attempt);
-      accepted == null ? void 0 : accepted();
-      if (!phase2Only) {
-        const emptyDetail = !note.detail.trim();
-        if (emptyDetail) {
-          if (!await this.phase1(attempt, note)) return await this.dropStale(attempt);
-        } else topic.skeleton = skeletonFilter(note.detail, { allow: topic.allow });
-        if (!this.isCurrent(attempt)) return await this.dropStale(attempt);
-      }
-      await this.phase2(attempt);
-    } catch (error) {
-      if (this.disposed) return;
-      if (signal.aborted || classifyFailure(error) === "stopped") return await this.stopped(attempt);
-      await this.setStatus(attempt, "error");
-      throw error;
-    } finally {
-      if (!attempt.handedOff) this.release(attempt);
-    }
-  }
-  async setStatus(attempt, status) {
-    if (this.disposed) return;
-    const path = attempt.topic.path;
-    await this.deps.mutate(async () => {
-      const owner = this.current.get(path);
-      if (owner && owner !== attempt) return;
-      await this.deps.repo.updateNote(path, { status });
-    });
-  }
-  /** Stop: phase-1 text stays, status goes back (nothing written) or to `idea` (never `completed`), held result is dropped. */
-  async stopped(attempt) {
-    var _a2;
-    const topic = attempt.topic;
-    if (((_a2 = this.held.get(topic.path)) == null ? void 0 : _a2.attempt) === attempt) this.held.delete(topic.path);
-    const outcome = seamlessOutcome({
-      stopped: true,
-      phase1Written: topic.phase1Written,
-      phase2: "none",
-      imagesRequested: topic.imagesRequested,
-      imagesSaved: 0
-    });
-    this.log(t("log.seamless_ended_0_1", topic.title, "stopped"));
-    if (!this.disposed) await this.setStatus(attempt, outcome.status === "restore" ? topic.status0 : outcome.status);
-  }
-  async discardHeld(path, attempt) {
-    var _a2;
-    if (((_a2 = this.held.get(path)) == null ? void 0 : _a2.attempt) !== attempt) return;
-    try {
-      await this.stopped(attempt);
-    } finally {
-      this.release(attempt);
-    }
-  }
-  // ---------- phase 1 ----------
-  /** Returns false when nothing was written because the attempt is no longer the topic's (stopped, retitled, or the detail is no longer empty). */
-  async phase1(attempt, note) {
-    const topic = attempt.topic;
-    const reply = await this.deps.askModel({
-      path: topic.path,
-      title: topic.title,
-      context: topic.context,
-      language: topic.language,
-      model: note.model,
-      reasoning: note.reasoning,
-      instruction: this.deps.skeletonInstruction(topic.language),
-      signal: attempt.controller.signal
-    });
-    if (!this.isCurrent(attempt)) return false;
-    const skeleton = skeletonFilter(reply.detail, { allow: topic.allow });
-    if (!skeleton.trim()) throw new Error(t("ui.seamless_phase1_empty"));
-    const summary = skeletonFilter(reply.summary, { allow: topic.allow }).trim();
-    let written2 = false;
-    await this.deps.mutate(async () => {
-      if (!this.isCurrent(attempt)) return;
-      const latest = await this.deps.repo.readNote(topic.path);
-      if (latest.title !== topic.title || latest.detail.trim()) return;
-      const placeholder2 = (value) => this.deps.isPlaceholderSummary ? this.deps.isPlaceholderSummary(value) : !value.trim();
-      await this.deps.repo.updateNote(topic.path, {
-        detail: skeleton,
-        researchWrittenHash: detailHash(skeleton),
-        ...summary && placeholder2(latest.summary) ? { summary } : {}
-      });
-      written2 = true;
-    });
-    if (!written2) return false;
-    topic.phase1Written = true;
-    topic.skeleton = skeleton;
-    return true;
-  }
-  // ---------- phase 2 ----------
-  async phase2(attempt) {
-    const topic = attempt.topic;
-    const signal = attempt.controller.signal;
-    const note = await this.deps.repo.readNote(topic.path);
-    if (signal.aborted) return await this.stopped(attempt);
-    let webSearch = true;
-    try {
-      webSearch = this.deps.capabilitiesFor(note.model).webSearch !== false;
-    } catch (e) {
-      webSearch = true;
-    }
-    if (!webSearch) return await this.fail(attempt, "no-web-model");
-    let result;
-    try {
-      await this.phase2Slots.acquire(signal);
-    } catch (e) {
-      return await this.stopped(attempt);
-    }
-    try {
-      const base = {
-        path: topic.path,
-        title: topic.title,
-        context: topic.context,
-        model: note.model,
-        reasoning: note.reasoning,
-        signal
-      };
-      const verifyCall = this.deps.runVerify({ ...base, skeleton: topic.skeleton, language: topic.language });
-      const imagesCall = this.deps.runImages(base);
-      const [verify, images] = await Promise.allSettled([verifyCall, imagesCall]);
-      if (signal.aborted) return await this.dropStale(attempt);
-      if (verify.status === "rejected") return await this.fail(attempt, classifyFailure(verify.reason), verify.reason);
-      result = {
-        verify: verify.value,
-        images: [...verify.value.images, ...images.status === "fulfilled" ? images.value.images : []],
-        imagesFailed: images.status === "rejected"
-      };
-    } finally {
-      this.phase2Slots.release();
-    }
-    await this.deliver(attempt, result);
-  }
-  async fail(attempt, failure, cause) {
-    var _a2;
-    const topic = attempt.topic;
-    if (failure === "stopped") return await this.stopped(attempt);
-    const outcome = seamlessOutcome({
-      failure,
-      phase1Written: topic.phase1Written,
-      phase2: "none",
-      imagesRequested: topic.imagesRequested,
-      imagesSaved: 0
-    });
-    this.log(
-      t(
-        "log.seamless_ended_0_1",
-        topic.title,
-        cause instanceof Error && failure === "other" ? `${failure}: ${cause.name}` : failure
-      )
-    );
-    if (this.disposed) return;
-    this.problemMap.set(topic.path, {
-      path: topic.path,
-      title: topic.title,
-      reason: (_a2 = outcome.reason) != null ? _a2 : "other",
-      ...outcome.action ? { action: outcome.action } : {}
-    });
-    await this.setStatus(attempt, outcome.status === "restore" ? "error" : outcome.status);
-    this.changed();
-  }
-  /** Phase-2 result arrived: fence, then hold (note open) or apply. */
-  async deliver(attempt, result) {
-    const topic = attempt.topic;
-    if (!await this.fenceOk(attempt)) return await this.dropStale(attempt);
-    if (this.deps.isShown(topic.path)) {
-      this.held.set(topic.path, { attempt, result });
-      attempt.handedOff = true;
-      this.changed();
-      return;
-    }
-    await this.apply(attempt, { attempt, result });
-  }
-  async fenceOk(attempt) {
-    if (!this.isCurrent(attempt)) return false;
-    try {
-      const note = await this.deps.repo.readNote(attempt.topic.path);
-      return note.title === attempt.topic.title && this.isCurrent(attempt);
-    } catch (e) {
-      return false;
-    }
-  }
-  async dropStale(attempt) {
-    this.log(t("log.stale_result_not_written"));
-    await this.stopped(attempt);
-  }
-  async applyHeld(path, entry) {
-    const attempt = entry.attempt;
-    if (this.held.get(path) !== entry) return;
-    if (!await this.fenceOk(attempt)) {
-      this.held.delete(path);
-      try {
-        await this.dropStale(attempt);
-      } finally {
-        this.release(attempt);
-      }
-      return;
-    }
-    this.held.delete(path);
-    try {
-      await this.apply(attempt, entry);
-    } finally {
-      if (!this.held.has(path)) this.release(attempt);
-    }
-  }
-  async saveImages(attempt, images) {
-    const saved = [];
-    for (const image of eligibleImages(images).eligible) {
-      if (!this.isCurrent(attempt)) break;
-      try {
-        const path = await this.deps.saveImage(image, attempt.topic.path, attempt.controller.signal);
-        if (path) saved.push({ path, image });
-      } catch (error) {
-        this.log(t("log.seamless_image_skipped_0", error instanceof Error ? error.message : "download"));
-      }
-    }
-    return saved;
-  }
-  /** Redo the fence, save images, then write inside the mutation queue: replace when the AI still owns the detail, else append. */
-  async apply(attempt, entry) {
-    var _a2;
-    const topic = attempt.topic;
-    const path = topic.path;
-    (_a2 = entry.saved) != null ? _a2 : entry.saved = await this.saveImages(attempt, entry.result.images);
-    const saved = entry.saved;
-    if (!this.isCurrent(attempt)) return await this.dropStale(attempt);
-    const box = {};
-    await this.deps.mutate(async () => {
-      var _a3, _b2;
-      if (!this.isCurrent(attempt)) {
-        box.stale = true;
-        return;
-      }
-      if (this.deps.isShown(path)) {
-        this.held.set(path, entry);
-        attempt.handedOff = true;
-        box.reheld = true;
-        return;
-      }
-      const latest = await this.deps.repo.readNote(path);
-      if (latest.title !== topic.title) {
-        box.stale = true;
-        return;
-      }
-      let composition;
-      try {
-        composition = composePhase2Detail(entry.result.verify, saved);
-      } catch (error) {
-        box.failure = error;
-        return;
-      }
-      const plan = planPhase2Write({
-        currentDetail: latest.detail,
-        writtenHash: latest.researchWrittenHash,
-        phase2Detail: composition.detail
-      });
-      const outcome = seamlessOutcome({
-        phase1Written: topic.phase1Written,
-        phase2: "applied",
-        imagesRequested: topic.imagesRequested,
-        imagesSaved: saved.length
-      });
-      if (outcome.reason === "no-images") box.problem = "no-images";
-      await this.deps.repo.updateNote(path, {
-        ...plan.mode === "noop" ? {} : { detail: plan.detail },
-        researchWrittenHash: plan.mode === "append" ? "" : (_b2 = (_a3 = plan.writtenHash) != null ? _a3 : latest.researchWrittenHash) != null ? _b2 : "",
-        status: outcome.status
-      });
-      const after = await this.deps.repo.readNote(path);
-      if (plan.mode === "replace" && detailHash(after.detail) !== plan.writtenHash)
-        await this.deps.repo.updateNote(path, { researchWrittenHash: detailHash(after.detail) });
-      box.written = { before: latest, after };
-    });
-    if (box.reheld) {
-      this.changed();
-      return;
-    }
-    if (box.stale) return await this.dropStale(attempt);
-    if (box.failure !== void 0) return await this.fail(attempt, "other", box.failure);
-    if (box.written) for (const listener of [...this.listeners]) listener({ type: "written", path, ...box.written });
-    if (box.problem) {
-      this.problemMap.set(path, { path, title: topic.title, reason: box.problem, action: "dismiss" });
-      this.log(t("log.seamless_ended_0_1", topic.title, box.problem));
-    }
-    this.changed();
   }
 };
 

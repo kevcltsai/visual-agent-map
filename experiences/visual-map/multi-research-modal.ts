@@ -14,6 +14,8 @@ export interface MultiResearchRequest {
   researchDepth?: ResearchDepth;
   /** Search for image references (an override; only meaningful with web search). */
   imageSearch?: boolean;
+  /** Seamless research only: the chat asked for images, so "none found" is a problem. */
+  imagesRequested?: boolean;
   requirements: string;
   /** Model for every started topic (saved on the topic, as single-topic research does); undefined keeps each topic's model. */
   model?: string;

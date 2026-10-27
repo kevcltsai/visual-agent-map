@@ -116,6 +116,8 @@ export interface SeamlessRequest {
   allow?: readonly string[];
   /** The chat asked for images. Only then is "no image found" a problem. */
   imagesRequested?: boolean;
+  /** The model the topic resolves to (a topic that follows its parent has no model of its own). A model chosen by hand on the note still wins. */
+  model?: string;
   /** The batch's stop signal. */
   signal?: AbortSignal;
   /** Called once the topic is registered and its status is `running` (the coordinator's `accepted`). */
@@ -247,6 +249,8 @@ interface Topic {
   language: ContentLanguage;
   allow: readonly string[];
   imagesRequested: boolean;
+  /** The resolved model of a topic that follows its parent; see `SeamlessRequest.model`. */
+  model?: string;
   /** Status the note had before the first attempt; restored when a stop comes before anything was written. */
   status0: SeamlessStatus;
   phase1Written: boolean;
@@ -326,6 +330,7 @@ export class SeamlessResearch {
       language: request.language,
       allow: [request.title, ...(request.allow ?? [])],
       imagesRequested: request.imagesRequested === true,
+      ...(request.model ? { model: request.model } : {}),
       status0: "idea",
       phase1Written: false,
       skeleton: ""
@@ -536,6 +541,11 @@ export class SeamlessResearch {
     }
   }
 
+  /** A model chosen by hand wins; a topic that follows its parent uses the model the view resolved for it. */
+  private modelFor(topic: Topic, note: SeamlessNote): string {
+    return note.modelSource === "manual" || !topic.model ? note.model : topic.model;
+  }
+
   // ---------- phase 1 ----------
 
   /** Returns false when nothing was written because the attempt is no longer the topic's (stopped, retitled, or the detail is no longer empty). */
@@ -546,7 +556,7 @@ export class SeamlessResearch {
       title: topic.title,
       context: topic.context,
       language: topic.language,
-      model: note.model,
+      model: this.modelFor(topic, note),
       reasoning: note.reasoning,
       instruction: this.deps.skeletonInstruction(topic.language),
       signal: attempt.controller.signal
@@ -584,7 +594,7 @@ export class SeamlessResearch {
     if (signal.aborted) return await this.stopped(attempt);
     let webSearch = true;
     try {
-      webSearch = this.deps.capabilitiesFor(note.model).webSearch !== false;
+      webSearch = this.deps.capabilitiesFor(this.modelFor(topic, note)).webSearch !== false;
     } catch {
       webSearch = true;
     }
@@ -601,7 +611,7 @@ export class SeamlessResearch {
         path: topic.path,
         title: topic.title,
         context: topic.context,
-        model: note.model,
+        model: this.modelFor(topic, note),
         reasoning: note.reasoning,
         signal
       };

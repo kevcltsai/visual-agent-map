@@ -1069,7 +1069,8 @@ export class NextStepModal extends Modal {
               research.querySelector<HTMLElement>(".vam-next-status")?.setText(message);
           }
         };
-        await this.rememberMode(mode);
+        // The hidden switch is not the user's choice: with the one-button research the map keeps the mode it has.
+        if (!this.plugin.settings.seamlessResearch) await this.rememberMode(mode);
         if (this.dead(controller)) return;
         this.detach(controller);
         let launchAccepted = false;
@@ -1463,7 +1464,9 @@ export class NextStepModal extends Modal {
       expandFooterText.hidden = mode !== "expand";
       reviewButton.hidden = mode !== "expand" || !this.pendingCount;
       // The AI mode applies to a research and to an expansion; a synthesis has no choice to make.
-      aiMode.element.hidden = mode === "synthesize";
+      // With the one-button research (experimental setting) a research has no mode to pick; expand keeps the switch.
+      aiMode.element.hidden =
+        mode === "synthesize" || (this.plugin.settings.seamlessResearch === true && mode === "research");
       // Once directions are requested, the synthesis step has no sources, language or template left to choose.
       syncSynthesisStage();
       refreshSummary();

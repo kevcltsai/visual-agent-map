@@ -70,6 +70,13 @@
 .vam-edge { fill: none; stroke: var(--interactive-accent); stroke-width: 2; opacity: 0.55; }
 .vam-node { --vam-card-bg: var(--background-primary); position: absolute; box-sizing: border-box; width: 280px; padding: 12px 14px 14px; border: 1px solid var(--background-modifier-border); border-radius: 12px; background: var(--vam-card-bg); box-shadow: var(--shadow-s); cursor: grab; user-select: none; transition: border-color 160ms ease-out, box-shadow 160ms ease-out; }
 .vam-node:hover { border-color: var(--background-modifier-border-hover); }
+/* Seamless research: a topic that is still growing breathes slowly; it stops when the work is done. Reduced motion: a steady accent border instead. */
+.vam-node.vam-seamless-growing { border-color: var(--interactive-accent); animation: vam-seamless-breathe 3.6s ease-in-out infinite; }
+@keyframes vam-seamless-breathe { 0%, 100% { border-color: var(--background-modifier-border); box-shadow: var(--shadow-s); } 50% { border-color: var(--interactive-accent); box-shadow: 0 0 0 3px color-mix(in srgb, var(--interactive-accent) 22%, transparent), var(--shadow-s); } }
+@media (prefers-reduced-motion: reduce) { .vam-node.vam-seamless-growing { animation: none; } }
+.vam-seamless-problems { flex-direction: column; align-items: stretch; }
+.vam-seamless-problem { display: flex; align-items: center; flex-wrap: wrap; gap: 6px 12px; }
+.vam-seamless-problem-text { font-size: var(--font-ui-small); }
 .vam-node > .vam-card-label { position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0; overflow: hidden; white-space: nowrap; border: 0; }
 .vam-node[data-aim-kind="topic"] { border-radius: 48% / 28%; padding: 22px 24px; }
 .vam-node[data-aim-kind="question"] { isolation: isolate; border-color: transparent; background: transparent; box-shadow: none; }

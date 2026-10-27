@@ -28,7 +28,9 @@ export class ShallowExpansionCoordinator {
     children: MapNode[],
     startChild: (child: MapNode, signal: AbortSignal, accepted: () => void) => Promise<void | "skipped">,
     changed: () => void,
-    externalSignal?: AbortSignal
+    externalSignal?: AbortSignal,
+    /** Children that run at once; 3 unless the caller says otherwise. */
+    limit = 3
   ): Promise<void> {
     if (this.isRunning(parentPath)) throw new Error("Shallow research is already running for this topic.");
     const controller = new AbortController();
@@ -96,7 +98,9 @@ export class ShallowExpansionCoordinator {
         }
       };
       try {
-        await Promise.all(Array.from({ length: Math.min(3, children.length) }, () => worker()));
+        await Promise.all(
+          Array.from({ length: Math.min(Math.max(1, Math.floor(limit) || 3), children.length) }, () => worker())
+        );
       } finally {
         state.status = controller.signal.aborted ? "stopped" : "completed";
         state.currentPath = undefined;

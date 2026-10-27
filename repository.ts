@@ -79,6 +79,8 @@ export interface Note {
   reasoning?: ReasoningLevel;
   researchMode: ResearchMode;
   visualMode: VisualMode;
+  /** Frontmatter `research-written-hash`: hash of the detail the seamless research flow wrote. Absent = the user owns the detail. */
+  researchWrittenHash?: string;
   detailTemplateId?: string;
   /** Per-topic tone preset id (frontmatter `tone`); absent = use the map default. */
   toneId?: string;
@@ -133,6 +135,8 @@ export interface Settings {
   markdownSelectionAiAutoOpen: boolean;
   /** Add diagrams after research (default on): the chart step after a note or an AIM conclusion is written. */
   addDiagramsAfterResearch: boolean;
+  /** Experimental one-button research (phase 1 without the web, phase 2 with it). Default off: research behaves as before. */
+  seamlessResearch: boolean;
   workspaceInitialized: boolean;
   sampleTourVersionSeen: number;
   canvasHintSeen: boolean;
@@ -233,6 +237,7 @@ export const DEFAULT_SETTINGS: Settings = {
   aiExchangeLoggingEnabled: false,
   markdownSelectionAiAutoOpen: true,
   addDiagramsAfterResearch: true,
+  seamlessResearch: false,
   workspaceInitialized: false,
   sampleTourVersionSeen: 0,
   canvasHintSeen: false
@@ -1143,6 +1148,9 @@ export class Repository {
       reasoning: normalizeReasoningLevel(fm["reasoning-level"] ?? this.settings.cliReasoning),
       researchMode: fm["research-mode"] === "research" ? "research" : "local",
       visualMode: fm["visual-mode"] === "on" || fm["visual-mode"] === "off" ? fm["visual-mode"] : "auto",
+      ...(typeof fm["research-written-hash"] === "string" && fm["research-written-hash"]
+        ? { researchWrittenHash: fm["research-written-hash"] }
+        : {}),
       ...(typeof fm["detail-template"] === "string" && fm["detail-template"]
         ? { detailTemplateId: fm["detail-template"] }
         : {}),
@@ -1189,6 +1197,10 @@ export class Repository {
       if (patch.reasoning !== undefined) fm["reasoning-level"] = normalizeReasoningLevel(patch.reasoning);
       if (patch.researchMode !== undefined) fm["research-mode"] = patch.researchMode;
       if (patch.visualMode !== undefined) fm["visual-mode"] = patch.visualMode;
+      if (patch.researchWrittenHash !== undefined)
+        patch.researchWrittenHash
+          ? (fm["research-written-hash"] = patch.researchWrittenHash)
+          : delete fm["research-written-hash"];
       if (patch.detailTemplateId !== undefined)
         patch.detailTemplateId ? (fm["detail-template"] = patch.detailTemplateId) : delete fm["detail-template"];
       if (patch.toneId !== undefined) patch.toneId ? (fm.tone = patch.toneId) : delete fm.tone;

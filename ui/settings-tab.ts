@@ -359,6 +359,20 @@ export class VisualAgentMapSettingTab extends PluginSettingTab {
         }
       },
       {
+        name: t("ui.seamless_research"),
+        render: setting => {
+          setting
+            .setName(t("ui.seamless_research"))
+            .setDesc(t("ui.seamless_research_desc"))
+            .addToggle(toggle =>
+              toggle.setValue(this.plugin.settings.seamlessResearch).onChange(async value => {
+                this.plugin.settings.seamlessResearch = value;
+                await this.plugin.saveSettings();
+              })
+            );
+        }
+      },
+      {
         name: t("ui.preview_card_size"),
         render: setting => {
           setting

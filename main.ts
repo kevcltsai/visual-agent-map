@@ -47,6 +47,7 @@ import { type MapDocument, type MapNode } from "./map-model";
 import {
   DEFAULT_SETTINGS,
   isManagedMapPath,
+  isPlaceholder,
   moveNotePath,
   normalizeReasoningLevel,
   normalizeMapChatStyle,
@@ -59,7 +60,7 @@ import {
   Repository,
   type Settings
 } from "./repository";
-import { normalizeTemplates } from "./ai/detail-templates";
+import { normalizeTemplates, resolveTemplate } from "./ai/detail-templates";
 import { normalizePresets } from "./ai/prompt-presets";
 import { effectiveReasoningLevel } from "./ai/task-policy";
 import { stepEffort } from "./core/provider-step-runner";
@@ -91,6 +92,18 @@ import type { AiRuntimeId } from "./core/ai-runtime";
 import { AiRuntimeService } from "./core/ai-runtime-service";
 import { ModelDiscovery, type ModelDiscoveryState } from "./core/model-discovery";
 import { ShallowExpansionCoordinator, type ExpansionBatchState } from "./experiences/visual-map/expansion-batch";
+import {
+  SeamlessResearch,
+  type SeamlessPhase1Input,
+  type SeamlessVerifyInput,
+  type SeamlessImagesInput
+} from "./experiences/visual-map/seamless-research";
+import { aiModeOptions } from "./experiences/visual-map/ai-mode";
+import { researchTopicTask } from "./experiences/visual-map/steps/fragments";
+import { researchVerifyStep, skeletonInstruction, type ResearchVerifyResult } from "./core/steps/research-verify/step";
+import { researchImagesStep, type ResearchImagesResult } from "./core/steps/research-verify/images";
+import { checkImageBytes, isHttpsUrl } from "./core/seamless-research/apply";
+import { isSearchNotPerformed } from "./ai/search-not-performed";
 import { ResearchProgressStore } from "./experiences/visual-map/research-progress";
 import type { ResearchObserver } from "./ai/research-observer";
 import { AiTaskService } from "./core/ai-task-service";
@@ -168,6 +181,7 @@ export function settingsFromSaved(saved: Partial<Settings> | null): Settings {
     aiExchangeLoggingEnabled: saved?.aiExchangeLoggingEnabled === true,
     markdownSelectionAiAutoOpen: saved?.markdownSelectionAiAutoOpen !== false,
     addDiagramsAfterResearch: saved?.addDiagramsAfterResearch !== false,
+    seamlessResearch: saved?.seamlessResearch === true,
     workspaceInitialized: saved ? saved.workspaceInitialized !== false : false,
     sampleTourVersionSeen: saved?.sampleTourVersionSeen ?? 0,
     canvasHintSeen: saved?.canvasHintSeen === true
@@ -205,6 +219,8 @@ export default class VisualAgentMapPlugin extends Plugin {
   private chartRunning = 0;
   readonly expansionBatches = new Map<string, ExpansionBatchState>();
   readonly expansionCoordinator = new ShallowExpansionCoordinator(this.activeTasks, this.expansionBatches);
+  /** The one-button research flow; created on first use, so with `settings.seamlessResearch` off nothing of it exists. */
+  private seamless: SeamlessResearch | null = null;
   pendingSuggestions: Map<string, Suggestion[]> = new Map();
   readonly pendingResearchOptions = new Map<string, TaskOptions>();
   readonly logs: LogManager = debugLog;
@@ -672,6 +688,11 @@ export default class VisualAgentMapPlugin extends Plugin {
       })
     );
     this.registerEvent(this.app.workspace.on("active-leaf-change", leaf => this.onActiveLeafChange(leaf)));
+    // A seamless-research result held for an open note is applied once the note is no longer shown (nothing exists with the setting off).
+    this.registerEvent(this.app.workspace.on("layout-change", () => void this.seamless?.flushHeld().catch(() => {})));
+    this.registerEvent(
+      this.app.workspace.on("active-leaf-change", () => void this.seamless?.flushHeld().catch(() => {}))
+    );
     this.registerEvent(
       this.app.workspace.on("file-open", file => {
         for (const leaf of this.app.workspace.getLeavesOfType("markdown")) this.styleNodeLeaf(leaf);
@@ -1046,6 +1067,7 @@ export default class VisualAgentMapPlugin extends Plugin {
   }
   resetCodexRuntime(): void {
     this.expansionCoordinator.stopAll();
+    this.seamless?.abortAll();
     this.aiCalls.stopAll();
     this.abortChartJobs();
     this.modelDiscovery.invalidate("codex");
@@ -1165,6 +1187,9 @@ export default class VisualAgentMapPlugin extends Plugin {
     leaf.view.containerEl.toggleClass("vam-topic-markdown", !!leaf.view.file && this.isNode(leaf.view.file));
   }
   onunload(): void {
+    // Seamless research: abort every topic and forget held results before the repository goes away.
+    this.seamless?.dispose();
+    this.seamless = null;
     // Background diagram jobs stop before the repository does, so none can apply a result after the vault is released.
     this.abortChartJobs();
     // In-flight work (a long Obsidian rename, a queued mutation) must not write into the vault after this point.
@@ -1503,6 +1528,136 @@ export default class VisualAgentMapPlugin extends Plugin {
   async searchImages(query: string, model: string, signal: AbortSignal): Promise<ImageCandidate[]> {
     const prepared = prepareStep(imageSearchStep, { query });
     return prepared.parse(await this.runMarkdownContextAi(prepared, model, signal, undefined, true));
+  }
+  /** The seamless research flow (see experiences/visual-map/seamless-research.ts). Callers check `settings.seamlessResearch` first; `research()` refuses when it is off. */
+  seamlessResearchService(): SeamlessResearch {
+    this.seamless ??= new SeamlessResearch({
+      enabled: () => this.settings.seamlessResearch,
+      repo: {
+        readNote: path => this.repo.readNote(path),
+        updateNote: (path, patch) => this.repo.updateNote(path, patch)
+      },
+      mutate: work => this.mutate(work),
+      askModel: input => this.runSeamlessPhase1(input),
+      runVerify: input => this.runResearchVerify(input),
+      runImages: input => this.runResearchImages(input),
+      saveImage: (image, notePath, signal) => this.saveResearchImage(image.imageUrl, notePath, signal),
+      isShown: path => this.isNoteShown(path),
+      capabilitiesFor: model => this.aiCalls.capabilitiesFor(model),
+      defaultModel: () => this.settings.cliModel,
+      running: this.running,
+      busyElsewhere: path => this.quickExpandPending.has(path) || this.activeTasks.has(path),
+      skeletonInstruction: language => skeletonInstruction(language),
+      log: message => this.logs.appendLog("info", message),
+      isPlaceholderSummary: summary => !summary.trim() || isPlaceholder(summary)
+    });
+    return this.seamless;
+  }
+  /** The note is open in a Markdown leaf that is visible right now. */
+  isNoteShown(path: string): boolean {
+    return this.app.workspace
+      .getLeavesOfType("markdown")
+      .some(
+        leaf => leaf.view instanceof MarkdownView && leaf.view.file?.path === path && leaf.view.containerEl.isShown()
+      );
+  }
+  /** Seamless phase 1: one Quick call without the web, fast depth, no images. The caller filters the text before it is written. */
+  private async runSeamlessPhase1(input: SeamlessPhase1Input): Promise<{ summary: string; detail: string }> {
+    const note = await this.repo.readNote(input.path);
+    const context: TaskContext = {
+      title: input.title,
+      summary: isPlaceholder(note.summary) ? "" : note.summary,
+      rules: "",
+      detail: "",
+      task: [note.prompt || researchTopicTask(input.language, input.title), input.instruction].join("\n\n"),
+      ancestors: input.context,
+      mode: "task",
+      ...aiModeOptions("quick", "research"),
+      researchDepth: "fast",
+      visualMode: "off",
+      outputLanguage: input.language,
+      detailTemplate: resolveTemplate(
+        this.settings.detailTemplates,
+        [note.detailTemplateId, this.settings.defaultDetailTemplateId],
+        noteLanguageOf(input.language)
+      ).template,
+      addCharts: false
+    };
+    const result = await this.askModel(context, input.model, input.reasoning, input.signal);
+    return { summary: result.summary, detail: result.detail };
+  }
+  /** Seamless phase 2, text and footnotes: web search only. One more try when the model finished without any web retrieval. */
+  async runResearchVerify(input: SeamlessVerifyInput): Promise<ResearchVerifyResult> {
+    const prepared = prepareStep(researchVerifyStep, {
+      topic: input.title,
+      context: input.context,
+      skeleton: input.skeleton,
+      language: input.language
+    });
+    return this.runSeamlessWebCall(prepared, input, "research-verify", 8, true);
+  }
+  /** Seamless phase 2, images: a separate web call beside runResearchVerify. No retry; the caller decides what a failure means. */
+  async runResearchImages(input: SeamlessImagesInput): Promise<ResearchImagesResult> {
+    const prepared = prepareStep(researchImagesStep, { topic: input.title, context: input.context });
+    return this.runSeamlessWebCall(prepared, input, "research-images", 6, false);
+  }
+  private async runSeamlessWebCall<Input, Output>(
+    prepared: PreparedStep<Input, Output>,
+    input: { title: string; model: string; reasoning?: unknown; signal: AbortSignal },
+    taskName: string,
+    searchBudget: number,
+    retryWithoutSearch: boolean
+  ): Promise<Output> {
+    const cancelled = (): Error => Object.assign(new Error(t("ui.ai_task_cancelled")), { name: "AbortError" });
+    for (let attempt = 1; ; attempt++) {
+      try {
+        this.aiCalls.capabilitiesFor(input.model);
+        // Fail before anything is registered or logged when there is no plugin directory (not desktop Obsidian).
+        this.pluginDirectory();
+        const effort = effectiveReasoningLevel(
+          { title: input.title, summary: "", detail: "", rules: "", task: prepared.prompt, ancestors: "" },
+          normalizeReasoningLevel(input.reasoning ?? this.settings.cliReasoning)
+        );
+        return await this.aiCalls.run(
+          prepared,
+          {
+            model: input.model,
+            effort,
+            topic: input.title,
+            taskName,
+            signal: input.signal,
+            localCodex: false,
+            stopped: cancelled,
+            task: { textOnly: false, webSearchOnly: true, generateImage: false, searchBudget }
+          },
+          (raw, exchange) => {
+            if (exchange.signal.aborted) throw cancelled();
+            const value = prepared.parse(raw);
+            exchange.parsed();
+            return value;
+          }
+        );
+      } catch (error) {
+        if (!retryWithoutSearch || attempt >= 2 || input.signal.aborted || !isSearchNotPerformed(error)) throw error;
+      }
+    }
+  }
+  /**
+   * Saves one researched image as a local copy next to `notePath`'s attachments. https only; the bytes must be png, jpeg, gif or
+   * webp (checked by magic bytes, not by name or content type) and at most 10 MB. Returns the Vault path, or undefined when the
+   * run was stopped; anything else that is wrong throws, and the caller drops that one image.
+   */
+  async saveResearchImage(url: string, notePath: string, signal: AbortSignal): Promise<string | undefined> {
+    if (!isHttpsUrl(url)) throw new Error("image address is not https");
+    if (signal.aborted) return undefined;
+    const response = await requestUrl({ url, method: "GET", throw: true });
+    if (signal.aborted) return undefined;
+    const checked = checkImageBytes(new Uint8Array(response.arrayBuffer));
+    if ("rejected" in checked) throw new Error(`image rejected: ${checked.rejected}`);
+    const extension = checked.kind === "jpeg" ? "jpg" : checked.kind;
+    const path = await this.app.fileManager.getAvailablePathForAttachment(`research-image.${extension}`, notePath);
+    await this.app.vault.createBinary(path, response.arrayBuffer);
+    return path;
   }
   private async runConfirmedMarkdownContextAi<Input, Output>(
     prepared: PreparedStep<Input, Output>,

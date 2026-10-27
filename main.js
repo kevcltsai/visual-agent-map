@@ -25500,7 +25500,7 @@ function normalizeHttpsUrl(value) {
   const cut = authorityLength < 0 ? raw.length : 8 + authorityLength;
   const authority = raw.slice(8, cut);
   if (!authority || authority.includes("@")) return void 0;
-  return raw.slice(0, cut) + raw.slice(cut).replace(/[()[\]!]/g, (char) => `%${char.charCodeAt(0).toString(16).toUpperCase().padStart(2, "0")}`);
+  return `https://${url.host}` + raw.slice(cut).replace(/[()[\]!]/g, (char) => `%${char.charCodeAt(0).toString(16).toUpperCase().padStart(2, "0")}`);
 }
 function stripUnsafeCharacters(text13) {
   let out = "";
@@ -25565,21 +25565,14 @@ function parseDestination(text13, from) {
   }
   return text13[j] === ")" ? { raw, end: j + 1 } : void 0;
 }
-function scrubSchemes(text13, drop) {
-  return text13.replace(/\b(?:javascript|vbscript|data|file):[^\s)\]]*/gi, (match) => {
-    drop("scheme", match);
-    return "";
-  });
-}
 function inline(text13, mode, options, drop) {
   var _a2;
   let out = "";
   let pending = "";
   const emit = (value) => {
-    out += scrubSchemes(pending, drop) + value;
+    out += pending + value;
     pending = "";
   };
-  const bracket = (char) => mode === "plain" ? char : `\\${char}`;
   let i = 0;
   while (i < text13.length) {
     const char = text13[i];
@@ -25589,7 +25582,7 @@ function inline(text13, mode, options, drop) {
         pending += char + next;
         i += 2;
       } else {
-        pending += char;
+        pending += "\\\\";
         i++;
       }
       continue;
@@ -25637,8 +25630,7 @@ function inline(text13, mode, options, drop) {
       const found = note.exec(text13);
       if (found && text13[i + found[0].length] !== "(") {
         const id = found[1];
-        if (mode === "plain") pending += found[0];
-        else if (mode === "text" && (!options.footnoteIds || options.footnoteIds.has(id))) emit(found[0]);
+        if (mode === "text" && (!options.footnoteIds || options.footnoteIds.has(id))) emit(found[0]);
         else pending += `\\[^${id}\\]`;
         i += found[0].length;
         continue;
@@ -25658,12 +25650,12 @@ function inline(text13, mode, options, drop) {
           continue;
         }
       }
-      pending += bracket("[");
+      pending += "\\[";
       i++;
       continue;
     }
-    if (char === "]") {
-      pending += bracket("]");
+    if (char === "!" || char === "]" || char === "(" || char === ")" || char === ">" || char === "`") {
+      pending += `\\${char}`;
       i++;
       continue;
     }
@@ -25712,7 +25704,7 @@ function buildLine(line, options, drop) {
     }
     return `[${definition[1].replace(/[[\]\\]/g, " ").trim() || "link"}]: ${href}`;
   }
-  const keep = (_b2 = (_a2 = /^(?:\s*(?:[-*+]|\d+[.)])\s+\[[ xX]\](?=\s)|\s*>+\s*\[![\w-]+\][+-]?)/.exec(line)) == null ? void 0 : _a2[0]) != null ? _b2 : "";
+  const keep = (_b2 = (_a2 = /^(?:\s*(?:[-*+]|\d+[.)])\s+\[[ xX]\](?=\s)|\s*>+\s*\[![\w-]+\][+-]?|\s*(?:>\s*)+)/.exec(line)) == null ? void 0 : _a2[0]) != null ? _b2 : "";
   return keep + inline(line.slice(keep.length), "text", options, drop);
 }
 function sanitizePhase2Markdown(markdown, options = {}) {
@@ -25765,7 +25757,7 @@ function eligibleImages(images, limit = MAX_IMAGES) {
   return { eligible, rejected };
 }
 function footnoteLabel(title) {
-  return cleanFragment(title, "plain").replace(/[[\]\\]/g, " ").trim();
+  return cleanFragment(title, "plain");
 }
 function renderFootnoteDefinitions(footnotes) {
   const lines = [];
@@ -26066,6 +26058,7 @@ function composePhase2Detail(verify, saved) {
   const clean4 = sanitizePhase2Markdown(verify.detail, { footnoteIds, referenceDefinitions: false }).markdown;
   if (!clean4.trim()) throw new Error(t("ui.seamless_phase2_empty"));
   const applied = applyCorrections(clean4, verify.verdicts, { footnoteIds });
+  if (!applied.detail.trim()) throw new Error(t("ui.seamless_phase2_empty"));
   const parts = [applied.detail.trimEnd(), renderFootnoteDefinitions(verify.footnotes), renderImageBlock(saved)].filter(
     Boolean
   );
@@ -26074,6 +26067,7 @@ function composePhase2Detail(verify, saved) {
     embeds: new Set(saved.map((item) => item.path)),
     referenceDefinitions: false
   }).markdown;
+  if (!final.trim()) throw new Error(t("ui.seamless_phase2_empty"));
   return { detail: `${final}
 ` };
 }

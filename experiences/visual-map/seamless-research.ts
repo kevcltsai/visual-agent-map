@@ -233,6 +233,7 @@ export function composePhase2Detail(
   const clean = sanitizePhase2Markdown(verify.detail, { footnoteIds, referenceDefinitions: false }).markdown;
   if (!clean.trim()) throw new Error(t("ui.seamless_phase2_empty"));
   const applied = applyCorrections(clean, verify.verdicts, { footnoteIds });
+  if (!applied.detail.trim()) throw new Error(t("ui.seamless_phase2_empty"));
   const parts = [applied.detail.trimEnd(), renderFootnoteDefinitions(verify.footnotes), renderImageBlock(saved)].filter(
     Boolean
   );
@@ -241,6 +242,7 @@ export function composePhase2Detail(
     embeds: new Set(saved.map(item => item.path)),
     referenceDefinitions: false
   }).markdown;
+  if (!final.trim()) throw new Error(t("ui.seamless_phase2_empty"));
   return { detail: `${final}\n` };
 }
 

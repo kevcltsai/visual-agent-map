@@ -331,7 +331,7 @@ test('footnote definitions keep only https sources and safe ids', () => {
     { id: '3', url: 'http://example.com', title: 'plain http' },
     { id: 'a b', url: 'https://example.com', title: 'bad id' }
   ]);
-  assert.equal(out, '[^1]: [標題  x](https://example.com/a)');
+  assert.equal(out, '[^1]: [標題 \\[x\\]](https://example.com/a)');
 });
 
 // ---------- failure classification ----------
@@ -634,7 +634,7 @@ test('R1-B1 footnote titles: <img>, markdown images and nested brackets never re
   ]);
   assert.doesNotMatch(out, /evil\.example|<img|!\[/);
   assert.equal(out.split('\n').length, 4);
-  for (const line of out.split('\n')) assert.match(line, /^\[\^\d\]: \[[^\][\\]*\]\(https:\/\/ok\.example\/\)$/);
+  for (const line of out.split('\n')) assert.match(line, /^\[\^\d\]: \[(?:[^\][\\]|\\.)*\]\(https:\/\/ok\.example\/\)$/);
 });
 
 test('R1-B1 corrections: correction text and old-sentence footnotes go through the builder', () => {
@@ -736,4 +736,20 @@ test('R1-M3 research-verify render: no choices adds nothing; each choice adds it
   const english = researchVerifyStep.render({ ...base, language: 'en', requirements: 'casual only' });
   assert.match(english, /The user's extra requirements/);
   assert.doesNotMatch(researchVerifyStep.render({ ...base, requirements: 'x' }), /內容範本|文字語氣/, 'only the chosen blocks appear');
+});
+
+test('R2-N3 hosts are written as punycode; an address without a path keeps no trailing slash', () => {
+  assert.equal(apply.normalizeHttpsUrl('https://\u0430pple.com/login'), 'https://xn--pple-43d.com/login');
+  assert.equal(apply.normalizeHttpsUrl('https://\u0430pple.com'), 'https://xn--pple-43d.com');
+  assert.equal(apply.normalizeHttpsUrl('https://Example.COM/A?b=(c)'), 'https://example.com/A?b=%28c%29');
+  assert.equal(apply.normalizeHttpsUrl('https://example.com'), 'https://example.com');
+});
+
+test('R2-N1 builder: the scheme text is kept and escaped, nothing is deleted from plain text', () => {
+  const out = apply.sanitizePhase2Markdown('!javascript:x[a](https://evil.example/i.png)').markdown;
+  assert.equal(out, '\\!javascript:x[a](https://evil.example/i.png)');
+  const two = apply.sanitizePhase2Markdown('!![i](https://x.example/)[java](javascript:1)script:y[a](https://evil.example/i.png)').markdown;
+  assert.doesNotMatch(two.replace(/\\[\s\S]/g, '  '), /!\[/);
+  assert.equal(apply.sanitizePhase2Markdown('a (b) `c` d > e!').markdown, 'a \\(b\\) \\`c\\` d \\> e\\!');
+  assert.equal(apply.sanitizePhase2Markdown('> quote\n> [!note] x').markdown, '> quote\n> [!note] x');
 });

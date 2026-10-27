@@ -145,7 +145,7 @@ export function normalizeHttpsUrl(value: string): string | undefined {
   const authority = raw.slice(8, cut);
   if (!authority || authority.includes("@")) return undefined;
   return (
-    raw.slice(0, cut) +
+    `https://${url.host}` +
     raw.slice(cut).replace(/[()[\]!]/g, char => `%${char.charCodeAt(0).toString(16).toUpperCase().padStart(2, "0")}`)
   );
 }
@@ -245,22 +245,14 @@ function parseDestination(text: string, from: number): { raw: string; end: numbe
   return text[j] === ")" ? { raw, end: j + 1 } : undefined;
 }
 
-function scrubSchemes(text: string, drop: Drop): string {
-  return text.replace(/\b(?:javascript|vbscript|data|file):[^\s)\]]*/gi, match => {
-    drop("scheme", match);
-    return "";
-  });
-}
-
 /** Writes one line of model text as allowed nodes only: plain text, https links, validated footnote references, own embeds. */
 function inline(text: string, mode: Mode, options: BuildOptions, drop: Drop): string {
   let out = "";
   let pending = "";
   const emit = (value: string): void => {
-    out += scrubSchemes(pending, drop) + value;
+    out += pending + value;
     pending = "";
   };
-  const bracket = (char: string): string => (mode === "plain" ? char : `\\${char}`);
   let i = 0;
   while (i < text.length) {
     const char = text[i];
@@ -270,7 +262,7 @@ function inline(text: string, mode: Mode, options: BuildOptions, drop: Drop): st
         pending += char + next;
         i += 2;
       } else {
-        pending += char;
+        pending += "\\\\";
         i++;
       }
       continue;
@@ -318,8 +310,7 @@ function inline(text: string, mode: Mode, options: BuildOptions, drop: Drop): st
       const found = note.exec(text);
       if (found && text[i + found[0].length] !== "(") {
         const id = found[1];
-        if (mode === "plain") pending += found[0];
-        else if (mode === "text" && (!options.footnoteIds || options.footnoteIds.has(id))) emit(found[0]);
+        if (mode === "text" && (!options.footnoteIds || options.footnoteIds.has(id))) emit(found[0]);
         else pending += `\\[^${id}\\]`;
         i += found[0].length;
         continue;
@@ -339,12 +330,12 @@ function inline(text: string, mode: Mode, options: BuildOptions, drop: Drop): st
           continue;
         }
       }
-      pending += bracket("[");
+      pending += "\\[";
       i++;
       continue;
     }
-    if (char === "]") {
-      pending += bracket("]");
+    if (char === "!" || char === "]" || char === "(" || char === ")" || char === ">" || char === "`") {
+      pending += `\\${char}`;
       i++;
       continue;
     }
@@ -395,7 +386,8 @@ function buildLine(line: string, options: BuildOptions, drop: Drop): string | un
     }
     return `[${definition[1].replace(/[[\]\\]/g, " ").trim() || "link"}]: ${href}`;
   }
-  const keep = /^(?:\s*(?:[-*+]|\d+[.)])\s+\[[ xX]\](?=\s)|\s*>+\s*\[![\w-]+\][+-]?)/.exec(line)?.[0] ?? "";
+  const keep =
+    /^(?:\s*(?:[-*+]|\d+[.)])\s+\[[ xX]\](?=\s)|\s*>+\s*\[![\w-]+\][+-]?|\s*(?:>\s*)+)/.exec(line)?.[0] ?? "";
   return keep + inline(line.slice(keep.length), "text", options, drop);
 }
 
@@ -494,11 +486,9 @@ export function eligibleImages(images: readonly Phase2Image[], limit = MAX_IMAGE
 
 // ---------- footnotes and corrections ----------
 
-/** A footnote title as a link label: markup removed through the builder, then nothing left that can open or close a bracket. */
+/** A footnote title as a link label: through the builder, so every bracket in it comes out escaped. */
 function footnoteLabel(title: string): string {
-  return cleanFragment(title, "plain")
-    .replace(/[[\]\\]/g, " ")
-    .trim();
+  return cleanFragment(title, "plain");
 }
 
 /** "[^id]: [title](url)" lines for the footnotes whose id and address pass the gates; titles keep no markup. */

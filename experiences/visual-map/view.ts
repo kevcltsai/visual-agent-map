@@ -6420,7 +6420,7 @@ export class VisualAgentMapView extends ItemView {
       }
       if (note) this.labelCard(card, t("ui.topic_card_label_0_1", note.title, statusText));
     }
-    // Offline relevance grading: mind maps only, and only a valid tier shows anything. Side topics fade (see styles.css)
+    // Offline relevance grading: mind maps only, and only a valid tier shows anything. Side topics get a dashed border (see styles.css)
     // but are never hidden, moved or collapsed.
     const relevance = !node.aimKind && !this.map?.aim && !this.builtIn ? note?.relevance : undefined;
     if (relevance) {

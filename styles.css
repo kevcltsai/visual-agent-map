@@ -29,7 +29,7 @@
 .vam-toolbar .vam-map-switcher:hover { background: var(--background-modifier-hover); }
 .vam-map-switcher:focus-visible { outline: 2px solid var(--interactive-accent); outline-offset: 1px; }
 .vam-map-title { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 650; }
-.vam-map-switcher-icon { display: inline-flex; flex-shrink: 0; color: var(--text-faint); }
+.vam-map-switcher-icon { display: inline-flex; flex-shrink: 0; color: var(--text-muted); }
 .vam-map-switcher-icon svg { width: 14px; height: 14px; }
 .vam-research-progress { display: inline-flex; align-items: center; gap: 8px; color: var(--text-muted); font-size: var(--font-ui-smaller); font-variant-numeric: tabular-nums; white-space: nowrap; }
 .vam-research-progress-track { width: 88px; height: 4px; overflow: hidden; border-radius: 2px; background: var(--background-modifier-border); }
@@ -48,7 +48,7 @@
 /* box-shadow: none above removes Obsidian's own focus ring, so these buttons draw one. */
 .vam-map-tools button:focus-visible, .vam-zoom-controls button:focus-visible, .vam-node-tools button:focus-visible { outline: 2px solid var(--interactive-accent); outline-offset: 1px; }
 .vam-map-tools button:not(.mod-cta):hover, .vam-zoom-controls button:hover { background: var(--background-modifier-hover); }
-.vam-map-tools button.is-active { background: var(--background-modifier-active-hover); box-shadow: inset 0 0 0 1px var(--interactive-accent); color: var(--text-accent); }
+.vam-map-tools button.is-active { background: var(--background-modifier-active-hover); box-shadow: inset 0 0 0 1px var(--interactive-accent); color: color-mix(in srgb, var(--text-accent) 80%, var(--text-normal)); }
 .vam-zoom-controls { right: 12px; bottom: 12px; }
 .vam-zoom-controls > .vam-layout-button { padding: 0 8px; font-size: var(--font-ui-small); }
 .vam-layout-button::after { content: "▾" / ""; margin-left: 4px; color: var(--text-muted); }
@@ -67,7 +67,7 @@
 .vam-node.is-marquee-remove { outline: 2px dashed var(--text-error); outline-offset: 3px; opacity: 0.6; }
 .vam-stage { position: absolute; left: 0; top: 0; width: 1px; height: 1px; transform-origin: 0 0; }
 .vam-edges { position: absolute; left: 0; top: 0; width: 1px; height: 1px; overflow: visible; pointer-events: none; }
-.vam-edge { fill: none; stroke: var(--interactive-accent); stroke-width: 2; opacity: 0.55; }
+.vam-edge { fill: none; stroke: var(--interactive-accent); stroke-width: 2; opacity: 1; }
 .vam-node { --vam-card-bg: var(--background-primary); position: absolute; box-sizing: border-box; width: 280px; padding: 12px 14px 14px; border: 1px solid var(--background-modifier-border); border-radius: 12px; background: var(--vam-card-bg); box-shadow: var(--shadow-s); cursor: grab; user-select: none; transition: border-color 160ms ease-out, box-shadow 160ms ease-out; }
 .vam-node:hover { border-color: var(--background-modifier-border-hover); }
 .vam-node > .vam-card-label { position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0; overflow: hidden; white-space: nowrap; border: 0; }
@@ -77,7 +77,7 @@
 .vam-node[data-aim-kind="answer"] { border: 1px solid var(--interactive-accent); border-radius: 18px; }
 .vam-node[data-aim-kind="research"] { border-radius: 4px; }
 .vam-node[data-aim-kind="synthesis"] { border-style: dashed; border-color: var(--interactive-accent); }
-.vam-edge-convergence { stroke: var(--interactive-accent); stroke-dasharray: 5 5; opacity: .8; }
+.vam-edge-convergence { stroke: var(--interactive-accent); stroke-dasharray: 5 5; opacity: 1; }
 .vam-aim-answer-snapshot { margin: 8px 0 0; padding: 6px 8px; border-left: 2px solid var(--interactive-accent); color: var(--text-muted); font-size: var(--font-ui-smaller); }
 .vam-aim-statusbar { display: flex; align-items: center; flex-wrap: wrap; gap: 8px 12px; min-height: 42px; padding: 8px 14px; border-bottom: 1px solid var(--background-modifier-border); border-left: 4px solid var(--interactive-accent); background: var(--background-secondary); }
 .vam-aim-status-title { font-size: var(--font-ui-small); font-weight: 800; letter-spacing: .02em; }
@@ -91,7 +91,7 @@
 .vam-conclusion-background { position: absolute; inset: 0; width: 100%; height: 100%; z-index: -1; pointer-events: none; filter: drop-shadow(0 2px 4px rgba(0,0,0,0.08)); }
 .vam-conclusion-background polygon { fill: var(--vam-card-bg); stroke: var(--background-modifier-border); stroke-width: 1; }
 .vam-node .vam-add-child { position: absolute; right: -14px; top: 50%; transform: translateY(-50%); width: 28px; height: 28px; padding: 0; border: 1px solid var(--background-modifier-border); border-radius: 50%; background: var(--vam-card-bg); box-shadow: var(--shadow-s); color: var(--text-muted); font-size: var(--font-ui-medium); line-height: 1; opacity: 0; transition: opacity 120ms ease-out; }
-.vam-node .vam-add-child:hover { color: var(--text-accent); border-color: var(--interactive-accent); }
+.vam-node .vam-add-child:hover { color: color-mix(in srgb, var(--text-accent) 70%, var(--text-normal)); border-color: var(--interactive-accent); }
 .vam-node:active { cursor: grabbing; }
 .vam-node.is-selected { border-color: var(--interactive-accent); outline: 2px solid var(--interactive-accent); outline-offset: 2px; }
 /* Keyboard focus is a separate signal from selection: a dashed ring further out. */
@@ -108,34 +108,34 @@
 .vam-node:hover > .vam-node-tools, .vam-node:focus-within > .vam-node-tools, .vam-viewport:not(.is-selecting) .vam-node.is-selected > .vam-node-tools { opacity: 1; pointer-events: auto; transform: none; }
 .vam-node-tools button { font-size: var(--font-ui-smaller); height: 26px; padding: 2px 8px; }
 .vam-node-tools > .vam-collapse-button { order: -1; }
-.vam-node-tools > .vam-ai-explore { color: var(--text-accent); font-weight: 600; }
+.vam-node-tools > .vam-ai-explore { color: color-mix(in srgb, var(--text-accent) 70%, var(--text-normal)); font-weight: 600; }
 .vam-node-tools > .vam-ai-explore::before { content: "✦" / ""; margin-right: 4px; }
 .vam-node:hover > .vam-add-child, .vam-node:focus-within > .vam-add-child, .vam-node.is-selected > .vam-add-child { opacity: 1; }
 /* One line per status: a long progress label ends in an ellipsis instead of running past the card. */
 .vam-status { display: inline-block; max-width: 100%; overflow: hidden; text-overflow: ellipsis; padding: 0; font-size: var(--font-ui-smaller); color: var(--text-muted); white-space: nowrap; }
-.vam-status::before { content: ""; display: inline-block; margin-right: 6px; vertical-align: 1px; width: 7px; height: 7px; box-sizing: border-box; border-radius: 50%; background: var(--text-faint); }
-.vam-status-idea::before { border: 1.5px solid var(--text-faint); background: transparent; }
-.vam-status-running { color: var(--text-accent); }
+.vam-status::before { content: ""; display: inline-block; margin-right: 6px; vertical-align: 1px; width: 7px; height: 7px; box-sizing: border-box; border-radius: 50%; background: var(--text-muted); }
+.vam-status-idea::before { border: 1.5px solid var(--text-muted); background: transparent; }
+.vam-status-running { color: color-mix(in srgb, var(--text-accent) 80%, var(--text-normal)); }
 .vam-status-running::before { background: var(--interactive-accent); animation: vam-pulse 1.4s ease-in-out infinite; }
 .vam-status-completed::before { background: var(--interactive-accent); }
-.vam-status-queued { color: var(--text-accent); }
+.vam-status-queued { color: color-mix(in srgb, var(--text-accent) 80%, var(--text-normal)); }
 .vam-status-queued::before { border: 1.5px solid var(--interactive-accent); background: transparent; }
-.vam-status-error { color: var(--color-red); }
+.vam-status-error { color: color-mix(in srgb, var(--color-red) 80%, var(--text-normal)); }
 .vam-status-error::before { background: var(--color-red); }
 .vam-node-header .vam-aim-question-status { padding: 3px 9px; border: 1px solid var(--background-modifier-border); border-radius: 20px; font-weight: 650; }
 .vam-badge-new { padding: 2px 8px; border-radius: 20px; font-size: var(--font-ui-smaller); background: var(--interactive-accent); color: var(--text-on-accent); }
 .vam-node-header button.vam-badge-new { border: 0; cursor: pointer; }
 .vam-card-title { color: var(--text-normal); font-size: var(--font-ui-medium); font-weight: 650; line-height: 1.4; margin: 8px 0 4px; overflow-wrap: anywhere; }
 .vam-card-summary { margin: 0; color: var(--text-muted); font-size: var(--font-ui-small); line-height: 1.55; overflow-wrap: anywhere; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 3; overflow: hidden; }
-.vam-card-error { margin: 6px 0 0; color: var(--color-red); font-size: var(--font-ui-smaller); line-height: 1.45; overflow-wrap: anywhere; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow: hidden; }
+.vam-card-error { margin: 6px 0 0; color: color-mix(in srgb, var(--color-red) 80%, var(--text-normal)); font-size: var(--font-ui-smaller); line-height: 1.45; overflow-wrap: anywhere; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow: hidden; }
 /* Research frame: open questions read as an unfinished frontier, concluded topics as settled ground. */
 .vam-node:not([data-aim-kind])[data-status="idea"] { border-style: dashed; border-color: var(--background-modifier-border-hover); box-shadow: none; }
-.vam-card-summary.is-preview { font-style: italic; color: var(--text-faint); }
+.vam-card-summary.is-preview { font-style: italic; color: var(--text-muted); }
 .vam-card-preview-label { font-style: normal; font-weight: 600; margin-right: 6px; }
 /* Unsaved summary preview under a multi-select synthesis or merge status bar (plain text, outside the live region). */
-.vam-task-preview { margin: 0; padding: 4px 14px 8px; color: var(--text-faint); font-style: italic; font-size: var(--font-ui-small); line-height: 1.45; overflow-wrap: anywhere; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow: hidden; }
+.vam-task-preview { margin: 0; padding: 4px 14px 8px; color: var(--text-muted); font-style: italic; font-size: var(--font-ui-small); line-height: 1.45; overflow-wrap: anywhere; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow: hidden; }
 .vam-task-preview[hidden] { display: none; }
-.vam-node:not([data-aim-kind])[data-status="idea"] .vam-card-summary { color: var(--text-faint); }
+.vam-node:not([data-aim-kind])[data-status="idea"] .vam-card-summary { color: var(--text-muted); }
 .vam-node:not([data-aim-kind])[data-status="running"] { border-color: var(--interactive-accent); }
 .vam-node:not([data-aim-kind])[data-status="queued"] { --vam-card-bg: color-mix(in srgb, var(--interactive-accent) 7%, var(--background-primary)); border-style: dashed; border-color: color-mix(in srgb, var(--interactive-accent) 60%, transparent); }
 .vam-node:not([data-aim-kind])[data-status="running"]::after { content: ""; position: absolute; left: 14px; right: 14px; top: -1px; height: 2px; border-radius: 2px; background: linear-gradient(90deg, transparent, var(--interactive-accent), transparent); background-size: 50% 100%; background-repeat: no-repeat; animation: vam-scan 1.6s ease-in-out infinite; }
@@ -144,7 +144,7 @@
 @property --vam-orbit { syntax: "<angle>"; inherits: false; initial-value: 0deg; }
 @keyframes vam-orbit { to { --vam-orbit: 360deg; } }
 @keyframes vam-scan { from { background-position: -100% 0; } to { background-position: 200% 0; } }
-/* Offline relevance grading (mind maps only): a quiet icon + text tag, no fill. Side topics fade but stay in place. */
+/* Offline relevance grading (mind maps only): a quiet icon + text tag, no fill. Side topics get a dashed border and muted text (never faded: faded text fell under 4.5:1) and stay in place. */
 .vam-relevance-tag { display: inline-flex; align-items: center; gap: 4px; max-width: 100%; font-size: var(--font-ui-smaller); line-height: 1.4; white-space: nowrap; }
 button.vam-relevance-tag-button { position: relative; appearance: none; margin: 0; padding: 0 4px; margin-left: -4px; border: 0; border-radius: var(--radius-s); background: transparent; box-shadow: none; height: auto; cursor: pointer; font-family: inherit; }
 .vam-relevance-tag-name { position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0; overflow: hidden; white-space: nowrap; }
@@ -153,12 +153,12 @@ button.vam-relevance-tag-button:focus-visible { outline: 2px solid var(--backgro
 button.vam-relevance-tag-button:disabled { cursor: default; opacity: .7; }
 .vam-relevance-tag > .vam-relevance-icon { display: inline-flex; flex: none; }
 .vam-relevance-tag .svg-icon { width: 14px; height: 14px; }
-.vam-relevance-tag[data-tier="core"] { color: var(--text-accent); }
+.vam-relevance-tag[data-tier="core"] { color: color-mix(in srgb, var(--text-accent) 80%, var(--text-normal)); }
 .vam-relevance-tag[data-tier="support"] { color: var(--text-muted); }
-.vam-relevance-tag[data-tier="side"] { color: var(--text-faint); }
-.vam-node[data-relevance="side"] { opacity: .5; transition: border-color 160ms ease-out, box-shadow 160ms ease-out, opacity 160ms ease-out; }
-.vam-node[data-relevance="side"]:hover, .vam-node[data-relevance="side"]:focus-within, .vam-node[data-relevance="side"].is-selected { opacity: 1; }
-.vam-edge.vam-edge-side { opacity: .2; }
+.vam-relevance-tag[data-tier="side"] { color: var(--text-muted); }
+.vam-node[data-relevance="side"] { border-style: dashed; }
+.vam-node[data-relevance="side"] .vam-card-title, .vam-node[data-relevance="side"] .vam-card-summary { color: var(--text-muted); }
+.vam-edge.vam-edge-side { stroke: var(--text-muted); opacity: 1; }
 /* One toolbar button at the same level as "Select topics"; the goal is cut with an ellipsis so the row never wraps. The sort icon sits in padding reserved on the right. */
 .vam-map-tools .vam-relevance-goal { position: relative; display: inline-block; flex: 0 1 auto; min-width: 0; max-width: 14em; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; padding-top: 0; padding-bottom: 0; line-height: var(--input-height); }
 .vam-map-tools .vam-relevance-goal.is-sorted { padding-right: calc(var(--size-4-3) + 18px); }
@@ -210,7 +210,7 @@ button.vam-relevance-tag-button:disabled { cursor: default; opacity: .7; }
   /* Same selector weight as the scan animation rule above, otherwise that rule keeps winning. */
   .vam-status-running::before, .vam-node:not([data-aim-kind])[data-status="running"]::after { animation: none; }
   .vam-node:not([data-aim-kind])[data-status="running"]::after { background: var(--interactive-accent); }
-  .vam-node, .vam-node[data-relevance="side"], .vam-node .vam-add-child, .vam-node > .vam-node-tools { transition: none; }
+  .vam-node, .vam-node .vam-add-child, .vam-node > .vam-node-tools { transition: none; }
 }
 .theme-dark .vam-viewport { background-color: var(--background-primary); }
 .theme-dark .vam-node { --vam-card-bg: var(--background-secondary); }
@@ -239,7 +239,7 @@ button.vam-relevance-tag-button:disabled { cursor: default; opacity: .7; }
 /* Review dialogs share the fixed action bar: content scrolls, actions stay in view. */
 .vam-review-modal { display: flex; flex-direction: column; max-height: 85vh; }
 .vam-review-modal .modal-content { flex: 1 1 auto; min-height: 0; overflow-y: auto; overflow-x: hidden; }
-.vam-next-actions > .vam-discard { order: -2; color: var(--text-error); }
+.vam-next-actions > .vam-discard { order: -2; color: color-mix(in srgb, var(--color-red) 40%, var(--text-normal)); }
 .vam-next-actions > .vam-next-status:empty { flex: 1 1 0; }
 .vam-next-actions > .vam-discard.mod-warning { color: var(--text-on-accent); }
 /* The step's primary action always sits in the same place: a bar below the scrolling content. */
@@ -310,7 +310,7 @@ button.vam-relevance-tag-button:disabled { cursor: default; opacity: .7; }
 .vam-field.vam-next-toggle input[type="radio"] { width: 18px; min-width: 18px; height: 18px; flex: 0 0 18px; margin: 0; }
 .vam-quick-limits input { width: 100%; max-width: 160px; }
 .vam-quick-limits > .vam-hint { grid-column: 1 / -1; margin: 0; }
-.vam-quick-limits > .vam-hint.is-error { color: var(--color-red); }
+.vam-quick-limits > .vam-hint.is-error { color: color-mix(in srgb, var(--color-red) 75%, var(--text-normal)); }
 .vam-next-choice button { margin-top: 12px; }
 .vam-next-status { min-height: 1.4em; color: var(--text-muted); }
 .vam-next-status:empty { min-height: 0; margin: 0; }
@@ -378,13 +378,13 @@ button.vam-relevance-tag-button:disabled { cursor: default; opacity: .7; }
 .vam-proposal.is-applied { opacity: 0.6; }
 .vam-proposal.is-stale .vam-proposal-title { text-decoration: line-through; }
 .vam-structure-note { margin: 4px 0 0 26px; font-size: var(--font-ui-small); color: var(--text-muted); }
-.vam-proposal.is-stale .vam-structure-note { color: var(--text-error); }
+.vam-proposal.is-stale .vam-structure-note { color: color-mix(in srgb, var(--color-red) 75%, var(--text-normal)); }
 .vam-structure-apply { flex: 0 0 auto; }
 .vam-proposal-kind { flex: 0 0 auto; padding: 1px 8px; border-radius: var(--radius-s); font-size: var(--font-ui-smaller); color: var(--text-muted); background: var(--background-modifier-hover); }
-.vam-proposal-kind-add { color: var(--color-green); }
-.vam-proposal-kind-move { color: var(--color-blue); }
-.vam-proposal-kind-merge { color: var(--color-purple); }
-.vam-proposal-kind-remove { color: var(--text-error); }
+.vam-proposal-kind-add { color: color-mix(in srgb, var(--color-green) 50%, var(--text-normal)); }
+.vam-proposal-kind-move { color: color-mix(in srgb, var(--color-blue) 60%, var(--text-normal)); }
+.vam-proposal-kind-merge { color: color-mix(in srgb, var(--color-purple) 80%, var(--text-normal)); }
+.vam-proposal-kind-remove { color: color-mix(in srgb, var(--color-red) 75%, var(--text-normal)); }
 .vam-proposal-reason, .vam-proposal-destination { margin: 4px 0 0 26px; color: var(--text-muted); font-size: var(--font-ui-small); }
 .vam-proposal-head > input[hidden] { display: none; }
 .vam-proposal.is-child.vam-proposal-depth-2 { margin-left: 52px; }
@@ -433,8 +433,8 @@ button.vam-relevance-tag-button:disabled { cursor: default; opacity: .7; }
 .vam-map-chat-log { flex: 1 1 auto; min-height: 0; overflow-y: auto; display: flex; flex-direction: column; gap: 8px; padding: 2px; scrollbar-width: thin; scrollbar-color: var(--background-modifier-border-hover) transparent; }
 .vam-map-chat-msg { display: flex; flex-direction: column; gap: 2px; padding: 6px 8px; border-radius: var(--radius-s); background: var(--background-secondary); }
 .vam-map-chat-suggest { display: flex; flex-direction: column; align-items: flex-start; gap: 0; }
-.vam-map-chat button.vam-map-chat-suggestion { height: auto; padding: 2px 4px; border: 0; border-radius: var(--radius-s); background: transparent; box-shadow: none; color: var(--text-accent); font-size: var(--font-ui-smaller); text-align: start; white-space: normal; }
-.vam-map-chat button.vam-map-chat-suggestion:hover { background: var(--background-modifier-hover); color: var(--text-accent-hover); }
+.vam-map-chat button.vam-map-chat-suggestion { height: auto; padding: 2px 4px; border: 0; border-radius: var(--radius-s); background: transparent; box-shadow: none; color: color-mix(in srgb, var(--text-accent) 55%, var(--text-normal)); font-size: var(--font-ui-smaller); text-align: start; white-space: normal; }
+.vam-map-chat button.vam-map-chat-suggestion:hover { background: var(--background-modifier-hover); color: color-mix(in srgb, var(--text-accent-hover) 55%, var(--text-normal)); }
 .vam-map-chat-suggest.is-examples { flex-direction: column; flex-wrap: nowrap; align-items: stretch; gap: 2px; }
 .vam-map-chat button.vam-map-chat-example { display: block; width: 100%; height: auto; padding: 6px 8px; border: 0; border-radius: var(--radius-s); background: transparent; box-shadow: none; color: var(--text-muted); text-align: start; white-space: normal; }
 .vam-map-chat button.vam-map-chat-example:hover { background: var(--background-modifier-hover); color: var(--text-normal); }
@@ -446,11 +446,11 @@ button.vam-relevance-tag-button:disabled { cursor: default; opacity: .7; }
 .vam-map-chat-resizer:hover::after, .vam-map-chat-resizer:focus-visible::after, .vam-map-chat.is-resizing .vam-map-chat-resizer::after { background: var(--interactive-accent); }
 .vam-map-chat-lines { display: flex; flex-direction: column; gap: 2px; margin-top: 6px; color: var(--text-muted); font-size: var(--font-ui-smaller); }
 .vam-map-chat-line { overflow-wrap: anywhere; }
-.vam-map-chat-line.is-failed { color: var(--text-error); font-weight: var(--font-semibold); }
+.vam-map-chat-line.is-failed { color: color-mix(in srgb, var(--color-red) 75%, var(--text-normal)); font-weight: var(--font-semibold); }
 .vam-map-chat-line.is-skipped { font-style: italic; }
 .vam-map-chat-line.is-note { margin-top: 4px; padding-top: 4px; border-top: 1px solid var(--background-modifier-border); }
 .vam-map-chat-lines-summary { color: var(--text-normal); font-weight: var(--font-semibold); }
-.vam-map-chat button.vam-map-chat-lines-toggle, .vam-map-chat button.vam-map-chat-more { align-self: flex-start; height: auto; padding: 0 6px; border: 0; background: transparent; box-shadow: none; color: var(--text-accent); font-size: var(--font-ui-smaller); }
+.vam-map-chat button.vam-map-chat-lines-toggle, .vam-map-chat button.vam-map-chat-more { align-self: flex-start; height: auto; padding: 0 6px; border: 0; background: transparent; box-shadow: none; color: color-mix(in srgb, var(--text-accent) 70%, var(--text-normal)); font-size: var(--font-ui-smaller); }
 .vam-map-chat button.vam-map-chat-retry { align-self: flex-start; height: auto; margin-top: 6px; padding: 3px 12px; border: 1px solid var(--background-modifier-border); border-radius: var(--radius-s); background: var(--background-primary); box-shadow: none; color: var(--text-normal); font-size: var(--font-ui-small); }
 .vam-map-chat button.vam-map-chat-retry:hover { background: var(--background-modifier-hover); }
 .vam-map-chat button.vam-map-chat-retry:disabled, .vam-map-chat button.vam-map-chat-more:disabled { color: var(--text-faint); cursor: default; }
@@ -461,10 +461,10 @@ button.vam-relevance-tag-button:disabled { cursor: default; opacity: .7; }
 .vam-map-chat-plan-estimate { font-weight: var(--font-semibold); font-size: var(--font-ui-small); }
 .vam-map-chat-plan-note, .vam-map-chat-plan-state { color: var(--text-muted); font-size: var(--font-ui-smaller); }
 .vam-map-chat-plan-buttons { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
-.vam-map-chat-plan-warning { color: var(--text-error); font-size: var(--font-ui-smaller); }
-.vam-map-chat-plan-group.is-danger .vam-map-chat-plan-group-title { color: var(--text-error); }
+.vam-map-chat-plan-warning { color: color-mix(in srgb, var(--color-red) 75%, var(--text-normal)); font-size: var(--font-ui-smaller); }
+.vam-map-chat-plan-group.is-danger .vam-map-chat-plan-group-title { color: color-mix(in srgb, var(--color-red) 75%, var(--text-normal)); }
 .vam-map-chat-plan-mark { margin-inline-start: 8px; padding: 0 6px; border: 1px solid currentcolor; border-radius: var(--radius-s); font-size: var(--font-ui-smaller); font-weight: var(--font-semibold); }
-.vam-map-chat-count-failed { color: var(--text-error); font-weight: var(--font-semibold); }
+.vam-map-chat-count-failed { color: color-mix(in srgb, var(--color-red) 75%, var(--text-normal)); font-weight: var(--font-semibold); }
 .vam-map-chat-plan-hint, .vam-map-chat-guide { color: var(--text-muted); font-size: var(--font-ui-smaller); }
 .vam-map-chat-guide { flex: 1 1 auto; padding: 4px 2px; font-size: var(--font-ui-small); }
 .vam-map-chat-guide.is-hidden, .vam-map-chat-plan-hint.is-hidden { display: none; }
@@ -483,8 +483,8 @@ button.vam-relevance-tag-button:disabled { cursor: default; opacity: .7; }
 .vam-map-chat .vam-map-chat-images-pick[aria-disabled="true"]:not(.is-inserted) { color: var(--text-muted); }
 .vam-map-chat .vam-map-chat-images-pick.is-inserted { box-shadow: 0 0 0 2px var(--interactive-accent); opacity: 1; }
 .vam-map-chat .vam-map-chat-images-pick.is-broken { background: transparent; box-shadow: none; border: 1px dashed var(--background-modifier-border-hover); }
-.vam-map-chat-images-missing { display: flex; align-items: center; justify-content: center; height: 72px; border: 1px dashed var(--background-modifier-border-hover); border-radius: var(--radius-s); color: var(--text-faint); }
-.vam-map-chat-images-state.is-inserted { display: flex; align-items: center; gap: 4px; color: var(--text-accent); }
+.vam-map-chat-images-missing { display: flex; align-items: center; justify-content: center; height: 72px; border: 1px dashed var(--background-modifier-border-hover); border-radius: var(--radius-s); color: var(--text-muted); }
+.vam-map-chat-images-state.is-inserted { display: flex; align-items: center; gap: 4px; color: color-mix(in srgb, var(--text-accent) 70%, var(--text-normal)); }
 .vam-map-chat-images-state-icon { display: inline-flex; flex: none; }
 .vam-map-chat-images-thumb { display: block; width: 100%; height: 72px; object-fit: cover; border-radius: var(--radius-s); background: var(--background-secondary); }
 .vam-map-chat-images-title, .vam-map-chat-images-state { overflow-wrap: anywhere; font-size: var(--font-ui-smaller); }
@@ -509,7 +509,7 @@ button.vam-relevance-tag-button:disabled { cursor: default; opacity: .7; }
 .vam-sample-start-chat:empty { display: none; }
 .vam-sample-start-chat > .vam-map-chat.is-hero { width: min(720px, 100%); }
 .vam-map-chat-msg.is-user { background: var(--background-modifier-hover); }
-.vam-map-chat-msg.is-error .vam-map-chat-text { color: var(--text-error); }
+.vam-map-chat-msg.is-error .vam-map-chat-text { color: color-mix(in srgb, var(--color-red) 75%, var(--text-normal)); }
 .vam-map-chat-role { color: var(--text-muted); font-size: var(--font-ui-smaller); }
 .vam-map-chat-text { white-space: pre-wrap; overflow-wrap: anywhere; user-select: text; }
 .vam-map-chat-text.is-markdown { white-space: normal; }
@@ -992,7 +992,7 @@ body .workspace-leaf-content.vam-topic-markdown .markdown-source-view.mod-cm6 .m
 .vam-aim-failure { margin-top: 8px; padding: 8px; border-left: 3px solid var(--text-error); background: var(--background-secondary); font-size: var(--font-smallest); overflow-wrap: anywhere; }
 .vam-aim-failure p { margin: 0 0 6px; }
 
-.vam-outline-error { color: var(--text-error); }
+.vam-outline-error { color: color-mix(in srgb, var(--color-red) 75%, var(--text-normal)); }
 .vam-outline-depth-2 { padding-left: 1.25em; } .vam-outline-depth-3 { padding-left: 2.5em; }
 .vam-outline-depth-4 { padding-left: 3.75em; } .vam-outline-depth-5 { padding-left: 5em; } .vam-outline-depth-6 { padding-left: 6.25em; }
 .vam-template-row { display: flex; justify-content: space-between; align-items: center; gap: var(--size-4-2); padding: var(--size-4-2) 0; border-bottom: 1px solid var(--background-modifier-border); }
@@ -1026,7 +1026,7 @@ button.vam-template-section-header:hover { background: var(--background-modifier
 .vam-template-preview pre { margin: var(--size-4-2) 0 0; white-space: pre-wrap; word-break: break-word; font-size: var(--font-ui-smaller); color: var(--text-normal); }
 .vam-template-issues { flex: 1 1 100%; }
 .vam-modal-actions { display: flex; justify-content: flex-end; gap: var(--size-4-2); margin-top: var(--size-4-4); }
-.vam-template-issue { color: var(--text-error); font-size: var(--font-ui-small); }
+.vam-template-issue { color: color-mix(in srgb, var(--color-red) 75%, var(--text-normal)); font-size: var(--font-ui-small); }
 .vam-outline-import-modal { width: min(560px, 92vw); }
 .vam-outline-intro { margin: 0 0 var(--size-4-4); }
 .vam-outline-section { display: flex; flex-direction: column; gap: var(--size-4-2); padding: var(--size-4-4) 0; border-top: 1px solid var(--background-modifier-border); }
@@ -1042,8 +1042,8 @@ button.vam-template-section-header:hover { background: var(--background-modifier
 .vam-outline-ai-editor[hidden] { display: none; }
 .vam-outline-ai-text { width: 100%; box-sizing: border-box; resize: vertical; }
 .vam-outline-ai-run { display: flex; align-items: center; gap: var(--size-4-2); flex-wrap: wrap; }
-.vam-outline-link { height: auto; padding: 2px var(--size-4-2); background: transparent; box-shadow: none; border: 0; color: var(--text-accent); font-size: var(--font-ui-small); cursor: pointer; }
-.vam-outline-link:hover { background: var(--background-modifier-hover); color: var(--text-accent-hover); }
+.vam-outline-link { height: auto; padding: 2px var(--size-4-2); background: transparent; box-shadow: none; border: 0; color: color-mix(in srgb, var(--text-accent) 70%, var(--text-normal)); font-size: var(--font-ui-small); cursor: pointer; }
+.vam-outline-link:hover { background: var(--background-modifier-hover); color: color-mix(in srgb, var(--text-accent-hover) 55%, var(--text-normal)); }
 .vam-outline-text { width: 100%; min-height: 8.5rem; font-family: var(--font-monospace); font-size: var(--font-ui-small); line-height: 1.6; }
 .vam-outline-source:empty { display: none; }
 .vam-outline-source { margin: 0; }
@@ -1079,7 +1079,7 @@ button.vam-template-section-header:hover { background: var(--background-modifier
 .vam-draft-preview :is(h3, h4, h5, h6) { font-size: var(--font-ui-medium); }
 .vam-draft-intro:focus { outline: none; }
 /* A destructive action inside a row of ordinary buttons. */
-.vam-danger-text { color: var(--text-error); }
+.vam-danger-text { color: color-mix(in srgb, var(--color-red) 75%, var(--text-normal)); }
 /* Map conflict: two plain choices, hand-merging folded away. */
 .vam-conflict-options { display: grid; gap: 8px; margin: 12px 0; }
 .vam-conflict-option { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 10px 12px; border: 1px solid var(--background-modifier-border); border-radius: var(--radius-m); }
@@ -1087,7 +1087,7 @@ button.vam-template-section-header:hover { background: var(--background-modifier
 .vam-conflict-merge > summary { color: var(--text-muted); cursor: pointer; font-size: var(--font-ui-small); font-weight: 600; }
 .vam-conflict-merge > textarea { margin-top: 8px; }
 .vam-field-head { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; }
-.vam-field-head > .vam-field-link { padding: 0; height: auto; border: 0; background: none; box-shadow: none; color: var(--text-accent); font-size: var(--font-ui-smaller); cursor: pointer; }
+.vam-field-head > .vam-field-link { padding: 0; height: auto; border: 0; background: none; box-shadow: none; color: color-mix(in srgb, var(--text-accent) 70%, var(--text-normal)); font-size: var(--font-ui-smaller); cursor: pointer; }
 .vam-field-head > .vam-field-link:hover { text-decoration: underline; }
 .vam-aim-pending { cursor: default; border-style: dashed; opacity: .85; pointer-events: none; }
 .vam-aim-pending strong { display: block; font-size: var(--font-ui-small); }
@@ -1276,7 +1276,7 @@ button.vam-template-section-header:hover { background: var(--background-modifier
 .markdown-rendered a.vam-link-scope.footnote-backref:hover { color: var(--text-normal); }
 /* Research progress: stage + seconds on the card, and the unsaved answer preview in the hover card. */
 .vam-research-stage { display: inline-block; max-width: 16em; overflow: hidden; text-overflow: ellipsis; vertical-align: bottom; }
-.vam-research-slow { color: var(--text-warning, var(--text-muted)); }
+.vam-research-slow { color: color-mix(in srgb, var(--text-warning, var(--text-muted)) 70%, var(--text-normal)); }
 .vam-hover-research-preview { margin: 0 0 10px; padding: 8px 10px; border: 1px dashed var(--background-modifier-border); border-radius: 8px; }
 .vam-hover-research-preview[hidden], .vam-hover-research-detail[hidden] { display: none; }
 .vam-hover-research-summary, .vam-hover-research-detail { margin-top: 4px; white-space: pre-wrap; overflow-wrap: anywhere; font-size: var(--vam-hover-body-size, 13px); line-height: var(--vam-hover-line-height, 1.45); color: var(--text-muted); }
@@ -1288,10 +1288,11 @@ button.vam-template-section-header:hover { background: var(--background-modifier
 .vam-share-preview { margin: 12px 0 4px; font-variant-numeric: tabular-nums; }
 .vam-share-size { font-weight: var(--font-semibold); }
 .vam-share-progress { color: var(--text-muted); }
-.vam-share-error { color: var(--text-error); }
+.vam-share-error { color: color-mix(in srgb, var(--color-red) 75%, var(--text-normal)); }
 .vam-share-note { margin-top: 6px; color: var(--text-muted); font-size: var(--font-ui-smaller); line-height: 1.5; }
-.vam-share-note.vam-share-warning { color: var(--text-warning, var(--text-normal)); }
-.vam-share-note.vam-share-error { color: var(--text-error); }
+/* Obsidian's warning orange is 2.95:1 on the default light dialog; mixed toward --text-normal it stays orange and readable (5.7 light, 8.9 dark) */
+.vam-share-note.vam-share-warning { color: color-mix(in srgb, var(--text-warning, var(--text-normal)) 60%, var(--text-normal)); }
+.vam-share-note.vam-share-error { color: color-mix(in srgb, var(--color-red) 75%, var(--text-normal)); }
 .vam-share-publish { margin-top: 10px; }
 .vam-share-publish-text { display: block; width: 100%; margin-top: 8px; font-size: var(--font-ui-smaller); }
 .vam-map-chat-style { display: flex; border: 1px solid var(--background-modifier-border); border-radius: var(--radius-s); overflow: hidden; }

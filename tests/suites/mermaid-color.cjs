@@ -99,8 +99,17 @@ const PROBE = `(() => {
       return { cls: s.getAttribute('class') || s.tagName, ratio: ratio(render(d.page, [[c, a]], d.filter), d.page), color: kind === 'fill' ? scs.fill : scs.stroke, filter: d.filter };
     });
   };
+  // hollow marks (cherry, merge centre, reverse cross, highlight centre) against the commit mark beneath them
+  const glyphs = (name, selector, kind) => {
+    const d = info(name), base = 'circle.commit:not(.commit-merge):not(.commit-cherry-pick), rect.commit-highlight-outer';
+    return [...d.svg.querySelectorAll(selector)].map(el => {
+      const scs = getComputedStyle(el), c = parse(kind === 'fill' ? scs.fill : scs.stroke), r = el.getBoundingClientRect();
+      const layers = under(d, r.x + r.width / 2, r.y + r.height / 2, s => s === el || !s.matches(base));
+      return { cls: el.getAttribute('class') || el.tagName, ratio: ratio(render(d.page, [...layers, [c, c[3]]], d.filter), render(d.page, layers, d.filter)) };
+    });
+  };
   const computed = (name, selector, prop) => (selector === 'svg' ? [info(name).svg] : [...info(name).svg.querySelectorAll(selector)]).map(s => ({ cls: s.getAttribute('class') || s.tagName, value: getComputedStyle(s)[prop] }));
-  return { texts, strokes, marks, computed };
+  return { texts, strokes, marks, glyphs, computed };
 })()`;
 
 function findChrome() {
@@ -179,7 +188,9 @@ test('mermaid colour: gitGraph, mindmap, gantt and xychart in VAM notes reach WC
         const call = (fn, ...args) => evaluate(`window.probe.${fn}(${args.map(a => JSON.stringify(a)).join(', ')})`);
         const result = { texts: {}, strokes: {} };
         for (const name of DIAGRAMS) { result.texts[name] = await call('texts', name); result.strokes[name] = await call('strokes', name); }
-        result.commitDots = await call('marks', 'gitGraph', 'circle.commit:not(.commit-merge)', 'fill');
+        result.commitDots = await call('marks', 'gitGraph', 'circle.commit:not(.commit-merge):not(.commit-cherry-pick)', 'fill');
+        result.highlightOuter = [...await call('marks', 'gitGraph', 'rect.commit-highlight-outer', 'fill'), ...await call('marks', 'gitGraph', 'rect.commit-highlight-outer', 'stroke')];
+        result.hollow = [...await call('glyphs', 'gitGraph', 'circle.commit-cherry-pick, circle.commit-merge, rect.commit-highlight-inner', 'fill'), ...await call('glyphs', 'gitGraph', 'line.commit-cherry-pick, path.commit-reverse', 'stroke')];
         result.ganttBorders = await call('marks', 'gantt', 'rect.task', 'stroke');
         result.ganttFills = await call('computed', 'gantt', 'rect.task', 'fill');
         result.mindmapEdges = await call('computed', 'mindmap', 'path.edge', 'stroke');
@@ -200,6 +211,7 @@ test('mermaid colour: gitGraph, mindmap, gantt and xychart in VAM notes reach WC
       }
       const arrows = lowest(r.strokes.gitGraph.filter(row => row.cls.includes('arrow')));
       rowsOut.push(`${scheme} gitGraph arrows ${Object.entries(arrows).map(([k, v]) => `${k.replace('arrow ', '')}=${v.toFixed(2)}`).join(' ')}`);
+      rowsOut.push(`${scheme} highlight frame min ${Math.min(...r.highlightOuter.map(m => m.ratio)).toFixed(2)}; cut-outs min ${Math.min(...r.hollow.map(m => m.ratio)).toFixed(2)}`);
       rowsOut.push(`${scheme} commit dots min ${Math.min(...r.commitDots.map(m => m.ratio)).toFixed(2)}; gantt borders ${Object.entries(lowest(r.ganttBorders)).map(([k, v]) => `${k}=${v.toFixed(2)}`).join(' ')}`);
     }
     console.log(`mermaid contrast:\n  ${rowsOut.join('\n  ')}`);
@@ -217,6 +229,10 @@ test('mermaid colour: gitGraph, mindmap, gantt and xychart in VAM notes reach WC
       assert.equal(new Set(r.arrowColors.map(row => branchIndex(row.cls))).size >= 8, true, 'fixture has all eight branch arrows');
       for (const m of r.commitDots) assert.ok(m.ratio >= 3, `${scheme}: commit dot ${m.cls} contrast ${m.ratio.toFixed(2)} must be >= 3`);
       assert.ok(r.commitDots.length >= 9, 'fixture has the commit dots');
+      assert.equal(r.highlightOuter.length, 2, 'fixture has a HIGHLIGHT frame');
+      for (const m of r.highlightOuter) assert.ok(m.ratio >= 3, `${scheme}: HIGHLIGHT frame ${m.color} contrast ${m.ratio.toFixed(2)} must be >= 3`);
+      assert.equal(r.hollow.length, 7, 'fixture has the cherry-pick, merge, REVERSE and HIGHLIGHT cut-outs');
+      for (const m of r.hollow) assert.ok(m.ratio >= 3, `${scheme}: cut-out ${m.cls} contrast ${m.ratio.toFixed(2)} against its commit mark must be >= 3`);
       // gantt: done bar border 3 (also doneCrit).
       const done = r.ganttBorders.filter(m => /done/.test(m.cls));
       assert.ok(done.length >= 2, 'fixture has done bars');

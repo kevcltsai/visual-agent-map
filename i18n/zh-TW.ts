@@ -1966,6 +1966,7 @@ export const zhTW: Record<TranslationKey, string> = {
   "share.viewer_image_omitted": "[圖片未包含]",
   "share.viewer_image_source_0": "來源：{0}",
   "share.viewer_resize_panel": "調整側欄寬度",
+  "share.viewer_outline": "大綱",
   "share.viewer_untitled": "未命名的心智圖",
   "share.viewer_language": "語言",
   "share.viewer_ai_translated_0": "由 AI 翻譯自{0}。",

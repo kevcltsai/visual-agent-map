@@ -2122,6 +2122,7 @@ export const en = {
   "share.viewer_image_omitted": "[image not included]",
   "share.viewer_image_source_0": "Source: {0}",
   "share.viewer_resize_panel": "Resize the side panel",
+  "share.viewer_outline": "Outline",
   "share.viewer_untitled": "Untitled map",
   "share.viewer_language": "Language",
   "share.viewer_ai_translated_0": "Translated by AI from {0}.",

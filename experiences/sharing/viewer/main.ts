@@ -15,6 +15,8 @@ export const INSTALL_URL = "https://github.com/kevcltsai/visual-agent-map?ref=sh
 const UNKNOWN_ORIGINAL = "und";
 const SVG_NS = "http://www.w3.org/2000/svg";
 const PANEL_WIDTH_KEY = "vam-share-panel-width";
+const OUTLINE_OPEN_KEY = "vam-share-outline-open";
+const NARROW_QUERY = "(max-width: 600px)";
 const PANEL_DEFAULT = 300;
 const PANEL_MIN = 240;
 const ZOOM_MIN = 0.25;
@@ -29,6 +31,15 @@ const ICONS: Record<string, string[]> = {
   library: ["path|d=m16 6 4 14", "path|d=M12 6v14", "path|d=M8 8v12", "path|d=M4 4v16"],
   skip: ["polygon|points=5 4 15 12 5 20 5 4", "line|x1=19|x2=19|y1=5|y2=19"],
   minus: ["path|d=M5 12h14"],
+  list: [
+    "path|d=M8 6h13",
+    "path|d=M8 12h13",
+    "path|d=M8 18h13",
+    "path|d=M3 6h.01",
+    "path|d=M3 12h.01",
+    "path|d=M3 18h.01"
+  ],
+  chevron: ["path|d=m9 18 6-6-6-6"],
   plus: ["path|d=M5 12h14", "path|d=M12 5v14"],
   max: [
     "path|d=M8 3H5a2 2 0 0 0-2 2v3",
@@ -95,6 +106,8 @@ function storageSet(key: string, value: string): void {
     /* private mode or blocked storage: the width just is not remembered */
   }
 }
+
+const isNarrow = (): boolean => window.matchMedia(NARROW_QUERY).matches;
 
 export function startViewer(doc: Document): void {
   const baseUi = uiFrom(readJson(doc, "vam-ui"));
@@ -277,6 +290,9 @@ export function startViewer(doc: Document): void {
   const mapHeading = make("h1", "vam-map-switcher");
   const sharedLabel = make("span", "vam-shared");
   toolbar.append(mapHeading, sharedLabel);
+  const outlineToggle = iconButton(toolbar, "list", "", () => setOutlineOpen(outline.hidden, true));
+  toolbar.prepend(outlineToggle);
+  outlineToggle.setAttribute("aria-controls", "vam-outline");
   const actions = make("div", "vam-toolbar-actions");
   const languageSelect = make("select", "vam-language");
   if (multilingual) {
@@ -337,7 +353,12 @@ export function startViewer(doc: Document): void {
   overlay.append(tools, hint, zoomBar);
   const inspector = make("aside", "vam-inspector");
   inspector.hidden = true;
-  workspace.append(viewport, overlay, inspector);
+  const outline = make("nav", "vam-outline");
+  outline.id = "vam-outline";
+  const outlineTree = make("div", "vam-outline-tree");
+  outlineTree.setAttribute("role", "tree");
+  outline.append(outlineTree);
+  workspace.append(outline, viewport, overlay, inspector);
   app.replaceChildren(...(multilingual ? [toolbar, translateNote, workspace] : [toolbar, workspace]));
 
   // ---- state
@@ -579,7 +600,7 @@ export function startViewer(doc: Document): void {
   const clampPanel = (width: number): number =>
     Math.round(Math.min(Math.max(PANEL_MIN, width), Math.max(PANEL_MIN, workspace.clientWidth * 0.7)));
   function applyPanelWidth(): void {
-    const narrow = window.matchMedia("(max-width: 600px)").matches;
+    const narrow = isNarrow();
     if (inspector.hidden || narrow) {
       inspector.style.removeProperty("width");
       overlay.style.removeProperty("right");
@@ -629,9 +650,15 @@ export function startViewer(doc: Document): void {
     else return;
     event.preventDefault();
   });
+  let wasNarrow = isNarrow();
   window.addEventListener("resize", () => {
     applyPanelWidth();
     transform();
+    // Crossing the phone breakpoint (rotating a phone, resizing a window) switches between the remembered state and the drawer default.
+    if (isNarrow() !== wasNarrow) {
+      wasNarrow = isNarrow();
+      setOutlineOpen(wasNarrow ? false : outlineWanted(), false);
+    }
   });
 
   function closeInspector(): void {
@@ -644,6 +671,7 @@ export function startViewer(doc: Document): void {
     workspace.classList.remove("has-inspector");
     inspector.replaceChildren();
     applyPanelWidth();
+    refreshOutline();
   }
   function select(id: string): void {
     const node = byId.get(id);
@@ -696,6 +724,8 @@ export function startViewer(doc: Document): void {
     workspace.classList.add("has-inspector");
     applyPanelWidth();
     inspector.scrollTop = 0;
+    refreshOutline();
+    revealCurrentRow();
   }
 
   // ---- layout menu
@@ -762,11 +792,17 @@ export function startViewer(doc: Document): void {
   });
   doc.addEventListener("pointerdown", event => {
     if (!menu.hidden && !zoomBar.contains(event.target as Node)) closeMenu(false);
+    const target = event.target as Node;
+    if (isNarrow() && !outline.hidden && !outline.contains(target) && !outlineToggle.contains(target))
+      setOutlineOpen(false, false);
   });
   doc.addEventListener("keydown", event => {
     if (event.key !== "Escape") return;
     if (!menu.hidden) closeMenu(true);
-    else if (!inspector.hidden) {
+    else if (isNarrow() && !outline.hidden) {
+      setOutlineOpen(false, false);
+      outlineToggle.focus();
+    } else if (!inspector.hidden) {
       const card = selected ? cards.get(selected) : undefined;
       closeInspector();
       card?.focus({ preventScroll: true });
@@ -807,6 +843,9 @@ export function startViewer(doc: Document): void {
     setLabel(showAllButton, ui.showAll);
     layoutButton.textContent = ui.layout;
     inspector.setAttribute("aria-label", ui.topicDetails);
+    outline.setAttribute("aria-label", ui.outline);
+    outlineTree.setAttribute("aria-label", ui.outline);
+    setLabel(outlineToggle, ui.outline);
     resizer.setAttribute("aria-label", ui.resizePanel);
     buildMenu();
     if (isTranslated()) {
@@ -827,13 +866,173 @@ export function startViewer(doc: Document): void {
     applyText();
     renderCards();
     drawEdges();
-    if (selected !== null && byId.has(selected)) {
+    buildOutline();
+    if (selected !== null && byId.has(selected) && !inspector.hidden) {
       select(selected);
       inspector.scrollTop = scroll;
     }
     scheduleEdges();
   }
   languageSelect.addEventListener("change", () => switchLanguage(languageSelect.value));
+
+  // ---- outline: the topic tree on the left. Folding it changes only the outline; a jump opens the map's folded ancestors.
+  const outlineOrder: MapNode[] = [];
+  const addToOutline = (node: MapNode): void => {
+    outlineOrder.push(node);
+    for (const kid of kidsOf.get(node.id) ?? []) addToOutline(kid);
+  };
+  for (const node of nodes) if (!node.parentId) addToOutline(node);
+  const outlineFolded = new Set<string>();
+  const outlineRows = new Map<string, HTMLElement>();
+  let outlineStop: string | null = null;
+  function outlineWanted(): boolean {
+    return storageGet(OUTLINE_OPEN_KEY) !== "0";
+  }
+  function setOutlineOpen(open: boolean, remember: boolean): void {
+    outline.hidden = !open;
+    workspace.classList.toggle("has-outline", open);
+    outlineToggle.setAttribute("aria-expanded", String(open));
+    // Phone width treats the outline as a drawer that is always shut at first: it never reads or writes the remembered state.
+    if (remember && !isNarrow()) storageSet(OUTLINE_OPEN_KEY, open ? "1" : "0");
+  }
+  const visibleOutline = (): MapNode[] => outlineOrder.filter(node => !outlineRows.get(node.id)?.hidden);
+  function refreshOutline(): void {
+    const shown: MapNode[] = [];
+    for (const node of outlineOrder) {
+      const row = outlineRows.get(node.id);
+      if (!row) continue;
+      let hide = false;
+      for (let parent = node.parentId; parent && !hide; parent = byId.get(parent)?.parentId ?? null)
+        hide = outlineFolded.has(parent);
+      row.hidden = hide;
+      if (!hide) shown.push(node);
+      if (kidsOf.has(node.id)) row.setAttribute("aria-expanded", String(!outlineFolded.has(node.id)));
+      if (node.id === selected) row.setAttribute("aria-current", "true");
+      else row.removeAttribute("aria-current");
+    }
+    const stop = shown.find(node => node.id === outlineStop) ?? shown[0];
+    for (const [id, row] of outlineRows) row.tabIndex = id === stop?.id ? 0 : -1;
+  }
+  /** Scrolls the outline (not the page) just enough to show the current row. */
+  function revealCurrentRow(): void {
+    const row = selected ? outlineRows.get(selected) : undefined;
+    if (!row || row.hidden || !outline.clientHeight) return;
+    if (row.offsetTop < outline.scrollTop) outline.scrollTop = row.offsetTop;
+    else if (row.offsetTop + row.offsetHeight > outline.scrollTop + outline.clientHeight)
+      outline.scrollTop = row.offsetTop + row.offsetHeight - outline.clientHeight;
+  }
+  function toggleOutlineFold(id: string): void {
+    if (!outlineFolded.delete(id)) outlineFolded.add(id);
+    refreshOutline();
+  }
+  function focusOutlineRow(id: string): void {
+    outlineStop = id;
+    refreshOutline();
+    outlineRows.get(id)?.focus();
+  }
+  function markSelected(): void {
+    for (const [key, card] of cards) {
+      card.classList.toggle("is-selected", key === selected);
+      card.setAttribute("aria-selected", String(key === selected));
+    }
+  }
+  /** A click on an outline topic: open the folded ancestors, bring the card to the middle, select and focus it. */
+  function goTo(id: string): void {
+    const node = byId.get(id);
+    if (!node) return;
+    let reopened = false;
+    let guard = 0;
+    for (let parent = node.parentId; parent && guard++ <= nodes.length; parent = byId.get(parent)?.parentId ?? null) {
+      const ancestor = byId.get(parent);
+      if (ancestor?.collapsed) {
+        ancestor.collapsed = false;
+        reopened = true;
+      }
+    }
+    selected = id;
+    if (reopened) relayout();
+    center(id);
+    if (!inspector.hidden) select(id);
+    else markSelected();
+    refreshOutline();
+    revealCurrentRow();
+    if (isNarrow()) setOutlineOpen(false, false);
+    cards.get(id)?.focus({ preventScroll: true });
+  }
+  function outlineKey(event: KeyboardEvent, node: MapNode): void {
+    if (event.target !== event.currentTarget || event.altKey || event.ctrlKey || event.metaKey) return;
+    const list = visibleOutline();
+    const index = list.indexOf(node);
+    const kids = kidsOf.get(node.id) ?? [];
+    const folded = outlineFolded.has(node.id);
+    let next: MapNode | undefined;
+    switch (event.key) {
+      case "ArrowDown":
+        next = list[index + 1];
+        break;
+      case "ArrowUp":
+        next = list[index - 1];
+        break;
+      case "Home":
+        next = list[0];
+        break;
+      case "End":
+        next = list[list.length - 1];
+        break;
+      case "ArrowRight":
+        if (kids.length && folded) toggleOutlineFold(node.id);
+        else next = kids[0];
+        break;
+      case "ArrowLeft":
+        if (kids.length && !folded) toggleOutlineFold(node.id);
+        else next = node.parentId ? byId.get(node.parentId) : undefined;
+        break;
+      case "Enter":
+      case " ":
+        goTo(node.id);
+        break;
+      default:
+        return;
+    }
+    event.preventDefault();
+    if (next) focusOutlineRow(next.id);
+  }
+  /** Rebuilds the rows (run at start and on a language switch); the folds and the current topic carry over. */
+  function buildOutline(): void {
+    outlineTree.replaceChildren();
+    outlineRows.clear();
+    for (const node of outlineOrder) {
+      const title = String(textOf(info.get(node.id)!).title ?? "");
+      const row = make("div", "vam-outline-item");
+      row.dataset.outlineId = node.id;
+      row.setAttribute("role", "treeitem");
+      const level = depthOf(node) + 1;
+      row.setAttribute("aria-level", String(level));
+      row.style.setProperty("--depth", String(level - 1));
+      const twist = make("span", "vam-outline-twist");
+      if (kidsOf.has(node.id)) {
+        twist.append(icon("chevron"));
+        twist.addEventListener("click", event => {
+          event.stopPropagation();
+          toggleOutlineFold(node.id);
+        });
+      }
+      const label = make("span", "vam-outline-title", title);
+      label.title = title;
+      row.append(twist, label);
+      row.addEventListener("click", () => goTo(node.id));
+      row.addEventListener("keydown", event => outlineKey(event, node));
+      row.addEventListener("focus", () => {
+        if (outlineStop !== node.id) {
+          outlineStop = node.id;
+          refreshOutline();
+        }
+      });
+      outlineTree.append(row);
+      outlineRows.set(node.id, row);
+    }
+    refreshOutline();
+  }
 
   // ---- pan, pinch and wheel
   const pointers = new Map<number, { x: number; y: number }>();
@@ -909,6 +1108,8 @@ export function startViewer(doc: Document): void {
 
   // ---- first view: every root and its first level, zoomed to show all
   applyText();
+  buildOutline();
+  setOutlineOpen(isNarrow() ? false : outlineWanted(), false);
   applyCollapseLevel(nodes, 1);
   renderCards();
   layout();

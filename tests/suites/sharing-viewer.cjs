@@ -518,6 +518,270 @@ test('sharing viewer collapse: the fold button is always visible and works by mo
   }
 });
 
+// ---- 0.28 ticket 05: the share viewer's left-hand outline.
+test('sharing viewer outline: the interface text exists in every language and the viewer keeps its rules (textContent only, one storage key)', () => {
+  assert.equal(text.shareViewerUiFor('en').outline, 'Outline');
+  assert.equal(text.shareViewerUiFor('zh-TW').outline, '大綱');
+  assert.equal(text.shareViewerUiFor('zh-CN').outline, '大纲');
+  assert.equal(dictionaries.SHARE_VIEWER_UI_EXTRA.ja.outline, 'アウトライン');
+  assert.equal(dictionaries.SHARE_VIEWER_UI_EXTRA.ko.outline, '개요');
+  assert.equal(dictionaries.SHARE_VIEWER_UI_EXTRA.es.outline, 'Esquema');
+  assert.equal(uiModule.SHARE_VIEWER_UI_DEFAULT.outline, 'Outline');
+  const main = read('experiences/sharing/viewer/main.ts');
+  assert.match(main, /vam-share-outline-open/);
+  assert.equal((main.match(/localStorage/g) ?? []).length, 2, 'storage is still only touched inside storageGet and storageSet');
+  assert.match(main, /storageGet\(OUTLINE_OPEN_KEY\)/);
+  assert.doesNotMatch(main, /innerHTML|insertAdjacentHTML|outerHTML/);
+  assert.match(main, /ui\.outline/);
+  const css = bundle.SHARE_VIEWER_CSS;
+  assert.match(css, /\.vam-outline \{[^}]*width: 260px/);
+  assert.match(css, /@media \(max-width: 600px\) \{[^@]*\.vam-outline \{[^}]*min\(85vw, 320px\)/);
+  assert.doesNotMatch(bundle.SHARE_VIEWER_JS, /<\/script|<!--/);
+  assert.ok(bundle.SHARE_VIEWER_JS.includes('vam-outline-title'), 'the generated viewer builds the outline');
+});
+
+function findChrome() {
+  const candidates = [process.env.CHROME_BIN, '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome', '/usr/bin/google-chrome', '/usr/bin/google-chrome-stable', '/usr/bin/chromium'].filter(Boolean);
+  return candidates.find(file => fs.existsSync(file));
+}
+
+/** Page helpers for the outline tests: evaluate, real mouse clicks, real key events, a reload that keeps the emulation. */
+function pageTools(send) {
+  const evaluate = async expression => (await send('Runtime.evaluate', { expression, returnByValue: true })).result.value;
+  const centerOf = selector => evaluate(`(() => { const r = document.querySelector(${JSON.stringify(selector)}).getBoundingClientRect(); return { x: r.left + r.width / 2, y: r.top + r.height / 2 }; })()`);
+  const click = async selector => {
+    const point = await centerOf(selector);
+    await send('Input.dispatchMouseEvent', { type: 'mouseMoved', ...point });
+    await send('Input.dispatchMouseEvent', { type: 'mousePressed', ...point, button: 'left', clickCount: 1 });
+    await send('Input.dispatchMouseEvent', { type: 'mouseReleased', ...point, button: 'left', clickCount: 1 });
+  };
+  const CODES = { ArrowUp: 38, ArrowDown: 40, ArrowLeft: 37, ArrowRight: 39, Home: 36, End: 35, Enter: 13, Escape: 27 };
+  const key = async name => {
+    await send('Input.dispatchKeyEvent', { type: name === 'Enter' ? 'keyDown' : 'rawKeyDown', key: name, code: name, windowsVirtualKeyCode: CODES[name], ...(name === 'Enter' ? { text: '\r' } : {}) });
+    await send('Input.dispatchKeyEvent', { type: 'keyUp', key: name, code: name, windowsVirtualKeyCode: CODES[name] });
+  };
+  const reload = async () => {
+    await send('Page.reload');
+    await new Promise(resolve => setTimeout(resolve, 1800));
+  };
+  const row = id => `.vam-outline [data-outline-id="${id}"]`;
+  const focusedRow = () => evaluate(`document.activeElement?.closest('.vam-outline [role="treeitem"]')?.dataset.outlineId ?? null`);
+  const visibleRows = () => evaluate(`Array.from(document.querySelectorAll('.vam-outline [role="treeitem"]')).filter(r => r.getClientRects().length).map(r => r.dataset.outlineId)`);
+  const cardCount = () => evaluate('document.querySelectorAll(".vam-node").length');
+  const transformOf = () => evaluate('document.querySelector(".vam-stage").style.transform');
+  const current = () => evaluate(`Array.from(document.querySelectorAll('.vam-outline [aria-current]')).map(r => r.dataset.outlineId)`);
+  const panelHidden = () => evaluate('document.querySelector(".vam-inspector").hidden');
+  return { evaluate, click, key, reload, row, focusedRow, visibleRows, cardCount, transformOf, current, panelHidden };
+}
+
+function depthsOf(data) {
+  const parent = new Map(data.nodes.map(node => [node.id, node.parentId]));
+  const depth = id => (parent.get(id) ? 1 + depth(parent.get(id)) : 1);
+  return Object.fromEntries(data.nodes.map(node => [node.id, depth(node.id)]));
+}
+
+const TOGGLE = '.vam-toolbar button[aria-controls]';
+
+test('sharing viewer outline: the tree mirrors the map, folds on its own, jumps to a topic, is keyboard operable and does not disturb pan and zoom (headless Chrome, desktop)', async t => {
+  const chrome = findChrome();
+  if (!chrome) return t.skip('no Chrome found (set CHROME_BIN)');
+  const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'vam-share-outline-'));
+  try {
+    const out = path.join(directory, 'outline.html');
+    execFileSync(process.execPath, [path.join(root, 'scripts', 'make-share-demo.mjs'), '--out', out, '--lang', 'en'], { cwd: root });
+    const report = await dumpDomLight(chrome, directory, pathToFileURL(out).href, 90000, async send => {
+      const { evaluate, click, key, reload, row, focusedRow, visibleRows, cardCount, transformOf, current, panelHidden } = pageTools(send);
+      const result = {};
+      result.items = await evaluate(`Array.from(document.querySelectorAll('.vam-outline [role="treeitem"]')).map(r => [r.dataset.outlineId, Number(r.getAttribute('aria-level')), r.getAttribute('aria-expanded'), r.querySelector('.vam-outline-title')?.textContent, r.querySelector('.vam-outline-title')?.title])`);
+      result.structure = await evaluate(`(() => { const n = document.querySelector('nav.vam-outline'); const b = document.querySelector('${TOGGLE}'); return { role: n.querySelector('[role="tree"]') ? 'tree' : null, label: n.getAttribute('aria-label'), hidden: n.hidden, width: n.getBoundingClientRect().width, toggleFirst: document.querySelector('.vam-toolbar').firstElementChild === b, toggleLabel: b.getAttribute('aria-label'), toggleTitle: b.title, expanded: b.getAttribute('aria-expanded'), controls: b.getAttribute('aria-controls') === n.id && !!n.id, tabbable: n.querySelectorAll('[role="treeitem"][tabindex="0"]').length }; })()`);
+      result.layout = await evaluate(`(() => { const o = document.querySelector('.vam-outline').getBoundingClientRect(); const v = document.querySelector('.vam-viewport').getBoundingClientRect(); const ov = document.querySelector('.vam-canvas-overlay').getBoundingClientRect(); const g = document.querySelector('.vam-map-tools').getBoundingClientRect(); const h = document.querySelector('.vam-canvas-hint').getBoundingClientRect(); return { viewportLeft: v.left, outlineRight: o.right, overlayLeft: ov.left, goalLeft: g.left, hintLeft: h.left }; })()`);
+      result.visibleAtStart = (await visibleRows()).length;
+      result.cardsAtStart = await cardCount();
+      // The arrow folds only the outline.
+      await click(`${row('heat')} .vam-outline-twist`);
+      result.folded = { rows: await visibleRows(), cards: await cardCount(), expanded: await evaluate(`document.querySelector('${row('heat')}').getAttribute('aria-expanded')`) };
+      await click(`${row('heat')} .vam-outline-twist`);
+      result.unfolded = { rows: (await visibleRows()).length, cards: await cardCount() };
+      // A grandchild under a map-collapsed ancestor: the cards open, the card is selected, focused and on screen, and the panel stays shut.
+      await click(`${row('deep')} .vam-outline-title`);
+      result.jump = await evaluate(`(() => { const c = document.querySelector('[data-node-id="deep"]'); if (!c) return null; const r = c.getBoundingClientRect(); const v = document.querySelector('.vam-viewport').getBoundingClientRect(); const o = document.querySelector('.vam-outline').getBoundingClientRect(); return { selected: c.classList.contains('is-selected'), ariaSelected: c.getAttribute('aria-selected'), focused: document.activeElement === c, centerInside: r.left + r.width / 2 > v.left && r.left + r.width / 2 < v.right && r.top + r.height / 2 > v.top && r.top + r.height / 2 < v.bottom, clearOfOutline: r.left + r.width / 2 > o.right, cards: document.querySelectorAll('.vam-node').length, ancestorOpen: ['heat', 'maillard', 'amino'].map(id => document.querySelector('[data-node-id="' + id + '"]')?.getAttribute('aria-expanded')) }; })()`);
+      result.jumpPanelHidden = await panelHidden();
+      result.jumpCurrent = await current();
+      // With the panel open, a jump shows the topic in it; a card click, the panel's sub-topic list and Escape all keep the outline in step.
+      await evaluate(`document.querySelector('[data-node-id="root"]').click()`);
+      result.afterCardClick = { panelHidden: await panelHidden(), current: await current() };
+      await click(`${row('water')} .vam-outline-title`);
+      result.jumpWithPanel = { panelHidden: await panelHidden(), heading: await evaluate('document.querySelector(".vam-inspector h3")?.textContent'), current: await current() };
+      await evaluate(`Array.from(document.querySelectorAll('.vam-subtopics button')).find(b => b.textContent === 'Evaporation').click()`);
+      result.afterSubtopic = await current();
+      await key('Escape');
+      result.afterEscape = { panelHidden: await panelHidden(), current: await current() };
+      // Keyboard (roving tabindex).
+      await evaluate(`document.querySelector('${row('root')}').focus()`);
+      const walk = [];
+      const expandedNow = () => evaluate(`document.activeElement.getAttribute('aria-expanded')`);
+      await key('ArrowDown'); walk.push(await focusedRow());
+      await key('ArrowRight'); walk.push(await focusedRow());
+      await key('ArrowRight'); walk.push(await focusedRow());
+      await key('ArrowRight'); walk.push(await focusedRow());
+      await key('ArrowLeft'); walk.push(await focusedRow()); // a topic without sub-topics: to the parent
+      await key('ArrowLeft'); walk.push(await expandedNow()); // an open parent: fold
+      await key('ArrowLeft'); walk.push(await focusedRow()); // a folded one: to its parent
+      await key('ArrowLeft'); walk.push(await expandedNow());
+      await key('ArrowDown'); walk.push(await focusedRow());
+      await key('ArrowUp'); walk.push(await focusedRow());
+      await key('End'); walk.push(await focusedRow());
+      await key('Home'); walk.push(await focusedRow());
+      result.walk = walk;
+      result.roving = await evaluate(`Array.from(document.querySelectorAll('.vam-outline [role="treeitem"][tabindex="0"]')).map(r => r.dataset.outlineId)`);
+      await evaluate(`document.querySelector('${row('s1')}').focus()`);
+      await key('Enter');
+      result.enter = await evaluate(`(() => { const c = document.querySelector('[data-node-id="s1"]'); return c && { selected: c.classList.contains('is-selected'), focused: document.activeElement === c }; })()`);
+      // Pan and zoom are untouched while the outline is open; scrolling over the outline does not zoom the map.
+      const before = await transformOf();
+      await click('.vam-zoom-controls button[aria-label="Zoom in"]');
+      result.zoomed = (await transformOf()) !== before;
+      const beforePan = await transformOf();
+      const area = await evaluate(`(() => { const r = document.querySelector('.vam-viewport').getBoundingClientRect(); return { x: r.left + r.width * 0.5, y: r.bottom - 120 }; })()`);
+      await send('Input.dispatchMouseEvent', { type: 'mouseMoved', ...area });
+      await send('Input.dispatchMouseEvent', { type: 'mousePressed', ...area, button: 'left', clickCount: 1 });
+      await send('Input.dispatchMouseEvent', { type: 'mouseMoved', x: area.x + 60, y: area.y - 40, button: 'left' });
+      await send('Input.dispatchMouseEvent', { type: 'mouseReleased', x: area.x + 60, y: area.y - 40, button: 'left', clickCount: 1 });
+      result.panned = (await transformOf()) !== beforePan;
+      const beforeWheel = await transformOf();
+      const onOutline = await evaluate(`(() => { const r = document.querySelector('.vam-outline').getBoundingClientRect(); return { x: r.left + r.width / 2, y: r.top + 60 }; })()`);
+      await send('Input.dispatchMouseEvent', { type: 'mouseWheel', ...onOutline, deltaX: 0, deltaY: -120, modifiers: 2 });
+      result.wheelOnOutline = (await transformOf()) === beforeWheel;
+      // Closing it gives the canvas the whole width and the choice is remembered; opening again brings it back.
+      await click(TOGGLE);
+      result.closed = await evaluate(`(() => ({ hidden: document.querySelector('.vam-outline').hidden, expanded: document.querySelector('${TOGGLE}').getAttribute('aria-expanded'), sameWidth: document.querySelector('.vam-viewport').getBoundingClientRect().width === document.querySelector('.vam-workspace').getBoundingClientRect().width, overlayLeft: document.querySelector('.vam-canvas-overlay').getBoundingClientRect().left, stored: window.localStorage.getItem('vam-share-outline-open') }))()`);
+      await reload();
+      result.closedAfterReload = await evaluate(`document.querySelector('.vam-outline').hidden`);
+      await click(TOGGLE);
+      result.reopened = await evaluate(`({ hidden: document.querySelector('.vam-outline').hidden, stored: window.localStorage.getItem('vam-share-outline-open') })`);
+      return result;
+    });
+    const data = payload();
+    const depth = depthsOf(data);
+    assert.deepEqual(report.items.map(item => item[0]), ['root', 'heat', 'maillard', 'amino', 'deep', 'sugars', 'caramel', 'water', 'a1', 'a2', 'salt', 's1'], 'one row per topic, depth-first');
+    for (const [id, level, expanded, title, tip] of report.items) {
+      const node = data.nodes.find(item => item.id === id);
+      assert.equal(level, depth[id], `aria-level of ${id}`);
+      assert.equal(title, node.title);
+      assert.equal(tip, node.title, 'the title attribute holds the full title');
+      const hasKids = data.nodes.some(item => item.parentId === id);
+      assert.equal(expanded, hasKids ? 'true' : null, `aria-expanded of ${id}: only a topic with sub-topics has it, and the outline starts fully open`);
+    }
+    assert.deepEqual(report.structure, { role: 'tree', label: 'Outline', hidden: false, width: 260, toggleFirst: true, toggleLabel: 'Outline', toggleTitle: 'Outline', expanded: 'true', controls: true, tabbable: 1 });
+    assert.equal(report.layout.viewportLeft, report.layout.outlineRight, 'the map sits beside the outline, not under it');
+    assert.equal(report.layout.overlayLeft, report.layout.outlineRight, 'the goal, hint and zoom bar make way for the outline');
+    assert.ok(report.layout.goalLeft > report.layout.outlineRight && report.layout.hintLeft > report.layout.outlineRight);
+    assert.equal(report.visibleAtStart, 12);
+    assert.equal(report.cardsAtStart, 4);
+    assert.deepEqual(report.folded.rows, ['root', 'heat', 'water', 'a1', 'a2', 'salt', 's1']);
+    assert.equal(report.folded.expanded, 'false');
+    assert.equal(report.folded.cards, 4, 'folding the outline does not fold the map');
+    assert.deepEqual(report.unfolded, { rows: 12, cards: 4 });
+    assert.deepEqual(plain(report.jump), { selected: true, ariaSelected: 'true', focused: true, centerInside: true, clearOfOutline: true, cards: report.jump.cards, ancestorOpen: ['true', 'true', 'true'] });
+    assert.ok(report.jump.cards > 4, 'the collapsed ancestors opened');
+    assert.equal(report.jumpPanelHidden, true, 'a jump with the panel shut does not open it');
+    assert.deepEqual(report.jumpCurrent, ['deep']);
+    assert.deepEqual(report.afterCardClick, { panelHidden: false, current: ['root'] });
+    assert.deepEqual(report.jumpWithPanel, { panelHidden: false, heading: 'Water in food', current: ['water'] });
+    assert.deepEqual(report.afterSubtopic, ['a2']);
+    assert.deepEqual(report.afterEscape, { panelHidden: true, current: [] });
+    assert.deepEqual(report.walk, ['heat', 'maillard', 'amino', 'deep', 'amino', 'false', 'maillard', 'false', 'caramel', 'maillard', 's1', 'root']);
+    assert.equal(report.roving.length, 1, 'one tab stop');
+    assert.deepEqual(report.enter, { selected: true, focused: true });
+    assert.equal(report.zoomed, true, 'zoom works with the outline open');
+    assert.equal(report.panned, true, 'dragging empty space pans with the outline open');
+    assert.equal(report.wheelOnOutline, true, 'scrolling the outline does not zoom the map');
+    assert.deepEqual(report.closed, { hidden: true, expanded: 'false', sameWidth: true, overlayLeft: 0, stored: '0' });
+    assert.equal(report.closedAfterReload, true, 'the closed state is remembered');
+    assert.deepEqual(report.reopened, { hidden: false, stored: '1' });
+  } finally {
+    try { fs.rmSync(directory, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 }); } catch (error) { console.warn(`could not remove temp directory: ${error.message}`); }
+  }
+});
+
+test('sharing viewer outline: at phone width it starts shut, opens as a drawer over the map, closes after a jump and on Escape, and remembers nothing (headless Chrome, 390x800)', async t => {
+  const chrome = findChrome();
+  if (!chrome) return t.skip('no Chrome found (set CHROME_BIN)');
+  const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'vam-share-outline-narrow-'));
+  try {
+    const out = path.join(directory, 'narrow.html');
+    execFileSync(process.execPath, [path.join(root, 'scripts', 'make-share-demo.mjs'), '--out', out, '--lang', 'en'], { cwd: root });
+    const report = await dumpDomLight(chrome, directory, pathToFileURL(out).href, 90000, async send => {
+      const { evaluate, click, key, reload, row } = pageTools(send);
+      await send('Emulation.setDeviceMetricsOverride', { width: 390, height: 800, deviceScaleFactor: 1, mobile: false });
+      await reload();
+      const state = () => evaluate(`(() => { const n = document.querySelector('.vam-outline'); const r = n.getBoundingClientRect(); const v = document.querySelector('.vam-viewport').getBoundingClientRect(); return { hidden: n.hidden, expanded: document.querySelector('${TOGGLE}').getAttribute('aria-expanded'), drawerWidth: n.hidden ? 0 : r.width, position: getComputedStyle(n).position, shadow: getComputedStyle(n).boxShadow !== 'none', canvasFull: v.width === document.querySelector('.vam-workspace').getBoundingClientRect().width, stored: window.localStorage.getItem('vam-share-outline-open') }; })()`);
+      const result = { initial: await state() };
+      await click(TOGGLE);
+      result.opened = await state();
+      await click(`${row('maillard')} .vam-outline-title`);
+      result.afterJump = await state();
+      result.focus = await evaluate(`document.activeElement === document.querySelector('[data-node-id="maillard"]')`);
+      result.selected = await evaluate(`document.querySelector('[data-node-id="maillard"]').classList.contains('is-selected')`);
+      await click(TOGGLE);
+      await key('Escape');
+      result.afterEscape = await state();
+      result.focusOnToggle = await evaluate(`document.activeElement === document.querySelector('${TOGGLE}')`);
+      await click(TOGGLE);
+      result.reopened = await state();
+      return result;
+    });
+    assert.deepEqual(report.initial, { hidden: true, expanded: 'false', drawerWidth: 0, position: 'absolute', shadow: true, canvasFull: true, stored: null });
+    assert.deepEqual(report.opened, { hidden: false, expanded: 'true', drawerWidth: 320, position: 'absolute', shadow: true, canvasFull: true, stored: null });
+    assert.deepEqual(report.afterJump, { hidden: true, expanded: 'false', drawerWidth: 0, position: 'absolute', shadow: true, canvasFull: true, stored: null });
+    assert.equal(report.focus, true, 'the card gets focus after the drawer closes');
+    assert.equal(report.selected, true);
+    assert.equal(report.afterEscape.hidden, true);
+    assert.equal(report.focusOnToggle, true, 'Escape returns focus to the toggle');
+    assert.equal(report.reopened.stored, null, 'phone width never writes the remembered state');
+  } finally {
+    try { fs.rmSync(directory, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 }); } catch (error) { console.warn(`could not remove temp directory: ${error.message}`); }
+  }
+});
+
+test('sharing viewer outline: a hostile title stays literal text, a throwing localStorage still shows the outline, and a language switch keeps the outline folds (headless Chrome)', async t => {
+  const chrome = findChrome();
+  if (!chrome) return t.skip('no Chrome found (set CHROME_BIN)');
+  const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'vam-share-outline-hostile-'));
+  try {
+    const hostile = '<img src=x onerror=alert(1)>';
+    const data = payload();
+    data.nodes.find(node => node.id === 's1').title = hostile;
+    const payloadFile = path.join(directory, 'payload.json');
+    fs.writeFileSync(payloadFile, JSON.stringify(data));
+    const out = path.join(directory, 'hostile.html');
+    execFileSync(process.execPath, [path.join(root, 'scripts', 'make-share-demo.mjs'), '--out', out, '--lang', 'en', '--payload', payloadFile, '--translate', 'ja', '--content-language', 'en', '--default-language', 'en'], { cwd: root });
+    const report = await dumpDomLight(chrome, directory, pathToFileURL(out).href, 90000, async send => {
+      const { evaluate, click, row, visibleRows } = pageTools(send);
+      await send('Page.addScriptToEvaluateOnNewDocument', { source: `window.__errors = []; window.addEventListener('error', e => window.__errors.push(String(e.message))); Storage.prototype.getItem = function () { throw new Error('blocked'); }; Storage.prototype.setItem = function () { throw new Error('blocked'); };` });
+      await send('Page.reload');
+      await new Promise(resolve => setTimeout(resolve, 1800));
+      const result = {};
+      result.shown = { hidden: await evaluate(`document.querySelector('.vam-outline').hidden`), rows: (await visibleRows()).length, errors: await evaluate('window.__errors') };
+      result.hostile = await evaluate(`(() => { const t = document.querySelector('${row('s1')} .vam-outline-title'); return { text: t.textContent, images: document.querySelectorAll('.vam-outline img').length, children: t.children.length }; })()`);
+      await click(`${row('heat')} .vam-outline-twist`);
+      await evaluate(`(() => { const s = document.querySelector('.vam-language'); s.value = 'ja'; s.dispatchEvent(new Event('change')); })()`);
+      await new Promise(resolve => setTimeout(resolve, 300));
+      result.switched = await evaluate(`({ heat: document.querySelector('${row('heat')} .vam-outline-title').textContent, folded: document.querySelector('${row('heat')}').getAttribute('aria-expanded'), rows: Array.from(document.querySelectorAll('.vam-outline [role="treeitem"]')).filter(r => r.getClientRects().length).length, label: document.querySelector('.vam-outline').getAttribute('aria-label'), errors: window.__errors })`);
+      return result;
+    });
+    assert.deepEqual(report.shown, { hidden: false, rows: 12, errors: [] });
+    assert.deepEqual(report.hostile, { text: hostile, images: 0, children: 0 });
+    assert.equal(report.switched.heat, '[ja] Heat and food');
+    assert.equal(report.switched.folded, 'false', 'the fold survives the language switch');
+    assert.equal(report.switched.rows, 7);
+    assert.equal(report.switched.label, 'アウトライン', 'the outline label follows the language');
+    assert.deepEqual(report.switched.errors, []);
+  } finally {
+    try { fs.rmSync(directory, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 }); } catch (error) { console.warn(`could not remove temp directory: ${error.message}`); }
+  }
+});
+
 test('sharing viewer language: switching goes through the same text and detail paths as the original', () => {
   const main = read('experiences/sharing/viewer/main.ts');
   // A translated note's detailHtml reaches fillDetail (DOMParser clean-up) exactly like the original's, and every text is set with textContent.

@@ -1964,6 +1964,7 @@ export const zhCN: Record<TranslationKey, string> = {
   "share.viewer_image_omitted": "[图片未包含]",
   "share.viewer_image_source_0": "来源：{0}",
   "share.viewer_resize_panel": "调整侧栏宽度",
+  "share.viewer_outline": "大纲",
   "share.viewer_untitled": "未命名的地图",
   "share.viewer_language": "语言",
   "share.viewer_ai_translated_0": "由 AI 翻译自{0}。",

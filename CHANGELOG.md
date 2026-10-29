@@ -2,9 +2,34 @@
 
 ## [Unreleased]
 
+## [0.27.1] - 2026-10-30
+
+### Easier to read shared maps
+
+Open a map you saved with **Share this map** in any browser and find your way around faster.
+
+- **Outline on the left.** The shared page now has an outline like the one in Obsidian. Open or close its levels, and click a topic to jump to it on the map. In a narrow window the outline starts closed; open it from the toolbar.
+- **Fold branches.** Click a topic that is open to hide its subtopics, and click again to show them.
+
+### Map AI chat answers in your language
+
+- When you paste text in another language and ask "summarize this", the AI now follows the language of what you typed, not the language of the pasted text.
+- A Chinese note that contains one Japanese link title is no longer treated as Japanese. Real Japanese text is still answered in Japanese.
+- When the chat builds a whole map from one sentence, every new topic now gets a one-line summary, not only the first one.
+- In picture search, an inserted picture and one that failed to load now look clearly different, and the result line says when the search is done, found nothing, failed or was stopped.
+
+### Better contrast
+
+Topics, lines, labels, toolbars and dialogs on the map, Mermaid diagrams and Gantt charts in your notes, and shared maps are easier to read in Obsidian's default light and dark themes.
+
 ### Changed
 
 - The AI Next Step dialog no longer offers "AI structure suggestions" (what to strengthen or cut). Use Research deeper, Expand, Integrate or Merge instead.
+
+### Known issues
+
+- The chat picks the language for each message on its own; it does not yet remember the language it used for a map.
+- Not yet tested on Windows or Linux.
 
 ## [0.27.0] - 2026-10-26
 

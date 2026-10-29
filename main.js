@@ -6066,13 +6066,14 @@ var FOLLOW_ANCHOR_KINDS = {
 var FOLLOW_ANCHOR_MAX = 80;
 var FOLLOW_INPUT_ID = "same-as-input";
 var KANA = /[\p{Script=Hiragana}\p{Script=Katakana}\u30FC]/gu;
+var JAPANESE_KANA_SHARE = 0.25;
 var japaneseKanaRule = (text11) => {
   var _a2, _b2, _c;
   const kana = (_a2 = text11.match(KANA)) != null ? _a2 : [];
   if (kana.filter((char) => char !== "\u306E").length < 2) return false;
   const han = ((_b2 = text11.match(/\p{Script=Han}/gu)) != null ? _b2 : []).length;
   const latinWords = ((_c = text11.match(/\p{Script=Latin}+/gu)) != null ? _c : []).length;
-  return kana.length + han >= 2 * latinWords;
+  return kana.length + han >= 2 * latinWords && kana.length / (kana.length + han) >= JAPANESE_KANA_SHARE;
 };
 var names = (zh, en2) => ({
   zh: { plain: zh, region: zh, usage: zh },
@@ -15346,8 +15347,13 @@ var hanScriptVotes = (text11) => {
 var OUTPUT_ROWS = OUTPUT_LANGUAGES;
 var isOutputOnlyLanguage = (value) => OUTPUT_LANGUAGES.some((item) => item.id === value);
 var UNDECIDED_HAN = "han";
-function signalOf(text11) {
+function detectionText(text11) {
+  const cleaned = text11.replace(/^[ \t]*(`{3,}|~{3,})[^\n]*\n[\s\S]*?\n[ \t]*\1[`~]*[ \t]*$/gm, "").replace(/`[^`\n]*`/g, "").replace(/!?\[[^\]\n]*\]\([^)\n]*\)/g, "").replace(/https?:\/\/[\x21-\x7E]+/g, "");
+  return /\p{L}/u.test(cleaned) ? cleaned : text11;
+}
+function signalOf(source) {
   var _a2, _b2, _c;
+  const text11 = detectionText(source);
   for (const entry of OUTPUT_ROWS) {
     const detect = entry.detect;
     if (!detect || !detect.script.test(text11) || ((_a2 = detect.exclude) == null ? void 0 : _a2.test(text11))) continue;

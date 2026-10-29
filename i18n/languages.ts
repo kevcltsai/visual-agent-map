@@ -165,16 +165,23 @@ export const FOLLOW_INPUT_ID = "same-as-input";
 
 const KANA = /[\p{Script=Hiragana}\p{Script=Katakana}\u30FC]/gu;
 /**
+ * Smallest share of kana among kana plus Han for Japanese (0.28 ticket 06, decision 2026-10-30-language-detect-ratio#1):
+ * Chinese text that quotes a little Japanese (a link title, a katakana word, ー as a dash) stays far below it, a Japanese
+ * sentence stays above.
+ */
+const JAPANESE_KANA_SHARE = 0.25;
+/**
  * Whether kana in `text` mean Japanese (D-2026-10-86): at least two kana other than the particle の (which Chinese
- * titles borrow, as in 台灣の旅), and kana plus Han make up at least twice the number of Latin words, so a Latin
- * sentence that quotes a katakana word is not Japanese.
+ * titles borrow, as in 台灣の旅), kana plus Han make up at least twice the number of Latin words, so a Latin sentence
+ * that quotes a katakana word is not Japanese, and kana are at least {@link JAPANESE_KANA_SHARE} of kana plus Han, so a
+ * long Chinese text with a few Japanese words is not Japanese either.
  */
 const japaneseKanaRule = (text: string): boolean => {
   const kana = text.match(KANA) ?? [];
   if (kana.filter(char => char !== "の").length < 2) return false;
   const han = (text.match(/\p{Script=Han}/gu) ?? []).length;
   const latinWords = (text.match(/\p{Script=Latin}+/gu) ?? []).length;
-  return kana.length + han >= 2 * latinWords;
+  return kana.length + han >= 2 * latinWords && kana.length / (kana.length + han) >= JAPANESE_KANA_SHARE;
 };
 
 /** Prompt names are the same in all three forms: these languages have no regional or usage variants. */

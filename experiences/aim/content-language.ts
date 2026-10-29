@@ -36,9 +36,25 @@ const UNDECIDED_HAN = "han";
 type Signal = DetectedLanguage | typeof UNDECIDED_HAN;
 
 /**
- * The language signal of one piece of text, from letters only (no AI call):
+ * The part of `text` that is the user's own words (0.28 ticket 06): fenced code blocks (an unclosed fence is kept),
+ * inline code, Markdown images and links (title and URL) and bare URLs (ASCII only, so Chinese written right after a URL stays) are
+ * removed. Wiki links keep their text. When
+ * nothing with a letter is left, the original text is used, so a lone link title still has a signal.
+ */
+function detectionText(text: string): string {
+  const cleaned = text
+    .replace(/^[ \t]*(`{3,}|~{3,})[^\n]*\n[\s\S]*?\n[ \t]*\1[`~]*[ \t]*$/gm, "")
+    .replace(/`[^`\n]*`/g, "")
+    .replace(/!?\[[^\]\n]*\]\([^)\n]*\)/g, "")
+    .replace(/https?:\/\/[\x21-\x7E]+/g, "");
+  return /\p{L}/u.test(cleaned) ? cleaned : text;
+}
+
+/**
+ * The language signal of one piece of text, from letters only (no AI call), after {@link detectionText} has removed
+ * links, images, URLs and code:
  * 1. output-only languages with a script of their own, from the `detect` data of the language table in row order (kana
- *    after the kana rule, hangul, Arabic script without Persian or Urdu letters, Thai, Vietnamese letters);
+ *    after the kana rule: enough kana, and a share of kana among kana and Han; hangul, Arabic script without Persian or Urdu letters, Thai, Vietnamese letters);
  * 2. Han text (at least as many Han characters as Latin words) is Chinese: Simplified or Traditional when the characters
  *    decide it, otherwise {@link UNDECIDED_HAN};
  * 3. plain English: every letter is ASCII, at least one English function word and no foreign one (see
@@ -47,7 +63,8 @@ type Signal = DetectedLanguage | typeof UNDECIDED_HAN;
  *    answer is the follow-the-input row: the model writes in the language of the text;
  * 5. undefined when there is no letter at all (empty, digits, emoji).
  */
-function signalOf(text: string): Signal | undefined {
+function signalOf(source: string): Signal | undefined {
+  const text = detectionText(source);
   for (const entry of OUTPUT_ROWS) {
     const detect = entry.detect;
     if (!detect || !detect.script.test(text) || detect.exclude?.test(text)) continue;

@@ -480,16 +480,14 @@ export function startViewer(doc: Document): void {
       const cardTools = make("div", "vam-node-tools");
       card.append(cardTools);
       if (count) {
-        const toggle = button(
-          node.collapsed ? header : cardTools,
-          node.collapsed ? fill(ui.expandCount, count) : ui.collapse,
-          "vam-collapse-button",
-          () => {
-            node.collapsed = !node.collapsed;
-            relayout(node.id);
-          }
-        );
+        const toggleText = node.collapsed ? fill(ui.expandCount, count) : ui.collapse;
+        const toggle = button(header, toggleText, "vam-collapse-button", () => {
+          node.collapsed = !node.collapsed;
+          relayout(node.id, true);
+        });
         toggle.setAttribute("aria-expanded", String(!node.collapsed));
+        toggle.setAttribute("aria-label", toggleText);
+        toggle.title = toggleText;
       }
       button(cardTools, ui.detailsButton, undefined, () => select(node.id));
       card.append(make("h3", "vam-card-title", String(shown.title ?? "")));
@@ -503,6 +501,10 @@ export function startViewer(doc: Document): void {
         if (event.key === "Enter" || event.key === " ") {
           event.preventDefault();
           select(node.id);
+        } else if (count && event.key === (node.collapsed ? "ArrowRight" : "ArrowLeft")) {
+          event.preventDefault();
+          node.collapsed = !node.collapsed;
+          relayout(node.id);
         }
       });
       card.addEventListener("pointerdown", event => dragCard(event, node, card));
@@ -520,7 +522,7 @@ export function startViewer(doc: Document): void {
     for (const id of cards.keys()) place(id);
   }
   /** Rebuilds the cards after a fold change, keeping the card the user acted on where it was on screen. */
-  function relayout(focusId?: string): void {
+  function relayout(focusId?: string, focusButton = false): void {
     const before = focusId ? cards.get(focusId)?.getBoundingClientRect() : undefined;
     renderCards();
     layout();
@@ -532,7 +534,8 @@ export function startViewer(doc: Document): void {
         view = { ...view, x: view.x + before.left - rect.left, y: view.y + before.top - rect.top };
         transform();
       }
-      after.focus({ preventScroll: true });
+      const target = focusButton ? after.querySelector<HTMLElement>(".vam-collapse-button") : null;
+      (target ?? after).focus({ preventScroll: true });
     }
   }
   /** Moves one card for this visit only; nothing is saved and Auto layout puts it back. */

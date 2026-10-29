@@ -41,6 +41,8 @@ export interface ShareViewerUi {
   /** `{0}` is the web address the image came from (shown as a link under the image). */
   imageSource: string;
   resizePanel: string;
+  /** Label of the outline (the topic tree on the left) and of its toggle button. */
+  outline: string;
   untitledMap: string;
   /** Label of the language menu in the toolbar. */
   language: string;
@@ -95,6 +97,7 @@ export const SHARE_VIEWER_UI_DEFAULT: Readonly<ShareViewerUi> = {
   imageOmitted: "[image not included]",
   imageSource: "Source: {0}",
   resizePanel: "Resize the side panel",
+  outline: "Outline",
   untitledMap: "Untitled map",
   language: "Language",
   aiTranslated: "Translated by AI from {0}.",

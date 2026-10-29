@@ -100,6 +100,20 @@ button:focus-visible, a:focus-visible, [tabindex]:focus-visible { outline: 2px s
 .vam-subtopics { display: flex; flex-direction: column; gap: 4px; margin-top: 16px; padding-top: 10px; border-top: 1px solid var(--background-modifier-border); }
 .vam-subtopics strong { font-size: var(--font-ui-small); color: var(--text-muted); font-weight: 500; }
 .vam-subtopics button { justify-content: flex-start; height: auto; min-height: 30px; white-space: normal; text-align: left; }
+/* Outline: the topic tree on the left of the map; a drawer over the map at phone width. */
+.vam-outline { position: relative; flex: none; width: 260px; padding: 6px 0; overflow-y: auto; overscroll-behavior: contain; background: var(--background-secondary); border-right: 1px solid var(--background-modifier-border); }
+.vam-outline[hidden] { display: none; }
+.vam-outline-item { --depth: 0; display: flex; align-items: center; gap: 2px; min-height: 28px; padding: 2px 8px 2px calc(8px + var(--depth, 0) * 16px); color: var(--text-normal); cursor: pointer; background-image: repeating-linear-gradient(to right, var(--background-modifier-border) 0 1px, transparent 1px 16px); background-repeat: no-repeat; background-position: 16px 0; background-size: calc(var(--depth, 0) * 16px) 100%; }
+.vam-outline-item[hidden] { display: none; }
+.vam-outline-item:hover { background-color: var(--background-modifier-hover); }
+.vam-outline-item[aria-current="true"] { background-color: var(--background-modifier-active-hover); color: var(--text-accent); }
+.vam-outline-item:focus-visible { outline-offset: -2px; }
+.vam-outline-twist { display: inline-flex; align-items: center; justify-content: center; flex: none; width: 16px; height: 16px; color: var(--text-faint); }
+.vam-outline-twist .svg-icon { width: 12px; height: 12px; transition: transform 0.1s; }
+.vam-outline-item[aria-expanded="true"] > .vam-outline-twist .svg-icon { transform: rotate(90deg); }
+.vam-outline-title { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+@media (min-width: 601px) { .vam-workspace.has-outline > .vam-canvas-overlay { left: 260px; } }
+@media (max-width: 600px) { .vam-outline { position: absolute; left: 0; top: 0; bottom: 0; z-index: 6; width: min(85vw, 320px); box-shadow: var(--shadow-l); } }
 /* Reading styles for the note HTML that Obsidian rendered at export time. */
 .vam-sample-detail { overflow-wrap: anywhere; }
 .vam-sample-detail h1, .vam-sample-detail h2, .vam-sample-detail h3, .vam-sample-detail h4, .vam-sample-detail h5, .vam-sample-detail h6 { margin: 18px 0 6px; line-height: 1.35; }

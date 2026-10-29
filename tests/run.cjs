@@ -45,6 +45,7 @@ const suites = [
   'sharing.cjs',
   'sharing-viewer.cjs',
   'map-view-color.cjs',
+  'mermaid-color.cjs',
   'sharing-export.cjs',
   'sharing-translate.cjs',
   'sharing-translate-dialog.cjs',

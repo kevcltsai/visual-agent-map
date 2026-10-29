@@ -1176,29 +1176,29 @@ button.vam-template-section-header:hover { background: var(--background-modifier
 .mermaid.vam-mermaid-scope > :is(#vam-mermaid-mindmap, svg)[aria-roledescription="mindmap"] { filter: none; }
 .mermaid.vam-mermaid-scope > :is(#vam-mermaid-mindmap, svg)[aria-roledescription="mindmap"] .section--1 :is(rect, circle, path, polygon) { fill: color-mix(in srgb, var(--interactive-accent) 30%, var(--background-primary)); }
 .mermaid.vam-mermaid-scope > :is(#vam-mermaid-mindmap, svg)[aria-roledescription="mindmap"] .section-0 :is(rect, circle, path, polygon) { fill: color-mix(in srgb, var(--color-red) 26%, var(--background-primary)); }
-.mermaid.vam-mermaid-scope > :is(#vam-mermaid-mindmap, svg)[aria-roledescription="mindmap"] .section-edge-0 { stroke: color-mix(in srgb, var(--color-red) 70%, var(--background-primary)); }
+.mermaid.vam-mermaid-scope > :is(#vam-mermaid-mindmap, svg)[aria-roledescription="mindmap"] .section-edge-0 { stroke: color-mix(in srgb, var(--color-red) 60%, var(--text-normal)); }
 .mermaid.vam-mermaid-scope > :is(#vam-mermaid-mindmap, svg)[aria-roledescription="mindmap"] .section-1 :is(rect, circle, path, polygon) { fill: color-mix(in srgb, var(--color-orange) 26%, var(--background-primary)); }
-.mermaid.vam-mermaid-scope > :is(#vam-mermaid-mindmap, svg)[aria-roledescription="mindmap"] .section-edge-1 { stroke: color-mix(in srgb, var(--color-orange) 70%, var(--background-primary)); }
+.mermaid.vam-mermaid-scope > :is(#vam-mermaid-mindmap, svg)[aria-roledescription="mindmap"] .section-edge-1 { stroke: color-mix(in srgb, var(--color-orange) 60%, var(--text-normal)); }
 .mermaid.vam-mermaid-scope > :is(#vam-mermaid-mindmap, svg)[aria-roledescription="mindmap"] .section-2 :is(rect, circle, path, polygon) { fill: color-mix(in srgb, var(--color-yellow) 26%, var(--background-primary)); }
-.mermaid.vam-mermaid-scope > :is(#vam-mermaid-mindmap, svg)[aria-roledescription="mindmap"] .section-edge-2 { stroke: color-mix(in srgb, var(--color-yellow) 70%, var(--background-primary)); }
+.mermaid.vam-mermaid-scope > :is(#vam-mermaid-mindmap, svg)[aria-roledescription="mindmap"] .section-edge-2 { stroke: color-mix(in srgb, var(--color-yellow) 60%, var(--text-normal)); }
 .mermaid.vam-mermaid-scope > :is(#vam-mermaid-mindmap, svg)[aria-roledescription="mindmap"] .section-3 :is(rect, circle, path, polygon) { fill: color-mix(in srgb, var(--color-green) 26%, var(--background-primary)); }
-.mermaid.vam-mermaid-scope > :is(#vam-mermaid-mindmap, svg)[aria-roledescription="mindmap"] .section-edge-3 { stroke: color-mix(in srgb, var(--color-green) 70%, var(--background-primary)); }
+.mermaid.vam-mermaid-scope > :is(#vam-mermaid-mindmap, svg)[aria-roledescription="mindmap"] .section-edge-3 { stroke: color-mix(in srgb, var(--color-green) 60%, var(--text-normal)); }
 .mermaid.vam-mermaid-scope > :is(#vam-mermaid-mindmap, svg)[aria-roledescription="mindmap"] .section-4 :is(rect, circle, path, polygon) { fill: color-mix(in srgb, var(--color-cyan) 26%, var(--background-primary)); }
-.mermaid.vam-mermaid-scope > :is(#vam-mermaid-mindmap, svg)[aria-roledescription="mindmap"] .section-edge-4 { stroke: color-mix(in srgb, var(--color-cyan) 70%, var(--background-primary)); }
+.mermaid.vam-mermaid-scope > :is(#vam-mermaid-mindmap, svg)[aria-roledescription="mindmap"] .section-edge-4 { stroke: color-mix(in srgb, var(--color-cyan) 60%, var(--text-normal)); }
 .mermaid.vam-mermaid-scope > :is(#vam-mermaid-mindmap, svg)[aria-roledescription="mindmap"] .section-5 :is(rect, circle, path, polygon) { fill: color-mix(in srgb, var(--color-blue) 26%, var(--background-primary)); }
-.mermaid.vam-mermaid-scope > :is(#vam-mermaid-mindmap, svg)[aria-roledescription="mindmap"] .section-edge-5 { stroke: color-mix(in srgb, var(--color-blue) 70%, var(--background-primary)); }
+.mermaid.vam-mermaid-scope > :is(#vam-mermaid-mindmap, svg)[aria-roledescription="mindmap"] .section-edge-5 { stroke: color-mix(in srgb, var(--color-blue) 60%, var(--text-normal)); }
 .mermaid.vam-mermaid-scope > :is(#vam-mermaid-mindmap, svg)[aria-roledescription="mindmap"] .section-6 :is(rect, circle, path, polygon) { fill: color-mix(in srgb, var(--color-purple) 26%, var(--background-primary)); }
-.mermaid.vam-mermaid-scope > :is(#vam-mermaid-mindmap, svg)[aria-roledescription="mindmap"] .section-edge-6 { stroke: color-mix(in srgb, var(--color-purple) 70%, var(--background-primary)); }
+.mermaid.vam-mermaid-scope > :is(#vam-mermaid-mindmap, svg)[aria-roledescription="mindmap"] .section-edge-6 { stroke: color-mix(in srgb, var(--color-purple) 60%, var(--text-normal)); }
 .mermaid.vam-mermaid-scope > :is(#vam-mermaid-mindmap, svg)[aria-roledescription="mindmap"] .section-7 :is(rect, circle, path, polygon) { fill: color-mix(in srgb, var(--color-pink) 26%, var(--background-primary)); }
-.mermaid.vam-mermaid-scope > :is(#vam-mermaid-mindmap, svg)[aria-roledescription="mindmap"] .section-edge-7 { stroke: color-mix(in srgb, var(--color-pink) 70%, var(--background-primary)); }
+.mermaid.vam-mermaid-scope > :is(#vam-mermaid-mindmap, svg)[aria-roledescription="mindmap"] .section-edge-7 { stroke: color-mix(in srgb, var(--color-pink) 60%, var(--text-normal)); }
 .mermaid.vam-mermaid-scope > :is(#vam-mermaid-mindmap, svg)[aria-roledescription="mindmap"] .section-8 :is(rect, circle, path, polygon) { fill: color-mix(in srgb, var(--color-red) 26%, var(--background-primary)); }
-.mermaid.vam-mermaid-scope > :is(#vam-mermaid-mindmap, svg)[aria-roledescription="mindmap"] .section-edge-8 { stroke: color-mix(in srgb, var(--color-red) 70%, var(--background-primary)); }
+.mermaid.vam-mermaid-scope > :is(#vam-mermaid-mindmap, svg)[aria-roledescription="mindmap"] .section-edge-8 { stroke: color-mix(in srgb, var(--color-red) 60%, var(--text-normal)); }
 .mermaid.vam-mermaid-scope > :is(#vam-mermaid-mindmap, svg)[aria-roledescription="mindmap"] .section-9 :is(rect, circle, path, polygon) { fill: color-mix(in srgb, var(--color-orange) 26%, var(--background-primary)); }
-.mermaid.vam-mermaid-scope > :is(#vam-mermaid-mindmap, svg)[aria-roledescription="mindmap"] .section-edge-9 { stroke: color-mix(in srgb, var(--color-orange) 70%, var(--background-primary)); }
+.mermaid.vam-mermaid-scope > :is(#vam-mermaid-mindmap, svg)[aria-roledescription="mindmap"] .section-edge-9 { stroke: color-mix(in srgb, var(--color-orange) 60%, var(--text-normal)); }
 .mermaid.vam-mermaid-scope > :is(#vam-mermaid-mindmap, svg)[aria-roledescription="mindmap"] .section-10 :is(rect, circle, path, polygon) { fill: color-mix(in srgb, var(--color-yellow) 26%, var(--background-primary)); }
-.mermaid.vam-mermaid-scope > :is(#vam-mermaid-mindmap, svg)[aria-roledescription="mindmap"] .section-edge-10 { stroke: color-mix(in srgb, var(--color-yellow) 70%, var(--background-primary)); }
+.mermaid.vam-mermaid-scope > :is(#vam-mermaid-mindmap, svg)[aria-roledescription="mindmap"] .section-edge-10 { stroke: color-mix(in srgb, var(--color-yellow) 60%, var(--text-normal)); }
 .mermaid.vam-mermaid-scope > :is(#vam-mermaid-mindmap, svg)[aria-roledescription="mindmap"] .section-11 :is(rect, circle, path, polygon) { fill: color-mix(in srgb, var(--color-green) 26%, var(--background-primary)); }
-.mermaid.vam-mermaid-scope > :is(#vam-mermaid-mindmap, svg)[aria-roledescription="mindmap"] .section-edge-11 { stroke: color-mix(in srgb, var(--color-green) 70%, var(--background-primary)); }
+.mermaid.vam-mermaid-scope > :is(#vam-mermaid-mindmap, svg)[aria-roledescription="mindmap"] .section-edge-11 { stroke: color-mix(in srgb, var(--color-green) 60%, var(--text-normal)); }
 .mermaid.vam-mermaid-scope > :is(#vam-mermaid-mindmap, svg)[aria-roledescription="mindmap"] :is(.nodeLabel, .nodeLabel p, text, tspan) { color: var(--text-normal); fill: var(--text-normal); }
 /* Gantt: bars are chips of an accent mixed into the page background (--background-primary) with --text-normal text, so the text/chip
    contrast follows the active theme (8:1 or more on Obsidian's default light and dark). Text outside the bars follows the theme,
@@ -1216,7 +1216,7 @@ button.vam-template-section-header:hover { background: var(--background-modifier
 .theme-dark .mermaid.vam-mermaid-scope > :is(#vam-mermaid-gantt, svg)[aria-roledescription="gantt"] text:is([class*="activeText"], [class*="doneText"], [class*="activeCritText"], [class*="doneCritText"])[class*="Outside"] { stroke: var(--text-normal); }
 .mermaid.vam-mermaid-scope > :is(#vam-mermaid-gantt, svg)[aria-roledescription="gantt"] .task { fill: color-mix(in srgb, var(--color-blue) 28%, var(--background-primary)); stroke: var(--color-blue); }
 .mermaid.vam-mermaid-scope > :is(#vam-mermaid-gantt, svg)[aria-roledescription="gantt"] .task[class*="active"] { fill: color-mix(in srgb, var(--color-blue) 16%, var(--background-primary)); }
-.mermaid.vam-mermaid-scope > :is(#vam-mermaid-gantt, svg)[aria-roledescription="gantt"] .task[class*="done"] { fill: color-mix(in srgb, var(--text-faint) 30%, var(--background-primary)); stroke: var(--text-faint); }
+.mermaid.vam-mermaid-scope > :is(#vam-mermaid-gantt, svg)[aria-roledescription="gantt"] .task[class*="done"] { fill: color-mix(in srgb, var(--text-faint) 30%, var(--background-primary)); stroke: var(--text-muted); }
 /* mermaid forces near-black text (its rule cannot be overridden from a plugin stylesheet) on active and done bars: in dark themes those chips mix the accent into --text-normal (light) instead of the page background */
 .theme-dark .mermaid.vam-mermaid-scope > :is(#vam-mermaid-gantt, svg)[aria-roledescription="gantt"] .task[class*="active"] { fill: color-mix(in srgb, var(--color-blue) 16%, var(--text-normal)); }
 .theme-dark .mermaid.vam-mermaid-scope > :is(#vam-mermaid-gantt, svg)[aria-roledescription="gantt"] .task[class*="done"] { fill: color-mix(in srgb, var(--text-faint) 30%, var(--text-normal)); }
@@ -1253,7 +1253,29 @@ button.vam-template-section-header:hover { background: var(--background-modifier
 .mermaid.vam-mermaid-scope > :is(#vam-mermaid-xychart, svg)[aria-roledescription="xychart"] :is(text, tspan) { fill: var(--text-normal); }
 .mermaid.vam-mermaid-scope > :is(#vam-mermaid-xychart, svg)[aria-roledescription="xychart"] :is(.bottom-axis, .left-axis) path { stroke: var(--text-muted); }
 .mermaid.vam-mermaid-scope > :is(#vam-mermaid-xychart, svg)[aria-roledescription="xychart"] [class^="bar-plot"] rect { fill: color-mix(in srgb, var(--interactive-accent) 55%, var(--background-primary)); stroke: var(--interactive-accent); stroke-width: 1px; }
-.mermaid.vam-mermaid-scope > :is(#vam-mermaid-xychart, svg)[aria-roledescription="xychart"] [class^="line-plot"] path { stroke: var(--color-orange); }
+.mermaid.vam-mermaid-scope > :is(#vam-mermaid-xychart, svg)[aria-roledescription="xychart"] [class^="line-plot"] path { stroke: color-mix(in srgb, var(--color-orange) 70%, var(--text-normal)); }
+/* gitGraph: the default palette is eight hsl hues whose lines sit at 1.4:1 on the page and whose branch labels are white or black on
+   mid-lightness fills (2.1:1 in dark after Obsidian's inversion). Same approach as the timeline: filter off, each branch takes an
+   Obsidian accent (--vam-git-accent), lines and commit dots mix it toward --text-normal so they stay at 3:1 or more on both themes,
+   branch labels sit on a tint of it with --text-normal text, and commit labels sit on the secondary background. */
+.mermaid.vam-mermaid-scope > :is(#vam-mermaid-gitGraph, svg)[aria-roledescription="gitGraph"] { filter: none; }
+.mermaid.vam-mermaid-scope > :is(#vam-mermaid-gitGraph, svg)[aria-roledescription="gitGraph"] :is(.branch0, .arrow0, .label0, .commit0) { --vam-git-accent: var(--interactive-accent); }
+.mermaid.vam-mermaid-scope > :is(#vam-mermaid-gitGraph, svg)[aria-roledescription="gitGraph"] :is(.branch1, .arrow1, .label1, .commit1) { --vam-git-accent: var(--color-orange); }
+.mermaid.vam-mermaid-scope > :is(#vam-mermaid-gitGraph, svg)[aria-roledescription="gitGraph"] :is(.branch2, .arrow2, .label2, .commit2) { --vam-git-accent: var(--color-green); }
+.mermaid.vam-mermaid-scope > :is(#vam-mermaid-gitGraph, svg)[aria-roledescription="gitGraph"] :is(.branch3, .arrow3, .label3, .commit3) { --vam-git-accent: var(--color-cyan); }
+.mermaid.vam-mermaid-scope > :is(#vam-mermaid-gitGraph, svg)[aria-roledescription="gitGraph"] :is(.branch4, .arrow4, .label4, .commit4) { --vam-git-accent: var(--color-blue); }
+.mermaid.vam-mermaid-scope > :is(#vam-mermaid-gitGraph, svg)[aria-roledescription="gitGraph"] :is(.branch5, .arrow5, .label5, .commit5) { --vam-git-accent: var(--color-purple); }
+.mermaid.vam-mermaid-scope > :is(#vam-mermaid-gitGraph, svg)[aria-roledescription="gitGraph"] :is(.branch6, .arrow6, .label6, .commit6) { --vam-git-accent: var(--color-pink); }
+.mermaid.vam-mermaid-scope > :is(#vam-mermaid-gitGraph, svg)[aria-roledescription="gitGraph"] :is(.branch7, .arrow7, .label7, .commit7) { --vam-git-accent: var(--color-red); }
+.mermaid.vam-mermaid-scope > :is(#vam-mermaid-gitGraph, svg)[aria-roledescription="gitGraph"] :is(text, tspan) { fill: var(--text-normal); }
+.mermaid.vam-mermaid-scope > :is(#vam-mermaid-gitGraph, svg)[aria-roledescription="gitGraph"] .branch { stroke: var(--text-muted); }
+.mermaid.vam-mermaid-scope > :is(#vam-mermaid-gitGraph, svg)[aria-roledescription="gitGraph"] .arrow { stroke: color-mix(in srgb, var(--vam-git-accent) 62%, var(--text-normal)); }
+.mermaid.vam-mermaid-scope > :is(#vam-mermaid-gitGraph, svg)[aria-roledescription="gitGraph"] .commit { fill: color-mix(in srgb, var(--vam-git-accent) 62%, var(--text-normal)); stroke: color-mix(in srgb, var(--vam-git-accent) 62%, var(--text-normal)); }
+.mermaid.vam-mermaid-scope > :is(#vam-mermaid-gitGraph, svg)[aria-roledescription="gitGraph"] :is(.commit-merge, .commit-reverse, .commit-highlight-inner) { fill: var(--background-primary); stroke: var(--background-primary); }
+.mermaid.vam-mermaid-scope > :is(#vam-mermaid-gitGraph, svg)[aria-roledescription="gitGraph"] .branchLabelBkg { fill: color-mix(in srgb, var(--vam-git-accent) 26%, var(--background-primary)); }
+.mermaid.vam-mermaid-scope > :is(#vam-mermaid-gitGraph, svg)[aria-roledescription="gitGraph"] .commit-label-bkg { fill: var(--background-secondary); opacity: 0.85; }
+.mermaid.vam-mermaid-scope > :is(#vam-mermaid-gitGraph, svg)[aria-roledescription="gitGraph"] .tag-label-bkg { fill: var(--background-secondary); stroke: var(--text-muted); }
+.mermaid.vam-mermaid-scope > :is(#vam-mermaid-gitGraph, svg)[aria-roledescription="gitGraph"] .tag-hole { fill: var(--text-muted); }
 .vam-selection-bar button[aria-disabled="true"] { opacity: 0.5; cursor: not-allowed; }
 
 /* Links in the body of VAM notes: Obsidian's default link color is 4.09:1 in the light theme, an unresolved link is 2.53:1

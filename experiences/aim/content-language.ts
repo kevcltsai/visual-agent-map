@@ -237,6 +237,23 @@ export function outputLanguageForMap(
 }
 
 /**
+ * The text sources the map chat reads the output language from (0.28 ticket 07, decision
+ * 2026-10-30-map-chat-instruction-language#1). The instruction is the first paragraph: the text before the first blank
+ * line (a line with only whitespace; `\n` and `\r\n` both count), when more text follows it. Returns
+ * `[instruction, whole message]`, so {@link chooseAimContentLanguage} takes the first source with letters: what the user
+ * typed decides, and a long paste after it is only read when the instruction has no letters (symbols, digits, emoji).
+ * A message with no blank line, or with nothing after it, is all the user's own words: `[whole message]`.
+ */
+export function mapChatLanguageSources(message: string): string[] {
+  const boundary = /(?:\r?\n)[ \t]*(?:\r?\n)/.exec(message);
+  if (!boundary) return [message];
+  const instruction = message.slice(0, boundary.index);
+  const rest = message.slice(boundary.index + boundary[0].length);
+  if (!/\S/.test(rest)) return [message];
+  return [instruction, message];
+}
+
+/**
  * The language a map's AI output and map-level text follow, as a `ContentLanguage`: the single function other code
  * (default names, labels) calls to learn what the map is written in. Same rule as {@link resolveAimContentLanguage}.
  */

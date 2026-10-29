@@ -15449,6 +15449,14 @@ function outputLanguageForMap(map, uiLanguage, ...sources2) {
   var _a2;
   return (_a2 = rememberedOutputLanguage(map)) != null ? _a2 : chooseAimContentLanguage(uiLanguage, ...sources2);
 }
+function mapChatLanguageSources(message) {
+  const boundary = /(?:\r?\n)[ \t]*(?:\r?\n)/.exec(message);
+  if (!boundary) return [message];
+  const instruction = message.slice(0, boundary.index);
+  const rest = message.slice(boundary.index + boundary[0].length);
+  if (!/\S/.test(rest)) return [message];
+  return [instruction, message];
+}
 var resolveMapOutputLanguage = resolveAimContentLanguage;
 function resolveAimNoteLanguage(map, uiLanguage) {
   return noteLanguageOf(resolveAimContentLanguage(map, uiLanguage));
@@ -45430,7 +45438,7 @@ ${note.detail.trim()}` : "",
       message,
       context,
       language: settings.language,
-      contentLanguage: outputLanguageForMap(map, settings.language, message),
+      contentLanguage: outputLanguageForMap(map, settings.language, ...mapChatLanguageSources(message)),
       style: redo ? "detailed" : normalizeMapChatStyle(settings.mapChatStyle),
       ...redo ? { redo: true } : {},
       model: ((_a2 = settings.mapChatModel) == null ? void 0 : _a2.trim()) || settings.cliModel,

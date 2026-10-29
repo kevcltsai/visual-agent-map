@@ -399,6 +399,8 @@ interface MergeTask {
 const TASK_PROGRESS_PREFIX = "vam-task:";
 /** How long the "merged, can undo" Notice stays, so its Undo button can be used. */
 const MERGE_DONE_NOTICE_MS = 15000;
+/** Owner 2026-10-28: the AI structure review stays in the code but the Next Step dialog no longer offers it; flip to show it again. */
+const STRUCTURE_REVIEW_ENTRY_SHOWN = false;
 /**
  * Writes an AI synthesis result into the parent topic. `save` re-checks the map, sources and parent note and throws
  * (writing nothing) when anything changed; the caller decides whether the run may still write before calling it.
@@ -1605,6 +1607,10 @@ export class VisualAgentMapView extends ItemView {
     if (this.map.nodes.some(item => item.parentId === node.id))
       return { label: t("ui.structure_review_entry_branch"), open: () => this.openStructureReview(node.id) };
     return undefined;
+  }
+  /** What the Next Step dialog offers; nothing while the entry is hidden (`STRUCTURE_REVIEW_ENTRY_SHOWN`). */
+  private nextStepStructureReview(node: MapNode): { label: string; open: () => void } | undefined {
+    return STRUCTURE_REVIEW_ENTRY_SHOWN ? this.structureReviewEntry(node) : undefined;
   }
   /** The AI sees each card's title, summary and status only; never a note body. */
   private describeForReview(id: string): { title: string; summary: string; status: string } | undefined {
@@ -7415,7 +7421,7 @@ export class VisualAgentMapView extends ItemView {
               }
             };
           })(),
-          structureReview: this.structureReviewEntry(node),
+          structureReview: this.nextStepStructureReview(node),
           sources,
           templates: this.templateChoices(),
           tones: this.toneChoices(),

@@ -551,6 +551,32 @@ test('B1 prompt: it tells the model to say what it will do (not what it did), ex
   assert.match(mapChatStep.render(request({ style: 'concise' })), /never claim it is already done/);
   assert.match(mapChatStep.render(request({ language: 'zh-TW', style: 'concise' })), /不可說已經完成/);
 });
+test('ticket 09 prompt: every add_child asks for a one-sentence summary, subtopics too, in both languages', () => {
+  for (const [language, absent, present] of [
+    ['en', [/optional one-sentence summary/], [/fill it for every card you add/, /give every card you will build a ref and a summary, the subtopics as well/]],
+    ['zh-TW', [/選填，一句摘要/, /卡/], [/每個新增的議題都要填/, /每個要建的議題都給 ref 與 summary，子議題也一樣/, /使用者明確要求不要摘要時才留空字串/]],
+    ['zh-CN', [/選填，一句摘要/, /卡/], [/每個新增的議題都要填/, /每個要建的議題都給 ref 與 summary，子議題也一樣/, /使用者明確要求不要摘要時才留空字串/]]
+  ]) {
+    const line = mapChatStep.render(request({ language })).split('\n').find(l => l.startsWith('- add_child'));
+    assert.ok(line, `${language}: the add_child line exists`);
+    for (const pattern of absent) assert.doesNotMatch(line, pattern, `${language} ${pattern}`);
+    for (const pattern of present) assert.match(line, pattern, `${language} ${pattern}`);
+  }
+});
+test('ticket 09 parser: a tree whose subtopics miss their summary keeps every topic', () => {
+  const noKey = item('add_child', { parentId: 'new:n1', title: '濾杯', ref: 'n3' }); delete noKey.summary;
+  const result = parse(reply(
+    item('add_child', { parentId: '', title: '咖啡沖煮', summary: '從器材到沖煮法的入門樹', ref: 'n0' }),
+    item('add_child', { parentId: 'new:n0', title: '器材', summary: '  需要準備的工具  ', ref: 'n1' }),
+    item('add_child', { parentId: 'new:n1', title: '磨豆機', summary: '', ref: 'n2' }),
+    noKey,
+    item('add_child', { parentId: 'new:n0', title: '變因', summary: null, ref: 'n4' }),
+    item('add_child', { parentId: 'new:n4', title: '水溫', summary: '   ', ref: 'n5' })
+  ));
+  assert.deepEqual(result.rejected, []);
+  assert.equal(result.actions.length, 6);
+  assert.deepEqual(result.actions.map(action => action.summary), ['從器材到沖煮法的入門樹', '需要準備的工具', '', '', '', '']);
+});
 
 // ---- plan conditions ----
 const plan = (actions, extra = {}, options) => planFor(actions, { parents: { a: 'r', a1: 'a', b: 'r', r: null }, selectedCount: 0, ...extra }, options);

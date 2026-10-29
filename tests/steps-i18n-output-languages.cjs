@@ -490,3 +490,56 @@ test('the Chinese follow-the-input clause keeps the user\'s own 「」 from clos
   const text = i18n.languagePromptName('same-as-input', 'zh', 'plain', { kind: 'topic', text: '他說「好」' });
   assert.ok(text.includes('「他說『好』」'), text);
 });
+
+// 0.28 ticket 06: the kana rule also needs a kana share, and links and code are not the user's own words.
+const T06_HEAD = "幫我依照以下chaptgpt 的回應產生一個心智圖:\n\n# 一、先講結論：v0.2 最大的問題，不是缺少原則，而是缺少取捨的判斷系統\n";
+const T06_JA_LINK = "[『push me pull you』澄 敬一 作品集 : くうろときろ                   essentials    ｜   古   ｜  周辺  ｜   栃木  ｜   茂呂　MORO  ｜ 古道具 ｜古物｜骨董｜プロダクト｜書籍｜アート](https://images.openai.com/static-rsc-4/eQcwB79?purpose=inline)\n";
+const T06_RU_LINK = "[Morning Reading Nook with Oak Chair & Travertine Table в 2025 г | Уголок для чтения, Уютный уголок, Нордический стиль](https://images.openai.com/static-rsc-4/SX3B?purpose=inline)\n";
+const T06_BODY = "你目前的文件是一份有明確價值觀的「產品哲學」，但還不是一套成熟的「個人品味系統」。\n".repeat(120);
+
+test('ticket 06: Chinese text with a little Japanese (link titles, quoted words, ー dashes) is not Japanese', () => {
+  for (const ui of ['zh-TW', 'en']) {
+    assert.equal(chooseAimContentLanguage(ui, T06_HEAD + T06_BODY + T06_RU_LINK), 'zh-TW', '原文去掉日文連結');
+    assert.equal(chooseAimContentLanguage(ui, T06_HEAD + T06_BODY + T06_JA_LINK + T06_RU_LINK), 'zh-TW', '原文含日文連結');
+    assert.equal(chooseAimContentLanguage(ui, '幫我依照以下回應產生心智圖：\n品味系統的五個盲點。\n[作品集 : くうろときろ](https://example.com/a.png)'), 'zh-TW', '最小重現');
+    assert.equal(chooseAimContentLanguage(ui, '品味系統需要審美判斷。アート'), 'zh-TW', '最小重現(只有アート)');
+    assert.equal(chooseAimContentLanguage(ui, '品味系統 ー 從價值清單到判斷規則ー三層結構'), 'zh-TW');
+    assert.equal(chooseAimContentLanguage(ui, '這個介面設計參考侘寂（わびさび）與留白的美學'), 'zh-TW');
+    assert.equal(chooseAimContentLanguage(ui, '台灣の旅：VAM 的品味系統'), 'zh-TW');
+    assert.equal(chooseAimContentLanguage(ui, '形・色・節奏・質感・動態'), 'zh-TW');
+  }
+  const long = '這是一段關於產品設計與個人判斷系統的長文，內容反覆討論取捨與原則。'.repeat(100) + 'シンプル';
+  assert.ok(long.length > 2000);
+  assert.equal(chooseAimContentLanguage('zh-TW', long), 'zh-TW', 'long Chinese ending with one katakana word');
+  assert.equal(detectAimContentLanguage('品味系統需要審美判斷。アート'), 'zh-TW');
+});
+
+test('ticket 06: real Japanese stays Japanese, also with many Han characters or a long paragraph', () => {
+  const samples = [
+    '日本銀行が金融政策を変更した', '東京ラーメンの旅', '今日は天気がいいので公園に行きます', '政府は新しい経済対策を発表した',
+    '私は毎朝コーヒーを飲みます', 'この映画はとても面白かったです', '来週の会議の資料を準備してください', '京都の紅葉を見に行きたい',
+    '新幹線で大阪まで行く', '日本語です Plan', '東京ラメン A B', 'ラメン'
+  ];
+  for (const text of samples) {
+    assert.equal(detectAimContentLanguage(text), 'ja', text);
+    assert.equal(chooseAimContentLanguage('zh-TW', text), 'ja', text);
+  }
+  const paragraph = '日本の経済は長い間、低成長とデフレに悩まされてきました。しかし最近では、賃金の上昇や企業の投資拡大により、少しずつ明るい兆しが見え始めています。専門家は、今後の金融政策の動向が景気の回復に大きな影響を与えると指摘しています。一方で、物価の上昇が家計に与える負担も無視できません。政府は支援策を検討しており、国民の生活を守るための対応が求められています。さらに、地方の中小企業では人手不足が深刻になっており、働き方の見直しや新しい技術の導入が急がれています。';
+  assert.ok(paragraph.length >= 200);
+  assert.equal(chooseAimContentLanguage('zh-TW', paragraph), 'ja');
+});
+
+test('ticket 06: links, images, URLs and code are not counted; a lone Japanese link still is', () => {
+  assert.equal(chooseAimContentLanguage('zh-TW', '品味系統的五個盲點。`こんにちはさようなら` 是範例'), 'zh-TW', 'inline code');
+  assert.equal(chooseAimContentLanguage('zh-TW', '品味系統的五個盲點。\n```\nこんにちは さようなら ラーメン\n```\n以上是範例'), 'zh-TW', 'fenced code');
+  assert.equal(chooseAimContentLanguage('zh-TW', '品味系統的五個盲點。\n~~~\nこんにちは さようなら ラーメン\n~~~\n以上是範例'), 'zh-TW', 'tilde fence');
+  assert.equal(chooseAimContentLanguage('zh-TW', '品味系統的五個盲點。![ラーメンの写真](https://x.jp/a.png)'), 'zh-TW', 'image');
+  assert.equal(chooseAimContentLanguage('zh-TW', '品味系統的五個盲點。https://x.jp/こんにちはさようなら'), 'zh-TW', 'bare URL');
+  assert.equal(chooseAimContentLanguage('zh-TW', '[東京ラーメンガイド](https://x.jp)'), 'ja', 'only a Japanese link: no letters left, the original text decides');
+  assert.equal(detectAimContentLanguage('[東京ラーメンガイド](https://x.jp)'), 'ja');
+  // An unclosed fence does not swallow the rest of the text.
+  assert.equal(chooseAimContentLanguage('zh-TW', '品味系統的五個盲點。\n```\nconst a = 1;\n這是後面的中文內容，很長很長很長'), 'zh-TW', 'unclosed fence, Chinese after it');
+  assert.equal(chooseAimContentLanguage('zh-TW', '```\nconst a = 1;\n東京ラーメンの旅に行きます。日本語を勉強しています'), 'ja', 'unclosed fence, Japanese after it');
+  // Wiki links keep their text.
+  assert.equal(chooseAimContentLanguage('zh-TW', '[[東京ラーメンガイド]]'), 'ja');
+});

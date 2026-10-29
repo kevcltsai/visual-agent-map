@@ -3281,7 +3281,7 @@ integrationTest('B3 find_images: the chat only picks the card and the words; the
   const gate = deferred(); h.control.search = async () => { await gate.promise; return imageItems(8); };
   const file = noteFile(h, 'a'); const before = h.contents.get(file); const note = await h.note('a');
   const lines = await apply(h, [findAct(h, 'a')]);
-  eq(lines.map(l => l.status), ['done']); assert.equal(lines[0].text, 'Done: Start looking for pictures for “Body”');
+  eq(lines.map(l => l.status), ['done']); assert.equal(lines[0].text, 'Started looking for pictures for “Body”', 'a start is not a "Done"'); assert.doesNotMatch(lines[0].text, /Done/);
   assert.equal(h.control.searches.length, 1); assert.equal(h.control.searches[0].query, 'espresso', 'the search words are the direction');
   assert.equal(h.control.searches[0].model, note.model, 'the card\'s model, not the chat model'); assert.equal(h.control.models.at(-1), note.model, 'asked its usage notice first');
   assert.equal(h.control.calls.filter(c => c === 'chat').length, 0, 'the chat itself made no request of its own here');
@@ -3475,18 +3475,118 @@ integrationTest('B3 find_images: the reader hears the candidates once, not while
   gate.resolve(); await withTimeout(until(() => lastImages(h).state === 'ready'));
   assert.equal(chat.liveEl.text, '', 'the turn is still streaming: held back');
   chat.finish('Reply done', []);
-  assert.match(chat.liveEl.text, /AI replied: Reply done/); assert.match(chat.liveEl.text, /Found 2 pictures\. Pick one to insert into “Body”\./);
-  assert.equal(chat.liveEl.text.match(/Found 2 pictures/g).length, 1);
-  chat.begin('next'); chat.finish('ok', []); assert.doesNotMatch(chat.liveEl.text, /Found 2 pictures/, 'said once');
+  assert.match(chat.liveEl.text, /AI replied: Reply done/); assert.match(chat.liveEl.text, /Found 2 usable pictures\. Pick one to insert into “Body”\./);
+  assert.equal(chat.liveEl.text.match(/Found 2 usable pictures/g).length, 1);
+  chat.begin('next'); chat.finish('ok', []); assert.doesNotMatch(chat.liveEl.text, /Found 2 usable pictures/, 'said once');
   await readyImages(h, 2, 'b'); // a later search that ends while nothing streams is announced at once
 });
 integrationTest('B3 find_images: a thumbnail that cannot be loaded is marked in words and cannot be picked', async () => {
   const { h } = await imageHarness(); const block = await readyImages(h, 2);
   const thumb = findAll(h.view.chat.logEl, i => i.tag === 'img')[0]; thumb.fire('error');
   assert.equal(block.items[0].broken, true); const buttons2 = pickButtons(h);
-  assert.equal(buttons2[0].attrs['aria-disabled'], 'true'); assert.match(visibleText(buttons2[0]), /Cannot load/);
-  const file = noteFile(h, 'a'); const before = h.contents.get(file); buttons2[0].click(); await tick();
+  assert.equal(buttons2[1].attrs['aria-disabled'], 'true', 'the broken one moved behind the one that loads'); assert.match(visibleText(buttons2[1]), /Cannot load/);
+  assert.equal(buttons2[0].attrs['aria-disabled'], 'false');
+  const file = noteFile(h, 'a'); const before = h.contents.get(file); buttons2[1].click(); await tick();
   assert.equal(h.contents.get(file), before);
+});
+// ---- B3-polish P1-1: inserted and cannot-load look different ----
+const sixWithOneBroken = async h => {
+  const block = await readyImages(h, 6);
+  findAll(h.view.chat.logEl, i => i.tag === 'img')[1].fire('error'); // Pic 1 does not load
+  return block;
+};
+integrationTest('B3-polish P1-1: six candidates with one that cannot load say "5 usable", and the broken one is last, dashed and without a picture', async () => {
+  const { h } = await imageHarness(); const block = await sixWithOneBroken(h);
+  assert.match(visibleText(h.view.chat.logEl), /Found 5 usable pictures\. Pick one to insert into “Body”\./); assert.doesNotMatch(visibleText(h.view.chat.logEl), /Found 6/);
+  const picks = pickButtons(h); assert.equal(picks.length, 6);
+  eq(picks.map(p => hasClass(p, 'is-broken')), [false, false, false, false, false, true]);
+  assert.equal(findAll(picks[5], i => i.tag === 'img').length, 0, 'a broken candidate has no picture element');
+  assert.equal(findAll(picks[5], i => hasClass(i, 'vam-map-chat-images-missing')).length, 1, 'a dashed placeholder instead');
+  assert.match(visibleText(picks[5]), /Cannot load/); assert.match(picks[5].attrs['aria-label'], /Insert: Pic 1 into Body/);
+  eq(picks.slice(0, 5).map(p => findAll(p, i => i.tag === 'img').length), [1, 1, 1, 1, 1]);
+  assert.equal(picks.filter(p => hasClass(p, 'is-inserted')).length, 0, 'cannot-load is not "inserted"');
+});
+integrationTest('B3-polish P1-1: a thumbnail that fails later rebuilds the row, and the keyboard stays on the same candidate button or source link', async () => {
+  const { h } = await imageHarness(); const block = await readyImages(h, 3);
+  const sources = () => findAll(h.view.chat.logEl, i => hasClass(i, 'vam-map-chat-images-source'));
+  pickButtons(h)[0].focus(); findAll(h.view.chat.logEl, i => i.tag === 'img')[1].fire('error');
+  assert.ok(block.items[1].broken); assert.ok(h.page.doc.activeElement === pickButtons(h)[0], 'the first candidate keeps the keyboard');
+  sources()[1].focus(); const label = sources()[1].attrs['aria-label']; findAll(h.view.chat.logEl, i => i.tag === 'img')[0].fire('error');
+  assert.ok(block.items[0].broken); assert.ok(h.page.doc.activeElement?.attrs?.['aria-label'] === label, 'the same source link keeps the keyboard');
+  assert.ok(sources().includes(h.page.doc.activeElement), 'and it is the link in the new row');
+});
+integrationTest('B3-polish P1-1: all candidates broken reads as none; a probe that already dropped a candidate counts only the rest', async () => {
+  const { h } = await imageHarness(); await readyImages(h, 2);
+  for (const img of findAll(h.view.chat.logEl, i => i.tag === 'img')) img.fire('error');
+  assert.match(visibleText(h.view.chat.logEl), /No loadable picture was found\. Nothing was inserted\./);
+  assert.doesNotMatch(visibleText(h.view.chat.logEl), /Found 0/);
+});
+integrationTest('B3-polish P1-1: an inserted candidate keeps its picture and is told apart from cannot-load by a tick, the accent word and an outline; it still cannot be inserted twice', async () => {
+  const { h } = await imageHarness(); const block = await readyImages(h, 3);
+  findAll(h.view.chat.logEl, i => i.tag === 'img')[2].fire('error');
+  pickButtons(h)[0].click(); await withTimeout(until(() => block.items[0].inserted));
+  const [inserted, plain, broken] = pickButtons(h);
+  assert.ok(hasClass(inserted, 'is-inserted')); assert.ok(!hasClass(inserted, 'is-broken')); assert.ok(!hasClass(plain, 'is-inserted') && !hasClass(plain, 'is-broken'));
+  assert.ok(hasClass(broken, 'is-broken') && !hasClass(broken, 'is-inserted'));
+  assert.equal(findAll(inserted, i => i.tag === 'img').length, 1, 'the inserted one keeps its picture');
+  const mark = findAll(inserted, i => hasClass(i, 'vam-map-chat-images-state-icon'))[0]; assert.equal(mark.children[0]?.iconName ?? mark.iconName, 'check');
+  assert.ok(findAll(inserted, i => hasClass(i, 'is-inserted') && hasClass(i, 'vam-map-chat-images-state')).length === 1); assert.match(visibleText(inserted), /Inserted into “Body”/);
+  assert.equal(inserted.attrs['aria-disabled'], 'true'); const file = noteFile(h, 'a'); const before = h.contents.get(file);
+  inserted.click(); await tick(); assert.equal(h.contents.get(file), before, 'no second insertion');
+  assert.doesNotMatch(visibleText(inserted), /Cannot load/); assert.doesNotMatch(visibleText(plain), /Inserted/);
+  // Obsidian dims every button[aria-disabled="true"] to opacity .7; the inserted one is not dimmed, so its picture keeps its colours.
+  const rule = fs.readFileSync(path.join(root, 'styles.css'), 'utf8').split('\n').find(line => line.startsWith('.vam-map-chat .vam-map-chat-images-pick.is-inserted {')) ?? '';
+  assert.match(rule, /opacity: 1;/);
+});
+// ---- B3-polish P1-2: the result line follows the candidate block ----
+const resultTexts = h => findAll(h.view.chat.logEl, i => hasClass(i, 'vam-map-chat-line')).map(i => i.text);
+integrationTest('B3-polish P1-2: the result line starts as "Started" and ends as the block ends (ready / empty / failed / stopped), never "Done" for a failure, on screen and in the saved turn', async () => {
+  const cases = [
+    ['ready', async h => { h.control.search = async () => imageItems(3); }, /^Done: found 3 pictures for “Body”$/, 'done'],
+    ['empty', async h => { h.control.probe = async () => []; }, /^No loadable picture was found for “Body”$/, 'skipped'],
+    ['failed', async h => { h.control.search = async () => { throw new Error('quota used up'); }; }, /^Failed: picture search for “Body” \(quota used up\)$/, 'failed']
+  ];
+  for (const [state, arrange, expected, status] of cases) {
+    const { h, chat } = await imageHarness(); await arrange(h);
+    const lines = await apply(h, [findAct(h, 'a')]);
+    chat.finish('Looking.', lines); // the turn may end before or after the search does
+    await withTimeout(until(() => lastImages(h)?.state === state));
+    const shown = resultTexts(h); eq(shown.length, 1);
+    assert.match(shown[0], expected, state); assert.doesNotMatch(shown[0], /^Done: Start/);
+    if (state !== 'ready') assert.doesNotMatch(shown[0], /Done/, `${state}: the line does not say Done`);
+    assert.equal(chat.completedTurns()[0].answer.lines.length, 1);
+    assert.match(chat.transcript().at(-1).lines[0].text, expected, 'the saved turn carries the final line'); assert.equal(chat.transcript().at(-1).lines[0].status, status);
+    assert.equal(findAll(h.view.chat.logEl, i => hasClass(i, 'vam-map-chat-line'))[0].cls.includes(`is-${status}`), true);
+  }
+  // A search that ends before the reply has finished: finish() must not bring the old "Started" text back.
+  const { h, chat } = await imageHarness(); h.control.search = async () => { throw new Error('boom'); };
+  const lines = await apply(h, [findAct(h, 'a')]); await withTimeout(until(() => lastImages(h)?.state === 'failed'));
+  chat.finish('Looking.', lines); eq(resultTexts(h), ['Failed: picture search for “Body” (boom)']);
+});
+integrationTest('B3-polish P1-2: stopping the search rewrites the line to "Stopped"; the saved turn carries it', async () => {
+  const { h, chat } = await imageHarness(); const gate = deferred(); h.control.search = async () => { await gate.promise; return imageItems(2); };
+  const lines = await apply(h, [findAct(h, 'a')]); chat.finish('Looking.', lines);
+  eq(resultTexts(h), ['Started looking for pictures for “Body”']);
+  find(h.view.chat.logEl, i => hasClass(i, 'vam-map-chat-images-stop')).click();
+  eq(resultTexts(h), ['Stopped: picture search for “Body”']); assert.equal(chat.transcript().at(-1).lines[0].status, 'skipped'); gate.resolve(); await tick();
+});
+integrationTest('B3-polish P1-2: writing the line back moves no focus and the reader hears the search result once', async () => {
+  const { h, chat } = await imageHarness(); const input = chat.inputEl; const gate = deferred();
+  h.control.search = async () => { await gate.promise; return imageItems(2); };
+  const lines = await apply(h, [findAct(h, 'a')]); chat.finish('Looking.', lines);
+  input.focus(); input.fire('compositionstart'); input.value = 'ni hao';
+  gate.resolve(); await withTimeout(until(() => lastImages(h).state === 'ready'));
+  eq(resultTexts(h), ['Done: found 2 pictures for “Body”']);
+  assert.equal(h.page.doc.activeElement, input); assert.equal(chat.isComposing, true); assert.equal(input.value, 'ni hao');
+  assert.equal(chat.liveEl.text.match(/Found 2 usable pictures/g).length, 1); assert.doesNotMatch(chat.liveEl.text, /Done: found/);
+});
+integrationTest('B3-polish P1-2: save as a note writes the final line, not "Done" for a failed search', async () => {
+  const { h, chat } = await imageHarness(); h.control.search = async () => { throw new Error('quota used up'); };
+  const lines = await apply(h, [findAct(h, 'a')]); await withTimeout(until(() => lastImages(h)?.state === 'failed'));
+  chat.finish('Looking.', lines);
+  saveButton(h).click(); await withTimeout(until(() => savedPaths(h).length === 1));
+  const text = h.contents.get(savedPaths(h)[0]);
+  assert.match(text, /Failed\\?: picture search for “Body” \\?\(quota used up\\?\)/); assert.doesNotMatch(text, /Done|Started looking/);
 });
 integrationTest('B3 find_images: the keyboard stays where it was when candidates arrive, and an insertion hands it back to the same button', async () => {
   const { h } = await imageHarness(); const input = h.view.chat.inputEl; input.focus(); input.fire('compositionstart'); input.value = 'ni hao';

@@ -145,7 +145,8 @@ import {
   type MapChatLine,
   type MapChatOrigin,
   type MapChatPlanCard,
-  type MapChatSavedTurn
+  type MapChatSavedTurn,
+  settledLine
 } from "./map-chat";
 import { imageMarkdown, type ImageCandidate } from "../../core/image-candidates";
 import {
@@ -483,7 +484,8 @@ function researchWebLines(web: ResearchWebTally): MapChatLine[] {
   return lines;
 }
 /** What one chat action came to: written, skipped with a reason (shown in the chat), or failed. */
-type ChatOutcome = { status: "done" } | { status: "skipped" | "failed"; reason: string; created?: boolean };
+type ChatOutcome =
+  { status: "done"; images?: MapChatImages } | { status: "skipped" | "failed"; reason: string; created?: boolean };
 /** What the writes of one reply have made so far: the real id behind each `ref`, and the cards created, in order. */
 interface ChatRun {
   refs: Map<string, string>;
@@ -10694,6 +10696,13 @@ export class VisualAgentMapView extends ItemView {
     }
   }
   private chatLine(label: string, outcome: ChatOutcome): MapChatLine {
+    // A picture search that has only started says so; its line follows the candidate block from then on (settledLine).
+    if (outcome.status === "done" && outcome.images)
+      return {
+        status: "done",
+        text: t("ui.map_chat_line_images_started_0", outcome.images.nodeTitle),
+        images: outcome.images
+      };
     if (outcome.status === "done") return { status: "done", text: t("ui.map_chat_line_done_0", label) };
     return {
       status: outcome.status,
@@ -11423,7 +11432,7 @@ export class VisualAgentMapView extends ItemView {
             }
           };
           chat.addImages(block);
-          settle({ status: "done" });
+          settle({ status: "done", images: block });
           try {
             await this.runImageSearch(block, controller, chat, note.model);
           } finally {
@@ -11535,7 +11544,7 @@ export class VisualAgentMapView extends ItemView {
       question: question.text,
       refs,
       answer: answer.text,
-      lines: answer.lines.map(line => line.text),
+      lines: answer.lines.map(line => settledLine(line).text),
       ...(answer.plan ? { plan: answer.plan.state } : {}),
       images: (answer.images ?? []).map(block => ({
         nodeTitle: block.nodeTitle,

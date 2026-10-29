@@ -1272,7 +1272,7 @@ button.vam-template-section-header:hover { background: var(--background-modifier
 .mermaid.vam-mermaid-scope > :is(#vam-mermaid-gitGraph, svg)[aria-roledescription="gitGraph"] .arrow { stroke: color-mix(in srgb, var(--vam-git-accent) 62%, var(--text-normal)); }
 .mermaid.vam-mermaid-scope > :is(#vam-mermaid-gitGraph, svg)[aria-roledescription="gitGraph"] .commit { fill: color-mix(in srgb, var(--vam-git-accent, var(--text-muted)) 62%, var(--text-normal)); stroke: color-mix(in srgb, var(--vam-git-accent, var(--text-muted)) 62%, var(--text-normal)); }
 .mermaid.vam-mermaid-scope > :is(#vam-mermaid-gitGraph, svg)[aria-roledescription="gitGraph"] :is(.commit-merge, .commit-reverse, .commit-highlight-inner) { fill: var(--background-primary); stroke: var(--background-primary); }
-.mermaid.vam-mermaid-scope > :is(#vam-mermaid-gitGraph, svg)[aria-roledescription="gitGraph"] .commit-cherry-pick { fill: var(--background-primary); stroke: var(--background-primary); }
+.mermaid.vam-mermaid-scope > :is(#vam-mermaid-gitGraph, svg)[aria-roledescription="gitGraph"] .commit-cherry-pick:is([fill], [stroke]) { fill: var(--background-primary); stroke: var(--background-primary); }
 .mermaid.vam-mermaid-scope > :is(#vam-mermaid-gitGraph, svg)[aria-roledescription="gitGraph"] .branchLabelBkg { fill: color-mix(in srgb, var(--vam-git-accent) 26%, var(--background-primary)); }
 .mermaid.vam-mermaid-scope > :is(#vam-mermaid-gitGraph, svg)[aria-roledescription="gitGraph"] .commit-label-bkg { fill: var(--background-secondary); opacity: 0.85; }
 .mermaid.vam-mermaid-scope > :is(#vam-mermaid-gitGraph, svg)[aria-roledescription="gitGraph"] .tag-label-bkg { fill: var(--background-secondary); stroke: var(--text-muted); }

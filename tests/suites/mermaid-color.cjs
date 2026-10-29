@@ -101,7 +101,7 @@ const PROBE = `(() => {
   };
   // hollow marks (cherry, merge centre, reverse cross, highlight centre) against the commit mark beneath them
   const glyphs = (name, selector, kind) => {
-    const d = info(name), base = 'circle.commit:not(.commit-merge):not(.commit-cherry-pick), rect.commit-highlight-outer';
+    const d = info(name), base = 'circle.commit:not(.commit-merge):not([fill]), rect.commit-highlight-outer';
     return [...d.svg.querySelectorAll(selector)].map(el => {
       const scs = getComputedStyle(el), c = parse(kind === 'fill' ? scs.fill : scs.stroke), r = el.getBoundingClientRect();
       const layers = under(d, r.x + r.width / 2, r.y + r.height / 2, s => s === el || !s.matches(base));
@@ -188,9 +188,9 @@ test('mermaid colour: gitGraph, mindmap, gantt and xychart in VAM notes reach WC
         const call = (fn, ...args) => evaluate(`window.probe.${fn}(${args.map(a => JSON.stringify(a)).join(', ')})`);
         const result = { texts: {}, strokes: {} };
         for (const name of DIAGRAMS) { result.texts[name] = await call('texts', name); result.strokes[name] = await call('strokes', name); }
-        result.commitDots = await call('marks', 'gitGraph', 'circle.commit:not(.commit-merge):not(.commit-cherry-pick)', 'fill');
+        result.commitDots = await call('marks', 'gitGraph', 'circle.commit:not(.commit-merge):not([fill])', 'fill');
         result.highlightOuter = [...await call('marks', 'gitGraph', 'rect.commit-highlight-outer', 'fill'), ...await call('marks', 'gitGraph', 'rect.commit-highlight-outer', 'stroke')];
-        result.hollow = [...await call('glyphs', 'gitGraph', 'circle.commit-cherry-pick, circle.commit-merge, rect.commit-highlight-inner', 'fill'), ...await call('glyphs', 'gitGraph', 'line.commit-cherry-pick, path.commit-reverse', 'stroke')];
+        result.hollow = [...await call('glyphs', 'gitGraph', 'circle.commit-cherry-pick[fill], circle.commit-merge, rect.commit-highlight-inner', 'fill'), ...await call('glyphs', 'gitGraph', 'line.commit-cherry-pick, path.commit-reverse', 'stroke')];
         result.ganttBorders = await call('marks', 'gantt', 'rect.task', 'stroke');
         result.ganttFills = await call('computed', 'gantt', 'rect.task', 'fill');
         result.mindmapEdges = await call('computed', 'mindmap', 'path.edge', 'stroke');

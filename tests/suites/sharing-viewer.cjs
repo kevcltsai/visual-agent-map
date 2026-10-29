@@ -350,7 +350,7 @@ test('sharing viewer language: a translated file carries the interface text of e
 /** Runs headless Chrome over CDP with the colour scheme pinned to light, so the DOM does not depend on the OS appearance. */
 async function dumpDomLight(chrome, directory, url, timeoutMs = 60000, drive = undefined) {
   const profile = path.join(directory, 'profile');
-  const child = spawn(chrome, ['--headless=new', '--disable-gpu', '--no-sandbox', '--remote-debugging-port=0', `--user-data-dir=${profile}`, '--window-size=1280,800', 'about:blank'], { stdio: 'ignore', detached: true }); // own process group, so cleanup can end Chrome's helper processes too
+  const child = spawn(chrome, ['--headless=new', '--disable-gpu', '--no-sandbox', '--use-mock-keychain', '--password-store=basic', '--remote-debugging-port=0', `--user-data-dir=${profile}`, '--window-size=1280,800', 'about:blank'], { stdio: 'ignore', detached: true }); // own process group, so cleanup can end Chrome's helper processes too
   let timer;
   let stopped = false;
   let exitInfo = null;

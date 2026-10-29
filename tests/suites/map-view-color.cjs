@@ -169,7 +169,7 @@ function findChrome() {
 /** Starts headless Chrome over CDP, runs `drive(send)` against `url`, and always ends the whole process group. */
 async function withChrome(chrome, directory, url, drive, timeoutMs = 90000) {
   const profile = path.join(directory, 'profile');
-  const child = spawn(chrome, ['--headless=new', '--disable-gpu', '--no-sandbox', '--remote-debugging-port=0', `--user-data-dir=${profile}`, '--window-size=1280,900', 'about:blank'], { stdio: 'ignore', detached: true });
+  const child = spawn(chrome, ['--headless=new', '--disable-gpu', '--no-sandbox', '--use-mock-keychain', '--password-store=basic', '--remote-debugging-port=0', `--user-data-dir=${profile}`, '--window-size=1280,900', 'about:blank'], { stdio: 'ignore', detached: true });
   let timer; let stopped = false; let exitInfo = null;
   child.once('exit', (code, signal) => { exitInfo = { code, signal }; });
   const deadline = new Promise((_, reject) => { timer = setTimeout(() => reject(new Error(`Chrome run timed out after ${timeoutMs} ms`)), timeoutMs); });

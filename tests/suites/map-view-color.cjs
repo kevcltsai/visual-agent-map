@@ -46,7 +46,13 @@ body { margin: 0; width: 1200px; height: 800px; background: var(--background-pri
   <div class="vam-canvas-overlay"><div class="vam-map-tools"><button class="is-active">Done selecting</button><button class="vam-relevance-goal">Prioritise by goal</button></div></div>
 </div>
 </div>
-<div class="modal vam-next-modal" style="background:var(--background-primary);width:400px"><div class="modal-content"><div class="vam-next-actions"><button class="vam-discard">Remove from map</button></div><div class="vam-share-note vam-share-warning">3 images could not be read</div></div></div>
+<div class="modal vam-next-modal" style="background:var(--background-primary);width:400px"><div class="modal-content"><div class="vam-next-actions"><button class="vam-discard">Remove from map</button></div><div class="vam-share-note vam-share-warning">3 images could not be read</div><div class="vam-share-note vam-share-error">Share failed</div><div class="vam-share-error">Save failed</div>
+<div class="vam-proposal is-stale"><span class="vam-proposal-kind vam-proposal-kind-remove">Remove</span><p class="vam-structure-note">Out of date</p></div>
+<div class="vam-outline-error">Outline error</div><button class="vam-outline-link">Pick a file</button><span class="vam-danger-text">Danger</span><div class="vam-template-issue">Template issue</div>
+<div class="vam-field-head"><button class="vam-field-link">Learn more</button></div><div class="vam-quick-limits"><p class="vam-hint is-error">Limit error</p></div></div></div>
+<div id="chat-secondary"><div class="vam-map-chat"><div class="vam-map-chat-msg is-error"><span class="vam-map-chat-text">Chat error</span><div class="vam-map-chat-line is-failed">Failed line</div><div class="vam-map-chat-plan-warning">Plan warning</div><div class="vam-map-chat-plan-group is-danger"><span class="vam-map-chat-plan-group-title">Danger group</span></div><span class="vam-map-chat-count-failed">2 failed</span><div class="vam-map-chat-images-state is-inserted">Inserted</div><button class="vam-map-chat-lines-toggle">Show lines</button><button class="vam-map-chat-more">More</button></div></div></div>
+<div id="chat-user"><div class="vam-map-chat"><div class="vam-map-chat-msg is-user is-error"><span class="vam-map-chat-text">Chat error</span><div class="vam-map-chat-line is-failed">Failed line</div><div class="vam-map-chat-plan-warning">Plan warning</div><div class="vam-map-chat-plan-group is-danger"><span class="vam-map-chat-plan-group-title">Danger group</span></div><span class="vam-map-chat-count-failed">2 failed</span><div class="vam-map-chat-images-state is-inserted">Inserted</div><button class="vam-map-chat-lines-toggle">Show lines</button><button class="vam-map-chat-more">More</button></div></div></div>
+<div class="vam-node" style="position:static;width:200px"><button class="vam-add-child" style="opacity:1">+</button></div>
 </body></html>`;
 
 // [name, selector, kind, need, options]. kind: color (text colour), stroke (SVG stroke), dot (::before fill), ring (::before border).
@@ -81,9 +87,31 @@ const CASES = [
   ['tools-by-goal', '.vam-map-tools .vam-relevance-goal', 'color', 4.5],
   ['running-label', '.vam-status-running', 'color', 4.5],
   ['queued-label', '.vam-status-queued', 'color', 4.5],
-  ['dot-completed (info)', '.vam-status-completed', 'dot', 0],
-  ['dot-running (info)', '.vam-status-running', 'dot', 0],
-  ['dot-queued (info)', '.vam-status-queued', 'ring', 0]
+  ['dot-completed', '.vam-status-completed', 'dot', 3],
+  ['dot-running', '.vam-status-running', 'dot', 3],
+  ['dot-queued', '.vam-status-queued', 'ring', 3],
+  ['share-error-note', '.vam-share-note.vam-share-error', 'color', 4.5],
+  ['share-error', '.vam-share-error:not(.vam-share-note)', 'color', 4.5],
+  ['structure-stale-note', '.vam-proposal.is-stale .vam-structure-note', 'color', 4.5],
+  ['structure-kind-remove', '.vam-proposal-kind-remove', 'color', 4.5],
+  ['outline-error', '.vam-outline-error', 'color', 4.5],
+  ['outline-link', '.vam-outline-link', 'color', 4.5, { buttonEnvelope: true }],
+  ['outline-link-hover', '.vam-outline-link', 'color', 4.5, { hover: true }],
+  ['danger-text', '.vam-danger-text', 'color', 4.5],
+  ['template-issue', '.vam-template-issue', 'color', 4.5],
+  ['field-link', '.vam-field-link', 'color', 4.5, { buttonEnvelope: true }],
+  ['quick-limits-error', '.vam-quick-limits > .vam-hint.is-error', 'color', 4.5],
+  ['add-child-hover', '.vam-add-child', 'color', 4.5, { hover: true }],
+  ...['#chat-secondary', '#chat-user'].flatMap(scope => [
+    ['chat-error-text', '.vam-map-chat-msg.is-error .vam-map-chat-text', 'color', 4.5],
+    ['chat-line-failed', '.vam-map-chat-line.is-failed', 'color', 4.5],
+    ['chat-plan-warning', '.vam-map-chat-plan-warning', 'color', 4.5],
+    ['chat-danger-title', '.vam-map-chat-plan-group.is-danger .vam-map-chat-plan-group-title', 'color', 4.5],
+    ['chat-count-failed', '.vam-map-chat-count-failed', 'color', 4.5],
+    ['chat-images-inserted', '.vam-map-chat-images-state.is-inserted', 'color', 4.5],
+    ['chat-lines-toggle', '.vam-map-chat-lines-toggle', 'color', 4.5, { buttonEnvelope: true }],
+    ['chat-more', '.vam-map-chat-more', 'color', 4.5, { buttonEnvelope: true }]
+  ].map(([name, selector, kind, need, options]) => [`${name} @${scope.slice(6)}`, `${scope} ${selector}`, kind, need, options]))
 ];
 
 // Runs in the page: blends opacity and translucent fills from the root down to the element, then returns the WCAG ratio (smallest over the given fills).

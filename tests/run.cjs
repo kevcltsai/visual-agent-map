@@ -44,6 +44,7 @@ const suites = [
   'research-progress.cjs',
   'sharing.cjs',
   'sharing-viewer.cjs',
+  'map-view-color.cjs',
   'sharing-export.cjs',
   'sharing-translate.cjs',
   'sharing-translate-dialog.cjs',

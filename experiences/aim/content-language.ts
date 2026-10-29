@@ -37,7 +37,8 @@ type Signal = DetectedLanguage | typeof UNDECIDED_HAN;
 
 /**
  * The part of `text` that is the user's own words (0.28 ticket 06): fenced code blocks (an unclosed fence is kept),
- * inline code, Markdown images and links (title and URL) and bare URLs are removed. Wiki links keep their text. When
+ * inline code, Markdown images and links (title and URL) and bare URLs (ASCII only, so Chinese written right after a URL stays) are
+ * removed. Wiki links keep their text. When
  * nothing with a letter is left, the original text is used, so a lone link title still has a signal.
  */
 function detectionText(text: string): string {
@@ -45,7 +46,7 @@ function detectionText(text: string): string {
     .replace(/^[ \t]*(`{3,}|~{3,})[^\n]*\n[\s\S]*?\n[ \t]*\1[`~]*[ \t]*$/gm, "")
     .replace(/`[^`\n]*`/g, "")
     .replace(/!?\[[^\]\n]*\]\([^)\n]*\)/g, "")
-    .replace(/https?:\/\/\S+/g, "");
+    .replace(/https?:\/\/[\x21-\x7E]+/g, "");
   return /\p{L}/u.test(cleaned) ? cleaned : text;
 }
 

@@ -534,7 +534,8 @@ test('ticket 06: links, images, URLs and code are not counted; a lone Japanese l
   assert.equal(chooseAimContentLanguage('zh-TW', '品味系統的五個盲點。\n```\nこんにちは さようなら ラーメン\n```\n以上是範例'), 'zh-TW', 'fenced code');
   assert.equal(chooseAimContentLanguage('zh-TW', '品味系統的五個盲點。\n~~~\nこんにちは さようなら ラーメン\n~~~\n以上是範例'), 'zh-TW', 'tilde fence');
   assert.equal(chooseAimContentLanguage('zh-TW', '品味系統的五個盲點。![ラーメンの写真](https://x.jp/a.png)'), 'zh-TW', 'image');
-  assert.equal(chooseAimContentLanguage('zh-TW', '品味系統的五個盲點。https://x.jp/こんにちはさようなら'), 'zh-TW', 'bare URL');
+  assert.equal(chooseAimContentLanguage('zh-TW', '品味系統。https://example.com/the-best-guide-for-the-trip'), 'zh-TW', 'bare URL: its Latin words are not counted');
+  assert.equal(chooseAimContentLanguage('zh-TW', 'アート https://x.jp品味系統需要審美判斷系統的說明與更多的中文內容'), 'zh-TW', 'bare URL: Chinese right after it is kept');
   assert.equal(chooseAimContentLanguage('zh-TW', '[東京ラーメンガイド](https://x.jp)'), 'ja', 'only a Japanese link: no letters left, the original text decides');
   assert.equal(detectAimContentLanguage('[東京ラーメンガイド](https://x.jp)'), 'ja');
   // An unclosed fence does not swallow the rest of the text.

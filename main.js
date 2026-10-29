@@ -15348,7 +15348,7 @@ var OUTPUT_ROWS = OUTPUT_LANGUAGES;
 var isOutputOnlyLanguage = (value) => OUTPUT_LANGUAGES.some((item) => item.id === value);
 var UNDECIDED_HAN = "han";
 function detectionText(text11) {
-  const cleaned = text11.replace(/^[ \t]*(`{3,}|~{3,})[^\n]*\n[\s\S]*?\n[ \t]*\1[`~]*[ \t]*$/gm, "").replace(/`[^`\n]*`/g, "").replace(/!?\[[^\]\n]*\]\([^)\n]*\)/g, "").replace(/https?:\/\/\S+/g, "");
+  const cleaned = text11.replace(/^[ \t]*(`{3,}|~{3,})[^\n]*\n[\s\S]*?\n[ \t]*\1[`~]*[ \t]*$/gm, "").replace(/`[^`\n]*`/g, "").replace(/!?\[[^\]\n]*\]\([^)\n]*\)/g, "").replace(/https?:\/\/[\x21-\x7E]+/g, "");
   return /\p{L}/u.test(cleaned) ? cleaned : text11;
 }
 function signalOf(source) {

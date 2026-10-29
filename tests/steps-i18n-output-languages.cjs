@@ -590,13 +590,24 @@ test('ticket 07: mapChatLanguageSources returns [instruction, whole text] or [wh
   assert.deepEqual(sourcesOf07('指示\n   \t\n' + pasted), ['指示', '指示\n   \t\n' + pasted]);
   assert.deepEqual(sourcesOf07('只有一行'), ['只有一行']);
   assert.deepEqual(sourcesOf07('第一行\n第二行'), ['第一行\n第二行']);
-  assert.deepEqual(sourcesOf07('👇\n\n' + pasted), ['👇', '👇\n\n' + pasted]);
+  assert.deepEqual(sourcesOf07('👇\n\n' + pasted), ['👇\n\n' + pasted]);
   assert.deepEqual(sourcesOf07(''), ['']);
 });
 
 test('ticket 07: a remembered map language still wins; a letterless instruction does not fall back to the interface', () => {
   assert.equal(chatLanguage07('zh-TW', '請整理\n\n中文內容很長很長', { outputLanguage: 'ja' }), 'ja');
   assert.equal(chatLanguage07('zh-TW', '👇\n\n' + JA_PARAGRAPH_07), 'ja');
+});
+
+test('ticket 07: a code block or a lone URL first is not the instruction; a blank line inside a fence is not a boundary', () => {
+  const code = '```js\nconst total = items.reduce((sum, item) => sum + item.price, 0);\n```';
+  const codeWithBlank = '```js\nconst a = 1;\n\nconst b = 2;\n```';
+  const ask = '請幫我解釋這段程式並畫成心智圖';
+  assert.equal(chatLanguage07('zh-TW', code + '\n\n' + ask), 'zh-TW');
+  assert.equal(chatLanguage07('zh-TW', codeWithBlank + '\n\n' + ask), 'zh-TW');
+  assert.deepEqual(sourcesOf07(codeWithBlank + '\n\n' + ask), [codeWithBlank + '\n\n' + ask]);
+  assert.deepEqual(sourcesOf07(ask + '\n\n' + codeWithBlank), [ask, ask + '\n\n' + codeWithBlank]);
+  assert.equal(chatLanguage07('zh-TW', 'https://example.com/a\n\n' + JA_PARAGRAPH_07), 'ja');
 });
 
 test('ticket 07: the map chat request takes its language from mapChatLanguageSources(message)', () => {

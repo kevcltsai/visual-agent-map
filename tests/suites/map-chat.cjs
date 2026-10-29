@@ -356,6 +356,24 @@ integrationTest('map chat: one reply applies add_child, rename_topic, move_topic
   eq(lines.map(l => l.text.split(':')[0]), ['Done', 'Done', 'Done', 'Done']);
 });
 
+integrationTest('map chat: ticket 09 - a tree reply where one subtopic has no summary still adds it; it keeps the placeholder and stays unresearched', async () => {
+  const h = await harness(); await h.view.hydrate();
+  const lines = await apply(h, [
+    { kind: 'add_child', parentId: h.ids.b, title: 'Brewing', summary: 'How to brew', ref: 'n1' },
+    { kind: 'add_child', parentId: 'new:n1', title: 'Grind', summary: 'Grind size by method', ref: 'n2' },
+    { kind: 'add_child', parentId: 'new:n1', title: 'Water', summary: '', ref: 'n3' }
+  ]);
+  eq(lines.map(l => l.status), ['done', 'done', 'done'], JSON.stringify(lines));
+  const { isPlaceholder } = load('repository.ts', { obsidian });
+  const nodes = await h.saved();
+  const notes = await Promise.all(nodes.map(n => h.repo.readNote(n.path)));
+  const read = async title => { const note = notes.find(x => x.title === title); assert.ok(note, `${title} is on the saved map`); return note; };
+  const brewing = await read('Brewing'), grind = await read('Grind'), water = await read('Water');
+  assert.equal(brewing.summary, 'How to brew'); assert.equal(grind.summary, 'Grind size by method');
+  assert.ok(isPlaceholder(water.summary) || water.summary.includes('No conclusion yet'), `Water keeps the placeholder: ${water.summary}`);
+  eq([brewing.status, grind.status, water.status], ['idea', 'idea', 'idea']);
+});
+
 // F1 (reviewer R1): an undo entry holds the map as it was before the chat wrote, so undoing it after the chat renamed files and moved cards
 // puts the map out of step with the notes (an orphan file, a parent that no longer exists, "File not found"). The history is cleared instead.
 integrationTest('map chat: F1 - a card drag, then a chat write, then Undo: nothing is left to undo, and the map and the files stay in step', async () => {

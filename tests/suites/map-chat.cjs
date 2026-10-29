@@ -3525,6 +3525,9 @@ integrationTest('B3-polish P1-1: an inserted candidate keeps its picture and is 
   assert.equal(inserted.attrs['aria-disabled'], 'true'); const file = noteFile(h, 'a'); const before = h.contents.get(file);
   inserted.click(); await tick(); assert.equal(h.contents.get(file), before, 'no second insertion');
   assert.doesNotMatch(visibleText(inserted), /Cannot load/); assert.doesNotMatch(visibleText(plain), /Inserted/);
+  // Obsidian dims every button[aria-disabled="true"] to opacity .7; the inserted one is not dimmed, so its picture keeps its colours.
+  const rule = fs.readFileSync(path.join(root, 'styles.css'), 'utf8').split('\n').find(line => line.startsWith('.vam-map-chat .vam-map-chat-images-pick.is-inserted {')) ?? '';
+  assert.match(rule, /opacity: 1;/);
 });
 // ---- B3-polish P1-2: the result line follows the candidate block ----
 const resultTexts = h => findAll(h.view.chat.logEl, i => hasClass(i, 'vam-map-chat-line')).map(i => i.text);

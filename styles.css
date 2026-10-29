@@ -144,7 +144,7 @@
 @property --vam-orbit { syntax: "<angle>"; inherits: false; initial-value: 0deg; }
 @keyframes vam-orbit { to { --vam-orbit: 360deg; } }
 @keyframes vam-scan { from { background-position: -100% 0; } to { background-position: 200% 0; } }
-/* Offline relevance grading (mind maps only): a quiet icon + text tag, no fill. Side topics fade but stay in place. */
+/* Offline relevance grading (mind maps only): a quiet icon + text tag, no fill. Side topics get a dashed border and muted text (never faded: faded text fell under 4.5:1) and stay in place. */
 .vam-relevance-tag { display: inline-flex; align-items: center; gap: 4px; max-width: 100%; font-size: var(--font-ui-smaller); line-height: 1.4; white-space: nowrap; }
 button.vam-relevance-tag-button { position: relative; appearance: none; margin: 0; padding: 0 4px; margin-left: -4px; border: 0; border-radius: var(--radius-s); background: transparent; box-shadow: none; height: auto; cursor: pointer; font-family: inherit; }
 .vam-relevance-tag-name { position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0; overflow: hidden; white-space: nowrap; }

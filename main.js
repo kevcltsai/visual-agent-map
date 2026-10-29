@@ -21610,6 +21610,7 @@ var MapChatPanel = class {
     __publicField(this, "spokenLater", []);
     /** The pick button of each picture candidate, to give the keyboard back after a repaint. */
     __publicField(this, "pickEls", /* @__PURE__ */ new WeakMap());
+    __publicField(this, "sourceEls", /* @__PURE__ */ new WeakMap());
     __publicField(this, "built", false);
     __publicField(this, "stopWatching", null);
     __publicField(this, "messageEls", []);
@@ -22870,11 +22871,10 @@ ${text11}` : text11;
         attr: { src: candidate.url, alt: "", loading: "lazy", referrerpolicy: "no-referrer" }
       });
       thumb.addEventListener("error", () => {
-        var _a2;
         item.broken = true;
-        const focused = this.host.activeElement() === pick;
+        const restore = this.keepRowFocus(block);
         this.renderLog();
-        if (focused) (_a2 = this.pickEls.get(item)) == null ? void 0 : _a2.focus();
+        restore();
       });
     }
     pick.createSpan({ cls: "vam-map-chat-images-title", text: clip(candidate.title, 80) });
@@ -22884,7 +22884,7 @@ ${text11}` : text11;
       state.createSpan({ text: t("ui.map_chat_images_inserted_0", clip(item.inserted)) });
     } else if (item.broken) pick.createSpan({ cls: "vam-map-chat-images-state", text: t("ui.map_chat_images_broken") });
     pick.addEventListener("click", () => this.pickImage(block, item));
-    cell.createEl("a", {
+    const source = cell.createEl("a", {
       cls: "vam-map-chat-images-source",
       text: t("ui.map_chat_images_source"),
       attr: {
@@ -22894,6 +22894,39 @@ ${text11}` : text11;
         "aria-label": t("ui.map_chat_images_source_0", clip(candidate.title))
       }
     });
+    this.sourceEls.set(item, source);
+  }
+  /**
+   * Remembers what the keyboard is on in the row that shows `block` (a candidate's button or source link, or the row's
+   * "more detail" or retry button) and returns how to put it back once that row was built again.
+   */
+  keepRowFocus(block) {
+    var _a2;
+    const active = this.host.activeElement();
+    const message = this.messages.find((candidate) => {
+      var _a3;
+      return (_a3 = candidate.images) == null ? void 0 : _a3.includes(block);
+    });
+    const entry = message ? this.rows.get(message) : void 0;
+    if (!message || !entry || !active || !entry.row.contains(active)) return () => {
+    };
+    for (const shown of (_a2 = message.images) != null ? _a2 : [])
+      for (const item of shown.items) {
+        if (this.pickEls.get(item) === active) return () => {
+          var _a3;
+          return (_a3 = this.pickEls.get(item)) == null ? void 0 : _a3.focus();
+        };
+        if (this.sourceEls.get(item) === active) return () => {
+          var _a3;
+          return (_a3 = this.sourceEls.get(item)) == null ? void 0 : _a3.focus();
+        };
+      }
+    if (entry.more === active) return () => {
+      var _a3, _b2;
+      return (_b2 = (_a3 = this.rows.get(message)) == null ? void 0 : _a3.more) == null ? void 0 : _b2.focus();
+    };
+    return () => {
+    };
   }
   /** A candidate was chosen: the host inserts it into the card; the button is inert while that runs and afterwards. */
   pickImage(block, item) {

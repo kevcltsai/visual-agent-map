@@ -3506,6 +3506,15 @@ integrationTest('B3-polish P1-1: six candidates with one that cannot load say "5
   eq(picks.slice(0, 5).map(p => findAll(p, i => i.tag === 'img').length), [1, 1, 1, 1, 1]);
   assert.equal(picks.filter(p => hasClass(p, 'is-inserted')).length, 0, 'cannot-load is not "inserted"');
 });
+integrationTest('B3-polish P1-1: a thumbnail that fails later rebuilds the row, and the keyboard stays on the same candidate button or source link', async () => {
+  const { h } = await imageHarness(); const block = await readyImages(h, 3);
+  const sources = () => findAll(h.view.chat.logEl, i => hasClass(i, 'vam-map-chat-images-source'));
+  pickButtons(h)[0].focus(); findAll(h.view.chat.logEl, i => i.tag === 'img')[1].fire('error');
+  assert.ok(block.items[1].broken); assert.ok(h.page.doc.activeElement === pickButtons(h)[0], 'the first candidate keeps the keyboard');
+  sources()[1].focus(); const label = sources()[1].attrs['aria-label']; findAll(h.view.chat.logEl, i => i.tag === 'img')[0].fire('error');
+  assert.ok(block.items[0].broken); assert.ok(h.page.doc.activeElement?.attrs?.['aria-label'] === label, 'the same source link keeps the keyboard');
+  assert.ok(sources().includes(h.page.doc.activeElement), 'and it is the link in the new row');
+});
 integrationTest('B3-polish P1-1: all candidates broken reads as none; a probe that already dropped a candidate counts only the rest', async () => {
   const { h } = await imageHarness(); await readyImages(h, 2);
   for (const img of findAll(h.view.chat.logEl, i => i.tag === 'img')) img.fire('error');

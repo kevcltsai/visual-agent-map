@@ -298,6 +298,7 @@ export class MapChatPanel {
   private spokenLater: string[] = [];
   /** The pick button of each picture candidate, to give the keyboard back after a repaint. */
   private pickEls = new WeakMap<MapChatImageItem, HTMLElement>();
+  private sourceEls = new WeakMap<MapChatImageItem, HTMLElement>();
   private built = false;
   private stopWatching: (() => void) | null = null;
   private messageEls: HTMLElement[] = [];
@@ -1647,10 +1648,10 @@ export class MapChatPanel {
       thumb.addEventListener("error", () => {
         item.broken = true;
         // The row is laid out again: this card moves behind the ones that load, and the sentence above counts only those.
-        // The keyboard stays where it is, unless it was on this very button.
-        const focused = this.host.activeElement() === pick;
+        // The keyboard stays on what it was on in this row (see keepRowFocus).
+        const restore = this.keepRowFocus(block);
         this.renderLog();
-        if (focused) this.pickEls.get(item)?.focus();
+        restore();
       });
     }
     pick.createSpan({ cls: "vam-map-chat-images-title", text: clip(candidate.title, 80) });
@@ -1660,7 +1661,7 @@ export class MapChatPanel {
       state.createSpan({ text: t("ui.map_chat_images_inserted_0", clip(item.inserted)) });
     } else if (item.broken) pick.createSpan({ cls: "vam-map-chat-images-state", text: t("ui.map_chat_images_broken") });
     pick.addEventListener("click", () => this.pickImage(block, item));
-    cell.createEl("a", {
+    const source = cell.createEl("a", {
       cls: "vam-map-chat-images-source",
       text: t("ui.map_chat_images_source"),
       attr: {
@@ -1670,6 +1671,24 @@ export class MapChatPanel {
         "aria-label": t("ui.map_chat_images_source_0", clip(candidate.title))
       }
     });
+    this.sourceEls.set(item, source);
+  }
+  /**
+   * Remembers what the keyboard is on in the row that shows `block` (a candidate's button or source link, or the row's
+   * "more detail" or retry button) and returns how to put it back once that row was built again.
+   */
+  private keepRowFocus(block: MapChatImages): () => void {
+    const active = this.host.activeElement();
+    const message = this.messages.find(candidate => candidate.images?.includes(block));
+    const entry = message ? this.rows.get(message) : undefined;
+    if (!message || !entry || !active || !entry.row.contains(active)) return () => {};
+    for (const shown of message.images ?? [])
+      for (const item of shown.items) {
+        if (this.pickEls.get(item) === active) return () => this.pickEls.get(item)?.focus();
+        if (this.sourceEls.get(item) === active) return () => this.sourceEls.get(item)?.focus();
+      }
+    if (entry.more === active) return () => this.rows.get(message)?.more?.focus();
+    return () => {};
   }
   /** A candidate was chosen: the host inserts it into the card; the button is inert while that runs and afterwards. */
   private pickImage(block: MapChatImages, item: MapChatImageItem): void {

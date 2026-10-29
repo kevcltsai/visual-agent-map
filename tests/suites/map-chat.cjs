@@ -2688,11 +2688,11 @@ integrationTest('B1 ui: stopping a turn and applying a plan each say one thing; 
 
 // ---- what must not change --------------------------------------------------------------------------------------------
 
-test('B1 ui: single sources stay single: one typingInField (3 mentions), the same 5 renderChatMarkdown mentions in code, one definition each of the focus capture and the detach', () => {
+test('B1 ui: single sources stay single: one typingInField (5 mentions: the definition and its 4 callers), the same 5 renderChatMarkdown mentions in code, one definition each of the focus capture and the detach', () => {
   const walk = dir => fs.readdirSync(path.join(root, dir), { withFileTypes: true }).flatMap(entry => entry.isDirectory() ? (['node_modules', 'tests', 'samples', 'scripts'].includes(entry.name) ? [] : walk(path.join(dir, entry.name))) : entry.name.endsWith('.ts') ? [path.join(dir, entry.name)] : []);
   const sources = walk('.').map(file => fs.readFileSync(path.join(root, file), 'utf8'));
   const total = pattern => sources.reduce((sum, text) => sum + (text.match(new RegExp(pattern, 'g')) ?? []).length, 0);
-  assert.equal(total('typingInField'), 3, 'typingInField'); assert.equal(total('renderChatMarkdown'), 5, 'renderChatMarkdown');
+  assert.equal(total('typingInField'), 5, 'typingInField'); assert.equal(total('active\\?\\.matches\\("input, textarea, select"\\)'), 1, 'the typing check is written once'); assert.equal(total('renderChatMarkdown'), 5, 'renderChatMarkdown');
   assert.equal(total('captureFocus\\(\\): \\(\\) => void \\{'), 1, 'one capture'); assert.equal(total('private detachMapChat\\(\\)'), 1, 'one detach');
 });
 

@@ -39197,15 +39197,12 @@ ${request.requirements}` : preset.text,
     if (file.path !== this.path && !((_a2 = this.map) == null ? void 0 : _a2.nodes.some((node) => node.path === file.path))) return;
     if (this.refreshTimer !== null) window.clearTimeout(this.refreshTimer);
     this.refreshTimer = window.setTimeout(() => {
-      var _a3, _b2, _c;
       if (this.closed) return;
       if (this.dragging) {
         this.changed(file);
         return;
       }
-      const active = (_b2 = (_a3 = this.contentEl.ownerDocument) == null ? void 0 : _a3.activeElement) != null ? _b2 : null;
-      const inChat = !!((_c = this.chat) == null ? void 0 : _c.isInput(active));
-      if (inChat ? this.chat.isComposing : this.contentEl.contains(active) && !!(active == null ? void 0 : active.matches("input, textarea, select"))) {
+      if (this.typingInField()) {
         this.changed(file);
         return;
       }
@@ -40826,7 +40823,6 @@ ${request.requirements}` : preset.text,
     }
   }
   async synchronize() {
-    var _a2, _b2, _c;
     if (this.builtIn) return;
     if (this.syncHold > 0) {
       this.syncPending = true;
@@ -40850,8 +40846,7 @@ ${request.requirements}` : preset.text,
     const before = JSON.stringify(Array.from(this.notes));
     await this.hydrate();
     if (structureChanged || before !== JSON.stringify(Array.from(this.notes))) {
-      const active = (_b2 = (_a2 = this.contentEl.ownerDocument) == null ? void 0 : _a2.activeElement) != null ? _b2 : null;
-      const editing = ((_c = this.chat) == null ? void 0 : _c.isInput(active)) ? this.chat.isComposing : this.contentEl.contains(active) && !!(active == null ? void 0 : active.matches("input, textarea, select"));
+      const editing = this.typingInField();
       if ((!editing || structureChanged) && !this.dragging) this.render();
       else {
         for (const node of this.map.nodes) this.refreshCard(node, false);

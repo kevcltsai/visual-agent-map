@@ -3621,15 +3621,9 @@ export class VisualAgentMapView extends ItemView {
         this.changed(file);
         return;
       }
-      const active = this.contentEl.ownerDocument?.activeElement ?? null;
       // The chat field is a text field too, but it is where the user waits for the map to change: only an IME
       // composition in it holds the repaint back.
-      const inChat = !!this.chat?.isInput(active);
-      if (
-        inChat
-          ? this.chat!.isComposing
-          : this.contentEl.contains(active) && !!active?.matches("input, textarea, select")
-      ) {
+      if (this.typingInField()) {
         this.changed(file);
         return;
       }
@@ -5449,12 +5443,9 @@ export class VisualAgentMapView extends ItemView {
     const before = JSON.stringify(Array.from(this.notes));
     await this.hydrate();
     if (structureChanged || before !== JSON.stringify(Array.from(this.notes))) {
-      const active = this.contentEl.ownerDocument?.activeElement ?? null;
       // The chat field is a text field too, but it is where the user waits for the map to change: only an IME
       // composition in it counts as editing (same rule as changed()).
-      const editing = this.chat?.isInput(active)
-        ? this.chat.isComposing
-        : this.contentEl.contains(active) && !!active?.matches("input, textarea, select");
+      const editing = this.typingInField();
       if ((!editing || structureChanged) && !this.dragging) this.render();
       else {
         // Cards are refreshed without redrawing the edges each time (a redraw reads every card's layout); once at the end.

@@ -1,6 +1,7 @@
 import { validateAimResearchPlan } from "./experiences/aim/research-plan";
 import { upgradeLegacyAimData } from "./experiences/aim/legacy-names";
 import type { AiResult } from "./ai/types";
+import { debugLog, type LogLevel } from "./log-manager";
 import { isMapAiMode, type MapAiMode } from "./experiences/visual-map/ai-mode";
 import type { FinalDeliveryCheckpoint } from "./experiences/aim/final-delivery";
 import { isContentLanguage, isNoteLanguage, t, translate, type ContentLanguage, type NoteLanguage } from "./i18n";
@@ -32,6 +33,163 @@ export interface MapDocument {
   detailTemplateId?: string;
   /** Default tone preset id for the map; absent = academic. */
   toneId?: string;
+  /** Semantic links between topics (evidence for a hypothesis, prerequisite knowledge). Absent when there are none. */
+  topicRelations?: TopicRelation[];
+}
+/**
+ * `evidence`: `from` is a fact topic, `to` the hypothesis it supports. `prerequisite`: `from` (A) is background for
+ * `to` (B). Neither changes the parent/child tree.
+ */
+export type TopicRelationKind = "evidence" | "prerequisite";
+export interface TopicRelation {
+  kind: TopicRelationKind;
+  from: string;
+  to: string;
+}
+const TOPIC_RELATION_KINDS: readonly string[] = ["evidence", "prerequisite"];
+const relationKey = (r: TopicRelation): string => `${r.kind}\0${r.from}\0${r.to}`;
+type RelationLogger = (level: LogLevel, message: string) => void;
+
+/**
+ * Drops what cannot be a relation: a non-list value (the whole key), malformed entries, unknown kinds, endpoints that
+ * are not topics, self links and duplicates. Prerequisite cycles are kept (a hand-written loop still opens). Logs one
+ * warn with counts only; removes the key when nothing is left. Never throws.
+ */
+export function sanitizeTopicRelations(
+  map: MapDocument,
+  log: RelationLogger = (l, m) => debugLog.appendLog(l, m)
+): void {
+  const raw: unknown = (map as { topicRelations?: unknown }).topicRelations;
+  if (raw === undefined) return;
+  if (!Array.isArray(raw)) {
+    delete map.topicRelations;
+    log("warn", "Ignored topicRelations: not a list.");
+    return;
+  }
+  const ids = new Set(map.nodes.map(n => n?.id));
+  const seen = new Set<string>();
+  const kept: TopicRelation[] = [];
+  let dropped = 0;
+  for (const item of raw as unknown[]) {
+    const r = item as Partial<TopicRelation> | null;
+    if (
+      !r ||
+      typeof r !== "object" ||
+      typeof r.kind !== "string" ||
+      !TOPIC_RELATION_KINDS.includes(r.kind) ||
+      typeof r.from !== "string" ||
+      typeof r.to !== "string" ||
+      !ids.has(r.from) ||
+      !ids.has(r.to) ||
+      r.from === r.to
+    ) {
+      dropped++;
+      continue;
+    }
+    const clean: TopicRelation = { kind: r.kind, from: r.from, to: r.to };
+    const key = relationKey(clean);
+    if (seen.has(key)) {
+      dropped++;
+      continue;
+    }
+    seen.add(key);
+    kept.push(clean);
+  }
+  if (dropped)
+    log("warn", `Dropped ${dropped} invalid topic relation${dropped === 1 ? "" : "s"} while reading the map.`);
+  if (kept.length) map.topicRelations = kept;
+  else delete map.topicRelations;
+}
+/** Replaces the relations; an empty list removes the key. Every write goes through here. */
+export function setTopicRelations(map: MapDocument, list: TopicRelation[]): void {
+  if (list.length) map.topicRelations = list.map(r => ({ kind: r.kind, from: r.from, to: r.to }));
+  else delete map.topicRelations;
+}
+/** Removes every relation (both kinds) that touches one of `ids`. */
+export function removeTopicRelationsFor(map: MapDocument, ids: Iterable<string>): void {
+  if (!map.topicRelations) return;
+  const gone = new Set(ids);
+  setTopicRelations(
+    map,
+    map.topicRelations.filter(r => !gone.has(r.from) && !gone.has(r.to))
+  );
+}
+/** True when `target` can be reached from `start` along prerequisite links (from -> to). Visited-set BFS, so loops end. */
+function reachesByPrerequisite(relations: readonly TopicRelation[], start: string, target: string): boolean {
+  const seen = new Set<string>([start]);
+  const queue = [start];
+  while (queue.length) {
+    const current = queue.shift() as string;
+    if (current === target) return true;
+    for (const r of relations)
+      if (r.kind === "prerequisite" && r.from === current && !seen.has(r.to)) {
+        seen.add(r.to);
+        queue.push(r.to);
+      }
+  }
+  return false;
+}
+/**
+ * Points every relation end at `fromIds` to `toId` (a merge). Self links and duplicates are dropped; a prerequisite
+ * that would newly close a cycle is dropped and counted. Cycles already present are not touched.
+ */
+export function retargetTopicRelations(
+  map: MapDocument,
+  fromIds: Iterable<string>,
+  toId: string
+): { droppedCycles: number } {
+  const result = { droppedCycles: 0 };
+  if (!map.topicRelations) return result;
+  const merged = new Set(fromIds);
+  const move = (id: string): string => (merged.has(id) ? toId : id);
+  const kept: TopicRelation[] = [];
+  const seen = new Set<string>();
+  const touched: TopicRelation[] = [];
+  for (const r of map.topicRelations) {
+    const next: TopicRelation = { kind: r.kind, from: move(r.from), to: move(r.to) };
+    if (next.from === next.to) continue;
+    const key = relationKey(next);
+    if (seen.has(key)) continue;
+    seen.add(key);
+    if (next.kind === "prerequisite" && (next.from !== r.from || next.to !== r.to)) touched.push(next);
+    else kept.push(next);
+  }
+  for (const r of touched) {
+    if (reachesByPrerequisite(kept, r.to, r.from)) result.droppedCycles++;
+    else kept.push(r);
+  }
+  const order = new Map(map.topicRelations.map((r, i) => [relationKey(r), i]));
+  kept.sort((a, b) => (order.get(relationKey(a)) ?? 1e9) - (order.get(relationKey(b)) ?? 1e9));
+  setTopicRelations(map, kept);
+  return result;
+}
+/** Hypotheses a topic can newly be evidence for: not itself, not a non-hypothesis, not already linked; none when the source is a hypothesis. */
+export function legalEvidenceTargets(
+  map: MapDocument,
+  fromId: string,
+  isHypothesis: (id: string) => boolean
+): string[] {
+  if (isHypothesis(fromId)) return [];
+  const linked = new Set(
+    (map.topicRelations ?? []).filter(r => r.kind === "evidence" && r.from === fromId).map(r => r.to)
+  );
+  return map.nodes.filter(n => n.id !== fromId && isHypothesis(n.id) && !linked.has(n.id)).map(n => n.id);
+}
+/** Topics that can newly be a prerequisite of `toId`: not itself, not already one, and not reachable from it along prerequisite links (that would close a cycle). */
+export function legalPrerequisiteSources(map: MapDocument, toId: string): string[] {
+  const relations = map.topicRelations ?? [];
+  const blocked = new Set<string>([toId]);
+  const queue = [toId];
+  while (queue.length) {
+    const current = queue.shift() as string;
+    for (const r of relations)
+      if (r.kind === "prerequisite" && r.from === current && !blocked.has(r.to)) {
+        blocked.add(r.to);
+        queue.push(r.to);
+      }
+  }
+  for (const r of relations) if (r.kind === "prerequisite" && r.to === toId) blocked.add(r.from);
+  return map.nodes.filter(n => !blocked.has(n.id)).map(n => n.id);
 }
 
 export function clearQuestionConvergenceEdges(map: MapDocument): boolean {
@@ -363,7 +521,7 @@ function validRetainedReports(reports: unknown): reports is AimRetainedReport[] 
   });
 }
 
-export function parseMap(content: string): MapDocument {
+export function parseMap(content: string, log?: RelationLogger): MapDocument {
   const block = content.match(/```agent-map\s*\n([\s\S]*?)\n```/);
   if (!block) throw new Error(t("ui.mind_map_data_was_not_found_keep_the_agent_map_block"));
   const map = upgradeLegacyAimData(JSON.parse(block[1]) as MapDocument);
@@ -453,6 +611,7 @@ export function parseMap(content: string): MapDocument {
   )
     map.viewport = { x: 40, y: 40, zoom: 1 };
   map.viewport.zoom = Math.min(2, Math.max(0.25, map.viewport.zoom));
+  sanitizeTopicRelations(map, log);
   return map;
 }
 function validateAimMap(map: MapDocument): void {

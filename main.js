@@ -15583,6 +15583,37 @@ function upgradeLegacyAimData(value) {
   return upgraded;
 }
 
+// log-manager.ts
+var LogManager = class {
+  constructor(limit = 500) {
+    this.limit = limit;
+    __publicField(this, "entries", []);
+    __publicField(this, "listeners", /* @__PURE__ */ new Set());
+  }
+  appendLog(level, message) {
+    const normalized = message.trim();
+    if (!normalized) return;
+    this.entries.push({ timestamp: (/* @__PURE__ */ new Date()).toISOString(), level, message: normalized });
+    if (this.entries.length > this.limit) this.entries.splice(0, this.entries.length - this.limit);
+    for (const listener of this.listeners) listener();
+  }
+  getLogs() {
+    return this.entries.map((entry) => ({ ...entry }));
+  }
+  clear() {
+    this.entries = [];
+    for (const listener of this.listeners) listener();
+  }
+  subscribe(listener) {
+    this.listeners.add(listener);
+    return () => this.listeners.delete(listener);
+  }
+};
+function formatDebugLogs(entries) {
+  return entries.map((entry) => `[${entry.timestamp}] [${entry.level.toUpperCase()}] ${entry.message}`).join("\n");
+}
+var debugLog = new LogManager();
+
 // experiences/visual-map/ai-mode.ts
 var DEFAULT_MAP_AI_MODE = "quick";
 function isMapAiMode(value) {
@@ -15652,6 +15683,40 @@ function applyCollapseLevel(nodes, shownLevels) {
 }
 
 // map-model.ts
+var TOPIC_RELATION_KINDS = ["evidence", "prerequisite"];
+var relationKey = (r) => `${r.kind}\0${r.from}\0${r.to}`;
+function sanitizeTopicRelations(map, log = (l, m) => debugLog.appendLog(l, m)) {
+  const raw = map.topicRelations;
+  if (raw === void 0) return;
+  if (!Array.isArray(raw)) {
+    delete map.topicRelations;
+    log("warn", "Ignored topicRelations: not a list.");
+    return;
+  }
+  const ids = new Set(map.nodes.map((n) => n == null ? void 0 : n.id));
+  const seen = /* @__PURE__ */ new Set();
+  const kept = [];
+  let dropped = 0;
+  for (const item of raw) {
+    const r = item;
+    if (!r || typeof r !== "object" || typeof r.kind !== "string" || !TOPIC_RELATION_KINDS.includes(r.kind) || typeof r.from !== "string" || typeof r.to !== "string" || !ids.has(r.from) || !ids.has(r.to) || r.from === r.to) {
+      dropped++;
+      continue;
+    }
+    const clean4 = { kind: r.kind, from: r.from, to: r.to };
+    const key2 = relationKey(clean4);
+    if (seen.has(key2)) {
+      dropped++;
+      continue;
+    }
+    seen.add(key2);
+    kept.push(clean4);
+  }
+  if (dropped)
+    log("warn", `Dropped ${dropped} invalid topic relation${dropped === 1 ? "" : "s"} while reading the map.`);
+  if (kept.length) map.topicRelations = kept;
+  else delete map.topicRelations;
+}
 function clearQuestionConvergenceEdges(map) {
   let changed = false;
   for (const node of map.nodes) {
@@ -15737,7 +15802,7 @@ function validRetainedReports(reports) {
     return typeof summary === "string" && summary.trim() !== "" && typeof detail === "string" && detail.trim() !== "";
   });
 }
-function parseMap(content) {
+function parseMap(content, log) {
   const block = content.match(/```agent-map\s*\n([\s\S]*?)\n```/);
   if (!block) throw new Error(t("ui.mind_map_data_was_not_found_keep_the_agent_map_block"));
   const map = upgradeLegacyAimData(JSON.parse(block[1]));
@@ -15778,6 +15843,7 @@ function parseMap(content) {
   if (!map.viewport || !Number.isFinite(map.viewport.x) || !Number.isFinite(map.viewport.y) || !Number.isFinite(map.viewport.zoom))
     map.viewport = { x: 40, y: 40, zoom: 1 };
   map.viewport.zoom = Math.min(2, Math.max(0.25, map.viewport.zoom));
+  sanitizeTopicRelations(map, log);
   return map;
 }
 function validateAimMap(map) {
@@ -18713,6 +18779,15 @@ function readRelevanceContext(fm) {
   const context = fm["relevance-context"];
   return typeof context === "string" ? normalizeRelevanceContext(context) : void 0;
 }
+var HYPOTHESIS_STRENGTHS = ["weak", "medium", "strong"];
+function readTopicKind(fm) {
+  return fm["topic-kind"] === "hypothesis" ? "hypothesis" : "topic";
+}
+function readHypothesisStrength(fm) {
+  if (readTopicKind(fm) !== "hypothesis") return void 0;
+  const value = fm["hypothesis-strength"];
+  return typeof value === "string" && HYPOTHESIS_STRENGTHS.includes(value) ? value : "weak";
+}
 
 // repository.ts
 function normalizeMapChatStyle(value) {
@@ -19520,6 +19595,7 @@ var Repository = class {
       ...typeof fm.tone === "string" && fm.tone ? { toneId: fm.tone } : {},
       ...noteContentLanguage(fm) ? { contentLanguage: noteContentLanguage(fm) } : {},
       ...readRelevance(fm) ? { relevance: readRelevance(fm) } : {},
+      ...readTopicKind(fm) === "hypothesis" ? { topicKind: "hypothesis", hypothesisStrength: readHypothesisStrength(fm) } : {},
       detailFormatIssues: Array.isArray(fm["detail-format-issues"]) ? fm["detail-format-issues"].filter((v) => typeof v === "string") : [],
       status: ["idea", "running", "completed", "error"].includes(normalized) ? normalized : "idea",
       mapId: text5(fm["agent-map-id"]),
@@ -19640,6 +19716,7 @@ ${withReferenceLinks(body, fm, language2)}`;
       "model-source": modelSource,
       "reasoning-level": (_a2 = initial.reasoning) != null ? _a2 : this.settings.cliReasoning,
       ...initial.researchMode ? { "research-mode": initial.researchMode } : {},
+      ...initial.hypothesis ? { "topic-kind": "hypothesis", "hypothesis-strength": "weak" } : {},
       status: "idea",
       cssclasses: [NOTE_CSS_CLASS]
     };
@@ -19749,6 +19826,13 @@ ${body}`);
   async readRelevanceSetup(path) {
     const fm = frontmatter(await this.app.vault.read(this.file(path)));
     return { goal: readRelevanceGoal(fm), level: readRelevanceLevel(fm), context: readRelevanceContext(fm) };
+  }
+  /** Sets a hypothesis note's `hypothesis-strength` only: no other key changes, `updated` is not bumped, nothing rebuilds. */
+  async writeHypothesisStrength(path, strength) {
+    await this.app.vault.process(
+      this.file(path),
+      (content) => setFrontmatterKeys(content, { "hypothesis-strength": strength })
+    );
   }
   /**
    * Sets or removes only the relevance keys of a note's frontmatter (`relevance-tier`, `relevance-manual`, and the
@@ -25758,37 +25842,6 @@ var ReferencePicker = class {
 
 // ui/modals/debug-log-modal.ts
 var import_obsidian20 = require("obsidian");
-
-// log-manager.ts
-var LogManager = class {
-  constructor(limit = 500) {
-    this.limit = limit;
-    __publicField(this, "entries", []);
-    __publicField(this, "listeners", /* @__PURE__ */ new Set());
-  }
-  appendLog(level, message) {
-    const normalized = message.trim();
-    if (!normalized) return;
-    this.entries.push({ timestamp: (/* @__PURE__ */ new Date()).toISOString(), level, message: normalized });
-    if (this.entries.length > this.limit) this.entries.splice(0, this.entries.length - this.limit);
-    for (const listener of this.listeners) listener();
-  }
-  getLogs() {
-    return this.entries.map((entry) => ({ ...entry }));
-  }
-  clear() {
-    this.entries = [];
-    for (const listener of this.listeners) listener();
-  }
-  subscribe(listener) {
-    this.listeners.add(listener);
-    return () => this.listeners.delete(listener);
-  }
-};
-function formatDebugLogs(entries) {
-  return entries.map((entry) => `[${entry.timestamp}] [${entry.level.toUpperCase()}] ${entry.message}`).join("\n");
-}
-var debugLog = new LogManager();
 
 // ai-exchange-log.ts
 function isRecord(value) {

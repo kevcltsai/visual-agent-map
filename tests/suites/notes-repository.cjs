@@ -3,7 +3,7 @@ const { nodeFsAdapter } = require('../support-fs-adapter.cjs');
 const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
-const { integrationTest, root, load, core, layout, node, map, plain, tree, TFolder, obsidian, DEFAULT_SETTINGS, fixture, topicNote } = require('../support.cjs');
+const { test, integrationTest, root, load, core, layout, node, map, plain, tree, TFolder, obsidian, DEFAULT_SETTINGS, fixture, topicNote } = require('../support.cjs');
 integrationTest('editing note fields preserves latest AI detail and unrelated frontmatter', async () => {
   const { repo, contents } = fixture(); const n = await topicNote(repo);
   contents.set(n.path, contents.get(n.path).replace('---\n', '---\ncustom: retain me\n'));
@@ -1726,4 +1726,38 @@ integrationTest('switching the interface language never rewrites an existing not
       assert.deepEqual(hashes(contents), before, `${created} -> ${next}: a rebuild after the switch keeps every note as it was`);
     }
   }
+});
+// ---- hypothesis-evidence: topic-kind and hypothesis-strength frontmatter ----
+test('hypothesis-evidence: readTopicKind and readHypothesisStrength treat invalid values as ordinary topic / weak', () => {
+  const { readTopicKind, readHypothesisStrength } = load('note-values.ts');
+  assert.equal(readTopicKind({}), 'topic');
+  for (const bad of ['Hypothesis', 'fact', '', 5, null, ['hypothesis']]) assert.equal(readTopicKind({ 'topic-kind': bad }), 'topic');
+  assert.equal(readTopicKind({ 'topic-kind': 'hypothesis' }), 'hypothesis');
+  assert.equal(readHypothesisStrength({ 'topic-kind': 'hypothesis' }), 'weak', 'missing strength is weak');
+  for (const bad of ['huge', '', 2, null, ['strong']]) assert.equal(readHypothesisStrength({ 'topic-kind': 'hypothesis', 'hypothesis-strength': bad }), 'weak');
+  for (const ok of ['weak', 'medium', 'strong']) assert.equal(readHypothesisStrength({ 'topic-kind': 'hypothesis', 'hypothesis-strength': ok }), ok);
+  assert.equal(readHypothesisStrength({ 'hypothesis-strength': 'strong' }), undefined, 'a non-hypothesis ignores a strength');
+  assert.equal(readHypothesisStrength({ 'topic-kind': 'bogus', 'hypothesis-strength': 'strong' }), undefined);
+});
+integrationTest('hypothesis-evidence: createNote writes the hypothesis keys only when asked, and readNote reads them back', async () => {
+  const { repo, contents } = fixture(); const mapDoc = { ...map([]), id: 'map-a' };
+  const plainNote = await repo.createNote('Fact', 'model-a', mapDoc, 'Map.md', 'workspace');
+  assert.doesNotMatch(contents.get(plainNote.path), /topic-kind|hypothesis-strength/, 'an ordinary topic writes neither key');
+  const read = await repo.readNote(plainNote.path); assert.equal(read.topicKind, undefined); assert.equal(read.hypothesisStrength, undefined);
+  const h = await repo.createNote('Claim', 'model-a', mapDoc, 'Map.md', 'workspace', { hypothesis: true });
+  assert.match(contents.get(h.path), /topic-kind: hypothesis/); assert.match(contents.get(h.path), /hypothesis-strength: weak/);
+  const note = await repo.readNote(h.path); assert.equal(note.topicKind, 'hypothesis'); assert.equal(note.hypothesisStrength, 'weak');
+});
+integrationTest('hypothesis-evidence: writeHypothesisStrength changes only its key, keeps updated, and survives note updates', async () => {
+  const { repo, contents } = fixture(); const mapDoc = { ...map([]), id: 'map-a' };
+  const h = await repo.createNote('Claim', 'model-a', mapDoc, 'Map.md', 'workspace', { hypothesis: true });
+  const before = contents.get(h.path); const updated = (await repo.readNote(h.path)).updated;
+  await repo.writeHypothesisStrength(h.path, 'strong');
+  const after = contents.get(h.path);
+  assert.equal(after, before.replace('hypothesis-strength: weak', 'hypothesis-strength: "strong"'), 'only that line changes');
+  assert.equal((await repo.readNote(h.path)).hypothesisStrength, 'strong'); assert.equal((await repo.readNote(h.path)).updated, updated);
+  await repo.updateNote(h.path, { status: 'completed' });
+  const kept = await repo.readNote(h.path); assert.equal(kept.topicKind, 'hypothesis'); assert.equal(kept.hypothesisStrength, 'strong');
+  contents.set(h.path, after.replace('"strong"', 'bogus'));
+  assert.equal((await repo.readNote(h.path)).hypothesisStrength, 'weak', 'an invalid stored strength reads as weak');
 });

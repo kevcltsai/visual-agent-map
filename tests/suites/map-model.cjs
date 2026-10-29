@@ -1,5 +1,7 @@
 const assert = require('node:assert/strict');
-const { test, core, layout, node, map, plain, tree } = require('../support.cjs');
+const fs = require('node:fs');
+const path = require('node:path');
+const { test, core, layout, node, map, plain, tree, root } = require('../support.cjs');
 // Cards without a measured height use the default, stacked with the fixed gap.
 const ROW = layout.DEFAULT_CARD_HEIGHT + layout.LAYOUT_GAP;
 test('rejects self links, descendant links, missing parent; allows detaching and reparenting', () => {
@@ -360,4 +362,96 @@ test('medianHeight gives the typical rendered card height for unmeasured cards',
   const typical = layout.medianHeight([70, 70, 70]);
   const placed = layout.arrangeMap(nodes, undefined, id => (id === 'r' ? 70 : typical));
   assert.equal(placed.find(item => item.id === 'b').y - placed.find(item => item.id === 'a').y, 70 + layout.LAYOUT_GAP);
+});
+// ---- hypothesis-evidence: topic relations (evidence / prerequisite) ----
+const relMap = (relations, ids = ['a', 'b', 'c', 'h', 'h2']) => { const m = map(ids.map(id => node(id))); if (relations !== undefined) m.topicRelations = relations; return m; };
+const parseWith = (m, extra) => { const logs = []; const parsed = core.parseMap(core.serializeMap(extra ? { ...m, ...extra } : m), (level, message) => logs.push({ level, message })); return { parsed, logs }; };
+const ev = (from, to) => ({ kind: 'evidence', from, to });
+const pre = (from, to) => ({ kind: 'prerequisite', from, to });
+test('hypothesis-evidence: parse drops a non-list topicRelations key, warns once, and does not throw', () => {
+  const { parsed, logs } = parseWith(relMap(), { topicRelations: { kind: 'evidence' } });
+  assert.equal('topicRelations' in parsed, false);
+  assert.equal(logs.length, 1); assert.equal(logs[0].level, 'warn');
+});
+test('hypothesis-evidence: parse drops malformed, unknown-kind, dangling, self and duplicate relations; logs counts only', () => {
+  const secret = 'secret-title-never-logged';
+  const { parsed, logs } = parseWith(relMap([ev('a', 'h'), ev('a', 'h'), { kind: 'weird', from: 'a', to: 'h' }, ev('a', 'missing'), ev('missing', 'h'), ev('a', 'a'), null, 5, { kind: 'evidence', from: 'a' }, { kind: 'evidence', from: 1, to: 'h' }, pre('b', 'c'), pre('b', 'c'), { ...ev('b', 'h2'), note: secret }]));
+  assert.deepEqual(plain(parsed.topicRelations), [ev('a', 'h'), pre('b', 'c'), ev('b', 'h2')]);
+  assert.equal(JSON.stringify(parsed).includes(secret), false, 'extra keys are not carried over');
+  assert.equal(logs.length, 1); assert.equal(logs[0].level, 'warn');
+  assert.match(logs[0].message, /\b10\b/, 'the drop count is logged');
+  assert.equal(logs[0].message.includes(secret), false); assert.doesNotMatch(logs[0].message, /missing|weird|evidence/);
+});
+test('hypothesis-evidence: parse removes the key when nothing valid remains and logs nothing for a clean list', () => {
+  assert.equal('topicRelations' in parseWith(relMap([ev('a', 'a')])).parsed, false);
+  assert.equal('topicRelations' in parseWith(relMap([])).parsed, false, 'an empty list is not kept');
+  const clean = parseWith(relMap([ev('a', 'h')]));
+  assert.deepEqual(clean.logs, []);
+});
+test('hypothesis-evidence: parse keeps a hand-written prerequisite cycle (A->B->A)', () => {
+  const { parsed, logs } = parseWith(relMap([pre('a', 'b'), pre('b', 'a'), pre('a', 'c'), pre('c', 'a')]));
+  assert.equal(parsed.topicRelations.length, 4); assert.deepEqual(logs, []);
+});
+test('hypothesis-evidence: a map without relations serializes byte for byte as before, and the key never appears', () => {
+  const source = relMap(undefined);
+  const text = core.serializeMap(source);
+  assert.equal(text.includes('topicRelations'), false);
+  assert.equal(core.serializeMap(core.parseMap(text)), text);
+  const sample = fs.readFileSync(path.join(root, 'samples/taiwan-travel/en/Map.md'), 'utf8');
+  assert.equal(core.serializeMap(core.parseMap(sample)).includes('topicRelations'), false);
+});
+test('hypothesis-evidence: both relation kinds round-trip through serialize and parse', () => {
+  const source = relMap([ev('a', 'h'), pre('b', 'c'), ev('b', 'h2')]);
+  const { parsed, logs } = parseWith(source);
+  assert.deepEqual(plain(parsed), plain(source)); assert.deepEqual(logs, []);
+  assert.deepEqual(plain(core.parseMap(core.serializeMap(parsed))), plain(source));
+});
+test('hypothesis-evidence: setTopicRelations removes the key for an empty list; removeTopicRelationsFor drops both kinds', () => {
+  const m = relMap([ev('a', 'h'), pre('b', 'c'), pre('c', 'a'), ev('b', 'h2')]);
+  core.removeTopicRelationsFor(m, ['a']);
+  assert.deepEqual(plain(m.topicRelations), [pre('b', 'c'), ev('b', 'h2')]);
+  core.removeTopicRelationsFor(m, ['b']);
+  assert.equal('topicRelations' in m, false, 'the last removal deletes the key');
+  core.setTopicRelations(m, [ev('a', 'h')]); assert.equal(m.topicRelations.length, 1);
+  core.setTopicRelations(m, []); assert.equal('topicRelations' in m, false);
+});
+test('hypothesis-evidence: legalEvidenceTargets excludes itself, ordinary topics and linked hypotheses; a hypothesis source gets none', () => {
+  const m = relMap([ev('a', 'h')]); const isHyp = id => id === 'h' || id === 'h2';
+  assert.deepEqual(core.legalEvidenceTargets(m, 'a', isHyp), ['h2'], 'h is already linked');
+  assert.deepEqual(core.legalEvidenceTargets(m, 'b', isHyp), ['h', 'h2']);
+  assert.deepEqual(plain(core.legalEvidenceTargets(m, 'h', isHyp)), [], 'a hypothesis cannot be evidence');
+  assert.deepEqual(plain(core.legalEvidenceTargets(relMap(undefined), 'a', () => false)), []);
+});
+test('hypothesis-evidence: legalPrerequisiteSources excludes itself, existing sources and anything that would close a cycle, directly or indirectly', () => {
+  const m = relMap([pre('a', 'b')], ['a', 'b', 'c', 'd', 'e']);
+  assert.deepEqual(core.legalPrerequisiteSources(m, 'b'), ['c', 'd', 'e'], 'self and existing source a are out');
+  core.setTopicRelations(m, [pre('b', 'x'), pre('x', 'c')]); m.nodes.push(node('x'));
+  assert.deepEqual(core.legalPrerequisiteSources(m, 'b'), ['a', 'd', 'e'], 'x and c are reachable from b, so they would close a cycle');
+  assert.deepEqual(core.legalPrerequisiteSources(relMap([ev('a', 'b')]), 'b'), ['a', 'c', 'h', 'h2'], 'evidence links do not count');
+});
+test('hypothesis-evidence: legalPrerequisiteSources terminates on a hand-written cycle', () => {
+  const m = relMap([pre('a', 'b'), pre('b', 'a'), pre('b', 'c'), pre('c', 'b')]);
+  assert.deepEqual(core.legalPrerequisiteSources(m, 'a'), ['h', 'h2']);
+  assert.deepEqual(core.legalPrerequisiteSources(m, 'h'), ['a', 'b', 'c', 'h2']);
+});
+test('hypothesis-evidence: retargetTopicRelations merges ends, dedupes, drops self links and reports new cycles', () => {
+  const m = relMap([ev('a', 'h'), ev('b', 'h'), pre('a', 'b'), pre('c', 'a'), pre('b', 'h2')]);
+  const result = core.retargetTopicRelations(m, ['a', 'b'], 'a');
+  assert.deepEqual(plain(m.topicRelations), [ev('a', 'h'), pre('c', 'a'), pre('a', 'h2')], 'two evidence links collapse; a->b becomes a self link and goes');
+  assert.deepEqual(plain(result), { droppedCycles: 0 });
+  const cyc = relMap([pre('a', 'c'), pre('c', 'b')]);
+  const merged = core.retargetTopicRelations(cyc, ['a', 'b'], 'a');
+  assert.deepEqual(plain(cyc.topicRelations), [pre('a', 'c')], 'c->a would close a cycle with a->c');
+  assert.deepEqual(plain(merged), { droppedCycles: 1 });
+  const none = relMap(undefined); assert.deepEqual(plain(core.retargetTopicRelations(none, ['a'], 'b')), { droppedCycles: 0 }); assert.equal('topicRelations' in none, false);
+});
+test('hypothesis-evidence: retargetTopicRelations leaves a pre-existing cycle alone', () => {
+  const m = relMap([pre('a', 'b'), pre('b', 'a'), ev('c', 'h')]);
+  assert.deepEqual(plain(core.retargetTopicRelations(m, ['c'], 'c2')), { droppedCycles: 0 });
+  assert.deepEqual(plain(m.topicRelations), [pre('a', 'b'), pre('b', 'a'), ev('c2', 'h')]);
+});
+test('hypothesis-evidence: dangling AIM convergence still throws', () => {
+  const m = map([{ ...node('a'), aimKind: 'question' }]); m.aim = { branches: [], runs: [] };
+  m.nodes[0].aimConvergesFromNodeIds = ['missing'];
+  assert.throws(() => core.parseMap(core.serializeMap(m)));
 });

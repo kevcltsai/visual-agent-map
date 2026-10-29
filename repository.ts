@@ -26,6 +26,10 @@ import {
   managedHeadingValue,
   managedSectionValue,
   readRelevance,
+  readTopicKind,
+  readHypothesisStrength,
+  type HypothesisStrength,
+  type TopicKind,
   readRelevanceGoal,
   normalizeRelevanceGoal,
   normalizeRelevanceContext,
@@ -91,6 +95,10 @@ export interface Note {
   referencePaths?: string[];
   /** Read-only grading from frontmatter (see readRelevance); absent when missing or invalid. */
   relevance?: NoteRelevance;
+  /** From `topic-kind` frontmatter; set only for a hypothesis (absent = ordinary topic). */
+  topicKind?: Exclude<TopicKind, "topic">;
+  /** From `hypothesis-strength`; set only for a hypothesis (missing or invalid reads as weak). */
+  hypothesisStrength?: HypothesisStrength;
 }
 export type NotePatch = Partial<Note>;
 export interface Settings {
@@ -1149,6 +1157,9 @@ export class Repository {
       ...(typeof fm.tone === "string" && fm.tone ? { toneId: fm.tone } : {}),
       ...(noteContentLanguage(fm) ? { contentLanguage: noteContentLanguage(fm) } : {}),
       ...(readRelevance(fm) ? { relevance: readRelevance(fm) } : {}),
+      ...(readTopicKind(fm) === "hypothesis"
+        ? { topicKind: "hypothesis" as const, hypothesisStrength: readHypothesisStrength(fm) }
+        : {}),
       detailFormatIssues: Array.isArray(fm["detail-format-issues"])
         ? fm["detail-format-issues"].filter((v): v is string => typeof v === "string")
         : [],
@@ -1278,7 +1289,9 @@ export class Repository {
     map: MapDocument,
     mapPath: string,
     modelSource: ModelSource,
-    initial: Pick<NotePatch, "detail" | "thinkingOrigin" | "summary" | "reasoning" | "researchMode"> = {},
+    initial: Pick<NotePatch, "detail" | "thinkingOrigin" | "summary" | "reasoning" | "researchMode"> & {
+      hypothesis?: true;
+    } = {},
     onCreate?: (path: string) => void
   ): Promise<MapNode> {
     const folder = this.topicFolder(mapPath, "Notes");
@@ -1297,6 +1310,7 @@ export class Repository {
       "model-source": modelSource,
       "reasoning-level": initial.reasoning ?? this.settings.cliReasoning,
       ...(initial.researchMode ? { "research-mode": initial.researchMode } : {}),
+      ...(initial.hypothesis ? { "topic-kind": "hypothesis", "hypothesis-strength": "weak" } : {}),
       status: "idea",
       cssclasses: [NOTE_CSS_CLASS]
     };
@@ -1418,6 +1432,13 @@ export class Repository {
   async readRelevanceSetup(path: string): Promise<RelevanceSetup> {
     const fm = frontmatter(await this.app.vault.read(this.file(path)));
     return { goal: readRelevanceGoal(fm), level: readRelevanceLevel(fm), context: readRelevanceContext(fm) };
+  }
+
+  /** Sets a hypothesis note's `hypothesis-strength` only: no other key changes, `updated` is not bumped, nothing rebuilds. */
+  async writeHypothesisStrength(path: string, strength: HypothesisStrength): Promise<void> {
+    await this.app.vault.process(this.file(path), content =>
+      setFrontmatterKeys(content, { "hypothesis-strength": strength })
+    );
   }
 
   /**

@@ -791,3 +791,111 @@ test('sharing viewer language: switching goes through the same text and detail p
   assert.match(main, /doc\.documentElement\.lang = code/);
   assert.match(main, /languageSelect\.setAttribute\("aria-label", ui\.language\)/);
 });
+
+/** In-page WCAG contrast: text colour against the background actually behind it, with every ancestor's opacity and translucent background blended in. */
+const CONTRAST_PROBE = `(() => {
+  const parse = value => {
+    let m = value.match(/^rgba?\\(([^)]+)\\)$/);
+    if (m) { const p = m[1].split(/[ ,\\/]+/).filter(Boolean).map(Number); return { r: p[0], g: p[1], b: p[2], a: p.length > 3 ? p[3] : 1 }; }
+    m = value.match(/^color\\(srgb ([^)]+)\\)$/);
+    if (m) { const p = m[1].split(/[ \\/]+/).filter(Boolean).map(Number); return { r: p[0] * 255, g: p[1] * 255, b: p[2] * 255, a: p.length > 3 ? p[3] : 1 }; }
+    throw new Error('unparsed colour ' + value);
+  };
+  const over = (top, under) => ({ r: top.r * top.a + under.r * (1 - top.a), g: top.g * top.a + under.g * (1 - top.a), b: top.b * top.a + under.b * (1 - top.a), a: 1 });
+  const mix = (o, inner, outer) => ({ r: o * inner.r + (1 - o) * outer.r, g: o * inner.g + (1 - o) * outer.g, b: o * inner.b + (1 - o) * outer.b, a: 1 });
+  const lum = c => { const f = v => { v /= 255; return v <= 0.03928 ? v / 12.92 : Math.pow((v + 0.055) / 1.055, 2.4); }; return 0.2126 * f(c.r) + 0.7152 * f(c.g) + 0.0722 * f(c.b); };
+  const ratio = (a, b) => { const x = lum(a), y = lum(b); return (Math.max(x, y) + 0.05) / (Math.min(x, y) + 0.05); };
+  const contrast = (el, colour) => {
+    const chain = [];
+    for (let e = el; e; e = e.parentElement) chain.unshift(e);
+    const backdrop = [];
+    const inner = [];
+    let below = { r: 255, g: 255, b: 255, a: 1 };
+    chain.forEach((e, i) => {
+      const style = getComputedStyle(e);
+      backdrop[i] = below;
+      inner[i] = over(parse(style.backgroundColor), below);
+      below = mix(Number(style.opacity), inner[i], below);
+    });
+    const lift = start => { let x = start; for (let i = chain.length - 1; i >= 0; i--) x = mix(Number(getComputedStyle(chain[i]).opacity), x, backdrop[i]); return x; };
+    const last = chain.length - 1;
+    const text = lift(over(parse(colour ?? getComputedStyle(el).color), inner[last]));
+    const bg = lift(inner[last]);
+    return ratio(text, bg);
+  };
+  const shown = selector => Array.from(document.querySelectorAll(selector)).filter(e => e.getClientRects().length);
+  const worst = (selector, colourOf) => { const els = shown(selector); if (!els.length) return null; return Math.round(Math.min(...els.map(e => contrast(e, colourOf?.(e)))) * 100) / 100; };
+  const out = {};
+  const text = {
+    outlineItem: '.vam-outline-item:not([aria-current="true"]) .vam-outline-title',
+    outlineCurrent: '.vam-outline-item[aria-current="true"] .vam-outline-title',
+    shared: '.vam-shared',
+    madeWith: '.vam-made-with',
+    cardTitle: '.vam-node:not([data-relevance="side"]) .vam-card-title',
+    cardSummary: '.vam-node:not([data-relevance="side"]) .vam-card-summary',
+    collapse: '.vam-node:not([data-relevance="side"]) .vam-collapse-button',
+    sideTitle: '.vam-node[data-relevance="side"] .vam-card-title',
+    sideSummary: '.vam-node[data-relevance="side"] .vam-card-summary',
+    sideCollapse: '.vam-node[data-relevance="side"] .vam-collapse-button',
+    sideTag: '.vam-node[data-relevance="side"] .vam-relevance-tag',
+    idea: '.vam-status-idea',
+    hint: '.vam-canvas-hint',
+    zoom: '.vam-zoom',
+    goal: '.vam-goal-text'
+  };
+  for (const [name, selector] of Object.entries(text)) out[name] = worst(selector);
+  out.twist = worst('.vam-outline-twist');
+  out.ideaCircle = worst('.vam-status-idea', e => getComputedStyle(e, '::before').borderTopColor);
+  return out;
+})()`;
+
+test('sharing viewer colour: every text and icon in the outline, toolbar, cards and tags meets WCAG AA in both light and dark (headless Chrome, opacity and translucent fills blended in)', async t => {
+  const chrome = findChrome();
+  if (!chrome) return t.skip('no Chrome found (set CHROME_BIN)');
+  const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'vam-share-colour-'));
+  try {
+    const out = path.join(directory, 'colour.html');
+    execFileSync(process.execPath, [path.join(root, 'scripts', 'make-share-demo.mjs'), '--out', out, '--lang', 'en'], { cwd: root });
+    const report = await dumpDomLight(chrome, directory, pathToFileURL(out).href, 120000, async send => {
+      const { evaluate, click, reload, row } = pageTools(send);
+      const measure = async scheme => {
+        await send('Emulation.setEmulatedMedia', { features: [{ name: 'prefers-color-scheme', value: scheme }] });
+        await reload();
+        await click(`${row('heat')} .vam-outline-title`);
+        await new Promise(resolve => setTimeout(resolve, 300));
+        const ratios = await evaluate(CONTRAST_PROBE);
+        const details = await evaluate(`(() => {
+          const side = document.querySelector('.vam-node[data-relevance="side"]');
+          const current = document.querySelector('.vam-outline-item[aria-current="true"]');
+          const plain = document.querySelector('.vam-outline-item:not([aria-current="true"])');
+          return {
+            scheme: matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light',
+            sideBorder: getComputedStyle(side).borderTopStyle, sideOpacity: getComputedStyle(side).opacity, sideTag: !!side.querySelector('.vam-relevance-tag'),
+            currentShadow: getComputedStyle(current).boxShadow, currentBg: getComputedStyle(current).backgroundColor, plainBg: getComputedStyle(plain).backgroundColor, currentWeight: getComputedStyle(current).fontWeight
+          };
+        })()`);
+        return { ratios, details };
+      };
+      return { light: await measure('light'), dark: await measure('dark') };
+    });
+    for (const scheme of ['light', 'dark']) {
+      const { ratios, details } = report[scheme];
+      assert.equal(details.scheme, scheme, 'the emulated scheme took effect');
+      console.log(`contrast ${scheme}: ${JSON.stringify(ratios)}`);
+      for (const [name, value] of Object.entries(ratios)) {
+        assert.notEqual(value, null, `${scheme}: ${name} exists in the demo`);
+        const need = name === 'twist' || name === 'ideaCircle' ? 3 : 4.5;
+        assert.ok(value >= need, `${scheme}: ${name} contrast ${value} must be >= ${need}`);
+      }
+      // Counterexamples: the cues that replace the fade stay visible.
+      assert.equal(details.sideBorder, 'dashed', `${scheme}: a side topic keeps its dashed frame`);
+      assert.equal(details.sideTag, true, `${scheme}: a side topic keeps its tag`);
+      assert.equal(details.sideOpacity, '1', `${scheme}: a side topic is not faded in the viewer`);
+      assert.notEqual(details.currentShadow, 'none', `${scheme}: the current outline row keeps its inset bar`);
+      assert.notEqual(details.currentBg, details.plainBg, `${scheme}: the current outline row keeps its own fill`);
+      assert.equal(details.currentWeight, '600', `${scheme}: the current outline row is bold`);
+    }
+  } finally {
+    try { fs.rmSync(directory, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 }); } catch (error) { console.warn(`could not remove temp directory: ${error.message}`); }
+  }
+});

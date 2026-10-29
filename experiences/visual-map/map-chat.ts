@@ -26,6 +26,42 @@ export type MapChatChip =
 export interface MapChatLine {
   status: "done" | "skipped" | "failed";
   text: string;
+  /**
+   * The picture search this line stands for. The line says how that search stands now (see {@link settledLine}), so it never
+   * claims a result the candidate block above does not show.
+   */
+  images?: MapChatImages;
+}
+
+/** How many candidates of a search can still be picked (the pictures whose thumbnail does not load do not count). */
+export function usableImageCount(block: MapChatImages): number {
+  return block.items.filter(item => !item.broken).length;
+}
+/** The line as it reads now: a picture-search line follows the state of its candidate block; any other line is itself. */
+export function settledLine(line: MapChatLine): MapChatLine {
+  const block = line.images;
+  if (!block) return line;
+  const title = clip(block.nodeTitle);
+  switch (block.state) {
+    case "searching":
+      return { ...line, status: "done", text: t("ui.map_chat_line_images_started_0", title) };
+    case "ready": {
+      const usable = usableImageCount(block);
+      return usable
+        ? { ...line, status: "done", text: t("ui.map_chat_line_images_ready_0_1", title, usable) }
+        : { ...line, status: "skipped", text: t("ui.map_chat_line_images_none_0", title) };
+    }
+    case "empty":
+      return { ...line, status: "skipped", text: t("ui.map_chat_line_images_none_0", title) };
+    case "failed":
+      return {
+        ...line,
+        status: "failed",
+        text: t("ui.map_chat_line_images_failed_0_1", title, clip(block.reason ?? "", 160))
+      };
+    case "stopped":
+      return { ...line, status: "skipped", text: t("ui.map_chat_line_images_stopped_0", title) };
+  }
 }
 
 /** What a question was sent with, kept so "say it in more detail" can send the same question again. */
@@ -375,7 +411,7 @@ export class MapChatPanel {
     return turns;
   }
   transcript(): MapChatMessage[] {
-    return this.messages.map(message => ({ ...message, lines: [...message.lines] }));
+    return this.messages.map(message => ({ ...message, lines: message.lines.map(settledLine) }));
   }
 
   /**
@@ -716,7 +752,7 @@ export class MapChatPanel {
     block.stop = undefined;
     this.renderLog();
     if (block.state === "ready")
-      this.announceImages(t("ui.map_chat_images_ready_0_1", block.items.length, clip(block.nodeTitle)));
+      this.announceImages(t("ui.map_chat_images_ready_0_1", usableImageCount(block), clip(block.nodeTitle)));
     else if (block.state === "empty") this.announceImages(t("ui.map_chat_images_none"));
     else if (block.state === "failed")
       this.announceImages(t("ui.map_chat_images_failed_0", clip(block.reason ?? "", 160)));
@@ -1320,7 +1356,10 @@ export class MapChatPanel {
       t("ui.map_chat_overflow_note"),
       t("ui.map_chat_images_source"),
       more ? t("ui.map_chat_more_detail") : "",
-      message.lines.map(line => `${line.status}:${line.text}`).join("\n"),
+      message.lines
+        .map(settledLine)
+        .map(line => `${line.status}:${line.text}`)
+        .join("\n"),
       message.plan
         ? `plan:${message.plan.state}:${message.plan.items.length}:${message.plan.estimate}:${message.plan.groups?.map(group => `${group.label}${group.danger ? "!" : ""}`).join("|") ?? ""}`
         : "",
@@ -1440,8 +1479,9 @@ export class MapChatPanel {
    */
   private buildLines(row: HTMLElement, message: MapChatMessage): void {
     const closing = t("ui.map_chat_not_undoable");
-    const results = message.lines.filter(line => line.text !== closing);
-    const notes = message.lines.filter(line => line.text === closing);
+    const lines = message.lines.map(settledLine);
+    const results = lines.filter(line => line.text !== closing);
+    const notes = lines.filter(line => line.text === closing);
     const list = row.createDiv({ cls: "vam-map-chat-lines" });
     const fold = results.length > MAP_CHAT_LINES_FOLD_ABOVE;
     const shown = !fold || message.linesOpen === true;
@@ -1546,17 +1586,19 @@ export class MapChatPanel {
       cls: `vam-map-chat-images is-${block.state}`,
       attr: { role: "group", "aria-label": t("ui.map_chat_images_label_0", clip(block.nodeTitle)) }
     });
-    const text =
+    const statusText = (): string =>
       block.state === "searching"
         ? t("ui.map_chat_images_searching_0", clip(block.query, 80))
         : block.state === "ready"
-          ? t("ui.map_chat_images_ready_0_1", block.items.length, clip(block.nodeTitle))
+          ? usableImageCount(block)
+            ? t("ui.map_chat_images_ready_0_1", usableImageCount(block), clip(block.nodeTitle))
+            : t("ui.map_chat_images_none")
           : block.state === "empty"
             ? t("ui.map_chat_images_none")
             : block.state === "failed"
               ? t("ui.map_chat_images_failed_0", clip(block.reason ?? "", 160))
               : t("ui.map_chat_images_stopped");
-    box.createDiv({ cls: "vam-map-chat-images-status", text });
+    box.createDiv({ cls: "vam-map-chat-images-status", text: statusText() });
     if (block.state === "searching" && block.stop) {
       const stop = box.createEl("button", {
         cls: "vam-map-chat-images-stop",
@@ -1567,7 +1609,9 @@ export class MapChatPanel {
     }
     if (block.state === "ready") {
       const list = box.createDiv({ cls: "vam-map-chat-images-list", attr: { role: "list" } });
-      block.items.forEach(item => this.buildImageItem(list, block, item));
+      // Pictures that cannot be loaded come last, so the ones that can be picked are together at the top.
+      const ordered = [...block.items.filter(item => !item.broken), ...block.items.filter(item => item.broken)];
+      ordered.forEach(item => this.buildImageItem(list, block, item));
     }
     if (block.notice)
       box.createDiv({ cls: "vam-map-chat-images-notice", text: block.notice, attr: { role: "status" } });
@@ -1585,27 +1629,36 @@ export class MapChatPanel {
         "aria-disabled": String(!!item.inserted || !!item.broken || !!item.busy)
       }
     });
+    // Inserted and cannot-load both cannot be pressed, but they are not alike: the first keeps its picture and says so with a
+    // tick and the accent colour, the second has no picture at all (a dashed frame and a muted word).
+    pick.toggleClass("is-inserted", !!item.inserted);
+    pick.toggleClass("is-broken", !!item.broken && !item.inserted);
     this.pickEls.set(item, pick);
     // Only the https address the parser kept; no referrer is sent, and nothing runs.
-    const thumb = item.broken
-      ? null
-      : pick.createEl("img", {
-          cls: "vam-map-chat-images-thumb",
-          attr: { src: candidate.url, alt: "", loading: "lazy", referrerpolicy: "no-referrer" }
-        });
-    pick.createSpan({ cls: "vam-map-chat-images-title", text: clip(candidate.title, 80) });
-    if (item.inserted)
-      pick.createSpan({
-        cls: "vam-map-chat-images-state",
-        text: t("ui.map_chat_images_inserted_0", clip(item.inserted))
+    if (item.broken) {
+      // No picture at all: a dashed frame in its place.
+      const gap = pick.createDiv({ cls: "vam-map-chat-images-missing", attr: { "aria-hidden": "true" } });
+      setIcon(gap.createSpan({ cls: "vam-map-chat-images-missing-icon" }), "image-off");
+    } else {
+      const thumb = pick.createEl("img", {
+        cls: "vam-map-chat-images-thumb",
+        attr: { src: candidate.url, alt: "", loading: "lazy", referrerpolicy: "no-referrer" }
       });
-    if (item.broken) pick.createSpan({ cls: "vam-map-chat-images-state", text: t("ui.map_chat_images_broken") });
-    thumb?.addEventListener("error", () => {
-      item.broken = true;
-      pick.setAttr("aria-disabled", "true");
-      thumb.remove();
-      pick.createSpan({ cls: "vam-map-chat-images-state", text: t("ui.map_chat_images_broken") });
-    });
+      thumb.addEventListener("error", () => {
+        item.broken = true;
+        // The row is laid out again: this card moves behind the ones that load, and the sentence above counts only those.
+        // The keyboard stays where it is, unless it was on this very button.
+        const focused = this.host.activeElement() === pick;
+        this.renderLog();
+        if (focused) this.pickEls.get(item)?.focus();
+      });
+    }
+    pick.createSpan({ cls: "vam-map-chat-images-title", text: clip(candidate.title, 80) });
+    if (item.inserted) {
+      const state = pick.createSpan({ cls: "vam-map-chat-images-state is-inserted" });
+      setIcon(state.createSpan({ cls: "vam-map-chat-images-state-icon" }), "check");
+      state.createSpan({ text: t("ui.map_chat_images_inserted_0", clip(item.inserted)) });
+    } else if (item.broken) pick.createSpan({ cls: "vam-map-chat-images-state", text: t("ui.map_chat_images_broken") });
     pick.addEventListener("click", () => this.pickImage(block, item));
     cell.createEl("a", {
       cls: "vam-map-chat-images-source",

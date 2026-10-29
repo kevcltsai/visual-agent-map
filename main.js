@@ -1135,10 +1135,15 @@ var en = {
   "ui.map_chat_do_find_images_0": "Start looking for pictures for \u201C{0}\u201D",
   "ui.map_chat_skip_images_one_card": "name exactly one card first",
   "ui.map_chat_skip_images_limit_0": "at most {0} picture searches per reply",
+  "ui.map_chat_line_images_started_0": "Started looking for pictures for \u201C{0}\u201D",
+  "ui.map_chat_line_images_ready_0_1": "Done: found {1} pictures for \u201C{0}\u201D",
+  "ui.map_chat_line_images_none_0": "No loadable picture was found for \u201C{0}\u201D",
+  "ui.map_chat_line_images_failed_0_1": "Failed: picture search for \u201C{0}\u201D ({1})",
+  "ui.map_chat_line_images_stopped_0": "Stopped: picture search for \u201C{0}\u201D",
   "ui.map_chat_images_label_0": "Picture candidates for \u201C{0}\u201D",
   "ui.map_chat_images_searching_0": "Looking for pictures: {0}",
   "ui.map_chat_images_stop": "Stop searching",
-  "ui.map_chat_images_ready_0_1": "Found {0} pictures. Pick one to insert into \u201C{1}\u201D.",
+  "ui.map_chat_images_ready_0_1": "Found {0} usable pictures. Pick one to insert into \u201C{1}\u201D.",
   "ui.map_chat_images_none": "No loadable picture was found. Nothing was inserted.",
   "ui.map_chat_images_failed_0": "The picture search failed: {0}",
   "ui.map_chat_images_stopped": "The picture search was stopped. Nothing was inserted.",
@@ -3098,10 +3103,15 @@ var zhCN = {
   "ui.map_chat_do_find_images_0": "\u5F00\u59CB\u4E3A\u201C{0}\u201D\u627E\u56FE",
   "ui.map_chat_skip_images_one_card": "\u8BF7\u6307\u5B9A\u4E00\u5F20\u5361",
   "ui.map_chat_skip_images_limit_0": "\u4E00\u6B21\u6700\u591A\u627E {0} \u7EC4\u56FE",
+  "ui.map_chat_line_images_started_0": "\u5DF2\u5F00\u59CB\u4E3A\u201C{0}\u201D\u627E\u56FE",
+  "ui.map_chat_line_images_ready_0_1": "\u5B8C\u6210\uFF1A\u4E3A\u201C{0}\u201D\u627E\u5230 {1} \u5F20\u56FE",
+  "ui.map_chat_line_images_none_0": "\u4E3A\u201C{0}\u201D\u6CA1\u6709\u627E\u5230\u53EF\u52A0\u8F7D\u7684\u56FE",
+  "ui.map_chat_line_images_failed_0_1": "\u5931\u8D25\uFF1A\u4E3A\u201C{0}\u201D\u627E\u56FE\uFF08{1}\uFF09",
+  "ui.map_chat_line_images_stopped_0": "\u5DF2\u505C\u6B62\uFF1A\u4E3A\u201C{0}\u201D\u627E\u56FE",
   "ui.map_chat_images_label_0": "\u201C{0}\u201D\u7684\u5019\u9009\u56FE",
   "ui.map_chat_images_searching_0": "\u6B63\u5728\u627E\u56FE\uFF1A{0}",
   "ui.map_chat_images_stop": "\u505C\u6B62\u627E\u56FE",
-  "ui.map_chat_images_ready_0_1": "\u627E\u5230 {0} \u5F20\u56FE\uFF0C\u53EF\u9009\u4E00\u5F20\u63D2\u5165\u201C{1}\u201D\u3002",
+  "ui.map_chat_images_ready_0_1": "\u627E\u5230 {0} \u5F20\u53EF\u7528\u7684\u56FE\uFF0C\u53EF\u9009\u4E00\u5F20\u63D2\u5165\u201C{1}\u201D\u3002",
   "ui.map_chat_images_none": "\u6CA1\u6709\u627E\u5230\u53EF\u8F7D\u5165\u7684\u56FE\uFF0C\u6CA1\u6709\u63D2\u5165\u4EFB\u4F55\u5185\u5BB9\u3002",
   "ui.map_chat_images_failed_0": "\u627E\u56FE\u5931\u8D25\uFF1A{0}",
   "ui.map_chat_images_stopped": "\u5DF2\u505C\u6B62\u627E\u56FE\uFF0C\u6CA1\u6709\u63D2\u5165\u4EFB\u4F55\u5185\u5BB9\u3002",
@@ -5061,10 +5071,15 @@ var zhTW = {
   "ui.map_chat_do_find_images_0": "\u958B\u59CB\u70BA\u300C{0}\u300D\u627E\u5716",
   "ui.map_chat_skip_images_one_card": "\u8ACB\u6307\u5B9A\u4E00\u5F35\u5361",
   "ui.map_chat_skip_images_limit_0": "\u4E00\u6B21\u6700\u591A\u627E {0} \u7D44\u5716",
+  "ui.map_chat_line_images_started_0": "\u5DF2\u958B\u59CB\u70BA\u300C{0}\u300D\u627E\u5716",
+  "ui.map_chat_line_images_ready_0_1": "\u5B8C\u6210\uFF1A\u70BA\u300C{0}\u300D\u627E\u5230 {1} \u5F35\u5716",
+  "ui.map_chat_line_images_none_0": "\u70BA\u300C{0}\u300D\u6C92\u6709\u627E\u5230\u53EF\u8F09\u5165\u7684\u5716",
+  "ui.map_chat_line_images_failed_0_1": "\u5931\u6557\uFF1A\u70BA\u300C{0}\u300D\u627E\u5716\uFF08{1}\uFF09",
+  "ui.map_chat_line_images_stopped_0": "\u5DF2\u505C\u6B62\uFF1A\u70BA\u300C{0}\u300D\u627E\u5716",
   "ui.map_chat_images_label_0": "\u300C{0}\u300D\u7684\u5019\u9078\u5716",
   "ui.map_chat_images_searching_0": "\u6B63\u5728\u627E\u5716\uFF1A{0}",
   "ui.map_chat_images_stop": "\u505C\u6B62\u627E\u5716",
-  "ui.map_chat_images_ready_0_1": "\u627E\u5230 {0} \u5F35\u5716\uFF0C\u53EF\u9078\u4E00\u5F35\u63D2\u5165\u300C{1}\u300D\u3002",
+  "ui.map_chat_images_ready_0_1": "\u627E\u5230 {0} \u5F35\u53EF\u7528\u7684\u5716\uFF0C\u53EF\u9078\u4E00\u5F35\u63D2\u5165\u300C{1}\u300D\u3002",
   "ui.map_chat_images_none": "\u6C92\u6709\u627E\u5230\u53EF\u8F09\u5165\u7684\u5716\uFF0C\u6C92\u6709\u63D2\u5165\u4EFB\u4F55\u5167\u5BB9\u3002",
   "ui.map_chat_images_failed_0": "\u627E\u5716\u5931\u6557\uFF1A{0}",
   "ui.map_chat_images_stopped": "\u5DF2\u505C\u6B62\u627E\u5716\uFF0C\u6C92\u6709\u63D2\u5165\u4EFB\u4F55\u5167\u5BB9\u3002",
@@ -21483,6 +21498,33 @@ function renderChatMarkdown(parent, text11, overflowNote = "") {
 }
 
 // experiences/visual-map/map-chat.ts
+function usableImageCount(block) {
+  return block.items.filter((item) => !item.broken).length;
+}
+function settledLine(line) {
+  var _a2;
+  const block = line.images;
+  if (!block) return line;
+  const title = clip(block.nodeTitle);
+  switch (block.state) {
+    case "searching":
+      return { ...line, status: "done", text: t("ui.map_chat_line_images_started_0", title) };
+    case "ready": {
+      const usable = usableImageCount(block);
+      return usable ? { ...line, status: "done", text: t("ui.map_chat_line_images_ready_0_1", title, usable) } : { ...line, status: "skipped", text: t("ui.map_chat_line_images_none_0", title) };
+    }
+    case "empty":
+      return { ...line, status: "skipped", text: t("ui.map_chat_line_images_none_0", title) };
+    case "failed":
+      return {
+        ...line,
+        status: "failed",
+        text: t("ui.map_chat_line_images_failed_0_1", title, clip((_a2 = block.reason) != null ? _a2 : "", 160))
+      };
+    case "stopped":
+      return { ...line, status: "skipped", text: t("ui.map_chat_line_images_stopped_0", title) };
+  }
+}
 var LABEL_LIMIT = 40;
 var clip = (value, limit = LABEL_LIMIT) => {
   const text11 = value.replace(/\s+/g, " ").trim();
@@ -21675,7 +21717,7 @@ var MapChatPanel = class {
     return turns;
   }
   transcript() {
-    return this.messages.map((message) => ({ ...message, lines: [...message.lines] }));
+    return this.messages.map((message) => ({ ...message, lines: message.lines.map(settledLine) }));
   }
   /**
    * Puts the panel into `parent` (built there the first time, moved there afterwards). "side" makes it the first child of
@@ -22015,7 +22057,7 @@ var MapChatPanel = class {
     block.stop = void 0;
     this.renderLog();
     if (block.state === "ready")
-      this.announceImages(t("ui.map_chat_images_ready_0_1", block.items.length, clip(block.nodeTitle)));
+      this.announceImages(t("ui.map_chat_images_ready_0_1", usableImageCount(block), clip(block.nodeTitle)));
     else if (block.state === "empty") this.announceImages(t("ui.map_chat_images_none"));
     else if (block.state === "failed")
       this.announceImages(t("ui.map_chat_images_failed_0", clip((_a2 = block.reason) != null ? _a2 : "", 160)));
@@ -22581,7 +22623,7 @@ ${text11}` : text11;
       t("ui.map_chat_overflow_note"),
       t("ui.map_chat_images_source"),
       more ? t("ui.map_chat_more_detail") : "",
-      message.lines.map((line) => `${line.status}:${line.text}`).join("\n"),
+      message.lines.map(settledLine).map((line) => `${line.status}:${line.text}`).join("\n"),
       message.plan ? `plan:${message.plan.state}:${message.plan.items.length}:${message.plan.estimate}:${(_b2 = (_a2 = message.plan.groups) == null ? void 0 : _a2.map((group) => `${group.label}${group.danger ? "!" : ""}`).join("|")) != null ? _b2 : ""}` : "",
       message.choices ? `choices:${message.choices.picked}:${message.choices.options.map((o) => o.label).join("|")}` : "",
       ((_c = message.images) != null ? _c : []).map(
@@ -22685,8 +22727,9 @@ ${text11}` : text11;
    */
   buildLines(row, message) {
     const closing = t("ui.map_chat_not_undoable");
-    const results = message.lines.filter((line) => line.text !== closing);
-    const notes = message.lines.filter((line) => line.text === closing);
+    const lines = message.lines.map(settledLine);
+    const results = lines.filter((line) => line.text !== closing);
+    const notes = lines.filter((line) => line.text === closing);
     const list = row.createDiv({ cls: "vam-map-chat-lines" });
     const fold2 = results.length > MAP_CHAT_LINES_FOLD_ABOVE;
     const shown = !fold2 || message.linesOpen === true;
@@ -22776,13 +22819,15 @@ ${text11}` : text11;
    * referrer. All text goes in as text.
    */
   buildImages(row, block) {
-    var _a2;
     const box = row.createDiv({
       cls: `vam-map-chat-images is-${block.state}`,
       attr: { role: "group", "aria-label": t("ui.map_chat_images_label_0", clip(block.nodeTitle)) }
     });
-    const text11 = block.state === "searching" ? t("ui.map_chat_images_searching_0", clip(block.query, 80)) : block.state === "ready" ? t("ui.map_chat_images_ready_0_1", block.items.length, clip(block.nodeTitle)) : block.state === "empty" ? t("ui.map_chat_images_none") : block.state === "failed" ? t("ui.map_chat_images_failed_0", clip((_a2 = block.reason) != null ? _a2 : "", 160)) : t("ui.map_chat_images_stopped");
-    box.createDiv({ cls: "vam-map-chat-images-status", text: text11 });
+    const statusText = () => {
+      var _a2;
+      return block.state === "searching" ? t("ui.map_chat_images_searching_0", clip(block.query, 80)) : block.state === "ready" ? usableImageCount(block) ? t("ui.map_chat_images_ready_0_1", usableImageCount(block), clip(block.nodeTitle)) : t("ui.map_chat_images_none") : block.state === "empty" ? t("ui.map_chat_images_none") : block.state === "failed" ? t("ui.map_chat_images_failed_0", clip((_a2 = block.reason) != null ? _a2 : "", 160)) : t("ui.map_chat_images_stopped");
+    };
+    box.createDiv({ cls: "vam-map-chat-images-status", text: statusText() });
     if (block.state === "searching" && block.stop) {
       const stop = box.createEl("button", {
         cls: "vam-map-chat-images-stop",
@@ -22790,13 +22835,14 @@ ${text11}` : text11;
         attr: { type: "button" }
       });
       stop.addEventListener("click", () => {
-        var _a3;
-        return (_a3 = block.stop) == null ? void 0 : _a3.call(block);
+        var _a2;
+        return (_a2 = block.stop) == null ? void 0 : _a2.call(block);
       });
     }
     if (block.state === "ready") {
       const list = box.createDiv({ cls: "vam-map-chat-images-list", attr: { role: "list" } });
-      block.items.forEach((item) => this.buildImageItem(list, block, item));
+      const ordered = [...block.items.filter((item) => !item.broken), ...block.items.filter((item) => item.broken)];
+      ordered.forEach((item) => this.buildImageItem(list, block, item));
     }
     if (block.notice)
       box.createDiv({ cls: "vam-map-chat-images-notice", text: block.notice, attr: { role: "status" } });
@@ -22812,24 +22858,31 @@ ${text11}` : text11;
         "aria-disabled": String(!!item.inserted || !!item.broken || !!item.busy)
       }
     });
+    pick.toggleClass("is-inserted", !!item.inserted);
+    pick.toggleClass("is-broken", !!item.broken && !item.inserted);
     this.pickEls.set(item, pick);
-    const thumb = item.broken ? null : pick.createEl("img", {
-      cls: "vam-map-chat-images-thumb",
-      attr: { src: candidate.url, alt: "", loading: "lazy", referrerpolicy: "no-referrer" }
-    });
-    pick.createSpan({ cls: "vam-map-chat-images-title", text: clip(candidate.title, 80) });
-    if (item.inserted)
-      pick.createSpan({
-        cls: "vam-map-chat-images-state",
-        text: t("ui.map_chat_images_inserted_0", clip(item.inserted))
+    if (item.broken) {
+      const gap = pick.createDiv({ cls: "vam-map-chat-images-missing", attr: { "aria-hidden": "true" } });
+      (0, import_obsidian16.setIcon)(gap.createSpan({ cls: "vam-map-chat-images-missing-icon" }), "image-off");
+    } else {
+      const thumb = pick.createEl("img", {
+        cls: "vam-map-chat-images-thumb",
+        attr: { src: candidate.url, alt: "", loading: "lazy", referrerpolicy: "no-referrer" }
       });
-    if (item.broken) pick.createSpan({ cls: "vam-map-chat-images-state", text: t("ui.map_chat_images_broken") });
-    thumb == null ? void 0 : thumb.addEventListener("error", () => {
-      item.broken = true;
-      pick.setAttr("aria-disabled", "true");
-      thumb.remove();
-      pick.createSpan({ cls: "vam-map-chat-images-state", text: t("ui.map_chat_images_broken") });
-    });
+      thumb.addEventListener("error", () => {
+        var _a2;
+        item.broken = true;
+        const focused = this.host.activeElement() === pick;
+        this.renderLog();
+        if (focused) (_a2 = this.pickEls.get(item)) == null ? void 0 : _a2.focus();
+      });
+    }
+    pick.createSpan({ cls: "vam-map-chat-images-title", text: clip(candidate.title, 80) });
+    if (item.inserted) {
+      const state = pick.createSpan({ cls: "vam-map-chat-images-state is-inserted" });
+      (0, import_obsidian16.setIcon)(state.createSpan({ cls: "vam-map-chat-images-state-icon" }), "check");
+      state.createSpan({ text: t("ui.map_chat_images_inserted_0", clip(item.inserted)) });
+    } else if (item.broken) pick.createSpan({ cls: "vam-map-chat-images-state", text: t("ui.map_chat_images_broken") });
     pick.addEventListener("click", () => this.pickImage(block, item));
     cell.createEl("a", {
       cls: "vam-map-chat-images-source",
@@ -45610,6 +45663,12 @@ ${note.detail.trim()}` : "",
     }
   }
   chatLine(label, outcome) {
+    if (outcome.status === "done" && outcome.images)
+      return {
+        status: "done",
+        text: t("ui.map_chat_line_images_started_0", outcome.images.nodeTitle),
+        images: outcome.images
+      };
     if (outcome.status === "done") return { status: "done", text: t("ui.map_chat_line_done_0", label) };
     return {
       status: outcome.status,
@@ -46262,7 +46321,7 @@ ${note.detail.trim()}` : "",
           }
         };
         chat.addImages(block);
-        settle({ status: "done" });
+        settle({ status: "done", images: block });
         try {
           await this.runImageSearch(block, controller, chat, note.model);
         } finally {
@@ -46373,7 +46432,7 @@ ${addition}` : addition });
       question: question.text,
       refs,
       answer: answer.text,
-      lines: answer.lines.map((line) => line.text),
+      lines: answer.lines.map((line) => settledLine(line).text),
       ...answer.plan ? { plan: answer.plan.state } : {},
       images: ((_e = answer.images) != null ? _e : []).map((block) => ({
         nodeTitle: block.nodeTitle,

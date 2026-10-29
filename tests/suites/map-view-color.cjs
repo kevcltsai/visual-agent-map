@@ -46,7 +46,7 @@ body { margin: 0; width: 1200px; height: 800px; background: var(--background-pri
   <div class="vam-canvas-overlay"><div class="vam-map-tools"><button class="is-active">Done selecting</button><button class="vam-relevance-goal">Prioritise by goal</button></div></div>
 </div>
 </div>
-<div class="modal vam-next-modal" style="background:var(--background-primary);width:400px"><div class="modal-content"><div class="vam-next-actions"><button class="vam-discard">Remove from map</button></div></div></div>
+<div class="modal vam-next-modal" style="background:var(--background-primary);width:400px"><div class="modal-content"><div class="vam-next-actions"><button class="vam-discard">Remove from map</button></div><div class="vam-share-note vam-share-warning">3 images could not be read</div></div></div>
 </body></html>`;
 
 // [name, selector, kind, need, options]. kind: color (text colour), stroke (SVG stroke), dot (::before fill), ring (::before border).
@@ -69,6 +69,7 @@ const CASES = [
   ['error-dot', '.vam-status-error', 'dot', 3],
   ['card-error', '.vam-card-error', 'color', 4.5],
   ['discard', '.vam-discard', 'color', 4.5, { buttonEnvelope: true }],
+  ['share-warning', '.vam-share-note.vam-share-warning', 'color', 4.5],
   ['switcher-icon', '.vam-map-switcher-icon svg', 'color', 3],
   ['ai-explore', '.vam-ai-explore', 'color', 4.5, { buttonEnvelope: true }],
   ['ai-explore-hover', '.vam-ai-explore', 'color', 4.5, { buttonEnvelope: true, hover: true }],

@@ -1290,7 +1290,8 @@ button.vam-template-section-header:hover { background: var(--background-modifier
 .vam-share-progress { color: var(--text-muted); }
 .vam-share-error { color: var(--text-error); }
 .vam-share-note { margin-top: 6px; color: var(--text-muted); font-size: var(--font-ui-smaller); line-height: 1.5; }
-.vam-share-note.vam-share-warning { color: var(--text-warning, var(--text-normal)); }
+/* Obsidian's warning orange is 2.95:1 on the default light dialog; mixed toward --text-normal it stays orange and readable (5.7 light, 8.9 dark) */
+.vam-share-note.vam-share-warning { color: color-mix(in srgb, var(--text-warning, var(--text-normal)) 60%, var(--text-normal)); }
 .vam-share-note.vam-share-error { color: var(--text-error); }
 .vam-share-publish { margin-top: 10px; }
 .vam-share-publish-text { display: block; width: 100%; margin-top: 8px; font-size: var(--font-ui-smaller); }

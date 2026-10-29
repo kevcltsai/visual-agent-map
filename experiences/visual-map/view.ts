@@ -1,6 +1,7 @@
 import {
   defaultOutputLanguage,
   existingNoteLanguage,
+  mapChatLanguageSources,
   outputLanguageForMap,
   rememberedOutputLanguage,
   resolveAimContentLanguage
@@ -10384,7 +10385,7 @@ export class VisualAgentMapView extends ItemView {
       message,
       context,
       language: settings.language,
-      contentLanguage: outputLanguageForMap(map, settings.language, message),
+      contentLanguage: outputLanguageForMap(map, settings.language, ...mapChatLanguageSources(message)),
       style: redo ? "detailed" : normalizeMapChatStyle(settings.mapChatStyle),
       ...(redo ? { redo: true } : {}),
       model: settings.mapChatModel?.trim() || settings.cliModel,

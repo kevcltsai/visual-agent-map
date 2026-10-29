@@ -36,17 +36,21 @@ const UNDECIDED_HAN = "han";
 type Signal = DetectedLanguage | typeof UNDECIDED_HAN;
 
 /**
- * The part of `text` that is the user's own words (0.28 ticket 06): fenced code blocks (an unclosed fence is kept),
- * inline code, Markdown images and links (title and URL) and bare URLs (ASCII only, so Chinese written right after a URL stays) are
- * removed. Wiki links keep their text. When
- * nothing with a letter is left, the original text is used, so a lone link title still has a signal.
+ * `text` without what is not the user's own words (0.28 ticket 06): fenced code blocks (an unclosed fence is kept),
+ * inline code, Markdown images and links (title and URL) and bare URLs (ASCII only, so Chinese written right after a URL
+ * stays). Wiki links keep their text.
  */
-function detectionText(text: string): string {
-  const cleaned = text
+function proseOf(text: string): string {
+  return text
     .replace(/^[ \t]*(`{3,}|~{3,})[^\n]*\n[\s\S]*?\n[ \t]*\1[`~]*[ \t]*$/gm, "")
     .replace(/`[^`\n]*`/g, "")
     .replace(/!?\[[^\]\n]*\]\([^)\n]*\)/g, "")
     .replace(/https?:\/\/[\x21-\x7E]+/g, "");
+}
+
+/** The text detection reads: {@link proseOf}, or the original text when no letter is left (a lone link title). */
+function detectionText(text: string): string {
+  const cleaned = proseOf(text);
   return /\p{L}/u.test(cleaned) ? cleaned : text;
 }
 
@@ -234,6 +238,27 @@ export function outputLanguageForMap(
   ...sources: (string | undefined)[]
 ): ContentLanguage {
   return rememberedOutputLanguage(map) ?? chooseAimContentLanguage(uiLanguage, ...sources);
+}
+
+/**
+ * The text sources the map chat reads the output language from (0.28 ticket 07, decision
+ * 2026-10-30-map-chat-instruction-language#1). The instruction is the first paragraph: the text before the first blank
+ * line (a line with only whitespace; `\n` and `\r\n` both count) outside a code fence, when more text follows it. Returns
+ * `[instruction, whole message]`, so {@link chooseAimContentLanguage} takes the first source with letters: what the user
+ * typed decides. When the instruction has no letters of its own once code, links and URLs are removed (symbols, emoji,
+ * a code block, a lone URL), or the message has no such blank line, the result is `[whole message]`.
+ */
+export function mapChatLanguageSources(message: string): string[] {
+  const blankLine = /\r?\n[ \t]*\r?\n/g;
+  for (let boundary = blankLine.exec(message); boundary; boundary = blankLine.exec(message)) {
+    const instruction = message.slice(0, boundary.index);
+    const fences = instruction.match(/^[ \t]*(?:`{3,}|~{3,})/gm)?.length ?? 0;
+    if (fences % 2 === 1) continue;
+    const rest = message.slice(boundary.index + boundary[0].length);
+    if (!/\S/.test(rest) || !/\p{L}/u.test(proseOf(instruction))) return [message];
+    return [instruction, message];
+  }
+  return [message];
 }
 
 /**

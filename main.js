@@ -15347,8 +15347,11 @@ var hanScriptVotes = (text11) => {
 var OUTPUT_ROWS = OUTPUT_LANGUAGES;
 var isOutputOnlyLanguage = (value) => OUTPUT_LANGUAGES.some((item) => item.id === value);
 var UNDECIDED_HAN = "han";
+function proseOf(text11) {
+  return text11.replace(/^[ \t]*(`{3,}|~{3,})[^\n]*\n[\s\S]*?\n[ \t]*\1[`~]*[ \t]*$/gm, "").replace(/`[^`\n]*`/g, "").replace(/!?\[[^\]\n]*\]\([^)\n]*\)/g, "").replace(/https?:\/\/[\x21-\x7E]+/g, "");
+}
 function detectionText(text11) {
-  const cleaned = text11.replace(/^[ \t]*(`{3,}|~{3,})[^\n]*\n[\s\S]*?\n[ \t]*\1[`~]*[ \t]*$/gm, "").replace(/`[^`\n]*`/g, "").replace(/!?\[[^\]\n]*\]\([^)\n]*\)/g, "").replace(/https?:\/\/[\x21-\x7E]+/g, "");
+  const cleaned = proseOf(text11);
   return /\p{L}/u.test(cleaned) ? cleaned : text11;
 }
 function signalOf(source) {
@@ -15448,6 +15451,19 @@ function resolveAimContentLanguage(map, uiLanguage) {
 function outputLanguageForMap(map, uiLanguage, ...sources2) {
   var _a2;
   return (_a2 = rememberedOutputLanguage(map)) != null ? _a2 : chooseAimContentLanguage(uiLanguage, ...sources2);
+}
+function mapChatLanguageSources(message) {
+  var _a2, _b2;
+  const blankLine = /\r?\n[ \t]*\r?\n/g;
+  for (let boundary = blankLine.exec(message); boundary; boundary = blankLine.exec(message)) {
+    const instruction = message.slice(0, boundary.index);
+    const fences = (_b2 = (_a2 = instruction.match(/^[ \t]*(?:`{3,}|~{3,})/gm)) == null ? void 0 : _a2.length) != null ? _b2 : 0;
+    if (fences % 2 === 1) continue;
+    const rest = message.slice(boundary.index + boundary[0].length);
+    if (!/\S/.test(rest) || !/\p{L}/u.test(proseOf(instruction))) return [message];
+    return [instruction, message];
+  }
+  return [message];
 }
 var resolveMapOutputLanguage = resolveAimContentLanguage;
 function resolveAimNoteLanguage(map, uiLanguage) {
@@ -45430,7 +45446,7 @@ ${note.detail.trim()}` : "",
       message,
       context,
       language: settings.language,
-      contentLanguage: outputLanguageForMap(map, settings.language, message),
+      contentLanguage: outputLanguageForMap(map, settings.language, ...mapChatLanguageSources(message)),
       style: redo ? "detailed" : normalizeMapChatStyle(settings.mapChatStyle),
       ...redo ? { redo: true } : {},
       model: ((_a2 = settings.mapChatModel) == null ? void 0 : _a2.trim()) || settings.cliModel,

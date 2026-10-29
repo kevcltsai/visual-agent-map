@@ -13,7 +13,7 @@ const support = require('./support.cjs');
 const i18n = load('i18n.ts');
 const { LANGUAGES, OUTPUT_LANGUAGES } = load('i18n/languages.ts');
 const content = load('experiences/aim/content-language.ts');
-const { detectAimContentLanguage, chooseAimContentLanguage, resolveAimContentLanguage, selectionOutputLanguage, defaultOutputLanguage, outputLanguageForMap, noteLanguageFromBody } = content;
+const { detectAimContentLanguage, chooseAimContentLanguage, resolveAimContentLanguage, selectionOutputLanguage, defaultOutputLanguage, outputLanguageForMap, noteLanguageFromBody, mapChatLanguageSources } = content;
 // The clause without an anchor (nothing to quote), then the anchored one that names and quotes the user's own text (D-2026-10-94).
 const CLAUSE_EN = "the language in which the user's own text (topic, question or selection) is written (not the language of these instructions or of the fixed headings)";
 const CLAUSE_ZH = '使用者自己輸入的文字（主題、問題或選取文字）所使用的語言（不是這些指示或固定標題的語言）';
@@ -543,4 +543,74 @@ test('ticket 06: links, images, URLs and code are not counted; a lone Japanese l
   assert.equal(chooseAimContentLanguage('zh-TW', '```\nconst a = 1;\n東京ラーメンの旅に行きます。日本語を勉強しています'), 'ja', 'unclosed fence, Japanese after it');
   // Wiki links keep their text.
   assert.equal(chooseAimContentLanguage('zh-TW', '[[東京ラーメンガイド]]'), 'ja');
+});
+
+const JA_PARAGRAPH_07 = '日本の経済は長い間、低成長とデフレに悩まされてきました。しかし最近では、賃金の上昇や企業の投資拡大により、少しずつ明るい兆しが見え始めています。専門家は、今後の金融政策の動向が景気の回復に大きな影響を与えると指摘しています。一方で、物価の上昇が家計に与える負担も無視できません。政府は支援策を検討しており、国民の生活を守るための対応が求められています。さらに、地方の中小企業では人手不足が深刻になっており、働き方の見直しや新しい技術の導入が急がれています。';
+const chatLanguage07 = (ui, message, map = null) => outputLanguageForMap(map, ui, ...mapChatLanguageSources(message));
+
+test('ticket 07: a Chinese instruction before a blank line decides, not the long Japanese text pasted after it', () => {
+  assert.ok(JA_PARAGRAPH_07.length >= 200);
+  assert.equal(chatLanguage07('zh-TW', '幫我依照以下 ChatGPT 的回應產生一個心智圖：\n\n' + JA_PARAGRAPH_07), 'zh-TW');
+});
+
+test('ticket 07: an English instruction decides over a pasted Chinese article', () => {
+  assert.equal(chatLanguage07('zh-TW', 'Make a mind map from this article:\n\n' + '品味系統需要審美判斷，也需要取捨的判斷系統。'.repeat(10)), 'en');
+});
+
+test('ticket 07: no blank line means the whole message, same as chooseAimContentLanguage', () => {
+  for (const message of ['幫我整理這張圖的重點', '東京ラーメンの旅に行きます', 'line one\nline two 中文']) {
+    assert.equal(chatLanguage07('zh-TW', message), chooseAimContentLanguage('zh-TW', message), message);
+  }
+});
+
+test('ticket 07: an instruction without letters falls back to the whole text', () => {
+  assert.equal(chatLanguage07('zh-TW', '👇\n\n' + JA_PARAGRAPH_07), 'ja');
+  assert.equal(chatLanguage07('zh-TW', ':\n\n' + JA_PARAGRAPH_07), 'ja');
+});
+
+// The module is loaded in another realm, so its arrays are copied before deepEqual.
+const sourcesOf07 = message => Array.from(mapChatLanguageSources(message));
+
+test('ticket 07: a blank line with nothing after it is not a boundary', () => {
+  assert.deepEqual(sourcesOf07('東京ラーメン\n\n'), ['東京ラーメン\n\n']);
+});
+
+test('ticket 07: the diagnosis message (Chinese instruction, long Chinese text with Japanese and Russian links) is zh-TW', () => {
+  const head = '幫我依照以下chaptgpt 的回應產生一個心智圖:\n\n# 一、先講結論：v0.2 最大的問題，不是缺少原則，而是缺少取捨的判斷系統\n';
+  const jaLink = '[『push me pull you』澄 敬一 作品集 : くうろときろ                   essentials    ｜   古   ｜  周辺  ｜   栃木  ｜   茂呂　MORO  ｜ 古道具 ｜古物｜骨董｜プロダクト｜書籍｜アート](https://images.openai.com/static-rsc-4/eQcwB79?purpose=inline)\n';
+  const ruLink = '[Morning Reading Nook with Oak Chair & Travertine Table в 2025 г | Уголок для чтения, Уютный уголок, Нордический стиль](https://images.openai.com/static-rsc-4/SX3B?purpose=inline)\n';
+  const body = '你目前的文件是一份有明確價值觀的「產品哲學」，但還不是一套成熟的「個人品味系統」。\n'.repeat(120);
+  assert.equal(chatLanguage07('zh-TW', head + body + jaLink + ruLink), 'zh-TW');
+});
+
+test('ticket 07: mapChatLanguageSources returns [instruction, whole text] or [whole text]', () => {
+  const pasted = 'second paragraph';
+  assert.deepEqual(sourcesOf07('指示\n\n' + pasted), ['指示', '指示\n\n' + pasted]);
+  assert.deepEqual(sourcesOf07('指示\r\n\r\n' + pasted), ['指示', '指示\r\n\r\n' + pasted]);
+  assert.deepEqual(sourcesOf07('指示\n   \t\n' + pasted), ['指示', '指示\n   \t\n' + pasted]);
+  assert.deepEqual(sourcesOf07('只有一行'), ['只有一行']);
+  assert.deepEqual(sourcesOf07('第一行\n第二行'), ['第一行\n第二行']);
+  assert.deepEqual(sourcesOf07('👇\n\n' + pasted), ['👇\n\n' + pasted]);
+  assert.deepEqual(sourcesOf07(''), ['']);
+});
+
+test('ticket 07: a remembered map language still wins; a letterless instruction does not fall back to the interface', () => {
+  assert.equal(chatLanguage07('zh-TW', '請整理\n\n中文內容很長很長', { outputLanguage: 'ja' }), 'ja');
+  assert.equal(chatLanguage07('zh-TW', '👇\n\n' + JA_PARAGRAPH_07), 'ja');
+});
+
+test('ticket 07: a code block or a lone URL first is not the instruction; a blank line inside a fence is not a boundary', () => {
+  const code = '```js\nconst total = items.reduce((sum, item) => sum + item.price, 0);\n```';
+  const codeWithBlank = '```js\nconst a = 1;\n\nconst b = 2;\n```';
+  const ask = '請幫我解釋這段程式並畫成心智圖';
+  assert.equal(chatLanguage07('zh-TW', code + '\n\n' + ask), 'zh-TW');
+  assert.equal(chatLanguage07('zh-TW', codeWithBlank + '\n\n' + ask), 'zh-TW');
+  assert.deepEqual(sourcesOf07(codeWithBlank + '\n\n' + ask), [codeWithBlank + '\n\n' + ask]);
+  assert.deepEqual(sourcesOf07(ask + '\n\n' + codeWithBlank), [ask, ask + '\n\n' + codeWithBlank]);
+  assert.equal(chatLanguage07('zh-TW', 'https://example.com/a\n\n' + JA_PARAGRAPH_07), 'ja');
+});
+
+test('ticket 07: the map chat request takes its language from mapChatLanguageSources(message)', () => {
+  const view = fs.readFileSync(path.join(__dirname, '..', 'experiences', 'visual-map', 'view.ts'), 'utf8');
+  assert.ok(view.includes('outputLanguageForMap(map, settings.language, ...mapChatLanguageSources(message))'));
 });

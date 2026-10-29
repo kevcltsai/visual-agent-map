@@ -1955,6 +1955,17 @@ test('map chat E1: a reply past the element budget builds at most the budget, th
   assert.ok(el.children.indexOf(note) < el.children.indexOf(plain));
   assert.equal(nodes(el).filter(i => i.tag === 'a').length > 0, true, 'the start is still laid out');
 });
+test('map chat E1: a streamed reply past the element budget builds at most the budget while streaming and after finish (counted, not timed)', () => {
+  const { MAX_REPLY_NODES } = load('core/map-chat-render.ts');
+  const clock = frames(); const f = panelFixture({}, clock.window); f.panel.setOpen(true); const log = f.parts.log();
+  const text = DENSE_OVER_BUDGET + 'THE END';
+  const check = when => {
+    const body = replyBody2(log); const count = nodes(body).length - 1; assert.ok(count <= MAX_REPLY_NODES + FIXED, `${when}: ${count} elements`);
+    assert.ok(find(body, i => hasClass(i, 'vam-map-chat-plain')), `${when}: the rest is plain text`); assert.ok(find(body, i => hasClass(i, 'vam-map-chat-overflow-note')), `${when}: with the note`);
+  };
+  f.panel.begin('q'); f.panel.streamReply(text); clock.run(); check('streaming');
+  f.panel.finish(text, []); check('finished');
+});
 test('map chat E1: past the budget, lines and list items keep their line breaks in the plain block, and nothing is lost', () => {
   const lines = Array.from({ length: 5000 }, (_, i) => `- item *${i}* **x**`); const text = lines.join('\n');
   const el = layoutWith(text); assert.ok(nodes(el).length - 1 <= 2000 + FIXED);
@@ -2009,12 +2020,14 @@ test('map chat E1: chunks that arrive within one frame are laid out once, with t
   for (let round = 0; round < 4; round++) { f.panel.streamReply(text); f.panel.streamReply(text + ' more'); clock.run(); }
   assert.equal(layouts, 5, 'one layout per frame');
 });
-// Ratio of the streamed run to one inline parse (unit = mean of ten parses, median of five paired rounds). Measured here, five runs each:
-// unmodified 190 to 200 on a quiet machine and 105 to 125 with three busy loops per core; a 2,000,000 element budget 580 to 665 quiet and 440 to 580 loaded. 300 sits between.
-// This is the coarse gate for gross cost. Finer regressions are counted instead of timed, because they move the ratio too little to separate from load noise:
-// frame coalescing by 'chunks that arrive within one frame are laid out once' (layout for every chunk: 30 layouts instead of 1, fails 5 of 5 quiet and loaded)
-// and the row cache by 'a finished message keeps its row on every later repaint'.
-const STREAM_RATIO_LIMIT = 300;
+// Ratio of the streamed run to one inline parse (unit = mean of ten parses, about 45 ms in one timed block; median of five paired rounds).
+// This is a coarse net for an unforeseen large slowdown (the whole run about 8 times the work or more), not for a small one: unchanged code moves by about
+// 2 times with machine load alone (unmodified 190 to 200 quiet, 128 to 142 at load 4, 105 to 125 with three busy loops per core).
+// The known regressions are counted instead: the element budget by 'a reply past the element budget builds at most the budget' and 'a streamed reply past
+// the element budget builds at most the budget', frame coalescing by 'chunks that arrive within one frame are laid out once', the row cache by
+// 'a finished message keeps its row on every later repaint', and one parse per reply by 'E2: the cut is found while parsing'.
+// Every layout done 20 times over (empty, parse and build): 2330 to 2470 at load 4, 2190 to 3250 with one busy loop per core. The limit is 4 times the largest unchanged ratio.
+const STREAM_RATIO_LIMIT = 800;
 
 // ---- Packet E2: one parse for the cut, the view's own window, language, plain-text edges --------------------------------------------
 

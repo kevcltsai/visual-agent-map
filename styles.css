@@ -381,9 +381,9 @@ button.vam-relevance-tag-button:disabled { cursor: default; opacity: .7; }
 .vam-proposal.is-stale .vam-structure-note { color: color-mix(in srgb, var(--color-red) 75%, var(--text-normal)); }
 .vam-structure-apply { flex: 0 0 auto; }
 .vam-proposal-kind { flex: 0 0 auto; padding: 1px 8px; border-radius: var(--radius-s); font-size: var(--font-ui-smaller); color: var(--text-muted); background: var(--background-modifier-hover); }
-.vam-proposal-kind-add { color: var(--color-green); }
-.vam-proposal-kind-move { color: var(--color-blue); }
-.vam-proposal-kind-merge { color: var(--color-purple); }
+.vam-proposal-kind-add { color: color-mix(in srgb, var(--color-green) 50%, var(--text-normal)); }
+.vam-proposal-kind-move { color: color-mix(in srgb, var(--color-blue) 60%, var(--text-normal)); }
+.vam-proposal-kind-merge { color: color-mix(in srgb, var(--color-purple) 80%, var(--text-normal)); }
 .vam-proposal-kind-remove { color: color-mix(in srgb, var(--color-red) 75%, var(--text-normal)); }
 .vam-proposal-reason, .vam-proposal-destination { margin: 4px 0 0 26px; color: var(--text-muted); font-size: var(--font-ui-small); }
 .vam-proposal-head > input[hidden] { display: none; }
@@ -1276,7 +1276,7 @@ button.vam-template-section-header:hover { background: var(--background-modifier
 .markdown-rendered a.vam-link-scope.footnote-backref:hover { color: var(--text-normal); }
 /* Research progress: stage + seconds on the card, and the unsaved answer preview in the hover card. */
 .vam-research-stage { display: inline-block; max-width: 16em; overflow: hidden; text-overflow: ellipsis; vertical-align: bottom; }
-.vam-research-slow { color: var(--text-warning, var(--text-muted)); }
+.vam-research-slow { color: color-mix(in srgb, var(--text-warning, var(--text-muted)) 70%, var(--text-normal)); }
 .vam-hover-research-preview { margin: 0 0 10px; padding: 8px 10px; border: 1px dashed var(--background-modifier-border); border-radius: 8px; }
 .vam-hover-research-preview[hidden], .vam-hover-research-detail[hidden] { display: none; }
 .vam-hover-research-summary, .vam-hover-research-detail { margin-top: 4px; white-space: pre-wrap; overflow-wrap: anywhere; font-size: var(--vam-hover-body-size, 13px); line-height: var(--vam-hover-line-height, 1.45); color: var(--text-muted); }

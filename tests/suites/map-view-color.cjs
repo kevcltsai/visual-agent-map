@@ -41,13 +41,13 @@ body { margin: 0; width: 1200px; height: 800px; background: var(--background-pri
     ${card('data-relevance="core"', 20, 60, `<div class="vam-node-header">${tag('core', 'Core')}</div><div class="vam-node-tools" style="opacity:1;pointer-events:auto;transform:none"><button class="vam-node-tool vam-ai-explore">AI explore</button></div><h3 class="vam-card-title">Core topic</h3><p class="vam-card-summary">Summary</p>`)}
     ${card('data-relevance="side"', 340, 60, `<div class="vam-node-header">${tag('side', 'Skippable')}</div><h3 class="vam-card-title">Skippable topic</h3><p class="vam-card-summary">Summary of a skippable topic</p>`)}
     ${card('data-status="idea"', 20, 260, `<div class="vam-node-header"><span class="vam-status vam-status-idea">To research</span></div><h3 class="vam-card-title">Idea topic</h3><p class="vam-card-summary">Idea summary</p><p class="vam-card-summary is-preview">Preview summary</p><p class="vam-task-preview">Task preview text</p>`)}
-    ${card('data-status="error"', 340, 260, `<div class="vam-node-header"><span class="vam-status vam-status-error">Error</span><span class="vam-status">Plain</span><span class="vam-status vam-status-completed">Done</span><span class="vam-status vam-status-running">Running</span><span class="vam-status vam-status-queued">Queued</span></div><h3 class="vam-card-title">Failed topic</h3><p class="vam-card-error">Something failed</p>`)}
+    ${card('data-status="error"', 340, 260, `<div class="vam-node-header"><span class="vam-status vam-status-error">Error</span><span class="vam-status">Plain</span><span class="vam-status vam-status-completed">Done</span><span class="vam-status vam-status-running">Running</span><span class="vam-status vam-status-queued">Queued</span><span class="vam-status vam-research-slow">Slow</span></div><h3 class="vam-card-title">Failed topic</h3><p class="vam-card-error">Something failed</p>`)}
   </div>
   <div class="vam-canvas-overlay"><div class="vam-map-tools"><button class="is-active">Done selecting</button><button class="vam-relevance-goal">Prioritise by goal</button></div></div>
 </div>
 </div>
 <div class="modal vam-next-modal" style="background:var(--background-primary);width:400px"><div class="modal-content"><div class="vam-next-actions"><button class="vam-discard">Remove from map</button></div><div class="vam-share-note vam-share-warning">3 images could not be read</div><div class="vam-share-note vam-share-error">Share failed</div><div class="vam-share-error">Save failed</div>
-<div class="vam-proposal is-stale"><span class="vam-proposal-kind vam-proposal-kind-remove">Remove</span><p class="vam-structure-note">Out of date</p></div>
+<div class="vam-proposal is-stale"><span class="vam-proposal-kind vam-proposal-kind-remove">Remove</span><span class="vam-proposal-kind vam-proposal-kind-add">Add</span><span class="vam-proposal-kind vam-proposal-kind-move">Move</span><span class="vam-proposal-kind vam-proposal-kind-merge">Merge</span><p class="vam-structure-note">Out of date</p></div>
 <div class="vam-outline-error">Outline error</div><button class="vam-outline-link">Pick a file</button><span class="vam-danger-text">Danger</span><div class="vam-template-issue">Template issue</div>
 <div class="vam-field-head"><button class="vam-field-link">Learn more</button></div><div class="vam-quick-limits"><p class="vam-hint is-error">Limit error</p></div></div></div>
 <div id="chat-secondary"><div class="vam-map-chat"><div class="vam-map-chat-msg is-error"><span class="vam-map-chat-text">Chat error</span><div class="vam-map-chat-line is-failed">Failed line</div><div class="vam-map-chat-plan-warning">Plan warning</div><div class="vam-map-chat-plan-group is-danger"><span class="vam-map-chat-plan-group-title">Danger group</span></div><span class="vam-map-chat-count-failed">2 failed</span><div class="vam-map-chat-images-state is-inserted">Inserted</div><button class="vam-map-chat-lines-toggle">Show lines</button><button class="vam-map-chat-more">More</button></div></div></div>
@@ -93,6 +93,10 @@ const CASES = [
   ['share-error-note', '.vam-share-note.vam-share-error', 'color', 4.5],
   ['share-error', '.vam-share-error:not(.vam-share-note)', 'color', 4.5],
   ['structure-stale-note', '.vam-proposal.is-stale .vam-structure-note', 'color', 4.5],
+  ['structure-kind-add', '.vam-proposal-kind-add', 'color', 4.5],
+  ['structure-kind-move', '.vam-proposal-kind-move', 'color', 4.5],
+  ['structure-kind-merge', '.vam-proposal-kind-merge', 'color', 4.5],
+  ['research-slow', '.vam-research-slow', 'color', 4.5],
   ['structure-kind-remove', '.vam-proposal-kind-remove', 'color', 4.5],
   ['outline-error', '.vam-outline-error', 'color', 4.5],
   ['outline-link', '.vam-outline-link', 'color', 4.5, { buttonEnvelope: true }],

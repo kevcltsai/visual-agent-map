@@ -868,6 +868,17 @@ integrationTest('structure review entry: the root topic offers the whole map, a 
   assert.equal(opened, 1); assert.equal(modal.closeCount, 1);
 });
 
+integrationTest('structure review entry: hidden from the Next Step dialog (owner 2026-10-28), the review itself stays', async () => {
+  const h = await viewHarness({ suggestions: [] });
+  for (const id of [h.ids.root, h.ids.a]) {
+    const node = h.view.map.nodes.find(n => n.id === id);
+    assert.ok(h.view.structureReviewEntry(node), `still eligible: ${id}`);
+    assert.equal(h.view.nextStepStructureReview(node), undefined, `not offered: ${id}`);
+  }
+  h.view.openStructureReview(null);
+  assert.equal(h.opened.at(-1).constructor.name, 'StructureReviewModal');
+});
+
 // ---- Adversarial cases from the Phase C test pass: late results, cancelled confirms and entry points -------------
 const diffWorld = (a0, b0) => { const strip = j => JSON.stringify(JSON.parse(j).map(([k, v]) => [k, v.replace(/^updated: .*\n/gm, '').replace(/^updated: .*$/gm, '').replace(/^agent-map-id: .*\n/gm, '')])); const a = strip(a0), b = strip(b0); return diffWorld0(a, b); };
 const diffWorld0 = (a, b) => { const A = new Map(JSON.parse(a)), B = new Map(JSON.parse(b)); const out = []; for (const k of new Set([...A.keys(), ...B.keys()])) { if (!A.has(k)) out.push('ADDED ' + k); else if (!B.has(k)) out.push('MISSING ' + k); else if (A.get(k) !== B.get(k)) { const x = A.get(k).split('\n'), y = B.get(k).split('\n'); out.push('CHANGED ' + k + JSON.stringify([A.get(k).slice(0,400), B.get(k).slice(0,400)]) + ': ' + x.filter(l => !y.includes(l)).join(' | ') + ' => ' + y.filter(l => !x.includes(l)).join(' | ')); } } return out.join('\n'); };

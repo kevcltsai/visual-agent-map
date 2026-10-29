@@ -36188,6 +36188,7 @@ function aimQuestionStatus(map, questionNodeId, activeQuestionNodeId) {
 }
 var TASK_PROGRESS_PREFIX = "vam-task:";
 var MERGE_DONE_NOTICE_MS = 15e3;
+var STRUCTURE_REVIEW_ENTRY_SHOWN = false;
 var cardLabelSequence = 0;
 var cardLabels = /* @__PURE__ */ new WeakMap();
 var relevanceRunToken = 0;
@@ -37241,6 +37242,10 @@ ${request.requirements}` : preset.text,
     if (this.map.nodes.some((item) => item.parentId === node.id))
       return { label: t("ui.structure_review_entry_branch"), open: () => this.openStructureReview(node.id) };
     return void 0;
+  }
+  /** What the Next Step dialog offers; nothing while the entry is hidden (`STRUCTURE_REVIEW_ENTRY_SHOWN`). */
+  nextStepStructureReview(node) {
+    return STRUCTURE_REVIEW_ENTRY_SHOWN ? this.structureReviewEntry(node) : void 0;
   }
   /** The AI sees each card's title, summary and status only; never a note body. */
   describeForReview(id) {
@@ -42576,7 +42581,7 @@ ${request.requirements}` : preset.text,
               }
             };
           })(),
-          structureReview: this.structureReviewEntry(node),
+          structureReview: this.nextStepStructureReview(node),
           sources: sources2,
           templates: this.templateChoices(),
           tones: this.toneChoices(),

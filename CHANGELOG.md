@@ -1,5 +1,11 @@
 # Changelog
 
+## [Unreleased]
+
+### Changed
+
+- The AI Next Step dialog no longer offers "AI structure suggestions" (what to strengthen or cut). Use Research deeper, Expand, Integrate or Merge instead.
+
 ## [0.27.0] - 2026-10-26
 
 ### Talk to your map

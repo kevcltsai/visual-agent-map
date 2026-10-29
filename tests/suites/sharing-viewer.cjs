@@ -348,7 +348,7 @@ test('sharing viewer language: a translated file carries the interface text of e
 });
 
 /** Runs headless Chrome over CDP with the colour scheme pinned to light, so the DOM does not depend on the OS appearance. */
-async function dumpDomLight(chrome, directory, url, timeoutMs = 60000) {
+async function dumpDomLight(chrome, directory, url, timeoutMs = 60000, drive = undefined) {
   const profile = path.join(directory, 'profile');
   const child = spawn(chrome, ['--headless=new', '--disable-gpu', '--no-sandbox', '--remote-debugging-port=0', `--user-data-dir=${profile}`, '--window-size=1280,800', 'about:blank'], { stdio: 'ignore', detached: true }); // own process group, so cleanup can end Chrome's helper processes too
   let timer;
@@ -384,6 +384,10 @@ async function dumpDomLight(chrome, directory, url, timeoutMs = 60000) {
     await send('Page.navigate', { url });
     await loaded;
     await new Promise(resolve => setTimeout(resolve, 1500));
+    // `drive(send)` lets a test operate the page (real mouse and key events) and returns its own result instead of the DOM dump.
+    if (drive) {
+      try { return await drive(send); } finally { socket.close(); }
+    }
     const result = await send('Runtime.evaluate', { expression: 'document.documentElement.outerHTML', returnByValue: true });
     socket.close();
     return result.result.value;
@@ -417,6 +421,98 @@ test('sharing viewer language: a plain file shows exactly the P1 page (same DOM 
     const app = dom.slice(dom.indexOf('<div id="vam-app"'), dom.indexOf('<script type="application/json" id="vam-ui">')).trimEnd() + '\n';
     assert.equal(clean(app), clean(read('tests/fixtures/sharing/viewer-p1-app.html')));
     assert.match(dom, /<html lang="en">/);
+  } finally {
+    try { fs.rmSync(directory, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 }); } catch (error) { console.warn(`could not remove temp directory: ${error.message}`); }
+  }
+});
+
+test('sharing viewer collapse: the fold button is always visible and works by mouse and keyboard, then pan and zoom still work (headless Chrome)', async t => {
+  const candidates = [process.env.CHROME_BIN, '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome', '/usr/bin/google-chrome', '/usr/bin/google-chrome-stable', '/usr/bin/chromium'].filter(Boolean);
+  const chrome = candidates.find(file => fs.existsSync(file));
+  if (!chrome) return t.skip('no Chrome found (set CHROME_BIN)');
+  const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'vam-share-fold-'));
+  try {
+    const out = path.join(directory, 'fold.html');
+    execFileSync(process.execPath, [path.join(root, 'scripts', 'make-share-demo.mjs'), '--out', out, '--lang', 'en'], { cwd: root });
+    const report = await dumpDomLight(chrome, directory, pathToFileURL(out).href, 60000, async send => {
+      const evaluate = async expression => (await send('Runtime.evaluate', { expression, returnByValue: true })).result.value;
+      const nodes = () => evaluate('document.querySelectorAll(".vam-node").length');
+      const state = id => evaluate(`(() => { const c = document.querySelector('[data-node-id="${id}"]'); return c && { expanded: c.getAttribute('aria-expanded'), button: c.querySelector('.vam-collapse-button')?.textContent ?? null }; })()`);
+      const click = async selector => {
+        const point = await evaluate(`(() => { const r = document.querySelector(${JSON.stringify(selector)}).getBoundingClientRect(); return { x: r.left + r.width / 2, y: r.top + r.height / 2 }; })()`);
+        await send('Input.dispatchMouseEvent', { type: 'mouseMoved', ...point });
+        await send('Input.dispatchMouseEvent', { type: 'mousePressed', ...point, button: 'left', clickCount: 1 });
+        await send('Input.dispatchMouseEvent', { type: 'mouseReleased', ...point, button: 'left', clickCount: 1 });
+      };
+      const key = async (name, code) => {
+        await send('Input.dispatchKeyEvent', { type: name === 'Enter' ? 'keyDown' : 'rawKeyDown', key: name, code: name, windowsVirtualKeyCode: code, ...(name === 'Enter' ? { text: '\r' } : {}) });
+        await send('Input.dispatchKeyEvent', { type: 'keyUp', key: name, code: name, windowsVirtualKeyCode: code });
+      };
+      const focusCard = id => evaluate(`document.querySelector('[data-node-id="${id}"]').focus()`);
+      const stamp = id => evaluate(`document.querySelector('[data-node-id="${id}"]').__stamp = 1`);
+      const stamped = id => evaluate(`document.querySelector('[data-node-id="${id}"]')?.__stamp === 1`);
+      const transformOf = () => evaluate('document.querySelector(".vam-stage").style.transform');
+      const result = {};
+      const LEFT = 37, RIGHT = 39;
+      result.start = await nodes();
+      result.rootButton = await evaluate(`(() => { const b = document.querySelector('[data-node-id="root"] .vam-collapse-button'); return { inHeader: !!b.closest('.vam-node-header'), inTools: !!b.closest('.vam-node-tools'), opacity: getComputedStyle(b).opacity, label: b.getAttribute('aria-label'), title: b.title, text: b.textContent }; })()`);
+      // Mouse: collapse hides the children and does not open the side panel; the next click brings them back and keeps focus on the button.
+      await click('[data-node-id="root"] .vam-collapse-button');
+      result.mouseCollapsed = { nodes: await nodes(), root: await state('root'), inspectorHidden: await evaluate('document.querySelector(".vam-inspector").hidden') };
+      result.mouseCollapsedLabel = await evaluate(`document.querySelector('[data-node-id="root"] .vam-collapse-button').getAttribute('aria-label')`);
+      await click('[data-node-id="root"] .vam-collapse-button');
+      result.mouseExpanded = { nodes: await nodes(), root: await state('root'), inspectorHidden: await evaluate('document.querySelector(".vam-inspector").hidden'), focusOnButton: await evaluate(`document.activeElement === document.querySelector('[data-node-id="root"] .vam-collapse-button')`) };
+      // Keyboard on the card: ArrowLeft folds, a second ArrowLeft does nothing, ArrowRight unfolds.
+      await focusCard('root');
+      await key('ArrowLeft', LEFT);
+      result.keyCollapsed = { nodes: await nodes(), root: await state('root') };
+      await stamp('root');
+      await key('ArrowLeft', LEFT);
+      result.keyCollapsedAgain = { nodes: await nodes(), root: await state('root'), same: await stamped('root') };
+      await key('ArrowRight', RIGHT);
+      result.keyExpanded = { nodes: await nodes(), root: await state('root') };
+      // A card with no sub-topics: both arrows do nothing and there is no fold button.
+      await focusCard('heat');
+      await key('ArrowRight', RIGHT);
+      result.heatOpened = await nodes();
+      const leaf = await evaluate(`(() => { const c = Array.from(document.querySelectorAll('.vam-node')).find(card => !card.hasAttribute('aria-expanded')); return c && c.dataset.nodeId; })()`);
+      result.leaf = leaf;
+      await stamp(leaf);
+      await focusCard(leaf);
+      await key('ArrowLeft', LEFT);
+      await key('ArrowRight', RIGHT);
+      result.leafAfter = { nodes: await nodes(), same: await stamped(leaf), buttons: await evaluate(`document.querySelectorAll('[data-node-id="${leaf}"] .vam-collapse-button').length`) };
+      // Keyboard on the button itself: it is a native button, so Enter folds it and focus comes back to the new button.
+      await evaluate(`document.querySelector('[data-node-id="root"] .vam-collapse-button').focus()`);
+      await key('Enter', 13);
+      result.enterCollapsed = { nodes: await nodes(), root: await state('root'), focusOnButton: await evaluate(`document.activeElement === document.querySelector('[data-node-id="root"] .vam-collapse-button')`) };
+      // With the map folded, zoom and pan still move the stage.
+      const before = await transformOf();
+      await click('.vam-zoom-controls button[aria-label="Zoom in"]');
+      result.zoomed = (await transformOf()) !== before;
+      const beforePan = await transformOf();
+      const area = await evaluate(`(() => { const r = document.querySelector('.vam-viewport').getBoundingClientRect(); return { x: r.left + r.width * 0.5, y: r.bottom - 120 }; })()`);
+      await send('Input.dispatchMouseEvent', { type: 'mouseMoved', ...area });
+      await send('Input.dispatchMouseEvent', { type: 'mousePressed', ...area, button: 'left', clickCount: 1 });
+      await send('Input.dispatchMouseEvent', { type: 'mouseMoved', x: area.x + 60, y: area.y - 40, button: 'left' });
+      await send('Input.dispatchMouseEvent', { type: 'mouseReleased', x: area.x + 60, y: area.y - 40, button: 'left', clickCount: 1 });
+      result.panned = (await transformOf()) !== beforePan;
+      return result;
+    });
+    assert.equal(report.start, 4);
+    assert.deepEqual(report.rootButton, { inHeader: true, inTools: false, opacity: '1', label: 'Collapse', title: 'Collapse', text: 'Collapse' }, 'the open card shows its fold button in the header without hover or focus');
+    assert.deepEqual(report.mouseCollapsed, { nodes: 1, root: { expanded: 'false', button: 'Expand 11' }, inspectorHidden: true });
+    assert.equal(report.mouseCollapsedLabel, 'Expand 11');
+    assert.deepEqual(report.mouseExpanded, { nodes: 4, root: { expanded: 'true', button: 'Collapse' }, inspectorHidden: true, focusOnButton: true });
+    assert.deepEqual(report.keyCollapsed, { nodes: 1, root: { expanded: 'false', button: 'Expand 11' } });
+    assert.deepEqual(report.keyCollapsedAgain, { nodes: 1, root: { expanded: 'false', button: 'Expand 11' }, same: true }, 'ArrowLeft on a folded card changes nothing');
+    assert.deepEqual(report.keyExpanded, { nodes: 4, root: { expanded: 'true', button: 'Collapse' } });
+    assert.ok(report.heatOpened > 4, 'ArrowRight opens a folded card');
+    assert.ok(report.leaf, 'the demo has a card without sub-topics');
+    assert.deepEqual(report.leafAfter, { nodes: report.heatOpened, same: true, buttons: 0 }, 'arrows on a card without sub-topics do nothing');
+    assert.deepEqual(report.enterCollapsed, { nodes: 1, root: { expanded: 'false', button: 'Expand 11' }, focusOnButton: true });
+    assert.equal(report.zoomed, true, 'zoom works after folding');
+    assert.equal(report.panned, true, 'dragging empty space pans after folding');
   } finally {
     try { fs.rmSync(directory, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 }); } catch (error) { console.warn(`could not remove temp directory: ${error.message}`); }
   }

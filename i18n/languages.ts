@@ -165,8 +165,9 @@ export const FOLLOW_INPUT_ID = "same-as-input";
 
 const KANA = /[\p{Script=Hiragana}\p{Script=Katakana}\u30FC]/gu;
 /**
- * Smallest share of kana among kana plus Han for Japanese (0.28 ticket 06, D-2026-10-<待填>): Chinese text that quotes a
- * little Japanese (a link title, a katakana word, ー as a dash) stays far below it, a Japanese sentence stays above.
+ * Smallest share of kana among kana plus Han for Japanese (0.28 ticket 06, decision 2026-10-30-language-detect-ratio#1):
+ * Chinese text that quotes a little Japanese (a link title, a katakana word, ー as a dash) stays far below it, a Japanese
+ * sentence stays above.
  */
 const JAPANESE_KANA_SHARE = 0.25;
 /**
